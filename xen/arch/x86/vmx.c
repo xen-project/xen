@@ -38,6 +38,9 @@
 int vmcs_size;
 unsigned int opt_vmx_debug_level;
 
+extern long evtchn_send(int lport);
+extern long do_block(void);
+
 int start_vmx()
 {
     struct vmcs_struct *vmcs;
@@ -306,9 +309,6 @@ static void vmx_io_instruction(struct xen_regs *regs,
     ioreq_t *p;
     unsigned long addr;
     unsigned long eip;
-
-    extern long evtchn_send(int lport);
-    extern long do_block(void);
 
     __vmread(GUEST_EIP, &eip);
 
@@ -618,7 +618,6 @@ static inline void vmx_do_msr_read(struct xen_regs *regs)
  */
 static inline void vmx_vmexit_do_hlt()
 {
-    extern long do_block(void);
 #if VMX_DEBUG
     unsigned long eip;
     __vmread(GUEST_EIP, &eip);

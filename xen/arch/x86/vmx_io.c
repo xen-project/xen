@@ -30,6 +30,8 @@
 #include <xen/event.h>
 #include <public/io/ioreq.h>
 
+extern long do_block();
+
 void vmx_io_assist(struct exec_domain *ed) 
 {
     vcpu_iodata_t *vio;
@@ -37,7 +39,6 @@ void vmx_io_assist(struct exec_domain *ed)
     struct domain *d = ed->domain;
     execution_context_t *ec = get_execution_context();
     unsigned long old_eax;
-    extern long do_block();
     unsigned long eflags;
     int dir;
 
@@ -208,8 +209,6 @@ void vmx_intr_assist(struct exec_domain *d)
 
 void vmx_do_resume(struct exec_domain *d) 
 {
-    extern long do_block();
-
     __vmwrite(HOST_CR3, pagetable_val(d->mm.monitor_table));
     __vmwrite(GUEST_CR3, pagetable_val(d->mm.shadow_table));
     __vmwrite(HOST_ESP, (unsigned long) get_stack_top());
