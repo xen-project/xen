@@ -289,7 +289,7 @@ test_all_events:
         movw %ax,TRAPBOUNCE_cs(%edx)
         movw $TBF_INTERRUPT,TRAPBOUNCE_flags(%edx)
         call create_bounce_frame
-        movl DOMAIN_shared_info(%ebx),%eax
+        movl EDOMAIN_vcpu_info(%ebx),%eax
         movb $1,VCPUINFO_upcall_mask(%eax) # Upcalls are masked during delivery
         jmp  restore_all_guest
 
