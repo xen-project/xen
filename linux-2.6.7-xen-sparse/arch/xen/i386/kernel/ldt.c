@@ -71,6 +71,9 @@ static int alloc_ldt(mm_context_t *pc, int mincount, int reload)
 #endif
 	}
 	if (oldsize) {
+		make_pages_writeable(oldldt, (oldsize * LDT_ENTRY_SIZE) /
+			PAGE_SIZE);
+		flush_page_update_queue();
 		if (oldsize*LDT_ENTRY_SIZE > PAGE_SIZE)
 			vfree(oldldt);
 		else
