@@ -7,11 +7,9 @@
  * after some fixed timeout). Conversely, work queues are a (slightly) neater
  * way of deferring work to a process context than using task queues in 2.4.
  * 
- * So, what we do here is a bit weird:
- *  1. On 2.4, we emulate work queues over task queues.
- *  2. On 2.6, we emulate task queues over work queues.
- * 
- * Note how much harder the latter is. :-)
+ * This is a bit of a needless reimplementation -- should have just pulled
+ * the code from 2.4, but I tried leveraging work queues to simplify things.
+ * They didn't help. :-(
  */
 
 #ifndef __QUEUES_H__
@@ -22,19 +20,19 @@
 #include <linux/workqueue.h>
 
 struct tq_struct { 
-    struct work_struct work;
-    struct list_head   list;
-    unsigned long      pending;
+    void (*fn)(void *);
+    void *arg;
+    struct list_head list;
+    unsigned long pending;
 };
 #define INIT_TQUEUE(_name, _fn, _arg)               \
     do {                                            \
         INIT_LIST_HEAD(&(_name)->list);             \
         (_name)->pending = 0;                       \
-        INIT_WORK(&(_name)->work, (_fn), (_arg));   \
+        (_name)->fn = (_fn); (_name)->arg = (_arg); \
     } while ( 0 )
-#define DECLARE_TQUEUE(_name, _fn, _arg)                                    \
-    struct tq_struct _name = { __WORK_INITIALIZER((_name).work, _fn, _arg), \
-                               LIST_HEAD_INIT((_name).list), 0 }
+#define DECLARE_TQUEUE(_name, _fn, _arg)            \
+    struct tq_struct _name = { (_fn), (_arg), LIST_HEAD_INIT((_name).list), 0 }
 
 typedef struct {
     struct list_head list;
@@ -59,6 +57,8 @@ static inline void run_task_queue(task_queue *tql)
     struct list_head head, *ent;
     struct tq_struct *tqe;
     unsigned long flags;
+    void (*fn)(void *);
+    void *arg;
 
     spin_lock_irqsave(&tql->lock, flags);
     list_add(&head, &tql->list);
@@ -70,8 +70,11 @@ static inline void run_task_queue(task_queue *tql)
         ent = head.next;
         list_del_init(ent);
         tqe = list_entry(ent, struct tq_struct, list);
-        wmb(); tqe->pending = 0;
-        schedule_work(&tqe->work);
+        fn  = tqe->fn;
+        arg = tqe->arg;
+        wmb();
+        tqe->pending = 0;
+        fn(arg);
     }
 }
 
