@@ -230,7 +230,7 @@ static int __pminit setup_p4_watchdog(void)
     return 1;
 }
 
-void __pminit setup_apic_nmi_watchdog (void)
+void __pminit setup_apic_nmi_watchdog(void)
 {
     if (!nmi_watchdog)
         return;

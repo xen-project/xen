@@ -1,22 +1,15 @@
 /* -*-  Mode:C; c-basic-offset:4; tab-width:4 -*-
  ****************************************************************************
- * (C) 2002 - Rolf Neugebauer - Intel Research Cambridge
+ * (C) 2002-2003 - Rolf Neugebauer - Intel Research Cambridge
+ * (C) 2002-2003 University of Cambridge
  ****************************************************************************
  *
- *        File: schedule.c
- *      Author: Rolf Neugebauer (neugebar@dcs.gla.ac.uk)
- *     Changes: 
- *              
- *        Date: Nov 2002
+ *        File: common/schedule.c
+ *      Author: Rolf Neugebar & Keir Fraser
  * 
- * Environment: Xen Hypervisor
  * Description: CPU scheduling
  *              implements A Borrowed Virtual Time scheduler.
  *              (see Duda & Cheriton SOSP'99)
- *
- ****************************************************************************
- * $Id: c-insert.c,v 1.7 2002/11/08 16:04:34 rn Exp $
- ****************************************************************************
  */
 
 #include <xeno/config.h>
@@ -39,20 +32,16 @@
 #define TRC(_x)
 #endif
 
-#define SCHED_HISTO
+/*#define SCHED_HISTO*/
 #ifdef SCHED_HISTO
 #define BUCKETS 31
 #endif
 
+#define MCU            (s32)MICROSECS(100)    /* Minimum unit */
+#define MCU_ADVANCE    10                     /* default weight */
+#define TIME_SLOP      (s32)MICROSECS(50)     /* allow time to slip a bit */
+static s32 ctx_allow = (s32)MILLISECS(5);     /* context switch allowance */
 
-#define MCU          (s32)MICROSECS(100)    /* Minimum unit */
-#define MCU_ADVANCE  10                     /* default weight */
-#define TIME_SLOP    (s32)MICROSECS(50)     /* allow time to slip a bit */
-static s32 ctx_allow=(s32)MILLISECS(5);     /* context switch allowance */
-
-/*****************************************************************************
- * per CPU data for the scheduler.
- *****************************************************************************/
 typedef struct schedule_data_st
 {
     spinlock_t          lock;           /* lock for protecting this */
@@ -64,61 +53,59 @@ typedef struct schedule_data_st
 #ifdef SCHED_HISTO
     u32                 hist[BUCKETS];  /* for scheduler latency histogram */
 #endif
-
 } __cacheline_aligned schedule_data_t;
 schedule_data_t schedule_data[NR_CPUS];
 
-struct ac_timer     v_timer;        /* scheduling timer  */
+struct ac_timer v_timer;        /* scheduling timer  */
 static void virt_timer(unsigned long foo);
 static void dump_rqueue(struct list_head *queue, char *name);
 
 
-/*****************************************************************************
- * Some convenience functions
- *****************************************************************************/
-/* add a task to the head of the runqueue */
 static inline void __add_to_runqueue_head(struct task_struct * p)
-{
-    
+{    
     list_add(&p->run_list, &schedule_data[p->processor].runqueue);
 }
-/* add a task to the tail of the runqueue */
+
 static inline void __add_to_runqueue_tail(struct task_struct * p)
 {
     list_add_tail(&p->run_list, &schedule_data[p->processor].runqueue);
 }
 
-/* remove a task from runqueue  */
 static inline void __del_from_runqueue(struct task_struct * p)
 {
     list_del(&p->run_list);
     p->run_list.next = NULL;
 }
-/* is task on run queue?  */
+
 static inline int __task_on_runqueue(struct task_struct *p)
 {
-    return (p->run_list.next != NULL);
+    return p->run_list.next != NULL;
 }
 
 #define next_domain(p) \\
         list_entry((p)->run_list.next, struct task_struct, run_list)
 
-/* calculate evt  */
 static void __calc_evt(struct task_struct *p)
 {
     s_time_t now = NOW();
-    if (p->warpback) {
-        if (((now - p->warped) < p->warpl) &&
-            ((now - p->uwarped) > p->warpu)) {
+    if ( p->warpback ) 
+    {
+        if ( ((now - p->warped) < p->warpl) &&
+             ((now - p->uwarped) > p->warpu) )
+        {
             /* allowed to warp */
             p->evt = p->avt - p->warp;
-        } else {
+        } 
+        else 
+        {
             /* warped for too long -> unwarp */
             p->evt      = p->avt;
             p->uwarped  = now;
             p->warpback = 0;
         }
-    } else {
+    } 
+    else 
+    {
         p->evt = p->avt;
     }
 }
@@ -132,11 +119,14 @@ void sched_add_domain(struct task_struct *p)
     p->state       = TASK_SUSPENDED;
     p->mcu_advance = MCU_ADVANCE;
 
-    if (p->domain == IDLE_DOMAIN_ID) {
+    if ( p->domain == IDLE_DOMAIN_ID )
+    {
         p->avt = 0xffffffff;
         p->evt = 0xffffffff;
         schedule_data[p->processor].idle = p;
-    } else {
+    } 
+    else 
+    {
         /* set avt end evt to system virtual time */
         p->avt         = schedule_data[p->processor].svt;
         p->evt         = schedule_data[p->processor].svt;
@@ -151,6 +141,19 @@ void sched_add_domain(struct task_struct *p)
 void sched_rem_domain(struct task_struct *p) 
 {
     p->state = TASK_DYING;
+}
+
+
+void init_idle_task(void)
+{
+    unsigned long flags;
+    struct task_struct *p = current;
+    spin_lock_irqsave(&schedule_data[p->processor].lock, flags);
+    p->has_cpu = 1;
+    p->state = TASK_RUNNING;
+    if ( !__task_on_runqueue(p) )
+        __add_to_runqueue_head(p);
+    spin_unlock_irqrestore(&schedule_data[p->processor].lock, flags);
 }
 
 

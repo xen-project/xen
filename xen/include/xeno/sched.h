@@ -271,6 +271,7 @@ void sched_rem_domain(struct task_struct *p);
 long sched_bvtctl(unsigned long ctx_allow);
 long sched_adjdom(int dom, unsigned long mcu_adv, unsigned long warp, 
                   unsigned long warpl, unsigned long warpu);
+void init_idle_task(void);
 int  wake_up(struct task_struct *p);
 long schedule_timeout(long timeout);
 long do_yield(void);
