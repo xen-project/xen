@@ -37,8 +37,8 @@
     if ( !(_p) ) { printk("Assertion '%s' failed, line %d, file %s", #_p , \
     __LINE__, __FILE__); *(int*)0=0; }
 #define DPRINTK(_f, _a...) printk(KERN_ALERT \
-                           "(file=%s, line=%d, eip=%08lx) " _f "\n", \
-                           __FILE__ , __LINE__ , eip, ## _a )
+                           "(file=%s, line=%d) " _f "\n", \
+                           __FILE__ , __LINE__ , ## _a )
 #else
 #define ASSERT(_p) ((void)0)
 #define DPRINTK(_f, _a...) ((void)0)
@@ -138,6 +138,28 @@ static unsigned char insn_decode[256] = {
     O, O, O, O, O, O, O|M, X
 };
 
+/* Bitmap of faulting instructions that we can handle. */
+static unsigned char handleable_code[32] = {
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    /* 0x80-0x83, 0x89, 0x8B */
+    0x0F, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    /* 0xC7 */
+    0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+};
+
+/* Bitmap of opcodes that use a register operand specified by Mod/RM. */
+static unsigned char opcode_uses_reg[32] = {
+    /* 0x00 - 0x3F */
+    0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F,
+    /* 0x40 - 0x7F */
+    0x00, 0x00, 0x00, 0x00, 0x0C, 0x0A, 0x00, 0x00,
+    /* 0x80 - 0xBF */
+    0xF0, 0x2F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    /* 0xC0 - 0xFF */
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+};
+
 static unsigned int parse_insn(unsigned char *insn, 
                                unsigned char *p_opcode,
                                unsigned char *p_decode)
@@ -188,27 +210,61 @@ static unsigned int parse_insn(unsigned char *insn,
     return ((pb - insn) + 1 + (d & INSN_SUFFIX_BYTES));
 }
 
-/* Bitmap of faulting instructions that we can handle. */
-static unsigned char handleable_code[32] = {
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    /* 0x80-0x83, 0x89, 0x8B */
-    0x0F, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    /* 0xC7 */
-    0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-};
+/*
+ * Mainly this function checks that our patches can't erroneously get flushed
+ * to a file on disc, which would screw us after reboot!
+ */
+static int safe_to_patch(unsigned long addr)
+{
+    struct mm_struct      *mm = current->mm;
+    struct vm_area_struct *vma;
+    struct file           *file;
+    unsigned char          _name[30], *name;
 
-/* Bitmap of opcodes that use a register operand specified by Mod/RM. */
-static unsigned char opcode_uses_reg[32] = {
-    /* 0x00 - 0x3F */
-    0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F,
-    /* 0x40 - 0x7F */
-    0x00, 0x00, 0x00, 0x00, 0x0C, 0x0A, 0x00, 0x00,
-    /* 0x80 - 0xBF */
-    0xF0, 0x2F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    /* 0xC0 - 0xFF */
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-};
+    /* Always safe to patch the fixup buffer. */
+    if ( addr <= (FIXUP_BUF_USER + FIXUP_BUF_SIZE) )
+        return 1;
+
+    down_read(&mm->mmap_sem);
+
+    if ( (vma = find_vma(current->mm, addr)) == NULL )
+    {
+        DPRINTK("No VMA contains fault address.");
+        goto fail;
+    }
+
+    /* No backing file, so safe to patch. */
+    if ( (file = vma->vm_file) == NULL )
+        goto success;
+
+    /* No shared mappings => nobody can dirty the file. */
+    /* XXX Note the assumption that noone will dirty the file in future! */
+    if ( file->f_mapping->i_mmap_writable != 0 )
+    {
+        DPRINTK("Shared mappings exist.");
+        goto fail;
+    }
+
+    /*
+     * Because of above dodgy assumption, we will only patch things in
+     * /lib/tls. Our belief is that updates here will only ever occur by
+     * unlinking the old files and installing completely fresh ones. :-)
+     */
+    name = d_path(file->f_dentry, file->f_vfsmnt, _name, sizeof(_name));
+    if ( strncmp("/lib/tls", name, 8) != 0 )
+    {
+        DPRINTK("Backing file is not in /lib/tls");
+        goto fail;
+    }
+
+ success:
+    up_read(&mm->mmap_sem);
+    return 1;
+
+ fail:
+    up_read(&mm->mmap_sem);
+    return 0;
+}
 
 asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
 {
@@ -219,6 +275,7 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
     unsigned char b[20], modrm, mod, reg, rm, sib, patch[20], opcode, decode;
     unsigned long eip = regs->eip - insn_len;
     struct fixup_entry *fe;
+    struct page *page;
     pte_t *pte;
     pmd_t *pmd;
     pgd_t *pgd;
@@ -231,26 +288,8 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
         return;
     }
 
-    if ( unlikely(eip >= (PAGE_OFFSET-32)) )
-    {
-        DPRINTK("User executing out of kernel space?!");
+    if ( unlikely(!safe_to_patch(eip)) )
         return;
-    }
-
-    /*
-     * Check that the page to be patched is part of a private VMA. This 
-     * means that our patch will never erroneously get flushed to disc.
-     */
-    if ( eip > (FIXUP_BUF_USER + FIXUP_BUF_SIZE) ) /* don't check fixup area */
-    {
-        /* [SMP] Need to grab the mmap_sem semaphore. */
-        struct vm_area_struct *vma = find_vma(current->mm, eip);
-        if ( (vma == NULL) || (vma->vm_flags & VM_MAYSHARE) )
-        {
-            DPRINTK("Cannot patch a shareable VMA.");
-            return;
-        }
-    }
 
     if ( unlikely(copy_from_user(b, (void *)eip, sizeof(b)) != 0) )
     {
@@ -591,6 +630,17 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
     for ( i = 5; i < fe->patched_code_len; i++ )
         patch[i] = 0x90; /* nop */
 
+    /* Find the physical page that is to be patched. Check it isn't dirty. */
+    pgd = pgd_offset(current->mm, eip);
+    pmd = pmd_offset(pgd, eip);
+    pte = pte_offset_kernel(pmd, eip);
+    page = pte_page(*pte);
+    if ( unlikely(PageDirty(page)) )
+    {
+        DPRINTK("Page is already dirty.");
+        return;
+    }
+
     if ( put_user(eip + PATCH_LEN, (unsigned long *)regs->esp - 1) != 0 )
     {
         DPRINTK("Failed to place return address on user stack.");
@@ -602,12 +652,9 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
     regs->eip = FIXUP_BUF_USER + fe->return_idx;
 
     /* [SMP] Need to pause other threads while patching. */
-    pgd = pgd_offset(current->mm, eip);
-    pmd = pmd_offset(pgd, eip);
-    pte = pte_offset_kernel(pmd, eip);
-    veip = kmap(pte_page(*pte));
+    veip = kmap(page);
     memcpy((char *)veip + (eip & ~PAGE_MASK), patch, fe->patched_code_len);
-    kunmap(pte_page(*pte));
+    kunmap(page);
 
     return;
 }
