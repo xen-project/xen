@@ -14,11 +14,6 @@ import sxp
 import XendDB
 import EventServer; eserver = EventServer.instance()
 
-from xen.xend.packing import SxpPacker, SxpUnpacker
-from xen.xend import XendDomain
-xd = XendDomain.instance()
-
-
 XFRD_PORT = 8002
 
 XFR_PROTO_MAJOR = 1
@@ -27,55 +22,63 @@ XFR_PROTO_MINOR = 0
 class Migrate(Protocol):
 
     def __init__(self, minfo):
-        self.packer = None
-        self.unpacker = None
+        self.parser = sxp.Parser()
         self.minfo = minfo
 
     def connectionMade(self):
-        self.packer = SxpPacker(self.transport)
-        self.unpacker = SxpPacker()
         # Send hello.
-        self.packer.pack(['xfr.hello', XFR_PROTO_MAJOR, XFR_PROTO_MINOR])
+        self.request(['xfr.hello', XFR_PROTO_MAJOR, XFR_PROTO_MINOR])
         # Send migrate.
         vmconfig = self.minfo.vmconfig()
         if not vmconfig:
             self.loseConnection()
             return
-        self.packer.pack(['xfr.migrate',
-                          self.minfo.src_dom,
-                          vmconfig,
-                          self.minfo.dst_host,
-                          self.minfo.dst_port])
+        self.request(['xfr.migrate',
+                      self.minfo.src_dom,
+                      vmconfig,
+                      self.minfo.dst_host,
+                      self.minfo.dst_port])
+
+    def request(self, req):
+        sxp.show(req, out=self.transport)
+        self.transport.write(' \n')
+
+    def loseConnection(self):
+        self.transport.loseConnection()
 
     def connectionLost(self, reason):
         self.minfo.closed(reason)
 
-    def dataReceived(self, data):
-        try:
-            self.unpacker.reset(data)
-            val = self.unpacker.unpack()
-            print 'dataReceived>', 'val=', val
-            op = val[0]
-            op.replace('.', '_')
-            if op.startwith('xfr_'):
-                fn = getattr(self, op, self.unknown)
-            else:
-                fn = self.unknown
-            fn(val)
-        except Exception, ex:
-            print 'dataReceived>', ex
-            pass
+    def dispatch(self, val):
+        op = sxp.name(val)
+        op = op.replace('.', '_')
+        if op.startswith('xfr_'):
+            fn = getattr(self, op, self.unknown)
+        else:
+            fn = self.unknown()
+        fn(val)
 
+    def dataReceived(self, data):
+        self.parser.input(data)
+        if self.parser.ready():
+            val = self.parser.get_val()
+            self.dispatch(val)
+        if self.parser.at_eof():
+            self.loseConnection()
+            
     def unknown(self, val):
         print 'unknown>', val
 
     def xfr_progress(self, val):
         print 'xfr_progress>', val
 
-    def xfr_error(self, val):
+    def xfr_err(self, val):
         # If we get an error with non-zero code the migrate failed.
         # An error with code zero indicates hello success.
-        err = int(val[1])
+        print 'xfr_err>', val
+        v = sxp.child(val)
+        print 'xfr_err>', type(v), v
+        err = int(sxp.child(val))
         if not err: return
         self.minfo.error(err);
         self.loseConnection()
@@ -83,14 +86,15 @@ class Migrate(Protocol):
     def xfr_ok(self, val):
         # An ok indicates migrate completed successfully, and contains
         # the new domain id on the remote system.
-        dom = int(val[1])
+        print 'xfr_ok>', val
+        dom = int(sxp.child(val))
         self.minfo.ok(dom)
         self.loseConnection()
 
 class MigrateClientFactory(ClientFactory):
 
     def __init__(self, minfo):
-        ClientFactory.__init__(self)
+        #ClientFactory.__init__(self)
         self.minfo = minfo
 
     def startedConnecting(self, connector):
@@ -116,7 +120,7 @@ class XendMigrateInfo:
         self.state = 'begin'
         self.src_host = socket.gethostname()
         self.src_dom = dom
-        self.dst_host = dst
+        self.dst_host = host
         self.dst_port = port
         self.dst_dom = None
         self.start = 0
@@ -139,12 +143,18 @@ class XendMigrateInfo:
         return sxpr
 
     def vmconfig(self):
-        dominfo = xd.domain_get(self.dom)
+        print 'vmconfig>'
+        from xen.xend import XendDomain
+        xd = XendDomain.instance()
+
+        dominfo = xd.domain_get(self.src_dom)
+        print 'vmconfig>', type(dominfo), dominfo
         if dominfo:
-            val = return sxp.to_string(dominfo)
+            val = sxp.to_string(dominfo.sxpr())
         else:
             val = None
-        return None
+        print 'vmconfig<', 'val=', type(val), val
+        return val
 
     def error(self, err):
         self.state = 'error'
@@ -153,7 +163,7 @@ class XendMigrateInfo:
         self.state = 'ok'
         self.dst_dom = dom
 
-    def close(self):
+    def closed(self, reason=None):
         if self.state =='ok':
             eserver.inject('xend.migrate.ok', self.sxpr())
         else:
@@ -208,15 +218,15 @@ class XendMigrate:
     def migrate_get(self, id):
         return self.migrate.get(id)
     
-    def migrate_begin(self, dom, host):
+    def migrate_begin(self, dom, host, port=XFRD_PORT):
         # Check dom for existence, not migrating already.
         # Subscribe to migrate notifications (for updating).
         id = self.nextid()
-        info = XenMigrateInfo(id, dom, host, XFRD_PORT)
+        info = XendMigrateInfo(id, dom, host, port)
         self._add_migrate(id, info)
         mcf = MigrateClientFactory(info)
         reactor.connectTCP('localhost', XFRD_PORT, mcf)
-        return info.deferred
+        return info
 
 def instance():
     global inst

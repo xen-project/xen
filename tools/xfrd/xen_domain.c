@@ -38,7 +38,7 @@ int xen_domain_snd(Conn *xend, IOStream *io, uint32_t dom, char *vmconfig, int v
         if(d > buf_n) d = buf_n;
         err = marshal_bytes(io, buf, d);
         if(err) goto exit;
-        //dprintf("> k=%d n=%d\n", k, n);
+        dprintf("> k=%d n=%d\n", k, n);
     }
     
   exit:
@@ -68,7 +68,7 @@ int xen_domain_rcv(IOStream *io, uint32_t *dom, char **vmconfig, int *vmconfig_n
         if(d > buf_n) d = buf_n;
         err = unmarshal_bytes(io, buf, d);
         if(err) goto exit;
-        //dprintf("> k=%d n=%d\n", k, n);
+        dprintf("> k=%d n=%d\n", k, n);
     }
   exit:
 #else    

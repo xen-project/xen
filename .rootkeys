@@ -296,6 +296,8 @@
 40e9808e99OcM547cKMTfmCVSoWVAw tools/xfrd/select.h
 40e9808e5_PLdodqVOSx0b4T_f5aeg tools/xfrd/sxpr.c
 40e9808e0O4sHZtkDv5hlSqjYcdQAQ tools/xfrd/sxpr.h
+40ec1cc6SIiGbynOi-1NtPesOlzF-Q tools/xfrd/sxpr_parser.c
+40ec1cc6wpvvGxZiq4EFvNOcw0tUFg tools/xfrd/sxpr_parser.h
 40e9808eF3NVldqRNS5IHM8gbFAvpw tools/xfrd/xdr.c
 40e9808ezXzoRHm7pybXU69NtnjimA tools/xfrd/xdr.h
 40e9808edpUtf4bJ8IbqClPJj_OvbA tools/xfrd/xen_domain.c
