@@ -17,7 +17,8 @@
 
 EXPORT_SYMBOL(__dev_alloc_skb);
 
-static kmem_cache_t *skbuff_cachep;
+/* Referenced in netback.c. */
+/*static*/ kmem_cache_t *skbuff_cachep;
 
 struct sk_buff *__dev_alloc_skb(unsigned int length, int gfp_mask)
 {
