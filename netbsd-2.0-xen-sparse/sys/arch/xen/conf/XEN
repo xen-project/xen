@@ -13,7 +13,6 @@ maxusers	32		# estimated number of users
 #
 options		XEN
 #options		DOM0OPS
-options		HZ=50
 
 #options 	I586_CPU
 options 	I686_CPU

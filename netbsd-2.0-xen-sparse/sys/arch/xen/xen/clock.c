@@ -54,12 +54,16 @@ __KERNEL_RCSID(0, "$NetBSD: clock.c,v 1.1.2.2 2004/07/17 16:43:56 he Exp $");
 static int xen_timer_handler(void *, struct trapframe *);
 
 /* These are peridically updated in shared_info, and then copied here. */
-static unsigned long shadow_tsc_stamp;
-static u_int64_t shadow_system_time;
+static uint64_t shadow_tsc_stamp;
+static uint64_t shadow_system_time;
 static unsigned long shadow_time_version;
 static struct timeval shadow_tv;
 
 static int timeset;
+
+static uint64_t processed_system_time;
+
+#define NS_PER_TICK (1000000000ULL/hz)
 
 /*
  * Reads a consistent set of time-base values from Xen, into a shadow data
@@ -77,6 +81,16 @@ get_time_values_from_xen(void)
 		shadow_system_time = HYPERVISOR_shared_info->system_time;
 		__insn_barrier();
 	} while (shadow_time_version != HYPERVISOR_shared_info->time_version1);
+}
+
+static uint64_t
+get_tsc_offset_ns(void)
+{
+	uint32_t tsc_delta;
+	struct cpu_info *ci = curcpu();
+
+	tsc_delta = cpu_counter32() - shadow_tsc_stamp;
+	return tsc_delta * 1000000000 / cpu_frequency(ci);
 }
 
 void
@@ -190,6 +204,9 @@ xen_initclocks()
 {
 	int irq = bind_virq_to_irq(VIRQ_TIMER);
 
+	get_time_values_from_xen();
+	processed_system_time = shadow_system_time;
+
 	event_set_handler(irq, (int (*)(void *))xen_timer_handler,
 	    NULL, IPL_CLOCK);
 	hypervisor_enable_irq(irq);
@@ -198,6 +215,8 @@ xen_initclocks()
 static int
 xen_timer_handler(void *arg, struct trapframe *regs)
 {
+	int64_t delta;
+
 #if defined(I586_CPU) || defined(I686_CPU)
 	static int microset_iter; /* call cc_microset once/sec */
 	struct cpu_info *ci = curcpu();
@@ -223,7 +242,13 @@ xen_timer_handler(void *arg, struct trapframe *regs)
 
 	get_time_values_from_xen();
 
-	hardclock((struct clockframe *)regs);
+	delta = (int64_t)(shadow_system_time + get_tsc_offset_ns() -
+			  processed_system_time);
+	while (delta >= NS_PER_TICK) {
+		hardclock((struct clockframe *)regs);
+		delta -= NS_PER_TICK;
+		processed_system_time += NS_PER_TICK;
+	}
 
 	return 0;
 }
