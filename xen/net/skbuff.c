@@ -172,10 +172,12 @@ static inline void dealloc_skb_data_page(struct sk_buff *skb)
 
 static inline void INTERRUPT_CHECK(int gfp_mask)
 {
+#if 0 /* Not needed in Xen */
     if (in_interrupt() && (gfp_mask & __GFP_WAIT)) {
         printk(KERN_ERR "alloc_skb called nonatomically\n");
         BUG();
     }
+#endif
 }
 
 
