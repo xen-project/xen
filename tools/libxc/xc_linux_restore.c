@@ -484,7 +484,12 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
                 goto out;
             }
         }
-        else if ( pfn_type[i] == (L2TAB|LPINTAB) )
+    }
+
+    /* must pin all L1's before L2's (need consistent va back ptr) */
+    for ( i = 0; i < nr_pfns; i++ )
+    {
+        if ( pfn_type[i] == (L2TAB|LPINTAB) )
         {
             if ( add_mmu_update(xc_handle, mmu,
                                 (pfn_to_mfn_table[i]<<PAGE_SHIFT) | 

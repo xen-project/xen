@@ -1454,8 +1454,9 @@ int do_mmu_update(mmu_update_t *ureqs, int count, int *success_count)
              * If in log-dirty mode, mark the corresponding pseudo-physical
              * page as dirty.
              */
-            if ( unlikely(d->mm.shadow_mode == SHM_logdirty) )
-                mark_dirty(&d->mm, pfn);
+            if ( unlikely(d->mm.shadow_mode == SHM_logdirty) && 
+		 mark_dirty(&d->mm, pfn) )
+		d->mm.shadow_dirty_block_count++;
 
             put_page(&frame_table[pfn]);
             break;
@@ -1738,7 +1739,7 @@ void ptwr_flush_inactive(void)
     }
     unmap_domain_mem(pl1e);
 
-    /* make pt page writable */
+    /* make pt page write protected */
     if (__get_user(pte, writable_pte)) {
         MEM_LOG("ptwr: Could not read pte at %p\n", writable_pte);
         domain_crash();
@@ -1824,21 +1825,10 @@ int ptwr_do_page_fault(unsigned long addr)
             }
             else
             {
-                l2_pgentry_t nl2e;
-
                 if ( ptwr_info[cpu].disconnected_pteidx >= 0 )
                     ptwr_reconnect_disconnected();
-                PTWR_PRINTK(PP_A, ("[A]    pl2e %p l2e %08lx pfn %08lx "
-                                   "taf %08x/%08x\n", pl2e,
-                                   l2_pgentry_val(*pl2e),
-                                   l1_pgentry_val(linear_pg_table
-                                                  [(unsigned long)pl2e >>
-                                                   PAGE_SHIFT]) >> PAGE_SHIFT,
-                                   frame_table[pfn].u.inuse.type_info,
-                                   frame_table[pfn].count_info));
-                /* disconnect l1 page */
-                nl2e = mk_l2_pgentry((l2_pgentry_val(*pl2e) & ~_PAGE_PRESENT));
-                update_l2e(pl2e, *pl2e, nl2e);
+
+		/* No need to actually disconnect L1 anymore in v2 wr_pt  */
 
                 ptwr_info[cpu].disconnected_pteidx = va_mask;
                 PTWR_PRINTK(PP_A, ("[A] now pl2e %p l2e %08lx              "
@@ -1848,11 +1838,16 @@ int ptwr_do_page_fault(unsigned long addr)
                                    frame_table[pfn].count_info));
                 ptwr_info[cpu].disconnected_l1va = addr;
                 ptwr_info[cpu].disconnected_pl1e =
-                    map_domain_mem(l2_pgentry_to_pagenr(nl2e) << PAGE_SHIFT);
+                    map_domain_mem( l2_pgentry_to_pagenr(*pl2e)<<PAGE_SHIFT );
+
+		/* XXX we could use the linear page table here... */	      
+		ASSERT( ((page->u.inuse.type_info & PGT_va_mask) >> 
+			 PGT_va_shift) < (PAGE_OFFSET >> L2_PAGETABLE_SHIFT)); 
+
                 memcpy(&ptwr_info[cpu].disconnected_page[0],
                        ptwr_info[cpu].disconnected_pl1e,
                        ENTRIES_PER_L1_PAGETABLE * sizeof(l1_pgentry_t));
-
+				  
                 /* make pt page writable */
                 ptwr_info[cpu].disconnected_pte = pte;
                 pte = (virt_to_phys(ptwr_info[cpu].disconnected_page) &
