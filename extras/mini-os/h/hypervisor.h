@@ -176,12 +176,12 @@ static __inline__ int HYPERVISOR_stop(unsigned long srec)
     return ret;
 }
 
-static __inline__ long HYPERVISOR_set_dom_timer(void *timer_arg)
+static __inline__ long HYPERVISOR_set_timer_op(void *timer_arg)
 {
     int ret;
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret) : "0" (__HYPERVISOR_set_dom_timer),
+        : "=a" (ret) : "0" (__HYPERVISOR_set_timer_op),
         "b" (timer_arg) : "memory" );
 
     return ret;
