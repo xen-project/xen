@@ -466,6 +466,17 @@ static inline int HYPERVISOR_physdev_op(void *physdev_op)
     return ret;
 }
 
+static inline int HYPERVISOR_grant_table_op(void *gnttab_op)
+{
+    int ret;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret) : "0" (__HYPERVISOR_grant_table_op),
+        "b" (gnttab_op) : "memory" );
+
+    return ret;
+}
+
 static inline int HYPERVISOR_update_va_mapping_otherdomain(
     unsigned long page_nr, pte_t new_val, unsigned long flags, domid_t domid)
 {
