@@ -218,15 +218,12 @@ static inline long
 HYPERVISOR_set_timer_op(
     u64 timeout)
 {
-    unsigned long timeout_hi = timeout >> 32;
-    unsigned long timeout_lo = timeout & 0xffffffff;    
     int ret;
 
     __asm__ __volatile__ (
         TRAP_INSTR
         : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_set_timer_op), 
-          "D" (timeout_hi), "S" (timeout_lo)
+	: "0" ((unsigned long)__HYPERVISOR_set_timer_op), "D" (timeout)
 	: __syscall_clobber );
 
     return ret;

@@ -294,20 +294,14 @@ long do_sched_op(unsigned long op)
 }
 
 /* Per-domain one-shot-timer hypercall. */
-long do_set_timer_op(unsigned long timeout_hi, unsigned long timeout_lo)
+long do_set_timer_op(s_time_t timeout)
 {
-    struct exec_domain *p = current;
+    struct exec_domain *ed = current;
 
-    rem_ac_timer(&p->timer);
+    rem_ac_timer(&ed->timer);
     
-    if ( (timeout_hi != 0) || (timeout_lo != 0) )
-    {
-        p->timer.expires = ((s_time_t)timeout_hi<<32) | ((s_time_t)timeout_lo);
-        add_ac_timer(&p->timer);
-    }
-
-    TRACE_5D(TRC_SCHED_SET_TIMER, p->domain->id, p->eid, p, timeout_hi,
-             timeout_lo);
+    if ( (ed->timer.expires = timeout) != 0 )
+        add_ac_timer(&ed->timer);
 
     return 0;
 }

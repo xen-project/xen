@@ -284,7 +284,7 @@ HYPERVISOR_set_timer_op(uint64_t timeout)
     __asm__ __volatile__ (
         TRAP_INSTR
         : "=a" (ret), "=b" (ign1), "=c" (ign2)
-	: "0" (__HYPERVISOR_set_timer_op), "b" (timeout_hi), "c" (timeout_lo)
+	: "0" (__HYPERVISOR_set_timer_op), "b" (timeout_lo), "c" (timeout_hi)
 	: "memory");
 
     return ret;

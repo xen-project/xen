@@ -2218,8 +2218,7 @@ long do_set_gdt(unsigned long *frame_list, unsigned int entries)
 }
 
 
-long do_update_descriptor(
-    unsigned long pa, unsigned long word1, unsigned long word2)
+long do_update_descriptor(unsigned long pa, u64 desc)
 {
     unsigned long pfn = pa >> PAGE_SHIFT;
     struct desc_struct *gdt_pent, d;
@@ -2227,8 +2226,7 @@ long do_update_descriptor(
     struct exec_domain *ed;
     long ret = -EINVAL;
 
-    d.a = (u32)word1;
-    d.b = (u32)word2;
+    *(u64 *)&d = desc;
 
     LOCK_BIGLOCK(current->domain);
 

@@ -249,6 +249,9 @@ long do_set_segment_base(unsigned int which, unsigned long base)
 {
     struct exec_domain *ed = current;
 
+    /* Canonicalise the base address. */
+    base &= VADDR_MASK;
+
     switch ( which )
     {
     case SEGBASE_FS:
@@ -264,6 +267,22 @@ long do_set_segment_base(unsigned int which, unsigned long base)
     case SEGBASE_GS_KERNEL:
         ed->arch.user_ctxt.gs_base_kernel = base;
         wrmsr(MSR_GS_BASE, base, base>>32);
+        break;
+
+    case SEGBASE_GS_USER_SEL:
+        __asm__ __volatile__ (
+            "     swapgs              \n"
+            "1:   movl %k0,%%gs       \n"
+            "     mfence; swapgs      \n" /* AMD erratum #88 */
+            ".section .fixup,\"ax\"   \n"
+            "2:   xorl %k0,%k0        \n"
+            "     jmp  1b             \n"
+            ".previous                \n"
+            ".section __ex_table,\"a\"\n"
+            "    .align 8             \n"
+            "    .quad 1b,2b          \n"
+            ".previous                  "
+            : : "r" (base&0xffff) );
         break;
 
     default:
@@ -284,7 +303,7 @@ int check_descriptor(struct desc_struct *d)
         goto good;
 
     /* The guest can only safely be executed in ring 3. */
-    if ( (b & _SEGMENT_DPL) != 3 )
+    if ( (b & _SEGMENT_DPL) != _SEGMENT_DPL )
         goto bad;
 
     /* All code and data segments are okay. No base/limit checking. */

@@ -55,7 +55,7 @@
 extern void load_gs_index(unsigned);
 
 #define __load_gs_index(index) \
-        xen_load_gs((index))
+	HYPERVISOR_set_segment_base(SEGBASE_GS_USER_SEL, index)
 
 /*
  * Load a segment. Fall back on loading the zero

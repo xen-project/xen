@@ -92,6 +92,7 @@
 #define SEGBASE_FS          0
 #define SEGBASE_GS_USER     1
 #define SEGBASE_GS_KERNEL   2
+#define SEGBASE_GS_USER_SEL 3 /* Set user %gs specified in base[15:0] */
 
 /*
  * int HYPERVISOR_switch_to_user(void)

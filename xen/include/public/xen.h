@@ -158,20 +158,20 @@
  * mfn: Machine frame number to be reassigned to the FD.
  *      (NB. page must currently belong to the calling domain).
  */
-#define MMUEXT_PIN_L1_TABLE      0 /* ptr = MA of frame to pin               */
-#define MMUEXT_PIN_L2_TABLE      1 /* ptr = MA of frame to pin               */
-#define MMUEXT_PIN_L3_TABLE      2 /* ptr = MA of frame to pin               */
-#define MMUEXT_PIN_L4_TABLE      3 /* ptr = MA of frame to pin               */
-#define MMUEXT_UNPIN_TABLE       4 /* ptr = MA of frame to unpin             */
-#define MMUEXT_NEW_BASEPTR       5 /* ptr = MA of new pagetable base         */
-#define MMUEXT_TLB_FLUSH_LOCAL   6 /* ptr = NULL                             */
-#define MMUEXT_INVLPG_LOCAL      7 /* ptr = VA to invalidate                 */
-#define MMUEXT_TLB_FLUSH_MULTI   8 /* ptr = NULL; mask = VCPUs to flush      */
-#define MMUEXT_INVLPG_MULTI      9 /* ptr = VA to inval.; mask = VCPUs       */
+#define MMUEXT_PIN_L1_TABLE      0
+#define MMUEXT_PIN_L2_TABLE      1
+#define MMUEXT_PIN_L3_TABLE      2
+#define MMUEXT_PIN_L4_TABLE      3
+#define MMUEXT_UNPIN_TABLE       4
+#define MMUEXT_NEW_BASEPTR       5
+#define MMUEXT_TLB_FLUSH_LOCAL   6
+#define MMUEXT_INVLPG_LOCAL      7
+#define MMUEXT_TLB_FLUSH_MULTI   8
+#define MMUEXT_INVLPG_MULTI      9
 #define MMUEXT_TLB_FLUSH_ALL    10
 #define MMUEXT_INVLPG_ALL       11
 #define MMUEXT_FLUSH_CACHE      12
-#define MMUEXT_SET_LDT          13 /* ptr = VA of table; val = # entries     */
+#define MMUEXT_SET_LDT          13
 #define MMUEXT_REASSIGN_PAGE    14
 #define MMUEXT_NEW_USER_BASEPTR 15
 

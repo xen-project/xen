@@ -30,6 +30,7 @@ restore_all_guest:
         popq  %r11                    # CS
         cmpw  $__GUEST_CS32,%r11
         popq  %r11                    # RFLAGS
+        cli                           # No interrupts after stack switch
         popq  %rsp                    # RSP
         je    1f
         sysretq
@@ -112,8 +113,8 @@ ENTRY(syscall_enter)
         movq  EDOMAIN_syscall_addr(%rbx),%rax
         movq  %rax,TRAPBOUNCE_eip(%rdx)
         movw  $0,TRAPBOUNCE_flags(%rdx)
-        pushq restore_all_guest(%rip)
-        jmp   create_bounce_frame
+        call  create_bounce_frame
+        jmp   restore_all_guest
 
 /* %rbx: struct exec_domain */
 hypercall:
@@ -215,7 +216,7 @@ FLT11:  movq  %rax,8(%rsi)              # ES
 FLT12:  movq  %rax,(%rsi)               # DS
 2:      subq  $16,%rsi
         movq  XREGS_r11+8(%rsp),%rax
-FLT13:  movq  %rax,(%rsi)               # R11
+FLT13:  movq  %rax,8(%rsi)              # R11
         movq  XREGS_rcx+8(%rsp),%rax
 FLT14:  movq  %rax,(%rsi)               # RCX
         /* Rewrite our stack frame and return to guest-OS mode. */

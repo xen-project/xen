@@ -430,20 +430,6 @@ void xen_tlb_flush(void)
     spin_unlock_irqrestore(&update_lock, flags);
 }
 
-void xen_load_gs(unsigned long ptr)
-{
-    int cpu = smp_processor_id();
-    int idx;
-    unsigned long flags;
-    spin_lock_irqsave(&update_lock, flags);
-    idx = per_cpu(mmu_update_queue_idx, cpu);
-    per_cpu(update_queue[idx], cpu).ptr  = phys_to_machine(ptr);
-    per_cpu(update_queue[idx], cpu).ptr |= MMU_EXTENDED_COMMAND;
-    per_cpu(update_queue[idx], cpu).val  = MMUEXT_LOAD_GS;
-    increment_index_and_flush();
-    spin_unlock_irqrestore(&update_lock, flags);
-}
-
 void xen_invlpg(unsigned long ptr)
 {
     int cpu = smp_processor_id();
