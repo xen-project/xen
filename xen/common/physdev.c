@@ -222,7 +222,7 @@ int physdev_pci_access_modify(domid_t dom, int bus, int dev, int func,
     {
         INFO("  dev does not exist\n");
         rc = -ENODEV;
-        goto clear_priviledge;
+        goto clear_privilege;
     }
     
     if ( (physdev = find_pdev(p, pdev)) != NULL) {
@@ -231,7 +231,7 @@ int physdev_pci_access_modify(domid_t dom, int bus, int dev, int func,
         physdev->flags = ACC_WRITE;
     } else {
         if ( (rc = add_dev_to_task(p, pdev, ACC_WRITE)) < 0)
-            goto clear_priviledge;
+            goto clear_privilege;
         allocated_physdev = 1;
     }
 
@@ -260,7 +260,7 @@ remove_dev:
         physdev->flags = oldacc;
     }
     
-clear_priviledge:
+clear_privilege:
     clear_bit(DF_PHYSDEV, &p->d_flags);
     clear_bit(DF_PRIVILEGED, &p->d_flags);
     put_domain(p);
