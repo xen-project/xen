@@ -225,8 +225,7 @@ int blkif_release(struct inode *inode, struct file *filep)
 int blkif_ioctl(struct inode *inode, struct file *filep,
                 unsigned command, unsigned long argument)
 {
-	int i;
-    /*  struct gendisk *gd = inode->i_bdev->bd_disk; */
+    int i;
 
     DPRINTK_IOCTL("command: 0x%x, argument: 0x%lx, dev: 0x%04x\n",
                   command, (long)argument, inode->i_rdev); 
