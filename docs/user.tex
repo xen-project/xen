@@ -96,7 +96,9 @@ isolation between the various OS instances and trying out multiple
 distros.
 
 The Windows XP port is only available to those who have signed the
-Microsoft Academic Source License.
+Microsoft Academic Source License.  Publically available XP support
+will not be available for the foreseeable future (this may change when
+Intel's Vanderpool Technology becomes available).
 
 Possible usage scenarios for Xen include:
 \begin{description}
@@ -376,10 +378,21 @@ In both cases, if you have an SMP machine you may wish to give the
 XXX Insert details on customising the kernel to be built.
 i.e. merging config files
 
+If you have an existing kernel configuration that you would like to
+use for domain 0, you should copy it to
+install/boot/config-2.6.8.1-xen0.  During the first build, you may be
+asked about some Xen-specific options.
+
+\framebox{\parbox{5in}{
+{\bf Distro specific:} \\
+{\it Gentoo} --- if not using udev (most installations, currently), you'll need
+to enable devfs and devfs mount at boot time in the xen0 config.
+}}
+
 The files produced by the build process are stored under the
 \path{install/} directory.  To install them in their default
 locations, do: \\
-\verb_# make install_\\
+\verb_# make install_
 
 Alternatively, users with special installation requirements may wish
 to install them manually by copying file to their appropriate
@@ -439,8 +452,11 @@ not remove the original contents of \path{menu.lst} --- you may want
 to boot up with your old Linux kernel in future, particularly if you
 have problems.
 
-XXX insert distro specific stuff in here (maybe)
-Suse 9.1: no 'ro' option
+\framebox{\parbox{5in}{
+{\bf Distro specific:} \\
+{\it SuSE} --- Omit the {\tt ro} option from the XenLinux kernel
+command line, since it causes problems on this distribution.
+}}
 
 \subsection{Serial Console}
 
@@ -583,11 +599,12 @@ You can also use the "service" command to run this script manually, e.g:
 
 \verb_# service xendomains start_
 
-Starts all the domains with config files under /etc/xc/auto/.
+Starts all the domains with config files under /etc/xen/auto/.
 
 \verb_# service xendomains stop_
 
 Shuts down ALL running Xen domains.
+
 
 \chapter{Domain management tasks}
 
