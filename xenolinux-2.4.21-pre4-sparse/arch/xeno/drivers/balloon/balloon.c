@@ -67,6 +67,7 @@ static unsigned long inflate_balloon(unsigned long num_pages)
     dom_mem_op_t dom_mem_op;
     unsigned long *parray;
     unsigned long *currp;
+    unsigned long curraddr;
     unsigned long ret = 0;
     unsigned long vaddr;
     unsigned long i, j;
@@ -100,8 +101,10 @@ static unsigned long inflate_balloon(unsigned long num_pages)
     currp = parray;
     for ( i = 0; i < num_pages; i++ )
     {
-        queue_l1_entry_update(get_ppte(*currp) | PGREQ_NORMAL, 0);
-        phys_to_machine_mapping[__pa(*currp) >> PAGE_SHIFT] = DEAD;
+        curraddr = *currp;
+        *currp = virt_to_machine(*currp) >> PAGE_SHIFT;
+        queue_l1_entry_update(get_ppte(curraddr) | PGREQ_NORMAL, 0);
+        phys_to_machine_mapping[__pa(curraddr) >> PAGE_SHIFT] = DEAD;
         currp++;
     }
 
@@ -112,7 +115,7 @@ static unsigned long inflate_balloon(unsigned long num_pages)
     dom_mem_op.u.balloon_inflate.pages = parray;
     if ( (ret = HYPERVISOR_dom_mem_op(&dom_mem_op)) != num_pages )
     {
-        printk("Unable to deflate balloon, error %lx\n", ret);
+        printk("Unable to inflate balloon, error %lx\n", ret);
         goto cleanup;
     }
 
@@ -145,10 +148,11 @@ static unsigned long process_new_pages(unsigned long * parray,
     unsigned long i;
 
     num_installed = 0;
-    for ( i = 0; i < tot_pages; i++ )
+    for ( i = 0; (i < tot_pages) && (num_installed < num); i++ )
     {
         if ( phys_to_machine_mapping[i] == DEAD )
         {
+            printk(KERN_ALERT "bd240 debug: proc_new_pages: i %lx, mpt %lx, %lx\n", i, i << PAGE_SHIFT, get_ppte((unsigned long)__va(i << PAGE_SHIFT)) | PGREQ_NORMAL);
             phys_to_machine_mapping[i] = *curr;
             queue_l1_entry_update((i << PAGE_SHIFT) | PGREQ_MPT_UPDATE, i);
             queue_l1_entry_update(
@@ -176,11 +180,13 @@ static unsigned long process_new_pages(unsigned long * parray,
     return num_installed;
 }
 
-static unsigned long deflate_balloon(unsigned long num_pages)
+unsigned long deflate_balloon(unsigned long num_pages)
 {
     dom_mem_op_t dom_mem_op;
     unsigned long ret;
     unsigned long * parray;
+
+    printk(KERN_ALERT "bd240 debug: deflate balloon called for %lx pages\n", num_pages);
 
     if ( num_pages > credit )
     {
@@ -206,6 +212,7 @@ static unsigned long deflate_balloon(unsigned long num_pages)
     }
 
     ret = num_pages;
+    credit -= num_pages;
 
  cleanup:
     kfree(parray);
