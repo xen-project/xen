@@ -24,7 +24,7 @@ import sys
 import socket
 import time
 
-XCS_PORT = 1633
+XCS_PATH = "/var/xen/xcs_socket"
 XCS_EXEC = "/usr/sbin/xcs"
 XCS_LOGFILE = "/var/log/xcs.log"
 
@@ -100,9 +100,9 @@ def xcs_running():
     """ See if the control switch is running.
     """
     ret = 1
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     try:
-        s.connect( ("127.0.0.1", XCS_PORT) )
+        s.connect( (XCS_PATH) )
     except:
         ret = 0
     s.close()
@@ -118,7 +118,7 @@ def main():
     
     if (not xcs_running()):
         if os.fork():
-            time.sleep(1) # let xcs start
+            time.sleep(0.5) # let xcs start
         else:
             try:
                 logfile = os.open(XCS_LOGFILE, 

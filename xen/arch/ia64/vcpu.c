@@ -1421,7 +1421,7 @@ extern struct domain *dom0;
 void vcpu_itc_no_srlz(VCPU *vcpu, UINT64 IorD, UINT64 vaddr, UINT64 pte, UINT64 logps)
 {
 	unsigned long psr;
-	unsigned long ps = (vcpu==dom0) ? logps : PAGE_SHIFT;
+	unsigned long ps = (vcpu->domain==dom0) ? logps : PAGE_SHIFT;
 
 	// FIXME: validate ifa here (not in Xen space), COULD MACHINE CHECK!
 	// FIXME, must be inlined or potential for nested fault here!

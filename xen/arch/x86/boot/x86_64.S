@@ -16,9 +16,9 @@ ENTRY(start)
         /* Magic number indicating a Multiboot header. */
         .long   0x1BADB002
         /* Flags to bootloader (see Multiboot spec). */
-        .long   0x00000002
+        .long   0x00000003
         /* Checksum: must be the negated sum of the first two fields. */
-        .long   -0x1BADB004
+        .long   -0x1BADB005
 
         .org    0x010
         .asciz "ERR: Not a 64-bit CPU!"

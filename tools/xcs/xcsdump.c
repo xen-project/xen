@@ -11,8 +11,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
+#include <sys/un.h>
 #include <ctype.h>
 #include <xc.h>
 #include <xen/xen.h>
@@ -23,24 +22,23 @@
 static int xcs_ctrl_fd = -1; /* connection to the xcs server. */
 static int xcs_data_fd = -1; /* connection to the xcs server. */
 
-int tcp_connect(char *ip, short port)
+int sock_connect(char *path)
 {
-    struct sockaddr_in addr;
-    int ret, fd;
+    struct sockaddr_un addr;
+    int ret, len, fd;
 
-    fd = socket(AF_INET, SOCK_STREAM, 0);
+    fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (fd < 0)
     {
         printf("error creating xcs socket!\n");
         return -1;
     }
 
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(port);
-    addr.sin_addr.s_addr = inet_addr(ip);
-    memset(&(addr.sin_zero), '\0', 8);
+    addr.sun_family = AF_UNIX;
+    strcpy(addr.sun_path, path);
+    len = sizeof(addr.sun_family) + strlen(addr.sun_path) + 1;
 
-    ret = connect(fd, (struct sockaddr *)&addr, sizeof(struct sockaddr));
+    ret = connect(fd, (struct sockaddr *)&addr, len);
     if (ret < 0) 
     {
         printf("error connecting to xcs!\n");
@@ -50,7 +48,7 @@ int tcp_connect(char *ip, short port)
     return fd;
 }
 
-void tcp_disconnect(int *fd)
+void sock_disconnect(int *fd)
 {
     close(*fd);
     *fd = -1;
@@ -91,7 +89,7 @@ int main(int argc, char* argv[])
         if ((strlen(argv[1]) >=2) && (strncmp(argv[1], "-v", 2) == 0))
             verbose = 1;
     
-    ret = tcp_connect("127.0.0.1", XCS_TCP_PORT);
+    ret = sock_connect(XCS_SUN_PATH);
     if (ret < 0) 
     {
         printf("connect failed!\n"); 
@@ -109,7 +107,7 @@ int main(int argc, char* argv[])
         exit(-1);
     }
     
-    ret = tcp_connect("127.0.0.1", XCS_TCP_PORT);
+    ret = sock_connect(XCS_SUN_PATH);
     if (ret < 0) 
     {
         printf("connect failed!\n"); 

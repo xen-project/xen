@@ -203,8 +203,8 @@ unsigned long alloc_boot_pages(unsigned long size, unsigned long align)
 #define MEMZONE_DOM 1
 #define NR_ZONES    2
 
-/* Up to 2^10 pages can be allocated at once. */
-#define MAX_ORDER 10
+/* Up to 2^20 pages can be allocated at once. */
+#define MAX_ORDER 20
 static struct list_head heap[NR_ZONES][MAX_ORDER+1];
 
 static unsigned long avail[NR_ZONES];

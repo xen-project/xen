@@ -45,7 +45,7 @@ void *map_domain_mem(unsigned long pa)
     unsigned int idx, cpu = smp_processor_id();
     unsigned long *cache = mapcache;
 #ifndef NDEBUG
-    unsigned flush_count = 0;
+    unsigned int flush_count = 0;
 #endif
 
     ASSERT(!in_irq());
@@ -65,17 +65,11 @@ void *map_domain_mem(unsigned long pa)
         idx = map_idx = (map_idx + 1) & (MAPCACHE_ENTRIES - 1);
         if ( unlikely(idx == 0) )
         {
+            ASSERT(flush_count++ == 0);
             flush_all_ready_maps();
             perfc_incrc(domain_page_tlb_flush);
             local_flush_tlb();
             shadow_epoch[cpu] = ++epoch;
-#ifndef NDEBUG
-            if ( unlikely(flush_count++) )
-            {
-                // we've run out of map cache entries...
-                BUG();
-            }
-#endif
         }
     }
     while ( cache[idx] != 0 );

@@ -177,9 +177,9 @@ static void __init kernel_physical_mapping_init(pgd_t *pgd_base)
 				pte = one_page_table_init(pmd);
 
 				pte += pte_ofs;
-				/* XEN: Only map initial RAM allocation. */
-				for (; pte_ofs < PTRS_PER_PTE && pfn < max_ram_pfn; pte++, pfn++, pte_ofs++) {
-						if (pte_present(*pte))
+				for (; pte_ofs < PTRS_PER_PTE && pfn < max_low_pfn; pte++, pfn++, pte_ofs++) {
+						/* XEN: Only map initial RAM allocation. */
+						if ((pfn >= max_ram_pfn) || pte_present(*pte))
 							continue;
 						if (is_kernel_text(address))
 							set_pte(pte, pfn_pte(pfn, PAGE_KERNEL_EXEC));
@@ -627,6 +627,7 @@ void __init mem_init(void)
 	int codesize, reservedpages, datasize, initsize;
 	int tmp;
 	int bad_ppro;
+	unsigned long pfn;
 
 #ifndef CONFIG_DISCONTIGMEM
 	if (!mem_map)
@@ -655,6 +656,12 @@ void __init mem_init(void)
 
 	/* this will put all low memory onto the freelists */
 	totalram_pages += __free_all_bootmem();
+	/* XEN: init and count low-mem pages outside initial allocation. */
+	for (pfn = xen_start_info.nr_pages; pfn < max_low_pfn; pfn++) {
+		ClearPageReserved(&mem_map[pfn]);
+		set_page_count(&mem_map[pfn], 1);
+		totalram_pages++;
+	}
 
 	reservedpages = 0;
 	for (tmp = 0; tmp < max_low_pfn; tmp++)
