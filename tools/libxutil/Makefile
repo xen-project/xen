@@ -8,7 +8,7 @@ LIB_SRCS += allocate.c
 LIB_SRCS += file_stream.c
 LIB_SRCS += gzip_stream.c
 LIB_SRCS += iostream.c
-LIB_SRCS += sys_net.c
+#LIB_SRCS += sys_net.c
 LIB_SRCS += sys_string.c
 
 LIB_OBJS := $(LIB_SRCS:.c=.o)

@@ -18,8 +18,10 @@
 #define CONFIG_ACPI_BOOT 1
 
 #define CONFIG_PCI 1
-#define CONFIG_PCI_BIOS 1
 #define CONFIG_PCI_DIRECT 1
+#if defined(__i386__)
+#define CONFIG_PCI_BIOS 1
+#endif
 
 #define CONFIG_IDE 1
 #define CONFIG_BLK_DEV_IDE 1

@@ -1,4 +1,5 @@
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+
 """Domain shutdown.
 """
 import string
@@ -10,7 +11,8 @@ from xen.xm.opts import *
 
 gopts = Opts(use="""[options] [DOM]
 
-Shutdown one or more domains gracefully.""")
+Shutdown one or more domains gracefully.
+""")
 
 gopts.opt('help', short='h',
          fn=set_true, default=0,
@@ -24,18 +26,22 @@ gopts.opt('wait', short='w',
          fn=set_true, default=0,
          use='Wait for shutdown to complete.')
 
-gopts.opt('norestart', short='n',
+gopts.opt('halt', short='H',
           fn=set_true, default=0,
-          use='Prevent domain restart.')
+          use='Shutdown without reboot.')
 
-def shutdown(opts, doms, wait):
+gopts.opt('reboot', short='R',
+          fn=set_true, default=0,
+          use='Shutdown and reboot.')
+
+def shutdown(opts, doms, mode, wait):
     def domains():
         return [ int(a) for a in server.xend_domains() ]
     if doms == None: doms = domains()
     if 0 in doms:
         doms.remove(0)
     for d in doms:
-        server.xend_domain_shutdown(d)
+        server.xend_domain_shutdown(d, mode)
     if wait:
         while doms:
             alive = domains()
@@ -49,6 +55,21 @@ def shutdown(opts, doms, wait):
             time.sleep(1)
         opts.info("All domains terminated")
 
+def shutdown_mode(opts):
+    mode = 'poweroff'
+    if opts.vals.wait:
+        mode = 'halt'
+        if opts.vals.reboot:
+           opts.err("Can't specify wait and reboot") 
+    else:
+        if opts.vals.halt and opts.vals.reboot:
+            opts.err("Can't specify halt and reboot")
+        if opts.vals.halt:
+            mode = 'halt'
+        elif opts.vals.reboot:
+            mode = 'reboot'
+    return mode
+
 def main_all(opts, args):
     shutdown(opts, None, opts.vals.wait)
 
@@ -59,7 +80,9 @@ def main_dom(opts, args):
         domid = int(dom)
     except:
         opts.err('Invalid domain: ' + dom)
-    shutdown(opts, [ domid ], opts.vals.wait)
+        
+    mode = shutdown_mode(opts)  
+    shutdown(opts, [ domid ], mode, opts.vals.wait)
     
 def main(argv):
     opts = gopts

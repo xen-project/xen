@@ -2,24 +2,23 @@
 #============================================================================
 # Python defaults setup for 'xm create'.
 # Edit this file to reflect the configuration of your system.
-# This file expects the variable 'vmid' to be set.
 #============================================================================
 
-def config_usage ():
-    print >>sys.stderr,"""
-The config file '%s' requires the following variable to be defined:
- vmid             -- Numeric identifier for the new domain, used to calculate
-                     the VM's IP address and root partition. E.g. -Dvmid=1
-""" % config_file
+# Define script variables here.
+# xm_vars is defined automatically, use xm_vars.var() to define a variable.
 
+def vmid_check(var, val):
+    val = int(val)
+    if val <= 0:
+        raise ValueError
+    return val
+    
+xm_vars.var('vmid',
+            use="Virtual machine id. Integer greater than 0.",
+            check=vmid_check)
 
-try:
-    vmid = int(vmid) # convert to integer
-except:
-    raise ValueError, "Variable 'vmid' must be an integer"
-
-if vmid <= 0:
-    raise ValueError, "Variable 'vmid' must be greater than 0" 
+# This checks the script variables.
+xm_vars.check()
 
 #----------------------------------------------------------------------------
 # Kernel image file.
@@ -97,6 +96,6 @@ extra = "4 VMID=%d bootdev=xennet0" % vmid
 #----------------------------------------------------------------------------
 # Set according to whether you want the domain  restarted when it exits.
 # The default is False.
-#restart = True
+#autorestart = True
 
 #============================================================================

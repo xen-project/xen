@@ -15,6 +15,7 @@ import sys
 import os
 
 from twisted.internet import defer
+defer.Deferred.debug = 1
 
 import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
 import xen.util.ip
@@ -291,6 +292,9 @@ def vm_restore(src, progress=0):
     if dom < 0:
         raise VmError('restore failed')
     vmconfig = sxp.from_string(d['vmconfig'])
+    if not vmconfig:
+        raise VmError('bad vmconfig s-expression')
+    vmconfig = vmconfig[0]
     vm.config = sxp.child_value(vmconfig, 'config')
     deferred = vm.dom_configure(dom)
     def vifs_cb(val, vm):
@@ -362,6 +366,8 @@ class XendDomainInfo:
         self.state = self.STATE_OK
         #todo: set to migrate info if migrating
         self.migrate = None
+        #Whether to auto-restart
+        self.autorestart = 0
 
     def setdom(self, dom):
         self.dom = int(dom)
@@ -417,7 +423,9 @@ class XendDomainInfo:
         self.config = config
         try:
             self.name = sxp.child_value(config, 'name')
-            self.memory = int(sxp.child_value(config, 'memory', '128'))
+            self.memory = int(sxp.child_value(config, 'memory') or '128')
+            if sxp.child(config, 'autorestart'):
+                self.autorestart = 1
             self.configure_backends()
             image = sxp.child_value(config, 'image')
             image_name = sxp.name(image)
@@ -426,14 +434,18 @@ class XendDomainInfo:
                 raise VmError('unknown image type: ' + image_name)
             image_handler(self, image)
             deferred = self.configure()
+            def cbok(x):
+                print 'vm_create> cbok', x
+                return x
+            def cberr(err):
+                self.destroy()
+                return err
+            deferred.addCallback(cbok)
+            deferred.addErrback(cberr)
         except StandardError, ex:
             # Catch errors, cleanup and re-raise.
             self.destroy()
             raise
-        def cbok(x):
-            print 'vm_create> cbok', x
-            return x
-        deferred.addCallback(cbok)
         print 'vm_create<'
         return deferred
 
@@ -445,7 +457,7 @@ class XendDomainInfo:
         """
         devices = []
         for d in sxp.children(self.config, 'device'):
-            dev = sxp.child0(d)
+            dev = sxp.child(d)
             if dev is None: continue
             if name == sxp.name(dev):
                 devices.append(dev)
@@ -576,7 +588,7 @@ class XendDomainInfo:
         if self.recreate: return
         memory = self.memory
         name = self.name
-        cpu = int(sxp.child_value(self.config, 'cpu', '-1'))
+        cpu = int(sxp.child_value(self.config, 'cpu') or '-1')
         print 'init_domain>', memory, name, cpu
         dom = xc.domain_create(mem_kb= memory * 1024, name= name, cpu= cpu)
         if dom <= 0:
@@ -641,7 +653,7 @@ class XendDomainInfo:
         devices = sxp.children(self.config, 'device')
         index = {}
         for d in devices:
-            dev = sxp.child0(d)
+            dev = sxp.child(d)
             if dev is None:
                 raise VmError('invalid device')
             dev_name = sxp.name(dev)
@@ -660,7 +672,7 @@ class XendDomainInfo:
         """Set configuration flags if the vm is a backend for netif of blkif.
         """
         for c in sxp.children(self.config, 'backend'):
-            name = sxp.name(sxp.child0(c))
+            name = sxp.name(sxp.child(c))
             if name == 'blkif':
                 self.blkif_backend = 1
             elif name == 'netif':
@@ -706,6 +718,10 @@ class XendDomainInfo:
             self.name = d['name']
             self.memory = d['memory']/1024
             deferred = self.configure()
+            def cberr(err):
+                self.destroy()
+                return err
+            deferred.addErrback(cberr)
         except StandardError, ex:
             self.destroy()
             raise
@@ -738,7 +754,7 @@ def vm_image_linux(vm, image):
     """
     kernel = sxp.child_value(image, "kernel")
     cmdline = ""
-    ip = sxp.child_value(image, "ip", "dhcp")
+    ip = sxp.child_value(image, "ip") or "dhcp"
     if ip:
         cmdline += " ip=" + ip
     root = sxp.child_value(image, "root")
@@ -747,7 +763,7 @@ def vm_image_linux(vm, image):
     args = sxp.child_value(image, "args")
     if args:
         cmdline += " " + args
-    ramdisk = sxp.child_value(image, "ramdisk", '')
+    ramdisk = sxp.child_value(image, "ramdisk") or ''
     vifs = vm.config_devices("vif")
     vm.create_domain("linux", kernel, ramdisk, cmdline, len(vifs))
     return vm
@@ -764,7 +780,7 @@ def vm_image_netbsd(vm, image):
     #todo: Same as for linux. Is that right? If so can unify them.
     kernel = sxp.child_value(image, "kernel")
     cmdline = ""
-    ip = sxp.child_value(image, "ip", "dhcp")
+    ip = sxp.child_value(image, "ip") or "dhcp"
     if ip:
         cmdline += "ip=" + ip
     root = sxp.child_value(image, "root")
@@ -793,7 +809,7 @@ def vm_dev_vif(vm, val, index):
     defer = make_vif(vm.dom, vif, vmac, vm.recreate)
     def fn(id):
         dev = xend.netif_dev(vm.dom, vif)
-        devid = sxp.attribute(val, 'id')
+        devid = sxp.child_value(val, 'id')
         if devid:
             dev.setprop('id', devid)
         bridge = sxp.child_value(val, "bridge")
@@ -820,7 +836,7 @@ def vm_dev_vbd(vm, val, index):
     dev = sxp.child_value(val, 'dev')
     if not dev:
         raise VmError('vbd: Missing dev')
-    mode = sxp.child_value(val, 'mode', 'r')
+    mode = sxp.child_value(val, 'mode') or 'r'
     defer = make_disk(vm.dom, uname, dev, mode, vm.recreate)
     def fn(vbd):
         dev = xend.blkif_dev(vm.dom, vdev)
@@ -922,7 +938,7 @@ def vm_field_vnet(vm, config, val, index):
         if id is None:
             raise VmError('vnet: missing vif id')
         dev = vm.get_device_by_id('vif', id)
-        #vnet = sxp.child_value(v, 'vnet', 1)
+        #vnet = sxp.child_value(v, 'vnet') or '1'
         #mac = sxp.child_value(dev, 'mac')
         #vif = sxp.child_value(dev, 'vif')
         #vnet_bridge(vnet, mac, vm.dom, 0)

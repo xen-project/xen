@@ -6,6 +6,9 @@ OBJS := $(subst pdb-linux.o,,$(OBJS))
 OBJS := $(subst pdb-stub.o,,$(OBJS))
 endif
 
+OBJS += $(patsubst %.S,%.o,$(wildcard $(TARGET_SUBARCH)/*.S))
+OBJS += $(patsubst %.c,%.o,$(wildcard $(TARGET_SUBARCH)/*.c))
+
 LINK_BASE := 0xFC500000 # Xen is linked here
 LOAD_BASE := 0x00100000 # Xen is loaded here
 
@@ -23,3 +26,5 @@ default: boot/$(TARGET_SUBARCH).o $(OBJS)
 
 clean:
 	rm -f *.o *~ core boot/*.o boot/*~ boot/core
+	rm -f $(TARGET_SUBARCH)/*.o $(TARGET_SUBARCH)/*~
+	rm -f $(TARGETSUBARCH)/core

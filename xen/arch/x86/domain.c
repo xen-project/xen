@@ -1,17 +1,10 @@
 /*
- *  linux/arch/i386/kernel/process.c
- *
  *  Copyright (C) 1995  Linus Torvalds
  *
  *  Pentium III FXSR, SSE support
  *	Gareth Hughes <gareth@valinux.com>, May 2000
  */
 
-/*
- * This file handles the architecture-dependent parts of process handling..
- */
-
-#define __KERNEL_SYSCALLS__
 #include <xen/config.h>
 #include <xen/lib.h>
 #include <xen/errno.h>
@@ -192,6 +185,8 @@ void machine_power_off(void)
     machine_restart(0);
 }
 
+#if defined(__i386__)
+
 void new_thread(struct domain *p,
                 unsigned long start_pc,
                 unsigned long start_stack,
@@ -361,3 +356,5 @@ long do_iopl(domid_t domain, unsigned int new_io_pl)
     ec->eflags = (ec->eflags & 0xffffcfff) | ((new_io_pl&3) << 12);
     return 0;
 }
+
+#endif
