@@ -67,12 +67,8 @@ char opt_nmi[10] = "fatal";
 #endif
 string_param("nmi", opt_nmi);
 
-asmlinkage int hypercall(void);
-
-/* Master table, and the one used by CPU0. */
+/* Master table, used by all CPUs on x86/64, and by CPU0 on x86/32.*/
 idt_entry_t idt_table[IDT_ENTRIES] = { {0, 0}, };
-/* All other CPUs have their own copy. */
-idt_entry_t *idt_tables[NR_CPUS] = { 0 };
 
 asmlinkage void divide_error(void);
 asmlinkage void debug(void);
@@ -714,13 +710,6 @@ asmlinkage int do_spurious_interrupt_bug(struct xen_regs *regs)
     return EXCRET_not_a_fault;
 }
 
-BUILD_SMP_INTERRUPT(deferred_nmi, TRAP_deferred_nmi)
-asmlinkage void smp_deferred_nmi(struct xen_regs regs)
-{
-    ack_APIC_irq();
-    do_nmi(&regs, 0);
-}
-
 void set_intr_gate(unsigned int n, void *addr)
 {
     _set_gate(idt_table+n,14,0,addr);
@@ -778,14 +767,6 @@ void __init trap_init(void)
     set_intr_gate(TRAP_alignment_check,&alignment_check);
     set_intr_gate(TRAP_machine_check,&machine_check);
     set_intr_gate(TRAP_simd_error,&simd_coprocessor_error);
-    set_intr_gate(TRAP_deferred_nmi,&deferred_nmi);
-
-#if defined(__i386__)
-    _set_gate(idt_table+HYPERCALL_VECTOR, 14, 1, &hypercall);
-#endif
-
-    /* CPU0 uses the master IDT. */
-    idt_tables[0] = idt_table;
 
     percpu_traps_init();
 

@@ -67,7 +67,7 @@ extern void ac_timer_init(void);
 extern void initialize_keytable();
 extern int do_timer_lists_from_pit;
 
-char ignore_irq13;		/* set if exception 16 works */
+char ignore_irq13; /* set if exception 16 works */
 struct cpuinfo_x86 boot_cpu_data = { 0, 0, 0, 0, -1 };
 
 #if defined(__x86_64__)
@@ -81,7 +81,7 @@ unsigned long wait_init_idle;
 
 struct exec_domain *idle_task[NR_CPUS] = { &idle0_exec_domain };
 
-#ifdef	CONFIG_ACPI_INTERPRETER
+#ifdef CONFIG_ACPI_INTERPRETER
 int acpi_disabled = 0;
 #else
 int acpi_disabled = 1;
@@ -300,7 +300,6 @@ void __init cpu_init(void)
 {
     int nr = smp_processor_id();
     struct tss_struct *t = &init_tss[nr];
-    unsigned char idt_load[10];
 
     if ( test_and_set_bit(nr, &cpu_initialized) )
         panic("CPU#%d already initialized!!!\n", nr);
@@ -309,10 +308,6 @@ void __init cpu_init(void)
     SET_GDT_ENTRIES(current, DEFAULT_GDT_ENTRIES);
     SET_GDT_ADDRESS(current, DEFAULT_GDT_ADDRESS);
     __asm__ __volatile__ ( "lgdt %0" : "=m" (*current->arch.gdt) );
-
-    *(unsigned short *)(&idt_load[0]) = (IDT_ENTRIES*sizeof(idt_entry_t))-1;
-    *(unsigned long  *)(&idt_load[2]) = (unsigned long)idt_tables[nr];
-    __asm__ __volatile__ ( "lidt %0" : "=m" (idt_load) );
 
     /* No nested task. */
     __asm__ __volatile__ ( "pushf ; andw $0xbfff,(%"__OP"sp) ; popf" );
@@ -410,7 +405,7 @@ static void __init start_of_day(void)
     APIC_init_uniprocessor();
 #else
     if ( opt_nosmp )
-	APIC_init_uniprocessor();
+        APIC_init_uniprocessor();
     else
     	smp_boot_cpus(); 
     /*
