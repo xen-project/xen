@@ -1152,14 +1152,15 @@ int do_update_va_mapping(unsigned long page_nr,
             perfc_incrc(shadow_update_va_fail);
         }
 
-
-	/* if we're in logdirty mode, we need to note that we've updated the
-	   PTE in the PT-holding page. This is a bit of a pain as we don't
-	   know the physcial (machine) frame number of the page */
-	if ( p->mm.shadow_mode == SHM_logdirty )
-	  mark_dirty( &current->mm, va_to_l1mfn(page_nr<<PAGE_SHIFT) );  
+        /*
+         * If we're in log-dirty mode then we need to note that we've updated
+         * the PTE in the PT-holding page. We need the machine frame number
+         * for this.
+         */
+        if ( p->mm.shadow_mode == SHM_logdirty )
+            mark_dirty( &current->mm, va_to_l1mfn(page_nr<<PAGE_SHIFT) );  
   
-	check_pagetable( p, p->mm.pagetable, "va" ); // debug
+        check_pagetable( p, p->mm.pagetable, "va" ); /* debug */
     }
 
     deferred_ops = percpu_info[cpu].deferred_ops;
