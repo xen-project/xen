@@ -327,9 +327,13 @@ class Dev:
     """Abstract class for a device attached to a device controller.
     """
     
-    def __init__(self, controller):
+    def __init__(self, idx, controller):
+        self.idx = str(idx)
         self.controller = controller
         self.props = {}
+
+    def getidx(self):
+        return self.idx
 
     def setprop(self, k, v):
         self.props[k] = v

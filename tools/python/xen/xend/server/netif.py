@@ -112,7 +112,7 @@ class NetDev(controller.Dev):
     """
 
     def __init__(self, ctrl, vif, config):
-        controller.Dev.__init__(self, ctrl)
+        controller.Dev.__init__(self, vif, ctrl)
         self.vif = vif
         self.evtchn = None
         self.configure(config)
@@ -140,7 +140,10 @@ class NetDev(controller.Dev):
     def sxpr(self):
         vif = str(self.vif)
         mac = self.get_mac()
-        val = ['vif', ['idx', vif], ['mac', mac]]
+        val = ['vif',
+               ['idx', self.idx],
+               ['vif', vif],
+               ['mac', mac]]
         if self.bridge:
             val.append(['bridge', self.bridge])
         if self.script:

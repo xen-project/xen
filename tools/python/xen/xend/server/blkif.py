@@ -215,7 +215,7 @@ class BlkDev(controller.Dev):
     """
 
     def __init__(self, ctrl, vdev, mode, segment):
-        controller.Dev.__init__(self, ctrl)
+        controller.Dev.__init__(self,  segment['device'], ctrl)
         self.vdev = vdev
         self.mode = mode
         self.device = segment['device']
@@ -227,7 +227,11 @@ class BlkDev(controller.Dev):
         return 'w' not in self.mode
 
     def sxpr(self):
-        val = ['blkdev', ['vdev', self.vdev], ['mode', self.mode] ]
+        val = ['blkdev',
+               ['idx', self.idx],
+               ['vdev', self.vdev],
+               ['device', self.device],
+               ['mode', self.mode]]
         return val
 
     def destroy(self):

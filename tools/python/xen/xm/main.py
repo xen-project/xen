@@ -246,10 +246,10 @@ class ProgList(Prog):
                 use_long = 1
                 
         if n == 0:
-            doms = map(int, server.xend_domains())
+            doms = server.xend_domains()
             doms.sort()
         else:
-            doms = map(int, params)
+            doms = params
             
         if use_long:
             self.long_list(doms)
@@ -257,22 +257,27 @@ class ProgList(Prog):
             self.brief_list(doms)
 
     def brief_list(self, doms):
-        print 'Dom  Name             Mem(MB)  CPU  State  Time(s)'
+        print 'Name              Id  Mem(MB)  CPU  State  Time(s)  Console'
         for dom in doms:
             info = server.xend_domain(dom)
             d = {}
-            d['dom'] = int(dom)
+            d['dom'] = int(sxp.child_value(info, 'id', '-1'))
             d['name'] = sxp.child_value(info, 'name', '??')
             d['mem'] = int(sxp.child_value(info, 'memory', '0'))
             d['cpu'] = int(sxp.child_value(info, 'cpu', '0'))
             d['state'] = sxp.child_value(info, 'state', '??')
             d['cpu_time'] = float(sxp.child_value(info, 'cpu_time', '0'))
-            print ("%(dom)-4d %(name)-16s %(mem)7d  %(cpu)3d  %(state)5s  %(cpu_time)7.1f" % d)
+            console = sxp.child(info, 'console')
+            if console:
+                d['port'] = sxp.child_value(console, 'console_port')
+            else:
+                d['port'] = ''
+            print ("%(name)-16s %(dom)3d  %(mem)7d  %(cpu)3d  %(state)5s  %(cpu_time)7.1f    %(port)4s"
+                   % d)
 
     def long_list(self, doms):
         for dom in doms:
             info = server.xend_domain(dom)
-            print '\nDomain %d' % dom
             PrettyPrint.prettyprint(info)
 
 xm.prog(ProgList)

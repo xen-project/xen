@@ -24,7 +24,7 @@ class SrvDomainDir(SrvDir):
 
     def domain(self, x):
         val = None
-        dom = self.xd.domain_get(x)
+        dom = self.xd.domain_lookup(x)
         if not dom:
             raise XendError('No such domain ' + str(x))
         val = SrvDomain(dom)
@@ -74,7 +74,7 @@ class SrvDomainDir(SrvDir):
     def _op_create_cb(self, dominfo, configstring, req):
         """Callback to handle deferred domain creation.
         """
-        dom = dominfo.id
+        dom = dominfo.name
         domurl = "%s/%s" % (req.prePathURL(), dom)
         req.setResponseCode(http.CREATED, "created")
         req.setHeader("Location", domurl)
@@ -112,7 +112,7 @@ class SrvDomainDir(SrvDir):
         return deferred
 
     def _op_restore_cb(self, dominfo, req):
-        dom = dominfo.id
+        dom = dominfo.name
         domurl = "%s/%s" % (req.prePathURL(), dom)
         req.setResponseCode(http.CREATED)
         req.setHeader("Location", domurl)
@@ -159,12 +159,12 @@ class SrvDomainDir(SrvDir):
             sxp.show(domains, out=req)
         else:
             domains = self.xd.domains()
-            domains.sort(lambda x, y: cmp(x.id, y.id))
+            domains.sort(lambda x, y: cmp(x.name, y.name))
             req.write('<ul>')
             for d in domains:
                req.write('<li><a href="%s%s"> Domain %s</a>'
-                         % (url, d.id, d.id))
-               req.write('name=%s' % d.name)
+                         % (url, d.name, d.name))
+               req.write('id=%s' % d.id)
                req.write('memory=%d'% d.memory)
                req.write('</li>')
             req.write('</ul>')
