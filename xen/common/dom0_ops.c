@@ -295,21 +295,16 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
         read_unlock_irqrestore(&tasklist_lock, flags);
 
-        op->u.getdomaininfo.flags =
-            (test_bit(DF_RUNNING, &d->flags) ? DOMFLAGS_RUNNING : 0);
-
-        if ( d != current )
-            domain_pause(d);
-
         op->u.getdomaininfo.domain = d->domain;
         strcpy(op->u.getdomaininfo.name, d->name);
         
-        op->u.getdomaininfo.flags |=
+        op->u.getdomaininfo.flags =
             (test_bit(DF_DYING,     &d->flags) ? DOMFLAGS_DYING     : 0) |
             (test_bit(DF_CRASHED,   &d->flags) ? DOMFLAGS_CRASHED   : 0) |
             (test_bit(DF_SUSPENDED, &d->flags) ? DOMFLAGS_SUSPENDED : 0) |
             (test_bit(DF_STOPPED,   &d->flags) ? DOMFLAGS_STOPPED   : 0) |
-            (test_bit(DF_BLOCKED,   &d->flags) ? DOMFLAGS_BLOCKED   : 0);
+            (test_bit(DF_BLOCKED,   &d->flags) ? DOMFLAGS_BLOCKED   : 0) |
+            (test_bit(DF_RUNNING,   &d->flags) ? DOMFLAGS_RUNNING   : 0);
 
         op->u.getdomaininfo.flags |= d->processor << DOMFLAGS_CPUSHIFT;
         op->u.getdomaininfo.flags |= 
@@ -326,8 +321,12 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             if ( (c = kmalloc(sizeof(*c), GFP_KERNEL)) == NULL )
             {
                 ret = -ENOMEM;
-                goto gdi_out;
+                put_domain(d);
+                break;
             }
+
+            if ( d != current )
+                domain_pause(d);
 
             c->flags = 0;
             memcpy(&c->cpu_ctxt, 
@@ -376,6 +375,9 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             c->failsafe_callback_eip = 
                 d->failsafe_address;
 
+            if ( d != current )
+                domain_unpause(d);
+
             if ( copy_to_user(op->u.getdomaininfo.ctxt, c, sizeof(*c)) )
                 ret = -EINVAL;
 
@@ -386,9 +388,6 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         if ( copy_to_user(u_dom0_op, op, sizeof(*op)) )     
             ret = -EINVAL;
 
-    gdi_out:
-        if ( d != current )
-            domain_unpause(d);
         put_domain(d);
     }
     break;
