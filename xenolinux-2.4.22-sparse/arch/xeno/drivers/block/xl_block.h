@@ -47,7 +47,6 @@
  */
 typedef struct xl_disk {
     int usage;
-    unsigned long capacity;
 } xl_disk_t;
 
 /* Generic layer. */
@@ -55,7 +54,7 @@ extern int xenolinux_control_msg(int operration, char *buffer, int size);
 extern int xenolinux_block_open(struct inode *inode, struct file *filep);
 extern int xenolinux_block_release(struct inode *inode, struct file *filep);
 extern int xenolinux_block_ioctl(struct inode *inode, struct file *filep,
-				 unsigned command, unsigned long argument);
+                                 unsigned command, unsigned long argument);
 extern int xenolinux_block_check(kdev_t dev);
 extern int xenolinux_block_revalidate(kdev_t dev);
 extern void do_xlblk_request (request_queue_t *rq); 
@@ -64,6 +63,5 @@ extern void do_xlblk_request (request_queue_t *rq);
 /* Virtual block-device subsystem. */
 extern int  xlvbd_init(xen_disk_info_t *xdi);
 extern void xlvbd_cleanup(void); 
-extern struct gendisk *xldev_to_gendisk(kdev_t xldev);
 
 #endif /* __XL_BLOCK_H__ */

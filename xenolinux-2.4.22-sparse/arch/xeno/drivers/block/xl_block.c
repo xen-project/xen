@@ -58,7 +58,7 @@ static inline void signal_requests_to_xen(void)
 
 static inline xl_disk_t *xldev_to_xldisk(kdev_t xldev)
 {
-    struct gendisk *gd = xldev_to_gendisk(xldev);
+    struct gendisk *gd = get_gendisk(xldev);
     return (xl_disk_t *)gd->real_devices + 
         (MINOR(xldev) >> gd->minor_shift);
 }
@@ -67,25 +67,36 @@ static inline xl_disk_t *xldev_to_xldisk(kdev_t xldev)
 int xenolinux_block_open(struct inode *inode, struct file *filep)
 {
     short xldev = inode->i_rdev; 
-    struct gendisk *gd = xldev_to_gendisk(xldev);
+    struct gendisk *gd = get_gendisk(xldev);
     xl_disk_t *disk = xldev_to_xldisk(inode->i_rdev);
     short minor = MINOR(xldev); 
 
-    if(!gd->part[minor].nr_sects) { 
-	/* Device either doesn't exist, or has zero capacity; we use 
-	   a few cheesy heuristics to return the relevant error code */
-	if(disk->capacity || (minor & (gd->max_p - 1))) { 
-	    // we have a real device, but no such partition, or we just 
-	    // have a partition number so guess this is the problem 
-	    return -ENXIO;     // no such device or address 
-	} else if (gd->flags[minor >> gd->minor_shift] & GENHD_FL_REMOVABLE) {
-	    // this is a removable device => assume that media is missing 
-	    return -ENOMEDIUM; // media not present (this is a guess) 
-	} else 
-	    // just go for the general 'no such device' error
-	    return -ENODEV;    // no such device
+    if ( gd->part[minor].nr_sects == 0 )
+    { 
+        /*
+         * Device either doesn't exist, or has zero capacity; we use a few
+         * cheesy heuristics to return the relevant error code
+         */
+        if ( (gd->sizes[minor >> gd->minor_shift] != 0) ||
+             ((minor & (gd->max_p - 1)) != 0) )
+        { 
+            /*
+             * We have a real device, but no such partition, or we just have a
+             * partition number so guess this is the problem.
+             */
+            return -ENXIO;     /* no such device or address */
+        }
+        else if ( gd->flags[minor >> gd->minor_shift] & GENHD_FL_REMOVABLE )
+        {
+            /* This is a removable device => assume that media is missing. */ 
+            return -ENOMEDIUM; /* media not present (this is a guess) */
+        } 
+        else
+        { 
+            /* Just go for the general 'no such device' error. */
+            return -ENODEV;    /* no such device */
+        }
     }
-
 
     disk->usage++;
     DPRINTK("xenolinux_block_open\n");
@@ -103,7 +114,7 @@ int xenolinux_block_release(struct inode *inode, struct file *filep)
 
 
 int xenolinux_block_ioctl(struct inode *inode, struct file *filep,
-			  unsigned command, unsigned long argument)
+                          unsigned command, unsigned long argument)
 {
     kdev_t dev = inode->i_rdev;
     struct hd_geometry *geo = (struct hd_geometry *)argument;
@@ -115,21 +126,21 @@ int xenolinux_block_ioctl(struct inode *inode, struct file *filep,
     DPRINTK_IOCTL("command: 0x%x, argument: 0x%lx, dev: 0x%04x\n",
                   command, (long) argument, dev); 
   
-    gd = xldev_to_gendisk(dev);
+    gd = get_gendisk(dev);
     part = &gd->part[MINOR(dev)]; 
 
     switch ( command )
     {
     case BLKGETSIZE:
         DPRINTK_IOCTL("   BLKGETSIZE: %x %lx\n", BLKGETSIZE, part->nr_sects); 
-	return put_user(part->nr_sects, (unsigned long *) argument);
+        return put_user(part->nr_sects, (unsigned long *) argument);
 
     case BLKRRPART:                               /* re-read partition table */
         DPRINTK_IOCTL("   BLKRRPART: %x\n", BLKRRPART); 
         return xenolinux_block_revalidate(dev);
 
     case BLKSSZGET:
-	return hardsect_size[MAJOR(dev)][MINOR(dev)]; 
+        return hardsect_size[MAJOR(dev)][MINOR(dev)]; 
 
     case BLKBSZGET:                                        /* get block size */
         DPRINTK_IOCTL("   BLKBSZGET: %x\n", BLKBSZGET);
@@ -137,35 +148,35 @@ int xenolinux_block_ioctl(struct inode *inode, struct file *filep,
 
     case BLKBSZSET:                                        /* set block size */
         DPRINTK_IOCTL("   BLKBSZSET: %x\n", BLKBSZSET);
-	break;
+        break;
 
     case BLKRASET:                                         /* set read-ahead */
         DPRINTK_IOCTL("   BLKRASET: %x\n", BLKRASET);
-	break;
+        break;
 
     case BLKRAGET:                                         /* get read-ahead */
         DPRINTK_IOCTL("   BLKRAFET: %x\n", BLKRAGET);
-	break;
+        break;
 
     case HDIO_GETGEO:
         /* note: these values are complete garbage */
         DPRINTK_IOCTL("   HDIO_GETGEO: %x\n", HDIO_GETGEO);
-	if (!argument) return -EINVAL;
-	if (put_user(0x00,  (unsigned long *) &geo->start)) return -EFAULT;
-	if (put_user(0xff,  (byte *)&geo->heads)) return -EFAULT;
-	if (put_user(0x3f,  (byte *)&geo->sectors)) return -EFAULT;
-	if (put_user(0x106, (unsigned short *)&geo->cylinders)) return -EFAULT;
-	return 0;
+        if (!argument) return -EINVAL;
+        if (put_user(0x00,  (unsigned long *) &geo->start)) return -EFAULT;
+        if (put_user(0xff,  (byte *)&geo->heads)) return -EFAULT;
+        if (put_user(0x3f,  (byte *)&geo->sectors)) return -EFAULT;
+        if (put_user(0x106, (unsigned short *)&geo->cylinders)) return -EFAULT;
+        return 0;
 
     case HDIO_GETGEO_BIG: 
         /* note: these values are complete garbage */
         DPRINTK_IOCTL("   HDIO_GETGEO_BIG: %x\n", HDIO_GETGEO_BIG);
-	if (!argument) return -EINVAL;
-	if (put_user(0x00,  (unsigned long *) &geo->start))  return -EFAULT;
-	if (put_user(0xff,  (byte *)&geo->heads))   return -EFAULT;
-	if (put_user(0x3f,  (byte *)&geo->sectors)) return -EFAULT;
-	if (put_user(0x106, (unsigned int *) &geo->cylinders)) return -EFAULT;
-	return 0;
+        if (!argument) return -EINVAL;
+        if (put_user(0x00,  (unsigned long *) &geo->start))  return -EFAULT;
+        if (put_user(0xff,  (byte *)&geo->heads))   return -EFAULT;
+        if (put_user(0x3f,  (byte *)&geo->sectors)) return -EFAULT;
+        if (put_user(0x106, (unsigned int *) &geo->cylinders)) return -EFAULT;
+        return 0;
 
     case CDROMMULTISESSION:
         DPRINTK("FIXME: support multisession CDs later\n");
@@ -175,7 +186,7 @@ int xenolinux_block_ioctl(struct inode *inode, struct file *filep,
 
     default:
         printk("ioctl %08x not supported by xl_block\n", command);
-	return -ENOSYS;
+        return -ENOSYS;
     }
     
     return 0;
@@ -190,12 +201,19 @@ int xenolinux_block_check(kdev_t dev)
 
 int xenolinux_block_revalidate(kdev_t dev)
 {
-    struct gendisk *gd = xldev_to_gendisk(dev);
+    struct gendisk *gd = get_gendisk(dev);
     xl_disk_t *disk = xldev_to_xldisk(dev);
-    unsigned long flags;
+    unsigned long flags, capacity = gd->part[MINOR(dev)].nr_sects;
     int i, disk_nr = MINOR(dev) >> gd->minor_shift; 
     
     DPRINTK("xenolinux_block_revalidate: %d\n", dev);
+
+    /*
+     * We didn't construct this VBD by reading a partition table. This
+     * function can only do bad things to us.
+     */
+    if ( capacity == 0 )
+        return -EINVAL;
 
     spin_lock_irqsave(&io_request_lock, flags);
     if ( disk->usage > 1 )
@@ -212,27 +230,9 @@ int xenolinux_block_revalidate(kdev_t dev)
         gd->part[MINOR(dev+i)].nr_sects = 0;
     }
 
-#if 0
-    /* VBDs can change under our feet. Check if that has happened. */
-    if ( MAJOR(dev) == XLVIRT_MAJOR )
-    {
-        xen_disk_info_t *xdi = kmalloc(sizeof(*xdi), GFP_KERNEL);
-        if ( xdi != NULL )
-        {
-            memset(xdi, 0, sizeof(*xdi));
-            xenolinux_control_msg(XEN_BLOCK_PROBE, 
-                                  (char *)xdi, sizeof(*xdi));
-            for ( i = 0; i < xdi->count; i++ )
-                if ( IS_VIRTUAL_XENDEV(xdi->disks[i].device) &&
-                     ((xdi->disks[i].device & XENDEV_IDX_MASK) == disk_nr) )
-                    ((xl_disk_t *)gd->real_devices)[disk_nr].capacity =
-                        xdi->disks[i].capacity;
-            kfree(xdi);
-        }
-    }
-#endif
+    /* XXX Should perhaps revalidate VBDs here */
 
-    grok_partitions(gd, disk_nr, gd->nr_real, disk->capacity);
+    grok_partitions(gd, disk_nr, gd->nr_real, capacity);
 
     return 0;
 }
@@ -271,14 +271,12 @@ static int hypervisor_request(unsigned long   id,
 
     case XEN_BLOCK_READ:
     case XEN_BLOCK_WRITE:
+        gd = get_gendisk(device); 
 
-	/* Get the appropriate gendisk */
-	gd = xldev_to_gendisk(device); 
-
-	/* Update the sector_number we'll pass down as appropriate; note 
-	   that we could sanity check that resulting sector will be in 
-	   this partition, but this will happen in xen anyhow */
-	sector_number += gd->part[MINOR(device)].start_sect;
+        /* Update the sector_number we'll pass down as appropriate; note 
+           that we could sanity check that resulting sector will be in 
+           this partition, but this will happen in xen anyhow */
+        sector_number += gd->part[MINOR(device)].start_sect;
 
         if ( (sg_operation == operation) &&
              (sg_dev == device) &&
@@ -339,9 +337,9 @@ void do_xlblk_request(request_queue_t *rq)
 
     while ( !rq->plugged && !list_empty(&rq->queue_head))
     {
-	if ( (req = blkdev_entry_next_request(&rq->queue_head)) == NULL ) 
-	    goto out;
-		
+        if ( (req = blkdev_entry_next_request(&rq->queue_head)) == NULL ) 
+            goto out;
+  
         DPRINTK("do_xlblk_request %p: cmd %i, sec %lx, (%li/%li) bh:%p\n",
                 req, req->cmd, req->sector,
                 req->current_nr_sectors, req->nr_sectors, req->bh);
@@ -351,11 +349,11 @@ void do_xlblk_request(request_queue_t *rq)
         if ((rw != READ) && (rw != WRITE))
             panic("XenoLinux Virtual Block Device: bad cmd: %d\n", rw);
 
-	req->errors = 0;
+        req->errors = 0;
 
         bh = req->bh;
         while ( bh != NULL )
-	{
+        {
             next_bh = bh->b_reqnext;
             bh->b_reqnext = NULL;
 
@@ -364,12 +362,12 @@ void do_xlblk_request(request_queue_t *rq)
                 (rw == READ) ? XEN_BLOCK_READ : XEN_BLOCK_WRITE, 
                 bh->b_data, bh->b_rsector, bh->b_size>>9, bh->b_rdev);
 
-	    if(full) { 
+            if(full) { 
 
-		bh->b_reqnext = next_bh;
-		pending_queues[nr_pending++] = rq;
-		if ( nr_pending >= MAX_PENDING ) BUG();
-		goto out; 
+                bh->b_reqnext = next_bh;
+                pending_queues[nr_pending++] = rq;
+                if ( nr_pending >= MAX_PENDING ) BUG();
+                goto out; 
 
             }
 
@@ -430,15 +428,15 @@ static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
     if ( state == STATE_CLOSED )
         return;
     
-    spin_lock_irqsave(&io_request_lock, flags);	    
+    spin_lock_irqsave(&io_request_lock, flags);     
 
     for ( i  = resp_cons;
-	  i != blk_ring->resp_prod;
-	  i  = BLK_RING_INC(i) )
+          i != blk_ring->resp_prod;
+          i  = BLK_RING_INC(i) )
     {
-	blk_ring_resp_entry_t *bret = &blk_ring->ring[i].resp;
-	switch (bret->operation)
-	{
+        blk_ring_resp_entry_t *bret = &blk_ring->ring[i].resp;
+        switch (bret->operation)
+        {
         case XEN_BLOCK_READ:
         case XEN_BLOCK_WRITE:
             if ( bret->status )
@@ -452,11 +450,11 @@ static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
                 bh->b_reqnext = NULL;
                 bh->b_end_io(bh, !bret->status);
             }
-	    break;
-	    
+            break;
+     
         default:
             BUG();
-	}
+        }
     }
     
     resp_cons = i;
@@ -501,8 +499,8 @@ int __init xlblk_init(void)
                         SA_SAMPLE_RANDOM, "blkdev", NULL);
     if ( error )
     {
-	printk(KERN_ALERT "Could not allocate receive interrupt\n");
-	goto fail;
+        printk(KERN_ALERT "Could not allocate receive interrupt\n");
+        goto fail;
     }
 
     /* Setup our [empty] disk information structure */
