@@ -12,7 +12,7 @@ class DomInfo( GenTabbed ):
         self.dom = 0;
     
         def tabUrlWriter( tab ):
-            return urlWriter( "mod=info&dom=%s%s" % ( self.dom, tab ) )
+            return urlWriter( "&dom=%s%s" % ( self.dom, tab ) )
         
         GenTabbed.__init__( self, "Domain Info", tabUrlWriter, [ 'General', 'SXP', 'Devices' ], [ DomGeneralTab, DomSXPTab, NullTab ]  )
 
@@ -52,13 +52,11 @@ class DomGenTab( GeneralTab ):
         
     def write_BODY( self, request ):
     
-        dom = request.args.get('dom')
+        self.dom = getVar('dom', request)
         
-        if dom is None or len(dom) != 1:
+        if self.dom is None:
             request.write( "<p>Please Select a Domain</p>" )
             return None
-        else:
-            self.dom = dom[0]
             
         self.dict = getDomInfoHash( self.dom )
         
@@ -72,17 +70,15 @@ class DomSXPTab( PreTab ):
 
 
     def write_BODY( self, request ):
-        dom = request.args.get('dom')
+        self.dom = getVar('dom', request)
         
-        if dom is None or len(dom) != 1:
+        if self.dom is None:
             request.write( "<p>Please Select a Domain</p>" )
             return None
-        else:
-            self.dom = dom[0]
-            
+
         domInfo = server.xend_domain( self.dom )
         
-        self.source = sxp2string( domInfo )
+        self.source = sxp2prettystring( domInfo )
         
         PreTab.write_BODY( self, request )
         
