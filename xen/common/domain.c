@@ -43,7 +43,6 @@ struct task_struct *do_createdomain(domid_t dom_id, unsigned int cpu)
 
     if ( (p = alloc_task_struct()) == NULL )
         return NULL;
-    memset(p, 0, sizeof(*p));
 
     atomic_set(&p->refcnt, 1);
 
@@ -496,7 +495,7 @@ void release_task(struct task_struct *p)
     UNSHARE_PFN(virt_to_page(p->shared_info));
     free_all_dom_mem(p);
 
-    kmem_cache_free(task_struct_cachep, p);
+    free_task_struct(p);
 }
 
 

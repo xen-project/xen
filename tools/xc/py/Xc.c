@@ -290,10 +290,10 @@ static PyObject *pyxc_bvtsched_domain_set(PyObject *self,
     u64           dom;
     unsigned long mcuadv, warp, warpl, warpu;
 
-    static char *kwd_list[] = { "dom", "mcuadv", "warp", "warpl", 
+    static char *kwd_list[] = { "dom", "mcuadv", "warp", "warpl",
                                 "warpu", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "Lllll", kwd_list, 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "Lllll", kwd_list,
                                       &dom, &mcuadv, &warp, &warpl, &warpu) )
         return NULL;
 
@@ -862,6 +862,49 @@ static PyObject *pyxc_physinfo(PyObject *self,
                          "cpu_khz",     info.cpu_khz);
 }
 
+static PyObject *pyxc_atropos_domain_set(PyObject *self,
+                                         PyObject *args,
+                                         PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+    PyObject *ret_obj;
+    int xtratime;
+    u64 domid;
+
+    static char *kwd_list[] = { "dom", "xtratime", NULL };
+    
+    if( !PyArg_ParseTupleAndKeywords(args, kwds, "Li", kwd_list, &domid,
+                                     &xtratime) )
+        return NULL;
+   
+    if ( xc_atropos_domain_set(xc->xc_handle, domid, xtratime) != 0 )
+        return PyErr_SetFromErrno(xc_error);
+
+    Py_INCREF(zero);
+    return zero;
+}
+
+static PyObject *pyxc_rrobin_global_set(PyObject *self,
+                                        PyObject *args,
+                                        PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+    PyObject *ret_obj;
+    u64 slice;
+    
+    static char *kwd_list[] = { "slice", NULL };
+
+    if( !PyArg_ParseTupleAndKeywords(args, kwds, "L", kwd_list, &slice) )
+        return NULL;
+    
+    if ( xc_rrobin_global_set(xc->xc_handle, slice) != 0 )
+        return PyErr_SetFromErrno(xc_error);
+    
+    Py_INCREF(zero);
+    return zero;
+}
+
+
 static PyMethodDef pyxc_methods[] = {
     { "domain_create", 
       (PyCFunction)pyxc_domain_create, 
@@ -955,15 +998,15 @@ static PyMethodDef pyxc_methods[] = {
       " cmdline [str, n/a]: Kernel parameters, if any.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
-    { "bvtsched_global_set", 
-      (PyCFunction)pyxc_bvtsched_global_set, 
+    { "bvtsched_global_set",
+      (PyCFunction)pyxc_bvtsched_global_set,
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Set global tuning parameters for Borrowed Virtual Time scheduler.\n"
       " ctx_allow [int]: Minimal guaranteed quantum (I think!).\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
-    { "bvtsched_domain_set", 
-      (PyCFunction)pyxc_bvtsched_domain_set, 
+    { "bvtsched_domain_set",
+      (PyCFunction)pyxc_bvtsched_domain_set,
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Set per-domain tuning parameters for Borrowed Virtual Time scheduler.\n"
       " dom    [long]: Identifier of domain to be tuned.\n"
@@ -972,6 +1015,22 @@ static PyMethodDef pyxc_methods[] = {
       " warpl  [int]:  Internal BVT parameter.\n"
       " warpu  [int]:  Internal BVT parameter.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "atropos_domain_set",
+      (PyCFunction)pyxc_atropos_domain_set,
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Set the extra time flag for a domain when running with Atropos.\n"
+      " dom [long]: domain to set\n"
+      " xtratime [int]: boolean\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "rrobin_global_set",
+      (PyCFunction)pyxc_rrobin_global_set,
+      METH_KEYWORDS, "\n"
+      "Set Round Robin scheduler slice.\n"
+      " slice [long]: Round Robin scheduler slice\n"
+      "Returns: [int] 0 on success, throws an exception on failure\n"
+    },
 
     { "vif_scheduler_set", 
       (PyCFunction)pyxc_vif_scheduler_set, 

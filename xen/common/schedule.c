@@ -2,14 +2,16 @@
  ****************************************************************************
  * (C) 2002-2003 - Rolf Neugebauer - Intel Research Cambridge
  * (C) 2002-2003 University of Cambridge
+ * (C) 2004      - Mark Williamson - Intel Research Cambridge
  ****************************************************************************
  *
  *        File: common/schedule.c
  *      Author: Rolf Neugebauer & Keir Fraser
+ *              Updated for generic API by Mark Williamson
  * 
- * Description: CPU scheduling
- *              implements A Borrowed Virtual Time scheduler.
- *              (see Duda & Cheriton SOSP'99)
+ * Description: Generic CPU scheduling code
+ *              implements support functionality for the Xen scheduler API.
+ *
  */
 
 #include <xeno/config.h>
@@ -23,6 +25,9 @@
 #include <xeno/interrupt.h>
 #include <xeno/timer.h>
 #include <xeno/perfc.h>
+#include <xeno/sched-if.h>
+#include <hypervisor-ifs/sched-ctl.h>
+#include <xeno/trace.h>
 
 /*#define WAKEUP_HISTO*/
 /*#define BLOCKTIME_HISTO*/
@@ -33,23 +38,54 @@
 #define BUCKETS 200
 #endif
 
-#define MCU            (s32)MICROSECS(100)    /* Minimum unit */
-#define MCU_ADVANCE    10                     /* default weight */
 #define TIME_SLOP      (s32)MICROSECS(50)     /* allow time to slip a bit */
-static s32 ctx_allow = (s32)MILLISECS(5);     /* context switch allowance */
 
-typedef struct schedule_data_st
-{
-    struct list_head    runqueue;       /* runqueue */
-    struct task_struct *curr;           /* current task */
-    struct task_struct *idle;           /* idle task for this cpu */
-    u32                 svt;            /* system virtual time. per CPU??? */
-    struct ac_timer     s_timer;        /* scheduling timer  */
-#ifdef BUCKETS
-    u32                 hist[BUCKETS];  /* for scheduler latency histogram */
-#endif
-} __cacheline_aligned schedule_data_t;
-static schedule_data_t schedule_data[NR_CPUS];
+/* XXX MAW pull trace-related #defines out of here and into an auto-generated
+ * header file later on! */
+#define TRC_SCHED_DOM_ADD             0x00010000
+#define TRC_SCHED_DOM_REM             0x00010001
+#define TRC_SCHED_WAKE                0x00010002
+#define TRC_SCHED_BLOCK               0x00010003
+#define TRC_SCHED_YIELD               0x00010004
+#define TRC_SCHED_SET_TIMER           0x00010005
+#define TRC_SCHED_CTL                 0x00010006
+#define TRC_SCHED_ADJDOM              0x00010007
+#define TRC_SCHED_RESCHED             0x00010008
+#define TRC_SCHED_SWITCH              0x00010009
+#define TRC_SCHED_S_TIMER_FN          0x0001000A
+#define TRC_SCHED_T_TIMER_FN          0x0001000B
+#define TRC_SCHED_DOM_TIMER_FN        0x0001000C
+#define TRC_SCHED_FALLBACK_TIMER_FN   0x0001000D
+
+#define _HIGH32(_x) (_x >> 32)
+#define _LOW32(_x)  ((u32)_x )
+
+/* Various timer handlers. */
+static void s_timer_fn(unsigned long unused);
+static void t_timer_fn(unsigned long unused);
+static void dom_timer_fn(unsigned long data);
+static void fallback_timer_fn(unsigned long unused);
+
+/* this is global for now so that private implementations can reach it */
+schedule_data_t schedule_data[NR_CPUS];
+
+/* XXX would be nice if the schedulers array could get populated
+ * automagically without having to hack the code in here         */
+extern struct scheduler sched_bvt_def, sched_rrobin_def;
+static struct scheduler *schedulers[] = { &sched_bvt_def,
+                                          &sched_rrobin_def,
+                                          NULL};
+
+/* scheduler ops for the current scheduler */
+static struct scheduler ops;
+
+/* for scheduler functions that return void             */
+#define SCHED_FN_VOID(fn, ...) do { if ( ops.fn ) ops.fn(__VA_ARGS__); } \
+                               while (0)
+
+/* for scheduler functions that return a numeric value  */
+#define SCHED_FN_RET(fn, ...)                             \
+         (( ops.fn != NULL ) ? ops.fn( __VA_ARGS__ ) : 0 )
 
 spinlock_t schedule_lock[NR_CPUS] __cacheline_aligned;
 
@@ -62,69 +98,36 @@ static struct ac_timer t_timer[NR_CPUS];
  */
 static struct ac_timer fallback_timer[NR_CPUS];
 
-/* Various timer handlers. */
-static void s_timer_fn(unsigned long unused);
-static void t_timer_fn(unsigned long unused);
-static void dom_timer_fn(unsigned long data);
-static void fallback_timer_fn(unsigned long unused);
+extern kmem_cache_t *task_struct_cachep;
 
-/*
- * Wrappers for run-queue management. Must be called with the schedule_lock
- * held.
+void free_task_struct(struct task_struct *p)
+{
+    SCHED_FN_VOID(free_task, p);
+    kmem_cache_free(task_struct_cachep, p);
+}
+
+/**
+ * alloc_task_struct - allocate a new task_struct and sched private structures
  */
-static inline void __add_to_runqueue_head(struct task_struct * p)
-{    
-    list_add(&p->run_list, &schedule_data[p->processor].runqueue);
-}
-
-static inline void __add_to_runqueue_tail(struct task_struct * p)
+struct task_struct *alloc_task_struct(void)
 {
-    list_add_tail(&p->run_list, &schedule_data[p->processor].runqueue);
-}
+    struct task_struct *p;
 
-static inline void __del_from_runqueue(struct task_struct * p)
-{
-    list_del(&p->run_list);
-    p->run_list.next = NULL;
-}
+    p=((struct task_struct *)kmem_cache_alloc(task_struct_cachep,GFP_KERNEL));
 
-static inline int __task_on_runqueue(struct task_struct *p)
-{
-    return p->run_list.next != NULL;
-}
+    if ( p == NULL )
+        return NULL;
 
-#define next_domain(p) \\
-        list_entry((p)->run_list.next, struct task_struct, run_list)
+    memset(p, 0, sizeof(*p));    
 
-/*
- * Calculate the effective virtual time for a domain. Take into account 
- * warping limits
- */
-static void __calc_evt(struct task_struct *p)
-{
-    s_time_t now = NOW();
-    if ( p->warpback ) 
+    if ( SCHED_FN_RET(alloc_task, p) < 0)
     {
-        if ( ((now - p->warped) < p->warpl) &&
-             ((now - p->uwarped) > p->warpu) )
-        {
-            /* allowed to warp */
-            p->evt = p->avt - p->warp;
-        } 
-        else 
-        {
-            /* warped for too long -> unwarp */
-            p->evt      = p->avt;
-            p->uwarped  = now;
-            p->warpback = 0;
-        }
-    } 
-    else 
-    {
-        p->evt = p->avt;
+        kmem_cache_free(task_struct_cachep, p);
+        return NULL;
     }
+    
+    return p;
 }
-
 
 /*
  * Add and remove a domain
@@ -132,40 +135,41 @@ static void __calc_evt(struct task_struct *p)
 void sched_add_domain(struct task_struct *p) 
 {
     p->state       = TASK_STOPPED;
-    p->mcu_advance = MCU_ADVANCE;
 
-    if ( p->domain == IDLE_DOMAIN_ID )
+    if( p->domain != IDLE_DOMAIN_ID )
     {
-        p->avt = p->evt = ~0U;
-        schedule_data[p->processor].idle = p;
-    } 
-    else 
-    {
-        /* Set avt end evt to system virtual time. */
-        p->avt         = schedule_data[p->processor].svt;
-        p->evt         = schedule_data[p->processor].svt;
-        /* Set some default values here. */
-        p->warpback    = 0;
-        p->warp        = 0;
-        p->warpl       = 0;
-        p->warpu       = 0;
-
         /* Initialise the per-domain timer. */
         init_ac_timer(&p->timer);
         p->timer.cpu      =  p->processor;
         p->timer.data     = (unsigned long)p;
         p->timer.function = &dom_timer_fn;
-
     }
+    else
+    {
+        schedule_data[p->processor].idle = p;
+    }
+
+    SCHED_FN_VOID(add_task, p);
+
+    TRACE_3D(TRC_SCHED_DOM_ADD, _HIGH32(p->domain), _LOW32(p->domain), p);
 }
 
+/* XXX race condition here?   we could both add and remove a domain at once, in
+ * theory.  ick! */
+/* XXX is the task already removed from the runlist at this point? */
 int sched_rem_domain(struct task_struct *p) 
 {
     int x, y = p->state;
     do {
         if ( (x = y) == TASK_DYING ) return 0;
     } while ( (y = cmpxchg(&p->state, x, TASK_DYING)) != x );
+
     rem_ac_timer(&p->timer);
+
+    SCHED_FN_VOID(rem_task, p);
+
+    TRACE_3D(TRC_SCHED_DOM_REM, _HIGH32(p->domain), _LOW32(p->domain), p);
+
     return 1;
 }
 
@@ -174,6 +178,11 @@ void init_idle_task(void)
 {
     unsigned long flags;
     struct task_struct *p = current;
+
+    if ( SCHED_FN_RET (alloc_task, p) < 0)
+		panic("Failed to allocate scheduler private data for idle task");
+    SCHED_FN_VOID(add_task, p);
+
     spin_lock_irqsave(&schedule_lock[p->processor], flags);
     p->has_cpu = 1;
     p->state = TASK_RUNNING;
@@ -182,30 +191,24 @@ void init_idle_task(void)
     spin_unlock_irqrestore(&schedule_lock[p->processor], flags);
 }
 
-
 void __wake_up(struct task_struct *p)
 {
+    TRACE_3D(TRC_SCHED_WAKE, _HIGH32(p->domain), _LOW32(p->domain), p);
+
     ASSERT(p->state != TASK_DYING);
 
     if ( unlikely(__task_on_runqueue(p)) )
         return;
 
     p->state = TASK_RUNNING;
-    __add_to_runqueue_head(p);
 
-    /* set the BVT parameters */
-    if (p->avt < schedule_data[p->processor].svt)
-        p->avt = schedule_data[p->processor].svt;
-
-    /* deal with warping here */
-    p->warpback  = 1;
-    p->warped    = NOW();
-    __calc_evt(p);
+    SCHED_FN_VOID(wake_up, p);
 
 #ifdef WAKEUP_HISTO
     p->wokenup = NOW();
 #endif
 }
+
 
 void wake_up(struct task_struct *p)
 {
@@ -220,9 +223,10 @@ void wake_up(struct task_struct *p)
  */
 static long do_block(void)
 {
+    ASSERT(current->domain != IDLE_DOMAIN_ID);
     set_bit(EVENTS_MASTER_ENABLE_BIT, &current->shared_info->events_mask);
     current->state = TASK_INTERRUPTIBLE;
-    current->warpback = 0; 
+    TRACE_2D(TRC_SCHED_BLOCK, current->domain, current);
     __enter_scheduler();
     return 0;
 }
@@ -232,6 +236,7 @@ static long do_block(void)
  */
 static long do_yield(void)
 {
+    TRACE_2D(TRC_SCHED_YIELD, current->domain, current);
     __enter_scheduler();
     return 0;
 }
@@ -295,37 +300,56 @@ long do_set_timer_op(unsigned long timeout_hi, unsigned long timeout_lo)
         add_ac_timer(&p->timer);
     }
 
+    TRACE_5D(TRC_SCHED_SET_TIMER, _HIGH32(p->domain), _LOW32(p->domain),
+             p, timeout_hi, timeout_lo);
+
     return 0;
 }
 
 
-/* Control the scheduler. */
-long sched_bvtctl(unsigned long c_allow)
+/**
+ * sched_ctl - dispatch a scheduler control operation
+ * @cmd:       the command passed in the dom0 op
+ *
+ * Given a generic scheduler control operation, call the control function for
+ * the scheduler in use, passing the appropriate control information from the
+ * union supplied.
+ */
+long sched_ctl(struct sched_ctl_cmd *cmd)
 {
-    ctx_allow = c_allow;
-    return 0;
-}
+    TRACE_0D(TRC_SCHED_CTL);
 
-/* Adjust scheduling parameter for a given domain. */
-long sched_adjdom(domid_t dom, unsigned long mcu_adv, unsigned long warp, 
-                 unsigned long warpl, unsigned long warpu)
-{
-    struct task_struct *p;
+    if ( cmd->if_ver != SCHED_CTL_IF_VER )
+        return -EACCES;
 
-    /* Sanity -- this can avoid divide-by-zero. */
-    if ( mcu_adv == 0 )
+    if ( cmd->sched_id != ops.sched_id )
         return -EINVAL;
 
-    p = find_domain_by_id(dom);
-    if ( p == NULL ) 
+    return SCHED_FN_RET(control, cmd);
+}
+
+
+/* Adjust scheduling parameter for a given domain. */
+long sched_adjdom(struct sched_adjdom_cmd *cmd)
+{
+    struct task_struct *p;    
+    
+    if ( cmd->if_ver != SCHED_CTL_IF_VER )
+        return -EACCES;
+
+    if ( cmd->sched_id != ops.sched_id )
+        return -EINVAL;
+
+    p = find_domain_by_id(cmd->domain);
+
+    if( p == NULL )
         return -ESRCH;
 
-    spin_lock_irq(&schedule_lock[p->processor]);   
-    p->mcu_advance = mcu_adv;
-    spin_unlock_irq(&schedule_lock[p->processor]); 
+    TRACE_2D(TRC_SCHED_ADJDOM, _HIGH32(p->domain), _LOW32(p->domain));
 
-    put_task_struct(p);
+    SCHED_FN_VOID(adjdom, p, cmd);
 
+    put_task_struct(p); 
     return 0;
 }
 
@@ -339,9 +363,11 @@ long sched_adjdom(domid_t dom, unsigned long mcu_adv, unsigned long warp,
  */
 unsigned long __reschedule(struct task_struct *p)
 {
-    int cpu = p->processor;
+       int cpu = p->processor;
     struct task_struct *curr;
     s_time_t now, min_time;
+
+    TRACE_3D(TRC_SCHED_RESCHED, _HIGH32(p->domain), _LOW32(p->domain), p);
 
     if ( unlikely(p->has_cpu || !__task_on_runqueue(p)) )
         return 0;
@@ -349,7 +375,7 @@ unsigned long __reschedule(struct task_struct *p)
     now = NOW();
     curr = schedule_data[cpu].curr;
     /* domain should run at least for ctx_allow */
-    min_time = curr->lastschd + ctx_allow;
+    min_time = curr->lastschd + curr->min_slice;
 
     if ( is_idle_task(curr) || (min_time <= now) )
     {
@@ -362,161 +388,67 @@ unsigned long __reschedule(struct task_struct *p)
     if ( schedule_data[cpu].s_timer.expires > min_time + TIME_SLOP )
         mod_ac_timer(&schedule_data[cpu].s_timer, min_time);
 
-    return 0;
+    return SCHED_FN_RET(reschedule, p);
 }
-
 
 void reschedule(struct task_struct *p)
 {
     unsigned long flags, cpu_mask;
+
     spin_lock_irqsave(&schedule_lock[p->processor], flags);
     cpu_mask = __reschedule(p);
+
     spin_unlock_irqrestore(&schedule_lock[p->processor], flags);
     hyp_event_notify(cpu_mask);
 }
 
-
 /* 
  * The main function
- * - deschedule the current domain.
- * - pick a new domain.
- *   i.e., the domain with lowest EVT.
- *   The runqueue should be ordered by EVT so that is easy.
+ * - deschedule the current domain (scheduler independent).
+ * - pick a new domain (scheduler dependent).
  */
 asmlinkage void __enter_scheduler(void)
 {
-    struct task_struct *prev = current, *next = NULL, *next_prime, *p;
-    struct list_head   *tmp;
+    struct task_struct *prev = current, *next = NULL;
     int                 cpu = prev->processor;
     s_time_t            now;
+    task_slice_t        next_slice;
     s32                 r_time;     /* time for new dom to run */
-    s32                 ranfor;     /* assume we never run longer than 2.1s! */
-    s32                 mcus;
-    u32                 next_evt, next_prime_evt, min_avt;
 
     perfc_incrc(sched_run);
+
+    clear_bit(_HYP_EVENT_NEED_RESCHED, &prev->hyp_events);
 
     spin_lock_irq(&schedule_lock[cpu]);
 
     now = NOW();
 
     rem_ac_timer(&schedule_data[cpu].s_timer);
-
+    
     ASSERT(!in_interrupt());
     ASSERT(__task_on_runqueue(prev));
     ASSERT(prev->state != TASK_UNINTERRUPTIBLE);
+    ASSERT(prev != NULL);
+
+    if ( prev->state == TASK_INTERRUPTIBLE )
+    {
+        /* this check is needed to avoid a race condition */
+        if ( signal_pending(prev) )
+            prev->state = TASK_RUNNING;
+        else
+            SCHED_FN_VOID(do_block, prev);
+    }
+
+    /* get policy-specific decision on scheduling... */
+    next_slice = ops.do_schedule(now);
+
+    r_time = next_slice.time;
+    next   = next_slice.task;
 
     if ( likely(!is_idle_task(prev)) ) 
-    {
-        ranfor = (s32)(now - prev->lastschd);
-        prev->cpu_time += ranfor;
-    
-        /* Calculate mcu and update avt. */
-        mcus = (ranfor + MCU - 1) / MCU;
-        prev->avt += mcus * prev->mcu_advance;
-        
-        __calc_evt(prev);
-        
-        __del_from_runqueue(prev);
-        
-        if ( likely(prev->state == TASK_RUNNING) ||
-             unlikely((prev->state == TASK_INTERRUPTIBLE) && 
-                      signal_pending(prev)) )
-        {
-            prev->state = TASK_RUNNING;
-            __add_to_runqueue_tail(prev);
-        }
-    }
+        prev->cpu_time += (now - prev->lastschd);
 
-    clear_bit(_HYP_EVENT_NEED_RESCHED, &prev->hyp_events);
-
-    /* We should at least have the idle task */
-    ASSERT(!list_empty(&schedule_data[cpu].runqueue));
-
-    /*
-     * scan through the run queue and pick the task with the lowest evt
-     * *and* the task the second lowest evt.
-     * this code is O(n) but we expect n to be small.
-     */
-    next       = schedule_data[cpu].idle;
-    next_prime = NULL;
-
-    next_evt       = ~0U;
-    next_prime_evt = ~0U;
-    min_avt        = ~0U;
-
-    list_for_each ( tmp, &schedule_data[cpu].runqueue )
-    {
-        p = list_entry(tmp, struct task_struct, run_list);
-        if ( p->evt < next_evt )
-        {
-            next_prime     = next;
-            next_prime_evt = next_evt;
-            next = p;
-            next_evt = p->evt;
-        } 
-        else if ( next_prime_evt == ~0U )
-        {
-            next_prime_evt = p->evt;
-            next_prime     = p;
-        } 
-        else if ( p->evt < next_prime_evt )
-        {
-            next_prime_evt = p->evt;
-            next_prime     = p;
-        }
-
-        /* Determine system virtual time. */
-        if ( p->avt < min_avt )
-            min_avt = p->avt;
-    }
-
-    /* Update system virtual time. */
-    if ( min_avt != ~0U )
-        schedule_data[cpu].svt = min_avt;
-
-    /* check for virtual time overrun on this cpu */
-    if ( schedule_data[cpu].svt >= 0xf0000000 )
-    {
-        u_long t_flags; 
-        write_lock_irqsave(&tasklist_lock, t_flags); 
-        for_each_domain ( p )
-        {
-            if ( p->processor == cpu )
-            {
-                p->evt -= 0xe0000000;
-                p->avt -= 0xe0000000;
-            }
-        } 
-        write_unlock_irqrestore(&tasklist_lock, t_flags); 
-        schedule_data[cpu].svt -= 0xe0000000;
-    }
-
-    /* work out time for next run through scheduler */
-    if ( is_idle_task(next) ) 
-    {
-        r_time = ctx_allow;
-        goto sched_done;
-    }
-
-    if ( (next_prime == NULL) || is_idle_task(next_prime) )
-    {
-        /* We have only one runnable task besides the idle task. */
-        r_time = 10 * ctx_allow;     /* RN: random constant */
-        goto sched_done;
-    }
-
-    /*
-     * If we are here then we have two runnable tasks.
-     * Work out how long 'next' can run till its evt is greater than
-     * 'next_prime's evt. Take context switch allowance into account.
-     */
-    ASSERT(next_prime->evt >= next->evt);
-    
-    r_time = ((next_prime->evt - next->evt)/next->mcu_advance) + ctx_allow;
-
- sched_done:
-    ASSERT(r_time >= ctx_allow);
+    /* now, switch to the new task... */
 
     prev->has_cpu = 0;
     next->has_cpu = 1;
@@ -537,7 +469,7 @@ asmlinkage void __enter_scheduler(void)
 
     if ( unlikely(prev == next) )
         return;
-
+    
     perfc_incrc(sched_ctx);
 
 #if defined(WAKEUP_HISTO)
@@ -557,6 +489,10 @@ asmlinkage void __enter_scheduler(void)
         else                    schedule_data[cpu].hist[BUCKETS-1]++;
     }
 #endif
+
+    TRACE_2D(TRC_SCHED_SWITCH, next->domain, next);
+
+    ASSERT(next->processor == current->processor);
 
     switch_to(prev, next);
     
@@ -591,6 +527,8 @@ int idle_cpu(int cpu)
 /* The scheduler timer: force a run through the scheduler*/
 static void s_timer_fn(unsigned long unused)
 {
+    TRACE_0D(TRC_SCHED_S_TIMER_FN);
+    
     set_bit(_HYP_EVENT_NEED_RESCHED, &current->hyp_events);
     perfc_incrc(sched_irq);
 }
@@ -599,6 +537,8 @@ static void s_timer_fn(unsigned long unused)
 static void t_timer_fn(unsigned long unused)
 {
     struct task_struct *p = current;
+
+    TRACE_0D(TRC_SCHED_T_TIMER_FN);
 
     if ( !is_idle_task(p) ) 
         set_bit(_EVENT_TIMER, &p->shared_info->events);
@@ -613,6 +553,8 @@ static void dom_timer_fn(unsigned long data)
     unsigned long cpu_mask = 0;
     struct task_struct *p = (struct task_struct *)data;
 
+    TRACE_0D(TRC_SCHED_DOM_TIMER_FN);
+
     cpu_mask |= mark_guest_event(p, _EVENT_TIMER);
     guest_event_notify(cpu_mask);
 }
@@ -622,6 +564,8 @@ static void dom_timer_fn(unsigned long data)
 static void fallback_timer_fn(unsigned long unused)
 {
     struct task_struct *p = current;
+
+    TRACE_0D(TRC_SCHED_FALLBACK_TIMER_FN);
 
     if ( !is_idle_task(p) )
         update_dom_time(p->shared_info);
@@ -660,6 +604,29 @@ void __init scheduler_init(void)
     }
 
     schedule_data[0].idle = &idle0_task;
+
+    extern char opt_sched[];
+
+    for ( i = 0; schedulers[i] != NULL; i++ )
+    {
+        ops = *schedulers[i]; /* fetch operations structure */
+
+        if(strcmp(ops.opt_name, opt_sched) == 0)
+            break;
+    }
+    
+    if ( schedulers[i] == NULL )
+        printk("Could not find scheduler: %s\n", opt_sched);
+
+    printk("Using scheduler: %s (%s)\n", ops.name, ops.opt_name);
+    
+    if ( ops.do_schedule == NULL)
+        panic("Chosen scheduler has NULL do_schedule!");
+
+    if ( SCHED_FN_RET(init_scheduler) < 0 )
+        panic("Initialising scheduler failed!");
+
+    SCHED_FN_VOID(add_task, &idle0_task);
 }
 
 /*
@@ -698,12 +665,9 @@ static void dump_rqueue(struct list_head *queue, char *name)
             (unsigned long) queue->next, (unsigned long) queue->prev);
     list_for_each (list, queue) {
         p = list_entry(list, struct task_struct, run_list);
-        printk("%3d: %llu has=%c mcua=0x%04lX"
-               " ev=0x%08X av=0x%08X c=0x%X%08X\n",
-               loop++, p->domain,
-               p->has_cpu ? 'T':'F',
-               p->mcu_advance, p->evt, p->avt,
-               (u32)(p->cpu_time>>32), (u32)p->cpu_time);
+        printk("%3d: %llu has=%c ", loop++, p->domain, p->has_cpu ? 'T':'F');
+        SCHED_FN_VOID(dump_runq_el, p);
+        printk("c=0x%X%08X\n", (u32)(p->cpu_time>>32), (u32)p->cpu_time);
         printk("         l: %lx n: %lx  p: %lx\n",
                (unsigned long)list, (unsigned long)list->next,
                (unsigned long)list->prev);
@@ -717,11 +681,13 @@ void dump_runq(u_char key, void *dev_id, struct pt_regs *regs)
     s_time_t now = NOW();
     int i;
 
-    printk("BVT: mcu=0x%08Xns ctx_allow=0x%08Xns NOW=0x%08X%08X\n",
-           (u32)MCU, (u32)ctx_allow, (u32)(now>>32), (u32)now); 
+	printk("Scheduler: %s (%s)\n", ops.name, ops.opt_name);
+    SCHED_FN_VOID(dump_settings);
+    printk("NOW=0x%08X%08X\n",  (u32)(now>>32), (u32)now); 
     for (i = 0; i < smp_num_cpus; i++) {
         spin_lock_irqsave(&schedule_lock[i], flags);
-        printk("CPU[%02d] svt=0x%08X ", i, (s32)schedule_data[i].svt);
+        printk("CPU[%02d] ", i);
+        SCHED_FN_VOID(dump_cpu_state,i);
         dump_rqueue(&schedule_data[i].runqueue, "rq"); 
         spin_unlock_irqrestore(&schedule_lock[i], flags);
     }

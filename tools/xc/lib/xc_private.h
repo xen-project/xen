@@ -23,6 +23,7 @@
 #include <dom0_ops.h>
 #include <vbd.h>
 #include <event_channel.h>
+#include <sched-ctl.h>
 
 #define _PAGE_PRESENT   0x001
 #define _PAGE_RW        0x002

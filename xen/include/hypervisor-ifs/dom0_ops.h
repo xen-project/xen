@@ -11,13 +11,14 @@
 #define __DOM0_OPS_H__
 
 #include "hypervisor-if.h"
+#include "sched-ctl.h"
 
 /*
  * Make sure you increment the interface version whenever you modify this file!
  * This makes sure that old versions of dom0 tools will stop working in a
  * well-defined way (rather than crashing the machine, for instance).
  */
-#define DOM0_INTERFACE_VERSION   0xAAAA0008
+#define DOM0_INTERFACE_VERSION   0xAAAA0009
 
 #define MAX_CMD_LEN       256
 #define MAX_DOMAIN_NAME    16
@@ -74,23 +75,13 @@ typedef struct dom0_builddomain_st
     full_execution_context_t ctxt;
 } dom0_builddomain_t;
 
-#define DOM0_BVTCTL            6
-typedef struct dom0_bvtctl_st
-{
-    /* IN variables. */
-    unsigned long ctx_allow;  /* context switch allowance */
-} dom0_bvtctl_t;
+#define DOM0_SCHEDCTL            6
+ /* struct sched_ctl_cmd is from sched-ctl.h   */
+typedef struct sched_ctl_cmd dom0_schedctl_t;
 
 #define DOM0_ADJUSTDOM         7
-typedef struct dom0_adjustdom_st
-{
-    /* IN variables. */
-    domid_t       domain;     /* domain id */
-    unsigned long mcu_adv;    /* mcu advance: inverse of weight */
-    unsigned long warp;       /* time warp */
-    unsigned long warpl;      /* warp limit */
-    unsigned long warpu;      /* unwarp time requirement */
-} dom0_adjustdom_t;
+/* struct sched_adjdom_cmd is from sched-ctl.h */
+typedef struct sched_adjdom_cmd dom0_adjustdom_t;
 
 #define DOM0_GETDOMAININFO    12
 typedef struct dom0_getdomaininfo_st
@@ -234,7 +225,7 @@ typedef struct dom0_op_st
         dom0_stopdomain_t       stopdomain;
         dom0_destroydomain_t    destroydomain;
         dom0_getmemlist_t       getmemlist;
-        dom0_bvtctl_t           bvtctl;
+        dom0_schedctl_t         schedctl;
         dom0_adjustdom_t        adjustdom;
         dom0_builddomain_t      builddomain;
         dom0_getdomaininfo_t    getdomaininfo;

@@ -18,6 +18,7 @@
 #include <asm/pdb.h>
 #include <xeno/trace.h>
 #include <xeno/console.h>
+#include <hypervisor-ifs/sched-ctl.h>
 
 extern unsigned int alloc_new_dom_mem(struct task_struct *, unsigned int);
 
@@ -196,22 +197,15 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     }
     break;
 
-    case DOM0_BVTCTL:
+    case DOM0_SCHEDCTL:
     {
-        unsigned long  ctx_allow = op->u.bvtctl.ctx_allow;
-        ret = sched_bvtctl(ctx_allow);        
+        ret = sched_ctl(&op->u.schedctl);
     }
     break;
 
     case DOM0_ADJUSTDOM:
     {
-        domid_t        dom     = op->u.adjustdom.domain;
-        unsigned long  mcu_adv = op->u.adjustdom.mcu_adv;
-        unsigned long  warp    = op->u.adjustdom.warp;
-        unsigned long  warpl   = op->u.adjustdom.warpl;
-        unsigned long  warpu   = op->u.adjustdom.warpu;
-
-        ret = sched_adjdom(dom, mcu_adv, warp, warpl, warpu);
+        ret = sched_adjdom(&op->u.adjustdom);
     }
     break;
 
@@ -281,7 +275,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             if ( (p->state == TASK_STOPPED) || (p->state == TASK_DYING) )
                 op->u.getdomaininfo.state = DOMSTATE_STOPPED;
             op->u.getdomaininfo.hyp_events  = p->hyp_events;
-            op->u.getdomaininfo.mcu_advance = p->mcu_advance;
+//            op->u.getdomaininfo.mcu_advance = p->mcu_advance;
             op->u.getdomaininfo.tot_pages   = p->tot_pages;
             op->u.getdomaininfo.cpu_time    = p->cpu_time;
             op->u.getdomaininfo.shared_info_frame = 

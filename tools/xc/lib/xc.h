@@ -81,6 +81,13 @@ int xc_bvtsched_domain_set(int xc_handle,
                            unsigned long warpl,
                            unsigned long warpu);
 
+int xc_atropos_domain_set(int xc_handle,
+			  u64 domid,
+			  int xtratime);
+
+int xc_rrobin_global_set(int xc_handle,
+			 u64 slice);
+
 typedef struct {
     unsigned long credit_bytes;
     unsigned long credit_usec;

@@ -71,6 +71,7 @@
 3fbba6dbDfYvJSsw9500b4SZyUhxjQ tools/xc/lib/Makefile
 3fbba6dc1uU7U3IFeF6A-XEOYF2MkQ tools/xc/lib/rpm.spec
 3fbba6dcrNxtygEcgJYAJJ1gCQqfsA tools/xc/lib/xc.h
+40589968oCfoUlXd460CjVAkBE8IBA tools/xc/lib/xc_atropos.c
 3fbba6dbEVkVMX0JuDFzap9jeaucGA tools/xc/lib/xc_bvtsched.c
 3fbba6dbasJQV-MVElDC0DGSHMiL5w tools/xc/lib/xc_domain.c
 40278d99BLsfUv3qxv0I8C1sClZ0ow tools/xc/lib/xc_elf.h
@@ -83,6 +84,7 @@
 4051bce6CHAsYh8P5t2OHDtRWOP9og tools/xc/lib/xc_physdev.c
 3fbba6dctWRWlFJkYb6hdix2X4WMuw tools/xc/lib/xc_private.c
 3fbba6dcbVrG2hPzEzwdeV_UC8kydQ tools/xc/lib/xc_private.h
+40589968UQFnJeOMn8UIFLbXBuwXjw tools/xc/lib/xc_rrobin.c
 3fbba6dcoGq9hQlksrBUfC2P5F6sGg tools/xc/lib/xc_vbd.c
 3fbba6dc38q-ioRlwSR_quw4G3qUeQ tools/xc/lib/xc_vif.c
 3fbd0a3dTwnDcfdw0-v46dPbX98zDw tools/xc/py/Makefile
@@ -169,6 +171,8 @@
 4051bcecFeq4DE70p4zGO5setf47CA xen/common/physdev.c
 4006e659i9j-doVxY7DKOGU4XVin1Q xen/common/rbtree.c
 3ddb79bdHqdQpATqC0rmUZNbsb6L6A xen/common/resource.c
+40589968dD2D1aejwSOvrROg7fOvGQ xen/common/sched_bvt.c
+40589968be_t_n0-w6ggceW7h-sx0w xen/common/sched_rrobin.c
 3e397e6619PgAfBbw2XFbXkewvUWgw xen/common/schedule.c
 3ddb79bdB9RNMnkQnUyZ5C9hhMSQQw xen/common/slab.c
 3ddb79bd0gVQYmL2zvuJnldvD0AGxQ xen/common/softirq.c
@@ -497,6 +501,7 @@
 3ead095dE_VF-QA88rl_5cWYRWtRVQ xen/include/hypervisor-ifs/kbd.h
 3ddb79c2oRPrzClk3zbTkRHlpumzKA xen/include/hypervisor-ifs/network.h
 4051db79512nOCGweabrFWO2M2h5ng xen/include/hypervisor-ifs/physdev.h
+40589968wmhPmV5-ENbBYmMjnedgKw xen/include/hypervisor-ifs/sched-ctl.h
 404f3d2eR2Owk-ZcGOx9ULGHg3nrww xen/include/hypervisor-ifs/trace.h
 3f0d22cbroqp_BkoDPwkfRJhaw1LiQ xen/include/hypervisor-ifs/vbd.h
 3ddb79c4qbCoOFHrv9sCGshbWzBVlQ xen/include/scsi/scsi.h
@@ -562,6 +567,7 @@
 3ddb79c04nQVR3EYM5L4zxDV_MCo1g xen/include/xeno/prefetch.h
 4006e65fWMwLqcocgik6wbF0Eeh0Og xen/include/xeno/rbtree.h
 3e4540ccU1sgCx8seIMGlahmMfv7yQ xen/include/xeno/reboot.h
+40589969nPq3DMzv24RDb5LXE9brHw xen/include/xeno/sched-if.h
 3ddb79c0LzqqS0LhAQ50ekgj4oGl7Q xen/include/xeno/sched.h
 403a06a7H0hpHcKpAiDe5BPnaXWTlA xen/include/xeno/serial.h
 3ddb79c0VDeD-Oft5eNfMneTU3D1dQ xen/include/xeno/skbuff.h

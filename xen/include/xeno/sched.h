@@ -114,16 +114,9 @@ struct task_struct
     s_time_t         wokenup;       /* time domain got woken up */
     struct ac_timer  timer;         /* one-shot timer for timeout values */
 
-    /* BVT scheduler specific. */
-    unsigned long mcu_advance;      /* inverse of weight */
-    u32           avt;              /* actual virtual time */
-    u32           evt;              /* effective virtual time */
-    int           warpback;         /* warp?  */
-    long          warp;             /* virtual time warp */
-    long          warpl;            /* warp limit */
-    long          warpu;            /* unwarp time requirement */
-    s_time_t      warped;           /* time it ran warped last time */
-    s_time_t      uwarped;          /* time it ran unwarped last time */
+    s_time_t         min_slice;     /* minimum time before reschedule */
+
+    void *sched_priv;               /* scheduler-specific data */
 
     /* Network I/O */
     net_vif_t *net_vif_list[MAX_DOMAIN_VIFS];
@@ -177,6 +170,7 @@ struct task_struct
 #define TASK_UNINTERRUPTIBLE     2
 #define TASK_STOPPED             4
 #define TASK_DYING               8
+#define TASK_SCHED_PRIV          16
 
 #include <asm/uaccess.h> /* for KERNEL_DS */
 
@@ -186,8 +180,6 @@ struct task_struct
     domain:      IDLE_DOMAIN_ID, \
     state:       TASK_RUNNING,   \
     has_cpu:     0,              \
-    evt:         0xffffffff,     \
-    avt:         0xffffffff,     \
     mm:          IDLE0_MM,       \
     addr_limit:  KERNEL_DS,      \
     thread:      INIT_THREAD,    \
@@ -202,9 +194,9 @@ extern struct task_struct *idle_task[NR_CPUS];
 
 #include <xeno/slab.h>
 
-extern kmem_cache_t *task_struct_cachep;
-#define alloc_task_struct()  \
-  ((struct task_struct *)kmem_cache_alloc(task_struct_cachep,GFP_KERNEL))
+void free_task_struct(struct task_struct *p);
+struct task_struct *alloc_task_struct();
+
 #define put_task_struct(_p) \
   if ( atomic_dec_and_test(&(_p)->refcnt) ) release_task(_p)
 #define get_task_struct(_p)  \
@@ -251,15 +243,14 @@ extern spinlock_t schedule_lock[NR_CPUS] __cacheline_aligned;
 void scheduler_init(void);
 void schedulers_start(void);
 void sched_add_domain(struct task_struct *p);
-int sched_rem_domain(struct task_struct *p);
-long sched_bvtctl(unsigned long ctx_allow);
-long sched_adjdom(domid_t dom, unsigned long mcu_adv, unsigned long warp, 
-                  unsigned long warpl, unsigned long warpu);
+int  sched_rem_domain(struct task_struct *p);
+long sched_ctl(struct sched_ctl_cmd *);
+long sched_adjdom(struct sched_adjdom_cmd *);
 void init_idle_task(void);
 void __wake_up(struct task_struct *p);
 void wake_up(struct task_struct *p);
-unsigned long __reschedule(struct task_struct *p);
 void reschedule(struct task_struct *p);
+unsigned long __reschedule(struct task_struct *p);
 
 /* NB. Limited entry in Xen. Not for arbitrary use! */
 asmlinkage void __enter_scheduler(void);
@@ -302,4 +293,4 @@ extern struct task_struct *task_list;
 
 extern void update_process_times(int user);
 
-#endif
+#endif /*_LINUX_SCHED_H */

@@ -86,7 +86,15 @@ static char *task_states[] =
     NULL,
     NULL,
     NULL,
-    "Dying     ", 
+    "Dying     ",
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    "Sched priv"
 }; 
 
 void do_task_queues(u_char key, void *dev_id, struct pt_regs *regs) 
