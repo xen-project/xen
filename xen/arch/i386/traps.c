@@ -252,7 +252,7 @@ asmlinkage void do_int3(struct pt_regs *regs, long error_code)
     struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
     trap_info_t *ti;
 
-    if ( pdb_handle_exception(3, regs) == 0 )
+    if ( pdb_initialized && pdb_handle_exception(3, regs) == 0 )
         return;
     if ( (regs->xcs & 3) != 3 )
     {
@@ -377,7 +377,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
 #endif
     }
 
-    if (pdb_page_fault_possible)
+    if (pdb_page_fault_possible)                 /* implicit pdb_initialized */
     {
         pdb_page_fault = 1;
 	/* make eax & edx valid to complete the instruction */
