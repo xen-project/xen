@@ -161,6 +161,12 @@ static unsigned long current_target(void)
     return target;
 }
 
+/*
+ * We avoid multiple worker processes conflicting via the balloon mutex.
+ * We may of course race updates of the target counts (which are protected
+ * by the balloon lock), or with changes to the Xen hard limit, but we will
+ * recover from these in time.
+ */
 static void balloon_process(void *unused)
 {
     unsigned long *mfn_list, pfn, i, flags;
@@ -283,9 +289,10 @@ static void balloon_process(void *unused)
 /* Resets the Xen limit, sets new target, and kicks off processing. */
 static void set_new_target(unsigned long target)
 {
+    /* No need for lock. Not read-modify-write updates. */
     hard_limit   = ~0UL;
     target_pages = target;
-    balloon_process(NULL);
+    schedule_work(&balloon_worker);
 }
 
 static void balloon_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
@@ -426,8 +433,7 @@ static int __init balloon_init(void)
 
     balloon_pde->proc_fops = &balloon_fops;
 
-    (void)ctrl_if_register_receiver(CMSG_MEM_REQUEST, balloon_ctrlif_rx,
-                                    CALLBACK_IN_BLOCKING_CONTEXT);
+    (void)ctrl_if_register_receiver(CMSG_MEM_REQUEST, balloon_ctrlif_rx, 0);
 
     /* Initialise the balloon with excess memory space. */
     for ( pfn = xen_start_info.nr_pages; pfn < max_pfn; pfn++ )
@@ -446,7 +452,7 @@ void balloon_update_driver_allowance(long delta)
 {
     unsigned long flags;
     balloon_lock(flags);
-    driver_pages += delta;
+    driver_pages += delta; /* non-atomic update */
     balloon_unlock(flags);
 }
 
@@ -458,7 +464,7 @@ void balloon_put_pages(unsigned long *mfn_list, unsigned long nr_mfns)
     if ( HYPERVISOR_dom_mem_op(MEMOP_decrease_reservation, 
                                mfn_list, nr_mfns, 0) != nr_mfns )
         BUG();
-    current_pages -= nr_mfns;
+    current_pages -= nr_mfns; /* non-atomic update */
     balloon_unlock(flags);
 
     schedule_work(&balloon_worker);
