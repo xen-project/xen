@@ -83,10 +83,13 @@ struct net_private
     _id; })
 
 
-static void dbg_network_int(int irq, void *dev_id, struct pt_regs *ptregs)
+static void _dbg_network_int(struct net_device *dev)
 {
-    struct net_device *dev = (struct net_device *)dev_id;
     struct net_private *np = dev->priv;
+
+    if ( np->state == STATE_CLOSED )
+        return;
+    
     printk(KERN_ALERT "tx_full = %d, tx_entries = %d, tx_resp_cons = %d,"
            " tx_req_prod = %d, tx_resp_prod = %d, tx_event = %d, state=%d\n",
            np->tx_full, atomic_read(&np->tx_entries), np->tx_resp_cons, 
@@ -97,6 +100,18 @@ static void dbg_network_int(int irq, void *dev_id, struct pt_regs *ptregs)
            " rx_req_prod = %d, rx_resp_prod = %d, rx_event = %d\n",
            np->rx_resp_cons, np->net_idx->rx_req_prod,
            np->net_idx->rx_resp_prod, np->net_idx->rx_event);
+}
+
+
+static void dbg_network_int(int irq, void *unused, struct pt_regs *ptregs)
+{
+    struct list_head *ent;
+    struct net_private *np;
+    list_for_each ( ent, &dev_list )
+    {
+        np = list_entry(ent, struct net_private, list);
+        _dbg_network_int(np->dev);
+    }
 }
 
 

@@ -46,6 +46,7 @@
 #include <asm/hypervisor.h>
 #include <asm/hypervisor-ifs/dom0_ops.h>
 #include <linux/netdevice.h>
+#include <linux/rtnetlink.h>
 #include <linux/tqueue.h>
 
 /*
@@ -1066,15 +1067,14 @@ static void stop_task(void *unused)
     char name[6];
     int i;
 
-    /* Close down all Ethernet interfaces. */
+    rtnl_lock();
     for ( i = 0; i < 10; i++ )
     {
         sprintf(name, "eth%d", i);
-        if ( (dev = dev_get_by_name(name)) == NULL )
-            continue;
-        dev_close(dev);
-        dev_put(dev);
+        if ( (dev = __dev_get_by_name(name)) != NULL )
+            dev_close(dev);
     }
+    rtnl_unlock();
 
     blkdev_suspend();
 
@@ -1093,15 +1093,14 @@ static void stop_task(void *unused)
 
     blkdev_resume();
 
-    /* Bring up all Ethernet interfaces. */
+    rtnl_lock();
     for ( i = 0; i < 10; i++ )
     {
         sprintf(name, "eth%d", i);
-        if ( (dev = dev_get_by_name(name)) == NULL )
-            continue;
-        dev_open(dev);
-        dev_put(dev);
+        if ( (dev = __dev_get_by_name(name)) != NULL )
+            dev_open(dev);
     }
+    rtnl_unlock();
 }
 
 static struct tq_struct stop_tq;
