@@ -21,6 +21,9 @@ LDFLAGS		:= -m elf_i386
 LDFLAGS_vmlinux :=
 CHECK		:= $(CHECK) -D__i386__=1
 
+CFLAGS += -m32
+AFLAGS += -m32
+
 CFLAGS += -pipe -msoft-float
 
 # prevent gcc from keeping the stack 16 byte aligned

@@ -11,10 +11,10 @@ COMPILE_ARCH    ?= $(shell uname -m | sed -e s/i.86/x86_32/)
 TARGET_ARCH     ?= $(COMPILE_ARCH)
 
 # Set ARCH/SUBARCH appropriately.
-COMPILE_SUBARCH := $(COMPILE_ARCH)
-TARGET_SUBARCH  := $(COMPILE_ARCH)
-COMPILE_ARCH    := $(patsubst x86%,x86,$(COMPILE_ARCH))
-TARGET_ARCH     := $(patsubst x86%,x86,$(TARGET_ARCH))
+override COMPILE_SUBARCH := $(COMPILE_ARCH)
+override TARGET_SUBARCH  := $(TARGET_ARCH)
+override COMPILE_ARCH    := $(patsubst x86%,x86,$(COMPILE_ARCH))
+override TARGET_ARCH     := $(patsubst x86%,x86,$(TARGET_ARCH))
 
 TARGET  := $(BASEDIR)/xen
 HDRS    := $(wildcard $(BASEDIR)/include/xen/*.h)

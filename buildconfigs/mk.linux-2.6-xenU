@@ -34,7 +34,7 @@ $(LINUX_DIR)/include/linux/autoconf.h: pristine-linux-$(LINUX_VER)
 	  cp $(DESTDIR)/boot/config-$(FULLVERSION) $(LINUX_DIR)/.config \
 	  || cp $(LINUX_DIR)/arch/xen/configs/$(EXTRAVERSION)_defconfig \
 		$(LINUX_DIR)/.config
-	make -C $(LINUX_DIR) ARCH=xen oldconfig
+	$(MAKE) -C $(LINUX_DIR) ARCH=xen oldconfig
 
 clean:
 	$(MAKE) -C $(LINUX_DIR) ARCH=xen clean
