@@ -69,12 +69,15 @@ static inline void flush_requests(void);
 
 static void kick_pending_request_queues(void);
 
+int __init xlblk_init(void);
+
 /**************************  KERNEL VERSION 2.6  **************************/
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 
 #define DISABLE_SCATTERGATHER() 
 
+__initcall(xlblk_init);
 
 int blkif_open(struct inode *inode, struct file *filep)
 {
@@ -322,12 +325,12 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
         case BLKIF_OP_READ:
         case BLKIF_OP_WRITE:
             if ( unlikely(bret->status != BLKIF_RSP_OKAY) )
-                DPRINTK("Bad return from blkdev data request: %lx\n",
+                DPRINTK("Bad return from blkdev data request: %x\n",
                         bret->status);
             req = (struct request *)bret->id;
             if ( unlikely(end_that_request_first
                           (req, 
-                           (bret->status != BLKIF_RSP_OKAY),
+                           (bret->status == BLKIF_RSP_OKAY),
                            req->hard_nr_sectors)) )
                 BUG();
             end_that_request_last(req);
@@ -1145,7 +1148,6 @@ int __init xlblk_init(void)
 
     return 0;
 }
-__initcall(xlblk_init);
 
 void blkdev_suspend(void)
 {
