@@ -12,8 +12,8 @@
 # Copyright (C) 2004 by Christian Limpach
 #
 
-EXTRAEXTRAVERSION=$(subst $(findstring $(EXTRAVERSION),$(shell basename $(TOPDIR))),,$(EXTRAVERSION))
-override EXTRAVERSION:=$(subst linux-$(VERSION).$(PATCHLEVEL).$(SUBLEVEL),,$(shell basename $(TOPDIR)))$(EXTRAEXTRAVERSION)
+XENVERSION   ?= -xen
+EXTRAVERSION := $(EXTRAVERSION)$(XENVERSION)
 
 XENARCH	:= $(subst ",,$(CONFIG_XENARCH))
 

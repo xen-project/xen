@@ -16,7 +16,8 @@
 #           Added '-march' and '-mpreferred-stack-boundary' support
 #
 
-override EXTRAVERSION:=$(subst linux-$(VERSION).$(PATCHLEVEL).$(SUBLEVEL),,$(shell basename $(TOPDIR)))$(EXTRAVERSION)
+XENVERSION   ?= -xen
+EXTRAVERSION := $(EXTRAVERSION)$(XENVERSION)
 
 # If no .config file exists then use the appropriate defconfig-* file
 ifneq (.config,$(wildcard .config))
