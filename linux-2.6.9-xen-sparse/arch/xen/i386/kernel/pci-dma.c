@@ -14,6 +14,10 @@
 #include <linux/version.h>
 #include <asm/io.h>
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+#define pte_offset_kernel pte_offset
+#endif
+
 struct dma_coherent_mem {
 	void		*virt_base;
 	u32		device_base;
@@ -22,8 +26,8 @@ struct dma_coherent_mem {
 	unsigned long	*bitmap;
 };
 
-void
-dma_contig_memory(unsigned long vstart, unsigned int order)
+static void
+xen_contig_memory(unsigned long vstart, unsigned int order)
 {
 	/*
 	 * Ensure multi-page extents are contiguous in machine memory.
@@ -69,7 +73,6 @@ dma_contig_memory(unsigned long vstart, unsigned int order)
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-#define pte_offset_kernel pte_offset
 void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
 			   dma_addr_t *dma_handle)
 #else
@@ -114,7 +117,7 @@ void *dma_alloc_coherent(struct device *dev, size_t size,
 	if (ret == NULL)
 		return ret;
 
-	dma_contig_memory(vstart, order);
+	xen_contig_memory(vstart, order);
 
 	memset(ret, 0, size);
 	*dma_handle = virt_to_bus(ret);
@@ -125,10 +128,13 @@ void *dma_alloc_coherent(struct device *dev, size_t size,
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
 void pci_free_consistent(struct pci_dev *hwdev, size_t size,
 			 void *vaddr, dma_addr_t dma_handle)
+{
+	free_pages((unsigned long)vaddr, get_order(size));
+}
 #else
+
 void dma_free_coherent(struct device *dev, size_t size,
 			 void *vaddr, dma_addr_t dma_handle)
-#endif
 {
 	struct dma_coherent_mem *mem = dev ? dev->dma_mem : NULL;
 	int order = get_order(size);
@@ -216,3 +222,5 @@ void *dma_mark_declared_memory_occupied(struct device *dev,
 	return mem->virt_base + (pos << PAGE_SHIFT);
 }
 EXPORT_SYMBOL(dma_mark_declared_memory_occupied);
+
+#endif

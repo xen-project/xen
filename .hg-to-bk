@@ -1,10 +1,2 @@
-#!/bin/sh -x
-set -e
-mkdir -p linux-2.4.27-xen-sparse
-mkdir -p linux-2.4.27-xen-sparse/arch
-mkdir -p linux-2.4.27-xen-sparse/arch/xen
-mkdir -p linux-2.4.27-xen-sparse/arch/xen/drivers
-mkdir -p linux-2.4.27-xen-sparse/arch/xen/drivers/balloon
-ln -s ../../../../../linux-2.6.8.1-xen-sparse/drivers/xen/balloon/balloon.c linux-2.4.27-xen-sparse/arch/xen/drivers/balloon/balloon.c
-(find -depth -type d -print | xargs -r rmdir 2>/dev/null) || true
+#!/bin/sh
 exit 0

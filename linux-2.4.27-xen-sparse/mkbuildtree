@@ -247,6 +247,9 @@ ln -sf ../../i386/mm/extable.c
 ln -sf ../../i386/mm/pageattr.c 
 ln -sf ../../../${LINUX_26}/arch/xen/i386/mm/hypervisor.c
 
+cd ${AD}/arch/xen/drivers/balloon
+ln -sf ../../../../${LINUX_26}/drivers/xen/balloon/balloon.c
+
 cd ${AD}/arch/xen/drivers/console
 ln -sf ../../../../${LINUX_26}/drivers/xen/console/console.c 
 

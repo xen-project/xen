@@ -1,6 +1,2 @@
-#!/bin/sh -x
-set -e
-test -L linux-2.4.27-xen-sparse/arch/xen/drivers/balloon/balloon.c
-rm      linux-2.4.27-xen-sparse/arch/xen/drivers/balloon/balloon.c
-(find -depth -type d -print | xargs -r rmdir 2>/dev/null) || true
+#!/bin/sh
 exit 0
