@@ -1,33 +1,92 @@
+#!/bin/sh
+
 # mkbuildtree <build tree>
 #
 # Creates symbolic links in <build tree> for the sparse tree
 # in the current directory.
+
+# Script to determine the relative path between two directories.
+# Copyright (c) D. J. Hawkey Jr. 2002
+# Fixed for Xen project by K. Fraser in 2003.  
+abs_to_rel ()
+{
+	local CWD SRCPATH
+                
+	if [ "$1" != "/" -a "${1##*[^/]}" = "/" ]; then
+		SRCPATH=${1%?}
+	else
+		SRCPATH=$1
+	fi
+	if [ "$2" != "/" -a "${2##*[^/]}" = "/" ]; then
+		DESTPATH=${2%?}
+	else
+		DESTPATH=$2
+	fi
+
+	CWD=$PWD
+	[ "${1%%[^/]*}" != "/" ] && cd $1 && SRCPATH=$PWD
+	[ "${2%%[^/]*}" != "/" ] && cd $2 && DESTPATH=$PWD
+	[ "$CWD" != "$PWD" ] && cd $CWD
+
+	BASEPATH=$SRCPATH
+
+	[ "$SRCPATH" = "$DESTPATH" ] && DESTPATH="." && return
+	[ "$SRCPATH" = "/" ] && DESTPATH=${DESTPATH#?} && return
+
+	while [ "$BASEPATH/" != "${DESTPATH%${DESTPATH#$BASEPATH/}}" ]; do
+          BASEPATH=${BASEPATH%/*}
+	done
+
+	SRCPATH=${SRCPATH#$BASEPATH}
+        DESTPATH=${DESTPATH#$BASEPATH}
+        DESTPATH=${DESTPATH#?}
+	while [ -n "$SRCPATH" ]; do
+		SRCPATH=${SRCPATH%/*}
+		DESTPATH="../$DESTPATH"
+	done
+
+	[ -z "$BASEPATH" ] && BASEPATH="/"
+	[ "${DESTPATH##*[^/]}" = "/" ] && DESTPATH=${DESTPATH%?}
+}
+
 
 [ "$1" == "" ] && { echo "Syntax: $0 <linux tree to xenify>"; exit 1; }
 
 # Get absolute path to the destination directory
 pushd . >/dev/null
 cd ${1}
-D=`pwd`
+AD=`pwd`
 popd >/dev/null
 
+# Get absolute path to the source directory
+AS=`pwd`
+
+# Get path to source, relative to destination
+abs_to_rel ${AD} ${AS}
+RS=$DESTPATH
+
 # Remove old copies of files and directories at the destination
-for i in `find -type f -o -type l` ; do rm -f ${D}/${i#./} ; done
+for i in `find . -type f -o -type l` ; do rm -f ${AD}/${i#./} ; done
+
+# We now work from the destination directory
+cd ${AD}
 
 # Create symlinks of files and directories which exist in the sparse source
-lndir -silent -ignorelinks `pwd` ${D}
-rm -f ${D}/mkbuildtree
+${AS}/lndir-rel -silent ${RS}
+rm -f mkbuildtree lndir-rel
 
 ## There are a whole bunch of special symlinks, mostly for files
 ## which are identical in the i386 and xeno-i386 architecture-dependent
 ## subdirectories.
 
 # This first symlink is special: it links to shared files in Xen's source tree
-rm -f ${D}/include/asm-xeno/hypervisor-ifs
-ln -sf `pwd`/../xen/include/hypervisor-ifs ${D}/include/asm-xeno/hypervisor-ifs
+rm -f ${AD}/include/asm-xeno/hypervisor-ifs
+mkdir ${AD}/include/asm-xeno/hypervisor-ifs
+cd    ${AD}/include/asm-xeno/hypervisor-ifs
+${AS}/lndir-rel -silent ../../../${RS}/../xen/include/hypervisor-ifs
 
 # The remainder are the i386 -> xeno-i386 links
-cd ${D}/include/asm-xeno
+cd ..
 ln -sf ../asm-i386/a.out.h 
 ln -sf ../asm-i386/apicdef.h 
 ln -sf ../asm-i386/apic.h 
