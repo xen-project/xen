@@ -58,11 +58,6 @@ static inline int do_privcmd(unsigned int cmd, unsigned long data)
     return ret;
 }
 
-static inline int do_xen_blkmsg(privcmd_blkmsg_t *blkmsg)
-{
-    return do_privcmd(IOCTL_PRIVCMD_BLKMSG, (unsigned long)blkmsg);
-}
-
 static inline int do_xen_hypercall(privcmd_hypercall_t *hypercall)
 {
     return do_privcmd(IOCTL_PRIVCMD_HYPERCALL, (unsigned long)hypercall);

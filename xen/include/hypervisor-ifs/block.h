@@ -22,12 +22,6 @@
 #define XEN_BLOCK_SPECIAL      4
 #define XEN_BLOCK_PROBE        5   /* get config from hypervisor */
 #define XEN_BLOCK_DEBUG        6   /* debug */
-#define XEN_BLOCK_VBD_CREATE   7   /* create vbd */
-#define XEN_BLOCK_VBD_DELETE   8   /* delete vbd */
-                                   /* XXX SMH: was 'probe vbd' */
-#define XEN_BLOCK_PHYSDEV_GRANT 10 /* grant access to range of disk blocks */
-#define XEN_BLOCK_PHYSDEV_PROBE 11 /* probe for a domain's physdev accesses */
-                                   /* XXX SMH: was 'probe vbd all' */
 
 /* NB. Ring size must be small enough for sizeof(blk_ring_t) <= PAGE_SIZE. */
 #define BLK_RING_SIZE        64
@@ -68,12 +62,10 @@ typedef struct blk_ring_st
 } blk_ring_t;
 
 /*
- *
- * physical disk (xhd) info, used by XEN_BLOCK_PROBE
- *
- */
-
-#define XEN_MAX_DISK_COUNT 100
+ * Information about the real and virtual disks we have; used during 
+ * guest device probing. 
+ */ 
+#define XEN_MAX_DISK_COUNT 64
 
 /* XXX SMH: below types chosen to align with ide_xxx types in ide.h */
 #define XD_TYPE_FLOPPY  0x00
@@ -82,10 +74,19 @@ typedef struct blk_ring_st
 #define XD_TYPE_OPTICAL 0x07
 #define XD_TYPE_DISK    0x20 
 
+#define XD_TYPE_MASK    0x3F
+#define XD_TYPE(_x)     ((_x) & XD_TYPE_MASK) 
+
+/* The top two bits of the type field encode various flags */
+#define XD_FLAG_RO      0x40
+#define XD_FLAG_VIRT    0x80
+#define XD_READONLY(_x) ((_x) & XD_FLAG_RO)
+#define XD_VIRTUAL(_x)  ((_x) & XF_FLAG_VIRT) 
+
 typedef struct xen_disk
 {
-    unsigned short device;       /* device number (see top of file)    */
-    unsigned short type;         /* device type, i.e. disk, cdrom, etc */
+    unsigned short device;       /* device number (opaque 16 bit val)  */
+    unsigned short info;         /* device type and flags              */
     unsigned long  capacity;     /* size in terms of #512 byte sectors */
 } xen_disk_t;
 

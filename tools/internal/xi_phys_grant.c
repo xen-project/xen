@@ -26,12 +26,17 @@ int main(int argc, char *argv[])
     */
     domain  = atoi(argv[2]); 
     device  = atoi(argv[3]); 
-	/* XXX SMH: hack -- generate device name by addition ptn number */
+    /* XXX SMH: hack -- generate device name by addition ptn number */
     vdevice = device + atoi(argv[6]);
     
     op.cmd = BLOCK_IO_OP_VBD_CREATE; 
     op.u.create_info.domain  = domain; 
     op.u.create_info.vdevice = vdevice; 
+    op.u.create_info.mode    = 0; 
+    if ( strchr(argv[1], 'r') )
+	op.u.create_info.mode |= VBD_MODE_R;
+    if ( strchr(argv[1], 'w') )
+        op.u.create_info.mode |= VBD_MODE_W;
 
     ret = do_block_io_op(&op);
 
@@ -49,13 +54,7 @@ int main(int argc, char *argv[])
     op.u.add_info.extent.device       = device; 
     op.u.add_info.extent.start_sector = atol(argv[4]);
     op.u.add_info.extent.nr_sectors   = atol(argv[5]);
-    op.u.add_info.extent.mode         = 0; 
-    if ( strchr(argv[1], 'r') )
-	op.u.add_info.extent.mode |= PHYSDISK_MODE_R;
-    if ( strchr(argv[1], 'w') )
-        op.u.add_info.extent.mode |= PHYSDISK_MODE_W;
 
-    
     ret = do_block_io_op(&op);
 
     if(ret < 0) { 

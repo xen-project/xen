@@ -1353,7 +1353,7 @@ void scsi_probe_devices(xen_disk_info_t *xdi)
 
 	/* XXX SMH: if make generic, need to properly determine 'type' */
         xdi->disks[xdi->count].device   = device;
-	xdi->disks[xdi->count].type     = XD_TYPE_DISK; 
+	xdi->disks[xdi->count].info     = XD_TYPE_DISK; 
         xdi->disks[xdi->count].capacity = capacity; 
         xdi->count++; 
                 

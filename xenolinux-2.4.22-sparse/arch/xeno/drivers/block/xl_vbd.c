@@ -77,7 +77,7 @@ typedef unsigned char bool;
 int __init xlvbd_init(xen_disk_info_t *xdi)
 {
     int i, result, nminors; 
-    struct gendisk *gd;
+    struct gendisk *gd = NULL;
     kdev_t device; 
     unsigned short major, minor, real_minor; 
     bool is_ide, is_scsi; 
@@ -237,6 +237,9 @@ int __init xlvbd_init(xen_disk_info_t *xdi)
 	    majors[major] = 1; 
 	}
 
+	if(XD_READONLY(xdi->disks[i].info)) 
+	    set_device_ro(device, 1); 
+
 	if(real_minor) { 
 
 	    /* Need to skankily setup 'partition' information */
@@ -247,29 +250,28 @@ int __init xlvbd_init(xen_disk_info_t *xdi)
 	} else { 
 	
 	    /* Some final fix-ups depending on the device type */
-	    switch (xdi->disks[i].type) 
+	    switch (XD_TYPE(xdi->disks[i].info)) 
 	    { 
+
 	    case XD_TYPE_CDROM:
-		set_device_ro(device, 1); 
-		
 	    case XD_TYPE_FLOPPY: 
 	    case XD_TYPE_TAPE:
 		gd->flags[0] = GENHD_FL_REMOVABLE; 
 		printk(KERN_ALERT 
 		       "Skipping partition check on %s /dev/%s\n", 
-		       xdi->disks[i].type==XD_TYPE_CDROM ? "cdrom" : 
-		       (xdi->disks[i].type==XD_TYPE_TAPE ? "tape" : 
+		       XD_TYPE(xdi->disks[i].info)==XD_TYPE_CDROM ? "cdrom" : 
+		       (XD_TYPE(xdi->disks[i].info)==XD_TYPE_TAPE ? "tape" : 
 			"floppy"), disk_name(gd, MINOR(device), buf)); 
 		break; 
-	    
+		
 	    case XD_TYPE_DISK: 
 		register_disk(gd, device, gd->nr_real, &xlvbd_block_fops, 
 			      xdi->disks[i].capacity);
 		break; 
 		
 	    default: 
-		printk(KERN_ALERT "XenoLinux: unknown ide device type %d\n", 
-		       xdi->disks[i].type); 
+		printk(KERN_ALERT "XenoLinux: unknown device type %d\n", 
+		       XD_TYPE(xdi->disks[i].info)); 
 		break; 
 	    }
 
@@ -304,41 +306,36 @@ struct gendisk *xldev_to_gendisk(kdev_t xldev)
 
 void xlvbd_cleanup(void)
 {
-#if 0
-    if ( xlvbd_gendisk == NULL ) return;
-    
-    blk_cleanup_queue(BLK_DEFAULT_QUEUE(XLVIRT_MAJOR));
+    bool is_ide, is_scsi; 
+    struct gendisk *gd; 
+    char *major_name; 
+    int major; 
 
-    xlvbd_gendisk = NULL;
+    for(major = 0; major < XLVBD_MAX_MAJORS; major++) { 
 
-    read_ahead[XLVIRT_MAJOR] = 0;
+	if(!(gd = xlvbd_gendisk[major]))
+	    continue; 
 
-    if ( blksize_size[XLVIRT_MAJOR] != NULL )
-    { 
-	kfree(blksize_size[XLVIRT_MAJOR]);
-        blksize_size[XLVIRT_MAJOR] = NULL;
+	is_ide = IDE_DISK_MAJOR(major);  /* is this an ide device? */
+	is_scsi= SCSI_BLK_MAJOR(major);  /* is this a scsi device? */
+
+	blk_cleanup_queue(BLK_DEFAULT_QUEUE(major)); 
+	
+	if(is_ide) { 
+	    major_name = XLIDE_MAJOR_NAME; 
+	} else if(is_scsi) { 
+	    major_name = XLSCSI_MAJOR_NAME;
+	} else { 
+	    major_name = XLVBD_MAJOR_NAME;
+	}
+
+	if (unregister_blkdev(major, major_name) != 0) 
+	    printk(KERN_ALERT "XenoLinux Virtual Block Device Driver:"
+		   "major device %04x uninstalled w/ errors\n", major); 
+
     }
 
-    if ( hardsect_size[XLVIRT_MAJOR] != NULL )
-    { 
-	kfree(hardsect_size[XLVIRT_MAJOR]);
-        hardsect_size[XLVIRT_MAJOR] = NULL;
-    }
-    
-    if ( max_sectors[XLVIRT_MAJOR] != NULL )
-    { 
-	kfree(max_sectors[XLVIRT_MAJOR]);
-        max_sectors[XLVIRT_MAJOR] = NULL;
-    }
-    
-    if ( unregister_blkdev(XLVIRT_MAJOR, XLVIRT_MAJOR_NAME) != 0 )
-    {
-	printk(KERN_ALERT
-	       "XenoLinux Virtual Block Device Driver"
-               " uninstalled w/ errs\n");
-    }
-#endif
-    printk(KERN_ALERT "xlvbd_cleanup: not implemented XXX FIXME SMH\n"); 
+    return; 
 }
 
 

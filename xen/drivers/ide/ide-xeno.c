@@ -55,7 +55,7 @@ void ide_probe_devices(xen_disk_info_t* xdi)
             capacity = current_capacity(drive);
 
             xdi->disks[xdi->count].device   = device; 
-            xdi->disks[xdi->count].type     = type; 
+            xdi->disks[xdi->count].info     = type; 
             xdi->disks[xdi->count].capacity = capacity;
             xdi->count++;
 

@@ -45,6 +45,7 @@ long vbd_create(vbd_create_t *create_info)
 
     new_vbd = kmalloc(sizeof(vbd_t), GFP_KERNEL); 
     new_vbd->vdevice = create_info->vdevice; 
+    new_vbd->mode    = create_info->mode; 
     new_vbd->extents = (xen_extent_le_t *)NULL; 
     new_vbd->next    = (vbd_t *)NULL; 
 
@@ -94,7 +95,6 @@ long vbd_add(vbd_add_t *add_info)
     xele->extent.device       = add_info->extent.device; 
     xele->extent.start_sector = add_info->extent.start_sector; 
     xele->extent.nr_sectors   = add_info->extent.nr_sectors; 
-    xele->extent.mode         = add_info->extent.mode; 
     xele->next                = (xen_extent_le_t *)NULL; 
 
     if(!v->extents) {
@@ -141,6 +141,13 @@ int vbd_translate(phys_seg_t * pseg, int *nr_segs,
 	return -ENODEV; 
     }
 
+    if(operation == READ && !VBD_CAN_READ(v)) 
+	return -EACCES; 
+    
+    if(operation == WRITE && !VBD_CAN_WRITE(v))
+	return -EACCES; 
+    
+
     /* Now iterate through the list of xen_extents, working out which 
        should be used to perform the translation. */
     sec = pseg->sector_number; 
@@ -150,12 +157,6 @@ int vbd_translate(phys_seg_t * pseg, int *nr_segs,
 
 	    /* we've got a match! XXX SMH: should deal with 
 	       situation where we span multiple xe's */
-
-	    if(operation == READ && !(x->extent.mode & PHYSDISK_MODE_R))
-		return -EACCES; 
-
-	    if(operation == WRITE && !(x->extent.mode & PHYSDISK_MODE_W))
-		return -EACCES; 
 
 	    pseg->dev = x->extent.device; 
 	    pseg->sector_number += x->extent.start_sector; 
@@ -189,7 +190,10 @@ void vbd_probe_devices(xen_disk_info_t *xdi, struct task_struct *p)
     for(i = 0; i < VBD_HTAB_SZ; i++) { 
 	for(v = p->vbdtab[i]; v; v = v->next) { 
 	    xdi->disks[xdi->count].device   = v->vdevice; 
-	    xdi->disks[xdi->count].type     = XD_TYPE_DISK; // always :-) 
+	    xdi->disks[xdi->count].info     = XD_FLAG_VIRT | XD_TYPE_DISK; 
+
+	    /* XXX SMH: and now set XD_FLAG_RO if necessary */
+
 	    xdi->disks[xdi->count].capacity = 0; 
 	    for(x = v->extents; x; x = x->next) 
 		xdi->disks[xdi->count].capacity += x->extent.nr_sectors; 

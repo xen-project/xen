@@ -160,6 +160,7 @@ int xenolinux_block_ioctl(struct inode *inode, struct file *filep,
     return 0;
 }
 
+/* check media change: should probably do something here in some cases :-) */
 int xenolinux_block_check(kdev_t dev)
 {
     DPRINTK("xenolinux_block_check\n");
@@ -246,8 +247,6 @@ static int hypervisor_request(unsigned long   id,
 
     switch ( operation )
     {
-//    case XEN_BLOCK_PHYSDEV_GRANT:
-//    case XEN_BLOCK_PHYSDEV_PROBE:
     case XEN_BLOCK_PROBE:
         if ( RING_PLUGGED ) return 1;
 	sector_number = 0;
@@ -431,12 +430,6 @@ static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
             }
 	    break;
 	    
-        case XEN_BLOCK_VBD_CREATE:
-        case XEN_BLOCK_VBD_DELETE:
-	case XEN_BLOCK_PHYSDEV_GRANT:
-	case XEN_BLOCK_PHYSDEV_PROBE:
-	    printk(KERN_ALERT "response for bogus operation %d\n", 
-		   bret->operation); 
         case XEN_BLOCK_PROBE:
             xlblk_control_msg_pending = bret->status;
             break;

@@ -23,20 +23,20 @@ typedef struct _xen_extent_le {
 */
 typedef struct _vbd { 
     unsigned short    vdevice;   // what the domain refers to this vbd as 
+    unsigned short    mode;      // VBD_MODE_{READONLY,READWRITE}
     xen_extent_le_t  *extents;   // list of xen_extents making up this vbd
     struct _vbd      *next;      // for chaining in the hash table
 } vbd_t; 
 
 #define VBD_HTAB_SZ  16       // no. of entries in the vbd hash table. 
 
-void xen_vbd_initialize(void);
-void xen_refresh_vbd_list (struct task_struct *p);
 long vbd_create(vbd_create_t *create_info); 
 long vbd_add(vbd_add_t *add_info); 
 long vbd_remove(vbd_remove_t *remove_info);
 long vbd_delete(vbd_delete_t *delete_info); 
 
-/* Describes a physical disk extent (part of a block io request) */
+
+/* Describes a [partial] disk extent (part of a block io request) */
 typedef struct {
     unsigned short dev;
     unsigned short nr_sects;
@@ -49,15 +49,4 @@ int vbd_translate(phys_seg_t * pseg, int *nr_segs,
 		  struct task_struct *p, int operation); 
 
 
-#if 0
-void destroy_physdisk_aces(struct task_struct *p);
-
-int xen_physdisk_grant(xp_disk_t *);
-int xen_physdisk_probe(struct task_struct *requesting_task,
-		       physdisk_probebuf_t *);
-int xen_physdisk_access_okay(phys_seg_t *pseg, struct task_struct *p,
-			     int operation);
-#endif
-
-
-#endif /* PHYSDISK_ACES__ */
+#endif /* __VBD_H__ */
