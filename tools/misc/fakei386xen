@@ -1,0 +1,32 @@
+#!/bin/bash
+
+cln () {
+while [ $# -gt 0 ]; do
+  (
+    test -f "$1" || { echo "$1: No such file or directory" 1>&2; exit 1; }
+    { cp $1 cln$$ && rm $1 && mv cln$$ $1; } || { rm -f cln$$; exit 1; }
+  )
+  shift
+done
+}
+
+
+for i in `find include/asm-xen arch/xen -type l | xargs ls -l | egrep '../(asm-)?i386/' | awk '{print $9}'`
+do
+  echo $i
+  cln $i
+done
+
+mv include/asm-i386 include/asm-Xi386
+mv include/asm-xen include/asm-i386
+ln -s asm-i386 include/asm-xen
+rm include/asm
+ln -s asm-i386 include/asm
+mv arch/i386 arch/Xi386
+mv arch/xen arch/i386
+ln -s i386 arch/xen
+
+mv Makefile XMakefile
+#sed -e 's/^EXTRAVERSION =.*/EXTRAVERSION = -xen/' <XMakefile >Makefile
+echo ARCH=i386 >Makefile ; cat XMakefile >>Makefile
+

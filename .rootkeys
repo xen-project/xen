@@ -55,6 +55,7 @@
 403b7cf7J7FsSSoEPGhx6gXR4pIdZg tools/examples/xc_physinfo.py
 401d7e16X4iojyKopo_j63AyzYZd2A tools/examples/xc_vd_tool.py
 3f776bd2Xd-dUcPKlPN2vG89VGtfvQ tools/misc/Makefile
+40ab2cfawIw8tsYo0dQKtp83h4qfTQ tools/misc/fakei386xen
 3f6dc136ZKOjd8PIqLbFBl_v-rnkGg tools/misc/miniterm/Makefile
 3f6dc140C8tAeBfroAF24VrmCS4v_w tools/misc/miniterm/README
 3f6dc142IHaf6XIcAYGmhV9nNSIHFQ tools/misc/miniterm/miniterm.c
