@@ -147,6 +147,9 @@ typedef struct
     unsigned long args[7];
 } multicall_entry_t;
 
+/* Event channel endpoints per domain. */
+#define NR_EVENT_CHANNELS 1024
+
 /*
  * Xen/guestos shared data -- pointer provided in start_info.
  * NB. We expect that this struct is smaller than a page.

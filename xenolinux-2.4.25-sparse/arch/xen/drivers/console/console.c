@@ -32,6 +32,8 @@
 
 static spinlock_t xen_console_lock = SPIN_LOCK_UNLOCKED;
 
+static int console_evtchn;
+
 #define XEN_TTY_MINOR 123
 
 /******************** Kernel console driver ********************************/
@@ -65,7 +67,7 @@ static void nonpriv_conwrite(const char *s, unsigned int count)
         
         ctrl_if->tx_req_prod++;
         evtchn_op.cmd = EVTCHNOP_send;
-        evtchn_op.u.send.local_port = 0;
+        evtchn_op.u.send.local_port = console_evtchn;
         (void)HYPERVISOR_event_channel_op(&evtchn_op);
         
         s     += src;
@@ -118,6 +120,28 @@ static struct console kcons_info = {
 
 void xen_console_init(void)
 {
+    evtchn_op_t op;
+    int i;
+
+    if ( !(start_info.flags & SIF_INITDOMAIN) )
+    {
+        /* Scan the event-channel space to find our control link to DOM0. */
+        for ( i = 0; i < NR_EVENT_CHANNELS; i++ )
+        {
+            op.cmd           = EVTCHNOP_status;
+            op.u.status.dom  = DOMID_SELF;
+            op.u.status.port = i;
+            if ( (HYPERVISOR_event_channel_op(&op) == 0) &&
+                 (op.u.status.status == EVTCHNSTAT_interdomain) &&
+                 (op.u.status.u.interdomain.dom == 0) )
+                break;
+        }
+        
+        /* Bug out if there is no control link. */
+        if ( (console_evtchn = i) == NR_EVENT_CHANNELS )
+            BUG();
+    }
+
     register_console(&kcons_info);
 
     /*
@@ -259,7 +283,7 @@ static void __do_console_io(void)
     {
         /* Send a notification to the controller. */
         evtchn_op.cmd = EVTCHNOP_send;
-        evtchn_op.u.send.local_port = 0;
+        evtchn_op.u.send.local_port = console_evtchn;
         (void)HYPERVISOR_event_channel_op(&evtchn_op);
     }
 }
@@ -467,7 +491,7 @@ int __init xen_con_init(void)
         panic("Couldn't register Xen virtual console driver\n");
 
     if ( !(start_info.flags & SIF_INITDOMAIN) )
-        console_irq = bind_evtchn_to_irq(1);
+        console_irq = bind_evtchn_to_irq(console_evtchn);
     else
         console_irq = bind_virq_to_irq(VIRQ_CONSOLE);
 
@@ -490,7 +514,7 @@ void __exit xen_con_fini(void)
     free_irq(console_irq, NULL);
 
     if ( !(start_info.flags & SIF_INITDOMAIN) )
-        unbind_evtchn_from_irq(1);
+        unbind_evtchn_from_irq(console_evtchn);
     else
         unbind_virq_from_irq(VIRQ_CONSOLE);
 }
