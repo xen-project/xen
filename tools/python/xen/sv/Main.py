@@ -1,14 +1,31 @@
 from xen.sv.HTMLBase import HTMLBase
-from xen.sv import DomList, NodeInfo, DomInfo
+from xen.sv.DomList  import DomList
+from xen.sv.NodeInfo import NodeInfo
+from xen.sv.DomInfo  import DomInfo
 
 class Main( HTMLBase ):
     
     isLeaf = True
 
-    def __init__( self ):
+    def __init__( self, urlWriter = None ):
+        self.modules = { "node": ( "Node details", NodeInfo ), 
+                         "list": ( "Domain summary", DomList ), 
+                         "info": ( "Domain info", DomInfo ) }
         HTMLBase.__init__(self)
         
     def render_POST( self, request ):
+    
+    	#decide what module post'd the action
+
+        mod = request.args.get('mod')
+                
+        if not mod is None and len(mod) == 1:
+            modTup = self.modules[ mod[0] ]
+            #check module exists
+            if modTup:
+               (modName, module) = modTup
+               module( self.mainUrlWriter ).perform( request )     
+    
         return self.render_GET( request )
 
     def mainUrlWriter( self, s ):
@@ -25,10 +42,10 @@ class Main( HTMLBase ):
         request.write( "   <img src='images/xen.png' width='150' height='75' border='0'/></a></td></tr>" )
         request.write( "   <tr><td align='center' valign='top'>" )
         
-        request.write( "    <p class='small'><a href='Main.rpy?mod=node'>Node details</a></p>" )
-        request.write( "    <p class='small'><a href='Main.rpy?mod=list'>Domains summary</a></p>" )
+        for (modName, (modTitle, module)) in self.modules.items():
+            request.write( "    <p class='small'><a href='Main.rpy?mod=%s'>%s</a></p>" % (modName, modTitle))
     
-        DomList.DomList( self.mainUrlWriter ).write_BODY( request, True, False )
+        DomList( self.mainUrlWriter ).write_BODY( request, True, False )
 
         request.write( "   </td></tr>" )
         request.write( "  </table>" )
@@ -44,14 +61,13 @@ class Main( HTMLBase ):
         
         if mod is None or len(mod) != 1:
             request.write( '<p>Please select a module</p>' )
-        elif mod[0] == 'info':
-            DomInfo.DomInfo( self.mainUrlWriter ).write_BODY( request )
-        elif mod[0] == 'list':
-            DomList.DomList( self.mainUrlWriter ).write_BODY( request )
-        elif mod[0] == 'node':
-            NodeInfo.NodeInfo( self.mainUrlWriter ).write_BODY( request )
         else:
-            request.write( '<p>Invalid module. Please select another</p>' )
+            modTup = self.modules[ mod[0] ]
+            if modTup:
+               (modName, module) = modTup
+               module( self.mainUrlWriter ).write_BODY( request )  
+            else:
+               request.write( '<p>Invalid module. Please select another</p>' )
     
         request.write( "   </td></tr>" )
         request.write( "  </table>" )

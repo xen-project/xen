@@ -14,7 +14,7 @@ class DomInfo( GenTabbed ):
         def tabUrlWriter( tab ):
             return urlWriter( "mod=info&dom=%s%s" % ( self.dom, tab ) )
         
-        GenTabbed.__init__( self, tabUrlWriter, [ 'General', 'SXP', 'Devices' ], [ DomGenTab, DomSXPTab, NullTab ]  )
+        GenTabbed.__init__( self, "Domain Info", tabUrlWriter, [ 'General', 'SXP', 'Devices' ], [ DomGeneralTab, DomSXPTab, NullTab ]  )
 
     def write_BODY( self, request ):
         dom = request.args.get('dom')
@@ -27,6 +27,10 @@ class DomInfo( GenTabbed ):
         
         GenTabbed.write_BODY( self, request )
 
+class DomGeneralTab( CompositeTab ):
+    def __init__( self ):
+       CompositeTab.__init__( self, [ DomGenTab, DomActionTab ] )        
+        
 class DomGenTab( GeneralTab ):
 
     def __init__( self ):
@@ -41,7 +45,7 @@ class DomGenTab( GeneralTab ):
         titles[ 'Total CPU' ] = ( 'cpu_time', smallTimeFormatter )
         titles[ 'Up Time' ] = ( 'up_time', bigTimeFormatter )
     
-        GeneralTab.__init__( self, "General Domain Info", {}, titles )
+        GeneralTab.__init__( self, {}, titles )
         
     def write_BODY( self, request ):
     
@@ -78,5 +82,19 @@ class DomSXPTab( PreTab ):
         self.source = sxp2string( domInfo )
         
         PreTab.write_BODY( self, request )
+        
+class DomActionTab( ActionTab ):
+
+    def __init__( self ):
+        ActionTab.__init__( self, { "shutdown" : ( "Shutdown the Domain", "shutdown.png" ),
+        	"reboot" : ( "Reboot the Domain", "reboot.png" ) } )    
+        
+    def op_shutdown( self, request ):
+    	print ">DomShutDown"
+    	#server.xend_node_shutdown()
+    
+    def op_reboot( self, request ):
+    	print ">DomReboot"
+        #server.xend_node_reboot()
         
 
