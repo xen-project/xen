@@ -26,6 +26,9 @@ class DomInfo( GenTabbed ):
             self.dom = dom[0]
         
         GenTabbed.write_BODY( self, request )
+        
+    def write_MENU( self, request ):
+        pass
 
 class DomGeneralTab( CompositeTab ):
     def __init__( self ):
@@ -86,15 +89,37 @@ class DomSXPTab( PreTab ):
 class DomActionTab( ActionTab ):
 
     def __init__( self ):
-        ActionTab.__init__( self, { "shutdown" : ( "Shutdown the Domain", "shutdown.png" ),
-        	"reboot" : ( "Reboot the Domain", "reboot.png" ) } )    
+    	actions = { "shutdown" : ( "Shutdown the Domain", "shutdown.png" ),
+        	    "reboot" : ( "Reboot the Domain", "reboot.png" ),
+                    "pause" : ( "Pause the Domain", "pause.png" ),
+                    "unpause" : ( "Unpause the Domain", "unpause.png" ) }
+        ActionTab.__init__( self, actions )    
         
     def op_shutdown( self, request ):
-    	print ">DomShutDown"
+   	dom = getVar( 'dom', request )
+        if not dom is None:
+    	   print ">DomShutDown %s" % dom
     	#server.xend_node_shutdown()
     
     def op_reboot( self, request ):
-    	print ">DomReboot"
+       	dom = getVar( 'dom', request )
+        if not dom is None:
+    	    print ">DomReboot %s" % dom
         #server.xend_node_reboot()
+        
+    def op_pause( self, request ):
+       	dom = getVar( 'dom', request )
+        if not dom is None:
+    	    print ">DomPause %s" % dom
+            server.xend_domain_pause( int( dom ) )
+        
+    def op_unpause( self, request ):
+       	dom = getVar( 'dom', request )
+        if not dom is None:
+    	   print ">DomUnpause %s" % dom
+           server.xend_domain_unpause( int( dom ) )
+        
+    
+    
         
 

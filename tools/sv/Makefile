@@ -31,6 +31,8 @@ install:
 	
 	install -m0644 images/shutdown.png $(sv_insdir)/images
 	install -m0644 images/reboot.png $(sv_insdir)/images
+	install -m0644 images/pause.png $(sv_insdir)/images
+	install -m0644 images/unpause.png $(sv_insdir)/images
 
 	# make include folder
 	mkdir -p $(sv_insdir)/inc

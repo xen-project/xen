@@ -38,14 +38,13 @@ class Main( HTMLBase ):
         request.write( " <td width='15px'>&nbsp;</td>" )
         request.write( " <td width='175px' align='center' valign'center'>" )
         request.write( "  <table cellspacing='0' cellpadding='0' border='0' width='100%' height='100%'>" )
-        request.write( "   <tr><td height='200px' align='center' valign='center'><a href='http://www.cl.cam.ac.uk/Research/SRG/netos/xen/'>" )
-        request.write( "   <img src='images/xen.png' width='150' height='75' border='0'/></a></td></tr>" )
+        request.write( "   <tr><td height='140px' align='center' valign='bottom'><a href='http://www.cl.cam.ac.uk/Research/SRG/netos/xen/'>" )
+        request.write( "   <img src='images/xen.png' width='150' height='75' border='0'/></a><br/></td></tr>" )
+        request.write( "   <tr><td height='60px' align='center'><p class='small'>SV Web Interface<br/>(C) <a href='mailto:tw275@cam.ac.uk'>Tom Wilkie</a> 2004</p></td></tr>")
         request.write( "   <tr><td align='center' valign='top'>" )
         
         for (modName, (modTitle, module)) in self.modules.items():
-            request.write( "    <p class='small'><a href='Main.rpy?mod=%s'>%s</a></p>" % (modName, modTitle))
-    
-        DomList( self.mainUrlWriter ).write_BODY( request, True, False )
+            module( self.mainUrlWriter ).write_MENU( request )
 
         request.write( "   </td></tr>" )
         request.write( "  </table>" )

@@ -11,6 +11,9 @@ class NodeInfo( GenTabbed ):
             return urlWriter( "mod=node%s" % url )
     
         GenTabbed.__init__( self, "Node Details", newUrlWriter, [ 'General', 'Dmesg', ], [ NodeGeneralTab, NodeDmesgTab ] )
+    
+    def write_MENU( self, request ):
+        request.write( "<p class='small'><a href='%s'>Node details</a></p>" % self.urlWriter( '' ) )
 
 class NodeGeneralTab( CompositeTab ):
     def __init__( self ):
