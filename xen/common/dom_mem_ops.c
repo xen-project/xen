@@ -15,31 +15,46 @@
 #include <xen/event.h>
 #include <asm/domain_page.h>
 
-static long alloc_dom_mem(struct domain *d, 
-                          unsigned long *extent_list, 
-                          unsigned long  nr_extents,
-                          unsigned int   extent_order)
+/*
+ * To allow safe resume of do_dom_mem_op() after preemption, we need to know 
+ * at what point in the page list to resume. For this purpose I steal the 
+ * high-order bits of the @op parameter, which are otherwise unused and zero.
+ */
+#define START_EXTENT_SHIFT 4 /* op[:4] == start_extent */
+
+#define PREEMPT_CHECK(_op)                          \
+    if ( hypercall_preempt_check() ) {              \
+        hypercall_create_continuation(              \
+            __HYPERVISOR_dom_mem_op, 5,             \
+            (_op) | (i << START_EXTENT_SHIFT),      \
+            extent_list, nr_extents, extent_order,  \
+            (d == current) ? DOMID_SELF : d->id);   \
+        return __HYPERVISOR_dom_mem_op;             \
+    }
+
+static long
+alloc_dom_mem(struct domain *d, 
+              unsigned long *extent_list, 
+              unsigned long  start_extent,
+              unsigned long  nr_extents,
+              unsigned int   extent_order)
 {
     struct pfn_info *page;
     unsigned long    i;
 
-    if ( unlikely(!access_ok(VERIFY_WRITE, extent_list, 
-                             nr_extents*sizeof(*extent_list))) )
-        return 0;
+    if ( unlikely(!array_access_ok(VERIFY_WRITE, extent_list, 
+                                   nr_extents, sizeof(*extent_list))) )
+        return start_extent;
 
     if ( (extent_order != 0) && !IS_CAPABLE_PHYSDEV(current) )
     {
         DPRINTK("Only I/O-capable domains may allocate > order-0 memory.\n");
-        return 0;
+        return start_extent;
     }
 
-    for ( i = 0; i < nr_extents; i++ )
+    for ( i = start_extent; i < nr_extents; i++ )
     {
-        hypercall_may_preempt(
-            __HYPERVISOR_dom_mem_op, 5,
-            MEMOP_increase_reservation,
-            &extent_list[i], nr_extents-i, extent_order,
-            (d == current) ? DOMID_SELF : d->id);
+        PREEMPT_CHECK(MEMOP_increase_reservation);
 
         if ( unlikely((page = alloc_domheap_pages(d, extent_order)) == NULL) )
         {
@@ -55,25 +70,23 @@ static long alloc_dom_mem(struct domain *d,
     return i;
 }
     
-static long free_dom_mem(struct domain *d,
-                         unsigned long *extent_list, 
-                         unsigned long  nr_extents,
-                         unsigned int   extent_order)
+static long
+free_dom_mem(struct domain *d,
+             unsigned long *extent_list, 
+             unsigned long  start_extent,
+             unsigned long  nr_extents,
+             unsigned int   extent_order)
 {
     struct pfn_info *page;
     unsigned long    i, j, mpfn;
 
-    if ( unlikely(!access_ok(VERIFY_READ, extent_list, 
-                             nr_extents*sizeof(*extent_list))) )
-        return 0;
+    if ( unlikely(!array_access_ok(VERIFY_READ, extent_list, 
+                                   nr_extents, sizeof(*extent_list))) )
+        return start_extent;
 
-    for ( i = 0; i < nr_extents; i++ )
+    for ( i = start_extent; i < nr_extents; i++ )
     {
-        hypercall_may_preempt(
-            __HYPERVISOR_dom_mem_op, 5,
-            MEMOP_decrease_reservation,
-            &extent_list[i], nr_extents-i, extent_order,
-            (d == current) ? DOMID_SELF : d->id);
+        PREEMPT_CHECK(MEMOP_decrease_reservation);
 
         if ( unlikely(__get_user(mpfn, &extent_list[i]) != 0) )
             return i;
@@ -106,15 +119,24 @@ static long free_dom_mem(struct domain *d,
 
     return i;
 }
-    
-long do_dom_mem_op(unsigned int   op, 
-                   unsigned long *extent_list, 
-                   unsigned long  nr_extents,
-                   unsigned int   extent_order,
-		   domid_t        domid)
+
+long
+do_dom_mem_op(unsigned long  op, 
+              unsigned long *extent_list, 
+              unsigned long  nr_extents,
+              unsigned int   extent_order,
+              domid_t        domid)
 {
     struct domain *d;
-    long           rc;
+    unsigned long  rc, start_extent;
+
+    /* Extract @start_extent from @op. */
+    start_extent  = op >> START_EXTENT_SHIFT;
+    op           &= (1 << START_EXTENT_SHIFT) - 1;
+
+    if ( unlikely(start_extent > nr_extents) || 
+         unlikely(nr_extents > (~0UL >> START_EXTENT_SHIFT)) )
+        return -EINVAL;
 
     if ( likely(domid == DOMID_SELF) )
         d = current;
@@ -126,10 +148,12 @@ long do_dom_mem_op(unsigned int   op,
     switch ( op )
     {
     case MEMOP_increase_reservation:
-        rc = alloc_dom_mem(d, extent_list, nr_extents, extent_order);
+        rc = alloc_dom_mem(
+            d, extent_list, start_extent, nr_extents, extent_order);
 	break;
     case MEMOP_decrease_reservation:
-        rc = free_dom_mem(d, extent_list, nr_extents, extent_order);
+        rc = free_dom_mem(
+            d, extent_list, start_extent, nr_extents, extent_order);
 	break;
     default:
         rc = -ENOSYS;

@@ -697,6 +697,7 @@
 3e4cd9d8LAAghUY0hNIK72uc2ch_Nw xen/common/keyhandler.c
 3ddb79bduhSEZI8xa7IbGQCpap5y2A xen/common/lib.c
 3ddb79bdS39UXxUtZnaScie83-7VTQ xen/common/memory.c
+41a61536SZbR6cj1ukWTb0DYU-vz9w xen/common/multicall.c
 3ddb79bdD4SLmmdMD7yLW5HcUWucXw xen/common/page_alloc.c
 3e54c38dkHAev597bPr71-hGzTdocg xen/common/perfc.c
 4051bcecFeq4DE70p4zGO5setf47CA xen/common/physdev.c
@@ -792,6 +793,7 @@
 40ec25fd7cSvbP7Biw91zaU_g0xsEQ xen/include/asm-x86/mm.h
 3ddb79c3n_UbPuxlkNxvvLycClIkxA xen/include/asm-x86/mpspec.h
 3ddb79c2wa0dA_LGigxOelSGbJ284Q xen/include/asm-x86/msr.h
+41a61536MFhNalgbVmYGXAhQsPTZNw xen/include/asm-x86/multicall.h
 3ddb79c3xjYnrv5t3VqYlR4tNEOl4Q xen/include/asm-x86/page.h
 3ddb79c3ysKUbxZuwKBRK3WXU2TlEg xen/include/asm-x86/pci.h
 404f1bb41Yl-5ZjIWnG66HDCj6OIWA xen/include/asm-x86/pda.h
@@ -853,6 +855,7 @@
 3ddb79c18Ajy7micDGQQfJ0zWgEHtA xen/include/xen/list.h
 3ddb79c1gs2VbLbQlw0dcDUXYIepDA xen/include/xen/mm.h
 3ddb79c1ieLZfGSFwfvvSQ2NK1BMSg xen/include/xen/multiboot.h
+41a61536ii6j2lJ2rXwMOLaG1CHPvw xen/include/xen/multicall.h
 3ddb79c2Fg44_PBPVxHSC0gTOMq4Ow xen/include/xen/pci.h
 3ddb79c0MOVXq8qZDQRGb6z64_xAwg xen/include/xen/pci_ids.h
 3e54c38dlSCVdyVM4PKcrSfzLLxWUQ xen/include/xen/perfc.h
