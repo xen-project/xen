@@ -42,6 +42,10 @@ void serial_puts(int handle, const unsigned char *s);
  * called with interrupts disabled.
  */
 unsigned char serial_getc(int handle);
+/* 
+ * Same as serial_getc but can also be called from interrupt handlers.
+ */
+unsigned char irq_serial_getc(int handle);
 
 void serial_force_unlock(int handle);
 

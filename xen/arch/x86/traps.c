@@ -51,6 +51,7 @@
 #include <asm/uaccess.h>
 #include <asm/i387.h>
 #include <asm/pdb.h>
+#include <xen/debugger_hooks.h>
 
 extern char opt_nmi[];
 
@@ -243,6 +244,9 @@ static inline void do_trap(int trapnr, char *str,
         return;
     }
 
+    if (debugger_trap(trapnr, regs))
+	return;
+
     show_registers(regs);
     panic("CPU%d FATAL TRAP: vector = %d (%s)\n"
           "[error_code=%08x]\n",
@@ -280,10 +284,8 @@ asmlinkage void do_int3(struct xen_regs *regs, long error_code)
     struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
     trap_info_t *ti;
 
-#ifdef XEN_DEBUGGER
-    if ( pdb_initialized && pdb_handle_exception(3, regs) == 0 )
+    if (debugger_trap(3, regs))
         return;
-#endif
 
     if ( (regs->cs & 3) != 3 )
     {
@@ -328,6 +330,8 @@ asmlinkage void do_double_fault(void)
     printk("CPU%d DOUBLE FAULT -- system shutdown\n", cpu);
     printk("System needs manual reset.\n");
     printk("************************************\n");
+
+    debugger_trap(8, NULL);
 
     /* Lock up the console to prevent spurious output from other CPUs. */
     console_force_lock();
@@ -406,6 +410,9 @@ asmlinkage void do_page_fault(struct xen_regs *regs, long error_code)
         return;
     }
 
+    if (debugger_trap(14, regs))
+	return;
+
     if ( addr >= PAGE_OFFSET )
     {
         unsigned long page;
@@ -422,17 +429,6 @@ asmlinkage void do_page_fault(struct xen_regs *regs, long error_code)
             printk(" -- POSSIBLY AN ACCESS TO FREED MEMORY? --\n");
 #endif
     }
-
-#ifdef XEN_DEBUGGER
-    if ( pdb_page_fault_possible )
-    {
-        pdb_page_fault = 1;
-        /* make eax & edx valid to complete the instruction */
-        regs->eax = (long)&pdb_page_fault_scratch;
-        regs->edx = (long)&pdb_page_fault_scratch;
-        return;
-    }
-#endif
 
     show_registers(regs);
     panic("CPU%d FATAL PAGE FAULT\n"
@@ -520,6 +516,9 @@ asmlinkage void do_general_protection(struct xen_regs *regs, long error_code)
         return;
     }
 
+    if (debugger_trap(13, regs))
+	return;
+
     die("general protection fault", regs, error_code);
 }
 
@@ -565,6 +564,9 @@ asmlinkage void io_check_error(struct xen_regs *regs)
 
 static void unknown_nmi_error(unsigned char reason, struct xen_regs * regs)
 {
+    if (debugger_trap(2, regs))
+	return;
+
     printk("Uhhuh. NMI received for unknown reason %02x.\n", reason);
     printk("Dazed and confused, but trying to continue\n");
     printk("Do you have a strange power saving mode enabled?\n");

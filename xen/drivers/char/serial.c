@@ -416,6 +416,30 @@ static int byte_matches(int handle, unsigned char *pc)
     return 0;
 }
 
+unsigned char irq_serial_getc(int handle)
+{
+    uart_t *uart = &com[handle & SERHND_IDX];
+    unsigned char c;
+
+    while ( uart->rxbufp != uart->rxbufc )
+    {
+        c = uart->rxbuf[MASK_RXBUF_IDX(uart->rxbufc++)];
+        if ( byte_matches(handle, &c) )
+            goto out;
+    }
+    
+    /* We now wait for the UART to receive a suitable character. */
+    do {
+        while ( (inb(uart->io_base + LSR) & LSR_DR) == 0 )
+            barrier();
+        c = inb(uart->io_base + RBR);
+    }
+    while ( !byte_matches(handle, &c) );
+    
+ out:
+    return c;
+}
+
 unsigned char serial_getc(int handle)
 {
     uart_t *uart = &com[handle & SERHND_IDX];
@@ -432,24 +456,9 @@ unsigned char serial_getc(int handle)
     }
     
     disable_irq(uart->irq);
-    
-    /* disable_irq() may have raced execution of uart_rx(). */
-    while ( uart->rxbufp != uart->rxbufc )
-    {
-        c = uart->rxbuf[MASK_RXBUF_IDX(uart->rxbufc++)];
-        if ( byte_matches(handle, &c) )
-            goto enable_and_out;
-    }
 
-    /* We now wait for the UART to receive a suitable character. */
-    do {
-        while ( (inb(uart->io_base + LSR) & LSR_DR) == 0 )
-            barrier();
-        c = inb(uart->io_base + RBR);
-    }
-    while ( !byte_matches(handle, &c) );
+    c = irq_serial_getc(handle);
     
- enable_and_out:
     enable_irq(uart->irq);
  out:
     spin_unlock_irqrestore(&uart->lock, flags);
