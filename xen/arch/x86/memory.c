@@ -1061,7 +1061,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
              unlikely(!gnttab_prepare_for_transfer(e, d, gntref)) )
         {
             MEM_LOG("Transferee has no reservation headroom (%d,%d), or "
-                    "provided a bad grant ref, or is dying (%08x).\n",
+                    "provided a bad grant ref, or is dying (%08lx).\n",
                     e->tot_pages, e->max_pages, e->flags);
             spin_unlock(&e->page_alloc_lock);
             put_domain(e);
