@@ -99,6 +99,7 @@
         pushl $VMX_MONITOR_EFLAGS; \
         popf; \
         subl $(NR_SKIPPED_REGS*4), %esp; \
+        movl $0, 0xc(%esp); /* eflags==0 identifies xen_regs as VMX guest */ \
         pushl %eax; \
         pushl %ebp; \
         pushl %edi; \
