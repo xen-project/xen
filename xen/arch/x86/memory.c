@@ -864,12 +864,17 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
     case MMUEXT_SET_FOREIGNDOM:
         domid = (domid_t)(val >> 16);
 
+        if ( (e = percpu_info[cpu].foreign) != NULL )
+            put_domain(e);
+        percpu_info[cpu].foreign = NULL;
+
         if ( !IS_PRIV(d) )
         {
             switch ( domid )
             {
             case DOMID_IO:
-                get_knownalive_domain(e = dom_io);
+                get_knownalive_domain(dom_io);
+                percpu_info[cpu].foreign = dom_io;
                 break;
             default:
                 MEM_LOG("Dom %u cannot set foreign dom\n", d->domain);
@@ -879,19 +884,18 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         }
         else
         {
-            if ( (e = percpu_info[cpu].foreign) != NULL )
-                put_domain(e);
-
             percpu_info[cpu].foreign = e = find_domain_by_id(domid);
             if ( e == NULL )
             {
                 switch ( domid )
                 {
                 case DOMID_XEN:
-                    get_knownalive_domain(e = dom_xen);
+                    get_knownalive_domain(dom_xen);
+                    percpu_info[cpu].foreign = dom_xen;
                     break;
                 case DOMID_IO:
-                    get_knownalive_domain(e = dom_io);
+                    get_knownalive_domain(dom_io);
+                    percpu_info[cpu].foreign = dom_io;
                     break;
                 default:
                     MEM_LOG("Unknown domain '%u'", domid);
