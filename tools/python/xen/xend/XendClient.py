@@ -89,6 +89,9 @@ def vneturl(location, root, id=''):
 def eventurl(location, root, id=''):
     return urljoin(location, root, 'event/', id)
 
+def dmesgurl(location, root, id=''):
+    return urljoin(location, root, 'dmesg/', id)
+
 def xend_request(url, method, data=None):
     """Make a request to xend.
 
@@ -192,6 +195,9 @@ class Xend:
 
     def eventurl(self, id=''):
         return eventurl(self.location, self.root, id)
+
+    def dmesgurl(self, id=''):
+        return dmesgurl(self.location, self.root, id)
 
     def xend(self):
         return xend_get(urljoin(self.location, self.root))
@@ -329,6 +335,9 @@ class Xend:
     def xend_event_inject(self, sxpr):
         val = xend_call(self.eventurl(),
                         {'op': 'inject', 'event': fileof(sxpr) })
+
+    def xend_dmesg(self):
+        return xend_get(self.dmesgurl())
     
 
 def main(argv):

@@ -503,5 +503,15 @@ can be omitted. See xen.xend.XendClient for the API functions.
 
 xm.prog(ProgCall)
 
+class ProgDmesg(Prog):
+    group = 'host'
+    name  =  "dmesg"
+    info  = """Print Xen boot output."""
+
+    def main(self, args):
+        print server.xend_dmesg()[1]
+
+xm.prog(ProgDmesg)
+
 def main(args):
     xm.main(args)
