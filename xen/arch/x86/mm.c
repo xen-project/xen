@@ -1598,17 +1598,17 @@ int do_update_va_mapping(unsigned long va,
              * page was not shadowed, or that the L2 entry has not yet been
              * updated to reflect the shadow.
              */
-            unsigned l2_idx = page_nr >> (L2_PAGETABLE_SHIFT - L1_PAGETABLE_SHIFT);
-            l2_pgentry_t gpde = linear_l2_table[l2_idx];
+            l2_pgentry_t gpde = linear_l2_table[l2_table_offset(va)];
             unsigned long gpfn = l2_pgentry_val(gpde) >> PAGE_SHIFT;
 
-            if (get_shadow_status(&d->mm, gpfn))
+            if (get_shadow_status(d, gpfn))
             {
-                unsigned long *gl1e = map_domain_mem(gpfn << PAGE_SHIFT);
-                unsigned l1_idx = page_nr & (ENTRIES_PER_L1_PAGETABLE - 1);
+                unsigned long gmfn = __gpfn_to_mfn(d, gpfn);
+                unsigned long *gl1e = map_domain_mem(gmfn << PAGE_SHIFT);
+                unsigned l1_idx = l1_table_offset(va);
                 gl1e[l1_idx] = sval;
                 unmap_domain_mem(gl1e);
-                put_shadow_status(&d->mm);
+                put_shadow_status(d);
 
                 perfc_incrc(shadow_update_va_fail1);
             }
