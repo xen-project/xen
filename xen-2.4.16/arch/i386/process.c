@@ -326,9 +326,7 @@ void new_thread(struct task_struct *p,
     regs->eflags |= X86_EFLAGS_IF;
 
     /* No fast trap at start of day. */
-    p->thread.fast_trap_idx    = 0x20;
-    p->thread.fast_trap_desc.a = 0;
-    p->thread.fast_trap_desc.b = 0;
+    SET_DEFAULT_FAST_TRAP(&p->thread);
 }
 
 

@@ -358,8 +358,14 @@ struct thread_struct {
     trap_info_t         traps[256];
 };
 
+#define SET_DEFAULT_FAST_TRAP(_p) \
+    (_p)->fast_trap_idx = 0x20;   \
+    (_p)->fast_trap_desc.a = 0;   \
+    (_p)->fast_trap_desc.b = 0;
+
 #define CLEAR_FAST_TRAP(_p) \
     (memset(idt_table + (_p)->fast_trap_idx, 0, 8))
+
 #define SET_FAST_TRAP(_p)   \
     (memcpy(idt_table + (_p)->fast_trap_idx, &((_p)->fast_trap_desc), 8))
 
@@ -369,7 +375,7 @@ struct thread_struct {
 	{ [0 ... 7] = 0 },	/* debugging registers */	\
 	0, 0, 0,						\
 	{ { 0, }, },		/* 387 state */			\
-	0, { 0, 0 },						\
+	0x20, { 0, 0 },		/* DEFAULT_FAST_TRAP */		\
 	{ {0} }			/* io permissions */		\
 }
 

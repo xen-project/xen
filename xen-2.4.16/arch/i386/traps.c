@@ -580,10 +580,7 @@ long do_set_fast_trap(int idx)
     if ( idx == 0 )
     {
         CLEAR_FAST_TRAP(&current->thread);
-        memset(idt_table+current->thread.fast_trap_idx, 0, 8);
-        current->thread.fast_trap_idx    = 0x20;
-        current->thread.fast_trap_desc.a = 0;
-        current->thread.fast_trap_desc.b = 0;
+        SET_DEFAULT_FAST_TRAP(&current->thread);
         return 0;
     }
 
