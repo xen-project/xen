@@ -402,12 +402,11 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 		processed_system_time += NS_PER_TICK;
 		do_timer(regs);
 #ifdef CONFIG_SMP
-		if (regs)	/* XXXsmp this needs to be done on every cpu
-				 * - every tick - maybe  */
-		    update_process_times(user_mode(regs));
+		if (regs)
+			update_process_times(user_mode(regs));
 #endif
 		if (regs)
-		    profile_tick(CPU_PROFILING, regs);
+			profile_tick(CPU_PROFILING, regs);
 	}
 
 	/*
@@ -712,9 +711,16 @@ static irqreturn_t local_timer_interrupt(int irq, void *dev_id,
 	if ((xxx++ % 100) == 0)
 		xxprint("local_timer_interrupt\n");
 
+	/*
+	 * update_process_times() expects us to have done irq_enter().
+	 * Besides, if we don't timer interrupts ignore the global
+	 * interrupt lock, which is the WrongThing (tm) to do.
+	 */
+	irq_enter();
 	/* XXX add processed_system_time loop thingy */
 	if (regs)
 		update_process_times(user_mode(regs));
+	irq_exit();
 
 	return IRQ_HANDLED;
 }
