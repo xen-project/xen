@@ -404,10 +404,15 @@ static int vmx_final_setup_guest(struct exec_domain *ed,
 
         /* Put the domain in shadow mode even though we're going to be using
          * the shared 1:1 page table initially. It shouldn't hurt */
-        shadow_mode_enable(ed->domain, SHM_full_32);
+        shadow_mode_enable(ed->domain, SHM_enable|SHM_translate|SHM_external);
     }
 
-    update_pagetables(ed);     /* this assigns shadow_pagetable */
+    /* We don't call update_pagetables() as we actively want fields such as 
+     * the linear_pg_table to be null so that we bail out early of 
+     * shadow_fault in case the vmx guest tries illegal accesses with
+     * paging turned of. 
+     */
+    //update_pagetables(ed);     /* this assigns shadow_pagetable */
     alloc_monitor_pagetable(ed); /* this assigns monitor_pagetable */
 
     return 0;
@@ -502,11 +507,7 @@ int arch_final_setup_guest(
         return vmx_final_setup_guest(d, c);
 #endif
 
-    /* We don't call update_pagetables() as we actively want fields such as 
-     * the linear_pg_table to be null so that we bail out early of 
-     * shadow_fault in case the vmx guest tries illegal accesses with
-     * paging turned of. 
-     */
+    update_pagetables(d);
 
     return 0;
 }

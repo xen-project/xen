@@ -384,7 +384,7 @@ int construct_dom0(struct domain *d,
 #ifndef NDEBUG
     if (0) /* XXXXX DO NOT CHECK IN ENABLED !!! (but useful for testing so leave) */
     {
-        shadow_mode_enable(d, SHM_test); 
+        shadow_mode_enable(d, SHM_enable); 
         update_pagetables(ed); /* XXX SMP */
     }
 #endif
