@@ -41,6 +41,11 @@ unsigned int opt_vmx_debug_level;
 extern long evtchn_send(int lport);
 extern long do_block(void);
 
+#define VECTOR_DB   1
+#define VECTOR_BP   3
+#define VECTOR_GP   13
+#define VECTOR_PG   14
+
 int start_vmx()
 {
     struct vmcs_struct *vmcs;
@@ -142,19 +147,26 @@ static int vmx_do_page_fault(unsigned long va, unsigned long error_code)
 static void vmx_do_general_protection_fault(struct xen_regs *regs) 
 {
     unsigned long eip, error_code;
+    unsigned long intr_fields;
 
     __vmread(GUEST_EIP, &eip);
     __vmread(VM_EXIT_INTR_ERROR_CODE, &error_code);
 
-    VMX_DBG_LOG(DBG_LEVEL_1, 
+    VMX_DBG_LOG(DBG_LEVEL_1,
             "vmx_general_protection_fault: eip = %lx, erro_code = %lx\n",
             eip, error_code);
 
-    VMX_DBG_LOG(DBG_LEVEL_1, 
+    VMX_DBG_LOG(DBG_LEVEL_1,
             "eax=%x, ebx=%x, ecx=%x, edx=%x, esi=%x, edi=%x\n",
             regs->eax, regs->ebx, regs->ecx, regs->edx, regs->esi, regs->edi);
 
-    __vmx_bug(regs);
+    /* Reflect it back into the guest */
+    intr_fields = (INTR_INFO_VALID_MASK | 
+		   INTR_TYPE_EXCEPTION |
+		   INTR_INFO_DELIEVER_CODE_MASK |
+		   VECTOR_GP);
+    __vmwrite(VM_ENTRY_INTR_INFO_FIELD, intr_fields);
+    __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, error_code);
 }
 
 static void vmx_vmexit_do_cpuid(unsigned long input, struct xen_regs *regs) 
@@ -725,11 +737,6 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
     switch (exit_reason) {
     case EXIT_REASON_EXCEPTION_NMI:
     {
-#define VECTOR_DB   1
-#define VECTOR_BP   3
-#define VECTOR_GP   13
-#define VECTOR_PG   14
-
         /*
          * We don't set the software-interrupt exiting (INT n). 
          * (1) We can get an exception (e.g. #PG) in the guest, or
