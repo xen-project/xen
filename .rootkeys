@@ -192,6 +192,12 @@
 40f56239-JNIaTzlviVJohVdoYOUpw linux-2.6.9-xen-sparse/drivers/xen/blkfront/blkfront.c
 40f56239y9naBTXe40Pi2J_z3p-d1g linux-2.6.9-xen-sparse/drivers/xen/blkfront/block.h
 40f56239BVfPsXBiWQitXgDRtOsiqg linux-2.6.9-xen-sparse/drivers/xen/blkfront/vbd.c
+41a226e0vjAcDXHOnXE5ummcdUD2mg linux-2.6.9-xen-sparse/drivers/xen/blktap/Makefile
+41a226e0VeZA1N8tbU6nvJ3OxUcJmw linux-2.6.9-xen-sparse/drivers/xen/blktap/blktap.c
+41a226e1k4J5VMLnrYXDWRqElS49YQ linux-2.6.9-xen-sparse/drivers/xen/blktap/blktap.h
+41a226e1-A_Hy7utS8vJKaXnH_tzfA linux-2.6.9-xen-sparse/drivers/xen/blktap/blktap_controlmsg.c
+41a226e19NoUUTOvs7jumDMRYDIO4Q linux-2.6.9-xen-sparse/drivers/xen/blktap/blktap_datapath.c
+41a226e1MNSyWWK5dEVgvSQ5OW0fDA linux-2.6.9-xen-sparse/drivers/xen/blktap/blktap_userdev.c
 40f56239fsLjvtD8YBRAWphps4FDjg linux-2.6.9-xen-sparse/drivers/xen/console/Makefile
 3e5a4e651TH-SXHoufurnWjgl5bfOA linux-2.6.9-xen-sparse/drivers/xen/console/console.c
 40f56239KYxO0YabhPzCTeUuln-lnA linux-2.6.9-xen-sparse/drivers/xen/evtchn/Makefile
