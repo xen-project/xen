@@ -93,8 +93,9 @@ VM_MASK		= 0x00020000
 #define XEN_UNLOCK_VCPU_INFO_SMP(reg) preempt_enable(%ebp)
 #define XEN_UNLOCK_VCPU_INFO_SMP_fixup .byte 0xff,0xff,0xff
 #define Ux00 0xff
+#define XEN_LOCKED_BLOCK_EVENTS(reg)	movb $1,evtchn_upcall_mask(reg)
 #define XEN_BLOCK_EVENTS(reg)	XEN_LOCK_VCPU_INFO_SMP(reg)		; \
-				movb $1,evtchn_upcall_mask(reg)		; \
+				XEN_LOCKED_BLOCK_EVENTS(reg)		; \
     				XEN_UNLOCK_VCPU_INFO_SMP(reg)
 #define XEN_UNBLOCK_EVENTS(reg)	XEN_LOCK_VCPU_INFO_SMP(reg)		; \
 				movb $0,evtchn_upcall_mask(reg)		; \
@@ -110,7 +111,8 @@ VM_MASK		= 0x00020000
 #define XEN_UNLOCK_VCPU_INFO_SMP(reg)
 #define XEN_UNLOCK_VCPU_INFO_SMP_fixup
 #define Ux00 0x00
-#define XEN_BLOCK_EVENTS(reg)	movb $1,evtchn_upcall_mask(reg)
+#define XEN_LOCKED_BLOCK_EVENTS(reg)	movb $1,evtchn_upcall_mask(reg)
+#define XEN_BLOCK_EVENTS(reg)	XEN_LOCKED_BLOCK_EVENTS(reg)
 #define XEN_UNBLOCK_EVENTS(reg)	movb $0,evtchn_upcall_mask(reg)
 #define XEN_SAVE_UPCALL_MASK(reg,tmp,off) \
 	movb evtchn_upcall_mask(reg), tmp; \
@@ -510,7 +512,7 @@ scrit:	/**** START OF CRITICAL REGION ****/
 	jnz  14f			# process more events if necessary...
 	XEN_UNLOCK_VCPU_INFO_SMP(%esi)
 	RESTORE_ALL
-14:	XEN_BLOCK_EVENTS(%esi)
+14:	XEN_LOCKED_BLOCK_EVENTS(%esi)
 	XEN_UNLOCK_VCPU_INFO_SMP(%esi)
 	jmp  11b
 ecrit:  /**** END OF CRITICAL REGION ****/
