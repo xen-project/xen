@@ -1271,6 +1271,18 @@ int new_guest_cr3(unsigned long mfn)
             put_page(&frame_table[old_base_mfn]);
         else
             put_page_and_type(&frame_table[old_base_mfn]);
+
+        // CR3 holds its own ref to its shadow...
+        //
+        if ( shadow_mode_enabled(d) )
+        {
+            if ( ed->arch.monitor_shadow_ref )
+                put_shadow_ref(ed->arch.monitor_shadow_ref);
+            ed->arch.monitor_shadow_ref =
+                pagetable_val(ed->arch.monitor_table) >> PAGE_SHIFT;
+            ASSERT(page_get_owner(&frame_table[ed->arch.monitor_shadow_ref]) == NULL);
+            get_shadow_ref(ed->arch.monitor_shadow_ref);
+        }
     }
     else
     {
@@ -1386,9 +1398,9 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         break;
     
     case MMUEXT_INVLPG:
-        __flush_tlb_one(ptr);
         if ( shadow_mode_enabled(d) )
             shadow_invlpg(ed, ptr);
+        __flush_tlb_one(ptr);
         break;
 
     case MMUEXT_FLUSH_CACHE:
@@ -1940,9 +1952,9 @@ int do_mmu_update(
 
     if ( deferred_ops & DOP_FLUSH_TLB )
     {
-        local_flush_tlb();
         if ( shadow_mode_enabled(d) )
             shadow_sync_all(d);
+        local_flush_tlb();
     }
         
     if ( deferred_ops & DOP_RELOAD_LDT )
@@ -2072,15 +2084,15 @@ int do_update_va_mapping(unsigned long va,
     if ( unlikely(deferred_ops & DOP_FLUSH_TLB) || 
          unlikely(flags & UVMF_FLUSH_TLB) )
     {
-        local_flush_tlb();
         if ( unlikely(shadow_mode_enabled(d)) )
             shadow_sync_all(d);
+        local_flush_tlb();
     }
     else if ( unlikely(flags & UVMF_INVLPG) )
     {
-        __flush_tlb_one(va);
         if ( unlikely(shadow_mode_enabled(d)) )
             shadow_invlpg(current, va);
+        __flush_tlb_one(va);
     }
 
     if ( unlikely(deferred_ops & DOP_RELOAD_LDT) )

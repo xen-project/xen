@@ -97,3 +97,4 @@ PERFCOUNTER_CPU(remove_write_predicted,            "remove_write predict hit&exi
 PERFCOUNTER_CPU(remove_write_bad_prediction,       "remove_write bad prediction")
 PERFCOUNTER_CPU(write_fault_bail,                  "sf bailed due to write_fault")
 PERFCOUNTER_CPU(read_fault_bail,                   "sf bailed due to read_fault")
+PERFCOUNTER_CPU(update_hl2e_invlpg,                 "update_hl2e calls invlpg")

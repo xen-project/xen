@@ -411,6 +411,8 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
                     if ( pagetable_val(ed->arch.shadow_table) )
                         adjust(&frame_table[pagetable_val(ed->arch.shadow_table)
                                             >> PAGE_SHIFT], 0);
+                    if ( ed->arch.monitor_shadow_ref )
+                        adjust(&frame_table[ed->arch.monitor_shadow_ref], 0);
                 }
             }
     }

@@ -62,10 +62,14 @@ shadow_promote(struct domain *d, unsigned long gpfn, unsigned long gmfn,
     if ( unlikely(page_is_page_table(page)) )
         return 1;
 
-    FSH_LOG("shadow_promote gpfn=%p gmfn=%p nt=%p", gpfn, gmfn, new_type);
+    FSH_LOG("%s: gpfn=%p gmfn=%p nt=%p", __func__, gpfn, gmfn, new_type);
 
     if ( !shadow_remove_all_write_access(d, gpfn, gmfn) )
+    {
+        FSH_LOG("%s: couldn't find/remove all write accesses, gpfn=%p gmfn=%p\n",
+                __func__, gpfn, gmfn);
         return 0;
+    }
 
     // To convert this page to use as a page table, the writable count
     // should now be zero.  Test this by grabbing the page as an page table,
@@ -1236,8 +1240,7 @@ shadow_hl2_table(struct domain *d, unsigned long gpfn, unsigned long gmfn,
 {
     unsigned long hl2mfn;
     l1_pgentry_t *hl2;
-    l2_pgentry_t *gl2;
-    int i, limit;
+    int limit;
 
     ASSERT(PGT_base_page_table == PGT_l2_page_table);
 
@@ -1249,7 +1252,6 @@ shadow_hl2_table(struct domain *d, unsigned long gpfn, unsigned long gmfn,
 
     perfc_incrc(shadow_hl2_table_count);
 
-    gl2 = map_domain_mem(gmfn << PAGE_SHIFT);
     hl2 = map_domain_mem(hl2mfn << PAGE_SHIFT);
 
     if ( shadow_mode_external(d) )
@@ -1257,19 +1259,7 @@ shadow_hl2_table(struct domain *d, unsigned long gpfn, unsigned long gmfn,
     else
         limit = DOMAIN_ENTRIES_PER_L2_PAGETABLE;
 
-    for ( i = 0; i < limit; i++ )
-    {
-        unsigned long gl2e = l2_pgentry_val(gl2[i]);
-        unsigned long hl2e;
-
-        hl2e_propagate_from_guest(d, gl2e, &hl2e);
-
-        if ( (hl2e & _PAGE_PRESENT) &&
-             !get_page(pfn_to_page(hl2e >> PAGE_SHIFT), d) )
-            hl2e = 0;
-
-        hl2[i] = mk_l1_pgentry(hl2e);
-    }
+    memset(hl2, 0, limit * sizeof(l1_pgentry_t));
 
     if ( !shadow_mode_external(d) )
     {
@@ -1287,7 +1277,6 @@ shadow_hl2_table(struct domain *d, unsigned long gpfn, unsigned long gmfn,
     }
 
     unmap_domain_mem(hl2);
-    unmap_domain_mem(gl2);
 
     return hl2mfn;
 }

@@ -67,6 +67,7 @@ extern int set_p2m_entry(
 
 static inline unsigned long __shadow_status(
     struct domain *d, unsigned long gpfn, unsigned long stype);
+static inline void update_hl2e(struct exec_domain *ed, unsigned long va);
 
 extern void vmx_shadow_clear_state(struct domain *);
 
@@ -121,6 +122,11 @@ __shadow_sync_va(struct exec_domain *ed, unsigned long va)
         //
         __shadow_sync_all(ed->domain);
     }
+
+    // Also make sure the HL2 is up-to-date for this address.
+    //
+    if ( unlikely(shadow_mode_translate(ed->domain)) )
+        update_hl2e(ed, va);
 }
 
 static void inline
@@ -314,34 +320,58 @@ static inline void
 __guest_set_l2e(
     struct exec_domain *ed, unsigned long va, unsigned long value)
 {
+    ed->arch.guest_vtable[l2_table_offset(va)] = mk_l2_pgentry(value);
+
     if ( unlikely(shadow_mode_translate(ed->domain)) )
+        update_hl2e(ed, va);
+}
+
+static inline void
+update_hl2e(struct exec_domain *ed, unsigned long va)
+{
+    int index = l2_table_offset(va);
+    unsigned long gl2e = l2_pgentry_val(ed->arch.guest_vtable[index]);
+    unsigned long mfn;
+    unsigned long old_hl2e, new_hl2e;
+    int need_flush = 0;
+
+    ASSERT(shadow_mode_translate(ed->domain));
+
+    old_hl2e = l1_pgentry_val(ed->arch.hl2_vtable[index]);
+
+    if ( (gl2e & _PAGE_PRESENT) &&
+         VALID_MFN(mfn = phys_to_machine_mapping(gl2e >> PAGE_SHIFT)) )
+        new_hl2e = (mfn << PAGE_SHIFT) | __PAGE_HYPERVISOR;
+    else
+        new_hl2e = 0;
+
+    // only do the ref counting if something important changed.
+    //
+    if ( (old_hl2e ^ new_hl2e) & (PAGE_MASK | _PAGE_PRESENT) )
     {
-        unsigned long mfn = phys_to_machine_mapping(value >> PAGE_SHIFT);
-        unsigned long old_hl2e =
-            l1_pgentry_val(ed->arch.hl2_vtable[l2_table_offset(va)]);
-        unsigned long new_hl2e =
-            (VALID_MFN(mfn) ? ((mfn << PAGE_SHIFT) | __PAGE_HYPERVISOR) : 0);
-
-        // only do the ref counting if something important changed.
-        //
-        if ( (old_hl2e ^ new_hl2e) & (PAGE_MASK | _PAGE_PRESENT) )
+        if ( (new_hl2e & _PAGE_PRESENT) &&
+             !get_page(pfn_to_page(new_hl2e >> PAGE_SHIFT), ed->domain) )
+            new_hl2e = 0;
+        if ( old_hl2e & _PAGE_PRESENT )
         {
-            if ( (new_hl2e & _PAGE_PRESENT) &&
-                 !shadow_get_page_from_l1e(mk_l1_pgentry(new_hl2e), ed->domain) )
-                new_hl2e = 0;
-            if ( old_hl2e & _PAGE_PRESENT )
-                put_page_from_l1e(mk_l1_pgentry(old_hl2e), ed->domain);
+            put_page(pfn_to_page(old_hl2e >> PAGE_SHIFT));
+            need_flush = 1;
         }
-
-        ed->arch.hl2_vtable[l2_table_offset(va)] = mk_l1_pgentry(new_hl2e);
     }
 
-    ed->arch.guest_vtable[l2_table_offset(va)] = mk_l2_pgentry(value);
+    ed->arch.hl2_vtable[l2_table_offset(va)] = mk_l1_pgentry(new_hl2e);
+
+    if ( need_flush )
+    {
+        perfc_incrc(update_hl2e_invlpg);
+        __flush_tlb_one(&linear_pg_table[l1_linear_offset(va)]);
+    }
 }
+
 
 /************************************************************************/
 
-//#define MFN3_TO_WATCH 0x1ff6e
+//#define MFN3_TO_WATCH 0x8575
 #ifdef MFN3_TO_WATCH
 #define get_shadow_ref(__s) (                                                 \
 {                                                                             \
