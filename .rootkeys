@@ -64,8 +64,6 @@
 3ec41f7d3-xTeoVJBJqWqxVfU-ANoQ tools/control/src/uk/ac/cam/cl/xeno/xenctl/Parser.java
 3ec41f7dOVZgjP4sQS6vjuBnExdlMQ tools/control/src/uk/ac/cam/cl/xeno/xenctl/RootBean.java
 3ec41f7dvPdszb0frNEkMnEdJUBVjA tools/control/src/uk/ac/cam/cl/xeno/xenctl/SystemConfigurationBean.java
-3ec41f7dlW5Buk3MO18HHtBax1Jz9g tools/control/src/uk/ac/cam/cl/xeno/xenctl/VirtualBlockDevice.java
-3ec41f7dP3VglJUTuP45rwvSAoW_pg tools/control/src/uk/ac/cam/cl/xeno/xenctl/VirtualDisk.java
 3ec41f7dO6IuKGGLG4VRUhMDmkTn5g tools/control/web/WEB-INF/web.xml
 3ec41f7dRAPXBA0jQUd1k6MB3xVidg tools/control/web/img/cambridge.gif
 3ec41f7dvxVe1Vb3kVOLZcN5Jra2tQ tools/control/web/img/help.gif
@@ -131,7 +129,6 @@
 3eb781fd8oRfPgH7qTh7xvgmwD6NgA tools/internal/xi_start.c
 3eb781fd0Eo9K1jEFCSAVzO51i_ngg tools/internal/xi_stop.c
 3eb781fd7211MZsLxJSiuy7W4KnJXg tools/internal/xi_vifinit
-3ea53c6d48QGVkviHh0jBB_h_ZqZDw tools/vdmanager/src/uk/ac/cam/cl/xeno/vdmanager/VirtualDiskManager.java
 3ddb79bcbOVHh38VJzc97-JEGD4dJQ xen/Makefile
 3ddb79bcCa2VbsMp7mWKlhgwLQUQGA xen/README
 3ddb79bcWnTwYsQRWl_PaneJfa6p0w xen/Rules.mk
