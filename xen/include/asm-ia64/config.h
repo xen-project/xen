@@ -217,6 +217,10 @@ void sort_main_extable(void);
 #define ARCH_HAS_EXEC_DOMAIN_MM_PTR
 
 // see arch/x86/nmi.c !?!?
+
+// these declarations got moved at some point, find a better place for them
+extern int opt_noht;
+extern int ht_per_core;
 extern unsigned int watchdog_on;
 
 // xen/include/asm/config.h
