@@ -160,7 +160,7 @@ static void __get_time_values_from_xen(void)
 		rmb();
 		shadow_tv.tv_sec    = s->wc_sec;
 		shadow_tv.tv_usec   = s->wc_usec;
-		shadow_tsc_stamp    = s->tsc_timestamp.tsc_bits;
+		shadow_tsc_stamp    = (u32)s->tsc_timestamp;
 		shadow_system_time  = s->system_time;
 		rmb();
 	}

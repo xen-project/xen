@@ -44,15 +44,14 @@ static unsigned int    rdtsc_bitshift;  /* Which 32 bits of TSC do we use?   */
 static u64             cpu_freq;        /* CPU frequency (Hz)                */
 static u32             st_scale_f;      /* Cycles -> ns, fractional part     */
 static u32             st_scale_i;      /* Cycles -> ns, integer part        */
-static u32             tsc_irq;         /* CPU0's TSC at last 'time update'  */
+static u32             shifted_tsc_irq; /* CPU0's TSC at last 'time update'  */
+static u64             full_tsc_irq;    /* ...ditto, but all 64 bits         */
 static s_time_t        stime_irq;       /* System time at last 'time update' */
 static unsigned long   wc_sec, wc_usec; /* UTC time at last 'time update'.   */
 static rwlock_t        time_lock = RW_LOCK_UNLOCKED;
 
 static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-    u64 full_tsc;
-
     write_lock_irq(&time_lock);
 
 #ifdef CONFIG_X86_IO_APIC
@@ -71,8 +70,8 @@ static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
      * Updates TSC timestamp (used to interpolate passage of time between
      * interrupts).
      */
-    rdtscll(full_tsc);
-    tsc_irq = (u32)(full_tsc >> rdtsc_bitshift);
+    rdtscll(full_tsc_irq);
+    shifted_tsc_irq = (u32)(full_tsc_irq >> rdtsc_bitshift);
 
     /* Update jiffies counter. */
     (*(unsigned long *)&jiffies)++;
@@ -243,7 +242,7 @@ static inline u64 get_time_delta(void)
 
     rdtscll(tsc);
     low = (u32)(tsc >> rdtsc_bitshift);
-    delta_tsc = (s32)(low - tsc_irq);
+    delta_tsc = (s32)(low - shifted_tsc_irq);
     if ( unlikely(delta_tsc < 0) ) delta_tsc = 0;
     delta = ((u64)delta_tsc * st_scale_f);
     delta >>= 32;
@@ -285,8 +284,7 @@ void update_dom_time(shared_info_t *si)
     wmb();
 
     si->cpu_freq       = cpu_freq;
-    si->tsc_timestamp.tsc_bitshift = rdtsc_bitshift;
-    si->tsc_timestamp.tsc_bits     = tsc_irq;
+    si->tsc_timestamp  = full_tsc_irq;
     si->system_time    = stime_irq;
     si->wc_sec         = wc_sec;
     si->wc_usec        = wc_usec;
@@ -328,7 +326,6 @@ void do_settime(unsigned long secs, unsigned long usecs, u64 system_time_base)
 int __init init_xen_time()
 {
     u64      scale;
-    u64      full_tsc;
     unsigned int cpu_ghz;
 
     cpu_ghz = (unsigned int)(cpu_freq / 1000000000ULL);
@@ -341,9 +338,9 @@ int __init init_xen_time()
     st_scale_i = scale >> 32;
 
     /* System time ticks from zero. */
-    rdtscll(full_tsc);
+    rdtscll(full_tsc_irq);
     stime_irq = (s_time_t)0;
-    tsc_irq   = (u32)(full_tsc >> rdtsc_bitshift);
+    shifted_tsc_irq = (u32)(full_tsc_irq >> rdtsc_bitshift);
 
     /* Wallclock time starts as the initial RTC time. */
     wc_sec  = get_cmos_time();

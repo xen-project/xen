@@ -78,7 +78,6 @@ static int count2; /* counter for mark_offset_tsc() */
  */
 static unsigned long fast_gettimeoffset_quotient;
 
-unsigned int rdtsc_bitshift;
 extern u32 shadow_tsc_stamp;
 extern u64 shadow_system_time;
 
@@ -91,7 +90,7 @@ static unsigned long get_offset_tsc(void)
 	rdtsc(eax,edx);
 
 	/* .. relative to previous jiffy (32 bits is enough) */
-	eax -= (shadow_tsc_stamp << rdtsc_bitshift) & 0xffffffff;
+	eax -= shadow_tsc_stamp;
 
 	/*
 	 * Time offset = (tsc_low delta) * fast_gettimeoffset_quotient
@@ -119,7 +118,7 @@ static unsigned long long monotonic_clock_tsc(void)
 	/* atomically read monotonic base & last_offset */
 	do {
 		seq = read_seqbegin(&monotonic_lock);
-		last_offset = monotonic_offset << rdtsc_bitshift;
+		last_offset = monotonic_offset;
 		base = monotonic_base;
 	} while (read_seqretry(&monotonic_lock, seq));
 
@@ -348,8 +347,6 @@ static int __init init_tsc(char* override)
 		    :"r" (cpu_khz),
 		    "0" (eax), "1" (edx));
 	}
-
-	rdtsc_bitshift = HYPERVISOR_shared_info->tsc_timestamp.tsc_bitshift;
 
 	set_cyc2ns_scale(cpu_khz/1000);
 
