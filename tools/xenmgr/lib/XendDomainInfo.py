@@ -59,7 +59,7 @@ class VmError(ValueError):
 class XendDomainInfo:
     """Virtual machine object."""
 
-    def __init__(self, config, dom, name, memory, image=None, console=None):
+    def __init__(self, config, dom, name, memory, image=None, console=None, info=None):
         """Construct a virtual machine object.
 
         config   configuration
@@ -78,8 +78,10 @@ class XendDomainInfo:
         self.console = console
         self.devices = {}
         self.configs = []
-        self.info = None
+        self.info = info
         self.ipaddrs = []
+        self.block_controller = 0
+        self.net_controller = 0
 
         #todo: state: running, suspended
         self.state = 'running'
@@ -111,6 +113,7 @@ class XendDomainInfo:
                 ['name', self.name],
                 ['memory', self.memory] ]
         if self.info:
+            print 'info:', self.info
             run   = (self.info['running'] and 'r') or '-'
             block = (self.info['blocked'] and 'b') or '-'
             stop  = (self.info['stopped'] and 's') or '-'
@@ -528,6 +531,18 @@ def vm_create_devices(vm, config):
     print '<vm_create_devices'
     return deferred
 
+def config_controllers(vm, config):
+    for c in sxp.children(config, 'controller'):
+        name = sxp.name(c)
+        if name == 'block':
+            vm.block_controller = 1
+            xend.blkif_set_control_domain(vm.dom)
+        elif name == 'net':
+            vm.net_controller = 1
+            xend.netif_set_control_domain(vm.dom)
+        else:
+            raise VmError('invalid controller type:' + str(name))
+    
 def vm_configure(vm, config):
     """Configure a vm.
 
@@ -536,7 +551,12 @@ def vm_configure(vm, config):
 
     returns Deferred - calls callback with vm
     """
-    d = xend.blkif_create(vm.dom)
+    config_controllers(vm, config)
+    if vm.block_controller:
+        d = xend.blkif_create(vm.dom)
+    else:
+        d = defer.Deferred()
+        d.callback(1)
     d.addCallback(_vm_configure1, vm, config)
     return d
 
@@ -653,8 +673,11 @@ def vm_dev_vif(vm, val, index):
     val       vif config
     index     vif index
     """
+    if vm.net_controller:
+        raise VmError('vif: vif in control domain')
     vif = index #todo
     vmac = sxp.child_value(val, "mac")
+    bridge = sxp.child_value(val, "bridge") # todo
     defer = make_vif(vm.dom, vif, vmac)
     def fn(id):
         dev = val + ['vif', vif]
@@ -671,6 +694,8 @@ def vm_dev_vbd(vm, val, index):
     val       vbd config
     index     vbd index
     """
+    if vm.block_controller:
+        raise VmError('vbd: vbd in control domain')
     uname = sxp.child_value(val, 'uname')
     if not uname:
         raise VMError('vbd: Missing uname')
@@ -686,6 +711,16 @@ def vm_dev_vbd(vm, val, index):
     defer.addCallback(fn)
     return defer
 
+def parse_pci(val):
+    if isinstance(val, StringType):
+        radix = 10
+        if val.startswith('0x') or val.startswith('0X'):
+            radix = 16
+        v = int(val, radix)
+    else:
+        v = val
+    return v
+
 def vm_dev_pci(vm, val, index):
     bus = sxp.child_value(val, 'bus')
     if not bus:
@@ -697,9 +732,9 @@ def vm_dev_pci(vm, val, index):
     if not func:
         raise VMError('pci: Missing func')
     try:
-        bus = int(bus, 16)
-        dev = int(dev, 16)
-        func = int(func, 16)
+        bus = parse_pci(bus)
+        dev = parse_pci(dev)
+        func = parse_pci(func)
     except:
         raise VMError('pci: invalid parameter')
     rc = xc.physdev_pci_access_modify(dom=vm.dom, bus=bus, dev=dev, func=func, enable=1)

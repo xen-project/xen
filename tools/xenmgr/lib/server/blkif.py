@@ -34,15 +34,18 @@ class BlkifControllerFactory(controller.ControllerFactory):
         return d
 
     def setControlDomain(self, dom):
-        if self.channel:
-            self.deregisterChannel()
-            self.attached = 0
+        if self.dom == dom: return
+        self.deregisterChannel()
+        self.attached = 0
         self.dom = dom
         self.registerChannel()
         #
         #if xend.blkif.be_port:
         #    xend.blkif.recovery = True
         #xend.blkif.be_port = xend.main.port_from_dom(dom)
+
+    def getControlDomain(self):
+        return self.dom
 
     def recv_be_create(self, msg, req):
         #print 'recv_be_create>'
@@ -81,15 +84,20 @@ class BlkifControllerFactory(controller.ControllerFactory):
         blkif = self.getInstanceByDom(dom)
         if blkif:
             blkif.reattach_device(vdev)
+        self.attached = self.devices_attached()
+        if self.attached:
+            self.reattached()
+
+    def devices_attached(self):
+        """Check if all devices are attached.
+        """
         attached = 1
         for blkif in self.getInstances():
             if not blkif.attached:
                 attached = 0
                 break
-        self.attached = attached
-        if self.attached:
-            self.reattached()
-
+        return attached
+                         
     def reattached(self):
         for blkif in self.getInstances():
             blkif.reattached()
@@ -149,12 +157,16 @@ class BlkifController(controller.Controller):
         return self.factory.addDeferred()
 
     def detach(self):
+        """Detach all devices, when the back-end control domain has changed.
+        """
         self.attached = 0
         for dev in self.devices.values():
             dev.attached = 0
             self.send_be_vbd_create(vdev)
 
     def reattach_device(self, vdev):
+        """Reattach a device, when the back-end control domain has changed.
+        """
         dev = self.devices[vdev]
         dev.attached = 1
         attached = 1
@@ -166,6 +178,8 @@ class BlkifController(controller.Controller):
         return self.attached
 
     def reattached(self):
+        """All devices have been reattached after the back-end control domain has changed.
+        """
         msg = packMsg('blkif_fe_interface_status_changed_t',
                       { 'handle' : 0,
                         'status' : BLKIF_INTERFACE_STATUS_DISCONNECTED})

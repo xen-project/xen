@@ -18,6 +18,9 @@ import XendDomainInfo
 import XendConsole
 import EventServer
 
+from xenmgr.server import SrvConsoleServer
+xend = SrvConsoleServer.instance()
+
 eserver = EventServer.instance()
 
 __all__ = [ "XendDomain" ]
@@ -49,15 +52,16 @@ class XendDomain:
     def initial_refresh(self):
         """Refresh initial domain info from domain_db.
         """
-        print "initial_refresh> db=", self.domain_db.values()
+        print "initial_refresh>"
+        for d in self.domain_db.values(): print 'db dom=', d
         domlist = xc.domain_getinfo()
-        print "doms=", domlist
+        for d in domlist: print 'xc dom=', d
         doms = {}
         for d in domlist:
             domid = str(d['dom'])
             doms[domid] = d
         for config in self.domain_db.values():
-            domid = int(sxp.child_value(config, 'id'))
+            domid = str(sxp.child_value(config, 'id'))
             print "dom=", domid, "config=", config
             if domid in doms:
                 print "dom=", domid, "new"
@@ -141,7 +145,7 @@ class XendDomain:
                 config = None
                 image = None
                 newinfo = XendDomainInfo.XendDomainInfo(
-                    config, d['dom'], d['name'], d['mem_kb']/1024, image)
+                    config, d['dom'], d['name'], d['mem_kb']/1024, image=image, info=d)
                 self._add_domain(newinfo.id, newinfo)
         # Remove entries for domains that no longer exist.
         for d in self.domain.values():
@@ -193,13 +197,13 @@ class XendDomain:
         """
         dom = int(id)
         eserver.inject('xend.domain.start', id)
-        return xc.domain_start(dom=dom)
+        return xend.domain_start(dom)
     
     def domain_stop(self, id):
         """Stop domain running.
         """
         dom = int(id)
-        return xc.domain_stop(dom=dom)
+        return xend.domain_stop(dom)
     
     def domain_shutdown(self, id):
         """Shutdown domain (nicely).
@@ -208,7 +212,7 @@ class XendDomain:
         if dom <= 0:
             return 0
         eserver.inject('xend.domain.shutdown', id)
-        val = xc.domain_destroy(dom=dom, force=0)
+        val = xend.domain_destroy(dom, force=0)
         self.refresh()
         return val
     
@@ -219,7 +223,7 @@ class XendDomain:
         if dom <= 0:
             return 0
         eserver.inject('xend.domain.halt', id)
-        val = xc.domain_destroy(dom=dom, force=1)
+        val = xend.domain_destroy(dom, force=1)
         self.refresh()
         return val       
 

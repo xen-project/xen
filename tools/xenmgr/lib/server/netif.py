@@ -35,6 +35,7 @@ class NetifControllerFactory(controller.ControllerFactory):
     def setControlDomain(self, dom):
         """Set the 'back-end' device driver domain.
         """
+        if self.dom == dom: return
         self.deregisterChannel()
         self.attached = 0
         self.dom = dom
@@ -44,7 +45,9 @@ class NetifControllerFactory(controller.ControllerFactory):
         #    xend.netif.recovery = True
         #    xend.netif.be_port = xend.main.port_from_dom(dom)
         #
-        pass
+
+    def getControlDomain(self):
+        return self.dom
 
     def recv_be_create(self, msg, req):
         self.callDeferred(0)
@@ -64,6 +67,8 @@ class NetifControllerFactory(controller.ControllerFactory):
         val = unpackMsg('netif_be_driver_status_changed_t', msg)
         status = val['status']
         if status == NETIF_DRIVER_STATUS_UP and not self.attached:
+            # If we are not attached the driver domain was changed, and
+            # this signals the new driver domain is ready.
             for netif in self.getInstances():
                 netif.reattach_devices()
             self.attached = 1
@@ -149,6 +154,8 @@ class NetifController(controller.Controller):
         return d
 
     def reattach_devices(self):
+        """Reattach all devices when the back-end control domain has changed.
+        """
         d = self.factory.addDeferred()
         self.send_be_create(vif)
         self.attach_fe_devices(0)
@@ -182,10 +189,6 @@ class NetifController(controller.Controller):
                         'rx_shmem_frame' : val['rx_shmem_frame'] })
         self.factory.writeRequest(msg)
 
-    #def recv_fe_interface_status_changed(self):
-    #    print 'recv_fe_interface_status_changed>'
-    #    pass
-    
     def send_interface_connected(self, vif):
         dev = self.devices[vif]
         msg = packMsg('netif_fe_interface_status_changed_t',
