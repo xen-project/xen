@@ -104,10 +104,6 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     if ( op->interface_version != DOM0_INTERFACE_VERSION )
         return -EACCES;
 
-    TRACE_5D(TRC_DOM0OP_ENTER_BASE + op->cmd, 
-             0, op->u.dummy[0], op->u.dummy[1], 
-             op->u.dummy[2], op->u.dummy[3] );
-
     switch ( op->cmd )
     {
 
@@ -470,10 +466,6 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         ret = arch_do_dom0_op(op,u_dom0_op);
 
     }
-
-    TRACE_5D(TRC_DOM0OP_LEAVE_BASE + op->cmd, ret,
-             op->u.dummy[0], op->u.dummy[1], op->u.dummy[2], op->u.dummy[3]);
-
 
     return ret;
 }
