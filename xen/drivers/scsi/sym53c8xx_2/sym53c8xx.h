@@ -181,7 +181,7 @@ int sym53c8xx_release(struct Scsi_Host *);
 /*
  *  These options are not tunable from 'make config'
  */
-#if 1
+#if 0
 #define	SYM_LINUX_PROC_INFO_SUPPORT
 #define SYM_LINUX_BOOT_COMMAND_LINE_SUPPORT
 #define SYM_LINUX_USER_COMMAND_SUPPORT

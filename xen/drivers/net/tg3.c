@@ -5868,6 +5868,8 @@ static void tg3_set_rx_mode(struct net_device *dev)
 	spin_unlock_irq(&tp->lock);
 }
 
+#ifdef ETHTOOL
+
 #define TG3_REGDUMP_LEN		(32 * 1024)
 
 static int tg3_get_regs_len(struct net_device *dev)
@@ -5938,6 +5940,8 @@ do {	p = orig_p + (reg);	\
 	spin_unlock(&tp->tx_lock);
 	spin_unlock_irq(&tp->lock);
 }
+
+#endif /* ETHTOOL */
 
 static int tg3_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 {
@@ -6088,6 +6092,8 @@ static int tg3_nway_reset(struct net_device *dev)
 	return r;
 }
   
+#ifdef ETHTOOL
+
 static void tg3_get_ringparam(struct net_device *dev, struct ethtool_ringparam *ering)
 {
 	struct tg3 *tp = dev->priv;
@@ -6170,6 +6176,8 @@ static int tg3_set_pauseparam(struct net_device *dev, struct ethtool_pauseparam 
 	return 0;
 }
   
+#endif /* ETHTOOL */
+
 static u32 tg3_get_rx_csum(struct net_device *dev)
 {
 	struct tg3 *tp = dev->priv;

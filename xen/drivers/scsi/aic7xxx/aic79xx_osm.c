@@ -376,8 +376,8 @@ static void ahd_linux_dev_timed_unfreeze(u_long arg);
 /* SAE */
 #if XENO_KILLED
 static void ahd_linux_sem_timeout(u_long arg);
-#endif
 static int  ahd_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag);
+#endif
 
 static void ahd_linux_initialize_scsi_bus(struct ahd_softc *ahd);
 static void ahd_linux_select_queue_depth(struct Scsi_Host *host,
@@ -2458,7 +2458,6 @@ ahd_linux_sem_timeout(u_long arg)
 	sem = (struct semaphore *)arg;
 	up(sem);
 }
-#endif
 
 static int
 ahd_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag)
@@ -2733,6 +2732,7 @@ done:
 	spin_lock_irq(&io_request_lock);
 	return (retval);
 }
+#endif /* XENO_KILLED */
 
 static void
 ahd_linux_dev_timed_unfreeze(u_long arg)

@@ -5,9 +5,7 @@ LD := ld
 # Linker should relocate monitor to this address
 MONITOR_BASE := 0xE0100000
 
-# NB. '-Wstrict-prototypes -Wredundant-decls -Wpointer-arith -Winline -ansi'
-#     might all be okay to add to Xen. '-Wnested-externs' is a maybe.
-#     '-Wcast-qual' is evil.
+# NB. '-Wcast-qual' is nasty, so I omitted it.
 CFLAGS := -fno-builtin -O3 -Wall -Ih/ -Wredundant-decls
 CFLAGS += -Wstrict-prototypes -Wnested-externs -Wpointer-arith -Winline -ansi
 

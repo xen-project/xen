@@ -147,12 +147,6 @@ const char *const scsi_device_types[MAX_SCSI_DEVICE_CODE] =
 	"Enclosure        ",
 };
 
-/* 
- * Function prototypes.
- */
-extern void scsi_times_out(Scsi_Cmnd * SCpnt);
-void scsi_build_commandblocks(Scsi_Device * SDpnt);
-
 /*
  * These are the interface to the old error handling code.  It should go away
  * someday soon.

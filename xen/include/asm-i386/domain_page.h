@@ -4,6 +4,9 @@
  * Allow temporary mapping of domain page frames into Xen space.
  */
 
+#ifndef __ASM_DOMAIN_PAGE_H__
+#define __ASM_DOMAIN_PAGE_H__
+
 #include <xeno/config.h>
 #include <xeno/sched.h>
 
@@ -23,21 +26,4 @@ extern void *map_domain_mem(unsigned long pa);
  */
 extern void unmap_domain_mem(void *va);
 
-#if 0
-#define MAPCACHE_HASH(_pfn)     ((_pfn) & (MAPCACHE_ENTRIES-1))
-static inline void *map_domain_mem(unsigned long pa)
-{
-    unsigned long pfn = pa >> PAGE_SHIFT;
-    unsigned long hash = MAPCACHE_HASH(pfn);
-    unsigned long *pent = mapcache[smp_processor_id()] + hash;
-    void *va = (void *)(MAPCACHE_VIRT_START + 
-                        (hash << PAGE_SHIFT) + 
-                        (pa & ~PAGE_MASK));
-    if ( (*pent & PAGE_MASK) != (pfn << PAGE_SHIFT) )
-    {
-        *pent = (pfn << PAGE_SHIFT) | __PAGE_HYPERVISOR;
-        __flush_tlb_one(va);
-    }
-    return va;
-}
-#endif
+#endif /* __ASM_DOMAIN_PAGE_H__ */

@@ -204,7 +204,7 @@ static int	mptscsih_doDv(MPT_SCSI_HOST *hd, int channel, int target);
 static void	mptscsih_dv_parms(MPT_SCSI_HOST *hd, DVPARAMETERS *dv,void *pPage);
 static void	mptscsih_fillbuf(char *buffer, int size, int index, int width);
 #endif
-static int	mptscsih_setup(char *str);
+/*static int	mptscsih_setup(char *str);*/
 static int	mptscsih_halt(struct notifier_block *nb, ulong event, void *buf);
 
 #if XENO_KILLED
@@ -7853,6 +7853,7 @@ mptscsih_fillbuf(char *buffer, int size, int index, int width)
 }
 #endif /* ~MPTSCSIH_DISABLE_DOMAIN_VALIDATION */
 
+#if 0
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /* Commandline Parsing routines and defines.
  *
@@ -7943,6 +7944,6 @@ __init mptscsih_setup(char *str)
 	}
 	return 1;
 }
-
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+#endif
 

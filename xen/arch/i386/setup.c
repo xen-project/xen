@@ -308,7 +308,6 @@ void __init start_of_day(void)
     extern void trap_init(void);
     extern void init_IRQ(void);
     extern void time_init(void);
-    extern void softirq_init(void);
     extern void timer_bh(void);
     extern void init_timervecs(void);
     extern void ac_timer_init(void);

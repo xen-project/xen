@@ -143,9 +143,8 @@ static char *test_strings[] = {
 };
 #endif
 
-static int e100_ethtool_led_blink(struct net_device *, struct ifreq *);
-
 #if 0
+static int e100_ethtool_led_blink(struct net_device *, struct ifreq *);
 static int e100_mii_ioctl(struct net_device *, struct ifreq *, int);
 #endif
 
@@ -3584,6 +3583,7 @@ e100_ethtool_eeprom(struct net_device *dev, struct ifreq *ifr)
 }
 #endif
 
+#if 0
 #define E100_BLINK_INTERVAL	(HZ/4)
 /**
  * e100_led_control
@@ -3666,6 +3666,7 @@ e100_ethtool_led_blink(struct net_device *dev, struct ifreq *ifr)
 
 	return 0;
 }
+#endif
 
 static inline int __devinit
 e100_10BaseT_adapter(struct e100_private *bdp)

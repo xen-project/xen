@@ -1036,7 +1036,7 @@ static void mega_get_boot_drv(mega_host_config *);
 static int mega_get_ldrv_num(mega_host_config *, Scsi_Cmnd *, int);
 static int mega_support_random_del(mega_host_config *);
 static int mega_del_logdrv(mega_host_config *, int);
-static int mega_do_del_logdrv(mega_host_config *, int);
+/*static int mega_do_del_logdrv(mega_host_config *, int);*/
 
 #endif
 

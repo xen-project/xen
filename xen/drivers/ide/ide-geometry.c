@@ -89,9 +89,6 @@ void probe_cmos_for_drives (ide_hwif_t *hwif)
 
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
 
-extern ide_drive_t * get_info_ptr(kdev_t);
-extern unsigned long current_capacity (ide_drive_t *);
-
 /*
  * If heads is nonzero: find a translation with this many heads and S=63.
  * Otherwise: find out how OnTrack Disk Manager would translate the disk.

@@ -42,6 +42,7 @@
 #ifndef _AIC79XX_LINUX_H_
 #define _AIC79XX_LINUX_H_
 
+#include <xeno/config.h>
 #include <xeno/types.h>
 #include <xeno/blk.h>
 #include <xeno/blkdev.h>
@@ -1123,8 +1124,11 @@ ahd_flush_device_writes(struct ahd_softc *ahd)
 /*
  * Always "return" 0 for success.
  */
-#define ahd_pci_set_dma_mask(dev_softc, mask)	\
-	(((dev_softc)->dma_mask = mask) && 0)
+static inline int ahd_pci_set_dma_mask(struct pci_dev *dev_softc, u64 mask)
+{
+    dev_softc->dma_mask = mask;
+    return 0;
+}
 #endif
 /*********************** Transaction Access Wrappers **************************/
 static __inline void ahd_set_transaction_status(struct scb *, uint32_t);

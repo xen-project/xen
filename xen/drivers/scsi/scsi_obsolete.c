@@ -85,8 +85,6 @@ extern void scsi_old_done(Scsi_Cmnd * SCpnt);
 int update_timeout(Scsi_Cmnd *, int);
 extern void scsi_old_times_out(Scsi_Cmnd * SCpnt);
 
-extern int scsi_dispatch_cmd(Scsi_Cmnd * SCpnt);
-
 #define SCSI_BLOCK(HOST) (HOST->can_queue && HOST->host_busy >= HOST->can_queue)
 
 static unsigned char generic_sense[6] =

@@ -54,7 +54,6 @@ extern volatile int logical_apicid_to_cpu[MAX_APICID];
  * General functions that each host system must provide.
  */
  
-extern void smp_boot_cpus(void);
 extern void smp_store_cpu_info(int id);		/* Store per CPU info (like the initial udelay numbers */
 
 /*

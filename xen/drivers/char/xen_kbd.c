@@ -183,7 +183,7 @@ long do_kbd_op(unsigned char op, unsigned char val)
 
 static void keyboard_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-    unsigned char status, scancode;
+    unsigned char status=0, scancode;
     unsigned int work = 1000;
     unsigned long cpu_mask = 0, flags;
     struct task_struct *p = CONSOLE_OWNER;

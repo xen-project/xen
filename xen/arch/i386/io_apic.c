@@ -689,11 +689,6 @@ next:
         /* XXX Skip the Linux/BSD fast-trap vector! XXX */
         if (current_vector == 0x80) goto next;
 
-#if 0
-	if (current_vector == SYSCALL_VECTOR)
-		goto next;
-#endif
-
 	if (current_vector > FIRST_SYSTEM_VECTOR) {
 		offset++;
 		current_vector = FIRST_DEVICE_VECTOR + offset;
@@ -707,8 +702,49 @@ next:
 }
 
 extern void (*interrupt[NR_IRQS])(void);
-static struct hw_interrupt_type ioapic_level_irq_type;
-static struct hw_interrupt_type ioapic_edge_irq_type;
+
+/*
+ * Level and edge triggered IO-APIC interrupts need different handling,
+ * so we use two separate IRQ descriptors. Edge triggered IRQs can be
+ * handled with the level-triggered descriptor, but that one has slightly
+ * more overhead. Level-triggered interrupts cannot be handled with the
+ * edge-triggered handler, without risking IRQ storms and other ugly
+ * races.
+ */
+
+static unsigned int startup_edge_ioapic_irq(unsigned int irq);
+#define shutdown_edge_ioapic_irq  disable_edge_ioapic_irq
+#define enable_edge_ioapic_irq    unmask_IO_APIC_irq
+static void disable_edge_ioapic_irq (unsigned int irq);
+static void ack_edge_ioapic_irq(unsigned int irq);
+static void end_edge_ioapic_irq (unsigned int i);
+static struct hw_interrupt_type ioapic_edge_irq_type = {
+	"IO-APIC-edge",
+	startup_edge_ioapic_irq,
+	shutdown_edge_ioapic_irq,
+	enable_edge_ioapic_irq,
+	disable_edge_ioapic_irq,
+	ack_edge_ioapic_irq,
+	end_edge_ioapic_irq,
+	set_ioapic_affinity,
+};
+
+static unsigned int startup_level_ioapic_irq (unsigned int irq);
+#define shutdown_level_ioapic_irq mask_IO_APIC_irq
+#define enable_level_ioapic_irq   unmask_IO_APIC_irq
+#define disable_level_ioapic_irq  mask_IO_APIC_irq
+static void mask_and_ack_level_ioapic_irq (unsigned int irq);
+static void end_level_ioapic_irq (unsigned int irq);
+static struct hw_interrupt_type ioapic_level_irq_type = {
+	"IO-APIC-level",
+	startup_level_ioapic_irq,
+	shutdown_level_ioapic_irq,
+	enable_level_ioapic_irq,
+	disable_level_ioapic_irq,
+	mask_and_ack_level_ioapic_irq,
+	end_level_ioapic_irq,
+	set_ioapic_affinity,
+};
 
 void __init setup_IO_APIC_irqs(void)
 {
@@ -1262,20 +1298,6 @@ static int __init timer_irq_works(void)
 	return 0;
 }
 
-/*
- * In the SMP+IOAPIC case it might happen that there are an unspecified
- * number of pending IRQ events unhandled. These cases are very rare,
- * so we 'resend' these IRQs via IPIs, to the same CPU. It's much
- * better to do it this way as thus we do not have to be aware of
- * 'pending' interrupts in the IRQ path, except at this point.
- */
-/*
- * Edge triggered needs to resend any interrupt
- * that was delayed but this is now handled in the device
- * independent code.
- */
-#define enable_edge_ioapic_irq unmask_IO_APIC_irq
-
 static void disable_edge_ioapic_irq (unsigned int irq) { /* nothing */ }
 
 /*
@@ -1304,8 +1326,6 @@ static unsigned int startup_edge_ioapic_irq(unsigned int irq)
 
 	return was_pending;
 }
-
-#define shutdown_edge_ioapic_irq	disable_edge_ioapic_irq
 
 /*
  * Once we have recorded IRQ_PENDING already, we can mask the
@@ -1344,10 +1364,6 @@ static unsigned int startup_level_ioapic_irq (unsigned int irq)
 
 	return 0; /* don't check for pending */
 }
-
-#define shutdown_level_ioapic_irq	mask_IO_APIC_irq
-#define enable_level_ioapic_irq		unmask_IO_APIC_irq
-#define disable_level_ioapic_irq	mask_IO_APIC_irq
 
 static void end_level_ioapic_irq (unsigned int irq)
 {
@@ -1411,37 +1427,6 @@ static void end_level_ioapic_irq (unsigned int irq)
 }
 
 static void mask_and_ack_level_ioapic_irq (unsigned int irq) { /* nothing */ }
-
-/*
- * Level and edge triggered IO-APIC interrupts need different handling,
- * so we use two separate IRQ descriptors. Edge triggered IRQs can be
- * handled with the level-triggered descriptor, but that one has slightly
- * more overhead. Level-triggered interrupts cannot be handled with the
- * edge-triggered handler, without risking IRQ storms and other ugly
- * races.
- */
-
-static struct hw_interrupt_type ioapic_edge_irq_type = {
-	"IO-APIC-edge",
-	startup_edge_ioapic_irq,
-	shutdown_edge_ioapic_irq,
-	enable_edge_ioapic_irq,
-	disable_edge_ioapic_irq,
-	ack_edge_ioapic_irq,
-	end_edge_ioapic_irq,
-	set_ioapic_affinity,
-};
-
-static struct hw_interrupt_type ioapic_level_irq_type = {
-	"IO-APIC-level",
-	startup_level_ioapic_irq,
-	shutdown_level_ioapic_irq,
-	enable_level_ioapic_irq,
-	disable_level_ioapic_irq,
-	mask_and_ack_level_ioapic_irq,
-	end_level_ioapic_irq,
-	set_ioapic_affinity,
-};
 
 static inline void init_IO_APIC_traps(void)
 {

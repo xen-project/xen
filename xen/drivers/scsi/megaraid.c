@@ -5407,7 +5407,7 @@ mega_del_logdrv(mega_host_config *this_hba, int logdrv)
 #endif
 }
 
-
+#if XENO_KILLED_DELLOGDRV
 static int
 mega_do_del_logdrv(mega_host_config *this_hba, int logdrv)
 {
@@ -5442,6 +5442,7 @@ mega_do_del_logdrv(mega_host_config *this_hba, int logdrv)
 
 	return rval;
 }
+#endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0)
 void *

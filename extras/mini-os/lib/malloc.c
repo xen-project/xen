@@ -2637,17 +2637,12 @@ static void malloc_init_state(av) mstate av;
    Other internal utilities operating on mstates
 */
 
-#if __STD_C
 static Void_t*  sYSMALLOc(INTERNAL_SIZE_T, mstate);
+#ifndef MORECORE_CANNOT_TRIM
 static int      sYSTRIm(size_t, mstate);
+#endif
 static void     malloc_consolidate(mstate);
 static Void_t** iALLOc(size_t, size_t*, int, Void_t**);
-#else
-static Void_t*  sYSMALLOc();
-static int      sYSTRIm();
-static void     malloc_consolidate();
-static Void_t** iALLOc();
-#endif
 
 /*
   Debugging support
@@ -3420,6 +3415,7 @@ static Void_t* sYSMALLOc(nb, av) INTERNAL_SIZE_T nb; mstate av;
 
 
 
+#ifndef MORECORE_CANNOT_TRIM
 /*
   sYSTRIm is an inverse of sorts to sYSMALLOc.  It gives memory back
   to the system (via negative arguments to sbrk) if there is unused
@@ -3485,6 +3481,7 @@ static int sYSTRIm(pad, av) size_t pad; mstate av;
   }
   return 0;
 }
+#endif
 
 /*
   ------------------------------ malloc ------------------------------

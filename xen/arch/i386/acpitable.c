@@ -31,7 +31,6 @@
 #include <xeno/kernel.h>
 #include <xeno/init.h>
 #include <xeno/types.h>
-/*#include <xeno/stddef.h>*/
 #include <xeno/slab.h>
 #include <xeno/pci.h>
 #include <asm/mpspec.h>
@@ -39,7 +38,7 @@
 #include <asm/apic.h>
 #include <asm/apicdef.h>
 #include <asm/page.h>
-/*#include <asm/pgtable.h>*/
+#include <asm/io_apic.h>
 
 #ifdef CONFIG_X86_IO_APIC
 

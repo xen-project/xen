@@ -206,18 +206,12 @@ extern int *mp_bus_id_to_pci_bus;
 extern int quad_local_to_mp_bus_id [NR_CPUS/4][4];
 
 extern unsigned int boot_cpu_physical_apicid;
-extern unsigned long phys_cpu_present_map;
 extern int smp_found_config;
 extern void find_smp_config (void);
 extern void get_smp_config (void);
-extern int nr_ioapics;
 extern int apic_version [MAX_APICS];
-extern int mp_irq_entries;
-extern struct mpc_config_intsrc *mp_irqs;
-extern int mpc_default_type;
 extern int mp_current_pci_id;
 extern unsigned long mp_lapic_addr;
-extern int pic_mode;
 
 #endif
 

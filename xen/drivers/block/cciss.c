@@ -29,17 +29,14 @@
 #include <xeno/slab.h>
 #include <xeno/delay.h>
 #include <xeno/major.h>
-//#include <xeno/fs.h>
 #include <xeno/blkpg.h>
 #include <xeno/interrupt.h>
 #include <xeno/timer.h>
-//#include <xeno/proc_fs.h>
 #include <xeno/init.h> 
 #include <xeno/hdreg.h>
 #include <xeno/spinlock.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>
-//#include <xeno/smp_lock.h>
 
 #include <xeno/blk.h>
 #include <xeno/blkdev.h>
@@ -60,7 +57,6 @@ MODULE_LICENSE("GPL");
 
 #include "cciss_cmd.h"
 #include "cciss.h"
-//#include <xeno/cciss_ioctl.h>
 
 /* define the PCI info for the cards we can control */
 const struct pci_device_id cciss_pci_device_id[] = {
@@ -137,7 +133,6 @@ static u32 heartbeat_timer = 0;
 
 static ctlr_info_t *hba[MAX_CTLR];
 static int map_major_to_ctlr[MAX_BLKDEV] = {0}; /* gets ctlr num from maj num */
-//static struct proc_dir_entry *proc_cciss;
 
 static void do_cciss_request(request_queue_t *q);
 static int cciss_open(struct inode *inode, struct file *filep);
@@ -147,9 +142,11 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 
 static int revalidate_logvol(kdev_t dev, int maxusage);
 static int frevalidate_logvol(kdev_t dev);
+#if 0
 static int deregister_disk(int ctlr, int logvol);
 static int register_new_disk(int cltr, int opened_vol, __u64 requested_lun);
 static int cciss_rescan_disk(int cltr, int logvol);
+#endif
 
 static void cciss_getgeometry(int cntl_num);
 
@@ -173,7 +170,6 @@ static void cciss_procinit(int i) {}
 
 
 static struct block_device_operations cciss_fops  = {
-	//owner:			THIS_MODULE,
 	open:			cciss_open, 
 	release:        	cciss_release,
         ioctl:			cciss_ioctl,
@@ -503,9 +499,11 @@ static int cciss_release(struct inode *inode, struct file *filep)
 static int cciss_ioctl(struct inode *inode, struct file *filep, 
 		unsigned int cmd, unsigned long arg)
 {
+#if 0
 	//int ctlr = map_major_to_ctlr[MAJOR(inode->i_rdev)];
 
 	//int dsk  = MINOR(inode->i_rdev) >> NWD_SHIFT;
+#endif
 
 printk(KERN_ALERT "cciss_ioctl: Called BUT NOT SUPPORTED cmd=%x %lx\n", cmd, arg);
 
@@ -1101,6 +1099,7 @@ static int frevalidate_logvol(kdev_t dev)
 #endif /* CCISS_DEBUG */ 
 	return revalidate_logvol(dev, 0);
 }
+#if 0
 static int deregister_disk(int ctlr, int logvol)
 {
 	unsigned long flags;
@@ -1781,6 +1780,8 @@ static int cciss_rescan_disk(int ctlr, int logvol)
 	kfree(inq_buff);
 	return 0;
 }
+#endif
+
 /*
  *   Wait polling for a command to complete.
  *   The memory mapped FIFO is polled for the completion.
@@ -3136,7 +3137,9 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 	request_queue_t *q;
 	int i;
 	int j;
+#if 0
 	int rc;
+#endif
 
 	printk(KERN_DEBUG "cciss: Device 0x%x has been found at"
 			" bus %d dev %d func %d\n",

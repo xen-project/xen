@@ -1801,8 +1801,6 @@ static void BusLogic_ReleaseResources(BusLogic_HostAdapter_T *) __init;
 static boolean BusLogic_TargetDeviceInquiry(BusLogic_HostAdapter_T *) __init;
 static void BusLogic_InitializeHostStructure(BusLogic_HostAdapter_T *,
 					     SCSI_Host_T *) __init;
-int BusLogic_DetectHostAdapter(SCSI_Host_Template_T *) __init;
-int BusLogic_ReleaseHostAdapter(SCSI_Host_T *) __init;
 static boolean BusLogic_ParseKeyword(char **, char *) __init;
 #if 0 /* XEN */
 static int BusLogic_ParseDriverOptions(char *) __init;
