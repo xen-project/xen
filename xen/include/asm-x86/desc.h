@@ -1,5 +1,6 @@
 #ifndef __ARCH_DESC_H
 #define __ARCH_DESC_H
+#ifndef __ASSEMBLY__
 
 #define LDT_ENTRY_SIZE 8
 
@@ -25,7 +26,6 @@
       (((_s)>>3) >  LAST_RESERVED_GDT_ENTRY) ||                            \
       ((_s)&4)) &&                                                         \
      (((_s)&3) == 1))
-#define VALID_CODESEL(_s) ((_s) == FLAT_RING1_CS || VALID_SEL(_s))
 
 /* These are bitmasks for the high 32 bits of a descriptor table entry. */
 #define _SEGMENT_TYPE    (15<< 8)
@@ -38,17 +38,51 @@
 #define _SEGMENT_DB      ( 1<<22) /* 16- or 32-bit segment */
 #define _SEGMENT_G       ( 1<<23) /* Granularity */
 
-#ifndef __ASSEMBLY__
 struct desc_struct {
     u32 a, b;
 };
 
 #if defined(__x86_64__)
+
+#define VALID_CODESEL(_s) ((_s) == FLAT_RING3_CS64 || VALID_SEL(_s))
+
 typedef struct {
     u64 a, b;
 } idt_entry_t;
+
+#define _set_gate(gate_addr,type,dpl,addr) ((void)0)
+#define _set_tssldt_desc(n,addr,limit,type) ((void)0)
+
 #elif defined(__i386__)
+
+#define VALID_CODESEL(_s) ((_s) == FLAT_RING1_CS || VALID_SEL(_s))
+
 typedef struct desc_struct idt_entry_t;
+
+#define _set_gate(gate_addr,type,dpl,addr) \
+do { \
+  int __d0, __d1; \
+  __asm__ __volatile__ ("movw %%dx,%%ax\n\t" \
+ "movw %4,%%dx\n\t" \
+ "movl %%eax,%0\n\t" \
+ "movl %%edx,%1" \
+ :"=m" (*((long *) (gate_addr))), \
+  "=m" (*(1+(long *) (gate_addr))), "=&a" (__d0), "=&d" (__d1) \
+ :"i" ((short) (0x8000+(dpl<<13)+(type<<8))), \
+  "3" ((char *) (addr)),"2" (__HYPERVISOR_CS << 16)); \
+} while (0)
+
+#define _set_tssldt_desc(n,addr,limit,type) \
+__asm__ __volatile__ ("movw %w3,0(%2)\n\t" \
+ "movw %%ax,2(%2)\n\t" \
+ "rorl $16,%%eax\n\t" \
+ "movb %%al,4(%2)\n\t" \
+ "movb %4,5(%2)\n\t" \
+ "movb $0,6(%2)\n\t" \
+ "movb %%ah,7(%2)\n\t" \
+ "rorl $16,%%eax" \
+ : "=m"(*(n)) : "a" (addr), "r"(n), "ir"(limit), "i"(type))
+
 #endif
 
 extern struct desc_struct gdt_table[];
@@ -64,8 +98,9 @@ struct Xgt_desc_struct {
 #define gdt_descr (*(struct Xgt_desc_struct *)((char *)&gdt - 2))
 
 extern void set_intr_gate(unsigned int irq, void * addr);
+extern void set_system_gate(unsigned int n, void *addr);
+extern void set_task_gate(unsigned int n, unsigned int sel);
 extern void set_tss_desc(unsigned int n, void *addr);
 
 #endif /* !__ASSEMBLY__ */
-
-#endif
+#endif /* __ARCH_DESC_H */
