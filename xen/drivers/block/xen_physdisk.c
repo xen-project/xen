@@ -84,7 +84,8 @@ static void xen_physdisk_revoke_access(unsigned short dev,
 			 list);
     ace_end = cur_ace->start_sect + cur_ace->n_sectors;
     if (cur_ace->start_sect >= kill_zone_end ||
-	ace_end <= start_sect)
+	ace_end <= start_sect ||
+	(cur_ace->device & ~0x1f) != (dev & ~0x1f))
       continue;
     
     DPRINTK("Killing ace [%lx, %lx) against kill zone [%lx, %lx)\n",
