@@ -1,12 +1,12 @@
 /******************************************************************************
- * libxc_vif.c
+ * xc_vif.c
  * 
  * API for manipulating and accessing per-network-interface parameters.
  * 
  * Copyright (c) 2003, K A Fraser.
  */
 
-#include "libxc_private.h"
+#include "xc_private.h"
 
 int xc_vif_scheduler_set(int xc_handle,
                          unsigned int domid, 

@@ -1,6 +1,6 @@
 
-#ifndef __LIBXC_PRIVATE_H__
-#define __LIBXC_PRIVATE_H__
+#ifndef __XC_PRIVATE_H__
+#define __XC_PRIVATE_H__
 
 typedef unsigned char      u8;
 typedef unsigned short     u16;
@@ -166,4 +166,4 @@ int close_pfn_mapper(int pm_handle);
 void *map_pfn(int pm_handle, unsigned long pfn);
 void unmap_pfn(int pm_handle, void *vaddr);
 
-#endif /* __LIBXC_PRIVATE_H__ */
+#endif /* __XC_PRIVATE_H__ */

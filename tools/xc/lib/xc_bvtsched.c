@@ -1,12 +1,12 @@
 /******************************************************************************
- * libxc_bvtsched.c
+ * xc_bvtsched.c
  * 
  * API for manipulating parameters of the Borrowed Virtual Time scheduler.
  * 
  * Copyright (c) 2003, K A Fraser.
  */
 
-#include "libxc_private.h"
+#include "xc_private.h"
 
 int xc_bvtsched_global_set(int xc_handle,
                            unsigned long ctx_allow)

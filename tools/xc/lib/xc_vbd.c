@@ -1,5 +1,5 @@
 /******************************************************************************
- * libxc_vbd.c
+ * xc_vbd.c
  * 
  * API for manipulating and accessing per-domain virtual block devices.
  * 
@@ -7,7 +7,7 @@
  */
 
 #define _GNU_SOURCE
-#include "libxc_private.h"
+#include "xc_private.h"
 
 int xc_vbd_create(int xc_handle,
                   unsigned int domid, 
