@@ -147,6 +147,7 @@ int xenolinux_block_ioctl(struct inode *inode, struct file *filep,
     struct hd_geometry *geo = (struct hd_geometry *)argument;
     struct gendisk *gd;     
     struct hd_struct *part; 
+    int i;
 
     /* NB. No need to check permissions. That is done for us. */
     
@@ -207,8 +208,8 @@ int xenolinux_block_ioctl(struct inode *inode, struct file *filep,
 
     case CDROMMULTISESSION:
         DPRINTK("FIXME: support multisession CDs later\n");
-        memset((struct cdrom_multisession *)argument, 0, 
-               sizeof(struct cdrom_multisession));
+        for ( i = 0; i < sizeof(struct cdrom_multisession); i++ )
+            if ( put_user(0, (byte *)(argument + i)) ) return -EFAULT;
         return 0;
 
     default:
