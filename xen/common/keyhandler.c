@@ -116,7 +116,6 @@ void do_task_queues(u_char key, void *dev_id, struct pt_regs *regs)
 
 extern void perfc_printall (u_char key, void *dev_id, struct pt_regs *regs);
 extern void perfc_reset (u_char key, void *dev_id, struct pt_regs *regs);
-extern void dump_timerq(u_char key, void *dev_id, struct pt_regs *regs);
 extern void dump_runq(u_char key, void *dev_id, struct pt_regs *regs);
 extern void print_sched_histo(u_char key, void *dev_id, struct pt_regs *regs);
 extern void reset_sched_histo(u_char key, void *dev_id, struct pt_regs *regs);
@@ -131,7 +130,6 @@ void initialize_keytable()
 	key_table[i].handler = (key_handler *)NULL; 
 	
     /* setup own handlers */
-    add_key_handler('a', dump_timerq,    "dump ac_timer queues");
     add_key_handler('d', dump_registers, "dump registers"); 
     add_key_handler('h', show_handlers, "show this message");
     add_key_handler('l', print_sched_histo, "print sched latency histogram");

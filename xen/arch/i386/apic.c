@@ -581,7 +581,7 @@ int __init calibrate_APIC_clock(void)
     int i;
     const int LOOPS = HZ/10;
 
-    printk("calibrating APIC timer for CPU%d...\n",  smp_processor_id());
+    printk("Calibrating APIC timer for CPU%d...\n",  smp_processor_id());
 
     /* Put whatever arbitrary (but long enough) timeout
      * value into the APIC clock, we just want to get the
@@ -611,12 +611,12 @@ int __init calibrate_APIC_clock(void)
     result = (tt1-tt2)*APIC_DIVISOR/LOOPS;
 
     printk("..... CPU speed is %ld.%04ld MHz.\n",
-           ((long)(t2-t1)/LOOPS)/(1000000/HZ),
-           ((long)(t2-t1)/LOOPS)%(1000000/HZ));
+           ((long)(t2-t1)/LOOPS) / (1000000/HZ), 
+           ((long)(t2-t1)/LOOPS) % (1000000/HZ));
 
     printk("..... Bus speed is %ld.%04ld MHz.\n",
-           result/(1000000/HZ),
-           result%(1000000/HZ));
+           result / (1000000/HZ), 
+           result % (1000000/HZ));
 
     cpu_freq = (u64)(((t2-t1)/LOOPS)*HZ);
 
@@ -625,10 +625,7 @@ int __init calibrate_APIC_clock(void)
     bus_cycle  = (u32) (1000000000000LL/bus_freq); /* in pico seconds */
     bus_scale  = (1000*262144)/bus_cycle;
 
-    /* print results */
-    printk("..... bus_freq  = %u Hz\n",  bus_freq);
-    printk("..... bus_cycle = %u ps\n",  bus_cycle);
-    printk("..... bus_scale = %u \n",    bus_scale);
+    printk("..... bus_scale = 0x%08X\n", bus_scale);
     /* reset APIC to zero timeout value */
     __setup_APIC_LVTT(0);
     return result;

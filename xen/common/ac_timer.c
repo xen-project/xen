@@ -1,20 +1,15 @@
 /* -*-  Mode:C; c-basic-offset:4; tab-width:4 -*-
  ****************************************************************************
- * (C) 2002 - Rolf Neugebauer - Intel Research Cambridge
+ * (C) 2002-2003 - Rolf Neugebauer - Intel Research Cambridge
+ * (C) 2002-2003 University of Cambridge
  ****************************************************************************
  *
  *        File: ac_timer.c
  *      Author: Rolf Neugebauer (neugebar@dcs.gla.ac.uk)
- *     Changes: 
+ *              Keir Fraser (kaf24@cl.cam.ac.uk)
  *              
- *        Date: Nov 2002
- * 
  * Environment: Xen Hypervisor
  * Description: Accurate timer for the Hypervisor
- *
- ****************************************************************************
- * $Id: c-insert.c,v 1.7 2002/11/08 16:04:34 rn Exp $
- ****************************************************************************
  */
 
 #include <xeno/config.h>
@@ -38,10 +33,10 @@
 #define TRC(_x)
 #endif
 
-/*****************************************************************************
+/*
  * We pull handlers off the timer list this far in future,
  * rather than reprogramming the time hardware.
- *****************************************************************************/
+ */
 #define TIMER_SLOP (50*1000) /* ns */
 
 /* A timer list per CPU */
@@ -65,24 +60,29 @@ static inline unsigned long __add_ac_timer(struct ac_timer *timer)
     /*
      * Add timer to the list. If it gets added to the front we schedule
      * a softirq. This will reprogram the timer, or handle the timer event
-     * imemdiately, depending on whether alarm is sufficiently ahead in the
+     * immediately, depending on whether alarm is sufficiently ahead in the
      * future.
      */
-    if (list_empty(&ac_timers[cpu].timers)) {
+    if ( list_empty(&ac_timers[cpu].timers) )
+    {
         list_add(&timer->timer_list, &ac_timers[cpu].timers);
         goto send_softirq;
-    } else {
+    } 
+    else 
+    {
         struct list_head *pos;
         struct ac_timer  *t;
 
-        list_for_each(pos, &ac_timers[cpu].timers) {
+        list_for_each ( pos, &ac_timers[cpu].timers )
+        {
             t = list_entry(pos, struct ac_timer, timer_list);
-            if (t->expires > timer->expires)
+            if ( t->expires > timer->expires )
                 break;
         }
+
         list_add(&(timer->timer_list), pos->prev);
 
-        if (timer->timer_list.prev == &ac_timers[cpu].timers)
+        if ( timer->timer_list.prev == &ac_timers[cpu].timers )
             goto send_softirq;
     }
 
@@ -104,7 +104,8 @@ void add_ac_timer(struct ac_timer *timer)
     cpu_mask = __add_ac_timer(timer);
     spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
 
-    if ( cpu_mask ) smp_send_event_check_mask(cpu_mask);
+    if ( cpu_mask ) 
+        smp_send_event_check_mask(cpu_mask);
 }
 
 
@@ -135,11 +136,15 @@ static inline unsigned long __rem_ac_timer(struct ac_timer *timer)
 
     detach_ac_timer(timer);
     
-    if (timer->timer_list.prev == &ac_timers[cpu].timers) {
+    if ( timer->timer_list.prev == &ac_timers[cpu].timers ) 
+    {
         /* just removed the head */
-        if (list_empty(&ac_timers[cpu].timers)) {
+        if ( list_empty(&ac_timers[cpu].timers) ) 
+        {
             goto send_softirq;
-        } else {
+        } 
+        else 
+        {
             timer = list_entry(ac_timers[cpu].timers.next,
                                struct ac_timer, timer_list);
             if ( timer->expires > (NOW() + TIMER_SLOP) )
@@ -165,7 +170,8 @@ void rem_ac_timer(struct ac_timer *timer)
         cpu_mask = __rem_ac_timer(timer);
     spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
 
-    if ( cpu_mask ) smp_send_event_check_mask(cpu_mask);
+    if ( cpu_mask ) 
+        smp_send_event_check_mask(cpu_mask);
 }
 
 
@@ -192,7 +198,8 @@ void mod_ac_timer(struct ac_timer *timer, s_time_t new_time)
 
     spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
 
-    if ( cpu_mask ) smp_send_event_check_mask(cpu_mask);
+    if ( cpu_mask ) 
+        smp_send_event_check_mask(cpu_mask);
 }
 
 
@@ -214,25 +221,31 @@ void do_ac_timer(void)
     TRC(printk("ACT  [%02d] do(): now=%lld\n", cpu, NOW()));
         
     /* Sanity: is the timer list empty? */
-    if ( list_empty(&ac_timers[cpu].timers) ) goto out;
+    if ( list_empty(&ac_timers[cpu].timers) ) 
+        goto out;
 
     /* Handle all timeouts in the near future. */
     while ( !list_empty(&ac_timers[cpu].timers) )
     {
         t = list_entry(ac_timers[cpu].timers.next,struct ac_timer, timer_list);
-        if ( t->expires > (NOW() + TIMER_SLOP) ) break;
+        if ( t->expires > (NOW() + TIMER_SLOP) ) 
+            break;
 
         ASSERT(t->cpu == cpu);
 
-        /* do some stats */
+        /* Do some stats collection. */
         diff = (now - t->expires);
-        if (diff > 0x7fffffff) diff =  0x7fffffff; /* THIS IS BAD! */
+        if ( diff > 0x7fffffff ) 
+            diff =  0x7fffffff; /* THIS IS BAD! */
         max = perfc_valuea(ac_timer_max, cpu);
-        if (diff > max) perfc_seta(ac_timer_max, cpu, diff);
+        if ( diff > max ) 
+            perfc_seta(ac_timer_max, cpu, diff);
 
         detach_ac_timer(t);
+
         spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
-        if ( t->function != NULL ) t->function(t->data);
+        if ( t->function != NULL ) 
+            t->function(t->data);
         spin_lock_irqsave(&ac_timers[cpu].lock, flags);
     }
         
@@ -246,7 +259,9 @@ void do_ac_timer(void)
             TRC(printk("ACT  [%02d] do(): again\n", cpu));
             goto do_timer_again;
         }
-    } else {
+    } 
+    else 
+    {
         reprogram_ac_timer((s_time_t) 0);
     }
 
@@ -288,10 +303,7 @@ static void ac_timer_softirq_action(struct softirq_action *a)
     }
 }
 
-/*****************************************************************************
- * debug dump_queue
- * arguments: queue head, name of queue
- *****************************************************************************/
+
 static void dump_tqueue(struct list_head *queue, char *name)
 {
     struct list_head *list;
@@ -300,7 +312,9 @@ static void dump_tqueue(struct list_head *queue, char *name)
 
     printk ("QUEUE %s %lx   n: %lx, p: %lx\n", name,  (unsigned long)queue,
             (unsigned long) queue->next, (unsigned long) queue->prev);
-    list_for_each (list, queue) {
+
+    list_for_each ( list, queue ) 
+    {
         t = list_entry(list, struct ac_timer, timer_list);
         printk ("  %s %d : %lx ex=0x%08X%08X %lu  n: %lx, p: %lx\n",
                 name, loop++, 
@@ -308,10 +322,10 @@ static void dump_tqueue(struct list_head *queue, char *name)
                 (u32)(t->expires>>32), (u32)t->expires, t->data,
                 (unsigned long)list->next, (unsigned long)list->prev);
     }
-    return; 
 }
 
-void dump_timerq(u_char key, void *dev_id, struct pt_regs *regs)
+
+static void dump_timerq(u_char key, void *dev_id, struct pt_regs *regs)
 {
     u_long   flags; 
     s_time_t now = NOW();
@@ -319,14 +333,15 @@ void dump_timerq(u_char key, void *dev_id, struct pt_regs *regs)
 
     printk("Dumping ac_timer queues: NOW=0x%08X%08X\n",
            (u32)(now>>32), (u32)now); 
-    for (i = 0; i < smp_num_cpus; i++) {
+
+    for ( i = 0; i < smp_num_cpus; i++ )
+    {
         printk("CPU[%02d] ", i);
         spin_lock_irqsave(&ac_timers[i].lock, flags);
         dump_tqueue(&ac_timers[i].timers, "ac_time"); 
         spin_unlock_irqrestore(&ac_timers[i].lock, flags);
         printk("\n");
     }
-    return; 
 }
 
 
@@ -343,52 +358,6 @@ void __init ac_timer_init(void)
         INIT_LIST_HEAD(&ac_timers[i].timers);
         spin_lock_init(&ac_timers[i].lock);
     }
+
+    add_key_handler('a', dump_timerq, "dump ac_timer queues");
 }
-
-
-/*****************************************************************************
- * GRAVEYARD
- *****************************************************************************/
-
-#if 0
-
-#ifdef AC_TIMER_STATS
-#define BUCKETS     1000
-#define MAX_STATS
-typedef struct act_stats_st
-{
-    u32 count;
-    u32 times[2*(BUCKETS)];
-} __cacheline_aligned act_stats_t;
-static act_stats_t act_stats[NR_CPUS];
-
-#endif
-
-#ifdef AC_TIMER_STATS
-    {
-        XXX this is at the wrong place
-        s32 diff;
-        u32 i;
-        diff = ((s32)(NOW() - t->expires)) / 1000; /* delta in us */
-        if (diff < -BUCKETS)
-            diff = -BUCKETS;
-        else if (diff > BUCKETS)
-            diff = BUCKETS;
-        act_stats[cpu].times[diff+BUCKETS]++;
-        act_stats[cpu].count++;
-
-        if (act_stats[cpu].count >= 5000) {
-            printk("ACT Stats\n");
-            for (i=0; i < 2*BUCKETS; i++) {
-                if (act_stats[cpu].times[i] != 0)
-                    printk("ACT [%02d]: %3dus: %5d\n",
-                           cpu,i-BUCKETS, act_stats[cpu].times[i]);
-                act_stats[cpu].times[i]=0;
-            }
-            act_stats[cpu].count = 0;
-            printk("\n");
-        }
-    }
-#endif
-
-#endif /* 0 */

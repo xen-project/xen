@@ -93,29 +93,33 @@ int __init check_nmi_watchdog (void)
     unsigned int prev_nmi_count[NR_CPUS];
     int j, cpu;
     
-    if (!nmi_watchdog)
+    if ( !nmi_watchdog )
         return 0;
 
-    printk("testing NMI watchdog ---\n");
+    printk("Testing NMI watchdog --- ");
 
-    for (j = 0; j < smp_num_cpus; j++) {
+    for ( j = 0; j < smp_num_cpus; j++ ) 
+    {
         cpu = cpu_logical_map(j);
         prev_nmi_count[cpu] = irq_stat[cpu].__nmi_count;
     }
     sti();
     mdelay((10*1000)/nmi_hz); /* wait 10 ticks */
 
-    for (j = 0; j < smp_num_cpus; j++) {
+    for ( j = 0; j < smp_num_cpus; j++ ) 
+    {
         cpu = cpu_logical_map(j);
-        if (nmi_count(cpu) - prev_nmi_count[cpu] <= 5)
-            printk("CPU#%d: NMI stuck?\n", cpu);
+        if ( nmi_count(cpu) - prev_nmi_count[cpu] <= 5 )
+            printk("CPU#%d stuck. ", cpu);
         else
-            printk("CPU#%d: NMI okay\n", cpu);
+            printk("CPU#%d okay. ", cpu);
     }
+
+    printk("\n");
 
     /* now that we know it works we can reduce NMI frequency to
        something more reasonable; makes a difference in some configs */
-    if (nmi_watchdog == NMI_LOCAL_APIC)
+    if ( nmi_watchdog == NMI_LOCAL_APIC )
         nmi_hz = 1;
 
     return 0;
@@ -132,8 +136,7 @@ static inline void nmi_pm_init(void) { }
 static void __pminit clear_msr_range(unsigned int base, unsigned int n)
 {
     unsigned int i;
-
-    for(i = 0; i < n; ++i)
+    for ( i = 0; i < n; i++ )
         wrmsr(base+i, 0, 0);
 }
 

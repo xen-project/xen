@@ -1,22 +1,16 @@
 /* -*-  Mode:C; c-basic-offset:4; tab-width:4 -*-
  ****************************************************************************
- * (C) 2002 - Rolf Neugebauer - Intel Research Cambridge
+ * (C) 2002-2003 - Rolf Neugebauer - Intel Research Cambridge
+ * (C) 2002-2003 University of Cambridge
  ****************************************************************************
  *
  *        File: i386/time.c
- *      Author: 
- *     Changes: 
- *              
- *        Date: Jan 2003
+ *      Author: Rolf Neugebar & Keir Fraser
  * 
  * Environment: Xen Hypervisor
  * Description: modified version of Linux' time.c
  *              implements system and wall clock time.
  *              based on freebsd's implementation.
- *
- ****************************************************************************
- * $Id: c-insert.c,v 1.7 2002/11/08 16:04:34 rn Exp $
- ****************************************************************************
  */
 
 /*
@@ -49,27 +43,47 @@
 #define TRC(_x)
 #endif
 
+/* GLOBALS */
+
 unsigned long cpu_khz;  /* Detected as we calibrate the TSC */
 unsigned long ticks_per_usec; /* TSC ticks per microsecond. */
-
-/* We use this to prevent overflow of 31-bit RDTSC "diffs". */
-static unsigned int rdtsc_bitshift;
-
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
+int timer_ack = 0;
 
-int timer_ack=0;
-extern spinlock_t i8259A_lock;
-static inline void do_timer_interrupt(int irq, 
-                                      void *dev_id, struct pt_regs *regs)
+/* PRIVATE */
+
+static unsigned int    rdtsc_bitshift;  /* Which 32 bits of TSC do we use?   */
+static unsigned long   init_cmos_time;  /* RTC time when system time == 0    */
+static u64             cpu_freqs[3];    /* Slow/correct/fast CPU freqs       */
+static u32             st_scale_f;      /* Cycles -> ns, fractional part     */
+static u32             st_scale_i;      /* Cycles -> ns, integer part        */
+static struct ac_timer update_timer;    /* Periodic 'time update' function   */
+static spinlock_t      stime_lock;      /* Lock for accessing sys & wc time  */
+struct timeval         wall_clock_time; /* WC time at last 'time update'     */
+static u32             tsc_irq;         /* CPU0's TSC at last 'time update'  */
+static s_time_t        stime_irq;       /* System time at last 'time update' */
+
+/*
+ * The scale update period is not a whole number of seconds since we want to
+ * avoid being in sync with the CMOS update-in-progress flag.
+ */
+#define SCALE_UPDATE_PERIOD MILLISECS(50200)
+#define TIME_UPDATE_PERIOD  MILLISECS(200)
+
+
+static inline void do_timer_interrupt(
+    int irq, void *dev_id, struct pt_regs *regs)
 {
 #ifdef CONFIG_X86_IO_APIC
-    if (timer_ack) {
+    if ( timer_ack ) 
+    {
         /*
          * Subtle, when I/O APICs are used we have to ack timer IRQ manually 
          * to reset the IRR bit for do_slow_gettimeoffset(). This will also 
          * deassert NMI lines for the watchdog if run on an 82489DX-based 
          * system.
          */
+        extern spinlock_t i8259A_lock;
         spin_lock(&i8259A_lock);
         outb(0x0c, 0x20);
         /* Ack the IRQ; AEOI will end it automatically. */
@@ -102,6 +116,8 @@ static struct irqaction irq0  = { timer_interrupt, SA_INTERRUPT, 0,
 
 static unsigned long __init calibrate_tsc(void)
 {
+    unsigned long startlow, starthigh, endlow, endhigh, count;
+
     /* Set the Gate high, disable speaker */
     outb((inb(0x61) & ~0x02) | 0x01, 0x61);
 
@@ -116,43 +132,24 @@ static unsigned long __init calibrate_tsc(void)
     outb(CALIBRATE_LATCH & 0xff, 0x42); /* LSB of count */
     outb(CALIBRATE_LATCH >> 8, 0x42);   /* MSB of count */
 
-    {
-        unsigned long startlow, starthigh;
-        unsigned long endlow, endhigh;
-        unsigned long count;
+    rdtsc(startlow, starthigh);
+    for ( count = 0; (inb(0x61) & 0x20) == 0; count++ )
+        continue;
+    rdtsc(endlow, endhigh);
 
-        rdtsc(startlow,starthigh);
-        count = 0;
-        do {
-            count++;
-        } while ((inb(0x61) & 0x20) == 0);
-        rdtsc(endlow,endhigh);
+    /* Error if the CTC doesn't behave itself. */
+    if ( count == 0 )
+        return 0;
 
-        /* Error: ECTCNEVERSET */
-        if (count <= 1)
-            goto bad_ctc;
+    /* [endhigh:endlow] = [endhigh:endlow] - [starthigh:startlow] */
+    __asm__( "subl %2,%0 ; sbbl %3,%1"
+             : "=a" (endlow), "=d" (endhigh)
+             : "g" (startlow), "g" (starthigh), "0" (endlow), "1" (endhigh) );
 
-        /* 64-bit subtract - gcc just messes up with long longs */
-        __asm__("subl %2,%0\n\t"
-                "sbbl %3,%1"
-                :"=a" (endlow), "=d" (endhigh)
-                :"g" (startlow), "g" (starthigh),
-                "0" (endlow), "1" (endhigh));
-
-        /* Error: ECPUTOOFAST */
-        if (endhigh)
-            goto bad_ctc;
-
-        return endlow;
-    }
-
-    /*
-     * The CTC wasn't reliable: we got a hit on the very first read, or the CPU
-     * was so fast/slow that the quotient wouldn't fit in 32 bits..
-     */
- bad_ctc:
-    return 0;
+    /* If quotient doesn't fit in 32 bits then we return error (zero). */
+    return endhigh ? 0 : endlow;
 }
+
 
 /***************************************************************************
  * CMOS Timer functions
@@ -178,32 +175,32 @@ mktime (unsigned int year, unsigned int mon,
         unsigned int day, unsigned int hour,
         unsigned int min, unsigned int sec)
 {
-    if (0 >= (int) (mon -= 2)) {   /* 1..12 -> 11,12,1..10 */
-        mon += 12;                 /* Puts Feb last since it has leap day */
+    /* 1..12 -> 11,12,1..10: put Feb last since it has a leap day. */
+    if ( 0 >= (int) (mon -= 2) )
+    {
+        mon += 12;
         year -= 1;
     }
+
     return ((((unsigned long)(year/4 - year/100 + year/400 + 367*mon/12 + day)+
               year*365 - 719499
         )*24 + hour /* now have hours */
-        )*60 + min /* now have minutes */
+        )*60 + min  /* now have minutes */
         )*60 + sec; /* finally seconds */
 }
 
 static unsigned long __get_cmos_time(void)
 {
     unsigned int year, mon, day, hour, min, sec;
-    /* Linux waits here for a the Update-In-Progress (UIP) flag going
-     * from 1 to 0. This can take up to a second. This is not acceptable
-     * for the use in Xen and this code is therfor removed at the cost
-     * of reduced accuracy. */
-    sec = CMOS_READ(RTC_SECONDS);
-    min = CMOS_READ(RTC_MINUTES);
+
+    sec  = CMOS_READ(RTC_SECONDS);
+    min  = CMOS_READ(RTC_MINUTES);
     hour = CMOS_READ(RTC_HOURS);
-    day = CMOS_READ(RTC_DAY_OF_MONTH);
-    mon = CMOS_READ(RTC_MONTH);
+    day  = CMOS_READ(RTC_DAY_OF_MONTH);
+    mon  = CMOS_READ(RTC_MONTH);
     year = CMOS_READ(RTC_YEAR);
     
-    if (!(CMOS_READ(RTC_CONTROL) & RTC_DM_BINARY) || RTC_ALWAYS_BCD)
+    if ( !(CMOS_READ(RTC_CONTROL) & RTC_DM_BINARY) || RTC_ALWAYS_BCD )
     {
         BCD_TO_BIN(sec);
         BCD_TO_BIN(min);
@@ -213,7 +210,7 @@ static unsigned long __get_cmos_time(void)
         BCD_TO_BIN(year);
     }
 
-    if ((year += 1900) < 1970)
+    if ( (year += 1900) < 1970 )
         year += 100;
 
     return mktime(year, mon, day, hour, min, sec);
@@ -239,41 +236,32 @@ static unsigned long maybe_get_cmos_time(void)
     return retval;
 }
 
-/* the more accurate version waits for a change */
+/* This version spins until it definitely reads a valid time from CMOS RAM. */
 static unsigned long get_cmos_time(void)
 {
     unsigned long res, flags;
     int i;
 
     spin_lock_irqsave(&rtc_lock, flags);
-    /* The Linux interpretation of the CMOS clock register contents:
-     * When the Update-In-Progress (UIP) flag goes from 1 to 0, the
-     * RTC registers show the second which has precisely just started.
-     * Let's hope other operating systems interpret the RTC the same way.
-     */
+
     /* read RTC exactly on falling edge of update flag */
-    for (i = 0 ; i < 1000000 ; i++) /* may take up to 1 second... */
-        if (CMOS_READ(RTC_FREQ_SELECT) & RTC_UIP)
+    for ( i = 0 ; i < 1000000 ; i++ ) /* may take up to 1 second... */
+        if ( (CMOS_READ(RTC_FREQ_SELECT) & RTC_UIP) )
             break;
-    for (i = 0 ; i < 1000000 ; i++) /* must try at least 2.228 ms */
-        if (!(CMOS_READ(RTC_FREQ_SELECT) & RTC_UIP))
+    for ( i = 0 ; i < 1000000 ; i++ ) /* must try at least 2.228 ms */
+        if ( !(CMOS_READ(RTC_FREQ_SELECT) & RTC_UIP) )
             break;
+
     res = __get_cmos_time();
+
     spin_unlock_irqrestore(&rtc_lock, flags);
     return res;
 }
 
-/***************************************************************************
- * Time
- * XXX RN: Will be able to remove some of the locking once the time is
- * update by the APIC on only one CPU. 
- ***************************************************************************/
 
-static spinlock_t stime_lock;
-static u32  st_scale_f;
-static u32  st_scale_i;
-u32         stime_pcc;   /* cycle counter value at last timer irq */
-s_time_t    stime_now;   /* time in ns at last timer IRQ */
+/***************************************************************************
+ * System Time
+ ***************************************************************************/
 
 static inline s_time_t __get_s_time(void)
 {
@@ -283,13 +271,13 @@ static inline s_time_t __get_s_time(void)
     
     rdtscll(tsc);
     low = (u32)(tsc >> rdtsc_bitshift);
-    delta_tsc = (s32)(low - stime_pcc);
+    delta_tsc = (s32)(low - tsc_irq);
     if ( unlikely(delta_tsc < 0) ) delta_tsc = 0;
     delta = ((u64)delta_tsc * st_scale_f);
     delta >>= 32;
     delta += ((u64)delta_tsc * st_scale_i);
 
-    return stime_now + delta;
+    return stime_irq + delta;
 }
 
 s_time_t get_s_time(void)
@@ -303,25 +291,23 @@ s_time_t get_s_time(void)
 }
 
 
-/* Wall Clock time */
-struct timeval    wall_clock_time; /* wall clock time at last update */
-s_time_t          wctime_st;       /* system time at last update */
-
 void do_gettimeofday(struct timeval *tv)
 {
     unsigned long flags;
     unsigned long usec, sec;
 
     spin_lock_irqsave(&stime_lock, flags);
-    usec = ((unsigned long)(__get_s_time() - wctime_st))/1000;
+    usec = ((unsigned long)(__get_s_time() - stime_irq))/1000;
     sec = wall_clock_time.tv_sec;
     usec += wall_clock_time.tv_usec;
     spin_unlock_irqrestore(&stime_lock, flags);
 
-    while (usec >= 1000000) {
+    while ( usec >= 1000000 ) 
+    {
         usec -= 1000000;
         sec++;
     }
+
     tv->tv_sec = sec;
     tv->tv_usec = usec;
 }
@@ -331,11 +317,11 @@ void do_settimeofday(struct timeval *tv)
     printk("XXX: do_settimeofday not implemented\n");
 }
 
+
 /***************************************************************************
  * Update times
  ***************************************************************************/
 
-/* update a domains notion of time */
 void update_dom_time(shared_info_t *si)
 {
     unsigned long flags;
@@ -343,15 +329,13 @@ void update_dom_time(shared_info_t *si)
     spin_lock_irqsave(&stime_lock, flags);
     si->cpu_freq       = cpu_freq;
     si->rdtsc_bitshift = rdtsc_bitshift;
-    si->system_time    = stime_now;
-    si->st_timestamp   = stime_pcc;
+    si->system_time    = stime_irq;
+    si->st_timestamp   = tsc_irq;
     si->tv_sec         = wall_clock_time.tv_sec;
     si->tv_usec        = wall_clock_time.tv_usec;
-    si->wc_timestamp   = wctime_st;
+    si->wc_timestamp   = stime_irq;
     si->wc_version++;
     spin_unlock_irqrestore(&stime_lock, flags);
-
-    TRC(printk(" 0x%08X%08X\n", (u32)(wctime_st>>32), (u32)wctime_st));
 }
 
 /*
@@ -362,21 +346,12 @@ void update_dom_time(shared_info_t *si)
  * - index 0 -> go slower
  * - index 1 -> frequency as determined during calibration
  * - index 2 -> go faster
- */
-/*
- * NB. The period is not a whole number of seconds since we want to avoid
- * being in sync with the CMOS update-in-progress flag, which causes this
- * routine to bail.
- */
-/*
+ * 
  * NB2. Note that update_scale is called from update_time with the stime_lock
  * still held. This is because we must only slow down cpu_freq at a timebase
  * change. If we did it in the middle of an update period then time would
  * seem to jump backwards since BASE+OLD_FREQ*DIFF > BASE+NEW_FREQ*DIFF.
  */
-#define SCALE_UPDATE_PERIOD   MILLISECS(50200)
-static unsigned long   init_cmos_time;
-static u64             cpu_freqs[3];
 static void update_scale(void)
 {
     unsigned long  cmos_time;
@@ -389,15 +364,18 @@ static void update_scale(void)
         return;
 
     ct = (u32)(cmos_time - init_cmos_time);
-    st = (u32)(stime_now/SECONDS(1));
+    st = (u32)(stime_irq/SECONDS(1));
     dt = (s32)(ct - st);
 
-    /* work out adjustment to scaling factor. allow +/- 1s drift */
-    if (dt < -1) freq_index = 0;       /* go slower */
-    else if (dt > 1) freq_index = 2;   /* go faster */
-    else freq_index = 1;               /* correct speed */
+    /* Work out adjustment to scaling factor. Allow +/- 1s drift. */
+    if ( dt < -1 ) 
+        freq_index = 0;   /* go slower */
+    else if ( dt > 1 ) 
+        freq_index = 2;   /* go faster */
+    else 
+        freq_index = 1;   /* correct speed */
 
-    if ((dt <= -10) || (dt >= 10))
+    if ( (dt <= -10) || (dt >= 10) )
         printk("Large time drift (cmos time - system time = %ds)\n", dt);
 
     /* set new frequency  */
@@ -411,36 +389,32 @@ static void update_scale(void)
 }
 
 
-/*
- * Update hypervisors notion of time
- * This is done periodically of it's own timer
- */
-#define TIME_UPDATE_PERIOD    MILLISECS(200)
-static struct ac_timer update_timer;
-static void update_time(unsigned long foo)
+static void update_time(unsigned long unused)
 {
     unsigned long  flags;
     s_time_t       new_st;
     unsigned long  usec;
-    u64            full_pcc;
+    u64            full_tsc;
     static int     calls_since_scale_update = 0;
 
     spin_lock_irqsave(&stime_lock, flags);
 
-    /* Update system time. */
-    stime_now = new_st = __get_s_time();
-    rdtscll(full_pcc);
-    stime_pcc = (u32)(full_pcc >> rdtsc_bitshift);
+    rdtscll(full_tsc);
+    new_st = __get_s_time();
 
     /* Update wall clock time. */
-    usec = ((unsigned long)(new_st - wctime_st))/1000;
+    usec = ((unsigned long)(new_st - stime_irq))/1000;
     usec += wall_clock_time.tv_usec;
-    while (usec >= 1000000) {
+    while ( usec >= 1000000 ) 
+    {
         usec -= 1000000;
         wall_clock_time.tv_sec++;
     }
     wall_clock_time.tv_usec = usec;
-    wctime_st = new_st;
+
+    /* Update system time. */
+    stime_irq = new_st;
+    tsc_irq   = (u32)(full_tsc >> rdtsc_bitshift);
 
     /* Maybe update our rate to be in sync with the RTC. */
     if ( ++calls_since_scale_update >= 
@@ -452,8 +426,8 @@ static void update_time(unsigned long foo)
 
     spin_unlock_irqrestore(&stime_lock, flags);
 
-    TRC(printk("TIME[%02d] update time: stime_now=%lld now=%lld,wct=%ld:%ld\n",
-               smp_processor_id(), stime_now, new_st, wall_clock_time.tv_sec,
+    TRC(printk("TIME[%02d] update time: stime_irq=%lld now=%lld,wct=%ld:%ld\n",
+               smp_processor_id(), stime_irq, new_st, wall_clock_time.tv_sec,
                wall_clock_time.tv_usec));
 
     /* Reload the timer. */
@@ -462,17 +436,12 @@ static void update_time(unsigned long foo)
 }
 
 
-/***************************************************************************
- * Init Xeno Time
- * This has to be done after all CPUs have been booted
- ***************************************************************************/
+/* Late init function (after all CPUs are booted). */
 int __init init_xeno_time()
 {
-    int      cpu = smp_processor_id();
-    u32      cpu_cycle;  /* time of one cpu cyle in pico-seconds */
-    u64      scale;      /* scale factor */
+    u64      scale;
     s64      freq_off;
-    u64      full_pcc;
+    u64      full_tsc;
     unsigned int cpu_ghz;
 
     spin_lock_init(&stime_lock);
@@ -481,61 +450,47 @@ int __init init_xeno_time()
     for ( rdtsc_bitshift = 0; cpu_ghz != 0; rdtsc_bitshift++, cpu_ghz >>= 1 )
         continue;
 
-    printk("Init Time[%02d]: %u\n", cpu, rdtsc_bitshift);
-
-    /* System Time */
-    cpu_cycle   = (u32) (1000000000LL/cpu_khz); /* in pico seconds */
-
-    /* calculate adjusted frequencies */
-    freq_off  = cpu_freq/1000; /* .1%  */
+    /* Calculate adjusted frequencies: +/- 0.1% */
+    freq_off = cpu_freq/1000;
     cpu_freqs[0] = cpu_freq + freq_off;
     cpu_freqs[1] = cpu_freq;
     cpu_freqs[2] = cpu_freq - freq_off;
 
-    scale = 1000000000LL << (32 + rdtsc_bitshift);
+    scale  = 1000000000LL << (32 + rdtsc_bitshift);
     scale /= cpu_freq;
     st_scale_f = scale & 0xffffffff;
     st_scale_i = scale >> 32;
 
-    /* Wall Clock time */
-    wall_clock_time.tv_sec  = get_cmos_time();
+    /* System time ticks from zero. */
+    rdtscll(full_tsc);
+    stime_irq = (s_time_t)0;
+    tsc_irq   = (u32)(full_tsc >> rdtsc_bitshift);
+
+    /* Wallclock time starts as the initial RTC time. */
+    wall_clock_time.tv_sec  = init_cmos_time = get_cmos_time();
     wall_clock_time.tv_usec = 0;
 
-    /* init cmos_time for synchronising */
-    init_cmos_time = wall_clock_time.tv_sec;
-
-    /* set starting times */
-    stime_now = (s_time_t)0;
-    rdtscll(full_pcc);
-    stime_pcc = (u32)(full_pcc >> rdtsc_bitshift);
-    wctime_st = NOW();
-
-    /* start timer to update time periodically */
+    /* Start timer to periodically update time and frequency scale. */
     init_ac_timer(&update_timer, 0);
     update_timer.data = 1;
     update_timer.function = &update_time;
     update_time(0);
  
-    printk(".... System Time: %lldns\n",   NOW());
-    printk(".....cpu_freq:    %08X%08X\n", (u32)(cpu_freq>>32), (u32)cpu_freq);
-    printk(".....cpu_cycle:   %u ps\n",    cpu_cycle);
-    printk(".....scale:       %08X%08X\n", (u32)(scale>>32), (u32)scale);
-    printk(".... st_scale_f:  %X\n",       st_scale_f);
-    printk(".... st_scale_i:  %X\n",       st_scale_i);
-    printk(".... stime_pcc:   %u\n",       stime_pcc);
-
-    printk(".... Wall Clock:  %lds %ldus\n", wall_clock_time.tv_sec,
-           wall_clock_time.tv_usec);
-    printk(".... wctime_st:   %lld\n", wctime_st);
+    printk("Time init:\n");
+    printk(".... System Time: %lldns\n", 
+           NOW());
+    printk(".... cpu_freq:    %08X:%08X\n", 
+           (u32)(cpu_freq>>32), (u32)cpu_freq);
+    printk(".... scale:       %08X:%08X\n", 
+           (u32)(scale>>32), (u32)scale);
+    printk(".... Wall Clock:  %lds %ldus\n", 
+           wall_clock_time.tv_sec, wall_clock_time.tv_usec);
 
     return 0;
 }
 
 
-/***************************************************************************
- * Init
- ***************************************************************************/
-
+/* Early init function. */
 void __init time_init(void)
 {
     unsigned long ticks_per_frac = calibrate_tsc();
