@@ -79,8 +79,13 @@ def lookup_raw_partn(partition):
 
     if not re.match( '/dev/', partition ):
         partition = '/dev/' + partition
-
-    drive = re.split( '[0-9]', partition )[0]
+        
+    """Try and match non-standard scsi raid arraysa
+    """
+    if re.match( '/dev/cciss/c[0-9]+d[0-9]+p[0-9]+', partition ):
+        drive = re.split( 'p[0-9]+', partition )[0]
+    else:
+        drive = re.split( '[0-9]', partition )[0]
 
     if drive == partition:
         fd = os.popen( '/sbin/sfdisk -s ' + drive + ' 2>/dev/null' )
