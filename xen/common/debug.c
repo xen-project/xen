@@ -61,7 +61,7 @@ void pdb_do_debug (dom0_op_t *op)
 
 	    if (p != NULL)
 	    {
-	        if (p->state != TASK_SUSPENDED)
+	        if (p->state != TASK_STOPPED)
 		{
 		    cpu_mask = mark_hyp_event(p, _HYP_EVENT_STOP);
 		    hyp_event_notify(cpu_mask);

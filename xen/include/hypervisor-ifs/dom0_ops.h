@@ -17,7 +17,7 @@
  * This makes sure that old versions of dom0 tools will stop working in a
  * well-defined way (rather than crashing the machine, for instance).
  */
-#define DOM0_INTERFACE_VERSION   0xAAAA0001
+#define DOM0_INTERFACE_VERSION   0xAAAA0002
 
 
 /*
@@ -35,6 +35,7 @@ typedef struct full_execution_context_st
     unsigned long ring1_ss, ring1_esp;      /* Virtual TSS (only SS1/ESP1)  */
     unsigned long pt_base;                  /* CR3 (pagetable base)         */
     unsigned long debugreg[8];              /* DB0-DB7 (debug registers)    */
+    u64           domain_time;              /* Domain virtual time          */
 } full_execution_context_t;
 
 #define MAX_CMD_LEN       256
@@ -88,13 +89,8 @@ typedef struct dom0_builddomain_st
 {
     /* IN variables. */
     unsigned int  domain;
-    unsigned long l2_pgt_addr;
-    unsigned long virt_load_addr;
     unsigned long virt_startinfo_addr;
-    unsigned int num_vifs;
-    char cmd_line[MAX_CMD_LEN];
-    unsigned long virt_mod_addr;
-    unsigned long virt_mod_len;
+    unsigned int  num_vifs;
     full_execution_context_t ctxt;
 } dom0_builddomain_t;
 

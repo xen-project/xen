@@ -30,12 +30,11 @@ static char *statestr(int state)
 {
     switch ( state )
     {
-    case  0: return "RUNNING";
-    case  1: return "INTERRUPTIBLE";
-    case  2: return "UNINTERRUPTIBLE";
-    case  4: return "WAIT";
-    case  8: return "SUSPENDED";
-    case 16: return "DYING";
+    case 0: return "RUNNING";
+    case 1: return "INTERRUPTIBLE";
+    case 2: return "UNINTERRUPTIBLE";
+    case 4: return "STOPPED";
+    case 8: return "DYING";
     default: return "UNKNOWN";
     }
     return NULL;

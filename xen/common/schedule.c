@@ -116,7 +116,7 @@ static void __calc_evt(struct task_struct *p)
  */
 void sched_add_domain(struct task_struct *p) 
 {
-    p->state       = TASK_SUSPENDED;
+    p->state       = TASK_STOPPED;
     p->mcu_advance = MCU_ADVANCE;
 
     if ( p->domain == IDLE_DOMAIN_ID )
@@ -379,11 +379,10 @@ asmlinkage void __enter_scheduler(void)
             break;
         }
     case TASK_UNINTERRUPTIBLE:
-    case TASK_WAIT:
     case TASK_DYING:
-    case TASK_SUSPENDED:
+    case TASK_STOPPED:
     default:
-        /* done if not running. Else, continue */
+        /* Done if not running. Else continue. */
         goto deschedule_done;
     case TASK_RUNNING:;
     }

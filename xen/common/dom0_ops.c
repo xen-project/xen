@@ -93,7 +93,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         return -EFAULT;
 
     if ( op.interface_version != DOM0_INTERFACE_VERSION )
-        return -EINVAL;
+        return -EACCES;
 
     switch ( op.cmd )
     {
@@ -249,6 +249,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     { 
         struct task_struct *p = &idle0_task;
         u_long flags;
+        int i;
 
         read_lock_irqsave (&tasklist_lock, flags);
 
@@ -271,11 +272,46 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             op.u.getdomaininfo.mcu_advance = p->mcu_advance;
             op.u.getdomaininfo.tot_pages   = p->tot_pages;
             op.u.getdomaininfo.cpu_time    = p->cpu_time;
-            memcpy(&op.u.getdomaininfo.ctxt, 
-                   &p->shared_info->execution_context,
-                   sizeof(execution_context_t));
+            if ( p->state == TASK_STOPPED )
+            {
+                rmb(); /* Ensure that we see saved register state. */
+                memcpy(&op.u.getdomaininfo.ctxt.i386_ctxt, 
+                       &p->shared_info->execution_context,
+                       sizeof(p->shared_info->execution_context));
+                memcpy(&op.u.getdomaininfo.ctxt.i387_ctxt,
+                       &p->thread.i387,
+                       sizeof(p->thread.i387));
+                memcpy(&op.u.getdomaininfo.ctxt.trap_ctxt,
+                       p->thread.traps,
+                       sizeof(p->thread.traps));
+                if ( (p->thread.fast_trap_desc.a == 0) &&
+                     (p->thread.fast_trap_desc.b == 0) )
+                    op.u.getdomaininfo.ctxt.fast_trap_idx = 0;
+                else
+                    op.u.getdomaininfo.ctxt.fast_trap_idx = 
+                        p->thread.fast_trap_idx;
+                op.u.getdomaininfo.ctxt.ldt_base = p->mm.ldt_base;
+                op.u.getdomaininfo.ctxt.ldt_ents = p->mm.ldt_ents;
+                op.u.getdomaininfo.ctxt.gdt_ents = 0;
+                if ( GET_GDT_ADDRESS(p) == GDT_VIRT_START )
+                {
+                    for ( i = 0; i < 16; i++ )
+                        op.u.getdomaininfo.ctxt.gdt_frames[i] = 
+                            l1_pgentry_to_pagenr(p->mm.perdomain_pt[i]);
+                    op.u.getdomaininfo.ctxt.gdt_ents = 
+                        (GET_GDT_ENTRIES(p) + 1) >> 3;
+                }
+                op.u.getdomaininfo.ctxt.ring1_ss  = p->thread.ss1;
+                op.u.getdomaininfo.ctxt.ring1_esp = p->thread.esp1;
+                op.u.getdomaininfo.ctxt.pt_base   = 
+                    pagetable_val(p->mm.pagetable);
+                memcpy(op.u.getdomaininfo.ctxt.debugreg, 
+                       p->thread.debugreg, 
+                       sizeof(p->thread.debugreg));
+                op.u.getdomaininfo.ctxt.domain_time = 
+                    p->shared_info->domain_time;
+            }
         }
-
         read_unlock_irqrestore(&tasklist_lock, flags);
         copy_to_user(u_dom0_op, &op, sizeof(op));
     }

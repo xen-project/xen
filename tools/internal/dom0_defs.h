@@ -98,7 +98,7 @@ static inline int do_dom0_op(dom0_op_t *op)
 
     if ( do_xen_hypercall(&hypercall) < 0 )
     {
-        if ( errno == EINVAL )
+        if ( errno == EACCES )
             fprintf(stderr, "Dom0 operation failed -- need to"
                     " rebuild the user-space tool set?\n");
         goto out2;

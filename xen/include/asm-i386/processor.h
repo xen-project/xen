@@ -14,6 +14,7 @@
 #include <xeno/config.h>
 #include <hypervisor-ifs/hypervisor-if.h>
 
+struct task_struct;
 
 /*
  * Default implementation of macro that returns current
@@ -381,6 +382,8 @@ extern struct desc_struct *idt_tables[];
     (memcpy(idt_tables[smp_processor_id()] + (_p)->fast_trap_idx, \
      &((_p)->fast_trap_desc), 8))
 
+long set_fast_trap(struct task_struct *p, int idx);
+
 #define INIT_THREAD  {						\
 	0, 0,		      					\
 	{ [0 ... 7] = 0 },	/* debugging registers */	\
@@ -430,7 +433,9 @@ struct mm_struct {
 #define GET_GDT_ENTRIES(_p)     ((*(u16 *)((_p)->mm.gdt + 0)))
 #define GET_GDT_ADDRESS(_p)     ((*(u32 *)((_p)->mm.gdt + 2)))
 
-struct task_struct;
+long set_gdt(struct task_struct *p, 
+             unsigned long *frames, 
+             unsigned int entries);
 
 /* Free all resources held by a thread. */
 extern void release_thread(struct task_struct *);

@@ -18,6 +18,8 @@
 #include <xeno/console.h>
 #include <xeno/vbd.h>
 
+#include <asm/i387.h>
+
 /*
  * NB. No ring-3 access in initial guestOS pagetables. Note that we allow
  * ring-3 privileges in the page directories, so that the guestOS may later
@@ -186,7 +188,7 @@ long kill_other_domain(unsigned int dom, int force)
     p = find_domain_by_id(dom);
     if ( p == NULL ) return -ESRCH;
 
-    if ( p->state == TASK_SUSPENDED )
+    if ( p->state == TASK_STOPPED )
     {
         __kill_domain(p);
     }
@@ -207,7 +209,12 @@ long kill_other_domain(unsigned int dom, int force)
 
 void stop_domain(void)
 {
-    set_current_state(TASK_SUSPENDED);
+    memcpy(&current->shared_info->execution_context, 
+           get_execution_context(), 
+           sizeof(execution_context_t));
+    unlazy_fpu(current);
+    wmb(); /* All CPUs must see saved info in state TASK_STOPPED. */
+    set_current_state(TASK_STOPPED);
     clear_bit(_HYP_EVENT_STOP, &current->hyp_events);
     __enter_scheduler();
 }
@@ -220,7 +227,7 @@ long stop_other_domain(unsigned int dom)
     p = find_domain_by_id (dom);
     if ( p == NULL) return -ESRCH;
     
-    if ( p->state != TASK_SUSPENDED )
+    if ( p->state != TASK_STOPPED )
     {
         cpu_mask = mark_hyp_event(p, _HYP_EVENT_STOP);
         hyp_event_notify(cpu_mask);
@@ -328,25 +335,10 @@ void release_task(struct task_struct *p)
 /* final_setup_guestos is used for final setup and launching of domains other
  * than domain 0. ie. the domains that are being built by the userspace dom0
  * domain builder.
- *
- * Initial load map:
- *  start_address:
- *     OS image
- *      ....
- *  stack_start:
- *  start_info:
- *      <one page>
- *  page tables:
- *      <enough pages>
- *  end_address:
- *  shared_info:
- *      <one page>
  */
-
 int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *builddomain)
 {
     start_info_t * virt_startinfo_addr;
-    unsigned long virt_stack_addr;
     unsigned long phys_l2tab;
     net_ring_t *shared_rings;
     net_vif_t *net_vif;
@@ -355,19 +347,43 @@ int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *builddomain)
     if ( (p->flags & PF_CONSTRUCTED) )
         return -EINVAL;
 
+    memcpy(&p->shared_info->execution_context,
+           &builddomain->ctxt.i386_ctxt,
+           sizeof(p->shared_info->execution_context));
+    memcpy(&p->thread.i387,
+           &builddomain->ctxt.i387_ctxt,
+           sizeof(p->thread.i387));
+    memcpy(p->thread.traps,
+           &builddomain->ctxt.trap_ctxt,
+           sizeof(p->thread.traps));
+    SET_DEFAULT_FAST_TRAP(&p->thread);
+    (void)set_fast_trap(p, builddomain->ctxt.fast_trap_idx);
+    p->mm.ldt_base = builddomain->ctxt.ldt_base;
+    p->mm.ldt_ents = builddomain->ctxt.ldt_ents;
+    SET_GDT_ENTRIES(p, DEFAULT_GDT_ENTRIES);
+    SET_GDT_ADDRESS(p, DEFAULT_GDT_ADDRESS);
+    if ( builddomain->ctxt.gdt_ents != 0 )
+        (void)set_gdt(p,
+                      builddomain->ctxt.gdt_frames,
+                      builddomain->ctxt.gdt_ents);
+    p->thread.ss1  = builddomain->ctxt.ring1_ss;
+    p->thread.esp1 = builddomain->ctxt.ring1_esp;
+    memcpy(p->thread.debugreg,
+           builddomain->ctxt.debugreg,
+           sizeof(p->thread.debugreg));
+    
     /* NB. Page base must already be pinned! */
-    phys_l2tab = builddomain->l2_pgt_addr;
+    phys_l2tab = builddomain->ctxt.pt_base;
     p->mm.pagetable = mk_pagetable(phys_l2tab);
     get_page_type(&frame_table[phys_l2tab>>PAGE_SHIFT]);
     get_page_tot(&frame_table[phys_l2tab>>PAGE_SHIFT]);
 
     /* set up the shared info structure */
     update_dom_time(p->shared_info);
-    p->shared_info->domain_time = 0;
+    p->shared_info->domain_time = builddomain->ctxt.domain_time;
 
     /* we pass start info struct to guest os as function parameter on stack */
     virt_startinfo_addr = (start_info_t *)builddomain->virt_startinfo_addr;
-    virt_stack_addr = (unsigned long)virt_startinfo_addr;       
 
     /* we need to populate start_info struct within the context of the
      * new domain. thus, temporarely install its pagetables.
@@ -376,17 +392,8 @@ int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *builddomain)
     __asm__ __volatile__ ( 
         "mov %%eax,%%cr3" : : "a" (pagetable_val(p->mm.pagetable)));
 
-    memset(virt_startinfo_addr, 0, sizeof(*virt_startinfo_addr));
     virt_startinfo_addr->nr_pages = p->tot_pages;
-    virt_startinfo_addr->shared_info = virt_to_phys(p->shared_info);
-    virt_startinfo_addr->pt_base = builddomain->virt_load_addr + 
-                    ((p->tot_pages - 1) << PAGE_SHIFT);
-   
-    /* module size and length */
-
-    virt_startinfo_addr->mod_start = builddomain->virt_mod_addr;
-    virt_startinfo_addr->mod_len   = builddomain->virt_mod_len;
-
+    virt_startinfo_addr->shared_info = virt_to_phys(p->shared_info);   
     virt_startinfo_addr->dom_id = p->domain;
     virt_startinfo_addr->flags  = IS_PRIV(p) ? SIF_PRIVILEGED : 0;
 
@@ -409,9 +416,6 @@ int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *builddomain)
     /* Add block io interface */
     virt_startinfo_addr->blk_ring = virt_to_phys(p->blk_ring_base);
 
-    /* Copy the command line */
-    strcpy(virt_startinfo_addr->cmd_line, builddomain->cmd_line);
-
     /* Reinstate the caller's page tables. */
     __asm__ __volatile__ (
         "mov %%eax,%%cr3" : : "a" (pagetable_val(current->mm.pagetable)));    
@@ -419,11 +423,6 @@ int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *builddomain)
 
     p->flags |= PF_CONSTRUCTED;
     
-    new_thread(p, 
-               (unsigned long)builddomain->virt_load_addr, 
-               (unsigned long)virt_stack_addr, 
-               (unsigned long)virt_startinfo_addr);
-
     return 0;
 }
 

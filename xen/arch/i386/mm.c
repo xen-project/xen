@@ -207,21 +207,18 @@ int check_descriptor(unsigned long a, unsigned long b)
 }
 
 
-long do_set_gdt(unsigned long *frame_list, unsigned int entries)
+long set_gdt(struct task_struct *p, 
+             unsigned long *frames,
+             unsigned int entries)
 {
     /* NB. There are 512 8-byte entries per GDT page. */
     unsigned int i, j, nr_pages = (entries + 511) / 512;
-    unsigned long frames[16], pfn, *gdt_page, flags;
+    unsigned long pfn, *gdt_page, flags;
     long ret = -EINVAL;
     struct pfn_info *page;
+    struct desc_struct *vgdt;
 
-    if ( (entries <= LAST_RESERVED_GDT_ENTRY) || (entries > 8192) ) 
-        return -EINVAL;
-
-    if ( copy_from_user(frames, frame_list, nr_pages * sizeof(unsigned long)) )
-        return -EFAULT;
-
-    spin_lock_irqsave(&current->page_lock, flags);
+    spin_lock_irqsave(&p->page_lock, flags);
 
     /* Check the new GDT. */
     for ( i = 0; i < nr_pages; i++ )
@@ -230,7 +227,7 @@ long do_set_gdt(unsigned long *frame_list, unsigned int entries)
             goto out;
         
         page = frame_table + frames[i];
-        if ( (page->flags & PG_domain_mask) != current->domain )
+        if ( (page->flags & PG_domain_mask) != p->domain )
             goto out;
 
         if ( (page->flags & PG_type_mask) != PGT_gdt_page )
@@ -250,12 +247,12 @@ long do_set_gdt(unsigned long *frame_list, unsigned int entries)
     /* Tear down the old GDT. */
     for ( i = 0; i < 16; i++ )
     {
-        pfn = l1_pgentry_to_pagenr(current->mm.perdomain_pt[i]);
-        current->mm.perdomain_pt[i] = mk_l1_pgentry(0);
+        pfn = l1_pgentry_to_pagenr(p->mm.perdomain_pt[i]);
+        p->mm.perdomain_pt[i] = mk_l1_pgentry(0);
         if ( pfn == 0 ) continue;
         page = frame_table + pfn;
         ASSERT((page->flags & PG_type_mask) == PGT_gdt_page);
-        ASSERT((page->flags & PG_domain_mask) == current->domain);
+        ASSERT((page->flags & PG_domain_mask) == p->domain);
         ASSERT((page->type_count != 0) && (page->tot_count != 0));
         put_page_type(page);
         put_page_tot(page);
@@ -264,7 +261,7 @@ long do_set_gdt(unsigned long *frame_list, unsigned int entries)
     /* Install the new GDT. */
     for ( i = 0; i < nr_pages; i++ )
     {
-        current->mm.perdomain_pt[i] =
+        p->mm.perdomain_pt[i] =
             mk_l1_pgentry((frames[i] << PAGE_SHIFT) | __PAGE_HYPERVISOR);
         
         page = frame_table + frames[i];
@@ -274,21 +271,42 @@ long do_set_gdt(unsigned long *frame_list, unsigned int entries)
         get_page_tot(page);
     }
 
-    local_flush_tlb();
-
     /* Copy reserved GDT entries to the new GDT. */
-    memcpy((struct desc_struct *)GDT_VIRT_START + FIRST_RESERVED_GDT_ENTRY, 
+    vgdt = map_domain_mem(frames[i] << PAGE_SHIFT);
+    memcpy(vgdt + FIRST_RESERVED_GDT_ENTRY, 
            gdt_table + FIRST_RESERVED_GDT_ENTRY, 
            NR_RESERVED_GDT_ENTRIES*8);
-    
-    SET_GDT_ADDRESS(current, GDT_VIRT_START);
-    SET_GDT_ENTRIES(current, (entries*8)-1);
-    __asm__ __volatile__ ("lgdt %0" : "=m" (*current->mm.gdt));
+    unmap_domain_mem(vgdt);
+
+    SET_GDT_ADDRESS(p, GDT_VIRT_START);
+    SET_GDT_ENTRIES(p, (entries*8)-1);
 
     ret = 0; /* success */
 
  out:
-    spin_unlock_irqrestore(&current->page_lock, flags);
+    spin_unlock_irqrestore(&p->page_lock, flags);
+    return ret;
+}
+
+
+long do_set_gdt(unsigned long *frame_list, unsigned int entries)
+{
+    unsigned int nr_pages = (entries + 511) / 512;
+    unsigned long frames[16];
+    long ret;
+
+    if ( (entries <= LAST_RESERVED_GDT_ENTRY) || (entries > 8192) ) 
+        return -EINVAL;
+    
+    if ( copy_from_user(frames, frame_list, nr_pages * sizeof(unsigned long)) )
+        return -EFAULT;
+
+    if ( (ret = set_gdt(current, frames, entries)) == 0 )
+    {
+        local_flush_tlb();
+        __asm__ __volatile__ ("lgdt %0" : "=m" (*current->mm.gdt));
+    }
+
     return ret;
 }
 

@@ -146,20 +146,18 @@ struct task_struct
  *                       or expiring timer
  * TASK_UNINTERRUPTIBLE: Domain is blocked but may not be woken up by an
  *                       arbitrary event or timer.
- * TASK_WAIT:            Domains CPU allocation expired.
- * TASK_SUSPENDED:       Domain is suspended (startofday or pervasive debugger)
+ * TASK_STOPPED:         Domain is sopped.
  * TASK_DYING:           Domain is about to cross over to the land of the dead.
  *
  * If you update these then please update the mapping to text names in
  * xi_list.
  */
 
-#define TASK_RUNNING            0
-#define TASK_INTERRUPTIBLE      1
-#define TASK_UNINTERRUPTIBLE    2
-#define TASK_WAIT               4
-#define TASK_SUSPENDED          8
-#define TASK_DYING              16
+#define TASK_RUNNING             0
+#define TASK_INTERRUPTIBLE       1
+#define TASK_UNINTERRUPTIBLE     2
+#define TASK_STOPPED             4
+#define TASK_DYING               8
 
 #include <asm/uaccess.h> /* for KERNEL_DS */
 

@@ -692,15 +692,16 @@ long do_set_callbacks(unsigned long event_selector,
 }
 
 
-long do_set_fast_trap(int idx)
+long set_fast_trap(struct task_struct *p, int idx)
 {
     trap_info_t *ti;
 
     /* Index 0 is special: it disables fast traps. */
     if ( idx == 0 )
     {
-        CLEAR_FAST_TRAP(&current->thread);
-        SET_DEFAULT_FAST_TRAP(&current->thread);
+        if ( p == current )
+            CLEAR_FAST_TRAP(&p->thread);
+        SET_DEFAULT_FAST_TRAP(&p->thread);
         return 0;
     }
 
@@ -712,7 +713,7 @@ long do_set_fast_trap(int idx)
     if ( (idx != 0x80) && ((idx < 0x20) || (idx > 0x2f)) ) 
         return -1;
 
-    ti = current->thread.traps + idx;
+    ti = p->thread.traps + idx;
 
     /*
      * We can't virtualise interrupt gates, as there's no way to get
@@ -721,16 +722,24 @@ long do_set_fast_trap(int idx)
     if ( TI_GET_IF(ti) )
         return -1;
 
-    CLEAR_FAST_TRAP(&current->thread);
+    if ( p == current )
+        CLEAR_FAST_TRAP(&p->thread);
 
-    current->thread.fast_trap_idx    = idx;
-    current->thread.fast_trap_desc.a = (ti->cs << 16) | (ti->address & 0xffff);
-    current->thread.fast_trap_desc.b = 
+    p->thread.fast_trap_idx    = idx;
+    p->thread.fast_trap_desc.a = (ti->cs << 16) | (ti->address & 0xffff);
+    p->thread.fast_trap_desc.b = 
         (ti->address & 0xffff0000) | 0x8f00 | (TI_GET_DPL(ti)&3)<<13;
 
-    SET_FAST_TRAP(&current->thread);
+    if ( p == current )
+        SET_FAST_TRAP(&p->thread);
 
     return 0;
+}
+
+
+long do_set_fast_trap(int idx)
+{
+    return set_fast_trap(current, idx);
 }
 
 

@@ -68,7 +68,7 @@ static int send_pgupdates(mmu_update_t *updates, int nr_updates)
 
 /* Read the kernel header, extracting the image size and load address. */
 static int read_kernel_header(int fd, long dom_size, 
-			      unsigned long * load_addr, size_t * ksize)
+                              unsigned long * load_addr, size_t * ksize)
 {
     char signature[8];
     char status[1024];
@@ -77,7 +77,7 @@ static int read_kernel_header(int fd, long dom_size,
     if ( fstat(fd, &stat) < 0 )
     {
         PERROR("Cannot stat the kernel image");
-	return -1;
+        return -1;
     }
 
     /* Double the kernel image size to account for dynamic memory usage etc. */
@@ -86,7 +86,7 @@ static int read_kernel_header(int fd, long dom_size,
         sprintf(status, "Kernel image size %ld larger than requested "
                 "domain size %ld\n Terminated.\n", stat.st_size, dom_size);
         ERROR(status);
-	return -1;
+        return -1;
     }
     
     read(fd, signature, SIG_LEN);
@@ -94,7 +94,7 @@ static int read_kernel_header(int fd, long dom_size,
     {
         ERROR("Kernel image does not contain required signature.\n"
               "Terminating.\n");
-	return -1;
+        return -1;
     }
 
     /* Read the load address which immediately follows the Xeno signature. */
@@ -147,7 +147,7 @@ static int copy_to_domain_page(unsigned long dst_pfn, void *src_page)
 static int setup_guestos(
     int dom, int kernel_fd, int initrd_fd, unsigned long tot_pages,
     unsigned long virt_load_addr, size_t ksize, 
-    dom0_builddomain_t *builddomain)
+    dom0_builddomain_t *builddomain, int argc, char **argv, int args_start)
 {
     l1_pgentry_t *vl1tab = NULL, *vl1e = NULL;
     l2_pgentry_t *vl2tab = NULL, *vl2e = NULL;
@@ -158,6 +158,9 @@ static int setup_guestos(
     unsigned long l1tab = 0;
     unsigned long num_pgt_updates = 0;
     unsigned long count, pt_start, i, j;
+    unsigned long initrd_addr = 0, initrd_len = 0;
+    start_info_t *start_info;
+    int cmd_len;
 
     memset(builddomain, 0, sizeof(*builddomain));
 
@@ -169,14 +172,14 @@ static int setup_guestos(
     pgt_update_arr = pgt_updates;
     if ( (pgt_update_arr == NULL) || (page_array == NULL) )
     {
-	PERROR("Could not allocate memory");
-	goto error_out;
+        PERROR("Could not allocate memory");
+        goto error_out;
     }
 
     if ( get_pfn_list(dom, page_array, tot_pages) != tot_pages )
     {
-	PERROR("Could not get the page frame list");
-	goto error_out;
+        PERROR("Could not get the page frame list");
+        goto error_out;
     }
 
     /* Load the guest OS image. */
@@ -196,15 +199,15 @@ static int setup_guestos(
     /* Load the initial ramdisk image. */
     if ( initrd_fd >= 0 )
     {
-	struct stat stat;
-	unsigned long isize;
+        struct stat stat;
+        unsigned long isize;
 
-	if ( fstat(initrd_fd, &stat) < 0 )
+        if ( fstat(initrd_fd, &stat) < 0 )
         {
             PERROR("Could not stat the initrd image");
             goto error_out;
-	}
-	isize = stat.st_size;
+        }
+        isize = stat.st_size;
         if ( ((isize + ksize) * 2) > (tot_pages << PAGE_SHIFT) )
         {
             ERROR("Kernel + initrd too big to safely fit in domain memory");
@@ -212,8 +215,8 @@ static int setup_guestos(
         }
 
         /* 'i' is 'ksize' rounded up to a page boundary. */
-        builddomain->virt_mod_addr = virt_load_addr + i;
-        builddomain->virt_mod_len  = isize;
+        initrd_addr = virt_load_addr + i;
+        initrd_len  = isize;
 
         for ( j = 0; j < isize; j += PAGE_SIZE, i += PAGE_SIZE )
         {
@@ -246,7 +249,7 @@ static int setup_guestos(
      */
     l2tab = page_array[alloc_index] << PAGE_SHIFT;
     alloc_index--;
-    builddomain->l2_pgt_addr = l2tab;
+    builddomain->ctxt.pt_base = l2tab;
 
     /*
      * Pin down l2tab addr as page dir page - causes hypervisor to provide
@@ -271,7 +274,7 @@ static int setup_guestos(
                 goto error_out;
             memset(vl1tab, 0, PAGE_SIZE);
             alloc_index--;
-			
+		
             vl1e = vl1tab + l1_table_offset(virt_load_addr + 
                                             (count << PAGE_SHIFT));
 
@@ -295,21 +298,40 @@ static int setup_guestos(
         {
             pgt_updates->ptr = (unsigned long)vl1e;
             pgt_updates->val = 
-		((page_array[count] << PAGE_SHIFT) | L1_PROT) & ~_PAGE_RW;
+                ((page_array[count] << PAGE_SHIFT) | L1_PROT) & ~_PAGE_RW;
             pgt_updates++;
             num_pgt_updates++;
             vl1e++;
         }
 
         pgt_updates->ptr = 
-	    (page_array[count] << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
+            (page_array[count] << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
         pgt_updates->val = count;
         pgt_updates++;
         num_pgt_updates++;
     }
 
     builddomain->virt_startinfo_addr =
-        virt_load_addr + ((alloc_index-1)<<PAGE_SHIFT);
+        virt_load_addr + ((alloc_index-1) << PAGE_SHIFT);
+
+    start_info = map_pfn(page_array[alloc_index-1]);
+    memset(start_info, 0, sizeof(*start_info));
+    start_info->pt_base     = virt_load_addr + ((tot_pages-1) << PAGE_SHIFT);
+    start_info->mod_start   = initrd_addr;
+    start_info->mod_len     = initrd_len;
+    cmd_len = 0;
+    for ( i = args_start; i < argc; i++ )
+    {
+        if ( cmd_len + strlen(argv[i]) > MAX_CMD_LEN - 1 ) 
+        {
+            ERROR("Size of image boot params too big!\n");
+            break;
+        }
+        strcat(start_info->cmd_line, argv[i]);
+        strcat(start_info->cmd_line, " ");
+        cmd_len += strlen(argv[i] + 1);
+    }
+    unmap_pfn(start_info);
 
     /* Send the page update requests down to the hypervisor. */
     if ( send_pgupdates(pgt_update_arr, num_pgt_updates) < 0 )
@@ -321,9 +343,9 @@ static int setup_guestos(
 
  error_out:
     if ( page_array == NULL )
-	free(page_array);
+        free(page_array);
     if ( pgt_update_arr == NULL )
-	free(pgt_update_arr);
+        free(pgt_update_arr);
     return -1;
 }
 
@@ -338,12 +360,11 @@ int main(int argc, char **argv)
     unsigned long load_addr;
     long tot_pages;
     int kernel_fd, initrd_fd = -1;
-    int count;
-    int cmd_len;
     int args_start = 4;
     char initrd_name[1024];
     int domain_id;
-    int rc;
+    int rc, i;
+    full_execution_context_t *ctxt;
 
     if ( argv[0] != NULL ) 
         argv0 = argv[0];
@@ -365,62 +386,98 @@ int main(int argc, char **argv)
     if ( (tot_pages = get_tot_pages(domain_id)) < 0 )
     {
         PERROR("Could not find total pages for domain");
-	return 1;
+        return 1;
     }
 
     kernel_fd = open(argv[2], O_RDONLY);
     if ( kernel_fd < 0 )
     {
         PERROR("Could not open kernel image");
-	return 1;
+        return 1;
     }
 
     rc = read_kernel_header(kernel_fd,
-			    tot_pages << (PAGE_SHIFT - 10), 
-			    &load_addr, &ksize);
+                            tot_pages << (PAGE_SHIFT - 10), 
+                            &load_addr, &ksize);
     if ( rc < 0 )
-	return 1;
+        return 1;
     
     if( (argc > args_start) && 
         (strncmp("initrd=", argv[args_start], 7) == 0) )
     {
-	strncpy( initrd_name, argv[args_start]+7, sizeof(initrd_name) );
-	initrd_name[sizeof(initrd_name)-1] = 0;
-	printf("initrd present, name = %s\n", initrd_name );
-	args_start++;
+        strncpy( initrd_name, argv[args_start]+7, sizeof(initrd_name) );
+        initrd_name[sizeof(initrd_name)-1] = 0;
+        printf("initrd present, name = %s\n", initrd_name );
+        args_start++;
         
-	initrd_fd = open(initrd_name, O_RDONLY);
-	if ( initrd_fd < 0 )
+        initrd_fd = open(initrd_name, O_RDONLY);
+        if ( initrd_fd < 0 )
         {
             PERROR("Could not open the initial ramdisk image");
-	    return 1;
-	}
+            return 1;
+        }
     }
 
     if ( setup_guestos(domain_id, kernel_fd, initrd_fd, tot_pages,
-                       load_addr, ksize, &launch_op.u.builddomain) < 0 )
+                       load_addr, ksize, &launch_op.u.builddomain,
+                       argc, argv, args_start) < 0 )
         return 1;
 
     if ( initrd_fd >= 0 )
-	close(initrd_fd);
+        close(initrd_fd);
     close(kernel_fd);
 
-    launch_op.u.builddomain.domain         = domain_id;
-    launch_op.u.builddomain.virt_load_addr = load_addr;
-    launch_op.u.builddomain.num_vifs       = atoi(argv[3]);
-    launch_op.u.builddomain.cmd_line[0]    = '\0';
-    cmd_len = 0;
-    for ( count = args_start; count < argc; count++ )
+    ctxt = &launch_op.u.builddomain.ctxt;
+
+    /*
+     * Initial register values:
+     *  DS,ES,FS,GS = FLAT_RING1_DS
+     *       CS:EIP = FLAT_RING1_CS:start_pc
+     *       SS:ESP = FLAT_RING1_DS:start_stack
+     *          ESI = start_info
+     *  [EAX,EBX,ECX,EDX,EDI,EBP are zero]
+     *       EFLAGS = IF | 2 (bit 1 is reserved and should always be 1)
+     */
+    ctxt->i386_ctxt.ds = FLAT_RING1_DS;
+    ctxt->i386_ctxt.es = FLAT_RING1_DS;
+    ctxt->i386_ctxt.fs = FLAT_RING1_DS;
+    ctxt->i386_ctxt.gs = FLAT_RING1_DS;
+    ctxt->i386_ctxt.ss = FLAT_RING1_DS;
+    ctxt->i386_ctxt.cs = FLAT_RING1_CS;
+    ctxt->i386_ctxt.eip = load_addr;
+    ctxt->i386_ctxt.esp = launch_op.u.builddomain.virt_startinfo_addr;
+    ctxt->i386_ctxt.esi = launch_op.u.builddomain.virt_startinfo_addr;
+    ctxt->i386_ctxt.eflags = (1<<9) | (1<<2);
+
+    /* FPU is set up to default initial state. */
+    memset(ctxt->i387_ctxt, 0, sizeof(ctxt->i387_ctxt));
+
+    /* Virtual IDT is empty at start-of-day. */
+    for ( i = 0; i < 256; i++ )
     {
-        if ( cmd_len + strlen(argv[count]) > MAX_CMD_LEN - 1 ) 
-        {
-            ERROR("Size of image boot params too big!\n");
-            break;
-        }
-        strcat(launch_op.u.builddomain.cmd_line, argv[count]);
-        strcat(launch_op.u.builddomain.cmd_line, " ");
-        cmd_len += strlen(argv[count] + 1);
+        ctxt->trap_ctxt[i].vector = i;
+        ctxt->trap_ctxt[i].cs     = FLAT_RING1_CS;
     }
+    ctxt->fast_trap_idx = 0;
+
+    /* No LDT. */
+    ctxt->ldt_ents = 0;
+    
+    /* Use the default Xen-provided GDT. */
+    ctxt->gdt_ents = 0;
+
+    /* Ring 1 stack is the initial stack. */
+    ctxt->ring1_ss  = FLAT_RING1_DS;
+    ctxt->ring1_esp = launch_op.u.builddomain.virt_startinfo_addr;
+
+    /* No debugging. */
+    memset(ctxt->debugreg, 0, sizeof(ctxt->debugreg));
+
+    /* Domain time counts from zero. */
+    ctxt->domain_time = 0;
+
+    launch_op.u.builddomain.domain   = domain_id;
+    launch_op.u.builddomain.num_vifs = atoi(argv[3]);
 
     launch_op.cmd = DOM0_BUILDDOMAIN;
     rc = do_dom0_op(&launch_op);

@@ -11,6 +11,7 @@
 
 #include <linux/types.h>
 #include <asm/hypervisor-ifs/hypervisor-if.h>
+#include <asm/hypervisor-ifs/dom0_ops.h>
 #include <asm/ptrace.h>
 #include <asm/page.h>
 
@@ -262,10 +263,10 @@ static inline int HYPERVISOR_exit(void)
     return ret;
 }
 
-static inline int HYPERVISOR_dom0_op(void *dom0_op)
+static inline int HYPERVISOR_dom0_op(dom0_op_t *dom0_op)
 {
     int ret;
-    op->interface_version = DOM0_INTERFACE_VERSION;
+    dom0_op->interface_version = DOM0_INTERFACE_VERSION;
     __asm__ __volatile__ (
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_dom0_op),
