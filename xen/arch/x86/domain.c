@@ -364,8 +364,6 @@ static void monitor_rm_pagetable(struct exec_domain *ed)
     l2_pgentry_t *mpl2e;
     unsigned long mpfn;
 
-    ASSERT( m->monitor_table );
-    
     mpl2e = (l2_pgentry_t *) map_domain_mem(pagetable_val(m->monitor_table));
     /*
      * First get the pfn for guest_pl2e_cache by looking at monitor_table
@@ -510,8 +508,10 @@ int arch_final_setup_guestos(struct exec_domain *d, full_execution_context_t *c)
         }
     }
 
+#ifdef CONFIG_VMX
     if (c->flags & ECF_VMX_GUEST)
         return vmx_final_setup_guestos(d, c);
+#endif
 
     return 0;
 }
@@ -747,6 +747,7 @@ static void relinquish_list(struct domain *d, struct list_head *list)
     spin_unlock_recursive(&d->page_alloc_lock);
 }
 
+#ifdef CONFIG_VMX
 static void vmx_domain_relinquish_memory(struct exec_domain *ed)
 {
     struct domain *d = ed->domain;
@@ -776,6 +777,7 @@ static void vmx_domain_relinquish_memory(struct exec_domain *ed)
     }
 
 }
+#endif
 
 void domain_relinquish_memory(struct domain *d)
 {
@@ -788,15 +790,18 @@ void domain_relinquish_memory(struct domain *d)
     shadow_mode_disable(d);
 
     /* Drop the in-use reference to the page-table base. */
-    for_each_exec_domain(d, ed) {
+    for_each_exec_domain ( d, ed )
+    {
         if ( pagetable_val(ed->mm.pagetable) != 0 )
             put_page_and_type(&frame_table[pagetable_val(ed->mm.pagetable) >>
                                            PAGE_SHIFT]);
     }
 
-    if (VMX_DOMAIN(d->exec_domain[0]))
-        for_each_exec_domain(d, ed)
+#ifdef CONFIG_VMX
+    if ( VMX_DOMAIN(d->exec_domain[0]) )
+        for_each_exec_domain ( d, ed )
             vmx_domain_relinquish_memory(ed);
+#endif
 
     /*
      * Relinquish GDT mappings. No need for explicit unmapping of the LDT as 

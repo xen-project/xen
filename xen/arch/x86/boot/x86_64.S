@@ -156,7 +156,8 @@ __high_start:
         lea     start(%rip),%rax
         sub     $0x100000,%rax
         add     %rax,%rdi
-        call    cmain
+        call    __start_xen
+        ud2     /* Force a panic (invalid opcode). */
 
 /* This is the default interrupt handler. */
 int_msg:
@@ -264,10 +265,9 @@ phys_to_machine_mapping:
 copy_from_user: 
 show_registers: 
 do_iopl: 
-.globl idt_table, copy_user_generic, memcmp, idt_tables, new_thread
+.globl idt_table, copy_user_generic, idt_tables, new_thread
 idt_table:
 copy_user_generic:
-memcmp:
 idt_tables:
 new_thread:
 .globl switch_to, __get_user_1, __get_user_4, __get_user_8, trap_init

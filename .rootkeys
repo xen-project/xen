@@ -65,14 +65,7 @@
 405853f2wg7JXZJNltspMwOZJklxgw linux-2.4.29-xen-sparse/arch/xen/drivers/netif/frontend/Makefile
 41ee5e8b_2rt-qHzbDXtIoBzOli0EA linux-2.4.29-xen-sparse/arch/xen/drivers/usbif/Makefile
 41ee5e8bUhF4tH7OoJaVbUxdXqneVw linux-2.4.29-xen-sparse/arch/xen/drivers/usbif/backend/Makefile
-41ee5e8bYDQkjRVKnFn5uFyy0KreCw linux-2.4.29-xen-sparse/arch/xen/drivers/usbif/backend/common.h
-41ee5e8bt7xeBUJqG5XJS-ofukdsgA linux-2.4.29-xen-sparse/arch/xen/drivers/usbif/backend/control.c
-41ee5e8bSs3BGC7yegM_ek2Tn0Ahvw linux-2.4.29-xen-sparse/arch/xen/drivers/usbif/backend/interface.c
-41ee5e8bglvqKvZSY5uJ5JGQejEwyQ linux-2.4.29-xen-sparse/arch/xen/drivers/usbif/backend/main.c
 41ee5e8bSPpxzhGO6TrY20TegW3cZg linux-2.4.29-xen-sparse/arch/xen/drivers/usbif/frontend/Makefile
-41ee5e8ckZ9xVNvu9NHIZDK7JqApmQ linux-2.4.29-xen-sparse/arch/xen/drivers/usbif/frontend/main.c
-41ee5e8ck9scpGirfqEZRARbGDyTXA linux-2.4.29-xen-sparse/arch/xen/drivers/usbif/frontend/xhci.h
-41ee5e8c6mLxIx82KPsbpt_uts_vSA linux-2.4.29-xen-sparse/arch/xen/drivers/usbif/usbif.h
 3e5a4e65lWzkiPXsZdzPt2RNnJGG1g linux-2.4.29-xen-sparse/arch/xen/kernel/Makefile
 3e5a4e65_hqfuxtGG8IUy6wRM86Ecg linux-2.4.29-xen-sparse/arch/xen/kernel/entry.S
 3e5a4e65Hy_1iUvMTPsNqGNXd9uFpg linux-2.4.29-xen-sparse/arch/xen/kernel/head.S
@@ -97,6 +90,7 @@
 3f108aeaLcGDgQdFAANLTUEid0a05w linux-2.4.29-xen-sparse/drivers/char/mem.c
 3e5a4e66rw65CxyolW9PKz4GG42RcA linux-2.4.29-xen-sparse/drivers/char/tty_io.c
 40c9c0c1pPwYE3-4i-oI3ubUu7UgvQ linux-2.4.29-xen-sparse/drivers/scsi/aic7xxx/Makefile
+41f97f64nW0wmgLxhwzPTzkF4E5ERA linux-2.4.29-xen-sparse/drivers/usb/hcd.c
 3e5a4e669uzIE54VwucPYtGwXLAbzA linux-2.4.29-xen-sparse/fs/exec.c
 3e5a4e66wbeCpsJgVf_U8Jde-CNcsA linux-2.4.29-xen-sparse/include/asm-xen/bugs.h
 3e5a4e66HdSkvIV6SJ1evG_xmTmXHA linux-2.4.29-xen-sparse/include/asm-xen/desc.h
@@ -228,6 +222,12 @@
 405853f6nbeazrNyEWNHBuoSg2PiPA linux-2.6.10-xen-sparse/drivers/xen/netfront/netfront.c
 4108f5c1ppFXVpQzCOAZ6xXYubsjKA linux-2.6.10-xen-sparse/drivers/xen/privcmd/Makefile
 3e5a4e65IUfzzMu2kZFlGEB8-rpTaA linux-2.6.10-xen-sparse/drivers/xen/privcmd/privcmd.c
+41ee5e8bYDQkjRVKnFn5uFyy0KreCw linux-2.6.10-xen-sparse/drivers/xen/usbback/common.h
+41ee5e8bt7xeBUJqG5XJS-ofukdsgA linux-2.6.10-xen-sparse/drivers/xen/usbback/control.c
+41ee5e8bSs3BGC7yegM_ek2Tn0Ahvw linux-2.6.10-xen-sparse/drivers/xen/usbback/interface.c
+41ee5e8bglvqKvZSY5uJ5JGQejEwyQ linux-2.6.10-xen-sparse/drivers/xen/usbback/usbback.c
+41ee5e8ckZ9xVNvu9NHIZDK7JqApmQ linux-2.6.10-xen-sparse/drivers/xen/usbfront/usbfront.c
+41ee5e8ck9scpGirfqEZRARbGDyTXA linux-2.6.10-xen-sparse/drivers/xen/usbfront/xhci.h
 412f47e4RKD-R5IS5gEXvcT8L4v8gA linux-2.6.10-xen-sparse/include/asm-generic/pgtable.h
 40f56239YAjS52QG2FIAQpHDZAdGHg linux-2.6.10-xen-sparse/include/asm-xen/asm-i386/desc.h
 4107adf1E5O4ztGHNGMzCCNhcvqNow linux-2.6.10-xen-sparse/include/asm-xen/asm-i386/dma-mapping.h
@@ -1054,6 +1054,7 @@
 41c0c412FLc0gunlJl91qMYscFtXVA xen/include/public/io/ioreq.h
 40f5623cTZ80EwjWUBlh44A9F9i_Lg xen/include/public/io/netif.h
 41d40e9b8zCk5VDqhVbuQyhc7G3lqA xen/include/public/io/ring.h
+41ee5e8c6mLxIx82KPsbpt_uts_vSA xen/include/public/io/usbif.h
 4051db79512nOCGweabrFWO2M2h5ng xen/include/public/physdev.h
 40589968wmhPmV5-ENbBYmMjnedgKw xen/include/public/sched_ctl.h
 404f3d2eR2Owk-ZcGOx9ULGHg3nrww xen/include/public/trace.h

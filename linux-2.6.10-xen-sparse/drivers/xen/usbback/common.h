@@ -15,7 +15,7 @@
 #include <asm-xen/ctrl_if.h>
 #include <asm-xen/hypervisor.h>
 
-#include "../usbif.h"
+#include <asm-xen/xen-public/io/usbif.h>
 
 #if 0
 #define ASSERT(_p) \

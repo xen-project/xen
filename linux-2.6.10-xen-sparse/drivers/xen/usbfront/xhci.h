@@ -3,7 +3,7 @@
 
 #include <linux/list.h>
 #include <linux/usb.h>
-#include "../usbif.h"
+#include <asm-xen/xen-public/io/usbif.h>
 #include <linux/spinlock.h>
 
 #define XHCI_NUMFRAMES		1024	/* in the frame list [array] */
