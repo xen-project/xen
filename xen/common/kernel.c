@@ -225,7 +225,6 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
 
     init_frametable((void *)FRAMETABLE_VIRT_START, max_page);
 
-
 #elif defined(__x86_64__)
 
     init_frametable(__va(xenheap_phys_end), max_page);

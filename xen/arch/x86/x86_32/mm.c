@@ -129,6 +129,22 @@ void __init zap_low_mappings(void)
 }
 
 
+/*
+ * Allows shooting down of borrowed page-table use on specific CPUs.
+ * Specifically, we borrow page tables when running the idle domain.
+ */
+static void __synchronise_pagetables(void *mask)
+{
+    struct domain *d = current;
+    if ( ((unsigned long)mask & (1<<d->processor)) && is_idle_task(d) )
+        write_ptbase(&d->mm);
+}
+void synchronise_pagetables(unsigned long cpu_mask)
+{
+    __synchronise_pagetables((void *)cpu_mask);
+    smp_call_function(__synchronise_pagetables, (void *)cpu_mask, 1, 1);
+}
+
 long do_stack_switch(unsigned long ss, unsigned long esp)
 {
     int nr = smp_processor_id();
