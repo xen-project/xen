@@ -660,15 +660,27 @@ int set_timeout_timer(void)
 {
 	u64 alarm = 0;
 	int ret = 0;
+#ifdef CONFIG_SMP
+	unsigned long seq;
+#endif
 
 	/*
 	 * This is safe against long blocking (since calculations are
 	 * not based on TSC deltas). It is also safe against warped
 	 * system time since suspend-resume is cooperative and we
-	 * would first get locked out. It is safe against normal
-	 * updates of jiffies since interrupts are off.
+	 * would first get locked out.
 	 */
+#ifdef CONFIG_SMP
+	do {
+		seq = read_seqbegin(&xtime_lock);
+		if (smp_processor_id())
+			alarm = __jiffies_to_st(jiffies + 1);
+		else
+			alarm = __jiffies_to_st(jiffies + 1);
+	} while (read_seqretry(&xtime_lock, seq));
+#else
 	alarm = __jiffies_to_st(next_timer_interrupt());
+#endif
 
 	/* Failure is pretty bad, but we'd best soldier on. */
 	if ( HYPERVISOR_set_timer_op(alarm) != 0 )
@@ -707,20 +719,26 @@ void time_resume(void)
 static irqreturn_t local_timer_interrupt(int irq, void *dev_id,
 					 struct pt_regs *regs)
 {
+#if 0
 	static int xxx = 0;
-	if ((xxx++ % 100) == 0)
-		xxprint("local_timer_interrupt\n");
+	if ((xxx++ % 2000) == 0)
+		printk("local_timer_interrupt %d\n", xxx);
+#endif
 
 	/*
 	 * update_process_times() expects us to have done irq_enter().
 	 * Besides, if we don't timer interrupts ignore the global
 	 * interrupt lock, which is the WrongThing (tm) to do.
 	 */
-	irq_enter();
+	// irq_enter();
 	/* XXX add processed_system_time loop thingy */
-	if (regs)
-		update_process_times(user_mode(regs));
-	irq_exit();
+	// if (regs)
+	//	update_process_times(user_mode(regs));
+	// irq_exit();
+	if (smp_processor_id() == 0) {
+	    xxprint("bug bug\n");
+	    BUG();
+	}
 
 	return IRQ_HANDLED;
 }
