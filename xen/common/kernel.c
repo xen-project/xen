@@ -461,9 +461,9 @@ unsigned short compute_cksum(unsigned short *buf, int count)
     unsigned long sum = 0;
     while ( count-- )
         sum += *buf++;
-    sum += sum >> 16;
-    sum += sum >> 16;
-    return (unsigned short)~sum;
+    while ( sum >> 16 )
+	sum = (sum & 0xffff) + (sum >> 16);
+    return (unsigned short) ~sum;
 }
 
 
@@ -495,18 +495,19 @@ int console_export(char *str, int len)
     udph = (struct udphdr *)(iph + 1); 
 
     skb_reserve(skb, sizeof(struct ethhdr)); 
-    skb_put(skb, hdr_size + len); 
+    skb_put(skb, hdr_size +  len); 
 
     /* Build IP header. */
     iph->version = 4;
     iph->ihl     = 5;
-    iph->frag_off= 0;
+    iph->tos	 = 0;
+    iph->tot_len = htons(hdr_size + len);
     iph->id      = 0xdead;
+    iph->frag_off= 0;
     iph->ttl     = 255;
     iph->protocol= 17;
     iph->daddr   = htonl(0xa9fe0100);  /* 169.254.1.0 */
     iph->saddr   = htonl(0xa9fefeff);  /* 169.254.254.255 */
-    iph->tot_len = htons(hdr_size + len); 
     iph->check	 = 0;
     iph->check   = compute_cksum((__u16 *)iph, sizeof(struct iphdr)/2); 
 

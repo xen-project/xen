@@ -39,8 +39,8 @@ UCCL)
 	PATH=$PATH:/usr/groups/xeno/build_tools/bin
 	mkdir -p install/boot
 	cd install/boot
-	ln -sf ../../xeno-roots/roots .
-	ln -sf ../../xeno-roots/usr .
+	ln -sf ../../../xeno-roots/roots .
+	ln -sf ../../../xeno-roots/usr .
 	ln -sf ../lib .
 	ln -sf ../bin .
 	ln -sf /usr/groups/srgboot/${USER}/xenoboot.sh .
