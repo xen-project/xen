@@ -240,7 +240,7 @@ struct pfn_info *alloc_domain_page(struct task_struct *p)
     if ( unlikely((mask = page->u.cpu_mask) != 0) )
     {
         pfn_stamp = page->tlbflush_timestamp;
-        for ( i = 0; mask != 0; i++ )
+        for ( i = 0; (mask != 0) && (i < NR_CPUS); i++ )
         {
             if ( unlikely(mask & (1<<i)) )
             {
