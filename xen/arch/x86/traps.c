@@ -383,14 +383,30 @@ asmlinkage void do_machine_check(struct xen_regs *regs)
     fatal_trap(TRAP_machine_check, regs);
 }
 
-asmlinkage int do_page_fault(struct xen_regs *regs)
+static inline void propagate_page_fault(unsigned long addr, u16 error_code)
 {
     trap_info_t *ti;
+    struct exec_domain *ed = current;
+    struct trap_bounce *tb = &ed->thread.trap_bounce;
+
+    ti = ed->thread.traps + 14;
+    tb->flags = TBF_EXCEPTION | TBF_EXCEPTION_ERRCODE | TBF_EXCEPTION_CR2;
+    tb->cr2        = addr;
+    tb->error_code = error_code;
+    tb->cs         = ti->cs;
+    tb->eip        = ti->address;
+    if ( TI_GET_IF(ti) )
+        ed->vcpu_info->evtchn_upcall_mask = 1;
+
+    ed->mm.guest_cr2 = addr;
+}
+
+asmlinkage int do_page_fault(struct xen_regs *regs)
+{
     unsigned long off, addr, fixup;
     struct exec_domain *ed = current;
     struct domain *d = ed->domain;
     extern int map_ldt_shadow_page(unsigned int);
-    struct trap_bounce *tb = &ed->thread.trap_bounce;
     int cpu = ed->processor;
     int ret;
 
@@ -447,14 +463,7 @@ asmlinkage int do_page_fault(struct xen_regs *regs)
     if ( !GUEST_FAULT(regs) )
         goto xen_fault;
 
-    ti = ed->thread.traps + 14;
-    tb->flags = TBF_EXCEPTION | TBF_EXCEPTION_ERRCODE | TBF_EXCEPTION_CR2;
-    tb->cr2        = addr;
-    tb->error_code = regs->error_code;
-    tb->cs         = ti->cs;
-    tb->eip        = ti->address;
-    if ( TI_GET_IF(ti) )
-        ed->vcpu_info->evtchn_upcall_mask = 1;
+    propagate_page_fault(addr, regs->error_code);
     return 0; 
 
  xen_fault:
@@ -497,45 +506,126 @@ asmlinkage int do_page_fault(struct xen_regs *regs)
 
 static int emulate_privileged_op(struct xen_regs *regs)
 {
-    u16 opcode;
+    extern long do_fpu_taskswitch(void);
+    extern void *decode_reg(struct xen_regs *regs, u8 b);
 
-    if ( get_user(opcode, (u16 *)regs->eip) || ((opcode & 0xff) != 0x0f) )
-        return 0;
+    struct exec_domain *ed = current;
+    unsigned long *reg, eip = regs->eip;
+    u8 opcode;
 
-    switch ( opcode >> 8 )
+    if ( get_user(opcode, (u8 *)eip) )
+        goto page_fault;
+    eip += 1;
+    if ( (opcode & 0xff) != 0x0f )
+        goto fail;
+
+    if ( get_user(opcode, (u8 *)eip) )
+        goto page_fault;
+    eip += 1;
+
+    switch ( opcode )
     {
+    case 0x06: /* CLTS */
+        (void)do_fpu_taskswitch();
+        break;
+
     case 0x09: /* WBINVD */
-        if ( !IS_CAPABLE_PHYSDEV(current->domain) )
+        if ( !IS_CAPABLE_PHYSDEV(ed->domain) )
         {
             DPRINTK("Non-physdev domain attempted WBINVD.\n");
-            return 0;
+            goto fail;
         }
         wbinvd();
-        regs->eip += 2;
-        return 1;
-        
+        break;
+
+    case 0x20: /* MOV CR?,<reg> */
+        if ( get_user(opcode, (u8 *)eip) )
+            goto page_fault;
+        eip += 1;
+        if ( (opcode & 0xc0) != 0xc0 )
+            goto fail;
+        reg = decode_reg(regs, opcode);
+        switch ( (opcode >> 3) & 7 )
+        {
+        case 0: /* Read CR0 */
+            *reg = 
+                (read_cr0() & ~X86_CR0_TS) | 
+                (test_bit(EDF_GUEST_STTS, &ed->ed_flags) ? X86_CR0_TS : 0);
+            break;
+
+        case 2: /* Read CR2 */
+            *reg = ed->mm.guest_cr2;
+            break;
+            
+        case 3: /* Read CR3 */
+            *reg = pagetable_val(ed->mm.pagetable);
+            break;
+
+        default:
+            goto fail;
+        }
+        break;
+
+    case 0x22: /* MOV <reg>,CR? */
+        if ( get_user(opcode, (u8 *)eip) )
+            goto page_fault;
+        eip += 1;
+        if ( (opcode & 0xc0) != 0xc0 )
+            goto fail;
+        reg = decode_reg(regs, opcode);
+        switch ( (opcode >> 3) & 7 )
+        {
+        case 0: /* Write CR0 */
+            if ( *reg & X86_CR0_TS ) /* XXX ignore all but TS bit */
+                (void)do_fpu_taskswitch;
+            break;
+
+        case 2: /* Write CR2 */
+            ed->mm.guest_cr2 = *reg;
+            break;
+            
+        case 3: /* Write CR3 */
+            LOCK_BIGLOCK(ed->domain);
+            (void)new_guest_cr3(*reg);
+            UNLOCK_BIGLOCK(ed->domain);
+            break;
+
+        default:
+            goto fail;
+        }
+        break;
+
     case 0x30: /* WRMSR */
-        if ( !IS_PRIV(current->domain) )
+        if ( !IS_PRIV(ed->domain) )
         {
             DPRINTK("Non-priv domain attempted WRMSR.\n");
-            return 0;
+            goto fail;
         }
         wrmsr(regs->ecx, regs->eax, regs->edx);
-        regs->eip += 2;
-        return 1;
+        break;
 
     case 0x32: /* RDMSR */
-        if ( !IS_PRIV(current->domain) )
+        if ( !IS_PRIV(ed->domain) )
         {
             DPRINTK("Non-priv domain attempted RDMSR.\n");
-            return 0;
+            goto fail;
         }
         rdmsr(regs->ecx, regs->eax, regs->edx);
-        regs->eip += 2;
-        return 1;
+        break;
+
+    default:
+        goto fail;
     }
 
+    regs->eip = eip;
+    return EXCRET_fault_fixed;
+
+ fail:
     return 0;
+
+ page_fault:
+    propagate_page_fault(eip, 0);
+    return EXCRET_fault_fixed;
 }
 
 asmlinkage int do_general_protection(struct xen_regs *regs)

@@ -278,6 +278,8 @@ extern ptwr_info_t ptwr_info[];
 void ptwr_flush(const int);
 int ptwr_do_page_fault(unsigned long);
 
+int new_guest_cr3(unsigned long pfn);
+
 #define __cleanup_writable_pagetable(_what)                                 \
 do {                                                                        \
     int cpu = smp_processor_id();                                           \
