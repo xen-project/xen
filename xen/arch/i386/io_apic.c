@@ -138,14 +138,10 @@ static void __init replace_pin_at_irq(unsigned int irq,
 	static void name##_IO_APIC_irq (unsigned int irq)		\
 	__DO_ACTION(R, ACTION, FINAL)
 
-DO_ACTION( __mask,             0, |= 0x00010000, io_apic_sync(entry->apic) )
-						/* mask = 1 */
-DO_ACTION( __unmask,           0, &= 0xfffeffff, )
-						/* mask = 0 */
-DO_ACTION( __mask_and_edge,    0, = (reg & 0xffff7fff) | 0x00010000, )
-						/* mask = 1, trigger = 0 */
-DO_ACTION( __unmask_and_level, 0, = (reg & 0xfffeffff) | 0x00008000, )
-						/* mask = 0, trigger = 1 */
+DO_ACTION( __mask,    0, |= 0x00010000, io_apic_sync(entry->apic) )
+DO_ACTION( __unmask,  0, &= 0xfffeffff, )
+DO_ACTION( __edge,    0, &= 0xffff7fff, )
+DO_ACTION( __level,   0, |= 0x00008000, )
 
 static void mask_IO_APIC_irq (unsigned int irq)
 {
@@ -1365,12 +1361,14 @@ static unsigned int startup_level_ioapic_irq (unsigned int irq)
 	return 0; /* don't check for pending */
 }
 
-static void end_level_ioapic_irq (unsigned int irq)
+static void mask_and_ack_level_ioapic_irq(unsigned int irq)
 {
 	unsigned long v;
 	int i;
 
 	balance_irq(irq);
+
+	mask_IO_APIC_irq(irq);
 
 /*
  * It appears there is an erratum which affects at least version 0x11
@@ -1405,7 +1403,7 @@ static void end_level_ioapic_irq (unsigned int irq)
 		atomic_inc(&irq_mis_count);
 #endif
 		spin_lock(&ioapic_lock);
-		__mask_and_edge_IO_APIC_irq(irq);
+		__edge_IO_APIC_irq(irq);
 #ifdef APIC_LOCKUP_DEBUG
 		for (entry = irq_2_pin + irq;;) {
 			unsigned int reg;
@@ -1421,12 +1419,15 @@ static void end_level_ioapic_irq (unsigned int irq)
 			entry = irq_2_pin + entry->next;
 		}
 #endif
-		__unmask_and_level_IO_APIC_irq(irq);
+		__level_IO_APIC_irq(irq);
 		spin_unlock(&ioapic_lock);
 	}
 }
 
-static void mask_and_ack_level_ioapic_irq (unsigned int irq) { /* nothing */ }
+static void end_level_ioapic_irq(unsigned int irq)
+{
+	unmask_IO_APIC_irq(irq);
+}
 
 static inline void init_IO_APIC_traps(void)
 {
