@@ -1,6 +1,7 @@
 package org.xenoserver.control;
 
-import java.net.*;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 
 public class InetAddressPattern
 {
@@ -11,7 +12,6 @@ public class InetAddressPattern
   {
     InetAddressPattern result = new InetAddressPattern ();
     char[] ca = t.toCharArray ();
-    int idx = 0;
     int len = ca.length;
 
     try {

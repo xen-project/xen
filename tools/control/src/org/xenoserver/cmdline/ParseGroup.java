@@ -1,8 +1,6 @@
 package org.xenoserver.cmdline;
 
-import java.util.Arrays;
 import java.util.LinkedList;
-import java.util.List;
 
 import org.xenoserver.control.CommandFailedException;
 import org.xenoserver.control.Defaults;

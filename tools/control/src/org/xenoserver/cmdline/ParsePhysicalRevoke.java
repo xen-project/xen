@@ -8,8 +8,6 @@ import org.xenoserver.control.Defaults;
 import org.xenoserver.control.Extent;
 import org.xenoserver.control.Partition;
 import org.xenoserver.control.PartitionManager;
-import org.xenoserver.control.Settings;
-import org.xenoserver.control.XML;
 
 public class ParsePhysicalRevoke extends CommandParser {
   public void parse(Defaults d, LinkedList args) throws ParseFailedException, CommandFailedException {
@@ -22,7 +20,7 @@ public class ParsePhysicalRevoke extends CommandParser {
       throw new ParseFailedException("Expected -p<partition_name>");
       
     // Initialise the partition manager and look up the partition
-    XML.load_state( PartitionManager.it, Settings.STATE_INPUT_FILE );
+    loadState();
     Partition p = PartitionManager.it.get_partition(partition_name);
     
     if ( p == null )

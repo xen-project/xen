@@ -126,4 +126,41 @@ Library
       return null;
     }
   }
+  
+  /**
+   * Formats a number of bytes in whichever way makes most sense based
+   * on magnitude and width.
+   * 
+   * @param size Number of bytes.
+   * @param width Width of field - at least 5, plz.
+   * @param prefix Set to 1 for left justify
+   * @return The formatted string.
+   */
+  public static String format_size(long size,int width,int prefix) {
+    char[] suffixes = { ' ', 'k', 'M', 'G' };
+    int suffix = 0;
+    long before = size;
+    float after = 0;
+    
+    while ( before > 10000 ) {
+      after = ((float)(before % 1024)) / 1024;
+      before /= 1024;
+      suffix++; 
+    }
+    
+    StringBuffer num = new StringBuffer(width);
+    num.append( Long.toString( before ) );
+    if ( after != 0 ) {
+      int space = width - num.length() - 2;
+      if ( space > 0 ) {
+        num.append( '.' );
+        if ( space > 3 )
+          space = 3;
+        num.append( Integer.toString( (int) (after * Math.pow(10,space))));
+      }
+    }
+    num.append( suffixes[suffix] );
+    
+    return format(num.toString(),width,prefix);
+  }
 }

@@ -4,9 +4,12 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
-import org.xenoserver.control.Command;
 import org.xenoserver.control.CommandFailedException;
 import org.xenoserver.control.Defaults;
+import org.xenoserver.control.PartitionManager;
+import org.xenoserver.control.Settings;
+import org.xenoserver.control.VirtualDiskManager;
+import org.xenoserver.control.XML;
 
 /**
  * Subclasses of Parser know how to parse arguments for a given command
@@ -83,5 +86,13 @@ public abstract class CommandParser {
       }
     }
     return result;
+  }
+
+  protected void loadState() {
+    XML.load_state( PartitionManager.it, VirtualDiskManager.it, Settings.STATE_INPUT_FILE );
+  }
+  
+  protected void saveState() {
+    XML.dump_state( PartitionManager.it, VirtualDiskManager.it, Settings.STATE_OUTPUT_FILE );
   }
 }

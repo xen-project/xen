@@ -31,7 +31,6 @@ public class CommandPhysicalList extends Command {
    */
   public String execute() throws CommandFailedException {
     Runtime r = Runtime.getRuntime();
-    int rc = 0;
     String outline;
     BufferedReader in;
     String output = null;

@@ -9,11 +9,8 @@ import org.xenoserver.control.CommandPhysicalList;
 import org.xenoserver.control.Defaults;
 import org.xenoserver.control.Extent;
 import org.xenoserver.control.Library;
-import org.xenoserver.control.Mode;
 import org.xenoserver.control.Partition;
 import org.xenoserver.control.PartitionManager;
-import org.xenoserver.control.Settings;
-import org.xenoserver.control.XML;
 
 public class ParsePhysicalList extends CommandParser {
 
@@ -23,7 +20,7 @@ public class ParsePhysicalList extends CommandParser {
       throw new ParseFailedException("Expected -n<domain_id>");
 
     // Initialise the partition manager
-    XML.load_state( PartitionManager.it, Settings.STATE_INPUT_FILE );
+    loadState();
     
     CommandPhysicalList list = new CommandPhysicalList( d, domain_id );
     String output = list.execute();

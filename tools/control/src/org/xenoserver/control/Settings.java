@@ -19,6 +19,7 @@ public final class Settings
   public static final String PARTITIONS_FILE = System.getProperty("PARTITIONS_FILE", "/proc/partitions");
   public static final String STATE_INPUT_FILE = System.getProperty("STATE_INPUT_FILE", "/var/lib/xen/vdstate.xml");
   public static final String STATE_OUTPUT_FILE = System.getProperty("STATE_OUTPUT_FILE", "/var/lib/xen/vdstate.xml");
+  public static final int SECTOR_SIZE = Integer.parseInt( System.getProperty("SECTOR_SIZE", "512") );
 
   public static File getDefaultsFile() {
     StringTokenizer tok = new StringTokenizer (DEFAULTS_PATH, ":");

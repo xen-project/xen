@@ -5,10 +5,13 @@
 
 package org.xenoserver.control;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.Vector;
-import java.util.Enumeration;
 
 /**
  * PartitionManager manages the partitions on the machine. It is a Singleton
@@ -136,8 +139,6 @@ PartitionManager
   void
   dump_xml (PrintWriter out)
   {
-    int loop;
-
     out.println("<partitions>");
     for (Enumeration e = partition_map.elements() ; e.hasMoreElements() ;) 
     {

@@ -27,7 +27,6 @@ public class CommandDomainList extends Command {
    */
   public String execute() throws CommandFailedException {
     Runtime r = Runtime.getRuntime();
-    int rc = 0;
     Vector v = new Vector();
     String outline;
     BufferedReader in;
