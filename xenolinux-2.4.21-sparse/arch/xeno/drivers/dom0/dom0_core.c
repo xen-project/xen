@@ -43,7 +43,6 @@ typedef struct proc_mem_data {
     int tot_pages;
 } proc_memdata_t;
 
-#define DOM_PHD         "phd"
 #define MAP_DISCONT     1
 
 extern struct file_operations dom0_phd_fops;
@@ -155,7 +154,7 @@ static void create_proc_dom_entries(int dom)
         file->data          = (void *) dom;
     }
 
-    file = create_proc_entry(DOM_PHD, 0600, dir);
+    file = create_proc_entry("phd", 0600, dir);
     if (file != NULL)
     {
         file->owner         = THIS_MODULE;
@@ -388,8 +387,8 @@ static int xeno_domains_show(struct seq_file *s, void *v)
                 di -> u.getdominfo.pg_head,
                 di -> u.getdominfo.tot_pages,
                 di -> u.getdominfo.name);
-    return 0;
 
+    return 0;
 }
 
 struct seq_operations xeno_domains_op = {
