@@ -216,7 +216,7 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
         domid_t dom = op->u.getpageframeinfo2.domain;
         unsigned long *s_ptr = (unsigned long*) op->u.getpageframeinfo2.array;
         struct domain *d;
-        unsigned long l_arr[GPF2_BATCH];
+        unsigned long *l_arr;
         ret = -ESRCH;
 
         if ( unlikely((d = find_domain_by_id(dom)) == NULL) )
@@ -227,6 +227,8 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
             ret = -E2BIG;
             break;
         }
+
+        l_arr = (unsigned long *)alloc_xenheap_page();
  
         ret = 0;
         for( n = 0; n < num; )
@@ -290,6 +292,8 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
 
             n += j;
         }
+
+        free_xenheap_page((unsigned long)l_arr);
 
         put_domain(d);
     }
