@@ -243,8 +243,8 @@ ENTRY(idle_pg_table_l2)
         identmap /* Too orangey for crows :-) */
 
         .org 0x4000
-ENTRY(cpu0_stack)    # Initial stack is 8kB
+ENTRY(cpu0_stack)
 
-        .org 0x6000
+        .org 0x4000 + STACK_SIZE
 ENTRY(stext)
 ENTRY(_stext)

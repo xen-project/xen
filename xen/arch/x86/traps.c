@@ -553,19 +553,55 @@ asmlinkage int do_general_protection(struct xen_regs *regs)
     return 0;
 }
 
+unsigned long nmi_softirq_reason;
+static void nmi_softirq(void)
+{
+    if ( dom0 == NULL )
+        return;
+
+    if ( test_and_clear_bit(0, &nmi_softirq_reason) )
+        send_guest_virq(dom0->exec_domain[0], VIRQ_PARITY_ERR);
+
+    if ( test_and_clear_bit(1, &nmi_softirq_reason) )
+        send_guest_virq(dom0->exec_domain[0], VIRQ_IO_ERR);
+}
+
 asmlinkage void mem_parity_error(struct xen_regs *regs)
 {
-    console_force_unlock();
-    printk("\n\nNMI - MEMORY ERROR\n");
-    fatal_trap(TRAP_nmi, regs);
+    /* Clear and disable the parity-error line. */
+    outb((inb(0x61)&15)|4,0x61);
+
+    switch ( opt_nmi[0] )
+    {
+    case 'd': /* 'dom0' */
+        set_bit(0, &nmi_softirq_reason);
+        raise_softirq(NMI_SOFTIRQ);
+    case 'i': /* 'ignore' */
+        break;
+    default:  /* 'fatal' */
+        console_force_unlock();
+        printk("\n\nNMI - MEMORY ERROR\n");
+        fatal_trap(TRAP_nmi, regs);
+    }
 }
 
 asmlinkage void io_check_error(struct xen_regs *regs)
 {
-    console_force_unlock();
+    /* Clear and disable the I/O-error line. */
+    outb((inb(0x61)&15)|8,0x61);
 
-    printk("\n\nNMI - I/O ERROR\n");
-    fatal_trap(TRAP_nmi, regs);
+    switch ( opt_nmi[0] )
+    {
+    case 'd': /* 'dom0' */
+        set_bit(0, &nmi_softirq_reason);
+        raise_softirq(NMI_SOFTIRQ);
+    case 'i': /* 'ignore' */
+        break;
+    default:  /* 'fatal' */
+        console_force_unlock();
+        printk("\n\nNMI - I/O ERROR\n");
+        fatal_trap(TRAP_nmi, regs);
+    }
 }
 
 static void unknown_nmi_error(unsigned char reason)
@@ -579,25 +615,15 @@ asmlinkage void do_nmi(struct xen_regs *regs, unsigned long reason)
 {
     ++nmi_count(smp_processor_id());
 
-#if CONFIG_X86_LOCAL_APIC
     if ( nmi_watchdog )
         nmi_watchdog_tick(regs);
-    else
-#endif
+
+    if ( reason & 0x80 )
+        mem_parity_error(regs);
+    else if ( reason & 0x40 )
+        io_check_error(regs);
+    else if ( !nmi_watchdog )
         unknown_nmi_error((unsigned char)(reason&0xff));
-}
-
-unsigned long nmi_softirq_reason;
-static void nmi_softirq(void)
-{
-    if ( dom0 == NULL )
-        return;
-
-    if ( test_and_clear_bit(0, &nmi_softirq_reason) )
-        send_guest_virq(dom0->exec_domain[0], VIRQ_PARITY_ERR);
-
-    if ( test_and_clear_bit(1, &nmi_softirq_reason) )
-        send_guest_virq(dom0->exec_domain[0], VIRQ_IO_ERR);
 }
 
 asmlinkage int math_state_restore(struct xen_regs *regs)
@@ -706,8 +732,8 @@ void set_tss_desc(unsigned int n, void *addr)
 
 void __init trap_init(void)
 {
-    extern void doublefault_init(void);
-    doublefault_init();
+    extern void percpu_traps_init(void);
+    extern void cpu_init(void);
 
     /*
      * Note that interrupt gates are always used, rather than trap gates. We 
@@ -745,13 +771,9 @@ void __init trap_init(void)
     /* CPU0 uses the master IDT. */
     idt_tables[0] = idt_table;
 
-    /*
-     * Should be a barrier for any external CPU state.
-     */
-    {
-        extern void cpu_init(void);
-        cpu_init();
-    }
+    percpu_traps_init();
+
+    cpu_init();
 
     open_softirq(NMI_SOFTIRQ, nmi_softirq);
 }

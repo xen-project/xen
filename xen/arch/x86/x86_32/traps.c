@@ -175,32 +175,31 @@ asmlinkage void do_double_fault(void)
         __asm__ __volatile__ ( "hlt" );
 }
 
-void __init doublefault_init(void)
-{
-    /*
-     * Make a separate task for double faults. This will get us debug output if
-     * we blow the kernel stack.
-     */
-    struct tss_struct *tss = &doublefault_tss;
-    memset(tss, 0, sizeof(*tss));
-    tss->ds     = __HYPERVISOR_DS;
-    tss->es     = __HYPERVISOR_DS;
-    tss->ss     = __HYPERVISOR_DS;
-    tss->esp    = (unsigned long)
-        &doublefault_stack[DOUBLEFAULT_STACK_SIZE];
-    tss->__cr3  = __pa(idle_pg_table);
-    tss->cs     = __HYPERVISOR_CS;
-    tss->eip    = (unsigned long)do_double_fault;
-    tss->eflags = 2;
-    tss->bitmap = IOBMP_INVALID_OFFSET;
-    _set_tssldt_desc(gdt_table+__DOUBLEFAULT_TSS_ENTRY,
-                     (unsigned long)tss, 235, 9);
-
-    set_task_gate(TRAP_double_fault, __DOUBLEFAULT_TSS_ENTRY<<3);
-}
-
 void __init percpu_traps_init(void)
 {
+    if ( smp_processor_id() == 0 )
+    {
+        /*
+         * Make a separate task for double faults. This will get us debug
+         * output if we blow the kernel stack.
+         */
+        struct tss_struct *tss = &doublefault_tss;
+        memset(tss, 0, sizeof(*tss));
+        tss->ds     = __HYPERVISOR_DS;
+        tss->es     = __HYPERVISOR_DS;
+        tss->ss     = __HYPERVISOR_DS;
+        tss->esp    = (unsigned long)
+            &doublefault_stack[DOUBLEFAULT_STACK_SIZE];
+        tss->__cr3  = __pa(idle_pg_table);
+        tss->cs     = __HYPERVISOR_CS;
+        tss->eip    = (unsigned long)do_double_fault;
+        tss->eflags = 2;
+        tss->bitmap = IOBMP_INVALID_OFFSET;
+        _set_tssldt_desc(gdt_table+__DOUBLEFAULT_TSS_ENTRY,
+                         (unsigned long)tss, 235, 9);
+    }
+
+    set_task_gate(TRAP_double_fault, __DOUBLEFAULT_TSS_ENTRY<<3);
 }
 
 long set_fast_trap(struct exec_domain *p, int idx)

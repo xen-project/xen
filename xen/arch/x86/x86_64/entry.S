@@ -12,9 +12,9 @@
 #include <public/xen.h>
 
 ENTRY(hypercall)
-        movl  $0x0833,8(%rsp)
+        movl  $__GUEST_SS,8(%rsp)
         pushq %r11
-        pushq $0x082b
+        pushq $__GUEST_CS
         pushq %rcx
         pushq $0
         SAVE_ALL
@@ -133,7 +133,13 @@ ENTRY(double_fault)
         jmp   error_code
 
 ENTRY(nmi)
-        iretq
+        pushq $0
+        SAVE_ALL
+        inb   $0x61,%al
+        movl  %eax,%esi # reason
+        movl  %esp,%edi # regs
+        call  SYMBOL_NAME(do_nmi)
+	jmp   restore_all_xen
 
 .data
 
