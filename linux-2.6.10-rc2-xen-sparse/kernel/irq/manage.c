@@ -144,9 +144,14 @@ int can_request_irq(unsigned int irq, unsigned long irqflags)
 	return !action;
 }
 
-/*
- * Internal function to register an irqaction - typically used to
- * allocate special interrupts that are part of the architecture.
+/**
+ *	setup_irq - register an irqaction structure
+ *	@irq: Interrupt to register
+ *	@irqaction: The irqaction structure to be registered
+ *
+ *	Normally called by request_irq, this function can be used
+ *	directly to allocate special interrupts that are part of the
+ *	architecture.
  */
 int setup_irq(unsigned int irq, struct irqaction * new)
 {
@@ -216,8 +221,17 @@ int setup_irq(unsigned int irq, struct irqaction * new)
 }
 
 /*
- * Internal function to unregister an irqaction - typically used to
- * deallocate special interrupts that are part of the architecture.
+ *	teardown_irq - unregister an irqaction
+ *	@irq: Interrupt line being freed
+ *	@old: Pointer to the irqaction that is to be unregistered
+ *
+ *	This function is called by free_irq and does the actual
+ *	business of unregistering the handler. It exists as a 
+ *	seperate function to enable handlers to be unregistered 
+ *	for irqactions that have been allocated statically at 
+ *	boot time.
+ *
+ *	This function must not be called from interrupt context.
  */
 int teardown_irq(unsigned int irq, struct irqaction * old)
 {
