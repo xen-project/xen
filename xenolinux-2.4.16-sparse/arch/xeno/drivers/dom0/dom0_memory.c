@@ -186,6 +186,8 @@ unsigned long direct_mmap(unsigned long phys_addr, unsigned long size,
     if(flag == MAP_DISCONT){
         ret = direct_remap_disc_page_range(addr, phys_addr, tot_pages, prot);
     } else {
+		printk(KERN_ALERT "bd240 debug: addr %lx, phys_addr %lx, size %lx\n",
+			addr, phys_addr, size);
         ret = direct_remap_page_range(addr, phys_addr, size, prot);
     }
 
