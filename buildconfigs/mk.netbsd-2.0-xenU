@@ -20,8 +20,6 @@ NETBSD_SRC       ?= $(firstword $(foreach dir,$(subst :, ,$(NETBSD_SRC_PATH)),\
 NETBSD_TOOLS_SRC ?= $(firstword $(foreach dir,$(subst :, ,$(NETBSD_SRC_PATH)),\
                     $(wildcard $(dir)/netbsd-$(NETBSD_VER)-tools.tar.*z*)))
 
-NETBSD_TREES := netbsd-$(NETBSD_VER)-xenU
-
 build: $(NETBSD_DIR) netbsd-$(EXTRAVERSION)
 
 netbsd-$(NETBSD_VER)-xen-kernel-$(NETBSD_CVSSNAP).tar.bz2:
@@ -32,8 +30,12 @@ NETBSD_SRC := ./netbsd-$(NETBSD_VER)-xen-kernel-$(NETBSD_CVSSNAP).tar.bz2
 endif
 
 pristine-netbsd-$(NETBSD_VER): $(NETBSD_SRC)
-	rm -rf tmp-netbsd-$(NETBSD_VER) $@ && mkdir -p tmp-netbsd-$(NETBSD_VER) && tar -C tmp-netbsd-$(NETBSD_VER) -jxf $(NETBSD_SRC) && mv tmp-netbsd-$(NETBSD_VER)/* $@
+	rm -rf tmp-netbsd-$(NETBSD_VER) $@ && \
+	mkdir -p tmp-netbsd-$(NETBSD_VER) && \
+	tar -C tmp-netbsd-$(NETBSD_VER) -jxf $(NETBSD_SRC) && \
+	mv tmp-netbsd-$(NETBSD_VER)/* $@
 	touch $@ # update timestamp to avoid rebuild
+	@rm -rf tmp-netbsd-$(NETBSD_VER)
 
 pristine-netbsd-tools-src: 
 ifeq ($(NETBSD_TOOLS_SRC),)
@@ -55,11 +57,13 @@ $(NETBSD_DIR): netbsd-tools pristine-netbsd-$(NETBSD_VER)
           ./mkbuildtree ../$(NETBSD_DIR) )
 
 # build the specified netbsd tree
-NBDIR = $(subst netbsd-,netbsd-$(NETBSD_VER)-,$@)
 netbsd-xen%:	
-	$(MAKE) -C $(NBDIR) config
-	$(MAKE) -C $(NBDIR) netbsd
-	$(MAKE) -C $(NBDIR) INSTALL_PATH=$(INSTALL_DIR) INSTALL_NAME=boot/netbsd-$(NETBSD_VER)-$(subst netbsd-,,$@) install
+	$(MAKE) -C netbsd-$(FULLVERSION) config
+	$(MAKE) -C netbsd-$(FULLVERSION) netbsd
+	$(MAKE) -C netbsd-$(FULLVERSION) INSTALL_PATH=$(INSTALL_DIR) INSTALL_NAME=boot/netbsd-$(NETBSD_VER)-$(subst netbsd-,,$@) install
+
+clean:
+	$(MAKE) -C netbsd-$(FULLVERSION) clean
 
 delete:
-	rm -rf $(NETBSD_TREES)
+	rm -rf tmp-netbsd-$(NETBSD_VER) $(NETBSD_DIR)

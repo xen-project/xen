@@ -31,8 +31,12 @@ LINUX_26SRC := ./linux-$(LINUX_26VER).tar.bz2
 endif
 
 pristine-linux-$(LINUX_26VER): $(LINUX_26SRC)
-	rm -rf tmp-linux-$(LINUX_26VER) $@ && mkdir -p tmp-linux-$(LINUX_26VER) && tar -C tmp-linux-$(LINUX_26VER) -jxf $(LINUX_26SRC) && mv tmp-linux-$(LINUX_26VER)/* $@ ; rm -rf tmp-linux-$(LINUX_26VER)
+	rm -rf tmp-linux-$(LINUX_26VER) $@ && \
+	mkdir -p tmp-linux-$(LINUX_26VER) && \
+	tar -C tmp-linux-$(LINUX_26VER) -jxf $(LINUX_26SRC) && \
+	mv tmp-linux-$(LINUX_26VER)/* $@
 	touch $@ # update timestamp to avoid rebuild
+	@rm -rf tmp-linux-$(LINUX_26VER)
 
 
 # search for a pristine kernel tar ball, or try downloading one
@@ -44,8 +48,12 @@ LINUX_24SRC := ./linux-$(LINUX_24VER).tar.bz2
 endif
 
 pristine-linux-$(LINUX_24VER): $(LINUX_24SRC)
-	rm -rf tmp-linux-$(LINUX_24VER) $@ && mkdir -p tmp-linux-$(LINUX_24VER) && tar -C tmp-linux-$(LINUX_24VER) -jxf $(LINUX_24SRC) && mv tmp-linux-$(LINUX_24VER)/* $@ ; rm -rf tmp-linux-$(LINUX_24VER)
+	rm -rf tmp-linux-$(LINUX_24VER) $@ && \
+	mkdir -p tmp-linux-$(LINUX_24VER) && \
+	tar -C tmp-linux-$(LINUX_24VER) -jxf $(LINUX_24SRC) && \
+	mv tmp-linux-$(LINUX_24VER)/* $@ && \
 	touch $@ # update timestamp to avoid rebuild
+	@rm -rf tmp-linux-$(LINUX_24VER)
 
 linux-$(LINUX_24VER)-xen.patch: pristine-linux-$(LINUX_24VER)	
 	rm -rf tmp-$@
@@ -69,4 +77,4 @@ mrproper:
 	rm -rf pristine-linux-$(LINUX_24VER) linux-$(LINUX_24VER).tar.bz2
 	rm -rf pristine-linux-$(LINUX_26VER) linux-$(LINUX_26VER).tar.bz2
 	rm -rf linux-$(LINUX_24VER)-xen.patch linux-$(LINUX_26VER)-xen.patch
-	rm -rf pristine-netbsd-2.0
+	rm -rf pristine-netbsd-2.0 netbsd-2.0-tools
