@@ -27,8 +27,11 @@ $(LINUX_DIR):  pristine-linux-$(LINUX_VER)
 	( cd $(LINUX_DIR) ; \
 	  sed -e 's/^EXTRAVERSION.*/&-$(EXTRAVERSION)/' Makefile >Mk.tmp ; \
 	  rm -f Makefile ; mv Mk.tmp Makefile )
-	# Re-use config from install dir if one exits else use make defconfig
-	cp $(INSTALL_DIR)/boot/config-$(FULLVERSION) $(LINUX_DIR)/.config || cp $(LINUX_DIR)/arch/xen/configs/$(EXTRAVERSION)_defconfig $(LINUX_DIR)/.config
+	# Re-use config from install dir if one exits else use default config
+	[ -r $(INSTALL_DIR)/boot/config-$(FULLVERSION) ] && \
+	  cp $(INSTALL_DIR)/boot/config-$(FULLVERSION) $(LINUX_DIR)/.config \
+	  || cp $(LINUX_DIR)/arch/xen/configs/$(EXTRAVERSION)_defconfig \
+		$(LINUX_DIR)/.config
 	make -C $(LINUX_DIR) ARCH=xen oldconfig
 
 clean:

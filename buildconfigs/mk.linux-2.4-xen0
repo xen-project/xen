@@ -33,8 +33,11 @@ $(LINUX_DIR):  pristine-linux-$(LINUX_VER) patches/ebtables.diff
 	  rm -f Makefile ; mv Mk.tmp Makefile )
 	# add ebtables patch
 	( cd $(LINUX_DIR) ; patch -p1 -F3 < ../patches/ebtables.diff )
-	# Re-use config from install dir if one exits else use make defconfig
-	cp $(INSTALL_DIR)/boot/config-$(FULLVERSION) $(LINUX_DIR)/.config || cp $(LINUX_DIR)/arch/xen/defconfig-$(EXTRAVERSION) $(LINUX_DIR)/.config
+	# Re-use config from install dir if one exits else use default config
+	[ -r $(INSTALL_DIR)/boot/config-$(FULLVERSION) ] && \
+	  cp $(INSTALL_DIR)/boot/config-$(FULLVERSION) $(LINUX_DIR)/.config \
+	  || cp $(LINUX_DIR)/arch/xen/defconfig-$(EXTRAVERSION) \
+		$(LINUX_DIR)/.config
 	make -C $(LINUX_DIR) ARCH=xen oldconfig
 	make -C $(LINUX_DIR) ARCH=xen dep
 
