@@ -259,7 +259,7 @@ class Opts:
         for opt in self.options:
             opt.show()
 
-    def load_defaults(self):
+    def load_defaults(self, help=0):
         """Load a defaults script. Assumes these options set:
         'path'    search path
         'default' script name
@@ -270,12 +270,12 @@ class Opts:
             else:
                 p = self.vals.defaults
             if os.path.exists(p):
-                self.load(p)
+                self.load(p, help)
                 break
         else:
             self.err("Cannot open defaults file %s" % self.vals.defaults)
 
-    def load(self, defaults, help=0):
+    def load(self, defaults, help):
         """Load a defaults file. Local variables in the file
         are used to set options with the same names.
         Variables are not used to set options that are already specified.
@@ -290,11 +290,17 @@ class Opts:
         cmd = '\n'.join(["import sys",
                          "import os",
                          "import os.path",
-                         "import xen.util.ip",
+                         "from xen.xm.help import Vars",
+                         "from xen.util import ip",
                          "xm_file = '%s'" % defaults,
-                         "xm_help = %d" % help ])
+                         "xm_help = %d" % help,
+                         "xm_vars = Vars(xm_file, xm_help, locals())",
+                         ])
         exec cmd in globals, locals
-        execfile(defaults, globals, locals)
+        try:
+            execfile(defaults, globals, locals)
+        except:
+            if not help: raise
         if help: return
         # Extract the values set by the script and set the corresponding
         # options, if not set on the command line.

@@ -2,17 +2,24 @@
 #============================================================================
 # Python defaults setup for 'xm create'.
 # Edit this file to reflect the configuration of your system.
-# This file expects the variable 'vmid' to be set.
+
 #============================================================================
 
-try:
-    vmid = int(vmid) # convert to integer
-except:
-    raise ValueError, "Variable 'vmid' must be an integer"
+# Define script variables here.
+# xm_vars is defined automatically, use xm_vars.var() to define a variable.
 
-if vmid <= 0:
-    raise ValueError, "Variable 'vmid' must be greater than 0" 
+def vmid_check(var, val):
+    val = int(val)
+    if val <= 0:
+        raise ValueError
+    return val
+    
+xm_vars.var('vmid',
+            use="Virtual machine id. Integer greater than 0.",
+            check=vmid_check)
 
+# This checks the script variables.
+xm_vars.check()
 
 #----------------------------------------------------------------------------
 # Kernel image file.

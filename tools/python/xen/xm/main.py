@@ -5,10 +5,12 @@ import os
 import os.path
 import sys
 from getopt import getopt
+import socket
 
 from xen.xend import PrettyPrint
 from xen.xend import sxp
 from xen.xend.XendClient import server
+from xen.xend.XendClient import main as xend_client_main
 from xen.xm import create, shutdown
 
 class Prog:
@@ -65,6 +67,13 @@ class Xm:
         sys.exit(1)
 
     def main(self, args):
+        try:
+            self.main_call(args)
+        except socket.error, ex:
+            print >>sys.stderr, ex
+            self.err("Error connecting to xend, is xend running?")
+
+    def main_call(self, args):
         """Main entry point. Dispatches to the progs.
         """
         self.name = args[0]
@@ -443,6 +452,22 @@ class ProgConsole(Prog):
         console_client.connect("localhost", int(port))
 
 xm.prog(ProgConsole)
+
+class ProgCall(Prog):
+    name = "call"
+    info = "Call xend api functions."
+
+    def help (self, args):
+        print "call fn argss..."
+        print """
+        Call a xend HTTP API function. The leading 'xend_' on the function
+can be omitted. See xen.xend.XendClient for the API functions.
+"""
+
+    def main(self, args):
+        xend_client_main(args)
+
+xm.prog(ProgCall)
 
 def main(args):
     xm.main(args)
