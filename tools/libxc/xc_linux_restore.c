@@ -504,6 +504,54 @@ printf("XXXXXXXXXXXXXXX pin L2\n");
 
     xcio_info(ioctxt, "\b\b\b\b100%%\nMemory reloaded.\n");
 
+    /* Get the list of PFNs that are not in the psuedo-phys map */
+    {
+	unsigned int count, *pfntab;
+	int rc;
+	if ( xcio_read(ioctxt, &count, sizeof(count)) )
+	{
+	    xcio_error(ioctxt, "Error when reading from state file");
+	    goto out;
+	}
+
+	pfntab = malloc( sizeof(unsigned int) * count );
+	if ( !pfntab )
+	{
+	    xcio_error(ioctxt, "Out of memory");
+	    goto out;
+	}
+
+	if ( xcio_read(ioctxt, pfntab, sizeof(unsigned int)*count) )
+	{
+	    xcio_error(ioctxt, "Error when reading pfntab from state file");
+	    goto out;
+	}
+
+	for(i=0;i<count;i++)
+	{
+	    unsigned long pfn = pfntab[i];
+	    pfntab[i]=pfn_to_mfn_table[pfn];
+	    pfn_to_mfn_table[pfn] = 0x80000001;  // not in pmap
+	}
+
+	if ( count>0 )
+	{
+	    if ( (rc = do_dom_mem_op( xc_handle,
+				       MEMOP_decrease_reservation,
+				       pfntab, count, 0, dom )) <0 )
+	    {
+		xcio_error(ioctxt, "Could not decrease reservation : %d",rc);
+		goto out;
+	    }
+	    else
+	    {
+		printf("Decreased reservation by %d pages\n", count);
+	    }
+	}
+	
+    }
+
+
 
     if ( xcio_read(ioctxt, &ctxt,       sizeof(ctxt)) ||
          xcio_read(ioctxt, shared_info, PAGE_SIZE) )
