@@ -1,3 +1,7 @@
+extern unsigned long disconnected;
+extern void ptwr_reconnect(unsigned long);
+extern int writable_idx;
+extern void ptwr_flush(void);
 /******************************************************************************
  * arch/x86/memory.c
  * 
@@ -117,7 +121,7 @@ static int get_page_and_type_from_pagenr(unsigned long page_nr,
 static void free_l2_table(struct pfn_info *page);
 static void free_l1_table(struct pfn_info *page);
 
-static int mod_l2_entry(l2_pgentry_t *, l2_pgentry_t, unsigned long);
+int mod_l2_entry(l2_pgentry_t *, l2_pgentry_t, unsigned long);
 static int mod_l1_entry(l1_pgentry_t *, l1_pgentry_t);
 
 /* Used to defer flushing of memory structures. */
@@ -509,8 +513,20 @@ static inline int update_l2e(l2_pgentry_t *pl2e,
 }
 
 
+static inline void set_l1_page_va(unsigned long pfn,
+                                  unsigned long va_idx)
+{
+    struct pfn_info *page;
+    
+    page = &frame_table[pfn];
+    page->type_and_flags &= ~PGT_va_mask;
+    page->type_and_flags |= va_idx << PGT_va_shift;
+}
+
+
+#define NPRINTK if (0) printk
 /* Update the L2 entry at pl2e to new value nl2e. pl2e is within frame pfn. */
-static int mod_l2_entry(l2_pgentry_t *pl2e, 
+int mod_l2_entry(l2_pgentry_t *pl2e, 
                         l2_pgentry_t nl2e, 
                         unsigned long pfn)
 {
@@ -528,6 +544,8 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
         return 0;
     ol2e = mk_l2_pgentry(_ol2e);
 
+    NPRINTK("mod_l2_entry pl2e %p ol2e %08lx nl2e %08lx pfn %08lx\n",
+            pl2e, l2_pgentry_val(ol2e), l2_pgentry_val(nl2e), pfn);
     if ( l2_pgentry_val(nl2e) & _PAGE_PRESENT )
     {
         /* Differ in mapping (bits 12-31) or presence (bit 0)? */
@@ -537,6 +555,9 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
         if ( unlikely(!get_page_from_l2e(nl2e, pfn)) )
             return 0;
         
+        set_l1_page_va(l2_pgentry_val(nl2e) >> PAGE_SHIFT,
+                       ((unsigned long)pl2e & (PAGE_SIZE-1)) >> 2);
+
         if ( unlikely(!update_l2e(pl2e, ol2e, nl2e)) )
         {
             put_page_from_l2e(nl2e, pfn);
@@ -697,6 +718,11 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
     struct domain *d = current, *nd, *e;
     u32 x, y;
     domid_t domid;
+
+    if (disconnected != ENTRIES_PER_L2_PAGETABLE)
+        ptwr_reconnect(0L);
+    if (writable_idx)
+        ptwr_flush();
 
     switch ( cmd )
     {
@@ -946,6 +972,11 @@ int do_mmu_update(mmu_update_t *ureqs, int count, int *success_count)
     perfc_incrc(calls_to_mmu_update); 
     perfc_addc(num_page_updates, count);
 
+    if (disconnected != ENTRIES_PER_L2_PAGETABLE)
+        ptwr_reconnect(0L);
+    if (writable_idx)
+        ptwr_flush();
+
     for ( i = 0; i < count; i++ )
     {
         if ( unlikely(copy_from_user(&req, ureqs, sizeof(req)) != 0) )
@@ -1118,6 +1149,11 @@ int do_update_va_mapping(unsigned long page_nr,
     unsigned long deferred_ops;
 
     perfc_incrc(calls_to_update_va);
+
+    if (disconnected != ENTRIES_PER_L2_PAGETABLE)
+        ptwr_reconnect(0L);
+    if (writable_idx)
+        ptwr_flush();
 
     if ( unlikely(page_nr >= (HYPERVISOR_VIRT_START >> PAGE_SHIFT)) )
         return -EINVAL;

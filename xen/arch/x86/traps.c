@@ -310,6 +310,82 @@ asmlinkage void do_double_fault(void)
     for ( ; ; ) ;
 }
 
+extern int mod_l2_entry(l2_pgentry_t *, l2_pgentry_t, unsigned long);
+unsigned long disconnected = ENTRIES_PER_L2_PAGETABLE;
+static unsigned long *writable_l1;
+#define	NR_WRITABLES 4
+static unsigned long *writables[NR_WRITABLES];
+int writable_idx = 0;
+#define PRINTK if (0) printk
+#define NPRINTK if (0) printk
+
+void ptwr_reconnect(unsigned long addr)
+{
+    unsigned long pte;
+    unsigned long pfn;
+    struct pfn_info *page;
+    l2_pgentry_t *pl2e;
+    PRINTK("page fault in disconnected space: addr %08lx space %08lx\n",
+           addr, disconnected << L2_PAGETABLE_SHIFT);
+    pl2e = &linear_l2_table[disconnected];
+
+    if (__get_user(pte, writable_l1))
+        BUG();
+    pfn = pte >> PAGE_SHIFT;
+    page = &frame_table[pfn];
+
+    /* reconnect l1 page */
+    PRINTK("    pl2e %p l2e %08lx pfn %08lx taf %08x/%08x\n", pl2e,
+           l2_pgentry_val(*pl2e),
+           l1_pgentry_val(linear_pg_table[(unsigned long)pl2e >>
+                                          PAGE_SHIFT]) >> PAGE_SHIFT,
+           frame_table[l2_pgentry_to_pagenr(*pl2e)].type_and_flags,
+           frame_table[pfn].type_and_flags);
+    mod_l2_entry(pl2e, mk_l2_pgentry((l2_pgentry_val(*pl2e) & ~0x800) |
+                                     _PAGE_PRESENT),
+                 l1_pgentry_val(linear_pg_table[(unsigned long)pl2e >>
+                                                PAGE_SHIFT]) >> PAGE_SHIFT);
+    PRINTK("now pl2e %p l2e %08lx              taf %08x/%08x\n", pl2e,
+           l2_pgentry_val(*pl2e),
+           frame_table[l2_pgentry_to_pagenr(*pl2e)].type_and_flags,
+           frame_table[pfn].type_and_flags);
+    disconnected = ENTRIES_PER_L2_PAGETABLE;
+    /* make pt page write protected */
+    if (__get_user(pte, writable_l1))
+        BUG();
+    PRINTK("writable_l1 at %p is %08lx\n", writable_l1, pte);
+    pte &= ~_PAGE_RW;
+    if (__put_user(pte, writable_l1))
+        BUG();
+    PRINTK("writable_l1 at %p now %08lx\n", writable_l1, pte);
+    /* and try again */
+    return;
+}
+
+void ptwr_flush(void)
+{
+    unsigned long pte, pfn;
+    struct pfn_info *page;
+    int i;
+
+    for (i = 0; i < writable_idx; i++) {
+        if (__get_user(pte, writables[i]))
+            BUG();
+        pfn = pte >> PAGE_SHIFT;
+        page = &frame_table[pfn];
+        PRINTK("alloc l1 page %p\n", page);
+        if (!get_page_type(page, PGT_l1_page_table))
+            BUG();
+        /* make pt page writable */
+        PRINTK("writable_l1 at %p is %08lx\n", writables[i], pte);
+        pte &= ~_PAGE_RW;
+        if (__put_user(pte, writables[i]))
+            BUG();
+        PRINTK("writable_l1 at %p now %08lx\n", writables[i], pte);
+    }
+    writable_idx = 0;
+}
+
 asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
 {
     struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
@@ -333,6 +409,80 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
         addr = p->mm.ldt_base + off;
         if ( likely(map_ldt_shadow_page(off >> PAGE_SHIFT)) )
             return; /* successfully copied the mapping */
+    }
+
+    if ((addr >> L2_PAGETABLE_SHIFT) == disconnected) {
+        ptwr_reconnect(addr);
+        return;
+    }
+
+    if (addr < PAGE_OFFSET && error_code & 2) {
+        /* write page fault, check if we're trying to modify an l1
+           page table */
+        unsigned long pte, pfn;
+        struct pfn_info *page;
+        l2_pgentry_t *pl2e;
+        NPRINTK("get user %p for va %08lx\n",
+                &linear_pg_table[addr>>PAGE_SHIFT], addr);
+        if (l2_pgentry_val(linear_l2_table[addr >> L2_PAGETABLE_SHIFT]) &
+            _PAGE_PRESENT &&
+            __get_user(pte, (unsigned long *)
+                       &linear_pg_table[addr >> PAGE_SHIFT]) == 0) {
+            pfn = pte >> PAGE_SHIFT;
+            NPRINTK("check pte %08lx = pfn %08lx for va %08lx\n", pte, pfn, addr);
+            page = &frame_table[pfn];
+            if ((page->type_and_flags & PGT_type_mask) == PGT_l1_page_table) {
+                pl2e = &linear_l2_table[(page->type_and_flags &
+                                         PGT_va_mask) >> PGT_va_shift];
+                PRINTK("page_fault on l1 pt at va %08lx, pt for %08x, pfn %08lx\n",
+                       addr, ((page->type_and_flags & PGT_va_mask) >>
+                              PGT_va_shift) << L2_PAGETABLE_SHIFT, pfn);
+                if (l2_pgentry_val(*pl2e) >> PAGE_SHIFT != pfn) {
+                    PRINTK("freeing l1 page %p\n", page);
+                    if (writable_idx == NR_WRITABLES)
+                        ptwr_flush();
+                    writables[writable_idx++] = (unsigned long *)
+                        &linear_pg_table[addr>>PAGE_SHIFT];
+                    if ((page->type_and_flags & PGT_count_mask) != 1)
+                        BUG();
+                    put_page_type(page);
+                } else {
+                    if (disconnected != ENTRIES_PER_L2_PAGETABLE)
+                        ptwr_reconnect(addr);
+                    PRINTK("    pl2e %p l2e %08lx pfn %08lx taf %08x/%08x\n",
+                           pl2e, l2_pgentry_val(*pl2e),
+                           l1_pgentry_val(linear_pg_table[(unsigned long)pl2e
+                                                          >> PAGE_SHIFT]) >>
+                           PAGE_SHIFT,
+                           frame_table[l2_pgentry_to_pagenr(*pl2e)].
+                           type_and_flags, frame_table[pfn].type_and_flags);
+                    /* disconnect l1 page */
+                    mod_l2_entry(pl2e, mk_l2_pgentry((l2_pgentry_val(*pl2e) &
+                                                      ~_PAGE_PRESENT) | 0x800),
+                                 l1_pgentry_val(linear_pg_table
+                                                [(unsigned long)pl2e
+                                                 >> PAGE_SHIFT]) >>
+                                 PAGE_SHIFT);
+                    disconnected = (page->type_and_flags & PGT_va_mask) >>
+                        PGT_va_shift;
+                    PRINTK("now pl2e %p l2e %08lx              taf %08x/%08x\n",
+                           pl2e, l2_pgentry_val(*pl2e),
+                           frame_table[l2_pgentry_to_pagenr(*pl2e)].
+                           type_and_flags,
+                           frame_table[pfn].type_and_flags);
+                    writable_l1 = (unsigned long *)
+                        &linear_pg_table[addr>>PAGE_SHIFT];
+                }
+                /* make pt page writable */
+                pte |= _PAGE_RW;
+                PRINTK("update %p pte to %08lx\n",
+                        &linear_pg_table[addr>>PAGE_SHIFT], pte);
+                if (__put_user(pte, (unsigned long *)
+                               &linear_pg_table[addr>>PAGE_SHIFT]))
+                    BUG();
+                return;
+            }
+        }
     }
 
     if ( unlikely(p->mm.shadow_mode) && 

@@ -135,7 +135,7 @@ static inline pte_t *pte_alloc_one(struct mm_struct *mm, unsigned long address)
     {
         clear_page(pte);
         __make_page_readonly(pte);
-        queue_pte_pin(__pa(pte));
+        // queue_pte_pin(__pa(pte));
     }
     return pte;
 
@@ -154,7 +154,7 @@ static inline pte_t *pte_alloc_one_fast(struct mm_struct *mm,
 
 static __inline__ void pte_free_slow(pte_t *pte)
 {
-    queue_pte_unpin(__pa(pte));
+    // queue_pte_unpin(__pa(pte));
     __make_page_writeable(pte);
     free_page((unsigned long)pte);
 }

@@ -52,8 +52,11 @@ struct pfn_info
  /* Has this page been validated for use as its current type? */
 #define _PGT_validated      28
 #define PGT_validated       (1<<_PGT_validated)
- /* 28-bit count of uses of this frame as its current type. */
-#define PGT_count_mask      ((1<<28)-1)
+ /* 10-bit most significant bits of va address if used as l1 page table */
+#define PGT_va_shift        18
+#define PGT_va_mask         (((1<<10)-1)<<PGT_va_shift)
+ /* 18-bit count of uses of this frame as its current type. */
+#define PGT_count_mask      ((1<<18)-1)
 
  /* For safety, force a TLB flush when this page's type changes. */
 #define _PGC_tlb_flush_on_type_change 31
