@@ -22,7 +22,25 @@ import os
 import sys
 from xen.xend.server import SrvDaemon
 
+def check_twisted_version():
+    """Check twisted version and print a warning if not high enough.
+    """
+    from twisted.copyright import version
+    # Supported twisted release and major version.
+    RELEASE = 1
+    MAJOR   = 3
+    (release, major, minor) = version.split('.')
+    release = int(release)
+    major = int(major)
+    if release > RELEASE: return
+    if release == RELEASE and major >= MAJOR: return
+    print >>sys.stderr, "*" * 60
+    print >>sys.stderr, "*" * 3, "Warning: Twisted version not supported: %s" % version
+    print >>sys.stderr, "*" * 3, "Use Twisted version %d.%d.0 or higher" % (RELEASE, MAJOR)
+    print >>sys.stderr, "*" * 60
+
 def main():
+    check_twisted_version()
     daemon = SrvDaemon.instance()
     if not sys.argv[1:]:
         print 'usage: %s {start|stop|restart}' % sys.argv[0]
