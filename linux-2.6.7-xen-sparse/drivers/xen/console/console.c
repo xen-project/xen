@@ -45,6 +45,10 @@ static enum { XC_OFF, XC_DEFAULT, XC_TTY, XC_SERIAL } xc_mode = XC_DEFAULT;
 
 static int __init xencons_setup(char *str)
 {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+    if (str[0] == '=')
+	str++;
+#endif
     if ( !strcmp(str, "tty") )
         xc_mode = XC_TTY;
     else if ( !strcmp(str, "ttyS") )
@@ -160,7 +164,14 @@ void xen_console_init(void)
     else
     {
         if ( xc_mode == XC_DEFAULT )
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0) && defined(CONFIG_VT)
+            /* On a kernel built with VT support, default to serial
+             * console because the VT driver has already allocated the
+             * /dev/tty device nodes */
+            xc_mode = XC_SERIAL;
+#else
             xc_mode = XC_TTY;
+#endif
         kcons_info.write = kcons_write;
     }
 

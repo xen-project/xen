@@ -285,8 +285,15 @@ static inline void flush_write_buffers(void)
 
 #ifdef SLOW_IO_BY_JUMPING
 #define __SLOW_DOWN_IO "jmp 1f; 1: jmp 1f; 1:"
-#else
+#elif defined(__UNSAFE_IO__)
 #define __SLOW_DOWN_IO "outb %%al,$0x80;"
+#else
+#define __SLOW_DOWN_IO "\n1: outb %%al,$0x80\n"		\
+		       "2:\n"				\
+		       ".section __ex_table,\"a\"\n\t"	\
+		       ".align 4\n\t"			\
+		       ".long 1b,2b\n"			\
+		       ".previous"
 #endif
 
 static inline void slow_down_io(void) {
@@ -320,7 +327,7 @@ static inline unsigned type in##bwl##_quad(int port, int quad) { \
 static inline unsigned type in##bwl(int port) { \
 	return in##bwl##_quad(port, 0); \
 }
-#else
+#else 
 #define __BUILDIO(bwl,bw,type) \
 static inline void out##bwl(unsigned type value, int port) { \
 	out##bwl##_local(value, port); \
@@ -331,7 +338,8 @@ static inline unsigned type in##bwl(int port) { \
 #endif
 
 
-#define BUILDIO(bwl,bw,type) \
+#if __UNSAFE_IO__
+#define ____BUILDIO(bwl,bw,type) \
 static inline void out##bwl##_local(unsigned type value, int port) { \
 	__asm__ __volatile__("out" #bwl " %" #bw "0, %w1" : : "a"(value), "Nd"(port)); \
 } \
@@ -339,7 +347,35 @@ static inline unsigned type in##bwl##_local(int port) { \
 	unsigned type value; \
 	__asm__ __volatile__("in" #bwl " %w1, %" #bw "0" : "=a"(value) : "Nd"(port)); \
 	return value; \
+}
+#else
+#define ____BUILDIO(bwl,bw,type) \
+static inline void out##bwl##_local(unsigned type value, int port) { \
+	__asm__ __volatile__("1: out" #bwl " %" #bw "0, %w1\n"		\
+			     "2:\n"					\
+			     ".section __ex_table,\"a\"\n\t"		\
+			     ".align 4\n\t"				\
+			     ".long 1b,2b\n"				\
+			     ".previous" : : "a"(value), "Nd"(port));	\
 } \
+static inline unsigned type in##bwl##_local(int port) { \
+	unsigned type value; \
+	__asm__ __volatile__("1:in" #bwl " %w1, %" #bw "0\n"		\
+			     "2:\n"					\
+			     ".section .fixup,\"ax\"\n"			\
+			     "3: mov" #bwl " $~0,%" #bw "0\n\t"		\
+			     "jmp 2b\n"					\
+			     ".previous\n"				\
+			     ".section __ex_table,\"a\"\n\t"		\
+			     ".align 4\n\t"				\
+			     ".long 1b,3b\n"				\
+			     ".previous" : "=a"(value) : "Nd"(port));	\
+	return value; \
+}
+#endif
+
+#define BUILDIO(bwl,bw,type) \
+____BUILDIO(bwl,bw,type) \
 static inline void out##bwl##_local_p(unsigned type value, int port) { \
 	out##bwl##_local(value, port); \
 	slow_down_io(); \

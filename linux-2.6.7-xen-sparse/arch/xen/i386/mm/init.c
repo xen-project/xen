@@ -502,7 +502,11 @@ void __init paging_init(void)
 #ifdef CONFIG_XEN_PRIVILEGED_GUEST
 	/* Setup mapping of lower 1st MB */
 	for (i = 0; i < NR_FIX_ISAMAPS; i++)
-		set_fixmap_ma(FIX_ISAMAP_BEGIN - i, i * PAGE_SIZE);
+		if (start_info.flags & SIF_PRIVILEGED)
+			set_fixmap_ma(FIX_ISAMAP_BEGIN - i, i * PAGE_SIZE);
+		else
+			set_fixmap_ma_ro(FIX_ISAMAP_BEGIN - i,
+					 virt_to_machine(empty_zero_page));
 #endif
 }
 
