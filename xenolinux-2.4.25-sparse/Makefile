@@ -9,7 +9,7 @@ KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)
 # Unless overridden, by default ARCH is equivalent to SUBARCH.
 # This will be overriden for Xen and UML builds.
 SUBARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ -e s/arm.*/arm/ -e s/sa110/arm/)
-ARCH := $(SUBARCH)
+ARCH ?= $(SUBARCH)
 
 KERNELPATH=kernel-$(shell echo $(KERNELRELEASE) | sed -e "s/-//g")
 

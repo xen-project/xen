@@ -95,8 +95,8 @@ oldconfig') but you can customise using one of the other config tools
 if you want.
 
   # cd /xeno-1.2.bk/xenolinux-2.4.24
-  # make ARCH=xeno oldconfig   { or menuconfig, or xconfig, or config }  
-  # make ARCH=xeno dep bzImage
+  # ARCH=xeno make oldconfig   { or menuconfig, or xconfig, or config }  
+  # ARCH=xeno make dep bzImage
 
 Assuming the build works, you'll end up with
 /xeno-1.2.bk/xenolinux-2.4.24/arch/xeno/boot/xenolinux.gz. This is the
