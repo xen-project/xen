@@ -11,6 +11,7 @@ TARGETS  = xi_create xi_start xi_stop xi_destroy xi_build
 TARGETS += xi_phys_grant xi_list xi_save_linux xi_restore_linux
 TARGETS += xi_sched_global xi_sched_domain xi_usage xi_vif_params
 TARGETS += xi_vbd_create xi_vbd_add xi_vbd_list xi_vbd_info 
+TARGETS += xi_read_console_ring
 INSTALL  = $(TARGETS) xi_vifinit xi_helper
 
 all: check-for-zlib $(TARGETS)

@@ -170,6 +170,7 @@
 3ec43c5dmQxGDvgJJXbV1yLxT30Y1A tools/internal/xi_helper
 3f108ad5wQm0ZaQ4GXFoUhH1W1aW9w tools/internal/xi_list.c
 3f0458aaXhD8BQAggO81gv30RQ-ifA tools/internal/xi_phys_grant.c
+3fb14ab76b0aJu66S18CVjlemLwk4Q tools/internal/xi_read_console_ring.c
 3fa9861aBdNV1yCjfY4cLPr4Mtrpuw tools/internal/xi_restore_linux.c
 3fa98615LWZfagwDBp7XfuC-u9wi3w tools/internal/xi_save_linux.c
 3f108adb2b5OkKL6-faG3lMiOYDf_w tools/internal/xi_sched_domain.c
@@ -239,6 +240,7 @@
 3e397e66AyyD5fYraAySWuwi9uqSXg xen/common/ac_timer.c
 3ddb79bddEYJbcURvqqcx99Yl2iAhQ xen/common/block.c
 3ddb79bdrqnW93GR9gZk1OJe1qK-iQ xen/common/brlock.c
+3fb10d07GscSWPKxBqpvNfU-dYfa0g xen/common/console.c
 3fa152581E5KhrAtqZef2Sr5NKTz4w xen/common/debug.c
 3ddb79bdLX_P6iB7ILiblRLWvebapg xen/common/dom0_ops.c
 3e6377e4i0c9GtKN65e99OtRbw3AZw xen/common/dom_mem_ops.c
