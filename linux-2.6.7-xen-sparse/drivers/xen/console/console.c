@@ -74,7 +74,9 @@ static void __xencons_tx_flush(void);
 /* This task is used to defer sending console data until there is space. */
 static void xencons_tx_flush_task_routine(void *data);
 
-static struct tq_struct xencons_tx_flush_task;
+static DECLARE_TQUEUE(xencons_tx_flush_task, 
+                      xencons_tx_flush_task_routine,
+                      NULL);
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 static struct tty_driver *xencons_driver;
@@ -630,8 +632,6 @@ static int __init xencons_init(void)
 {
     if ( xc_mode == XC_OFF )
         return 0;
-
-    INIT_TQUEUE(&xencons_tx_flush_task, xencons_tx_flush_task_routine, NULL);
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
     xencons_driver = alloc_tty_driver((xc_mode == XC_SERIAL) ? 

@@ -32,6 +32,9 @@ struct tq_struct {
         (_name)->pending = 0;                       \
         INIT_WORK(&(_name)->work, (_fn), (_arg));   \
     } while ( 0 )
+#define DECLARE_TQUEUE(_name, _fn, _arg)                                    \
+    struct tq_struct _name = { __WORK_INITIALIZER((_name).work, _fn, _arg), \
+                               LIST_HEAD_INIT((_name).list), 0 }
 
 typedef struct {
     struct list_head list;
