@@ -236,6 +236,8 @@ class AsynchXendClient(http.HTTPClient):
         self.sendHeader('Host', url.location())
         for (k, v) in request.headers.items():
             self.sendHeader(k, v)
+        if request.data:
+            self.sendHeader('Content-Length', len(request.data))
         self.endHeaders()
         if request.data:
             self.transport.write(request.data)
@@ -517,22 +519,6 @@ class Xend:
         return self.xendGet(self.dmesgurl())
     
 
-def synchmain(srv, argv):
-    xend = Xend(srv=srv)
-    if len(argv) > 1:
-        fn = argv[0]
-    else:
-        fn = 'xend'
-    if not fn.startswith('xend'):
-        fn = 'xend_' + fn
-    args = argv[1:]
-    try:
-        val = getattr(xend, fn)(*args)
-        PrettyPrint.prettyprint(val)
-    except XendError, err:
-        print 'ERROR:', err
-        sys.exit(1)
-
 def xendmain(srv, asynch, fn, args):
     if asynch:
         client = AsynchXendClientProtocol()
@@ -586,7 +572,7 @@ def main(argv):
             srv = v
         elif k in ['-a', '--asynch']:
             asynch = 1
-        elif k in ['-d', '--DEBUG']:
+        elif k in ['-d', '--debug']:
             DEBUG = 1
     if len(args):
         fn = args[0]
