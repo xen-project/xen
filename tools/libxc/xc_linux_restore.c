@@ -112,7 +112,7 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
     unsigned long *region_mfn = NULL;
 
     /* A temporary mapping, and a copy, of one frame of guest memory. */
-    unsigned long *ppage;
+    unsigned long *ppage = NULL;
 
     /* A copy of the pfn-to-mfn table frame list. */
     unsigned long pfn_to_mfn_frame_list[1024];
@@ -530,6 +530,7 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
         xcio_error(ioctxt, "GDT entry count out of range");
         goto out;
     }
+
     for ( i = 0; i < ctxt.gdt_ents; i += 512 )
     {
         pfn = ctxt.gdt_frames[i];
