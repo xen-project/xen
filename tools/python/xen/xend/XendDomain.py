@@ -21,6 +21,7 @@ import XendDomainInfo
 import XendConsole
 import XendMigrate
 import EventServer
+from XendError import XendError
 
 from xen.xend.server import SrvDaemon
 xend = SrvDaemon.instance()
@@ -324,9 +325,9 @@ class XendDomain:
         dom = int(id)
         dominfo = self.domain_get(dom)
         if not dominfo:
-            raise ValueError("Invalid domain: " + str(id))
+            raise XendError("Invalid domain: " + str(id))
         if dominfo.config:
-            raise ValueError("Domain already configured: " + str(id))
+            raise XendError("Domain already configured: " + str(id))
         def fn(dominfo):
             self._add_domain(dominfo.id, dominfo)
             return dominfo
@@ -575,7 +576,7 @@ class XendDomain:
         dom = int(dom)
         dominfo = self.domain_get(dom)
         if not dominfo:
-            raise ValueError("invalid domain:" + str(dom))
+            raise XendError("invalid domain:" + str(dom))
         self.refresh_schedule()
         return dominfo.device_create(devconfig)
 
@@ -589,7 +590,7 @@ class XendDomain:
         dom = int(dom)
         dominfo = self.domain_get(dom)
         if not dominfo:
-            raise ValueError("invalid domain:" + str(dom))
+            raise XendError("invalid domain:" + str(dom))
         self.refresh_schedule()
         return dominfo.device_destroy(type, idx)
 

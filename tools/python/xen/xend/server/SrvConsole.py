@@ -21,19 +21,22 @@ class SrvConsole(SrvDir):
         return self.perform(req)
         
     def render_GET(self, req):
-        if self.use_sxp(req):
-            req.setHeader("Content-Type", sxp.mime_type)
-            sxp.show(self.info.sxpr(), out=req)
-        else:
-            req.write('<html><head></head><body>')
-            self.print_path(req)
-            #self.ls()
-            req.write('<p>%s</p>' % self.info)
-            req.write('<p><a href="%s">Connect to domain %d</a></p>'
-                      % (self.info.uri(), self.info.dom2))
-            self.form(req)
-            req.write('</body></html>')
-        return ''
+        try:
+            if self.use_sxp(req):
+                req.setHeader("Content-Type", sxp.mime_type)
+                sxp.show(self.info.sxpr(), out=req)
+            else:
+                req.write('<html><head></head><body>')
+                self.print_path(req)
+                #self.ls()
+                req.write('<p>%s</p>' % self.info)
+                req.write('<p><a href="%s">Connect to domain %d</a></p>'
+                          % (self.info.uri(), self.info.dom2))
+                self.form(req)
+                req.write('</body></html>')
+            return ''
+        except Exception, ex:
+            self._perform_err(ex, req)
 
     def form(self, req):
         req.write('<form method="post" action="%s">' % req.prePathURL())

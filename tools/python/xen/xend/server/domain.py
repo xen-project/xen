@@ -1,5 +1,7 @@
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
 
+from xen.xend.XendError import XendError
+
 import channel
 import controller
 from messages import *
@@ -57,6 +59,6 @@ class DomainController(controller.Controller):
         """
         msgtype = self.reasons.get(reason)
         if not msgtype:
-            raise ValueError('invalid reason:' + reason)
+            raise XendError('invalid reason:' + reason)
         msg = packMsg(msgtype, {})
         self.writeRequest(msg)

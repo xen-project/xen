@@ -240,6 +240,7 @@
 40c9c468fSl3H3IypyT0ppkbb0ZT9A tools/python/xen/xend/XendDomain.py
 40c9c468bbKq3uC7_fuNUkiMMjArdw tools/python/xen/xend/XendDomainConfig.py
 40c9c4685ykq87_n1kVUbMr9flx9fg tools/python/xen/xend/XendDomainInfo.py
+40f50d99YiiaMI1fZBh1VCDFLD57qg tools/python/xen/xend/XendError.py
 40c9c46854nsHmuxHQHncKk5rAs5NA tools/python/xen/xend/XendMigrate.py
 40c9c468M96gA1EYDvNa5w5kQNYLFA tools/python/xen/xend/XendNode.py
 40c9c4686jruMyZIqiaZRMiMoqMJtg tools/python/xen/xend/XendRoot.py

@@ -13,6 +13,8 @@ import types
 from StringIO import StringIO
 import urlparse
 
+from twisted.protocols import http
+
 from encode import *
 import sxp
 import PrettyPrint
@@ -121,9 +123,9 @@ def xend_request(url, method, data=None):
     resp = conn.getresponse()
     if DEBUG: print resp.status, resp.reason
     if DEBUG: print resp.msg.headers
-    if resp.status in [204, 404]:
+    if resp.status in [ http.NO_CONTENT ]:
         return None
-    if resp.status not in [200, 201, 202, 203]:
+    if resp.status not in [ http.OK, http.CREATED, http.ACCEPTED ]:
         raise XendError(resp.reason)
     pin = sxp.Parser()
     data = resp.read()
@@ -135,7 +137,7 @@ def xend_request(url, method, data=None):
     val = pin.get_val()
     #if isinstance(val, types.ListType) and sxp.name(val) == 'val':
     #    val = val[1]
-    if isinstance(val, types.ListType) and sxp.name(val) == 'err':
+    if isinstance(val, types.ListType) and sxp.name(val) == 'xend.err':
         raise XendError(val[1])
     if DEBUG: print '**val='; sxp.show(val); print
     return val

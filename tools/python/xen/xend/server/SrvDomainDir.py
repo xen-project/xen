@@ -9,6 +9,7 @@ from twisted.web import error
 from xen.xend import sxp
 from xen.xend import XendDomain
 from xen.xend.Args import FormFn
+from xen.xend.XendError import XendError
 
 from SrvDir import SrvDir
 from SrvDomain import SrvDomain
@@ -23,13 +24,10 @@ class SrvDomainDir(SrvDir):
 
     def domain(self, x):
         val = None
-        try:
-            dom = self.xd.domain_get(x)
-            if not dom: raise KeyError('No such domain')
-            val = SrvDomain(dom)
-        except KeyError, ex:
-            print 'SrvDomainDir>', ex
-            pass
+        dom = self.xd.domain_get(x)
+        if not dom:
+            raise XendError('No such domain ' + str(x))
+        val = SrvDomain(dom)
         return val
 
     def get(self, x):
@@ -44,6 +42,7 @@ class SrvDomainDir(SrvDir):
         Expects the domain config in request parameter 'config' in SXP format.
         """
         ok = 0
+        errmsg = ''
         try:
             configstring = req.args.get('config')[0]
             print 'config:', configstring
@@ -55,12 +54,12 @@ class SrvDomainDir(SrvDir):
         except Exception, ex:
             print 'op_create> Exception in config', ex
             traceback.print_exc()
+            errmsg = 'Configuration error ' + str(ex)
+        except sxp.ParseError, ex:
+            errmsg = 'Invalid configuration ' + str(ex)
         if not ok:
-            req.setResponseCode(http.BAD_REQUEST, "Invalid configuration")
-            return "Invalid configuration"
-            return error.ErrorPage(http.BAD_REQUEST,
-                                   "Invalid",
-                                   "Invalid configuration")
+            req.setResponseCode(http.BAD_REQUEST, errmsg)
+            return errmsg
         try:
             deferred = self.xd.domain_create(config)
             deferred.addCallback(self._op_create_cb, configstring, req)
@@ -71,10 +70,6 @@ class SrvDomainDir(SrvDir):
             traceback.print_exc()
             req.setResponseCode(http.BAD_REQUEST, "Error creating domain: " + str(ex))
             return str(ex)
-            #return error.ErrorPage(http.BAD_REQUEST,
-            #                       "Error creating domain",
-            #                       str(ex))
-                                   
 
     def _op_create_cb(self, dominfo, configstring, req):
         """Callback to handle deferred domain creation.
@@ -113,7 +108,7 @@ class SrvDomainDir(SrvDir):
                     [['file', 'str']])
         deferred = fn(req.args)
         deferred.addCallback(self._op_restore_cb, req)
-        deferred.addErrback(self._op_restore_err, req)
+        #deferred.addErrback(self._op_restore_err, req)
         return deferred
 
     def _op_restore_cb(self, dominfo, req):
@@ -140,17 +135,20 @@ class SrvDomainDir(SrvDir):
         return self.perform(req)
 
     def render_GET(self, req):
-        if self.use_sxp(req):
-            req.setHeader("Content-Type", sxp.mime_type)
-            self.ls_domain(req, 1)
-        else:
-            req.write("<html><head></head><body>")
-            self.print_path(req)
-            self.ls(req)
-            self.ls_domain(req)
-            self.form(req)
-            req.write("</body></html>")
-        return ''
+        try:
+            if self.use_sxp(req):
+                req.setHeader("Content-Type", sxp.mime_type)
+                self.ls_domain(req, 1)
+            else:
+                req.write("<html><head></head><body>")
+                self.print_path(req)
+                self.ls(req)
+                self.ls_domain(req)
+                self.form(req)
+                req.write("</body></html>")
+            return ''
+        except Exception, ex:
+            self._perform_err(ex, req)
 
     def ls_domain(self, req, use_sxp=0):
         url = req.prePathURL()

@@ -100,15 +100,8 @@ class SrvDomain(SrvDir):
         fn = FormFn(self.xd.domain_device_create,
                     [['dom', 'int'],
                      ['config', 'sxpr']])
-        try:
-            d = fn(req.args, {'dom': self.dom.id})
-            d.addErrback(self._op_device_create_err, req)
-            return d
-        except ValueError, ex:
-            return ['err', str(ex)]
-
-    def _op_device_create_err(self, err, req):
-        return ['err', str(err)]
+        d = fn(req.args, {'dom': self.dom.id})
+        return d
 
     def op_device_destroy(self, op, req):
         fn = FormFn(self.xd.domain_device_destroy,

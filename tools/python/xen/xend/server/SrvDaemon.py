@@ -31,6 +31,7 @@ from xen.xend import sxp
 from xen.xend import PrettyPrint
 from xen.xend import EventServer
 eserver = EventServer.instance()
+from xen.xend.XendError import XendError
 
 from xen.xend.server import SrvServer
 
@@ -114,7 +115,7 @@ class MgmtProtocol(protocol.DatagramProtocol):
         """
         print name, req
         dom = sxp.child_value(req, 'domain')
-        if not dom: raise ValueError('Missing domain')
+        if not dom: raise XendError('Missing domain')
         dom = int(dom)
         console_port = sxp.child_value(req, 'console_port')
         if console_port:
@@ -131,11 +132,11 @@ class MgmtProtocol(protocol.DatagramProtocol):
     def op_console_disconnect(self, name, req):
         id = sxp.child_value(req, 'id')
         if not id:
-            raise ValueError('Missing console id')
+            raise XendError('Missing console id')
         id = int(id)
         console = self.daemon.get_console(id)
         if not console:
-            raise ValueError('Invalid console id')
+            raise XendError('Invalid console id')
         if console.conn:
             console.conn.loseConnection()
         return ['ok']
@@ -340,7 +341,7 @@ class EventProtocol(protocol.Protocol):
          return 'op_' + name.replace('.', '_')
 
     def operror(self, name, req):
-        raise NotImplementedError('Invalid operation: ' +name)
+        raise XendError('Invalid operation: ' +name)
 
     def dispatch(self, req):
         op_name = sxp.name(req)
@@ -371,7 +372,7 @@ class EventProtocol(protocol.Protocol):
     def op_console_disconnect(self, name, req):
         id = sxp.child_value(req, 'id')
         if not id:
-            raise ValueError('Missing console id')
+            raise XendError('Missing console id')
         self.daemon.console_disconnect(id)
         return ['ok']
 
@@ -707,7 +708,7 @@ class Daemon:
         """
         ctrl = self.blkifCF.getInstanceByDom(dom)
         if not ctrl:
-            raise ValueError('No blkif controller: %d' % dom)
+            raise XendError('No blkif controller: %d' % dom)
         print 'blkif_dev_create>', dom, vdev, mode, segment
         d = ctrl.attachDevice(vdev, mode, segment, recreate=recreate)
         return d
@@ -740,7 +741,7 @@ class Daemon:
         """
         ctrl = self.netifCF.getInstanceByDom(dom)
         if not ctrl:
-            raise ValueError('No netif controller: %d' % dom)
+            raise XendError('No netif controller: %d' % dom)
         d = ctrl.attachDevice(vif, config, recreate=recreate)
         return d
 
@@ -769,7 +770,7 @@ class Daemon:
         """
         console = self.get_console(id)
         if not console:
-            raise ValueError('Invalid console id')
+            raise XendError('Invalid console id')
         console.disconnect()
 
     def domain_shutdown(self, dom, reason):
@@ -777,7 +778,7 @@ class Daemon:
         """
         ctrl = self.domainCF.getInstanceByDom(dom)
         if not ctrl:
-            raise ValueError('No domain controller: %d' % dom)
+            raise XendError('No domain controller: %d' % dom)
         ctrl.shutdown(reason)
         return 0
         

@@ -1,8 +1,19 @@
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
 
+from twisted.protocols import http
 from twisted.web import error
+
 from xen.xend import sxp
+from xen.xend.XendError import XendError
+
 from SrvBase import SrvBase
+
+class SrvError(error.ErrorPage):
+
+    def render(self, request):
+        val = error.ErrorPage.render(self, request)
+        request.setResponseCode(self.code, self.brief)
+        return val
 
 class SrvConstructor:
     """Delayed constructor for sub-servers.
@@ -38,11 +49,17 @@ class SrvDir(SrvBase):
         self.table = {}
         self.order = []
 
+    def noChild(self, msg):
+        return SrvError(http.NOT_FOUND, msg, msg)
+
     def getChild(self, x, req):
         if x == '': return self
-        val = self.get(x)
+        try:
+            val = self.get(x)
+        except XendError, ex:
+            return self.noChild(str(ex))
         if val is None:
-            return error.NoResource('Not found')
+            return self.noChild('Not found ' + str(x))
         else:
             return val
 
@@ -59,16 +76,19 @@ class SrvDir(SrvBase):
         self.order.append(x)
 
     def render_GET(self, req):
-        if self.use_sxp(req):
-            req.setHeader("Content-type", sxp.mime_type)
-            self.ls(req, 1)
-        else:
-            req.write('<html><head></head><body>')
-            self.print_path(req)
-            self.ls(req)
-            self.form(req)
-            req.write('</body></html>')
-        return ''
+        try:
+            if self.use_sxp(req):
+                req.setHeader("Content-type", sxp.mime_type)
+                self.ls(req, 1)
+            else:
+                req.write('<html><head></head><body>')
+                self.print_path(req)
+                self.ls(req)
+                self.form(req)
+                req.write('</body></html>')
+            return ''
+        except Exception, ex:
+            self._perform_err(ex, req)
             
     def ls(self, req, use_sxp=0):
         url = req.prePathURL()

@@ -29,6 +29,8 @@ xendConsole = XendConsole.instance()
 import server.SrvDaemon
 xend = server.SrvDaemon.instance()
 
+from XendError import VmError
+
 """Flag for a block device backend domain."""
 SIF_BLK_BE_DOMAIN = (1<<4)
 
@@ -57,16 +59,6 @@ def shutdown_reason(code):
     @rtype:  string
     """
     return shutdown_reasons.get(code, "?")
-
-class VmError(ValueError):
-    """Vm construction error."""
-
-    def __init__(self, value):
-        self.value = value
-
-    def __str__(self):
-        return self.value
-
 
 def blkdev_name_to_number(name):
     """Take the given textual block-device name (e.g., '/dev/sda1',
@@ -410,7 +402,11 @@ class XendDomainInfo:
                 self.autorestart = 1
             self.configure_backends()
             image = sxp.child_value(config, 'image')
+            if image is None:
+                raise VmError('missing image')
             image_name = sxp.name(image)
+            if image_name is None:
+                raise VmError('missing image name')
             image_handler = get_image_handler(image_name)
             if image_handler is None:
                 raise VmError('unknown image type: ' + image_name)

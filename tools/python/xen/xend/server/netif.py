@@ -8,6 +8,7 @@ from twisted.internet import defer
 from xen.xend import sxp
 from xen.xend import PrettyPrint
 from xen.xend import Vifctl
+from xen.xend.XendError import XendError
 
 import channel
 import controller
@@ -123,9 +124,9 @@ class NetDev(controller.Dev):
         self.ipaddr = None
         
         vmac = sxp.child_value(config, 'mac')
-        if not vmac: raise ValueError("invalid mac")
+        if not vmac: raise XendError("invalid mac")
         mac = [ int(x, 16) for x in vmac.split(':') ]
-        if len(mac) != 6: raise ValueError("invalid mac")
+        if len(mac) != 6: raise XendError("invalid mac")
         self.mac = mac
 
         self.bridge = sxp.child_value(config, 'bridge')
