@@ -53,7 +53,6 @@ platform_is_hp_ski(void)
 }
 
 /* calls in xen/common code that are unused on ia64 */
-void synchronise_execution_state(unsigned long cpu_mask) { }
 
 int grant_table_create(struct domain *d) { return 0; }
 void grant_table_destroy(struct domain *d)

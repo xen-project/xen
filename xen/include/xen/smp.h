@@ -45,8 +45,6 @@ extern void smp_commence(void);
  */
 extern int smp_call_function(
     void (*func) (void *info), void *info, int retry, int wait);
-extern int smp_subset_call_function(
-    void (*func) (void *info), void *info, int wait, unsigned long cpuset);
 
 /*
  * True once the per process idle is forked
@@ -87,7 +85,6 @@ extern volatile int smp_msg_id;
 #define cpu_logical_map(cpu)			0
 #define cpu_number_map(cpu)			0
 #define smp_call_function(func,info,retry,wait)	0
-#define smp_subset_call_function(f,i,w,c)	({ if ( (c&1) ) (*f)(i); 0; })
 #define cpu_online_map				1
 
 #endif

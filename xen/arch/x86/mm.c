@@ -2827,7 +2827,8 @@ void audit_domain(struct domain *d)
 
     if ( d != current->domain )
         domain_pause(d);
-    synchronise_lazy_execstate(~0UL);
+
+    sync_lazy_execstate_all();
 
     printk("pt base=%lx sh_info=%x\n",
            pagetable_val(d->exec_domain[0]->arch.guest_table)>>PAGE_SHIFT,

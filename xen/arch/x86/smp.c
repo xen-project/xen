@@ -154,10 +154,13 @@ asmlinkage void smp_invalidate_interrupt(void)
 {
     ack_APIC_irq();
     perfc_incrc(ipis);
-    if ( flush_va == FLUSHVA_ALL )
-        local_flush_tlb();
-    else
-        local_flush_tlb_one(flush_va);
+    if ( !__sync_lazy_execstate() )
+    {
+        if ( flush_va == FLUSHVA_ALL )
+            local_flush_tlb();
+        else
+            local_flush_tlb_one(flush_va);
+    }
     clear_bit(smp_processor_id(), &flush_cpumask);
 }
 
@@ -269,45 +272,6 @@ int smp_call_function(
     wmb();
 
     send_IPI_allbutself(CALL_FUNCTION_VECTOR);
-
-    while ( (wait ? data.finished : data.started) != cpuset )
-        cpu_relax();
-
-    spin_unlock(&call_lock);
-
-    return 0;
-}
-
-/* Run a function on a subset of CPUs (may include local CPU). */
-int smp_subset_call_function(
-    void (*func) (void *info), void *info, int wait, unsigned long cpuset)
-{
-    struct call_data_struct data;
-
-    ASSERT(local_irq_is_enabled());
-
-    if ( cpuset & (1UL << smp_processor_id()) )
-    {
-        local_irq_disable();
-        (*func)(info);
-        local_irq_enable();
-    }
-
-    cpuset &= ((1UL << smp_num_cpus) - 1) & ~(1UL << smp_processor_id());
-    if ( cpuset == 0 )
-        return 0;
-
-    data.func = func;
-    data.info = info;
-    data.started = data.finished = 0;
-    data.wait = wait;
-
-    spin_lock(&call_lock);
-
-    call_data = &data;
-    wmb();
-
-    send_IPI_mask(cpuset, CALL_FUNCTION_VECTOR);
 
     while ( (wait ? data.finished : data.started) != cpuset )
         cpu_relax();

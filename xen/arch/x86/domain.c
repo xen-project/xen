@@ -744,11 +744,20 @@ long do_switch_to_user(void)
     return stu.rax; 
 }
 
+#define switch_kernel_stack(_n,_c) ((void)0)
+
 #elif defined(__i386__)
 
 #define load_segments(_p, _n) ((void)0)
 #define save_segments(_p)     ((void)0)
 #define clear_segments()      ((void)0)
+
+static inline void switch_kernel_stack(struct exec_domain *n, unsigned int cpu)
+{
+    struct tss_struct *tss = &init_tss[cpu];
+    tss->esp1 = n->arch.kernel_sp;
+    tss->ss1  = n->arch.kernel_ss;
+}
 
 #endif
 
@@ -772,41 +781,35 @@ static void __context_switch(void)
         save_segments(p);
     }
 
-    memcpy(stack_ec,
-           &n->arch.user_ctxt,
-           sizeof(*stack_ec));
-
-    /* Maybe switch the debug registers. */
-    if ( unlikely(n->arch.debugreg[7]) )
+    if ( !is_idle_task(n->domain) )
     {
-        loaddebug(&n->arch, 0);
-        loaddebug(&n->arch, 1);
-        loaddebug(&n->arch, 2);
-        loaddebug(&n->arch, 3);
-        /* no 4 and 5 */
-        loaddebug(&n->arch, 6);
-        loaddebug(&n->arch, 7);
-    }
+        memcpy(stack_ec,
+               &n->arch.user_ctxt,
+               sizeof(*stack_ec));
 
-    if ( !VMX_DOMAIN(n) )
-    {
-        SET_FAST_TRAP(&n->arch);
-
-#ifdef __i386__
+        /* Maybe switch the debug registers. */
+        if ( unlikely(n->arch.debugreg[7]) )
         {
-            /* Switch the kernel ring-1 stack. */
-            struct tss_struct *tss = &init_tss[cpu];
-            tss->esp1 = n->arch.kernel_sp;
-            tss->ss1  = n->arch.kernel_ss;
+            loaddebug(&n->arch, 0);
+            loaddebug(&n->arch, 1);
+            loaddebug(&n->arch, 2);
+            loaddebug(&n->arch, 3);
+            /* no 4 and 5 */
+            loaddebug(&n->arch, 6);
+            loaddebug(&n->arch, 7);
         }
-#endif
+
+        if ( !VMX_DOMAIN(n) )
+        {
+            SET_FAST_TRAP(&n->arch);
+            switch_kernel_stack(n, cpu);
+        }
     }
 
     set_bit(cpu, &n->domain->cpuset);
     write_ptbase(n);
-    clear_bit(cpu, &p->domain->cpuset);
-
     __asm__ __volatile__ ( "lgdt %0" : "=m" (*n->arch.gdt) );
+    clear_bit(cpu, &p->domain->cpuset);
 
     percpu_ctxt[cpu].curr_ed = n;
 }
@@ -820,7 +823,7 @@ void context_switch(struct exec_domain *prev, struct exec_domain *next)
 
     set_current(next);
 
-    if ( ((realprev = percpu_ctxt[smp_processor_id()]. curr_ed) == next) || 
+    if ( ((realprev = percpu_ctxt[smp_processor_id()].curr_ed) == next) || 
          is_idle_task(next->domain) )
     {
         local_irq_enable();
@@ -851,18 +854,14 @@ void context_switch(struct exec_domain *prev, struct exec_domain *next)
     BUG();
 }
 
-static void __synchronise_lazy_execstate(void *unused)
+int __sync_lazy_execstate(void)
 {
-    if ( percpu_ctxt[smp_processor_id()].curr_ed != current )
-    {
-        __context_switch();
-        load_LDT(current);
-        clear_segments();
-    }
-}
-void synchronise_lazy_execstate(unsigned long cpuset)
-{
-    smp_subset_call_function(__synchronise_lazy_execstate, NULL, 1, cpuset);
+    if ( percpu_ctxt[smp_processor_id()].curr_ed == current )
+        return 0;
+    __context_switch();
+    load_LDT(current);
+    clear_segments();
+    return 1;
 }
 
 unsigned long __hypercall_create_continuation(

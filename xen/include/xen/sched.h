@@ -255,7 +255,9 @@ void domain_sleep(struct exec_domain *d);
  * Force loading of currently-executing domain state on the specified set
  * of CPUs. This is used to counteract lazy state switching where required.
  */
-void synchronise_lazy_execstate(unsigned long cpuset);
+#define sync_lazy_execstate_cpuset(_cpuset) flush_tlb_mask(_cpuset)
+#define sync_lazy_execstate_all()           flush_tlb_all()
+extern int __sync_lazy_execstate(void);
 
 extern void context_switch(
     struct exec_domain *prev, 
@@ -337,7 +339,7 @@ static inline void exec_domain_pause(struct exec_domain *ed)
     ASSERT(ed != current);
     atomic_inc(&ed->pausecnt);
     domain_sleep(ed);
-    synchronise_lazy_execstate(ed->domain->cpuset & (1UL << ed->processor));
+    sync_lazy_execstate_cpuset(ed->domain->cpuset & (1UL << ed->processor));
 }
 
 static inline void domain_pause(struct domain *d)
@@ -351,7 +353,7 @@ static inline void domain_pause(struct domain *d)
         domain_sleep(ed);
     }
 
-    synchronise_lazy_execstate(d->cpuset);
+    sync_lazy_execstate_cpuset(d->cpuset);
 }
 
 static inline void exec_domain_unpause(struct exec_domain *ed)
@@ -386,7 +388,7 @@ static inline void domain_pause_by_systemcontroller(struct domain *d)
             domain_sleep(ed);
     }
 
-    synchronise_lazy_execstate(d->cpuset);
+    sync_lazy_execstate_cpuset(d->cpuset);
 }
 
 static inline void domain_unpause_by_systemcontroller(struct domain *d)
