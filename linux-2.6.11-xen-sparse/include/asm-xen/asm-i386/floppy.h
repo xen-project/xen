@@ -186,7 +186,7 @@ static int xen_floppy_init(void)
 {
 	use_virtual_dma = 1;
 	can_use_virtual_dma = 1;
-	return 0x340;
+	return 0x3f0;
 }
 
 /*
