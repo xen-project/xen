@@ -247,10 +247,19 @@ void context_switch(struct exec_domain *prev, struct exec_domain *next)
 //printk("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
 //printk("@@@@@@ context switch from domain %d (%x) to domain %d (%x)\n",
 //prev->domain->id,(long)prev&0xffffff,next->domain->id,(long)next&0xffffff);
-//printk("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
 //if (prev->domain->id == 1 && next->domain->id == 0) cs10foo();
 //if (prev->domain->id == 0 && next->domain->id == 1) cs01foo();
+//printk("@@sw %d->%d\n",prev->domain->id,next->domain->id);
 	switch_to(prev,next,prev);
+// leave this debug for now: it acts as a heartbeat when more than
+// one domain is active
+{
+static long cnt[16] = { 50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50};
+static int i = 100;
+int id = ((struct exec_domain *)current)->domain->id & 0xf;
+if (!cnt[id]--) { printk("%x",id); cnt[id] = 50; }
+if (!i--) { printk("+",id); cnt[id] = 100; }
+}
 	clear_bit(EDF_RUNNING, &prev->ed_flags);
 	//if (!is_idle_task(next->domain) )
 		//send_guest_virq(next, VIRQ_TIMER);

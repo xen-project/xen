@@ -311,7 +311,8 @@ extern unsigned long vhpt_paddr, vhpt_pend;
 
 	pmd = pmd_offset(pgd, mpaddr);
 	if (pmd_none(*pmd))
-		pmd_populate(mm, pmd, pte_alloc_one(mm,mpaddr));
+		pmd_populate_kernel(mm, pmd, pte_alloc_one_kernel(mm,mpaddr));
+//		pmd_populate(mm, pmd, pte_alloc_one(mm,mpaddr));
 
 	pte = pte_offset_map(pmd, mpaddr);
 	if (pte_none(*pte)) {
@@ -509,14 +510,17 @@ parsedomainelfimage(char *elfbase, unsigned long elfsize, unsigned long *entry)
 	    return -EINVAL;
 	}
 
+#if 0
 	/* Find the section-header strings table. */
 	if ( ehdr.e_shstrndx == SHN_UNDEF )
 	{
 	    printk("ELF image has no section-header strings table (shstrtab).\n");
 	    return -EINVAL;
 	}
+#endif
 
 	*entry = ehdr.e_entry;
+printf("parsedomainelfimage: entry point = %p\n",*entry);
 
 	return 0;
 }
@@ -559,8 +563,16 @@ void alloc_domU_staging(void)
 		while(1);
 	}
 	else domU_staging_area = (unsigned long *)__va(domU_staging_start);
-	printf("alloc_domU_staging: domU_staging_start=%p\n",domU_staging_start);
+	printf("alloc_domU_staging: domU_staging_area=%p\n",domU_staging_area);
 
+}
+
+unsigned long
+domU_staging_read_8(unsigned long at)
+{
+	// no way to return errors so just do it
+	return domU_staging_area[at>>3];
+	
 }
 
 unsigned long
@@ -569,7 +581,7 @@ domU_staging_write_32(unsigned long at, unsigned long a, unsigned long b,
 {
 	if (at + 32 > domU_staging_size) return -1;
 	if (at & 0x1f) return -1;
-	at >>= 5;
+	at >>= 3;
 	domU_staging_area[at++] = a;
 	domU_staging_area[at++] = b;
 	domU_staging_area[at++] = c;
@@ -796,7 +808,7 @@ int construct_domU(struct domain *d,
 		d->shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
 
 	/* Copy the OS image. */
-	printk("calling loaddomainelfimage\n");
+	printk("calling loaddomainelfimage(%p,%p)\n",d,image_start);
 	loaddomainelfimage(d,image_start);
 	printk("loaddomainelfimage returns\n");
 
@@ -813,7 +825,11 @@ int construct_domU(struct domain *d,
 // FIXME: When dom0 can construct domains, this goes away (or is rewritten)
 int launch_domainU(unsigned long size)
 {
-	static int next = 100;  // FIXME
+#ifdef CLONE_DOMAIN0
+	static int next = CLONE_DOMAIN0+1;
+#else
+	static int next = 1;
+#endif	
 
 	struct domain *d = do_createdomain(next,0);
 	if (!d) {
