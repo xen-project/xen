@@ -388,6 +388,8 @@ claim_new_pages(unsigned long num_pages)
 
 static int balloon_try_target(int target)
 {
+    int change, reclaim;
+
     if ( target < current_pages )
     {
         int change = inflate_balloon(current_pages-target);
@@ -400,7 +402,7 @@ static int balloon_try_target(int target)
     }
     else if ( target > current_pages )
     {
-        int change, reclaim = min(target,most_seen_pages) - current_pages;
+        reclaim = min((unsigned long)target,most_seen_pages) - current_pages;
 
         if ( reclaim )
         {
