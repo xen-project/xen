@@ -96,7 +96,7 @@ void MULTICALL_flush_page_update_queue(void)
 #if PT_UPDATE_DEBUG > 0
         DEBUG_allow_pt_reads();
 #endif
-        queue_multicall2(__HYPERVISOR_pt_update, update_queue, idx);
+        queue_multicall2(__HYPERVISOR_pt_update, (unsigned long)update_queue, idx);
         idx = 0;
     }
     spin_unlock_irqrestore(&update_lock, flags);

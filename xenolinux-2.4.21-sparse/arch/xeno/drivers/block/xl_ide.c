@@ -125,7 +125,7 @@ static void setup_major(struct gendisk **pgd,
         }
     }
 
-    return gd;
+    return;
 }
 
 

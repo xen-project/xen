@@ -168,7 +168,6 @@ void show_stack(unsigned long * esp)
 
 void show_registers(struct pt_regs *regs)
 {
-	int i;
 	int in_kernel = 1;
 	unsigned long esp;
 	unsigned short ss;
@@ -200,19 +199,22 @@ void show_registers(struct pt_regs *regs)
 		show_stack((unsigned long*)esp);
 
 #if 0
-		printk("\nCode: ");
-		if(regs->eip < PAGE_OFFSET)
-			goto bad;
+                {
+                        int i;
+			printk("\nCode: ");
+			if(regs->eip < PAGE_OFFSET)
+			        goto bad;
 
-		for(i=0;i<20;i++)
-		{
-			unsigned char c;
-			if(__get_user(c, &((unsigned char*)regs->eip)[i])) {
+			for(i=0;i<20;i++)
+			{
+			        unsigned char c;
+			        if(__get_user(c, &((unsigned char*)regs->eip)[i])) {
 bad:
-				printk(" Bad EIP value.");
-				break;
+				        printk(" Bad EIP value.");
+					break;
+				}
+				printk("%02x ", c);
 			}
-			printk("%02x ", c);
 		}
 #endif
 	}

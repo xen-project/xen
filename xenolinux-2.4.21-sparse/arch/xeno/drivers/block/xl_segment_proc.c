@@ -10,6 +10,8 @@
 
 static struct proc_dir_entry *vhd;
 
+extern unsigned short xldev_to_physdev(kdev_t xldev);
+
 static int proc_read_vhd(char *page, char **start, off_t off,
 			 int count, int *eof, void *data)
 {

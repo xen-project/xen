@@ -61,7 +61,9 @@ static kdev_t xen_console_device(struct console *c)
 }
 
 static struct console xen_console_info = {
-    name:		"xen_console",
+    name:		"xencons", /* Used to be xen_console, but we're only
+				      actually allowed 8 charcters including
+				      the terminator... */
     write:		xen_console_write,
     device:             xen_console_device,
     flags:		CON_PRINTBUFFER,

@@ -127,7 +127,7 @@ int direct_remap_disc_page_range(unsigned long from,
                 unsigned long first_pg, int tot_pages, pgprot_t prot)
 {
     dom0_op_t dom0_op;
-    unsigned long *pfns = get_free_page(GFP_KERNEL);
+    unsigned long *pfns = (unsigned long *)get_free_page(GFP_KERNEL);
     unsigned long start = from;
     int pages, i;
 
@@ -154,7 +154,7 @@ int direct_remap_disc_page_range(unsigned long from,
     }
 
 out:
-    free_page(pfns);
+    free_page((unsigned long)pfns);
     return tot_pages;
 } 
            

@@ -70,7 +70,7 @@ int xlscsi_init(xen_disk_info_t *xdi)
     blksize_size[XLSCSI_MAJOR]  = xlscsi_blksize_size;
     hardsect_size[XLSCSI_MAJOR] = xlscsi_hardsect_size;
     max_sectors[XLSCSI_MAJOR]   = xlscsi_max_sectors;
-    read_ahead[XLSCSI_MAJOR]    = NULL; //XXX8;
+    read_ahead[XLSCSI_MAJOR]    = 0; //XXX8;
 
     blk_init_queue(BLK_DEFAULT_QUEUE(XLSCSI_MAJOR), do_xlblk_request);
 

@@ -347,8 +347,7 @@ void dump_thread(struct pt_regs * regs, struct user * dump)
  */
 void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 {
-    struct thread_struct *prev = &prev_p->thread,
-        *next = &next_p->thread;
+    struct thread_struct *next = &next_p->thread;
 
     __cli();
 

@@ -284,7 +284,11 @@ static void __init set_max_mapnr_init(void)
 
 static int __init free_pages_init(void)
 {
-	int bad_ppro, reservedpages, pfn;
+#ifdef CONFIG_HIGHMEM
+#error Where is this supposed to be initialised?
+        int bad_ppro;
+#endif
+	int reservedpages, pfn;
 
 	/* this will put all low memory onto the freelists */
 	totalram_pages += free_all_bootmem();

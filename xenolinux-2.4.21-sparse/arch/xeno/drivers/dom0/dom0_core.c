@@ -64,7 +64,6 @@ extern struct file_operations dom0_phd_fops;
 
 struct proc_dir_entry *xeno_base;
 static struct proc_dir_entry *dom0_cmd_intf;
-static struct proc_dir_entry *proc_ft;
 static struct proc_dir_entry *dom_list_intf;
 
 unsigned long direct_mmap(unsigned long, unsigned long, pgprot_t, int, int);
@@ -341,8 +340,6 @@ static int cmd_write_proc(struct file *file, const char *buffer,
     int ret = 0;
     struct proc_dir_entry * new_dom_id;
     dom0_newdomain_t * params;
-    int i;
-    unsigned long p;
     
     copy_from_user(&op, buffer, sizeof(dom0_op_t));
 
@@ -359,7 +356,7 @@ static int cmd_write_proc(struct file *file, const char *buffer,
     }
     else if ( op.cmd == DO_PGUPDATES )
     {
-        ret = HYPERVISOR_pt_update(op.u.pgupdate.pgt_update_arr,
+        ret = HYPERVISOR_pt_update((void *)op.u.pgupdate.pgt_update_arr,
                                    op.u.pgupdate.num_pgt_updates);
     }
     else
@@ -460,7 +457,7 @@ static int xeno_domains_show(struct seq_file *s, void *v)
               di -> u.getdominfo.state,
               di -> u.getdominfo.hyp_events,
               di -> u.getdominfo.mcu_advance,
-              di -> u.getdominfo.pg_head,
+              (void *)di -> u.getdominfo.pg_head,
               di -> u.getdominfo.tot_pages,
               di -> u.getdominfo.name);
 

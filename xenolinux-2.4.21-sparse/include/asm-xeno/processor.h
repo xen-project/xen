@@ -372,7 +372,7 @@ struct thread_struct {
 };
 
 #define INIT_THREAD  { sizeof(init_stack) + (long) &init_stack, \
-                       0, 0, 0, 0, 0, 0, {0}, 0, 0, 0, {0}, 0, 0, 0, 0, 0 }
+                       0, 0, 0, 0, 0, 0, {0}, 0, 0, 0, {{0}}, 0, 0, 0, 0, 0 }
 
 #define INIT_TSS  {						\
 	0,0, /* back_link, __blh */				\
