@@ -9,6 +9,9 @@
 #include <xen/irq.h>
 #include <asm/flushtlb.h>
 
+/* All CPUs have their own IDT to allow set_fast_trap(). */
+idt_entry_t *idt_tables[NR_CPUS] = { 0 };
+
 static int kstack_depth_to_print = 8*20;
 
 static inline int kernel_text_address(unsigned long addr)
@@ -177,29 +180,47 @@ asmlinkage void do_double_fault(void)
         __asm__ __volatile__ ( "hlt" );
 }
 
+BUILD_SMP_INTERRUPT(deferred_nmi, TRAP_deferred_nmi)
+asmlinkage void smp_deferred_nmi(struct xen_regs regs)
+{
+    asmlinkage void do_nmi(struct xen_regs *, unsigned long);
+    ack_APIC_irq();
+    do_nmi(&regs, 0);
+}
+
 void __init percpu_traps_init(void)
 {
-    if ( smp_processor_id() == 0 )
-    {
-        /*
-         * Make a separate task for double faults. This will get us debug
-         * output if we blow the kernel stack.
-         */
-        struct tss_struct *tss = &doublefault_tss;
-        memset(tss, 0, sizeof(*tss));
-        tss->ds     = __HYPERVISOR_DS;
-        tss->es     = __HYPERVISOR_DS;
-        tss->ss     = __HYPERVISOR_DS;
-        tss->esp    = (unsigned long)
-            &doublefault_stack[DOUBLEFAULT_STACK_SIZE];
-        tss->__cr3  = __pa(idle_pg_table);
-        tss->cs     = __HYPERVISOR_CS;
-        tss->eip    = (unsigned long)do_double_fault;
-        tss->eflags = 2;
-        tss->bitmap = IOBMP_INVALID_OFFSET;
-        _set_tssldt_desc(gdt_table+__DOUBLEFAULT_TSS_ENTRY,
-                         (unsigned long)tss, 235, 9);
-    }
+    asmlinkage int hypercall(void);
+
+    if ( smp_processor_id() != 0 )
+        return;
+
+    /* CPU0 uses the master IDT. */
+    idt_tables[0] = idt_table;
+
+    /* The hypercall entry vector is only accessible from ring 1. */
+    _set_gate(idt_table+HYPERCALL_VECTOR, 14, 1, &hypercall);
+
+    set_intr_gate(TRAP_deferred_nmi, &deferred_nmi);
+
+    /*
+     * Make a separate task for double faults. This will get us debug output if
+     * we blow the kernel stack.
+     */
+    struct tss_struct *tss = &doublefault_tss;
+    memset(tss, 0, sizeof(*tss));
+    tss->ds     = __HYPERVISOR_DS;
+    tss->es     = __HYPERVISOR_DS;
+    tss->ss     = __HYPERVISOR_DS;
+    tss->esp    = (unsigned long)
+        &doublefault_stack[DOUBLEFAULT_STACK_SIZE];
+    tss->__cr3  = __pa(idle_pg_table);
+    tss->cs     = __HYPERVISOR_CS;
+    tss->eip    = (unsigned long)do_double_fault;
+    tss->eflags = 2;
+    tss->bitmap = IOBMP_INVALID_OFFSET;
+    _set_tssldt_desc(gdt_table+__DOUBLEFAULT_TSS_ENTRY,
+                     (unsigned long)tss, 235, 9);
 
     set_task_gate(TRAP_double_fault, __DOUBLEFAULT_TSS_ENTRY<<3);
 }

@@ -159,17 +159,22 @@ void __init percpu_traps_init(void)
     char *stack_bottom, *stack;
     int   cpu = smp_processor_id();
 
+    if ( cpu == 0 )
+    {
+        /* Specify dedicated interrupt stacks for NMIs and double faults. */
+        set_intr_gate(TRAP_double_fault, &double_fault);
+        idt_table[TRAP_double_fault].a |= 1UL << 32; /* IST1 */
+        idt_table[TRAP_nmi].a          |= 2UL << 32; /* IST2 */
+    }
+
     stack_bottom = (char *)get_stack_bottom();
     stack        = (char *)((unsigned long)stack_bottom & ~(STACK_SIZE - 1));
 
     /* Double-fault handler has its own per-CPU 1kB stack. */
     init_tss[cpu].ist[0] = (unsigned long)&stack[1024];
-    set_intr_gate(TRAP_double_fault, &double_fault);
-    idt_tables[cpu][TRAP_double_fault].a |= 1UL << 32; /* IST1 */
 
     /* NMI handler has its own per-CPU 1kB stack. */
     init_tss[cpu].ist[1] = (unsigned long)&stack[2048];
-    idt_tables[cpu][TRAP_nmi].a          |= 2UL << 32; /* IST2 */
 
     /*
      * Trampoline for SYSCALL entry from long mode.
