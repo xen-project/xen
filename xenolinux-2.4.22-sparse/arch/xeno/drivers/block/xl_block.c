@@ -272,11 +272,9 @@ int xenolinux_block_revalidate(kdev_t dev)
     struct gendisk *gd = xldev_to_gendisk(dev);
     xl_disk_t *disk = xldev_to_xldisk(dev);
     unsigned long flags;
-    int i, partn_shift = PARTN_SHIFT(dev);
-    int xdev = dev & XENDEV_IDX_MASK;
+    int i, partn_shift = PARTN_SHIFT(dev), disk_nr = MINOR(dev) >> partn_shift;
     
-    DPRINTK("xenolinux_block_revalidate: %d %d %d\n", 
-	    dev, xdev, XENDEV_IDX_MASK);
+    DPRINTK("xenolinux_block_revalidate: %d\n", dev);
 
     spin_lock_irqsave(&io_request_lock, flags);
     if ( disk->usage > 1 )
@@ -286,14 +284,32 @@ int xenolinux_block_revalidate(kdev_t dev)
     }
     spin_unlock_irqrestore(&io_request_lock, flags);
 
-    for ( i = 0; i < (1 << partn_shift); i++ )
+    for ( i = (1 << partn_shift) - 1; i >= 0; i-- )
     {
-        invalidate_device(xdev + i, 1);
-        gd->part[xdev + i].start_sect = 0;
-        gd->part[xdev + i].nr_sects = 0;
+        invalidate_device(dev+i, 1);
+        gd->part[MINOR(dev+i)].start_sect = 0;
+        gd->part[MINOR(dev+i)].nr_sects = 0;
     }
 
-    grok_partitions(gd, MINOR(dev) >> partn_shift,
+    /* VBDs can change under our feet. Check if that has happened. */
+    if ( MAJOR(dev) == XLVIRT_MAJOR )
+    {
+        xen_disk_info_t *xdi = kmalloc(sizeof(*xdi), GFP_KERNEL);
+        if ( xdi != NULL )
+        {
+            memset(xdi, 0, sizeof(*xdi));
+            xenolinux_control_msg(XEN_BLOCK_PROBE_SEG, 
+                                  (char *)xdi, sizeof(*xdi));
+            for ( i = 0; i < xdi->count; i++ )
+                if ( IS_VIRTUAL_XENDEV(xdi->disks[i].device) &&
+                     ((xdi->disks[i].device & XENDEV_IDX_MASK) == disk_nr) )
+                    ((xl_disk_t *)gd->real_devices)[disk_nr].capacity =
+                        xdi->disks[i].capacity;
+            kfree(xdi);
+        }
+    }
+
+    grok_partitions(gd, disk_nr,
                     1 << partn_shift, disk->capacity);
 
     return 0;
