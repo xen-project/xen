@@ -10,7 +10,7 @@ SONAME   = libxc.so.$(MAJOR)
 CC       = gcc
 
 XEN_ROOT = ../..
-include $(XEN_ROOT)/tools/Make.defs
+include $(XEN_ROOT)/tools/Rules.mk
 
 vpath %c       $(XEN_LIBXUTIL)
 INCLUDES += -I $(XEN_LIBXUTIL)

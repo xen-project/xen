@@ -3,10 +3,10 @@ INSTALL_PROG	= $(INSTALL) -m0755
 INSTALL_DIR	= $(INSTALL) -d -m0755
 
 XEN_ROOT=../..
-include $(XEN_ROOT)/tools/Make.defs
+include $(XEN_ROOT)/tools/Rules.mk
 
-CC         = gcc
-CFLAGS     = -Wall -Werror -O3 
+CC        = gcc
+CFLAGS   += -Wall -Werror -O3 
 
 INCLUDES += -I $(XEN_XC)
 INCLUDES += -I $(XEN_LIBXC)
@@ -27,7 +27,8 @@ install: all
 	$(INSTALL_DIR) $(DESTDIR)/usr/sbin
 	$(INSTALL_PROG) $(INSTALL_BIN) $(DESTDIR)/usr/bin
 	$(INSTALL_PROG) $(INSTALL_SBIN) $(DESTDIR)/usr/sbin
-	$(MAKE) -C miniterm install
+#       No sense in installing miniterm on the Xen box.
+#	$(MAKE) -C miniterm install
 
 clean:
 	$(RM) *.o $(TARGETS) *~

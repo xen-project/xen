@@ -294,8 +294,8 @@
 413aa1d0oNP8HXLvfPuMe6cSroUfSA patches/linux-2.6.9/agpgart.patch
 413aa1d0ewvSv-ohnNnQQNGsbPTTNA patches/linux-2.6.9/drm.patch
 418abc69J3F638vPO9MYoDGeYilxoQ patches/linux-2.6.9/nettel.patch
-40e1b09db5mN69Ijj0X_Eol-S7dXiw tools/Make.defs
 3f776bd1Hy9rn69ntXBhPReUFw9IEA tools/Makefile
+40e1b09db5mN69Ijj0X_Eol-S7dXiw tools/Rules.mk
 4124b307nRyK3dhn1hAsvrY76NuV3g tools/check/Makefile
 4124b307vHLUWbfpemVefmaWDcdfag tools/check/README
 4124b307jt7T3CHysgl9LijNHSe1tA tools/check/check_brctl

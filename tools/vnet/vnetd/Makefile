@@ -21,7 +21,7 @@ all: vnetd
 #----------------------------------------------------------------------------
 
 XEN_ROOT  = ../../..
-include $(XEN_ROOT)/tools/Make.defs
+include $(XEN_ROOT)/tools/Rules.mk
 
 VNETD_INSTALL_DIR = /usr/sbin
 

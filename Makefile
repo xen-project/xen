@@ -21,6 +21,12 @@ XKERNELS := $(foreach kernel, $(KERNELS), $(patsubst buildconfigs/mk.%,%,$(wildc
 
 export DESTDIR
 
+# Export target architecture overrides to Xen and Linux sub-trees.
+ifneq ($(ARCH),)
+export TARGET_SUBARCH := $(ARCH)
+export SUBARCH        := $(subst x86_32,i386,$(ARCH))
+endif
+
 include buildconfigs/Rules.mk
 
 .PHONY:	all dist install xen tools kernels docs world clean mkpatches mrproper
@@ -36,8 +42,8 @@ install: xen checked-tools kernels docs
 
 # Only check for install req'mts on 'make install', not on 'make dist'.
 checked-tools:
-	$(MAKE) -C tools/check install
-	$(MAKE) -C tools install
+	$(MAKE) ARCH=$(ARCH) -C tools/check install
+	$(MAKE) ARCH=$(ARCH) -C tools install
 
 # build and install everything into local dist directory
 dist: xen tools kernels docs
@@ -51,7 +57,7 @@ xen:
 	$(MAKE) -C xen install
 
 tools:
-	$(MAKE) -C tools install
+	$(MAKE) ARCH=$(ARCH) -C tools install
 
 kernels:
 	for i in $(XKERNELS) ; do $(MAKE) $$i-build || exit 1; done
@@ -86,7 +92,7 @@ world:
 # clean doesn't do a kclean
 clean: 
 	$(MAKE) -C xen clean
-	$(MAKE) -C tools clean
+	$(MAKE) ARCH=$(ARCH) -C tools clean
 	$(MAKE) -C docs clean
 
 # clean, but blow away kernel build tree plus tar balls

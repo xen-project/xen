@@ -4,7 +4,7 @@ INSTALL_DATA	= $(INSTALL) -m0644
 INSTALL_PROG	= $(INSTALL) -m0755
 INSTALL_DIR	= $(INSTALL) -d -m0755
 
-include $(XEN_ROOT)/tools/Make.defs
+include $(XEN_ROOT)/tools/Rules.mk
 
 CC = gcc
 
