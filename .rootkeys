@@ -1023,12 +1023,14 @@
 421098b4weyd0AQTjPLmooChUJm13Q xen/arch/ia64/patch/linux-2.6.7/kregs.h
 421098b4vHCejAUPem4w8p5V-AD1Ig xen/arch/ia64/patch/linux-2.6.7/lds.S
 421098b4uooGl5X8zZM96qpmS0Furg xen/arch/ia64/patch/linux-2.6.7/linuxtime.h
+424dad01Txy4dcgKHGkTx1L2z7GuQA xen/arch/ia64/patch/linux-2.6.7/mca_asm.h
 421098b4awnw3Jf23gohJWoK8s7-Qg xen/arch/ia64/patch/linux-2.6.7/minstate.h
 421098b5hIfMbZlQTfrOKN4BtzJgDQ xen/arch/ia64/patch/linux-2.6.7/mm_bootmem.c
 421098b53IVBoQPcDjFciZy86YEhRQ xen/arch/ia64/patch/linux-2.6.7/mm_contig.c
 421098b5pZw41QuBTvhjvSol6aAHDw xen/arch/ia64/patch/linux-2.6.7/mmzone.h
 421098b5B_dClZDGuPYeY3IXo8Hlbw xen/arch/ia64/patch/linux-2.6.7/page.h
 421098b5saClfxPj36l47H9Um7h1Fw xen/arch/ia64/patch/linux-2.6.7/page_alloc.c
+424dab78_JGGpJDaAb6ZtkPJAkAKOA xen/arch/ia64/patch/linux-2.6.7/pal.S
 4241ed05l9ZdG7Aj0tygIxIwPRXhog xen/arch/ia64/patch/linux-2.6.7/pgalloc.h
 421098b5OkmcjMBq8gxs7ZrTa4Ao6g xen/arch/ia64/patch/linux-2.6.7/processor.h
 421098b51RLB6jWr6rIlpB2SNObxZg xen/arch/ia64/patch/linux-2.6.7/sal.h

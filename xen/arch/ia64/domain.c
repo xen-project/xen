@@ -194,9 +194,9 @@ void arch_do_createdomain(struct exec_domain *ed)
 	if (!allocate_rid_range(d,DOMAIN_RID_BITS_DEFAULT)) // FIXME
 		BUG();
 	// the following will eventually need to be negotiated dynamically
-	d->xen_vastart = 0xfffc000000000000;
-	d->xen_vaend = 0xfffe000000000000;
-	d->shared_info_va = 0xfffd000000000000;
+	d->xen_vastart = 0xf000000000000000;
+	d->xen_vaend = 0xf300000000000000;
+	d->shared_info_va = 0xf100000000000000;
 	d->breakimm = 0x1000;
 	// stay on kernel stack because may get interrupts!
 	// ia64_ret_from_clone (which b0 gets in new_thread) switches
@@ -882,3 +882,24 @@ void domain_pend_keyboard_interrupt(int irq)
 {
 	vcpu_pend_interrupt(dom0->exec_domain[0],irq);
 }
+
+/////////////////////////////////
+// added 01Apr2005, to accomodate change in xen/sched.h, not clear
+//  yet if this functionality is needed on ia64
+#if 0
+static void __synchronise_lazy_execstate(void *unused)
+{
+    if ( percpu_ctxt[smp_processor_id()].curr_ed != current )
+    {
+        __context_switch();
+        load_LDT(current);
+        clear_segments();
+    }
+}
+#endif
+
+void synchronise_lazy_execstate(unsigned long cpuset)
+{
+    //smp_subset_call_function(__synchronise_lazy_execstate, NULL, 1, cpuset);
+}
+/////////////////////////////////

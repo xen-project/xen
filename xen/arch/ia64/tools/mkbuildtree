@@ -112,7 +112,8 @@ softlink arch/ia64/kernel/ia64_ksyms.c arch/ia64/ia64_ksyms.c
 softlink arch/ia64/kernel/irq_lsapic.c arch/ia64/irq_lsapic.c
 softlink arch/ia64/kernel/machvec.c arch/ia64/machvec.c
 softlink arch/ia64/mm/extable.c arch/ia64/extable.c
-softlink arch/ia64/kernel/pal.S arch/ia64/pal.S
+#softlink arch/ia64/kernel/pal.S arch/ia64/pal.S
+cp_patch arch/ia64/kernel/pal.S arch/ia64/pal.S pal.S
 softlink arch/ia64/kernel/patch.c arch/ia64/patch.c
 softlink arch/ia64/kernel/sal.c arch/ia64/sal.c
 softlink arch/ia64/kernel/minstate.h arch/ia64/minstate.h
@@ -213,7 +214,8 @@ softlink include/asm-ia64/ioctl.h include/asm-ia64/ioctl.h
 softlink include/asm-ia64/linkage.h include/asm-ia64/linkage.h
 softlink include/asm-ia64/machvec.h include/asm-ia64/machvec.h
 softlink include/asm-ia64/machvec_hpsim.h include/asm-ia64/machvec_hpsim.h
-softlink include/asm-ia64/mca_asm.h include/asm-ia64/mca_asm.h
+#softlink include/asm-ia64/mca_asm.h include/asm-ia64/mca_asm.h
+cp_patch include/asm-ia64/mca_asm.h include/asm-ia64/mca_asm.h mca_asm.h
 softlink include/asm-ia64/mca.h include/asm-ia64/mca.h
 softlink include/asm-ia64/meminit.h include/asm-ia64/meminit.h
 softlink include/asm-ia64/mman.h include/asm-ia64/mman.h

@@ -5,8 +5,8 @@ ifeq ($(COMPILE_ARCH),$(TARGET_ARCH))
 OBJCOPY = objcopy
 endif
 ifneq ($(COMPILE_ARCH),$(TARGET_ARCH))
-CC = /usr/local/sp_env/v2.2.3/i686/bin/ia64-unknown-linux-gcc
-LD = /usr/local/sp_env/v2.2.3/i686/bin/ia64-unknown-linux-ld
+CC = /usr/local/sp_env/v2.2.5/i686/bin/ia64-unknown-linux-gcc
+LD = /usr/local/sp_env/v2.2.5/i686/bin/ia64-unknown-linux-ld
 OBJCOPY = /usr/local/sp_env/v2.2/i686/bin/ia64-unknown-linux-objcopy
 endif
 HOSTCC := gcc

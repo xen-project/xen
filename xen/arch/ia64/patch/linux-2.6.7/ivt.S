@@ -1,5 +1,5 @@
 --- ../../linux-2.6.7/arch/ia64/kernel/ivt.S	2004-06-15 23:18:59.000000000 -0600
-+++ arch/ia64/ivt.S	2005-03-28 20:16:02.000000000 -0700
++++ arch/ia64/ivt.S	2005-04-01 12:56:01.000000000 -0700
 @@ -1,3 +1,21 @@
 +
 +#ifdef XEN
@@ -99,10 +99,10 @@
 +#ifdef XEN
 +	;;
 +	// FIXME: inadequate test, this is where we test for Xen address
-+	// note that 0xfffc (cached) and 0xdffc (uncached) addresses
++	// note that 0xf000 (cached) and 0xd000 (uncached) addresses
 +	// should be OK.  (Though no I/O is done in Xen, EFI needs uncached
 +	// addresses and some domain EFI calls are passed through)
-+	tbit.nz p0,p8=r16,50
++	tbit.nz p0,p8=r16,60
 +(p8)	br.cond.spnt page_fault
 +//(p8)	br.cond.spnt 0
 +	;;
