@@ -46,6 +46,34 @@ static int lower_zone_reserve_ratio[MAX_NR_ZONES-1] = { 256, 32 };
 
 int vm_gfp_debug = 0;
 
+static void FASTCALL(__free_pages_ok (struct page *page, unsigned int order));
+
+static spinlock_t free_pages_ok_no_irq_lock = SPIN_LOCK_UNLOCKED;
+struct page * free_pages_ok_no_irq_head;
+
+static void do_free_pages_ok_no_irq(void * arg)
+{
+       struct page * page, * __page;
+
+       spin_lock_irq(&free_pages_ok_no_irq_lock);
+
+       page = free_pages_ok_no_irq_head;
+       free_pages_ok_no_irq_head = NULL;
+
+       spin_unlock_irq(&free_pages_ok_no_irq_lock);
+
+       while (page) {
+               __page = page;
+               page = page->next_hash;
+               __free_pages_ok(__page, __page->index);
+       }
+}
+
+static struct tq_struct free_pages_ok_no_irq_task = {
+       .routine        = do_free_pages_ok_no_irq,
+};
+
+
 /*
  * Temporary debugging check.
  */
@@ -81,7 +109,6 @@ int vm_gfp_debug = 0;
  * -- wli
  */
 
-static void FASTCALL(__free_pages_ok (struct page *page, unsigned int order));
 static void __free_pages_ok (struct page *page, unsigned int order)
 {
 	unsigned long index, page_idx, mask, flags;
@@ -97,8 +124,20 @@ static void __free_pages_ok (struct page *page, unsigned int order)
 	 * a reference to a page in order to pin it for io. -ben
 	 */
 	if (PageLRU(page)) {
-		if (unlikely(in_interrupt()))
-			BUG();
+		if (unlikely(in_interrupt())) {
+			unsigned long flags;
+
+			spin_lock_irqsave(&free_pages_ok_no_irq_lock, flags);
+			page->next_hash = free_pages_ok_no_irq_head;
+			free_pages_ok_no_irq_head = page;
+			page->index = order;
+	
+			spin_unlock_irqrestore(&free_pages_ok_no_irq_lock, flags);
+	
+			schedule_task(&free_pages_ok_no_irq_task);
+			return;
+		}
+		
 		lru_cache_del(page);
 	}
 

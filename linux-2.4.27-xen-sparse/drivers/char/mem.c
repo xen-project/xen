@@ -78,7 +78,7 @@ static ssize_t do_write_mem(struct file * file, void *p, unsigned long realp,
 	if (copy_from_user(p, buf, count))
 		return -EFAULT;
 	written += count;
-	*ppos += written;
+	*ppos = realp + written;
 	return written;
 }
 
@@ -119,7 +119,7 @@ static ssize_t read_mem(struct file * file, char * buf,
 	if (copy_to_user(buf, __va(p), count))
 		return -EFAULT;
 	read += count;
-	*ppos += read;
+	*ppos = p + read;
 	return read;
 }
 
