@@ -655,7 +655,8 @@ static void blkif_status_change(blkif_fe_interface_status_changed_t *status)
 
         blkif_evtchn = status->evtchn;
         blkif_irq = bind_evtchn_to_irq(blkif_evtchn);
-        (void)request_irq(blkif_irq, blkif_int, 0, "blkif", NULL);
+        (void)request_irq(blkif_irq, blkif_int, 
+                          SA_SAMPLE_RANDOM, "blkif", NULL);
 
         if ( recovery )
         {
