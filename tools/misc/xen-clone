@@ -79,7 +79,7 @@ then
  cd ../install/boot
  ln -s vmlinux-${LINUX_VER}-xen0 xenolinux.gz
   
-elif
+else
  # old style repository without 'make world'
 
 
