@@ -19,10 +19,10 @@
 #define EVTCHNOP_bind_interdomain 0
 typedef struct {
     /* IN parameters. */
-    domid_t dom1, dom2;               /*  0,  4 */
+    domid_t dom1, dom2;               /*  0,  2 */
     /* OUT parameters. */
-    u32     port1, port2;             /*  8, 12 */
-} PACKED evtchn_bind_interdomain_t; /* 16 bytes */
+    u32     port1, port2;             /*  4,  8 */
+} PACKED evtchn_bind_interdomain_t; /* 12 bytes */
 
 /*
  * EVTCHNOP_bind_virq: Bind a local event channel to IRQ <irq>.
@@ -65,6 +65,7 @@ typedef struct {
 typedef struct {
     /* IN parameters. */
     domid_t dom;                      /*  0 */
+    u16     __pad;
     u32     port;                     /*  4 */
     /* No OUT parameters. */
 } PACKED evtchn_close_t; /* 8 bytes */
@@ -92,6 +93,7 @@ typedef struct {
 typedef struct {
     /* IN parameters */
     domid_t dom;                      /*  0 */
+    u16     __pad;
     u32     port;                     /*  4 */
     /* OUT parameters */
 #define EVTCHNSTAT_closed       0  /* Chennel is not in use.                 */
@@ -103,6 +105,7 @@ typedef struct {
     union {                           /* 12 */
         struct {
             domid_t dom;                              /* 12 */
+            u16     __pad;
             u32     port;                             /* 16 */
         } PACKED interdomain; /* EVTCHNSTAT_interdomain */
         u32 pirq;      /* EVTCHNSTAT_pirq        */   /* 12 */

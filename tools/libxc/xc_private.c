@@ -296,7 +296,7 @@ long long  xc_domain_get_cpu_usage( int xc_handle, domid_t domid )
     op.u.getdomaininfo.domain = (domid_t)domid;
     op.u.getdomaininfo.ctxt = NULL;
     if ( (do_dom0_op(xc_handle, &op) < 0) || 
-         ((u32)op.u.getdomaininfo.domain != domid) )
+         ((u16)op.u.getdomaininfo.domain != domid) )
     {
         PERROR("Could not get info on domain");
         return -1;

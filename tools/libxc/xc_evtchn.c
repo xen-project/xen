@@ -115,7 +115,7 @@ int xc_evtchn_status(int xc_handle,
         switch ( status->status = op.u.status.status )
         {
         case EVTCHNSTAT_interdomain:
-            status->u.interdomain.dom  = (u32)op.u.status.u.interdomain.dom;
+            status->u.interdomain.dom  = (u16)op.u.status.u.interdomain.dom;
             status->u.interdomain.port = op.u.status.u.interdomain.port;
             break;
         case EVTCHNSTAT_pirq:

@@ -25,7 +25,7 @@ int xc_domain_create(int xc_handle,
     op.u.createdomain.cpu = cpu;
 
     if ( (err = do_dom0_op(xc_handle, &op)) == 0 )
-        *pdomid = (u32)op.u.createdomain.domain;
+        *pdomid = (u16)op.u.createdomain.domain;
 
     return err;
 }    
@@ -88,7 +88,7 @@ int xc_domain_getinfo(int xc_handle,
         op.u.getdomaininfo.ctxt = NULL; /* no exec context info, thanks. */
         if ( do_dom0_op(xc_handle, &op) < 0 )
             break;
-        info->domid   = (u32)op.u.getdomaininfo.domain;
+        info->domid   = (u16)op.u.getdomaininfo.domain;
 
         info->cpu     =
             (op.u.getdomaininfo.flags>>DOMFLAGS_CPUSHIFT) & DOMFLAGS_CPUMASK;
@@ -111,7 +111,7 @@ int xc_domain_getinfo(int xc_handle,
         strncpy(info->name, op.u.getdomaininfo.name, XC_DOMINFO_MAXNAME);
         info->name[XC_DOMINFO_MAXNAME-1] = '\0';
 
-        next_domid = (u32)op.u.getdomaininfo.domain + 1;
+        next_domid = (u16)op.u.getdomaininfo.domain + 1;
         info++;
     }
 
@@ -129,7 +129,7 @@ int xc_domain_getfullinfo(int xc_handle,
     op->u.getdomaininfo.ctxt = ctxt;
 
     rc = do_dom0_op(xc_handle, op);
-    if ( ((u32)op->u.getdomaininfo.domain != domid) && rc > 0 )
+    if ( ((u16)op->u.getdomaininfo.domain != domid) && rc > 0 )
         return -ESRCH;
     else
         return rc;
