@@ -9,7 +9,7 @@ HDRS     = $(wildcard *.h)
 OBJS     = $(patsubst %.c,%.o,$(wildcard *.c))
 
 BIN      = xentrace
-SCRIPTS  = xentrace_cpusplit xentrace_format
+SCRIPTS  = xentrace_format
 MAN1     = $(wildcard *.1)
 MAN8     = $(wildcard *.8)
 
