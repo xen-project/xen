@@ -203,9 +203,14 @@
 3e5a4e651TH-SXHoufurnWjgl5bfOA linux-2.6.7-xen-sparse/drivers/xen/console/console.c
 40f56239KYxO0YabhPzCTeUuln-lnA linux-2.6.7-xen-sparse/drivers/xen/evtchn/Makefile
 40f56239DoibTX6R-ZYd3QTXAB8_TA linux-2.6.7-xen-sparse/drivers/xen/evtchn/evtchn.c
-40f56239lrg_Ob0BJ8WBFS1zeg2CYw linux-2.6.7-xen-sparse/drivers/xen/net/Kconfig
-40f56239Wd4k_ycG_mFsSO1r5xKdtQ linux-2.6.7-xen-sparse/drivers/xen/net/Makefile
-405853f6nbeazrNyEWNHBuoSg2PiPA linux-2.6.7-xen-sparse/drivers/xen/net/network.c
+410a9817HEVJvred5Oy_uKH3HFJC5Q linux-2.6.7-xen-sparse/drivers/xen/netback/Makefile
+4097ba831lpGeLlPg-bfV8XarVVuoQ linux-2.6.7-xen-sparse/drivers/xen/netback/common.h
+4097ba83wvv8yi5P5xugCUBAdb6O-A linux-2.6.7-xen-sparse/drivers/xen/netback/control.c
+4097ba83byY5bTSugJGZ1exTxIcMKw linux-2.6.7-xen-sparse/drivers/xen/netback/interface.c
+4087cf0dGmSbFhFZyIZBJzvqxY-qBw linux-2.6.7-xen-sparse/drivers/xen/netback/netback.c
+40f56239lrg_Ob0BJ8WBFS1zeg2CYw linux-2.6.7-xen-sparse/drivers/xen/netfront/Kconfig
+40f56239Wd4k_ycG_mFsSO1r5xKdtQ linux-2.6.7-xen-sparse/drivers/xen/netfront/Makefile
+405853f6nbeazrNyEWNHBuoSg2PiPA linux-2.6.7-xen-sparse/drivers/xen/netfront/netfront.c
 4108f5c1ppFXVpQzCOAZ6xXYubsjKA linux-2.6.7-xen-sparse/drivers/xen/privcmd/Makefile
 3e5a4e65IUfzzMu2kZFlGEB8-rpTaA linux-2.6.7-xen-sparse/drivers/xen/privcmd/privcmd.c
 40f56239YAjS52QG2FIAQpHDZAdGHg linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/desc.h
@@ -251,6 +256,7 @@
 40f5623cBiQhPHILVLrl3xa6bDBaRg linux-2.6.7-xen-sparse/include/asm-xen/xen.h
 3f689063BoW-HWV3auUJ-OqXfcGArw linux-2.6.7-xen-sparse/include/asm-xen/xen_proc.h
 40f56a0ddHCSs3501MY4hRf22tctOw linux-2.6.7-xen-sparse/mkbuildtree
+410a94a4KT6I6X0LVc7djB39tRDp4g linux-2.6.7-xen-sparse/mm/page_alloc.c
 40e1b09db5mN69Ijj0X_Eol-S7dXiw tools/Make.defs
 3f776bd1Hy9rn69ntXBhPReUFw9IEA tools/Makefile
 401d7e160vaxMBAUSLSicuZ7AQjJ3w tools/examples/Makefile

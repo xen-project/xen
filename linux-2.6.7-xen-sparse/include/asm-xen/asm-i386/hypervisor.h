@@ -151,6 +151,12 @@ static inline int flush_page_update_queue(void)
 #define xen_flush_page_update_queue() (_flush_page_update_queue())
 void MULTICALL_flush_page_update_queue(void);
 
+#ifdef CONFIG_XEN_PHYSDEV_ACCESS
+/* Allocate a contiguous empty region of low memory. Return virtual start. */
+unsigned long allocate_empty_lowmem_region(unsigned long pages);
+/* Deallocate a contiguous region of low memory. Return it to the allocator. */
+void deallocate_lowmem_region(unsigned long vstart, unsigned long pages);
+#endif
 
 /*
  * Assembler stubs for hyper-calls.
@@ -389,9 +395,12 @@ static inline int HYPERVISOR_update_va_mapping(
         "b" (page_nr), "c" ((new_val).pte_low), "d" (flags) : "memory" );
 
     if ( unlikely(ret < 0) )
-        panic("Failed update VA mapping: %08lx, %08lx, %08lx",
-              page_nr, (new_val).pte_low, flags);
-    
+    {
+        printk(KERN_ALERT "Failed update VA mapping: %08lx, %08lx, %08lx\n",
+               page_nr, (new_val).pte_low, flags);
+        BUG();
+    }
+
     return ret;
 }
 
