@@ -123,6 +123,7 @@ static always_inline unsigned long __cmpxchg(volatile void *ptr, unsigned long o
  * If no fault occurs then _o is updated to the value we saw at _p. If this
  * is the same as the initial value of _o then _n is written to location _p.
  */
+#ifdef __i386__
 #define __cmpxchg_user(_p,_o,_n,_isuff,_oppre,_regtype)                 \
     __asm__ __volatile__ (                                              \
         "1: " LOCK_PREFIX "cmpxchg"_isuff" %"_oppre"2,%3\n"             \
@@ -138,7 +139,6 @@ static always_inline unsigned long __cmpxchg(volatile void *ptr, unsigned long o
         : "=a" (_o), "=r" (_rc)                                         \
         : _regtype (_n), "m" (*__xg((volatile void *)_p)), "0" (_o), "1" (0) \
         : "memory");
-#ifdef __i386__
 #define cmpxchg_user(_p,_o,_n)                                          \
 ({                                                                      \
     int _rc;                                                            \
@@ -156,6 +156,21 @@ static always_inline unsigned long __cmpxchg(volatile void *ptr, unsigned long o
     _rc;                                                                \
 })
 #else
+#define __cmpxchg_user(_p,_o,_n,_isuff,_oppre,_regtype)                 \
+    __asm__ __volatile__ (                                              \
+        "1: " LOCK_PREFIX "cmpxchg"_isuff" %"_oppre"2,%3\n"             \
+        "2:\n"                                                          \
+        ".section .fixup,\"ax\"\n"                                      \
+        "3:     movl $1,%1\n"                                           \
+        "       jmp 2b\n"                                               \
+        ".previous\n"                                                   \
+        ".section __ex_table,\"a\"\n"                                   \
+        "       .align 8\n"                                             \
+        "       .quad 1b,3b\n"                                          \
+        ".previous"                                                     \
+        : "=a" (_o), "=r" (_rc)                                         \
+        : _regtype (_n), "m" (*__xg((volatile void *)_p)), "0" (_o), "1" (0) \
+        : "memory");
 #define cmpxchg_user(_p,_o,_n)                                          \
 ({                                                                      \
     int _rc;                                                            \
