@@ -2075,10 +2075,11 @@ static int tg3_poll(struct net_device *netdev, int *budget)
 {
 	struct tg3 *tp = netdev->priv;
 	struct tg3_hw_status *sblk = tp->hw_status;
-	unsigned long flags;
 	int done;
-
+#ifdef NAPI
+	unsigned long flags;
 	spin_lock_irqsave(&tp->lock, flags);
+#endif
 
 	/* handle link change and other phy events */
 	if (!(tp->tg3_flags &
@@ -2098,7 +2099,9 @@ static int tg3_poll(struct net_device *netdev, int *budget)
 		spin_unlock(&tp->tx_lock);
 	}
 
+#ifdef NAPI
 	spin_unlock_irqrestore(&tp->lock, flags);
+#endif
 
 	/* run RX thread, within the bounds set by NAPI.
 	 * All RX "locking" is done by ensuring outside
