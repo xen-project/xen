@@ -68,12 +68,10 @@ static void fallback_timer_fn(unsigned long unused);
 schedule_data_t schedule_data[NR_CPUS];
 
 extern struct scheduler sched_bvt_def;
-extern struct scheduler sched_fbvt_def;
 extern struct scheduler sched_rrobin_def;
 extern struct scheduler sched_atropos_def;
 static struct scheduler *schedulers[] = { 
     &sched_bvt_def,
-    &sched_fbvt_def,
     &sched_rrobin_def,
     &sched_atropos_def,
     NULL

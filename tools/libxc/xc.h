@@ -120,26 +120,6 @@ int xc_bvtsched_domain_get(int xc_handle,
                            long long *warpl,
                            long long *warpu);
 
-int xc_fbvtsched_global_set(int xc_handle,
-                           unsigned long ctx_allow);
-
-int xc_fbvtsched_domain_set(int xc_handle,
-                           u32 domid,
-                           unsigned long mcuadv,
-                           unsigned long warp,
-                           unsigned long warpl,
-                           unsigned long warpu);
-
-int xc_fbvtsched_global_get(int xc_handle,
-                           unsigned long *ctx_allow);
-
-int xc_fbvtsched_domain_get(int xc_handle,
-                           u32 domid,
-                           unsigned long *mcuadv,
-                           unsigned long *warp,
-                           unsigned long *warpl,
-                           unsigned long *warpu);
-
 int xc_atropos_domain_set(int xc_handle,
                           u32 domid,
                           u64 period, u64 slice, u64 latency,

@@ -651,25 +651,6 @@ class XendDomain:
         except Exception, ex:
             raise XendError(str(ex))
     
-    def domain_cpu_fbvt_set(self, id, mcuadv, warp, warpl, warpu):
-        """Set FBVT (Fair Borrowed Virtual Time) scheduler parameters for a domain.
-        """
-        dominfo = self.domain_lookup(id)
-        try:
-            return xc.fbvtsched_domain_set(dom=dominfo.dom, mcuadv=mcuadv,
-                                           warp=warp, warpl=warpl, warpu=warpu)
-        except Exception, ex:
-            raise XendError(str(ex))
-
-    def domain_cpu_fbvt_get(self, id):
-        """Get FBVT (Fair Borrowed Virtual Time) scheduler parameters for a domain.
-        """
-        dominfo = self.domain_lookup(id)
-        try:
-            return xc.fbvtsched_domain_get(dominfo.dom)
-        except Exception, ex:
-            raise XendError(str(ex))
-        
     def domain_cpu_atropos_set(self, id, period, slice, latency, xtratime):
         """Set Atropos scheduler parameters for a domain.
         """

@@ -552,40 +552,6 @@ class ProgBvtslice(Prog):
 
 xm.prog(ProgBvtslice)
 
-class ProgFbvt(Prog):
-    group = 'scheduler'
-    name = "fbvt"
-    info = """Set FBVT scheduler parameters."""
-    
-    def help(self, args):
-        print args[0], "DOM MCUADV WARP WARPL WARPU"
-        print '\nSet Fair Borrowed Virtual Time scheduler parameters.'
-
-    def main(self, args):
-        if len(args) != 6: self.err("%s: Invalid argument(s)" % args[0])
-        dom = args[1]
-        v = map(int, args[2:6])
-        server.xend_domain_cpu_fbvt_set(dom, *v)
-
-xm.prog(ProgFbvt)
-
-class ProgFbvtslice(Prog):
-    group = 'scheduler'
-    name = "fbvt_ctxallow"
-    info = """Set the FBVT scheduler context switch allowance."""
-
-    def help(self, args):
-        print args[0], 'CTX_ALLOW'
-        print '\nSet Fair Borrowed Virtual Time scheduler context switch allowance.'
-
-    def main(self, args):
-        if len(args) < 2: self.err('%s: Missing context switch allowance.' 
-                                                                % args[0])
-        ctx_allow = int(args[1])
-        server.xend_node_cpu_fbvt_slice_set(ctx_allow)
-
-xm.prog(ProgFbvtslice)
-
 
 class ProgAtropos(Prog):
     group = 'scheduler'

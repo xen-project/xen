@@ -195,11 +195,6 @@ class Xend:
                              {'op'      : 'cpu_bvt_slice_set',
                               'ctx_allow' : ctx_allow })
 
-    def xend_node_cpu_fbvt_slice_set(self, ctx_allow):
-        return self.xendPost(self.nodeurl(),
-                             {'op'      : 'cpu_fbvt_slice_set',
-                              'ctx_allow' : ctx_allow })
-
     def xend_domains(self):
         return self.xendGet(self.domainurl())
 
@@ -263,14 +258,6 @@ class Xend:
                               'warpvalue': warpvalue,
                               'warpl'    : warpl,
                               'warpu'    : warpu })
-
-    def xend_domain_cpu_fbvt_set(self, id, mcuadv, warp, warpl, warpu):
-        return self.xendPost(self.domainurl(id),
-                             {'op'      : 'cpu_fbvt_set',
-                              'mcuadv'  : mcuadv,
-                              'warp'    : warp,
-                              'warpl'   : warpl,
-                              'warpu'   : warpu })
 
     def xend_domain_cpu_atropos_set(self, id, period, slice, latency, xtratime):
         return self.xendPost(self.domainurl(id),

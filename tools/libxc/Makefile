@@ -20,7 +20,6 @@ INCLUDES += -I $(XEN_LIBXUTIL)
 SRCS     :=
 SRCS     += xc_atropos.c
 SRCS     += xc_bvtsched.c
-SRCS     += xc_fbvtsched.c
 SRCS     += xc_domain.c
 SRCS     += xc_evtchn.c
 SRCS     += xc_io.c

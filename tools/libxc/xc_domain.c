@@ -213,11 +213,6 @@ int xc_domain_setcpuweight(int xc_handle,
             break;
         }
         
-        case SCHED_FBVT:
-        {
-            // TODO
-            break;
-        }
         case SCHED_RROBIN:
         {
             /* The weight cannot be set for RRobin */

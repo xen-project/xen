@@ -333,7 +333,6 @@
 3fbba6dbasJQV-MVElDC0DGSHMiL5w tools/libxc/xc_domain.c
 40278d99BLsfUv3qxv0I8C1sClZ0ow tools/libxc/xc_elf.h
 403e0977Bjsm_e82pwvl9VvaJxh8Gg tools/libxc/xc_evtchn.c
-40ec1922Nq_Rur5KUH0MvRNKczPGxg tools/libxc/xc_fbvtsched.c
 40e03333Eegw8czSWvHsbKxrRZJjRA tools/libxc/xc_io.c
 40e03333vrWGbLAhyJjXlqCHaJt7eA tools/libxc/xc_io.h
 3fbba6dbNCU7U6nsMYiXzKkp3ztaJg tools/libxc/xc_linux_build.c
@@ -640,7 +639,6 @@
 3ddb79bdHqdQpATqC0rmUZNbsb6L6A xen/common/resource.c
 4064773cJ31vZt-zhbSoxqft1Jaw0w xen/common/sched_atropos.c
 40589968dD2D1aejwSOvrROg7fOvGQ xen/common/sched_bvt.c
-40ec1922He_dRhVJdOicTcHvT8v1NQ xen/common/sched_fair_bvt.c
 40589968be_t_n0-w6ggceW7h-sx0w xen/common/sched_rrobin.c
 3e397e6619PgAfBbw2XFbXkewvUWgw xen/common/schedule.c
 3ddb79bdB9RNMnkQnUyZ5C9hhMSQQw xen/common/slab.c
