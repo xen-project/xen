@@ -3,10 +3,10 @@
 #vgaromimage: $BXSHARE/VGABIOS-lgpl-latest
 floppya: 1_44=a.img, status=inserted
 floppyb: 1_44=b.img, status=inserted
-#ata0-master: type=disk, path=minibootable.img, cylinders=900, heads=15, spt=17
 # if you don't use absolute paths below, bochs looks under the cwd of xend, 
 # which is usually "/"
-ata0-master: type=disk, path=/tmp/min-fc2-i386.img, cylinders=800, heads=4, spt=32
+#ata0-master: type=disk, path=/var/images/min-el3-i386.img, cylinders=800, heads=4, spt=32
+ata0-master: type=disk, path=/var/images/1g-el3-i386.img, mode=flat, cylinders=2048, heads=16, spt=63
 boot: c
 
 log: /tmp/bochsout.txt
