@@ -16,8 +16,9 @@ class DomList( HTMLBase ):
     	return self.write_BODY( request, head=True, long=False ) 
 
     def write_BODY( self, request, head=True, long=True ):
-    
-        domains = server.xend_domains()
+        
+        domains = map(int, server.xend_domains())
+        domains.sort()
     
         request.write( "\n<table style='border:0px solid white' cellspacing='0' cellpadding='0' border='0' width='100%'>\n" )
         
