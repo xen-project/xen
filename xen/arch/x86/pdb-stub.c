@@ -44,9 +44,6 @@ static int remote_debug;
 static char pdb_in_buffer[PDB_BUFMAX];
 static char pdb_out_buffer[PDB_BUFMAX];
 static char pdb_buffer[PDB_BUFMAX];
-static int  pdb_in_buffer_ptr;
-static unsigned char  pdb_in_checksum;
-static unsigned char  pdb_xmit_checksum;
 
 struct pdb_context pdb_ctx;
 int pdb_continue_thread = 0;
