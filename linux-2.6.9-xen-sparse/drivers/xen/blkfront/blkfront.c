@@ -1262,7 +1262,8 @@ static void blkif_status(blkif_fe_interface_status_t *status)
 {
     if ( status->handle != blkif_handle )
     {
-        WPRINTK(" Invalid blkif: handle=%u", status->handle);
+        WPRINTK(" Invalid blkif: handle=%u\n", status->handle);
+        unexpected(status);
         return;
     }
 
