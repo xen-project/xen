@@ -78,66 +78,56 @@
  * HYPERVISOR_mmu_update() accepts a list of (ptr, val) pairs.
  * ptr[1:0] specifies the appropriate MMU_* command.
  * 
- * GPS (General-Purpose Subject)
- * -----------------------------
- *  This domain that must own all non-page-table pages that are involved in
- *  MMU updates. By default it is the domain that executes mmu_update(). If the
- *  caller has sufficient privilege then it can be changed by executing
- *  MMUEXT_SET_SUBJECTDOM.
- * 
- * PTS (Page-Table Subject)
- * ------------------------
- *  This domain must own all the page-table pages that are subject to MMU
- *  updates. By default it is the domain that executes mmu_update(). If the
- *  caller has sufficient privilege then it can be changed by executing
- *  MMUEXT_SET_SUBJECTDOM with val[14] (SET_PAGETABLE_SUBJECTDOM) set.
+ * FOREIGN DOMAIN (FD)
+ * -------------------
+ *  Some commands recognise an explicitly-declared foreign domain,
+ *  in which case they will operate with respect to the foreigner rather than
+ *  the calling domain. Where the FD has some effect, it is described below.
  * 
  * ptr[1:0] == MMU_NORMAL_PT_UPDATE:
- * Updates an entry in a page table.
- * ptr[:2]  -- machine address of the page-table entry to modify [1]
- * val      -- value to write [2]
+ * Updates an entry in a page table. If updating an L1 table, and the new
+ * table entry is valid/present, the mapped frame must belong to the FD, if
+ * an FD has been specified. If attempting to map an I/O page, then the FD
+ * is ignored, but the calling domain must have sufficient privilege.
+ * ptr[:2]  -- Machine address of the page-table entry to modify.
+ * val      -- Value to write.
  * 
  * ptr[1:0] == MMU_MACHPHYS_UPDATE:
  * Updates an entry in the machine->pseudo-physical mapping table.
- * ptr[:2]  -- machine address within the frame whose mapping to modify [3]
- * val      -- value to write into the mapping entry
+ * ptr[:2]  -- Machine address within the frame whose mapping to modify.
+ *             The frame must belong to the FD, if one is specified.
+ * val      -- Value to write into the mapping entry.
  *  
  * ptr[1:0] == MMU_EXTENDED_COMMAND:
- * val[7:0] -- MMUEXT_* command
+ * val[7:0] -- MMUEXT_* command.
  * 
  *   val[7:0] == MMUEXT_(UN)PIN_*_TABLE:
- *   ptr[:2]  -- machine address of frame to be (un)pinned as a p.t. page [1]
+ *   ptr[:2]  -- Machine address of frame to be (un)pinned as a p.t. page.
+ *               The frame must belong to the FD, if one is specified.
  * 
  *   val[7:0] == MMUEXT_NEW_BASEPTR:
- *   ptr[:2]  -- machine address of new page-table base to install in MMU [1]
+ *   ptr[:2]  -- Machine address of new page-table base to install in MMU.
  * 
  *   val[7:0] == MMUEXT_TLB_FLUSH:
- *   no additional arguments
+ *   No additional arguments.
  * 
  *   val[7:0] == MMUEXT_INVLPG:
- *   ptr[:2]  -- linear address to be flushed from the TLB
+ *   ptr[:2]  -- Linear address to be flushed from the TLB.
  * 
  *   val[7:0] == MMUEXT_SET_LDT:
- *   ptr[:2]  -- linear address of LDT base (NB. must be page-aligned)
- *   val[:8]  -- number of entries in LDT
+ *   ptr[:2]  -- Linear address of LDT base (NB. must be page-aligned).
+ *   val[:8]  -- Number of entries in LDT.
  * 
- *   val[7:0] == MMUEXT_SET_SUBJECTDOM:
- *   val[14]  -- if TRUE then sets the PTS in addition to the GPS.
- *   (ptr[31:15],val[31:15]) -- dom[31:0]
+ *   val[7:0] == MMUEXT_SET_FOREIGNDOM:
+ *   val[31:15] -- Domain to set as the Foreign Domain (FD).
+ *                 (NB. DOMID_SELF is not recognised)
  * 
  *   val[7:0] == MMUEXT_REASSIGN_PAGE:
- *   ptr[:2]  -- machine address within page to be reassigned to the GPS.
+ *   ptr[:2]  -- A machine address within the page to be reassigned to the FD.
+ *               (NB. page must currently belong to the calling domain).
  * 
- *   val[7:0] == MMUEXT_RESET_SUBJECTDOM:
- *   Resets both the GPS and the PTS to their defaults (i.e., calling domain).
- * 
- * Notes on constraints on the above arguments:
- *  [1] The page frame containing the machine address must belong to the PTS.
- *  [2] If the PTE is valid (i.e., bit 0 is set) then the specified page frame
- *      must belong to: 
- *       (a) the PTS (if the PTE is part of a non-L1 table); or
- *       (b) the GPS (if the PTE is part of an L1 table).
- *  [3] The page frame containing the machine address must belong to the GPS.
+ *   val[7:0] == MMUEXT_CLEAR_FOREIGNDOM:
+ *   Clears the FD.
  */
 #define MMU_NORMAL_PT_UPDATE     0 /* checked '*ptr = val'. ptr is MA.       */
 #define MMU_MACHPHYS_UPDATE      2 /* ptr = MA of frame to modify entry for  */
@@ -151,10 +141,9 @@
 #define MMUEXT_TLB_FLUSH         6 /* ptr = NULL                             */
 #define MMUEXT_INVLPG            7 /* ptr = VA to invalidate                 */
 #define MMUEXT_SET_LDT           8 /* ptr = VA of table; val = # entries     */
-#define MMUEXT_SET_SUBJECTDOM    9 /* (ptr[31:15],val[31:15]) = dom[31:0]    */
-#define SET_PAGETABLE_SUBJECTDOM (1<<14) /* OR into 'val' arg of SUBJECTDOM  */
+#define MMUEXT_SET_FOREIGNDOM    9 /* val[31:15] = dom                       */
 #define MMUEXT_REASSIGN_PAGE    10
-#define MMUEXT_RESET_SUBJECTDOM 11
+#define MMUEXT_CLEAR_FOREIGNDOM 11
 #define MMUEXT_CMD_MASK        255
 #define MMUEXT_CMD_SHIFT         8
 
@@ -198,7 +187,8 @@
 
 typedef u16 domid_t;
 /* DOMID_SELF is used in certain contexts to refer to oneself. */
-#define DOMID_SELF (0x7FFEU)
+#define DOMID_SELF  (0x7FF0U)
+/* NB. IDs >= 0x7FF1 are reserved for future use. */
 
 /*
  * Send an array of these to HYPERVISOR_mmu_update().

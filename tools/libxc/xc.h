@@ -153,7 +153,7 @@ int xc_rrobin_global_set(int xc_handle, u64 slice);
 
 int xc_rrobin_global_get(int xc_handle, u64 *slice);
 
-#define DOMID_SELF              (0x7FFEU)
+#define DOMID_SELF              (0x7FF0U)
 
 typedef struct {
 #define EVTCHNSTAT_closed       0  /* Chennel is not in use.                 */

@@ -96,17 +96,13 @@ long do_dom_mem_op(unsigned int   op,
 		   domid_t        domid)
 {
     struct domain *d;
-    long rc = -ENOSYS;
+    long           rc;
 
-    if (domid == DOMID_SELF)
-	d = current;
-    else
-	d = find_domain_by_id(domid);
-
-    if (d==NULL)
+    d = (domid == DOMID_SELF) ? current : find_domain_by_id(domid);
+    if ( d == NULL )
 	return -ESRCH;
 
-    switch( op )
+    switch ( op )
     {
     case MEMOP_increase_reservation:
         rc = alloc_dom_mem(d, extent_list, nr_extents, extent_order);
@@ -114,9 +110,12 @@ long do_dom_mem_op(unsigned int   op,
     case MEMOP_decrease_reservation:
         rc = free_dom_mem(d, extent_list, nr_extents, extent_order);
 	break;
+    default:
+        rc = -ENOSYS;
+        break;
     }
 
-    if (domid!=DOMID_SELF)
+    if ( domid != DOMID_SELF )
 	put_domain(d);
 
     return rc;

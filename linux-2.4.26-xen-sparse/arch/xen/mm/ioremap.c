@@ -117,10 +117,9 @@ int direct_remap_area_pages(struct mm_struct *mm,
 
     if ( domid != 0 )
     {
-        u[0].val  = (unsigned long)(domid<<16) & ~0xFFFFUL;
-        u[0].ptr  = (unsigned long)(domid<< 0) & ~0xFFFFUL;
-        u[0].ptr |= MMU_EXTENDED_COMMAND;
-        u[0].val |= MMUEXT_SET_SUBJECTDOM;
+        u[0].ptr  = MMU_EXTENDED_COMMAND;
+        u[0].val  = MMUEXT_SET_FOREIGNDOM;
+        u[0].val |= (unsigned long)domid << 16;
         v = w = &u[1];
     }
     else

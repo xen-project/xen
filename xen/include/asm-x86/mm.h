@@ -147,7 +147,7 @@ static inline int get_page(struct pfn_info *page,
         p  = np;
         if ( unlikely((x & PGC_count_mask) == 0) ||  /* Not allocated? */
              unlikely((nx & PGC_count_mask) == 0) || /* Count overflow? */
-             unlikely(!IS_PRIV(domain) && p != domain) ) /* Wrong owner? */
+             unlikely(p != domain) )                 /* Wrong owner? */
         {
             DPRINTK("Error pfn %08lx: ed=%p(%u), sd=%p(%u),"
                     " caf=%08x, taf=%08x\n",
@@ -249,7 +249,8 @@ static inline int get_page_type(struct pfn_info *page, u32 type)
         /* Try to validate page type; drop the new reference on failure. */
         if ( unlikely(!alloc_page_type(page, type)) )
         {
-            DPRINTK("Error while validating pfn %08lx for type %08x. caf=%08x taf=%08x\n",
+            DPRINTK("Error while validating pfn %08lx for type %08x."
+                    " caf=%08x taf=%08x\n",
                     page_to_pfn(page), type,
 		    page->u.inuse.count_info,
 		    page->u.inuse.type_info);
