@@ -38,6 +38,11 @@ config XEN_PHYSDEV_ACCESS
 
 endmenu
 
+# Xen's block device backend driver needs 2^12 pages
+config FORCE_MAX_ZONEORDER
+        int
+        default "12" if XEN_PHYSDEV_ACCESS
+        default "11" if !XEN_PHYSDEV_ACCESS
 
 #config VT
 #	bool
