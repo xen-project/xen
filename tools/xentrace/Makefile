@@ -7,7 +7,8 @@ CFLAGS  += -I../../xenolinux-sparse/include
 HDRS     = $(wildcard *.h)
 OBJS     = $(patsubst %.c,%.o,$(wildcard *.c))
 
-BIN      = xentrace xentrace_cpusplit xentrace_format
+BIN      = xentrace
+SCRIPTS  = xentrace_cpusplit xentrace_format
 MAN1     = $(wildcard *.1)
 MAN8     = $(wildcard *.8)
 
@@ -17,7 +18,7 @@ install: all
 	mkdir -p $(prefix)/usr/bin
 	mkdir -p $(prefix)/usr/man/man1
 	mkdir -p $(prefix)/usr/man/man8
-	install -m0755 $(BIN) $(prefix)/usr/bin
+	install -m0755 $(BIN) $(SCRIPTS) $(prefix)/usr/bin
 	install -m0644 $(MAN1) $(prefix)/usr/man/man1
 	install -m0644 $(MAN8) $(prefix)/usr/man/man8
 
