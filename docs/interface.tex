@@ -758,9 +758,9 @@ xentrace\_format} and {\tt xentrace\_cpusplit}.
 
 Install trap handler table.
 
-\section{ mmu\_update(mmu\_update\_t *req, int count, int *success_count)} 
+\section{ mmu\_update(mmu\_update\_t *req, int count, int *success\_count)} 
 Update the page table for the domain. Updates can be batched.
-success_count will be updated to report the number of successfull
+success\_count will be updated to report the number of successfull
 updates.  The update types are:
 
 {\it MMU\_NORMAL\_PT\_UPDATE}:
@@ -866,7 +866,7 @@ set debug register reg to value
 \section{ set\_fast\_trap(int idx)}
  install traps to allow guest OS to bypass hypervisor
 
-\section{ dom\_mem\_op(unsigned int op, unsigned long *extent_list, unsigned long nr\_extents, unsigned int extent_order)}
+\section{ dom\_mem\_op(unsigned int op, unsigned long *extent\_list, unsigned long nr\_extents, unsigned int extent\_order)}
 Increase or decrease memory reservations for guest OS
 
 \section{ multicall(void *call\_list, int nr\_calls)}
@@ -874,7 +874,7 @@ Execute a series of hypervisor calls
 
 \section{ update\_va\_mapping(unsigned long page\_nr, unsigned long val, unsigned long flags)}
 
-\section{ set\_timer\_op(uint64_t timeout)} 
+\section{ set\_timer\_op(uint64\_t timeout)} 
 Request a timer event to be sent at the specified system time.
 
 \section{ event\_channel\_op(void *op)} 
@@ -896,6 +896,6 @@ Interact with the console, operations are:
 
 \section{ vm\_assist(unsigned int cmd, unsigned int type)}
 
-\section{ update\_va\_mapping\_otherdomain(unsigned long page\_nr, unsigned long val, unsigned long flags, uint16_t domid)}
+\section{ update\_va\_mapping\_otherdomain(unsigned long page\_nr, unsigned long val, unsigned long flags, uint16\_t domid)}
 
 \end{document}
