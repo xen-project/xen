@@ -672,6 +672,14 @@ x86_emulate_memop(
         dst.val ^= src.val;
         src.val ^= dst.val;
         lock_prefix = 1;
+        /* Write back the source (temporary register location). */
+        switch ( dst.bytes )
+        {
+        case 1: *(u8  *)src.ptr = (u8)src.val; break;
+        case 2: *(u16 *)src.ptr = (u16)src.val; break;
+        case 4: *src.ptr = (u32)src.val; break; /* 64b mode: zero-extend */
+        case 8: *src.ptr = src.val; break;
+        }
         break;
     case 0xa0 ... 0xa1: /* mov */
         dst.ptr = (unsigned long *)&_regs.eax;

@@ -134,9 +134,42 @@ int main(int argc, char **argv)
         goto fail;
     printf("okay\n");
 
+    printf("%-40s", "Testing lock cmpxchgb %%cl,(%%eax)...");
+    instr[0] = 0xf0; instr[1] = 0x0f; instr[2] = 0xb0; instr[3] = 0x08;
+    regs.eflags = 0x200;
+    regs.eip    = (unsigned long)&instr[0];
+    regs.eax    = 0xAABBCC77UL;
+    regs.ecx    = 0xFF;
+    cr2         = (unsigned long)&res;
+    rc = x86_emulate_memop(&regs, cr2, &emulops, 4);    
+    if ( (rc != 0) || 
+         (res != 0x923456AA) || 
+         ((regs.eflags&0x240) != 0x200) ||
+         (regs.eax != 0xAABBCCAA) ||
+         (regs.ecx != 0xFF) ||
+         (regs.eip != (unsigned long)&instr[4]) )
+        goto fail;
+    printf("okay\n");
+
+    printf("%-40s", "Testing xchgl %%ecx,(%%eax)...");
+    instr[0] = 0x87; instr[1] = 0x08;
+    regs.eflags = 0x200;
+    regs.eip    = (unsigned long)&instr[0];
+    regs.ecx    = 0x12345678;
+    cr2         = (unsigned long)&res;
+    rc = x86_emulate_memop(&regs, cr2, &emulops, 4);    
+    if ( (rc != 0) || 
+         (res != 0x12345678) || 
+         (regs.eflags != 0x200) ||
+         (regs.ecx != 0x923456AA) ||
+         (regs.eip != (unsigned long)&instr[2]) )
+        goto fail;
+    printf("okay\n");
+
     printf("%-40s", "Testing lock cmpxchgl %%ecx,(%%eax)...");
     instr[0] = 0xf0; instr[1] = 0x0f; instr[2] = 0xb1; instr[3] = 0x08;
     regs.eflags = 0x200;
+    res         = 0x923456AA;
     regs.eip    = (unsigned long)&instr[0];
     regs.eax    = 0x923456AAUL;
     regs.ecx    = 0xDDEEFF00L;
@@ -186,7 +219,7 @@ int main(int argc, char **argv)
         goto fail;
     printf("okay\n");
 
-    printf("%-40s", "Testing cmpxchg (%edi) [succeeding]...");
+    printf("%-40s", "Testing cmpxchg8b (%edi) [succeeding]...");
     instr[0] = 0x0f; instr[1] = 0xc7; instr[2] = 0x0f;
     regs.eflags = 0x200;
     regs.eax    = cmpxchg8b_res[0];
@@ -205,7 +238,7 @@ int main(int argc, char **argv)
         goto fail;
     printf("okay\n");
 
-    printf("%-40s", "Testing cmpxchg (%edi) [failing]...");
+    printf("%-40s", "Testing cmpxchg8b (%edi) [failing]...");
     instr[0] = 0x0f; instr[1] = 0xc7; instr[2] = 0x0f;
     regs.eip    = (unsigned long)&instr[0];
     regs.edi    = (unsigned long)cmpxchg8b_res;
