@@ -263,8 +263,17 @@ static inline int ptep_test_and_clear_young(pte_t *ptep)
 	return test_and_clear_bit(_PAGE_BIT_ACCESSED, &ptep->pte_low);
 }
 
-static inline void ptep_set_wrprotect(pte_t *ptep)		{ clear_bit(_PAGE_BIT_RW, &ptep->pte_low); }
-static inline void ptep_mkdirty(pte_t *ptep)			{ set_bit(_PAGE_BIT_DIRTY, &ptep->pte_low); }
+static inline void ptep_set_wrprotect(pte_t *ptep)
+{
+	if (pte_write(*ptep))
+		clear_bit(_PAGE_BIT_RW, &ptep->pte_low);
+}
+
+static inline void ptep_mkdirty(pte_t *ptep)
+{
+	if (!pte_dirty(*ptep))
+		set_bit(_PAGE_BIT_DIRTY, &ptep->pte_low);
+}
 
 /*
  * Macro to mark a page protection value as "uncacheable".  On processors which do not support

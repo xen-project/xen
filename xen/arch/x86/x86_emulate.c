@@ -668,18 +668,17 @@ x86_emulate_memop(
         emulate_2op_SrcV("test", src, dst, _regs.eflags);
         break;
     case 0x86 ... 0x87: /* xchg */
-        src.val ^= dst.val;
-        dst.val ^= src.val;
-        src.val ^= dst.val;
-        lock_prefix = 1;
-        /* Write back the source (temporary register location). */
+        /* Write back the register source. */
         switch ( dst.bytes )
         {
-        case 1: *(u8  *)src.ptr = (u8)src.val; break;
-        case 2: *(u16 *)src.ptr = (u16)src.val; break;
-        case 4: *src.ptr = (u32)src.val; break; /* 64b mode: zero-extend */
-        case 8: *src.ptr = src.val; break;
+        case 1: *(u8  *)src.ptr = (u8)dst.val; break;
+        case 2: *(u16 *)src.ptr = (u16)dst.val; break;
+        case 4: *src.ptr = (u32)dst.val; break; /* 64b mode: zero-extend */
+        case 8: *src.ptr = dst.val; break;
         }
+        /* Write back the memory destination with implicit LOCK prefix. */
+        dst.val = src.val;
+        lock_prefix = 1;
         break;
     case 0xa0 ... 0xa1: /* mov */
         dst.ptr = (unsigned long *)&_regs.eax;
