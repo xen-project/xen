@@ -201,7 +201,7 @@ def daemon_loop():
                     xend.blkif.backend_rx_req(port, msg)
                 elif type == CMSG_NETIF_FE and net_if:
                     net_if.ctrlif_rx_req(port, msg)
-                elif type == CMSG_NETIF_BE:
+                elif type == CMSG_NETIF_BE and port == xend.netif.be_port:
                     xend.netif.backend_rx_req(port, msg)
                 else:
                     port.write_response(msg)
@@ -213,7 +213,7 @@ def daemon_loop():
                 type = (msg.get_header())['type']
                 if type == CMSG_BLKIF_BE and port == dom0_port:
                     xend.blkif.backend_rx_rsp(port, msg)
-                elif type == CMSG_NETIF_BE:
+                elif type == CMSG_NETIF_BE and port == xend.netif.be_port:
                     xend.netif.backend_rx_rsp(port, msg)
 
             # Send console data.
