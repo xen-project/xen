@@ -1,6 +1,6 @@
 \documentclass[11pt,twoside,final,openright]{xenstyle}
-\usepackage{a4,graphicx,setspace,times}
-\setstretch{1.15}
+\usepackage{a4,graphicx,parskip,setspace,times}
+\setstretch{1.1}
 
 \begin{document}
 
@@ -49,7 +49,7 @@ Contributions of material, suggestions and corrections are welcome.
 \renewcommand{\bottomfraction}{.8}
 \renewcommand{\textfraction}{.2}
 \renewcommand{\floatpagefraction}{.8}
-\setstretch{1.15}
+\setstretch{1.1}
 
 \newcommand{\path}[1]{{\tt #1}}
 
@@ -79,7 +79,7 @@ The drawback of this approach is that it requires operating systems to
 be {\em ported} to run on Xen.  This process is similar to a port of
 an operating system to a new hardware platform, although the process
 is simplified because the paravirtual machine architecture is very
-similar to the underlying native hardware. Although operating system
+similar to the underlying native hardware. Even though operating system
 kernels must explicitly support Xen, a key feature is that user space
 applications and libraries {\em do not} require modification.
 
@@ -96,18 +96,18 @@ Possible usage scenarios for Xen include:
       machine.
 \item [Multiple OS configurations.] Run multiple operating systems
       simultaneously, for instance for compatibility or QA purposes.
-\item [Server consolidation.] Move multiple servers onto one box,
-      provided performance and fault isolation at virtual machine
-      boundaries.
+\item [Server consolidation.] Move multiple servers onto one box
+      with performance and fault isolation provided at virtual machine
+      boundaries. 
 \item [Cluster computing.] Improve manageability and efficiency by
       running services in virtual machines, isolated from
-      machine-specifics and load balance using live migration.
+      machine-specifics; load balance using live migration.
 \item [High availability computing.] Run device drivers in sandboxed
       domains for increased robustness.
 \item [Hardware support for custom OSes.] Export drivers from a
-      mainstream OS (e.g. Linux) with good hardware support
+      mainstream OS (e.g. Linux) with wide-ranging hardware support
       to your custom OS, avoiding the need for you to port existing
-      drivers to achieve good hardware support.
+      drivers.
 \end{description}
 
 \section{Structure of a Xen-Based System}
@@ -126,15 +126,15 @@ other domains and manages their virtual devices. It also performs
 suspend, resume and migration of virtual machines. Where one is
 required, the X server is also run in domain 0.
 
-Within Domain 0, a process called `Xend' runs to manage the system.
+Within Domain 0, a process called `xend' runs to manage the system.
 Xend is responsible for managing virtual machines and providing access
 to their consoles.  Commands are issued to Xend over an HTTP
 interface, either from a command-line tool or from a web browser.
 
 \section{Hardware Support}
 
-Xen currently runs only on the x86 architecture (however, ports to other
-architectures, including x86/64 and IA64, are in progress).
+Xen currently runs only on the x86 architecture, although ports to other
+architectures, including x86/64 and IA64, are in progress.
 Xen requires a `P6' or newer processor (e.g. Pentium Pro, Celeron,
 Pentium II, Pentium III, Pentium IV, Xeon, AMD Athlon, AMD Duron).
 Multiprocessor machines are supported, and we also have basic support
@@ -146,7 +146,7 @@ mode.
 Xen can currently use up to 4GB of memory.  It is possible for x86
 machines to address up to 64GB of physical memory but there are no
 plans to support these systems.  The x86\_64 port is the planned route
-to supporting more than 4GB of memory.
+to supporting larger memory sizes. 
 
 Xen offloads most of the hardware support issues to the guest OS
 running in Domain 0.  Xen itself only contains code to detect and
@@ -186,7 +186,7 @@ first public release (1.0) was made in October 2003.  Since
 then, Xen has been extensively developed and is now used in production
 scenarios on multiple sites.
 
-Xen 2.0 feature greatly enhanced hardware support, configuration
+Xen 2.0 features greatly enhanced hardware support, configuration
 flexibility, usability and a larger complement of supported operating
 systems. This latest release takes Xen a step closer to becoming the 
 definitive open source solution for virtualisation.
@@ -209,7 +209,7 @@ operating system distribution.
 \item A working installation of the GRUB bootloader.
 \item An installation of Twisted v1.3 or above (see {\tt
 http://www.twistedmatrix.com}).  There may be a package available for
-your distribution; alternatively it can be installed by running {\tt \#
+your distribution; alternatively it can be installed by running {\tt
 make install-twisted} in the root of the Xen source tree.
 \item Python logging package (see {\tt http://www.red-dove.com/})
 \item The Linux bridge control tools (see {\tt
@@ -228,9 +228,11 @@ available for your distribution.
 \section{Install Bitkeeper (Optional)}
 
 To fetch a local copy, first download the BitKeeper tools.
-Download instructions must be obtained by filling out the provided
-form at: \\ {\tt
-http://www.bitmover.com/cgi-bin/download.cgi }
+Download instructions can be obtained by filling out the provided
+form at: 
+\begin{quote} 
+{\tt http://www.bitmover.com/cgi-bin/download.cgi}
+\end{quote}
 
 The BitKeeper install program is designed to be run with X.  If X is
 not available, you can specify the install directory on the command
@@ -240,8 +242,11 @@ line.
 
 \subsection{Using Bitkeeper}
 
-The public master BK repository for the 2.0 release lives at: \\
-{\tt bk://xen.bkbits.net/xen-2.0.bk}.  You can use Bitkeeper to
+The public master BK repository for the 2.0 release lives at: 
+\begin{quote}
+{\tt bk://xen.bkbits.net/xen-2.0.bk}  
+\end{quote} 
+You can use Bitkeeper to
 download it and keep it updated with the latest features and fixes.
 
 Change to the directory in which you want to put the source code, then
@@ -249,6 +254,7 @@ run:
 \begin{verbatim}
 # bk clone bk://xen.bkbits.net/xen-2.0.bk
 \end{verbatim}
+
 
 Under your current directory, a new directory named `xen-2.0.bk' has
 been created, which contains all the source code for the Xen
@@ -268,7 +274,8 @@ changes to the repository by running:
 The Xen source tree is also available in gzipped tarball form from the
 Xen downloads page:\\
 {\tt http://www.cl.cam.ac.uk/Research/SRG/netos/xen/downloads.html}.
-Prebuilt tarballs are also available from this page but are very large.
+Prebuilt tarballs are also available from this page but are relatively
+ large.
 
 \section{The distribution}
 
