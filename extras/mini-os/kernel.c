@@ -96,7 +96,7 @@ void start_kernel(start_info_t *si)
     __sti();
     
     /* print out some useful information  */
-    printk("Xeno Minimal OS!\n");
+    printk("Xen Minimal OS!\n");
     printk("start_info:   %p\n",  si);
     printk("  nr_pages:   %lu",     si->nr_pages);
     printk("  shared_inf: %08lx\n", si->shared_info);

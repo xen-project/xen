@@ -1,5 +1,5 @@
 ###########################################
-Xeno HOWTO
+Xen HOWTO
 
 University of Cambridge Computer Laboratory
 
@@ -7,8 +7,8 @@ http://www.cl.cam.ac.uk/netos/xen
 #############################
 
 
-Get Xeno Source Codes
-==========================
+Get Xen Source Code
+=============================
 
 The public master BK repository for the 1.2 release lives at:
 'bk://xen.bkbits.net/xeno-1.2.bk'
@@ -21,8 +21,8 @@ Then install the tools and then run:
 # bk clone bk://xen.bkbits.net/xeno-1.2.bk
 
 Under your current directory, a new directory named 'xeno-1.2.bk' has
-been created, which contains all the source codes for Xen and
-XenoLinux. 
+been created, which contains all the necessary source codes for the
+Xen hypervisor and Linux guest OSes.
 
 To get newest changes to the repository, run
 # cd xeno-1.2.bk
@@ -46,7 +46,7 @@ This will (should) produce a file called 'xen' in the current
 directory.  This is the ELF 32-bit LSB executable file of Xen.  You
 can also find a gzip version, named 'xen.gz'.
 
-To install the built files on your Xenoserver under /usr, type 'make
+To install the built files on your server under /usr, type 'make
 install' at the root of the BK repository. You will need to be root to
 do this!
 
@@ -55,14 +55,14 @@ install directory just outside the BK repo; if this suits your setup,
 go for it.
 
 
-Build XenoLinux
+Build Linux as a Xen guest OS
 ==============================
 
 This is a little more involved since the repository only contains a
 "sparse" tree -- this is essentially an 'overlay' on a standard linux
 kernel source tree. It contains only those files currently 'in play'
 which are either modified versions of files in the vanilla linux tree,
-or brand new files specific to XenoLinux.
+or brand new files specific to the Xen port.
 
 So, first you need a vanilla linux-2.4.24 tree, which is located at:
 http://www.kernel.org/pub/linux/kernel/v2.4
@@ -84,7 +84,7 @@ kernel tree:
   # cd /xeno-1.2.bk/xenolinux-2.4.24-sparse
   # ./mkbuildtree ../linux-2.4.24
 
-Finally, rename the buildtree since it is now a xenolinux buildtree. 
+Finally, rename the buildtree since it is now a 'xenolinux' buildtree. 
 
   # cd /xeno-1.2.bk
   # mv linux-2.4.24 xenolinux-2.4.24
@@ -95,12 +95,12 @@ oldconfig') but you can customise using one of the other config tools
 if you want.
 
   # cd /xeno-1.2.bk/xenolinux-2.4.24
-  # ARCH=xeno make oldconfig   { or menuconfig, or xconfig, or config }  
-  # ARCH=xeno make dep
-  # ARCH=xeno make bzImage
+  # ARCH=xen make oldconfig   { or menuconfig, or xconfig, or config }  
+  # ARCH=xen make dep
+  # ARCH=xen make bzImage
 
 Assuming the build works, you'll end up with
-/xeno-1.2.bk/xenolinux-2.4.24/arch/xeno/boot/xenolinux.gz. This is the
+/xeno-1.2.bk/xenolinux-2.4.24/arch/xen/boot/xenolinux.gz. This is the
 gzip version of XenoLinux kernel image.
 
 
@@ -123,7 +123,7 @@ libraries in /usr/bin and /usr/lib. You will need to be root to do this!
 
 As noted earlier, 'make dist' installs files to a local 'install'
 directory just outside the BK repository. These files will then need
-to be installed manually onto the Xenoserver.
+to be installed manually onto the server.
 
 The Example Scripts
 ===================
@@ -149,7 +149,7 @@ Installation
 
 First:
 # cp /xen-1.2.bk/xen/xen.gz /boot/xen.gz
-# cp /xen-1.2.bk/xenolinux-2.4.24/arch/xeno/boot/xenolinux.gz /boot/xenolinux.gz
+# cp /xen-1.2.bk/xenolinux-2.4.24/arch/xen/boot/xenolinux.gz /boot/xenolinux.gz
 
 Second, you must have 'GNU Grub' installed. Then you need to edit
 the Grub configuration file '/boot/grub/menu.lst'.

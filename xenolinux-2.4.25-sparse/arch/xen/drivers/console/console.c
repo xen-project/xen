@@ -87,8 +87,8 @@ static void priv_conwrite(const char *s, unsigned int count)
     }
 }
 
-static void xen_console_write(struct console *co, const char *s, 
-                              unsigned int count)
+static void kcons_write(struct console *co, const char *s, 
+                        unsigned int count)
 {
     unsigned long flags;
     spin_lock_irqsave(&xen_console_lock, flags);
@@ -99,7 +99,7 @@ static void xen_console_write(struct console *co, const char *s,
     spin_unlock_irqrestore(&xen_console_lock, flags);
 }
 
-static kdev_t xen_console_device(struct console *c)
+static kdev_t kcons_device(struct console *c)
 {
     /*
      * This is the magic that binds our "struct console" to our
@@ -108,19 +108,17 @@ static kdev_t xen_console_device(struct console *c)
     return MKDEV(TTY_MAJOR, XEN_TTY_MINOR);
 }
 
-static struct console xen_console_info = {
-    name:		"xencons", /* Used to be xen_console, but we're only
-				      actually allowed 8 charcters including
-				      the terminator... */
-    write:		xen_console_write,
-    device:             xen_console_device,
-    flags:		CON_PRINTBUFFER,
-    index:		-1,
+static struct console kcons_info = {
+    name:    "xencons",
+    write:   kcons_write,
+    device:  kcons_device,
+    flags:   CON_PRINTBUFFER,
+    index:   -1,
 };
 
 void xen_console_init(void)
 {
-    register_console(&xen_console_info);
+    register_console(&kcons_info);
 }
 
 
@@ -137,7 +135,7 @@ asmlinkage int xprintk(const char *fmt, ...)
     va_end(args);
     
     /* Send the processed output directly to Xen. */
-    xen_console_write(NULL, printk_buf, printk_len);
+    kcons_write(NULL, printk_buf, printk_len);
 
     return 0;
 }

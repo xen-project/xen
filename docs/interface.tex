@@ -705,7 +705,7 @@ behaviours.
 \subsection{Internal API}
 
 To use the trace buffer functionality from within Xen, you must {\tt \#include
-<xeno/trace.h>}, which contains definitions related to the trace buffer.  Trace
+<xen/trace.h>}, which contains definitions related to the trace buffer.  Trace
 events are inserted into the buffer using the {\tt TRACE\_xD} ({\tt x} = 0, 1,
 2, 3, 4 or 5) macros.  These all take an event number, plus {\tt x} additional
 (32-bit) data as their arguments.  For trace buffer-enabled builds of Xen these
@@ -718,7 +718,7 @@ overheads.
 
 By default, the trace buffer is enabled only in debug builds (i.e. {\tt NDEBUG}
 is not defined).  It can be enabled separately by defining {\tt TRACE\_BUFFER},
-either in {\tt <xeno/config.h>} or on the gcc command line.
+either in {\tt <xen/config.h>} or on the gcc command line.
 
 \subsection{Dumping trace data}
 

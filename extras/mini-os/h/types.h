@@ -9,7 +9,7 @@
  *              
  *        Date: May 2003
  * 
- * Environment: Xeno Minimal OS
+ * Environment: Xen Minimal OS
  * Description: a random collection of type definitions
  *
  ****************************************************************************

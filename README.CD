@@ -577,7 +577,7 @@ like normal linux kernels. Modules should be installed under
 If there's some kernel feature that hasn't been built into our default
 kernel, there's a pretty good change that if its a non-hardware
 related option you'll just be able to enable it and rebuild.  If its
-not on the xconfig menu, hack the arch/xeno/config.in to put the menu
+not on the xconfig menu, hack the arch/xen/config.in to put the menu
 back in.
 
 If you're going to use the link local 169.254.1.x addresses to

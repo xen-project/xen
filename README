@@ -62,8 +62,7 @@ regularly use it to host complex applications such as PostgreSQL,
 Apache, BK servers etc. It runs every user-space applications we've
 tried.  We refer to our version of Linux ported to run on Xen as
 "XenoLinux", although really it's just standard Linux ported to a new
-virtual CPU architecture that we call xeno-x86 (abbreviated to just
-"xeno").
+virtual CPU architecture that we call xen-x86.
 
 NetBSD has been ported to Xen by Christian Limpach, and will hopefully
 soon become part of the standard release. Work on a FreeBSD port has
@@ -147,7 +146,7 @@ can be used to clone the repository and perform a full build.
 
 The build procedure for xenolinux is slightly complicated as its done
 by running the 'mkbuildtree' script over a pristine Linux tree to turn
-it into a xenolinux tree by adding the 'xeno' architecture.
+it into a xenolinux tree by adding the 'xen' architecture.
 
 There's also a recent pre-built source tree on the project downloads
 page: http://www.cl.cam.ac.uk/netos/xen/downloads/xeno-1.2.tar.gz
@@ -160,6 +159,6 @@ README.CD contains some example invocations.
 
 See example Python scripts in tools/examples/ and the associated README.
 
-Further documentation is in docs/ (e.g., docs/Xeno-HOWTO), and also in
+Further documentation is in docs/ (e.g., docs/Xen-HOWTO), and also in
 
 

@@ -21,7 +21,7 @@ clean:
 
 install: $(DOCUMENTS)
 	mkdir -p $(prefix)/usr/share/doc/xen
-	cp -a $(DOCUMENTS) VBD-HOWTO.txt Xeno-1.2-HOWTO.txt $(prefix)/usr/share/doc/xen
+	cp -a $(DOCUMENTS) VBD-HOWTO.txt Xen-HOWTO.txt $(prefix)/usr/share/doc/xen
 
 %.pdf: %.ps
 	ps2pdf $< $@

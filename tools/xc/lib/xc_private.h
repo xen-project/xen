@@ -16,7 +16,7 @@
 
 #include "xc.h"
 
-#include <asm-xeno/proc_cmd.h>
+#include <asm-xen/proc_cmd.h>
 
 /* from xen/include/hypervisor-ifs */
 #include <hypervisor-if.h>

@@ -1,13 +1,13 @@
 /******************************************************************************
  * xc_linux_save.c
  * 
- * Save the state of a running Xenolinux session.
+ * Save the state of a running Linux session.
  * 
  * Copyright (c) 2003, K A Fraser.
  */
 
 #include "xc_private.h"
-#include <asm-xeno/suspend.h>
+#include <asm-xen/suspend.h>
 #include <zlib.h>
 
 /* This may allow us to create a 'quiet' command-line option, if necessary. */

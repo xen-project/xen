@@ -57,8 +57,8 @@ Xen Configuration
   Symbolic debugging infomration is quite helpful too:
   xeno.bk/xen/arch/i386/Rules.mk
     add -g to CFLAGS to compile Xen with symbols
-  xeno.bk/xenolinux-2.4.24-sparse/arch/xeno/Makefile
-    add -g to CFLAGS to compile XenoLinux with symbols
+  xeno.bk/xenolinux-2.4.24-sparse/arch/xen/Makefile
+    add -g to CFLAGS to compile Linux with symbols
 
   You may also want to consider dedicating a register to the
   frame pointer (disable the -fomit-frame-pointer compile flag).
@@ -97,7 +97,7 @@ GDB 6.0
 Usage
 -----
 
-1. Boot Xen and XenoLinux
+1. Boot Xen and Linux
 2. Interrupt Xen by pressing 'D' at the console
    You should see the console message: 
    pdb_handle_exception [0x88][0xfc5c9d88]

@@ -9,7 +9,7 @@
 405ef604hIZH5pGi2uwlrlSvUMrutw docs/Console-HOWTO.txt
 3f9e7d53iC47UnlfORp9iC1vai6kWw docs/Makefile
 40083bb4LVQzRqA3ABz0__pPhGNwtA docs/VBD-HOWTO.txt
-4021053fmeFrEyPHcT8JFiDpLNgtHQ docs/Xeno-HOWTO.txt
+4021053fmeFrEyPHcT8JFiDpLNgtHQ docs/Xen-HOWTO.txt
 3f9e7d60PWZJeVh5xdnk0nLUdxlqEA docs/eps/xenlogo.eps
 3f9e7d63lTwQbp2fnx7yY93epWS-eQ docs/figs/dummy
 3f9e7d564bWFB-Czjv1qdmE6o0GqNg docs/interface.tex
@@ -647,7 +647,7 @@
 3e5a4e66aHCbQ_F5QZ8VeyikLmuRZQ xenolinux-2.4.25-sparse/arch/xen/kernel/traps.c
 3e5a4e66-9_NczrVMbuQkoSLyXckIw xenolinux-2.4.25-sparse/arch/xen/lib/Makefile
 3e5a4e6637ZDk0BvFEC-aFQs599-ng xenolinux-2.4.25-sparse/arch/xen/lib/delay.c
-3f68905cF5i8-NYpIhGjKmh0y8Gu5g xenolinux-2.4.25-sparse/arch/xen/lib/xeno_proc.c
+3f68905cF5i8-NYpIhGjKmh0y8Gu5g xenolinux-2.4.25-sparse/arch/xen/lib/xen_proc.c
 3e5a4e66croVgpcJyJuF2ycQw0HuJw xenolinux-2.4.25-sparse/arch/xen/mm/Makefile
 3e5a4e66l8Q5Tv-6B3lQIRmaVbFPzg xenolinux-2.4.25-sparse/arch/xen/mm/fault.c
 3e5a4e668SE9rixq4ahho9rNhLUUFQ xenolinux-2.4.25-sparse/arch/xen/mm/hypervisor.c
@@ -684,7 +684,7 @@
 3fa8e3f0kBLeE4To2vpdi3cpJbIkbQ xenolinux-2.4.25-sparse/include/asm-xen/suspend.h
 3e5a4e68mTr0zcp9SXDbnd-XLrrfxw xenolinux-2.4.25-sparse/include/asm-xen/system.h
 3f1056a9L_kqHcFheV00KbKBzv9j5w xenolinux-2.4.25-sparse/include/asm-xen/vga.h
-3f689063nhrIRsMMZjZxMFk7iEINqQ xenolinux-2.4.25-sparse/include/asm-xen/xeno_proc.h
+3f689063nhrIRsMMZjZxMFk7iEINqQ xenolinux-2.4.25-sparse/include/asm-xen/xen_proc.h
 3f056927gMHl7mWB89rb73JahbhQIA xenolinux-2.4.25-sparse/include/linux/blk.h
 3e5a4e68WLX3B8owTvktP3HHOtznPQ xenolinux-2.4.25-sparse/include/linux/major.h
 401c0590D_kwJDU59X8NyvqSv_Cl2A xenolinux-2.4.25-sparse/include/linux/sched.h

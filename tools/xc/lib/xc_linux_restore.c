@@ -1,13 +1,13 @@
 /******************************************************************************
  * xc_linux_restore.c
  * 
- * Restore the state of a Xenolinux session.
+ * Restore the state of a Linux session.
  * 
  * Copyright (c) 2003, K A Fraser.
  */
 
 #include "xc_private.h"
-#include <asm-xeno/suspend.h>
+#include <asm-xen/suspend.h>
 #include <zlib.h>
 
 /* This may allow us to create a 'quiet' command-line option, if necessary. */
