@@ -556,7 +556,15 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 	 * Load the per-thread Thread-Local Storage descriptor.
 	 * This is load_TLS(next, cpu) with multicalls.
 	 */
-#define C(i) queue_multicall3(__HYPERVISOR_update_descriptor, virt_to_machine(&get_cpu_gdt_table(cpu)[GDT_ENTRY_TLS_MIN + i]), ((u32 *)&next->tls_array[i])[0], ((u32 *)&next->tls_array[i])[1])
+#define C(i) do {							    \
+	if (unlikely(next->tls_array[i].a != prev->tls_array[i].a ||	    \
+		     next->tls_array[i].b != prev->tls_array[i].b))	    \
+		queue_multicall3(__HYPERVISOR_update_descriptor,	    \
+				 virt_to_machine(&get_cpu_gdt_table(cpu)    \
+						 [GDT_ENTRY_TLS_MIN + i]),  \
+				 ((u32 *)&next->tls_array[i])[0],	    \
+				 ((u32 *)&next->tls_array[i])[1]);	    \
+} while (0)
 	C(0); C(1); C(2);
 #undef C
 
