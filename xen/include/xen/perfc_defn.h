@@ -50,6 +50,7 @@ PERFCOUNTER_CPU(shadow_sync_all,                   "calls to shadow_sync_all")
 PERFCOUNTER_CPU(shadow_make_snapshot,              "snapshots created")
 PERFCOUNTER_CPU(shadow_mark_mfn_out_of_sync_calls, "calls to shadow_mk_out_of_sync")
 PERFCOUNTER_CPU(shadow_out_of_sync_calls,          "calls to shadow_out_of_sync")
+PERFCOUNTER_CPU(extra_va_update_sync,              "extra syncs for bug in chk_pgtb")
 PERFCOUNTER_CPU(snapshot_entry_matches_calls,      "calls to ss_entry_matches")
 PERFCOUNTER_CPU(snapshot_entry_matches_true,       "ss_entry_matches returns true")
 

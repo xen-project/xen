@@ -2001,6 +2001,8 @@ int do_update_va_mapping(unsigned long va,
     }
     else
     {
+        unsigned long l1mfn;
+
         if ( unlikely(percpu_info[cpu].foreign &&
                       (shadow_mode_translate(d) ||
                        shadow_mode_translate(percpu_info[cpu].foreign))) )
@@ -2020,6 +2022,29 @@ int do_update_va_mapping(unsigned long va,
         // linear_pg_table[l1_linear_offset(va)] to be in sync)...
         //
         __shadow_sync_va(ed, va);
+
+#if 1 /* keep check_pagetables() happy */
+        /*
+         * However, the above doesn't guarantee that there's no snapshot of
+         * the L1 table in question; it just says that the relevant L2 and L1
+         * entries for VA are in-sync.  There might still be a snapshot.
+         *
+         * The checking code in _check_pagetables() assumes that no one will
+         * mutate the shadow of a page that has a snapshot.  It's actually
+         * OK to not sync this page, but it seems simpler to:
+         * 1) keep all code paths the same, and
+         * 2) maintain the invariant for _check_pagetables(), rather than try
+         *    to teach it about this boundary case.
+         * So we flush this L1 page, if it's out of sync.
+         */
+        l1mfn = (l2_pgentry_val(linear_l2_table(ed)[l2_table_offset(va)]) >>
+                 PAGE_SHIFT);
+        if ( mfn_out_of_sync(l1mfn) )
+        {
+            perfc_incrc(extra_va_update_sync);
+            __shadow_sync_mfn(d, l1mfn);
+        }
+#endif /* keep check_pagetables() happy */
 
         if ( unlikely(__put_user(val, &l1_pgentry_val(
                                      linear_pg_table[l1_linear_offset(va)]))) )
