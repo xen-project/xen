@@ -817,13 +817,14 @@ int do_process_page_updates(page_update_request_t *ureqs, int count)
                     err = mod_l2_entry((l2_pgentry_t *)req.ptr, 
                                        mk_l2_pgentry(req.val)); 
                     break;                    
-                case PGT_none:
-                    MEM_LOG("Update to non-pt page %08lx", req.ptr);
-                    *(unsigned long *)req.ptr = req.val;
-                    err = 0;
-                    break;
                 default:
-                    MEM_LOG("Update to bad page %08lx", req.ptr);
+                    if ( page->type_count == 0 )
+                    {
+                        *(unsigned long *)req.ptr = req.val;
+                        err = 0;
+                    }
+                    else
+                        MEM_LOG("Update to bad page %08lx", req.ptr);
                     break;
                 }
             }
