@@ -217,6 +217,7 @@
 40f5623aFTyFTR-vdiA-KaGxk5JOKQ linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/msr.h
 40f5623adgjZq9nAgCt0IXdWl7udSA linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/page.h
 40f5623a54NuG-7qHihGYmw4wWQnMA linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/param.h
+41137cc1kkvg0cg7uxddcEfjL7L67w linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/pci.h
 40f5623atCokYc2uCysSJ8jFO8TEsw linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/pgalloc.h
 40f5623aEToIXouJgO-ao5d5pcEt1w linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/pgtable-2level.h
 40f5623aCCXRPlGpNthVXstGz9ZV3A linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/pgtable.h
