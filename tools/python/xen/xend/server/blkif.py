@@ -187,7 +187,7 @@ class BlkifBackendInterface(controller.BackendInterface):
         self.writeRequest(msg, response=response)
 
     def connectInterface(self, val):
-        self.evtchn = channel.eventChannel(0, self.controller.dom)
+        self.evtchn = channel.eventChannel(self.dom, self.controller.dom)
         log.debug("Connecting blkif to event channel %s ports=%d:%d",
                   str(self), self.evtchn['port1'], self.evtchn['port2'])
         msg = packMsg('blkif_be_connect_t',
