@@ -14,6 +14,7 @@
 #include <asm/hypervisor.h>
 #include <asm/ptrace.h>
 #include <asm/synch_bitops.h>
+#include <asm/hypervisor-ifs/event_channel.h>
 
 /*
  * LOW-LEVEL DEFINITIONS
@@ -60,6 +61,14 @@ static inline void clear_evtchn_exception(int port)
 {
     shared_info_t *s = HYPERVISOR_shared_info;
     synch_clear_bit(port, &s->evtchn_exception[0]);
+}
+
+static inline void notify_via_evtchn(int port)
+{
+    evtchn_op_t op;
+    op.cmd = EVTCHNOP_send;
+    op.u.send.local_port = port;
+    (void)HYPERVISOR_event_channel_op(&op);
 }
 
 /*

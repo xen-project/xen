@@ -9,6 +9,7 @@
 #ifndef __ASM_XEN__CTRL_IF_H__
 #define __ASM_XEN__CTRL_IF_H__
 
+#include <linux/tqueue.h>
 #include <asm/hypervisor.h>
 
 typedef control_msg_t ctrl_msg_t;

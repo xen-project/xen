@@ -265,10 +265,15 @@ static inline void flush_tlb_pgtables(struct mm_struct *mm,
     XEN_flush_page_update_queue();
 }
 
+/*
+ * NB. The 'domid' field should be zero if mapping I/O space (non RAM).
+ * Otherwise it identifies the owner of the memory that is being mapped.
+ */
 extern int direct_remap_area_pages(struct mm_struct *mm,
                                    unsigned long address, 
                                    unsigned long machine_addr,
                                    unsigned long size, 
-                                   pgprot_t prot);
+                                   pgprot_t prot,
+                                   domid_t  domid);
 
 #endif /* _I386_PGALLOC_H */

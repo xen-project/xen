@@ -161,13 +161,6 @@ static inline int HYPERVISOR_mmu_update(mmu_update_t *req, int count)
         : "=a" (ret) : "0" (__HYPERVISOR_mmu_update), 
         "b" (req), "c" (count) : "memory" );
 
-    if ( unlikely(ret < 0) )
-    {
-        extern void show_trace(unsigned long *);
-        show_trace(NULL);
-        panic("Failed mmu update: %p, %d", req, count);
-    }
-
     return ret;
 }
 

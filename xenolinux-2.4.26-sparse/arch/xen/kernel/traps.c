@@ -321,7 +321,11 @@ asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
 			u.ptr  = MMU_EXTENDED_COMMAND;
 			u.ptr |= (unsigned long)&default_ldt[0];
 			u.val  = MMUEXT_SET_LDT | (5 << MMUEXT_CMD_SHIFT);
-			HYPERVISOR_mmu_update(&u, 1);
+			if ( unlikely(HYPERVISOR_mmu_update(&u, 1) < 0) )
+			{
+				show_trace(NULL);
+				panic("Failed to install default LDT");
+			}
 			return;
 		}
 	}

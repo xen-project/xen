@@ -674,6 +674,10 @@ static PyObject *xu_port_new(PyObject *self, PyObject *args)
         goto fail1;
     }
 
+    /* Set the General-Purpose Subject whose page frame will be mapped. */
+    (void)ioctl(xup->mem_fd, _IO('M', 1), (unsigned long)(dom>> 0)); /* low  */
+    (void)ioctl(xup->mem_fd, _IO('M', 2), (unsigned long)(dom>>32)); /* high */
+
     if ( (xup->xc_handle = xc_interface_open()) == -1 )
     {
         PyErr_SetString(port_error, "Could not open Xen control interface");

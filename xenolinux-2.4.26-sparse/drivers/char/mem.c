@@ -197,24 +197,11 @@ static inline int noncached_address(unsigned long addr)
 #endif
 }
 
+#if !defined(CONFIG_XEN)
 static int mmap_mem(struct file * file, struct vm_area_struct * vma)
 {
 	unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
 
-#if defined(CONFIG_XEN) && defined(CONFIG_XEN_PRIVILEGED_GUEST)
-	if (!(start_info.flags & SIF_PRIVILEGED))
-		return -ENXIO;
-
-	/* DONTCOPY is essential for Xen as copy_page_range is broken. */
-	vma->vm_flags |= VM_RESERVED | VM_IO | VM_DONTCOPY;
-	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-	if (direct_remap_area_pages(vma->vm_mm, vma->vm_start, offset, 
-			     vma->vm_end-vma->vm_start, vma->vm_page_prot))
-		return -EAGAIN;
-	return 0;
-#elif defined(CONFIG_XEN)
-	return -ENXIO;
-#else
 	/*
 	 * Accessing memory above the top the kernel knows about or
 	 * through a file pointer that was marked O_SYNC will be
@@ -236,8 +223,50 @@ static int mmap_mem(struct file * file, struct vm_area_struct * vma)
 			     vma->vm_page_prot))
 		return -EAGAIN;
 	return 0;
-#endif
 }
+#elif !defined(CONFIG_XEN_PRIVILEGED_GUEST)
+static int mmap_mem(struct file * file, struct vm_area_struct * vma)
+{
+	return -ENXIO;
+}
+#else
+static int mmap_mem(struct file * file, struct vm_area_struct * vma)
+{
+	unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
+	domid_t domid;
+
+	if (!(start_info.flags & SIF_PRIVILEGED))
+		return -ENXIO;
+
+	domid = file->private_data ? *(domid_t *)file->private_data : 0;
+
+	/* DONTCOPY is essential for Xen as copy_page_range is broken. */
+	vma->vm_flags |= VM_RESERVED | VM_IO | VM_DONTCOPY;
+	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+	if (direct_remap_area_pages(vma->vm_mm, vma->vm_start, offset, 
+				vma->vm_end-vma->vm_start, vma->vm_page_prot,
+				domid))
+		return -EAGAIN;
+	return 0;
+}
+static int ioctl_mem(struct inode * inode, struct file * file, unsigned int cmd, unsigned long arg)
+{
+	if (file->private_data == NULL)
+		file->private_data = kmalloc(sizeof(domid_t), GFP_KERNEL);
+	switch (cmd) {
+	case _IO('M', 1): ((unsigned long *)file->private_data)[0]=arg; break;
+	case _IO('M', 2): ((unsigned long *)file->private_data)[1]=arg; break;
+	default: return -ENOSYS;
+	}
+	return 0;
+}
+static int release_mem(struct inode * inode, struct file * file)
+{
+	if (file->private_data != NULL)
+		kfree(file->private_data);
+	return 0;
+}
+#endif /* CONFIG_XEN */
 
 /*
  * This function reads the *virtual* memory as seen by the kernel.
@@ -426,10 +455,6 @@ static inline size_t read_zero_pagealigned(char * buf, size_t size)
 			goto out_up;
 		if (vma->vm_flags & VM_SHARED)
 			break;
-#if defined(CONFIG_XEN_PRIVILEGED_GUEST)
-		if (vma->vm_flags & VM_IO)
-			break;
-#endif
 		count = vma->vm_end - addr;
 		if (count > size)
 			count = size;
@@ -615,10 +640,6 @@ static int mmap_kmem(struct file * file, struct vm_area_struct * vma)
 	unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
 	unsigned long size = vma->vm_end - vma->vm_start;
 
-#if defined(CONFIG_XEN)
-	return -ENXIO;
-#endif
-
 	/*
 	 * If the user is not attempting to mmap a high memory address then
 	 * the standard mmap_mem mechanism will work.  High memory addresses
@@ -663,13 +684,19 @@ static struct file_operations mem_fops = {
 	write:		write_mem,
 	mmap:		mmap_mem,
 	open:		open_mem,
+#if defined(CONFIG_XEN_PRIVILEGED_GUEST)
+	release:	release_mem,
+	ioctl:		ioctl_mem,
+#endif
 };
 
 static struct file_operations kmem_fops = {
 	llseek:		memory_lseek,
 	read:		read_kmem,
 	write:		write_kmem,
+#if !defined(CONFIG_XEN)
 	mmap:		mmap_kmem,
+#endif
 	open:		open_kmem,
 };
 
@@ -715,12 +742,6 @@ static int memory_open(struct inode * inode, struct file * filp)
 			break;
 #if defined(CONFIG_ISA) || !defined(__mc68000__)
 		case 4:
-#if defined(CONFIG_XEN)
-#if defined(CONFIG_XEN_PRIVILEGED_GUEST)
-			if (!(start_info.flags & SIF_PRIVILEGED))
-#endif
-				return -ENXIO;
-#endif
 			filp->f_op = &port_fops;
 			break;
 #endif

@@ -154,7 +154,7 @@ static inline int do_block_io_op(int xc_handle, block_io_op_t *op)
 /*
  * PFN mapping.
  */
-int init_pfn_mapper(void);
+int init_pfn_mapper(domid_t domid);
 int close_pfn_mapper(int pm_handle);
 void *map_pfn_writeable(int pm_handle, unsigned long pfn);
 void *map_pfn_readonly(int pm_handle, unsigned long pfn);

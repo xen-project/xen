@@ -6,9 +6,15 @@
 
 #include "xc_private.h"
 
-int init_pfn_mapper(void)
+int init_pfn_mapper(domid_t domid)
 {
-    return open("/dev/mem", O_RDWR);
+    int fd = open("/dev/mem", O_RDWR);
+    if ( fd >= 0 )
+    {
+        (void)ioctl(fd, _IO('M', 1), (unsigned long)(domid>> 0)); /* low  */
+        (void)ioctl(fd, _IO('M', 2), (unsigned long)(domid>>32)); /* high */
+    }
+    return fd;
 }
 
 int close_pfn_mapper(int pm_handle)
@@ -49,7 +55,7 @@ static int flush_mmu_updates(int xc_handle, mmu_t *mmu)
     if ( mmu->idx == FIRST_MMU_UPDATE )
         return 0;
 
-    /* The first two requests set the correct subject domain. */
+    /* The first two requests set the correct subject domain (PTS and GPS). */
     mmu->updates[0].val  = (unsigned long)(mmu->subject<<16) & ~0xFFFFUL;
     mmu->updates[0].ptr  = (unsigned long)(mmu->subject<< 0) & ~0xFFFFUL;
     mmu->updates[1].val  = (unsigned long)(mmu->subject>>16) & ~0xFFFFUL;
@@ -57,7 +63,7 @@ static int flush_mmu_updates(int xc_handle, mmu_t *mmu)
     mmu->updates[0].ptr |= MMU_EXTENDED_COMMAND;
     mmu->updates[0].val |= MMUEXT_SET_SUBJECTDOM_L;
     mmu->updates[1].ptr |= MMU_EXTENDED_COMMAND;
-    mmu->updates[1].val |= MMUEXT_SET_SUBJECTDOM_H;
+    mmu->updates[1].val |= MMUEXT_SET_SUBJECTDOM_H | SET_PAGETABLE_SUBJECTDOM;
 
     hypercall.op     = __HYPERVISOR_mmu_update;
     hypercall.arg[0] = (unsigned long)mmu->updates;

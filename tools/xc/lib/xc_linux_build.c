@@ -165,7 +165,7 @@ static int setup_guestos(int xc_handle,
 
     memset(builddomain, 0, sizeof(*builddomain));
 
-    if ( (pm_handle = init_pfn_mapper()) < 0 )
+    if ( (pm_handle = init_pfn_mapper((domid_t)dom)) < 0 )
         goto error_out;
 
     if ( (page_array = malloc(nr_pages * sizeof(unsigned long))) == NULL )

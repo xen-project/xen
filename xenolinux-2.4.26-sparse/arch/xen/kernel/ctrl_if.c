@@ -15,8 +15,7 @@
 #include <linux/irq.h>
 #include <linux/interrupt.h>
 #include <asm/ctrl_if.h>
-#include <asm/hypervisor.h>
-#include <asm/hypervisor-ifs/event_channel.h>
+#include <asm/evtchn.h>
 
 static int        ctrl_if_evtchn;
 static int        ctrl_if_irq;
@@ -50,10 +49,7 @@ static DECLARE_TASKLET(ctrl_if_rx_tasklet, __ctrl_if_rx_tasklet, 0);
 
 static void ctrl_if_notify_controller(void)
 {
-    evtchn_op_t evtchn_op;
-    evtchn_op.cmd = EVTCHNOP_send;
-    evtchn_op.u.send.local_port = ctrl_if_evtchn;
-    (void)HYPERVISOR_event_channel_op(&evtchn_op);
+    notify_via_evtchn(ctrl_if_evtchn);
 }
 
 static void ctrl_if_rxmsg_default_handler(ctrl_msg_t *msg, unsigned long id)

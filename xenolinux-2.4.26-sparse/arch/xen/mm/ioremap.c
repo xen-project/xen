@@ -31,9 +31,27 @@ static inline void direct_remap_area_pte(pte_t *pte,
                                          unsigned long address, 
                                          unsigned long size,
                                          unsigned long machine_addr, 
-                                         pgprot_t prot)
+                                         pgprot_t prot,
+                                         domid_t  domid)
 {
     unsigned long end;
+
+    mmu_update_t *u, *v;
+    u = v = vmalloc(3*PAGE_SIZE); /* plenty */
+
+    /* If not I/O mapping then specify General-Purpose Subject Domain (GPS). */
+    if ( domid != 0 )
+    {
+        v[0].val  = (unsigned long)(domid<<16) & ~0xFFFFUL;
+        v[0].ptr  = (unsigned long)(domid<< 0) & ~0xFFFFUL;
+        v[1].val  = (unsigned long)(domid>>16) & ~0xFFFFUL;
+        v[1].ptr  = (unsigned long)(domid>>32) & ~0xFFFFUL;
+        v[0].ptr |= MMU_EXTENDED_COMMAND;
+        v[0].val |= MMUEXT_SET_SUBJECTDOM_L;
+        v[1].ptr |= MMU_EXTENDED_COMMAND;
+        v[1].val |= MMUEXT_SET_SUBJECTDOM_H;
+        v += 2;
+    }
 
     address &= ~PMD_MASK;
     end = address + size;
@@ -46,11 +64,18 @@ static inline void direct_remap_area_pte(pte_t *pte,
             printk("direct_remap_area_pte: page already exists\n");
             BUG();
         }
-        set_pte(pte, pte_mkio(direct_mk_pte_phys(machine_addr, prot))); 
+        v->ptr = virt_to_machine(pte);
+        v->val = (machine_addr & PAGE_MASK) | pgprot_val(prot) | _PAGE_IO;
+        v++;
         address += PAGE_SIZE;
         machine_addr += PAGE_SIZE;
         pte++;
     } while (address && (address < end));
+
+    if ( ((v-u) != 0) && (HYPERVISOR_mmu_update(u, v-u) < 0) )
+        printk(KERN_WARNING "Failed to ioremap %08lx->%08lx (%08lx)\n",
+               end-size, end, machine_addr-size);
+    vfree(u);
 }
 
 static inline int direct_remap_area_pmd(struct mm_struct *mm,
@@ -58,7 +83,8 @@ static inline int direct_remap_area_pmd(struct mm_struct *mm,
                                         unsigned long address, 
                                         unsigned long size,
                                         unsigned long machine_addr,
-                                        pgprot_t prot)
+                                        pgprot_t prot,
+                                        domid_t  domid)
 {
     unsigned long end;
 
@@ -74,7 +100,7 @@ static inline int direct_remap_area_pmd(struct mm_struct *mm,
         if (!pte)
             return -ENOMEM;
         direct_remap_area_pte(pte, address, end - address, 
-                              address + machine_addr, prot);
+                              address + machine_addr, prot, domid);
         address = (address + PMD_SIZE) & PMD_MASK;
         pmd++;
     } while (address && (address < end));
@@ -85,7 +111,8 @@ int direct_remap_area_pages(struct mm_struct *mm,
                             unsigned long address, 
                             unsigned long machine_addr,
                             unsigned long size, 
-                            pgprot_t prot)
+                            pgprot_t prot,
+                            domid_t  domid)
 {
     int error = 0;
     pgd_t * dir;
@@ -103,7 +130,7 @@ int direct_remap_area_pages(struct mm_struct *mm,
         if (!pmd)
             break;
         error = direct_remap_area_pmd(mm, pmd, address, end - address,
-                                      machine_addr + address, prot);
+                                      machine_addr + address, prot, domid);
         if (error)
             break;
         address = (address + PGDIR_SIZE) & PGDIR_MASK;
@@ -158,7 +185,7 @@ void * __ioremap(unsigned long machine_addr,
     prot = __pgprot(_PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | 
                     _PAGE_ACCESSED | flags);
     if (direct_remap_area_pages(&init_mm, VMALLOC_VMADDR(addr), 
-                                machine_addr, size, prot)) {
+                                machine_addr, size, prot, 0)) {
         vfree(addr);
         return NULL;
     }

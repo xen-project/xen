@@ -116,7 +116,8 @@ static inline void __flush_page_update_queue(void)
 #endif
     idx = 0;
     wmb(); /* Make sure index is cleared first to avoid double updates. */
-    HYPERVISOR_mmu_update(update_queue, _idx);
+    if ( unlikely(HYPERVISOR_mmu_update(update_queue, _idx) < 0) )
+        panic("Failed to execute MMU updates");
 }
 
 void _flush_page_update_queue(void)
@@ -182,8 +183,8 @@ void queue_invlpg(unsigned long ptr)
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
     update_queue[idx].ptr  = MMU_EXTENDED_COMMAND;
-    update_queue[idx].val  = ptr & PAGE_MASK;
-    update_queue[idx].val |= MMUEXT_INVLPG;
+    update_queue[idx].ptr |= ptr & PAGE_MASK;
+    update_queue[idx].val  = MMUEXT_INVLPG;
     increment_index();
     spin_unlock_irqrestore(&update_lock, flags);
 }

@@ -71,22 +71,73 @@
 #define NR_VIRQS       12
 
 /*
- * MMU_XXX: specified in least 2 bits of 'ptr' field. These bits are masked
- *  off to get the real 'ptr' value.
- * All requests specify relevent address in 'ptr'. This is either a
- * machine/physical address (MA), or linear/virtual address (VA).
- * Normal requests specify update value in 'value'.
- * Extended requests specify command in least 8 bits of 'value'. These bits
- *  are masked off to get the real 'val' value. Except for MMUEXT_SET_LDT 
- *  which shifts the least bits out.
+ * MMU-UPDATE REQUESTS
+ * 
+ * HYPERVISOR_mmu_update() accepts a list of (ptr, val) pairs.
+ * ptr[1:0] specifies the appropriate MMU_* command.
+ * 
+ * GPS (General-Purpose Subject)
+ * -----------------------------
+ *  This domain that must own all non-page-table pages that are involved in
+ *  MMU updates. By default it is the domain that executes mmu_update(). If the
+ *  caller has sufficient privilege then it can be changed by executing
+ *  MMUEXT_SET_SUBJECTDOM_{L,H}.
+ * 
+ * PTS (Page-Table Subject)
+ * ------------------------
+ *  This domain must own all the page-table pages that are subject to MMU
+ *  updates. By default it is the domain that executes mmu_update(). If the
+ *  caller has sufficient privilege then it can be changed by executing
+ *  MMUEXT_SET_SUBJECTDOM_H with val[14] (SET_PAGETABLE_SUBJECTDOM) set.
+ * 
+ * ptr[1:0] == MMU_NORMAL_PT_UPDATE:
+ * Updates an entry in a page table.
+ * ptr[:2]  -- machine address of the page-table entry to modify [1]
+ * val      -- value to write [2]
+ * 
+ * ptr[1:0] == MMU_MACHPHYS_UPDATE:
+ * Updates an entry in the machine->pseudo-physical mapping table.
+ * ptr[:2]  -- machine address within the frame whose mapping to modify [3]
+ * val      -- value to write into the mapping entry
+ *  
+ * ptr[1:0] == MMU_EXTENDED_COMMAND:
+ * val[7:0] -- MMUEXT_* command
+ * 
+ *   val[7:0] == MMUEXT_(UN)PIN_*_TABLE:
+ *   ptr[:2]  -- machine address of frame to be (un)pinned as a p.t. page [1]
+ * 
+ *   val[7:0] == MMUEXT_NEW_BASEPTR:
+ *   ptr[:2]  -- machine address of new page-table base to install in MMU [1]
+ * 
+ *   val[7:0] == MMUEXT_TLB_FLUSH:
+ *   no additional arguments
+ * 
+ *   val[7:0] == MMUEXT_INVLPG:
+ *   ptr[:2]  -- linear address to be flushed from the TLB
+ * 
+ *   val[7:0] == MMUEXT_SET_LDT:
+ *   ptr[:2]  -- linear address of LDT base (NB. must be page-aligned)
+ *   val[:8]  -- number of entries in LDT
+ * 
+ *   val[7:0] == MMUEXT_SET_SUBJECTDOM_L:
+ *   (ptr[31:15],val[31:15]) -- dom[31:0]
+ * 
+ *   val[7:0] == MMUEXT_SET_SUBJECTDOM_H:
+ *   val[14]  -- if TRUE then sets the PTS in addition to the GPS.
+ *   (ptr[31:15],val[31:15]) -- dom[63:32]
+ *   NB. This command must be immediately preceded by SET_SUBJECTDOM_L.
+ * 
+ * Notes on constraints on the above arguments:
+ *  [1] The page frame containing the machine address must belong to the PTS.
+ *  [2] If the PTE is valid (i.e., bit 0 is set) then the specified page frame
+ *      must belong to: 
+ *       (a) the PTS (if the PTE is part of a non-L1 table); or
+ *       (b) the GPS (if the PTE is part of an L1 table).
+ *  [3] The page frame containing the machine address must belong to the GPS.
  */
-/* A normal page-table update request. */
 #define MMU_NORMAL_PT_UPDATE     0 /* checked '*ptr = val'. ptr is MA.       */
-/* Update an entry in the machine->physical mapping table. */
 #define MMU_MACHPHYS_UPDATE      2 /* ptr = MA of frame to modify entry for  */
-/* An extended command. */
 #define MMU_EXTENDED_COMMAND     3 /* least 8 bits of val demux further      */
-/* Extended commands: */
 #define MMUEXT_PIN_L1_TABLE      0 /* ptr = MA of frame to pin               */
 #define MMUEXT_PIN_L2_TABLE      1 /* ptr = MA of frame to pin               */
 #define MMUEXT_PIN_L3_TABLE      2 /* ptr = MA of frame to pin               */
@@ -94,11 +145,12 @@
 #define MMUEXT_UNPIN_TABLE       4 /* ptr = MA of frame to unpin             */
 #define MMUEXT_NEW_BASEPTR       5 /* ptr = MA of new pagetable base         */
 #define MMUEXT_TLB_FLUSH         6 /* ptr = NULL                             */
-#define MMUEXT_INVLPG            7 /* ptr = NULL ; val = VA to invalidate    */
+#define MMUEXT_INVLPG            7 /* ptr = VA to invalidate                 */
 #define MMUEXT_SET_LDT           8 /* ptr = VA of table; val = # entries     */
 /* NB. MMUEXT_SET_SUBJECTDOM must consist of *_L followed immediately by *_H */
 #define MMUEXT_SET_SUBJECTDOM_L  9 /* (ptr[31:15],val[31:15]) = dom[31:0]    */
 #define MMUEXT_SET_SUBJECTDOM_H 10 /* (ptr[31:15],val[31:15]) = dom[63:32]   */
+#define SET_PAGETABLE_SUBJECTDOM (1<<14) /* OR into 'val' arg of SUBJECTDOM_H*/
 #define MMUEXT_CMD_MASK        255
 #define MMUEXT_CMD_SHIFT         8
 

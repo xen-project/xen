@@ -178,7 +178,7 @@ int xc_linux_save(int xc_handle,
         goto out;
     }
 
-    if ( (pm_handle = init_pfn_mapper()) < 0 )
+    if ( (pm_handle = init_pfn_mapper((domid_t)domid)) < 0 )
         goto out;
 
     /* Is the suspend-record MFN actually valid for this domain? */
