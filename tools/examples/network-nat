@@ -1,18 +1,18 @@
 #!/bin/sh
 #============================================================================
-# Default Xen network start/stop script.
+# Default Xen network start/stop script when using NAT.
 # Xend calls a network script when it starts.
 # The script name to use is defined in /etc/xen/xend-config.sxp
 # in the network-script field.
 #
 # Usage:
 #
-# network-route (start|stop|status) {VAR=VAL}*
+# network-nat (start|stop|status) {VAR=VAL}*
 #
 # Vars:
 #
 # netdev     The gateway interface (default eth0).
-# antispoof  Whether to use iptables to prevent spoofing (default yes).
+# antispoof  Whether to use iptables to prevent spoofing (default no).
 #
 #============================================================================
 
@@ -30,7 +30,7 @@ for arg ; do export "${arg}" ; done
 
 netdev=${netdev:-eth0}
 # antispoofing not yet implemented
-antispoof=${antispoof:-yes}
+antispoof=${antispoof:-no}
 
 echo "network-nat $OP netdev=$netdev antispoof=$antispoof"
 
