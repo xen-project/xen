@@ -28,6 +28,7 @@
 #include <xen/spinlock.h>
 #include <xen/slab.h>
 #include <xen/irq.h>
+#include <xen/softirq.h>
 #include <asm/domain_page.h>
 
 /*
@@ -551,7 +552,6 @@ void free_domheap_pages(struct pfn_info *pg, unsigned int order)
 {
     int            i, drop_dom_ref;
     struct domain *d = pg->u.inuse.domain;
-    void          *p;
 
     ASSERT(!in_irq());
 
@@ -579,18 +579,6 @@ void free_domheap_pages(struct pfn_info *pg, unsigned int order)
             pg[i].tlbflush_timestamp  = tlbflush_current_time();
             pg[i].u.free.cpu_mask     = 1 << d->processor;
             list_del(&pg[i].list);
-
-            /*
-             * Normally we expect a domain to clear pages before freeing them,
-             * if it cares about the secrecy of their contents. However, after
-             * a domain has died we assume responsibility for erasure.
-             */
-            if ( unlikely(test_bit(DF_DYING, &d->flags)) )
-            {
-                p = map_domain_mem(page_to_phys(&pg[i]));
-                clear_page(p);
-                unmap_domain_mem(p);
-            }
         }
 
         d->tot_pages -= 1 << order;
@@ -598,7 +586,24 @@ void free_domheap_pages(struct pfn_info *pg, unsigned int order)
 
         spin_unlock_recursive(&d->page_alloc_lock);
 
-        free_heap_pages(MEMZONE_DOM, pg, order);
+        if ( likely(!test_bit(DF_DYING, &d->flags)) )
+        {
+            free_heap_pages(MEMZONE_DOM, pg, order);
+        }
+        else
+        {
+            /*
+             * Normally we expect a domain to clear pages before freeing them,
+             * if it cares about the secrecy of their contents. However, after
+             * a domain has died we assume responsibility for erasure.
+             */
+            for ( i = 0; i < (1 << order); i++ )
+            {
+                spin_lock(&page_scrub_lock);
+                list_add(&pg[i].list, &page_scrub_list);
+                spin_unlock(&page_scrub_lock);
+            }
+        }
     }
     else
     {
@@ -616,3 +621,63 @@ unsigned long avail_domheap_pages(void)
 {
     return avail[MEMZONE_DOM];
 }
+
+
+
+/*************************
+ * PAGE SCRUBBING
+ */
+
+static spinlock_t page_scrub_lock;
+struct list_head page_scrub_list;
+
+static void page_scrub_softirq(void)
+{
+    struct list_head *ent;
+    struct pfn_info  *pg;
+    void             *p;
+    int               i;
+    s_time_t          start = NOW();
+
+    /* Aim to do 1ms of work (ten percent of a 10ms jiffy). */
+    do {
+        spin_lock(&page_scrub_lock);
+
+        if ( unlikely((ent = page_scrub_list.next) == &page_scrub_list) )
+        {
+            spin_unlock(&page_scrub_lock);
+            return;
+        }
+        
+        /* Peel up to 16 pages from the list. */
+        for ( i = 0; i < 16; i++ )
+            if ( (ent = ent->next) == &page_scrub_list )
+                break;
+        
+        /* Remove peeled pages from the list. */
+        ent->next->prev = &page_scrub_list;
+        page_scrub_list.next = ent->next;
+        
+        spin_unlock(&page_scrub_lock);
+        
+        /* Working backwards, scrub each page in turn. */
+        while ( ent != &page_scrub_list )
+        {
+            pg = list_entry(ent, struct pfn_info, list);
+            ent = ent->prev;
+            p = map_domain_mem(page_to_phys(pg));
+            clear_page(p);
+            unmap_domain_mem(p);
+            free_heap_pages(MEMZONE_DOM, pg, 0);
+        }
+    } while ( (NOW() - start) < MILLISECS(1) );
+}
+
+static __init int page_scrub_init(void)
+{
+    spin_lock_init(&page_scrub_lock);
+    INIT_LIST_HEAD(&page_scrub_list);
+    open_softirq(PAGE_SCRUB_SOFTIRQ, page_scrub_softirq);
+    return 0;
+}
+__initcall(page_scrub_init);

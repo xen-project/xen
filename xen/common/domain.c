@@ -197,7 +197,7 @@ unsigned int alloc_new_dom_mem(struct domain *d, unsigned int kbytes)
         if ( unlikely((page = alloc_domheap_page(d)) == NULL) )
         {
             domain_relinquish_memory(d);
-            return -ENOMEM;
+            return list_empty(&page_scrub_list) ? -ENOMEM : -EAGAIN;
         }
 
         /* Initialise the machine-to-phys mapping for this page. */

@@ -437,6 +437,8 @@ static void t_timer_fn(unsigned long unused)
     if ( !is_idle_task(d) && update_dom_time(d) )
         send_guest_virq(d, VIRQ_TIMER);
 
+    page_scrub_schedule_work();
+
     t_timer[d->processor].expires = NOW() + MILLISECS(10);
     add_ac_timer(&t_timer[d->processor]);
 }
