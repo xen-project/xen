@@ -38,8 +38,8 @@ CPU:  Pentium Pro/II/III/IV/Xeon, Athlon (i.e. P6 or newer) SMP supported
 IDE:  Intel PIIX chipset, others will be PIO only (slow)
 SCSI: Adaptec / Dell PERC Raid (aacraid), megaraid, Adaptec aic7xxx
 Net:  Recommended: Intel e1000, Broadcom BCM57xx (tg3), 3c905 (3c59x)
-      Tested but requires extra copies : pcnet32
-      Untested and also requires extra copies : Intel e100, tulip
+      Tested but requires extra copies : pcnet32, Intel e100
+      Untested and also requires extra copies : tulip
 
 Because of the demo CD's use of ram disks, make sure you have plenty
 of RAM (256MB+).
@@ -103,7 +103,7 @@ distribution, or using the file systems from the CD (which are based
 on RH9). See the installation instructions later in this document.
 
 If you want to browse the Xen / Xenolinux source, it's all located
-under /local/src, complete with BitKeeper repository. We've also
+under /usr/local/src, complete with BitKeeper repository. We've also
 included source code and configuration information for the various
 benchmarks we used in the SOSP paper.
 
@@ -114,7 +114,7 @@ Starting other domains
 There's a web interface for starting and managing other domains (VMs),
 but since we generally use the command line tools they're probably
 rather better debugged at present. The key command is 'xenctl' which
-lives in /local/bin and uses /etc/xenctl.xml for its default
+lives in /usr/local/bin and uses /etc/xenctl.xml for its default
 configuration. Run 'xenctl' without any arguments to get a help
 message.
 
@@ -137,7 +137,7 @@ Next, run a the xen UDP console displayer:
 
 
 The tool used for starting and controlling domains is 'xenctl'. It's a
-java java front end to various underlying internal tools written in C
+java front end to various underlying internal tools written in C
 (xi_*). Running off CD, it seems to take an age to start...
 
 xenctl uses /etc/xenctl.xml as its default configuration. The
@@ -166,7 +166,7 @@ These commands can be entered manually, but for convenience, xenctl
 will also read them from a script and infer which domain number you're
 referring to (-nX). To use the sample script:
 
- xenctl script -f/etc/xen-mynewdom
+ xenctl script -f/etc/xen-mynewdom     [NB: no space after the -f]
 
 You should see the domain booting on your xen_read_console window.
 
@@ -194,7 +194,7 @@ If you configured the new domain with its own IP address, you should
 be able to ssh into it directly.
 
 
-"xenctl list" provides status information about running domains,
+"xenctl domain list" provides status information about running domains,
 though is currently only allowed to be run by domain 0. It accesses
 /proc/xeno/domains to read this information from Xen. You can also use
 xenctl to 'stop' (pause) a domain, or 'kill' a domain. You can either
@@ -258,7 +258,7 @@ The purpose of the Demo CD is to distribute a snapshot of Xen's source,
 and simultaneously provide a convenient means for enabling people to
 get experience playing with Xen without needing to install it on their
 hard drive. If you decide to install Xen/XenoLinux you can do so
-simply by folling the INSTALL instructions and copying the contents of
+simply by following the INSTALL instructions and copying the contents of
 the CD on to a suitably formated disk partition and install the Grub
 bootloader.
 
@@ -319,7 +319,8 @@ arguments to pass to Xen. In this case, we set the maximum amount of
 memory to allocate to domain0, and the serial baud rate (the default
 is 9600 baud). We could also disable smp support (nosmp) or disable
 hyper-threading support (noht). If you have multiple network interface
-there are various options to select which ones to use.
+you can use ifname=XXX to select which ones to use. If your network
+card is unsupported, use ifname=dummy
 
 The second line specifies which xenolinux image to use, and the
 standard linux command line arguments to pass to the kernel. In this
