@@ -101,6 +101,7 @@
 3eb781fdEYILyFg60YVBsWNqxWFf1g tools/internal/dom0_ops.h
 3eb781fddjylXbsepjppUyIXa5lcaQ tools/internal/hypervisor_defs.h
 3eb781fdKiQbgozBsgs_zzJQ9ubehw tools/internal/mem_defs.h
+3ec61e1bJCeJJu0SsptmDpA1xKvwvw tools/internal/rpm.spec
 3eb781fdgbSkh2O6JQS-65Dz4n0ItQ tools/internal/xi_build.c
 3eb781fdW1SAyiaC4mTsXq_9fRHh-A tools/internal/xi_create.c
 3eb781fdcJ0fF7rWfzAOArW-x4-gwA tools/internal/xi_destroy.c
