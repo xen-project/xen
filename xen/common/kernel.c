@@ -16,12 +16,6 @@
 #include <linux/if_ether.h>
 #include <asm/domain_page.h>
 
-/* VGA text definitions. */
-#define COLUMNS	    80
-#define LINES	    24
-#define ATTRIBUTE    7
-#define VIDEO	    __va(0xB8000)
-
 static int xpos, ypos;
 static volatile unsigned char *video;
 
@@ -244,6 +238,12 @@ void putchar_serial(unsigned char c)
     outb(c, SERIAL_BASE+TX_HOLD);
 }
 
+
+/* VGA text (mode 3) definitions. */
+#define COLUMNS	    80
+#define LINES	    25
+#define ATTRIBUTE    7
+#define VIDEO	    __va(0xB8000)
 
 /* This is actually code from vgaHWRestore in an old version of XFree86 :-) */
 void init_vga(void)
