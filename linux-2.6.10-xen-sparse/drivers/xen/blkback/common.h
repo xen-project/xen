@@ -15,6 +15,7 @@
 #include <asm-xen/ctrl_if.h>
 #include <asm-xen/hypervisor.h>
 #include <asm-xen/xen-public/io/blkif.h>
+#include <asm-xen/xen-public/io/ring.h>
 
 #if 0
 #define ASSERT(_p) \
@@ -36,19 +37,17 @@ struct block_device;
 
 typedef struct blkif_st {
     /* Unique identifier for this interface. */
-    domid_t          domid;
-    unsigned int     handle;
+    domid_t           domid;
+    unsigned int      handle;
     /* Physical parameters of the comms window. */
-    unsigned long    shmem_frame;
-    unsigned int     evtchn;
-    int              irq;
+    unsigned long     shmem_frame;
+    unsigned int      evtchn;
+    int               irq;
     /* Comms information. */
-    blkif_ring_t    *blk_ring_base; /* ioremap()'ed ptr to shmem_frame. */
-    BLKIF_RING_IDX     blk_req_cons;  /* Request consumer. */
-    BLKIF_RING_IDX     blk_resp_prod; /* Private version of resp. producer. */
+    blkif_back_ring_t blk_ring;
     /* VBDs attached to this interface. */
-    rb_root_t        vbd_rb;        /* Mapping from 16-bit vdevices to VBDs. */
-    spinlock_t       vbd_lock;      /* Protects VBD mapping. */
+    rb_root_t         vbd_rb;        /* Mapping from 16-bit vdevices to VBDs.*/
+    spinlock_t        vbd_lock;      /* Protects VBD mapping. */
     /* Private fields. */
     enum { DISCONNECTED, DISCONNECTING, CONNECTED } status;
     /*
@@ -56,6 +55,10 @@ typedef struct blkif_st {
      * We therefore need to store the id from the original request.
      */
     u8               disconnect_rspid;
+#ifdef CONFIG_XEN_BLKDEV_TAP_BE
+    /* Is this a blktap frontend */
+    unsigned int     is_blktap;
+#endif
     struct blkif_st *hash_next;
     struct list_head blkdev_list;
     spinlock_t       blk_ring_lock;

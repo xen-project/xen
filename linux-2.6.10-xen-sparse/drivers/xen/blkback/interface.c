@@ -39,7 +39,7 @@ static void __blkif_disconnect_complete(void *arg)
      * must still be notified to the remote driver.
      */
     unbind_evtchn_from_irq(blkif->evtchn);
-    vfree(blkif->blk_ring_base);
+    vfree(blkif->blk_ring.sring);
 
     /* Construct the deferred response message. */
     cmsg.type         = CMSG_BLKIF_BE;
@@ -149,14 +149,15 @@ void blkif_destroy(blkif_be_destroy_t *destroy)
 
 void blkif_connect(blkif_be_connect_t *connect)
 {
-    domid_t       domid  = connect->domid;
-    unsigned int  handle = connect->blkif_handle;
-    unsigned int  evtchn = connect->evtchn;
-    unsigned long shmem_frame = connect->shmem_frame;
+    domid_t        domid  = connect->domid;
+    unsigned int   handle = connect->blkif_handle;
+    unsigned int   evtchn = connect->evtchn;
+    unsigned long  shmem_frame = connect->shmem_frame;
     struct vm_struct *vma;
-    pgprot_t      prot;
-    int           error;
-    blkif_t      *blkif;
+    pgprot_t       prot;
+    int            error;
+    blkif_t       *blkif;
+    blkif_sring_t *sring;
 
     blkif = blkif_find_by_handle(domid, handle);
     if ( unlikely(blkif == NULL) )
@@ -195,11 +196,13 @@ void blkif_connect(blkif_be_connect_t *connect)
         vfree(vma->addr);
         return;
     }
-
+    sring = (blkif_sring_t *)vma->addr;
+    SHARED_RING_INIT(BLKIF_RING, sring);
+    BACK_RING_INIT(BLKIF_RING, &blkif->blk_ring, sring);
+    
     blkif->evtchn        = evtchn;
     blkif->irq           = bind_evtchn_to_irq(evtchn);
     blkif->shmem_frame   = shmem_frame;
-    blkif->blk_ring_base = (blkif_ring_t *)vma->addr;
     blkif->status        = CONNECTED;
     blkif_get(blkif);
 

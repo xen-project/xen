@@ -9,6 +9,8 @@
 #ifndef __XEN_PUBLIC_IO_BLKIF_H__
 #define __XEN_PUBLIC_IO_BLKIF_H__
 
+#include <asm-xen/xen-public/io/ring.h>
+
 #define blkif_vdev_t   u16
 #define blkif_sector_t u64
 
@@ -52,27 +54,11 @@ typedef struct {
 #define BLKIF_RSP_OKAY    0 /* non-specific 'okay'  */
 
 /*
- * We use a special capitalised type name because it is _essential_ that all 
- * arithmetic on indexes is done on an integer type of the correct size.
+ * Generate blkif ring structures and types.
  */
-typedef u32 BLKIF_RING_IDX;
 
-/*
- * Ring indexes are 'free running'. That is, they are not stored modulo the
- * size of the ring buffer. The following macro converts a free-running counter
- * into a value that can directly index a ring-buffer array.
- */
-#define MASK_BLKIF_IDX(_i) ((_i)&(BLKIF_RING_SIZE-1))
-
-typedef struct {
-    BLKIF_RING_IDX req_prod;  /*  0: Request producer. Updated by front-end. */
-    BLKIF_RING_IDX resp_prod; /*  4: Response producer. Updated by back-end. */
-    union {                   /*  8 */
-        blkif_request_t  req;
-        blkif_response_t resp;
-    } PACKED ring[BLKIF_RING_SIZE];
-} PACKED blkif_ring_t;
-
+#define BLKIF_RING RING_PARAMS(blkif_request_t, blkif_response_t, PAGE_SIZE)
+DEFINE_RING_TYPES(blkif, BLKIF_RING);
 
 /*
  * BLKIF_OP_PROBE:
