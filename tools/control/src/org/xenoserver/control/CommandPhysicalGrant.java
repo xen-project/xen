@@ -14,6 +14,8 @@ public class CommandPhysicalGrant extends Command {
     private Mode mode;
     /** True to force grant */
     private boolean force;
+    /** Number to substitute for + (-1 => use domain_id) */
+    private int subst;
 
     /**
      * Constructor for CommandPhysicalGrant.
@@ -28,12 +30,14 @@ public class CommandPhysicalGrant extends Command {
         int domain_id,
         String partition,
         Mode mode,
-        boolean force) {
+        boolean force,
+	int subst) {
         this.d = d;
         this.domain_id = domain_id;
         this.partition_name = partition;
         this.mode = mode;
         this.force = force;
+	this.subst = subst;
     }
 
     /**
@@ -42,7 +46,7 @@ public class CommandPhysicalGrant extends Command {
     public String execute() throws CommandFailedException {
         Runtime r = Runtime.getRuntime();
         String output = null;
-	String resolved = StringPattern.parse(partition_name).resolve(domain_id);
+	String resolved = StringPattern.parse(partition_name).resolve(subst == -1 ? domain_id : subst);
 	String resolved2 = d.runCommand(d.xiToolsDir + Settings.XI_HELPER + " expand " + resolved).trim();
         Partition partition = PartitionManager.IT.getPartition(resolved2);
     

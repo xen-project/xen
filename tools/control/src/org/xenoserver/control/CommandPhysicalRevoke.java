@@ -10,6 +10,8 @@ public class CommandPhysicalRevoke extends Command {
     private int domain_id;
     /** Partition to revoke access to */
     private String partition_name;
+    /** Number to substitute for + (-1 => use domain_id) */
+    private int subst;
 
     /**
      * Constructor for CommandPhysicalRevoke.
@@ -17,10 +19,11 @@ public class CommandPhysicalRevoke extends Command {
      * @param domain_id Domain to revoke access from.
      * @param partition Partition to revoke access to.
      */
-    public CommandPhysicalRevoke(Defaults d, int domain_id, String partition) {
+    public CommandPhysicalRevoke(Defaults d, int domain_id, String partition, int subst) {
         this.d = d;
         this.domain_id = domain_id;
         this.partition_name = partition;
+	this.subst = subst;
     }
 
     /**
@@ -29,7 +32,7 @@ public class CommandPhysicalRevoke extends Command {
     public String execute() throws CommandFailedException {
         Runtime r = Runtime.getRuntime();
         String output = null;
-	String resolved = StringPattern.parse(partition_name).resolve(domain_id);
+	String resolved = StringPattern.parse(partition_name).resolve(subst == -1 ? domain_id : subst);
 	String resolved2 = d.runCommand(d.xiToolsDir + Settings.XI_HELPER + " expand " + resolved).trim();
         Partition partition = PartitionManager.IT.getPartition(resolved2);
 

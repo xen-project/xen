@@ -14,6 +14,7 @@ public class ParsePhysicalGrant extends CommandParser {
         boolean force = getFlagParameter(args, 'f');
         String partition_name = getStringParameter(args, 'p', "");
         boolean write = getFlagParameter(args, 'w');
+	int subst = getIntParameter(args, 'x', -1);
 
         if (domain_id == 0) {
             throw new ParseFailedException("Expected -n<domain_id>");
@@ -32,7 +33,7 @@ public class ParsePhysicalGrant extends CommandParser {
         // Initialise the partition manager and look up the partition
         loadState();
         String output =
-            new CommandPhysicalGrant(d, domain_id, partition_name, mode, force)
+            new CommandPhysicalGrant(d, domain_id, partition_name, mode, force,subst)
                 .execute();
         if (output != null) {
             System.out.println(output);
@@ -44,7 +45,7 @@ public class ParsePhysicalGrant extends CommandParser {
     }
 
     public String getUsage() {
-        return "-p<partition_name> [-n<domain_id>] [-f] [-w]";
+        return "-p<partition_name> [-n<domain_id>] [-f] [-w] [-x<subst>]";
     }
 
     public String getHelpText() {

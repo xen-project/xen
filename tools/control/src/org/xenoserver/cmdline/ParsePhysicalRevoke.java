@@ -11,6 +11,7 @@ public class ParsePhysicalRevoke extends CommandParser {
         throws ParseFailedException, CommandFailedException {
         int domain_id = getIntParameter(args, 'n', d.domainNumber);
         String partition_name = getStringParameter(args, 'p', "");
+	int subst = getIntParameter(args, 'x', -1);
 
         if (domain_id == 0) {
             throw new ParseFailedException("Expected -n<domain_id>");
@@ -21,7 +22,7 @@ public class ParsePhysicalRevoke extends CommandParser {
 
         // Initialise the partition manager and look up the partition
         loadState();
-        String output = new CommandPhysicalRevoke(d, domain_id, partition_name).execute();
+        String output = new CommandPhysicalRevoke(d, domain_id, partition_name, subst).execute();
         if (output != null) {
             System.out.println(output);
         }
@@ -32,7 +33,7 @@ public class ParsePhysicalRevoke extends CommandParser {
     }
 
     public String getUsage() {
-        return "-p<partition_name> [-n<domain_id>]";
+        return "-p<partition_name> [-n<domain_id>] [-x<subst>]";
     }
 
     public String getHelpText() {

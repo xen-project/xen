@@ -16,6 +16,7 @@ public class ParseVbdCreate extends CommandParser {
         int domain_id = getIntParameter(args, 'n', d.domainNumber);
         int vbd_num = getIntParameter(args, 'v', -1);
         boolean write = getFlagParameter(args, 'w');
+	int subst = getIntParameter(args, 'x', -1);
 
         if (vd_key.equals("") && partition_name.equals("")) {
             throw new ParseFailedException("Expected -k<key> or -p<partition>");
@@ -37,7 +38,7 @@ public class ParseVbdCreate extends CommandParser {
         loadState();
         String output;
         if (vd_key.equals("")) {
-            output = new CommandVbdCreatePhysical(d,  partition_name, domain_id, vbd_num, mode ).execute();
+            output = new CommandVbdCreatePhysical(d,  partition_name, domain_id, vbd_num, mode, subst ).execute();
         } else {
             output =
                 new CommandVbdCreate(vd_key, domain_id, vbd_num, mode).execute();
@@ -53,7 +54,7 @@ public class ParseVbdCreate extends CommandParser {
     }
 
     public String getUsage() {
-        return "{-k<key>|-p<partition} -v<vbd_num> [-n<domain_id>] [-w]";
+        return "{-k<key>|-p<partition} -v<vbd_num> [-n<domain_id>] [-w] [-x<subst>]";
     }
 
     public String getHelpText() {

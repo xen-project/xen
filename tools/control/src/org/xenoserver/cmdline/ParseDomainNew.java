@@ -27,6 +27,7 @@ public class ParseDomainNew extends CommandParser {
         String nw_mask = getStringParameter(args, 'm', d.nwMask);
         String nw_nfs_server = getStringParameter(args, 's', d.nwNFSServer);
         String nw_host = getStringParameter(args, 'h', d.nwHost);
+	int subst = getIntParameter(args, 'x', -1);
 
         d.describe();
 
@@ -47,7 +48,8 @@ public class ParseDomainNew extends CommandParser {
                 nw_mask,
                 nw_nfs_server,
                 nw_host,
-                usr_dev);
+                usr_dev,
+		subst);
         c.execute();
         String[] output = c.output();
         for (int i = 0; i < output.length; i++) {
@@ -57,7 +59,7 @@ public class ParseDomainNew extends CommandParser {
         if (root_dev.startsWith("/dev/sda") || root_dev.startsWith("/dev/hda")) {
             String real_root = StringPattern.parse(root_dev).resolve(c.domain_id());
             String device = real_root.substring(real_root.indexOf('/',1)+1);
-            CommandPhysicalGrant cg = new CommandPhysicalGrant(d,c.domain_id(),device,Mode.READ_WRITE,false);
+            CommandPhysicalGrant cg = new CommandPhysicalGrant(d,c.domain_id(),device,Mode.READ_WRITE,false,subst);
             String output2 = cg.execute();
             if ( output2 != null ) {
                 System.out.println(output2);
@@ -67,7 +69,7 @@ public class ParseDomainNew extends CommandParser {
         if (usr_dev != null && ((usr_dev.startsWith("/dev/sda")) || usr_dev.startsWith("/dev/hda"))) {
             String real_usr = StringPattern.parse(usr_dev).resolve(c.domain_id());
             String device = real_usr.substring(real_usr.indexOf('/',1)+1);
-            CommandPhysicalGrant cg = new CommandPhysicalGrant(d,c.domain_id(),device,Mode.READ_ONLY,false);
+            CommandPhysicalGrant cg = new CommandPhysicalGrant(d,c.domain_id(),device,Mode.READ_ONLY,false,subst);
             String output2 = cg.execute();
             if ( output2 != null ) {
                 System.out.println(output2);
@@ -80,7 +82,7 @@ public class ParseDomainNew extends CommandParser {
     }
 
     public String getUsage() {
-        return "[-n<domain_name>] [-k<size>] [-i<image>] [-v<num_vifs>] [-r<initrd>] [-d<root_device>] [-t<root_mount_args>] [-u<usr_device>] [-f<nfs_root>] [-s<nfs_boot_server>] [-4<ipv4_boot_address>] [-g<ipv4_boot_gateway>] [-m<ipv4_boot_netmask>] [-h<hostname>] [-a<args>]";
+        return "[-n<domain_name>] [-k<size>] [-i<image>] [-v<num_vifs>] [-r<initrd>] [-d<root_device>] [-t<root_mount_args>] [-u<usr_device>] [-f<nfs_root>] [-s<nfs_boot_server>] [-4<ipv4_boot_address>] [-g<ipv4_boot_gateway>] [-m<ipv4_boot_netmask>] [-h<hostname>] [-a<args>] [-x<subst>]";
     }
 
     public String getHelpText() {
@@ -98,6 +100,7 @@ public class ParseDomainNew extends CommandParser {
             + "  -t  Root mount args (e.g ro)                 root_args\n"
             + "  -u  Usr dev/path (e.g /dev/hda3, server:path)usr_device\n"
             + "  -a  Additional boot parameters               args\n"
+            + "  -x  Number to substitute for + if not domain id\n"
             + "\n"
             + "Networking options:\n"
             + "  -f  NFS root (if /dev/nfs specified)         nw_nfs_root\n"

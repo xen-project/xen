@@ -17,6 +17,8 @@ public class CommandVbdCreatePhysical extends Command {
     private int vbd_num;
     /** Access mode to grant. */
     private Mode mode;
+    /** Number to substitute for + (-1 => use domain_id) */
+    private int subst;
 
     /**
      * Constructor for CommandVbdCreate.
@@ -30,19 +32,21 @@ public class CommandVbdCreatePhysical extends Command {
 	String partition,
         int domain_id,
         int vbd_num,
-        Mode mode) {
+        Mode mode,
+	int subst) {
         this.d = d;
         this.partition_name = partition;
         this.domain_id = domain_id;
         this.vbd_num = vbd_num;
         this.mode = mode;
+	this.subst = subst;
     }
 
     /**
      * @see org.xenoserver.control.Command#execute()
      */
     public String execute() throws CommandFailedException {
-        String resolved = StringPattern.parse(partition_name).resolve(domain_id);
+        String resolved = StringPattern.parse(partition_name).resolve(subst == -1 ? domain_id : subst);
 	String resolved2 = d.runCommand(d.xiToolsDir + Settings.XI_HELPER + " expand " + resolved).trim();
         Partition partition = PartitionManager.IT.getPartition(resolved2);
         if (partition == null) {

@@ -52,6 +52,8 @@ public class CommandDomainNew extends Command {
     private String[] output;
     /** Domain ID created. */
     private int domain_id;
+    /** Number to substitute for + (-1 => use domain_id) */
+    private int subst;
 
     /**
      * @return Output from domain creation.
@@ -99,8 +101,9 @@ public class CommandDomainNew extends Command {
         String nw_gw,
         String nw_mask,
         String nw_nfs_server,
-        String nw_host) {
-        this(d,name,size,image,initrd,vifs,bargs,root_dev,root_args,nfs_root_path,nw_ip,nw_gw,nw_mask,nw_nfs_server,nw_host,null);
+        String nw_host,
+	int subst) {
+        this(d,name,size,image,initrd,vifs,bargs,root_dev,root_args,nfs_root_path,nw_ip,nw_gw,nw_mask,nw_nfs_server,nw_host,null,subst);
     }
     
     public CommandDomainNew(
@@ -119,7 +122,8 @@ public class CommandDomainNew extends Command {
         String nw_mask,
         String nw_nfs_server,
         String nw_host,
-        String usr_dev) {
+        String usr_dev,
+	int subst) {
             this.d = d;
             this.name = name;
             this.size = size;
@@ -136,6 +140,7 @@ public class CommandDomainNew extends Command {
             this.nw_nfs_server = nw_nfs_server;
             this.nw_host = nw_host;
             this.usr_dev = usr_dev;
+	    this.subst = subst;
     }
 
     /**
@@ -211,8 +216,10 @@ public class CommandDomainNew extends Command {
                             + " domains");
                 }
 
+		if (subst == -1) subst = domain_id;
+
                 /* Set up boot parameters to pass to xi_build. */
-		bargs = StringPattern.parse(bargs).resolve(domain_id) + " ";
+		bargs = StringPattern.parse(bargs).resolve(subst) + " ";
                 if (root_dev.equals("/dev/nfs")) {
                     if (vifs == 0) {
                         throw new CommandFailedException("Cannot use NFS root without VIFs configured");
@@ -225,27 +232,27 @@ public class CommandDomainNew extends Command {
                     }
                     bargs =
                         (bargs
-                            + " root=/dev/nfs " + StringPattern.parse(root_args).resolve(domain_id) + " " 
+                            + " root=/dev/nfs " + StringPattern.parse(root_args).resolve(subst) + " " 
                             + "nfsroot="
                             + StringPattern.parse(nfs_root_path).resolve(
-                                domain_id)
+                                subst)
                             + " ");
                 } else {
                     bargs =
                         (bargs
                             + " root="
-                            + StringPattern.parse(root_dev).resolve(domain_id)
-                            + " " + StringPattern.parse(root_args).resolve(domain_id) + " ");
+                            + StringPattern.parse(root_dev).resolve(subst)
+                            + " " + StringPattern.parse(root_args).resolve(subst) + " ");
 
                 }
                 
                 if (usr_dev != null && !usr_dev.equals("")) {
-                    bargs = bargs + " usr=" + StringPattern.parse(usr_dev).resolve(domain_id) + " ";
+                    bargs = bargs + " usr=" + StringPattern.parse(usr_dev).resolve(subst) + " ";
                 }
 
                 if (vifs > 0) {
                     domain_ip =
-                        InetAddressPattern.parse(nw_ip).resolve(domain_id);
+                        InetAddressPattern.parse(nw_ip).resolve(subst);
                  /*   if (nw_host == null) {
                         try {
                             nw_host =
@@ -263,18 +270,18 @@ public class CommandDomainNew extends Command {
                                 ? ""
                                 : (InetAddressPattern
                                     .parse(nw_nfs_server)
-                                    .resolve(domain_id)))
+                                    .resolve(subst)))
                             + ":"
                             + ((nw_gw == null || nw_gw.equals(""))
                                 ? ""
                                 : (InetAddressPattern
                                     .parse(nw_gw)
-                                    .resolve(domain_id)))
+                                    .resolve(subst)))
                             + ":"
                             + ((nw_mask == null || nw_mask.equals(""))
                                 ? ""
                                 : InetAddressPattern.parse(nw_mask).resolve(
-                                    domain_id))
+                                    subst))
                             + ":"
                             + ((nw_host == null) ? "" : nw_host)
                             + ":eth0:off "
