@@ -231,7 +231,7 @@ int domain_iomem_in_pfn(struct domain *p, unsigned long pfn)
     phys_dev_t *phys_dev;
 
     VERBOSE_INFO("Checking if physdev-capable domain %u needs access to "
-                 "pfn %08lx\n", p->id, pfn);
+                 "pfn %p\n", p->id, pfn);
     
     spin_lock(&p->pcidev_lock);
 
@@ -257,7 +257,7 @@ int domain_iomem_in_pfn(struct domain *p, unsigned long pfn)
     
     spin_unlock(&p->pcidev_lock);
 
-    VERBOSE_INFO("Domain %u %s mapping of pfn %08lx\n",
+    VERBOSE_INFO("Domain %u %s mapping of pfn %p\n",
                  p->id, ret ? "allowed" : "disallowed", pfn);
 
     return ret;

@@ -249,7 +249,7 @@ static int shadow_mode_table_op(
 
     ASSERT(spin_is_locked(&d->arch.shadow_lock));
 
-    SH_VLOG("shadow mode table op %08lx %08lx count %d",
+    SH_VLOG("shadow mode table op %p %p count %d",
             pagetable_val(d->exec_domain[0]->arch.pagetable),    /* XXX SMP */
             pagetable_val(d->exec_domain[0]->arch.shadow_table), /* XXX SMP */
             d->arch.shadow_page_count);
@@ -422,7 +422,7 @@ void unshadow_table(unsigned long gpfn, unsigned int type)
     unsigned long  smfn;
     struct domain *d = page_get_owner(&frame_table[gpfn]);
 
-    SH_VLOG("unshadow_table type=%08x gpfn=%08lx", type, gpfn);
+    SH_VLOG("unshadow_table type=%08x gpfn=%p", type, gpfn);
 
     perfc_incrc(unshadow_table_count);
 
@@ -455,7 +455,7 @@ unsigned long shadow_l2_table(
 
     guest_gpfn = __mfn_to_gpfn(d, gpfn);
 
-    SH_VVLOG("shadow_l2_table( %08lx )", gpfn);
+    SH_VVLOG("shadow_l2_table( %p )", gpfn);
 
     perfc_incrc(shadow_l2_table_count);
 
@@ -506,7 +506,7 @@ unsigned long shadow_l2_table(
     if ( shadow_mode(d) != SHM_full_32 ) 
         unmap_domain_mem(spl2e);
 
-    SH_VLOG("shadow_l2_table( %08lx -> %08lx)", gpfn, spfn);
+    SH_VLOG("shadow_l2_table( %p -> %p)", gpfn, spfn);
     return spfn;
 }
 
@@ -526,7 +526,7 @@ static void shadow_map_l1_into_current_l2(unsigned long va)
     if ( !(sl1ss & PSH_shadowed) )
     {
         /* This L1 is NOT already shadowed so we need to shadow it. */
-        SH_VVLOG("4a: l1 not shadowed ( %08lx )", sl1pfn);
+        SH_VVLOG("4a: l1 not shadowed ( %p )", sl1pfn);
 
         sl1pfn_info = alloc_shadow_page(d);
         sl1pfn_info->u.inuse.type_info = PGT_l1_page_table;
@@ -555,7 +555,7 @@ static void shadow_map_l1_into_current_l2(unsigned long va)
     else
     {
         /* This L1 is shadowed already, but the L2 entry is missing. */
-        SH_VVLOG("4b: was shadowed, l2 missing ( %08lx )", sl1pfn);
+        SH_VVLOG("4b: was shadowed, l2 missing ( %p )", sl1pfn);
 
         sl1pfn = sl1ss & PSH_pfn_mask;
         l2pde_general(d, &gl2e, &sl2e, sl1pfn);
@@ -596,7 +596,7 @@ int shadow_fault(unsigned long va, long error_code)
     struct exec_domain *ed = current;
     struct domain *d = ed->domain;
 
-    SH_VVLOG("shadow_fault( va=%08lx, code=%ld )", va, error_code );
+    SH_VVLOG("shadow_fault( va=%p, code=%ld )", va, error_code );
 
     check_pagetable(d, ed->arch.pagetable, "pre-sf");
 
@@ -678,7 +678,7 @@ int shadow_fault(unsigned long va, long error_code)
     if ( unlikely(__put_user(spte, (unsigned long *)
                              &shadow_linear_pg_table[va >> PAGE_SHIFT])) )
     {
-        SH_VVLOG("3: not shadowed/mapped gpte=%08lx spte=%08lx", gpte, spte);
+        SH_VVLOG("3: not shadowed/mapped gpte=%p spte=%p", gpte, spte);
         shadow_map_l1_into_current_l2(va);
         shadow_linear_pg_table[va >> PAGE_SHIFT] = mk_l1_pgentry(spte);
     }
@@ -702,8 +702,8 @@ void shadow_l1_normal_pt_update(
     l1_pgentry_t *spl1e, *prev_spl1e = *prev_spl1e_ptr;
 
     /* N.B. To get here, we know the l1 page *must* be shadowed. */
-    SH_VVLOG("shadow_l1_normal_pt_update pa=%08lx, gpte=%08lx, "
-             "prev_smfn=%08lx, prev_spl1e=%p",
+    SH_VVLOG("shadow_l1_normal_pt_update pa=%p, gpte=%p, "
+             "prev_smfn=%p, prev_spl1e=%p",
              pa, gpte, prev_smfn, prev_spl1e);
 
     smfn = __shadow_status(current->domain, pa >> PAGE_SHIFT) & PSH_pfn_mask;
@@ -732,7 +732,7 @@ void shadow_l2_normal_pt_update(unsigned long pa, unsigned long gpde)
     unsigned long sl1mfn;
 
     /* N.B. To get here, we know the l2 page *must* be shadowed. */
-    SH_VVLOG("shadow_l2_normal_pt_update pa=%08lx, gpde=%08lx",pa,gpde);
+    SH_VVLOG("shadow_l2_normal_pt_update pa=%p, gpde=%p",pa,gpde);
 
     sl2mfn = __shadow_status(current->domain, pa >> PAGE_SHIFT) & PSH_pfn_mask;
 
@@ -771,8 +771,8 @@ char * sh_check_name;
 
 #define FAIL(_f, _a...)                                                      \
     do {                                                                     \
-        printk("XXX %s-FAIL (%d,%d)" _f " g=%08lx s=%08lx &g=%08lx &s=%08lx" \
-               " pa(&g)=%08lx pa(&s)=%08lx\n",                               \
+        printk("XXX %s-FAIL (%d,%d)" _f " g=%p s=%p &g=%p &s=%p" \
+               " pa(&g)=%p pa(&s)=%p\n",                               \
                sh_check_name, level, i, ## _a , gpte, spte, pgpte, pspte,    \
                virt_to_phys2(pgpte), virt_to_phys2(pspte));                  \
         errors++;                                                            \
@@ -829,7 +829,7 @@ static int check_pte(
             FAIL("Shadow in L1 entry?");
 
         if ( __shadow_status(d, gpfn) != (PSH_shadowed | smfn) )
-            FAIL("smfn problem g.sf=%08lx", 
+            FAIL("smfn problem g.sf=%p", 
                  __shadow_status(d, gpfn) );
     }
 
@@ -885,7 +885,7 @@ void check_pagetable(struct domain *d, pagetable_t pt, char *s)
   
     if ( ! (ss & PSH_shadowed) )
     {
-        printk("%s-PT %08lx not shadowed\n", s, gptbase);
+        printk("%s-PT %p not shadowed\n", s, gptbase);
 
         if ( ss != 0 )
             BUG();
@@ -908,7 +908,7 @@ void check_pagetable(struct domain *d, pagetable_t pt, char *s)
         for ( i = DOMAIN_ENTRIES_PER_L2_PAGETABLE; 
               i < (SH_LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT);
               i++ )
-            printk("+++ (%d) %08lx %08lx\n",i,
+            printk("+++ (%d) %p %p\n",i,
                    l2_pgentry_val(gpl2e[i]), l2_pgentry_val(spl2e[i]));
         FAILPT("hypervisor entries inconsistent");
     }
@@ -920,7 +920,7 @@ void check_pagetable(struct domain *d, pagetable_t pt, char *s)
     if ( (l2_pgentry_val(spl2e[SH_LINEAR_PT_VIRT_START >> 
                               L2_PAGETABLE_SHIFT]) != 
           ((smfn << PAGE_SHIFT) | __PAGE_HYPERVISOR)) )
-        FAILPT("hypervisor shadow linear map inconsistent %08lx %08lx",
+        FAILPT("hypervisor shadow linear map inconsistent %p %p",
                l2_pgentry_val(spl2e[SH_LINEAR_PT_VIRT_START >>
                                    L2_PAGETABLE_SHIFT]),
                (smfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);

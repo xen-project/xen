@@ -237,7 +237,7 @@ static inline void l1pte_write_fault(
 
     spte = (mfn << PAGE_SHIFT) | (gpte & ~PAGE_MASK);
 
-    SH_VVLOG("l1pte_write_fault: updating spte=0x%08lx gpte=0x%08lx", spte, gpte);
+    SH_VVLOG("l1pte_write_fault: updating spte=0x%p gpte=0x%p", spte, gpte);
     *gpte_p = gpte;
     *spte_p = spte;
 }
@@ -256,7 +256,7 @@ static inline void l1pte_read_fault(
     if ( (shadow_mode(d) == SHM_logdirty) || ! (gpte & _PAGE_DIRTY) )
         spte &= ~_PAGE_RW;
 
-    SH_VVLOG("l1pte_read_fault: updating spte=0x%08lx gpte=0x%08lx", spte, gpte);
+    SH_VVLOG("l1pte_read_fault: updating spte=0x%p gpte=0x%p", spte, gpte);
     *gpte_p = gpte;
     *spte_p = spte;
 }
@@ -309,7 +309,7 @@ static inline void l1pte_propagate_from_guest(
 
 #if SHADOW_VERBOSE_DEBUG
     if ( old_spte || spte || gpte )
-        SH_VVLOG("l1pte_propagate_from_guest: gpte=0x%08lx, old spte=0x%08lx, new spte=0x%08lx ", gpte, old_spte, spte);
+        SH_VVLOG("l1pte_propagate_from_guest: gpte=0x%p, old spte=0x%p, new spte=0x%p ", gpte, old_spte, spte);
 #endif
 
     *gpte_p = gpte;
@@ -366,7 +366,7 @@ static void shadow_audit(struct domain *d, int print)
             live++; 
             if ( (a->pfn == 0) || (a->smfn_and_flags == 0) )
             {
-                printk("XXX live=%d pfn=%08lx sp=%08lx next=%p\n",
+                printk("XXX live=%d pfn=%p sp=%p next=%p\n",
                        live, a->pfn, a->smfn_and_flags, a->next);
                 BUG();
             }
@@ -439,7 +439,7 @@ static inline unsigned long __shadow_status(
                 SWAP(head->smfn_and_flags, x->smfn_and_flags);
             }
 
-            SH_VVLOG("lookup gpfn=%08lx => status=%08lx",
+            SH_VVLOG("lookup gpfn=%p => status=%p",
                      gpfn, head->smfn_and_flags);
             return head->smfn_and_flags;
         }
@@ -449,7 +449,7 @@ static inline unsigned long __shadow_status(
     }
     while ( x != NULL );
 
-    SH_VVLOG("lookup gpfn=%08lx => status=0", gpfn);
+    SH_VVLOG("lookup gpfn=%p => status=0", gpfn);
     return 0;
 }
 
@@ -577,7 +577,7 @@ static inline void set_shadow_status(
 
     x = head = hash_bucket(d, gpfn);
    
-    SH_VVLOG("set gpfn=%08x s=%08lx bucket=%p(%p)", gpfn, s, x, x->next);
+    SH_VVLOG("set gpfn=%08x s=%p bucket=%p(%p)", gpfn, s, x, x->next);
     shadow_audit(d, 0);
 
     /*
@@ -692,7 +692,7 @@ static inline void __shadow_mk_pagetable(struct exec_domain *ed)
     unsigned long gpfn = pagetable_val(ed->arch.pagetable) >> PAGE_SHIFT;
     unsigned long smfn = __shadow_status(d, gpfn) & PSH_pfn_mask;
 
-    SH_VVLOG("0: __shadow_mk_pagetable(gpfn=%08lx, smfn=%08lx)", gpfn, smfn);
+    SH_VVLOG("0: __shadow_mk_pagetable(gpfn=%p, smfn=%p)", gpfn, smfn);
 
     if ( unlikely(smfn == 0) )
         smfn = shadow_l2_table(d, gpfn);
@@ -709,7 +709,7 @@ static inline void shadow_mk_pagetable(struct exec_domain *ed)
 {
      if ( unlikely(shadow_mode(ed->domain)) )
      {
-         SH_VVLOG("shadow_mk_pagetable( gptbase=%08lx, mode=%d )",
+         SH_VVLOG("shadow_mk_pagetable( gptbase=%p, mode=%d )",
              pagetable_val(ed->arch.pagetable),
                   shadow_mode(ed->domain)); 
 
@@ -718,7 +718,7 @@ static inline void shadow_mk_pagetable(struct exec_domain *ed)
          shadow_unlock(ed->domain);
 
      SH_VVLOG("leaving shadow_mk_pagetable:\n"
-              "( gptbase=%08lx, mode=%d ) sh=%08lx",
+              "( gptbase=%p, mode=%d ) sh=%p",
               pagetable_val(ed->arch.pagetable),
               shadow_mode(ed->domain), 
               pagetable_val(ed->arch.shadow_table) );
