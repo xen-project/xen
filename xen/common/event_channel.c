@@ -46,7 +46,7 @@ static int get_free_port(struct task_struct *p)
         if ( max == MAX_EVENT_CHANNELS )
             return -ENOSPC;
         
-        max = (max == 0) ? 4 : (max * 2);
+        max *= 2;
         
         chn = kmalloc(max * sizeof(event_channel_t), GFP_KERNEL);
         if ( unlikely(chn == NULL) )
@@ -287,10 +287,7 @@ static long __evtchn_close(struct task_struct *p1, int port1)
         if ( chn2[port2].u.remote.dom != p1 )
             BUG();
 
-        chn2[port2].state         = ECS_UNBOUND;
-        chn2[port2].u.remote.dom  = NULL;
-        chn2[port2].u.remote.port = 0xFFFF;
-
+        chn2[port2].state = ECS_UNBOUND;
         evtchn_set_exception(p2, port2);
 
         break;
@@ -299,10 +296,7 @@ static long __evtchn_close(struct task_struct *p1, int port1)
         BUG();
     }
 
-    chn1[port1].state         = ECS_FREE;
-    chn1[port1].u.remote.dom  = NULL;
-    chn1[port1].u.remote.port = 0xFFFF;
-    
+    chn1[port1].state = ECS_FREE;
     evtchn_set_exception(p1, port1);
 
  out:

@@ -995,7 +995,7 @@ int pirq_guest_bind(struct task_struct *p, int irq, int will_share)
     unsigned long flags;
     irq_desc_t *desc = &irq_desc[irq];
     irq_guest_action_t *action;
-    int rc;
+    int rc = 0;
 
     if ( !IS_PRIV(p) )
         return -EPERM;
@@ -1006,19 +1006,19 @@ int pirq_guest_bind(struct task_struct *p, int irq, int will_share)
 
     if ( !(desc->status & IRQ_GUEST) )
     {
-        rc = -EBUSY;
         if ( desc->action != NULL )
         {
             DPRINTK("Cannot bind IRQ %d to guest. In use by '%s'.\n",
                     irq, desc->action->name);
+            rc = -EBUSY;
             goto out;
         }
 
-        rc = -ENOMEM;
         action = kmalloc(sizeof(irq_guest_action_t), GFP_KERNEL);
         if ( (desc->action = (struct irqaction *)action) == NULL )
         {
             DPRINTK("Cannot bind IRQ %d to guest. Out of memory.\n", irq);
+            rc = -ENOMEM;
             goto out;
         }
 
@@ -1038,16 +1038,14 @@ int pirq_guest_bind(struct task_struct *p, int irq, int will_share)
         goto out;
     }
 
-    rc = -EBUSY;
     if ( action->nr_guests == IRQ_MAX_GUESTS )
     {
         DPRINTK("Cannot bind IRQ %d to guest. Already at max share.\n", irq);
+        rc = -EBUSY;
         goto out;
     }
 
     action->guest[action->nr_guests++] = p;
-
-    rc = 0;
 
  out:
     spin_unlock_irqrestore(&desc->lock, flags);

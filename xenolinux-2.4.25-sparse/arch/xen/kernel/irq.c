@@ -824,7 +824,7 @@ unsigned long probe_irq_on(void)
 	 * something may have generated an irq long ago and we want to
 	 * flush such a longstanding irq before considering it as spurious. 
 	 */
-	for (i = NR_IRQS-1; i > 0; i--)  {
+	for (i = NR_PIRQS-1; i > 0; i--)  {
 		desc = irq_desc + i;
 
 		spin_lock_irq(&desc->lock);
@@ -842,7 +842,7 @@ unsigned long probe_irq_on(void)
 	 * (we must startup again here because if a longstanding irq
 	 * happened in the previous stage, it may have masked itself)
 	 */
-	for (i = NR_IRQS-1; i > 0; i--) {
+	for (i = NR_PIRQS-1; i > 0; i--) {
 		desc = irq_desc + i;
 
 		spin_lock_irq(&desc->lock);
@@ -864,7 +864,7 @@ unsigned long probe_irq_on(void)
 	 * Now filter out any obviously spurious interrupts
 	 */
 	val = 0;
-	for (i = 0; i < NR_IRQS; i++) {
+	for (i = 0; i < NR_PIRQS; i++) {
 		irq_desc_t *desc = irq_desc + i;
 		unsigned int status;
 
@@ -909,7 +909,7 @@ unsigned int probe_irq_mask(unsigned long val)
 	unsigned int mask;
 
 	mask = 0;
-	for (i = 0; i < NR_IRQS; i++) {
+	for (i = 0; i < NR_PIRQS; i++) {
 		irq_desc_t *desc = irq_desc + i;
 		unsigned int status;
 
@@ -959,7 +959,7 @@ int probe_irq_off(unsigned long val)
 
 	nr_irqs = 0;
 	irq_found = 0;
-	for (i = 0; i < NR_IRQS; i++) {
+	for (i = 0; i < NR_PIRQS; i++) {
 		irq_desc_t *desc = irq_desc + i;
 		unsigned int status;
 

@@ -164,9 +164,10 @@ struct task_struct
      * domain's event-channel spinlock. Read accesses can also synchronise on 
      * the lock, but races don't usually matter.
      */
-    u16 pirq_to_evtchn[128];
+#define NR_PIRQS 128 /* Put this somewhere sane! */
+    u16 pirq_to_evtchn[NR_PIRQS];
     u16 virq_to_evtchn[NR_VIRQS];
-    u32 pirq_mask[2];
+    u32 pirq_mask[NR_PIRQS/32];
 
     /* Physical I/O */
     spinlock_t       pcidev_lock;
