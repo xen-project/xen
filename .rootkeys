@@ -140,6 +140,8 @@
 3eb781fd7211MZsLxJSiuy7W4KnJXg tools/internal/xi_vifinit
 3f13d81eQ9Vz-h-6RDGFkNR9CRP95g tools/misc/enable_nat
 3f13d81e6Z6806ihYYUw8GVKNkYnuw tools/misc/enable_nat.README
+3f1668d4-FUY6Enc7MB3GcwUtfJ5HA tools/misc/mkdevnodes
+3f1668d4F29Jsw0aC0bJEIkOBiagiQ tools/misc/read_console_udp.c
 3ddb79bcbOVHh38VJzc97-JEGD4dJQ xen/Makefile
 3ddb79bcCa2VbsMp7mWKlhgwLQUQGA xen/README
 3ddb79bcWnTwYsQRWl_PaneJfa6p0w xen/Rules.mk

@@ -1,0 +1,21 @@
+#! /bin/bash
+
+BASE=${1:?"base directory missing (eg. /dev)"}
+
+rm -f ${BASE}/xhd[abcdefghijklmnop]*
+rm -f ${BASE}/xsd[abcdefghijklmnop]*
+rm -f ${BASE}/xvd[abcdefghijklmnop]*
+
+# XLVIRT is 16 devices of 15 partitions
+
+LETTERS="a b c d e f g h i j k l m n o p"
+PARTITIONS="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15"
+
+j=0
+for l in ${LETTERS}; do
+    mknod ${BASE}/xvd${l} b 125 ${j}
+    for i in ${PARTITIONS}; do
+        mknod ${BASE}/xvd${l}${i} b 125 $(($i+$j))
+    done
+    j=$(($j+16))
+done
