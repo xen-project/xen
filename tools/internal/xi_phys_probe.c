@@ -35,9 +35,9 @@ int main(int argc, char *argv[])
       break;
 
     for (x = 0; x < buf.n_aces; x++) {
-      printf("%x:[%x,%x) : %x\n", buf.entries[x].device,
+      printf("%x %x %x %x\n", buf.entries[x].device,
 	     buf.entries[x].start_sect,
-	     buf.entries[x].start_sect  + buf.entries[x].n_sectors,
+	     buf.entries[x].n_sectors,
 	     buf.entries[x].mode);
     }
     buf.start_ind += buf.n_aces;
