@@ -107,6 +107,7 @@ static inline int kernel_text_address(unsigned long addr)
 
 }
 
+
 void show_trace(unsigned long * stack)
 {
     int i;
@@ -124,6 +125,13 @@ void show_trace(unsigned long * stack)
         }
     }
     printk("\n");
+}
+
+void show_traceX(void)
+{
+    unsigned long *addr;
+    __asm__ __volatile__ ("movl %%esp,%0" : "=r" (addr) : );
+    show_trace(addr);
 }
 
 void show_stack(unsigned long *esp)
@@ -172,6 +180,7 @@ void show_registers(struct pt_regs *regs)
            regs->xfs & 0xffff, regs->xgs & 0xffff, ss);
 
     show_stack(&regs->esp);
+    show_trace(&regs->esp);
 }	
 
 
@@ -322,6 +331,8 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
 
     __asm__ __volatile__ ("movl %%cr2,%0" : "=r" (addr) : );
 
+//    __sti(); // XXXX This may not be safe??? LDT issues???
+
     perfc_incrc(page_faults);
 
     if ( unlikely(addr >= LDT_VIRT_START) && 
@@ -339,7 +350,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
 
     if ( unlikely(p->mm.shadow_mode) && 
          (addr < PAGE_OFFSET) && shadow_fault(addr, error_code) )
-	return; /* Return TRUE if fault was handled. */
+	return; /* Returns TRUE if fault was handled. */
 
     if ( unlikely(!(regs->xcs & 3)) )
         goto fault_in_hypervisor;
