@@ -6,14 +6,15 @@ perfc       ?= n
 trace       ?= n
 optimize    ?= y
 
-# Currently supported architectures:
-#  {COMPILE,TARGET}_ARCH    := x86
-#  {COMPILE,TARGET}_SUBARCH := x86_32 | x86_64
-COMPILE_ARCH    := x86
-COMPILE_SUBARCH := $(shell uname -m | sed -e s/i.86/x86_32/)
-
+# Currently supported architectures: x86_32, x86_64
+COMPILE_ARCH    ?= $(shell uname -m | sed -e s/i.86/x86_32/)
 TARGET_ARCH     ?= $(COMPILE_ARCH)
-TARGET_SUBARCH  ?= $(COMPILE_SUBARCH)
+
+# Set ARCH/SUBARCH appropriately.
+COMPILE_SUBARCH := $(COMPILE_ARCH)
+TARGET_SUBARCH  := $(COMPILE_ARCH)
+COMPILE_ARCH    := $(patsubst x86%,x86,$(COMPILE_ARCH))
+TARGET_ARCH     := $(patsubst x86%,x86,$(TARGET_ARCH))
 
 TARGET  := $(BASEDIR)/xen
 HDRS    := $(wildcard $(BASEDIR)/include/xen/*.h)
