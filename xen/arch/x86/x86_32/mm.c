@@ -104,9 +104,10 @@ void __init zap_low_mappings(void)
  */
 static void __synchronise_pagetables(void *mask)
 {
-    struct exec_domain *d = current;
-    if ( ((unsigned long)mask & (1<<d->processor)) && is_idle_task(d->domain) )
-        write_ptbase(&d->mm);
+    struct exec_domain *ed = current;
+    if ( ((unsigned long)mask & (1 << ed->processor)) &&
+         is_idle_task(ed->domain) )
+        write_ptbase(&ed->mm);
 }
 void synchronise_pagetables(unsigned long cpu_mask)
 {

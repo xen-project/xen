@@ -60,36 +60,14 @@ void __set_fixmap(enum fixed_addresses idx,
 
 void __init paging_init(void)
 {
-    void *ioremap_pt;
-    int i;
-
-    /* Create page table for ioremap(). */
-    ioremap_pt = (void *)alloc_xenheap_page();
-    clear_page(ioremap_pt);
-    idle_pg_table[IOREMAP_VIRT_START >> L2_PAGETABLE_SHIFT] = 
-        mk_l2_pgentry(__pa(ioremap_pt) | __PAGE_HYPERVISOR);
-
-    /* Create read-only mapping of MPT for guest-OS use. */
-    idle_pg_table[RO_MPT_VIRT_START >> L2_PAGETABLE_SHIFT] =
-        mk_l2_pgentry(l2_pgentry_val(
-            idle_pg_table[RDWR_MPT_VIRT_START >> L2_PAGETABLE_SHIFT]) & 
-                      ~_PAGE_RW);
-
-    /* Set up mapping cache for domain pages. */
-    mapcache = (unsigned long *)alloc_xenheap_page();
-    clear_page(mapcache);
-    idle_pg_table[MAPCACHE_VIRT_START >> L2_PAGETABLE_SHIFT] =
-        mk_l2_pgentry(__pa(mapcache) | __PAGE_HYPERVISOR);
-
     /* Set up linear page table mapping. */
-    idle_pg_table[LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
-        mk_l2_pgentry(__pa(idle_pg_table) | __PAGE_HYPERVISOR);
-
+    idle_pg_table[LINEAR_PT_VIRT_START >> L4_PAGETABLE_SHIFT] =
+        mk_l4_pgentry(__pa(idle_pg_table) | __PAGE_HYPERVISOR);
 }
 
 void __init zap_low_mappings(void)
 {
-    idle_pg_table[0] = 0;
+    idle_pg_table[0] = mk_l4_pgentry(0);
 }
 
 
@@ -99,9 +77,10 @@ void __init zap_low_mappings(void)
  */
 static void __synchronise_pagetables(void *mask)
 {
-    struct domain *d = current;
-    if ( ((unsigned long)mask & (1<<d->processor)) && is_idle_task(d) )
-        write_ptbase(&d->mm);
+    struct exec_domain *ed = current;
+    if ( ((unsigned long)mask & (1 << ed->processor)) &&
+         is_idle_task(ed->domain) )
+        write_ptbase(&ed->mm);
 }
 void synchronise_pagetables(unsigned long cpu_mask)
 {
@@ -111,6 +90,7 @@ void synchronise_pagetables(unsigned long cpu_mask)
 
 long do_stack_switch(unsigned long ss, unsigned long esp)
 {
+#if 0
     int nr = smp_processor_id();
     struct tss_struct *t = &init_tss[nr];
 
@@ -122,7 +102,7 @@ long do_stack_switch(unsigned long ss, unsigned long esp)
     current->thread.guestos_sp = esp;
     t->ss1  = ss;
     t->esp1 = esp;
-
+#endif
     return 0;
 }
 
@@ -163,9 +143,11 @@ int check_descriptor(unsigned long *d)
         if ( (b & _SEGMENT_TYPE) != 0xc00 )
             goto bad;
 
+#if 0
         /* Can't allow far jump to a Xen-private segment. */
         if ( !VALID_CODESEL(a>>16) )
             goto bad;
+#endif
 
         /* Reserved bits must be zero. */
         if ( (b & 0xe0) != 0 )
@@ -226,24 +208,25 @@ int check_descriptor(unsigned long *d)
 }
 
 
-void destroy_gdt(struct domain *d)
+void destroy_gdt(struct exec_domain *ed)
 {
     int i;
     unsigned long pfn;
 
     for ( i = 0; i < 16; i++ )
     {
-        if ( (pfn = l1_pgentry_to_pagenr(d->mm.perdomain_pt[i])) != 0 )
+        if ( (pfn = l1_pgentry_to_pagenr(ed->mm.perdomain_ptes[i])) != 0 )
             put_page_and_type(&frame_table[pfn]);
-        d->mm.perdomain_pt[i] = mk_l1_pgentry(0);
+        ed->mm.perdomain_ptes[i] = mk_l1_pgentry(0);
     }
 }
 
 
-long set_gdt(struct domain *d, 
+long set_gdt(struct exec_domain *ed, 
              unsigned long *frames,
              unsigned int entries)
 {
+    struct domain *d = ed->domain;
     /* NB. There are 512 8-byte entries per GDT page. */
     int i = 0, nr_pages = (entries + 511) / 512;
     struct desc_struct *vgdt;
@@ -284,15 +267,15 @@ long set_gdt(struct domain *d,
     unmap_domain_mem(vgdt);
 
     /* Tear down the old GDT. */
-    destroy_gdt(d);
+    destroy_gdt(ed);
 
     /* Install the new GDT. */
     for ( i = 0; i < nr_pages; i++ )
-        d->mm.perdomain_pt[i] =
+        ed->mm.perdomain_ptes[i] =
             mk_l1_pgentry((frames[i] << PAGE_SHIFT) | __PAGE_HYPERVISOR);
 
-    SET_GDT_ADDRESS(d, GDT_VIRT_START);
-    SET_GDT_ENTRIES(d, entries);
+    SET_GDT_ADDRESS(ed, GDT_VIRT_START(ed));
+    SET_GDT_ENTRIES(ed, entries);
 
     return 0;
 
@@ -339,7 +322,7 @@ long do_update_descriptor(
         return -EINVAL;
 
     page = &frame_table[pfn];
-    if ( unlikely(!get_page(page, current)) )
+    if ( unlikely(!get_page(page, current->domain)) )
         return -EINVAL;
 
     /* Check if the given frame is in use in an unsafe context. */
@@ -347,7 +330,7 @@ long do_update_descriptor(
     {
     case PGT_gdt_page:
         /* Disallow updates of Xen-reserved descriptors in the current GDT. */
-        if ( (l1_pgentry_to_pagenr(current->mm.perdomain_pt[0]) == pfn) &&
+        if ( (l1_pgentry_to_pagenr(current->mm.perdomain_ptes[0]) == pfn) &&
              (((pa&(PAGE_SIZE-1))>>3) >= FIRST_RESERVED_GDT_ENTRY) &&
              (((pa&(PAGE_SIZE-1))>>3) <= LAST_RESERVED_GDT_ENTRY) )
             goto out;

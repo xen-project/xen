@@ -130,7 +130,12 @@ typedef struct { unsigned long pt_lo; } pagetable_t;
 
 #define va_to_l1mfn(_va) (l2_pgentry_val(linear_l2_table[_va>>L2_PAGETABLE_SHIFT]) >> PAGE_SHIFT)
 
+#ifdef __i386__
 extern l2_pgentry_t idle_pg_table[ENTRIES_PER_L2_PAGETABLE];
+#else
+extern l4_pgentry_t idle_pg_table[ENTRIES_PER_L4_PAGETABLE];
+#endif
+
 extern void paging_init(void);
 
 /* Flush global pages as well. */
