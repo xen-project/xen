@@ -17,7 +17,7 @@ import os
 from twisted.internet import defer
 
 import xen.ext.xc; xc = xen.ext.xc.new()
-import xenctl.ip
+from xen.util import ip
 
 import sxp
 
