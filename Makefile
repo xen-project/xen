@@ -36,7 +36,7 @@ LINUX_SRC        ?= $(firstword $(foreach dir,$(subst :, ,$(LINUX_SRC_PATH)),\
 pristine-linux-src: 
 ifeq ($(LINUX_SRC),)
 	@echo "Cannot find linux-$(LINUX_VER).tar.gz in path $(LINUX_SRC_PATH)"
-	@wget ftp://ftp.kernel.org/pub/linux/kernel/v2.4/linux-$(LINUX_VER).tar.bz2 -O./linux-$(LINUX_VER).tar.bz2
+	@wget http://www.kernel.org/pub/linux/kernel/v2.4/linux-$(LINUX_VER).tar.bz2 -O./linux-$(LINUX_VER).tar.bz2
 LINUX_SRC := ./linux-$(LINUX_VER).tar.bz2 
 endif
 
