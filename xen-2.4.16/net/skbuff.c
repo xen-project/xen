@@ -150,8 +150,6 @@ static __inline__ void skb_head_to_pool(struct sk_buff *skb)
 	kmem_cache_free(skbuff_head_cache, skb);
 }
 
-//static unsigned long skbpagesout=0, skbpagesin=0;
-
 static inline u8 *alloc_skb_data_page(struct sk_buff *skb)
 {
         struct list_head *list_ptr;
@@ -166,13 +164,11 @@ static inline u8 *alloc_skb_data_page(struct sk_buff *skb)
         pf = list_entry(list_ptr, struct pfn_info, list);
         pf->flags = 0; // owned by dom0
         list_del(&pf->list);
-        //pf->next = pf->prev = (pf - frame_table);
         free_pfns--;
 
         spin_unlock_irqrestore(&free_list_lock, flags);
 
         skb->pf = pf;
-//if (skbpagesout++ % 100 == 0) printk("XEN-: skb allocs: %lu\n", skbpagesout);
         return (u8 *)((pf - frame_table) << PAGE_SHIFT);
 }
 
@@ -190,7 +186,6 @@ static inline void dealloc_skb_data_page(struct sk_buff *skb)
 
         spin_unlock_irqrestore(&free_list_lock, flags);
 
-//if (skbpagesin++ % 100 == 0) printk("XEN-: skb allocs: %lu\n", skbpagesin);
 }
 
 struct sk_buff *alloc_zc_skb(unsigned int size,int gfp_mask)
@@ -406,10 +401,16 @@ static void skb_release_data(struct sk_buff *skb)
 		if (skb_shinfo(skb)->frag_list)
 			skb_drop_fraglist(skb);
 
-                if (skb->skb_type == SKB_NORMAL) {
+                if (skb->skb_type == SKB_NORMAL) 
+                {
 		    kfree(skb->head);
-                } else if (skb->skb_type == SKB_ZERO_COPY) {                    dealloc_skb_data_page(skb);
-                } else {
+                } 
+                else if (skb->skb_type == SKB_ZERO_COPY) 
+                {
+                    dealloc_skb_data_page(skb);
+                } 
+                else 
+                {
                     BUG(); //skb_release_data called with unknown skb type!
                 }
 	}

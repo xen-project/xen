@@ -186,35 +186,7 @@ inline unsigned long get_ppte(unsigned long addr)
 
         return ppte;
 }
-/*
-static void validate_free_list(void)
-{
-    unsigned long addr, ppfn, mpfn, mpfn2, flags;
-    struct list_head *i;
-    struct net_page_info *np;
 
-    printk(KERN_ALERT "Walking free pages:\n");
-   
-    spin_lock_irqsave(&net_page_list_lock, flags);
-    
-    list_for_each(i, &net_page_list) 
-    {
-        np = list_entry(i, struct net_page_info, list);
-        addr = np->virt_addr;
-        ppfn = virt_to_phys(addr) >> PAGE_SHIFT;
-        mpfn = get_ppte(addr);
-        mpfn2 = phys_to_machine_mapping[ppfn];
-
-        mpfn = (*(unsigned long *)phys_to_virt(machine_to_phys(mpfn))) >> PAGE_SHIFT;
-        if (mpfn != mpfn2) printk(KERN_ALERT "mpfn %lu != %lu\n", mpfn, mpfn2);
-
-        if (machine_to_phys_mapping[mpfn] != ppfn) printk(KERN_ALERT "ppfn %lu != %lu\n", machine_to_phys_mapping[mpfn], ppfn);
-    }
-
-    spin_unlock_irqrestore(&net_page_list_lock, flags);
-    
-}
-*/
 static void network_alloc_rx_buffers(struct net_device *dev)
 {
     unsigned int i;
@@ -232,7 +204,6 @@ static void network_alloc_rx_buffers(struct net_device *dev)
         np->rx_skb_ring[i] = skb;
         np->net_ring->rx_ring[i].addr = get_ppte(skb->head); 
         np->net_ring->rx_ring[i].size = RX_BUF_SIZE - 16; /* arbitrary */
-//printk(KERN_ALERT "[%p]\n", phys_to_machine(virt_to_phys(skb->page_ptr)));
     }
 
     np->net_ring->rx_prod = i;
@@ -256,15 +227,6 @@ static void network_free_rx_buffers(struct net_device *dev)
     }
 }
 
-void print_range(u8 *start, unsigned int len)
-{
-    int i = 0;
-
-    while (i++ < len)
-        printk("%x:", start[i]);
-    printk("\n");
-}
-
 static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
     unsigned int i;
@@ -276,9 +238,6 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
         netif_stop_queue(dev);
         return -ENOBUFS;
     }
-//print_range(skb->data, ETH_HLEN + 8);
-//print_range(skb->data + ETH_HLEN + 8, 20);
-//printk("skb->len is %u in guestOS (expected fraglen: %u).\n", skb->len, skb->len - (ETH_HLEN + 8));
     i = np->net_ring->tx_prod;
 
     if ( (((unsigned long)skb->data & ~PAGE_MASK) + skb->len) >= PAGE_SIZE )
@@ -331,8 +290,6 @@ static void network_rx_int(int irq, void *dev_id, struct pt_regs *ptregs)
     struct net_private *np = dev->priv;
     struct sk_buff *skb;
     
-    /*if (net_countx++ % 100 == 0) validate_free_list();*/
-    
  again:
     for ( i = np->rx_idx; i != np->net_ring->rx_cons; i = RX_RING_INC(i) )
     {
@@ -344,8 +301,6 @@ static void network_rx_int(int irq, void *dev_id, struct pt_regs *ptregs)
         }
         skb = np->rx_skb_ring[i];
 
-//printk(KERN_ALERT "[%u]: ptmm[%lx] old:(%lx) new:(%lx)\n", i , virt_to_phys(skb->head) >> PAGE_SHIFT, phys_to_machine_mapping[virt_to_phys(skb->head) >> PAGE_SHIFT], (*(unsigned long *)phys_to_virt(machine_to_phys(np->net_ring->rx_ring[i].addr))) >> PAGE_SHIFT);
-
         phys_to_machine_mapping[virt_to_phys(skb->head) >> PAGE_SHIFT] =
             (*(unsigned long *)phys_to_virt(
                     machine_to_phys(np->net_ring->rx_ring[i].addr))
@@ -354,8 +309,8 @@ static void network_rx_int(int irq, void *dev_id, struct pt_regs *ptregs)
         skb_put(skb, np->net_ring->rx_ring[i].size);
         skb->protocol = eth_type_trans(skb, dev);
 
-        /* Set up shinfo -- from alloc_skb */
-        /* This was particularily nasty:  the shared info is hidden at the back of the data area
+        /* Set up shinfo -- from alloc_skb 
+         * This was particularily nasty:  the shared info is hidden at the back of the data area
          * (presumably so it can be shared), but on page flip it gets very spunked.
          */
 

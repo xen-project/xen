@@ -507,7 +507,13 @@ int dev_queue_xmit(struct sk_buff *skb)
 {
 	struct net_device *dev = skb->dev;
 	struct Qdisc  *q;
-if (!(dev->features&NETIF_F_SG)) printk("NIC doesn't do SG!!!\n");
+        
+        if (!(dev->features&NETIF_F_SG)) 
+        {
+            printk("NIC doesn't do scatter-gather!\n");
+            BUG();
+        }
+        
 	if (skb_shinfo(skb)->frag_list &&
 	    !(dev->features&NETIF_F_FRAGLIST) &&
 	    skb_linearize(skb, GFP_ATOMIC) != 0) {
@@ -679,30 +685,16 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
 {
         net_shadow_ring_t *shadow_ring;
         rx_shadow_entry_t *rx;
-        unsigned long *g_pte; //tmp
+        unsigned long *g_pte; 
         struct pfn_info *g_pfn, *h_pfn;
-        unsigned int i; //, nvif;
+        unsigned int i; 
 
         
         
-        /*
-         * Write the virtual MAC address into the destination field
-         * of the ethernet packet. Furthermore, do the same for ARP
-         * reply packets. This is easy because the virtual MAC address
-         * is always 00-[nn]-00-00-00-00, where the second sixteen bits 
-         * of the MAC are the vif's id.  This is to differentiate between
-         * vifs on guests that have more than one.
-         *
-         * In zero copy, the data pointers for the packet have to have been 
-         * mapped in by the caller.
-         */
-
         memset(skb->mac.ethernet->h_dest, 0, ETH_ALEN);
-//        *(unsigned int *)(skb->mac.ethernet->h_dest + 1) = nvif;
         if ( ntohs(skb->mac.ethernet->h_proto) == ETH_P_ARP )
         {
             memset(skb->nh.raw + 18, 0, ETH_ALEN);
-//            *(unsigned int *)(skb->nh.raw + 18 + 1) = nvif;
         }
         shadow_ring = vif->shadow_ring;
 
@@ -789,14 +781,17 @@ int netif_rx(struct sk_buff *skb)
 	    get_fast_time(&skb->stamp);
 
         if ( (skb->data - skb->head) != (18 + ETH_HLEN) )
-            printk("headroom was %lu!\n", (unsigned long)skb->data - (unsigned long)skb->head);
-        //    BUG();
+            BUG();
         
         skb->head = (u8 *)map_domain_mem(((skb->pf - frame_table) << PAGE_SHIFT));
 
         /* remapping this address really screws up all the skb pointers.  We need 
-        * to map them all here sufficiently to get the packet demultiplexed.
-        */
+         * to map them all here sufficiently to get the packet demultiplexed.
+         *
+         * this remapping happens more than once in the code and is grim.  It will
+         * be fixed in a later update -- drivers should be able to align the packet
+         * arbitrarily.
+         */
                 
         skb->data = skb->head;
         skb_reserve(skb,18); // 18 is the 16 from dev_alloc_skb plus 2 for #
@@ -805,9 +800,6 @@ int netif_rx(struct sk_buff *skb)
         skb->data += ETH_HLEN;
         skb->nh.raw = skb->data;
         
-	/* The code is rearranged so that the path is the most
-	   short when CPU is congested, but is still operating.
-	 */
 	queue = &softnet_data[this_cpu];
         
 	netdev_rx_stat[this_cpu].total++;
@@ -817,15 +809,9 @@ int netif_rx(struct sk_buff *skb)
                 
         if ( skb->dst_vif == VIF_UNKNOWN_INTERFACE )
             skb->dst_vif = __net_get_target_vif(skb->mac.raw, skb->len, skb->src_vif);
-//if (skb->dst_vif == VIF_DROP)
-//printk("netif_rx target: %d (sec: %u)\n", skb->dst_vif, skb->security);
         
         if ( (vif = sys_vif_list[skb->dst_vif]) == NULL )
-        {
-//printk("No such vif! (%d).\n", skb->dst_vif);
-            // the target vif does not exist.
             goto drop;
-        }
 
         /* This lock-and-walk of the task list isn't really necessary, and is an
          * artifact of the old code.  The vif contains a pointer to the skb list 
@@ -985,6 +971,16 @@ static inline void handle_diverter(struct sk_buff *skb)
 }
 #endif   /* CONFIG_NET_DIVERT */
 
+
+/*
+ * update_shared_ring(void)
+ *
+ * This replaces flush_rx_queue as the guest event handler to move packets queued in
+ * the guest ring up to the guest.  Really, the packet is already there, it was page
+ * flipped in deliver_packet, but this moves the ring descriptor across from the 
+ * shadow ring and increments the pointers.
+ */
+
 void update_shared_ring(void)
 {
     rx_shadow_entry_t *rx;
@@ -1017,156 +1013,6 @@ void update_shared_ring(void)
     }
 }
             
-void flush_rx_queue(void)
-{
-    struct sk_buff *skb;
-    shared_info_t *s = current->shared_info;
-    net_ring_t *net_ring;
-    net_shadow_ring_t *shadow_ring;
-    unsigned int i, nvif;
-    rx_shadow_entry_t *rx;
-    unsigned long *g_pte, tmp;
-    struct pfn_info *g_pfn, *h_pfn;
-    
-    /* I have changed this to batch flush all vifs for a guest
-     * at once, whenever this is called.  Since the guest is about to be
-     * scheduled and issued an RX interrupt for one nic, it might as well
-     * receive all pending traffic  although it will still only get
-     * interrupts about rings that pass the event marker.  
-     *
-     * If this doesn't make sense, _HYP_EVENT_NET_RX can be modified to
-     * represent individual interrups as _EVENT_NET_RX and the outer for
-     * loop can be replaced with a translation to the specific NET 
-     * interrupt to serve. --akw
-     */
-    clear_bit(_HYP_EVENT_NET_RX, &current->hyp_events);
-
-    for (nvif = 0; nvif < current->num_net_vifs; nvif++)
-    {
-        net_ring = current->net_vif_list[nvif]->net_ring;
-        shadow_ring = current->net_vif_list[nvif]->shadow_ring;
-        while ( (skb = skb_dequeue(&current->net_vif_list[nvif]->skb_list)) 
-                        != NULL )
-        {
-            //temporary hack to stop processing non-zc skbs.
-            if (skb->skb_type == SKB_NORMAL) continue;
-            /*
-             * Write the virtual MAC address into the destination field
-             * of the ethernet packet. Furthermore, do the same for ARP
-             * reply packets. This is easy because the virtual MAC address
-             * is always 00-00-00-00-00-00.
-             *
-             * Actually, the MAC address is now all zeros, except for the
-             * second sixteen bits, which are the per-host vif id.
-             * (so eth0 should be 00-00-..., eth1 is 00-01-...)
-             */
-            
-            if (skb->skb_type == SKB_ZERO_COPY)
-            {
-                skb->head = (u8 *)map_domain_mem(((skb->pf - frame_table) << PAGE_SHIFT));
-                skb->data = skb->head;
-                skb_reserve(skb,16); 
-                skb->mac.raw = skb->data;
-                skb->data += ETH_HLEN;
-            }
-            
-            memset(skb->mac.ethernet->h_dest, 0, ETH_ALEN);
-            *(unsigned int *)(skb->mac.ethernet->h_dest + 1) = nvif;
-            if ( ntohs(skb->mac.ethernet->h_proto) == ETH_P_ARP )
-            {
-                memset(skb->nh.raw + 18, 0, ETH_ALEN);
-                *(unsigned int *)(skb->nh.raw + 18 + 1) = nvif;
-            }
-
-            if (skb->skb_type == SKB_ZERO_COPY)
-            {
-                unmap_domain_mem(skb->head);
-            }
-
-            i = net_ring->rx_cons;
-            if ( i != net_ring->rx_prod )
-            {
-                net_ring->rx_ring[i].status = shadow_ring->rx_ring[i].status;
-                if ( shadow_ring->rx_ring[i].status == RING_STATUS_OK)
-                {
-                    rx = shadow_ring->rx_ring+i;
-                    if ( (skb->len + ETH_HLEN) < rx->size )
-                        rx->size = skb->len + ETH_HLEN;
-
-                    /* remap the packet again.  This is very temporary and will shortly be
-                     * replaced with a page swizzle.
-                     */
-
-                    /*if (skb->skb_type == SKB_ZERO_COPY)
-                    {
-                        skb->head = (u8 *)map_domain_mem(((skb->pf - frame_table) << PAGE_SHIFT));
-                        skb->data = skb->head;
-                        skb_reserve(skb,16); 
-                        skb->mac.raw = skb->data;
-                        skb->data += ETH_HLEN;
-                    }
-                                                                        
-                    copy_to_user((void *)rx->addr, skb->mac.raw, rx->size);
-                    copy_to_user(net_ring->rx_ring+i, rx, sizeof(rx));
-                    
-                    if (skb->skb_type == SKB_ZERO_COPY)
-                    {
-                        unmap_domain_mem(skb->head);
-                        skb->head = skb->data = skb->tail = (void *)0xdeadbeef;
-                    }*/
-
-                    //presumably I don't need to rewalk the guest page table
-                    //here.
-                    if (skb->skb_type == SKB_ZERO_COPY) 
-                    {
-                        // g_pfn is the frame FROM the guest being given up
-                        // h_pfn is the frame FROM the hypervisor, passing up.
-                        
-                        if (rx->flush_count == tlb_flush_count[smp_processor_id()])
-                        {
-                            flush_tlb_all();
-                        }
-                        
-                        g_pte = map_domain_mem(rx->addr);
-                        
-                        //g_pfn = frame_table + (rx->addr >> PAGE_SHIFT);
-                        g_pfn =  frame_table + (*g_pte >> PAGE_SHIFT);
-                        h_pfn = skb->pf;
-
-
-                        //tmp = g_pfn->next; g_pfn->next = h_pfn->next; h_pfn->next = tmp;
-                        //tmp = g_pfn->prev; g_pfn->prev = h_pfn->prev; h_pfn->prev = tmp;
-                        tmp = g_pfn->flags; g_pfn->flags = h_pfn->flags; h_pfn->flags = tmp;
-                        
-                        h_pfn->tot_count = 1;
-                        h_pfn->type_count = g_pfn->type_count;
-                        g_pfn->tot_count = g_pfn->type_count = 0;
-                        
-                        h_pfn->flags = current->domain | PGT_l1_page_table;
-                        g_pfn->flags = PGT_l1_page_table;
-
-
-                        *g_pte = (*g_pte & ~PAGE_MASK) | (((h_pfn - frame_table) << PAGE_SHIFT) & PAGE_MASK);
-
-                        *g_pte |= _PAGE_PRESENT;
-                        unmap_domain_mem(g_pte);
-
-                        skb->pf = g_pfn; // return the guest pfn to be put on the free list
-                    } else {
-                        BUG(); //got a non-zero copy skb.  which is not good.
-                    }
-                    
-                }
-                net_ring->rx_cons = (i+1) & (RX_RING_SIZE-1);
-                if ( net_ring->rx_cons == net_ring->rx_event )
-                    set_bit(_EVENT_NET_RX, &s->events);
-            }
-            kfree_skb(skb);
-        }
-    }
-}
-
-
 /*
  *	Map an interface index to its name (SIOCGIFNAME)
  */
@@ -2179,16 +2025,6 @@ void tx_skb_release(struct sk_buff *skb)
  * descriptor rings.
  */
 #define PKT_PROT_LEN (ETH_HLEN + 8)
-
-void print_range2(u8 *start, unsigned int len)
-{
-    int i=0;
-    while (i++ < len)
-    {
-        printk("%x:",start[i]);
-    }
-    printk("\n");
-}
 
 long do_net_update(void)
 {

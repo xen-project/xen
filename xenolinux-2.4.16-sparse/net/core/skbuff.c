@@ -433,6 +433,7 @@ static void skb_release_data(struct sk_buff *skb)
 	    atomic_dec_and_test(&(skb_shinfo(skb)->dataref))) {
 		if (skb_shinfo(skb)->nr_frags) {
 			int i;
+printk("there were %u frags!\n", skb_shinfo(skb)->nr_frags);
 			for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) 
 {
 				put_page(skb_shinfo(skb)->frags[i].page);
@@ -442,14 +443,14 @@ static void skb_release_data(struct sk_buff *skb)
 		if (skb_shinfo(skb)->frag_list)
 			skb_drop_fraglist(skb);
 
-                if (skb->skb_type == SKB_NORMAL)
-                {
+                //if (skb->skb_type == SKB_NORMAL)
+                //{
 		    kfree(skb->head);
-                } else {// SKB_ZERO_COPY
+                //} else {// SKB_ZERO_COPY
                     //free_net_page(skb->net_page);
 //printk(KERN_ALERT "<%p>\n", phys_to_machine(virt_to_phys(skb->head)));
-                    free_page((void *)skb->head);
-                }
+                //    free_page((void *)skb->head);
+                //}
 	}
 
 }
