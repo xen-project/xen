@@ -463,3 +463,7 @@ tools/control/web/pd-l.jsp
 tools/control/web/pd-r.jsp
 tools/control/web/pd-rr.jsp
 tools/control/web/pd.jsp
+tools/internal/xi_list
+tools/internal/xi_usage
+tools/internal/xi_sched_domain
+tools/internal/xi_sched_global
