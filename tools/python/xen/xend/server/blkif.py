@@ -74,7 +74,6 @@ class BlkifBackendInterface(controller.BackendInterface):
 
     def respond_be_create(self, msg):
         val = unpackMsg('blkif_be_create_t', msg)
-        print 'respond_be_create>', val
         self.connected = 1
         return self
     
@@ -122,7 +121,6 @@ class BlkifBackendInterface(controller.BackendInterface):
         @type  msg: xu message
         """
         val = unpackMsg('blkif_be_connect_t', msg)
-        print 'respond_be_connect>', str(self), val
         self.send_fe_interface_status_changed()
             
     def send_fe_interface_status_changed(self, response=None):
@@ -401,7 +399,6 @@ class BlkifController(controller.SplitController):
 
     def recv_fe_driver_status_changed(self, msg, req):
         val = unpackMsg('blkif_fe_driver_status_changed_t', msg)
-        print 'recv_fe_driver_status_changed>', val
         # For each backend?
         msg = packMsg('blkif_fe_interface_status_changed_t',
                       { 'handle' : 0,

@@ -228,10 +228,6 @@ class XendDomain:
         """
         self.reap_cancel()
         domlist = xc.domain_getinfo()
-        #for d in domlist:
-        #    print 'reap> xen:  ', d['dom'], d
-        #for d in self.domain_by_id.values():
-        #    print 'reap> xend: ', d.id, d.info
         casualties = []
         for d in domlist:
             dead = 0
@@ -272,10 +268,6 @@ class XendDomain:
         """
         self.refresh_cancel()
         domlist = xc.domain_getinfo()
-        #for d in domlist:
-        #    print 'refresh> xen:  ', d['dom'], d
-        #for d in self.domain_by_id.values():
-        #    print 'refresh> xend: ', d.id, d.info
         # Index the domlist by id.
         # Add entries for any domains we don't know about.
         doms = {}
@@ -394,12 +386,8 @@ class XendDomain:
         @param vmconfig: vm configuration
         @return: deferred
         """
-        print 'domain_configure>', id, vmconfig
         config = sxp.child_value(vmconfig, 'config')
         dominfo = self.domain_lookup(id)
-        print 'domain_configure>', 'dominfo=', dominfo
-        for dinfo in self.domain_by_id.values():
-            print 'domain', 'id=', dinfo.id, 'name=', dinfo.name
         log.debug('domain_configure> id=%s config=%s', str(id), str(config))
         if dominfo.config:
             raise XendError("Domain already configured: " + dominfo.id)
@@ -597,11 +585,9 @@ class XendDomain:
         """
         # Need a cancel too?
         # Don't forget to cancel restart for it.
-        print 'domain_migrate>', id, dst
         dominfo = self.domain_lookup(id)
         xmigrate = XendMigrate.instance()
         val = xmigrate.migrate_begin(dominfo.id, dst, live=live)
-        print 'domain_migrate<', val
         return val
 
     def domain_save(self, id, dst, progress=0):
@@ -616,10 +602,10 @@ class XendDomain:
         xmigrate = XendMigrate.instance()
         return xmigrate.save_begin(dominfo.id, dst)
     
-    def domain_pincpu(self, dom, cpu):
+    def domain_pincpu(self, id, cpu):
         """Pin a domain to a cpu.
 
-        @param dom: domain
+        @param id: domain
         @param cpu: cpu number
         """
         dominfo = self.domain_lookup(id)

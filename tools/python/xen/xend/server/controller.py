@@ -9,7 +9,7 @@ from twisted.internet import defer
 import channel
 from messages import msgTypeName, printMsg
 
-DEBUG = 1
+DEBUG = 0
 
 class Responder:
     """Handler for a response to a message with a specified id.

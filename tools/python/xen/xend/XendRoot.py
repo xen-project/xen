@@ -58,6 +58,7 @@ class XendRoot:
         self.dbroot = None
         self.config_path = None
         self.config = None
+        self.logger = None
         self.configure()
         self.check_lastboot()
         eserver.subscribe('xend.*', self.event_handler)
@@ -85,18 +86,75 @@ class XendRoot:
     def start(self):
         eserver.inject('xend.start', self.rebooted)
 
+    def _format(self, msg, args):
+        if args:
+            return str(msg)
+        else:
+            return str(msg) % args
+
+    def _log(self, mode, fmt, args):
+        """Logging function that uses the logger if it exists, otherwise
+        logs to stderr. We use this for XendRoot log messages because
+        they may be logged before the logger has been configured.
+        Other components can safely use the logger.
+        """
+        log = self.get_logger()
+        if mode not in ['warning', 'info', 'debug', 'error']:
+            mode = 'info'
+        level = mode.upper()
+        if log:
+            getattr(log, mode)(fmt, *args)
+        else:
+            print >>stderr, "xend", "[%s]" % level, self._format(msg, args)
+
+    def logDebug(self, fmt, *args):
+        """Log a debug message.
+
+        @param fmt: message format
+        @param args: arguments
+        """
+        self._log('info', fmt, args)
+        
+    def logInfo(self, fmt, *args):
+        """Log an info message.
+
+        @param fmt: message format
+        @param args: arguments
+        """
+        self._log('info', fmt, args)
+
+    def logWarning(self, fmt, *args):
+        """Log a warning message.
+
+        @param fmt: message format
+        @param args: arguments
+        """
+        self._log('warning', fmt, args)
+        
+    def logError(self, fmt, *args):
+        """Log an error message.
+
+        @param fmt: message format
+        @param args: arguments
+        """
+        self._log('error', fmt, args)
+        
     def event_handler(self, event, val):
-        print >> sys.stderr, "EVENT>", event, val
+        self.logInfo("EVENT> %s %s", str(event), str(val))
 
     def read_lastboot(self):
+        """Read the lastboot file to determine the time of the last boot.
+        """
         try:
             val = file(self.lastboot, 'rb').readlines()[0]
         except StandardError, ex:
-            print 'warning: Error reading', self.lastboot, ex
+            self.logWarning('Error reading %s: %s', self.lastboot, str(ex))
             val = None
         return val
 
     def write_lastboot(self, val):
+        """Write the last boot time to the lastboot file.
+        """
         if not val: return
         try:
             fdir = os.path.dirname(self.lastboot)
@@ -106,8 +164,7 @@ class XendRoot:
             out.write(val)
             out.close()
         except IOError, ex:
-            print 'warning: Error writing', self.lastboot, ex
-            pass
+            self.logWarning('Error writing %s: %s', self.lastboot, str(ex))
 
     def check_lastboot(self):
         """Check if there has been a system reboot since we saved lastboot.
@@ -122,13 +179,17 @@ class XendRoot:
         self.last_reboot = this_val
 
     def get_last_reboot(self):
+        """Get the last reboot time as a string.
+        """
         return self.last_reboot
 
     def get_rebooted(self):
+        """Get the rebooted flag. The flag is true if the system has
+        been rebooted since xend was last run.
+        """
         return self.rebooted
 
     def configure(self):
-        print 'XendRoot>configure>'
         self.set_config()
         self.configure_logger()
         self.dbroot = self.get_config_value("dbroot", self.dbroot_default)
@@ -140,9 +201,13 @@ class XendRoot:
         self.logging = XendLogging(logfile, level=loglevel)
 
     def get_logging(self):
+        """Get the XendLogging instance.
+        """
         return self.logging
 
     def get_logger(self):
+        """Get the logger.
+        """
         return self.logging.getLogger()
 
     def get_dbroot(self):
@@ -156,9 +221,7 @@ class XendRoot:
         The config file is a sequence of sxp forms.
         """
         self.config_path = os.getenv(self.config_var, self.config_default)
-        print 'XendRoot>set_config> config_path=', self.config_path
         if os.path.exists(self.config_path):
-            print 'XendRoot>set_config> loading'
             fin = file(self.config_path, 'rb')
             try:
                 config = sxp.parse(fin)
@@ -167,9 +230,7 @@ class XendRoot:
             finally:
                 fin.close()
         else:
-            print 'XendRoot>set_config> not found'
             self.config = ['xend-config']
-        print 'XendRoot> config=', self.config
 
     def get_config(self, name=None):
         """Get the configuration element with the given name, or
@@ -213,6 +274,9 @@ class XendRoot:
         return v in ['yes', '1', 'on']
 
 def instance():
+    """Get an instance of XendRoot.
+    Use this instead of the constructor.
+    """
     global inst
     try:
         inst
@@ -221,10 +285,24 @@ def instance():
     return inst
 
 def logger():
+    """Get the logger.
+    """
     return instance().get_logger()
 
 def add_component(name, val):
+    """Register a component with XendRoot.
+    This is used to work-round import cycles.
+
+    @param name: component name
+    @param val:  component value (often a module)
+    """
     return instance().add_component(name, val)
 
 def get_component(name):
+    """Get a component.
+    This is used to work-round import cycles.
+
+    @param name: component name
+    @return component or None
+    """
     return instance().get_component(name)

@@ -334,7 +334,7 @@ class EventProtocol(protocol.Protocol):
         self.events = events
 
     def queue_event(self, name, v):
-        # Despite the name we dont' queue the event here.
+        # Despite the name we don't queue the event here.
         # We send it because the transport will queue it.
         self.send_event([name, v])
         
@@ -397,11 +397,27 @@ class EventProtocol(protocol.Protocol):
         eserver.inject(sxp.name(event), event)
         return ['ok']
 
-    def op_traceon(self, name, v):
-        self.daemon.tracing(1)
+    def op_trace(self, name, v):
+        mode = (v[1] == 'on')
+        self.daemon.tracing(mode)
 
-    def op_traceoff(self, name, v):
-        self.daemon.tracing(0)
+    def op_log_stderr(self, name, v):
+        mode = v[1]
+        logging = XendRoot.instance().get_logging()
+        if mode == 'on':
+            logging.addLogStderr()
+        else:
+            logging.removeLogStderr()
+
+    def op_debug_msg(self, name, v):
+        mode = v[1]
+        import messages
+        messages.DEBUG = (mode == 'on')
+
+    def op_debug_controller(self, name, v):
+        mode = v[1]
+        import controller
+        controller.DEBUG = (mode == 'on')
 
 
 class EventFactory(protocol.Factory):

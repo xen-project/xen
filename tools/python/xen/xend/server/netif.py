@@ -191,7 +191,6 @@ class NetDev(controller.SplitDev):
             vnet.vifctl(op, self.get_vifname(), self.get_mac())
 
     def attach(self):
-        print 'attach>'
         d = self.send_be_create()
         d.addCallback(self.respond_be_create)
         return d
@@ -207,7 +206,6 @@ class NetDev(controller.SplitDev):
 
     def respond_be_create(self, msg):
         val = unpackMsg('netif_be_create_t', msg)
-        print 'respond_be_create>', val
         return self
 
     def destroy(self):

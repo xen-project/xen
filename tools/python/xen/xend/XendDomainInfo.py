@@ -16,7 +16,6 @@ import os
 import time
 
 from twisted.internet import defer
-#defer.Deferred.debug = 1
 
 import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
 import xen.util.ip
@@ -188,7 +187,7 @@ def vif_up(iplist):
 
     def arping(ip, gw):
         cmd = '/usr/sbin/arping -A -b -I eth0 -c 1 -s %s %s' % (ip, gw)
-        print cmd
+        log.debug(cmd)
         os.system(cmd)
         
     gateway = xen.util.ip.get_current_ipgw() or '255.255.255.255'
@@ -472,7 +471,6 @@ class XendDomainInfo:
         # my domain id.
         if not dominfo:
             return
-        #print 'check_name>', 'dom=', dominfo.name, dominfo.dom, 'self=', name, self.dom
         if dominfo.is_terminated():
             return
         if not self.dom or (dominfo.dom != self.dom):
