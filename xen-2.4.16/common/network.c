@@ -18,6 +18,8 @@
 #include <linux/skbuff.h>
 #include <xeno/netdevice.h>
 #include <xeno/in.h>
+#include <asm/domain_page.h>
+#include <asm/io.h>
 
 /* vif globals 
  * sys_vif_list is a lookup table for vifs, used in packet forwarding.
@@ -127,6 +129,33 @@ void destroy_net_vif(struct task_struct *p)
     kfree(p->net_vif_list[i]->shadow_ring);
     kmem_cache_free(net_vif_cache, p->net_vif_list[i]);
 }
+
+/* vif_query - Call from the proc file system to get a list of vifs 
+ * assigned to a particular domain.
+ */
+
+void vif_query(vif_query_t *vq)
+{
+    struct task_struct *dom_task;
+    char buf[128];
+    int i;
+
+    if ( !(dom_task = find_domain_by_id(vq->domain)) )
+    {
+        return;
+    }
+
+    *buf = '\0';
+
+    for (i=0; i < dom_task->num_net_vifs; i++)
+    {
+        sprintf(buf + strlen(buf), "%d\n", dom_task->net_vif_list[i]->id);
+    }
+
+    copy_to_user(vq->buf, buf, strlen(buf) + 1);
+    
+}
+        
 
 /* print_vif_list - Print the contents of the global vif table.
  */
@@ -426,6 +455,11 @@ long do_network_op(network_op_t *u_network_op)
         print_net_rule_list();
     }
     break;
+
+    case NETWORK_OP_VIFQUERY:
+    {
+        vif_query(&op.u.vif_query);
+    }
     
     default:
         ret = -ENOSYS;

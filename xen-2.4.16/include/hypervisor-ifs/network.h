@@ -85,6 +85,12 @@ typedef struct net_rule_st
     u16  action;
 } net_rule_t;
 
+typedef struct vif_query_st
+{
+    unsigned int    domain;
+    char            *buf;   // where to put the reply -- guest virtual address
+} vif_query_t;
+
 /* Network trap operations and associated structure. 
  * This presently just handles rule insertion and deletion, but will
  * evenually have code to add and remove interfaces.
@@ -93,6 +99,7 @@ typedef struct net_rule_st
 #define NETWORK_OP_ADDRULE      0
 #define NETWORK_OP_DELETERULE   1
 #define NETWORK_OP_GETRULELIST  2
+#define NETWORK_OP_VIFQUERY     3
 
 typedef struct network_op_st 
 {
@@ -100,6 +107,7 @@ typedef struct network_op_st
     union
     {
         net_rule_t net_rule;
+        vif_query_t vif_query;
     }
     u;
 } network_op_t;
