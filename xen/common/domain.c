@@ -172,7 +172,7 @@ void domain_shutdown(u8 reason)
 
         debugger_trap_immediate();
 
-        if ( reason == 0 ) 
+        if ( reason == SHUTDOWN_poweroff ) 
         {
             printk("Domain 0 halted: halting machine.\n");
             machine_halt();
@@ -182,6 +182,12 @@ void domain_shutdown(u8 reason)
             printk("Domain 0 shutdown: rebooting machine.\n");
             machine_restart(0);
         }
+    }
+
+    if ( reason == SHUTDOWN_crash )
+    {
+        domain_crash();
+        BUG();
     }
 
     d->shutdown_code = reason;
