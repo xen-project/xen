@@ -356,26 +356,24 @@ unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes)
     temp = free_list.next;
 
     /* allocate first page */
-    pf = list_entry(temp, struct pfn_info, list);
+    pf = pf_head = list_entry(temp, struct pfn_info, list);
     pf->flags |= p->domain;
     temp = temp->next;
     list_del(&pf->list);
-    pf->next = pf->prev = p->pg_head = (pf - frame_table);
+    INIT_LIST_HEAD(&pf->list);
+    p->pg_head = pf - frame_table;
     pf->type_count = pf->tot_count = 0;
     free_pfns--;
-    pf_head = pf;
 
     /* allocate the rest */
-    for(alloc_pfns = req_pages - 1; alloc_pfns; alloc_pfns--){
+    for ( alloc_pfns = req_pages - 1; alloc_pfns; alloc_pfns-- )
+    {
         pf = list_entry(temp, struct pfn_info, list);
         pf->flags |= p->domain;
         temp = temp->next;
         list_del(&pf->list);
 
-        pf->next = p->pg_head;
-        pf->prev = pf_head->prev;
-        (frame_table + pf_head->prev)->next = (pf - frame_table);
-        pf_head->prev = (pf - frame_table);
+        list_add_tail(&pf->list, &pf_head->list);
         pf->type_count = pf->tot_count = 0;
 
         free_pfns--;
@@ -406,6 +404,7 @@ unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes)
 
 int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
 {
+    struct list_head *list_ent;
     l2_pgentry_t * l2tab;
     l1_pgentry_t * l1tab;
     start_info_t * virt_startinfo_addr;
@@ -428,10 +427,12 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
         do_process_page_updates_bh(pgt_updates, 1);
         pgt_updates++;
         if(!((unsigned long)pgt_updates & (PAGE_SIZE-1))){
-            unmap_domain_mem((void *)((unsigned long)(pgt_updates-1) & PAGE_MASK));
-            curr_update_phys = (frame_table + (curr_update_phys >> PAGE_SHIFT))->next 
-                << PAGE_SHIFT;
-            pgt_updates = (page_update_request_t *)map_domain_mem(curr_update_phys);
+            unmap_domain_mem(pgt_updates-1);
+            list_ent = frame_table[curr_update_phys >> PAGE_SHIFT].list.next;
+            curr_update_phys = list_entry(list_ent, struct pfn_info, list) -
+                frame_table;
+            curr_update_phys <<= PAGE_SHIFT;
+            pgt_updates = map_domain_mem(curr_update_phys);
         }
     }
     unmap_domain_mem((void *)((unsigned long)(pgt_updates-1) & PAGE_MASK));
@@ -549,7 +550,9 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
 static unsigned long alloc_page_from_domain(unsigned long * cur_addr, 
     unsigned long * index)
 {
-    *cur_addr = (frame_table + (*cur_addr >> PAGE_SHIFT))->prev << PAGE_SHIFT;
+    struct list_head *ent = frame_table[*cur_addr >> PAGE_SHIFT].list.prev;
+    *cur_addr = list_entry(ent, struct pfn_info, list) - frame_table;
+    *cur_addr <<= PAGE_SHIFT;
     (*index)--;    
     return *cur_addr;
 }
@@ -559,6 +562,7 @@ static unsigned long alloc_page_from_domain(unsigned long * cur_addr,
  */
 int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
 {
+    struct list_head *list_ent;
     char *src, *dst;
     int i, dom = p->domain;
     unsigned long phys_l1tab, phys_l2tab;
@@ -653,7 +657,10 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
             machine_to_phys_mapping[cur_address >> PAGE_SHIFT] = count;
         }
 
-        cur_address = ((frame_table + (cur_address >> PAGE_SHIFT))->next) << PAGE_SHIFT;
+        list_ent = frame_table[cur_address >> PAGE_SHIFT].list.next;
+        cur_address = list_entry(list_ent, struct pfn_info, list) -
+            frame_table;
+        cur_address <<= PAGE_SHIFT;
     }
     unmap_domain_mem(l1start);
 
@@ -661,7 +668,10 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     cur_address = p->pg_head << PAGE_SHIFT;
     for ( count = 0; count < alloc_index; count++ ) 
     {
-        cur_address = ((frame_table + (cur_address >> PAGE_SHIFT))->next) << PAGE_SHIFT;
+        list_ent = frame_table[cur_address >> PAGE_SHIFT].list.next;
+        cur_address = list_entry(list_ent, struct pfn_info, list) -
+            frame_table;
+        cur_address <<= PAGE_SHIFT;
     }
 
     l2tab = l2start + l2_table_offset(virt_load_address + 
@@ -682,7 +692,10 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
         page->flags = dom | PGT_l1_page_table;
         page->tot_count++;
         
-        cur_address = ((frame_table + (cur_address >> PAGE_SHIFT))->next) << PAGE_SHIFT;
+        list_ent = frame_table[cur_address >> PAGE_SHIFT].list.next;
+        cur_address = list_entry(list_ent, struct pfn_info, list) -
+            frame_table;
+        cur_address <<= PAGE_SHIFT;
     }
     page->flags = dom | PGT_l2_page_table;
     unmap_domain_mem(l1start);

@@ -56,8 +56,6 @@ void __free_pages(unsigned long p, int order);
  */
 typedef struct pfn_info {
     struct list_head list;      /* ->mapping has some page lists. */
-    unsigned long next;         /* used for threading pages belonging */
-    unsigned long prev;         /* to same domain */
     unsigned long flags;        /* atomic flags. */
     unsigned long tot_count;    /* Total domain usage count. */
     unsigned long type_count;   /* pagetable/dir, or domain-writeable refs. */

@@ -56,11 +56,6 @@ unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr, unsi
 		if (TASK_SIZE - len < addr)
 			return -ENOMEM;
         
-		if(current->pid > 100){
-		printk(KERN_ALERT "bd240 debug: gua: vm addr found %lx\n", addr);
-			printk(KERN_ALERT "bd240 debug: gua: first condition %d, %lx, %lx\n",vma, addr + len, vma->vm_start);
-			printk(KERN_ALERT "bd240 debug: gua: second condition %d\n", direct_mapped(addr));
-		}
 		if ((!vma || addr + len <= vma->vm_start) && !direct_mapped(addr))
 			return addr;
 		
@@ -77,10 +72,7 @@ struct list_head *find_direct(struct list_head *list, unsigned long addr)
     for ( curr = direct_list->next; curr != direct_list; curr = curr->next )
     {
         node = list_entry(curr, direct_mmap_node_t, list);
-        if( node->vm_start >= addr ){
-			printk(KERN_ALERT "bd240 debug: find_direct: hit %lx\n", node->vm_start); 
-			break;
-		}
+        if ( node->vm_start >= addr ) break;
     }
 
     return curr;

@@ -35,21 +35,24 @@ static void build_page_list(struct task_struct *p)
     unsigned long * list;
     unsigned long curr;
     unsigned long page;
+    struct list_head *list_ent;
 
     list = (unsigned long *)map_domain_mem(p->pg_head << PAGE_SHIFT);
-    curr = p->pg_head;
-    *list++ = p->pg_head;
-    page = (frame_table + p->pg_head)->next;
-    while(page != p->pg_head){
-        if(!((unsigned long)list & (PAGE_SIZE-1))){
-            curr = (frame_table + curr)->next;
-            unmap_domain_mem((unsigned long)(list-1) & PAGE_MASK);
+    curr = page = p->pg_head;
+    do {
+        *list++ = page;
+        list_ent = frame_table[page].list.next;
+        page = list_entry(list_ent, struct pfn_info, list) - frame_table;
+        if( !((unsigned long)list & (PAGE_SIZE-1)) )
+        {
+            list_ent = frame_table[curr].list.next;
+            curr = list_entry(list_ent, struct pfn_info, list) - frame_table;
+            unmap_domain_mem(list-1);
             list = (unsigned long *)map_domain_mem(curr << PAGE_SHIFT);
         }
-        *list++ = page;
-        page = (frame_table + page)->next;
     }
-    unmap_domain_mem((unsigned long)(list-1) & PAGE_MASK);
+    while ( page != p->pg_head );
+    unmap_domain_mem(list);
 }
     
 long do_dom0_op(dom0_op_t *u_dom0_op)
@@ -147,12 +150,14 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         int i;
         unsigned long pfn = op.u.getmemlist.start_pfn;
         unsigned long *buffer = op.u.getmemlist.buffer;
+        struct list_head *list_ent;
 
         for ( i = 0; i < op.u.getmemlist.num_pfns; i++ )
         {
             /* XXX We trust DOM0 to give us a safe buffer. XXX */
             *buffer++ = pfn;
-            pfn = (frame_table + pfn)->next;
+            list_ent = frame_table[pfn].list.next;
+            pfn = list_entry(list_ent, struct pfn_info, list) - frame_table;
         }
     }
     break;
