@@ -2145,20 +2145,25 @@ int setup_network_devices(void)
 {
     int i, ret;
     extern char opt_ifname[];
-    struct net_device *dev = dev_get_by_name(opt_ifname);
+    struct net_device *dev;
 
-    if ( dev == NULL ) 
+    if ( (dev = dev_get_by_name(opt_ifname)) == NULL ) 
     {
-        printk("Could not find device %s\n", opt_ifname);
-        return 0;
+        printk("Could not find device %s: using dummy device\n", opt_ifname);
+        strcpy(opt_ifname, "dummy");
+        if ( (dev = dev_get_by_name(opt_ifname)) == NULL )
+        {
+            printk("Failed to find the dummy device!\n");
+            return 0;
+        }
     }
 
-    ret = dev_open(dev);
-    if ( ret != 0 )
+    if ( (ret = dev_open(dev)) != 0 )
     {
         printk("Error opening device %s for use (%d)\n", opt_ifname, ret);
         return 0;
     }
+
     printk("Device %s opened and ready for use.\n", opt_ifname);
     the_dev = dev;
 
