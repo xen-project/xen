@@ -31,7 +31,7 @@
 #include "../scsi/scsi.h"
 #include "../scsi/hosts.h"
 #include <asm/atomic.h>
-#include <linux/timer.h>
+#include <xeno/timer.h>
 
 #include "cciss_scsi.h"
 

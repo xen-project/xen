@@ -650,7 +650,7 @@ struct hd_driveid {
 /*
  * These routines are used for kernel command line parameters from main.c:
  */
-#include <linux/config.h>
+#include <xeno/config.h>
 
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
 int ide_register(int io_port, int ctl_port, int irq);

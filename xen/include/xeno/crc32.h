@@ -7,7 +7,7 @@
 #ifndef _LINUX_CRC32_H
 #define _LINUX_CRC32_H
 
-#include <linux/types.h>
+#include <xeno/types.h>
 
 /* The little-endian AUTODIN II ethernet CRC calculation.
    N.B. Do not use for bulk data, use a table-based routine instead.

@@ -21,30 +21,30 @@
  *	2 of the License, or (at your option) any later version.
  */
 
-#include <linux/config.h> 
-#include <linux/lib.h> 
+#include <xeno/config.h> 
+#include <xeno/lib.h> 
 #include <asm/uaccess.h>
 #include <asm/system.h>
 #include <asm/bitops.h>
-#include <linux/types.h>
-//#include <linux/kernel.h>
-#include <linux/sched.h>
-//#include <linux/string.h>
-#include <linux/mm.h>
-#include <linux/socket.h>
-#include <linux/sockios.h>
-//#include <linux/in.h>
-#include <linux/errno.h>
-#include <linux/interrupt.h>
-#include <linux/if_ether.h>
-//#include <linux/inet.h>
-#include <linux/netdevice.h>
-#include <linux/etherdevice.h>
-//#include <linux/proc_fs.h>
-#include <linux/init.h>
+#include <xeno/types.h>
+//#include <xeno/kernel.h>
+#include <xeno/sched.h>
+//#include <xeno/string.h>
+#include <xeno/mm.h>
+#include <xeno/socket.h>
+#include <xeno/sockios.h>
+//#include <xeno/in.h>
+#include <xeno/errno.h>
+#include <xeno/interrupt.h>
+#include <xeno/if_ether.h>
+//#include <xeno/inet.h>
+#include <xeno/netdevice.h>
+#include <xeno/etherdevice.h>
+//#include <xeno/proc_fs.h>
+#include <xeno/init.h>
 //#include <net/ip.h>
 //#include <net/route.h>
-#include <linux/skbuff.h>
+#include <xeno/skbuff.h>
 //#include <net/sock.h>
 //#include <net/arp.h>
 

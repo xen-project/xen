@@ -32,7 +32,7 @@
 
 #ifdef __KERNEL__
 
-#include <linux/notifier.h>
+#include <xeno/notifier.h>
 
 extern int register_reboot_notifier(struct notifier_block *);
 extern int unregister_reboot_notifier(struct notifier_block *);

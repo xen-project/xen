@@ -93,7 +93,7 @@ typedef struct {
 } spinlock_t;
 #define SPIN_LOCK_UNLOCKED (spinlock_t) { 0, 25, __BASE_FILE__ }
 
-/*#include <linux/kernel.h>*/
+/*#include <xeno/kernel.h>*/
 
 #define spin_lock_init(x)	do { (x)->lock = 0; } while (0)
 #define spin_is_locked(lock)	(test_bit(0,(lock)))

@@ -15,14 +15,14 @@
  *  1999-03-10  Improved NTP compatibility by Ulrich Windl
  */
 
-#include <linux/config.h>
-#include <linux/mm.h>
-#include <linux/time.h>
-#include <linux/timer.h>
-#include <linux/timex.h>
-#include <linux/tqueue.h>
-#include <linux/delay.h>
-#include <linux/interrupt.h>
+#include <xeno/config.h>
+#include <xeno/mm.h>
+#include <xeno/time.h>
+#include <xeno/timer.h>
+#include <xeno/timex.h>
+#include <xeno/tqueue.h>
+#include <xeno/delay.h>
+#include <xeno/interrupt.h>
 
 #include <xeno/event.h>
 

@@ -14,7 +14,7 @@
 #include <xeno/event.h>
 #include <xeno/console.h>
 
-/* Hash-defines torn from <linux/pc_keyb.h> and <asm/keyboard.h> */
+/* Hash-defines torn from <xeno/pc_keyb.h> and <asm/keyboard.h> */
 
 #define KBD_STATUS_REG	     0x64 /* Status register (R) */
 #define KBD_CNTL_REG	     0x64 /* Controller command register (W) */

@@ -1,7 +1,7 @@
 #ifndef __ASM_APIC_H
 #define __ASM_APIC_H
 
-#include <linux/config.h>
+#include <xeno/config.h>
 #include <asm/ptrace.h>
 #include <asm/apicdef.h>
 #include <asm/system.h>

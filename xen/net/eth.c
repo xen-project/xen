@@ -37,22 +37,22 @@
  *		as published by the Free Software Foundation; either version
  *		2 of the License, or (at your option) any later version.
  */
-#include <linux/types.h>
-//#include <linux/kernel.h>
-#include <linux/sched.h>
-//#include <linux/string.h>
-#include <linux/mm.h>
-#include <linux/socket.h>
-//#include <linux/in.h>
-//#include <linux/inet.h>
-//#include <linux/ip.h>
-#include <linux/netdevice.h>
-#include <linux/etherdevice.h>
-#include <linux/skbuff.h>
-#include <linux/errno.h>
-#include <linux/config.h>
-#include <linux/lib.h>
-#include <linux/init.h>
+#include <xeno/types.h>
+//#include <xeno/kernel.h>
+#include <xeno/sched.h>
+//#include <xeno/string.h>
+#include <xeno/mm.h>
+#include <xeno/socket.h>
+//#include <xeno/in.h>
+//#include <xeno/inet.h>
+//#include <xeno/ip.h>
+#include <xeno/netdevice.h>
+#include <xeno/etherdevice.h>
+#include <xeno/skbuff.h>
+#include <xeno/errno.h>
+#include <xeno/config.h>
+#include <xeno/lib.h>
+#include <xeno/init.h>
 //#include <net/dst.h>
 //#include <net/arp.h>
 //#include <net/sock.h>

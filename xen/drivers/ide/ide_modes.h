@@ -7,7 +7,7 @@
 #ifndef _IDE_MODES_H
 #define _IDE_MODES_H
 
-#include <linux/config.h>
+#include <xeno/config.h>
 
 /*
  * Shared data/functions for determining best PIO mode for an IDE drive.

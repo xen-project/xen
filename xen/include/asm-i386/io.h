@@ -6,7 +6,7 @@
 
 #define IO_SPACE_LIMIT 0xffff
 
-/*#include <linux/vmalloc.h>*/
+/*#include <xeno/vmalloc.h>*/
 
 /*
  * Temporary debugging check to catch old code using

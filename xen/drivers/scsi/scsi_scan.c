@@ -20,7 +20,7 @@
 #include "constants.h"
 
 #ifdef CONFIG_KMOD
-#include <linux/kmod.h>
+#include <xeno/kmod.h>
 #endif
 
 /* 

@@ -7,9 +7,9 @@
 #ifndef _LINUX_MODULE_H
 #define _LINUX_MODULE_H
 
-#include <linux/config.h>
-#include <linux/spinlock.h>
-#include <linux/list.h>
+#include <xeno/config.h>
+#include <xeno/spinlock.h>
+#include <xeno/list.h>
 
 #ifdef __GENKSYMS__
 #  define _set_ver(sym) sym
@@ -18,7 +18,7 @@
 #else /* ! __GENKSYMS__ */
 # if !defined(MODVERSIONS) && defined(EXPORT_SYMTAB)
 #   define _set_ver(sym) sym
-#   include <linux/modversions.h>
+#   include <xeno/modversions.h>
 # endif
 #endif /* __GENKSYMS__ */
 
@@ -303,7 +303,7 @@ extern struct module __this_module;
 #define MOD_IN_USE		__MOD_IN_USE(THIS_MODULE)
 
 #if 0
-#include <linux/version.h>
+#include <xeno/version.h>
 static const char __module_kernel_version[] __attribute__((section(".modinfo"))) =
 "kernel_version=" UTS_RELEASE;
 #ifdef MODVERSIONS

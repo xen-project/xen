@@ -191,7 +191,7 @@ extern void paging_init(void);
 #define __flush_tlb_one(__addr) \
 __asm__ __volatile__("invlpg %0": :"m" (*(char *) (__addr)))
 
-#include <linux/config.h>
+#include <xeno/config.h>
 
 /*
  * Tell the user there is some problem.  The exception handler decodes this frame.

@@ -53,15 +53,15 @@
  *
  */
 
-#include <linux/config.h>
-#include <linux/types.h>
-#include <linux/kernel.h>
-#include <linux/ioport.h>
-#include <linux/pci.h>
-#include <linux/hdreg.h>
-#include <linux/ide.h>
-#include <linux/delay.h>
-#include <linux/init.h>
+#include <xeno/config.h>
+#include <xeno/types.h>
+#include <xeno/kernel.h>
+#include <xeno/ioport.h>
+#include <xeno/pci.h>
+#include <xeno/hdreg.h>
+#include <xeno/ide.h>
+#include <xeno/delay.h>
+#include <xeno/init.h>
 
 #include <asm/io.h>
 
@@ -72,8 +72,8 @@
 #define DISPLAY_PIIX_TIMINGS
 
 #if defined(DISPLAY_PIIX_TIMINGS) && defined(CONFIG_PROC_FS)
-#include <linux/stat.h>
-#include <linux/proc_fs.h>
+#include <xeno/stat.h>
+#include <xeno/proc_fs.h>
 
 static int piix_get_info(char *, char **, off_t, int);
 extern int (*piix_display_info)(char *, char **, off_t, int); /* ide-proc.c */

@@ -14,16 +14,16 @@
 #ifndef _LINUX_SKBUFF_H
 #define _LINUX_SKBUFF_H
 
-#include <linux/config.h>
-#include <linux/lib.h>
-#include <linux/time.h>
-#include <linux/timer.h>
-#include <linux/cache.h>
-#include <linux/slab.h>
+#include <xeno/config.h>
+#include <xeno/lib.h>
+#include <xeno/time.h>
+#include <xeno/timer.h>
+#include <xeno/cache.h>
+#include <xeno/slab.h>
 #include <asm/system.h>
 #include <asm/atomic.h>
 #include <asm/types.h>
-#include <linux/mm.h>
+#include <xeno/mm.h>
 #include <xeno/vif.h>
 
 /* skb_type values */

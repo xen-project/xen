@@ -13,8 +13,8 @@
 #ifndef _LINUX_TQUEUE_H
 #define _LINUX_TQUEUE_H
 
-#include <linux/spinlock.h>
-#include <linux/list.h>
+#include <xeno/spinlock.h>
+#include <xeno/list.h>
 #include <asm/bitops.h>
 #include <asm/system.h>
 

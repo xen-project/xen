@@ -15,9 +15,9 @@
  *    reentrant and should be faster). Use only strsep() in new code, please.
  */
  
-#include <linux/types.h>
-#include <linux/string.h>
-#include <linux/ctype.h>
+#include <xeno/types.h>
+#include <xeno/string.h>
+#include <xeno/ctype.h>
 
 #ifndef __HAVE_ARCH_STRNICMP
 /**

@@ -4,10 +4,10 @@
 #define FUSION_LINUX_COMPAT_H
 /*{-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
-#include <linux/version.h>
-#include <linux/config.h>
-#include <linux/kernel.h>
-#include <linux/pci.h>
+#include <xeno/version.h>
+#include <xeno/config.h>
+#include <xeno/kernel.h>
+#include <xeno/pci.h>
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 

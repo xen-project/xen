@@ -5,8 +5,8 @@
 
 #ifdef __KERNEL__
 
-#include <linux/types.h>	/* for size_t */
-//#include <linux/stddef.h>	/* for NULL */
+#include <xeno/types.h>	/* for size_t */
+//#include <xeno/stddef.h>	/* for NULL */
 
 #ifdef __cplusplus
 extern "C" {

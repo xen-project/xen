@@ -7,7 +7,7 @@
 
 /* For avoiding bswap on i386 */
 #ifdef __KERNEL__
-#include <linux/config.h>
+#include <xeno/config.h>
 #endif
 
 static __inline__ __const__ __u32 ___arch__swab32(__u32 x)
@@ -42,6 +42,6 @@ static __inline__ __const__ __u16 ___arch__swab16(__u16 x)
 
 #endif /* __GNUC__ */
 
-#include <linux/byteorder/little_endian.h>
+#include <xeno/byteorder/little_endian.h>
 
 #endif /* _I386_BYTEORDER_H */

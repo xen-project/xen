@@ -155,7 +155,7 @@ struct mptscsih_driver_setup
 		 *	Super HACK!  -by sralston:-(
 		 *	(good grief; heaven help me!)
 		 */
-#		include <linux/capability.h>
+#		include <xeno/capability.h>
 #		if !defined(CAP_LEASE) && !defined(MODULE)
 #			undef MPT_SCSIHOST_NEED_ENTRY_EXIT_HOOKUPS
 #		endif
@@ -168,12 +168,12 @@ struct mptscsih_driver_setup
 
 /*
  *	tq_scheduler disappeared @ lk-2.4.0-test12
- *	(right when <linux/sched.h> newly defined TQ_ACTIVE)
+ *	(right when <xeno/sched.h> newly defined TQ_ACTIVE)
  *	tq_struct reworked in 2.5.41. Include workqueue.h.
  */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,41)
-#	include <linux/sched.h>
-#	include <linux/workqueue.h>
+#	include <xeno/sched.h>
+#	include <xeno/workqueue.h>
 #define SCHEDULE_TASK(x)		\
 	if (schedule_work(x) == 0) {	\
 		/*MOD_DEC_USE_COUNT*/;	\
@@ -181,7 +181,7 @@ struct mptscsih_driver_setup
 #else
 #define HAVE_TQ_SCHED	1
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-#	include <linux/sched.h>
+#	include <xeno/sched.h>
 #	ifdef TQ_ACTIVE
 #		undef HAVE_TQ_SCHED
 #	endif

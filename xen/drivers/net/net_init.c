@@ -33,25 +33,25 @@
 
 */
 
-#include <linux/config.h>
-#include <linux/module.h>
-#include <linux/errno.h>
-//#include <linux/kernel.h>
-#include <linux/sched.h>
-#include <linux/types.h>
-//#include <linux/fs.h>
-#include <linux/slab.h>
-#include <linux/if_ether.h>
-#include <linux/lib.h>
-#include <linux/netdevice.h>
-#include <linux/etherdevice.h>
-//#include <linux/fddidevice.h>
-//#include <linux/hippidevice.h>
-//#include <linux/trdevice.h>
-//#include <linux/fcdevice.h>
-//#include <linux/if_arp.h>
-//#include <linux/if_ltalk.h>
-//#include <linux/rtnetlink.h>
+#include <xeno/config.h>
+#include <xeno/module.h>
+#include <xeno/errno.h>
+//#include <xeno/kernel.h>
+#include <xeno/sched.h>
+#include <xeno/types.h>
+//#include <xeno/fs.h>
+#include <xeno/slab.h>
+#include <xeno/if_ether.h>
+#include <xeno/lib.h>
+#include <xeno/netdevice.h>
+#include <xeno/etherdevice.h>
+//#include <xeno/fddidevice.h>
+//#include <xeno/hippidevice.h>
+//#include <xeno/trdevice.h>
+//#include <xeno/fcdevice.h>
+//#include <xeno/if_arp.h>
+//#include <xeno/if_ltalk.h>
+//#include <xeno/rtnetlink.h>
 //#include <net/neighbour.h>
 
 #define rtnl_lock() ((void)0)

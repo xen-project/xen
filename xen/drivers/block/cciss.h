@@ -1,7 +1,7 @@
 #ifndef CCISS_H
 #define CCISS_H
 
-#include <linux/genhd.h>
+#include <xeno/genhd.h>
 
 #include "cciss_cmd.h"
 

@@ -29,7 +29,7 @@
 #include <xeno/slab.h>
 #include <xeno/spinlock.h>
 #include <xeno/if_ether.h>
-#include <linux/skbuff.h>
+#include <xeno/skbuff.h>
 #include <xeno/netdevice.h>
 #include <xeno/in.h>
 #include <asm/domain_page.h>

@@ -157,7 +157,7 @@
 
 /* SAE: Xen doesn't have a proc filesystem */
 #if defined(CONFIG_PROC_FS)
-#include <linux/proc_fs.h>
+#include <xeno/proc_fs.h>
 #endif
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/

@@ -16,10 +16,10 @@
 #include <xeno/module.h>
 
 
-/*#include <linux/fs.h>*/
-/*#include <linux/genhd.h>*/
+/*#include <xeno/fs.h>*/
+/*#include <xeno/genhd.h>*/
 #include <xeno/blk.h>
-/*#include <linux/kernel.h>*/
+/*#include <xeno/kernel.h>*/
 #include <asm/unaligned.h>
 #include "scsi.h"
 #include "hosts.h"

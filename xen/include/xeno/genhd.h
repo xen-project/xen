@@ -56,7 +56,7 @@ struct partition {
 } __attribute__((packed));
 
 #ifdef __KERNEL__
-/*#  include <linux/devfs_fs_kernel.h>*/
+/*#  include <xeno/devfs_fs_kernel.h>*/
 
 struct hd_struct {
 	unsigned long start_sect;

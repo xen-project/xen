@@ -27,6 +27,6 @@ static __inline__ __const__ __u32 ___arch__swab32(__u32 x)
 
 #define __BYTEORDER_HAS_U64__
 
-#include <linux/byteorder/little_endian.h>
+#include <xeno/byteorder/little_endian.h>
 
 #endif /* _X86_64_BYTEORDER_H */

@@ -305,7 +305,7 @@
 
 /* Include the ID list */
 
-#include <linux/pci_ids.h>
+#include <xeno/pci_ids.h>
 
 /*
  * The PCI interface treats multi-function devices as independent
@@ -328,11 +328,11 @@
 
 #ifdef __KERNEL__
 
-#include <linux/types.h>
-#include <linux/config.h>
-#include <linux/ioport.h>
-#include <linux/list.h>
-#include <linux/errno.h>
+#include <xeno/types.h>
+#include <xeno/config.h>
+#include <xeno/ioport.h>
+#include <xeno/list.h>
+#include <xeno/errno.h>
 
 /* File state for mmap()s on /proc/bus/pci/X/Y */
 enum pci_mmap_state {

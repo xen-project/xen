@@ -6,9 +6,9 @@
  *	Copyright 1998--2000 Martin Mares <mj@ucw.cz>
  */
 
-#include <linux/types.h>
-//#include <linux/kernel.h>
-#include <linux/pci.h>
+#include <xeno/types.h>
+//#include <xeno/kernel.h>
+#include <xeno/pci.h>
 
 int
 pcibios_present(void)

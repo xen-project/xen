@@ -8,12 +8,12 @@
  * Copyright 2000, David S. Miller <davem@redhat.com>
  */
 
-#include <linux/config.h>
+#include <xeno/config.h>
 
 #ifdef CONFIG_SMP
 
-#include <linux/sched.h>
-#include <linux/brlock.h>
+#include <xeno/sched.h>
+#include <xeno/brlock.h>
 
 #ifdef __BRLOCK_USE_ATOMICS
 

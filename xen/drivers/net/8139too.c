@@ -96,30 +96,30 @@
 #define DRV_VERSION	"0.9.26"
 
 
-#include <linux/config.h>
-#include <linux/module.h>
+#include <xeno/config.h>
+#include <xeno/module.h>
 
 #ifdef XEN
 typedef int pid_t;
-#include <linux/lib.h>
+#include <xeno/lib.h>
 #endif
-#include <linux/kernel.h>
-#include <linux/compiler.h>
-#include <linux/pci.h>
-#include <linux/init.h>
-#include <linux/ioport.h>
-#include <linux/netdevice.h>
-#include <linux/etherdevice.h>
+#include <xeno/kernel.h>
+#include <xeno/compiler.h>
+#include <xeno/pci.h>
+#include <xeno/init.h>
+#include <xeno/ioport.h>
+#include <xeno/netdevice.h>
+#include <xeno/etherdevice.h>
 #ifndef XEN
-#include <linux/rtnetlink.h>
+#include <xeno/rtnetlink.h>
 #endif
-#include <linux/delay.h>
-#include <linux/ethtool.h>
-#include <linux/mii.h>
+#include <xeno/delay.h>
+#include <xeno/ethtool.h>
+#include <xeno/mii.h>
 #ifndef XEN
-#include <linux/completion.h>
+#include <xeno/completion.h>
 #endif
-#include <linux/crc32.h>
+#include <xeno/crc32.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
 

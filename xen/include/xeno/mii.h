@@ -8,7 +8,7 @@
 #ifndef __LINUX_MII_H__
 #define __LINUX_MII_H__
 
-#include <linux/types.h>
+#include <xeno/types.h>
 
 /* Generic MII registers. */
 

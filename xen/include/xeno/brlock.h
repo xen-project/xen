@@ -38,12 +38,12 @@ enum brlock_indices {
 	__BR_END
 };
 
-#include <linux/config.h>
+#include <xeno/config.h>
 
 #ifdef CONFIG_SMP
 
-#include <linux/cache.h>
-#include <linux/spinlock.h>
+#include <xeno/cache.h>
+#include <xeno/spinlock.h>
 
 #if defined(__i386__) || defined(__ia64__) || defined(__x86_64__)
 #define __BRLOCK_USE_ATOMICS

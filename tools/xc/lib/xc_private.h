@@ -17,10 +17,12 @@
 #include "xc.h"
 
 #include <asm-xeno/proc_cmd.h>
-#include <hypervisor-ifs/hypervisor-if.h>
-#include <hypervisor-ifs/dom0_ops.h>
-#include <hypervisor-ifs/vbd.h>
-#include <hypervisor-ifs/event_channel.h>
+
+/* from xen/include/hypervisor-ifs */
+#include <hypervisor-if.h>
+#include <dom0_ops.h>
+#include <vbd.h>
+#include <event_channel.h>
 
 #define _PAGE_PRESENT   0x001
 #define _PAGE_RW        0x002

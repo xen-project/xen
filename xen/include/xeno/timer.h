@@ -1,8 +1,8 @@
 #ifndef _LINUX_TIMER_H
 #define _LINUX_TIMER_H
 
-#include <linux/config.h>
-#include <linux/list.h>
+#include <xeno/config.h>
+#include <xeno/list.h>
 
 /*
  * In Linux 2.4, static timers have been removed from the kernel.

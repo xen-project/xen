@@ -5,7 +5,8 @@ SONAME   = libxc.so.$(MAJOR)
 
 CC       = gcc
 CFLAGS   = -c -Wall -O3 
-CFLAGS  += -I../../../xen/include -I../../../xenolinux-sparse/include
+CFLAGS  += -I../../../xen/include/hypervisor-ifs
+CFLAGS  += -I../../../xenolinux-sparse/include
 
 HDRS     = $(wildcard *.h)
 OBJS     = $(patsubst %.c,%.o,$(wildcard *.c))

@@ -1,12 +1,4 @@
 
-CC        = gcc
-CFLAGS    = -Wall -O3 
-EXTRA_INC = -I../../xen/include -I../../xenolinux-sparse/include -I../xc/lib
-
-HDRS     = $(wildcard *.h)
-SRCS     = $(wildcard *.c)
-OBJS     = $(patsubst %.c,%.o,$(SRCS))
-
 INSTALL  = $(wildcard *.py)
 ETC	 = defaults democd netbsd
 INITD    = xendomains
@@ -32,8 +24,3 @@ dist: all
 	install --mode=555 $(INITD) ../../../install/init.d
 
 clean:
-
-
-%: %.c $(HDRS) Makefile
-	$(CC) $(CFLAGS) $(EXTRA_INC) -o $@ $<
-

@@ -1,7 +1,7 @@
 #ifndef _LINUX_INIT_H
 #define _LINUX_INIT_H
 
-#include <linux/config.h>
+#include <xeno/config.h>
 
 /* These macros are used to mark some functions or 
  * initialized data (doesn't apply to uninitialized data)

@@ -21,7 +21,7 @@
   file called LICENSE.
   
   Contact Information:
-  Linux NICS <linux.nics@intel.com>
+  Linux NICS <xeno.nics@intel.com>
   Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
 *******************************************************************************/
 
@@ -78,10 +78,10 @@
  * 2.1.24       10/7/02
  */
  
-#include <linux/config.h>
+#include <xeno/config.h>
 /*#include <net/checksum.h>*/
-/*#include <linux/tcp.h>*/
-/*#include <linux/udp.h>*/
+/*#include <xeno/tcp.h>*/
+/*#include <xeno/udp.h>*/
 #include "e100.h"
 #include "e100_ucode.h"
 #include "e100_config.h"
@@ -379,7 +379,7 @@ static inline tcb_t *e100_prepare_xmit_buff(struct e100_private *,
 					    struct sk_buff *);
 static void e100_set_multi_exec(struct net_device *dev);
 
-MODULE_AUTHOR("Intel Corporation, <linux.nics@intel.com>");
+MODULE_AUTHOR("Intel Corporation, <xeno.nics@intel.com>");
 MODULE_DESCRIPTION("Intel(R) PRO/100 Network Driver");
 MODULE_LICENSE("GPL");
 

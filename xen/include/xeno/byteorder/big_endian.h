@@ -8,7 +8,7 @@
 #define __BIG_ENDIAN_BITFIELD
 #endif
 
-#include <linux/byteorder/swab.h>
+#include <xeno/byteorder/swab.h>
 
 #define __constant_htonl(x) ((__u32)(x))
 #define __constant_ntohl(x) ((__u32)(x))
@@ -63,6 +63,6 @@
 #define __cpu_to_be16s(x) do {} while (0)
 #define __be16_to_cpus(x) do {} while (0)
 
-#include <linux/byteorder/generic.h>
+#include <xeno/byteorder/generic.h>
 
 #endif /* _LINUX_BYTEORDER_BIG_ENDIAN_H */

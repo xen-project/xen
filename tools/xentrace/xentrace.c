@@ -23,7 +23,8 @@
 
 #include "../xc/lib/xc_private.h"
 
-#include <xeno/trace.h>
+/* from xen/include/hypervisor-ifs */
+#include <trace.h>
 
 extern FILE *stdout;
 

@@ -26,7 +26,7 @@
 #include <asm/uaccess.h>
 #include <hypervisor-ifs/dom0_ops.h>
 #include <asm/byteorder.h>
-#include <linux/if_ether.h>
+#include <xeno/if_ether.h>
 #include <asm/domain_page.h>
 #include <xeno/console.h>
 #include <xeno/net_headers.h>

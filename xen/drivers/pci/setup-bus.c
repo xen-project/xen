@@ -17,13 +17,13 @@
  *	     tighter packing. Prefetchable range support.
  */
 
-#include <linux/init.h>
-#include <linux/kernel.h>
-#include <linux/pci.h>
-#include <linux/errno.h>
-#include <linux/ioport.h>
-#include <linux/cache.h>
-#include <linux/slab.h>
+#include <xeno/init.h>
+#include <xeno/kernel.h>
+#include <xeno/pci.h>
+#include <xeno/errno.h>
+#include <xeno/ioport.h>
+#include <xeno/cache.h>
+#include <xeno/slab.h>
 
 
 #define DEBUG_CONFIG 1

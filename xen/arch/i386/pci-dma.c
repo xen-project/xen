@@ -7,10 +7,10 @@
  * in asm/pci.h.
  */
 
-#include <linux/types.h>
-#include <linux/mm.h>
-#include <linux/lib.h>
-#include <linux/pci.h>
+#include <xeno/types.h>
+#include <xeno/mm.h>
+#include <xeno/lib.h>
+#include <xeno/pci.h>
 #include <asm/io.h>
 
 void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,

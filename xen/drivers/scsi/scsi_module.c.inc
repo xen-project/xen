@@ -30,7 +30,7 @@
  */
 
 #include <xeno/module.h>
-#include <linux/init.h>
+#include <xeno/init.h>
 
 extern int scsi_register_module(int, void *);
 extern int scsi_unregister_module(int, void *);

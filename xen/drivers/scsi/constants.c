@@ -10,7 +10,7 @@
 
 #include <xeno/config.h>
 #include <xeno/blk.h>
-/*#include <linux/kernel.h> */
+/*#include <xeno/kernel.h> */
 #include "scsi.h"
 #include "hosts.h"
 

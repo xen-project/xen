@@ -24,7 +24,7 @@
 #ifndef _LINUX_ETHERDEVICE_H
 #define _LINUX_ETHERDEVICE_H
 
-#include <linux/if_ether.h>
+#include <xeno/if_ether.h>
 
 #ifdef __KERNEL__
 extern int		eth_header(struct sk_buff *skb, struct net_device *dev,

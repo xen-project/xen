@@ -21,7 +21,7 @@
   file called LICENSE.
   
   Contact Information:
-  Linux NICS <linux.nics@intel.com>
+  Linux NICS <xeno.nics@intel.com>
   Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
 
 *******************************************************************************/
@@ -32,48 +32,48 @@
 #ifndef _E1000_H_
 #define _E1000_H_
 
-//#include <linux/stddef.h>
-#include <linux/config.h>
-#include <linux/module.h>
-#include <linux/types.h>
+//#include <xeno/stddef.h>
+#include <xeno/config.h>
+#include <xeno/module.h>
+#include <xeno/types.h>
 #include <asm/byteorder.h>
-#include <linux/init.h>
-#include <linux/mm.h>
-#include <linux/errno.h>
-#include <linux/ioport.h>
-#include <linux/pci.h>
-#include <linux/kernel.h>
-#include <linux/netdevice.h>
-#include <linux/etherdevice.h>
-#include <linux/skbuff.h>
-#include <linux/delay.h>
-#include <linux/timer.h>
-#include <linux/slab.h>
-#include <linux/interrupt.h>
-#include <linux/string.h>
-//#include <linux/pagemap.h>
+#include <xeno/init.h>
+#include <xeno/mm.h>
+#include <xeno/errno.h>
+#include <xeno/ioport.h>
+#include <xeno/pci.h>
+#include <xeno/kernel.h>
+#include <xeno/netdevice.h>
+#include <xeno/etherdevice.h>
+#include <xeno/skbuff.h>
+#include <xeno/delay.h>
+#include <xeno/timer.h>
+#include <xeno/slab.h>
+#include <xeno/interrupt.h>
+#include <xeno/string.h>
+//#include <xeno/pagemap.h>
 #include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/irq.h>
-//#include <linux/capability.h>
-#include <linux/in.h>
-//#include <linux/ip.h>
-//#include <linux/tcp.h>
-//#include <linux/udp.h>
+//#include <xeno/capability.h>
+#include <xeno/in.h>
+//#include <xeno/ip.h>
+//#include <xeno/tcp.h>
+//#include <xeno/udp.h>
 //#include <net/pkt_sched.h>
-#include <linux/list.h>
-#include <linux/reboot.h>
+#include <xeno/list.h>
+#include <xeno/reboot.h>
 #ifdef NETIF_F_TSO
 #include <net/checksum.h>
 #endif
 #ifdef SIOCGMIIPHY
-#include <linux/mii.h>
+#include <xeno/mii.h>
 #endif
 #ifdef SIOCETHTOOL
-#include <linux/ethtool.h>
+#include <xeno/ethtool.h>
 #endif
 #ifdef NETIF_F_HW_VLAN_TX
-#include <linux/if_vlan.h>
+#include <xeno/if_vlan.h>
 #endif
 
 #define BAR_0		0

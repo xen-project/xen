@@ -14,7 +14,7 @@
 
 */
 
-#include <linux/kernel.h>
+#include <xeno/kernel.h>
 #include "tulip.h"
 
 

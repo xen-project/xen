@@ -19,8 +19,8 @@
 #ifndef _LINUX_IF_H
 #define _LINUX_IF_H
 
-#include <linux/types.h>		/* for "__kernel_caddr_t" et al	*/
-#include <linux/socket.h>		/* for "struct sockaddr" et al	*/
+#include <xeno/types.h>		/* for "__kernel_caddr_t" et al	*/
+#include <xeno/socket.h>		/* for "struct sockaddr" et al	*/
 
 /* Standard interface flags (netdevice->flags). */
 #define	IFF_UP		0x1		/* interface is up		*/

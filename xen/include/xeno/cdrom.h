@@ -1,5 +1,5 @@
 /*
- * -- <linux/cdrom.h>
+ * -- <xeno/cdrom.h>
  * General header file for linux CD-ROM drivers 
  * Copyright (C) 1992         David Giller, rafetmad@oxy.edu
  *               1994, 1995   Eberhard Moenkeberg, emoenke@gwdg.de
@@ -716,7 +716,7 @@ struct request_sense {
 
 #ifdef __KERNEL__
 #if 0
-#include <linux/devfs_fs_kernel.h>
+#include <xeno/devfs_fs_kernel.h>
 #else
 #include <xeno/kdev_t.h>
 #endif

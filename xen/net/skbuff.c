@@ -32,18 +32,18 @@
  *	2 of the License, or (at your option) any later version.
  */
 
-#include <linux/config.h>
-#include <linux/lib.h>
-#include <linux/errno.h>
-#include <linux/types.h>
-#include <linux/sched.h>
-#include <linux/mm.h>
-#include <linux/interrupt.h>
-#include <linux/slab.h>
-#include <linux/netdevice.h>
-#include <linux/skbuff.h>
-#include <linux/cache.h>
-#include <linux/init.h>
+#include <xeno/config.h>
+#include <xeno/lib.h>
+#include <xeno/errno.h>
+#include <xeno/types.h>
+#include <xeno/sched.h>
+#include <xeno/mm.h>
+#include <xeno/interrupt.h>
+#include <xeno/slab.h>
+#include <xeno/netdevice.h>
+#include <xeno/skbuff.h>
+#include <xeno/cache.h>
+#include <xeno/init.h>
 
 #include <asm/uaccess.h>
 #include <asm/system.h>

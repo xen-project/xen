@@ -12,12 +12,12 @@
  *  use the PowerTweak utility (see http://powertweak.sourceforge.net).
  */
 
-#include <linux/config.h>
-#include <linux/types.h>
-#include <linux/lib.h>
-#include <linux/pci.h>
-#include <linux/init.h>
-#include <linux/delay.h>
+#include <xeno/config.h>
+#include <xeno/types.h>
+#include <xeno/lib.h>
+#include <xeno/pci.h>
+#include <xeno/init.h>
+#include <xeno/delay.h>
 
 #undef DEBUG
 

@@ -2,10 +2,10 @@
 #ifndef _LINUX_INTERRUPT_H
 #define _LINUX_INTERRUPT_H
 
-#include <linux/config.h>
-#include <linux/lib.h>
-#include <linux/smp.h>
-#include <linux/cache.h>
+#include <xeno/config.h>
+#include <xeno/lib.h>
+#include <xeno/smp.h>
+#include <xeno/cache.h>
 
 #include <asm/bitops.h>
 #include <asm/atomic.h>

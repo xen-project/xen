@@ -479,6 +479,7 @@
 3ddb79c25UE59iu4JJcbRalx95mvcg xen/include/hypervisor-ifs/hypervisor-if.h
 3ead095dE_VF-QA88rl_5cWYRWtRVQ xen/include/hypervisor-ifs/kbd.h
 3ddb79c2oRPrzClk3zbTkRHlpumzKA xen/include/hypervisor-ifs/network.h
+404f3d2eR2Owk-ZcGOx9ULGHg3nrww xen/include/hypervisor-ifs/trace.h
 3f0d22cbroqp_BkoDPwkfRJhaw1LiQ xen/include/hypervisor-ifs/vbd.h
 3ddb79c4qbCoOFHrv9sCGshbWzBVlQ xen/include/scsi/scsi.h
 3ddb79c4R4iVwqIIeychVQYmIH4FUg xen/include/scsi/scsi_ioctl.h

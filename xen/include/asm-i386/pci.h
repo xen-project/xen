@@ -1,7 +1,7 @@
 #ifndef __i386_PCI_H
 #define __i386_PCI_H
 
-#include <linux/config.h>
+#include <xeno/config.h>
 
 #ifdef __KERNEL__
 
@@ -28,10 +28,10 @@ int pcibios_set_irq_routing(struct pci_dev *dev, int pin, int irq);
  * i386 has everything mapped statically.
  */
 
-#include <linux/types.h>
-#include <linux/slab.h>
+#include <xeno/types.h>
+#include <xeno/slab.h>
 #include <asm/scatterlist.h>
-/*#include <linux/string.h>*/
+/*#include <xeno/string.h>*/
 #include <asm/io.h>
 
 struct pci_dev;

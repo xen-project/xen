@@ -21,7 +21,7 @@
   file called LICENSE.
   
   Contact Information:
-  Linux NICS <linux.nics@intel.com>
+  Linux NICS <xeno.nics@intel.com>
   Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
 
 *******************************************************************************/
@@ -29,17 +29,17 @@
 #ifndef _KCOMPAT_H_
 #define _KCOMPAT_H_
 
-#include <linux/version.h>
-#include <linux/types.h>
-#include <linux/errno.h>
-#include <linux/module.h>
-#include <linux/pci.h>
-#include <linux/netdevice.h>
-#include <linux/ioport.h>
-#include <linux/slab.h>
-//#include <linux/pagemap.h>
-#include <linux/list.h>
-#include <linux/sched.h>
+#include <xeno/version.h>
+#include <xeno/types.h>
+#include <xeno/errno.h>
+#include <xeno/module.h>
+#include <xeno/pci.h>
+#include <xeno/netdevice.h>
+#include <xeno/ioport.h>
+#include <xeno/slab.h>
+//#include <xeno/pagemap.h>
+#include <xeno/list.h>
+#include <xeno/sched.h>
 #include <asm/io.h>
 
 #ifndef IRQ_HANDLED
@@ -296,7 +296,7 @@ static inline void _kc_synchronize_irq() { synchronize_irq(); }
 #undef synchronize_irq
 #define synchronize_irq(X) _kc_synchronize_irq()
 
-#include <linux/tqueue.h>
+#include <xeno/tqueue.h>
 #define work_struct tq_struct
 #define INIT_WORK INIT_TQUEUE
 #define schedule_work schedule_task

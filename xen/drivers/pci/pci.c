@@ -9,22 +9,22 @@
  *	Copyright 1997 -- 2000 Martin Mares <mj@ucw.cz>
  */
 
-#include <linux/config.h>
-#include <linux/sched.h>
-#include <linux/module.h>
-#include <linux/types.h>
-/*#include <linux/kernel.h>*/
-#include <linux/pci.h>
-/*#include <linux/string.h>*/
-#include <linux/init.h>
-#include <linux/slab.h>
-#include <linux/ioport.h>
-#include <linux/spinlock.h>
-/*#include <linux/pm.h>*/
-/*#include <linux/kmod.h>*/		/* for hotplug_path */
-/*#include <linux/bitops.h>*/
-#include <linux/delay.h>
-#include <linux/cache.h>
+#include <xeno/config.h>
+#include <xeno/sched.h>
+#include <xeno/module.h>
+#include <xeno/types.h>
+/*#include <xeno/kernel.h>*/
+#include <xeno/pci.h>
+/*#include <xeno/string.h>*/
+#include <xeno/init.h>
+#include <xeno/slab.h>
+#include <xeno/ioport.h>
+#include <xeno/spinlock.h>
+/*#include <xeno/pm.h>*/
+/*#include <xeno/kmod.h>*/		/* for hotplug_path */
+/*#include <xeno/bitops.h>*/
+#include <xeno/delay.h>
+#include <xeno/cache.h>
 
 #include <asm/page.h>
 /*#include <asm/dma.h>*/	/* isa_dma_bridge_buggy */

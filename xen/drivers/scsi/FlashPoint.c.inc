@@ -16,7 +16,7 @@
 */
 
 
-#include <linux/config.h>
+#include <xeno/config.h>
 
 
 #ifndef CONFIG_SCSI_OMIT_FLASHPOINT

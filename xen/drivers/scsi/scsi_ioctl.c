@@ -12,12 +12,12 @@
 #include <asm/system.h>
 #include <asm/page.h>
 
-/*  #include <linux/interrupt.h> */
-/*  #include <linux/errno.h> */
-/*  #include <linux/kernel.h> */
+/*  #include <xeno/interrupt.h> */
+/*  #include <xeno/errno.h> */
+/*  #include <xeno/kernel.h> */
 #include <xeno/sched.h>
-/*  #include <linux/mm.h> */
-/*  #include <linux/string.h> */
+/*  #include <xeno/mm.h> */
+/*  #include <xeno/string.h> */
 
 #include <xeno/blk.h>
 #include "scsi.h"

@@ -3,11 +3,11 @@
  *	New style setup code for the network devices
  */
  
-#include <linux/config.h>
-#include <linux/netdevice.h>
-#include <linux/errno.h>
-#include <linux/init.h>
-//#include <linux/netlink.h>
+#include <xeno/config.h>
+#include <xeno/netdevice.h>
+#include <xeno/errno.h>
+#include <xeno/init.h>
+//#include <xeno/netlink.h>
 
 extern int slip_init_ctrl_dev(void);
 extern int x25_asy_init_ctrl_dev(void);

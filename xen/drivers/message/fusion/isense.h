@@ -3,9 +3,9 @@
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
 #ifdef __KERNEL__
-#include <linux/types.h>		/* needed for u8, etc. */
-#include <linux/string.h>		/* needed for strcat   */
-#include <linux/kernel.h>		/* needed for sprintf  */
+#include <xeno/types.h>		/* needed for u8, etc. */
+#include <xeno/string.h>		/* needed for strcat   */
+#include <xeno/kernel.h>		/* needed for sprintf  */
 #else
     #ifndef U_STUFF_DEFINED
     #define U_STUFF_DEFINED

@@ -38,18 +38,18 @@
 #define AAC_DRIVER_VERSION		"1.1.2"
 #define AAC_DRIVER_BUILD_DATE		__DATE__ " " __TIME__
 
-#include <linux/module.h>
-#include <linux/config.h>
-#include <linux/kernel.h>
-#include <linux/init.h>
-#include <linux/types.h>
-#include <linux/sched.h>
-#include <linux/pci.h>
-#include <linux/spinlock.h>
-#include <linux/slab.h>
-/*#include <linux/completion.h>*/
+#include <xeno/module.h>
+#include <xeno/config.h>
+#include <xeno/kernel.h>
+#include <xeno/init.h>
+#include <xeno/types.h>
+#include <xeno/sched.h>
+#include <xeno/pci.h>
+#include <xeno/spinlock.h>
+#include <xeno/slab.h>
+/*#include <xeno/completion.h>*/
 /*#include <asm/semaphore.h>*/
-#include <linux/blk.h>
+#include <xeno/blk.h>
 #include "scsi.h"
 #include "hosts.h"
 

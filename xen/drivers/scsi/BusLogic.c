@@ -30,20 +30,20 @@
 #define BusLogic_DriverDate		"17 August 1998"
 
 
-#include <linux/version.h>
-#include <linux/module.h>
-#include <linux/config.h>
-#include <linux/init.h>
-#include <linux/types.h>
-#include <linux/blk.h>
-#include <linux/blkdev.h>
-#include <linux/delay.h>
-#include <linux/ioport.h>
-#include <linux/mm.h>
-#include <linux/sched.h>
-/*#include <linux/stat.h>*/
-#include <linux/pci.h>
-#include <linux/spinlock.h>
+#include <xeno/version.h>
+#include <xeno/module.h>
+#include <xeno/config.h>
+#include <xeno/init.h>
+#include <xeno/types.h>
+#include <xeno/blk.h>
+#include <xeno/blkdev.h>
+#include <xeno/delay.h>
+#include <xeno/ioport.h>
+#include <xeno/mm.h>
+#include <xeno/sched.h>
+/*#include <xeno/stat.h>*/
+#include <xeno/pci.h>
+#include <xeno/spinlock.h>
 #include <asm/dma.h>
 #include <asm/io.h>
 #include <asm/system.h>

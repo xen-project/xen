@@ -4,9 +4,9 @@
 #if defined(__KERNEL__) || !defined(__GLIBC__) || (__GLIBC__ < 2)
 
 //#include <asm/socket.h>			/* arch-dependent defines	*/
-#include <linux/sockios.h>		/* the SIOCxxx I/O controls	*/
-//#include <linux/uio.h>			/* iovec support		*/
-#include <linux/types.h>		/* pid_t			*/
+#include <xeno/sockios.h>		/* the SIOCxxx I/O controls	*/
+//#include <xeno/uio.h>			/* iovec support		*/
+#include <xeno/types.h>		/* pid_t			*/
 
 typedef unsigned short	sa_family_t;
 

@@ -26,7 +26,7 @@
 */
 
 
-#include <linux/config.h>
+#include <xeno/config.h>
 
 
 /*

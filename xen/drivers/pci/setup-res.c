@@ -16,13 +16,13 @@
  *	     Resource sorting
  */
 
-#include <linux/init.h>
-#include <linux/lib.h>
-#include <linux/pci.h>
-#include <linux/errno.h>
-#include <linux/ioport.h>
-#include <linux/cache.h>
-#include <linux/slab.h>
+#include <xeno/init.h>
+#include <xeno/lib.h>
+#include <xeno/pci.h>
+#include <xeno/errno.h>
+#include <xeno/ioport.h>
+#include <xeno/cache.h>
+#include <xeno/slab.h>
 
 
 #define DEBUG_CONFIG 0

@@ -15,9 +15,9 @@
 */
 
 #include "tulip.h"
-#include <linux/config.h>
-#include <linux/etherdevice.h>
-#include <linux/pci.h>
+#include <xeno/config.h>
+#include <xeno/etherdevice.h>
+#include <xeno/pci.h>
 
 
 int tulip_rx_copybreak;

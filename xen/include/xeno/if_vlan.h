@@ -23,8 +23,8 @@ struct packet_type;
 struct vlan_collection;
 struct vlan_dev_info;
 
-//#include <linux/proc_fs.h> /* for proc_dir_entry */
-#include <linux/netdevice.h>
+//#include <xeno/proc_fs.h> /* for proc_dir_entry */
+#include <xeno/netdevice.h>
 
 #define VLAN_HLEN	4		/* The additional bytes (on top of the Ethernet header)
 					 * that VLAN requires.
