@@ -111,7 +111,7 @@ static void xen_physdisk_revoke_access(unsigned short dev,
       /* Cut the current ace down to just the bit before the kzone,
 	 create a new ace for the bit just after it. */ 
       new_ace = kmalloc(sizeof(*cur_ace), GFP_KERNEL);
-      new_ace->device = dev;
+      new_ace->device = dev & ~0x1f;
       new_ace->start_sect = kill_zone_end;
       new_ace->n_sectors = ace_end - kill_zone_end;
       new_ace->mode = cur_ace->mode;

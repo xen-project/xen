@@ -58,5 +58,5 @@ rpm: all
 	rm -rf staging
 
 clean:
-	$(RM) *.o *.rpm $(XI_CREATE) $(XI_START) $(XI_STOP) $(XI_DESTROY) $(XI_BUILD) $(XI_PHYSDEV_GRANT)
+	$(RM) *.o *.rpm $(XI_CREATE) $(XI_START) $(XI_STOP) $(XI_DESTROY) $(XI_BUILD) $(XI_PHYS_GRANT) $(XI_PHYS_REVOKE) $(XI_PHYS_PROBE)
 
