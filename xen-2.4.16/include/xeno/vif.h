@@ -26,16 +26,17 @@
  */
 
 typedef struct rx_shadow_entry_st {
-    unsigned long addr;
-    unsigned long size;
-    int           status;
-    unsigned long flush_count;
+    unsigned long  addr;
+    unsigned short size;
+    unsigned short status;
+    unsigned long  flush_count;
 } rx_shadow_entry_t;
 
 typedef struct tx_shadow_entry_st {
-    unsigned long addr;
-    unsigned long size;
-    int           status;
+    void          *header;
+    unsigned long  payload;
+    unsigned short size;
+    unsigned short status;
 } tx_shadow_entry_t;
 
 typedef struct net_shadow_ring_st {
@@ -46,12 +47,11 @@ typedef struct net_shadow_ring_st {
 } net_shadow_ring_t;
 
 typedef struct net_vif_st {
-    net_ring_t          *net_ring;
-    net_shadow_ring_t   *shadow_ring;
+    net_ring_t         *net_ring;
+    net_shadow_ring_t  *shadow_ring;
     int                 id;
-    struct sk_buff_head skb_list;
-    unsigned int domain;
-    // rules table goes here in next revision.
+    struct task_struct *domain;
+    struct list_head    list;
 } net_vif_t;
 
 /* VIF-related defines. */

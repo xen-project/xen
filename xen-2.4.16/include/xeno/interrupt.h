@@ -172,13 +172,17 @@ static inline void tasklet_disable(struct tasklet_struct *t)
 static inline void tasklet_enable(struct tasklet_struct *t)
 {
 	smp_mb__before_atomic_dec();
-	atomic_dec(&t->count);
+	if (atomic_dec_and_test(&t->count) &&
+	    test_bit(TASKLET_STATE_SCHED, &t->state))
+		__tasklet_schedule(t);
 }
 
 static inline void tasklet_hi_enable(struct tasklet_struct *t)
 {
 	smp_mb__before_atomic_dec();
-	atomic_dec(&t->count);
+	if (atomic_dec_and_test(&t->count) &&
+	    test_bit(TASKLET_STATE_SCHED, &t->state))
+		__tasklet_hi_schedule(t);
 }
 
 extern void tasklet_kill(struct tasklet_struct *t);

@@ -70,18 +70,6 @@ static void remove_from_blkdev_list(struct task_struct *p)
     spin_unlock_irqrestore(&io_schedule_list_lock, flags);
 }
 
-static void add_to_blkdev_list(struct task_struct *p)
-{
-    unsigned long flags;
-    if ( __on_blkdev_list(p) ) return;
-    spin_lock_irqsave(&io_schedule_list_lock, flags);
-    if ( !__on_blkdev_list(p) )
-    {
-        list_add(&p->blkdev_list, &io_schedule_list);
-    }
-    spin_unlock_irqrestore(&io_schedule_list_lock, flags);
-}
-
 static void add_to_blkdev_list_tail(struct task_struct *p)
 {
     unsigned long flags;

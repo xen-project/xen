@@ -38,29 +38,11 @@
 #ifdef __KERNEL__
 #include <xeno/config.h>
 
-struct divert_blk;
 struct vlan_group;
-
-#define HAVE_ALLOC_NETDEV		/* feature macro: alloc_xxxdev
-					   functions are available. */
-
-#define NET_XMIT_SUCCESS	0
-#define NET_XMIT_DROP		1	/* skb dropped			*/
-#define NET_XMIT_CN		2	/* congestion notification	*/
-#define NET_XMIT_POLICED	3	/* skb is shot by police	*/
-#define NET_XMIT_BYPASS		4	/* packet does not leave via dequeue;
-					   (TC use only - dev_queue_xmit
-					   returns this as NET_XMIT_SUCCESS) */
 
 /* Backlog congestion levels */
 #define NET_RX_SUCCESS		0   /* keep 'em coming, baby */
 #define NET_RX_DROP		1  /* packet dropped */
-#define NET_RX_CN_LOW		2   /* storm alert, just in case */
-#define NET_RX_CN_MOD		3   /* Storm on its way! */
-#define NET_RX_CN_HIGH		4   /* The storm is here */
-#define NET_RX_BAD		5  /* packet dropped due to kernel error */
-
-#define net_xmit_errno(e)	((e) != NET_XMIT_CN ? -ENOBUFS : 0)
 
 #endif
 
@@ -182,7 +164,6 @@ enum netdev_state_t
 	__LINK_STATE_XOFF=0,
 	__LINK_STATE_START,
 	__LINK_STATE_PRESENT,
-	__LINK_STATE_SCHED,
 	__LINK_STATE_NOCARRIER
 };
 
@@ -409,7 +390,6 @@ extern struct net_device	*dev_alloc(const char *name, int *err);
 extern int		dev_alloc_name(struct net_device *dev, const char *name);
 extern int		dev_open(struct net_device *dev);
 extern int		dev_close(struct net_device *dev);
-extern int		dev_queue_xmit(struct sk_buff *skb);
 extern int		register_netdevice(struct net_device *dev);
 extern int		unregister_netdevice(struct net_device *dev);
 extern void dev_shutdown(struct net_device *dev);
@@ -430,30 +410,14 @@ static inline int unregister_gifconf(unsigned int family)
 
 extern struct tasklet_struct net_tx_tasklet;
 
-
-struct softnet_data
-{
-	struct net_device	*output_queue;
-	struct sk_buff		*completion_queue;
-} __attribute__((__aligned__(SMP_CACHE_BYTES)));
-
-
-extern struct softnet_data softnet_data[NR_CPUS];
+extern struct list_head net_schedule_list;
+extern spinlock_t net_schedule_list_lock;
 
 #define HAVE_NETIF_QUEUE
 
 static inline void __netif_schedule(struct net_device *dev)
 {
-	if (!test_and_set_bit(__LINK_STATE_SCHED, &dev->state)) {
-		unsigned long flags;
-		int cpu = smp_processor_id();
-
-		local_irq_save(flags);
-		dev->next_sched = softnet_data[cpu].output_queue;
-		softnet_data[cpu].output_queue = dev;
-                tasklet_schedule(&net_tx_tasklet);
-		local_irq_restore(flags);
-	}
+	tasklet_schedule(&net_tx_tasklet);
 }
 
 static inline void netif_schedule(struct net_device *dev)
@@ -488,41 +452,18 @@ static inline int netif_running(struct net_device *dev)
 	return test_bit(__LINK_STATE_START, &dev->state);
 }
 
-/* Use this variant when it is known for sure that it
- * is executing from interrupt context.
- */
-static inline void dev_kfree_skb_irq(struct sk_buff *skb)
-{
-	if (atomic_dec_and_test(&skb->users)) {
-		int cpu = smp_processor_id();
-		unsigned long flags;
 
-		local_irq_save(flags);
-		skb->next = softnet_data[cpu].completion_queue;
-		softnet_data[cpu].completion_queue = skb;
-                tasklet_schedule(&net_tx_tasklet);
-		local_irq_restore(flags);
-	}
-}
-
-/* Use this variant in places where it could be invoked
- * either from interrupt or non-interrupt context.
+/*
+ * Xen does not need deferred skb freeing, as all destructor hook functions 
+ * are IRQ safe. Linux needed more care for some destructors...
  */
-static inline void dev_kfree_skb_any(struct sk_buff *skb)
-{
-	if (in_irq())
-		dev_kfree_skb_irq(skb);
-	else
-		dev_kfree_skb(skb);
-}
+#define dev_kfree_skb_irq(_skb) dev_kfree_skb(_skb)
+#define dev_kfree_skb_any(_skb) dev_kfree_skb(_skb)
 
 extern void		net_call_rx_atomic(void (*fn)(void));
-#define HAVE_NETIF_RX 1
 extern int		netif_rx(struct sk_buff *skb);
 extern int		dev_ioctl(unsigned int cmd, void *);
 extern int		dev_change_flags(struct net_device *, unsigned);
-extern void		dev_queue_xmit_nit(struct sk_buff *skb, struct net_device *dev);
-
 extern void		dev_init(void);
 
 extern int		netdev_nit;
@@ -654,9 +595,7 @@ extern void		dev_load(const char *name);
 extern void		dev_mcast_init(void);
 extern int		netdev_register_fc(struct net_device *dev, void (*stimul)(struct net_device *dev));
 extern void		netdev_unregister_fc(int bit);
-extern int		netdev_max_backlog;
 extern unsigned long	netdev_fc_xoff;
-extern atomic_t netdev_dropping;
 extern int		netdev_set_master(struct net_device *dev, struct net_device *master);
 extern struct sk_buff * skb_checksum_help(struct sk_buff *skb);
 

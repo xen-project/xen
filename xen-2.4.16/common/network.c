@@ -81,9 +81,9 @@ net_vif_t *create_net_vif(int domain)
     new_vif->net_ring = new_ring;
     new_vif->shadow_ring = shadow_ring;
     
-                    
-    skb_queue_head_init(&new_vif->skb_list);
-    new_vif->domain = domain;
+    new_vif->domain = find_domain_by_id(domain);
+
+    new_vif->list.next = NULL;
     
     write_lock(&sys_vif_lock);
     new_vif->id = sys_vif_count;
@@ -114,16 +114,11 @@ fail:
 
 void destroy_net_vif(struct task_struct *p)
 {
-    struct sk_buff *skb;
     int i;
 
     if ( p->num_net_vifs <= 0 ) return; // nothing to do.
     
     i = --p->num_net_vifs;
-    while ( (skb = skb_dequeue(&p->net_vif_list[i]->skb_list)) != NULL )
-    {
-        kfree_skb(skb);
-    }
     
     write_lock(&sys_vif_lock);
     sys_vif_list[p->net_vif_list[i]->id] = NULL; // system vif list not gc'ed
@@ -145,17 +140,12 @@ void vif_query(vif_query_t *vq)
     char buf[128];
     int i;
 
-    if ( !(dom_task = find_domain_by_id(vq->domain)) )
-    {
-        return;
-    }
+    if ( !(dom_task = find_domain_by_id(vq->domain)) ) return;
 
     *buf = '\0';
 
-    for (i=0; i < dom_task->num_net_vifs; i++)
-    {
+    for ( i = 0; i < dom_task->num_net_vifs; i++ )
         sprintf(buf + strlen(buf), "%d\n", dom_task->net_vif_list[i]->id);
-    }
 
     copy_to_user(vq->buf, buf, strlen(buf) + 1);
     
@@ -171,12 +161,12 @@ void print_vif_list()
     net_vif_t *v;
 
     printk("Currently, there are %d VIFs.\n", sys_vif_count);
-    for (i=0; i<sys_vif_count; i++)
+    for ( i = 0; i<sys_vif_count; i++ )
     {
         v = sys_vif_list[i];
         printk("] VIF Entry %d(%d):\n", i, v->id);
         printk("   > net_ring*:  %p\n", v->net_ring);
-        printk("   > domain   :  %u\n", v->domain);
+        printk("   > domain   :  %u\n", v->domain->domain);
     }
 }
 

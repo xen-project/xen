@@ -97,11 +97,6 @@ void dev_activate(struct net_device *dev)
 void dev_deactivate(struct net_device *dev)
 {
     dev_watchdog_down(dev);
-
-    while (test_bit(__LINK_STATE_SCHED, &dev->state)) {
-        current->policy |= SCHED_YIELD;
-        schedule();
-    }
 }
 
 void dev_init_scheduler(struct net_device *dev)

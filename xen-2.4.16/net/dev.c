@@ -37,7 +37,6 @@
 #define rtmsg_ifinfo(_a,_b,_c) ((void)0)
 #define rtnl_lock() ((void)0)
 #define rtnl_unlock() ((void)0)
-#define dst_init() ((void)0)
 
 #if 0
 #define DPRINTK(_f, _a...) printk(_f , ## _a)
@@ -53,11 +52,12 @@
 struct net_device *the_dev = NULL;
 
 /*
- *	Device drivers call our routines to queue packets here. We empty the
- *	queue in the local softnet handler.
+ * Transmitted packets are fragmented, so we can copy the important headesr 
+ * before checking them for validity. Avoids need for page protection.
  */
-struct softnet_data softnet_data[NR_CPUS] __cacheline_aligned;
-
+/* Ethernet + IP headers */
+#define PKT_PROT_LEN (ETH_HLEN + 20)
+static kmem_cache_t *net_header_cachep;
 
 /**
  *	__dev_get_by_name	- find a device by its name 
@@ -104,14 +104,6 @@ struct net_device *dev_get_by_name(const char *name)
     read_unlock(&dev_base_lock);
     return dev;
 }
-
-/* 
-   Return value is changed to int to prevent illegal usage in future.
-   It is still legal to use to check for device existance.
-
-   User should understand, that the result returned by this function
-   is meaningless, if it was not issued under rtnl semaphore.
- */
 
 /**
  *	dev_get	-	test if a device exists
@@ -483,141 +475,12 @@ illegal_highdma(struct net_device *dev, struct sk_buff *skb)
 #define illegal_highdma(dev, skb)	(0)
 #endif
 
-/*
- * dev_queue_xmit - transmit a buffer
- * @skb: buffer to transmit
- *	
- * Queue a buffer for transmission to a network device. The caller must
- * have set the device and priority and built the buffer before calling this 
- * function. The function can be called from an interrupt.
- *
- * A negative errno code is returned on a failure. A success does not
- * guarantee the frame will be transmitted as it may be dropped due
- * to congestion or traffic shaping.
- */
-
-int dev_queue_xmit(struct sk_buff *skb)
-{
-    struct net_device *dev = skb->dev;
-        
-    if (!(dev->features&NETIF_F_SG)) 
-    {
-        printk("NIC doesn't do scatter-gather!\n");
-        BUG();
-    }
-        
-    if (skb_shinfo(skb)->frag_list &&
-        !(dev->features&NETIF_F_FRAGLIST) &&
-        skb_linearize(skb, GFP_ATOMIC) != 0) {
-        kfree_skb(skb);
-        return -ENOMEM;
-    }
-
-    spin_lock_bh(&dev->queue_lock);
-    if (dev->flags&IFF_UP) {
-        int cpu = smp_processor_id();
-
-        if (dev->xmit_lock_owner != cpu) {
-            spin_unlock(&dev->queue_lock);
-            spin_lock(&dev->xmit_lock);
-            dev->xmit_lock_owner = cpu;
-
-            if (!netif_queue_stopped(dev)) {
-                if (dev->hard_start_xmit(skb, dev) == 0) {
-                    dev->xmit_lock_owner = -1;
-                    spin_unlock_bh(&dev->xmit_lock);
-                    return 0;
-                }
-            }
-            dev->xmit_lock_owner = -1;
-            spin_unlock_bh(&dev->xmit_lock);
-            kfree_skb(skb);
-            return -ENETDOWN;
-        }
-    }
-    spin_unlock_bh(&dev->queue_lock);
-
-    kfree_skb(skb);
-    return -ENETDOWN;
-}
-
 
 /*=======================================================================
 			Receiver routines
   =======================================================================*/
 
-int netdev_max_backlog = 300;
-/* These numbers are selected based on intuition and some
- * experimentatiom, if you have more scientific way of doing this
- * please go ahead and fix things.
- */
-int no_cong_thresh = 10;
-int no_cong = 20;
-int lo_cong = 100;
-int mod_cong = 290;
-
 struct netif_rx_stats netdev_rx_stat[NR_CPUS];
-
-
-#ifdef CONFIG_NET_HW_FLOWCONTROL
-atomic_t netdev_dropping = ATOMIC_INIT(0);
-static unsigned long netdev_fc_mask = 1;
-unsigned long netdev_fc_xoff = 0;
-spinlock_t netdev_fc_lock = SPIN_LOCK_UNLOCKED;
-
-static struct
-{
-    void (*stimul)(struct net_device *);
-    struct net_device *dev;
-} netdev_fc_slots[BITS_PER_LONG];
-
-int netdev_register_fc(struct net_device *dev, 
-                       void (*stimul)(struct net_device *dev))
-{
-    int bit = 0;
-    unsigned long flags;
-
-    spin_lock_irqsave(&netdev_fc_lock, flags);
-    if (netdev_fc_mask != ~0UL) {
-        bit = ffz(netdev_fc_mask);
-        netdev_fc_slots[bit].stimul = stimul;
-        netdev_fc_slots[bit].dev = dev;
-        set_bit(bit, &netdev_fc_mask);
-        clear_bit(bit, &netdev_fc_xoff);
-    }
-    spin_unlock_irqrestore(&netdev_fc_lock, flags);
-    return bit;
-}
-
-void netdev_unregister_fc(int bit)
-{
-    unsigned long flags;
-
-    spin_lock_irqsave(&netdev_fc_lock, flags);
-    if (bit > 0) {
-        netdev_fc_slots[bit].stimul = NULL;
-        netdev_fc_slots[bit].dev = NULL;
-        clear_bit(bit, &netdev_fc_mask);
-        clear_bit(bit, &netdev_fc_xoff);
-    }
-    spin_unlock_irqrestore(&netdev_fc_lock, flags);
-}
-
-static void netdev_wakeup(void)
-{
-    unsigned long xoff;
-
-    spin_lock(&netdev_fc_lock);
-    xoff = netdev_fc_xoff;
-    netdev_fc_xoff = 0;
-    while (xoff) {
-        int i = ffz(~xoff);
-        xoff &= ~(1<<i);
-        netdev_fc_slots[i].stimul(netdev_fc_slots[i].dev);
-    }
-    spin_unlock(&netdev_fc_lock);
-}
-#endif
 
 void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
 {
@@ -677,9 +540,6 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
     shadow_ring->rx_cons = RX_RING_INC(i);
 }
 
-/* Deliver skb to an old protocol, which is not threaded well
-   or which do not understand shared skbs.
- */
 /**
  *	netif_rx	-	post buffer to the network code
  *	@skb: buffer to post
@@ -691,12 +551,7 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
  *      
  *	return values:
  *	NET_RX_SUCCESS	(no congestion)           
- *	NET_RX_CN_LOW     (low congestion) 
- *	NET_RX_CN_MOD     (moderate congestion)
- *	NET_RX_CN_HIGH    (high congestion) 
  *	NET_RX_DROP    (packet was dropped)
- *      
- *      
  */
 
 int netif_rx(struct sk_buff *skb)
@@ -707,7 +562,6 @@ int netif_rx(struct sk_buff *skb)
         
     struct task_struct *p;
     int this_cpu = smp_processor_id();
-    struct softnet_data *queue;
     unsigned long flags;
     net_vif_t *vif;
 
@@ -732,8 +586,6 @@ int netif_rx(struct sk_buff *skb)
     skb->mac.raw = skb->data;
     skb->data += ETH_HLEN;
     skb->nh.raw = skb->data;
-        
-    queue = &softnet_data[this_cpu];
         
     netdev_rx_stat[this_cpu].total++;
 
@@ -762,8 +614,7 @@ int netif_rx(struct sk_buff *skb)
         read_lock(&tasklist_lock);
         p = &idle0_task;
         do {
-            if ( p->domain != vif->domain ) continue;
-            if ( vif->skb_list.qlen > 100 ) break;
+            if ( p != vif->domain ) continue;
             deliver_packet(skb, vif);
             cpu_mask = mark_hyp_event(p, _HYP_EVENT_NET_RX);
             read_unlock(&tasklist_lock);
@@ -787,124 +638,146 @@ int netif_rx(struct sk_buff *skb)
     kfree_skb(skb);
     hyp_event_notify(cpu_mask);
     local_irq_restore(flags);
-    return 0;
+    return NET_RX_SUCCESS;
 }
 
 
-static int deliver_to_old_ones(struct packet_type *pt, 
-                               struct sk_buff *skb, int last)
+/*************************************************************
+ * NEW TRANSMIT SCHEDULER
+ */
+
+struct list_head net_schedule_list;
+spinlock_t net_schedule_list_lock;
+
+static int __on_net_schedule_list(net_vif_t *vif)
 {
-    static spinlock_t net_bh_lock = SPIN_LOCK_UNLOCKED;
-    int ret = NET_RX_DROP;
-
-
-    if (!last) {
-        skb = skb_clone(skb, GFP_ATOMIC);
-        if (skb == NULL)
-            return ret;
-    }
-    if (skb_is_nonlinear(skb) && skb_linearize(skb, GFP_ATOMIC) != 0) {
-        kfree_skb(skb);
-        return ret;
-    }
-
-    /* The assumption (correct one) is that old protocols
-       did not depened on BHs different of NET_BH and TIMER_BH.
-    */
-
-    /* Emulate NET_BH with special spinlock */
-    spin_lock(&net_bh_lock);
-
-    /* Disable timers and wait for all timers completion */
-    tasklet_disable(bh_task_vec+TIMER_BH);
-
-    ret = pt->func(skb, skb->dev, pt);
-
-    tasklet_hi_enable(bh_task_vec+TIMER_BH);
-    spin_unlock(&net_bh_lock);
-    return ret;
+    return vif->list.next != NULL;
 }
 
+static void remove_from_net_schedule_list(net_vif_t *vif)
+{
+    unsigned long flags;
+    if ( !__on_net_schedule_list(vif) ) return;
+    spin_lock_irqsave(&net_schedule_list_lock, flags);
+    if ( __on_net_schedule_list(vif) )
+    {
+        list_del(&vif->list);
+        vif->list.next = NULL;
+    }
+    spin_unlock_irqrestore(&net_schedule_list_lock, flags);
+}
+
+static void add_to_net_schedule_list_tail(net_vif_t *vif)
+{
+    unsigned long flags;
+    if ( __on_net_schedule_list(vif) ) return;
+    spin_lock_irqsave(&net_schedule_list_lock, flags);
+    if ( !__on_net_schedule_list(vif) )
+    {
+        list_add_tail(&vif->list, &net_schedule_list);
+    }
+    spin_unlock_irqrestore(&net_schedule_list_lock, flags);
+}
+
+
+/* Destructor function for tx skbs. */
+static void tx_skb_release(struct sk_buff *skb)
+{
+    int i;
+    net_ring_t *ring;
+    
+    for ( i = 0; i < skb_shinfo(skb)->nr_frags; i++ )
+        put_page_tot(skb_shinfo(skb)->frags[i].page);
+
+    if ( skb->skb_type == SKB_NODATA )
+        kmem_cache_free(net_header_cachep, skb->head);
+
+    skb_shinfo(skb)->nr_frags = 0; 
+
+    /*
+     * XXX This assumes that, per vif, SKBs are processed in-order!
+     * Also assumes no concurrency. This is safe because each vif
+     * maps to one NIC. This is executed in NIC interrupt code, so we have
+     * mutual exclusion from do_IRQ().
+     */
+    ring = sys_vif_list[skb->src_vif]->net_ring;
+    ring->tx_cons = TX_RING_INC(ring->tx_cons);
+
+    if ( ring->tx_cons == ring->tx_event )
+        set_bit(_EVENT_NET_TX, 
+                &sys_vif_list[skb->src_vif]->domain->shared_info->events);
+}
+
+    
 static void net_tx_action(unsigned long unused)
 {
-    int cpu = smp_processor_id();
+    struct net_device *dev = the_dev;
+    struct list_head *ent;
+    struct sk_buff *skb;
+    net_vif_t *vif;
+    tx_shadow_entry_t *tx;
+    int pending_bytes = 0, pending_bytes_max = 1;
 
-    if (softnet_data[cpu].completion_queue) {
-        struct sk_buff *clist;
+    spin_lock(&dev->xmit_lock);
+    while ( !netif_queue_stopped(dev) &&
+            (pending_bytes < pending_bytes_max) &&
+            !list_empty(&net_schedule_list) )
+    {
+        /* Get a vif from the list with work to do. */
+        ent = net_schedule_list.next;
+        vif = list_entry(ent, net_vif_t, list);
+        remove_from_net_schedule_list(vif);
+        if ( vif->shadow_ring->tx_idx == vif->shadow_ring->tx_prod )
+            continue;
 
-        local_irq_disable();
-        clist = softnet_data[cpu].completion_queue;
-        softnet_data[cpu].completion_queue = NULL;
-        local_irq_enable();
+        /* Check the chosen entry is good. */
+        tx = &vif->shadow_ring->tx_ring[vif->shadow_ring->tx_idx];
+        if ( tx->status != RING_STATUS_OK ) goto skip_desc;
 
-        while (clist != NULL) {
-            struct sk_buff *skb = clist;
-            clist = clist->next;
-
-            BUG_TRAP(atomic_read(&skb->users) == 0);
-            __kfree_skb(skb);
+        if ( (skb = alloc_skb_nodata(GFP_ATOMIC)) == NULL )
+        {
+            add_to_net_schedule_list_tail(vif);
+            printk("Out of memory in net_tx_action()!\n");
+            goto out;
         }
-    }
+        
+        skb->destructor = tx_skb_release;
+        
+        skb->head = skb->data = tx->header;
+        skb->end  = skb->tail = skb->head + PKT_PROT_LEN;
+        
+        skb->dev      = the_dev;
+        skb->src_vif  = vif->id;
+        skb->dst_vif  = VIF_PHYSICAL_INTERFACE;
+        skb->mac.raw  = skb->data; 
+        
+        skb_shinfo(skb)->frags[0].page        = frame_table +
+            (tx->payload >> PAGE_SHIFT);
+        skb_shinfo(skb)->frags[0].size        = tx->size - PKT_PROT_LEN;
+        skb_shinfo(skb)->frags[0].page_offset = tx->payload & ~PAGE_MASK;
+        skb_shinfo(skb)->nr_frags = 1;
 
-    if (softnet_data[cpu].output_queue) {
-        struct net_device *head;
+        skb->data_len = tx->size - PKT_PROT_LEN;
+        skb->len      = tx->size;
 
-        local_irq_disable();
-        head = softnet_data[cpu].output_queue;
-        softnet_data[cpu].output_queue = NULL;
-        local_irq_enable();
-
-        while (head != NULL) {
-            struct net_device *dev = head;
-            head = head->next_sched;
-
-            smp_mb__before_clear_bit();
-            clear_bit(__LINK_STATE_SCHED, &dev->state);
-
-            if (spin_trylock(&dev->queue_lock)) {
-				/*qdisc_run(dev); XXX KAF */
-                spin_unlock(&dev->queue_lock);
-            } else {
-                netif_schedule(dev);
-            }
+        /* Transmit should always work, or the queue would be stopped. */
+        if ( dev->hard_start_xmit(skb, dev) != 0 )
+        {
+            add_to_net_schedule_list_tail(vif);
+            printk("Weird failure in hard_start_xmit!\n");
+            goto out;
         }
+
+    skip_desc:
+        vif->shadow_ring->tx_idx = TX_RING_INC(vif->shadow_ring->tx_idx);
+        if ( vif->shadow_ring->tx_idx != vif->shadow_ring->tx_prod )
+            add_to_net_schedule_list_tail(vif);
     }
-}
-DECLARE_TASKLET(net_tx_tasklet, net_tx_action, 0);
-
-#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
-void (*br_handle_frame_hook)(struct sk_buff *skb) = NULL;
-#endif
-
-static __inline__ int handle_bridge(struct sk_buff *skb,
-                                    struct packet_type *pt_prev)
-{
-    int ret = NET_RX_DROP;
-
-    if (pt_prev) {
-        if (!pt_prev->data)
-            ret = deliver_to_old_ones(pt_prev, skb, 0);
-        else {
-            atomic_inc(&skb->users);
-            ret = pt_prev->func(skb, skb->dev, pt_prev);
-        }
-    }
-
-#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
-    br_handle_frame_hook(skb);
-#endif
-    return ret;
+ out:
+    spin_unlock(&dev->xmit_lock);
 }
 
-
-#ifdef CONFIG_NET_DIVERT
-static inline void handle_diverter(struct sk_buff *skb)
-{
-    /* if diversion is supported on device, then divert */
-    if (skb->dev->divert && skb->dev->divert->divert)
-        divert_frame(skb);
-}
-#endif   /* CONFIG_NET_DIVERT */
+DECLARE_TASKLET_DISABLED(net_tx_tasklet, net_tx_action, 0);
 
 
 /*
@@ -1809,22 +1682,20 @@ extern void dv_init(void);
 int __init net_dev_init(void)
 {
     struct net_device *dev, **dp;
-    int i;
 
     if ( !dev_boot_phase )
         return 0;
 
-    /* KAF: was sone in socket_init, but that top-half stuff is gone. */
     skb_init();
 
-    /* Initialise the packet receive queues. */
-    for ( i = 0; i < NR_CPUS; i++ )
-    {
-        struct softnet_data *queue;
-        queue = &softnet_data[i];
-        queue->completion_queue = NULL;
-    }
-	
+    net_header_cachep = kmem_cache_create(
+        "net_header_cache", 
+        (PKT_PROT_LEN + sizeof(void *) - 1) & ~(sizeof(void *) - 1),
+        0, SLAB_HWCACHE_ALIGN, NULL, NULL);
+
+    spin_lock_init(&net_schedule_list_lock);
+    INIT_LIST_HEAD(&net_schedule_list);
+
     /*
      *	Add the devices.
      *	If the call to dev->init fails, the dev is removed
@@ -1887,12 +1758,7 @@ int __init net_dev_init(void)
 
     dev_boot_phase = 0;
 
-    dst_init();
     dev_mcast_init();
-
-#ifdef CONFIG_NET_SCHED
-    pktsched_init();
-#endif
 
     /*
      *	Initialise network devices
@@ -1920,36 +1786,6 @@ inline int init_tx_header(u8 *data, unsigned int len, struct net_device *dev)
 }
 
 
-/* 
- * tx_skb_release
- *
- * skb destructor function that is attached to zero-copy tx skbs before 
- * they are passed to the device driver for transmission.  The destructor 
- * is responsible for unlinking the fragment pointer to the skb data that 
- * is in guest memory, and decrementing the tot_count on the packet pages 
- * pfn_info.
- */
-
-void tx_skb_release(struct sk_buff *skb)
-{
-    int i;
-    
-    for ( i = 0; i < skb_shinfo(skb)->nr_frags; i++ )
-        skb_shinfo(skb)->frags[i].page->tot_count--;
-    
-    skb_shinfo(skb)->nr_frags = 0; 
-
-    /*
-     * XXX This assumes that, per vif, SKBs are processed in-order!
-     * Also, like lots of code in here -- we assume direct access to the
-     * consumer and producer indexes. This is likely safe for the
-     * forseeable future.
-     */
-    sys_vif_list[skb->src_vif]->net_ring->tx_cons = 
-        TX_RING_INC(sys_vif_list[skb->src_vif]->net_ring->tx_cons);
-}
-
-    
 /*
  * do_net_update:
  * 
@@ -1957,12 +1793,8 @@ void tx_skb_release(struct sk_buff *skb)
  * descriptor rings.
  */
 
-/* Ethernet + IP headers */
-#define PKT_PROT_LEN (ETH_HLEN + 20)
-
 long do_net_update(void)
 {
-    shared_info_t *shared = current->shared_info;    
     net_ring_t *net_ring;
     net_shadow_ring_t *shadow_ring;
     net_vif_t *current_vif;
@@ -1988,15 +1820,19 @@ long do_net_update(void)
          * PHASE 1 -- TRANSMIT RING
          */
 
-        for ( i = shadow_ring->tx_cons; 
+        for ( i = shadow_ring->tx_prod; 
               i != net_ring->tx_prod; 
               i = TX_RING_INC(i) )
         {
             if ( copy_from_user(&tx, net_ring->tx_ring+i, sizeof(tx)) )
             {
                 DPRINTK("Bad copy_from_user for tx net descriptor\n");
+                shadow_ring->tx_ring[i].status = RING_STATUS_ERR_CFU;
                 continue;
             }
+
+            shadow_ring->tx_ring[i].size   = tx.size;
+            shadow_ring->tx_ring[i].status = RING_STATUS_BAD_PAGE;
 
             if ( tx.size < PKT_PROT_LEN )
             {
@@ -2010,41 +1846,35 @@ long do_net_update(void)
                         tx.addr, tx.size, (tx.addr &~PAGE_MASK) + tx.size);
                 continue;
             }
-            
-            if ( TX_RING_INC(i) == net_ring->tx_event )
-            {
-                set_bit(_EVENT_NET_TX, &shared->events);
-            }
 
-            /* 
-             * Map the skb in from the guest, and get it's delivery target.
-             * We need this to know whether the packet is to be sent locally
-             * or remotely.
-             */
+            pfn  = tx.addr >> PAGE_SHIFT;
+            page = frame_table + pfn;
+            if ( (pfn >= max_page) || 
+                 ((page->flags & PG_domain_mask) != current->domain) ) 
+            {
+                DPRINTK("Bad page frame\n");
+                continue;
+            }
             
             g_data = map_domain_mem(tx.addr);
 
             protocol = __constant_htons(
                 init_tx_header(g_data, tx.size, the_dev));
             if ( protocol == 0 )
-            {
-                unmap_domain_mem(g_data);
-                continue;
-            }
+                goto unmap_and_continue;
 
             target = __net_get_target_vif(g_data, tx.size, current_vif->id);
 
-            if (target > VIF_PHYSICAL_INTERFACE )
+            if ( target > VIF_PHYSICAL_INTERFACE )
             {
                 /* Local delivery */
-                skb = dev_alloc_skb(tx.size);
-
-                if (skb == NULL) 
-                {
-                    unmap_domain_mem(g_data);
-                    continue;
-                }
+                if ( (skb = dev_alloc_skb(tx.size)) == NULL ) 
+                    goto unmap_and_continue;
                 
+                skb->destructor = tx_skb_release;
+
+                shadow_ring->tx_ring[i].status = RING_STATUS_OK;
+
                 skb->src_vif = current_vif->id;
                 skb->dst_vif = target;
                 skb->protocol = protocol;
@@ -2058,52 +1888,26 @@ long do_net_update(void)
                 unmap_domain_mem(skb->head);
                 skb->data += ETH_HLEN;
                 (void)netif_rx(skb);
-                unmap_domain_mem(g_data);
             }
             else if ( target == VIF_PHYSICAL_INTERFACE )
             {
-                /*
-                 * External delivery: create a fragmented SKB, consisting of a
-                 * small copied section for the header, then a reference to the
-                 * in-place payload.
-                 */                
-                skb = alloc_skb(PKT_PROT_LEN, GFP_KERNEL);
-                if (skb == NULL) 
-                    continue;
-            
-                skb_put(skb, PKT_PROT_LEN);
-                memcpy(skb->data, g_data, PKT_PROT_LEN);
-                unmap_domain_mem(g_data);
-
-                skb->dev = the_dev;
-                skb->src_vif = current_vif->id;
-                skb->dst_vif = target;
-                skb->protocol = protocol; 
-                skb->mac.raw=skb->data; 
-
-                /* One more reference to guest page for duration of transfer */
-                page = (tx.addr >> PAGE_SHIFT) + frame_table;
-                page->tot_count++;
-                
-                /* We have special destructor to deal with guest frag. */
-                skb->destructor = &tx_skb_release;
-
-                skb_shinfo(skb)->frags[0].page = page;
-                skb_shinfo(skb)->frags[0].size = tx.size - PKT_PROT_LEN;
-                skb_shinfo(skb)->frags[0].page_offset 
-                    = (tx.addr & ~PAGE_MASK) + PKT_PROT_LEN;
-                skb_shinfo(skb)->nr_frags = 1;
-                skb->data_len = tx.size - skb->len;
-                skb->len = tx.size;
-                
-                dev_queue_xmit(skb);
+                shadow_ring->tx_ring[i].header = 
+                    kmem_cache_alloc(net_header_cachep, GFP_KERNEL);
+                if ( shadow_ring->tx_ring[i].header == NULL ) 
+                    goto unmap_and_continue;
+                memcpy(shadow_ring->tx_ring[i].header, g_data, PKT_PROT_LEN);
+                shadow_ring->tx_ring[i].payload = tx.addr + PKT_PROT_LEN;
+                shadow_ring->tx_ring[i].status = RING_STATUS_OK;
+                get_page_tot(page);
             }
-            else
-            {
-                unmap_domain_mem(g_data);
-            }
+
+        unmap_and_continue:
+            unmap_domain_mem(g_data);
         }
-        shadow_ring->tx_cons = i;
+        smp_wmb(); /* Let other CPUs see new descriptors first. */
+        shadow_ring->tx_prod = i;
+        add_to_net_schedule_list_tail(current_vif);
+        tasklet_schedule(&net_tx_tasklet); /* XXX */
 
         /*
          * PHASE 2 -- RECEIVE RING
@@ -2131,9 +1935,10 @@ long do_net_update(void)
             
             shadow_ring->rx_ring[i].status = RING_STATUS_BAD_PAGE;
             
-            if  ( page->flags != (PGT_l1_page_table | current->domain) ) 
+            if ( (pfn >= max_page) || 
+                 (page->flags != (PGT_l1_page_table | current->domain)) ) 
             {
-                DPRINTK("Bad page flags\n");
+                DPRINTK("Bad page frame containing ppte\n");
                 continue;
             }
             
@@ -2175,7 +1980,7 @@ int setup_network_devices(void)
     int ret;
     extern char opt_ifname[];
     struct net_device *dev = dev_get_by_name(opt_ifname);
-    
+
     if ( dev == NULL ) 
     {
         printk("Could not find device %s\n", opt_ifname);
@@ -2190,6 +1995,8 @@ int setup_network_devices(void)
     }
     printk("Device %s opened and ready for use.\n", opt_ifname);
     the_dev = dev;
+
+    tasklet_enable(&net_tx_tasklet);
 
     return 1;
 }

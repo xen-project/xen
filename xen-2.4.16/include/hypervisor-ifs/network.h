@@ -15,15 +15,15 @@
 #include <linux/types.h>
 
 typedef struct tx_entry_st {
-	unsigned long addr;   /* virtual address */
-	unsigned long size;   /* in bytes */
-        int           status; /* per descriptor status. */
+	unsigned long  addr;   /* machine address of packet */
+	unsigned short size;   /* in bytes */
+        unsigned short status; /* per descriptor status. */
 } tx_entry_t;
 
 typedef struct rx_entry_st {
-	unsigned long addr;   /* virtual address */
-	unsigned long size;   /* in bytes */
-        int           status; /* per descriptor status. */
+	unsigned long  addr;   /* machine address of PTE to swizzle */
+	unsigned short size;   /* in bytes */
+        unsigned short status; /* per descriptor status. */
 } rx_entry_t;
 
 #define TX_RING_SIZE 256
