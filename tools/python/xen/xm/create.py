@@ -109,6 +109,10 @@ gopts.var('cpu', val='CPU',
           fn=set_int, default=None,
           use="CPU to run the domain on.")
 
+gopts.var('vcpus', val='VCPUS',
+          fn=set_int, default=1,
+          use="# of Virtual CPUS in domain.")
+
 gopts.var('cpu_weight', val='WEIGHT',
           fn=set_float, default=None,
           use="""Set the new domain's cpu weight.
@@ -245,7 +249,10 @@ def configure_image(config, vals):
         config_image.append(['root', cmdline_root])
     if vals.extra:
         config_image.append(['args', vals.extra])
+    if vals.vcpus:
+        config_image.append(['vcpus', vals.vcpus])
     config.append(['image', config_image ])
+
     
 def configure_disks(config_devs, vals):
     """Create the config for disks (virtual block devices).

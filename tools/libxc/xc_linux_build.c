@@ -51,7 +51,8 @@ static int setup_guestos(int xc_handle,
                          const char *cmdline,
                          unsigned long shared_info_frame,
                          unsigned int control_evtchn,
-                         unsigned long flags)
+                         unsigned long flags,
+                         unsigned int vcpus)
 {
     l1_pgentry_t *vl1tab=NULL, *vl1e=NULL;
     l2_pgentry_t *vl2tab=NULL, *vl2e=NULL;
@@ -80,8 +81,6 @@ static int setup_guestos(int xc_handle,
     unsigned long vpt_start;
     unsigned long vpt_end;
     unsigned long v_end;
-
-    char *n_vcpus;
 
     memset(&dsi, 0, sizeof(struct domain_setup_info));
 
@@ -291,11 +290,10 @@ static int setup_guestos(int xc_handle,
     /* Mask all upcalls... */
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
         shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
-    n_vcpus = getenv("XEN_VCPUS");
-    if ( n_vcpus )
-	shared_info->n_vcpu = atoi(n_vcpus);
-    else
-	shared_info->n_vcpu = 1;
+
+    shared_info->n_vcpu = vcpus;
+    printf(" VCPUS:         %d\n", shared_info->n_vcpu);
+
     munmap(shared_info, PAGE_SIZE);
 
     /* Send the page update requests down to the hypervisor. */
@@ -324,7 +322,8 @@ int xc_linux_build(int xc_handle,
                    const char *ramdisk_name,
                    const char *cmdline,
                    unsigned int control_evtchn,
-                   unsigned long flags)
+                   unsigned long flags,
+                   unsigned int vcpus)
 {
     dom0_op_t launch_op, op;
     int initrd_fd = -1;
@@ -390,7 +389,7 @@ int xc_linux_build(int xc_handle,
                        &vstartinfo_start, &vkern_entry,
                        ctxt, cmdline,
                        op.u.getdomaininfo.shared_info_frame,
-                       control_evtchn, flags) < 0 )
+                       control_evtchn, flags, vcpus) < 0 )
     {
         ERROR("Error constructing guest OS");
         goto error_out;

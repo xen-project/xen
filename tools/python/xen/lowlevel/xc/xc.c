@@ -348,19 +348,19 @@ static PyObject *pyxc_linux_build(PyObject *self,
 
     u32   dom;
     char *image, *ramdisk = NULL, *cmdline = "";
-    int   control_evtchn, flags = 0;
+    int   control_evtchn, flags = 0, vcpus = 1;
 
     static char *kwd_list[] = { "dom", "control_evtchn", 
-                                "image", "ramdisk", "cmdline", "flags",
+                                "image", "ramdisk", "cmdline", "flags", "vcpus",
                                 NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iis|ssi", kwd_list, 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iis|ssii", kwd_list, 
                                       &dom, &control_evtchn, 
-                                      &image, &ramdisk, &cmdline, &flags) )
+                                      &image, &ramdisk, &cmdline, &flags, &vcpus) )
         return NULL;
 
     if ( xc_linux_build(xc->xc_handle, dom, image,
-                        ramdisk, cmdline, control_evtchn, flags) != 0 )
+                        ramdisk, cmdline, control_evtchn, flags, vcpus) != 0 )
         return PyErr_SetFromErrno(xc_error);
     
     Py_INCREF(zero);
@@ -1023,6 +1023,7 @@ static PyMethodDef pyxc_methods[] = {
       " image   [str]:      Name of kernel image file. May be gzipped.\n"
       " ramdisk [str, n/a]: Name of ramdisk file, if any.\n"
       " cmdline [str, n/a]: Kernel parameters, if any.\n\n"
+      " vcpus   [int, 1]:   Number of Virtual CPUS in domain.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "vmx_build", 
