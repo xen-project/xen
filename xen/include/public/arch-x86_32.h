@@ -9,6 +9,11 @@
 #ifndef __XEN_PUBLIC_ARCH_X86_32_H__
 #define __XEN_PUBLIC_ARCH_X86_32_H__
 
+#ifndef PACKED
+/* GCC-specific way to pack structure definitions (no implicit padding). */
+#define PACKED __attribute__ ((packed))
+#endif
+
 /*
  * Pointers and other address fields inside interface structures are padded to
  * 64 bits. This means that field alignments aren't different between 32- and

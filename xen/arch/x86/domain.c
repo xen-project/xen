@@ -196,6 +196,48 @@ void machine_halt(void)
     __machine_halt(NULL);
 }
 
+void dump_pageframe_info(struct domain *d)
+{
+    struct pfn_info *page;
+    struct list_head *ent;
+
+    if ( d->tot_pages < 10 )
+    {
+        list_for_each ( ent, &d->page_list )
+        {
+            page = list_entry(ent, struct pfn_info, list);
+            printk("Page %08x: caf=%08x, taf=%08x\n",
+                   page_to_phys(page), page->count_info,
+                   page->u.inuse.type_info);
+        }
+    }
+    
+    page = virt_to_page(d->shared_info);
+    printk("Shared_info@%08x: caf=%08x, taf=%08x\n",
+           page_to_phys(page), page->count_info,
+           page->u.inuse.type_info);
+}
+
+xmem_cache_t *domain_struct_cachep;
+void __init domain_startofday(void)
+{
+    domain_struct_cachep = xmem_cache_create(
+        "domain_cache", sizeof(struct domain),
+        0, SLAB_HWCACHE_ALIGN, NULL, NULL);
+    if ( domain_struct_cachep == NULL )
+        panic("No slab cache for domain structs.");
+}
+
+struct domain *arch_alloc_domain_struct(void)
+{
+    return xmem_cache_alloc(domain_struct_cachep);
+}
+
+void arch_free_domain_struct(struct domain *d)
+{
+    xmem_cache_free(domain_struct_cachep, d);
+}
+
 void free_perdomain_pt(struct domain *d)
 {
     free_xenheap_page((unsigned long)d->mm.perdomain_pt);

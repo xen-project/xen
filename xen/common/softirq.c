@@ -15,7 +15,9 @@
 #include <xen/sched.h>
 #include <xen/softirq.h>
 
+#ifndef __ARCH_IRQ_STAT
 irq_cpustat_t irq_stat[NR_CPUS];
+#endif
 
 static softirq_handler softirq_handlers[NR_SOFTIRQS];
 

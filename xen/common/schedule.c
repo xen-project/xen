@@ -89,26 +89,24 @@ static struct scheduler ops;
 /* Per-CPU periodic timer sends an event to the currently-executing domain. */
 static struct ac_timer t_timer[NR_CPUS]; 
 
-extern xmem_cache_t *domain_struct_cachep;
-
 void free_domain_struct(struct domain *d)
 {
     SCHED_OP(free_task, d);
-    xmem_cache_free(domain_struct_cachep, d);
+    arch_free_domain_struct(d);
 }
 
 struct domain *alloc_domain_struct(void)
 {
     struct domain *d;
 
-    if ( (d = xmem_cache_alloc(domain_struct_cachep)) == NULL )
+    if ( (d = arch_alloc_domain_struct()) == NULL )
         return NULL;
     
     memset(d, 0, sizeof(*d));
 
     if ( SCHED_OP(alloc_task, d) < 0 )
     {
-        xmem_cache_free(domain_struct_cachep, d);
+        arch_free_domain_struct(d);
         return NULL;
     }
 
@@ -320,8 +318,7 @@ void __enter_scheduler(void)
     task_slice_t        next_slice;
     s32                 r_time;     /* time for new dom to run */
 
-    cleanup_writable_pagetable(
-        prev, PTWR_CLEANUP_ACTIVE | PTWR_CLEANUP_INACTIVE);
+    cleanup_writable_pagetable(prev);
 
     perfc_incrc(sched_run);
     

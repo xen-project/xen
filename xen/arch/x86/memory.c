@@ -1325,7 +1325,7 @@ int do_mmu_update(
     u32 type_info;
     domid_t domid;
 
-    cleanup_writable_pagetable(d, PTWR_CLEANUP_ACTIVE | PTWR_CLEANUP_INACTIVE);
+    cleanup_writable_pagetable(d);
 
     /*
      * If we are resuming after preemption, read how much work we have already
@@ -1552,7 +1552,7 @@ int do_update_va_mapping(unsigned long page_nr,
     if ( unlikely(page_nr >= (HYPERVISOR_VIRT_START >> PAGE_SHIFT)) )
         return -EINVAL;
 
-    cleanup_writable_pagetable(d, PTWR_CLEANUP_ACTIVE | PTWR_CLEANUP_INACTIVE);
+    cleanup_writable_pagetable(d);
 
     /*
      * XXX When we make this support 4MB superpages we should also deal with 
