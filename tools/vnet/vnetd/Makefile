@@ -42,7 +42,6 @@ INCLUDES += -I$(GC_INCLUDE)
 CPPFLAGS += -D USE_GC
 
 #----------------------------------------------------------------------------
-CFLAGS += -g
 CFLAGS += -Wall
 CFLAGS += $(INCLUDES) $(LIBS)
 
