@@ -36,6 +36,7 @@
 __KERNEL_RCSID(0, "$NetBSD: if_xennet.c,v 1.1.2.1 2004/05/22 15:58:29 he Exp $");
 
 #include "opt_inet.h"
+#include "rnd.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -525,7 +526,7 @@ xennet_interface_status_change(netif_fe_interface_status_t *status)
 		    ether_sprintf(sc->sc_enaddr));
 
 #if NRND > 0
-		rnd_attach_source(&sc->rnd_source, sc->sc_dev.dv_xname,
+		rnd_attach_source(&sc->sc_rnd_source, sc->sc_dev.dv_xname,
 		    RND_TYPE_NET, 0);
 #endif
 		break;
@@ -646,6 +647,10 @@ xen_network_handler(void *arg)
 	struct mbuf *m;
 
 	network_tx_buf_gc(sc);
+
+#if NRND > 0
+	rnd_add_uint32(&sc->sc_rnd_source, sc->sc_rx_resp_cons);
+#endif
 
  again:
 	for (ringidx = sc->sc_rx_resp_cons;
@@ -968,6 +973,10 @@ xennet_start(struct ifnet *ifp)
 	IFQ_POLL(&ifp->if_snd, m);
 	if (m == 0)
 		panic("%s: No packet to start", sc->sc_dev.dv_xname);
+#endif
+
+#if NRND > 0
+	rnd_add_uint32(&sc->sc_rnd_source, sc->sc_tx->req_prod);
 #endif
 
 	if ((ifp->if_flags & (IFF_RUNNING | IFF_OACTIVE)) != IFF_RUNNING)
