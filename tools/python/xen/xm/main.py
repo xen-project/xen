@@ -452,6 +452,40 @@ class ProgMaxmem(Prog):
 
 xm.prog(ProgMaxmem)
 
+class ProgDomid(Prog):
+    group = 'domain'
+    name = 'domid'
+    info = 'Convert a domain name to a domain id.'
+
+    def help(self, args):
+        print args[0], "DOM"
+        print '\nGet the domain id for the domain with name DOM.'
+        
+    def main (self, args):
+        if len(args) != 2: self.err("%s: Invalid argument(s)" % args[0])
+        name = args[1]
+        dom = server.xend_domain(name)
+        print sxp.child_value(dom, 'id')
+
+xm.prog(ProgDomid)
+
+class ProgDomname(Prog):
+    group = 'domain'
+    name = 'domname'
+    info = 'Convert a domain id to a domain name.'
+
+    def help(self, args):
+        print args[0], "DOM"
+        print '\nGet the name for the domain with id DOM.'
+        
+    def main (self, args):
+        if len(args) != 2: self.err("%s: Invalid argument(s)" % args[0])
+        name = args[1]
+        dom = server.xend_domain(name)
+        print sxp.child_value(dom, 'name')
+
+xm.prog(ProgDomname)
+
 class ProgBvt(Prog):
     group = 'scheduler'
     name = "bvt"
