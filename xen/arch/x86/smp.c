@@ -218,8 +218,8 @@ asmlinkage void smp_invalidate_interrupt(void)
 {
     ack_APIC_irq();
     perfc_incrc(ipis);
-    if ( likely(test_and_clear_bit(smp_processor_id(), &flush_cpumask)) )
-        local_flush_tlb();
+    local_flush_tlb();
+    clear_bit(smp_processor_id(), &flush_cpumask);
 }
 
 void flush_tlb_mask(unsigned long mask)
@@ -267,15 +267,13 @@ void flush_tlb_mask(unsigned long mask)
  */
 void new_tlbflush_clock_period(void)
 {
-    spin_lock(&flush_lock);
+    /* Only the leader gets here. Noone else should tick the clock. */
+    ASSERT(((tlbflush_clock+1) & TLBCLOCK_EPOCH_MASK) == 0);
 
-    /* Someone may acquire the lock and execute the flush before us. */
-    if ( ((tlbflush_clock+1) & TLBCLOCK_EPOCH_MASK) != 0 )
-        goto out;
-
+    /* Flush everyone else. We definitely flushed just before entry. */
     if ( smp_num_cpus > 1 )
     {
-        /* Flush everyone else. We definitely flushed just before entry. */
+        spin_lock(&flush_lock);
         flush_cpumask = ((1 << smp_num_cpus) - 1) & ~(1 << smp_processor_id());
         send_IPI_allbutself(INVALIDATE_TLB_VECTOR);
         while ( flush_cpumask != 0 )
@@ -283,13 +281,18 @@ void new_tlbflush_clock_period(void)
             rep_nop();
             barrier();
         }
+        spin_unlock(&flush_lock);
     }
 
     /* No need for atomicity: we are the only possible updater. */
     tlbflush_clock++;
 
- out:
-    spin_unlock(&flush_lock);
+    /* Finally, signal the end of the epoch-change protocol. */
+    wmb();
+    tlbflush_epoch_changing = 0;
+
+    /* In case we got to the end of the next epoch already. */
+    tlb_clocktick();
 }
 
 static void flush_tlb_all_pge_ipi(void* info)

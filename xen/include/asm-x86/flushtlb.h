@@ -4,7 +4,7 @@
  * TLB flushes are timestamped using a global virtual 'clock' which ticks
  * on any TLB flush on any processor.
  * 
- * Copyright (c) 2003, K A Fraser
+ * Copyright (c) 2003-2004, K A Fraser
  */
 
 #ifndef __FLUSHTLB_H__
@@ -31,16 +31,17 @@
 static inline int NEED_FLUSH(u32 cpu_stamp, u32 lastuse_stamp)
 {
     /*
-     * Why does this work?
-     *  1. XOR sets high-order bits determines if stamps from differing epochs.
-     *  2. Subtraction sets high-order bits if 'cpu_stamp > lastuse_stamp'.
-     * In either case a flush is unnecessary: we therefore OR the results from
-     * (1) and (2), mask the high-order bits, and return the inverse.
+     * Worst case in which a flush really is required:
+     *  CPU has not flushed since end of last epoch (cpu_stamp = 0x0000ffff).
+     *  Clock has run to end of current epoch (clock = 0x0001ffff).
+     *  Therefore maximum valid difference is 0x10000 (EPOCH_MASK + 1).
+     * N.B. The clock cannot run further until the CPU has flushed once more
+     * and updated its stamp to 0x1ffff, so this is as 'far out' as it can get.
      */
-    return !(((lastuse_stamp^cpu_stamp)|(lastuse_stamp-cpu_stamp)) & 
-             ~TLBCLOCK_EPOCH_MASK);
+    return ((lastuse_stamp - cpu_stamp) <= (TLBCLOCK_EPOCH_MASK + 1));
 }
 
+extern unsigned long tlbflush_epoch_changing;
 extern u32 tlbflush_clock;
 extern u32 tlbflush_time[NR_CPUS];
 
