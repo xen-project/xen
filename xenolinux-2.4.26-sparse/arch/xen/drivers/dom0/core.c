@@ -62,16 +62,70 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
     }
     break;
 
+    case IOCTL_PRIVCMD_MMAP:
+    {
+#define PRIVCMD_MMAP_SZ 32
+	privcmd_mmap_t mmapcmd;
+	privcmd_mmap_entry_t msg[PRIVCMD_MMAP_SZ], *p;
+	int i;
+
+        if ( copy_from_user(&mmapcmd, (void *)data, sizeof(mmapcmd)) )
+            return -EFAULT;
+
+	p = mmapcmd.entry;
+
+	for (i=0; i<mmapcmd.num; i+=PRIVCMD_MMAP_SZ, p+=PRIVCMD_MMAP_SZ)
+	{
+	    int j, n = ((mmapcmd.num-i)>PRIVCMD_MMAP_SZ)?
+		PRIVCMD_MMAP_SZ:(mmapcmd.num-i);
+	    if ( copy_from_user(&msg, p, n*sizeof(privcmd_mmap_entry_t)) )
+		return -EFAULT;
+	    
+	    for (j=0;j<n;j++)
+	    {
+		struct vm_area_struct *vma = 
+		    find_vma( current->mm, msg[j].va );
+
+		if (!vma)
+		    return -EINVAL;
+
+		if (msg[j].va > PAGE_OFFSET)
+		    return -EINVAL;
+
+		if (msg[j].va + (msg[j].npages<<PAGE_SHIFT) > vma->vm_end)
+		    return -EINVAL;
+
+		if (direct_remap_area_pages(vma->vm_mm, 
+					    msg[j].va&PAGE_MASK, 
+					    msg[j].mfn<<PAGE_SHIFT, 
+					    msg[j].npages<<PAGE_SHIFT, 
+					    vma->vm_page_prot))
+		    return -EINVAL;
+	    }
+	}
+	ret = 0;
+    }
+    break;
+
     default:
         ret = -EINVAL;
     	break;
-	}
+    }
     return ret;
 }
 
+static int privcmd_mmap(struct file * file, struct vm_area_struct * vma)
+{
+printk(KERN_ALERT"privcmd_mmap\n");
+	/* DONTCOPY is essential for Xen as copy_page_range is broken. */
+	vma->vm_flags |= VM_RESERVED | VM_IO | VM_DONTCOPY;
+
+	return 0;
+}
 
 static struct file_operations privcmd_file_ops = {
-  ioctl : privcmd_ioctl
+  ioctl : privcmd_ioctl,
+  mmap:   privcmd_mmap
 };
 
 
