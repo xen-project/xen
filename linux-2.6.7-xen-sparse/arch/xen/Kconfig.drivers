@@ -4,12 +4,15 @@ menu "Device Drivers"
 
 source "drivers/base/Kconfig"
 
-if XEN_PHYSDEV_ACCESS
-source "drivers/block/Kconfig"
-source "drivers/ide/Kconfig"
 source "drivers/scsi/Kconfig"
-source "drivers/cdrom/Kconfig"
+source "drivers/block/Kconfig"
 source "drivers/md/Kconfig"
+
+# Always include scsi and block to enable iscsi, loop0 etc.
+
+if XEN_PHYSDEV_ACCESS
+source "drivers/ide/Kconfig"
+source "drivers/cdrom/Kconfig"
 endif
 
 source "net/Kconfig"
