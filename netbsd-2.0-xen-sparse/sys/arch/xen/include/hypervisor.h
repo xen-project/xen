@@ -83,7 +83,7 @@ extern union start_info_union start_info_union;
 
 
 /* hypervisor.c */
-void do_hypervisor_callback(struct trapframe *regs);
+void do_hypervisor_callback(struct intrframe *regs);
 void hypervisor_notify_via_evtchn(unsigned int);
 void hypervisor_enable_irq(unsigned int);
 void hypervisor_disable_irq(unsigned int);

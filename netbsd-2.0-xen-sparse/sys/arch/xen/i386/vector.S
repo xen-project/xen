@@ -1347,9 +1347,10 @@ ENTRY(hypervisor_callback)
         jb   11f
         cmpl $ecrit,%eax
         jb   critical_region_fixup
-11:     push %esp
+11:     pushl CPUVAR(ILEVEL)
+        push %esp
         call do_hypervisor_callback
-        add  $4,%esp
+        add  $8,%esp
         movl HYPERVISOR_shared_info,%esi
         xorl %eax,%eax
         movb TF_CS(%esp),%cl

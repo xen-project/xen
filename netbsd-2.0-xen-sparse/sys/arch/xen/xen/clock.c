@@ -51,7 +51,7 @@ __KERNEL_RCSID(0, "$NetBSD: clock.c,v 1.1.2.2 2004/07/17 16:43:56 he Exp $");
 
 #include "config_time.h"		/* for CONFIG_TIME */
 
-static int xen_timer_handler(void *, struct trapframe *);
+static int xen_timer_handler(void *, struct intrframe *);
 
 /* These are peridically updated in shared_info, and then copied here. */
 static uint64_t shadow_tsc_stamp;
@@ -213,7 +213,7 @@ xen_initclocks()
 }
 
 static int
-xen_timer_handler(void *arg, struct trapframe *regs)
+xen_timer_handler(void *arg, struct intrframe *regs)
 {
 	int64_t delta;
 
@@ -245,7 +245,7 @@ xen_timer_handler(void *arg, struct trapframe *regs)
 	delta = (int64_t)(shadow_system_time + get_tsc_offset_ns() -
 			  processed_system_time);
 	while (delta >= NS_PER_TICK) {
-		hardclock((struct clockframe *)regs);
+		hardclock(regs);
 		delta -= NS_PER_TICK;
 		processed_system_time += NS_PER_TICK;
 	}

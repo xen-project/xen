@@ -123,9 +123,13 @@ init_events()
 }
 
 unsigned int
-do_event(int irq, struct trapframe *regs)
+do_event(int irq, struct intrframe *regs)
 {
 	struct cpu_info *ci;
+	int ilevel;
+	struct intrhand *ih;
+	int	(*ih_fun)(void *, void *);
+	extern struct uvmexp uvmexp;
 
 	if (irq >= NR_IRQS) {
 #ifdef DIAGNOSTIC
@@ -144,15 +148,46 @@ do_event(int irq, struct trapframe *regs)
 
 	hypervisor_acknowledge_irq(irq);
 	if (ci->ci_isources[irq] == NULL) {
+		hypervisor_enable_irq(irq);
 		return 0;
 	}
-	__asm__ __volatile__ (
-		"   movl $1f,%%esi	;"
-		"   jmp  *%%eax		;"
-		"1:			"
-		: : "a" (ci->ci_isources[irq]->is_recurse),
-		"b" (ci->ci_ilevel)
-		: "esi", "ecx", "edx", "memory");
+	ilevel = ci->ci_ilevel;
+	if (ci->ci_isources[irq]->is_maxlevel <= ilevel) {
+		ci->ci_ipending |= 1 << irq;
+		/* leave masked */
+		return 0;
+	}
+	uvmexp.intrs++;
+	ci->ci_isources[irq]->is_evcnt.ev_count++;
+	ci->ci_ilevel = ci->ci_isources[irq]->is_maxlevel;
+	/* sti */
+	ci->ci_idepth++;
+#ifdef MULTIPROCESSOR
+	x86_intlock(regs);
+#endif
+	ih = ci->ci_isources[irq]->is_handlers;
+	while (ih != NULL) {
+		if (ih->ih_level <= ilevel) {
+#ifdef MULTIPROCESSOR
+			x86_intunlock(regs);
+#endif
+			ci->ci_ipending |= 1 << irq;
+			/* leave masked */
+			ci->ci_idepth--;
+			splx(ilevel);
+			return 0;
+		}
+		ci->ci_ilevel = ih->ih_level;
+		ih_fun = (void *)ih->ih_fun;
+		ih_fun(ih->ih_arg, regs);
+		ih = ih->ih_next;
+	}
+#ifdef MULTIPROCESSOR
+	x86_intunlock(regs);
+#endif
+	hypervisor_enable_irq(irq);
+	ci->ci_idepth--;
+	splx(ilevel);
 
 	if (0 && irq == 4)
 		printf("do_event %d done, ipending %08x\n", irq,
