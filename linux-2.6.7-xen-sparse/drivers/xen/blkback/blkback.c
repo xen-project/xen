@@ -146,6 +146,12 @@ static int blkio_schedule(void *arg)
     blkif_t          *blkif;
     struct list_head *ent;
 
+    daemonize(
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+        "xenblkd"
+#endif
+        );
+
     for ( ; ; )
     {
         /* Wait for work to do. */
