@@ -319,12 +319,12 @@ dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_
 	unsigned long maxmem = d->max_pages * PAGE_SIZE;
 	unsigned long start_mpaddr = ((d==dom0)?dom0_start:0);
 
-#	define MAKE_MD(typ, attr, start, end)		\
+#	define MAKE_MD(typ, attr, start, end, abs) 	\	
 	do {						\
 		md = efi_memmap + i++;			\
 		md->type = typ;				\
 		md->pad = 0;				\
-		md->phys_addr = start_mpaddr + start;	\
+		md->phys_addr = abs ? start : start_mpaddr + start;	\
 		md->virt_addr = 0;			\
 		md->num_pages = (end - start) >> 12;	\
 		md->attribute = attr;			\
@@ -472,27 +472,27 @@ dom_fw_init (struct domain *d, char *args, int arglen, char *fw_mem, int fw_mem_
 
 	/* simulate 1MB free memory at physical address zero */
 	i = 0;
-	MAKE_MD(EFI_BOOT_SERVICES_DATA,EFI_MEMORY_WB,0*MB,1*MB);
+	MAKE_MD(EFI_BOOT_SERVICES_DATA,EFI_MEMORY_WB,0*MB,1*MB, 0);
 	/* hypercall patches live here, masquerade as reserved PAL memory */
-	MAKE_MD(EFI_PAL_CODE,EFI_MEMORY_WB,HYPERCALL_START,HYPERCALL_END);
-	MAKE_MD(EFI_CONVENTIONAL_MEMORY,EFI_MEMORY_WB,HYPERCALL_END,maxmem);
+	MAKE_MD(EFI_PAL_CODE,EFI_MEMORY_WB,HYPERCALL_START,HYPERCALL_END, 0);
+	MAKE_MD(EFI_CONVENTIONAL_MEMORY,EFI_MEMORY_WB,HYPERCALL_END,maxmem, 0);
 #ifdef PASS_THRU_IOPORT_SPACE
 	if (d == dom0 && !running_on_sim) {
 		/* pass through the I/O port space */
-		efi_memory_desc_t efi_get_io_md(void);
-		efi_memory_desc_t ia64_efi_io_md = efi_get_io_md();
+		efi_memory_desc_t *efi_get_io_md(void);
+		efi_memory_desc_t *ia64_efi_io_md = efi_get_io_md();
 		u32 type;
 		u64 iostart, ioend, ioattr;
 		
-		type = ia64_efi_io_md.type;
-		iostart = ia64_efi_io_md.phys_addr;
-		ioend = ia64_efi_io_md.phys_addr +
-			(ia64_efi_io_md.num_pages << 12);
-		ioattr = ia64_efi_io_md.attribute;
-		MAKE_MD(type,ioattr,iostart,ioend);
+		type = ia64_efi_io_md->type;
+		iostart = ia64_efi_io_md->phys_addr;
+		ioend = ia64_efi_io_md->phys_addr +
+			(ia64_efi_io_md->num_pages << 12);
+		ioattr = ia64_efi_io_md->attribute;
+		MAKE_MD(type,ioattr,iostart,ioend, 1);
 	}
 	else
-		MAKE_MD(EFI_RESERVED_TYPE,0,0,0);
+		MAKE_MD(EFI_RESERVED_TYPE,0,0,0,0);
 #endif
 
 	bp->efi_systab = dom_pa(fw_mem);
