@@ -12,9 +12,13 @@ SOURCEFORGE_MIRROR := http://heanet.dl.sourceforge.net/sourceforge
 #KERNELS = mk.linux-2.6-xen0 mk.linux-2.6-xenU mk.linux-2.4-xen0 mk.linux-2.4-xenU mk.netbsd-2.0-xenU
 KERNELS = mk.linux-2.6-xen0 mk.linux-2.6-xenU
 
+ALLKERNELS = $(patsubst buildconfigs/%,%,$(wildcard buildconfigs/mk.*))
+ALLSPARSETREES = $(patsubst %-xen-sparse,%,$(wildcard *-xen-sparse))
+
 export INSTALL_DIR SOURCEFORGE_MIRROR
 
-.PHONY: all dist install xen tools kernels docs kdelete kclean mkpatches world clean mrproper
+.PHONY:	all dist install xen tools kernels docs world clean mkpatches mrproper
+.PHONY:	kbuild kdelete kclean
 
 all: 	dist
 
@@ -49,17 +53,19 @@ docs:
 	sh ./docs/check_pkgs && \
 		$(MAKE) prefix=$(INSTALL_DIR) dist=yes -C docs install || true
 
+kbuild: kernels
+
 # Delete the kernel build trees entirely
 kdelete:
 	for i in $(KERNELS) ; do $(MAKE) -f buildconfigs/$$i delete ; done
 
 # Clean the kernel build trees
 kclean:
-	for i in $(KERNELS) ; do $(MAKE) -f buildconfigs/$$i delete ; done
+	for i in $(KERNELS) ; do $(MAKE) -f buildconfigs/$$i clean ; done
 
 # Make patches from kernel sparse trees
 mkpatches:
-	$(MAKE) -f buildconfigs/Rules.mk mkpatches
+	for i in $(ALLSPARSETREES) ; do $(MAKE) -f buildconfigs/Rules.mk $$i-xen.patch ; done
 
 
 # build xen, the tools, and a domain 0 plus unprivileged linux-xen images,
@@ -77,9 +83,10 @@ clean:
 	$(MAKE) -C docs clean
 
 # clean, but blow away kernel build tree plus tar balls
-mrproper: clean kdelete
-	rm -rf dist patches *.tar.bz2 
-	$(MAKE) -f buildconfigs/Rules.mk mrproper
+mrproper: clean
+	rm -rf dist patches
+	for i in $(ALLKERNELS) ; do $(MAKE) -f buildconfigs/$$i delete ; done
+	for i in $(ALLSPARSETREES) ; do $(MAKE) -f buildconfigs/Rules.mk $$i-mrproper ; done
 
 install-twisted:
 	wget http://www.twistedmatrix.com/products/get-current.epy

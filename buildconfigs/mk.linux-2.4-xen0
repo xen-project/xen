@@ -1,7 +1,9 @@
 
+LINUX_SERIES = 2.4
+
 EXTRAVERSION = xen0
 
-FULLVERSION  = $(LINUX_24VER)-$(EXTRAVERSION)
+FULLVERSION  = $(LINUX_VER)-$(EXTRAVERSION)
 
 LINUX_DIR    = linux-$(FULLVERSION)
 
@@ -19,11 +21,11 @@ patches/ebtables.diff:
 	mkdir -p patches
 	wget http://www.cl.cam.ac.uk/netos/xen/downloads/ebtables-brnf-5_vs_2.4.27.diff.gz -O- | gunzip -c > $@
 
-$(LINUX_DIR):  pristine-linux-$(LINUX_24VER) patches/ebtables.diff
+$(LINUX_DIR):  pristine-linux-$(LINUX_VER) patches/ebtables.diff
 	rm -rf $(LINUX_DIR)
-	cp -al pristine-linux-$(LINUX_24VER) $(LINUX_DIR)
+	cp -al pristine-linux-$(LINUX_VER) $(LINUX_DIR)
 	# Apply arch-xen patches
-	( cd linux-$(LINUX_24VER)-xen-sparse ; \
+	( cd linux-$(LINUX_VER)-xen-sparse ; \
           ./mkbuildtree ../$(LINUX_DIR) )
 	# Patch kernel Makefile to set EXTRAVERSION
 	( cd $(LINUX_DIR) ; \
@@ -40,11 +42,4 @@ clean:
 	$(MAKE) -C $(LINUX_DIR) ARCH=xen clean
 
 delete: 
-	rm -rf tmp-linux-$(LINUX_24VER) $(LINUX_DIR) 
-
-
-
-
-
-
-
+	rm -rf tmp-linux-$(LINUX_VER) $(LINUX_DIR) 
