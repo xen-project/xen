@@ -1,67 +1,22 @@
+import string, re, os, sqlite, Xc, sys
 
-import string, re, os
+##### Module variables
 
-def blkdev_name_to_number(name):
-    """Take the given textual block-device name (e.g., '/dev/sda1',
-    'hda') and return the device number used by the OS. """
+"""Location of the Virtual Disk management database.
+   defaults to /var/spool/xen_vdisks.sqlite
+"""
+VD_DB_FILE = "/var/spool/xen_vdisks.sqlite"
 
-    if not re.match( '/dev/', name ):
-        name = '/dev/' + name
-        
-    return os.stat(name).st_rdev
+"""VBD expertise level - determines the strictness of the sanity checking.
+  This mode determines the level of complaints when disk sharing occurs
+  through the current VBD mappings.
+   0 - only allow shared mappings if both domains have r/o access (always OK)
+   1 - also allow sharing with one dom r/w and the other r/o
+   2 - allow sharing with both doms r/w
+"""
+VBD_EXPERT_MODE = 0
 
-
-# lookup_blkdev_partn_info( '/dev/sda3' )
-def lookup_raw_partn(partition):
-    """Take the given block-device name (e.g., '/dev/sda1', 'hda')
-    and return a information tuple ( partn-dev, disc-dev, start-sect,
-    nr-sects, type )
-        partn-dev:  Device number of the given partition
-        disc-dev:   Device number of the disc containing the partition
-        start-sect: Index of first sector of the partition
-        nr-sects:   Number of sectors comprising this partition
-        type:       'Disk' or identifying name for partition type
-    """
-
-    if not re.match( '/dev/', partition ):
-        partition = '/dev/' + partition
-
-    drive = re.split( '[0-9]', partition )[0]
-
-    if drive == partition:
-        fd = os.popen( '/sbin/sfdisk -s ' + drive + ' 2>/dev/null' )
-        line = fd.readline()
-        if line:
-            return [( blkdev_name_to_number(drive),
-                     0,
-                     string.atol(line) * 2,
-                     'Disk' )]
-        return None
-
-    # determine position on disk
-    fd = os.popen( '/sbin/sfdisk -d ' + drive + ' 2>/dev/null' )
-
-    #['/dev/sda3 : start= 16948575, size=16836120, Id=83, bootable\012']
-    lines = fd.readlines()
-    for line in lines:
-        m = re.search( '^' + partition + '\s*: start=\s*([0-9]+), ' +
-                       'size=\s*([0-9]+), Id=\s*(\S+).*$', line)
-        if m:
-            return [( blkdev_name_to_number(drive),
-                     string.atol(m.group(1)),
-                     string.atol(m.group(2)),
-                     m.group(3) )]
-    return None
-
-def lookup_disk_uname( uname ):
-    ( type, d_name ) = string.split( uname, ':' )
-
-    if type == "phy":
-	segments = lookup_raw_partn( d_name )
-    elif type == "vd":
-	segments = lookup_vd( d_name )
-
-    return segments
+##### Networking-related functions
 
 def get_current_ipaddr(dev='eth0'):
     """Return a string containing the primary IP address for the given
@@ -133,4 +88,464 @@ def add_offset_to_ip( ip, off ):
     
     return '%d.%d.%d.%d' % ( ((a>>24)&0xff), ((a>>16)&0xff),
 			     ((a>>8)&0xff), (a&0xff) )
+
+##### VBD-related Functions
+
+def blkdev_name_to_number(name):
+    """Take the given textual block-device name (e.g., '/dev/sda1',
+    'hda') and return the device number used by the OS. """
+
+    if not re.match( '/dev/', name ):
+        name = '/dev/' + name
+        
+    return os.stat(name).st_rdev
+
+# lookup_blkdev_partn_info( '/dev/sda3' )
+def lookup_raw_partn(partition):
+    """Take the given block-device name (e.g., '/dev/sda1', 'hda')
+    and return a dictionary { partn-dev, start-sect,
+    nr-sects, type }
+        device:       Device number of the given partition
+        start_sector: Index of first sector of the partition
+        nr_sectsors:  Number of sectors comprising this partition
+        type:       'Disk' or identifying name for partition type
+    """
+
+    if not re.match( '/dev/', partition ):
+        partition = '/dev/' + partition
+
+    drive = re.split( '[0-9]', partition )[0]
+
+    if drive == partition:
+        fd = os.popen( '/sbin/sfdisk -s ' + drive + ' 2>/dev/null' )
+        line = fd.readline()
+        if line:
+            return [ { 'device' : blkdev_name_to_number(drive),
+                       'start_sector' : 0,
+                       'nr_sectors' : string.atol(line) * 2,
+                       'type' : 'Disk' } ]
+        return None
+
+    # determine position on disk
+    fd = os.popen( '/sbin/sfdisk -d ' + drive + ' 2>/dev/null' )
+
+    #['/dev/sda3 : start= 16948575, size=16836120, Id=83, bootable\012']
+    lines = fd.readlines()
+    for line in lines:
+        m = re.search( '^' + partition + '\s*: start=\s*([0-9]+), ' +
+                       'size=\s*([0-9]+), Id=\s*(\S+).*$', line)
+        if m:
+            return [ { 'device' : blkdev_name_to_number(drive),
+                       'start_sector' : string.atol(m.group(1)),
+                       'nr_sectors' : string.atol(m.group(2)),
+                       'type' : m.group(3) } ]
+    
+    return None
+
+def lookup_disk_uname( uname ):
+    """Lookup a list of segments for either a physical or a virtual device.
+    uname [string]:  name of the device in the format \'vd:id\' for a virtual
+                     disk, or \'phy:dev\' for a physical device
+    returns [list of dicts]: list of extents that make up the named device
+    """
+    ( type, d_name ) = string.split( uname, ':' )
+
+    if type == "phy":
+        segments = lookup_raw_partn( d_name )
+    elif type == "vd":
+	segments = vd_lookup( d_name )
+
+    return segments
+
+
+
+##### VD Management-related functions
+
+
+
+def __vd_no_database():
+    """Called when no database found - exits with an error
+    """
+    print >> sys.stderr, "ERROR: Could not locate the database file at " + VD_DB_FILE
+    sys.exit(1)
+
+def vd_format(partition, extent_size_mb):
+    """Format a partition or drive for use a virtual disk storage.
+    partition [string]: device file representing the partition
+    extent_size_mb [string]: extent size in megabytes to use on this disk
+    """
+
+    if not os.path.isfile(VD_DB_FILE):
+        vd_init_db(VD_DB_FILE)
+    
+    if not re.match( '/dev/', partition ):
+        partition = '/dev/' + partition
+
+    cx = sqlite.connect(VD_DB_FILE)
+    cu = cx.cursor()
+
+    cu.execute("select * from vdisk_part where partition = \'"
+               + partition + "\'")
+    row = cu.fetchone()
+
+    extent_size = extent_size_mb * 2048 # convert megabytes to sectors
+    
+    if not row:
+        part_info = lookup_raw_partn(partition)[0]
+        
+        cu.execute("INSERT INTO vdisk_part(partition, part_id, extent_size) " +
+                   "VALUES ( \'" + partition + "\', " + str(part_info['device'])
+                   + ", " + str(extent_size) + ")")
+
+
+        cu.execute("SELECT max(vdisk_extent_no) FROM vdisk_extents "
+                   + "WHERE vdisk_id = 0")
+        
+        max_id, = cu.fetchone()
+
+        if max_id != None:
+            new_id = max_id + 1
+        else:
+            new_id = 0
+
+        for i in range(part_info['nr_sectors'] / extent_size):
+            sql ="""INSERT INTO vdisk_extents(vdisk_extent_no, vdisk_id,
+                                              part_id, part_extent_no)
+                    VALUES ("""+ str(new_id + i) + ", 0, "\
+                               + str(part_info['device']) + ", " + str(i) + ")"
+            cu.execute(sql)
+
+    cx.commit()
+    cx.close()
+    return 0
+
+def vd_create(size_mb, expiry):
+    """Create a new virtual disk.
+    size_mb [int]: size in megabytes for the new virtual disk
+    expiry [int]: expiry time in seconds from now
+    """
+
+    if not os.path.isfile(VD_DB_FILE):
+        __vd_no_database()
+
+    cx = sqlite.connect(VD_DB_FILE)
+    cu = cx.cursor()
+
+    size = size_mb * 2048
+
+    cu.execute("SELECT max(vdisk_id) FROM vdisks")
+    max_id, = cu.fetchone()
+    new_id = int(max_id) + 1
+
+    # fetch a list of extents from the expired disks, along with information
+    # about their size
+    cu.execute("""SELECT vdisks.vdisk_id, vdisk_extent_no, part_extent_no,
+                         vdisk_extents.part_id, extent_size
+                  FROM vdisk_extents NATURAL JOIN vdisks
+                                                  NATURAL JOIN vdisk_part
+                  WHERE expires AND expiry_time < datetime('now')
+                  ORDER BY expiry_time asc, vdisk_extent_no desc
+               """)  # aims to reuse the last extents
+                     # from the longest-expired disks first
+
+    allocated = 0
+
+    if expiry:
+        expiry_ts = "datetime('now', '" + str(expiry) + " seconds')"
+        expires = 1;
+    else:
+        expiry_ts = "NULL"
+        expires = 0;
+
+    # we'll use this to build the SQL statement we want
+    building_sql = "INSERT INTO vdisks(vdisk_id, size, expires, expiry_time)" \
+                   +" VALUES ("+str(new_id)+", "+str(size)+ ", "              \
+                   + str(expires) + ", " + expiry_ts + "); "
+
+    counter = 0
+
+    while allocated < size:
+        row = cu.fetchone()
+        if not row:
+            cx.close()
+            return -1
+
+        (vdisk_id, vdisk_extent_no, part_extent_no, part_id, extent_size) = row
+        allocated += extent_size
+        building_sql += "UPDATE vdisk_extents SET vdisk_id = " + str(new_id) \
+                        + ", " + "vdisk_extent_no = " + str(counter)         \
+                        + " WHERE vdisk_extent_no = " + str(vdisk_extent_no) \
+                        + " AND vdisk_id = " + str(vdisk_id) + "; "
+
+        counter += 1
+        
+
+    # this will execute the SQL query we build to store details of the new
+    # virtual disk and allocate space to it print building_sql
+    cu.execute(building_sql)
+    
+    cx.commit()
+    cx.close()
+    return str(new_id)
+
+
+# Future work: Disk sizes aren't modified when vd_create scavenges extents from
+# expired disks.  As a result it is possible to check if a disk is expired but
+# intact (assuming VD IDs are not reused) - could allow recovery when people
+# mess up.
+
+def vd_lookup(id):
+    """Lookup a Virtual Disk by ID.
+    id [string]: a virtual disk identifier
+    Returns [list of dicts]: a list of extents as dicts, contain fields:
+                             device : Linux device number
+                             start_sector : within the device
+                             nr_sectors : size of this extent
+                             type : set to \'VD Extent\'
+    """
+
+    if not os.path.isfile(VD_DB_FILE):
+        __vd_no_database()
+
+    cx = sqlite.connect(VD_DB_FILE)
+    cu = cx.cursor()
+
+  
+    # This query tells PySQLite how to convert the data returned from the
+    # following query - the use of the multiplication confuses it otherwise ;-)
+    # This row is significant to PySQLite but is syntactically an SQL comment.
+
+    cu.execute("-- types int, int, int")
+
+    # This SQL statement is designed so that when the results are fetched they
+    # will be in the right format to return immediately.
+    cu.execute("""SELECT vdisk_extents.part_id,
+                         round(part_extent_no * extent_size) as start,
+                         extent_size
+                         
+                  FROM vdisk_extents NATURAL JOIN vdisks
+                                                NATURAL JOIN vdisk_part
+                                                
+                  WHERE (expiry_time > datetime('now') OR not expires)
+                                    AND vdisk_extents.vdisk_id = """ + id
+               )
+
+    ret = cu.fetchall()
+
+    # use this function to map the results from the database into a dict
+    # list of extents, for consistency with the rest of the code
+    def transform ((device, start_sector, nr_sectors)):
+        return {'device' : device, 'start_sector' : int(start_sector),
+                'nr_sectors' : nr_sectors, 'type' : 'VD Extent' }
+
+    cx.commit()
+    cx.close()
+
+    return map(transform, ret) # transforms the tuples into dicts to return
+
+
+def vd_refresh(id, expiry):
+    """Change the expiry time of a virtual disk.
+    id [string]: a virtual disk identifier
+    expiry [int]: expiry time in seconds from now (0 = never expire)
+    """
+
+    if not os.path.isfile(VD_DB_FILE):
+        __vd_no_database()
+    
+    cx = sqlite.connect(VD_DB_FILE)
+    cu = cx.cursor()
+
+    if expiry:
+        expires = 1
+        expiry_ts = "datetime('now', '" + str(expiry) + " seconds')"
+    else:
+        expires = 0
+        expiry_ts = "NULL"
+
+    cu.execute("UPDATE vdisks SET expires = " + str(expires)
+               + ", expiry_time = " + expiry_ts
+               + " WHERE vdisk_id = " + id)
+
+    cx.commit()
+    cx.close()
+    
+    return
+
+def vd_delete(id):
+    """Deletes a Virtual Disk, making its extents available for future
+    virtual disks.
+       [id] identifier for the virtual disk to delete
+    """
+
+    if not os.path.isfile(VD_DB_FILE):
+        __vd_no_database()
+    
+    cx = sqlite.connect(VD_DB_FILE)
+    cu = cx.cursor()
+
+    cu.execute("UPDATE vdisks SET expires = 1, expiry_time = datetime('now')"
+               + " WHERE vdisk_id = " + id)
+
+    cx.commit()
+    cx.close()
+    
+    return
+
+def vd_init_db(path):
+    """Initialise the VD SQLite database
+    path [string]: path to the SQLite database file
+    """
+
+    cx = sqlite.connect(path)
+    cu = cx.cursor()
+
+    cu.execute(
+        """CREATE TABLE vdisk_extents
+                           ( vdisk_extent_no INT,
+                             vdisk_id INT,
+                             part_id INT,
+                             part_extent_no INT )
+        """)
+
+    cu.execute(
+        """CREATE TABLE vdisk_part
+                           ( part_id INT,
+                             partition VARCHAR,
+                             extent_size INT )
+        """)
+
+    cu.execute(
+        """CREATE TABLE vdisks
+                           ( vdisk_id INT,
+                             size INT,
+                             expires BOOLEAN,
+                             expiry_time TIMESTAMP )
+        """)
+
+
+    cu.execute(
+        """INSERT INTO vdisks ( vdisk_id, size, expires, expiry_time )
+                       VALUES ( 0,        0,    1,       datetime('now') )
+        """)
+
+    cx.commit()
+    cx.close()
+
+    VD_DB_FILE = path
+
+
+
+def vd_extents_validate(new_extents,new_writeable):
+    """Validate the extents against the existing extents.
+    Complains if the list supplied clashes against the extents that
+    are already in use in the system.
+    new_extents [list of dicts]: list of new extents, as dicts
+    new_writeable [int]: 1 if they are to be writeable, 0 otherwise
+    returns [int]: either the expertise level of the mapping if it doesn't
+                   exceed VBD_EXPERT_MODE or -1 if it does (error)
+    """
+
+    xc = Xc.new()
+
+    ##### Probe for explicitly created virtual disks and build a list
+    ##### of extents for comparison with the ones that are being added
+
+    probe = xc.vbd_probe()
+
+    old_extents = [] # this will hold a list of all existing extents and
+                     # their writeable status, as a list of (device,
+                     # start, size, writeable?) tuples
+
+    for vbd in probe:
+        this_vbd_extents = xc.vbd_getextents(vbd['dom'],vbd['vbd'])
+        for vbd_ext in this_vbd_extents:
+            vbd_ext['writeable'] = vbd['writeable']
+            old_extents.append(vbd_ext);
+
+    ##### Now scan /proc/mounts for compile a list of extents corresponding to
+    ##### any devices mounted in DOM0.  This list is added on to old_extents
+
+    regexp = re.compile("/dev/(\S*) \S* \S* (..).*");
+    fd = open('/proc/mounts', "r")
+
+    while True:
+        line = fd.readline()
+        if not line: # if we've run out of lines then stop reading
+            break
+        
+        m = regexp.match(line)
+
+        # if the regexp didn't match then it's probably a line we don't
+        # care about - skip to next line
+        if not m:
+            continue
+
+        # lookup the device
+        ext_list = lookup_raw_partn(m.group(1))
+
+        # if lookup failed, skip to next mounted device
+        if not ext_list:
+            continue
+
+        # set a writeable flag as appropriate
+        for ext in ext_list:
+            ext['writeable'] = m.group(2) == 'rw'
+
+        # now we've got here, the contents of ext_list are in a
+        # suitable format to be added onto the old_extents list, ready
+        # for checking against the new extents
+
+        old_extents.extend(ext_list)
+
+    fd.close() # close /proc/mounts
+
+    ##### By this point, old_extents contains a list of extents, in
+    ##### dictionary format corresponding to every extent of physical
+    ##### disk that's either part of an explicitly created VBD, or is
+    ##### mounted under DOM0.  We now check these extents against the
+    ##### proposed additions in new_extents, to see if a conflict will
+    ##### happen if they are added with write status new_writeable
+
+    level = 0 # this'll accumulate the max warning level
+
+    # Search for clashes between the new extents and the old ones
+    # Takes time O(len(new_extents) * len(old_extents))
+    for new_ext in new_extents:
+        for old_ext in old_extents:
+            if(new_ext['device'] == old_ext['device']):
+
+                new_ext_start = new_ext['start_sector']
+                new_ext_end = new_ext_start + new_ext['nr_sectors'] - 1
+                
+                old_ext_start = old_ext['start_sector']
+                old_ext_end = old_ext_start + old_ext['nr_sectors'] - 1
+                
+                if((old_ext_start <= new_ext_start <= old_ext_end) or
+                   (old_ext_start <= new_ext_end <= old_ext_end)):
+                    if (not old_ext['writeable']) and new_writeable:
+                        level = max(1,level)
+                    elif old_ext['writeable'] and (not new_writeable):
+                        level = max(1,level)
+                    elif old_ext['writeable'] and new_writeable:
+                        level = max(2,level)
+
+
+    ##### level now holds the warning level incurred by the current
+    ##### VBD setup and we complain appropriately to the user
+
+
+    if level == 1:
+        print >> sys.stderr, """Warning: one or more hard disk extents
+         writeable by one domain are also readable by another."""
+    elif level == 2:
+        print >> sys.stderr, """Warning: one or more hard disk extents are
+         writeable by two or more domains simultaneously."""
+
+    if level > VBD_EXPERT_MODE:
+        print >> sys.stderr, """ERROR: This kind of disk sharing is not allowed
+        at the current safety level (%d).""" % VBD_EXPERT_MODE
+        level = -1
+
+    return level
 

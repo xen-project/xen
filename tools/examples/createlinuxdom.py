@@ -51,6 +51,12 @@ vbds = [ ('phy:sda%d'%(7+guestid),'sda1','w' ),
 	 ('phy:sda6','sda6','r'),
 	 ('phy:cdrom','hdd','r') ]
 
+# STEP 5b. Set the VBD expertise level.  Most people should leave this
+# on 0, at least to begin with - this script can detect most dangerous
+# disk sharing between domains and with this set to zero it will only
+# allow read only sharing.
+vbd_expert = 0
+
 # STEP 6. Build the command line for the new domain. Edit as req'd.
 # You only need the ip= line if you're NFS booting or the root file system
 # doesn't set it later e.g. in ifcfg-eth0 or via DHCP
@@ -96,7 +102,7 @@ def make_domain():
 
     # set up access to the global variables declared above
     global image, memory_megabytes, domain_name, ipaddr, netmask
-    global vbds, cmdline, xc
+    global vbds, cmdline, xc, vbd_expert
     	
     if not os.path.isfile( image ):
         print "Image file '" + image + "' does not exist"
@@ -116,6 +122,10 @@ def make_domain():
         sys.exit()
 
     # setup the virtual block devices
+
+    # set the expertise level appropriately
+    XenoUtil.VBD_EXPERT_MODE = vbd_expert
+    
     for ( uname, virt_name, rw ) in vbds:
 	virt_dev = XenoUtil.blkdev_name_to_number( virt_name )
 
@@ -125,20 +135,23 @@ def make_domain():
 	    xc.domain_destroy ( dom=id )
 	    sys.exit()
 
+        # check that setting up this VBD won't violate the sharing
+        # allowed by the current VBD expertise level
+        if XenoUtil.vd_extents_validate(segments, rw=='w') < 0:
+            xc.domain_destroy( dom = id )
+            sys.exit()
+            
 	if xc.vbd_create( dom=id, vbd=virt_dev, writeable= rw=='w' ):
 	    print "Error creating VBD vbd=%d writeable=%d\n" % (virt_dev,rw)
 	    xc.domain_destroy ( dom=id )
 	    sys.exit()
 
-	for (s_dev,s_start,s_len,s_type) in segments:
-	    if xc.vbd_grow( dom=id,
-			    vbd=virt_dev,
-			    device=s_dev,
-			    start_sector=s_start,
-			    nr_sectors=s_len ):
-		print "Error populating VBD vbd=%d\n" % virt_dev
-		xc.domain_destroy ( dom=id )
-		sys.exit()
+        if xc.vbd_setextents( dom=id,
+                              vbd=virt_dev,
+                              extents=segments):
+            print "Error populating VBD vbd=%d\n" % virt_dev
+            xc.domain_destroy ( dom=id )
+            sys.exit()
 
     # setup virtual firewall rules for all aliases
     for ip in ipaddr:

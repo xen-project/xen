@@ -1,0 +1,273 @@
+Virtual Block Devices / Virtual Disks in Xen - HOWTO
+====================================================
+
+HOWTO for Xen 1.2
+
+Mark A. Williamson (mark.a.williamson@intel.com)
+(C) Intel Research Cambridge 2004
+
+Introduction
+------------
+
+This document describes the new Virtual Block Device (VBD) and Virtual Disk
+features available in Xen release 1.2.  First, a brief introduction to some
+basic disk concepts on a Xen system:
+
+Virtual Block Devices (VBDs):
+	VBDs are the disk abstraction provided by Xen.  All XenoLinux disk accesses
+	go through the VBD driver.  Using the VBD functionality, it is possible
+	to selectively grant domains access to portions of the physical disks
+	in the system.
+
+	A virtual block device can also consist of multiple extents from the
+	physical disks in the system, allowing them to be accessed as a single
+	uniform device from the domain with access to that VBD.
+
+	Everyone who uses Xen / XenoLinux uses VBDs but for less advanced uses
+	they can almost be ignored.
+
+Virtual Disks (VDs):
+	VDs are an abstraction built on top of the functionality provided by
+	VBDs.  The VD management code maintains a "free pool" of disk space on
+	the system that has been reserved for use with VDs.  The tools can
+	automatically allocate collections of extents from this free pool to
+	create "virtual disks" on demand.
+
+	VDs can then be used just like normal disks by domains.  VDs appear
+	just like any other disk to guest domains, since they use the same VBD
+	abstraction, as provided by Xen.
+
+	Using VDs is optional, since it's always possible to dedicate
+	partitions, or entire disks to your virtual machines.  VDs are handy
+	when you have a dynamically changing set of virtual machines and you
+	don't want to have to keep repartitioning in order to provide them with
+	disk space.
+
+If that didn't all make sense, it doesn't matter too much ;-)  Using the
+functionality is fairly straightforward and some examples will clarify things.
+The text below expands a bit on the concepts involved, finishing up with a
+walkthrough of some simple virtual disk management tasks.
+
+
+Virtual Block Devices
+---------------------
+
+Before covering VD management, it's worth discussing some aspects of the VBD
+functionality that will be useful to know.
+
+A VBD is made up of a number of extents from physical disk devices.  The
+extents for a VBD don't have to be contiguous, or even on the same device.  Xen
+performs address translation so that they appear as a single contiguous
+device.
+
+When the VBD layer is used to give access to entire drives or entire
+partitions, the VBDs simply consist of a single extent, corresponding to the
+drive or partition used.  When used with Virtual Disks, the extent list
+functionality will be used (discussed later).
+
+Xen 1.2 and its associated XenoLinux release support automatic registration /
+removal of VBDs.  It has always been possible to add a VBD to a running
+XenoLinux domain but it was then necessary to run "xen_vbd_refresh" in order
+for the new device to be detected.  Nowadays, when a VBD is added, the domain
+it's added to automatically registers the disk.
+
+Note that it is possible to use the VBD functionality to allow multiple domains
+write access to the same areas of disk.  This is almost always a bad thing!
+
+The provided example script createlinuxdom.py does its best to check that disk
+areas are not shared unsafely and will catch many cases of this.  Setting the
+vbd_expert variable in that script controls how unsafe it allows VBD mappings
+to be - 0 should be right for most people ;-)
+
+
+Virtual Disk Management
+-----------------------
+
+The VD management code runs entirely in userspace.  The code is written in
+Python and can therefore be accessed from custom scripts, as well as from the
+convenience scripts provided.  The underlying VD database is a SQLite database
+in /var/spool/xen_vdisks.sqlite.
+
+The scripts provided are as follows:
+
+vd_format.py -	     "Formats" a partition or disk device for use storing
+		     virtual disks.  This does not actually write data to the
+		     specified device.  Rather, it adds the device to the VD
+		     free-space pool, for later allocation.
+
+		     You should only add devices that correspond directly to
+		     physical disks / partitions - trying to use a VBD that you
+		     have created yourself as part of the free space pool has
+		     undefined (possibly nasty) results.
+
+vd_create.py -	     Creates a virtual disk of specified size by allocating space
+		     from the free space pool.  The virtual disk is identified
+		     in future by the unique ID returned by this script.
+
+		     The disk can be given an expiry time, if desired.  For
+		     most users, the best idea is to specify a time of 0 (which
+		     has the special meaning "never expire") and then
+		     explicitly delete the VD when finished with it -
+		     otherwise, VDs could disappear unexpectedly...
+
+vd_refresh.py -	     Allows the expiry time of a (not yet expired) virtual disk to
+		     be modified.  Be aware the VD will disappear when the time has
+		     expired.
+
+vd_delete.py -	     Explicitly delete a VD.  Makes it disappear immediately.
+
+
+The functionality provided by these scripts is also available directly from
+Python functions in the XenoUtil module - you can use this functionality in
+your own scripts.
+
+Populating VDs:
+
+Once you've created a VD, you might want to populate it from DOM0 (for
+instance, to put a root filesystem onto it for a guest domain).  This can be
+done by dynamically creating a VBD - this is discussed below.
+
+More detail:
+
+When you use vd_format.py to add a device to the free space pool, the device is
+logically split up into extents.  These extents are recorded in the Virtual
+Disk Management database in /var/spool/xen_vdisks.sqlite.
+
+When you use vd_create.py to add create a virtual disk, some of the extents in
+the free space pool are reallocated for that virtual disk and a record for that
+VD is added to the database.  When VDs are mapped into domains as VBDs, the
+system looks up the allocated extents for the virtual disk in order to set up
+the underlying VBD.
+
+Free space is identified by the fact that it belongs to an "expired" disk.
+When vd_format.py adds a real device to the free pool, it actually divides it
+into extents and adds them to an already-expired virtual disk.
+
+If you set an expiry time on a VD, its extents will be liable to be reallocated
+to new VDs as soon as that expiry time runs out.  Therefore, be careful when
+setting expiry times.
+
+Finally, vd_delete.py can be used to delete virtual disks when they are no
+longer needed.  It works by causing them to expire immediately.
+
+Security note:
+
+The disk space for VDs is not zeroed when it is initially added to the free
+space pool OR when a VD expires OR when a VD is created.  Therefore, if this is
+not done manually it is possible for a domain to read a VD to determine what
+was written by previous owners of its constituent extents.  If this is a
+problem, users should manually clean the VD in some way before allocating
+
+
+Dynamically Registering VBDs
+----------------------------
+
+Two scripts are included to make it easy to add VDs to domains.
+
+add_vbd_to_dom.py -	 Creates a VBD corresponding to either a physical
+			 device or a virtual disk and adds it as a specified
+			 device under the target domain, with either read or
+			 write access.
+
+remove_vbd_from_dom.py - Removes the VBD associated with a specified device
+			 node from the target domain.
+
+These scripts are most useful when populating VDs.  VDs can't be populated
+directly, since they don't correspond to real devices.  Using:
+
+  add_vbd_to_dom.py vd:your_vd_id /dev/wherever 0 rw
+
+You can make a virtual disk available to DOM0.  Sensible devices to map VDs to
+in DOM0 are the /dev/xvd* nodes, since that makes it obvious that they are Xen
+virtual devices that don't correspond to real physical devices.
+
+You can then format, mount and populate the VD through the nominated device
+node.  When you've finished, use:
+
+  remove_vbd_from_dom.py /dev/whatever 0
+
+To revoke DOM0's access to it.  It's then ready for use in a guest domain.
+
+
+
+You can also use add_vbd_to_dom.py to grant access to a physical device to a
+guest - you might use this to temporarily share a partition, or to add access
+to a partition that wasn't granted at boot time.  Again, remove_vbd_from_dom.py
+allows you to revoke access.
+
+When playing with VBDs, remember that in general, it is only safe for two
+domains to have access to a filesystem if they both have read-only access.  You
+shouldn't be trying to share anything which is writeable, even if only by one
+domain, unless you're really sure you know what you're doing!
+
+
+
+Walkthrough: Booting a domain from a VD
+---------------------------------------
+
+As an example, here is a sequence of commands you might use to create a virtual
+disk, populate it with a root filesystem and boot a domain from it.  These
+steps assume that you've installed the example scripts somewhere on your PATH -
+if you haven't done that, you'll need to specify a fully qualified pathname in
+the examples below.  The steps also assume that you know how to use the
+createlinuxdom.py script provided and have already set it up for your local
+configuration, apart from the virtual disks info.
+
+First, if you haven't done so already, you'll initialise the free space pool by
+adding a real partition to it.  The details are stored in the database, so
+you'll only need to do it once.  You can also use this command to add further
+partitions to the existing free space pool.
+
+> vd_format.py /dev/<real partition>
+
+Now you'll want to allocate the space for your virtual disk.  Do so using the
+following, specifying the size in megabytes.
+
+> vd_create.py <chosen size>
+
+At this point, the vd_create.py program will tell you the virtual disk ID.
+Note it down, as it is how you will identify the virtual device in future.
+
+If you don't want the VD to be bootable (i.e. you're booting a domain from some
+other medium and just want it to be able to access this VD), you can simply add
+it to the vbds list in your custom createlinuxdom.py (step 5) and then run that
+script.  Any formatting / populating of the VD can be done from that domain.
+
+If you want to boot off your new VD as well then you need to populate it with a
+standard Linux root filesystem.  You'll need to temporarily add the VD to DOM0
+in order to do this.  To give DOM0 r/w access to the VD, use the following
+command line, substituting the ID you got earlier.
+
+> add_vbd_to_dom.py vd:<id> /dev/xvda 0 rw
+
+This attaches the VD to the device /dev/xvda - you can use other devices if you
+choose too but with the xvd* devices it's obvious you're using a virtual device.
+
+Now make a filesystem on this device, mount it and populate it with a root
+filesystem.  These steps are exactly the same as under normal Linux.  When
+you've finished, unmount the filesystem again.
+
+You should now remove the VD from DOM0.  This will prevent you accidentally
+changing it in DOM0, whilst the guest domain is using it.
+
+> remove_vbd_from_dom.py /dev/xvda 0
+
+It should now be possible to boot a guest domain from the VD.  To do this, you
+should add the VD's details to the vbds list in step 5 of createlinuxdom.py and
+set the value of rootbit in step 6.  For instance, you might add:
+
+('vd:<id>', '/dev/xvda', 'w')
+
+To the vbds list in step 5 - this gives the domain writeable access to the VD
+as if it were the domain's /dev/xvda.
+
+Then you would set:
+
+rootbit = "root=/dev/xvda ro"
+
+In step 6 to tell the kernel where the root filesystem is.
+
+
+
+Once these variables are set, you can run createlinuxdom.py to start your new
+domain.
