@@ -18,7 +18,7 @@ static int readelfimage_base_and_size(char *elfbase,
                                       unsigned long *pkernstart,
                                       unsigned long *pkernend,
                                       unsigned long *pkernentry);
-static int loadelfimage(char *elfbase, int pmh, unsigned long *parray,
+static int loadelfimage(char *elfbase, void *pmh, unsigned long *parray,
                         unsigned long vstart);
 
 static long get_tot_pages(int xc_handle, u32 domid)
@@ -53,7 +53,7 @@ static int get_pfn_list(int xc_handle,
     return (ret < 0) ? -1 : op.u.getmemlist.num_pfns;
 }
 
-static int copy_to_domain_page(int pm_handle,
+static int copy_to_domain_page(void *pm_handle,
                                unsigned long dst_pfn, 
                                void *src_page)
 {
@@ -86,7 +86,8 @@ static int setup_guestos(int xc_handle,
     extended_start_info_t *start_info;
     shared_info_t *shared_info;
     mmu_t *mmu = NULL;
-    int pm_handle=-1, rc;
+    void  *pm_handle=NULL;
+    int rc;
 
     unsigned long nr_pt_pages;
     unsigned long ppt_alloc;
@@ -165,7 +166,7 @@ static int setup_guestos(int xc_handle,
            v_start, v_end);
     printf(" ENTRY ADDRESS: %08lx\n", vkern_entry);
 
-    if ( (pm_handle = init_pfn_mapper((domid_t)dom)) < 0 )
+    if ( (pm_handle = init_pfn_mapper((domid_t)dom)) == NULL )
         goto error_out;
 
     if ( (page_array = malloc(nr_pages * sizeof(unsigned long))) == NULL )
@@ -307,7 +308,7 @@ static int setup_guestos(int xc_handle,
  error_out:
     if ( mmu != NULL )
         free(mmu);
-    if ( pm_handle >= 0 )
+    if ( pm_handle != NULL )
         (void)close_pfn_mapper(pm_handle);
     if ( page_array != NULL )
         free(page_array);
@@ -629,7 +630,7 @@ static int readelfimage_base_and_size(char *elfbase,
     return 0;
 }
 
-static int loadelfimage(char *elfbase, int pmh, unsigned long *parray,
+static int loadelfimage(char *elfbase, void *pmh, unsigned long *parray,
                         unsigned long vstart)
 {
     Elf_Ehdr *ehdr = (Elf_Ehdr *)elfbase;
@@ -649,11 +650,11 @@ static int loadelfimage(char *elfbase, int pmh, unsigned long *parray,
         {
             pa = (phdr->p_vaddr + done) - vstart;
             va = map_pfn_writeable(pmh, parray[pa>>PAGE_SHIFT]);
-            va += pa & (PAGE_SIZE-1);
             chunksz = phdr->p_filesz - done;
             if ( chunksz > (PAGE_SIZE - (pa & (PAGE_SIZE-1))) )
                 chunksz = PAGE_SIZE - (pa & (PAGE_SIZE-1));
-            memcpy(va, elfbase + phdr->p_offset + done, chunksz);
+            memcpy(va + (pa & (PAGE_SIZE-1)),
+                   elfbase + phdr->p_offset + done, chunksz);
             unmap_pfn(pmh, va);
         }
 
@@ -661,11 +662,10 @@ static int loadelfimage(char *elfbase, int pmh, unsigned long *parray,
         {
             pa = (phdr->p_vaddr + done) - vstart;
             va = map_pfn_writeable(pmh, parray[pa>>PAGE_SHIFT]);
-            va += pa & (PAGE_SIZE-1);
             chunksz = phdr->p_memsz - done;
             if ( chunksz > (PAGE_SIZE - (pa & (PAGE_SIZE-1))) )
                 chunksz = PAGE_SIZE - (pa & (PAGE_SIZE-1));
-            memset(va, 0, chunksz);
+            memset(va + (pa & (PAGE_SIZE-1)), 0, chunksz);
             unmap_pfn(pmh, va);            
         }
     }

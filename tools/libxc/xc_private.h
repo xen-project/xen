@@ -131,11 +131,11 @@ static inline int do_multicall_op(int xc_handle,
 /*
  * PFN mapping.
  */
-int init_pfn_mapper(domid_t domid);
-int close_pfn_mapper(int pm_handle);
-void *map_pfn_writeable(int pm_handle, unsigned long pfn);
-void *map_pfn_readonly(int pm_handle, unsigned long pfn);
-void unmap_pfn(int pm_handle, void *vaddr);
+void *init_pfn_mapper(domid_t domid);
+int close_pfn_mapper(void *pm_handle);
+void *map_pfn_writeable(void *pm_handle, unsigned long pfn);
+void *map_pfn_readonly(void *pm_handle, unsigned long pfn);
+void unmap_pfn(void *pm_handle, void *vaddr);
 int get_pfn_type_batch(int xc_handle, u32 dom, int num, unsigned long *arr);
 unsigned long csum_page (void * page);
 
