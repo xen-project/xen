@@ -600,9 +600,9 @@ extern void (*late_time_init)(void);
 void __init hpet_time_init(void)
 {
 	xtime.tv_sec = get_cmos_time();
-	wall_to_monotonic.tv_sec = -xtime.tv_sec;
 	xtime.tv_nsec = (INITIAL_JIFFIES % HZ) * (NSEC_PER_SEC / HZ);
-	wall_to_monotonic.tv_nsec = -xtime.tv_nsec;
+	set_normalized_timespec(&wall_to_monotonic,
+		-xtime.tv_sec, -xtime.tv_nsec);
 
 	if (hpet_enable() >= 0) {
 		printk("Using HPET for base-timer\n");
@@ -637,9 +637,9 @@ void __init time_init(void)
 #endif
 	__get_time_values_from_xen();
 	xtime.tv_sec = shadow_tv.tv_sec;
-	wall_to_monotonic.tv_sec = -xtime.tv_sec;
 	xtime.tv_nsec = shadow_tv.tv_usec * NSEC_PER_USEC;
-	wall_to_monotonic.tv_nsec = -xtime.tv_nsec;
+	set_normalized_timespec(&wall_to_monotonic,
+		-xtime.tv_sec, -xtime.tv_nsec);
 	processed_system_time = shadow_system_time;
 
 	if (timer_tsc_init.init(NULL) != 0)
