@@ -355,11 +355,12 @@ static void __init pagetable_init (void)
 	 */
 	memcpy(new_pgd, old_pgd, PTRS_PER_PGD_NO_HV*sizeof(pgd_t));
 	make_page_readonly(new_pgd);
-	queue_pgd_pin(__pa(new_pgd));
+	xen_pgd_pin(__pa(new_pgd));
 	load_cr3(new_pgd);
-	queue_pgd_unpin(__pa(old_pgd));
+	flush_page_update_queue();
+	xen_pgd_unpin(__pa(old_pgd));
 	make_page_writable(old_pgd);
-	__flush_tlb_all(); /* implicit flush */
+	__flush_tlb_all();
 	free_bootmem(__pa(old_pgd), PAGE_SIZE);
 
 	kernel_physical_mapping_init(new_pgd);
