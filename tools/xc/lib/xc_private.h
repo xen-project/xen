@@ -149,10 +149,8 @@ static inline int do_block_io_op(int xc_handle, block_io_op_t *op)
         goto out1;
     }
 
-    if ( do_xen_hypercall(xc_handle, &hypercall) < 0 )
+    if ( (ret = do_xen_hypercall(xc_handle, &hypercall)) < 0 )
         goto out2;
-
-    ret = 0;
 
  out2: (void)munlock(op, sizeof(*op));
  out1: return ret;
