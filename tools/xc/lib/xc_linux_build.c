@@ -98,7 +98,7 @@ static int copy_to_domain_page(int pm_handle,
 static int setup_guestos(int xc_handle,
                          int dom, 
                          gzFile kernel_gfd, 
-                         int initrd_fd, 
+                         gzFile initrd_gfd, 
                          unsigned long tot_pages,
                          unsigned long *virt_startinfo_addr, 
                          unsigned long virt_load_addr, 
@@ -164,38 +164,30 @@ static int setup_guestos(int xc_handle,
     ksize = i;
 
     /* Load the initial ramdisk image. */
-    if ( initrd_fd >= 0 )
+    if ( initrd_gfd )
     {
-        struct stat stat;
-        unsigned long isize;
+	int size;
 
-        if ( fstat(initrd_fd, &stat) < 0 )
-        {
-            PERROR("Could not stat the initrd image");
-            goto error_out;
-        }
-        isize = stat.st_size;
-        if ( (isize + ksize) > ((tot_pages/2) * PAGE_SIZE) )
-        {
-            ERROR("Kernel/initrd too big to safely fit in domain memory");
-            goto error_out;
-        }
-
-        initrd_addr = virt_load_addr + ksize;
-        initrd_len  = isize;
-
-        for ( j = 0, i = ksize; j < isize; j += PAGE_SIZE, i += PAGE_SIZE )
-        {
-            char page[PAGE_SIZE];
-            int size = ((isize-j) < PAGE_SIZE) ? (isize-j) : PAGE_SIZE;
-            if ( read(initrd_fd, page, size) != size )
+	for ( j=0, i=ksize; i < ((tot_pages/2) * PAGE_SIZE); i += PAGE_SIZE )
+	{
+	    char page[PAGE_SIZE];
+            if ( (size = gzread(initrd_gfd, page, PAGE_SIZE)) == -1 )
             {
-                PERROR("Error reading initrd image, could not"
-                       " read the whole image.");
-                goto error_out;
-            } 
-            copy_to_domain_page(pm_handle, page_array[i>>PAGE_SHIFT], page);
-        }
+		PERROR("Error reading initrd image, could not");
+		goto error_out;
+	    }
+	    j += size;
+	    if ( size > 0 )
+		copy_to_domain_page(pm_handle, page_array[i>>PAGE_SHIFT], page);
+	    if ( size < PAGE_SIZE )
+		goto initrd_copied;
+	}
+	ERROR("Kernel/initrd too big to safely fit in domain memory");
+            goto error_out;
+        
+ initrd_copied:	
+        initrd_addr = virt_load_addr + ksize;
+        initrd_len  = j;
     }
 
     alloc_index = tot_pages - 1;
@@ -328,8 +320,8 @@ int xc_linux_build(int xc_handle,
     dom0_op_t launch_op, op;
     unsigned long load_addr;
     long tot_pages;
-    int kernel_fd, initrd_fd = -1;
-    gzFile kernel_gfd;
+    int kernel_fd = -1, initrd_fd = -1;
+    gzFile kernel_gfd = NULL, initrd_gfd = NULL;
     int rc, i;
     full_execution_context_t *ctxt;
     unsigned long virt_startinfo_addr;
@@ -380,6 +372,13 @@ int xc_linux_build(int xc_handle,
             PERROR("Could not open the initial ramdisk image");
             goto error_out;
         }
+
+	if ( (initrd_gfd = gzdopen(initrd_fd, "rb")) == NULL )
+	{
+	    PERROR("Could not allocate decompression state for initrd");
+	    goto error_out;
+	}
+
     }
 
     op.cmd = DOM0_GETDOMAININFO;
@@ -397,7 +396,7 @@ int xc_linux_build(int xc_handle,
         goto error_out;
     }
 
-    if ( setup_guestos(xc_handle, domid, kernel_gfd, initrd_fd, tot_pages,
+    if ( setup_guestos(xc_handle, domid, kernel_gfd, initrd_gfd, tot_pages,
                        &virt_startinfo_addr,
                        load_addr, &launch_op.u.builddomain, cmdline,
                        op.u.getdomaininfo.shared_info_frame) < 0 )
@@ -406,9 +405,14 @@ int xc_linux_build(int xc_handle,
         goto error_out;
     }
 
+    if ( kernel_fd >= 0 )
+        close(kernel_fd);
+    if( kernel_gfd )
+	gzclose(kernel_gfd);
     if ( initrd_fd >= 0 )
         close(initrd_fd);
-    gzclose(kernel_gfd);
+    if( initrd_gfd )
+	gzclose(initrd_gfd);
 
     ctxt = &launch_op.u.builddomain.ctxt;
 
@@ -473,8 +477,14 @@ int xc_linux_build(int xc_handle,
     return rc;
 
  error_out:
+    if ( kernel_fd >= 0 )
+        close(kernel_fd);
+    if( kernel_gfd )
+	gzclose(kernel_gfd);
     if ( initrd_fd >= 0 )
         close(initrd_fd);
-    gzclose(kernel_gfd);
+    if( initrd_gfd )
+	gzclose(initrd_gfd);
+
     return -1;
 }
