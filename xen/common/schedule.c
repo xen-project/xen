@@ -166,10 +166,7 @@ void domain_sleep(struct domain *d)
  
     /* Synchronous. */
     while ( test_bit(DF_RUNNING, &d->flags) && !domain_runnable(d) )
-    {
-        smp_mb();
         cpu_relax();
-    }
 }
 
 void domain_wake(struct domain *d)

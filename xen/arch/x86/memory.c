@@ -904,10 +904,7 @@ int get_page_type(struct pfn_info *page, u32 type)
         {
             /* Someone else is updating validation of this page. Wait... */
             while ( (y = page->u.inuse.type_info) == x )
-            {
-                rep_nop();
-                barrier();
-            }
+                cpu_relax();
             goto again;
         }
     }

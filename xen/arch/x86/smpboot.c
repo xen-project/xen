@@ -396,7 +396,7 @@ void __init start_secondary(void)
     smp_callin();
 
     while (!atomic_read(&smp_commenced))
-        rep_nop();
+        cpu_relax();
 
     /*
      * At this point, boot CPU has fully initialised the IDT. It is

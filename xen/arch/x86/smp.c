@@ -239,10 +239,7 @@ void flush_tlb_mask(unsigned long mask)
         flush_cpumask = mask;
         send_IPI_mask(mask, INVALIDATE_TLB_VECTOR);
         while ( flush_cpumask != 0 )
-        {
-            rep_nop();
-            barrier();
-        }
+            cpu_relax();
 
         spin_unlock(&flush_lock);
     }
@@ -260,10 +257,7 @@ void new_tlbflush_clock_period(void)
         flush_cpumask = ((1 << smp_num_cpus) - 1) & ~(1 << smp_processor_id());
         send_IPI_allbutself(INVALIDATE_TLB_VECTOR);
         while ( flush_cpumask != 0 )
-        {
-            rep_nop();
-            barrier();
-        }
+            cpu_relax();
         spin_unlock(&flush_lock);
     }
 
