@@ -29,7 +29,6 @@ static void flush_ldt(void *null)
 {
         if (current->active_mm) {
                 load_LDT(&current->active_mm->context);
-                flush_page_update_queue();
         }
 }
 #endif
@@ -70,7 +69,6 @@ static int alloc_ldt(mm_context_t *pc, unsigned mincount, int reload)
 		make_pages_readonly(pc->ldt, (pc->size * LDT_ENTRY_SIZE) /
 				    PAGE_SIZE);
 		load_LDT(pc);
-		flush_page_update_queue();
 #ifdef CONFIG_SMP
 		mask = cpumask_of_cpu(smp_processor_id());
 		if (!cpus_equal(current->mm->cpu_vm_mask, mask))
@@ -83,7 +81,6 @@ static int alloc_ldt(mm_context_t *pc, unsigned mincount, int reload)
 	if (oldsize) {
 		make_pages_writable(oldldt, (oldsize * LDT_ENTRY_SIZE) /
 			PAGE_SIZE);
-		flush_page_update_queue();
 		if (oldsize*LDT_ENTRY_SIZE > PAGE_SIZE)
 			vfree(oldldt);
 		else
@@ -100,7 +97,6 @@ static inline int copy_ldt(mm_context_t *new, mm_context_t *old)
 	memcpy(new->ldt, old->ldt, old->size*LDT_ENTRY_SIZE);
 	make_pages_readonly(new->ldt, (new->size * LDT_ENTRY_SIZE) /
 			    PAGE_SIZE);
-	flush_page_update_queue();
 	return 0;
 }
 
@@ -136,7 +132,6 @@ void destroy_context(struct mm_struct *mm)
 		make_pages_writable(mm->context.ldt, 
 				    (mm->context.size * LDT_ENTRY_SIZE) /
 				    PAGE_SIZE);
-		flush_page_update_queue();
 		if (mm->context.size*LDT_ENTRY_SIZE > PAGE_SIZE)
 			vfree(mm->context.ldt);
 		else

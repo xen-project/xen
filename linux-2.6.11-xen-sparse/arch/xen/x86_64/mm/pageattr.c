@@ -23,7 +23,6 @@ void pte_free(struct page *pte)
 
         xen_pte_unpin(__pa(ptep));
         make_page_writable(ptep);
-	flush_page_update_queue(); 
 	__free_page(pte); 
 }
 

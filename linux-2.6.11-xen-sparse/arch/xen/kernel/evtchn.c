@@ -81,8 +81,13 @@ extern fastcall unsigned int do_IRQ(struct pt_regs *regs);
 #else
 extern asmlinkage unsigned int do_IRQ(struct pt_regs *regs);
 #endif
+#if defined (__i386__)
+#define IRQ_REG orig_eax
+#elif defined (__x86_64__)
+#define IRQ_REG orig_rax
+#endif
 #define do_IRQ(irq, regs) do {		\
-    (regs)->orig_eax = (irq);		\
+    (regs)->IRQ_REG = (irq);		\
     do_IRQ((regs));			\
 } while (0)
 #endif
@@ -102,7 +107,7 @@ void force_evtchn_callback(void)
 /* NB. Interrupts are disabled on entry. */
 asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
 {
-    unsigned long  l1, l2;
+    u32 	   l1, l2;
     unsigned int   l1i, l2i, port;
     int            irq;
     shared_info_t *s = HYPERVISOR_shared_info;

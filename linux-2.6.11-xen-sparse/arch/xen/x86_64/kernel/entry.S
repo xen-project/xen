@@ -336,7 +336,7 @@ badsys:
 ENTRY(int_ret_from_sys_call)	
         XEN_GET_VCPU_INFO(%r11)
         XEN_BLOCK_EVENTS(%r11)
-	testb $1,SS-ARGOFFSET+4(%rsp)
+	testb $3,CS-ARGOFFSET(%rsp)
         jnz 1f
         /* Need to set the proper %ss (not NULL) for ring 3 iretq */
         movl $__KERNEL_DS,SS-ARGOFFSET(%rsp)

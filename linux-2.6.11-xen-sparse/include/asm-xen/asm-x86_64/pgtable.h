@@ -91,9 +91,9 @@ static inline void set_pte(pte_t *dst, pte_t val)
 #endif
 #endif
 
-#define set_pmd(pmdptr, pmdval) xen_l2_entry_update(pmdptr, (pmdval).pmd)
-#define set_pud(pudptr, pudval) xen_l3_entry_update(pudptr, (pudval).pud)
-#define set_pgd(pgdptr, pgdval) xen_l4_entry_update(pgdptr, (pgdval).pgd)
+#define set_pmd(pmdptr, pmdval) xen_l2_entry_update(pmdptr, (pmdval))
+#define set_pud(pudptr, pudval) xen_l3_entry_update(pudptr, (pudval))
+#define set_pgd(pgdptr, pgdval) xen_l4_entry_update(pgdptr, (pgdval))
 
 extern inline void pud_clear (pud_t * pud)
 {

@@ -122,7 +122,7 @@ void make_page_readonly(void *va)
         pud = pud_offset(pgd, addr);
         pmd = pmd_offset(pud, addr);
         pte = pte_offset_kernel(pmd, addr);
-        queue_l1_entry_update(pte, (*(unsigned long*)pte)&~_PAGE_RW);
+        xen_l1_entry_update(pte, (*(unsigned long*)pte)&~_PAGE_RW);
 	__flush_tlb_one(addr);
 }
 
@@ -140,7 +140,7 @@ void make_page_writable(void *va)
         pud = pud_offset(pgd, addr);
         pmd = pmd_offset(pud, addr);
         pte = pte_offset_kernel(pmd, addr);
-        queue_l1_entry_update(pte, (*(unsigned long*)pte)|_PAGE_RW);
+        xen_l1_entry_update(pte, (*(unsigned long*)pte)|_PAGE_RW);
 	__flush_tlb_one(addr);
 }
 

@@ -47,8 +47,8 @@
 #include <asm/pda.h>
 #include <asm/prctl.h>
 #include <asm/kdebug.h>
-#include <asm-xen/multicall.h>
 #include <asm-xen/xen-public/dom0_ops.h>
+#include <asm-xen/xen-public/physdev.h>
 #include <asm/desc.h>
 #include <asm/proto.h>
 #include <asm/hardirq.h>
@@ -203,7 +203,7 @@ void exit_thread(void)
 
 void load_gs_index(unsigned gs)
 {
-    __load_gs_index(gs);
+	HYPERVISOR_set_segment_base(SEGBASE_GS_USER_SEL, gs);
 }
 
 void flush_thread(void)
@@ -346,6 +346,14 @@ out:
 		HYPERVISOR_set_debugreg((register),	\
 			(thread->debugreg ## register))
 
+
+static inline void __save_init_fpu( struct task_struct *tsk )
+{
+	asm volatile( "rex64 ; fxsave %0 ; fnclex"
+		      : "=m" (tsk->thread.i387.fxsave));
+	tsk->thread_info->status &= ~TS_USEDFPU;
+}
+
 /*
  *	switch_to(x,y) should switch tasks from x to y.
  *
@@ -359,61 +367,68 @@ struct task_struct *__switch_to(struct task_struct *prev_p, struct task_struct *
 				 *next = &next_p->thread;
 	int cpu = smp_processor_id();  
 	struct tss_struct *tss = &per_cpu(init_tss, cpu);
-        dom0_op_t op;
-
-        /* NB. No need to disable interrupts as already done in sched.c */
-        /* __cli(); */
-
-//	MULTICALL_flush_page_update_queue();
-
-	/* never put a printk in __switch_to... printk() calls wake_up*() indirectly */
-
+	physdev_op_t iopl_op, iobmp_op;
+	multicall_entry_t _mcl[8], *mcl = _mcl;
+ 
 	/*
 	 * This is basically '__unlazy_fpu', except that we queue a
 	 * multicall to indicate FPU task switch, rather than
 	 * synchronously trapping to Xen.
 	 */
 	if (prev_p->thread_info->status & TS_USEDFPU) {
-		save_init_fpu(prev_p);
-		queue_multicall0(__HYPERVISOR_fpu_taskswitch);
+		__save_init_fpu(prev_p); /* _not_ save_init_fpu() */
+		mcl->op      = __HYPERVISOR_fpu_taskswitch;
+		mcl->args[0] = 1;
+		mcl++;
 	}
 
 	/*
 	 * Reload esp0, LDT and the page table pointer:
 	 */
 	tss->rsp0 = next->rsp0;
-//	queue_multicall1(__HYPERVISOR_stack_switch, tss->rsp0);
-	HYPERVISOR_stack_switch(__KERNEL_DS, tss->rsp0);
+	mcl->op      = __HYPERVISOR_stack_switch;
+	mcl->args[0] = __KERNEL_DS;
+	mcl->args[1] = tss->rsp0;
+	mcl++;
 
 	/*
 	 * Load the per-thread Thread-Local Storage descriptor.
 	 * This is load_TLS(next, cpu) with multicalls.
 	 */
 #define C(i) do {							\
-          if (unlikely(next->tls_array[i] != prev->tls_array[i]))       \
-            queue_multicall2(__HYPERVISOR_update_descriptor,            \
-                             virt_to_machine(&get_cpu_gdt_table(cpu)    \
-                                             [GDT_ENTRY_TLS_MIN + i]),  \
-                             (unsigned long) &next->tls_array[i]);      \
+	if (unlikely(next->tls_array[i] != prev->tls_array[i])) {	\
+		mcl->op      = __HYPERVISOR_update_descriptor;		\
+		mcl->args[0] = virt_to_machine(&get_cpu_gdt_table(cpu)	\
+					       [GDT_ENTRY_TLS_MIN + i]); \
+		mcl->args[1] = (unsigned long) ((u64 *) &next->tls_array[i]); \
+		mcl->args[2] = (unsigned long) ((u64 *) &next->tls_array[i]); \
+		mcl++;							\
+	}								\
 } while (0)
 	C(0); C(1); C(2);
 #undef C
 
-	if (xen_start_info.flags & SIF_PRIVILEGED) {
-		op.cmd           = DOM0_IOPL;
-		op.u.iopl.domain = DOMID_SELF;
-		op.u.iopl.iopl   = next->io_pl;
-		op.interface_version = DOM0_INTERFACE_VERSION;
-		HYPERVISOR_dom0_op(&op);
-#if 0
-		queue_multicall1(__HYPERVISOR_dom0_op, (unsigned long)&op);
-#endif
+	if (unlikely(prev->io_pl != next->io_pl)) {
+		iopl_op.cmd             = PHYSDEVOP_SET_IOPL;
+		iopl_op.u.set_iopl.iopl = next->io_pl;
+		mcl->op      = __HYPERVISOR_physdev_op;
+		mcl->args[0] = (unsigned long)&iopl_op;
+		mcl++;
 	}
 
-	/* EXECUTE ALL TASK SWITCH XEN SYSCALLS AT THIS POINT. */
-//	execute_multicall_list();
-        /* __sti(); */
+	if (unlikely(prev->io_bitmap_ptr || next->io_bitmap_ptr)) {
+		iobmp_op.cmd                     =
+			PHYSDEVOP_SET_IOBITMAP;
+		iobmp_op.u.set_iobitmap.bitmap   =
+			(unsigned long)next->io_bitmap_ptr;
+		iobmp_op.u.set_iobitmap.nr_ports =
+			next->io_bitmap_ptr ? IO_BITMAP_BITS : 0;
+		mcl->op      = __HYPERVISOR_physdev_op;
+		mcl->args[0] = (unsigned long)&iobmp_op;
+		mcl++;
+	}
 
+	(void)HYPERVISOR_multicall(_mcl, mcl - _mcl);
 	/* 
 	 * Switch DS and ES.
 	 * This won't pick up thread selector changes, but I guess that is ok.
@@ -483,25 +498,6 @@ struct task_struct *__switch_to(struct task_struct *prev_p, struct task_struct *
 		/* no 4 and 5 */
 		loaddebug(next, 6);
 		loaddebug(next, 7);
-	}
-
-	/* 
-	 * Handle the IO bitmap 
-	 */ 
-	if (unlikely(prev->io_bitmap_ptr || next->io_bitmap_ptr)) {
-		if (next->io_bitmap_ptr)
-			/*
-			 * Copy the relevant range of the IO bitmap.
-			 * Normally this is 128 bytes or less:
- 			 */
-			memcpy(tss->io_bitmap, next->io_bitmap_ptr,
-				max(prev->io_bitmap_max, next->io_bitmap_max));
-		else {
-			/*
-			 * Clear any possible leftover bits:
-			 */
-			memset(tss->io_bitmap, 0xff, prev->io_bitmap_max);
-		}
 	}
 
 	return prev_p;

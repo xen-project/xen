@@ -58,7 +58,7 @@
 #include <asm/setup.h>
 #include <asm/mach_apic.h>
 #include <asm/numa.h>
-
+#include <asm-xen/xen-public/physdev.h>
 #include "setup_arch_pre.h"
 #include <asm-xen/hypervisor.h>
 
@@ -604,7 +604,9 @@ static void __init print_memory_map(char *who)
 void __init setup_arch(char **cmdline_p)
 {
 	unsigned long low_mem_size;
-        int i,j;
+	int i, j;
+	physdev_op_t op;
+ 
 #if 0
  	ROOT_DEV = old_decode_dev(ORIG_ROOT_DEV);
 #else
@@ -805,16 +807,6 @@ void __init setup_arch(char **cmdline_p)
         /* XXX Disable irqdebug until we have a way to avoid interrupt
 	 * conflicts. */
 /*	noirqdebug_setup(""); */
-	/* If we are a privileged guest OS then we should request IO privs. */
-	if (xen_start_info.flags & SIF_PRIVILEGED) {
-		dom0_op_t op;
-		op.cmd           = DOM0_IOPL;
-		op.u.iopl.domain = DOMID_SELF;
-		op.u.iopl.iopl   = 3;
-		if (HYPERVISOR_dom0_op(&op) != 0)
-			panic("Unable to obtain IOPL, despite SIF_PRIVILEGED");
-		current->thread.io_pl = 3;
-	}
 
 #ifdef CONFIG_XEN_PRIVILEGED_GUEST
 	/*
@@ -843,8 +835,12 @@ void __init setup_arch(char **cmdline_p)
 		pci_mem_start = low_mem_size;
 
 #ifdef CONFIG_GART_IOMMU
-       iommu_hole_init();
+	iommu_hole_init();
 #endif
+
+	op.cmd             = PHYSDEVOP_SET_IOPL;
+	op.u.set_iopl.iopl = current->thread.io_pl = 1;
+	HYPERVISOR_physdev_op(&op);
 
 	if (xen_start_info.flags & SIF_INITDOMAIN) {
 		if (!(xen_start_info.flags & SIF_PRIVILEGED))

@@ -218,7 +218,6 @@ void __init cpu_gdt_init(struct desc_ptr *gdt_descr)
 		frames[f] = virt_to_machine(va) >> PAGE_SHIFT;
 		make_page_readonly((void *)va);
 	}
-	flush_page_update_queue();
 	if (HYPERVISOR_set_gdt(frames, gdt_descr->size /
                                sizeof (struct desc_struct)))
 		BUG();
@@ -328,9 +327,7 @@ void __init cpu_init (void)
 	enter_lazy_tlb(&init_mm, me);
 
 	load_LDT(&init_mm.context);
-        flush_page_update_queue();
 
-#if 0                         
 	/*
 	 * Clear all 6 debug registers:
 	 */
@@ -339,7 +336,6 @@ void __init cpu_init (void)
 	CD(0); CD(1); CD(2); CD(3); /* no db4 and db5 */; CD(6); CD(7);
 
 #undef CD
-#endif
 #if 0
 	fpu_init(); 
 #endif

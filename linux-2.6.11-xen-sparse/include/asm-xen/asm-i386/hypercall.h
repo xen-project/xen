@@ -26,33 +26,27 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
  * IN THE SOFTWARE.
  */
-/*
- * Benjamin Liu <benjamin.liu@intel.com>
- * Jun Nakajima <jun.nakajima@intel.com>
- *   Ported to x86-64.
- * 
- */
 
 #ifndef __HYPERCALL_H__
 #define __HYPERCALL_H__
 #include <asm-xen/xen-public/xen.h>
 
-#define __syscall_clobber "r11","rcx","memory"
-
 /*
  * Assembler stubs for hyper-calls.
  */
+
 static inline int
 HYPERVISOR_set_trap_table(
     trap_info_t *table)
 {
     int ret;
+    unsigned long ignore;
 
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_set_trap_table), "D" (table)
-	: __syscall_clobber );
+        : "=a" (ret), "=b" (ignore)
+	: "0" (__HYPERVISOR_set_trap_table), "1" (table)
+	: "memory" );
 
     return ret;
 }
@@ -62,13 +56,14 @@ HYPERVISOR_mmu_update(
     mmu_update_t *req, int count, int *success_count, domid_t domid)
 {
     int ret;
+    unsigned long ign1, ign2, ign3, ign4;
 
     __asm__ __volatile__ (
-        "movq %5, %%r10;" TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_mmu_update), "D" (req), "S" ((long)count),
-	  "d" (success_count), "g" ((unsigned long)domid)
-	: __syscall_clobber, "r10" );
+        TRAP_INSTR
+        : "=a" (ret), "=b" (ign1), "=c" (ign2), "=d" (ign3), "=S" (ign4)
+	: "0" (__HYPERVISOR_mmu_update), "1" (req), "2" (count),
+        "3" (success_count), "4" (domid)
+	: "memory" );
 
     return ret;
 }
@@ -78,13 +73,14 @@ HYPERVISOR_mmuext_op(
     struct mmuext_op *op, int count, int *success_count, domid_t domid)
 {
     int ret;
+    unsigned long ign1, ign2, ign3, ign4;
 
     __asm__ __volatile__ (
-        "movq %5, %%r10;" TRAP_INSTR
-        : "=a" (ret)
-        : "0" (__HYPERVISOR_mmuext_op), "D" (op), "S" ((long)count), 
-          "d" (success_count), "g" ((unsigned long)domid)
-        : __syscall_clobber, "r10" );
+        TRAP_INSTR
+        : "=a" (ret), "=b" (ign1), "=c" (ign2), "=d" (ign3), "=S" (ign4)
+	: "0" (__HYPERVISOR_mmuext_op), "1" (op), "2" (count),
+        "3" (success_count), "4" (domid)
+	: "memory" );
 
     return ret;
 }
@@ -94,56 +90,64 @@ HYPERVISOR_set_gdt(
     unsigned long *frame_list, int entries)
 {
     int ret;
+    unsigned long ign1, ign2;
 
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_set_gdt), "D" (frame_list), "S" ((long)entries)
-	: __syscall_clobber );
+        : "=a" (ret), "=b" (ign1), "=c" (ign2)
+	: "0" (__HYPERVISOR_set_gdt), "1" (frame_list), "2" (entries)
+	: "memory" );
 
 
     return ret;
 }
+
 static inline int
 HYPERVISOR_stack_switch(
     unsigned long ss, unsigned long esp)
 {
     int ret;
+    unsigned long ign1, ign2;
 
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_stack_switch), "D" (ss), "S" (esp)
-	: __syscall_clobber );
+        : "=a" (ret), "=b" (ign1), "=c" (ign2)
+	: "0" (__HYPERVISOR_stack_switch), "1" (ss), "2" (esp)
+	: "memory" );
 
     return ret;
 }
 
 static inline int
 HYPERVISOR_set_callbacks(
-    unsigned long event_address, unsigned long failsafe_address, 
-    unsigned long syscall_address)
+    unsigned long event_selector, unsigned long event_address,
+    unsigned long failsafe_selector, unsigned long failsafe_address)
 {
     int ret;
+    unsigned long ign1, ign2, ign3, ign4;
 
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_set_callbacks), "D" (event_address),
-	  "S" (failsafe_address), "d" (syscall_address)
-	: __syscall_clobber );
+        : "=a" (ret), "=b" (ign1), "=c" (ign2), "=d" (ign3), "=S" (ign4)
+	: "0" (__HYPERVISOR_set_callbacks), "1" (event_selector),
+	  "2" (event_address), "3" (failsafe_selector), "4" (failsafe_address)
+	: "memory" );
 
     return ret;
 }
 
 static inline int
 HYPERVISOR_fpu_taskswitch(
-    void)
+    int set)
 {
     int ret;
+    unsigned long ign;
+
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret) : "0" ((unsigned long)__HYPERVISOR_fpu_taskswitch) : __syscall_clobber );
+        : "=a" (ret), "=b" (ign)
+        : "0" (__HYPERVISOR_fpu_taskswitch), "1" (set)
+        : "memory" );
 
     return ret;
 }
@@ -153,12 +157,13 @@ HYPERVISOR_yield(
     void)
 {
     int ret;
+    unsigned long ign;
 
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_sched_op), "D" ((unsigned long)SCHEDOP_yield)
-	: __syscall_clobber );
+        : "=a" (ret), "=b" (ign)
+	: "0" (__HYPERVISOR_sched_op), "1" (SCHEDOP_yield)
+	: "memory" );
 
     return ret;
 }
@@ -168,11 +173,12 @@ HYPERVISOR_block(
     void)
 {
     int ret;
+    unsigned long ign1;
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_sched_op), "D" ((unsigned long)SCHEDOP_block)
-	: __syscall_clobber );
+        : "=a" (ret), "=b" (ign1)
+	: "0" (__HYPERVISOR_sched_op), "1" (SCHEDOP_block)
+	: "memory" );
 
     return ret;
 }
@@ -182,12 +188,13 @@ HYPERVISOR_shutdown(
     void)
 {
     int ret;
+    unsigned long ign1;
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_sched_op),
-	  "D" ((unsigned long)(SCHEDOP_shutdown | (SHUTDOWN_poweroff << SCHEDOP_reasonshift)))
-	: __syscall_clobber );
+        : "=a" (ret), "=b" (ign1)
+	: "0" (__HYPERVISOR_sched_op),
+	  "1" (SCHEDOP_shutdown | (SHUTDOWN_poweroff << SCHEDOP_reasonshift))
+        : "memory" );
 
     return ret;
 }
@@ -197,13 +204,13 @@ HYPERVISOR_reboot(
     void)
 {
     int ret;
-
+    unsigned long ign1;
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_sched_op),
-	  "D" ((unsigned long)(SCHEDOP_shutdown | (SHUTDOWN_reboot << SCHEDOP_reasonshift)))
-	: __syscall_clobber );
+        : "=a" (ret), "=b" (ign1)
+	: "0" (__HYPERVISOR_sched_op),
+	  "1" (SCHEDOP_shutdown | (SHUTDOWN_reboot << SCHEDOP_reasonshift))
+        : "memory" );
 
     return ret;
 }
@@ -213,35 +220,49 @@ HYPERVISOR_suspend(
     unsigned long srec)
 {
     int ret;
+    unsigned long ign1, ign2;
 
     /* NB. On suspend, control software expects a suspend record in %esi. */
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_sched_op),
-        "D" ((unsigned long)(SCHEDOP_shutdown | (SHUTDOWN_suspend << SCHEDOP_reasonshift))), 
-        "S" (srec)
-	: __syscall_clobber );
+        : "=a" (ret), "=b" (ign1), "=S" (ign2)
+	: "0" (__HYPERVISOR_sched_op),
+        "b" (SCHEDOP_shutdown | (SHUTDOWN_suspend << SCHEDOP_reasonshift)), 
+        "S" (srec) : "memory");
 
     return ret;
 }
 
-/*
- * We can have the timeout value in a single argument for the hypercall, but
- * that will break the common code. 
- */
+static inline int
+HYPERVISOR_crash(
+    void)
+{
+    int ret;
+    unsigned long ign1;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret), "=b" (ign1)
+	: "0" (__HYPERVISOR_sched_op),
+	  "1" (SCHEDOP_shutdown | (SHUTDOWN_crash << SCHEDOP_reasonshift))
+        : "memory" );
+
+    return ret;
+}
+
 static inline long
 HYPERVISOR_set_timer_op(
     u64 timeout)
 {
     int ret;
+    unsigned long timeout_hi = (unsigned long)(timeout>>32);
+    unsigned long timeout_lo = (unsigned long)timeout;
+    unsigned long ign1, ign2;
 
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_set_timer_op),
-	  "D" (timeout)
-	: __syscall_clobber );
+        : "=a" (ret), "=b" (ign1), "=c" (ign2)
+	: "0" (__HYPERVISOR_set_timer_op), "b" (timeout_lo), "c" (timeout_hi)
+	: "memory");
 
     return ret;
 }
@@ -251,13 +272,14 @@ HYPERVISOR_dom0_op(
     dom0_op_t *dom0_op)
 {
     int ret;
+    unsigned long ign1;
 
     dom0_op->interface_version = DOM0_INTERFACE_VERSION;
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_dom0_op), "D" (dom0_op)
-	: __syscall_clobber );
+        : "=a" (ret), "=b" (ign1)
+	: "0" (__HYPERVISOR_dom0_op), "1" (dom0_op)
+	: "memory");
 
     return ret;
 }
@@ -267,12 +289,12 @@ HYPERVISOR_set_debugreg(
     int reg, unsigned long value)
 {
     int ret;
-
+    unsigned long ign1, ign2;
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_set_debugreg), "D" ((unsigned long)reg), "S" (value)
-	: __syscall_clobber );
+        : "=a" (ret), "=b" (ign1), "=c" (ign2)
+	: "0" (__HYPERVISOR_set_debugreg), "1" (reg), "2" (value)
+	: "memory" );
 
     return ret;
 }
@@ -282,28 +304,29 @@ HYPERVISOR_get_debugreg(
     int reg)
 {
     unsigned long ret;
-
+    unsigned long ign;
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_get_debugreg), "D" ((unsigned long)reg)
-	: __syscall_clobber );
+        : "=a" (ret), "=b" (ign)
+	: "0" (__HYPERVISOR_get_debugreg), "1" (reg)
+	: "memory" );
 
     return ret;
 }
 
 static inline int
 HYPERVISOR_update_descriptor(
-    unsigned long ma, unsigned long word)
+    unsigned long ma, unsigned long word1, unsigned long word2)
 {
     int ret;
+    unsigned long ign1, ign2, ign3;
 
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_update_descriptor), "D" (ma),
-	  "S" (word)
-	: __syscall_clobber );
+        : "=a" (ret), "=b" (ign1), "=c" (ign2), "=d" (ign3)
+	: "0" (__HYPERVISOR_update_descriptor), "1" (ma), "2" (word1),
+	  "3" (word2)
+	: "memory" );
 
     return ret;
 }
@@ -313,12 +336,13 @@ HYPERVISOR_set_fast_trap(
     int idx)
 {
     int ret;
+    unsigned long ign;
 
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_set_fast_trap), "D" ((unsigned long)idx)
-	: __syscall_clobber );
+        : "=a" (ret), "=b" (ign)
+	: "0" (__HYPERVISOR_set_fast_trap), "1" (idx)
+	: "memory" );
 
     return ret;
 }
@@ -329,13 +353,15 @@ HYPERVISOR_dom_mem_op(
     unsigned long nr_extents, unsigned int extent_order)
 {
     int ret;
+    unsigned long ign1, ign2, ign3, ign4, ign5;
 
     __asm__ __volatile__ (
-        "movq %5,%%r10; movq %6,%%r8;" TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_dom_mem_op), "D" ((unsigned long)op), "S" (extent_list),
-	  "d" (nr_extents), "g" ((unsigned long) extent_order), "g" ((unsigned long) DOMID_SELF)
-	: __syscall_clobber,"r8","r10");
+        TRAP_INSTR
+        : "=a" (ret), "=b" (ign1), "=c" (ign2), "=d" (ign3), "=S" (ign4),
+	  "=D" (ign5)
+	: "0" (__HYPERVISOR_dom_mem_op), "1" (op), "2" (extent_list),
+	  "3" (nr_extents), "4" (extent_order), "5" (DOMID_SELF)
+        : "memory" );
 
     return ret;
 }
@@ -345,28 +371,37 @@ HYPERVISOR_multicall(
     void *call_list, int nr_calls)
 {
     int ret;
+    unsigned long ign1, ign2;
 
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_multicall), "D" (call_list), "S" ((unsigned long)nr_calls)
-	: __syscall_clobber);
+        : "=a" (ret), "=b" (ign1), "=c" (ign2)
+	: "0" (__HYPERVISOR_multicall), "1" (call_list), "2" (nr_calls)
+	: "memory" );
 
     return ret;
 }
 
 static inline int
 HYPERVISOR_update_va_mapping(
-    unsigned long page_nr, pte_t new_val, unsigned long flags)
+    unsigned long va, pte_t new_val, unsigned long flags)
 {
     int ret;
+    unsigned long ign1, ign2, ign3;
 
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_update_va_mapping), 
-          "D" (page_nr), "S" (new_val.pte), "d" (flags)
-	: __syscall_clobber);
+        : "=a" (ret), "=b" (ign1), "=c" (ign2), "=d" (ign3)
+	: "0" (__HYPERVISOR_update_va_mapping), 
+          "1" (va), "2" ((new_val).pte_low), "3" (flags)
+	: "memory" );
+
+    if ( unlikely(ret < 0) )
+    {
+        printk(KERN_ALERT "Failed update VA mapping: %08lx, %08lx, %08lx\n",
+               va, (new_val).pte_low, flags);
+        BUG();
+    }
 
     return ret;
 }
@@ -376,11 +411,12 @@ HYPERVISOR_event_channel_op(
     void *op)
 {
     int ret;
+    unsigned long ignore;
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_event_channel_op), "D" (op)
-	: __syscall_clobber);
+        : "=a" (ret), "=b" (ignore)
+	: "0" (__HYPERVISOR_event_channel_op), "1" (op)
+	: "memory" );
 
     return ret;
 }
@@ -390,12 +426,13 @@ HYPERVISOR_xen_version(
     int cmd)
 {
     int ret;
+    unsigned long ignore;
 
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_xen_version), "D" ((unsigned long)cmd)
-	: __syscall_clobber);
+        : "=a" (ret), "=b" (ignore)
+	: "0" (__HYPERVISOR_xen_version), "1" (cmd)
+	: "memory" );
 
     return ret;
 }
@@ -405,11 +442,12 @@ HYPERVISOR_console_io(
     int cmd, int count, char *str)
 {
     int ret;
+    unsigned long ign1, ign2, ign3;
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_console_io), "D" ((unsigned long)cmd), "S" ((unsigned long)count), "d" (str)
-	: __syscall_clobber);
+        : "=a" (ret), "=b" (ign1), "=c" (ign2), "=d" (ign3)
+	: "0" (__HYPERVISOR_console_io), "1" (cmd), "2" (count), "3" (str)
+	: "memory" );
 
     return ret;
 }
@@ -419,12 +457,13 @@ HYPERVISOR_physdev_op(
     void *physdev_op)
 {
     int ret;
+    unsigned long ign;
 
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_physdev_op), "D" (physdev_op)
-	: __syscall_clobber);
+        : "=a" (ret), "=b" (ign)
+	: "0" (__HYPERVISOR_physdev_op), "1" (physdev_op)
+	: "memory" );
 
     return ret;
 }
@@ -434,28 +473,30 @@ HYPERVISOR_grant_table_op(
     unsigned int cmd, void *uop, unsigned int count)
 {
     int ret;
+    unsigned long ign1, ign2, ign3;
 
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_grant_table_op), "D" ((unsigned long)cmd), "S" ((unsigned long)uop), "d" (count)
-	: __syscall_clobber);
+        : "=a" (ret), "=b" (ign1), "=c" (ign2), "=d" (ign3)
+	: "0" (__HYPERVISOR_grant_table_op), "1" (cmd), "2" (uop), "3" (count)
+	: "memory" );
 
     return ret;
 }
 
 static inline int
 HYPERVISOR_update_va_mapping_otherdomain(
-    unsigned long page_nr, pte_t new_val, unsigned long flags, domid_t domid)
+    unsigned long va, pte_t new_val, unsigned long flags, domid_t domid)
 {
     int ret;
+    unsigned long ign1, ign2, ign3, ign4;
 
     __asm__ __volatile__ (
-        "movq %5, %%r10;" TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_update_va_mapping_otherdomain),
-          "D" (page_nr), "S" (new_val.pte), "d" (flags), "g" ((unsigned long)domid)
-	: __syscall_clobber,"r10");
+        TRAP_INSTR
+        : "=a" (ret), "=b" (ign1), "=c" (ign2), "=d" (ign3), "=S" (ign4)
+	: "0" (__HYPERVISOR_update_va_mapping_otherdomain),
+          "1" (va), "2" ((new_val).pte_low), "3" (flags), "4" (domid) :
+        "memory" );
     
     return ret;
 }
@@ -465,23 +506,13 @@ HYPERVISOR_vm_assist(
     unsigned int cmd, unsigned int type)
 {
     int ret;
+    unsigned long ign1, ign2;
 
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_vm_assist), "D" ((unsigned long)cmd), "S" ((unsigned long)type)
-	: __syscall_clobber);
-
-    return ret;
-}
-
-static inline int
-HYPERVISOR_switch_to_user(void)
-{
-    int ret;
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret) : "0" ((unsigned long)__HYPERVISOR_switch_to_user) : __syscall_clobber );
+        : "=a" (ret), "=b" (ign1), "=c" (ign2)
+	: "0" (__HYPERVISOR_vm_assist), "1" (cmd), "2" (type)
+	: "memory" );
 
     return ret;
 }
@@ -491,27 +522,13 @@ HYPERVISOR_boot_vcpu(
     unsigned long vcpu, full_execution_context_t *ctxt)
 {
     int ret;
+    unsigned long ign1, ign2;
 
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret)
-	: "0" (__HYPERVISOR_boot_vcpu), "D" (vcpu), "S" (ctxt)
-	: __syscall_clobber);
-
-    return ret;
-}
-
-static inline int
-HYPERVISOR_set_segment_base(
-    int reg, unsigned long value)
-{
-    int ret;
-
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret)
-	: "0" ((unsigned long)__HYPERVISOR_set_segment_base), "D" ((unsigned long)reg), "S" (value)
-	: __syscall_clobber );
+        : "=a" (ret), "=b" (ign1), "=c" (ign2)
+	: "0" (__HYPERVISOR_boot_vcpu), "1" (vcpu), "2" (ctxt)
+	: "memory");
 
     return ret;
 }
