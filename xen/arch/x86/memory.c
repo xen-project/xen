@@ -820,14 +820,23 @@ void put_page_type(struct pfn_info *page)
         nx = x - 1;
 
         ASSERT((x & PGT_count_mask) != 0);
-        ASSERT(x & PGT_validated);
+
+        /*
+         * The page should always be validated while a reference is held. The 
+         * exception is during domain destruction, when we forcibly invalidate 
+         * page-table pages if we detect a referential loop.
+         * See domain.c:relinquish_list().
+         */
+        ASSERT((x & PGT_validated) || 
+               test_bit(DF_DYING, &page->u.inuse.domain->flags));
 
         if ( unlikely((nx & PGT_count_mask) == 0) )
         {
             /* Record TLB information for flush later. Races are harmless. */
             page->tlbflush_timestamp = tlbflush_clock;
             
-            if ( unlikely((nx & PGT_type_mask) <= PGT_l4_page_table) )
+            if ( unlikely((nx & PGT_type_mask) <= PGT_l4_page_table) &&
+                 likely(nx & PGT_validated) )
             {
                 /*
                  * Page-table pages must be unvalidated when count is zero. The
