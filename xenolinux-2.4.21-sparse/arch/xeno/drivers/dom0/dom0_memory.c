@@ -16,9 +16,6 @@
 
 #include "dom0_ops.h"
 
-#define MAP_CONT    0
-#define MAP_DISCONT 1
-
 extern struct list_head * find_direct(struct list_head *, unsigned long);
 
 /*
@@ -165,24 +162,20 @@ int direct_remap_disc_page_range(unsigned long from,
  */
 
 unsigned long direct_mmap(unsigned long phys_addr, unsigned long size, 
-                          pgprot_t prot, int flag, int tot_pages)
+			  pgprot_t prot, int tot_pages)
 {
     direct_mmap_node_t * dmmap;
     struct list_head * entry;
     unsigned long addr;
     int ret = 0;
     
-    if(!capable(CAP_SYS_ADMIN)){
-        ret = -EPERM;
-        goto out;
-    }
+    if(!capable(CAP_SYS_ADMIN))
+        return -EPERM;
 
     /* get unmapped area invokes xen specific arch_get_unmapped_area */
     addr = get_unmapped_area(NULL, 0, size, 0, 0);
-    if(addr & ~PAGE_MASK){
-        ret = -ENOMEM;
-        goto out;
-    }
+    if(addr & ~PAGE_MASK)
+        return -ENOMEM;
 
     /* add node on the list of directly mapped areas, make sure the
      * list remains sorted.
@@ -192,24 +185,21 @@ unsigned long direct_mmap(unsigned long phys_addr, unsigned long size,
     dmmap->vm_end = addr + size;
     entry = find_direct(&current->mm->context.direct_list, addr);
     if(entry != &current->mm->context.direct_list){
-        list_add_tail(&dmmap->list, entry);
+      list_add_tail(&dmmap->list, entry);
     } else {
-    	list_add_tail(&dmmap->list, &current->mm->context.direct_list);
+      list_add_tail(&dmmap->list, &current->mm->context.direct_list);
     }
+
+    /* XXX kfree(dmmap)? */
 
     /* and perform the mapping */
-    if(flag == MAP_DISCONT){
-        ret = direct_remap_disc_page_range(addr, phys_addr >> PAGE_SHIFT, 
-                                           tot_pages, prot);
-    } else {
-        ret = direct_remap_page_range(addr, phys_addr, size, prot);
-    }
+    ret = direct_remap_disc_page_range(addr, phys_addr >> PAGE_SHIFT, 
+				       tot_pages, prot);
 
     if(ret == 0)
-        ret = addr;
-
- out: 
-    return ret;
+        return addr;
+    else
+        return ret;
 }
 
 /* most of the checks, refcnt updates, cache stuff have been thrown out as they are not
