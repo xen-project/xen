@@ -311,12 +311,12 @@ void direct_zap_page_range(struct mm_struct *mm, unsigned long address, unsigned
 }
 
 
-int direct_unmap(unsigned long addr, unsigned long size)
+int direct_unmap(struct mm_struct *mm, unsigned long addr, unsigned long size)
 {
     int count = 0, tot_pages = (size+PAGE_SIZE-1) >> PAGE_SHIFT;
     direct_mmap_node_t * node;
     struct list_head * curr;
-    struct list_head * direct_list = &current->mm->context.direct_list;    
+    struct list_head * direct_list = &mm->context.direct_list;    
 
     curr = direct_list->next;
     while ( curr != direct_list )
@@ -335,7 +335,7 @@ int direct_unmap(unsigned long addr, unsigned long size)
 
     while ( count < tot_pages )
     {
-        direct_zap_page_range(current->mm, addr, PAGE_SIZE);
+        direct_zap_page_range(mm, addr, PAGE_SIZE);
         addr += PAGE_SIZE;
         count++;
     }
