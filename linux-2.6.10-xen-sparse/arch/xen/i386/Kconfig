@@ -440,22 +440,23 @@ config PREEMPT
 #	   Enabling this feature will cause a message to be printed when the P4
 #	   enters thermal throttling.
 
-#config MICROCODE
-#	 tristate "/dev/cpu/microcode - Intel IA32 CPU microcode support"
-#	 ---help---
-#	   If you say Y here and also to "/dev file system support" in the
-#	   'File systems' section, you will be able to update the microcode on
-#	   Intel processors in the IA32 family, e.g. Pentium Pro, Pentium II,
-#	   Pentium III, Pentium 4, Xeon etc.  You will obviously need the
-#	   actual microcode binary data itself which is not shipped with the
-#	   Linux kernel.
-#
-#	   For latest news and information on obtaining all the required
-#	   ingredients for this driver, check:
-#	   <http://www.urbanmyth.org/microcode/>.
-#
-#	   To compile this driver as a module, choose M here: the
-#	   module will be called microcode.
+config MICROCODE
+	 tristate "/dev/cpu/microcode - Intel IA32 CPU microcode support"
+	 depends on XEN_PRIVILEGED_GUEST
+	 ---help---
+	   If you say Y here and also to "/dev file system support" in the
+	   'File systems' section, you will be able to update the microcode on
+	   Intel processors in the IA32 family, e.g. Pentium Pro, Pentium II,
+	   Pentium III, Pentium 4, Xeon etc.  You will obviously need the
+	   actual microcode binary data itself which is not shipped with the
+	   Linux kernel.
+
+	   For latest news and information on obtaining all the required
+	   ingredients for this driver, check:
+	   <http://www.urbanmyth.org/microcode/>.
+
+	   To compile this driver as a module, choose M here: the
+	   module will be called microcode.
 
 #config X86_MSR
 #	 tristate "/dev/cpu/*/msr - Model-specific register support"

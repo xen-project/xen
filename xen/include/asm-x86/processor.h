@@ -532,7 +532,7 @@ long set_gdt(struct domain *d,
 
 long set_debugreg(struct domain *p, int reg, unsigned long value);
 
-struct microcode {
+struct microcode_header {
     unsigned int hdrver;
     unsigned int rev;
     unsigned int date;
@@ -540,12 +540,32 @@ struct microcode {
     unsigned int cksum;
     unsigned int ldrver;
     unsigned int pf;
-    unsigned int reserved[5];
-    unsigned int bits[500];
+    unsigned int datasize;
+    unsigned int totalsize;
+    unsigned int reserved[3];
 };
 
-/* '6' because it used to be for P6 only (but now covers Pentium 4 as well) */
-#define MICROCODE_IOCFREE	_IO('6',0)
+struct microcode {
+    struct microcode_header hdr;
+    unsigned int bits[0];
+};
+
+typedef struct microcode microcode_t;
+typedef struct microcode_header microcode_header_t;
+
+/* microcode format is extended from prescott processors */
+struct extended_signature {
+    unsigned int sig;
+    unsigned int pf;
+    unsigned int cksum;
+};
+
+struct extended_sigtable {
+    unsigned int count;
+    unsigned int cksum;
+    unsigned int reserved[3];
+    struct extended_signature sigs[0];
+};
 
 /* REP NOP (PAUSE) is a good thing to insert into busy-wait loops. */
 static inline void rep_nop(void)

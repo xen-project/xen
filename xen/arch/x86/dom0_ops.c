@@ -130,6 +130,13 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
     }
     break;
 
+    case DOM0_MICROCODE:
+    {
+        extern int microcode_update(void *buf, unsigned long len);
+        ret = microcode_update(op->u.microcode.data, op->u.microcode.length);
+    }
+    break;
+
     default:
         ret = -ENOSYS;
 

@@ -146,6 +146,7 @@
 40f58a0d31M2EkuPbG94ns_nOi0PVA linux-2.6.10-xen-sparse/arch/xen/i386/kernel/i386_ksyms.c
 40faa751_zbZlAmLyQgCXdYekVFdWA linux-2.6.10-xen-sparse/arch/xen/i386/kernel/ioport.c
 40f56238ue3YRsK52HG7iccNzP1AwQ linux-2.6.10-xen-sparse/arch/xen/i386/kernel/ldt.c
+41d54a76YMCA67S8J-TBT3J62Wx6yA linux-2.6.10-xen-sparse/arch/xen/i386/kernel/microcode.c
 4107adf1cNtsuOxOB4T6paAoY2R2PA linux-2.6.10-xen-sparse/arch/xen/i386/kernel/pci-dma.c
 40f56238a8iOVDEoostsbun_sy2i4g linux-2.6.10-xen-sparse/arch/xen/i386/kernel/process.c
 40f56238YQIJoYG2ehDGEcdTgLmGbg linux-2.6.10-xen-sparse/arch/xen/i386/kernel/setup.c
@@ -664,6 +665,7 @@
 3ddb79bcKIkRR0kqWaJhe5VUDkMdxg xen/arch/x86/io_apic.c
 3ddb79bdqfIcjkz_h9Hvtp8Tk_19Zw xen/arch/x86/irq.c
 40ec29ffuOa1ZvmJHzFKyZn4k_RcXg xen/arch/x86/memory.c
+41d54a76qfpO0VnbL2tYs0Jgt3W3XA xen/arch/x86/microcode.c
 3ddb79bdS4UeWWXDH-FaBKqcpMFcnw xen/arch/x86/mpparse.c
 41aaf566Z4sTDgJ77eEg0TzzQ1ka6Q xen/arch/x86/mtrr/amd.c
 41aaf566TOpOBXT00wwQGUh20f1rlA xen/arch/x86/mtrr/centaur.c
