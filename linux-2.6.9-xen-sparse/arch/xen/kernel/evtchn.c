@@ -467,6 +467,8 @@ void __init init_IRQ(void)
 {
     int i;
 
+    irq_ctx_init(0);
+
     spin_lock_init(&irq_mapping_update_lock);
 
     /* No VIRQ -> IRQ mappings. */
