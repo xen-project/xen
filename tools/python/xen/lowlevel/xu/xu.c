@@ -1059,7 +1059,7 @@ static PyObject *xu_port_new(PyObject *self, PyObject *args)
 {
     xu_port_object *xup;
     u32 dom;
-    int port1, port2;
+    int port1 = 0, port2 = 0;
 
     if ( !PyArg_ParseTuple(args, "i", &dom) )
         return NULL;

@@ -146,6 +146,9 @@ typedef struct {
     } u;
 } xc_evtchn_status_t;
 
+int xc_evtchn_alloc_unbound(int xc_handle,
+                            u32 dom,
+                            int *port);
 int xc_evtchn_bind_interdomain(int xc_handle,
                                u32 dom1,   /* may be DOMID_SELF */
                                u32 dom2,   /* may be DOMID_SELF */

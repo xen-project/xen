@@ -31,6 +31,26 @@ static int do_evtchn_op(int xc_handle, evtchn_op_t *op)
 }
 
 
+int xc_evtchn_alloc_unbound(int xc_handle,
+                            u32 dom,
+                            int *port)
+{
+    evtchn_op_t op;
+    int         rc;
+
+    op.cmd = EVTCHNOP_alloc_unbound;
+    op.u.alloc_unbound.dom = (domid_t)dom;
+   
+    if ( (rc = do_evtchn_op(xc_handle, &op)) == 0 )
+    {
+        if ( port != NULL )
+            *port = op.u.alloc_unbound.port;
+    }
+    
+    return rc;
+}
+
+
 int xc_evtchn_bind_interdomain(int xc_handle,
                                u32 dom1,
                                u32 dom2,
@@ -41,9 +61,12 @@ int xc_evtchn_bind_interdomain(int xc_handle,
     int         rc;
 
     op.cmd = EVTCHNOP_bind_interdomain;
-    op.u.bind_interdomain.dom1 = (domid_t)dom1;
-    op.u.bind_interdomain.dom2 = (domid_t)dom2;
-   
+    op.u.bind_interdomain.dom1  = (domid_t)dom1;
+    op.u.bind_interdomain.dom2  = (domid_t)dom2;
+    op.u.bind_interdomain.port1 = (port1 != NULL) ? *port1 : 0;
+    op.u.bind_interdomain.port2 = (port2 != NULL) ? *port2 : 0;
+
+
     if ( (rc = do_evtchn_op(xc_handle, &op)) == 0 )
     {
         if ( port1 != NULL )
