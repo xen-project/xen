@@ -184,7 +184,7 @@
 
 /* Domain 0 is allowed to submit requests on behalf of others. */
 #define DOMAIN_OKAY(_f) \
-    (((_f) & PG_domain_mask) == current->domain)
+    ((((_f) & PG_domain_mask) == current->domain) || (current->domain == 0))
 
 /* 'get' checks parameter for validity before inc'ing refcnt. */
 static int get_l2_table(unsigned long page_nr);
