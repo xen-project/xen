@@ -264,6 +264,7 @@ def randomMAC():
 
     @return: MAC address string
     """
+    random.seed()
     mac = [ 0xaa, 0x00, 0x00,
             random.randint(0x00, 0x7f),
             random.randint(0x00, 0xff),
