@@ -13,18 +13,32 @@
 #include "common.h"
 #include <asm/hypervisor-ifs/dom_mem_ops.h>
 
-static void net_tx_action(unsigned long unused);
 static void netif_page_release(struct page *page);
 static void make_tx_response(netif_t *netif, 
                              u16      id,
                              s8       st);
-static void make_rx_response(netif_t     *netif, 
+static int  make_rx_response(netif_t     *netif, 
                              u16          id, 
                              s8           st,
                              netif_addr_t addr,
                              u16          size);
 
+static void net_tx_action(unsigned long unused);
 static DECLARE_TASKLET(net_tx_tasklet, net_tx_action, 0);
+
+static void net_rx_action(unsigned long unused);
+static DECLARE_TASKLET(net_rx_tasklet, net_rx_action, 0);
+
+typedef struct {
+    u16 id;
+    unsigned long old_mach_ptr;
+    unsigned long new_mach_pfn;
+    netif_t *netif;
+} rx_info_t;
+static struct sk_buff_head rx_queue;
+static multicall_entry_t rx_mcl[NETIF_RX_RING_SIZE*2];
+static mmu_update_t rx_mmu[NETIF_RX_RING_SIZE*4];
+static unsigned char rx_notify[NR_EVENT_CHANNELS];
 
 /* Don't currently gate addition of an interface to the tx scheduling list. */
 #define tx_work_exists(_if) (1)
@@ -98,22 +112,12 @@ static inline void maybe_schedule_tx_action(void)
 int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
     netif_t *netif = (netif_t *)dev->priv;
-    s8 status = NETIF_RSP_OKAY;
-    u16 size=0, id;
-    mmu_update_t mmu[4];
-    multicall_entry_t mcl[2];
-    unsigned long vdata, mdata=0, new_mfn;
 
     /* Drop the packet if the target domain has no receive buffers. */
     if ( (netif->rx_req_cons == netif->rx->req_prod) ||
          ((netif->rx_req_cons-netif->rx_resp_prod) == NETIF_RX_RING_SIZE) )
-    {
-        dev_kfree_skb(skb);
-        return 0;
-    }
+        goto drop;
 
-    id = netif->rx->ring[MASK_NETIF_RX_IDX(netif->rx_req_cons++)].req.id;
- 
     /*
      * We do not copy the packet unless:
      *  1. The data is shared; or
@@ -130,11 +134,7 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
         struct sk_buff *nskb = alloc_skb(PAGE_SIZE-1024, GFP_ATOMIC);
         int hlen = skb->data - skb->head;
         if ( unlikely(nskb == NULL) )
-        {
-            DPRINTK("DOM%llu couldn't get memory for skb.\n", netif->domid);
-            status = NETIF_RSP_ERROR;
-            goto out;
-        }
+            goto drop;
         skb_reserve(nskb, hlen);
         __skb_put(nskb, skb->len);
         (void)skb_copy_bits(skb, -hlen, nskb->head, hlen + skb->len);
@@ -142,63 +142,163 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
         skb = nskb;
     }
 
-    vdata = (unsigned long)skb->data;
-    mdata = virt_to_machine(vdata);
-    size  = skb->tail - skb->data;
+    ((rx_info_t *)&skb->cb[0])->id    =
+        netif->rx->ring[MASK_NETIF_RX_IDX(netif->rx_req_cons++)].req.id;
+    ((rx_info_t *)&skb->cb[0])->netif = netif;
+        
+    __skb_queue_tail(&rx_queue, skb);
+    tasklet_schedule(&net_rx_tasklet);
 
-    new_mfn = get_new_mfn();
+    return 0;
 
-    mmu[0].ptr  = (new_mfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
-    mmu[0].val  = __pa(vdata) >> PAGE_SHIFT;
-
-    mmu[1].val  = (unsigned long)(netif->domid<<16) & ~0xFFFFUL;
-    mmu[1].ptr  = (unsigned long)(netif->domid<< 0) & ~0xFFFFUL;
-    mmu[2].val  = (unsigned long)(netif->domid>>16) & ~0xFFFFUL;
-    mmu[2].ptr  = (unsigned long)(netif->domid>>32) & ~0xFFFFUL;
-    mmu[1].ptr |= MMU_EXTENDED_COMMAND;
-    mmu[1].val |= MMUEXT_SET_SUBJECTDOM_L;
-    mmu[2].ptr |= MMU_EXTENDED_COMMAND;
-    mmu[2].val |= MMUEXT_SET_SUBJECTDOM_H;
-
-    mmu[3].ptr  = (mdata & PAGE_MASK) | MMU_EXTENDED_COMMAND;
-    mmu[3].val  = MMUEXT_REASSIGN_PAGE;
-
-    mcl[0].op = __HYPERVISOR_mmu_update;
-    mcl[0].args[0] = (unsigned long)mmu;
-    mcl[0].args[1] = 4;
-    mcl[1].op = __HYPERVISOR_update_va_mapping;
-    mcl[1].args[0] = vdata >> PAGE_SHIFT;
-    mcl[1].args[1] = (new_mfn << PAGE_SHIFT) | __PAGE_KERNEL;
-    mcl[1].args[2] = UVMF_INVLPG;
-
-    (void)HYPERVISOR_multicall(mcl, 2);
-    if ( mcl[0].args[5] != 0 )
-    {
-        DPRINTK("Failed MMU update transferring to DOM%llu\n", netif->domid);
-        (void)HYPERVISOR_update_va_mapping(
-            vdata >> PAGE_SHIFT,
-            (pte_t) { (mdata & PAGE_MASK) | __PAGE_KERNEL },
-            UVMF_INVLPG);
-        dealloc_mfn(new_mfn);
-        status = NETIF_RSP_ERROR;
-        goto out;
-    }
-
-    phys_to_machine_mapping[__pa(vdata) >> PAGE_SHIFT] = new_mfn;
-
-    atomic_set(&(skb_shinfo(skb)->dataref), 1);
-    skb_shinfo(skb)->nr_frags = 0;
-    skb_shinfo(skb)->frag_list = NULL;
-
-    netif->stats.rx_bytes += size;
-    netif->stats.rx_packets++;
-
- out:
-    spin_lock(&netif->rx_lock);
-    make_rx_response(netif, id, status, mdata, size);
-    spin_unlock(&netif->rx_lock);    
+ drop:
+    netif->stats.rx_dropped++;
     dev_kfree_skb(skb);
     return 0;
+}
+
+#if 0
+static void xen_network_done_notify(void)
+{
+    static struct net_device *eth0_dev = NULL;
+    if ( unlikely(eth0_dev == NULL) )
+        eth0_dev = __dev_get_by_name("eth0");
+    netif_rx_schedule(eth0_dev);
+}
+/* 
+ * Add following to poll() function in NAPI driver (Tigon3 is example):
+ *  if ( xen_network_done() )
+ *      tge_3nable_ints(tp); 
+ */
+int xen_network_done(void)
+{
+    return skb_queue_empty(&rx_queue);
+}
+#endif
+
+static void net_rx_action(unsigned long unused)
+{
+    netif_t *netif;
+    s8 status;
+    u16 size, id, evtchn;
+    mmu_update_t *mmu = rx_mmu;
+    multicall_entry_t *mcl;
+    unsigned long vdata, mdata, new_mfn;
+    struct sk_buff_head rxq;
+    struct sk_buff *skb;
+    u16 notify_list[NETIF_RX_RING_SIZE];
+    int notify_nr = 0;
+
+    skb_queue_head_init(&rxq);
+
+    mcl = rx_mcl;
+    while ( (skb = __skb_dequeue(&rx_queue)) != NULL )
+    {
+        netif   = ((rx_info_t *)&skb->cb[0])->netif;
+        vdata   = (unsigned long)skb->data;
+        mdata   = virt_to_machine(vdata);
+        new_mfn = get_new_mfn();
+        
+        mmu[0].ptr  = (new_mfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
+        mmu[0].val  = __pa(vdata) >> PAGE_SHIFT;        
+        mmu[1].val  = (unsigned long)(netif->domid<<16) & ~0xFFFFUL;
+        mmu[1].ptr  = (unsigned long)(netif->domid<< 0) & ~0xFFFFUL;
+        mmu[2].val  = (unsigned long)(netif->domid>>16) & ~0xFFFFUL;
+        mmu[2].ptr  = (unsigned long)(netif->domid>>32) & ~0xFFFFUL;
+        mmu[1].ptr |= MMU_EXTENDED_COMMAND;
+        mmu[1].val |= MMUEXT_SET_SUBJECTDOM_L;
+        mmu[2].ptr |= MMU_EXTENDED_COMMAND;
+        mmu[2].val |= MMUEXT_SET_SUBJECTDOM_H;
+        mmu[3].ptr  = (mdata & PAGE_MASK) | MMU_EXTENDED_COMMAND;
+        mmu[3].val  = MMUEXT_REASSIGN_PAGE;
+
+        mcl[0].op = __HYPERVISOR_update_va_mapping;
+        mcl[0].args[0] = vdata >> PAGE_SHIFT;
+        mcl[0].args[1] = (new_mfn << PAGE_SHIFT) | __PAGE_KERNEL;
+        mcl[0].args[2] = UVMF_INVLPG;
+        mcl[1].op = __HYPERVISOR_mmu_update;
+        mcl[1].args[0] = (unsigned long)mmu;
+        mcl[1].args[1] = 4;
+
+        mmu += 4;
+        mcl += 2;
+
+        ((rx_info_t *)&skb->cb[0])->old_mach_ptr = mdata;
+        ((rx_info_t *)&skb->cb[0])->new_mach_pfn = new_mfn;
+        __skb_queue_tail(&rxq, skb);
+
+        /* Filled the batch queue? */
+        if ( (mcl - rx_mcl) == ARRAY_SIZE(rx_mcl) )
+            break;
+    }
+
+    if ( (mcl - rx_mcl) == 0 )
+        return;
+
+    (void)HYPERVISOR_multicall(rx_mcl, mcl - rx_mcl);
+
+    mcl = rx_mcl;
+    while ( (skb = __skb_dequeue(&rxq)) != NULL )
+    {
+        netif   = ((rx_info_t *)&skb->cb[0])->netif;
+        size    = skb->tail - skb->data;
+        id      = ((rx_info_t *)&skb->cb[0])->id;
+        new_mfn = ((rx_info_t *)&skb->cb[0])->new_mach_pfn;
+        mdata   = ((rx_info_t *)&skb->cb[0])->old_mach_ptr;
+
+        /* Check the reassignment error code. */
+        if ( unlikely(mcl[1].args[5] != 0) )
+        {
+            DPRINTK("Failed MMU update transferring to DOM%llu\n",
+                    netif->domid);
+            (void)HYPERVISOR_update_va_mapping(
+                (unsigned long)skb->head >> PAGE_SHIFT,
+                (pte_t) { (mdata & PAGE_MASK) | __PAGE_KERNEL },
+                UVMF_INVLPG);
+            dealloc_mfn(new_mfn);
+            status = NETIF_RSP_ERROR;
+        }
+        else
+        {
+            phys_to_machine_mapping[__pa(skb->data) >> PAGE_SHIFT] = new_mfn;
+
+            atomic_set(&(skb_shinfo(skb)->dataref), 1);
+            skb_shinfo(skb)->nr_frags = 0;
+            skb_shinfo(skb)->frag_list = NULL;
+
+            netif->stats.rx_bytes += size;
+            netif->stats.rx_packets++;
+
+            status = NETIF_RSP_OKAY;
+        }
+
+        evtchn = netif->evtchn;
+        if ( make_rx_response(netif, id, status, mdata, size) &&
+             (rx_notify[evtchn] == 0) )
+        {
+            rx_notify[evtchn] = 1;
+            notify_list[notify_nr++] = evtchn;
+        }
+
+        dev_kfree_skb(skb);
+
+        mcl += 2;
+    }
+
+    while ( notify_nr != 0 )
+    {
+        evtchn = notify_list[--notify_nr];
+        rx_notify[evtchn] = 0;
+        notify_via_evtchn(evtchn);
+    }
+
+    /* More work to do? */
+    if ( !skb_queue_empty(&rx_queue) )
+        tasklet_schedule(&net_rx_tasklet);
+#if 0
+    else
+        xen_network_done_notify();
+#endif
 }
 
 struct net_device_stats *netif_be_get_stats(struct net_device *dev)
@@ -497,11 +597,11 @@ static void make_tx_response(netif_t *netif,
         notify_via_evtchn(netif->evtchn);
 }
 
-static void make_rx_response(netif_t     *netif, 
-                             u16          id, 
-                             s8           st,
-                             netif_addr_t addr,
-                             u16          size)
+static int make_rx_response(netif_t     *netif, 
+                            u16          id, 
+                            s8           st,
+                            netif_addr_t addr,
+                            u16          size)
 {
     NET_RING_IDX i = netif->rx_resp_prod;
     netif_rx_response_t *resp;
@@ -516,8 +616,7 @@ static void make_rx_response(netif_t     *netif,
     netif->rx->resp_prod = netif->rx_resp_prod = ++i;
 
     mb(); /* Update producer before checking event threshold. */
-    if ( i == netif->rx->event )
-        notify_via_evtchn(netif->evtchn);
+    return (i == netif->rx->event);
 }
 
 static int __init init_module(void)
@@ -526,6 +625,8 @@ static int __init init_module(void)
 
     if ( !(start_info.flags & SIF_INITDOMAIN) )
         return 0;
+
+    skb_queue_head_init(&rx_queue);
 
     netif_interface_init();
 
