@@ -273,10 +273,19 @@ class Opts:
         return remaining arguments
         """
         self.argv = argv
+
         try:
             (vals, args) = getopt(argv[1:], self.short_opts(), self.long_opts())
         except GetoptError, err:
             self.err(str(err))
+
+	# hack to work around lack of gnu getopts parsing in python 2.2
+	xargs = args
+	while xargs[1:]:
+	    (v,xargs) = getopt(xargs[1:], self.short_opts(), self.long_opts())
+	    vals = vals + v
+
+	# back to the real work
         self.args = args
         for (k, v) in vals:
             for opt in self.options:
