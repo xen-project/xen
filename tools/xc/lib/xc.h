@@ -64,7 +64,7 @@ int xc_linux_save(int xc_handle,
                   int verbose);
 
 int xc_linux_restore(int xc_handle,
-		     u64 domid,
+                     u64 domid,
                      const char *state_file, 
                      int verbose,
                      u64 *pdomid);
@@ -74,13 +74,15 @@ int xc_linux_build(int xc_handle,
                    const char *image_name,
                    const char *ramdisk_name,
                    const char *cmdline,
-                   unsigned int control_evtchn);
+                   unsigned int control_evtchn,
+                   int io_priv);
 
 int xc_netbsd_build(int xc_handle,
                     u64 domid,
                     const char *image_name,
                     const char *cmdline,
-                    unsigned int control_evtchn);
+                    unsigned int control_evtchn,
+                    int io_priv);
 
 int xc_bvtsched_global_set(int xc_handle,
                            unsigned long ctx_allow);
@@ -248,15 +250,15 @@ int xc_shadow_control(int xc_handle,
 
 int xc_domain_setname(int xc_handle,
                       u64 domid, 
-		      char *name);
+                      char *name);
 
 int xc_domain_setinitialmem(int xc_handle,
-			    u64 domid, 
-			    unsigned int initial_memkb);
+                            u64 domid, 
+                            unsigned int initial_memkb);
 
 int xc_domain_setmaxmem(int xc_handle,
-			    u64 domid, 
-			    unsigned int max_memkb);
+                            u64 domid, 
+                            unsigned int max_memkb);
 
 
 #endif /* __XC_H__ */

@@ -73,7 +73,8 @@ static int setup_guestos(int xc_handle,
                          dom0_builddomain_t *builddomain, 
                          const char *cmdline,
                          unsigned long shared_info_frame,
-                         unsigned int control_evtchn)
+                         unsigned int control_evtchn,
+                         int io_priv)
 {
     l1_pgentry_t *vl1tab=NULL, *vl1e=NULL;
     l2_pgentry_t *vl2tab=NULL, *vl2e=NULL;
@@ -269,7 +270,7 @@ static int setup_guestos(int xc_handle,
     memset(start_info, 0, sizeof(*start_info));
     start_info->nr_pages     = nr_pages;
     start_info->shared_info  = shared_info_frame << PAGE_SHIFT;
-    start_info->flags        = 0;
+    start_info->flags        = io_priv ? SIF_PRIVILEGED : 0;
     start_info->pt_base      = vpt_start;
     start_info->nr_pt_frames = nr_pt_pages;
     start_info->mfn_list     = vphysmap_start;
@@ -382,7 +383,8 @@ int xc_linux_build(int xc_handle,
                    const char *image_name,
                    const char *ramdisk_name,
                    const char *cmdline,
-                   unsigned int control_evtchn)
+                   unsigned int control_evtchn,
+                   int io_priv)
 {
     dom0_op_t launch_op, op;
     int initrd_fd = -1;
@@ -440,7 +442,7 @@ int xc_linux_build(int xc_handle,
                        &vstartinfo_start, &vkern_entry,
                        &launch_op.u.builddomain, cmdline,
                        op.u.getdomaininfo.shared_info_frame,
-                       control_evtchn) < 0 )
+                       control_evtchn, io_priv) < 0 )
     {
         ERROR("Error constructing guest OS");
         goto error_out;
@@ -553,13 +555,13 @@ static int readelfimage_base_and_size(char *elfbase,
 
     if ( (ehdr->e_phoff + (ehdr->e_phnum * ehdr->e_phentsize)) > elfsize )
     {
-	ERROR("ELF program headers extend beyond end of image.");
+        ERROR("ELF program headers extend beyond end of image.");
         return -EINVAL;
     }
 
     if ( (ehdr->e_shoff + (ehdr->e_shnum * ehdr->e_shentsize)) > elfsize )
     {
-	ERROR("ELF section headers extend beyond end of image.");
+        ERROR("ELF section headers extend beyond end of image.");
         return -EINVAL;
     }
 
@@ -635,7 +637,7 @@ static int loadelfimage(char *elfbase, int pmh, unsigned long *parray,
     {
         phdr = (Elf_Phdr *)(elfbase + ehdr->e_phoff + (h*ehdr->e_phentsize));
         if ( !is_loadable_phdr(phdr) )
-	    continue;
+            continue;
         
         for ( done = 0; done < phdr->p_filesz; done += chunksz )
         {

@@ -239,8 +239,12 @@ def make_domain():
 	xc.domain_destroy ( dom=id )
 	sys.exit()
 
+    # will the domain have IO privileges?
+    if pci_device_list != []: io_priv = True
+    else:                     io_priv = False
+
     if restore:
-        ret = eval('xc.%s_restore ( dom=id, state_file=state_file, progress=1 )' % builder_fn)
+        ret = eval('xc.%s_restore ( dom=id, state_file=state_file, progress=1, io_priv=%d )' % (builder_fn, io_priv))
         if ret < 0:
             print "Error restoring domain"
             print "Return code = " + str(ret)
@@ -248,7 +252,7 @@ def make_domain():
             sys.exit()
     else:
 
-        ret = eval('xc.%s_build ( dom=id, image=image, ramdisk=ramdisk, cmdline=cmdline, control_evtchn=xend_response["remote_port"] )' % builder_fn)
+        ret = eval('xc.%s_build ( dom=id, image=image, ramdisk=ramdisk, cmdline=cmdline, control_evtchn=xend_response["remote_port"], io_priv=%d )' % (builder_fn, io_priv) )
         if ret < 0:
             print "Error building Linux guest OS: "
             print "Return code = " + str(ret)
