@@ -1,9 +1,12 @@
+#define _GNU_SOURCE
 #include <unistd.h>
 #include <stdio.h>
 #include <errno.h>
 #include <sys/fcntl.h>
+#include <string.h>
+#include <stdlib.h>
 
-#include "physdev.h"
+#include "hypervisor-ifs/block.h"
 
 int main(int argc, char *argv[])
 {

@@ -12,8 +12,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <stdlib.h>
+#include <string.h>
 
-#include "hypervisor_defs.h"
 #include "dom0_ops.h"
 #include "dom0_defs.h"
 #include "mem_defs.h"
