@@ -9,6 +9,9 @@
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED)
 #define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
 
+static unsigned long virt_startinfo_addr;
+static unsigned long startinfo_frame;
+
 static char *argv0 = "internal_domain_build";
 
 static long get_tot_pages(int domain_id)
@@ -313,10 +316,11 @@ static int setup_guestos(
         num_pgt_updates++;
     }
 
-    builddomain->virt_startinfo_addr =
+    virt_startinfo_addr =
         virt_load_addr + ((alloc_index-1) << PAGE_SHIFT);
+    startinfo_frame = page_array[alloc_index-1];
 
-    start_info = map_pfn(page_array[alloc_index-1]);
+    start_info = map_pfn(startinfo_frame);
     memset(start_info, 0, sizeof(*start_info));
     start_info->pt_base     = virt_load_addr + ((tot_pages-1) << PAGE_SHIFT);
     start_info->mod_start   = initrd_addr;
@@ -473,8 +477,8 @@ int main(int argc, char **argv)
     ctxt->i386_ctxt.ss = FLAT_RING1_DS;
     ctxt->i386_ctxt.cs = FLAT_RING1_CS;
     ctxt->i386_ctxt.eip = load_addr;
-    ctxt->i386_ctxt.esp = launch_op.u.builddomain.virt_startinfo_addr;
-    ctxt->i386_ctxt.esi = launch_op.u.builddomain.virt_startinfo_addr;
+    ctxt->i386_ctxt.esp = virt_startinfo_addr;
+    ctxt->i386_ctxt.esi = virt_startinfo_addr;
     ctxt->i386_ctxt.eflags = (1<<9) | (1<<2);
 
     /* FPU is set up to default initial state. */
@@ -496,7 +500,7 @@ int main(int argc, char **argv)
 
     /* Ring 1 stack is the initial stack. */
     ctxt->ring1_ss  = FLAT_RING1_DS;
-    ctxt->ring1_esp = launch_op.u.builddomain.virt_startinfo_addr;
+    ctxt->ring1_esp = virt_startinfo_addr;
 
     /* No debugging. */
     memset(ctxt->debugreg, 0, sizeof(ctxt->debugreg));
@@ -506,6 +510,8 @@ int main(int argc, char **argv)
     ctxt->event_callback_eip    = 0;
     ctxt->failsafe_callback_cs  = FLAT_RING1_CS;
     ctxt->failsafe_callback_eip = 0;
+
+    ctxt->start_info_frame = startinfo_frame;
 
     launch_op.u.builddomain.domain   = domain_id;
     launch_op.u.builddomain.num_vifs = atoi(argv[3]);

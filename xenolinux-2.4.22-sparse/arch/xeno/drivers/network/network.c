@@ -517,7 +517,7 @@ int __init init_module(void)
         goto fail;
     }
     
-    err = request_irq(_EVENT_DEBUG, dbg_network_int, SA_SHIRQ, "debug", NULL);
+    err = request_irq(_EVENT_DEBUG, dbg_network_int, 0, "debug", NULL);
     if ( err )
         printk(KERN_WARNING "Non-fatal error -- no debug interrupt\n");
 

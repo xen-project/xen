@@ -325,7 +325,7 @@ void release_task(struct task_struct *p)
  */
 int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *builddomain)
 {
-    start_info_t *virt_startinfo_addr;
+    start_info_t *startinfo;
     unsigned long phys_l2tab;
     net_ring_t *shared_rings;
     net_vif_t *net_vif;
@@ -365,6 +365,7 @@ int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *builddomain)
     p->event_address     = builddomain->ctxt.event_callback_eip;
     p->failsafe_selector = builddomain->ctxt.failsafe_callback_cs;
     p->failsafe_address  = builddomain->ctxt.failsafe_callback_eip;
+    p->thread.start_info_frame = builddomain->ctxt.start_info_frame;
     
     /* NB. Page base must already be pinned! */
     phys_l2tab = builddomain->ctxt.pt_base;
@@ -375,18 +376,12 @@ int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *builddomain)
     /* Set up the shared info structure. */
     update_dom_time(p->shared_info);
 
-    virt_startinfo_addr = (start_info_t *)builddomain->virt_startinfo_addr;
-
-    /*
-     * We need to populate start_info struct within the context of the new
-     * domain. Thus temporarely install its pagetables.
-     */
-    __cli();
-    __asm__ __volatile__ ( 
-        "mov %%eax,%%cr3" : : "a" (pagetable_val(p->mm.pagetable)));
+    startinfo = (start_info_t *)
+        map_domain_mem(p->thread.start_info_frame << PAGE_SHIFT);
 
     /* Add virtual network interfaces and point to them in startinfo. */
-    while (builddomain->num_vifs-- > 0) {
+    while ( builddomain->num_vifs-- > 0 )
+    {
         net_vif = create_net_vif(p->domain);
         shared_rings = net_vif->shared_rings;
         if (!shared_rings) panic("no network ring!\n");
@@ -395,19 +390,16 @@ int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *builddomain)
     for ( i = 0; i < MAX_DOMAIN_VIFS; i++ )
     {
         if ( p->net_vif_list[i] == NULL ) continue;
-        virt_startinfo_addr->net_rings[i] = 
+        startinfo->net_rings[i] = 
             virt_to_phys(p->net_vif_list[i]->shared_rings);
-        memcpy(virt_startinfo_addr->net_vmac[i],
+        memcpy(startinfo->net_vmac[i],
                p->net_vif_list[i]->vmac, ETH_ALEN);
     }
 
     /* Add block io interface */
-    virt_startinfo_addr->blk_ring = virt_to_phys(p->blk_ring_base);
+    startinfo->blk_ring = virt_to_phys(p->blk_ring_base);
 
-    /* Reinstate the caller's page tables. */
-    __asm__ __volatile__ (
-        "mov %%eax,%%cr3" : : "a" (pagetable_val(current->mm.pagetable)));    
-    __sti();
+    unmap_domain_mem(startinfo);
 
     p->flags |= PF_CONSTRUCTED;
     
@@ -588,6 +580,9 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
     /* Set up shared info area. */
     update_dom_time(p->shared_info);
     p->shared_info->domain_time = 0;
+
+    /* DOM0 can't be stopped/started, so no need for an ongoing s.i. frame. */
+    p->thread.start_info_frame = 0;
 
     virt_startinfo_address = (start_info_t *)
         (virt_load_address + ((alloc_index - 1) << PAGE_SHIFT));
