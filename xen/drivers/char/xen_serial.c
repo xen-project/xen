@@ -70,7 +70,7 @@ static void serial_rx_int(int irq, void *dev_id, struct pt_regs *regs)
 
 void initialize_serial() 
 {
-    int fifo, rc; 
+    int rc; 
     
     /* setup key handler */
     add_key_handler('~', toggle_echo, "toggle serial echo");
@@ -87,6 +87,6 @@ void initialize_serial()
     outb(NS16550_IER_ERDAI, 
          SERIAL_BASE + NS16550_IER );
 
-    if((rc = request_irq(4, serial_rx_int, SA_NOPROFILE, "serial", 0)))
+    if( (rc = request_irq(4, serial_rx_int, SA_NOPROFILE, "serial", 0)) )
 	printk("initialize_serial: failed to get IRQ4, rc=%d\n", rc); 
 }
