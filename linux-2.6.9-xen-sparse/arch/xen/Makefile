@@ -33,16 +33,11 @@ include/asm-xen/asm:
 	@echo '  SYMLINK $@ -> include/asm-xen/asm-$(XENARCH)'
 	@ln -fsn asm-$(XENARCH) $@
 
-include/asm-xen/asm-$(XENARCH)/xen-public:
-	@echo '  SYMLINK $@ -> include/asm-xen/xen-public'
-	@ln -fsn ../xen-public $@
-
 arch/xen/arch:
 	@rm -f $@
 	@ln -fsn $(XENARCH) $@
 
 prepare: include/.asm-ignore include/asm-xen/asm \
-	include/asm-xen/asm-$(XENARCH)/xen-public \
 	arch/xen/arch ;
 
 all: vmlinuz

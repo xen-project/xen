@@ -44,7 +44,7 @@
 #include <asm/desc.h>
 #include <asm/mmu_context.h>
 #include <asm/multicall.h>
-#include <asm/xen-public/dom0_ops.h>
+#include <asm-xen/xen-public/dom0_ops.h>
 
 #include <linux/irq.h>
 

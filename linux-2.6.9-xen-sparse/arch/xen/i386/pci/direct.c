@@ -6,8 +6,8 @@
 #include <linux/init.h>
 #include "pci.h"
 
-#include <asm/xen-public/xen.h>
-#include <asm/xen-public/physdev.h>
+#include <asm-xen/xen-public/xen.h>
+#include <asm-xen/xen-public/physdev.h>
 
 /*
  * Functions for accessing PCI configuration space with type xen accesses

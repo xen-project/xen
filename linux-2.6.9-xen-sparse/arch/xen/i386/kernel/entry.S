@@ -48,7 +48,7 @@
 #include <asm/smp.h>
 #include <asm/page.h>
 #include "irq_vectors.h"
-#include <asm/xen-public/xen.h>
+#include <asm-xen/xen-public/xen.h>
 
 #define nr_syscalls ((syscall_table_size)/4)
 

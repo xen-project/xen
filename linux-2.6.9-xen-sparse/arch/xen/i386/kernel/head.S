@@ -15,7 +15,7 @@
 #include <asm/segment.h>
 #include <asm/thread_info.h>
 #include <asm/asm_offsets.h>
-#include <asm/xen-public/arch-x86_32.h>
+#include <asm-xen/xen-public/arch-x86_32.h>
 
 /*
  * References to members of the new_cpu_data structure.

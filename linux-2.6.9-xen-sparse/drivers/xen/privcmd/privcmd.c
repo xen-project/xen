@@ -26,7 +26,7 @@
 #include <asm/uaccess.h>
 #include <asm/tlb.h>
 #include <asm-xen/proc_cmd.h>
-#include <asm/xen-public/dom0_ops.h>
+#include <asm-xen/xen-public/dom0_ops.h>
 #include <asm-xen/xen_proc.h>
 
 static struct proc_dir_entry *privcmd_intf;

@@ -47,7 +47,7 @@
 #include <asm/irq.h>
 #include <asm/desc.h>
 #include <asm-xen/multicall.h>
-#include <asm/xen-public/dom0_ops.h>
+#include <asm-xen/xen-public/dom0_ops.h>
 #ifdef CONFIG_MATH_EMULATION
 #include <asm/math_emu.h>
 #endif

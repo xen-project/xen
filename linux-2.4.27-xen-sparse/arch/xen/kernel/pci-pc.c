@@ -18,8 +18,8 @@
 #include <asm/segment.h>
 #include <asm/io.h>
 
-#include <asm/xen-public/xen.h>
-#include <asm/xen-public/physdev.h>
+#include <asm-xen/xen-public/xen.h>
+#include <asm-xen/xen-public/physdev.h>
 
 #include "pci-i386.h"
 

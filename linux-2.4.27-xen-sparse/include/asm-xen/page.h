@@ -12,7 +12,7 @@
 #include <linux/config.h>
 #include <linux/string.h>
 #include <asm/types.h>
-#include <asm/xen-public/xen.h>
+#include <asm-xen/xen-public/xen.h>
 
 #ifdef CONFIG_XEN_SCRUB_PAGES
 #define scrub_pages(_p,_n) memset((void *)(_p), 0, (_n) << PAGE_SHIFT)

@@ -8,7 +8,7 @@
 #include <linux/smp_lock.h>
 #include <linux/stddef.h>
 #include <linux/slab.h>
-#include <asm/xen-public/dom0_ops.h>
+#include <asm-xen/xen-public/dom0_ops.h>
 
 asmlinkage long sys_iopl(unsigned int new_io_pl)
 {

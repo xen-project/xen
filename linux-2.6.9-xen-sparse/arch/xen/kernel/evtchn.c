@@ -38,8 +38,8 @@
 #include <asm/system.h>
 #include <asm/ptrace.h>
 #include <asm/synch_bitops.h>
-#include <asm/xen-public/event_channel.h>
-#include <asm/xen-public/physdev.h>
+#include <asm-xen/xen-public/event_channel.h>
+#include <asm-xen/xen-public/physdev.h>
 #include <asm-xen/ctrl_if.h>
 #include <asm-xen/hypervisor.h>
 
