@@ -12,6 +12,8 @@ XEN_CONFIGS += xmexample2
 XEN_SCRIPT_DIR = /etc/xen/scripts
 XEN_SCRIPTS = network
 XEN_SCRIPTS += vif-bridge
+XEN_SCRIPTS += block-file
+XEN_SCRIPTS += block-enbd
 
 all: 
 
