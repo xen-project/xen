@@ -331,8 +331,6 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
 
     __asm__ __volatile__ ("movl %%cr2,%0" : "=r" (addr) : );
 
-//    __sti(); // XXXX This may not be safe??? LDT issues???
-
     perfc_incrc(page_faults);
 
     if ( unlikely(addr >= LDT_VIRT_START) && 

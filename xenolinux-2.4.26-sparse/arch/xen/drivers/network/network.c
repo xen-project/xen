@@ -373,7 +373,10 @@ static inline void _network_interrupt(struct net_device *dev)
         {
             /* Gate this error. We get a (valid) slew of them on suspend. */
             if ( np->state == STATE_ACTIVE )
-                printk(KERN_ALERT "bad buffer on RX ring!(%d)\n", rx->status);
+            {
+	        /* With live migrate, we even get these...  Disable for now. */
+                // printk(KERN_ALERT "bad buffer on RX ring!(%d)\n", rx->status);
+            }
             dev_kfree_skb_any(skb);
             continue;
         }
