@@ -277,8 +277,10 @@ for additional Xend logging functionality.
 
 \section{Install Bitkeeper (Optional)}
 
-To fetch a local copy, first download the BitKeeper tools at: \\ {\tt
-http://www.bitmover.com/download }
+To fetch a local copy, first download the BitKeeper tools.
+Download instructions must be obtained by filling out the provided
+form at: \\ {\tt
+http://www.bitmover.com/cgi-bin/download.cgi }
 
 The BitKeeper install program is designed to be run with X.  If X is
 not available, you can specify the install directory on the command
@@ -328,7 +330,7 @@ The Xen source code repository is structured as follows:
 \item[\path{xen/}] The Xen hypervisor itself.
 \item[\path{linux-2.4.27-xen/}] Linux 2.4 support for Xen
 \item[\path{linux-2.6.8.1-xen/}] Linux 2.6 support for Xen
-\item[\path{doc/}] various documentation files for users and developers
+\item[\path{docs/}] various documentation files for users and developers
 \item[\path{extras/}] currently this contains the Mini OS, aimed at developers
 \end{description}
 
@@ -340,8 +342,7 @@ following:
 \begin{itemize}
 \item Build Xen
 \item Build the control tools, including Xend
-\item Download the ebtables patch for Linux 2.4
-\item Download (if necessary) and unpack the Linux 2.4 source code,
+\item Download (if necessary) and unpack the Linux 2.6 source code,
       and patch it for use with Xen
 \item Build a Linux kernel to use in domain 0 and a smaller
       unprivileged kernel, which can optionally be used for
@@ -354,7 +355,7 @@ more complicated. The makefile needs a `pristine' linux kernel tree
 which it will then add the Xen architecture files to. You can tell the
 makefile the location of the appropriate linux compressed tar file by
 setting the LINUX\_SRC environment variable, e.g. \\
-\verb!# LINUX_SRC=/tmp/linux-2.4.27.tar.gz make world! \\ or by
+\verb!# LINUX_SRC=/tmp/linux-2.6.8.1.tar.bz2 make world! \\ or by
 placing the tar file somewhere in the search path of {\tt LINUX\_SRC\_PATH}
 which defaults to ``{\tt .:..}". If the makefile can't find a suitable
 kernel tar file it attempts to download it from kernel.org (this won't
@@ -363,15 +364,19 @@ work if you're behind a firewall).
 After untaring the pristine kernel tree, the makefile uses the {\tt
 mkbuildtree} script to add the Xen patches the kernel. It then builds
 two different XenLinux images, one with a ``-xen0'' extension which
-contains hardware device drivers and is intended to be used in the
-first virtual machine (``domain 0''), and one with a ``-xenU''
-extension that just contains virtual-device drivers.
+contains hardware device drivers and drivers for Xen's virtual devices,
+and one with a ``-xenU'' extension that just contains the virtual ones.
+The former is intended to be used in the first virtual machine (``domain 0''),
+the latter just has a smaller memory footprint.
 
-The procedure is similar to build the Linux 2.6 port: \\
-\verb!# LINUX_SRC=/path/to/linux2.6/source make linux26!
+The procedure is similar to build the Linux 2.4 port: \\
+\verb!# LINUX_SRC=/path/to/linux2.4/source make linux24!
 
 In both cases, if you have an SMP machine you may wish to give the
 {\tt '-j4'} argument to make to get a parallel build.
+
+XXX Insert details on customising the kernel to be built.
+i.e. merging config files
 
 The files produced by the build process are stored under the
 \path{install/} directory.  To install them in their default
@@ -385,8 +390,8 @@ destinations.
 Take a look at the files in \path{install/boot/}:
 \begin{itemize}
 \item \path{install/boot/xen.gz} The Xen 'kernel'
-\item \path{install/boot/vmlinuz-2.4.27-xen0}  Domain 0 XenLinux kernel
-\item \path{install/boot/vmlinuz-2.4.27-xenU}  Unprivileged XenLinux kernel
+\item \path{install/boot/vmlinuz-2.6.8.1-xen0}  Domain 0 XenLinux kernel
+\item \path{install/boot/vmlinuz-2.6.8.1-xenU}  Unprivileged XenLinux kernel
 \end{itemize}
 
 The difference between the two Linux kernels that are built is due to
@@ -414,9 +419,9 @@ This file is sometimes called \path{menu.lst}, depending on your
 distribution.  The entry should look something like the following:
 
 \begin{verbatim}
-title Xen 2.0 / XenLinux 2.4.27
+title Xen 2.0 / XenLinux 2.6.8.1
   kernel /boot/xen.gz dom0_mem=131072 com1=115200,8n1
-  module /boot/vmlinuz-2.4.27-xen0 root=/dev/sda4 ro console=tty0 console=ttyS0
+  module /boot/vmlinuz-2.6.8.1-xen0 root=/dev/sda4 ro console=tty0 console=ttyS0
 \end{verbatim}
 
 The first line of the configuration (kernel...) tells GRUB where to
@@ -426,9 +431,12 @@ XenLinux kernel that Xen should start and the parameters that should
 be passed to it.
 
 As always when installing a new kernel, it is recommended that you do
-not remove the original contents of \path{grub.conf} --- you may want
+not remove the original contents of \path{menu.lst} --- you may want
 to boot up with your old Linux kernel in future, particularly if you
 have problems.
+
+XXX insert distro specific stuff in here (maybe)
+Suse 9.1: no 'ro' option
 
 \subsection{Serial Console}
 
@@ -438,6 +446,9 @@ designed to make this procedure the same as configuring a normal
 serial console.  Add the line:
 
 {\tt c:2345:respawn:/sbin/mingetty ttyS0}
+
+XXX insert distro specific stuff in here (maybe)
+Suse 9.1: different boot scheme (/etc/init.d/)
 
 \section{Test the new install}
 
