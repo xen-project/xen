@@ -239,3 +239,13 @@ void *module_text_address(unsigned long addr)
 {
 	return NULL;
 }
+
+// context_switch
+void context_switch(struct exec_domain *prev, struct exec_domain *next)
+{
+	switch_to(prev,next);
+	clear_bit(EDF_RUNNING, &prev->ed_flags);
+	//if (!is_idle_task(next->domain) )
+		//send_guest_virq(next, VIRQ_TIMER);
+	schedule_tail(next);
+}

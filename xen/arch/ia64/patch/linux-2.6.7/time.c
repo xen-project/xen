@@ -1,5 +1,5 @@
 --- ../../linux-2.6.7/arch/ia64/kernel/time.c	2004-06-15 23:19:01.000000000 -0600
-+++ arch/ia64/time.c	2005-03-08 08:05:00.000000000 -0700
++++ arch/ia64/time.c	2005-03-09 13:22:52.000000000 -0700
 @@ -10,16 +10,22 @@
   */
  #include <linux/config.h>
@@ -33,7 +33,7 @@
  
  extern unsigned long wall_jiffies;
  
-@@ -45,6 +54,58 @@
+@@ -45,6 +54,59 @@
  
  #endif
  
@@ -70,10 +70,11 @@
 +    return now; 
 +}
 +
-+void update_dom_time(struct exec_domain *ed)
++int update_dom_time(struct exec_domain *ed)
 +{
 +// FIXME: implement this?
 +//	printf("update_dom_time: called, not implemented, skipping\n");
++	return 0;
 +}
 +
 +/* Set clock to <secs,usecs> after 00:00:00 UTC, 1 January, 1970. */
@@ -92,7 +93,7 @@
  static void
  itc_reset (void)
  {
-@@ -80,12 +141,15 @@
+@@ -80,12 +142,15 @@
  	return (elapsed_cycles*local_cpu_data->nsec_per_cyc) >> IA64_NSEC_PER_CYC_SHIFT;
  }
  
@@ -108,7 +109,7 @@
  int
  do_settimeofday (struct timespec *tv)
  {
-@@ -95,7 +159,9 @@
+@@ -95,7 +160,9 @@
  	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
  		return -EINVAL;
  
@@ -118,7 +119,7 @@
  	{
  		/*
  		 * This is revolting. We need to set "xtime" correctly. However, the value
-@@ -117,12 +183,15 @@
+@@ -117,12 +184,15 @@
  		time_esterror = NTP_PHASE_LIMIT;
  		time_interpolator_reset();
  	}
@@ -134,7 +135,7 @@
  
  void
  do_gettimeofday (struct timeval *tv)
-@@ -185,6 +254,7 @@
+@@ -185,6 +255,7 @@
  }
  
  EXPORT_SYMBOL(do_gettimeofday);
@@ -142,7 +143,7 @@
  
  /*
   * The profiling function is SMP safe. (nothing can mess
-@@ -195,6 +265,9 @@
+@@ -195,6 +266,9 @@
  static inline void
  ia64_do_profile (struct pt_regs * regs)
  {
@@ -152,7 +153,7 @@
  	unsigned long ip, slot;
  	extern cpumask_t prof_cpu_mask;
  
-@@ -231,24 +304,89 @@
+@@ -231,24 +305,89 @@
  		ip = prof_len-1;
  	atomic_inc((atomic_t *)&prof_buffer[ip]);
  }
@@ -242,7 +243,7 @@
  	ia64_do_profile(regs);
  
  	while (1) {
-@@ -269,10 +407,16 @@
+@@ -269,10 +408,16 @@
  			 * another CPU. We need to avoid to SMP race by acquiring the
  			 * xtime_lock.
  			 */
@@ -259,7 +260,7 @@
  		} else
  			local_cpu_data->itm_next = new_itm;
  
-@@ -292,7 +436,12 @@
+@@ -292,7 +437,12 @@
  		 */
  		while (!time_after(new_itm, ia64_get_itc() + local_cpu_data->itm_delta/2))
  			new_itm += local_cpu_data->itm_delta;
@@ -272,7 +273,7 @@
  		/* double check, in case we got hit by a (slow) PMI: */
  	} while (time_after_eq(ia64_get_itc(), new_itm));
  	return IRQ_HANDLED;
-@@ -307,6 +456,7 @@
+@@ -307,6 +457,7 @@
  	int cpu = smp_processor_id();
  	unsigned long shift = 0, delta;
  
@@ -280,7 +281,7 @@
  	/* arrange for the cycle counter to generate a timer interrupt: */
  	ia64_set_itv(IA64_TIMER_VECTOR);
  
-@@ -320,6 +470,7 @@
+@@ -320,6 +471,7 @@
  		shift = (2*(cpu - hi) + 1) * delta/hi/2;
  	}
  	local_cpu_data->itm_next = ia64_get_itc() + delta + shift;
@@ -288,7 +289,7 @@
  	ia64_set_itm(local_cpu_data->itm_next);
  }
  
-@@ -335,6 +486,7 @@
+@@ -335,6 +487,7 @@
  	 * frequency and then a PAL call to determine the frequency ratio between the ITC
  	 * and the base frequency.
  	 */
@@ -296,7 +297,7 @@
  	status = ia64_sal_freq_base(SAL_FREQ_BASE_PLATFORM,
  				    &platform_base_freq, &platform_base_drift);
  	if (status != 0) {
-@@ -384,9 +536,11 @@
+@@ -384,9 +537,11 @@
  					+ itc_freq/2)/itc_freq;
  
  	if (!(sal_platform_features & IA64_SAL_PLATFORM_FEATURE_ITC_DRIFT)) {
@@ -308,7 +309,7 @@
  	}
  
  	/* Setup the CPU local timer tick */
-@@ -395,7 +549,9 @@
+@@ -395,7 +550,9 @@
  
  static struct irqaction timer_irqaction = {
  	.handler =	timer_interrupt,
@@ -318,7 +319,7 @@
  	.name =		"timer"
  };
  
-@@ -403,12 +559,16 @@
+@@ -403,12 +560,16 @@
  time_init (void)
  {
  	register_percpu_irq(IA64_TIMER_VECTOR, &timer_irqaction);
