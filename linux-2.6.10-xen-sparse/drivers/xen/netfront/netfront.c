@@ -273,7 +273,6 @@ static int send_fake_arp(struct net_device *dev)
                      dst_ip, dev, src_ip,
                      /*dst_hw*/ NULL, /*src_hw*/ NULL, 
                      /*target_hw*/ dev->dev_addr);
-    printk(KERN_ALERT "ARP sent on %08x %08x %p\n", dst_ip, src_ip, skb);
     if ( skb == NULL )
         return -ENOMEM;
 
