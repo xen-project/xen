@@ -34,6 +34,12 @@ xend = server.SrvDaemon.instance()
 
 from XendError import VmError
 
+"""The length of domain names that Xen can handle.
+The names stored in Xen itself are not used for much, and
+xend can handle domain names of any length.
+"""
+MAX_DOMAIN_NAME = 15
+
 """Flag for a block device backend domain."""
 SIF_BLK_BE_DOMAIN = (1<<4)
 
@@ -270,7 +276,7 @@ def vm_recreate(savedinfo, info):
     vm = XendDomainInfo()
     vm.recreate = 1
     vm.setdom(info['dom'])
-    vm.name = info['name']
+    #vm.name = info['name']
     vm.memory = info['mem_kb']/1024
     start_time = sxp.child_value(savedinfo, 'start_time')
     if start_time is not None:
@@ -283,8 +289,8 @@ def vm_recreate(savedinfo, info):
     if config:
         d = vm.construct(config)
     else:
-        d = defer.Deferred()
-        d.callback(vm)
+        vm.name = info['name']
+        d = defer.succeed(vm)
     vm.recreate = 0
     return d
 
@@ -701,14 +707,17 @@ class XendDomainInfo:
             self.start_time = time.time()
         if self.restore:
             return
+        dom = self.dom or 0
         memory = self.memory
         name = self.name
+        # If the name is over the xen limit, use the end of it.
+        if len(name) > MAX_DOMAIN_NAME:
+            name = name[-MAX_DOMAIN_NAME:]
         try:
             cpu = int(sxp.child_value(self.config, 'cpu', '-1'))
         except:
             raise VmError('invalid cpu')
         cpu_weight = self.cpu_weight
-        dom = self.dom or 0
         dom = xc.domain_create(dom= dom, mem_kb= memory * 1024,
                                name= name, cpu= cpu, cpu_weight= cpu_weight)
         if dom <= 0:
@@ -946,7 +955,7 @@ class XendDomainInfo:
         try:
             self.restore = 1
             self.setdom(dom)
-            self.name = d['name']
+            #self.name = d['name']
             self.memory = d['mem_kb']/1024
             deferred = self.construct(config)
         finally:
