@@ -88,3 +88,4 @@ install/*
 patches/ebtables-brnf-5_vs_2.4.25.diff
 patches/ebtables.diff
 tools/x2d2/minixend
+BLOG

@@ -5,40 +5,6 @@
 
 struct e820map e820;
 
-static void __init limit_regions(unsigned long long size)
-{
-    unsigned long long current_addr = 0;
-    int i;
-
-#if 0
-    if (efi_enabled) {
-        for (i = 0; i < memmap.nr_map; i++) {
-            current_addr = memmap.map[i].phys_addr +
-                (memmap.map[i].num_pages << 12);
-            if (memmap.map[i].type == EFI_CONVENTIONAL_MEMORY) {
-                if (current_addr >= size) {
-                    memmap.map[i].num_pages -=
-                        (((current_addr-size) + PAGE_SIZE-1) >> PAGE_SHIFT);
-                    memmap.nr_map = i + 1;
-                    return;
-                }
-            }
-        }
-    }
-#endif
-
-    for (i = 0; i < e820.nr_map; i++) {
-        if (e820.map[i].type == E820_RAM) {
-            current_addr = e820.map[i].addr + e820.map[i].size;
-            if (current_addr >= size) {
-                e820.map[i].size -= current_addr-size;
-                e820.nr_map = i + 1;
-                return;
-            }
-        }
-    }
-}
-
 static void __init add_memory_region(unsigned long long start,
                                      unsigned long long size, int type)
 {
