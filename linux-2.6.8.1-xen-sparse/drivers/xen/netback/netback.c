@@ -108,10 +108,6 @@ static inline void maybe_schedule_tx_action(void)
         tasklet_schedule(&net_tx_tasklet);
 }
 
-/*
- * This is the primary RECEIVE function for a network interface.
- * Note that, from the p.o.v. of /this/ OS it looks like a transmit.
- */
 int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
     netif_t *netif = (netif_t *)dev->priv;
@@ -156,7 +152,7 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
     return 0;
 
  drop:
-    netif->stats.rx_dropped++;
+    netif->stats.tx_dropped++;
     dev_kfree_skb(skb);
     return 0;
 }
@@ -260,8 +256,8 @@ static void net_rx_action(unsigned long unused)
         skb_shinfo(skb)->nr_frags = 0;
         skb_shinfo(skb)->frag_list = NULL;
 
-        netif->stats.rx_bytes += size;
-        netif->stats.rx_packets++;
+        netif->stats.tx_bytes += size;
+        netif->stats.tx_packets++;
 
         /* The update_va_mapping() must not fail. */
         if ( unlikely(mcl[0].args[5] != 0) )
@@ -579,8 +575,8 @@ static void net_tx_action(unsigned long unused)
         skb->dev      = netif->dev;
         skb->protocol = eth_type_trans(skb, skb->dev);
 
-        netif->stats.tx_bytes += txreq.size;
-        netif->stats.tx_packets++;
+        netif->stats.rx_bytes += txreq.size;
+        netif->stats.rx_packets++;
 
         netif_rx(skb);
         netif->dev->last_rx = jiffies;
