@@ -141,6 +141,7 @@
 #define capable(_c) 0
 
 #ifndef __ASSEMBLY__
+extern unsigned long _end; /* standard ELF symbol */
 extern void __out_of_line_bug(int line) __attribute__((noreturn));
 #define out_of_line_bug() __out_of_line_bug(__LINE__)
 #endif

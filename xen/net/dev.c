@@ -519,7 +519,7 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
         
     h_pfn->tot_count = h_pfn->type_count = 1;
     g_pfn->tot_count = g_pfn->type_count = 0;
-    h_pfn->flags = g_pfn->flags & (~PG_type_mask);
+    h_pfn->flags = g_pfn->flags & ~PG_type_mask;
         
     if (*g_pte & _PAGE_RW) h_pfn->flags |= PGT_writeable_page;
     g_pfn->flags = 0;

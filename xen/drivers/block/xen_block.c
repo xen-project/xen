@@ -277,7 +277,8 @@ static int __buffer_is_valid(struct task_struct *p,
 
         /* If reading into the frame, the frame must be writeable. */
         if ( writeable_buffer &&
-             ((page->flags & PG_type_mask) != PGT_writeable_page) )
+             ((page->flags & PG_type_mask) != PGT_writeable_page) &&
+             (page->type_count != 0) )
         {
             DPRINTK("non-writeable page passed for block read\n");
             goto out;
@@ -301,7 +302,16 @@ static void __lock_buffer(unsigned long buffer,
           pfn++ )
     {
         page = frame_table + pfn;
-        if ( writeable_buffer ) get_page_type(page);
+        if ( writeable_buffer )
+        {
+            if ( page->type_count == 0 )
+            {
+                page->flags &= ~(PG_type_mask | PG_need_flush);
+                /* NB. This ref alone won't cause a TLB flush. */
+                page->flags |= PGT_writeable_page;
+            }
+            get_page_type(page);
+        }
         get_page_tot(page);
     }
 }
@@ -320,8 +330,13 @@ static void unlock_buffer(struct task_struct *p,
           pfn++ )
     {
         page = frame_table + pfn;
-        if ( writeable_buffer && (put_page_type(page) == 0) )
-            page->flags &= ~PG_type_mask;
+        if ( writeable_buffer &&
+             (put_page_type(page) == 0) &&
+             (page->flags & PG_need_flush) )
+        {
+            __flush_tlb();
+            page->flags &= ~PG_need_flush;
+        }
         put_page_tot(page);
     }
     spin_unlock_irqrestore(&p->page_lock, flags);

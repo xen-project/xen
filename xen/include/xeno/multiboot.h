@@ -15,6 +15,9 @@
    along with this program; if not, write to the Free Software
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.  */
 
+#ifndef __MULTIBOOT_H__
+#define __MULTIBOOT_H__
+
 #ifndef __ELF__
 #error "Build on a 32-bit ELF system"
 #endif
@@ -79,3 +82,5 @@ typedef struct memory_map
   unsigned long length_high;
   unsigned long type;
 } memory_map_t;
+
+#endif /* __MULTIBOOT_H__ */

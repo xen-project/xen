@@ -110,7 +110,10 @@ static chunk_head_t  free_tail[FREELIST_SIZE];
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
 
 
-/* Initialise allocator, placing addresses [@min,@max] in free pool. */
+/*
+ * Initialise allocator, placing addresses [@min,@max] in free pool.
+ * @min and @max are PHYSICAL addresses.
+ */
 void __init init_page_allocator(unsigned long min, unsigned long max)
 {
     int i;
@@ -168,7 +171,21 @@ void __init init_page_allocator(unsigned long min, unsigned long max)
 }
 
 
-/* Allocate 2^@order contiguous pages. */
+/* Release a PHYSICAL address range to the allocator. */
+void release_bytes_to_allocator(unsigned long min, unsigned long max)
+{
+    min = round_pgup  (min) + PAGE_OFFSET;
+    max = round_pgdown(max) + PAGE_OFFSET;
+
+    while ( min < max )
+    {
+        __free_pages(min, 0);
+        min += PAGE_SIZE;
+    }
+}
+
+
+/* Allocate 2^@order contiguous pages. Returns a VIRTUAL address. */
 unsigned long __get_free_pages(int mask, int order)
 {
     int i, attempts = 0;
@@ -233,7 +250,7 @@ retry:
 }
 
 
-/* Free 2^@order pages at location @p. */
+/* Free 2^@order pages at VIRTUAL address @p. */
 void __free_pages(unsigned long p, int order)
 {
     unsigned long size = 1 << (order + PAGE_SHIFT);

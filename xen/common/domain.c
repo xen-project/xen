@@ -14,15 +14,10 @@
 #include <asm/domain_page.h>
 #include <asm/flushtlb.h>
 #include <asm/msr.h>
-#include <xeno/multiboot.h>
 #include <xeno/blkdev.h>
 
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED)
 #define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED|_PAGE_DIRTY)
-
-extern int nr_mods;
-extern module_t *mod;
-extern unsigned char *cmdline;
 
 rwlock_t tasklist_lock __cacheline_aligned = RW_LOCK_UNLOCKED;
 
@@ -173,7 +168,7 @@ unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes)
     for ( alloc_pfns = 0; alloc_pfns < req_pages; alloc_pfns++ )
     {
         pf = list_entry(temp, struct pfn_info, list);
-        pf->flags |= p->domain;
+        pf->flags = p->domain;
         pf->type_count = pf->tot_count = 0;
         temp = temp->next;
         list_del(&pf->list);
@@ -366,9 +361,9 @@ static unsigned long alloc_page_from_domain(unsigned long * cur_addr,
 /* setup_guestos is used for building dom0 solely. other domains are built in
  * userspace dom0 and final setup is being done by final_setup_guestos.
  */
-int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
+int setup_guestos(struct task_struct *p, dom0_newdomain_t *params, 
+                  char *data_start, unsigned long data_len, char *cmdline)
 {
-
     struct list_head *list_ent;
     char *src, *dst;
     int i, dom = p->domain;
@@ -387,13 +382,13 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     /* Sanity! */
     if ( p->domain != 0 ) BUG();
 
-    if ( strncmp(__va(mod[0].mod_start), "XenoGues", 8) )
+    if ( strncmp(data_start, "XenoGues", 8) )
     {
         printk("DOM%d: Invalid guest OS image\n", dom);
         return -1;
     }
 
-    virt_load_address = *(unsigned long *)__va(mod[0].mod_start + 8);
+    virt_load_address = *(unsigned long *)(data_start + 8);
     if ( (virt_load_address & (PAGE_SIZE-1)) )
     {
         printk("DOM%d: Guest OS load address not page-aligned (%08lx)\n",
@@ -407,13 +402,12 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     alloc_address <<= PAGE_SHIFT;
     alloc_index = p->tot_pages;
 
-    if ( (mod[nr_mods-1].mod_end-mod[0].mod_start) > 
-         (params->memory_kb << 9) )
+    if ( data_len > (params->memory_kb << 9) )
     {
         printk("DOM%d: Guest OS image is too large\n"
                "       (%luMB is greater than %uMB limit for a\n"
                "        %uMB address space)\n",
-               dom, (mod[nr_mods-1].mod_end-mod[0].mod_start)>>20,
+               dom, data_len>>20,
                (params->memory_kb)>>11,
                (params->memory_kb)>>10);
         free_all_dom_mem(p);
@@ -539,9 +533,9 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     __write_cr3_counted(pagetable_val(p->mm.pagetable));
 
     /* Copy the guest OS image. */
-    src = (char *)__va(mod[0].mod_start + 12);
+    src = (char *)(data_start + 12);
     dst = (char *)virt_load_address;
-    while ( src < (char *)__va(mod[nr_mods-1].mod_end) ) *dst++ = *src++;
+    while ( src < (data_start+data_len) ) *dst++ = *src++;
 
     /* Set up start info area. */
     memset(virt_startinfo_address, 0, sizeof(*virt_startinfo_address));
@@ -568,23 +562,13 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     /* Add block io interface */
     virt_startinfo_address->blk_ring = virt_to_phys(p->blk_ring_base); 
 
-    /* We tell OS about any modules we were given. */
-    if ( nr_mods > 1 )
-    {
-        virt_startinfo_address->mod_start = 
-            (mod[1].mod_start-mod[0].mod_start-12) + virt_load_address;
-        virt_startinfo_address->mod_len = 
-            mod[nr_mods-1].mod_end - mod[1].mod_start;
-    }
-
     dst = virt_startinfo_address->cmd_line;
-    if ( mod[0].string )
+    if ( cmdline != NULL )
     {
-        char *modline = (char *)__va(mod[0].string);
         for ( i = 0; i < 255; i++ )
         {
-            if ( modline[i] == '\0' ) break;
-            *dst++ = modline[i];
+            if ( cmdline[i] == '\0' ) break;
+            *dst++ = cmdline[i];
         }
     }
     *dst = '\0';
