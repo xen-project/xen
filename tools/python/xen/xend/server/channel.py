@@ -94,7 +94,7 @@ class ChannelFactory:
     def createPort(self, dom, remote_port=0):
         """Create a port for a channel to the given domain.
         """
-        return xu.port(dom, remote_port)
+        return xu.port(dom, 0, remote_port)
 
 def channelFactory():
     """Singleton constructor for the channel factory.
