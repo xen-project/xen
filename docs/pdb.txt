@@ -70,7 +70,7 @@ Serial Port Configuration
 
   pdb expects to communicate with gdb using the serial port.  Since 
   this port is often shared with the machine's console output, pdb can
-  discriminate its communication by setting the high bit of each char.
+  discriminate its communication by setting the high bit of each byte.
 
   A new tool has been added to the source tree which splits 
   the serial output from a remote machine into two streams: 
@@ -82,22 +82,12 @@ Serial Port Configuration
   Note: nsplitd was originally written for the Nemesis project
   at Cambridge.
 
-  Usage:
-    %telnet <hostname> <port>
-    This is the console of the remote machine.  You will probably
-    want to set telnet in char mode (or create a .telnetrc file).
-    <hostname> and <port> are for your instance of nsplitd.
-    You should be able to press 'h' to display a list of keyboard
-    handlers.  In particular, you should see:
-       key 'D' (ascii '44') => enter pervasive debugger
-
   After nsplitd accepts a connection on <port>, it starts listening
   on port <port + 1>.  Characters sent to the <port + 1> will have the
   high bit set and vice versa for characters received.
 
-  Note: if you are not using a serial console and can dedicate your
-  serial line to pdb messages, then edit pdb_put_char and pdb_get_char 
-  in pdb-stub.c to remove the high bit tests.
+  You can connect to the nsplitd using
+  'tools/xenctl/lib/console_client.py <host> <port>'
 
 GDB 6.0
   pdb has been tested with gdb 6.0.  It should also work with

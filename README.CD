@@ -520,8 +520,9 @@ We supply a handy debug terminal program which you can find in
 /usr/local/src/xen-1.0/xeno-1.0.bk/tools/misc/miniterm/
 This should be built and executed on another machine that is connected
 via a null modem cable. Documentation is included.
-Alternatively, telnet can be used in 'char mode' if the Xen machine is
-connected to a serial-port server.
+Alternatively, if the Xen machine is connected to a serial-port server
+then we supply a dumb TCP terminal client:
+ 'tools/xenctl/lib/console_client.py <server host> <server port>'
 
 
 Installing Xen / XenoLinux on a RedHat distribution
