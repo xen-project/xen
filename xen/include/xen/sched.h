@@ -73,6 +73,7 @@ struct exec_domain
 #endif
 
     struct ac_timer  timer;         /* one-shot timer for timeout values */
+    unsigned long    sleep_tick;    /* tick at which this vcpu started sleep */
 
     s_time_t         lastschd;      /* time this domain was last scheduled */
     s_time_t         lastdeschd;    /* time this domain was last descheduled */
@@ -96,7 +97,6 @@ struct exec_domain
 struct domain
 {
     domid_t          id;
-    s_time_t         create_time;
 
     shared_info_t   *shared_info;     /* shared data area */
     spinlock_t       time_lock;
@@ -214,11 +214,21 @@ extern int construct_dom0(
 extern int set_info_guest(struct domain *d, dom0_setdomaininfo_t *);
 
 struct domain *find_domain_by_id(domid_t dom);
-struct domain *find_last_domain(void);
 extern void domain_destruct(struct domain *d);
 extern void domain_kill(struct domain *d);
-extern void domain_crash(void);
 extern void domain_shutdown(u8 reason);
+
+/*
+ * Mark current domain as crashed. This function returns: the domain is not
+ * synchronously descheduled from any processor.
+ */
+extern void domain_crash(void);
+
+/*
+ * Mark current domain as crashed and synchronously deschedule from the local
+ * processor. This function never returns.
+ */
+extern void domain_crash_synchronous(void) __attribute__((noreturn));
 
 void new_thread(struct exec_domain *d,
                 unsigned long start_pc,
@@ -239,8 +249,6 @@ int  sched_id();
 void init_idle_task(void);
 void domain_wake(struct exec_domain *d);
 void domain_sleep(struct exec_domain *d);
-
-void __enter_scheduler(void);
 
 extern void context_switch(
     struct exec_domain *prev, 
@@ -390,7 +398,6 @@ static inline void domain_unpause_by_systemcontroller(struct domain *d)
 
 #include <xen/slab.h>
 #include <xen/domain.h>
-
 
 #endif /* __SCHED_H__ */
 

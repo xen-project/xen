@@ -29,13 +29,8 @@ class SrvDomain(SrvDir):
                     [['dom', 'int'],
                      ['config', 'sxpr']])
         deferred = fn(req.args, {'dom': self.dom.dom})
-        deferred.addErrback(self._op_configure_err, req)
         return deferred
 
-    def _op_configure_err(self, err, req):
-        req.setResponseCode(http.BAD_REQUEST, "Error: "+ str(err))
-        return str(err)
-        
     def op_unpause(self, op, req):
         val = self.xd.domain_unpause(self.dom.name)
         return val
@@ -68,16 +63,11 @@ class SrvDomain(SrvDir):
                      ['file', 'str']])
         deferred = fn(req.args, {'dom': self.dom.id})
         deferred.addCallback(self._op_save_cb, req)
-        deferred.addErrback(self._op_save_err, req)
         return deferred
 
     def _op_save_cb(self, val, req):
         return 0
 
-    def _op_save_err(self, err, req):
-        req.setResponseCode(http.BAD_REQUEST, "Error: "+ str(err))
-        return str(err)
-        
     def op_migrate(self, op, req):
         fn = FormFn(self.xd.domain_migrate,
                     [['dom', 'str'],
@@ -85,9 +75,7 @@ class SrvDomain(SrvDir):
                      ['live', 'int'],
                      ['resource', 'int']])
         deferred = fn(req.args, {'dom': self.dom.id})
-        print 'op_migrate>', deferred
         deferred.addCallback(self._op_migrate_cb, req)
-        deferred.addErrback(self._op_migrate_err, req)
         return deferred
 
     def _op_migrate_cb(self, info, req):
@@ -100,11 +88,6 @@ class SrvDomain(SrvDir):
         req.setHeader("Location", url)
         print '_op_migrate_cb> url=', url
         return url
-
-    def _op_migrate_err(self, err, req):
-        print '_op_migrate_err>', err, req
-        req.setResponseCode(http.BAD_REQUEST, "Error: "+ str(err))
-        return str(err)
 
     def op_pincpu(self, op, req):
         fn = FormFn(self.xd.domain_pincpu,

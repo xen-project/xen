@@ -594,8 +594,6 @@ __initcall(debugtrace_init);
  * **************************************************************
  */
 
-extern void trap_to_xendbg(void);
-
 void panic(const char *fmt, ...)
 {
     va_list args;

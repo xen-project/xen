@@ -119,7 +119,7 @@ void netif_create(netif_be_create_t *create)
     unsigned int       handle = create->netif_handle;
     struct net_device *dev;
     netif_t          **pnetif, *netif;
-    char               name[IFNAMSIZ];
+    char               name[IFNAMSIZ] = {};
 
     snprintf(name, IFNAMSIZ - 1, "vif%u.%u", domid, handle);
     dev = alloc_netdev(sizeof(netif_t), name, ether_setup);

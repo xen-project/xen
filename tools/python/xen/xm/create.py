@@ -5,6 +5,7 @@
 import random
 import string
 import sys
+import socket
 
 from xen.xend import sxp
 from xen.xend import PrettyPrint
@@ -80,6 +81,14 @@ gopts.opt('paused', short='p',
 gopts.opt('console_autoconnect', short='c',
           fn=set_true, default=0,
           use="Connect to the console after the domain is created.")
+
+gopts.var('vnc', val='no|yes',
+          fn=set_bool, default=None,
+          use="""Spawn a vncviewer listening for a vnc server in the domain.
+          The address of the vncviewer is passed to the domain on the kernel command
+          line using 'VNC_SERVER=<host>:<port>'. The port used by vnc is 5500 + DISPLAY.
+          A display value with a free port is chosen if possible.
+          """)
 
 gopts.var('name', val='NAME',
           fn=set_value, default=None,
@@ -160,7 +169,7 @@ gopts.var('ipaddr', val="IPADDR",
           fn=append_value, default=[],
           use="Add an IP address to the domain.")
 
-gopts.var('vif', val="mac=MAC,be_mac=MAC,bridge=BRIDGE,script=SCRIPT,backend=DOM",
+gopts.var('vif', val="mac=MAC,be_mac=MAC,bridge=BRIDGE,script=SCRIPT,backend=DOM,vifname=NAME",
           fn=append_value, default=[],
           use="""Add a network interface with the given MAC address and bridge.
           The vif is configured by calling the given configuration script.
@@ -170,6 +179,8 @@ gopts.var('vif', val="mac=MAC,be_mac=MAC,bridge=BRIDGE,script=SCRIPT,backend=DOM
           If bridge is not specified the default bridge is used.
           If script is not specified the default script is used.
           If backend is not specified the default backend driver domain is used.
+          If vifname is not specified the backend virtual interface will have name vifD.N
+          where D is the domain id and N is the interface id.
           This option may be repeated to add more than one vif.
           Specifying vifs will increase the number of interfaces as needed.""")
 
@@ -321,6 +332,7 @@ def configure_vifs(config_devs, vals):
             script = d.get('script')
             backend = d.get('backend')
             ip = d.get('ip')
+            vifname = d.get('vifname')
         else:
             mac = randomMAC()
             be_mac = None
@@ -328,8 +340,11 @@ def configure_vifs(config_devs, vals):
             script = None
             backend = None
             ip = None
+            vifname = None
         config_vif = ['vif']
         config_vif.append(['mac', mac])
+        if vifname:
+            config_vif.append(['vifname', vifname])
         if be_mac:
             config_vif.append(['be_mac', be_mac])
         if bridge:
@@ -429,7 +444,7 @@ def preprocess_vifs(opts, vals):
             (k, v) = b.strip().split('=', 1)
             k = k.strip()
             v = v.strip()
-            if k not in ['mac', 'be_mac', 'bridge', 'script', 'backend', 'ip']:
+            if k not in ['mac', 'be_mac', 'bridge', 'script', 'backend', 'ip', 'vifname']:
                 opts.err('Invalid vif specifier: ' + vif)
             d[k] = v
         vifs.append(d)
@@ -455,6 +470,58 @@ def preprocess_nfs(opts, vals):
         opts.err('Must set nfs root and nfs server')
     nfs = 'nfsroot=' + vals.nfs_server + ':' + vals.nfs_root
     vals.extra = nfs + ' ' + vals.extra
+
+
+def get_host_addr():
+    host = socket.gethostname()
+    addr = socket.gethostbyname(host)
+    return addr
+
+VNC_BASE_PORT = 5500
+
+def choose_vnc_display():
+    """Try to choose a free vnc display.
+    """
+    def netstat_local_ports():
+        """Run netstat to get a list of the local ports in use.
+        """
+        l = os.popen("netstat -nat").readlines()
+        r = []
+        # Skip 2 lines of header.
+        for x in l[2:]:
+            # Local port is field 3.
+            y = x.split()[3]
+            # Field is addr:port, split off the port.
+            y = y.split(':')[1]
+            r.append(int(y))
+        return r
+
+    ports = netstat_local_ports()
+    for d in range(1, 100):
+        port = VNC_BASE_PORT + d
+        if port in ports: continue
+        return d
+    return None
+
+def spawn_vnc(display):
+    os.system("vncviewer -listen %d &" % display)
+    return VNC_BASE_PORT + display
+    
+def preprocess_vnc(opts, vals):
+    """If vnc was specified, spawn a vncviewer in listen mode
+    and pass its address to the domain on the kernel command line.
+    """
+    if not vals.vnc: return
+    vnc_display = choose_vnc_display()
+    if not vnc_display:
+        opts.warn("No free vnc display")
+        return
+    print 'VNC=', vnc_display
+    vnc_port = spawn_vnc(vnc_display)
+    if vnc_port > 0:
+        vnc_host = get_host_addr()
+        vnc = 'VNC_VIEWER=%s:%d' % (vnc_host, vnc_port)
+        vals.extra = vnc + ' ' + vals.extra
     
 def preprocess(opts, vals):
     if not vals.kernel:
@@ -464,6 +531,7 @@ def preprocess(opts, vals):
     preprocess_vifs(opts, vals)
     preprocess_ip(opts, vals)
     preprocess_nfs(opts, vals)
+    preprocess_vnc(opts, vals)
          
 def make_domain(opts, config):
     """Create, build and start a domain.

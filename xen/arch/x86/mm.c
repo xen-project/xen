@@ -1147,13 +1147,16 @@ int get_page_type(struct pfn_info *page, u32 type)
                  * may be unnecessary (e.g., page was GDT/LDT) but those
                  * circumstances should be very rare.
                  */
-                struct domain *d = page_get_owner(page);
-                if ( unlikely(NEED_FLUSH(tlbflush_time[d->exec_domain[0]->
-                                                      processor],
-                                         page->tlbflush_timestamp)) )
+                struct exec_domain *ed;
+                unsigned long mask = 0;
+                for_each_exec_domain ( page_get_owner(page), ed )
+                    mask |= 1 << ed->processor;
+                mask = tlbflush_filter_cpuset(mask, page->tlbflush_timestamp);
+
+                if ( unlikely(mask != 0) )
                 {
-                    perfc_incr(need_flush_tlb_flush);
-                    flush_tlb_cpu(d->exec_domain[0]->processor);
+                    perfc_incrc(need_flush_tlb_flush);
+                    flush_tlb_mask(mask);
                 }
 
                 /* We lose existing type, back pointer, and validity. */
@@ -1666,8 +1669,8 @@ int do_mmu_update(
     if ( unlikely(shadow_mode_enabled(d)) )
         check_pagetable(d, ed->arch.guest_table, "pre-mmu"); /* debug */
 
-    if ( unlikely(shadow_mode_translate(d) ) )
-        domain_crash();
+    if ( unlikely(shadow_mode_translate(d)) )
+        domain_crash_synchronous();
 
     /*
      * If we are resuming after preemption, read how much work we have already
@@ -2030,8 +2033,8 @@ int do_update_va_mapping(unsigned long va,
     if ( unlikely(!__addr_ok(va)) )
         return -EINVAL;
 
-    if ( unlikely(shadow_mode_translate(d) ) )
-        domain_crash();
+    if ( unlikely(shadow_mode_translate(d)) )
+        domain_crash_synchronous();
 
     LOCK_BIGLOCK(d);
 
@@ -2309,7 +2312,7 @@ void ptwr_flush(const int which)
         MEM_LOG("ptwr: Could not read pte at %p\n", ptep);
         /*
          * Really a bug. We could read this PTE during the initial fault,
-         * and pagetables can't have changed meantime. XXX Multi-CPU guests?
+         * and pagetables can't have changed meantime.
          */
         BUG();
     }
@@ -2336,7 +2339,7 @@ void ptwr_flush(const int which)
         MEM_LOG("ptwr: Could not update pte at %p\n", ptep);
         /*
          * Really a bug. We could write this PTE during the initial fault,
-         * and pagetables can't have changed meantime. XXX Multi-CPU guests?
+         * and pagetables can't have changed meantime.
          */
         BUG();
     }
@@ -2389,9 +2392,8 @@ void ptwr_flush(const int which)
              */
             memcpy(&pl1e[i], &ptwr_info[cpu].ptinfo[which].page[i],
                    (L1_PAGETABLE_ENTRIES - i) * sizeof(l1_pgentry_t));
-            unmap_domain_mem(pl1e);
-            ptwr_info[cpu].ptinfo[which].l1va = 0;
             domain_crash();
+            break;
         }
         
         if ( unlikely(sl1e != NULL) )
@@ -2685,6 +2687,7 @@ int ptwr_do_page_fault(unsigned long addr)
         unmap_domain_mem(ptwr_info[cpu].ptinfo[which].pl1e);
         ptwr_info[cpu].ptinfo[which].l1va = 0;
         domain_crash();
+        return 0;
     }
     
     return EXCRET_fault_fixed;
@@ -2721,40 +2724,6 @@ __initcall(ptwr_init);
 /************************************************************************/
 
 #ifndef NDEBUG
-
-void ptwr_status(void)
-{
-    unsigned long pte, *ptep, pfn;
-    struct pfn_info *page;
-    int cpu = smp_processor_id();
-
-    ptep = (unsigned long *)&linear_pg_table
-        [ptwr_info[cpu].ptinfo[PTWR_PT_INACTIVE].l1va>>PAGE_SHIFT];
-
-    if ( __get_user(pte, ptep) ) {
-        MEM_LOG("ptwr: Could not read pte at %p\n", ptep);
-        domain_crash();
-    }
-
-    pfn = pte >> PAGE_SHIFT;
-    page = &frame_table[pfn];
-    printk("need to alloc l1 page %p\n", page);
-    /* make pt page writable */
-    printk("need to make read-only l1-page at %p is %p\n",
-           ptep, pte);
-
-    if ( ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l1va == 0 )
-        return;
-
-    if ( __get_user(pte, (unsigned long *)
-                    ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l1va) ) {
-        MEM_LOG("ptwr: Could not read pte at %p\n", (unsigned long *)
-                ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l1va);
-        domain_crash();
-    }
-    pfn = pte >> PAGE_SHIFT;
-    page = &frame_table[pfn];
-}
 
 void audit_pagelist(struct domain *d)
 {

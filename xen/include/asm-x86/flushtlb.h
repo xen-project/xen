@@ -43,6 +43,26 @@ static inline int NEED_FLUSH(u32 cpu_stamp, u32 lastuse_stamp)
              (lastuse_stamp <= curr_time)));
 }
 
+/*
+ * Filter the given set of CPUs, returning only those that may not have
+ * flushed their TLBs since @page_timestamp.
+ */
+static inline unsigned long tlbflush_filter_cpuset(
+    unsigned long cpuset, u32 page_timestamp)
+{
+    int i;
+    unsigned long remain;
+
+    for ( i = 0, remain = ~0UL; (cpuset & remain) != 0; i++, remain <<= 1 )
+    {
+        if ( (cpuset & (1UL << i)) &&
+             !NEED_FLUSH(tlbflush_time[i], page_timestamp) )
+            cpuset &= ~(1UL << i);
+    }
+
+    return cpuset;
+}
+
 extern void new_tlbflush_clock_period(void);
 
 /* Read pagetable base. */

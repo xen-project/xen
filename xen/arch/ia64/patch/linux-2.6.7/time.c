@@ -70,11 +70,11 @@
 +    return now; 
 +}
 +
-+int update_dom_time(struct exec_domain *ed)
++void update_dom_time(struct exec_domain *ed)
 +{
 +// FIXME: implement this?
 +//	printf("update_dom_time: called, not implemented, skipping\n");
-+	return 0;
++	return;
 +}
 +
 +/* Set clock to <secs,usecs> after 00:00:00 UTC, 1 January, 1970. */

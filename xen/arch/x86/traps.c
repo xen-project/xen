@@ -223,18 +223,7 @@ asmlinkage int do_int3(struct xen_regs *regs)
         show_registers(regs);
         panic("CPU%d FATAL TRAP: vector = 3 (Int3)\n", smp_processor_id());
     } 
-#ifdef DOMU_DEBUG
-    else if ( KERNEL_MODE(ed, regs) && ed->domain->id != 0 ) 
-    {
-        if ( !test_and_set_bit(EDF_CTRLPAUSE, &ed->ed_flags) ) {
-            while (ed == current)
-                __enter_scheduler();
-            domain_pause_by_systemcontroller(ed->domain);
-        }
-        
-        return 0;
-    }
-#endif /* DOMU_DEBUG */
+
     ti = current->arch.traps + 3;
     tb->flags = TBF_EXCEPTION;
     tb->cs    = ti->cs;
@@ -950,8 +939,6 @@ asmlinkage int do_debug(struct xen_regs *regs)
     struct exec_domain *ed = current;
     struct trap_bounce *tb = &ed->arch.trap_bounce;
 
-    DEBUGGER_trap_entry(TRAP_debug, regs);
-
     __asm__ __volatile__("mov %%db6,%0" : "=r" (condition));
 
     /* Mask out spurious debug traps due to lazy DR7 setting */
@@ -961,6 +948,8 @@ asmlinkage int do_debug(struct xen_regs *regs)
         __asm__("mov %0,%%db7" : : "r" (0UL));
         goto out;
     }
+
+    DEBUGGER_trap_entry(TRAP_debug, regs);
 
     if ( !GUEST_MODE(regs) )
     {
@@ -974,19 +963,7 @@ asmlinkage int do_debug(struct xen_regs *regs)
          */
         goto out;
     } 
-#ifdef DOMU_DEBUG
-    else if ( KERNEL_MODE(ed, regs) && ed->domain->id != 0 ) 
-    {
-        regs->eflags &= ~EF_TF;
-        if ( !test_and_set_bit(EDF_CTRLPAUSE, &ed->ed_flags) ) {
-            while (ed == current)
-                __enter_scheduler();
-            domain_pause_by_systemcontroller(ed->domain);
-        }
 
-        goto out;
-    }    
-#endif /* DOMU_DEBUG */
     /* Save debug status register where guest OS can peek at it */
     ed->arch.debugreg[6] = condition;
 

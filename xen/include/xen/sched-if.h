@@ -1,36 +1,31 @@
-#include <asm/types.h>
-
-/*
+/******************************************************************************
  * Additional declarations for the generic scheduler interface.  This should
  * only be included by files that implement conforming schedulers.
  *
  * Portions by Mark Williamson are (C) 2004 Intel Research Cambridge
  */
 
-#define BUCKETS 10
+#ifndef __XEN_SCHED_IF_H__
+#define __XEN_SCHED_IF_H__
 
-typedef struct schedule_data_st
-{
-    spinlock_t          schedule_lock;  /* spinlock protecting curr pointer
-                                            TODO check this */
-    struct exec_domain  *curr;          /* current task */
-    struct exec_domain  *idle;          /* idle task for this cpu */
-    void *              sched_priv;
-    struct ac_timer     s_timer;        /* scheduling timer  */
+struct schedule_data {
+    spinlock_t          schedule_lock;  /* spinlock protecting curr        */
+    struct exec_domain *curr;           /* current task                    */
+    struct exec_domain *idle;           /* idle task for this cpu          */
+    void               *sched_priv;
+    struct ac_timer     s_timer;        /* scheduling timer                */
+    unsigned long       tick;           /* current periodic 'tick'         */
 #ifdef BUCKETS
     u32                 hist[BUCKETS];  /* for scheduler latency histogram */
 #endif
-} __cacheline_aligned schedule_data_t;
+} __cacheline_aligned;
 
-
-typedef struct task_slice_st
-{
+struct task_slice {
     struct exec_domain *task;
     s_time_t            time;
-} task_slice_t;
+};
 
-struct scheduler
-{
+struct scheduler {
     char *name;             /* full name for this scheduler      */
     char *opt_name;         /* option name for this scheduler    */
     unsigned int sched_id;  /* ID for this scheduler             */
@@ -44,7 +39,7 @@ struct scheduler
     void         (*sleep)          (struct exec_domain *);
     void         (*wake)           (struct exec_domain *);
     void         (*do_block)       (struct exec_domain *);
-    task_slice_t (*do_schedule)    (s_time_t);
+    struct task_slice (*do_schedule) (s_time_t);
     int          (*control)        (struct sched_ctl_cmd *);
     int          (*adjdom)         (struct domain *,
                                     struct sched_adjdom_cmd *);
@@ -53,7 +48,6 @@ struct scheduler
     int          (*prn_state)      (int);
 };
 
-/* per CPU scheduler information */
-extern schedule_data_t schedule_data[];
+extern struct schedule_data schedule_data[];
 
-
+#endif /* __XEN_SCHED_IF_H__ */

@@ -385,13 +385,17 @@ nvm86_3:/* Rewrite our stack frame and return to ring 1. */
         movb $0,TRAPBOUNCE_flags(%edx)
         ret
 .section __ex_table,"a"
-	.long  FLT6,domain_crash ,  FLT7,domain_crash ,  FLT8,domain_crash
-        .long  FLT9,domain_crash , FLT10,domain_crash , FLT11,domain_crash
-        .long FLT12,domain_crash , FLT13,domain_crash , FLT14,domain_crash
-        .long FLT15,domain_crash , FLT16,domain_crash , FLT17,domain_crash
-	.long FLT18,domain_crash , FLT19,domain_crash , FLT20,domain_crash
-        .long FLT21,domain_crash , FLT22,domain_crash , FLT23,domain_crash
-        .long FLT24,domain_crash , FLT25,domain_crash , FLT26,domain_crash
+	.long  FLT6,domain_crash_synchronous ,  FLT7,domain_crash_synchronous
+        .long  FLT8,domain_crash_synchronous ,  FLT9,domain_crash_synchronous
+        .long FLT10,domain_crash_synchronous , FLT11,domain_crash_synchronous
+        .long FLT12,domain_crash_synchronous , FLT13,domain_crash_synchronous
+        .long FLT14,domain_crash_synchronous , FLT15,domain_crash_synchronous
+        .long FLT16,domain_crash_synchronous , FLT17,domain_crash_synchronous
+	.long FLT18,domain_crash_synchronous , FLT19,domain_crash_synchronous
+        .long FLT20,domain_crash_synchronous , FLT21,domain_crash_synchronous
+        .long FLT22,domain_crash_synchronous , FLT23,domain_crash_synchronous
+        .long FLT24,domain_crash_synchronous , FLT25,domain_crash_synchronous
+        .long FLT26,domain_crash_synchronous
 .previous
 
         ALIGN
@@ -682,9 +686,9 @@ VFLT3:  movl %gs:(%esi),%eax
         jmp test_all_events
 
 .section __ex_table,"a"
-        .long VFLT1,domain_crash
-        .long VFLT2,domain_crash
-        .long VFLT3,domain_crash
+        .long VFLT1,domain_crash_synchronous
+        .long VFLT2,domain_crash_synchronous
+        .long VFLT3,domain_crash_synchronous
 .previous
 
 .data

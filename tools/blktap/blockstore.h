@@ -22,7 +22,7 @@
 #endif
 
 #define FREEBLOCK_SIZE  (BLOCK_SIZE / sizeof(u64)) - (3 * sizeof(u64))
-#define FREEBLOCK_MAGIC 0x0fee0fee0fee0fee
+#define FREEBLOCK_MAGIC 0x0fee0fee0fee0feeULL
 
 typedef struct {
     u64 magic;
@@ -31,7 +31,7 @@ typedef struct {
     u64 list[FREEBLOCK_SIZE];
 } freeblock_t; 
 
-#define BLOCKSTORE_MAGIC 0xaaaaaaa00aaaaaaa
+#define BLOCKSTORE_MAGIC 0xaaaaaaa00aaaaaaaULL
 #define BLOCKSTORE_SUPER 1ULL
 
 typedef struct {

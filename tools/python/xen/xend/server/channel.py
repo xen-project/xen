@@ -11,7 +11,31 @@ VIRQ_CONSOLE    = 3  # (DOM0) bytes received on emergency console.
 VIRQ_DOM_EXC    = 4  # (DOM0) Exceptional event for some domain.
 
 def eventChannel(dom1, dom2):
-    return xc.evtchn_bind_interdomain(dom1=dom1, dom2=dom2)
+    """Create an event channel between domains.
+    The returned dict contains dom1, dom2, port1 and port2 on success.
+
+    @return dict (empty on error)
+    """
+    evtchn = xc.evtchn_bind_interdomain(dom1=dom1, dom2=dom2)
+    if evtchn:
+        evtchn['dom1'] = dom1
+        evtchn['dom2'] = dom2
+    return evtchn
+
+def eventChannelClose(evtchn):
+    """Close an event channel that was opened by eventChannel().
+    """
+    def evtchn_close(dom, port):
+        if (dom is None) or (port is None): return
+        try:
+            xc.evtchn_close(dom=dom, port=port)
+        except Exception, ex:
+            pass
+        
+    if not evtchn: return
+    evtchn_close(evtchn.get('dom1'), evtchn.get('port1'))
+    evtchn_close(evtchn.get('dom2'), evtchn.get('port2'))
+    
 
 class ChannelFactory:
     """Factory for creating channels.

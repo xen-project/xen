@@ -672,6 +672,7 @@ int set_timeout_timer(void)
 {
 	u64 alarm = 0;
 	int ret = 0;
+	unsigned long j;
 #ifdef CONFIG_SMP
 	unsigned long seq;
 #endif
@@ -685,13 +686,14 @@ int set_timeout_timer(void)
 #ifdef CONFIG_SMP
 	do {
 		seq = read_seqbegin(&xtime_lock);
-		if (smp_processor_id())
-			alarm = __jiffies_to_st(jiffies + 1);
-		else
-			alarm = __jiffies_to_st(jiffies + 1);
+		j = jiffies + 1;
+		alarm = __jiffies_to_st(j);
 	} while (read_seqretry(&xtime_lock, seq));
 #else
-	alarm = __jiffies_to_st(next_timer_interrupt());
+	j = next_timer_interrupt();
+	if (j < (jiffies + 1))
+		j = jiffies + 1;
+	alarm = __jiffies_to_st(j);
 #endif
 
 	/* Failure is pretty bad, but we'd best soldier on. */
@@ -726,7 +728,6 @@ void time_resume(void)
 }
 
 #ifdef CONFIG_SMP
-#define xxprint(msg) HYPERVISOR_console_io(CONSOLEIO_write, strlen(msg), msg)
 
 static irqreturn_t local_timer_interrupt(int irq, void *dev_id,
 					 struct pt_regs *regs)
@@ -762,11 +763,6 @@ static irqreturn_t local_timer_interrupt(int irq, void *dev_id,
 		if (regs)
 			profile_tick(CPU_PROFILING, regs);
 #endif
-	}
-
-	if (smp_processor_id() == 0) {
-	    xxprint("bug bug\n");
-	    BUG();
 	}
 
 	return IRQ_HANDLED;
