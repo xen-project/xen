@@ -475,6 +475,7 @@ void make_pages_writable(void *va, unsigned int nr);
 #define kern_addr_valid(addr)	(1)
 #endif /* !CONFIG_DISCONTIGMEM */
 
+#define DOMID_LOCAL (0xFFFFU)
 int direct_remap_area_pages(struct mm_struct *mm,
                             unsigned long address, 
                             unsigned long machine_addr,
@@ -488,17 +489,6 @@ int __direct_remap_area_pages(struct mm_struct *mm,
 
 #define io_remap_page_range(vma,from,phys,size,prot) \
 	direct_remap_area_pages(vma->vm_mm,from,phys,size,prot,DOMID_IO)
-
-int direct_remap_area_pages(struct mm_struct *mm,
-			    unsigned long address, 
-			    unsigned long machine_addr,
-			    unsigned long size, 
-			    pgprot_t prot,
-			    domid_t  domid);
-int __direct_remap_area_pages(struct mm_struct *mm,
-			      unsigned long address, 
-			      unsigned long size, 
-			      mmu_update_t *v);
 
 #define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_YOUNG
 #define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_DIRTY

@@ -79,6 +79,7 @@ void __iomem * __ioremap(unsigned long phys_addr, unsigned long size, unsigned l
 	void __iomem * addr;
 	struct vm_struct * area;
 	unsigned long offset, last_addr;
+	domid_t domid = DOMID_IO;
 
 	/* Don't allow wraparound or zero size */
 	last_addr = phys_addr + size - 1;
@@ -106,6 +107,8 @@ void __iomem * __ioremap(unsigned long phys_addr, unsigned long size, unsigned l
 		for(page = virt_to_page(t_addr); page <= virt_to_page(t_end); page++)
 			if(!PageReserved(page))
 				return NULL;
+
+		domid = DOMID_LOCAL;
 	}
 
 	/*
@@ -382,10 +385,13 @@ int direct_remap_area_pages(struct mm_struct *mm,
 #define MAX_DIRECTMAP_MMU_QUEUE 130
 	mmu_update_t u[MAX_DIRECTMAP_MMU_QUEUE], *w, *v;
 
-	u[0].ptr  = MMU_EXTENDED_COMMAND;
-	u[0].val  = MMUEXT_SET_FOREIGNDOM;
-	u[0].val |= (unsigned long)domid << 16;
-	v = w = &u[1];
+	v = w = &u[0];
+	if (domid != DOMID_LOCAL) {
+		u[0].ptr  = MMU_EXTENDED_COMMAND;
+		u[0].val  = MMUEXT_SET_FOREIGNDOM;
+		u[0].val |= (unsigned long)domid << 16;
+		v = w = &u[1];
+	}
 
 	start_address = address;
 
