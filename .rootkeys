@@ -536,8 +536,7 @@
 40fcefb3zGC9XNBkSwTEobCoq8YClA tools/sv/inc/style.css
 4194e861IgTabTt8HOuh143QIJFD1Q tools/x2d2/Makefile
 4194e861M2gcBz4i94cQYpqzi8n6UA tools/x2d2/cntrl_con.c
-4194e861xToz-o2KH6VT_CPJqVGMCg tools/x2d2/domain_controller.h
-4194e8612TrrMvC8ZlA4h2ZYCPWz4g tools/x2d2/main.c
+4194e8612TrrMvC8ZlA4h2ZYCPWz4g tools/x2d2/minixend.c
 4194e861x2eqNCD61RYPCUEBVdMYuw tools/x2d2/minixend.h
 4194e861A4V9VbD_FYmgXpYEj5YwVg tools/x2d2/util.c
 403a3edbrr8RE34gkbR40zep98SXbg tools/xentrace/Makefile
@@ -612,6 +611,7 @@
 3ddb79bc-Udq7ol-NX4q9XsYnN7A2Q xen/arch/x86/time.c
 3ddb79bccYVzXZJyVaxuv5T42Z1Fsw xen/arch/x86/trampoline.S
 3ddb79bcOftONV9h4QCxXOfiT0h91w xen/arch/x86/traps.c
+419cbedeQDg8IrO3izo3o5rQNlo0kQ xen/arch/x86/x86_32/asm-offsets.c
 3e32af9aRnYGl4GMOaDKp7JdfhOGhg xen/arch/x86/x86_32/domain_page.c
 3ddb79bcecupHj56ZbTa3B0FxDowMg xen/arch/x86/x86_32/entry.S
 3ddb79bcHwuCQDjBICDTSis52hWguw xen/arch/x86/x86_32/mm.c

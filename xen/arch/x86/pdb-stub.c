@@ -1217,8 +1217,8 @@ void pdb_key_pressed(unsigned char key)
 void pdb_handle_debug_trap(struct xen_regs *regs, long error_code)
 {
     unsigned int condition;
-    struct domain *tsk = current;
-    struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
+    struct domain *d = current;
+    struct trap_bounce *tb = &d->thread.trap_bounce;
 
     __asm__ __volatile__("movl %%db6,%0" : "=r" (condition));
     if ( (condition & (1 << 14)) != (1 << 14) )
@@ -1227,11 +1227,11 @@ void pdb_handle_debug_trap(struct xen_regs *regs, long error_code)
 
     if ( pdb_handle_exception(1, regs) != 0 )
     {
-        tsk->thread.debugreg[6] = condition;
+        d->thread.debugreg[6] = condition;
 
-        gtb->flags = GTBF_TRAP_NOCODE;
-        gtb->cs    = tsk->thread.traps[1].cs;
-        gtb->eip   = tsk->thread.traps[1].address;
+        tb->flags = TBF_TRAP_NOCODE;
+        tb->cs    = d->thread.traps[1].cs;
+        tb->eip   = d->thread.traps[1].address;
     }
 }
 

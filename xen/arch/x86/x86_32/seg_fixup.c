@@ -286,7 +286,7 @@ int gpf_emulate_4gb(struct xen_regs *regs)
 {
     struct exec_domain *d = current;
     trap_info_t   *ti;
-    struct guest_trap_bounce *gtb;
+    struct trap_bounce *tb;
     u8            modrm, mod, reg, rm, decode;
     void         *memreg, *regreg;
     unsigned long offset;
@@ -466,11 +466,11 @@ int gpf_emulate_4gb(struct xen_regs *regs)
     if ( VM_ASSIST(d->domain, VMASST_TYPE_4gb_segments_notify) )
     {
         ti  = &d->thread.traps[15];
-        gtb = &guest_trap_bounce[d->processor];
-        gtb->flags      = GTBF_TRAP;
-        gtb->error_code = pb - eip;
-        gtb->cs         = ti->cs;
-        gtb->eip        = ti->address;
+        tb = &d->thread.trap_bounce;
+        tb->flags      = TBF_TRAP;
+        tb->error_code = pb - eip;
+        tb->cs         = ti->cs;
+        tb->eip        = ti->address;
         if ( TI_GET_IF(ti) )
             d->vcpu_info->evtchn_upcall_mask = 1;
     }

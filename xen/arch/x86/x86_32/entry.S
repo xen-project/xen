@@ -196,13 +196,11 @@ restore_all_guest:
 /* No special register assumptions */
 failsafe_callback:
         GET_CURRENT(%ebx)
-        movl EDOMAIN_processor(%ebx),%eax
-        shl  $4,%eax
-        lea  guest_trap_bounce(%eax),%edx
+        leal EDOMAIN_trap_bounce(%ebx),%edx
         movl EDOMAIN_failsafe_addr(%ebx),%eax
-        movl %eax,GTB_eip(%edx)
+        movl %eax,TRAPBOUNCE_eip(%edx)
         movl EDOMAIN_failsafe_sel(%ebx),%eax
-        movw %ax,GTB_cs(%edx)
+        movw %ax,TRAPBOUNCE_cs(%edx)
         call create_bounce_frame
         subl $16,%esi                # add DS/ES/FS/GS to failsafe stack frame
         movl XREGS_ds(%esp),%eax
@@ -265,13 +263,11 @@ test_all_events:
         jz   restore_all_guest
         movb $1,VCPUINFO_upcall_mask(%eax) # Upcalls are masked during delivery
 /*process_guest_events:*/
-        movl EDOMAIN_processor(%ebx),%edx
-        shl  $4,%edx                     # sizeof(guest_trap_bounce) == 16
-        lea  guest_trap_bounce(%edx),%edx
+        leal EDOMAIN_trap_bounce(%ebx),%edx
         movl EDOMAIN_event_addr(%ebx),%eax
-        movl %eax,GTB_eip(%edx)
+        movl %eax,TRAPBOUNCE_eip(%edx)
         movl EDOMAIN_event_sel(%ebx),%eax
-        movw %ax,GTB_cs(%edx)
+        movw %ax,TRAPBOUNCE_cs(%edx)
         call create_bounce_frame
         jmp  restore_all_guest
 
@@ -283,7 +279,7 @@ process_softirqs:
                 
 /* CREATE A BASIC EXCEPTION FRAME ON GUEST OS (RING-1) STACK:            */
 /*   {EIP, CS, EFLAGS, [ESP, SS]}                                        */
-/* %edx == guest_trap_bounce, %ebx == task_struct                        */
+/* %edx == trap_bounce, %ebx == task_struct                              */
 /* %eax,%ecx are clobbered. %gs:%esi contain new XREGS_ss/XREGS_esp. */
 create_bounce_frame:        
         mov  XREGS_cs+4(%esp),%cl
@@ -323,9 +319,9 @@ FAULT12:movl %eax,%gs:8(%esi)
         movl %eax,XREGS_eflags+4(%esp)
         movl %gs,XREGS_ss+4(%esp)
         movl %esi,XREGS_esp+4(%esp)
-        movzwl GTB_cs(%edx),%eax
+        movzwl TRAPBOUNCE_cs(%edx),%eax
         movl %eax,XREGS_cs+4(%esp)
-        movl GTB_eip(%edx),%eax
+        movl TRAPBOUNCE_eip(%edx),%eax
         movl %eax,XREGS_eip+4(%esp)
         ret
 
@@ -362,25 +358,23 @@ crash_domain_fixup3:
 
         ALIGN
 process_guest_exception_and_events:        
-        movl EDOMAIN_processor(%ebx),%eax
-        shl  $4,%eax
-        lea  guest_trap_bounce(%eax),%edx
-        testb $~0,GTB_flags(%edx)
+        leal EDOMAIN_trap_bounce(%ebx),%edx
+        testb $~0,TRAPBOUNCE_flags(%edx)
         jz   test_all_events
         call create_bounce_frame        # just the basic frame
-        mov  GTB_flags(%edx),%cl
-        test $GTBF_TRAP_NOCODE,%cl
+        mov  TRAPBOUNCE_flags(%edx),%cl
+        test $TBF_TRAP_NOCODE,%cl
         jnz  2f
         subl $4,%esi                    # push error_code onto guest frame
-        movl GTB_error_code(%edx),%eax
+        movl TRAPBOUNCE_error_code(%edx),%eax
 FAULT13:movl %eax,%gs:(%esi)
-        test $GTBF_TRAP_CR2,%cl
+        test $TBF_TRAP_CR2,%cl
         jz   1f
         subl $4,%esi                    # push %cr2 onto guest frame
-        movl GTB_cr2(%edx),%eax
+        movl TRAPBOUNCE_cr2(%edx),%eax
 FAULT14:movl %eax,%gs:(%esi)
 1:      movl %esi,XREGS_esp(%esp)        
-2:      movb $0,GTB_flags(%edx)
+2:      movb $0,TRAPBOUNCE_flags(%edx)
         jmp  test_all_events
 
         ALIGN

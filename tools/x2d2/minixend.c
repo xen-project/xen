@@ -15,6 +15,7 @@
 #include <netinet/in.h>
 #include <printf.h>
 #include <pthread.h>
+#include <sched.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -48,14 +49,10 @@ head_console = LIST_HEAD(&head_console);
 foreach_item(d, &head_connection, struct open_connection, connection_list)
 
 /* Not modified after initial start up */
-static struct domain *
-dom0;
-unsigned
-xc_handle;
-static int
-listen_fd;
-int
-evtchn_fd;
+static struct domain *dom0;
+unsigned xc_handle;
+static int listen_fd;
+int evtchn_fd;
 
 static struct list_head
 head_event_receiver = LIST_HEAD(&head_event_receiver);
@@ -332,11 +329,11 @@ send_control_message(int type, int subtype, int id,
    -- Front end sends us a NETIF_FE_INTERFACE_CONNECT for each netif
 */
 static void
-handle_netif_fe_driver_status_changed(control_msg_t *m,
-				      netif_fe_driver_status_changed_t *sh,
-				      struct domain *d)
+handle_netif_fe_driver_status(control_msg_t *m,
+			      netif_fe_driver_status_t *sh,
+			      struct domain *d)
 {
-	netif_fe_interface_status_changed_t if_s;
+	netif_fe_interface_status_t if_s;
 	control_msg_t be_msg;
 	netif_be_create_t *be = (void *)be_msg.msg;
 	int r;
@@ -346,11 +343,9 @@ handle_netif_fe_driver_status_changed(control_msg_t *m,
 		/* Tell the back end about the new interface coming
 		 * up. */
 		if (d->created_netif_backend) {
-			PRINTF(10, "Front end came up twice in dom %d -> reporting no interfaces this time around.\n", d->domid);
-			sh->nr_interfaces = 0;
 			send_control_reply(m, d);
 			send_control_message(CMSG_NETIF_FE,
-					     CMSG_NETIF_FE_DRIVER_STATUS_CHANGED,
+					     CMSG_NETIF_FE_DRIVER_STATUS,
 					     1,
 					     sizeof(*sh),
 					     sh,
@@ -374,10 +369,9 @@ handle_netif_fe_driver_status_changed(control_msg_t *m,
 		if (be->status != NETIF_BE_STATUS_OKAY) {
 			/* Uh oh... can't bring back end
 			 * up. */
-			sh->nr_interfaces = 0;
 			send_control_reply(m, d);
 			send_control_message(CMSG_NETIF_FE,
-					     CMSG_NETIF_FE_DRIVER_STATUS_CHANGED,
+					     CMSG_NETIF_FE_DRIVER_STATUS,
 					     1,
 					     sizeof(*sh),
 					     sh,
@@ -400,10 +394,9 @@ handle_netif_fe_driver_status_changed(control_msg_t *m,
 
 		/* Tell domain how many interfaces it has to deal
 		 * with. */
-		sh->nr_interfaces = 1;
 		send_control_reply(m, d);
 		send_control_message(CMSG_NETIF_FE,
-				     CMSG_NETIF_FE_DRIVER_STATUS_CHANGED,
+				     CMSG_NETIF_FE_DRIVER_STATUS,
 				     1,
 				     sizeof(*sh),
 				     sh,
@@ -413,7 +406,7 @@ handle_netif_fe_driver_status_changed(control_msg_t *m,
 		if_s.handle = 0;
 		if_s.status = NETIF_INTERFACE_STATUS_DISCONNECTED;
 		send_control_message(CMSG_NETIF_FE,
-				     CMSG_NETIF_FE_INTERFACE_STATUS_CHANGED,
+				     CMSG_NETIF_FE_INTERFACE_STATUS,
 				     1,
 				     sizeof(if_s),
 				     &if_s,
@@ -434,7 +427,7 @@ handle_netif_fe_interface_connect(control_msg_t *m,
 {
 	control_msg_t be_msg;
 	netif_be_connect_t *bmsg = (void *)be_msg.msg;
-	netif_fe_interface_status_changed_t fmsg = {0};
+	netif_fe_interface_status_t fmsg = {0};
 	int evtchn_ports[2];
 	int r;
 
@@ -477,7 +470,7 @@ handle_netif_fe_interface_connect(control_msg_t *m,
 		memcpy(fmsg.mac, d->netif_mac, 6);
 
 		send_control_message(CMSG_NETIF_FE,
-				     CMSG_NETIF_FE_INTERFACE_STATUS_CHANGED,
+				     CMSG_NETIF_FE_INTERFACE_STATUS,
 				     0,
 				     sizeof(fmsg),
 				     &fmsg,
@@ -489,11 +482,11 @@ static void
 process_netif_fe_message(control_msg_t *m, struct domain *d)
 {
 	switch (m->subtype) {
-	case CMSG_NETIF_FE_DRIVER_STATUS_CHANGED:
+	case CMSG_NETIF_FE_DRIVER_STATUS:
 	{
-		netif_fe_driver_status_changed_t *sh =
-			(netif_fe_driver_status_changed_t *)m->msg;
-		handle_netif_fe_driver_status_changed(m, sh, d);
+		netif_fe_driver_status_t *sh =
+			(netif_fe_driver_status_t *)m->msg;
+		handle_netif_fe_driver_status(m, sh, d);
 		break;
 	}
 	case CMSG_NETIF_FE_INTERFACE_CONNECT:
@@ -506,72 +499,6 @@ process_netif_fe_message(control_msg_t *m, struct domain *d)
 	default:
 		warnx("unknown netif front end message subtype %d",
 		      m->subtype);
-	}
-}
-
-static void
-process_pdb_be_driver_status_changed_message(control_msg_t *msg,
-					     pdb_be_driver_status_changed_t*pe,
-					     struct domain *d)
-{
-	pdb_be_connected_t conn;
-	pdb_fe_new_be_t new_be;
-	int assist_channel[2];
-	int event_channel[2];
-	int r;
-
-	switch (pe->status) {
-	case PDB_DRIVER_STATUS_UP:
-		PRINTF(4, "creating event channel for PDB device\n");
-		r = allocate_event_channel(d, assist_channel);
-		r |= allocate_event_channel(d, event_channel);
-		if (r < 0)
-			abort(); /* XXX need to handle this */
-
-		send_trivial_control_reply(msg, d);
-
-		PRINTF(4, "informing front end of event channel\n");
-		conn.assist_port = assist_channel[1];
-		conn.event_port = event_channel[1];
-		send_control_message(CMSG_PDB_BE,
-				     CMSG_PDB_BE_INTERFACE_CONNECTED,
-				     0,
-				     sizeof(conn),
-				     &conn,
-				     d);
-
-		PRINTF(4, "informing back end of front end\n");
-		new_be.domain = d->domid;
-		new_be.assist_evtchn = assist_channel[0];
-		new_be.event_evtchn = event_channel[0];
-		new_be.assist_frame = pe->assist_page;
-		new_be.event_frame = pe->event_page;
-		send_control_message(CMSG_PDB_FE,
-				     CMSG_PDB_FE_NEW_BE,
-				     0,
-				     sizeof(new_be),
-				     &new_be,
-				     dom0);
-		break;
-	default:
-		warnx("unknown pdb status %d", pe->status);
-	}
-}
-
-static void
-process_pdb_be_message(control_msg_t *msg, struct domain *d)
-{
-	switch (msg->subtype) {
-	case CMSG_PDB_BE_DRIVER_STATUS_CHANGED:
-	{
-		pdb_be_driver_status_changed_t *pe =
-			(pdb_be_driver_status_changed_t *)msg->msg;
-		process_pdb_be_driver_status_changed_message(msg, pe, d);
-		break;
-	}
-	default:
-		warnx("unknown pdb back end message subtype %d",
-		      msg->subtype);
 	}
 }
 
@@ -592,9 +519,6 @@ process_control_message(control_msg_t *msg, struct domain *d)
 		break;
 	case CMSG_NETIF_FE:
 		process_netif_fe_message(&m, d);
-		break;
-	case CMSG_PDB_BE:
-		process_pdb_be_message(&m, d);
 		break;
 	default:
 		warnx("unknown control message type %d", m.type);
@@ -685,7 +609,7 @@ signal_domain(struct domain *d)
 				PRINTF(1, "delivering event id %d\n", evt->id);
 				pthread_cond_broadcast(&evt->cond);
 				pthread_mutex_unlock(&d->mux);
-				pthread_yield();
+				sched_yield();
 				pthread_mutex_lock(&d->mux);
 			} else {
 				warnx("unexpected message id %d discarded",
@@ -701,7 +625,7 @@ signal_domain(struct domain *d)
 				PRINTF(1, "delivering event rep id %d\n", evt->id);
 				pthread_cond_broadcast(&evt->cond);
 				pthread_mutex_unlock(&d->mux);
-				pthread_yield();
+				sched_yield();
 				pthread_mutex_lock(&d->mux);
 			} else {
 				warnx("unexpected message reply id %d discarded",
@@ -949,7 +873,7 @@ find_dom0(void)
 		err(1, "binding to domain 0 control event channel");
 
 	work->domid = 0;
-	work->name = xstrdup("dom0");
+	work->name = strdup("dom0");
 	work->mem_kb = info.max_memkb;
 	work->state = DOM_STATE_RUNNING;
 	work->shared_info_mfn = info.shared_info_frame;

@@ -81,10 +81,8 @@ static void show_handlers(unsigned char key)
                    key_table[i].desc);
 }
 
-
 static void dump_registers(unsigned char key, struct xen_regs *regs)
 {
-    extern void show_registers(struct xen_regs *regs); 
     printk("'%c' pressed -> dumping registers\n", key); 
     show_registers(regs); 
 }
