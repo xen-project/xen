@@ -189,10 +189,11 @@ int curldebug(CURL *curl, curl_infotype ty, char *buf, size_t buf_n, void *data)
  * @param fmt url format string, followed by parameters
  * @return 0 on success, error code otherwise
  */
-static int curlsetup(CURL **pcurl, char *url, int url_n, char *fmt, ...){
+static int curlsetup(CURL **pcurl, struct curl_slist **pheaders, char *url, int url_n, char *fmt, ...){
     int err = 0;
     va_list args;
     CURL *curl = NULL;
+    struct curl_slist *headers = NULL;
     int n = 0;
 
     curl = curlinit();
@@ -224,15 +225,29 @@ static int curlsetup(CURL **pcurl, char *url, int url_n, char *fmt, ...){
 #endif
     // Set the URL.
     curl_easy_setopt(curl, CURLOPT_URL, url);
+
+    headers = curl_slist_append(headers, "Expect:");
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    
   exit:
     if(err && curl){
         curl_easy_cleanup(curl);
         curl = NULL;
     }
     *pcurl = curl;
+    if (pheaders)
+	*pheaders = headers;
     return err;
 }
 
+static void curlcleanup(CURL **pcurl, struct curl_slist **pheaders){
+    if (*pcurl)
+	curl_easy_cleanup(*pcurl);
+    if (*pheaders)
+	curl_slist_free_all(*pheaders);
+    *pcurl = NULL;
+    *pheaders = NULL;
+}
 /** Make the http request stored in the curl handle and get
  *  the result code from the curl code and the http return code.
  *
@@ -268,15 +283,16 @@ int curlresult(CURL *curl){
 int xen_domain_ls(void){
     int err = 0;
     CURL *curl = NULL;
+    struct curl_slist *headers = NULL;
     char url[128] = {};
     int url_n = sizeof(url);
 
     dprintf(">\n");
-    err = curlsetup(&curl, url, url_n, "http://localhost:%d/xend/domain", XEND_PORT);
+    err = curlsetup(&curl, &headers, url, url_n, "http://localhost:%d/xend/domain", XEND_PORT);
     if(err) goto exit;
     err = curlresult(curl);
   exit:
-    if(curl) curl_easy_cleanup(curl);
+    curlcleanup(&curl, &headers);
     dprintf("< err=%d\n", err);
     return err;
 }
@@ -291,6 +307,7 @@ int xen_domain_ls(void){
 int xen_domain_configure(uint32_t dom, char *vmconfig, int vmconfig_n){
     int err = 0;
     CURL *curl = NULL;
+    struct curl_slist *headers = NULL;
     char url[128] = {};
     int url_n = sizeof(url);
     struct curl_httppost *form = NULL, *last = NULL;
@@ -300,7 +317,7 @@ int xen_domain_configure(uint32_t dom, char *vmconfig, int vmconfig_n){
     // List domains so that xend will update its domain list and notice the new domain.
     xen_domain_ls();
 
-    err = curlsetup(&curl, url, url_n, "http://localhost:%d/xend/domain/%u", XEND_PORT, dom);
+    err = curlsetup(&curl, &headers, url, url_n, "http://localhost:%d/xend/domain/%u", XEND_PORT, dom);
     if(err) goto exit;
 
     // Config field - set from vmconfig.
@@ -329,7 +346,7 @@ int xen_domain_configure(uint32_t dom, char *vmconfig, int vmconfig_n){
     curl_easy_setopt(curl, CURLOPT_HTTPPOST, form);
     err = curlresult(curl);
   exit:
-    if(curl) curl_easy_cleanup(curl);
+    curlcleanup(&curl, &headers);
     if(form) curl_formfree(form);
     dprintf("< err=%d\n", err);
     return err;
@@ -343,6 +360,7 @@ int xen_domain_configure(uint32_t dom, char *vmconfig, int vmconfig_n){
 int xen_domain_unpause(uint32_t dom){
     int err = 0;
     CURL *curl = NULL;
+    struct curl_slist *headers = NULL;
     char url[128] = {};
     int url_n = sizeof(url);
     struct curl_httppost *form = NULL, *last = NULL;
@@ -350,7 +368,7 @@ int xen_domain_unpause(uint32_t dom){
 
     dprintf("> dom=%u\n", dom);
 
-    err = curlsetup(&curl, url, url_n, "http://localhost:%d/xend/domain/%u", XEND_PORT, dom);
+    err = curlsetup(&curl, &headers, url, url_n, "http://localhost:%d/xend/domain/%u", XEND_PORT, dom);
     if(err) goto exit;
 
     // Op field.
@@ -367,7 +385,7 @@ int xen_domain_unpause(uint32_t dom){
     curl_easy_setopt(curl, CURLOPT_HTTPPOST, form);
     err = curlresult(curl);
   exit:
-    if(curl) curl_easy_cleanup(curl);
+    curlcleanup(&curl, &headers);
     if(form) curl_formfree(form);
     dprintf("< err=%d\n", err);
     return err;
