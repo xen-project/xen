@@ -12,7 +12,7 @@
 #include <xeno/lib.h>
 #include <asm/page.h>
 #include <xeno/spinlock.h>
-
+#include <xeno/slab.h>
 
 static spinlock_t alloc_lock = SPIN_LOCK_UNLOCKED;
 
@@ -102,7 +102,7 @@ struct chunk_tail_st {
 
 /* Linked lists of free chunks of different powers-of-two in size. */
 #define FREELIST_SIZE ((sizeof(void*)<<3)-PAGE_SHIFT)
-static chunk_head_t *free_list[FREELIST_SIZE];
+static chunk_head_t *free_head[FREELIST_SIZE];
 static chunk_head_t  free_tail[FREELIST_SIZE];
 #define FREELIST_EMPTY(_l) ((_l)->next == NULL)
 
@@ -120,8 +120,8 @@ void __init init_page_allocator(unsigned long min, unsigned long max)
 
     for ( i = 0; i < FREELIST_SIZE; i++ )
     {
-        free_list[i]       = &free_tail[i];
-        free_tail[i].pprev = &free_list[i];
+        free_head[i]       = &free_tail[i];
+        free_tail[i].pprev = &free_head[i];
         free_tail[i].next  = NULL;
     }
 
@@ -159,10 +159,10 @@ void __init init_page_allocator(unsigned long min, unsigned long max)
         ct = (chunk_tail_t *)min-1;
         i -= PAGE_SHIFT;
         ch->level       = i;
-        ch->next        = free_list[i];
-        ch->pprev       = &free_list[i];
+        ch->next        = free_head[i];
+        ch->pprev       = &free_head[i];
         ch->next->pprev = &ch->next;
-        free_list[i]    = ch;
+        free_head[i]    = ch;
         ct->level       = i;
     }
 }
@@ -182,15 +182,15 @@ retry:
 
     /* Find smallest order which can satisfy the request. */
     for ( i = order; i < FREELIST_SIZE; i++ ) {
-	if ( !FREELIST_EMPTY(free_list[i]) ) 
+	if ( !FREELIST_EMPTY(free_head[i]) ) 
 	    break;
     }
 
     if ( i == FREELIST_SIZE ) goto no_memory;
  
     /* Unlink a chunk. */
-    alloc_ch = free_list[i];
-    free_list[i] = alloc_ch->next;
+    alloc_ch = free_head[i];
+    free_head[i] = alloc_ch->next;
     alloc_ch->next->pprev = alloc_ch->pprev;
 
     /* We may have to break the chunk a number of times. */
@@ -203,13 +203,13 @@ retry:
 
         /* Create new header for spare chunk. */
         spare_ch->level = i;
-        spare_ch->next  = free_list[i];
-        spare_ch->pprev = &free_list[i];
+        spare_ch->next  = free_head[i];
+        spare_ch->pprev = &free_head[i];
         spare_ct->level = i;
 
         /* Link in the spare chunk. */
         spare_ch->next->pprev = &spare_ch->next;
-        free_list[i] = spare_ch;
+        free_head[i] = spare_ch;
     }
     
     map_alloc(__pa(alloc_ch)>>PAGE_SHIFT, 1<<order);
@@ -279,10 +279,10 @@ void __free_pages(unsigned long p, int order)
     ct = (chunk_tail_t *)(p+size)-1;
     ct->level = order;
     ch->level = order;
-    ch->pprev = &free_list[order];
-    ch->next  = free_list[order];
+    ch->pprev = &free_head[order];
+    ch->next  = free_head[order];
     ch->next->pprev = &ch->next;
-    free_list[order] = ch;
+    free_head[order] = ch;
 
     spin_unlock_irqrestore(&alloc_lock, flags);
 }
