@@ -253,6 +253,16 @@ The following is a list of command line arguments to pass to Xen:
                   transmitted/received character.
  [NB. Default for this option is 'com1,tty']
 
+ conswitch=<switch-char><auto-switch-char>
+                  Specify how to switch serial-console input between
+                  Xen and DOM0. The required sequence is CTRL-<switch_char>
+                  pressed three times. Specifying '`' disables switching.
+                  The <auto-switch-char> specifies whether Xen should
+                  auto-switch input to DOM0 when it boots -- if it is 'x'
+                  then auto-switching is disabled. Any other value, or
+                  omitting the character, enables auto-switching.
+ [NB. Default for this option is 'a']
+
  dom0_mem=xxx     Set the maximum amount of memory for domain0.
 
  tbuf_size=xxx    Set the size of the per-cpu trace buffers, in pages

@@ -17,6 +17,8 @@
 #include <xen/keyhandler.h>
 #include <asm/uaccess.h>
 
+extern unsigned char opt_console[], opt_conswitch[];
+
 static int xpos, ypos;
 static unsigned char *video = __va(0xB8000);
 
@@ -227,17 +229,18 @@ long read_console_ring(unsigned long str, unsigned int count, unsigned cmd)
 static char serial_rx_ring[SERIAL_RX_SIZE];
 static unsigned int serial_rx_cons, serial_rx_prod;
 
-/* CTRL-a switches input direction between Xen and DOM0. */
-#define CTRL_A 0x01
+/* CTRL-<switch_char> switches input direction between Xen and DOM0. */
+#define SWITCH_CODE (opt_conswitch[0]-'a'+1)
 static int xen_rx = 1; /* FALSE => serial input passed to domain 0. */
 
 static void switch_serial_input(void)
 {
     static char *input_str[2] = { "DOM0", "Xen" };
     xen_rx = !xen_rx;
-    printk("*** Serial input -> %s "
-           "(type 'CTRL-a' three times to switch input to %s).\n",
-           input_str[xen_rx], input_str[!xen_rx]);
+    if ( SWITCH_CODE != 0 )
+        printk("*** Serial input -> %s "
+               "(type 'CTRL-%c' three times to switch input to %s).\n",
+               input_str[xen_rx], opt_conswitch[0], input_str[!xen_rx]);
 }
 
 static void __serial_rx(unsigned char c, struct pt_regs *regs)
@@ -264,20 +267,20 @@ static void __serial_rx(unsigned char c, struct pt_regs *regs)
 
 static void serial_rx(unsigned char c, struct pt_regs *regs)
 {
-    static int ctrl_a_count = 0;
+    static int switch_code_count = 0;
 
-    if ( c == CTRL_A )
+    if ( (SWITCH_CODE != 0) && (c == SWITCH_CODE) )
     {
-        /* We eat CTRL-a in groups of three to switch console input. */
-        if ( ++ctrl_a_count == 3 )
+        /* We eat CTRL-<switch_char> in groups of 3 to switch console input. */
+        if ( ++switch_code_count == 3 )
         {
             switch_serial_input();
-            ctrl_a_count = 0;
+            switch_code_count = 0;
         }
     }
     else
     {
-        ctrl_a_count = 0;
+        switch_code_count = 0;
     }
 
     /* Finally process the just-received character. */
@@ -395,7 +398,6 @@ void set_printk_prefix(const char *prefix)
 
 void init_console(void)
 {
-    extern unsigned char opt_console[];
     unsigned char *p;
 
     /* Where should console output go? */
@@ -418,6 +420,15 @@ void console_endboot(int disable_vga)
 {
     if ( disable_vga )
         vgacon_enabled = 0;
+
+    /*
+     * If user specifies so, we fool the switch routine to redirect input
+     * straight back to Xen. I use this convoluted method so we still print
+     * a useful 'how to switch' message.
+     */
+    if ( opt_conswitch[1] == 'x' )
+        xen_rx = !xen_rx;
+
     /* Serial input is directed to DOM0 by default. */
     switch_serial_input();
 }
