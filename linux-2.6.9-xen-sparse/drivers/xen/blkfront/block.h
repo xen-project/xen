@@ -64,6 +64,7 @@
 
 struct xlbd_type_info {
 	int partn_shift;
+	int partn_per_major;
 	int devs_per_major;
 	int hardsect_size;
 	int max_sectors;
@@ -77,8 +78,8 @@ struct xlbd_type_info {
  */
 struct xlbd_major_info {
 	int major;
+	int index;
 	int usage;
-	int xd_device;
 	struct xlbd_type_info *type;
 };
 
