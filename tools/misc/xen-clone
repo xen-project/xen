@@ -67,13 +67,14 @@ then
 
  LINUX_VER=`( /bin/ls -ld ${DEST_BK_REP}/*linux-*-xen-sparse ) 2>/dev/null | sed -e 's!^.*linux-\(.\+\)-xen-sparse!\1!'`
 
- if [ -e ${LINUX_DIR}/linux-${LINUX_VER}.tar.gz ]  
+ if [ -e ${LINUX_DIR}/linux-${LINUX_VER}.tar.gz ] 
+ then
   export LINUX_SRC=${LINUX_DIR}/linux-${LINUX_VER}.tar.gz
  fi
 
  cd ${DEST_BK_REP} 
  ln -sf ../install install
- make world
+ make -j4 world
  cd ../install/boot
  [ -r vmlinuz-${LINUX_VER}-xen0 ] && ln -s vmlinuz-${LINUX_VER}-xen0 xenolinux.gz
   

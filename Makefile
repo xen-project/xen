@@ -38,7 +38,7 @@ config_%: linux-$(LINUX_VER)-xen
 
 build_%: 
 	$(MAKE) -C linux-$(LINUX_VER)-xen ARCH=xen bzImage
-	$(MAKE) -C linux-$(LINUX_VER)-xen ARCH=xen INSTALL_NAME=$(subst linux_,$(LINUX_VER)-,$(@)) prefix=$(INSTALL_DIR) install
+	$(MAKE) -C linux-$(LINUX_VER)-xen ARCH=xen INSTALL_NAME=$(subst build_,$(LINUX_VER)-,$(@)) prefix=$(INSTALL_DIR) install
 
 
 world: dist
