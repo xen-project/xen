@@ -1972,6 +1972,16 @@ static int get_tx_bufs(net_vif_t *vif)
         }
         else if ( (target == VIF_PHYS) || IS_PRIV(p) )
         {
+            /*
+             * XXX HACK XXX: Our wildcard rule for domain-0 incorrectly puts 
+             * some 169.254.* (ie. link-local) packets on the wire unless we 
+             * include this explicit test. :-(
+             */
+            if ( (ntohs(*(unsigned short *)(g_data + 12)) == ETH_P_IP) &&
+                 ((ntohl(*(unsigned long *)(g_data + 26)) & 0xFFFF0000) == 
+                  0xA9FE0000) )
+                goto disallow_linklocal_packets;
+
             stx = &vif->tx_shadow_ring[MASK_NET_TX_IDX(j)];
             stx->id     = tx.id;
             stx->size   = tx.size;
@@ -1990,6 +2000,7 @@ static int get_tx_bufs(net_vif_t *vif)
         }
         else
         {
+        disallow_linklocal_packets:
             make_tx_response(vif, tx.id, RING_STATUS_DROPPED);
         }
 

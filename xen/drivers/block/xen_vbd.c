@@ -89,7 +89,7 @@ long vbd_create(vbd_create_t *create)
     if ( unlikely((p = find_domain_by_id(create->domain)) == NULL) )
     {
         DPRINTK("vbd_create attempted for non-existent domain %d\n", 
-                domain); 
+                create->domain); 
         return -EINVAL; 
     }
 

@@ -75,7 +75,7 @@ static u32 st_scale_i; /* convert ticks -> usecs */
 
 /* These are peridically updated in shared_info, and then copied here. */
 static u32 shadow_tsc_stamp;
-static s64 shadow_system_time;
+static u64 shadow_system_time;
 static u32 shadow_time_version;
 static struct timeval shadow_tv;
 
@@ -91,9 +91,12 @@ static long last_update_to_rtc, last_update_to_xen;
 #endif
 
 /* Periodically take synchronised time base from Xen, if we need it. */
-static long last_update_from_xen;
+static long last_update_from_xen;   /* UTC seconds when last read Xen clock. */
 
-static u64 processed_system_time;
+/* Keep track of last time we did processing/updating of jiffies and xtime. */
+static u64 processed_system_time;   /* System time (ns) at last processing. */
+
+#define NS_PER_TICK (1000000000ULL/HZ)
 
 #define HANDLE_USEC_UNDERFLOW(_tv)         \
     do {                                   \
@@ -197,8 +200,11 @@ static int set_rtc_mmss(unsigned long nowtime)
 #endif
 
 
-/* Must be called with the xtime_lock held for writing. */
-static void get_time_values_from_xen(void)
+/*
+ * Reads a consistent set of time-base values from Xen, into a shadow data
+ * area. Must be called with the xtime_lock held for writing.
+ */
+static void __get_time_values_from_xen(void)
 {
     do {
         shadow_time_version = HYPERVISOR_shared_info->time_version2;
@@ -216,7 +222,11 @@ static void get_time_values_from_xen(void)
     (shadow_time_version == HYPERVISOR_shared_info->time_version2)
 
 
-static inline unsigned long get_time_delta_usecs(void)
+/*
+ * Returns the system time elapsed, in ns, since the current shadow_timestamp
+ * was calculated. Must be called with the xtime_lock held for reading.
+ */
+static inline unsigned long __get_time_delta_usecs(void)
 {
     s32      delta_tsc;
     u32      low;
@@ -234,6 +244,9 @@ static inline unsigned long get_time_delta_usecs(void)
 }
 
 
+/*
+ * Returns the current time-of-day in UTC timeval format.
+ */
 void do_gettimeofday(struct timeval *tv)
 {
 	unsigned long flags, lost;
@@ -242,7 +255,7 @@ void do_gettimeofday(struct timeval *tv)
  again:
     read_lock_irqsave(&xtime_lock, flags);
 
-    _tv.tv_usec = get_time_delta_usecs();
+    _tv.tv_usec = __get_time_delta_usecs();
     if ( (lost = (jiffies - wall_jiffies)) != 0 )
         _tv.tv_usec += lost * (1000000 / HZ);
     _tv.tv_sec   = xtime.tv_sec;
@@ -257,7 +270,7 @@ void do_gettimeofday(struct timeval *tv)
          */
         read_unlock_irqrestore(&xtime_lock, flags);
         write_lock_irqsave(&xtime_lock, flags);
-        get_time_values_from_xen();
+        __get_time_values_from_xen();
         write_unlock_irqrestore(&xtime_lock, flags);
         goto again;
     }
@@ -276,6 +289,10 @@ void do_gettimeofday(struct timeval *tv)
     *tv = _tv;
 }
 
+
+/*
+ * Sets the current time-of-day based on passed-in UTC timeval parameter.
+ */
 void do_settimeofday(struct timeval *tv)
 {
     struct timeval newtv;
@@ -291,10 +308,10 @@ void do_settimeofday(struct timeval *tv)
      * be stale, so we can retry with fresh ones.
      */
  again:
-    tv->tv_usec -= get_time_delta_usecs();
+    tv->tv_usec -= __get_time_delta_usecs();
     if ( unlikely(!TIME_VALUES_UP_TO_DATE) )
     {
-        get_time_values_from_xen();
+        __get_time_values_from_xen();
         goto again;
     }
     
@@ -334,6 +351,7 @@ void do_settimeofday(struct timeval *tv)
     }
 }
 
+
 asmlinkage long sys_stime(int *tptr)
 {
 	int value;
@@ -353,14 +371,22 @@ asmlinkage long sys_stime(int *tptr)
 	return 0;
 }
 
-#define NS_PER_TICK (1000000000ULL/HZ)
+
+/* Convert jiffies to system time. Call with xtime_lock held for reading. */
+static inline u64 __jiffies_to_st(unsigned long j) 
+{
+    return processed_system_time + ((j - jiffies) * NS_PER_TICK);
+}
+
+
 static inline void do_timer_interrupt(int irq, void *dev_id,
                                       struct pt_regs *regs)
 {
     s64 delta;
+    unsigned long ticks = 0;
     long sec_diff;
 
-    get_time_values_from_xen();
+    __get_time_values_from_xen();
 
     if ( (delta = (s64)(shadow_system_time - processed_system_time)) < 0 )
     {
@@ -368,13 +394,24 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
         return;
     }
 
+    /* Process elapsed jiffies since last call. */
     while ( delta >= NS_PER_TICK )
     {
-        do_timer(regs);
+        ticks++;
         delta -= NS_PER_TICK;
         processed_system_time += NS_PER_TICK;
     }
-    
+
+    if ( ticks != 0 )
+    {
+        do_timer_ticks(ticks);
+
+        if ( user_mode(regs) )
+            update_process_times_us(ticks, 0);
+        else
+            update_process_times_us(0, ticks);
+    }
+
     /*
      * Take synchronised time from Xen once a minute if we're not
      * synchronised ourselves, and we haven't chosen to keep an independent
@@ -446,6 +483,7 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 #endif
 }
 
+
 static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
     write_lock(&xtime_lock);
@@ -460,6 +498,89 @@ static struct irqaction irq_timer = {
     0, 
     "timer", 
     NULL, 
+    NULL
+};
+
+
+/*
+ * This function works out when the the next timer function has to be
+ * executed (by looking at the timer list) and sets the Xen one-shot
+ * domain timer to the appropriate value. This is typically called in
+ * cpu_idle() before the domain blocks.
+ * 
+ * The function returns a non-0 value on error conditions.
+ * 
+ * It must be called with interrupts disabled.
+ */
+extern spinlock_t timerlist_lock;
+int set_timeout_timer(void)
+{
+    struct timer_list *timer;
+    u64 alarm = 0;
+    int ret = 0;
+
+    spin_lock(&timerlist_lock);
+
+    /*
+     * This is safe against long blocking (since calculations are not based on 
+     * TSC deltas). It is also safe against warped system time since
+     * suspend-resume is cooperative and we would first get locked out. It is 
+     * safe against normal updates of jiffies since interrupts are off.
+     */
+    if ( (timer = next_timer_event()) != NULL )
+        alarm = __jiffies_to_st(timer->expires);
+
+    /* Failure is pretty bad, but we'd best soldier on. */
+    if ( HYPERVISOR_set_dom_timer(alarm) != 0 )
+        ret = -1;
+    
+    spin_unlock(&timerlist_lock);
+
+    return ret;
+}
+
+
+/* Time debugging. */
+static void dbg_time_int(int irq, void *dev_id, struct pt_regs *ptregs)
+{
+    unsigned long flags, j;
+    u64 s_now, j_st;
+    struct timeval s_tv, tv;
+
+    struct timer_list *timer;
+    u64 t_st;
+
+    read_lock_irqsave(&xtime_lock, flags);
+    s_tv.tv_sec  = shadow_tv.tv_sec;
+    s_tv.tv_usec = shadow_tv.tv_usec;
+    s_now        = shadow_system_time;
+    read_unlock_irqrestore(&xtime_lock, flags);
+
+    do_gettimeofday(&tv);
+
+    j = jiffies;
+    j_st = __jiffies_to_st(j);
+
+    timer = next_timer_event();
+    t_st = __jiffies_to_st(timer->expires);
+
+    printk(KERN_ALERT "time: shadow_st=0x%X:%08X\n",
+           (u32)(s_now>>32), (u32)s_now);
+    printk(KERN_ALERT "time: wct=%lds %ldus shadow_wct=%lds %ldus\n",
+           tv.tv_sec, tv.tv_usec, s_tv.tv_sec, s_tv.tv_usec);
+    printk(KERN_ALERT "time: jiffies=%lu(0x%X:%08X) timeout=%lu(0x%X:%08X)\n",
+           jiffies,(u32)(j_st>>32), (u32)j_st,
+           timer->expires,(u32)(t_st>>32), (u32)t_st);
+    printk(KERN_ALERT "time: processed_system_time=0x%X:%08X\n",
+           (u32)(processed_system_time>>32), (u32)processed_system_time);
+}
+
+static struct irqaction dbg_time = {
+    dbg_time_int, 
+    SA_SHIRQ, 
+    0, 
+    "timer_dbg", 
+    &dbg_time_int,
     NULL
 };
 
@@ -494,10 +615,12 @@ void __init time_init(void)
     st_scale_f = scale & 0xffffffff;
     st_scale_i = scale >> 32;
 
-    get_time_values_from_xen();
+    __get_time_values_from_xen();
     processed_system_time = shadow_system_time;
 
-    setup_irq(TIMER_IRQ, &irq_timer);
+    (void)setup_irq(TIMER_IRQ, &irq_timer);
+
+    (void)setup_irq(_EVENT_DEBUG, &dbg_time);
 
     rdtscll(alarm);
 

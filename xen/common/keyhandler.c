@@ -1,5 +1,7 @@
+
 #include <xeno/keyhandler.h> 
 #include <xeno/reboot.h>
+#include <xeno/event.h>
 
 #define KEY_MAX 256
 #define STR_MAX  64
@@ -80,40 +82,48 @@ static void kill_dom0(u_char key, void *dev_id, struct pt_regs *regs)
 /* XXX SMH: this is keir's fault */
 static char *task_states[] = 
 { 
-    "Runnable", 
-    "Interruptible Sleep", 
-    "Uninterruptible Sleep", 
-    NULL, "Stopped", 
-    NULL, NULL, NULL, "Dying", 
+    "Runnable  ", 
+    "Int Sleep ", 
+    "UInt Sleep", 
+    NULL,
+    "Stopped   ", 
+    NULL,
+    NULL,
+    NULL,
+    "Dying     ", 
 }; 
 
 void do_task_queues(u_char key, void *dev_id, struct pt_regs *regs) 
 {
-    unsigned long       flags; 
+    unsigned long       flags, cpu_mask = 0; 
     struct task_struct *p; 
     shared_info_t      *s; 
+    s_time_t            now = NOW();
 
-    printk("'%c' pressed -> dumping task queues\n", key); 
+    printk("'%c' pressed -> dumping task queues (now=0x%X:%08X)\n", key,
+           (u32)(now>>32), (u32)now); 
 
     read_lock_irqsave(&tasklist_lock, flags); 
 
     p = &idle0_task;
     do {
         printk("Xen: DOM %d, CPU %d [has=%c], state = %s, "
-	       "hyp_events = %08x\n", 
-	       p->domain, p->processor, p->has_cpu ? 'T':'F', 
-	       task_states[p->state], p->hyp_events); 
-	s = p->shared_info; 
-	if( !is_idle_task(p) )
+               "hyp_events = %08x\n", 
+               p->domain, p->processor, p->has_cpu ? 'T':'F', 
+               task_states[p->state], p->hyp_events); 
+        s = p->shared_info; 
+        if( !is_idle_task(p) )
         {
-	    printk("Guest: events = %08lx, events_mask = %08lx\n", 
-		   s->events, s->events_mask); 
-	    printk("Notifying guest...\n"); 
-	    set_bit(_EVENT_DEBUG, &s->events); 
-	}
+            printk("Guest: events = %08lx, events_mask = %08lx\n", 
+                   s->events, s->events_mask); 
+            printk("Notifying guest...\n"); 
+            cpu_mask |= mark_guest_event(p, _EVENT_DEBUG);
+        }
     } while ( (p = p->next_task) != &idle0_task );
 
     read_unlock_irqrestore(&tasklist_lock, flags); 
+
+    guest_event_notify(cpu_mask);
 }
 
 extern void perfc_printall (u_char key, void *dev_id, struct pt_regs *regs);

@@ -1,20 +1,14 @@
 /* -*-  Mode:C; c-basic-offset:4; tab-width:4 -*-
  ****************************************************************************
  * (C) 2003 - Rolf Neugebauer - Intel Research Cambridge
+ * (C) 2002-2003 - Keir Fraser - University of Cambridge 
  ****************************************************************************
  *
  *        File: time.c
- *      Author: Rolf Neugebauer (neugebar@dcs.gla.ac.uk)
- *     Changes: 
- *              
- *        Date: Jul 2003
- * 
- * Environment: Xen Minimal OS
+ *      Author: Rolf Neugebauer and Keir Fraser
+ *
  * Description: Simple time and timer functions
  *
- ****************************************************************************
- * $Id: c-insert.c,v 1.7 2002/11/08 16:04:34 rn Exp $
- ****************************************************************************
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
  * deal in the Software without restriction, including without limitation the
@@ -105,6 +99,29 @@ static __inline__ unsigned long get_time_delta_usecs(void)
     return (unsigned long)delta;
 }
 
+s64 get_s_time (void)
+{
+    u64 u_delta;
+    s64 ret;
+
+ again:
+
+    u_delta = get_time_delta_usecs();
+    ret = shadow_system_time + (1000 * u_delta);
+
+    if ( unlikely(!TIME_VALUES_UP_TO_DATE) )
+    {
+        /*
+         * We may have blocked for a long time, rendering our calculations
+         * invalid (e.g. the time delta may have overflowed). Detect that
+         * and recalculate with fresh values.
+         */
+        get_time_values_from_xen();
+        goto again;
+    }
+
+    return ret;
+}
 
 void gettimeofday(struct timeval *tv)
 {
@@ -123,10 +140,15 @@ void gettimeofday(struct timeval *tv)
 }
 
 
+/*
+ * Just a dummy 
+ */
 static void timer_handler(int ev, struct pt_regs *regs)
 {
     static int i;
     struct timeval tv;
+
+    get_time_values_from_xen();
 
     i++;
     if (i >= 1000) {

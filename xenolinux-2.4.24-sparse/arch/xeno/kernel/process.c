@@ -80,14 +80,36 @@ void enable_hlt(void)
  */
 void cpu_idle (void)
 {
-    /* endless idle loop with no priority at all */
+    extern int set_timeout_timer(void);
+    
+    /* Endless idle loop with no priority at all. */
     init_idle();
     current->nice = 20;
     current->counter = -100;
 
-    while (1) {
-        while (!current->need_resched)
-            HYPERVISOR_yield();
+    for ( ; ; )
+    {
+        while ( !current->need_resched )
+        {
+            __cli();
+            if ( current->need_resched )
+            {
+                /* The race-free check for events failed. */
+                __sti();
+                break;
+            }
+            else if ( set_timeout_timer() == 0 )
+            {
+                /* NB. Blocking reenable events in a race-free manner. */
+                HYPERVISOR_block();
+            }
+            else
+            {
+                /* No race here: yielding will get us the CPU again anyway. */
+                __sti();
+                HYPERVISOR_yield();
+            }
+        }
         schedule();
         check_pgt_cache();
     }

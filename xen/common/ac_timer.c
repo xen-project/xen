@@ -27,12 +27,6 @@
 #include <asm/system.h>
 #include <asm/desc.h>
 
-#ifdef AC_TIMER_TRACE
-#define TRC(_x) _x
-#else
-#define TRC(_x)
-#endif
-
 /*
  * We pull handlers off the timer list this far in future,
  * rather than reprogramming the time hardware.

@@ -100,25 +100,27 @@ struct task_struct
     unsigned int     tot_pages; /* number of pages currently possesed */
     unsigned int     max_pages; /* max number of pages that can be possesed */
 
-    /* scheduling */
+    /* Scheduling. */
     struct list_head run_list;
     int              has_cpu;
-    int state;                  /* current run state */
-    int cpupinned;              /* true if pinned to curent CPU */
+    int              state;         /* current run state */
+    int              cpupinned;     /* true if pinned to curent CPU */
+    s_time_t         lastschd;      /* time this domain was last scheduled */
+    s_time_t         lastdeschd;    /* time this domain was last descheduled */
+    s_time_t         cpu_time;      /* total CPU time received till now */
+    s_time_t         wokenup;       /* time domain got woken up */
+    struct ac_timer  timer;         /* one-shot timer for timeout values */
 
-    s_time_t lastschd;              /* time this domain was last scheduled */
-    s_time_t cpu_time;              /* total CPU time received till now */
-    s_time_t wokenup;               /* time domain got woken up */
-
+    /* BVT scheduler specific. */
     unsigned long mcu_advance;      /* inverse of weight */
-    u32  avt;                       /* actual virtual time */
-    u32  evt;                       /* effective virtual time */
-    int  warpback;                  /* warp?  */
-    long warp;                      /* virtual time warp */
-    long warpl;                     /* warp limit */
-    long warpu;                     /* unwarp time requirement */
-    s_time_t warped;                /* time it ran warped last time */
-    s_time_t uwarped;               /* time it ran unwarped last time */
+    u32           avt;              /* actual virtual time */
+    u32           evt;              /* effective virtual time */
+    int           warpback;         /* warp?  */
+    long          warp;             /* virtual time warp */
+    long          warpl;            /* warp limit */
+    long          warpu;            /* unwarp time requirement */
+    s_time_t      warped;           /* time it ran warped last time */
+    s_time_t      uwarped;          /* time it ran unwarped last time */
 
     /* Network I/O */
     net_vif_t *net_vif_list[MAX_DOMAIN_VIFS];
@@ -250,7 +252,6 @@ long sched_adjdom(int dom, unsigned long mcu_adv, unsigned long warp,
 void init_idle_task(void);
 void __wake_up(struct task_struct *p);
 void wake_up(struct task_struct *p);
-long do_yield(void);
 unsigned long __reschedule(struct task_struct *p);
 void reschedule(struct task_struct *p);
 
@@ -271,8 +272,9 @@ static inline long schedule_timeout(long timeout)
     return 0;
 }
 
-#define signal_pending(_p) ((_p)->hyp_events || \
-                            (_p)->shared_info->events)
+#define signal_pending(_p) \
+    ((_p)->hyp_events ||   \
+     ((_p)->shared_info->events & (_p)->shared_info->events_mask))
 
 void domain_init(void);
 

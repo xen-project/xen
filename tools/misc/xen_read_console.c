@@ -11,9 +11,9 @@
 
 int main(void)
 {
-    unsigned char buf[208];
+    unsigned char buf[208], filtered[208];
     struct sockaddr_in addr, from;
-    int fromlen = sizeof(from);
+    int fromlen = sizeof(from), i, j;
     int len, fd = socket(PF_INET, SOCK_DGRAM, 0);
     
     if ( fd < 0 )
@@ -46,7 +46,12 @@ int main(void)
         if ( buf[len-1] != '\n' ) { buf[len] = '\n'; len++; }
         buf[len] = '\0';
 
-        printf("[%d] %s", ntohs(from.sin_port),buf);
+        for ( i = 0, j = 0; i < len; i++ )
+            if ( (buf[i] == '\n') || (buf[i] == '\0') ||
+                 ((buf[i] >= 32) && (buf[i] <= 126)) )
+                filtered[j++] = buf[i];
+
+        printf("[%d] %s", ntohs(from.sin_port), filtered);
 
         fromlen = sizeof(from);
     }

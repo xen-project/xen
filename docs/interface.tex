@@ -117,18 +117,20 @@ time.
 
 
 \section{Cycle counter time}
-This provides the finest-grained, free-running time reference, with the approximate
-frequency being publicly accessible. The cycle counter time is used to accurately
-extrapolate the other time references. On SMP machines it is currently assumed
-that the cycle counter time is synchronised between CPUs. The current x86-based
-implementation achieves this within inter-CPU communication latencies.
+This provides the finest-grained, free-running time reference, with the
+approximate frequency being publicly accessible. The cycle counter time is
+used to accurately extrapolate the other time references. On SMP machines
+it is currently assumed that the cycle counter time is synchronised between
+CPUs. The current x86-based implementation achieves this within inter-CPU
+communication latencies.
 
 \section{System time}
-This is a 64-bit value containing the nanoseconds elapsed since boot time. Unlike
-cycle counter time, system time accurately reflects the passage of real time, i.e.
-it is adjusted several times a second for timer drift. This is done by running an
-NTP client in {\it domain0} on behalf of the machine, feeding updates to the 
-hypervisor. Intermediate values can be extrapolated using the cycle counter. 
+This is a 64-bit value containing the nanoseconds elapsed since boot
+time. Unlike cycle counter time, system time accurately reflects the
+passage of real time, i.e.  it is adjusted several times a second for timer
+drift. This is done by running an NTP client in {\it domain0} on behalf of
+the machine, feeding updates to the hypervisor. Intermediate values can be
+extrapolated using the cycle counter.
 
 \section{Wall clock time}
 This is the actual ``time of day'' Unix style struct timeval (i.e. seconds and
@@ -140,10 +142,39 @@ and remain perfectly in time.
 
 
 \section{Domain virtual time}
-This progresses at the same pace as cycle counter time, but only while a domain
-is executing. It stops while a domain is de-scheduled. Therefore the share of the 
-CPU that a domain receives is indicated by the rate at which its domain virtual
-time increases, relative to the rate at which cycle counter time does so.
+This progresses at the same pace as cycle counter time, but only while a
+domain is executing. It stops while a domain is de-scheduled. Therefore the
+share of the CPU that a domain receives is indicated by the rate at which
+its domain virtual time increases, relative to the rate at which cycle
+counter time does so.
+
+\section{Time interface}
+Xen exports some timestamps to guest operating systems through their shared
+info page. Timestamps are provided for system time and wall-clock time. Xen
+also provides the cycle counter values at the time of the last update
+allowing guests to calculate the current values. The cpu frequency and a
+scaling factor are provided for guests to convert cycle counter values to
+real time. Since all time stamps need to be updated and read
+\emph{atomically} two version numbers are also stored in the shared info
+page.
+
+Xen will ensure that the time stamps are updated frequently enough to avoid
+an overflow of the cycle counter values. Guest can check if its notion of
+time is up-to-date by comparing the version numbers.
+
+\section{Timer events}
+
+Xen maintains a periodic timer (currently with a 10ms period) which sends a
+timer event to the currently executing domain. This allows Guest OSes to
+keep track of the passing of time when executing. The scheduler also
+arranges for a newly activated domain to receive a timer event when
+scheduled so that the Guest OS can adjust to the passage of time while it
+has been inactive.
+
+In addition, Xen exports a hypercall interface to each domain which allows
+them to request a timer event send to them at the specified system
+time. Guest OSes may use this timer to implemented timeout values when they
+block.
 
 \chapter{Memory}
 
@@ -371,7 +402,15 @@ Notify hypervisor of updates to transmit and/or receive descriptor rings.
 Notify hypervisor that fpu registers needed to be save on context switch.
 
 \section{ sched\_op(unsigned long op)} 
-Request scheduling operation from hypervisor. The options are: yield, stop, and exit.
+Request scheduling operation from hypervisor. The options are: {\it yield},
+{\it block}, {\it stop}, and {\it exit}. {\it yield} keeps the calling
+domain run-able but may cause a reschedule if other domains are
+run-able. {\it block} removes the calling domain from the run queue and the
+domains sleeps until an event is delivered to it. {\it stop} and {\it exit}
+should be self-explanatory.
+
+\section{ set\_dom\_timer(dom\_timer\_arg\_t *timer\_arg)} 
+Request a timer event to be sent at the specified system time.
 
 \section{ dom0\_op(dom0\_op\_t *op)} 
 Administrative domain operations for domain management. The options are:

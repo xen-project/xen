@@ -13,9 +13,11 @@ define_bool CONFIG_SBUS n
 define_bool CONFIG_UID16 y
 
 mainmenu_option next_comment
-comment 'Privileged guest OS'
+comment 'XenoLinux'
 bool 'Support for privileged operations (domain 0)' CONFIG_XENO_PRIV
 endmenu
+# the IBM S/390 patch needs this.
+define_bool CONFIG_NO_IDLE_HZ y
 
 mainmenu_option next_comment
 comment 'Code maturity level options'

@@ -256,6 +256,17 @@ static inline int HYPERVISOR_yield(void)
     return ret;
 }
 
+static inline int HYPERVISOR_block(void)
+{
+    int ret;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret) : "0" (__HYPERVISOR_sched_op),
+        "b" (SCHEDOP_block) );
+
+    return ret;
+}
+
 static inline int HYPERVISOR_exit(void)
 {
     int ret;
@@ -275,6 +286,19 @@ static inline int HYPERVISOR_stop(unsigned long srec)
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_sched_op),
         "b" (SCHEDOP_stop), "S" (srec) : "memory" );
+
+    return ret;
+}
+
+static inline long HYPERVISOR_set_dom_timer(u64 timeout)
+{
+    int ret;
+    unsigned long timeout_hi = (unsigned long)(timeout>>32);
+    unsigned long timeout_lo = (unsigned long)timeout;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret) : "0" (__HYPERVISOR_set_dom_timer),
+        "b" (timeout_hi), "c" (timeout_lo) : "memory" );
 
     return ret;
 }

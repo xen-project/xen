@@ -8,9 +8,12 @@ CONFIG_ISA=y
 CONFIG_UID16=y
 
 #
-# Privileged guest OS
+# XenoLinux Options
 #
+# support for priviledged domains
 CONFIG_XENO_PRIV=y
+# On demand timer setting (taken from s390 patch set)
+CONFIG_NO_IDLE_HZ=y
 
 #
 # Code maturity level options

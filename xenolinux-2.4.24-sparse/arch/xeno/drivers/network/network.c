@@ -81,15 +81,15 @@ static void _dbg_network_int(struct net_device *dev)
     if ( np->state == STATE_CLOSED )
         return;
     
-    printk(KERN_ALERT "tx_full = %d, tx_resp_cons = 0x%08x,"
-           " tx_req_prod = 0x%08x, tx_resp_prod = 0x%08x,"
-           " tx_event = 0x%08x, state=%d\n",
+    printk(KERN_ALERT "net: tx_full=%d, tx_resp_cons=0x%08x,"
+           " tx_req_prod=0x%08x\nnet: tx_resp_prod=0x%08x,"
+           " tx_event=0x%08x, state=%d\n",
            np->tx_full, np->tx_resp_cons, 
            np->net_idx->tx_req_prod, np->net_idx->tx_resp_prod, 
            np->net_idx->tx_event,
            test_bit(__LINK_STATE_XOFF, &dev->state));
-    printk(KERN_ALERT "rx_resp_cons = 0x%08x,"
-           " rx_req_prod = 0x%08x, rx_resp_prod = 0x%08x, rx_event = 0x%08x\n",
+    printk(KERN_ALERT "net: rx_resp_cons=0x%08x,"
+           " rx_req_prod=0x%08x\nnet: rx_resp_prod=0x%08x, rx_event=0x%08x\n",
            np->rx_resp_cons, np->net_idx->rx_req_prod,
            np->net_idx->rx_resp_prod, np->net_idx->rx_event);
 }
@@ -550,7 +550,8 @@ int __init init_module(void)
         goto fail;
     }
     
-    err = request_irq(_EVENT_DEBUG, dbg_network_int, 0, "debug", NULL);
+    err = request_irq(_EVENT_DEBUG, dbg_network_int, SA_SHIRQ, "net_dbg", 
+                      &dbg_network_int);
     if ( err )
         printk(KERN_WARNING "Non-fatal error -- no debug interrupt\n");
 

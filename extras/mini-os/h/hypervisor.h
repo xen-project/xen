@@ -1,3 +1,10 @@
+/******************************************************************************
+ * hypervisor.h
+ * 
+ * Linux-specific hypervisor handling.
+ * 
+ * Copyright (c) 2002, K A Fraser
+ */
 
 #ifndef _HYPERVISOR_H_
 #define _HYPERVISOR_H_
@@ -135,6 +142,17 @@ static __inline__ int HYPERVISOR_yield(void)
     return ret;
 }
 
+static __inline__ int HYPERVISOR_block(void)
+{
+    int ret;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret) : "0" (__HYPERVISOR_sched_op),
+        "b" (SCHEDOP_block) );
+
+    return ret;
+}
+
 static __inline__ int HYPERVISOR_exit(void)
 {
     int ret;
@@ -146,13 +164,25 @@ static __inline__ int HYPERVISOR_exit(void)
     return ret;
 }
 
-static __inline__ int HYPERVISOR_stop(void)
+static __inline__ int HYPERVISOR_stop(unsigned long srec)
+{
+    int ret;
+    /* NB. On suspend, control software expects a suspend record in %esi. */
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret) : "0" (__HYPERVISOR_sched_op),
+        "b" (SCHEDOP_stop), "S" (srec) : "memory" );
+
+    return ret;
+}
+
+static __inline__ long HYPERVISOR_set_dom_timer(void *timer_arg)
 {
     int ret;
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret) : "0" (__HYPERVISOR_sched_op),
-        "b" (SCHEDOP_stop) );
+        : "=a" (ret) : "0" (__HYPERVISOR_set_dom_timer),
+        "b" (timer_arg) : "memory" );
 
     return ret;
 }

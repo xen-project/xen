@@ -16,7 +16,7 @@ all: $(TARGETS)
 
 install: all
 	mkdir -p /usr/bin
-	cp -a $(INSTALL) /usr/bin
+	cp $(INSTALL) /usr/bin
 	chmod 755 /usr/bin/xen-mkdevnodes
 	chmod 755 /usr/bin/xen_nat_enable
 	chmod 755 /usr/bin/xen-clone
@@ -24,7 +24,7 @@ install: all
 
 dist: all
 	mkdir -p ../../../install/bin
-	cp -a $(INSTALL) ../../../install/bin
+	cp $(INSTALL) ../../../install/bin
 	chmod 755 ../../../install/bin/xen-mkdevnodes
 	chmod 755 ../../../install/bin/xen_nat_enable
 	chmod 755 ../../../install/bin/xen-clone

@@ -37,12 +37,6 @@
 #include <asm/fixmap.h>
 #include <asm/mc146818rtc.h>
 
-#ifdef TIME_TRACE
-#define TRC(_x) _x
-#else
-#define TRC(_x)
-#endif
-
 extern rwlock_t xtime_lock;
 extern unsigned long wall_jiffies;
 
