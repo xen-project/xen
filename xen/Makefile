@@ -45,10 +45,10 @@ $(TARGET): delete-unfresh-files make-links $(GENERATED_FILES)
 make-links: delete-links
 	ln -sf xeno include/linux
 	ln -sf asm-$(ARCH) include/asm
-	ln -sf if-$(ARCH) include/hypervisor-ifs/if-arch
+	ln -sf arch-$(ARCH) include/hypervisor-ifs/arch
 
 delete-links:
-	rm -f include/linux include/asm include/hypervisor-ifs/if-arch
+	rm -f include/linux include/asm include/hypervisor-ifs/arch
 
 # Blow away kernel.o because build info is stored statically within it.
 delete-unfresh-files:

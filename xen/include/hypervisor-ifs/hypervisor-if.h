@@ -7,7 +7,7 @@
 #ifndef __HYPERVISOR_IF_H__
 #define __HYPERVISOR_IF_H__
 
-#include "if-arch/hypervisor-if-arch.h"
+#include "arch/hypervisor-if.h"
 
 /*
  * HYPERVISOR "SYSTEM CALLS"

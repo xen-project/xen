@@ -1,7 +1,7 @@
 /******************************************************************************
- * hypervisor-if-i386.h
+ * arch-i386/hypervisor-if.h
  * 
- * i386 32-bit Interface to Xeno hypervisor.
+ * Interface to x86 32-bit Xeno hypervisor.
  */
 
 #ifndef __HYPERVISOR_IF_I386_H__

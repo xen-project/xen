@@ -1,5 +1,5 @@
 /******************************************************************************
- * hypervisor-if.h
+ * arch-x86_64/hypervisor-if.h
  * 
  * Interface to AMD x86-64 bit Xeno hypervisor.
  */
