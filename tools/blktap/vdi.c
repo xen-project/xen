@@ -171,6 +171,9 @@ void vdi_snapshot(vdi_t *vdi)
     
 int __init_vdi()
 {
+    /* sneak this in here for the moment. */
+    __rcache_init();
+    
     /* force the registry to be created if it doesn't exist. */
     vdi_registry_t *vdi_reg = get_vdi_registry();
     if (vdi_reg == NULL) {
@@ -178,6 +181,7 @@ int __init_vdi()
         return -1;
     }
     freeblock(vdi_reg);
+    
     
     return 0;
 }

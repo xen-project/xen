@@ -174,5 +174,5 @@ bb-tls: $(LIB) blockstore-benchmark.c
 bb-trans: $(LIB) blockstore-benchmark.c
 	$(CC) $(CFLAGS) -o bb-trans blockstore-benchmark.c blockstore.c -lpthread
 
-radix-test: $(LIB) radix.c blockstore-threaded-trans.c
+radix-test: $(LIB) radix.c blockstore.c
 	$(CC) $(CFLAGS) -g3 -D RADIX_STANDALONE -o radix-test radix.c blockstore-threaded-trans.c
