@@ -154,11 +154,13 @@ void __iomem * __ioremap(unsigned long phys_addr, unsigned long size, unsigned l
 	if (!size || last_addr < phys_addr)
 		return NULL;
 
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
 	/*
 	 * Don't remap the low PCI/ISA area, it's always mapped..
 	 */
 	if (phys_addr >= 0x0 && last_addr < 0x100000)
 		return isa_bus_to_virt(phys_addr);
+#endif
 
 	/*
 	 * Don't allow anybody to remap normal RAM that we're using..
@@ -287,11 +289,13 @@ void __init *bt_ioremap(unsigned long phys_addr, unsigned long size)
 	if (!size || last_addr < phys_addr)
 		return NULL;
 
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
 	/*
 	 * Don't remap the low PCI/ISA area, it's always mapped..
 	 */
 	if (phys_addr >= 0x0 && last_addr < 0x100000)
 		return isa_bus_to_virt(phys_addr);
+#endif
 
 	/*
 	 * Mappings have to be page-aligned
