@@ -60,6 +60,7 @@ schedule_data_t schedule_data[NR_CPUS];
 
 struct ac_timer     v_timer;        /* scheduling timer  */
 static void virt_timer(unsigned long foo);
+static void dump_rqueue(struct list_head *queue, char *name);
 
 
 /*****************************************************************************
@@ -148,7 +149,7 @@ int wake_up(struct task_struct *p)
 
 /****************************************************************************
  * Domain requested scheduling operations
- * KAF: No, turn it back into do_yield()!
+ * KAF: turn it back into do_yield()!
  ****************************************************************************/
 long do_sched_op(void)
 {
@@ -197,6 +198,8 @@ long sched_adjdom(int dom, unsigned long mcu_adv, unsigned long warp,
  * - current task is idle task
  * - new processes evt is lower than current one
  * - the current task already ran for it's context switch allowance
+ * XXX RN: not quite sure about the last two. Strictly, if p->evt < curr->evt
+ * should still let curr run for at least ctx_allow. But that gets quite messy.
  ****************************************************************************/
 void reschedule(struct task_struct *p)
 {
@@ -369,11 +372,12 @@ asmlinkage void schedule(void)
     ASSERT(r_time != 0);
     ASSERT(r_time > ctx_allow);
 
+#if 0
     if ( (r_time==0) || (r_time < ctx_allow)) {
         printk("[%02d]: %lx\n", this_cpu, r_time);
         dump_rqueue(&schedule_data[this_cpu].runqueue, "foo");
     }
-
+#endif
 
     prev->has_cpu = 0;
     next->has_cpu = 1;
