@@ -44,6 +44,16 @@ config XEN_WRITABLE_PAGETABLES
 
 endmenu
 
+config FOREIGN_PAGES
+	bool
+	default y if XEN_PHYSDEV_ACCESS
+	default n if !XEN_PHYSDEV_ACCESS
+
+config PAGESIZED_SKBS
+	bool
+	default y if XEN_PHYSDEV_ACCESS
+	default n if !XEN_PHYSDEV_ACCESS
+
 #config VT
 #	bool
 #	default y
