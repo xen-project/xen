@@ -298,18 +298,18 @@ void arch_vmx_do_launch(struct exec_domain *ed)
 
 static void alloc_monitor_pagetable(struct exec_domain *ed)
 {
-    unsigned long mpfn;
+    unsigned long mmfn;
     l2_pgentry_t *mpl2e, *phys_table;
-    struct pfn_info *mpfn_info;
+    struct pfn_info *mmfn_info;
     struct domain *d = ed->domain;
 
     ASSERT(!pagetable_val(ed->arch.monitor_table)); /* we should only get called once */
 
-    mpfn_info = alloc_domheap_page(NULL);
-    ASSERT( mpfn_info ); 
+    mmfn_info = alloc_domheap_page(NULL);
+    ASSERT( mmfn_info ); 
 
-    mpfn = (unsigned long) (mpfn_info - frame_table);
-    mpl2e = (l2_pgentry_t *) map_domain_mem(mpfn << PAGE_SHIFT);
+    mmfn = (unsigned long) (mmfn_info - frame_table);
+    mpl2e = (l2_pgentry_t *) map_domain_mem(mmfn << PAGE_SHIFT);
     memset(mpl2e, 0, PAGE_SIZE);
 
     memcpy(&mpl2e[DOMAIN_ENTRIES_PER_L2_PAGETABLE], 
@@ -320,7 +320,7 @@ static void alloc_monitor_pagetable(struct exec_domain *ed)
         mk_l2_pgentry((__pa(d->arch.mm_perdomain_pt) & PAGE_MASK) 
                       | __PAGE_HYPERVISOR);
 
-    ed->arch.monitor_table = mk_pagetable(mpfn << PAGE_SHIFT);
+    ed->arch.monitor_table = mk_pagetable(mmfn << PAGE_SHIFT);
     ed->arch.monitor_vtable = mpl2e;
 
     phys_table = (l2_pgentry_t *)
@@ -337,26 +337,26 @@ static void alloc_monitor_pagetable(struct exec_domain *ed)
 static void free_monitor_pagetable(struct exec_domain *ed)
 {
     l2_pgentry_t *mpl2e;
-    unsigned long mpfn;
+    unsigned long mfn;
 
     ASSERT( pagetable_val(ed->arch.monitor_table) );
     
     mpl2e = ed->arch.monitor_vtable;
 
     /*
-     * First get the pfn for hl2_table by looking at monitor_table
+     * First get the mfn for hl2_table by looking at monitor_table
      */
-    mpfn = l2_pgentry_val(mpl2e[LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT])
+    mfn = l2_pgentry_val(mpl2e[LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT])
         >> PAGE_SHIFT;
 
-    free_domheap_page(&frame_table[mpfn]);
+    free_domheap_page(&frame_table[mfn]);
     unmap_domain_mem(mpl2e);
 
     /*
      * Then free monitor_table.
      */
-    mpfn = (pagetable_val(ed->arch.monitor_table)) >> PAGE_SHIFT;
-    free_domheap_page(&frame_table[mpfn]);
+    mfn = (pagetable_val(ed->arch.monitor_table)) >> PAGE_SHIFT;
+    free_domheap_page(&frame_table[mfn]);
 
     ed->arch.monitor_table = mk_pagetable(0);
     ed->arch.monitor_vtable = 0;
