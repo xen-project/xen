@@ -108,21 +108,18 @@ void do_task_queues(u_char key, void *dev_id, struct pt_regs *regs)
 
     read_lock_irqsave(&tasklist_lock, flags); 
 
-    p = &idle0_task;
-    do {
+    for_each_domain ( p )
+    {
         printk("Xen: DOM %llu, CPU %d [has=%c], state = %s, "
                "hyp_events = %08x\n", 
                p->domain, p->processor, p->has_cpu ? 'T':'F', 
                task_states[p->state], p->hyp_events); 
         s = p->shared_info; 
-        if( !is_idle_task(p) )
-        {
-            printk("Guest: events = %08lx, events_mask = %08lx\n", 
-                   s->events, s->events_mask); 
-            printk("Notifying guest...\n"); 
-            cpu_mask |= mark_guest_event(p, _EVENT_DEBUG);
-        }
-    } while ( (p = p->next_task) != &idle0_task );
+        printk("Guest: events = %08lx, events_mask = %08lx\n", 
+               s->events, s->events_mask); 
+        printk("Notifying guest...\n"); 
+        cpu_mask |= mark_guest_event(p, _EVENT_DEBUG);
+    }
 
     read_unlock_irqrestore(&tasklist_lock, flags); 
 

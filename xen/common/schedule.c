@@ -479,15 +479,14 @@ asmlinkage void __enter_scheduler(void)
     {
         u_long t_flags; 
         write_lock_irqsave(&tasklist_lock, t_flags); 
-        p = &idle0_task;
-        do {
-            if ( (p->processor == cpu) && !is_idle_task(p) )
+        for_each_domain ( p )
+        {
+            if ( p->processor == cpu )
             {
                 p->evt -= 0xe0000000;
                 p->avt -= 0xe0000000;
             }
         } 
-        while ( (p = p->next_task) != &idle0_task );
         write_unlock_irqrestore(&tasklist_lock, t_flags); 
         schedule_data[cpu].svt -= 0xe0000000;
     }

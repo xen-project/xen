@@ -86,14 +86,14 @@ pdb_process_query (char *ptr)
     }
     else if (strcmp(ptr, "fThreadInfo") == 0)
     {
-        struct task_struct *p = &idle0_task;
+        struct task_struct *p;
         u_long flags;
 	int count = 0, buf_idx = 0;
 
         read_lock_irqsave (&tasklist_lock, flags);
 
 	pdb_out_buffer[buf_idx++] = 'm';
-        while ( (p = p->next_task) != &idle0_task )
+        for_each_domain ( p )
 	{
 	    domid_t domain = p->domain + PDB_DOMAIN_OFFSET;
 

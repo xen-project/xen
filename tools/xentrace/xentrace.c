@@ -407,8 +407,7 @@ int main(int argc, char **argv)
 {
     int ret;
     FILE *logfile = stdout;
-
-    const struct sigaction act = { .sa_handler = close_handler };
+    struct sigaction act;
 
     opts.outfile = 0;
     opts.num_cpus = 1;
@@ -421,6 +420,7 @@ int main(int argc, char **argv)
         logfile = fopen(opts.outfile, "w");
     
     /* ensure that if we get a signal, we'll do cleanup, then exit */
+    act.sa_handler = close_handler;
     sigaction(SIGHUP,  &act, 0);
     sigaction(SIGTERM, &act, 0);
     sigaction(SIGINT,  &act, 0);

@@ -152,7 +152,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     {
         domid_t dom = op->u.destroydomain.domain;
         int force = op->u.destroydomain.force;
-        ret = (dom == IDLE_DOMAIN_ID) ? -EPERM : kill_other_domain(dom, force);
+        ret = kill_other_domain(dom, force);
     }
     break;
 
@@ -210,9 +210,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         unsigned long  warpl   = op->u.adjustdom.warpl;
         unsigned long  warpu   = op->u.adjustdom.warpu;
 
-        ret = -EPERM;
-        if ( dom != IDLE_DOMAIN_ID )
-            ret = sched_adjdom(dom, mcu_adv, warp, warpl, warpu);
+        ret = sched_adjdom(dom, mcu_adv, warp, warpl, warpu);
     }
     break;
 
@@ -256,18 +254,19 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
     case DOM0_GETDOMAININFO:
     { 
-        struct task_struct *p = &idle0_task;
+        struct task_struct *p;
         u_long flags;
         int i;
 
         read_lock_irqsave (&tasklist_lock, flags);
 
-        while ( (p = p->next_task) != &idle0_task )
-            if ( !is_idle_task(p) && 
-                 (p->domain >= op->u.getdomaininfo.domain) )
+        for_each_domain ( p )
+        {
+            if ( p->domain >= op->u.getdomaininfo.domain )
                 break;
+        }
 
-        if ( p == &idle0_task )
+        if ( p == NULL )
         {
             ret = -ESRCH;
         }

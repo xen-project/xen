@@ -557,16 +557,12 @@ long vbd_probe(vbd_probe_t *probe)
     if ( probe->domain == VBD_PROBE_ALL )
     { 
         read_lock_irqsave(&tasklist_lock, flags);
-        p = &idle0_task; 
-        while ( (p = p->next_task) != &idle0_task )
+        for_each_domain ( p )
         {
-            if ( !is_idle_task(p) )
+            if ( (ret = vbd_probe_devices(&probe->xdi, p)) != 0 )
             { 
-                if( (ret = vbd_probe_devices(&probe->xdi, p)) != 0 )
-                { 
-                    read_unlock_irqrestore(&tasklist_lock, flags);
-                    goto out; 
-                }
+                read_unlock_irqrestore(&tasklist_lock, flags);
+                goto out; 
             }
         }
         read_unlock_irqrestore(&tasklist_lock, flags);

@@ -30,17 +30,16 @@
 /* Both these structures are protected by the tasklist_lock. */
 rwlock_t tasklist_lock __cacheline_aligned = RW_LOCK_UNLOCKED;
 struct task_struct *task_hash[TASK_HASH_SIZE];
+struct task_struct *task_list;
 
 struct task_struct *do_createdomain(domid_t dom_id, unsigned int cpu)
 {
-    int retval;
     char buf[100];
-    struct task_struct *p = NULL;
+    struct task_struct *p, **pp;
     unsigned long flags;
 
-    retval = -ENOMEM;
-    p = alloc_task_struct();
-    if ( p == NULL ) return NULL;
+    if ( (p = alloc_task_struct()) == NULL )
+        return NULL;
     memset(p, 0, sizeof(*p));
 
     atomic_set(&p->refcnt, 1);
@@ -48,36 +47,50 @@ struct task_struct *do_createdomain(domid_t dom_id, unsigned int cpu)
     p->domain    = dom_id;
     p->processor = cpu;
 
-    /* We use a large intermediate to avoid overflow in sprintf. */
-    sprintf(buf, "Domain-%llu", dom_id);
-    strncpy(p->name, buf, MAX_DOMAIN_NAME);
-    p->name[MAX_DOMAIN_NAME-1] = '\0';
+    memcpy(&p->thread, &idle0_task.thread, sizeof(p->thread));
 
-    spin_lock_init(&p->blk_ring_lock);
-    spin_lock_init(&p->event_channel_lock);
+    if ( p->domain != IDLE_DOMAIN_ID )
+    {
+        /* We use a large intermediate to avoid overflow in sprintf. */
+        sprintf(buf, "Domain-%llu", dom_id);
+        strncpy(p->name, buf, MAX_DOMAIN_NAME);
+        p->name[MAX_DOMAIN_NAME-1] = '\0';
 
-    p->shared_info = (void *)get_free_page(GFP_KERNEL);
-    memset(p->shared_info, 0, PAGE_SIZE);
-    SHARE_PFN_WITH_DOMAIN(virt_to_page(p->shared_info), p);
+        spin_lock_init(&p->blk_ring_lock);
+        spin_lock_init(&p->event_channel_lock);
+        
+        p->addr_limit = USER_DS;
+        
+        spin_lock_init(&p->page_list_lock);
+        INIT_LIST_HEAD(&p->page_list);
+        p->max_pages = p->tot_pages = 0;
 
-    p->mm.perdomain_pt = (l1_pgentry_t *)get_free_page(GFP_KERNEL);
-    memset(p->mm.perdomain_pt, 0, PAGE_SIZE);
-
-    init_blkdev_info(p);
-
-    p->addr_limit = USER_DS;
+        p->shared_info = (void *)get_free_page(GFP_KERNEL);
+        memset(p->shared_info, 0, PAGE_SIZE);
+        SHARE_PFN_WITH_DOMAIN(virt_to_page(p->shared_info), p);
+        
+        p->mm.perdomain_pt = (l1_pgentry_t *)get_free_page(GFP_KERNEL);
+        memset(p->mm.perdomain_pt, 0, PAGE_SIZE);
+        
+        init_blkdev_info(p);
+        
+        write_lock_irqsave(&tasklist_lock, flags);
+        pp = &task_list; /* NB. task_list is maintained in order of dom_id. */
+        for ( pp = &task_list; *pp != NULL; pp = &(*pp)->next_list )
+            if ( (*pp)->domain > p->domain )
+                break;
+        p->next_list = *pp;
+        *pp = p;
+        p->next_hash = task_hash[TASK_HASH(dom_id)];
+        task_hash[TASK_HASH(dom_id)] = p;
+        write_unlock_irqrestore(&tasklist_lock, flags);
+    }
+    else
+    {
+        sprintf(p->name, "Idle-%d", cpu);
+    }
 
     sched_add_domain(p);
-
-    spin_lock_init(&p->page_list_lock);
-    INIT_LIST_HEAD(&p->page_list);
-    p->max_pages = p->tot_pages = 0;
-
-    write_lock_irqsave(&tasklist_lock, flags);
-    SET_LINKS(p);
-    p->next_hash = task_hash[TASK_HASH(dom_id)];
-    task_hash[TASK_HASH(dom_id)] = p;
-    write_unlock_irqrestore(&tasklist_lock, flags);
 
     return p;
 }
@@ -141,9 +154,13 @@ void __kill_domain(struct task_struct *p)
      * holds a reference to the domain being queried. Take care!
      */
     write_lock_irqsave(&tasklist_lock, flags);
-    REMOVE_LINKS(p);
-    pp = &task_hash[TASK_HASH(p->domain)];
-    while ( *pp != p ) *pp = (*pp)->next_hash;
+    pp = &task_list;                       /* Delete from task_list. */
+    while ( *pp != p ) 
+        *pp = (*pp)->next_list;
+    *pp = p->next_list;
+    pp = &task_hash[TASK_HASH(p->domain)]; /* Delete from task_hash. */
+    while ( *pp != p ) 
+        *pp = (*pp)->next_hash;
     *pp = p->next_hash;
     write_unlock_irqrestore(&tasklist_lock, flags);
 
