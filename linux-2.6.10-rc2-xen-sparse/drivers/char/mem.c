@@ -202,17 +202,12 @@ static int mmap_kmem(struct file * file, struct vm_area_struct * vma)
 		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 #endif
 
-	/* Don't try to swap out physical pages.. */
-	vma->vm_flags |= VM_RESERVED;
-
-	/*
-	 * Don't dump addresses that are not real memory to a core file.
-	 */
-	if (uncached)
-		vma->vm_flags |= VM_IO;
-
-	if (remap_page_range(vma, vma->vm_start, offset, vma->vm_end-vma->vm_start,
-			     vma->vm_page_prot))
+	/* Remap-pfn-range will mark the range VM_IO and VM_RESERVED */
+	if (remap_pfn_range(vma,
+			    vma->vm_start,
+			    vma->vm_pgoff,
+			    vma->vm_end-vma->vm_start,
+			    vma->vm_page_prot))
 		return -EAGAIN;
 	return 0;
 }
