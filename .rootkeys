@@ -86,6 +86,8 @@
 3ddb79bfKvn9mt0kofpkw0QaWjxO6A xen-2.4.16/drivers/net/net_init.c
 3ddb79c0fQgORkFlqWZdP-6cDHyFIQ xen-2.4.16/drivers/net/pcnet32.c
 3ddb79bf_CBcu3QWYwq4bNAOnM2RqQ xen-2.4.16/drivers/net/setup.c
+3e45a0c6u66EL2AI36eLOmf_abXs7g xen-2.4.16/drivers/net/tg3.c
+3e45a0c6yrXj5pmQT0PvVSJ01YLABQ xen-2.4.16/drivers/net/tg3.h
 3ddb79bfh8ucmq_HqRSaURalpeAmPg xen-2.4.16/drivers/net/tulip/.depend
 3ddb79bfsJ-hdQ17EXTFiUOHisjNgQ xen-2.4.16/drivers/net/tulip/21142.c
 3ddb79bf0lzTL-ywAdOO7vctTYAmJA xen-2.4.16/drivers/net/tulip/ChangeLog
