@@ -1,43 +1,34 @@
+Future plans and enhancements
+=============================
 
+For up-to-date details of features currently under implementation,
+visit the Xen project roadmap at:
+http://www.cl.cam.ac.uk/Research/SRG/netos/xen/roadmap.html
 
-Known limitations and work in progress
-======================================
-
-The current Xen Virtual Firewall Router (VFR) implementation in the
-snapshot tree is very rudimentary, and in particular, lacks the RSIP
-IP port-space sharing across domains that provides a better
-alternative to NAT.  There's a complete new implementation under
-development which also supports much better logging and auditing
-support. For now, if you want NAT, see the xen_nat_enable scripts and
-get domain0 to do it for you.
-
+IO enhancements
+---------------
 There are also a number of memory management enhancements that didn't
 make this release: We have plans for a "universal buffer cache" that
 enables otherwise unused system memory to be used by domains in a
-read-only fashion. We also have plans for inter-domain shared-memory
-to enable high-performance bulk transport for cases where the usual
-internal networking performance isn't good enough (e.g. communication
-with a internal file server on another domain).
+read-only fashion.
 
-We have the equivalent of balloon driver functionality to control
-domain's memory usage, enabling a domain to give back unused pages to
-Xen. This needs properly documenting, and perhaps a way of domain0
-signalling to a domain that it requires it to reduce its memory
-footprint, rather than just the domain volunteering (see section on
-the improved control interface).
-
+Disk Scheduling
+---------------
 The current disk scheduler is rather simplistic (batch round robin),
 and could be replaced by e.g. Cello if we have QoS isolation
 problems. For most things it seems to work OK, but there's currently
 no service differentiation or weighting.
 
+Improved load-balancing
+-----------------------
 Currently, although Xen runs on SMP and SMT (hyperthreaded) machines,
 the scheduling is far from smart -- domains are currently statically
 assigned to a CPU when they are created (in a round robin fashion).
-The scheduler needs to be modified such that before going idle a
-logical CPU looks for work on other run queues (particularly on the
-same physical CPU). 
+We'd like to see a user-space load-balancing daemon that can shift
+domains between CPUs as their activity changes.
 
+Multiprocessor Guest VMs
+------------------------
 Xen currently only supports uniprocessor guest OSes. We have designed
 the Xen interface with MP guests in mind, and plan to build an MP
 Linux guest in due course. Basically, an MP guest would consist of
@@ -48,3 +39,21 @@ page directory to a write-able page, we must ensure that no other CPU
 still has the page in its TLB to ensure memory system integrity.  One
 other issue for supporting MP guests is that we'll need some sort of
 CPU gang scheduler, which will require some research.
+
+Cluster Management
+------------------
+There have been discussions regarding a unified cluster controller
+for Xen deployments.  This would leverage the existing features of
+Xen to present a uniform control interface for managing a cluster
+as a pool of resources, rather than a set of completely distinct
+machines.
+
+PAE Support on 32-bit x86
+-------------------------
+Xen can currently use up to 4GB of memory. It's possible for x86
+machines to address more than that (64GB), but it requires using a
+different page table format (3-level rather than 2-level) that we
+currently don't support. Adding 3-level PAE support wouldn't be
+difficult, but we'd also need to add support to all the guest
+OSs. We do not plan to add this support ourselves but volunteers
+are welcome!
