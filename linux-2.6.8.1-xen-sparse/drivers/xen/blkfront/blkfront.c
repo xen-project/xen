@@ -32,7 +32,7 @@ typedef unsigned char byte; /* from linux/ide.h */
 static unsigned int blkif_state = BLKIF_STATE_CLOSED;
 static unsigned int blkif_evtchn, blkif_irq;
 
-static volatile int blkif_control_rsp_valid;
+static int blkif_control_rsp_valid;
 static blkif_response_t blkif_control_rsp;
 
 static blkif_ring_t *blk_ring;
