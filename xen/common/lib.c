@@ -354,10 +354,10 @@ __qdivrem(uq, vq, arq)
 	return (tmp.q);
 }
 
-
 /*
  * Divide two signed quads.
  * ??? if -1/2 should produce -1 on this machine, this code is wrong
+ * (Grzegorz Milos) Note for the above: -1/2 is 0. And so it should.
  */
 s64
 __divdi3(s64 a, s64 b)
@@ -377,6 +377,7 @@ __divdi3(s64 a, s64 b)
 	return (neg ? -uq : uq);
 }
 
+
 /*
  * Divide two unsigned quads.
  */
@@ -386,6 +387,57 @@ __udivdi3(a, b)
 {
 
         return (__qdivrem(a, b, (u64 *)0));
+}
+
+/*
+ * Remainder of unsigned quad division
+ */
+u64 __umoddi3(u64 a, u64 b)
+{
+    u64 rem;
+    __qdivrem(a, b, &rem);
+    return rem;
+}
+
+/*
+ * Remainder of signed quad division.
+ * The result of mod is not always equal to division
+ * remainder. The following example shows the result for all
+ * four possible cases:
+ *  11 %  5 =  1
+ * -11 %  5 =  4
+ *  11 % -5 = -4
+ * -11 % -5 = -1
+ */
+s64 __moddi3(s64 a, s64 b)
+{
+	u64 ua, ub, urem;
+	int neg1, neg2;
+
+	if (a < 0)
+		ua = -(u64)a, neg1 = 1;
+	else
+		ua = a, neg1 = 0;
+        
+	if (b < 0)
+		ub = -(u64)b, neg2 = 1;
+	else
+		ub = b, neg2 = 0;
+	__qdivrem(ua, ub, &urem);
+    
+    /* There 4 different cases: */
+    if(neg1)
+    {
+        if(neg2)
+            return -urem;
+        else
+            return ub - urem;
+    }   
+    else
+        if(neg2)
+            return -ub + urem;
+        else
+            return urem;
 }
 
 #endif /* BITS_PER_LONG == 32 */
