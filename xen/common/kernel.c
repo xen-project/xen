@@ -366,7 +366,7 @@ void printf (const char *fmt, ...)
 void panic(const char *fmt, ...)
 {
     va_list args;
-    char buf[1024], *p;
+    char buf[1024];
     unsigned long flags;
     extern void machine_restart(char *);
     
@@ -377,10 +377,10 @@ void panic(const char *fmt, ...)
     /* Spit out multiline message in one go. */
     spin_lock_irqsave(&console_lock, flags);
     __putstr("\n****************************************\n");
-    p = buf;
-    while ( *p ) putchar(*p++);
+    __putstr(buf);
     __putstr("Aieee! CPU");
-    putchar((char)smp_processor_id() + '0');
+    sprintf(buf, "%d", smp_processor_id());
+    __putstr(buf);
     __putstr(" is toast...\n");
     __putstr("****************************************\n\n");
     __putstr("Reboot in five seconds...\n");
@@ -538,6 +538,7 @@ long do_console_write(char *str, unsigned int count)
 #define SIZEOF_BUF 256
     unsigned char safe_str[SIZEOF_BUF];
     unsigned char exported_str[SIZEOF_BUF];
+    unsigned char dom_id[5];
     unsigned long flags;
     int i=0;
     int j=0;
@@ -551,7 +552,8 @@ long do_console_write(char *str, unsigned int count)
     spin_lock_irqsave(&console_lock, flags);
 
     __putstr("DOM"); 
-    putchar(current->domain+'0'); 
+    sprintf(dom_id, "%d", current->domain);
+    __putstr(dom_id);
     __putstr(": ");
     
     for ( i = 0; i < count; i++ )
