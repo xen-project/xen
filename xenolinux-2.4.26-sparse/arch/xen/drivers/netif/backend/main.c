@@ -77,6 +77,7 @@ static spinlock_t net_schedule_list_lock;
 static unsigned long mfn_list[MAX_MFN_ALLOC];
 static unsigned int alloc_index = 0;
 static spinlock_t mfn_lock = SPIN_LOCK_UNLOCKED;
+
 static void __refresh_mfn_list(void)
 {
     int ret;
@@ -91,6 +92,7 @@ static void __refresh_mfn_list(void)
     }
     alloc_index = MAX_MFN_ALLOC;
 }
+
 static unsigned long get_new_mfn(void)
 {
     unsigned long mfn, flags;
@@ -101,11 +103,25 @@ static unsigned long get_new_mfn(void)
     spin_unlock_irqrestore(&mfn_lock, flags);
     return mfn;
 }
+
 static void dealloc_mfn(unsigned long mfn)
 {
     unsigned long flags;
+    dom_mem_op_t  op;
+
     spin_lock_irqsave(&mfn_lock, flags);
-    mfn_list[alloc_index++] = mfn;
+    if ( alloc_index != MAX_MFN_ALLOC )
+    {
+        /* Usually we can put the MFN back on the quicklist. */
+        mfn_list[alloc_index++] = mfn;
+    }
+    else
+    {
+        op.op = MEMOP_RESERVATION_INCREASE;
+        op.u.decrease.size  = 1;
+        op.u.decrease.pages = &mfn;
+        (void)HYPERVISOR_dom_mem_op(&op);
+    }
     spin_unlock_irqrestore(&mfn_lock, flags);
 }
 
@@ -180,7 +196,7 @@ static void xen_network_done_notify(void)
 /* 
  * Add following to poll() function in NAPI driver (Tigon3 is example):
  *  if ( xen_network_done() )
- *      tge_3nable_ints(tp); 
+ *      tg3_enable_ints(tp); 
  */
 int xen_network_done(void)
 {

@@ -88,14 +88,6 @@ void vbd_destroy(blkif_be_vbd_destroy_t *delete);
 int vbd_probe(blkif_t *blkif, vdisk_t *vbd_info, int max_vbds);
 void destroy_all_vbds(blkif_t *blkif);
 
-typedef struct {
-    blkif_t       *blkif;
-    unsigned long  id;
-    atomic_t       pendcnt;
-    unsigned short operation;
-    int            status;
-} pending_req_t;
-
 /* Describes a [partial] disk extent (part of a block io request) */
 typedef struct {
     unsigned short dev;
