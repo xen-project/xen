@@ -1,7 +1,7 @@
 
 CC       = gcc
 CFLAGS   = -Wall -O3 
-CFLAGS  += -I../../xen/include -I../../xenolinux-2.4.21-sparse/include
+CFLAGS  += -I../../xen/include -I../../xenolinux-2.4.22-sparse/include
 
 HDRS     = $(wildcard *.h)
 SRCS     = $(wildcard *.c)
