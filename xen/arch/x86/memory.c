@@ -1644,12 +1644,12 @@ void ptwr_flush(const int which)
         l1_pgentry_t ol1e, nl1e;
         nl1e = ptwr_info[cpu].ptinfo[which].page[i];
         ol1e = pl1e[i];
-        if (likely(l1_pgentry_val(nl1e) == l1_pgentry_val(ol1e)))
+        if (likely(l1_pgentry_val(ol1e) == l1_pgentry_val(nl1e)))
             continue;
-        if (likely(l1_pgentry_val(nl1e) == (l1_pgentry_val(ol1e) | _PAGE_RW)))
+        if (likely(l1_pgentry_val(ol1e) == (l1_pgentry_val(nl1e) | _PAGE_RW)))
         {
             if (likely(readonly_page_from_l1e(nl1e))) {
-                pl1e[i] = ptwr_info[cpu].ptinfo[which].page[i];
+                pl1e[i] = nl1e;
                 continue;
             }
         }
@@ -1659,7 +1659,7 @@ void ptwr_flush(const int which)
             MEM_LOG("ptwr: Could not re-validate l1 page\n");
             domain_crash();
         }
-        pl1e[i] = ptwr_info[cpu].ptinfo[which].page[i];
+        pl1e[i] = nl1e;
     }
     unmap_domain_mem(pl1e);
 
