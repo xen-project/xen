@@ -12,7 +12,7 @@ shift;
 
 ARGS="$*"
 
-IMAGE=../../../xenolinux-2.4.21-pre4/arch/xeno/boot/image
+IMAGE=../../../xenolinux-2.4.21/arch/xeno/boot/image
 
 
 LASTDOM=`/bin/ls /proc/xeno/ | grep -v cmd | cut -c4- | sort -rn | head -1`
