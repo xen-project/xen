@@ -311,7 +311,7 @@ unsigned long alloc_xenheap_pages(int order)
 
     for ( i = 0; i < (1 << order); i++ )
     {
-        pg[i].count_info        = PGC_always_set;
+        pg[i].count_info        = 0;
         pg[i].u.inuse.domain    = NULL;
         pg[i].u.inuse.type_info = 0;
     }
@@ -384,7 +384,7 @@ struct pfn_info *alloc_domheap_pages(struct domain *d, int order)
             }
         }
 
-        pg[i].count_info        = PGC_always_set;
+        pg[i].count_info        = 0;
         pg[i].u.inuse.domain    = NULL;
         pg[i].u.inuse.type_info = 0;
     }

@@ -297,19 +297,9 @@ void cmain(multiboot_info_t *mbi)
     xmem_cache_init();
     xmem_cache_sizes_init(max_page);
 
-    /*
-     * Create a domain-structure allocator. The SLAB_NO_REAP flag is essential!
-     * This is because in some situations a domain's reference count will be
-     * incremented by someone with no other handle on the structure -- this is 
-     * inherently racey because the struct could be freed by the time that the
-     * count is incremented. By specifying 'no-reap' we ensure that, worst
-     * case, they increment some other domain's count, rather than corrupting
-     * a random field in a random structure!
-     * See, for example, arch/x86/memory.c:get_page_from_l1e().
-     */
     domain_struct_cachep = xmem_cache_create(
         "domain_cache", sizeof(struct domain),
-        0, SLAB_HWCACHE_ALIGN | SLAB_NO_REAP, NULL, NULL);
+        0, SLAB_HWCACHE_ALIGN, NULL, NULL);
     if ( domain_struct_cachep == NULL )
         panic("No slab cache for task structs.");
 

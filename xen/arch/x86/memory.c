@@ -164,9 +164,6 @@ void arch_init_memory(void)
 
     memset(percpu_info, 0, sizeof(percpu_info));
 
-    for ( mfn = 0; mfn < max_page; mfn++ )
-        frame_table[mfn].count_info |= PGC_always_set;
-
     /* Initialise to a magic of 0x55555555 so easier to spot bugs later. */
     memset(machine_to_phys_mapping, 0x55, 4<<20);
 
@@ -193,9 +190,9 @@ void arch_init_memory(void)
           mfn < virt_to_phys(&machine_to_phys_mapping[1<<20])>>PAGE_SHIFT;
           mfn++ )
     {
-        frame_table[mfn].count_info        |= PGC_allocated | 1;
-        frame_table[mfn].u.inuse.type_info  = PGT_gdt_page | 1; /* non-RW */
-        frame_table[mfn].u.inuse.domain     = dom_xen;
+        frame_table[mfn].count_info        = PGC_allocated | 1;
+        frame_table[mfn].u.inuse.type_info = PGT_gdt_page | 1; /* non-RW */
+        frame_table[mfn].u.inuse.domain    = dom_xen;
     }
 }
 
@@ -403,8 +400,6 @@ get_page_from_l1e(
 
     if ( unlikely(!pfn_is_ram(pfn)) )
     {
-        /* SPECIAL CASE 1. Mapping an I/O page. */
-
         /* Revert to caller privileges if FD == DOMID_IO. */
         if ( d == dom_io )
             d = current;
@@ -420,33 +415,7 @@ get_page_from_l1e(
     }
 
     if ( unlikely(!get_page_from_pagenr(pfn, d)) )
-    {
-        /* SPECIAL CASE 2. Mapping a foreign page via a grant table. */
-        
-        int rc;
-        struct domain *e;
-        u32 count_info;
-        /*
-         * Yuk! Amazingly this is the simplest way to get a guaranteed atomic
-         * snapshot of a 64-bit value on IA32. x86/64 solves this of course!
-         * Basically it's a no-op CMPXCHG, to get us the current contents.
-         * No need for LOCK prefix -- we know that count_info is never zero
-         * because it contains PGC_always_set.
-         */
-        ASSERT(test_bit(_PGC_always_set, &page->count_info));
-        __asm__ __volatile__(
-            "cmpxchg8b %2"
-            : "=d" (e), "=a" (count_info),
-              "=m" (*(volatile u64 *)(&page->count_info))
-            : "0" (0), "1" (0), "c" (0), "b" (0) );
-        if ( unlikely((count_info & PGC_count_mask) == 0) ||
-             unlikely(e == NULL) || unlikely(!get_domain(e)) )
-             return 0;
-        rc = gnttab_try_map(
-            e, d, pfn, (l1v & _PAGE_RW) ? GNTTAB_MAP_RW : GNTTAB_MAP_RO);
-        put_domain(e);
-        return rc;
-    }
+        return 0;
 
     if ( l1v & _PAGE_RW )
     {
@@ -510,8 +479,7 @@ static void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
          * mappings and which unmappings are counted via the grant entry, but
          * really it doesn't matter as privileged domains have carte blanche.
          */
-        if ( likely(gnttab_try_map(e, d, pfn, (l1v & _PAGE_RW) ? 
-                                   GNTTAB_UNMAP_RW : GNTTAB_UNMAP_RO)) )
+        if ( likely(gnttab_check_unmap(e, d, pfn, !(l1v & _PAGE_RW))) )
             return;
         /* Assume this mapping was made via MMUEXT_SET_FOREIGNDOM... */
     }

@@ -24,7 +24,10 @@
  * 
  * Introducing a valid entry into the grant table:
  *  1. Write ent->domid.
- *  2. Write ent->frame (to zero if installing GTF_accept_transfer).
+ *  2. Write ent->frame:
+ *      GTF_permit_access:   Frame to which access is permitted.
+ *      GTF_accept_transfer: Pseudo-phys frame slot being filled by new
+ *                           frame, or zero if none.
  *  3. Write memory barrier (WMB).
  *  4. Write ent->flags, inc. valid type.
  * 
@@ -49,10 +52,11 @@
  *  [*] If GTF_transfer_committed is set then the grant entry is 'committed'.
  *      The guest must /not/ modify the grant entry until the address of the
  *      transferred frame is written. It is safe for the guest to spin waiting
- *      for this to occur (detect by observing non-zero value in ent->frame).
+ *      for this to occur (detect by observing GTF_transfer_completed in
+ *      ent->flags).
  *
  * Invalidating a committed GTF_accept_transfer entry:
- *  1. Wait for ent->frame != 0.
+ *  1. Wait for (ent->flags & GTF_transfer_completed).
  *
  * Changing a GTF_permit_access from writable to read-only:
  *  Use SMP-safe CMPXCHG to set GTF_readonly, while checking !GTF_writing.
@@ -86,10 +90,10 @@ typedef struct {
  *  GTF_accept_transfer: Allow @domid to transfer ownership of one page frame
  *                       to this guest. Xen writes the page number to @frame.
  */
-#define GTF_invalid         (0<<0)
-#define GTF_permit_access   (1<<0)
-#define GTF_accept_transfer (2<<0)
-#define GTF_type_mask       (3<<0)
+#define GTF_invalid         (0U<<0)
+#define GTF_permit_access   (1U<<0)
+#define GTF_accept_transfer (2U<<0)
+#define GTF_type_mask       (3U<<0)
 
 /*
  * Subflags for GTF_permit_access.
@@ -98,23 +102,26 @@ typedef struct {
  *  GTF_writing: Grant entry is currently mapped for writing by @domid. [XEN]
  */
 #define _GTF_readonly       (2)
-#define GTF_readonly        (1<<_GTF_readonly)
+#define GTF_readonly        (1U<<_GTF_readonly)
 #define _GTF_reading        (3)
-#define GTF_reading         (1<<_GTF_reading)
+#define GTF_reading         (1U<<_GTF_reading)
 #define _GTF_writing        (4)
-#define GTF_writing         (1<<_GTF_writing)
+#define GTF_writing         (1U<<_GTF_writing)
 
 /*
  * Subflags for GTF_accept_transfer:
  *  GTF_transfer_committed: Xen sets this flag to indicate that it is committed
  *      to transferring ownership of a page frame. When a guest sees this flag
- *      it must /not/ modify the grant entry until the address of the
- *      transferred frame is written into the entry.
- *      NB. It is safe for the guest to spin-wait on the frame address:
- *          Xen will always write the frame address in a timely manner.
+ *      it must /not/ modify the grant entry until GTF_transfer_completed is
+ *      set by Xen.
+ *  GTF_transfer_completed: It is safe for the guest to spin-wait on this flag
+ *      after reading GTF_transfer_committed. Xen will always write the frame
+ *      address, followed by ORing this flag, in a timely manner.
  */
 #define _GTF_transfer_committed (2)
-#define GTF_transfer_committed  (1<<_GTF_transfer_committed)
+#define GTF_transfer_committed  (1U<<_GTF_transfer_committed)
+#define _GTF_transfer_completed (3)
+#define GTF_transfer_completed  (1U<<_GTF_transfer_completed)
 
 
 /***********************************
@@ -127,28 +134,56 @@ typedef struct {
 typedef u16 grant_ref_t;
 
 /*
- * GNTTABOP_update_pin_status: Change the pin status of of <dom>'s grant entry
- * with reference <ref>.
+ * GNTTABOP_map_grant_ref: Map the grant entry (<dom>,<ref>) for access
+ * by devices and/or host CPUs. If successful, <handle> is a tracking number
+ * that must be presented later to destroy the mapping(s). On error, <handle>
+ * is a negative status code.
  * NOTES:
- *  1. If GNTPIN_dev_accessible is specified then <dev_bus_addr> is the address
+ *  1. If GNTPIN_map_for_dev is specified then <dev_bus_addr> is the address
  *     via which I/O devices may access the granted frame.
- *  2. If GNTPIN_host_accessible is specified then <host_phys_addr> is the
- *     physical address of the frame, which may be mapped into the caller's
- *     page tables.
+ *  2. If GNTPIN_map_for_host is specified then a mapping will be added at
+ *     virtual address <host_virt_addr> in the current address space.
+ *  3. Mappings should only be destroyed via GNTTABOP_unmap_grant_ref. If a
+ *     host mapping is destroyed by other means then it is *NOT* guaranteed
+ *     to be accounted to the correct grant reference!
  */
-#define GNTTABOP_update_pin_status    0
+#define GNTTABOP_map_grant_ref        0
 typedef struct {
     /* IN parameters. */
-    domid_t     dom;                  /*  0 */
-    grant_ref_t ref;                  /*  2 */
-    u16         pin_flags;            /*  4 */
-    u16         __pad;                /*  6 */
+    memory_t    host_virt_addr;       /*  0 */
+    MEMORY_PADDING;
+    domid_t     dom;                  /*  8 */
+    grant_ref_t ref;                  /* 10 */
+    u16         flags;                /* 12: GNTMAP_* */
     /* OUT parameters. */
+    s16         handle;               /* 14: +ve: handle; -ve: GNTST_* */
+    memory_t    dev_bus_addr;         /* 16 */
+    MEMORY_PADDING;
+} PACKED gnttab_map_grant_ref_t; /* 24 bytes */
+
+/*
+ * GNTTABOP_unmap_grant_ref: Destroy one or more grant-reference mappings
+ * tracked by <handle>. If <host_virt_addr> or <dev_bus_addr> is zero, that
+ * field is ignored. If non-zero, they must refer to a device/host mapping
+ * that is tracked by <handle>
+ * NOTES:
+ *  1. The call may fail in an undefined manner if either mapping is not
+ *     tracked by <handle>.
+ *  3. After executing a batch of unmaps, it is guaranteed that no stale
+ *     mappings will remain in the device or host TLBs.
+ */
+#define GNTTABOP_unmap_grant_ref      1
+typedef struct {
+    /* IN parameters. */
+    memory_t    host_virt_addr;       /*  0 */
+    MEMORY_PADDING;
     memory_t    dev_bus_addr;         /*  8 */
     MEMORY_PADDING;
-    memory_t    host_phys_addr;       /* 12 */
-    MEMORY_PADDING;
-} PACKED gnttab_update_pin_status_t; /* 16 bytes */
+    u16         handle;               /* 16 */
+    /* OUT parameters. */
+    s16         status;               /* 18: GNTST_* */
+    u32         __pad;
+} PACKED gnttab_unmap_grant_ref_t; /* 24 bytes */
 
 /*
  * GNTTABOP_setup_table: Set up a grant table for <dom> comprising at least
@@ -159,38 +194,58 @@ typedef struct {
  *  2. Only a sufficiently-privileged domain may specify <dom> != DOMID_SELF.
  *  3. Xen may not support more than a single grant-table page per domain.
  */
-#define GNTTABOP_setup_table          1
+#define GNTTABOP_setup_table          2
 typedef struct {
     /* IN parameters. */
     domid_t     dom;                  /*  0 */
     u16         nr_frames;            /*  2 */
-    u32         __pad;
+    u16         __pad;
     /* OUT parameters. */
+    s16         status;               /*  6: GNTST_* */
     unsigned long *frame_list;        /*  8 */
     MEMORY_PADDING;
 } PACKED gnttab_setup_table_t; /* 16 bytes */
 
-typedef struct {
-    u32 cmd; /* GNTTABOP_* */         /*  0 */
-    u32 __reserved;                   /*  4 */
-    union {                           /*  8 */
-        gnttab_update_pin_status_t update_pin_status;
-        gnttab_setup_table_t       setup_table;
-        u8                         __dummy[16];
-    } PACKED u;
-} PACKED gnttab_op_t; /* 24 bytes */
+/*
+ * Bitfield values for update_pin_status.flags.
+ */
+ /* Map the grant entry for access by I/O devices. */
+#define _GNTMAP_device_map      (0)
+#define GNTMAP_device_map       (1<<_GNTMAP_device_map)
+ /* Map the grant entry for access by host CPUs. */
+#define _GNTMAP_host_map        (1)
+#define GNTMAP_host_map         (1<<_GNTMAP_host_map)
+ /* Accesses to the granted frame will be restricted to read-only access. */
+#define _GNTMAP_readonly        (2)
+#define GNTMAP_readonly         (1<<_GNTMAP_readonly)
+ /*
+  * GNTMAP_host_map subflag:
+  *  0 => The host mapping is usable only by the guest OS.
+  *  1 => The host mapping is usable by guest OS + current application.
+  */
+#define _GNTMAP_application_map (3)
+#define GNTMAP_application_map  (1<<_GNTMAP_application_map)
 
 /*
- * Bitfield values for <pin_flags>.
+ * Values for error status returns. All errors are -ve.
  */
- /* Pin the grant entry for access by I/O devices. */
-#define _GNTPIN_dev_accessible  (0)
-#define GNTPIN_dev_accessible   (1<<_GNTPIN_dev_accessible)
- /* Pin the grant entry for access by host CPUs. */
-#define _GNTPIN_host_accessible (1)
-#define GNTPIN_host_accessible  (1<<_GNTPIN_host_accessible)
- /* Accesses to the granted frame will be restricted to read-only access. */
-#define _GNTPIN_readonly        (2)
-#define GNTPIN_readonly         (1<<_GNTPIN_readonly)
+#define GNTST_okay             (0)
+#define GNTST_general_error    (-1) /* General undefined error.              */
+#define GNTST_bad_domain       (-2) /* Unrecognsed domain id.                */
+#define GNTST_bad_gntref       (-3) /* Unrecognised or inappropriate gntref. */
+#define GNTST_bad_handle       (-3) /* Unrecognised or inappropriate handle. */
+#define GNTST_no_device_space  (-4) /* Out of space in I/O MMU.              */
+#define GNTST_permission_denied (-5) /* Not enough privilege for operation.  */
+
+#define GNTTABOP_error_msgs {                   \
+    "okay",                                     \
+    "undefined error",                          \
+    "unrecognised domain id",                   \
+    "invalid grant reference",                  \
+    "invalid mapping handle",                   \
+    "no spare translation slot in the I/O MMU", \
+    "permission denied"                         \
+}
+        
 
 #endif /* __HYPERVISOR_IFS_GRANT_TABLE_H__ */

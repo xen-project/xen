@@ -16,7 +16,7 @@
 #include <asm-xen/hypervisor.h>
 #include <asm-xen/hypervisor-ifs/grant_table.h>
 
-grant_ref_t
+int
 gnttab_grant_foreign_access(
     domid_t domid, unsigned long frame, int readonly);
 
@@ -24,7 +24,7 @@ void
 gnttab_end_foreign_access(
     grant_ref_t ref, int readonly);
 
-grant_ref_t
+int
 gnttab_grant_foreign_transfer(
     domid_t domid);
 

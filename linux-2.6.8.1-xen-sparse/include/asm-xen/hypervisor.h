@@ -181,7 +181,9 @@ void deallocate_lowmem_region(unsigned long vstart, unsigned long pages);
  * Assembler stubs for hyper-calls.
  */
 
-static inline int HYPERVISOR_set_trap_table(trap_info_t *table)
+static inline int
+HYPERVISOR_set_trap_table(
+    trap_info_t *table)
 {
     int ret;
     __asm__ __volatile__ (
@@ -192,8 +194,9 @@ static inline int HYPERVISOR_set_trap_table(trap_info_t *table)
     return ret;
 }
 
-static inline int HYPERVISOR_mmu_update(mmu_update_t *req, int count,
-					int *success_count)
+static inline int
+HYPERVISOR_mmu_update(
+    mmu_update_t *req, int count, int *success_count)
 {
     int ret;
     __asm__ __volatile__ (
@@ -204,7 +207,9 @@ static inline int HYPERVISOR_mmu_update(mmu_update_t *req, int count,
     return ret;
 }
 
-static inline int HYPERVISOR_set_gdt(unsigned long *frame_list, int entries)
+static inline int
+HYPERVISOR_set_gdt(
+    unsigned long *frame_list, int entries)
 {
     int ret;
     __asm__ __volatile__ (
@@ -216,7 +221,9 @@ static inline int HYPERVISOR_set_gdt(unsigned long *frame_list, int entries)
     return ret;
 }
 
-static inline int HYPERVISOR_stack_switch(unsigned long ss, unsigned long esp)
+static inline int
+HYPERVISOR_stack_switch(
+    unsigned long ss, unsigned long esp)
 {
     int ret;
     __asm__ __volatile__ (
@@ -227,7 +234,8 @@ static inline int HYPERVISOR_stack_switch(unsigned long ss, unsigned long esp)
     return ret;
 }
 
-static inline int HYPERVISOR_set_callbacks(
+static inline int
+HYPERVISOR_set_callbacks(
     unsigned long event_selector, unsigned long event_address,
     unsigned long failsafe_selector, unsigned long failsafe_address)
 {
@@ -241,7 +249,9 @@ static inline int HYPERVISOR_set_callbacks(
     return ret;
 }
 
-static inline int HYPERVISOR_fpu_taskswitch(void)
+static inline int
+HYPERVISOR_fpu_taskswitch(
+    void)
 {
     int ret;
     __asm__ __volatile__ (
@@ -251,7 +261,9 @@ static inline int HYPERVISOR_fpu_taskswitch(void)
     return ret;
 }
 
-static inline int HYPERVISOR_yield(void)
+static inline int
+HYPERVISOR_yield(
+    void)
 {
     int ret;
     __asm__ __volatile__ (
@@ -262,7 +274,9 @@ static inline int HYPERVISOR_yield(void)
     return ret;
 }
 
-static inline int HYPERVISOR_block(void)
+static inline int
+HYPERVISOR_block(
+    void)
 {
     int ret;
     __asm__ __volatile__ (
@@ -273,7 +287,9 @@ static inline int HYPERVISOR_block(void)
     return ret;
 }
 
-static inline int HYPERVISOR_shutdown(void)
+static inline int
+HYPERVISOR_shutdown(
+    void)
 {
     int ret;
     __asm__ __volatile__ (
@@ -285,7 +301,9 @@ static inline int HYPERVISOR_shutdown(void)
     return ret;
 }
 
-static inline int HYPERVISOR_reboot(void)
+static inline int
+HYPERVISOR_reboot(
+    void)
 {
     int ret;
     __asm__ __volatile__ (
@@ -297,7 +315,9 @@ static inline int HYPERVISOR_reboot(void)
     return ret;
 }
 
-static inline int HYPERVISOR_suspend(unsigned long srec)
+static inline int
+HYPERVISOR_suspend(
+    unsigned long srec)
 {
     int ret;
     /* NB. On suspend, control software expects a suspend record in %esi. */
@@ -310,7 +330,9 @@ static inline int HYPERVISOR_suspend(unsigned long srec)
     return ret;
 }
 
-static inline long HYPERVISOR_set_timer_op(u64 timeout)
+static inline long
+HYPERVISOR_set_timer_op(
+    u64 timeout)
 {
     int ret;
     unsigned long timeout_hi = (unsigned long)(timeout>>32);
@@ -323,7 +345,9 @@ static inline long HYPERVISOR_set_timer_op(u64 timeout)
     return ret;
 }
 
-static inline int HYPERVISOR_dom0_op(dom0_op_t *dom0_op)
+static inline int
+HYPERVISOR_dom0_op(
+    dom0_op_t *dom0_op)
 {
     int ret;
     dom0_op->interface_version = DOM0_INTERFACE_VERSION;
@@ -335,7 +359,9 @@ static inline int HYPERVISOR_dom0_op(dom0_op_t *dom0_op)
     return ret;
 }
 
-static inline int HYPERVISOR_set_debugreg(int reg, unsigned long value)
+static inline int
+HYPERVISOR_set_debugreg(
+    int reg, unsigned long value)
 {
     int ret;
     __asm__ __volatile__ (
@@ -346,7 +372,9 @@ static inline int HYPERVISOR_set_debugreg(int reg, unsigned long value)
     return ret;
 }
 
-static inline unsigned long HYPERVISOR_get_debugreg(int reg)
+static inline unsigned long
+HYPERVISOR_get_debugreg(
+    int reg)
 {
     unsigned long ret;
     __asm__ __volatile__ (
@@ -357,7 +385,8 @@ static inline unsigned long HYPERVISOR_get_debugreg(int reg)
     return ret;
 }
 
-static inline int HYPERVISOR_update_descriptor(
+static inline int
+HYPERVISOR_update_descriptor(
     unsigned long ma, unsigned long word1, unsigned long word2)
 {
     int ret;
@@ -369,7 +398,9 @@ static inline int HYPERVISOR_update_descriptor(
     return ret;
 }
 
-static inline int HYPERVISOR_set_fast_trap(int idx)
+static inline int
+HYPERVISOR_set_fast_trap(
+    int idx)
 {
     int ret;
     __asm__ __volatile__ (
@@ -380,10 +411,10 @@ static inline int HYPERVISOR_set_fast_trap(int idx)
     return ret;
 }
 
-static inline int HYPERVISOR_dom_mem_op(unsigned int   op,
-                                        unsigned long *extent_list,
-                                        unsigned long  nr_extents,
-                                        unsigned int   extent_order)
+static inline int
+HYPERVISOR_dom_mem_op(
+    unsigned int op, unsigned long *extent_list,
+    unsigned long nr_extents, unsigned int extent_order)
 {
     int ret;
     __asm__ __volatile__ (
@@ -396,7 +427,9 @@ static inline int HYPERVISOR_dom_mem_op(unsigned int   op,
     return ret;
 }
 
-static inline int HYPERVISOR_multicall(void *call_list, int nr_calls)
+static inline int
+HYPERVISOR_multicall(
+    void *call_list, int nr_calls)
 {
     int ret;
     __asm__ __volatile__ (
@@ -407,7 +440,8 @@ static inline int HYPERVISOR_multicall(void *call_list, int nr_calls)
     return ret;
 }
 
-static inline int HYPERVISOR_update_va_mapping(
+static inline int
+HYPERVISOR_update_va_mapping(
     unsigned long page_nr, pte_t new_val, unsigned long flags)
 {
     int ret;
@@ -426,7 +460,9 @@ static inline int HYPERVISOR_update_va_mapping(
     return ret;
 }
 
-static inline int HYPERVISOR_event_channel_op(void *op)
+static inline int
+HYPERVISOR_event_channel_op(
+    void *op)
 {
     int ret;
     __asm__ __volatile__ (
@@ -437,7 +473,9 @@ static inline int HYPERVISOR_event_channel_op(void *op)
     return ret;
 }
 
-static inline int HYPERVISOR_xen_version(int cmd)
+static inline int
+HYPERVISOR_xen_version(
+    int cmd)
 {
     int ret;
     __asm__ __volatile__ (
@@ -448,7 +486,9 @@ static inline int HYPERVISOR_xen_version(int cmd)
     return ret;
 }
 
-static inline int HYPERVISOR_console_io(int cmd, int count, char *str)
+static inline int
+HYPERVISOR_console_io(
+    int cmd, int count, char *str)
 {
     int ret;
     __asm__ __volatile__ (
@@ -459,7 +499,9 @@ static inline int HYPERVISOR_console_io(int cmd, int count, char *str)
     return ret;
 }
 
-static inline int HYPERVISOR_physdev_op(void *physdev_op)
+static inline int
+HYPERVISOR_physdev_op(
+    void *physdev_op)
 {
     int ret;
     __asm__ __volatile__ (
@@ -470,18 +512,21 @@ static inline int HYPERVISOR_physdev_op(void *physdev_op)
     return ret;
 }
 
-static inline int HYPERVISOR_grant_table_op(void *gnttab_op)
+static inline int
+HYPERVISOR_grant_table_op(
+    unsigned int cmd, void *uop, unsigned int count)
 {
     int ret;
     __asm__ __volatile__ (
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_grant_table_op),
-        "b" (gnttab_op) : "memory" );
+        "b" (cmd), "c" (count), "d" (uop) : "memory" );
 
     return ret;
 }
 
-static inline int HYPERVISOR_update_va_mapping_otherdomain(
+static inline int
+HYPERVISOR_update_va_mapping_otherdomain(
     unsigned long page_nr, pte_t new_val, unsigned long flags, domid_t domid)
 {
     int ret;
@@ -494,7 +539,9 @@ static inline int HYPERVISOR_update_va_mapping_otherdomain(
     return ret;
 }
 
-static inline int HYPERVISOR_vm_assist(unsigned int cmd, unsigned int type)
+static inline int
+HYPERVISOR_vm_assist(
+    unsigned int cmd, unsigned int type)
 {
     int ret;
     __asm__ __volatile__ (

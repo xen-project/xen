@@ -70,33 +70,30 @@ struct pfn_info
 #define PGT_type_mask       (7<<29) /* Bits 29-31. */
  /* Has this page been validated for use as its current type? */
 #define _PGT_validated      28
-#define PGT_validated       (1<<_PGT_validated)
+#define PGT_validated       (1U<<_PGT_validated)
  /* Owning guest has pinned this page to its current type? */
 #define _PGT_pinned         27
-#define PGT_pinned          (1<<_PGT_pinned)
+#define PGT_pinned          (1U<<_PGT_pinned)
  /* The 10 most significant bits of virt address if this is a page table. */
 #define PGT_va_shift        17
-#define PGT_va_mask         (((1<<10)-1)<<PGT_va_shift)
+#define PGT_va_mask         (((1U<<10)-1)<<PGT_va_shift)
  /* Is the back pointer still mutable (i.e. not fixed yet)? */
-#define PGT_va_mutable      (((1<<10)-1)<<PGT_va_shift)
+#define PGT_va_mutable      (((1U<<10)-1)<<PGT_va_shift)
  /* Is the back pointer unknown (e.g., p.t. is mapped at multiple VAs)? */
-#define PGT_va_unknown      (((1<<10)-2)<<PGT_va_shift)
+#define PGT_va_unknown      (((1U<<10)-2)<<PGT_va_shift)
  /* 17-bit count of uses of this frame as its current type. */
-#define PGT_count_mask      ((1<<17)-1)
+#define PGT_count_mask      ((1U<<17)-1)
 
  /* Cleared when the owning guest 'frees' this page. */
-#define _PGC_allocated                31
-#define PGC_allocated                 (1<<_PGC_allocated)
- /* This bit is always set, guaranteeing that the count word is never zero. */
-#define _PGC_always_set               30
-#define PGC_always_set                (1<<_PGC_always_set)
- /* 30-bit count of references to this frame. */
-#define PGC_count_mask                ((1<<30)-1)
+#define _PGC_allocated      31
+#define PGC_allocated       (1U<<_PGC_allocated)
+ /* 31-bit count of references to this frame. */
+#define PGC_count_mask      ((1U<<31)-1)
 
 /* We trust the slab allocator in slab.c, and our use of it. */
-#define PageSlab(page)		(1)
-#define PageSetSlab(page)	((void)0)
-#define PageClearSlab(page)	((void)0)
+#define PageSlab(page)	    (1)
+#define PageSetSlab(page)   ((void)0)
+#define PageClearSlab(page) ((void)0)
 
 #define IS_XEN_HEAP_FRAME(_pfn) (page_to_phys(_pfn) < xenheap_phys_end)
 
@@ -108,7 +105,7 @@ struct pfn_info
         wmb(); /* install valid domain ptr before updating refcnt. */       \
         spin_lock(&(_dom)->page_alloc_lock);                                \
         /* _dom holds an allocation reference */                            \
-        ASSERT((_pfn)->count_info == PGC_always_set);                       \
+        ASSERT((_pfn)->count_info == 0);                                    \
         (_pfn)->count_info |= PGC_allocated | 1;                            \
         if ( unlikely((_dom)->xenheap_pages++ == 0) )                       \
             get_knownalive_domain(_dom);                                    \

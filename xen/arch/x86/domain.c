@@ -708,7 +708,7 @@ int construct_dom0(struct domain *p,
         page = &frame_table[mfn];
         page->u.inuse.domain    = p;
         page->u.inuse.type_info = 0;
-        page->count_info        = PGC_always_set | PGC_allocated | 1;
+        page->count_info        = PGC_allocated | 1;
         list_add_tail(&page->list, &p->page_list);
         p->tot_pages++; p->max_pages++;
     }
