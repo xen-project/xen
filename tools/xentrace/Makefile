@@ -1,10 +1,16 @@
 
+XEN_ROOT=../..
+include $(XEN_ROOT)/tools/Make.defs
+
 CC       = gcc
 CFLAGS   = -Wall -O3 -Werror
-CFLAGS  += -I../../xen/include/hypervisor-ifs
-CFLAGS  += -I../../linux-xen-sparse/include
-CFLAGS  += -I../xu/lib
-CFLAGS  += -I../lib
+
+CFLAGS  += -I $(XEN_HYPERVISOR_IFS)
+CFLAGS  += -I $(XEN_LINUX_INCLUDE)
+CFLAGS  += -I $(XEN_XC)
+CFLAGS  += -I $(XEN_XU)
+CFLAGS  += -I $(XEN_LIBXC)
+CFLAGS  += -I $(XEN_LIBXUTIL)
 
 HDRS     = $(wildcard *.h)
 OBJS     = $(patsubst %.c,%.o,$(wildcard *.c))
@@ -28,4 +34,4 @@ clean:
 	$(RM) *.a *.so *.o *.rpm $(BIN)
 
 %: %.c $(HDRS) Makefile
-	$(CC) $(CFLAGS) -o $@ $< -L../xc/lib -lxc
+	$(CC) $(CFLAGS) -o $@ $< -L$(XEN_LIBXC) -lxc

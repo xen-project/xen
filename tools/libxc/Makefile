@@ -5,19 +5,20 @@ SONAME   = libxc.so.$(MAJOR)
 
 CC       = gcc
 
-XEN_ROOT = ../../..
+XEN_ROOT = ../..
+include $(XEN_ROOT)/tools/Make.defs
 
-vpath %.h      $(XEN_ROOT)/xen/include/hypervisor-ifs
-INCLUDES += -I $(XEN_ROOT)/xen/include/hypervisor-ifs
+vpath %.h      $(XEN_HYPERVISOR_IFS)
+INCLUDES += -I $(XEN_HYPERVISOR_IFS)
 
-vpath %.h      $(XEN_ROOT)/tools/xu/lib
-INCLUDES += -I $(XEN_ROOT)/tools/xu/lib
+vpath %h       $(XEN_LINUX_INCLUDE)
+INCLUDES += -I $(XEN_LINUX_INCLUDE)
 
-vpath %h       $(XEN_ROOT)/linux-xen-sparse/include
-INCLUDES += -I $(XEN_ROOT)/linux-xen-sparse/include
+vpath %.h      $(XEN_XU)
+INCLUDES += -I $(XEN_XU)
 
-vpath %c       $(XEN_ROOT)/tools/lib
-INCLUDES += -I $(XEN_ROOT)/tools/lib
+vpath %c       $(XEN_LIBXUTIL)
+INCLUDES += -I $(XEN_LIBXUTIL)
 
 LIB_SRCS :=
 LIB_SRCS += allocate.c
@@ -54,11 +55,7 @@ SRCS     += xc_physdev.c
 SRCS     += xc_private.c
 SRCS     += xc_rrobin.c
 
-SRCS     += $(LIB_SRCS)
-
-#CFLAGS  += -I../../../xen/include/hypervisor-ifs
-#CFLAGS  += -I../../xu/lib
-#CFLAGS  += -I../../../linux-xen-sparse/include
+#SRCS     += $(LIB_SRCS)
 
 CFLAGS   += -Wall
 CFLAGS   += -Werror
@@ -109,7 +106,7 @@ libxc.so:
 libxc.so.$(MAJOR):
 	ln -sf libxc.so.$(MAJOR).$(MINOR) $@
 libxc.so.$(MAJOR).$(MINOR): $(OBJS)
-	$(CC) -Wl,-soname -Wl,$(SONAME) -shared -o $@ $^ -lz
+	$(CC) -Wl,-soname -Wl,$(SONAME) -shared -o $@ $^ ../libxutil/libxutil.a -lz 
 
 %.o: %.c Makefile
 

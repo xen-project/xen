@@ -4,7 +4,7 @@ from twisted.internet import defer
 
 from xen.xend import sxp
 from xen.xend import PrettyPrint
-from xen.xend import XendBridge
+from xen.xend import Vifctl
 
 import channel
 import controller
@@ -115,10 +115,11 @@ class NetDev(controller.Dev):
         self.mac = mac
         self.evtchn = None
         self.bridge = None
+        self.ipaddr = []
 
     def sxpr(self):
         vif = str(self.vif)
-        mac = ':'.join(map(lambda x: "%x" % x, self.mac))
+        mac = self.get_mac()
         val = ['netdev', ['vif', vif], ['mac', mac]]
         if self.bridge:
             val.append(['bridge', self.bridge])
@@ -128,20 +129,31 @@ class NetDev(controller.Dev):
                         self.evtchn['port2']])
         return val
 
-    def bridge_add(self, bridge):
-        self.bridge = XendBridge.vif_bridge_add(self.controller.dom, self.vif, bridge)
+    def get_vifname(self):
+        return "vif%d.%d" % (self.controller.dom, self.vif)
 
-    def bridge_rem(self):
-        if not self.bridge: return
-        XendBridge.vif_bridge_rem(self.controller.dom, self.vif, self.bridge)
-        self.bridge = None
+    def get_mac(self):
+        return ':'.join(map(lambda x: "%x" % x, self.mac))
+
+    def vifctl_params(self):
+        return { 'mac'   : self.get_mac(),
+                 'bridge': self.bridge,
+                 'ipaddr': self.ipaddr }
+
+    def up(self, bridge=None, ipaddr=[]):
+        self.bridge = bridge
+        self.ipaddr = ipaddr
+        Vifctl.up(self.get_vifname(), **self.vifctl_params())
+
+    def down(self):
+        Vifctl.down(self.get_vifname(), **self.vifctl_params())
 
     def destroy(self):
         def cb_destroy(val):
             self.controller.send_be_destroy(self.vif)
         print 'NetDev>destroy>', 'vif=', self.vif
         PrettyPrint.prettyprint(self.sxpr())
-        self.bridge_rem()
+        self.down()
         d = self.controller.factory.addDeferred()
         d.addCallback(cb_destroy)
         self.controller.send_be_disconnect(self.vif)

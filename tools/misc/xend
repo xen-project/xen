@@ -1,6 +1,8 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #  -*- mode: python; -*-
+#============================================================================
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+#============================================================================
 
 """Xen management daemon. Lives in /usr/sbin.
    Provides console server and HTTP management api.

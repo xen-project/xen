@@ -24,8 +24,6 @@ import sxp
 import XendConsole
 xendConsole = XendConsole.instance()
 
-import XendBridge
-
 import server.SrvDaemon
 xend = server.SrvDaemon.instance()
 
@@ -628,7 +626,7 @@ class XendDomainInfo:
         """Set configuration flags if the vm is a backend for netif of blkif.
         """
         for c in sxp.children(self.config, 'backend'):
-            name = sxp.name(c)
+            name = sxp.name(sxp.child0(c))
             if name == 'blkif':
                 self.blkif_backend = 1
             elif name == 'netif':
@@ -765,7 +763,7 @@ def vm_dev_vif(vm, val, index):
         if devid:
             dev.setprop('id', devid)
         bridge = sxp.child_value(val, "bridge")
-        dev.bridge_add(bridge)
+        dev.up(bridge)
         vm.add_device('vif', dev)
         print 'vm_dev_vif> created', dev
         return id
