@@ -19,6 +19,7 @@
 #include <linux/gfp.h>
 #include <linux/poll.h>
 #include <asm/pgalloc.h>
+#include <asm-xen/xen-public/io/blkif.h> /* for control ring. */
 
 #include "blktap.h"
 
@@ -40,6 +41,11 @@ unsigned long rings_vstart;
 /* Rings up to user space. */
 static blkif_front_ring_t blktap_ufe_ring;
 static blkif_back_ring_t  blktap_ube_ring;
+static ctrl_front_ring_t  blktap_uctrl_ring;
+
+/* local prototypes */
+static int blktap_read_fe_ring(void);
+static int blktap_read_be_ring(void);
 
 /* -------[ blktap vm ops ]------------------------------------------- */
 
@@ -66,16 +72,28 @@ struct vm_operations_struct blktap_vm_ops = {
 static int blktap_open(struct inode *inode, struct file *filp)
 {
     blkif_sring_t *sring;
+    ctrl_sring_t *csring;
     
     if ( test_and_set_bit(0, &blktap_dev_inuse) )
         return -EBUSY;
 
     printk(KERN_ALERT "blktap open.\n");
+    
+    /* Allocate the ctrl ring. */
+    csring = (ctrl_sring_t *)get_zeroed_page(GFP_KERNEL);
+    if (csring == NULL)
+        goto fail_nomem;
+
+    SetPageReserved(virt_to_page(csring));
+    
+    SHARED_RING_INIT(CTRL_RING, csring);
+    FRONT_RING_INIT(CTRL_RING, &blktap_uctrl_ring, csring);
+
 
     /* Allocate the fe ring. */
     sring = (blkif_sring_t *)get_zeroed_page(GFP_KERNEL);
     if (sring == NULL)
-        goto fail_nomem;
+        goto fail_free_ctrl;
 
     SetPageReserved(virt_to_page(sring));
     
@@ -95,6 +113,9 @@ static int blktap_open(struct inode *inode, struct file *filp)
     DPRINTK(KERN_ALERT "blktap open.\n");
 
     return 0;
+    
+ fail_free_ctrl:
+    free_page( (unsigned long) blktap_uctrl_ring.sring);
 
  fail_free_fe:
     free_page( (unsigned long) blktap_ufe_ring.sring);
@@ -111,6 +132,9 @@ static int blktap_release(struct inode *inode, struct file *filp)
     printk(KERN_ALERT "blktap closed.\n");
 
     /* Free the ring page. */
+    ClearPageReserved(virt_to_page(blktap_uctrl_ring.sring));
+    free_page((unsigned long) blktap_uctrl_ring.sring);
+
     ClearPageReserved(virt_to_page(blktap_ufe_ring.sring));
     free_page((unsigned long) blktap_ufe_ring.sring);
 
@@ -120,6 +144,15 @@ static int blktap_release(struct inode *inode, struct file *filp)
     return 0;
 }
 
+/* Note on mmap:
+ * remap_pfn_range sets VM_IO on vma->vm_flags.  In trying to make libaio
+ * work to do direct page access from userspace, this ended up being a
+ * problem.  The bigger issue seems to be that there is no way to map
+ * a foreign page in to user space and have the virtual address of that 
+ * page map sanely down to a mfn.
+ * Removing the VM_IO flag results in a loop in get_user_pages, as 
+ * pfn_valid() always fails on a foreign page.
+ */
 static int blktap_mmap(struct file *filp, struct vm_area_struct *vma)
 {
     int size;
@@ -148,20 +181,28 @@ static int blktap_mmap(struct file *filp, struct vm_area_struct *vma)
     /* not sure if I really need to do this... */
     vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 
-    DPRINTK("Mapping be_ring page %lx.\n", __pa(blktap_ube_ring.sring));
-    if (remap_page_range(vma, vma->vm_start, 
-                         __pa(blktap_ube_ring.sring), 
+    DPRINTK("Mapping ctrl_ring page %lx.\n", __pa(blktap_uctrl_ring.sring));
+    if (remap_pfn_range(vma, vma->vm_start, 
+                         __pa(blktap_uctrl_ring.sring) >> PAGE_SHIFT, 
                          PAGE_SIZE, vma->vm_page_prot)) {
-        WPRINTK("be_ring: remap_page_range failure!\n");
+        WPRINTK("ctrl_ring: remap_pfn_range failure!\n");
+    }
+
+
+    DPRINTK("Mapping be_ring page %lx.\n", __pa(blktap_ube_ring.sring));
+    if (remap_pfn_range(vma, vma->vm_start + PAGE_SIZE, 
+                         __pa(blktap_ube_ring.sring) >> PAGE_SHIFT, 
+                         PAGE_SIZE, vma->vm_page_prot)) {
+        WPRINTK("be_ring: remap_pfn_range failure!\n");
     }
 
     DPRINTK("Mapping fe_ring page %lx.\n", __pa(blktap_ufe_ring.sring));
-    if (remap_page_range(vma, vma->vm_start + PAGE_SIZE, 
-                         __pa(blktap_ufe_ring.sring), 
+    if (remap_pfn_range(vma, vma->vm_start + ( 2 * PAGE_SIZE ), 
+                         __pa(blktap_ufe_ring.sring) >> PAGE_SHIFT, 
                          PAGE_SIZE, vma->vm_page_prot)) {
-        WPRINTK("fe_ring: remap_page_range failure!\n");
+        WPRINTK("fe_ring: remap_pfn_range failure!\n");
     }
-
+            
     blktap_vma = vma;
     blktap_ring_ok = 1;
 
@@ -211,9 +252,11 @@ static unsigned int blktap_poll(struct file *file, poll_table *wait)
 {
         poll_wait(file, &blktap_wait, wait);
 
-        if ( RING_HAS_UNPUSHED_REQUESTS(BLKIF_RING, &blktap_ufe_ring) ||
+        if ( RING_HAS_UNPUSHED_REQUESTS(BLKIF_RING, &blktap_uctrl_ring) ||
+             RING_HAS_UNPUSHED_REQUESTS(BLKIF_RING, &blktap_ufe_ring)   ||
              RING_HAS_UNPUSHED_RESPONSES(BLKIF_RING, &blktap_ube_ring) ) {
 
+            RING_PUSH_REQUESTS(BLKIF_RING, &blktap_uctrl_ring);
             RING_PUSH_REQUESTS(BLKIF_RING, &blktap_ufe_ring);
             RING_PUSH_RESPONSES(BLKIF_RING, &blktap_ube_ring);
             return POLLIN | POLLRDNORM;
@@ -260,7 +303,6 @@ int blktap_write_fe_ring(blkif_request_t *req)
         return 0;
     }
 
-    //target = RING_NEXT_EMPTY_REQUEST(BLKIF_RING, &blktap_ufe_ring);
     target = RING_GET_REQUEST(BLKIF_RING, &blktap_ufe_ring,
             blktap_ufe_ring.req_prod_pvt);
     memcpy(target, req, sizeof(*req));
@@ -270,7 +312,7 @@ int blktap_write_fe_ring(blkif_request_t *req)
 
         error = direct_remap_area_pages(blktap_vma->vm_mm, 
                                         MMAP_VADDR(ID_TO_IDX(req->id), i), 
-                                        target->frame_and_sects[0] & PAGE_MASK,
+                                        target->frame_and_sects[i] & PAGE_MASK,
                                         PAGE_SIZE,
                                         blktap_vma->vm_page_prot,
                                         ID_TO_DOM(req->id));
@@ -302,7 +344,6 @@ int blktap_write_be_ring(blkif_response_t *rsp)
 
     /* No test for fullness in the response direction. */
 
-    //target = RING_NEXT_EMPTY_RESPONSE(BLKIF_RING, &blktap_ube_ring);
     target = RING_GET_RESPONSE(BLKIF_RING, &blktap_ube_ring,
             blktap_ube_ring.rsp_prod_pvt);
     memcpy(target, rsp, sizeof(*rsp));
@@ -314,7 +355,7 @@ int blktap_write_be_ring(blkif_response_t *rsp)
     return 0;
 }
 
-int blktap_read_fe_ring(void)
+static int blktap_read_fe_ring(void)
 {
     /* This is called to read responses from the UFE ring. */
 
@@ -329,7 +370,6 @@ int blktap_read_fe_ring(void)
     if (blktap_mode & BLKTAP_MODE_INTERCEPT_FE) {
 
         /* for each outstanding message on the UFEring  */
-        //RING_FOREACH_RESPONSE(BLKIF_RING, &blktap_ufe_ring, prod, resp_s) {
         rp = blktap_ufe_ring.sring->rsp_prod;
         rmb();
         
@@ -349,7 +389,7 @@ int blktap_read_fe_ring(void)
     return 0;
 }
 
-int blktap_read_be_ring(void)
+static int blktap_read_be_ring(void)
 {
     /* This is called to read requests from the UBE ring. */
 
@@ -362,7 +402,6 @@ int blktap_read_be_ring(void)
     if (blktap_mode & BLKTAP_MODE_INTERCEPT_BE) {
 
         /* for each outstanding message on the UFEring  */
-        //RING_FOREACH_REQUEST(BLKIF_RING, &blktap_ube_ring, prod, req_s) {
         rp = blktap_ube_ring.sring->req_prod;
         rmb();
         for ( i = blktap_ube_ring.req_cons; i != rp; i++ )
@@ -379,6 +418,31 @@ int blktap_read_be_ring(void)
 
     return 0;
 }
+
+int blktap_write_ctrl_ring(ctrl_msg_t *msg)
+{
+    ctrl_msg_t *target;
+
+    if ( ! blktap_ring_ok ) {
+        DPRINTK("blktap: be_ring not ready for a request!\n");
+        return 0;
+    }
+
+    /* No test for fullness in the response direction. */
+
+    target = RING_GET_REQUEST(CTRL_RING, &blktap_uctrl_ring,
+            blktap_uctrl_ring.req_prod_pvt);
+    memcpy(target, msg, sizeof(*msg));
+
+    blktap_uctrl_ring.req_prod_pvt++;
+    
+    /* currently treat the ring as unidirectional. */
+    blktap_uctrl_ring.rsp_cons = blktap_uctrl_ring.sring->rsp_prod;
+    
+    return 0;
+       
+}
+
 /* -------[ blktap module setup ]------------------------------------- */
 
 static struct miscdevice blktap_miscdev = {

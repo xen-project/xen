@@ -40,8 +40,6 @@ inline active_req_t *get_active_req(void)
     spin_lock_irqsave(&active_req_lock, flags);
     idx =  active_req_ring[MASK_ACTIVE_IDX(active_cons++)];
     ar = &active_reqs[idx];
-if (ar->inuse) WPRINTK("AR INUSE! (%lu)\n", ar->id);
-ar->inuse = 1;
     spin_unlock_irqrestore(&active_req_lock, flags);
     
     return ar;
@@ -52,7 +50,6 @@ inline void free_active_req(active_req_t *ar)
     unsigned long flags;
         
     spin_lock_irqsave(&active_req_lock, flags);
-ar->inuse = 0;
     active_req_ring[MASK_ACTIVE_IDX(active_prod++)] = ACTIVE_IDX(ar);
     spin_unlock_irqrestore(&active_req_lock, flags);
 }
@@ -97,11 +94,8 @@ inline int write_resp_to_fe_ring(blkif_t *blkif, blkif_response_t *rsp)
     blkif_response_t *resp_d;
     active_req_t *ar;
     
-    /* remap id, and free the active req. blkif lookup goes here too.*/
     ar = &active_reqs[ID_TO_IDX(rsp->id)];
-    /* WPRINTK("%3u > %3lu\n", ID_TO_IDX(rsp->id), ar->id); */
     rsp->id = ar->id;
-    free_active_req(ar);
             
     resp_d = RING_GET_RESPONSE(BLKIF_RING, &blkif->blk_ring,
             blkif->blk_ring.rsp_prod_pvt);
@@ -109,6 +103,9 @@ inline int write_resp_to_fe_ring(blkif_t *blkif, blkif_response_t *rsp)
     wmb();
     blkif->blk_ring.rsp_prod_pvt++;
             
+    blkif_put(ar->blkif);
+    free_active_req(ar);
+    
     return 0;
 }
 
@@ -116,6 +113,11 @@ inline int write_req_to_be_ring(blkif_request_t *req)
 {
     blkif_request_t *req_d;
 
+    if ( blktap_be_state != BLKIF_STATE_CONNECTED ) {
+        WPRINTK("Tap trying to access an unconnected backend!\n");
+        return 0;
+    }
+    
     req_d = RING_GET_REQUEST(BLKIF_RING, &blktap_be_ring,
             blktap_be_ring.req_prod_pvt);
     memcpy(req_d, req, sizeof(blkif_request_t));
@@ -135,6 +137,9 @@ inline void kick_fe_domain(blkif_t *blkif)
 
 inline void kick_be_domain(void)
 {
+    if ( blktap_be_state != BLKIF_STATE_CONNECTED ) 
+        return;
+    
     wmb(); /* Ensure that the frontend can see the requests. */
     RING_PUSH_REQUESTS(BLKIF_RING, &blktap_be_ring);
     notify_via_evtchn(blkif_ptbe_evtchn);
@@ -310,6 +315,7 @@ static int do_block_io_op(blkif_t *blkif, int max_to_do)
          */
         ar = get_active_req();
         ar->id = req_s->id;
+        blkif_get(blkif);
         ar->blkif = blkif;
         req_s->id = MAKE_ID(blkif->domid, ACTIVE_IDX(ar));
         /* WPRINTK("%3u < %3lu\n", ID_TO_IDX(req_s->id), ar->id); */
@@ -458,11 +464,13 @@ void print_vm_ring_idxs(void)
                 blkif->blk_ring.sring->req_prod,
                 blkif->blk_ring.sring->rsp_prod);
     }
-    WPRINTK("BE Ring: \n--------\n");
-    WPRINTK("BE: rsp_cons: %2d, req_prod_prv: %2d "
-        "| req_prod: %2d, rsp_prod: %2d\n",
-        blktap_be_ring.rsp_cons,
-        blktap_be_ring.req_prod_pvt,
-        blktap_be_ring.sring->req_prod,
-        blktap_be_ring.sring->rsp_prod);
+    if (blktap_be_ring.sring != NULL) {
+        WPRINTK("BE Ring: \n--------\n");
+        WPRINTK("BE: rsp_cons: %2d, req_prod_prv: %2d "
+            "| req_prod: %2d, rsp_prod: %2d\n",
+            blktap_be_ring.rsp_cons,
+            blktap_be_ring.req_prod_pvt,
+            blktap_be_ring.sring->req_prod,
+            blktap_be_ring.sring->rsp_prod);
+    }
 }        
