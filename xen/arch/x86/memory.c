@@ -1288,8 +1288,9 @@ void ptwr_reconnect_disconnected(unsigned long addr)
                          _PAGE_PRESENT);
     pl1e = map_domain_mem(l2_pgentry_to_pagenr(nl2e) << PAGE_SHIFT);
     for ( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ ) {
-        if ((l1_pgentry_val(pl1e[i]) ^
-             l1_pgentry_val(ptwr_disconnected_page[cpu][i])) == _PAGE_RW) {
+        if (likely((l1_pgentry_val(pl1e[i]) ^
+                    l1_pgentry_val(ptwr_disconnected_page[cpu][i])) ==
+                   _PAGE_RW)) {
 #if 0
             struct pfn_info *page = &frame_table[l1_pgentry_to_pagenr(pl1e[i])];
             printk("%03x: %08lx != %08lx %08x/%08x\n", i,
@@ -1297,7 +1298,7 @@ void ptwr_reconnect_disconnected(unsigned long addr)
                    l1_pgentry_val(pl1e[i]), page->type_and_flags,
                    page->count_and_flags);
 #endif
-            if (readonly_page_from_l1e(pl1e[i]))
+            if (likely(readonly_page_from_l1e(pl1e[i])))
                 continue;
         }
         if (l1_pgentry_val(pl1e[i]) != l1_pgentry_val(ptwr_disconnected_page[cpu][i])) {
@@ -1306,7 +1307,8 @@ void ptwr_reconnect_disconnected(unsigned long addr)
                    l1_pgentry_val(ptwr_disconnected_page[cpu][i]),
                    l1_pgentry_val(pl1e[i]));
 #endif
-            if (l1_pgentry_val(ptwr_disconnected_page[cpu][i]) & _PAGE_PRESENT)
+            if (unlikely(l1_pgentry_val(ptwr_disconnected_page[cpu][i]) &
+                         _PAGE_PRESENT))
                 put_page_from_l1e(ptwr_disconnected_page[cpu][i]);
             if (unlikely(!get_page_from_l1e(pl1e[i])))
                 BUG();
@@ -1386,7 +1388,8 @@ void ptwr_flush_inactive(void)
                        l1_pgentry_val(ptwr_writable_page[cpu][idx][i]),
                        l1_pgentry_val(pl1e[i]));
 #endif
-                if (l1_pgentry_val(ptwr_writable_page[cpu][idx][i]) & _PAGE_PRESENT)
+                if (unlikely(l1_pgentry_val(ptwr_writable_page[cpu][idx][i]) &
+                             _PAGE_PRESENT))
                     put_page_from_l1e(ptwr_writable_page[cpu][idx][i]);
                 if (unlikely(!get_page_from_l1e(pl1e[i])))
                     BUG();
