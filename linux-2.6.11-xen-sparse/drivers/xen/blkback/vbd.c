@@ -150,7 +150,7 @@ void vbd_grow(blkif_be_vbd_grow_t *grow)
     {
         DPRINTK("vbd_grow: device %08x doesn't exist.\n", x->extent.device);
         grow->status = BLKIF_BE_STATUS_EXTENT_NOT_FOUND;
-        blkdev_put(x->bdev);
+        bdev_put(x->bdev);
         goto out;
     }
 
@@ -255,7 +255,7 @@ void vbd_shrink(blkif_be_vbd_shrink_t *shrink)
     *px = x->next; /* ATOMIC: no need for vbd_lock. */
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-    blkdev_put(x->bdev);
+    bdev_put(x->bdev);
 #endif
     kfree(x);
 
@@ -307,7 +307,7 @@ void vbd_destroy(blkif_be_vbd_destroy_t *destroy)
     {
         t = x->next;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-        blkdev_put(x->bdev);
+        bdev_put(x->bdev);
 #endif
         kfree(x);
         x = t;
@@ -335,7 +335,7 @@ void destroy_all_vbds(blkif_t *blkif)
         {
             t = x->next;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-            blkdev_put(x->bdev);
+            bdev_put(x->bdev);
 #endif
             kfree(x);
             x = t;
