@@ -1,80 +1,68 @@
 
 # We expect these two to already be set if people 
 # are using the top-level Makefile
-DIST_DIR    ?= $(shell pwd)/dist
-INSTALL_DIR ?= $(DIST_DIR)/install
+DIST_DIR	?= $(shell pwd)/dist
+INSTALL_DIR	?= $(DIST_DIR)/install
+
+.PHONY:	mkpatches mrproper
 
 
-# Figure out which Linux version
-LINUX_26VER ?= $(shell ( /bin/ls -ld linux-2.6.*-xen-sparse ) \
-		2>/dev/null | sed -e 's!^.*linux-\(.\+\)-xen-sparse!\1!' )
 
-LINUX_24VER ?= $(shell ( /bin/ls -ld linux-2.4.*-xen-sparse ) \
-		2>/dev/null | sed -e 's!^.*linux-\(.\+\)-xen-sparse!\1!' )
+# Expand Linux series to Linux version
+LINUX_SERIES	?= 2.6
+LINUX_VER	?= $(patsubst linux-%-xen-sparse,%,$(wildcard linux-$(LINUX_SERIES)*-xen-sparse))
 
-LINUX_SRC_PATH   ?= .:..
+# Setup Linux search patch
+LINUX_SRC_PATH	?= .:..
+vpath linux-%.tar.bz2 $(LINUX_SRC_PATH)
 
-LINUX_26SRC      ?= $(firstword $(foreach dir,$(subst :, ,$(LINUX_SRC_PATH)),\
-                    $(wildcard $(dir)/linux-$(LINUX_26VER).tar.*z*)))
+# download a pristine Linux kernel tarball if there isn't one in LINUX_SRC_PATH
+linux-%.tar.bz2: override _LINUX_VDIR = $(word 1,$(subst ., ,$*)).$(word 2,$(subst ., ,$*))
+linux-%.tar.bz2:
+	echo "Cannot find linux-$*.tar.bz2 in path $(LINUX_SRC_PATH)"
+	wget http://www.kernel.org/pub/linux/kernel/v$(_LINUX_VDIR)/linux-$*.tar.bz2 -O./$@
 
-LINUX_24SRC      ?= $(firstword $(foreach dir,$(subst :, ,$(LINUX_SRC_PATH)),\
-                    $(wildcard $(dir)/linux-$(LINUX_24VER).tar.*z*)))
 
-.PHONY:	mkpatches linux-$(LINUX_24VER)-xen.patch linux-$(LINUX_26VER)-xen.patch mrproper
 
-# search for a pristine kernel tar ball, or try downloading one
-linux-$(LINUX_26VER).tar.bz2:
-ifeq ($(LINUX_26SRC),)
-	echo "Cannot find linux-$(LINUX_26VER).tar.bz2 in path $(LINUX_SRC_PATH)"
-	wget http://www.kernel.org/pub/linux/kernel/v2.6/linux-$(LINUX_26VER).tar.bz2 -O./linux-$(LINUX_26VER).tar.bz2
-LINUX_26SRC := ./linux-$(LINUX_26VER).tar.bz2 
-endif
+# Expand NetBSD release to NetBSD version
+NETBSD_RELEASE  ?= 2.0
+NETBSD_VER      ?= $(patsubst netbsd-%-xen-sparse,%,$(wildcard netbsd-$(NETBSD_RELEASE)*-xen-sparse))
+NETBSD_CVSSNAP  ?= 20040906
 
-pristine-linux-$(LINUX_26VER): $(LINUX_26SRC)
-	rm -rf tmp-linux-$(LINUX_26VER) $@ && \
-	mkdir -p tmp-linux-$(LINUX_26VER) && \
-	tar -C tmp-linux-$(LINUX_26VER) -jxf $(LINUX_26SRC) && \
-	mv tmp-linux-$(LINUX_26VER)/* $@
+# Setup NetBSD search patch
+NETBSD_SRC_PATH	?= .:..
+vpath netbsd-%.tar.bz2 $(NETBSD_SRC_PATH)
+
+# download a pristine NetBSD tarball if there isn't one in NETBSD_SRC_PATH
+netbsd-%-xen-kernel-$(NETBSD_CVSSNAP).tar.bz2:
+	echo "Cannot find $@ in path $(NETBSD_SRC_PATH)"
+	wget http://www.cl.cam.ac.uk/Research/SRG/netos/xen/downloads/netbsd-$(NETBSD_VER)-xen-kernel-$(NETBSD_CVSSNAP).tar.bz2 -O./$@
+
+netbsd-%.tar.bz2: netbsd-%-xen-kernel-$(NETBSD_CVSSNAP).tar.bz2
+	ln -fs $< $@
+
+
+
+
+pristine-%: %.tar.bz2
+	rm -rf tmp-$* $@ && \
+	  mkdir -p tmp-$* && \
+	  tar -C tmp-$* -jxf $< && \
+	  mv tmp-$*/* $@
 	touch $@ # update timestamp to avoid rebuild
-	@rm -rf tmp-linux-$(LINUX_26VER)
+	@rm -rf tmp-$*
 
-
-# search for a pristine kernel tar ball, or try downloading one
-linux-$(LINUX_24VER).tar.bz2:
-ifeq ($(LINUX_24SRC),)
-	echo "Cannot find linux-$(LINUX_24VER).tar.bz2 in path $(LINUX_SRC_PATH)"
-	wget http://www.kernel.org/pub/linux/kernel/v2.4/linux-$(LINUX_24VER).tar.bz2 -O./linux-$(LINUX_24VER).tar.bz2
-LINUX_24SRC := ./linux-$(LINUX_24VER).tar.bz2 
-endif
-
-pristine-linux-$(LINUX_24VER): $(LINUX_24SRC)
-	rm -rf tmp-linux-$(LINUX_24VER) $@ && \
-	mkdir -p tmp-linux-$(LINUX_24VER) && \
-	tar -C tmp-linux-$(LINUX_24VER) -jxf $(LINUX_24SRC) && \
-	mv tmp-linux-$(LINUX_24VER)/* $@ && \
-	touch $@ # update timestamp to avoid rebuild
-	@rm -rf tmp-linux-$(LINUX_24VER)
-
-linux-$(LINUX_24VER)-xen.patch: pristine-linux-$(LINUX_24VER)	
+%-xen.patch: pristine-%
 	rm -rf tmp-$@
-	cp -al pristine-linux-$(LINUX_24VER) tmp-$@
-	( cd linux-$(LINUX_24VER)-xen-sparse ; \
-          ./mkbuildtree ../tmp-$@ )	
-	diff -Nurp pristine-linux-$(LINUX_24VER) tmp-$@ > $@ || true
+	cp -al pristine-$* tmp-$@
+	( cd $*-xen-sparse && ./mkbuildtree ../tmp-$@ )	
+	diff -Nurp pristine-$* tmp-$@ > $@ || true
 	rm -rf tmp-$@
 
-linux-$(LINUX_26VER)-xen.patch: pristine-linux-$(LINUX_26VER)
-	rm -rf tmp-$@
-	cp -al pristine-linux-$(LINUX_26VER) tmp-$@
-	( cd linux-$(LINUX_26VER)-xen-sparse ; \
-          ./mkbuildtree ../tmp-$@ )	
-	diff -Nurp pristine-linux-$(LINUX_26VER) tmp-$@ > $@ || true
-	rm -rf tmp-$@
+%-mrproper:
+	rm -rf pristine-$* $*.tar.bz2
+	rm -rf $*-xen.patch
+	rm -rf $*-tools $*-tools.tar.bz2
 
-mkpatches: linux-$(LINUX_24VER)-xen.patch linux-$(LINUX_26VER)-xen.patch
-
-mrproper:
-	rm -rf pristine-linux-$(LINUX_24VER) linux-$(LINUX_24VER).tar.bz2
-	rm -rf pristine-linux-$(LINUX_26VER) linux-$(LINUX_26VER).tar.bz2
-	rm -rf linux-$(LINUX_24VER)-xen.patch linux-$(LINUX_26VER)-xen.patch
-	rm -rf pristine-netbsd-2.0 netbsd-2.0-tools
+# never delete any intermediate files.
+.SECONDARY:
