@@ -1126,6 +1126,16 @@ void __init setup_arch(char **cmdline_p)
 	}
 	aux_device_present = AUX_DEVICE_INFO;
 
+#ifdef CONFIG_XEN_PHYSDEV_ACCESS
+	/* This is drawn from a dump from vgacon:startup in standard Linux. */
+	screen_info.orig_video_mode = 3; 
+	screen_info.orig_video_isVGA = 1;
+	screen_info.orig_video_lines = 25;
+	screen_info.orig_video_cols = 80;
+	screen_info.orig_video_ega_bx = 3;
+	screen_info.orig_video_points = 16;
+#endif
+
 #ifdef CONFIG_BLK_DEV_RAM
 	rd_image_start = RAMDISK_FLAGS & RAMDISK_IMAGE_START_MASK;
 	rd_prompt = ((RAMDISK_FLAGS & RAMDISK_PROMPT_FLAG) != 0);

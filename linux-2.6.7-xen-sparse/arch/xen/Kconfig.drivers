@@ -4,11 +4,19 @@ menu "Device Drivers"
 
 source "drivers/base/Kconfig"
 
-#source "drivers/block/Kconfig"
+if XEN_PHYSDEV_ACCESS
+source "drivers/block/Kconfig"
+source "drivers/ide/Kconfig"
+source "drivers/scsi/Kconfig"
+source "drivers/cdrom/Kconfig"
+source "drivers/md/Kconfig"
+endif
 
 source "net/Kconfig"
 
-#source "drivers/input/Kconfig"
+if XEN_PHYSDEV_ACCESS
+source "drivers/input/Kconfig"
+endif
 
 config INPUT
 	tristate "Input devices (needed for keyboard, mouse, ...)" if EMBEDDED
@@ -28,7 +36,9 @@ config INPUT
 	  To compile this driver as a module, choose M here: the
 	  module will be called input.
 
-#source "drivers/char/Kconfig"
+if XEN_PHYSDEV_ACCESS
+source "drivers/char/Kconfig"
+endif
 
 config UNIX98_PTYS
 	bool "Unix98 PTY support" if EMBEDDED
@@ -54,7 +64,9 @@ config UNIX98_PTYS
 	  you're on an embedded system and want to conserve memory.
 
 
-#source "drivers/video/Kconfig"
+if XEN_PHYSDEV_ACCESS
+source "drivers/video/Kconfig"
+endif
 
 #config XEN_EVTCHN
 #	bool "Xen Event Channel"
