@@ -65,7 +65,7 @@ LINUX_VER=`/bin/ls -ld ${DEST_BK_REP}/xenolinux-sparse | sed -e 's!^.*xenolinux-
 # copy in the master Linux tree for this kernel
 if [ ! -d linux-${LINUX_VER} ]
 then
-tar -zxf ${LINUX_DIR}/linux-${LINUX_VER}.tar.gz || tar -zxf ${LINUX_DIR}/linux-${LINUX_VER}.tgz || cp -a ${LINUX_DIR}/linux-${LINUX_VER} . ||  wget ftp://ftp.kernel.org/pub/linux/kernel/v2.4/linux-${LINUX_VER}.tar.gz -O- | tar -zxf - || exit -1
+tar -jxf ${LINUX_DIR}/linux-${LINUX_VER}.tar.bz2 || tar -zxf ${LINUX_DIR}/linux-${LINUX_VER}.tar.gz || tar -zxf ${LINUX_DIR}/linux-${LINUX_VER}.tgz || cp -a ${LINUX_DIR}/linux-${LINUX_VER} . ||  wget ftp://ftp.kernel.org/pub/linux/kernel/v2.4/linux-${LINUX_VER}.tar.gz -O- | tar -zxf - || exit -1
 fi
 
 # build and install Xen and tools

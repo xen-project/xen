@@ -471,3 +471,4 @@ xen/arch/i386/nmi.o
 xen/drivers/net/dummy.o
 tools/misc/miniterm/miniterm
 tools/misc/xen_read_console
+extras/mini-os/h/hypervisor-ifs
