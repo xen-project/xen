@@ -57,9 +57,11 @@ typedef struct { unsigned long pt_lo; } pagetable_t;
 #include <asm/flushtlb.h>
 
 #define linear_pg_table ((l1_pgentry_t *)LINEAR_PT_VIRT_START)
-#define linear_l2_table ((l2_pgentry_t *)(LINEAR_PT_VIRT_START+(LINEAR_PT_VIRT_START>>(L2_PAGETABLE_SHIFT-L1_PAGETABLE_SHIFT))))
+#define __linear_l2_table ((l2_pgentry_t *)(LINEAR_PT_VIRT_START + \
+     (LINEAR_PT_VIRT_START>>(L2_PAGETABLE_SHIFT-L1_PAGETABLE_SHIFT))))
+#define linear_l2_table(_ed) ((_ed)->arch.guest_vtable)
 
-#define va_to_l1mfn(_va) (l2_pgentry_val(linear_l2_table[_va>>L2_PAGETABLE_SHIFT]) >> PAGE_SHIFT)
+#define va_to_l1mfn(_ed, _va) (l2_pgentry_val(linear_l2_table(_ed)[_va>>L2_PAGETABLE_SHIFT]) >> PAGE_SHIFT)
 
 extern root_pgentry_t idle_pg_table[ROOT_PAGETABLE_ENTRIES];
 

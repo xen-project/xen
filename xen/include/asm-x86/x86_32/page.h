@@ -68,7 +68,7 @@ typedef l2_pgentry_t root_pgentry_t;
 #define L1_DISALLOW_MASK (3UL << 7)
 #define L2_DISALLOW_MASK (7UL << 7)
 #define L3_DISALLOW_MASK (7UL << 7)
-#define L2_DISALLOW_MASK (7UL << 7)
+#define L4_DISALLOW_MASK (7UL << 7)
 
 #endif /* __X86_32_PAGE_H__ */
 

@@ -85,6 +85,8 @@ void *map_domain_mem(unsigned long pa)
 void unmap_domain_mem(void *va)
 {
     unsigned int idx;
+    ASSERT((void *)MAPCACHE_VIRT_START <= va);
+    ASSERT(va < (void *)MAPCACHE_VIRT_END);
     idx = ((unsigned long)va - MAPCACHE_VIRT_START) >> PAGE_SHIFT;
     mapcache[idx] |= READY_FOR_TLB_FLUSH;
 }

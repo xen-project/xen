@@ -25,6 +25,9 @@
 static unsigned int opt_dom0_mem = 0;
 integer_param("dom0_mem", opt_dom0_mem);
 
+static unsigned int opt_dom0_shadow = 0;
+boolean_param("dom0_shadow", opt_dom0_shadow);
+
 #if defined(__i386__)
 /* No ring-3 access in initial leaf page tables. */
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED)
@@ -267,8 +270,13 @@ int construct_dom0(struct domain *d,
     l1tab += l1_table_offset(vpt_start);
     for ( count = 0; count < nr_pt_pages; count++ ) 
     {
-        *l1tab = mk_l1_pgentry(l1_pgentry_val(*l1tab) & ~_PAGE_RW);
         page = &frame_table[l1_pgentry_to_pfn(*l1tab)];
+        if ( !opt_dom0_shadow )
+            *l1tab = mk_l1_pgentry(l1_pgentry_val(*l1tab) & ~_PAGE_RW);
+        else
+            if ( !get_page_type(page, PGT_writable_page) )
+                BUG();
+
         if ( count == 0 )
         {
             page->u.inuse.type_info &= ~PGT_type_mask;
@@ -511,6 +519,12 @@ int construct_dom0(struct domain *d,
     set_bit(DF_CONSTRUCTED, &d->d_flags);
 
     new_thread(ed, dsi.v_kernentry, vstack_end, vstartinfo_start);
+
+    if ( opt_dom0_shadow )
+    {
+        shadow_mode_enable(d, SHM_enable); 
+        update_pagetables(ed); /* XXX SMP */
+    }
 
     return 0;
 }

@@ -29,6 +29,7 @@
 #include <xen/slab.h>
 #include <xen/irq.h>
 #include <asm/domain_page.h>
+#include <asm/shadow.h>
 
 /*
  * Comma-separated list of hexadecimal page numbers containing bad bytes.
@@ -566,7 +567,23 @@ void free_domheap_pages(struct pfn_info *pg, unsigned int order)
 
         for ( i = 0; i < (1 << order); i++ )
         {
-            ASSERT((pg[i].u.inuse.type_info & PGT_count_mask) == 0);
+            if ( ((pg[i].u.inuse.type_info & PGT_count_mask) != 0) &&
+                shadow_mode_enabled(d) )
+            {
+                // XXX This needs more thought...
+                //
+                printk("%s: needing to call shadow_remove_all_access for mfn=%p\n",
+                       __func__, page_to_pfn(&pg[i]));
+                printk("Amfn=%p c=%p t=%p\n", page_to_pfn(&pg[i]),
+                       pg[i].count_info, pg[i].u.inuse.type_info);
+                shadow_lock(d);
+                shadow_remove_all_access(d, page_to_pfn(&pg[i]));
+                shadow_unlock(d);
+                printk("Bmfn=%p c=%p t=%p\n", page_to_pfn(&pg[i]),
+                       pg[i].count_info, pg[i].u.inuse.type_info);
+            }
+
+            ASSERT( (pg[i].u.inuse.type_info & PGT_count_mask) == 0 );
             pg[i].tlbflush_timestamp  = tlbflush_current_time();
             pg[i].u.free.cpu_mask     = cpu_mask;
             list_del(&pg[i].list);

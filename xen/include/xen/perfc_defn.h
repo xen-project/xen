@@ -48,3 +48,33 @@ PERFCOUNTER_ARRAY( exceptions, "exceptions", 32 )
 #define VMX_PERF_VECTOR_SIZE 0x20
 PERFCOUNTER_ARRAY( vmexits, "vmexits", VMX_PERF_EXIT_REASON_SIZE )
 PERFCOUNTER_ARRAY( cause_vector, "cause vector", VMX_PERF_VECTOR_SIZE )
+
+
+PERFCOUNTER_CPU( shadow_hl2_table_count,   "shadow_hl2_table count" )
+PERFCOUNTER_CPU( shadow_set_l1e_force_map, "shadow_set_l1e forced to map l1" )
+PERFCOUNTER_CPU( shadow_set_l1e_unlinked,  "shadow_set_l1e found unlinked l1" )
+PERFCOUNTER_CPU( shadow_set_l1e_fail,      "shadow_set_l1e failed (no sl1)" )
+PERFCOUNTER_CPU( shadow_invlpg_faults,     "shadow_invlpg's get_user faulted")
+
+
+/* STATUS counters do not reset when 'P' is hit */
+PERFSTATUS( snapshot_pages,  "current # fshadow snapshot pages" )
+
+PERFCOUNTER_CPU(shadow_status_calls,    "calls to __shadow_status" )
+PERFCOUNTER_CPU(shadow_status_miss,     "missed shadow cache" )
+PERFCOUNTER_CPU(shadow_status_hit_head, "hits on head of bucket" )
+
+PERFCOUNTER_CPU(shadow_sync_all,                   "calls to shadow_sync_all")
+PERFCOUNTER_CPU(shadow_make_snapshot,              "snapshots created")
+PERFCOUNTER_CPU(shadow_mark_mfn_out_of_sync_calls, "calls to shadow_mk_out_of_sync")
+PERFCOUNTER_CPU(shadow_out_of_sync_calls,          "calls to shadow_out_of_sync")
+PERFCOUNTER_CPU(snapshot_entry_matches_calls,      "calls to ss_entry_matches")
+PERFCOUNTER_CPU(snapshot_entry_matches_true,       "ss_entry_matches returns true")
+
+PERFCOUNTER_CPU(shadow_fault_calls,                "calls to shadow_fault")
+PERFCOUNTER_CPU(shadow_fault_bail_pde_not_present, "sf bailed due to pde not present")
+PERFCOUNTER_CPU(shadow_fault_bail_pte_not_present, "sf bailed due to pte not present")
+PERFCOUNTER_CPU(shadow_fault_bail_ro_mapping,      "sf bailed due to a ro mapping")
+PERFCOUNTER_CPU(shadow_fault_fixed,                "sf fixed the pgfault")
+PERFCOUNTER_CPU(validate_pte_change,               "calls to validate_pte_change")
+PERFCOUNTER_CPU(validate_pde_change,               "calls to validate_pde_change")

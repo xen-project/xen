@@ -106,6 +106,7 @@ static void inline __update_guest_eip(unsigned long inst_len)
 
 static int vmx_do_page_fault(unsigned long va, struct xen_regs *regs) 
 {
+    struct exec_domain *ed = current;
     unsigned long eip;
     unsigned long gpte, gpa;
     int result;
@@ -123,9 +124,9 @@ static int vmx_do_page_fault(unsigned long va, struct xen_regs *regs)
      * If vpagetable is zero, then we are still emulating 1:1 page tables,
      * and we should have never gotten here.
      */
-    if ( !current->arch.guest_vtable )
+    if ( !test_bit(VMX_CPU_STATE_PG_ENABLED, &ed->arch.arch_vmx.cpu_state) )
     {
-        printk("vmx_do_page_fault while still running on 1:1 page table\n");
+        printk("vmx_do_page_fault while running on 1:1 page table\n");
         return 0;
     }
 
@@ -269,21 +270,17 @@ static void vmx_vmexit_do_invlpg(unsigned long va)
 {
     unsigned long eip;
     struct exec_domain *ed = current;
-    unsigned int index;
 
     __vmread(GUEST_EIP, &eip);
 
-    VMX_DBG_LOG(DBG_LEVEL_VMMU, "vmx_vmexit_do_invlpg:eip=%p, va=%p",
-            eip, va);
+    VMX_DBG_LOG(DBG_LEVEL_VMMU, "vmx_vmexit_do_invlpg: eip=%p, va=%p",
+                eip, va);
 
     /*
      * We do the safest things first, then try to update the shadow
      * copying from guest
      */
     shadow_invlpg(ed, va);
-    index = l2_table_offset(va);
-    ed->arch.hl2_vtable[index] = 
-        mk_l2_pgentry(0); /* invalidate pgd cache */
 }
 
 static void vmx_io_instruction(struct xen_regs *regs, 
@@ -428,14 +425,6 @@ static void mov_to_cr(int gp, int cr, struct xen_regs *regs)
             }
             old_base_mfn = pagetable_val(d->arch.guest_table) >> PAGE_SHIFT;
 
-            /* We know that none of the previous 1:1 shadow pages are
-             * going to be used again, so might as well flush them.
-             * XXXX wait until the last VCPU boots before doing the flush !!
-             */
-            shadow_lock(d->domain);
-            free_shadow_state(d->domain); // XXX SMP
-            shadow_unlock(d->domain);
-
             /*
              * Now arch.guest_table points to machine physical.
              */
@@ -469,7 +458,6 @@ static void mov_to_cr(int gp, int cr, struct xen_regs *regs)
             break;
         }
         
-        hl2_table_invalidate(d);
         /*
          * We make a new one if the shadow does not exist.
          */
@@ -482,8 +470,7 @@ static void mov_to_cr(int gp, int cr, struct xen_regs *regs)
             mfn = phys_to_machine_mapping(value >> PAGE_SHIFT);
             if ((mfn << PAGE_SHIFT) != pagetable_val(d->arch.guest_table))
                 __vmx_bug(regs);
-            vmx_shadow_clear_state(d->domain);
-            shadow_invalidate(d);
+            shadow_sync_all(d->domain);
         } else {
             /*
              * If different, make a shadow. Check if the PDBR is valid
@@ -525,8 +512,6 @@ static void mov_to_cr(int gp, int cr, struct xen_regs *regs)
          */
         if ((old_cr ^ value) & (X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE)) {
             vmx_shadow_clear_state(d->domain);
-            shadow_invalidate(d);
-            hl2_table_invalidate(d);
         }
         break;
     default:

@@ -951,6 +951,7 @@
 3ddb79bcBQF85CfLS4i1WGZ4oLLaCA xen/arch/x86/Rules.mk
 3e5636e5FAYZ5_vQnmgwFJfSdmO5Mw xen/arch/x86/acpi.c
 3ddb79bcsjinG9k1KcvbVBuas1R2dA xen/arch/x86/apic.c
+42386d3bKw0QftYe-cDL6_4WiATRTw xen/arch/x86/audit.c
 3ddb79c4yGZ7_22QAFFwPzqP4NSHwA xen/arch/x86/boot/mkelf32.c
 3ddb79bcSC_LvnmFlX-T5iTgaR0SKg xen/arch/x86/boot/x86_32.S
 40e42bdbNu4MjI750THP_8J1S-Sa0g xen/arch/x86/boot/x86_64.S

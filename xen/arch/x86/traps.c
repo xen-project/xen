@@ -114,7 +114,7 @@ asmlinkage void fatal_trap(int trapnr, struct xen_regs *regs)
     if ( trapnr == TRAP_page_fault )
     {
         __asm__ __volatile__ ("mov %%cr2,%0" : "=r" (cr2) : );
-        printk("Faulting linear address might be %0lx %lx\n", cr2, cr2);
+        printk("Faulting linear address might be %p\n", cr2);
     }
 
     printk("************************************\n");
@@ -269,6 +269,8 @@ asmlinkage int do_page_fault(struct xen_regs *regs)
 
     DEBUGGER_trap_entry(TRAP_page_fault, regs);
 
+    //printk("do_page_fault(eip=%p, va=%p, code=%d)\n", regs->eip, addr, regs->error_code);
+
     perfc_incrc(page_faults);
 
     if ( likely(VM_ASSIST(d, VMASST_TYPE_writable_pagetables)) )
@@ -295,9 +297,12 @@ asmlinkage int do_page_fault(struct xen_regs *regs)
         UNLOCK_BIGLOCK(d);
     }
 
-    if ( unlikely(shadow_mode_enabled(d)) && 
-         (addr < PAGE_OFFSET) && shadow_fault(addr, regs) )
+    if ( unlikely(shadow_mode_enabled(d)) &&
+         ((addr < PAGE_OFFSET) || shadow_mode_external(d)) &&
+         shadow_fault(addr, regs) )
+    {
         return EXCRET_fault_fixed;
+    }
 
     if ( unlikely(addr >= LDT_VIRT_START(ed)) && 
          (addr < (LDT_VIRT_START(ed) + (ed->arch.ldt_ents*LDT_ENTRY_SIZE))) )
