@@ -9,8 +9,11 @@
 #include <sys/time.h>
 #include "xc_private.h"
 #include <asm-xen/suspend.h>
+#include <time.h>
 
 #define BATCH_SIZE 1024   /* 1024 pages (4MB) at a time */
+
+#define MAX_MBIT_RATE 500
 
 #define DEBUG  0
 #define DDEBUG 0
@@ -138,6 +141,80 @@ static long long tv_delta( struct timeval *new, struct timeval *old )
         (new->tv_usec - old->tv_usec);
 }
 
+
+#define START_MBIT_RATE ioctxt->resource
+
+static int mbit_rate, ombit_rate = 0;
+static int burst_time_us = -1;
+
+#define MBIT_RATE mbit_rate
+#define BURST_BUDGET (100*1024)
+
+/* 
+   1000000/((100)*1024*1024/8/(100*1024))
+   7812
+   1000000/((100)*1024/8/(100))
+   7812
+   1000000/((100)*128/(100))
+   7812
+   100000000/((100)*128)
+   7812
+   100000000/128
+   781250
+ */
+#define RATE_TO_BTU 781250
+#define BURST_TIME_US burst_time_us
+
+static int xcio_ratewrite(XcIOContext *ioctxt, void *buf, int n){
+    static int budget = 0;
+    static struct timeval last_put = { 0 };
+    struct timeval now;
+    struct timespec delay;
+    long long delta;
+    int rc;
+
+    if (START_MBIT_RATE == 0)
+	return xcio_write(ioctxt, buf, n);
+    
+    budget -= n;
+    if (budget < 0) {
+	if (MBIT_RATE != ombit_rate) {
+	    BURST_TIME_US = RATE_TO_BTU / MBIT_RATE;
+	    ombit_rate = MBIT_RATE;
+	    xcio_info(ioctxt,
+		      "rate limit: %d mbit/s burst budget %d slot time %d\n",
+		      MBIT_RATE, BURST_BUDGET, BURST_TIME_US);
+	}
+	if (last_put.tv_sec == 0) {
+	    budget += BURST_BUDGET;
+	    gettimeofday(&last_put, NULL);
+	} else {
+	    while (budget < 0) {
+		gettimeofday(&now, NULL);
+		delta = tv_delta(&now, &last_put);
+		while (delta > BURST_TIME_US) {
+		    budget += BURST_BUDGET;
+		    last_put.tv_usec += BURST_TIME_US;
+		    if (last_put.tv_usec > 1000000) {
+			last_put.tv_usec -= 1000000;
+			last_put.tv_sec++;
+		    }
+		    delta -= BURST_TIME_US;
+		}
+		if (budget > 0)
+		    break;
+		delay.tv_sec = 0;
+		delay.tv_nsec = 1000 * (BURST_TIME_US - delta);
+		while (delay.tv_nsec > 0)
+		    if (nanosleep(&delay, &delay) == 0)
+			break;
+	    }
+	}
+    }
+    rc = IOStream_write(ioctxt->io, buf, n);
+    return (rc == n ? 0 : rc);
+}
+
 static int print_stats( int xc_handle, u32 domid, 
                         int pages_sent, xc_shadow_control_stats_t *stats,
                         int print )
@@ -168,12 +245,20 @@ static int print_stats( int xc_handle, u32 domid,
 
     if ( print )
         printf("delta %lldms, dom0 %d%%, target %d%%, sent %dMb/s, "
-               "dirtied %dMb/s\n",
+               "dirtied %dMb/s %ld pages\n",
                wall_delta, 
                (int)((d0_cpu_delta*100)/wall_delta),
                (int)((d1_cpu_delta*100)/wall_delta),
-               (int)((pages_sent*PAGE_SIZE*8)/(wall_delta*1000)),
-               (int)((stats->dirty_count*PAGE_SIZE*8)/(wall_delta*1000)));
+               (int)((pages_sent*PAGE_SIZE)/(wall_delta*(1000/8))),
+               (int)((stats->dirty_count*PAGE_SIZE)/(wall_delta*(1000/8))),
+               stats->dirty_count);
+
+    if (((stats->dirty_count*PAGE_SIZE)/(wall_delta*(1000/8))) > mbit_rate) {
+	mbit_rate = (int)((stats->dirty_count*PAGE_SIZE)/(wall_delta*(1000/8)))
+	    + 50;
+	if (mbit_rate > MAX_MBIT_RATE)
+	    mbit_rate = MAX_MBIT_RATE;
+    }
 
     d0_cpu_last  = d0_cpu_now;
     d1_cpu_last  = d1_cpu_now;
@@ -198,14 +283,15 @@ static int write_vmconfig(XcIOContext *ioctxt){
 }
 
 static int analysis_phase( int xc_handle, u32 domid, 
-                           int nr_pfns, unsigned long *arr )
+                           int nr_pfns, unsigned long *arr, int runs )
 {
     long long start, now;
     xc_shadow_control_stats_t stats;
+    int j;
 
     start = llgettimeofday();
 
-    while ( 0 )
+    for (j = 0; j < runs; j++)
     {
         int i;
 
@@ -213,9 +299,9 @@ static int analysis_phase( int xc_handle, u32 domid,
                            DOM0_SHADOW_CONTROL_OP_CLEAN,
                            arr, nr_pfns, NULL);
         printf("#Flush\n");
-        for ( i = 0; i < 100; i++ )
+        for ( i = 0; i < 40; i++ )
         {     
-            usleep(10000);     
+            usleep(50000);     
             now = llgettimeofday();
             xc_shadow_control( xc_handle, domid, 
                                DOM0_SHADOW_CONTROL_OP_PEEK,
@@ -345,6 +431,10 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 
     int needed_to_fix = 0;
     int total_sent    = 0;
+
+    MBIT_RATE = START_MBIT_RATE;
+
+    xcio_info(ioctxt, "xc_linux_save start %d\n", domid);
     
     if (mlock(&ctxt, sizeof(ctxt))) {
         xcio_perror(ioctxt, "Unable to mlock ctxt");
@@ -440,7 +530,6 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
         }
 
         last_iter = 0;
-        sent_last_iter = 1<<20; /* 4GB of pages */
     } else{
 	/* This is a non-live suspend. Issue the call back to get the
 	 domain suspended */
@@ -455,6 +544,7 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 	}
 
     }
+    sent_last_iter = 1<<20; /* 4GB of pages */
 
     /* calculate the power of 2 order of nr_pfns, e.g.
        15->4 16->4 17->5 */
@@ -493,7 +583,7 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 
     }
 
-    analysis_phase( xc_handle, domid, nr_pfns, to_skip );
+    analysis_phase( xc_handle, domid, nr_pfns, to_skip, 0 );
 
     /* We want zeroed memory so use calloc rather than malloc. */
     pfn_type = calloc(BATCH_SIZE, sizeof(unsigned long));
@@ -744,14 +834,14 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
    
                     } /* end of page table rewrite for loop */
       
-                    if ( xcio_write(ioctxt, page, PAGE_SIZE) ){
+                    if ( xcio_ratewrite(ioctxt, page, PAGE_SIZE) ){
                         xcio_error(ioctxt, "Error when writing to state file (4)");
                         goto out;
                     }
       
                 }  /* end of it's a PT page */ else {  /* normal page */
 
-                    if ( xcio_write(ioctxt, region_base + (PAGE_SIZE*j), 
+                    if ( xcio_ratewrite(ioctxt, region_base + (PAGE_SIZE*j), 
                                      PAGE_SIZE) ){
                         xcio_error(ioctxt, "Error when writing to state file (5)");
                         goto out;
@@ -801,7 +891,8 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
         if ( live )
         {
             if ( 
-                /* ( sent_this_iter > (sent_last_iter * 0.95) ) || */
+                ( ( sent_this_iter > sent_last_iter ) &&
+		  (mbit_rate == MAX_MBIT_RATE ) ) ||
                 (iter >= max_iters) || 
                 (sent_this_iter+skip_this_iter < 50) || 
                 (total_sent > nr_pfns*max_factor) )
@@ -816,11 +907,11 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 		    goto out;
 		}
 
-		printf("SUSPEND flags %08lx shinfo %08lx eip %08lx esi %08lx\n", 
-		       op.u.getdomaininfo.flags, op.u.getdomaininfo.shared_info_frame,
-		       ctxt.cpu_ctxt.eip, ctxt.cpu_ctxt.esi );
-
-
+		xcio_info(ioctxt,
+                          "SUSPEND flags %08lx shinfo %08lx eip %08lx "
+                          "esi %08lx\n", op.u.getdomaininfo.flags,
+                          op.u.getdomaininfo.shared_info_frame,
+                          ctxt.cpu_ctxt.eip, ctxt.cpu_ctxt.esi );
             } 
 
             if ( xc_shadow_control( xc_handle, domid, 

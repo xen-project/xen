@@ -26,7 +26,7 @@ gopts.opt('live', short='l',
           fn=set_true, default=0,
           use="Use live migration.")
 
-gopts.opt('resource', short='r',
+gopts.opt('resource', short='r', val='MBIT',
           fn=set_int, default=0,
           use="Set level of resource usage for migration.")
 

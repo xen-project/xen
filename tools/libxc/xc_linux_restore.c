@@ -130,6 +130,8 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
     /* used by debug verify code */
     unsigned long buf[PAGE_SIZE/sizeof(unsigned long)];
 
+    xcio_info(ioctxt, "xc_linux_restore start\n");
+
     if ( mlock(&ctxt, sizeof(ctxt) ) )
     {
         /* needed for when we do the build dom0 op, 
@@ -194,7 +196,7 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
     }
     
     ioctxt->domain = dom;
-    printf("Created domain %ld\n",dom);
+    xcio_info(ioctxt, "Created domain %ld\n",dom);
 
     /* Get the domain's shared-info frame. */
     op.cmd = DOM0_GETDOMAININFO;
@@ -433,7 +435,7 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
         n+=j; /* crude stats */
     }
 
-    DPRINTF("Received all pages\n");
+    xcio_info(ioctxt, "Received all pages\n");
 
     /*
      * Pin page tables. Do this after writing to them as otherwise Xen
@@ -473,7 +475,8 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
 
     if ( finish_mmu_updates(xc_handle, mmu) ) goto out;
 
-    xcio_info(ioctxt, "\b\b\b\b100%%\nMemory reloaded.\n");
+    xcio_info(ioctxt, "\b\b\b\b100%%\n");
+    xcio_info(ioctxt, "Memory reloaded.\n");
 
     /* Get the list of PFNs that are not in the psuedo-phys map */
     {
@@ -647,7 +650,9 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
         xcio_error(ioctxt, "Bad LDT base or size");
         goto out;
     }
-   
+
+    xcio_info(ioctxt, "Domain ready to be built.\n");
+
     op.cmd = DOM0_BUILDDOMAIN;
     op.u.builddomain.domain   = (domid_t)dom;
     op.u.builddomain.ctxt = &ctxt;
@@ -661,6 +666,7 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
 
     if ( ioctxt->flags & XCFLAGS_CONFIGURE )
     {
+        xcio_info(ioctxt, "Domain ready to be unpaused\n");
         op.cmd = DOM0_UNPAUSEDOMAIN;
         op.u.unpausedomain.domain = (domid_t)dom;
         rc = do_dom0_op(xc_handle, &op);
