@@ -225,13 +225,14 @@ long sched_adjdom(int dom, unsigned long mcu_adv, unsigned long warp,
            dom, mcu_adv, warp, warpl, warpu);
 
     p = find_domain_by_id(dom);
-    if ( p == NULL ) return -ESRCH;
+    if ( p == NULL ) 
+        return -ESRCH;
 
     spin_lock_irq(&schedule_data[p->processor].lock);   
-
     p->mcu_advance = mcu_adv;
-
     spin_unlock_irq(&schedule_data[p->processor].lock); 
+
+    put_task_struct(p);
 
     return 0;
 }
@@ -569,11 +570,9 @@ void __init scheduler_init(void)
 void schedulers_start(void) 
 {   
     printk("Start schedulers\n");
-    __cli();
     sched_timer(0);
     virt_timer(0);
     smp_call_function((void *)sched_timer, NULL, 1, 1);
-    __sti();
 }
 
 

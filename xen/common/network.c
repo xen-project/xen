@@ -259,8 +259,11 @@ int vif_getinfo(vif_getinfo_t *info)
 
     vif = p->net_vif_list[info->vif];
 
-    if(vif == NULL)
+    if ( vif == NULL )
+    {
+        put_task_struct(p);
         return -ENOSYS;
+    }
 
     info->total_bytes_sent              = vif->total_bytes_sent;
     info->total_bytes_received          = vif->total_bytes_received;

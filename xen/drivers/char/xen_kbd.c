@@ -185,12 +185,13 @@ static void keyboard_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
     unsigned char status, scancode;
     unsigned int work = 1000;
-    unsigned long cpu_mask, flags;
+    unsigned long cpu_mask = 0, flags;
+    struct task_struct *p = CONSOLE_OWNER;
 
     spin_lock_irqsave(&kbd_lock, flags);
 
     while ( (--work > 0) && ((status = kbd_read_status()) & KBD_STAT_OBF) )
-    {      
+    {
         scancode = kbd_read_input();
       
 #ifdef CONFIG_XEN_ATTENTION_KEY
@@ -214,15 +215,23 @@ static void keyboard_interrupt(int irq, void *dev_id, struct pt_regs *regs)
         }
 #endif
       
-        kbd_ring_push(status, scancode);
-        cpu_mask = mark_guest_event(CONSOLE_OWNER, _EVENT_KBD);
-        guest_event_notify(cpu_mask);
+        if ( p != NULL )
+        {
+            kbd_ring_push(status, scancode);
+            cpu_mask |= mark_guest_event(CONSOLE_OWNER, _EVENT_KBD);
+        }
     }
     
     if ( !work )
         printk(KERN_ERR "xen_keyb: controller jammed (0x%02X).\n", status);
 
     spin_unlock_irqrestore(&kbd_lock, flags);
+
+    if ( p != NULL )
+    {
+        put_task_struct(p);
+        guest_event_notify(cpu_mask);
+    }    
 }
     
     
