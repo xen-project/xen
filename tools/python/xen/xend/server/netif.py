@@ -24,12 +24,12 @@ class NetifBackendController(controller.BackendController):
     def __init__(self, ctrl, dom):
         controller.BackendController.__init__(self, ctrl, dom)
         self.addMethod(CMSG_NETIF_BE,
-                       CMSG_NETIF_BE_DRIVER_STATUS_CHANGED,
-                       self.recv_be_driver_status_changed)
+                       CMSG_NETIF_BE_DRIVER_STATUS,
+                       self.recv_be_driver_status)
         self.registerChannel()
 
-    def recv_be_driver_status_changed(self, msg, req):
-        val = unpackMsg('netif_be_driver_status_changed_t', msg)
+    def recv_be_driver_status(self, msg, req):
+        val = unpackMsg('netif_be_driver_status_t', msg)
         status = val['status']
 
 class NetifBackendInterface(controller.BackendInterface):
@@ -98,11 +98,12 @@ class NetDev(controller.SplitDev):
     """Info record for a network device.
     """
 
-    def __init__(self, ctrl, vif, config):
+    def __init__(self, vif, ctrl, config):
         controller.SplitDev.__init__(self, vif, ctrl)
         self.vif = vif
         self.evtchn = None
         self.configure(config)
+        self.status = NETIF_INTERFACE_STATUS_DISCONNECTED
 
     def _get_config_mac(self, config):
         vmac = sxp.child_value(config, 'mac')
@@ -245,6 +246,18 @@ class NetDev(controller.SplitDev):
         d.addCallback(self.respond_be_create)
         return d
 
+    def getEventChannelBackend(self):
+        val = 0
+        if self.evtchn:
+            val = self.evtchn['port1']
+        return val
+
+    def getEventChannelFrontend(self):
+        val = 0
+        if self.evtchn:
+            val = self.evtchn['port2']
+        return val
+
     def send_be_create(self):
         d = defer.Deferred()
         msg = packMsg('netif_be_create_t',
@@ -264,11 +277,12 @@ class NetDev(controller.SplitDev):
 
         @param change: change flag
         """
+        self.status = NETIF_INTERFACE_STATUS_CLOSED
         def cb_destroy(val):
             self.send_be_destroy()
             self.getBackendInterface().close()
             if change:
-                self.interfaceChanged()
+                self.reportStatus()
         log.debug("Destroying vif domain=%d vif=%d", self.controller.dom, self.vif)
         self.vifctl('down')
         d = self.send_be_disconnect()
@@ -295,7 +309,7 @@ class NetDev(controller.SplitDev):
         msg = packMsg('netif_be_connect_t',
                       { 'domid'          : self.controller.dom,
                         'netif_handle'   : self.vif,
-                        'evtchn'         : self.evtchn['port1'],
+                        'evtchn'         : self.getEventChannelBackend(),
                         'tx_shmem_frame' : val['tx_shmem_frame'],
                         'rx_shmem_frame' : val['rx_shmem_frame'] })
         d = defer.Deferred()
@@ -306,34 +320,25 @@ class NetDev(controller.SplitDev):
         val = unpackMsg('netif_be_connect_t', msg)
         dom = val['domid']
         vif = val['netif_handle']
-        msg = packMsg('netif_fe_interface_status_changed_t',
-                      { 'handle' : self.vif,
-                        'status' : NETIF_INTERFACE_STATUS_CONNECTED,
-                        'evtchn' : self.evtchn['port2'],
-                        'domid'  : self.backendDomain,
-                        'mac'    : self.mac })
-        self.controller.writeRequest(msg)
+        self.status = NETIF_INTERFACE_STATUS_CONNECTED
+        self.reportStatus()
 
-    def attach_fe_device(self):
-        msg = packMsg('netif_fe_interface_status_changed_t',
+    def reportStatus(self, resp=0):
+        msg = packMsg('netif_fe_interface_status_t',
                       { 'handle' : self.vif,
-                        'status' : NETIF_INTERFACE_STATUS_DISCONNECTED,
-                        'evtchn' : 0,
+                        'status' : self.status,
+                        'evtchn' : self.getEventChannelFrontend(),
                         'domid'  : self.backendDomain,
                         'mac'    : self.mac })
-        self.controller.writeRequest(msg)
+        if resp:
+            self.controller.writeResponse(msg)
+        else:
+            self.controller.writeRequest(msg)
 
     def interfaceChanged(self):
         """Notify the font-end that a device has been added or removed.
-        The front-end should then probe the devices.
         """
-        msg = packMsg('netif_fe_interface_status_changed_t',
-                      { 'handle' : self.vif,
-                        'status' : NETIF_INTERFACE_STATUS_CHANGED,
-                        'evtchn' : 0,
-                        'domid'  : self.backendDomain,
-                        'mac'    : self.mac })
-        self.controller.writeRequest(msg)
+        self.reportStatus()
         
 class NetifController(controller.SplitController):
     """Network interface controller. Handles all network devices for a domain.
@@ -343,8 +348,11 @@ class NetifController(controller.SplitController):
         controller.SplitController.__init__(self, factory, dom)
         self.devices = {}
         self.addMethod(CMSG_NETIF_FE,
-                       CMSG_NETIF_FE_DRIVER_STATUS_CHANGED,
-                       self.recv_fe_driver_status_changed)
+                       CMSG_NETIF_FE_DRIVER_STATUS,
+                       self.recv_fe_driver_status)
+        self.addMethod(CMSG_NETIF_FE,
+                       CMSG_NETIF_FE_INTERFACE_STATUS,
+                       self.recv_fe_interface_status)
         self.addMethod(CMSG_NETIF_FE,
                        CMSG_NETIF_FE_INTERFACE_CONNECT,
                        self.recv_fe_interface_connect)
@@ -359,19 +367,6 @@ class NetifController(controller.SplitController):
         """
         controller.Controller.lostChannel(self)
 
-    def getDevices(self):
-        """Get a list of the devices.
-        """
-        return self.devices.values()
-
-    def getDevice(self, vif):
-        """Get a device.
-
-        @param vif: device index
-        @return: device (or None)
-        """
-        return self.devices.get(vif)
-
     def addDevice(self, vif, config):
         """Add a network interface.
 
@@ -381,13 +376,9 @@ class NetifController(controller.SplitController):
         """
         if vif in self.devices:
             raise XendError('device exists:' + str(vif))
-        dev = NetDev(self, vif, config)
+        dev = NetDev(vif, self, config)
         self.devices[vif] = dev
         return dev
-
-    def delDevice(self, vif):
-        if vif in self.devices:
-            del self.devices[vif]
 
     def destroy(self):
         """Destroy the controller and all devices.
@@ -415,23 +406,64 @@ class NetifController(controller.SplitController):
             d = dev.attach()
         return d
 
-    def recv_fe_driver_status_changed(self, msg, req):
+    def recv_fe_driver_status(self, msg, req):
         if not req: return
-        msg = packMsg('netif_fe_driver_status_changed_t',
+        print
+        print 'recv_fe_driver_status>'
+        msg = packMsg('netif_fe_driver_status_t',
                       { 'status'     : NETIF_DRIVER_STATUS_UP,
                         ## FIXME: max_handle should be max active interface id
-                        'max_handle' : len(self.devices) })
-        self.writeRequest(msg)
-        for dev in self.devices.values():
-            dev.attach_fe_device()
+                        'max_handle' : len(self.devices)
+                        #'max_handle' : self.getMaxDeviceIdx()
+                        })
+        # Two ways of doing it:
+        # 1) front-end requests driver status, we reply with the interface count,
+        #    front-end polls the interfaces,
+        #    front-end checks they are all up
+        # 2) front-end requests driver status, we reply (with anything),
+        #    we notify the interfaces,
+        #    we notify driver status up with the count
+        #    front-end checks they are all up
+        #
+        # We really want to use 1), but at the moment the xenU kernel panics
+        # in that mode, so we're sticking to 2) for now.
+        resp = 0
+        if resp:
+            self.writeResponse(msg)
+        else:
+            for dev in self.devices.values():
+                dev.reportStatus()
+            self.writeRequest(msg)
+        return resp
+
+    def recv_fe_interface_status(self, msg, req):
+        if not req: return
+        print
+        val = unpackMsg('netif_fe_interface_status_t', msg)
+        print "recv_fe_interface_status>", val
+        vif = val['handle']
+        dev = self.findDevice(vif)
+        if dev:
+            print 'recv_fe_interface_status>', 'dev=', dev
+            dev.reportStatus(resp=1)
+        else:
+            msg = packMsg('netif_fe_interface_status_t',
+                          { 'handle' : -1,
+                            'status' : NETIF_INTERFACE_STATUS_CLOSED,
+                            });
+            print 'recv_fe_interface_status>', 'no dev, returning -1'
+            self.writeResponse(msg)
+        return 1
+            
     
     def recv_fe_interface_connect(self, msg, req):
         val = unpackMsg('netif_fe_interface_connect_t', msg)
         vif = val['handle']
-        dev = self.devices.get(vif)
+        print
+        print "recv_fe_interface_connect", val
+        dev = self.getDevice(vif)
         if dev:
             dev.recv_fe_interface_connect(val, req)
         else:
             log.error('Received netif_fe_interface_connect for unknown vif: dom=%d vif=%d',
                       self.dom, vif)
-

@@ -155,6 +155,7 @@ def make_disk(vm, config, uname, dev, mode, recreate=0):
     @param recreate: recreate flag (after xend restart)
     @return: deferred
     """
+    idx = vm.next_device_index('vbd')
     segments = lookup_disk_uname(uname)
     if not segments:
         raise VmError("vbd: Segments not found: uname=%s" % uname)
@@ -166,7 +167,7 @@ def make_disk(vm, config, uname, dev, mode, recreate=0):
     if not vdev:
         raise VmError("vbd: Device not found: uname=%s dev=%s" % (uname, dev))
     ctrl = xend.blkif_create(vm.dom, recreate=recreate)
-    return ctrl.attachDevice(config, vdev, mode, segment, recreate=recreate)
+    return ctrl.attachDevice(idx, config, vdev, mode, segment, recreate=recreate)
         
 def vif_up(iplist):
     """send an unsolicited ARP reply for all non link-local IP addresses.

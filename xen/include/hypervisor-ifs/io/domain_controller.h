@@ -70,10 +70,10 @@ typedef struct {
  */
 
 /* Messages from domain controller to guest. */
-#define CMSG_BLKIF_FE_INTERFACE_STATUS_CHANGED   0
+#define CMSG_BLKIF_FE_INTERFACE_STATUS           0
 
 /* Messages from guest to domain controller. */
-#define CMSG_BLKIF_FE_DRIVER_STATUS_CHANGED     32
+#define CMSG_BLKIF_FE_DRIVER_STATUS             32
 #define CMSG_BLKIF_FE_INTERFACE_CONNECT         33
 #define CMSG_BLKIF_FE_INTERFACE_DISCONNECT      34
 #define CMSG_BLKIF_FE_INTERFACE_QUERY           35
@@ -84,25 +84,25 @@ typedef struct {
 #define blkif_sector_t u64
 
 /*
- * CMSG_BLKIF_FE_INTERFACE_STATUS_CHANGED:
+ * CMSG_BLKIF_FE_INTERFACE_STATUS:
  *  Notify a guest about a status change on one of its block interfaces.
  *  If the interface is DESTROYED or DOWN then the interface is disconnected:
  *   1. The shared-memory frame is available for reuse.
  *   2. Any unacknowledged messages pending on the interface were dropped.
  */
-#define BLKIF_INTERFACE_STATUS_DESTROYED    0 /* Interface doesn't exist.    */
+#define BLKIF_INTERFACE_STATUS_CLOSED       0 /* Interface doesn't exist.    */
 #define BLKIF_INTERFACE_STATUS_DISCONNECTED 1 /* Exists but is disconnected. */
 #define BLKIF_INTERFACE_STATUS_CONNECTED    2 /* Exists and is connected.    */
-#define BLKIF_INTERFACE_STATUS_CHANGED      3 /* A device has been added or removed. */
+//#define BLKIF_INTERFACE_STATUS_CHANGED      3 /* A device has been added or removed. */
 typedef struct {
     u32 handle; /*  0 */
     u32 status; /*  4 */
     u16 evtchn; /*  8: (only if status == BLKIF_INTERFACE_STATUS_CONNECTED). */
     domid_t domid; /* 10: status != BLKIF_INTERFACE_STATUS_DESTROYED */
-} PACKED blkif_fe_interface_status_changed_t; /* 12 bytes */
+} PACKED blkif_fe_interface_status_t; /* 12 bytes */
 
 /*
- * CMSG_BLKIF_FE_DRIVER_STATUS_CHANGED:
+ * CMSG_BLKIF_FE_DRIVER_STATUS:
  *  Notify the domain controller that the front-end driver is DOWN or UP.
  *  When the driver goes DOWN then the controller will send no more
  *  status-change notifications.
@@ -121,7 +121,7 @@ typedef struct {
     /* OUT */
     /* Driver should query interfaces [0..max_handle]. */
     u32 max_handle;    /*  4 */
-} PACKED blkif_fe_driver_status_changed_t; /* 8 bytes */
+} PACKED blkif_fe_driver_status_t; /* 8 bytes */
 
 /*
  * CMSG_BLKIF_FE_INTERFACE_CONNECT:
@@ -172,7 +172,7 @@ typedef struct {
 #define CMSG_BLKIF_BE_VBD_SHRINK  7  /* Remove last extent from a given VBD. */
 
 /* Messages to domain controller. */
-#define CMSG_BLKIF_BE_DRIVER_STATUS_CHANGED 32
+#define CMSG_BLKIF_BE_DRIVER_STATUS 32
 
 /*
  * Message request/response definitions for block-device messages.
@@ -325,14 +325,14 @@ typedef struct {
 } PACKED blkif_be_vbd_shrink_t; /* 16 bytes */
 
 /*
- * CMSG_BLKIF_BE_DRIVER_STATUS_CHANGED:
+ * CMSG_BLKIF_BE_DRIVER_STATUS:
  *  Notify the domain controller that the back-end driver is DOWN or UP.
  *  If the driver goes DOWN while interfaces are still UP, the controller
  *  will automatically send DOWN notifications.
  */
 typedef struct {
     u32        status;        /*  0: BLKIF_DRIVER_STATUS_??? */
-} PACKED blkif_be_driver_status_changed_t; /* 4 bytes */
+} PACKED blkif_be_driver_status_t; /* 4 bytes */
 
 
 /******************************************************************************
@@ -340,22 +340,22 @@ typedef struct {
  */
 
 /* Messages from domain controller to guest. */
-#define CMSG_NETIF_FE_INTERFACE_STATUS_CHANGED   0
+#define CMSG_NETIF_FE_INTERFACE_STATUS   0
 
 /* Messages from guest to domain controller. */
-#define CMSG_NETIF_FE_DRIVER_STATUS_CHANGED     32
+#define CMSG_NETIF_FE_DRIVER_STATUS             32
 #define CMSG_NETIF_FE_INTERFACE_CONNECT         33
 #define CMSG_NETIF_FE_INTERFACE_DISCONNECT      34
 #define CMSG_NETIF_FE_INTERFACE_QUERY           35
 
 /*
- * CMSG_NETIF_FE_INTERFACE_STATUS_CHANGED:
+ * CMSG_NETIF_FE_INTERFACE_STATUS:
  *  Notify a guest about a status change on one of its network interfaces.
- *  If the interface is DESTROYED or DOWN then the interface is disconnected:
+ *  If the interface is CLOSED or DOWN then the interface is disconnected:
  *   1. The shared-memory frame is available for reuse.
  *   2. Any unacknowledged messgaes pending on the interface were dropped.
  */
-#define NETIF_INTERFACE_STATUS_DESTROYED    0 /* Interface doesn't exist.    */
+#define NETIF_INTERFACE_STATUS_CLOSED       0 /* Interface doesn't exist.    */
 #define NETIF_INTERFACE_STATUS_DISCONNECTED 1 /* Exists but is disconnected. */
 #define NETIF_INTERFACE_STATUS_CONNECTED    2 /* Exists and is connected.    */
 #define NETIF_INTERFACE_STATUS_CHANGED      3 /* A device has been added or removed. */
@@ -365,17 +365,17 @@ typedef struct {
     u16        evtchn; /*  8: status == NETIF_INTERFACE_STATUS_CONNECTED */
     u8         mac[6]; /* 10: status == NETIF_INTERFACE_STATUS_CONNECTED */
     domid_t    domid;  /* 16: status != NETIF_INTERFACE_STATUS_DESTROYED */
-} PACKED netif_fe_interface_status_changed_t; /* 18 bytes */
+} PACKED netif_fe_interface_status_t; /* 18 bytes */
 
 /*
- * CMSG_NETIF_FE_DRIVER_STATUS_CHANGED:
+ * CMSG_NETIF_FE_DRIVER_STATUS:
  *  Notify the domain controller that the front-end driver is DOWN or UP.
  *  When the driver goes DOWN then the controller will send no more
  *  status-change notifications.
  *  If the driver goes DOWN while interfaces are still UP, the domain
  *  will automatically take the interfaces DOWN.
  * 
- *  NB. The controller should not send an INTERFACE_STATUS_CHANGED message
+ *  NB. The controller should not send an INTERFACE_STATUS message
  *  for interfaces that are active when it receives an UP notification. We
  *  expect that the frontend driver will query those interfaces itself.
  */
@@ -387,7 +387,7 @@ typedef struct {
     /* OUT */
     /* Driver should query interfaces [0..max_handle]. */
     u32        max_handle;    /*  4 */
-} PACKED netif_fe_driver_status_changed_t; /* 8 bytes */
+} PACKED netif_fe_driver_status_t; /* 8 bytes */
 
 /*
  * CMSG_NETIF_FE_INTERFACE_CONNECT:
@@ -437,7 +437,7 @@ typedef struct {
 #define CMSG_NETIF_BE_DISCONNECT  3  /* Disconnect i/f from remote driver.   */
 
 /* Messages to domain controller. */
-#define CMSG_NETIF_BE_DRIVER_STATUS_CHANGED 32
+#define CMSG_NETIF_BE_DRIVER_STATUS 32
 
 /*
  * Message request/response definitions for net-device messages.
@@ -533,14 +533,14 @@ typedef struct {
 } PACKED netif_be_disconnect_t; /* 12 bytes */
 
 /*
- * CMSG_NETIF_BE_DRIVER_STATUS_CHANGED:
+ * CMSG_NETIF_BE_DRIVER_STATUS:
  *  Notify the domain controller that the back-end driver is DOWN or UP.
  *  If the driver goes DOWN while interfaces are still UP, the domain
  *  will automatically send DOWN notifications.
  */
 typedef struct {
     u32        status;        /*  0: NETIF_DRIVER_STATUS_??? */
-} PACKED netif_be_driver_status_changed_t; /* 4 bytes */
+} PACKED netif_be_driver_status_t; /* 4 bytes */
 
 
 /******************************************************************************

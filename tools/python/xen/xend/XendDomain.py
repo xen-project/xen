@@ -239,14 +239,14 @@ class XendDomain:
         destroyed = 0
         for d in casualties:
             id = str(d['dom'])
-            log.debug('XendDomain>reap> domain died id=%s', id)
+            dominfo = self.domain_by_id.get(id)
+            name = (dominfo and dominfo.name) or '??'
+            log.debug('XendDomain>reap> domain died name=%s id=%s', name, id)
             if d['shutdown']:
                 reason = XendDomainInfo.shutdown_reason(d['shutdown_reason'])
                 log.debug('XendDomain>reap> shutdown id=%s reason=%s', id, reason)
-                dominfo = self.domain_by_id.get(id)
-                name = (dominfo and dominfo.name) or '??'
                 if reason in ['suspend']:
-                    if dominfo.is_terminated():
+                    if dominfo and dominfo.is_terminated():
                         log.debug('XendDomain>reap> Suspended domain died id=%s', id)
                     else:
                         eserver.inject('xend.domain.suspended', [name, id])

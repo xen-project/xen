@@ -1010,23 +1010,23 @@ void blkif_control_send(blkif_request_t *req, blkif_response_t *rsp)
 }
 
 
-static void blkif_status_change(blkif_fe_interface_status_changed_t *status)
+static void blkif_status_change(blkif_fe_interface_status_t *status)
 {
     ctrl_msg_t                   cmsg;
     blkif_fe_interface_connect_t up;
     long rc;
 
-    if ( status->handle != 0 )
-    {
-        printk(KERN_WARNING "Status change on unsupported blkif %d\n",
-               status->handle);
-        return;
-    }
+/*     if ( status->handle != 0 ) */
+/*     { */
+/*         printk(KERN_WARNING "Status change on unsupported blkif %d\n", */
+/*                status->handle); */
+/*         return; */
+/*     } */
 
     switch ( status->status )
     {
-    case BLKIF_INTERFACE_STATUS_DESTROYED:
-        printk(KERN_WARNING "Unexpected blkif-DESTROYED message in state %d\n",
+    case BLKIF_INTERFACE_STATUS_CLOSED:
+        printk(KERN_WARNING "Unexpected blkif-CLOSED message in state %d\n",
                blkif_state);
         break;
 
@@ -1148,11 +1148,11 @@ static void blkif_status_change(blkif_fe_interface_status_changed_t *status)
 
         break;
 
-    case BLKIF_INTERFACE_STATUS_CHANGED:
-        /* The domain controller is notifying us that a device has been
-        * added or removed.
-        */
-        break;
+//    case BLKIF_INTERFACE_STATUS_CHANGED:
+//        /* The domain controller is notifying us that a device has been
+//        * added or removed.
+//        */
+//        break;
 
     default:
         printk(KERN_WARNING "Status change to unknown value %d\n", 
@@ -1166,14 +1166,14 @@ static void blkif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
 {
     switch ( msg->subtype )
     {
-    case CMSG_BLKIF_FE_INTERFACE_STATUS_CHANGED:
-        if ( msg->length != sizeof(blkif_fe_interface_status_changed_t) )
+    case CMSG_BLKIF_FE_INTERFACE_STATUS:
+        if ( msg->length != sizeof(blkif_fe_interface_status_t) )
             goto parse_error;
-        blkif_status_change((blkif_fe_interface_status_changed_t *)
+        blkif_status_change((blkif_fe_interface_status_t *)
                             &msg->msg[0]);
         break;        
 #if 0
-    case CMSG_BLKIF_FE_VBD_STATUS_CHANGED:
+    case CMSG_BLKIF_FE_VBD_STATUS:
         update_tq.routine = update_vbds_task;
         schedule_task(&update_tq);
         break;
@@ -1194,7 +1194,7 @@ static void blkif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
 int __init xlblk_init(void)
 {
     ctrl_msg_t                       cmsg;
-    blkif_fe_driver_status_changed_t st;
+    blkif_fe_driver_status_t st;
     int i;
     
     if ( (start_info.flags & SIF_INITDOMAIN) 
@@ -1215,8 +1215,8 @@ int __init xlblk_init(void)
 
     /* Send a driver-UP notification to the domain controller. */
     cmsg.type      = CMSG_BLKIF_FE;
-    cmsg.subtype   = CMSG_BLKIF_FE_DRIVER_STATUS_CHANGED;
-    cmsg.length    = sizeof(blkif_fe_driver_status_changed_t);
+    cmsg.subtype   = CMSG_BLKIF_FE_DRIVER_STATUS;
+    cmsg.length    = sizeof(blkif_fe_driver_status_t);
     st.status      = BLKIF_DRIVER_STATUS_UP;
     memcpy(cmsg.msg, &st, sizeof(st));
     ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
@@ -1245,12 +1245,12 @@ void blkdev_suspend(void)
 void blkdev_resume(void)
 {
     ctrl_msg_t                       cmsg;
-    blkif_fe_driver_status_changed_t st;    
+    blkif_fe_driver_status_t st;    
 
     /* Send a driver-UP notification to the domain controller. */
     cmsg.type      = CMSG_BLKIF_FE;
-    cmsg.subtype   = CMSG_BLKIF_FE_DRIVER_STATUS_CHANGED;
-    cmsg.length    = sizeof(blkif_fe_driver_status_changed_t);
+    cmsg.subtype   = CMSG_BLKIF_FE_DRIVER_STATUS;
+    cmsg.length    = sizeof(blkif_fe_driver_status_t);
     st.status      = BLKIF_DRIVER_STATUS_UP;
     memcpy(cmsg.msg, &st, sizeof(st));
     ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);

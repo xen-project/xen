@@ -522,6 +522,9 @@ class BackendInterface:
     def writeRequest(self, msg, response=None):
         return self.backend.writeRequest(msg, response=response)
 
+    def writeResponse(self, msg):
+        return self.backend.writeResponse(msg)
+    
     def close(self):
         self.backend.deregisterInterface(self)
         self.controller.backendInterfaceClosed(self)
@@ -536,6 +539,60 @@ class SplitController(Controller):
         Controller.__init__(self, factory, dom)
         self.backendInterfaces = {}
         self.backendHandle = 0
+        self.devices = {}
+
+    def getDevices(self):
+        """Get a list of the devices..
+        """
+        return self.devices.values()
+
+    def delDevice(self, idx):
+        """Remove the device with the given index from the device table.
+
+        @param idx device index
+        """
+        if idx in self.devices:
+            del self.devices[idx]
+
+    def getDevice(self, idx):
+        """Get the device with a given index.
+
+        @param idx device index
+        @return device (or None)
+        """
+        return self.devices.get(idx)
+
+    def findDevice(self, idx):
+        """Find a device. If idx is non-negative,
+        get the device with the given index. If idx is negative,
+        look for the device with least index greater than -idx - 2.
+        For example, if idx is -2, look for devices with index
+        greater than 0, i.e. 1 or above.
+
+        @param idx device index
+        @return device (or None)
+        """
+        if idx < 0:
+            idx = -idx - 2
+            val = None
+            for dev in self.devices.values():
+                if dev.idx <= idx: continue
+                if (val is None) or (dev.idx < val.idx):
+                    val = dev
+        else:
+            val = getDevice(idx)
+        return val
+
+    def getMaxDeviceIdx(self):
+        """Get the maximum id used by devices.
+
+        @return maximum idx
+        """
+        maxIdx = 0
+        for dev in self.devices:
+            if dev.idx > maxIdx:
+                maxIdx = dev.idx
+        return maxIdx
         
     def getBackendInterfaces(self):
         return self.backendInterfaces.values()

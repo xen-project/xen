@@ -49,16 +49,16 @@ static void netif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
 
 void netif_ctrlif_init(void)
 {
-    ctrl_msg_t                       cmsg;
-    netif_be_driver_status_changed_t st;
+    ctrl_msg_t cmsg;
+    netif_be_driver_status_t st;
 
     (void)ctrl_if_register_receiver(CMSG_NETIF_BE, netif_ctrlif_rx,
                                     CALLBACK_IN_BLOCKING_CONTEXT);
 
     /* Send a driver-UP notification to the domain controller. */
     cmsg.type      = CMSG_NETIF_BE;
-    cmsg.subtype   = CMSG_NETIF_BE_DRIVER_STATUS_CHANGED;
-    cmsg.length    = sizeof(netif_be_driver_status_changed_t);
+    cmsg.subtype   = CMSG_NETIF_BE_DRIVER_STATUS;
+    cmsg.length    = sizeof(netif_be_driver_status_t);
     st.status      = NETIF_DRIVER_STATUS_UP;
     memcpy(cmsg.msg, &st, sizeof(st));
     ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
