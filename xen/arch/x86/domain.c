@@ -271,12 +271,12 @@ void arch_do_createdomain(struct exec_domain *ed)
         ed->vcpu_info = &d->shared_info->vcpu_data[ed->eid];
         SHARE_PFN_WITH_DOMAIN(virt_to_page(d->shared_info), d);
         machine_to_phys_mapping[virt_to_phys(d->shared_info) >> 
-                               PAGE_SHIFT] = INVALID_P2M_ENTRY;
+                               PAGE_SHIFT] = INVALID_M2P_ENTRY;
 
         d->arch.mm_perdomain_pt = (l1_pgentry_t *)alloc_xenheap_page();
         memset(d->arch.mm_perdomain_pt, 0, PAGE_SIZE);
         machine_to_phys_mapping[virt_to_phys(d->arch.mm_perdomain_pt) >> 
-                               PAGE_SHIFT] = INVALID_P2M_ENTRY;
+                               PAGE_SHIFT] = INVALID_M2P_ENTRY;
         ed->arch.perdomain_ptes = d->arch.mm_perdomain_pt;
 
 #ifdef __x86_64__
@@ -687,7 +687,8 @@ long do_switch_to_user(void)
     struct switch_to_user  stu;
     struct exec_domain    *ed = current;
 
-    if ( unlikely(copy_from_user(&stu, (void *)regs->rsp, sizeof(stu))) )
+    if ( unlikely(copy_from_user(&stu, (void *)regs->rsp, sizeof(stu))) ||
+         unlikely(pagetable_val(ed->arch.pagetable_user) == 0) )
         return -EFAULT;
 
     ed->arch.flags &= ~TF_kernel_mode;

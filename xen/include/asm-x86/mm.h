@@ -128,8 +128,6 @@ static inline u32 pickle_domptr(struct domain *domain)
         spin_unlock(&(_dom)->page_alloc_lock);                              \
     } while ( 0 )
 
-#define INVALID_P2M_ENTRY (~0UL)
-
 extern struct pfn_info *frame_table;
 extern unsigned long frame_table_size;
 extern unsigned long max_page;
@@ -231,15 +229,16 @@ void synchronise_pagetables(unsigned long cpu_mask);
  * contiguous (or near contiguous) physical memory.
  */
 #undef  machine_to_phys_mapping
+#define machine_to_phys_mapping ((u32 *)RDWR_MPT_VIRT_START)
+#define INVALID_M2P_ENTRY        (~0U)
+#define IS_INVALID_M2P_ENTRY(_e) (!!((_e) & (1U<<31)))
 
 /*
  * The phys_to_machine_mapping is the reversed mapping of MPT for full
  * virtualization.
  */
-#undef  phys_to_machine_mapping
-
-#define machine_to_phys_mapping ((unsigned long *)RDWR_MPT_VIRT_START)
 #define __phys_to_machine_mapping ((unsigned long *)PERDOMAIN_VIRT_START)
+
 /* Returns the machine physical */
 static inline unsigned long phys_to_machine_mapping(unsigned long pfn) 
 {

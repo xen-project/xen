@@ -181,7 +181,7 @@ static inline int __mark_dirty(struct domain *d, unsigned int mfn)
      * domain's pseudo-physical memory map (e.g., the shared info frame).
      * Nothing to do here...
      */
-    if ( unlikely(pfn & 0x80000000UL) )
+    if ( unlikely(IS_INVALID_M2P_ENTRY(pfn)) )
         return rc;
 
     if ( likely(pfn < d->arch.shadow_dirty_bitmap_size) )

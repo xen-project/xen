@@ -115,8 +115,8 @@ void __set_fixmap(
 
 void __init paging_init(void)
 {
-    void *newpt;
     unsigned long i, p, max;
+    l3_pgentry_t *l3rw, *l3ro;
 
     /* Map all of physical memory. */
     max = ((max_page + L1_PAGETABLE_ENTRIES - 1) & 
@@ -134,25 +134,32 @@ void __init paging_init(void)
         if ( p == 0 )
             panic("Not enough memory for m2p table\n");
         map_pages(idle_pg_table, RDWR_MPT_VIRT_START + i*8, p, 
-                  1UL << L2_PAGETABLE_SHIFT, PAGE_HYPERVISOR);
+                  1UL << L2_PAGETABLE_SHIFT, PAGE_HYPERVISOR | _PAGE_USER);
         memset((void *)(RDWR_MPT_VIRT_START + i*8), 0x55,
                1UL << L2_PAGETABLE_SHIFT);
     }
 
+    /*
+     * Above we mapped the M2P table as user-accessible and read-writable.
+     * Fix security by denying user access at the top level of the page table.
+     */
+    idle_pg_table[l4_table_offset(RDWR_MPT_VIRT_START)] =
+        mk_l4_pgentry(l4_pgentry_val(
+            idle_pg_table[l4_table_offset(RDWR_MPT_VIRT_START)]) & 
+                      ~_PAGE_USER);
+
     /* Create read-only mapping of MPT for guest-OS use. */
-    newpt = (void *)alloc_xenheap_page();
-    clear_page(newpt);
+    l3ro = (l3_pgentry_t *)alloc_xenheap_page();
+    clear_page(l3ro);
     idle_pg_table[l4_table_offset(RO_MPT_VIRT_START)] =
-        mk_l4_pgentry((__pa(newpt) | __PAGE_HYPERVISOR | _PAGE_USER) &
+        mk_l4_pgentry((__pa(l3ro) | __PAGE_HYPERVISOR | _PAGE_USER) &
                       ~_PAGE_RW);
     /* Copy the L3 mappings from the RDWR_MPT area. */
-    p  = l4_pgentry_val(idle_pg_table[l4_table_offset(RDWR_MPT_VIRT_START)]);
-    p &= PAGE_MASK;
-    p += l3_table_offset(RDWR_MPT_VIRT_START) * sizeof(l3_pgentry_t);
-    newpt = (void *)((unsigned long)newpt +
-                     (l3_table_offset(RO_MPT_VIRT_START) *
-                      sizeof(l3_pgentry_t)));
-    memcpy(newpt, __va(p),
+    l3rw = l4_pgentry_to_l3(
+        idle_pg_table[l4_table_offset(RDWR_MPT_VIRT_START)]);
+    l3rw += l3_table_offset(RDWR_MPT_VIRT_START);
+    l3ro += l3_table_offset(RO_MPT_VIRT_START);
+    memcpy(l3ro, l3rw,
            (RDWR_MPT_VIRT_END - RDWR_MPT_VIRT_START) >> L3_PAGETABLE_SHIFT);
 
     /* Set up linear page table mapping. */
