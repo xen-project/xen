@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 
 ##############################################
 # Console client for Xen guest OSes
@@ -57,4 +58,4 @@ def connect(host,port):
         termios.tcsetattr(0, termios.TCSAFLUSH, oattrs)
 
 if __name__ == '__main__':
-    main(str(sys.argv[1]),int(sys.argv[2]))
+    connect(str(sys.argv[1]),int(sys.argv[2]))
