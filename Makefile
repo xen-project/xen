@@ -2,8 +2,8 @@
 # Grand Unified Makefile for Xen.
 #
 
-DIST_DIR	:= $(CURDIR)/dist
-DESTDIR		:= $(DIST_DIR)/install
+DISTDIR		?= $(CURDIR)/dist
+DESTDIR		?= $(DISTDIR)/install
 
 INSTALL		:= install
 INSTALL_DIR	:= $(INSTALL) -d -m0755
@@ -40,10 +40,10 @@ install-tools:
 	$(MAKE) -C tools install
 
 install-kernels:
-	cp -a $(INSTALL_DIR)/boot/* /boot/
-	cp -a $(INSTALL_DIR)/lib/modules/* /lib/modules/
-	cp -dR $(INSTALL_DIR)/boot/*$(LINUX_VER)* $(prefix)/boot/
-	cp -dR $(INSTALL_DIR)/lib/modules/* $(prefix)/lib/modules/
+	cp -a $(DESTDIR)/boot/* /boot/
+	cp -a $(DESTDIR)/lib/modules/* /lib/modules/
+	cp -dR $(DESTDIR)/boot/*$(LINUX_VER)* $(prefix)/boot/
+	cp -dR $(DESTDIR)/lib/modules/* $(prefix)/lib/modules/
 
 install-docs:
 	sh ./docs/check_pkgs && $(MAKE) -C docs install || true
@@ -52,11 +52,11 @@ install-docs:
 
 # build and install everything into local dist directory
 dist: xen tools kernels docs
-	$(INSTALL_DIR) $(DIST_DIR)/check
-	$(INSTALL_DATA) ./COPYING $(DIST_DIR)
-	$(INSTALL_DATA) ./README $(DIST_DIR)
-	$(INSTALL_PROG) ./install.sh $(DIST_DIR)
-	$(INSTALL_PROG) tools/check/chk tools/check/check_* $(DIST_DIR)/check
+	$(INSTALL_DIR) $(DISTDIR)/check
+	$(INSTALL_DATA) ./COPYING $(DISTDIR)
+	$(INSTALL_DATA) ./README $(DISTDIR)
+	$(INSTALL_PROG) ./install.sh $(DISTDIR)
+	$(INSTALL_PROG) tools/check/chk tools/check/check_* $(DISTDIR)/check
 
 xen:
 	$(MAKE) dist=yes -C xen install

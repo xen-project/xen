@@ -37,8 +37,8 @@ $(LINUX_DIR)/include/linux/autoconf.h: pristine-linux-$(LINUX_VER)
 	# add ebtables patch
 	( cd $(LINUX_DIR) ; patch -p1 -F3 < ../patches/tmp/ebtables.diff )
 	# Re-use config from install dir if one exits else use default config
-	[ -r $(INSTALL_DIR)/boot/config-$(FULLVERSION) ] && \
-	  cp $(INSTALL_DIR)/boot/config-$(FULLVERSION) $(LINUX_DIR)/.config \
+	[ -r $(DESTDIR)/boot/config-$(FULLVERSION) ] && \
+	  cp $(DESTDIR)/boot/config-$(FULLVERSION) $(LINUX_DIR)/.config \
 	  || cp $(LINUX_DIR)/arch/xen/defconfig-$(EXTRAVERSION) \
 		$(LINUX_DIR)/.config
 	make -C $(LINUX_DIR) ARCH=xen oldconfig
