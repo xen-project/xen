@@ -19,7 +19,8 @@ extern void schedule(void);
 static hyp_event_callback_fn_t event_call_fn[] = 
 {
     schedule,
-    kill_domain
+    kill_domain,
+    stop_domain
 };
 
 /* Handle outstanding events for the currently-executing domain. */
