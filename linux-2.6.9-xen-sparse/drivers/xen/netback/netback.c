@@ -11,6 +11,7 @@
  */
 
 #include "common.h"
+#include <asm-xen/balloon.h>
 
 static void netif_page_release(struct page *page);
 static void netif_skb_release(struct sk_buff *skb);
@@ -28,6 +29,8 @@ static DECLARE_TASKLET(net_tx_tasklet, net_tx_action, 0);
 
 static void net_rx_action(unsigned long unused);
 static DECLARE_TASKLET(net_rx_tasklet, net_rx_action, 0);
+
+static struct timer_list net_timer;
 
 static struct sk_buff_head rx_queue;
 static multicall_entry_t rx_mcl[NETIF_RX_RING_SIZE*2];
@@ -69,27 +72,20 @@ static unsigned long mfn_list[MAX_MFN_ALLOC];
 static unsigned int alloc_index = 0;
 static spinlock_t mfn_lock = SPIN_LOCK_UNLOCKED;
 
-static void __refresh_mfn_list(void)
+static unsigned long alloc_mfn(void)
 {
-    int ret = HYPERVISOR_dom_mem_op(MEMOP_increase_reservation,
-                                    mfn_list, MAX_MFN_ALLOC, 0);
-    if ( unlikely(ret != MAX_MFN_ALLOC) )
-        BUG();
-    alloc_index = MAX_MFN_ALLOC;
-}
-
-static unsigned long get_new_mfn(void)
-{
-    unsigned long mfn, flags;
+    unsigned long mfn = 0, flags;
     spin_lock_irqsave(&mfn_lock, flags);
-    if ( alloc_index == 0 )
-        __refresh_mfn_list();
-    mfn = mfn_list[--alloc_index];
+    if ( unlikely(alloc_index == 0) )
+        alloc_index = HYPERVISOR_dom_mem_op(
+            MEMOP_increase_reservation, mfn_list, MAX_MFN_ALLOC, 0);
+    if ( alloc_index != 0 )
+        mfn = mfn_list[--alloc_index];
     spin_unlock_irqrestore(&mfn_lock, flags);
     return mfn;
 }
 
-static void dealloc_mfn(unsigned long mfn)
+static void free_mfn(unsigned long mfn)
 {
     unsigned long flags;
     spin_lock_irqsave(&mfn_lock, flags);
@@ -210,8 +206,16 @@ static void net_rx_action(unsigned long unused)
         netif   = (netif_t *)skb->dev->priv;
         vdata   = (unsigned long)skb->data;
         mdata   = virt_to_machine(vdata);
-        new_mfn = get_new_mfn();
-        
+
+        /* Memory squeeze? Back off for an arbitrary while. */
+        if ( (new_mfn = alloc_mfn()) == 0 )
+        {
+            if ( net_ratelimit() )
+                printk(KERN_WARNING "Memory squeeze in netback driver.\n");
+            mod_timer(&net_timer, jiffies + HZ);
+            break;
+        }
+
         /*
          * Set the new P2M table entry before reassigning the old data page.
          * Heed the comment in pgtable-2level.h:pte_page(). :-)
@@ -280,7 +284,7 @@ static void net_rx_action(unsigned long unused)
         if ( unlikely(mcl[1].args[5] != 0) )
         {
             DPRINTK("Failed MMU update transferring to DOM%u\n", netif->domid);
-            dealloc_mfn(mdata >> PAGE_SHIFT);
+            free_mfn(mdata >> PAGE_SHIFT);
             status = NETIF_RSP_ERROR;
         }
 
@@ -307,12 +311,17 @@ static void net_rx_action(unsigned long unused)
     }
 
     /* More work to do? */
-    if ( !skb_queue_empty(&rx_queue) )
+    if ( !skb_queue_empty(&rx_queue) && !timer_pending(&net_timer) )
         tasklet_schedule(&net_rx_tasklet);
 #if 0
     else
         xen_network_done_notify();
 #endif
+}
+
+static void net_alarm(unsigned long unused)
+{
+    tasklet_schedule(&net_rx_tasklet);
 }
 
 struct net_device_stats *netif_be_get_stats(struct net_device *dev)
@@ -781,9 +790,16 @@ static int __init netback_init(void)
 
     printk("Initialising Xen netif backend\n");
 
+    /* We can increase reservation by this much in net_rx_action(). */
+    balloon_update_driver_allowance(NETIF_RX_RING_SIZE);
+
     skb_queue_head_init(&rx_queue);
     skb_queue_head_init(&tx_queue);
 
+    init_timer(&net_timer);
+    net_timer.data = 0;
+    net_timer.function = net_alarm;
+    
     netif_interface_init();
 
     if ( (mmap_vstart = allocate_empty_lowmem_region(MAX_PENDING_REQS)) == 0 )

@@ -35,6 +35,7 @@
 #include <asm/pgtable.h>
 #include <asm-xen/hypervisor.h>
 #include <asm-xen/multicall.h>
+#include <asm-xen/balloon.h>
 
 /*
  * This suffices to protect us if we ever move to SMP domains.
@@ -352,7 +353,6 @@ unsigned long allocate_empty_lowmem_region(unsigned long pages)
     unsigned long *pfn_array;
     unsigned long  vstart;
     unsigned long  i;
-    int            ret;
     unsigned int   order = get_order(pages*PAGE_SIZE);
 
     vstart = __get_free_pages(GFP_KERNEL, order);
@@ -378,57 +378,11 @@ unsigned long allocate_empty_lowmem_region(unsigned long pages)
     /* Flush updates through and flush the TLB. */
     xen_tlb_flush();
 
-    ret = HYPERVISOR_dom_mem_op(MEMOP_decrease_reservation, 
-                                pfn_array, 1<<order, 0);
-    if ( unlikely(ret != (1<<order)) )
-    {
-        printk(KERN_WARNING "Unable to reduce memory reservation (%d)\n", ret);
-        BUG();
-    }
+    balloon_put_pages(pfn_array, 1 << order);
 
     vfree(pfn_array);
 
     return vstart;
-}
-
-void deallocate_lowmem_region(unsigned long vstart, unsigned long pages)
-{
-    pgd_t         *pgd; 
-    pmd_t         *pmd;
-    pte_t         *pte;
-    unsigned long *pfn_array;
-    unsigned long  i;
-    int            ret;
-    unsigned int   order = get_order(pages*PAGE_SIZE);
-
-    pfn_array = vmalloc((1<<order) * sizeof(*pfn_array));
-    if ( pfn_array == NULL )
-        BUG();
-
-    ret = HYPERVISOR_dom_mem_op(MEMOP_increase_reservation,
-                                pfn_array, 1<<order, 0);
-    if ( unlikely(ret != (1<<order)) )
-    {
-        printk(KERN_WARNING "Unable to increase memory reservation (%d)\n",
-               ret);
-        BUG();
-    }
-
-    for ( i = 0; i < (1<<order); i++ )
-    {
-        pgd = pgd_offset_k(   (vstart + (i*PAGE_SIZE)));
-        pmd = pmd_offset(pgd, (vstart + (i*PAGE_SIZE)));
-        pte = pte_offset_kernel(pmd, (vstart + (i*PAGE_SIZE)));
-        queue_l1_entry_update(pte, (pfn_array[i]<<PAGE_SHIFT)|__PAGE_KERNEL);
-        queue_machphys_update(pfn_array[i], __pa(vstart)>>PAGE_SHIFT);
-        phys_to_machine_mapping[__pa(vstart)>>PAGE_SHIFT] = pfn_array[i];
-    }
-
-    flush_page_update_queue();
-
-    vfree(pfn_array);
-
-    free_pages(vstart, order);
 }
 
 #endif /* CONFIG_XEN_PHYSDEV_ACCESS */
