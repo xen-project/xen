@@ -29,16 +29,16 @@ extern void arch_getdomaininfo_ctxt(struct domain *, full_execution_context_t *)
 
 static inline int is_free_domid(domid_t dom)
 {
-    struct domain  *d;
+    struct domain *d;
 
-    if (dom >= DOMID_SELF) return 0;
-    d = find_domain_by_id(dom);
-    if (d == NULL) {
-        return 1;
-    } else {
-        put_domain(d);
+    if ( dom >= DOMID_SELF )
         return 0;
-    }
+
+    if ( (d = find_domain_by_id(dom)) == NULL )
+        return 1;
+
+    put_domain(d);
+    return 0;
 }
 
 /** Allocate a free domain id. We try to reuse domain ids in a fairly low range,
@@ -52,72 +52,42 @@ static int allocate_domid(domid_t *pdom)
     static domid_t curdom = 0;
     static domid_t topdom = 101;
     int err = 0;
-    domid_t cur, dom, top;
+    domid_t dom;
+
+    spin_lock(&domid_lock);
 
     /* Try to use a domain id in the range 0..topdom, starting at curdom. */
-    spin_lock(&domid_lock);
-    cur = curdom;
-    dom = curdom;
-    top = topdom;
-    spin_unlock(&domid_lock);
-    do {
-        ++dom;
-        if (dom == top) {
+    for ( dom = curdom + 1; dom != curdom; dom++ )
+    {
+        if ( dom == topdom )
             dom = 1;
-        }
-        if (is_free_domid(dom)) goto exit;
-    } while (dom != cur);
-    /* Couldn't find a free domain id in 0..topdom, try higher. */
-    for (dom = top; dom < DOMID_SELF; dom++) {
-        if(is_free_domid(dom)) goto exit;
+        if ( is_free_domid(dom) )
+            goto exit;
     }
+
+    /* Couldn't find a free domain id in 0..topdom, try higher. */
+    for ( dom = topdom; dom < DOMID_SELF; dom++ )
+    {
+        if ( is_free_domid(dom) )
+        {
+            topdom = dom + 1;
+            goto exit;
+        }
+    }
+
     /* No free domain ids. */
     err = -ENOMEM;
+
   exit:
-    if (err == 0) {
-        spin_lock(&domid_lock);
+    if ( err == 0 )
+    {
         curdom = dom;
-        if (dom >= topdom) {
-            topdom = dom + 1;
-        }
-        spin_unlock(&domid_lock);
         *pdom = dom;
     }
+
+    spin_unlock(&domid_lock);
     return err;
 }
-
-#if 0
-        struct domain    *d;
-        static domid_t    domnr = 0;
-        static spinlock_t domnr_lock = SPIN_LOCK_UNLOCKED;
-        unsigned int      pro;
-        domid_t           dom;
-
-        ret = -ENOMEM;
-
-        if(op->u.createdomain.domain > 0){
-            d = find_domain_by_id(dom);
-            if(d){
-                put_domain(d);
-                ret = -EINVAL;
-                break;
-            }
-        } else {
-            /* Search for an unused domain identifier. */
-            for ( ; ; )
-            {
-                spin_lock(&domnr_lock);
-                /* Wrap the roving counter when we reach first special value. */
-                if ( (dom = ++domnr) == DOMID_SELF )
-                    dom = domnr = 1;
-                spin_unlock(&domnr_lock);
-                
-                if ( (d = find_domain_by_id(dom)) == NULL )
-                    break;
-                put_domain(d);
-             }
-        }
-#endif
 
 long do_dom0_op(dom0_op_t *u_dom0_op)
 {
@@ -196,30 +166,23 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         unsigned int      pro;
         domid_t           dom;
 
-        ret = -ENOMEM;
-
         dom = op->u.createdomain.domain;
-        if ( 0 < dom && dom < DOMID_SELF )
+        if ( (dom > 0) && (dom < DOMID_SELF) )
         {
+            ret = -EINVAL;
             if ( !is_free_domid(dom) )
-            {
-                ret = -EINVAL;
                 break;
-            }
         }
-        else
-        {
-            ret = allocate_domid(&dom);
-            if ( ret ) break;
-        }
+        else if ( (ret = allocate_domid(&dom)) != 0 )
+            break;
 
         if ( op->u.createdomain.cpu == -1 )
             pro = (unsigned int)dom % smp_num_cpus;
         else
             pro = op->u.createdomain.cpu % smp_num_cpus;
 
-        d = do_createdomain(dom, pro);
-        if ( d == NULL ) 
+        ret = -ENOMEM;
+        if ( (d = do_createdomain(dom, pro)) == NULL )
             break;
 
         if ( op->u.createdomain.name[0] )
@@ -527,7 +490,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         pi->ht_per_core = ht;
         pi->cores       = smp_num_cpus / pi->ht_per_core;
         pi->total_pages = max_page;
-        pi->free_pages  = free_pfns;
+        pi->free_pages  = avail_domheap_pages();
         pi->cpu_khz     = cpu_khz;
 
         copy_to_user(u_dom0_op, op, sizeof(*op));

@@ -97,13 +97,13 @@ struct pfn_info
 
 #define SHARE_PFN_WITH_DOMAIN(_pfn, _dom)                                   \
     do {                                                                    \
-        (_pfn)->u.inuse.domain = (_dom);                                          \
+        (_pfn)->u.inuse.domain = (_dom);                                    \
         /* The incremented type count is intended to pin to 'writeable'. */ \
-        (_pfn)->u.inuse.type_info  = PGT_writeable_page | PGT_validated | 1;   \
+        (_pfn)->u.inuse.type_info  = PGT_writeable_page | PGT_validated | 1;\
         wmb(); /* install valid domain ptr before updating refcnt. */       \
         spin_lock(&(_dom)->page_alloc_lock);                                \
         /* _dom holds an allocation reference */                            \
-        (_pfn)->u.inuse.count_info = PGC_allocated | 1;                        \
+        (_pfn)->u.inuse.count_info = PGC_allocated | 1;                     \
         if ( unlikely((_dom)->xenheap_pages++ == 0) )                       \
             get_domain(_dom);                                               \
         spin_unlock(&(_dom)->page_alloc_lock);                              \
@@ -111,14 +111,10 @@ struct pfn_info
 
 extern struct pfn_info *frame_table;
 extern unsigned long frame_table_size;
-extern struct list_head free_list;
-extern spinlock_t free_list_lock;
-extern unsigned int free_pfns;
 extern unsigned long max_page;
 void init_frametable(void *frametable_vstart, unsigned long nr_pages);
-void add_to_domain_alloc_list(unsigned long ps, unsigned long pe);
 
-struct pfn_info *alloc_domain_page(struct domain *p);
+struct pfn_info *alloc_domain_page(struct domain *d);
 void free_domain_page(struct pfn_info *page);
 
 int alloc_page_type(struct pfn_info *page, unsigned int type);
@@ -287,10 +283,10 @@ static inline int get_page_and_type(struct pfn_info *page,
     return rc;
 }
 
-#define ASSERT_PAGE_IS_TYPE(_p, _t)                \
-    ASSERT(((_p)->u.inuse.type_info & PGT_type_mask) == (_t));  \
+#define ASSERT_PAGE_IS_TYPE(_p, _t)                            \
+    ASSERT(((_p)->u.inuse.type_info & PGT_type_mask) == (_t)); \
     ASSERT(((_p)->u.inuse.type_info & PGT_count_mask) != 0)
-#define ASSERT_PAGE_IS_DOMAIN(_p, _d)              \
+#define ASSERT_PAGE_IS_DOMAIN(_p, _d)                          \
     ASSERT(((_p)->u.inuse.count_info & PGC_count_mask) != 0);  \
     ASSERT((_p)->u.inuse.domain == (_d))
 

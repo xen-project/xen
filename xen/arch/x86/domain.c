@@ -210,6 +210,11 @@ void machine_halt(void)
     __machine_halt(NULL);
 }
 
+void free_perdomain_pt(struct domain *d)
+{
+    free_xenheap_page((unsigned long)d->mm.perdomain_pt);
+}
+
 void arch_do_createdomain(struct domain *d)
 {
     d->shared_info = (void *)alloc_xenheap_page();

@@ -22,19 +22,8 @@ static long alloc_dom_mem(struct domain *d,
     struct pfn_info *page;
     unsigned long    i;
 
-    /* Leave some slack pages; e.g., for the network. */
-    if ( unlikely(free_pfns < (nr_pages + (SLACK_DOMAIN_MEM_KILOBYTES >> 
-                                           (PAGE_SHIFT-10)))) )
-    {
-        DPRINTK("Not enough slack: %u %u\n",
-                free_pfns,
-                SLACK_DOMAIN_MEM_KILOBYTES >> (PAGE_SHIFT-10));
-        return 0;
-    }
-
     for ( i = 0; i < nr_pages; i++ )
     {
-        /* NB. 'alloc_domain_page' does limit-checking on pages per domain. */
         if ( unlikely((page = alloc_domain_page(d)) == NULL) )
         {
             DPRINTK("Could not allocate a frame\n");
