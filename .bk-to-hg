@@ -1,8 +1,2 @@
-#!/bin/sh -x
-set -e
-test -L tools/domain_builder/dom0_ops.h
-rm      tools/domain_builder/dom0_ops.h
-test -L tools/internal/dom0_ops.h
-rm      tools/internal/dom0_ops.h
-(find -depth -type d -print | xargs -r rmdir 2>/dev/null) || true
+#!/bin/sh
 exit 0

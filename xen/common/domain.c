@@ -9,7 +9,7 @@
 #include <xeno/delay.h>
 #include <xeno/event.h>
 #include <xeno/time.h>
-#include <xeno/dom0_ops.h>
+#include <hypervisor-ifs/dom0_ops.h>
 #include <asm/io.h>
 #include <asm/domain_page.h>
 #include <asm/flushtlb.h>

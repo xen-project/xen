@@ -3,9 +3,7 @@
  * 
  * Process command requests from domain-0 guest OS.
  * 
- * Copyright (c) 2002, K A Fraser, B Dragovic
- * 
- * MUST BE KEPT IN SYNC WITH xenolinux<*>/arch/xeno/drivers/dom0/dom0_ops.h
+ * Copyright (c) 2002-2003, K A Fraser, B Dragovic
  */
 
 
@@ -88,7 +86,7 @@ typedef struct dom0_getdominfo_st
   long long cpu_time;
 } dom0_getdominfo_t;
 
-
+#ifndef NO_DOM0_OP_T
 typedef struct dom0_op_st
 {
     unsigned long cmd;
@@ -104,5 +102,6 @@ typedef struct dom0_op_st
    }
     u;
 } dom0_op_t;
+#endif
 
 #endif

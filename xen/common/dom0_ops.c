@@ -10,7 +10,7 @@
 #include <xeno/types.h>
 #include <xeno/lib.h>
 #include <xeno/mm.h>
-#include <xeno/dom0_ops.h>
+#include <hypervisor-ifs/dom0_ops.h>
 #include <xeno/sched.h>
 #include <xeno/event.h>
 #include <asm/domain_page.h>

@@ -90,7 +90,7 @@
 3e4d00468-FN2VDeEHo96zxrMHK_mA tools/domain_builder/Makefile
 3e4d0046SPau_y0sw2WLJz8QkqNoRA tools/domain_builder/README
 3e4d0046bbdH0GsI9J_1Eb4ZQHfIiQ tools/domain_builder/dom0_defs.h
-3e71f9b871pvOAxDrhxpC4N4mHkbww tools/domain_builder/dom0_ops.h
+3ee609abdxnu1GvbtXnPlMfEkTEIwQ tools/domain_builder/dom0_ops.h
 3e4d0046ouLij_CMN_j7-dUHZIBI_A tools/domain_builder/dom_builder.c
 3e4d0046EKs06fY0CWDEgZQcn7DYUg tools/domain_builder/dom_kill.c
 3e4d0046aPbGiRTtdWxqY5b3ytWurA tools/domain_builder/hypervisor_defs.h
@@ -100,7 +100,7 @@
 3e4d0046IBzDIeaMbQB-e2QB2ahbig tools/domain_builder/vifinit
 3eb781fdl4lXWYZzmqDDUAYhAThRqQ tools/internal/Makefile
 3eb781fdc539MQQm47rYRCCR3N5i-Q tools/internal/dom0_defs.h
-3eb781fdEYILyFg60YVBsWNqxWFf1g tools/internal/dom0_ops.h
+3ee609b3Yr4aggmLSKmhiIzT8-nURA tools/internal/dom0_ops.h
 3eb781fddjylXbsepjppUyIXa5lcaQ tools/internal/hypervisor_defs.h
 3eb781fdKiQbgozBsgs_zzJQ9ubehw tools/internal/mem_defs.h
 3ec61e1bJCeJJu0SsptmDpA1xKvwvw tools/internal/rpm.spec
@@ -373,6 +373,7 @@
 3ddb79c3M2n1ROZH6xk3HbyN4CPDqg xen/include/asm-i386/uaccess.h
 3ddb79c3uPGcP_l_2xyGgBSWd5aC-Q xen/include/asm-i386/unaligned.h
 3ddb79c2YTaZwOqWin9-QNgHge5RVw xen/include/hypervisor-ifs/block.h
+3ddb79c2PMeWTK86y4C3F4MzHw4A1g xen/include/hypervisor-ifs/dom0_ops.h
 3ddb79c25UE59iu4JJcbRalx95mvcg xen/include/hypervisor-ifs/hypervisor-if.h
 3ead095dE_VF-QA88rl_5cWYRWtRVQ xen/include/hypervisor-ifs/kbd.h
 3ddb79c2oRPrzClk3zbTkRHlpumzKA xen/include/hypervisor-ifs/network.h
@@ -399,7 +400,6 @@
 3eb165e0eawr3R-p2ZQtSdLWtLRN_A xen/include/xeno/console.h
 3ddb79c1V44RD26YqCUm-kqIupM37A xen/include/xeno/ctype.h
 3ddb79c05DdHQ0UxX_jKsXdR4QlMCA xen/include/xeno/delay.h
-3ddb79c2PMeWTK86y4C3F4MzHw4A1g xen/include/xeno/dom0_ops.h
 3e6377eaioRoNm0m_HSDEAd4Vqrq_w xen/include/xeno/dom_mem_ops.h
 3ddb79c1uaWQZj551j1O0B5z8AnHOg xen/include/xeno/elevator.h
 3ddb79c0HIghfBF8zFUdmXhOU8i6hA xen/include/xeno/errno.h

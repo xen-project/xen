@@ -10,7 +10,7 @@
 #include <asm/processor.h>
 #include <asm/current.h>
 #include <hypervisor-ifs/hypervisor-if.h>
-#include <xeno/dom0_ops.h>
+#include <hypervisor-ifs/dom0_ops.h>
 
 #include <xeno/list.h>
 #include <xeno/time.h>

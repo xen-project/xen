@@ -1,9 +1,2 @@
-#!/bin/sh -x
-set -e
-mkdir -p tools
-mkdir -p tools/domain_builder
-ln -s ../../xenolinux-2.4.21-pre4-sparse/arch/xeno/drivers/dom0/dom0_ops.h tools/domain_builder/dom0_ops.h
-mkdir -p tools/internal
-ln -s ../../xenolinux-2.4.21-pre4-sparse/arch/xeno/drivers/dom0/dom0_ops.h tools/internal/dom0_ops.h
-(find -depth -type d -print | xargs -r rmdir 2>/dev/null) || true
+#!/bin/sh
 exit 0

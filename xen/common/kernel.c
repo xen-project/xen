@@ -13,7 +13,7 @@
 #include <asm/io.h>
 #include <asm/msr.h>
 #include <asm/uaccess.h>
-#include <xeno/dom0_ops.h>
+#include <hypervisor-ifs/dom0_ops.h>
 #include <asm/byteorder.h>
 #include <linux/if_ether.h>
 #include <asm/domain_page.h>
