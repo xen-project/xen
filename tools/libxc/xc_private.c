@@ -228,11 +228,9 @@ static int flush_mmu_updates(int xc_handle, mmu_t *mmu)
     if ( mmu->idx == FIRST_MMU_UPDATE )
         return 0;
 
-    /* The first two requests set the correct subject domain (PTS and GPS). */
-    mmu->updates[0].val  = (unsigned long)(mmu->subject<<16) & ~0xFFFFUL;
-    mmu->updates[0].ptr  = (unsigned long)(mmu->subject<< 0) & ~0xFFFFUL;
-    mmu->updates[0].ptr |= MMU_EXTENDED_COMMAND;
-    mmu->updates[0].val |= MMUEXT_SET_SUBJECTDOM | SET_PAGETABLE_SUBJECTDOM;
+    mmu->updates[0].ptr  = MMU_EXTENDED_COMMAND;
+    mmu->updates[0].val  = MMUEXT_SET_FOREIGNDOM;
+    mmu->updates[0].val |= (unsigned long)mmu->subject << 16;
 
     hypercall.op     = __HYPERVISOR_mmu_update;
     hypercall.arg[0] = (unsigned long)mmu->updates;

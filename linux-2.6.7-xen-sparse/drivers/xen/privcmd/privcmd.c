@@ -140,10 +140,9 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 
         if ( m.dom != 0 )
         {
-            u[0].val  = (unsigned long)(m.dom<<16) & ~0xFFFFUL;
-            u[0].ptr  = (unsigned long)(m.dom<< 0) & ~0xFFFFUL;
-            u[0].ptr |= MMU_EXTENDED_COMMAND;
-            u[0].val |= MMUEXT_SET_SUBJECTDOM;
+            u[0].ptr  = MMU_EXTENDED_COMMAND;
+            u[0].val  = MMUEXT_SET_FOREIGNDOM;
+            u[0].val |= (unsigned long)m.dom << 16;
             v = w = &u[1];
         }
         else

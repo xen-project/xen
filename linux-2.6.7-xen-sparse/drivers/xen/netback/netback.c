@@ -205,11 +205,10 @@ static void net_rx_action(unsigned long unused)
         new_mfn = get_new_mfn();
         
         mmu[0].ptr  = (new_mfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
-        mmu[0].val  = __pa(vdata) >> PAGE_SHIFT;        
-        mmu[1].val  = (unsigned long)(netif->domid<<16) & ~0xFFFFUL;
-        mmu[1].ptr  = (unsigned long)(netif->domid<< 0) & ~0xFFFFUL;
-        mmu[1].ptr |= MMU_EXTENDED_COMMAND;
-        mmu[1].val |= MMUEXT_SET_SUBJECTDOM;
+        mmu[0].val  = __pa(vdata) >> PAGE_SHIFT;  
+        mmu[1].ptr  = MMU_EXTENDED_COMMAND;
+        mmu[1].val  = MMUEXT_SET_FOREIGNDOM;      
+        mmu[1].val |= (unsigned long)netif->domid << 16;
         mmu[2].ptr  = (mdata & PAGE_MASK) | MMU_EXTENDED_COMMAND;
         mmu[2].val  = MMUEXT_REASSIGN_PAGE;
 
