@@ -277,8 +277,6 @@ static long evtchn_bind_virq(evtchn_bind_virq_t *bind)
         return port;
 
     bind->port = port;
-    printk("evtchn_bind_virq %d/%d virq %d -> %d\n",
-           d->id, ed->eid, virq, port);
     return 0;
 }
 
@@ -302,8 +300,6 @@ static long evtchn_bind_ipi(evtchn_bind_ipi_t *bind)
         return port;
 
     bind->port = port;
-    printk("evtchn_bind_ipi %d/%d ipi_edom %d -> %d\n",
-           d->id, current->eid, ipi_edom, port);
     return 0;
 }
 
@@ -341,8 +337,6 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
         return rc;
 
     bind->port = port;
-    printk("evtchn_bind_pirq %d/%d pirq %d -> port %d\n",
-           d->id, current->eid, pirq, port);
     return 0;
 }
 

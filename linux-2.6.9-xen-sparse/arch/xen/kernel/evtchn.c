@@ -497,22 +497,6 @@ void setup_misdirect_virq(void)
     (void)setup_irq(bind_virq_to_irq(VIRQ_MISDIRECT), &misdirect_action);
 }
 
-static irqreturn_t xen_dbg(int irq, void *dev_id, struct pt_regs *regs)
-{
-     char *msg = "debug\n";
-     (void)HYPERVISOR_console_io(CONSOLEIO_write, strlen(msg), msg);
-     return IRQ_HANDLED;
-}
-
-static struct irqaction xen_action = {
-    xen_dbg, 
-    SA_INTERRUPT, 
-    CPU_MASK_CPU0, 
-    "xen-dbg", 
-    NULL, 
-    NULL
-};
-
 void irq_suspend(void)
 {
     int pirq, virq, irq, evtchn;
@@ -616,9 +600,6 @@ void __init init_IRQ(void)
     }
 
     (void)setup_misdirect_virq();
-
-    printk("debug_int\n");
-	(void)setup_irq(bind_virq_to_irq(VIRQ_DEBUG), &xen_action);
 
     /* This needs to be done early, but after the IRQ subsystem is alive. */
     ctrl_if_init();

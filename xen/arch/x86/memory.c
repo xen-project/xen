@@ -1690,7 +1690,7 @@ void ptwr_flush(const int which)
 
     /* Ensure that there are no stale writable mappings in any TLB. */
     /* NB. INVLPG is a serialising instruction: flushes pending updates. */
-#if 0
+#if 1
     __flush_tlb_one(l1va); /* XXX Multi-CPU guests? */
 #else
     flush_tlb_all();
@@ -1862,7 +1862,7 @@ int ptwr_do_page_fault(unsigned long addr)
     if ( (which == PTWR_PT_ACTIVE) && likely(!current->mm.shadow_mode) )
     {
         *pl2e = mk_l2_pgentry(l2e & ~_PAGE_PRESENT);
-#if 0
+#if 1
         flush_tlb(); /* XXX Multi-CPU guests? */
 #else
         flush_tlb_all();

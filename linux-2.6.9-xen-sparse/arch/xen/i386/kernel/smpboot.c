@@ -53,7 +53,6 @@
 
 #if 1
 #define Dprintk(args...)
-#define xxprint(msg) HYPERVISOR_console_io(CONSOLEIO_write, strlen(msg), msg)
 #else
 #include <mach_apic.h>
 #endif
@@ -116,7 +115,6 @@ void __init smp_alloc_memory(void)
 #if 1
 	int cpu;
 
-	xxprint("smp_alloc_memory\n");
 	for (cpu = 1; cpu < NR_CPUS; cpu++) {
 		cpu_gdt_descr[cpu].address = (unsigned long)
 			alloc_bootmem_low_pages(PAGE_SIZE);
@@ -445,7 +443,6 @@ extern int cpu_idle(void);
 static irqreturn_t local_debug_interrupt(int irq, void *dev_id,
 					 struct pt_regs *regs)
 {
-	xxprint("local_debug_interrupt\n");
 
 	return IRQ_HANDLED;
 }
@@ -674,10 +671,6 @@ wakeup_secondary_cpu(int logical_apicid, unsigned long start_eip)
 static int __init
 wakeup_secondary_cpu(int phys_apicid, unsigned long start_eip)
 {
-#if 1
-	xxprint("wakeup_secondary_cpu\n");
-	return 0;
-#else
 	unsigned long send_status = 0, accept_status = 0;
 	int maxlvt, timeout, num_starts, j;
 
@@ -806,7 +799,6 @@ wakeup_secondary_cpu(int phys_apicid, unsigned long start_eip)
 		printk("APIC delivery error (%lx).\n", accept_status);
 
 	return (send_status | accept_status);
-#endif
 }
 #endif	/* WAKE_SECONDARY_VIA_INIT */
 #endif
@@ -1286,7 +1278,6 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	if (cpu_has_tsc && cpucount && cpu_khz)
 		synchronize_tsc_bp();
 #endif
-	xxprint("smp_boot_cpus done\n");
 }
 
 /* These are wrappers to interface to the new boot process.  Someone
@@ -1304,7 +1295,6 @@ void __devinit smp_prepare_boot_cpu(void)
 
 int __devinit __cpu_up(unsigned int cpu)
 {
-	xxprint("__cpu_up\n");
 	/* This only works at boot for x86.  See "rewrite" above. */
 	if (cpu_isset(cpu, smp_commenced_mask)) {
 		local_irq_enable();
@@ -1322,7 +1312,6 @@ int __devinit __cpu_up(unsigned int cpu)
 	cpu_set(cpu, smp_commenced_mask);
 	while (!cpu_isset(cpu, cpu_online_map))
 		mb();
-	xxprint("__cpu_up ok\n");
 	return 0;
 }
 

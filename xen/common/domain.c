@@ -323,8 +323,6 @@ long do_boot_vcpu(unsigned long vcpu, full_execution_context_t *ctxt)
         goto out;
     }
 
-    printk("do_boot_vcpu for dom %d vcpu %ld\n", d->id, vcpu);
-
     ed = d->exec_domain[vcpu];
 
     atomic_set(&ed->pausecnt, 0);
