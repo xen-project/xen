@@ -28,6 +28,9 @@ xendConsole = XendConsole.instance()
 import server.SrvConsoleServer
 xend = server.SrvConsoleServer.instance()
 
+SIF_BLK_BE_DOMAIN = (1<<4)
+SIF_NET_BE_DOMAIN = (1<<5)
+
 def readlines(fd):
     """Version of readlines safe against EINTR.
     """
@@ -331,23 +334,28 @@ def xen_domain_create(config, ostype, name, memory, kernel, ramdisk, cmdline, vi
     vifs_n  number of network interfaces
     returns vm
     """
+    flags = 0
     if not os.path.isfile(kernel):
         raise VmError('Kernel image does not exist: %s' % kernel)
     if ramdisk and not os.path.isfile(ramdisk):
         raise VMError('Kernel ramdisk does not exist: %s' % ramdisk)
 
     cpu = int(sxp.child_value(config, 'cpu', '-1'))
+    print 'xen_domain_create> create ', memory, name, cpu
     dom = xc.domain_create(mem_kb= memory * 1024, name= name, cpu= cpu)
     if dom <= 0:
         raise VmError('Creating domain failed: name=%s memory=%d kernel=%s'
                       % (name, memory, kernel))
     console = xendConsole.console_create(dom)
     buildfn = getattr(xc, '%s_build' % ostype)
+    
+    print 'xen_domain_create> build ', ostype, dom, kernel, cmdline, ramdisk
     err = buildfn(dom            = dom,
                   image          = kernel,
                   control_evtchn = console.port2,
                   cmdline        = cmdline,
-                  ramdisk        = ramdisk)
+                  ramdisk        = ramdisk,
+                  flags          = flags)
     if err != 0:
         raise VmError('Building domain failed: type=%s dom=%d err=%d'
                       % (ostype, dom, err))
@@ -552,10 +560,10 @@ def vm_configure(vm, config):
     """
     config_controllers(vm, config)
     if vm.block_controller:
-        d = xend.blkif_create(vm.dom)
-    else:
         d = defer.Deferred()
         d.callback(1)
+    else:
+        d = xend.blkif_create(vm.dom)
     d.addCallback(_vm_configure1, vm, config)
     return d
 
