@@ -1,3 +1,4 @@
+/* -*-  Mode:C; c-basic-offset:8; tab-width:8; indent-tabs-mode:t -*- */
 /*
  *	Low-Level PCI Support for PC
  *
@@ -445,8 +446,9 @@ static struct pci_ops pci_direct_conf2 = {
 static int __devinit pci_sanity_check(struct pci_ops *o)
 {
 	u16 x;
-	struct pci_bus bus;		/* Fake bus and device */
-	struct pci_dev dev;
+	/* XEN: static is important to prevent stack overflow! */
+	static struct pci_bus bus;		/* Fake bus and device */
+	static struct pci_dev dev;
 
 	if (pci_probe & PCI_NO_CHECKS)
 		return 1;
@@ -1131,8 +1133,9 @@ static void __devinit pcibios_fixup_ghosts(struct pci_bus *b)
 static void __devinit pcibios_fixup_peer_bridges(void)
 {
 	int n;
-	struct pci_bus bus;
-	struct pci_dev dev;
+	/* XEN: static is important to prevent stack overflow! */
+	static struct pci_bus bus;
+	static struct pci_dev dev;
 	u16 l;
 
 	if (pcibios_last_bus <= 0 || pcibios_last_bus >= 0xff)
