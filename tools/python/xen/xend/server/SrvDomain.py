@@ -19,9 +19,10 @@ class SrvDomain(SrvDir):
         self.xconsole = XendConsole.instance()
 
     def op_configure(self, op, req):
+        print 'op_configure>', op, req.args
         fn = FormFn(self.xd.domain_configure,
                     [['dom', 'int'],
-                     ['config', 'sxp']])
+                     ['config', 'sxpr']])
         val = fn(req.args, {'dom': self.dom.id})
         #todo: may need to add ok and err callbacks.
         return val

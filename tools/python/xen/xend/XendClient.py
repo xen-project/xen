@@ -222,13 +222,18 @@ class Xend:
                          {'op'      : 'create',
                           'config'  : fileof(conf) })
 
-    def xend_domain(self, id):
-        return xend_get(self.domainurl(id))
+    def xend_domain_restore(self, filename):
+        return xend_call(self.domainurl(),
+                         {'op'      : 'restore',
+                          'file'    : filename })
 
     def xend_domain_configure(self, id, config):
         return xend_call(self.domainurl(id),
                          {'op'      : 'configure',
                           'config'  : fileof(conf) })
+
+    def xend_domain(self, id):
+        return xend_get(self.domainurl(id))
 
     def xend_domain_unpause(self, id):
         return xend_call(self.domainurl(id),
@@ -251,11 +256,6 @@ class Xend:
         return xend_call(self.domainurl(id),
                          {'op'      : 'save',
                           'file'    : filename})
-
-    def xend_domain_restore(self, id, filename):
-        return xend_call(self.domainurl(id),
-                         {'op'      : 'restore',
-                          'file'    : filename })
 
     def xend_domain_migrate(self, id, dst):
         return xend_call(self.domainurl(id),
