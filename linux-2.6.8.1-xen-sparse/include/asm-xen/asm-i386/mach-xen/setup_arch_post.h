@@ -14,7 +14,7 @@ static char * __init machine_specific_memory_setup(void)
 	who = "Xen";
 
 	start_pfn = 0;
-	max_pfn = start_info.nr_pages;
+	max_pfn = xen_start_info.nr_pages;
 
 	e820.nr_map = 0;
 	add_memory_region(PFN_PHYS(start_pfn), PFN_PHYS(max_pfn) - PFN_PHYS(start_pfn), E820_RAM);

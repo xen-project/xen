@@ -15,8 +15,8 @@ ENTRY(stext)
 ENTRY(_stext)
         cld
         lss stack_start,%esp
-        /* Copy the necessary stuff from start_info structure. */
-        mov $SYMBOL_NAME(start_info_union),%edi
+        /* Copy the necessary stuff from xen_start_info structure. */
+        mov $SYMBOL_NAME(xen_start_info_union),%edi
         mov $128,%ecx
         rep movsl
         jmp SYMBOL_NAME(start_kernel)

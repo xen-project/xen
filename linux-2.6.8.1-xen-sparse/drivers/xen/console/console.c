@@ -153,7 +153,7 @@ static int __init xen_console_init(void)
 void xen_console_init(void)
 #endif
 {
-    if ( start_info.flags & SIF_INITDOMAIN )
+    if ( xen_start_info.flags & SIF_INITDOMAIN )
     {
         if ( xc_mode == XC_DEFAULT )
             xc_mode = XC_SERIAL;
@@ -210,7 +210,7 @@ void xencons_force_flush(void)
     int        sz;
 
     /* Emergency console is synchronous, so there's nothing to flush. */
-    if ( start_info.flags & SIF_INITDOMAIN )
+    if ( xen_start_info.flags & SIF_INITDOMAIN )
         return;
 
     /*
@@ -286,7 +286,7 @@ static void __xencons_tx_flush(void)
     int        sz, work_done = 0;
     ctrl_msg_t msg;
 
-    if ( start_info.flags & SIF_INITDOMAIN )
+    if ( xen_start_info.flags & SIF_INITDOMAIN )
     {
         if ( x_char )
         {
@@ -700,7 +700,7 @@ static int __init xencons_init(void)
     tty_register_device(xencons_driver, 0, NULL);
 #endif
 
-    if ( start_info.flags & SIF_INITDOMAIN )
+    if ( xen_start_info.flags & SIF_INITDOMAIN )
     {
         xencons_priv_irq = bind_virq_to_irq(VIRQ_CONSOLE);
         (void)request_irq(xencons_priv_irq,
@@ -728,7 +728,7 @@ static void __exit xencons_fini(void)
     if ( (ret = tty_unregister_driver(DRV(xencons_driver))) != 0 )
         printk(KERN_ERR "Unable to unregister Xen console driver: %d\n", ret);
 
-    if ( start_info.flags & SIF_INITDOMAIN )
+    if ( xen_start_info.flags & SIF_INITDOMAIN )
     {
         free_irq(xencons_priv_irq, NULL);
         unbind_virq_from_irq(VIRQ_CONSOLE);

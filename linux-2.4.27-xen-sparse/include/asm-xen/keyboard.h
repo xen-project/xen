@@ -43,7 +43,7 @@ extern unsigned char pckbd_sysrq_xlate[128];
 
 #define SYSRQ_KEY 0x54
 
-#define kbd_controller_present() (start_info.flags & SIF_INITDOMAIN)
+#define kbd_controller_present() (xen_start_info.flags & SIF_INITDOMAIN)
 
 /* resource allocation */
 #define kbd_request_region()

@@ -208,7 +208,7 @@ static struct file_operations privcmd_file_ops = {
 
 static int __init privcmd_init(void)
 {
-    if ( !(start_info.flags & SIF_PRIVILEGED) )
+    if ( !(xen_start_info.flags & SIF_PRIVILEGED) )
         return 0;
 
     privcmd_intf = create_xen_proc_entry("privcmd", 0400);

@@ -114,7 +114,7 @@ extern int blk_nohighio;
 int enable_acpi_smp_table;
 
 /* Raw start-of-day parameters from the hypervisor. */
-union start_info_union start_info_union;
+union xen_start_info_union xen_start_info_union;
 
 #define COMMAND_LINE_SIZE 256
 static char command_line[COMMAND_LINE_SIZE];
@@ -131,7 +131,7 @@ static int __init parse_mem_cmdline (char ** cmdline_p)
     int mem_param = 0;
 
     /* Save unparsed command line copy for /proc/cmdline */
-    memcpy(saved_command_line, start_info.cmd_line, COMMAND_LINE_SIZE);
+    memcpy(saved_command_line, xen_start_info.cmd_line, COMMAND_LINE_SIZE);
     saved_command_line[COMMAND_LINE_SIZE-1] = '\0';
 
     for (;;) {
@@ -275,7 +275,7 @@ void __init setup_arch(char **cmdline_p)
      * arch/xen/drivers/balloon/balloon.c
      */
     mem_param = parse_mem_cmdline(cmdline_p);
-    if (!mem_param) mem_param = start_info.nr_pages;
+    if (!mem_param) mem_param = xen_start_info.nr_pages;
 
 #define PFN_UP(x)	(((x) + PAGE_SIZE-1) >> PAGE_SHIFT)
 #define PFN_DOWN(x)	((x) >> PAGE_SHIFT)
@@ -323,11 +323,11 @@ void __init setup_arch(char **cmdline_p)
     }
 #endif
 
-    phys_to_machine_mapping = (unsigned long *)start_info.mfn_list;
-    cur_pgd = init_mm.pgd = (pgd_t *)start_info.pt_base;
+    phys_to_machine_mapping = (unsigned long *)xen_start_info.mfn_list;
+    cur_pgd = init_mm.pgd = (pgd_t *)xen_start_info.pt_base;
 
-    start_pfn = (__pa(start_info.pt_base) >> PAGE_SHIFT) + 
-        start_info.nr_pt_frames;
+    start_pfn = (__pa(xen_start_info.pt_base) >> PAGE_SHIFT) + 
+        xen_start_info.nr_pt_frames;
 
     /*
      * Initialize the boot-time allocator, and free up all RAM. Then reserve 
@@ -337,7 +337,7 @@ void __init setup_arch(char **cmdline_p)
      * bootstrap page table. We are guaranteed to get >=512kB unused 'padding'
      * for our own use after all bootstrap elements (see hypervisor-if.h).
      */
-    boot_pfn = min((int)start_info.nr_pages,lmax_low_pfn);
+    boot_pfn = min((int)xen_start_info.nr_pages,lmax_low_pfn);
     bootmap_size = init_bootmem(start_pfn,boot_pfn);
     free_bootmem(0, PFN_PHYS(boot_pfn));
     reserve_bootmem(__pa(&_stext), 
@@ -352,20 +352,20 @@ void __init setup_arch(char **cmdline_p)
 
 
 #ifdef CONFIG_BLK_DEV_INITRD
-    if ( start_info.mod_start != 0 )
+    if ( xen_start_info.mod_start != 0 )
     {
-        if ( (__pa(start_info.mod_start) + start_info.mod_len) <= 
+        if ( (__pa(xen_start_info.mod_start) + xen_start_info.mod_len) <= 
              (max_low_pfn << PAGE_SHIFT) )
         {
-            initrd_start = start_info.mod_start;
-            initrd_end   = initrd_start + start_info.mod_len;
+            initrd_start = xen_start_info.mod_start;
+            initrd_end   = initrd_start + xen_start_info.mod_len;
             initrd_below_start_ok = 1;
         }
         else
         {
             printk(KERN_ERR "initrd extends beyond end of memory "
                    "(0x%08lx > 0x%08lx)\ndisabling initrd\n",
-                   __pa(start_info.mod_start) + start_info.mod_len,
+                   __pa(xen_start_info.mod_start) + xen_start_info.mod_len,
                    max_low_pfn << PAGE_SHIFT);
             initrd_start = 0;
         }
@@ -384,7 +384,7 @@ void __init setup_arch(char **cmdline_p)
 	virt_to_machine(pfn_to_mfn_frame_list) >> PAGE_SHIFT;
 
     /* If we are a privileged guest OS then we should request IO privileges. */
-    if ( start_info.flags & SIF_PRIVILEGED ) 
+    if ( xen_start_info.flags & SIF_PRIVILEGED ) 
     {
         dom0_op_t op;
         op.cmd           = DOM0_IOPL;
@@ -395,9 +395,9 @@ void __init setup_arch(char **cmdline_p)
         current->thread.io_pl = 1;
     }
 
-    if (start_info.flags & SIF_INITDOMAIN )
+    if (xen_start_info.flags & SIF_INITDOMAIN )
     {
-        if( !(start_info.flags & SIF_PRIVILEGED) )
+        if( !(xen_start_info.flags & SIF_PRIVILEGED) )
             panic("Xen granted us console access but not privileged status");
 
 #if defined(CONFIG_VT)

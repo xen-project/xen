@@ -19,13 +19,13 @@
 #include <asm/page.h>
 
 /* arch/xen/i386/kernel/setup.c */
-union start_info_union
+union xen_start_info_union
 {
-    start_info_t start_info;
+    start_info_t xen_start_info;
     char padding[512];
 };
-extern union start_info_union start_info_union;
-#define start_info (start_info_union.start_info)
+extern union xen_start_info_union xen_start_info_union;
+#define xen_start_info (xen_start_info_union.xen_start_info)
 
 /* arch/xen/kernel/process.c */
 void xen_cpu_idle (void);

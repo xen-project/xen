@@ -1352,8 +1352,8 @@ int __init xlblk_init(void)
 {
     int i;
     
-    if ( (start_info.flags & SIF_INITDOMAIN) 
-         || (start_info.flags & SIF_BLK_BE_DOMAIN) )
+    if ( (xen_start_info.flags & SIF_INITDOMAIN) 
+         || (xen_start_info.flags & SIF_BLK_BE_DOMAIN) )
         return 0;
 
     printk(KERN_INFO "[XEN] Initialising virtual block device driver\n");
