@@ -156,132 +156,116 @@ static int read_ldt(void * ptr, unsigned long bytecount)
 	return bytecount;
 }
 
-
 static int read_default_ldt(void * ptr, unsigned long bytecount)
 {
-    int err;
-    unsigned long size;
-    void *address;
+	int err;
+	unsigned long size;
+	void *address;
 
-    err = 0;
-    address = &default_ldt[0];
-    size = 5*sizeof(struct desc_struct);
-    if (size > bytecount)
-        size = bytecount;
+	err = 0;
+	address = &default_ldt[0];
+	size = 5*sizeof(struct desc_struct);
+	if (size > bytecount)
+		size = bytecount;
 
-    err = size;
-    if (copy_to_user(ptr, address, size))
-        err = -EFAULT;
+	err = size;
+	if (copy_to_user(ptr, address, size))
+		err = -EFAULT;
 
-    return err;
+	return err;
 }
 
 static int write_ldt(void * ptr, unsigned long bytecount, int oldmode)
 {
-    struct mm_struct * mm = current->mm;
-    __u32 entry_1, entry_2, *lp;
-    unsigned long phys_lp, max_limit;
-    int error;
-    struct modify_ldt_ldt_s ldt_info;
+	struct mm_struct * mm = current->mm;
+	__u32 entry_1, entry_2, *lp;
+	unsigned long phys_lp;
+	int error;
+	struct modify_ldt_ldt_s ldt_info;
 
-    error = -EINVAL;
-    if (bytecount != sizeof(ldt_info))
-        goto out;
-    error = -EFAULT; 	
-    if (copy_from_user(&ldt_info, ptr, sizeof(ldt_info)))
-        goto out;
+	error = -EINVAL;
+	if (bytecount != sizeof(ldt_info))
+		goto out;
+	error = -EFAULT; 	
+	if (copy_from_user(&ldt_info, ptr, sizeof(ldt_info)))
+		goto out;
 
-    error = -EINVAL;
-    if (ldt_info.entry_number >= LDT_ENTRIES)
-        goto out;
-    if (ldt_info.contents == 3) {
-        if (oldmode)
-            goto out;
-        if (ldt_info.seg_not_present == 0)
-            goto out;
-    }
+	error = -EINVAL;
+	if (ldt_info.entry_number >= LDT_ENTRIES)
+		goto out;
+	if (ldt_info.contents == 3) {
+		if (oldmode)
+			goto out;
+		if (ldt_info.seg_not_present == 0)
+			goto out;
+	}
 
-    /*
-     * This makes our tests for overlap with Xen space easier. There's no good
-     * reason to have a user segment starting this high anyway.
-     */
-    if (ldt_info.base_addr >= PAGE_OFFSET)
-        goto out;
+	down(&mm->context.sem);
+	if (ldt_info.entry_number >= mm->context.size) {
+		error = alloc_ldt(&current->mm->context, ldt_info.entry_number+1, 1);
+		if (error < 0)
+			goto out_unlock;
+	}
 
-    down(&mm->context.sem);
-    if (ldt_info.entry_number >= mm->context.size) {
-      error = alloc_ldt(&current->mm->context, ldt_info.entry_number+1, 1);
-      if (error < 0)
-	goto out_unlock;
-    }
+	lp = (__u32 *) ((ldt_info.entry_number << 3) + (char *) mm->context.ldt);
+	phys_lp = arbitrary_virt_to_phys(lp);
 
+   	/* Allow LDTs to be cleared by the user. */
+   	if (ldt_info.base_addr == 0 && ldt_info.limit == 0) {
+		if (oldmode ||
+		    (ldt_info.contents == 0		&&
+		     ldt_info.read_exec_only == 1	&&
+		     ldt_info.seg_32bit == 0		&&
+		     ldt_info.limit_in_pages == 0	&&
+		     ldt_info.seg_not_present == 1	&&
+		     ldt_info.useable == 0 )) {
+			entry_1 = 0;
+			entry_2 = 0;
+			goto install;
+		}
+	}
 
-    lp = (__u32 *)((ldt_info.entry_number<<3) + (char *)mm->context.ldt);
-    phys_lp = arbitrary_virt_to_phys(lp);
+	entry_1 = ((ldt_info.base_addr & 0x0000ffff) << 16) |
+		  (ldt_info.limit & 0x0ffff);
+	entry_2 = (ldt_info.base_addr & 0xff000000) |
+		  ((ldt_info.base_addr & 0x00ff0000) >> 16) |
+		  (ldt_info.limit & 0xf0000) |
+		  ((ldt_info.read_exec_only ^ 1) << 9) |
+		  (ldt_info.contents << 10) |
+		  ((ldt_info.seg_not_present ^ 1) << 15) |
+		  (ldt_info.seg_32bit << 22) |
+		  (ldt_info.limit_in_pages << 23) |
+		  0x7000;
+	if (!oldmode)
+		entry_2 |= (ldt_info.useable << 20);
 
-    /* Allow LDTs to be cleared by the user. */
-    if (ldt_info.base_addr == 0 && ldt_info.limit == 0) {
-        if (oldmode ||
-            (ldt_info.contents == 0		&&
-             ldt_info.read_exec_only == 1	&&
-             ldt_info.seg_32bit == 0		&&
-             ldt_info.limit_in_pages == 0	&&
-             ldt_info.seg_not_present == 1	&&
-             ldt_info.useable == 0 )) {
-            entry_1 = 0;
-            entry_2 = 0;
-            goto install;
-        }
-    }
+	/* Install the new entry ...  */
+install:
+	error = HYPERVISOR_update_descriptor(phys_lp, entry_1, entry_2);
 
-    max_limit = HYPERVISOR_VIRT_START - ldt_info.base_addr;
-    if ( ldt_info.limit_in_pages )
-        max_limit >>= PAGE_SHIFT;
-    max_limit--;
-    if ( (ldt_info.limit & 0xfffff) > (max_limit & 0xfffff) )
-        ldt_info.limit = max_limit;
-
-    entry_1 = ((ldt_info.base_addr & 0x0000ffff) << 16) |
-        (ldt_info.limit & 0x0ffff);
-    entry_2 = (ldt_info.base_addr & 0xff000000) |
-        ((ldt_info.base_addr & 0x00ff0000) >> 16) |
-        (ldt_info.limit & 0xf0000) |
-        ((ldt_info.read_exec_only ^ 1) << 9) |
-        (ldt_info.contents << 10) |
-        ((ldt_info.seg_not_present ^ 1) << 15) |
-        (ldt_info.seg_32bit << 22) |
-        (ldt_info.limit_in_pages << 23) |
-        0x7000;
-    if (!oldmode)
-        entry_2 |= (ldt_info.useable << 20);
-
-    /* Install the new entry ...  */
- install:
-    error = HYPERVISOR_update_descriptor(phys_lp, entry_1, entry_2);
-
- out_unlock:
-    up(&mm->context.sem);
- out:
-    return error;
+out_unlock:
+	up(&mm->context.sem);
+out:
+	return error;
 }
 
 asmlinkage int sys_modify_ldt(int func, void *ptr, unsigned long bytecount)
 {
-    int ret = -ENOSYS;
+	int ret = -ENOSYS;
 
-    switch (func) {
-    case 0:
-        ret = read_ldt(ptr, bytecount);
-        break;
-    case 1:
-        ret = write_ldt(ptr, bytecount, 1);
-        break;
-    case 2:
-        ret = read_default_ldt(ptr, bytecount);
-        break;
-    case 0x11:
-        ret = write_ldt(ptr, bytecount, 0);
-        break;
-    }
-    return ret;
+	switch (func) {
+	case 0:
+		ret = read_ldt(ptr, bytecount);
+		break;
+	case 1:
+		ret = write_ldt(ptr, bytecount, 1);
+		break;
+	case 2:
+		ret = read_default_ldt(ptr, bytecount);
+		break;
+	case 0x11:
+		ret = write_ldt(ptr, bytecount, 0);
+		break;
+	}
+	return ret;
 }

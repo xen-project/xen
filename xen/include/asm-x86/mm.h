@@ -274,7 +274,7 @@ static inline int get_page_and_type(struct pfn_info *page,
     ASSERT(((_p)->count_and_flags & PGC_count_mask) != 0);  \
     ASSERT((_p)->u.domain == (_d))
 
-int check_descriptor(unsigned long a, unsigned long b);
+int check_descriptor(unsigned long *d);
 
 /*
  * Use currently-executing domain's pagetables on the specified CPUs.
@@ -298,7 +298,7 @@ extern unsigned long *machine_to_phys_mapping;
 /* Part of the domain API. */
 int do_mmu_update(mmu_update_t *updates, int count, int *success_count);
 
-#define DEFAULT_GDT_ENTRIES     ((LAST_RESERVED_GDT_ENTRY*8)+7)
+#define DEFAULT_GDT_ENTRIES     (LAST_RESERVED_GDT_ENTRY+1)
 #define DEFAULT_GDT_ADDRESS     ((unsigned long)gdt_table)
 
 #ifdef MEMORY_GUARD

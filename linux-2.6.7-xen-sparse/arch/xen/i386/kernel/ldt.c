@@ -182,7 +182,7 @@ static int write_ldt(void __user * ptr, unsigned long bytecount, int oldmode)
 {
 	struct mm_struct * mm = current->mm;
 	__u32 entry_1, entry_2, *lp;
-	unsigned long phys_lp, max_limit;
+	unsigned long phys_lp;
 	int error;
 	struct user_desc ldt_info;
 
@@ -203,14 +203,6 @@ static int write_ldt(void __user * ptr, unsigned long bytecount, int oldmode)
 			goto out;
 	}
 
-	/*
-	 * This makes our tests for overlap with Xen space
-	 * easier. There's no good reason to have a user segment
-	 * starting this high anyway.
-	 */
-	if (ldt_info.base_addr >= PAGE_OFFSET)
-		goto out;
-
 	down(&mm->context.sem);
 	if (ldt_info.entry_number >= mm->context.size) {
 		error = alloc_ldt(&current->mm->context, ldt_info.entry_number+1, 1);
@@ -229,13 +221,6 @@ static int write_ldt(void __user * ptr, unsigned long bytecount, int oldmode)
 			goto install;
 		}
 	}
-
-	max_limit = HYPERVISOR_VIRT_START - ldt_info.base_addr;
-	if (ldt_info.limit_in_pages)
-		max_limit >>= PAGE_SHIFT;
-	max_limit--;
-	if ((ldt_info.limit & 0xfffff) > (max_limit & 0xfffff))
-		ldt_info.limit = max_limit;
 
 	entry_1 = LDT_entry_a(&ldt_info);
 	entry_2 = LDT_entry_b(&ldt_info);

@@ -1,4 +1,6 @@
 
+PERFCOUNTER_CPU (emulations,   "instructions emulated" )
+
 PERFCOUNTER_CPU( irqs,         "#interrupts" )
 PERFCOUNTER_CPU( ipis,         "#IPIs" )
 PERFCOUNTER_CPU( irq_time,     "cycles spent in irq handler" )

@@ -1,7 +1,7 @@
 /******************************************************************************
- * arch/i386/mm.c
+ * arch/x86/x86_32/mm.c
  * 
- * Modifications to Linux original are copyright (c) 2002-2003, K A Fraser
+ * Modifications to Linux original are copyright (c) 2004, K A Fraser
  * 
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -164,9 +164,9 @@ long do_stack_switch(unsigned long ss, unsigned long esp)
 
 
 /* Returns TRUE if given descriptor is valid for GDT or LDT. */
-int check_descriptor(unsigned long a, unsigned long b)
+int check_descriptor(unsigned long *d)
 {
-    unsigned long base, limit;
+    unsigned long base, limit, a = d[0], b = d[1];
 
     /* A not-present descriptor will always fault, so is safe. */
     if ( !(b & _SEGMENT_P) ) 
@@ -211,15 +211,27 @@ int check_descriptor(unsigned long a, unsigned long b)
         goto good;
     }
     
-    /* Check that base/limit do not overlap Xen-private space. */
+    /* Check that base is at least a page away from Xen-private area. */
     base  = (b&(0xff<<24)) | ((b&0xff)<<16) | (a>>16);
+    if ( base >= (PAGE_OFFSET - PAGE_SIZE) )
+        goto bad;
+
+    /* Check and truncate the limit if necessary. */
     limit = (b&0xf0000) | (a&0xffff);
     limit++; /* We add one because limit is inclusive. */
     if ( (b & _SEGMENT_G) )
         limit <<= 12;
     if ( ((base + limit) <= base) || 
          ((base + limit) > PAGE_OFFSET) )
-        goto bad;
+    {
+        /* Need to truncate. Calculate and poke a best-effort limit. */
+        limit = PAGE_OFFSET - base;
+        if ( (b & _SEGMENT_G) )
+            limit >>= 12;
+        limit--;
+        d[0] &= ~0x0ffff; d[0] |= limit & 0x0ffff;
+        d[1] &= ~0xf0000; d[1] |= limit & 0xf0000;
+    }
 
  good:
     return 1;
@@ -275,7 +287,7 @@ long set_gdt(struct domain *d,
             mk_l1_pgentry((frames[i] << PAGE_SHIFT) | __PAGE_HYPERVISOR);
 
     SET_GDT_ADDRESS(d, GDT_VIRT_START);
-    SET_GDT_ENTRIES(d, (entries*8)-1);
+    SET_GDT_ENTRIES(d, entries);
 
     return 0;
 
@@ -311,11 +323,14 @@ long do_set_gdt(unsigned long *frame_list, unsigned int entries)
 long do_update_descriptor(
     unsigned long pa, unsigned long word1, unsigned long word2)
 {
-    unsigned long *gdt_pent, pfn = pa >> PAGE_SHIFT;
+    unsigned long *gdt_pent, pfn = pa >> PAGE_SHIFT, d[2];
     struct pfn_info *page;
     long ret = -EINVAL;
 
-    if ( (pa & 7) || (pfn >= max_page) || !check_descriptor(word1, word2) )
+    d[0] = word1;
+    d[1] = word2;
+
+    if ( (pa & 7) || (pfn >= max_page) || !check_descriptor(d) )
         return -EINVAL;
 
     page = &frame_table[pfn];
@@ -346,8 +361,7 @@ long do_update_descriptor(
 
     /* All is good so make the update. */
     gdt_pent = map_domain_mem(pa);
-    gdt_pent[0] = word1;
-    gdt_pent[1] = word2;
+    memcpy(gdt_pent, d, 8);
     unmap_domain_mem(gdt_pent);
 
     put_page_type(page);

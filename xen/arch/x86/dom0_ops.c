@@ -133,8 +133,7 @@ void arch_getdomaininfo_ctxt(struct domain *d, full_execution_context_t *c)
         for ( i = 0; i < 16; i++ )
             c->gdt_frames[i] = 
                 l1_pgentry_to_pagenr(d->mm.perdomain_pt[i]);
-        c->gdt_ents = 
-            (GET_GDT_ENTRIES(d) + 1) >> 3;
+        c->gdt_ents = GET_GDT_ENTRIES(d);
     }
     c->guestos_ss  = d->thread.guestos_ss;
     c->guestos_esp = d->thread.guestos_sp;

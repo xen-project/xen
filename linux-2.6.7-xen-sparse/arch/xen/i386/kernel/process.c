@@ -331,24 +331,6 @@ void prepare_to_copy(struct task_struct *tsk)
 	unlazy_fpu(tsk);
 }
 
-/* NB. This Xen-specific function is inlined in 'write_ldt'. */
-static int truncate_user_desc(struct user_desc *info)
-{
-	unsigned long max_limit;
-
-	if (info->base_addr >= PAGE_OFFSET)
-		return 0;
-
-	max_limit = HYPERVISOR_VIRT_START - info->base_addr;
-	if (info->limit_in_pages)
-		max_limit >>= PAGE_SHIFT;
-	max_limit--;
-	if ((info->limit & 0xfffff) > (max_limit & 0xfffff))
-		info->limit = max_limit;
-
-	return 1;
-}
-
 int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 	unsigned long unused,
 	struct task_struct * p, struct pt_regs * regs)
@@ -397,9 +379,6 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 
 		idx = info.entry_number;
 		if (idx < GDT_ENTRY_TLS_MIN || idx > GDT_ENTRY_TLS_MAX)
-			goto out;
-
-		if (!truncate_user_desc(&info))
 			goto out;
 
 		desc = p->thread.tls_array + idx - GDT_ENTRY_TLS_MIN;
@@ -716,9 +695,6 @@ asmlinkage int sys_set_thread_area(struct user_desc __user *u_info)
 	if (copy_from_user(&info, u_info, sizeof(info)))
 		return -EFAULT;
 	idx = info.entry_number;
-
-	if (!truncate_user_desc(&info))
-		return -EINVAL;
 
 	/*
 	 * index -1 means the kernel should try to find and
