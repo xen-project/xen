@@ -544,6 +544,7 @@
 3e5a4e67P_6RRoCzUiQt_gyx6lmyWw xenolinux-2.4.21-pre4-sparse/include/asm-xeno/hdreg.h
 3e5a4e67w_DWgjIJ17Tlossu1LGujQ xenolinux-2.4.21-pre4-sparse/include/asm-xeno/highmem.h
 3e5a4e67YtcyDLQsShhCfQwPSELfvA xenolinux-2.4.21-pre4-sparse/include/asm-xeno/hw_irq.h
+3e00b957NB9Iz667rjRZg5YAJqoKCg xenolinux-2.4.21-pre4-sparse/include/asm-xeno/hypervisor-ifs
 3e5a4e677VBavzM1UZIEcH1B-RlXMA xenolinux-2.4.21-pre4-sparse/include/asm-xeno/hypervisor.h
 3e5a4e679TYbXAUiURvTeX4cFb1RlQ xenolinux-2.4.21-pre4-sparse/include/asm-xeno/i387.h
 3e5a4e672eNAzAKUZsefsPdmsH19hA xenolinux-2.4.21-pre4-sparse/include/asm-xeno/ide.h
