@@ -29,12 +29,11 @@ public class CommandPhysicalRevoke extends Command {
     public String execute() throws CommandFailedException {
         Runtime r = Runtime.getRuntime();
         String output = null;
-
-        Partition partition = PartitionManager.IT.getPartition(StringPattern.parse(partition_name).resolve(domain_id));
+	String resolved = StringPattern.parse(partition_name).resolve(domain_id);
+        Partition partition = PartitionManager.IT.getPartition(resolved);
 
         if (partition == null) {
-            throw new CommandFailedException(
-                "Partition " + partition_name + " does not exist.");
+          throw new CommandFailedException("Partition " + partition_name + " (resolved to " + resolved + ") does not exist.");
         }
 
         try {
