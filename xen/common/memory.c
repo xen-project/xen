@@ -80,15 +80,13 @@ void __init init_frametable(void *frametable_vstart, unsigned long nr_pages)
 
 void add_to_domain_alloc_list(unsigned long ps, unsigned long pe)
 {
-    struct pfn_info *pf;
     unsigned long i;
     unsigned long flags;
 
     spin_lock_irqsave(&free_list_lock, flags);
     for ( i = ps >> PAGE_SHIFT; i < (pe >> PAGE_SHIFT); i++ )
     {
-        pf = list_entry(&frame_table[i].list, struct pfn_info, list);
-        list_add_tail(&pf->list, &free_list);
+        list_add_tail(&frame_table[i].list, &free_list);
         free_pfns++;
     }
     spin_unlock_irqrestore(&free_list_lock, flags);
