@@ -11,6 +11,7 @@
 #include <linux/vmalloc.h>
 #include <linux/init.h>
 #include <linux/slab.h>
+#include <linux/module.h>
 #include <asm/io.h>
 #include <asm/fixmap.h>
 #include <asm/cacheflush.h>
@@ -432,3 +433,5 @@ int direct_remap_area_pages(
 
 	return 0;
 }
+
+EXPORT_SYMBOL(direct_remap_area_pages);
