@@ -52,11 +52,23 @@ static unsigned long mmap_vstart;
 static u16 pending_id[MAX_PENDING_REQS];
 static netif_t *pending_netif[MAX_PENDING_REQS];
 static u16 pending_ring[MAX_PENDING_REQS];
-static spinlock_t pend_prod_lock = SPIN_LOCK_UNLOCKED;
 typedef unsigned int PEND_RING_IDX;
 #define MASK_PEND_IDX(_i) ((_i)&(MAX_PENDING_REQS-1))
 static PEND_RING_IDX pending_prod, pending_cons;
 #define NR_PENDING_REQS (MAX_PENDING_REQS - pending_prod + pending_cons)
+
+/* Freed TX SKBs get batched on this ring before return to pending_ring. */
+static u16 dealloc_ring[MAX_PENDING_REQS];
+static spinlock_t dealloc_lock = SPIN_LOCK_UNLOCKED;
+static PEND_RING_IDX dealloc_prod, dealloc_cons;
+
+typedef struct {
+    u16 idx;
+    netif_tx_request_t req;
+    netif_t *netif;
+} tx_info_t;
+static struct sk_buff_head tx_queue;
+static multicall_entry_t tx_mcl[MAX_PENDING_REQS];
 
 static struct list_head net_schedule_list;
 static spinlock_t net_schedule_list_lock;
@@ -215,7 +227,7 @@ static void net_rx_action(unsigned long unused)
         mcl[0].op = __HYPERVISOR_update_va_mapping;
         mcl[0].args[0] = vdata >> PAGE_SHIFT;
         mcl[0].args[1] = (new_mfn << PAGE_SHIFT) | __PAGE_KERNEL;
-        mcl[0].args[2] = UVMF_INVLPG;
+        mcl[0].args[2] = 0;
         mcl[1].op = __HYPERVISOR_mmu_update;
         mcl[1].args[0] = (unsigned long)mmu;
         mcl[1].args[1] = 4;
@@ -232,9 +244,10 @@ static void net_rx_action(unsigned long unused)
             break;
     }
 
-    if ( (mcl - rx_mcl) == 0 )
+    if ( mcl == rx_mcl )
         return;
 
+    mcl[-2].args[2] = UVMF_FLUSH_TLB;
     (void)HYPERVISOR_multicall(rx_mcl, mcl - rx_mcl);
 
     mcl = rx_mcl;
@@ -369,7 +382,51 @@ static void net_tx_action(unsigned long unused)
     u16 pending_idx;
     NETIF_RING_IDX i;
     struct page *page;
+    multicall_entry_t *mcl;
 
+    if ( (i = dealloc_cons) == dealloc_prod )
+        goto skip_dealloc;
+
+    mcl = tx_mcl;
+    while ( i != dealloc_prod )
+    {
+        pending_idx = dealloc_ring[MASK_PEND_IDX(i++)];
+        mcl[0].op = __HYPERVISOR_update_va_mapping;
+        mcl[0].args[0] = MMAP_VADDR(pending_idx) >> PAGE_SHIFT;
+        mcl[0].args[1] = 0;
+        mcl[0].args[2] = 0;
+        mcl++;        
+    }
+
+    mcl[-1].args[2] = UVMF_FLUSH_TLB;
+    (void)HYPERVISOR_multicall(tx_mcl, mcl - tx_mcl);
+
+    while ( dealloc_cons != dealloc_prod )
+    {
+        pending_idx = dealloc_ring[MASK_PEND_IDX(dealloc_cons++)];
+
+        netif = pending_netif[pending_idx];
+
+        spin_lock(&netif->tx_lock);
+        make_tx_response(netif, pending_id[pending_idx], NETIF_RSP_OKAY);
+        spin_unlock(&netif->tx_lock);
+        
+        pending_ring[MASK_PEND_IDX(pending_prod++)] = pending_idx;
+        
+        /*
+         * Scheduling checks must happen after the above response is posted.
+         * This avoids a possible race with a guest OS on another CPU.
+         */
+        mb();
+        if ( (netif->tx_req_cons != netif->tx->req_prod) &&
+             ((netif->tx_req_cons-netif->tx_resp_prod) != NETIF_TX_RING_SIZE) )
+            add_to_net_schedule_list_tail(netif);
+        
+        netif_put(netif);
+    }
+
+ skip_dealloc:
+    mcl = tx_mcl;
     while ( (NR_PENDING_REQS < MAX_PENDING_REQS) &&
             !list_empty(&net_schedule_list) )
     {
@@ -440,29 +497,61 @@ static void net_tx_action(unsigned long unused)
 
         pending_idx = pending_ring[MASK_PEND_IDX(pending_cons)];
 
-        if ( HYPERVISOR_update_va_mapping_otherdomain(
-            MMAP_VADDR(pending_idx) >> PAGE_SHIFT,
-            (pte_t) { (txreq.addr & PAGE_MASK) | __PAGE_KERNEL },
-            0, netif->domid) != 0 )
-        {
-            DPRINTK("Bad page frame\n");
-            make_tx_response(netif, txreq.id, NETIF_RSP_ERROR);
-            netif_put(netif);
-            continue;
-        }
-        phys_to_machine_mapping[__pa(MMAP_VADDR(pending_idx)) >> PAGE_SHIFT] =
-            txreq.addr >> PAGE_SHIFT;
-
         if ( unlikely((skb = alloc_skb(PKT_PROT_LEN, GFP_ATOMIC)) == NULL) )
         {
             DPRINTK("Can't allocate a skb in start_xmit.\n");
             make_tx_response(netif, txreq.id, NETIF_RSP_ERROR);
             netif_put(netif);
-            HYPERVISOR_update_va_mapping(MMAP_VADDR(pending_idx) >> PAGE_SHIFT,
-                                         (pte_t) { 0 }, UVMF_INVLPG);
             break;
         }
+
+        mcl[0].op = __HYPERVISOR_update_va_mapping_otherdomain;
+        mcl[0].args[0] = MMAP_VADDR(pending_idx) >> PAGE_SHIFT;
+        mcl[0].args[1] = (txreq.addr & PAGE_MASK) | __PAGE_KERNEL;
+        mcl[0].args[2] = 0;
+        mcl[0].args[3] = (unsigned long)netif->domid;
+        mcl[0].args[4] = (unsigned long)(netif->domid>>32);
+        mcl++;
         
+        ((tx_info_t *)&skb->cb[0])->idx = pending_idx;
+        ((tx_info_t *)&skb->cb[0])->netif = netif;
+        memcpy(&((tx_info_t *)&skb->cb[0])->req, &txreq, sizeof(txreq));
+        __skb_queue_tail(&tx_queue, skb);
+
+        pending_cons++;
+
+        /* Filled the batch queue? */
+        if ( (mcl - tx_mcl) == ARRAY_SIZE(tx_mcl) )
+            break;
+    }
+
+    if ( mcl == tx_mcl )
+        return;
+
+    (void)HYPERVISOR_multicall(tx_mcl, mcl - tx_mcl);
+
+    mcl = tx_mcl;
+    while ( (skb = __skb_dequeue(&tx_queue)) != NULL )
+    {
+        pending_idx = ((tx_info_t *)&skb->cb[0])->idx;
+        netif       = ((tx_info_t *)&skb->cb[0])->netif;
+        memcpy(&txreq, &((tx_info_t *)&skb->cb[0])->req, sizeof(txreq));
+
+        /* Check the remap error code. */
+        if ( unlikely(mcl[0].args[5] != 0) )
+        {
+            DPRINTK("Bad page frame\n");
+            make_tx_response(netif, txreq.id, NETIF_RSP_ERROR);
+            netif_put(netif);
+            kfree_skb(skb);
+            mcl++;
+            pending_ring[MASK_PEND_IDX(pending_prod++)] = pending_idx;
+            continue;
+        }
+
+        phys_to_machine_mapping[__pa(MMAP_VADDR(pending_idx)) >> PAGE_SHIFT] =
+            txreq.addr >> PAGE_SHIFT;
+
         __skb_put(skb, PKT_PROT_LEN);
         memcpy(skb->data, 
                (void *)(MMAP_VADDR(pending_idx)|(txreq.addr&~PAGE_MASK)),
@@ -491,42 +580,23 @@ static void net_tx_action(unsigned long unused)
         netif->stats.tx_bytes += txreq.size;
         netif->stats.tx_packets++;
 
-        pending_cons++;
-
         netif_rx(skb);
         netif->dev->last_rx = jiffies;
+
+        mcl++;
     }
 }
 
 static void netif_page_release(struct page *page)
 {
     unsigned long flags;
-    netif_t *netif;
-    u16 pending_idx;
+    u16 pending_idx = page - virt_to_page(mmap_vstart);
 
-    pending_idx = page - virt_to_page(mmap_vstart);
+    spin_lock_irqsave(&dealloc_lock, flags);
+    dealloc_ring[MASK_PEND_IDX(dealloc_prod++)] = pending_idx;
+    spin_unlock_irqrestore(&dealloc_lock, flags);
 
-    netif = pending_netif[pending_idx];
-
-    HYPERVISOR_update_va_mapping(MMAP_VADDR(pending_idx) >> PAGE_SHIFT,
-                                 (pte_t) { 0 }, UVMF_INVLPG);
-        
-    spin_lock(&netif->tx_lock);
-    make_tx_response(netif, pending_id[pending_idx], NETIF_RSP_OKAY);
-    spin_unlock(&netif->tx_lock);
-
-    /*
-     * Scheduling checks must happen after the above response is posted.
-     * This avoids a possible race with a guest OS on another CPU.
-     */
-    mb();
-    netif_schedule_work(netif);
-
-    netif_put(netif);
- 
-    spin_lock_irqsave(&pend_prod_lock, flags);
-    pending_ring[MASK_PEND_IDX(pending_prod++)] = pending_idx;
-    spin_unlock_irqrestore(&pend_prod_lock, flags);
+    tasklet_schedule(&net_tx_tasklet);
 }
 
 #if 0
@@ -627,6 +697,7 @@ static int __init init_module(void)
         return 0;
 
     skb_queue_head_init(&rx_queue);
+    skb_queue_head_init(&tx_queue);
 
     netif_interface_init();
 
