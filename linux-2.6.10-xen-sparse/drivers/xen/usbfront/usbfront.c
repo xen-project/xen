@@ -1417,13 +1417,7 @@ static int alloc_xhci(void)
 		goto err_alloc_xhci;
 	}
 
-	/* Reset here so we don't get any interrupts from an old setup */
-	/*  or broken setup */
-	//	reset_hc(xhci);
-
-
 	xhci->state = USBIF_STATE_CLOSED;
-	xhci->is_suspended = 0;
 
 	spin_lock_init(&xhci->urb_remove_list_lock);
 	INIT_LIST_HEAD(&xhci->urb_remove_list);

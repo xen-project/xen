@@ -1,3 +1,15 @@
+/******************************************************************************
+ * xhci.h
+ *
+ * Private definitions for the Xen Virtual USB Controller.  Based on
+ * drivers/usb/host/uhci.h from Linux.  Copyright for the imported content is
+ * retained by the original authors.
+ *
+ * Modifications are:
+ * Copyright (C) 2004 Intel Research Cambridge
+ * Copyright (C) 2004, 2005 Mark Williamson
+ */
+
 #ifndef __LINUX_XHCI_H
 #define __LINUX_XHCI_H
 
@@ -6,48 +18,19 @@
 #include <asm-xen/xen-public/io/usbif.h>
 #include <linux/spinlock.h>
 
-#define XHCI_NUMFRAMES		1024	/* in the frame list [array] */
-#define XHCI_MAX_SOF_NUMBER	2047	/* in an SOF packet */
-#define CAN_SCHEDULE_FRAMES	1000	/* how far future frames can be scheduled */
-
-/* In the absence of actual hardware state, we maintain the current known state
- * of the virtual hub ports in this data structure.
- */
-typedef struct
-{
-        unsigned int cs     :1;     /* Connection status.  do we really need this /and/ ccs? */
+/* xhci_port_t - current known state of a virtual hub ports */
+typedef struct {
+        unsigned int cs     :1; /* Connection status.  do we really need this /and/ ccs? */
         unsigned int cs_chg :1; /* Connection status change.  */
-        unsigned int pe     :1;     /* Port enable.               */
+        unsigned int pe     :1; /* Port enable.               */
         unsigned int pe_chg :1; /* Port enable change.        */
-        unsigned int ccs    :1;    /* Current connect status.    */
-        unsigned int susp   :1;   /* Suspended.                 */
-        unsigned int lsda   :1;   /* Low speed device attached. */
-        unsigned int pr     :1;     /* Port reset.                */
-        
-    /* Device info? */
+        unsigned int ccs    :1; /* Current connect status.    */
+        unsigned int susp   :1; /* Suspended.                 */
+        unsigned int lsda   :1; /* Low speed device attached. */
+        unsigned int pr     :1; /* Port reset.                */
 } xhci_port_t;
 
-struct xhci_frame_list {
-	__u32 frame[XHCI_NUMFRAMES];
-
-	void *frame_cpu[XHCI_NUMFRAMES];
-};
-
-struct urb_priv;
-
-#define xhci_status_bits(ctrl_sts)	(ctrl_sts & 0xFE0000)
-#define xhci_actual_length(ctrl_sts)	((ctrl_sts + 1) & TD_CTRL_ACTLEN_MASK) /* 1-based */
-
-#define xhci_maxlen(token)	((token) >> 21)
-#define xhci_expected_length(info) (((info >> 21) + 1) & TD_TOKEN_EXPLEN_MASK) /* 1-based */
-#define xhci_toggle(token)	(((token) >> TD_TOKEN_TOGGLE_SHIFT) & 1)
-#define xhci_endpoint(token)	(((token) >> 15) & 0xf)
-#define xhci_devaddr(token)	(((token) >> 8) & 0x7f)
-#define xhci_devep(token)	(((token) >> 8) & 0x7ff)
-#define xhci_packetid(token)	((token) & TD_TOKEN_PID_MASK)
-#define xhci_packetout(token)	(xhci_packetid(token) != USB_PID_IN)
-#define xhci_packetin(token)	(xhci_packetid(token) == USB_PID_IN)
-
+/* struct virt_root_hub - state related to the virtual root hub */
 struct virt_root_hub {
 	struct usb_device *dev;
 	int devnum;		/* Address of Root Hub endpoint */
@@ -59,15 +42,10 @@ struct virt_root_hub {
 	int c_p_r[8];
 	struct timer_list rh_int_timer;
         spinlock_t port_state_lock;
-        xhci_port_t *ports;       /*  */
+        xhci_port_t *ports;
 };
 
-/*
- * This describes the full xhci information.
- *
- * Note how the "proper" USB information is just
- * a subset of what the full implementation needs.
- */
+/* struct xhci - contains the state associated with a single USB interface */
 struct xhci {
 
 #ifdef CONFIG_PROC_FS
@@ -78,15 +56,13 @@ struct xhci {
 
         int evtchn;                        /* Interdom channel to backend */
         int irq;                           /* Bound to evtchn */
-        int state;                         /* State of this USB interface */
+        enum { USBIF_STATE_CONNECTED    = 2,
+               USBIF_STATE_DISCONNECTED = 1,
+               USBIF_STATE_CLOSED       = 0
+        } state; /* State of this USB interface */
         unsigned long bandwidth;
-        int handle;
 
 	struct usb_bus *bus;
-
-	spinlock_t frame_list_lock;
-	struct xhci_frame_list *fl;		/* P: xhci->frame_list_lock */
-	int is_suspended;
 
 	/* Main list of URB's currently controlled by this HC */
 	spinlock_t urb_list_lock;
@@ -102,12 +78,12 @@ struct xhci {
 
 	struct virt_root_hub rh;	/* private data of the virtual root hub */
 
-        spinlock_t response_lock;
-
         usbif_front_ring_t usb_ring;
-        int usb_resp_cons;
+
+        int awaiting_reset;
 };
 
+/* per-URB private data structure for the host controller */
 struct urb_priv {
 	struct urb *urb;
         usbif_iso_t *schedule;
@@ -122,7 +98,6 @@ struct urb_priv {
 
 	unsigned long inserttime;	/* In jiffies */
 
-	struct list_head queue_list;	/* P: xhci->frame_list_lock */
 	struct list_head complete_list;	/* P: xhci->complete_list_lock */
 };
 
@@ -140,8 +115,7 @@ struct urb_priv {
  *
  * #1 xhci->urb_list_lock
  * #2 urb->lock
- * #3 xhci->urb_remove_list_lock, xhci->frame_list_lock, 
- *   xhci->qh_remove_list_lock
+ * #3 xhci->urb_remove_list_lock
  * #4 xhci->complete_list_lock
  *
  * If you're going to grab 2 or more locks at once, ALWAYS grab the lock
