@@ -555,8 +555,6 @@ int netif_rx(struct sk_buff *skb)
 #ifdef CONFIG_SMP
     unsigned long cpu_mask;
 #endif
-        
-    struct task_struct *p;
     int this_cpu = smp_processor_id();
     unsigned long flags;
     net_vif_t *vif;
@@ -567,15 +565,6 @@ int netif_rx(struct sk_buff *skb)
     ASSERT((skb->data - skb->head) == (18 + ETH_HLEN));
         
     skb->head = (u8 *)map_domain_mem(((skb->pf - frame_table) << PAGE_SHIFT));
-
-    /*
-     * remapping this address really screws up all the skb pointers.  We
-     * need to map them all here sufficiently to get the packet
-     * demultiplexed. this remapping happens more than once in the code and
-     * is grim.  It will be fixed in a later update -- drivers should be
-     * able to align the packet arbitrarily.
-     */
-                
     skb->data = skb->head;
     skb_reserve(skb,18); /* 18 is the 16 from dev_alloc_skb plus 2 for
                             IP header alignment. */
@@ -592,45 +581,19 @@ int netif_rx(struct sk_buff *skb)
         skb->dst_vif = __net_get_target_vif(skb->mac.raw, 
                                             skb->len, skb->src_vif);
         
-    if ( (vif = sys_vif_list[skb->dst_vif]) == NULL )
-        goto drop;
-
-    /*
-     * This lock-and-walk of the task list isn't really necessary, and is
-     * an artifact of the old code.  The vif contains a pointer to the skb
-     * list we are going to queue the packet in, so the lock and the inner
-     * loop could be removed. The argument against this is a possible race
-     * in which a domain is killed as packets are being delivered to it.
-     * This would result in the dest vif vanishing before we can deliver to
-     * it.
-     */
-        
-    if ( skb->dst_vif >= VIF_PHYSICAL_INTERFACE )
+    if ( ((vif = sys_vif_list[skb->dst_vif]) == NULL) ||
+         (skb->dst_vif <= VIF_PHYSICAL_INTERFACE) )
     {
-        read_lock(&tasklist_lock);
-        p = &idle0_task;
-        do {
-            if ( p != vif->domain ) continue;
-            deliver_packet(skb, vif);
-            cpu_mask = mark_hyp_event(p, _HYP_EVENT_NET_RX);
-            read_unlock(&tasklist_lock);
-            goto found;
-        }
-        while ( (p = p->next_task) != &idle0_task );
-        read_unlock(&tasklist_lock); 
-        goto drop;
+        netdev_rx_stat[this_cpu].dropped++;
+        unmap_domain_mem(skb->head);
+        kfree_skb(skb);
+        local_irq_restore(flags);
+        return NET_RX_DROP;
     }
 
- drop:
-    netdev_rx_stat[this_cpu].dropped++;
+    deliver_packet(skb, vif);
+    cpu_mask = mark_hyp_event(vif->domain, _HYP_EVENT_NET_RX);
     unmap_domain_mem(skb->head);
-    kfree_skb(skb);
-    local_irq_restore(flags);
-    return NET_RX_DROP;
-
- found:
-    unmap_domain_mem(skb->head);
-    skb->head = skb->data = skb->tail = (void *)0xdeadbeef;
     kfree_skb(skb);
     hyp_event_notify(cpu_mask);
     local_irq_restore(flags);
@@ -858,7 +821,7 @@ void update_shared_ring(void)
         while ( shadow_ring->rx_cons != shadow_ring->rx_idx )
         {
             rx = shadow_ring->rx_ring + shadow_ring->rx_cons;
-            copy_to_user(net_ring->rx_ring + net_ring->rx_cons, rx, 
+            copy_to_user(net_ring->rx_ring + shadow_ring->rx_cons, rx, 
                          sizeof(rx_entry_t));
 
             if ( rx->flush_count == tlb_flush_count[smp_processor_id()] )
