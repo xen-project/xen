@@ -160,12 +160,11 @@ int fbvt_init_idle_task(struct domain *p)
     if(fbvt_alloc_task(p) < 0) return -1;
 
     fbvt_add_task(p);
-//printk("< ----- >Initialising idle task for processor %d, address %d, priv %d\n", p->processor, (int)p, (int)p->sched_priv);
-    spin_lock_irqsave(&schedule_lock[p->processor], flags);
+    spin_lock_irqsave(&schedule_data[p->processor].schedule_lock, flags);
     set_bit(DF_RUNNING, &p->flags);
     if ( !__task_on_runqueue(RUNLIST(p)) )
     __add_to_runqueue_head(RUNLIST(p), RUNQUEUE(p->processor));
-    spin_unlock_irqrestore(&schedule_lock[p->processor], flags);
+    spin_unlock_irqrestore(&schedule_data[p->processor].schedule_lock, flags);
 
     return 0;
 }
@@ -233,7 +232,7 @@ int fbvt_adjdom(struct domain *p,
         if ( mcu_adv == 0 )
             return -EINVAL;
         
-        spin_lock_irqsave(&schedule_lock[p->processor], flags);   
+        spin_lock_irqsave(&schedule_data[p->processor].schedule_lock, flags);   
         inf->mcu_advance = mcu_adv;
         inf->warp = warp;
         inf->warpl = warpl;
@@ -244,18 +243,20 @@ int fbvt_adjdom(struct domain *p,
                 p->domain, inf->mcu_advance, inf->warp,
                 inf->warpl, inf->warpu );
 
-        spin_unlock_irqrestore(&schedule_lock[p->processor], flags);
+        spin_unlock_irqrestore(&schedule_data[p->processor].schedule_lock, 
+                                                                        flags);
     }
     else if ( cmd->direction == SCHED_INFO_GET )
     {
         struct fbvt_dom_info *inf = FBVT_INFO(p);
 
-        spin_lock_irqsave(&schedule_lock[p->processor], flags);   
+        spin_lock_irqsave(&schedule_data[p->processor].schedule_lock, flags);   
         params->mcu_adv = inf->mcu_advance;
         params->warp    = inf->warp;
         params->warpl   = inf->warpl;
         params->warpu   = inf->warpu;
-        spin_unlock_irqrestore(&schedule_lock[p->processor], flags);
+        spin_unlock_irqrestore(&schedule_data[p->processor].schedule_lock, 
+                                                                        flags);
     }
     
     return 0;
@@ -285,7 +286,6 @@ static task_slice_t fbvt_do_schedule(s_time_t now)
     struct fbvt_dom_info *next_prime_inf = NULL;
     task_slice_t        ret;
 
-//if(prev->sched_priv == NULL) printk("----> %d\n", prev->domain);
     ASSERT(prev->sched_priv != NULL);
     ASSERT(prev_inf != NULL);
 
@@ -450,7 +450,6 @@ static task_slice_t fbvt_do_schedule(s_time_t now)
     next->min_slice = ctx_allow;
     ret.task = next;
     ret.time = r_time;
-//printk("NEXT --> domain %d (address %d, processor %d), priv %d\n",next->domain, (int)next, next->processor, (int)next->sched_priv); 
     return ret;
 }
 
@@ -476,7 +475,7 @@ static void fbvt_dump_cpu_state(int i)
     struct fbvt_dom_info *d_inf;
     struct domain *d;
 
-    spin_lock_irqsave(&schedule_lock[i], flags);
+    spin_lock_irqsave(&schedule_data[i].schedule_lock, flags);
     printk("svt=0x%08lX ", CPU_SVT(i));
 
     queue = RUNQUEUE(i);
@@ -495,7 +494,7 @@ static void fbvt_dump_cpu_state(int i)
             (unsigned long)list, (unsigned long)list->next,
             (unsigned long)list->prev);
     }
-    spin_unlock_irqrestore(&schedule_lock[i], flags);
+    spin_unlock_irqrestore(&schedule_data[i].schedule_lock, flags);
 }
 
 
@@ -559,14 +558,10 @@ static void fbvt_wake(struct domain *d)
     int                   cpu = d->processor;
     s32                   io_warp;
 
-//printk("-|--> Adding new domain %d\n",d->domain);
-//printk("-|--> Current%d  (address %d, processor %d)  %d\n",current->domain,(int)current, current->processor, (int)current->sched_priv);
     /* If on the runqueue already then someone has done the wakeup work. */
     if ( unlikely(__task_on_runqueue(RUNLIST(d))) )
         return;
-//printk("----> Not on runqueue\n");
     __add_to_runqueue_head(RUNLIST(d), RUNQUEUE(cpu));
-//printk(" ---> %d\n",(int)current->sched_priv);
  
     now = NOW();
 
@@ -617,7 +612,6 @@ static void fbvt_wake(struct domain *d)
     __calc_evt(inf);
 
     curr = schedule_data[cpu].curr;
-//printk(" ---> %d\n",(int)current->sched_priv);
  
     /* Currently-running domain should run at least for ctx_allow. */
     min_time = curr->lastschd + curr->min_slice;
@@ -626,7 +620,6 @@ static void fbvt_wake(struct domain *d)
         cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
     else if ( schedule_data[cpu].s_timer.expires > (min_time + TIME_SLOP) )
         mod_ac_timer(&schedule_data[cpu].s_timer, min_time);
-//printk(" ---> %d\n",(int)current->sched_priv);
 } 
 
 struct scheduler sched_fbvt_def = {

@@ -196,8 +196,6 @@ void new_thread(struct domain *d,
 extern unsigned long wait_init_idle;
 #define init_idle() clear_bit(smp_processor_id(), &wait_init_idle);
 
-extern spinlock_t schedule_lock[NR_CPUS] __cacheline_aligned;
-
 #define set_current_state(_s) do { current->state = (_s); } while (0)
 void scheduler_init(void);
 void schedulers_start(void);

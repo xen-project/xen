@@ -95,11 +95,11 @@ static int rr_init_idle_task(struct domain *p)
     if(rr_alloc_task(p) < 0) return -1;
     rr_add_task(p);
 
-    spin_lock_irqsave(&schedule_lock[p->processor], flags);
+    spin_lock_irqsave(&schedule_data[p->processor].schedule_lock, flags);
     set_bit(DF_RUNNING, &p->flags);
     if ( !__task_on_runqueue(RUNLIST(p)) )
          __add_to_runqueue_head(RUNLIST(p), RUNQUEUE(p->processor));
-    spin_unlock_irqrestore(&schedule_lock[p->processor], flags);
+    spin_unlock_irqrestore(&schedule_data[p->processor].schedule_lock, flags);
     return 0;
 }
 
@@ -194,7 +194,7 @@ static void rr_dump_cpu_state(int i)
     int loop = 0;
     struct rrobin_dom_info *d_inf;
 
-    spin_lock_irqsave(&schedule_lock[i], flags);
+    spin_lock_irqsave(&schedule_data[i].schedule_lock, flags);
 
     queue = RUNQUEUE(i);
     printk("QUEUE rq %lx   n: %lx, p: %lx\n",  (unsigned long)queue,
@@ -210,7 +210,7 @@ static void rr_dump_cpu_state(int i)
         d_inf = list_entry(list, struct rrobin_dom_info, run_list);
         rr_dump_domain(d_inf->domain);
     }
-    spin_unlock_irqrestore(&schedule_lock[i], flags);
+    spin_unlock_irqrestore(&schedule_data[i].schedule_lock, flags);
 }
 
 
