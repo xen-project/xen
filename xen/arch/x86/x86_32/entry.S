@@ -602,7 +602,7 @@ ENTRY(nmi)
         # reload DS and ES when handling them.
         inb   $0x61,%al
         testb $0x80,%al
-        je   nmi_parity_err
+        jne   nmi_parity_err
         testb $0x40,%al
         jne   nmi_io_err
         movl  %eax,%ebx
