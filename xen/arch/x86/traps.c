@@ -709,9 +709,9 @@ void set_tss_desc(unsigned int n, void *addr)
 {
     _set_tssldt_desc(
         gdt_table + __TSS(n),
-        (int)addr,
+        (unsigned long)addr,
         offsetof(struct tss_struct, __cacheline_filler) - 1,
-        0x89);
+        9);
 }
 
 void __init trap_init(void)
@@ -735,7 +735,6 @@ void __init trap_init(void)
     set_intr_gate(TRAP_bounds,&bounds);
     set_intr_gate(TRAP_invalid_op,&invalid_op);
     set_intr_gate(TRAP_no_device,&device_not_available);
-    set_task_gate(TRAP_double_fault,__DOUBLEFAULT_TSS_ENTRY<<3);
     set_intr_gate(TRAP_copro_seg,&coprocessor_segment_overrun);
     set_intr_gate(TRAP_invalid_tss,&invalid_TSS);
     set_intr_gate(TRAP_no_segment,&segment_not_present);
@@ -750,6 +749,7 @@ void __init trap_init(void)
     set_intr_gate(TRAP_deferred_nmi,&nmi);
 
 #if defined(__i386__)
+    set_task_gate(TRAP_double_fault,__DOUBLEFAULT_TSS_ENTRY<<3);
     _set_gate(idt_table+HYPERCALL_VECTOR, 14, 1, &hypercall);
 #elif defined(__x86_64__)
     _set_gate(idt_table+HYPERCALL_VECTOR, 14, 3, &hypercall);

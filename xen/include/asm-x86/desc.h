@@ -4,14 +4,6 @@
 
 #define LDT_ENTRY_SIZE 8
 
-#define __DOUBLEFAULT_TSS_ENTRY FIRST_RESERVED_GDT_ENTRY
-
-#define __FIRST_TSS_ENTRY (FIRST_RESERVED_GDT_ENTRY + 8)
-#define __FIRST_LDT_ENTRY (__FIRST_TSS_ENTRY + 1)
-
-#define __TSS(n) (((n)<<1) + __FIRST_TSS_ENTRY)
-#define __LDT(n) (((n)<<1) + __FIRST_LDT_ENTRY)
-
 #define load_TR(n)  __asm__ __volatile__ ("ltr  %%ax" : : "a" (__TSS(n)<<3) )
 
 /*
@@ -44,6 +36,12 @@ struct desc_struct {
 
 #if defined(__x86_64__)
 
+#define __FIRST_TSS_ENTRY (FIRST_RESERVED_GDT_ENTRY + 8)
+#define __FIRST_LDT_ENTRY (__FIRST_TSS_ENTRY + 2)
+
+#define __TSS(n) (((n)<<2) + __FIRST_TSS_ENTRY)
+#define __LDT(n) (((n)<<2) + __FIRST_LDT_ENTRY)
+
 #define VALID_CODESEL(_s) ((_s) == FLAT_RING3_CS64 || VALID_SEL(_s))
 
 typedef struct {
@@ -63,9 +61,27 @@ do {                                                     \
         ((unsigned long)(addr) >> 32);                   \
 } while (0)
 
-#define _set_tssldt_desc(n,addr,limit,type) ((void)0)
+#define _set_tssldt_desc(desc,addr,limit,type)           \
+do {                                                     \
+    (desc)[0].a =                                        \
+        ((u32)(addr) << 16) | ((u32)(limit) & 0xFFFF);   \
+    (desc)[0].b =                                        \
+        ((u32)(addr) & 0xFF000000U) |                    \
+        ((u32)(type) << 8) | 0x8000U |                   \
+        (((u32)(addr) & 0x00FF0000U) >> 16);             \
+    (desc)[1].a = (u32)(((unsigned long)(addr)) >> 32);  \
+    (desc)[1].b = 0;                                     \
+} while (0)
 
 #elif defined(__i386__)
+
+#define __DOUBLEFAULT_TSS_ENTRY FIRST_RESERVED_GDT_ENTRY
+
+#define __FIRST_TSS_ENTRY (FIRST_RESERVED_GDT_ENTRY + 8)
+#define __FIRST_LDT_ENTRY (__FIRST_TSS_ENTRY + 1)
+
+#define __TSS(n) (((n)<<1) + __FIRST_TSS_ENTRY)
+#define __LDT(n) (((n)<<1) + __FIRST_LDT_ENTRY)
 
 #define VALID_CODESEL(_s) ((_s) == FLAT_RING1_CS || VALID_SEL(_s))
 
@@ -93,7 +109,7 @@ __asm__ __volatile__ ("movw %w3,0(%2)\n\t" \
  "movb $0,6(%2)\n\t" \
  "movb %%ah,7(%2)\n\t" \
  "rorl $16,%%eax" \
- : "=m"(*(n)) : "a" (addr), "r"(n), "ir"(limit), "i"(type))
+ : "=m"(*(n)) : "a" (addr), "r"(n), "ir"(limit), "i"(type|0x80))
 
 #endif
 

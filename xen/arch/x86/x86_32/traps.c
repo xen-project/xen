@@ -172,7 +172,7 @@ void __init doublefault_init(void)
     tss->eflags = 2;
     tss->bitmap = IOBMP_INVALID_OFFSET;
     _set_tssldt_desc(gdt_table+__DOUBLEFAULT_TSS_ENTRY,
-                     (int)tss, 235, 0x89);
+                     (unsigned long)tss, 235, 9);
 }
 
 long set_fast_trap(struct exec_domain *p, int idx)

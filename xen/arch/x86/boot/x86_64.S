@@ -196,7 +196,7 @@ ENTRY(gdt_table)
         .quad 0x00affa000000ffff     /* 0x082b ring 3 code, 64-bit mode   */
         .quad 0x00cff2000000ffff     /* 0x0833 ring 3 data                */
         .quad 0x0000000000000000     /* unused                            */
-        .fill 2*NR_CPUS,8,0          /* space for TSS and LDT per CPU     */
+        .fill 4*NR_CPUS,8,0          /* space for TSS and LDT per CPU     */
 
         .word   0
 gdt_descr:
@@ -206,7 +206,7 @@ SYMBOL_NAME(gdt):
 
         .word   0    
 idt_descr:
-        .word   256*8-1
+        .word   256*16-1
 SYMBOL_NAME(idt):
         .quad   SYMBOL_NAME(idt_table)
 

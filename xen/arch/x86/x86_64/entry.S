@@ -32,7 +32,7 @@ restore_all_xen:
         popq  %rsi
         popq  %rdi
         addq  $8,%rsp
-        iret
+        iretq
 
 error_code:
         SAVE_ALL

@@ -91,23 +91,21 @@ EXPORT_SYMBOL(acpi_disabled);
 int phys_proc_id[NR_CPUS];
 int logical_proc_id[NR_CPUS];
 
-#if defined(__i386__)
-
-/* Standard macro to see if a specific flag is changeable */
-static inline int flag_is_changeable_p(u32 flag)
+/* Standard macro to see if a specific flag is changeable. */
+static inline int flag_is_changeable_p(unsigned long flag)
 {
-    u32 f1, f2;
+    unsigned long f1, f2;
 
-    asm("pushfl\n\t"
-        "pushfl\n\t"
-        "popl %0\n\t"
-        "movl %0,%1\n\t"
-        "xorl %2,%0\n\t"
-        "pushl %0\n\t"
-        "popfl\n\t"
-        "pushfl\n\t"
-        "popl %0\n\t"
-        "popfl\n\t"
+    asm("pushf\n\t"
+        "pushf\n\t"
+        "pop %0\n\t"
+        "mov %0,%1\n\t"
+        "xor %2,%0\n\t"
+        "push %0\n\t"
+        "popf\n\t"
+        "pushf\n\t"
+        "pop %0\n\t"
+        "popf\n\t"
         : "=&r" (f1), "=&r" (f2)
         : "ir" (flag));
 
@@ -119,12 +117,6 @@ static int __init have_cpuid_p(void)
 {
     return flag_is_changeable_p(X86_EFLAGS_ID);
 }
-
-#elif defined(__x86_64__)
-
-#define have_cpuid_p() (1)
-
-#endif
 
 void __init get_cpu_vendor(struct cpuinfo_x86 *c)
 {
@@ -306,38 +298,40 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 unsigned long cpu_initialized;
 void __init cpu_init(void)
 {
-#if defined(__i386__) /* XXX */
     int nr = smp_processor_id();
-    struct tss_struct * t = &init_tss[nr];
+    struct tss_struct *t = &init_tss[nr];
 
     if ( test_and_set_bit(nr, &cpu_initialized) )
         panic("CPU#%d already initialized!!!\n", nr);
     printk("Initializing CPU#%d\n", nr);
 
-    t->bitmap = IOBMP_INVALID_OFFSET;
-    memset(t->io_bitmap, ~0, sizeof(t->io_bitmap));
-
     /* Set up GDT and IDT. */
     SET_GDT_ENTRIES(current, DEFAULT_GDT_ENTRIES);
     SET_GDT_ADDRESS(current, DEFAULT_GDT_ADDRESS);
-    __asm__ __volatile__("lgdt %0": "=m" (*current->mm.gdt));
-    __asm__ __volatile__("lidt %0": "=m" (idt_descr));
+    __asm__ __volatile__ ( "lgdt %0" : "=m" (*current->mm.gdt) );
+    __asm__ __volatile__ ( "lidt %0" : "=m" (idt_descr) );
 
     /* No nested task. */
-    __asm__("pushfl ; andl $0xffffbfff,(%esp) ; popfl");
+    __asm__ __volatile__ ( "pushf ; andw $0xbfff,(%"__OP"sp) ; popf" );
 
     /* Ensure FPU gets initialised for each domain. */
     stts();
 
     /* Set up and load the per-CPU TSS and LDT. */
+    t->bitmap = IOBMP_INVALID_OFFSET;
+    memset(t->io_bitmap, ~0, sizeof(t->io_bitmap));
+#if defined(__i386__)
     t->ss0  = __HYPERVISOR_DS;
     t->esp0 = get_stack_top();
+#elif defined(__x86_64__)
+    t->rsp0 = get_stack_top();
+#endif
     set_tss_desc(nr,t);
     load_TR(nr);
-    __asm__ __volatile__("lldt %%ax"::"a" (0));
+    __asm__ __volatile__ ( "lldt %%ax" : : "a" (0) );
 
     /* Clear all 6 debug registers. */
-#define CD(register) __asm__("movl %0,%%db" #register ::"r"(0) );
+#define CD(register) __asm__ ( "mov %0,%%db" #register : : "r" (0UL) );
     CD(0); CD(1); CD(2); CD(3); /* no db4 and db5 */; CD(6); CD(7);
 #undef CD
 
@@ -345,7 +339,6 @@ void __init cpu_init(void)
     write_ptbase(&current->mm);
 
     init_idle_task();
-#endif
 }
 
 static void __init do_initcalls(void)

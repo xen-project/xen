@@ -168,7 +168,7 @@ void __init init_frametable(void)
 
 void arch_init_memory(void)
 {
-#ifdef __i386__
+#ifdef __i386__ /* XXX */
     unsigned long i;
 
     /*

@@ -410,8 +410,8 @@ void __init start_secondary(void)
      * now safe to make ourselves a private copy.
      */
     idt_tables[cpu] = xmalloc_array(idt_entry_t, IDT_ENTRIES);
-    memcpy(idt_tables[cpu], idt_table, IDT_ENTRIES*8);
-    *(unsigned short *)(&idt_load[0]) = (IDT_ENTRIES*8)-1;
+    memcpy(idt_tables[cpu], idt_table, IDT_ENTRIES*sizeof(idt_entry_t));
+    *(unsigned short *)(&idt_load[0]) = (IDT_ENTRIES*sizeof(idt_entry_t))-1;
     *(unsigned long  *)(&idt_load[2]) = (unsigned long)idt_tables[cpu];
     __asm__ __volatile__ ( "lidt %0" : "=m" (idt_load) );
 

@@ -30,7 +30,7 @@
  * NB. The reserved range is inclusive (that is, both FIRST_RESERVED_GDT_ENTRY
  * and LAST_RESERVED_GDT_ENTRY are reserved).
  */
-#define NR_RESERVED_GDT_ENTRIES    40 
+#define NR_RESERVED_GDT_ENTRIES    72
 #define FIRST_RESERVED_GDT_ENTRY   256
 #define LAST_RESERVED_GDT_ENTRY    \
   (FIRST_RESERVED_GDT_ENTRY + NR_RESERVED_GDT_ENTRIES - 1)

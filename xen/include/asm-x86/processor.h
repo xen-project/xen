@@ -379,7 +379,7 @@ struct tss_struct {
     u8  io_bitmap[IOBMP_BYTES+1];
     /* Pads the TSS to be cacheline-aligned (total size is 0x2080). */
     u8 __cacheline_filler[23];
-};
+} __cacheline_aligned PACKED;
 
 struct trap_bounce {
     unsigned long  error_code;

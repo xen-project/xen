@@ -498,7 +498,7 @@ int arch_final_setup_guestos(struct exec_domain *d, full_execution_context_t *c)
     return 0;
 }
 
-#if defined(__i386__)
+#if defined(__i386__) /* XXX */
 
 void new_thread(struct exec_domain *d,
                 unsigned long start_pc,
