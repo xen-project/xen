@@ -148,6 +148,8 @@
 40f56238a8iOVDEoostsbun_sy2i4g linux-2.6.9-xen-sparse/arch/xen/i386/kernel/process.c
 40f56238YQIJoYG2ehDGEcdTgLmGbg linux-2.6.9-xen-sparse/arch/xen/i386/kernel/setup.c
 40f56238nWMQg7CKbyTy0KJNvCzbtg linux-2.6.9-xen-sparse/arch/xen/i386/kernel/signal.c
+41811cac4lkCB-fHir6CcxuEJ2pGsQ linux-2.6.9-xen-sparse/arch/xen/i386/kernel/smp.c
+41811ca9mbGpqBrZVrUGEiv8CTV3ng linux-2.6.9-xen-sparse/arch/xen/i386/kernel/smpboot.c
 40f56238UL9uv78ODDzMwLL9yryeFw linux-2.6.9-xen-sparse/arch/xen/i386/kernel/sysenter.c
 40f56238qVGkpO_ycnQA8k03kQzAgA linux-2.6.9-xen-sparse/arch/xen/i386/kernel/time.c
 40f56238NzTgeO63RGoxHrW5NQeO3Q linux-2.6.9-xen-sparse/arch/xen/i386/kernel/timers/Makefile
@@ -175,6 +177,7 @@
 412dfae9eA3_6e6bCGUtg1mj8b56fQ linux-2.6.9-xen-sparse/arch/xen/kernel/gnttab.c
 40f562392LBhwmOxVPsYdkYXMxI_ZQ linux-2.6.9-xen-sparse/arch/xen/kernel/reboot.c
 414c113396tK1HTVeUalm3u-1DF16g linux-2.6.9-xen-sparse/arch/xen/kernel/skbuff.c
+418f90e4lGdeJK9rmbOB1kN-IKSjsQ linux-2.6.9-xen-sparse/arch/xen/kernel/smp.c
 3f68905c5eiA-lBMQSvXLMWS1ikDEA linux-2.6.9-xen-sparse/arch/xen/kernel/xen_proc.c
 41261688yS8eAyy-7kzG4KBs0xbYCA linux-2.6.9-xen-sparse/drivers/Makefile
 4108f5c1WfTIrs0HZFeV39sttekCTw linux-2.6.9-xen-sparse/drivers/char/mem.c
@@ -216,6 +219,7 @@
 40f5623aKXkBBxgpLx2NcvkncQ1Yyw linux-2.6.9-xen-sparse/include/asm-xen/asm-i386/mach-xen/irq_vectors.h
 40f5623aDMCsWOFO0jktZ4e8sjwvEg linux-2.6.9-xen-sparse/include/asm-xen/asm-i386/mach-xen/setup_arch_post.h
 40f5623arsFXkGdPvIqvFi3yFXGR0Q linux-2.6.9-xen-sparse/include/asm-xen/asm-i386/mach-xen/setup_arch_pre.h
+41811f07Iri9hrvs97t-baxmhOwWDQ linux-2.6.9-xen-sparse/include/asm-xen/asm-i386/mach-xen/smpboot_hooks.h
 4120f807GCO0uqsLqdZj9csxR1Wthw linux-2.6.9-xen-sparse/include/asm-xen/asm-i386/mmu_context.h
 40f5623aFTyFTR-vdiA-KaGxk5JOKQ linux-2.6.9-xen-sparse/include/asm-xen/asm-i386/msr.h
 40f5623adgjZq9nAgCt0IXdWl7udSA linux-2.6.9-xen-sparse/include/asm-xen/asm-i386/page.h

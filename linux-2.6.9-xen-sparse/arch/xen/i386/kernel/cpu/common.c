@@ -604,3 +604,9 @@ void __init cpu_init (void)
 	current->used_math = 0;
 	mxcsr_feature_mask_init();
 }
+
+
+int get_smp_processor_id(void)
+{
+	return smp_processor_id();
+}

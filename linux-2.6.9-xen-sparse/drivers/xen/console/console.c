@@ -238,7 +238,7 @@ void xencons_force_flush(void)
      * We use dangerous control-interface functions that require a quiescent
      * system and no interrupts. Try to ensure this with a global cli().
      */
-    cli();
+    local_irq_disable();	/* XXXsmp */
 
     /* Spin until console data is flushed through to the domain controller. */
     while ( (wc != wp) && !ctrl_if_transmitter_empty() )

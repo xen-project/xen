@@ -1,7 +1,6 @@
 #ifndef __ASM_MSR_H
 #define __ASM_MSR_H
 
-#include <linux/smp.h>
 #include <asm-xen/hypervisor.h>
 
 /*
@@ -10,12 +9,14 @@
  * pointer indirection), this allows gcc to optimize better
  */
 
+extern int get_smp_processor_id(void);
+
 #define rdmsr(_msr,_val1,_val2) do { \
 	dom0_op_t op; \
 	op.cmd = DOM0_MSR; \
 	op.u.msr.write = 0; \
 	op.u.msr.msr = (_msr); \
-	op.u.msr.cpu_mask = (1 << smp_processor_id()); \
+	op.u.msr.cpu_mask = (1 << get_smp_processor_id()); \
 	HYPERVISOR_dom0_op(&op); \
 	(_val1) = op.u.msr.out1; \
 	(_val2) = op.u.msr.out2; \
@@ -25,7 +26,7 @@
 	dom0_op_t op; \
 	op.cmd = DOM0_MSR; \
 	op.u.msr.write = 1; \
-	op.u.msr.cpu_mask = (1 << smp_processor_id()); \
+	op.u.msr.cpu_mask = (1 << get_smp_processor_id()); \
 	op.u.msr.msr = (_msr); \
 	op.u.msr.in1 = (_val1); \
 	op.u.msr.in2 = (_val2); \

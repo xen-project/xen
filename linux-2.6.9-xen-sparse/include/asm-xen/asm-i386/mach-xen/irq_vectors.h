@@ -77,7 +77,6 @@
  * the usable vector space is 0x20-0xff (224 vectors)
  */
 
-#if 0
 /*
  * The maximum number of vectors supported by i386 processors
  * is limited to 256. For processors other than i386, NR_VECTORS
@@ -85,6 +84,7 @@
  */
 #define NR_VECTORS 256
 
+#if 0
 #ifdef CONFIG_PCI_USE_VECTOR
 #define NR_IRQS FIRST_SYSTEM_VECTOR
 #define NR_IRQ_VECTORS NR_IRQS

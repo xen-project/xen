@@ -401,6 +401,11 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 		delta -= NS_PER_TICK;
 		processed_system_time += NS_PER_TICK;
 		do_timer(regs);
+#ifdef CONFIG_SMP
+		if (regs)	/* XXXsmp this needs to be done on every cpu
+				 * - every tick - maybe  */
+		    update_process_times(user_mode(regs));
+#endif
 		if (regs)
 		    profile_tick(CPU_PROFILING, regs);
 	}
