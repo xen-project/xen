@@ -302,42 +302,55 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 
 #define safe_halt()             ((void)0)
 
-/*
- * Note the use of synch_*_bit() operations in the following. These operations
- * ensure correct serialisation of checks and updates w.r.t. Xen executing on
- * a different CPU.
+/* 
+ * The use of 'barrier' in the following reflects their use as local-lock
+ * operations. Reentrancy must be prevented (e.g., __cli()) /before/ following
+ * critical operations are executed. All critical operatiosn must complete
+ * /before/ reentrancy is permitted (e.g., __sti()). Alpha architecture also
+ * includes these barriers, for example.
  */
 
 #define __cli()                                                               \
 do {                                                                          \
-    synch_set_bit(0, &HYPERVISOR_shared_info->evtchn_upcall_mask);            \
+    HYPERVISOR_shared_info->vcpu_data[0].evtchn_upcall_mask = 1;              \
+    barrier();                                                                \
 } while (0)
 
 #define __sti()                                                               \
 do {                                                                          \
     shared_info_t *_shared = HYPERVISOR_shared_info;                          \
-    synch_clear_bit(0, &_shared->evtchn_upcall_mask);                         \
-    if ( unlikely(synch_test_bit(0, &_shared->evtchn_upcall_pending)) )       \
+    barrier();                                                                \
+    _shared->vcpu_data[0].evtchn_upcall_mask = 0;                             \
+    if ( unlikely(_shared->vcpu_data[0].evtchn_upcall_pending) )              \
         evtchn_do_upcall(NULL);                                               \
 } while (0)
 
 #define __save_flags(x)                                                       \
 do {                                                                          \
-    (x) = synch_test_bit(0, &HYPERVISOR_shared_info->evtchn_upcall_mask);     \
+    (x) = HYPERVISOR_shared_info->vcpu_data[0].evtchn_upcall_mask;            \
 } while (0)
 
-#define __restore_flags(x) do { if (x) __cli(); else __sti(); } while (0)
+#define __restore_flags(x)                                                    \
+do {                                                                          \
+    shared_info_t *_shared = HYPERVISOR_shared_info;                          \
+    barrier();                                                                \
+    if ( (_shared->vcpu_data[0].evtchn_upcall_mask = x) == 0 )                \
+        if ( unlikely(_shared->vcpu_data[0].evtchn_upcall_pending) )          \
+            evtchn_do_upcall(NULL);                                           \
+} while (0)
 
 #define __save_and_cli(x)                                                     \
 do {                                                                          \
-    (x) = synch_test_and_set_bit(                                             \
-        0, &HYPERVISOR_shared_info->evtchn_upcall_mask);                      \
+    (x) = HYPERVISOR_shared_info->vcpu_data[0].evtchn_upcall_mask;            \
+    HYPERVISOR_shared_info->vcpu_data[0].evtchn_upcall_mask = 1;              \
+    barrier();                                                                \
 } while (0)
 
 #define __save_and_sti(x)                                                     \
 do {                                                                          \
-    (x) = synch_test_and_clear_bit(                                           \
-        0, &HYPERVISOR_shared_info->evtchn_upcall_mask);                      \
+    barrier();                                                                \
+    (x) = HYPERVISOR_shared_info->vcpu_data[0].evtchn_upcall_mask;            \
+    HYPERVISOR_shared_info->vcpu_data[0].evtchn_upcall_mask = 0;              \
 } while (0)
 
 #define local_irq_save(x)       __save_and_cli(x)

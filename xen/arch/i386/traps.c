@@ -206,7 +206,7 @@ static inline void do_trap(int trapnr, char *str,
     gtb->cs         = ti->cs;
     gtb->eip        = ti->address;
     if ( TI_GET_IF(ti) )
-        set_bit(0, &p->shared_info->evtchn_upcall_mask);
+        p->shared_info->vcpu_data[0].evtchn_upcall_mask = 1;
     return; 
 
  fault_in_hypervisor:
@@ -277,9 +277,7 @@ asmlinkage void do_int3(struct pt_regs *regs, long error_code)
     gtb->cs         = ti->cs;
     gtb->eip        = ti->address;
     if ( TI_GET_IF(ti) )
-        set_bit(0, &p->shared_info->evtchn_upcall_mask);
-    return;
-
+        p->shared_info->vcpu_data[0].evtchn_upcall_mask = 1;
 }
 
 asmlinkage void do_double_fault(void)
@@ -353,7 +351,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
     gtb->cs         = ti->cs;
     gtb->eip        = ti->address;
     if ( TI_GET_IF(ti) )
-        set_bit(0, &p->shared_info->evtchn_upcall_mask);
+        p->shared_info->vcpu_data[0].evtchn_upcall_mask = 1;
     return; 
 
  fault_in_hypervisor:
@@ -452,7 +450,7 @@ asmlinkage void do_general_protection(struct pt_regs *regs, long error_code)
     gtb->cs         = ti->cs;
     gtb->eip        = ti->address;
     if ( TI_GET_IF(ti) )
-        set_bit(0, &p->shared_info->evtchn_upcall_mask);
+        p->shared_info->vcpu_data[0].evtchn_upcall_mask = 1;
     return;
 
  gp_in_kernel:

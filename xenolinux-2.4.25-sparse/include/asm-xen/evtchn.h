@@ -42,10 +42,12 @@ static inline void unmask_evtchn(int port)
      * a real IO-APIC we 'lose the interrupt edge' if the channel is masked.
      */
     if (  synch_test_bit        (port,    &s->evtchn_pending[0]) && 
-         !synch_test_and_set_bit(port>>5, &s->evtchn_pending_sel) &&
-         !synch_test_and_set_bit(0,       &s->evtchn_upcall_pending) &&
-         !synch_test_bit        (0,       &s->evtchn_upcall_mask) )
-        evtchn_do_upcall(NULL);
+         !synch_test_and_set_bit(port>>5, &s->evtchn_pending_sel) )
+    {
+        s->vcpu_data[0].evtchn_upcall_pending = 1;
+        if ( !s->vcpu_data[0].evtchn_upcall_mask )
+            evtchn_do_upcall(NULL);
+    }
 }
 
 static inline void clear_evtchn(int port)

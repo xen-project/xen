@@ -297,10 +297,10 @@ static inline long schedule_timeout(long timeout)
     return 0;
 }
 
-#define signal_pending(_p) \
-    (((_p)->hyp_events != 0) ||                                 \
-     (test_bit(0, &(_p)->shared_info->evtchn_upcall_pending) && \
-      !test_bit(0, &(_p)->shared_info->evtchn_upcall_mask)))
+#define signal_pending(_p)                                      \
+    ( (_p)->hyp_events ||                                       \
+      ((_p)->shared_info->vcpu_data[0].evtchn_upcall_pending && \
+       !(_p)->shared_info->vcpu_data[0].evtchn_upcall_mask) )
 
 void domain_init(void);
 
