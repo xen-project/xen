@@ -37,6 +37,7 @@ struct e820entry {
 int nr_mods;
 module_t *mod;
 
+void init_vga(void);
 void init_serial(void);
 void start_of_day(void);
 
@@ -77,6 +78,7 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
      * rate is known. Any messages before that will be output using the
      * seetings of the bootloader, for example. Maybe okay for error msgs...
      */
+    init_vga();
     cls();
 
     if ( magic != MULTIBOOT_BOOTLOADER_MAGIC )
@@ -243,8 +245,56 @@ void putchar_serial(unsigned char c)
 }
 
 
+/* This is actually code from vgaHWRestore in an old version of XFree86 :-) */
+void init_vga(void)
+{
+    /* The following VGA state was saved from a chip in text mode 3. */
+    static unsigned char regs[] = {
+        /* Sequencer registers */
+        0x03, 0x00, 0x03, 0x00, 0x02,
+        /* CRTC registers */
+        0x5f, 0x4f, 0x50, 0x82, 0x55, 0x81, 0xbf, 0x1f, 0x00, 0x4f, 0x20,
+        0x0e, 0x00, 0x00, 0x01, 0xe0, 0x9c, 0x8e, 0x8f, 0x28, 0x1f, 0x96,
+        0xb9, 0xa3, 0xff,
+        /* Graphic registers */
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x0e, 0x00, 0xff,
+        /* Attribute registers */
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x14, 0x07, 0x38, 0x39, 0x3a,
+        0x3b, 0x3c, 0x3d, 0x3e, 0x3f, 0x0c, 0x00, 0x0f, 0x08, 0x00
+    };
+
+    int i, j = 0;
+    volatile unsigned char tmp;
+
+    tmp = inb(0x3da);
+    outb(0x00, 0x3c0);
+
+    for ( i = 0; i < 5;  i++ )
+        outw((regs[j++] << 8) | i, 0x3c4);
+  
+    /* Ensure CRTC registers 0-7 are unlocked by clearing bit 7 of CRTC[17]. */
+    outw(((regs[5+17] & 0x7F) << 8) | 17, 0x3d4);
+    
+    for ( i = 0; i < 25; i++ ) 
+        outw((regs[j++] << 8) | i, 0x3d4);
+    
+    for ( i = 0; i < 9;  i++ )
+        outw((regs[j++] << 8) | i, 0x3ce);
+    
+    for ( i = 0; i < 21; i++ )
+    {
+        tmp = inb(0x3da);
+        outb(i, 0x3c0); 
+        outb(regs[j++], 0x3c0);
+    }
+
+    tmp = inb(0x3da);
+    outb(0x20, 0x3c0);
+}
+
+
 /* Clear the screen and initialize VIDEO, XPOS and YPOS.  */
-void cls (void)
+void cls(void)
 {
     int i;
 
