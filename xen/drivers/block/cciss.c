@@ -3415,10 +3415,10 @@ static struct pci_driver cciss_pci_driver = {
 */
 int __init cciss_init(void)
 {
-
-	printk(KERN_INFO DRIVER_NAME "\n");
-	/* Register for out PCI devices */
-	return pci_module_init(&cciss_pci_driver);
+	int ret = pci_module_init(&cciss_pci_driver);
+	if (ret >= 0)
+		printk(KERN_INFO DRIVER_NAME "\n");
+	return ret;
 }
 
 EXPORT_NO_SYMBOLS;
