@@ -2050,6 +2050,7 @@ static int resync_all(struct domain *d, u32 stype)
             }
             break;
         case PGT_l2_shadow:
+            max = -1;
             for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++ )
             {
                 if ( !is_guest_l2_slot(i) && !external )
@@ -2065,17 +2066,18 @@ static int resync_all(struct domain *d, u32 stype)
                     //
                     // snapshot[i] = new_pde;
                 }
+                if ( new_pde != 0 )
+                    max = i;
 
                 // XXX - This hack works for linux guests.
                 //       Need a better solution long term.
                 if ( !(new_pde & _PAGE_PRESENT) && unlikely(new_pde != 0) &&
                      !unshadow &&
                      (frame_table[smfn].u.inuse.type_info & PGT_pinned) )
-                {
-                    perfc_incrc(unshadow_l2_count);
                     unshadow = 1;
-                }
             }
+            if ( max == -1 )
+                unshadow = 1;
             break;
         default:
             for ( i = 0; i < L2_PAGETABLE_ENTRIES; i++ )
@@ -2102,7 +2104,10 @@ static int resync_all(struct domain *d, u32 stype)
         unmap_domain_mem(guest);
 
         if ( unlikely(unshadow) )
+        {
+            perfc_incrc(unshadow_l2_count);
             shadow_unpin(smfn);
+        }
     }
 
     return need_flush;
