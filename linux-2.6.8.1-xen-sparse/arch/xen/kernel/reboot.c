@@ -64,11 +64,19 @@ static void __do_suspend(void)
 #ifdef CONFIG_XEN_BLKDEV_FRONTEND
     extern void blkdev_suspend(void);
     extern void blkdev_resume(void);
+#else
+#define blkdev_suspend() do{}while(0)
+#define blkdev_resume()  do{}while(0)
 #endif
+
 #ifdef CONFIG_XEN_NETDEV_FRONTEND
     extern void netif_suspend(void);
-    extern void netif_resume(void);    
+    extern void netif_resume(void);  
+#else
+#define netif_suspend() do{}while(0)
+#define netif_resume()  do{}while(0)
 #endif
+
     extern void time_suspend(void);
     extern void time_resume(void);
     extern unsigned long max_pfn;
@@ -82,13 +90,9 @@ static void __do_suspend(void)
 
     __cli();
 
-#ifdef CONFIG_XEN_NETDEV_FRONTEND
     netif_suspend();
-#endif
 
-#ifdef CONFIG_XEN_BLKDEV_FRONTEND
     blkdev_suspend();
-#endif
 
     time_suspend();
 
@@ -139,13 +143,9 @@ static void __do_suspend(void)
 
     time_resume();
 
-#ifdef CONFIG_XEN_BLKDEV_FRONTEND
     blkdev_resume();
-#endif
 
-#ifdef CONFIG_XEN_NETDEV_FRONTEND
     netif_resume();
-#endif
 
     __sti();
 

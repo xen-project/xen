@@ -26,16 +26,48 @@
 
 typedef unsigned char byte; /* from linux/ide.h */
 
+/* Control whether runtime update of vbds is enabled. */
+#define ENABLE_VBD_UPDATE 1
+
+#if ENABLE_VBD_UPDATE
+static void vbd_update(void);
+#else
+static void vbd_update(void){};
+#endif
+
 #define BLKIF_STATE_CLOSED       0
 #define BLKIF_STATE_DISCONNECTED 1
 #define BLKIF_STATE_CONNECTED    2
+
+static char *blkif_state_name[] = {
+    [BLKIF_STATE_CLOSED]       = "closed",
+    [BLKIF_STATE_DISCONNECTED] = "disconnected",
+    [BLKIF_STATE_CONNECTED]    = "connected",
+};
+
+static char * blkif_status_name[] = {
+    [BLKIF_INTERFACE_STATUS_CLOSED]       = "closed",
+    [BLKIF_INTERFACE_STATUS_DISCONNECTED] = "disconnected",
+    [BLKIF_INTERFACE_STATUS_CONNECTED]    = "connected",
+    [BLKIF_INTERFACE_STATUS_CHANGED]      = "changed",
+};
+
+#if 1
+#define dprintf(fmt, args...) \
+printk(KERN_ALERT "[XEN:%s:%s:%d] " fmt, __FUNCTION__, __FILE__, __LINE__, ##args)
+#endif
+
+#define WPRINTK(fmt, args...) printk(KERN_WARNING "[XEN] " fmt, ##args)
+
+static int blkif_handle = 0;
 static unsigned int blkif_state = BLKIF_STATE_CLOSED;
-static unsigned int blkif_evtchn, blkif_irq;
+static unsigned int blkif_evtchn = 0;
+static unsigned int blkif_irq = 0;
 
 static int blkif_control_rsp_valid;
 static blkif_response_t blkif_control_rsp;
 
-static blkif_ring_t *blk_ring;
+static blkif_ring_t *blk_ring = NULL;
 static BLKIF_RING_IDX resp_cons; /* Response consumer for comms ring. */
 static BLKIF_RING_IDX req_prod;  /* Private request producer.         */
 
@@ -92,6 +124,13 @@ static inline void ADD_ID_TO_FREELIST( unsigned long id )
 
 __initcall(xlblk_init);
 
+#if ENABLE_VBD_UPDATE
+static void vbd_update()
+{
+    dprintf(">\n");
+    dprintf("<\n");
+}
+#endif /* ENABLE_VBD_UPDATE */
 
 static void kick_pending_request_queues(void)
 {
@@ -131,10 +170,7 @@ int blkif_release(struct inode *inode, struct file *filep)
      * Update of usage count is protected by a per-device semaphore.
      */
     if (--di->mi->usage == 0) {
-#if 0
-        update_tq.routine = update_vbds_task;
-        schedule_task(&update_tq);
-#endif
+        vbd_update();
     }
 
     return 0;
@@ -415,19 +451,31 @@ static int nr_pending;
 
 #define blkif_io_lock io_request_lock
 
+/*============================================================================*/
+#if ENABLE_VBD_UPDATE
+
 /*
  * blkif_update_int/update-vbds_task - handle VBD update events.
  *  Schedule a task for keventd to run, which will update the VBDs and perform 
  *  the corresponding updates to our view of VBD state.
  */
-
-#if 0
-static struct tq_struct update_tq;
 static void update_vbds_task(void *unused)
 { 
     xlvbd_update_vbds();
 }
-#endif
+
+static void vbd_update(void)
+{
+    static struct tq_struct update_tq;
+    dprintf(">\n");
+    update_tq.routine = update_vbds_task;
+    schedule_task(&update_tq);
+    dprintf("<\n");
+}
+
+#endif /* ENABLE_VBD_UPDATE */
+/*============================================================================*/
+
 
 static void kick_pending_request_queues(void)
 {
@@ -490,12 +538,8 @@ int blkif_release(struct inode *inode, struct file *filep)
      * When usage drops to zero it may allow more VBD updates to occur.
      * Update of usage count is protected by a per-device semaphore.
      */
-    if ( --disk->usage == 0 )
-    {
-#if 0
-        update_tq.routine = update_vbds_task;
-        schedule_task(&update_tq);
-#endif
+    if ( --disk->usage == 0 ) {
+        vbd_update();
     }
 
     return 0;
@@ -937,8 +981,9 @@ static inline void translate_req_to_pfn(blkif_request_t *xreq,
     /* preserve id */
     xreq->sector_number = req->sector_number;
 
-    for ( i = 0; i < req->nr_segments; i++ )
+    for ( i = 0; i < req->nr_segments; i++ ){
         xreq->frame_and_sects[i] = machine_to_phys(req->frame_and_sects[i]);
+    }
 }
 
 static inline void translate_req_to_mfn(blkif_request_t *xreq,
@@ -952,8 +997,9 @@ static inline void translate_req_to_mfn(blkif_request_t *xreq,
     xreq->id            = req->id;   /* copy id (unlike above) */
     xreq->sector_number = req->sector_number;
 
-    for ( i = 0; i < req->nr_segments; i++ )
+    for ( i = 0; i < req->nr_segments; i++ ){
         xreq->frame_and_sects[i] = phys_to_machine(req->frame_and_sects[i]);
+    }
 }
 
 
@@ -1010,153 +1056,230 @@ void blkif_control_send(blkif_request_t *req, blkif_response_t *rsp)
 }
 
 
-static void blkif_status_change(blkif_fe_interface_status_t *status)
+/* Send a driver status notification to the domain controller. */
+static void send_driver_status(int ok){
+    ctrl_msg_t cmsg = {
+        .type    = CMSG_BLKIF_FE,
+        .subtype = CMSG_BLKIF_FE_DRIVER_STATUS,
+        .length  = sizeof(blkif_fe_driver_status_t),
+    };
+    blkif_fe_driver_status_t *msg = (void*)cmsg.msg;
+    
+    msg->status = (ok ? BLKIF_DRIVER_STATUS_UP : BLKIF_DRIVER_STATUS_DOWN);
+
+    ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
+}
+
+/* Tell the controller to bring up the interface. */
+static void blkif_send_interface_connect(void){
+    ctrl_msg_t cmsg = {
+        .type    = CMSG_BLKIF_FE,
+        .subtype = CMSG_BLKIF_FE_INTERFACE_CONNECT,
+        .length  = sizeof(blkif_fe_interface_connect_t),
+    };
+    blkif_fe_interface_connect_t *msg = (void*)cmsg.msg;
+    
+    msg->handle      = 0;
+    msg->shmem_frame = (virt_to_machine(blk_ring) >> PAGE_SHIFT);
+    
+    ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
+}
+
+static void blkif_free(void)
 {
-    ctrl_msg_t                   cmsg;
-    blkif_fe_interface_connect_t up;
-    long rc;
 
-/*     if ( status->handle != 0 ) */
-/*     { */
-/*         printk(KERN_WARNING "Status change on unsupported blkif %d\n", */
-/*                status->handle); */
-/*         return; */
-/*     } */
+    printk(KERN_INFO "[XEN] Recovering virtual block device driver\n");
+            
+    /* Prevent new requests being issued until we fix things up. */
+    spin_lock_irq(&blkif_io_lock);
+    recovery = 1;
+    blkif_state = BLKIF_STATE_DISCONNECTED;
+    spin_unlock_irq(&blkif_io_lock);
 
-    switch ( status->status )
-    {
+    /* Free resources associated with old device channel. */
+    if(blk_ring){
+        free_page((unsigned long)blk_ring);
+        blk_ring = 0;
+    }
+    free_irq(blkif_irq, NULL);
+    blkif_irq = 0;
+    
+    unbind_evtchn_from_irq(blkif_evtchn);
+    blkif_evtchn = 0;
+}
+
+static void blkif_close(void){
+}
+
+/* Move from CLOSED to DISCONNECTED state. */
+static void blkif_disconnect(void)
+{
+    if(blk_ring) free_page((unsigned long)blk_ring);
+    blk_ring = (blkif_ring_t *)__get_free_page(GFP_KERNEL);
+    blk_ring->req_prod = blk_ring->resp_prod = resp_cons = req_prod = 0;
+    blkif_state  = BLKIF_STATE_DISCONNECTED;
+    blkif_send_interface_connect();
+}
+
+static void blkif_reset(void)
+{
+    printk(KERN_INFO "[XEN] Recovering virtual block device driver\n");
+    blkif_free();
+    blkif_disconnect();
+}
+
+static void blkif_recover(void)
+{
+
+    int i;
+
+    /* Hmm, requests might be re-ordered when we re-issue them.
+     * This will need to be fixed once we have barriers */
+
+    /* Stage 1 : Find active and move to safety. */
+    for ( i = 0; i < BLKIF_RING_SIZE; i++ ) {
+        if ( rec_ring[i].id >= PAGE_OFFSET ) {
+            translate_req_to_mfn(
+                &blk_ring->ring[req_prod].req, &rec_ring[i]);
+            req_prod++;
+        }
+    }
+
+    printk(KERN_ALERT"blkfront: recovered %d descriptors\n",req_prod);
+	    
+    /* Stage 2 : Set up shadow list. */
+    for ( i = 0; i < req_prod; i++ ) {
+        rec_ring[i].id = blk_ring->ring[i].req.id;		
+        blk_ring->ring[i].req.id = i;
+        translate_req_to_pfn(&rec_ring[i], &blk_ring->ring[i].req);
+    }
+
+    /* Stage 3 : Set up free list. */
+    for ( ; i < BLKIF_RING_SIZE; i++ ){
+        rec_ring[i].id = i+1;
+    }
+    rec_ring_free = req_prod;
+    rec_ring[BLKIF_RING_SIZE-1].id = 0x0fffffff;
+
+    /* blk_ring->req_prod will be set when we flush_requests().*/
+    wmb();
+
+    /* Switch off recovery mode, using a memory barrier to ensure that
+     * it's seen before we flush requests - we don't want to miss any
+     * interrupts. */
+    recovery = 0;
+    wmb();
+
+    /* Kicks things back into life. */
+    flush_requests();
+
+    /* Now safe to left other peope use interface. */
+    blkif_state = BLKIF_STATE_CONNECTED;
+}
+
+static void blkif_connect(blkif_fe_interface_status_t *status)
+{
+    int err = 0;
+
+    blkif_evtchn = status->evtchn;
+    blkif_irq    = bind_evtchn_to_irq(blkif_evtchn);
+
+    err = request_irq(blkif_irq, blkif_int, SA_SAMPLE_RANDOM, "blkif", NULL);
+    if(err){
+        printk(KERN_ALERT "[XEN] blkfront request_irq failed (err=%d)\n", err);
+        return;
+    }
+
+    if ( recovery ) {
+        blkif_recover();
+    } else {
+        /* Transition to connected in case we need to do 
+         *  a partition probe on a whole disk. */
+        blkif_state = BLKIF_STATE_CONNECTED;
+        
+        /* Probe for discs attached to the interface. */
+        xlvbd_init();
+    }
+    
+    /* Kick pending requests. */
+    spin_lock_irq(&blkif_io_lock);
+    kick_pending_request_queues();
+    spin_unlock_irq(&blkif_io_lock);
+}
+
+static void unexpected(blkif_fe_interface_status_t *status)
+{
+    WPRINTK(" Unexpected blkif status %s in state %s\n", 
+           blkif_status_name[status->status],
+           blkif_state_name[blkif_state]);
+}
+
+static void blkif_status(blkif_fe_interface_status_t *status)
+{
+    if (status->handle != blkif_handle) {
+        WPRINTK(" Invalid blkif: handle=%u", status->handle);
+        return;
+    }
+
+    switch (status->status) {
+
     case BLKIF_INTERFACE_STATUS_CLOSED:
-        printk(KERN_WARNING "Unexpected blkif-CLOSED message in state %d\n",
-               blkif_state);
+        switch(blkif_state){
+        case BLKIF_STATE_CLOSED:
+            unexpected(status);
+            break;
+        case BLKIF_STATE_DISCONNECTED:
+        case BLKIF_STATE_CONNECTED:
+            unexpected(status);
+            blkif_close();
+            break;
+        }
         break;
 
     case BLKIF_INTERFACE_STATUS_DISCONNECTED:
-        if ( blkif_state != BLKIF_STATE_CLOSED )
-        {
-            printk(KERN_WARNING "Unexpected blkif-DISCONNECTED message"
-                   " in state %d\n", blkif_state);
-
-            printk(KERN_INFO "VBD driver recovery in progress\n");
-            
-            /* Prevent new requests being issued until we fix things up. */
-            spin_lock_irq(&blkif_io_lock);
-            recovery = 1;
-            blkif_state = BLKIF_STATE_DISCONNECTED;
-            spin_unlock_irq(&blkif_io_lock);
-
-            /* Free resources associated with old device channel. */
-            free_page((unsigned long)blk_ring);
-            free_irq(blkif_irq, NULL);
-            unbind_evtchn_from_irq(blkif_evtchn);
+        switch(blkif_state){
+        case BLKIF_STATE_CLOSED:
+            blkif_disconnect();
+            break;
+        case BLKIF_STATE_DISCONNECTED:
+        case BLKIF_STATE_CONNECTED:
+            unexpected(status);
+            blkif_reset();
+            break;
         }
-
-        /* Move from CLOSED to DISCONNECTED state. */
-        blk_ring = (blkif_ring_t *)__get_free_page(GFP_KERNEL);
-        blk_ring->req_prod = blk_ring->resp_prod = resp_cons = req_prod = 0;
-        blkif_state  = BLKIF_STATE_DISCONNECTED;
-
-        /* Construct an interface-CONNECT message for the domain controller. */
-        cmsg.type      = CMSG_BLKIF_FE;
-        cmsg.subtype   = CMSG_BLKIF_FE_INTERFACE_CONNECT;
-        cmsg.length    = sizeof(blkif_fe_interface_connect_t);
-        up.handle      = 0;
-        up.shmem_frame = virt_to_machine(blk_ring) >> PAGE_SHIFT;
-        memcpy(cmsg.msg, &up, sizeof(up));
-        
-        /* Tell the controller to bring up the interface. */
-        ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
         break;
 
     case BLKIF_INTERFACE_STATUS_CONNECTED:
-        if ( blkif_state == BLKIF_STATE_CLOSED )
-        {
-            printk(KERN_WARNING "Unexpected blkif-CONNECTED message"
-                   " in state %d\n", blkif_state);
+        switch(blkif_state){
+        case BLKIF_STATE_CLOSED:
+            unexpected(status);
+            blkif_disconnect();
+            blkif_connect(status);
+            break;
+        case BLKIF_STATE_DISCONNECTED:
+            blkif_connect(status);
+            break;
+        case BLKIF_STATE_CONNECTED:
+            unexpected(status);
+            blkif_connect(status);
             break;
         }
-
-        blkif_evtchn = status->evtchn;
-        blkif_irq    = bind_evtchn_to_irq(blkif_evtchn);
-
-        if ( (rc = request_irq(blkif_irq, blkif_int, 
-                               SA_SAMPLE_RANDOM, "blkif", NULL)) )
-	    printk(KERN_ALERT"blkfront request_irq failed (%ld)\n",rc);
-
-        if ( recovery )
-        {
-	    int i;
-
-	    /* Hmm, requests might be re-ordered when we re-issue them.
-	       This will need to be fixed once we have barriers */
-
-	    /* Stage 1 : Find active and move to safety. */
-	    for ( i = 0; i < BLKIF_RING_SIZE; i++ )
-	    {
-		if ( rec_ring[i].id >= PAGE_OFFSET )
-		{
-		    translate_req_to_mfn(
-			&blk_ring->ring[req_prod].req, &rec_ring[i]);
-		    req_prod++;
-		}
-	    }
-
-            printk(KERN_ALERT"blkfront: recovered %d descriptors\n",req_prod);
-	    
-            /* Stage 2 : Set up shadow list. */
-	    for ( i = 0; i < req_prod; i++ )
-	    {
-		rec_ring[i].id = blk_ring->ring[i].req.id;		
-		blk_ring->ring[i].req.id = i;
-		translate_req_to_pfn(&rec_ring[i], &blk_ring->ring[i].req);
-	    }
-
-	    /* Stage 3 : Set up free list. */
-	    for ( ; i < BLKIF_RING_SIZE; i++ )
-		rec_ring[i].id = i+1;
-	    rec_ring_free = req_prod;
-	    rec_ring[BLKIF_RING_SIZE-1].id = 0x0fffffff;
-
-            /* blk_ring->req_prod will be set when we flush_requests().*/
-            wmb();
-
-            /* Switch off recovery mode, using a memory barrier to ensure that
-             * it's seen before we flush requests - we don't want to miss any
-             * interrupts. */
-            recovery = 0;
-            wmb();
-
-            /* Kicks things back into life. */
-            flush_requests();
-
-	    /* Now safe to left other peope use interface */
-	    blkif_state = BLKIF_STATE_CONNECTED;
-        }
-        else
-        {
-	    /* transtion to connected in case we need to do a 
-	       a partion probe on a whole disk */
-	    blkif_state = BLKIF_STATE_CONNECTED;
-
-            /* Probe for discs that are attached to the interface. */
-            xlvbd_init();
-        }
-        
-        /* Kick pending requests. */
-        spin_lock_irq(&blkif_io_lock);
-        kick_pending_request_queues();
-        spin_unlock_irq(&blkif_io_lock);
-
         break;
 
-//    case BLKIF_INTERFACE_STATUS_CHANGED:
-//        /* The domain controller is notifying us that a device has been
-//        * added or removed.
-//        */
-//        break;
+   case BLKIF_INTERFACE_STATUS_CHANGED:
+        switch(blkif_state){
+        case BLKIF_STATE_CLOSED:
+        case BLKIF_STATE_DISCONNECTED:
+            unexpected(status);
+            break;
+        case BLKIF_STATE_CONNECTED:
+            vbd_update();
+            break;
+        }
+       break;
 
     default:
-        printk(KERN_WARNING "Status change to unknown value %d\n", 
-               status->status);
+        WPRINTK(" Invalid blkif status: %d\n", status->status);
         break;
     }
 }
@@ -1169,15 +1292,9 @@ static void blkif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
     case CMSG_BLKIF_FE_INTERFACE_STATUS:
         if ( msg->length != sizeof(blkif_fe_interface_status_t) )
             goto parse_error;
-        blkif_status_change((blkif_fe_interface_status_t *)
-                            &msg->msg[0]);
+        blkif_status((blkif_fe_interface_status_t *)
+                     &msg->msg[0]);
         break;        
-#if 0
-    case CMSG_BLKIF_FE_VBD_STATUS:
-        update_tq.routine = update_vbds_task;
-        schedule_task(&update_tq);
-        break;
-#endif
     default:
         goto parse_error;
     }
@@ -1190,36 +1307,10 @@ static void blkif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
     ctrl_if_send_response(msg);
 }
 
-
-int __init xlblk_init(void)
-{
-    ctrl_msg_t                       cmsg;
-    blkif_fe_driver_status_t st;
+int wait_for_blkif(void){
+    int err = 0;
     int i;
-    
-    if ( (start_info.flags & SIF_INITDOMAIN) 
-         || (start_info.flags & SIF_BLK_BE_DOMAIN) )
-        return 0;
-
-    printk(KERN_INFO "Initialising Xen virtual block device\n");
-
-    rec_ring_free = 0;
-    for (i=0; i<BLKIF_RING_SIZE; i++)
-    {
-	rec_ring[i].id = i+1;
-    }
-    rec_ring[BLKIF_RING_SIZE-1].id = 0x0fffffff;
-
-    (void)ctrl_if_register_receiver(CMSG_BLKIF_FE, blkif_ctrlif_rx,
-                                    CALLBACK_IN_BLOCKING_CONTEXT);
-
-    /* Send a driver-UP notification to the domain controller. */
-    cmsg.type      = CMSG_BLKIF_FE;
-    cmsg.subtype   = CMSG_BLKIF_FE_DRIVER_STATUS;
-    cmsg.length    = sizeof(blkif_fe_driver_status_t);
-    st.status      = BLKIF_DRIVER_STATUS_UP;
-    memcpy(cmsg.msg, &st, sizeof(st));
-    ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
+    send_driver_status(1);
 
     /*
      * We should read 'nr_interfaces' from response message and wait
@@ -1232,8 +1323,34 @@ int __init xlblk_init(void)
         schedule_timeout(1);
     }
 
-    if (blkif_state != BLKIF_STATE_CONNECTED)
-        printk(KERN_INFO "Timeout connecting block device driver!\n");
+    if (blkif_state != BLKIF_STATE_CONNECTED){
+        printk(KERN_INFO "[XEN] Timeout connecting block device driver!\n");
+        err = -ENOSYS;
+    }
+    return err;
+}
+
+int __init xlblk_init(void)
+{
+    int i;
+    
+    if ( (start_info.flags & SIF_INITDOMAIN) 
+         || (start_info.flags & SIF_BLK_BE_DOMAIN) )
+        return 0;
+
+    printk(KERN_INFO "[XEN] Initialising virtual block device driver\n");
+
+    rec_ring_free = 0;
+    for (i=0; i<BLKIF_RING_SIZE; i++)
+    {
+	rec_ring[i].id = i+1;
+    }
+    rec_ring[BLKIF_RING_SIZE-1].id = 0x0fffffff;
+
+    (void)ctrl_if_register_receiver(CMSG_BLKIF_FE, blkif_ctrlif_rx,
+                                    CALLBACK_IN_BLOCKING_CONTEXT);
+
+    wait_for_blkif();
 
     return 0;
 }
@@ -1244,16 +1361,7 @@ void blkdev_suspend(void)
 
 void blkdev_resume(void)
 {
-    ctrl_msg_t                       cmsg;
-    blkif_fe_driver_status_t st;    
-
-    /* Send a driver-UP notification to the domain controller. */
-    cmsg.type      = CMSG_BLKIF_FE;
-    cmsg.subtype   = CMSG_BLKIF_FE_DRIVER_STATUS;
-    cmsg.length    = sizeof(blkif_fe_driver_status_t);
-    st.status      = BLKIF_DRIVER_STATUS_UP;
-    memcpy(cmsg.msg, &st, sizeof(st));
-    ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
+    send_driver_status(1);
 }
 
 /* XXXXX THIS IS A TEMPORARY FUNCTION UNTIL WE GET GRANT TABLES */
@@ -1275,5 +1383,3 @@ void blkif_completion(blkif_request_t *req)
     }
     
 }
-
-

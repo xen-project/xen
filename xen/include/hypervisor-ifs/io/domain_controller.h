@@ -93,7 +93,7 @@ typedef struct {
 #define BLKIF_INTERFACE_STATUS_CLOSED       0 /* Interface doesn't exist.    */
 #define BLKIF_INTERFACE_STATUS_DISCONNECTED 1 /* Exists but is disconnected. */
 #define BLKIF_INTERFACE_STATUS_CONNECTED    2 /* Exists and is connected.    */
-//#define BLKIF_INTERFACE_STATUS_CHANGED      3 /* A device has been added or removed. */
+#define BLKIF_INTERFACE_STATUS_CHANGED      3 /* A device has been added or removed. */
 typedef struct {
     u32 handle; /*  0 */
     u32 status; /*  4 */

@@ -824,6 +824,9 @@ class XendDomainInfo:
         dev_index = len(devs)
         self.config.append(['device', dev_config])
         d = dev_handler(self, dev_config, dev_index, change=1)
+        def cbok(dev):
+            return dev.sxpr()
+        d.addCallback(cbok)
         return d
 
     def device_configure(self, dev_config, idx):

@@ -128,20 +128,20 @@ struct net_private
     struct sk_buff *rx_skbs[NETIF_RX_RING_SIZE+1];
 };
 
-static char * status_name[] = {
+char * status_name[] = {
     [NETIF_INTERFACE_STATUS_CLOSED]       = "closed",
     [NETIF_INTERFACE_STATUS_DISCONNECTED] = "disconnected",
     [NETIF_INTERFACE_STATUS_CONNECTED]    = "connected",
     [NETIF_INTERFACE_STATUS_CHANGED]      = "changed",
 };
 
-static char * be_state_name[] = {
+char * be_state_name[] = {
     [BEST_CLOSED]       = "closed",
     [BEST_DISCONNECTED] = "disconnected",
     [BEST_CONNECTED]    = "connected",
 };
 
-static char * user_state_name[] = {
+char * user_state_name[] = {
     [UST_CLOSED] = "closed",
     [UST_OPEN]   = "open",
 };

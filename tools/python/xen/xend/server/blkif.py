@@ -153,7 +153,7 @@ class BlkifBackendInterface(controller.BackendInterface):
         """
         msg = packMsg('blkif_fe_interface_status_t',
                       { 'handle' : self.handle,
-                        'status' : BLKIF_INTERFACE_STATUS,
+                        'status' : BLKIF_INTERFACE_STATUS_CHANGED,
                         'domid'  : self.dom,
                         'evtchn' : 0 })
         self.controller.writeRequest(msg)
