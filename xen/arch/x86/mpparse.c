@@ -1232,7 +1232,6 @@ void __init mp_config_acpi_legacy_irqs (void)
 
 void __init mp_parse_prt (void)
 {
-	struct list_head	*node = NULL;
 	struct acpi_prt_entry	*entry = NULL;
 	int			ioapic = -1;
 	int			ioapic_pin = 0;
@@ -1245,9 +1244,7 @@ void __init mp_parse_prt (void)
 	 * Parsing through the PCI Interrupt Routing Table (PRT) and program
 	 * routing for all entries.
 	 */
-	list_for_each(node, &acpi_prt.entries) {
-		entry = list_entry(node, struct acpi_prt_entry, node);
-
+	list_for_each_entry(entry, &acpi_prt.entries, node) {
 		/* Need to get irq for dynamic entry */
 		if (entry->link.handle) {
 			irq = acpi_pci_link_get_irq(entry->link.handle, entry->link.index, &edge_level, &active_high_low);

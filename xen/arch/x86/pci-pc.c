@@ -1372,11 +1372,9 @@ void __devinit  pcibios_fixup_bus(struct pci_bus *b)
 
 struct pci_bus * __devinit pcibios_scan_root(int busnum)
 {
-	struct list_head *list;
 	struct pci_bus *bus;
 
-	list_for_each(list, &pci_root_buses) {
-		bus = pci_bus_b(list);
+	pci_for_each_bus(bus) {
 		if (bus->number == busnum) {
 			/* Already scanned */
 			return bus;

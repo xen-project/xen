@@ -10,7 +10,7 @@ INSTALL_DIR	:= $(INSTALL) -d -m0755
 INSTALL_DATA	:= $(INSTALL) -m0644
 INSTALL_PROG	:= $(INSTALL) -m0755
 
-KERNELS ?= linux-2.6-xen0 linux-2.6-xenU
+KERNELS ?= linux-2.6-xen0 linux-2.6-xenU  linux-2.4-xen0 linux-2.4-xenU netbsd-2.0-xenU
 # linux-2.4-xen0 linux-2.4-xenU netbsd-2.0-xenU
 # You may use wildcards in the above e.g. KERNELS=*2.4*
 

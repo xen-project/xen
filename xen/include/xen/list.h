@@ -161,8 +161,6 @@ static __inline__ void list_splice(struct list_head *list, struct list_head *hea
 	for (pos = (head)->next, n = pos->next; pos != (head); \
 		pos = n, n = pos->next)
 
-#endif
-
 /**
  * list_for_each_entry	-	iterate over list of given type
  * @pos:	the type * to use as a loop counter.
@@ -175,3 +173,6 @@ static __inline__ void list_splice(struct list_head *list, struct list_head *hea
 	     &pos->member != (head); 					\
 	     pos = list_entry(pos->member.next, typeof(*pos), member),	\
 		     prefetch(pos->member.next))
+
+#endif /* _LINUX_LIST_H */
+

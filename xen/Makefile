@@ -49,9 +49,9 @@ $(TARGET): delete-unfresh-files include/xen/compile.h
 	$(MAKE) -C drivers
 	$(MAKE) -C arch/$(TARGET_ARCH)
 
-# Blow away kernel.o because build info is stored statically within it.
 delete-unfresh-files:
-	rm -f include/xen/banner.h include/xen/compile.h common/kernel.o
+	rm -f include/xen/banner.h include/xen/compile.h
+	$(MAKE) -C arch/$(TARGET_ARCH) delete-unfresh-files
 
 # compile.h contains dynamic build info. Rebuilt on every 'make' invocation.
 include/xen/compile.h: LANG=C

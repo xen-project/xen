@@ -41,4 +41,8 @@ clean:
 	rm -f x86_32/*.o x86_32/*~ x86_32/core
 	rm -f x86_64/*.o x86_64/*~ x86_64/core
 
-.PHONY: default clean
+# setup.o contains bits of compile.h so it must be blown away
+delete-unfresh-files:
+	rm -f setup.o
+
+.PHONY: default clean delete-unfresh-files

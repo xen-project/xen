@@ -778,12 +778,10 @@ void pdb_bkpt_add (unsigned long cr3, unsigned long address)
 struct pdb_breakpoint* pdb_bkpt_search (unsigned long cr3, 
 					unsigned long address)
 {
-    struct list_head *list_entry;
     struct pdb_breakpoint *bkpt;
 
-    list_for_each(list_entry, &breakpoints.list)
+    list_for_each_entry ( bkpt, &breakpoints.list, list )
     {
-        bkpt = list_entry(list_entry, struct pdb_breakpoint, list);
 	if ( bkpt->cr3 == cr3 && bkpt->address == address )
             return bkpt;
     }
@@ -797,12 +795,10 @@ struct pdb_breakpoint* pdb_bkpt_search (unsigned long cr3,
  */
 int pdb_bkpt_remove (unsigned long cr3, unsigned long address)
 {
-    struct list_head *list_entry;
     struct pdb_breakpoint *bkpt;
 
-    list_for_each(list_entry, &breakpoints.list)
+    list_for_each_entry ( bkpt, &breakpoints.list, list )
     {
-        bkpt = list_entry(list_entry, struct pdb_breakpoint, list);
 	if ( bkpt->cr3 == cr3 && bkpt->address == address )
 	{
             list_del(&bkpt->list);

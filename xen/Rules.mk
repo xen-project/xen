@@ -22,6 +22,7 @@ HDRS    += $(wildcard $(BASEDIR)/include/public/*.h)
 HDRS    += $(wildcard $(BASEDIR)/include/asm-$(TARGET_ARCH)/*.h)
 HDRS    += $(wildcard $(BASEDIR)/include/asm-$(TARGET_ARCH)/$(TARGET_SUBARCH)/*.h)
 # compile.h is always regenerated, but other files shouldn't be rebuilt
+HDRS    := $(subst $(BASEDIR)/include/xen/banner.h,,$(HDRS))
 HDRS    := $(subst $(BASEDIR)/include/xen/compile.h,,$(HDRS))
 
 C_SRCS  := $(wildcard *.c)

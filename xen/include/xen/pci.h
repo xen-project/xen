@@ -358,7 +358,7 @@ enum pci_mmap_state {
 	for(dev = pci_dev_g(pci_devices.prev); dev != pci_dev_g(&pci_devices); dev = pci_dev_g(dev->global_list.prev))
 
 #define pci_for_each_bus(bus) \
-for(bus = pci_bus_b(pci_root_buses.next); bus != pci_bus_b(&pci_root_buses); bus = pci_bus_b(bus->node.next))
+	list_for_each_entry(bus, &pci_root_buses, node)
 
 /*
  * The pci_dev structure is used to describe both PCI and ISAPnP devices.
