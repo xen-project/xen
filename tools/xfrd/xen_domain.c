@@ -53,7 +53,10 @@ void xcfini(void){
  * At some point during this the domain is suspended, and then there's no way back.
  * Even if something later goes wrong we can't restart the domain.
  */
-int xen_domain_snd(Conn *xend, IOStream *io, uint32_t dom, char *vmconfig, int vmconfig_n){
+int xen_domain_snd(Conn *xend, IOStream *io,
+                   uint32_t dom,
+                   char *vmconfig, int vmconfig_n,
+                   int live){
     int err = 0;
 #ifdef _XEN_XFR_STUB_
     char buf[1024];
@@ -89,7 +92,9 @@ int xen_domain_snd(Conn *xend, IOStream *io, uint32_t dom, char *vmconfig, int v
     ioctxt->suspend = domain_suspend;
     ioctxt->vmconfig = vmconfig;
     ioctxt->vmconfig_n = vmconfig_n;
-
+    if(live){
+        ioctxt->flags |= XCFLAGS_LIVE;
+    }
     err = xc_linux_save(xcinit(), ioctxt);
 #endif   
     dprintf("< err=%d\n", err);

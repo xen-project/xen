@@ -80,7 +80,8 @@ class SrvDomain(SrvDir):
     def op_migrate(self, op, req):
         fn = FormFn(self.xd.domain_migrate,
                     [['dom', 'str'],
-                     ['destination', 'str']])
+                     ['destination', 'str'],
+                     ['live', 'int']])
         deferred = fn(req.args, {'dom': self.dom.id})
         print 'op_migrate>', deferred
         deferred.addCallback(self._op_migrate_cb, req)
@@ -244,4 +245,5 @@ class SrvDomain(SrvDir):
         req.write('<form method="post" action="%s">' % url)
         req.write('<br><input type="submit" name="op" value="migrate">')
         req.write(' To host: <input type="text" name="destination">')
+        req.write('<input type="checkbox" name="live" value="1">Live')
         req.write('</form>')
