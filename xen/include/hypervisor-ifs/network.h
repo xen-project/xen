@@ -12,9 +12,6 @@
 #ifndef __RING_H__
 #define __RING_H__
 
-#include <linux/types.h>
-
-
 typedef struct tx_req_entry_st
 {
     unsigned short id;

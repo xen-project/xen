@@ -1,40 +1,37 @@
-#define _GNU_SOURCE
-#include <unistd.h>
-#include <errno.h>
-#include <stdio.h>
-#include <sys/fcntl.h>
-#include <string.h>
-#include <stdlib.h>
 
-#include "hypervisor-ifs/block.h"
+#define _GNU_SOURCE
+#include "dom0_defs.h"
 
 int main(int argc, char *argv[])
 {
-    xp_disk_t buf;
-    int fd;
-    char *strbuf;
+    privcmd_blkmsg_t blkmsg;
+    xp_disk_t        xpd;
 
-    if (argc != 5) {
-	fprintf(stderr,
-		"Usage: xi_physdev_revoke <domain> <device> <start sector> <n_sectors>\n");
+    if ( argc != 5 )
+    {
+	fprintf(stderr, "Usage: xi_physdev_revoke <domain> "
+                "<device> <start sector> <n_sectors>\n");
 	return 1;
     }
 
-    buf.device = atol(argv[2]);
-    buf.mode = 0;
-    buf.start_sect = atol(argv[3]);
-    buf.n_sectors = atol(argv[4]);
+    xpd.mode       = 0;
+    xpd.domain     = atol(argv[1]);
+    xpd.device     = xldev_to_physdev(atol(argv[2]));
+    xpd.start_sect = atol(argv[3]);
+    xpd.n_sectors  = atol(argv[4]);
 
-    asprintf(&strbuf, "/proc/xeno/dom%s/phd", argv[1]);
-    fd = open(strbuf, O_WRONLY);
-    if (fd < 0) {
-	fprintf(stderr, "Can\'t open %s: %s.\n", strbuf, strerror(errno));
-	return 1;
+    if ( xpd.device == 0 )
+    {
+        ERROR("Unrecognised device");
+        return 1;
     }
-    free(strbuf);
 
-    write(fd, &buf, sizeof(buf));
-    close(fd);
+    blkmsg.op       = XEN_BLOCK_PHYSDEV_GRANT;
+    blkmsg.buf      = &xpd;
+    blkmsg.buf_size = sizeof(xpd);
+
+    if ( do_xen_blkmsg(&blkmsg) < 0 )
+        return 1;
 
     return 0;
 }

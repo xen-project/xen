@@ -462,6 +462,7 @@ static unsigned long alloc_page_from_domain(unsigned long * cur_addr,
  * userspace dom0 and final setup is being done by final_setup_guestos.
  */
 int setup_guestos(struct task_struct *p, dom0_newdomain_t *params, 
+                  unsigned int num_vifs,
                   char *phy_data_start, unsigned long data_len, 
 		  char *cmdline, unsigned long initrd_len)
 {
@@ -689,7 +690,7 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params,
     }
 
     /* Add virtual network interfaces and point to them in startinfo. */
-    while (params->num_vifs-- > 0) {
+    while (num_vifs-- > 0) {
         net_vif = create_net_vif(dom);
         shared_rings = net_vif->shared_rings;
         if (!shared_rings) panic("no network ring!\n");

@@ -12,9 +12,6 @@
 
 static struct proc_dir_entry *vhd;
 
-extern unsigned short xldev_to_physdev(kdev_t xldev);
-extern dev_t physdev_to_xldev(unsigned short physdev);
-
 static void *proc_vhd_next(struct seq_file *s, void *v, loff_t *pos)
 {
     xen_segment_info_t *data;
@@ -310,11 +307,13 @@ static struct file_operations proc_vhd_operations = {
 
 int __init xlseg_proc_init(void)
 {
-    vhd = create_proc_entry("xeno/dom0/vhd", 0600, NULL);
-    if (vhd == NULL)
-    {
+    if ( !(start_info.flags & SIF_PRIVILEGED) )
+        return 0;
+
+    vhd = create_proc_entry("xeno/vhd", 0600, NULL);
+    if ( vhd == NULL )
         panic ("xlseg_init: unable to create vhd proc entry\n");
-    }
+
     vhd->data       = NULL;
     vhd->proc_fops  = &proc_vhd_operations;
     vhd->owner      = THIS_MODULE;

@@ -26,11 +26,11 @@
 
 typedef struct dom0_newdomain_st 
 {
-    unsigned int domain;    // return parameter
+    /* IN parameters. */
     unsigned int memory_kb; 
-    unsigned int num_vifs;  // temporary
-    unsigned long pg_head;  // return parameter
     char name[MAX_DOMAIN_NAME];
+    /* OUT parameters. */
+    unsigned int domain; 
 } dom0_newdomain_t;
 
 typedef struct dom0_killdomain_st
@@ -41,14 +41,17 @@ typedef struct dom0_killdomain_st
 
 typedef struct dom0_getmemlist_st
 {
-    unsigned long start_pfn;
+    /* IN variables. */
+    unsigned int  domain;
+    unsigned long max_pfns;
+    void         *buffer;
+    /* OUT variables. */
     unsigned long num_pfns;
-    void *buffer;
 } dom0_getmemlist_t;
 
 typedef struct domain_launch
 {
-    unsigned int domain;
+    unsigned int  domain;
     unsigned long l2_pgt_addr;
     unsigned long virt_load_addr;
     unsigned long virt_shinfo_addr;
@@ -75,14 +78,15 @@ typedef struct dom0_adjustdom_st
 
 typedef struct dom0_getdominfo_st
 {
-    unsigned int domain;          /* All returns except domain */
+    /* IN variables. */
+    unsigned int domain;
+    /* OUT variables. */
     char name[MAX_DOMAIN_NAME];
     int processor;
     int has_cpu;
     int state;
     int hyp_events;
     unsigned long mcu_advance;
-    unsigned long pg_head;
     unsigned int tot_pages;
     long long cpu_time;
 } dom0_getdominfo_t;
@@ -93,7 +97,6 @@ typedef struct dom0_iopl_st
     unsigned int iopl;
 } dom0_iopl_t;
 
-#ifndef NO_DOM0_OP_T
 typedef struct dom0_op_st
 {
     unsigned long cmd;
@@ -110,6 +113,5 @@ typedef struct dom0_op_st
     }
     u;
 } dom0_op_t;
-#endif
 
 #endif

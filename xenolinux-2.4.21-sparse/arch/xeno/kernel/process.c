@@ -145,9 +145,6 @@ void release_segments(struct mm_struct *mm)
         flush_page_update_queue();
         vfree(ldt);
     }
-
-    /* YUK! We do this here because destroy_context() is too late. */
-    destroy_direct_list(mm);
 }
 
 /*

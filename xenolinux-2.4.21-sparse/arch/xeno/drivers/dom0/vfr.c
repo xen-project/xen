@@ -224,7 +224,7 @@ static int vfr_write_proc(struct file *file, const char *buffer,
 static int __init init_module(void)
 {
     *readbuf = '\0';
-    proc_vfr = create_proc_entry ("vfr", 0600, &proc_root);
+    proc_vfr = create_proc_entry ("xeno/vfr", 0600, &proc_root);
     if ( proc_vfr != NULL )
     {
         proc_vfr->owner      = THIS_MODULE;
@@ -239,7 +239,7 @@ static int __init init_module(void)
 static void __exit cleanup_module(void)
 {
     if ( proc_vfr == NULL ) return;
-    remove_proc_entry("vfr", &proc_root);
+    remove_proc_entry("xeno/vfr", &proc_root);
     proc_vfr = NULL;
 }
 

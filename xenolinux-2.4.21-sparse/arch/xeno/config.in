@@ -13,6 +13,11 @@ define_bool CONFIG_SBUS n
 define_bool CONFIG_UID16 y
 
 mainmenu_option next_comment
+comment 'Privileged guest OS'
+bool 'Support for privileged operations (domain 0)' CONFIG_XENO_PRIV
+endmenu
+
+mainmenu_option next_comment
 comment 'Code maturity level options'
 bool 'Prompt for development and/or incomplete code/drivers' CONFIG_EXPERIMENTAL
 endmenu

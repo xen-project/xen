@@ -9,9 +9,9 @@
 #ifndef __HYPERVISOR_H__
 #define __HYPERVISOR_H__
 
+#include <linux/types.h>
 #include <asm/hypervisor-ifs/hypervisor-if.h>
 #include <asm/ptrace.h>
-//#include <asm/page.h>
 
 /* arch/xeno/kernel/setup.c */
 union start_info_union

@@ -43,6 +43,31 @@ static inline void signal_requests_to_xen(void)
     HYPERVISOR_block_io_op();
 }
 
+
+inline kdev_t physdev_to_xldev(unsigned short physdev)
+{
+    switch (physdev & XENDEV_TYPE_MASK) {
+    case XENDEV_IDE:
+        if ( (physdev & XENDEV_IDX_MASK) < XLIDE_DEVS_PER_MAJOR) {
+	    return MKDEV(XLIDE_MAJOR_0,
+			 (physdev & XENDEV_IDX_MASK) << XLIDE_PARTN_SHIFT);
+	} else if ( (physdev & XENDEV_IDX_MASK) < (XLIDE_DEVS_PER_MAJOR * 2)) {
+	    return MKDEV(XLIDE_MAJOR_1,
+			 (physdev & XENDEV_IDX_MASK) << XLIDE_PARTN_SHIFT);
+	}
+	break;
+    case XENDEV_SCSI:
+	return MKDEV(XLSCSI_MAJOR,
+		     (physdev & XENDEV_IDX_MASK) << XLSCSI_PARTN_SHIFT);
+    case XENDEV_VIRTUAL:
+	return MKDEV(XLVIRT_MAJOR,
+		     (physdev & XENDEV_IDX_MASK) << XLVIRT_PARTN_SHIFT);
+    }
+
+    return 0;
+}
+
+
 /* Convert from a XenoLinux major device to the Xen-level 'physical' device */
 inline unsigned short xldev_to_physdev(kdev_t xldev) 
 {
@@ -68,8 +93,6 @@ inline unsigned short xldev_to_physdev(kdev_t xldev)
         physdev = XENDEV_VIRTUAL + (MINOR(xldev) >> XLVIRT_PARTN_SHIFT);
         break;
     } 
-
-    if ( physdev == 0 ) BUG();
 
     return physdev;
 }

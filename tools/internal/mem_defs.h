@@ -1,24 +1,16 @@
-/*
- * memory related definitions needed for userspace domain builder dom0 application. these _need_ to
- * be kept in sync with the kernel .h files they were copied over from or something horrible will
- * happen. remmember: god kills a kitten every time you forget to keep these in sync.
- * 
- * KAF: Boris, these constants are all fixed by x86 hardware. So the kittens are safe for now :-)
- * 
- * Copyright 2002 by B Dragovic
- */
 
-/* copied over from hypervisor: include/asm-i386/page.h */
+#ifndef __MEM_DEFS_H__
+#define __MEM_DEFS_H__
 
 #define _PAGE_PRESENT   0x001
-#define _PAGE_RW    0x002
-#define _PAGE_USER  0x004
-#define _PAGE_PWT   0x008
-#define _PAGE_PCD   0x010
+#define _PAGE_RW        0x002
+#define _PAGE_USER      0x004
+#define _PAGE_PWT       0x008
+#define _PAGE_PCD       0x010
 #define _PAGE_ACCESSED  0x020
-#define _PAGE_DIRTY 0x040
+#define _PAGE_DIRTY     0x040
 #define _PAGE_PAT       0x080
-#define _PAGE_PSE   0x080
+#define _PAGE_PSE       0x080
 #define _PAGE_GLOBAL    0x100
 
 
@@ -40,6 +32,4 @@ typedef struct { unsigned long l2_lo; } l2_pgentry_t;
 #define l2_table_offset(_a) \
           ((_a) >> L2_PAGETABLE_SHIFT)
 
-/* local definitions */
-
-#define nr_2_page(x) ((x) << PAGE_SHIFT)
+#endif /* __MEM_DEFS_H__ */

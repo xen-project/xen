@@ -16,10 +16,10 @@ then
 fi
 
 #outbound rule:
-echo "ADD ACCEPT srcaddr=$3 srcaddrmask=255.255.255.255 srcdom=$1 srcidx=$2 dst=PHYS proto=any" > /proc/vfr
+echo "ADD ACCEPT srcaddr=$3 srcaddrmask=255.255.255.255 srcdom=$1 srcidx=$2 dst=PHYS proto=any" > /proc/xeno/vfr
 
 #inbound rule:
-echo "ADD ACCEPT dstaddr=$3 dstaddrmask=255.255.255.255 src=ANY dstdom=$1 dstidx=$2 proto=any" > /proc/vfr
+echo "ADD ACCEPT dstaddr=$3 dstaddrmask=255.255.255.255 src=ANY dstdom=$1 dstidx=$2 proto=any" > /proc/xeno/vfr
 
 #----] done.
 
