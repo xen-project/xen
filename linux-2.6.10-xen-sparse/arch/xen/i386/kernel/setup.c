@@ -1360,7 +1360,10 @@ void __init setup_arch(char **cmdline_p)
 		efi_enabled = 1;
 #endif
 
- 	ROOT_DEV = MKDEV(RAMDISK_MAJOR,0); /*old_decode_dev(ORIG_ROOT_DEV);*/
+	/* This must be initialized to UNNAMED_MAJOR for ipconfig to work
+	   properly.  Setting ROOT_DEV to default to /dev/ram0 breaks initrd.
+	*/
+	ROOT_DEV = MKDEV(UNNAMED_MAJOR,0);
  	drive_info = DRIVE_INFO;
  	screen_info = SCREEN_INFO;
 	edid_info = EDID_INFO;
