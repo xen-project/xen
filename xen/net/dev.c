@@ -2023,7 +2023,7 @@ static void make_tx_response(net_vif_t     *vif,
     vif->tx_resp_prod = vif->shared_idxs->tx_resp_prod = pos;
     if ( pos == vif->shared_idxs->rx_event )
     {
-        unsigned long cpu_mask = mark_guest_event(vif->domain, _EVENT_NET_TX);
+        unsigned long cpu_mask = mark_guest_event(vif->domain, _EVENT_NET);
         guest_event_notify(cpu_mask);    
     }
     spin_unlock_irqrestore(&vif->tx_lock, flags);
@@ -2052,7 +2052,7 @@ static void make_rx_response(net_vif_t     *vif,
     vif->rx_resp_prod = vif->shared_idxs->rx_resp_prod = pos;
     if ( pos == vif->shared_idxs->rx_event )
     {
-        unsigned long cpu_mask = mark_guest_event(vif->domain, _EVENT_NET_RX);
+        unsigned long cpu_mask = mark_guest_event(vif->domain, _EVENT_NET);
         guest_event_notify(cpu_mask);    
     }
     spin_unlock_irqrestore(&vif->rx_lock, flags);

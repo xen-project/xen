@@ -828,7 +828,7 @@ static void make_response(struct task_struct *p, unsigned long id,
     spin_unlock_irqrestore(&p->blk_ring_lock, flags);
     
     /* Kick the relevant domain. */
-    cpu_mask = mark_guest_event(p, _EVENT_BLK_RESP);
+    cpu_mask = mark_guest_event(p, _EVENT_BLKDEV);
     guest_event_notify(cpu_mask); 
 }
 

@@ -14,11 +14,7 @@
 #include <asm/hypervisor.h>
 #include <asm/ptrace.h>
 
-#define NET_TX_IRQ  _EVENT_NET_TX
-#define NET_RX_IRQ  _EVENT_NET_RX
-#define NET2_TX_IRQ  _EVENT_NET2_TX
-#define NET2_RX_IRQ  _EVENT_NET2_RX
-#define TIMER_IRQ   _EVENT_TIMER
+#define TIMER_IRQ _EVENT_TIMER
 
 #define NR_IRQS (sizeof(HYPERVISOR_shared_info->events) * 8)
 

@@ -25,8 +25,7 @@
 #include <net/sock.h>
 #include <net/pkt_sched.h>
 
-#define NET_TX_IRQ _EVENT_NET_TX
-#define NET_RX_IRQ _EVENT_NET_RX
+#define NET_IRQ _EVENT_NET
 
 #define TX_MAX_ENTRIES (TX_RING_SIZE - 2)
 #define RX_MAX_ENTRIES (RX_RING_SIZE - 2)
@@ -38,8 +37,7 @@
 
 #define RX_BUF_SIZE ((PAGE_SIZE/2)+1) /* Fool the slab allocator :-) */
 
-static void network_rx_int(int irq, void *dev_id, struct pt_regs *ptregs);
-static void network_tx_int(int irq, void *dev_id, struct pt_regs *ptregs);
+static void network_interrupt(int irq, void *dev_id, struct pt_regs *ptregs);
 static void network_tx_buf_gc(struct net_device *dev);
 static void network_alloc_rx_buffers(struct net_device *dev);
 static void network_free_rx_buffers(struct net_device *dev);
@@ -128,23 +126,12 @@ static int network_open(struct net_device *dev)
 
     network_alloc_rx_buffers(dev);
 
-    error = request_irq(NET_RX_IRQ, network_rx_int, 
-                        SA_SAMPLE_RANDOM, "net-rx", dev);
+    error = request_irq(NET_IRQ, network_interrupt, 
+                        SA_SAMPLE_RANDOM, "network", dev);
     if ( error )
     {
-        printk(KERN_WARNING "%s: Could not allocate receive interrupt\n",
+        printk(KERN_WARNING "%s: Could not allocate network interrupt\n",
                dev->name);
-        network_free_rx_buffers(dev);
-        goto fail;
-    }
-
-    error = request_irq(NET_TX_IRQ, network_tx_int, 
-                        SA_SAMPLE_RANDOM, "net-tx", dev);
-    if ( error )
-    {
-        printk(KERN_WARNING "%s: Could not allocate transmit interrupt\n",
-               dev->name);
-        free_irq(NET_RX_IRQ, dev);
         network_free_rx_buffers(dev);
         goto fail;
     }
@@ -213,7 +200,8 @@ static void network_tx_buf_gc(struct net_device *dev)
     spin_unlock_irqrestore(&np->tx_lock, flags);
 }
 
-inline pte_t *get_ppte(void *addr)
+
+static inline pte_t *get_ppte(void *addr)
 {
     pgd_t *pgd; pmd_t *pmd; pte_t *pte;
     pgd = pgd_offset_k(   (unsigned long)addr);
@@ -221,6 +209,7 @@ inline pte_t *get_ppte(void *addr)
     pte = pte_offset(pmd, (unsigned long)addr);
     return pte;
 }
+
 
 static void network_alloc_rx_buffers(struct net_device *dev)
 {
@@ -324,7 +313,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 }
 
 
-static void network_rx_int(int irq, void *dev_id, struct pt_regs *ptregs)
+static void network_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 {
     unsigned int i;
     struct net_device *dev = (struct net_device *)dev_id;
@@ -332,6 +321,8 @@ static void network_rx_int(int irq, void *dev_id, struct pt_regs *ptregs)
     struct sk_buff *skb;
     rx_resp_entry_t *rx;
     
+    network_tx_buf_gc(dev);
+
  again:
     for ( i  = np->rx_resp_cons; 
           i != np->net_idx->rx_resp_prod; 
@@ -390,13 +381,6 @@ static void network_rx_int(int irq, void *dev_id, struct pt_regs *ptregs)
 }
 
 
-static void network_tx_int(int irq, void *dev_id, struct pt_regs *ptregs)
-{
-    struct net_device *dev = (struct net_device *)dev_id;
-    network_tx_buf_gc(dev);
-}
-
-
 int network_close(struct net_device *dev)
 {
     netif_stop_queue(dev);
@@ -408,8 +392,7 @@ int network_close(struct net_device *dev)
      * no sensible way of retrieving them.
      */
 #if 0
-    free_irq(NET_RX_IRQ, dev);
-    free_irq(NET_TX_IRQ, dev);
+    free_irq(NET_IRQ, dev);
 
     network_free_rx_buffers(dev);
     kfree(np->net_ring->rx_ring);

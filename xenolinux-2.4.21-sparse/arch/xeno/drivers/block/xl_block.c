@@ -11,7 +11,7 @@
 
 typedef unsigned char byte; /* from linux/ide.h */
 
-#define XLBLK_RESPONSE_IRQ _EVENT_BLK_RESP
+#define XLBLK_RESPONSE_IRQ _EVENT_BLKDEV
 #define DEBUG_IRQ          _EVENT_DEBUG 
 
 static blk_ring_t *blk_ring;
@@ -573,7 +573,7 @@ int __init xlblk_init(void)
     blk_ring->req_prod = blk_ring->resp_prod = resp_cons = req_prod = 0;
     
     error = request_irq(XLBLK_RESPONSE_IRQ, xlblk_response_int, 
-                        SA_SAMPLE_RANDOM, "xlblk-response", NULL);
+                        SA_SAMPLE_RANDOM, "blkdev", NULL);
     if ( error )
     {
 	printk(KERN_ALERT "Could not allocate receive interrupt\n");

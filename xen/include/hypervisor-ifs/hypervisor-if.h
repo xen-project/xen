@@ -72,22 +72,20 @@
  */
 
 /* Events that a guest OS may receive from the hypervisor. */
-#define EVENT_BLK_RESP 0x01 /* A block device response has been queued. */
+#define EVENT_BLKDEV   0x01 /* A block device response has been queued. */
 #define EVENT_TIMER    0x02 /* A timeout has been updated. */
 #define EVENT_DIE      0x04 /* OS is about to be killed. Clean up please! */
 #define EVENT_DEBUG    0x08 /* Request guest to dump debug info (gross!) */
-#define EVENT_NET_TX   0x10 /* There are packets for transmission. */
-#define EVENT_NET_RX   0x20 /* There are empty buffers for receive. */
-#define EVENT_KBD      0x40 /* PS/2 keyboard or mouse event(s) */
+#define EVENT_NET      0x10 /* There are packets for transmission. */
+#define EVENT_PS2      0x20 /* PS/2 keyboard or mouse event(s) */
 
 /* Bit offsets, as opposed to the above masks. */
-#define _EVENT_BLK_RESP 0
-#define _EVENT_TIMER	1
-#define _EVENT_DIE	2
-#define _EVENT_NET_TX	3
-#define _EVENT_NET_RX	4
-#define _EVENT_DEBUG	5
-#define _EVENT_KBD      6
+#define _EVENT_BLKDEV   0
+#define _EVENT_TIMER    1
+#define _EVENT_DIE      2
+#define _EVENT_DEBUG    3
+#define _EVENT_NET      4
+#define _EVENT_PS2      5
 
 /*
  * Virtual addresses beyond this are not modifiable by guest OSes.

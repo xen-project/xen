@@ -19,12 +19,6 @@
 #include <linux/pm.h>
 #include <asm/io.h>
 
-
-#define KEYBOARD_IRQ _EVENT_KBD
-#define AUX_IRQ _EVENT_KBD
-
-/* THIS SECTION RELATIVELY UNTOUCHED */
-
 extern int pckbd_setkeycode(unsigned int scancode, unsigned int keycode);
 extern int pckbd_getkeycode(unsigned int scancode);
 extern int pckbd_translate(unsigned char scancode, unsigned char *keycode,
@@ -60,8 +54,10 @@ static inline int xen_kbd_controller_present ()
 }
 
 /* resource allocation */
-#define kbd_request_region() do { } while (0)
-#define kbd_request_irq(handler) request_irq(_EVENT_KBD, handler, 0, "PS/2 kbd", NULL)
+#define kbd_request_region()     \
+    do { } while (0)
+#define kbd_request_irq(handler) \
+    request_irq(_EVENT_PS2, handler, 0, "ps/2", NULL)
 
 /* could implement these with command to xen to filter mouse stuff... */
 #define aux_request_irq(hand, dev_id) 0

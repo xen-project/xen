@@ -69,9 +69,9 @@ typedef struct net_idx_st
 {
     /*
      * Guest OS places packets into ring at tx_req_prod.
-     * Guest OS receives DOMAIN_EVENT_NET_TX when tx_resp_prod passes tx_event.
+     * Guest OS receives EVENT_NET when tx_resp_prod passes tx_event.
      * Guest OS places empty buffers into ring at rx_req_prod.
-     * Guest OS receives DOMAIN_EVENT_NET_RX when rx_rssp_prod passes rx_event.
+     * Guest OS receives EVENT_NET when rx_rssp_prod passes rx_event.
      */
     unsigned int tx_req_prod, tx_resp_prod, tx_event;
     unsigned int rx_req_prod, rx_resp_prod, rx_event;

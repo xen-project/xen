@@ -218,7 +218,7 @@ static void keyboard_interrupt(int irq, void *dev_id, struct pt_regs *regs)
         if ( p != NULL )
         {
             kbd_ring_push(status, scancode);
-            cpu_mask |= mark_guest_event(p, _EVENT_KBD);
+            cpu_mask |= mark_guest_event(p, _EVENT_PS2);
         }
     }
     
