@@ -241,13 +241,13 @@ long do_set_gdt(unsigned long *frame_list, unsigned int entries)
             mk_l1_pgentry((frames[i] << PAGE_SHIFT) | __PAGE_HYPERVISOR);
         
         page = frame_table + frames[i];
-        page->flags &= ~PG_type_mask;
+        page->flags &= ~(PG_type_mask | PG_need_flush);
         page->flags |= PGT_gdt_page;
         get_page_type(page);
         get_page_tot(page);
     }
 
-    flush_tlb();
+    local_flush_tlb();
 
     /* Copy over first entries of the new GDT. */
     memcpy((void *)GDT_VIRT_START, gdt_table, FIRST_DOMAIN_GDT_ENTRY*8);

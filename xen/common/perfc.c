@@ -25,7 +25,7 @@ struct perfcounter_t perfcounters;
 
 void perfc_printall(u_char key, void *dev_id, struct pt_regs *regs)
 {
-    int i, j;
+    int i, j, sum;
     s_time_t now = NOW();
     atomic_t *counters = (atomic_t *)&perfcounters;
 
@@ -34,27 +34,27 @@ void perfc_printall(u_char key, void *dev_id, struct pt_regs *regs)
 
     for ( i = 0; i < NR_PERFCTRS; i++ ) 
     {
-        printk("%20s  ",  perfc_info[i].name);
+        printk("%-32s  ",  perfc_info[i].name);
         switch ( perfc_info[i].type )
         {
         case TYPE_SINGLE:
-            printk("%10d  0x%08x",
-                   atomic_read(&counters[0]), 
-                   atomic_read(&counters[0]));
+            printk("TOTAL[%10d]", atomic_read(&counters[0]));
             counters += 1;
             break;
         case TYPE_CPU:
+            for ( j = sum = 0; j < smp_num_cpus; j++ )
+                sum += atomic_read(&counters[j]);
+            printk("TOTAL[%10d]  ", sum);
             for ( j = 0; j < smp_num_cpus; j++ )
-                printk("CPU%02d[%10d 0x%08x]  ",
-                       j, atomic_read(&counters[j]), 
-                       atomic_read(&counters[j]));
+                printk("CPU%02d[%10d]  ", j, atomic_read(&counters[j]));
             counters += NR_CPUS;
             break;
         case TYPE_ARRAY:
+            for ( j = sum = 0; j < perfc_info[i].nr_elements; j++ )
+                sum += atomic_read(&counters[j]);
+            printk("TOTAL[%10d]  ", sum);
             for ( j = 0; j < perfc_info[i].nr_elements; j++ )
-                printk("ARR%02d[%10d 0x%08x]  ",
-                       j, atomic_read(&counters[j]), 
-                       atomic_read(&counters[j]));
+                printk("ARR%02d[%10d]  ", j, atomic_read(&counters[j]));
             counters += j;
             break;
         }

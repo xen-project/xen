@@ -18,6 +18,7 @@
 #include <xeno/delay.h>
 #include <xeno/spinlock.h>
 #include <xeno/irq.h>
+#include <xeno/perfc.h>
 #include <asm/domain_page.h>
 #include <asm/system.h>
 #include <asm/io.h>
@@ -322,6 +323,13 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
             if ( !check_descriptor(ldt_page[i*2], ldt_page[i*2+1]) )
                 goto unlock_and_bounce_fault;
         unmap_domain_mem(ldt_page);
+
+        if ( page->flags & PG_need_flush )
+        {
+            perfc_incrc(need_flush_tlb_flush);
+            local_flush_tlb();
+            page->flags &= ~PG_need_flush;
+        }
 
         page->flags &= ~PG_type_mask;
         page->flags |= PGT_ldt_page;

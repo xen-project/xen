@@ -31,7 +31,7 @@ static void flush_all_ready_maps(void)
     do { if ( (*cache & READY_FOR_TLB_FLUSH) ) *cache = 0; }
     while ( ((unsigned long)(++cache) & ~PAGE_MASK) != 0 );
 
-    perfc_incr(domain_page_tlb_flush);
+    perfc_incrc(domain_page_tlb_flush);
     local_flush_tlb();
 }
 

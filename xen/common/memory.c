@@ -70,7 +70,6 @@
 
 /*
  * THE FOLLOWING ARE ISSUES IF GUEST OPERATING SYSTEMS BECOME SMP-CAPABLE.
- * [THAT IS, THEY'RE NOT A PROBLEM NOW, AND MAY NOT EVER BE.]
  * -----------------------------------------------------------------------
  * 
  * *********
@@ -83,7 +82,6 @@
  * than one, we'd probably just flush on all processors running the domain.
  * *********
  * 
- * ** 1 **
  * The problem involves creating new page tables which might be mapped 
  * writeable in the TLB of another processor. As an example, a domain might be 
  * running in two contexts (ie. on two processors) simultaneously, using the 
@@ -109,67 +107,15 @@
  * FLUSH_NONE, FLUSH_PAGETABLE, FLUSH_DOMAIN. A flush reduces this
  * to FLUSH_NONE, while squashed write mappings can only promote up
  * to more aggressive flush types.
- * 
- * ** 2 **
- * Same problem occurs when removing a page table, at level 1 say, then
- * making it writeable. Need a TLB flush between otherwise another processor
- * might write an illegal mapping into the old table, while yet another
- * processor can use the illegal mapping because of a stale level-2 TLB
- * entry. So, removal of a table reference sets 'flush_level' appropriately,
- * and a flush occurs on next addition of a fresh write mapping.
- * 
- * BETTER SOLUTION FOR BOTH 1 AND 2:
- * When type_refcnt goes to zero, leave old type in place (don't set to
- * PGT_none). Then, only flush if making a page table of a page with
- * (cnt=0,type=PGT_writeable), or when adding a write mapping for a page
- * with (cnt=0, type=PGT_pagexxx). A TLB flush will cause all pages
- * with refcnt==0 to be reset to PGT_none. Need an array for the purpose,
- * added to when a type_refcnt goes to zero, and emptied on a TLB flush.
- * Either have per-domain table, or force TLB flush at end of each
- * call to 'process_page_updates'.
- * Most OSes will always keep a writeable reference hanging around, and
- * page table structure is fairly static, so this mechanism should be
- * fairly cheap.
- * 
- * MAYBE EVEN BETTER? [somewhat dubious: not for first cut of the code]:
- * If we need to force an intermediate flush, those other processors
- * spin until we complete, then do a single TLB flush. They can spin on
- * the lock protecting 'process_page_updates', and continue when that
- * is freed. Saves cost of setting up and servicing an IPI: later
- * communication is synchronous. Processors trying to install the domain
- * or domain&pagetable would also enter the spin.
- * 
- * ** 3 **
- * Indeed, this problem generalises to reusing page tables at different
- * levels of the hierarchy (conceptually, the guest OS can use the
- * hypervisor to introduce illegal table entries by proxy). Consider
- * unlinking a level-1 page table and reintroducing at level 2 with no
- * TLB flush. Hypervisor can add a reference to some other level-1 table
- * with the RW bit set. This is fine in the level-2 context, but some
- * other processor may still be using that table in level-1 context
- * (due to a stale TLB entry). At level 1 it may look like the
- * processor has write access to the other level-1 page table! Therefore
- * can add illegal values there with impunity :-(
- * 
- * Fortunately, the solution above generalises to this extended problem.
  */
 
-/*
- * UPDATE 12.11.02.: We no longer have struct page and mem_map. These
- * have been replaced by struct pfn_info and frame_table respectively.
- * 
- * system_free_list is a list_head linking all system owned free pages.
- * it is initialized in init_frametable.
- *
- * Boris Dragovic.
- */
- 
 #include <xeno/config.h>
 #include <xeno/init.h>
 #include <xeno/lib.h>
 #include <xeno/mm.h>
 #include <xeno/sched.h>
 #include <xeno/errno.h>
+#include <xeno/perfc.h>
 #include <asm/page.h>
 #include <asm/flushtlb.h>
 #include <asm/io.h>
@@ -303,6 +249,13 @@ static int inc_page_refcnt(unsigned long page_nr, unsigned int type)
                     page_nr << PAGE_SHIFT,
                     flags & PG_type_mask, type, page_type_count(page));
             return -1;
+        }
+
+        if ( flags & PG_need_flush )
+        {
+            flush_tlb[smp_processor_id()] = 1;
+            page->flags &= ~PG_need_flush;
+            perfc_incrc(need_flush_tlb_flush);
         }
 
         page->flags &= ~PG_type_mask;
@@ -540,11 +493,7 @@ static void put_page(unsigned long page_nr, int writeable)
             ((page->flags & PG_need_flush) == PG_need_flush)));
     if ( writeable )
     {
-        if ( put_page_type(page) == 0 )
-        {
-            flush_tlb[smp_processor_id()] = 1;
-            page->flags &= ~PG_need_flush;
-        }
+        put_page_type(page);
     }
     else if ( unlikely(((page->flags & PG_type_mask) == PGT_ldt_page) &&
                        (page_type_count(page) != 0)) )

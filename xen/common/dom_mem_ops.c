@@ -11,6 +11,7 @@
 #include <xeno/lib.h>
 #include <xeno/mm.h>
 #include <xeno/dom_mem_ops.h>
+#include <xeno/perfc.h>
 #include <xeno/sched.h>
 #include <xeno/event.h>
 #include <asm/domain_page.h>
@@ -89,6 +90,7 @@ static long free_dom_mem(struct task_struct *p, balloon_inf_op_t bop)
     unsigned long     i;
     unsigned long     flags;
     long              rc = 0;
+    int               need_flush = 0;
 
     spin_lock_irqsave(&free_list_lock, flags);
     spin_lock(&p->page_lock);
@@ -117,6 +119,8 @@ static long free_dom_mem(struct task_struct *p, balloon_inf_op_t bop)
             goto out;
         }
 
+        need_flush |= pf->flags & PG_need_flush;
+
         pf->flags = 0;
 
         list_del(&pf->list);
@@ -130,6 +134,12 @@ static long free_dom_mem(struct task_struct *p, balloon_inf_op_t bop)
     spin_unlock(&p->page_lock);
     spin_unlock_irqrestore(&free_list_lock, flags);
     
+    if ( need_flush )
+    {
+        __flush_tlb();
+        perfc_incrc(need_flush_tlb_flush);
+    }
+
     return rc ? rc : bop.size;
 }
     

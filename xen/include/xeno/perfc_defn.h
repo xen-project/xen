@@ -16,4 +16,5 @@ PERFCOUNTER( net_rx_delivered, "net rx delivered" )
 PERFCOUNTER( net_rx_tlbflush, "net rx tlb flushes" )
 PERFCOUNTER( net_tx_transmitted, "net tx transmitted" )
 
-PERFCOUNTER( domain_page_tlb_flush, "domain page tlb flushes" )
+PERFCOUNTER_CPU( domain_page_tlb_flush, "domain page tlb flushes" )
+PERFCOUNTER_CPU( need_flush_tlb_flush, "PG_need_flush tlb flushes" )

@@ -39,9 +39,6 @@
  *
  *  - flush_tlb() flushes the current mm struct TLBs
  *  - flush_tlb_all() flushes all processes TLBs
- *  - flush_tlb_mm(mm) flushes the specified mm context TLB's
- *  - flush_tlb_page(vma, vmaddr) flushes one page
- *  - flush_tlb_range(mm, start, end) flushes a range of pages
  *  - flush_tlb_pgtables(mm, start, end) flushes a range of page tables
  *
  * ..but the i386 has somewhat limited tlb flushing capabilities,
@@ -50,54 +47,19 @@
 
 #ifndef CONFIG_SMP
 
-#define flush_tlb() __flush_tlb()
-#define flush_tlb_all() __flush_tlb_all()
-#define local_flush_tlb() __flush_tlb()
-
-static inline void flush_tlb_mm(struct mm_struct *mm)
-{
-	if (mm == current->active_mm)
-		__flush_tlb();
-}
-
-static inline void flush_tlb_cpu(unsigned int cpu)
-{
-    __flush_tlb();
-}
-
-#if 0
-static inline void flush_tlb_page(struct vm_area_struct *vma,
-	unsigned long addr)
-{
-	if (vma->vm_mm == current->active_mm)
-		__flush_tlb_one(addr);
-}
-#endif
-
-static inline void flush_tlb_range(struct mm_struct *mm,
-	unsigned long start, unsigned long end)
-{
-	if (mm == current->active_mm)
-		__flush_tlb();
-}
+#define flush_tlb()         __flush_tlb()
+#define flush_tlb_all()     __flush_tlb_all()
+#define local_flush_tlb()   __flush_tlb()
+#define flush_tlb_cpu(_cpu) __flush_tlb()
 
 #else
 
 #include <xeno/smp.h>
 
-#define local_flush_tlb() \
-	__flush_tlb()
+#define flush_tlb()	    __flush_tlb()
+#define local_flush_tlb()   __flush_tlb()
 
 extern void flush_tlb_all(void);
-extern void flush_tlb_current_task(void);
-extern void flush_tlb_mm(struct mm_struct *);
-
-#define flush_tlb()	flush_tlb_current_task()
-
-static inline void flush_tlb_range(struct mm_struct * mm, unsigned long start, unsigned long end)
-{
-	flush_tlb_mm(mm);
-}
 
 extern void flush_tlb_others(unsigned long cpumask);
 static inline void flush_tlb_cpu(unsigned int cpu)

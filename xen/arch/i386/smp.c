@@ -352,48 +352,6 @@ void flush_tlb_others(unsigned long cpumask)
     spin_unlock(&tlbstate_lock);
 }
 	
-void flush_tlb_current_task(void)
-{
-#if 0
-    struct mm_struct *mm = &current->mm;
-    unsigned long cpu_mask = mm->cpu_vm_mask & ~(1 << smp_processor_id());
-
-    local_flush_tlb();
-    if (cpu_mask)
-        flush_tlb_others(cpu_mask, mm, FLUSH_ALL);
-#endif
-}
-
-void flush_tlb_mm (struct mm_struct * mm)
-{
-#if 0
-    unsigned long cpu_mask = mm->cpu_vm_mask & ~(1 << smp_processor_id());
-
-    if (current->active_mm == mm)
-        local_flush_tlb();
-    if (cpu_mask)
-        flush_tlb_others(cpu_mask, mm, FLUSH_ALL);
-#endif
-}
-
-#if 0
-void flush_tlb_page(struct vm_area_struct * vma, unsigned long va)
-{
-    struct mm_struct *mm = vma->vm_mm;
-    unsigned long cpu_mask = mm.cpu_vm_mask & ~(1 << smp_processor_id());
-
-    if (current->active_mm == mm) {
-        if(current->mm)
-            __flush_tlb_one(va);
-        else
-            leave_mm(smp_processor_id());
-    }
-
-    if (cpu_mask)
-        flush_tlb_others(cpu_mask, mm, va);
-}
-#endif
-
 static inline void do_flush_tlb_all_local(void)
 {
     unsigned long cpu = smp_processor_id();

@@ -14,13 +14,9 @@ ENTRY(start)
         /* Magic number indicating a Multiboot header. */
 	.long	0x1BADB002
 	/* Flags to bootloader (see Multiboot spec). */
-	.long	0x00000006
+	.long	0x00000002
 	/* Checksum: must be the negated sum of the first two fields. */
-	.long	-0x1BADB008
-        /* Unused loader addresses (ELF header has all this already).*/
-        .long   0,0,0,0,0
-        /* EGA text mode. */
-        .long   1,0,0,0
+	.long	-0x1BADB004
         
 hal_entry:
         /* Set up a few descriptors: on entry only CS is guaranteed good. */
