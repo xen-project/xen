@@ -224,7 +224,7 @@ asmlinkage void smp_invalidate_interrupt(void)
 
 void flush_tlb_mask(unsigned long mask)
 {
-    ASSERT(!in_irq());
+    ASSERT(local_irq_is_enabled());
     
     if ( mask & (1 << smp_processor_id()) )
     {
@@ -234,20 +234,7 @@ void flush_tlb_mask(unsigned long mask)
 
     if ( mask != 0 )
     {
-        /*
-         * We are certainly not reentering a flush_lock region on this CPU
-         * because we are not in an IRQ context. We can therefore wait for the
-         * other guy to release the lock. This is harder than it sounds because
-         * local interrupts might be disabled, and he may be waiting for us to
-         * execute smp_invalidate_interrupt(). We deal with this possibility by
-         * inlining the meat of that function here.
-         */
-        while ( unlikely(!spin_trylock(&flush_lock)) )
-        {
-            if ( test_and_clear_bit(smp_processor_id(), &flush_cpumask) )
-                local_flush_tlb();
-            rep_nop();
-        }
+        spin_lock(&flush_lock);
 
         flush_cpumask = mask;
         send_IPI_mask(mask, INVALIDATE_TLB_VECTOR);
@@ -264,6 +251,8 @@ void flush_tlb_mask(unsigned long mask)
 /* Call with no locks held and interrupts enabled (e.g., softirq context). */
 void new_tlbflush_clock_period(void)
 {
+    ASSERT(local_irq_is_enabled());
+    
     /* Flush everyone else. We definitely flushed just before entry. */
     if ( smp_num_cpus > 1 )
     {

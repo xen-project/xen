@@ -3,9 +3,6 @@
 #include <xen/spinlock.h>
 #include <asm/uaccess.h>
 
-extern const struct exception_table_entry __start___ex_table[];
-extern const struct exception_table_entry __stop___ex_table[];
-
 static inline unsigned long
 search_one_table(const struct exception_table_entry *first,
 		 const struct exception_table_entry *last,
@@ -31,5 +28,21 @@ search_one_table(const struct exception_table_entry *first,
 unsigned long
 search_exception_table(unsigned long addr)
 {
-    return search_one_table(__start___ex_table, __stop___ex_table-1, addr);
+    extern const struct exception_table_entry __start___ex_table[];
+    extern const struct exception_table_entry __stop___ex_table[];
+    return search_one_table(
+        __start___ex_table, __stop___ex_table-1, addr);
 }
+
+#ifdef __i386__
+unsigned long
+search_pre_exception_table(unsigned long addr)
+{
+    extern const struct exception_table_entry __start___pre_ex_table[];
+    extern const struct exception_table_entry __stop___pre_ex_table[];
+    unsigned long fixup = search_one_table(
+        __start___pre_ex_table, __stop___pre_ex_table-1, addr);
+    DPRINTK("Pre-exception: %08lx -> %08lx\n", addr, fixup);
+    return fixup;
+}
+#endif

@@ -1091,7 +1091,7 @@ int pdb_handle_exception(int exceptionVector,
 	 (xen_regs->cs & 3) == 3 && 
 	 xen_regs->eip != pdb_system_call_next_addr + 1)
     {
-        TRC(printf("pdb: user bkpt (0x%x) at 0x%x:0x%lx:0x%lx\n", 
+        TRC(printf("pdb: user bkpt (0x%x) at 0x%x:0x%lx:0x%x\n", 
 		   exceptionVector, xen_regs->cs & 3, cr3, xen_regs->eip));
 	return 1;
     }
@@ -1110,12 +1110,12 @@ int pdb_handle_exception(int exceptionVector,
 	 (exceptionVector != KEYPRESS_EXCEPTION) &&
 	 xen_regs->eip < 0xc0000000)  /* Linux-specific for now! */
     {
-        TRC(printf("pdb: user bkpt (0x%x) at 0x%lx:0x%lx\n", 
+        TRC(printf("pdb: user bkpt (0x%x) at 0x%lx:0x%x\n", 
 		   exceptionVector, cr3, xen_regs->eip));
 	return 1;
     }
 
-    printk("pdb_handle_exception [0x%x][0x%lx:0x%lx]\n",
+    printk("pdb_handle_exception [0x%x][0x%lx:0x%x]\n",
 	   exceptionVector, cr3, xen_regs->eip);
 
     if ( pdb_stepping )
@@ -1229,7 +1229,7 @@ void pdb_handle_debug_trap(struct xen_regs *regs, long error_code)
     {
         d->thread.debugreg[6] = condition;
 
-        tb->flags = TBF_TRAP_NOCODE;
+        tb->flags = TBF_EXCEPTION;
         tb->cs    = d->thread.traps[1].cs;
         tb->eip   = d->thread.traps[1].address;
     }

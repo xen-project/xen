@@ -467,7 +467,7 @@ int gpf_emulate_4gb(struct xen_regs *regs)
     {
         ti  = &d->thread.traps[15];
         tb = &d->thread.trap_bounce;
-        tb->flags      = TBF_TRAP;
+        tb->flags      = TBF_EXCEPTION | TBF_EXCEPTION_ERRCODE;
         tb->error_code = pb - eip;
         tb->cs         = ti->cs;
         tb->eip        = ti->address;
