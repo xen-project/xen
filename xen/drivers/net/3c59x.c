@@ -227,12 +227,9 @@ static int vortex_debug = 1;
 #include <xen/config.h>
 #include <xen/lib.h>
 #include <xen/module.h>
-//#include <xen/kernel.h>
 #include <xen/sched.h>
-//#include <xen/string.h>
 #include <xen/timer.h>
 #include <xen/errno.h>
-//#include <xen/in.h>
 #include <xen/ioport.h>
 #include <xen/slab.h>
 #include <xen/interrupt.h>
@@ -243,7 +240,7 @@ static int vortex_debug = 1;
 #include <xen/etherdevice.h>
 #include <xen/skbuff.h>
 #include <xen/ethtool.h>
-//#include <xen/highmem.h>
+#include <asm/domain_page.h>
 #include <asm/irq.h>			/* For NR_IRQS only. */
 #include <asm/bitops.h>
 #include <asm/io.h>
@@ -1936,7 +1933,9 @@ vortex_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		/* netif_wake_queue() will be called at the DMADone interrupt. */
 	} else {
 		/* ... and the packet rounded to a doubleword. */
-		outsl(ioaddr + TX_FIFO, skb->data, (skb->len + 3) >> 2);
+		char *vdata = map_domain_mem(__pa(skb->data));
+		outsl(ioaddr + TX_FIFO, vdata, (skb->len + 3) >> 2);
+		unmap_domain_mem(vdata);
 		dev_kfree_skb (skb);
 		if (inw(ioaddr + TxFree) > 1536) {
 			netif_start_queue (dev);	/* AKPM: redundant? */
@@ -2342,8 +2341,10 @@ static int vortex_rx(struct net_device *dev)
 						;
 					pci_unmap_single(vp->pdev, dma, pkt_len, PCI_DMA_FROMDEVICE);
 				} else {
-					insl(ioaddr + RX_FIFO, skb_put(skb, pkt_len),
+					char *vdata = map_domain_mem(__pa(skb_put(skb, pkt_len)));
+					insl(ioaddr + RX_FIFO, vdata,
 						 (pkt_len + 3) >> 2);
+					unmap_domain_mem(vdata);
 				}
 				outw(RxDiscard, ioaddr + EL3_CMD); /* Pop top Rx packet. */
 				skb->protocol = eth_type_trans(skb, dev);
