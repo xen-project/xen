@@ -16,6 +16,7 @@
 #include <asm/shadow.h>
 #include <public/dom0_ops.h>
 #include <asm/domain_page.h>
+#include <public/io/domain_controller.h>
 
 /* Both these structures are protected by the domlist_lock. */
 rwlock_t domlist_lock = RW_LOCK_UNLOCKED;
@@ -167,6 +168,9 @@ void domain_shutdown(u8 reason)
             machine_restart(0);
         }
     }
+
+    if ( reason == SHUTDOWN_crash )
+        domain_crash();  /* we will not return */  
 
     current->shutdown_code = reason;
     set_bit(DF_SHUTDOWN, &current->flags);

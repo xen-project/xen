@@ -19,7 +19,7 @@
 #define SHUTDOWN_poweroff   0  /* Domain exited normally. Clean up and kill. */
 #define SHUTDOWN_reboot     1  /* Clean up, kill, and then restart.          */
 #define SHUTDOWN_suspend    2  /* Clean up, save suspend info, kill.         */
-
+#define SHUTDOWN_crash      3  /* Tell controler we've crashed.              */
 
 /*
  * CONTROLLER MESSAGING INTERFACE.
