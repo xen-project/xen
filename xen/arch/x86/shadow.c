@@ -45,7 +45,7 @@ static inline void free_shadow_page(
     free_domheap_page(page);
 }
 
-static void free_shadow_state(struct domain *d)
+void free_shadow_state(struct domain *d)
 {
     int                   i, free = 0;
     struct shadow_status *x, *n;
@@ -166,15 +166,20 @@ void shadow_mode_init(void)
 {
 }
 
-int shadow_mode_enable(struct domain *d, unsigned int mode)
-{
-    d->arch.shadow_ht = xmalloc_array(struct shadow_status, shadow_ht_buckets);
-    if ( d->arch.shadow_ht == NULL )
-        goto nomem;
-    memset(d->arch.shadow_ht, 0,
-           shadow_ht_buckets * sizeof(struct shadow_status));
 
-    if ( mode == SHM_logdirty )
+int __shadow_mode_enable(struct domain *d, unsigned int mode)
+{
+    if (!d->arch.shadow_ht)
+    {
+        d->arch.shadow_ht = xmalloc_array(struct shadow_status, shadow_ht_buckets);
+        if ( d->arch.shadow_ht == NULL )
+            goto nomem;
+
+        memset(d->arch.shadow_ht, 0,
+           shadow_ht_buckets * sizeof(struct shadow_status));
+    }
+
+    if ( mode == SHM_logdirty && !d->arch.shadow_dirty_bitmap)
     {
         d->arch.shadow_dirty_bitmap_size = (d->max_pages + 63) & ~63;
         d->arch.shadow_dirty_bitmap = 
@@ -191,7 +196,6 @@ int shadow_mode_enable(struct domain *d, unsigned int mode)
 
     d->arch.shadow_mode = mode;
 
-    __shadow_mk_pagetable(d->exec_domain[0]); /* XXX SMP */
     return 0;
 
  nomem:
@@ -199,6 +203,15 @@ int shadow_mode_enable(struct domain *d, unsigned int mode)
         xfree(d->arch.shadow_ht);
     d->arch.shadow_ht = NULL;
     return -ENOMEM;
+}
+
+int shadow_mode_enable(struct domain *d, unsigned int mode)
+{
+    int rc;
+    shadow_lock(d);
+    rc = __shadow_mode_enable(d, mode);
+    shadow_unlock(d);
+    return rc;
 }
 
 void __shadow_mode_disable(struct domain *d)
@@ -240,6 +253,7 @@ static int shadow_mode_table_op(
 {
     unsigned int      op = sc->op;
     int               i, rc = 0;
+    struct exec_domain *ed;
 
     ASSERT(spin_is_locked(&d->arch.shadow_lock));
 
@@ -344,7 +358,10 @@ static int shadow_mode_table_op(
 
     SH_VLOG("shadow mode table op : page count %d", d->arch.shadow_page_count);
     shadow_audit(d, 1);
-    __shadow_mk_pagetable(d->exec_domain[0]); /* XXX SMP */
+
+    for_each_exec_domain(d,ed)
+        __update_pagetables(ed);
+
     return rc;
 }
 
@@ -352,6 +369,7 @@ int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
 {
     unsigned int op = sc->op;
     int          rc = 0;
+    struct exec_domain *ed;
 
     if ( unlikely(d == current->domain) )
     {
@@ -372,12 +390,12 @@ int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
 
     case DOM0_SHADOW_CONTROL_OP_ENABLE_TEST:
         shadow_mode_disable(d);
-        rc = shadow_mode_enable(d, SHM_test);
+        rc = __shadow_mode_enable(d, SHM_test);
         break;
 
     case DOM0_SHADOW_CONTROL_OP_ENABLE_LOGDIRTY:
         shadow_mode_disable(d);
-        rc = shadow_mode_enable(d, SHM_logdirty);
+        rc = __shadow_mode_enable(d, SHM_logdirty);
         break;
 
     default:
@@ -386,6 +404,9 @@ int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
     }
 
     shadow_unlock(d);
+
+    for_each_exec_domain(d,ed)
+        update_pagetables(ed);
 
     domain_unpause(d);
 

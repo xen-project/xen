@@ -124,7 +124,7 @@ struct arch_exec_domain
 #define IDLE0_ARCH_EXEC_DOMAIN                                      \
 {                                                                   \
     perdomain_ptes: 0,                                              \
-    guest_table:    mk_pagetable(__pa(idle_pg_table))               \
+    monitor_table:  mk_pagetable(__pa(idle_pg_table))               \
 }
 
 #endif /* __ASM_DOMAIN_H__ */
