@@ -57,6 +57,19 @@
 #endif
 
 
+/* Set the close-on-exec flag on a file descriptor.  Doesn't currently bother
+ * to check for errors. */
+static void set_cloexec(int fd)
+{
+    int flags = fcntl(fd, F_GETFD, 0);
+
+    if ( flags < 0 )
+	return;
+
+    flags |= FD_CLOEXEC;
+    fcntl(fd, F_SETFD, flags);
+}
+
 /*
  * *********************** NOTIFIER ***********************
  */
@@ -197,6 +210,7 @@ static PyObject *xu_notifier_new(PyObject *self, PyObject *args)
         PyObject_Del((PyObject *)xun);
         return PyErr_SetFromErrno(PyExc_IOError);
     }
+    set_cloexec(xun->evtchn_fd);
 
     return (PyObject *)xun;
 }
@@ -896,6 +910,7 @@ static int __xu_port_connect(xu_port_object *xup)
         PyErr_SetString(port_error, "Could not open '/dev/mem'");
         return -1;
     }
+    set_cloexec(xup->mem_fd);
 
     /* Set the General-Purpose Subject whose page frame will be mapped. */
     (void)ioctl(xup->mem_fd, _IO('M', 1), (unsigned long)xup->remote_dom);
