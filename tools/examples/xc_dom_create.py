@@ -274,7 +274,7 @@ def make_domain():
     # set the expertise level appropriately
     xenctl.utils.VBD_EXPERT_MODE = vbd_expert
 
-    if not (flags & 4): # It's not a block backend (or it's old IO world)
+    if not (flags & 1<<4): # It's not a block backend (or it's old IO world)
         if new_io_world:
             cmsg = 'new_block_interface(dom='+str(id)+')'
             xend_response = xenctl.utils.xend_control_message(cmsg)
@@ -350,7 +350,7 @@ def make_domain():
                 sys.exit()
 
     if new_io_world:
-        if not (flags & 8): # If it's not the net backend, give it a frontend.
+        if not (flags & 1<<5): # If it's not the net backend, give it a frontend.
             cmsg = 'new_network_interface(dom='+str(id)+')'
             xend_response = xenctl.utils.xend_control_message(cmsg)
             if not xend_response['success']:

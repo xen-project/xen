@@ -4,7 +4,7 @@
 ## Copyright (c) 2004, K A Fraser (University of Cambridge)
 #################################################################
 
-import errno, re, os, select, signal, socket, struct, sys
+import errno, re, os, select, signal, socket, sys
 import xend.main, xend.console, xend.manager, xend.utils, Xc
 
 CMSG_BLKIF_BE = 1
@@ -47,7 +47,7 @@ def backend_rx_req(port, msg):
     subtype = (msg.get_header())['subtype']
     print "Received blkif-be request, subtype %d" % subtype
     if subtype == CMSG_BLKIF_BE_DRIVER_STATUS_CHANGED:
-        (status, dummy) = struct.unpack("II", msg.get_payload())
+        status = (msg.get_payload())['status']
         if status == BLKIF_DRIVER_STATUS_UP:
             if xend.blkif.recovery:
                 # Nasty hack: we count the number of VBDs we reattach so that
@@ -107,9 +107,9 @@ def backend_rx_rsp(port, msg):
                for blkif_key in interface.list.keys():
                    blkif = interface.list[blkif_key]
                    print "  Notifying %d" % blkif.dom
-                   msg = xend.utils.message(CMSG_BLKIF_FE,                   \
-                                            CMSG_BLKIF_FE_INTERFACE_STATUS_CHANGED, 0)
-                   msg.append_payload(struct.pack("III", 0,1,0))
+                   msg = xend.utils.message(CMSG_BLKIF_FE,
+                                            CMSG_BLKIF_FE_INTERFACE_STATUS_CHANGED,
+                                            0, { 'handle' : 0, 'status' : 1 })
                    blkif.ctrlif_tx_req(xend.main.port_from_dom(blkif.dom),msg)
                xend.blkif.recovery = False
                print "Done notifying guests"
@@ -158,8 +158,11 @@ class interface:
 
     def reattach_device(self, vdev):
         (pdev, start_sect, nr_sect, readonly) = self.devices[vdev]
-        msg = xend.utils.message(CMSG_BLKIF_BE, CMSG_BLKIF_BE_VBD_CREATE, 0)
-        msg.append_payload(struct.pack("IIHII",self.dom,0,vdev,readonly,0))
+        msg = xend.utils.message(CMSG_BLKIF_BE, CMSG_BLKIF_BE_VBD_CREATE,
+                                 0, { 'domid' : self.dom,
+                                      'blkif_handle' : 0,
+                                      'vdevice' : vdev,
+                                      'readonly' : readonly })
         xend.blkif.pendaddr = xend.main.mgmt_req_addr
         backend_tx_req(msg)
 
@@ -200,9 +203,9 @@ class interface:
             pl = msg.get_payload()
             (hnd, frame) = (pl['handle'], pl['shmem_frame'])
             xc = Xc.new()
-            self.evtchn = xc.evtchn_bind_interdomain( \
-                dom1=xend.blkif.be_port.remote_dom,   \
-                dom2=self.dom)
+            self.evtchn = xc.evtchn_bind_interdomain(
+                                            dom1=xend.blkif.be_port.remote_dom,
+                                            dom2=self.dom)
             msg = xend.utils.message(CMSG_BLKIF_BE,
                                      CMSG_BLKIF_BE_CONNECT, 0,
                                      { 'domid' : self.dom, 'blkif_handle' : 0,
