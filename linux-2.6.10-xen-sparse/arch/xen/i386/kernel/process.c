@@ -500,7 +500,7 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 	 */
 	if (prev_p->thread_info->status & TS_USEDFPU) {
 		__save_init_fpu(prev_p); /* _not_ save_init_fpu() */
-		queue_multicall0(__HYPERVISOR_fpu_taskswitch);
+		queue_multicall1(__HYPERVISOR_fpu_taskswitch, 1);
 	}
 
 	/*

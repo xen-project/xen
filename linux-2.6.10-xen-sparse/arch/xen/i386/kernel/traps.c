@@ -902,14 +902,6 @@ asmlinkage void math_state_restore(struct pt_regs regs)
 	struct thread_info *thread = current_thread_info();
 	struct task_struct *tsk = thread->task;
 
-	/*
-	 * A trap in kernel mode can be ignored. It'll be the fast XOR or
-	 * copying libraries, which will correctly save/restore state and
-	 * reset the TS bit in CR0.
-	 */
-	if ((regs.xcs & 2) == 0)
-		return;
-
 	/* NB. 'clts' is done for us by Xen during virtual trap. */
 	if (!tsk->used_math)
 		init_fpu(tsk);

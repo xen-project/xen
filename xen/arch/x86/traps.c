@@ -348,6 +348,25 @@ asmlinkage int do_page_fault(struct xen_regs *regs)
     return 0;
 }
 
+long do_fpu_taskswitch(int set)
+{
+    struct exec_domain *ed = current;
+
+    if ( set )
+    {
+        set_bit(EDF_GUEST_STTS, &ed->ed_flags);
+        stts();
+    }
+    else
+    {
+        clear_bit(EDF_GUEST_STTS, &ed->ed_flags);
+        if ( test_bit(EDF_USEDFPU, &ed->ed_flags) )
+            clts();
+    }
+
+    return 0;
+}
+
 static int emulate_privileged_op(struct xen_regs *regs)
 {
     extern void *decode_reg(struct xen_regs *regs, u8 b);
@@ -369,9 +388,7 @@ static int emulate_privileged_op(struct xen_regs *regs)
     switch ( opcode )
     {
     case 0x06: /* CLTS */
-        clear_bit(EDF_GUEST_STTS, &ed->ed_flags);
-        if ( test_bit(EDF_USEDFPU, &ed->ed_flags) )
-            clts();
+        (void)do_fpu_taskswitch(0);
         break;
 
     case 0x09: /* WBINVD */
@@ -420,17 +437,7 @@ static int emulate_privileged_op(struct xen_regs *regs)
         switch ( (opcode >> 3) & 7 )
         {
         case 0: /* Write CR0 */
-            if ( *reg & X86_CR0_TS )
-            {
-                set_bit(EDF_GUEST_STTS, &ed->ed_flags);
-                stts();
-            }
-            else
-            {
-                clear_bit(EDF_GUEST_STTS, &ed->ed_flags);
-                if ( test_bit(EDF_USEDFPU, &ed->ed_flags) )
-                    clts();
-            }
+            (void)do_fpu_taskswitch(!!(*reg & X86_CR0_TS));
             break;
 
         case 2: /* Write CR2 */
@@ -823,14 +830,6 @@ long do_set_trap_table(trap_info_t *traps)
 
     UNLOCK_BIGLOCK(current->domain);
 
-    return 0;
-}
-
-
-long do_fpu_taskswitch(void)
-{
-    set_bit(EDF_GUEST_STTS, &current->ed_flags);
-    stts();
     return 0;
 }
 

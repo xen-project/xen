@@ -212,12 +212,16 @@ HYPERVISOR_set_callbacks(
 
 static inline int
 HYPERVISOR_fpu_taskswitch(
-    void)
+    int set)
 {
     int ret;
+    unsigned long ign;
+
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret) : "0" (__HYPERVISOR_fpu_taskswitch) : "memory" );
+        : "=a" (ret), "=b" (ign)
+        : "0" (__HYPERVISOR_fpu_taskswitch), "1" (set)
+        : "memory" );
 
     return ret;
 }

@@ -106,17 +106,16 @@ static inline unsigned long _get_base(char * addr)
 /*
  * Clear and set 'TS' bit respectively
  */
-#define clts() __asm__ __volatile__ ("clts")
+#define clts() (HYPERVISOR_fpu_taskswitch(0))
 #define read_cr0() \
 	BUG();
 #define write_cr0(x) \
 	BUG();
-
 #define read_cr4() \
 	BUG();
 #define write_cr4(x) \
 	BUG();
-#define stts() (HYPERVISOR_fpu_taskswitch())
+#define stts() (HYPERVISOR_fpu_taskswitch(1))
 
 #endif	/* __KERNEL__ */
 
