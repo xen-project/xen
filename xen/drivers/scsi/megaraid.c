@@ -3118,9 +3118,11 @@ static int mega_findCard (Scsi_Host_Template * pHostTmpl,
 		megaCfg->lock_pend = SPIN_LOCK_UNLOCKED;
 		megaCfg->lock_scsicmd = SPIN_LOCK_UNLOCKED;
 		megaCfg->flag = flag;
+#if XENO_KILLED_DELLOGDRV
 		megaCfg->int_qh = NULL;
 		megaCfg->int_qt = NULL;
 		megaCfg->int_qlen = 0;
+#endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 		megaCfg->dev = pdev;
@@ -3955,7 +3957,9 @@ int megaraid_queue (Scsi_Cmnd * SCpnt, void (*pktComp) (Scsi_Cmnd *))
 		 * logical drive opertion. If it is, queue the commands in the
 		 * internal queue until the delete operation is complete.
 		 */
+#if XENO_KILLED_DELLOGDRV
 		if( ! megaCfg->quiescent ) {
+#endif
 			/* Add SCB to the head of the pending queue */
 			if (megaCfg->qPendingH == NULL) {
 				megaCfg->qPendingH = megaCfg->qPendingT = pScb;
@@ -3970,6 +3974,7 @@ int megaraid_queue (Scsi_Cmnd * SCpnt, void (*pktComp) (Scsi_Cmnd *))
 				DRIVER_UNLOCK (megaCfg);
 				return 0;
 			}
+#if XENO_KILLED_DELLOGDRV
 		}
 		else {
 			/* Add SCB to the internal queue */
@@ -3982,6 +3987,7 @@ int megaraid_queue (Scsi_Cmnd * SCpnt, void (*pktComp) (Scsi_Cmnd *))
 			megaCfg->int_qt->next = NULL;
 			megaCfg->int_qlen++;
 		}
+#endif
 
 		if (pScb->SCpnt->cmnd[0] == M_RD_IOCTL_CMD_NEW) {
 #if XENO_KILLED
@@ -5329,7 +5335,7 @@ static int
 mega_del_logdrv(mega_host_config *this_hba, int logdrv)
 {
   return -ENOSYS;
-#if XENO_KILLED
+#if XENO_KILLED_DELLOGDRV
 	int		rval;
 	IO_LOCK_T;
 	DECLARE_WAIT_QUEUE_HEAD(wq);

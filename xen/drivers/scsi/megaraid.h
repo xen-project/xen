@@ -236,6 +236,7 @@
     present:	  	0,		       	/* Present			*/\
     unchecked_isa_dma:	0,		       	/* Default Unchecked ISA DMA	*/\
     use_clustering:   	ENABLE_CLUSTERING, 	/* Enable Clustering		*/\
+    use_new_eh_code:    1,                      /* Uses new error handling code */\
   }
 #endif
 // XENO: REMOVED     command:	  	megaraid_command,	/* Command Function		*/
@@ -802,6 +803,7 @@ typedef struct _mega_host_config {
 	int		support_random_del;	/* Do we support random deletion of logdrvs */
 	int		read_ldidmap;	/* set after logical drive deltion. The logical
 								drive number must be read from the map */
+#if XENO_KILLED_DELLOGDRV
 	int		quiescent;	/* a stage reached when delete logical drive needs to
 						   be done. Stop sending requests to the hba till
 						   delete operation is completed */
@@ -809,6 +811,7 @@ typedef struct _mega_host_config {
 	mega_scb	*int_qh;	/* commands are queued in the internal queue */
 	mega_scb	*int_qt;	/* while the hba is quiescent */
 	int			int_qlen;
+#endif
 	char		logdrv_chan[MAX_CHANNEL+NVIRT_CHAN]; /* logical drive are on
 														 what channels. */
 	int			mega_ch_class;
