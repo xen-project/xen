@@ -1399,6 +1399,23 @@ special configuration.
 The purpose of this section is to describe the mechanisms provided by
 \xend to allow a flexible configuration for Xen's virtual networking.
 
+\subsection{Xen virtual network topology}
+
+Each domain network interface is connected to a virtual network
+interface in dom0 by a point to point link (effectively a `virtual
+crossover cable').  These devices are named {\tt
+vif$<$domid$>$.$<$vifid$>$} (e.g. {\tt vif1.0} for the first interface
+in domain 1, {\tt vif3.1} for the second interface in domain 3).
+
+Traffic on these virtual interfaces is handled in domain 0 using
+standard Linux mechanisms for bridging, routing, rate limiting, etc.
+Xend calls on two shell scripts to perform initial configuration of
+the network and configuration of new virtual interfaces.  By default,
+these scripts configure a single bridge for all the virtual
+interfaces.  Arbitrary routing / bridging configurations can be
+configured by customising the scripts, as described in the following
+section.
+
 \subsection{Xen networking scripts}
 
 Xen's virtual networking is configured by two shell scripts (by
@@ -1428,6 +1445,9 @@ VIFs on the default Xen bridge.
 
 \end{description} 
 
+For more complex network setups (e.g. where routing is required or
+integrate with existing bridges) these scripts may be replaced with
+customised variants for your site's preferred configuration.
 
 %% There are two possible types of privileges:  IO privileges and
 %% administration privileges.
