@@ -161,7 +161,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     case DOM0_CREATEDOMAIN:
     {
         struct domain *d;
-        unsigned int   pro = 0;
+        unsigned int   pro;
         domid_t        dom;
 
         dom = op->u.createdomain.domain;
@@ -178,16 +178,22 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         {
             /* Do an initial placement. Pick the least-populated CPU. */
             struct domain *d;
-            unsigned int i, cnt[NR_CPUS] = { 0 };
+            unsigned int i, ht, cnt[NR_CPUS] = { 0 };
 
             read_lock(&domlist_lock);
             for_each_domain ( d )
                 cnt[d->processor]++;
             read_unlock(&domlist_lock);
 
-            for ( i = 0; i < smp_num_cpus; i++ )
-                if ( cnt[i] < cnt[pro] )
-                    pro = i;
+            /* If we're on a HT system, we only use the first HT for dom0,
+               other domains will all share the second HT of each CPU.
+	       Since dom0 is on CPU 0, we favour high numbered CPUs in
+	       the event of a tie */
+            ht = opt_noht ? 1 : ht_per_core;
+            pro = ht-1;
+            for ( i = pro; i < smp_num_cpus; i += ht )
+		if ( cnt[i] <= cnt[pro] )
+		    pro = i;
         }
         else
             pro = op->u.createdomain.cpu % smp_num_cpus;
