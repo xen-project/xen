@@ -38,7 +38,8 @@ OBJS     = $(patsubst %.c,%.o,$(SRCS))
 
 LIB      = libxc.so libxc.so.$(MAJOR) libxc.so.$(MAJOR).$(MINOR)
 
-all: check-for-zlib mk-symlinks $(LIB)
+all: check-for-zlib mk-symlinks
+	$(MAKE) $(LIB)
 
 check-for-zlib:
 	@if [ ! -e /usr/include/zlib.h ]; then \

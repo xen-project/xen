@@ -4,7 +4,7 @@
 #
 
 : ${HOS:=$(uname -s | tr /A-Z/ /a-z/)}
-: ${HARCH:=$(uname -i)}
+: ${HARCH:=$(uname -i 2>/dev/null || echo i386)}
 : ${NETBSD_RELEASE:=$(basename $(cd $(dirname $0) && pwd) | sed 's/netbsd-\([0-9]\+\.[0-9]\+\).*/\1/')}
 : ${NETBSD_VERSION:=$(basename $(cd $(dirname $0) && pwd) | sed 's/netbsd-\([0-9]\+\.[0-9]\+.*\)-xen.*/\1/')}
 : ${TOPDIR:=$(cd $(dirname $0) && pwd | sed 's/\(netbsd-[0-9]\+\.[0-9]\+.*-xen[^/]*\)/\1/')}

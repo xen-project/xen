@@ -30,10 +30,10 @@ install: all
 pdf/%.pdf: ps/%.ps
 	mkdir -p pdf ; ps2pdf $< $@
 
-ps/%.ps: %.dvi $(GFX)
+ps/%.ps: %.dvi
 	mkdir -p ps ; dvips -Ppdf -G0 -o $@ $<
 
-%.dvi: src/%.tex
+%.dvi: src/%.tex $(GFX)
 	latex $< >/dev/null
 	if [ -e $*.toc ] ; then latex $< >/dev/null ; fi
 
