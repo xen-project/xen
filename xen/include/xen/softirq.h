@@ -11,6 +11,9 @@ enum
 {
     AC_TIMER_SOFTIRQ=0,
     NEW_TLBFLUSH_CLOCK_PERIOD_SOFTIRQ,
+#ifdef XEN_DEBUGGER
+    DEBUGGER_SOFTIRQ,
+#endif
     SCHEDULE_SOFTIRQ, /* NB. This must come last or do_softirq() will break! */
     NR_SOFTIRQS
 };

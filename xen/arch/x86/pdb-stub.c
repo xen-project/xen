@@ -20,6 +20,7 @@
 #include <asm/pdb.h>
 #include <xen/list.h>
 #include <xen/serial.h>
+#include <xen/softirq.h>
 
 #undef PDB_DEBUG_TRACE
 #ifdef PDB_DEBUG_TRACE
@@ -1287,10 +1288,15 @@ int pdb_handle_exception(int exceptionVector,
     return 0;
 }
 
+void __pdb_key_pressed(void)
+{
+    struct pt_regs *regs = (struct pt_regs *)get_execution_context();
+    pdb_handle_exception(KEYPRESS_EXCEPTION, regs);
+}
+
 void pdb_key_pressed(u_char key, void *dev_id, struct pt_regs *regs) 
 {
-    pdb_handle_exception(KEYPRESS_EXCEPTION, regs);
-    return;
+    raise_softirq(DEBUGGER_SOFTIRQ);
 }
 
 void initialize_pdb()
@@ -1323,6 +1329,7 @@ void initialize_pdb()
     /* Acknowledge any spurious GDB packets. */
     pdb_put_char('+');
 
+    open_softirq(DEBUGGER_SOFTIRQ, __pdb_key_pressed);
     add_key_handler('D', pdb_key_pressed, "enter pervasive debugger");
 
     pdb_initialized = 1;
