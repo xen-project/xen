@@ -75,7 +75,7 @@ static unsigned char insn_decode[256] = {
     X, X, X, X, X, X, X, X,
     X, X, X, X, X, X, X, X,
     /* 0xA0 - 0xAF */
-    O|1, O|4, O|1, O|4, X, X, X, X,
+    O|4, O|4, O|4, O|4, X, X, X, X,
     X, X, X, X, X, X, X, X,
     /* 0xB0 - 0xBF */
     X, X, X, X, X, X, X, X,
@@ -366,28 +366,17 @@ int gpf_emulate_4gb(struct xen_regs *regs)
     
     if ( !(decode & HAS_MODRM) )
     {
-        switch ( decode & 7 )
-        {
-        case 1:
-            if ( get_user(b, pb) )
-            {
-                DPRINTK("Fault while extracting <moffs8>.\n");
-                goto page_fault;
-            }
-            pb++;
-            offset = (signed long)(signed char)b;
-            goto skip_modrm;
-        case 4:
-            if ( get_user(offset, (u32 *)pb) )
-            {
-                DPRINTK("Fault while extracting <disp8>.\n");
-                goto page_fault;
-            }
-            pb += 4;
-            goto skip_modrm;
-        default:
+        if ( (decode & 7) != 4 )
             goto fail;
+
+        if ( get_user(offset, (u32 *)pb) )
+        {
+            DPRINTK("Fault while extracting <disp8>.\n");
+            goto page_fault;
         }
+        pb += 4;
+
+        goto skip_modrm;
     }
 
     /*
