@@ -204,7 +204,7 @@ extern void __error_in_apic_c (void);
  */
 void __init init_bsp_APIC(void)
 {
-    unsigned long value, ver;
+    unsigned long l, h;
 
     /*
      * Don't do the setup now if we have a SMP BIOS as the
@@ -213,32 +213,22 @@ void __init init_bsp_APIC(void)
     if (smp_found_config || !cpu_has_apic)
         return;
 
-    value = apic_read(APIC_LVR);
-    ver = GET_APIC_VERSION(value);
-
     /*
-     * Do not trust the local APIC being empty at bootup.
+     * Our best bet here is to disable the APIC. This should be safe, as it
+     * ought to be a uniprocessor box (we tested for an SMP configuration
+     * already), so we shouldn't be getting interrupt messages in serial-bus
+     * form from an IO APIC. The APIC will be enabled again later, so don't
+     * worry :-) Doing the easy thing here should make boot-time more reliable.
      */
-    clear_local_APIC();
+    printk("Disabling local APIC during early boot sequence...\n");
+    rdmsr(MSR_IA32_APICBASE, l, h);
+    l &= ~MSR_IA32_APICBASE_BASE;
+    wrmsr(MSR_IA32_APICBASE, l, h);
 
-    /*
-     * Enable APIC.
-     */
-    value = apic_read(APIC_SPIV);
-    value &= ~APIC_VECTOR_MASK;
-    value |= APIC_SPIV_APIC_ENABLED;
-    value |= APIC_SPIV_FOCUS_DISABLED;
-    value |= SPURIOUS_APIC_VECTOR;
-    apic_write_around(APIC_SPIV, value);
-
-    /*
-     * Set up the virtual wire mode.
-     */
-    apic_write_around(APIC_LVT0, APIC_DM_EXTINT);
-    value = APIC_DM_NMI;
-    if (!APIC_INTEGRATED(ver))		/* 82489DX */
-        value |= APIC_LVT_LEVEL_TRIGGER;
-    apic_write_around(APIC_LVT1, value);
+    /* We should now be in non-APIC mode. */
+    l = cpuid_edx(1);
+    if ( test_bit(X86_FEATURE_APIC, &l) ) BUG();
+    clear_bit(X86_FEATURE_APIC, &boot_cpu_data.x86_capability);
 }
 
 void __init setup_local_APIC (void)
@@ -401,10 +391,8 @@ static int __init detect_init_APIC (void)
             wrmsr(MSR_IA32_APICBASE, l, h);
         }
     }
-    /*
-     * The APIC feature bit should now be enabled
-     * in `cpuid'
-     */
+
+    /* The APIC feature bit should now be enabled in `cpuid' */
     features = cpuid_edx(1);
     if (!(features & (1 << X86_FEATURE_APIC))) {
         printk("Could not enable APIC!\n");
