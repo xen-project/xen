@@ -74,8 +74,6 @@ void lgdt_finish(void);
  * be MACHINE addresses.
  */
 
-extern unsigned int mmu_update_queue_idx;
-
 void queue_l1_entry_update(pte_t *ptr, unsigned long val);
 void queue_l2_entry_update(pmd_t *ptr, unsigned long val);
 void queue_pt_switch(unsigned long ptr);
@@ -185,12 +183,11 @@ extern page_update_debug_t update_debug_queue[];
 #endif
 
 void _flush_page_update_queue(void);
-static inline int flush_page_update_queue(void)
-{
-    unsigned int idx = mmu_update_queue_idx;
-    if ( idx != 0 ) _flush_page_update_queue();
-    return idx;
-}
+#define flush_page_update_queue() do {				\
+    DECLARE_PER_CPU(unsigned int, mmu_update_queue_idx);	\
+    if (per_cpu(mmu_update_queue_idx, smp_processor_id()))	\
+	_flush_page_update_queue();				\
+} while (0)
 #define xen_flush_page_update_queue() (_flush_page_update_queue())
 #define XEN_flush_page_update_queue() (_flush_page_update_queue())
 void MULTICALL_flush_page_update_queue(void);

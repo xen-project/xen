@@ -35,6 +35,7 @@
 #include <asm/pgtable.h>
 #include <asm-xen/hypervisor.h>
 #include <asm-xen/multicall.h>
+#include <linux/percpu.h>
 
 /*
  * This suffices to protect us if we ever move to SMP domains.
@@ -49,12 +50,15 @@ static spinlock_t update_lock = SPIN_LOCK_UNLOCKED;
 #define QUEUE_SIZE 2048
 #define pte_offset_kernel pte_offset
 #else
+#ifdef CONFIG_SMP
+#define QUEUE_SIZE 1
+#else
 #define QUEUE_SIZE 128
 #endif
+#endif
 
-static mmu_update_t update_queue[QUEUE_SIZE];
-unsigned int mmu_update_queue_idx = 0;
-#define idx mmu_update_queue_idx
+DEFINE_PER_CPU(mmu_update_t, update_queue[QUEUE_SIZE]);
+DEFINE_PER_CPU(unsigned int, mmu_update_queue_idx);
 
 #if MMU_UPDATE_DEBUG > 0
 page_update_debug_t update_debug_queue[QUEUE_SIZE] = {{0}};
@@ -64,6 +68,8 @@ page_update_debug_t update_debug_queue[QUEUE_SIZE] = {{0}};
 #if MMU_UPDATE_DEBUG > 3
 static void DEBUG_allow_pt_reads(void)
 {
+    int cpu = smp_processor_id();
+    int idx = per_cpu(mmu_update_queue_idx, cpu);
     pte_t *pte;
     mmu_update_t update;
     int i;
@@ -79,6 +85,8 @@ static void DEBUG_allow_pt_reads(void)
 }
 static void DEBUG_disallow_pt_read(unsigned long va)
 {
+    int cpu = smp_processor_id();
+    int idx = per_cpu(mmu_update_queue_idx, cpu);
     pte_t *pte;
     pmd_t *pmd;
     pgd_t *pgd;
@@ -118,9 +126,12 @@ static void DEBUG_disallow_pt_read(unsigned long va)
  */
 void MULTICALL_flush_page_update_queue(void)
 {
+    int cpu = smp_processor_id();
+    int idx;
     unsigned long flags;
     unsigned int _idx;
     spin_lock_irqsave(&update_lock, flags);
+    idx = per_cpu(mmu_update_queue_idx, cpu);
     if ( (_idx = idx) != 0 ) 
     {
 #if MMU_UPDATE_DEBUG > 1
@@ -130,10 +141,10 @@ void MULTICALL_flush_page_update_queue(void)
 #if MMU_UPDATE_DEBUG > 3
         DEBUG_allow_pt_reads();
 #endif
-        idx = 0;
+        per_cpu(mmu_update_queue_idx, cpu) = 0;
         wmb(); /* Make sure index is cleared first to avoid double updates. */
         queue_multicall3(__HYPERVISOR_mmu_update, 
-                         (unsigned long)update_queue, 
+                         (unsigned long)&per_cpu(update_queue[0], cpu), 
                          (unsigned long)_idx, 
                          (unsigned long)NULL);
     }
@@ -142,17 +153,18 @@ void MULTICALL_flush_page_update_queue(void)
 
 static inline void __flush_page_update_queue(void)
 {
-    unsigned int _idx = idx;
+    int cpu = smp_processor_id();
+    unsigned int _idx = per_cpu(mmu_update_queue_idx, cpu);
 #if MMU_UPDATE_DEBUG > 1
-    if (idx > 1)
+    if (_idx > 1)
     printk("Flushing %d entries from pt update queue\n", idx);
 #endif
 #if MMU_UPDATE_DEBUG > 3
     DEBUG_allow_pt_reads();
 #endif
-    idx = 0;
+    per_cpu(mmu_update_queue_idx, cpu) = 0;
     wmb(); /* Make sure index is cleared first to avoid double updates. */
-    if ( unlikely(HYPERVISOR_mmu_update(update_queue, _idx, NULL) < 0) )
+    if ( unlikely(HYPERVISOR_mmu_update(&per_cpu(update_queue[0], cpu), _idx, NULL) < 0) )
     {
         printk(KERN_ALERT "Failed to execute MMU updates.\n");
         BUG();
@@ -161,139 +173,175 @@ static inline void __flush_page_update_queue(void)
 
 void _flush_page_update_queue(void)
 {
+    int cpu = smp_processor_id();
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
-    if ( idx != 0 ) __flush_page_update_queue();
+    if ( per_cpu(mmu_update_queue_idx, cpu) != 0 ) __flush_page_update_queue();
     spin_unlock_irqrestore(&update_lock, flags);
 }
 
 static inline void increment_index(void)
 {
-    idx++;
-    if ( unlikely(idx == QUEUE_SIZE) ) __flush_page_update_queue();
+    int cpu = smp_processor_id();
+    per_cpu(mmu_update_queue_idx, cpu)++;
+    if ( unlikely(per_cpu(mmu_update_queue_idx, cpu) == QUEUE_SIZE) ) __flush_page_update_queue();
 }
 
 static inline void increment_index_and_flush(void)
 {
-    idx++;
+    int cpu = smp_processor_id();
+    per_cpu(mmu_update_queue_idx, cpu)++;
     __flush_page_update_queue();
 }
 
 void queue_l1_entry_update(pte_t *ptr, unsigned long val)
 {
+    int cpu = smp_processor_id();
+    int idx;
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
 #if MMU_UPDATE_DEBUG > 3
     DEBUG_disallow_pt_read((unsigned long)ptr);
 #endif
-    update_queue[idx].ptr = virt_to_machine(ptr);
-    update_queue[idx].val = val;
+    idx = per_cpu(mmu_update_queue_idx, cpu);
+    per_cpu(update_queue[idx], cpu).ptr = virt_to_machine(ptr);
+    per_cpu(update_queue[idx], cpu).val = val;
     increment_index();
     spin_unlock_irqrestore(&update_lock, flags);
 }
 
 void queue_l2_entry_update(pmd_t *ptr, unsigned long val)
 {
+    int cpu = smp_processor_id();
+    int idx;
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
-    update_queue[idx].ptr = virt_to_machine(ptr);
-    update_queue[idx].val = val;
+    idx = per_cpu(mmu_update_queue_idx, cpu);
+    per_cpu(update_queue[idx], cpu).ptr = virt_to_machine(ptr);
+    per_cpu(update_queue[idx], cpu).val = val;
     increment_index();
     spin_unlock_irqrestore(&update_lock, flags);
 }
 
 void queue_pt_switch(unsigned long ptr)
 {
+    int cpu = smp_processor_id();
+    int idx;
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
-    update_queue[idx].ptr  = phys_to_machine(ptr);
-    update_queue[idx].ptr |= MMU_EXTENDED_COMMAND;
-    update_queue[idx].val  = MMUEXT_NEW_BASEPTR;
+    idx = per_cpu(mmu_update_queue_idx, cpu);
+    per_cpu(update_queue[idx], cpu).ptr  = phys_to_machine(ptr);
+    per_cpu(update_queue[idx], cpu).ptr |= MMU_EXTENDED_COMMAND;
+    per_cpu(update_queue[idx], cpu).val  = MMUEXT_NEW_BASEPTR;
     increment_index();
     spin_unlock_irqrestore(&update_lock, flags);
 }
 
 void queue_tlb_flush(void)
 {
+    int cpu = smp_processor_id();
+    int idx;
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
-    update_queue[idx].ptr  = MMU_EXTENDED_COMMAND;
-    update_queue[idx].val  = MMUEXT_TLB_FLUSH;
+    idx = per_cpu(mmu_update_queue_idx, cpu);
+    per_cpu(update_queue[idx], cpu).ptr  = MMU_EXTENDED_COMMAND;
+    per_cpu(update_queue[idx], cpu).val  = MMUEXT_TLB_FLUSH;
     increment_index();
     spin_unlock_irqrestore(&update_lock, flags);
 }
 
 void queue_invlpg(unsigned long ptr)
 {
+    int cpu = smp_processor_id();
+    int idx;
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
-    update_queue[idx].ptr  = MMU_EXTENDED_COMMAND;
-    update_queue[idx].ptr |= ptr & PAGE_MASK;
-    update_queue[idx].val  = MMUEXT_INVLPG;
+    idx = per_cpu(mmu_update_queue_idx, cpu);
+    per_cpu(update_queue[idx], cpu).ptr  = MMU_EXTENDED_COMMAND;
+    per_cpu(update_queue[idx], cpu).ptr |= ptr & PAGE_MASK;
+    per_cpu(update_queue[idx], cpu).val  = MMUEXT_INVLPG;
     increment_index();
     spin_unlock_irqrestore(&update_lock, flags);
 }
 
 void queue_pgd_pin(unsigned long ptr)
 {
+    int cpu = smp_processor_id();
+    int idx;
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
-    update_queue[idx].ptr  = phys_to_machine(ptr);
-    update_queue[idx].ptr |= MMU_EXTENDED_COMMAND;
-    update_queue[idx].val  = MMUEXT_PIN_L2_TABLE;
+    idx = per_cpu(mmu_update_queue_idx, cpu);
+    per_cpu(update_queue[idx], cpu).ptr  = phys_to_machine(ptr);
+    per_cpu(update_queue[idx], cpu).ptr |= MMU_EXTENDED_COMMAND;
+    per_cpu(update_queue[idx], cpu).val  = MMUEXT_PIN_L2_TABLE;
     increment_index();
     spin_unlock_irqrestore(&update_lock, flags);
 }
 
 void queue_pgd_unpin(unsigned long ptr)
 {
+    int cpu = smp_processor_id();
+    int idx;
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
-    update_queue[idx].ptr  = phys_to_machine(ptr);
-    update_queue[idx].ptr |= MMU_EXTENDED_COMMAND;
-    update_queue[idx].val  = MMUEXT_UNPIN_TABLE;
+    idx = per_cpu(mmu_update_queue_idx, cpu);
+    per_cpu(update_queue[idx], cpu).ptr  = phys_to_machine(ptr);
+    per_cpu(update_queue[idx], cpu).ptr |= MMU_EXTENDED_COMMAND;
+    per_cpu(update_queue[idx], cpu).val  = MMUEXT_UNPIN_TABLE;
     increment_index();
     spin_unlock_irqrestore(&update_lock, flags);
 }
 
 void queue_pte_pin(unsigned long ptr)
 {
+    int cpu = smp_processor_id();
+    int idx;
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
-    update_queue[idx].ptr  = phys_to_machine(ptr);
-    update_queue[idx].ptr |= MMU_EXTENDED_COMMAND;
-    update_queue[idx].val  = MMUEXT_PIN_L1_TABLE;
+    idx = per_cpu(mmu_update_queue_idx, cpu);
+    per_cpu(update_queue[idx], cpu).ptr  = phys_to_machine(ptr);
+    per_cpu(update_queue[idx], cpu).ptr |= MMU_EXTENDED_COMMAND;
+    per_cpu(update_queue[idx], cpu).val  = MMUEXT_PIN_L1_TABLE;
     increment_index();
     spin_unlock_irqrestore(&update_lock, flags);
 }
 
 void queue_pte_unpin(unsigned long ptr)
 {
+    int cpu = smp_processor_id();
+    int idx;
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
-    update_queue[idx].ptr  = phys_to_machine(ptr);
-    update_queue[idx].ptr |= MMU_EXTENDED_COMMAND;
-    update_queue[idx].val  = MMUEXT_UNPIN_TABLE;
+    idx = per_cpu(mmu_update_queue_idx, cpu);
+    per_cpu(update_queue[idx], cpu).ptr  = phys_to_machine(ptr);
+    per_cpu(update_queue[idx], cpu).ptr |= MMU_EXTENDED_COMMAND;
+    per_cpu(update_queue[idx], cpu).val  = MMUEXT_UNPIN_TABLE;
     increment_index();
     spin_unlock_irqrestore(&update_lock, flags);
 }
 
 void queue_set_ldt(unsigned long ptr, unsigned long len)
 {
+    int cpu = smp_processor_id();
+    int idx;
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
-    update_queue[idx].ptr  = MMU_EXTENDED_COMMAND | ptr;
-    update_queue[idx].val  = MMUEXT_SET_LDT | (len << MMUEXT_CMD_SHIFT);
+    idx = per_cpu(mmu_update_queue_idx, cpu);
+    per_cpu(update_queue[idx], cpu).ptr  = MMU_EXTENDED_COMMAND | ptr;
+    per_cpu(update_queue[idx], cpu).val  = MMUEXT_SET_LDT | (len << MMUEXT_CMD_SHIFT);
     increment_index();
     spin_unlock_irqrestore(&update_lock, flags);
 }
 
 void queue_machphys_update(unsigned long mfn, unsigned long pfn)
 {
+    int cpu = smp_processor_id();
+    int idx;
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
-    update_queue[idx].ptr = (mfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
-    update_queue[idx].val = pfn;
+    idx = per_cpu(mmu_update_queue_idx, cpu);
+    per_cpu(update_queue[idx], cpu).ptr = (mfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
+    per_cpu(update_queue[idx], cpu).val = pfn;
     increment_index();
     spin_unlock_irqrestore(&update_lock, flags);
 }
@@ -301,119 +349,152 @@ void queue_machphys_update(unsigned long mfn, unsigned long pfn)
 /* queue and flush versions of the above */
 void xen_l1_entry_update(pte_t *ptr, unsigned long val)
 {
+    int cpu = smp_processor_id();
+    int idx;
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
 #if MMU_UPDATE_DEBUG > 3
     DEBUG_disallow_pt_read((unsigned long)ptr);
 #endif
-    update_queue[idx].ptr = virt_to_machine(ptr);
-    update_queue[idx].val = val;
+    idx = per_cpu(mmu_update_queue_idx, cpu);
+    per_cpu(update_queue[idx], cpu).ptr = virt_to_machine(ptr);
+    per_cpu(update_queue[idx], cpu).val = val;
     increment_index_and_flush();
     spin_unlock_irqrestore(&update_lock, flags);
 }
 
 void xen_l2_entry_update(pmd_t *ptr, unsigned long val)
 {
+    int cpu = smp_processor_id();
+    int idx;
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
-    update_queue[idx].ptr = virt_to_machine(ptr);
-    update_queue[idx].val = val;
+    idx = per_cpu(mmu_update_queue_idx, cpu);
+    per_cpu(update_queue[idx], cpu).ptr = virt_to_machine(ptr);
+    per_cpu(update_queue[idx], cpu).val = val;
     increment_index_and_flush();
     spin_unlock_irqrestore(&update_lock, flags);
 }
 
 void xen_pt_switch(unsigned long ptr)
 {
+    int cpu = smp_processor_id();
+    int idx;
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
-    update_queue[idx].ptr  = phys_to_machine(ptr);
-    update_queue[idx].ptr |= MMU_EXTENDED_COMMAND;
-    update_queue[idx].val  = MMUEXT_NEW_BASEPTR;
+    idx = per_cpu(mmu_update_queue_idx, cpu);
+    per_cpu(update_queue[idx], cpu).ptr  = phys_to_machine(ptr);
+    per_cpu(update_queue[idx], cpu).ptr |= MMU_EXTENDED_COMMAND;
+    per_cpu(update_queue[idx], cpu).val  = MMUEXT_NEW_BASEPTR;
     increment_index_and_flush();
     spin_unlock_irqrestore(&update_lock, flags);
 }
 
 void xen_tlb_flush(void)
 {
+    int cpu = smp_processor_id();
+    int idx;
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
-    update_queue[idx].ptr  = MMU_EXTENDED_COMMAND;
-    update_queue[idx].val  = MMUEXT_TLB_FLUSH;
+    idx = per_cpu(mmu_update_queue_idx, cpu);
+    per_cpu(update_queue[idx], cpu).ptr  = MMU_EXTENDED_COMMAND;
+    per_cpu(update_queue[idx], cpu).val  = MMUEXT_TLB_FLUSH;
     increment_index_and_flush();
     spin_unlock_irqrestore(&update_lock, flags);
 }
 
 void xen_invlpg(unsigned long ptr)
 {
+    int cpu = smp_processor_id();
+    int idx;
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
-    update_queue[idx].ptr  = MMU_EXTENDED_COMMAND;
-    update_queue[idx].ptr |= ptr & PAGE_MASK;
-    update_queue[idx].val  = MMUEXT_INVLPG;
+    idx = per_cpu(mmu_update_queue_idx, cpu);
+    per_cpu(update_queue[idx], cpu).ptr  = MMU_EXTENDED_COMMAND;
+    per_cpu(update_queue[idx], cpu).ptr |= ptr & PAGE_MASK;
+    per_cpu(update_queue[idx], cpu).val  = MMUEXT_INVLPG;
     increment_index_and_flush();
     spin_unlock_irqrestore(&update_lock, flags);
 }
 
 void xen_pgd_pin(unsigned long ptr)
 {
+    int cpu = smp_processor_id();
+    int idx;
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
-    update_queue[idx].ptr  = phys_to_machine(ptr);
-    update_queue[idx].ptr |= MMU_EXTENDED_COMMAND;
-    update_queue[idx].val  = MMUEXT_PIN_L2_TABLE;
+    idx = per_cpu(mmu_update_queue_idx, cpu);
+    per_cpu(update_queue[idx], cpu).ptr  = phys_to_machine(ptr);
+    per_cpu(update_queue[idx], cpu).ptr |= MMU_EXTENDED_COMMAND;
+    per_cpu(update_queue[idx], cpu).val  = MMUEXT_PIN_L2_TABLE;
     increment_index_and_flush();
     spin_unlock_irqrestore(&update_lock, flags);
 }
 
 void xen_pgd_unpin(unsigned long ptr)
 {
+    int cpu = smp_processor_id();
+    int idx;
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
-    update_queue[idx].ptr  = phys_to_machine(ptr);
-    update_queue[idx].ptr |= MMU_EXTENDED_COMMAND;
-    update_queue[idx].val  = MMUEXT_UNPIN_TABLE;
+    idx = per_cpu(mmu_update_queue_idx, cpu);
+    per_cpu(update_queue[idx], cpu).ptr  = phys_to_machine(ptr);
+    per_cpu(update_queue[idx], cpu).ptr |= MMU_EXTENDED_COMMAND;
+    per_cpu(update_queue[idx], cpu).val  = MMUEXT_UNPIN_TABLE;
     increment_index_and_flush();
     spin_unlock_irqrestore(&update_lock, flags);
 }
 
 void xen_pte_pin(unsigned long ptr)
 {
+    int cpu = smp_processor_id();
+    int idx;
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
-    update_queue[idx].ptr  = phys_to_machine(ptr);
-    update_queue[idx].ptr |= MMU_EXTENDED_COMMAND;
-    update_queue[idx].val  = MMUEXT_PIN_L1_TABLE;
+    idx = per_cpu(mmu_update_queue_idx, cpu);
+    per_cpu(update_queue[idx], cpu).ptr  = phys_to_machine(ptr);
+    per_cpu(update_queue[idx], cpu).ptr |= MMU_EXTENDED_COMMAND;
+    per_cpu(update_queue[idx], cpu).val  = MMUEXT_PIN_L1_TABLE;
     increment_index_and_flush();
     spin_unlock_irqrestore(&update_lock, flags);
 }
 
 void xen_pte_unpin(unsigned long ptr)
 {
+    int cpu = smp_processor_id();
+    int idx;
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
-    update_queue[idx].ptr  = phys_to_machine(ptr);
-    update_queue[idx].ptr |= MMU_EXTENDED_COMMAND;
-    update_queue[idx].val  = MMUEXT_UNPIN_TABLE;
+    idx = per_cpu(mmu_update_queue_idx, cpu);
+    per_cpu(update_queue[idx], cpu).ptr  = phys_to_machine(ptr);
+    per_cpu(update_queue[idx], cpu).ptr |= MMU_EXTENDED_COMMAND;
+    per_cpu(update_queue[idx], cpu).val  = MMUEXT_UNPIN_TABLE;
     increment_index_and_flush();
     spin_unlock_irqrestore(&update_lock, flags);
 }
 
 void xen_set_ldt(unsigned long ptr, unsigned long len)
 {
+    int cpu = smp_processor_id();
+    int idx;
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
-    update_queue[idx].ptr  = MMU_EXTENDED_COMMAND | ptr;
-    update_queue[idx].val  = MMUEXT_SET_LDT | (len << MMUEXT_CMD_SHIFT);
+    idx = per_cpu(mmu_update_queue_idx, cpu);
+    per_cpu(update_queue[idx], cpu).ptr  = MMU_EXTENDED_COMMAND | ptr;
+    per_cpu(update_queue[idx], cpu).val  = MMUEXT_SET_LDT | (len << MMUEXT_CMD_SHIFT);
     increment_index_and_flush();
     spin_unlock_irqrestore(&update_lock, flags);
 }
 
 void xen_machphys_update(unsigned long mfn, unsigned long pfn)
 {
+    int cpu = smp_processor_id();
+    int idx;
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
-    update_queue[idx].ptr = (mfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
-    update_queue[idx].val = pfn;
+    idx = per_cpu(mmu_update_queue_idx, cpu);
+    per_cpu(update_queue[idx], cpu).ptr = (mfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
+    per_cpu(update_queue[idx], cpu).val = pfn;
     increment_index_and_flush();
     spin_unlock_irqrestore(&update_lock, flags);
 }
