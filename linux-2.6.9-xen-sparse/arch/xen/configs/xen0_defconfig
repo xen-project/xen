@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.9-xen0
-# Sun Oct 31 21:30:07 2004
+# Sun Nov 14 16:55:05 2004
 #
 CONFIG_XEN=y
 CONFIG_ARCH_XEN=y
@@ -200,7 +200,7 @@ CONFIG_PREVENT_FIRMWARE_BUILD=y
 #
 # Block devices
 #
-# CONFIG_BLK_DEV_FD is not set
+CONFIG_BLK_DEV_FD=y
 # CONFIG_BLK_DEV_XD is not set
 # CONFIG_BLK_CPQ_DA is not set
 CONFIG_BLK_CPQ_CISS_DA=y

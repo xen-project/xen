@@ -39,6 +39,8 @@ ALL_OBJS += $(BASEDIR)/arch/$(TARGET_ARCH)/arch.o
 HOSTCC     = gcc
 HOSTCFLAGS = -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer 
 
+test-gcc-flag = $(shell gcc -v --help 2>&1 | grep -q " $(1) " && echo $(1))
+
 include $(BASEDIR)/arch/$(TARGET_ARCH)/Rules.mk
 
 ifneq ($(debug),y)
@@ -61,6 +63,8 @@ endif
 ifeq ($(trace),y)
 CFLAGS += -DTRACE_BUFFER
 endif
+
+CFLAGS := $(strip $(CFLAGS))
 
 %.o: %.c $(HDRS) Makefile
 	$(CC) $(CFLAGS) -c $< -o $@
