@@ -18,7 +18,7 @@
 #include <xen/list.h>
 #include <xen/serial.h>
 
-#define DEBUG_TRACE
+#undef DEBUG_TRACE
 #ifdef DEBUG_TRACE
 #define TRC(_x) _x
 #else
@@ -352,9 +352,10 @@ pdb_process_command (char *ptr, struct pt_regs *regs, unsigned long cr3,
 	else
 	  pdb_ctx[pdb_level].ctrl_cr3 = pagetable_val(p->mm.pagetable);
 	put_task_struct(p);
-	printk ("PROCESS: PDB SET CONTROL DOMAIN TO 0x%lx 0x%x\n",
+
+	TRC(printk ("PROCESS: PDB SET CONTROL DOMAIN TO 0x%lx 0x%x\n",
 		pdb_ctx[pdb_level].ctrl_cr3, 
-		pdb_ctx[pdb_level].ctrl);
+		pdb_ctx[pdb_level].ctrl));
     }
     if (pdb_ctx[pdb_level].info_cr3 == 0 &&
 	pdb_ctx[pdb_level].info >= 0)
@@ -367,9 +368,9 @@ pdb_process_command (char *ptr, struct pt_regs *regs, unsigned long cr3,
 	else
 	  pdb_ctx[pdb_level].info_cr3 = pagetable_val(p->mm.pagetable);
 	put_task_struct(p);
-	printk ("PROCESS: PDB SET INFO DOMAIN TO 0x%lx 0x%x\n",
+	TRC(printk ("PROCESS: PDB SET INFO DOMAIN TO 0x%lx 0x%x\n",
 		pdb_ctx[pdb_level].info_cr3, 
-		pdb_ctx[pdb_level].info);
+		pdb_ctx[pdb_level].info));
     }
 
     switch (*ptr++)
@@ -473,9 +474,9 @@ pdb_process_command (char *ptr, struct pt_regs *regs, unsigned long cr3,
 		    else
 		      pdb_ctx[pdb_level].ctrl_cr3 = pagetable_val(p->mm.pagetable);
 		    put_task_struct(p);
-		    printk ("PDB SET CONTROL DOMAIN TO 0x%lx 0x%x\n",
+		    TRC(printk ("PDB SET CONTROL DOMAIN TO 0x%lx 0x%x\n",
 			    pdb_ctx[pdb_level].ctrl_cr3,
-			    pdb_ctx[pdb_level].ctrl);
+			    pdb_ctx[pdb_level].ctrl));
 		}
             }
             else if (*ptr == 'g')
@@ -490,9 +491,9 @@ pdb_process_command (char *ptr, struct pt_regs *regs, unsigned long cr3,
 		    else
 		      pdb_ctx[pdb_level].info_cr3 = pagetable_val(p->mm.pagetable);
 		    put_task_struct(p);
-		    printk ("PDB SET INFO DOMAIN TO 0x%lx 0x%x\n",
+		    TRC(printk ("PDB SET INFO DOMAIN TO 0x%lx 0x%x\n",
 			    pdb_ctx[pdb_level].info_cr3,
-			    pdb_ctx[pdb_level].info);
+			    pdb_ctx[pdb_level].info));
 		}
             }
             else
@@ -981,12 +982,13 @@ int pdb_change_values_one_page(u_char *buffer, int length,
     if (!(l2_pgentry_val(*l2_table) & _PAGE_PRESENT)) 
     {
         struct task_struct *p = find_domain_by_id(0);
-	printk ("cr3: 0x%lx    dom0cr3:  0x%lx\n",  cr3,
+	printk ("pdb error: cr3: 0x%lx    dom0cr3:  0x%lx\n",  cr3,
 		p->mm.shadow_mode ? pagetable_val(p->mm.shadow_table)
 		                  : pagetable_val(p->mm.pagetable));
 	put_task_struct(p);
 
-	printk ("L2:0x%p (0x%lx) \n", l2_table, l2_pgentry_val(*l2_table));
+	printk ("pdb error: L2:0x%p (0x%lx) \n", 
+		l2_table, l2_pgentry_val(*l2_table));
 	goto exit2;
     }
 
@@ -1161,7 +1163,7 @@ int pdb_handle_exception(int exceptionVector,
     }
 
     printk("pdb_handle_exception [0x%x][0x%lx:0x%lx]\n",
-           exceptionVector, cr3, xen_regs->eip);
+	   exceptionVector, cr3, xen_regs->eip);
 
     if ( pdb_stepping )
     {
