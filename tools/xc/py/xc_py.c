@@ -439,7 +439,6 @@ static PyObject *pyxc_readconsolering(PyObject *self,
                                       PyObject *kwds)
 {
     XcObject *xc = (XcObject *)self;
-    PyObject *pystr = Py_None;
 
     unsigned int clear = 0;
     char         str[32768];
@@ -452,10 +451,7 @@ static PyObject *pyxc_readconsolering(PyObject *self,
 
     ret = xc_readconsolering(xc->xc_handle, str, sizeof(str), clear);
 
-    if ( ret > 0 )
-        pystr = PyString_FromString(str);
-    
-    return pystr;
+    return PyString_FromStringAndSize(str, (ret < 0) ? 0 : ret);
 }
 
 static PyMethodDef pyxc_methods[] = {
