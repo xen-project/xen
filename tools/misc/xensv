@@ -22,6 +22,8 @@ import os
 import sys
 import re
 
+# Default install path for Xen binary packages.
+sys.path.append('/lib/python')
 from xen.xend.server.params import XEND_PID_FILE
 
 class CheckError(ValueError):

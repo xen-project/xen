@@ -51,8 +51,13 @@ check-for-zlib:
 LINUX_ROOT := $(wildcard $(XEN_ROOT)/linux-2.6.*-xen-sparse)
 mk-symlinks:
 	[ -e xen/linux ] || mkdir -p xen/linux
-	lndir -silent ../$(XEN_ROOT)/xen/include/public xen
-	lndir -silent ../../$(LINUX_ROOT)/include/asm-xen/linux-public xen/linux
+	[ -e xen/io ]    || mkdir -p xen/io
+	( cd xen >/dev/null ; \
+	  ln -sf ../$(XEN_ROOT)/xen/include/public/*.h . )
+	( cd xen/io >/dev/null ; \
+	   ln -sf ../../$(XEN_ROOT)/xen/include/public/io/*.h . )
+	( cd xen/linux >/dev/null ; \
+	  ln -sf ../../$(LINUX_ROOT)/include/asm-xen/linux-public/*.h . )
 
 install: all
 	mkdir -p $(prefix)/usr/lib

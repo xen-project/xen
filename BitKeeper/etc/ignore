@@ -18,7 +18,6 @@ docs/*.log
 docs/*.pdf
 docs/*.ps
 docs/*.toc
-docs/figs/xenserver.eps
 docs/html/*
 docs/ps/*
 docs/pdf/*

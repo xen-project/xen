@@ -14,11 +14,14 @@ SOURCEFORGE_MIRROR := http://heanet.dl.sourceforge.net/sourceforge
 all:
 	$(MAKE) prefix=$(INSTALL_DIR) dist=yes -C xen install
 	$(MAKE) prefix=$(INSTALL_DIR) dist=yes -C tools install
+	sh ./docs/check_pkgs && \
+		$(MAKE) prefix=$(INSTALL_DIR) dist=yes -C docs install
 
 # install everything into the standard system directories
 install: dist
 	$(MAKE) -C xen install
 	$(MAKE) -C tools install
+	sh ./docs/check_pkgs && $(MAKE) -C docs install
 	$(shell cp -a install/boot/*$(LINUX_VER)* /boot/)
 	$(shell cp -a install/lib/modules/* /lib/modules/)
 

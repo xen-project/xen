@@ -1,0 +1,22 @@
+
+silent_which ()
+{
+        if ! `which $1 1>/dev/null 2>/dev/null`; then
+                echo "*************************************************"
+                echo "*************************************************"
+                echo "* WARNING: Package '$1' is required"
+                echo "*          to build Xen documentation"
+                echo "*************************************************"
+                echo "*************************************************"
+        fi
+        which $1 1>/dev/null 2>/dev/null
+}
+
+silent_which latex      || exit 1
+silent_which latex2html || exit 1
+silent_which dvips      || exit 1
+silent_which ps2pdf     || exit 1
+silent_which fig2dev    || exit 1
+silent_which tgif       || exit 1
+
+exit 0
