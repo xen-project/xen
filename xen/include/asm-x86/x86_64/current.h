@@ -41,8 +41,9 @@ static inline execution_context_t *get_execution_context(void)
 static inline unsigned long get_stack_bottom(void)
 {
     unsigned long p;
-    __asm__ ( "orq %%rsp,%0; andq $~7,%0" 
-              : "=r" (p) : "0" (STACK_SIZE-64) );
+    __asm__( "andq %%rsp,%0; addq %2,%0"
+	    : "=r" (p)
+	    : "0" (~(STACK_SIZE-1)), "i" (STACK_SIZE-64) );
     return p;
 }
 
