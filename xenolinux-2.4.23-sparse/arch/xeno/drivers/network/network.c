@@ -315,7 +315,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
     network_tx_buf_gc(dev);
 
-    if ( (i - np->tx_resp_cons) == TX_RING_SIZE )
+    if ( (i - np->tx_resp_cons) == (TX_RING_SIZE - 1) )
     {
         np->tx_full = 1;
         netif_stop_queue(dev);
