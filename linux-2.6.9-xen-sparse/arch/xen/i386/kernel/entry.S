@@ -323,7 +323,7 @@ resume_vm86:
 	RESTORE_REGS
 	movl %eax,(%esp)
 	movl $__HYPERVISOR_switch_vm86,%eax
-	int $0x82			# Atomically enables events delivery
+	int $0x82
 	ud2
 
 	# perform work that needs to be done immediately before resumption
@@ -555,7 +555,8 @@ ENTRY(failsafe_callback)
 1:      popl %ds
 2:      popl %es
 3:      popl %fs
-4:      popl %gs
+4:      pop  %gs
+        subl $4,%esp
         SAVE_ALL
         jmp  ret_from_exception
 .section .fixup,"ax";	\
