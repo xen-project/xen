@@ -123,7 +123,7 @@ extern void bt_iounmap(void *addr, unsigned long size);
  */
 #define isa_virt_to_bus(_x) BUG() // should be (void *)((FIX_ISAMAP_BEGIN - __virt_to_fix((_x))) << PAGE_SHIFT)
 #define isa_page_to_bus(_x) BUG()  // page_to_phys(_x)
-#ifdef CONFIG_XEN_PHYSDEV_ACCESS
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
 #define isa_bus_to_virt(_x) (void *)__fix_to_virt(FIX_ISAMAP_BEGIN - ((_x) >> PAGE_SHIFT))
 #else
 #define isa_bus_to_virt(_x) (void *)0L /* XXXcl */

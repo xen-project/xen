@@ -117,9 +117,6 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
 	struct vm_struct * area;
 	unsigned long offset, last_addr;
 
-	if (!(start_info.flags & SIF_PRIVILEGED))
-		return NULL;
-
 	/* Don't allow wraparound or zero size */
 	last_addr = phys_addr + size - 1;
 	if (!size || last_addr < phys_addr)
