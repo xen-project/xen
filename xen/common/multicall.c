@@ -52,9 +52,15 @@ long do_multicall(multicall_entry_t *call_list, unsigned int nr_calls)
 
         if ( hypercall_preempt_check() )
         {
-            /* If the sub-call wasn't preempted, skip over it. */
+            /*
+             * Copy the sub-call continuation if it was preempted.
+             * Otherwise skip over the sub-call entirely.
+             */
             if ( !test_bit(_MCSF_call_preempted, &mcs->flags) )
                 i++;
+            else
+                (void)__copy_to_user(&call_list[i], &mcs->call,
+                                     sizeof(*call_list));
 
             /* Only create a continuation if there is work left to be done. */
             if ( i < nr_calls )
