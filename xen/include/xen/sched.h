@@ -59,7 +59,7 @@ struct exec_domain
 {
     u32 processor;
 
-    shared_info_t *shared_info;
+    vcpu_info_t *vcpu_info;
 
     struct domain *domain;
     struct exec_domain *ed_next_list;

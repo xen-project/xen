@@ -464,7 +464,7 @@ asmlinkage void do_general_protection(struct xen_regs *regs, long error_code)
 {
     struct exec_domain *ed = current;
     struct domain *d = ed->domain;
-    struct trap_bounce *tb = &d->thread.trap_bounce;
+    struct trap_bounce *tb = &ed->thread.trap_bounce;
     trap_info_t *ti;
     unsigned long fixup;
 
@@ -616,7 +616,7 @@ asmlinkage void do_debug(struct xen_regs *regs, long error_code)
 {
     unsigned int condition;
     struct exec_domain *d = current;
-    struct trap_bounce *tb = &ed->thread.trap_bounce;
+    struct trap_bounce *tb = &d->thread.trap_bounce;
 
     DEBUGGER_trap_entry(TRAP_debug, regs, error_code);
 
