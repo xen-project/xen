@@ -134,10 +134,11 @@ recommended since they require extra packet copies.
 Building Xen and XenoLinux
 ==========================
 
-The public master BK repository lives at: bk://xen.bkbits.net/xeno.bk
+The public master BK repository for the 1.0 release lives at: 
+bk://xen.bkbits.net/xeno-1.0.bk
 
 To fetch a local copy, install the BitKeeper tools, then run: 
-'bk clone bk://xen.bkbits.net/xeno.bk'
+'bk clone bk://xen.bkbits.net/xeno-1.0.bk'
 
 To see how to build Xen, Xenolinux, and all the control tools, inspect
 the tools/misc/xen-clone script in the BK repository. This script can

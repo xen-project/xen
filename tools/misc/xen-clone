@@ -15,8 +15,8 @@ UCCL)
 	LINUX_DIR=${3:-/usr/groups/xeno/archive/}
 	;;
 *)
-	BK_REP=${1:-bk://xen.bkbits.net/xeno.bk}
-	# BK_REP=${1:-ssh://xen@xen.bkbits.net/xeno.bk}
+	BK_REP=${1:-bk://xen.bkbits.net/xeno-1.0.bk}
+	# BK_REP=${1:-ssh://xen@xen.bkbits.net/xeno-1.0.bk}
 	LINUX_DIR=${3:-..}
 ;;
 esac

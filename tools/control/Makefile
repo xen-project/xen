@@ -8,6 +8,7 @@ clean: clean-cmdline clean-web
 
 examples: FORCE
 	mkdir -p ../../../install/etc
+	chmod +w ../../../install/etc/*
 	cp examples/xen* examples/*example ../../../install/etc/
 
 cmdline: FORCE

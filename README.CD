@@ -429,7 +429,7 @@ figuring out what's happened.  Debug a XenoLinux image just as you
 would any other Linux kernel.
 
 We supply a handy debug terminal program which you can find in
-/usr/local/src/xen-1.0/xeno.bk/tools/misc/miniterm/
+/usr/local/src/xen-1.0/xeno-1.0.bk/tools/misc/miniterm/
 This should be built and executed on another machine that is connected
 via a null modem cable. Documentation is included.
 Alternatively, telnet can be used in 'char mode' if the Xen machine is
