@@ -219,10 +219,10 @@ nopaging_gdt_descr:
 ENTRY(gdt_table)
         .quad 0x0000000000000000     /* NULL descriptor */
         .quad 0x0000000000000000     /* not used */
-        .quad 0x00ceba000000ffff     /* 0x11 ring 1 3.5GB code at 0x00000000 */
-        .quad 0x00ceb2000000ffff     /* 0x19 ring 1 3.5GB data at 0x00000000 */
-        .quad 0x00cefa000000ffff     /* 0x23 ring 3 3.5GB code at 0x00000000 */
-        .quad 0x00cef2000000ffff     /* 0x2b ring 3 3.5GB data at 0x00000000 */
+        .quad 0x00cdba000000ffff     /* 0x11 ring 1 3.5GB code at 0x00000000 */
+        .quad 0x00cdb2000000ffff     /* 0x19 ring 1 3.5GB data at 0x00000000 */
+        .quad 0x00cdfa000000ffff     /* 0x23 ring 3 3.5GB code at 0x00000000 */
+        .quad 0x00cdf2000000ffff     /* 0x2b ring 3 3.5GB data at 0x00000000 */
         .quad 0x00cf9a000000ffff     /* 0x30 ring 0 4.0GB code at 0x00000000 */
         .quad 0x00cf92000000ffff     /* 0x38 ring 0 4.0GB data at 0x00000000 */
         .quad 0x0000000000000000

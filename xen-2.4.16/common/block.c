@@ -17,5 +17,6 @@
  */
 blk_ring_t *create_block_ring(int domain)
 {
-  printk ("XEN create block ring");
+    printk ("XEN create block ring <not implemented>");
+    return (blk_ring_t *)NULL; 
 }

@@ -12,6 +12,8 @@
 #include <asm/msr.h>
 #include <asm/uaccess.h>
 #include <xeno/dom0_ops.h>
+#include <asm/byteorder.h>
+#include <linux/if_ether.h>
 
 /* VGA text definitions. */
 #define COLUMNS	    80
@@ -326,33 +328,175 @@ asmlinkage long sys_ni_syscall(void)
 }
 
 
+unsigned short compute_cksum(unsigned short *buf, int count)
+{
+	/* Function written by ek247
+	 * Computes IP and UDP checksum.
+	 * To be used for the fake console packets
+	 * created in console_export
+	 */
+
+    unsigned long sum=0;
+
+    while (count--)
+    {
+        sum+=*buf++;
+        if (sum & 0xFFFF0000)
+        {
+            //carry occured, so wrap around
+            sum &=0xFFFF;
+            sum++;
+        }
+    }
+    return ~(sum & 0xFFFF);
+}
+
+
+
+/* XXX SMH: below is rather vile; pulled in to allow network console */
+
+extern int netif_rx(struct sk_buff *); 
+
+typedef struct my_udphdr {
+    __u16 source;
+    __u16 dest;
+    __u16 len;
+    __u16 check;
+} my_udphdr_t; 
+
+
+typedef struct my_iphdr {
+#if defined(__LITTLE_ENDIAN_BITFIELD)
+    __u8    ihl:4,
+	version:4;
+#elif defined (__BIG_ENDIAN_BITFIELD)
+    __u8    version:4,
+	ihl:4;
+#else
+#error  "Please fix <asm/byteorder.h>"
+#endif
+    __u8    tos;
+    __u16   tot_len;
+    __u16   id;
+    __u16   frag_off;
+    __u8    ttl;
+    __u8    protocol;
+    __u16   check;
+    __u32   saddr;
+    __u32   daddr;
+} my_iphdr_t; 
+
+
+typedef struct my_ethhdr {
+    unsigned char   h_dest[6];   	
+    unsigned char   h_source[6]; 	
+    unsigned short  h_proto;        
+} my_ethhdr_t; 
+
+
+int console_export(char *str, int len)
+{
+    /* Function written by ek247
+     * Exports console output from all domains upwards
+     * to domain0, by stuffing it into a fake network
+     * packet
+     */
+    struct sk_buff *console_packet;
+    struct my_iphdr *iph = NULL;  
+    struct my_udphdr *udph = NULL; 
+    struct my_ethhdr *ethh = NULL; 
+    int hdr_size = sizeof(struct my_iphdr) + sizeof(struct my_udphdr); 
+    
+    // Prepare console packet
+    console_packet = alloc_skb(sizeof(struct my_ethhdr) + hdr_size + len, 
+			       GFP_KERNEL);
+    skb_reserve(console_packet, sizeof(struct my_ethhdr)); 
+    ethh   = (struct my_ethhdr *)console_packet->head;
+
+    skb_put(console_packet, hdr_size + len); 
+    iph  = (struct my_iphdr *)console_packet->data; 
+	udph = (struct my_udphdr *)(iph + 1); 
+	memcpy((char *)(udph + 1), str, len); 
+
+    // Build IP header
+    iph->version = 4;
+    iph->ihl     = 5;
+    iph->frag_off= 0;
+    iph->id      = 0xdead;
+    iph->ttl     = 255;
+    iph->protocol= 17;
+    iph->daddr   = htonl(opt_ipbase);
+    iph->saddr   = htonl(0xa9fe0001); 
+    iph->tot_len = htons(hdr_size + len); 
+
+    // Calculating IP checksum
+    iph->check	 = 0;
+    iph->check   = compute_cksum((__u16 *)iph, sizeof(struct my_iphdr)/2); 
+
+
+    // Build UDP header
+    udph->source    = htons(current->domain);
+    udph->dest      = htons(666);
+    udph->len       = htons(sizeof(struct my_udphdr) + len);
+    udph->check     = 0;
+		
+    // Fix Ethernet header
+    memcpy(ethh->h_source, "000000", 6);
+    memcpy(ethh->h_dest, "000000", 6);
+    ethh->h_proto = htons(ETH_P_IP);
+    console_packet->mac.ethernet= (struct ethhdr *)ethh;
+    
+    // Pass the packet to netif_rx
+    (void)netif_rx(console_packet);
+
+    return 1;
+}
+
+
 long do_console_write(char *str, int count)
 {
 #define SIZEOF_BUF 256
     unsigned char safe_str[SIZEOF_BUF];
+    unsigned char exported_str[SIZEOF_BUF];
     unsigned long flags;
-    int i;
+    int i=0;
+    int j=0;
     unsigned char prev = '\n';
-
+    
     if ( count > SIZEOF_BUF ) count = SIZEOF_BUF;
-
+    
     if ( copy_from_user(safe_str, str, count) )
         return -EFAULT;
-        
+    
     spin_lock_irqsave(&console_lock, flags);
+
+    __putstr("DOM"); 
+    putchar(current->domain+'0'); 
+    __putstr(": ");
+    
     for ( i = 0; i < count; i++ )
     {
-        if ( prev == '\n' )
-        {
-            __putstr("DOM"); 
-            putchar(current->domain+'0'); 
-            __putstr(": ");
-        }
+	exported_str[j++]=safe_str[i];
+	
         if ( !safe_str[i] ) break;
         putchar(prev = safe_str[i]);
+	
+        if ( prev == '\n' )
+        {
+	    exported_str[j]='\0';
+	    console_export(exported_str, j-1);
+	    j=0;
+        }
+	
     }
-    if ( prev != '\n' ) putchar('\n');
+    if ( prev != '\n' ) 
+    {
+	putchar('\n');
+        exported_str[j]='\0';
+        console_export(exported_str, j-1);
+    }
+    
     spin_unlock_irqrestore(&console_lock, flags);
-
+    
     return(0);
 }
