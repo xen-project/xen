@@ -246,6 +246,7 @@ extern struct domain *task_list;
 #define DF_DYING       11 /* Death rattle.                                  */
 #define DF_RUNNING     12 /* Currently running on a CPU.                    */
 #define DF_CPUPINNED   13 /* Disables auto-migration.                       */
+#define DF_MIGRATED    14 /* Domain migrated between CPUs.                  */ 
 
 static inline int domain_runnable(struct domain *d)
 {
