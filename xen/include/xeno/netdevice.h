@@ -40,6 +40,12 @@
 
 struct vlan_group;
 
+extern struct skb_completion_queues {
+    struct sk_buff *rx; /* Packets received in interrupt context. */
+    unsigned int rx_qlen;
+    struct sk_buff *tx; /* Tx buffers defunct in interrupt context. */
+} skb_queue[NR_CPUS] __cacheline_aligned;
+
 /* Backlog congestion levels */
 #define NET_RX_SUCCESS		0   /* keep 'em coming, baby */
 #define NET_RX_DROP		1  /* packet dropped */
@@ -453,12 +459,30 @@ static inline int netif_running(struct net_device *dev)
 }
 
 
-/*
- * Xen does not need deferred skb freeing, as all destructor hook functions 
- * are IRQ safe. Linux needed more care for some destructors...
+/* Use this variant when it is known for sure that it
+ * is executing from interrupt context.
  */
-#define dev_kfree_skb_irq(_skb) dev_kfree_skb(_skb)
-#define dev_kfree_skb_any(_skb) dev_kfree_skb(_skb)
+static inline void dev_kfree_skb_irq(struct sk_buff *skb)
+{
+	int cpu = smp_processor_id();
+	unsigned long flags;
+	local_irq_save(flags);
+	skb->next = skb_queue[cpu].tx;
+	skb_queue[cpu].tx = skb;
+	__cpu_raise_softirq(cpu, NET_TX_SOFTIRQ);
+	local_irq_restore(flags);
+}
+
+/* Use this variant in places where it could be invoked
+ * either from interrupt or non-interrupt context.
+ */
+static inline void dev_kfree_skb_any(struct sk_buff *skb)
+{
+	if (in_irq())
+		dev_kfree_skb_irq(skb);
+	else
+		dev_kfree_skb(skb);
+}
 
 extern void		net_call_rx_atomic(void (*fn)(void));
 extern int		netif_rx(struct sk_buff *skb);

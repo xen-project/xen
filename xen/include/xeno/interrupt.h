@@ -21,33 +21,23 @@ struct irqaction {
 };
 
 
-/* Who gets which entry in bh_base.  Things which will occur most often
-   should come first */
-   
 enum {
 	TIMER_BH = 0,
-	TQUEUE_BH,
-	SCSI_BH,
-	IMMEDIATE_BH
+	SCSI_BH
 };
 
 #include <asm/hardirq.h>
 #include <asm/softirq.h>
 
 
-
-/* PLEASE, avoid to allocate new softirqs, if you need not _really_ high
-   frequency threaded job scheduling. For almost all the purposes
-   tasklets are more than enough. F.e. all serial device BHs et
-   al. should be converted to tasklets, not to softirqs.
- */
-
 enum
 {
 	HI_SOFTIRQ=0,
 	NET_RX_SOFTIRQ,
 	AC_TIMER_SOFTIRQ,
-	TASKLET_SOFTIRQ
+	TASKLET_SOFTIRQ,
+        BLKDEV_RESPONSE_SOFTIRQ,
+        NET_TX_SOFTIRQ
 };
 
 /* softirq mask and active fields moved to irq_cpustat_t in

@@ -132,6 +132,7 @@
 #include <xeno/sched.h>
 #include <xeno/errno.h>
 #include <xeno/perfc.h>
+#include <xeno/interrupt.h>
 #include <asm/page.h>
 #include <asm/flushtlb.h>
 #include <asm/io.h>
@@ -253,11 +254,15 @@ int map_ldt_shadow_page(unsigned int off)
 {
     struct task_struct *p = current;
     unsigned long addr = p->mm.ldt_base + (off << PAGE_SHIFT);
-    unsigned long l1e, *ldt_page, flags;
+    unsigned long l1e, *ldt_page;
     struct pfn_info *page;
     int i, ret = -1;
 
-    spin_lock_irqsave(&p->page_lock, flags);
+    /* We cannot take a page_lock in interrupt context. */
+    if ( in_interrupt() )
+        BUG();
+
+    spin_lock(&p->page_lock);
 
     __get_user(l1e, (unsigned long *)(linear_pg_table+(addr>>PAGE_SHIFT)));
     if ( unlikely(!(l1e & _PAGE_PRESENT)) )
@@ -294,7 +299,7 @@ int map_ldt_shadow_page(unsigned int off)
     ret = 0;
 
  out:
-    spin_unlock_irqrestore(&p->page_lock, flags);
+    spin_unlock(&p->page_lock);
     return ret;
 }
 
@@ -865,7 +870,7 @@ int do_mmu_update(mmu_update_t *ureqs, int count)
 
         err = 1;
 
-        spin_lock_irq(&current->page_lock);
+        spin_lock(&current->page_lock);
 
         /* Get the page-frame number that a non-extended command references. */
         if ( (cmd == MMU_NORMAL_PT_UPDATE) || 
@@ -974,7 +979,7 @@ int do_mmu_update(mmu_update_t *ureqs, int count)
         }
 
     unlock:
-        spin_unlock_irq(&current->page_lock);
+        spin_unlock(&current->page_lock);
 
         if ( unlikely(err) )
         {
@@ -1015,7 +1020,7 @@ int do_update_va_mapping(unsigned long page_nr,
     if ( unlikely(page_nr >= (HYPERVISOR_VIRT_START >> PAGE_SHIFT)) )
         goto out;
 
-    spin_lock_irq(&p->page_lock);
+    spin_lock(&p->page_lock);
 
     /* Check that the VA's page-directory entry is present.. */
     if ( unlikely((err = __get_user(_x, (unsigned long *)
@@ -1047,7 +1052,7 @@ int do_update_va_mapping(unsigned long page_nr,
     if ( unlikely(cr0 != 0) )
         write_cr0(cr0);
  unlock_and_out:
-    spin_unlock_irq(&p->page_lock);
+    spin_unlock(&p->page_lock);
  out:
     return err;
 }

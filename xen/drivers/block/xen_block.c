@@ -58,6 +58,8 @@ static spinlock_t pend_prod_lock = SPIN_LOCK_UNLOCKED;
 static kmem_cache_t *buffer_head_cachep;
 static atomic_t nr_pending;
 
+static struct buffer_head *completed_bhs[NR_CPUS] __cacheline_aligned;
+
 static int __buffer_is_valid(struct task_struct *p, 
                              unsigned long buffer, 
                              unsigned short size,
@@ -166,41 +168,68 @@ static void maybe_trigger_io_schedule(void)
 
 /******************************************************************
  * COMPLETION CALLBACK -- Called as bh->b_end_io()
- * NB. This can be called from interrupt context!
  */
+
+static void end_block_io_op_softirq(struct softirq_action *h)
+{
+    pending_req_t *pending_req;
+    struct buffer_head *bh, *nbh;
+    unsigned int cpu = smp_processor_id();
+
+    local_irq_disable();
+    bh = completed_bhs[cpu];
+    completed_bhs[cpu] = NULL;
+    local_irq_enable();
+
+    while ( bh != NULL )
+    {
+        pending_req = bh->pending_req;
+        
+        unlock_buffer(pending_req->domain, 
+                      virt_to_phys(bh->b_data), 
+                      bh->b_size, 
+                      (pending_req->operation==READ));
+        
+        if ( atomic_dec_and_test(&pending_req->pendcnt) )
+        {
+            make_response(pending_req->domain, pending_req->id,
+                          pending_req->operation, pending_req->status);
+            put_task_struct(pending_req->domain);
+            spin_lock(&pend_prod_lock);
+            pending_ring[pending_prod] = pending_req - pending_reqs;
+            PENDREQ_IDX_INC(pending_prod);
+            spin_unlock(&pend_prod_lock);
+            atomic_dec(&nr_pending);
+            maybe_trigger_io_schedule();
+        }
+        
+        nbh = bh->b_reqnext;
+        kmem_cache_free(buffer_head_cachep, bh);
+        bh = nbh;
+    }
+}
 
 static void end_block_io_op(struct buffer_head *bh, int uptodate)
 {
     unsigned long flags;
-    pending_req_t *pending_req = bh->pending_req;
+    unsigned int cpu = smp_processor_id();
 
     /* An error fails the entire request. */
     if ( !uptodate )
     {
         DPRINTK("Buffer not up-to-date at end of operation\n");
-        pending_req->status = 2;
+        bh->pending_req->status = 2;
     }
 
-    unlock_buffer(pending_req->domain, 
-                  virt_to_phys(bh->b_data), 
-                  bh->b_size, 
-                  (pending_req->operation==READ));
+    local_irq_save(flags);
+    bh->b_reqnext = completed_bhs[cpu];
+    completed_bhs[cpu] = bh;
+    local_irq_restore(flags);
 
-    if ( atomic_dec_and_test(&pending_req->pendcnt) )
-    {
-        make_response(pending_req->domain, pending_req->id,
-                      pending_req->operation, pending_req->status);
-        put_task_struct(pending_req->domain);
-        spin_lock_irqsave(&pend_prod_lock, flags);
-        pending_ring[pending_prod] = pending_req - pending_reqs;
-        PENDREQ_IDX_INC(pending_prod);
-        spin_unlock_irqrestore(&pend_prod_lock, flags);
-        atomic_dec(&nr_pending);
-        maybe_trigger_io_schedule();
-    }
-
-    kmem_cache_free(buffer_head_cachep, bh);
+    __cpu_raise_softirq(cpu, BLKDEV_RESPONSE_SOFTIRQ);
 }
+
+
 /* ----[ Syscall Interface ]------------------------------------------------*/
 
 long do_block_io_op(block_io_op_t *u_block_io_op)
@@ -364,10 +393,10 @@ static void unlock_buffer(struct task_struct *p,
                           unsigned short size,
                           int writeable_buffer)
 {
-    unsigned long    pfn, flags;
+    unsigned long    pfn;
     struct pfn_info *page;
 
-    spin_lock_irqsave(&p->page_lock, flags);
+    spin_lock(&p->page_lock);
     for ( pfn = buffer >> PAGE_SHIFT; 
           pfn < ((buffer + size + PAGE_SIZE - 1) >> PAGE_SHIFT);
           pfn++ )
@@ -377,7 +406,7 @@ static void unlock_buffer(struct task_struct *p,
             put_page_type(page);
         put_page_tot(page);
     }
-    spin_unlock_irqrestore(&p->page_lock, flags);
+    spin_unlock(&p->page_lock);
 }
 
 static int do_block_io_op_domain(struct task_struct *p, int max_to_do)
@@ -438,7 +467,7 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
     struct buffer_head *bh;
     int operation = (req->operation == XEN_BLOCK_WRITE) ? WRITE : READ;
     unsigned short nr_sects;
-    unsigned long buffer, flags;
+    unsigned long buffer;
     int i, tot_sects;
     pending_req_t *pending_req;
 
@@ -446,7 +475,7 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
     int new_segs, nr_psegs = 0;
     phys_seg_t phys_seg[MAX_BLK_SEGS * 2];
 
-    spin_lock_irqsave(&p->page_lock, flags);
+    spin_lock(&p->page_lock);
 
     /* Check that number of segments is sane. */
     if ( (req->nr_segments == 0) || (req->nr_segments > MAX_BLK_SEGS) )
@@ -516,7 +545,7 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
     for ( i = 0; i < nr_psegs; i++ )
         __lock_buffer(phys_seg[i].buffer, phys_seg[i].nr_sects<<9, 
                       (operation==READ));
-    spin_unlock_irqrestore(&p->page_lock, flags);
+    spin_unlock(&p->page_lock);
 
     atomic_inc(&nr_pending);
     pending_req = pending_reqs + pending_ring[pending_cons];
@@ -560,7 +589,7 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
     return;
 
  bad_descriptor:
-    spin_unlock_irqrestore(&p->page_lock, flags);
+    spin_unlock(&p->page_lock);
     make_response(p, req->id, req->operation, 1);
 } 
 
@@ -574,19 +603,19 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
 static void make_response(struct task_struct *p, unsigned long id, 
 			  unsigned short op, unsigned long st)
 {
-    unsigned long cpu_mask, flags;
+    unsigned long cpu_mask;
     int position;
     blk_ring_t *blk_ring;
 
     /* Place on the response ring for the relevant domain. */ 
-    spin_lock_irqsave(&p->blk_ring_lock, flags);
+    spin_lock(&p->blk_ring_lock);
     blk_ring = p->blk_ring_base;
     position = p->blk_resp_prod;
     blk_ring->ring[position].resp.id        = id;
     blk_ring->ring[position].resp.operation = op;
     blk_ring->ring[position].resp.status    = st;
     p->blk_resp_prod = blk_ring->resp_prod = BLK_RING_INC(position);
-    spin_unlock_irqrestore(&p->blk_ring_lock, flags);
+    spin_unlock(&p->blk_ring_lock);
     
     /* Kick the relevant domain. */
     cpu_mask = mark_guest_event(p, _EVENT_BLKDEV);
@@ -659,7 +688,13 @@ void initialize_block_io ()
     atomic_set(&nr_pending, 0);
     pending_prod = pending_cons = 0;
     memset(pending_reqs, 0, sizeof(pending_reqs));
-    for ( i = 0; i < MAX_PENDING_REQS; i++ ) pending_ring[i] = i;
+    for ( i = 0; i < MAX_PENDING_REQS; i++ )
+        pending_ring[i] = i;
+    
+    for ( i = 0; i < NR_CPUS; i++ )
+        completed_bhs[i] = NULL;
+        
+    open_softirq(BLKDEV_RESPONSE_SOFTIRQ, end_block_io_op_softirq, NULL);
 
     spin_lock_init(&io_schedule_list_lock);
     INIT_LIST_HEAD(&io_schedule_list);

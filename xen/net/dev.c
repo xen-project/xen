@@ -50,7 +50,7 @@
 #define TX_RING_ADD(_i,_j) (((_i)+(_j)) & (TX_RING_SIZE-1))
 #define RX_RING_ADD(_i,_j) (((_i)+(_j)) & (RX_RING_SIZE-1))
 
-static struct sk_buff_head rx_skb_queue[NR_CPUS] __cacheline_aligned;
+struct skb_completion_queues skb_queue[NR_CPUS] __cacheline_aligned;
 
 static int get_tx_bufs(net_vif_t *vif);
 
@@ -607,35 +607,40 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
 
 int netif_rx(struct sk_buff *skb)
 {
-    int this_cpu = smp_processor_id();
-    struct sk_buff_head *q = &rx_skb_queue[this_cpu];
+    int cpu = smp_processor_id();
     unsigned long flags;
 
-    /* This oughtn't to happen, really! */
-    if ( unlikely(skb_queue_len(q) > 100) )
+    local_irq_save(flags);
+
+    if ( unlikely(skb_queue[cpu].rx_qlen > 100) )
     {
+        local_irq_restore(flags);
         perfc_incr(net_rx_congestion_drop);
         return NET_RX_DROP;
     }
 
-    local_irq_save(flags);
-    __skb_queue_tail(q, skb);
+    skb->next = skb_queue[cpu].rx;
+    skb_queue[cpu].rx = skb;
+
     local_irq_restore(flags);
 
-    __cpu_raise_softirq(this_cpu, NET_RX_SOFTIRQ);
+    __cpu_raise_softirq(cpu, NET_RX_SOFTIRQ);
 
     return NET_RX_SUCCESS;
 }
 
 static void net_rx_action(struct softirq_action *h)
 {
-    int offset, this_cpu = smp_processor_id();
-    struct sk_buff_head *q = &rx_skb_queue[this_cpu];
-    struct sk_buff *skb;
+    int offset, cpu = smp_processor_id();
+    struct sk_buff *skb, *nskb;
 
     local_irq_disable();
-    
-    while ( (skb = __skb_dequeue(q)) != NULL )
+    skb = skb_queue[cpu].rx;
+    skb_queue[cpu].rx = NULL;
+    skb_queue[cpu].rx_qlen = 0;
+    local_irq_enable();
+
+    while ( skb != NULL )
     {
         ASSERT(skb->skb_type == SKB_ZERO_COPY);
 
@@ -652,7 +657,7 @@ static void net_rx_action(struct softirq_action *h)
         skb_push(skb, ETH_HLEN);
         skb->mac.raw = skb->data;
         
-        netdev_rx_stat[this_cpu].total++;
+        netdev_rx_stat[cpu].total++;
         
         if ( skb->dst_vif == NULL )
             skb->dst_vif = net_get_target_vif(
@@ -668,10 +673,11 @@ static void net_rx_action(struct softirq_action *h)
         }
 
         unmap_domain_mem(skb->head);
-        kfree_skb(skb);
-    }
 
-    local_irq_enable();
+        nskb = skb->next;
+        kfree_skb(skb);
+        skb = nskb;
+    }
 }
 
 
@@ -823,39 +829,58 @@ static inline void maybe_schedule_tx_action(void)
 }
 
 
+static void net_tx_gc(struct softirq_action *h)
+{
+    int cpu = smp_processor_id();
+    struct sk_buff *skb, *nskb;
+
+    local_irq_disable();
+    skb = skb_queue[cpu].tx;
+    skb_queue[cpu].tx = NULL;
+    local_irq_enable();
+
+    while ( skb != NULL )
+    {
+        nskb = skb->next;
+        __kfree_skb(skb);
+        skb = nskb;
+    }
+}
+
 /* Destructor function for tx skbs. */
 static void tx_skb_release(struct sk_buff *skb)
 {
     int i;
-    net_vif_t *vif = skb->src_vif;
-    unsigned long flags;
+    net_vif_t *vif;
+
+    vif = skb->src_vif;
     
-    spin_lock_irqsave(&vif->domain->page_lock, flags);
+    spin_lock(&vif->domain->page_lock);
     for ( i = 0; i < skb_shinfo(skb)->nr_frags; i++ )
         put_page_tot(skb_shinfo(skb)->frags[i].page);
-    spin_unlock_irqrestore(&vif->domain->page_lock, flags);
-
+    spin_unlock(&vif->domain->page_lock);
+    
     if ( skb->skb_type == SKB_NODATA )
         kmem_cache_free(net_header_cachep, skb->head);
-
+    
     skb_shinfo(skb)->nr_frags = 0; 
-
-    spin_lock_irqsave(&vif->tx_lock, flags);
+    
+    spin_lock(&vif->tx_lock);
     __make_tx_response(vif, skb->guest_id, RING_STATUS_OK);
-    spin_unlock_irqrestore(&vif->tx_lock, flags);
-
+    spin_unlock(&vif->tx_lock);
+    
     /*
-     * Checks below must happen after the above response is posted.
-     * This avoids a possible race with a guest OS on another CPU.
+     * Checks below must happen after the above response is posted. This avoids
+     * a possible race with a guest OS on another CPU.
      */
     smp_mb();
-
+    
     if ( (vif->tx_cons == vif->tx_prod) && get_tx_bufs(vif) )
     {
         add_to_net_schedule_list_tail(vif);
         maybe_schedule_tx_action();        
     }
-
+    
     put_vif(vif);
 }
 
@@ -1849,12 +1874,11 @@ static int get_tx_bufs(net_vif_t *vif)
     struct sk_buff     *skb;
     tx_req_entry_t      tx;
     int                 i, j, ret = 0;
-    unsigned long       flags;
 
     if ( vif->tx_req_cons == shared_idxs->tx_req_prod )
         return 0;
 
-    spin_lock_irqsave(&vif->tx_lock, flags);
+    spin_lock(&vif->tx_lock);
 
     /* Currently waiting for more credit? */
     if ( vif->remaining_credit == 0 )
@@ -2013,7 +2037,7 @@ static int get_tx_bufs(net_vif_t *vif)
         vif->tx_prod = j;
 
  out:
-    spin_unlock_irqrestore(&vif->tx_lock, flags);
+    spin_unlock(&vif->tx_lock);
 
     return ret;
 }
@@ -2063,14 +2087,14 @@ static long get_bufs_from_vif(net_vif_t *vif)
         pte_pfn = rx.addr >> PAGE_SHIFT;
         pte_page = frame_table + pte_pfn;
             
-        spin_lock_irq(&p->page_lock);
+        spin_lock(&p->page_lock);
         if ( (pte_pfn >= max_page) || 
              ((pte_page->flags & (PG_type_mask | PG_domain_mask)) != 
               (PGT_l1_page_table | p->domain)) ) 
         {
             DPRINTK("Bad page frame for ppte %d,%08lx,%08lx,%08lx\n",
                     p->domain, pte_pfn, max_page, pte_page->flags);
-            spin_unlock_irq(&p->page_lock);
+            spin_unlock(&p->page_lock);
             make_rx_response(vif, rx.id, 0, RING_STATUS_BAD_PAGE, 0);
             continue;
         }
@@ -2117,7 +2141,7 @@ static long get_bufs_from_vif(net_vif_t *vif)
             
     rx_unmap_and_continue:
         unmap_domain_mem(ptep);
-        spin_unlock_irq(&p->page_lock);
+        spin_unlock(&p->page_lock);
     }
 
     vif->rx_req_cons = i;
@@ -2135,7 +2159,7 @@ static long get_bufs_from_vif(net_vif_t *vif)
 long flush_bufs_for_vif(net_vif_t *vif)
 {
     int i;
-    unsigned long *pte, flags;
+    unsigned long *pte;
     struct pfn_info *page;
     struct task_struct *p = vif->domain;
     rx_shadow_entry_t *rx;
@@ -2143,7 +2167,7 @@ long flush_bufs_for_vif(net_vif_t *vif)
     net_idx_t *shared_idxs = vif->shared_idxs;
 
     /* Return any outstanding receive buffers to the guest OS. */
-    spin_lock_irqsave(&p->page_lock, flags);
+    spin_lock(&p->page_lock);
     for ( i = vif->rx_req_cons; 
           (i != shared_idxs->rx_req_prod) && 
               (((vif->rx_resp_prod-i) & (RX_RING_SIZE-1)) != 1); 
@@ -2181,13 +2205,13 @@ long flush_bufs_for_vif(net_vif_t *vif)
         make_rx_response(vif, rx->id, 0, RING_STATUS_DROPPED, 0);
     }
     vif->rx_cons = i;
-    spin_unlock_irqrestore(&p->page_lock, flags);
+    spin_unlock(&p->page_lock);
 
     /*
      * Flush pending transmit buffers. The guest may still have to wait for
      * buffers that are queued at a physical NIC.
      */
-    spin_lock_irqsave(&vif->tx_lock, flags);
+    spin_lock(&vif->tx_lock);
     for ( i = vif->tx_req_cons; 
           (i != shared_idxs->tx_req_prod) && 
               (((vif->tx_resp_prod-i) & (TX_RING_SIZE-1)) != 1); 
@@ -2197,7 +2221,7 @@ long flush_bufs_for_vif(net_vif_t *vif)
                            RING_STATUS_DROPPED);
     }
     vif->tx_req_cons = i;
-    spin_unlock_irqrestore(&vif->tx_lock, flags);
+    spin_unlock(&vif->tx_lock);
 
     return 0;
 }
@@ -2236,7 +2260,7 @@ long do_net_io_op(netop_t *uop)
 
     case NETOP_RESET_RINGS:
         /* We take the tx_lock to avoid a race with get_tx_bufs. */
-        spin_lock_irq(&vif->tx_lock);
+        spin_lock(&vif->tx_lock);
         if ( (vif->rx_req_cons != vif->rx_resp_prod) || 
              (vif->tx_req_cons != vif->tx_resp_prod) )
         {
@@ -2249,7 +2273,7 @@ long do_net_io_op(netop_t *uop)
             vif->tx_req_cons = vif->tx_resp_prod = 0;
             ret = 0;
         }
-        spin_unlock_irq(&vif->tx_lock);
+        spin_unlock(&vif->tx_lock);
         break;
 
     case NETOP_GET_VIF_INFO:
@@ -2297,12 +2321,11 @@ static void make_rx_response(net_vif_t     *vif,
                              unsigned char  st,
                              unsigned char  off)
 {
-    unsigned long flags;
     unsigned int pos;
     rx_resp_entry_t *resp;
 
     /* Place on the response ring for the relevant domain. */ 
-    spin_lock_irqsave(&vif->rx_lock, flags);
+    spin_lock(&vif->rx_lock);
     pos  = vif->rx_resp_prod;
     resp = &vif->shared_rings->rx_ring[pos].resp;
     resp->id     = id;
@@ -2317,19 +2340,24 @@ static void make_rx_response(net_vif_t     *vif,
         unsigned long cpu_mask = mark_guest_event(vif->domain, _EVENT_NET);
         guest_event_notify(cpu_mask);    
     }
-    spin_unlock_irqrestore(&vif->rx_lock, flags);
+    spin_unlock(&vif->rx_lock);
 }
 
 
 int setup_network_devices(void)
 {
-    int i, ret;
+    int ret;
     extern char opt_ifname[];
 
-    for ( i = 0; i < smp_num_cpus; i++ )
-        skb_queue_head_init(&rx_skb_queue[i]);
+    memset(skb_queue, 0, sizeof(skb_queue));
 
+    /* Actual receive processing happens in softirq context. */
     open_softirq(NET_RX_SOFTIRQ, net_rx_action, NULL);
+
+    /* Processing of defunct transmit buffers happens in softirq context. */
+    open_softirq(NET_TX_SOFTIRQ, net_tx_gc, NULL);
+
+    /* Tranmit scheduling happens in a tasklet to exclude other processors. */
     tasklet_enable(&net_tx_tasklet);
 
     if ( (the_dev = dev_get_by_name(opt_ifname)) == NULL ) 

@@ -213,12 +213,12 @@ long set_gdt(struct task_struct *p,
 {
     /* NB. There are 512 8-byte entries per GDT page. */
     unsigned int i, j, nr_pages = (entries + 511) / 512;
-    unsigned long pfn, *gdt_page, flags;
+    unsigned long pfn, *gdt_page;
     long ret = -EINVAL;
     struct pfn_info *page;
     struct desc_struct *vgdt;
 
-    spin_lock_irqsave(&p->page_lock, flags);
+    spin_lock(&p->page_lock);
 
     /* Check the new GDT. */
     for ( i = 0; i < nr_pages; i++ )
@@ -284,7 +284,7 @@ long set_gdt(struct task_struct *p,
     ret = 0; /* success */
 
  out:
-    spin_unlock_irqrestore(&p->page_lock, flags);
+    spin_unlock(&p->page_lock);
     return ret;
 }
 
@@ -314,14 +314,14 @@ long do_set_gdt(unsigned long *frame_list, unsigned int entries)
 long do_update_descriptor(
     unsigned long pa, unsigned long word1, unsigned long word2)
 {
-    unsigned long *gdt_pent, flags, pfn = pa >> PAGE_SHIFT;
+    unsigned long *gdt_pent, pfn = pa >> PAGE_SHIFT;
     struct pfn_info *page;
     long ret = -EINVAL;
 
     if ( (pa & 7) || (pfn >= max_page) || !check_descriptor(word1, word2) )
         return -EINVAL;
 
-    spin_lock_irqsave(&current->page_lock, flags);
+    spin_lock(&current->page_lock);
 
     page = frame_table + pfn;
     if ( (page->flags & PG_domain_mask) != current->domain )
@@ -353,6 +353,6 @@ long do_update_descriptor(
     ret = 0; /* success */
 
  out:
-    spin_unlock_irqrestore(&current->page_lock, flags);
+    spin_unlock(&current->page_lock);
     return ret;
 }
