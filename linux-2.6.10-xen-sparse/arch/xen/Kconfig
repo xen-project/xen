@@ -115,8 +115,15 @@ config XEN_BLKDEV_TAP
 	  space.  Odds are that you want to say N here.
 
 config XEN_WRITABLE_PAGETABLES
-	bool
+	bool "writable page tables"
 	default y
+
+config XEN_SHADOW_MODE
+	bool "Fake shadow mode"
+	default n
+    help
+      fakes out a shadow mode kernel
+
 
 config XEN_SCRUB_PAGES
 	bool "Scrub memory before freeing it to Xen"

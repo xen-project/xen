@@ -80,7 +80,11 @@ static void __do_suspend(void)
     extern void time_suspend(void);
     extern void time_resume(void);
     extern unsigned long max_pfn;
+#ifndef CONFIG_XEN_SHADOW_MODE
+    extern unsigned int *pfn_to_mfn_frame_list;
+#else /* CONFIG_XEN_SHADOW_MODE */
     extern unsigned int *__vms_pfn_to_mfn_frame_list;
+#endif /* CONFIG_XEN_SHADOW_MODE */
 
     suspend_record = (suspend_record_t *)__get_free_page(GFP_KERNEL);
     if ( suspend_record == NULL )
@@ -105,7 +109,11 @@ static void __do_suspend(void)
 
     memcpy(&suspend_record->resume_info, &xen_start_info, sizeof(xen_start_info));
 
+#ifndef CONFIG_XEN_SHADOW_MODE
+    HYPERVISOR_suspend(virt_to_machine(suspend_record) >> PAGE_SHIFT);
+#else /* CONFIG_XEN_SHADOW_MODE */
     HYPERVISOR_suspend(__vms_virt_to_machine(suspend_record) >> PAGE_SHIFT);
+#endif /* CONFIG_XEN_SHADOW_MODE */
 
     HYPERVISOR_vm_assist(VMASST_CMD_enable,
 			 VMASST_TYPE_4gb_segments);
@@ -118,7 +126,11 @@ static void __do_suspend(void)
 
     memcpy(&xen_start_info, &suspend_record->resume_info, sizeof(xen_start_info));
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)) && !defined(CONFIG_XEN_SHADOW_MODE)
+    set_fixmap_ma(FIX_SHARED_INFO, xen_start_info.shared_info);
+#else
     set_fixmap(FIX_SHARED_INFO, xen_start_info.shared_info);
+#endif
 
     HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
 
@@ -126,11 +138,20 @@ static void __do_suspend(void)
 
     for ( i=0, j=0; i < max_pfn; i+=(PAGE_SIZE/sizeof(unsigned long)), j++ )
     {
+#ifndef CONFIG_XEN_SHADOW_MODE
+        pfn_to_mfn_frame_list[j] = 
+            virt_to_machine(&phys_to_machine_mapping[i]) >> PAGE_SHIFT;
+#else /* CONFIG_XEN_SHADOW_MODE */
         __vms_pfn_to_mfn_frame_list[j] = 
             __vms_virt_to_machine(&__vms_phys_to_machine_mapping[i]) >> PAGE_SHIFT;
+#endif /* CONFIG_XEN_SHADOW_MODE */
     }
     HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list =
+#ifndef CONFIG_XEN_SHADOW_MODE
+        virt_to_machine(pfn_to_mfn_frame_list) >> PAGE_SHIFT;
+#else /* CONFIG_XEN_SHADOW_MODE */
         __vms_virt_to_machine(__vms_pfn_to_mfn_frame_list) >> PAGE_SHIFT;
+#endif /* CONFIG_XEN_SHADOW_MODE */
 
 
     irq_resume();

@@ -89,21 +89,44 @@ static inline void * phys_to_virt(unsigned long address)
 /*
  * Change "struct page" to physical address.
  */
+#ifndef CONFIG_XEN_SHADOW_MODE
+#define page_to_pseudophys(page) ((dma_addr_t)page_to_pfn(page) << PAGE_SHIFT)
+#define page_to_phys(page)	 (phys_to_machine(page_to_pseudophys(page)))
+#else /* CONFIG_XEN_SHADOW_MODE */
 #define __vms_page_to_pseudophys(page) ((dma_addr_t)page_to_pfn(page) << PAGE_SHIFT)
 #define __vms_page_to_machphys(page) (__vms_phys_to_machine(__vms_page_to_pseudophys(page)))
 #define page_to_phys(page)	 (__vms_page_to_machphys(page))
+#endif /* CONFIG_XEN_SHADOW_MODE */
 
+#ifndef CONFIG_XEN_SHADOW_MODE
+#define bio_to_pseudophys(bio)	 (page_to_pseudophys(bio_page((bio))) + \
+				  (unsigned long) bio_offset((bio)))
+#else /* CONFIG_XEN_SHADOW_MODE */
 #define __vms_bio_to_pseudophys(bio)	 (__vms_page_to_pseudophys(bio_page((bio))) + \
 				  (unsigned long) bio_offset((bio)))
+#endif /* CONFIG_XEN_SHADOW_MODE */
+
+#ifndef CONFIG_XEN_SHADOW_MODE
+#define bvec_to_pseudophys(bv)	 (page_to_pseudophys((bv)->bv_page) + \
+				  (unsigned long) (bv)->bv_offset)
+#else /* CONFIG_XEN_SHADOW_MODE */
 #define __vms_bvec_to_pseudophys(bv)	 (__vms_page_to_pseudophys((bv)->bv_page) + \
 				  (unsigned long) (bv)->bv_offset)
 #define __vms_bvec_to_machphys(bv)	 (__vms_page_to_machphys((bv)->bv_page) + \
 				  (unsigned long) (bv)->bv_offset)
+#endif /* CONFIG_XEN_SHADOW_MODE */
 
+#ifndef CONFIG_XEN_SHADOW_MODE
+#define BIOVEC_PHYS_MERGEABLE(vec1, vec2)	\
+	(((bvec_to_phys((vec1)) + (vec1)->bv_len) == bvec_to_phys((vec2))) && \
+	 ((bvec_to_pseudophys((vec1)) + (vec1)->bv_len) == \
+	  bvec_to_pseudophys((vec2))))
+#else /* CONFIG_XEN_SHADOW_MODE */
 #define BIOVEC_PHYS_MERGEABLE(vec1, vec2)	\
 	(((bvec_to_phys((vec1)) + (vec1)->bv_len) == bvec_to_phys((vec2))) && \
 	 ((__vms_bvec_to_machphys((vec1)) + (vec1)->bv_len) == \
 	  __vms_bvec_to_machphys((vec2))))
+#endif /* CONFIG_XEN_SHADOW_MODE */
 
 extern void __iomem * __ioremap(unsigned long offset, unsigned long size, unsigned long flags);
 
@@ -152,8 +175,13 @@ extern void bt_iounmap(void *addr, unsigned long size);
  *
  * Allow them on x86 for legacy drivers, though.
  */
+#ifndef CONFIG_XEN_SHADOW_MODE
+#define virt_to_bus(_x) phys_to_machine(__pa(_x))
+#define bus_to_virt(_x) __va(machine_to_phys(_x))
+#else /* CONFIG_XEN_SHADOW_MODE */
 #define virt_to_bus(_x) __vms_phys_to_machine(__pa(_x))
 #define bus_to_virt(_x) ({ BUG(); __va((_x)); })
+#endif /* CONFIG_XEN_SHADOW_MODE */
 
 /*
  * readX/writeX() are used to access memory mapped devices. On some

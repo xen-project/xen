@@ -207,7 +207,11 @@ static void net_rx_action(unsigned long unused)
     {
         netif   = netdev_priv(skb->dev);
         vdata   = (unsigned long)skb->data;
+#ifndef CONFIG_XEN_SHADOW_MODE
+        mdata   = virt_to_machine(vdata);
+#else /* CONFIG_XEN_SHADOW_MODE */
         mdata   = __vms_virt_to_machine(vdata);
+#endif /* CONFIG_XEN_SHADOW_MODE */
 
         /* Memory squeeze? Back off for an arbitrary while. */
         if ( (new_mfn = alloc_mfn()) == 0 )
@@ -223,7 +227,11 @@ static void net_rx_action(unsigned long unused)
          * Set the new P2M table entry before reassigning the old data page.
          * Heed the comment in pgtable-2level.h:pte_page(). :-)
          */
+#ifndef CONFIG_XEN_SHADOW_MODE
+        phys_to_machine_mapping[__pa(skb->data) >> PAGE_SHIFT] = new_mfn;
+#else /* CONFIG_XEN_SHADOW_MODE */
         __vms_phys_to_machine_mapping[__pa(skb->data) >> PAGE_SHIFT] = new_mfn;
+#endif /* CONFIG_XEN_SHADOW_MODE */
         
         mmu[0].ptr  = (new_mfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
         mmu[0].val  = __pa(vdata) >> PAGE_SHIFT;  
@@ -590,7 +598,11 @@ static void net_tx_action(unsigned long unused)
             continue;
         }
 
+#ifndef CONFIG_XEN_SHADOW_MODE
+        phys_to_machine_mapping[__pa(MMAP_VADDR(pending_idx)) >> PAGE_SHIFT] =
+#else /* CONFIG_XEN_SHADOW_MODE */
         __vms_phys_to_machine_mapping[__pa(MMAP_VADDR(pending_idx)) >> PAGE_SHIFT] =
+#endif /* CONFIG_XEN_SHADOW_MODE */
             FOREIGN_FRAME(txreq.addr >> PAGE_SHIFT);
 
         data_len = (txreq.size > PKT_PROT_LEN) ? PKT_PROT_LEN : txreq.size;

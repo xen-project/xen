@@ -12,9 +12,9 @@
 #ifdef __KERNEL__
 #ifndef __ASSEMBLY__
 
-#ifndef BUG
+#ifdef CONFIG_XEN_SHADOW_MODE
 #include <asm/bug.h>
-#endif
+#endif /* CONFIG_XEN_SHADOW_MODE */
 
 #include <linux/config.h>
 #include <linux/string.h>
@@ -59,18 +59,37 @@
 #define copy_user_page(to, from, vaddr, pg)	copy_page(to, from)
 
 /**** MACHINE <-> PHYSICAL CONVERSION MACROS ****/
+#ifndef CONFIG_XEN_SHADOW_MODE
+extern unsigned int *phys_to_machine_mapping;
+#define pfn_to_mfn(_pfn) ((unsigned long)(phys_to_machine_mapping[(_pfn)]))
+#define mfn_to_pfn(_mfn) ((unsigned long)(machine_to_phys_mapping[(_mfn)]))
+static inline unsigned long phys_to_machine(unsigned long phys)
+#else /* CONFIG_XEN_SHADOW_MODE */
 extern unsigned int *__vms_phys_to_machine_mapping;
 #define __vms_pfn_to_mfn(_pfn) ((unsigned long)(__vms_phys_to_machine_mapping[(_pfn)]))
 #define __vms_mfn_to_pfn(_mfn) ({ BUG(); ((unsigned long)(__vms_machine_to_phys_mapping[(_mfn)])); })
 static inline unsigned long __vms_phys_to_machine(unsigned long phys)
+#endif /* CONFIG_XEN_SHADOW_MODE */
 {
+#ifndef CONFIG_XEN_SHADOW_MODE
+	unsigned long machine = pfn_to_mfn(phys >> PAGE_SHIFT);
+#else /* CONFIG_XEN_SHADOW_MODE */
 	unsigned long machine = __vms_pfn_to_mfn(phys >> PAGE_SHIFT);
+#endif /* CONFIG_XEN_SHADOW_MODE */
 	machine = (machine << PAGE_SHIFT) | (phys & ~PAGE_MASK);
 	return machine;
 }
+#ifndef CONFIG_XEN_SHADOW_MODE
+static inline unsigned long machine_to_phys(unsigned long machine)
+#else /* CONFIG_XEN_SHADOW_MODE */
 static inline unsigned long __vms_machine_to_phys(unsigned long machine)
+#endif /* CONFIG_XEN_SHADOW_MODE */
 {
+#ifndef CONFIG_XEN_SHADOW_MODE
+	unsigned long phys = mfn_to_pfn(machine >> PAGE_SHIFT);
+#else /* CONFIG_XEN_SHADOW_MODE */
 	unsigned long phys = __vms_mfn_to_pfn(machine >> PAGE_SHIFT);
+#endif /* CONFIG_XEN_SHADOW_MODE */
 	phys = (phys << PAGE_SHIFT) | (machine & ~PAGE_MASK);
 	return phys;
 }
@@ -93,8 +112,14 @@ typedef struct { unsigned long pmd; } pmd_t;
 typedef struct { unsigned long pgd; } pgd_t;
 typedef struct { unsigned long pgprot; } pgprot_t;
 #define boot_pte_t pte_t /* or would you rather have a typedef */
+#ifndef CONFIG_XEN_SHADOW_MODE
+#define pte_val(x)	(((x).pte_low & 1) ? machine_to_phys((x).pte_low) : \
+			 (x).pte_low)
+#define pte_val_ma(x)	((x).pte_low)
+#else /* CONFIG_XEN_SHADOW_MODE */
 #define pte_val(x)	((x).pte_low)
 #define __vms_pte_val_ma(x)	((x).pte_low)
+#endif /* CONFIG_XEN_SHADOW_MODE */
 #define HPAGE_SHIFT	22
 #endif
 #define PTE_MASK	PAGE_MASK
@@ -109,17 +134,32 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 
 static inline unsigned long pmd_val(pmd_t x)
 {
+#ifndef CONFIG_XEN_SHADOW_MODE
+	unsigned long ret = x.pmd;
+	if (ret) ret = machine_to_phys(ret);
+	return ret;
+#else /* CONFIG_XEN_SHADOW_MODE */
 	return x.pmd;
+#endif /* CONFIG_XEN_SHADOW_MODE */
 }
 #define pgd_val(x)	({ BUG(); (unsigned long)0; })
 #define pgprot_val(x)	((x).pgprot)
 
 static inline pte_t __pte(unsigned long x)
 {
+#ifndef CONFIG_XEN_SHADOW_MODE
+	if (x & 1) x = phys_to_machine(x);
+#endif /* ! CONFIG_XEN_SHADOW_MODE */
 	return ((pte_t) { (x) });
 }
+#ifndef CONFIG_XEN_SHADOW_MODE
+#define __pte_ma(x)	((pte_t) { (x) } )
+#endif /* ! CONFIG_XEN_SHADOW_MODE */
 static inline pmd_t __pmd(unsigned long x)
 {
+#ifndef CONFIG_XEN_SHADOW_MODE
+	if ((x & 1)) x = phys_to_machine(x);
+#endif /* ! CONFIG_XEN_SHADOW_MODE */
 	return ((pmd_t) { (x) });
 }
 #define __pgd(x)	({ BUG(); (pgprot_t) { 0 }; })
@@ -197,8 +237,13 @@ extern int sysctl_legacy_va_layout;
 		 VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC)
 
 /* VIRT <-> MACHINE conversion */
+#ifndef CONFIG_XEN_SHADOW_MODE
+#define virt_to_machine(_a)	(phys_to_machine(__pa(_a)))
+#define machine_to_virt(_m)	(__va(machine_to_phys(_m)))
+#else /* CONFIG_XEN_SHADOW_MODE */
 #define __vms_virt_to_machine(_a)	(__vms_phys_to_machine(__pa(_a)))
 #define __vms_machine_to_virt(_m)	(__va(__vms_machine_to_phys(_m)))
+#endif /* CONFIG_XEN_SHADOW_MODE */
 
 #endif /* __KERNEL__ */
 

@@ -129,7 +129,11 @@ static inline void translate_req_to_pfn(blkif_request_t *xreq,
     xreq->sector_number = req->sector_number;
 
     for ( i = 0; i < req->nr_segments; i++ )
+#ifndef CONFIG_XEN_SHADOW_MODE
+        xreq->frame_and_sects[i] = machine_to_phys(req->frame_and_sects[i]);
+#else /* CONFIG_XEN_SHADOW_MODE */
         xreq->frame_and_sects[i] = __vms_machine_to_phys(req->frame_and_sects[i]);
+#endif /* CONFIG_XEN_SHADOW_MODE */
 }
 
 static inline void translate_req_to_mfn(blkif_request_t *xreq,
@@ -144,7 +148,11 @@ static inline void translate_req_to_mfn(blkif_request_t *xreq,
     xreq->sector_number = req->sector_number;
 
     for ( i = 0; i < req->nr_segments; i++ )
+#ifndef CONFIG_XEN_SHADOW_MODE
+        xreq->frame_and_sects[i] = phys_to_machine(req->frame_and_sects[i]);
+#else /* CONFIG_XEN_SHADOW_MODE */
         xreq->frame_and_sects[i] = __vms_phys_to_machine(req->frame_and_sects[i]);
+#endif /* CONFIG_XEN_SHADOW_MODE */
 }
 
 
@@ -1091,7 +1099,11 @@ static void blkif_send_interface_connect(void)
     blkif_fe_interface_connect_t *msg = (void*)cmsg.msg;
     
     msg->handle      = 0;
+#ifndef CONFIG_XEN_SHADOW_MODE
+    msg->shmem_frame = (virt_to_machine(blk_ring.sring) >> PAGE_SHIFT);
+#else /* CONFIG_XEN_SHADOW_MODE */
     msg->shmem_frame = (__vms_virt_to_machine(blk_ring.sring) >> PAGE_SHIFT);
+#endif /* CONFIG_XEN_SHADOW_MODE */
     
     ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
 }
@@ -1401,7 +1413,11 @@ void blkif_completion(blkif_request_t *req)
         for ( i = 0; i < req->nr_segments; i++ )
         {
             unsigned long pfn = req->frame_and_sects[i] >> PAGE_SHIFT;
+#ifndef CONFIG_XEN_SHADOW_MODE
+            unsigned long mfn = phys_to_machine_mapping[pfn];
+#else /* CONFIG_XEN_SHADOW_MODE */
             unsigned long mfn = __vms_phys_to_machine_mapping[pfn];
+#endif /* CONFIG_XEN_SHADOW_MODE */
             xen_machphys_update(mfn, pfn);
         }
         break;

@@ -56,8 +56,14 @@ void __init bt_iounmap(void *addr, unsigned long size)
 static inline int is_local_lowmem(unsigned long address)
 {
 	extern unsigned long max_low_pfn;
+#ifndef CONFIG_XEN_SHADOW_MODE
+	unsigned long mfn = address >> PAGE_SHIFT;
+	unsigned long pfn = mfn_to_pfn(mfn);
+	return ((pfn < max_low_pfn) && (pfn_to_mfn(pfn) == mfn));
+#else /* CONFIG_XEN_SHADOW_MODE */
 	unsigned long pfn = address >> PAGE_SHIFT;
 	return (pfn < max_low_pfn);
+#endif /* CONFIG_XEN_SHADOW_MODE */
 }
 
 /*
@@ -96,7 +102,7 @@ void __iomem * __ioremap(unsigned long phys_addr, unsigned long size, unsigned l
 	/*
 	 * Don't allow anybody to remap normal RAM that we're using..
 	 */
-#if 0
+#ifndef CONFIG_XEN_SHADOW_MODE
 	if (is_local_lowmem(phys_addr)) {
 		char *t_addr, *t_end;
 		struct page *page;
@@ -110,7 +116,7 @@ void __iomem * __ioremap(unsigned long phys_addr, unsigned long size, unsigned l
 
 		domid = DOMID_LOCAL;
 	}
-#endif
+#endif /* ! CONFIG_XEN_SHADOW_MODE */
 
 	/*
 	 * Mappings have to be page-aligned
@@ -256,7 +262,11 @@ void __init *bt_ioremap(unsigned long phys_addr, unsigned long size)
 	 */
 	idx = FIX_BTMAP_BEGIN;
 	while (nrpages > 0) {
+#ifndef CONFIG_XEN_SHADOW_MODE
+		set_fixmap_ma(idx, phys_addr);
+#else /* CONFIG_XEN_SHADOW_MODE */
 		__vms_set_fixmap_ma(idx, phys_addr);
+#endif /* CONFIG_XEN_SHADOW_MODE */
 		phys_addr += PAGE_SIZE;
 		--idx;
 		--nrpages;
@@ -313,7 +323,11 @@ static inline void direct_remap_area_pte(pte_t *pte,
 		BUG();
 
 	do {
+#ifndef CONFIG_XEN_SHADOW_MODE
+		(*v)->ptr = virt_to_machine(pte);
+#else /* CONFIG_XEN_SHADOW_MODE */
 		(*v)->ptr = __vms_virt_to_machine(pte);
+#endif /* CONFIG_XEN_SHADOW_MODE */
 		(*v)++;
 		address += PAGE_SIZE;
 		pte++;
@@ -387,12 +401,14 @@ int direct_remap_area_pages(struct mm_struct *mm,
 	mmu_update_t u[MAX_DIRECTMAP_MMU_QUEUE], *w, *v;
 
 	v = w = &u[0];
-	if (0 && domid != DOMID_LOCAL) {
+#ifndef CONFIG_XEN_SHADOW_MODE
+	if (domid != DOMID_LOCAL) {
 		u[0].ptr  = MMU_EXTENDED_COMMAND;
 		u[0].val  = MMUEXT_SET_FOREIGNDOM;
 		u[0].val |= (unsigned long)domid << 16;
 		v = w = &u[1];
 	}
+#endif /* CONFIG_XEN_SHADOW_MODE */
 
 	start_address = address;
 
@@ -416,6 +432,10 @@ int direct_remap_area_pages(struct mm_struct *mm,
 		 * Fill in the machine address: PTE ptr is done later by
 		 * __direct_remap_area_pages(). 
 		 */
+#ifndef CONFIG_XEN_SHADOW_MODE
+		v->val = (machine_addr & PAGE_MASK) | pgprot_val(prot);
+
+#else /* CONFIG_XEN_SHADOW_MODE */
         {
             mmu_update_t update;
             int success = 0;
@@ -429,6 +449,7 @@ int direct_remap_area_pages(struct mm_struct *mm,
                 
 		v->val = (ppfn << PAGE_SHIFT) | pgprot_val(prot);
         }
+#endif /* CONFIG_XEN_SHADOW_MODE */
 		machine_addr += PAGE_SIZE;
 		address += PAGE_SIZE; 
 		v++;

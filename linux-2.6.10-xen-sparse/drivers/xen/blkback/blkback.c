@@ -444,7 +444,11 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 #else
         mcl[i].args[3] = blkif->domid;
 #endif
+#ifndef CONFIG_XEN_SHADOW_MODE
+        phys_to_machine_mapping[__pa(MMAP_VADDR(pending_idx, i))>>PAGE_SHIFT] =
+#else /* CONFIG_XEN_SHADOW_MODE */
         __vms_phys_to_machine_mapping[__pa(MMAP_VADDR(pending_idx, i))>>PAGE_SHIFT] =
+#endif /* CONFIG_XEN_SHADOW_MODE */
             FOREIGN_FRAME(phys_seg[i].buffer >> PAGE_SHIFT);
     }
 

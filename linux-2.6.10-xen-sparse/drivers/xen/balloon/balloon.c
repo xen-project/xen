@@ -206,11 +206,19 @@ static void balloon_process(void *unused)
                 BUG();
 
             pfn = page - mem_map;
+#ifndef CONFIG_XEN_SHADOW_MODE
+            if ( phys_to_machine_mapping[pfn] != INVALID_P2M_ENTRY )
+#else /* CONFIG_XEN_SHADOW_MODE */
             if ( __vms_phys_to_machine_mapping[pfn] != INVALID_P2M_ENTRY )
+#endif /* CONFIG_XEN_SHADOW_MODE */
                 BUG();
 
             /* Update P->M and M->P tables. */
+#ifndef CONFIG_XEN_SHADOW_MODE
+            phys_to_machine_mapping[pfn] = mfn_list[i];
+#else /* CONFIG_XEN_SHADOW_MODE */
             __vms_phys_to_machine_mapping[pfn] = mfn_list[i];
+#endif /* CONFIG_XEN_SHADOW_MODE */
             queue_machphys_update(mfn_list[i], pfn);
             
             /* Link back into the page tables if it's not a highmem page. */
@@ -244,8 +252,13 @@ static void balloon_process(void *unused)
             }
 
             pfn = page - mem_map;
+#ifndef CONFIG_XEN_SHADOW_MODE
+            mfn_list[i] = phys_to_machine_mapping[pfn];
+            phys_to_machine_mapping[pfn] = INVALID_P2M_ENTRY;
+#else /* CONFIG_XEN_SHADOW_MODE */
             mfn_list[i] = __vms_phys_to_machine_mapping[pfn];
             __vms_phys_to_machine_mapping[pfn] = INVALID_P2M_ENTRY;
+#endif /* CONFIG_XEN_SHADOW_MODE */
 
             if ( !PageHighMem(page) )
             {

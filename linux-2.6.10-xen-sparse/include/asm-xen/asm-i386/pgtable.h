@@ -319,9 +319,16 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 #define pmd_page_kernel(pmd) \
 ((unsigned long) __va(pmd_val(pmd) & PAGE_MASK))
 
+#ifndef CONFIG_XEN_SHADOW_MODE
+#define pmd_clear(xp) do {					\
+	set_pmd(xp, __pmd(0));					\
+	xen_flush_page_update_queue();				\
+} while (0)
+#else /* CONFIG_XEN_SHADOW_MODE */
 #define pmd_clear(xp)	do {					\
 	set_pmd(xp, __pmd(0));					\
 } while (0)
+#endif /* CONFIG_XEN_SHADOW_MODE */
 
 #ifndef CONFIG_DISCONTIGMEM
 #define pmd_page(pmd) (pfn_to_page(pmd_val(pmd) >> PAGE_SHIFT))
@@ -459,6 +466,16 @@ void make_page_writable(void *va);
 void make_pages_readonly(void *va, unsigned int nr);
 void make_pages_writable(void *va, unsigned int nr);
 
+#ifndef CONFIG_XEN_SHADOW_MODE
+#define arbitrary_virt_to_machine(__va)					\
+({									\
+	pgd_t *__pgd = pgd_offset_k((unsigned long)(__va));		\
+	pmd_t *__pmd = pmd_offset(__pgd, (unsigned long)(__va));	\
+	pte_t *__pte = pte_offset_kernel(__pmd, (unsigned long)(__va));	\
+	unsigned long __pa = (*(unsigned long *)__pte) & PAGE_MASK;	\
+	__pa | ((unsigned long)(__va) & (PAGE_SIZE-1));			\
+})
+#else /* CONFIG_XEN_SHADOW_MODE */
 #define __vms_arbitrary_virt_to_machine(__va)					\
 ({									\
 	pgd_t *__pgd = pgd_offset_k((unsigned long)(__va));		\
@@ -467,7 +484,9 @@ void make_pages_writable(void *va, unsigned int nr);
 	unsigned long __pa = (*(unsigned long *)__pte) & PAGE_MASK;	\
 	__vms_phys_to_machine(__pa) | ((unsigned long)(__va) & (PAGE_SIZE-1)); \
 })
+#endif /* CONFIG_XEN_SHADOW_MODE */
 
+#ifdef CONFIG_XEN_SHADOW_MODE
 #define arbitrary_virt_to_phys(__va)					\
 ({									\
 	pgd_t *__pgd = pgd_offset_k((unsigned long)(__va));		\
@@ -476,6 +495,7 @@ void make_pages_writable(void *va, unsigned int nr);
 	unsigned long __pa = (*(unsigned long *)__pte) & PAGE_MASK;	\
 	(__pa) | ((unsigned long)(__va) & (PAGE_SIZE-1));               \
 })
+#endif /* CONFIG_XEN_SHADOW_MODE */
 
 #endif /* !__ASSEMBLY__ */
 

@@ -375,10 +375,18 @@ static void network_alloc_rx_buffers(struct net_device *dev)
         
         np->rx->ring[MASK_NETIF_RX_IDX(req_prod + i)].req.id = id;
         
+#ifndef CONFIG_XEN_SHADOW_MODE
+        rx_pfn_array[i] = virt_to_machine(skb->head) >> PAGE_SHIFT;
+#else /* CONFIG_XEN_SHADOW_MODE */
         rx_pfn_array[i] = __vms_virt_to_machine(skb->head) >> PAGE_SHIFT;
+#endif /* CONFIG_XEN_SHADOW_MODE */
 
 	/* Remove this page from pseudo phys map before passing back to Xen. */
+#ifndef CONFIG_XEN_SHADOW_MODE
+	phys_to_machine_mapping[__pa(skb->head) >> PAGE_SHIFT] 
+#else /* CONFIG_XEN_SHADOW_MODE */
 	__vms_phys_to_machine_mapping[__pa(skb->head) >> PAGE_SHIFT] 
+#endif /* CONFIG_XEN_SHADOW_MODE */
 	    = INVALID_P2M_ENTRY;
 
         rx_mcl[i].op = __HYPERVISOR_update_va_mapping;
@@ -464,7 +472,11 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
     tx = &np->tx->ring[MASK_NETIF_TX_IDX(i)].req;
 
     tx->id   = id;
+#ifndef CONFIG_XEN_SHADOW_MODE
+    tx->addr = virt_to_machine(skb->data);
+#else /* CONFIG_XEN_SHADOW_MODE */
     tx->addr = __vms_virt_to_machine(skb->data);
+#endif /* CONFIG_XEN_SHADOW_MODE */
     tx->size = skb->len;
 
     wmb(); /* Ensure that backend will see the request. */
@@ -579,7 +591,11 @@ static int netif_poll(struct net_device *dev, int *pbudget)
         mcl->args[2] = 0;
         mcl++;
 
+#ifndef CONFIG_XEN_SHADOW_MODE
+        phys_to_machine_mapping[__pa(skb->head) >> PAGE_SHIFT] = 
+#else /* CONFIG_XEN_SHADOW_MODE */
         __vms_phys_to_machine_mapping[__pa(skb->head) >> PAGE_SHIFT] = 
+#endif /* CONFIG_XEN_SHADOW_MODE */
             rx->addr >> PAGE_SHIFT;
 
         __skb_queue_tail(&rxq, skb);
@@ -736,7 +752,11 @@ static void network_connect(struct net_device *dev,
                 tx = &np->tx->ring[requeue_idx++].req;
                 
                 tx->id   = i;
+#ifndef CONFIG_XEN_SHADOW_MODE
+                tx->addr = virt_to_machine(skb->data);
+#else /* CONFIG_XEN_SHADOW_MODE */
                 tx->addr = __vms_virt_to_machine(skb->data);
+#endif /* CONFIG_XEN_SHADOW_MODE */
                 tx->size = skb->len;
                 
                 np->stats.tx_bytes += skb->len;
@@ -799,8 +819,13 @@ static void send_interface_connect(struct net_private *np)
     netif_fe_interface_connect_t *msg = (void*)cmsg.msg;
 
     msg->handle = np->handle;
+#ifndef CONFIG_XEN_SHADOW_MODE
+    msg->tx_shmem_frame = (virt_to_machine(np->tx) >> PAGE_SHIFT);
+    msg->rx_shmem_frame = (virt_to_machine(np->rx) >> PAGE_SHIFT);
+#else /* CONFIG_XEN_SHADOW_MODE */
     msg->tx_shmem_frame = (__vms_virt_to_machine(np->tx) >> PAGE_SHIFT);
     msg->rx_shmem_frame = (__vms_virt_to_machine(np->rx) >> PAGE_SHIFT);
+#endif /* CONFIG_XEN_SHADOW_MODE */
         
     ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
 }

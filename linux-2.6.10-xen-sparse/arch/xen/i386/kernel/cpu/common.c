@@ -512,7 +512,11 @@ void __init cpu_gdt_init(struct Xgt_desc_struct *gdt_descr)
 	for (va = gdt_descr->address, f = 0;
 	     va < gdt_descr->address + gdt_descr->size;
 	     va += PAGE_SIZE, f++) {
+#ifndef CONFIG_XEN_SHADOW_MODE
+		frames[f] = virt_to_machine(va) >> PAGE_SHIFT;
+#else /* CONFIG_XEN_SHADOW_MODE */
 		frames[f] = __vms_virt_to_machine(va) >> PAGE_SHIFT;
+#endif /* CONFIG_XEN_SHADOW_MODE */
 		make_page_readonly((void *)va);
 	}
 	flush_page_update_queue();
