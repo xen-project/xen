@@ -130,7 +130,6 @@ class XendRequest:
 class XendClientProtocol:
     """Abstract class for xend clients.
     """
-
     def xendRequest(self, url, method, args=None):
         """Make a request to xend.
         Implement in a subclass.
@@ -176,6 +175,9 @@ class XendClientProtocol:
         """Handle the data returned in response to the request.
         """
         if data is None: return None
+        type = self.getHeader('Content-Type')
+        if type != sxp.mime_type:
+            return data
         try:
             pin = sxp.Parser()
             pin.input(data);
@@ -194,10 +196,21 @@ class XendClientProtocol:
         """
         raise err
 
+    def getHeader(self, key):
+        """Get a header from the response.
+        Case is ignored in the key.
+
+        @param key: header key
+        @return: header
+        """
+        raise NotImplementedError()
+
 class SynchXendClientProtocol(XendClientProtocol):
     """A synchronous xend client. This will make a request, wait for
     the reply and return the result.
     """
+
+    resp = None
 
     def xendRequest(self, url, method, args=None):
         """Make a request to xend.
@@ -211,6 +224,7 @@ class SynchXendClientProtocol(XendClientProtocol):
         if DEBUG: conn.set_debuglevel(1)
         conn.request(method, url.fullpath(), self.request.data, self.request.headers)
         resp = conn.getresponse()
+        self.resp = resp
         val = self.handleStatus(resp.version, resp.status, resp.reason)
         if val is None:
             data = None
@@ -219,6 +233,10 @@ class SynchXendClientProtocol(XendClientProtocol):
         conn.close()
         val = self.handleResponse(data)
         return val
+
+    def getHeader(self, key):
+        return self.resp.getheader(key)
+
 
 class AsynchXendClient(http.HTTPClient):
     """A subclass of twisted's HTTPClient to deal with a connection to xend.
@@ -245,6 +263,9 @@ class AsynchXendClient(http.HTTPClient):
     def handleStatus(self, version, status, message):
         return self.protocol.handleStatus(version, status, message)
 
+    def handleHeader(self, key, val):
+        return self.protocol.handleHeader(key, val)
+
     def handleResponse(self, data):
         return self.protocol.handleResponse(data)
 
@@ -257,47 +278,7 @@ class AsynchXendClientProtocol(XendClientProtocol):
     """
     def __init__(self):
         self.err = None
-
-    def xendRequest(self, url, method, args=None):
-        """Make a request to xend. The returned deferred is called when
-        the result is available.
-
-        @param url:    xend request url
-        @param method: http method: POST or GET
-        @param args:   request arguments (dict)
-        @return: deferred
-        """
-        request = XendRequest(url, method, args)
-        self.deferred = Deferred()
-        clientCreator = ClientCreator(reactor, AsynchXendClient, self, request)
-        clientCreator.connectTCP(url.host, url.port)
-        return self.deferred
-
-    def callErrback(self, err):
-        if not self.deferred.called:
-            self.err = err
-            self.deferred.errback(err)
-        return err
-
-    def callCallback(self, val):
-        if not self.deferred.called:
-            self.deferred.callback(val)
-        return val
-
-    def handleException(self, err):
-        return self.callErrback(err)
-
-    def handleResponse(self, data):
-        if self.err: return self.err
-        val = XendClientProtocol.handleResponse(self, data)
-        if isinstance(val, Exception):
-            self.callErrback(val)
-        else:
-            self.callCallback(val)
-        return val
-
-    def __init__(self):
-        self.err = None
+        self.headers = {}
 
     def xendRequest(self, url, method, args=None):
         """Make a request to xend. The returned deferred is called when
@@ -327,6 +308,12 @@ class AsynchXendClientProtocol(XendClientProtocol):
 
     def handleException(self, err):
         return self.callErrback(err)
+
+    def handleHeader(self, key, val):
+        self.headers[key.lower()] = val
+
+    def getHeader(self, key):
+        return self.headers.get(key.lower())
 
     def handleResponse(self, data):
         if self.err: return self.err
@@ -397,9 +384,6 @@ class Xend:
     def eventurl(self, id=''):
         return self.url.relative('event/' + str(id))
 
-    def dmesgurl(self, id=''):
-        return self.url.relative('node/dmesg/' + str(id))
-
     def xend(self):
         return self.xendGet(self.url)
 
@@ -408,14 +392,17 @@ class Xend:
         
     def xend_node_shutdown(self):
         return self.xendPost(self.nodeurl(),
-                {'op'      : 'shutdown'})
+                             {'op'      : 'shutdown'})
                 
     def xend_node_restart(self):
         return self.xendPost(self.nodeurl(),
-                {'op'      : 'reboot'})
+                             {'op'      : 'reboot'})
 
     def xend_node_dmesg(self):
-        return self.xendGet(self.dmesgurl())
+        return self.xendGet(self.nodeurl('dmesg'))
+
+    def xend_node_log(self):
+        return self.xendGet(self.nodeurl('log'))
 
     def xend_node_cpu_rrobin_slice_set(self, slice):
         return self.xendPost(self.nodeurl(),

@@ -1,9 +1,11 @@
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
 
 import os
-from SrvDir import SrvDir
+
 from xen.xend import sxp
 from xen.xend import XendDmesg
+
+from SrvDir import SrvDir
 
 class SrvDmesg(SrvDir):
     """Xen Dmesg output.
@@ -16,13 +18,13 @@ class SrvDmesg(SrvDir):
     def render_GET(self, req):
         try:
             if self.use_sxp(req):
-                req.setHeader("Content-Type", sxp.mime_type)
-                sxp.show(['dmesg'] + self.info(), out=req)
+                req.setHeader("Content-Type", "text/plain")
+                req.write(self.info())
             else:
                 req.write('<html><head></head><body>')
-                req.write('<pre>')
                 self.print_path(req)
-                req.write(self.info()[0])
+                req.write('<pre>')
+                req.write(self.info())
                 req.write('</pre></body></html>')
             return ''
         except Exception, ex:

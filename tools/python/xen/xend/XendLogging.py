@@ -44,12 +44,16 @@ class XendLogging:
                                            mode='a',
                                            maxBytes=self.maxBytes,
                                            backupCount=self.backupCount)
+        self.logfilename = filename
         self.logfile.setFormatter(Formatter(self.logFileFormat, self.dateFormat))
         log = self.getLogger()
         log.addHandler(self.logfile)
 
     def getLogFile(self):
         return self.logfile
+
+    def getLogFilename(self):
+        return self.logfilename
 
     def initLogStderr(self):
         self.logstderr = StreamHandler()

@@ -13,6 +13,39 @@ from xen.xend.XendClient import XendError, server
 from xen.xend.XendClient import main as xend_client_main
 from xen.xm import create, destroy, shutdown
 
+class Group:
+
+    name = ""
+    info = ""
+    
+    def __init__(self, xm):
+        self.xm = xm
+        self.progs = {}
+
+    def addprog(self, prog):
+        self.progs[prog.name] = prog
+
+    def getprog(self, name):
+        return self.progs.get(name)
+
+    def proglist(self):
+        kl = self.progs.keys()
+        kl.sort()
+        return [ self.getprog(k) for k in kl ]
+
+    def help(self, args):
+        if self.info:
+            print 
+            print self.info
+            print
+        else:
+            print
+        
+    def shortHelp(self, args):
+        self.help(args)
+        for p in self.proglist():
+            p.shortHelp(args)
+
 class Prog:
     """Base class for sub-programs.
     """
@@ -61,6 +94,7 @@ class Xm:
         self.name = 'xm'
         self.unknown = ProgUnknown(self)
         self.progs = {}
+        self.groups = {}
 
     def err(self, msg):
         print >>sys.stderr, "Error:", msg
@@ -101,6 +135,7 @@ class Xm:
         """
         p = pklass(self)
         self.progs[p.name] = p
+        self.getgroup(p.group).addprog(p)
         return p
 
     def getprog(self, name, val=None):
@@ -123,25 +158,56 @@ class Xm:
 
         return self.progs.get(match, val)
 
-    def proglist(self):
-        """Get a list of sub-programs, ordered by group.
-        """
-        groups = {}
-        for p in self.progs.values():
-            l = groups.get(p.group, [])
-            l.append(p)
-            groups[p.group] = l
-        kl = groups.keys()
+    def group(self, klass):
+        g = klass(self)
+        self.groups[g.name] = g
+        return g
+
+    def getgroup(self, name):
+        return self.groups[name]
+
+    def grouplist(self):
+        kl = self.groups.keys()
         kl.sort()
-        pl = []
-        for k in kl:
-            l = groups[k]
-            l.sort()
-            pl += l
-        return pl
+        return [ self.getgroup(k) for k in kl ]
         
 # Create the application object, then add the sub-program classes.
 xm = Xm()
+
+class GroupAll(Group):
+
+    name = "all"
+    info = ""
+
+xm.group(GroupAll)
+
+class GroupDomain(Group):
+
+    name = "domain"
+    info = "Commands on domains:"
+    
+xm.group(GroupDomain)
+
+class GroupScheduler(Group):
+
+    name = "scheduler"
+    info = "Comands controlling scheduling:"
+
+xm.group(GroupScheduler)
+
+class GroupHost(Group):
+
+    name = "host"
+    info = "Commands related to the xen host (node):"
+
+xm.group(GroupHost)
+
+class GroupConsole(Group):
+
+    name = "console"
+    info = "Commands related to consoles:"
+
+xm.group(GroupConsole)
 
 class ProgHelp(Prog):
 
@@ -157,8 +223,8 @@ class ProgHelp(Prog):
             else:
                 print '%s: Unknown command: %s' % (self.name, name)
         else:
-            for p in self.xm.proglist():
-                p.shortHelp(args)
+            for g in self.xm.grouplist():
+                g.shortHelp(args)
             print "\nTry '%s help CMD' for help on CMD" % self.xm.name
 
     main = help
@@ -220,7 +286,7 @@ xm.prog(ProgRestore)
 class ProgList(Prog):
     group = 'domain'
     name = "list"
-    info = """List info about domains."""
+    info = """List information about domains."""
 
     short_options = 'l'
     long_options = ['long']
@@ -512,7 +578,7 @@ class ProgConsole(Prog):
     info = """Open a console to a domain."""
     
     def help(self, args):
-        print "console DOM"
+        print args[0], "DOM"
         print "\nOpen a console to domain DOM."
 
     def main(self, args):
@@ -533,7 +599,7 @@ class ProgCall(Prog):
     info = "Call xend api functions."
 
     def help (self, args):
-        print "call fn argss..."
+        print args[0], "function args..."
         print """
         Call a xend HTTP API function. The leading 'xend_' on the function
 can be omitted. See xen.xend.XendClient for the API functions.
@@ -550,9 +616,19 @@ class ProgDmesg(Prog):
     info  = """Print Xen boot output."""
 
     def main(self, args):
-        print server.xend_node_dmesg()[1]
+        print server.xend_node_dmesg()
 
 xm.prog(ProgDmesg)
+
+class ProgLog(Prog):
+    group = 'host'
+    name  =  "log"
+    info  = """Print the xend log."""
+
+    def main(self, args):
+        print server.xend_node_log()
+
+xm.prog(ProgLog)
 
 def main(args):
     xm.main(args)

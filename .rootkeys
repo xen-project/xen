@@ -433,6 +433,7 @@
 40c9c469TaZ83ypsrktmPSHLEZiP5w tools/python/xen/xend/server/SrvRoot.py
 40c9c469W3sgDMbBJYQdz5wbQweL0Q tools/python/xen/xend/server/SrvServer.py
 40c9c469aq7oXrE1Ngqf3_lBqL0RoQ tools/python/xen/xend/server/SrvVnetDir.py
+4108f181GtRoD1U9TBuJXMfBbGJwdQ tools/python/xen/xend/server/SrvXendLog.py
 40c9c469Y_aimoOFfUZoS-4eV8gEKg tools/python/xen/xend/server/__init__.py
 40c9c4692hckPol_EK0EGB16ZyDsyQ tools/python/xen/xend/server/blkif.py
 40c9c469N2-b3GqpLHHHPZykJPLVvA tools/python/xen/xend/server/channel.py

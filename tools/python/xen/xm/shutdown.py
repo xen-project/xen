@@ -9,7 +9,8 @@ import time
 from xen.xend.XendClient import server
 from xen.xm.opts import *
 
-DOM0 = 'Domain-0'
+DOM0_NAME = 'Domain-0'
+DOM0_ID = '0'
 
 gopts = Opts(use="""[options] [DOM]
 
@@ -38,8 +39,9 @@ gopts.opt('reboot', short='R',
 
 def shutdown(opts, doms, mode, wait):
     if doms == None: doms = server.xend_domains()
-    if DOM0 in doms:
-        doms.remove(DOM0)
+    for x in [DOM0_NAME, DOM0_ID]:
+        if x in doms:
+            doms.remove(x)
     for d in doms:
         server.xend_domain_shutdown(d, mode)
     if wait:
