@@ -23,24 +23,7 @@ rwlock_t domlist_lock = RW_LOCK_UNLOCKED;
 struct domain *domain_hash[DOMAIN_HASH_SIZE];
 struct domain *domain_list;
 
-xmem_cache_t *domain_struct_cachep;
-xmem_cache_t *exec_domain_struct_cachep;
 struct domain *dom0;
-
-void __init domain_startofday(void)
-{
-    domain_struct_cachep = xmem_cache_create(
-        "domain_cache", sizeof(struct domain),
-        0, SLAB_HWCACHE_ALIGN, NULL, NULL);
-    if ( domain_struct_cachep == NULL )
-        BUG();
-
-    exec_domain_struct_cachep = xmem_cache_create(
-        "exec_dom_cache", sizeof(struct exec_domain),
-        0, SLAB_HWCACHE_ALIGN, NULL, NULL);
-    if ( exec_domain_struct_cachep == NULL )
-        BUG();
-}
 
 struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
 {
@@ -225,8 +208,8 @@ unsigned int alloc_new_dom_mem(struct domain *d, unsigned int kbytes)
             return -ENOMEM;
         }
 
-        /* initialise to machine_to_phys_mapping table to likely pfn */
-        machine_to_phys_mapping[page-frame_table] = alloc_pfns;
+        /* Initialise the machine-to-phys mapping for this page. */
+        set_machinetophys(page_to_pfn(page), alloc_pfns);
     }
 
     return 0;

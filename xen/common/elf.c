@@ -10,6 +10,14 @@
 #include <xen/mm.h>
 #include <xen/elf.h>
 
+#ifdef CONFIG_X86
+#define FORCE_XENELF_IMAGE 1
+#define ELF_ADDR           p_vaddr
+#elif defined(__ia64__)
+#define FORCE_XENELF_IMAGE 0
+#define ELF_ADDR           p_paddr
+#endif
+
 static inline int is_loadable_phdr(Elf_Phdr *phdr)
 {
     return ((phdr->p_type == PT_LOAD) &&
@@ -84,7 +92,9 @@ int parseelfimage(char *elfbase,
     if ( guestinfo == NULL )
     {
         printk("Not a Xen-ELF image: '__xen_guest' section not found.\n");
+#ifndef FORCE_XENELF_IMAGE
         return -EINVAL;
+#endif
     }
 
     for ( h = 0; h < ehdr->e_phnum; h++ ) 
@@ -92,10 +102,10 @@ int parseelfimage(char *elfbase,
         phdr = (Elf_Phdr *)(elfbase + ehdr->e_phoff + (h*ehdr->e_phentsize));
         if ( !is_loadable_phdr(phdr) )
             continue;
-        if ( phdr->p_vaddr < kernstart )
-            kernstart = phdr->p_vaddr;
-        if ( (phdr->p_vaddr + phdr->p_memsz) > kernend )
-            kernend = phdr->p_vaddr + phdr->p_memsz;
+        if ( phdr->ELF_ADDR < kernstart )
+            kernstart = phdr->ELF_ADDR;
+        if ( (phdr->ELF_ADDR + phdr->p_memsz) > kernend )
+            kernend = phdr->ELF_ADDR + phdr->p_memsz;
     }
 
     if ( (kernstart > kernend) || 
@@ -107,11 +117,15 @@ int parseelfimage(char *elfbase,
     }
 
     dsi->v_start = kernstart;
-    if ( (p = strstr(guestinfo, "VIRT_BASE=")) != NULL )
-        dsi->v_start = simple_strtoul(p+10, &p, 0);
 
-    if ( (p = strstr(guestinfo, "PT_MODE_WRITABLE")) != NULL )
-        dsi->use_writable_pagetables = 1;
+    if ( guestinfo != NULL )
+    {
+        if ( (p = strstr(guestinfo, "VIRT_BASE=")) != NULL )
+            dsi->v_start = simple_strtoul(p+10, &p, 0);
+        
+        if ( (p = strstr(guestinfo, "PT_MODE_WRITABLE")) != NULL )
+            dsi->use_writable_pagetables = 1;
+    }
 
     dsi->v_kernstart = kernstart;
     dsi->v_kernend   = kernend;
@@ -132,10 +146,10 @@ int loadelfimage(char *elfbase)
         if ( !is_loadable_phdr(phdr) )
             continue;
         if ( phdr->p_filesz != 0 )
-            memcpy((char *)phdr->p_vaddr, elfbase + phdr->p_offset, 
+            memcpy((char *)phdr->ELF_ADDR, elfbase + phdr->p_offset, 
                    phdr->p_filesz);
         if ( phdr->p_memsz > phdr->p_filesz )
-            memset((char *)phdr->p_vaddr + phdr->p_filesz, 0, 
+            memset((char *)phdr->ELF_ADDR + phdr->p_filesz, 0, 
                    phdr->p_memsz - phdr->p_filesz);
     }
 

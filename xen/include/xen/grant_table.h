@@ -25,7 +25,6 @@
 #define __XEN_GRANT_H__
 
 #include <xen/config.h>
-#include <xen/mm.h>
 #include <public/grant_table.h>
 
 /* Active grant entry - used for shadowing GTF_permit_access grants. */

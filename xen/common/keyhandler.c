@@ -98,8 +98,6 @@ void do_task_queues(unsigned char key)
     struct domain *d;
     struct exec_domain *ed;
     s_time_t       now = NOW();
-    struct list_head *ent;
-    struct pfn_info  *page;
 
     printk("'%c' pressed -> dumping task queues (now=0x%X:%08X)\n", key,
            (u32)(now>>32), (u32)now); 
@@ -112,21 +110,7 @@ void do_task_queues(unsigned char key)
                "xenheap_pages=%d\n", d->id, d->d_flags,
                atomic_read(&d->refcnt), d->tot_pages, d->xenheap_pages);
 
-        if ( d->tot_pages < 10 )
-        {
-            list_for_each ( ent, &d->page_list )
-            {
-                page = list_entry(ent, struct pfn_info, list);
-                printk("Page %08x: caf=%08x, taf=%08x\n",
-                       page_to_phys(page), page->count_info,
-                       page->u.inuse.type_info);
-            }
-        }
-
-        page = virt_to_page(d->shared_info);
-        printk("Shared_info@%08x: caf=%08x, taf=%08x\n",
-               page_to_phys(page), page->count_info,
-               page->u.inuse.type_info);
+        dump_pageframe_info(d);
                
         for_each_exec_domain ( d, ed ) {
             printk("Guest: %p CPU %d [has=%c] flags=%lx "

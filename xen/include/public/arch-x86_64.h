@@ -9,6 +9,11 @@
 #ifndef __XEN_PUBLIC_ARCH_X86_64_H__
 #define __XEN_PUBLIC_ARCH_X86_64_H__
 
+#ifndef PACKED
+/* GCC-specific way to pack structure definitions (no implicit padding). */
+#define PACKED __attribute__ ((packed))
+#endif
+
 /* Pointers are naturally 64 bits in this architecture; no padding needed. */
 #define _MEMORY_PADDING(_X)
 #define MEMORY_PADDING 
