@@ -27,6 +27,8 @@ MAJOR    := 1.3
 MINOR    := 0
 LIB_NAME := libxutil
 LIB      := $(LIB_NAME).so 
+LIB      += $(LIB_NAME).so.$(MAJOR)
+LIB      += $(LIB_NAME).so.$(MAJOR).$(MINOR)
 
 all: check-for-zlib $(LIB)
 
