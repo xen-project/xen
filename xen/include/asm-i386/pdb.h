@@ -14,6 +14,7 @@
 
 #include <asm/ptrace.h>
 #include <xen/list.h>
+#include <hypervisor-ifs/dom0_ops.h>
 #include <hypervisor-ifs/hypervisor-if.h>                   /* for domain id */
 
 extern int pdb_initialized;
@@ -37,6 +38,17 @@ extern int pdb_handle_exception(int exceptionVector,
 extern int pdb_serial_input(u_char c, struct pt_regs *regs);
 extern void pdb_do_debug(dom0_op_t *op);
 
+/* PDB Context. */
+struct pdb_context
+{
+    int valid;
+    int domain;
+    int process;
+    int system_call;              /* 0x01 break on enter, 0x02 break on exit */
+    unsigned long ptbr;
+};
+extern struct pdb_context pdb_ctx;
+
 /* Breakpoints. */
 struct pdb_breakpoint
 {
@@ -55,5 +67,22 @@ extern int   hex (char);
 extern char *mem2hex (char *, char *, int);
 extern char *hex2mem (char *, char *, int);
 extern int   hexToInt (char **ptr, int *intValue);
+
+/* Temporary Linux specific definitions */
+extern int pdb_system_call;
+extern unsigned char pdb_system_call_enter_instr;    /* original enter instr */
+extern unsigned char pdb_system_call_leave_instr;     /* original next instr */
+extern unsigned long pdb_system_call_next_addr;      /* instr after int 0x80 */
+extern unsigned long pdb_system_call_eflags_addr;   /* saved eflags on stack */
+
+unsigned long pdb_linux_pid_ptbr (unsigned long cr3, int pid);
+void pdb_linux_get_values(char *buffer, int length, unsigned long address,
+			  int pid, unsigned long cr3);
+void pdb_linux_set_values(char *buffer, int length, unsigned long address,
+			  int pid, unsigned long cr3);
+void pdb_linux_syscall_enter_bkpt (struct pt_regs *regs, long error_code,
+				   trap_info_t *ti);
+void pdb_linux_syscall_exit_bkpt (struct pt_regs *regs, 
+				  struct pdb_context *pdb_ctx);
 
 #endif  /* __PDB_H__ */

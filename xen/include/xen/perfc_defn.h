@@ -1,5 +1,6 @@
 
 PERFCOUNTER_CPU( irqs,         "#interrupts" )
+PERFCOUNTER_CPU( ipis,         "#IPIs" )
 PERFCOUNTER_CPU( irq_time,     "cycles spent in irq handler" )
 
 PERFCOUNTER_CPU( apic_timer,   "apic timer interrupts" )

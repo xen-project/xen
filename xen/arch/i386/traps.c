@@ -107,36 +107,9 @@ static inline int kernel_text_address(unsigned long addr)
 
 }
 
-
-void show_trace(unsigned long * stack)
-{
-    int i;
-    unsigned long addr;
-
-    printk("Call Trace: ");
-    i = 1;
-    while (((long) stack & (STACK_SIZE-1)) != 0) {
-        addr = *stack++;
-        if (kernel_text_address(addr)) {
-            if (i && ((i % 6) == 0))
-                printk("\n   ");
-            printk("[<%08lx>] ", addr);
-            i++;
-        }
-    }
-    printk("\n");
-}
-
-void show_traceX(void)
-{
-    unsigned long *addr;
-    __asm__ __volatile__ ("movl %%esp,%0" : "=r" (addr) : );
-    show_trace(addr);
-}
-
 void show_stack(unsigned long *esp)
 {
-    unsigned long *stack;
+    unsigned long *stack, addr;
     int i;
 
     printk("Stack trace from ESP=%p:\n", esp);
@@ -152,6 +125,20 @@ void show_stack(unsigned long *esp)
             printk("[%08lx] ", *stack++);
         else
             printk("%08lx ", *stack++);            
+    }
+    printk("\n");
+
+    printk("Call Trace from ESP=%p: ", esp);
+    stack = esp;
+    i = 0;
+    while (((long) stack & (STACK_SIZE-1)) != 0) {
+        addr = *stack++;
+        if (kernel_text_address(addr)) {
+            if (i && ((i % 6) == 0))
+                printk("\n   ");
+            printk("[<%08lx>] ", addr);
+            i++;
+        }
     }
     printk("\n");
 }
@@ -250,7 +237,6 @@ DO_ERROR_NOCODE( 0, "divide error", divide_error)
 DO_ERROR_NOCODE( 4, "overflow", overflow)
 DO_ERROR_NOCODE( 5, "bounds", bounds)
 DO_ERROR_NOCODE( 6, "invalid operand", invalid_op)
-DO_ERROR_NOCODE( 7, "device not available", device_not_available)
 DO_ERROR_NOCODE( 9, "coprocessor segment overrun", coprocessor_segment_overrun)
 DO_ERROR(10, "invalid TSS", invalid_TSS)
 DO_ERROR(11, "segment not present", segment_not_present)
@@ -267,10 +253,10 @@ asmlinkage void do_int3(struct pt_regs *regs, long error_code)
     struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
     trap_info_t *ti;
 
+    if ( pdb_handle_exception(3, regs) == 0 )
+        return;
     if ( (regs->xcs & 3) != 3 )
     {
-        if ( pdb_handle_exception(3, regs) == 0 )
-             return;
         if ( unlikely((regs->xcs & 3) == 0) )
         {
             show_registers(regs);
@@ -445,6 +431,15 @@ asmlinkage void do_general_protection(struct pt_regs *regs, long error_code)
         ti = current->thread.traps + (error_code>>3);
         if ( TI_GET_DPL(ti) >= (regs->xcs & 3) )
         {
+	    unsigned long cr3;
+	
+	    __asm__ __volatile__ ("movl %%cr3,%0" : "=r" (cr3) : );
+	    if (pdb_initialized && pdb_ctx.system_call != 0 &&
+		cr3 == pdb_ctx.ptbr)
+	    {
+	        pdb_linux_syscall_enter_bkpt(regs, error_code, ti);
+	    }
+
             gtb->flags = GTBF_TRAP_NOCODE;
             regs->eip += 2;
             goto finish_propagation;

@@ -28,15 +28,6 @@
 
 extern unsigned int alloc_new_dom_mem(struct task_struct *, unsigned int);
 
-/* Basically used to protect the domain-id space. */
-static spinlock_t create_dom_lock = SPIN_LOCK_UNLOCKED;
-
-static domid_t get_domnr(void)
-{
-    static domid_t domnr = 0;
-    return ++domnr;
-}
-
 static int msr_cpu_mask;
 static unsigned long msr_addr;
 static unsigned long msr_lo;
@@ -117,23 +108,24 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     case DOM0_CREATEDOMAIN:
     {
         struct task_struct *p;
-        static unsigned int pro = 0;
+        static domid_t    domnr = 0;
+        static spinlock_t domnr_lock = SPIN_LOCK_UNLOCKED;
+        unsigned int pro;
         domid_t dom;
         ret = -ENOMEM;
 
-        spin_lock_irq(&create_dom_lock);
-        
-        if ( (dom = get_domnr()) == 0 ) 
-            goto exit_create;
+        spin_lock(&domnr_lock);
+        dom = ++domnr;
+        spin_unlock(&domnr_lock);
 
 	if (op->u.createdomain.cpu == -1 )
-	    pro = (pro+1) % smp_num_cpus;
+	    pro = (unsigned int)dom % smp_num_cpus;
 	else
 	    pro = op->u.createdomain.cpu % smp_num_cpus;
 
         p = do_createdomain(dom, pro);
         if ( p == NULL ) 
-            goto exit_create;
+            break;
 
 	if ( op->u.createdomain.name[0] )
         {
@@ -145,16 +137,13 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         if ( ret != 0 ) 
         {
             __kill_domain(p);
-            goto exit_create;
+            break;
         }
 
         ret = 0;
         
         op->u.createdomain.domain = p->domain;
         copy_to_user(u_dom0_op, op, sizeof(*op));
- 
-    exit_create:
-        spin_unlock_irq(&create_dom_lock);
     }
     break;
 
