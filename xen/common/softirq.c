@@ -1,73 +1,53 @@
-/*
- *	linux/kernel/softirq.c
- *
- *	Copyright (C) 1992 Linus Torvalds
- *
- * Fixed a disable_bh()/enable_bh() race (was causing a console lockup)
- * due bh_mask_count not atomic handling. Copyright (C) 1998  Andrea Arcangeli
- *
- * Rewritten. Old one was good in 2.2, but in 2.3 it was immoral. --ANK (990903)
+/******************************************************************************
+ * common/softirq.c
+ * 
+ * Modified from the Linux original. Softirqs in Xen are only executed in
+ * an outermost activation (e.g., never within an interrupt activation).
+ * This simplifies some things and generally seems a good thing.
+ * 
+ * Copyright (c) 2003, K A Fraser
+ * 
+ * Copyright (C) 1992 Linus Torvalds
  */
 
-#include <linux/config.h>
-#include <linux/mm.h>
-#include <linux/sched.h>
-#include <linux/interrupt.h>
-#include <linux/init.h>
-#include <linux/tqueue.h>
-
-/*
-   - No shared variables, all the data are CPU local.
-   - If a softirq needs serialization, let it serialize itself
-     by its own spinlocks.
-   - Even if softirq is serialized, only local cpu is marked for
-     execution. Hence, we get something sort of weak cpu binding.
-     Though it is still not clear, will it result in better locality
-     or will not.
-   - These softirqs are not masked by global cli() and start_bh_atomic()
-     (by clear reasons). Hence, old parts of code still using global locks
-     MUST NOT use softirqs, but insert interfacing routines acquiring
-     global locks. F.e. look at BHs implementation.
-
-   Examples:
-   - NET RX softirq. It is multithreaded and does not require
-     any global serialization.
-   - NET TX softirq. It kicks software netdevice queues, hence
-     it is logically serialized per device, but this serialization
-     is invisible to common code.
-   - Tasklets: serialized wrt itself.
-   - Bottom halves: globally serialized, grr...
- */
+#include <xeno/config.h>
+#include <xeno/mm.h>
+#include <xeno/sched.h>
+#include <xeno/interrupt.h>
+#include <xeno/init.h>
+#include <xeno/tqueue.h>
 
 irq_cpustat_t irq_stat[NR_CPUS];
 
 static struct softirq_action softirq_vec[32] __cacheline_aligned;
 
-
 asmlinkage void do_softirq()
 {
-    int cpu = smp_processor_id();
+    unsigned int pending, cpu = smp_processor_id();
     struct softirq_action *h;
-    __u32 pending;
 
-    if ( in_interrupt() )
+    if ( unlikely(in_interrupt()) )
         BUG();
 
-    local_bh_disable();
+    /*
+     * XEN: This isn't real mutual-exclusion: it just ensures that in_softirq()
+     * and in_interrupt() are both TRUE, allowing checks for erroneous reentry.
+     */
+    cpu_bh_disable(cpu);
 
     while ( (pending = xchg(&softirq_pending(cpu), 0)) != 0 )
     {
         h = softirq_vec;
         while ( pending )
         {
-            if (pending & 1)
+            if ( pending & 1 )
                 h->action(h);
             h++;
             pending >>= 1;
         }
     }
 
-    __local_bh_enable();
+    cpu_bh_enable(cpu);
 }
 
 inline void cpu_raise_softirq(unsigned int cpu, unsigned int nr)
@@ -130,14 +110,18 @@ static void tasklet_action(struct softirq_action *a)
     tasklet_vec[cpu].list = NULL;
     local_irq_enable();
 
-    while (list) {
+    while ( list != NULL )
+    {
         struct tasklet_struct *t = list;
 
         list = list->next;
 
-        if (tasklet_trylock(t)) {
-            if (!atomic_read(&t->count)) {
-                if (!test_and_clear_bit(TASKLET_STATE_SCHED, &t->state))
+        if ( likely(tasklet_trylock(t)) )
+        {
+            if ( likely(!atomic_read(&t->count)) )
+            {
+                if ( unlikely(!test_and_clear_bit(TASKLET_STATE_SCHED, 
+                                                  &t->state)) )
                     BUG();
                 t->func(t->data);
             }
@@ -163,14 +147,18 @@ static void tasklet_hi_action(struct softirq_action *a)
     tasklet_hi_vec[cpu].list = NULL;
     local_irq_enable();
 
-    while (list) {
+    while ( list != NULL )
+    {
         struct tasklet_struct *t = list;
 
         list = list->next;
 
-        if (tasklet_trylock(t)) {
-            if (!atomic_read(&t->count)) {
-                if (!test_and_clear_bit(TASKLET_STATE_SCHED, &t->state))
+        if ( likely(tasklet_trylock(t)) )
+        {
+            if ( likely(!atomic_read(&t->count)) )
+            {
+                if ( unlikely(!test_and_clear_bit(TASKLET_STATE_SCHED, 
+                                                  &t->state)) )
                     BUG();
                 t->func(t->data);
             }
@@ -199,10 +187,10 @@ void tasklet_init(struct tasklet_struct *t,
 
 void tasklet_kill(struct tasklet_struct *t)
 {
-    if (in_interrupt())
+    if ( in_interrupt() )
         BUG();
-    while (test_and_set_bit(TASKLET_STATE_SCHED, &t->state))
-        while (test_bit(TASKLET_STATE_SCHED, &t->state))
+    while ( test_and_set_bit(TASKLET_STATE_SCHED, &t->state) )
+        while ( test_bit(TASKLET_STATE_SCHED, &t->state) )
             do_softirq();
     tasklet_unlock_wait(t);
     clear_bit(TASKLET_STATE_SCHED, &t->state);
@@ -215,28 +203,19 @@ void tasklet_kill(struct tasklet_struct *t)
 static void (*bh_base[32])(void);
 struct tasklet_struct bh_task_vec[32];
 
-/* BHs are serialized by spinlock global_bh_lock.
-
-   It is still possible to make synchronize_bh() as
-   spin_unlock_wait(&global_bh_lock). This operation is not used
-   by kernel now, so that this lock is not made private only
-   due to wait_on_irq().
-
-   It can be removed only after auditing all the BHs.
- */
 spinlock_t global_bh_lock = SPIN_LOCK_UNLOCKED;
 
 static void bh_action(unsigned long nr)
 {
     int cpu = smp_processor_id();
 
-    if (!spin_trylock(&global_bh_lock))
+    if ( !spin_trylock(&global_bh_lock) )
         goto resched;
 
-    if (!hardirq_trylock(cpu))
+    if ( !hardirq_trylock(cpu) )
         goto resched_unlock;
 
-    if (bh_base[nr])
+    if ( likely(bh_base[nr] != NULL) )
         bh_base[nr]();
 
     hardirq_endlock(cpu);
@@ -265,7 +244,7 @@ void __init softirq_init()
 {
     int i;
 
-    for (i=0; i<32; i++)
+    for ( i = 0; i < 32; i++)
         tasklet_init(bh_task_vec+i, bh_action, i);
 
     open_softirq(TASKLET_SOFTIRQ, tasklet_action, NULL);
@@ -274,8 +253,11 @@ void __init softirq_init()
 
 void __run_task_queue(task_queue *list)
 {
-    struct list_head head, *next;
-    unsigned long flags;
+    struct list_head  head, *next;
+    unsigned long     flags;
+    void              (*f) (void *);
+    struct tq_struct *p;
+    void             *data;
 
     spin_lock_irqsave(&tqueue_lock, flags);
     list_add(&head, list);
@@ -283,18 +265,15 @@ void __run_task_queue(task_queue *list)
     spin_unlock_irqrestore(&tqueue_lock, flags);
 
     next = head.next;
-    while (next != &head) {
-        void (*f) (void *);
-        struct tq_struct *p;
-        void *data;
-
+    while ( next != &head )
+    {
         p = list_entry(next, struct tq_struct, list);
         next = next->next;
         f = p->routine;
         data = p->data;
         wmb();
         p->sync = 0;
-        if (f)
+        if ( likely(f != NULL) )
             f(data);
     }
 }
