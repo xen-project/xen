@@ -182,7 +182,7 @@ int fixup_seg(u16 seg, unsigned long offset)
         table = (unsigned long *)LDT_VIRT_START;
         if ( idx >= d->mm.ldt_ents )
         {
-            DPRINTK("Segment %04x out of LDT range (%d)\n",
+            DPRINTK("Segment %04x out of LDT range (%ld)\n",
                     seg, d->mm.ldt_ents);
             goto fail;
         }
@@ -231,16 +231,9 @@ int fixup_seg(u16 seg, unsigned long offset)
     }
     else
     {
-        /*
-         * Expands-up: All the way to Xen space? Assume 4GB if so.
-         * NB: we compare offset with limit-15, instead of the "real"
-         * comparison of offset+15 (worst case) with limit,
-         * to avoid possible unsigned int overflow of offset+15.
-         * limit-15 will not underflow here because we don't allow expand-up
-         * segments with maxlimit.
-         */
+        /* Expands-up: All the way to Xen space? Assume 4GB if so. */
         if ( ((PAGE_OFFSET - (base + limit)) < PAGE_SIZE) &&
-             ((offset) > (limit-15)) )
+             (offset > limit) )
         {
             /* Flip to expands-down. */
             limit = -(base & PAGE_MASK);
@@ -248,8 +241,8 @@ int fixup_seg(u16 seg, unsigned long offset)
         }
     }
 
-    DPRINTK("None of the above! (%08lx:%08lx, %d, %08lx, %08lx, %08lx)\n", 
-            a, b, positive_access, base, limit, base+limit);
+    DPRINTK("None of the above! (%08lx:%08lx, %08lx, %08lx, %08lx)\n", 
+            a, b, base, limit, base+limit);
 
  fail:
     return 0;
@@ -312,7 +305,7 @@ int gpf_emulate_4gb(struct xen_regs *regs)
 
     if ( !linearise_address((u16)regs->cs, regs->eip, (unsigned long *)&eip) )
     {
-        DPRINTK("Cannot linearise %04x:%08lx\n", regs->cs, regs->eip);
+        DPRINTK("Cannot linearise %04x:%08x\n", regs->cs, regs->eip);
         goto fail;
     }
 
@@ -340,25 +333,25 @@ int gpf_emulate_4gb(struct xen_regs *regs)
         case 0xf0: /* LOCK */
         case 0xf2: /* REPNE/REPNZ */
         case 0xf3: /* REP/REPE/REPZ */
-            continue;
+            break;
         case 0x2e: /* CS override */
             pseg = &regs->cs;
-            continue;
+            break;
         case 0x3e: /* DS override */
             pseg = &regs->ds;
-            continue;
+            break;
         case 0x26: /* ES override */
             pseg = &regs->es;
-            continue;
+            break;
         case 0x64: /* FS override */
             pseg = &regs->fs;
-            continue;
+            break;
         case 0x65: /* GS override */
             pseg = &regs->gs;
-            continue;
+            break;
         case 0x36: /* SS override */
             pseg = &regs->ss;
-            continue;
+            break;
         default: /* Not a prefix byte */
             goto done_prefix;
         }
@@ -489,7 +482,7 @@ int gpf_emulate_4gb(struct xen_regs *regs)
 
  fixme:
     DPRINTK("Undecodable instruction %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x "
-            "caused GPF(0) at %04x:%08lx\n",
+            "caused GPF(0) at %04x:%08x\n",
             eip[0], eip[1], eip[2], eip[3],
             eip[4], eip[5], eip[6], eip[7],
             regs->cs, regs->eip);

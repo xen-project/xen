@@ -36,7 +36,7 @@
 
 #define DP(_f) printk(KERN_ALERT "  " _f "\n")
 
-asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
+fastcall void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
 {
     static unsigned long printed = 0;
     int i;
