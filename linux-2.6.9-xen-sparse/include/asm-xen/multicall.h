@@ -30,78 +30,86 @@
 
 #include <asm-xen/hypervisor.h>
 
-extern multicall_entry_t multicall_list[];
-extern int nr_multicall_ents;
+DECLARE_PER_CPU(multicall_entry_t, multicall_list[]);
+DECLARE_PER_CPU(int, nr_multicall_ents);
 
 static inline void queue_multicall0(unsigned long op)
 {
-    int i = nr_multicall_ents;
-    multicall_list[i].op      = op;
-    nr_multicall_ents = i+1;
+    int cpu = smp_processor_id();
+    int i = per_cpu(nr_multicall_ents, cpu);
+    per_cpu(multicall_list[i], cpu).op      = op;
+    per_cpu(nr_multicall_ents, cpu) = i+1;
 }
 
 static inline void queue_multicall1(unsigned long op, unsigned long arg1)
 {
-    int i = nr_multicall_ents;
-    multicall_list[i].op      = op;
-    multicall_list[i].args[0] = arg1;
-    nr_multicall_ents = i+1;
+    int cpu = smp_processor_id();
+    int i = per_cpu(nr_multicall_ents, cpu);
+    per_cpu(multicall_list[i], cpu).op      = op;
+    per_cpu(multicall_list[i], cpu).args[0] = arg1;
+    per_cpu(nr_multicall_ents, cpu) = i+1;
 }
 
 static inline void queue_multicall2(
     unsigned long op, unsigned long arg1, unsigned long arg2)
 {
-    int i = nr_multicall_ents;
-    multicall_list[i].op      = op;
-    multicall_list[i].args[0] = arg1;
-    multicall_list[i].args[1] = arg2;
-    nr_multicall_ents = i+1;
+    int cpu = smp_processor_id();
+    int i = per_cpu(nr_multicall_ents, cpu);
+    per_cpu(multicall_list[i], cpu).op      = op;
+    per_cpu(multicall_list[i], cpu).args[0] = arg1;
+    per_cpu(multicall_list[i], cpu).args[1] = arg2;
+    per_cpu(nr_multicall_ents, cpu) = i+1;
 }
 
 static inline void queue_multicall3(
     unsigned long op, unsigned long arg1, unsigned long arg2,
     unsigned long arg3)
 {
-    int i = nr_multicall_ents;
-    multicall_list[i].op      = op;
-    multicall_list[i].args[0] = arg1;
-    multicall_list[i].args[1] = arg2;
-    multicall_list[i].args[2] = arg3;
-    nr_multicall_ents = i+1;
+    int cpu = smp_processor_id();
+    int i = per_cpu(nr_multicall_ents, cpu);
+    per_cpu(multicall_list[i], cpu).op      = op;
+    per_cpu(multicall_list[i], cpu).args[0] = arg1;
+    per_cpu(multicall_list[i], cpu).args[1] = arg2;
+    per_cpu(multicall_list[i], cpu).args[2] = arg3;
+    per_cpu(nr_multicall_ents, cpu) = i+1;
 }
 
 static inline void queue_multicall4(
     unsigned long op, unsigned long arg1, unsigned long arg2,
     unsigned long arg3, unsigned long arg4)
 {
-    int i = nr_multicall_ents;
-    multicall_list[i].op      = op;
-    multicall_list[i].args[0] = arg1;
-    multicall_list[i].args[1] = arg2;
-    multicall_list[i].args[2] = arg3;
-    multicall_list[i].args[3] = arg4;
-    nr_multicall_ents = i+1;
+    int cpu = smp_processor_id();
+    int i = per_cpu(nr_multicall_ents, cpu);
+    per_cpu(multicall_list[i], cpu).op      = op;
+    per_cpu(multicall_list[i], cpu).args[0] = arg1;
+    per_cpu(multicall_list[i], cpu).args[1] = arg2;
+    per_cpu(multicall_list[i], cpu).args[2] = arg3;
+    per_cpu(multicall_list[i], cpu).args[3] = arg4;
+    per_cpu(nr_multicall_ents, cpu) = i+1;
 }
 
 static inline void queue_multicall5(
     unsigned long op, unsigned long arg1, unsigned long arg2,
     unsigned long arg3, unsigned long arg4, unsigned long arg5)
 {
-    int i = nr_multicall_ents;
-    multicall_list[i].op      = op;
-    multicall_list[i].args[0] = arg1;
-    multicall_list[i].args[1] = arg2;
-    multicall_list[i].args[2] = arg3;
-    multicall_list[i].args[3] = arg4;
-    multicall_list[i].args[4] = arg5;
-    nr_multicall_ents = i+1;
+    int cpu = smp_processor_id();
+    int i = per_cpu(nr_multicall_ents, cpu);
+    per_cpu(multicall_list[i], cpu).op      = op;
+    per_cpu(multicall_list[i], cpu).args[0] = arg1;
+    per_cpu(multicall_list[i], cpu).args[1] = arg2;
+    per_cpu(multicall_list[i], cpu).args[2] = arg3;
+    per_cpu(multicall_list[i], cpu).args[3] = arg4;
+    per_cpu(multicall_list[i], cpu).args[4] = arg5;
+    per_cpu(nr_multicall_ents, cpu) = i+1;
 }
 
 static inline void execute_multicall_list(void)
 {
-    if ( unlikely(nr_multicall_ents == 0) ) return;
-    (void)HYPERVISOR_multicall(multicall_list, nr_multicall_ents);
-    nr_multicall_ents = 0;
+    int cpu = smp_processor_id();
+    if ( unlikely(per_cpu(nr_multicall_ents, cpu) == 0) ) return;
+    (void)HYPERVISOR_multicall(&per_cpu(multicall_list[0], cpu),
+			       per_cpu(nr_multicall_ents, cpu));
+    per_cpu(nr_multicall_ents, cpu) = 0;
 }
 
 #endif /* __MULTICALL_H__ */
