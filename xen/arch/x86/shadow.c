@@ -60,7 +60,7 @@ shadow_promote(struct domain *d, unsigned long gpfn, unsigned long gmfn,
         __shadow_sync_mfn(d, gmfn);
     }
 
-    if ( unlikely(mfn_is_page_table(gmfn)) )
+    if ( unlikely(page_is_page_table(page)) )
     {
         min_type = shadow_max_pgtable_type(d, gpfn) + PGT_l1_shadow;
         max_type = new_type;
@@ -99,7 +99,7 @@ shadow_promote(struct domain *d, unsigned long gpfn, unsigned long gmfn,
     if ( get_page_type(page, PGT_base_page_table) )
     {
         put_page_type(page);
-        set_bit(_PGC_page_table, &frame_table[gmfn].count_info);
+        set_bit(_PGC_page_table, &page->count_info);
     }
     else
     {

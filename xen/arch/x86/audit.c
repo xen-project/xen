@@ -25,25 +25,17 @@
 #include <xen/kernel.h>
 #include <xen/lib.h>
 #include <xen/mm.h>
-//#include <xen/sched.h>
-//#include <xen/errno.h>
 #include <xen/perfc.h>
-//#include <xen/irq.h>
-//#include <xen/softirq.h>
 #include <asm/shadow.h>
 #include <asm/page.h>
 #include <asm/flushtlb.h>
-//#include <asm/io.h>
-//#include <asm/uaccess.h>
-//#include <asm/domain_page.h>
-//#include <asm/ldt.h>
 
 // XXX SMP bug -- these should not be statics...
 //
 static int ttot=0, ctot=0, io_mappings=0, lowmem_mappings=0;
 static int l1, l2, oos_count, page_count;
 
-#define FILE_AND_LINE 1
+#define FILE_AND_LINE 0
 
 #if FILE_AND_LINE
 #define adjust(_p, _a) _adjust((_p), (_a), __FILE__, __LINE__)
@@ -73,7 +65,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
             if ( page_get_owner(page) == NULL )
             {
                 APRINTK("adjust(mfn=%p, dir=%d, adjtype=%d) owner=NULL",
-                        page_to_pfn(page), dir, adjtype, file, line);
+                        page_to_pfn(page), dir, adjtype);
                 errors++;
             }
 
