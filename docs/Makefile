@@ -33,8 +33,8 @@ install: $(DOCUMENTS)
 	dvips -Ppdf -G0 -o $@ $<
 
 %.dvi: %.tex
-	latex $*
-	if [ -e $*.toc ] ; then latex $* ; fi
+	latex $* >/dev/null
+	if [ -e $*.toc ] ; then latex $* >/dev/null ; fi
 
 %.eps: %.fig
 	fig2dev -L eps $< $@
@@ -43,4 +43,4 @@ install: $(DOCUMENTS)
 	tgif -print -color -eps $<
 
 %.html: %.tex
-	latex2html --split 0 --nonavigation --noinfo --math $<
+	latex2html --split 0 --nonavigation --noinfo --math $< 1>/dev/null 2>/dev/null
