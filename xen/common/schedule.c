@@ -249,10 +249,15 @@ asmlinkage void schedule(void)
  need_resched_back:
     perfc_incrc(sched_run2);
 
-    now = NOW();
-    next = NULL;
+
     prev = current;
+    next = NULL;
+
     this_cpu = prev->processor;
+
+    spin_lock_irq(&schedule_data[this_cpu].lock);
+
+    now = NOW();
 
     /* remove timer  */
     rem_ac_timer(&schedule_data[this_cpu].s_timer);
@@ -261,10 +266,9 @@ asmlinkage void schedule(void)
      * deschedule the current domain
      */
 
-    spin_lock_irq(&schedule_data[this_cpu].lock);
-
     ASSERT(!in_interrupt());
     ASSERT(__task_on_runqueue(prev));
+
 
     if (is_idle_task(prev)) 
         goto deschedule_done;
@@ -363,7 +367,7 @@ asmlinkage void schedule(void)
      * work out how long 'next' can run till its evt is greater than
      * 'next_prime's evt. Taking context switch allowance into account.
      */
-    ASSERT(next_prime->evt > next->evt);
+    ASSERT(next_prime->evt >= next->evt);
     r_time = ((next_prime->evt - next->evt)/next->mcu_advance) + ctx_allow;
 
  sched_done:
@@ -389,7 +393,7 @@ asmlinkage void schedule(void)
  timer_redo:
     schedule_data[this_cpu].s_timer.expires  = now + r_time;
     if (add_ac_timer(&schedule_data[this_cpu].s_timer) == 1) {
-        printk("SCHED[%02d]: Shit this shouldn't happen %08x\n", 
+        printk("SCHED[%02d]: Shit this shouldn't happen r_time=%lu\n", 
                this_cpu, r_time);
         now = NOW();
         goto timer_redo;
