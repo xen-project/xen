@@ -47,7 +47,7 @@ loadelfsymtab(
     struct domain_setup_info *dsi);
 
 static int setup_guestos(int xc_handle,
-                         u32 dom,
+                         u32 dom, int memsize,
                          char *image, unsigned long image_size,
                          gzFile initrd_gfd, unsigned long initrd_len,
                          unsigned long nr_pages,
@@ -110,20 +110,22 @@ static int setup_guestos(int xc_handle,
      * read-only). We have a pair of simultaneous equations in two unknowns, 
      * which we solve by exhaustive search.
      */
-    nr_pt_pages = 1 + (nr_pages >> (PAGE_SHIFT - 2));
     vboot_params_start = LINUX_BOOT_PARAMS_ADDR;
     vboot_params_end   = vboot_params_start + PAGE_SIZE;
     vboot_gdt_start    = vboot_params_end;
     vboot_gdt_end      = vboot_gdt_start + PAGE_SIZE;
-    v_end              = nr_pages << PAGE_SHIFT;
-    vpt_end            = v_end - (16 << PAGE_SHIFT); /* leaving the top 64k untouched */
-    vpt_start          = vpt_end - (nr_pt_pages << PAGE_SHIFT);
-    vinitrd_end        = vpt_start;
+
+    v_end              = memsize << 20;
+    vinitrd_end        = v_end - PAGE_SIZE; /* leaving the top 4k untouched for IO requests page use */
     vinitrd_start      = vinitrd_end - initrd_len;
     vinitrd_start      = vinitrd_start & (~(PAGE_SIZE - 1));
 
     if(initrd_len == 0)
         vinitrd_start = vinitrd_end = 0;
+
+    nr_pt_pages = 1 + ((memsize + 3) >> 2);
+    vpt_start   = v_end;
+    vpt_end     = vpt_start + (nr_pt_pages * PAGE_SIZE);
 
     printf("VIRTUAL MEMORY ARRANGEMENT:\n"
            " Boot_params:   %08lx->%08lx\n"
@@ -218,9 +220,6 @@ static int setup_guestos(int xc_handle,
         }
 
         *vl1e = (page_array[count] << PAGE_SHIFT) | L1_PROT;
-        if ( (count >= ((vpt_start-dsi.v_start)>>PAGE_SHIFT)) && 
-             (count <  ((vpt_end  -dsi.v_start)>>PAGE_SHIFT)) )
-            *vl1e &= ~_PAGE_RW;
         vl1e++;
     }
     munmap(vl1tab, PAGE_SIZE);
@@ -267,7 +266,7 @@ static int setup_guestos(int xc_handle,
     boot_paramsp->initrd_start = vinitrd_start;
     boot_paramsp->initrd_size = initrd_len;
 
-    i = (nr_pages >> (PAGE_SHIFT - 10)) - (1 << 10) - 4;
+    i = ((memsize - 1) << 10) - 4;
     boot_paramsp->alt_mem_k = i; /* alt_mem_k */
     boot_paramsp->screen.overlap.ext_mem_k = i & 0xFFFF; /* ext_mem_k */
 
@@ -374,6 +373,7 @@ int vmx_identify(void)
 
 int xc_vmx_build(int xc_handle,
                    u32 domid,
+                   int memsize,
                    const char *image_name,
                    struct mem_map *mem_mapp,
                    const char *ramdisk_name,
@@ -445,7 +445,7 @@ int xc_vmx_build(int xc_handle,
         goto error_out;
     }
 
-    if ( setup_guestos(xc_handle, domid, image, image_size, 
+    if ( setup_guestos(xc_handle, domid, memsize, image, image_size, 
                        initrd_gfd, initrd_size, nr_pages, 
                        ctxt, cmdline,
                        op.u.getdomaininfo.shared_info_frame,

@@ -320,6 +320,7 @@ class XendDomainInfo:
         self.restart_time = None
         self.console_port = None
         self.savedinfo = None
+        self.image_handler = None
         self.is_vmx = 0
         self.vcpus = 1
 
@@ -455,6 +456,7 @@ class XendDomainInfo:
             except:
                 raise VmError('invalid vcpus value')
 
+            self.find_image_handler()
             self.init_domain()
             self.configure_console()
             self.configure_backends()
@@ -471,7 +473,7 @@ class XendDomainInfo:
             raise
         return deferred
 
-    def construct_image(self):
+    def find_image_handler(self):
         """Construct the boot image for the domain.
 
         @return vm
@@ -482,10 +484,17 @@ class XendDomainInfo:
         image_name = sxp.name(image)
         if image_name is None:
             raise VmError('missing image name')
+        if image_name == "vmx":
+            self.is_vmx = 1
         image_handler = get_image_handler(image_name)
         if image_handler is None:
             raise VmError('unknown image type: ' + image_name)
-        image_handler(self, image)
+        self.image_handler = image_handler
+        return self
+
+    def construct_image(self):
+        image = sxp.child_value(self.config, 'image')
+        self.image_handler(self, image)
         return self
 
     def config_devices(self, name):
@@ -730,7 +739,8 @@ class XendDomainInfo:
         except:
             raise VmError('invalid cpu')
         cpu_weight = self.cpu_weight
-        dom = xc.domain_create(dom= dom, mem_kb= memory * 1024,
+        memory = memory * 1024 + self.pgtable_size(memory)
+        dom = xc.domain_create(dom= dom, mem_kb= memory,
                                cpu= cpu, cpu_weight= cpu_weight)
         if dom <= 0:
             raise VmError('Creating domain failed: name=%s memory=%d'
@@ -757,6 +767,7 @@ class XendDomainInfo:
         	err = buildfn(dom      = dom,
                	      	image          = kernel,
                       	control_evtchn = 0,
+                        memsize        = self.memory,
 			memmap	       = memmap,
                       	cmdline        = cmdline,
                       	ramdisk        = ramdisk,
@@ -1084,6 +1095,18 @@ class XendDomainInfo:
         d.addErrback(dlist_err)
         return d
 
+    def pgtable_size(self, memory):
+        """Return the size of memory needed for 1:1 page tables for physical
+           mode.
+
+        @param memory: size in MB
+        @return size in KB
+        """
+        if self.is_vmx:
+            # Logic x86-32 specific. 
+            # 1 page for the PGD + 1 pte page for 4MB of memory (rounded)
+            return (1 + ((memory + 3) >> 2)) * 4
+        return 0
 
 def vm_image_linux(vm, image):
     """Create a VM for a linux image.
@@ -1159,7 +1182,6 @@ def vm_image_vmx(vm, image):
     from xen.util.memmap import memmap_parse
     memmap = memmap_parse(memmap)
     vm.create_domain("vmx", kernel, ramdisk, cmdline, memmap)
-    vm.is_vmx = 1
     return vm
 
 def vm_dev_vif(vm, val, index, change=0):
