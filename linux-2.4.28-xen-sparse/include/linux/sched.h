@@ -769,7 +769,7 @@ extern struct mm_struct * start_lazy_tlb(void);
 extern void end_lazy_tlb(struct mm_struct *mm);
 
 /* mmdrop drops the mm and the page tables */
-extern inline void FASTCALL(__mmdrop(struct mm_struct *));
+extern void FASTCALL(__mmdrop(struct mm_struct *));
 static inline void mmdrop(struct mm_struct * mm)
 {
 	if (atomic_dec_and_test(&mm->mm_count))

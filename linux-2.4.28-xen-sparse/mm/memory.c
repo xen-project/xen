@@ -1439,7 +1439,7 @@ int handle_mm_fault(struct mm_struct *mm, struct vm_area_struct * vma,
  * On a two-level page table, this ends up actually being entirely
  * optimized away.
  */
-pmd_t *__pmd_alloc(struct mm_struct *mm, pgd_t *pgd, unsigned long address)
+pmd_t fastcall *__pmd_alloc(struct mm_struct *mm, pgd_t *pgd, unsigned long address)
 {
 	pmd_t *new;
 
@@ -1473,7 +1473,7 @@ out:
  * We've already handled the fast-path in-line, and we own the
  * page table lock.
  */
-pte_t *pte_alloc(struct mm_struct *mm, pmd_t *pmd, unsigned long address)
+pte_t fastcall *pte_alloc(struct mm_struct *mm, pmd_t *pmd, unsigned long address)
 {
 	if (pmd_none(*pmd)) {
 		pte_t *new;

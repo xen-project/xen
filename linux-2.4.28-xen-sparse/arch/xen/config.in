@@ -146,7 +146,7 @@ if [ "$CONFIG_PROC_FS" = "y" ]; then
 	 A.OUT		CONFIG_KCORE_AOUT" ELF
 fi
 tristate 'Kernel support for a.out binaries' CONFIG_BINFMT_AOUT
-tristate 'Kernel support for ELF binaries' CONFIG_BINFMT_ELF
+bool 'Kernel support for ELF binaries' CONFIG_BINFMT_ELF
 tristate 'Kernel support for MISC binaries' CONFIG_BINFMT_MISC
 bool 'Select task to kill on out of memory condition' CONFIG_OOM_KILLER
 
