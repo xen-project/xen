@@ -26,7 +26,7 @@ def expand_dev_name(name):
 def check_mounted(self, name):
     mode = None
     name = expand_dev_name(name)
-    lines = util.popen('mount 2>/dev/null').readlines()
+    lines = util.popen('mount').readlines()
     exp = re.compile('^' + name + ' .*[\(,]r(?P<mode>[ow])[,\)]')
     for line in lines:
         pm = exp.match(line)

@@ -30,7 +30,7 @@ class Daemon:
         cmdex = '(?P<cmd>.*)'
         procre = re.compile('^\s*' + pidex + '\s*' + pythonex + '\s*' + cmdex + '$')
         xendre = re.compile('^/usr/sbin/xend\s*(start|restart)\s*.*$')
-        procs = util.popen('ps -e -o pid,args 2>/dev/null')
+        procs = util.popen('ps -e -o pid,args')
         for proc in procs:
             pm = procre.match(proc)
             if not pm: continue
@@ -58,7 +58,7 @@ class Daemon:
             return 0
         # Read the pid of the previous invocation and search active process list.
         pid = open(PID_FILE, 'r').read()
-        lines = util.popen('ps ' + pid + ' 2>/dev/null').readlines()
+        lines = util.popen('ps ' + pid).readlines()
         for line in lines:
             if re.search('^ *' + pid + '.+xensv', line):
                 if not kill:

@@ -51,7 +51,7 @@ def get_current_ipaddr(dev='eth0'):
 
     returns interface address as a string
     """
-    fd = util.popen( '/sbin/ifconfig ' + dev + ' 2>/dev/null' )
+    fd = util.popen( '/sbin/ifconfig ' + dev )
     lines = _readlines(fd)
     for line in lines:
         m = re.search( '^\s+inet addr:([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+).*',
@@ -69,7 +69,7 @@ def get_current_ipmask(dev='eth0'):
 
     returns interface netmask as a string
     """
-    fd = util.popen( '/sbin/ifconfig ' + dev + ' 2>/dev/null' )
+    fd = util.popen( '/sbin/ifconfig ' + dev )
     lines = _readlines(fd)
     for line in lines:
         m = re.search( '^.+Mask:([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+).*',
