@@ -25,7 +25,9 @@ ps: $(DOC_PS)
 
 pdf: $(DOC_PDF)
 
-html: $(DOC_HTML)
+html:
+	@if which $(LATEX2HTML) 1>/dev/null 2>/dev/null; then \
+	$(MAKE) $(DOC_HTML); fi
 
 clean:
 	rm -rf .word_count *.aux *.dvi *.bbl *.blg *.glo *.idx *~ 
@@ -37,7 +39,7 @@ install: all
 	$(INSTALL_DIR) $(DESTDIR)$(pkgdocdir)
 	cp -dR ps $(DESTDIR)$(pkgdocdir)
 	cp -dR pdf $(DESTDIR)$(pkgdocdir)
-	cp -dR html $(DESTDIR)$(pkgdocdir)
+	[ ! -d html ] || cp -dR html $(DESTDIR)$(pkgdocdir)
 
 pdf/%.pdf: ps/%.ps
 	$(INSTALL_DIR) $(@D)
