@@ -13,7 +13,6 @@ __KERNEL_RCSID(0, "$NetBSD$");
 #include <sys/systm.h>
 #include <sys/proc.h>
 #include <sys/malloc.h>
-#include <sys/kthread.h>
 
 #include <machine/xen.h>
 #include <machine/hypervisor.h>
@@ -76,8 +75,6 @@ static int ctrl_if_tx_wait;
 static void __ctrl_if_tx_tasklet(unsigned long data);
 
 static void __ctrl_if_rx_tasklet(unsigned long data);
-
-static void ctrl_if_kthread(void *);
 
 #define get_ctrl_if() ((control_if_t *)((char *)HYPERVISOR_shared_info + 2048))
 #define TX_FULL(_c)   \
@@ -194,34 +191,22 @@ static void __ctrl_if_rx_tasklet(unsigned long data)
     {
         __insn_barrier();
         ctrl_if_rxmsg_deferred_prod = dp;
-#if 0
-        wakeup(&ctrl_if_kthread);
-#else
 	if (ctrl_if_softintr)
 		softintr_schedule(ctrl_if_softintr);
-#endif
     }
 }
 
 static int ctrl_if_interrupt(void *arg)
 {
-    control_if_t *ctrl_if = get_ctrl_if();
+	control_if_t *ctrl_if = get_ctrl_if();
 
-    if ( ctrl_if_tx_resp_cons != ctrl_if->tx_resp_prod ||
-	ctrl_if_rx_req_cons != ctrl_if->rx_req_prod ) {
-#if 0
-#if 0
-	    wakeup(&ctrl_if_kthread);
-#else
-	    if (ctrl_if_softintr)
-		    softintr_schedule(ctrl_if_softintr);
-#endif
-#else
-	    ctrl_if_kthread((void *)1);
-#endif
-    }
+	if ( ctrl_if_tx_resp_cons != ctrl_if->tx_resp_prod )
+		__ctrl_if_tx_tasklet(0);
 
-    return 0;
+	if ( ctrl_if_rx_req_cons != ctrl_if->rx_req_prod )
+		__ctrl_if_rx_tasklet(0);
+
+	return 0;
 }
 
 int
@@ -289,6 +274,7 @@ ctrl_if_send_message_block(
 	while ((rc = ctrl_if_send_message_noblock(msg, hnd, id)) == EAGAIN) {
 		/* XXXcl possible race -> add a lock and ltsleep */
 #if 1
+		HYPERVISOR_yield();
 #else
 		rc = tsleep((caddr_t) &ctrl_if_tx_wait, PUSER | PCATCH,
 		    "ctrl_if", 0);
@@ -459,50 +445,16 @@ ctrl_if_unregister_receiver(
     restore_flags(flags);
 
     /* Ensure that @hnd will not be executed after this function returns. */
-#if 0
-    wakeup(&ctrl_if_kthread);
-#else
     if (ctrl_if_softintr)
 	    softintr_schedule(ctrl_if_softintr);
-#endif
-}
-
-static void
-ctrl_if_kthread(void *arg)
-{
-	control_if_t *ctrl_if = get_ctrl_if();
-
-	for (;;) {
-		if ( ctrl_if_tx_resp_cons != ctrl_if->tx_resp_prod )
-			__ctrl_if_tx_tasklet(0);
-
-		if ( ctrl_if_rx_req_cons != ctrl_if->rx_req_prod )
-			__ctrl_if_rx_tasklet(0);
-
-		if (arg) {
-			// printf("ctrl_if_kthread one-shot done\n");
-			return;
-		}
-
-		tsleep((caddr_t)&ctrl_if_kthread, PUSER | PCATCH,
-		    "ctrl_if", 0);
-	}
 }
 
 static void
 ctrl_if_softintr_handler(void *arg)
 {
-	static int in_handler = 0;
-
-	if (in_handler++ != 0) {
-		ctrl_if_evtchn = -1;
-		panic("recurse");
-	}
 
 	if ( ctrl_if_rxmsg_deferred_cons != ctrl_if_rxmsg_deferred_prod )
 		__ctrl_if_rxmsg_deferred(NULL);
-
-	in_handler--;
 }
 
 #ifdef notyet
@@ -545,7 +497,6 @@ void ctrl_if_resume(void)
     hypervisor_enable_irq(ctrl_if_irq);
 }
 
-void ctrl_if_early_init(void);
 void ctrl_if_early_init(void)
 {
 

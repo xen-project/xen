@@ -117,6 +117,7 @@ void ctrl_if_suspend(void);
 void ctrl_if_resume(void);
 
 /* Start-of-day setup. */
+void ctrl_if_early_init(void);
 void ctrl_if_init(void);
 
 /*

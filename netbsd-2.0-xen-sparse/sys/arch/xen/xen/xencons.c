@@ -348,7 +348,6 @@ xencons_rx(ctrl_msg_t *msg, unsigned long id)
 	ctrl_if_send_response(msg);
 }
 
-void ctrl_if_early_init(void);
 void
 xenconscn_attach()
 {
