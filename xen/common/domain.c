@@ -367,6 +367,8 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
         * sizeof(l2_pgentry_t));
     l2tab[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] = 
         mk_l2_pgentry(__pa(p->mm.perdomain_pt) | __PAGE_HYPERVISOR);
+    l2tab[LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
+        mk_l2_pgentry(phys_l2tab | __PAGE_HYPERVISOR);
     p->mm.pagetable = mk_pagetable(phys_l2tab);
     unmap_domain_mem(l2tab);
 
@@ -542,6 +544,8 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params,
     memcpy(l2tab, idle_pg_table[p->processor], PAGE_SIZE);
     l2tab[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] =
         mk_l2_pgentry(__pa(p->mm.perdomain_pt) | __PAGE_HYPERVISOR);
+    l2tab[LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
+        mk_l2_pgentry(phys_l2tab | __PAGE_HYPERVISOR);
     memset(l2tab, 0, DOMAIN_ENTRIES_PER_L2_PAGETABLE*sizeof(l2_pgentry_t));
     p->mm.pagetable = mk_pagetable(phys_l2tab);
 

@@ -4,32 +4,9 @@
 #include <xeno/config.h>
 #include <asm/bitops.h>
 
-struct task_struct;
-extern void switch_to(struct task_struct *prev, 
-                      struct task_struct *next);
-
 /* Clear and set 'TS' bit respectively */
 #define clts() __asm__ __volatile__ ("clts")
-#define read_cr0() ({ \
-	unsigned int __dummy; \
-	__asm__( \
-		"movl %%cr0,%0\n\t" \
-		:"=r" (__dummy)); \
-	__dummy; \
-})
-#define write_cr0(x) \
-	__asm__("movl %0,%%cr0": :"r" (x));
-
-#define read_cr4() ({ \
-	unsigned int __dummy; \
-	__asm__( \
-		"movl %%cr4,%0\n\t" \
-		:"=r" (__dummy)); \
-	__dummy; \
-})
-#define write_cr4(x) \
-	__asm__("movl %0,%%cr4": :"r" (x));
-#define stts() write_cr0(8 | read_cr0())
+#define stts() write_cr0(X86_CR0_TS|read_cr0())
 
 #define wbinvd() \
 	__asm__ __volatile__ ("wbinvd": : :"memory");
@@ -46,60 +23,9 @@ static inline unsigned long get_limit(unsigned long segment)
 
 #define xchg(ptr,v) ((__typeof__(*(ptr)))__xchg((unsigned long)(v),(ptr),sizeof(*(ptr))))
 
-#define tas(ptr) (xchg((ptr),1))
-
 struct __xchg_dummy { unsigned long a[100]; };
 #define __xg(x) ((struct __xchg_dummy *)(x))
 
-
-/*
- * The semantics of XCHGCMP8B are a bit strange, this is why
- * there is a loop and the loading of %%eax and %%edx has to
- * be inside. This inlines well in most cases, the cached
- * cost is around ~38 cycles. (in the future we might want
- * to do an SIMD/3DNOW!/MMX/FPU 64-bit store here, but that
- * might have an implicit FPU-save as a cost, so it's not
- * clear which path to go.)
- */
-static inline void __set_64bit (unsigned long long * ptr,
-		unsigned int low, unsigned int high)
-{
-	__asm__ __volatile__ (
-		"\n1:\t"
-		"movl (%0), %%eax\n\t"
-		"movl 4(%0), %%edx\n\t"
-		"cmpxchg8b (%0)\n\t"
-		"jnz 1b"
-		: /* no outputs */
-		:	"D"(ptr),
-			"b"(low),
-			"c"(high)
-		:	"ax","dx","memory");
-}
-
-static inline void __set_64bit_constant (unsigned long long *ptr,
-						 unsigned long long value)
-{
-	__set_64bit(ptr,(unsigned int)(value), (unsigned int)((value)>>32ULL));
-}
-#define ll_low(x)	*(((unsigned int*)&(x))+0)
-#define ll_high(x)	*(((unsigned int*)&(x))+1)
-
-static inline void __set_64bit_var (unsigned long long *ptr,
-			 unsigned long long value)
-{
-	__set_64bit(ptr,ll_low(value), ll_high(value));
-}
-
-#define set_64bit(ptr,value) \
-(__builtin_constant_p(value) ? \
- __set_64bit_constant(ptr, value) : \
- __set_64bit_var(ptr, value) )
-
-#define _set_64bit(ptr,value) \
-(__builtin_constant_p(value) ? \
- __set_64bit(ptr, (unsigned int)(value), (unsigned int)((value)>>32ULL) ) : \
- __set_64bit(ptr, ll_low(value), ll_high(value)) )
 
 /*
  * Note: no "lock" prefix even on SMP: xchg always implies lock anyway

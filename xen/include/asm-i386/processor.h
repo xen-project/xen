@@ -19,7 +19,8 @@
  * Default implementation of macro that returns current
  * instruction pointer ("program counter").
  */
-#define current_text_addr() ({ void *pc; __asm__("movl $1f,%0\n1:":"=g" (pc)); pc; })
+#define current_text_addr() \
+  ({ void *pc; __asm__("movl $1f,%0\n1:":"=g" (pc)); pc; })
 
 /*
  *  CPU type and hardware bug flags. Kept separately for each CPU.
@@ -158,6 +159,34 @@ static inline unsigned int cpuid_edx(unsigned int op)
             : "bx", "cx");
     return edx;
 }
+
+
+/*
+ * Intel CPU flags in CR0
+ */
+#define X86_CR0_PE              0x00000001 /* Enable Protected Mode    (RW) */
+#define X86_CR0_MP              0x00000002 /* Monitor Coprocessor      (RW) */
+#define X86_CR0_EM              0x00000004 /* Require FPU Emulation    (RO) */
+#define X86_CR0_TS              0x00000008 /* Task Switched            (RW) */
+#define X86_CR0_NE              0x00000020 /* Numeric Error Reporting  (RW) */
+#define X86_CR0_WP              0x00010000 /* Supervisor Write Protect (RW) */
+#define X86_CR0_AM              0x00040000 /* Alignment Checking       (RW) */
+#define X86_CR0_NW              0x20000000 /* Not Write-Through        (RW) */
+#define X86_CR0_CD              0x40000000 /* Cache Disable            (RW) */
+#define X86_CR0_PG              0x80000000 /* Paging                   (RW) */
+
+#define read_cr0() ({ \
+	unsigned int __dummy; \
+	__asm__( \
+		"movl %%cr0,%0\n\t" \
+		:"=r" (__dummy)); \
+	__dummy; \
+})
+
+#define write_cr0(x) \
+	__asm__("movl %0,%%cr0": :"r" (x));
+
+
 
 /*
  * Intel CPU features in CR4

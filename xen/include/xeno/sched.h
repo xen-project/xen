@@ -281,6 +281,10 @@ void reschedule(struct task_struct *p);
 asmlinkage void __enter_scheduler(void);
 #define schedule() __schedule_not_callable_in_xen()
 
+extern void switch_to(struct task_struct *prev, 
+                      struct task_struct *next);
+
+
 /* A compatibility hack for Linux drivers. */
 #define MAX_SCHEDULE_TIMEOUT 0UL
 static inline long schedule_timeout(long timeout)
