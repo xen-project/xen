@@ -5,7 +5,6 @@ import java.util.LinkedList;
 import org.xenoserver.control.CommandFailedException;
 import org.xenoserver.control.CommandPhysicalRevoke;
 import org.xenoserver.control.Defaults;
-import org.xenoserver.control.Extent;
 import org.xenoserver.control.Partition;
 import org.xenoserver.control.PartitionManager;
 
@@ -26,10 +25,7 @@ public class ParsePhysicalRevoke extends CommandParser {
     if ( p == null )
       throw new CommandFailedException("Partition " + partition_name + " does not exist.");
 
-    // Convert the partition into a physical extent
-    Extent e = p.toExtent();
-    
-    String output = new CommandPhysicalRevoke( d, domain_id, e ).execute();
+    String output = new CommandPhysicalRevoke( d, domain_id, p ).execute();
     if ( output != null )
       System.out.println( output );
   }

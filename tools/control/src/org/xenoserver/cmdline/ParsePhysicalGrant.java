@@ -5,7 +5,6 @@ import java.util.LinkedList;
 import org.xenoserver.control.CommandFailedException;
 import org.xenoserver.control.CommandPhysicalGrant;
 import org.xenoserver.control.Defaults;
-import org.xenoserver.control.Extent;
 import org.xenoserver.control.Mode;
 import org.xenoserver.control.Partition;
 import org.xenoserver.control.PartitionManager;
@@ -39,11 +38,7 @@ public class ParsePhysicalGrant extends CommandParser {
     if (p.isXeno() && !force)
       throw new CommandFailedException("Refusing to grant physical access as the given partition is allocated to the virtual disk manager. Use -f if you are sure.");
      
-    // Convert the partition into a physical extent
-    Extent e = p.toExtent();
-    int partition_no = p.getMinor() & 0x1F;
-    
-    String output = new CommandPhysicalGrant( d, domain_id, e, mode, partition_no ).execute();
+    String output = new CommandPhysicalGrant( d, domain_id, p, mode ).execute();
     if ( output != null )
       System.out.println( output );
   }

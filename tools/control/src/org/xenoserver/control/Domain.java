@@ -2,30 +2,39 @@ package org.xenoserver.control;
 
 /**
  * A Domain object holds the details of one domain suitable for returning
- * from methods enquiring about domain status.
+ * from methods enquiring about domain status. As it's only used to pass
+ * return values back from DomainList, the fields are left public for
+ * convenience.
  */
-public class
-Domain
-{
-  public int id;                                                /* domain id */
-  public int processor;                                         /* processor */
-  public boolean cpu;                                             /* has cpu */
-  public int   nstate;                                              /* state */
-  public String state;            /* running, interruptable, uninterruptable,
-				                      wait, suspended, dying */
-  public int mcu;                                            /* mcu advances */
-  public int pages;                                           /* total pages */
-  public String name;                                                /* name */
+public class Domain {
+    /** Domain ID. */
+    public int id;
+    /** Processor index. */
+    public int processor;
+    /** Has the CPU at the moment? */
+    public boolean cpu;
+    /** State index. */
+    public int nstate;
+    /** State string. */
+    public String state;
+    /** MCU advances. */
+    public int mcu;
+    /** Total pages. */
+    public int pages;
+    /** Name. */
+    public String name;
 
-  Domain()
-  {
-    id = 0;
-    processor = 0;
-    cpu = false;
-    nstate = 0;
-    state = "";
-    mcu = 0;
-    pages = 0;
-    name = "none";
-  }
+    /**
+     * Domain constructor, with default values.
+     */
+    Domain() {
+        id = 0;
+        processor = 0;
+        cpu = false;
+        nstate = 0;
+        state = "";
+        mcu = 0;
+        pages = 0;
+        name = "none";
+    }
 }
