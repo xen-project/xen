@@ -173,6 +173,7 @@ typedef struct {
 #define EM_PARISC	15		/* HPPA */
 #define EM_SPARC32PLUS	18		/* Enhanced instruction set SPARC */
 #define EM_PPC		20		/* PowerPC */
+#define EM_PPC64	21		/* PowerPC 64-bit */
 #define EM_ARM		40		/* Advanced RISC Machines ARM */
 #define EM_ALPHA	41		/* DEC ALPHA */
 #define EM_SPARCV9	43		/* SPARC version 9 */
