@@ -129,7 +129,7 @@ void __iomem * __ioremap(unsigned long phys_addr, unsigned long size, unsigned l
 	if (direct_remap_area_pages(&init_mm, (unsigned long) addr, phys_addr,
 				    size, __pgprot(_PAGE_PRESENT | _PAGE_RW |
 						   _PAGE_DIRTY | _PAGE_ACCESSED
-						   | flags), DOMID_IO)) {
+						   | flags), domid)) {
 		vunmap((void __force *) addr);
 		return NULL;
 	}
