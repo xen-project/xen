@@ -8,6 +8,7 @@ extern u32 tlbflush_clock;
 extern u32 tlbflush_time[NR_CPUS];
 
 #define tlbflush_current_time() tlbflush_clock
+#define tlbflush_filter_cpuset(x,y) (0)
 #define NEED_FLUSH(x, y) (0)
 
 #endif
