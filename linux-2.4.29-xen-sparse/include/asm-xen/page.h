@@ -43,9 +43,9 @@
 #define copy_user_page(to, from, vaddr)	copy_page(to, from)
 
 /**** MACHINE <-> PHYSICAL CONVERSION MACROS ****/
-extern unsigned long *phys_to_machine_mapping;
-#define pfn_to_mfn(_pfn) (phys_to_machine_mapping[(_pfn)])
-#define mfn_to_pfn(_mfn) (machine_to_phys_mapping[(_mfn)])
+extern unsigned int *phys_to_machine_mapping;
+#define pfn_to_mfn(_pfn) ((unsigned long)(phys_to_machine_mapping[(_pfn)]))
+#define mfn_to_pfn(_mfn) ((unsigned long)(machine_to_phys_mapping[(_mfn)]))
 static inline unsigned long phys_to_machine(unsigned long phys)
 {
     unsigned long machine = pfn_to_mfn(phys >> PAGE_SHIFT);

@@ -80,7 +80,7 @@ static void __do_suspend(void)
     extern void time_suspend(void);
     extern void time_resume(void);
     extern unsigned long max_pfn;
-    extern unsigned long *pfn_to_mfn_frame_list;
+    extern unsigned int *pfn_to_mfn_frame_list;
 
     suspend_record = (suspend_record_t *)__get_free_page(GFP_KERNEL);
     if ( suspend_record == NULL )

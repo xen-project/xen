@@ -60,7 +60,7 @@ static int errno;
  */
 shared_info_t *HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
 
-unsigned long *phys_to_machine_mapping, *pfn_to_mfn_frame_list;
+unsigned int *phys_to_machine_mapping, *pfn_to_mfn_frame_list;
 
 DEFINE_PER_CPU(multicall_entry_t, multicall_list[8]);
 DEFINE_PER_CPU(int, nr_multicall_ents);
@@ -327,7 +327,7 @@ void __init setup_arch(char **cmdline_p)
     }
 #endif
 
-    phys_to_machine_mapping = (unsigned long *)xen_start_info.mfn_list;
+    phys_to_machine_mapping = (unsigned int *)xen_start_info.mfn_list;
     cur_pgd = init_mm.pgd = (pgd_t *)xen_start_info.pt_base;
 
     start_pfn = (__pa(xen_start_info.pt_base) >> PAGE_SHIFT) + 
@@ -382,7 +382,7 @@ void __init setup_arch(char **cmdline_p)
     {
         phys_to_machine_mapping = alloc_bootmem_low_pages(
             max_pfn * sizeof(unsigned long));
-        memset(phys_to_machine_mapping, ~0, max_pfn * sizeof(unsigned long));
+        memset(phys_to_machine_mapping, ~0, max_pfn * sizeof(unsigned int));
         memcpy(phys_to_machine_mapping,
                (unsigned long *)xen_start_info.mfn_list,
                xen_start_info.nr_pages * sizeof(unsigned long));

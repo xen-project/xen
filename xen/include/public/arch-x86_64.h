@@ -81,7 +81,7 @@
 
 /* The machine->physical mapping table starts at this address, read-only. */
 #ifndef machine_to_phys_mapping
-#define machine_to_phys_mapping ((unsigned long *)HYPERVISOR_VIRT_START)
+#define machine_to_phys_mapping ((u32 *)HYPERVISOR_VIRT_START)
 #endif
 
 /*

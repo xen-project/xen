@@ -69,7 +69,7 @@ static inline pmd_t * pmd_offset(pgd_t * dir, unsigned long address)
  *      require. In all the cases we care about, the high bit gets shifted out
  *      (e.g., phys_to_machine()) so behaviour there is correct.
  */
-#define INVALID_P2M_ENTRY (~0UL)
+#define INVALID_P2M_ENTRY (~0U)
 #define FOREIGN_FRAME(_m) ((_m) | (1UL<<((sizeof(unsigned long)*8)-1)))
 #define pte_page(_pte)                                        \
 ({                                                            \

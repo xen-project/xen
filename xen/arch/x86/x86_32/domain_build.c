@@ -116,7 +116,7 @@ int construct_dom0(struct domain *d,
     vinitrd_start    = round_pgup(dsi.v_kernend);
     vinitrd_end      = vinitrd_start + initrd_len;
     vphysmap_start   = round_pgup(vinitrd_end);
-    vphysmap_end     = vphysmap_start + (nr_pages * sizeof(unsigned long));
+    vphysmap_end     = vphysmap_start + (nr_pages * sizeof(u32));
     vpt_start        = round_pgup(vphysmap_end);
     for ( nr_pt_pages = 2; ; nr_pt_pages++ )
     {
@@ -337,7 +337,7 @@ int construct_dom0(struct domain *d,
         if ( pfn > REVERSE_START )
             mfn = (alloc_end>>PAGE_SHIFT) - (pfn - REVERSE_START);
 #endif
-        ((unsigned long *)vphysmap_start)[pfn] = mfn;
+        ((u32 *)vphysmap_start)[pfn] = mfn;
         machine_to_phys_mapping[mfn] = pfn;
     }
 

@@ -345,7 +345,7 @@ static void __init probe_roms(void)
 shared_info_t *HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
 EXPORT_SYMBOL(HYPERVISOR_shared_info);
 
-unsigned long *phys_to_machine_mapping, *pfn_to_mfn_frame_list;
+unsigned int *phys_to_machine_mapping, *pfn_to_mfn_frame_list;
 EXPORT_SYMBOL(phys_to_machine_mapping);
 
 DEFINE_PER_CPU(multicall_entry_t, multicall_list[8]);
@@ -1142,7 +1142,7 @@ static unsigned long __init setup_memory(void)
 	}
 #endif
 
-	phys_to_machine_mapping = (unsigned long *)xen_start_info.mfn_list;
+	phys_to_machine_mapping = (unsigned int *)xen_start_info.mfn_list;
 
 	return max_low_pfn;
 }
