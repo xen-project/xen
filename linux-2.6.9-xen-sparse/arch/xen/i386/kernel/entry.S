@@ -137,7 +137,7 @@ VM_MASK		= 0x00020000
 	pushl %ebx; \
 	movl $(__USER_DS), %edx; \
 	movl %edx, %ds; \
-	movl %edx, %es;
+	movl %edx, %es
 
 #define SAVE_ALL \
 	SAVE_ALL_NO_EVENTMASK; \
@@ -572,7 +572,7 @@ critical_region_fixup:
 	jmp  11b
 
 critical_fixup_table:
-	.byte 0x00,0x00,0x00		# testb $0x1,(%esi) = XEN_TEST_PENDING
+	.byte 0x00,0x00,0x00		# testb $0xff,(%esi) = XEN_TEST_PENDING
 	.byte 0x00,0x00			# jnz  14f
 	XEN_UNLOCK_VCPU_INFO_SMP_fixup
 	.byte 0x00			# pop  %ebx
