@@ -50,10 +50,11 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
         DP("***************************************************************");
         DP("***************************************************************");
         DP("** WARNING: Currently emulating unsupported memory accesses  **");
-        DP("**          in /lib/tls libraries. Although this emulation   **");
-        DP("**          ensures correct execution, it is very slow!      **");
-        DP("**          TO OBTAIN FULL PERFORMANCE, EXECUTE THE          **");
-        DP("**          FOLLOWING AS ROOT:                               **");
+        DP("**          in /lib/tls libraries. The emulation is very     **");
+        DP("**          slow, and may not work correctly with all        **");
+        DP("**          programs (e.g., some may 'Segmentation fault').  **");
+        DP("**          TO ENSURE FULL PERFORMANCE AND CORRECT FUNCTION, **");
+        DP("**          YOU MUST EXECUTE THE FOLLOWING AS ROOT:          **");
         DP("**          mv /lib/tls /lib/tls.disabled                    **");
         DP("***************************************************************");
         DP("***************************************************************");
