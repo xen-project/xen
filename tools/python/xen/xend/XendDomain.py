@@ -53,9 +53,8 @@ class XendDomain:
         # Hack alert. Python does not support mutual imports, but XendDomainInfo
         # needs access to the XendDomain instance to look up domains. Attempting
         # to import XendDomain from XendDomainInfo causes unbounded recursion.
-        # So we stuff the XendDomain instance (self) into XendDomainInfo's
-        # namespace as 'xd'.
-        XendDomainInfo.xd = self
+        # So we stuff the XendDomain instance (self) into xroot's components.
+        xroot.add_component("xen.xend.XendDomain", self)
         # Table of domain info indexed by domain id.
         self.db = XendDB.XendDB(self.dbpath)
         self.domain_db = self.db.fetchall("")

@@ -10,6 +10,7 @@ from xen.xend import Vifctl
 from xen.xend.XendError import XendError
 from xen.xend.XendLogging import log
 from xen.xend import XendVnet
+from xen.xend.XendRoot import get_component
 
 import channel
 import controller
@@ -168,8 +169,14 @@ class NetDev(controller.Dev):
 
     def vifctl_params(self, vmname=None):
         dom = self.controller.dom
-        name = vmname or ('DOM%d' % dom)
-        return { 'domain': name,
+        if vmname is None:
+            xd = get_component('xen.xend.XendDomain')
+            try:
+                vm = xd.domain_lookup(dom)
+                vmname = vm.name
+            except:
+                vmname = 'DOM%d' % dom
+        return { 'domain': vmname,
                  'vif'   : self.get_vifname(), 
                  'mac'   : self.get_mac(),
                  'bridge': self.bridge,

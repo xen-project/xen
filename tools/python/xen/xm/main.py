@@ -282,17 +282,13 @@ class ProgRestore(Prog):
     info = """Create a domain from a saved state."""
 
     def help(self, args):
-        print args[0], "FILE [CONFIG]"
-        print "\nRestore a domain from FILE using configuration CONFIG."
+        print args[0], "FILE"
+        print "\nRestore a domain from FILE."
     
-    def main(self, help, args):
+    def main(self, args):
         if len(args) < 2: self.err("%s: Missing arguments" % args[0])
-        savefile =  os.path.abspath(args[1])
-        if len(args) >= 3:
-            configfile = os.path.abspath(args[2])
-        else:
-            configfile = None
-        info = server.xend_domain_restore(savefile, configfile)
+        savefile = os.path.abspath(args[1])
+        info = server.xend_domain_restore(savefile)
         PrettyPrint.prettyprint(info)
 
 xm.prog(ProgRestore)
