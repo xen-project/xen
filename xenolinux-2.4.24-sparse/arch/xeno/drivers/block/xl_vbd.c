@@ -365,7 +365,7 @@ static int xlvbd_remove_device(int device)
 
         /* Clear the consists-of-virtual-partitions flag if possible. */
         gd->flags[minor >> gd->minor_shift] &= ~GENHD_FL_VIRT_PARTNS;
-        for ( i = 0; i < gd->max_p; i++ )
+        for ( i = 1; i < gd->max_p; i++ )
             if ( gd->sizes[(minor & ~(gd->max_p-1)) + i] != 0 )
                 gd->flags[minor >> gd->minor_shift] |= GENHD_FL_VIRT_PARTNS;
 
