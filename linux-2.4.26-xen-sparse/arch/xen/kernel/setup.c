@@ -1200,6 +1200,7 @@ static void __do_suspend(void)
     /* Hmmm... a cleaner interface to suspend/resume blkdevs would be nice. */
     extern void blkdev_suspend(void);
     extern void blkdev_resume(void);
+    extern void netif_resume(void);
     
     extern void time_suspend(void);
     extern void time_resume(void);
@@ -1248,8 +1249,8 @@ static void __do_suspend(void)
 
     __sti();
 
-    //blkdev_resume();
-    //netdev_resume();
+    blkdev_resume();
+    netif_resume();
 
  out:
     if ( suspend_record != NULL )
