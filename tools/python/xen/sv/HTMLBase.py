@@ -1,23 +1,21 @@
-from twisted.web import server, resource
-from twisted.internet import reactor
+from twisted.web.resource import Resource
 
-class HTMLBase( resource.Resource ):
-	
+class HTMLBase( Resource ):
+
     isLeaf = True
-		
+ 
     def __init__( self ):
-        resource.Resource.__init__(self)
-		
+        Resource.__init__(self)
+
     def render_GET( self, request ):
         self.write_TOP( request )
-        return self.write_BODY( request, self.finish_render_GET )
-
-    def finish_render_GET( self, request ):
+        self.write_BODY( request )
         self.write_BOTTOM( request )
         request.finish()
+        return ''
                 
     def write_BODY( self, request ):
-		request.write( "BODY" )
+        request.write( "BODY" )
         
     def write_TOP( self, request ):
         request.write( '<html><head><title>Xen</title><link rel="stylesheet" type="text/css" href="inc/style.css" />' )

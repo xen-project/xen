@@ -1,93 +1,54 @@
-from twisted.web import resource
-from twisted.web.server import NOT_DONE_YET
-
-from xen.xend.XendClient import server as XendServer
+from xen.xend.XendClient import server
 from xen.xend import sxp
 
 from xen.sv.HTMLBase import HTMLBase
 from xen.sv.util import *
 
-from twisted.internet import reactor
-
 class DomList( HTMLBase ):
     
     isLeaf = True
 
-    def __init__( self, urlWriter, callback ):
+    def __init__( self, urlWriter ):
         HTMLBase.__init__(self)
         self.urlWriter = urlWriter
-        self.head = None
-        self.long = None
-        self.rendered_domains = {}
-        self.domCount = 0
-        self.callback = callback
 
     def write_BODY( self, request, head=True, long=True ):
-        deferred = XendServer.xend_domains()
-        deferred.addCallback( self.get_domain_info, request )
-        deferred.addErrback( self.errback )
-        
-        self.head = head
-        self.long = long
-        
-    def errback( self, err ):
-        print 'errback>', err
     
-    def get_domain_info( self, domains, request ):
+        domains = server.xend_domains()
     
-        self.domCount = len( domains )
-    
-        for domain in domains:
-            deferred = getDomInfoHash( domain )
-            deferred.addCallback( self.render_domain, request )
-            deferred.addErrback( self.errback )
-            
-    def render_domain( self, domInfoHash, request ):
-    
-        domStr = "<td class='domainInfo' align='center'>%(dom)-4d</td>\n" % domInfoHash
-
-        url = self.urlWriter( "mod=info&dom=%(dom)-4d" % domInfoHash )
-                             
-        domStr += "<td class='domainInfo' align='center'><a href='%s'>%s</a></td>\n" % ( url, domInfoHash['name'] )
-        
-        if self.long: 
-            domStr += "<td class='domainInfo' align='center'>%(mem)7d</td>\n" % domInfoHash
-            domStr += "<td class='domainInfo' align='center'>%(cpu)3d</td>\n" % domInfoHash
-        
-        domStr += "<td class='domainInfo' align='center'>%(state)5s</td>\n" % domInfoHash
-        
-        if self.long:
-            domStr += "<td class='domainInfo' align='center'>%(cpu_time)7.1f</td>\n" % domInfoHash
-            
-        self.rendered_domains[ domInfoHash[ 'dom' ] ] = domStr
-        self.domCount -= 1
-        
-        if self.domCount == 0:
-            self.finish_write_BODY( request )
-        
-    def finish_write_BODY( self, request ):
-
         request.write( "\n<table style='border:0px solid white' cellspacing='0' cellpadding='0' border='0' width='100%'>\n" )
         
-        if self.head:
+        if head:
             request.write( "<tr class='domainInfoHead'>" )
-            self.write_DOMAIN_HEAD( request, self.long )
+            self.write_DOMAIN_HEAD( request, long )
             request.write( "</tr>" )
         
         odd = True
-        for domain in self.rendered_domains.values():
+        
+        for domain in domains:
             if odd:
                 request.write( "<tr class='domainInfoOdd'>\n" )
                 odd = False
             else:
                 request.write( "<tr class='domainInfoEven'>\n" )
                 odd = True
-            request.write( domain )
+            self.write_DOMAIN( request, getDomInfoHash( domain ), long )
             request.write( "</tr>\n" )
         
         request.write( "</table>\n" )
+            
+    def write_DOMAIN( self, request, domInfoHash, long=True ):   
+        request.write( "<td class='domainInfo' align='center'>%(dom)-4d</td>\n" % domInfoHash )
 
-        self.callback( request )
+        url = self.urlWriter( "mod=info&dom=%(dom)-4d" % domInfoHash )
+
+        request.write( "<td class='domainInfo' align='center'><a href='%s'>%s</a></td>\n" % ( url, domInfoHash['name'] ) )
+        if long: 
+            request.write( "<td class='domainInfo' align='center'>%(mem)7d</td>\n" % domInfoHash )
+            request.write( "<td class='domainInfo' align='center'>%(cpu)3d</td>\n" % domInfoHash )
+        request.write( "<td class='domainInfo' align='center'>%(state)5s</td>\n" % domInfoHash )
+        if long:
+            request.write( "<td class='domainInfo' align='center'>%(cpu_time)7.1f</td>\n" % domInfoHash )
 
     def write_DOMAIN_HEAD( self, request, long=True ):
         request.write( "<td class='domainInfoHead' align='center'>Domain</td>\n" )      

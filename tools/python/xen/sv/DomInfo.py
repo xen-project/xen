@@ -1,20 +1,20 @@
-from HTMLBase import HTMLBase
-from XendClientDeferred import server
+from xen.xend.XendClient import aserver as server
 from xen.xend import PrettyPrint
 
+from xen.sv.HTMLBase import HTMLBase
 from xen.sv.util import *
 from xen.sv.GenTabbed import *
 
 class DomInfo( GenTabbed ):
 
-    def __init__( self, urlWriter, callback ):
+    def __init__( self, urlWriter ):
         
         self.dom = 0;
     
         def tabUrlWriter( tab ):
             return urlWriter( "mod=info&dom=%s%s" % ( self.dom, tab ) )
         
-        GenTabbed.__init__( self, tabUrlWriter, [ 'General', 'SXP', 'Devices' ], [ DomGenTab, DomSXPTab, NullTab ], callback  )
+        GenTabbed.__init__( self, tabUrlWriter, [ 'General', 'SXP', 'Devices' ], [ DomGenTab, DomSXPTab, NullTab ]  )
 
     def write_BODY( self, request ):
         dom = request.args.get('dom')
@@ -43,7 +43,8 @@ class DomGenTab( GeneralTab ):
     
         GeneralTab.__init__( self, "General Domain Info", {}, titles )
         
-    def write_BODY( self, request, callback ):
+    def write_BODY( self, request ):
+    
         dom = request.args.get('dom')
         
         if dom is None or len(dom) != 1:
@@ -52,14 +53,9 @@ class DomGenTab( GeneralTab ):
         else:
             self.dom = dom[0]
             
-        deferred = getDomInfoHash( self.dom )
-        deferred.addCallback( self.continue_BODY, request, callback )
-
-    def continue_BODY( self, dict, request, callback ):
-
-        self.dict = dict
+        self.dict = getDomInfoHash( self.dom )
         
-        GeneralTab.write_BODY( self, request, callback )
+        GeneralTab.write_BODY( self, request )
             
 class DomSXPTab( PreTab ):
 
@@ -67,21 +63,8 @@ class DomSXPTab( PreTab ):
         self.dom = 0
         PreTab.__init__( self, "" )
 
-    def fn( self, x, request ):
-        class tmp:
-            def __init__( self ):
-                self.str = ""
-            def write( self, str ):
-                self.str = self.str + str
-        temp = tmp()
-        PrettyPrint.prettyprint( x, out=temp )
-        self.source = temp.str
-        return request
-        
-    def fn2( self, request, callback ):
-        PreTab.write_BODY( self, request, callback )
-        
-    def write_BODY( self, request, callback ):
+
+    def write_BODY( self, request ):
         dom = request.args.get('dom')
         
         if dom is None or len(dom) != 1:
@@ -90,10 +73,10 @@ class DomSXPTab( PreTab ):
         else:
             self.dom = dom[0]
             
-        deferred = server.xend_domain( self.dom )
+        domInfo = server.xend_domain( self.dom )
         
-        deferred.addCallback( self.fn, request )
-        deferred.addCallback( self.fn2, callback )
-        def errback( x ):
-            print ">err ", x
-        deferred.addErrback( errback )
+        self.source = sxp2string( domInfo )
+        
+        PreTab.write_BODY( self, request )
+        
+
