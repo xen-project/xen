@@ -40,7 +40,6 @@
 static void network_interrupt(int irq, void *dev_id, struct pt_regs *ptregs);
 static void network_tx_buf_gc(struct net_device *dev);
 static void network_alloc_rx_buffers(struct net_device *dev);
-static void network_free_rx_buffers(struct net_device *dev);
 static void cleanup_module(void);
 
 static struct list_head dev_list;
@@ -98,8 +97,6 @@ static void dbg_network_int(int irq, void *dev_id, struct pt_regs *ptregs)
            " rx_req_prod = %d, rx_resp_prod = %d, rx_event = %d\n",
            np->rx_resp_cons, np->net_idx->rx_req_prod,
            np->net_idx->rx_resp_prod, np->net_idx->rx_event);
-
-    show_registers(ptregs);
 }
 
 
@@ -129,15 +126,12 @@ static int network_open(struct net_device *dev)
     for ( i = 0; i < RX_RING_SIZE; i++ )
         np->rx_skbs[i] = (void *)(i+1);
 
-    network_alloc_rx_buffers(dev);
-
     error = request_irq(NET_IRQ, network_interrupt, 
                         SA_SAMPLE_RANDOM, "network", dev);
     if ( error )
     {
         printk(KERN_WARNING "%s: Could not allocate network interrupt\n",
                dev->name);
-        network_free_rx_buffers(dev);
         goto fail;
     }
 
@@ -148,6 +142,8 @@ static int network_open(struct net_device *dev)
         printk(KERN_WARNING "%s: Non-fatal error -- no debug interrupt\n",
                dev->name);
     }
+
+    network_alloc_rx_buffers(dev);
 
     printk("XenoLinux Virtual Network Driver installed as %s\n", dev->name);
 
@@ -226,6 +222,9 @@ static void network_alloc_rx_buffers(struct net_device *dev)
         if ( skb == NULL ) break;
         skb->dev = dev;
 
+        if ( unlikely(((unsigned long)skb->head & (PAGE_SIZE-1)) != 0) )
+            panic("alloc_skb needs to provide us page-aligned buffers.");
+
         id = GET_ID_FROM_FREELIST(np->rx_skbs);
         np->rx_skbs[id] = skb;
 
@@ -254,21 +253,6 @@ static void network_alloc_rx_buffers(struct net_device *dev)
     }
 }
 
-
-static void network_free_rx_buffers(struct net_device *dev)
-{
-    unsigned int i;
-    struct net_private *np = dev->priv;
-    struct sk_buff *skb;    
-
-    for ( i  = np->rx_resp_cons; 
-          i != np->net_idx->rx_req_prod; 
-          i  = RX_RING_INC(i) )
-    {
-        skb = np->rx_skbs[np->net_ring->rx_ring[i].req.id];
-        dev_kfree_skb_any(skb);
-    }
-}
 
 static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
@@ -370,15 +354,7 @@ static void network_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
         phys_to_machine_mapping[virt_to_phys(skb->head) >> PAGE_SHIFT] =
             (*(unsigned long *)get_ppte(skb->head)) >> PAGE_SHIFT;
 
-        if ( rx->offset < 16 )
-        {
-            printk(KERN_ALERT "need pkt offset >= 16 (got %d)\n", rx->offset);
-            dev_kfree_skb_any(skb);
-            continue;
-        }
-        
-        skb_reserve(skb, rx->offset - 16);
-
+        skb->data = skb->tail = skb->head + rx->offset;
         skb_put(skb, rx->size);
         skb->protocol = eth_type_trans(skb, dev);
 
@@ -402,23 +378,6 @@ static void network_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 int network_close(struct net_device *dev)
 {
     netif_stop_queue(dev);
-
-    /*
-     * XXXX This cannot be done safely until be have a proper interface
-     * for setting up and tearing down virtual interfaces on the fly.
-     * Currently the receive buffers are locked down by Xen and we have
-     * no sensible way of retrieving them.
-     */
-#if 0
-    free_irq(NET_IRQ, dev);
-
-    network_free_rx_buffers(dev);
-    kfree(np->net_ring->rx_ring);
-    kfree(np->net_ring->tx_ring);
-
-    MOD_DEC_USE_COUNT;
-#endif
-
     return 0;
 }
 
