@@ -227,6 +227,8 @@ of the following possibilities, for example:
 
  * root=/dev/hda3 ro
      boot using a standard hard disk partition as root
+     !!! remember to do "xenctl physical grant -phda3 -w -n<dom>" first
+     (grant domain <dom> read/write access to partition 3)
 
  * root=/dev/xvda1 ro
      boot using a pre-configured 'virtual block device' that will be
