@@ -1,7 +1,7 @@
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
 """Object-oriented command-line option support.
 """
-from getopt import getopt
+from getopt import getopt, GetoptError
 import os
 import os.path
 import sys
@@ -273,7 +273,10 @@ class Opts:
         return remaining arguments
         """
         self.argv = argv
-        (vals, args) = getopt(argv[1:], self.short_opts(), self.long_opts())
+        try:
+            (vals, args) = getopt(argv[1:], self.short_opts(), self.long_opts())
+        except GetoptError, err:
+            self.err(str(err))
         self.args = args
         for (k, v) in vals:
             for opt in self.options:
@@ -331,7 +334,7 @@ class Opts:
             else:
                 p = self.vals.defaults
             if os.path.exists(p):
-		print 'Using config file %s\n' % (p)
+		self.info('Using config file %s' % p)
                 self.load(p, help)
                 break
         else:
