@@ -467,3 +467,4 @@ tools/internal/xi_list
 tools/internal/xi_usage
 tools/internal/xi_sched_domain
 tools/internal/xi_sched_global
+xen/arch/i386/nmi.o
