@@ -869,8 +869,6 @@ The available commands are as follows:
 \item[pincpu] Pin a domain to a CPU.
 \item[bvt] Set BVT scheduler parameters for a domain.
 \item[bvt\_ctxallow] Set the BVT context switching allowance for the system.
-\item[fbvt] Set the FBVT scheduler parameters for a domain.
-\item[fbvt\_ctxallow] Set the FBVT context switching allowance for the system.
 \item[atropos] Set the atropos parameters for a domain.
 \item[rrobin] Set the round robin time slice for the system.
 \item[info] Get information about the Xen host.
@@ -895,11 +893,6 @@ The available commands are as follows:
                            VMM like {\bf Xen} but was designed as a new
                            operating system structure, rather than
                            specifically to run multiple conventional OSs.
-
-\item[FBVT]                A derivative of the { \bf BVT } scheduler that
-                           aims to give better fairness performance to IO
-                           intensive domains in competition with CPU
-                           intensive domains.
 
 \item[Domain]              A domain is the execution context that
                            contains a running { \bf virtual machine }.
@@ -1046,7 +1039,7 @@ will provide a higher-level interface to these tools.
 
 BVT provides proportional fair shares of the CPU time.  It has been
 observed to penalise domains that block frequently (e.g. IO intensive
-domains), so the FBVT derivative has been included as an alternative.
+domains), but this can be compensated by using warping. 
 
 \subsection{Global Parameters}
 
