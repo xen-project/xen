@@ -102,7 +102,7 @@ PROCESSOR       =  0
 STATE           =  4
 HYP_EVENTS      =  8
 DOMAIN          = 12        
-SHARED_INFO     = 24
+SHARED_INFO     = 16
 
 /* Offsets in shared_info_t */
 EVENTS          =  0
@@ -527,6 +527,7 @@ ENTRY(hypervisor_call_table)
         .long SYMBOL_NAME(do_set_debugreg)
         .long SYMBOL_NAME(do_get_debugreg)
         .long SYMBOL_NAME(do_update_descriptor)
+        .long SYMBOL_NAME(do_set_fast_trap)
         .rept NR_syscalls-(.-hypervisor_call_table)/4
         .long SYMBOL_NAME(sys_ni_syscall)
 	.endr

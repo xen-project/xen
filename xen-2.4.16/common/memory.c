@@ -176,7 +176,7 @@
 #include <asm/uaccess.h>
 #include <asm/domain_page.h>
 
-#if 1
+#if 0
 #define MEM_LOG(_f, _a...) printk("DOM%d: (file=memory.c, line=%d) " _f "\n", current->domain, __LINE__, ## _a )
 #else
 #define MEM_LOG(_f, _a...) ((void)0)
@@ -230,18 +230,18 @@ void __init init_frametable(unsigned long nr_pages)
     frame_table = (frame_table_t *)FRAMETABLE_VIRT_START;
     memset(frame_table, 0, frame_table_size);
 
-    free_pfns = nr_pages - 
-        ((__pa(frame_table) + frame_table_size) >> PAGE_SHIFT);
+    free_pfns = 0;
 
     /* Put all domain-allocatable memory on a free list. */
     spin_lock_irqsave(&free_list_lock, flags);
     INIT_LIST_HEAD(&free_list);
     for( page_index = (__pa(frame_table) + frame_table_size) >> PAGE_SHIFT; 
-         page_index < nr_pages; 
+         page_index < nr_pages;
          page_index++ )      
     {
         pf = list_entry(&frame_table[page_index].list, struct pfn_info, list);
         list_add_tail(&pf->list, &free_list);
+        free_pfns++;
     }
     spin_unlock_irqrestore(&free_list_lock, flags);
 }

@@ -288,6 +288,16 @@ static inline int HYPERVISOR_update_descriptor(
         : "=a" (ret) : "0" (__HYPERVISOR_set_gdt), 
         "b" (pa), "c" (word1), "d" (word2) );
 
+    return ret;
+}
+
+static inline int HYPERVISOR_set_fast_trap(int idx)
+{
+    int ret;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret) : "0" (__HYPERVISOR_set_fast_trap), 
+        "b" (idx) );
 
     return ret;
 }

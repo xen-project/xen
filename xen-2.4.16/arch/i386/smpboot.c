@@ -685,6 +685,8 @@ static void __init do_boot_cpu (int apicid)
     idle->thread.esp = idle->thread.esp0 = (unsigned long)idle + THREAD_SIZE;
     idle->thread.eip = (unsigned long) start_secondary;
 
+    SET_DEFAULT_FAST_TRAP(&idle->thread);
+
     /* start_eip had better be page-aligned! */
     start_eip = setup_trampoline();
 

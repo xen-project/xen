@@ -18,7 +18,8 @@
 #ifndef _LINUX_IN_H
 #define _LINUX_IN_H
 
-#include <linux/types.h>
+#include <xeno/types.h>
+#include <xeno/socket.h>
 
 /* Standard well-defined IP protocols.  */
 enum {

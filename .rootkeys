@@ -71,10 +71,25 @@
 3ddb79bfl_DWxZQFKiJ2BXrSedV4lg xen-2.4.16/drivers/net/8139cp.c
 3ddb79c0tWiE8xIFHszxipeVCGKTSA xen-2.4.16/drivers/net/Makefile
 3ddb79bfU-H1Hms4BuJEPPydjXUEaQ xen-2.4.16/drivers/net/Space.c
+3e4540ccS4bfbx9rLiLElP0F1OVwZA xen-2.4.16/drivers/net/e1000/LICENSE
+3e4540ccXG6af_6-u0IiKKvtdGHJyA xen-2.4.16/drivers/net/e1000/Makefile
+3e4540ccoY2eo4VIkbR4sCOj0bVzSA xen-2.4.16/drivers/net/e1000/e1000.h
+3e4540ccvUz0j2ejQ9Z9djEGc93wRA xen-2.4.16/drivers/net/e1000/e1000_ethtool.c
+3e4540ccjqsc94nU3C4w3ZJaxFZFjA xen-2.4.16/drivers/net/e1000/e1000_hw.c
+3e4540cczrrQVyyj-s1-viyX1kMUlA xen-2.4.16/drivers/net/e1000/e1000_hw.h
+3e4540ccvQ9Dtoh9tV-L3ULUwN9X7g xen-2.4.16/drivers/net/e1000/e1000_main.c
+3e4540cc3t7_y-YLeyMG2pX9xtdXPA xen-2.4.16/drivers/net/e1000/e1000_osdep.h
+3e4540cct_8Ig-Y1W_vM2gS_u7mC0A xen-2.4.16/drivers/net/e1000/e1000_param.c
 3ddb79c0GejJrp1U6W4G6dYi-RiH4A xen-2.4.16/drivers/net/eepro100.c
+3e465c00t2nochqR27eEY_FBjxsUCw xen-2.4.16/drivers/net/ne/8390.c
+3e465c00AIRmk20x1vYETtnL71eGvA xen-2.4.16/drivers/net/ne/8390.h
+3e465c00UIvPTAtAcgcQWCVFa2bwww xen-2.4.16/drivers/net/ne/Makefile
+3e465c00rWSHiXmHuOWLRf7r2n8S3g xen-2.4.16/drivers/net/ne/ne.c
 3ddb79bfKvn9mt0kofpkw0QaWjxO6A xen-2.4.16/drivers/net/net_init.c
 3ddb79c0fQgORkFlqWZdP-6cDHyFIQ xen-2.4.16/drivers/net/pcnet32.c
 3ddb79bf_CBcu3QWYwq4bNAOnM2RqQ xen-2.4.16/drivers/net/setup.c
+3e45a0c6u66EL2AI36eLOmf_abXs7g xen-2.4.16/drivers/net/tg3.c
+3e45a0c6yrXj5pmQT0PvVSJ01YLABQ xen-2.4.16/drivers/net/tg3.h
 3ddb79bfh8ucmq_HqRSaURalpeAmPg xen-2.4.16/drivers/net/tulip/.depend
 3ddb79bfsJ-hdQ17EXTFiUOHisjNgQ xen-2.4.16/drivers/net/tulip/21142.c
 3ddb79bf0lzTL-ywAdOO7vctTYAmJA xen-2.4.16/drivers/net/tulip/ChangeLog
@@ -146,6 +161,7 @@
 3ddb79c3n_UbPuxlkNxvvLycClIkxA xen-2.4.16/include/asm-i386/mpspec.h
 3ddb79c2wa0dA_LGigxOelSGbJ284Q xen-2.4.16/include/asm-i386/msr.h
 3ddb79c3xjYnrv5t3VqYlR4tNEOl4Q xen-2.4.16/include/asm-i386/page.h
+3e450943kzme29HPCtq5HNOVQkddfw xen-2.4.16/include/asm-i386/param.h
 3ddb79c3ysKUbxZuwKBRK3WXU2TlEg xen-2.4.16/include/asm-i386/pci.h
 3ddb79c3nm2zdzeO6Mj8g7ex3txgGw xen-2.4.16/include/asm-i386/pgalloc.h
 3ddb79c2QF5-pZGzuX4QukPCDAl59A xen-2.4.16/include/asm-i386/processor.h
@@ -157,6 +173,7 @@
 3ddb79c3e9DCEoR-WzNxcOQDzLu7BQ xen-2.4.16/include/asm-i386/softirq.h
 3ddb79c3NiyQE2vQnyGiaBnNjBO1rA xen-2.4.16/include/asm-i386/spinlock.h
 3ddb79c3ezddh34MdelJpa5tNR00Dw xen-2.4.16/include/asm-i386/system.h
+3e450943TfE-iovQIY_tMO_VdGsPhA xen-2.4.16/include/asm-i386/timex.h
 3ddb79c4HugMq7IYGxcQKFBpKwKhzA xen-2.4.16/include/asm-i386/types.h
 3ddb79c3M2n1ROZH6xk3HbyN4CPDqg xen-2.4.16/include/asm-i386/uaccess.h
 3ddb79c3uPGcP_l_2xyGgBSWd5aC-Q xen-2.4.16/include/asm-i386/unaligned.h
@@ -167,6 +184,7 @@
 3ddb79c4R4iVwqIIeychVQYmIH4FUg xen-2.4.16/include/scsi/scsi_ioctl.h
 3ddb79c4yw_mfd4Uikn3v_IOPRpa1Q xen-2.4.16/include/scsi/scsicam.h
 3ddb79c4HKPMLvDBP9LxzPi_szVxGA xen-2.4.16/include/scsi/sg.h
+3e450943xQztorJxTGW3BPZ4LhRHbw xen-2.4.16/include/stdarg.h
 3ddb79c0nTsjSpVK4ZVTI9WwN24xtQ xen-2.4.16/include/xeno/blk.h
 3ddb79c0dVhTHLsv6CPTf4baKix4mA xen-2.4.16/include/xeno/blkdev.h
 3ddb79c18ePBgitnOs7GiOCFilODVw xen-2.4.16/include/xeno/blkpg.h
@@ -195,6 +213,7 @@
 3ddb79c1yHLp08JhgPxIMcZ8DwN9hg xen-2.4.16/include/xeno/if.h
 3ddb79c1RCWOkWPQRzbYVTX_e-E7CA xen-2.4.16/include/xeno/if_ether.h
 3ddb79c2IYah7z7hkzPyOiG8szKkyw xen-2.4.16/include/xeno/if_packet.h
+3e4540ccefnCkeqtD_dW_CBOjXUSYw xen-2.4.16/include/xeno/if_vlan.h
 3df0af1c-QrOEqpPHq4uL3NZzCeJCg xen-2.4.16/include/xeno/in.h
 3ddb79c0GurNF9tDWqQbAwJFH8ugfA xen-2.4.16/include/xeno/init.h
 3ddb79c1Vi5VleJAOKHAlY0G2zAsgw xen-2.4.16/include/xeno/interrupt.h
@@ -203,6 +222,7 @@
 3ddb79c2qAxCOABlkKtD8Txohe-qEw xen-2.4.16/include/xeno/irq.h
 3ddb79c2b3qe-6Ann09FqZBF4IrJaQ xen-2.4.16/include/xeno/irq_cpustat.h
 3ddb79c11w_O7z7YZJnzuDSxaK5LlA xen-2.4.16/include/xeno/kdev_t.h
+3e4540ccPHqIIv2pvnQ1gV8LUnoHIg xen-2.4.16/include/xeno/kernel.h
 3ddb79c1NfYlOrWNqgZkj9EwtFfJow xen-2.4.16/include/xeno/lib.h
 3ddb79c18Ajy7micDGQQfJ0zWgEHtA xen-2.4.16/include/xeno/list.h
 3ddb79c0_s2_wgV0cA6tztEaeyy1NA xen-2.4.16/include/xeno/major.h
@@ -211,10 +231,12 @@
 3ddb79c13p9iHn1XAp0IS1qvj4yDsg xen-2.4.16/include/xeno/module.h
 3ddb79c1ieLZfGSFwfvvSQ2NK1BMSg xen-2.4.16/include/xeno/multiboot.h
 3ddb79c0CLfAlJLg1ohdPD-Jjn-jxg xen-2.4.16/include/xeno/netdevice.h
+3e4540ccaugeWGdOuphJKj6WFw1jkw xen-2.4.16/include/xeno/notifier.h
 3ddb79c2Fg44_PBPVxHSC0gTOMq4Ow xen-2.4.16/include/xeno/pci.h
 3ddb79c0MOVXq8qZDQRGb6z64_xAwg xen-2.4.16/include/xeno/pci_ids.h
 3ddb79c2byJwwNNkiES__A9H4Cvc4g xen-2.4.16/include/xeno/pkt_sched.h
 3ddb79c04nQVR3EYM5L4zxDV_MCo1g xen-2.4.16/include/xeno/prefetch.h
+3e4540ccU1sgCx8seIMGlahmMfv7yQ xen-2.4.16/include/xeno/reboot.h
 3ddb79c0LzqqS0LhAQ50ekgj4oGl7Q xen-2.4.16/include/xeno/sched.h
 3ddb79c0VDeD-Oft5eNfMneTU3D1dQ xen-2.4.16/include/xeno/skbuff.h
 3ddb79c14dXIhP7C2ahnoD08K90G_w xen-2.4.16/include/xeno/slab.h
@@ -294,7 +316,6 @@
 3ddb79bcJfHdwrPsjqgI33_OsGdVCg xenolinux-2.4.16-sparse/drivers/block/rd.c
 3ddb79bcpVu-IbnqwQqpRqsEbLpsuw xenolinux-2.4.16-sparse/drivers/char/tty_io.c
 3e15d5273gfR2fbcYe05kqBSAvCX_w xenolinux-2.4.16-sparse/fs/exec.c
-3ddb79bba_zKpuurHVeWfgDkyPoq8A xenolinux-2.4.16-sparse/fs/nfs/nfsroot.c
 3ddb79b8VFtfWSCrXKPN2K21zd_vtw xenolinux-2.4.16-sparse/include/asm-xeno/a.out.h
 3ddb79b8Zzi13p3OAPV25QgiC3THAQ xenolinux-2.4.16-sparse/include/asm-xeno/apic.h
 3ddb79baZDlsdV_m6C5CXnWMl15p1g xenolinux-2.4.16-sparse/include/asm-xeno/apicdef.h

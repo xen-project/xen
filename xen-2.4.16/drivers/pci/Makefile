@@ -40,4 +40,5 @@ devlist.h classlist.h: pci.ids gen-devlist
 	./gen-devlist <pci.ids
 
 gen-devlist: gen-devlist.c
-	$(CC) $(CFLAGS) -o gen-devlist gen-devlist.c
+	$(HOSTCC) $(HOSTCFLAGS) -o gen-devlist gen-devlist.c
+

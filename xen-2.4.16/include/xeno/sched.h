@@ -63,17 +63,12 @@ struct task_struct {
     int state, hyp_events;
     unsigned int domain;
 
-    /* index into frame_table threading pages belonging to this
-     * domain together. these are placed at the top of the structure
-     * to avoid nasty padding for various kernel structs when using
-     * task_struct in user space
-     */
-    unsigned long pg_head;
-    unsigned int tot_pages;
-
     /* An unsafe pointer into a shared data area. */
     shared_info_t *shared_info;
     
+    struct list_head pg_head;
+    unsigned int tot_pages;
+
     /* Pointer to this guest's virtual interfaces. */
     /* network */
     net_ring_t *net_ring_base;

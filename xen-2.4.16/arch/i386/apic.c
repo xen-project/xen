@@ -200,45 +200,16 @@ void __init sync_Arb_IDs(void)
 extern void __error_in_apic_c (void);
 
 /*
- * An initial setup of the virtual wire mode.
+ * WAS: An initial setup of the virtual wire mode.
+ * NOW: We don't bother doing anything. All we need at this point
+ * is to receive timer ticks, so that 'jiffies' is incremented.
+ * If we're SMP, then we can assume BIOS did setup for us.
+ * If we're UP, then the APIC should be disabled (it is at reset).
+ * If we're UP and APIC is enabled, then BIOS is clever and has 
+ * probably done initial interrupt routing for us.
  */
 void __init init_bsp_APIC(void)
 {
-    unsigned long value, ver;
-
-    /*
-     * Don't do the setup now if we have a SMP BIOS as the
-     * through-I/O-APIC virtual wire mode might be active.
-     */
-    if (smp_found_config || !cpu_has_apic)
-        return;
-
-    value = apic_read(APIC_LVR);
-    ver = GET_APIC_VERSION(value);
-
-    /*
-     * Do not trust the local APIC being empty at bootup.
-     */
-    clear_local_APIC();
-
-    /*
-     * Enable APIC.
-     */
-    value = apic_read(APIC_SPIV);
-    value &= ~APIC_VECTOR_MASK;
-    value |= APIC_SPIV_APIC_ENABLED;
-    value |= APIC_SPIV_FOCUS_DISABLED;
-    value |= SPURIOUS_APIC_VECTOR;
-    apic_write_around(APIC_SPIV, value);
-
-    /*
-     * Set up the virtual wire mode.
-     */
-    apic_write_around(APIC_LVT0, APIC_DM_EXTINT);
-    value = APIC_DM_NMI;
-    if (!APIC_INTEGRATED(ver))		/* 82489DX */
-        value |= APIC_LVT_LEVEL_TRIGGER;
-    apic_write_around(APIC_LVT1, value);
 }
 
 void __init setup_local_APIC (void)
@@ -401,10 +372,8 @@ static int __init detect_init_APIC (void)
             wrmsr(MSR_IA32_APICBASE, l, h);
         }
     }
-    /*
-     * The APIC feature bit should now be enabled
-     * in `cpuid'
-     */
+
+    /* The APIC feature bit should now be enabled in `cpuid' */
     features = cpuid_edx(1);
     if (!(features & (1 << X86_FEATURE_APIC))) {
         printk("Could not enable APIC!\n");

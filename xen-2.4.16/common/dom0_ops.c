@@ -32,26 +32,26 @@ static unsigned int get_domnr(void)
 
 static void build_page_list(struct task_struct *p)
 {
-    unsigned long * list;
+    unsigned long *list;
     unsigned long curr;
-    unsigned long page;
     struct list_head *list_ent;
 
-    list = (unsigned long *)map_domain_mem(p->pg_head << PAGE_SHIFT);
-    curr = page = p->pg_head;
-    do {
-        *list++ = page;
-        list_ent = frame_table[page].list.next;
-        page = list_entry(list_ent, struct pfn_info, list) - frame_table;
-        if( !((unsigned long)list & (PAGE_SIZE-1)) )
+    curr = list_entry(p->pg_head.next, struct pfn_info, list) - frame_table;
+    list = (unsigned long *)map_domain_mem(curr << PAGE_SHIFT);
+
+    list_for_each(list_ent, &p->pg_head)
+    {
+        *list++ = list_entry(list_ent, struct pfn_info, list) - frame_table;
+
+        if( ((unsigned long)list & ~PAGE_MASK) == 0 )
         {
-            list_ent = frame_table[curr].list.next;
-            curr = list_entry(list_ent, struct pfn_info, list) - frame_table;
+            struct list_head *ent = frame_table[curr].list.next;
+            curr = list_entry(ent, struct pfn_info, list) - frame_table;
             unmap_domain_mem(list-1);
             list = (unsigned long *)map_domain_mem(curr << PAGE_SHIFT);
         }
     }
-    while ( page != p->pg_head );
+
     unmap_domain_mem(list);
 }
     
@@ -97,37 +97,20 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         pro = (pro+1) % smp_num_cpus;
         p->processor = pro;
 
-        /* if we are not booting dom 0 than only mem 
-         * needs to be allocated
-         */
-        if(dom != 0){
+        if ( dom == 0 ) BUG();
 
-            if(alloc_new_dom_mem(p, op.u.newdomain.memory_kb) != 0){
-                ret = -1;
-                break;
-            }
-            build_page_list(p);
-            
-            ret = p->domain;
+        ret = alloc_new_dom_mem(p, op.u.newdomain.memory_kb);
+        if ( ret != 0 ) break;
 
-            op.u.newdomain.domain = ret;
-            op.u.newdomain.pg_head = p->pg_head;
-            copy_to_user(u_dom0_op, &op, sizeof(op));
-
-            break;
-        }
-
-        /* executed only in case of domain 0 */
-        ret = setup_guestos(p, &op.u.newdomain);    /* Load guest OS into @p */
-        if ( ret != 0 ) 
-        {
-            p->state = TASK_DYING;
-            release_task(p);
-            break;
-        }
-        wake_up(p);          /* Put @p on runqueue */
-        reschedule(p);       /* Force a scheduling decision on @p's CPU */
+        build_page_list(p);
+        
         ret = p->domain;
+        
+        op.u.newdomain.domain = ret;
+        op.u.newdomain.pg_head = 
+            list_entry(p->pg_head.next, struct pfn_info, list) -
+            frame_table;
+        copy_to_user(u_dom0_op, &op, sizeof(op));
     }
     break;
 
