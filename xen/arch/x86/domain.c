@@ -735,7 +735,6 @@ void context_switch(struct exec_domain *prev_p, struct exec_domain *next_p)
 {
     struct tss_struct *tss = init_tss + smp_processor_id();
     execution_context_t *stack_ec = get_execution_context();
-    int i;
 
     __cli();
 
@@ -767,57 +766,33 @@ void context_switch(struct exec_domain *prev_p, struct exec_domain *next_p)
             loaddebug(&next_p->arch, 7);
         }
 
-        if ( VMX_DOMAIN(next_p) )
+        if ( !VMX_DOMAIN(next_p) )
         {
-            write_ptbase(next_p);
-            set_current(next_p);
-            __asm__ __volatile__ ("lgdt %0" : "=m" (*next_p->arch.gdt));
-            __sti();
-            goto done;
-        }
- 
-        SET_FAST_TRAP(&next_p->arch);
+            SET_FAST_TRAP(&next_p->arch);
 
 #ifdef __i386__
-        /* Switch the kernel ring-1 stack. */
-        tss->esp1 = next_p->arch.kernel_sp;
-        tss->ss1  = next_p->arch.kernel_ss;
+            /* Switch the kernel ring-1 stack. */
+            tss->esp1 = next_p->arch.kernel_sp;
+            tss->ss1  = next_p->arch.kernel_ss;
 #endif
+        }
 
         /* Switch page tables. */
         write_ptbase(next_p);
     }
 
-    if ( unlikely(prev_p->arch.io_bitmap != NULL) )
-    {
-        for ( i = 0; i < sizeof(prev_p->arch.io_bitmap_sel) * 8; i++ )
-            if ( !test_bit(i, &prev_p->arch.io_bitmap_sel) )
-                memset(&tss->io_bitmap[i * IOBMP_BYTES_PER_SELBIT],
-                       ~0U, IOBMP_BYTES_PER_SELBIT);
-        tss->bitmap = IOBMP_INVALID_OFFSET;
-    }
-
-    if ( unlikely(next_p->arch.io_bitmap != NULL) )
-    {
-        for ( i = 0; i < sizeof(next_p->arch.io_bitmap_sel) * 8; i++ )
-            if ( !test_bit(i, &next_p->arch.io_bitmap_sel) )
-                memcpy(&tss->io_bitmap[i * IOBMP_BYTES_PER_SELBIT],
-                       &next_p->arch.io_bitmap[i * IOBMP_BYTES_PER_SELBIT],
-                       IOBMP_BYTES_PER_SELBIT);
-        tss->bitmap = IOBMP_OFFSET;
-    }
-
     set_current(next_p);
 
-    /* Switch GDT and LDT. */
     __asm__ __volatile__ ("lgdt %0" : "=m" (*next_p->arch.gdt));
-    load_LDT(next_p);
 
     __sti();
 
-    switch_segments(stack_ec, prev_p, next_p);
+    if ( !VMX_DOMAIN(next_p) )
+    {
+        load_LDT(next_p);
+        switch_segments(stack_ec, prev_p, next_p);
+    }
 
- done:
     /*
      * We do this late on because it doesn't need to be protected by the
      * schedule_lock, and because we want this to be the very last use of

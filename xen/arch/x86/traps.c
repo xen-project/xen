@@ -379,14 +379,49 @@ long do_fpu_taskswitch(int set)
     return 0;
 }
 
-static inline int user_io_okay(
+/* Has the guest requested sufficient permission for this I/O access? */
+static inline int guest_io_okay(
     unsigned int port, unsigned int bytes,
     struct exec_domain *ed, struct xen_regs *regs)
 {
-    if ( ed->arch.iopl < (KERNEL_MODE(ed, regs) ? 1 : 3) )
-        return 0;
-    return 1;
+    u16 x;
+    if ( ed->arch.iopl >= (KERNEL_MODE(ed, regs) ? 1 : 3) )
+        return 1;
+    if ( (ed->arch.iobmp_limit > (port + bytes)) &&
+         (__get_user(x, (u16 *)(ed->arch.iobmp+(port>>3))) == 0) &&
+         ((x & (((1<<bytes)-1) << (port&7))) == 0) )
+        return 1;
+    return 0;
 }
+
+/* Has the administrator granted sufficient permission for this I/O access? */
+static inline int admin_io_okay(
+    unsigned int port, unsigned int bytes,
+    struct exec_domain *ed, struct xen_regs *regs)
+{
+    struct domain *d = ed->domain;
+    u16 x;
+    if ( IS_PRIV(d) || (d->arch.max_iopl >= (KERNEL_MODE(ed, regs) ? 1 : 3)) )
+        return 1;
+    if ( d->arch.iobmp_mask != NULL )
+    {
+        x = *(u16 *)(d->arch.iobmp_mask + (port >> 3));
+        if ( (x & (((1<<bytes)-1) << (port&7))) == 0 )
+            return 1;
+    }
+    return 0;
+}
+
+/* Check admin limits. Silently fail the access if it is disallowed. */
+#define inb_user(_p, _d, _r) (admin_io_okay(_p, 1, _d, _r) ? inb(_p) : ~0)
+#define inw_user(_p, _d, _r) (admin_io_okay(_p, 2, _d, _r) ? inw(_p) : ~0)
+#define inl_user(_p, _d, _r) (admin_io_okay(_p, 4, _d, _r) ? inl(_p) : ~0)
+#define outb_user(_v, _p, _d, _r) \
+    (admin_io_okay(_p, 1, _d, _r) ? outb(_v, _p) : ((void)0))
+#define outw_user(_v, _p, _d, _r) \
+    (admin_io_okay(_p, 2, _d, _r) ? outw(_v, _p) : ((void)0))
+#define outl_user(_v, _p, _d, _r) \
+    (admin_io_okay(_p, 4, _d, _r) ? outl(_v, _p) : ((void)0))
 
 #define insn_fetch(_type, _size, _ptr)          \
 ({  unsigned long _x;                           \
@@ -450,22 +485,22 @@ static int emulate_privileged_op(struct xen_regs *regs)
         case 0x6c: /* INSB */
             op_bytes = 1;
         case 0x6d: /* INSW/INSL */
-            if ( !user_io_okay((u16)regs->edx, op_bytes, ed, regs) )
+            if ( !guest_io_okay((u16)regs->edx, op_bytes, ed, regs) )
                 goto fail;
             switch ( op_bytes )
             {
             case 1:
-                data = (u8)inb((u16)regs->edx);
+                data = (u8)inb_user((u16)regs->edx, ed, regs);
                 if ( put_user((u8)data, (u8 *)regs->edi) )
                     goto write_fault;
                 break;
             case 2:
-                data = (u16)inw((u16)regs->edx);
+                data = (u16)inw_user((u16)regs->edx, ed, regs);
                 if ( put_user((u16)data, (u16 *)regs->edi) )
                     goto write_fault;
                 break;
             case 4:
-                data = (u32)inl((u16)regs->edx);
+                data = (u32)inl_user((u16)regs->edx, ed, regs);
                 if ( put_user((u32)data, (u32 *)regs->edi) )
                     goto write_fault;
                 break;
@@ -476,24 +511,24 @@ static int emulate_privileged_op(struct xen_regs *regs)
         case 0x6e: /* OUTSB */
             op_bytes = 1;
         case 0x6f: /* OUTSW/OUTSL */
-            if ( !user_io_okay((u16)regs->edx, op_bytes, ed, regs) )
+            if ( !guest_io_okay((u16)regs->edx, op_bytes, ed, regs) )
                 goto fail;
             switch ( op_bytes )
             {
             case 1:
                 if ( get_user(data, (u8 *)regs->esi) )
                     goto read_fault;
-                outb((u8)data, (u16)regs->edx);
+                outb_user((u8)data, (u16)regs->edx, ed, regs);
                 break;
             case 2:
                 if ( get_user(data, (u16 *)regs->esi) )
                     goto read_fault;
-                outw((u16)data, (u16)regs->edx);
+                outw_user((u16)data, (u16)regs->edx, ed, regs);
                 break;
             case 4:
                 if ( get_user(data, (u32 *)regs->esi) )
                     goto read_fault;
-                outl((u32)data, (u16)regs->edx);
+                outl_user((u32)data, (u16)regs->edx, ed, regs);
                 break;
             }
             regs->esi += (regs->eflags & EF_DF) ? -op_bytes : op_bytes;
@@ -518,20 +553,20 @@ static int emulate_privileged_op(struct xen_regs *regs)
     case 0xe5: /* IN imm8,%eax */
         port = insn_fetch(u8, 1, eip);
     exec_in:
-        if ( !user_io_okay(port, op_bytes, ed, regs) )
+        if ( !guest_io_okay(port, op_bytes, ed, regs) )
             goto fail;
         switch ( op_bytes )
         {
         case 1:
             regs->eax &= ~0xffUL;
-            regs->eax |= (u8)inb(port);
+            regs->eax |= (u8)inb_user(port, ed, regs);
             break;
         case 2:
             regs->eax &= ~0xffffUL;
-            regs->eax |= (u16)inw(port);
+            regs->eax |= (u16)inw_user(port, ed, regs);
             break;
         case 4:
-            regs->eax = (u32)inl(port);
+            regs->eax = (u32)inl_user(port, ed, regs);
             break;
         }
         goto done;
@@ -547,18 +582,18 @@ static int emulate_privileged_op(struct xen_regs *regs)
     case 0xe7: /* OUT %eax,imm8 */
         port = insn_fetch(u8, 1, eip);
     exec_out:
-        if ( !user_io_okay(port, op_bytes, ed, regs) )
+        if ( !guest_io_okay(port, op_bytes, ed, regs) )
             goto fail;
         switch ( op_bytes )
         {
         case 1:
-            outb((u8)regs->eax, port);
+            outb_user((u8)regs->eax, port, ed, regs);
             break;
         case 2:
-            outw((u16)regs->eax, port);
+            outw_user((u16)regs->eax, port, ed, regs);
             break;
         case 4:
-            outl((u32)regs->eax, port);
+            outl_user((u32)regs->eax, port, ed, regs);
             break;
         }
         goto done;

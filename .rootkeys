@@ -145,6 +145,7 @@
 3e5a4e65_hqfuxtGG8IUy6wRM86Ecg linux-2.4.29-xen-sparse/arch/xen/kernel/entry.S
 3e5a4e65Hy_1iUvMTPsNqGNXd9uFpg linux-2.4.29-xen-sparse/arch/xen/kernel/head.S
 3e5a4e65RMGcuA-HCn3-wNx3fFQwdg linux-2.4.29-xen-sparse/arch/xen/kernel/i386_ksyms.c
+4241709bNBs1q4Ss32YW0CyFVOGhEg linux-2.4.29-xen-sparse/arch/xen/kernel/ioport.c
 3e5a4e653U6cELGv528IxOLHvCq8iA linux-2.4.29-xen-sparse/arch/xen/kernel/irq.c
 3e5a4e65muT6SU3ck47IP87Q7Ti5hA linux-2.4.29-xen-sparse/arch/xen/kernel/ldt.c
 4051db95N9N99FjsRwi49YKUNHWI8A linux-2.4.29-xen-sparse/arch/xen/kernel/pci-pc.c

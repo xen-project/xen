@@ -47,7 +47,7 @@
 #include <asm/irq.h>
 #include <asm/desc.h>
 #include <asm-xen/multicall.h>
-#include <asm-xen/xen-public/dom0_ops.h>
+#include <asm-xen/xen-public/physdev.h>
 #ifdef CONFIG_MATH_EMULATION
 #include <asm/math_emu.h>
 #endif
@@ -228,20 +228,11 @@ void exit_thread(void)
 
 	/* The process may have allocated an io port bitmap... nuke it. */
 	if (unlikely(NULL != t->io_bitmap_ptr)) {
-		int cpu = get_cpu();
-		struct tss_struct *tss = &per_cpu(init_tss, cpu);
-
+		physdev_op_t op = { 0 };
+		op.cmd = PHYSDEVOP_SET_IOBITMAP;
+		HYPERVISOR_physdev_op(&op);
 		kfree(t->io_bitmap_ptr);
 		t->io_bitmap_ptr = NULL;
-		/*
-		 * Careful, clear this in the TSS too:
-		 */
-		memset(tss->io_bitmap, 0xff, tss->io_bitmap_max);
-		t->io_bitmap_max = 0;
-		tss->io_bitmap_owner = NULL;
-		tss->io_bitmap_max = 0;
-		tss->io_bitmap_base = INVALID_IO_BITMAP_OFFSET;
-		put_cpu();
 	}
 }
 
@@ -412,37 +403,6 @@ int dump_task_regs(struct task_struct *tsk, elf_gregset_t *regs)
 	return 1;
 }
 
-static inline void
-handle_io_bitmap(struct thread_struct *next, struct tss_struct *tss)
-{
-	if (!next->io_bitmap_ptr) {
-		/*
-		 * Disable the bitmap via an invalid offset. We still cache
-		 * the previous bitmap owner and the IO bitmap contents:
-		 */
-		tss->io_bitmap_base = INVALID_IO_BITMAP_OFFSET;
-		return;
-	}
-	if (likely(next == tss->io_bitmap_owner)) {
-		/*
-		 * Previous owner of the bitmap (hence the bitmap content)
-		 * matches the next task, we dont have to do anything but
-		 * to set a valid offset in the TSS:
-		 */
-		tss->io_bitmap_base = IO_BITMAP_OFFSET;
-		return;
-	}
-	/*
-	 * Lazy TSS's I/O bitmap copy. We set an invalid offset here
-	 * and we let the task to get a GPF in case an I/O instruction
-	 * is performed.  The handler of the GPF will verify that the
-	 * faulting task has a valid I/O bitmap and, it true, does the
-	 * real copy and restart the instruction.  This will save us
-	 * redundant copies when the currently switched task does not
-	 * perform any I/O during its timeslice.
-	 */
-	tss->io_bitmap_base = INVALID_IO_BITMAP_OFFSET_LAZY;
-}
 /*
  * This special macro can be used to load a debugging register
  */
@@ -483,7 +443,7 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 				 *next = &next_p->thread;
 	int cpu = smp_processor_id();
 	struct tss_struct *tss = &per_cpu(init_tss, cpu);
-	dom0_op_t op;
+	physdev_op_t iopl_op, iobmp_op;
 
         /* NB. No need to disable interrupts as already done in sched.c */
         /* __cli(); */
@@ -540,12 +500,22 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 	C(0); C(1); C(2);
 #undef C
 
-	if (xen_start_info.flags & SIF_PRIVILEGED) {
-		op.cmd           = DOM0_IOPL;
-		op.u.iopl.domain = DOMID_SELF;
-		op.u.iopl.iopl   = next->io_pl;
-		op.interface_version = DOM0_INTERFACE_VERSION;
-		queue_multicall1(__HYPERVISOR_dom0_op, (unsigned long)&op);
+	if (unlikely(prev->io_pl != next->io_pl)) {
+		iopl_op.cmd             = PHYSDEVOP_SET_IOPL;
+		iopl_op.u.set_iopl.iopl = next->io_pl;
+		queue_multicall1(__HYPERVISOR_physdev_op,
+				(unsigned long)&iopl_op);
+	}
+
+	if (unlikely(prev->io_bitmap_ptr || next->io_bitmap_ptr)) {
+		iobmp_op.cmd                     =
+			PHYSDEVOP_SET_IOBITMAP;
+		iobmp_op.u.set_iobitmap.bitmap   =
+			(unsigned long)next->io_bitmap_ptr;
+		iobmp_op.u.set_iobitmap.nr_ports =
+			next->io_bitmap_ptr ? IO_BITMAP_BITS : 0;
+		queue_multicall1(__HYPERVISOR_physdev_op,
+				(unsigned long)&iobmp_op);
 	}
 
 	/* EXECUTE ALL TASK SWITCH XEN SYSCALLS AT THIS POINT. */
@@ -572,9 +542,6 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 		loaddebug(next, 6);
 		loaddebug(next, 7);
 	}
-
-	if (unlikely(prev->io_bitmap_ptr || next->io_bitmap_ptr))
-		handle_io_bitmap(next, tss);
 
 	return prev_p;
 }

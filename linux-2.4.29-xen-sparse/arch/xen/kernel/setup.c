@@ -48,7 +48,7 @@ static int errno;
 #include <asm/mmu_context.h>
 #include <asm/ctrl_if.h>
 #include <asm/hypervisor.h>
-#include <asm-xen/xen-public/dom0_ops.h>
+#include <asm-xen/xen-public/physdev.h>
 #include <linux/netdevice.h>
 #include <linux/rtnetlink.h>
 #include <linux/tqueue.h>
@@ -206,6 +206,7 @@ void __init setup_arch(char **cmdline_p)
     unsigned long bootmap_size, start_pfn, lmax_low_pfn;
     int mem_param;  /* user specified memory size in pages */
     int boot_pfn;   /* low pages available for bootmem */
+    physdev_op_t op;
 
     extern void hypervisor_callback(void);
     extern void failsafe_callback(void);
@@ -416,17 +417,9 @@ void __init setup_arch(char **cmdline_p)
     HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list =
 	virt_to_machine(pfn_to_mfn_frame_list) >> PAGE_SHIFT;
 
-    /* If we are a privileged guest OS then we should request IO privileges. */
-    if ( xen_start_info.flags & SIF_PRIVILEGED ) 
-    {
-        dom0_op_t op;
-        op.cmd           = DOM0_IOPL;
-        op.u.iopl.domain = DOMID_SELF;
-        op.u.iopl.iopl   = 1;
-        if( HYPERVISOR_dom0_op(&op) != 0 )
-            panic("Unable to obtain IOPL, despite being SIF_PRIVILEGED");
-        current->thread.io_pl = 1;
-    }
+    op.cmd             = PHYSDEVOP_SET_IOPL;
+    op.u.set_iopl.iopl = current->thread.io_pl = 1;
+    HYPERVISOR_physdev_op(&op);
 
     if (xen_start_info.flags & SIF_INITDOMAIN )
     {

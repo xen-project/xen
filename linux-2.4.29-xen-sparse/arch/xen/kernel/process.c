@@ -44,7 +44,7 @@
 #include <asm/desc.h>
 #include <asm/mmu_context.h>
 #include <asm/multicall.h>
-#include <asm-xen/xen-public/dom0_ops.h>
+#include <asm-xen/xen-public/physdev.h>
 
 #include <linux/irq.h>
 
@@ -304,6 +304,7 @@ void dump_thread(struct pt_regs * regs, struct user * dump)
 void fastcall __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 {
     struct thread_struct *next = &next_p->thread;
+    physdev_op_t op;
 
     __cli();
 
@@ -335,14 +336,12 @@ void fastcall __switch_to(struct task_struct *prev_p, struct task_struct *next_p
     }
 
     queue_multicall2(__HYPERVISOR_stack_switch, __KERNEL_DS, next->esp0);
-    if ( xen_start_info.flags & SIF_PRIVILEGED ) 
+
+    if ( prev_p->thread.io_pl != next->io_pl ) 
     {
-        dom0_op_t op;
-        op.cmd           = DOM0_IOPL;
-        op.u.iopl.domain = DOMID_SELF;
-        op.u.iopl.iopl   = next->io_pl;
-        op.interface_version = DOM0_INTERFACE_VERSION;
-        queue_multicall1(__HYPERVISOR_dom0_op, (unsigned long)&op);
+        op.cmd             = PHYSDEVOP_SET_IOPL;
+	op.u.set_iopl.iopl = next->io_pl;
+        queue_multicall1(__HYPERVISOR_physdev_op, (unsigned long)&op);
     }
 
     /* EXECUTE ALL TASK SWITCH XEN SYSCALLS AT THIS POINT. */

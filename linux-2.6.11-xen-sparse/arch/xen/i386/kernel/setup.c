@@ -52,6 +52,7 @@
 #include <asm/ist.h>
 #include <asm/io.h>
 #include <asm-xen/hypervisor.h>
+#include <asm-xen/xen-public/physdev.h>
 #include "setup_arch_pre.h"
 #include <bios_ebda.h>
 
@@ -1399,9 +1400,9 @@ static void set_mca_bus(int x) { }
  */
 void __init setup_arch(char **cmdline_p)
 {
-        int i,j;
-
-        unsigned long max_low_pfn;
+	int i,j;
+	physdev_op_t op;
+	unsigned long max_low_pfn;
 
 	/* Force a quick death if the kernel panics. */
 	extern int panic_timeout;
@@ -1585,16 +1586,9 @@ void __init setup_arch(char **cmdline_p)
 
 	register_memory();
 
-	/* If we are a privileged guest OS then we should request IO privs. */
-	if (xen_start_info.flags & SIF_PRIVILEGED) {
-		dom0_op_t op;
-		op.cmd           = DOM0_IOPL;
-		op.u.iopl.domain = DOMID_SELF;
-		op.u.iopl.iopl   = 1;
-		if (HYPERVISOR_dom0_op(&op) != 0)
-			panic("Unable to obtain IOPL, despite SIF_PRIVILEGED");
-		current->thread.io_pl = 1;
-	}
+	op.cmd             = PHYSDEVOP_SET_IOPL;
+	op.u.set_iopl.iopl = current->thread.io_pl = 1;
+	HYPERVISOR_physdev_op(&op);
 
 	if (xen_start_info.flags & SIF_INITDOMAIN) {
 		if (!(xen_start_info.flags & SIF_PRIVILEGED))

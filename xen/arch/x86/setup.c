@@ -312,7 +312,6 @@ void __init cpu_init(void)
 
     /* Set up and load the per-CPU TSS and LDT. */
     t->bitmap = IOBMP_INVALID_OFFSET;
-    memset(t->io_bitmap, ~0, sizeof(t->io_bitmap));
 #if defined(__i386__)
     t->ss0  = __HYPERVISOR_DS;
     t->esp0 = get_stack_bottom();

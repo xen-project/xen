@@ -129,6 +129,12 @@ struct domain *find_last_domain(void)
 }
 
 
+#ifndef CONFIG_IA64
+extern void physdev_destroy_state(struct domain *d);
+#else
+#define physdev_destroy_state(_d) ((void)0)
+#endif
+
 void domain_kill(struct domain *d)
 {
     struct exec_domain *ed;
@@ -139,6 +145,7 @@ void domain_kill(struct domain *d)
         for_each_exec_domain(d, ed)
             sched_rem_domain(ed);
         domain_relinquish_memory(d);
+        physdev_destroy_state(d);
         put_domain(d);
     }
 }

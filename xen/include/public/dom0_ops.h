@@ -19,7 +19,7 @@
  * This makes sure that old versions of dom0 tools will stop working in a
  * well-defined way (rather than crashing the machine, for instance).
  */
-#define DOM0_INTERFACE_VERSION   0xAAAA1001
+#define DOM0_INTERFACE_VERSION   0xAAAA1002
 
 /************************************************************************/
 
@@ -119,13 +119,6 @@ typedef struct {
     full_execution_context_t *ctxt;         /*  8 */
     MEMORY_PADDING;
 } PACKED dom0_setdomaininfo_t;              /* 16 bytes */
-
-#define DOM0_IOPL             14
-typedef struct {
-    domid_t domain;                   /*  0 */
-    u16     __pad;
-    u32     iopl;                     /*  4 */
-} PACKED dom0_iopl_t; /* 8 bytes */
 
 #define DOM0_MSR              15
 typedef struct {
@@ -414,6 +407,20 @@ typedef struct {
     u32     _pad0;
 } PACKED dom0_microcode_t; /* 16 bytes */
 
+#define DOM0_IOPL_PERMISSION     36
+typedef struct {
+    domid_t domain;                   /* 0: domain to be affected */
+    u16     max_iopl;                 /* 2: new effective IOPL limit */
+} PACKED dom0_iopl_permission_t; /* 4 bytes */
+
+#define DOM0_IOPORT_PERMISSION   37
+typedef struct {
+    domid_t domain;                   /* 0: domain to be affected */
+    u16     first_port;               /* 2: first port int range */
+    u16     nr_ports;                 /* 4: size of port range */
+    u16     allow_access;             /* 6: allow or deny access to range? */
+} PACKED dom0_ioport_permission_t; /* 8 bytes */
+
 typedef struct {
     u32 cmd;                          /* 0 */
     u32 interface_version;            /* 4 */ /* DOM0_INTERFACE_VERSION */
@@ -429,7 +436,6 @@ typedef struct {
         dom0_setdomaininfo_t     setdomaininfo;
         dom0_getdomaininfo_t     getdomaininfo;
         dom0_getpageframeinfo_t  getpageframeinfo;
-        dom0_iopl_t              iopl;
 	dom0_msr_t               msr;
 	dom0_debug_t             debug;
 	dom0_settime_t           settime;
@@ -449,6 +455,8 @@ typedef struct {
         dom0_read_memtype_t      read_memtype;
         dom0_perfccontrol_t      perfccontrol;
         dom0_microcode_t         microcode;
+        dom0_iopl_permission_t   iopl_permission;
+        dom0_ioport_permission_t ioport_permission;
     } PACKED u;
 } PACKED dom0_op_t; /* 80 bytes */
 

@@ -69,26 +69,47 @@ typedef struct _phys_dev_st {
 
 
 /* Find a device on a per-domain device list. */
-static phys_dev_t *find_pdev(struct domain *p, struct pci_dev *dev)
+static phys_dev_t *find_pdev(struct domain *d, struct pci_dev *dev)
 {
-    phys_dev_t *t, *res = NULL;
-
-    list_for_each_entry ( t, &p->pcidev_list, node )
-    {
+    phys_dev_t *t;
+    list_for_each_entry ( t, &d->pcidev_list, node )
         if ( dev == t->dev )
+            return t;
+    return NULL;
+}
+
+static int setup_ioport_memory_access(struct domain *d, struct pci_dev *pdev)
+{
+    struct resource *r;
+    int i, j;
+
+    if ( d->arch.iobmp_mask == NULL )
+    {
+        if ( (d->arch.iobmp_mask = xmalloc_array(u8, IOBMP_BYTES)) == NULL )
+            return -ENOMEM;
+        memset(d->arch.iobmp_mask, 0xFF, IOBMP_BYTES);
+    }
+
+    for ( i = 0; i < DEVICE_COUNT_RESOURCE; i++ )
+    {
+        r = &pdev->resource[i];         
+        if ( r->flags & IORESOURCE_IO )
         {
-            res = t;
-            break;
+            INFO("Giving domain %u IO resources (%lx - %lx) "
+                 "for device %s\n", d->id, r->start, r->end, pdev->slot_name);
+            for ( j = r->start; j < r->end + 1; j++ )
+                clear_bit(j, d->arch.iobmp_mask);
         }
     }
-    return res;
+
+    return 0;
 }
 
 /* Add a device to a per-domain device-access list. */
-static int add_dev_to_task(struct domain *p, struct pci_dev *dev, 
-                           int acc)
+static int add_dev_to_task(struct domain *d, struct pci_dev *dev, int acc)
 {
     phys_dev_t *physdev;
+    int         rc;
     
     if ( (physdev = xmalloc(phys_dev_t)) == NULL )
     {
@@ -96,104 +117,56 @@ static int add_dev_to_task(struct domain *p, struct pci_dev *dev,
         return -ENOMEM;
     }
     
+    if ( (rc = setup_ioport_memory_access(d, dev)) < 0 )
+    {
+        xfree(physdev);
+        return rc;
+    }
+
     physdev->dev = dev;
     physdev->flags = acc;
     physdev->state = 0;
-    list_add(&physdev->node, &p->pcidev_list);
+    list_add(&physdev->node, &d->pcidev_list);
 
     if ( acc == ACC_WRITE )
-        physdev->owner = p;
+        physdev->owner = d;
 
     return 0;
 }
 
-/* Remove a device from a per-domain device-access list. */
-static void remove_dev_from_task(struct domain *p, struct pci_dev *dev)
+void physdev_destroy_state(struct domain *d)
 {
-    phys_dev_t *physdev = find_pdev(p, dev);
+    struct list_head *ent;
 
-    if ( physdev == NULL )
-        BUG();
-    
-    list_del(&physdev->node);
-
-    xfree(physdev);
-}
-
-static int setup_ioport_memory_access(domid_t dom, struct domain* p, 
-                                      struct exec_domain* ed,
-                                      struct pci_dev *pdev)
-{
-    struct exec_domain* edc;
-    int i, j;
-
-    /* Now, setup access to the IO ports and memory regions for the device. */
-    if ( ed->arch.io_bitmap == NULL )
+    if ( d->arch.iobmp_mask != NULL )
     {
-        if ( (ed->arch.io_bitmap = xmalloc_array(u8, IOBMP_BYTES)) == NULL )
-            return -ENOMEM;
-
-        memset(ed->arch.io_bitmap, 0xFF, IOBMP_BYTES);
-
-        ed->arch.io_bitmap_sel = ~0ULL;
-
-        for_each_exec_domain(p, edc) {
-            if (edc == ed)
-                continue;
-            edc->arch.io_bitmap = ed->arch.io_bitmap;
-        }
+        xfree(d->arch.iobmp_mask);
+        d->arch.iobmp_mask = NULL;
     }
 
-    for ( i = 0; i < DEVICE_COUNT_RESOURCE; i++ )
+    while ( (ent = d->pcidev_list.next) != &d->pcidev_list )
     {
-        struct resource *r = &pdev->resource[i];
-        
-        if ( r->flags & IORESOURCE_IO )
-        {
-            /* Give the domain access to the IO ports it needs.  Currently,
-             * this will allow all processes in that domain access to those
-             * ports as well.  This will do for now, since driver domains don't
-             * run untrusted processes! */
-            INFO("Giving domain %u IO resources (%lx - %lx) "
-                 "for device %s\n", dom, r->start, r->end, pdev->slot_name);
-            for ( j = r->start; j < r->end + 1; j++ )
-            {
-                clear_bit(j, ed->arch.io_bitmap);
-                clear_bit(j / IOBMP_BITS_PER_SELBIT, &ed->arch.io_bitmap_sel);
-            }
-        }
-        /* rights to IO memory regions are checked when the domain maps them */
+        list_del(ent);
+        xfree(list_entry(ent, phys_dev_t, node));
     }
-
-    for_each_exec_domain(p, edc) {
-        if (edc == ed)
-            continue;
-        edc->arch.io_bitmap_sel = ed->arch.io_bitmap_sel;
-    }
-
-    return 0;
 }
 
 /*
  * physdev_pci_access_modify:
  * Allow/disallow access to a specific PCI device.  Guests should not be
  * allowed to see bridge devices as it needlessly complicates things (one
- * possible exception to this is the AGP bridge).  If the given device is a
- * bridge, then the domain should get access to all the leaf devices below
- * that bridge (XXX this is unimplemented!).
+ * possible exception to this is the AGP bridge).
  */
 int physdev_pci_access_modify(domid_t dom, int bus, int dev, int func, 
                               int enable)
 {
     struct domain *p;
-    struct exec_domain *ed;
     struct pci_dev *pdev;
     phys_dev_t *physdev;
     int rc = 0;
-    int oldacc = -1, allocated_physdev = 0;
+    int oldacc = -1;
 
-    if ( !IS_PRIV(current->domain) )
-        BUG();
+    BUG_ON(!IS_PRIV(current->domain));
 
     if ( (bus > PCI_BUSMAX) || (dev > PCI_DEVMAX) || (func > PCI_FUNCMAX) )
         return -EINVAL;
@@ -209,8 +182,6 @@ int physdev_pci_access_modify(domid_t dom, int bus, int dev, int func,
     if ( (p = find_domain_by_id(dom)) == NULL ) 
         return -ESRCH;
 
-    ed = p->exec_domain[0];     /* XXX */
-
     /* Make the domain privileged. */
     set_bit(DF_PHYSDEV, &p->d_flags);
     /* FIXME: MAW for now make the domain REALLY privileged so that it
@@ -222,47 +193,23 @@ int physdev_pci_access_modify(domid_t dom, int bus, int dev, int func,
     {
         INFO("  dev does not exist\n");
         rc = -ENODEV;
-        goto clear_privilege;
+        goto out;
     }
     
-    if ( (physdev = find_pdev(p, pdev)) != NULL) {
-        /* Sevice already on list: update access permissions. */
-        oldacc = physdev->flags;
-        physdev->flags = ACC_WRITE;
-    } else {
-        if ( (rc = add_dev_to_task(p, pdev, ACC_WRITE)) < 0)
-            goto clear_privilege;
-        allocated_physdev = 1;
-    }
-
     INFO("  add RW %02x:%02x:%02x\n", pdev->bus->number,
          PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn));
 
-    /* Is the device a bridge or cardbus? */
-    if ( pdev->hdr_type != PCI_HEADER_TYPE_NORMAL ) {
-        INFO("XXX can't give access to bridge devices yet\n");
-        rc = -EPERM;
-        goto remove_dev;
+    if ( (physdev = find_pdev(p, pdev)) != NULL )
+    {
+        oldacc = physdev->flags;
+        physdev->flags = ACC_WRITE;
+    }
+    else
+    {
+        rc = add_dev_to_task(p, pdev, ACC_WRITE);
     }
 
-    if ( (rc = setup_ioport_memory_access(dom, p, ed, pdev)) < 0 )
-        goto remove_dev;
-
-    put_domain(p);
-    return rc;
-
-remove_dev:
-    if (allocated_physdev) {
-        /* new device was added - remove it from the list */
-        remove_dev_from_task(p, pdev);
-    } else {
-        /* device already existed - just undo the access changes */
-        physdev->flags = oldacc;
-    }
-    
-clear_privilege:
-    clear_bit(DF_PHYSDEV, &p->d_flags);
-    clear_bit(DF_PRIVILEGED, &p->d_flags);
+ out:
     put_domain(p);
     return rc;
 }
@@ -308,9 +255,8 @@ int domain_iomem_in_pfn(struct domain *p, unsigned long pfn)
 }
 
 /* check if a domain has general access to a device */
-inline static int check_dev_acc (struct domain *p,
-                                 int bus, int dev, int func,
-                                 phys_dev_t **pdev) 
+static inline int check_dev_acc(
+    struct domain *d, int bus, int dev, int func, phys_dev_t **pdev)
 {
     struct pci_dev *target_dev;
     phys_dev_t     *target_pdev;
@@ -318,10 +264,10 @@ inline static int check_dev_acc (struct domain *p,
 
     *pdev = NULL;
 
-     if ( !IS_CAPABLE_PHYSDEV(p) )
-         return -EPERM; /* no pci access permission */
+     if ( !IS_CAPABLE_PHYSDEV(d) )
+         return -EPERM;
 
-    if ( bus > PCI_BUSMAX || dev > PCI_DEVMAX || func > PCI_FUNCMAX )
+    if ( (bus > PCI_BUSMAX) || (dev > PCI_DEVMAX) || (func > PCI_FUNCMAX) )
         return -EINVAL;
 
     VERBOSE_INFO("b=%x d=%x f=%x ", bus, dev, func);
@@ -336,7 +282,7 @@ inline static int check_dev_acc (struct domain *p,
     }
 
     /* check access */
-    target_pdev = find_pdev(p, target_dev);
+    target_pdev = find_pdev(d, target_dev);
     if ( !target_pdev )
     {
         VERBOSE_INFO("dom has no access to target\n");
@@ -746,6 +692,24 @@ long do_physdev_op(physdev_op_t *uop)
         if ( strstr(irq_desc[irq].handler->typename, "edge") == NULL )
             op.u.irq_status_query.flags |= PHYSDEVOP_IRQ_NEEDS_UNMASK_NOTIFY;
         ret = 0;
+        break;
+
+    case PHYSDEVOP_SET_IOPL:
+        ret = -EINVAL;
+        if ( op.u.set_iopl.iopl > 3 )
+            break;
+        ret = 0;
+        current->arch.iopl = op.u.set_iopl.iopl;
+        break;
+
+    case PHYSDEVOP_SET_IOBITMAP:
+        ret = -EINVAL;
+        if ( !access_ok(VERIFY_READ, op.u.set_iobitmap.bitmap, IOBMP_BYTES) ||
+             (op.u.set_iobitmap.nr_ports > 65536) )
+            break;
+        ret = 0;
+        current->arch.iobmp       = (u8 *)op.u.set_iobitmap.bitmap;
+        current->arch.iobmp_limit = op.u.set_iobitmap.nr_ports;
         break;
 
     default:

@@ -136,14 +136,61 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
     }
     break;
 
-    case DOM0_IOPL:
+    case DOM0_IOPL_PERMISSION:
     {
+        struct domain *d;
+
         ret = -EINVAL;
-        if ( op->u.iopl.domain == DOMID_SELF )
+        if ( op->u.iopl_permission.max_iopl > 3 )
+            break;
+
+        ret = -ESRCH;
+        if ( unlikely((d = find_domain_by_id(
+            op->u.iopl_permission.domain)) == NULL) )
+            break;
+
+        ret = 0;
+        d->arch.max_iopl = op->u.iopl_permission.max_iopl;
+
+        put_domain(d);
+    }
+    break;
+
+    case DOM0_IOPORT_PERMISSION:
+    {
+        struct domain *d;
+        unsigned int fp = op->u.ioport_permission.first_port;
+        unsigned int np = op->u.ioport_permission.nr_ports;
+        unsigned int p;
+
+        ret = -EINVAL;
+        if ( (fp + np) >= 65536 )
+            break;
+
+        ret = -ESRCH;
+        if ( unlikely((d = find_domain_by_id(
+            op->u.ioport_permission.domain)) == NULL) )
+            break;
+
+        ret = -ENOMEM;
+        if ( d->arch.iobmp_mask != NULL )
         {
-            current->arch.iopl = op->u.iopl.iopl & 3;
-            ret = 0;
+            if ( (d->arch.iobmp_mask = xmalloc_array(
+                u8, IOBMP_BYTES)) == NULL )
+                break;
+            memset(d->arch.iobmp_mask, 0xFF, IOBMP_BYTES);
         }
+
+        ret = 0;
+        for ( p = fp; p < (fp + np); p++ )
+        {
+            if ( op->u.ioport_permission.allow_access )
+                clear_bit(p, d->arch.iobmp_mask);
+            else
+                set_bit(p, d->arch.iobmp_mask);
+        }
+
+        put_domain(d);
     }
     break;
 
