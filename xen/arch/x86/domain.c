@@ -299,7 +299,7 @@ static void alloc_monitor_pagetable(struct exec_domain *ed)
     struct pfn_info *mpfn_info;
     struct domain *d = ed->domain;
 
-    ASSERT(!ed->arch.monitor_table); /* we should only get called once */
+    ASSERT(!pagetable_val(ed->arch.monitor_table)); /* we should only get called once */
 
     mpfn_info = alloc_domheap_page(NULL);
     ASSERT( mpfn_info ); 
@@ -502,8 +502,11 @@ int arch_final_setup_guest(
         return vmx_final_setup_guest(d, c);
 #endif
 
-    update_pagetables(d);  /* this assigns shadow_pagetable 
-                                and monitor_table */
+    /* We don't call update_pagetables() as we actively want fields such as 
+     * the linear_pg_table to be null so that we bail out early of 
+     * shadow_fault in case the vmx guest tries illegal accesses with
+     * paging turned of. 
+     */
 
     return 0;
 }
