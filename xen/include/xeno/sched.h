@@ -145,7 +145,7 @@ struct task_struct {
      */
     struct mm_struct *active_mm;
     struct thread_struct thread;
-    struct task_struct *prev_task, *next_task;
+    struct task_struct *prev_task, *next_task, *next_hash;
     
     unsigned long flags;
 

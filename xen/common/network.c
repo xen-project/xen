@@ -148,6 +148,9 @@ void unlink_net_vif(net_vif_t *vif)
     unsigned long flags;
     int i;
 
+    if ( vif == NULL )
+        return;
+
     for ( i = 0; i < MAX_DOMAIN_VIFS; i++ )
         if ( vif->domain->net_vif_list[i] == vif )
             vif->domain->net_vif_list[i] = NULL;

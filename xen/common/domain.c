@@ -26,6 +26,10 @@
 
 rwlock_t tasklist_lock __cacheline_aligned = RW_LOCK_UNLOCKED;
 
+#define TASK_HASH_SIZE 256
+#define TASK_HASH(_id) ((_id)&(TASK_HASH_SIZE-1))
+static struct task_struct *task_hash[TASK_HASH_SIZE];
+
 /*
  * create a new domain
  */
@@ -69,32 +73,33 @@ struct task_struct *do_newdomain(unsigned int dom_id, unsigned int cpu)
     p->max_pages = p->tot_pages = 0;
     write_lock_irqsave(&tasklist_lock, flags);
     SET_LINKS(p);
+    p->next_hash = task_hash[TASK_HASH(dom_id)];
+    task_hash[TASK_HASH(dom_id)] = p;
     write_unlock_irqrestore(&tasklist_lock, flags);
 
     return(p);
 }
 
 
-/* Get a pointer to the specified domain.  Consider replacing this
- * with a hash lookup later.
- *
- * Also, kill_other_domain should call this instead of scanning on its own.
- */
 struct task_struct *find_domain_by_id(unsigned int dom)
 {
-    struct task_struct *p = &idle0_task;
+    struct task_struct *p;
+    unsigned long flags;
 
-    read_lock_irq(&tasklist_lock);
-    do {
-        if ( (p->domain == dom) ) {
-            get_task_struct(p); /* increment the refcnt for caller */
-            read_unlock_irq(&tasklist_lock);
-            return (p);
+    read_lock_irqsave(&tasklist_lock, flags);
+    p = task_hash[TASK_HASH(dom)];
+    while ( p != NULL )
+    {
+        if ( p->domain == dom )
+        {
+            get_task_struct(p);
+            break;
         }
-    } while ( (p = p->next_task) != &idle0_task );
-    read_unlock_irq(&tasklist_lock);
+        p = p->next_hash;
+    }
+    read_unlock_irqrestore(&tasklist_lock, flags);
 
-    return 0;
+    return p;
 }
 
 
@@ -243,14 +248,20 @@ void free_all_dom_mem(struct task_struct *p)
 /* Release resources belonging to task @p. */
 void release_task(struct task_struct *p)
 {
+    struct task_struct **pp;
+    unsigned long flags;
+
     ASSERT(p->state == TASK_DYING);
     ASSERT(!p->has_cpu);
 
     printk("Releasing task %d\n", p->domain);
 
-    write_lock_irq(&tasklist_lock);
+    write_lock_irqsave(&tasklist_lock, flags);
     REMOVE_LINKS(p);
-    write_unlock_irq(&tasklist_lock);
+    pp = &task_hash[TASK_HASH(p->domain)];
+    while ( *pp != p ) *pp = (*pp)->next_hash;
+    *pp = p->next_hash;
+    write_unlock_irqrestore(&tasklist_lock, flags);
 
     /*
      * This frees up blkdev rings. Totally safe since blkdev ref counting

@@ -27,23 +27,18 @@
 
 typedef struct rx_shadow_entry_st 
 {
-    /* IN vars */
     unsigned short id;
+    unsigned short flush_count; /* 16 bits should be enough */
     unsigned long  pte_ptr;
     unsigned long  buf_pfn;
-    /* PRIVATE vars */
-    unsigned long  flush_count;
 } rx_shadow_entry_t;
 
 typedef struct tx_shadow_entry_st 
 {
-    /* IN vars */
     unsigned short id;
+    unsigned short size;
     void          *header;
     unsigned long  payload;
-    /* OUT vars */
-    unsigned short size;
-    unsigned char  status;
 } tx_shadow_entry_t;
 
 typedef struct net_vif_st {

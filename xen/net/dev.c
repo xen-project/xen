@@ -559,7 +559,7 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
      * network driver that called us should also have no nasty locks.
      */
     rx = vif->rx_shadow_ring + vif->rx_cons;
-    if ( rx->flush_count == 
+    if ( rx->flush_count == (unsigned short)
          atomic_read(&tlb_flush_count[vif->domain->processor]) )
         flush_tlb_cpu(vif->domain->processor);
 
@@ -706,7 +706,7 @@ static void tx_skb_release(struct sk_buff *skb)
 
     tx = vif->tx_shadow_ring + vif->tx_cons;
     vif->tx_cons = TX_RING_INC(vif->tx_cons);
-    make_tx_response(vif, tx->id, tx->status);
+    make_tx_response(vif, tx->id, RING_STATUS_OK);
 
     put_vif(vif);
 }
@@ -748,8 +748,6 @@ static void net_tx_action(unsigned long unused)
         vif->tx_idx = TX_RING_INC(vif->tx_idx);
         if ( vif->tx_idx != vif->tx_prod )
             add_to_net_schedule_list_tail(vif);
-
-        ASSERT(tx->status == RING_STATUS_OK);
 
         skb->destructor = tx_skb_release;
         
@@ -1871,7 +1869,6 @@ long do_net_update(void)
             {
                 vif->tx_shadow_ring[j].id     = tx.id;
                 vif->tx_shadow_ring[j].size   = tx.size;
-                vif->tx_shadow_ring[j].status = RING_STATUS_OK;
                 vif->tx_shadow_ring[j].header = 
                     kmem_cache_alloc(net_header_cachep, GFP_KERNEL);
                 if ( vif->tx_shadow_ring[j].header == NULL )
@@ -1968,7 +1965,7 @@ long do_net_update(void)
             vif->rx_shadow_ring[j].id          = rx.id;
             vif->rx_shadow_ring[j].pte_ptr     = rx.addr;
             vif->rx_shadow_ring[j].buf_pfn     = buf_pfn;
-            vif->rx_shadow_ring[j].flush_count = 
+            vif->rx_shadow_ring[j].flush_count = (unsigned short) 
                 atomic_read(&tlb_flush_count[smp_processor_id()]);
             j = RX_RING_INC(j);
             
