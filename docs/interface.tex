@@ -219,8 +219,27 @@ charge of performing page table updates on behalf of the domains. This is
 neccessary to prevent domains from adding arbitrary mappings to their page
 tables or introducing mappings to other's page tables.
 
+\section{Segment Descriptor Tables}
 
+On boot a guest is supplied with a default GDT, which is {\em not}
+taken from its own memory allocation. If the guest wishes to use other
+than the default `flat' ring-1 and ring-3 segments that this default
+table provides, it must register a custom GDT and/or LDT with Xen,
+allocated from its own memory.
 
+int {\bf set\_gdt}(unsigned long *{\em frame\_list}, int {\em entries})
+
+{\em frame\_list}: An array of up to 16 page frames within which the GDT
+resides. Any frame registered as a GDT frame may only be mapped
+read-only within the guest's address space (e.g., no writeable
+mappings, no use as a page-table page, and so on).
+
+{\em entries}: The number of descriptor-entry slots in the GDT. Note that
+the table must be large enough to contain Xen's reserved entries; thus
+we must have '{\em entries $>$ LAST\_RESERVED\_GDT\_ENTRY}'. Note also that,
+after registering the GDT, slots {\em FIRST\_} through
+{\em LAST\_RESERVED\_GDT\_ENTRY} are no longer usable by the guest and may be
+overwritten by Xen.
 
 \section{Pseudo-Physical Memory}
 The usual problem of external fragmentation means that a domain is unlikely to
