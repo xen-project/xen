@@ -32,33 +32,30 @@
  * in the guest's pseudophysical map.
  * 0x80000000-3 mark the shared_info, and blk/net rings
  */
-#define MFN_IS_IN_PSEUDOPHYS_MAP(_mfn) \
-    (((_mfn) < (1024*1024)) && \
-     ( ( (live_mfn_to_pfn_table[_mfn] < nr_pfns) && \
-       (live_pfn_to_mfn_table[live_mfn_to_pfn_table[_mfn]] == (_mfn)) ) || \
-\
-       (live_mfn_to_pfn_table[_mfn] >= 0x80000000 && \
- live_mfn_to_pfn_table[_mfn] <= 0x80000003 ) || \
- live_pfn_to_mfn_table[live_mfn_to_pfn_table[_mfn]] == 0x80000004 )  )
+#define MFN_IS_IN_PSEUDOPHYS_MAP(_mfn)                                    \
+    (((_mfn) < (1024*1024)) &&                                            \
+     (((live_mfn_to_pfn_table[_mfn] < nr_pfns) &&                         \
+       (live_pfn_to_mfn_table[live_mfn_to_pfn_table[_mfn]] == (_mfn))) || \
+      ((live_mfn_to_pfn_table[_mfn] >= 0x80000000) &&                     \
+       (live_mfn_to_pfn_table[_mfn] <= 0x80000003)) ||                    \
+      (live_pfn_to_mfn_table[live_mfn_to_pfn_table[_mfn]] == 0x80000004)))
      
 /* Returns TRUE if MFN is successfully converted to a PFN. */
-#define translate_mfn_to_pfn(_pmfn)         \
-({                                          \
-    unsigned long mfn = *(_pmfn);           \
-    int _res = 1;                           \
-    if ( !MFN_IS_IN_PSEUDOPHYS_MAP(mfn) )   \
-        _res = 0;                           \
-    else                                    \
-        *(_pmfn) = live_mfn_to_pfn_table[mfn];   \
-    _res;                                   \
+#define translate_mfn_to_pfn(_pmfn)            \
+({                                             \
+    unsigned long mfn = *(_pmfn);              \
+    int _res = 1;                              \
+    if ( !MFN_IS_IN_PSEUDOPHYS_MAP(mfn) )      \
+        _res = 0;                              \
+    else                                       \
+        *(_pmfn) = live_mfn_to_pfn_table[mfn]; \
+    _res;                                      \
 })
 
-
-/* test_bit */
 static inline int test_bit ( int nr, volatile void * addr)
 {
-    return ( ((unsigned long*)addr)[nr/(sizeof(unsigned long)*8)] >> 
-             (nr % (sizeof(unsigned long)*8) ) ) & 1;
+    return (((unsigned long*)addr)[nr/(sizeof(unsigned long)*8)] >> 
+            (nr % (sizeof(unsigned long)*8))) & 1;
 }
 
 static inline void clear_bit ( int nr, volatile void * addr)
@@ -72,11 +69,8 @@ static inline void set_bit ( int nr, volatile void * addr)
     ((unsigned long*)addr)[nr/(sizeof(unsigned long)*8)] |= 
         (1 << (nr % (sizeof(unsigned long)*8) ) );
 }
-/*
- * hweightN: returns the hamming weight (i.e. the number
- * of bits set) of a N-bit word
- */
 
+/* Returns the hamming weight (i.e. the number of bits set) in a N-bit word */
 static inline unsigned int hweight32(unsigned int w)
 {
     unsigned int res = (w & 0x55555555) + ((w >> 1) & 0x55555555);
@@ -90,7 +84,7 @@ static inline int count_bits ( int nr, volatile void *addr)
 {
     int i, count = 0;
     unsigned long *p = (unsigned long *)addr;
-    /* we know the array is padded to unsigned long */
+    /* We know that the array is padded to unsigned long. */
     for(i=0;i<nr/(sizeof(unsigned long)*8);i++,p++)
         count += hweight32( *p );
     return count;
@@ -120,11 +114,7 @@ static inline int permute( int i, int nr, int order_nr  )
       LKJIHGF
       */
 
-    do
-    {
-        i = ( ( i>>(order_nr-10))  | ( i<<10 ) ) &
-            ((1<<order_nr)-1);
-    }
+    do { i = ((i>>(order_nr-10)) | ( i<<10 ) ) & ((1<<order_nr)-1); }
     while ( i >= nr ); /* this won't ever loop if nr is a power of 2 */
 
     return i;
@@ -135,14 +125,22 @@ static long long tv_to_us( struct timeval *new )
     return (new->tv_sec * 1000000) + new->tv_usec;
 }
 
-static long long tvdelta( struct timeval *new, struct timeval *old )
+static long long llgettimeofday()
+{
+    struct timeval now;
+    gettimeofday(&now, NULL);
+    return tv_to_us(&now);
+}
+
+static long long tv_delta( struct timeval *new, struct timeval *old )
 {
     return ((new->tv_sec - old->tv_sec)*1000000 ) + 
         (new->tv_usec - old->tv_usec);
 }
 
-static int track_cpu_usage( int xc_handle, u32 domid, int faults,
-                            int pages_sent, int pages_dirtied, int print )
+static int print_stats( int xc_handle, u32 domid, 
+                        int pages_sent, xc_shadow_control_stats_t *stats,
+                        int print )
 {
     static struct timeval wall_last;
     static long long      d0_cpu_last;
@@ -153,33 +151,29 @@ static int track_cpu_usage( int xc_handle, u32 domid, int faults,
     long long             d0_cpu_now, d0_cpu_delta;
     long long             d1_cpu_now, d1_cpu_delta;
 
-
     gettimeofday(&wall_now, NULL);
 
     d0_cpu_now = xc_domain_get_cpu_usage( xc_handle, 0 )/1000;
     d1_cpu_now = xc_domain_get_cpu_usage( xc_handle, domid )/1000;
 
-    if ( d0_cpu_now == -1 || d1_cpu_now == -1 ) 
-    {
+    if ( (d0_cpu_now == -1) || (d1_cpu_now == -1) ) 
         printf("ARRHHH!!\n");
-    }
 
-    wall_delta = tvdelta(&wall_now,&wall_last)/1000;
+    wall_delta = tv_delta(&wall_now,&wall_last)/1000;
 
     if ( wall_delta == 0 ) wall_delta = 1;
 
     d0_cpu_delta  = (d0_cpu_now - d0_cpu_last)/1000;
     d1_cpu_delta  = (d1_cpu_now - d1_cpu_last)/1000;
 
-    if(print)
-        printf("delta %lldms, dom0 %d%%, target %d%%, "
-               "sent %dMb/s, dirtied %dMb/s\n",
+    if ( print )
+        printf("delta %lldms, dom0 %d%%, target %d%%, sent %dMb/s, "
+               "dirtied %dMb/s\n",
                wall_delta, 
                (int)((d0_cpu_delta*100)/wall_delta),
                (int)((d1_cpu_delta*100)/wall_delta),
                (int)((pages_sent*PAGE_SIZE*8)/(wall_delta*1000)),
-               (int)((pages_dirtied*PAGE_SIZE*8)/(wall_delta*1000))
-            );
+               (int)((stats->dirty_count*PAGE_SIZE*8)/(wall_delta*1000)));
 
     d0_cpu_last  = d0_cpu_now;
     d1_cpu_last  = d1_cpu_now;
@@ -203,6 +197,41 @@ static int write_vmconfig(XcIOContext *ioctxt){
     return err;
 }
 
+static int analysis_phase( int xc_handle, u32 domid, 
+                           int nr_pfns, unsigned long *arr )
+{
+    long long start, now;
+    xc_shadow_control_stats_t stats;
+
+    start = llgettimeofday();
+
+    while ( 0 )
+    {
+        int i;
+
+        xc_shadow_control( xc_handle, domid, 
+                           DOM0_SHADOW_CONTROL_OP_CLEAN2,
+                           arr, nr_pfns, NULL);
+        printf("#Flush\n");
+        for ( i = 0; i < 100; i++ )
+        {     
+            usleep(10000);     
+            now = llgettimeofday();
+            xc_shadow_control( xc_handle, domid, 
+                               DOM0_SHADOW_CONTROL_OP_PEEK,
+                               NULL, 0, &stats);
+
+            printf("now= %lld faults= %ld dirty= %ld dirty_net= %ld "
+                   "dirty_block= %ld\n", 
+                   ((now-start)+500)/1000, 
+                   stats.fault_count, stats.dirty_count,
+                   stats.dirty_net_count, stats.dirty_block_count);
+        }
+    }
+
+    return -1;
+}
+
 int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 {
     dom0_op_t op;
@@ -212,7 +241,6 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
     int live = (ioctxt->flags & XCFLAGS_LIVE);
     int debug = (ioctxt->flags & XCFLAGS_DEBUG);
     int sent_last_iter, skip_this_iter;
-    unsigned long dirtied_this_iter, faults_this_iter;
 
     /* Important tuning parameters */
     int max_iters  = 29; /* limit us to 30 times round loop */
@@ -263,6 +291,8 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
        - to skip this iteration because already dirty;
        - to fixup by sending at the end if not already resent; */
     unsigned long *to_send, *to_skip, *to_fix;
+    
+    xc_shadow_control_stats_t stats;
 
     int needed_to_fix = 0;
     int total_sent    = 0;
@@ -278,6 +308,11 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
         goto out;
     }
 
+    if ( xc_domain_getfullinfo( xc_handle, domid, &op, &ctxt) )
+    {
+        PERROR("Could not get full domain info");
+        goto out;
+    }
     memcpy(name, op.u.getdomaininfo.name, sizeof(name));
     shared_info_frame = op.u.getdomaininfo.shared_info_frame;
 
@@ -329,7 +364,7 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
             pgd[HYPERVISOR_VIRT_START>>L2_PAGETABLE_SHIFT]>>PAGE_SHIFT;
 
         live_mfn_to_pfn_table = 
-            mfn_mapper_map_single(xc_handle, DOMID_SELF, 
+            mfn_mapper_map_single(xc_handle, ~0UL, 
                                   PAGE_SIZE*1024, PROT_READ, 
                                   mfn_to_pfn_table_start_mfn );
     }
@@ -364,7 +399,7 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
     if( live ){ 
         if ( xc_shadow_control( xc_handle, domid, 
                                 DOM0_SHADOW_CONTROL_OP_ENABLE_LOGDIRTY,
-                                NULL, 0, NULL, NULL ) < 0 ){
+                                NULL, 0, NULL ) < 0 )
             xcio_error(ioctxt, "Couldn't enable shadow mode");
             goto out;
         }
@@ -375,11 +410,14 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
         }
 
         last_iter = 0;
-        sent_last_iter = 1<<20; /* 4GB's worth of pages */
+        sent_last_iter = 1<<20; /* 4GB of pages */
     } else{
         last_iter = 1;
     }
 
+    /* calculate the power of 2 order of nr_pfns, e.g.
+       15->4 16->4 17->5 */
+    for( i=nr_pfns-1, order_nr=0; i ; i>>=1, order_nr++ );
 
     /* Setup to_send bitmap */
     {
@@ -410,11 +448,7 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 
     }
 
-    /* calculate the power of 2 order of nr_pfns, e.g.
-       15->4 16->4 17->5 */
-    for( i=nr_pfns-1, order_nr=0; i ; i>>=1, order_nr++ );
-
-    printf("nr_pfns=%lu order_nr=%d\n",nr_pfns, order_nr);
+    analysis_phase( xc_handle, domid, nr_pfns, to_skip );
 
     /* We want zeroed memory so use calloc rather than malloc. */
     pfn_type = calloc(BATCH_SIZE, sizeof(unsigned long));
@@ -468,7 +502,7 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
         goto out;
     }
 
-    track_cpu_usage(xc_handle, domid, 0, 0, 0, 0 );
+    print_stats( xc_handle, domid, 0, &stats, 0 );
 
     /* Now write out each data page, canonicalising page tables as we go... */
     
@@ -497,7 +531,7 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
             if ( !last_iter && 
                  xc_shadow_control(xc_handle, domid, 
                                    DOM0_SHADOW_CONTROL_OP_PEEK,
-                                   to_skip, nr_pfns, NULL, NULL) != nr_pfns ){
+                                   to_skip, nr_pfns, NULL) != nr_pfns ) {
                 xcio_error(ioctxt, "Error peeking shadow bitmap");
                 goto out;
             }
@@ -506,24 +540,27 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
             /* load pfn_type[] with the mfn of all the pages we're doing in
                this batch. */
 
-            for( batch = 0; batch < BATCH_SIZE && N < nr_pfns ; N++ ){
+            for ( batch = 0; batch < BATCH_SIZE && N < nr_pfns ; N++ )
+            {
                 int n = permute(N, nr_pfns, order_nr );
 
-                if(0 && debug)
-                    fprintf(stderr,"%d pfn= %08lx mfn= %08lx %d   "
-                            "[mfn]= %08lx\n",
-                            iter, (unsigned long)n, live_pfn_to_mfn_table[n],
+                if ( 0 && debug )
+                    fprintf(stderr,"%d pfn= %08lx mfn= %08lx %d  "
+                            " [mfn]= %08lx\n",
+                            iter, n, live_pfn_to_mfn_table[n],
                             test_bit(n,to_send),
-                            live_mfn_to_pfn_table[
-                                live_pfn_to_mfn_table[n]&0xFFFFF]);
+                            live_mfn_to_pfn_table[live_pfn_to_mfn_table[n]&
+                                                 0xFFFFF]);
 
-                if (!last_iter && test_bit(n, to_send) && test_bit(n, to_skip)){
+                if ( !last_iter && 
+                     test_bit(n, to_send) && 
+                     test_bit(n, to_skip) )
                     skip_this_iter++; /* stats keeping */
                 }
 
-                if (! ( (test_bit(n, to_send) && !test_bit(n, to_skip)) ||
-                        (test_bit(n, to_send) && last_iter) ||
-                        (test_bit(n, to_fix)  && last_iter) )   ){
+                if ( !((test_bit(n, to_send) && !test_bit(n, to_skip)) ||
+                       (test_bit(n, to_send) && last_iter) ||
+                       (test_bit(n, to_fix)  && last_iter)) )
                     continue;
                 }
 
@@ -543,29 +580,29 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 
                     set_bit( n, to_fix );
                     if( iter>1 )
-                        DDPRINTF("Urk! netbuf race: iter %d, pfn %lx."
-                                 " mfn %lx\n",
+                        DDPRINTF("netbuf race: iter %d, pfn %lx. mfn %lx\n",
                                  iter,n,pfn_type[batch]);
                     continue;
                 }
 
-                if ( last_iter && test_bit(n, to_fix) && 
-                     !test_bit(n, to_send) ){
+                if ( last_iter && 
+                     test_bit(n, to_fix) && 
+                     !test_bit(n, to_send) )
+                {
                     needed_to_fix++;
                     DPRINTF("Fix! iter %d, pfn %lx. mfn %lx\n",
                             iter,n,pfn_type[batch]);
                 }
 
-                clear_bit( n, to_fix ); 
+                clear_bit(n, to_fix); 
 
                 batch++;
             }
      
-            DDPRINTF("batch %d:%d (n=%d)\n",iter,batch,n);
+            DDPRINTF("batch %d:%d (n=%d)\n", iter, batch, n);
 
-            if ( batch == 0 ){
-                goto skip; /* very unlikely */
-            }
+            if ( batch == 0 )
+                goto skip; /* vanishingly unlikely... */
       
             if ( (region_base = mfn_mapper_map_batch(xc_handle, domid, 
                                                      PROT_READ,
@@ -586,23 +623,19 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
                     continue;
                 }
   
-                if ( 0 && debug ){
-                    fprintf(stderr,"%d pfn= %08lx mfn= %08lx "
-                            "[mfn]= %08lx sum= %08lx\n",
+                if ( 0 && debug )
+                    fprintf(stderr, "%d pfn= %08lx mfn= %08lx [mfn]= %08lx"
+                            " sum= %08lx\n",
                             iter, 
                             (pfn_type[j] & LTAB_MASK) | pfn_batch[j],
                             pfn_type[j],
                             live_mfn_to_pfn_table[pfn_type[j]&(~LTAB_MASK)],
-                            csum_page(region_base + (PAGE_SIZE*j))
-                        );
-                }
+                            csum_page(region_base + (PAGE_SIZE*j)));
 
                 /* canonicalise mfn->pfn */
-                pfn_type[j] = (pfn_type[j] & LTAB_MASK) |
-                    pfn_batch[j];
+                pfn_type[j] = (pfn_type[j] & LTAB_MASK) | pfn_batch[j];
             }
 
-     
             if ( xcio_write(ioctxt, &batch, sizeof(int) ) ){
                 xcio_error(ioctxt, "Error when writing to state file (2)");
                 goto out;
@@ -616,7 +649,6 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
             /* entering this loop, pfn_type is now in pfns (Not mfns) */
             for( j = 0; j < batch; j++ ){
                 /* write out pages in batch */
-  
                 if( (pfn_type[j] & LTAB_MASK) == XTAB){
                     DDPRINTF("SKIP BOGUS page %i mfn %08lx\n",j,pfn_type[j]);
                     continue;
@@ -624,17 +656,18 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
   
                 if ( ((pfn_type[j] & LTAB_MASK) == L1TAB) || 
                      ((pfn_type[j] & LTAB_MASK) == L2TAB) ){
-      
                     memcpy(page, region_base + (PAGE_SIZE*j), PAGE_SIZE);
       
                     for ( k = 0; 
                           k < (((pfn_type[j] & LTAB_MASK) == L2TAB) ? 
-                               (HYPERVISOR_VIRT_START >> L2_PAGETABLE_SHIFT) : 
+                               (HYPERVISOR_VIRT_START >> L2_PAGETABLE_SHIFT) :
                                1024); 
                           k++ ){
                         unsigned long pfn;
 
-                        if ( !(page[k] & _PAGE_PRESENT) ) continue;
+                        if ( !(page[k] & _PAGE_PRESENT) )
+                            continue;
+                        
                         mfn = page[k] >> PAGE_SHIFT;      
                         pfn = live_mfn_to_pfn_table[mfn];
 
@@ -647,11 +680,22 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
                                    page[k], mfn, live_mfn_to_pfn_table[mfn],
                                    (live_mfn_to_pfn_table[mfn]<nr_pfns)? 
                                    live_pfn_to_mfn_table[
-                                       live_mfn_to_pfn_table[mfn]]:0xdeadbeef);
-                            pfn = 0; /* be suspicious, very suspicious */
+                                       live_mfn_to_pfn_table[mfn]] : 
+                                   0xdeadbeef);
+
+                            pfn = 0; /* be suspicious */
                         }
+
                         page[k] &= PAGE_SIZE - 1;
                         page[k] |= pfn << PAGE_SHIFT;
+   
+#if 0
+                        printf("L%d i=%d pfn=%d mfn=%d k=%d pte=%08lx "
+                               "xpfn=%d\n",
+                               pfn_type[j]>>28,
+                               j,i,mfn,k,page[k],page[k]>>PAGE_SHIFT);
+#endif     
+   
                     } /* end of page table rewrite for loop */
       
                     if ( xcio_write(ioctxt, page, PAGE_SIZE) ){
@@ -682,8 +726,9 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
         xcio_info(ioctxt, "\r %d: sent %d, skipped %d, ", 
                        iter, sent_this_iter, skip_this_iter );
 
-        if ( last_iter ){
-            track_cpu_usage( xc_handle, domid, 0, sent_this_iter, 0, 1);
+        if ( last_iter ) {
+            print_stats( xc_handle, domid, sent_this_iter, &stats, 1);
+
             xcio_info(ioctxt, "Total pages sent= %d (%.2fx)\n", 
                            total_sent, ((float)total_sent)/nr_pfns );
             xcio_info(ioctxt, "(of which %d were fixups)\n", needed_to_fix  );
@@ -691,7 +736,7 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 
         if (last_iter && debug){
             int minusone = -1;
-            memset( to_send, 0xff, nr_pfns/8 );
+            memset( to_send, 0xff, (nr_pfns+8)/8 );
             debug = 0;
             printf("Entering debug resend-all mode\n");
     
@@ -707,21 +752,23 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 
         if ( last_iter ) break;
 
-        if ( live ) {
-            if ( (iter >= max_iters) || 
-                 (sent_this_iter+skip_this_iter < 50) || 
-                 (total_sent > nr_pfns*max_factor) )
+        if ( live )
+        {
+            if ( 
+                /* ( sent_this_iter > (sent_last_iter * 0.95) ) || */
+                (iter >= max_iters) || 
+                (sent_this_iter+skip_this_iter < 50) || 
+                (total_sent > nr_pfns*max_factor) )
             {
                 DPRINTF("Start last iteration\n");
                 last_iter = 1;
 
-                xc_domain_pause(xc_handle, domid);
+                xc_domain_pause( xc_handle, domid );
             } 
 
             if ( xc_shadow_control( xc_handle, domid, 
                                     DOM0_SHADOW_CONTROL_OP_CLEAN2,
-                                    to_send, nr_pfns, &faults_this_iter,
-                                    &dirtied_this_iter) != nr_pfns ) 
+                                    to_send, nr_pfns, &stats ) != nr_pfns ) 
             {
                 xcio_error(ioctxt, "Error flushing shadow PT");
                 goto out;
@@ -729,11 +776,10 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 
             sent_last_iter = sent_this_iter;
 
-            /* dirtied_this_iter = count_bits( nr_pfns, to_send ); */
-            track_cpu_usage( xc_handle, domid, faults_this_iter,
-                             sent_this_iter, dirtied_this_iter, 1);
+            print_stats( xc_handle, domid, sent_this_iter, &stats, 1);
      
         }
+
 
     } /* end of while 1 */
 
@@ -750,13 +796,9 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
     }
 
     /* Get the final execution context */
-    op.cmd = DOM0_GETDOMAININFO;
-    op.u.getdomaininfo.domain = (domid_t)domid;
-    op.u.getdomaininfo.ctxt = &ctxt;
-    if ( (do_dom0_op(xc_handle, &op) < 0) || 
-         ((u32)op.u.getdomaininfo.domain != domid) )
+    if ( xc_domain_getfullinfo( xc_handle, domid, &op, &ctxt) )
     {
-        xcio_perror(ioctxt, "Could not get info on domain");
+        xcio_perror(ioctxt, "Could not get full domain info");
         goto out;
     }
 
@@ -779,7 +821,7 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
         xcio_error(ioctxt, "PT base is not in range of pseudophys map");
         goto out;
     }
-    ctxt.pt_base = live_mfn_to_pfn_table[ctxt.pt_base >> PAGE_SHIFT] << 
+    ctxt.pt_base = live_mfn_to_pfn_table[ctxt.pt_base >> PAGE_SHIFT] <<
         PAGE_SHIFT;
 
     if ( xcio_write(ioctxt, &ctxt,       sizeof(ctxt)) ||
