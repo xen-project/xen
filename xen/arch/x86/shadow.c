@@ -187,7 +187,29 @@ alloc_shadow_page(struct domain *d,
     unsigned long smfn;
     int pin = 0;
 
-    page = alloc_domheap_page(NULL);
+    // Currently, we only keep pre-zero'ed pages around for use as L1's...
+    // This will change.  Soon.
+    //
+    if ( psh_type == PGT_l1_shadow )
+    {
+        if ( !list_empty(&d->arch.free_shadow_frames) )
+        {
+            struct list_head *entry = d->arch.free_shadow_frames.next;
+            page = list_entry(entry, struct pfn_info, list);
+            list_del(entry);
+            perfc_decr(free_l1_pages);
+        }
+        else
+        {
+            page = alloc_domheap_page(NULL);
+            void *l1 = map_domain_mem(page_to_pfn(page) << PAGE_SHIFT);
+            memset(l1, 0, PAGE_SIZE);
+            unmap_domain_mem(l1);
+        }
+    }
+    else
+        page = alloc_domheap_page(NULL);
+
     if ( unlikely(page == NULL) )
     {
         printk("Couldn't alloc shadow page! dom%d count=%d\n",
@@ -271,11 +293,21 @@ free_shadow_l1_table(struct domain *d, unsigned long smfn)
 {
     l1_pgentry_t *pl1e = map_domain_mem(smfn << PAGE_SHIFT);
     int i;
+    struct pfn_info *spage = pfn_to_page(smfn);
+    u32 min_max = spage->tlbflush_timestamp;
+    int min = SHADOW_MIN(min_max);
+    int max = SHADOW_MAX(min_max);
 
-    for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
+    for ( i = min; i <= max; i++ )
+    {
         put_page_from_l1e(pl1e[i], d);
+        pl1e[i] = mk_l1_pgentry(0);
+    }
 
     unmap_domain_mem(pl1e);
+
+    list_add(&spage->list, &d->arch.free_shadow_frames);
+    perfc_incr(free_l1_pages);
 }
 
 static void inline
@@ -372,7 +404,8 @@ void free_shadow_page(unsigned long smfn)
     page->tlbflush_timestamp = 0;
     page->u.free.cpu_mask = 0;
 
-    free_domheap_page(page);
+    if ( type != PGT_l1_shadow )
+        free_domheap_page(page);
 }
 
 static void inline
@@ -1428,8 +1461,6 @@ void shadow_map_l1_into_current_l2(unsigned long va)
             &(shadow_linear_pg_table[l1_linear_offset(va) &
                                      ~(L1_PAGETABLE_ENTRIES-1)]);
 
-        memset(spl1e, 0, PAGE_SIZE);
-
         unsigned long sl1e;
         int index = l1_table_offset(va);
         int min = 1, max = 0;
@@ -2006,7 +2037,7 @@ static int resync_all(struct domain *d, u32 stype)
     unsigned long *guest, *shadow, *snapshot;
     int need_flush = 0, external = shadow_mode_external(d);
     int unshadow;
-    unsigned long min_max;
+    u32 min_max;
     int min, max;
 
     ASSERT(spin_is_locked(&d->arch.shadow_lock));

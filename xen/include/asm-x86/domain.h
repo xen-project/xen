@@ -50,6 +50,8 @@ struct arch_domain
     struct out_of_sync_entry *out_of_sync_extras;
     unsigned int out_of_sync_extras_count;
 
+    struct list_head free_shadow_frames;
+
     pagetable_t  phys_table;               /* guest 1:1 pagetable */
 
 } __cacheline_aligned;

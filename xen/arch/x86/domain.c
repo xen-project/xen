@@ -262,7 +262,8 @@ void arch_do_createdomain(struct exec_domain *ed)
             mk_l3_pgentry(__pa(d->arch.mm_perdomain_l2) | __PAGE_HYPERVISOR);
 #endif
 
-        shadow_lock_init(d);        
+        shadow_lock_init(d);
+        INIT_LIST_HEAD(&d->arch.free_shadow_frames);
     }
 }
 

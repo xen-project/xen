@@ -1294,7 +1294,7 @@ void static inline
 shadow_update_min_max(unsigned long smfn, int index)
 {
     struct pfn_info *sl1page = pfn_to_page(smfn);
-    unsigned long min_max = sl1page->tlbflush_timestamp;
+    u32 min_max = sl1page->tlbflush_timestamp;
     int min = SHADOW_MIN(min_max);
     int max = SHADOW_MAX(min_max);
     int update = 0;
