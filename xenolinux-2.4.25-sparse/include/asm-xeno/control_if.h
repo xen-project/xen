@@ -8,11 +8,11 @@
 #define __CONTROL_IF_H__
 
 typedef struct {
-    u8 cmd_type;     /* echoed in response */
-    u8 cmd_subtype;  /* echoed in response */
-    u8 id;           /* echoed in response */
-    u8 length;       /* number of bytes in 'msg' */
-    unsigned char msg[60]; /* command-specific message data */
+    u8 type;     /* echoed in response */
+    u8 subtype;  /* echoed in response */
+    u8 id;       /* echoed in response */
+    u8 length;   /* number of bytes in 'msg' */
+    unsigned char msg[60]; /* type-specific message data */
 } control_msg_t;
 
 #define CONTROL_RING_SIZE 8
@@ -26,7 +26,7 @@ typedef struct {
     CONTROL_RING_IDX rx_req_prod, rx_resp_prod;
 } control_if_t;
 
-#define CMD_CONSOLE      0
-#define CMD_CONSOLE_DATA 0
+#define CMSG_CONSOLE      0
+#define CMSG_CONSOLE_DATA 0
 
 #endif /* __CONTROL_IF_H__ */

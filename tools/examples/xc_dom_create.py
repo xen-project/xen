@@ -237,9 +237,14 @@ def make_domain():
             xc.domain_destroy ( dom=id )
             sys.exit()
 
-    ports = xc.evtchn_open( dom2=id )
-    if not ports:
+    cmsg = 'new_control_interface(dom='+str(id)+')'
+    xend_response = XenoUtil.xend_control_message(cmsg)
+    if not xend_response['success']:
         print "Error creating initial event channel"
+        print "Error type: " + xend_response['error_type']
+        if xend_response['error_type'] == 'exception':
+            print "Exception type: " + xend_response['exception_type']
+            print "Exception value: " + xend_response['exception_value']
         xc.domain_destroy ( dom=id )
         sys.exit()
 
@@ -292,7 +297,7 @@ def make_domain():
         xc.domain_destroy ( dom=id )
         sys.exit()
 
-    return (id, 9600+ports['port1'])
+    return (id, xend_response['console_port'])
 # end of make_domain()
 
 def mkpidfile():

@@ -1,5 +1,5 @@
 
-all: ../lib/libxc.so.1.3.0 ../lib/xc.h
+all:
 	python setup.py build
 
 install: all

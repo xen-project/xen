@@ -52,9 +52,9 @@ static void nonpriv_conwrite(const char *s, unsigned int count)
 
         p = MASK_CONTROL_IDX(ctrl_if->tx_req_prod);
         
-        ctrl_if->tx_ring[p].cmd_type    = CMD_CONSOLE;
-        ctrl_if->tx_ring[p].cmd_subtype = CMD_CONSOLE_DATA;
-        ctrl_if->tx_ring[p].id          = 0xaa;
+        ctrl_if->tx_ring[p].type    = CMSG_CONSOLE;
+        ctrl_if->tx_ring[p].subtype = CMSG_CONSOLE_DATA;
+        ctrl_if->tx_ring[p].id      = 0xaa;
         src = dst = 0;
         while ( (src < count) && (dst < (sizeof(ctrl_if->tx_ring[p].msg)-1)) )
         {
@@ -202,8 +202,8 @@ static void __do_console_io(void)
     for ( c = ctrl_if->rx_resp_prod; c != ctrl_if->rx_req_prod; c++ )
     {
         msg = &ctrl_if->rx_ring[MASK_CONTROL_IDX(c)];
-        if ( (msg->cmd_type == CMD_CONSOLE) &&
-             (msg->cmd_subtype == CMD_CONSOLE_DATA) )
+        if ( (msg->type == CMSG_CONSOLE) &&
+             (msg->subtype == CMSG_CONSOLE_DATA) )
         {
             for ( i = 0; i < msg->length; i++ )
                 tty_insert_flip_char(xeno_console_tty, msg->msg[i], 0);
@@ -225,9 +225,9 @@ static void __do_console_io(void)
         if ( (wc == wp) && (x_char == 0) )
             break;
         msg = &ctrl_if->tx_ring[MASK_CONTROL_IDX(c)];
-        msg->cmd_type    = CMD_CONSOLE;
-        msg->cmd_subtype = CMD_CONSOLE_DATA;
-        msg->id          = 0xaa;
+        msg->type    = CMSG_CONSOLE;
+        msg->subtype = CMSG_CONSOLE_DATA;
+        msg->id      = 0xaa;
         len = 0;
         if ( x_char != 0 ) /* Handle XON/XOFF urgently. */
         {

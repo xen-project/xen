@@ -1,4 +1,4 @@
-import string, re, os, sys
+import os, re, socket, string, sys, tempfile
 
 ##### Module variables
 
@@ -183,6 +183,27 @@ def lookup_disk_uname( uname ):
 
     return segments
 
+
+##### Management of the Xen control daemon
+##### (c) Keir Fraser, University of Cambridge
+
+def xend_control_message( message ):
+    """Takes a textual control message and sends it to the 'xend' Xen
+    control daemon. Returns a dictionary containing the daemon's multi-part
+    response."""
+    tmpdir = tempfile.mkdtemp()
+    try:
+        ctl = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM, 0)
+        ctl.bind(tmpdir+'/sock')
+        ctl.sendto(message, '/var/run/xend/management_sock')
+        data, addr = ctl.recvfrom(2048)
+        ctl.close()
+    finally:
+        if os.path.exists(tmpdir+'/sock'):
+            os.unlink(tmpdir+'/sock')
+        if os.path.exists(tmpdir):
+            os.rmdir(tmpdir)    
+    return eval(data)
 
 
 ##### VD Management-related functions

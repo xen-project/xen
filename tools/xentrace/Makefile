@@ -14,18 +14,22 @@ MAN8     = $(wildcard *.8)
 all: $(BIN)
 
 install: all
-	mkdir -p /usr/bin
-	cp $(BIN) /usr/bin
-	for i in $(BIN); do chmod 755 /usr/bin/$$i; done
-	for i in $(MAN1); do cp $$i /usr/man/man1/$$i; done
-	for i in $(MAN8); do cp $$i /usr/man/man8/$$i; done
+	mkdir -p $(prefix)/usr/bin
+	mkdir -p $(prefix)/usr/man/man1
+	mkdir -p $(prefix)/usr/man/man8
+	cp $(BIN) $(prefix)/usr/bin
+	for i in $(BIN); do chmod 755 $(prefix)/usr/bin/$$i; done
+	for i in $(MAN1); do cp $$i $(prefix)/usr/man/man1/$$i; done
+	for i in $(MAN8); do cp $$i $(prefix)/usr/man/man8/$$i; done
 
 dist: all
 	mkdir -p ../../../install/bin
+	mkdir -p ../../../install/man/man1
+	mkdir -p ../../../install/man/man8
 	cp $(BIN) ../../../install/bin
-	chmod 755 ../../../install/bin/$(BIN)
-	cp $(SCRIPTS) ../../../install/bin
-	for i in $(SCRIPTS); do chmod 755 ../../../install/bin/$i; done
+	for i in $(BIN); do chmod 755 ../../../install/bin/$$i; done
+	for i in $(MAN1); do cp $$i ../../../install/man/man1/$$i; done
+	for i in $(MAN8); do cp $$i ../../../install/man/man8/$$i; done
 
 clean:
 	$(RM) *.a *.so *.o *.rpm $(BIN)

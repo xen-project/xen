@@ -1,16 +1,16 @@
 /******************************************************************************
- * xend.c
- * 
- * The grand Xen daemon. For now it's just a virtual-console concentrator.
+ * xend_utils.c
  * 
  * Copyright (c) 2004, K A Fraser
  */
 
+#include <Python.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/mman.h>
@@ -32,64 +32,302 @@
 #define PORTIDX_MASK    0x7fff   /* Strip subtype to obtain port index. */
 #define EVTCHN_RESET _IO('E', 1) /* Clear notification buffer. Clear errors. */
 
-/* Error macros. */
-#define ERROR(_f, _a...)     \
-    fprintf ( stderr, "ERROR: " _f "\n" , ## _a );
-#define SYS_ERROR(_f, _a...) \
-    fprintf ( stderr, "ERROR: " _f " [errno=%d (%s)]\n" , \
-              ## _a , errno , strerror(errno) );
-#define HINT(_f, _a...)      \
-    fprintf ( stderr, "Hint: " _f "\n" , ## _a );
-#define ROOT_HINT() HINT("You must execute this daemon as root.")
-#define DOM0_HINT() HINT("You must execute this daemon " \
-                         "on a privileged Xenolinux instance (e.g., DOM0).")
+/* Size of a machine page frame. */
+#define PAGE_SIZE 4096
 
-#if 0
-#define DPRINTF(_f, _a...)  \
-    fprintf ( stdout, _f "\n" , ## _a );
-#else
-#define DPRINTF(_f, _a...) ((void)0)
-#endif
 
-/* Per-port Tx/Rx buffering. */
-#define CONBUFSZ 65536
-#define MASK_CONBUF_IDX(_i) ((_i)&(CONBUFSZ-1))
+/*
+ * *********************** NOTIFIER ***********************
+ */
 
-struct portinfo;
-typedef struct portinfo {
-    u64              dom;
-    control_if_t    *interface;
-    CONTROL_RING_IDX tx_req_cons, tx_resp_prod;
-    CONTROL_RING_IDX rx_req_prod, rx_resp_cons;
-    char            *tx_buf, *rx_buf;
-    unsigned int     txp, txc, rxp, rxc;
-#define CONSTAT_CLOSED    0
-#define CONSTAT_LISTENING 1
-#define CONSTAT_CONNECTED 2
-    int              con_fd, con_status;
-    struct portinfo **pprev, *next; /* links to other active ports */
-} portinfo_t;
+typedef struct {
+    PyObject_HEAD;
+    int evtchn_fd;
+} xu_notifier_object;
 
-#define PORT(_pinfo) ((_pinfo)-portinfo)
-#define TX_EMPTY(_pinfo) ((_pinfo)->txp == (_pinfo)->txc)
-#define TX_FULL(_pinfo)  (((_pinfo)->txp - (_pinfo)->txc) == CONBUFSZ)
-#define RX_EMPTY(_pinfo) ((_pinfo)->rxp == (_pinfo)->rxc)
-#define RX_FULL(_pinfo)  (((_pinfo)->rxp - (_pinfo)->rxc) == CONBUFSZ)
+static PyObject *xu_notifier_read(PyObject *self, PyObject *args)
+{
+    xu_notifier_object *xun = (xu_notifier_object *)self;
+    u16 v;
+    int bytes;
 
-static portinfo_t *active_head;   /* linked list of active ports */
-static portinfo_t portinfo[1024]; /* array of all ports */    
-static int xc_fd, evt_fd, mem_fd;
+    if ( !PyArg_ParseTuple(args, "") )
+        return NULL;
+    
+    while ( (bytes = read(xun->evtchn_fd, &v, sizeof(v))) == -1 )
+    {
+        if ( errno == EINTR )
+            continue;
+        if ( errno == EAGAIN )
+            goto none;
+        return PyErr_SetFromErrno(PyExc_IOError);
+    }
+    
+    if ( bytes == sizeof(v) )
+        return Py_BuildValue("(i,i)", v&PORTIDX_MASK, v&~PORTIDX_MASK);
 
-#define PAGE_SIZE           4096 /* size of a machine page frame            */
-#define BATCH_SIZE           512 /* maximum notifications to read at a time */
+ none:
+    Py_INCREF(Py_None);
+    return Py_None;
+}
 
-static int make_consock_listener(portinfo_t *pinfo);
-static int make_consock_connected(portinfo_t *pinfo);
-static void make_consock_closed(portinfo_t *pinfo);
-static void do_consock_read(portinfo_t *pinfo);
-static void do_consock_write(portinfo_t *pinfo);
-static int process_evtchn_reads(portinfo_t *pinfo);
-static int process_evtchn_writes(portinfo_t *pinfo);
+static PyObject *xu_notifier_clear(PyObject *self, PyObject *args)
+{
+    xu_notifier_object *xun = (xu_notifier_object *)self;
+    u16 v;
+    int idx, type;
+
+    if ( !PyArg_ParseTuple(args, "ii", &idx, &type) )
+        return NULL;
+    
+    v = (u16)idx | (u16)type;
+
+    (void)write(xun->evtchn_fd, &v, sizeof(v));
+
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static PyObject *xu_notifier_fileno(PyObject *self, PyObject *args)
+{
+    xu_notifier_object *xun = (xu_notifier_object *)self;
+    return PyInt_FromLong(xun->evtchn_fd);
+}
+
+static PyMethodDef xu_notifier_methods[] = {
+    { "read",
+      (PyCFunction)xu_notifier_read,
+      METH_VARARGS,
+      "Read a (@port, @type) pair.\n" },
+
+    { "clear", 
+      (PyCFunction)xu_notifier_clear,
+      METH_VARARGS,
+      "Clear a (@port, @type) pair.\n" },
+
+    { "fileno", 
+      (PyCFunction)xu_notifier_fileno,
+      METH_VARARGS,
+      "Return the file descriptor for the notification channel.\n" },
+
+    { NULL, NULL, 0, NULL }
+};
+
+staticforward PyTypeObject xu_notifier_type;
+
+static PyObject *xu_notifier_new(PyObject *self, PyObject *args)
+{
+    xu_notifier_object *xun;
+
+    if ( !PyArg_ParseTuple(args, "") )
+        return NULL;
+
+    xun = PyObject_New(xu_notifier_object, &xu_notifier_type);
+
+    xun->evtchn_fd = open(EVTCHN_DEV_NAME, O_NONBLOCK|O_RDWR);
+    if ( xun->evtchn_fd == -1 )
+    {
+        PyObject_Del((PyObject *)xun);
+        return PyErr_SetFromErrno(PyExc_IOError);
+    }
+
+    return (PyObject *)xun;
+}
+
+static PyObject *xu_notifier_getattr(PyObject *obj, char *name)
+{
+    if ( strcmp(name, "DISCONNECT") == 0 )
+        return PyInt_FromLong(PORT_DISCONNECT);
+    if ( strcmp(name, "NORMAL") == 0 )
+        return PyInt_FromLong(PORT_NORMAL);
+    return Py_FindMethod(xu_notifier_methods, obj, name);
+}
+
+static void xu_notifier_dealloc(PyObject *self)
+{
+    xu_notifier_object *xun = (xu_notifier_object *)self;
+    (void)close(xun->evtchn_fd);
+    PyObject_Del(self);
+}
+
+static PyTypeObject xu_notifier_type = {
+    PyObject_HEAD_INIT(&PyType_Type)
+    0,
+    "notifier",
+    sizeof(xu_notifier_object),
+    0,
+    xu_notifier_dealloc, /* tp_dealloc     */
+    NULL,                /* tp_print       */
+    xu_notifier_getattr, /* tp_getattr     */
+    NULL,                /* tp_setattr     */
+    NULL,                /* tp_compare     */
+    NULL,                /* tp_repr        */
+    NULL,                /* tp_as_number   */
+    NULL,                /* tp_as_sequence */
+    NULL,                /* tp_as_mapping  */
+    NULL                 /* tp_hash        */
+};
+
+
+
+/*
+ * *********************** MESSAGE ***********************
+ */
+
+typedef struct {
+    PyObject_HEAD;
+    control_msg_t msg;
+} xu_message_object;
+
+static PyObject *xu_message_append_payload(PyObject *self, PyObject *args)
+{
+    xu_message_object *xum = (xu_message_object *)self;
+    char *str;
+    int len;
+
+    if ( !PyArg_ParseTuple(args, "s#", &str, &len) )
+        return NULL;
+
+    if ( (len + xum->msg.length) > sizeof(xum->msg.msg) )
+    {
+        PyErr_SetString(PyExc_RuntimeError, "out of space in control message");
+        return NULL;
+    }
+
+    memcpy(&xum->msg.msg[xum->msg.length], str, len);
+    xum->msg.length += len;
+
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static PyObject *xu_message_get_payload(PyObject *self, PyObject *args)
+{
+    xu_message_object *xum = (xu_message_object *)self;
+
+    if ( !PyArg_ParseTuple(args, "") )
+        return NULL;
+
+    return PyString_FromStringAndSize(xum->msg.msg, xum->msg.length);
+}
+
+static PyObject *xu_message_set_header(PyObject *self, 
+                                       PyObject *args, 
+                                       PyObject *kwds)
+{
+    xu_message_object *xum = (xu_message_object *)self;
+    int type = -1, subtype = -1, id = -1;
+
+    static char *kwd_list[] = { "type", "subtype", "id", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|iii", kwd_list,
+                                      &type, &subtype, &id) )
+        return NULL;
+
+    if ( type != -1 )
+        xum->msg.type = (u8)type;
+    if ( subtype != -1 )
+        xum->msg.subtype = (u8)subtype;
+    if ( id != -1 )
+        xum->msg.id = (u8)id;
+
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static PyObject *xu_message_get_header(PyObject *self, PyObject *args)
+{
+    xu_message_object *xum = (xu_message_object *)self;
+
+    if ( !PyArg_ParseTuple(args, "") )
+        return NULL;
+
+    return Py_BuildValue("{s:i,s:i,s:i}",
+                         "type",    xum->msg.type,
+                         "subtype", xum->msg.subtype,
+                         "id",      xum->msg.id);
+}
+
+static PyMethodDef xu_message_methods[] = {
+    { "append_payload", 
+      (PyCFunction)xu_message_append_payload,
+      METH_VARARGS,
+      "Append @str to the message payload.\n" },
+
+    { "get_payload",
+      (PyCFunction)xu_message_get_payload,
+      METH_VARARGS,
+      "Return the message payload in string form.\n" },
+
+    { "set_header",
+      (PyCFunction)xu_message_set_header,
+      METH_VARARGS | METH_KEYWORDS,
+      "Accepts keywords @type, @subtype, and @id.\n" },
+
+    { "get_header",
+      (PyCFunction)xu_message_get_header,
+      METH_VARARGS,
+      "Returns a dictionary of values for @type, @subtype, and @id.\n" },
+
+    { NULL, NULL, 0, NULL }
+};
+
+staticforward PyTypeObject xu_message_type;
+
+static PyObject *xu_message_new(PyObject *self, PyObject *args)
+{
+    xu_message_object *xum;
+    int type, subtype, id;
+
+    if ( !PyArg_ParseTuple(args, "iii", &type, &subtype, &id) )
+        return NULL;
+
+    xum = PyObject_New(xu_message_object, &xu_message_type);
+
+    xum->msg.type    = type;
+    xum->msg.subtype = subtype;
+    xum->msg.id      = id;
+    xum->msg.length  = 0;
+
+    return (PyObject *)xum;
+}
+
+static PyObject *xu_message_getattr(PyObject *obj, char *name)
+{
+    xu_message_object *xum;
+    if ( strcmp(name, "MAX_PAYLOAD") == 0 )
+        return PyInt_FromLong(sizeof(xum->msg.msg));
+    return Py_FindMethod(xu_message_methods, obj, name);
+}
+
+static void xu_message_dealloc(PyObject *self)
+{
+    PyObject_Del(self);
+}
+
+static PyTypeObject xu_message_type = {
+    PyObject_HEAD_INIT(&PyType_Type)
+    0,
+    "message",
+    sizeof(xu_message_object),
+    0,
+    xu_message_dealloc,   /* tp_dealloc     */
+    NULL,                /* tp_print       */
+    xu_message_getattr,   /* tp_getattr     */
+    NULL,                /* tp_setattr     */
+    NULL,                /* tp_compare     */
+    NULL,                /* tp_repr        */
+    NULL,                /* tp_as_number   */
+    NULL,                /* tp_as_sequence */
+    NULL,                /* tp_as_mapping  */
+    NULL                 /* tp_hash        */
+};
+
+
+
+/*
+ * *********************** PORT ***********************
+ */
 
 static control_if_t *map_control_interface(int fd, unsigned long pfn)
 {
@@ -99,518 +337,670 @@ static control_if_t *map_control_interface(int fd, unsigned long pfn)
         return NULL;
     return (control_if_t *)(vaddr + 2048);
 }
-
 static void unmap_control_interface(int fd, control_if_t *c)
 {
     char *vaddr = (char *)c - 2048;
     (void)munmap(vaddr, PAGE_SIZE);
 }
 
-/* Returns TRUE if the channel is open on exit. */
-static int handle_channel_exception(unsigned int port)
+typedef struct {
+    PyObject_HEAD;
+    int mem_fd;
+    int xc_handle;
+    u64 remote_dom;
+    int local_port, remote_port;
+    control_if_t    *interface;
+    CONTROL_RING_IDX tx_req_cons, tx_resp_prod;
+    CONTROL_RING_IDX rx_req_prod, rx_resp_cons;
+} xu_port_object;
+
+static PyObject *port_error;
+
+static PyObject *xu_port_notify(PyObject *self, PyObject *args)
 {
+    xu_port_object *xup = (xu_port_object *)self;
+
+    if ( !PyArg_ParseTuple(args, "") )
+        return NULL;
+
+    (void)xc_evtchn_send(xup->xc_handle, xup->local_port);
+
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static PyObject *xu_port_read_request(PyObject *self, PyObject *args)
+{
+    xu_port_object    *xup = (xu_port_object *)self;
+    xu_message_object *xum;
+    CONTROL_RING_IDX   c = xup->tx_req_cons;
+    control_if_t      *cif = xup->interface;
+    control_msg_t     *cmsg;
+
+    if ( !PyArg_ParseTuple(args, "") )
+        return NULL;
+
+    if ( (c == cif->tx_req_prod) || 
+         ((c - xup->tx_resp_prod) == CONTROL_RING_SIZE) )
+    {
+        PyErr_SetString(port_error, "no request to read");
+        return NULL;
+    }
+
+    cmsg = &cif->tx_ring[MASK_CONTROL_IDX(c)];
+    xum = PyObject_New(xu_message_object, &xu_message_type);
+    memcpy(&xum->msg, cmsg, sizeof(*cmsg));
+    if ( xum->msg.length > sizeof(xum->msg.msg) )
+        xum->msg.length = sizeof(xum->msg.msg);
+    xup->tx_req_cons++;
+    return (PyObject *)xum;
+}
+
+static PyObject *xu_port_write_request(PyObject *self, PyObject *args)
+{
+    xu_port_object    *xup = (xu_port_object *)self;
+    xu_message_object *xum;
+    CONTROL_RING_IDX   p = xup->rx_req_prod;
+    control_if_t      *cif = xup->interface;
+    control_msg_t     *cmsg;
+
+    if ( !PyArg_ParseTuple(args, "O", (PyObject **)&xum) )
+        return NULL;
+
+    if ( !PyObject_TypeCheck((PyObject *)xum, &xu_message_type) )
+    {
+        PyErr_SetString(PyExc_TypeError, "expected a xend_utils.message");
+        return NULL;        
+    }
+
+    if ( ((p - xup->rx_resp_cons) == CONTROL_RING_SIZE) )
+    {
+        PyErr_SetString(port_error, "no space to write request");
+        return NULL;
+    }
+
+    cmsg = &cif->rx_ring[MASK_CONTROL_IDX(p)];
+    memcpy(cmsg, &xum->msg, sizeof(*cmsg));
+
+    xup->rx_req_prod = cif->rx_req_prod = p + 1;
+
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static PyObject *xu_port_read_response(PyObject *self, PyObject *args)
+{
+    xu_port_object    *xup = (xu_port_object *)self;
+    xu_message_object *xum;
+    CONTROL_RING_IDX   c = xup->rx_resp_cons;
+    control_if_t      *cif = xup->interface;
+    control_msg_t     *cmsg;
+
+    if ( !PyArg_ParseTuple(args, "") )
+        return NULL;
+
+    if ( (c == cif->rx_resp_prod) || (c == xup->rx_req_prod) )
+    {
+        PyErr_SetString(port_error, "no response to read");
+        return NULL;
+    }
+
+    cmsg = &cif->rx_ring[MASK_CONTROL_IDX(c)];
+    xum = PyObject_New(xu_message_object, &xu_message_type);
+    memcpy(&xum->msg, cmsg, sizeof(*cmsg));
+    if ( xum->msg.length > sizeof(xum->msg.msg) )
+        xum->msg.length = sizeof(xum->msg.msg);
+    xup->rx_resp_cons++;
+    return (PyObject *)xum;
+}
+
+static PyObject *xu_port_write_response(PyObject *self, PyObject *args)
+{
+    xu_port_object    *xup = (xu_port_object *)self;
+    xu_message_object *xum;
+    CONTROL_RING_IDX   p = xup->tx_resp_prod;
+    control_if_t      *cif = xup->interface;
+    control_msg_t     *cmsg;
+
+    if ( !PyArg_ParseTuple(args, "O", (PyObject **)&xum) )
+        return NULL;
+
+    if ( !PyObject_TypeCheck((PyObject *)xum, &xu_message_type) )
+    {
+        PyErr_SetString(PyExc_TypeError, "expected a xend_utils.message");
+        return NULL;        
+    }
+
+    if ( p == xup->tx_req_cons )
+    {
+        PyErr_SetString(port_error, "no space to write response");
+        return NULL;
+    }
+
+    cmsg = &cif->tx_ring[MASK_CONTROL_IDX(p)];
+    memcpy(cmsg, &xum->msg, sizeof(*cmsg));
+
+    xup->tx_resp_prod = cif->tx_resp_prod = p + 1;
+
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static PyObject *xu_port_request_to_read(PyObject *self, PyObject *args)
+{
+    xu_port_object    *xup = (xu_port_object *)self;
+    CONTROL_RING_IDX   c = xup->tx_req_cons;
+    control_if_t      *cif = xup->interface;
+
+    if ( !PyArg_ParseTuple(args, "") )
+        return NULL;
+
+    if ( (c == cif->tx_req_prod) || 
+         ((c - xup->tx_resp_prod) == CONTROL_RING_SIZE) )
+        return PyInt_FromLong(0);
+
+    return PyInt_FromLong(1);
+}
+
+static PyObject *xu_port_space_to_write_request(PyObject *self, PyObject *args)
+{
+    xu_port_object    *xup = (xu_port_object *)self;
+    CONTROL_RING_IDX   p = xup->rx_req_prod;
+
+    if ( !PyArg_ParseTuple(args, "") )
+        return NULL;
+
+    if ( ((p - xup->rx_resp_cons) == CONTROL_RING_SIZE) )
+        return PyInt_FromLong(0);
+
+    return PyInt_FromLong(1);
+}
+
+static PyObject *xu_port_response_to_read(PyObject *self, PyObject *args)
+{
+    xu_port_object    *xup = (xu_port_object *)self;
+    CONTROL_RING_IDX   c = xup->rx_resp_cons;
+    control_if_t      *cif = xup->interface;
+
+    if ( !PyArg_ParseTuple(args, "") )
+        return NULL;
+
+    if ( (c == cif->rx_resp_prod) || (c == xup->rx_req_prod) )
+        return PyInt_FromLong(0);
+
+    return PyInt_FromLong(1);
+}
+
+static PyObject *xu_port_space_to_write_response(
+    PyObject *self, PyObject *args)
+{
+    xu_port_object    *xup = (xu_port_object *)self;
+    CONTROL_RING_IDX   p = xup->tx_resp_prod;
+
+    if ( !PyArg_ParseTuple(args, "") )
+        return NULL;
+
+    if ( p == xup->tx_req_cons )
+        return PyInt_FromLong(0);
+
+    return PyInt_FromLong(1);
+}
+
+static PyMethodDef xu_port_methods[] = {
+    { "notify",
+      (PyCFunction)xu_port_notify,
+      METH_VARARGS,
+      "Send a notification to the remote end.\n" },
+
+    { "read_request",
+      (PyCFunction)xu_port_read_request,
+      METH_VARARGS,
+      "Read a request message from the control interface.\n" },
+
+    { "write_request",
+      (PyCFunction)xu_port_write_request,
+      METH_VARARGS,
+      "Write a request message to the control interface.\n" },
+
+    { "read_response",
+      (PyCFunction)xu_port_read_response,
+      METH_VARARGS,
+      "Read a response message from the control interface.\n" },
+
+    { "write_response",
+      (PyCFunction)xu_port_write_response,
+      METH_VARARGS,
+      "Write a response message to the control interface.\n" },
+
+    { "request_to_read",
+      (PyCFunction)xu_port_request_to_read,
+      METH_VARARGS,
+      "Returns TRUE if there is a request message to read.\n" },
+
+    { "space_to_write_request",
+      (PyCFunction)xu_port_space_to_write_request,
+      METH_VARARGS,
+      "Returns TRUE if there is space to write a request message.\n" },
+
+    { "response_to_read",
+      (PyCFunction)xu_port_response_to_read,
+      METH_VARARGS,
+      "Returns TRUE if there is a response message to read.\n" },
+
+    { "space_to_write_response",
+      (PyCFunction)xu_port_space_to_write_response,
+      METH_VARARGS,
+      "Returns TRUE if there is space to write a response message.\n" },
+
+    { NULL, NULL, 0, NULL }
+};
+
+staticforward PyTypeObject xu_port_type;
+
+static PyObject *xu_port_new(PyObject *self, PyObject *args)
+{
+    xu_port_object *xup;
+    u64 dom;
+    int port1, port2;
     xc_dominfo_t info;
-    unsigned int remote_port, status;
-    u64          remote_dom;
-    u16          wbuf;
-    portinfo_t  *pinfo = &portinfo[port];
 
-    if ( xc_evtchn_status(xc_fd, DOMID_SELF, port, 
-                          &remote_dom, &remote_port, &status) != 0 )
+    if ( !PyArg_ParseTuple(args, "L", &dom) )
+        return NULL;
+
+    xup = PyObject_New(xu_port_object, &xu_port_type);
+
+    if ( (xup->mem_fd = open("/dev/mem", O_RDWR)) == -1 )
     {
-        SYS_ERROR("Unexpected failure when obtaining port-%d status.", port);
-        exit(1);
+        PyErr_SetString(port_error, "Could not open '/dev/mem'");
+        goto fail1;
     }
+
+    if ( (xup->xc_handle = xc_interface_open()) == -1 )
+    {
+        PyErr_SetString(port_error, "Could not open Xen control interface");
+        goto fail2;
+    }
+
+    if ( xc_evtchn_open(xup->xc_handle, DOMID_SELF, dom, &port1, &port2) != 0 )
+    {
+        PyErr_SetString(port_error, "Could not open channel to domain");
+        goto fail3;
+    }
+
+    if ( (xc_domain_getinfo(xup->xc_handle, dom, 1, &info) != 1) ||
+         (info.domid != dom) )
+    {
+        PyErr_SetString(port_error, "Failed to obtain domain status");
+        goto fail4;
+    }
+
+    xup->interface = 
+        map_control_interface(xup->mem_fd, info.shared_info_frame);
+    if ( xup->interface == NULL )
+    {
+        PyErr_SetString(port_error, "Failed to map domain control interface");
+        goto fail4;
+    }
+
+    xup->tx_req_cons  = 0;
+    xup->tx_resp_prod = 0;
+    xup->rx_req_prod  = 0;
+    xup->rx_resp_cons = 0;
+    xup->remote_dom   = dom;
+    xup->local_port   = port1;
+    xup->remote_port  = port2;
+
+    return (PyObject *)xup;
+
     
-    if ( status != EVTCHNSTAT_connected )
-    {
-        DPRINTF("Port %d not connected: cleaning up.", port);
-        if ( pinfo->interface != NULL )
-        {
-            unmap_control_interface(mem_fd, pinfo->interface);
-            pinfo->interface = NULL;
-            *(pinfo->pprev) = pinfo->next;
-            if ( pinfo->next != NULL )
-                pinfo->next->pprev = pinfo->pprev;
-            make_consock_closed(pinfo);
-            free(pinfo->tx_buf);
-            free(pinfo->rx_buf);
-            memset(pinfo, 0, sizeof(*pinfo));
-        }
-        /* Cleanup sanity: we'll be the grim reaper. */
-        wbuf = port | PORT_NORMAL;
-        (void)write(evt_fd, &wbuf, sizeof(wbuf));
-        wbuf = port | PORT_DISCONNECT;
-        (void)write(evt_fd, &wbuf, sizeof(wbuf));
-        if ( status == EVTCHNSTAT_disconnected )
-            (void)xc_evtchn_close(xc_fd, DOMID_SELF, port);
-        return 0;
-    }
-
-    /* We only deal with initial ports (id == 0). */
-    if ( remote_port != 0 )
-        return 0;
-
-    if ( pinfo->interface == NULL )
-    {
-        DPRINTF("New control interface for DOM%llu on port %d.", 
-                remote_dom, port);
-        if ( xc_domain_getinfo(xc_fd, remote_dom, 1, &info) != 1 )
-        {
-            SYS_ERROR("Failed to obtain DOM%llu status.", remote_dom);
-            exit(1);
-        }
-        memset(pinfo, 0, sizeof(*pinfo));
-        pinfo->interface = 
-            map_control_interface(mem_fd, info.shared_info_frame);
-        pinfo->tx_buf = malloc(CONBUFSZ);
-        pinfo->rx_buf = malloc(CONBUFSZ);
-        pinfo->dom = remote_dom;
-        pinfo->con_status = CONSTAT_CLOSED;
-        if ( !make_consock_listener(pinfo) )
-        {
-            ERROR("Could not start console %d in listener status.",
-                  PORT(pinfo));
-            exit(1);
-        }
-        pinfo->pprev = &active_head;
-        if ( (pinfo->next = active_head) != NULL )
-            pinfo->next->pprev = &pinfo->next;
-        active_head = pinfo;
-    }
-
-    return 1;
+ fail4:
+    (void)xc_evtchn_close(xup->xc_handle, DOMID_SELF, port1);
+ fail3:
+    (void)xc_interface_close(xup->xc_handle);
+ fail2:
+    (void)close(xup->mem_fd);
+ fail1:
+    PyObject_Del((PyObject *)xup);
+    return NULL;        
 }
 
-static void process_channel(unsigned int port)
+static PyObject *xu_port_getattr(PyObject *obj, char *name)
 {
-    portinfo_t      *pinfo = &portinfo[port];
-    u16              wbuf = port;
-
-    /* Acknowledge the notification. */
-    (void)write(evt_fd, &wbuf, sizeof(wbuf));
-
-    /* Process requests; send notification if we updated either ring. */
-    if ( process_evtchn_reads(pinfo) || process_evtchn_writes(pinfo) )
-        (void)xc_evtchn_send(xc_fd, port);
+    xu_port_object *xup = (xu_port_object *)obj;
+    if ( strcmp(name, "local_port") == 0 )
+        return PyInt_FromLong(xup->local_port);
+    if ( strcmp(name, "remote_port") == 0 )
+        return PyInt_FromLong(xup->remote_port);
+    if ( strcmp(name, "remote_dom") == 0 )
+        return PyLong_FromUnsignedLongLong(xup->remote_dom);
+    return Py_FindMethod(xu_port_methods, obj, name);
 }
 
-int main(int argc, char **argv)
+static void xu_port_dealloc(PyObject *self)
 {
-    struct pollfd polls[1025]; /* one per port, plus /dev/xeno/evtchn */
-    portinfo_t *pinfo;
-    unsigned int batch, bytes, i, port, fd_idx;
-    u16 buf[BATCH_SIZE];
+    xu_port_object *xup = (xu_port_object *)self;
+    unmap_control_interface(xup->mem_fd, xup->interface);
+    (void)xc_evtchn_close(xup->xc_handle, DOMID_SELF, xup->local_port);
+    (void)xc_interface_close(xup->xc_handle);
+    (void)close(xup->mem_fd);
+    PyObject_Del(self);
+}
 
-    /* Ignore writes to disconnected sockets. We clear up later. */
-    (void)signal(SIGPIPE, SIG_IGN);
+static PyTypeObject xu_port_type = {
+    PyObject_HEAD_INIT(&PyType_Type)
+    0,
+    "port",
+    sizeof(xu_port_object),
+    0,
+    xu_port_dealloc,     /* tp_dealloc     */
+    NULL,                /* tp_print       */
+    xu_port_getattr,     /* tp_getattr     */
+    NULL,                /* tp_setattr     */
+    NULL,                /* tp_compare     */
+    NULL,                /* tp_repr        */
+    NULL,                /* tp_as_number   */
+    NULL,                /* tp_as_sequence */
+    NULL,                /* tp_as_mapping  */
+    NULL                 /* tp_hash        */
+};
+
+
+
+/*
+ * *********************** BUFFER ***********************
+ */
+
+#define BUFSZ 65536
+#define MASK_BUF_IDX(_i) ((_i)&(BUFSZ-1))
+typedef unsigned int BUF_IDX;
+
+typedef struct {
+    PyObject_HEAD;
+    char        *buf;
+    unsigned int prod, cons;
+} xu_buffer_object;
+
+static PyObject *__xu_buffer_peek(xu_buffer_object *xub, int max)
+{
+    PyObject *str1, *str2;
+    int len1, len2, c = MASK_BUF_IDX(xub->cons);
+
+    len1 = xub->prod - xub->cons;
+    if ( len1 > (BUFSZ - c) ) /* clip to ring wrap */
+        len1 = BUFSZ - c;
+    if ( len1 > max )         /* clip to specified maximum */
+        len1 = max;
+    if ( len1 < 0 )           /* sanity */
+        len1 = 0;
+
+    if ( (str1 = PyString_FromStringAndSize(&xub->buf[c], len1)) == NULL )
+        return NULL;
+
+    if ( (len1 < (xub->prod - xub->cons)) && (len1 < max) )
+    {
+        len2 = max - len1;
+        if ( len2 > MASK_BUF_IDX(xub->prod) )
+            len2 = MASK_BUF_IDX(xub->prod);
+        if ( len2 > 0 )
+        {
+            str2 = PyString_FromStringAndSize(&xub->buf[0], len2);
+            if ( str2 == NULL )
+                return NULL;
+            PyString_ConcatAndDel(&str1, str2);
+            if ( str1 == NULL )
+                return NULL;
+        }
+    }
+
+    return str1;
+}
+
+static PyObject *xu_buffer_peek(PyObject *self, PyObject *args)
+{
+    xu_buffer_object *xub = (xu_buffer_object *)self;
+    int max = 1024;
+
+    if ( !PyArg_ParseTuple(args, "|i", &max) )
+        return NULL;
     
-    if ( (evt_fd = open(EVTCHN_DEV_NAME, O_NONBLOCK|O_RDWR)) == -1 )
-    {
-        SYS_ERROR("Could not open '%s'", EVTCHN_DEV_NAME);
-        ROOT_HINT();
-        HINT("On a non-devfs system you must run 'mknod %s c %d %d'.",
-             EVTCHN_DEV_NAME, EVTCHN_DEV_MAJOR, EVTCHN_DEV_MINOR);
-        exit(1);
-    }
-
-    if ( (mem_fd = open("/dev/mem", O_RDWR)) == -1 )
-    {
-        SYS_ERROR("Could not open '/dev/mem'");
-        ROOT_HINT();
-        exit(1);
-    }
-
-    if ( (xc_fd = xc_interface_open()) == -1 )
-    {
-        SYS_ERROR("Could not open Xen control interface");
-        ROOT_HINT();
-        DOM0_HINT();
-        exit(1);
-    }
-
-    for ( ; ; )
-    {
-        polls[0].fd     = evt_fd;
-        polls[0].events = POLLIN;
-
-        fd_idx = 1;
-        for ( pinfo = active_head; pinfo != NULL; pinfo = pinfo->next )
-        {
-            switch ( pinfo->con_status )
-            {
-            case CONSTAT_LISTENING:
-                polls[fd_idx].fd     = pinfo->con_fd;
-                polls[fd_idx].events = POLLIN;
-                fd_idx++;
-                break;
-            case CONSTAT_CONNECTED:
-                polls[fd_idx].fd     = pinfo->con_fd;
-                polls[fd_idx].events = POLLIN | (RX_EMPTY(pinfo)?0:POLLOUT);
-                fd_idx++;
-                break;
-            }
-        }
-
-        while ( poll(polls, fd_idx, -1) == -1 )
-        {
-            if ( errno == EINTR )
-                continue;
-            SYS_ERROR("Unexpected error from poll().");
-            exit(1);
-        }
-
-        fd_idx = 1;
-        for ( pinfo = active_head; pinfo != NULL; pinfo = pinfo->next )
-        {
-            switch ( pinfo->con_status )
-            {
-            case CONSTAT_LISTENING:
-                if ( ((polls[fd_idx].revents & POLLIN) != 0) )
-                    (void)make_consock_connected(pinfo);
-                break;
-            case CONSTAT_CONNECTED:
-                if ( ((polls[fd_idx].revents & POLLOUT) != 0) )
-                    do_consock_write(pinfo);
-                if ( ((polls[fd_idx].revents & POLLIN) != 0) )
-                    do_consock_read(pinfo);
-                break;
-            }
-            fd_idx++;
-        }
-
-        while ( (bytes = read(evt_fd, buf, sizeof(buf))) == -1 )
-        {
-            if ( errno == EINTR )
-                continue;
-            if ( errno == EAGAIN )
-            {
-                bytes = 0;
-                break;
-            }
-            SYS_ERROR("Unexpected error while reading '%s'.", EVTCHN_DEV_NAME);
-            exit(1);
-        }
-        
-        if ( bytes == 0 )
-            continue;
-
-        if ( (bytes & 1) != 0 )
-        {
-            ERROR("Bad read length (%d bytes) from '%s'.",
-                  bytes, EVTCHN_DEV_NAME);
-            exit(1);
-        }
-        
-        batch = bytes / sizeof(u16);
-        for ( i = 0; i < batch; i++ )
-        {
-            port = buf[i] & PORTIDX_MASK;
-            
-            if ( buf[i] & PORT_DISCONNECT )
-            {
-                DPRINTF("Disconnect on port %d.", port);
-                (void)handle_channel_exception(port);
-                continue;
-            }
-            
-            if ( portinfo[port].interface == NULL )
-            {
-                DPRINTF("Unexpected notification on port %d.", port);
-                if ( !handle_channel_exception(port) )
-                    continue;
-            }
-            
-            process_channel(port);
-        }
-    }
-
-    (void)xc_interface_close(xc_fd);
-    (void)close(mem_fd);
-    (void)close(evt_fd);
-
-    return 0;
+    return __xu_buffer_peek(xub, max);
 }
 
-
-/* Returns non-zero if console is listening on exit. */
-static int make_consock_listener(portinfo_t *pinfo)
+static PyObject *xu_buffer_read(PyObject *self, PyObject *args)
 {
-    int reuseaddr_flag = 1;
-    struct linger linger;
-    int tcp_port = 9600 + PORT(pinfo);
-    int fd, flags;
-    struct sockaddr_in sa;
+    xu_buffer_object *xub = (xu_buffer_object *)self;
+    PyObject *str;
+    int max = 1024;
 
-    if ( pinfo->con_status == CONSTAT_LISTENING )
-        return 1;
+    if ( !PyArg_ParseTuple(args, "|i", &max) )
+        return NULL;
 
-    if ( pinfo->con_status == CONSTAT_CONNECTED )
-    {
-        (void)close(pinfo->con_fd);
-        pinfo->con_status = CONSTAT_CLOSED;
-    }
+    if ( (str = __xu_buffer_peek(xub, max)) != NULL )
+        xub->cons += PyString_Size(str);
 
-    if ( (fd = socket(AF_INET, SOCK_STREAM, 0)) == -1 )
-    {
-        SYS_ERROR("Could not create TCP socket.");
-        return 0;
-    }
-
-    linger.l_onoff = 0;
-    if ( (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, 
-                     &reuseaddr_flag, sizeof(int)) != 0) ||
-         (setsockopt(fd, SOL_SOCKET, SO_LINGER, 
-                     &linger, sizeof(linger)) != 0) )
-    {
-        SYS_ERROR("Could not enable immediate reuse of socket port.");
-        close(fd);
-        return 0;
-    }
-
-    sa.sin_family      = AF_INET;
-    sa.sin_addr.s_addr = htonl(INADDR_ANY);
-    sa.sin_port        = htons(tcp_port);
-    if ( bind(fd, (struct sockaddr *)&sa, sizeof(sa)) != 0 )
-    {
-        SYS_ERROR("Unable to bind to console port %d.", tcp_port);
-        close(fd);
-        return 0;
-    }
-
-    if ( listen(fd, 5) != 0 )
-    {
-        SYS_ERROR("Unable to listen on console port %d.", tcp_port);
-        close(fd);
-        return 0;
-    }
-
-    if ( ((flags = fcntl(fd, F_GETFL, 0)) < 0) ||
-         (fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0) )
-    {
-        SYS_ERROR("Unable to set non-blocking status for console listener.");
-        close(fd);
-        return 0;
-    }
-
-    pinfo->con_fd     = fd;
-    pinfo->con_status = CONSTAT_LISTENING;
-    return 1;
+    return str;
 }
 
-/* Returns non-zero if console is connected on exit. */
-static int make_consock_connected(portinfo_t *pinfo)
+static PyObject *xu_buffer_discard(PyObject *self, PyObject *args)
 {
-    int fd, flags, sa_len;
-    struct linger linger;
-    struct sockaddr_in sa;
+    xu_buffer_object *xub = (xu_buffer_object *)self;
+    int max, len;
 
-    if ( pinfo->con_status == CONSTAT_CONNECTED )
-        return 1;
+    if ( !PyArg_ParseTuple(args, "i", &max) )
+        return NULL;
 
-    if ( pinfo->con_status == CONSTAT_CLOSED )
-        return 0;
+    len = xub->prod - xub->cons;
+    if ( len > max )
+        len = max;
+    if ( len < 0 )
+        len = 0;
 
-    if ( (fd = accept(pinfo->con_fd, (struct sockaddr *)&sa, &sa_len)) == -1 )
-        return 0;
+    xub->cons += len;
 
-    linger.l_onoff = 0;
-    if ( setsockopt(fd, SOL_SOCKET, SO_LINGER, 
-                    &linger, sizeof(linger)) != 0 )
-    {
-        SYS_ERROR("Could not enable immediate socket death.");
-        close(fd);
-        return 0;
-    }
-
-    if ( ((flags = fcntl(fd, F_GETFL, 0)) < 0) ||
-         (fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0) )
-    {
-        SYS_ERROR("Unable to set non-blocking status on socket.");
-        close(fd);
-        return 0;
-    }
-
-    (void)close(pinfo->con_fd);
-
-    pinfo->con_fd     = fd;
-    pinfo->con_status = CONSTAT_CONNECTED;
-    return 1;
+    return PyInt_FromLong(len);
 }
 
-
-static void make_consock_closed(portinfo_t *pinfo)
+static PyObject *xu_buffer_write(PyObject *self, PyObject *args)
 {
-    if ( pinfo->con_status != CONSTAT_CLOSED )
-        (void)close(pinfo->con_fd);
-    pinfo->con_status = CONSTAT_CLOSED;
-}
+    xu_buffer_object *xub = (xu_buffer_object *)self;
+    char *str;
+    int len, len1, len2;
 
+    if ( !PyArg_ParseTuple(args, "s#", &str, &len) )
+        return NULL;
 
-static void do_consock_read(portinfo_t *pinfo)
-{
-    char buf[1024];
-    int  idx, bytes, rc, was_empty = TX_EMPTY(pinfo);
+    len1 = len;
+    if ( len1 > (BUFSZ - MASK_BUF_IDX(xub->prod)) )
+        len1 = BUFSZ - MASK_BUF_IDX(xub->prod);
+    if ( len1 > (BUFSZ - (xub->prod - xub->cons)) )
+        len1 = BUFSZ - (xub->prod - xub->cons);
 
-    while ( (rc = read(pinfo->con_fd, &buf, sizeof(buf))) > 0 )
+    if ( len1 == 0 )
+        return PyInt_FromLong(0);
+
+    memcpy(&xub->buf[MASK_BUF_IDX(xub->prod)], &str[0], len1);
+    xub->prod += len1;
+
+    if ( len1 < len )
     {
-        idx = 0;
-        while ( (rc != 0) && !TX_FULL(pinfo) )
+        len2 = len - len1;
+        if ( len2 > (BUFSZ - MASK_BUF_IDX(xub->prod)) )
+            len2 = BUFSZ - MASK_BUF_IDX(xub->prod);
+        if ( len2 > (BUFSZ - (xub->prod - xub->cons)) )
+            len2 = BUFSZ - (xub->prod - xub->cons);
+        if ( len2 != 0 )
         {
-            bytes = rc;
-            /* Clip copy to ring-buffer wrap. */
-            if ( bytes > (CONBUFSZ - MASK_CONBUF_IDX(pinfo->txp)) )
-                bytes = CONBUFSZ - MASK_CONBUF_IDX(pinfo->txp);
-            /* Clip copy to ring-buffer overflow. */
-            if ( bytes > (CONBUFSZ - (pinfo->txp - pinfo->txc)) )
-                bytes = CONBUFSZ - (pinfo->txp - pinfo->txc);
-            memcpy(&pinfo->tx_buf[MASK_CONBUF_IDX(pinfo->txp)],
-                   &buf[idx], bytes);
-            pinfo->txp += bytes;
-            idx        += bytes;
-            rc         -= bytes;
+            memcpy(&xub->buf[MASK_BUF_IDX(xub->prod)], &str[len1], len2);
+            xub->prod += len2;
+            return PyInt_FromLong(len1 + len2);
         }
     }
 
-    if ( (rc == 0) || (errno != EAGAIN) )
-    {
-        DPRINTF("Console client has disconnected.");
-        if ( !make_consock_listener(pinfo) )
-        {
-            ERROR("Could not revert console %d to listener status.",
-                  PORT(pinfo));
-            exit(1);
-        }
-    }
-
-    if ( was_empty && !TX_EMPTY(pinfo) )
-    {
-        /* There is now data to transmit to guest. Kickstart the pipeline. */
-        if ( process_evtchn_writes(pinfo) )
-            (void)xc_evtchn_send(xc_fd, PORT(pinfo));
-    }
+    return PyInt_FromLong(len1);
 }
 
-static void do_consock_write(portinfo_t *pinfo)
+static PyObject *xu_buffer_empty(PyObject *self, PyObject *args)
 {
-    int bytes, rc;
+    xu_buffer_object *xub = (xu_buffer_object *)self;
 
-    while ( !RX_EMPTY(pinfo) )
-    {
-        /* Clip transfer to ring-buffer wrap. */
-        bytes = CONBUFSZ - MASK_CONBUF_IDX(pinfo->rxc);
-        /* Clip transfer to ring-buffer overflow. */
-        if ( bytes > (pinfo->rxp - pinfo->rxc) )
-            bytes = pinfo->rxp - pinfo->rxc;
-        rc = write(pinfo->con_fd, 
-                   &pinfo->rx_buf[MASK_CONBUF_IDX(pinfo->rxc)], 
-                   bytes);
-        if ( rc <= 0 )
-            return; /* Nothing to do. Errors cleaned up in reader code. */
-        pinfo->rxc += rc;
-    }
+    if ( !PyArg_ParseTuple(args, "") )
+        return NULL;
+
+    if ( xub->cons == xub->prod )
+        return PyInt_FromLong(1);
+
+    return PyInt_FromLong(0);
 }
 
-static int process_evtchn_reads(portinfo_t *pinfo)
+static PyObject *xu_buffer_full(PyObject *self, PyObject *args)
 {
-    CONTROL_RING_IDX c;
-    control_if_t    *cif = pinfo->interface;
-    control_msg_t   *cmsg;
-    unsigned int     clen, idx, len, bytes;
+    xu_buffer_object *xub = (xu_buffer_object *)self;
 
-    for ( c = pinfo->tx_req_cons; 
-          (c != cif->tx_req_prod) && 
-              ((c-pinfo->tx_resp_prod) != CONTROL_RING_SIZE);
-          c++ )
-    {
-        cmsg = &cif->tx_ring[MASK_CONTROL_IDX(c)];
+    if ( !PyArg_ParseTuple(args, "") )
+        return NULL;
 
-        if ( (clen = cmsg->length) > sizeof(cmsg->msg) )
-            clen = sizeof(cmsg->msg);
+    if ( (xub->prod - xub->cons) == BUFSZ )
+        return PyInt_FromLong(1);
 
-        if ( (cmsg->cmd_type == CMD_CONSOLE) &&
-             (cmsg->cmd_subtype == CMD_CONSOLE_DATA) )
-        {
-            idx = 0;
-            len = cmsg->length;
-            while ( (len != 0) && !RX_FULL(pinfo) )
-            {
-                bytes = len;
-                /* Clip copy to ring-buffer wrap. */
-                if ( bytes > (CONBUFSZ - MASK_CONBUF_IDX(pinfo->rxp)) )
-                    bytes = CONBUFSZ - MASK_CONBUF_IDX(pinfo->rxp);
-                /* Clip copy to ring-buffer overflow. */
-                if ( bytes > (CONBUFSZ - (pinfo->rxp - pinfo->rxc)) )
-                    bytes = CONBUFSZ - (pinfo->rxp - pinfo->rxc);
-                memcpy(&pinfo->rx_buf[MASK_CONBUF_IDX(pinfo->rxp)],
-                       &cmsg->msg[idx], bytes);
-                pinfo->rxp += bytes;
-                idx += bytes;
-                len -= bytes;
-            }
-        }
-
-        /* Prepare response. No payload; msg type and id same as request. */
-        cmsg->length = 0;
-    }
-
-    if ( c != pinfo->tx_req_cons )
-    {
-        /* Update private indexes. */
-        pinfo->tx_resp_prod = c;
-        pinfo->tx_req_cons  = c;
-        /* Queue responses and send a notification to the guest OS. */
-        cif->tx_resp_prod   = c;
-        return 1;
-    }
-
-    return 0;
+    return PyInt_FromLong(0);
 }
 
-static int process_evtchn_writes(portinfo_t *pinfo)
+static PyMethodDef xu_buffer_methods[] = {
+    { "peek", 
+      (PyCFunction)xu_buffer_peek,
+      METH_VARARGS,
+      "Peek up to @max bytes from the buffer. Returns a string.\n" },
+
+    { "read", 
+      (PyCFunction)xu_buffer_read,
+      METH_VARARGS,
+      "Read up to @max bytes from the buffer. Returns a string.\n" },
+
+    { "discard", 
+      (PyCFunction)xu_buffer_discard,
+      METH_VARARGS,
+      "Discard up to @max bytes from the buffer. Returns number of bytes.\n" },
+
+    { "write", 
+      (PyCFunction)xu_buffer_write,
+      METH_VARARGS,
+      "Write @string into buffer. Return number of bytes written.\n" },
+
+    { "empty", 
+      (PyCFunction)xu_buffer_empty,
+      METH_VARARGS,
+      "Return TRUE if the buffer is empty.\n" },
+
+    { "full", 
+      (PyCFunction)xu_buffer_full,
+      METH_VARARGS,
+      "Return TRUE if the buffer is full.\n" },
+
+    { NULL, NULL, 0, NULL }
+};
+
+staticforward PyTypeObject xu_buffer_type;
+
+static PyObject *xu_buffer_new(PyObject *self, PyObject *args)
 {
-    CONTROL_RING_IDX p, rx_resp_prod;
-    control_if_t    *cif = pinfo->interface;
-    control_msg_t   *cmsg;
-    unsigned int     bytes;
+    xu_buffer_object *xub;
 
-    /* Validate the rx-response producer, an dupdate our consumer if okay. */
-    rx_resp_prod = cif->rx_resp_prod;
-    if ( (pinfo->rx_resp_cons != rx_resp_prod) &&
-         ((pinfo->rx_req_prod - rx_resp_prod) <= CONTROL_RING_SIZE) &&
-         ((rx_resp_prod - pinfo->rx_resp_cons) <= CONTROL_RING_SIZE) )
-        pinfo->rx_resp_cons = cif->rx_resp_prod;
+    if ( !PyArg_ParseTuple(args, "") )
+        return NULL;
 
-    for ( p = pinfo->rx_req_prod;
-          (p-pinfo->rx_resp_cons) != CONTROL_RING_SIZE;
-          p++ )
+    xub = PyObject_New(xu_buffer_object, &xu_buffer_type);
+
+    if ( (xub->buf = malloc(BUFSZ)) == NULL )
     {
-        if ( TX_EMPTY(pinfo) )
-            break;
-        cmsg = &cif->rx_ring[MASK_CONTROL_IDX(p)];
-        bytes = sizeof(cmsg->msg);
-        /* Clip transfer to ring-buffer wrap. */
-        if ( bytes > (CONBUFSZ - MASK_CONBUF_IDX(pinfo->txc)) )
-            bytes = CONBUFSZ - MASK_CONBUF_IDX(pinfo->txc);
-        /* Clip transfer to ring-buffer overflow. */
-        if ( bytes > (pinfo->txp - pinfo->txc) )
-            bytes = pinfo->txp - pinfo->txc;
-        cmsg->cmd_type    = CMD_CONSOLE;
-        cmsg->cmd_subtype = CMD_CONSOLE_DATA;
-        cmsg->id          = 0xaa;
-        cmsg->length      = bytes;
-        memcpy(&cmsg->msg[0], 
-               &pinfo->tx_buf[MASK_CONBUF_IDX(pinfo->txc)], 
-               bytes);
-        pinfo->txc += bytes;
+        PyObject_Del((PyObject *)xub);
+        return NULL;
     }
 
-    if ( p != pinfo->rx_req_prod )
-    {
-        pinfo->rx_req_prod  = p;
-        cif->rx_req_prod    = p;
-        return 1;
-    }
+    xub->prod = xub->cons = 0;
 
-    return 0;
+    return (PyObject *)xub;
+}
+
+static PyObject *xu_buffer_getattr(PyObject *obj, char *name)
+{
+    return Py_FindMethod(xu_buffer_methods, obj, name);
+}
+
+static void xu_buffer_dealloc(PyObject *self)
+{
+    xu_buffer_object *xub = (xu_buffer_object *)self;
+    free(xub->buf);
+    PyObject_Del(self);
+}
+
+static PyTypeObject xu_buffer_type = {
+    PyObject_HEAD_INIT(&PyType_Type)
+    0,
+    "buffer",
+    sizeof(xu_buffer_object),
+    0,
+    xu_buffer_dealloc,   /* tp_dealloc     */
+    NULL,                /* tp_print       */
+    xu_buffer_getattr,   /* tp_getattr     */
+    NULL,                /* tp_setattr     */
+    NULL,                /* tp_compare     */
+    NULL,                /* tp_repr        */
+    NULL,                /* tp_as_number   */
+    NULL,                /* tp_as_sequence */
+    NULL,                /* tp_as_mapping  */
+    NULL                 /* tp_hash        */
+};
+
+
+
+/*
+ * *********************** MODULE WRAPPER ***********************
+ */
+
+static void handle_child_death(int dummy)
+{
+    while ( waitpid(-1, NULL, WNOHANG) > 0 )
+        continue;
+}
+
+static PyObject *xu_autoreap(PyObject *self, PyObject *args)
+{
+    struct sigaction sa;
+
+    if ( !PyArg_ParseTuple(args, "") )
+        return NULL;
+
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = handle_child_death;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_NOCLDSTOP | SA_RESTART;
+    (void)sigaction(SIGCHLD, &sa, NULL);
+
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static PyMethodDef xu_methods[] = {
+    { "notifier", xu_notifier_new, METH_VARARGS, 
+      "Create a new notifier." },
+    { "message", xu_message_new, METH_VARARGS, 
+      "Create a new communications message." },
+    { "port", xu_port_new, METH_VARARGS, 
+      "Create a new communications port." },
+    { "buffer", xu_buffer_new, METH_VARARGS, 
+      "Create a new ring buffer." },
+    { "autoreap", xu_autoreap, METH_VARARGS,
+      "Ensure that zombie children are automatically reaped by the OS." },
+    { NULL, NULL, 0, NULL }
+};
+
+PyMODINIT_FUNC initxend_utils(void)
+{
+    PyObject *m, *d;
+
+    m = Py_InitModule("xend_utils", xu_methods);
+
+    d = PyModule_GetDict(m);
+    port_error = PyErr_NewException("xend_utils.PortError", NULL, NULL);
+    PyDict_SetItemString(d, "PortError", port_error);
 }
