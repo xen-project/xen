@@ -67,16 +67,19 @@ static void fallback_timer_fn(unsigned long unused);
 /* This is global for now so that private implementations can reach it */
 schedule_data_t schedule_data[NR_CPUS];
 
-/*
- * TODO: It would be nice if the schedulers array could get populated
- * automagically without having to hack the code in here.
- */
-extern struct scheduler sched_bvt_def, sched_fbvt_def, sched_rrobin_def, sched_atropos_def;
-static struct scheduler *schedulers[] = { &sched_bvt_def,
-					                      &sched_fbvt_def,
-                                          &sched_rrobin_def,
-                                          &sched_atropos_def,
-                                          NULL};
+extern struct scheduler sched_bvt_def;
+extern struct scheduler sched_fbvt_def;
+extern struct scheduler sched_rrobin_def;
+extern struct scheduler sched_atropos_def;
+static struct scheduler *schedulers[] = { 
+    &sched_bvt_def,
+#ifdef BROKEN_SCHEDULERS
+    &sched_fbvt_def,
+    &sched_rrobin_def,
+    &sched_atropos_def,
+#endif
+    NULL
+};
 
 /* Operations for the current scheduler. */
 static struct scheduler ops;
@@ -155,21 +158,20 @@ void sched_rem_domain(struct domain *d)
 
 void init_idle_task(void)
 {
-    struct domain *d = current;
-
-    if ( SCHED_OP(init_idle_task, d) < 0)
-        panic("Failed to initialise idle task for processor %d",d->processor);
+    if ( SCHED_OP(init_idle_task, current) < 0 )
+        BUG();
 }
 
 void domain_sleep(struct domain *d)
 {
     unsigned long flags;
 
-    /* sleep and wake protected by domain's sleep_lock */
-    spin_lock_irqsave(&d->sleep_lock, flags);
+    spin_lock_irqsave(&schedule_data[d->processor].schedule_lock, flags);
+
     if ( likely(!domain_runnable(d)) )
         SCHED_OP(sleep, d);
-    spin_unlock_irqrestore(&d->sleep_lock, flags);
+
+    spin_unlock_irqrestore(&schedule_data[d->processor].schedule_lock, flags);
  
     /* Synchronous. */
     while ( test_bit(DF_RUNNING, &d->flags) && !domain_runnable(d) )
@@ -181,10 +183,10 @@ void domain_sleep(struct domain *d)
 
 void domain_wake(struct domain *d)
 {
-    unsigned long       flags;
+    unsigned long flags;
 
-    spin_lock_irqsave(&d->sleep_lock, flags);
-    
+    spin_lock_irqsave(&schedule_data[d->processor].schedule_lock, flags);
+
     if ( likely(domain_runnable(d)) )
     {
         TRACE_2D(TRC_SCHED_WAKE, d->domain, d);
@@ -196,7 +198,7 @@ void domain_wake(struct domain *d)
     
     clear_bit(DF_MIGRATED, &d->flags);
     
-    spin_unlock_irqrestore(&d->sleep_lock, flags);
+    spin_unlock_irqrestore(&schedule_data[d->processor].schedule_lock, flags);
 }
 
 /* Block the currently-executing domain until a pertinent event occurs. */
@@ -217,7 +219,6 @@ static long do_yield(void)
     __enter_scheduler();
     return 0;
 }
-
 
 /*
  * Demultiplex scheduler-related hypercalls.
@@ -292,24 +293,25 @@ long sched_ctl(struct sched_ctl_cmd *cmd)
 /* Adjust scheduling parameter for a given domain. */
 long sched_adjdom(struct sched_adjdom_cmd *cmd)
 {
-    struct domain *p;    
-    
+    struct domain *d;
+
     if ( cmd->sched_id != ops.sched_id )
         return -EINVAL;
 
     if ( cmd->direction != SCHED_INFO_PUT && cmd->direction != SCHED_INFO_GET )
         return -EINVAL;
 
-    p = find_domain_by_id(cmd->domain);
-
-    if( p == NULL )
+    d = find_domain_by_id(cmd->domain);
+    if ( d == NULL )
         return -ESRCH;
 
-    TRACE_1D(TRC_SCHED_ADJDOM, p->domain);
+    TRACE_1D(TRC_SCHED_ADJDOM, d->domain);
 
-    SCHED_OP(adjdom, p, cmd);
+    spin_lock_irq(&schedule_data[d->processor].schedule_lock);
+    SCHED_OP(adjdom, d, cmd);
+    spin_unlock_irq(&schedule_data[d->processor].schedule_lock);
 
-    put_domain(p); 
+    put_domain(d);
     return 0;
 }
 
@@ -335,7 +337,6 @@ void __enter_scheduler(void)
     rem_ac_timer(&schedule_data[cpu].s_timer);
     
     ASSERT(!in_irq());
-    // TODO - move to specific scheduler ASSERT(__task_on_runqueue(prev));
 
     if ( test_bit(DF_BLOCKED, &prev->flags) )
     {
@@ -361,6 +362,9 @@ void __enter_scheduler(void)
     /* reprogramm the timer */
     schedule_data[cpu].s_timer.expires  = now + r_time;
     add_ac_timer(&schedule_data[cpu].s_timer);
+
+    /* Must be protected by the schedule_lock! */
+    set_bit(DF_RUNNING, &next->flags);
 
     spin_unlock_irq(&schedule_data[cpu].schedule_lock);
 
@@ -405,7 +409,6 @@ void __enter_scheduler(void)
      * without warning). 
      */
     clear_bit(DF_RUNNING, &prev->flags);
-    set_bit(DF_RUNNING, &next->flags);
 
     /* Mark a timer event for the newly-scheduled domain. */
     if ( !is_idle_task(next) )
@@ -549,15 +552,23 @@ void dump_runq(u_char key, void *dev_id, struct pt_regs *regs)
 {
     s_time_t      now = NOW();
     int           i;
+    unsigned long flags;
+
+    local_irq_save(flags);
 
     printk("Scheduler: %s (%s)\n", ops.name, ops.opt_name);
     SCHED_OP(dump_settings);
     printk("NOW=0x%08X%08X\n",  (u32)(now>>32), (u32)now); 
+
     for ( i = 0; i < smp_num_cpus; i++ )
     {
+        spin_lock(&schedule_data[i].schedule_lock);
         printk("CPU[%02d] ", i);
         SCHED_OP(dump_cpu_state,i);
+        spin_unlock(&schedule_data[i].schedule_lock);
     }
+
+    local_irq_restore(flags);
 }
 
 #if defined(WAKE_HISTO) || defined(BLOCKTIME_HISTO)

@@ -39,7 +39,6 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
     d->domain    = dom_id;
     d->processor = cpu;
     d->create_time = NOW();
-    spin_lock_init(&d->sleep_lock);
  
     memcpy(&d->thread, &idle0_task.thread, sizeof(d->thread));
 
