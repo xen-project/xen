@@ -163,18 +163,6 @@ void clear_page_tables(struct mm_struct *mm, unsigned long first, int nr)
 #define PTE_TABLE_MASK	((PTRS_PER_PTE-1) * sizeof(pte_t))
 #define PMD_TABLE_MASK	((PTRS_PER_PMD-1) * sizeof(pmd_t))
 
-#undef set_pte
-#define set_pte(pteptr, pteval) do { \
-	(*(pteptr) = pteval); \
-	/* printk("set_pte %p -> %08lx\n", pteptr, pteval); */ \
-} while (0)
-//void queue_l1_entry_update_queued(pte_t *ptr, unsigned long val);
-//#define set_pte(pteptr, pteval) queue_l1_entry_update_queued(pteptr, (pteval).pte_low)
-// #define ptep_get_and_clear(xp)	__pte(xchg(&(xp)->pte_low, 0))
-//#undef pte_unmap
-//#define pte_unmap(pte) xen_flush_page_update_queue()
-#undef pmd_bad
-#define	pmd_bad(x)	(((x).pmd & (~PAGE_MASK & ~_PAGE_USER & ~_PAGE_PRESENT & ~0x800)) != (_KERNPG_TABLE & ~_PAGE_PRESENT))
 /*
  * copy one vm_area from one task to the other. Assumes the page tables
  * already present in the new task to be cleared in the whole range
@@ -196,8 +184,6 @@ int copy_page_range(struct mm_struct *dst, struct mm_struct *src,
 
 	src_pgd = pgd_offset(src, address)-1;
 	dst_pgd = pgd_offset(dst, address)-1;
-        /* printk("copy_page_range src %p dst %p src_pgd %p dst_pgd %p %08lx-%08lx\n", */
-/*                src, dst, src_pgd, dst_pgd, address, end); */
 
 	for (;;) {
 		pmd_t * src_pmd, * dst_pmd;
@@ -219,7 +205,6 @@ skip_copy_pmd_range:	address = (address + PGDIR_SIZE) & PGDIR_MASK;
 
 		src_pmd = pmd_offset(src_pgd, address);
 		dst_pmd = pmd_alloc(dst, dst_pgd, address);
-                /* printk("src_pmd %p dst_pmd %p\n", src_pmd, dst_pmd); */
 		if (!dst_pmd)
 			goto nomem;
 
@@ -241,8 +226,6 @@ skip_copy_pte_range:		address = (address + PMD_SIZE) & PMD_MASK;
 
 			src_pte = pte_offset(src_pmd, address);
 			dst_pte = pte_alloc(dst, dst_pmd, address);
-                        /* printk("src_pte %p(%p,%08lx,%08lx, %08lx) dst_pte %p\n", */
-/*                                src_pte, src_pmd, *src_pmd, pmd_page(*src_pmd), address, dst_pte); */
 			if (!dst_pte)
 				goto nomem;
 
@@ -256,8 +239,6 @@ skip_copy_pte_range:		address = (address + PMD_SIZE) & PMD_MASK;
 				if (pte_none(pte))
 					goto cont_copy_pte_range_noset;
 				if (!pte_present(pte)) {
-                                    printk("swap_dup call %p:%08lx\n",
-                                           src_pte, pte.pte_low);
 					swap_duplicate(pte_to_swp_entry(pte));
 					goto cont_copy_pte_range;
 				}
@@ -268,17 +249,10 @@ skip_copy_pte_range:		address = (address + PMD_SIZE) & PMD_MASK;
 
 				/* If it's a COW mapping, write protect it both in the parent and the child */
 				if (cow && pte_write(pte)) {
-                                    /* printk("ptep_set_wrprotect %p was %08lx\n", src_pte, *src_pte); */
-#if 0
 					/* XEN modification: modified ordering here to avoid RaW hazard. */
 					pte = *src_pte;
 					pte = pte_wrprotect(pte);
 					ptep_set_wrprotect(src_pte);
-#else
-                                        clear_bit(_PAGE_BIT_RW, src_pte); //ptep_set_wrprotect(src_pte);
-					pte = *src_pte;
-                                    /* printk("ptep_set_wrprotect %p now %08lx\n", src_pte, *src_pte); */
-#endif
 				}
 
 				/* If it's a shared mapping, mark it clean in the child */
@@ -304,13 +278,10 @@ cont_copy_pmd_range:	src_pmd++;
 out_unlock:
 	spin_unlock(&src->page_table_lock);
 out:
-        /* printk("out\n"); */
 	return 0;
 nomem:
 	return -ENOMEM;
 }
-#undef set_pte
-#define set_pte(pteptr, pteval) queue_l1_entry_update(pteptr, (pteval).pte_low)
 
 /*
  * Return indicates whether a page was freed so caller can adjust rss
