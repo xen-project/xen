@@ -24,16 +24,26 @@
 #define shadow_linear_pg_table ((l1_pgentry_t *)SH_LINEAR_PT_VIRT_START)
 #define shadow_linear_l2_table ((l2_pgentry_t *)(SH_LINEAR_PT_VIRT_START+(SH_LINEAR_PT_VIRT_START>>(L2_PAGETABLE_SHIFT-L1_PAGETABLE_SHIFT))))
 
+#define shadow_mode(_d)      ((_d)->mm.shadow_mode)
+#define shadow_lock_init(_d) spin_lock_init(&(_d)->mm.shadow_lock)
+
 extern void shadow_mode_init(void);
-extern int shadow_mode_control( struct domain *p, dom0_shadow_control_t *sc );
-extern int shadow_fault( unsigned long va, long error_code );
-extern void shadow_l1_normal_pt_update( unsigned long pa, unsigned long gpte, 
-                                        unsigned long *prev_spfn_ptr,
-                                        l1_pgentry_t **prev_spl1e_ptr  );
-extern void shadow_l2_normal_pt_update( unsigned long pa, unsigned long gpte );
-extern void unshadow_table( unsigned long gpfn, unsigned int type );
-extern int shadow_mode_enable( struct domain *p, unsigned int mode );
-extern void shadow_mode_disable( struct domain *p );
+extern int shadow_mode_control(struct domain *p, dom0_shadow_control_t *sc);
+extern int shadow_fault(unsigned long va, long error_code);
+extern void shadow_l1_normal_pt_update(unsigned long pa, unsigned long gpte, 
+                                       unsigned long *prev_spfn_ptr,
+                                       l1_pgentry_t **prev_spl1e_ptr);
+extern void shadow_l2_normal_pt_update(unsigned long pa, unsigned long gpte);
+extern void unshadow_table(unsigned long gpfn, unsigned int type);
+extern int shadow_mode_enable(struct domain *p, unsigned int mode);
+
+extern void __shadow_mode_disable(struct domain *d);
+static inline void shadow_mode_disable(struct domain *d)
+{
+    if ( shadow_mode(d) )
+        __shadow_mode_disable(d);
+}
+
 extern unsigned long shadow_l2_table( 
     struct mm_struct *m, unsigned long gpfn );
 
@@ -77,11 +87,6 @@ printk("DOM%u: (file=shadow.c, line=%d) " _f "\n",    \
 
 /************************************************************************/
 
-#define shadow_mode(d)		(d->mm.shadow_mode)
-#define	shadow_lock_init(d)	spin_lock_init(&d->mm.shadow_lock)
-
-/************************************************************************/
-
 static inline int __mark_dirty( struct mm_struct *m, unsigned int mfn )
 {
     unsigned int pfn;
@@ -100,14 +105,14 @@ static inline int __mark_dirty( struct mm_struct *m, unsigned int mfn )
     ASSERT(m->shadow_dirty_bitmap);
     if( likely(pfn<m->shadow_dirty_bitmap_size) )
     {
-	/* These updates occur with mm.shadow_lock held, so use 
-	   (__) version of test_and_set */
-	if( __test_and_set_bit( pfn, m->shadow_dirty_bitmap ) == 0 )
-	{
-	    // if we set it
-	    m->shadow_dirty_count++;
-	    rc = 1;
-	}
+        /* These updates occur with mm.shadow_lock held, so use 
+           (__) version of test_and_set */
+        if ( __test_and_set_bit( pfn, m->shadow_dirty_bitmap ) == 0 )
+        {
+            // if we set it
+            m->shadow_dirty_count++;
+            rc = 1;
+        }
     }
     else
     {
@@ -119,7 +124,7 @@ static inline int __mark_dirty( struct mm_struct *m, unsigned int mfn )
                frame_table[mfn].count_and_flags, 
                frame_table[mfn].type_and_flags );
     }
-	
+
     return rc;
 }
 
@@ -138,13 +143,13 @@ static inline int mark_dirty( struct mm_struct *m, unsigned int mfn )
 
 /************************************************************************/
 
-static inline void l1pte_write_fault( struct mm_struct *m, 
-                                      unsigned long *gpte_p, unsigned long *spte_p )
+static inline void l1pte_write_fault(
+    struct mm_struct *m, unsigned long *gpte_p, unsigned long *spte_p)
 { 
     unsigned long gpte = *gpte_p;
     unsigned long spte = *spte_p;
 
-    switch( m->shadow_mode )
+    switch ( m->shadow_mode )
     {
     case SHM_test:
         spte = gpte;
@@ -164,13 +169,13 @@ static inline void l1pte_write_fault( struct mm_struct *m,
     *spte_p = spte;
 }
 
-static inline void l1pte_read_fault( struct mm_struct *m, 
-                                     unsigned long *gpte_p, unsigned long *spte_p )
+static inline void l1pte_read_fault(
+    struct mm_struct *m, unsigned long *gpte_p, unsigned long *spte_p)
 { 
     unsigned long gpte = *gpte_p;
     unsigned long spte = *spte_p;
 
-    switch( m->shadow_mode )
+    switch ( m->shadow_mode )
     {
     case SHM_test:
         spte = gpte;
@@ -192,13 +197,13 @@ static inline void l1pte_read_fault( struct mm_struct *m,
     *spte_p = spte;
 }
 
-static inline void l1pte_no_fault( struct mm_struct *m, 
-                                   unsigned long *gpte_p, unsigned long *spte_p )
+static inline void l1pte_no_fault(
+    struct mm_struct *m, unsigned long *gpte_p, unsigned long *spte_p)
 { 
     unsigned long gpte = *gpte_p;
     unsigned long spte = *spte_p;
 
-    switch( m->shadow_mode )
+    switch ( m->shadow_mode )
     {
     case SHM_test:
         spte = 0;
@@ -227,9 +232,11 @@ static inline void l1pte_no_fault( struct mm_struct *m,
     *spte_p = spte;
 }
 
-static inline void l2pde_general( struct mm_struct *m, 
-                                  unsigned long *gpde_p, unsigned long *spde_p,
-                                  unsigned long sl1pfn)
+static inline void l2pde_general(
+    struct mm_struct *m, 
+    unsigned long *gpde_p,
+    unsigned long *spde_p,
+    unsigned long sl1pfn)
 {
     unsigned long gpde = *gpde_p;
     unsigned long spde = *spde_p;
@@ -255,8 +262,6 @@ static inline void l2pde_general( struct mm_struct *m,
 }
 
 /*********************************************************************/
-
-
 
 #if SHADOW_HASH_DEBUG
 static void shadow_audit(struct mm_struct *m, int print)

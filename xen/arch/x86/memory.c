@@ -91,7 +91,7 @@
 #include <xen/errno.h>
 #include <xen/perfc.h>
 #include <xen/irq.h>
-#include <xen/shadow.h>
+#include <asm/shadow.h>
 #include <asm/page.h>
 #include <asm/flushtlb.h>
 #include <asm/io.h>

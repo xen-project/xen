@@ -360,6 +360,7 @@
 3ddb79bdLX_P6iB7ILiblRLWvebapg xen/common/dom0_ops.c
 3e6377e4i0c9GtKN65e99OtRbw3AZw xen/common/dom_mem_ops.c
 3ddb79bdYO5D8Av12NHqPeSviav7cg xen/common/domain.c
+40f2b4a27xPOh3R6zD4M_aabz-TDyg xen/common/elf.c
 3fba5b96H0khoxNiKbjdi0inpXV-Pw xen/common/event_channel.c
 3ddb79bd9drcFPVxd4w2GPOIjLlXpA xen/common/kernel.c
 3e4cd9d8LAAghUY0hNIK72uc2ch_Nw xen/common/keyhandler.c
@@ -449,6 +450,7 @@
 3ddb79c3r9-31dIsewPV3P3i8HALsQ xen/include/asm-x86/delay.h
 3ddb79c34BFiXjBJ_cCKB0aCsV1IDw xen/include/asm-x86/desc.h
 40715b2dTokMLYGSuD58BnxOqyWVew xen/include/asm-x86/div64.h
+40f2b4a2hC3HtChu-ArD8LyojxWMjg xen/include/asm-x86/domain.h
 3e20b82fl1jmQiKdLy7fxMcutfpjWA xen/include/asm-x86/domain_page.h
 3ddb79c3NU8Zy40OTrq3D-i30Y3t4A xen/include/asm-x86/fixmap.h
 3e2d29944GI24gf7vOP_7x8EyuqxeA xen/include/asm-x86/flushtlb.h
@@ -527,7 +529,6 @@
 40589969nPq3DMzv24RDb5LXE9brHw xen/include/xen/sched-if.h
 3ddb79c0LzqqS0LhAQ50ekgj4oGl7Q xen/include/xen/sched.h
 403a06a7H0hpHcKpAiDe5BPnaXWTlA xen/include/xen/serial.h
-40e3392dib7GrcBAu5cT-EUZTYzeEQ xen/include/xen/shadow.h
 3ddb79c14dXIhP7C2ahnoD08K90G_w xen/include/xen/slab.h
 3ddb79c09xbS-xxfKxuV3JETIhBzmg xen/include/xen/smp.h
 3ddb79c1Vi5VleJAOKHAlY0G2zAsgw xen/include/xen/softirq.h

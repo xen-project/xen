@@ -17,7 +17,7 @@
 #include <asm/pdb.h>
 #include <xen/trace.h>
 #include <xen/console.h>
-#include <xen/shadow.h>
+#include <asm/shadow.h>
 #include <hypervisor-ifs/sched_ctl.h>
 
 #define TRC_DOM0OP_ENTER_BASE  0x00020000

@@ -38,7 +38,7 @@
 #include <xen/spinlock.h>
 #include <xen/irq.h>
 #include <xen/perfc.h>
-#include <xen/shadow.h>
+#include <asm/shadow.h>
 #include <asm/domain_page.h>
 #include <asm/system.h>
 #include <asm/io.h>
