@@ -2387,7 +2387,6 @@ void ptwr_flush(const int which)
                    (L1_PAGETABLE_ENTRIES - i) * sizeof(l1_pgentry_t));
             unmap_domain_mem(pl1e);
             ptwr_info[cpu].ptinfo[which].l1va = 0;
-            UNLOCK_BIGLOCK(d);
             domain_crash();
         }
         

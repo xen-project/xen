@@ -1007,6 +1007,7 @@ long do_set_trap_table(trap_info_t *traps)
 {
     trap_info_t cur;
     trap_info_t *dst = current->arch.traps;
+    long rc = 0;
 
     LOCK_BIGLOCK(current->domain);
 
@@ -1014,16 +1015,25 @@ long do_set_trap_table(trap_info_t *traps)
     {
         if ( hypercall_preempt_check() )
         {
-            UNLOCK_BIGLOCK(current->domain);
-            return hypercall1_create_continuation(
+            rc = hypercall1_create_continuation(
                 __HYPERVISOR_set_trap_table, traps);
+            break;
         }
 
-        if ( copy_from_user(&cur, traps, sizeof(cur)) ) return -EFAULT;
+        if ( copy_from_user(&cur, traps, sizeof(cur)) ) 
+        {
+            rc = -EFAULT;
+            break;
+        }
 
-        if ( cur.address == 0 ) break;
+        if ( cur.address == 0 )
+            break;
 
-        if ( !VALID_CODESEL(cur.cs) ) return -EPERM;
+        if ( !VALID_CODESEL(cur.cs) )
+        {
+            rc = -EPERM;
+            break;
+        }
 
         memcpy(dst+cur.vector, &cur, sizeof(cur));
         traps++;
@@ -1031,7 +1041,7 @@ long do_set_trap_table(trap_info_t *traps)
 
     UNLOCK_BIGLOCK(current->domain);
 
-    return 0;
+    return rc;
 }
 
 
