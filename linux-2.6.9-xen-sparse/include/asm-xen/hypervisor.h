@@ -59,7 +59,6 @@ void do_hypervisor_callback(struct pt_regs *regs);
 #define PROT_ON  1
 #define PROT_OFF 0
 void /* __init */ protect_page(pgd_t *dpgd, void *page, int mode);
-void /* __init */ protect_pagetable(pgd_t *dpgd, pgd_t *spgd, int mode);
 
 /* arch/xen/i386/kernel/head.S */
 void lgdt_finish(void);

@@ -4,6 +4,7 @@
  * Xen balloon driver - enables returning/claiming memory to/from Xen.
  *
  * Copyright (c) 2003, B Dragovic
+ * Copyright (c) 2003-2004, M Williamson, K Fraser
  * 
  * This file may be distributed separately from the Linux kernel, or
  * incorporated into other software packages, subject to the following license:
@@ -48,19 +49,10 @@
 #include <asm/tlb.h>
 #include <linux/list.h>
 
-/* USER DEFINES -- THESE SHOULD BE COPIED TO USER-SPACE TOOLS */
-#define USER_INFLATE_BALLOON  1   /* return mem to hypervisor */
-#define USER_DEFLATE_BALLOON  2   /* claim mem from hypervisor */
-typedef struct user_balloon_op {
-    unsigned int  op;
-    unsigned long size;
-} user_balloon_op_t;
-/* END OF USER DEFINE */
-
 static struct proc_dir_entry *balloon_pde;
 
 unsigned long credit;
-static unsigned long current_pages, most_seen_pages;
+static unsigned long current_pages;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 /* Use the private and mapping fields of struct page as a list. */
@@ -78,71 +70,66 @@ static unsigned long current_pages, most_seen_pages;
 #define pte_offset_kernel pte_offset
 #endif
 
+#define IPRINTK(fmt, args...) \
+    printk(KERN_INFO "xen_mem: " fmt, ##args)
+#define WPRINTK(fmt, args...) \
+    printk(KERN_WARNING "xen_mem: " fmt, ##args)
+
 /* List of ballooned pages, threaded through the mem_map array. */
 LIST_HEAD(ballooned_pages);
 
-/** add_ballooned_page - remember we've ballooned a pfn */
-void add_ballooned_page(unsigned long pfn)
+/* balloon_append: add the given page to the balloon. */
+void balloon_append(struct page *page)
 {
-    struct page *p = mem_map + pfn;
-
-    list_add(PAGE_TO_LIST(p), &ballooned_pages);
+    list_add(PAGE_TO_LIST(page), &ballooned_pages);
 }
 
-/* rem_ballooned_page - recall a ballooned page and remove from list. */
-struct page *rem_ballooned_page(void)
+/* balloon_retrieve: rescue a page from the balloon, if it is not empty. */
+struct page *balloon_retrieve(void)
 {
-    if(!list_empty(&ballooned_pages))
-    {
-        struct page *ret;
+    struct page *page;
 
-        ret = LIST_TO_PAGE(ballooned_pages.next);
-	UNLIST_PAGE(ret);
-
-        return ret;
-    }
-    else
+    if ( list_empty(&ballooned_pages) )
         return NULL;
+
+    page = LIST_TO_PAGE(ballooned_pages.next);
+    UNLIST_PAGE(page);
+    return page;
 }
 
 static inline pte_t *get_ptep(unsigned long addr)
 {
-    pgd_t *pgd; pmd_t *pmd; pte_t *ptep;
-    pgd = pgd_offset_k(addr);
+    pgd_t *pgd;
+    pmd_t *pmd;
 
+    pgd = pgd_offset_k(addr);
     if ( pgd_none(*pgd) || pgd_bad(*pgd) ) BUG();
 
     pmd = pmd_offset(pgd, addr);
     if ( pmd_none(*pmd) || pmd_bad(*pmd) ) BUG();
 
-    ptep = pte_offset_kernel(pmd, addr);
-
-    return ptep;
+    return pte_offset_kernel(pmd, addr);
 }
 
 /* Main function for relinquishing memory. */
 static unsigned long inflate_balloon(unsigned long num_pages)
-
 {
-    unsigned long *parray;
-    unsigned long *currp;
-    unsigned long curraddr;
-    unsigned long ret = 0;
-    unsigned long i, j;
+    unsigned long *parray, *currp, curraddr, ret = 0, i, j, mfn, pfn;
+    struct page *page;
 
     parray = (unsigned long *)vmalloc(num_pages * sizeof(unsigned long));
     if ( parray == NULL )
     {
-        printk(KERN_ERR "inflate_balloon: Unable to vmalloc parray\n");
-        return -EFAULT;
+        WPRINTK("inflate_balloon: Unable to vmalloc parray\n");
+        return -ENOMEM;
     }
 
     currp = parray;
 
     for ( i = 0; i < num_pages; i++, currp++ )
     {
-        struct page *page = alloc_page(GFP_HIGHUSER);
-        unsigned long pfn = page - mem_map;
+        page = alloc_page(GFP_HIGHUSER);
+        pfn  = page - mem_map;
 
         /* If allocation fails then free all reserved pages. */
         if ( page == NULL )
@@ -160,10 +147,9 @@ static unsigned long inflate_balloon(unsigned long num_pages)
         *currp = pfn;
     }
 
-
     for ( i = 0, currp = parray; i < num_pages; i++, currp++ )
     {
-        unsigned long mfn = phys_to_machine_mapping[*currp];
+        mfn      = phys_to_machine_mapping[*currp];
         curraddr = (unsigned long)page_address(mem_map + *currp);
         /* Blow away page contents for security, and also p.t. ref if any. */
         if ( curraddr != 0 )
@@ -180,7 +166,7 @@ static unsigned long inflate_balloon(unsigned long num_pages)
         }
 #endif
 
-        add_ballooned_page(*currp);
+        balloon_append(&mem_map[*currp]);
 
         phys_to_machine_mapping[*currp] = INVALID_P2M_ENTRY;
         *currp = mfn;
@@ -206,62 +192,45 @@ static unsigned long inflate_balloon(unsigned long num_pages)
     return ret;
 }
 
-/*
- * Install new mem pages obtained by deflate_balloon. function walks 
- * phys->machine mapping table looking for DEAD entries and populates
- * them.
- */
-static unsigned long process_returned_pages(unsigned long * parray, 
-                                       unsigned long num)
+/* Install a set of new pages (@mfn_list, @nr_mfns) into the memory map. */
+static unsigned long process_returned_pages(
+    unsigned long *mfn_list, unsigned long nr_mfns)
 {
-    /* currently, this function is rather simplistic as 
-     * it is assumed that domain reclaims only number of 
-     * pages previously released. this is to change soon
-     * and the code to extend page tables etc. will be 
-     * incorporated here.
-     */
-     
-    unsigned long * curr = parray;
-    unsigned long num_installed;
-
+    unsigned long pfn, i;
     struct page *page;
 
-    num_installed = 0;
-    while ( (page = rem_ballooned_page()) != NULL )
+    for ( i = 0; i < nr_mfns; i++ )
     {
-        unsigned long pfn;
-
-        if ( num_installed == num )
+        if ( (page = balloon_retrieve()) != NULL )
             break;
 
         pfn = page - mem_map;
-
-        if(phys_to_machine_mapping[pfn] != INVALID_P2M_ENTRY)
-        {
-            printk("BUG: Tried to unballoon existing page!");
+        if ( phys_to_machine_mapping[pfn] != INVALID_P2M_ENTRY )
             BUG();
-        }
 
-        phys_to_machine_mapping[pfn] = *curr;
-        queue_machphys_update(*curr, pfn);
-        if (pfn<max_low_pfn)
+        /* Update P->M and M->P tables. */
+        phys_to_machine_mapping[pfn] = mfn_list[i];
+        queue_machphys_update(mfn_list[i], pfn);
+
+        /* Link back into the page tables if it's not a highmem page. */
+        if ( pfn < max_low_pfn )
             queue_l1_entry_update(
                 get_ptep((unsigned long)__va(pfn << PAGE_SHIFT)),
-                ((*curr) << PAGE_SHIFT) | pgprot_val(PAGE_KERNEL));
-        
-        __free_page(mem_map + pfn);
+                (mfn_list[i] << PAGE_SHIFT) | pgprot_val(PAGE_KERNEL));
 
-        curr++;
-        num_installed++;
+        /* Finally, relinquish the memory back to the system allocator. */
+        ClearPageReserved(page);
+        set_page_count(page, 1);
+        __free_page(page);
     }
 
-    return num_installed;
+    return i;
 }
 
 unsigned long deflate_balloon(unsigned long num_pages)
 {
     unsigned long ret;
-    unsigned long * parray;
+    unsigned long *parray;
 
     if ( num_pages > credit )
     {
@@ -305,205 +274,25 @@ unsigned long deflate_balloon(unsigned long num_pages)
 
 #define PAGE_TO_MB_SHIFT 8
 
-/*
- * pagetable_extend() mimics pagetable_init() from arch/xen/mm/init.c 
- * The loops do go through all of low memory (ZONE_NORMAL).  The
- * old pages have _PAGE_PRESENT set and so get skipped.
- * If low memory is not full, the new pages are used to fill it, going
- * from cur_low_pfn to low_pfn.   high memory is not direct mapped so
- * no extension is needed for new high memory.
- */
-
-static void pagetable_extend (int cur_low_pfn, int newpages)
-{
-    unsigned long vaddr, end;
-    pgd_t *kpgd, *pgd, *pgd_base;
-    int i, j, k;
-    pmd_t *kpmd, *pmd;
-    pte_t *kpte, *pte, *pte_base;
-    int low_pfn = min(cur_low_pfn+newpages,(int)max_low_pfn);
-
-    /*
-     * This can be zero as well - no problem, in that case we exit
-     * the loops anyway due to the PTRS_PER_* conditions.
-     */
-    end = (unsigned long)__va(low_pfn*PAGE_SIZE);
-
-    pgd_base = init_mm.pgd;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-    i = pgd_index(PAGE_OFFSET);
-#else
-    i = __pgd_offset(PAGE_OFFSET);
-#endif
-    pgd = pgd_base + i;
-
-    for (; i < PTRS_PER_PGD; pgd++, i++) {
-        vaddr = i*PGDIR_SIZE;
-        if (end && (vaddr >= end))
-            break;
-        pmd = (pmd_t *)pgd;
-        for (j = 0; j < PTRS_PER_PMD; pmd++, j++) {
-            vaddr = i*PGDIR_SIZE + j*PMD_SIZE;
-            if (end && (vaddr >= end))
-                break;
-
-            /* Filled in for us already? */
-            if ( pmd_val(*pmd) & _PAGE_PRESENT )
-                continue;
-
-            pte_base = pte = (pte_t *) __get_free_page(GFP_KERNEL);
-
-            for (k = 0; k < PTRS_PER_PTE; pte++, k++) {
-                vaddr = i*PGDIR_SIZE + j*PMD_SIZE + k*PAGE_SIZE;
-                if (end && (vaddr >= end))
-                    break;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-                *pte = mk_pte(virt_to_page(vaddr), PAGE_KERNEL);
-#else
-		*pte = mk_pte_phys(__pa(vaddr), PAGE_KERNEL);
-#endif
-            }
-            kpgd = pgd_offset_k((unsigned long)pte_base);
-            kpmd = pmd_offset(kpgd, (unsigned long)pte_base);
-            kpte = pte_offset_kernel(kpmd, (unsigned long)pte_base);
-            queue_l1_entry_update(kpte,
-                                  (*(unsigned long *)kpte)&~_PAGE_RW);
-            set_pmd(pmd, __pmd(_KERNPG_TABLE + __pa(pte_base)));
-            XEN_flush_page_update_queue();
-        }
-    }
-}
-
-/*
- * claim_new_pages() asks xen to increase this domain's memory  reservation
- * and return a list of the new pages of memory.  This new pages are
- * added to the free list of the memory manager.
- *
- * Available RAM does not normally change while Linux runs.  To make this work,
- * the linux mem= boottime command line param must say how big memory could
- * possibly grow.  Then setup_arch() in arch/xen/kernel/setup.c
- * sets max_pfn, max_low_pfn and the zones according to
- * this max memory size.   The page tables themselves can only be
- * extended after xen has assigned new pages to this domain.
- */
-
-static unsigned long
-claim_new_pages(unsigned long num_pages)
-{
-    unsigned long new_page_cnt, pfn;
-    unsigned long * parray, *curr;
-
-    if (most_seen_pages+num_pages> max_pfn)
-        num_pages = max_pfn-most_seen_pages;
-    if (num_pages==0) return -EINVAL;
-
-    parray = (unsigned long *)vmalloc(num_pages * sizeof(unsigned long));
-    if ( parray == NULL )
-    {
-        printk(KERN_ERR "claim_new_pages: Unable to vmalloc parray\n");
-        return 0;
-    }
-
-    new_page_cnt = HYPERVISOR_dom_mem_op(MEMOP_increase_reservation, 
-                                parray, num_pages, 0);
-    if ( new_page_cnt != num_pages )
-    {
-        printk(KERN_WARNING
-            "claim_new_pages: xen granted only %lu of %lu requested pages\n",
-            new_page_cnt, num_pages);
-
-        /* 
-         * Avoid xen lockup when user forgot to setdomainmaxmem. Xen
-         * usually can dribble out a few pages and then hangs.
-         */
-        if ( new_page_cnt < 1000 )
-        {
-            printk(KERN_WARNING "Remember to use setdomainmaxmem\n");
-            HYPERVISOR_dom_mem_op(MEMOP_decrease_reservation, 
-                                parray, new_page_cnt, 0);
-            return -EFAULT;
-        }
-    }
-    memcpy(phys_to_machine_mapping+most_seen_pages, parray,
-           new_page_cnt * sizeof(unsigned long));
-
-    pagetable_extend(most_seen_pages,new_page_cnt);
-
-    for ( pfn = most_seen_pages, curr = parray;
-          pfn < most_seen_pages+new_page_cnt;
-          pfn++, curr++ )
-    {
-        struct page *page = mem_map + pfn;
-
-#ifndef CONFIG_HIGHMEM
-        if ( pfn>=max_low_pfn )
-        {
-            printk(KERN_WARNING "Warning only %ldMB will be used.\n",
-               pfn>>PAGE_TO_MB_SHIFT);
-            printk(KERN_WARNING "Use a HIGHMEM enabled kernel.\n");
-            break;
-        }
-#endif
-        queue_machphys_update(*curr, pfn);
-        if ( pfn < max_low_pfn )
-            queue_l1_entry_update(
-                get_ptep((unsigned long)__va(pfn << PAGE_SHIFT)),
-                ((*curr) << PAGE_SHIFT) | pgprot_val(PAGE_KERNEL));
-        
-        XEN_flush_page_update_queue();
-        
-        /* this next bit mimics arch/xen/mm/init.c:one_highpage_init() */
-        ClearPageReserved(page);
-        if ( pfn >= max_low_pfn )
-            set_bit(PG_highmem, &page->flags);
-        set_page_count(page, 1);
-        __free_page(page);
-    }
-
-    vfree(parray);
-
-    return new_page_cnt;
-}
-
-
 static int balloon_try_target(int target)
 {
     int change, reclaim;
 
     if ( target < current_pages )
     {
-        int change = inflate_balloon(current_pages-target);
-        if ( change <= 0 )
+        if ( (change = inflate_balloon(current_pages-target)) <= 0 )
             return change;
-
         current_pages -= change;
         printk(KERN_INFO "Relinquish %dMB to xen. Domain now has %luMB\n",
             change>>PAGE_TO_MB_SHIFT, current_pages>>PAGE_TO_MB_SHIFT);
     }
-    else if ( target > current_pages )
+    else if ( (reclaim = target - current_pages) > 0 )
     {
-        reclaim = min((unsigned long)target,most_seen_pages) - current_pages;
-
-        if ( reclaim )
-        {
-            change = deflate_balloon( reclaim );
-            if ( change <= 0 )
-                return change;
-            current_pages += change;
-            printk(KERN_INFO "Reclaim %dMB from xen. Domain now has %luMB\n",
-                change>>PAGE_TO_MB_SHIFT, current_pages>>PAGE_TO_MB_SHIFT);
-        }
-
-        if ( most_seen_pages < target )
-        {
-            int growth = claim_new_pages(target-most_seen_pages);
-            if ( growth <= 0 )
-                return growth;
-            most_seen_pages += growth;
-            current_pages += growth;
-            printk(KERN_INFO "Granted %dMB new mem. Dom now has %luMB\n",
-                growth>>PAGE_TO_MB_SHIFT, current_pages>>PAGE_TO_MB_SHIFT);
-        }
+        if ( (change = deflate_balloon(reclaim)) <= 0 )
+            return change;
+        current_pages += change;
+        printk(KERN_INFO "Reclaim %dMB from xen. Domain now has %luMB\n",
+               change>>PAGE_TO_MB_SHIFT, current_pages>>PAGE_TO_MB_SHIFT);
     }
 
     return 1;
@@ -640,12 +429,15 @@ static int balloon_read(char *page, char **start, off_t off,
 
 static int __init balloon_init(void)
 {
-    printk(KERN_ALERT "Starting Xen Balloon driver\n");
+    unsigned long pfn;
+    struct page *page;
 
-    most_seen_pages = current_pages = min(xen_start_info.nr_pages,max_pfn);
+    IPRINTK("Initialising balloon driver.\n");
+
+    current_pages = min(xen_start_info.nr_pages, max_pfn);
     if ( (balloon_pde = create_xen_proc_entry("memory_target", 0644)) == NULL )
     {
-        printk(KERN_ALERT "Unable to create balloon driver proc entry!");
+        WPRINTK("Unable to create balloon driver proc entry!");
         return -1;
     }
 
@@ -661,18 +453,12 @@ static int __init balloon_init(void)
     (void)ctrl_if_register_receiver(CMSG_MEM_REQUEST, balloon_ctrlif_rx,
                                     CALLBACK_IN_BLOCKING_CONTEXT);
 
-    /* 
-     * make_module a new phys map if mem= says xen can give us memory  to grow
-     */
-    if ( max_pfn > xen_start_info.nr_pages )
+    /* Initialise the balloon with excess memory space. */
+    for ( pfn = xen_start_info.nr_pages; pfn < max_pfn; pfn++ )
     {
-        extern unsigned long *phys_to_machine_mapping;
-        unsigned long *newmap;
-        newmap = (unsigned long *)vmalloc(max_pfn * sizeof(unsigned long));
-        memset(newmap, ~0, max_pfn * sizeof(unsigned long));
-        memcpy(newmap, phys_to_machine_mapping,
-               xen_start_info.nr_pages * sizeof(unsigned long));
-        phys_to_machine_mapping = newmap;
+        page = &mem_map[pfn];
+        if ( !PageReserved(page) )
+            balloon_append(page);
     }
 
     return 0;
