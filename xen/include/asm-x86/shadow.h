@@ -305,10 +305,15 @@ static inline void l1pte_propagate_from_guest(
     case SHM_full_32:
     {
         unsigned long host_pfn, host_gpte;
+        spte = 0;
+
+        if (mmio_space(gpte & 0xFFFFF000)) {
+            *spte_p = spte;
+            return;
+        }
         
         host_pfn = phys_to_machine_mapping[gpte >> PAGE_SHIFT];
         host_gpte = (host_pfn << PAGE_SHIFT) | (gpte & ~PAGE_MASK);
-        spte = 0;
 
         if ( (host_gpte & (_PAGE_PRESENT|_PAGE_ACCESSED) ) == 
              (_PAGE_PRESENT|_PAGE_ACCESSED) )
@@ -697,7 +702,7 @@ static inline void __shadow_mk_pagetable( struct mm_struct *mm )
         SH_VVLOG("__shadow_mk_pagetable(guest_gpfn=%08lx, gpfn=%08lx\n", 
                  guest_gpfn, gpfn);
 
-        spfn = __shadow_status(mm, gpfn) & PSH_pfn_mask;
+        spfn = __shadow_status(mm, guest_gpfn) & PSH_pfn_mask;
         if ( unlikely(spfn == 0) ) {
             spfn = shadow_l2_table(mm, gpfn);
             mm->shadow_table = mk_pagetable(spfn<<PAGE_SHIFT);

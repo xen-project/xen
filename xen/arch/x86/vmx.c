@@ -107,7 +107,7 @@ static int vmx_do_page_fault(unsigned long va, unsigned long error_code)
 {
     unsigned long eip, pfn;
     unsigned int index;
-    unsigned long gpde = 0;
+    unsigned long gpde = 0, gpte, gpa;
     int result;
     struct exec_domain *ed = current;
     struct mm_struct *m = &ed->mm;
@@ -137,6 +137,15 @@ static int vmx_do_page_fault(unsigned long va, unsigned long error_code)
         m->guest_pl2e_cache[index] = 
             mk_l2_pgentry((pfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
     }
+    
+    if (unlikely(__get_user(gpte, (unsigned long *)
+                            &linear_pg_table[va >> PAGE_SHIFT])))
+        return 0;
+    
+    gpa = (gpte & PAGE_MASK) | (va & (PAGE_SIZE - 1));
+
+    if (mmio_space(gpa))
+        handle_mmio(va, gpte, gpa);
 
     if ((result = shadow_fault(va, error_code)))
         return result;
@@ -283,7 +292,7 @@ static inline void guest_pl2e_cache_invalidate(struct mm_struct *m)
     memset(m->guest_pl2e_cache, 0, PAGE_SIZE);
 }
 
-static inline unsigned long gva_to_gpa(unsigned long gva)
+inline unsigned long gva_to_gpa(unsigned long gva)
 {
     unsigned long gpde, gpte, pfn, index;
     struct exec_domain *d = current;
@@ -784,6 +793,7 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
             __vmread(VM_EXIT_INTR_ERROR_CODE, &error_code);
             VMX_DBG_LOG(DBG_LEVEL_VMMU, 
                     "eax=%x, ebx=%x, ecx=%x, edx=%x, esi=%x, edi=%x\n", regs.eax, regs.ebx, regs.ecx, regs.edx, regs.esi, regs.edi);
+            d->thread.arch_vmx.vmx_platform.mpci.inst_decoder_regs = &regs;
 
             if (!(error = vmx_do_page_fault(va, error_code))) {
                 /*
