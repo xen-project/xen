@@ -1004,7 +1004,7 @@ class XendDomainInfo:
                 log.warning("Unknown config field %s", field_name)
             index[field_name] = field_index + 1
         d = defer.DeferredList(dlist, fireOnOneErrback=1)
-        deferred.addErrback(dlist_err)
+        d.addErrback(dlist_err)
         return d
 
 
@@ -1018,7 +1018,7 @@ def vm_image_linux(vm, image):
     """
     kernel = sxp.child_value(image, "kernel")
     cmdline = ""
-    ip = sxp.child_value(image, "ip", "dhcp")
+    ip = sxp.child_value(image, "ip", None)
     if ip:
         cmdline += " ip=" + ip
     root = sxp.child_value(image, "root")
