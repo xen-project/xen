@@ -168,7 +168,7 @@ void init_frametable(void);
 int alloc_page_type(struct pfn_info *page, unsigned int type);
 void free_page_type(struct pfn_info *page, unsigned int type);
 extern void invalidate_shadow_ldt(struct exec_domain *d);
-extern u32 shadow_remove_all_write_access(
+extern int shadow_remove_all_write_access(
     struct domain *d, unsigned min_type, unsigned max_type,
     unsigned long gpfn, unsigned long gmfn);
 extern u32 shadow_remove_all_access( struct domain *d, unsigned long gmfn);
