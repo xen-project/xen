@@ -48,6 +48,8 @@ struct task_struct *do_newdomain(unsigned int dom_id, unsigned int cpu)
     p->domain    = dom_id;
     p->processor = cpu;
 
+    sprintf (p->name, "Domain-%d", dom_id);
+
     spin_lock_init(&p->blk_ring_lock);
     spin_lock_init(&p->page_lock);
 

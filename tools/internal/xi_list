@@ -1,0 +1,45 @@
+#!/bin/bash
+#
+# xi_list
+#
+# This is a silly little script to dump the currently running domains.
+# The output format is a series of space-separate fields for each domain:
+#
+#  1. Domain id
+#  2. Processor
+#  3. Has CPU (1 => true, 0 => false)
+#  4. State (RUNNING, INTERRUPTABLE, UNINTERRUPTABLE, WAIT, SUSPENDED, DYING)
+#  5. MCU advance
+#  6. Total pages
+#  7. Name
+
+INPUT_FILE=/proc/xeno/domains
+
+awk -f - $INPUT_FILE <<EOF
+{
+  dom_id = \$1;
+
+  processor = \$2;
+
+  has_cpu = \$3;
+
+  state = "UNKNOWN";
+
+  if (\$4 == 0)  state = "RUNNING";
+  if (\$4 == 1)  state = "INTERRUPTIBLE";
+  if (\$4 == 2)  state = "UNINTERRUPTABLE";
+  if (\$4 == 4)  state = "WAIT";
+  if (\$4 == 8)  state = "SUSPENDED";
+  if (\$4 == 16) state = "DYING";
+
+  mcu_advance = \$6;
+
+  tot_pages = \$8;
+
+  printf "%d %d %d %s %d %d %s", dom_id, processor, has_cpu, state, mcu_advance, tot_pages, \$9;
+  for (i = 10; i < NF; i ++) {
+    printf " %s", \$i;
+  }
+  printf "\n";
+}
+EOF 

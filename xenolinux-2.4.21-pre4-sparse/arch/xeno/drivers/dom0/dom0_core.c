@@ -351,6 +351,12 @@ static int xeno_domains_show(struct seq_file *s, void *v)
 { 
   dom0_op_t *di = v;
   
+  /*
+   * Output one domain's details to dom0.
+   *
+   * If you update this format string then change xi_list to match.
+   */
+
   seq_printf (s, 
               "%8d %2d %1d %2d %8d %8ld %p %8d %s\n",
               di -> u.getdominfo.domain, 

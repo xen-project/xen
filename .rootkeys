@@ -39,6 +39,7 @@
 3eb781fdgbSkh2O6JQS-65Dz4n0ItQ tools/internal/xi_build.c
 3eb781fdW1SAyiaC4mTsXq_9fRHh-A tools/internal/xi_create.c
 3eb781fdcJ0fF7rWfzAOArW-x4-gwA tools/internal/xi_destroy.c
+3eb83c3bZeECmphOKOJxSu4Lo1LpBw tools/internal/xi_list
 3eb781fd8oRfPgH7qTh7xvgmwD6NgA tools/internal/xi_start.c
 3eb781fd0Eo9K1jEFCSAVzO51i_ngg tools/internal/xi_stop.c
 3eb781fd7211MZsLxJSiuy7W4KnJXg tools/internal/xi_vifinit

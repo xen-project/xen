@@ -170,6 +170,9 @@ struct task_struct
  * TASK_WAIT:            Domains CPU allocation expired.
  * TASK_SUSPENDED:       Domain is in supsended state (eg. start of day)
  * TASK_DYING:           Domain is about to cross over to the land of the dead.
+ *
+ * If you update these then please update the mapping to text names in
+ * xi_list.
  */
 
 #define TASK_RUNNING            0
