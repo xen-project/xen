@@ -85,6 +85,7 @@ typedef struct dom0_getdominfo_st
   unsigned long mcu_advance;
   unsigned long pg_head;
   unsigned int tot_pages;
+  long long cpu_time;
 } dom0_getdominfo_t;
 
 

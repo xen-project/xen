@@ -236,6 +236,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
                 list_entry(p->pg_head.next, struct pfn_info, list) -
                 frame_table;
             op.u.getdominfo.tot_pages   = p->tot_pages;
+            op.u.getdominfo.cpu_time    = p->cpu_time;
         }
 
         read_unlock_irqrestore(&tasklist_lock, flags);

@@ -55,6 +55,7 @@ typedef struct proc_mem_data {
 #define DOM_DIR         "dom"
 #define DOM_MEM         "mem"
 #define DOM_VIF         "vif"
+#define DOM_USAGE       "usage"
 
 #define MAP_DISCONT     1
 
@@ -112,6 +113,39 @@ struct file_operations dom_vif_ops = {
     read:    dom_vif_read
 };
 
+static ssize_t dom_usage_read(struct file * file, char * buff, size_t size, loff_t * off)
+{
+    char hyp_buf[128];
+    dom0_op_t op;
+    static int finished = 0;
+
+    if ( finished )
+    {
+        finished = 0;
+        return 0;
+    }
+
+    op.cmd = DOM0_GETDOMAININFO;
+    op.u.getdominfo.domain = (unsigned int)
+        ((struct proc_dir_entry *)file->f_dentry->d_inode->u.generic_ip)->data;
+
+    (void)HYPERVISOR_dom0_op(&op);
+
+    snprintf(hyp_buf, 128, "cpu: %lld\n", op.u.getdominfo.cpu_time);
+
+    if (*off >= (strlen(hyp_buf) + 1)) return 0;
+    
+    copy_to_user(buff, hyp_buf, strlen(hyp_buf));
+
+    finished = 1;
+
+    return strlen(hyp_buf) + 1;
+}
+
+struct file_operations dom_usage_ops = {
+    read:    dom_usage_read
+};
+
 
 static void create_proc_dom_entries(int dom)
 {
@@ -134,6 +168,15 @@ static void create_proc_dom_entries(int dom)
         file->owner         = THIS_MODULE;
         file->nlink         = 1;
         file->proc_fops     = &dom_vif_ops;
+        file->data          = (void *) dom;
+    }
+
+    file = create_proc_entry(DOM_USAGE, 0600, dir);
+    if (file != NULL)
+    {
+        file->owner         = THIS_MODULE;
+        file->nlink         = 1;
+        file->proc_fops     = &dom_usage_ops;
         file->data          = (void *) dom;
     }
 }
