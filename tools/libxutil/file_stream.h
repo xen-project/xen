@@ -16,8 +16,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef _XEN_LIB_FILE_STREAM_H_
-#define _XEN_LIB_FILE_STREAM_H_
+#ifndef _XUTIL_FILE_STREAM_H_
+#define _XUTIL_FILE_STREAM_H_
 
 #ifndef __KERNEL__
 #include "iostream.h"
@@ -32,4 +32,4 @@ extern IOStream get_stream_stdin(void);
 
 extern int file_stream_setvbuf(IOStream *io, char *buf, int mode, size_t size);
 #endif
-#endif /* !_XEN_LIB_FILE_STREAM_H_ */
+#endif /* !_XUTIL_FILE_STREAM_H_ */

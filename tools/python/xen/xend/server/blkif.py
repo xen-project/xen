@@ -210,9 +210,6 @@ class BlkifController(controller.Controller):
                         self.evtchn['port2']])
         return val
 
-    def lostChannel(self):
-        controller.Controller.lostChannel(self)
-
     def getDevices(self):
         return self.devices.values()
 

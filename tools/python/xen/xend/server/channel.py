@@ -174,9 +174,9 @@ class VirqChannel(BaseChannel):
         """Close the channel. Calls lostChannel(self) on all its clients and
         channelClosed() on the factory.
         """
-        for c in self.clients:
+        for c in self.clients[:]:
             c.lostChannel(self)
-        del self.clients
+        self.clients = []
         BaseChannel.close(self)
 
     def registerClient(self, client):
@@ -238,7 +238,7 @@ class Channel(BaseChannel):
         """
         if self.closed: return
         self.closed = 1
-        for d in self.devs:
+        for d in self.devs[:]:
             d.lostChannel()
         self.factory.channelClosed(self)
         self.devs = []

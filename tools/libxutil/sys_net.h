@@ -16,8 +16,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef _XEN_LIB_SYS_NET_H_
-#define _XEN_LIB_SYS_NET_H_
+#ifndef _XUTIL_SYS_NET_H_
+#define _XUTIL_SYS_NET_H_
 /** @file
  *
  * Replacement for standard network includes.
@@ -72,7 +72,7 @@ extern int inet_aton(const char *address, struct in_addr *inp);
 extern char *mac_ntoa(const unsigned char *macaddr);
 extern int mac_aton(const char *addr, unsigned char *macaddr);
 
-#endif /* !_SP_SYS_NET_H_ */
+#endif /* !_XUTIL_SYS_NET_H_ */
 
 
 

@@ -198,8 +198,9 @@ class NetifController(controller.Controller):
     def randomMAC(self):
         """Generate a random MAC address.
 
-        The OUI (Organisation Unique Identifier) used is AA:00:00, which
-        is a currently unassigned one that used to belong to DEC.
+        Uses OUI (Organizationally Unique Identifier) AA:00:00, an
+        unassigned one that used to belong to DEC. The OUI list is
+        available at 'standards.ieee.org'.
 
         The remaining 3 fields are random, with the first bit of the first
         random field set 0.
