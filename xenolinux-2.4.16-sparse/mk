@@ -1,0 +1,6 @@
+export INSTALL_MOD_PATH=/local/scratch/kaf24/xeno/linux-install
+ARCH=xeno make -j 4 bzImage
+ARCH=xeno make -j 4 modules
+ARCH=xeno INSTALL_MOD_PATH=/anfs/nta3/xeno-roots/kaf24/root0 really make modules_install
+ARCH=xeno INSTALL_MOD_PATH=/anfs/nta3/xeno-roots/kaf24/root1 really make modules_install
+cp arch/xeno/boot/image.gz /usr/groups/pegasus/boot/kaf24/meteors/vmlinux.gz

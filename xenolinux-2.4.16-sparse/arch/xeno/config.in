@@ -1,0 +1,135 @@
+#
+# For a description of the syntax of this configuration file,
+# see Documentation/kbuild/config-language.txt.
+#
+mainmenu_name "Linux Kernel Configuration"
+
+define_bool CONFIG_XENO y
+
+define_bool CONFIG_X86 y
+define_bool CONFIG_ISA y
+define_bool CONFIG_SBUS n
+
+define_bool CONFIG_UID16 y
+
+mainmenu_option next_comment
+comment 'Code maturity level options'
+bool 'Prompt for development and/or incomplete code/drivers' CONFIG_EXPERIMENTAL
+endmenu
+
+mainmenu_option next_comment
+comment 'Loadable module support'
+bool 'Enable loadable module support' CONFIG_MODULES
+if [ "$CONFIG_MODULES" = "y" ]; then
+   bool '  Set version information on all module symbols' CONFIG_MODVERSIONS
+   bool '  Kernel module loader' CONFIG_KMOD
+fi
+endmenu
+
+mainmenu_option next_comment
+comment 'Processor type and features'
+choice 'Processor family' \
+	"Pentium-Pro/Celeron/Pentium-II		CONFIG_M686 \
+	 Pentium-III/Celeron(Coppermine)	CONFIG_MPENTIUMIII \
+	 Pentium-4				CONFIG_MPENTIUM4 \
+	 Athlon/Duron/K7			CONFIG_MK7" Pentium-Pro
+
+   define_bool CONFIG_X86_WP_WORKS_OK y
+   define_bool CONFIG_X86_INVLPG y
+   define_bool CONFIG_X86_CMPXCHG y
+   define_bool CONFIG_X86_XADD y
+   define_bool CONFIG_X86_BSWAP y
+   define_bool CONFIG_X86_POPAD_OK y
+   define_bool CONFIG_RWSEM_GENERIC_SPINLOCK n
+   define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM y
+
+   define_bool CONFIG_X86_GOOD_APIC y
+   define_bool CONFIG_X86_PGE y
+   define_bool CONFIG_X86_USE_PPRO_CHECKSUM y
+   define_bool CONFIG_X86_TSC y
+
+if [ "$CONFIG_M686" = "y" ]; then
+   define_int  CONFIG_X86_L1_CACHE_SHIFT 5
+fi
+if [ "$CONFIG_MPENTIUMIII" = "y" ]; then
+   define_int  CONFIG_X86_L1_CACHE_SHIFT 5
+fi
+if [ "$CONFIG_MPENTIUM4" = "y" ]; then
+   define_int  CONFIG_X86_L1_CACHE_SHIFT 7
+fi
+if [ "$CONFIG_MK7" = "y" ]; then
+   define_int  CONFIG_X86_L1_CACHE_SHIFT 6
+   define_bool CONFIG_X86_USE_3DNOW y
+fi
+
+choice 'High Memory Support' \
+	"off    CONFIG_NOHIGHMEM \
+	 4GB    CONFIG_HIGHMEM4G \
+	 64GB   CONFIG_HIGHMEM64G" off
+if [ "$CONFIG_HIGHMEM4G" = "y" ]; then
+   define_bool CONFIG_HIGHMEM y
+fi
+if [ "$CONFIG_HIGHMEM64G" = "y" ]; then
+   define_bool CONFIG_HIGHMEM y
+   define_bool CONFIG_X86_PAE y
+fi
+
+#bool 'Symmetric multi-processing support' CONFIG_SMP
+#if [ "$CONFIG_SMP" = "y" -a "$CONFIG_X86_CMPXCHG" = "y" ]; then
+#   define_bool CONFIG_HAVE_DEC_LOCK y
+#fi
+endmenu
+
+mainmenu_option next_comment
+comment 'General setup'
+
+bool 'Networking support' CONFIG_NET
+
+bool 'System V IPC' CONFIG_SYSVIPC
+bool 'BSD Process Accounting' CONFIG_BSD_PROCESS_ACCT
+bool 'Sysctl support' CONFIG_SYSCTL
+if [ "$CONFIG_PROC_FS" = "y" ]; then
+   choice 'Kernel core (/proc/kcore) format' \
+	"ELF		CONFIG_KCORE_ELF	\
+	 A.OUT		CONFIG_KCORE_AOUT" ELF
+fi
+tristate 'Kernel support for a.out binaries' CONFIG_BINFMT_AOUT
+tristate 'Kernel support for ELF binaries' CONFIG_BINFMT_ELF
+tristate 'Kernel support for MISC binaries' CONFIG_BINFMT_MISC
+
+endmenu
+
+if [ "$CONFIG_NET" = "y" ]; then
+   source net/Config.in
+fi
+
+source drivers/block/Config.in
+define_bool CONFIG_BLK_DEV_IDE_MODES n
+define_bool CONFIG_BLK_DEV_HD n
+
+source fs/Config.in
+
+mainmenu_option next_comment
+comment 'Kernel hacking'
+
+bool 'Kernel debugging' CONFIG_DEBUG_KERNEL
+if [ "$CONFIG_DEBUG_KERNEL" != "n" ]; then
+   bool '  Debug high memory support' CONFIG_DEBUG_HIGHMEM
+   bool '  Debug memory allocations' CONFIG_DEBUG_SLAB
+   bool '  Memory mapped I/O debugging' CONFIG_DEBUG_IOVIRT
+   bool '  Magic SysRq key' CONFIG_MAGIC_SYSRQ
+   bool '  Spinlock debugging' CONFIG_DEBUG_SPINLOCK
+   bool '  Verbose BUG() reporting (adds 70K)' CONFIG_DEBUG_BUGVERBOSE
+   bool '  Built-in Kernel Debugger support' CONFIG_KDB
+   dep_tristate '    KDB modules' CONFIG_KDB_MODULES $CONFIG_KDB
+   if [ "$CONFIG_KDB" = "y" ]; then
+      bool '    KDB off by default' CONFIG_KDB_OFF
+      comment '  Load all symbols for debugging is required for KDB'
+      define_bool CONFIG_KALLSYMS y
+   else
+      bool '  Load all symbols for debugging' CONFIG_KALLSYMS
+   fi
+   bool '  Compile the kernel with frame pointers' CONFIG_FRAME_POINTER
+fi
+
+endmenu

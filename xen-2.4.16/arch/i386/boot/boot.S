@@ -1,0 +1,241 @@
+#include <xeno/config.h>
+#include <asm/page.h>
+
+#define  SECONDARY_CPU_FLAG 0xA5A5A5A5
+                
+       	.text
+
+ENTRY(start)
+        jmp hal_entry
+
+        .align	4
+
+/*** MULTIBOOT HEADER ****/
+        /* Magic number indicating a Multiboot header. */
+	.long	0x1BADB002
+	/* Flags to bootloader (see Multiboot spec). */
+	.long	0x00000006
+	/* Checksum: must be the negated sum of the first two fields. */
+	.long	-0x1BADB008
+        /* Unused loader addresses (ELF header has all this already).*/
+        .long   0,0,0,0,0
+        /* EGA text mode. */
+        .long   1,0,0,0
+        
+hal_entry:
+        /* Set up a few descriptors: on entry only CS is guaranteed good. */
+        lgdt    %cs:nopaging_gdt_descr-__PAGE_OFFSET
+        mov     $(__HYPERVISOR_DS),%ecx
+        mov     %ecx,%ds
+        mov     %ecx,%es
+        ljmp    $(__HYPERVISOR_CS),$(1f)-__PAGE_OFFSET
+1:      lss     stack_start-__PAGE_OFFSET,%esp
+
+        /* Reset EFLAGS (subsumes CLI and CLD). */
+	pushl	$0
+	popf
+
+        /* CPU type checks. We need P6+. */
+        mov     $0x200000,%edx
+        pushfl
+        pop     %ecx
+        and     %edx,%ecx
+        jne     bad_cpu            # ID bit should be clear
+        pushl   %edx
+        popfl
+        pushfl
+        pop     %ecx
+        and     %edx,%ecx
+        je      bad_cpu            # ID bit should be set
+
+        /* Set up CR0. */
+        mov     %cr0,%ecx
+        and     $0x00000011,%ecx   # save ET and PE
+        or      $0x00050022,%ecx   # set AM, WP, NE and MP
+        mov     %ecx,%cr0
+
+        /* Set up FPU. */
+        fninit
+        
+        /* Set up CR4, except global flag which Intel requires should be     */
+        /* left until after paging is enabled (IA32 Manual Vol. 3, Sec. 2.5) */
+        mov     %cr4,%ecx
+        or      mmu_cr4_features-__PAGE_OFFSET,%ecx
+        mov     %ecx,mmu_cr4_features-__PAGE_OFFSET
+        and     $0x7f,%ecx /* disable GLOBAL bit */
+        mov     %ecx,%cr4
+                
+        /* Is this a non-boot processor? */
+        cmp     $(SECONDARY_CPU_FLAG),%ebx
+        jne     continue_boot_cpu
+        
+        call    start_paging
+        lidt    idt_descr                        
+        jmp     initialize_secondary
+        
+continue_boot_cpu:
+        add     $__PAGE_OFFSET,%ebx
+	push 	%ebx /* Multiboot info struct */
+	push 	%eax /* Multiboot magic value */
+
+        /* Initialize BSS (no nasty surprises!) */
+        mov     $__bss_start-__PAGE_OFFSET,%edi
+        mov     $_end-__PAGE_OFFSET,%ecx
+        sub     %edi,%ecx
+        xor     %eax,%eax
+        rep     stosb
+
+        /* Initialize low and high mappings of all memory with 4MB pages */
+        mov     $idle0_pg_table-__PAGE_OFFSET,%edi
+        mov     $0x1e3,%eax                  /* PRESENT+RW+A+D+4MB+GLOBAL */
+1:      mov     %eax,__PAGE_OFFSET>>20(%edi) /* high mapping */
+        stosl                                /* low mapping */
+        add     $(1<<L2_PAGETABLE_SHIFT),%eax
+        cmp     $MAX_USABLE_ADDRESS+0x1e3,%eax
+        jne     1b
+
+        call    start_paging        
+        call    setup_idt
+        lidt    idt_descr
+                
+        /* Call into main C routine. This should never return.*/
+       	call	cmain
+        ud2     /* Force a panic (invalid opcode). */
+
+start_paging:
+        mov     $idle0_pg_table-__PAGE_OFFSET,%eax
+        mov     %eax,%cr3
+        mov     %cr0,%eax
+        or      $0x80010000,%eax /* set PG and WP bits */
+        mov     %eax,%cr0
+        jmp     1f
+1:      /* Install relocated selectors (FS/GS unused). */
+        lgdt    gdt_descr
+        mov     $(__HYPERVISOR_DS),%ecx
+        mov     %ecx,%ds
+        mov     %ecx,%es
+        mov     %ecx,%ss
+        ljmp    $(__HYPERVISOR_CS),$1f
+1:      /* Paging enabled, so we can now enable GLOBAL mappings in CR4. */
+        movl    mmu_cr4_features,%ecx
+        movl    %ecx,%cr4
+        /* Relocate ESP */
+        add     $__PAGE_OFFSET,%esp
+        /* Relocate EIP via return jump */
+        pop     %ecx
+        add     $__PAGE_OFFSET,%ecx
+        jmp     *%ecx
+    
+            
+/*** INTERRUPT INITIALISATION ***/
+        
+setup_idt:
+        lea     ignore_int,%edx
+        mov     $(__HYPERVISOR_CS << 16),%eax
+        mov     %dx,%ax            /* selector = 0x0010 = cs */
+        mov     $0x8E00,%dx        /* interrupt gate - dpl=0, present */
+
+        lea     SYMBOL_NAME(idt_table),%edi
+        mov     $256,%ecx
+1:      mov     %eax,(%edi)
+        mov     %edx,4(%edi)
+        add     $8,%edi
+        loop    1b
+        ret
+
+/* This is the default interrupt handler. */
+int_msg:
+        .asciz "Unknown interrupt\n"
+        ALIGN
+ignore_int:
+        cld
+        push    %eax
+        push    %ecx
+        push    %edx
+        pushl   %es
+        pushl   %ds
+        mov     $(__HYPERVISOR_DS),%eax
+        mov     %eax,%ds
+        mov     %eax,%es
+        pushl   $int_msg
+        call    SYMBOL_NAME(printf)
+1:      jmp     1b
+        pop     %eax
+        popl    %ds
+        popl    %es
+        pop     %edx
+        pop     %ecx
+        pop     %eax
+        iret
+
+
+bad_cpu_msg:
+        .asciz  "Bad CPU type. Need P6+."
+        ALIGN
+bad_cpu: 
+        call    init_serial
+        mov     $bad_cpu_msg,%esi
+1:      lodsb
+        test    %al,%al
+        je      1f
+        push    %eax
+        call    putchar_serial
+        add     $4,%esp
+        jmp     1b
+1:      jmp     1b
+                   
+        
+/*** STACK LOCATION ***/
+        
+ENTRY(stack_start)
+        .long SYMBOL_NAME(idle0_task_union)+8192-__PAGE_OFFSET
+        .long __HYPERVISOR_DS
+        
+/*** DESCRIPTOR TABLES ***/
+
+.globl SYMBOL_NAME(idt)
+.globl SYMBOL_NAME(gdt)        
+
+        ALIGN
+        
+        .word   0    
+idt_descr:
+	.word	256*8-1
+SYMBOL_NAME(idt):
+        .long	SYMBOL_NAME(idt_table)
+
+        .word   0
+gdt_descr:
+	.word	256*8-1
+SYMBOL_NAME(gdt):       
+        .long   SYMBOL_NAME(gdt_table)	/* gdt base */
+
+        .word   0
+nopaging_gdt_descr:
+        .word   256*8-1
+        .long   SYMBOL_NAME(gdt_table)-__PAGE_OFFSET
+        
+        ALIGN
+ENTRY(gdt_table)
+        .quad 0x0000000000000000     /* NULL descriptor */
+        .quad 0x0000000000000000     /* not used */
+        .quad 0x00ceba000000ffff     /* 0x11 ring 1 3.5GB code at 0x00000000 */
+        .quad 0x00ceb2000000ffff     /* 0x19 ring 1 3.5GB data at 0x00000000 */
+        .quad 0x00cefa000000ffff     /* 0x23 ring 3 3.5GB code at 0x00000000 */
+        .quad 0x00cef2000000ffff     /* 0x2b ring 3 3.5GB data at 0x00000000 */
+        .quad 0x00cf9a000000ffff     /* 0x30 ring 0 4.0GB code at 0x00000000 */
+        .quad 0x00cf92000000ffff     /* 0x38 ring 0 4.0GB data at 0x00000000 */
+        .quad 0x0000000000000000
+        .quad 0x0000000000000000
+        .quad 0x0000000000000000
+        .quad 0x0000000000000000
+        .fill NR_CPUS*4,8,0             /* space for TSS's and LDT's */
+
+# The following adds 12kB to the kernel file size.
+        .org 0x1000
+ENTRY(idle0_pg_table)
+        .org 0x2000
+ENTRY(idle0_task_union)
+        .org 0x4000
+ENTRY(stext)
+ENTRY(_stext)
