@@ -102,17 +102,15 @@ FORCE: ;
 bzImage: vmlinux
 	@$(MAKEBOOT) bzImage
 
+INSTALL_NAME ?= $(KERNELRELEASE)
 install: bzImage
-	mkdir -p $(prefix)/boot
-	install -m0644 arch/$(ARCH)/boot/bzImage $(prefix)/boot/vmlinuz-$(INSTALL_NAME)
-	install -m0644 vmlinux $(prefix)/boot/vmlinux-syms-$(INSTALL_NAME)
-	install -m0664 .config $(prefix)/boot/config-$(INSTALL_NAME)
+	mkdir -p $(INSTALL_PATH)/boot
+	install -m0644 arch/$(ARCH)/boot/bzImage $(INSTALL_PATH)/boot/vmlinuz-$(INSTALL_NAME)$(INSTALL_SUFFIX)
+	install -m0644 vmlinux $(INSTALL_PATH)/boot/vmlinux-syms-$(INSTALL_NAME)$(INSTALL_SUFFIX)
+	install -m0664 .config $(INSTALL_PATH)/boot/config-$(INSTALL_NAME)$(INSTALL_SUFFIX)
 
-dist: bzImage
-	mkdir -p ../install/boot
-	install -m0644 arch/$(ARCH)/boot/bzImage ../install/boot/vmlinuz-$(INSTALL_NAME)
-	install -m0644 vmlinux ../install/boot/vmlinux-syms-$(INSTALL_NAME)
-	install -m0664 .config ../install/boot/config-$(INSTALL_NAME)
+dist: 
+	$(MAKE) INSTALL_PATH=../install install
 
 %_config: arch/xen/defconfig-%
 	rm -f .config arch/xen/defconfig

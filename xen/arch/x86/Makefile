@@ -15,8 +15,8 @@ endif
 # wrapping that with a low-memory bootstrapper.)
 default: boot/boot.o $(OBJS)
 	$(LD) -r -o arch.o $(OBJS)
-	$(LD) $(LDFLAGS) boot/boot.o $(ALL_OBJS) -o $(TARGET).dbg
-	objcopy -R .note -R .comment -S $(TARGET).dbg $(TARGET)
+	$(LD) $(LDFLAGS) boot/boot.o $(ALL_OBJS) -o $(TARGET)-syms
+	objcopy -R .note -R .comment -S $(TARGET)-syms $(TARGET)
 	$(BASEDIR)/tools/elf-reloc $(MONITOR_BASE) $(LOAD_BASE) $(TARGET)
 
 clean:
