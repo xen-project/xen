@@ -61,6 +61,16 @@ config XEN_BLKDEV_TAP_BE
           with the blktap.  This option will be removed as the block drivers are
           modified to use grant tables.
 
+config XEN_BLKDEV_GRANT
+        bool "Grant table substrate for block drivers (DANGEROUS)"
+        depends on !XEN_BLKDEV_TAP_BE
+        default n
+        help
+          This introduces the use of grant tables as a data exhange mechanism
+          between the frontend and backend block drivers. This currently
+          conflicts with the block tap, and should be considered untested
+          and likely to render your system unstable.
+
 config XEN_NETDEV_BACKEND
 	bool "Network-device backend driver"
 	depends on XEN_PHYSDEV_ACCESS

@@ -51,7 +51,10 @@ typedef struct {
 #define GNTPIN_devr_inc      (1 << GNTPIN_devr_shift)
 #define GNTPIN_devr_mask     (0xFFU << GNTPIN_devr_shift)
 
-#define NR_GRANT_ENTRIES     (PAGE_SIZE / sizeof(grant_entry_t))
+#define ORDER_GRANT_FRAMES   2
+#define NR_GRANT_FRAMES      (1U << ORDER_GRANT_FRAMES)
+#define NR_GRANT_ENTRIES     (NR_GRANT_FRAMES * PAGE_SIZE / sizeof(grant_entry_t))
+
 
 /*
  * Tracks a mapping of another domain's grant reference. Each domain has a
@@ -104,7 +107,7 @@ gnttab_prepare_for_transfer(
 /* Notify 'rd' of a completed transfer via an already-locked grant entry. */
 void 
 gnttab_notify_transfer(
-    struct domain *rd, grant_ref_t ref, unsigned long frame);
+    struct domain *rd, struct domain *ld, grant_ref_t ref, unsigned long frame);
 
 /* Pre-domain destruction release of granted device mappings of other domains.*/
 void
