@@ -179,8 +179,7 @@ class XendDomain:
         @param info:      domain info from xen
         @return: deferred
         """
-        config = sxp.child_value(savedinfo, 'config')
-        deferred = XendDomainInfo.vm_recreate(config, info)
+        deferred = XendDomainInfo.vm_recreate(savedinfo, info)
         def fn(dominfo):
             self.domain[dominfo.id] = dominfo
         deferred.addCallback(fn)
@@ -249,19 +248,29 @@ class XendDomain:
             id = str(d['dom'])
             doms[id] = d
             if id not in self.domain:
-                config = None
-                deferred = XendDomainInfo.vm_recreate(config, d)
+                savedinfo = None
+                deferred = XendDomainInfo.vm_recreate(savedinfo, d)
                 def fn(dominfo):
                     self._add_domain(dominfo.id, dominfo)
                 deferred.addCallback(fn)
         # Remove entries for domains that no longer exist.
         for d in self.domain.values():
-            dominfo = doms.get(d.id)
-            if dominfo:
-                d.update(dominfo)
+            info = doms.get(d.id)
+            if info:
+                d.update(info)
             else:
                 self._delete_domain(d.id)
         self.reap_schedule(1)
+
+    def update_domain(self, id):
+        """Update the saved info for a domain.
+
+        @param id: domain id
+        """
+        dominfo = self.domain.get(id)
+        if dominfo:
+            self.domain_db[id] = dominfo.sxpr()
+            self.sync_domain(id)
 
     def refresh_domain(self, id):
         """Refresh information for a single domain.
@@ -580,7 +589,9 @@ class XendDomain:
         if not dominfo:
             raise XendError("invalid domain:" + str(dom))
         self.refresh_schedule()
-        return dominfo.device_create(devconfig)
+        val = dominfo.device_create(devconfig)
+        self.update_domain(dominfo.id)
+        return val
 
     def domain_device_destroy(self, dom, type, idx):
         """Destroy a device.
@@ -594,7 +605,9 @@ class XendDomain:
         if not dominfo:
             raise XendError("invalid domain:" + str(dom))
         self.refresh_schedule()
-        return dominfo.device_destroy(type, idx)
+        val = dominfo.device_destroy(type, idx)
+        self.update_domain(dominfo.id)
+        return val
 
     def domain_devtype_ls(self, dom, type):
         """Get list of device indexes for a domain.

@@ -253,14 +253,24 @@ def vm_create(config):
     vm = XendDomainInfo()
     return vm.construct(config)
 
-def vm_recreate(config, info):
+def vm_recreate(savedinfo, info):
     """Create the VM object for an existing domain.
+
+    @param savedinfo: saved info from the domain DB
+    @type  savedinfo: sxpr
+    @param info:      domain info from xc
+    @type  info:      xc domain dict
+    @return: deferred
     """
     vm = XendDomainInfo()
     vm.recreate = 1
     vm.setdom(info['dom'])
     vm.name = info['name']
     vm.memory = info['mem_kb']/1024
+    start_time = sxp.child_value(savedinfo, 'start_time')
+    if start_time is not None:
+        vm.startTime = float(start_time)
+    config = sxp.child_value(savedinfo, 'config')
     if config:
         d = vm.construct(config)
     else:
@@ -382,6 +392,7 @@ class XendDomainInfo:
                 ['id', self.id],
                 ['name', self.name],
                 ['memory', self.memory] ]
+
         if self.info:
             run   = (self.info['running'] and 'r') or '-'
             block = (self.info['blocked'] and 'b') or '-'
@@ -396,10 +407,10 @@ class XendDomainInfo:
             sxpr.append(['cpu', self.info['cpu']])
             sxpr.append(['cpu_time', self.info['cpu_time']/1e9])    
             
-            if self.startTime:
-                upTime =  time.time() - self.startTime  
-                sxpr.append(['up_time', str( upTime ) ] )
-                sxpr.append(['start_time', str( self.startTime ) ] )
+        if self.startTime:
+            upTime =  time.time() - self.startTime  
+            sxpr.append(['up_time', str(upTime) ])
+            sxpr.append(['start_time', str(self.startTime) ])
 
         if self.console:
             sxpr.append(self.console.sxpr())
@@ -417,9 +428,6 @@ class XendDomainInfo:
             self.memory = int(sxp.child_value(config, 'memory'))
             if self.memory is None:
                 raise VmError('missing memory size')
-
-            if sxp.child_value( config, 'start_time' ) != None:
-                self.startTime = float( sxp.child_value( config, 'start_time' ) )
 
             self.configure_console()
             self.configure_restart()
@@ -598,7 +606,7 @@ class XendDomainInfo:
                           % (name, memory))
         self.setdom(dom)
 
-        if self.startTime == None:
+        if self.startTime is None:
             self.startTime = time.time()
 
     def build_domain(self, ostype, kernel, ramdisk, cmdline, vifs_n):
