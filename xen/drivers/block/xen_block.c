@@ -166,6 +166,7 @@ static void maybe_trigger_io_schedule(void)
 
 /******************************************************************
  * COMPLETION CALLBACK -- Called as bh->b_end_io()
+ * NB. This can be called from interrupt context!
  */
 
 static void end_block_io_op(struct buffer_head *bh, int uptodate)
@@ -208,11 +209,11 @@ long do_block_io_op(block_io_op_t *u_block_io_op)
     block_io_op_t op; 
     struct task_struct *p = current;
 
-    if (copy_from_user(&op, u_block_io_op, sizeof(op)))
+    if ( copy_from_user(&op, u_block_io_op, sizeof(op)) )
         return -EFAULT;
 
-    switch (op.cmd) {
-
+    switch ( op.cmd )
+    {
     case BLOCK_IO_OP_SIGNAL: 
 	/* simply indicates there're reqs outstanding => add current to list */
 	add_to_blkdev_list_tail(p);
@@ -276,7 +277,6 @@ long do_block_io_op(block_io_op_t *u_block_io_op)
     default: 
 	ret = -ENOSYS; 
     } 
-
 
     return ret;
 }
@@ -439,7 +439,7 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
     int operation = (req->operation == XEN_BLOCK_WRITE) ? WRITE : READ;
     unsigned short nr_sects;
     unsigned long buffer, flags;
-    int i, rc, tot_sects;
+    int i, tot_sects;
     pending_req_t *pending_req;
 
     /* We map virtual scatter/gather segments to physical segments. */
@@ -484,23 +484,29 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
 	phys_seg[nr_psegs].nr_sects      = nr_sects;
 
         /* Translate the request into the relevant 'physical device' */
-	new_segs = 1; 
-	rc = vbd_translate(&phys_seg[nr_psegs], &new_segs, p, operation); 
+	new_segs = vbd_translate(&phys_seg[nr_psegs], p, operation); 
 
-	/* If it fails we bail (unless the caller is priv => has raw access) */
-	if(rc) { 
-	    if(!IS_PRIV(p)) {
-		printk("access denied: %s of [%ld,%ld] on dev=%04x\n", 
-		       operation == READ ? "read" : "write", 
-		       req->sector_number + tot_sects, 
-		       req->sector_number + tot_sects + nr_sects, 
-		       req->device); 
-		goto bad_descriptor;
-	    }
+	/* If it fails we bail (unless the caller is privileged). */
+	if ( new_segs < 0 )
+        { 
+            if ( unlikely(new_segs != -ENODEV) || unlikely(!IS_PRIV(p)) )
+            {
+                DPRINTK("access denied: %s of [%ld,%ld] on dev=%04x\n", 
+                        operation == READ ? "read" : "write", 
+                        req->sector_number + tot_sects, 
+                        req->sector_number + tot_sects + nr_sects, 
+                        req->device); 
+                goto bad_descriptor;
+            }
 
-	    /* SMH: skanky hack; clear any 'partition' info in device */
+	    /*
+             * XXX Clear any 'partition' info in device. This works because IDE
+             * ignores the partition bits anyway. Only SCSI needs this hack,
+             * and it has four bits to clear.
+             */
 	    phys_seg[nr_psegs].dev = req->device & 0xFFF0;
-	}
+            new_segs = 1;
+        }
 	 
         nr_psegs += new_segs;
         if ( nr_psegs >= (MAX_BLK_SEGS*2) ) BUG();
@@ -620,6 +626,7 @@ void init_blkdev_info(struct task_struct *p)
     clear_page(p->blk_ring_base);
     SHARE_PFN_WITH_DOMAIN(virt_to_page(p->blk_ring_base), p->domain);
     p->blkdev_list.next = NULL;
+    spin_lock_init(&p->vbd_lock);
 }
 
 /* End-of-day teardown for a domain. */
@@ -628,6 +635,7 @@ void destroy_blkdev_info(struct task_struct *p)
     ASSERT(!__on_blkdev_list(p));
     UNSHARE_PFN(virt_to_page(p->blk_ring_base));
     free_page((unsigned long)p->blk_ring_base);
+    destroy_all_vbds(p);
 }
 
 void unlink_blkdev_info(struct task_struct *p)

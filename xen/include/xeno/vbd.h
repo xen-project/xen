@@ -37,6 +37,7 @@ long vbd_delete(vbd_delete_t *delete_params);
 long vbd_probe(vbd_probe_t *probe_params); 
 long vbd_info(vbd_info_t *info_params); 
 
+void destroy_all_vbds(struct task_struct *p);
 
 /* Describes a [partial] disk extent (part of a block io request) */
 typedef struct {
@@ -47,8 +48,7 @@ typedef struct {
 } phys_seg_t;
 
 
-int vbd_translate(phys_seg_t * pseg, int *nr_segs, 
-		  struct task_struct *p, int operation); 
+int vbd_translate(phys_seg_t *pseg, struct task_struct *p, int operation); 
 
 
 #endif /* __VBD_H__ */

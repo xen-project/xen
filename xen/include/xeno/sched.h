@@ -114,12 +114,8 @@ struct task_struct
     unsigned int blk_resp_prod; /* (private version of) response producer */
     struct list_head blkdev_list;
     spinlock_t blk_ring_lock;
-    struct list_head physdisk_aces; /* physdisk_ace structures
-				       describing what bits of disk
-				       the process can do raw access
-				       to. */
-    spinlock_t physdev_lock;
-    vbd_t *vbdtab[VBD_HTAB_SZ];     // mapping from 16bit vdevices to vbds
+    vbd_t *vbdtab[VBD_HTAB_SZ];   /* mapping from 16-bit vdevices to vbds */
+    spinlock_t vbd_lock;
 
     /* VM */
     struct mm_struct mm;

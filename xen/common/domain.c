@@ -52,7 +52,6 @@ struct task_struct *do_createdomain(unsigned int dom_id, unsigned int cpu)
 
     spin_lock_init(&p->blk_ring_lock);
     spin_lock_init(&p->page_lock);
-    spin_lock_init(&p->physdev_lock);
 
     p->shared_info = (void *)get_free_page(GFP_KERNEL);
     memset(p->shared_info, 0, PAGE_SIZE);
@@ -62,8 +61,6 @@ struct task_struct *do_createdomain(unsigned int dom_id, unsigned int cpu)
     memset(p->mm.perdomain_pt, 0, PAGE_SIZE);
 
     init_blkdev_info(p);
-
-    INIT_LIST_HEAD(&p->physdisk_aces);
 
     p->addr_limit = USER_DS;
 
@@ -131,11 +128,6 @@ void __kill_domain(struct task_struct *p)
     printk("Killing domain %d\n", p->domain);
 
     unlink_blkdev_info(p);
-
-#if 0
-    for ( i = 0; i < XEN_MAX_VBDS; i++ )
-	xen_vbd_delete(p, i);
-#endif
 
     for ( i = 0; i < MAX_DOMAIN_VIFS; i++ )
         unlink_net_vif(p->net_vif_list[i]);
@@ -302,15 +294,10 @@ void release_task(struct task_struct *p)
     printk("Releasing task %d\n", p->domain);
 
     /*
-     * This frees up blkdev rings. Totally safe since blkdev ref counting
-     * actually uses the task_struct refcnt.
+     * This frees up blkdev rings and vbd-access lists. Totally safe since
+     * blkdev ref counting actually uses the task_struct refcnt.
      */
     destroy_blkdev_info(p);
-
-#if 0
-    /* Free up the physdisk access control info */
-    destroy_physdisk_aces(p);
-#endif
 
     /* Free all memory associated with this domain. */
     free_page((unsigned long)p->mm.perdomain_pt);
