@@ -7,7 +7,8 @@
 /* describes dirrectly mapped vma nodes */
 typedef struct {
     struct list_head list;
-    unsigned long addr;
+    unsigned long vm_start;
+	unsigned long vm_end;
 } direct_mmap_node_t;
 
 /*

@@ -14,15 +14,13 @@
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
 
+/*
 static int direct_mapped(unsigned long addr)
 {
     direct_mmap_node_t * node;
     struct list_head * curr;
     struct list_head * direct_list = &current->mm->context.direct_list;
 
-    /* now, this loop is going to make things slow, maybe should think
-     * of a better way to implement it, maybe without list_head
-     */
     curr = direct_list->next;
     while(curr != direct_list){
         node = list_entry(curr, direct_mmap_node_t, list);
@@ -36,7 +34,8 @@ static int direct_mapped(unsigned long addr)
 
     return 1;
 }
-
+*/
+/*
 unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr, unsigned long len, unsigned long pgoff, unsigned long flags)
 {
 	struct vm_area_struct *vma;
@@ -54,15 +53,9 @@ unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr, unsi
 	addr = PAGE_ALIGN(TASK_UNMAPPED_BASE);
 
 	for (vma = find_vma(current->mm, addr); ; vma = vma->vm_next) {
-		/* At this point:  (!vma || addr < vma->vm_end). */
 		if (TASK_SIZE - len < addr)
 			return -ENOMEM;
         
-        /* here we check whether the vma is big enough and we also check
-         * whether it has already been direct mapped, in which case it
-         * is not available. this is the only difference to generic
-         * arch_get_unmapped_area. 
-         */
 		if(current->pid > 100){
 		printk(KERN_ALERT "bd240 debug: gua: vm addr found %lx\n", addr);
 			printk(KERN_ALERT "bd240 debug: gua: first condition %d, %lx, %lx\n",vma, addr + len, vma->vm_start);
@@ -73,4 +66,73 @@ unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr, unsi
 		
         addr = vma->vm_end;
 	}
+}
+*/
+struct list_head *find_direct(struct list_head *list, unsigned long addr)
+{
+    for ( curr = direct_list->next; curr != direct_list; curr = curr->next )
+    {
+        node = list_entry(curr, direct_mmap_node_t, list);
+        if( node->vm_start > addr ) break;
+    }
+
+    return curr;
+}
+
+unsigned long arch_get_unmapped_area(struct file *filp, unsigned long
+addr, unsigned long len, unsigned long pgoff, unsigned long flags)
+{
+    struct vm_area_struct *vma;
+    direct_mmap_node_t * node;
+    struct list_head * curr;
+    struct list_head * direct_list = &current->mm->context.direct_list;
+
+    if (len > TASK_SIZE)
+        return -ENOMEM;
+
+    if ( addr )
+    {
+        addr = PAGE_ALIGN(addr);
+        vma = find_vma(current->mm, addr);
+        curr = find_direct(direct_list, addr);
+        node = list_entry(curr, direct_mmap_node_t, list);
+        if ( (TASK_SIZE - len >= addr) &&
+             (!vma || addr + len <= vma->vm_start) &&
+             ((curr == direct_list) || addr + len <= node->vm_start) )
+            return addr;
+    }
+
+    addr = PAGE_ALIGN(TASK_UNMAPPED_BASE);
+
+
+    /* Find first VMA and direct_map nodes with vm_start > addr */
+    vma  = find_vma(current->mm, addr);
+    curr = find_direct(direct_list, addr);
+    node = list_entry(curr, direct_mmap_node_t, list);
+
+    for ( ; ; )
+    {
+        if ( TASK_SIZE - len < addr ) return -ENOMEM;
+
+        if ( vma && (vma->vm_start < node->vm_start) )
+        {
+            /* Do we fit before VMA node? */
+            if ( addr + len <= vma->vm_start ) return addr;
+            addr = vma->vm_end;
+            vma = vma->vm_next;
+        }
+        else if ( curr != direct_list )
+        {
+            /* Do we fit before direct_map node? */
+            if ( addr + len <= node->vm_start) return addr;
+            addr = node->vm_end;
+            curr = curr->next;
+            node = list_entry(curr, direct_mmap_node_t, list);
+        }
+        else
+        {
+            /* Reached end of VMA and direct_map lists */
+            return addr;
+        }
+    }
 }

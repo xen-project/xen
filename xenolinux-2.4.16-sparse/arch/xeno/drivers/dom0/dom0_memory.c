@@ -20,17 +20,13 @@
 #define MAP_CONT    0
 #define MAP_DISCONT 1
 
+extern struct list_head * find_direct(struct list_head *, unsigned long);
+
 /* now, this is grimm, kmalloc seems to have problems allocating small mem
  * blocks, so i have decided to use fixed (a bit) larger blocks... this needs
  * to be traced down but no time now.
  */
 #define KMALLOC_SIZE	128
-
-/*
- * maps a range of physical memory into the requested pages. the old
- * mappings are removed. any references to nonexistent pages results
- * in null mappings (currently treated as "copy-on-access")
- */
 
 /* bd240: functions below perform direct mapping to the real physical pages needed for
  * mapping various hypervisor specific structures needed in dom0 userspace by various
@@ -169,6 +165,7 @@ unsigned long direct_mmap(unsigned long phys_addr, unsigned long size,
                 pgprot_t prot, int flag, int tot_pages)
 {
     direct_mmap_node_t * dmmap;
+    struct list_head * entry;
     unsigned long addr;
     int ret = 0;
     
@@ -184,12 +181,19 @@ unsigned long direct_mmap(unsigned long phys_addr, unsigned long size,
         goto out;
     }
 
-    /* add node on the list of directly mapped areas */ 
+    /* add node on the list of directly mapped areas, make sure the
+	 * list remains sorted.
+	 */ 
     //dmmap = (direct_mmap_node_t *)kmalloc(GFP_KERNEL, sizeof(direct_mmap_node_t));
     dmmap = (direct_mmap_node_t *)kmalloc(GFP_KERNEL, KMALLOC_SIZE);
-
-    dmmap->addr = addr;
-    list_add(&dmmap->list, &current->mm->context.direct_list);
+    dmmap->vm_start = addr;
+    dmmap->vm_end = addr + size;
+	entry = find_direct(&current->mm->context.direct_list, addr);
+	if(entry != &current->mm->context.direct_list){
+		list_add_tail(&dmmap->list, entry);
+	} else {
+    	list_add(&dmmap->list, &current->mm->context.direct_list);
+	}
 
     /* and perform the mapping */
     if(flag == MAP_DISCONT){
