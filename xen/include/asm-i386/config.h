@@ -40,8 +40,6 @@
 
 #define CONFIG_XEN_ATTENTION_KEY 1
 
-#define CONFIG_SHADOW 1
-
 
 #define HZ 100
 

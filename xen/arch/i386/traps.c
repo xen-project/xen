@@ -339,13 +339,11 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
             return; /* successfully copied the mapping */
     }
 
-#ifdef CONFIG_SHADOW
-    if ( p->mm.shadowmode && addr < PAGE_OFFSET &&
+    if ( unlikely( p->mm.shadow_mode ) && addr < PAGE_OFFSET &&
 	 shadow_fault( addr, error_code ) )
       {
 	return; // return true if fault was handled 
       }
-#endif
 
     if ( unlikely(!(regs->xcs & 3)) )
         goto fault_in_hypervisor;

@@ -494,6 +494,7 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
     unsigned short size;
     unsigned char  offset, status = RING_STATUS_OK;
     struct task_struct *p = vif->domain;
+    unsigned long spte_pfn;
 
     memcpy(skb->mac.ethernet->h_dest, vif->vmac, ETH_ALEN);
     if ( ntohs(skb->mac.ethernet->h_proto) == ETH_P_ARP )
@@ -546,21 +547,18 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
         goto out;
     }
 
-
-#ifdef CONFIG_SHADOW
-    if ( pte_page->shadow_and_flags & PSH_shadowed )
+    if ( p->mm.shadow_mode && 
+	 (spte_pfn=get_shadow_status(p, pte_page-frame_table)) )
     {
-        unsigned long spte_pfn = pte_page->shadow_and_flags & PSH_pfn_mask;
 	unsigned long *sptr = map_domain_mem( (spte_pfn<<PAGE_SHIFT) |
 			(((unsigned long)ptep)&~PAGE_MASK) );
 
-        // save the fault later
+        // avoid the fault later
 	*sptr = new_pte;
 
-	unmap_domain_mem( sptr );
+	unmap_domain_mem(sptr);
+	put_shadow_status(p);
     }
-#endif
-
 
     machine_to_phys_mapping[new_page - frame_table] 
         = machine_to_phys_mapping[old_page - frame_table];
@@ -2068,7 +2066,7 @@ static void get_rx_bufs(net_vif_t *vif)
     rx_shadow_entry_t *srx;
     unsigned long  pte_pfn, buf_pfn;
     struct pfn_info *pte_page, *buf_page;
-    unsigned long *ptep, pte;
+    unsigned long *ptep, pte, spfn;
 
     spin_lock(&vif->rx_lock);
 
@@ -2114,21 +2112,16 @@ static void get_rx_bufs(net_vif_t *vif)
             goto rx_unmap_and_continue;
         }
 
-#ifdef CONFIG_SHADOW
-	{
-	    if ( frame_table[rx.addr>>PAGE_SHIFT].shadow_and_flags & PSH_shadowed )
-	      {
-		unsigned long spfn = 
-		  frame_table[rx.addr>>PAGE_SHIFT].shadow_and_flags & PSH_pfn_mask;
-		unsigned long * sptr = map_domain_mem( (spfn<<PAGE_SHIFT) | (rx.addr&~PAGE_MASK) );
+	if ( p->mm.shadow_mode && 
+	     (spfn=get_shadow_status(p, rx.addr>>PAGE_SHIFT)) )
+	  {
+	    unsigned long * sptr = 
+	      map_domain_mem( (spfn<<PAGE_SHIFT) | (rx.addr&~PAGE_MASK) );
 
-		*sptr = 0;
-		unmap_domain_mem( sptr );
-
-	      }
-
-	}
-#endif
+	    *sptr = 0;
+	    unmap_domain_mem( sptr );
+	    put_shadow_status(p);
+	  }
         
         buf_pfn  = pte >> PAGE_SHIFT;
         buf_page = &frame_table[buf_pfn];

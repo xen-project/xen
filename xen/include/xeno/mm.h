@@ -67,10 +67,6 @@ struct pfn_info
     unsigned long       type_and_flags;
     /* Timestamp from 'TLB clock', used to reduce need for safety flushes. */
     unsigned long       tlbflush_timestamp;
-#ifdef CONFIG_SHADOW
-    /* Shadow page status: top bits flags, bottom bits are a pfn */
-    unsigned long       shadow_and_flags;  
-#endif
 };
 
  /* The following page types are MUTUALLY EXCLUSIVE. */

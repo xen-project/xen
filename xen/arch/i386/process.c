@@ -282,24 +282,13 @@ void switch_to(struct task_struct *prev_p, struct task_struct *next_p)
     }
 
     /* Switch page tables.  */
-#ifdef CONFIG_SHADOW
-
-    /*    printk("switch_to %08lx, %08lx\n", next_p->mm.pagetable,
-	   next_p->mm.shadowtable);*/
-
-
-    if( next_p->mm.shadowmode )
+    if( next_p->mm.shadow_mode )
       {
-	check_pagetable( next_p->mm.pagetable, "switch" );
-	write_cr3_counted(pagetable_val(next_p->mm.shadowtable));
+	check_pagetable( next_p, next_p->mm.pagetable, "switch" );
+	write_cr3_counted(pagetable_val(next_p->mm.shadow_table));
       }
     else
-#endif
       write_cr3_counted(pagetable_val(next_p->mm.pagetable));
-
-
-
-
 
     set_current(next_p);
 

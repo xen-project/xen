@@ -341,12 +341,14 @@ void free_domain_page(struct pfn_info *page)
         if ( !(page->count_and_flags & PGC_zombie) )
         {
             page->tlbflush_timestamp = tlbflush_clock;
-            page->u.cpu_mask = 1 << p->processor;
-
-            spin_lock(&p->page_list_lock);
-            list_del(&page->list);
-            p->tot_pages--;
-            spin_unlock(&p->page_list_lock);
+	    if (p)
+	    {
+                page->u.cpu_mask = 1 << p->processor;
+                spin_lock(&p->page_list_lock);
+		list_del(&page->list);
+		p->tot_pages--;
+		spin_unlock(&p->page_list_lock);
+	    }
         }
 
         page->count_and_flags = 0;
@@ -546,10 +548,6 @@ int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *builddomain)
     p->mm.pagetable = mk_pagetable(phys_l2tab);
     get_page_and_type(&frame_table[phys_l2tab>>PAGE_SHIFT], p, 
                       PGT_l2_page_table);
-
-#ifdef CONFIG_SHADOW
-    p->mm.shadowtable = shadow_mk_pagetable(phys_l2tab, p->mm.shadowmode);
-#endif
 
     /* Set up the shared info structure. */
     update_dom_time(p->shared_info);
@@ -852,14 +850,9 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
 
     set_bit(PF_CONSTRUCTED, &p->flags);
 
-#ifdef CONFIG_SHADOW
-
-printk("Engage shadow mode for dom 0\n");
-    p->mm.shadowmode = SHM_test; // XXXXX IAP
-    p->mm.shadowtable = shadow_mk_pagetable(phys_l2tab, p->mm.shadowmode );
+#if 1 // XXXXX IAP DO NOT CHECK IN ENBALED !!!!!!!
+    shadow_mode_enable(p, SHM_test); 
 #endif
-
-
 
     new_thread(p, 
                (unsigned long)virt_load_address, 

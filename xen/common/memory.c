@@ -765,20 +765,22 @@ void free_page_type(struct pfn_info *page, unsigned int type)
     {
     case PGT_l1_page_table:
         free_l1_table(page);
-#ifdef CONFIG_SHADOW
-	// assume we're in shadow mode if PSH_shadowed set
-	if ( current->mm.shadowmode && page->shadow_and_flags & PSH_shadowed )
+	if ( unlikely(current->mm.shadow_mode) && 
+	     (get_shadow_status(current, page-frame_table) & PSH_shadowed) )
+	{
 	    unshadow_table( page-frame_table, type );
-#endif
+	    put_shadow_status(current);
+        }
 	return;
 
     case PGT_l2_page_table:
         free_l2_table(page);
-#ifdef CONFIG_SHADOW
-	// assume we're in shadow mode if PSH_shadowed set
-	if ( current->mm.shadowmode && page->shadow_and_flags & PSH_shadowed )
+	if ( unlikely(current->mm.shadow_mode) && 
+	     (get_shadow_status(current, page-frame_table) & PSH_shadowed) )
+	{
 	    unshadow_table( page-frame_table, type );
-#endif
+	    put_shadow_status(current);
+        }
 	return;
 
     default:
@@ -848,21 +850,22 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
             put_page_and_type(&frame_table[pagetable_val(current->mm.pagetable)
                                           >> PAGE_SHIFT]);
             current->mm.pagetable = mk_pagetable(pfn << PAGE_SHIFT);
-#ifdef CONFIG_SHADOW            
-	    current->mm.shadowtable = 
-	      shadow_mk_pagetable(pfn << PAGE_SHIFT, current->mm.shadowmode);
-#endif
-            invalidate_shadow_ldt();
 
+	    if( unlikely(current->mm.shadow_mode))
+	      current->mm.shadow_table = 
+		shadow_mk_pagetable(current, pfn<<PAGE_SHIFT);
+
+            invalidate_shadow_ldt();
+	    
+	    // start using the new PT straight away
             percpu_info[cpu].deferred_ops &= ~DOP_FLUSH_TLB;
-#ifdef CONFIG_SHADOW
-            if ( unlikely(current->mm.shadowmode) )
+            if ( unlikely(current->mm.shadow_mode) )
 	    {
-                check_pagetable( current->mm.pagetable, "pre-stlb-flush" );
-	        write_cr3_counted(pagetable_val(current->mm.shadowtable));
+                check_pagetable( current, 
+				 current->mm.pagetable, "pre-stlb-flush" );
+	        write_cr3_counted(pagetable_val(current->mm.shadow_table));
             }
             else
-#endif	  
 	        write_cr3_counted(pagetable_val(current->mm.pagetable));
         }
         else
@@ -947,10 +950,8 @@ int do_mmu_update(mmu_update_t *ureqs, int count)
     struct pfn_info *page;
     int rc = 0, okay = 1, i, cpu = smp_processor_id();
     unsigned int cmd;
-#ifdef CONFIG_SHADOW
     unsigned long prev_spfn = 0;
     l1_pgentry_t *prev_spl1e = 0;
-#endif
 
     perfc_incrc(calls_to_mmu_update); 
     perfc_addc(num_page_updates, count);
@@ -1002,11 +1003,14 @@ int do_mmu_update(mmu_update_t *ureqs, int count)
                     okay = mod_l1_entry((l1_pgentry_t *)va, 
                                         mk_l1_pgentry(req.val)); 
 
-#ifdef CONFIG_SHADOW
-		    if ( okay && page->shadow_and_flags & PSH_shadowed )
+		    if ( okay && unlikely(current->mm.shadow_mode) &&
+			 (get_shadow_status(current, page-frame_table) &
+			  PSH_shadowed) )
+		    {
 		        shadow_l1_normal_pt_update( req.ptr, req.val, 
 						    &prev_spfn, &prev_spl1e );
-#endif
+			put_shadow_status(current);
+		    }
 
                     put_page_type(page);
                 }
@@ -1017,10 +1021,14 @@ int do_mmu_update(mmu_update_t *ureqs, int count)
                     okay = mod_l2_entry((l2_pgentry_t *)va, 
                                         mk_l2_pgentry(req.val),
                                         pfn); 
-#ifdef CONFIG_SHADOW
-		    if ( okay && page->shadow_and_flags & PSH_shadowed )
+
+		    if ( okay && unlikely(current->mm.shadow_mode) &&
+			 (get_shadow_status(current, page-frame_table) & 
+			  PSH_shadowed) )
+		    {
 		        shadow_l2_normal_pt_update( req.ptr, req.val );
-#endif
+			put_shadow_status(current);
+		    }
 
                     put_page_type(page);
                 }
@@ -1032,19 +1040,11 @@ int do_mmu_update(mmu_update_t *ureqs, int count)
                     okay = 1;
                     put_page_type(page);
 
-#ifdef CONFIG_SHADOW
-		    if ( page->shadow_and_flags & PSH_shadowed )
-		        BUG(); 
-		        // at present, we shouldn't be shadowing such pages
-#endif
-
-
+                    // at present, we don't shadowing such pages
                 }
                 break;
             }
 
-check_pagetable( current->mm.pagetable, "mmu" ); // XXX XXX XXX XXX XXX
-            
             put_page(page);
 
             break;
@@ -1087,25 +1087,22 @@ check_pagetable( current->mm.pagetable, "mmu" ); // XXX XXX XXX XXX XXX
     if ( prev_pfn != 0 )
         unmap_domain_mem((void *)va);
 
-#ifdef CONFIG_SHADOW
     if( prev_spl1e != 0 ) 
         unmap_domain_mem((void *)prev_spl1e);
-#endif
 
     deferred_ops = percpu_info[cpu].deferred_ops;
     percpu_info[cpu].deferred_ops = 0;
 
     if ( deferred_ops & DOP_FLUSH_TLB )
     {
-#ifdef CONFIG_SHADOW
-        if ( unlikely(current->mm.shadowmode) )
+        if ( unlikely(current->mm.shadow_mode) )
 	{
-            check_pagetable( current->mm.pagetable, "pre-stlb-flush" );
-	    write_cr3_counted(pagetable_val(current->mm.shadowtable));
+            check_pagetable( current, 
+			     current->mm.pagetable, "pre-stlb-flush" );
+	    write_cr3_counted(pagetable_val(current->mm.shadow_table));
         }
         else
-#endif	  
-	  write_cr3_counted(pagetable_val(current->mm.pagetable));
+  	    write_cr3_counted(pagetable_val(current->mm.pagetable));
     }
 
     if ( deferred_ops & DOP_RELOAD_LDT )
@@ -1142,9 +1139,7 @@ int do_update_va_mapping(unsigned long page_nr,
                                 mk_l1_pgentry(val))) )
         err = -EINVAL;
 
-#ifdef CONFIG_SHADOW
-
-    if ( unlikely(p->mm.shadowmode) )
+    if ( unlikely(p->mm.shadow_mode) )
     {
         unsigned long sval = 0;
 
@@ -1164,14 +1159,14 @@ int do_update_va_mapping(unsigned long page_nr,
 	{
 	    // Since L2's are guranteed RW, failure indicates the page
 	    // was not shadowed, so ignore.
-            
+            perfc_incrc(shadow_update_va_fail);
 	    //MEM_LOG("update_va_map: couldn't write update\n");	
 	}
+
+	check_pagetable( p, p->mm.pagetable, "va" ); // debug
+    
     }
 
-check_pagetable( p->mm.pagetable, "va" );
-
-#endif
 
     deferred_ops = percpu_info[cpu].deferred_ops;
     percpu_info[cpu].deferred_ops = 0;
@@ -1179,12 +1174,10 @@ check_pagetable( p->mm.pagetable, "va" );
     if ( unlikely(deferred_ops & DOP_FLUSH_TLB) || 
          unlikely(flags & UVMF_FLUSH_TLB) )
     {
-#ifdef CONFIG_SHADOW
-        if ( unlikely(p->mm.shadowmode) )
-          write_cr3_counted(pagetable_val(p->mm.shadowtable));
+        if ( unlikely(p->mm.shadow_mode) )
+            write_cr3_counted(pagetable_val(p->mm.shadow_table));
         else
-#endif
-          write_cr3_counted(pagetable_val(p->mm.pagetable));
+            write_cr3_counted(pagetable_val(p->mm.pagetable));
     }
     else if ( unlikely(flags & UVMF_INVLPG) )
         __flush_tlb_one(page_nr << PAGE_SHIFT);

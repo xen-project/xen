@@ -12,6 +12,7 @@
 #include <asm/cpufeature.h>
 #include <asm/desc.h>
 #include <xeno/config.h>
+#include <xeno/spinlock.h>
 #include <hypervisor-ifs/hypervisor-if.h>
 
 struct task_struct;
@@ -416,10 +417,14 @@ struct mm_struct {
     l1_pgentry_t *perdomain_pt;
     pagetable_t  pagetable;
 
-#ifdef CONFIG_SHADOW
-    unsigned int shadowmode;  /* flags to control shadow table operation */
-    pagetable_t  shadowtable;
-#endif
+    unsigned int shadow_mode;  /* flags to control shadow table operation */
+    pagetable_t  shadow_table;
+    spinlock_t shadow_lock;
+    struct shadow_status *shadow_ht;
+    struct shadow_status *shadow_ht_free;
+    struct shadow_status *shadow_ht_extras; // extra allocation units
+    unsigned int shadow_page_count;
+    unsigned int shadow_max_page_count;
 
     /* Current LDT details. */
     unsigned long ldt_base, ldt_ents, shadow_ldt_mapcnt;

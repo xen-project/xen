@@ -103,7 +103,7 @@ void perfc_reset(u_char key, void *dev_id, struct pt_regs *regs)
             for ( j = sum = 0; j < perfc_info[i].nr_elements; j++ )
 	      	atomic_set(&counters[j],0);
         case TYPE_S_ARRAY:
-            counters += j;
+            counters += perfc_info[i].nr_elements;
             break;
         }
     }

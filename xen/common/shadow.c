@@ -7,30 +7,12 @@
 #include <asm/domain_page.h>
 #include <asm/page.h>
 
-#ifdef CONFIG_SHADOW
-
-
-#if SHADOW_DEBUG
-#define MEM_VLOG(_f, _a...)                             \
-  printk("DOM%llu: (file=shadow.c, line=%d) " _f "\n", \
-         current->domain , __LINE__ , ## _a )
-#else
-#define MEM_VLOG(_f, _a...) 
-#endif
-
-#if 0
-#define MEM_VVLOG(_f, _a...)                             \
-  printk("DOM%llu: (file=shadow.c, line=%d) " _f "\n", \
-         current->domain , __LINE__ , ## _a )
-#else
-#define MEM_VVLOG(_f, _a...) 
-#endif
-
 
 /********
 
 To use these shadow page tables, guests must not rely on the ACCESSED
 and DIRTY bits on L2 pte's being accurate -- they will typically all be set.
+
 
 I doubt this will break anything. (If guests want to use the va_update
 mechanism they've signed up for this anyhow...)
@@ -38,39 +20,148 @@ mechanism they've signed up for this anyhow...)
 ********/
 
 
-pagetable_t shadow_mk_pagetable( unsigned long gptbase, 
-					unsigned int shadowmode )
+int shadow_mode_enable( struct task_struct *p, unsigned int mode )
 {
-	unsigned long gpfn, spfn=0;
+	struct shadow_status **fptr;
+	int i;
 
-	MEM_VVLOG("shadow_mk_pagetable( gptbase=%08lx, mode=%d )",
-			 gptbase, shadowmode );
+	// sychronously stop domain
+    // XXX for the moment, only use on already stopped domains!!!
 
-	if ( unlikely(shadowmode) ) 
+	spin_lock_init(&p->mm.shadow_lock);
+	spin_lock(&p->mm.shadow_lock);
+
+    p->mm.shadow_mode = mode;
+	
+	// allocate hashtable
+    p->mm.shadow_ht = kmalloc( shadow_ht_buckets * 
+							   sizeof(struct shadow_status), GFP_KERNEL );
+	if( ! p->mm.shadow_ht )
+		goto nomem;
+
+	memset( p->mm.shadow_ht, 0, shadow_ht_buckets * 
+							   sizeof(struct shadow_status) );
+
+
+	// allocate space for first lot of extra nodes
+    p->mm.shadow_ht_extras = kmalloc( sizeof(void*) + (shadow_ht_extra_size * 
+							   sizeof(struct shadow_status)), GFP_KERNEL );
+
+	if( ! p->mm.shadow_ht_extras )
+		goto nomem;
+
+	memset( p->mm.shadow_ht_extras, 0, sizeof(void*) + (shadow_ht_extra_size * 
+							   sizeof(struct shadow_status)) );
+	
+    // add extras to free list
+	fptr = &p->mm.shadow_ht_free;
+	for ( i=0; i<shadow_ht_extra_size; i++ )
 	{
-		gpfn =  gptbase >> PAGE_SHIFT;
-		
-		if ( likely(frame_table[gpfn].shadow_and_flags & PSH_shadowed) )
-		{
-			spfn = frame_table[gpfn].shadow_and_flags & PSH_pfn_mask;
-		}
-		else
-		{
-			spfn = shadow_l2_table( gpfn );
-		}      
+		*fptr = &p->mm.shadow_ht_extras[i];
+		fptr = &(p->mm.shadow_ht_extras[i].next);
 	}
+	*fptr = NULL;
+	*((struct shadow_status ** ) &p->mm.shadow_ht_extras[shadow_ht_extra_size]) = NULL;
 
-	return mk_pagetable(spfn << PAGE_SHIFT);
+	spin_unlock(&p->mm.shadow_lock);
+
+    // call shadow_mk_pagetable
+	p->mm.shadow_table = shadow_mk_pagetable( p, 
+											  pagetable_val(p->mm.pagetable) );
+
+	return 0;
+
+nomem:
+	spin_unlock(&p->mm.shadow_lock);
+	return -ENOMEM;
 }
+
+void shadow_mode_disable( )
+{
+
+    // free the hash buckets as you go
+
+    // free the hashtable itself
+}
+
+
+static inline void free_shadow_page( struct task_struct *p, unsigned int pfn )
+{
+    unsigned long flags;
+
+	p->mm.shadow_page_count--;
+
+    spin_lock_irqsave(&free_list_lock, flags);
+    list_add(&frame_table[pfn].list, &free_list);
+    free_pfns++;
+    spin_unlock_irqrestore(&free_list_lock, flags);
+}
+
+static inline struct pfn_info *alloc_shadow_page( struct task_struct *p )
+{
+	p->mm.shadow_page_count++;
+
+	return alloc_domain_page( NULL );
+}
+
+
+static void __free_shadow_table( struct task_struct *p )
+{
+	int j;
+	struct shadow_status *a;
+	
+	// the code assumes you're not using the page tables i.e.
+    // the domain is stopped and cr3 is something else!!
+
+    // walk the hash table and call free_shadow_page on all pages
+
+    for(j=0;j<shadow_ht_buckets;j++)
+    {
+        a = &p->mm.shadow_ht[j];        
+        if (a->pfn)
+        {
+            free_shadow_page( p, a->spfn_and_flags & PSH_pfn_mask );
+            a->pfn = 0;
+            a->spfn_and_flags = 0;
+        }
+        a=a->next;
+        while(a)
+		{ 
+            struct shadow_status *next = a->next;
+            free_shadow_page( p, a->spfn_and_flags & PSH_pfn_mask );
+            a->pfn = 0;
+            a->spfn_and_flags = 0;
+            a->next = p->mm.shadow_ht_free;
+            p->mm.shadow_ht_free = a;
+            a=next;
+		}
+	}
+}
+
+static void flush_shadow_table( struct task_struct *p )
+{
+	
+    // XXX synchronously stop domain (needed for SMP guests)
+
+    // switch to idle task's page tables
+ 
+    // walk the hash table and call free_shadow_page on all pages
+	spin_lock(&p->mm.shadow_lock);
+	__free_shadow_table( p );
+	spin_unlock(&p->mm.shadow_lock);
+
+    // XXX unpause domain
+}
+
+
 
 void unshadow_table( unsigned long gpfn, unsigned int type )
 {
 	unsigned long spfn;
 
-    MEM_VLOG("unshadow_table type=%08x gpfn=%08lx, spfn=%08lx",
+    SH_VLOG("unshadow_table type=%08x gpfn=%08lx",
 		 type,
-		 gpfn,
-		 frame_table[gpfn].shadow_and_flags & PSH_pfn_mask );
+		 gpfn );
 
 	perfc_incrc(unshadow_table_count);
 
@@ -79,9 +170,8 @@ void unshadow_table( unsigned long gpfn, unsigned int type )
 	// even in the SMP guest case, there won't be a race here as
     // this CPU was the one that cmpxchg'ed the page to invalid
 
-	spfn = frame_table[gpfn].shadow_and_flags & PSH_pfn_mask;
-	frame_table[gpfn].shadow_and_flags=0;
-	frame_table[spfn].shadow_and_flags=0;
+	spfn = __shadow_status(current, gpfn) & PSH_pfn_mask;
+	delete_shadow_status(current, gpfn);
 
 #if 0 // XXX leave as might be useful for later debugging
 	{ 
@@ -101,27 +191,21 @@ void unshadow_table( unsigned long gpfn, unsigned int type )
     else
 		perfc_decr(shadow_l2_pages);
 
-	//free_domain_page( &frame_table[spfn] );
-
-	{
-    unsigned long flags;
-    spin_lock_irqsave(&free_list_lock, flags);
-    list_add(&frame_table[spfn].list, &free_list);
-    free_pfns++;
-    spin_unlock_irqrestore(&free_list_lock, flags);
-	}
+	free_shadow_page( current, spfn );
 
 }
 
 
-unsigned long shadow_l2_table( unsigned long gpfn )
+static unsigned long shadow_l2_table( 
+                     struct task_struct *p, unsigned long gpfn )
 {
 	struct pfn_info *spfn_info;
 	unsigned long spfn;
 	l2_pgentry_t *spl2e, *gpl2e;
 	int i;
 
-	MEM_VVLOG("shadow_l2_table( %08lx )",gpfn);
+	SH_VVLOG("shadow_l2_table( %08lx )",gpfn);
+	spin_lock(&p->mm.shadow_lock);
 
 	perfc_incrc(shadow_l2_table_count);
 	perfc_incr(shadow_l2_pages);
@@ -129,17 +213,14 @@ unsigned long shadow_l2_table( unsigned long gpfn )
     // XXX in future, worry about racing in SMP guests 
     //      -- use cmpxchg with PSH_pending flag to show progress (and spin)
 
-	spfn_info = alloc_domain_page( NULL ); // XXX account properly later 
+	spfn_info = alloc_shadow_page(p);
 
     ASSERT( spfn_info ); // XXX deal with failure later e.g. blow cache
 
 	spfn = (unsigned long) (spfn_info - frame_table);
 
 	// mark pfn as being shadowed, update field to point at shadow
-	frame_table[gpfn].shadow_and_flags = spfn | PSH_shadowed;
-
-	// mark shadow pfn as being a shadow, update field to point at  pfn	
-	frame_table[spfn].shadow_and_flags = gpfn | PSH_shadow;
+	set_shadow_status(p, gpfn, spfn | PSH_shadowed);
 	
 	// we need to do this before the linear map is set up
 	spl2e = (l2_pgentry_t *) map_domain_mem(spfn << PAGE_SHIFT);
@@ -172,11 +253,11 @@ unsigned long shadow_l2_table( unsigned long gpfn )
 		if (gpte & _PAGE_PRESENT)
 		{
 			unsigned long s_sh = 
-				frame_table[ gpte>>PAGE_SHIFT ].shadow_and_flags;
+				__shadow_status(p, gpte>>PAGE_SHIFT);
 
 			if( s_sh & PSH_shadowed ) // PSH_shadowed
 			{
-				if ( unlikely( (frame_table[gpte>>PAGE_SHIFT].type_and_flags & PGT_type_mask) == PGT_l2_page_table) )
+				if ( unlikely( (__shadow_status(p, gpte>>PAGE_SHIFT) & PGT_type_mask) == PGT_l2_page_table) )
                 {
 					printk("Linear mapping detected\n");
   				    spte = gpte & ~_PAGE_RW;
@@ -203,32 +284,60 @@ unsigned long shadow_l2_table( unsigned long gpfn )
     unmap_domain_mem( gpl2e );
     unmap_domain_mem( spl2e );
 
-	MEM_VLOG("shadow_l2_table( %08lx -> %08lx)",gpfn,spfn);
+	SH_VLOG("shadow_l2_table( %08lx -> %08lx)",gpfn,spfn);
 
-
+	spin_unlock(&p->mm.shadow_lock);
 	return spfn;
 }
 
+pagetable_t shadow_mk_pagetable( struct task_struct *p, 
+											   unsigned long gptbase)
+{
+	unsigned long gpfn, spfn=0;
+
+	SH_VVLOG("shadow_mk_pagetable( gptbase=%08lx, mode=%d )",
+			 gptbase, p->mm.shadow_mode );
+
+	if ( likely(p->mm.shadow_mode) )  // should always be true if we're here
+	{
+		gpfn =  gptbase >> PAGE_SHIFT;
+		
+		if ( unlikely((spfn=__shadow_status(p, gpfn)) == 0 ) )
+		{
+			spfn = shadow_l2_table(p, gpfn );
+		}      
+	}
+
+	SH_VVLOG("leaving shadow_mk_pagetable( gptbase=%08lx, mode=%d )",
+			 gptbase, p->mm.shadow_mode );
+
+	return mk_pagetable(spfn<<PAGE_SHIFT);
+}
 
 int shadow_fault( unsigned long va, long error_code )
 {
 	unsigned long gpte, spte;
 
-	MEM_VVLOG("shadow_fault( va=%08lx, code=%ld )", va, error_code );
+	SH_VVLOG("shadow_fault( va=%08lx, code=%ld )", va, error_code );
 
-    check_pagetable( current->mm.pagetable, "pre-sf" );
+    spin_lock(&current->mm.shadow_lock);
+
+    check_pagetable( current, current->mm.pagetable, "pre-sf" );
 
 	if ( unlikely(__get_user(gpte, (unsigned long*)&linear_pg_table[va>>PAGE_SHIFT])) )
 	{
-		MEM_VVLOG("shadow_fault - EXIT: read gpte faulted" );
+		SH_VVLOG("shadow_fault - EXIT: read gpte faulted" );
+        spin_unlock(&current->mm.shadow_lock);
 		return 0;  // propagate to guest
 	}
 
 	if ( ! (gpte & _PAGE_PRESENT) )
 	{
-		MEM_VVLOG("shadow_fault - EXIT: gpte not present (%lx)",gpte );
+		SH_VVLOG("shadow_fault - EXIT: gpte not present (%lx)",gpte );
+        spin_unlock(&current->mm.shadow_lock);
 		return 0;  // we're not going to be able to help
     }
+
 
     spte = gpte;
 
@@ -242,7 +351,8 @@ int shadow_fault( unsigned long va, long error_code )
 		}
 		else
 		{   // write fault on RO page
-            MEM_VVLOG("shadow_fault - EXIT: write fault on RO page (%lx)",gpte );
+            SH_VVLOG("shadow_fault - EXIT: write fault on RO page (%lx)",gpte );
+            spin_unlock(&current->mm.shadow_lock);
 			return 0; // propagate to guest
 			// not clear whether we should set accessed bit here...
 		}
@@ -255,7 +365,7 @@ int shadow_fault( unsigned long va, long error_code )
 			spte &= ~_PAGE_RW;  // force clear unless already dirty
 	}
 
- 	MEM_VVLOG("plan: gpte=%08lx  spte=%08lx", gpte, spte );
+ 	SH_VVLOG("plan: gpte=%08lx  spte=%08lx", gpte, spte );
 
 	// write back updated gpte
     // XXX watch out for read-only L2 entries! (not used in Linux)
@@ -269,13 +379,13 @@ int shadow_fault( unsigned long va, long error_code )
 
 		unsigned long gpde, spde, gl1pfn, sl1pfn;
 
-        MEM_VVLOG("3: not shadowed or l2 insufficient gpte=%08lx  spte=%08lx",gpte,spte );
+        SH_VVLOG("3: not shadowed or l2 insufficient gpte=%08lx  spte=%08lx",gpte,spte );
 
         gpde = l2_pgentry_val(linear_l2_table[va>>L2_PAGETABLE_SHIFT]);
 
         gl1pfn = gpde>>PAGE_SHIFT;
 
-        if ( ! (frame_table[gl1pfn].shadow_and_flags & PSH_shadowed ) )
+        if ( ! (sl1pfn=__shadow_status(current, gl1pfn) ) )
         {
             // this L1 is NOT already shadowed so we need to shadow it
             struct pfn_info *sl1pfn_info;
@@ -284,12 +394,11 @@ int shadow_fault( unsigned long va, long error_code )
             sl1pfn_info = alloc_domain_page( NULL ); // XXX account properly! 
             sl1pfn = sl1pfn_info - frame_table;
 
-            MEM_VVLOG("4a: l1 not shadowed ( %08lx )",sl1pfn);
+            SH_VVLOG("4a: l1 not shadowed ( %08lx )",sl1pfn);
 	        perfc_incrc(shadow_l1_table_count);
 	        perfc_incr(shadow_l1_pages);
 
-            sl1pfn_info->shadow_and_flags = PSH_shadow | gl1pfn;
-            frame_table[gl1pfn].shadow_and_flags = PSH_shadowed | sl1pfn;
+            set_shadow_status(current, gl1pfn, PSH_shadowed | sl1pfn);
 
             gpde = gpde | _PAGE_ACCESSED | _PAGE_DIRTY;
             spde = (gpde & ~PAGE_MASK) | _PAGE_RW | (sl1pfn<<PAGE_SHIFT);
@@ -330,9 +439,7 @@ int shadow_fault( unsigned long va, long error_code )
             // this L1 was shadowed (by another PT) but we didn't have an L2
             // entry for it
 
-            sl1pfn = frame_table[gl1pfn].shadow_and_flags & PSH_pfn_mask;
-
-            MEM_VVLOG("4b: was shadowed, l2 missing ( %08lx )",sl1pfn);
+            SH_VVLOG("4b: was shadowed, l2 missing ( %08lx )",sl1pfn);
 
 		    spde = (gpde & ~PAGE_MASK) | (sl1pfn<<PAGE_SHIFT) | _PAGE_RW | _PAGE_ACCESSED | _PAGE_DIRTY;
 
@@ -341,7 +448,7 @@ int shadow_fault( unsigned long va, long error_code )
 
 			if ( unlikely( (sl1pfn<<PAGE_SHIFT) == (gl1pfn<<PAGE_SHIFT)  ) )
 			{   // detect linear map, and keep pointing at guest
-                MEM_VLOG("4c: linear mapping ( %08lx )",sl1pfn);
+                SH_VLOG("4c: linear mapping ( %08lx )",sl1pfn);
 				spde = (spde & ~PAGE_MASK) | (gl1pfn<<PAGE_SHIFT);
 			}
 
@@ -358,7 +465,9 @@ int shadow_fault( unsigned long va, long error_code )
     	
     perfc_incrc(shadow_fixup_count);
 
-    check_pagetable( current->mm.pagetable, "post-sf" );
+    check_pagetable( current, current->mm.pagetable, "post-sf" );
+
+    spin_unlock(&current->mm.shadow_lock);
 
     return 1; // let's try the faulting instruction again...
 
@@ -373,13 +482,13 @@ void shadow_l1_normal_pt_update( unsigned long pa, unsigned long gpte,
     l1_pgentry_t * spl1e, * prev_spl1e = *prev_spl1e_ptr;
 
 
-MEM_VVLOG("shadow_l1_normal_pt_update pa=%08lx, gpte=%08lx, prev_spfn=%08lx, prev_spl1e=%08lx\n",
+SH_VVLOG("shadow_l1_normal_pt_update pa=%08lx, gpte=%08lx, prev_spfn=%08lx, prev_spl1e=%08lx\n",
 pa,gpte,prev_spfn, prev_spl1e);
 
     // to get here, we know the l1 page *must* be shadowed
 
     gpfn = pa >> PAGE_SHIFT;
-    spfn = frame_table[gpfn].shadow_and_flags & PSH_pfn_mask;
+    spfn = __shadow_status(current, gpfn) & PSH_pfn_mask;
 
     if ( spfn == prev_spfn )
     {
@@ -417,21 +526,23 @@ void shadow_l2_normal_pt_update( unsigned long pa, unsigned long gpte )
 {
     unsigned long gpfn, spfn, spte;
     l2_pgentry_t * sp2le;
-    unsigned long s_sh;
+    unsigned long s_sh=0;
 
-    MEM_VVLOG("shadow_l2_normal_pt_update pa=%08lx, gpte=%08lx",pa,gpte);
+    SH_VVLOG("shadow_l2_normal_pt_update pa=%08lx, gpte=%08lx",pa,gpte);
 
     // to get here, we know the l2 page has a shadow
 
     gpfn = pa >> PAGE_SHIFT;
-    spfn = frame_table[gpfn].shadow_and_flags & PSH_pfn_mask;
+    spfn = __shadow_status(current, gpfn) & PSH_pfn_mask;
 
-    sp2le = (l2_pgentry_t *) map_domain_mem( spfn << PAGE_SHIFT );
-    // no real need for a cache here
 
     spte = 0;
 
-    s_sh = frame_table[gpte >> PAGE_SHIFT].shadow_and_flags;
+	if( gpte & _PAGE_PRESENT )
+		s_sh = __shadow_status(current, gpte >> PAGE_SHIFT);
+
+    sp2le = (l2_pgentry_t *) map_domain_mem( spfn << PAGE_SHIFT );
+    // no real need for a cache here
 		
 	if ( s_sh ) // PSH_shadowed
 	{
@@ -463,7 +574,8 @@ char * sh_check_name;
 #define FAIL(_f, _a...)                             \
 {printk("XXX %s-FAIL (%d,%d)" _f " g=%08lx s=%08lx\n",  sh_check_name, level, i, ## _a , gpte, spte ); BUG();}
 
-int check_pte( unsigned long gpte, unsigned long spte, int level, int i )
+static int check_pte( struct task_struct *p, 
+			   unsigned long gpte, unsigned long spte, int level, int i )
 {
 	unsigned long mask, gpfn, spfn;
 
@@ -504,42 +616,24 @@ int check_pte( unsigned long gpte, unsigned long spte, int level, int i )
 		if ( level > 1 )
 			FAIL("Linear map ???");			 // XXX this will fail on BSD
 
-#if 0 // might be a RO mapping of a page table page
-		if ( frame_table[gpfn].shadow_and_flags != 0 )
-        {
-			FAIL("Should have been shadowed g.sf=%08lx s.sf=%08lx", 
-				 frame_table[gpfn].shadow_and_flags,
-				 frame_table[spfn].shadow_and_flags);
-        }
-		else
-#endif
-			return 1;
+		return 1;
 	}
 	else
 	{
 		if ( level < 2 )
 			FAIL("Shadow in L1 entry?");
 
-		if ( frame_table[gpfn].shadow_and_flags != (PSH_shadowed | spfn) )
-			FAIL("spfn problem g.sf=%08lx s.sf=%08lx [g.sf]=%08lx [s.sf]=%08lx", 
-				 frame_table[gpfn].shadow_and_flags,
-				 frame_table[spfn].shadow_and_flags,
-				 frame_table[frame_table[gpfn].shadow_and_flags&PSH_pfn_mask].shadow_and_flags,
-				 frame_table[frame_table[spfn].shadow_and_flags&PSH_pfn_mask].shadow_and_flags
-				 );
-
-		if ( frame_table[spfn].shadow_and_flags != (PSH_shadow | gpfn) )
-			FAIL("gpfn problem g.sf=%08lx s.sf=%08lx", 
-				 frame_table[gpfn].shadow_and_flags,
-				 frame_table[spfn].shadow_and_flags);
-
+		if ( __shadow_status(p, gpfn) != (PSH_shadowed | spfn) )
+			FAIL("spfn problem g.sf=%08lx", 
+				 __shadow_status(p, gpfn) );
 	}
 
 	return 1;
 }
 
 
-int check_l1_table( unsigned long va, unsigned long g2, unsigned long s2 )
+static int check_l1_table( struct task_struct *p, unsigned long va, 
+					unsigned long g2, unsigned long s2 )
 {
 	int j;
 	unsigned long *gpl1e, *spl1e;
@@ -555,7 +649,7 @@ int check_l1_table( unsigned long va, unsigned long g2, unsigned long s2 )
 		unsigned long gpte = gpl1e[j];
 		unsigned long spte = spl1e[j];
 		
-		check_pte( gpte, spte, 1, j );
+		check_pte( p, gpte, spte, 1, j );
 	}
 	
 	unmap_domain_mem( spl1e );
@@ -567,7 +661,7 @@ int check_l1_table( unsigned long va, unsigned long g2, unsigned long s2 )
 #define FAILPT(_f, _a...)                             \
 {printk("XXX FAIL %s-PT" _f "\n", s, ## _a ); BUG();}
 
-int check_pagetable( pagetable_t pt, char *s )
+int check_pagetable( struct task_struct *p, pagetable_t pt, char *s )
 {
 	unsigned long gptbase = pagetable_val(pt);
 	unsigned long gpfn, spfn;
@@ -576,28 +670,25 @@ int check_pagetable( pagetable_t pt, char *s )
 
 	sh_check_name = s;
 
-    MEM_VVLOG("%s-PT Audit",s);
+    SH_VVLOG("%s-PT Audit",s);
 
 	sh_l2_present = sh_l1_present = 0;
 
 	gpfn =  gptbase >> PAGE_SHIFT;
 
-	if ( ! (frame_table[gpfn].shadow_and_flags & PSH_shadowed) )
+	if ( ! (__shadow_status(p, gpfn) & PSH_shadowed) )
 	{
 		printk("%s-PT %08lx not shadowed\n", s, gptbase);
 
-		if( frame_table[gpfn].shadow_and_flags != 0 ) BUG();
+		if( __shadow_status(p, gpfn) != 0 ) BUG();
 
 		return 0;
 	}
 	
-    spfn = frame_table[gpfn].shadow_and_flags & PSH_pfn_mask;
+    spfn = __shadow_status(p, gpfn) & PSH_pfn_mask;
 
-	if ( ! frame_table[gpfn].shadow_and_flags == (PSH_shadowed | spfn) )
+	if ( ! __shadow_status(p, gpfn) == (PSH_shadowed | spfn) )
 		FAILPT("ptbase shadow inconsistent1");
-
-	if ( ! frame_table[spfn].shadow_and_flags == (PSH_shadow | gpfn) )
-		FAILPT("ptbase shadow inconsistent2");
 
 	gpl2e = (l2_pgentry_t *) map_domain_mem( gpfn << PAGE_SHIFT );
 	spl2e = (l2_pgentry_t *) map_domain_mem( spfn << PAGE_SHIFT );
@@ -641,7 +732,7 @@ int check_pagetable( pagetable_t pt, char *s )
 		unsigned long gpte = l2_pgentry_val(gpl2e[i]);
 		unsigned long spte = l2_pgentry_val(spl2e[i]);
 
-		check_pte( gpte, spte, 2, i );
+		check_pte( p, gpte, spte, 2, i );
 	}
 
 
@@ -652,7 +743,7 @@ int check_pagetable( pagetable_t pt, char *s )
 		unsigned long spte = l2_pgentry_val(spl2e[i]);
 
 		if ( spte )	   
-			check_l1_table( 
+			check_l1_table( p,
 				i<<L2_PAGETABLE_SHIFT,
 				gpte>>PAGE_SHIFT, spte>>PAGE_SHIFT );
 
@@ -661,7 +752,7 @@ int check_pagetable( pagetable_t pt, char *s )
 	unmap_domain_mem( spl2e );
 	unmap_domain_mem( gpl2e );
 
-	MEM_VVLOG("PT verified : l2_present = %d, l1_present = %d\n",
+	SH_VVLOG("PT verified : l2_present = %d, l1_present = %d\n",
 		   sh_l2_present, sh_l1_present );
 	
 	return 1;
@@ -671,7 +762,6 @@ int check_pagetable( pagetable_t pt, char *s )
 #endif
 
 
-#endif // CONFIG_SHADOW
 
 
 
