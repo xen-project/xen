@@ -66,6 +66,8 @@ int xen_domain_snd(Conn *xend, IOStream *io, uint32_t dom, char *vmconfig, int v
         dprintf("> k=%d n=%d\n", k, n);
     }
     
+    dom = 99;
+    err = xfr_vm_suspend(xend, dom);
   exit:
 #else 
     XcIOContext _ioctxt = {}, *ioctxt = &_ioctxt;

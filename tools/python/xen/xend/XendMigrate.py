@@ -50,7 +50,7 @@ class Xfrd(Protocol):
         self.parser.input(data)
         if self.parser.ready():
             val = self.parser.get_val()
-            self.xinfo.dispatch(val)
+            self.xinfo.dispatch(self, val)
         if self.parser.at_eof():
             self.loseConnection()
             
@@ -122,9 +122,9 @@ class XfrdInfo:
         # If we get an error with non-zero code the operation failed.
         # An error with code zero indicates hello success.
         print 'xfr_err>', val
-        v = sxp.child(val)
+        v = sxp.child0(val)
         print 'xfr_err>', type(v), v
-        err = int(sxp.child(val))
+        err = int(sxp.child0(val))
         if not err: return
         self.error(err);
         xfrd.loseConnection()
@@ -169,9 +169,9 @@ class XendMigrateInfo(XfrdInfo):
     """Representation of a migrate in-progress and its interaction with xfrd.
     """
 
-    def __init__(self, id, dom, host, port):
+    def __init__(self, xid, dom, host, port):
         XfrdInfo.__init__(self)
-        self.id = id
+        self.xid = xid
         self.state = 'begin'
         self.src_host = socket.gethostname()
         self.src_dom = dom
@@ -181,7 +181,7 @@ class XendMigrateInfo(XfrdInfo):
         self.start = 0
         
     def sxpr(self):
-        sxpr = ['migrate', ['id', self.id], ['state', self.state] ]
+        sxpr = ['migrate', ['id', self.xid], ['state', self.state] ]
         sxpr_src = ['src', ['host', self.src_host], ['domain', self.src_dom] ]
         sxpr.append(sxpr_src)
         sxpr_dst = ['dst', ['host', self.dst_host] ]
@@ -220,9 +220,9 @@ class XendSaveInfo(XfrdInfo):
     """Representation of a save in-progress and its interaction with xfrd.
     """
     
-    def __init__(self, id, dom, file):
+    def __init__(self, xid, dom, file):
         XfrdInfo.__init__(self)
-        self.id = id
+        self.xid = xid
         self.state = 'begin'
         self.src_dom = dom
         self.file = file
@@ -230,7 +230,7 @@ class XendSaveInfo(XfrdInfo):
         
     def sxpr(self):
         sxpr = ['save',
-                ['id', self.id],
+                ['id', self.xid],
                 ['state', self.state],
                 ['domain', self.src_dom],
                 ['file', self.file] ]
@@ -272,32 +272,33 @@ class XendMigrate:
         self.db = XendDB.XendDB(self.dbpath)
         self.session = {}
         self.session_db = self.db.fetchall("")
-        self.id = 0
+        self.xid = 0
 
     def nextid(self):
-        self.id += 1
-        return "%d" % self.id
+        self.xid += 1
+        return "%d" % self.xid
 
     def sync(self):
         self.db.saveall("", self.session_db)
 
-    def sync_session(self, id):
-        self.db.save(id, self.session_db[id])
+    def sync_session(self, xid):
+        print 'sync_session>', type(xid), xid, self.session_db[xid]
+        self.db.save(xid, self.session_db[xid])
 
     def close(self):
         pass
 
-    def _add_session(self, id, info):
-        self.session[id] = info
-        self.session_db[id] = info.sxpr()
-        self.sync_session(id)
+    def _add_session(self, xid, info):
+        self.session[xid] = info
+        self.session_db[xid] = info.sxpr()
+        self.sync_session(xid)
         #eserver.inject('xend.migrate.begin', info.sxpr())
 
-    def _delete_session(self, id):
-        #eserver.inject('xend.migrate.end', id)
-        del self.session[id]
-        del self.session_db[id]
-        self.db.delete(id)
+    def _delete_session(self, xid):
+        #eserver.inject('xend.migrate.end', xid)
+        del self.session[xid]
+        del self.session_db[xid]
+        self.db.delete(xid)
 
     def session_ls(self):
         return self.session.keys()
@@ -305,11 +306,11 @@ class XendMigrate:
     def sessions(self):
         return self.session.values()
 
-    def session_get(self, id):
-        return self.session.get(id)
+    def session_get(self, xid):
+        return self.session.get(xid)
 
     def session_begin(self, info):
-        self._add_session(id, info)
+        self._add_session(info.xid, info)
         mcf = XfrdClientFactory(info)
         reactor.connectTCP('localhost', XFRD_PORT, mcf)
         return info
@@ -324,8 +325,8 @@ class XendMigrate:
         """
         # Check dom for existence, not migrating already.
         # Subscribe to migrate notifications (for updating).
-        id = self.nextid()
-        info = XendMigrateInfo(id, dom, host, port)
+        xid = self.nextid()
+        info = XendMigrateInfo(xid, dom, host, port)
         self.session_begin(info)
         return info.deferred
 
@@ -336,8 +337,8 @@ class XendMigrate:
         @param file: destination file
         @return: deferred
         """
-        id = self.nextid()
-        info = XendSaveInfo(id, dom, file)
+        xid = self.nextid()
+        info = XendSaveInfo(xid, dom, file)
         self.session_begin(info)
         return info.deferred
 

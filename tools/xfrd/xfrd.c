@@ -558,11 +558,13 @@ int xfr_send_suspend(Conn *conn, uint32_t vmid){
  */
 int xfr_vm_suspend(Conn *xend, uint32_t vmid){
     int err = 0;
+    dprintf("> vmid=%u\n", vmid);
     err = xfr_send_suspend(xend, vmid);
     if(err) goto exit;
     IOStream_flush(xend->out);
     err = xfr_response(xend);
   exit:
+    dprintf("< err=%d\n", err);
     return err;
 }
 
