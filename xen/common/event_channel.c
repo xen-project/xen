@@ -283,6 +283,9 @@ static long evtchn_bind_ipi(evtchn_bind_ipi_t *bind)
     struct domain *d = ed->domain;
     int            port, ipi_edom = bind->ipi_edom;
 
+    if ( ipi_edom >= MAX_VIRT_CPUS )
+        return -EINVAL;
+
     spin_lock(&d->event_channel_lock);
 
     if ( (port = get_free_port(ed)) >= 0 )
