@@ -78,6 +78,8 @@ class Args:
                 val = str(v)
             elif type == 'sxpr':
                 val = self.sxpr(v)
+            elif type == 'bool':
+                val = self.bool(v)
             else:
                 raise ArgError('invalid type:' + str(type))
             return val
@@ -85,6 +87,9 @@ class Args:
             raise
         except StandardError, ex:
             raise ArgError(str(ex))
+
+    def bool(self, v):
+        return (v.lower() in ['on', 'yes', '1', 'true'])
 
     def sxpr(self, v):
         if isinstance(v, types.ListType):
