@@ -27,7 +27,7 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 	start_addr = addr = mm->free_area_cache;
 #else
-	addr = PAGE_ALIGN(TASK_UNMAPPED_BASE);
+	start_addr = addr = PAGE_ALIGN(TASK_UNMAPPED_BASE);
 #endif
 
 full_search:
@@ -61,7 +61,10 @@ unsigned long
 arch_check_fixed_mapping(struct file *filp, unsigned long addr,
 		unsigned long len, unsigned long pgoff, unsigned long flags)
 {
-	if ( addr < (FIRST_USER_PGD_NR<<PGDIR_SHIFT) )
+	if (addr < (FIRST_USER_PGD_NR<<PGDIR_SHIFT)) {
+		printk(KERN_ALERT "WARNING: Preventing a mmap() request by %s at 0x%08lx, len %08lx\n",
+		current->comm, addr, len);
 		return -EINVAL;
+	}
 	return 0;
 }

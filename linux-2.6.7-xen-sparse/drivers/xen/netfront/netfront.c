@@ -17,6 +17,7 @@
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/init.h>
+#include <linux/bitops.h>
 #include <net/sock.h>
 #include <net/pkt_sched.h>
 #include <asm/io.h>
@@ -427,9 +428,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
          */
         if ( unlikely(rx->status <= 0) )
         {
-            /* Gate this error. We get a (valid) slew of them on suspend. */
-            if ( np->user_state == UST_OPEN )
-                printk(KERN_ALERT "bad buffer on RX ring!(%d)\n", rx->status);
+	    printk(KERN_ALERT "bad buffer on RX ring!(%d)\n", rx->status);
             np->rx->ring[MASK_NETIF_RX_IDX(np->rx->req_prod)].req.id = rx->id;
             wmb();
             np->rx->req_prod++;
@@ -470,6 +469,15 @@ static int netif_poll(struct net_device *dev, int *pbudget)
         mcl->args[2] = 0;
         mcl++;
         (void)HYPERVISOR_multicall(rx_mcl, mcl - rx_mcl);
+
+#if 0 
+	if (unlikely(rx_mcl[0].args[5] != 0))
+	    printk(KERN_ALERT"Hypercall0 failed %u\n",np->rx->resp_prod);
+
+	if (unlikely(rx_mcl[1].args[5] != 0))
+	    printk(KERN_ALERT"Hypercall1 failed %u\n",np->rx->resp_prod);
+#endif
+
     }
 
     while ( (skb = __skb_dequeue(&rxq)) != NULL )
@@ -595,6 +603,7 @@ static void network_connect(struct net_device *dev,
 printk(KERN_ALERT"Netfront recovered tx=%d rxfree=%d\n",
        np->tx->req_prod,np->rx->req_prod);
 
+
     /* Step 3: All public and private state should now be sane.  Get
      * ready to start sending and receiving packets and give the driver
      * domain a kick because we've probably just requeued some
@@ -712,7 +721,6 @@ static void netif_status_change(netif_fe_interface_status_changed_t *status)
         np->irq = bind_evtchn_to_irq(np->evtchn);
         (void)request_irq(np->irq, netif_int, SA_SAMPLE_RANDOM, 
                           dev->name, dev);
-        
         netctrl_connected_count();
         break;
 
@@ -897,10 +905,9 @@ void netif_suspend(void)
 	sprintf(name,"eth%d",i);
 	dev = __dev_get_by_name(name);
 
-	if ( dev && (dev->flags & IFF_UP) )
+	if ( dev )
 	{
 	    np  = dev->priv;
-
 	    free_irq(np->irq, dev);
             unbind_evtchn_from_irq(np->evtchn);
 	}    
@@ -932,6 +939,9 @@ void netif_resume(void)
 
 	    // stop bad things from happening until we're back up
 	    np->backend_state = BEST_DISCONNECTED;
+	    
+	    memset(np->tx,0,PAGE_SIZE);
+	    memset(np->rx,0,PAGE_SIZE);
 
 	    cmsg.type      = CMSG_NETIF_FE;
 	    cmsg.subtype   = CMSG_NETIF_FE_INTERFACE_CONNECT;

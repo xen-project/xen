@@ -186,6 +186,11 @@ static inline unsigned int cpuid_edx(unsigned int op)
 	cur_pgd = pgdir;	/* XXXsmp */		\
 } while (/* CONSTCOND */0)
 
+#define load_cr3_noflush(pgdir) do {			\
+	queue_pt_switch(__pa(pgdir));			\
+	cur_pgd = pgdir;	/* XXXsmp */		\
+} while (/* CONSTCOND */0)
+
 
 /*
  * Intel CPU features in CR4

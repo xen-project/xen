@@ -20,8 +20,12 @@ class NodeInfoTab( GeneralTab ):
                         
     def __init__( self ):
          
-        nodeInfo = sxp2hash( server.xend_node() )
-    
+    	nodeInfo = {}
+        try:
+            nodeInfo = sxp2hash( server.xend_node() )
+   	except:
+            nodeInfo[ 'system' ] = 'Error getting node info'
+             
         dictTitles = {}
         dictTitles[ 'System' ] = 'system'
         dictTitles[ 'Hostname' ] = 'host' 
@@ -39,8 +43,11 @@ class NodeInfoTab( GeneralTab ):
 class NodeDmesgTab( PreTab ):
 
     def __init__( self ):
-        dmesg = server.xend_node_dmesg()
-        PreTab.__init__( self, dmesg[ 1 ] )
+    	try:
+            dmesg = server.xend_node_dmesg()
+        except:
+            dmesg = "Error getting node information: XenD not running?"
+        PreTab.__init__( self, dmesg )
   
 class NodeActionTab( ActionTab ):
 

@@ -73,7 +73,7 @@ static int setup_guestos(int xc_handle,
     unsigned long l1tab;
     unsigned long count, pt_start;
     unsigned long symtab_addr = 0, symtab_len = 0;
-    extended_start_info_t *start_info;
+    start_info_t *start_info;
     shared_info_t *shared_info;
     unsigned long ksize;
     mmu_t *mmu = NULL;

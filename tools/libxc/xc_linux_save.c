@@ -463,10 +463,6 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 	    goto out;
 	}
 
-	printf("SUSPPPPPPPP flags %08lx shinfo %08lx eip %08lx esi %08lx\n", 
-	       op.u.getdomaininfo.flags, op.u.getdomaininfo.shared_info_frame,
-	       ctxt.cpu_ctxt.eip, ctxt.cpu_ctxt.esi );
-
     }
 
     /* calculate the power of 2 order of nr_pfns, e.g.
@@ -866,9 +862,41 @@ printf("type fail: page %i mfn %08lx\n",j,pfn_type[j]);
         goto out;
     }
 
-printf("SUSPPPPPPPP flags %08lx shinfo %08lx eip %08lx esi %08lx\n", 
-       op.u.getdomaininfo.flags, op.u.getdomaininfo.shared_info_frame,
-       ctxt.cpu_ctxt.eip, ctxt.cpu_ctxt.esi );
+    /* Send through a list of all the PFNs that were not in map at the close */
+    {
+	unsigned int i,j;
+	unsigned int pfntab[1024];
+
+	for ( i = 0, j = 0; i < nr_pfns; i++ )
+	{
+	    if ( live_pfn_to_mfn_table[i] >= 0x80000000UL )
+		j++;
+	}
+
+	if ( xcio_write(ioctxt, &j, sizeof(unsigned int)) )
+	{
+	    xcio_error(ioctxt, "Error when writing to state file (6a)");
+	    goto out;
+	}	
+
+	for ( i = 0, j = 0; i < nr_pfns; )
+	{
+	    if ( live_pfn_to_mfn_table[i] >= 0x80000000UL )
+	    {
+		pfntab[j++] = i;
+	    }
+	    i++;
+	    if ( j == 1024 || i == nr_pfns )
+	    {
+		if ( xcio_write(ioctxt, &pfntab, sizeof(unsigned long)*j) )
+		{
+		    xcio_error(ioctxt, "Error when writing to state file (6b)");
+		    goto out;
+		}	
+		j = 0;
+	    }
+	}
+    }
 
     /* Map the suspend-record MFN to pin it. The page must be owned by 
        domid for this to succeed. */

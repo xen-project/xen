@@ -21,7 +21,7 @@
 /* arch/xen/i386/kernel/setup.c */
 union start_info_union
 {
-    extended_start_info_t start_info;
+    start_info_t start_info;
     char padding[512];
 };
 extern union start_info_union start_info_union;
@@ -374,7 +374,8 @@ static inline int HYPERVISOR_dom_mem_op(unsigned int   op,
     __asm__ __volatile__ (
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_dom_mem_op),
-        "b" (op), "c" (extent_list), "d" (nr_extents), "S" (extent_order)
+        "b" (op), "c" (extent_list), "d" (nr_extents), "S" (extent_order),
+	"D" (DOMID_SELF)
         : "memory" );
 
     return ret;
