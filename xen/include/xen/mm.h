@@ -39,7 +39,6 @@ unsigned long avail_domheap_pages(void);
 #define free_domheap_page(_p) (free_domheap_pages(_p,0))
 
 /* Automatic page scrubbing for dead domains. */
-extern spinlock_t page_scrub_lock;
 extern struct list_head page_scrub_list;
 #define page_scrub_schedule_work()              \
     do {                                        \
