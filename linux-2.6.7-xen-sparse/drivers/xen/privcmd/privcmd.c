@@ -67,7 +67,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
     }
     break;
     
-
+#if defined(CONFIG_XEN_PRIVILEGED_GUEST)
     case IOCTL_PRIVCMD_MMAP:
     {
 #define PRIVCMD_MMAP_SZ 32
@@ -179,6 +179,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
         break;
     }
     break;
+#endif
 
     default:
         ret = -EINVAL;
