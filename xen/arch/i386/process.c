@@ -235,33 +235,49 @@ void switch_to(struct task_struct *prev_p, struct task_struct *next_p)
     __cli();
 
     /* Switch guest general-register state. */
-    memcpy(&prev_p->shared_info->execution_context, 
-           stack_ec, 
-           sizeof(*stack_ec));
-    memcpy(stack_ec,
-           &next_p->shared_info->execution_context,
-           sizeof(*stack_ec));
+    if ( !is_idle_task(prev_p) )
+    {
+        memcpy(&prev_p->shared_info->execution_context, 
+               stack_ec, 
+               sizeof(*stack_ec));
+        unlazy_fpu(prev_p);
+        CLEAR_FAST_TRAP(&prev_p->thread);
+    }
 
-    /*
-     * This is sufficient! If the descriptor DPL differs from CS RPL
-     * then we'll #GP. If DS, ES, FS, GS are DPL 0 then they'll be
-     * cleared automatically. If SS RPL or DPL differs from CS RPL
-     * then we'll #GP.
-     */
-    if ( (stack_ec->cs & 3) == 0 )
-        stack_ec->cs = FLAT_RING1_CS;
-    if ( (stack_ec->ss & 3) == 0 )
-        stack_ec->ss = FLAT_RING1_DS;
+    if ( !is_idle_task(next_p) )
+    {
+        memcpy(stack_ec,
+               &next_p->shared_info->execution_context,
+               sizeof(*stack_ec));
 
-    unlazy_fpu(prev_p);
+        /*
+         * This is sufficient! If the descriptor DPL differs from CS RPL then 
+         * we'll #GP. If DS, ES, FS, GS are DPL 0 then they'll be cleared 
+         * automatically. If SS RPL or DPL differs from CS RPL then we'll #GP.
+         */
+        if ( (stack_ec->cs & 3) == 0 )
+            stack_ec->cs = FLAT_RING1_CS;
+        if ( (stack_ec->ss & 3) == 0 )
+            stack_ec->ss = FLAT_RING1_DS;
 
-    /* Switch the fast-trap handler. */
-    CLEAR_FAST_TRAP(&prev_p->thread);
-    SET_FAST_TRAP(&next_p->thread);
+        SET_FAST_TRAP(&next_p->thread);
 
-    /* Switch the guest OS ring-1 stack. */
-    tss->esp1 = next->esp1;
-    tss->ss1  = next->ss1;
+        /* Switch the guest OS ring-1 stack. */
+        tss->esp1 = next->esp1;
+        tss->ss1  = next->ss1;
+
+        /* Maybe switch the debug registers. */
+        if ( next->debugreg[7] )
+        {
+            loaddebug(next, 0);
+            loaddebug(next, 1);
+            loaddebug(next, 2);
+            loaddebug(next, 3);
+            /* no 4 and 5 */
+            loaddebug(next, 6);
+            loaddebug(next, 7);
+        }
+    }
 
     /* Switch page tables.  */
     write_cr3_counted(pagetable_val(next_p->mm.pagetable));
@@ -271,18 +287,6 @@ void switch_to(struct task_struct *prev_p, struct task_struct *next_p)
     /* Switch GDT and LDT. */
     __asm__ __volatile__ ("lgdt %0" : "=m" (*next_p->mm.gdt));
     load_LDT(next_p);
-
-    /* Maybe switch the debug registers. */
-    if ( next->debugreg[7] )
-    {
-        loaddebug(next, 0);
-        loaddebug(next, 1);
-        loaddebug(next, 2);
-        loaddebug(next, 3);
-        /* no 4 and 5 */
-        loaddebug(next, 6);
-        loaddebug(next, 7);
-    }
 
     __sti();
 }

@@ -224,11 +224,6 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
 
     init_page_allocator(__pa(&_end), MAX_MONITOR_ADDRESS);
  
-    /* These things will get done by do_createdomain() for all other tasks. */
-    current->shared_info = (void *)get_free_page(GFP_KERNEL);
-    memset(current->shared_info, 0, sizeof(shared_info_t));
-    set_fs(USER_DS);
-
     /* Initialise the slab allocator. */
     kmem_cache_init();
     kmem_cache_sizes_init(max_page);
