@@ -585,7 +585,7 @@ static int __init xencons_init(void)
     xencons_driver.wait_until_sent = xencons_wait_until_sent;
 
     if ( tty_register_driver(&xencons_driver) )
-        panic("Couldn't register Xen virtual console driver\n");
+        panic("Couldn't register Xen virtual console driver as %s\n",xencons_driver.name);
 
     if ( start_info.flags & SIF_INITDOMAIN )
     {
@@ -598,7 +598,7 @@ static int __init xencons_init(void)
         (void)ctrl_if_register_receiver(CMSG_CONSOLE, xencons_rx, 0);
     }
 
-    printk("Xen virtual console successfully installed\n");
+    printk("Xen virtual console successfully installed as %s\n",xencons_driver.name);
     
     return 0;
 }
