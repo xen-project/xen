@@ -164,9 +164,9 @@
  */
 #define SCHEDOP_yield           0   /* Give up the CPU voluntarily.       */
 #define SCHEDOP_block           1   /* Block until an event is received.  */
-#define SCHEDOP_suspend         2   /* Stop executing this domain.        */
+#define SCHEDOP_shutdown        2   /* Stop executing this domain.        */
 #define SCHEDOP_cmdmask       255   /* 8-bit command. */
-#define SCHEDOP_reasonshift     8   /* 8-bit suspend code. (SCHEDOP_suspend) */
+#define SCHEDOP_reasonshift     8   /* 8-bit reason code. (SCHEDOP_shutdown) */
 
 /*
  * Commands to HYPERVISOR_console_io().

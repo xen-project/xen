@@ -606,13 +606,8 @@ int xc_linux_restore(int xc_handle,
 
 
  out:
-    if ( rc != 0 )
-    {
-        if ( dom != 0 )
-        {
-            xc_domain_destroy( xc_handle, dom, 1 );
-        }
-    }
+    if ( (rc != 0) && (dom != 0) )
+        xc_domain_destroy(xc_handle, dom);
 
     if ( mmu != NULL )
         free(mmu);

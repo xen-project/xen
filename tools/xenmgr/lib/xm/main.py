@@ -101,25 +101,25 @@ class Xm:
         """Shutdown a domain."""
         shutdown.main(args)
 
-    def xm_stop(self, help, args):
-        """Stop execution of a domain."""
+    def xm_pause(self, help, args):
+        """Pause execution of a domain."""
         if help:
             print args[0], 'DOM'
-            print '\nStop execution of domain DOM.'
+            print '\nPause execution of domain DOM.'
             return
         if len(args) < 2: self.err("%s: Missing domain" % args[0])
         dom = args[1]
-        server.xend_domain_stop(dom)
+        server.xend_domain_pause(dom)
 
-    def xm_start(self, help, args):
-        """Start execution of a domain."""
+    def xm_unpause(self, help, args):
+        """(Re)start execution of a domain."""
         if help:
             print args[0], 'DOM'
-            print '\nStart execution of domain DOM.'
+            print '\n(Re)start execution of domain DOM.'
             return
         if len(args) < 2: self.err("%s: Missing domain" % args[0])
         dom = args[1]
-        server.xend_domain_start(dom)
+        server.xend_domain_unpause(dom)
 
     def xm_pincpu(self, help, args):
         """Pin a domain to a cpu. """

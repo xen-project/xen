@@ -187,13 +187,13 @@ class Xend:
     def xend_domain(self, id):
         return xend_get(self.domainurl(id))
 
-    def xend_domain_start(self, id):
+    def xend_domain_unpause(self, id):
         return xend_call(self.domainurl(id),
-                         {'op'      : 'start'})
+                         {'op'      : 'unpause'})
 
-    def xend_domain_stop(self, id):
+    def xend_domain_pause(self, id):
         return xend_call(self.domainurl(id),
-                         {'op'      : 'stop'})
+                         {'op'      : 'pause'})
 
     def xend_domain_shutdown(self, id):
         return xend_call(self.domainurl(id),

@@ -417,7 +417,7 @@ static int shadow_mode_table_op(struct domain *d,
 
         /* Might as well stop the domain as an optimization. */
 		if ( zero )
-            domain_stop(d);
+            domain_pause_by_systemcontroller(d);
 
 		break;
     }

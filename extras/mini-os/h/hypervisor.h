@@ -148,7 +148,7 @@ static inline int HYPERVISOR_shutdown(void)
     __asm__ __volatile__ (
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_sched_op),
-        "b" (SCHEDOP_suspend | (STOPCODE_shutdown << SCHEDOP_reasonshift))
+        "b" (SCHEDOP_shutdown | (SHUTDOWN_poweroff << SCHEDOP_reasonshift))
         : "memory" );
 
     return ret;
@@ -160,7 +160,7 @@ static inline int HYPERVISOR_reboot(void)
     __asm__ __volatile__ (
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_sched_op),
-        "b" (SCHEDOP_suspend | (STOPCODE_reboot << SCHEDOP_reasonshift))
+        "b" (SCHEDOP_shutdown | (SHUTDOWN_reboot << SCHEDOP_reasonshift))
         : "memory" );
 
     return ret;
@@ -173,7 +173,7 @@ static inline int HYPERVISOR_suspend(unsigned long srec)
     __asm__ __volatile__ (
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_sched_op),
-        "b" (SCHEDOP_suspend | (STOPCODE_suspend << SCHEDOP_reasonshift)), 
+        "b" (SCHEDOP_shutdown | (SHUTDOWN_suspend << SCHEDOP_reasonshift)), 
         "S" (srec) : "memory" );
 
     return ret;

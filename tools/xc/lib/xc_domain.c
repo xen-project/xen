@@ -30,34 +30,32 @@ int xc_domain_create(int xc_handle,
 }    
 
 
-int xc_domain_start(int xc_handle,
+int xc_domain_pause(int xc_handle, 
                     u32 domid)
 {
     dom0_op_t op;
-    op.cmd = DOM0_STARTDOMAIN;
-    op.u.startdomain.domain = (domid_t)domid;
+    op.cmd = DOM0_PAUSEDOMAIN;
+    op.u.pausedomain.domain = (domid_t)domid;
     return do_dom0_op(xc_handle, &op);
 }    
 
 
-int xc_domain_stop(int xc_handle, 
-                   u32 domid)
+int xc_domain_unpause(int xc_handle,
+                      u32 domid)
 {
     dom0_op_t op;
-    op.cmd = DOM0_STOPDOMAIN;
-    op.u.stopdomain.domain = (domid_t)domid;
+    op.cmd = DOM0_UNPAUSEDOMAIN;
+    op.u.unpausedomain.domain = (domid_t)domid;
     return do_dom0_op(xc_handle, &op);
 }    
 
 
 int xc_domain_destroy(int xc_handle,
-                      u32 domid, 
-                      int force)
+                      u32 domid)
 {
     dom0_op_t op;
     op.cmd = DOM0_DESTROYDOMAIN;
     op.u.destroydomain.domain = (domid_t)domid;
-    op.u.destroydomain.force  = !!force;
     return do_dom0_op(xc_handle, &op);
 }
 
@@ -94,12 +92,12 @@ int xc_domain_getinfo(int xc_handle,
         info->cpu     =
             (op.u.getdomaininfo.flags>>DOMFLAGS_CPUSHIFT) & DOMFLAGS_CPUMASK;
 
-        info->dying     = (op.u.getdomaininfo.flags & DOMFLAGS_DYING);
-        info->crashed   = (op.u.getdomaininfo.flags & DOMFLAGS_CRASHED);
-        info->suspended = (op.u.getdomaininfo.flags & DOMFLAGS_SUSPENDED);
-        info->stopped   = (op.u.getdomaininfo.flags & DOMFLAGS_STOPPED);
-        info->blocked   = (op.u.getdomaininfo.flags & DOMFLAGS_BLOCKED);
-        info->running   = (op.u.getdomaininfo.flags & DOMFLAGS_RUNNING);
+        info->dying    = (op.u.getdomaininfo.flags & DOMFLAGS_DYING);
+        info->crashed  = (op.u.getdomaininfo.flags & DOMFLAGS_CRASHED);
+        info->shutdown = (op.u.getdomaininfo.flags & DOMFLAGS_SHUTDOWN);
+        info->paused   = (op.u.getdomaininfo.flags & DOMFLAGS_PAUSED);
+        info->blocked  = (op.u.getdomaininfo.flags & DOMFLAGS_BLOCKED);
+        info->running  = (op.u.getdomaininfo.flags & DOMFLAGS_RUNNING);
 
         info->nr_pages = op.u.getdomaininfo.tot_pages;
         info->max_memkb = op.u.getdomaininfo.max_pages<<(PAGE_SHIFT-10);

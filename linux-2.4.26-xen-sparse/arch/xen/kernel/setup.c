@@ -1143,26 +1143,6 @@ void __init cpu_init (void)
 
 
 /******************************************************************************
- * Time-to-die callback handling.
- */
-
-static void shutdown_handler(ctrl_msg_t *msg, unsigned long id)
-{
-    extern void ctrl_alt_del(void);
-    ctrl_if_send_response(msg);
-    ctrl_alt_del();
-}
-
-static int __init setup_shutdown_event(void)
-{
-    ctrl_if_register_receiver(CMSG_SHUTDOWN, shutdown_handler, 0);
-    return 0;
-}
-
-__initcall(setup_shutdown_event);
-
-
-/******************************************************************************
  * Stop/pickle callback handling.
  */
 
@@ -1294,9 +1274,15 @@ static void suspend_task(void *unused)
 
 static struct tq_struct suspend_tq;
 
-static void suspend_handler(ctrl_msg_t *msg, unsigned long id)
+static void shutdown_handler(ctrl_msg_t *msg, unsigned long id)
 {
-    if ( !suspending )
+    if ( msg->subtype != CMSG_SHUTDOWN_SUSPEND )
+    {
+        extern void ctrl_alt_del(void);
+        ctrl_if_send_response(msg);
+        ctrl_alt_del();
+    }
+    else if ( !suspending )
     {
 	suspending = 1;
 	suspend_tq.routine = suspend_task;
@@ -1310,10 +1296,10 @@ static void suspend_handler(ctrl_msg_t *msg, unsigned long id)
     ctrl_if_send_response(msg);
 }
 
-static int __init setup_suspend_event(void)
+static int __init setup_shutdown_event(void)
 {
-    ctrl_if_register_receiver(CMSG_SUSPEND, suspend_handler, 0);
+    ctrl_if_register_receiver(CMSG_SHUTDOWN, shutdown_handler, 0);
     return 0;
 }
 
-__initcall(setup_suspend_event);
+__initcall(setup_shutdown_event);

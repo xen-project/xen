@@ -113,8 +113,8 @@ class XendDomainInfo:
         if self.info:
             run   = (self.info['running'] and 'r') or '-'
             block = (self.info['blocked'] and 'b') or '-'
-            stop  = (self.info['stopped'] and 's') or '-'
-            susp  = (self.info['suspended'] and 'S') or '-'
+            stop  = (self.info['paused']  and 'p') or '-'
+            susp  = (self.info['shutdown'] and 's') or '-'
             crash = (self.info['crashed'] and 'c') or '-'
             state = run + block + stop + susp + crash
             sxpr.append(['cpu', self.info['cpu']])
@@ -172,7 +172,7 @@ class XendDomainInfo:
     def destroy(self):
         if self.dom <= 0:
             return 0
-        return xc.domain_destroy(dom=self.dom, force=1)
+        return xc.domain_destroy(dom=self.dom)
 
     def show(self):
         """Print virtual machine info.

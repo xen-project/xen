@@ -129,7 +129,8 @@ struct domain *alloc_domain_struct(void)
  */
 void sched_add_domain(struct domain *d) 
 {
-    set_bit(DF_STOPPED, &d->flags);
+    /* Must be unpaused by control software to start execution. */
+    set_bit(DF_CTRLPAUSE, &d->flags);
 
     if ( d->domain != IDLE_DOMAIN_ID )
     {
@@ -269,9 +270,9 @@ long do_sched_op(unsigned long op)
         break;
     }
 
-    case SCHEDOP_suspend:
+    case SCHEDOP_shutdown:
     {
-        domain_suspend((u8)(op >> SCHEDOP_reasonshift));
+        domain_shutdown((u8)(op >> SCHEDOP_reasonshift));
         break;
     }
 

@@ -29,13 +29,13 @@ typedef struct {
 
 
 /*
- * Stop codes for SCHEDOP_suspend. These are opaque to Xen but interpreted by
- * control software to determine appropriate action.
+ * Reason codes for SCHEDOP_shutdown. These are opaque to Xen but may be
+ * interpreted by control software to determine the appropriate action. These 
+ * are only really advisories: the controller can actually do as it likes.
  */
-
-#define STOPCODE_shutdown   0  /* Domain exited normally. Clean up and kill. */
-#define STOPCODE_reboot     1  /* Clean up, kill, and then restart. */
-#define STOPCODE_suspend    2  /* Clean up, save suspend info, kill. */
+#define SHUTDOWN_poweroff   0  /* Domain exited normally. Clean up and kill. */
+#define SHUTDOWN_reboot     1  /* Clean up, kill, and then restart.          */
+#define SHUTDOWN_suspend    2  /* Clean up, save suspend info, kill.         */
 
 
 /*
@@ -69,7 +69,6 @@ typedef struct {
 #define CMSG_BLKIF_FE       2  /* Block-device frontend   */
 #define CMSG_NETIF_BE       3  /* Network-device backend  */
 #define CMSG_NETIF_FE       4  /* Network-device frontend */
-#define CMSG_SUSPEND        5  /* Suspend messages        */
 #define CMSG_SHUTDOWN       6  /* Shutdown messages       */
 
 
@@ -519,25 +518,15 @@ typedef struct {
 
 
 /******************************************************************************
- * SUSPEND DEFINITIONS
- */
-
-/*
- * Subtypes for console messages.
- */
-/* None. */
-
-
-/******************************************************************************
  * CONSOLE DEFINITIONS
  */
 
 /*
  * Subtypes for console messages.
  */
-#define CMSG_SHUTDOWN_HALT      0   /* Shutdown and halt (don't die). */
-#define CMSG_SHUTDOWN_POWEROFF  1   /* 'Poweroff' => clean death.     */
-#define CMSG_SHUTDOWN_REBOOT    2   /* Shutdown and restart.          */
-
+#define CMSG_SHUTDOWN_POWEROFF  0   /* Clean shutdown (SHUTDOWN_poweroff).   */
+#define CMSG_SHUTDOWN_REBOOT    1   /* Clean shutdown (SHUTDOWN_reboot).     */
+#define CMSG_SHUTDOWN_SUSPEND   2   /* Create suspend info, then             */
+                                    /* SHUTDOWN_suspend.                     */
 
 #endif /* __DOMAIN_CONTROLLER_H__ */

@@ -25,8 +25,8 @@ int xc_interface_close(int xc_handle);
 typedef struct {
     u32           domid;
     unsigned int  cpu;
-    unsigned int  dying:1, crashed:1, suspended:1, 
-                  stopped:1, blocked:1, running:1;
+    unsigned int  dying:1, crashed:1, shutdown:1, 
+                  paused:1, blocked:1, running:1;
     unsigned long nr_pages;
     unsigned long shared_info_frame;
     u64           cpu_time;
@@ -40,13 +40,12 @@ int xc_domain_create(int xc_handle,
                      const char *name,
 		     int cpu,
                      u32 *pdomid);
-int xc_domain_start(int xc_handle, 
+int xc_domain_pause(int xc_handle, 
                     u32 domid);
-int xc_domain_stop(int xc_handle, 
-                   u32 domid);
+int xc_domain_unpause(int xc_handle, 
+                      u32 domid);
 int xc_domain_destroy(int xc_handle, 
-                      u32 domid, 
-                      int force);
+                      u32 domid);
 int xc_domain_pincpu(int xc_handle,
                      u32 domid,
                      int cpu);

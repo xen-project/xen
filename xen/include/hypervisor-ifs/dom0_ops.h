@@ -19,7 +19,7 @@
  * This makes sure that old versions of dom0 tools will stop working in a
  * well-defined way (rather than crashing the machine, for instance).
  */
-#define DOM0_INTERFACE_VERSION   0xAAAA000F
+#define DOM0_INTERFACE_VERSION   0xAAAA0010
 
 #define MAX_DOMAIN_NAME    16
 
@@ -63,20 +63,19 @@ typedef struct {
 typedef struct {
     /* IN variables. */
     domid_t      domain;              /*  0 */
-    u32          force;               /*  4 */
-} PACKED dom0_destroydomain_t; /* 8 bytes */
+} PACKED dom0_destroydomain_t; /* 4 bytes */
 
-#define DOM0_STARTDOMAIN      10
+#define DOM0_PAUSEDOMAIN      10
 typedef struct {
     /* IN parameters. */
     domid_t domain;                   /*  0 */
-} PACKED dom0_startdomain_t; /* 4 bytes */
+} PACKED dom0_pausedomain_t; /* 4 bytes */
 
-#define DOM0_STOPDOMAIN       11
+#define DOM0_UNPAUSEDOMAIN    11
 typedef struct {
     /* IN parameters. */
     domid_t domain;                   /*  0 */
-} PACKED dom0_stopdomain_t; /* 4 bytes */
+} PACKED dom0_unpausedomain_t; /* 4 bytes */
 
 #define DOM0_GETDOMAININFO    12
 typedef struct {
@@ -85,14 +84,14 @@ typedef struct {
     /* OUT variables. */
 #define DOMFLAGS_DYING     (1<<0) /* Domain is scheduled to die.             */
 #define DOMFLAGS_CRASHED   (1<<1) /* Crashed domain; frozen for postmortem.  */
-#define DOMFLAGS_SUSPENDED (1<<2) /* Domain voluntarily halted it execution. */
-#define DOMFLAGS_STOPPED   (1<<3) /* Currently stopped by control software.  */
+#define DOMFLAGS_SHUTDOWN  (1<<2) /* The guest OS has shut itself down.      */
+#define DOMFLAGS_PAUSED    (1<<3) /* Currently paused by control software.   */
 #define DOMFLAGS_BLOCKED   (1<<4) /* Currently blocked pending an event.     */
 #define DOMFLAGS_RUNNING   (1<<5) /* Domain is currently running.            */
 #define DOMFLAGS_CPUMASK      255 /* CPU to which this domain is bound.      */
 #define DOMFLAGS_CPUSHIFT       8
-#define DOMFLAGS_SUSPCODEMASK 255 /* DOMSTATE_SUSPENDED guest-supplied code. */
-#define DOMFLAGS_SUSPCODESHIFT 16
+#define DOMFLAGS_SHUTDOWNMASK 255 /* DOMFLAGS_SHUTDOWN guest-supplied code.  */
+#define DOMFLAGS_SHUTDOWNSHIFT 16
     u32      flags;                   /*  4 */
     u8       name[MAX_DOMAIN_NAME];   /*  8 */
     full_execution_context_t *ctxt;   /* 24 */ /* NB. IN/OUT variable. */
@@ -319,8 +318,8 @@ typedef struct {
     union {                           /* 8 */
 	u32                      dummy[18]; /* 72 bytes */
         dom0_createdomain_t      createdomain;
-        dom0_startdomain_t       startdomain;
-        dom0_stopdomain_t        stopdomain;
+        dom0_pausedomain_t       pausedomain;
+        dom0_unpausedomain_t     unpausedomain;
         dom0_destroydomain_t     destroydomain;
         dom0_getmemlist_t        getmemlist;
         dom0_schedctl_t          schedctl;

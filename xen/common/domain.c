@@ -11,6 +11,7 @@
 #include <xen/shadow.h>
 #include <xen/console.h>
 #include <xen/shadow.h>
+#include <xen/irq.h>
 #include <asm/io.h>
 #include <asm/domain_page.h>
 #include <asm/flushtlb.h>
@@ -193,19 +194,19 @@ void domain_crash(void)
     BUG();
 }
 
-void domain_suspend(u8 reason)
+void domain_shutdown(u8 reason)
 {
     struct domain *d;
 
     if ( current->domain == 0 )
     {
         extern void machine_restart(char *);
-        printk("Domain 0 halted: rebooting machine!\n");
+        printk("Domain 0 shutdown: rebooting machine!\n");
         machine_restart(0);
     }
 
-    current->suspend_code = reason;
-    set_bit(DF_SUSPENDED, &current->flags);
+    current->shutdown_code = reason;
+    set_bit(DF_SHUTDOWN, &current->flags);
 
     d = find_domain_by_id(0);
     send_guest_virq(d, VIRQ_DOM_EXC);

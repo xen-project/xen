@@ -364,7 +364,7 @@ def make_domain():
 	if not nlb: print >>open('/proc/sys/net/ipv4/ip_nonlocal_bind','w'), '0'
 
     if not dontstart:
-        if xc.domain_start( dom=id ) < 0:
+        if xc.domain_unpause( dom=id ) < 0:
             print "Error starting domain"
             xc.domain_destroy ( dom=id )
             sys.exit()

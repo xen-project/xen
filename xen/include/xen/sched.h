@@ -96,7 +96,7 @@ struct domain
 
     /* Scheduling. */
     struct list_head run_list;
-    int              suspend_code;  /* code value from OS (if DF_SUSPENDED). */
+    int              shutdown_code; /* code value from OS (if DF_SHUTDOWN). */
     s_time_t         lastschd;      /* time this domain was last scheduled */
     s_time_t         lastdeschd;    /* time this domain was last descheduled */
     s_time_t         cpu_time;      /* total CPU time received till now */
@@ -193,7 +193,7 @@ struct domain *find_last_domain(void);
 extern void domain_destruct(struct domain *d);
 extern void domain_kill(struct domain *d);
 extern void domain_crash(void);
-extern void domain_suspend(u8 reason);
+extern void domain_shutdown(u8 reason);
 
 /* arch/process.c */
 void new_thread(struct domain *d,
@@ -254,8 +254,8 @@ extern struct domain *task_list;
 #define DF_CONSOLEWRITEBUG 6 /* Has this domain used the obsolete console?  */
 #define DF_PHYSDEV      7 /* May this domain do IO to physical devices?     */
 #define DF_BLOCKED      8 /* Domain is blocked waiting for an event.        */
-#define DF_STOPPED      9 /* Domain is stopped by control software.          */
-#define DF_SUSPENDED   10 /* Guest suspended its execution for some reason. */
+#define DF_CTRLPAUSE    9 /* Domain is paused by controller software.       */
+#define DF_SHUTDOWN    10 /* Guest shut itself down for some reason.        */
 #define DF_CRASHED     11 /* Domain crashed inside Xen, cannot continue.    */
 #define DF_DYING       12 /* Death rattle.                                  */
 #define DF_RUNNING     13 /* Currently running on a CPU.                    */
@@ -264,8 +264,8 @@ extern struct domain *task_list;
 static inline int domain_runnable(struct domain *d)
 {
     return ( (atomic_read(&d->pausecnt) == 0) &&
-             !(d->flags & ((1<<DF_BLOCKED)|(1<<DF_STOPPED)|
-                           (1<<DF_SUSPENDED)|(1<<DF_CRASHED))) );
+             !(d->flags & ((1<<DF_BLOCKED)|(1<<DF_CTRLPAUSE)|
+                           (1<<DF_SHUTDOWN)|(1<<DF_CRASHED))) );
 }
 
 static inline void domain_pause(struct domain *d)
@@ -289,24 +289,17 @@ static inline void domain_unblock(struct domain *d)
         domain_wake(d);
 }
 
-static inline void domain_unsuspend(struct domain *d)
+static inline void domain_pause_by_systemcontroller(struct domain *d)
 {
     ASSERT(d != current);
-    if ( test_and_clear_bit(DF_SUSPENDED, &d->flags) )
-        domain_wake(d);
-}
-
-static inline void domain_stop(struct domain *d)
-{
-    ASSERT(d != current);
-    if ( !test_and_set_bit(DF_STOPPED, &d->flags) )
+    if ( !test_and_set_bit(DF_CTRLPAUSE, &d->flags) )
         domain_sleep(d);
 }
 
-static inline void domain_start(struct domain *d)
+static inline void domain_unpause_by_systemcontroller(struct domain *d)
 {
     ASSERT(d != current);
-    if ( test_and_clear_bit(DF_STOPPED, &d->flags) )
+    if ( test_and_clear_bit(DF_CTRLPAUSE, &d->flags) )
         domain_wake(d);
 }
 

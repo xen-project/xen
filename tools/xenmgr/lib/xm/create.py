@@ -270,7 +270,7 @@ def make_domain(opts, config):
     else:
         console_port = None
     
-    if server.xend_domain_start(dom) < 0:
+    if server.xend_domain_unpause(dom) < 0:
         server.xend_domain_halt(dom)
         opts.err("Failed to start domain %d" % dom)
     opts.info("Started domain %d, console on port %d"

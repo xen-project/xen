@@ -55,7 +55,7 @@ static PyObject *pyxc_domain_create(PyObject *self,
     return PyInt_FromLong(dom);
 }
 
-static PyObject *pyxc_domain_start(PyObject *self,
+static PyObject *pyxc_domain_pause(PyObject *self,
                                    PyObject *args,
                                    PyObject *kwds)
 {
@@ -68,16 +68,16 @@ static PyObject *pyxc_domain_start(PyObject *self,
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i", kwd_list, &dom) )
         return NULL;
 
-    if ( xc_domain_start(xc->xc_handle, dom) != 0 )
+    if ( xc_domain_pause(xc->xc_handle, dom) != 0 )
         return PyErr_SetFromErrno(xc_error);
     
     Py_INCREF(zero);
     return zero;
 }
 
-static PyObject *pyxc_domain_stop(PyObject *self,
-                                  PyObject *args,
-                                  PyObject *kwds)
+static PyObject *pyxc_domain_unpause(PyObject *self,
+                                     PyObject *args,
+                                     PyObject *kwds)
 {
     XcObject *xc = (XcObject *)self;
 
@@ -88,7 +88,7 @@ static PyObject *pyxc_domain_stop(PyObject *self,
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i", kwd_list, &dom) )
         return NULL;
 
-    if ( xc_domain_stop(xc->xc_handle, dom) != 0 )
+    if ( xc_domain_unpause(xc->xc_handle, dom) != 0 )
         return PyErr_SetFromErrno(xc_error);
     
     Py_INCREF(zero);
@@ -102,15 +102,13 @@ static PyObject *pyxc_domain_destroy(PyObject *self,
     XcObject *xc = (XcObject *)self;
 
     u32 dom;
-    int force = 0;
 
-    static char *kwd_list[] = { "dom", "force", NULL };
+    static char *kwd_list[] = { "dom", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|i", kwd_list, 
-                                      &dom, &force) )
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i", kwd_list, &dom) )
         return NULL;
 
-    if ( xc_domain_destroy(xc->xc_handle, dom, force) != 0 )
+    if ( xc_domain_destroy(xc->xc_handle, dom) != 0 )
         return PyErr_SetFromErrno(xc_error);
     
     Py_INCREF(zero);
@@ -171,8 +169,8 @@ static PyObject *pyxc_domain_getinfo(PyObject *self,
                           "cpu",       info[i].cpu,
                           "dying",     info[i].dying,
                           "crashed",   info[i].crashed,
-                          "suspended", info[i].suspended,
-                          "stopped",   info[i].stopped,
+                          "shutdown",  info[i].shutdown,
+                          "paused",    info[i].paused,
                           "blocked",   info[i].blocked,
                           "running",   info[i].running,
                           "mem_kb",    info[i].nr_pages*4,
@@ -270,7 +268,7 @@ static PyObject *pyxc_linux_save(PyObject *self,
             if ( rc == 0 )
             {
                 printf("Migration succesful -- destroy local copy\n");
-                xc_domain_destroy( xc->xc_handle, dom, 1 );
+                xc_domain_destroy(xc->xc_handle, dom);
                 close(sd);
                 Py_INCREF(zero);
                 return zero;
@@ -281,7 +279,7 @@ static PyObject *pyxc_linux_save(PyObject *self,
 
     serr:
         printf("Migration failed -- restart local copy\n");
-        xc_domain_start( xc->xc_handle, dom );
+        xc_domain_unpause(xc->xc_handle, dom);
         PyErr_SetFromErrno(xc_error);
         if ( sd >= 0 ) close(sd);
         return NULL;
@@ -327,7 +325,7 @@ static PyObject *pyxc_linux_save(PyObject *self,
             /* kill domain. We don't want to do this for checkpointing, but
                if we don't do it here I think people will hurt themselves
                by accident... */
-            xc_domain_destroy( xc->xc_handle, dom, 1 );
+            xc_domain_destroy(xc->xc_handle, dom);
             gzclose(gfd);
             close(fd);
 
@@ -1015,26 +1013,25 @@ static PyMethodDef pyxc_methods[] = {
       " name   [str, '(anon)']: Informative textual name.\n\n"
       "Returns: [int] new domain identifier; -1 on error.\n" },
 
-    { "domain_start", 
-      (PyCFunction)pyxc_domain_start, 
+    { "domain_pause", 
+      (PyCFunction)pyxc_domain_pause, 
       METH_VARARGS | METH_KEYWORDS, "\n"
-      "Start execution of a domain.\n"
-      " dom [int]: Identifier of domain to be started.\n\n"
+      "Temporarily pause execution of a domain.\n"
+      " dom [int]: Identifier of domain to be paused.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
-    { "domain_stop", 
-      (PyCFunction)pyxc_domain_stop, 
+    { "domain_unpause", 
+      (PyCFunction)pyxc_domain_unpause, 
       METH_VARARGS | METH_KEYWORDS, "\n"
-      "Stop execution of a domain.\n"
-      " dom [int]: Identifier of domain to be stopped.\n\n"
+      "(Re)start execution of a domain.\n"
+      " dom [int]: Identifier of domain to be unpaused.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "domain_destroy", 
       (PyCFunction)pyxc_domain_destroy, 
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Destroy a domain.\n"
-      " dom   [int]:    Identifier of domain to be destroyed.\n"
-      " force [int, 0]: Bool - force immediate destruction?\n\n"
+      " dom [int]:    Identifier of domain to be destroyed.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "domain_pincpu", 
@@ -1059,8 +1056,8 @@ static PyMethodDef pyxc_methods[] = {
       " cpu      [int]:  CPU to which this domain is bound\n"
       " dying    [int]:  Bool - is the domain dying?\n"
       " crashed  [int]:  Bool - has the domain crashed?\n"
-      " suspended[int]:  Bool - has the domain suspended itself?\n"
-      " stopped  [int]:  Bool - is the domain stopped by control software?\n"
+      " shutdown [int]:  Bool - has the domain shut itself down?\n"
+      " paused   [int]:  Bool - is the domain paused by control software?\n"
       " blocked  [int]:  Bool - is the domain blocked waiting for an event?\n"
       " running  [int]:  Bool - is the domain currently running?\n"
       " mem_kb   [int]:  Memory reservation, in kilobytes\n"

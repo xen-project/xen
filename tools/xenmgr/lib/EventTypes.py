@@ -5,8 +5,8 @@
 ## xend.domain.destroy: dom, reason:died/crashed
 ## xend.domain.up ?
 
-## xend.domain.start: dom
-## xend.domain.stop: dom
+## xend.domain.unpause: dom
+## xend.domain.pause: dom
 ## xend.domain.shutdown: dom
 ## xend.domain.halt: dom
 

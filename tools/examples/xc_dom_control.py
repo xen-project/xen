@@ -9,8 +9,8 @@ def usage ():
     print >>sys.stderr, """
 Usage: %s [command] <params>
 
-  stop      [dom]        -- pause a domain
-  start     [dom]        -- un-pause a domain
+  pause     [dom]        -- pause a domain
+  unpause   [dom]        -- un-pause a domain
   shutdown  [dom] [[-w]] -- request a domain to shutdown (can specify 'all')
                             (optionally wait for complete shutdown)
   destroy   [dom]        -- immediately terminate a domain
@@ -45,21 +45,21 @@ dom = None
 if len( sys.argv ) > 2 and re.match('\d+$', sys.argv[2]):
     dom = int(sys.argv[2])
 
-if cmd == 'stop':
-    rc = xc.domain_stop( dom=dom )
+if cmd == 'pause':
+    rc = xc.domain_pause( dom=dom )
 
-elif cmd == 'start':
-    rc = xc.domain_start( dom=dom )    
+elif cmd == 'unpause':
+    rc = xc.domain_unpause( dom=dom )    
 
 elif cmd == 'shutdown':
     list = []
     if dom != None:
-        rc = xc.domain_destroy( dom=dom, force=0 )
+        rc = xc.domain_destroy( dom=dom ) # should be CMSG_SHUTDOWN
         list.append(dom)
     elif sys.argv[2] == 'all':
         for i in xc.domain_getinfo():
             if i['dom'] != 0: # don't shutdown dom0!
-                ret = xc.domain_destroy( dom=i['dom'], force=0 )
+                ret = xc.domain_destroy( dom=i['dom'] ) # should be CMSG_SHUTDOWN
                 if ret !=0: rc = ret
                 else: list.append(i['dom'])
 
@@ -72,7 +72,7 @@ elif cmd == 'shutdown':
                 time.sleep(1)
 
 elif cmd == 'destroy':
-    rc = xc.domain_destroy( dom=dom, force=1 )    
+    rc = xc.domain_destroy( dom=dom )    
 
 elif cmd == 'pincpu':
 
@@ -90,8 +90,8 @@ elif cmd == 'list':
 
 	run   = (domain['running'] and 'r') or '-'
         block = (domain['blocked'] and 'b') or '-'
-	stop  = (domain['stopped'] and 's') or '-'
-	susp  = (domain['suspended'] and 'S') or '-'
+	stop  = (domain['paused']  and 'p') or '-'
+	susp  = (domain['shutdown'] and 's') or '-'
 	crash = (domain['crashed'] and 'c') or '-'
 
         domain['state'] = run + block + stop + susp + crash

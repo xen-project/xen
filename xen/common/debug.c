@@ -52,7 +52,7 @@ void pdb_do_debug (dom0_op_t *op)
 	    struct domain *d = find_domain_by_id(op->u.debug.domain);
 	    if ( d != NULL )
 	    {
-                domain_start(d);
+                domain_unpause_by_systemcontroller(d);
 		put_domain(d);
 	    }
 	    else
@@ -94,7 +94,7 @@ void pdb_do_debug (dom0_op_t *op)
 
 	    if ( d != NULL )
 	    {
-                domain_stop(d);
+                domain_pause_by_systemcontroller(d);
 		put_domain(d);
 	    }
 	    else
