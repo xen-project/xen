@@ -480,19 +480,12 @@ void serial_force_unlock(int handle)
         uart->lock = SPIN_LOCK_UNLOCKED;
 }
 
-void serial_endboot()
+void serial_endboot(void)
 {
     int i;
-
-    for (i=0;i<sizeof(com)/sizeof(struct uart);i++)
-    {
-        if( UART_ENABLED(&com[i]) )
-        {
-            /* remove access */
-            physdev_modify_ioport_access_range( dom0, 0, com[i].io_base, 8 );
-        }
-    }
-    
+    for ( i = 0; i < ARRAY_SIZE(com); i++ )
+        if ( UART_ENABLED(&com[i]) )
+            physdev_modify_ioport_access_range(dom0, 0, com[i].io_base, 8);
 }
 
 /*

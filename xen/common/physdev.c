@@ -105,18 +105,12 @@ static int setup_ioport_memory_access(struct domain *d, struct pci_dev *pdev)
     return 0;
 }
 
-void physdev_modify_ioport_access_range( struct domain *d, int enable, 
-                                 int port, int num )
+void physdev_modify_ioport_access_range(
+    struct domain *d, int enable, int port, int num)
 {
     int i;
-    ASSERT( d->arch.iobmp_mask );
-    for ( i = port; i < port+num; i++ )
-    {
-        if(enable)
-            clear_bit(i, d->arch.iobmp_mask);
-        else
-            set_bit(i, d->arch.iobmp_mask);
-    }
+    for ( i = port; i < (port + num); i++ )
+        (enable ? clear_bit : set_bit)(i, d->arch.iobmp_mask);
 }
 
 /* Add a device to a per-domain device-access list. */
