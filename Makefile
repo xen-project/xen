@@ -5,25 +5,23 @@
 DIST_DIR    ?= $(shell pwd)/dist
 INSTALL_DIR ?= $(DIST_DIR)/install
 
-SOURCEFORGE_MIRROR := http://heanet.dl.sourceforge.net/sourceforge
-#http://voxel.dl.sourceforge.net/sourceforge/
-#http://easynews.dl.sourceforge.net/sourceforge
+KERNELS ?= linux-2.6-xen0 linux-2.6-xenU
+# linux-2.4-xen0 linux-2.4-xenU netbsd-2.0-xenU
 
-#KERNELS ?= mk.linux-2.6-xen0 mk.linux-2.6-xenU mk.linux-2.4-xen0 mk.linux-2.4-xenU mk.netbsd-2.0-xenU
-KERNELS ?= mk.linux-2.6-xen0 mk.linux-2.6-xenU
-
-ALLKERNELS = $(patsubst buildconfigs/%,%,$(wildcard buildconfigs/mk.*))
+ALLKERNELS = $(patsubst buildconfigs/mk.%,%,$(wildcard buildconfigs/mk.*))
 ALLSPARSETREES = $(patsubst %-xen-sparse,%,$(wildcard *-xen-sparse))
 
-export INSTALL_DIR SOURCEFORGE_MIRROR
+export INSTALL_DIR
+
+include buildconfigs/Rules.mk
 
 .PHONY:	all dist install xen tools kernels docs world clean mkpatches mrproper
 .PHONY:	kbuild kdelete kclean
 
-all: 	dist
+all: dist
 
 # build and install everything into local dist directory
-dist:	xen tools kernels docs
+dist: xen tools kernels docs
 	install -m0644 ./COPYING $(DIST_DIR)
 	install -m0644 ./README $(DIST_DIR)
 	install -m0755 ./install.sh $(DIST_DIR)
@@ -47,27 +45,27 @@ xen:
 tools:
 	$(MAKE) prefix=$(INSTALL_DIR) dist=yes -C tools install
 
-# Build all the various kernels and modules
 kernels:
-	for i in $(KERNELS) ; do $(MAKE) -f buildconfigs/$$i build ; done
+	for i in $(KERNELS) ; do $(MAKE) $$i-build ; done
 
 docs:
 	sh ./docs/check_pkgs && \
 		$(MAKE) prefix=$(INSTALL_DIR) dist=yes -C docs install || true
 
+# Build all the various kernels and modules
 kbuild: kernels
 
 # Delete the kernel build trees entirely
 kdelete:
-	for i in $(KERNELS) ; do $(MAKE) -f buildconfigs/$$i delete ; done
+	for i in $(KERNELS) ; do $(MAKE) $$i-delete ; done
 
 # Clean the kernel build trees
 kclean:
-	for i in $(KERNELS) ; do $(MAKE) -f buildconfigs/$$i clean ; done
+	for i in $(KERNELS) ; do $(MAKE) $$i-clean ; done
 
 # Make patches from kernel sparse trees
 mkpatches:
-	for i in $(ALLSPARSETREES) ; do $(MAKE) -f buildconfigs/Rules.mk $$i-xen.patch ; done
+	for i in $(ALLSPARSETREES) ; do $(MAKE) $$i-xen.patch ; done
 
 
 # build xen, the tools, and a domain 0 plus unprivileged linux-xen images,
@@ -87,8 +85,8 @@ clean:
 # clean, but blow away kernel build tree plus tar balls
 mrproper: clean
 	rm -rf dist patches/tmp
-	for i in $(ALLKERNELS) ; do $(MAKE) -f buildconfigs/$$i delete ; done
-	for i in $(ALLSPARSETREES) ; do $(MAKE) -f buildconfigs/Rules.mk $$i-mrproper ; done
+	for i in $(ALLKERNELS) ; do $(MAKE) $$i-delete ; done
+	for i in $(ALLSPARSETREES) ; do $(MAKE) $$i-mrproper ; done
 
 install-twisted:
 	wget http://www.twistedmatrix.com/products/get-current.epy
@@ -113,16 +111,14 @@ uninstall:
 	cp -a /etc/xen /etc/xen.old && rm -rf /etc/xen 
 	rm -rf "/usr/lib/python2.?/site-packages/xen* /usr/lib/libxc* /usr/lib/python2.?/site-packages/Xc*"
 
-# Legacy target for compatibility
+# Legacy targets for compatibility
 linux24:
-	$(MAKE) -f buildconfigs/mk.linux-2.4-xen0 build
-	$(MAKE) -f buildconfigs/mk.linux-2.4-xenU build
+	$(MAKE) linux-2.4-xen0-build
+	$(MAKE) linux-2.4-xenU-build
 
-# Legacy target for compatibility
 linux26:
-	$(MAKE) -f buildconfigs/mk.linux-2.6-xen0 build
-	$(MAKE) -f buildconfigs/mk.linux-2.6-xenU build
+	$(MAKE) linux-2.6-xen0-build
+	$(MAKE) linux-2.6-xenU-build
 
-# Legacy target for compatibility
 netbsd20:
-	$(MAKE) -f buildconfigs/mk.netbsd-2.0-xenU build
+	$(MAKE) netbsd-2.0-xenU-build
