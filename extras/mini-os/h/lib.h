@@ -55,22 +55,7 @@
 #ifndef _LIB_H_
 #define _LIB_H_
 
-
-/* variadic function support */
-typedef char *va_list;
-#define __va_size(type) \
-        (((sizeof(type) + sizeof(int) - 1) / sizeof(int)) * sizeof(int))
-#ifdef __GNUC__
-#define va_start(ap, last) \
-        ((ap) = (va_list)__builtin_next_arg(last))
-#else
-#define va_start(ap, last) \
-        ((ap) = (va_list)&(last) + __va_size(last))
-#endif
-#define va_arg(ap, type) \
-        (*(type *)((ap) += __va_size(type), (ap) - __va_size(type)))
-#define va_end(ap)
-
+#include <stdarg.h>
 
 /* printing */
 #define printk  printf

@@ -298,7 +298,7 @@ exception_with_ints_disabled:
         testb $3,XREGS_cs(%rsp)         # interrupts disabled outside Xen?
         jnz   1b                        # it really does happen!
                                         #  (e.g., DOM0 X server)
-        movq  XREGS_rip(%rsp),%rdi
+        movq  %rsp,%rdi
         call  search_pre_exception_table
         testq %rax,%rax                 # no fixup code for faulting EIP?
         jz    FATAL_exception_with_ints_disabled

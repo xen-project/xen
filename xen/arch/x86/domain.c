@@ -85,109 +85,79 @@ void startup_cpu_idle_loop(void)
 
 static long no_idt[2];
 static int reboot_mode;
-int reboot_thru_bios = 0;
-
-#ifdef CONFIG_SMP
-int reboot_smp = 0;
-static int reboot_cpu = -1;
-/* shamelessly grabbed from lib/vsprintf.c for readability */
-#define is_digit(c)	((c) >= '0' && (c) <= '9')
-#endif
-
 
 static inline void kb_wait(void)
 {
     int i;
 
-    for (i=0; i<0x10000; i++)
-        if ((inb_p(0x64) & 0x02) == 0)
+    for ( i = 0; i < 0x10000; i++ )
+        if ( (inb_p(0x64) & 0x02) == 0 )
             break;
 }
 
-
 void machine_restart(char * __unused)
 {
-#ifdef CONFIG_SMP
-    int cpuid;
-#endif
+    int i;
 	
     if ( opt_noreboot )
     {
         printk("Reboot disabled on cmdline: require manual reset\n");
-        for ( ; ; ) __asm__ __volatile__ ("hlt");
+        for ( ; ; )
+            safe_halt();
     }
 
-#ifdef CONFIG_SMP
-    cpuid = GET_APIC_ID(apic_read(APIC_ID));
-
-    /* KAF: Need interrupts enabled for safe IPI. */
     __sti();
 
-    if (reboot_smp) {
-
-        /* check to see if reboot_cpu is valid 
-           if its not, default to the BSP */
-        if ((reboot_cpu == -1) ||  
-            (reboot_cpu > (NR_CPUS -1))  || 
-            !(phys_cpu_present_map & (1<<cpuid))) 
-            reboot_cpu = boot_cpu_physical_apicid;
-
-        reboot_smp = 0;  /* use this as a flag to only go through this once*/
-        /* re-run this function on the other CPUs
-           it will fall though this section since we have 
-           cleared reboot_smp, and do the reboot if it is the
-           correct CPU, otherwise it halts. */
-        if (reboot_cpu != cpuid)
-            smp_call_function((void *)machine_restart , NULL, 1, 0);
+    /* Ensure we are the boot CPU. */
+    if ( GET_APIC_ID(apic_read(APIC_ID)) != boot_cpu_physical_apicid )
+    {
+        smp_call_function((void *)machine_restart, NULL, 1, 0);
+        for ( ; ; )
+            safe_halt();
     }
 
-    /* if reboot_cpu is still -1, then we want a tradional reboot, 
-       and if we are not running on the reboot_cpu,, halt */
-    if ((reboot_cpu != -1) && (cpuid != reboot_cpu)) {
-        for (;;)
-            __asm__ __volatile__ ("hlt");
-    }
     /*
      * Stop all CPUs and turn off local APICs and the IO-APIC, so
      * other OSs see a clean IRQ state.
      */
     smp_send_stop();
     disable_IO_APIC();
-#endif
+
 #ifdef CONFIG_VMX
     stop_vmx();
 #endif
 
-    if(!reboot_thru_bios) {
-        /* rebooting needs to touch the page at absolute addr 0 */
-        *((unsigned short *)__va(0x472)) = reboot_mode;
-        for (;;) {
-            int i;
-            for (i=0; i<100; i++) {
-                kb_wait();
-                udelay(50);
-                outb(0xfe,0x64);         /* pulse reset low */
-                udelay(50);
-            }
-            /* That didn't work - force a triple fault.. */
-            __asm__ __volatile__("lidt %0": "=m" (no_idt));
-            __asm__ __volatile__("int3");
-        }
-    }
+    /* Rebooting needs to touch the page at absolute address 0. */
+    *((unsigned short *)__va(0x472)) = reboot_mode;
 
-    panic("Need to reinclude BIOS reboot code\n");
+    for ( ; ; )
+    {
+        /* Pulse the keyboard reset line. */
+        for ( i = 0; i < 100; i++ )
+        {
+            kb_wait();
+            udelay(50);
+            outb(0xfe,0x64); /* pulse reset low */
+            udelay(50);
+        }
+
+        /* That didn't work - force a triple fault.. */
+        __asm__ __volatile__("lidt %0": "=m" (no_idt));
+        __asm__ __volatile__("int3");
+    }
 }
 
 
 void __attribute__((noreturn)) __machine_halt(void *unused)
 {
     for ( ; ; )
-        __asm__ __volatile__ ( "cli; hlt" );
+        safe_halt();
 }
 
 void machine_halt(void)
 {
-    smp_call_function(__machine_halt, NULL, 1, 1);
+    watchdog_on = 0;
+    smp_call_function(__machine_halt, NULL, 1, 0);
     __machine_halt(NULL);
 }
 

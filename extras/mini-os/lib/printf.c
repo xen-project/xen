@@ -341,7 +341,9 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 		case 'p':
 			ul = (uintptr_t)va_arg(ap, void *);
 			base = 16;
-			sharpflag = (width == 0);
+			sharpflag = 0;
+            padc  = '0';
+            width = sizeof(uintptr_t)*2;
 			goto nosign;
 		case 'q':
 			qflag = 1;

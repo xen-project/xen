@@ -55,10 +55,10 @@ typedef l4_pgentry_t root_pgentry_t;
 #define root_pgentry_to_phys(_x) (l4_pgentry_to_phys(_x))
 
 /* Turn a typed table entry into a page index. */
-#define l1_pgentry_to_pfn(_x)   (l1_pgentry_val(_x) >> PAGE_SHIFT) 
-#define l2_pgentry_to_pfn(_x)   (l2_pgentry_val(_x) >> PAGE_SHIFT)
-#define l3_pgentry_to_pfn(_x)   (l3_pgentry_val(_x) >> PAGE_SHIFT)
-#define l4_pgentry_to_pfn(_x)   (l4_pgentry_val(_x) >> PAGE_SHIFT)
+#define l1_pgentry_to_pfn(_x)   (l1_pgentry_to_phys(_x) >> PAGE_SHIFT) 
+#define l2_pgentry_to_pfn(_x)   (l2_pgentry_to_phys(_x) >> PAGE_SHIFT)
+#define l3_pgentry_to_pfn(_x)   (l3_pgentry_to_phys(_x) >> PAGE_SHIFT)
+#define l4_pgentry_to_pfn(_x)   (l4_pgentry_to_phys(_x) >> PAGE_SHIFT)
 #define root_pgentry_to_pfn(_x) (l4_pgentry_to_pfn(_x))
 
 /* Pagetable walking. */

@@ -65,7 +65,7 @@ extern char shared_info[PAGE_SIZE];
 static shared_info_t *map_shared_info(unsigned long pa)
 {
     if ( HYPERVISOR_update_va_mapping(
-        (unsigned long)shared_info, pa | 3, UVMF_INVLPG) )
+        (unsigned long)shared_info, pa | 7, UVMF_INVLPG) )
     {
         printk("Failed to map shared_info!!\n");
         *(int*)0=0;

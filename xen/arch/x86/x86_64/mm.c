@@ -37,6 +37,7 @@ void *safe_page_alloc(void)
 }
 
 /* Map physical byte range (@p, @p+@s) at virt address @v in pagetable @pt. */
+#define __PTE_MASK (~(_PAGE_GLOBAL|_PAGE_DIRTY|_PAGE_PCD|_PAGE_PWT))
 int map_pages(
     root_pgentry_t *pt,
     unsigned long v,
@@ -57,7 +58,7 @@ int map_pages(
         {
             newpg = safe_page_alloc();
             clear_page(newpg);
-            *pl4e = mk_l4_pgentry(__pa(newpg) | __PAGE_HYPERVISOR);
+            *pl4e = mk_l4_pgentry(__pa(newpg) | (flags & __PTE_MASK));
         }
 
         pl3e = l4_pgentry_to_l3(*pl4e) + l3_table_offset(v);
@@ -65,7 +66,7 @@ int map_pages(
         {
             newpg = safe_page_alloc();
             clear_page(newpg);
-            *pl3e = mk_l3_pgentry(__pa(newpg) | __PAGE_HYPERVISOR);
+            *pl3e = mk_l3_pgentry(__pa(newpg) | (flags & __PTE_MASK));
         }
 
         pl2e = l3_pgentry_to_l2(*pl3e) + l2_table_offset(v);
@@ -88,7 +89,7 @@ int map_pages(
             {
                 newpg = safe_page_alloc();
                 clear_page(newpg);
-                *pl2e = mk_l2_pgentry(__pa(newpg) | __PAGE_HYPERVISOR);
+                *pl2e = mk_l2_pgentry(__pa(newpg) | (flags & __PTE_MASK));
             }
             pl1e = l2_pgentry_to_l1(*pl2e) + l1_table_offset(v);
             if ( (l1_pgentry_val(*pl1e) & _PAGE_PRESENT) )

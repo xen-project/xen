@@ -1,20 +1,8 @@
 /* -*-  Mode:C; c-basic-offset:4; tab-width:4 -*-
- ****************************************************************************
+ *
  * (C) 2003 - Rolf Neugebauer - Intel Research Cambridge
- ****************************************************************************
+ * Copyright (c) 2005, Keir A Fraser
  *
- *        File: mm.h
- *      Author: Rolf Neugebauer (neugebar@dcs.gla.ac.uk)
- *     Changes: 
- *              
- *        Date: Aug 2003
- * 
- * Environment: 
- * Description: 
- *
- ****************************************************************************
- * $Id: h-insert.h,v 1.4 2002/11/08 16:03:55 rn Exp $
- ****************************************************************************
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
  * deal in the Software without restriction, including without limitation the
@@ -36,6 +24,48 @@
 
 #ifndef _MM_H_
 #define _MM_H_
+
+#ifdef __x86_64__
+
+#define L1_PAGETABLE_SHIFT      12
+#define L2_PAGETABLE_SHIFT      21
+#define L3_PAGETABLE_SHIFT      30
+#define L4_PAGETABLE_SHIFT      39
+
+#define L1_PAGETABLE_ENTRIES    512
+#define L2_PAGETABLE_ENTRIES    512
+#define L3_PAGETABLE_ENTRIES    512
+#define L4_PAGETABLE_ENTRIES    512
+
+/* These are page-table limitations. Current CPUs support only 40-bit phys. */
+#define PADDR_BITS              52
+#define VADDR_BITS              48
+#define PADDR_MASK              ((1UL << PADDR_BITS)-1)
+#define VADDR_MASK              ((1UL << VADDR_BITS)-1)
+
+#define pte_to_mfn(_pte) (((_pte) & (PADDR_MASK&PAGE_MASK)) >> PAGE_SHIFT)
+
+/* Given a virtual address, get an entry offset into a page table. */
+#define l1_table_offset(_a) \
+  (((_a) >> L1_PAGETABLE_SHIFT) & (L1_PAGETABLE_ENTRIES - 1))
+#define l2_table_offset(_a) \
+  (((_a) >> L2_PAGETABLE_SHIFT) & (L2_PAGETABLE_ENTRIES - 1))
+#define l3_table_offset(_a) \
+  (((_a) >> L3_PAGETABLE_SHIFT) & (L3_PAGETABLE_ENTRIES - 1))
+#define l4_table_offset(_a) \
+  (((_a) >> L4_PAGETABLE_SHIFT) & (L4_PAGETABLE_ENTRIES - 1))
+#endif
+
+#define _PAGE_PRESENT  0x001UL
+#define _PAGE_RW       0x002UL
+#define _PAGE_USER     0x004UL
+#define _PAGE_PWT      0x008UL
+#define _PAGE_PCD      0x010UL
+#define _PAGE_ACCESSED 0x020UL
+#define _PAGE_DIRTY    0x040UL
+#define _PAGE_PAT      0x080UL
+#define _PAGE_PSE      0x080UL
+#define _PAGE_GLOBAL   0x100UL
 
 #define PAGE_SHIFT      12
 #define PAGE_SIZE       (1UL << PAGE_SHIFT)
@@ -72,6 +102,8 @@ static __inline__ unsigned long machine_to_phys(unsigned long machine)
 
 #define to_phys(x)                 ((unsigned long)(x)-VIRT_START)
 #define to_virt(x)                 ((void *)((unsigned long)(x)+VIRT_START))
+#define __va to_virt
+#define __pa to_phys
 
 void init_mm(void);
 unsigned long alloc_pages(int order);

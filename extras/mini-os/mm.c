@@ -84,6 +84,7 @@ void init_mm(void)
      */
 
     max_free_pfn = PFN_DOWN(to_phys(pgd));
+#ifdef __i386__
     {
         unsigned long *pgd = (unsigned long *)start_info.pt_base;
         unsigned long  pte;
@@ -110,6 +111,7 @@ void init_mm(void)
            (u_long)to_virt(PFN_PHYS(start_pfn)), PFN_PHYS(start_pfn), 
            (u_long)to_virt(PFN_PHYS(max_free_pfn)), PFN_PHYS(max_free_pfn));
     init_page_allocator(PFN_PHYS(start_pfn), PFN_PHYS(max_free_pfn));   
+#endif
 
 
     /* Now initialise the physical->machine mapping table. */

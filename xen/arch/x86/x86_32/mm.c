@@ -29,6 +29,7 @@
 #include <asm/domain_page.h>
 
 /* Map physical byte range (@p, @p+@s) at virt address @v in pagetable @pt. */
+#define __PTE_MASK (~(_PAGE_GLOBAL|_PAGE_DIRTY|_PAGE_PCD|_PAGE_PWT))
 int map_pages(
     root_pgentry_t *pt,
     unsigned long v,
@@ -62,7 +63,7 @@ int map_pages(
             {
                 newpg = (void *)alloc_xenheap_page();
                 clear_page(newpg);
-                *pl2e = mk_l2_pgentry(__pa(newpg) | __PAGE_HYPERVISOR);
+                *pl2e = mk_l2_pgentry(__pa(newpg) | (flags & __PTE_MASK));
             }
             pl1e = l2_pgentry_to_l1(*pl2e) + l1_table_offset(v);
             if ( (l1_pgentry_val(*pl1e) & _PAGE_PRESENT) )
