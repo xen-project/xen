@@ -1057,15 +1057,35 @@ __initcall(setup_die_event);
  * Stop/pickle callback handling.
  */
 
+#include <asm/suspend.h>
+
 static void stop_task(void *unused)
 {
     /* Hmmm... a cleaner interface to suspend/resume blkdevs would be nice. */
     extern void blkdev_suspend(void);
     extern void blkdev_resume(void);
     
+    unsigned long *pfn_to_mfn_frame_list = NULL;
+    suspend_record_t *suspend_record     = NULL;
     struct net_device *dev;
     char name[6];
-    int i;
+    int i, j;
+
+    if ( (pfn_to_mfn_frame_list = (unsigned long *)__get_free_page(GFP_KERNEL))
+         == NULL )
+        goto out;
+    if ( (suspend_record = (suspend_record_t *)__get_free_page(GFP_KERNEL))
+         == NULL )
+        goto out;
+
+    suspend_record->pfn_to_mfn_frame_list = 
+        virt_to_machine(pfn_to_mfn_frame_list) >> PAGE_SHIFT;
+    suspend_record->nr_pfns = max_pfn;
+
+    j = 0;
+    for ( i = 0; i < max_pfn; i += (PAGE_SIZE / sizeof(unsigned long)) )
+        pfn_to_mfn_frame_list[j++] = 
+            virt_to_machine(&phys_to_machine_mapping[i]) >> PAGE_SHIFT;
 
     rtnl_lock();
     for ( i = 0; i < 10; i++ )
@@ -1083,7 +1103,11 @@ static void stop_task(void *unused)
     HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
     clear_fixmap(FIX_SHARED_INFO);
 
-    HYPERVISOR_stop();
+    memcpy(&suspend_record->resume_info, &start_info, sizeof(start_info));
+
+    HYPERVISOR_stop(virt_to_machine(suspend_record) >> PAGE_SHIFT);
+
+    memcpy(&start_info, &suspend_record->resume_info, sizeof(start_info));
 
     set_fixmap(FIX_SHARED_INFO, start_info.shared_info);
     HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
@@ -1101,6 +1125,12 @@ static void stop_task(void *unused)
             dev_open(dev);
     }
     rtnl_unlock();
+
+ out:
+    if ( pfn_to_mfn_frame_list != NULL )
+        free_page((unsigned long)pfn_to_mfn_frame_list);
+    if ( suspend_record != NULL )
+        free_page((unsigned long)suspend_record);
 }
 
 static struct tq_struct stop_tq;

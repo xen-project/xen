@@ -110,7 +110,7 @@ void start_kernel(start_info_t *si)
     }; printk("\n");
     printk("  blk_ring:   0x%lx\n", si->blk_ring);
 #endif
-    printk("  dom_id:     %d\n",  si->dom_id);
+    printk("  dom_id:     %ld\n",  si->dom_id);
     printk("  flags:      0x%lx\n", si->flags);
     printk("  cmd_line:   %s\n",  si->cmd_line ? (const char *)si->cmd_line : "NULL");
 

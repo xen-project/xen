@@ -263,13 +263,14 @@ static inline int HYPERVISOR_exit(void)
     return ret;
 }
 
-static inline int HYPERVISOR_stop(void)
+static inline int HYPERVISOR_stop(unsigned long srec)
 {
     int ret;
+    /* NB. On suspend, control software expects a suspend record in %esi. */
     __asm__ __volatile__ (
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_sched_op),
-        "b" (SCHEDOP_stop) );
+        "b" (SCHEDOP_stop), "S" (srec) : "memory" );
 
     return ret;
 }
