@@ -100,12 +100,14 @@ struct arch_exec_domain
      * are put in this table (eg. the current GDT is mapped here).
      */
     l1_pgentry_t *perdomain_ptes;
-    pagetable_t  pagetable;
-    pagetable_t  pagetable_user;  /* x86/64: user-space pagetable. */
 
-    pagetable_t  monitor_table;
-    pagetable_t  phys_table;            /* 1:1 pagetable */
-    pagetable_t  shadow_table;
+    pagetable_t  guest_table_user;      /* x86/64: user-space pagetable. */
+    pagetable_t  guest_table;           /* guest notion of cr3 */
+    pagetable_t  shadow_table;          /* shadow of guest */
+    pagetable_t  monitor_table;         /* used in hypervisor */
+
+    pagetable_t  phys_table;            /* guest 1:1 pagetable */
+
     l2_pgentry_t *vpagetable;	        /* virtual address of pagetable */
     l2_pgentry_t *shadow_vtable;	/* virtual address of shadow_table */
     l2_pgentry_t *guest_pl2e_cache;	/* guest page directory cache */
@@ -122,7 +124,7 @@ struct arch_exec_domain
 #define IDLE0_ARCH_EXEC_DOMAIN                                      \
 {                                                                   \
     perdomain_ptes: 0,                                              \
-    pagetable:      mk_pagetable(__pa(idle_pg_table))               \
+    guest_table:    mk_pagetable(__pa(idle_pg_table))               \
 }
 
 #endif /* __ASM_DOMAIN_H__ */

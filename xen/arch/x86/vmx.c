@@ -419,13 +419,13 @@ static void mov_to_cr(int gp, int cr, struct xen_regs *regs)
                         d->arch.arch_vmx.cpu_cr3);
                 domain_crash(); /* need to take a clean path */
             }
-            old_base_pfn = pagetable_val(d->arch.pagetable) >> PAGE_SHIFT;
+            old_base_pfn = pagetable_val(d->arch.guest_table) >> PAGE_SHIFT;
             /*
-             * Now mm.pagetable points to machine physical.
+             * Now arch.guest_table points to machine physical.
              */
-            d->arch.pagetable = mk_pagetable(pfn << PAGE_SHIFT);
+            d->arch.guest_table = mk_pagetable(pfn << PAGE_SHIFT);
 
-            VMX_DBG_LOG(DBG_LEVEL_VMMU, "New mm.pagetable = %lx\n", 
+            VMX_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx\n", 
                     (unsigned long) (pfn << PAGE_SHIFT));
 
             shadow_lock(d->domain);
@@ -466,7 +466,7 @@ static void mov_to_cr(int gp, int cr, struct xen_regs *regs)
              * We simply invalidate the shadow.
              */
             pfn = phys_to_machine_mapping(value >> PAGE_SHIFT);
-            if ((pfn << PAGE_SHIFT) != pagetable_val(d->arch.pagetable))
+            if ((pfn << PAGE_SHIFT) != pagetable_val(d->arch.guest_table))
                 __vmx_bug(regs);
             vmx_shadow_clear_state(d->domain);
             shadow_invalidate(d);
@@ -484,7 +484,7 @@ static void mov_to_cr(int gp, int cr, struct xen_regs *regs)
             }
             pfn = phys_to_machine_mapping(value >> PAGE_SHIFT);
             vmx_shadow_clear_state(d->domain);
-            d->arch.pagetable = mk_pagetable(pfn << PAGE_SHIFT);
+            d->arch.guest_table = mk_pagetable(pfn << PAGE_SHIFT);
             shadow_mk_pagetable(d);
             /* 
              * mm->shadow_table should hold the next CR3 for shadow

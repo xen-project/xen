@@ -726,7 +726,7 @@ static inline unsigned long gva_to_gpa(unsigned long gva)
 static inline void __shadow_mk_pagetable(struct exec_domain *ed)
 {
     struct domain *d = ed->domain;
-    unsigned long gpfn = pagetable_val(ed->arch.pagetable) >> PAGE_SHIFT;
+    unsigned long gpfn = pagetable_val(ed->arch.guest_table) >> PAGE_SHIFT;
     unsigned long smfn = __shadow_status(d, gpfn) & PSH_pfn_mask;
 
     SH_VVLOG("0: __shadow_mk_pagetable(gpfn=%p, smfn=%p)", gpfn, smfn);
@@ -747,7 +747,7 @@ static inline void shadow_mk_pagetable(struct exec_domain *ed)
      if ( unlikely(shadow_mode(ed->domain)) )
      {
          SH_VVLOG("shadow_mk_pagetable( gptbase=%p, mode=%d )",
-             pagetable_val(ed->arch.pagetable),
+             pagetable_val(ed->arch.guest_table),
                   shadow_mode(ed->domain)); 
 
          shadow_lock(ed->domain);
@@ -756,7 +756,7 @@ static inline void shadow_mk_pagetable(struct exec_domain *ed)
 
      SH_VVLOG("leaving shadow_mk_pagetable:\n"
               "( gptbase=%p, mode=%d ) sh=%p",
-              pagetable_val(ed->arch.pagetable),
+              pagetable_val(ed->arch.guest_table),
               shadow_mode(ed->domain), 
               pagetable_val(ed->arch.shadow_table) );
      }

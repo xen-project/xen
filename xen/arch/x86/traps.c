@@ -401,7 +401,7 @@ static int emulate_privileged_op(struct xen_regs *regs)
             break;
             
         case 3: /* Read CR3 */
-            *reg = pagetable_val(ed->arch.pagetable);
+            *reg = pagetable_val(ed->arch.guest_table);
             break;
 
         default:
