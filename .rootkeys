@@ -684,6 +684,7 @@
 3e5a4e68uJz-xI0IBVMD7xRLQKJDFg xenolinux-2.4.25-sparse/include/asm-xen/segment.h
 3e5a4e68Nfdh6QcOKUTGCaYkf2LmYA xenolinux-2.4.25-sparse/include/asm-xen/smp.h
 3fa8e3f0kBLeE4To2vpdi3cpJbIkbQ xenolinux-2.4.25-sparse/include/asm-xen/suspend.h
+4062f7e2PzFOUGT0PaE7A0VprTU3JQ xenolinux-2.4.25-sparse/include/asm-xen/synch_bitops.h
 3e5a4e68mTr0zcp9SXDbnd-XLrrfxw xenolinux-2.4.25-sparse/include/asm-xen/system.h
 3f1056a9L_kqHcFheV00KbKBzv9j5w xenolinux-2.4.25-sparse/include/asm-xen/vga.h
 3f689063nhrIRsMMZjZxMFk7iEINqQ xenolinux-2.4.25-sparse/include/asm-xen/xen_proc.h
