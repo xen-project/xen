@@ -54,29 +54,27 @@ net_vif_t *create_net_vif(int domain)
     net_shadow_ring_t *shadow_ring;
     struct task_struct *dom_task;
     
-    if ( !(dom_task = find_domain_by_id(domain)) ) 
-    {
-            return NULL;
-    }
+    if ( !(dom_task = find_domain_by_id(domain)) )
+        return NULL;
     
     if ( (new_vif = kmem_cache_alloc(net_vif_cache, GFP_KERNEL)) == NULL )
-    {
-            return NULL;
-    }
+        return NULL;
     
     new_ring = dom_task->net_ring_base + dom_task->num_net_vifs;
     memset(new_ring, 0, sizeof(net_ring_t));
 
     shadow_ring = kmalloc(sizeof(net_shadow_ring_t), GFP_KERNEL);
-    if (shadow_ring == NULL) goto fail;
+    if ( shadow_ring == NULL ) goto fail;
     
     shadow_ring->rx_ring = kmalloc(RX_RING_SIZE
                     * sizeof(rx_shadow_entry_t), GFP_KERNEL);
-    if ( shadow_ring->rx_ring == NULL )
+    shadow_ring->tx_ring = kmalloc(TX_RING_SIZE
+                    * sizeof(tx_shadow_entry_t), GFP_KERNEL);
+    if ( (shadow_ring->rx_ring == NULL) || (shadow_ring->tx_ring == NULL) )
             goto fail;
 
     shadow_ring->rx_prod = shadow_ring->rx_cons = shadow_ring->rx_idx = 0;
-    shadow_ring->tx_cons = 0;
+    shadow_ring->tx_prod = shadow_ring->tx_cons = shadow_ring->tx_idx = 0;
     
     /* Fill in the new vif struct. */
     
@@ -98,7 +96,13 @@ net_vif_t *create_net_vif(int domain)
     return new_vif;
     
 fail:
-    printk("VIF allocation failed!\n");
+    kmem_cache_free(net_vif_cache, new_vif);
+    if ( shadow_ring != NULL )
+    {
+        if ( shadow_ring->rx_ring ) kfree(shadow_ring->rx_ring);
+        if ( shadow_ring->tx_ring ) kfree(shadow_ring->tx_ring);
+        kfree(shadow_ring);
+    }
     return NULL;
 }
 
@@ -125,6 +129,7 @@ void destroy_net_vif(struct task_struct *p)
     sys_vif_list[p->net_vif_list[i]->id] = NULL; // system vif list not gc'ed
     write_unlock(&sys_vif_lock);        
    
+    kfree(p->net_vif_list[i]->shadow_ring->tx_ring);
     kfree(p->net_vif_list[i]->shadow_ring->rx_ring);
     kfree(p->net_vif_list[i]->shadow_ring);
     kmem_cache_free(net_vif_cache, p->net_vif_list[i]);

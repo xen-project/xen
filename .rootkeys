@@ -260,7 +260,6 @@
 3ddb79c0MOVXq8qZDQRGb6z64_xAwg xen-2.4.16/include/xeno/pci_ids.h
 3e54c38dlSCVdyVM4PKcrSfzLLxWUQ xen-2.4.16/include/xeno/perfc.h
 3e54c38de9SUSYSAwxDf_DwkpAnQFA xen-2.4.16/include/xeno/perfc_defn.h
-3ddb79c2byJwwNNkiES__A9H4Cvc4g xen-2.4.16/include/xeno/pkt_sched.h
 3ddb79c04nQVR3EYM5L4zxDV_MCo1g xen-2.4.16/include/xeno/prefetch.h
 3e4540ccU1sgCx8seIMGlahmMfv7yQ xen-2.4.16/include/xeno/reboot.h
 3ddb79c0LzqqS0LhAQ50ekgj4oGl7Q xen-2.4.16/include/xeno/sched.h
@@ -279,10 +278,9 @@
 3ddb79c4YQCQ6r0xNLLu0jfbM7pVmA xen-2.4.16/net/Makefile
 3ddb79c4AkfDkTCw0comx4L8wsUOMg xen-2.4.16/net/dev.c
 3ddb79c4x1L_soh8b-r_1jQW_37Icw xen-2.4.16/net/dev_mcast.c
+3ddb79c4KZhNxUuYJ7lul8cc-wRkyg xen-2.4.16/net/devinit.c
 3ddb79c4NSDwiQ-AmrYdxcRAwLPzwQ xen-2.4.16/net/eth.c
-3ddb79c4KZhNxUuYJ7lul8cc-wRkyg xen-2.4.16/net/sch_generic.c
 3ddb79c4TZj1wXPKQt36O72SddtBNQ xen-2.4.16/net/skbuff.c
-3ddb79c4ARyIHqv3Y6YFckIUbyA8Tw xen-2.4.16/net/utils.c
 3ddb79c4x8dvwPtzclghWAKFWpEBFA xen-2.4.16/tools/Makefile
 3ddb79c4yGZ7_22QAFFwPzqP4NSHwA xen-2.4.16/tools/elf-reloc.c
 3ddb79bbYMXGmQTsr5BeGS_RuZ5f_w xenolinux-2.4.16-sparse/Makefile

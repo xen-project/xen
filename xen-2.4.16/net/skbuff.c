@@ -40,26 +40,14 @@
 #include <linux/lib.h>
 #include <linux/errno.h>
 #include <linux/types.h>
-//#include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/interrupt.h>
-//#include <linux/in.h>
-//#include <linux/inet.h>
 #include <linux/slab.h>
 #include <linux/netdevice.h>
-//#include <linux/string.h>
 #include <linux/skbuff.h>
 #include <linux/cache.h>
 #include <linux/init.h>
-//#include <linux/highmem.h>
-
-//#include <net/ip.h>
-//#include <net/protocol.h>
-//#include <net/dst.h>
-//#include <net/tcp.h>
-//#include <net/udp.h>
-//#include <net/sock.h>
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
@@ -162,7 +150,7 @@ static inline u8 *alloc_skb_data_page(struct sk_buff *skb)
 
         list_ptr = free_list.next;
         pf = list_entry(list_ptr, struct pfn_info, list);
-        pf->flags = 0; // owned by dom0
+        pf->flags = 0; /* owned by dom0 */
         list_del(&pf->list);
         free_pfns--;
 
@@ -218,14 +206,9 @@ struct sk_buff *alloc_zc_skb(unsigned int size,int gfp_mask)
         if (data == NULL)
                 goto nodata;
 
-        // This is so that pci_map_single does the right thing in the driver.
-        // If you want to ever use this pointer otherwise, you need to regenerate it 
-        // based on skb->pf.
+        /* A FAKE virtual address, so that pci_map_xxx dor the right thing. */
         data = phys_to_virt((unsigned long)data); 
         
-        /* XXX: does not include slab overhead */
-        skb->truesize = size + sizeof(struct sk_buff);
-
         /* Load the data pointers. */
         skb->head = data;
         skb->data = data;
@@ -302,9 +285,6 @@ struct sk_buff *alloc_skb(unsigned int size,int gfp_mask)
 	if (data == NULL)
 		goto nodata;
 
-	/* XXX: does not include slab overhead */ 
-	skb->truesize = size + sizeof(struct sk_buff);
-
 	/* Load the data pointers. */
 	skb->head = data;
 	skb->data = data;
@@ -343,15 +323,9 @@ static inline void skb_headerinit(void *p, kmem_cache_t *cache,
 	skb->next = NULL;
 	skb->prev = NULL;
 	skb->list = NULL;
-	skb->sk = NULL;
-	skb->stamp.tv_sec=0;	/* No idea about time */
 	skb->dev = NULL;
-//	skb->dst = NULL;
-	memset(skb->cb, 0, sizeof(skb->cb));
 	skb->pkt_type = PACKET_HOST;	/* Default type */
 	skb->ip_summed = 0;
-	skb->priority = 0;
-	skb->security = 0;	/* By default packets are insecure */
 	skb->destructor = NULL;
 
 #ifdef CONFIG_NETFILTER
@@ -411,7 +385,7 @@ static void skb_release_data(struct sk_buff *skb)
                 } 
                 else 
                 {
-                    BUG(); //skb_release_data called with unknown skb type!
+                    BUG();
                 }
 	}
 }
@@ -442,7 +416,6 @@ void __kfree_skb(struct sk_buff *skb)
 		BUG();
 	}
 
-//	dst_release(skb->dst);
 	if(skb->destructor) {
 		if (in_irq()) {
 			printk(KERN_WARNING "Warning: kfree_skb on hard IRQ %p\n",
@@ -487,26 +460,18 @@ struct sk_buff *skb_clone(struct sk_buff *skb, int gfp_mask)
 
 	n->next = n->prev = NULL;
 	n->list = NULL;
-	n->sk = NULL;
-	C(stamp);
 	C(dev);
 	C(h);
 	C(nh);
 	C(mac);
-//	C(dst);
-//	dst_clone(n->dst);
-	memcpy(n->cb, skb->cb, sizeof(skb->cb));
 	C(len);
 	C(data_len);
 	C(csum);
 	n->cloned = 1;
 	C(pkt_type);
 	C(ip_summed);
-	C(priority);
 	atomic_set(&n->users, 1);
 	C(protocol);
-	C(security);
-	C(truesize);
 	C(head);
 	C(data);
 	C(tail);
@@ -543,20 +508,14 @@ static void copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 	unsigned long offset = new->data - old->data;
 
 	new->list=NULL;
-	new->sk=NULL;
 	new->dev=old->dev;
-	new->priority=old->priority;
 	new->protocol=old->protocol;
-//	new->dst=dst_clone(old->dst);
 	new->h.raw=old->h.raw+offset;
 	new->nh.raw=old->nh.raw+offset;
 	new->mac.raw=old->mac.raw+offset;
-	memcpy(new->cb, old->cb, sizeof(old->cb));
 	atomic_set(&new->users, 1);
 	new->pkt_type=old->pkt_type;
-	new->stamp=old->stamp;
 	new->destructor = NULL;
-	new->security=old->security;
 #ifdef CONFIG_NETFILTER
 	new->nfmark=old->nfmark;
 	new->nfcache=old->nfcache;

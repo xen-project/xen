@@ -6,10 +6,10 @@
 
 #include <asm/byteorder.h>
 
-#define TRY_SOFTIRQ
-#ifdef TRY_SOFTIRQ
+#define TRY_TASKLET
+#ifdef TRY_TASKLET
 /* XXX SMH: trying to use softirqs to trigger stuff done prev by threads */
-#include <xeno/interrupt.h>  /* for softirq stuff */
+#include <xeno/interrupt.h>  /* for tasklet/softirq stuff */
 #endif
 
 /*------------------------------------------------------------------------------
@@ -1408,8 +1408,9 @@ int aac_rx_init(struct aac_dev *dev, unsigned long devNumber);
 int aac_sa_init(struct aac_dev *dev, unsigned long devNumber);
 unsigned int aac_response_normal(struct aac_queue * q);
 unsigned int aac_command_normal(struct aac_queue * q);
-#ifdef TRY_SOFTIRQ
-int aac_command_thread(struct softirq_action *h); 
+#ifdef TRY_TASKLET
+extern struct tasklet_struct aac_command_tasklet;
+int aac_command_thread(unsigned long data);
 #else
 int aac_command_thread(struct aac_dev * dev);
 #endif

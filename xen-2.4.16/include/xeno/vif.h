@@ -32,10 +32,17 @@ typedef struct rx_shadow_entry_st {
     unsigned long flush_count;
 } rx_shadow_entry_t;
 
+typedef struct tx_shadow_entry_st {
+    unsigned long addr;
+    unsigned long size;
+    int           status;
+} tx_shadow_entry_t;
+
 typedef struct net_shadow_ring_st {
     rx_shadow_entry_t *rx_ring;
+    tx_shadow_entry_t *tx_ring;
     unsigned int rx_prod, rx_cons, rx_idx;
-    unsigned int tx_cons; /* ahead of shared tx_cons */
+    unsigned int tx_prod, tx_cons, tx_idx;
 } net_shadow_ring_t;
 
 typedef struct net_vif_st {

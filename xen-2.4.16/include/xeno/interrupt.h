@@ -27,19 +27,8 @@ struct irqaction {
 enum {
 	TIMER_BH = 0,
 	TQUEUE_BH,
-	DIGI_BH,
-	SERIAL_BH,
-	RISCOM8_BH,
-	SPECIALIX_BH,
-	AURORA_BH,
-	ESP_BH,
 	SCSI_BH,
-	IMMEDIATE_BH,
-	CYCLADES_BH,
-	CM206_BH,
-	JS_BH,
-	MACSERIAL_BH,
-	ISICOM_BH
+	IMMEDIATE_BH
 };
 
 #include <asm/hardirq.h>
@@ -56,10 +45,7 @@ enum {
 enum
 {
 	HI_SOFTIRQ=0,
-	NET_TX_SOFTIRQ,
-	NET_RX_SOFTIRQ,
-	TASKLET_SOFTIRQ, 
-	SCSI_LOW_SOFTIRQ,
+	TASKLET_SOFTIRQ
 };
 
 /* softirq mask and active fields moved to irq_cpustat_t in

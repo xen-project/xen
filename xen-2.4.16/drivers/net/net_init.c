@@ -423,8 +423,7 @@ void ether_setup(struct net_device *dev)
 	dev->hard_header_len 	= ETH_HLEN;
 	dev->mtu		= 1500; /* eth_mtu */
 	dev->addr_len		= ETH_ALEN;
-	dev->tx_queue_len	= 100;	/* Ethernet wants good queues */	
-	
+
 	memset(dev->broadcast,0xFF, ETH_ALEN);
 
 	/* New-style flags. */
@@ -449,7 +448,6 @@ void fddi_setup(struct net_device *dev)
 	dev->hard_header_len	= FDDI_K_SNAP_HLEN+3;	/* Assume 802.2 SNAP hdr len + 3 pad bytes */
 	dev->mtu				= FDDI_K_SNAP_DLEN;		/* Assume max payload of 802.2 SNAP frame */
 	dev->addr_len			= FDDI_K_ALEN;
-	dev->tx_queue_len		= 100;	/* Long queues on FDDI */
 	
 	memset(dev->broadcast, 0xFF, FDDI_K_ALEN);
 
@@ -482,9 +480,8 @@ void hippi_setup(struct net_device *dev)
 	dev->hard_header_len 	= HIPPI_HLEN;
 	dev->mtu		= 65280;
 	dev->addr_len		= HIPPI_ALEN;
-	dev->tx_queue_len	= 25 /* 5 */;
-	memset(dev->broadcast, 0xFF, HIPPI_ALEN);
 
+	memset(dev->broadcast, 0xFF, HIPPI_ALEN);
 
 	/*
 	 * HIPPI doesn't support broadcast+multicast and we only use
@@ -523,7 +520,6 @@ void ltalk_setup(struct net_device *dev)
 	dev->hard_header_len 	= LTALK_HLEN;
 	dev->mtu		= LTALK_MTU;
 	dev->addr_len		= LTALK_ALEN;
-	dev->tx_queue_len	= 10;	
 	
 	dev->broadcast[0]	= 0xFF;
 
@@ -594,7 +590,6 @@ void tr_setup(struct net_device *dev)
 	dev->hard_header_len	= TR_HLEN;
 	dev->mtu		= 2000;
 	dev->addr_len		= TR_ALEN;
-	dev->tx_queue_len	= 100;	/* Long queues on tr */
 	
 	memset(dev->broadcast,0xFF, TR_ALEN);
 
@@ -671,7 +666,6 @@ void fc_setup(struct net_device *dev)
 	dev->hard_header_len    =        FC_HLEN;
         dev->mtu                =        2024;
         dev->addr_len           =        FC_ALEN;
-        dev->tx_queue_len       =        100; /* Long queues on fc */
 
         memset(dev->broadcast,0xFF, FC_ALEN);
 

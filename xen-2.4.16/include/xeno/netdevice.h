@@ -25,17 +25,18 @@
 #ifndef _LINUX_NETDEVICE_H
 #define _LINUX_NETDEVICE_H
 
-#include <linux/if.h>
-#include <linux/if_ether.h>
-#include <linux/if_packet.h>
-#include <linux/sched.h>
+#include <xeno/if.h>
+#include <xeno/if_ether.h>
+#include <xeno/if_packet.h>
+#include <xeno/sched.h>
+#include <xeno/interrupt.h>
 
 #include <asm/atomic.h>
 #include <asm/cache.h>
 #include <asm/byteorder.h>
 
 #ifdef __KERNEL__
-#include <linux/config.h>
+#include <xeno/config.h>
 
 struct divert_blk;
 struct vlan_group;
@@ -64,28 +65,6 @@ struct vlan_group;
 #endif
 
 #define MAX_ADDR_LEN	8		/* Largest hardware address length */
-
-/*
- *	Compute the worst case header length according to the protocols
- *	used.
- */
- 
-#if !defined(CONFIG_AX25) && !defined(CONFIG_AX25_MODULE) && !defined(CONFIG_TR)
-#define LL_MAX_HEADER	32
-#else
-#if defined(CONFIG_AX25) || defined(CONFIG_AX25_MODULE)
-#define LL_MAX_HEADER	96
-#else
-#define LL_MAX_HEADER	48
-#endif
-#endif
-
-#if !defined(CONFIG_NET_IPIP) && \
-    !defined(CONFIG_IPV6) && !defined(CONFIG_IPV6_MODULE)
-#define MAX_HEADER LL_MAX_HEADER
-#else
-#define MAX_HEADER (LL_MAX_HEADER + 48)
-#endif
 
 /*
  *	Network device statistics. Akin to the 2.0 ether stats but
@@ -141,8 +120,8 @@ enum {
 
 extern const char *if_port_text[];
 
-#include <linux/cache.h>
-#include <linux/skbuff.h>
+#include <xeno/cache.h>
+#include <xeno/skbuff.h>
 
 struct neighbour;
 struct neigh_parms;
@@ -311,18 +290,6 @@ struct net_device
 	void                    *dn_ptr;        /* DECnet specific data */
 	void                    *ip6_ptr;       /* IPv6 specific data */
 	void			*ec_ptr;	/* Econet specific data	*/
-#if 0
-						/* IAP: add fields but
-						nothing else */		
-	struct list_head        poll_list;      /* Link to poll list    */
-	int                     quota;
-	int                     weight;
-#endif
-	struct Qdisc		*qdisc;
-	struct Qdisc		*qdisc_sleeping;
-	struct Qdisc		*qdisc_list;
-	struct Qdisc		*qdisc_ingress;
-	unsigned long		tx_queue_len;	/* Max frames per queue allowed */
 
 	/* hard_start_xmit synchronizer */
 	spinlock_t		xmit_lock;
@@ -425,12 +392,10 @@ struct packet_type
 };
 
 
-#include <linux/interrupt.h>
-//#include <linux/notifier.h>
+#include <xeno/interrupt.h>
 
-extern struct net_device		loopback_dev;		/* The loopback */
-extern struct net_device		*dev_base;		/* All devices */
-extern rwlock_t				dev_base_lock;		/* Device list lock */
+extern struct net_device		*dev_base;      /* All devices */
+extern rwlock_t				dev_base_lock;	/* Device list lock */
 
 extern int			netdev_boot_setup_add(char *name, struct ifmap *map);
 extern int 			netdev_boot_setup_check(struct net_device *dev);
@@ -447,8 +412,10 @@ extern int		dev_close(struct net_device *dev);
 extern int		dev_queue_xmit(struct sk_buff *skb);
 extern int		register_netdevice(struct net_device *dev);
 extern int		unregister_netdevice(struct net_device *dev);
-//extern int 		register_netdevice_notifier(struct notifier_block *nb);
-//extern int		unregister_netdevice_notifier(struct notifier_block *nb);
+extern void dev_shutdown(struct net_device *dev);
+extern void dev_activate(struct net_device *dev);
+extern void dev_deactivate(struct net_device *dev);
+extern void dev_init_scheduler(struct net_device *dev);
 extern int		dev_new_index(void);
 extern struct net_device	*dev_get_by_index(int ifindex);
 extern struct net_device	*__dev_get_by_index(int ifindex);
@@ -461,17 +428,11 @@ static inline int unregister_gifconf(unsigned int family)
 	return register_gifconf(family, 0);
 }
 
-/*
- * Incoming packets are placed on per-cpu queues so that
- * no locking is needed.
- */
+extern struct tasklet_struct net_tx_tasklet;
+
 
 struct softnet_data
 {
-	int			throttle;
-	int			cng_level;
-	int			avg_blog;
-	struct sk_buff_head	input_pkt_queue;
 	struct net_device	*output_queue;
 	struct sk_buff		*completion_queue;
 } __attribute__((__aligned__(SMP_CACHE_BYTES)));
@@ -490,7 +451,7 @@ static inline void __netif_schedule(struct net_device *dev)
 		local_irq_save(flags);
 		dev->next_sched = softnet_data[cpu].output_queue;
 		softnet_data[cpu].output_queue = dev;
-		cpu_raise_softirq(cpu, NET_TX_SOFTIRQ);
+                tasklet_schedule(&net_tx_tasklet);
 		local_irq_restore(flags);
 	}
 }
@@ -533,13 +494,13 @@ static inline int netif_running(struct net_device *dev)
 static inline void dev_kfree_skb_irq(struct sk_buff *skb)
 {
 	if (atomic_dec_and_test(&skb->users)) {
-		int cpu =smp_processor_id();
+		int cpu = smp_processor_id();
 		unsigned long flags;
 
 		local_irq_save(flags);
 		skb->next = softnet_data[cpu].completion_queue;
 		softnet_data[cpu].completion_queue = skb;
-		cpu_raise_softirq(cpu, NET_TX_SOFTIRQ);
+                tasklet_schedule(&net_tx_tasklet);
 		local_irq_restore(flags);
 	}
 }
@@ -575,11 +536,6 @@ static inline int netif_rx_ni(struct sk_buff *skb)
        if (softirq_pending(smp_processor_id()))
                do_softirq();
        return err;
-}
-
-static inline void dev_init_buffers(struct net_device *dev)
-{
-	/* WILL BE REMOVED IN 2.5.0 */
 }
 
 extern int netdev_finish_unregister(struct net_device *dev);

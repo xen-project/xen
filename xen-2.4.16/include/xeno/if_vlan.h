@@ -135,12 +135,19 @@ struct vlan_skb_tx_cookie {
 	u32	vlan_tag;
 };
 
+#if 0
 #define VLAN_TX_COOKIE_MAGIC	0x564c414e	/* "VLAN" in ascii. */
 #define VLAN_TX_SKB_CB(__skb)	((struct vlan_skb_tx_cookie *)&((__skb)->cb[0]))
 #define vlan_tx_tag_present(__skb) \
 	(VLAN_TX_SKB_CB(__skb)->magic == VLAN_TX_COOKIE_MAGIC)
 #define vlan_tx_tag_get(__skb)	(VLAN_TX_SKB_CB(__skb)->vlan_tag)
+#else /* XXX KAF: We don't support vlan tagging at the moment. */
+#define VLAN_TX_SKB_CB(__skb)	   NULL
+#define vlan_tx_tag_present(__skb) 0
+#define vlan_tx_tag_get(__skb)	   0
+#endif
 
+#if 0
 /* VLAN rx hw acceleration helper.  This acts like netif_{rx,receive_skb}(). */
 static inline int __vlan_hwaccel_rx(struct sk_buff *skb,
 				    struct vlan_group *grp,
@@ -203,6 +210,9 @@ static inline int vlan_hwaccel_receive_skb(struct sk_buff *skb,
 {
 	return __vlan_hwaccel_rx(skb, grp, vlan_tag, 1);
 }
+#else
+#define vlan_hwaccel_rx(_skb, _grp, _tag) (netif_rx(_skb))
+#endif
 #endif /* __KERNEL__ */
 
 /* VLAN IOCTLs are found in sockios.h */

@@ -16,8 +16,6 @@
 
 #include <linux/config.h>
 #include <linux/lib.h>
-//#include <linux/kernel.h>
-//#include <linux/sched.h>
 #include <linux/time.h>
 #include <linux/timer.h>
 #include <linux/cache.h>
@@ -26,7 +24,6 @@
 #include <asm/types.h>
 #include <linux/spinlock.h>
 #include <linux/mm.h>
-//#include <linux/highmem.h>
 
 // vif special values.
 #define VIF_PHYSICAL_INTERFACE  -1
@@ -144,8 +141,6 @@ struct sk_buff {
 	struct sk_buff	* prev;			/* Previous buffer in list 			*/
 
 	struct sk_buff_head * list;		/* List we are on				*/
-	struct sock	*sk;			/* Socket we are owned by 			*/
-	struct timeval	stamp;			/* Time we arrived				*/
 	struct net_device	*dev;		/* Device we arrived on/are leaving by		*/
 
 	/* Transport layer header */
@@ -177,66 +172,25 @@ struct sk_buff {
 	  	unsigned char 	*raw;
 	} mac;
 
-//	struct  dst_entry *dst;
-
-	/* 
-	 * This is the control buffer. It is free to use for every
-	 * layer. Please put your private variables there. If you
-	 * want to keep them across layers you have to do a skb_clone()
-	 * first. This is owned by whoever has the skb queued ATM.
-	 */ 
-	char		cb[48];	 
-
 	unsigned int 	len;			/* Length of actual data			*/
  	unsigned int 	data_len;
 	unsigned int	csum;			/* Checksum 					*/
-	unsigned char 	__unused,		/* Dead field, may be reused			*/
+	unsigned char 	skb_type,
 			cloned, 		/* head may be cloned (check refcnt to be sure) */
   			pkt_type,		/* Packet class					*/
   			ip_summed;		/* Driver fed us an IP checksum			*/
-	__u32		priority;		/* Packet queueing priority			*/
 	atomic_t	users;			/* User count - see datagram.c,tcp.c 		*/
 	unsigned short	protocol;		/* Packet protocol from driver. 		*/
-	unsigned short	security;		/* Security level of packet			*/
-	unsigned int	truesize;		/* Buffer size 					*/
-
 	unsigned char	*head;			/* Head of buffer 				*/
 	unsigned char	*data;			/* Data head pointer				*/
 	unsigned char	*tail;			/* Tail pointer					*/
 	unsigned char 	*end;			/* End pointer					*/
 
 	void 		(*destructor)(struct sk_buff *);	/* Destruct function		*/
-
-        unsigned int    skb_type;               /* SKB_NORMAL or SKB_ZERO_COPY                  */
         struct pfn_info *pf;                    /* record of physical pf address for freeing    */
         int src_vif;                            /* vif we came from                             */
         int dst_vif;                            /* vif we are bound for                         */
         struct skb_shared_info shinfo;          /* shared info is no longer shared in Xen.      */
-        
-
-                
-        
-#ifdef CONFIG_NETFILTER
-	/* Can be used for communication between hooks. */
-        unsigned long	nfmark;
-	/* Cache info */
-	__u32		nfcache;
-	/* Associated connection, if any */
-	struct nf_ct_info *nfct;
-#ifdef CONFIG_NETFILTER_DEBUG
-        unsigned int nf_debug;
-#endif
-#endif /*CONFIG_NETFILTER*/
-
-#if defined(CONFIG_HIPPI)
-	union{
-		__u32	ifield;
-	} private;
-#endif
-
-#ifdef CONFIG_NET_SCHED
-       __u32           tc_index;               /* traffic control index */
-#endif
 };
 
 #define SK_WMEM_MAX	65535
@@ -1000,7 +954,6 @@ static inline void skb_orphan(struct sk_buff *skb)
 	if (skb->destructor)
 		skb->destructor(skb);
 	skb->destructor = NULL;
-	skb->sk = NULL;
 }
 
 /**
@@ -1130,10 +1083,8 @@ static inline void kunmap_skb_frag(void *vaddr)
 		     skb=skb->next)
 
 
-extern struct sk_buff *		skb_recv_datagram(struct sock *sk,unsigned flags,int noblock, int *err);
 extern int			skb_copy_datagram(const struct sk_buff *from, int offset, char *to,int size);
 extern int			skb_copy_and_csum_datagram(const struct sk_buff *skb, int offset, u8 *to, int len, unsigned int *csump);
-extern void			skb_free_datagram(struct sock * sk, struct sk_buff *skb);
 
 extern unsigned int		skb_checksum(const struct sk_buff *skb, int offset, int len, unsigned int csum);
 extern int			skb_copy_bits(const struct sk_buff *skb, int offset, void *to, int len);

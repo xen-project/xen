@@ -69,9 +69,6 @@
 #define SIOCGIFBR	0x8940		/* Bridging support		*/
 #define SIOCSIFBR	0x8941		/* Set bridging options 	*/
 
-#define SIOCGIFTXQLEN	0x8942		/* Get the tx queue length	*/
-#define SIOCSIFTXQLEN	0x8943		/* Set the tx queue length 	*/
-
 #define SIOCGIFDIVERT	0x8944		/* Frame diversion support */
 #define SIOCSIFDIVERT	0x8945		/* Set frame diversion options */
 

@@ -39,7 +39,7 @@
 #include <xeno/pci.h>
 #include <xeno/spinlock.h>
 
-#include <xeno/interrupt.h> // for softirq stuff 
+#include <xeno/interrupt.h> /* tasklet stuff */
 
 /*  #include <xeno/slab.h> */
 /*  #include <xeno/completion.h> */
@@ -529,10 +529,15 @@ int fib_send(u16 command, struct fib * fibptr, unsigned long size,  int priority
 #if 0
 	down(&fibptr->event_wait);
 #endif
-#ifdef TRY_SOFTIRQ
+#ifdef TRY_TASKLET
+        /*
+         * XXX KAF: Well, this is pretty gross. We should probably
+         * do_softirq() after scheduling the tasklet, as long as we
+         * are _sure_ we hold no locks here...
+         */
 	printk("about to softirq aac_command_thread...\n"); 
 	while (!fibptr->done) { 
-	    raise_softirq(SCSI_LOW_SOFTIRQ); 
+            tasklet_schedule(&aac_command_tasklet);
 	    mdelay(100); 
 	}
 	printk("back from softirq cmd thread and fibptr->done!\n"); 
@@ -837,13 +842,14 @@ static void aac_handle_aif(struct aac_dev * dev, struct fib * fibptr)
  *	more FIBs.
  */
  
-#ifndef TRY_SOFTIRQ
+#ifndef TRY_TASKLET
+DECLARE_TASKLET_DISABLED(aac_command_tasklet, aac_command_thread, 0);
 int aac_command_thread(struct aac_dev * dev)
 {
 #else
-int aac_command_thread(struct softirq_action *h)
+int aac_command_thread(unsigned long data)
 {   
-    struct aac_dev *dev = (struct aac_dev *)h->data; 
+    struct aac_dev *dev = (struct aac_dev *)data; 
 #endif
     struct hw_fib *fib, *newfib;
     struct fib fibptr; /* for error logging */
