@@ -310,7 +310,7 @@ char *mac_ntoa(const unsigned char *mac){
     static char buf[MAC_LENGTH + 1];
     int buf_n = sizeof(buf);
 
-    memset(buf, buf_n, 0);
+    memset(buf, 0, buf_n);
     snprintf(buf, buf_n, "%02x:%02x:%02x:%02x:%02x:%02x",
              mac[0], mac[1], mac[2],
              mac[3], mac[4], mac[5]);
