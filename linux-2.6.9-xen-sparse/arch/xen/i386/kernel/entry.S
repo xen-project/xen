@@ -510,28 +510,19 @@ critical_fixup_table:
 
 # Hypervisor uses this for application faults while it executes.
 ENTRY(failsafe_callback)
-	pushal
-	call install_safe_pf_handler
-	movl 32(%esp),%ebx
-1:	movl %ebx,%ds
-	movl 36(%esp),%ebx
-2:	movl %ebx,%es
-	movl 40(%esp),%ebx
-3:	movl %ebx,%fs
-	movl 44(%esp),%ebx
-4:	movl %ebx,%gs
-	call install_normal_pf_handler
-	popal
-	addl $16,%esp
+1:      popl %ds
+2:      popl %es
+3:      popl %fs
+4:      popl %gs
 5:	iret
 .section .fixup,"ax";	\
-6:	xorl %ebx,%ebx;	\
+6:	movl $0,(%esp);	\
 	jmp 1b;		\
-7:	xorl %ebx,%ebx;	\
+7:	movl $0,(%esp);	\
 	jmp 2b;		\
-8:	xorl %ebx,%ebx;	\
+8:	movl $0,(%esp);	\
 	jmp 3b;		\
-9:	xorl %ebx,%ebx;	\
+9:	movl $0,(%esp);	\
 	jmp 4b;		\
 10:	pushl %ss;	\
 	popl %ds;	\
@@ -726,7 +717,6 @@ ENTRY(_name1)								  \
 	addl $12,%esp							; \
 	jmp ret_from_exception						;
 PAGE_FAULT_STUB(page_fault, do_page_fault)
-PAGE_FAULT_STUB(safe_page_fault, do_safe_page_fault)
 
 #ifdef CONFIG_X86_MCE
 ENTRY(machine_check)

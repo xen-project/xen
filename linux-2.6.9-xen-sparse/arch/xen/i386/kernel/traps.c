@@ -60,8 +60,6 @@ asmlinkage int system_call(void);
 asmlinkage void lcall7(void);
 asmlinkage void lcall27(void);
 
-asmlinkage void safe_page_fault(void);
-
 /* Do we ignore FPU interrupts ? */
 char ignore_fpu_irq = 0;
 
@@ -1071,59 +1069,4 @@ void __init trap_init(void)
 	 * Should be a barrier for any external CPU state.
 	 */
 	cpu_init();
-}
-
-
-/*
- * install_safe_pf_handler / install_normal_pf_handler:
- * 
- * These are used within the failsafe_callback handler in entry.S to avoid
- * taking a full page fault when reloading FS and GS. This is because FS and 
- * GS could be invalid at pretty much any point while Xen Linux executes (we 
- * don't set them to safe values on entry to the kernel). At *any* point Xen 
- * may be entered due to a hardware interrupt --- on exit from Xen an invalid 
- * FS/GS will cause our failsafe_callback to be executed. This could occur, 
- * for example, while the mmmu_update_queue is in an inconsistent state. This
- * is disastrous because the normal page-fault handler touches the update
- * queue!
- * 
- * Fortunately, within the failsafe handler it is safe to force DS/ES/FS/GS
- * to zero if they cannot be reloaded -- at this point executing a normal
- * page fault would not change this effect. The safe page-fault handler
- * ensures this end result (blow away the selector value) without the dangers
- * of the normal page-fault handler.
- * 
- * NB. Perhaps this can all go away after we have implemented writable
- * page tables. :-)
- */
-
-asmlinkage void do_safe_page_fault(struct pt_regs *regs, 
-                                   unsigned long error_code,
-                                   unsigned long address)
-{
-	if (!fixup_exception(regs))
-		die("Unhandleable 'safe' page fault!", regs, error_code);
-}
-
-unsigned long install_safe_pf_handler(void)
-{
-	static trap_info_t safe_pf[] = { 
-		{ 14, 0, __KERNEL_CS, (unsigned long)safe_page_fault },
-		{  0, 0,           0, 0                              }
-	};
-	unsigned long flags;
-	local_irq_save(flags);
-	HYPERVISOR_set_trap_table(safe_pf);
-	return flags; /* This is returned in %%eax */
-}
-
-__attribute__((regparm(3))) /* This function take its arg in %%eax */
-void install_normal_pf_handler(unsigned long flags)
-{
-	static trap_info_t normal_pf[] = { 
-		{ 14, 0, __KERNEL_CS, (unsigned long)page_fault },
-		{  0, 0,           0, 0                         }
-	};
-	HYPERVISOR_set_trap_table(normal_pf);
-	local_irq_restore(flags);
 }
