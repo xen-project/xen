@@ -13,41 +13,42 @@ import org.xenoserver.control.VirtualDiskManager;
 
 public class ParseVdShow extends CommandParser {
   public void parse(Defaults d, LinkedList args) throws ParseFailedException, CommandFailedException {
-    int vd_num = getIntParameter(args,'n',-1);
+    String key = getStringParameter(args,'k',"");
     
     loadState();
     
-    if ( vd_num < 0 ) {
-      System.out.println("num key        expiry                       name                 size");
-      for (int i=0;i<VirtualDiskManager.it.getVirtualDiskCount();i++) {
-        VirtualDisk vd = VirtualDiskManager.it.getVirtualDisk(i);
-        System.out.print( Library.format(i,3,0) + " " + vd.getKey() + " " );
+    if ( key.equals("") ) {
+      System.out.println("key        expiry                       name                 size");
+      Iterator i = VirtualDiskManager.IT.getVirtualDisks();
+      while ( i.hasNext() ) {
+        VirtualDisk vd = (VirtualDisk) i.next();
+        System.out.print( vd.getKey() + " " );
         if ( vd.getExpiry() != null )
           System.out.print( vd.getExpiry().toString() );
         else
           System.out.print( "                            " );
-        System.out.println( " " + Library.format(vd.getName(),16,1) + " "
-                          + Library.format_size(vd.getSize()*Settings.SECTOR_SIZE,8,0) );
+        System.out.println( " " + Library.format(vd.getName(),16,true) + " "
+                          + Library.formatSize(vd.getSize()*Settings.SECTOR_SIZE,8,false) );
       }
     } else {
-      VirtualDisk vd = VirtualDiskManager.it.getVirtualDisk(vd_num);
+      VirtualDisk vd = VirtualDiskManager.IT.getVirtualDisk(key);
       if ( vd == null )
-        throw new CommandFailedException("There is no virtual disk " + vd_num );
+        throw new CommandFailedException("There is no virtual disk " + key );
         
       System.out.println("  name: " + vd.getName());
       System.out.println("   key: " + vd.getKey());
-      System.out.println("  size: " + Library.format_size(vd.getSize()*Settings.SECTOR_SIZE,8,1));
+      System.out.println("  size: " + Library.formatSize(vd.getSize()*Settings.SECTOR_SIZE,8,true));
       if ( vd.getExpiry() != null )
         System.out.println("expiry: " + vd.getExpiry());
       System.out.println();
  
-      Iterator i = vd.iterator();
+      Iterator i = vd.extents();
       System.out.println("  disk       offset         size");
       while (i.hasNext()) {
         Extent e = (Extent) i.next();
-        System.out.println( Library.format(e.getDisk(), 6, 0) + " "
-                          + Library.format(e.getOffset(), 12, 0) + " "
-                          + Library.format(e.getSize(), 12, 0) );
+        System.out.println( Library.format(e.getDisk(), 6, false) + " "
+                          + Library.format(e.getOffset(), 12, false) + " "
+                          + Library.format(e.getSize(), 12, false) );
       }
     }
   }

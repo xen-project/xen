@@ -7,230 +7,216 @@ package org.xenoserver.control;
 
 import java.io.PrintWriter;
 import java.util.Date;
-import java.util.Enumeration;
-import java.util.Hashtable;
-import java.util.Vector;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 
 /**
  * VirtualDiskManager manages the list of virtual disks on the machine. It is
  * a Singleton which automatically initialises itself on first class reference.
  */
 public class VirtualDiskManager {
-  public static final VirtualDiskManager it = new VirtualDiskManager();
-  VirtualDisk free_disk;
-  Vector virtual_disks;
-  Hashtable virtual_block_devices;
-  Hashtable key_hash;
+    /** The single VDM reference. */
+    public static final VirtualDiskManager IT = new VirtualDiskManager();
+    /** The free-space disk. */
+    private VirtualDisk freeDisk;
+    /** The map of keys to virtual disks. */
+    private LinkedHashMap virtualDisks = new LinkedHashMap(100);
+    /** The map of (domain,vbdnum) to virtual block devices. */
+    private LinkedHashMap virtualBlockDevices = new LinkedHashMap(100);
 
-  private VirtualDiskManager() {
-    free_disk = new VirtualDisk("free");
-
-    virtual_disks = new Vector(10, 5);
-    flush_virtual_block_devices();
-    key_hash = new Hashtable(100);
-  }
-
-  public VirtualDisk get_virtual_disk_key(String key) {
-    return ((VirtualDisk) key_hash.get(key));
-  }
-
-  public void add_xeno_partition(Partition partition, long size) {
-    free_disk.add_new_partition(partition, size);
-    return;
-  }
-
-  /*
-   * create a new virtual disk
-   */
-
-  public VirtualDisk create_virtual_disk(String name, long size, Date expiry) {
-    VirtualDisk vd = new VirtualDisk(name, expiry);
-
-    if ( free_disk.getSize() < size )
-      return null;
-    
-    while (size > 0) {
-      Extent e;
-
-      e = free_disk.remove_extent();
-      if (e == null) {
-        return null;
-      }
-      size -= e.size;
-      vd.add_extent(e);
+    /**
+     * VDM constructor, private as it's a singleton.
+     */
+    private VirtualDiskManager() {
+        freeDisk = new VirtualDisk("free");
     }
 
-    add_virtual_disk(vd);
-
-    return vd;
-  }
-
-  /*
-   * delete a new virtual disk.  extents go back into the free pool
-   */
-
-  public void delete_virtual_disk(String key) {
-    VirtualDisk vd;
-
-    vd = (VirtualDisk) key_hash.get(key);
-    if (vd != null) {
-      Extent e;
-
-      key_hash.remove(key);
-      virtual_disks.remove(vd);
-
-      e = vd.remove_extent();
-      while (e != null) {
-        free_disk.add_extent(e);
-        e = vd.remove_extent();
-      }
-    }
-    return;
-  }
-
-  /*
-   * reset the expiry time for a virtual disk
-   */
-
-  public void refresh_virtual_disk(String key, Date expiry) {
-    VirtualDisk vd = (VirtualDisk) key_hash.get(key);
-    if (vd != null) {
-      vd.set_expiry(expiry);
-    }
-  }
-
-  /*
-   * create a new virtual block device
-   */
-  public VirtualBlockDevice create_virtual_block_device(
-    String key,
-    int domain,
-    int vbd_num,
-    String mode) {
-    VirtualBlockDevice vbd = new VirtualBlockDevice();
-    VirtualDisk vd = get_virtual_disk_key(key);
-
-    if (vd == null) {
-      System.err.println(
-        "create virtual block device error: unknown key " + "[" + key + "]");
-      return null;
+    /**
+     * Get the virtual disk with the specified key.
+     * @param key The key to look for.
+     * @return The virtual disk, or null if not found.
+     */
+    public VirtualDisk getVirtualDisk(String key) {
+        return ((VirtualDisk) virtualDisks.get(key));
     }
 
-    vbd.key = key;
-    vbd.domain = domain;
-    vbd.vbdnum = vbd_num;
-
-    if (mode.equals(Mode.READ_ONLY.toString())
-      || mode.equals("RO")
-      || mode.equals("ro")) {
-      vbd.mode = Mode.READ_ONLY;
-    } else if (
-      mode.equals(Mode.READ_WRITE.toString())
-        || mode.equals("RW")
-        || mode.equals("rw")) {
-      vbd.mode = Mode.READ_WRITE;
-    } else {
-      System.err.println(
-        "create virtual block device error: unknown mode " + "[" + mode + "]");
-      return null;
+    /**
+     * Add a new partition to the free space list in the disk manager.
+     * @param partition The partition to add.
+     * @param chunkSize The chunk size to split the partition into, in sectors. 
+     */
+    public void addPartition(Partition partition, long chunkSize) {
+        freeDisk.addPartition(partition, chunkSize);
     }
 
-    add_virtual_block_device(vbd);
+    /**
+     * Create a new virtual disk.
+     * @param name The disk name to use.
+     * @param size The number of sectors to allocate.
+     * @param expiry The expiry time, or null for never.
+     * @return null if not enough space is available
+     */
+    public VirtualDisk createVirtualDisk(String name, long size, Date expiry) {
+        if (freeDisk.getSize() < size) {
+            return null;
+        }
 
-    return vbd;
-  }
+        VirtualDisk vd = new VirtualDisk(name, expiry);
 
-  /*
-   * delete a virtual block device 
-   */
-  public void delete_virtual_block_device(int domain, int vbd_num) {
-    Object hash = get_vbd_hash(domain, vbd_num);
-    virtual_block_devices.remove(hash);
-  }
+        while (size > 0) {
+            Extent e;
 
-  /*
-   * flush all virtual block devices
-   */
-  public void flush_virtual_block_devices() {
-    /* isn't automatic garbage collection wonderful? */
-    virtual_block_devices = new Hashtable(100);
-  }
+            e = freeDisk.removeExtent();
+            if (e == null) {
+                return null;
+            }
+            size -= e.getSize();
+            vd.addExtent(e);
+        }
 
-  public void add_virtual_disk(VirtualDisk vd) {
-    virtual_disks.add(vd);
-    key_hash.put(vd.getKey(), vd);
-  }
+        insertVirtualDisk(vd);
 
-  public void add_virtual_block_device(VirtualBlockDevice vbd) {
-    Object hash = get_vbd_hash(vbd.domain, vbd.vbdnum);
-    virtual_block_devices.put(hash, vbd);
-  }
-
-  Object get_vbd_hash(int domain, int vbd_num) {
-    return new Integer(domain * 16 + vbd_num);
-  }
-
-  public void add_free(VirtualDisk vd) {
-    free_disk = vd;
-  }
-
-  public String dump_virtualblockdevices() {
-    StringBuffer sb = new StringBuffer();
-    boolean first = true;
-
-    for (Enumeration enumeration = virtual_block_devices.elements();
-      enumeration.hasMoreElements();
-      ) {
-      VirtualBlockDevice vbd = (VirtualBlockDevice) enumeration.nextElement();
-      if (first) {
-        sb.append(vbd.dump(true));
-        first = false;
-      }
-
-      sb.append(vbd.dump(false));
+        return vd;
     }
 
-    return sb.toString();
-  }
+    /**
+     * Delete a virtual disk, and put its extents back into the free pool.
+     * @param key The key of the disk to delete.
+     */
+    public void deleteVirtualDisk(String key) {
+        VirtualDisk vd;
 
-  public void dump_xml(PrintWriter out) {
-    out.println("<free>");
-    free_disk.dump_xml(out);
-    out.println("</free>");
-    out.println("<virtual_disks>");
-    for (int i = 0; i < virtual_disks.size(); i++) {
-      VirtualDisk vd = (VirtualDisk) virtual_disks.get(i);
-      vd.dump_xml(out);
+        vd = (VirtualDisk) virtualDisks.get(key);
+        if (vd != null) {
+            Extent e;
+
+            virtualDisks.remove(key);
+
+            e = vd.removeExtent();
+            while (e != null) {
+                freeDisk.addExtent(e);
+                e = vd.removeExtent();
+            }
+        }
     }
-    out.println("</virtual_disks>");
-    out.println("<virtual_block_devices>");
-    for (Enumeration enumeration = virtual_block_devices.elements();
-      enumeration.hasMoreElements();
-      ) {
-      VirtualBlockDevice vbd = (VirtualBlockDevice) enumeration.nextElement();
-      vbd.dump_xml(out);
+
+    /**
+     * Create a new virtual block device.
+     * @param vd The virtual disk to expose.
+     * @param domain The domain to create the device for.
+     * @param vbdNum The block device number to use.
+     * @param mode The mode to create the device with.
+     * @return The newly created virtual block device.
+     */
+    public VirtualBlockDevice createVirtualBlockDevice(
+        VirtualDisk vd,
+        int domain,
+        int vbdNum,
+        Mode mode) {
+        VirtualBlockDevice vbd =
+            new VirtualBlockDevice(vd, domain, vbdNum, mode);
+
+        insertVirtualBlockDevice(vbd);
+
+        return vbd;
     }
 
-    out.println("</virtual_block_devices>");
+    /**
+     * Delete a virtual block device.
+     * @param domain Domain owning the device.
+     * @param vbdNum The vbd number within the domain.
+     */
+    public void deleteVirtualBlockDevice(int domain, int vbdNum) {
+        Object hash = hashVBD(domain, vbdNum);
+        virtualBlockDevices.remove(hash);
+    }
 
-    return;
-  }
+    /**
+     * Flush all virtual block devices.
+     */
+    public void flushVirtualBlockDevices() {
+        /* isn't automatic garbage collection wonderful? */
+        virtualBlockDevices = new LinkedHashMap(100);
+    }
 
-  /*************************************************************************/
+    /**
+     * Insert a new virtual disk into the map.
+     * @param vd The disk to insert.
+     */
+    void insertVirtualDisk(VirtualDisk vd) {
+        virtualDisks.put(vd.getKey(), vd);
+    }
 
-  public int getVirtualDiskCount() {
-    return virtual_disks.size();
-  }
+    /**
+     * Insert a new virtual block device into the map.
+     * @param vbd The device to insert.
+     */
+    void insertVirtualBlockDevice(VirtualBlockDevice vbd) {
+        Object hash = hashVBD(vbd.getDomain(), vbd.getVbdNum());
+        virtualBlockDevices.put(hash, vbd);
+    }
 
-  public VirtualDisk getVirtualDisk(int index) {
-    return (VirtualDisk) virtual_disks.get(index);
-  }
+    /**
+     * Hash a virtual block device.
+     * @param domain The VBD's domain.
+     * @param vbdNum The VBD's number within the domain.
+     * @return A suitable hash key.
+     */
+    Object hashVBD(int domain, int vbdNum) {
+        return new Integer(domain * 16 + vbdNum);
+    }
 
-  public VirtualDisk getFreeVirtualDisk() {
-    return free_disk;
-  }
+    /**
+     * Set a new free disk.
+     * @param vd The free disk to set.
+     */
+    void setFreeDisk(VirtualDisk vd) {
+        freeDisk = vd;
+    }
 
-  public Enumeration getVirtualBlockDevices() {
-    return virtual_block_devices.elements();
-  }
+    /**
+     * Dump the data in the VirtualDiskManager in XML form.
+     * @param out The output writer to dump to.
+     */
+    void dumpAsXML(PrintWriter out) {
+        out.println("<free>");
+        freeDisk.dumpAsXML(out);
+        out.println("</free>");
+        out.println("<virtual_disks>");
+        Iterator i = virtualDisks.values().iterator();
+        while (i.hasNext()) {
+            VirtualDisk vd = (VirtualDisk) i.next();
+            vd.dumpAsXML(out);
+        }
+        out.println("</virtual_disks>");
+        out.println("<virtual_block_devices>");
+        i = virtualBlockDevices.values().iterator();
+        while (i.hasNext()) {
+            VirtualBlockDevice vbd = (VirtualBlockDevice) i.next();
+            vbd.dumpAsXML(out);
+        }
+
+        out.println("</virtual_block_devices>");
+    }
+
+    /**
+     * @return The free disk.
+     */
+    public VirtualDisk getFreeDisk() {
+        return freeDisk;
+    }
+
+    /**
+     * @return An iterator over the virtual block devices.
+     */
+    public Iterator getVirtualBlockDevices() {
+        return virtualBlockDevices.values().iterator();
+    }
+
+    /**
+     * @return An iterator over the virtual disks.
+     */
+    public Iterator getVirtualDisks() {
+        return virtualDisks.values().iterator();
+    }
 }

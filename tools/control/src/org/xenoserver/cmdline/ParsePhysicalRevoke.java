@@ -21,7 +21,7 @@ public class ParsePhysicalRevoke extends CommandParser {
       
     // Initialise the partition manager and look up the partition
     loadState();
-    Partition p = PartitionManager.it.get_partition(partition_name);
+    Partition p = PartitionManager.IT.getPartition(partition_name);
     
     if ( p == null )
       throw new CommandFailedException("Partition " + partition_name + " does not exist.");

@@ -12,26 +12,26 @@ import org.xenoserver.control.PartitionManager;
 public class ParsePartitionsList extends CommandParser {
   public void parse(Defaults d, LinkedList args) throws ParseFailedException, CommandFailedException {
     loadState();
-    Iterator i = PartitionManager.it.iterator();
+    Iterator i = PartitionManager.IT.iterator();
     int idx = 1;
     System.out.println( "     maj:min " + "    blocks " + "start sect " +
                         " num sects " + "name" );
     while (i.hasNext()) {
       Partition p = (Partition) i.next();
 
-      if (p.getIsXeno()) {
+      if (p.isXeno()) {
         System.out.print("[ ");
       } else {
         System.out.print("  ");
       }
-      System.out.print(Library.format(idx++, 2, 0) + " ");
-      System.out.print(Library.format(p.getMajor(),3,0) + ":" + 
-          Library.format(p.getMinor(),3,1) + " " +
-          Library.format(p.getBlocks(),10,0) + " " +
-          Library.format(p.getStartSect(),10,0) + " " +
-          Library.format(p.getNumSects(),10,0) + " " +
-          Library.format(p.getName(),7,1));   
-      if (p.getIsXeno()) {
+      System.out.print(Library.format(idx++, 2, false) + " ");
+      System.out.print(Library.format(p.getMajor(),3,false) + ":" + 
+          Library.format(p.getMinor(),3,true) + " " +
+          Library.format(p.getBlocks(),10,false) + " " +
+          Library.format(p.getStartSect(),10,false) + " " +
+          Library.format(p.getNumSects(),10,false) + " " +
+          Library.format(p.getName(),7,true));   
+      if (p.isXeno()) {
         System.out.println("]");
       } else {
         System.out.println();

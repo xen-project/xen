@@ -427,3 +427,4 @@ xenolinux-2.4.16-sparse/arch/xeno/drivers/block/Makefile.orig
 xenolinux-2.4.16-sparse/arch/xeno/drivers/block/block.c.orig
 xenolinux-2.4.16-sparse/scripts/kconfig.tk
 xenolinux-2.4.21-sparse/include/linux/blk.h~
+tools/control/.checkstyle
