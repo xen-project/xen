@@ -17,10 +17,8 @@
 #include <xeno/keyhandler.h>
 #include <xeno/interrupt.h>
 #include <xeno/segment.h>
-#include <asm/domain_page.h> /* TEST_READ_VALIDITY */
 
 #if 0
-#define TEST_READ_VALIDITY
 #define DPRINTK(_f, _a...) printk( _f , ## _a )
 #else
 #define DPRINTK(_f, _a...) ((void)0)
@@ -206,16 +204,6 @@ static void end_block_io_op(struct buffer_head *bh, int uptodate)
         DPRINTK("Buffer not up-to-date at end of operation\n");
         pending_req->status = 1;
     }
-#ifdef TEST_READ_VALIDITY
-    else if ( pending_req->operation == READ )
-    {
-        unsigned long *buff = map_domain_mem(virt_to_phys(bh->b_data));
-        if ( (buff[  0] == 0xdeadbeef) &&
-             (buff[127] == 0xdeadbeef) )
-            printk("An unmodified buffer at sector %ld. b_data = %08x, phys = %08x\n", bh->b_rsector,bh->b_data,virt_to_phys(bh->b_data));
-        unmap_domain_mem(buff);
-    }
-#endif
 
     unlock_buffer(pending_req->domain, 
                   virt_to_phys(bh->b_data), 
@@ -616,12 +604,6 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
         } 
         else
         {
-#ifdef TEST_READ_VALIDITY
-            unsigned long *buff = map_domain_mem(phys_seg[i].buffer);
-            buff[  0] = 0xdeadbeef;
-            buff[127] = 0xdeadbeef;
-            unmap_domain_mem(buff);
-#endif
             bh->b_state = (1 << BH_Mapped) | (1 << BH_Read);
         }
 
