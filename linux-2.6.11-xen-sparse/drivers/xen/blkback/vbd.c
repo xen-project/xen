@@ -12,6 +12,15 @@
 
 #include "common.h"
 
+struct vbd { 
+    blkif_vdev_t   vdevice;     /* what the domain refers to this vbd as */
+    unsigned char  readonly;    /* Non-zero -> read-only */
+    unsigned char  type;        /* VDISK_TYPE_xxx */
+    blkif_pdev_t   pdevice;     /* phys device that this vbd maps to */
+    struct block_device *bdev;
+    rb_node_t      rb;          /* for linking into R-B tree lookup struct */
+}; 
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 static inline dev_t vbd_map_devnum(blkif_pdev_t cookie)
 { return MKDEV(cookie>>8, cookie&0xff); }
@@ -25,7 +34,7 @@ static inline dev_t vbd_map_devnum(blkif_pdev_t cookie)
 
 void vbd_create(blkif_be_vbd_create_t *create) 
 {
-    vbd_t       *vbd; 
+    struct vbd  *vbd; 
     rb_node_t  **rb_p, *rb_parent = NULL;
     blkif_t     *blkif;
     blkif_vdev_t vdevice = create->vdevice;
@@ -43,7 +52,7 @@ void vbd_create(blkif_be_vbd_create_t *create)
     while ( *rb_p != NULL )
     {
         rb_parent = *rb_p;
-        vbd = rb_entry(rb_parent, vbd_t, rb);
+        vbd = rb_entry(rb_parent, struct vbd, rb);
         if ( vdevice < vbd->vdevice )
         {
             rb_p = &rb_parent->rb_left;
@@ -60,7 +69,7 @@ void vbd_create(blkif_be_vbd_create_t *create)
         }
     }
 
-    if ( unlikely((vbd = kmalloc(sizeof(vbd_t), GFP_KERNEL)) == NULL) )
+    if ( unlikely((vbd = kmalloc(sizeof(struct vbd), GFP_KERNEL)) == NULL) )
     {
         DPRINTK("vbd_create: out of memory\n");
         create->status = BLKIF_BE_STATUS_OUT_OF_MEMORY;
@@ -115,7 +124,7 @@ void vbd_create(blkif_be_vbd_create_t *create)
 void vbd_destroy(blkif_be_vbd_destroy_t *destroy) 
 {
     blkif_t           *blkif;
-    vbd_t             *vbd;
+    struct vbd        *vbd;
     rb_node_t         *rb;
     blkif_vdev_t       vdevice = destroy->vdevice;
 
@@ -131,7 +140,7 @@ void vbd_destroy(blkif_be_vbd_destroy_t *destroy)
     rb = blkif->vbd_rb.rb_node;
     while ( rb != NULL )
     {
-        vbd = rb_entry(rb, vbd_t, rb);
+        vbd = rb_entry(rb, struct vbd, rb);
         if ( vdevice < vbd->vdevice )
             rb = rb->rb_left;
         else if ( vdevice > vbd->vdevice )
@@ -154,14 +163,14 @@ void vbd_destroy(blkif_be_vbd_destroy_t *destroy)
 
 void destroy_all_vbds(blkif_t *blkif)
 {
-    vbd_t             *vbd;
-    rb_node_t         *rb;
+    struct vbd *vbd;
+    rb_node_t  *rb;
 
     spin_lock(&blkif->vbd_lock);
 
     while ( (rb = blkif->vbd_rb.rb_node) != NULL )
     {
-        vbd = rb_entry(rb, vbd_t, rb);
+        vbd = rb_entry(rb, struct vbd, rb);
         rb_erase(rb, &blkif->vbd_rb);
         spin_unlock(&blkif->vbd_lock);
         bdev_put(vbd->bdev);
@@ -173,7 +182,8 @@ void destroy_all_vbds(blkif_t *blkif)
 }
 
 
-static void vbd_probe_single(blkif_t *blkif, vdisk_t *vbd_info, vbd_t *vbd)
+static void vbd_probe_single(
+    blkif_t *blkif, vdisk_t *vbd_info, struct vbd *vbd)
 {
     vbd_info->device   = vbd->vdevice; 
     vbd_info->info     = vbd->type | (vbd->readonly ? VDISK_FLAG_RO : 0);
@@ -199,7 +209,8 @@ int vbd_probe(blkif_t *blkif, vdisk_t *vbd_info, int max_vbds)
     for ( ; ; )
     {
         /* STEP 2. Dealt with left subtree. Now process current node. */
-        vbd_probe_single(blkif, &vbd_info[nr_vbds], rb_entry(rb, vbd_t, rb));
+        vbd_probe_single(blkif, &vbd_info[nr_vbds],
+                         rb_entry(rb, struct vbd, rb));
         if ( ++nr_vbds == max_vbds )
             goto out;
 
@@ -232,11 +243,11 @@ int vbd_probe(blkif_t *blkif, vdisk_t *vbd_info, int max_vbds)
 }
 
 
-int vbd_translate(phys_seg_t *pseg, blkif_t *blkif, int operation)
+int vbd_translate(struct phys_req *req, blkif_t *blkif, int operation)
 {
-    vbd_t     *vbd;
-    rb_node_t *rb;
-    int        rc = -EACCES;
+    struct vbd *vbd;
+    rb_node_t  *rb;
+    int         rc = -EACCES;
 
     /* Take the vbd_lock because another thread could be updating the tree. */
     spin_lock(&blkif->vbd_lock);
@@ -244,10 +255,10 @@ int vbd_translate(phys_seg_t *pseg, blkif_t *blkif, int operation)
     rb = blkif->vbd_rb.rb_node;
     while ( rb != NULL )
     {
-        vbd = rb_entry(rb, vbd_t, rb);
-        if ( pseg->dev < vbd->vdevice )
+        vbd = rb_entry(rb, struct vbd, rb);
+        if ( req->dev < vbd->vdevice )
             rb = rb->rb_left;
-        else if ( pseg->dev > vbd->vdevice )
+        else if ( req->dev > vbd->vdevice )
             rb = rb->rb_right;
         else
             goto found;
@@ -263,12 +274,12 @@ int vbd_translate(phys_seg_t *pseg, blkif_t *blkif, int operation)
     if ( (operation == WRITE) && vbd->readonly )
         goto out;
 
-    if ( unlikely((pseg->sector_number + pseg->nr_sects) > vbd_sz(vbd)) )
+    if ( unlikely((req->sector_number + req->nr_sects) > vbd_sz(vbd)) )
         goto out;
 
-    pseg->dev  = vbd->pdevice;
-    pseg->bdev = vbd->bdev;
-    rc = 1;
+    req->dev  = vbd->pdevice;
+    req->bdev = vbd->bdev;
+    rc = 0;
 
  out:
     spin_unlock(&blkif->vbd_lock);
