@@ -1837,3 +1837,109 @@ out:
 	return ret;
 }
 
+void dump_slabinfo()
+{
+	struct list_head *p;
+        unsigned long spin_flags;
+
+	/* Output format version, so at least we can change it without _too_
+	 * many complaints.
+	 */
+	printk( "slabinfo - version: 1.1"
+#if STATS
+				" (statistics)"
+#endif
+#ifdef CONFIG_SMP
+				" (SMP)"
+#endif
+				"\n");
+	down(&cache_chain_sem);
+	p = &cache_cache.next;
+	do {
+		kmem_cache_t	*cachep;
+		struct list_head *q;
+		slab_t		*slabp;
+		unsigned long	active_objs;
+		unsigned long	num_objs;
+		unsigned long	active_slabs = 0;
+		unsigned long	num_slabs;
+		cachep = list_entry(p, kmem_cache_t, next);
+
+		spin_lock_irq(&cachep->spinlock);
+		active_objs = 0;
+		num_slabs = 0;
+		list_for_each(q,&cachep->slabs_full) {
+			slabp = list_entry(q, slab_t, list);
+			if (slabp->inuse != cachep->num)
+				BUG();
+			active_objs += cachep->num;
+			active_slabs++;
+		}
+		list_for_each(q,&cachep->slabs_partial) {
+			slabp = list_entry(q, slab_t, list);
+			if (slabp->inuse == cachep->num || !slabp->inuse)
+				BUG();
+			active_objs += slabp->inuse;
+			active_slabs++;
+		}
+		list_for_each(q,&cachep->slabs_free) {
+			slabp = list_entry(q, slab_t, list);
+			if (slabp->inuse)
+				BUG();
+			num_slabs++;
+		}
+		num_slabs+=active_slabs;
+		num_objs = num_slabs*cachep->num;
+
+		printk("%-17s %6lu %6lu %6u %4lu %4lu %4u",
+			cachep->name, active_objs, num_objs, cachep->objsize,
+			active_slabs, num_slabs, (1<<cachep->gfporder));
+
+#if STATS
+		{
+			unsigned long errors = cachep->errors;
+			unsigned long high = cachep->high_mark;
+			unsigned long grown = cachep->grown;
+			unsigned long reaped = cachep->reaped;
+			unsigned long allocs = cachep->num_allocations;
+
+			printk(" : %6lu %7lu %5lu %4lu %4lu",
+					high, allocs, grown, reaped, errors);
+		}
+#endif
+#ifdef CONFIG_SMP
+		{
+			unsigned int batchcount = cachep->batchcount;
+			unsigned int limit;
+
+			if (cc_data(cachep))
+				limit = cc_data(cachep)->limit;
+			 else
+				limit = 0;
+			printk(" : %4u %4u",
+					limit, batchcount);
+		}
+#endif
+#if STATS && defined(CONFIG_SMP)
+		{
+			unsigned long allochit = atomic_read(&cachep->allochit);
+			unsigned long allocmiss = atomic_read(&cachep->allocmiss);
+			unsigned long freehit = atomic_read(&cachep->freehit);
+			unsigned long freemiss = atomic_read(&cachep->freemiss);
+			printk(" : %6lu %6lu %6lu %6lu",
+					allochit, allocmiss, freehit, freemiss);
+		}
+#endif
+		printk("\n");
+		spin_unlock_irq(&cachep->spinlock);
+
+		p = cachep->next.next;
+	} while (p != &cache_cache.next);
+
+	up(&cache_chain_sem);
+
+	return;
+}
+
+
+
