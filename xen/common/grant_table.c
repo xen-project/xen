@@ -42,7 +42,7 @@ get_maptrack_handle(
     grant_table_t *t)
 {
     unsigned int h;
-    if ( unlikely((h = t->maptrack_head) == NR_MAPTRACK_ENTRIES) )
+    if ( unlikely((h = t->maptrack_head) == t->maptrack_limit) )
         return -1;
     t->maptrack_head = t->maptrack[h].ref_and_flags >> MAPTRACK_REF_SHIFT;
     t->map_count++;
@@ -362,10 +362,30 @@ __gnttab_map_grant_ref(
     /* get a maptrack handle */
     if ( unlikely((handle = get_maptrack_handle(ld->grant_table)) == -1) )
     {
-        put_domain(rd);
-        DPRINTK("No more map handles available\n");
-        (void)__put_user(GNTST_no_device_space, &uop->handle);
-        return GNTST_no_device_space;
+        int              i;
+        grant_mapping_t *new_mt;
+        grant_table_t   *lgt      = ld->grant_table;
+
+        /* grow the maptrack table */
+        if ( (new_mt = (void *)alloc_xenheap_pages(lgt->maptrack_order + 1)) == NULL )
+        {
+            put_domain(rd);
+            DPRINTK("No more map handles available\n");
+            (void)__put_user(GNTST_no_device_space, &uop->handle);
+            return GNTST_no_device_space;
+        }
+
+        memcpy(new_mt, lgt->maptrack, PAGE_SIZE << lgt->maptrack_order);
+        for ( i = lgt->maptrack_limit; i < (lgt->maptrack_limit << 1); i++ )
+            new_mt[i].ref_and_flags = (i+1) << MAPTRACK_REF_SHIFT;
+
+        free_xenheap_pages((unsigned long)lgt->maptrack, lgt->maptrack_order);
+        lgt->maptrack          = new_mt;
+        lgt->maptrack_order   += 1;
+        lgt->maptrack_limit  <<= 1;
+
+        printk("Doubled maptrack size\n");
+        handle = get_maptrack_handle(ld->grant_table);
     }
 
 #ifdef GRANT_DEBUG_VERBOSE
@@ -458,7 +478,7 @@ __gnttab_unmap_grant_ref(
 
     map = &ld->grant_table->maptrack[handle];
 
-    if ( unlikely(handle >= NR_MAPTRACK_ENTRIES) ||
+    if ( unlikely(handle >= ld->grant_table->maptrack_limit) ||
          unlikely(!(map->ref_and_flags & MAPTRACK_GNTMAP_MASK)) )
     {
         DPRINTK("Bad handle (%d).\n", handle);
@@ -752,7 +772,7 @@ gnttab_dump_table(gnttab_dump_table_t *uop)
         }
     }
 
-    for ( i = 0; i < NR_MAPTRACK_ENTRIES; i++ )
+    for ( i = 0; i < gt->maptrack_limit; i++ )
     {
         maptrack = &gt->maptrack[i];
 
@@ -860,7 +880,7 @@ gnttab_check_unmap(
 
     rgt = rd->grant_table;
 
-    for ( handle = 0; handle < NR_MAPTRACK_ENTRIES; handle++ )
+    for ( handle = 0; handle < lgt->maptrack_limit; handle++ )
     {
         map = &lgt->maptrack[handle];
 
@@ -1074,8 +1094,10 @@ grant_table_create(
     /* Tracking of mapped foreign frames table */
     if ( (t->maptrack = (void *)alloc_xenheap_page()) == NULL )
         goto no_mem;
+    t->maptrack_order = 0;
+    t->maptrack_limit = PAGE_SIZE / sizeof(grant_mapping_t);
     memset(t->maptrack, 0, PAGE_SIZE);
-    for ( i = 0; i < NR_MAPTRACK_ENTRIES; i++ )
+    for ( i = 0; i < t->maptrack_limit; i++ )
         t->maptrack[i].ref_and_flags = (i+1) << MAPTRACK_REF_SHIFT;
 
     /* Shared grant table. */
@@ -1121,7 +1143,7 @@ gnttab_release_dev_mappings(grant_table_t *gt)
 
     ld = current->domain;
 
-    for ( handle = 0; handle < NR_MAPTRACK_ENTRIES; handle++ )
+    for ( handle = 0; handle < gt->maptrack_limit; handle++ )
     {
         map = &gt->maptrack[handle];
 
@@ -1191,7 +1213,7 @@ grant_table_destroy(
         /* Free memory relating to this grant table. */
         d->grant_table = NULL;
         free_xenheap_pages((unsigned long)t->shared, ORDER_GRANT_FRAMES);
-        free_xenheap_page((unsigned long)t->maptrack);
+        free_xenheap_page((unsigned long)t->maptrack); //cwc22
         xfree(t->active);
         xfree(t);
     }

@@ -66,7 +66,6 @@ typedef struct {
 } grant_mapping_t;
 #define MAPTRACK_GNTMAP_MASK 7
 #define MAPTRACK_REF_SHIFT   3
-#define NR_MAPTRACK_ENTRIES  (PAGE_SIZE / sizeof(grant_mapping_t))
 
 /* Per-domain grant information. */
 typedef struct {
@@ -77,6 +76,8 @@ typedef struct {
     /* Mapping tracking table. */
     grant_mapping_t      *maptrack;
     unsigned int          maptrack_head;
+    unsigned int          maptrack_order;
+    unsigned int          maptrack_limit;
     unsigned int          map_count;
     /* Lock protecting updates to active and shared grant tables. */
     spinlock_t            lock;
