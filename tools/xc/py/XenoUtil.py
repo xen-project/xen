@@ -3,9 +3,9 @@ import string, re, os, sys
 ##### Module variables
 
 """Location of the Virtual Disk management database.
-   defaults to /var/spool/xen_vdisks.sqlite
+   defaults to /var/lib/xen_vdisks.sqlite
 """
-VD_DB_FILE = "/var/spool/xen_vdisks.sqlite"
+VD_DB_FILE = "/var/lib/xen_vdisks.sqlite"
 
 """VBD expertise level - determines the strictness of the sanity checking.
   This mode determines the level of complaints when disk sharing occurs
