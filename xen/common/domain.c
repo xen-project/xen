@@ -299,7 +299,7 @@ struct pfn_info *alloc_domain_page(struct task_struct *p)
     if ( (mask = page->u.cpu_mask) != 0 )
     {
         pfn_stamp = page->tlbflush_timestamp;
-        for ( i = 0; (mask != 0) && (i < NR_CPUS); i++ )
+        for ( i = 0; (mask != 0) && (i < smp_num_cpus); i++ )
         {
             if ( mask & (1<<i) )
             {

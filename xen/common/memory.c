@@ -798,6 +798,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
     unsigned long pfn = ptr >> PAGE_SHIFT;
     unsigned long old_base_pfn;
     struct pfn_info *page = &frame_table[pfn];
+    struct task_struct *p = current, *q;
 
     switch ( cmd )
     {
@@ -846,18 +847,18 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         break;
 
     case MMUEXT_NEW_BASEPTR:
-        okay = get_page_and_type_from_pagenr(pfn, PGT_l2_page_table, current);
+        okay = get_page_and_type_from_pagenr(pfn, PGT_l2_page_table, p);
         if ( likely(okay) )
         {
             invalidate_shadow_ldt();
 
             percpu_info[cpu].deferred_ops &= ~DOP_FLUSH_TLB;
-            old_base_pfn = pagetable_val(current->mm.pagetable) >> PAGE_SHIFT;
-            current->mm.pagetable = mk_pagetable(pfn << PAGE_SHIFT);
+            old_base_pfn = pagetable_val(p->mm.pagetable) >> PAGE_SHIFT;
+            p->mm.pagetable = mk_pagetable(pfn << PAGE_SHIFT);
 
-            shadow_mk_pagetable(&current->mm);
+            shadow_mk_pagetable(&p->mm);
 
-            write_ptbase(&current->mm);
+            write_ptbase(&p->mm);
 
             put_page_and_type(&frame_table[old_base_pfn]);    
 
@@ -893,13 +894,13 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
             okay = 0;
             MEM_LOG("Bad args to SET_LDT: ptr=%08lx, ents=%08lx", ptr, ents);
         }
-        else if ( (current->mm.ldt_ents != ents) || 
-                  (current->mm.ldt_base != ptr) )
+        else if ( (p->mm.ldt_ents != ents) || 
+                  (p->mm.ldt_base != ptr) )
         {
             invalidate_shadow_ldt();
-            current->mm.ldt_base = ptr;
-            current->mm.ldt_ents = ents;
-            load_LDT(current);
+            p->mm.ldt_base = ptr;
+            p->mm.ldt_ents = ents;
+            load_LDT(p);
             percpu_info[cpu].deferred_ops &= ~DOP_RELOAD_LDT;
             if ( ents != 0 )
                 percpu_info[cpu].deferred_ops |= DOP_RELOAD_LDT;
@@ -915,10 +916,10 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         percpu_info[cpu].subject_id |= 
             ((domid_t)((ptr&~0xFFFF)|(val>>16)))<<32;
 
-        if ( !IS_PRIV(current) )
+        if ( !IS_PRIV(p) )
         {
             MEM_LOG("Dom %llu has no privilege to set subject domain",
-                    current->domain);
+                    p->domain);
             okay = 0;
         }
         else
@@ -937,19 +938,26 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         }
         break;
 
-        /* XXX This function is racey! */
     case MMUEXT_REASSIGN_PAGE:
-        if ( unlikely(!IS_PRIV(current)) )
+        if ( unlikely(!IS_PRIV(p)) )
         {
             MEM_LOG("Dom %llu has no privilege to reassign page ownership",
-                    current->domain);
+                    p->domain);
             okay = 0;
         }
-        else if ( likely(percpu_info[cpu].gps != NULL) )
+        else if ( likely((q = percpu_info[cpu].gps) != NULL) &&
+                  likely(test_bit(_PGC_allocated, &page->count_and_flags)) &&
+                  likely(page->u.domain == p) ) /* won't be smp-guest safe */
         {
-            current->tot_pages--;
-            percpu_info[cpu].gps->tot_pages++;
-            page->u.domain = percpu_info[cpu].gps;
+            spin_lock(&p->page_list_lock);
+            p->tot_pages--;
+            list_del(&page->list);
+            spin_unlock(&p->page_list_lock);
+            page->u.domain = q;
+            spin_lock(&q->page_list_lock);
+            q->tot_pages++;
+            list_add_tail(&page->list, &q->page_list);
+            spin_unlock(&q->page_list_lock);
         }
         else
         {
