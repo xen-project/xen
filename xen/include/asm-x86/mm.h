@@ -114,9 +114,6 @@ extern unsigned long frame_table_size;
 extern unsigned long max_page;
 void init_frametable(void *frametable_vstart, unsigned long nr_pages);
 
-struct pfn_info *alloc_domain_page(struct domain *d);
-void free_domain_page(struct pfn_info *page);
-
 int alloc_page_type(struct pfn_info *page, unsigned int type);
 void free_page_type(struct pfn_info *page, unsigned int type);
 
@@ -131,7 +128,7 @@ static inline void put_page(struct pfn_info *page)
     while ( unlikely((y = cmpxchg(&page->u.inuse.count_info, x, nx)) != x) );
 
     if ( unlikely((nx & PGC_count_mask) == 0) )
-        free_domain_page(page);
+        free_domheap_page(page);
 }
 
 

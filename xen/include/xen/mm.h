@@ -2,7 +2,8 @@
 #ifndef __XEN_MM_H__
 #define __XEN_MM_H__
 
-#include <asm/mm.h>
+struct domain;
+struct pfn_info;
 
 /* Generic allocator */
 unsigned long init_heap_allocator(
@@ -20,10 +21,12 @@ void free_xenheap_pages(unsigned long p, int order);
 
 /* Domain suballocator */
 void init_domheap_pages(unsigned long ps, unsigned long pe);
-struct pfn_info *alloc_domheap_pages(int order);
+struct pfn_info *alloc_domheap_pages(struct domain *d, int order);
 void free_domheap_pages(struct pfn_info *pg, int order);
 unsigned long avail_domheap_pages(void);
-#define alloc_domheap_page() (alloc_domheap_pages(0))
+#define alloc_domheap_page(_d) (alloc_domheap_pages(_d,0))
 #define free_domheap_page(_p) (free_domheap_pages(_p,0))
+
+#include <asm/mm.h>
 
 #endif /* __XEN_MM_H__ */

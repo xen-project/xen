@@ -24,7 +24,7 @@ static long alloc_dom_mem(struct domain *d,
 
     for ( i = 0; i < nr_pages; i++ )
     {
-        if ( unlikely((page = alloc_domain_page(d)) == NULL) )
+        if ( unlikely((page = alloc_domheap_page(d)) == NULL) )
         {
             DPRINTK("Could not allocate a frame\n");
             break;
