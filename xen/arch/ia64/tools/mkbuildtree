@@ -98,6 +98,9 @@ cp_patch mm/bootmem.c arch/ia64/mm_bootmem.c mm_bootmem.c
 cp_patch mm/page_alloc.c arch/ia64/page_alloc.c page_alloc.c
 cp_patch mm/slab.c arch/ia64/slab.c slab.c
 
+# following renamed to avoid conflict
+softlink kernel/extable.c arch/ia64/linuxextable.c
+
 cp_patch arch/ia64/mm/contig.c arch/ia64/mm_contig.c mm_contig.c
 cp_patch arch/ia64/mm/tlb.c arch/ia64/tlb.c tlb.c
 
@@ -108,6 +111,7 @@ softlink arch/ia64/kernel/entry.h arch/ia64/entry.h
 softlink arch/ia64/kernel/ia64_ksyms.c arch/ia64/ia64_ksyms.c
 softlink arch/ia64/kernel/irq_lsapic.c arch/ia64/irq_lsapic.c
 softlink arch/ia64/kernel/machvec.c arch/ia64/machvec.c
+softlink arch/ia64/mm/extable.c arch/ia64/extable.c
 softlink arch/ia64/kernel/pal.S arch/ia64/pal.S
 softlink arch/ia64/kernel/patch.c arch/ia64/patch.c
 softlink arch/ia64/kernel/sal.c arch/ia64/sal.c
@@ -182,6 +186,7 @@ null include/asm-ia64/domain_page.h
 null include/asm-ia64/flushtlb.h
 null include/asm-ia64/io_apic.h
 null include/asm-ia64/pdb.h
+null include/asm-ia64/module.h
 
 softlink include/asm-ia64/acpi.h include/asm-ia64/acpi.h
 softlink include/asm-ia64/asmmacro.h include/asm-ia64/asmmacro.h
