@@ -578,19 +578,16 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
         }
     }
     *dst = '\0';
+//printk("opt_nfsroot=%d,%s XX cmd =: %s\n",opt_nfsroot,opt_nfsroot,virt_startinfo_address->cmd_line);
 
-    if ( opt_nfsroot )
-    {
+    if ( strcmp("",opt_nfsroot) )
+    {   // if nfsroot has been set to something
         unsigned char boot[150];
         unsigned char ipbase[20], nfsserv[20], gateway[20], netmask[20];
         unsigned char nfsroot[70];
         snprintf(nfsroot, 70, opt_nfsroot, dom); 
         snprintf(boot, 200,
-#if 1
                 " root=/dev/nfs ip=%s:%s:%s:%s::eth0:off nfsroot=%s",
-#else
-                " ro root=/dev/xhda7 ip=%s:%s:%s:%s::eth0:off arfle=%s",
-#endif
                  quad_to_str(opt_ipbase + dom, ipbase),
                  quad_to_str(opt_nfsserv, nfsserv),
                  quad_to_str(opt_gateway, gateway),
@@ -598,6 +595,18 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
                  nfsroot);
         strcpy(dst, boot);
     }
+    else
+    {   
+        unsigned char boot[150];
+        unsigned char ipbase[20], nfsserv[20], gateway[20], netmask[20];
+        snprintf(boot, 200,
+                " ip=%s::%s:%s::eth0:off",
+                 quad_to_str(opt_ipbase + dom, ipbase),
+                 quad_to_str(opt_gateway, gateway),
+                 quad_to_str(opt_netmask, netmask));
+        strcpy(dst, boot);
+    }
+
 
     /* Reinstate the caller's page tables. */
     __write_cr3_counted(pagetable_val(current->mm.pagetable));
