@@ -30,7 +30,7 @@
 #define Activation_Reason_Preempted 2
 #define Activation_Reason_Extra     3
 
-/* The following will be used for atropos-specific per-domain data fields */
+/* Atropos-specific per-domain data */
 struct at_dom_info
 {
     /* MAW Xen additions */
@@ -40,18 +40,20 @@ struct at_dom_info
 
     /* (what remains of) the original fields */
 
-    s_time_t     deadline;       /* Next deadline                */
-    s_time_t     prevddln;       /* Previous deadline            */
+    s_time_t     deadline;       /* Next deadline                        */
+    s_time_t     prevddln;       /* Previous deadline                    */
     
-    s_time_t     remain;         /* Time remaining this period   */
-    s_time_t     period;         /* Period of time allocation    */
-    s_time_t     slice;          /* Length of allocation         */
-    s_time_t     latency;        /* Unblocking latency           */
+    s_time_t     remain;         /* Time remaining this period           */
+    s_time_t     period;         /* Current period of time allocation    */
+    s_time_t     nat_period;     /* Natural period                       */
+    s_time_t     slice;          /* Current length of allocation         */
+    s_time_t     nat_slice;      /* Natural length of allocation         */
+    s_time_t     latency;        /* Unblocking latency                   */
 
-    int          xtratime;       /* Prepared to accept extra?    */
+    int          xtratime;       /* Prepared to accept extra time?       */
 };
 
-
+/* Atropos-specific per-CPU data */
 struct at_cpu_info
 {
     struct list_head waitq; /* wait queue*/
@@ -65,8 +67,10 @@ struct at_cpu_info
 
 #define BESTEFFORT_QUANTUM MILLISECS(5)
 
+
 /* SLAB cache for struct at_dom_info objects */
 static kmem_cache_t *dom_info_cache;
+
 
 /** calculate the length of a linked list */
 static int q_len(struct list_head *q) 
@@ -167,17 +171,15 @@ static void at_add_task(struct task_struct *p)
     DOM_INFO(p)->owner = p;
     p->lastschd = now;
  
-    if(is_idle_task(p))
-      DOM_INFO(p)->slice = MILLISECS(5);
-
-    /* DOM 0's scheduling parameters must be set here in order for it to boot
-     * the system! */
+    /* DOM 0's parameters must be set here for it to boot the system! */
     if(p->domain == 0)
     {
         DOM_INFO(p)->remain = MILLISECS(15);
-        DOM_INFO(p)->period = MILLISECS(20);
-        DOM_INFO(p)->slice  = MILLISECS(15);
-        DOM_INFO(p)->latency = MILLISECS(10);
+        DOM_INFO(p)->nat_period =
+            DOM_INFO(p)->period = MILLISECS(20);
+        DOM_INFO(p)->nat_slice =
+            DOM_INFO(p)->slice = MILLISECS(15);
+        DOM_INFO(p)->latency = MILLISECS(5);
         DOM_INFO(p)->xtratime = 1;
         DOM_INFO(p)->deadline = now;
         DOM_INFO(p)->prevddln = now;
@@ -185,11 +187,13 @@ static void at_add_task(struct task_struct *p)
     else /* other domains run basically best effort unless otherwise set */
     {
         DOM_INFO(p)->remain = 0;
-        DOM_INFO(p)->period = MILLISECS(10000);
-        DOM_INFO(p)->slice  = MILLISECS(10);
-        DOM_INFO(p)->latency = MILLISECS(10000);
+        DOM_INFO(p)->nat_period =
+            DOM_INFO(p)->period = SECONDS(10);
+        DOM_INFO(p)->nat_slice =
+            DOM_INFO(p)->slice  = MILLISECS(10);
+        DOM_INFO(p)->latency = SECONDS(10);
         DOM_INFO(p)->xtratime = 1;
-        DOM_INFO(p)->deadline = now + MILLISECS(10000);
+        DOM_INFO(p)->deadline = now + SECONDS(10);
         DOM_INFO(p)->prevddln = 0;
     }
 
@@ -226,10 +230,19 @@ static void dequeue(struct task_struct *sdom)
  * This function deals with updating the sdom for a domain
  * which has just been unblocked.  
  *
- * ASSERT: On entry, the sdom has already been removed from the block
- * queue (it can be done more efficiently if we know that it
- * is on the head of the queue) but its deadline field has not been
- * restored yet.
+ * Xen's Atropos treats unblocking slightly differently to Nemesis:
+ *
+ * - "Short blocking" domains (i.e. that unblock before their deadline has
+ *  expired) are treated the same as in nemesis (put on the wait queue and
+ *  given preferential treatment in selecting domains for extra time).
+ *
+ * - "Long blocking" domains do not simply have their period truncated to their
+ *  unblocking latency as before but also have their slice recomputed to be the
+ *  same fraction of their new period.  Each time the domain is scheduled, the
+ *  period and slice are doubled until they reach their original ("natural")
+ *  values, as set by the user (and stored in nat_period and nat_slice).  The
+ *  idea is to give better response times to unblocking whilst preserving QoS
+ *  guarantees to other domains.
  */
 static void unblock(struct task_struct *sdom)
 {
@@ -239,18 +252,27 @@ static void unblock(struct task_struct *sdom)
     dequeue(sdom);
 
     /* We distinguish two cases... short and long blocks */
-    if ( inf->deadline < time ) {
+
+    if ( inf->deadline < time )
+    {
+        /* Long blocking case */
+
 	/* The sdom has passed its deadline since it was blocked. 
 	   Give it its new deadline based on the latency value. */
-	inf->prevddln = time; 
+	inf->prevddln = time;
+
+        /* Scale the scheduling parameters as requested by the latency hint. */
 	inf->deadline = time + inf->latency;
-	inf->remain   = inf->slice;
-        if(inf->remain > 0)
-            sdom->state = TASK_RUNNING;
-        else
-            sdom->state = ATROPOS_TASK_WAIT;
-        
-    } else {
+        inf->slice = inf->nat_slice / ( inf->nat_period / inf->latency );
+        inf->period = inf->latency;
+	inf->remain = inf->slice;
+
+        sdom->state = TASK_RUNNING;
+    }
+    else
+    {
+        /* Short blocking case */
+
 	/* We leave REMAIN intact, but put this domain on the WAIT
 	   queue marked as recently unblocked.  It will be given
 	   priority over other domains on the wait queue until while
@@ -288,9 +310,8 @@ task_slice_t ksched_scheduler(s_time_t time)
 
     /* If we were spinning in the idle loop, there is no current
      * domain to deschedule. */
-    if (is_idle_task(cur_sdom)) {
+    if (is_idle_task(cur_sdom))
 	goto deschedule_done;
-    }
 
     /*****************************
      * 
@@ -308,7 +329,8 @@ task_slice_t ksched_scheduler(s_time_t time)
     dequeue(cur_sdom);
 
     if ((cur_sdom->state == TASK_RUNNING) ||
-        (cur_sdom->state == ATROPOS_TASK_UNBLOCKED)) {
+        (cur_sdom->state == ATROPOS_TASK_UNBLOCKED))
+    {
 
 	/* In this block, we are doing accounting for an sdom which has 
 	   been running in contracted time.  Note that this could now happen
@@ -318,10 +340,11 @@ task_slice_t ksched_scheduler(s_time_t time)
 	cur_info->remain  -= ranfor;
 
 	/* If guaranteed time has run out... */
-	if ( cur_info->remain <= 0 ) {
+	if ( cur_info->remain <= 0 )
+        {
 	    /* Move domain to correct position in WAIT queue */
             /* XXX sdom_unblocked doesn't need this since it is 
-	     already in the correct place. */
+               already in the correct place. */
 	    cur_sdom->state = ATROPOS_TASK_WAIT;
 	}
     }
@@ -351,6 +374,20 @@ task_slice_t ksched_scheduler(s_time_t time)
 
         dequeue(sdom);
 
+        if ( inf->period != inf->nat_period )
+        {
+            /* This domain has had its parameters adjusted as a result of
+             * unblocking and they need to be adjusted before requeuing it */
+            inf->slice  *= 2;
+            inf->period *= 2;
+            
+            if ( inf->period > inf->nat_period )
+            {
+                inf->period = inf->nat_period;
+                inf->slice  = inf->nat_slice;
+            }
+        }
+
 	/* Domain begins a new period and receives a slice of CPU 
 	 * If this domain has been blocking then throw away the
 	 * rest of it's remain - it can't be trusted */
@@ -358,8 +395,10 @@ task_slice_t ksched_scheduler(s_time_t time)
 	    inf->remain = inf->slice;
     	else 
 	    inf->remain += inf->slice;
+
 	inf->prevddln = inf->deadline;
 	inf->deadline += inf->period;
+
         if(inf->remain > 0)
             sdom->state = TASK_RUNNING;
         else
@@ -391,8 +430,8 @@ task_slice_t ksched_scheduler(s_time_t time)
     /* MAW - the idle domain is always on the run queue.  We run from the
      * runqueue if it's NOT the idle domain or if there's nothing on the wait
      * queue */
-    if (cur_sdom->domain == IDLE_DOMAIN_ID && !list_empty(WAITQ(cpu))) {
-
+    if (cur_sdom->domain == IDLE_DOMAIN_ID && !list_empty(WAITQ(cpu)))
+    {
         struct list_head *item;
 
 	/* Try running a domain on the WAIT queue - this part of the
@@ -426,24 +465,23 @@ task_slice_t ksched_scheduler(s_time_t time)
 	   flag set.  The NEXT_OPTM field is used to cheaply achieve
 	   an approximation of round-robin order */
         list_for_each(item, WAITQ(cpu))
-            {
-                struct at_dom_info *inf =
-                    list_entry(item, struct at_dom_info, waitq);
-                
-                sdom = inf->owner;
-
-                if (inf->xtratime && i >= waitq_rrobin) {
-                    cur_sdom = sdom;
-                    cur_info  = inf;
-                    newtime = time + BESTEFFORT_QUANTUM;
-                    reason  = Activation_Reason_Extra;
-                    waitq_rrobin = i + 1; /* set this value ready for next */
-                    goto found;
-                }
-
-                i++;
+        {
+            struct at_dom_info *inf =
+                list_entry(item, struct at_dom_info, waitq);
+            
+            sdom = inf->owner;
+            
+            if (inf->xtratime && i >= waitq_rrobin) {
+                cur_sdom = sdom;
+                cur_info  = inf;
+                newtime = time + BESTEFFORT_QUANTUM;
+                reason  = Activation_Reason_Extra;
+                waitq_rrobin = i + 1; /* set this value ready for next */
+                goto found;
             }
-
+            
+            i++;
+        }
     }
 
     found:
@@ -523,15 +561,21 @@ static int at_adjdom(struct task_struct *p, struct sched_adjdom_cmd *cmd)
 {
     if ( cmd->direction == SCHED_INFO_PUT )
     {
-        DOM_INFO(p)->period   = cmd->u.atropos.period;
-        DOM_INFO(p)->slice    = cmd->u.atropos.slice;
+        /* sanity checking! */
+        if( cmd->u.atropos.latency > cmd->u.atropos.nat_period
+            || cmd->u.atropos.latency == 0
+            || cmd->u.atropos.nat_slice > cmd->u.atropos.nat_period )
+            return -EINVAL;
+
+        DOM_INFO(p)->nat_period   = cmd->u.atropos.nat_period;
+        DOM_INFO(p)->nat_slice    = cmd->u.atropos.nat_slice;
         DOM_INFO(p)->latency  = cmd->u.atropos.latency;
         DOM_INFO(p)->xtratime = !!cmd->u.atropos.xtratime;
     }
     else if ( cmd->direction == SCHED_INFO_GET )
     {
-        cmd->u.atropos.period   = DOM_INFO(p)->period;
-        cmd->u.atropos.slice    = DOM_INFO(p)->slice;
+        cmd->u.atropos.nat_period   = DOM_INFO(p)->nat_period;
+        cmd->u.atropos.nat_slice    = DOM_INFO(p)->nat_slice;
         cmd->u.atropos.latency  = DOM_INFO(p)->latency;
         cmd->u.atropos.xtratime = DOM_INFO(p)->xtratime;
     }
@@ -548,9 +592,6 @@ static int at_alloc_task(struct task_struct *p)
     if( (DOM_INFO(p) = kmem_cache_alloc(dom_info_cache, GFP_KERNEL)) == NULL )
         return -1;
 
-    if(p->domain == IDLE_DOMAIN_ID)
-      printk("ALLOC IDLE ON CPU %d\n", p->processor);
-
     memset(DOM_INFO(p), 0, sizeof(struct at_dom_info));
 
     return 0;
@@ -562,6 +603,7 @@ static void at_free_task(struct task_struct *p)
 {
     kmem_cache_free( dom_info_cache, DOM_INFO(p) );
 }
+
 
 /* print decoded domain private state value (if known) */
 static int at_prn_state(int state)

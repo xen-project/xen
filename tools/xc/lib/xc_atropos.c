@@ -20,8 +20,8 @@ int xc_atropos_domain_set(int xc_handle,
     op.u.adjustdom.sched_id = SCHED_ATROPOS;
     op.u.adjustdom.direction = SCHED_INFO_PUT;
 
-    p->period   = period;
-    p->slice    = slice;
+    p->nat_period   = period;
+    p->nat_slice    = slice;
     p->latency  = latency;
     p->xtratime = xtratime;
 
@@ -42,8 +42,8 @@ int xc_atropos_domain_get(int xc_handle, u64 domid, u64 *period,
 
     ret = do_dom0_op(xc_handle, &op);
 
-    *period   = p->period;
-    *slice    = p->slice;
+    *period   = p->nat_period;
+    *slice    = p->nat_slice;
     *latency  = p->latency;
     *xtratime = p->xtratime;
 
