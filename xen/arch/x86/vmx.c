@@ -646,6 +646,20 @@ static void vmx_print_line(const char c, struct exec_domain *d)
         print_buf[index++] = c;
 }
 
+void save_vmx_execution_context(execution_context_t *ctxt)
+{
+    __vmread(GUEST_SS_SELECTOR, &ctxt->ss);
+    __vmread(GUEST_ESP, &ctxt->esp);
+    __vmread(GUEST_EFLAGS, &ctxt->eflags);
+    __vmread(GUEST_CS_SELECTOR, &ctxt->cs);
+    __vmread(GUEST_EIP, &ctxt->eip);
+
+    __vmread(GUEST_GS_SELECTOR, &ctxt->gs);
+    __vmread(GUEST_FS_SELECTOR, &ctxt->fs);
+    __vmread(GUEST_ES_SELECTOR, &ctxt->es);
+    __vmread(GUEST_DS_SELECTOR, &ctxt->ds);
+}
+
 #ifdef XEN_DEBUGGER
 void save_xen_regs(struct xen_regs *regs)
 {

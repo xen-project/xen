@@ -348,16 +348,21 @@ void arch_getdomaininfo_ctxt(
     struct exec_domain *ed, full_execution_context_t *c)
 { 
     int i;
-    unsigned long vmx_domain = ed->arch.arch_vmx.flags;
+#ifdef __i386__  /* Remove when x86_64 VMX is implemented */
+    unsigned long vmx_domain;
     extern void save_vmx_execution_context(execution_context_t *);
+#endif
 
     c->flags = 0;
     memcpy(&c->cpu_ctxt, 
            &ed->arch.user_ctxt,
            sizeof(ed->arch.user_ctxt));
 
+#ifdef __i386__
+    vmx_domain = ed->arch.arch_vmx.flags;
     if (vmx_domain)
         save_vmx_execution_context(&c->cpu_ctxt);
+#endif
 
     if ( test_bit(EDF_DONEFPUINIT, &ed->ed_flags) )
         c->flags |= ECF_I387_VALID;
