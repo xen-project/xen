@@ -28,20 +28,23 @@ all:
 install: all install-initd install-configs install-scripts
 
 install-initd:
-	$(INSTALL_DIR) $(DESTDIR)/etc/init.d
+	[ -d $(DESTDIR)/etc/init.d ] || $(INSTALL_DIR) $(DESTDIR)/etc/init.d
 	$(INSTALL_PROG) $(XEND_INITD) $(DESTDIR)/etc/init.d
 	$(INSTALL_PROG) $(XENDOMAINS_INITD) $(DESTDIR)/etc/init.d
 
 install-configs:
-	$(INSTALL_DIR) $(DESTDIR)$(XEN_CONFIG_DIR)
-	$(INSTALL_DIR) $(DESTDIR)$(XEN_CONFIG_DIR)/auto
+	[ -d $(DESTDIR)$(XEN_CONFIG_DIR) ] || \
+		$(INSTALL_DIR) $(DESTDIR)$(XEN_CONFIG_DIR)
+	[ -d $(DESTDIR)$(XEN_CONFIG_DIR)/auto ] || \
+		$(INSTALL_DIR) $(DESTDIR)$(XEN_CONFIG_DIR)/auto
 	for i in $(XEN_CONFIGS); \
 	    do [ -a $(DESTDIR)$(XEN_CONFIG_DIR)/$$i ] || \
 	    $(INSTALL_DATA) $$i $(DESTDIR)$(XEN_CONFIG_DIR); \
 	done
 
 install-scripts:
-	$(INSTALL_DIR) $(DESTDIR)$(XEN_SCRIPT_DIR)
+	[ -d $(DESTDIR)$(XEN_SCRIPT_DIR) ] || \
+		$(INSTALL_DIR) $(DESTDIR)$(XEN_SCRIPT_DIR)
 	for i in $(XEN_SCRIPTS); \
 	    do [ -a $(DESTDIR)$(XEN_SCRIPT_DIR)/$$i ] || \
 	    $(INSTALL_PROG) $$i $(DESTDIR)$(XEN_SCRIPT_DIR); \

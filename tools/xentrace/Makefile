@@ -4,10 +4,10 @@ INSTALL_DIR	= $(INSTALL) -d -m0755
 INSTALL_DATA	= $(INSTALL) -m0644
 
 XEN_ROOT=../..
-include $(XEN_ROOT)/tools/Make.defs
+include $(XEN_ROOT)/tools/Rules.mk
 
 CC       = gcc
-CFLAGS   = -Wall -Werror -O3
+CFLAGS  += -Wall -Werror -O3
 
 CFLAGS  += -I $(XEN_XC)
 CFLAGS  += -I $(XEN_LIBXC)
@@ -24,9 +24,11 @@ MAN8     = $(wildcard *.8)
 all: $(BIN)
 
 install: all
-	$(INSTALL_DIR) $(DESTDIR)/usr/bin
-	$(INSTALL_DIR) $(DESTDIR)/usr/man/man1
-	$(INSTALL_DIR) $(DESTDIR)/usr/man/man8
+	[ -d $(DESTDIR)/usr/bin ] || $(INSTALL_DIR) $(DESTDIR)/usr/bin
+	[ -d $(DESTDIR)/usr/man/man1 ] || \
+		$(INSTALL_DIR) $(DESTDIR)/usr/man/man1
+	[ -d $(DESTDIR)/usr/man/man8 ] || \
+		$(INSTALL_DIR) $(DESTDIR)/usr/man/man8
 	$(INSTALL_PROG) $(BIN) $(SCRIPTS) $(DESTDIR)/usr/bin
 	$(INSTALL_DATA) $(MAN1) $(DESTDIR)/usr/man/man1
 	$(INSTALL_DATA) $(MAN8) $(DESTDIR)/usr/man/man8

@@ -11,7 +11,7 @@ INSTALL_DIR	:= $(INSTALL) -d -m0755
 INSTALL_DATA	:= $(INSTALL) -m0644
 INSTALL_PROG	:= $(INSTALL) -m0755
 
-KERNELS ?= *2.6*
+KERNELS ?= linux-2.6-xen0 linux-2.6-xenU
 # linux-2.4-xen0 linux-2.4-xenU netbsd-2.0-xenU
 # You may use wildcards in the above e.g. KERNELS=*2.4*
 
@@ -21,23 +21,21 @@ XKERNELS := $(foreach kernel, $(KERNELS), $(patsubst buildconfigs/mk.%,%,$(wildc
 
 export DESTDIR
 
+# Export target architecture overrides to Xen and Linux sub-trees.
+ifneq ($(TARGET_ARCH),)
+SUBARCH := $(subst x86_32,i386,$(TARGET_ARCH))
+export TARGET_ARCH SUBARCH
+endif
+
 include buildconfigs/Rules.mk
 
 .PHONY:	all dist install xen tools kernels docs world clean mkpatches mrproper
-.PHONY:	kbuild kdelete kclean install-tools install-xen install-docs
-.PHONY: install-kernels
+.PHONY:	kbuild kdelete kclean
 
 all: dist
 
-# install everything into the standard system directories
-# NB: install explicitly does not check that everything is up to date!
-install: DESTDIR=
-install: xen checked-tools kernels docs
-
-# Only check for install req'mts on 'make install', not on 'make dist'.
-checked-tools:
-	$(MAKE) -C tools/check install
-	$(MAKE) -C tools install
+# build and install everything into the standard system directories
+install: install-xen install-tools install-kernels install-docs
 
 # build and install everything into local dist directory
 dist: xen tools kernels docs
@@ -112,9 +110,17 @@ install-iptables:
 	tar -jxf iptables-1.2.11.tar.bz2
 	$(MAKE) -C iptables-1.2.11 PREFIX= KERNEL_DIR=../linux-$(LINUX_VER)-xen0 install
 
+install-%: DESTDIR=
+install-%: %
+	@: # do nothing
+
 help:
 	@echo 'Installation targets:'
 	@echo '  install          - build and install everything'
+	@echo '  install-xen      - build and install the Xen hypervisor'
+	@echo '  install-tools    - build and install the control tools'
+	@echo '  install-kernels  - build and install guest kernels'
+	@echo '  install-docs     - build and install documentation'
 	@echo ''
 	@echo 'Building targets:'
 	@echo '  dist             - build and install everything into local dist directory'
@@ -172,3 +178,4 @@ linux26:
 
 netbsd20:
 	$(MAKE) netbsd-2.0-xenU-build
+

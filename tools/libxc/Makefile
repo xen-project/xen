@@ -10,7 +10,7 @@ SONAME   = libxc.so.$(MAJOR)
 CC       = gcc
 
 XEN_ROOT = ../..
-include $(XEN_ROOT)/tools/Make.defs
+include $(XEN_ROOT)/tools/Rules.mk
 
 vpath %c       $(XEN_LIBXUTIL)
 INCLUDES += -I $(XEN_LIBXUTIL)
@@ -67,8 +67,8 @@ mk-symlinks:
 	  ln -sf ../../$(LINUX_ROOT)/include/asm-xen/linux-public/*.h . )
 
 install: all
-	$(INSTALL_DIR) $(DESTDIR)/usr/lib
-	$(INSTALL_DIR) $(DESTDIR)/usr/include
+	[ -d $(DESTDIR)/usr/lib ] || $(INSTALL_DIR) $(DESTDIR)/usr/lib
+	[ -d $(DESTDIR)/usr/include ] || $(INSTALL_DIR) $(DESTDIR)/usr/include
 	$(INSTALL_PROG) $(LIB) $(DESTDIR)/usr/lib
 	ln -sf libxc.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/lib/libxc.so.$(MAJOR)
 	ln -sf libxc.so.$(MAJOR) $(DESTDIR)/usr/lib/libxc.so
