@@ -1,5 +1,5 @@
 /******************************************************************************
- * xl_segment.c
+ * xl_vbd.c
  * 
  * Xenolinux virtual block-device driver (xvd).
  * 
@@ -15,15 +15,13 @@ typedef unsigned char byte;
 
 #define XLVIRT_MAX        256
 #define XLVIRT_MAJOR_NAME "xvd"
-static int xlseg_blksize_size[XLVIRT_MAX];
-static int xlseg_hardsect_size[XLVIRT_MAX];
-static int xlseg_max_sectors[XLVIRT_MAX];
+static int xlvbd_blksize_size[XLVIRT_MAX];
+static int xlvbd_hardsect_size[XLVIRT_MAX];
+static int xlvbd_max_sectors[XLVIRT_MAX];
 
-struct gendisk *xlsegment_gendisk = NULL;
+struct gendisk *xlvbd_gendisk = NULL;
 
-static xen_disk_info_t xlseg_disk_info;
-
-static struct block_device_operations xlsegment_block_fops = 
+static struct block_device_operations xlvbd_block_fops = 
 {
     open:               xenolinux_block_open,
     release:            xenolinux_block_release,
@@ -33,51 +31,39 @@ static struct block_device_operations xlsegment_block_fops =
 };
 
 
-int xlsegment_hwsect(int minor) 
+int xlvbd_hwsect(int minor) 
 {
-    return xlseg_hardsect_size[minor]; 
+    return xlvbd_hardsect_size[minor]; 
 } 
 
 
-int __init xlseg_init(void)
+int __init xlvbd_init(xen_disk_info_t *xdi)
 {
     int i, result, units, minors, disk;
-    xen_disk_info_t *xdi = &xlseg_disk_info;
     struct gendisk *gd;
 
-    SET_MODULE_OWNER(&xlsegment_block_fops);
-
-    /* Probe for disk information. */
-    memset(xdi, 0, sizeof(*xdi));
-    xenolinux_control_msg(XEN_BLOCK_PROBE_SEG, (char *)xdi, sizeof(*xdi));
-
-    DPRINTK("xvd block device probe:\n");
-    for ( i = 0; i < xdi->count; i++ )
-    { 
-	DPRINTK("  %2d: device: %d, capacity: %ld\n",
-		i, xdi->disks[i].device, xdi->disks[i].capacity);
-    }
+    SET_MODULE_OWNER(&xlvbd_block_fops);
 
     result = register_blkdev(XLVIRT_MAJOR, XLVIRT_MAJOR_NAME,
-                             &xlsegment_block_fops);
+                             &xlvbd_block_fops);
     if ( result < 0 )
     {
-	printk(KERN_ALERT "XL Segment: can't get major %d\n", XLVIRT_MAJOR);
+	printk(KERN_ALERT "XL VBD: can't get major %d\n", XLVIRT_MAJOR);
 	return result;
     }
 
     /* Initialize global arrays. */
     for (i = 0; i < XLVIRT_MAX; i++) 
     {
-        xlseg_blksize_size[i]  = 512;
-        xlseg_hardsect_size[i] = 512;
-        xlseg_max_sectors[i]   = 128;
+        xlvbd_blksize_size[i]  = 512;
+        xlvbd_hardsect_size[i] = 512;
+        xlvbd_max_sectors[i]   = 128;
     }
 
     blk_size[XLVIRT_MAJOR]      = NULL;
-    blksize_size[XLVIRT_MAJOR]  = xlseg_blksize_size;
-    hardsect_size[XLVIRT_MAJOR] = xlseg_hardsect_size;
-    max_sectors[XLVIRT_MAJOR]   = xlseg_max_sectors;
+    blksize_size[XLVIRT_MAJOR]  = xlvbd_blksize_size;
+    hardsect_size[XLVIRT_MAJOR] = xlvbd_hardsect_size;
+    max_sectors[XLVIRT_MAJOR]   = xlvbd_max_sectors;
     read_ahead[XLVIRT_MAJOR]    = 8;
 
     blk_init_queue(BLK_DEFAULT_QUEUE(XLVIRT_MAJOR), do_xlblk_request);
@@ -102,7 +88,7 @@ int __init xlseg_init(void)
     gd->nr_real	     = units;           
     gd->real_devices = kmalloc(units * sizeof(xl_disk_t), GFP_KERNEL);
     gd->next	     = NULL;            
-    gd->fops         = &xlsegment_block_fops;
+    gd->fops         = &xlvbd_block_fops;
     gd->de_arr       = kmalloc(sizeof(*gd->de_arr) * units, GFP_KERNEL);
     gd->flags	     = kmalloc(sizeof(*gd->flags) * units, GFP_KERNEL);
     memset(gd->sizes, 0, minors * sizeof(int));
@@ -110,7 +96,7 @@ int __init xlseg_init(void)
     memset(gd->de_arr, 0, sizeof(*gd->de_arr) * units);
     memset(gd->flags, 0, sizeof(*gd->flags) * units);
     memset(gd->real_devices, 0, sizeof(xl_disk_t) * units);
-    xlsegment_gendisk = gd;
+    xlvbd_gendisk = gd;
     add_gendisk(gd);
 
     /* Now register each disk in turn. */
@@ -127,25 +113,25 @@ int __init xlseg_init(void)
         register_disk(gd, 
                       MKDEV(XLVIRT_MAJOR, disk<<XLVIRT_PARTN_SHIFT), 
                       1<<XLVIRT_PARTN_SHIFT, 
-                      &xlsegment_block_fops, 
+                      &xlvbd_block_fops, 
                       xdi->disks[i].capacity);
     }
 
     printk(KERN_ALERT 
-	   "XenoLinux Virtual Segment Device Driver installed [device: %d]\n",
+	   "XenoLinux Virtual Block Device Driver installed [device: %d]\n",
 	   XLVIRT_MAJOR);
 
     return 0;
 }
 
 
-static void __exit xlseg_cleanup(void)
+void xlvbd_cleanup(void)
 {
-    if ( xlsegment_gendisk == NULL ) return;
+    if ( xlvbd_gendisk == NULL ) return;
 
     blk_cleanup_queue(BLK_DEFAULT_QUEUE(XLVIRT_MAJOR));
 
-    xlsegment_gendisk = NULL;
+    xlvbd_gendisk = NULL;
 
     read_ahead[XLVIRT_MAJOR] = 0;
 
@@ -170,13 +156,13 @@ static void __exit xlseg_cleanup(void)
     if ( unregister_blkdev(XLVIRT_MAJOR, XLVIRT_MAJOR_NAME) != 0 )
     {
 	printk(KERN_ALERT
-	       "XenoLinux Virtual Segment Device Driver"
+	       "XenoLinux Virtual Block Device Driver"
                " uninstalled w/ errs\n");
     }
 }
 
 
 #ifdef MODULE
-module_init(xlseg_init);
-module_exit(xlseg_cleanup);
+module_init(xlvbd_init);
+module_exit(xlvbd_cleanup);
 #endif

@@ -2,8 +2,7 @@
 #include <xeno/types.h>
 #include <xeno/lib.h>
 #include <xeno/ide.h>
-#include <xeno/segment.h>
-#include <hypervisor-ifs/block.h>
+#include <xeno/vbd.h>
 #include <asm/domain_page.h>
 #include <asm/io.h>
 
@@ -11,7 +10,6 @@ void ide_probe_devices(xen_disk_info_t* xdi)
 {
     int loop;
     unsigned int unit;
-    xen_disk_info_t *xen_xdi = map_domain_mem(virt_to_phys(xdi));
     unsigned long capacity; 
     unsigned short device, type; 
     ide_drive_t *drive;
@@ -36,17 +34,17 @@ void ide_probe_devices(xen_disk_info_t* xdi)
             device   = MK_IDE_XENDEV((loop * MAX_DRIVES) + unit);
             capacity = current_capacity(drive);
 
-            xen_xdi->disks[xen_xdi->count].device   = device; 
-            xen_xdi->disks[xen_xdi->count].type     = type; 
-            xen_xdi->disks[xen_xdi->count].capacity = capacity;
-            xen_xdi->count++;
+            xdi->disks[xdi->count].device   = device; 
+            xdi->disks[xdi->count].type     = type; 
+            xdi->disks[xdi->count].capacity = capacity;
+            xdi->count++;
 
             printk("Device %d: IDE-XENO (%s) capacity %ldkB (%ldMB)\n",
-                   xen_xdi->count, (type == XD_TYPE_DISK) ? "disk" : 
+                   xdi->count, (type == XD_TYPE_DISK) ? "disk" : 
 		   ((type == XD_TYPE_CDROM) ? "cdrom" : "unknown"), 
 		   capacity>>1, capacity>>11);
         }
     }
-
-    unmap_domain_mem(xen_xdi);
+    
+    return;
 }
