@@ -224,24 +224,24 @@ void domain_sleep(struct exec_domain *d)
     }
 }
 
-void domain_wake(struct exec_domain *d)
+void domain_wake(struct exec_domain *ed)
 {
     unsigned long flags;
 
-    spin_lock_irqsave(&schedule_data[d->processor].schedule_lock, flags);
+    spin_lock_irqsave(&schedule_data[ed->processor].schedule_lock, flags);
 
-    if ( likely(domain_runnable(d)) )
+    if ( likely(domain_runnable(ed)) )
     {
-        TRACE_2D(TRC_SCHED_WAKE, d->id, d);
-        SCHED_OP(wake, d);
+        TRACE_2D(TRC_SCHED_WAKE, ed->domain->id, ed);
+        SCHED_OP(wake, ed);
 #ifdef WAKE_HISTO
-        d->wokenup = NOW();
+        ed->wokenup = NOW();
 #endif
     }
     
-    clear_bit(EDF_MIGRATED, &d->ed_flags);
+    clear_bit(EDF_MIGRATED, &ed->ed_flags);
     
-    spin_unlock_irqrestore(&schedule_data[d->processor].schedule_lock, flags);
+    spin_unlock_irqrestore(&schedule_data[ed->processor].schedule_lock, flags);
 }
 
 /* Block the currently-executing domain until a pertinent event occurs. */
@@ -250,7 +250,7 @@ long do_block(void)
     ASSERT(current->domain->id != IDLE_DOMAIN_ID);
     current->vcpu_info->evtchn_upcall_mask = 0;
     set_bit(EDF_BLOCKED, &current->ed_flags);
-    TRACE_2D(TRC_SCHED_BLOCK, current->id, current);
+    TRACE_2D(TRC_SCHED_BLOCK, current->domain->id, current);
     __enter_scheduler();
     return 0;
 }
@@ -258,7 +258,7 @@ long do_block(void)
 /* Voluntarily yield the processor for this allocation. */
 static long do_yield(void)
 {
-    TRACE_2D(TRC_SCHED_YIELD, current->id, current);
+    TRACE_2D(TRC_SCHED_YIELD, current->domain->id, current);
     __enter_scheduler();
     return 0;
 }
@@ -447,7 +447,7 @@ void __enter_scheduler(void)
     }
 #endif
 
-    TRACE_2D(TRC_SCHED_SWITCH, next->id, next);
+    TRACE_2D(TRC_SCHED_SWITCH, next->domain->id, next);
 
     switch_to(prev, next);
 

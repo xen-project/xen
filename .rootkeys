@@ -98,7 +98,6 @@
 40d70c240tW7TWArl1VUgIFH2nVO1A linux-2.4.28-xen-sparse/include/asm-xen/keyboard.h
 3e5a4e678ddsQOpbSiRdy1GRcDc9WA linux-2.4.28-xen-sparse/include/asm-xen/mmu_context.h
 40d06e5b2YWInUX1Xv9amVANwd_2Xg linux-2.4.28-xen-sparse/include/asm-xen/module.h
-3f8707e7ZmZ6TxyX0ZUEfvhA2Pb_xQ linux-2.4.28-xen-sparse/include/asm-xen/msr.h
 3e5a4e67mnQfh-R8KcQCaVo2Oho6yg linux-2.4.28-xen-sparse/include/asm-xen/page.h
 409ba2e7ZfV5hqTvIzxLtpClnxtIzg linux-2.4.28-xen-sparse/include/asm-xen/pci.h
 3e5a4e67uTYU5oEnIDjxuaez8njjqg linux-2.4.28-xen-sparse/include/asm-xen/pgalloc.h
@@ -232,7 +231,6 @@
 40f5623arsFXkGdPvIqvFi3yFXGR0Q linux-2.6.9-xen-sparse/include/asm-xen/asm-i386/mach-xen/setup_arch_pre.h
 41811f07Iri9hrvs97t-baxmhOwWDQ linux-2.6.9-xen-sparse/include/asm-xen/asm-i386/mach-xen/smpboot_hooks.h
 4120f807GCO0uqsLqdZj9csxR1Wthw linux-2.6.9-xen-sparse/include/asm-xen/asm-i386/mmu_context.h
-40f5623aFTyFTR-vdiA-KaGxk5JOKQ linux-2.6.9-xen-sparse/include/asm-xen/asm-i386/msr.h
 40f5623adgjZq9nAgCt0IXdWl7udSA linux-2.6.9-xen-sparse/include/asm-xen/asm-i386/page.h
 40f5623a54NuG-7qHihGYmw4wWQnMA linux-2.6.9-xen-sparse/include/asm-xen/asm-i386/param.h
 41137cc1kkvg0cg7uxddcEfjL7L67w linux-2.6.9-xen-sparse/include/asm-xen/asm-i386/pci.h
@@ -306,8 +304,6 @@
 413cb3b5F56TvQWAmO5TsuzhtzLFPQ netbsd-2.0-xen-sparse/sys/arch/xen/xen/xenkbc.c
 413cb3b53nyOv1OIeDSsCXhBFDXvJA netbsd-2.0-xen-sparse/sys/nfs/files.nfs
 413aa1d0oNP8HXLvfPuMe6cSroUfSA patches/linux-2.6.9/agpgart.patch
-413aa1d0ewvSv-ohnNnQQNGsbPTTNA patches/linux-2.6.9/drm.patch
-418abc69J3F638vPO9MYoDGeYilxoQ patches/linux-2.6.9/nettel.patch
 40e1b09db5mN69Ijj0X_Eol-S7dXiw tools/Make.defs
 3f776bd1Hy9rn69ntXBhPReUFw9IEA tools/Makefile
 4124b307nRyK3dhn1hAsvrY76NuV3g tools/check/Makefile

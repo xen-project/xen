@@ -237,12 +237,10 @@ extern unsigned long *phys_to_machine_mapping;
 void *memguard_init(void *heap_start);
 void memguard_guard_range(void *p, unsigned long l);
 void memguard_unguard_range(void *p, unsigned long l);
-int memguard_is_guarded(void *p);
 #else
 #define memguard_init(_s)              (_s)
 #define memguard_guard_range(_p,_l)    ((void)0)
 #define memguard_unguard_range(_p,_l)  ((void)0)
-#define memguard_is_guarded(_p)        (0)
 #endif
 
 

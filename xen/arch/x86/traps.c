@@ -51,6 +51,7 @@
 #include <asm/uaccess.h>
 #include <asm/i387.h>
 #include <asm/debugger.h>
+#include <asm/msr.h>
 
 #if defined(__i386__)
 
@@ -481,6 +482,49 @@ asmlinkage int do_page_fault(struct xen_regs *regs)
     return 0;
 }
 
+static int emulate_privileged_op(struct xen_regs *regs)
+{
+    u16 opcode;
+
+    if ( get_user(opcode, (u16 *)regs->eip) || ((opcode & 0xff) != 0x0f) )
+        return 0;
+
+    switch ( opcode >> 8 )
+    {
+    case 0x09: /* WBINVD */
+        if ( !IS_CAPABLE_PHYSDEV(current->domain) )
+        {
+            DPRINTK("Non-physdev domain attempted WBINVD.\n");
+            return 0;
+        }
+        wbinvd();
+        regs->eip += 2;
+        return 1;
+        
+    case 0x30: /* WRMSR */
+        if ( !IS_PRIV(current->domain) )
+        {
+            DPRINTK("Non-priv domain attempted WRMSR.\n");
+            return 0;
+        }
+        wrmsr(regs->ecx, regs->eax, regs->edx);
+        regs->eip += 2;
+        return 1;
+
+    case 0x32: /* RDMSR */
+        if ( !IS_PRIV(current->domain) )
+        {
+            DPRINTK("Non-priv domain attempted RDMSR.\n");
+            return 0;
+        }
+        rdmsr(regs->ecx, regs->eax, regs->edx);
+        regs->eip += 2;
+        return 1;
+    }
+
+    return 0;
+}
+
 asmlinkage int do_general_protection(struct xen_regs *regs)
 {
     struct exec_domain *ed = current;
@@ -528,6 +572,12 @@ asmlinkage int do_general_protection(struct xen_regs *regs)
             goto finish_propagation;
         }
     }
+
+    /* Emulate some simple privileged instructions when exec'ed in ring 1. */
+    if ( (regs->error_code == 0) &&
+         RING_1(regs) &&
+         emulate_privileged_op(regs) )
+        return 0;
 
 #if defined(__i386__)
     if ( VM_ASSIST(d, VMASST_TYPE_4gb_segments) && 

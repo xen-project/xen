@@ -466,14 +466,4 @@ void memguard_unguard_range(void *p, unsigned long l)
     __memguard_change_range(p, l, 0);
 }
 
-int memguard_is_guarded(void *p)
-{
-    l1_pgentry_t *l1;
-    l2_pgentry_t *l2;
-    unsigned long _p = (unsigned long)p;
-    l2  = &idle_pg_table[l2_table_offset(_p)];
-    l1  = l2_pgentry_to_l1(*l2) + l1_table_offset(_p);
-    return !(l1_pgentry_val(*l1) & _PAGE_PRESENT);
-}
-
 #endif
