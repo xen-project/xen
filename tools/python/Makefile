@@ -2,7 +2,8 @@
 XEN_ROOT = ../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-all:
+all: build
+build:
 	CFLAGS="$(CFLAGS)" python setup.py build
 
 install: all

@@ -18,7 +18,8 @@ DOC_HTML	:= $(patsubst src/%.tex,html/%/index.html,$(DOC_TEX))
 
 GFX = $(patsubst %.fig, %.eps, $(wildcard figs/*.fig))
 
-all: ps pdf html
+all: build
+build: ps pdf html
 	rm -f *.aux *.dvi *.bbl *.blg *.glo *.idx *.ilg *.log *.ind *.toc
 
 ps: $(DOC_PS)

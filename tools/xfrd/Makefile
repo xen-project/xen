@@ -63,7 +63,8 @@ XFRD_LIBS += $(CURL_LIBS)
 
 #$(warning XFRD_LIBS = $(XFRD_LIBS))
 
-all: xfrd
+all: build
+build: xfrd
 
 xfrd: $(XFRD_PROG_OBJ)
 	$(CC) -o $@ $^ $(XFRD_LIBS)
