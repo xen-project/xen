@@ -148,6 +148,7 @@ unsigned long max_page;
 
 void __init init_frametable(void)
 {
+#ifdef __i386__
     unsigned long i, p;
 
     frame_table      = (struct pfn_info *)FRAMETABLE_VIRT_START;
@@ -164,6 +165,7 @@ void __init init_frametable(void)
     }
 
     memset(frame_table, 0, frame_table_size);
+#endif
 }
 
 void arch_init_memory(void)
