@@ -814,7 +814,8 @@ long do_set_trap_table(trap_info_t *traps)
 
     for ( ; ; )
     {
-        hypercall_may_preempt(__HYPERVISOR_set_trap_table, 1, traps);
+        locked_hypercall_may_preempt(current->domain,
+                                     __HYPERVISOR_set_trap_table, 1, traps);
 
         if ( copy_from_user(&cur, traps, sizeof(cur)) ) return -EFAULT;
 

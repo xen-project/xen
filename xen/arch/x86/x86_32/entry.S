@@ -96,7 +96,7 @@ do_multicall:
 multicall_loop:
         pushl %ecx
         movl  4(%esp),%ecx               # %ecx = struct domain
-        movl  DOMAIN_processor(%ecx),%eax
+        movl  EDOMAIN_processor(%ecx),%eax
         shl   $6,%eax                    # sizeof(irq_cpustat) == 64
         testl $~0,SYMBOL_NAME(irq_stat)(%eax,1)
         jnz   multicall_preempt
@@ -172,7 +172,7 @@ multicall_fixup1:
                 
         ALIGN
 restore_all_guest:
-        testb $TF_failsafe_return,DOMAIN_thread_flags(%ebx)
+        testb $TF_failsafe_return,EDOMAIN_thread_flags(%ebx)
         jnz  failsafe_callback
 FLT1:   movl XREGS_ds(%esp),%ds
 FLT2:   movl XREGS_es(%esp),%es
@@ -212,9 +212,9 @@ FIX1:   SET_XEN_SEGMENTS(a)
 DBLFLT1:GET_CURRENT(%ebx)
         jmp   test_all_events
 DBLFIX1:GET_CURRENT(%ebx)
-        testb $TF_failsafe_return,DOMAIN_thread_flags(%ebx)
+        testb $TF_failsafe_return,EDOMAIN_thread_flags(%ebx)
         jnz   domain_crash             # cannot reenter failsafe code
-        orb   $TF_failsafe_return,DOMAIN_thread_flags(%ebx)
+        orb   $TF_failsafe_return,EDOMAIN_thread_flags(%ebx)
         jmp   test_all_events          # will return via failsafe code
 .previous
 .section __pre_ex_table,"a"
@@ -251,7 +251,7 @@ FLT6:   iret
 .section .fixup,"ax"
 FIX6:   pushl %ebx
         GET_CURRENT(%ebx)
-        orb   $TF_failsafe_return,DOMAIN_thread_flags(%ebx)
+        orb   $TF_failsafe_return,EDOMAIN_thread_flags(%ebx)
         pop   %ebx
         jmp   FIX5
 .section __pre_ex_table,"a"
