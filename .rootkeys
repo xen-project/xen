@@ -846,6 +846,7 @@
 41d58ba6ijEF6fedqRO5vFu7uCirZg tools/xcs/xcsdump.c
 403a3edbrr8RE34gkbR40zep98SXbg tools/xentrace/Makefile
 40a107afN60pFdURgBv9KwEzgRl5mQ tools/xentrace/formats
+420d52d2_znVbT4JAPIU36vQOme83g tools/xentrace/xenctx.c
 4050c413PhhLNAYk3TEwP37i_iLw9Q tools/xentrace/xentrace.8
 403a3edbVpV2E_wq1zeEkJ_n4Uu2eg tools/xentrace/xentrace.c
 403a3edblCUrzSj0mmKhO5HOPrOrSQ tools/xentrace/xentrace_format
