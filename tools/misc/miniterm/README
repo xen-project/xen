@@ -1,0 +1,13 @@
+This is a modified version of the miniterm program distributed as part
+of the Linux Programmer's Guide (LPG) by Sven Goldt.
+
+It is intended to be used as a dumb raw terminal for debugging Xen
+machines over the serial line.
+
+By default it will connect to COM1 (/dev/ttyS0) at 115200 baud.
+These options can be modified as follows:
+ miniterm [-b<baudrate>] [-d<devicename>]
+
+'ctrl-b' quits miniterm.
+
+ -- Keir Fraser (21/9/2003)
