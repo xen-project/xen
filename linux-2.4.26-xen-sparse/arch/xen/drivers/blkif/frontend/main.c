@@ -61,30 +61,34 @@ static unsigned long sg_next_sect;
 #define DISABLE_SCATTERGATHER() (sg_operation = -1)
 
 
-inline void translate_req_to_pfn( blkif_request_t * xreq, blkif_request_t * req)
+static inline void translate_req_to_pfn(blkif_request_t *xreq,
+                                        blkif_request_t *req)
 {
     int i;
     
-    *xreq=*req; 
-    for ( i=0; i<req->nr_segments; i++ )
-    {	
-	xreq->frame_and_sects[i] = (req->frame_and_sects[i] & ~PAGE_MASK) |
-	    (machine_to_phys_mapping[req->frame_and_sects[i]>>PAGE_SHIFT]<<PAGE_SHIFT);	
+    *xreq = *req;
+
+    for ( i = 0; i < req->nr_segments; i++ )
+    {
+        xreq->frame_and_sects[i] = (req->frame_and_sects[i] & ~PAGE_MASK) |
+            (machine_to_phys_mapping[req->frame_and_sects[i] >> PAGE_SHIFT] <<
+             PAGE_SHIFT);
     }
-    return xreq;
 }
 
-inline void translate_req_to_mfn( blkif_request_t * xreq, blkif_request_t * req)
+static inline void translate_req_to_mfn(blkif_request_t *xreq,
+                                        blkif_request_t *req)
 {
     int i;
 
-    *xreq=*req; 
-    for ( i=0; i<req->nr_segments; i++ )
-    {	
-	xreq->frame_and_sects[i] = (req->frame_and_sects[i] & ~PAGE_MASK) |
-	    (phys_to_machine_mapping[req->frame_and_sects[i]>>PAGE_SHIFT]<<PAGE_SHIFT);
+    *xreq = *req;
+
+    for ( i = 0; i < req->nr_segments; i++ )
+    {
+        xreq->frame_and_sects[i] = (req->frame_and_sects[i] & ~PAGE_MASK) |
+            (phys_to_machine_mapping[req->frame_and_sects[i] >> PAGE_SHIFT] <<
+             PAGE_SHIFT);
     }
-    return xreq;
 }
 
 
@@ -170,7 +174,7 @@ int blkif_release(struct inode *inode, struct file *filep)
 
 
 int blkif_ioctl(struct inode *inode, struct file *filep,
-                          unsigned command, unsigned long argument)
+                unsigned command, unsigned long argument)
 {
     kdev_t dev = inode->i_rdev;
     struct hd_geometry *geo = (struct hd_geometry *)argument;
@@ -392,8 +396,8 @@ static int blkif_queue_request(unsigned long   id,
                 DISABLE_SCATTERGATHER();
 
             /* Update the copy of the request in the recovery ring. */
-	    translate_req_to_pfn(&blk_ring_rec->ring[
-		MASK_BLKIF_IDX(blk_ring_rec->req_prod - 1)].req, req);
+            translate_req_to_pfn(&blk_ring_rec->ring[
+                MASK_BLKIF_IDX(blk_ring_rec->req_prod - 1)].req, req);
 
             return 0;
         }
@@ -425,7 +429,7 @@ static int blkif_queue_request(unsigned long   id,
 
     /* Keep a private copy so we can reissue requests when recovering. */    
     translate_req_to_pfn(&blk_ring_rec->ring[
-	MASK_BLKIF_IDX(blk_ring_rec->req_prod)].req, req);
+        MASK_BLKIF_IDX(blk_ring_rec->req_prod)].req, req);
     blk_ring_rec->req_prod++;
 
     return 0;
@@ -602,7 +606,7 @@ void blkif_control_send(blkif_request_t *req, blkif_response_t *rsp)
     blk_ring->ring[MASK_BLKIF_IDX(req_prod)].req = *req;
     
     translate_req_to_pfn(&blk_ring_rec->ring[
-	MASK_BLKIF_IDX(blk_ring_rec->req_prod++)].req,req);
+        MASK_BLKIF_IDX(blk_ring_rec->req_prod++)].req,req);
 
     req_prod++;
     flush_requests();
@@ -693,27 +697,29 @@ static void blkif_status_change(blkif_fe_interface_status_changed_t *status)
         {
             int i,j;
 
-	    /* Shouldn't need the io_request_lock here - the device is
-	     * plugged and the recovery flag prevents the interrupt handler
-	     * changing anything. */
+            /*
+             * Shouldn't need the io_request_lock here - the device is plugged
+             * and the recovery flag prevents the interrupt handler changing
+             * anything.
+             */
 
             /* Reissue requests from the private block ring. */
             for ( i = 0;
-		  resp_cons_rec < blk_ring_rec->req_prod;
+                  resp_cons_rec < blk_ring_rec->req_prod;
                   resp_cons_rec++, i++ )
             {                
-                translate_req_to_mfn(&blk_ring->ring[i].req,
-				     &blk_ring_rec->ring[
-					 MASK_BLKIF_IDX(resp_cons_rec)].req);
+                translate_req_to_mfn(
+                    &blk_ring->ring[i].req,
+                    &blk_ring_rec->ring[MASK_BLKIF_IDX(resp_cons_rec)].req);
             }
 
-            /* Reset the private block ring to match the new ring. */	    
-	    for( j=0; j<i; j++ )
-	    {		
-		translate_req_to_pfn(
-		    &blk_ring_rec->ring[j].req,
-		    &blk_ring->ring[j].req);
-	    }
+            /* Reset the private block ring to match the new ring. */
+            for ( j = 0; j < i; j++ )
+            {
+                translate_req_to_pfn(
+                    &blk_ring_rec->ring[j].req,
+                    &blk_ring->ring[j].req);
+            }
 
             resp_cons_rec = 0;
 
@@ -788,7 +794,7 @@ int __init xlblk_init(void)
     blkif_fe_driver_status_changed_t st;
 
     if ( (start_info.flags & SIF_INITDOMAIN) 
-        || (start_info.flags & SIF_BLK_BE_DOMAIN) )
+         || (start_info.flags & SIF_BLK_BE_DOMAIN) )
         return 0;
 
     printk(KERN_INFO "Initialising Xen virtual block device\n");
@@ -821,24 +827,9 @@ int __init xlblk_init(void)
     return 0;
 }
 
-
-static void __exit xlblk_cleanup(void)
-{
-    /* XXX FIXME */
-    BUG();
-}
-
-
-#ifdef MODULE
-module_init(xlblk_init);
-module_exit(xlblk_cleanup);
-#endif
-
-
 void blkdev_suspend(void)
 {
 }
-
 
 void blkdev_resume(void)
 {
@@ -853,4 +844,3 @@ void blkdev_resume(void)
     memcpy(cmsg.msg, &st, sizeof(st));
     ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
 }
-
