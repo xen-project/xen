@@ -55,8 +55,6 @@
  */
 #define SMP_CACHE_BYTES 64
 #define NR_CPUS 16
-#define __cacheline_aligned __attribute__((__aligned__(SMP_CACHE_BYTES)))
-#define ____cacheline_aligned __cacheline_aligned
 
 /* Linkage for x86 */
 #define asmlinkage        __attribute__((regparm(0)))

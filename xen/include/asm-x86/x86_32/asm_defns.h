@@ -11,7 +11,7 @@
 /* Maybe auto-generate the following two cases (quoted vs. unquoted). */
 #ifndef __ASSEMBLY__
 
-#define __SAVE_ALL_PRE(_reg) \
+#define __SAVE_ALL_PRE \
         "cld;" \
         "pushl %eax;" \
         "pushl %ebp;" \
@@ -20,16 +20,20 @@
         "pushl %edx;" \
         "pushl %ecx;" \
         "pushl %ebx;" \
-        "movb "STR(XREGS_cs)"(%esp),%"STR(_reg)"l;" \
-        "testb $3,%"STR(_reg)"l;" \
-        "je 1f;" \
+        "testl $"STR(X86_EFLAGS_VM)","STR(XREGS_eflags)"(%esp);" \
+        "jz 2f;" \
+        "call setup_vm86_frame;" \
+        "jmp 3f;" \
+        "2:testb $3,"STR(XREGS_cs)"(%esp);" \
+        "jz 1f;" \
         "movl %ds,"STR(XREGS_ds)"(%esp);" \
         "movl %es,"STR(XREGS_es)"(%esp);" \
         "movl %fs,"STR(XREGS_fs)"(%esp);" \
-        "movl %gs,"STR(XREGS_gs)"(%esp);"
+        "movl %gs,"STR(XREGS_gs)"(%esp);" \
+        "3:"
 
 #define SAVE_ALL_NOSEGREGS(_reg) \
-        __SAVE_ALL_PRE(_reg) \
+        __SAVE_ALL_PRE \
         "1:"
 
 #define SET_XEN_SEGMENTS(_reg) \
@@ -38,13 +42,13 @@
         "movl %e"STR(_reg)"x,%es;"
 
 #define SAVE_ALL(_reg) \
-        __SAVE_ALL_PRE(_reg) \
+        __SAVE_ALL_PRE \
         SET_XEN_SEGMENTS(_reg) \
         "1:"
 
 #else
 
-#define __SAVE_ALL_PRE(_reg) \
+#define __SAVE_ALL_PRE \
         cld; \
         pushl %eax; \
         pushl %ebp; \
@@ -53,16 +57,20 @@
         pushl %edx; \
         pushl %ecx; \
         pushl %ebx; \
-        movb XREGS_cs(%esp),% ## _reg ## l; \
-        testb $3,% ## _reg ## l; \
-        je 1f; \
+        testl $X86_EFLAGS_VM,XREGS_eflags(%esp); \
+        jz 2f; \
+        call setup_vm86_frame; \
+        jmp 3f; \
+        2:testb $3,XREGS_cs(%esp); \
+        jz 1f; \
         movl %ds,XREGS_ds(%esp); \
         movl %es,XREGS_es(%esp); \
         movl %fs,XREGS_fs(%esp); \
-        movl %gs,XREGS_gs(%esp);
+        movl %gs,XREGS_gs(%esp); \
+        3:
 
 #define SAVE_ALL_NOSEGREGS(_reg) \
-        __SAVE_ALL_PRE(_reg) \
+        __SAVE_ALL_PRE \
         1:
 
 #define SET_XEN_SEGMENTS(_reg) \
@@ -71,7 +79,7 @@
         movl %e ## _reg ## x,%es;
 
 #define SAVE_ALL(_reg) \
-        __SAVE_ALL_PRE(_reg) \
+        __SAVE_ALL_PRE \
         SET_XEN_SEGMENTS(_reg) \
         1:
 

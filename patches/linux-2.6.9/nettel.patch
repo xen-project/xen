@@ -1,6 +1,6 @@
-diff -ru linux-2.6.8.1/drivers/mtd/maps/nettel.c linux-2.6.8.1-xen0/drivers/mtd/maps/nettel.c
---- linux-2.6.8.1/drivers/mtd/maps/nettel.c	2004-10-21 15:59:29.000000000 -0600
-+++ linux-2.6.8.1-xen0/drivers/mtd/maps/nettel.c	2004-10-22 09:12:17.000000000 -0600
+diff -ur linux-2.6.9/drivers/mtd/maps/nettel.c linux-2.6.9-new/drivers/mtd/maps/nettel.c
+--- linux-2.6.9/drivers/mtd/maps/nettel.c	2004-10-18 22:53:44.000000000 +0100
++++ linux-2.6.9-new/drivers/mtd/maps/nettel.c	2004-11-28 19:45:35.000000000 +0000
 @@ -270,7 +270,7 @@
  	maxsize = AMD_WINDOW_MAXSIZE;
  

@@ -64,6 +64,7 @@ ES		= 0x20
 ORIG_EAX	= 0x24
 EIP		= 0x28
 CS		= 0x2C
+EVENT_MASK	= 0x2E
 EFLAGS		= 0x30
 OLDESP		= 0x34
 OLDSS		= 0x38
@@ -79,19 +80,23 @@ VM_MASK		= 0x00020000
 #define evtchn_upcall_pending		/* 0 */
 #define evtchn_upcall_mask		1
 
+#define XEN_GET_VCPU_INFO(reg)	movl HYPERVISOR_shared_info,reg
 #define XEN_BLOCK_EVENTS(reg)	movb $1,evtchn_upcall_mask(reg)
 #define XEN_UNBLOCK_EVENTS(reg)	movb $0,evtchn_upcall_mask(reg)
-#define XEN_TEST_PENDING(reg)	testb $0xFF,evtchn_upcall_pending(%reg)
+#define XEN_SAVE_UPCALL_MASK(reg,tmp,off) \
+	movb evtchn_upcall_mask(reg), tmp; \
+	movb tmp, off(%esp)
+
+#define XEN_TEST_PENDING(reg)	testb $0xFF,evtchn_upcall_pending(reg)
 
 #ifdef CONFIG_PREEMPT
-#define preempt_stop		movl HYPERVISOR_shared_info,%esi	; \
-				XEN_BLOCK_EVENTS(%esi)
+#define preempt_stop		XEN_BLOCK_EVENTS(%esi)
 #else
 #define preempt_stop
 #define resume_kernel		restore_all_enable_events
 #endif
 
-#define SAVE_ALL \
+#define SAVE_ALL_NO_EVENTMASK \
 	cld; \
 	pushl %es; \
 	pushl %ds; \
@@ -104,7 +109,12 @@ VM_MASK		= 0x00020000
 	pushl %ebx; \
 	movl $(__USER_DS), %edx; \
 	movl %edx, %ds; \
-	movl %edx, %es;
+	movl %edx, %es
+
+#define SAVE_ALL \
+	SAVE_ALL_NO_EVENTMASK; \
+	XEN_GET_VCPU_INFO(%esi); \
+	XEN_SAVE_UPCALL_MASK(%esi,%dl,EVENT_MASK)
 
 #define RESTORE_INT_REGS \
 	popl %ebx;	\
@@ -154,6 +164,7 @@ ENTRY(ret_from_fork)
 	call schedule_tail
 	GET_THREAD_INFO(%ebp)
 	popl %eax
+	XEN_GET_VCPU_INFO(%esi)
 	jmp syscall_exit
 
 /*
@@ -174,34 +185,31 @@ ret_from_intr:
 	testl $(VM_MASK | 2), %eax
 	jz resume_kernel		# returning to kernel or vm86-space
 ENTRY(resume_userspace)
-	movl HYPERVISOR_shared_info,%esi
-	XEN_BLOCK_EVENTS(%esi)		# make tests atomic
-					# make sure we don't miss an interrupt
+	XEN_GET_VCPU_INFO(%esi)
+	XEN_BLOCK_EVENTS(%esi)		# make sure we don't miss an interrupt
 					# setting need_resched or sigpending
 					# between sampling and the iret
-ret_syscall_tests:
 	movl TI_flags(%ebp), %ecx
 	andl $_TIF_WORK_MASK, %ecx	# is there any work to be done on
 					# int/exception return?
 	jne work_pending
-	jmp restore_all_enable_events
+	jmp restore_all
 
 #ifdef CONFIG_PREEMPT
 ENTRY(resume_kernel)
-	movl HYPERVISOR_shared_info,%esi
+	XEN_GET_VCPU_INFO(%esi)
 	cmpl $0,TI_preempt_count(%ebp)	# non-zero preempt_count ?
-	jnz restore_all_enable_events
+	jnz restore_all
 need_resched:
 	movl TI_flags(%ebp), %ecx	# need_resched set ?
 	testb $_TIF_NEED_RESCHED, %cl
-	jz restore_all_enable_events
-	testl $IF_MASK,EFLAGS(%esp)     # interrupts off (exception path) ?
-	jz restore_all_enable_events
+	jz restore_all
+	testb $0xFF,EVENT_MASK(%esp)	# interrupts off (exception path) ?
+	jnz restore_all
 	movl $PREEMPT_ACTIVE,TI_preempt_count(%ebp)
-	XEN_UNBLOCK_EVENTS(%esi)	# reenable event callbacks
+	XEN_UNBLOCK_EVENTS(%esi)
 	call schedule
-	movl HYPERVISOR_shared_info,%esi
-	XEN_BLOCK_EVENTS(%esi)		# make tests atomic
+	XEN_BLOCK_EVENTS(%esi)
 	movl $0,TI_preempt_count(%ebp)
 	jmp need_resched
 #endif
@@ -267,35 +275,44 @@ syscall_call:
 	call *sys_call_table(,%eax,4)
 	movl %eax,EAX(%esp)		# store the return value
 syscall_exit:
-	movl HYPERVISOR_shared_info,%esi
-	XEN_BLOCK_EVENTS(%esi)		# make tests atomic
-					# make sure we don't miss an interrupt
+	XEN_BLOCK_EVENTS(%esi)		# make sure we don't miss an interrupt
 					# setting need_resched or sigpending
 					# between sampling and the iret
 	movl TI_flags(%ebp), %ecx
 	testw $_TIF_ALLWORK_MASK, %cx	# current->work
 	jne syscall_exit_work
-	jmp restore_all_enable_events
+restore_all:
+	testl $VM_MASK, EFLAGS(%esp)
+	jnz resume_vm86
+	movb EVENT_MASK(%esp), %al
+	notb %al			# %al == ~saved_mask
+	andb evtchn_upcall_mask(%esi),%al
+	andb $1,%al			# %al == mask & ~saved_mask
+	jnz restore_all_enable_events	#     != 0 => reenable event delivery
+	RESTORE_ALL
+
+resume_vm86:
+	XEN_UNBLOCK_EVENTS(%esi)
+	RESTORE_REGS
+	movl %eax,(%esp)
+	movl $__HYPERVISOR_switch_vm86,%eax
+	int $0x82
+	ud2
 
 	# perform work that needs to be done immediately before resumption
 	ALIGN
 work_pending:
-	XEN_UNBLOCK_EVENTS(%esi)	# reenable event callbacks
 	testb $_TIF_NEED_RESCHED, %cl
 	jz work_notifysig
 work_resched:
 	call schedule
-	movl HYPERVISOR_shared_info,%esi
-	XEN_BLOCK_EVENTS(%esi)		# make tests atomic
-					# make sure we don't miss an interrupt
+	XEN_BLOCK_EVENTS(%esi)		# make sure we don't miss an interrupt
 					# setting need_resched or sigpending
 					# between sampling and the iret
 	movl TI_flags(%ebp), %ecx
 	andl $_TIF_WORK_MASK, %ecx	# is there any work to be done other
 					# than syscall tracing?
-	jz restore_all_enable_events
-	# XXXcl sti missing???
-	XEN_UNBLOCK_EVENTS(%esi)	# reenable event callbacks
+	jz restore_all
 	testb $_TIF_NEED_RESCHED, %cl
 	jnz work_resched
 
@@ -307,8 +324,7 @@ work_notifysig:				# deal with pending signals and
 					# vm86-space
 	xorl %edx, %edx
 	call do_notify_resume
-	movl HYPERVISOR_shared_info,%esi
-	jmp restore_all_enable_events
+	jmp restore_all
 
 	ALIGN
 work_notifysig_v86:
@@ -318,8 +334,7 @@ work_notifysig_v86:
 	movl %eax, %esp
 	xorl %edx, %edx
 	call do_notify_resume
-	movl HYPERVISOR_shared_info,%esi
-	jmp restore_all_enable_events
+	jmp restore_all
 
 	# perform syscall exit tracing
 	ALIGN
@@ -336,11 +351,9 @@ syscall_trace_entry:
 	# perform syscall exit tracing
 	ALIGN
 syscall_exit_work:
-	movl HYPERVISOR_shared_info,%esi
 	testb $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT|_TIF_SINGLESTEP), %cl
 	jz work_pending
-	XEN_UNBLOCK_EVENTS(%esi)	# reenable event callbacks
-					# could let do_syscall_trace() call
+	XEN_UNBLOCK_EVENTS(%esi)	# could let do_syscall_trace() call
 					# schedule() instead
 	movl %esp, %eax
 	movl $1, %edx
@@ -359,6 +372,44 @@ syscall_fault:
 syscall_badsys:
 	movl $-ENOSYS,EAX(%esp)
 	jmp resume_userspace
+
+#if 0 /* XEN */
+/*
+ * Build the entry stubs and pointer table with
+ * some assembler magic.
+ */
+.data
+ENTRY(interrupt)
+.text
+
+vector=0
+ENTRY(irq_entries_start)
+.rept NR_IRQS
+	ALIGN
+1:	pushl $vector-256
+	jmp common_interrupt
+.data
+	.long 1b
+.text
+vector=vector+1
+.endr
+
+	ALIGN
+common_interrupt:
+	SAVE_ALL
+	call do_IRQ
+	jmp ret_from_intr
+
+#define BUILD_INTERRUPT(name, nr)	\
+ENTRY(name)				\
+	pushl $nr-256;			\
+	SAVE_ALL			\
+	call smp_/**/name;	\
+	jmp ret_from_intr;
+
+/* The include is where all of the SMP etc. interrupts come from */
+#include "entry_arch.h"
+#endif /* XEN */
 
 ENTRY(divide_error)
 	pushl $0			# no error code
@@ -385,6 +436,8 @@ error_code:
 	movl %ecx, %ds
 	movl %ecx, %es
 	movl %esp,%eax			# pt_regs pointer
+	XEN_GET_VCPU_INFO(%esi)
+	XEN_SAVE_UPCALL_MASK(%esi,%dl,EVENT_MASK+8)
 	call *%edi
 	jmp ret_from_exception
 
@@ -401,24 +454,24 @@ error_code:
 # activation and restart the handler using the previous one.
 ENTRY(hypervisor_callback)
 	pushl %eax
-	SAVE_ALL
-	GET_THREAD_INFO(%ebp)
+	SAVE_ALL_NO_EVENTMASK
 	movl EIP(%esp),%eax
 	cmpl $scrit,%eax
 	jb   11f
 	cmpl $ecrit,%eax
 	jb   critical_region_fixup
-11:	push %esp
+11:	XEN_GET_VCPU_INFO(%esi)
+	movb $0, EVENT_MASK(%esp)
+	push %esp
 	call evtchn_do_upcall
 	add  $4,%esp
-	movl HYPERVISOR_shared_info,%esi
-	movb CS(%esp),%cl
-	test $2,%cl			# slow return to ring 2 or 3
-	jne  ret_syscall_tests
+	jmp  ret_from_intr
+
+        ALIGN
 restore_all_enable_events:  
-safesti:XEN_UNBLOCK_EVENTS(%esi)	# reenable event callbacks
+	XEN_UNBLOCK_EVENTS(%esi)
 scrit:	/**** START OF CRITICAL REGION ****/
-	testb $1,evtchn_upcall_pending(%esi)
+	XEN_TEST_PENDING(%esi)
 	jnz  14f			# process more events if necessary...
 	RESTORE_ALL
 14:	XEN_BLOCK_EVENTS(%esi)
@@ -450,7 +503,7 @@ critical_region_fixup:
 	jmp  11b
 
 critical_fixup_table:
-	.byte 0x00,0x00,0x00		# testb $0xff,(%esi)
+	.byte 0x00,0x00,0x00		# testb $0xff,(%esi) = XEN_TEST_PENDING
 	.byte 0x00,0x00			# jnz  14f
 	.byte 0x00			# pop  %ebx
 	.byte 0x04			# pop  %ecx
@@ -468,11 +521,13 @@ critical_fixup_table:
 
 # Hypervisor uses this for application faults while it executes.
 ENTRY(failsafe_callback)
-1:      popl %ds
-2:      popl %es
-3:      popl %fs
-4:      popl %gs
-5:	iret
+1:	popl %ds
+2:	popl %es
+3:	popl %fs
+4:	popl %gs
+	subl $4,%esp
+	SAVE_ALL
+	jmp  ret_from_exception
 .section .fixup,"ax";	\
 6:	movl $0,(%esp);	\
 	jmp 1b;		\
@@ -482,12 +537,6 @@ ENTRY(failsafe_callback)
 	jmp 3b;		\
 9:	movl $0,(%esp);	\
 	jmp 4b;		\
-10:	pushl %ss;	\
-	popl %ds;	\
-	pushl %ss;	\
-	popl %es;	\
-	pushl $11;	\
-	call do_exit;	\
 .previous;		\
 .section __ex_table,"a";\
 	.align 4;	\
@@ -495,7 +544,6 @@ ENTRY(failsafe_callback)
 	.long 2b,7b;	\
 	.long 3b,8b;	\
 	.long 4b,9b;	\
-	.long 5b,10b;	\
 .previous
 
 ENTRY(coprocessor_error)
@@ -548,10 +596,10 @@ debug_stack_correct:
 	movl %esp,%eax			# pt_regs pointer
 	call do_debug
 	testl %eax,%eax
-	jnz restore_all_enable_events
+	jnz restore
 	jmp ret_from_exception
 
-#if 0
+#if 0 /* XEN */
 /*
  * NMI is doubly nasty. It can happen _while_ we're handling
  * a debug fault, and the debug fault hasn't yet been able to
@@ -595,7 +643,7 @@ nmi_debug_stack_check:
 nmi_debug_stack_fixup:
 	FIX_STACK(24,nmi_stack_correct, 1)
 	jmp nmi_stack_correct
-#endif
+#endif /* XEN */
 
 ENTRY(int3)
 	pushl $-1			# mark this as an int
@@ -604,7 +652,7 @@ ENTRY(int3)
 	movl %esp,%eax		# pt_regs pointer
 	call do_int3
 	testl %eax,%eax
-	jnz restore_all_enable_events
+	jnz restore_all
 	jmp ret_from_exception
 
 ENTRY(overflow)
@@ -625,10 +673,6 @@ ENTRY(invalid_op)
 ENTRY(coprocessor_segment_overrun)
 	pushl $0
 	pushl $do_coprocessor_segment_overrun
-	jmp error_code
-
-ENTRY(double_fault)
-	pushl $do_double_fault
 	jmp error_code
 
 ENTRY(invalid_TSS)
@@ -655,31 +699,31 @@ ENTRY(alignment_check)
 # which is the linear faulting address.
 # fastcall register usage:  %eax = pt_regs, %edx = error code,
 #			    %ecx = fault address
-#define PAGE_FAULT_STUB(_name1, _name2)					  \
-ENTRY(_name1)								  \
-	pushl %ds							; \
-	pushl %eax							; \
-	xorl %eax, %eax							; \
-	pushl %ebp							; \
-	pushl %edi							; \
-	pushl %esi							; \
-	pushl %edx							; \
-	decl %eax			/* eax = -1 */			; \
-	pushl %ecx							; \
-	pushl %ebx							; \
-	cld								; \
-	movl %es,%edi							; \
-	movl ES(%esp), %ecx		/* get the faulting address */	; \
-	movl ORIG_EAX(%esp), %edx	/* get the error code */	; \
-	movl %eax, ORIG_EAX(%esp)					; \
-	movl %edi, ES(%esp)						; \
-	movl $(__KERNEL_DS), %eax					; \
-	movl %eax, %ds							; \
-	movl %eax, %es							; \
-	movl %esp,%eax			/* pt_regs pointer */		; \
-	call _name2							; \
-	jmp ret_from_exception						;
-PAGE_FAULT_STUB(page_fault, do_page_fault)
+ENTRY(page_fault)
+	pushl %ds
+	pushl %eax
+	xorl %eax, %eax
+	pushl %ebp
+	pushl %edi
+	pushl %esi
+	pushl %edx
+	decl %eax			/* eax = -1 */
+	pushl %ecx
+	pushl %ebx
+	cld
+	movl %es,%edi
+	movl ES(%esp), %ecx		/* get the faulting address */
+	movl ORIG_EAX(%esp), %edx	/* get the error code */
+	movl %eax, ORIG_EAX(%esp)
+	movl %edi, ES(%esp)
+	movl $(__KERNEL_DS),%eax
+	movl %eax, %ds
+	movl %eax, %es
+	movl %esp,%eax			/* pt_regs pointer */
+	XEN_GET_VCPU_INFO(%esi)
+	XEN_SAVE_UPCALL_MASK(%esi,%bl,EVENT_MASK+12)
+	call do_page_fault
+	jmp ret_from_exception
 
 #ifdef CONFIG_X86_MCE
 ENTRY(machine_check)
@@ -807,7 +851,7 @@ ENTRY(sys_call_table)
 	.long sys_iopl		/* 110 */
 	.long sys_vhangup
 	.long sys_ni_syscall	/* old "idle" system call */
-	.long sys_ni_syscall	/* disable sys_vm86old */
+	.long sys_vm86old
 	.long sys_wait4
 	.long sys_swapoff	/* 115 */
 	.long sys_sysinfo

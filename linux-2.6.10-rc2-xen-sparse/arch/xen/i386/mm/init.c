@@ -435,17 +435,24 @@ void zap_low_mappings (void)
 void __init zone_sizes_init(void)
 {
 	unsigned long zones_size[MAX_NR_ZONES] = {0, 0, 0};
-	unsigned int max_dma, high, low;
+	unsigned int /*max_dma,*/ high, low;
 	
-	max_dma = virt_to_phys((char *)MAX_DMA_ADDRESS) >> PAGE_SHIFT;
+	/*
+	 * XEN: Our notion of "DMA memory" is fake when running over Xen.
+	 * We simply put all RAM in the DMA zone so that those drivers which
+	 * needlessly specify GFP_DMA do not get starved of RAM unnecessarily.
+	 * Those drivers that *do* require lowmem are screwed anyway when
+	 * running over Xen!
+	 */
+	/*max_dma = virt_to_phys((char *)MAX_DMA_ADDRESS) >> PAGE_SHIFT;*/
 	low = max_low_pfn;
 	high = highend_pfn;
 	
-	if (low < max_dma)
+	/*if (low < max_dma)*/
 		zones_size[ZONE_DMA] = low;
-	else {
-		zones_size[ZONE_DMA] = max_dma;
-		zones_size[ZONE_NORMAL] = low - max_dma;
+	/*else*/ {
+		/*zones_size[ZONE_DMA] = max_dma;*/
+		/*zones_size[ZONE_NORMAL] = low - max_dma;*/
 #ifdef CONFIG_HIGHMEM
 		zones_size[ZONE_HIGHMEM] = high - low;
 #endif
@@ -590,7 +597,7 @@ void __init paging_init(void)
 	HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
 	memset(empty_zero_page, 0, sizeof(empty_zero_page));
 
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+#ifdef CONFIG_XEN_PHYSDEV_ACCESS
 	/* Setup mapping of lower 1st MB */
 	for (i = 0; i < NR_FIX_ISAMAPS; i++)
 		if (xen_start_info.flags & SIF_PRIVILEGED)

@@ -18,7 +18,7 @@
 #include <asm/domain_page.h>
 
 /* Both these structures are protected by the domlist_lock. */
-rwlock_t domlist_lock __cacheline_aligned = RW_LOCK_UNLOCKED;
+rwlock_t domlist_lock = RW_LOCK_UNLOCKED;
 struct domain *domain_hash[DOMAIN_HASH_SIZE];
 struct domain *domain_list;
 

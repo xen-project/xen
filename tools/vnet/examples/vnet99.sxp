@@ -1,0 +1,3 @@
+# Vnet configuration for a vnet with id 99 and message confidentiality.
+# Configure using 'xm call vnet_add vnet99.sxp'.
+(vnet (id 99) (bridge vnet99) (vnetif vnetif99) (security conf))

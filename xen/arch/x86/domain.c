@@ -32,6 +32,7 @@
 #include <asm/shadow.h>
 #include <xen/console.h>
 #include <xen/elf.h>
+#include <xen/multicall.h>
 
 #if !defined(CONFIG_X86_64BITMODE)
 /* No ring-3 access in initial page tables. */
@@ -426,6 +427,39 @@ long do_iopl(domid_t domain, unsigned int new_io_pl)
     return 0;
 }
 
+unsigned long hypercall_create_continuation(
+    unsigned int op, unsigned int nr_args, ...)
+{
+    struct mc_state *mcs = &mc_state[smp_processor_id()];
+    execution_context_t *ec;
+    unsigned long *preg;
+    unsigned int i;
+    va_list args;
+
+    va_start(args, nr_args);
+
+    if ( test_bit(_MCSF_in_multicall, &mcs->flags) )
+    {
+        __set_bit(_MCSF_call_preempted, &mcs->flags);
+
+        for ( i = 0; i < nr_args; i++ )
+            mcs->call.args[i] = va_arg(args, unsigned long);
+    }
+    else
+    {
+        ec       = get_execution_context();
+        ec->eax  = op;
+        ec->eip -= 2;  /* re-execute 'int 0x82' */
+        
+        for ( i = 0, preg = &ec->ebx; i < nr_args; i++, preg++ )
+            *preg = va_arg(args, unsigned long);
+    }
+
+    va_end(args);
+
+    return op;
+}
+
 #endif
 
 
@@ -490,8 +524,6 @@ static void relinquish_list(struct domain *d, struct list_head *list)
 
 void domain_relinquish_memory(struct domain *d)
 {
-    audit_domain(d);
-
     /* Ensure that noone is running over the dead domain's page tables. */
     synchronise_pagetables(~0UL);
 

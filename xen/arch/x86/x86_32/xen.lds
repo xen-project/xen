@@ -1,6 +1,6 @@
 /* ld script to make i386 Linux kernel
  * Written by Martin Mares <mj@atrey.karlin.mff.cuni.cz>
- * Modifified for i386 Xen by Keir Fraser
+ * Modified for i386 Xen by Keir Fraser
  */
 OUTPUT_FORMAT("elf32-i386", "elf32-i386", "elf32-i386")
 OUTPUT_ARCH(i386)
@@ -29,6 +29,11 @@ SECTIONS
   __start___ex_table = .;
   __ex_table : { *(__ex_table) } :text
   __stop___ex_table = .;
+
+  . = ALIGN(16);		/* Pre-exception table */
+  __start___pre_ex_table = .;
+  __pre_ex_table : { *(__pre_ex_table) } :text
+  __stop___pre_ex_table = .;
 
   __start___ksymtab = .;	/* Kernel symbol table */
   __ksymtab : { *(__ksymtab) } :text
@@ -64,9 +69,6 @@ SECTIONS
 
   . = ALIGN(4096);
   .data.page_aligned : { *(.data.idt) } :text
-
-  . = ALIGN(32);
-  .data.cacheline_aligned : { *(.data.cacheline_aligned) } :text
 
   __bss_start = .;		/* BSS */
   .bss : {

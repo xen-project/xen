@@ -4,26 +4,27 @@
 struct xen_regs
 {
     /* All saved activations contain the following fields. */
-    long ebx;
-    long ecx;
-    long edx;
-    long esi;
-    long edi;
-    long ebp;
-    long eax;
-    long orig_eax;
-    long eip;
-    int  cs;
-    long eflags;
+    u32 ebx;
+    u32 ecx;
+    u32 edx;
+    u32 esi;
+    u32 edi;
+    u32 ebp;
+    u32 eax;
+    u16 error_code;
+    u16 entry_vector;
+    u32 eip;
+    u32 cs;
+    u32 eflags;
 
     /* Only saved guest activations contain the following fields. */
-    long esp;
-    int  ss;
-    int  es;
-    int  ds;
-    int  fs;
-    int  gs;
-};
+    u32 esp;
+    u32 ss;
+    u32 es;
+    u32 ds;
+    u32 fs;
+    u32 gs;
+} __attribute__ ((packed));
 
 enum EFLAGS {
     EF_CF   = 0x00000001,
@@ -47,5 +48,11 @@ enum EFLAGS {
     EF_VIP  = 0x00100000,   /* virtual interrupt pending */
     EF_ID   = 0x00200000,   /* id */
 };
+
+#define VM86_MODE(_r) ((_r)->eflags & EF_VM)
+#define RING_0(_r)    (((_r)->cs & 3) == 0)
+#define RING_1(_r)    (((_r)->cs & 3) == 1)
+#define RING_2(_r)    (((_r)->cs & 3) == 2)
+#define RING_3(_r)    (((_r)->cs & 3) == 3)
 
 #endif

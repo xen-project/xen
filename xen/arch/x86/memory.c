@@ -126,11 +126,10 @@ static int mod_l1_entry(l1_pgentry_t *, l1_pgentry_t);
 static struct {
 #define DOP_FLUSH_TLB   (1<<0) /* Flush the TLB.                 */
 #define DOP_RELOAD_LDT  (1<<1) /* Reload the LDT shadow mapping. */
-    unsigned long       deferred_ops;
-    unsigned long       cr0;
+    unsigned long  deferred_ops;
     /* If non-NULL, specifies a foreign subject domain for some operations. */
-    struct domain      *foreign;
-} percpu_info[NR_CPUS] __cacheline_aligned;
+    struct domain *foreign;
+} __cacheline_aligned percpu_info[NR_CPUS];
 
 /*
  * Returns the current foreign domain; defaults to the currently-executing
@@ -1277,29 +1276,79 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
     return okay;
 }
 
-
-int do_mmu_update(mmu_update_t *ureqs, int count, int *success_count)
+int do_mmu_update(
+    mmu_update_t *ureqs, unsigned int count, unsigned int *pdone)
 {
+/*
+ * We steal the m.s.b. of the @count parameter to indicate whether this
+ * invocation of do_mmu_update() is resuming a previously preempted call.
+ * We steal the next 15 bits to remember the current FOREIGNDOM.
+ */
+#define MMU_UPDATE_PREEMPTED          (~(~0U>>1))
+#define MMU_UPDATE_PREEMPT_FDOM_SHIFT ((sizeof(int)*8)-16)
+#define MMU_UPDATE_PREEMPT_FDOM_MASK  (0x7FFFU<<MMU_UPDATE_PREEMPT_FDOM_SHIFT)
+
     mmu_update_t req;
     unsigned long va = 0, deferred_ops, pfn, prev_pfn = 0;
     struct pfn_info *page;
-    int rc = 0, okay = 1, i, cpu = smp_processor_id();
-    unsigned int cmd;
+    int rc = 0, okay = 1, i = 0, cpu = smp_processor_id();
+    unsigned int cmd, done = 0;
     unsigned long prev_spfn = 0;
     l1_pgentry_t *prev_spl1e = 0;
     struct domain *d = current;
     u32 type_info;
+    domid_t domid;
 
     perfc_incrc(calls_to_mmu_update); 
     perfc_addc(num_page_updates, count);
 
     cleanup_writable_pagetable(d, PTWR_CLEANUP_ACTIVE | PTWR_CLEANUP_INACTIVE);
 
-    if ( unlikely(!access_ok(VERIFY_READ, ureqs, count * sizeof(req))) )
-        return -EFAULT;
+    /*
+     * If we are resuming after preemption, read how much work we have already
+     * done. This allows us to set the @done output parameter correctly.
+     * We also reset FOREIGNDOM here.
+     */
+    if ( unlikely(count&(MMU_UPDATE_PREEMPTED|MMU_UPDATE_PREEMPT_FDOM_MASK)) )
+    {
+        if ( !(count & MMU_UPDATE_PREEMPTED) )
+        {
+            /* Count overflow into private FOREIGNDOM field. */
+            MEM_LOG("do_mmu_update count is too large");
+            rc = -EINVAL;
+            goto out;
+        }
+        count &= ~MMU_UPDATE_PREEMPTED;
+        domid = count >> MMU_UPDATE_PREEMPT_FDOM_SHIFT;
+        count &= ~MMU_UPDATE_PREEMPT_FDOM_MASK;
+        if ( unlikely(pdone != NULL) )
+            (void)get_user(done, pdone);
+        if ( (domid != current->id) &&
+             !do_extended_command(0, MMUEXT_SET_FOREIGNDOM | (domid << 16)) )
+        {
+            rc = -EINVAL;
+            goto out;
+        }
+    }
+
+    if ( unlikely(!array_access_ok(VERIFY_READ, ureqs, count, sizeof(req))) )
+    {
+        rc = -EFAULT;
+        goto out;
+    }
 
     for ( i = 0; i < count; i++ )
     {
+        if ( hypercall_preempt_check() )
+        {
+            rc = hypercall_create_continuation(
+                __HYPERVISOR_mmu_update, 3, ureqs, 
+                (count - i) |
+                (FOREIGNDOM->id << MMU_UPDATE_PREEMPT_FDOM_SHIFT) | 
+                MMU_UPDATE_PREEMPTED, pdone);
+            break;
+        }
+
         if ( unlikely(__copy_from_user(&req, ureqs, sizeof(req)) != 0) )
         {
             MEM_LOG("Bad __copy_from_user");
@@ -1433,6 +1482,7 @@ int do_mmu_update(mmu_update_t *ureqs, int count, int *success_count)
         ureqs++;
     }
 
+ out:
     if ( prev_pfn != 0 )
         unmap_domain_mem((void *)va);
 
@@ -1454,8 +1504,9 @@ int do_mmu_update(mmu_update_t *ureqs, int count, int *success_count)
         percpu_info[cpu].foreign = NULL;
     }
 
-    if ( unlikely(success_count != NULL) )
-        put_user(count, success_count);
+    /* Add incremental work we have done to the @done output parameter. */
+    if ( unlikely(pdone != NULL) )
+        __put_user(done + i, pdone);
 
     return rc;
 }
@@ -1754,17 +1805,20 @@ int ptwr_do_page_fault(unsigned long addr)
     which = PTWR_PT_INACTIVE;
     if ( (l2e >> PAGE_SHIFT) == pfn )
     {
-        /*
-         * If the PRESENT bit is clear, we may be conflicting with the current 
-         * ACTIVE p.t. (it may be the same p.t. mapped at another virt addr).
-         */
-        if ( unlikely(!(l2e & _PAGE_PRESENT)) &&
-             ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l1va )
-            ptwr_flush(PTWR_PT_ACTIVE);
-        
-        /* Now do a final check of the PRESENT bit to set ACTIVE. */
+        /* Check the PRESENT bit to set ACTIVE. */
         if ( likely(l2e & _PAGE_PRESENT) )
             which = PTWR_PT_ACTIVE;
+        else {
+            /*
+             * If the PRESENT bit is clear, we may be conflicting with
+             * the current ACTIVE p.t. (it may be the same p.t. mapped
+             * at another virt addr).
+             * The ptwr_flush call below will restore the PRESENT bit.
+             */
+            if ( ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l1va &&
+                 l2_idx == ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l2_idx )
+                which = PTWR_PT_ACTIVE;
+        }
     }
     
     PTWR_PRINTK("[%c] page_fault on l1 pt at va %08lx, pt for %08x, "

@@ -18,7 +18,7 @@ c-obj-y	+=	umc.o
 
 #obj-$(CONFIG_X86_MCE)	+=	../../../../i386/kernel/cpu/mcheck/
 
-#obj-$(CONFIG_MTRR)	+= 	../../../../i386/kernel/cpu/mtrr/
+obj-$(CONFIG_MTRR)	+= 	mtrr/
 #obj-$(CONFIG_CPU_FREQ)	+=	../../../../i386/kernel/cpu/cpufreq/
 
 c-link	:=

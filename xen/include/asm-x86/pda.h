@@ -14,7 +14,7 @@ struct x8664_pda {
 	int cpunumber;		    /* Logical CPU number */
 	char *irqstackptr;	/* top of irqstack */
 	unsigned long volatile *level4_pgt; 
-} ____cacheline_aligned;
+} __cacheline_aligned;
 
 #define PDA_STACKOFFSET (5*8)
 

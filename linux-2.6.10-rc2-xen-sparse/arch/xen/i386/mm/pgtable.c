@@ -195,7 +195,7 @@ void pte_ctor(void *pte, kmem_cache_t *cache, unsigned long unused)
 
 	clear_page(pte);
 	make_page_readonly(pte);
-	queue_pte_pin(virt_to_phys(pte));
+	queue_pte_pin(__pa(pte));
 	flush_page_update_queue();
 }
 
@@ -204,7 +204,7 @@ void pte_dtor(void *pte, kmem_cache_t *cache, unsigned long unused)
 	struct page *page = virt_to_page(pte);
 	ClearPageForeign(page);
 
-	queue_pte_unpin(virt_to_phys(pte));
+	queue_pte_unpin(__pa(pte));
 	make_page_writable(pte);
 	flush_page_update_queue();
 }

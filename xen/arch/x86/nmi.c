@@ -286,7 +286,7 @@ void nmi_watchdog_tick (struct xen_regs * regs)
         if ( alert_counter[cpu] == 5*nmi_hz )
         {
             console_force_unlock();
-            fatal_trap(TRAP_nmi, regs, 0);
+            fatal_trap(TRAP_nmi, regs);
         }
     } 
     else 

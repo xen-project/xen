@@ -6,6 +6,7 @@
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/spinlock.h>
+#include <xen/cache.h>
 #include <asm/regs.h>
 #include <xen/smp.h>
 #include <asm/page.h>
@@ -20,6 +21,7 @@
 #include <asm/current.h>
 #include <xen/spinlock.h>
 #include <xen/grant_table.h>
+#include <xen/irq_cpustat.h>
 
 extern unsigned long volatile jiffies;
 extern rwlock_t domlist_lock;
@@ -215,6 +217,11 @@ void startup_cpu_idle_loop(void);
 void continue_cpu_idle_loop(void);
 
 void continue_nonidle_task(void);
+
+unsigned long hypercall_create_continuation(
+    unsigned int op, unsigned int nr_args, ...);
+#define hypercall_preempt_check() \
+    (unlikely(softirq_pending(smp_processor_id())))
 
 /* This domain_hash and domain_list are protected by the domlist_lock. */
 #define DOMAIN_HASH_SIZE 256

@@ -23,7 +23,7 @@
 #ifdef CONFIG_X86_INTEL_USERCOPY
 extern struct movsl_mask {
 	int mask;
-} ____cacheline_aligned_in_smp movsl_mask;
+} __cacheline_aligned movsl_mask;
 #endif
 
 #define __addr_ok(addr) ((unsigned long)(addr) < HYPERVISOR_VIRT_START)
@@ -66,6 +66,9 @@ extern struct movsl_mask {
  */
 #define access_ok(type,addr,size) (likely(__range_ok(addr,size) == 0))
 
+#define array_access_ok(type,addr,count,size) \
+    (likely(count < (~0UL/size)) && access_ok(type,addr,count*size))
+
 /*
  * The exception table consists of pairs of addresses: the first is the
  * address of an instruction that is allowed to fault, and the second is
@@ -85,6 +88,7 @@ struct exception_table_entry
 };
 
 extern unsigned long search_exception_table(unsigned long);
+extern void sort_exception_tables(void);
 
 /**
  * get_user: - Get a simple variable from user space.

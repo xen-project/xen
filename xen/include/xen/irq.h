@@ -54,7 +54,7 @@ typedef struct {
     struct irqaction *action;	/* IRQ action list */
     unsigned int depth;		/* nested irq disables */
     spinlock_t lock;
-} ____cacheline_aligned irq_desc_t;
+} __cacheline_aligned irq_desc_t;
 
 extern irq_desc_t irq_desc[NR_IRQS];
 
