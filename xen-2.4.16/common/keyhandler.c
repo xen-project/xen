@@ -46,7 +46,9 @@ void show_handlers(u_char key, void *dev_id, struct pt_regs *regs)
     printk("'%c' pressed -> showing installed handlers\n", key); 
     for(i=0; i < KEY_MAX; i++) 
 	if(key_table[i].handler) 
-	    printk("ASCII '%02x' => %s\n", i, key_table[i].desc);
+	    printk(" key '%c' (ascii '%02x') => %s\n", 
+			(i<33 || i>126)?(' '):(i),i,
+			key_table[i].desc);
     return; 
 }
 
