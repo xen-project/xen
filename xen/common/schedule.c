@@ -372,7 +372,8 @@ void __enter_scheduler(void)
         return;
     
     cleanup_writable_pagetable(PTRW_CLEANUP_ACTIVE | PTRW_CLEANUP_INACTIVE);
-#ifdef TRACK_PTWR_DOMAIN
+
+#ifdef PTWR_TRACK_DOMAIN
     {
         extern domid_t ptwr_domain[];
         int cpu = smp_processor_id();

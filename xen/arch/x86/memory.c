@@ -1244,7 +1244,7 @@ static unsigned long *ptwr_writable_l1[NR_CPUS] __cacheline_aligned;
 static unsigned long *ptwr_writables[NR_CPUS][PTWR_NR_WRITABLES] __cacheline_aligned;
 int ptwr_writable_idx[NR_CPUS] __cacheline_aligned = { 0, };
 static l1_pgentry_t ptwr_writable_page[NR_CPUS][PTWR_NR_WRITABLES][ENTRIES_PER_L1_PAGETABLE] __cacheline_aligned;
-#ifdef TRACK_PTWR_DOMAIN
+#ifdef PTWR_TRACK_DOMAIN
 domid_t ptwr_domain[NR_CPUS] = { 0, };
 #endif
 
@@ -1261,7 +1261,7 @@ void ptwr_reconnect_disconnected(unsigned long addr)
     int cpu = smp_processor_id();
     int i;
 
-#ifdef TRACK_PTWR_DOMAIN
+#ifdef PTWR_TRACK_DOMAIN
     if (ptwr_domain[cpu] != get_current()->domain)
         printk("ptwr_reconnect_disconnected domain mismatch %d != %d\n",
                ptwr_domain[cpu], get_current()->domain);
@@ -1295,20 +1295,9 @@ void ptwr_reconnect_disconnected(unsigned long addr)
             continue;
         if (likely((l1_pgentry_val(nl1e) ^ l1_pgentry_val(ol1e)) ==
                    _PAGE_RW)) {
-#if 0
-            struct pfn_info *page = &frame_table[l1_pgentry_to_pagenr(nl1e)];
-            printk("%03x: %08lx != %08lx %08x/%08x\n", i,
-                   l1_pgentry_val(ol1e), l1_pgentry_val(nl1e),
-                   page->u.inuse.type_info, page->u.inuse.count_info);
-#endif
             if (likely(readonly_page_from_l1e(nl1e)))
                 continue;
         }
-#if 0
-        printk("%03x: %08lx != %08lx\n", i,
-               l1_pgentry_val(ptwr_disconnected_page[cpu][i]),
-               l1_pgentry_val(pl1e[i]));
-#endif
         if (unlikely(l1_pgentry_val(ol1e) & _PAGE_PRESENT))
             put_page_from_l1e(ol1e);
         if (unlikely(!get_page_from_l1e(nl1e)))
@@ -1317,13 +1306,6 @@ void ptwr_reconnect_disconnected(unsigned long addr)
     unmap_domain_mem(pl1e);
     update_l2e(pl2e, *pl2e, nl2e);
 
-#if 0
-    if (page->u.inuse.count_info & PGC_guest_pinned) {
-        if ((page->u.inuse.type_info & PGT_count_mask) != 1)
-            BUG();
-        page->u.inuse.type_info++;
-    }
-#endif
     PTWR_PRINTK("now pl2e %p l2e %08lx              taf %08x/%08x/%u\n", pl2e,
                 l2_pgentry_val(*pl2e),
                 frame_table[pfn].u.inuse.type_info,
@@ -1351,7 +1333,7 @@ void ptwr_flush_inactive(void)
     int i, idx;
     static int maxidx = 0;
 
-#ifdef TRACK_PTWR_DOMAIN
+#ifdef PTWR_TRACK_DOMAIN
     if (ptwr_domain[cpu] != get_current()->domain)
         printk("ptwr_flush_inactive domain mismatch %d != %d\n",
                ptwr_domain[cpu], get_current()->domain);
@@ -1374,22 +1356,6 @@ void ptwr_flush_inactive(void)
             nl1e = pl1e[i];
             if (likely(l1_pgentry_val(ol1e) == l1_pgentry_val(nl1e)))
                 continue;
-#if 0
-            if ((l1_pgentry_val(ol1e) ^ l1_pgentry_val(nl1e)) == _PAGE_RW) {
-#if 01
-                struct pfn_info *page = &frame_table[l1_pgentry_to_pagenr(nl1e)];
-                printk("%03x: %08lx != %08lx %08x/%08x\n", i,
-                       l1_pgentry_val(ol1e), l1_pgentry_val(nl1e),
-                       page->u.inuse.type_info, page->u.inuse.count_info);
-#endif
-                if (readonly_page_from_l1e(nl1e))
-                    continue;
-            }
-#endif
-#if 0
-            printk("%03x: %08lx != %08lx\n", i,
-                   l1_pgentry_val(ol1e), l1_pgentry_val(nl1e));
-#endif
             if (unlikely(l1_pgentry_val(ol1e) & _PAGE_PRESENT))
                 put_page_from_l1e(ol1e);
             if (unlikely(!get_page_from_l1e(nl1e)))
@@ -1397,13 +1363,6 @@ void ptwr_flush_inactive(void)
         }
         unmap_domain_mem(pl1e);
 
-#if 0
-        if (page->u.inuse.count_info & PGC_guest_pinned) {
-            if ((page->u.inuse.type_info & PGT_count_mask) != 1)
-                BUG();
-            page->u.inuse.type_info++;
-        }
-#endif
         /* make pt page writable */
         PTWR_PRINTK("writable_l1 at %p is %08lx\n", ptwr_writables[cpu][idx],
                     pte);
@@ -1440,25 +1399,17 @@ int ptwr_do_page_fault(unsigned long addr)
 #endif
         page = &frame_table[pfn];
         if ((page->u.inuse.type_info & PGT_type_mask) == PGT_l1_page_table) {
-#ifdef TRACK_PTWR_DOMAIN
+#ifdef PTWR_TRACK_DOMAIN
             if (ptwr_domain[cpu] != get_current()->domain)
                 printk("ptwr_do_page_fault domain mismatch %d != %d\n",
                        ptwr_domain[cpu], get_current()->domain);
 #endif
             pl2e = &linear_l2_table[(page->u.inuse.type_info &
                                      PGT_va_mask) >> PGT_va_shift];
-            PTWR_PRINTK("page_fault on l1 pt at va %08lx, pt for %08x, pfn %08lx\n",
-                        addr, ((page->u.inuse.type_info & PGT_va_mask) >>
-                               PGT_va_shift) << L2_PAGETABLE_SHIFT, pfn);
-#if 0
-            if (page->u.inuse.count_info & PGC_guest_pinned) {
-                PTWR_PRINTK(" pinned l1 page %p taf %08x/%08x\n", page,
-                            page->u.inuse.type_info, page->u.inuse.count_info);
-                if ((page->u.inuse.type_info & PGT_count_mask) != 2)
-                    BUG();
-                page->u.inuse.type_info--;
-            }
-#endif
+            PTWR_PRINTK("page_fault on l1 pt at va %08lx, pt for %08x, "
+			"pfn %08lx\n", addr,
+			((page->u.inuse.type_info & PGT_va_mask) >>
+			 PGT_va_shift) << L2_PAGETABLE_SHIFT, pfn);
             if (l2_pgentry_val(*pl2e) >> PAGE_SHIFT != pfn) {
                 l1_pgentry_t *pl1e;
                 PTWR_PRINTK("freeing l1 page %p taf %08x/%08x\n", page,
@@ -1467,10 +1418,6 @@ int ptwr_do_page_fault(unsigned long addr)
                     ptwr_flush_inactive();
                 ptwr_writables[cpu][ptwr_writable_idx[cpu]] = (unsigned long *)
                     &linear_pg_table[addr>>PAGE_SHIFT];
-#if 0
-                if ((page->u.inuse.type_info & PGT_count_mask) != 1)
-                    BUG();
-#endif
 
                 pl1e = map_domain_mem(pfn << PAGE_SHIFT);
                 memcpy(&ptwr_writable_page[cpu][ptwr_writable_idx[cpu]][0],
@@ -1524,6 +1471,7 @@ int ptwr_do_page_fault(unsigned long addr)
     return 0;
 }
 
+#ifndef NDEBUG
 void ptwr_status(void)
 {
     int i;
@@ -1562,3 +1510,4 @@ void ptwr_status(void)
                 frame_table[l2_pgentry_to_pagenr(*pl2e)].u.inuse.type_info,
                 frame_table[pfn].u.inuse.type_info, frame_table[pfn].u.inuse.domain->domain);
 }
+#endif
