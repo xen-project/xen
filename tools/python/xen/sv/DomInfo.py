@@ -2,8 +2,8 @@ from HTMLBase import HTMLBase
 from XendClientDeferred import server
 from xen.xend import PrettyPrint
 
-from xen.xend.sv.util import *
-from xen.xend.sv.GenTabbed import *
+from xen.sv.util import *
+from xen.sv.GenTabbed import *
 
 class DomInfo( GenTabbed ):
 

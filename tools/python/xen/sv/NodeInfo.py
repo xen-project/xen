@@ -1,9 +1,9 @@
 from xen.xend import XendDmesg
 from xen.xend import XendNode
 
-from xen.xend.sv.util import *
-from xen.xend.sv.GenTabbed import *
-from xen.xend.sv.HTMLBase  import HTMLBase
+from xen.sv.util import *
+from xen.sv.GenTabbed import *
+from xen.sv.HTMLBase  import HTMLBase
 
 class NodeInfo( GenTabbed ):
 

@@ -6,7 +6,7 @@ from xen.xend import sxp
 
 from HTMLBase import HTMLBase
 
-from xen.xend.sv import DomList, NodeInfo, DomInfo
+from xen.sv import DomList, NodeInfo, DomInfo
 
 class Main( HTMLBase ):
     

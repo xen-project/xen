@@ -1,11 +1,11 @@
 from twisted.web import resource
 from twisted.web.server import NOT_DONE_YET
 
-from XendClientDeferred import server as XendServer
+from xen.xend.XendClient import server as XendServer
 from xen.xend import sxp
 
-from xen.xend.sv.HTMLBase import HTMLBase
-from xen.xend.sv.util import *
+from xen.sv.HTMLBase import HTMLBase
+from xen.sv.util import *
 
 from twisted.internet import reactor
 

@@ -1,7 +1,7 @@
 import types
 
-from HTMLBase import HTMLBase
-from TabView import TabView
+from xen.sv.HTMLBase import HTMLBase
+from xen.sv.TabView import TabView
 
 class GenTabbed( HTMLBase ):
 

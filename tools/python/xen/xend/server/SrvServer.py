@@ -44,12 +44,8 @@ def create(port=None, interface=None, bridge=0):
     if bridge or xroot.rebooted:
         Vifctl.network('start')
     root = resource.Resource()
-    sv = static.File( "/usr/lib/python2.2/site-packages/xen/xend/sv/" )
-    sv.indexNames=['Main.rpy']
-    sv.processors={'.rpy':script.ResourceScript}
     xend = SrvRoot()
     root.putChild('xend', xend)
-    root.putChild('sv', sv)
     site = server.Site(root)
     reactor.listenTCP(port, site, interface=interface)
 

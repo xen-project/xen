@@ -1,4 +1,4 @@
-from xen.xend.sv.XendClientDeferred import server
+from xen.xend.XendClient import server
 from xen.xend import sxp
 
 def getDomInfoHash( domain ):
