@@ -13,6 +13,7 @@
 static struct proc_dir_entry *vhd;
 
 extern unsigned short xldev_to_physdev(kdev_t xldev);
+extern dev_t physdev_to_xldev(unsigned short physdev);
 
 static void *proc_vhd_next(struct seq_file *s, void *v, loff_t *pos)
 {
@@ -50,7 +51,7 @@ static int proc_vhd_show(struct seq_file *s, void *v)
 		data->segments[data->count - 1].domain,
 		data->segments[data->count - 1].seg_nr,
 		data->segments[data->count - 1].key,
-		data->segments[data->count - 1].device);
+		physdev_to_xldev(data->segments[data->count - 1].device));
 
     return 0;
 }

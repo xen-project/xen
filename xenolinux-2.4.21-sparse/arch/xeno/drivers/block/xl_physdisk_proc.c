@@ -13,7 +13,7 @@
 extern int xenolinux_control_msg(int operration, char *buffer, int size);
 extern unsigned short xldev_to_physdev(kdev_t xldev);
 
-static dev_t physdev_to_xldev(unsigned short physdev)
+dev_t physdev_to_xldev(unsigned short physdev)
 {
     switch (physdev & XENDEV_TYPE_MASK) {
     case XENDEV_IDE:
