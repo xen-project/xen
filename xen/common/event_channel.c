@@ -22,6 +22,7 @@
 #include <xeno/sched.h>
 #include <xeno/event.h>
 
+#define MAX_EVENT_CHANNELS 1024
 
 static long event_channel_open(u16 target_dom)
 {
@@ -75,7 +76,7 @@ static long event_channel_open(u16 target_dom)
     if ( unlikely(lid == -1) )
     {
         /* Reached maximum channel count? */
-        if ( unlikely(lmax == 1024) )
+        if ( unlikely(lmax == MAX_EVENT_CHANNELS) )
         {
             rc = -ENOSPC;
             goto out;
@@ -224,39 +225,27 @@ static long event_channel_close(u16 lid)
 static long event_channel_send(u16 lid)
 {
     struct task_struct *lp = current, *rp;
-    event_channel_t    *lchn, *rchn;
-    u16                 rid;
+    u16                 rid, rdom;
     shared_info_t      *rsi;
     unsigned long       cpu_mask;
 
     spin_lock(&lp->event_channel_lock);
 
-    lchn = lp->event_channel;
-
     if ( unlikely(lid >= lp->max_event_channel) || 
-         unlikely((lchn[lid].flags & (ECF_INUSE|ECF_CONNECTED)) !=
-                  (ECF_INUSE|ECF_CONNECTED)) )
+         unlikely(!(lp->event_channel[lid].flags & ECF_CONNECTED)) )
     {
         spin_unlock(&lp->event_channel_lock);
         return -EINVAL;
     }
 
-    rid  = lchn[lid].flags & ECF_TARGET_ID;
-    rp   = find_domain_by_id(lchn[lid].target_dom);
-    ASSERT(rp != NULL);
+    rdom = lp->event_channel[lid].target_dom;
+    rid  = lp->event_channel[lid].flags & ECF_TARGET_ID;
 
     spin_unlock(&lp->event_channel_lock);
 
-    spin_lock(&rp->event_channel_lock);
-
-    rchn = rp->event_channel;
-
-    if ( unlikely(rid >= rp->max_event_channel) )
-    {
-        spin_unlock(&rp->event_channel_lock);
-        put_task_struct(rp);
+    if ( unlikely(rid >= MAX_EVENT_CHANNELS) || 
+         unlikely ((rp = find_domain_by_id(rdom)) == NULL) )
         return -EINVAL;
-    }
 
     rsi = rp->shared_info;
     if ( !test_and_set_bit(rid,    &rsi->event_channel_pend[0]) &&
@@ -266,7 +255,6 @@ static long event_channel_send(u16 lid)
         guest_event_notify(cpu_mask);
     }
 
-    spin_unlock(&rp->event_channel_lock);
     put_task_struct(rp);
     return 0;
 }
@@ -284,7 +272,7 @@ static long event_channel_status(u16 lid)
 
     if ( lid < lp->max_event_channel )
     {
-        if ( (lchn[lid].flags & (ECF_INUSE|ECF_CONNECTED)) == ECF_INUSE )
+        if ( lchn[lid].flags & ECF_CONNECTED )
             rc = EVTCHNSTAT_connected;        
         else if ( lchn[lid].flags & ECF_INUSE )
             rc = EVTCHNSTAT_disconnected;
