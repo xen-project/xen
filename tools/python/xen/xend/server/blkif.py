@@ -16,16 +16,45 @@ import channel
 import controller
 from messages import *
 
+def expand_dev_name(name):
+    if re.match( '^/dev/', name ):
+	return name
+    else:
+	return '/dev/' + name
+
+def check_mounted(self, name):
+    mode = None
+    name = expand_dev_name(name)
+    lines = os.popen('mount 2>/dev/null').readlines()
+    exp = re.compile('^' + name + '.*[\(,]r(?P<mode>[ow])[,\)]')
+    for line in lines:
+        pm = exp.match(line)
+        if not pm: continue
+        mode = pm.group('mode')
+        break
+    if mode is 'w':
+        return mode
+    if mode is 'o':
+        mode = 'r'
+    blkifs = self.ctrl.daemon.blkifs()
+    for blkif in blkifs:
+        if blkif[1][1] is self.ctrl.dom:
+            continue
+        for dev in self.ctrl.daemon.blkif_get(blkif[1][1]).getDevices():
+            if dev.type == 'phy' and name == expand_dev_name(dev.params):
+                mode = dev.mode
+                if 'w' in mode:
+                    return 'w'
+    if mode and 'r' in mode:
+        return 'r'
+    return None
 
 def blkdev_name_to_number(name):
     """Take the given textual block-device name (e.g., '/dev/sda1',
     'hda') and return the device number used by the OS. """
 
-    if re.match( '^/dev/', name ):
-	n = name
-    else:
-	n = '/dev/' + name
-    
+    n = expand_dev_name(name)
+
     try:
 	return os.stat(n).st_rdev
     except Exception, ex:
@@ -283,6 +312,7 @@ class BlkDev(controller.SplitDev):
         self.device = None
         self.start_sector = None
         self.nr_sectors = None
+        self.ctrl = ctrl
         self.configure(config)
 
     def configure(self, config):
@@ -322,6 +352,14 @@ class BlkDev(controller.SplitDev):
         Blkctl.block('unbind', self.type, self.node)
 
     def setNode(self, node):
+        mounted_mode = check_mounted(self, node)
+        if not '!' in self.mode and mounted_mode:
+            if mounted_mode is "w":
+                raise VmError("vbd: Segment %s is in writable use" %
+                              self.uname)
+            elif 'w' in self.mode:
+                raise VmError("vbd: Segment %s is in read-only use" %
+                              self.uname)
         segment = blkdev_segment(node)
         if not segment:
             raise VmError("vbd: Segment not found: uname=%s" % self.uname)

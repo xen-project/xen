@@ -649,7 +649,9 @@ class Daemon:
         
         Returns controller
         """
-        return self.blkifCF.getController(dom)
+        blkif = self.blkifCF.getController(dom)
+        blkif.daemon = self
+        return blkif
 
     def blkifs(self):
         return [ x.sxpr() for x in self.blkifCF.getControllers() ]
