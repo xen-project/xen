@@ -523,3 +523,14 @@ tools/xc/lib/xc_private.o
 tools/xc/lib/xc_vbd.o
 tools/xc/lib/xc_vif.o
 xen/xen.s
+xen/drivers/message/fusion/driver.o
+xen/drivers/message/fusion/mptbase.o
+xen/drivers/message/fusion/mptscsih.o
+xen/drivers/net/e1000/kcompat.o
+xen/drivers/scsi/sym53c8xx_2/sym53c8xx.o
+xen/drivers/scsi/sym53c8xx_2/sym_fw.o
+xen/drivers/scsi/sym53c8xx_2/sym_glue.o
+xen/drivers/scsi/sym53c8xx_2/sym_hipd.o
+xen/drivers/scsi/sym53c8xx_2/sym_malloc.o
+xen/drivers/scsi/sym53c8xx_2/sym_misc.o
+xen/drivers/scsi/sym53c8xx_2/sym_nvram.o

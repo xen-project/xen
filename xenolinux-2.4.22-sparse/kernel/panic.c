@@ -16,6 +16,7 @@
 #include <linux/init.h>
 #include <linux/sysrq.h>
 #include <linux/interrupt.h>
+#include <linux/console.h>
 
 asmlinkage void sys_sync(void);	/* it's really int */
 
@@ -30,6 +31,8 @@ static int __init panic_setup(char *str)
 }
 
 __setup("panic=", panic_setup);
+
+int machine_paniced; 
 
 /**
  *	panic - halt the system
@@ -49,6 +52,11 @@ NORET_TYPE void panic(const char * fmt, ...)
         unsigned long caller = (unsigned long) __builtin_return_address(0);
 #endif
 
+#ifdef CONFIG_VT
+	disable_console_blank();
+#endif
+	machine_paniced = 1;
+	
 	bust_spinlocks(1);
 	va_start(args, fmt);
 	vsprintf(buf, fmt, args);

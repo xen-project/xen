@@ -67,6 +67,10 @@ if [ "$CONFIG_MK7" = "y" ]; then
    define_bool CONFIG_X86_USE_3DNOW y
 fi
 
+if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+   tristate 'BIOS Enhanced Disk Drive calls determine boot disk (EXPERIMENTAL)' CONFIG_EDD
+fi
+
 choice 'High Memory Support' \
 	"off    CONFIG_NOHIGHMEM \
 	 4GB    CONFIG_HIGHMEM4G \
@@ -162,6 +166,8 @@ if [ "$CONFIG_DEBUG_KERNEL" != "n" ]; then
 fi
 
 source drivers/acpi/Config.in
+
+int 'Kernel messages buffer length shift (0 = default)' CONFIG_LOG_BUF_SHIFT 0
 
 endmenu
 

@@ -121,6 +121,10 @@ int * max_sectors[MAX_BLKDEV];
 unsigned long blk_max_low_pfn, blk_max_pfn;
 int blk_nohighio = 0;
 
+int block_dump = 0;
+
+static struct timer_list writeback_timer;
+
 static inline int get_max_sectors(kdev_t dev)
 {
 	if (!max_sectors[MAJOR(dev)])
@@ -1293,6 +1297,9 @@ void submit_bh(int rw, struct buffer_head * bh)
 	if (waitqueue_active(&bh->b_wait))
 		wake_up(&bh->b_wait);
 
+	if (block_dump)
+		printk(KERN_DEBUG "%s: %s block %lu/%u on %s\n", current->comm, rw == WRITE ? "WRITE" : "READ", bh->b_rsector, count, kdevname(bh->b_rdev));
+
 	put_bh(bh);
 	switch (rw) {
 		case WRITE:
@@ -1413,6 +1420,11 @@ sorry:
 extern int stram_device_init (void);
 #endif
 
+static void blk_writeback_timer(unsigned long data)
+{
+	wakeup_bdflush();
+	wakeup_kupdate();
+}
 
 /**
  * end_that_request_first - end I/O on one buffer.
@@ -1469,9 +1481,17 @@ int end_that_request_first (struct request *req, int uptodate, char *name)
 	return 0;
 }
 
+extern int laptop_mode;
+
 void end_that_request_last(struct request *req)
 {
 	struct completion *waiting = req->waiting;
+
+	/*
+	 * schedule the writeout of pending dirty data when the disk is idle
+	 */
+	if (laptop_mode && req->cmd == READ)
+		mod_timer(&writeback_timer, jiffies + 5 * HZ);
 
 	req_finished_io(req);
 	blkdev_release_request(req);
@@ -1499,6 +1519,9 @@ int __init blk_dev_init(void)
 
 	blk_max_low_pfn = max_low_pfn - 1;
 	blk_max_pfn = max_pfn - 1;
+
+	init_timer(&writeback_timer);
+	writeback_timer.function = blk_writeback_timer;
 
 #ifdef CONFIG_AMIGA_Z2RAM
 	z2_init();

@@ -149,7 +149,7 @@ void * __ioremap(unsigned long machine_addr,
     /* Mappings have to be page-aligned */
     offset = machine_addr & ~PAGE_MASK;
     machine_addr &= PAGE_MASK;
-    size = PAGE_ALIGN(last_addr) - machine_addr;
+    size = PAGE_ALIGN(last_addr+1) - machine_addr;
 
     /* Ok, go for it */
     area = get_vm_area(size, VM_IOREMAP);

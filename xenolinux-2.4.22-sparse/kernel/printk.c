@@ -29,6 +29,7 @@
 
 #include <asm/uaccess.h>
 
+#if !defined(CONFIG_LOG_BUF_SHIFT) || (CONFIG_LOG_BUF_SHIFT == 0)
 #if defined(CONFIG_MULTIQUAD) || defined(CONFIG_IA64)
 #define LOG_BUF_LEN	(65536)
 #elif defined(CONFIG_ARCH_S390)
@@ -37,6 +38,9 @@
 #define LOG_BUF_LEN	(32768)
 #else	
 #define LOG_BUF_LEN	(16384)			/* This must be a power of two */
+#endif
+#else /* CONFIG_LOG_BUF_SHIFT */
+#define LOG_BUF_LEN (1 << CONFIG_LOG_BUF_SHIFT)
 #endif
 
 #define LOG_BUF_MASK	(LOG_BUF_LEN-1)

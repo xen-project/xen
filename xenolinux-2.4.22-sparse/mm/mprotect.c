@@ -275,7 +275,7 @@ asmlinkage long sys_mprotect(unsigned long start, size_t len, unsigned long prot
 	len = PAGE_ALIGN(len);
 	end = start + len;
 	if (end < start)
-		return -EINVAL;
+		return -ENOMEM;
 	if (prot & ~(PROT_READ | PROT_WRITE | PROT_EXEC))
 		return -EINVAL;
 	if (end == start)
