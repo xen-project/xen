@@ -53,6 +53,7 @@ void init_trace_bufs(void)
     unsigned long nr_pages;
     char         *rawbuf;
     struct t_buf *buf;
+    struct task_struct *dom0;
     
     if ( opt_tbuf_size == 0 )
     {
@@ -69,10 +70,15 @@ void init_trace_bufs(void)
         return;
     }
 
-    /* share pages so that xentrace can map them */
+    /* Share pages so that xentrace can map them. */
+
+    dom0 = find_domain_by_id(0);
+
     for( i = 0; i < nr_pages; i++)
-        SHARE_PFN_WITH_DOMAIN(virt_to_page(rawbuf+(i*PAGE_SIZE)), 0);
+        SHARE_PFN_WITH_DOMAIN(virt_to_page(rawbuf+(i*PAGE_SIZE)), dom0);
     
+    put_task_struct(dom0);
+
     for ( i = 0; i < smp_num_cpus; i++ )
     {
         buf = t_bufs[i] = (struct t_buf *)&rawbuf[i*opt_tbuf_size*PAGE_SIZE];
