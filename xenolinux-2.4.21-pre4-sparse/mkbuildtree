@@ -3,6 +3,8 @@
 # Creates symbolic links in <build tree> for the sparse tree
 # in the current directory.
 
+[ "$1" == "" ] && { echo "Syntax: $0 <linux tree to xenify>"; exit 1; }
+
 # Get absolute path to the destination directory
 pushd . >/dev/null
 cd ${1}
@@ -24,101 +26,106 @@ rm -f ${D}/mkbuildtree
 ln -sf `pwd`/../xen/include/hypervisor-ifs ${D}/include/asm-xeno/hypervisor-ifs
 
 # The remainder are the i386 -> xeno-i386 links
-ln -sf ${D}/include/asm-i386/a.out.h ${D}/include/asm-xeno/a.out.h
-ln -sf ${D}/include/asm-i386/apicdef.h ${D}/include/asm-xeno/apicdef.h
-ln -sf ${D}/include/asm-i386/apic.h ${D}/include/asm-xeno/apic.h
-ln -sf ${D}/include/asm-i386/atomic.h ${D}/include/asm-xeno/atomic.h
-ln -sf ${D}/include/asm-i386/bitops.h ${D}/include/asm-xeno/bitops.h
-ln -sf ${D}/include/asm-i386/boot.h ${D}/include/asm-xeno/boot.h
-ln -sf ${D}/include/asm-i386/byteorder.h ${D}/include/asm-xeno/byteorder.h
-ln -sf ${D}/include/asm-i386/cache.h ${D}/include/asm-xeno/cache.h
-ln -sf ${D}/include/asm-i386/checksum.h ${D}/include/asm-xeno/checksum.h
-ln -sf ${D}/include/asm-i386/cpufeature.h ${D}/include/asm-xeno/cpufeature.h
-ln -sf ${D}/include/asm-i386/current.h ${D}/include/asm-xeno/current.h
-ln -sf ${D}/include/asm-i386/debugreg.h ${D}/include/asm-xeno/debugreg.h
-ln -sf ${D}/include/asm-i386/delay.h ${D}/include/asm-xeno/delay.h
-ln -sf ${D}/include/asm-i386/div64.h ${D}/include/asm-xeno/div64.h
-ln -sf ${D}/include/asm-i386/dma.h ${D}/include/asm-xeno/dma.h
-ln -sf ${D}/include/asm-i386/elf.h ${D}/include/asm-xeno/elf.h
-ln -sf ${D}/include/asm-i386/errno.h ${D}/include/asm-xeno/errno.h
-ln -sf ${D}/include/asm-i386/fcntl.h ${D}/include/asm-xeno/fcntl.h
-ln -sf ${D}/include/asm-i386/floppy.h ${D}/include/asm-xeno/floppy.h
-ln -sf ${D}/include/asm-i386/hardirq.h ${D}/include/asm-xeno/hardirq.h
-ln -sf ${D}/include/asm-i386/hdreg.h ${D}/include/asm-xeno/hdreg.h
-ln -sf ${D}/include/asm-i386/i387.h ${D}/include/asm-xeno/i387.h
-ln -sf ${D}/include/asm-i386/ide.h ${D}/include/asm-xeno/ide.h
-ln -sf ${D}/include/asm-i386/init.h ${D}/include/asm-xeno/init.h
-ln -sf ${D}/include/asm-i386/io_apic.h ${D}/include/asm-xeno/io_apic.h
-ln -sf ${D}/include/asm-i386/ioctl.h ${D}/include/asm-xeno/ioctl.h
-ln -sf ${D}/include/asm-i386/ioctls.h ${D}/include/asm-xeno/ioctls.h
-ln -sf ${D}/include/asm-i386/ipcbuf.h ${D}/include/asm-xeno/ipcbuf.h
-ln -sf ${D}/include/asm-i386/ipc.h ${D}/include/asm-xeno/ipc.h
-ln -sf ${D}/include/asm-i386/keyboard.h ${D}/include/asm-xeno/keyboard.h
-ln -sf ${D}/include/asm-i386/kmap_types.h ${D}/include/asm-xeno/kmap_types.h
-ln -sf ${D}/include/asm-i386/ldt.h ${D}/include/asm-xeno/ldt.h
-ln -sf ${D}/include/asm-i386/linux_logo.h ${D}/include/asm-xeno/linux_logo.h
-ln -sf ${D}/include/asm-i386/locks.h ${D}/include/asm-xeno/locks.h
-ln -sf ${D}/include/asm-i386/math_emu.h ${D}/include/asm-xeno/math_emu.h
-ln -sf ${D}/include/asm-i386/mc146818rtc.h ${D}/include/asm-xeno/mc146818rtc.h
-ln -sf ${D}/include/asm-i386/mca_dma.h ${D}/include/asm-xeno/mca_dma.h
-ln -sf ${D}/include/asm-i386/mman.h ${D}/include/asm-xeno/mman.h
-ln -sf ${D}/include/asm-i386/mmx.h ${D}/include/asm-xeno/mmx.h
-ln -sf ${D}/include/asm-i386/module.h ${D}/include/asm-xeno/module.h
-ln -sf ${D}/include/asm-i386/mpspec.h ${D}/include/asm-xeno/mpspec.h
-ln -sf ${D}/include/asm-i386/msgbuf.h ${D}/include/asm-xeno/msgbuf.h
-ln -sf ${D}/include/asm-i386/msr.h ${D}/include/asm-xeno/msr.h
-ln -sf ${D}/include/asm-i386/mtrr.h ${D}/include/asm-xeno/mtrr.h
-ln -sf ${D}/include/asm-i386/namei.h ${D}/include/asm-xeno/namei.h
-ln -sf ${D}/include/asm-i386/param.h ${D}/include/asm-xeno/param.h
-ln -sf ${D}/include/asm-i386/parport.h ${D}/include/asm-xeno/parport.h
-ln -sf ${D}/include/asm-i386/poll.h ${D}/include/asm-xeno/poll.h
-ln -sf ${D}/include/asm-i386/posix_types.h ${D}/include/asm-xeno/posix_types.h
-ln -sf ${D}/include/asm-i386/resource.h ${D}/include/asm-xeno/resource.h
-ln -sf ${D}/include/asm-i386/rwlock.h ${D}/include/asm-xeno/rwlock.h
-ln -sf ${D}/include/asm-i386/rwsem.h ${D}/include/asm-xeno/rwsem.h
-ln -sf ${D}/include/asm-i386/scatterlist.h ${D}/include/asm-xeno/scatterlist.h
-ln -sf ${D}/include/asm-i386/semaphore.h ${D}/include/asm-xeno/semaphore.h
-ln -sf ${D}/include/asm-i386/sembuf.h ${D}/include/asm-xeno/sembuf.h
-ln -sf ${D}/include/asm-i386/serial.h ${D}/include/asm-xeno/serial.h
-ln -sf ${D}/include/asm-i386/setup.h ${D}/include/asm-xeno/setup.h
-ln -sf ${D}/include/asm-i386/shmbuf.h ${D}/include/asm-xeno/shmbuf.h
-ln -sf ${D}/include/asm-i386/shmparam.h ${D}/include/asm-xeno/shmparam.h
-ln -sf ${D}/include/asm-i386/sigcontext.h ${D}/include/asm-xeno/sigcontext.h
-ln -sf ${D}/include/asm-i386/siginfo.h ${D}/include/asm-xeno/siginfo.h
-ln -sf ${D}/include/asm-i386/signal.h ${D}/include/asm-xeno/signal.h
-ln -sf ${D}/include/asm-i386/smplock.h ${D}/include/asm-xeno/smplock.h
-ln -sf ${D}/include/asm-i386/socket.h ${D}/include/asm-xeno/socket.h
-ln -sf ${D}/include/asm-i386/sockios.h ${D}/include/asm-xeno/sockios.h
-ln -sf ${D}/include/asm-i386/softirq.h ${D}/include/asm-xeno/softirq.h
-ln -sf ${D}/include/asm-i386/spinlock.h ${D}/include/asm-xeno/spinlock.h
-ln -sf ${D}/include/asm-i386/statfs.h ${D}/include/asm-xeno/statfs.h
-ln -sf ${D}/include/asm-i386/stat.h ${D}/include/asm-xeno/stat.h
-ln -sf ${D}/include/asm-i386/string-486.h ${D}/include/asm-xeno/string-486.h
-ln -sf ${D}/include/asm-i386/string.h ${D}/include/asm-xeno/string.h
-ln -sf ${D}/include/asm-i386/termbits.h ${D}/include/asm-xeno/termbits.h
-ln -sf ${D}/include/asm-i386/termios.h ${D}/include/asm-xeno/termios.h
-ln -sf ${D}/include/asm-i386/timex.h ${D}/include/asm-xeno/timex.h
-ln -sf ${D}/include/asm-i386/tlb.h ${D}/include/asm-xeno/tlb.h
-ln -sf ${D}/include/asm-i386/types.h ${D}/include/asm-xeno/types.h
-ln -sf ${D}/include/asm-i386/uaccess.h ${D}/include/asm-xeno/uaccess.h
-ln -sf ${D}/include/asm-i386/ucontext.h ${D}/include/asm-xeno/ucontext.h
-ln -sf ${D}/include/asm-i386/unaligned.h ${D}/include/asm-xeno/unaligned.h
-ln -sf ${D}/include/asm-i386/unistd.h ${D}/include/asm-xeno/unistd.h
-ln -sf ${D}/include/asm-i386/user.h ${D}/include/asm-xeno/user.h
-ln -sf ${D}/include/asm-i386/vga.h ${D}/include/asm-xeno/vga.h
-ln -sf ${D}/include/asm-i386/xor.h ${D}/include/asm-xeno/xor.h
-ln -sf ${D}/arch/i386/kernel/init_task.c ${D}/arch/xeno/kernel/init_task.c
-ln -sf ${D}/arch/i386/kernel/ptrace.c ${D}/arch/xeno/kernel/ptrace.c
-ln -sf ${D}/arch/i386/kernel/semaphore.c ${D}/arch/xeno/kernel/semaphore.c
-ln -sf ${D}/arch/i386/kernel/sys_i386.c ${D}/arch/xeno/kernel/sys_i386.c
-ln -sf ${D}/arch/i386/lib/checksum.S ${D}/arch/xeno/lib/checksum.S
-ln -sf ${D}/arch/i386/lib/dec_and_lock.c ${D}/arch/xeno/lib/dec_and_lock.c
-ln -sf ${D}/arch/i386/lib/getuser.S ${D}/arch/xeno/lib/getuser.S
-ln -sf ${D}/arch/i386/lib/iodebug.c ${D}/arch/xeno/lib/iodebug.c
-ln -sf ${D}/arch/i386/lib/memcpy.c ${D}/arch/xeno/lib/memcpy.c
-ln -sf ${D}/arch/i386/lib/mmx.c ${D}/arch/xeno/lib/mmx.c
-ln -sf ${D}/arch/i386/lib/old-checksum.c ${D}/arch/xeno/lib/old-checksum.c
-ln -sf ${D}/arch/i386/lib/strstr.c ${D}/arch/xeno/lib/strstr.c
-ln -sf ${D}/arch/i386/lib/usercopy.c ${D}/arch/xeno/lib/usercopy.c
-ln -sf ${D}/arch/i386/mm/extable.c ${D}/arch/xeno/mm/extable.c
-ln -sf ${D}/arch/i386/mm/pageattr.c ${D}/arch/xeno/mm/pageattr.c
+cd ${D}/include/asm-xeno
+ln -sf ../asm-i386/a.out.h 
+ln -sf ../asm-i386/apicdef.h 
+ln -sf ../asm-i386/apic.h 
+ln -sf ../asm-i386/atomic.h 
+ln -sf ../asm-i386/bitops.h 
+ln -sf ../asm-i386/boot.h 
+ln -sf ../asm-i386/byteorder.h 
+ln -sf ../asm-i386/cache.h 
+ln -sf ../asm-i386/checksum.h 
+ln -sf ../asm-i386/cpufeature.h 
+ln -sf ../asm-i386/current.h 
+ln -sf ../asm-i386/debugreg.h 
+ln -sf ../asm-i386/delay.h 
+ln -sf ../asm-i386/div64.h 
+ln -sf ../asm-i386/dma.h 
+ln -sf ../asm-i386/elf.h 
+ln -sf ../asm-i386/errno.h 
+ln -sf ../asm-i386/fcntl.h 
+ln -sf ../asm-i386/floppy.h 
+ln -sf ../asm-i386/hardirq.h 
+ln -sf ../asm-i386/hdreg.h 
+ln -sf ../asm-i386/i387.h 
+ln -sf ../asm-i386/ide.h 
+ln -sf ../asm-i386/init.h 
+ln -sf ../asm-i386/io_apic.h
+ln -sf ../asm-i386/ioctl.h
+ln -sf ../asm-i386/ioctls.h
+ln -sf ../asm-i386/ipcbuf.h
+ln -sf ../asm-i386/ipc.h 
+ln -sf ../asm-i386/keyboard.h
+ln -sf ../asm-i386/kmap_types.h
+ln -sf ../asm-i386/ldt.h 
+ln -sf ../asm-i386/linux_logo.h
+ln -sf ../asm-i386/locks.h 
+ln -sf ../asm-i386/math_emu.h
+ln -sf ../asm-i386/mc146818rtc.h
+ln -sf ../asm-i386/mca_dma.h 
+ln -sf ../asm-i386/mman.h 
+ln -sf ../asm-i386/mmx.h 
+ln -sf ../asm-i386/module.h 
+ln -sf ../asm-i386/mpspec.h 
+ln -sf ../asm-i386/msgbuf.h 
+ln -sf ../asm-i386/msr.h 
+ln -sf ../asm-i386/mtrr.h 
+ln -sf ../asm-i386/namei.h 
+ln -sf ../asm-i386/param.h 
+ln -sf ../asm-i386/parport.h 
+ln -sf ../asm-i386/poll.h 
+ln -sf ../asm-i386/posix_types.h 
+ln -sf ../asm-i386/resource.h 
+ln -sf ../asm-i386/rwlock.h 
+ln -sf ../asm-i386/rwsem.h 
+ln -sf ../asm-i386/scatterlist.h
+ln -sf ../asm-i386/semaphore.h 
+ln -sf ../asm-i386/sembuf.h 
+ln -sf ../asm-i386/serial.h 
+ln -sf ../asm-i386/setup.h 
+ln -sf ../asm-i386/shmbuf.h 
+ln -sf ../asm-i386/shmparam.h 
+ln -sf ../asm-i386/sigcontext.h 
+ln -sf ../asm-i386/siginfo.h 
+ln -sf ../asm-i386/signal.h 
+ln -sf ../asm-i386/smplock.h 
+ln -sf ../asm-i386/socket.h 
+ln -sf ../asm-i386/sockios.h 
+ln -sf ../asm-i386/softirq.h 
+ln -sf ../asm-i386/spinlock.h 
+ln -sf ../asm-i386/statfs.h 
+ln -sf ../asm-i386/stat.h 
+ln -sf ../asm-i386/string-486.h 
+ln -sf ../asm-i386/string.h 
+ln -sf ../asm-i386/termbits.h 
+ln -sf ../asm-i386/termios.h 
+ln -sf ../asm-i386/timex.h 
+ln -sf ../asm-i386/tlb.h 
+ln -sf ../asm-i386/types.h 
+ln -sf ../asm-i386/uaccess.h 
+ln -sf ../asm-i386/ucontext.h 
+ln -sf ../asm-i386/unaligned.h
+ln -sf ../asm-i386/unistd.h 
+ln -sf ../asm-i386/user.h 
+ln -sf ../asm-i386/vga.h 
+ln -sf ../asm-i386/xor.h 
+
+cd ../../arch/xeno/kernel
+ln -sf ../../i386/kernel/init_task.c
+ln -sf ../../i386/kernel/ptrace.c
+ln -sf ../../i386/kernel/semaphore.c 
+ln -sf ../../i386/kernel/sys_i386.c 
+cd ../lib
+ln -sf ../../i386/lib/checksum.S 
+ln -sf ../../i386/lib/dec_and_lock.c 
+ln -sf ../../i386/lib/getuser.S 
+ln -sf ../../i386/lib/iodebug.c 
+ln -sf ../../i386/lib/memcpy.c 
+ln -sf ../../i386/lib/mmx.c
+ln -sf ../../i386/lib/old-checksum.c 
+ln -sf ../../i386/lib/strstr.c 
+ln -sf ../../i386/lib/usercopy.c 
+cd ../mm
+ln -sf ../../i386/mm/extable.c 
+ln -sf ../../i386/mm/pageattr.c 
