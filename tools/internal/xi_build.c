@@ -102,6 +102,18 @@ static int read_kernel_header(int fd, long dom_size,
     /* Read the load address which immediately follows the Xeno signature. */
     read(fd, load_addr, sizeof(unsigned long));
 
+    if ( (*load_addr & (PAGE_SIZE-1)) != 0 )
+    {
+        ERROR("We can only deal with page-aligned load addresses");
+        return -1;
+    }
+
+    if ( (*load_addr + (dom_size << 10)) > HYPERVISOR_VIRT_START )
+    {
+        ERROR("Cannot map all domain memory without hitting Xen space");
+        return -1;
+    }
+
     *ksize = stat.st_size - SIG_LEN - sizeof(unsigned long);
 
     return 0;

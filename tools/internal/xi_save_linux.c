@@ -104,6 +104,9 @@ int main(int argc, char **argv)
     /* Remember if we stopped the guest, so we can restart it on exit. */
     int we_stopped_it = 0;
 
+    /* The new domain's shared-info frame number. */
+    unsigned long shared_info_frame;
+    
     /* A copy of the CPU context of the guest. */
     full_execution_context_t ctxt;
 
@@ -164,6 +167,7 @@ int main(int argc, char **argv)
 
         memcpy(&ctxt, &op.u.getdomaininfo.ctxt, sizeof(ctxt));
         memcpy(name, op.u.getdomaininfo.name, sizeof(name));
+        shared_info_frame = op.u.getdomaininfo.shared_info_frame;
 
         if ( op.u.getdomaininfo.state == DOMSTATE_STOPPED )
             break;
@@ -302,16 +306,19 @@ int main(int argc, char **argv)
     }
 
     /* Start writing out the saved-domain record. */
+    ppage = map_pfn(shared_info_frame);
     if ( !checked_write(fd, "XenoLinuxSuspend",    16) ||
          !checked_write(fd, name,                  sizeof(name)) ||
          !checked_write(fd, &srec.nr_pfns,         sizeof(unsigned long)) ||
          !checked_write(fd, &ctxt,                 sizeof(ctxt)) ||
+         !checked_write(fd, ppage,                 PAGE_SIZE) ||
          !checked_write(fd, pfn_to_mfn_frame_list, PAGE_SIZE) ||
          !checked_write(fd, pfn_type,              4 * srec.nr_pfns) )
     {
         ERROR("Error when writing to state file");
         goto out;
     }
+    unmap_pfn(ppage);
 
     /* Now write out each data page, canonicalising page tables as we go... */
     for ( i = 0; i < srec.nr_pfns; i++ )
@@ -319,7 +326,7 @@ int main(int argc, char **argv)
         mfn = pfn_to_mfn_table[i];
 
         ppage = map_pfn(mfn);
-        memcpy(&page, ppage, PAGE_SIZE);
+        memcpy(page, ppage, PAGE_SIZE);
         unmap_pfn(ppage);
 
         if ( (pfn_type[i] == L1TAB) || (pfn_type[i] == L2TAB) )
@@ -338,7 +345,7 @@ int main(int argc, char **argv)
             }
         }
 
-        if ( !checked_write(fd, &page, PAGE_SIZE) )
+        if ( !checked_write(fd, page, PAGE_SIZE) )
         {
             ERROR("Error when writing to state file");
             goto out;

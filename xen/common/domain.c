@@ -330,6 +330,7 @@ void release_task(struct task_struct *p)
 int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *builddomain)
 {
     unsigned long phys_l2tab;
+    int i;
 
     if ( (p->flags & PF_CONSTRUCTED) )
         return -EINVAL;
@@ -358,9 +359,8 @@ int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *builddomain)
                       builddomain->ctxt.gdt_ents);
     p->thread.ss1  = builddomain->ctxt.ring1_ss;
     p->thread.esp1 = builddomain->ctxt.ring1_esp;
-    memcpy(p->thread.debugreg,
-           builddomain->ctxt.debugreg,
-           sizeof(p->thread.debugreg));
+    for ( i = 0; i < 8; i++ )
+        (void)set_debugreg(p, i, builddomain->ctxt.debugreg[i]);
     p->event_selector    = builddomain->ctxt.event_callback_cs;
     p->event_address     = builddomain->ctxt.event_callback_eip;
     p->failsafe_selector = builddomain->ctxt.failsafe_callback_cs;

@@ -10,12 +10,73 @@
 #include "mem_defs.h"
 #include <asm-xeno/suspend.h>
 
-static char *argv0 = "internal_save_linux";
+static char *argv0 = "internal_restore_linux";
 
-/* A table mapping each PFN to its current MFN. */
+/* A table mapping each PFN to its new MFN. */
 static unsigned long *pfn_to_mfn_table;
-/* A table mapping each current MFN to its canonical PFN. */
-static unsigned long *mfn_to_pfn_table;
+
+static int get_pfn_list(
+    int domain_id, unsigned long *pfn_buf, unsigned long max_pfns)
+{
+    dom0_op_t op;
+    int ret;
+    op.cmd = DOM0_GETMEMLIST;
+    op.u.getmemlist.domain   = domain_id;
+    op.u.getmemlist.max_pfns = max_pfns;
+    op.u.getmemlist.buffer   = pfn_buf;
+
+    if ( mlock(pfn_buf, max_pfns * sizeof(unsigned long)) != 0 )
+    {
+        PERROR("Could not lock pfn list buffer");
+        return -1;
+    }    
+
+    ret = do_dom0_op(&op);
+
+    (void)munlock(pfn_buf, max_pfns * sizeof(unsigned long));
+
+    return (ret < 0) ? -1 : op.u.getmemlist.num_pfns;
+}
+
+#define MAX_MMU_UPDATES 1024
+static mmu_update_t mmu_updates[MAX_MMU_UPDATES];
+static int mmu_update_idx;
+
+static void flush_mmu_updates(void)
+{
+    privcmd_hypercall_t hypercall;
+
+    if ( mmu_update_idx == 0 )
+        return;
+
+    hypercall.op     = __HYPERVISOR_mmu_update;
+    hypercall.arg[0] = (unsigned long)mmu_updates;
+    hypercall.arg[1] = (unsigned long)mmu_update_idx;
+
+    if ( mlock(mmu_updates, sizeof(mmu_updates)) != 0 )
+    {
+        PERROR("Could not lock pagetable update array");
+        exit(1);
+    }
+
+    if ( do_xen_hypercall(&hypercall) < 0 )
+    {
+        ERROR("Failure when submitting mmu updates");
+        exit(1);
+    }
+
+    mmu_update_idx = 0;
+    
+    (void)munlock(mmu_updates, sizeof(mmu_updates));
+}
+
+static void add_mmu_update(unsigned long ptr, unsigned long val)
+{
+    mmu_updates[mmu_update_idx].ptr = ptr;
+    mmu_updates[mmu_update_idx].val = val;
+    if ( ++mmu_update_idx == MAX_MMU_UPDATES )
+        flush_mmu_updates();
+}
 
 static int devmem_fd;
 
@@ -46,47 +107,6 @@ static void unmap_pfn(void *vaddr)
     (void)munmap(vaddr, PAGE_SIZE);
 }
 
-/*
- * Returns TRUE if the given machine frame number has a unique mapping
- * in the guest's pseudophysical map.
- */
-#define MFN_IS_IN_PSEUDOPHYS_MAP(_mfn) \
-    (((_mfn) < (1024*1024)) &&          \
-     (pfn_to_mfn_table[mfn_to_pfn_table[_mfn]] == (_mfn)))
-
-/* Returns TRUE if MFN is successfully converted to a PFN. */
-static int translate_mfn_to_pfn(unsigned long *pmfn)
-{
-    unsigned long mfn = *pmfn;
-    if ( !MFN_IS_IN_PSEUDOPHYS_MAP(mfn) )
-        return 0;
-    *pmfn = mfn_to_pfn_table[mfn];
-    return 1;
-}
-
-static int check_pfn_ownership(unsigned long mfn, unsigned int dom)
-{
-    dom0_op_t op;
-    op.cmd = DOM0_GETPAGEFRAMEINFO;
-    op.u.getpageframeinfo.pfn = mfn;
-    if ( (do_dom0_op(&op) < 0) || (op.u.getpageframeinfo.domain != dom) )
-        return 0;
-    return 1;
-}
-
-static unsigned int get_pfn_type(unsigned long mfn)
-{
-    dom0_op_t op;
-    op.cmd = DOM0_GETPAGEFRAMEINFO;
-    op.u.getpageframeinfo.pfn = mfn;
-    if ( do_dom0_op(&op) < 0 )
-    {
-        PERROR("Unexpected failure when getting page frame info!");
-        exit(1);
-    }
-    return op.u.getpageframeinfo.type;
-}
-
 static int checked_read(int fd, void *buf, size_t count)
 {
     int rc;
@@ -98,11 +118,15 @@ static int checked_read(int fd, void *buf, size_t count)
 int main(int argc, char **argv)
 {
     dom0_op_t op;
-    int rc = 1, i;
-    unsigned long mfn, dom = 0;
+    int rc = 1, i, j;
+    unsigned long mfn, pfn, dom = 0;
     
     /* Number of page frames in use by this XenoLinux session. */
     unsigned long nr_pfns;
+
+    /* The new domain's shared-info frame number. */
+    unsigned long shared_info_frame;
+    unsigned char shared_info[PAGE_SIZE]; /* saved contents from file */
     
     /* A copy of the CPU context of the guest. */
     full_execution_context_t ctxt;
@@ -121,11 +145,9 @@ int main(int argc, char **argv)
 
     /* A copy of the pfn-to-mfn table frame list. */
     unsigned long pfn_to_mfn_frame_list[1024];
-    /* A temporary mapping of one frame in the above list. */
-    unsigned long *pfn_to_mfn_frame;
 
-    /* A temporary mapping, and a copy, of the guest's suspend record. */
-    suspend_record_t *p_srec, srec;
+    /* A temporary mapping of the guest's suspend record. */
+    suspend_record_t *p_srec;
 
     /* The name and descriptor of the file that we are reading from. */
     char *filename;
@@ -158,15 +180,10 @@ int main(int argc, char **argv)
     if ( !checked_read(fd, name,                  sizeof(name)) ||
          !checked_read(fd, &nr_pfns,              sizeof(unsigned long)) ||
          !checked_read(fd, &ctxt,                 sizeof(ctxt)) ||
+         !checked_read(fd, shared_info,           PAGE_SIZE) ||
          !checked_read(fd, pfn_to_mfn_frame_list, PAGE_SIZE) )
     {
         ERROR("Error when reading from state file");
-        goto out;
-    }
-
-    if ( nr_pfns > 1024*1024 )
-    {
-        ERROR("Invalid state file -- pfn count out of range");
         goto out;
     }
 
@@ -181,8 +198,13 @@ int main(int argc, char **argv)
     }
     name[MAX_DOMAIN_NAME-1] = '\0';
 
+    if ( nr_pfns > 1024*1024 )
+    {
+        ERROR("Invalid state file -- pfn count out of range");
+        goto out;
+    }
+
     /* We want zeroed memory so use calloc rather than malloc. */
-    mfn_to_pfn_table = calloc(1, 4 * 1024 * 1024);
     pfn_to_mfn_table = calloc(1, 4 * nr_pfns);
     pfn_type         = calloc(1, 4 * nr_pfns);    
 
@@ -192,7 +214,7 @@ int main(int argc, char **argv)
         goto out;
     }
 
-    /* Create a new domain of teh appropriate size, and find it's dom_id. */
+    /* Create a new domain of the appropriate size, and find it's dom_id. */
     op.cmd = DOM0_CREATEDOMAIN;
     op.u.createdomain.memory_kb = nr_pfns * (PAGE_SIZE / 1024);
     memcpy(op.u.createdomain.name, name, MAX_DOMAIN_NAME);
@@ -203,131 +225,200 @@ int main(int argc, char **argv)
     }
     dom = op.u.createdomain.domain;
 
+    /* Get the domain's shared-info frame. */
+    op.cmd = DOM0_GETDOMAININFO;
+    op.u.getdomaininfo.domain = dom;
+    if ( do_dom0_op(&op) < 0 )
+    {
+        ERROR("Could not get information on new domain");
+        goto out;
+    }
+    shared_info_frame = op.u.getdomaininfo.shared_info_frame;
+
     if ( init_pfn_mapper() < 0 )
         goto out;
 
-    /* Is the suspend-record MFN actually valid for this domain? */
-    if ( !check_pfn_ownership(ctxt.i386_ctxt.esi, dom) )
-    {
-        ERROR("Invalid state record pointer");
-        goto out;
-    }
+    /* Copy saved contents of shared-info page. No checking needed. */
+    ppage = map_pfn(shared_info_frame);
+    memcpy(ppage, shared_info, PAGE_SIZE);
+    unmap_pfn(ppage);
 
-    /* If the suspend-record MFN is okay then grab a copy of it to @srec. */
-    p_srec = map_pfn(ctxt.i386_ctxt.esi);
-    memcpy(&srec, p_srec, sizeof(srec));
-    unmap_pfn(p_srec);
-
-    if ( !check_pfn_ownership(srec.pfn_to_mfn_frame_list, dom) )
+    /* Build the pfn-to-mfn table. We choose MFN ordering returned by Xen. */
+    if ( get_pfn_list(dom, pfn_to_mfn_table, nr_pfns) != nr_pfns )
     {
-        ERROR("Invalid pfn-to-mfn frame list pointer");
+        ERROR("Did not read correct number of frame numbers for new dom");
         goto out;
     }
 
     /*
-     * Construct the local pfn-to-mfn and mfn-to-pfn tables. On exit from this
-     * loop we have each MFN mapped at most once. Note that there may be MFNs
-     * that aren't mapped at all: we detect these by MFN_IS_IN_PSEUDOPHYS_MAP.
+     * Now simply read each saved frame into its new machine frame.
+     * We uncanonicalise page tables as we go.
      */
-    pfn_to_mfn_frame = NULL;
-    for ( i = 0; i < srec.nr_pfns; i++ )
-    {
-        /* Each frameful of table frames must be checked & mapped on demand. */
-        if ( (i & 1023) == 0 )
-        {
-            mfn = pfn_to_mfn_frame_list[i/1024];
-            if ( !check_pfn_ownership(mfn, dom) )
-            {
-                ERROR("Invalid frame number if pfn-to-mfn frame list");
-                goto out;
-            }
-            if ( pfn_to_mfn_frame != NULL )
-                unmap_pfn(pfn_to_mfn_frame);
-            pfn_to_mfn_frame = map_pfn(mfn);
-        }
-        
-        mfn = pfn_to_mfn_frame[i & 1023];
-
-        if ( !check_pfn_ownership(mfn, dom) )
-        {
-            ERROR("Invalid frame specified with pfn-to-mfn table");
-            goto out;
-        }
-
-        pfn_to_mfn_table[i] = mfn;
-
-        /* Did we map this MFN already? That would be invalid! */
-        if ( MFN_IS_IN_PSEUDOPHYS_MAP(mfn) )
-        {
-            ERROR("A machine frame appears twice in pseudophys space");
-            goto out;
-        }
-        
-        mfn_to_pfn_table[mfn] = i;
-
-        /* Query page type by MFN, but store it by PFN. */
-        pfn_type[i] = get_pfn_type(mfn);
-    }
-
-    /* Canonicalise the suspend-record frame number. */
-    if ( !translate_mfn_to_pfn(&ctxt.i386_ctxt.esi) )
-    {
-        ERROR("State record is not in range of pseudophys map");
-        goto out;
-    }
-
-    /* Canonicalise each GDT frame number. */
-    for ( i = 0; i < ctxt.gdt_ents; i += 512 )
-    {
-        if ( !translate_mfn_to_pfn(&ctxt.gdt_frames[i]) )
-        {
-            ERROR("GDT frame is not in range of pseudophys map");
-            goto out;
-        }
-    }
-
-    /* Canonicalise the page table base pointer. */
-    if ( !MFN_IS_IN_PSEUDOPHYS_MAP(ctxt.pt_base >> PAGE_SHIFT) )
-    {
-        ERROR("PT base is not in range of pseudophys map");
-        goto out;
-    }
-    ctxt.pt_base = mfn_to_pfn_table[ctxt.pt_base >> PAGE_SHIFT] << PAGE_SHIFT;
-
-    /* Canonicalise the pfn-to-mfn table frame-number list. */
-    for ( i = 0; i < srec.nr_pfns; i += 1024 )
-    {
-        if ( !translate_mfn_to_pfn(&pfn_to_mfn_frame_list[i/1024]) )
-        {
-            ERROR("Frame # in pfn-to-mfn frame list is not in pseudophys");
-            goto out;
-        }
-    }
-
-    /* Now write out each data page, canonicalising page tables as we go... */
-    for ( i = 0; i < srec.nr_pfns; i++ )
+    for ( i = 0; i < nr_pfns; i++ )
     {
         mfn = pfn_to_mfn_table[i];
-        ppage = map_pfn(mfn);
-        memcpy(&page, ppage, PAGE_SIZE);
-        unmap_pfn(ppage);
-        if ( (pfn_type[i] == L1TAB) || (pfn_type[i] == L2TAB) )
+
+        if ( !checked_read(fd, page, PAGE_SIZE) )
         {
-            for ( i = 0; i < 1024; i++ )
-            {
-                if ( !(page[i] & _PAGE_PRESENT) ) continue;
-                mfn = page[i] >> PAGE_SHIFT;
-                if ( !MFN_IS_IN_PSEUDOPHYS_MAP(mfn) )
-                {
-                    ERROR("Frame number in pagetable page is invalid");
-                    goto out;
-                }
-                page[i] &= PAGE_SIZE - 1;
-                page[i] |= mfn_to_pfn_table[mfn] << PAGE_SHIFT;
-            }
+            ERROR("Error when reading from state file");
+            goto out;
         }
-        write(fd, &page, PAGE_SIZE);
+
+        ppage = map_pfn(mfn);
+        switch ( pfn_type[i] )
+        {
+        case L1TAB:
+            memset(ppage, 0, PAGE_SIZE);
+            add_mmu_update((mfn<<PAGE_SHIFT) | MMU_EXTENDED_COMMAND,
+                           MMUEXT_PIN_L1_TABLE);
+            for ( j = 0; j < 1024; j++ )
+            {
+                if ( page[j] & _PAGE_PRESENT )
+                {
+                    if ( (pfn = page[j] >> PAGE_SHIFT) >= nr_pfns )
+                    {
+                        ERROR("Frame number in page table is out of range");
+                        goto out;
+                    }
+                    if ( (pfn_type[pfn] != NONE) && (page[j] & _PAGE_RW) )
+                    {
+                        ERROR("Write access requested for a restricted frame");
+                        goto out;
+                    }
+                    page[j] &= PAGE_SIZE - 1;
+                    page[j] |= pfn_to_mfn_table[pfn] << PAGE_SHIFT;
+                }
+                add_mmu_update((unsigned long)&ppage[j], page[j]);
+            }
+            break;
+        case L2TAB:
+            memset(ppage, 0, PAGE_SIZE);
+            add_mmu_update((mfn<<PAGE_SHIFT) | MMU_EXTENDED_COMMAND,
+                           MMUEXT_PIN_L2_TABLE);
+            for ( j = 0; j < 1024; j++ )
+            {
+                if ( page[j] & _PAGE_PRESENT )
+                {
+                    if ( (pfn = page[j] >> PAGE_SHIFT) >= nr_pfns )
+                    {
+                        ERROR("Frame number in page table is out of range");
+                        goto out;
+                    }
+                    if ( pfn_type[pfn] != L1TAB )
+                    {
+                        ERROR("Page table mistyping");
+                        goto out;
+                    }
+                    page[j] &= PAGE_SIZE - 1;
+                    page[j] |= pfn_to_mfn_table[pfn] << PAGE_SHIFT;
+                }
+                add_mmu_update((unsigned long)&ppage[j], page[j]);
+            }
+            break;
+        default:
+            memcpy(ppage, page, PAGE_SIZE);
+            break;
+        }
+        unmap_pfn(ppage);
+
+        add_mmu_update((mfn<<PAGE_SHIFT) | MMU_MACHPHYS_UPDATE, i);
     }
+
+    flush_mmu_updates();
+
+    /* Uncanonicalise the suspend-record frame number and poke resume rec. */
+    pfn = ctxt.i386_ctxt.esi;
+    if ( (pfn >= nr_pfns) || (pfn_type[pfn] != NONE) )
+    {
+        ERROR("Suspend record frame number is bad");
+        goto out;
+    }
+    ctxt.i386_ctxt.esi = mfn = pfn_to_mfn_table[pfn];
+    p_srec = map_pfn(mfn);
+    p_srec->resume_info.nr_pages    = nr_pfns;
+    p_srec->resume_info.shared_info = shared_info_frame << PAGE_SHIFT;
+    p_srec->resume_info.dom_id      = dom;
+    p_srec->resume_info.flags       = 0;
+    unmap_pfn(p_srec);
+
+    /* Uncanonicalise each GDT frame number. */
+    if ( ctxt.gdt_ents > 8192 )
+    {
+        ERROR("GDT entry count out of range");
+        goto out;
+    }
+    for ( i = 0; i < ctxt.gdt_ents; i += 512 )
+    {
+        pfn = ctxt.gdt_frames[i];
+        if ( (pfn >= nr_pfns) || (pfn_type[pfn] != NONE) )
+        {
+            ERROR("GDT frame number is bad");
+            goto out;
+        }
+        ctxt.gdt_frames[i] = pfn_to_mfn_table[pfn];
+    }
+
+    /* Uncanonicalise the page table base pointer. */
+    pfn = ctxt.pt_base >> PAGE_SHIFT;
+    if ( (pfn >= nr_pfns) || (pfn_type[pfn] != L2TAB) )
+    {
+        ERROR("PT base is bad");
+        goto out;
+    }
+    ctxt.pt_base = pfn_to_mfn_table[pfn] << PAGE_SHIFT;
+
+    /* Uncanonicalise the pfn-to-mfn table frame-number list. */
+    for ( i = 0; i < nr_pfns; i += 1024 )
+    {
+        unsigned long copy_size = (nr_pfns - i) * sizeof(unsigned long);
+        if ( copy_size > PAGE_SIZE ) copy_size = PAGE_SIZE;
+        pfn = pfn_to_mfn_frame_list[i/1024];
+        if ( (pfn >= nr_pfns) || (pfn_type[pfn] != NONE) )
+        {
+            ERROR("PFN-to-MFN frame number is bad");
+            goto out;
+        }
+        ppage = map_pfn(pfn_to_mfn_table[pfn]);
+        memcpy(ppage, &pfn_to_mfn_table[i], copy_size);        
+        unmap_pfn(ppage);
+    }
+
+    /*
+     * Safety checking of saved context:
+     *  1. i386_ctxt is fine, as Xen checks that on context switch.
+     *  2. i387_ctxt is fine, as it can't hurt Xen.
+     *  3. trap_ctxt needs the code selectors checked.
+     *  4. fast_trap_idx is checked by Xen.
+     *  5. ldt base must be page-aligned, no more than 8192 ents, ...
+     *  6. gdt already done, and further checking is done by Xen.
+     *  7. check that ring1_ss/esp is safe.
+     *  8. pt_base is already done.
+     *  9. debugregs are checked by Xen.
+     *  10. callback code selectors need checking.
+     */
+    for ( i = 0; i < 256; i++ )
+    {
+        ctxt.trap_ctxt[i].vector = i;
+        if ( (ctxt.trap_ctxt[i].cs & 3) == 0 )
+            ctxt.trap_ctxt[i].cs = FLAT_RING1_CS;
+    }
+    if ( (ctxt.ring1_ss & 3) == 0 )
+        ctxt.ring1_ss = FLAT_RING1_DS;
+    if ( ctxt.ring1_esp > HYPERVISOR_VIRT_START )
+        ctxt.ring1_esp = HYPERVISOR_VIRT_START;
+    if ( (ctxt.event_callback_cs & 3) == 0 )
+        ctxt.event_callback_cs = FLAT_RING1_CS;
+    if ( (ctxt.failsafe_callback_cs & 3) == 0 )
+        ctxt.failsafe_callback_cs = FLAT_RING1_CS;
+    if ( ((ctxt.ldt_base & (PAGE_SIZE - 1)) != 0) ||
+         (ctxt.ldt_ents > 8192) ||
+         (ctxt.ldt_base > HYPERVISOR_VIRT_START) ||
+         ((ctxt.ldt_base + ctxt.ldt_ents*8) > HYPERVISOR_VIRT_START) )
+    {
+        ERROR("Bad LDT base or size");
+        goto out;
+    }
+
 
     /* Success! */
     rc = 0;

@@ -751,7 +751,7 @@ long do_fpu_taskswitch(void)
 }
 
 
-long do_set_debugreg(int reg, unsigned long value)
+long set_debugreg(struct task_struct *p, int reg, unsigned long value)
 {
     int i;
 
@@ -759,19 +759,23 @@ long do_set_debugreg(int reg, unsigned long value)
     {
     case 0: 
         if ( value > (PAGE_OFFSET-4) ) return -EPERM;
-        __asm__ ( "movl %0, %%db0" : : "r" (value) );
+        if ( p == current ) 
+            __asm__ ( "movl %0, %%db0" : : "r" (value) );
         break;
     case 1: 
         if ( value > (PAGE_OFFSET-4) ) return -EPERM;
-        __asm__ ( "movl %0, %%db1" : : "r" (value) );
+        if ( p == current ) 
+            __asm__ ( "movl %0, %%db1" : : "r" (value) );
         break;
     case 2: 
         if ( value > (PAGE_OFFSET-4) ) return -EPERM;
-        __asm__ ( "movl %0, %%db2" : : "r" (value) );
+        if ( p == current ) 
+            __asm__ ( "movl %0, %%db2" : : "r" (value) );
         break;
     case 3:
         if ( value > (PAGE_OFFSET-4) ) return -EPERM;
-        __asm__ ( "movl %0, %%db3" : : "r" (value) );
+        if ( p == current ) 
+            __asm__ ( "movl %0, %%db3" : : "r" (value) );
         break;
     case 6:
         /*
@@ -780,7 +784,8 @@ long do_set_debugreg(int reg, unsigned long value)
          */
         value &= 0xffffefff; /* reserved bits => 0 */
         value |= 0xffff0ff0; /* reserved bits => 1 */
-        __asm__ ( "movl %0, %%db6" : : "r" (value) );
+        if ( p == current ) 
+            __asm__ ( "movl %0, %%db6" : : "r" (value) );
         break;
     case 7:
         /*
@@ -800,14 +805,20 @@ long do_set_debugreg(int reg, unsigned long value)
             for ( i = 0; i < 16; i += 2 )
                 if ( ((value >> (i+16)) & 3) == 2 ) return -EPERM;
         }
-        __asm__ ( "movl %0, %%db7" : : "r" (value) );
+        if ( p == current ) 
+            __asm__ ( "movl %0, %%db7" : : "r" (value) );
         break;
     default:
         return -EINVAL;
     }
 
-    current->thread.debugreg[reg] = value;
+    p->thread.debugreg[reg] = value;
     return 0;
+}
+
+long do_set_debugreg(int reg, unsigned long value)
+{
+    return set_debugreg(current, reg, value);
 }
 
 unsigned long do_get_debugreg(int reg)

@@ -437,6 +437,8 @@ long set_gdt(struct task_struct *p,
              unsigned long *frames, 
              unsigned int entries);
 
+long set_debugreg(struct task_struct *p, int reg, unsigned long value);
+
 struct microcode {
     unsigned int hdrver;
     unsigned int rev;
