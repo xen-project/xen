@@ -13,7 +13,9 @@ static int xlide_blksize_size[XLIDE_MAX];
 static int xlide_hardsect_size[XLIDE_MAX];
 static int xlide_max_sectors[XLIDE_MAX];
 
-struct gendisk *xlide_gendisk[2] = { NULL };
+#define XLIDE_NR_MAJORS     2
+
+struct gendisk *xlide_gendisk[XLIDE_NR_MAJORS] = { NULL };
 
 static struct block_device_operations xlide_block_fops = 
 {
@@ -37,9 +39,10 @@ static int get_major(int major)
     return r;
 }
 
-static struct gendisk *setup_major(xen_disk_info_t *xdi, int base, int major)
+static void setup_major(struct gendisk **pgd, 
+                        xen_disk_info_t *xdi, int base, int major)
 {
-    int i, minors, disk, units = 2;
+    int i, minors, disk, units = XLIDE_DEVS_PER_MAJOR;
     unsigned short minor; 
     unsigned char buf[64];
     struct gendisk *gd;
@@ -78,6 +81,7 @@ static struct gendisk *setup_major(xen_disk_info_t *xdi, int base, int major)
     memset(gd->de_arr, 0, sizeof(*gd->de_arr) * units);
     memset(gd->flags, 0, sizeof(*gd->flags) * units);
     memset(gd->real_devices, 0, sizeof(xl_disk_t) * units);
+    *pgd = gd;
     add_gendisk(gd);
     
     /* Now register each disk in turn. */
@@ -134,7 +138,7 @@ int xlide_init(xen_disk_info_t *xdi)
     for ( i = 0; i < xdi->count; i++ )
         if ( IS_IDE_XENDEV(xdi->disks[i].device) &&
              ((xdi->disks[i].device & XENDEV_IDX_MASK) <
-              (2*XLIDE_DEVS_PER_MAJOR)) ) 
+              (XLIDE_NR_MAJORS*XLIDE_DEVS_PER_MAJOR)) ) 
             units++;
     if ( units == 0 ) return 0;
 
@@ -156,8 +160,8 @@ int xlide_init(xen_disk_info_t *xdi)
         xlide_max_sectors[i]   = 128;
     }
 
-    xlide_gendisk[0] = setup_major(xdi, 0, XLIDE_MAJOR_0);
-    xlide_gendisk[1] = setup_major(xdi, 2, XLIDE_MAJOR_1);
+    setup_major(&xlide_gendisk[0], xdi, 0*XLIDE_DEVS_PER_MAJOR, XLIDE_MAJOR_0);
+    setup_major(&xlide_gendisk[1], xdi, 1*XLIDE_DEVS_PER_MAJOR, XLIDE_MAJOR_1);
 
     return 0;
 }
