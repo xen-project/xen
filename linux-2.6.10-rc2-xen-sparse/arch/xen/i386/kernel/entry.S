@@ -102,10 +102,9 @@ VM_MASK		= 0x00020000
 	pushl %edx; \
 	pushl %ecx; \
 	pushl %ebx; \
-	movl $(__KERNEL_DS), %edx; \
+	movl $(__USER_DS), %edx; \
 	movl %edx, %ds; \
 	movl %edx, %es;
-	# XXXcl USER?
 
 #define RESTORE_INT_REGS \
 	popl %ebx;	\
