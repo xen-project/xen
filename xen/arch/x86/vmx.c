@@ -36,6 +36,8 @@
 #include <asm/vmx_vmcs.h>
 #include <public/io/ioreq.h>
 
+#ifdef CONFIG_VMX
+
 int vmcs_size;
 unsigned int opt_vmx_debug_level;
 
@@ -123,7 +125,7 @@ static int vmx_do_page_fault(unsigned long va, unsigned long error_code)
     /*
      * Set up guest page directory cache to make linear_pt_table[] work.
      */
-    __guest_get_pl2e(ed, va, &gpde);
+    __guest_get_l2e(ed, va, &gpde);
     if (!(gpde & _PAGE_PRESENT))
         return 0;
 
@@ -301,7 +303,7 @@ inline unsigned long gva_to_gpa(unsigned long gva)
     unsigned long gpde, gpte, pfn, index;
     struct exec_domain *ed = current;
 
-    __guest_get_pl2e(ed, gva, &gpde);
+    __guest_get_l2e(ed, gva, &gpde);
     index = (gva >> L2_PAGETABLE_SHIFT);
 
     pfn = phys_to_machine_mapping(gpde >> PAGE_SHIFT);
@@ -939,3 +941,5 @@ asmlinkage void load_cr2(void)
     local_irq_disable();        
     asm volatile("movl %0,%%cr2": :"r" (d->arch.arch_vmx.cpu_cr2));
 }
+
+#endif /* CONFIG_VMX */

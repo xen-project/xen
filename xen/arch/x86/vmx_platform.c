@@ -34,6 +34,8 @@
 #include <xen/sched.h>
 #include <asm/current.h>
 
+#ifdef CONFIG_VMX
+
 #define DECODE_success  1
 #define DECODE_failure  0
 
@@ -553,3 +555,4 @@ void handle_mmio(unsigned long va, unsigned long gpte, unsigned long gpa)
     domain_crash();
 }
 
+#endif /* CONFIG_VMX */

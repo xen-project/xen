@@ -200,14 +200,14 @@ void write_ptbase(struct exec_domain *ed)
     unsigned long pa;
 
 #ifdef CONFIG_VMX
-    if ( unlikely(d->arch.shadow_mode) )
-        pa = ((d->arch.shadow_mode == SHM_full_32) ?
+    if ( unlikely(shadow_mode(d)) )
+        pa = ((shadow_mode(d) == SHM_full_32) ?
               pagetable_val(ed->arch.monitor_table) :
               pagetable_val(ed->arch.shadow_table));
     else
         pa = pagetable_val(ed->arch.pagetable);
 #else
-    if ( unlikely(d->arch.shadow_mode) )
+    if ( unlikely(shadow_mode(d)) )
         pa = pagetable_val(ed->arch.shadow_table);    
     else
         pa = pagetable_val(ed->arch.pagetable);
@@ -707,7 +707,7 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e)
 
     if ( l1_pgentry_val(nl1e) & _PAGE_PRESENT )
     {
-        /* Differ in mapping (bits 12-31), r/w (bit 1), or presence (bit 0)? */
+        /* Same mapping (bits 12-31), r/w (bit 1), and presence (bit 0)? */
         if ( ((l1_pgentry_val(ol1e) ^ l1_pgentry_val(nl1e)) & ~0xffc) == 0 )
             return update_l1e(pl1e, ol1e, nl1e);
 
@@ -772,7 +772,7 @@ void free_page_type(struct pfn_info *page, unsigned int type)
         BUG();
     }
 
-    if ( unlikely(d->arch.shadow_mode) && 
+    if ( unlikely(shadow_mode(d)) && 
          (get_shadow_status(d, page_to_pfn(page)) & PSH_shadowed) )
     {
         unshadow_table(page_to_pfn(page), type);
@@ -1329,7 +1329,7 @@ int do_mmu_update(
     struct pfn_info *page;
     int rc = 0, okay = 1, i = 0, cpu = smp_processor_id();
     unsigned int cmd, done = 0;
-    unsigned long prev_spfn = 0;
+    unsigned long prev_smfn = 0;
     l1_pgentry_t *prev_spl1e = 0;
     struct exec_domain *ed = current;
     struct domain *d = ed->domain;
@@ -1339,6 +1339,9 @@ int do_mmu_update(
     LOCK_BIGLOCK(d);
 
     cleanup_writable_pagetable(d);
+
+    if ( unlikely(shadow_mode(d)) )
+        check_pagetable(d, ed->arch.pagetable, "pre-mmu"); /* debug */
 
     /*
      * If we are resuming after preemption, read how much work we have already
@@ -1434,12 +1437,12 @@ int do_mmu_update(
                     okay = mod_l1_entry((l1_pgentry_t *)va, 
                                         mk_l1_pgentry(req.val)); 
 
-                    if ( unlikely(d->arch.shadow_mode) && okay &&
+                    if ( unlikely(shadow_mode(d)) && okay &&
                          (get_shadow_status(d, page-frame_table) &
                           PSH_shadowed) )
                     {
                         shadow_l1_normal_pt_update(
-                            req.ptr, req.val, &prev_spfn, &prev_spl1e);
+                            req.ptr, req.val, &prev_smfn, &prev_spl1e);
                         put_shadow_status(d);
                     }
 
@@ -1453,7 +1456,7 @@ int do_mmu_update(
                                         mk_l2_pgentry(req.val),
                                         pfn); 
 
-                    if ( unlikely(d->arch.shadow_mode) && okay &&
+                    if ( unlikely(shadow_mode(d)) && okay &&
                          (get_shadow_status(d, page-frame_table) & 
                           PSH_shadowed) )
                     {
@@ -1491,7 +1494,7 @@ int do_mmu_update(
              * If in log-dirty mode, mark the corresponding pseudo-physical
              * page as dirty.
              */
-            if ( unlikely(d->arch.shadow_mode == SHM_logdirty) && 
+            if ( unlikely(shadow_mode(d) == SHM_logdirty) && 
                  mark_dirty(d, pfn) )
                 d->arch.shadow_dirty_block_count++;
 
@@ -1547,6 +1550,9 @@ int do_mmu_update(
     if ( unlikely(pdone != NULL) )
         __put_user(done + i, pdone);
 
+    if ( unlikely(shadow_mode(d)) )
+        check_pagetable(d, ed->arch.pagetable, "post-mmu"); /* debug */
+
     UNLOCK_BIGLOCK(d);
     return rc;
 }
@@ -1580,9 +1586,9 @@ int do_update_va_mapping(unsigned long page_nr,
                                 mk_l1_pgentry(val))) )
         err = -EINVAL;
 
-    if ( unlikely(d->arch.shadow_mode) )
+    if ( unlikely(shadow_mode(d)) )
     {
-        unsigned long sval;
+        unsigned long sval = 0;
 
         l1pte_propagate_from_guest(d, &val, &sval);
 
@@ -1601,7 +1607,7 @@ int do_update_va_mapping(unsigned long page_nr,
          * the PTE in the PT-holding page. We need the machine frame number
          * for this.
          */
-        if ( d->arch.shadow_mode == SHM_logdirty )
+        if ( shadow_mode(d) == SHM_logdirty )
             mark_dirty(d, va_to_l1mfn(page_nr << PAGE_SHIFT));  
   
         check_pagetable(d, ed->arch.pagetable, "va"); /* debug */
@@ -1874,7 +1880,7 @@ void ptwr_flush(const int which)
                 PTWR_PRINT_WHICH, ptep, pte);
     pte &= ~_PAGE_RW;
 
-    if ( unlikely(d->arch.shadow_mode) )
+    if ( unlikely(shadow_mode(d)) )
     {
         /* Write-protect the p.t. page in the shadow page table. */
         l1pte_propagate_from_guest(d, &pte, &spte);
@@ -1966,7 +1972,7 @@ void ptwr_flush(const int which)
      * STEP 3. Reattach the L1 p.t. page into the current address space.
      */
 
-    if ( (which == PTWR_PT_ACTIVE) && likely(!d->arch.shadow_mode) )
+    if ( (which == PTWR_PT_ACTIVE) && likely(!shadow_mode(d)) )
     {
         pl2e = &linear_l2_table[ptwr_info[cpu].ptinfo[which].l2_idx];
         *pl2e = mk_l2_pgentry(l2_pgentry_val(*pl2e) | _PAGE_PRESENT); 
@@ -2070,7 +2076,7 @@ int ptwr_do_page_fault(unsigned long addr)
     
     /* For safety, disconnect the L1 p.t. page from current space. */
     if ( (which == PTWR_PT_ACTIVE) && 
-         likely(!current->domain->arch.shadow_mode) )
+         likely(!shadow_mode(current->domain)) )
     {
         *pl2e = mk_l2_pgentry(l2e & ~_PAGE_PRESENT);
 #if 1

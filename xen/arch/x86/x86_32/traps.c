@@ -7,6 +7,7 @@
 #include <xen/console.h>
 #include <xen/mm.h>
 #include <xen/irq.h>
+#include <asm/flushtlb.h>
 
 static int kstack_depth_to_print = 8*20;
 
@@ -114,6 +115,7 @@ void show_registers(struct xen_regs *regs)
            regs->esi, regs->edi, regs->ebp, esp);
     printk("ds: %04x   es: %04x   fs: %04x   gs: %04x   ss: %04x\n",
            ds, es, fs, gs, ss);
+    printk("cr3: %08lx\n", read_cr3());
 
     show_stack((unsigned long *)&regs->esp);
 } 

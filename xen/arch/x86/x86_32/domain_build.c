@@ -20,6 +20,7 @@
 #include <xen/event.h>
 #include <xen/elf.h>
 #include <xen/kernel.h>
+#include <asm/shadow.h>
 
 /* No ring-3 access in initial page tables. */
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED)
@@ -377,10 +378,13 @@ int construct_dom0(struct domain *d,
 
     new_thread(ed, dsi.v_kernentry, vstack_end, vstartinfo_start);
 
-#if 0 /* XXXXX DO NOT CHECK IN ENABLED !!! (but useful for testing so leave) */
-    shadow_lock(&d->mm);
-    shadow_mode_enable(d, SHM_test); 
-    shadow_unlock(&d->mm);
+#ifndef NDEBUG
+    if (0) /* XXXXX DO NOT CHECK IN ENABLED !!! (but useful for testing so leave) */
+    {
+        shadow_lock(d);
+        shadow_mode_enable(d, SHM_test); 
+        shadow_unlock(d);
+    }
 #endif
 
     return 0;

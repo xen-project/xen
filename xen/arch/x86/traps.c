@@ -272,6 +272,12 @@ asmlinkage int do_page_fault(struct xen_regs *regs)
 
     perfc_incrc(page_faults);
 
+#if 0
+    printk("do_page_fault(addr=0x%08lx, error_code=%d)\n",
+           addr, regs->error_code);
+    show_registers(regs);
+#endif
+
     if ( likely(VM_ASSIST(d, VMASST_TYPE_writable_pagetables)) )
     {
         LOCK_BIGLOCK(d);

@@ -33,6 +33,8 @@
 #include <public/io/ioreq.h>
 #include <asm/domain_page.h>
 
+#ifdef CONFIG_VMX
+
 struct vmcs_struct *alloc_vmcs(void) 
 {
     struct vmcs_struct *vmcs;
@@ -469,3 +471,4 @@ void vm_resume_fail(unsigned long eflags)
     BUG();
 }
 
+#endif /* CONFIG_VMX */
