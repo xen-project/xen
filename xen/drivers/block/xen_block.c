@@ -583,11 +583,15 @@ static void dispatch_probe(struct task_struct *p, int index)
     */
     xdi = map_domain_mem(buffer);
     xdi->count = 0; 
-    /*if(IS_PRIV(p)) { */
+#if 0 // XXX SMH: fix below once done proper vbd/physd rewrit
+    if(IS_PRIV(p)) { 
+#endif
 	/* privilege domains always gets access to the 'real' devices */
 	ide_probe_devices(xdi);
 	scsi_probe_devices(xdi);
-    /*} */ 
+#if 0
+    } 
+#endif
     vbd_probe_devices(xdi, p); 
     unmap_domain_mem(xdi);
 
