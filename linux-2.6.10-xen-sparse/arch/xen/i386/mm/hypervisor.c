@@ -133,6 +133,9 @@ void queue_l1_entry_update(pte_t *ptr, unsigned long val)
     per_cpu(update_queue[idx], cpu).ptr = virt_to_machine(ptr);
     per_cpu(update_queue[idx], cpu).val = val;
     increment_index();
+#ifdef CONFIG_XEN_DEBUG_NO_MMU_BATCHING
+    __flush_page_update_queue();
+#endif
     spin_unlock_irqrestore(&update_lock, flags);
 }
 

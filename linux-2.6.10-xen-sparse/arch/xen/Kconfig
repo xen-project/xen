@@ -115,8 +115,37 @@ config XEN_BLKDEV_TAP
 	  space.  Odds are that you want to say N here.
 
 config XEN_WRITABLE_PAGETABLES
-	bool
+	bool "writable page tables"
 	default y
+
+config XEN_SYSCALL_STATS
+	bool "system call statistics"
+	default n
+
+config XEN_DEBUG_NO_MMU_BATCHING
+	bool "Disables batching on MMU updates"
+	default n
+    help
+      This does a hypercall per PTE update
+      we only use this for benchmarking
+      enable only if you know what you are doing
+
+config XEN_BATCH_MODE1
+	bool "A variant of writable pagetable using the batch interface"
+	default n
+    help
+      default is no batching and minor mods for some batching
+      we only use this for benchmarking
+      enable only if you know what you are doing
+
+config XEN_BATCH_MODE2
+	bool "forward port of 2.4 batching"
+	default n
+    help
+      default is batching + flushes where 2.4 had them
+      we only use this for benchmarking
+      enable only if you know what you are doing
+
 
 config XEN_SCRUB_PAGES
 	bool "Scrub memory before freeing it to Xen"

@@ -280,7 +280,10 @@ sysenter_past_esp:
 	jnz syscall_trace_entry
 	cmpl $(nr_syscalls), %eax
 	jae syscall_badsys
-	call *sys_call_table(,%eax,4)
+#ifdef CONFIG_XEN_SYSCALL_STATS
+    lock incl syscall_stats(,%eax,4)
+#endif
+    call *sys_call_table(,%eax,4)
 	movl %eax,EAX(%esp)
 	cli
 	movl TI_flags(%ebp), %ecx
@@ -305,7 +308,10 @@ ENTRY(system_call)
 	cmpl $(nr_syscalls), %eax
 	jae syscall_badsys
 syscall_call:
-	call *sys_call_table(,%eax,4)
+#ifdef CONFIG_XEN_SYSCALL_STATS
+    lock incl syscall_stats(,%eax,4)
+#endif
+    call *sys_call_table(,%eax,4)
 	movl %eax,EAX(%esp)		# store the return value
 syscall_exit:
 	XEN_BLOCK_EVENTS(%esi)		# make sure we don't miss an interrupt

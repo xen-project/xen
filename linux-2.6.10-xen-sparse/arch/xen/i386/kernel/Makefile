@@ -43,6 +43,8 @@ c-obj-$(CONFIG_HPET_TIMER) 	+= time_hpet.o
 c-obj-$(CONFIG_EFI) 		+= efi.o efi_stub.o
 c-obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
 
+c-obj-$(CONFIG_XEN_SYSCALL_STATS) += syscall_stats.o
+
 EXTRA_AFLAGS   := -traditional
 
 c-obj-$(CONFIG_SCx200)		+= scx200.o

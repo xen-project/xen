@@ -246,7 +246,7 @@ int main(int argc, char **argv)
         while((cpu_mask&1)) {
             int i;
             for (i=0x300;i<0x312;i++) {
-                printf("%010llx ",cpus_rdmsr( cpu_mask, i ) );
+                printf("%010llu ",cpus_rdmsr( cpu_mask, i ) );
             }
             printf("\n");
             cpu_mask>>=1;

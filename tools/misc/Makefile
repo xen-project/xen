@@ -14,7 +14,7 @@ CFLAGS   += $(INCLUDES)
 
 HDRS     = $(wildcard *.h)
 
-TARGETS  = xenperf
+TARGETS  = xenperf xc_shadow
 
 INSTALL_BIN  = $(TARGETS) xencons
 INSTALL_SBIN = netfix xm xend xensv xenperf

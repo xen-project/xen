@@ -218,6 +218,11 @@ out:
  * dst->page_table_lock is held on entry and exit,
  * but may be dropped within pmd_alloc() and pte_alloc_map().
  */
+#ifdef CONFIG_XEN_BATCH_MODE1
+#undef set_pte
+#define set_pte(pteptr, pteval)\
+    set_pte_batched(pteptr, pteval);
+#endif
 int copy_page_range(struct mm_struct *dst, struct mm_struct *src,
 			struct vm_area_struct *vma)
 {
@@ -354,8 +359,11 @@ cont_copy_pte_range_noset:
 			cond_resched_lock(&dst->page_table_lock);
 cont_copy_pmd_range:
 			src_pmd++;
-			dst_pmd++;
+			dst_pmd++;            
 		} while ((unsigned long)src_pmd & PMD_TABLE_MASK);
+#ifdef CONFIG_XEN_BATCH_MODE1
+        _flush_page_update_queue();
+#endif
 	}
 out_unlock:
 	spin_unlock(&src->page_table_lock);
@@ -445,8 +453,18 @@ static void zap_pte_range(struct mmu_gather *tlb,
 			free_swap_and_cache(pte_to_swp_entry(pte));
 		pte_clear(ptep);
 	}
+#ifdef CONFIG_XEN_BATCH_MODE1
+    _flush_page_update_queue();
+#endif
 	pte_unmap(ptep-1);
 }
+
+#ifdef CONFIG_XEN_BATCH_MODE1
+#undef set_pte
+#define set_pte(pteptr, pteval)\
+    set_pte_batched(pteptr, pteval);\
+    _flush_page_update_queue()
+#endif
 
 static void zap_pmd_range(struct mmu_gather *tlb,
 		pgd_t * dir, unsigned long address,
@@ -839,6 +857,11 @@ out:
 
 EXPORT_SYMBOL(get_user_pages);
 
+#ifdef CONFIG_XEN_BATCH_MODE1
+#undef set_pte
+#define set_pte(pteptr, pteval)\
+    set_pte_batched(pteptr, pteval);
+#endif
 static void zeromap_pte_range(pte_t * pte, unsigned long address,
                                      unsigned long size, pgprot_t prot)
 {
@@ -855,7 +878,18 @@ static void zeromap_pte_range(pte_t * pte, unsigned long address,
 		address += PAGE_SIZE;
 		pte++;
 	} while (address && (address < end));
+
+#ifdef CONFIG_XEN_BATCH_MODE1
+    _flush_page_update_queue();
+#endif
+
 }
+#ifdef CONFIG_XEN_BATCH_MODE1
+#undef set_pte
+#define set_pte(pteptr, pteval)\
+    set_pte_batched(pteptr, pteval);\
+    _flush_page_update_queue()
+#endif
 
 static inline int zeromap_pmd_range(struct mm_struct *mm, pmd_t * pmd, unsigned long address,
                                     unsigned long size, pgprot_t prot)
@@ -917,6 +951,11 @@ int zeromap_page_range(struct vm_area_struct *vma, unsigned long address, unsign
  * mappings are removed. any references to nonexistent pages results
  * in null mappings (currently treated as "copy-on-access")
  */
+#ifdef CONFIG_XEN_BATCH_MODE1
+#undef set_pte
+#define set_pte(pteptr, pteval)\
+    set_pte_batched(pteptr, pteval);
+#endif
 static inline void remap_pte_range(pte_t * pte, unsigned long address, unsigned long size,
 	unsigned long pfn, pgprot_t prot)
 {
@@ -934,7 +973,16 @@ static inline void remap_pte_range(pte_t * pte, unsigned long address, unsigned 
 		pfn++;
 		pte++;
 	} while (address && (address < end));
+#ifdef CONFIG_XEN_BATCH_MODE1
+    _flush_page_update_queue();
+#endif
 }
+#ifdef CONFIG_XEN_BATCH_MODE1
+#undef set_pte
+#define set_pte(pteptr, pteval)\
+    set_pte_batched(pteptr, pteval);\
+    _flush_page_update_queue()
+#endif
 
 static inline int remap_pmd_range(struct mm_struct *mm, pmd_t * pmd, unsigned long address, unsigned long size,
 	unsigned long pfn, pgprot_t prot)
