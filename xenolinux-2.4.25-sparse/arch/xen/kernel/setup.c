@@ -43,6 +43,7 @@
 #include <asm/dma.h>
 #include <asm/mpspec.h>
 #include <asm/mmu_context.h>
+#include <asm/ctrl_if.h>
 #include <asm/hypervisor.h>
 #include <asm/hypervisor-ifs/dom0_ops.h>
 #include <linux/netdevice.h>
@@ -1187,6 +1188,8 @@ static void stop_task(void *unused)
 
     time_suspend();
 
+    ctrl_if_suspend();
+
     HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
     clear_fixmap(FIX_SHARED_INFO);
 
@@ -1199,6 +1202,8 @@ static void stop_task(void *unused)
     set_fixmap(FIX_SHARED_INFO, start_info.shared_info);
     HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
     memset(empty_zero_page, 0, PAGE_SIZE);
+
+    ctrl_if_resume();
 
     time_resume();
 

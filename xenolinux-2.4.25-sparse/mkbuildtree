@@ -112,8 +112,11 @@ mkdir  ${AD}/include/asm-xen/hypervisor-ifs
 cd     ${AD}/include/asm-xen/hypervisor-ifs
 relative_lndir ../../../${RS}/../xen/include/hypervisor-ifs
 
-# The remainder are the i386 -> xen-i386 links
+# Another special symlink: to the shared definitions for the control interface
 cd ..
+ln -sf ../../${RS}/../tools/xend/lib/domain_controller.h
+
+# The remainder are the i386 -> xen-i386 links
 ln -sf ../asm-i386/a.out.h 
 ln -sf ../asm-i386/apicdef.h 
 ln -sf ../asm-i386/apic.h 

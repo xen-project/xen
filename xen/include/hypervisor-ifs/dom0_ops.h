@@ -20,7 +20,6 @@
  */
 #define DOM0_INTERFACE_VERSION   0xAAAA000B
 
-#define MAX_CMD_LEN       256
 #define MAX_DOMAIN_NAME    16
 
 #define DOM0_CREATEDOMAIN      8

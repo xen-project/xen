@@ -72,7 +72,8 @@ static int setup_guestos(int xc_handle,
                          unsigned long *pvsi, unsigned long *pvke,
                          dom0_builddomain_t *builddomain, 
                          const char *cmdline,
-                         unsigned long shared_info_frame)
+                         unsigned long shared_info_frame,
+                         unsigned int control_evtchn)
 {
     l1_pgentry_t *vl1tab=NULL, *vl1e=NULL;
     l2_pgentry_t *vl2tab=NULL, *vl2e=NULL;
@@ -80,7 +81,7 @@ static int setup_guestos(int xc_handle,
     unsigned long l2tab;
     unsigned long l1tab;
     unsigned long count, i;
-    start_info_t *start_info;
+    extended_start_info_t *start_info;
     shared_info_t *shared_info;
     mmu_t *mmu = NULL;
     int pm_handle=-1, rc;
@@ -272,13 +273,14 @@ static int setup_guestos(int xc_handle,
     start_info->pt_base      = vpt_start;
     start_info->nr_pt_frames = nr_pt_pages;
     start_info->mfn_list     = vphysmap_start;
+    start_info->domain_controller_evtchn = control_evtchn;
     if ( initrd_len != 0 )
     {
         start_info->mod_start    = vinitrd_start;
         start_info->mod_len      = initrd_len;
     }
-    strncpy(start_info->cmd_line, cmdline, MAX_CMD_LEN);
-    start_info->cmd_line[MAX_CMD_LEN-1] = '\0';
+    strncpy(start_info->cmd_line, cmdline, MAX_CMDLINE);
+    start_info->cmd_line[MAX_CMDLINE-1] = '\0';
     unmap_pfn(pm_handle, start_info);
 
     /* shared_info page starts its life empty. */
@@ -379,7 +381,8 @@ int xc_linux_build(int xc_handle,
                    u64 domid,
                    const char *image_name,
                    const char *ramdisk_name,
-                   const char *cmdline)
+                   const char *cmdline,
+                   unsigned int control_evtchn)
 {
     dom0_op_t launch_op, op;
     int initrd_fd = -1;
@@ -436,7 +439,8 @@ int xc_linux_build(int xc_handle,
                        initrd_gfd, initrd_size, nr_pages, 
                        &vstartinfo_start, &vkern_entry,
                        &launch_op.u.builddomain, cmdline,
-                       op.u.getdomaininfo.shared_info_frame) < 0 )
+                       op.u.getdomaininfo.shared_info_frame,
+                       control_evtchn) < 0 )
     {
         ERROR("Error constructing guest OS");
         goto error_out;

@@ -234,23 +234,23 @@ def make_domain():
             print "Error creating domain"
             sys.exit()
             
-        ret = eval('xc.%s_build ( dom=id, image=image, ramdisk=ramdisk, cmdline=cmdline )' % builder_fn)
+        cmsg = 'new_control_interface(dom='+str(id)+')'
+        xend_response = xenctl.utils.xend_control_message(cmsg)
+        if not xend_response['success']:
+            print "Error creating initial event channel"
+            print "Error type: " + xend_response['error_type']
+            if xend_response['error_type'] == 'exception':
+                print "Exception type: " + xend_response['exception_type']
+                print "Exception value: " + xend_response['exception_value']
+            xc.domain_destroy ( dom=id )
+            sys.exit()
+
+        ret = eval('xc.%s_build ( dom=id, image=image, ramdisk=ramdisk, cmdline=cmdline, control_evtchn=xend_response["remote_port"] )' % builder_fn)
         if ret < 0:
             print "Error building Linux guest OS: "
             print "Return code = " + str(ret)
             xc.domain_destroy ( dom=id )
             sys.exit()
-
-    cmsg = 'new_control_interface(dom='+str(id)+')'
-    xend_response = xenctl.utils.xend_control_message(cmsg)
-    if not xend_response['success']:
-        print "Error creating initial event channel"
-        print "Error type: " + xend_response['error_type']
-        if xend_response['error_type'] == 'exception':
-            print "Exception type: " + xend_response['exception_type']
-            print "Exception value: " + xend_response['exception_value']
-        xc.domain_destroy ( dom=id )
-        sys.exit()
 
     # setup the virtual block devices
 

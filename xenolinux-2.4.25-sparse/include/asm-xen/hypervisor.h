@@ -13,13 +13,14 @@
 #include <linux/kernel.h>
 #include <asm/hypervisor-ifs/hypervisor-if.h>
 #include <asm/hypervisor-ifs/dom0_ops.h>
+#include <asm/domain_controller.h>
 #include <asm/ptrace.h>
 #include <asm/page.h>
 
 /* arch/xen/kernel/setup.c */
 union start_info_union
 {
-    start_info_t start_info;
+    extended_start_info_t start_info;
     char padding[512];
 };
 extern union start_info_union start_info_union;

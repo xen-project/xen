@@ -21,7 +21,9 @@
 #include <errno.h>
 #include <signal.h>
 #include <xc.h>
-#include "control_if.h"
+
+#include <hypervisor-if.h>
+#include "domain_controller.h"
 
 /* Needed for Python versions earlier than 2.3. */
 #ifndef PyMODINIT_FUNC

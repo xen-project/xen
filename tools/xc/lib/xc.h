@@ -69,12 +69,14 @@ int xc_linux_build(int xc_handle,
                    u64 domid,
                    const char *image_name,
                    const char *ramdisk_name,
-                   const char *cmdline);
+                   const char *cmdline,
+                   unsigned int control_evtchn);
 
 int xc_netbsd_build(int xc_handle,
                     u64 domid,
                     const char *image_name,
-                    const char *cmdline);
+                    const char *cmdline,
+                    unsigned int control_evtchn);
 
 int xc_bvtsched_global_set(int xc_handle,
                            unsigned long ctx_allow);

@@ -12,7 +12,7 @@
 
 typedef struct suspend_record_st {
     /* To be filled in before resume. */
-    start_info_t resume_info;
+    extended_start_info_t resume_info;
     /*
      * The number of a machine frame containing, in sequence, the number of
      * each machine frame that contains PFN -> MFN translation table data.

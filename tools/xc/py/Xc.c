@@ -225,14 +225,18 @@ static PyObject *pyxc_linux_build(PyObject *self,
 
     u64   dom;
     char *image, *ramdisk = NULL, *cmdline = "";
+    int   control_evtchn;
 
-    static char *kwd_list[] = { "dom", "image", "ramdisk", "cmdline", NULL };
+    static char *kwd_list[] = { "dom", "control_evtchn", 
+                                "image", "ramdisk", "cmdline", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "Ls|ss", kwd_list, 
-                                      &dom, &image, &ramdisk, &cmdline) )
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "Lis|ss", kwd_list, 
+                                      &dom, &control_evtchn, 
+                                      &image, &ramdisk, &cmdline) )
         return NULL;
 
-    if ( xc_linux_build(xc->xc_handle, dom, image, ramdisk, cmdline) != 0 )
+    if ( xc_linux_build(xc->xc_handle, dom, image, 
+                        ramdisk, cmdline, control_evtchn) != 0 )
         return PyErr_SetFromErrno(xc_error);
     
     Py_INCREF(zero);
@@ -247,14 +251,18 @@ static PyObject *pyxc_netbsd_build(PyObject *self,
 
     u64   dom;
     char *image, *ramdisk = NULL, *cmdline = "";
+    int   control_evtchn;
 
-    static char *kwd_list[] = { "dom", "image", "ramdisk", "cmdline", NULL };
+    static char *kwd_list[] = { "dom", "control_evtchn",
+                                "image", "ramdisk", "cmdline", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "Ls|ss", kwd_list, 
-                                      &dom, &image, &ramdisk, &cmdline) )
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "Lis|ss", kwd_list, 
+                                      &dom, &control_evtchn,
+                                      &image, &ramdisk, &cmdline) )
         return NULL;
 
-    if ( xc_netbsd_build(xc->xc_handle, dom, image, cmdline) != 0 )
+    if ( xc_netbsd_build(xc->xc_handle, dom, image, 
+                         cmdline, control_evtchn) != 0 )
         return PyErr_SetFromErrno(xc_error);
     
     Py_INCREF(zero);

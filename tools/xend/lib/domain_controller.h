@@ -1,5 +1,5 @@
 /******************************************************************************
- * control_if.h
+ * domain_controller.h
  * 
  * Interface to server controller (e.g., 'xend'). This header file defines the 
  * interface that is shared with guest OSes.
@@ -7,8 +7,28 @@
  * Copyright (c) 2004, K A Fraser
  */
 
-#ifndef __CONTROL_IF_H__
-#define __CONTROL_IF_H__
+#ifndef __DOMAIN_CONTROLLER_H__
+#define __DOMAIN_CONTROLLER_H__
+
+
+#ifndef BASIC_START_INFO
+#error "Xen header file hypervisor-if.h must already be included here."
+#endif
+
+
+/*
+ * EXTENDED BOOTSTRAP STRUCTURE FOR NEW DOMAINS.
+ */
+
+typedef struct {
+    BASIC_START_INFO;
+    unsigned int domain_controller_evtchn;
+} extended_start_info_t;
+
+
+/*
+ * CONTROLLER MESSAGING INTERFACE.
+ */
 
 typedef struct {
     u8 type;     /* echoed in response */
@@ -32,4 +52,5 @@ typedef struct {
 #define CMSG_CONSOLE      0
 #define CMSG_CONSOLE_DATA 0
 
-#endif /* __CONTROL_IF_H__ */
+
+#endif /* __DOMAIN_CONTROLLER_H__ */

@@ -3,6 +3,7 @@ CC         = gcc
 CFLAGS     = -Wall -O3 
 EXTRA_INC  = -I../../xen/include/hypervisor-ifs
 EXTRA_INC += -I../../xenolinux-sparse/include -I../xc/lib
+EXTRA_INC += -I../xend/lib
 
 HDRS     = $(wildcard *.h)
 SRCS     = $(wildcard *.c)

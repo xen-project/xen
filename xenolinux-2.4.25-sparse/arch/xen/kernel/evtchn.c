@@ -15,6 +15,7 @@
 #include <asm/system.h>
 #include <asm/ptrace.h>
 #include <asm/synch_bitops.h>
+#include <asm/ctrl_if.h>
 #include <asm/hypervisor.h>
 #include <asm/hypervisor-ifs/event_channel.h>
 #include <asm/hypervisor-ifs/physdev.h>
@@ -396,4 +397,7 @@ void __init init_IRQ(void)
     }
 
     (void)setup_irq(bind_virq_to_irq(VIRQ_MISDIRECT), &misdirect_action);
+
+    /* This needs to be done early, but after the IRQ subsystem is alive. */
+    ctrl_if_init();
 }

@@ -102,7 +102,7 @@
 40431ac64Hj4ixUnKmlugZKhXPFE_Q tools/xend/Makefile
 4055ad95Se-FqttgxollqOAAHB94zA tools/xend/lib/__init__.py
 4055ad97wMLUj0BZT0e_T0EwQN0Bvw tools/xend/lib/console.py
-4048c0ddsF0WrU7HUzTvg1MJoCIfWg tools/xend/lib/control_if.h
+4048c0ddsF0WrU7HUzTvg1MJoCIfWg tools/xend/lib/domain_controller.h
 4054a301VEag2GwrBrFBna5U1BGlLA tools/xend/lib/main.py
 4055ad9ah9IuC3sJT2c_gYIFY5Tw_g tools/xend/lib/manager.py
 40431ac8wrUEj-XM7B8smFtx_HA7lQ tools/xend/lib/utils.c
@@ -668,9 +668,14 @@
 40420a73Wou6JlsZDiu6YwjYomsm7A xenolinux-2.4.25-sparse/arch/xen/drivers/evtchn/evtchn.c
 3e5a4e65gZBRBB6RsSVg1c9iahigAw xenolinux-2.4.25-sparse/arch/xen/drivers/network/Makefile
 3e5a4e65ZxKrbFetVB84JhrTyZ1YuQ xenolinux-2.4.25-sparse/arch/xen/drivers/network/network.c
+4075806dI5kfeMD5RV-DA0PYoThx_w xenolinux-2.4.25-sparse/arch/xen/drivers/vblkif/Makefile
+4075806d3fJqqDC1pYYPTZPc575iKg xenolinux-2.4.25-sparse/arch/xen/drivers/vblkif/block.c
+4075806d4-j7vN0Mn0bklI1cRUX1vQ xenolinux-2.4.25-sparse/arch/xen/drivers/vblkif/block.h
+4075806dibjCcfuXv6CINMhxWTw3jQ xenolinux-2.4.25-sparse/arch/xen/drivers/vblkif/vbd.c
 405853f2wg7JXZJNltspMwOZJklxgw xenolinux-2.4.25-sparse/arch/xen/drivers/vnetif/Makefile
 405853f6nbeazrNyEWNHBuoSg2PiPA xenolinux-2.4.25-sparse/arch/xen/drivers/vnetif/vnetif.c
 3e5a4e65lWzkiPXsZdzPt2RNnJGG1g xenolinux-2.4.25-sparse/arch/xen/kernel/Makefile
+4075806dE5mQwlVUf8-t3YXjiMMWDQ xenolinux-2.4.25-sparse/arch/xen/kernel/ctrl_if.c
 3e5a4e65_hqfuxtGG8IUy6wRM86Ecg xenolinux-2.4.25-sparse/arch/xen/kernel/entry.S
 3e5a4e65ibVQmwlOn0j3sVH_j_6hAg xenolinux-2.4.25-sparse/arch/xen/kernel/evtchn.c
 3e5a4e65Hy_1iUvMTPsNqGNXd9uFpg xenolinux-2.4.25-sparse/arch/xen/kernel/head.S
@@ -699,7 +704,7 @@
 3e5a4e66rw65CxyolW9PKz4GG42RcA xenolinux-2.4.25-sparse/drivers/char/tty_io.c
 3e5a4e669uzIE54VwucPYtGwXLAbzA xenolinux-2.4.25-sparse/fs/exec.c
 3e5a4e66wbeCpsJgVf_U8Jde-CNcsA xenolinux-2.4.25-sparse/include/asm-xen/bugs.h
-4048c0ddxnIa2GpBAVR-mY6mNSdeJg xenolinux-2.4.25-sparse/include/asm-xen/control_if.h
+4048c0ddxnIa2GpBAVR-mY6mNSdeJg xenolinux-2.4.25-sparse/include/asm-xen/ctrl_if.h
 3e5a4e66HdSkvIV6SJ1evG_xmTmXHA xenolinux-2.4.25-sparse/include/asm-xen/desc.h
 4048c0e0_P2wUTiT6UqgPhn0s7yFcA xenolinux-2.4.25-sparse/include/asm-xen/evtchn.h
 3e5a4e66SYp_UpAVcF8Lc1wa3Qtgzw xenolinux-2.4.25-sparse/include/asm-xen/fixmap.h

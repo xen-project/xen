@@ -299,18 +299,35 @@ typedef struct shared_info_st
  *     bootstrap element. If necessary, the bootstrap virtual region is
  *     extended by an extra 4MB to ensure this.
  */
-typedef struct start_info_st {
-    /* THE FOLLOWING ARE FILLED IN BOTH ON INITIAL BOOT AND ON RESUME.     */
-    unsigned long nr_pages;       /* total pages allocated to this domain. */
-    unsigned long shared_info;    /* MACHINE address of shared info struct.*/
-    unsigned long flags;          /* SIF_xxx flags.                        */
-    /* THE FOLLOWING ARE ONLY FILLED IN ON INITIAL BOOT (NOT RESUME).      */
-    unsigned long pt_base;        /* VIRTUAL address of page directory.    */
-    unsigned long nr_pt_frames;   /* Number of bootstrap p.t. frames.      */
-    unsigned long mfn_list;       /* VIRTUAL address of page-frame list.   */
-    unsigned long mod_start;      /* VIRTUAL address of pre-loaded module. */
-    unsigned long mod_len;        /* Size (bytes) of pre-loaded module.    */
-    unsigned char cmd_line[1];    /* Variable-length options.              */
+
+/*
+ * This is the basic bootstrap information structure as passed by Xen to the
+ * initial controller domain. We want this structure to be easily extended by
+ * more sophisticated domain builders and controllers, so we make the basic
+ * fields of this structure available via a BASIC_START_INFO macro.
+ * 
+ * Extended version of start_info_t should be defined as:
+ *  typedef struct {
+ *      BASIC_START_INFO;
+ *      <...extra fields...>
+ *  } extended_start_info_t;
+ */
+#define MAX_CMDLINE 256
+#define BASIC_START_INFO                                                      \
+    /* THE FOLLOWING ARE FILLED IN BOTH ON INITIAL BOOT AND ON RESUME.     */ \
+    unsigned long nr_pages;       /* total pages allocated to this domain. */ \
+    unsigned long shared_info;    /* MACHINE address of shared info struct.*/ \
+    unsigned long flags;          /* SIF_xxx flags.                        */ \
+    /* THE FOLLOWING ARE ONLY FILLED IN ON INITIAL BOOT (NOT RESUME).      */ \
+    unsigned long pt_base;        /* VIRTUAL address of page directory.    */ \
+    unsigned long nr_pt_frames;   /* Number of bootstrap p.t. frames.      */ \
+    unsigned long mfn_list;       /* VIRTUAL address of page-frame list.   */ \
+    unsigned long mod_start;      /* VIRTUAL address of pre-loaded module. */ \
+    unsigned long mod_len;        /* Size (bytes) of pre-loaded module.    */ \
+    unsigned char cmd_line[MAX_CMDLINE]
+
+typedef struct {
+    BASIC_START_INFO;
 } start_info_t;
 
 /* These flags are passed in the 'flags' field of start_info_t. */
