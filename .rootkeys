@@ -107,7 +107,6 @@
 41224663YBCUMX1kVo_HRUtgaHTi7w linux-2.4.29-xen-sparse/include/asm-xen/queues.h
 3e5a4e68uJz-xI0IBVMD7xRLQKJDFg linux-2.4.29-xen-sparse/include/asm-xen/segment.h
 3e5a4e68Nfdh6QcOKUTGCaYkf2LmYA linux-2.4.29-xen-sparse/include/asm-xen/smp.h
-4062f7e2PzFOUGT0PaE7A0VprTU3JQ linux-2.4.29-xen-sparse/include/asm-xen/synch_bitops.h
 3e5a4e68mTr0zcp9SXDbnd-XLrrfxw linux-2.4.29-xen-sparse/include/asm-xen/system.h
 3f1056a9L_kqHcFheV00KbKBzv9j5w linux-2.4.29-xen-sparse/include/asm-xen/vga.h
 40659defgWA92arexpMGn8X3QMDj3w linux-2.4.29-xen-sparse/include/asm-xen/xor.h

@@ -179,9 +179,7 @@ static void __init kernel_physical_mapping_init(pgd_t *pgd_base)
 				pte += pte_ofs;
 				for (; pte_ofs < PTRS_PER_PTE && pfn < max_low_pfn; pte++, pfn++, pte_ofs++) {
 						/* XEN: Only map initial RAM allocation. */
-						if (pfn >= max_ram_pfn)
-							break;
-						if (pte_present(*pte))
+						if ((pfn >= max_ram_pfn) || pte_present(*pte))
 							continue;
 						if (is_kernel_text(address))
 							set_pte(pte, pfn_pte(pfn, PAGE_KERNEL_EXEC));
