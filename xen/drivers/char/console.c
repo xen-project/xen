@@ -21,7 +21,7 @@
 #include <asm/mm.h>
 
 /* opt_console: comma-separated list of console outputs. */
-static unsigned char opt_console[30] = "com1,vga";
+static unsigned char opt_console[30] = OPT_CONSOLE_STR;
 string_param("console", opt_console);
 
 /* opt_conswitch: a character pair controlling console switching. */

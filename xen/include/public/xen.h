@@ -257,7 +257,7 @@ typedef struct
  * Per-VCPU information goes here. This will be cleaned up more when Xen 
  * actually supports multi-VCPU guests.
  */
-typedef struct vcpu_info_st
+typedef struct
 {
     /*
      * 'evtchn_upcall_pending' is written non-zero by Xen to indicate
@@ -284,11 +284,12 @@ typedef struct vcpu_info_st
      * an upcall activation. The mask is cleared when the VCPU requests
      * to block: this avoids wakeup-waiting races.
      */
-    u8 evtchn_upcall_pending;
-    u8 evtchn_upcall_mask;
+    u8 evtchn_upcall_pending;           /* 0 */
+    u8 evtchn_upcall_mask;              /* 1 */
     u8 pad0, pad1;
     u32 evtchn_pending_sel;             /* 4 */
-} PACKED vcpu_info_t;                   /* 8 */
+    arch_vcpu_info_t arch;              /* 8 */
+} PACKED vcpu_info_t;                   /* 8 + arch */
 
 /*
  * Xen/guestos shared data -- pointer provided in start_info.

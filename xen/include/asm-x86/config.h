@@ -52,6 +52,8 @@
 
 #define HZ 100
 
+#define OPT_CONSOLE_STR "com1,vga"
+
 /*
  * Just to keep compiler happy.
  * NB. DO NOT CHANGE SMP_CACHE_BYTES WITHOUT FIXING arch/i386/entry.S!!!

@@ -29,6 +29,7 @@
 
 #include <xen/types.h>
 #include <public/xen.h>
+#include <asm/time.h>
 
 extern int init_xen_time();
 

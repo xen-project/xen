@@ -141,6 +141,9 @@ typedef struct {
     u64 pfn_to_mfn_frame_list;
 } PACKED arch_shared_info_t;
 
+typedef struct {
+} PACKED arch_vcpu_info_t;
+
 #define ARCH_HAS_FAST_TRAP
 
 #endif
