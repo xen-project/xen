@@ -8,6 +8,8 @@
 #include <xeno/delay.h>
 #include <xeno/skbuff.h>
 #include <xeno/interrupt.h>
+#include <xeno/compile.h>
+#include <xeno/version.h>
 #include <asm/io.h>
 #include <asm/msr.h>
 #include <asm/uaccess.h>
@@ -160,6 +162,19 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
 
     /* INITIALISE SERIAL LINE (printk will work okay from here on). */
     init_serial();
+
+    /* Print the intro banner. The ASCII art is ugle since '\\' -> '\'. */
+    printk(" __  __            _   ___    _          _        \n");
+    printk(" \\ \\/ /___ _ __   / | / _ \\  | |__   ___| |_ __ _ \n");
+    printk("  \\  // _ \\ '_ \\  | || | | | | '_ \\ / _ \\ __/ _` |\n");
+    printk("  /  \\  __/ | | | | || |_| | | |_) |  __/ || (_| |\n");
+    printk(" /_/\\_\\___|_| |_| |_(_)___/  |_.__/ \\___|\\__\\__,_|\n\n");
+    printk(" http://www.cl.cam.ac.uk/xeno\n");
+    printk(" University of Cambridge Computer Laboratory\n\n");
+    printk(" Xen version %d.%d%s (%s@%s) (%s) %s\n\n",
+           XEN_VERSION, XEN_SUBVERSION, XEN_EXTRAVERSION,
+           XEN_COMPILE_BY, XEN_COMPILE_DOMAIN,
+           XEN_COMPILER, XEN_COMPILE_DATE);
 
     memcpy(&idle0_task_union, &first_task_struct, sizeof(first_task_struct));
 
@@ -350,7 +365,7 @@ static inline void __putstr(const char *str)
 void printf (const char *fmt, ...)
 {
     va_list args;
-    char buf[1024], *p;
+    char buf[128], *p;
     unsigned long flags;
 
     va_start(args, fmt);
@@ -366,7 +381,7 @@ void printf (const char *fmt, ...)
 void panic(const char *fmt, ...)
 {
     va_list args;
-    char buf[1024];
+    char buf[128];
     unsigned long flags;
     extern void machine_restart(char *);
     
