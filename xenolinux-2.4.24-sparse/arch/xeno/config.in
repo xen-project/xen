@@ -136,7 +136,6 @@ endmenu
 
 source drivers/char/Config.in
 
-
 source fs/Config.in
 
 mainmenu_option next_comment
@@ -147,10 +146,8 @@ bool 'Xen console support' CONFIG_XEN_CONSOLE
 if [ "$CONFIG_VT" = "y" ]; then
    bool 'VGA text console' CONFIG_VGA_CONSOLE
    bool 'Dummy console' CONFIG_DUMMY_CONSOLE 
-#   bool 'Video mode selection support' CONFIG_VIDEO_SELECT
 fi
 endmenu
-
 
 mainmenu_option next_comment
 comment 'Kernel hacking'
@@ -166,8 +163,6 @@ if [ "$CONFIG_DEBUG_KERNEL" != "n" ]; then
    bool '  Load all symbols for debugging' CONFIG_KALLSYMS
    bool '  Compile the kernel with frame pointers' CONFIG_FRAME_POINTER
 fi
-
-source drivers/acpi/Config.in
 
 int 'Kernel messages buffer length shift (0 = default)' CONFIG_LOG_BUF_SHIFT 0
 
