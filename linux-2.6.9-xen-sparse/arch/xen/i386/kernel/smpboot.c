@@ -332,9 +332,9 @@ static void __init synchronize_tsc_ap (void)
 	}
 }
 #undef NR_LOOPS
+#endif
 
 extern void calibrate_delay(void);
-#endif
 
 static atomic_t init_deasserted;
 
@@ -403,8 +403,8 @@ void __init smp_callin(void)
 	Dprintk("CALLIN, before setup_local_APIC().\n");
 	smp_callin_clear_local_apic();
 	setup_local_APIC();
-	map_cpu_to_logical_apicid();
 #endif
+	map_cpu_to_logical_apicid();
 
 	local_irq_enable();
 
@@ -567,15 +567,11 @@ u8 cpu_2_logical_apicid[NR_CPUS] = { [0 ... NR_CPUS-1] = BAD_APICID };
 
 void map_cpu_to_logical_apicid(void)
 {
-#if 1
-	xxprint("map_cpu_to_logical_apicid\n");
-#else
 	int cpu = smp_processor_id();
-	int apicid = logical_smp_processor_id();
+	int apicid = smp_processor_id();
 
 	cpu_2_logical_apicid[cpu] = apicid;
 	map_cpu_to_node(cpu, apicid_to_node(apicid));
-#endif
 }
 
 void unmap_cpu_to_logical_apicid(int cpu)
@@ -958,7 +954,7 @@ static int __init do_boot_cpu(int apicid)
 	x86_cpu_to_apicid[cpu] = apicid;
 	if (boot_error) {
 		/* Try to put things back the way they were before ... */
-		// unmap_cpu_to_logical_apicid(cpu);
+		unmap_cpu_to_logical_apicid(cpu);
 		cpu_clear(cpu, cpu_callout_map); /* was set here (do_boot_cpu()) */
 		cpu_clear(cpu, cpu_initialized); /* was set by cpu_init() */
 		cpucount--;
@@ -1175,7 +1171,9 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 #if 0
 	connect_bsp_APIC();
 	setup_local_APIC();
+#endif
 	map_cpu_to_logical_apicid();
+#if 0
 
 
 	setup_portio_remap();
