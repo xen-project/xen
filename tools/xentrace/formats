@@ -1,35 +1,34 @@
-0x00010000	CPU%(cpu)d %(tsc).6f sched_add_domain(0x%(3)08x)            [ dom id = 0x%(2)08x   ]
-0x00010001	CPU%(cpu)d %(tsc).6f sched_rem_domain(0x%08(3)x)            [ dom id = 0x%(2)08x   ]
-0x00010002	CPU%(cpu)d %(tsc).6f __wake_up(0x%(3)08x)                   [ dom id = 0x%(2)08x   ]
-0x00010003	CPU%(cpu)d %(tsc).6f do_block()                             [ current = 0x%(2)08x  ]
-0x00010004	CPU%(cpu)d %(tsc).6f do_yield()		                    [ current = %(2)08x    ]
-0x00010005	CPU%(cpu)d %(tsc).6f do_set_timer_op(0x%(4)08x, 0x%(5)08x)  [ current = 0x%(3)08x  ]
-0x00010006	CPU%(cpu)d %(tsc).6f sched_ctl(0x%(1)08x)
-0x00010007	CPU%(cpu)d %(tsc).6f sched_adjdom(params)                   [ dom id = 0x%(2)08x   ]
-0x00010008	CPU%(cpu)d %(tsc).6f __reschedule(0x%(3)08x)                [ dom id = 0x(2)08x    ]
-0x00010009	CPU%(cpu)d %(tsc).6f switching to task_struct 0x%(1)08x     [ dom id = 0x%(1)x     ]
-0x0001000A	CPU%(cpu)d %(tsc).6f s_timer_fn(unused)
-0x0001000B	CPU%(cpu)d %(tsc).6f t_timer_fn(unused)
-0x0001000C	CPU%(cpu)d %(tsc).6f dom_timer_fn(data)
-0x0001000D	CPU%(cpu)d %(tsc).6f fallback_timer_fn(unused)
+0x00010000	CPU%(cpu)d	%(tsc)d		sched_add_domain	[ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
+0x00010001	CPU%(cpu)d	%(tsc)d		sched_rem_domain	[ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
+0x00010002	CPU%(cpu)d	%(tsc)d		domain_sleep		[ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
+0x00010003	CPU%(cpu)d	%(tsc)d		domain_wake		[ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
+0x00010004	CPU%(cpu)d	%(tsc)d		do_yield		[ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
+0x00010005	CPU%(cpu)d	%(tsc)d		do_block		[ domid = 0x%(1)08x, edomid = 0x%(2)08x ]
+0x00010006	CPU%(cpu)d	%(tsc)d		domain_shutdown		[ domid = 0x%(1)08x, edomid = 0x%(2)08x, reason = 0x%(3)08x ]
+0x00010007	CPU%(cpu)d	%(tsc)d		sched_ctl
+0x00010008	CPU%(cpu)d	%(tsc)d		sched_adjdom		[ domid = 0x%(1)08x ]
+0x00010009	CPU%(cpu)d	%(tsc)d		__enter_scheduler	[ prev<domid:edomid> = 0x%(1)08x : 0x%(2)08x, next<domid:edomid> = 0x%(3)08x : 0x%(4)08x ]
+0x0001000A	CPU%(cpu)d	%(tsc)d		s_timer_fn
+0x0001000B	CPU%(cpu)d	%(tsc)d		t_timer_fn
+0x0001000C	CPU%(cpu)d	%(tsc)d		dom_timer_fn
 
 
-0x00020008	CPU%(cpu)d %(tsc).6f enter: dom0_create_dom ( )
-0x00030008	CPU%(cpu)d %(tsc).6f leave: dom0_create_dom ( )
+0x00020008	CPU%(cpu)d	%(tsc)d		enter: dom0_create_dom
+0x00030008	CPU%(cpu)d	%(tsc)d		leave: dom0_create_dom
+0x00020009	CPU%(cpu)d	%(tsc)d		enter: dom0_destroy_dom
+0x00030009	CPU%(cpu)d	%(tsc)d		leave: dom0_destroy_dom
+0x0002000A	CPU%(cpu)d	%(tsc)d		enter: dom0_start_dom
+0x0003000A	CPU%(cpu)d	%(tsc)d		leave: dom0_start_dom
+0x0002000B	CPU%(cpu)d	%(tsc)d		enter: dom0_stop_dom
+0x0003000B	CPU%(cpu)d	%(tsc)d		leave: dom0_stop_dom
+0x0002000C	CPU%(cpu)d	%(tsc)d		enter: dom0_getinfo
+0x0003000C	CPU%(cpu)d	%(tsc)d		leave: dom0_getinfo
+0x0002000D	CPU%(cpu)d	%(tsc)d		enter: dom0_build
+0x0003000D	CPU%(cpu)d	%(tsc)d		leave: dom0_build
+0x00020019	CPU%(cpu)d	%(tsc)d		enter: dom0_shadow_op
+0x00030019	CPU%(cpu)d	%(tsc)d		leave: dom0_shadow_op
 
-0x00020009	CPU%(cpu)d %(tsc).6f enter: dom0_destroy_dom ( dom=0x%(2)x )
-0x00030009	CPU%(cpu)d %(tsc).6f leave: dom0_destroy_dom ( dom=0x%(2)x ) = %(1)d
 
-0x0002000A	CPU%(cpu)d %(tsc).6f enter: dom0_start_dom ( dom=0x%(2)x )
-0x0003000A	CPU%(cpu)d %(tsc).6f leave: dom0_start_dom ( dom=0x%(2)x ) = %(1)d
-0x0002000B	CPU%(cpu)d %(tsc).6f enter: dom0_stop_dom ( dom=0x%(2)x )
-0x0003000B	CPU%(cpu)d %(tsc).6f leave: dom0_stop_dom ( dom=0x%(2)x ) = %(1)d
-0x0002000C	CPU%(cpu)d %(tsc).6f enter: dom0_getinfo ( dom=0x%(2)x )
-0x0003000C	CPU%(cpu)d %(tsc).6f leave: dom0_getinfo ( dom=0x%(2)x ) = %(1)d
-0x0002000D	CPU%(cpu)d %(tsc).6f enter: dom0_build ( dom=0x%(2)x )
-0x0003000D	CPU%(cpu)d %(tsc).6f leave: dom0_build ( dom=0x%(2)x ) = %(1)d
-
-0x00020019	CPU%(cpu)d %(tsc).6f enter: dom0_shadow_op ( dom=0x%(2)x, %(3)d )
-0x00030019	CPU%(cpu)d %(tsc).6f leave: dom0_shadow_op ( dom=0x%(2)x, %(3)d  ) = %(1)d
-
-#0x0		CPU%(cpu)d %(tsc).6f %(event)x
+0x00040001	CPU%(cpu)d      %(tsc)d		VMX_VMEXIT		[ domid = 0x%(1)08x, eip = 0x%(2)08x, reason = 0x%(3)08x ]
+0x00040002	CPU%(cpu)d      %(tsc)d		VMX_VECTOR		[ domid = 0x%(1)08x, eip = 0x%(2)08x, vector = 0x%(3)08x ]
+0x00040003	CPU%(cpu)d      %(tsc)d		VMX_INT			[ domid = 0x%(1)08x, trap = 0x%(2)08x, va = 0x%(3)08x ]
