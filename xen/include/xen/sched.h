@@ -55,32 +55,9 @@ void destroy_event_channels(struct domain *d);
 
 struct domain 
 {
-    /*
-     * DO NOT CHANGE THE ORDER OF THE FOLLOWING.
-     * Their offsets are hardcoded in entry.S
-     */
+    u32 processor;
 
-    u32 processor;               /* 00: current processor */
-
-    /* An unsafe pointer into a shared data area. */
-    shared_info_t *shared_info;  /* 04: shared data area */
-
-    /*
-     * Return vectors pushed to us by guest OS.
-     * The stack frame for events is exactly that of an x86 hardware interrupt.
-     * The stack frame for a failsafe callback is augmented with saved values
-     * for segment registers %ds, %es, %fs and %gs:
-     * 	%ds, %es, %fs, %gs, %eip, %cs, %eflags [, %oldesp, %oldss]
-     */
-    unsigned long event_selector;    /* 08: entry CS  */
-    unsigned long event_address;     /* 12: entry EIP */
-
-    unsigned long failsafe_selector; /* 16: entry CS  */
-    unsigned long failsafe_address;  /* 20: entry EIP */
-
-    /*
-     * From here on things can be added and shuffled without special attention
-     */
+    shared_info_t *shared_info;
 
     domid_t  id;
     s_time_t create_time;

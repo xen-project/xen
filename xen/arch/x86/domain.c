@@ -276,10 +276,10 @@ int arch_final_setup_guestos(struct domain *d, full_execution_context_t *c)
     for ( i = 0; i < 8; i++ )
         (void)set_debugreg(d, i, c->debugreg[i]);
 
-    d->event_selector    = c->event_callback_cs;
-    d->event_address     = c->event_callback_eip;
-    d->failsafe_selector = c->failsafe_callback_cs;
-    d->failsafe_address  = c->failsafe_callback_eip;
+    d->thread.event_selector    = c->event_callback_cs;
+    d->thread.event_address     = c->event_callback_eip;
+    d->thread.failsafe_selector = c->failsafe_callback_cs;
+    d->thread.failsafe_address  = c->failsafe_callback_eip;
     
     phys_basetab = c->pt_base;
     d->mm.pagetable = mk_pagetable(phys_basetab);
@@ -741,8 +741,8 @@ int construct_dom0(struct domain *p,
      * We're basically forcing default RPLs to 1, so that our "what privilege
      * level are we returning to?" logic works.
      */
-    p->failsafe_selector = FLAT_GUESTOS_CS;
-    p->event_selector    = FLAT_GUESTOS_CS;
+    p->thread.failsafe_selector = FLAT_GUESTOS_CS;
+    p->thread.event_selector    = FLAT_GUESTOS_CS;
     p->thread.guestos_ss = FLAT_GUESTOS_DS;
     for ( i = 0; i < 256; i++ ) 
         p->thread.traps[i].cs = FLAT_GUESTOS_CS;

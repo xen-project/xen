@@ -36,10 +36,11 @@ void __dummy__(void)
 
     OFFSET(DOMAIN_processor, struct domain, processor);
     OFFSET(DOMAIN_shared_info, struct domain, shared_info);
-    OFFSET(DOMAIN_event_sel, struct domain, event_selector);
-    OFFSET(DOMAIN_event_addr, struct domain, event_address);
-    OFFSET(DOMAIN_failsafe_sel, struct domain, failsafe_selector);
-    OFFSET(DOMAIN_failsafe_addr, struct domain, failsafe_address);
+    OFFSET(DOMAIN_event_sel, struct domain, thread.event_selector);
+    OFFSET(DOMAIN_event_addr, struct domain, thread.event_address);
+    OFFSET(DOMAIN_failsafe_sel, struct domain, thread.failsafe_selector);
+    OFFSET(DOMAIN_failsafe_addr, struct domain, thread.failsafe_address);
+    OFFSET(DOMAIN_trap_bounce, struct domain, thread.trap_bounce);
     BLANK();
 
     OFFSET(SHINFO_upcall_pending, shared_info_t, 
@@ -48,10 +49,10 @@ void __dummy__(void)
            vcpu_data[0].evtchn_upcall_mask);
     BLANK();
 
-    OFFSET(GTB_error_code, struct guest_trap_bounce, error_code);
-    OFFSET(GTB_cr2, struct guest_trap_bounce, cr2);
-    OFFSET(GTB_flags, struct guest_trap_bounce, flags);
-    OFFSET(GTB_cs, struct guest_trap_bounce, cs);
-    OFFSET(GTB_eip, struct guest_trap_bounce, eip);
+    OFFSET(TRAPBOUNCE_error_code, struct trap_bounce, error_code);
+    OFFSET(TRAPBOUNCE_cr2, struct trap_bounce, cr2);
+    OFFSET(TRAPBOUNCE_flags, struct trap_bounce, flags);
+    OFFSET(TRAPBOUNCE_cs, struct trap_bounce, cs);
+    OFFSET(TRAPBOUNCE_eip, struct trap_bounce, eip);
     BLANK();
 }
