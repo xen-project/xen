@@ -14,6 +14,9 @@
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 static dev_t vbd_map_devnum(blkif_pdev_t);
+#define bdev_put(_b) blkdev_put(_b)
+#else
+#define bdev_put(_b) ((void)0)
 #endif
 
 void vbd_create(blkif_be_vbd_create_t *create) 

@@ -30,10 +30,8 @@
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 typedef struct rb_root rb_root_t;
 typedef struct rb_node rb_node_t;
-extern void bdev_put(struct block_device *bdev);
 #else
 struct block_device;
-#define bdev_put(_b) ((void)0)
 #endif
 
 typedef struct blkif_st {
