@@ -236,6 +236,31 @@ static inline void __skb_queue_head(struct sk_buff_head *list, struct sk_buff *n
 }
 
 /**
+ *      __skb_queue_tail - queue a buffer at the list tail
+ *      @list: list to use
+ *      @newsk: buffer to queue
+ *
+ *      Queue a buffer at the end of a list. This function takes no locks
+ *      and you must therefore hold required locks before calling it.
+ *
+ *      A buffer cannot be placed on two lists at the same time.
+ */ 
+
+static inline void __skb_queue_tail(struct sk_buff_head *list, struct sk_buff *newsk)
+{
+        struct sk_buff *prev, *next;
+
+        newsk->list = list;
+        list->qlen++;
+        next = (struct sk_buff *)list;
+        prev = next->prev;
+        newsk->next = next;
+        newsk->prev = prev;
+        next->prev = newsk;
+        prev->next = newsk;
+}
+
+/**
  *	__skb_dequeue - remove from the head of the queue
  *	@list: list to dequeue from
  *

@@ -51,6 +51,8 @@
 #define TX_RING_ADD(_i,_j) (((_i)+(_j)) & (TX_RING_SIZE-1))
 #define RX_RING_ADD(_i,_j) (((_i)+(_j)) & (RX_RING_SIZE-1))
 
+static struct sk_buff_head rx_skb_queue[NR_CPUS] __cacheline_aligned;
+
 static void make_tx_response(net_vif_t *vif, 
                              unsigned short id, 
                              unsigned char  st);
@@ -604,39 +606,68 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
 
 int netif_rx(struct sk_buff *skb)
 {
-    int offset, this_cpu = smp_processor_id();
+    int this_cpu = smp_processor_id();
+    struct sk_buff_head *q = &rx_skb_queue[this_cpu];
     unsigned long flags;
 
+    /* This oughtn't to happen, really! */
+    if ( unlikely(skb_queue_len(q) > 100) )
+    {
+        printk("Congestion -- packet dropped!!\n");
+        return NET_RX_DROP;
+    }
+
     local_irq_save(flags);
-
-    ASSERT(skb->skb_type == SKB_ZERO_COPY);
-
-    /*
-     * Offset will include 16 bytes padding from dev_alloc_skb, 14 bytes for 
-     * ethernet header, plus any other alignment padding added by the driver.
-     */
-    offset = (int)skb->data & ~PAGE_MASK; 
-    skb->head = (u8 *)map_domain_mem(((skb->pf - frame_table) << PAGE_SHIFT));
-    skb->data = skb->nh.raw = skb->head + offset;
-    skb->tail = skb->data + skb->len;
-    skb_push(skb, ETH_HLEN);
-    skb->mac.raw = skb->data;
-
-    netdev_rx_stat[this_cpu].total++;
-
-    if ( skb->dst_vif == NULL )
-        skb->dst_vif = net_get_target_vif(skb->data, skb->len, skb->src_vif);
-        
-    if ( !VIF_LOCAL(skb->dst_vif) )
-        skb->dst_vif = find_vif_by_id(0);
-
-    deliver_packet(skb, skb->dst_vif);
-    put_vif(skb->dst_vif);
-
-    unmap_domain_mem(skb->head);
-    kfree_skb(skb);
+    __skb_queue_tail(q, skb);
     local_irq_restore(flags);
+
+    __cpu_raise_softirq(this_cpu, NET_RX_SOFTIRQ);
+
     return NET_RX_SUCCESS;
+}
+
+static void net_rx_action(struct softirq_action *h)
+{
+    int offset, this_cpu = smp_processor_id();
+    struct sk_buff_head *q = &rx_skb_queue[this_cpu];
+    struct sk_buff *skb;
+
+    local_irq_disable();
+    
+    while ( (skb = __skb_dequeue(q)) != NULL )
+    {
+        ASSERT(skb->skb_type == SKB_ZERO_COPY);
+
+        /*
+         * Offset will include 16 bytes padding from dev_alloc_skb, 14 bytes
+         * for ethernet header, plus any other alignment padding added by the
+         * driver.
+         */
+        offset = (int)skb->data & ~PAGE_MASK; 
+        skb->head = (u8 *)map_domain_mem(((skb->pf - frame_table) << 
+                                          PAGE_SHIFT));
+        skb->data = skb->nh.raw = skb->head + offset;
+        skb->tail = skb->data + skb->len;
+        skb_push(skb, ETH_HLEN);
+        skb->mac.raw = skb->data;
+        
+        netdev_rx_stat[this_cpu].total++;
+        
+        if ( skb->dst_vif == NULL )
+            skb->dst_vif = net_get_target_vif(
+                skb->data, skb->len, skb->src_vif);
+        
+        if ( !VIF_LOCAL(skb->dst_vif) )
+            skb->dst_vif = find_vif_by_id(0);
+        
+        deliver_packet(skb, skb->dst_vif);
+        put_vif(skb->dst_vif);
+        
+        unmap_domain_mem(skb->head);
+        kfree_skb(skb);
+    }
+
+    local_irq_enable();
 }
 
 
@@ -1770,7 +1801,7 @@ long do_net_update(void)
     net_vif_t *vif;
     net_idx_t *shared_idxs;
     unsigned int i, j, idx;
-    struct sk_buff *skb, *interdom_skb = NULL;
+    struct sk_buff *skb;
     tx_req_entry_t tx;
     rx_req_entry_t rx;
     unsigned long pte_pfn, buf_pfn;
@@ -1874,11 +1905,7 @@ long do_net_update(void)
                 skb->len = tx.size - ETH_HLEN;
                 unmap_domain_mem(skb->head);
 
-                /*
-                 * We must defer netif_rx until we have released the current
-                 * domain's page_lock, or we may deadlock on SMP.
-                 */
-                interdom_skb = skb;
+                netif_rx(skb);
 
                 make_tx_response(vif, tx.id, RING_STATUS_OK);
             }
@@ -1907,11 +1934,6 @@ long do_net_update(void)
         tx_unmap_and_continue:
             unmap_domain_mem(g_data);
             spin_unlock_irq(&current->page_lock);
-            if ( interdom_skb != NULL )
-            {
-                (void)netif_rx(interdom_skb);
-                interdom_skb = NULL;
-            }
         }
 
         vif->tx_req_cons = i;
@@ -2069,7 +2091,7 @@ static void make_rx_response(net_vif_t     *vif,
 
 int setup_network_devices(void)
 {
-    int ret;
+    int i, ret;
     extern char opt_ifname[];
     struct net_device *dev = dev_get_by_name(opt_ifname);
 
@@ -2088,6 +2110,10 @@ int setup_network_devices(void)
     printk("Device %s opened and ready for use.\n", opt_ifname);
     the_dev = dev;
 
+    for ( i = 0; i < smp_num_cpus; i++ )
+        skb_queue_head_init(&rx_skb_queue[i]);
+
+    open_softirq(NET_RX_SOFTIRQ, net_rx_action, NULL);
     tasklet_enable(&net_tx_tasklet);
 
     return 1;
