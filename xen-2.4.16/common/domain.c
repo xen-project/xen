@@ -672,6 +672,8 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
             frame_table;
         cur_address <<= PAGE_SHIFT;
     }
+    page->type_count |= REFCNT_PIN_BIT;
+    page->tot_count  |= REFCNT_PIN_BIT;
     page->flags = dom | PGT_l2_page_table;
     unmap_domain_mem(l1start);
 
