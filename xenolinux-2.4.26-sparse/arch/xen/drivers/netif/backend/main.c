@@ -328,14 +328,14 @@ static int __on_net_schedule_list(netif_t *netif)
 
 static void remove_from_net_schedule_list(netif_t *netif)
 {
-    spin_lock(&net_schedule_list_lock);
+    spin_lock_irq(&net_schedule_list_lock);
     if ( likely(__on_net_schedule_list(netif)) )
     {
         list_del(&netif->list);
         netif->list.next = NULL;
         netif_put(netif);
     }
-    spin_unlock(&net_schedule_list_lock);
+    spin_unlock_irq(&net_schedule_list_lock);
 }
 
 static void add_to_net_schedule_list_tail(netif_t *netif)
@@ -343,13 +343,13 @@ static void add_to_net_schedule_list_tail(netif_t *netif)
     if ( __on_net_schedule_list(netif) )
         return;
 
-    spin_lock(&net_schedule_list_lock);
+    spin_lock_irq(&net_schedule_list_lock);
     if ( !__on_net_schedule_list(netif) && (netif->status == CONNECTED) )
     {
         list_add_tail(&netif->list, &net_schedule_list);
         netif_get(netif);
     }
-    spin_unlock(&net_schedule_list_lock);
+    spin_unlock_irq(&net_schedule_list_lock);
 }
 
 static inline void netif_schedule_work(netif_t *netif)
@@ -702,6 +702,35 @@ static int make_rx_response(netif_t     *netif,
     return (i == netif->rx->event);
 }
 
+static void netif_be_dbg(int irq, void *dev_id, struct pt_regs *regs)
+{
+    struct list_head *ent;
+    netif_t *netif;
+    int i = 0;
+
+    printk(KERN_ALERT "netif_schedule_list:\n");
+    spin_lock_irq(&net_schedule_list_lock);
+
+    list_for_each ( ent, &net_schedule_list )
+    {
+        netif = list_entry(ent, netif_t, list);
+        printk(KERN_ALERT " %d: private(rx_req_cons=%08x rx_resp_prod=%08x\n",
+               i, netif->rx_req_cons, netif->rx_resp_prod);               
+        printk(KERN_ALERT "   tx_req_cons=%08x tx_resp_prod=%08x)\n",
+               netif->tx_req_cons, netif->tx_resp_prod);
+        printk(KERN_ALERT "   shared(rx_req_prod=%08x rx_resp_prod=%08x\n",
+               netif->rx->req_prod, netif->rx->resp_prod);
+        printk(KERN_ALERT "   rx_event=%08x tx_req_prod=%08x\n",
+               netif->rx->event, netif->tx->req_prod);
+        printk(KERN_ALERT "   tx_resp_prod=%08x, tx_event=%08x)\n",
+               netif->tx->resp_prod, netif->tx->event);
+        i++;
+    }
+
+    spin_unlock_irq(&net_schedule_list_lock);
+    printk(KERN_ALERT " ** End of netif_schedule_list **\n");
+}
+
 static int __init init_module(void)
 {
     int i;
@@ -726,6 +755,10 @@ static int __init init_module(void)
     INIT_LIST_HEAD(&net_schedule_list);
 
     netif_ctrlif_init();
+
+    (void)request_irq(bind_virq_to_irq(VIRQ_DEBUG),
+                      netif_be_dbg, SA_SHIRQ, 
+                      "net-be-dbg", NULL);
 
     return 0;
 }
