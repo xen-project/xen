@@ -9,17 +9,15 @@
 #include <xeno/lib.h>
 #include <xeno/sched.h>
 #include <xeno/blkdev.h>
-#include <xeno/event.h>                                    /* mark_hyp_event */
+#include <xeno/event.h>
 #include <hypervisor-ifs/block.h>
 #include <hypervisor-ifs/hypervisor-if.h>
 #include <asm-i386/io.h>
 #include <asm/spinlock.h>
-
 #include <xeno/keyhandler.h>
 
 #define XEN_BLK_DEBUG 0
 #define XEN_BLK_DEBUG_LEVEL KERN_ALERT
-
 
 /*
  * KAF XXX: the current state of play with blk_requests.
@@ -30,8 +28,7 @@
  * will go where we currently increment 'nr_pending'. The scheduler will
  * refuse admission of a blk_request if it is already full.
  */
-typedef struct blk_request
-{
+typedef struct blk_request {
   struct list_head queue;
   struct buffer_head *bh;
   blk_ring_req_entry_t *request;
@@ -40,25 +37,19 @@ typedef struct blk_request
 #define MAX_PENDING_REQS 256                 /* very arbitrary */
 static kmem_cache_t *blk_request_cachep;
 static atomic_t nr_pending;
-static int pending_work;              /* which domains have work for us? */
+static int pending_work; /* Bitmask: which domains have work for us? */
 
-
-/* some definitions */
-void dumpx (char *buffer, int count);
-void printx (char * string);
-long do_block_io_op_domain (struct task_struct* task);
-int dispatch_rw_block_io (int index);
-int dispatch_probe_block_io (int index);
-int dispatch_debug_block_io (int index);
+static long do_block_io_op_domain (struct task_struct* task);
+static int dispatch_rw_block_io (int index);
+static int dispatch_probe_block_io (int index);
+static int dispatch_debug_block_io (int index);
 
 /*
- * end_block_io_op
- *
- * IO has completed.  Need to notify the guest operating system.
- * Called from ll_rw_block -- currently /DIRECTLY/ -- XXX FIXME 
- * (e.g. hook into proper end processing of ll_rw) 
+ * end_block_io_op:
+ *  IO has completed.  Need to notify the guest operating system.
+ *  Called from ll_rw_block -- currently /DIRECTLY/ -- XXX FIXME 
+ *  (e.g. hook into proper end processing of ll_rw) 
  */
-
 void end_block_io_op(struct buffer_head * bh)
 {
     unsigned long cpu_mask;
@@ -101,15 +92,6 @@ void end_block_io_op(struct buffer_head * bh)
     /*
      * now check if there is any pending work from any domain
      * that we were previously unable to process.
-     *
-     * NOTE: the current algorithm will check _every_ domain
-     * and wake up _every_ domain that has pending work.
-     * In the future, we should stop waking up domains once
-     * there isn't any space for their requests any more
-     * ALSO, we need to maintain a counter of the last domain
-     * that we woke up for fairness... we shouldn't restart
-     * at domain 0 every time (although we might want to special
-     * case domain 0);
      */
     for ( loop = 0; loop < XEN_BLOCK_MAX_DOMAINS; loop++ )
     {
@@ -139,10 +121,9 @@ void end_block_io_op(struct buffer_head * bh)
 
 
 /*
- * do_block_io_op
- *
- * Accept a block io request from a guest operating system.
- * There is an entry in the hypervisor_call_table (xen/arch/i386/entry.S).
+ * do_block_io_op:
+ *  Accept a block io request from a guest operating system.
+ *  There is an entry in the hypervisor_call_table (xen/arch/i386/entry.S).
  */
 
 long do_block_io_op (void)
@@ -152,11 +133,10 @@ long do_block_io_op (void)
 
 
 /*
- * do_block_io_op
- *
- * handle the requests for a particular domain
+ * do_block_io_op_domain:
+ *  Handle the requests for a particular domain
  */
-long do_block_io_op_domain (struct task_struct* task)
+static long do_block_io_op_domain (struct task_struct* task)
 {
     blk_ring_t *blk_ring = task->blk_ring_base;
     int loop, status;
@@ -209,16 +189,16 @@ long do_block_io_op_domain (struct task_struct* task)
 }
 
 
-int dispatch_debug_block_io (int index)
+static int dispatch_debug_block_io (int index)
 {
     printk (KERN_ALERT "dispatch_debug_block_io: UNIMPL\n"); 
     return 1; 
 }
 
-extern void ide_probe_devices(xen_disk_info_t *xdi);
 
-int dispatch_probe_block_io (int index)
+static int dispatch_probe_block_io (int index)
 {
+    extern void ide_probe_devices(xen_disk_info_t *xdi);
     blk_ring_t *blk_ring = current->blk_ring_base;
     xen_disk_info_t *xdi;
     
@@ -233,10 +213,10 @@ int dispatch_probe_block_io (int index)
     return 0;
 }
 
-extern void ll_rw_block(int rw, int nr, struct buffer_head * bhs[]); 
 
-int dispatch_rw_block_io (int index)
+static int dispatch_rw_block_io (int index)
 {
+    extern void ll_rw_block(int rw, int nr, struct buffer_head * bhs[]); 
     blk_ring_t *blk_ring = current->blk_ring_base;
     struct buffer_head *bh;
     struct request_queue *rq;
@@ -317,41 +297,6 @@ int dispatch_rw_block_io (int index)
 }
 
 
-/*
- * debug dump_queue
- * arguments: queue head, name of queue
- */
-void dump_queue(struct list_head *queue, char *name)
-{
-    struct list_head *list;
-    int loop = 0;
-    
-    printk ("QUEUE %s %lx   n: %lx, p: %lx\n", name,  (unsigned long)queue,
-	    (unsigned long) queue->next, (unsigned long) queue->prev);
-    list_for_each (list, queue) {
-	printk ("  %s %d : %lx   n: %lx, p: %lx\n", name, loop++, 
-		(unsigned long)list,
-		(unsigned long)list->next, (unsigned long)list->prev);
-    }
-    return; 
-}
-
-void dump_queue_head(struct list_head *queue, char *name)
-{
-    struct list_head *list;
-    int loop = 0;
-    
-    printk ("QUEUE %s %lx   n: %lx, p: %lx\n", name,  (unsigned long)queue,
-	    (unsigned long) queue->next, (unsigned long) queue->prev);
-    list_for_each (list, queue) {
-	printk ("      %d : %lx   n: %lx, p: %lx\n", loop++, 
-		(unsigned long)list,
-		(unsigned long)list->next, (unsigned long)list->prev);
-	if (loop >= 5) return;
-    }
-}
-
-
 static void dump_blockq(u_char key, void *dev_id, struct pt_regs *regs) 
 {
     printk("Dumping block queue stats: nr_pending = %d\n",
@@ -359,12 +304,6 @@ static void dump_blockq(u_char key, void *dev_id, struct pt_regs *regs)
 }
 
 
-/*
- * initialize_block_io
- *
- * initialize everything for block io called from 
- * arch/i386/setup.c::start_of_day
- */
 void initialize_block_io ()
 {
     blk_request_cachep = kmem_cache_create(
@@ -373,9 +312,7 @@ void initialize_block_io ()
     
     add_key_handler('b', dump_blockq, "dump xen ide blkdev stats"); 
     
-    /* If bit i is true then domain i has work for us to do. */
     pending_work = 0;
-
     atomic_set(&nr_pending, 0);
 }
 
