@@ -8,6 +8,9 @@
 #ifndef __BLKTAPLIB_H__
 #define __BLKTAPLIB_H__
 
+#ifndef __SHORT_INT_TYPES__
+#define __SHORT_INT_TYPES__
+
 #include <stdint.h>
 
 typedef uint8_t            u8;
@@ -18,6 +21,8 @@ typedef int8_t             s8;
 typedef int16_t            s16;
 typedef int32_t            s32;
 typedef int64_t            s64;
+
+#endif /*  __SHORT_INT_TYPES__ */
                                                                                 
 #if defined(__i386__)
 #define rmb() __asm__ __volatile__ ( "lock; addl $0,0(%%esp)" : : : "memory" )

@@ -1,0 +1,177 @@
+Parallax Quick Overview
+March 3, 2005
+
+This is intended to provide a quick set of instructions to let you
+guys play with the current parallax source.  In it's current form, the
+code will let you run an arbitrary number of VMs off of a single disk
+image, doing copy-on-write as they make updates.  Each domain is
+assigned a virtual disk image (VDI), which may be based on a snapshot
+of an existing image.  All of the VDI and snapshot management should
+currently work.
+
+The current implementation uses a single file as a blockstore for
+_everything_ this will soon be replaced by the fancier backend code
+and the local cache.  As it stands, Parallax will create
+"blockstore.dat" in the directory that you run it from, and use
+largefile support to make this grow to unfathomable girth.  So, you
+probably want to run the daemon off of a local disk, with a lot of
+free space.
+
+Here's how to get going:
+
+0. Setup:
+---------
+
+Pick a local directory on a disk with lots of room.  You should be
+running from a privileged domain (e.g. dom0) with the blocktap
+configured in and block backend NOT.
+
+For convenience (for the moment) copy all of the vdi tools (vdi_*) and
+the parallax daemon from tools/blktap into this directory.
+
+1. Populate the blockstore:
+---------------------------
+
+First you need to put at least one image into the blockstore.  You
+will need a disk image, either as a file or local partition.  My
+general approach has been to
+
+(a) make a really big sparse file with 
+
+        dd if=/dev/zero of=./image bs=4K count=1 seek=[big value]
+
+(b) put a filesystem into it
+
+        mkfs.ext3 ./image
+
+(c) mount it using loopback
+
+        mkdir ./mnt
+        mount -o loop ./image
+
+(d) cd into it and untar one of the image files from srg-roots.
+
+        cd mnt
+        tar ...
+
+NOTE: Beware if your system is FC3.  mkfs is not compatible with old
+versions of fedora, and so you don't have much choice but to install
+further fc3 images if you have used the fc3 version of mkfs.
+
+(e) unmount the image
+
+        cd ..
+        umount mnt
+
+(f) now, create a new VDI to hold the image 
+
+        ./vdi_create "My new FC3 VDI"
+
+(g) get the id of the new VDI.
+
+        ./vdi_list
+
+        |      0                     My new FC3 VDI
+
+(0 is the VDI id... create a few more if you want.)
+
+(h) hoover your image into the new VDI.
+
+        ./vdi_fill 0 ./image
+
+This will pull the entire image into the blockstore and set up a
+mapping tree for it for VDI 0.  Passing a device (i.e. /dev/sda3)
+should also work, but vdi_fill has NO notion of sparseness yet, so you
+are going to pump a block into the store for each block you read.
+
+vdi_fill will count up until it is done, and you should be ready to
+go.  If you want to be anal, you can use vdi_validate to test the VDI
+against the original image.
+
+2. Create some extra VDIs
+-------------------------
+
+VDIs are actually a list of snapshots, and each snapshot is a full
+image of mappings.  So, to preserve an immutable copy of a current
+VDI, do this:
+
+(a) Snapshot your new VDI.
+
+        ./vdi_snap 0
+
+Snapshotting writes the current radix root to the VDI's snapshot log,
+and assigns it a new writable root.
+
+(b) look at the VDI's snapshot log.
+
+        ./vdi_snap_list 0
+
+        | 16   0      Thu Mar  3 19:27:48 2005 565111           31
+
+The first two columns constitute a snapshot id and represent the
+(block, offset) of the snapshot record.  The Date tells you when the
+snapshot was made, and 31 is the radix root node of the snapshot.
+
+(c) Create a new VDI, based on that snapshot, and look at the list.
+
+        ./vdi_create "FC3 - Copy 1" 16 0
+        ./vdi_list
+
+        |      0                     My new FC3 VDI
+        |      1                       FC3 - Copy 1
+
+NOTE: If you have Graphviz installed on your system, you can use
+vdi_tree to generate a postscript of your current set of VDIs and
+snapshots.
+
+
+Create as many VDIs as you need for the VMs that you want to run.
+
+3. Boot some VMs:
+-----------------
+
+Parallax currently uses a hack in xend to pass the VDI id, you need to
+modify the disk line of the VM config that is going to mount it.
+
+(a) set up your vm config, by using the following disk line:
+
+        disk = ['parallax:1,sda1,w,0' ]
+
+This example uses VDI 1 (from vdi_list above), presents it as sda1
+(writable), and uses dom 0 as the backend.  If you were running the
+daemon (and tap driver) in some domain other than 0, you would change
+this last parameter.
+
+NOTE: You'll need to have reinstalled xend/tools prior to booting the vm, so that it knows what to do with "parallax:".
+
+(b) Run parallax in the backend domain.
+
+        ./parallax
+
+(c) create your new domain.
+
+        xm create ...
+
+---
+
+That's pretty much all there is to it at the moment.  Hope this is
+clear enough to get you going.  Now, a few serious caveats that will
+be sorted out in the almost immediate future:
+
+WARNINGS:
+---------
+
+1. There is NO locking in the VDI tools at the moment, so I'd avoid
+running them in parallel, or more importantly, running them while the
+daemon is running.
+
+2. I doubt that xend will be very happy about restarting if you have
+parallax-using domains.  So if it dies while there are active parallax
+doms, you may need to reboot.
+
+3. I've turned off write-in-place.  So at the moment, EVERY block
+write is a log append on the blockstore.  I've been having some probs
+with the radix tree's marking of writable blocks after snapshots and
+will sort this out very soon.
+
+
