@@ -151,10 +151,10 @@
 
 static int alloc_l2_table(struct pfn_info *page);
 static int alloc_l1_table(struct pfn_info *page);
-static int get_page_from_pagenr(unsigned long page_nr, struct domain *p);
+static int get_page_from_pagenr(unsigned long page_nr, struct domain *d);
 static int get_page_and_type_from_pagenr(unsigned long page_nr, 
                                          u32 type,
-                                         struct domain *p);
+                                         struct domain *d);
 
 static void free_l2_table(struct pfn_info *page);
 static void free_l1_table(struct pfn_info *page);
@@ -241,35 +241,35 @@ void add_to_domain_alloc_list(unsigned long ps, unsigned long pe)
     spin_unlock_irqrestore(&free_list_lock, flags);
 }
 
-static void __invalidate_shadow_ldt(struct domain *p)
+static void __invalidate_shadow_ldt(struct domain *d)
 {
     int i;
     unsigned long pfn;
     struct pfn_info *page;
     
-    p->mm.shadow_ldt_mapcnt = 0;
+    d->mm.shadow_ldt_mapcnt = 0;
 
     for ( i = 16; i < 32; i++ )
     {
-        pfn = l1_pgentry_to_pagenr(p->mm.perdomain_pt[i]);
+        pfn = l1_pgentry_to_pagenr(d->mm.perdomain_pt[i]);
         if ( pfn == 0 ) continue;
-        p->mm.perdomain_pt[i] = mk_l1_pgentry(0);
-        page = frame_table + pfn;
+        d->mm.perdomain_pt[i] = mk_l1_pgentry(0);
+        page = &frame_table[pfn];
         ASSERT_PAGE_IS_TYPE(page, PGT_ldt_page);
-        ASSERT_PAGE_IS_DOMAIN(page, p);
+        ASSERT_PAGE_IS_DOMAIN(page, d);
         put_page_and_type(page);
     }
 
     /* Dispose of the (now possibly invalid) mappings from the TLB.  */
-    percpu_info[p->processor].deferred_ops |= DOP_FLUSH_TLB | DOP_RELOAD_LDT;
+    percpu_info[d->processor].deferred_ops |= DOP_FLUSH_TLB | DOP_RELOAD_LDT;
 }
 
 
 static inline void invalidate_shadow_ldt(void)
 {
-    struct domain *p = current;
-    if ( p->mm.shadow_ldt_mapcnt != 0 )
-        __invalidate_shadow_ldt(p);
+    struct domain *d = current;
+    if ( d->mm.shadow_ldt_mapcnt != 0 )
+        __invalidate_shadow_ldt(d);
 }
 
 
@@ -294,28 +294,28 @@ int alloc_segdesc_page(struct pfn_info *page)
 /* Map shadow page at offset @off. */
 int map_ldt_shadow_page(unsigned int off)
 {
-    struct domain *p = current;
+    struct domain *d = current;
     unsigned long l1e;
 
     if ( unlikely(in_irq()) )
         BUG();
 
-    __get_user(l1e, (unsigned long *)&linear_pg_table[(p->mm.ldt_base >> 
+    __get_user(l1e, (unsigned long *)&linear_pg_table[(d->mm.ldt_base >> 
                                                        PAGE_SHIFT) + off]);
 
     if ( unlikely(!(l1e & _PAGE_PRESENT)) ||
          unlikely(!get_page_and_type(&frame_table[l1e >> PAGE_SHIFT], 
-                                     p, PGT_ldt_page)) )
+                                     d, PGT_ldt_page)) )
         return 0;
 
-    p->mm.perdomain_pt[off + 16] = mk_l1_pgentry(l1e | _PAGE_RW);
-    p->mm.shadow_ldt_mapcnt++;
+    d->mm.perdomain_pt[off + 16] = mk_l1_pgentry(l1e | _PAGE_RW);
+    d->mm.shadow_ldt_mapcnt++;
 
     return 1;
 }
 
 
-static int get_page_from_pagenr(unsigned long page_nr, struct domain *p)
+static int get_page_from_pagenr(unsigned long page_nr, struct domain *d)
 {
     struct pfn_info *page = &frame_table[page_nr];
 
@@ -325,7 +325,7 @@ static int get_page_from_pagenr(unsigned long page_nr, struct domain *p)
         return 0;
     }
 
-    if ( unlikely(!get_page(page, p)) )
+    if ( unlikely(!get_page(page, d)) )
     {
         MEM_LOG("Could not get page ref for pfn %08lx", page_nr);
         return 0;
@@ -337,11 +337,11 @@ static int get_page_from_pagenr(unsigned long page_nr, struct domain *p)
 
 static int get_page_and_type_from_pagenr(unsigned long page_nr, 
                                          u32 type,
-                                         struct domain *p)
+                                         struct domain *d)
 {
     struct pfn_info *page = &frame_table[page_nr];
 
-    if ( unlikely(!get_page_from_pagenr(page_nr, p)) )
+    if ( unlikely(!get_page_from_pagenr(page_nr, d)) )
         return 0;
 
     if ( unlikely(!get_page_type(page, type)) )
@@ -412,7 +412,7 @@ static int get_page_from_l1e(l1_pgentry_t l1e)
 {
     unsigned long l1v = l1_pgentry_val(l1e);
     unsigned long pfn = l1_pgentry_to_pagenr(l1e);
-    extern int domain_iomem_in_pfn(struct domain *p, unsigned long pfn);
+    extern int domain_iomem_in_pfn(struct domain *d, unsigned long pfn);
 
     if ( !(l1v & _PAGE_PRESENT) )
         return 1;
@@ -720,21 +720,11 @@ int alloc_page_type(struct pfn_info *page, unsigned int type)
                                      &page->count_and_flags)) )
     {
         struct domain *p = page->u.domain;
-        mb(); /* Check zombie status before using domain ptr. */
-        /*
-         * NB. 'p' may no longer be valid by time we dereference it, so
-         * p->processor might be garbage. We clamp it, just in case.
-         */
-        if ( likely(!test_bit(_PGC_zombie, &page->count_and_flags)) )
+        if ( unlikely(NEED_FLUSH(tlbflush_time[p->processor],
+                                 page->tlbflush_timestamp)) )
         {
-            unsigned int cpu = p->processor;
-            if ( likely(cpu <= smp_num_cpus) &&
-                 unlikely(NEED_FLUSH(tlbflush_time[cpu],
-                                     page->tlbflush_timestamp)) )
-            {
-                perfc_incr(need_flush_tlb_flush);
-                flush_tlb_cpu(cpu);
-            }
+            perfc_incr(need_flush_tlb_flush);
+            flush_tlb_cpu(p->processor);
         }
     }
 
@@ -803,7 +793,8 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
     unsigned long pfn = ptr >> PAGE_SHIFT;
     unsigned long old_base_pfn;
     struct pfn_info *page = &frame_table[pfn];
-    struct domain *p = current, *q;
+    struct domain *d = current, *nd, *e;
+    u32 x, y;
     domid_t domid;
 
     switch ( cmd )
@@ -853,18 +844,18 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         break;
 
     case MMUEXT_NEW_BASEPTR:
-        okay = get_page_and_type_from_pagenr(pfn, PGT_l2_page_table, p);
+        okay = get_page_and_type_from_pagenr(pfn, PGT_l2_page_table, d);
         if ( likely(okay) )
         {
             invalidate_shadow_ldt();
 
             percpu_info[cpu].deferred_ops &= ~DOP_FLUSH_TLB;
-            old_base_pfn = pagetable_val(p->mm.pagetable) >> PAGE_SHIFT;
-            p->mm.pagetable = mk_pagetable(pfn << PAGE_SHIFT);
+            old_base_pfn = pagetable_val(d->mm.pagetable) >> PAGE_SHIFT;
+            d->mm.pagetable = mk_pagetable(pfn << PAGE_SHIFT);
 
-            shadow_mk_pagetable(&p->mm);
+            shadow_mk_pagetable(&d->mm);
 
-            write_ptbase(&p->mm);
+            write_ptbase(&d->mm);
 
             put_page_and_type(&frame_table[old_base_pfn]);    
 
@@ -900,13 +891,13 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
             okay = 0;
             MEM_LOG("Bad args to SET_LDT: ptr=%08lx, ents=%08lx", ptr, ents);
         }
-        else if ( (p->mm.ldt_ents != ents) || 
-                  (p->mm.ldt_base != ptr) )
+        else if ( (d->mm.ldt_ents != ents) || 
+                  (d->mm.ldt_base != ptr) )
         {
             invalidate_shadow_ldt();
-            p->mm.ldt_base = ptr;
-            p->mm.ldt_ents = ents;
-            load_LDT(p);
+            d->mm.ldt_base = ptr;
+            d->mm.ldt_ents = ents;
+            load_LDT(d);
             percpu_info[cpu].deferred_ops &= ~DOP_RELOAD_LDT;
             if ( ents != 0 )
                 percpu_info[cpu].deferred_ops |= DOP_RELOAD_LDT;
@@ -917,10 +908,10 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
     case MMUEXT_SET_SUBJECTDOM:
         domid = ((domid_t)((ptr&~0xFFFF)|(val>>16)));
 
-        if ( !IS_PRIV(p) )
+        if ( !IS_PRIV(d) )
         {
             MEM_LOG("Dom %u has no privilege to set subject domain",
-                    p->domain);
+                    d->domain);
             okay = 0;
         }
         else
@@ -939,31 +930,89 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         break;
 
     case MMUEXT_REASSIGN_PAGE:
-        if ( unlikely(!IS_PRIV(p)) )
+        if ( unlikely(!IS_PRIV(d)) )
         {
-            MEM_LOG("Dom %u has no privilege to reassign page ownership",
-                    p->domain);
+            MEM_LOG("Dom %u has no reassignment priv", d->domain);
             okay = 0;
+            break;
         }
-        else if ( likely((q = percpu_info[cpu].gps) != NULL) &&
-                  likely(test_bit(_PGC_allocated, &page->count_and_flags)) &&
-                  likely(page->u.domain == p) ) /* won't be smp-guest safe */
-        {
-            spin_lock(&p->page_list_lock);
-            p->tot_pages--;
-            list_del(&page->list);
-            spin_unlock(&p->page_list_lock);
-            page->u.domain = q;
-            spin_lock(&q->page_list_lock);
-            q->tot_pages++;
-            list_add_tail(&page->list, &q->page_list);
-            spin_unlock(&q->page_list_lock);
-        }
-        else
+
+        if ( unlikely((e = percpu_info[cpu].gps) == NULL) )
         {
             MEM_LOG("No GPS to reassign pfn %08lx to\n", pfn);
             okay = 0;
+            break;
         }
+
+        /*
+         * Grab both page_list locks, in order. This prevents the page from
+         * disappearing elsewhere while we modify the owner, and we'll need
+         * both locks if we're successful so that we can change lists.
+         */
+        if ( d < e )
+        {
+            spin_lock(&d->page_list_lock);
+            spin_lock(&e->page_list_lock);
+        }
+        else
+        {
+            spin_lock(&e->page_list_lock);
+            spin_lock(&d->page_list_lock);
+        }
+
+        /* A domain shouldn't have PGC_allocated pages when it is dying. */
+        if ( unlikely(test_bit(DF_DYING, &e->flags)) )
+        {
+            okay = 0;
+            goto reassign_fail;
+        }
+
+        /*
+         * The tricky bit: atomically change owner while there is just one
+         * benign reference to the page (PGC_allocated). If that reference
+         * disappears then the deallocation routine will safely spin.
+         */
+        nd = page->u.domain;
+        y  = page->count_and_flags;
+        do {
+            x = y;
+            if ( unlikely((x & (PGC_count_mask|PGC_allocated)) != 
+                          (1|PGC_allocated)) ||
+                 unlikely(nd != d) )
+            {
+                MEM_LOG("Bad page values %08lx: ed=%p(%u), sd=%p,"
+                        " caf=%08x, taf=%08x\n", page_to_pfn(page),
+                        d, d->domain, nd, x, page->type_and_flags);
+                okay = 0;
+                goto reassign_fail;
+            }
+            __asm__ __volatile__(
+                LOCK_PREFIX "cmpxchg8b %3"
+                : "=a" (nd), "=d" (y), "=b" (e),
+                "=m" (*(volatile u64 *)(&page->u.domain))
+                : "0" (d), "1" (x), "b" (e), "c" (x) );
+        } 
+        while ( unlikely(nd != d) || unlikely(y != x) );
+        
+        /*
+         * Unlink from 'd'. We transferred at least one reference to 'e', so
+         * noone else is spinning to try to delete this page from 'd'.
+         */
+        d->tot_pages--;
+        list_del(&page->list);
+        
+        /*
+         * Add the page to 'e'. Someone may already have removed the last
+         * reference and want to remove the page from 'e'. However, we have
+         * the lock so they'll spin waiting for us.
+         */
+        if ( unlikely(e->tot_pages++ == 0) )
+            get_domain(e);
+        list_add_tail(&page->list, &e->page_list);
+
+    reassign_fail:        
+        spin_unlock(&d->page_list_lock);
+        spin_unlock(&e->page_list_lock);
         break;
 
     case MMUEXT_RESET_SUBJECTDOM:
@@ -1228,14 +1277,14 @@ int do_update_va_mapping_otherdomain(unsigned long page_nr,
                                      domid_t domid)
 {
     unsigned int cpu = smp_processor_id();
-    struct domain *p;
+    struct domain *d;
     int rc;
 
     if ( unlikely(!IS_PRIV(current)) )
         return -EPERM;
 
-    percpu_info[cpu].gps = p = find_domain_by_id(domid);
-    if ( unlikely(p == NULL) )
+    percpu_info[cpu].gps = d = find_domain_by_id(domid);
+    if ( unlikely(d == NULL) )
     {
         MEM_LOG("Unknown domain '%u'", domid);
         return -ESRCH;
@@ -1243,7 +1292,7 @@ int do_update_va_mapping_otherdomain(unsigned long page_nr,
 
     rc = do_update_va_mapping(page_nr, val, flags);
 
-    put_domain(p);
+    put_domain(d);
     percpu_info[cpu].gps = NULL;
 
     return rc;
@@ -1257,8 +1306,6 @@ int do_update_va_mapping_otherdomain(unsigned long page_nr,
  * audit_page():      in addition maintains a history of audited pages
  * reaudit_pages():   re-audit previously audited pages
  * audit_all_pages(): check the ref-count for all leaf pages
- *                    also checks for zombie pages
- * 
  * reaudit_page() and audit_all_pages() are designed to be
  * keyhandler functions so that they can be easily invoked from the console.
  */
@@ -1284,8 +1331,6 @@ void __audit_page(unsigned long pfn) {
     for ( i = 0; i < max_page; i++ )
     {
         if ( (frame_table[i].count_and_flags & PGC_count_mask) == 0 )
-            continue;
-        if ( (frame_table[i].count_and_flags & PGC_zombie) != 0 )
             continue;
 
         /* check if entry is a page table (L1 page table) and in use */
@@ -1359,7 +1404,6 @@ void reaudit_pages(u_char key, void *dev_id, struct pt_regs *regs)
 /*
  * do various checks on all pages.
  * Currently:
- * - check for zombie pages
  * - check for pages with corrupt ref-count
  * Interrupts are diabled completely. use with care.
  */
@@ -1376,16 +1420,6 @@ void audit_all_pages(u_char key, void *dev_id, struct pt_regs *regs)
     /* walk the frame table */
     for ( i = 0; i < max_page; i++ )
     {
-        /* check for zombies */
-        if ( ((frame_table[i].count_and_flags & PGC_count_mask) != 0) &&
-             ((frame_table[i].count_and_flags & PGC_zombie) != 0) )
-        { 
-            printk("zombie: pfn=%08lx cf=%08x tf=%08x dom=%08lx\n", 
-                   i, frame_table[i].count_and_flags,
-                   frame_table[i].type_and_flags,
-                   (unsigned long)frame_table[i].u.domain);
-        }
-
         /* check ref count for leaf pages */
         if ( ((frame_table[i].type_and_flags & PGT_type_mask) ==
               PGT_writeable_page) )

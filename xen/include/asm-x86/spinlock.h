@@ -6,200 +6,123 @@
 #include <asm/atomic.h>
 #include <asm/rwlock.h>
 
-#if 0
-#define SPINLOCK_DEBUG	1
-#else
-#define SPINLOCK_DEBUG	0
-#endif
-
-/*
- * Your basic SMP spinlocks, allowing only a single CPU anywhere
- */
-
 typedef struct {
-	volatile unsigned int lock;
-#if SPINLOCK_DEBUG
-	unsigned magic;
-#endif
+    volatile s16 lock;
+    s8 recurse_cpu;
+    u8 recurse_cnt;
 } spinlock_t;
 
-#define SPINLOCK_MAGIC	0xdead4ead
-
-#if SPINLOCK_DEBUG
-#define SPINLOCK_MAGIC_INIT	, SPINLOCK_MAGIC
-#else
-#define SPINLOCK_MAGIC_INIT	/* */
-#endif
-
-#define SPIN_LOCK_UNLOCKED (spinlock_t) { 1 SPINLOCK_MAGIC_INIT }
+#define SPIN_LOCK_UNLOCKED (spinlock_t) { 1, -1, 0 }
 
 #define spin_lock_init(x)	do { *(x) = SPIN_LOCK_UNLOCKED; } while(0)
-
-/*
- * Simple spin lock operations.  There are two variants, one clears IRQ's
- * on the local processor, one does not.
- *
- * We make no fairness assumptions. They have a cost.
- */
-
 #define spin_is_locked(x)	(*(volatile char *)(&(x)->lock) <= 0)
-#define spin_unlock_wait(x)	do { barrier(); } while(spin_is_locked(x))
-
-#define spin_lock_string \
-	"\n1:\t" \
-	"lock ; decb %0\n\t" \
-	"js 2f\n" \
-	".section .text.lock,\"ax\"\n" \
-	"2:\t" \
-	"cmpb $0,%0\n\t" \
-	"rep;nop\n\t" \
-	"jle 2b\n\t" \
-	"jmp 1b\n" \
-	".previous"
-
-/*
- * This works. Despite all the confusion.
- * (except on PPro SMP or if we are using OOSTORE)
- * (PPro errata 66, 92)
- */
- 
-#if !defined(CONFIG_X86_OOSTORE) && !defined(CONFIG_X86_PPRO_FENCE)
-
-#define spin_unlock_string \
-	"movb $1,%0" \
-		:"=m" (lock->lock) : : "memory"
-
-
-static inline void spin_unlock(spinlock_t *lock)
-{
-#if SPINLOCK_DEBUG
-	if (lock->magic != SPINLOCK_MAGIC)
-		BUG();
-	if (!spin_is_locked(lock))
-		BUG();
-#endif
-	__asm__ __volatile__(
-		spin_unlock_string
-	);
-}
-
-#else
-
-#define spin_unlock_string \
-	"xchgb %b0, %1" \
-		:"=q" (oldval), "=m" (lock->lock) \
-		:"0" (oldval) : "memory"
-
-static inline void spin_unlock(spinlock_t *lock)
-{
-	char oldval = 1;
-#if SPINLOCK_DEBUG
-	if (lock->magic != SPINLOCK_MAGIC)
-		BUG();
-	if (!spin_is_locked(lock))
-		BUG();
-#endif
-	__asm__ __volatile__(
-		spin_unlock_string
-	);
-}
-
-#endif
-
-static inline int spin_trylock(spinlock_t *lock)
-{
-	char oldval;
-	__asm__ __volatile__(
-		"xchgb %b0,%1"
-		:"=q" (oldval), "=m" (lock->lock)
-		:"0" (0) : "memory");
-	return oldval > 0;
-}
 
 static inline void spin_lock(spinlock_t *lock)
 {
-#if SPINLOCK_DEBUG
-	__label__ here;
-here:
-	if (lock->magic != SPINLOCK_MAGIC) {
-printk("eip: %p\n", &&here);
-		BUG();
-	}
-#endif
-	__asm__ __volatile__(
-		spin_lock_string
-		:"=m" (lock->lock) : : "memory");
+    __asm__ __volatile__ (
+        "1:  lock; decb %0         \n"
+        "    js 2f                 \n"
+        ".section .text.lock,\"ax\"\n"
+        "2:  cmpb $0,%0            \n"
+        "    rep; nop              \n"
+        "    jle 2b                \n"
+        "    jmp 1b                \n"
+        ".previous"
+        : "=m" (lock->lock) : : "memory" );
 }
 
+static inline void spin_unlock(spinlock_t *lock)
+{
+#if !defined(CONFIG_X86_OOSTORE)
+    ASSERT(spin_is_locked(lock));
+    __asm__ __volatile__ (
+	"movb $1,%0" 
+        : "=m" (lock->lock) : : "memory" );
+#else
+    char oldval = 1;
+    ASSERT(spin_is_locked(lock));
+    __asm__ __volatile__ (
+	"xchgb %b0, %1"
+        : "=q" (oldval), "=m" (lock->lock) : "0" (oldval) : "memory" );
+#endif
+}
+
+static inline int spin_trylock(spinlock_t *lock)
+{
+    char oldval;
+    __asm__ __volatile__(
+        "xchgb %b0,%1"
+        :"=q" (oldval), "=m" (lock->lock)
+        :"0" (0) : "memory");
+    return oldval > 0;
+}
 
 /*
- * Read-write spinlocks, allowing multiple readers
- * but only one writer.
- *
- * NOTE! it is quite common to have readers in interrupts
- * but no interrupt writers. For those circumstances we
- * can "mix" irq-safe locks - any writer needs to get a
- * irq-safe write-lock, but readers can get non-irqsafe
- * read-locks.
+ * spin_[un]lock_recursive(): Use these forms when the lock can (safely!) be
+ * reentered recursively on the same CPU. All critical regions that may form
+ * part of a recursively-nested set must be protected by these forms. If there
+ * are any critical regions that cannot form part of such a set, they can use
+ * standard spin_[un]lock().
  */
+#define spin_lock_recursive(_lock)                 \
+    do {                                           \
+        int cpu = smp_processor_id();              \
+        if ( likely((_lock)->recurse_cpu != cpu) ) \
+        {                                          \
+            spin_lock(_lock);                      \
+            (_lock)->recurse_cpu = cpu;            \
+        }                                          \
+        (_lock)->recurse_cnt++;                    \
+    } while ( 0 )
+
+#define spin_unlock_recursive(_lock)               \
+    do {                                           \
+        if ( likely(--(_lock)->recurse_cnt == 0) ) \
+        {                                          \
+            (_lock)->recurse_cpu = -1;             \
+            spin_unlock(_lock);                    \
+        }                                          \
+    } while ( 0 )
+
+
 typedef struct {
-	volatile unsigned int lock;
-#if SPINLOCK_DEBUG
-	unsigned magic;
-#endif
+    volatile unsigned int lock;
 } rwlock_t;
 
-#define RWLOCK_MAGIC	0xdeaf1eed
-
-#if SPINLOCK_DEBUG
-#define RWLOCK_MAGIC_INIT	, RWLOCK_MAGIC
-#else
-#define RWLOCK_MAGIC_INIT	/* */
-#endif
-
-#define RW_LOCK_UNLOCKED (rwlock_t) { RW_LOCK_BIAS RWLOCK_MAGIC_INIT }
+#define RW_LOCK_UNLOCKED (rwlock_t) { RW_LOCK_BIAS }
 
 #define rwlock_init(x)	do { *(x) = RW_LOCK_UNLOCKED; } while(0)
 
 /*
  * On x86, we implement read-write locks as a 32-bit counter
  * with the high bit (sign) being the "contended" bit.
- *
- * The inline assembly is non-obvious. Think about it.
- *
- * Changed to use the same technique as rw semaphores.  See
- * semaphore.h for details.  -ben
  */
-/* the spinlock helpers are in arch/x86/kernel/semaphore.c */
-
 static inline void read_lock(rwlock_t *rw)
 {
-#if SPINLOCK_DEBUG
-	if (rw->magic != RWLOCK_MAGIC)
-		BUG();
-#endif
-	__build_read_lock(rw, "__read_lock_failed");
+    __build_read_lock(rw, "__read_lock_failed");
 }
 
 static inline void write_lock(rwlock_t *rw)
 {
-#if SPINLOCK_DEBUG
-	if (rw->magic != RWLOCK_MAGIC)
-		BUG();
-#endif
-	__build_write_lock(rw, "__write_lock_failed");
+    __build_write_lock(rw, "__write_lock_failed");
 }
 
-#define read_unlock(rw)		asm volatile("lock ; incl %0" :"=m" ((rw)->lock) : : "memory")
-#define write_unlock(rw)	asm volatile("lock ; addl $" RW_LOCK_BIAS_STR ",%0":"=m" ((rw)->lock) : : "memory")
+#define read_unlock(rw)                            \
+    __asm__ __volatile__ (                         \
+        "lock ; incl %0" :                         \
+        "=m" ((rw)->lock) : : "memory" )
+#define write_unlock(rw)                           \
+    __asm__ __volatile__ (                         \
+        "lock ; addl $" RW_LOCK_BIAS_STR ",%0" :   \
+        "=m" ((rw)->lock) : : "memory" )
 
 static inline int write_trylock(rwlock_t *lock)
 {
-	atomic_t *count = (atomic_t *)lock;
-	if (atomic_sub_and_test(RW_LOCK_BIAS, count))
-		return 1;
-	atomic_add(RW_LOCK_BIAS, count);
-	return 0;
+    atomic_t *count = (atomic_t *)lock;
+    if ( atomic_sub_and_test(RW_LOCK_BIAS, count) )
+        return 1;
+    atomic_add(RW_LOCK_BIAS, count);
+    return 0;
 }
 
 #endif /* __ASM_SPINLOCK_H */

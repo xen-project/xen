@@ -71,27 +71,28 @@ static void halt_machine(u_char key, void *dev_id, struct pt_regs *regs)
 
 void do_task_queues(u_char key, void *dev_id, struct pt_regs *regs) 
 {
-    unsigned long       flags;
-    struct domain *p; 
-    shared_info_t      *s; 
-    s_time_t            now = NOW();
+    unsigned long  flags;
+    struct domain *d; 
+    shared_info_t *s; 
+    s_time_t       now = NOW();
 
     printk("'%c' pressed -> dumping task queues (now=0x%X:%08X)\n", key,
            (u32)(now>>32), (u32)now); 
 
     read_lock_irqsave(&tasklist_lock, flags); 
 
-    for_each_domain ( p )
+    for_each_domain ( d )
     {
-        printk("Xen: DOM %u, CPU %d [has=%c]\n",
-               p->domain, p->processor, 
-               test_bit(DF_RUNNING, &p->flags) ? 'T':'F'); 
-        s = p->shared_info; 
+        printk("Xen: DOM %u, CPU %d [has=%c] refcnt=%d nr_pages=%d\n",
+               d->domain, d->processor, 
+               test_bit(DF_RUNNING, &d->flags) ? 'T':'F',
+               atomic_read(&d->refcnt), d->tot_pages);
+        s = d->shared_info; 
         printk("Guest: upcall_pend = %02x, upcall_mask = %02x\n", 
                s->vcpu_data[0].evtchn_upcall_pending, 
                s->vcpu_data[0].evtchn_upcall_mask);
         printk("Notifying guest...\n"); 
-        send_guest_virq(p, VIRQ_DEBUG);
+        send_guest_virq(d, VIRQ_DEBUG);
     }
 
     read_unlock_irqrestore(&tasklist_lock, flags); 

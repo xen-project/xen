@@ -91,7 +91,7 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
     }
 
     /* Avoid deadlock by first acquiring lock of domain with smaller id. */
-    if ( dom1 < dom2 )
+    if ( d1 < d2 )
     {
         spin_lock(&d1->event_channel_lock);
         spin_lock(&d2->event_channel_lock);
@@ -271,7 +271,7 @@ static long __evtchn_close(struct domain *d1, int port1)
                 goto out;
             }
 
-            if ( d1->domain < d2->domain )
+            if ( d1 < d2 )
             {
                 spin_lock(&d2->event_channel_lock);
             }
