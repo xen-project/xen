@@ -262,7 +262,12 @@ int set_one_rr(unsigned long rr, unsigned long val)
 	newrrv.rrval = 0;
 	newrid = ed->domain->starting_rid + rrv.rid;
 
-	if (newrid > ed->domain->ending_rid) return 0;
+	if (newrid > ed->domain->ending_rid) {
+		printk("can't set rr%d to %lx, starting_rid=%lx,"
+			"ending_rid=%lx, val=%lx\n", rreg, newrid,
+			ed->domain->starting_rid,ed->domain->ending_rid,val);
+		return 0;
+	}
 
 	memrrv.rrval = rrv.rrval;
 	if (rreg == 7) {
@@ -335,21 +340,21 @@ if (!ed->vcpu_info) { printf("Stopping in init_all_rr\n"); dummy(); }
 
 /* XEN/ia64 INTERNAL ROUTINES */
 
-unsigned long physicalize_rid(struct exec_domain *ed, unsigned long rid)
+unsigned long physicalize_rid(struct exec_domain *ed, unsigned long rrval)
 {
 	ia64_rr rrv;
 	    
-	rrv.rrval = rid;
+	rrv.rrval = rrval;
 	rrv.rid += ed->domain->starting_rid;
 	return rrv.rrval;
 }
 
 unsigned long
-virtualize_rid(struct exec_domain *ed, unsigned long rid)
+virtualize_rid(struct exec_domain *ed, unsigned long rrval)
 {
 	ia64_rr rrv;
 	    
-	rrv.rrval = rid;
+	rrv.rrval = rrval;
 	rrv.rid -= ed->domain->starting_rid;
 	return rrv.rrval;
 }
@@ -365,6 +370,7 @@ unsigned long load_region_regs(struct exec_domain *ed)
 {
 	unsigned long rr0, rr1,rr2, rr3, rr4, rr5, rr6, rr7;
 	// TODO: These probably should be validated
+	unsigned long bad = 0;
 
 	if (ed->vcpu_info->arch.metaphysical_mode) {
 		ia64_rr rrv;
@@ -383,25 +389,28 @@ unsigned long load_region_regs(struct exec_domain *ed)
 		set_rr_no_srlz(0x8000000000000000L, rr4);
 		set_rr_no_srlz(0xa000000000000000L, rr5);
 		set_rr_no_srlz(0xc000000000000000L, rr6);
+		// skip rr7 when in metaphysical mode
 	}
 	else {
-		rr0 = physicalize_rid(ed, ed->vcpu_info->arch.rrs[0]);
-		rr1 = physicalize_rid(ed, ed->vcpu_info->arch.rrs[1]);
-		rr2 = physicalize_rid(ed, ed->vcpu_info->arch.rrs[2]);
-		rr3 = physicalize_rid(ed, ed->vcpu_info->arch.rrs[3]);
-		rr4 = physicalize_rid(ed, ed->vcpu_info->arch.rrs[4]);
-		rr5 = physicalize_rid(ed, ed->vcpu_info->arch.rrs[5]);
-		rr6 = physicalize_rid(ed, ed->vcpu_info->arch.rrs[6]);
-		set_one_rr(0x0000000000000000L, rr0);
-		set_one_rr(0x2000000000000000L, rr1);
-		set_one_rr(0x4000000000000000L, rr2);
-		set_one_rr(0x6000000000000000L, rr3);
-		set_one_rr(0x8000000000000000L, rr4);
-		set_one_rr(0xa000000000000000L, rr5);
-		set_one_rr(0xc000000000000000L, rr6);
-		ia64_srlz_d();
+		rr0 =  ed->vcpu_info->arch.rrs[0];
+		rr1 =  ed->vcpu_info->arch.rrs[1];
+		rr2 =  ed->vcpu_info->arch.rrs[2];
+		rr3 =  ed->vcpu_info->arch.rrs[3];
+		rr4 =  ed->vcpu_info->arch.rrs[4];
+		rr5 =  ed->vcpu_info->arch.rrs[5];
+		rr6 =  ed->vcpu_info->arch.rrs[6];
+		rr7 =  ed->vcpu_info->arch.rrs[7];
+		if (!set_one_rr(0x0000000000000000L, rr0)) bad |= 1;
+		if (!set_one_rr(0x2000000000000000L, rr1)) bad |= 2;
+		if (!set_one_rr(0x4000000000000000L, rr2)) bad |= 4;
+		if (!set_one_rr(0x6000000000000000L, rr3)) bad |= 8;
+		if (!set_one_rr(0x8000000000000000L, rr4)) bad |= 0x10;
+		if (!set_one_rr(0xa000000000000000L, rr5)) bad |= 0x20;
+		if (!set_one_rr(0xc000000000000000L, rr6)) bad |= 0x40;
+		if (!set_one_rr(0xe000000000000000L, rr7)) bad |= 0x80;
 	}
-	rr7 = physicalize_rid(ed, ed->vcpu_info->arch.rrs[7]);
-	set_one_rr(0xe000000000000000L, rr7);
 	ia64_srlz_d();
+	if (bad) {
+		panic_domain(0,"load_region_regs: can't set! bad=%lx\n",bad);
+	}
 }

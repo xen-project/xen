@@ -148,8 +148,8 @@ void reflect_interruption(unsigned long ifa, unsigned long isr, unsigned long it
 		vector &= ~0xf;
 		if (vector != IA64_DATA_TLB_VECTOR &&
 		    vector != IA64_DATA_TLB_VECTOR) {
-panic_domain(regs,"psr.ic off, delivering fault=%lx,iip=%p,isr=%p,PSCB.iip=%p\n",
-	vector,regs->cr_iip,isr,PSCB(ed,iip));
+panic_domain(regs,"psr.ic off, delivering fault=%lx,iip=%p,ifa=%p,isr=%p,PSCB.iip=%p\n",
+	vector,regs->cr_iip,ifa,isr,PSCB(ed,iip));
 			
 		}
 //printf("Delivering NESTED DATA TLB fault\n");
@@ -284,6 +284,9 @@ if (address < 0x4000) printf("WARNING: page_fault @%p, iip=%p\n",address,iip);
 		else {
 			// should never happen.  If it does, region 0 addr may
 			// indicate a bad xen pointer
+			printk("*** xen_handle_domain_access: exception table"
+                               " lookup failed, iip=%p, addr=%p, spinning...\n",
+				iip,address);
 			panic_domain(regs,"*** xen_handle_domain_access: exception table"
                                " lookup failed, iip=%p, addr=%p, spinning...\n",
 				iip,address);
@@ -816,7 +819,7 @@ ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long i
 	unsigned long itir = vcpu_get_itir_on_fault(ed,ifa);
 
 	if (!(psr & IA64_PSR_CPL)) {
-		panic_domain(regs,"ia64_handle_reflection: reflecting with priv=0!!\n");
+		printk("ia64_handle_reflection: reflecting with priv=0!!\n");
 	}
 	// FIXME: no need to pass itir in to this routine as we need to
 	// compute the virtual itir anyway (based on domain's RR.ps)
