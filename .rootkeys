@@ -641,7 +641,6 @@
 4051db8dJYX86ZCLA-WfTW2dAyrehw xenolinux-2.4.25-sparse/arch/xen/kernel/pci-i386.h
 4051db91BenvDZEMZxQCGkQyJYoG5w xenolinux-2.4.25-sparse/arch/xen/kernel/pci-irq.c
 4051db95N9N99FjsRwi49YKUNHWI8A xenolinux-2.4.25-sparse/arch/xen/kernel/pci-pc.c
-4051db99fbdTHgCpjywPCp7vjLCe7Q xenolinux-2.4.25-sparse/arch/xen/kernel/physirq.c
 3e5a4e65IGt3WwQDNiL4h-gYWgNTWQ xenolinux-2.4.25-sparse/arch/xen/kernel/process.c
 3e5a4e66tR-qJMLj3MppcKqmvuI2XQ xenolinux-2.4.25-sparse/arch/xen/kernel/setup.c
 3e5a4e66fWSTagLGU2P8BGFGRjhDiw xenolinux-2.4.25-sparse/arch/xen/kernel/signal.c

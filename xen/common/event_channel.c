@@ -146,7 +146,7 @@ static long evtchn_bind_virq(evtchn_bind_virq_t *bind)
     int virq = bind->virq;
     int port;
 
-    if ( virq >= NR_VIRQS )
+    if ( virq >= ARRAY_SIZE(p->virq_to_evtchn) )
         return -EINVAL;
 
     spin_lock(&p->event_channel_lock);
@@ -165,6 +165,37 @@ static long evtchn_bind_virq(evtchn_bind_virq_t *bind)
     p->event_channel[port].u.virq = virq;
 
     p->virq_to_evtchn[virq] = port;
+
+ out:
+    spin_unlock(&p->event_channel_lock);
+
+    if ( port < 0 )
+        return port;
+
+    bind->port = port;
+    return 0;
+}
+
+
+static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
+{
+    struct task_struct *p = current;
+    int pirq = bind->pirq;
+    int port;
+
+    if ( pirq >= ARRAY_SIZE(p->pirq_to_evtchn) )
+        return -EINVAL;
+
+    spin_lock(&p->event_channel_lock);
+
+    if ( ((port = p->pirq_to_evtchn[pirq]) != 0) ||
+         ((port = get_free_port(p)) < 0) )
+        goto out;
+
+    p->event_channel[port].state  = ECS_PIRQ;
+    p->event_channel[port].u.pirq = pirq;
+
+    p->pirq_to_evtchn[pirq] = port;
 
  out:
     spin_unlock(&p->event_channel_lock);
@@ -396,13 +427,19 @@ long do_event_channel_op(evtchn_op_t *uop)
     {
     case EVTCHNOP_bind_interdomain:
         rc = evtchn_bind_interdomain(&op.u.bind_interdomain);
-        if ( copy_to_user(uop, &op, sizeof(op)) != 0 )
+        if ( (rc == 0) && (copy_to_user(uop, &op, sizeof(op)) != 0) )
             rc = -EFAULT; /* Cleaning up here would be a mess! */
         break;
 
     case EVTCHNOP_bind_virq:
         rc = evtchn_bind_virq(&op.u.bind_virq);
-        if ( copy_to_user(uop, &op, sizeof(op)) != 0 )
+        if ( (rc == 0) && (copy_to_user(uop, &op, sizeof(op)) != 0) )
+            rc = -EFAULT; /* Cleaning up here would be a mess! */
+        break;
+
+    case EVTCHNOP_bind_pirq:
+        rc = evtchn_bind_pirq(&op.u.bind_pirq);
+        if ( (rc == 0) && (copy_to_user(uop, &op, sizeof(op)) != 0) )
             rc = -EFAULT; /* Cleaning up here would be a mess! */
         break;
 
@@ -416,7 +453,7 @@ long do_event_channel_op(evtchn_op_t *uop)
 
     case EVTCHNOP_status:
         rc = evtchn_status(&op.u.status);
-        if ( copy_to_user(uop, &op, sizeof(op)) != 0 )
+        if ( (rc == 0) && (copy_to_user(uop, &op, sizeof(op)) != 0) )
             rc = -EFAULT;
         break;
 

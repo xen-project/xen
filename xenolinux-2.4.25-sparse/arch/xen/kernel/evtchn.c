@@ -17,20 +17,23 @@
 #include <asm/synch_bitops.h>
 #include <asm/hypervisor.h>
 #include <asm/hypervisor-ifs/event_channel.h>
-
-/* Dynamic IRQ <-> event-channel mappings. */
-static int evtchn_to_dynirq[1024];
-static int dynirq_to_evtchn[NR_IRQS];
-
-/* Dynamic IRQ <-> VIRQ mapping. */
-static int virq_to_dynirq[NR_VIRQS];
+#include <asm/hypervisor-ifs/physdev.h>
 
 /*
- * Reference counts for bindings to dynamic IRQs.
- * NB. This array is referenced with respect to DYNIRQ_BASE!
+ * This lock protects updates to the following mapping and reference-count
+ * arrays. The lock does not need to be acquired to read the mapping tables.
  */
-static int dynirq_bindcount[NR_DYNIRQS];
-static spinlock_t dynirq_lock;
+static spinlock_t irq_mapping_update_lock;
+
+/* IRQ <-> event-channel mappings. */
+static int evtchn_to_irq[NR_EVENT_CHANNELS];
+static int irq_to_evtchn[NR_IRQS];
+
+/* IRQ <-> VIRQ mapping. */
+static int virq_to_irq[NR_VIRQS];
+
+/* Reference counts for bindings to IRQs. */
+static int irq_bindcount[NR_IRQS];
 
 /* Upcall to generic IRQ layer. */
 extern asmlinkage unsigned int do_IRQ(int irq, struct pt_regs *regs);
@@ -39,7 +42,7 @@ static void evtchn_handle_normal(shared_info_t *s, struct pt_regs *regs)
 {
     unsigned long l1, l2;
     unsigned int  l1i, l2i, port;
-    int           dynirq;
+    int           irq;
 
     l1 = xchg(&s->evtchn_pending_sel, 0);
     while ( (l1i = ffs(l1)) != 0 )
@@ -54,8 +57,8 @@ static void evtchn_handle_normal(shared_info_t *s, struct pt_regs *regs)
             l2 &= ~(1 << l2i);
             
             port = (l1i << 5) + l2i;
-            if ( (dynirq = evtchn_to_dynirq[port]) != -1 )
-                do_IRQ(dynirq + DYNIRQ_BASE, regs);
+            if ( (irq = evtchn_to_irq[port]) != -1 )
+                do_IRQ(irq, regs);
             else
                 evtchn_device_upcall(port, 0);
         }
@@ -66,7 +69,7 @@ static void evtchn_handle_exceptions(shared_info_t *s, struct pt_regs *regs)
 {
     unsigned long l1, l2;
     unsigned int  l1i, l2i, port;
-    int           dynirq;
+    int           irq;
 
     l1 = xchg(&s->evtchn_exception_sel, 0);
     while ( (l1i = ffs(l1)) != 0 )
@@ -81,10 +84,9 @@ static void evtchn_handle_exceptions(shared_info_t *s, struct pt_regs *regs)
             l2 &= ~(1 << l2i);
             
             port = (l1i << 5) + l2i;
-            if ( (dynirq = evtchn_to_dynirq[port]) != -1 )
+            if ( (irq = evtchn_to_irq[port]) != -1 )
             {
-                printk(KERN_ALERT "Error on IRQ line %d!\n", 
-                       dynirq + DYNIRQ_BASE);
+                printk(KERN_ALERT "Error on IRQ line %d!\n", irq);
                 synch_clear_bit(port, &s->evtchn_exception[0]);
             }
             else
@@ -112,28 +114,28 @@ void evtchn_do_upcall(struct pt_regs *regs)
 }
 
 
-static int find_unbound_dynirq(void)
+static int find_unbound_irq(void)
 {
-    int i;
+    int irq;
 
-    for ( i = 0; i < NR_DYNIRQS; i++ )
-        if ( dynirq_bindcount[i] == 0 )
+    for ( irq = 0; irq < NR_IRQS; irq++ )
+        if ( irq_bindcount[irq] == 0 )
             break;
 
-    if ( i == NR_DYNIRQS )
+    if ( irq == NR_IRQS )
         BUG();
 
-    return i;
+    return irq;
 }
 
 int bind_virq_to_irq(int virq)
 {
     evtchn_op_t op;
-    int evtchn, dynirq;
+    int evtchn, irq;
 
-    spin_lock(&dynirq_lock);
+    spin_lock(&irq_mapping_update_lock);
 
-    if ( (dynirq = virq_to_dynirq[virq]) == -1 )
+    if ( (irq = virq_to_irq[virq]) == -1 )
     {
         op.cmd              = EVTCHNOP_bind_virq;
         op.u.bind_virq.virq = virq;
@@ -141,29 +143,29 @@ int bind_virq_to_irq(int virq)
             BUG();
         evtchn = op.u.bind_virq.port;
 
-        dynirq = find_unbound_dynirq();
-        evtchn_to_dynirq[evtchn] = dynirq;
-        dynirq_to_evtchn[dynirq] = evtchn;
+        irq = find_unbound_irq();
+        evtchn_to_irq[evtchn] = irq;
+        irq_to_evtchn[irq]    = evtchn;
 
-        virq_to_dynirq[virq] = dynirq;
+        virq_to_irq[virq] = irq;
     }
 
-    dynirq_bindcount[dynirq]++;
+    irq_bindcount[irq]++;
 
-    spin_unlock(&dynirq_lock);
+    spin_unlock(&irq_mapping_update_lock);
     
-    return dynirq + DYNIRQ_BASE;
+    return irq;
 }
 
 void unbind_virq_from_irq(int virq)
 {
     evtchn_op_t op;
-    int dynirq = virq_to_dynirq[virq];
-    int evtchn = dynirq_to_evtchn[dynirq];
+    int irq    = virq_to_irq[virq];
+    int evtchn = irq_to_evtchn[irq];
 
-    spin_lock(&dynirq_lock);
+    spin_lock(&irq_mapping_update_lock);
 
-    if ( --dynirq_bindcount[dynirq] == 0 )
+    if ( --irq_bindcount[irq] == 0 )
     {
         op.cmd          = EVTCHNOP_close;
         op.u.close.dom  = DOMID_SELF;
@@ -171,47 +173,47 @@ void unbind_virq_from_irq(int virq)
         if ( HYPERVISOR_event_channel_op(&op) != 0 )
             BUG();
 
-        evtchn_to_dynirq[evtchn] = -1;
-        dynirq_to_evtchn[dynirq] = -1;
-        virq_to_dynirq[virq]     = -1;
+        evtchn_to_irq[evtchn] = -1;
+        irq_to_evtchn[irq]    = -1;
+        virq_to_irq[virq]     = -1;
     }
 
-    spin_unlock(&dynirq_lock);
+    spin_unlock(&irq_mapping_update_lock);
 }
 
 int bind_evtchn_to_irq(int evtchn)
 {
-    int dynirq;
+    int irq;
 
-    spin_lock(&dynirq_lock);
+    spin_lock(&irq_mapping_update_lock);
 
-    if ( (dynirq = evtchn_to_dynirq[evtchn]) == -1 )
+    if ( (irq = evtchn_to_irq[evtchn]) == -1 )
     {
-        dynirq = find_unbound_dynirq();
-        evtchn_to_dynirq[evtchn] = dynirq;
-        dynirq_to_evtchn[dynirq] = evtchn;
+        irq = find_unbound_irq();
+        evtchn_to_irq[evtchn] = irq;
+        irq_to_evtchn[irq]    = evtchn;
     }
 
-    dynirq_bindcount[dynirq]++;
+    irq_bindcount[irq]++;
 
-    spin_unlock(&dynirq_lock);
+    spin_unlock(&irq_mapping_update_lock);
     
-    return dynirq + DYNIRQ_BASE;
+    return irq;
 }
 
 void unbind_evtchn_from_irq(int evtchn)
 {
-    int dynirq = evtchn_to_dynirq[evtchn];
+    int irq = evtchn_to_irq[evtchn];
 
-    spin_lock(&dynirq_lock);
+    spin_lock(&irq_mapping_update_lock);
 
-    if ( --dynirq_bindcount[dynirq] == 0 )
+    if ( --irq_bindcount[irq] == 0 )
     {
-        evtchn_to_dynirq[evtchn] = -1;
-        dynirq_to_evtchn[dynirq] = -1;
+        evtchn_to_irq[evtchn] = -1;
+        irq_to_evtchn[irq]    = -1;
     }
 
-    spin_unlock(&dynirq_lock);
+    spin_unlock(&irq_mapping_update_lock);
 }
 
 
@@ -221,41 +223,35 @@ void unbind_evtchn_from_irq(int evtchn)
 
 static unsigned int startup_dynirq(unsigned int irq)
 {
-    int dynirq = irq - DYNIRQ_BASE;
-    unmask_evtchn(dynirq_to_evtchn[dynirq]);
+    unmask_evtchn(irq_to_evtchn[irq]);
     return 0;
 }
 
 static void shutdown_dynirq(unsigned int irq)
 {
-    int dynirq = irq - DYNIRQ_BASE;
-    mask_evtchn(dynirq_to_evtchn[dynirq]);
+    mask_evtchn(irq_to_evtchn[irq]);
 }
 
 static void enable_dynirq(unsigned int irq)
 {
-    int dynirq = irq - DYNIRQ_BASE;
-    unmask_evtchn(dynirq_to_evtchn[dynirq]);
+    unmask_evtchn(irq_to_evtchn[irq]);
 }
 
 static void disable_dynirq(unsigned int irq)
 {
-    int dynirq = irq - DYNIRQ_BASE;
-    mask_evtchn(dynirq_to_evtchn[dynirq]);
+    mask_evtchn(irq_to_evtchn[irq]);
 }
 
 static void ack_dynirq(unsigned int irq)
 {
-    int dynirq = irq - DYNIRQ_BASE;
-    mask_evtchn(dynirq_to_evtchn[dynirq]);
-    clear_evtchn(dynirq_to_evtchn[dynirq]);
+    mask_evtchn(irq_to_evtchn[irq]);
+    clear_evtchn(irq_to_evtchn[irq]);
 }
 
 static void end_dynirq(unsigned int irq)
 {
-    int dynirq = irq - DYNIRQ_BASE;
     if ( !(irq_desc[irq].status & IRQ_DISABLED) )
-        unmask_evtchn(dynirq_to_evtchn[dynirq]);
+        unmask_evtchn(irq_to_evtchn[irq]);
 }
 
 static struct hw_interrupt_type dynirq_type = {
@@ -266,6 +262,87 @@ static struct hw_interrupt_type dynirq_type = {
     disable_dynirq,
     ack_dynirq,
     end_dynirq,
+    NULL
+};
+
+static inline void pirq_unmask_notify(int pirq)
+{
+    physdev_op_t op;
+    op.cmd = PHYSDEVOP_UNMASK_IRQ;
+    (void)HYPERVISOR_physdev_op(&op);
+}
+
+static unsigned int startup_pirq(unsigned int irq)
+{
+    evtchn_op_t op;
+    int evtchn;
+
+    op.cmd              = EVTCHNOP_bind_pirq;
+    op.u.bind_pirq.pirq = irq;
+    if ( HYPERVISOR_event_channel_op(&op) != 0 )
+        BUG();
+    evtchn = op.u.bind_virq.port;
+
+    evtchn_to_irq[evtchn] = irq;
+    irq_to_evtchn[irq]    = evtchn;
+
+    unmask_evtchn(evtchn);
+    pirq_unmask_notify(irq_to_pirq(irq));
+
+    return 0;
+}
+
+static void shutdown_pirq(unsigned int irq)
+{
+    evtchn_op_t op;
+    int evtchn = irq_to_evtchn[irq];
+
+    mask_evtchn(evtchn);
+
+    op.cmd          = EVTCHNOP_close;
+    op.u.close.dom  = DOMID_SELF;
+    op.u.close.port = evtchn;
+    if ( HYPERVISOR_event_channel_op(&op) != 0 )
+        BUG();
+
+    evtchn_to_irq[evtchn] = -1;
+    irq_to_evtchn[irq]    = -1;
+}
+
+static void enable_pirq(unsigned int irq)
+{
+    unmask_evtchn(irq_to_evtchn[irq]);
+    pirq_unmask_notify(irq_to_pirq(irq));
+}
+
+static void disable_pirq(unsigned int irq)
+{
+    mask_evtchn(irq_to_evtchn[irq]);
+}
+
+static void ack_pirq(unsigned int irq)
+{
+    mask_evtchn(irq_to_evtchn[irq]);
+    clear_evtchn(irq_to_evtchn[irq]);
+}
+
+static void end_pirq(unsigned int irq)
+{
+    if ( !(irq_desc[irq].status & IRQ_DISABLED) )
+    {
+        unmask_evtchn(irq_to_evtchn[irq]);
+        pirq_unmask_notify(irq_to_pirq(irq));
+    }
+}
+
+static struct hw_interrupt_type pirq_type = {
+    "Phys-irq",
+    startup_pirq,
+    shutdown_pirq,
+    enable_pirq,
+    disable_pirq,
+    ack_pirq,
+    end_pirq,
     NULL
 };
 
@@ -287,32 +364,41 @@ void __init init_IRQ(void)
 {
     int i;
 
-    for ( i = 0; i < NR_VIRQS; i++ )
-        virq_to_dynirq[i] = -1;
+    spin_lock_init(&irq_mapping_update_lock);
 
-    for ( i = 0; i < 1024; i++ )
-        evtchn_to_dynirq[i] = -1;
+    /* No VIRQ -> IRQ mappings. */
+    for ( i = 0; i < NR_VIRQS; i++ )
+        virq_to_irq[i] = -1;
+
+    /* No event-channel -> IRQ mappings. */
+    for ( i = 0; i < NR_EVENT_CHANNELS; i++ )
+        evtchn_to_irq[i] = -1;
+
+    /* No IRQ -> event-channel mappings. */
+    for ( i = 0; i < NR_IRQS; i++ )
+        irq_to_evtchn[i] = -1;
 
     for ( i = 0; i < NR_DYNIRQS; i++ )
     {
-        dynirq_to_evtchn[i] = -1;
-        dynirq_bindcount[i] = 0;
+        /* Dynamic IRQ space is currently unbound. Zero the refcnts. */
+        irq_bindcount[dynirq_to_irq(i)] = 0;
+
+        irq_desc[dynirq_to_irq(i)].status  = IRQ_DISABLED;
+        irq_desc[dynirq_to_irq(i)].action  = 0;
+        irq_desc[dynirq_to_irq(i)].depth   = 1;
+        irq_desc[dynirq_to_irq(i)].handler = &dynirq_type;
     }
 
-    spin_lock_init(&dynirq_lock);
-
-    for ( i = 0; i < NR_DYNIRQS; i++ )
+    for ( i = 0; i < NR_PIRQS; i++ )
     {
-        irq_desc[i + DYNIRQ_BASE].status  = IRQ_DISABLED;
-        irq_desc[i + DYNIRQ_BASE].action  = 0;
-        irq_desc[i + DYNIRQ_BASE].depth   = 1;
-        irq_desc[i + DYNIRQ_BASE].handler = &dynirq_type;
+        /* Phys IRQ space is statically bound (1:1 mapping). Nail refcnts. */
+        irq_bindcount[pirq_to_irq(i)] = 1;
+
+        irq_desc[pirq_to_irq(i)].status  = IRQ_DISABLED;
+        irq_desc[pirq_to_irq(i)].action  = 0;
+        irq_desc[pirq_to_irq(i)].depth   = 1;
+        irq_desc[pirq_to_irq(i)].handler = &pirq_type;
     }
 
     (void)setup_irq(bind_virq_to_irq(VIRQ_ERROR), &error_action);
-    
-#ifdef CONFIG_PCI
-    /* Also initialise the physical IRQ handlers. */
-    physirq_init();
-#endif
 }
