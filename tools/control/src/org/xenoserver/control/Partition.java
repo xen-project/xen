@@ -161,11 +161,10 @@ Partition
   {
     Extent e = new Extent();
     // Build 16-bit disk number.. high 8 bits are the major
-    int disknum = major << 8;
+    e.disk = major << 8;
     // Low 8 bits are the minor, but bottom 5 need to be cleared
     // as they are the partition number, not the disk number
-    disknum |= ( minor & 0xE0 );
-    e.disk = (short) disknum;
+    e.disk |= ( minor & 0xE0 );
     e.offset = start_sect;
     e.size = nr_sects;
     return e;
@@ -179,7 +178,7 @@ Partition
   {
     if ( e.getMajor() != major )
       return false;
-    if ( e.getMinor() != (minor & 0xE0) )
+    if ( e.getMinor() != minor )
       return false;
     if ( e.offset != start_sect )
       return false;

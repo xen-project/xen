@@ -8,11 +8,11 @@ package org.xenoserver.control;
 public class
 Extent
 {
-  short disk;
+  int disk;
   long offset;                                           /* offset into disk */
   long size;                      /* size of this extent in 512 byte sectors */
 
-  public short
+  public int
   getDisk()
   {
     return disk;

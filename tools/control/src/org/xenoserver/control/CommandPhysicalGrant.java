@@ -5,6 +5,7 @@ public class CommandPhysicalGrant extends Command {
   private int domain_id;
   private Extent extent;
   private Mode mode;
+  private int partition_no;
 
   /**
    * Constructor for CommandPhysicalGrant.
@@ -12,16 +13,19 @@ public class CommandPhysicalGrant extends Command {
    * @param domain_id Domain to grant access for.
    * @param extent Extent to grant access to.
    * @param mode Access mode to grant.
+   * @param partition_no Partition number to use (or zero for none).
    */
   public CommandPhysicalGrant(
     Defaults d,
     int domain_id,
     Extent extent,
-    Mode mode) {
+    Mode mode,
+    int partition_no) {
     this.d = d;
     this.domain_id = domain_id;
     this.extent = extent;
     this.mode = mode;
+    this.partition_no = partition_no;
   }
 
   public String execute() throws CommandFailedException {
@@ -30,7 +34,7 @@ public class CommandPhysicalGrant extends Command {
 
     try {
       Process start_p;
-      String start_cmdarray[] = new String[6];
+      String start_cmdarray[] = new String[7];
       int start_rc;
       start_cmdarray[0] = d.XIToolsDir + "xi_phys_grant";
       if ( mode == Mode.READ_WRITE )
@@ -40,9 +44,10 @@ public class CommandPhysicalGrant extends Command {
       else
         throw new CommandFailedException( "Unknown access mode '" + mode + "'" );
       start_cmdarray[2] = Integer.toString( domain_id );
-      start_cmdarray[3] = Short.toString( extent.getDisk() );
+      start_cmdarray[3] = Integer.toString( extent.getDisk() );
       start_cmdarray[4] = Long.toString( extent.getOffset() );
       start_cmdarray[5] = Long.toString( extent.getSize() );
+      start_cmdarray[6] = Integer.toString( partition_no );
 
       if (Settings.TEST) {
         output = reportCommand(start_cmdarray);

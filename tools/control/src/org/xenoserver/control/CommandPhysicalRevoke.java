@@ -30,7 +30,7 @@ public class CommandPhysicalRevoke extends Command {
       int start_rc;
       start_cmdarray[0] = d.XIToolsDir + "xi_phys_revoke";
       start_cmdarray[1] = Integer.toString( domain_id );
-      start_cmdarray[2] = Short.toString( extent.getDisk() );
+      start_cmdarray[2] = Integer.toString( extent.getDisk() );
       start_cmdarray[3] = Long.toString( extent.getOffset() );
       start_cmdarray[4] = Long.toString( extent.getSize() );
 

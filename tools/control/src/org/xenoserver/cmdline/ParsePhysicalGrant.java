@@ -43,8 +43,9 @@ public class ParsePhysicalGrant extends CommandParser {
      
     // Convert the partition into a physical extent
     Extent e = p.toExtent();
+    int partition_no = p.getMinor() & 0x1F;
     
-    String output = new CommandPhysicalGrant( d, domain_id, e, mode ).execute();
+    String output = new CommandPhysicalGrant( d, domain_id, e, mode, partition_no ).execute();
     if ( output != null )
       System.out.println( output );
   }
