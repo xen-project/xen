@@ -21,9 +21,6 @@ public class ParseVbdCreate extends CommandParser {
         if (vd_key.equals("") && partition_name.equals("")) {
             throw new ParseFailedException("Expected -k<key> or -p<partition>");
         }
-        if (domain_id == 0) {
-            throw new ParseFailedException("Expected -n<domain_id>");
-        }
         if (vbd_num == -1) {
             throw new ParseFailedException("Expected -v<vbd_num>");
         }
