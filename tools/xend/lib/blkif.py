@@ -64,7 +64,7 @@ def backend_rx_rsp(port, msg):
                                  { 'domid' : dom, 'blkif_handle' : 0,
                                    'vdevice' : vdev,
                                    'extent.sector_start' : start_sect,
-                                   'extent.sector.length' : nr_sect,
+                                   'extent.sector_length' : nr_sect,
                                    'extent.device' : pdev })
         backend_tx_req(msg)
     elif subtype == CMSG_BLKIF_BE_VBD_GROW:
