@@ -108,6 +108,7 @@
 extern int acpi_lapic;
 extern int acpi_ioapic;
 extern int acpi_noirq;
+extern int acpi_disabled;
 
 /* Fixmap pages to reserve for ACPI boot-time tables (see fixmap.h) */
 #define FIX_ACPI_PAGES 4
