@@ -92,7 +92,7 @@ int parseelfimage(char *elfbase,
     if ( guestinfo == NULL )
     {
         printk("Not a Xen-ELF image: '__xen_guest' section not found.\n");
-#ifndef FORCE_XENELF_IMAGE
+#if FORCE_XENELF_IMAGE
         return -EINVAL;
 #endif
     }
