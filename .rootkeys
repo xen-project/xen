@@ -213,6 +213,7 @@
 40f5623akIoBsQ3KxSB2kufkbgONXQ linux-2.6.9-xen-sparse/include/asm-xen/asm-i386/fixmap.h
 4118b6a418gnL6AZsTdglC92YGqYTg linux-2.6.9-xen-sparse/include/asm-xen/asm-i386/highmem.h
 40f5623aJVXQwpJMOLE99XgvGsfQ8Q linux-2.6.9-xen-sparse/include/asm-xen/asm-i386/io.h
+417d36c6TD52EqC__mHeIj9CHnuEjA linux-2.6.9-xen-sparse/include/asm-xen/asm-i386/mach-xen/bios_ebda.h
 40f5623am9BzluYFuV6EQfTd-so3dA linux-2.6.9-xen-sparse/include/asm-xen/asm-i386/mach-xen/do_timer.h
 40f5623adZQ1IZGPxbDXONjyZGYuTA linux-2.6.9-xen-sparse/include/asm-xen/asm-i386/mach-xen/io_ports.h
 40f5623aKXkBBxgpLx2NcvkncQ1Yyw linux-2.6.9-xen-sparse/include/asm-xen/asm-i386/mach-xen/irq_vectors.h
