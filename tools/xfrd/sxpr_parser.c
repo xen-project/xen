@@ -242,6 +242,8 @@ int Parser_pop(Parser *p){
     int err = 0;
     ParserState *s = p->state;
     p->state = s->parent;
+    if (p->start_state == s)
+        p->start_state = NULL;
     ParserState_free(s);
     return err;
 }
@@ -374,7 +376,7 @@ Sxpr Parser_get_all(Parser *p){
     if(CONSP(p->val)){
         v = p->val;
         p->val = ONONE;
-    } else if(CONSP(p->start_state->val)){
+    } else if(p->start_state && CONSP(p->start_state->val)){
         v = p->start_state->val;
         p->start_state->val = ONULL;
         v = nrev(v);
@@ -808,26 +810,13 @@ int at_eof(Parser *p){
     return p->eof;
 }
 
-//#define SXPR_PARSER_MAIN
 #ifdef SXPR_PARSER_MAIN
 /* Stuff for standalone testing. */
 
 #include "file_stream.h"
 #include "string_stream.h"
 
-int stringof(Sxpr exp, char **s){
-    int err = 0;
-    if(ATOMP(exp)){
-        *s = atom_name(exp);
-    } else if(STRINGP(exp)){
-        *s = string_string(exp);
-    } else {
-        err = -EINVAL;
-        *s = NULL;
-    }
-    return err;
-}
-
+extern int stringof(Sxpr exp, char **s);
 int child_string(Sxpr exp, Sxpr key, char **s){
     int err = 0;
     Sxpr val = sxpr_child_value(exp, key, ONONE);
@@ -835,22 +824,7 @@ int child_string(Sxpr exp, Sxpr key, char **s){
     return err;
 }
 
-int intof(Sxpr exp, int *v){
-    int err = 0;
-    char *s;
-    unsigned long l;
-    if(INTP(exp)){
-        *v = OBJ_INT(exp);
-    } else {
-        err = stringof(exp, &s);
-        if(err) goto exit;
-        err = convert_atoul(s, &l);
-        *v = (int)l;
-    }
- exit:
-    return err;
-}
-
+extern int intof(Sxpr exp, int *v);
 int child_int(Sxpr exp, Sxpr key, int *v){
     int err = 0;
     Sxpr val = sxpr_child_value(exp, key, ONONE);

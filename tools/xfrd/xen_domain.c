@@ -83,7 +83,7 @@ int xen_domain_snd(Conn *xend, IOStream *io,
     }
     
     dom = 99;
-    err = domain_suspend(dom, xend);
+    err = domain_suspend(xend, dom);
     IOStream_close(io);
   exit:
 #else 
