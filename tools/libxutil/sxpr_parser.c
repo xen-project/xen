@@ -1,3 +1,19 @@
+/*
+ * Copyright (C) 2001 - 2004 Mike Wray <mike.wray@hp.com>
+ *
+ * This library is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation; either version 2.1 of the
+ * License, or  (at your option) any later version. This library is 
+ * distributed in the  hope that it will be useful, but WITHOUT ANY
+ * WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this library; if not, write to the Free Software Foundation,
+ * Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+ */
 
 #ifdef __KERNEL__
 #  include <linux/config.h>
@@ -242,6 +258,8 @@ int Parser_pop(Parser *p){
     int err = 0;
     ParserState *s = p->state;
     p->state = s->parent;
+    if (p->start_state == s)
+        p->start_state = NULL;
     ParserState_free(s);
     return err;
 }
@@ -374,7 +392,7 @@ Sxpr Parser_get_all(Parser *p){
     if(CONSP(p->val)){
         v = p->val;
         p->val = ONONE;
-    } else if(CONSP(p->start_state->val)){
+    } else if(p->start_state && CONSP(p->start_state->val)){
         v = p->start_state->val;
         p->start_state->val = ONULL;
         v = nrev(v);
@@ -808,26 +826,13 @@ int at_eof(Parser *p){
     return p->eof;
 }
 
-//#define SXPR_PARSER_MAIN
 #ifdef SXPR_PARSER_MAIN
 /* Stuff for standalone testing. */
 
 #include "file_stream.h"
 #include "string_stream.h"
 
-int stringof(Sxpr exp, char **s){
-    int err = 0;
-    if(ATOMP(exp)){
-        *s = atom_name(exp);
-    } else if(STRINGP(exp)){
-        *s = string_string(exp);
-    } else {
-        err = -EINVAL;
-        *s = NULL;
-    }
-    return err;
-}
-
+extern int stringof(Sxpr exp, char **s);
 int child_string(Sxpr exp, Sxpr key, char **s){
     int err = 0;
     Sxpr val = sxpr_child_value(exp, key, ONONE);
@@ -835,22 +840,7 @@ int child_string(Sxpr exp, Sxpr key, char **s){
     return err;
 }
 
-int intof(Sxpr exp, int *v){
-    int err = 0;
-    char *s;
-    unsigned long l;
-    if(INTP(exp)){
-        *v = OBJ_INT(exp);
-    } else {
-        err = stringof(exp, &s);
-        if(err) goto exit;
-        err = convert_atoul(s, &l);
-        *v = (int)l;
-    }
- exit:
-    return err;
-}
-
+extern int intof(Sxpr exp, int *v);
 int child_int(Sxpr exp, Sxpr key, int *v){
     int err = 0;
     Sxpr val = sxpr_child_value(exp, key, ONONE);

@@ -1,0 +1,50 @@
+Vnet Module Command Interface
+Mike Wray <mike.wray@hp.com>
+2004/09/17
+
+When insmod the vnet-module creates /proc/vnet/policy which
+can be used to control the module by writing commands into it.
+The return code from the command should be returned by close.
+
+The commands are:
+
+(vnet.add (id <id>) [(security { none | auth | conf } )] )
+
+Create the vnet with id <id> and the given security level (default none).
+Security levels:
+- none: no security
+- auth: message authentication (IPSEC hmac)
+- conf: message confidentiality (IPSEC hmac and encryption)
+
+(vnet.del (id <id>))
+
+Delete the vnet with id <id>.
+
+(vif.add (vnet <vnetid>) (vmac <macaddr>))
+
+Add the vif with MAC address <macaddr> to the vnet with id <vnetid>.
+This makes the vnet module respond to VARP requests for <macaddr>
+on vnet <vnetid>.
+
+(vif.del (vnet <vnetid>) (vmac <macaddr>))
+
+Remove the vif with MAC address <macaddr> from the vnet with id <vnetid>.
+The vnet module will stop responding to VARP for the vif.
+
+Examples:
+
+To create vnet 10 with no security:
+
+echo '(vnet.add (id 10))' > /proc/vnet/policy
+
+To create vnet 11 with message authentication:
+
+echo '(vnet.add (id 11) (security auth))' > /proc/vnet/policy
+
+To add the vif with vmac "aa:00:00:bc:34:ae" to vnet 10:
+
+echo '(vif.add (vnet 10) (vmac aa:00:00:bc:34:ae))' > /proc/vnet/policy
+
+To remove the vif from the vnet:
+
+echo '(vif.del (vnet 10) (vmac aa:00:00:bc:34:ae))' > /proc/vnet/policy

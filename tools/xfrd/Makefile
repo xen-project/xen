@@ -26,11 +26,15 @@ XFRD_PROG_OBJ += $(UTIL_LIB)
 # Define to use stubs, undefine to use the real Xen functions.
 #CPPFLAGS += -D _XEN_XFR_STUB_
 
+ifeq ($(SXPR_DEBUG),1)
+CPPFLAGS += -D _XEN_XFR_STUB_ -D SXPR_PARSER_MAIN
+endif
+
 CC := gcc
 
 CFLAGS += -g
 CFLAGS += -Wall
-CFALGS += -Werror
+CFLAGS += -Werror
 CFLAGS += $(INCLUDES)
 # Make gcc generate dependencies.
 CFLAGS += -Wp,-MD,.$(@F).d
