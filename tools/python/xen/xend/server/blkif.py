@@ -26,7 +26,7 @@ def check_mounted(self, name):
     mode = None
     name = expand_dev_name(name)
     lines = os.popen('mount 2>/dev/null').readlines()
-    exp = re.compile('^' + name + '.*[\(,]r(?P<mode>[ow])[,\)]')
+    exp = re.compile('^' + name + ' .*[\(,]r(?P<mode>[ow])[,\)]')
     for line in lines:
         pm = exp.match(line)
         if not pm: continue
