@@ -597,7 +597,7 @@ void __init paging_init(void)
 	HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
 	memset(empty_zero_page, 0, sizeof(empty_zero_page));
 
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+#ifdef CONFIG_XEN_PHYSDEV_ACCESS
 	/* Setup mapping of lower 1st MB */
 	for (i = 0; i < NR_FIX_ISAMAPS; i++)
 		if (xen_start_info.flags & SIF_PRIVILEGED)

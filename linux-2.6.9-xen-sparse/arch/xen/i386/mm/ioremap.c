@@ -259,10 +259,12 @@ void __iomem *ioremap_nocache (unsigned long phys_addr, unsigned long size)
 void iounmap(volatile void __iomem *addr)
 {
 	struct vm_struct *p;
-        if ((unsigned long)addr <= 0x100000)
-                return;
 	if ((void __force *) addr <= high_memory) 
 		return; 
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+	if ((unsigned long) addr >= fix_to_virt(FIX_ISAMAP_BEGIN))
+		return;
+#endif
 	p = remove_vm_area((void *) (PAGE_MASK & (unsigned long __force) addr));
 	if (!p) { 
 		printk("__iounmap: bad address %p\n", addr);
@@ -332,10 +334,12 @@ void __init bt_iounmap(void *addr, unsigned long size)
 	enum fixed_addresses idx;
 
 	virt_addr = (unsigned long)addr;
-        if (virt_addr < 0x100000)
-                return;
 	if (virt_addr < fix_to_virt(FIX_BTMAP_BEGIN))
 		return;
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+	if (virt_addr >= fix_to_virt(FIX_ISAMAP_BEGIN))
+		return;
+#endif
 	offset = virt_addr & ~PAGE_MASK;
 	nrpages = PAGE_ALIGN(offset + size - 1) >> PAGE_SHIFT;
 
