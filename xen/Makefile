@@ -9,8 +9,6 @@ export BASEDIR          := $(shell pwd)
 
 include Rules.mk
 
-GENERATED_FILES := include/xen/compile.h
-
 default: $(TARGET)
 	gzip -f -9 < $(TARGET) > $(TARGET).gz
 
@@ -30,27 +28,23 @@ install: $(TARGET)
 dist: $(TARGET)
 	$(MAKE) prefix=`pwd`/../install dist=yes install
 
-clean: delete-links
+clean:
 	$(MAKE) -C figlet clean
 	$(MAKE) -C common clean
 	$(MAKE) -C drivers clean
 	$(MAKE) -C arch/$(TARGET_ARCH) clean
-	rm -f *.o $(TARGET)* *~ core $(GENERATED_FILES)
+	rm -f include/asm *.o $(TARGET)* *~ core include/xen/compile.h
 
-$(TARGET): delete-unfresh-files make-links $(GENERATED_FILES)
+$(TARGET): delete-unfresh-files
+	[ -e include/asm ] || ln -sf asm-$(TARGET_ARCH) include/asm
+	$(MAKE) include/xen/compile.h
 	$(MAKE) -C common
 	$(MAKE) -C drivers
 	$(MAKE) -C arch/$(TARGET_ARCH)
 
-make-links: delete-links
-	ln -sf asm-$(TARGET_ARCH) include/asm
-
-delete-links:
-	rm -f include/asm
-
 # Blow away kernel.o because build info is stored statically within it.
 delete-unfresh-files:
-	rm -f $(GENERATED_FILES) common/kernel.o
+	rm -f include/xen/compile.h common/kernel.o
 
 # compile.h contains dynamic build info. Rebuilt on every 'make' invocation.
 include/xen/compile.h:
@@ -71,8 +65,7 @@ include/xen/compile.h:
 	cd ./figlet && make && ./figlet Xen $(XEN_VERSION).$(XEN_SUBVERSION)$(XEN_EXTRAVERSION) 1>>../$@ && cd ..
 	@LANG=C echo >> $@
 
-.PHONY: $(GENERATED_FILES) make-links delete-links default 
-.PHONY: debug install clean delete-unfresh-files TAGS
+.PHONY: default debug install dist clean delete-unfresh-files TAGS
 
 SUBDIRS = arch common drivers 
 TAGS: 
