@@ -27,6 +27,7 @@ import sxp
 import XendConsole
 xendConsole = XendConsole.instance()
 from XendLogging import log
+from XendRoot import get_component
 
 import server.SrvDaemon
 xend = server.SrvDaemon.instance()
@@ -460,7 +461,8 @@ class XendDomainInfo:
             if c in '_-.': continue
             if c in string.ascii_letters: continue
             raise VmError('invalid vm name')
-        # See comment in XendDomain constructor about 'xd'.
+        # See comment in XendDomain constructor.
+        xd = get_component('xen.xend.XendDomain')
         if xd.domain_exists(name):
             raise VmError('vm name clash: ' + name)
         

@@ -50,6 +50,8 @@ class XendRoot:
 
     loglevel_default = 'DEBUG'
 
+    components = {}
+
     def __init__(self):
         self.rebooted = 0
         self.last_reboot = None
@@ -61,6 +63,24 @@ class XendRoot:
         eserver.subscribe('xend.*', self.event_handler)
         #eserver.subscribe('xend.domain.created', self.event_handler)
         #eserver.subscribe('xend.domain.died', self.event_handler)
+
+    def add_component(self, name, val):
+        """Add a xend component.
+
+        @param name: component name
+        @param val:  component object
+        """
+        self.components[name] = val
+
+    def get_component(self, name):
+        """Get a xend component from its name.
+        This is used as a work-round for problems caused by mutually
+        recursive imports.
+
+        @param name: component name
+        @return: component object (or None)
+        """
+        return self.components.get(name)
 
     def start(self):
         eserver.inject('xend.start', self.rebooted)
@@ -202,3 +222,9 @@ def instance():
 
 def logger():
     return instance().get_logger()
+
+def add_component(name, val):
+    return instance().add_component(name, val)
+
+def get_component(name):
+    return instance().get_component(name)
