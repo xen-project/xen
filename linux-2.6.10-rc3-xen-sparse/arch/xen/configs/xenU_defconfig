@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.10-rc2-xenU
-# Thu Dec 23 14:02:24 2004
+# Linux kernel version: 2.6.10-rc3-xenU
+# Sun Dec 26 10:35:15 2004
 #
 CONFIG_XEN=y
 CONFIG_ARCH_XEN=y
@@ -92,6 +92,7 @@ CONFIG_MPENTIUM4=y
 # CONFIG_MK7 is not set
 # CONFIG_MK8 is not set
 # CONFIG_MCRUSOE is not set
+# CONFIG_MEFFICEON is not set
 # CONFIG_MWINCHIPC6 is not set
 # CONFIG_MWINCHIP2 is not set
 # CONFIG_MWINCHIP3D is not set
@@ -171,6 +172,7 @@ CONFIG_BLK_DEV_LOOP=m
 # CONFIG_BLK_DEV_CRYPTOLOOP is not set
 CONFIG_BLK_DEV_NBD=m
 CONFIG_BLK_DEV_RAM=y
+CONFIG_BLK_DEV_RAM_COUNT=16
 CONFIG_BLK_DEV_RAM_SIZE=4096
 CONFIG_BLK_DEV_INITRD=y
 CONFIG_INITRAMFS_SOURCE=""
@@ -217,7 +219,6 @@ CONFIG_BLK_DEV_SD=m
 # SCSI low-level drivers
 #
 # CONFIG_SCSI_SATA is not set
-# CONFIG_SCSI_QLOGIC_1280_1040 is not set
 # CONFIG_SCSI_DEBUG is not set
 
 #
