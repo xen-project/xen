@@ -574,7 +574,7 @@ long do_console_write(char *str, unsigned int count)
 {
 #define SIZEOF_BUF 256
     unsigned char safe_str[SIZEOF_BUF];
-    unsigned char exported_str[SIZEOF_BUF];
+    unsigned char exported_str[SIZEOF_BUF+1];
     unsigned char dom_id[5];
     unsigned long flags;
     int i=0;
@@ -605,8 +605,8 @@ long do_console_write(char *str, unsigned int count)
     
     spin_unlock_irqrestore(&console_lock, flags);
     
-    exported_str[j]='\0';
-    console_export(exported_str, j-1);
+    exported_str[j++]='\0';
+    console_export(exported_str, j);
     
     return(0);
 }
