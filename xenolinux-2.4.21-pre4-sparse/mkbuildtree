@@ -23,6 +23,7 @@ rm -f ${D}/mkbuildtree
 ## subdirectories.
 
 # This first symlink is special: it links to shared files in Xen's source tree
+rm -f ${D}/include/asm-xeno/hypervisor-ifs
 ln -sf `pwd`/../xen/include/hypervisor-ifs ${D}/include/asm-xeno/hypervisor-ifs
 
 # The remainder are the i386 -> xeno-i386 links
