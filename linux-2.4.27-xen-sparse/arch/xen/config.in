@@ -271,7 +271,7 @@ source fs/Config.in
 mainmenu_option next_comment
 comment 'Console drivers'
 
-bool 'Xen console support' CONFIG_XEN_CONSOLE
+define_bool CONFIG_XEN_CONSOLE y
 
 if [ "$CONFIG_VT" = "y" ]; then
    bool 'VGA text console' CONFIG_VGA_CONSOLE
