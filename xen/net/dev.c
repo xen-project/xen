@@ -662,9 +662,12 @@ static void net_rx_action(struct softirq_action *h)
         if ( !VIF_LOCAL(skb->dst_vif) )
             skb->dst_vif = find_vif_by_id(0);
         
-        deliver_packet(skb, skb->dst_vif);
-        put_vif(skb->dst_vif);
-        
+        if ( skb->dst_vif != NULL )
+        {
+            deliver_packet(skb, skb->dst_vif);
+            put_vif(skb->dst_vif);
+        }
+
         unmap_domain_mem(skb->head);
         kfree_skb(skb);
     }
