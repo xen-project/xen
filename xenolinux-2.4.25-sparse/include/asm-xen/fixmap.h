@@ -17,6 +17,10 @@
 #include <linux/kernel.h>
 #include <asm/apicdef.h>
 #include <asm/page.h>
+#ifdef CONFIG_HIGHMEM
+#include <linux/threads.h>
+#include <asm/kmap_types.h>
+#endif
 
 /*
  * Here we define all the compile-time 'special' virtual
@@ -38,7 +42,7 @@
  */
 
 enum fixed_addresses {
-#ifdef CONFIG_HIGHMEM_XXX
+#ifdef CONFIG_HIGHMEM
 	FIX_KMAP_BEGIN,	/* reserved pte's for temporary kernel mappings */
 	FIX_KMAP_END = FIX_KMAP_BEGIN+(KM_TYPE_NR*NR_CPUS)-1,
 #endif

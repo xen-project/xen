@@ -19,7 +19,7 @@
 override EXTRAVERSION := -xen$(EXTRAVERSION)
 
 LD=$(CROSS_COMPILE)ld -m elf_i386
-OBJCOPY=$(CROSS_COMPILE)objcopy -O binary -R .note -R .comment -S
+OBJCOPY=$(CROSS_COMPILE)objcopy -R .note -R .comment -S
 LDFLAGS=-e stext
 LINKFLAGS =-T $(TOPDIR)/arch/xen/vmlinux.lds $(LDFLAGS)
 

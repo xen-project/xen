@@ -411,8 +411,6 @@ void __init start_of_day(void)
 
     check_nmi_watchdog();
 
-    zap_low_mappings();
-
 #ifdef CONFIG_PCI
     pci_init();
 #endif

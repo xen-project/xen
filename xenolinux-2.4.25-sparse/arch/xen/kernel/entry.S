@@ -369,21 +369,28 @@ critical_fixup_table:
 
 # Hypervisor uses this for application faults while it executes.
 ENTRY(failsafe_callback)
+        pushal
         call SYMBOL_NAME(install_safe_pf_handler)
-1:      pop  %ds
-2:      pop  %es
-3:      pop  %fs
-4:      pop  %gs
+        movl 32(%esp),%ebx
+1:      movl %ebx,%ds
+        movl 36(%esp),%ebx
+2:      movl %ebx,%es
+        movl 40(%esp),%ebx
+3:      movl %ebx,%fs
+        movl 44(%esp),%ebx
+4:      movl %ebx,%gs
         call SYMBOL_NAME(install_normal_pf_handler)
+        popal
+        addl $16,%esp
 5:      iret
 .section .fixup,"ax";	\
-6:	movl $0,(%esp);	\
+6:	xorl %ebx,%ebx;	\
 	jmp 1b;		\
-7:	movl $0,(%esp);	\
+7:	xorl %ebx,%ebx;	\
 	jmp 2b;		\
-8:	movl $0,(%esp);	\
+8:	xorl %ebx,%ebx;	\
 	jmp 3b;		\
-9:	movl $0,(%esp);	\
+9:	xorl %ebx,%ebx;	\
 	jmp 4b;		\
 10:	pushl %ss;	\
 	popl %ds;	\

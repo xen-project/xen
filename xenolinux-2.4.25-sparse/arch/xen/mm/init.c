@@ -58,6 +58,31 @@ int do_check_pgt_cache(int low, int high)
     }
     return freed;
 }
+ 
+/*
+ * NOTE: pagetable_init alloc all the fixmap pagetables contiguous on the
+ * physical space so we can cache the place of the first one and move
+ * around without checking the pgd every time.
+ */
+
+#if CONFIG_HIGHMEM
+pte_t *kmap_pte;
+pgprot_t kmap_prot;
+
+#define kmap_get_fixmap_pte(vaddr) \
+    pte_offset(pmd_offset(pgd_offset_k(vaddr), (vaddr)), (vaddr))
+
+void __init kmap_init(void)
+{
+    unsigned long kmap_vstart;
+
+    /* cache the first kmap pte */
+    kmap_vstart = __fix_to_virt(FIX_KMAP_BEGIN);
+    kmap_pte = kmap_get_fixmap_pte(kmap_vstart);
+
+    kmap_prot = PAGE_KERNEL;
+}
+#endif /* CONFIG_HIGHMEM */
 
 void show_mem(void)
 {
@@ -186,6 +211,77 @@ static void __init fixrange_init (unsigned long start,
 }
 
 
+static void __init pagetable_init (void)
+{
+    unsigned long vaddr, end;
+    pgd_t *kpgd, *pgd, *pgd_base;
+    int i, j, k;
+    pmd_t *kpmd, *pmd;
+    pte_t *kpte, *pte, *pte_base;
+
+    /*
+     * This can be zero as well - no problem, in that case we exit
+     * the loops anyway due to the PTRS_PER_* conditions.
+     */
+    end = (unsigned long)__va(max_low_pfn*PAGE_SIZE);
+
+    pgd_base = init_mm.pgd;
+    i = __pgd_offset(PAGE_OFFSET);
+    pgd = pgd_base + i;
+
+    for (; i < PTRS_PER_PGD; pgd++, i++) {
+        vaddr = i*PGDIR_SIZE;
+        if (end && (vaddr >= end))
+            break;
+        pmd = (pmd_t *)pgd;
+        for (j = 0; j < PTRS_PER_PMD; pmd++, j++) {
+            vaddr = i*PGDIR_SIZE + j*PMD_SIZE;
+            if (end && (vaddr >= end))
+                break;
+
+            /* Filled in for us already? */
+            if ( pmd_val(*pmd) & _PAGE_PRESENT )
+                continue;
+
+            pte_base = pte = (pte_t *) alloc_bootmem_low_pages(PAGE_SIZE);
+
+            for (k = 0; k < PTRS_PER_PTE; pte++, k++) {
+                vaddr = i*PGDIR_SIZE + j*PMD_SIZE + k*PAGE_SIZE;
+                if (end && (vaddr >= end))
+                    break;
+                *pte = mk_pte_phys(__pa(vaddr), PAGE_KERNEL);
+            }
+            kpgd = pgd_offset_k((unsigned long)pte_base);
+            kpmd = pmd_offset(kpgd, (unsigned long)pte_base);
+            kpte = pte_offset(kpmd, (unsigned long)pte_base);
+            queue_l1_entry_update(kpte,
+                                  (*(unsigned long *)kpte)&~_PAGE_RW);
+            set_pmd(pmd, __pmd(_KERNPG_TABLE + __pa(pte_base)));
+            XEN_flush_page_update_queue();
+        }
+    }
+
+    /*
+     * Fixed mappings, only the page table structure has to be
+     * created - mappings will be set by set_fixmap():
+     */
+    vaddr = __fix_to_virt(__end_of_fixed_addresses - 1) & PMD_MASK;
+    fixrange_init(vaddr, HYPERVISOR_VIRT_START, init_mm.pgd);
+
+#if CONFIG_HIGHMEM
+    /*
+     * Permanent kmaps:
+     */
+    vaddr = PKMAP_BASE;
+    fixrange_init(vaddr, vaddr + PAGE_SIZE*LAST_PKMAP, init_mm.pgd);
+
+    pgd = init_mm.pgd + __pgd_offset(vaddr);
+    pmd = pmd_offset(pgd, vaddr);
+    pte = pte_offset(pmd, vaddr);
+    pkmap_page_table = pte;
+#endif
+}
+
 static void __init zone_sizes_init(void)
 {
     unsigned long zones_size[MAX_NR_ZONES] = {0, 0, 0};
@@ -207,25 +303,11 @@ static void __init zone_sizes_init(void)
     free_area_init(zones_size);
 }
 
-/*
- * paging_init() sets up the page tables - note that the first 8MB are
- * already mapped by head.S.
- *
- * This routines also unmaps the page at virtual kernel address 0, so
- * that we can trap those pesky NULL-reference errors in the kernel.
- */
 void __init paging_init(void)
 {
-    unsigned long vaddr;
+    pagetable_init();
 
     zone_sizes_init();
-
-    /*
-     * Fixed mappings, only the page table structure has to be created -
-     * mappings will be set by set_fixmap():
-     */
-    vaddr = __fix_to_virt(__end_of_fixed_addresses - 1) & PMD_MASK;
-    fixrange_init(vaddr, HYPERVISOR_VIRT_START, init_mm.pgd);
 
     /* Switch to the real shared_info page, and clear the dummy page. */
     set_fixmap(FIX_SHARED_INFO, start_info.shared_info);
@@ -233,7 +315,6 @@ void __init paging_init(void)
     memset(empty_zero_page, 0, sizeof(empty_zero_page));
 
 #ifdef CONFIG_HIGHMEM
-#error
     kmap_init();
 #endif
 }
@@ -241,6 +322,11 @@ void __init paging_init(void)
 static inline int page_is_ram (unsigned long pagenr)
 {
     return 1;
+}
+
+static inline int page_kills_ppro(unsigned long pagenr)
+{
+    return 0;
 }
 
 #ifdef CONFIG_HIGHMEM
@@ -278,8 +364,7 @@ static void __init set_max_mapnr_init(void)
 static int __init free_pages_init(void)
 {
 #ifdef CONFIG_HIGHMEM
-#error Where is this supposed to be initialised?
-    int bad_ppro;
+    int bad_ppro = 0;
 #endif
     int reservedpages, pfn;
 

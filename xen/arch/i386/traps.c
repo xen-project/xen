@@ -339,11 +339,9 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
             return; /* successfully copied the mapping */
     }
 
-    if ( unlikely( p->mm.shadow_mode ) && addr < PAGE_OFFSET &&
-	 shadow_fault( addr, error_code ) )
-      {
-	return; // return true if fault was handled 
-      }
+    if ( unlikely(p->mm.shadow_mode) && 
+         (addr < PAGE_OFFSET) && shadow_fault(addr, error_code) )
+	return; /* Return TRUE if fault was handled. */
 
     if ( unlikely(!(regs->xcs & 3)) )
         goto fault_in_hypervisor;
@@ -363,7 +361,8 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
     if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
     {
         perfc_incrc(copy_user_faults);
-        //DPRINTK("copy_user fault: %08lx -> %08lx\n", regs->eip, fixup);
+        if ( !p->mm.shadow_mode )
+            DPRINTK("Page fault: %08lx -> %08lx\n", regs->eip, fixup);
         regs->eip = fixup;
         regs->xds = regs->xes = regs->xfs = regs->xgs = __HYPERVISOR_DS;
         return;

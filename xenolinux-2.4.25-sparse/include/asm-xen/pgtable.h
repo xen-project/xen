@@ -101,7 +101,11 @@ extern void * high_memory;
 #define VMALLOC_START	(((unsigned long) high_memory + 2*VMALLOC_OFFSET-1) & \
 						~(VMALLOC_OFFSET-1))
 #define VMALLOC_VMADDR(x) ((unsigned long)(x))
-#define VMALLOC_END	(FIXADDR_START - 2*PAGE_SIZE)
+#if CONFIG_HIGHMEM
+# define VMALLOC_END	(PKMAP_BASE-2*PAGE_SIZE)
+#else
+# define VMALLOC_END	(FIXADDR_START-2*PAGE_SIZE)
+#endif
 
 #define _PAGE_BIT_PRESENT	0
 #define _PAGE_BIT_RW		1

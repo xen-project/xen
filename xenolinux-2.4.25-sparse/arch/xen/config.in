@@ -82,9 +82,9 @@ fi
 #   tristate 'BIOS Enhanced Disk Drive calls determine boot disk (EXPERIMENTAL)' CONFIG_EDD
 #fi
 
-#choice 'High Memory Support' \
-#	"off    CONFIG_NOHIGHMEM \
-#	 4GB    CONFIG_HIGHMEM4G \
+choice 'High Memory Support' \
+	"off    CONFIG_NOHIGHMEM \
+	 4GB    CONFIG_HIGHMEM4G" off
 #	 64GB   CONFIG_HIGHMEM64G" off
 if [ "$CONFIG_HIGHMEM4G" = "y" ]; then
    define_bool CONFIG_HIGHMEM y

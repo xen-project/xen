@@ -228,10 +228,13 @@ struct task_struct *alloc_task_struct();
 
 extern struct task_struct *do_createdomain(
     domid_t dom_id, unsigned int cpu);
-extern int setup_guestos(
-    struct task_struct *p, dom0_createdomain_t *params, unsigned int num_vifs,
-    char *data_start, unsigned long data_len, 
-    char *cmdline, unsigned long initrd_len);
+extern int construct_dom0(struct task_struct *p, 
+                          unsigned long alloc_start,
+                          unsigned long alloc_end,
+                          unsigned int num_vifs,
+                          char *image_start, unsigned long image_len, 
+                          char *initrd_start, unsigned long initrd_len,
+                          char *cmdline);
 extern int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *);
 
 struct task_struct *find_domain_by_id(domid_t dom);

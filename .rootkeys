@@ -411,7 +411,6 @@
 3ddb79c34BFiXjBJ_cCKB0aCsV1IDw xen/include/asm-i386/desc.h
 3e564149UkU91RX7onzpCAmbj_IFjw xen/include/asm-i386/dma.h
 3e20b82fl1jmQiKdLy7fxMcutfpjWA xen/include/asm-i386/domain_page.h
-3ddb79c2O729EttZTYu1c8LcsUO_GQ xen/include/asm-i386/elf.h
 3ddb79c3NU8Zy40OTrq3D-i30Y3t4A xen/include/asm-i386/fixmap.h
 3e2d29944GI24gf7vOP_7x8EyuqxeA xen/include/asm-i386/flushtlb.h
 3ddb79c39o75zPP0T1aQQ4mNrCAN2w xen/include/asm-i386/hardirq.h
@@ -460,7 +459,6 @@
 404f1b9fl6AQ_a-T1TDK3fuwTPXmHw xen/include/asm-x86_64/desc.h
 404f1ba05mjpUREtosjzz3PPL5cTJA xen/include/asm-x86_64/dma.h
 404f1ba13mnjeZT2ytPm0DB63703nA xen/include/asm-x86_64/domain_page.h
-404f1ba2IXQ7E0x9NlqpR5hgYtC9RQ xen/include/asm-x86_64/elf.h
 404f1ba31i0gS-cdqvd0RZX1HVnxsA xen/include/asm-x86_64/fixmap.h
 404f1ba4KXQ_V7HOkenF04KRU7Tl7w xen/include/asm-x86_64/flushtlb.h
 404f1ba5Sqzc22eXORShvCF9-rpMbA xen/include/asm-x86_64/hardirq.h
@@ -534,6 +532,7 @@
 3ddb79c1V44RD26YqCUm-kqIupM37A xen/include/xen/ctype.h
 3ddb79c05DdHQ0UxX_jKsXdR4QlMCA xen/include/xen/delay.h
 3ddb79c1uaWQZj551j1O0B5z8AnHOg xen/include/xen/elevator.h
+3ddb79c2O729EttZTYu1c8LcsUO_GQ xen/include/xen/elf.h
 3ddb79c0HIghfBF8zFUdmXhOU8i6hA xen/include/xen/errno.h
 3ddb79c0rMjudDKkJku_mkm0J-BZgw xen/include/xen/etherdevice.h
 3ddb79c0T3X07lFnM9OSE-W5bqIDSQ xen/include/xen/ethtool.h
@@ -663,7 +662,7 @@
 3e5a4e66HdSkvIV6SJ1evG_xmTmXHA xenolinux-2.4.25-sparse/include/asm-xen/desc.h
 4048c0e0_P2wUTiT6UqgPhn0s7yFcA xenolinux-2.4.25-sparse/include/asm-xen/evtchn.h
 3e5a4e66SYp_UpAVcF8Lc1wa3Qtgzw xenolinux-2.4.25-sparse/include/asm-xen/fixmap.h
-3e5a4e67w_DWgjIJ17Tlossu1LGujQ xenolinux-2.4.25-sparse/include/asm-xen/highmem.h
+406aeeaaQvl4RNtmd9hDEugBURbFpQ xenolinux-2.4.25-sparse/include/asm-xen/highmem.h
 3e5a4e67YtcyDLQsShhCfQwPSELfvA xenolinux-2.4.25-sparse/include/asm-xen/hw_irq.h
 3e5a4e677VBavzM1UZIEcH1B-RlXMA xenolinux-2.4.25-sparse/include/asm-xen/hypervisor.h
 4060044fVx7-tokvNLKBf_6qBB4lqQ xenolinux-2.4.25-sparse/include/asm-xen/io.h
@@ -697,6 +696,7 @@
 3f9d4b44247udoqWEgFkaHiWv6Uvyg xenolinux-2.4.25-sparse/kernel/time.c
 401c059bjLBFYHRD4Py2uM3eA1D4zQ xenolinux-2.4.25-sparse/kernel/timer.c
 3e6e7c1efbQe93xCvOpOVCnXTMmQ5w xenolinux-2.4.25-sparse/mkbuildtree
+406aeeafkrnCuIVWLFv3kfn4uAD5Eg xenolinux-2.4.25-sparse/mm/highmem.c
 3e5a4e68GxCIaFH4sy01v1wjapetaA xenolinux-2.4.25-sparse/mm/memory.c
 3f108af5VxPkLv13tXpXgoRKALQtXQ xenolinux-2.4.25-sparse/mm/mprotect.c
 3e5a4e681xMPdF9xCMwpyfuYMySU5g xenolinux-2.4.25-sparse/mm/mremap.c

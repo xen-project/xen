@@ -104,10 +104,12 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
     dom0_createdomain_t dom0_params;
     unsigned long max_page;
     unsigned char *cmdline;
-    module_t *mod;
+    module_t *mod = (module_t *)__va(mbi->mods_addr);
     void *heap_start;
     int i;
     unsigned long max_mem;
+    unsigned long dom0_memory_start, dom0_memory_end;
+    unsigned long initial_images_start, initial_images_end;
 
     /* Parse the command-line options. */
     cmdline = (unsigned char *)(mbi->cmdline ? __va(mbi->cmdline) : NULL);
@@ -215,6 +217,19 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
            max_page >> (20-PAGE_SHIFT),
 	   max_mem  >> (20-PAGE_SHIFT) );
 
+    initial_images_start = MAX_DIRECTMAP_ADDRESS;
+    initial_images_end   = initial_images_start + 
+        (mod[mbi->mods_count-1].mod_end - mod[0].mod_start);
+    dom0_memory_start    = (initial_images_end + ((4<<20)-1)) & ~((4<<20)-1);
+    dom0_memory_end      = dom0_memory_start + (opt_dom0_mem << 10);
+    dom0_memory_end      = (dom0_memory_end + PAGE_SIZE - 1) & PAGE_MASK;
+    
+    /* Cheesy sanity check: enough memory for DOM0 allocation + some slack? */
+    if ( (dom0_memory_end + (8<<20)) > (max_page<<PAGE_SHIFT) )
+        panic("Not enough memory to craete initial domain!\n");
+
+    add_to_domain_alloc_list(dom0_memory_end, max_page << PAGE_SHIFT);
+
     heap_start = memguard_init(&_end);
 
     printk("Xen heap size is %luKB\n", 
@@ -243,24 +258,30 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
     /* Create initial domain 0. */
     dom0_params.memory_kb = opt_dom0_mem;
     new_dom = do_createdomain(0, 0);
-    if ( new_dom == NULL ) panic("Error creating domain 0\n");
+    if ( new_dom == NULL )
+        panic("Error creating domain 0\n");
 
     set_bit(PF_PRIVILEGED, &new_dom->flags);
 
     /*
      * We're going to setup domain0 using the module(s) that we stashed safely
-     * above our MAX_DIRECTMAP_ADDRESS in boot/Boot.S The second module, if
-     * present, is an initrd ramdisk
+     * above our MAX_DIRECTMAP_ADDRESS in boot/boot.S. The second module, if
+     * present, is an initrd ramdisk.
      */
-    mod = (module_t *)__va(mbi->mods_addr);
-    if ( setup_guestos(new_dom, 
-                       &dom0_params, 1,
-                       (char *)MAX_DIRECTMAP_ADDRESS, 
-                       mod[mbi->mods_count-1].mod_end - mod[0].mod_start,
-                       __va(mod[0].string),
-		       (mbi->mods_count == 2) ?
-                       (mod[1].mod_end - mod[1].mod_start):0)
-         != 0 ) panic("Could not set up DOM0 guest OS\n");
+    if ( construct_dom0(new_dom, dom0_memory_start, dom0_memory_end, 1,
+                        (char *)initial_images_start, 
+                        mod[0].mod_end-mod[0].mod_start,
+                        (mbi->mods_count == 1) ? 0 :
+                        (char *)initial_images_start + 
+                        (mod[1].mod_start-mod[0].mod_start),
+                        (mbi->mods_count == 1) ? 0 :
+                        mod[mbi->mods_count-1].mod_end - mod[1].mod_start,
+                        __va(mod[0].string)) != 0)
+        panic("Could not set up DOM0 guest OS\n");
+
+    /* The stash space for the initial kernel image can now be freed up. */
+    add_to_domain_alloc_list(__pa(frame_table) + frame_table_size,
+                             dom0_memory_start);
 
     wake_up(new_dom);
 
