@@ -74,6 +74,7 @@ ln -sf ../asm-i386/mtrr.h
 ln -sf ../asm-i386/namei.h 
 ln -sf ../asm-i386/param.h 
 ln -sf ../asm-i386/parport.h 
+ln -sf ../asm-i386/pgtable-3level.h 
 ln -sf ../asm-i386/poll.h 
 ln -sf ../asm-i386/posix_types.h 
 ln -sf ../asm-i386/resource.h 
@@ -112,6 +113,7 @@ ln -sf ../asm-i386/vga.h
 ln -sf ../asm-i386/xor.h 
 
 cd ../../arch/xeno/kernel
+ln -sf ../../i386/kernel/i387.c
 ln -sf ../../i386/kernel/init_task.c
 ln -sf ../../i386/kernel/ptrace.c
 ln -sf ../../i386/kernel/semaphore.c 

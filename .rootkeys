@@ -498,7 +498,6 @@
 3e5a4e65Hy_1iUvMTPsNqGNXd9uFpg xenolinux-2.4.21-pre4-sparse/arch/xeno/kernel/head.S
 3e5a4e65ibVQmwlOn0j3sVH_j_6hAg xenolinux-2.4.21-pre4-sparse/arch/xeno/kernel/hypervisor.c
 3e5a4e65RMGcuA-HCn3-wNx3fFQwdg xenolinux-2.4.21-pre4-sparse/arch/xeno/kernel/i386_ksyms.c
-3e5a4e65JfSHwduNJO6j-upYnjoWLA xenolinux-2.4.21-pre4-sparse/arch/xeno/kernel/i387.c
 3e5a4e65MEvZhlr070sK5JsfAQlv7Q xenolinux-2.4.21-pre4-sparse/arch/xeno/kernel/ioport.c
 3e5a4e653U6cELGv528IxOLHvCq8iA xenolinux-2.4.21-pre4-sparse/arch/xeno/kernel/irq.c
 3e5a4e65muT6SU3ck47IP87Q7Ti5hA xenolinux-2.4.21-pre4-sparse/arch/xeno/kernel/ldt.c
@@ -534,7 +533,6 @@
 3e5a4e67mnQfh-R8KcQCaVo2Oho6yg xenolinux-2.4.21-pre4-sparse/include/asm-xeno/page.h
 3e5a4e67uTYU5oEnIDjxuaez8njjqg xenolinux-2.4.21-pre4-sparse/include/asm-xeno/pgalloc.h
 3e5a4e67X7JyupgdYkgDX19Huj2sAw xenolinux-2.4.21-pre4-sparse/include/asm-xeno/pgtable-2level.h
-3e5a4e67w3ckNdrTEgqiSiYYAYMwOQ xenolinux-2.4.21-pre4-sparse/include/asm-xeno/pgtable-3level.h
 3e5a4e67gr4NLGtQ5CvSLimMYZlkOA xenolinux-2.4.21-pre4-sparse/include/asm-xeno/pgtable.h
 3e5a4e676uK4xErTBDH6XJREn9LSyg xenolinux-2.4.21-pre4-sparse/include/asm-xeno/processor.h
 3e5a4e67AJPjW-zL7p-xWuA6IVeH1g xenolinux-2.4.21-pre4-sparse/include/asm-xeno/ptrace.h
