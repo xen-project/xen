@@ -443,8 +443,9 @@ class ProgPincpu(Prog):
 
     def main(self, args):
         if len(args) != 3: self.err("%s: Invalid argument(s)" % args[0])
-        v = map(int, args[1:3])
-        server.xend_domain_pincpu(*v)
+        dom = args[1]
+        cpu = int(args[2])
+        server.xend_domain_pincpu(dom, cpu)
 
 xm.prog(ProgPincpu)
 
@@ -459,8 +460,9 @@ class ProgMaxmem(Prog):
 
     def main(self, args):
         if len(args) != 3: self.err("%s: Invalid argument(s)" % args[0])
-        v = map(int, args[1:3])
-        server.xend_domain_maxmem_set(*v)
+        dom = args[1]
+        mem = int(args[2])
+        server.xend_domain_maxmem_set(dom, mem)
 
 xm.prog(ProgMaxmem)
 
@@ -509,8 +511,9 @@ class ProgBvt(Prog):
 
     def main(self, args):
         if len(args) != 7: self.err("%s: Invalid argument(s)" % args[0])
-        v = map(long, args[1:7])
-        server.xend_domain_cpu_bvt_set(*v)
+        dom = args[1]
+        v = map(long, args[2:7])
+        server.xend_domain_cpu_bvt_set(dom, *v)
 
 xm.prog(ProgBvt)
 
@@ -542,8 +545,9 @@ class ProgFbvt(Prog):
 
     def main(self, args):
         if len(args) != 6: self.err("%s: Invalid argument(s)" % args[0])
-        v = map(int, args[1:6])
-        server.xend_domain_cpu_fbvt_set(*v)
+        dom = args[1]
+        v = map(int, args[2:6])
+        server.xend_domain_cpu_fbvt_set(dom, *v)
 
 xm.prog(ProgFbvt)
 
@@ -576,8 +580,9 @@ class ProgAtropos(Prog):
 
     def main(self, args):
         if len(args) != 5: self.err("%s: Invalid argument(s)" % args[0])
-        v = map(int, args[1:5])
-        server.xend_domain_cpu_atropos_set(*v)
+        dom = args[1]
+        v = map(int, args[2:5])
+        server.xend_domain_cpu_atropos_set(dom, *v)
 
 xm.prog(ProgAtropos)
 
