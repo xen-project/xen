@@ -1,6 +1,6 @@
 \documentclass[11pt,twoside,final,openright]{xenstyle}
-\usepackage{a4,graphicx,parskip,setspace,times,xspace}
-\setstretch{1.1}
+\usepackage{a4,graphicx,html,parskip,setspace,times,xspace}
+\setstretch{1.15}
 
 
 \def\Xend{{Xend}\xspace}
@@ -56,8 +56,7 @@ Contributions of material, suggestions and corrections are welcome.
 \renewcommand{\floatpagefraction}{.8}
 \setstretch{1.1}
 
-\newcommand{\path}[1]{{\small {\tt #1}}}
-
+\latexhtml{\newcommand{\path}[1]{{\small {\tt #1}}}}{\newcommand{\path}[1]{{\tt #1}}}
 
 \part{Introduction and Tutorial}
 \chapter{Introduction}
@@ -551,7 +550,7 @@ fills in parts of this template.
 
 Both of them can be found in \path{/etc/xen/}
 
-\section{Editing \path{xmdefconfig}}
+\section{Editing {\tt xmdefconfig}}
 
 At minimum, you should edit the following 
 variables in \path{/etc/xen/xmdefconfig}:
@@ -1511,9 +1510,10 @@ mailing list (address below).
 
 For developers interested in porting operating systems to Xen, the
 {\em Xen Interface Manual} is distributed in the \path{docs/}
-directory of the Xen source distribution.  Various HOWTOs are
-available in \path{docs/HOWTOS} but this content is being integrated
-into this manual.
+directory of the Xen source distribution.  
+
+%Various HOWTOs are available in \path{docs/HOWTOS} but this content is
+%being integrated into this manual.
 
 \section{Online references}
 
