@@ -52,8 +52,6 @@
 #include <asm/i387.h>
 #include <asm/debugger.h>
 
-extern char opt_nmi[];
-
 struct guest_trap_bounce guest_trap_bounce[NR_CPUS] = { { 0 } };
 
 #if defined(__i386__)
@@ -199,19 +197,38 @@ void show_registers(struct xen_regs *regs)
     show_stack(&regs->esp);
 } 
 
-
-spinlock_t die_lock = SPIN_LOCK_UNLOCKED;
-
-void die(const char *str, struct xen_regs * regs, long err)
+/*
+ * This is called for faults at very unexpected times (e.g., when interrupts
+ * are disabled). In such situations we can't do much that is safe. We try to
+ * print out some tracing and then we just spin.
+ */
+asmlinkage void fatal_trap(int trapnr, struct xen_regs *regs, long error_code)
 {
-    unsigned long flags;
-    spin_lock_irqsave(&die_lock, flags);
-    printk("%s: %04lx,%04lx\n", str, err >> 16, err & 0xffff);
-    show_registers(regs);
-    spin_unlock_irqrestore(&die_lock, flags);
-    panic("Fatal crash within Xen.\n");
-}
+    int cpu = smp_processor_id();
+    static char *trapstr[] = { 
+        "divide error", "debug", "nmi", "bkpt", "overflow", "bounds", 
+        "invalid operation", "device not available", "double fault", 
+        "coprocessor segment", "invalid tss", "segment not found", 
+        "stack error", "general protection fault", "page fault", 
+        "spurious interrupt", "coprocessor error", "alignment check", 
+        "machine check", "simd error"
+    };
 
+    show_registers(regs);
+    printk("************************************\n");
+    printk("CPU%d FATAL TRAP %d (%s), ERROR_CODE %lx%s.\n",
+           cpu, trapnr, trapstr[trapnr], error_code,
+           (regs->eflags & X86_EFLAGS_IF) ? "" : ", IN INTERRUPT CONTEXT");
+    printk("System shutting down -- need manual reset.\n");
+    printk("************************************\n");
+
+    /* Lock up the console to prevent spurious output from other CPUs. */
+    console_force_lock();
+
+    /* Wait for manual reset. */
+    for ( ; ; )
+        __asm__ __volatile__ ( "hlt" );
+}
 
 static inline void do_trap(int trapnr, char *str,
                            struct xen_regs *regs, 
@@ -275,7 +292,6 @@ DO_ERROR(11, "segment not present", segment_not_present)
 DO_ERROR(12, "stack segment", stack_segment)
 DO_ERROR_NOCODE(16, "fpu error", coprocessor_error)
 DO_ERROR(17, "alignment check", alignment_check)
-DO_ERROR_NOCODE(18, "machine check", machine_check)
 DO_ERROR_NOCODE(19, "simd error", simd_coprocessor_error)
 
 asmlinkage void do_int3(struct xen_regs *regs, long error_code)
@@ -328,13 +344,17 @@ asmlinkage void do_double_fault(void)
     printk("System needs manual reset.\n");
     printk("************************************\n");
 
-    DEBUGGER_trap_fatal(TRAP_double_fault, NULL, 0);
-
     /* Lock up the console to prevent spurious output from other CPUs. */
     console_force_lock();
 
     /* Wait for manual reset. */
-    for ( ; ; ) ;
+    for ( ; ; )
+        __asm__ __volatile__ ( "hlt" );
+}
+
+asmlinkage void do_machine_check(struct xen_regs *regs, long error_code)
+{
+    fatal_trap(TRAP_machine_check, regs, error_code);
 }
 
 asmlinkage void do_page_fault(struct xen_regs *regs, long error_code)
@@ -509,47 +529,24 @@ asmlinkage void do_general_protection(struct xen_regs *regs, long error_code)
 
     DEBUGGER_trap_fatal(TRAP_gp_fault, regs, error_code);
 
-    die("general protection fault", regs, error_code);
+    show_registers(regs);
+    panic("CPU%d GENERAL PROTECTION FAULT\n"
+          "[error_code=%08x]\n", smp_processor_id(), error_code);
 }
 
 asmlinkage void mem_parity_error(struct xen_regs *regs)
 {
     console_force_unlock();
-
-    printk("\n\n");
-
-    show_registers(regs);
-
-    printk("************************************\n");
-    printk("CPU%d MEMORY ERROR -- system shutdown\n", smp_processor_id());
-    printk("System needs manual reset.\n");
-    printk("************************************\n");
-
-    /* Lock up the console to prevent spurious output from other CPUs. */
-    console_force_lock();
-
-    /* Wait for manual reset. */
-    for ( ; ; ) ;
+    printk("\n\nNMI - MEMORY ERROR\n");
+    fatal_trap(TRAP_nmi, regs, 0);
 }
 
 asmlinkage void io_check_error(struct xen_regs *regs)
 {
     console_force_unlock();
 
-    printk("\n\n");
-
-    show_registers(regs);
-
-    printk("************************************\n");
-    printk("CPU%d I/O ERROR -- system shutdown\n", smp_processor_id());
-    printk("System needs manual reset.\n");
-    printk("************************************\n");
-
-    /* Lock up the console to prevent spurious output from other CPUs. */
-    console_force_lock();
-
-    /* Wait for manual reset. */
-    for ( ; ; ) ;
+    printk("\n\nNMI - I/O ERROR\n");
+    fatal_trap(TRAP_nmi, regs, 0);
 }
 
 static void unknown_nmi_error(unsigned char reason, struct xen_regs * regs)
@@ -738,26 +735,26 @@ void __init trap_init(void)
      * saved. The page-fault handler also needs interrupts disabled until %cr2 
      * has been read and saved on the stack.
      */
-    set_intr_gate(0,&divide_error);
-    set_intr_gate(1,&debug);
-    set_intr_gate(2,&nmi);
-    set_system_gate(3,&int3);     /* usable from all privilege levels */
-    set_system_gate(4,&overflow); /* usable from all privilege levels */
-    set_intr_gate(5,&bounds);
-    set_intr_gate(6,&invalid_op);
-    set_intr_gate(7,&device_not_available);
-    set_task_gate(8,__DOUBLEFAULT_TSS_ENTRY<<3);
-    set_intr_gate(9,&coprocessor_segment_overrun);
-    set_intr_gate(10,&invalid_TSS);
-    set_intr_gate(11,&segment_not_present);
-    set_intr_gate(12,&stack_segment);
-    set_intr_gate(13,&general_protection);
-    set_intr_gate(14,&page_fault);
-    set_intr_gate(15,&spurious_interrupt_bug);
-    set_intr_gate(16,&coprocessor_error);
-    set_intr_gate(17,&alignment_check);
-    set_intr_gate(18,&machine_check);
-    set_intr_gate(19,&simd_coprocessor_error);
+    set_intr_gate(TRAP_divide_error,&divide_error);
+    set_intr_gate(TRAP_debug,&debug);
+    set_intr_gate(TRAP_nmi,&nmi);
+    set_system_gate(TRAP_int3,&int3);         /* usable from all privileges */
+    set_system_gate(TRAP_overflow,&overflow); /* usable from all privileges */
+    set_intr_gate(TRAP_bounds,&bounds);
+    set_intr_gate(TRAP_invalid_op,&invalid_op);
+    set_intr_gate(TRAP_no_device,&device_not_available);
+    set_task_gate(TRAP_double_fault,__DOUBLEFAULT_TSS_ENTRY<<3);
+    set_intr_gate(TRAP_copro_seg,&coprocessor_segment_overrun);
+    set_intr_gate(TRAP_invalid_tss,&invalid_TSS);
+    set_intr_gate(TRAP_no_segment,&segment_not_present);
+    set_intr_gate(TRAP_stack_error,&stack_segment);
+    set_intr_gate(TRAP_gp_fault,&general_protection);
+    set_intr_gate(TRAP_page_fault,&page_fault);
+    set_intr_gate(TRAP_spurious_int,&spurious_interrupt_bug);
+    set_intr_gate(TRAP_copro_error,&coprocessor_error);
+    set_intr_gate(TRAP_alignment_check,&alignment_check);
+    set_intr_gate(TRAP_machine_check,&machine_check);
+    set_intr_gate(TRAP_simd_error,&simd_coprocessor_error);
 
     /* Only ring 1 can access Xen services. */
     _set_gate(idt_table+HYPERCALL_VECTOR,14,1,&hypercall);

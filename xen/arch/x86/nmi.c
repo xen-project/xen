@@ -25,12 +25,12 @@
 #include <asm/smp.h>
 #include <asm/msr.h>
 #include <asm/mpspec.h>
+#include <asm/debugger.h>
 
 unsigned int nmi_watchdog = NMI_NONE;
 unsigned int watchdog_on = 0;
 static unsigned int nmi_hz = HZ;
 unsigned int nmi_perfctr_msr;	/* the MSR to reset in NMI handler */
-extern void show_registers(struct xen_regs *regs);
 
 extern int logical_proc_id[];
 
@@ -272,8 +272,6 @@ void touch_nmi_watchdog (void)
 
 void nmi_watchdog_tick (struct xen_regs * regs)
 {
-    extern void die(const char * str, struct xen_regs * regs, long err);
-
     int sum, cpu = smp_processor_id();
 
     sum = apic_timer_irqs[cpu];
@@ -288,7 +286,7 @@ void nmi_watchdog_tick (struct xen_regs * regs)
         if ( alert_counter[cpu] == 5*nmi_hz )
         {
             console_force_unlock();
-            die("NMI Watchdog detected LOCKUP on CPU", regs, cpu);
+            fatal_trap(TRAP_nmi, regs, 0);
         }
     } 
     else 
