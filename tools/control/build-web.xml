@@ -399,6 +399,7 @@
     <mkdir  dir="${build.home}"/>
     <mkdir  dir="${build.home}/WEB-INF"/>
     <mkdir  dir="${build.home}/WEB-INF/classes"/>
+    <mkdir  dir="${dist.home}"/>
 
 	<!-- create templates -->
 	<exec executable="make" dir="${web.home}/tmpl"/>

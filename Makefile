@@ -22,14 +22,12 @@ all:
 	$(MAKE) -C tools/balloon
 	$(MAKE) -C tools/control
 	$(MAKE) -C tools/internal
-	$(MAKE) -C tools/vdmanager
 
 install: all
 	$(MAKE) -C xen install
 	$(MAKE) -C tools/balloon install
 	$(MAKE) -C tools/control install
 	$(MAKE) -C tools/internal install
-	$(MAKE) -C tools/vdmanager install
 
 
 clean:
@@ -37,5 +35,4 @@ clean:
 	$(MAKE) -C tools/balloon clean
 	$(MAKE) -C tools/control clean
 	$(MAKE) -C tools/internal clean
-	$(MAKE) -C tools/vdmanager clean
 
