@@ -138,7 +138,10 @@ class SrvDomain(SrvDir):
         fn = FormFn(self.xd.domain_cpu_sedf_set,
                     [['dom', 'str'],
                      ['period', 'int'],
-                     ['slice', 'int']])
+                     ['slice', 'int'],
+		     ['latency', 'int'],
+		     ['extratime', 'int'],
+		     ['weight', 'int']])
         val = fn(req.args, {'dom': self.dom.id})
         return val
 

@@ -243,11 +243,11 @@ int xc_rrobin_global_get(int xc_handle, u64 *slice);
 
 int xc_sedf_domain_set(int xc_handle,
                           u32 domid,
-                          u64 period, u64 slice);
+                          u64 period, u64 slice, u64 latency, u16 extratime, u16 weight);
 
 int xc_sedf_domain_get(int xc_handle,
                           u32 domid,
-                          u64* period, u64 *slice);
+                          u64* period, u64 *slice, u64 *latency, u16 *extratime, u16* weight);
 
 typedef evtchn_status_t xc_evtchn_status_t;
 

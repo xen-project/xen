@@ -606,14 +606,14 @@ class ProgSedf(Prog):
     info = """Set simple EDF parameters."""
 
     def help(self, args):
-        print args[0], "DOM PERIOD SLICE"
+        print args[0], "DOM PERIOD SLICE LATENCY EXTRATIME WEIGHT"
         print "\nSet simple EDF parameters."
 
     def main(self, args):
-        if len(args) != 4: self.err("%s: Invalid argument(s)" % args[0])
-        dom = args[1]
-        v = map(int, args[2:4])
-        server.xend_domain_cpu_sedf_set(dom, *v)
+	if len(args) != 7: self.err("%s: Invalid argument(s)" % args[0])
+	dom = args[1]
+	v = map(int, args[2:7])
+	server.xend_domain_cpu_sedf_set(dom, *v)
 
 xm.prog(ProgSedf)
 

@@ -70,8 +70,9 @@ struct sched_adjdom_cmd
         {
             u64 period;     /* 16 */
             u64 slice;      /* 24 */
-            u64 dummy1;     /* 32 */
-            u32 dummy2;     /* 36 */
+            u64 latency;    /* 32 */
+            u16 extratime;  /* 36 */
+	    u16 weight;     /* 38 */
         } PACKED sedf;
 
     } PACKED u;

@@ -660,12 +660,12 @@ class XendDomain:
         except Exception, ex:
             raise XendError(str(ex))
     
-    def domain_cpu_sedf_set(self, id, period, slice):
-        """Set Atropos scheduler parameters for a domain.
+    def domain_cpu_sedf_set(self, id, period, slice, latency, extratime, weight):
+        """Set Simple EDF scheduler parameters for a domain.
         """
-        dominfo = self.domain_lookup(id)
+	dominfo = self.domain_lookup(id)
         try:
-            return xc.sedf_domain_set(dominfo.dom, period, slice)
+            return xc.sedf_domain_set(dominfo.dom, period, slice, latency, extratime, weight)
         except Exception, ex:
             raise XendError(str(ex))
 

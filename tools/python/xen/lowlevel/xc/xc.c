@@ -791,15 +791,14 @@ static PyObject *pyxc_sedf_domain_set(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
     u32 domid;
-    u64 period, slice;
+    u64 period, slice, latency;
+    u16 extratime, weight;
+    static char *kwd_list[] = { "dom", "period", "slice", "latency", "extratime", "weight",NULL };
     
-    static char *kwd_list[] = { "dom", "period", "slice", NULL };
-    
-    if( !PyArg_ParseTupleAndKeywords(args, kwds, "iLL", kwd_list, &domid,
-                                     &period, &slice) )
+    if( !PyArg_ParseTupleAndKeywords(args, kwds, "iLLLhh", kwd_list, &domid,
+                                     &period, &slice, &latency, &extratime, &weight) )
         return NULL;
-   
-    if ( xc_sedf_domain_set(xc->xc_handle, domid, period, slice) != 0 )
+   if ( xc_sedf_domain_set(xc->xc_handle, domid, period, slice, latency, extratime,weight) != 0 )
         return PyErr_SetFromErrno(xc_error);
 
     Py_INCREF(zero);
@@ -812,21 +811,24 @@ static PyObject *pyxc_sedf_domain_get(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
     u32 domid;
-    u64 period, slice;
-        
+    u64 period, slice,latency;
+    u16 weight, extratime;
+    
     static char *kwd_list[] = { "dom", NULL };
 
     if( !PyArg_ParseTupleAndKeywords(args, kwds, "i", kwd_list, &domid) )
         return NULL;
     
     if ( xc_sedf_domain_get( xc->xc_handle, domid, &period,
-                                &slice) )
+                                &slice,&latency,&extratime,&weight) )
         return PyErr_SetFromErrno(xc_error);
 
-    return Py_BuildValue("{s:i,s:L,s:L}",
-                         "domain",  domid,
-                         "period",  period,
-                         "slice",   slice);
+    return Py_BuildValue("{s:i,s:L,s:L,s:L,s:i}",
+                         "domain",    domid,
+                         "period",    period,
+                         "slice",     slice,
+			 "latency",   latency,
+			 "extratime", extratime);
 }
 
 static PyObject *pyxc_shadow_control(PyObject *self,
@@ -1068,9 +1070,11 @@ static PyMethodDef pyxc_methods[] = {
       (PyCFunction)pyxc_sedf_domain_set,
       METH_KEYWORDS, "\n"
       "Set the scheduling parameters for a domain when running with Atropos.\n"
-      " dom      [int]:  domain to set\n"
-      " period   [long]: domain's scheduling period\n"
-      " slice    [long]: domain's slice per period\n"
+      " dom       [int]:  domain to set\n"
+      " period    [long]: domain's scheduling period\n"
+      " slice     [long]: domain's slice per period\n"
+      " latency   [long]: domain's wakeup latency hint\n"
+      " extratime [int]:  domain aware of extratime?\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "sedf_domain_get",
@@ -1078,11 +1082,13 @@ static PyMethodDef pyxc_methods[] = {
       METH_KEYWORDS, "\n"
       "Get the current scheduling parameters for a domain when running with\n"
       "the Atropos scheduler."
-      " dom      [int]: domain to query\n"
-      "Returns:  [dict]\n"
-      " domain   [int]: domain ID\n"
-      " period   [long]: scheduler period\n"
-      " slice    [long]: CPU reservation per period\n"},
+      " dom       [int]: domain to query\n"
+      "Returns:   [dict]\n"
+      " domain    [int]: domain ID\n"
+      " period    [long]: scheduler period\n"
+      " slice     [long]: CPU reservation per period\n"
+      " latency   [long]: domain's wakeup latency hint\n"
+      " extratime [int]:  domain aware of extratime?\n"},
 
     { "evtchn_alloc_unbound", 
       (PyCFunction)pyxc_evtchn_alloc_unbound,
