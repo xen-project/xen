@@ -4,6 +4,10 @@
 
 SIZE=${1:?"size missing"}
 
+SITE_NFS=128.232.32.20
+SITE_GW=128.232.32.1
+SITE_MASK=255.255.240.0
+
 shift;
 
 ARGS="$*"
@@ -25,6 +29,11 @@ NEWNAME=$NEWADDR
 LOOKUP=`host $NEWADDR`
 echo $LOOKUP | grep 'domain name pointer' && NEWNAME=`echo $LOOKUP | sed -e 's!.*domain name pointer \([^ ]\+\).$!\1!'`
 echo New IP address : ${NEWADDR}  name : ${NEWNAME}
+
+#SITE_GW=`netstat -rn|while read a b c;do case "$a" in 0.0.0.0)echo "$b";;esac;done`
+
+IP_CONFIG="ip=${NEWADDR}:${SITE_NFS}:${SITE_GW}:${SITE_MASK}:${NEWNAME}:eth0:off"
+echo IP_CONFIG : ${IP_CONFIG}
 
 CMDLINE=`cat /proc/cmdline`
 case $CMDLINE in
@@ -48,8 +57,8 @@ esac
 
 echo New root arguments : ${NEWROOT_DEV}
 
-echo ./newdom ${SIZE} ${IMAGE} ${NEWADDR} ${NEWROOT_DEV} ${ARGS}
+echo ./newdom ${SIZE} ${IMAGE} ${NEWADDR} ${IP_CONFIG} ${NEWROOT_DEV} ${EXTRA_ARGS}
 
-./newdom ${SIZE} ${IMAGE} ${NEWADDR} ${NEWROOT_DEV} ${ARGS}
+./newdom ${SIZE} ${IMAGE} ${NEWADDR} ${IP_CONFIG} ${NEWROOT_DEV} ${EXTRA_ARGS}
 
 
