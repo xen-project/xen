@@ -296,17 +296,18 @@ static inline void __update_dom_time(struct exec_domain *ed)
     spin_unlock(&d->time_lock);
 }
 
-void update_dom_time(struct exec_domain *ed)
+int update_dom_time(struct exec_domain *ed)
 {
     unsigned long flags;
 
-    if ( ed->domain->shared_info->tsc_timestamp != full_tsc_irq )
-    {
-        read_lock_irqsave(&time_lock, flags);
-        __update_dom_time(ed);
-        read_unlock_irqrestore(&time_lock, flags);
-        send_guest_virq(ed, VIRQ_TIMER);
-    }
+    if ( ed->domain->shared_info->tsc_timestamp == full_tsc_irq )
+        return 0;
+
+    read_lock_irqsave(&time_lock, flags);
+    __update_dom_time(ed);
+    read_unlock_irqrestore(&time_lock, flags);
+
+    return 1;
 }
 
 /* Set clock to <secs,usecs> after 00:00:00 UTC, 1 January, 1970. */

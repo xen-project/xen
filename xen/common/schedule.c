@@ -457,8 +457,8 @@ void __enter_scheduler(void)
     clear_bit(EDF_RUNNING, &prev->ed_flags);
 
     /* Ensure that the domain has an up-to-date time base. */
-    if ( !is_idle_task(next->domain) )
-        update_dom_time(next);
+    if ( !is_idle_task(next->domain) && update_dom_time(next) )
+        send_guest_virq(next, VIRQ_TIMER);
 
     schedule_tail(next);
 
@@ -495,8 +495,8 @@ static void t_timer_fn(unsigned long unused)
 
     TRACE_0D(TRC_SCHED_T_TIMER_FN);
 
-    if ( !is_idle_task(ed->domain) )
-        update_dom_time(ed);
+    if ( !is_idle_task(ed->domain) && update_dom_time(ed) )
+        send_guest_virq(ed, VIRQ_TIMER);
 
     t_timer[ed->processor].expires = NOW() + MILLISECS(10);
     add_ac_timer(&t_timer[ed->processor]);
@@ -508,7 +508,8 @@ static void dom_timer_fn(unsigned long data)
     struct exec_domain *ed = (struct exec_domain *)data;
 
     TRACE_0D(TRC_SCHED_DOM_TIMER_FN);
-    update_dom_time(ed);
+    (void)update_dom_time(ed);
+    send_guest_virq(ed, VIRQ_TIMER);
 }
 
 /* Initialise the data structures. */
