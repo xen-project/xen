@@ -547,6 +547,7 @@ static PyObject *xu_message_new(PyObject *self, PyObject *args)
         P2C(blkif_fe_interface_status_changed_t, handle, u32);
         P2C(blkif_fe_interface_status_changed_t, status, u32);
         P2C(blkif_fe_interface_status_changed_t, evtchn, u16);
+        P2C(blkif_fe_interface_status_changed_t, domid,  u16);
         break;
     case TYPE(CMSG_BLKIF_BE, CMSG_BLKIF_BE_CREATE):
         P2C(blkif_be_create_t, domid,        u32);
@@ -594,6 +595,7 @@ static PyObject *xu_message_new(PyObject *self, PyObject *args)
         P2C(netif_fe_interface_status_changed_t, handle, u32);
         P2C(netif_fe_interface_status_changed_t, status, u32);
         P2C(netif_fe_interface_status_changed_t, evtchn, u16);
+        P2C(netif_fe_interface_status_changed_t, domid,  u16);
         P2C(netif_fe_interface_status_changed_t, mac[0], u8);
         P2C(netif_fe_interface_status_changed_t, mac[1], u8);
         P2C(netif_fe_interface_status_changed_t, mac[2], u8);

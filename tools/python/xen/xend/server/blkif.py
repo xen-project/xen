@@ -121,6 +121,7 @@ class BlkifBackendController(controller.BackendController):
         msg = packMsg('blkif_fe_interface_status_changed_t',
                       { 'handle' : self.handle,
                         'status' : BLKIF_INTERFACE_STATUS_CONNECTED,
+                        'domid'  : 0, ## FIXME: should be domid of backend
                         'evtchn' : self.evtchn['port2'] })
         self.controller.writeRequest(msg, response=response)
         
@@ -382,6 +383,7 @@ class BlkifController(controller.SplitController):
         msg = packMsg('blkif_fe_interface_status_changed_t',
                       { 'handle' : 0,
                         'status' : BLKIF_INTERFACE_STATUS_DISCONNECTED,
+                        'domid'  : 0, ## FIXME: should be domid of backend
                         'evtchn' : 0 })
         self.writeRequest(msg)
 

@@ -234,6 +234,7 @@ class NetDev(controller.SplitDev):
                       { 'handle' : self.vif,
                         'status' : NETIF_INTERFACE_STATUS_CONNECTED,
                         'evtchn' : self.evtchn['port2'],
+                        'domid'  : 0, ## FIXME: should be domid of backend
                         'mac'    : self.mac })
         self.controller.writeRequest(msg)
 
@@ -242,6 +243,7 @@ class NetDev(controller.SplitDev):
                       { 'handle' : self.vif,
                         'status' : NETIF_INTERFACE_STATUS_DISCONNECTED,
                         'evtchn' : 0,
+                        'domid'  : 0, ## FIXME: should be domid of backend
                         'mac'    : self.mac })
         self.controller.writeRequest(msg)
         

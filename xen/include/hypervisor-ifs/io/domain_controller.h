@@ -96,7 +96,8 @@ typedef struct {
     u32 handle; /*  0 */
     u32 status; /*  4 */
     u16 evtchn; /*  8: (only if status == BLKIF_INTERFACE_STATUS_CONNECTED). */
-} PACKED blkif_fe_interface_status_changed_t; /* 10 bytes */
+    domid_t domid; /* 10: status != BLKIF_INTERFACE_STATUS_DESTROYED */
+} PACKED blkif_fe_interface_status_changed_t; /* 12 bytes */
 
 /*
  * CMSG_BLKIF_FE_DRIVER_STATUS_CHANGED:
@@ -347,7 +348,8 @@ typedef struct {
     u32        status; /*  4 */
     u16        evtchn; /*  8: status == NETIF_INTERFACE_STATUS_CONNECTED */
     u8         mac[6]; /* 10: status == NETIF_INTERFACE_STATUS_CONNECTED */
-} PACKED netif_fe_interface_status_changed_t; /* 16 bytes */
+    domid_t    domid;  /* 16: status != NETIF_INTERFACE_STATUS_DESTROYED */
+} PACKED netif_fe_interface_status_changed_t; /* 18 bytes */
 
 /*
  * CMSG_NETIF_FE_DRIVER_STATUS_CHANGED:
