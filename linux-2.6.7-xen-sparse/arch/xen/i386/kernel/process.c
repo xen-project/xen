@@ -502,10 +502,10 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 				 *next = &next_p->thread;
 	int cpu = smp_processor_id();
 	struct tss_struct *tss = init_tss + cpu;
-	unsigned long flags;
 	dom0_op_t op;
 
-	local_irq_save(flags);
+        /* NB. No need to disable interrupts as already done in sched.c */
+        /* __cli(); */
 
 	/*
 	 * Save away %fs and %gs. No need to save %es and %ds, as
@@ -569,8 +569,7 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 
 	/* EXECUTE ALL TASK SWITCH XEN SYSCALLS AT THIS POINT. */
 	execute_multicall_list();
-
-	local_irq_restore(flags);
+        /* __sti(); */
 
 	/*
 	 * Restore %fs and %gs if needed.

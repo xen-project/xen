@@ -218,6 +218,7 @@
 41062ab7HMSSuaUv3_Z4agLpjSO88A linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/mach-xen/pci-functions.h
 40f5623aDMCsWOFO0jktZ4e8sjwvEg linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/mach-xen/setup_arch_post.h
 40f5623arsFXkGdPvIqvFi3yFXGR0Q linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/mach-xen/setup_arch_pre.h
+4120f807GCO0uqsLqdZj9csxR1Wthw linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/mmu_context.h
 40f5623aFTyFTR-vdiA-KaGxk5JOKQ linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/msr.h
 40f5623adgjZq9nAgCt0IXdWl7udSA linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/page.h
 40f5623a54NuG-7qHihGYmw4wWQnMA linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/param.h
