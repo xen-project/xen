@@ -113,7 +113,7 @@ class ConsoleController(controller.Controller):
 
     def __init__(self, factory, dom, console_port):
         controller.Controller.__init__(self, factory, dom)
-        self.majorTypes = [ CMSG_CONSOLE ]
+        self.addMethod(CMSG_CONSOLE, 0, None)
         self.status = self.STATUS_NEW
         self.addr = None
         self.conn = None

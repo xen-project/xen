@@ -25,12 +25,9 @@ class NetifControllerFactory(controller.ControllerFactory):
 
     def __init__(self):
         controller.ControllerFactory.__init__(self)
-
-        self.majorTypes = [ CMSG_NETIF_BE ]
-
-        self.subTypes = {
-            CMSG_NETIF_BE_DRIVER_STATUS_CHANGED: self.recv_be_driver_status_changed,
-            }
+        self.addMethod(CMSG_NETIF_BE,
+                       CMSG_NETIF_BE_DRIVER_STATUS_CHANGED,
+                       self.recv_be_driver_status_changed)
         self.attached = 1
         self.registerChannel()
 
@@ -218,14 +215,12 @@ class NetifController(controller.Controller):
         controller.Controller.__init__(self, factory, dom)
         self.devices = {}
         
-        self.majorTypes = [ CMSG_NETIF_FE ]
-
-        self.subTypes = {
-            CMSG_NETIF_FE_DRIVER_STATUS_CHANGED:
-                self.recv_fe_driver_status_changed,
-            CMSG_NETIF_FE_INTERFACE_CONNECT    :
-                self.recv_fe_interface_connect,
-            }
+        self.addMethod(CMSG_NETIF_FE,
+                       CMSG_NETIF_FE_DRIVER_STATUS_CHANGED,
+                       self.recv_fe_driver_status_changed)
+        self.addMethod(CMSG_NETIF_FE,
+                       CMSG_NETIF_FE_INTERFACE_CONNECT,
+                       self.recv_fe_interface_connect)
         self.registerChannel()
 
     def sxpr(self):

@@ -20,12 +20,9 @@ class BlkifControllerFactory(controller.ControllerFactory):
 
     def __init__(self):
         controller.ControllerFactory.__init__(self)
-
-        self.majorTypes = [ CMSG_BLKIF_BE ]
-
-        self.subTypes = {
-            CMSG_BLKIF_BE_DRIVER_STATUS_CHANGED: self.recv_be_driver_status_changed,
-            }
+        self.addMethod(CMSG_BLKIF_BE,
+                       CMSG_BLKIF_BE_DRIVER_STATUS_CHANGED,
+                       self.recv_be_driver_status_changed)
         self.attached = 1
         self.registerChannel()
 
@@ -262,15 +259,12 @@ class BlkifController(controller.Controller):
     def __init__(self, factory, dom):
         controller.Controller.__init__(self, factory, dom)
         self.devices = {}
-
-        self.majorTypes = [ CMSG_BLKIF_FE ]
-
-        self.subTypes = {
-            CMSG_BLKIF_FE_DRIVER_STATUS_CHANGED:
-                self.recv_fe_driver_status_changed,
-            CMSG_BLKIF_FE_INTERFACE_CONNECT    :
-                self.recv_fe_interface_connect,
-            }
+        self.addMethod(CMSG_BLKIF_FE,
+                       CMSG_BLKIF_FE_DRIVER_STATUS_CHANGED,
+                       self.recv_fe_driver_status_changed)
+        self.addMethod(CMSG_BLKIF_FE,
+                       CMSG_BLKIF_FE_INTERFACE_CONNECT,
+                       self.recv_fe_interface_connect)
         self.attached = 1
         self.evtchn = None
         self.registerChannel()

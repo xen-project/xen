@@ -9,7 +9,7 @@ from twisted.internet import defer
 import channel
 from messages import msgTypeName, printMsg
 
-DEBUG = 0
+DEBUG = 1
 
 class Responder:
     """Handler for a response to a message with a specified id.
@@ -56,9 +56,7 @@ class CtrlMsgRcvr:
     @ivar dom: the domain we are a control interface for
     @type dom: int
     @ivar majorTypes: major message types we are interested in
-    @type majorTypes: [int]
-    @ivar subTypes: mapping of message subtypes to methods
-    @ivar subTypes: {int:method}
+    @type majorTypes: {int:{int:method}}
     @ivar timeout: timeout (in seconds) for message handlers
     @type timeout: int
     
@@ -72,8 +70,7 @@ class CtrlMsgRcvr:
 
     def __init__(self):
         self.channelFactory = channel.channelFactory()
-        self.majorTypes = [ ]
-        self.subTypes = {}
+        self.majorTypes = {}
         self.dom = None
         self.channel = None
         self.idx = None
@@ -82,6 +79,37 @@ class CtrlMsgRcvr:
 
     def setTimeout(self, timeout):
         self.timeout = timeout
+
+    def getMethod(self, type, subtype):
+        """Get the method for a type and subtype.
+
+        @param type: major message type
+        @param subtype: minor message type
+        @return: method or None
+        """
+        method = None
+        subtypes = self.majorTypes.get(type)
+        if subtypes:
+            method = subtypes.get(subtype)
+        return method
+
+    def addMethod(self, type, subtype, method):
+        """Add a method to handle a message type and subtype.
+        
+        @param type: major message type
+        @param subtype: minor message type
+        @param method: method
+        """
+        subtypes = self.majorTypes.get(type)
+        if not subtypes:
+            subtypes = {}
+            self.majorTypes[type] = subtypes
+        subtypes[subtype] = method
+
+    def getMajorTypes(self):
+        """Get the list of major message types handled.
+        """
+        return self.majorTypes.keys()
 
     def requestReceived(self, msg, type, subtype):
         """Dispatch a request message to handlers.
@@ -97,7 +125,7 @@ class CtrlMsgRcvr:
         if DEBUG:
             print 'requestReceived>',
             printMsg(msg, all=1)
-        method = self.subTypes.get(subtype)
+        method = self.getMethod(type, subtype)
         if method:
             method(msg, 1)
         elif DEBUG:
@@ -125,7 +153,7 @@ class CtrlMsgRcvr:
             printMsg(msg, all=1)
         if self.callResponders(msg):
             return
-        method = self.subTypes.get(subtype)
+        method = self.getMethod(type, subtype)
         if method:
             method(msg, 0)
         elif DEBUG:
@@ -190,7 +218,7 @@ class CtrlMsgRcvr:
         self.channel = self.channelFactory.domChannel(self.dom)
         self.idx = self.channel.getIndex()
         if self.majorTypes:
-            self.channel.registerDevice(self.majorTypes, self)
+            self.channel.registerDevice(self.getMajorTypes(), self)
         
     def deregisterChannel(self):
         """Deregister interest in our major message types with the
