@@ -499,7 +499,13 @@ static void dispatch_rw_block_io(struct task_struct *p,
         bh->b_size          = phys_seg[i].nr_sects << 9;
         bh->b_dev           = phys_seg[i].dev;
         bh->b_rsector       = (unsigned long)phys_seg[i].sector_number;
+
+	/* SMH: we store a 'pseudo-virtual' bogus address in b_data since
+	   later code will undo this transformation (i.e. +-PAGE_OFFSET). */
         bh->b_data          = phys_to_virt(phys_seg[i].buffer);
+	
+	/* SMH: bh_phys() uses the below field as a 'cheap' virt_to_phys */
+	bh->b_page          = &frame_table[phys_seg[i].buffer>>PAGE_SHIFT]; 
         bh->b_end_io        = end_block_io_op;
         bh->pending_req     = pending_req;
 

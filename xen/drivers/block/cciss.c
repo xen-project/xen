@@ -433,6 +433,44 @@ static void cciss_geninit( int ctlr)
 	}
 	hba[ctlr]->gendisk.nr_real = hba[ctlr]->highest_lun+1;
 }
+
+
+void cciss_probe_devices(xen_disk_info_t *xdi)
+{
+    int i, ctlr;
+    drive_info_struct *drv; 
+    xen_disk_t *xd = &xdi->disks[xdi->count];
+
+    ctlr = 0;  /* XXX SMH: only deal with 1 controller for now */
+
+    /* Loop through each real device */ 
+    for(i=0; i < NWD; i++) {
+	
+        drv = &(hba[ctlr]->drv[i]);
+	
+	if (!(drv->nr_blocks))
+            continue;
+	
+	if ( xdi->count == xdi->max )
+	    BUG();
+	
+	
+	hba[ctlr]->hd[i << NWD_SHIFT].nr_sects = 
+	    hba[ctlr]->sizes[i << NWD_SHIFT] = drv->nr_blocks;
+	
+	/* We export 'raw' linux device numbers to domain 0. */
+	xd->device   = MKDEV(hba[ctlr]->major, i << 4); 
+	xd->info     = XD_TYPE_DISK;   /* XXX should check properly   */
+        xd->capacity = drv->nr_blocks; /* in terms of 512byte sectors */
+	xd->domain   = 0;
+	
+	xdi->count++;
+        xd++;
+	
+    }
+
+}
+
 /*
  * Open.  Make sure the device is really there.
  */
@@ -2394,8 +2432,8 @@ next:
 	seg = 0;
 	lastdataend = ~0ULL;
 	while(bh) {
-//		if (bh_phys(bh) == lastdataend)
-		if ((page_to_phys(bh->b_page) + bh_offset(bh))== lastdataend)
+
+		if (bh_phys(bh) == lastdataend)
 		{  /* tack it on to the last segment */
 			tmp_sg[seg-1].length +=bh->b_size;
 			lastdataend += bh->b_size;
