@@ -29,8 +29,12 @@ class BlkifControllerFactory(controller.ControllerFactory):
     def createInstance(self, dom, recreate=0):
         """Create a block device controller for a domain.
 
-        dom      domain
-        recreate if true it's a recreate (after xend restart)
+        @param dom: domain
+        @type  dom: int
+        @param recreate: if true it's a recreate (after xend restart)
+        @type  recreate: bool
+        @return: deferred
+        @rtype: twisted.internet.defer.Deferred
         """
         d = defer.Deferred()
         blkif = self.getInstanceByDom(dom)
@@ -51,9 +55,10 @@ class BlkifControllerFactory(controller.ControllerFactory):
     def getDomainDevices(self, dom):
         """Get the block devices for a domain.
 
-        dom domain
-
-        returns devices
+        @param dom: domain
+        @type  dom: int
+        @return: devices
+        @rtype:  [device]
         """
         blkif = self.getInstanceByDom(dom)
         return (blkif and blkif.getDevices()) or []
@@ -61,10 +66,12 @@ class BlkifControllerFactory(controller.ControllerFactory):
     def getDomainDevice(self, dom, vdev):
         """Get a block device from a domain.
 
-        dom  domain
-        vdev device index
-
-        returns device
+        @param dom: domain
+        @type  dom: int
+        @param vdev: device index
+        @type  vedv: int
+        @return: device
+        @rtype:  device
         """
         blkif = self.getInstanceByDom(dom)
         return (blkif and blkif.getDevice(vdev)) or None
@@ -72,8 +79,10 @@ class BlkifControllerFactory(controller.ControllerFactory):
     def setControlDomain(self, dom, recreate=0):
         """Set the back-end block device controller domain.
 
-        dom      domain
-        recreate if true it's a recreate (after xend restart)
+        @param dom: domain
+        @type  dom: int
+        @param recreate: if true it's a recreate (after xend restart)
+        @type  recreate: int
         """
         if self.dom == dom: return
         self.deregisterChannel()
@@ -84,14 +93,19 @@ class BlkifControllerFactory(controller.ControllerFactory):
 
     def getControlDomain(self):
         """Get the back-end block device controller domain.
+
+        @return: domain
+        @rtype:  int
         """
         return self.dom
 
     def reattachDevice(self, dom, vdev):
         """Reattach a device (on changing control domain).
 
-        dom  domain
-        vdev device index
+        @param dom: domain
+        @type  dom: int
+        @param vdev: device index
+        @type  vdev: int
         """
         blkif = self.getInstanceByDom(dom)
         if blkif:
@@ -102,6 +116,9 @@ class BlkifControllerFactory(controller.ControllerFactory):
 
     def devicesAttached(self):
         """Check if all devices are attached.
+
+        @return: true if all devices attached
+        @rtype:  bool
         """
         attached = 1
         for blkif in self.getInstances():
@@ -111,19 +128,32 @@ class BlkifControllerFactory(controller.ControllerFactory):
         return attached
                          
     def reattached(self):
-        """Notify all block interface we have been reattached
+        """Notify all block interfaces we have been reattached
         (after changing control domain).
         """
         for blkif in self.getInstances():
             blkif.reattached()
 
     def respond_be_create(self, msg, d):
+        """Response handler for a be_create message.
+        Calls I{d} with the block interface created.
+
+        @param msg: message
+        @type  msg: xu message
+        @param d: deferred to call
+        @type  d: Deferred
+        """
         print 'respond_be_create>'
         val = unpackMsg('blkif_be_create_t', msg)
         blkif = self.getInstanceByDom(val['domid'])
         d.callback(blkif)
     
     def respond_be_connect(self, msg):
+        """Response handler for a be_connect message.
+
+        @param msg: message
+        @type  msg: xu message
+        """
         print 'respond_be_connect>', self
         val = unpackMsg('blkif_be_connect_t', msg)
         blkif = self.getInstanceByDom(val['domid'])
@@ -133,6 +163,15 @@ class BlkifControllerFactory(controller.ControllerFactory):
             pass
     
     def respond_be_vbd_create(self, msg, d):
+        """Response handler for a be_vbd_create message.
+        Tries to grow the vbd, and passes the deferred I{d} on for
+        the grow to call.
+
+        @param msg: message
+        @type  msg: xu message
+        @param d: deferred to call
+        @type  d: Deferred
+        """
         print 'recv_be_vbd_create>', self
         val = unpackMsg('blkif_be_vbd_create_t', msg)
         blkif = self.getInstanceByDom(val['domid'])
@@ -145,6 +184,13 @@ class BlkifControllerFactory(controller.ControllerFactory):
             pass
     
     def respond_be_vbd_grow(self, msg, d):
+        """Response handler for a be_vbd_grow message.
+
+        @param msg: message
+        @type  msg: xu message
+        @param d: deferred to call
+        @type  d: Deferred or None
+        """
         print 'recv_be_vbd_grow>', self
         val = unpackMsg('blkif_be_vbd_grow_t', msg)
         # Check status?
@@ -155,6 +201,13 @@ class BlkifControllerFactory(controller.ControllerFactory):
             self.reattachDevice(val['domid'], val['vdevice'])
 
     def recv_be_driver_status_changed(self, msg, req):
+        """Request handler for be_driver_status_changed messages.
+        
+        @param msg: message
+        @type  msg: xu message
+        @param req: request flag (true if the msg is a request)
+        @type  req: bool
+        """
         print 'recv_be_driver_status_changed>', self, req
         val = unpackMsg('blkif_be_driver_status_changed_t', msg)
         status = val['status']
@@ -222,6 +275,17 @@ class BlkifController(controller.Controller):
         return self.devices.get(vdev)
 
     def addDevice(self, vdev, mode, segment):
+        """Add a device to the device table.
+
+        @param vdev:     device index
+        @type  vdev:     int
+        @param mode:     read/write mode
+        @type  mode:     string
+        @param segment:  segment
+        @type  segment:  int
+        @return: device
+        @rtype:  BlkDev
+        """
         if vdev in self.devices: return None
         dev = BlkDev(self, vdev, mode, segment)
         self.devices[vdev] = dev
@@ -230,12 +294,16 @@ class BlkifController(controller.Controller):
     def attachDevice(self, vdev, mode, segment, recreate=0):
         """Attach a device to the specified interface.
 
-        vdev     device index
-        mode     read/write mode
-        segment  segment
-        recreate if true it's being recreated (after xend restart)
-
-        returns deferred
+        @param vdev:     device index
+        @type  vdev:     int
+        @param mode:     read/write mode
+        @type  mode:     string
+        @param segment:  segment
+        @type  segment:  int
+        @param recreate: if true it's being recreated (after xend restart)
+        @type  recreate: bool
+        @return: deferred
+        @rtype:  Deferred
         """
         dev = self.addDevice(vdev, mode, segment)
         if not dev: return -1

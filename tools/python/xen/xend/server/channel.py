@@ -2,7 +2,7 @@
 
 import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
 from xen.lowlevel import xu
-from messages import msgTypeName
+from messages import msgTypeName, printMsg
 
 VIRQ_MISDIRECT  = 0  # Catch-all interrupt for unbound VIRQs.
 VIRQ_TIMER      = 1  # Timebase update, and/or requested timeout.
@@ -222,12 +222,18 @@ class Channel(BaseChannel):
 
     def getLocalPort(self):
         """Get the local port.
+
+        @return: local port
+        @rtype:  int
         """
         if self.closed: return -1
         return self.port.local_port
 
     def getRemotePort(self):
         """Get the remote port.
+
+        @return: remote port
+        @rtype:  int
         """
         if self.closed: return -1
         return self.port.remote_port
@@ -248,8 +254,9 @@ class Channel(BaseChannel):
     def registerDevice(self, types, dev):
         """Register a device controller.
 
-        @param types message types the controller handles
-        @param dev   device controller
+        @param types: message types the controller handles
+        @type  types: array of ints
+        @param dev:   device controller
         """
         if self.closed: return
         self.devs.append(dev)
@@ -259,7 +266,7 @@ class Channel(BaseChannel):
     def deregisterDevice(self, dev):
         """Remove the registration for a device controller.
 
-        @param dev device controller
+        @param dev: device controller
         """
         if dev in self.devs:
             self.devs.remove(dev)
@@ -270,13 +277,20 @@ class Channel(BaseChannel):
     def getDevice(self, type):
         """Get the device controller handling a message type.
 
-        @param type message type
-        @returns controller or None
+        @param type: message type
+        @type  type: int
+        @return: controller or None
+        @rtype:  device controller
         """
         return self.devs_by_type.get(type)
 
     def getMessageType(self, msg):
         """Get a 2-tuple of the message type and subtype.
+
+        @param msg: message
+        @type  msg: xu message
+        @return: type info
+        @rtype:  (int, int)
         """
         hdr = msg.get_header()
         return (hdr['type'], hdr.get('subtype'))
