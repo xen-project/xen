@@ -81,6 +81,8 @@ typedef struct domain_launch
     unsigned long virt_startinfo_addr;
     unsigned int num_vifs;
     char cmd_line[MAX_CMD_LEN];
+    unsigned long virt_mod_addr;
+    unsigned long virt_mod_len;
 } dom_meminfo_t;
 
 
