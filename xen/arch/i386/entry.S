@@ -373,7 +373,7 @@ test_all_events:
         andl UPCALL_PENDING(%eax),%ecx  # ECX = pending & ~mask
         andl $1,%ecx                    # Is bit 0 pending and not masked?
         jz   restore_all_guest
-        orl  %ecx,UPCALL_MASK(%eax)     # Upcalls are masked during delivery
+        lock btsl $0,UPCALL_MASK(%eax)  # Upcalls are masked during delivery
 /*process_guest_events:*/
         movzwl PROCESSOR(%ebx),%edx
         shl  $4,%edx                    # sizeof(guest_trap_bounce) == 16

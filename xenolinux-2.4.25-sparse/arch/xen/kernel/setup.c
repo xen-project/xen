@@ -1151,6 +1151,9 @@ static void stop_task(void *unused)
     extern void blkdev_suspend(void);
     extern void blkdev_resume(void);
     
+    extern void time_suspend(void);
+    extern void time_resume(void);
+
     unsigned long *pfn_to_mfn_frame_list = NULL;
     suspend_record_t *suspend_record     = NULL;
     struct net_device *dev;
@@ -1198,6 +1201,8 @@ static void stop_task(void *unused)
 
     __cli();
 
+    time_suspend();
+
     HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
     clear_fixmap(FIX_SHARED_INFO);
 
@@ -1210,6 +1215,8 @@ static void stop_task(void *unused)
     set_fixmap(FIX_SHARED_INFO, start_info.shared_info);
     HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
     memset(empty_zero_page, 0, PAGE_SIZE);
+
+    time_resume();
 
     __sti();
 

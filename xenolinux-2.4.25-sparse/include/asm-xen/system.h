@@ -4,9 +4,10 @@
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
+#include <linux/bitops.h>
+#include <asm/synch_bitops.h>
 #include <asm/segment.h>
 #include <asm/hypervisor.h>
-#include <linux/bitops.h> /* for LOCK_PREFIX */
 #include <asm/evtchn.h>
 
 #ifdef __KERNEL__
@@ -250,19 +251,19 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 	unsigned long prev;
 	switch (size) {
 	case 1:
-		__asm__ __volatile__(LOCK_PREFIX "cmpxchgb %b1,%2"
+		__asm__ __volatile__("lock cmpxchgb %b1,%2"
 				     : "=a"(prev)
 				     : "q"(new), "m"(*__xg(ptr)), "0"(old)
 				     : "memory");
 		return prev;
 	case 2:
-		__asm__ __volatile__(LOCK_PREFIX "cmpxchgw %w1,%2"
+		__asm__ __volatile__("lock cmpxchgw %w1,%2"
 				     : "=a"(prev)
 				     : "q"(new), "m"(*__xg(ptr)), "0"(old)
 				     : "memory");
 		return prev;
 	case 4:
-		__asm__ __volatile__(LOCK_PREFIX "cmpxchgl %1,%2"
+		__asm__ __volatile__("lock cmpxchgl %1,%2"
 				     : "=a"(prev)
 				     : "q"(new), "m"(*__xg(ptr)), "0"(old)
 				     : "memory");
@@ -320,49 +321,47 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 
 #define set_wmb(var, value) do { var = value; wmb(); } while (0)
 
+#define safe_halt()             ((void)0)
+
 /*
- * NB. ALl the following routines are SMP-safe on x86, even where they look
- * possibly racy. For example, we must ensure that we clear the mask bit and
- * /then/ check teh pending bit. But this will happen because the bit-update
- * operations are ordering barriers.
- * 
- * For this reason also, many uses of 'barrier' here are rather anal. But
- * they do no harm.
+ * Note the use of synch_*_bit() operations in the following. These operations
+ * ensure correct serialisation of checks and updates w.r.t. Xen executing on
+ * a different CPU.
  */
 
 #define __cli()                                                               \
 do {                                                                          \
-    set_bit(0, &HYPERVISOR_shared_info->evtchn_upcall_mask);                  \
-    barrier();                                                                \
+    synch_set_bit(0, &HYPERVISOR_shared_info->evtchn_upcall_mask);            \
 } while (0)
 
 #define __sti()                                                               \
 do {                                                                          \
     shared_info_t *_shared = HYPERVISOR_shared_info;                          \
-    clear_bit(0, &_shared->evtchn_upcall_mask);                               \
-    barrier();                                                                \
-    if ( unlikely(test_bit(0, &_shared->evtchn_upcall_pending)) )             \
+    synch_clear_bit(0, &_shared->evtchn_upcall_mask);                         \
+    if ( unlikely(synch_test_bit(0, &_shared->evtchn_upcall_pending)) )       \
         evtchn_do_upcall(NULL);                                               \
 } while (0)
 
 #define __save_flags(x)                                                       \
 do {                                                                          \
-    (x) = test_bit(0, &HYPERVISOR_shared_info->evtchn_upcall_mask);           \
-    barrier();                                                                \
+    (x) = synch_test_bit(0, &HYPERVISOR_shared_info->evtchn_upcall_mask);     \
 } while (0)
 
-#define __restore_flags(x)      do { if (x) __cli(); else __sti(); } while (0)
+#define __restore_flags(x) do { if (x) __cli(); else __sti(); } while (0)
 
-#define safe_halt()             ((void)0)
-
-#define __save_and_cli(x)	do { __save_flags(x); __cli(); } while(0);
-#define __save_and_sti(x)	do { __save_flags(x); __sti(); } while(0);
-
-#define local_irq_save(x)                                                     \
+#define __save_and_cli(x)                                                     \
 do {                                                                          \
-    (x) = test_and_set_bit(0, &HYPERVISOR_shared_info->evtchn_upcall_mask);   \
-    barrier();                                                                \
+    (x) = synch_test_and_set_bit(                                             \
+        0, &HYPERVISOR_shared_info->evtchn_upcall_mask);                      \
 } while (0)
+
+#define __save_and_sti(x)                                                     \
+do {                                                                          \
+    (x) = synch_test_and_clear_bit(                                           \
+        0, &HYPERVISOR_shared_info->evtchn_upcall_mask);                      \
+} while (0)
+
+#define local_irq_save(x)       __save_and_cli(x)
 #define local_irq_restore(x)    __restore_flags(x)
 #define local_irq_disable()     __cli()
 #define local_irq_enable()      __sti()

@@ -13,6 +13,7 @@
 #include <linux/config.h>
 #include <asm/hypervisor.h>
 #include <asm/ptrace.h>
+#include <asm/synch_bitops.h>
 
 /*
  * LOW-LEVEL DEFINITIONS
@@ -27,21 +28,15 @@ void evtchn_device_upcall(int port, int exception);
 static inline void mask_evtchn(int port)
 {
     shared_info_t *s = HYPERVISOR_shared_info;
-    set_bit(port, &s->evtchn_mask[0]);
+    synch_set_bit(port, &s->evtchn_mask[0]);
 }
 
-/*
- * I haven't thought too much about the synchronisation in here against
- * other CPUs, but all the bit-update operations are reorder barriers on
- * x86 so reordering concerns aren't a problem for now. Some mb() calls
- * would be required on weaker architectures I think. -- KAF (24/3/2004)
- */
 static inline void unmask_evtchn(int port)
 {
     shared_info_t *s = HYPERVISOR_shared_info;
     int need_upcall = 0;
 
-    clear_bit(port, &s->evtchn_mask[0]);
+    synch_clear_bit(port, &s->evtchn_mask[0]);
 
     /*
      * The following is basically the equivalent of 'hw_resend_irq'. Just like
@@ -49,34 +44,43 @@ static inline void unmask_evtchn(int port)
      */
 
     /* Asserted a standard notification? */
-    if (  test_bit        (port,    &s->evtchn_pending[0]) && 
-         !test_and_set_bit(port>>5, &s->evtchn_pending_sel) )
+    if (  synch_test_bit        (port,    &s->evtchn_pending[0]) && 
+         !synch_test_and_set_bit(port>>5, &s->evtchn_pending_sel) )
         need_upcall = 1;
 
     /* Asserted an exceptional notification? */
-    if (  test_bit        (port,    &s->evtchn_exception[0]) && 
-         !test_and_set_bit(port>>5, &s->evtchn_exception_sel) )
+    if (  synch_test_bit        (port,    &s->evtchn_exception[0]) && 
+         !synch_test_and_set_bit(port>>5, &s->evtchn_exception_sel) )
         need_upcall = 1;
 
     /* If asserted either type of notification, check the master flags. */
     if ( need_upcall &&
-         !test_and_set_bit(0,       &s->evtchn_upcall_pending) &&
-         !test_bit        (0,       &s->evtchn_upcall_mask) )
+         !synch_test_and_set_bit(0,       &s->evtchn_upcall_pending) &&
+         !synch_test_bit        (0,       &s->evtchn_upcall_mask) )
         evtchn_do_upcall(NULL);
 }
 
 static inline void clear_evtchn(int port)
 {
     shared_info_t *s = HYPERVISOR_shared_info;
-    clear_bit(port, &s->evtchn_pending[0]);
+    synch_clear_bit(port, &s->evtchn_pending[0]);
 }
 
 static inline void clear_evtchn_exception(int port)
 {
     shared_info_t *s = HYPERVISOR_shared_info;
-    clear_bit(port, &s->evtchn_exception[0]);
+    synch_clear_bit(port, &s->evtchn_exception[0]);
 }
 
+static inline void evtchn_clear_error_virq(void)
+{
+    /*
+     * XXX This prevents a bogus 'VIRQ_ERROR' when interrupts are enabled
+     * for the first time. This works because by this point all important
+     * VIRQs (eg. timer) have been properly bound.
+     */
+    synch_clear_bit(0, &HYPERVISOR_shared_info->evtchn_pending[0]);
+}
 
 /*
  * CHARACTER-DEVICE DEFINITIONS

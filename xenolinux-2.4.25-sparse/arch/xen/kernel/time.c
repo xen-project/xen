@@ -634,6 +634,24 @@ void __init time_init(void)
     rdtscll(alarm);
 }
 
+void time_suspend(void)
+{
+}
+
+void time_resume(void)
+{
+    unsigned long flags;
+    write_lock_irqsave(&xtime_lock, flags);
+    /* Get timebases for new environment. */ 
+    __get_time_values_from_xen();
+    /* Reset our own concept of passage of system time. */
+    processed_system_time = shadow_system_time;
+    /* Accept a warp in UTC (wall-clock) time. */
+    last_seen_tv.tv_sec = 0;
+    /* Make sure we resync UTC time with Xen on next timer interrupt. */
+    last_update_from_xen = 0;
+    write_unlock_irqrestore(&xtime_lock, flags);
+}
 
 /*
  * /proc/sys/xen: This really belongs in another file. It can stay here for

@@ -144,12 +144,7 @@ void xen_console_init(void)
 
     register_console(&kcons_info);
 
-    /*
-     * XXX This prevents a bogus 'VIRQ_ERROR' when interrupts are enabled
-     * for the first time. This works because by this point all important
-     * VIRQs (eg. timer) have been properly bound.
-     */
-    clear_bit(0, &HYPERVISOR_shared_info->evtchn_pending[0]);
+    evtchn_clear_error_virq();
 }
 
 

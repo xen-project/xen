@@ -14,6 +14,7 @@
 #include <asm/atomic.h>
 #include <asm/system.h>
 #include <asm/ptrace.h>
+#include <asm/synch_bitops.h>
 #include <asm/hypervisor.h>
 #include <asm/hypervisor-ifs/event_channel.h>
 
@@ -84,7 +85,7 @@ static void evtchn_handle_exceptions(shared_info_t *s, struct pt_regs *regs)
             {
                 printk(KERN_ALERT "Error on IRQ line %d!\n", 
                        dynirq + DYNIRQ_BASE);
-                clear_bit(port, &s->evtchn_exception[0]);
+                synch_clear_bit(port, &s->evtchn_exception[0]);
             }
             else
                 evtchn_device_upcall(port, 1);
@@ -99,7 +100,7 @@ void evtchn_do_upcall(struct pt_regs *regs)
 
     local_irq_save(flags);
     
-    while ( test_and_clear_bit(0, &s->evtchn_upcall_pending) )
+    while ( synch_test_and_clear_bit(0, &s->evtchn_upcall_pending) )
     {
         if ( s->evtchn_pending_sel != 0 )
             evtchn_handle_normal(s, regs);
