@@ -1,7 +1,7 @@
 /******************************************************************************
  * arch/xen/drivers/netif/frontend/main.c
  * 
- * Virtual network driver for XenoLinux.
+ * Virtual network driver for conversing with remote driver backends.
  * 
  * Copyright (c) 2002-2004, K A Fraser
  */
@@ -36,7 +36,6 @@
 
 static void network_tx_buf_gc(struct net_device *dev);
 static void network_alloc_rx_buffers(struct net_device *dev);
-static void cleanup_module(void);
 
 static unsigned long rx_pfn_array[NETIF_RX_RING_SIZE];
 static multicall_entry_t rx_mcl[NETIF_RX_RING_SIZE+1];
@@ -63,11 +62,16 @@ struct net_private
     unsigned int evtchn;
     unsigned int irq;
 
-#define NETIF_STATE_CLOSED       0
-#define NETIF_STATE_DISCONNECTED 1
-#define NETIF_STATE_CONNECTED    2
-#define NETIF_STATE_ACTIVE       3
-    unsigned int state;
+    /* What is the status of our connection to the remote backend? */
+#define BEST_CLOSED       0
+#define BEST_DISCONNECTED 1
+#define BEST_CONNECTED    2
+    unsigned int backend_state;
+
+    /* Is this interface open or closed (down or up)? */
+#define UST_CLOSED        0
+#define UST_OPEN          1
+    unsigned int user_state;
 
     /*
      * {tx,rx}_skbs store outstanding skbuffs. The first entry in each
@@ -135,7 +139,8 @@ static int netctrl_err(int err)
 static int netctrl_connected(void)
 {
     int ok = 0;
-    ok = (netctrl.err ? netctrl.err : (netctrl.connected_n == netctrl.interface_n));
+    ok = (netctrl.err ? netctrl.err :
+          (netctrl.connected_n == netctrl.interface_n));
     return ok;
 }
 
@@ -152,12 +157,13 @@ static int netctrl_connected_count(void)
 
     connected = 0;
     
-    list_for_each(ent, &dev_list) {
+    list_for_each(ent, &dev_list)
+    {
         np = list_entry(ent, struct net_private, list);
-        if ( np->state == NETIF_STATE_CONNECTED){
+        if ( np->backend_state == BEST_CONNECTED )
             connected++;
-        }
     }
+
     netctrl.connected_n = connected;
     return connected;
 }
@@ -165,31 +171,15 @@ static int netctrl_connected_count(void)
 static int network_open(struct net_device *dev)
 {
     struct net_private *np = dev->priv;
-    int i;
 
-    if ( np->state != NETIF_STATE_CONNECTED )
-        return -EINVAL;
-
-    np->rx_resp_cons = np->tx_resp_cons = np->tx_full = 0;
     memset(&np->stats, 0, sizeof(np->stats));
-    spin_lock_init(&np->tx_lock);
-    spin_lock_init(&np->rx_lock);
 
-    /* Initialise {tx,rx}_skbs to be a free chain containing every entry. */
-    for ( i = 0; i <= NETIF_TX_RING_SIZE; i++ )
-        np->tx_skbs[i] = (void *)(i+1);
-    for ( i = 0; i <= NETIF_RX_RING_SIZE; i++ )
-        np->rx_skbs[i] = (void *)(i+1);
-
-    wmb();
-    np->state = NETIF_STATE_ACTIVE;
+    np->user_state = UST_OPEN;
 
     network_alloc_rx_buffers(dev);
     np->rx->event = np->rx_resp_cons + 1;
 
     netif_start_queue(dev);
-
-    MOD_INC_USE_COUNT;
 
     return 0;
 }
@@ -201,6 +191,9 @@ static void network_tx_buf_gc(struct net_device *dev)
     unsigned short id;
     struct net_private *np = dev->priv;
     struct sk_buff *skb;
+
+    if ( np->backend_state != BEST_CONNECTED )
+        return;
 
     do {
         prod = np->tx->resp_prod;
@@ -233,7 +226,7 @@ static void network_tx_buf_gc(struct net_device *dev)
          ((np->tx->req_prod - prod) < NETIF_TX_RING_SIZE) )
     {
         np->tx_full = 0;
-        if ( np->state == NETIF_STATE_ACTIVE )
+        if ( np->user_state == UST_OPEN )
             netif_wake_queue(dev);
     }
 }
@@ -249,7 +242,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 
     /* Make sure the batch is large enough to be worthwhile (1/2 ring). */
     if ( unlikely((i - np->rx_resp_cons) > (NETIF_RX_RING_SIZE/2)) || 
-         unlikely(np->state != NETIF_STATE_ACTIVE) )
+         unlikely(np->backend_state != BEST_CONNECTED) )
         return;
 
     do {
@@ -333,8 +326,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
     
     spin_lock_irq(&np->tx_lock);
 
-    /* if the backend isn't available then don't do anything! */
-    if ( !netif_carrier_ok(dev) )
+    if ( np->backend_state != BEST_CONNECTED )
     {
         spin_unlock_irq(&np->tx_lock);
         return 1;
@@ -383,11 +375,11 @@ static void netif_int(int irq, void *dev_id, struct pt_regs *ptregs)
     unsigned long flags;
 
     spin_lock_irqsave(&np->tx_lock, flags);
-    if ( likely(netif_carrier_ok(dev)) )
-        network_tx_buf_gc(dev);
+    network_tx_buf_gc(dev);
     spin_unlock_irqrestore(&np->tx_lock, flags);
 
-    if ( np->rx_resp_cons != np->rx->resp_prod )
+    if ( (np->rx_resp_cons != np->rx->resp_prod) &&
+         (np->user_state == UST_OPEN) )
         netif_rx_schedule(dev);
 }
 
@@ -406,8 +398,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 
     spin_lock(&np->rx_lock);
 
-    /* If the device is undergoing recovery then don't do anything. */
-    if ( !netif_carrier_ok(dev) )
+    if ( np->backend_state != BEST_CONNECTED )
     {
         spin_unlock(&np->rx_lock);
         return 0;
@@ -430,7 +421,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
         if ( unlikely(rx->status <= 0) )
         {
             /* Gate this error. We get a (valid) slew of them on suspend. */
-            if ( np->state == NETIF_STATE_ACTIVE )
+            if ( np->user_state != UST_OPEN )
                 printk(KERN_ALERT "bad buffer on RX ring!(%d)\n", rx->status);
             dev_kfree_skb(skb);
             continue;
@@ -517,22 +508,8 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 static int network_close(struct net_device *dev)
 {
     struct net_private *np = dev->priv;
-
+    np->user_state = UST_CLOSED;
     netif_stop_queue(np->dev);
-
-    np->state = NETIF_STATE_CONNECTED;
-
-    /* XXX We need to properly disconnect via the domain controller. */
-    while ( /*(np->rx_resp_cons != np->rx->req_prod) ||*/
-            (np->tx_resp_cons != np->tx->req_prod) )
-    {
-        barrier();
-        current->state = TASK_INTERRUPTIBLE;
-        schedule_timeout(1);
-    }
-
-    MOD_DEC_USE_COUNT;
-
     return 0;
 }
 
@@ -544,7 +521,8 @@ static struct net_device_stats *network_get_stats(struct net_device *dev)
 }
 
 
-static void network_reconnect(struct net_device *dev, netif_fe_interface_status_changed_t *status)
+static void network_connect(struct net_device *dev,
+                            netif_fe_interface_status_changed_t *status)
 {
     struct net_private *np;
     int i, requeue_idx;
@@ -576,8 +554,10 @@ static void network_reconnect(struct net_device *dev, netif_fe_interface_status_
      * to avoid this but maybe it doesn't matter so much given the
      * interface has been down.
      */
-    for( requeue_idx = 0, i = 1; i <= NETIF_TX_RING_SIZE; i++ ){
-            if( (unsigned long)np->tx_skbs[i] >= __PAGE_OFFSET ) {
+    for ( requeue_idx = 0, i = 1; i <= NETIF_TX_RING_SIZE; i++ )
+    {
+            if ( (unsigned long)np->tx_skbs[i] >= __PAGE_OFFSET )
+            {
                 struct sk_buff *skb = np->tx_skbs[i];
                 
                 tx = &np->tx->ring[requeue_idx++].req;
@@ -605,15 +585,12 @@ static void network_reconnect(struct net_device *dev, netif_fe_interface_status_
      * domain a kick because we've probably just requeued some
      * packets.
      */
-    netif_carrier_on(dev);
-    netif_start_queue(dev);
-    np->state = NETIF_STATE_ACTIVE;
-
+    np->backend_state = BEST_CONNECTED;
     notify_via_evtchn(status->evtchn);  
-
     network_tx_buf_gc(dev);
 
-    printk(KERN_INFO "Recovery completed\n");
+    if ( np->user_state == UST_OPEN )
+        netif_start_queue(dev);
 
     spin_unlock(&np->tx_lock);
     spin_unlock_irq(&np->rx_lock);
@@ -644,14 +621,14 @@ static void netif_status_change(netif_fe_interface_status_changed_t *status)
     {
     case NETIF_INTERFACE_STATUS_DESTROYED:
         printk(KERN_WARNING "Unexpected netif-DESTROYED message in state %d\n",
-               np->state);
+               np->backend_state);
         break;
 
     case NETIF_INTERFACE_STATUS_DISCONNECTED:
-        if ( np->state != NETIF_STATE_CLOSED )
+        if ( np->backend_state != BEST_CLOSED )
         {
             printk(KERN_WARNING "Unexpected netif-DISCONNECTED message"
-                   " in state %d\n", np->state);
+                   " in state %d\n", np->backend_state);
 	    printk(KERN_INFO "Attempting to reconnect network interface\n");
 
             /* Begin interface recovery.
@@ -672,8 +649,7 @@ static void netif_status_change(netif_fe_interface_status_changed_t *status)
             spin_lock_irq(&np->tx_lock);
             spin_lock(&np->rx_lock);
             netif_stop_queue(dev);
-            netif_carrier_off(dev);
-            np->state  = NETIF_STATE_DISCONNECTED;
+            np->backend_state = BEST_DISCONNECTED;
             spin_unlock(&np->rx_lock);
             spin_unlock_irq(&np->tx_lock);
 
@@ -689,7 +665,7 @@ static void netif_status_change(netif_fe_interface_status_changed_t *status)
         np->rx = (netif_rx_interface_t *)__get_free_page(GFP_KERNEL);
         memset(np->tx, 0, PAGE_SIZE);
         memset(np->rx, 0, PAGE_SIZE);
-        np->state  = NETIF_STATE_DISCONNECTED;
+        np->backend_state = BEST_DISCONNECTED;
 
         /* Construct an interface-CONNECT message for the domain controller. */
         cmsg.type      = CMSG_NETIF_FE;
@@ -705,18 +681,16 @@ static void netif_status_change(netif_fe_interface_status_changed_t *status)
         break;
 
     case NETIF_INTERFACE_STATUS_CONNECTED:
-        if ( np->state == NETIF_STATE_CLOSED ){
+        if ( np->backend_state == BEST_CLOSED )
+        {
             printk(KERN_WARNING "Unexpected netif-CONNECTED message"
-                   " in state %d\n", np->state);
+                   " in state %d\n", np->backend_state);
             break;
         }
 
         memcpy(dev->dev_addr, status->mac, ETH_ALEN);
 
-        if ( netif_carrier_ok(dev) )
-            np->state = NETIF_STATE_CONNECTED;
-        else
-            network_reconnect(dev, status);
+        network_connect(dev, status);
 
         np->evtchn = status->evtchn;
         np->irq = bind_evtchn_to_irq(np->evtchn);
@@ -740,20 +714,31 @@ static void netif_status_change(netif_fe_interface_status_changed_t *status)
  */
 static int create_netdev(int handle, struct net_device **val)
 {
-    int err = 0;
+    int i, err = 0;
     struct net_device *dev = NULL;
     struct net_private *np = NULL;
 
-    dev = alloc_etherdev(sizeof(struct net_private));
-    if (!dev){
+    if ( (dev = alloc_etherdev(sizeof(struct net_private))) == NULL )
+    {
         printk(KERN_WARNING "%s> alloc_etherdev failed.\n", __FUNCTION__);
         err = -ENOMEM;
         goto exit;
     }
-    np         = dev->priv;
-    np->state  = NETIF_STATE_CLOSED;
-    np->handle = handle;
+
+    np                = dev->priv;
+    np->backend_state = BEST_CLOSED;
+    np->user_state    = UST_CLOSED;
+    np->handle        = handle;
     
+    spin_lock_init(&np->tx_lock);
+    spin_lock_init(&np->rx_lock);
+
+    /* Initialise {tx,rx}_skbs to be a free chain containing every entry. */
+    for ( i = 0; i <= NETIF_TX_RING_SIZE; i++ )
+        np->tx_skbs[i] = (void *)(i+1);
+    for ( i = 0; i <= NETIF_RX_RING_SIZE; i++ )
+        np->rx_skbs[i] = (void *)(i+1);
+
     dev->open            = network_open;
     dev->hard_start_xmit = network_start_xmit;
     dev->stop            = network_close;
@@ -761,19 +746,19 @@ static int create_netdev(int handle, struct net_device **val)
     dev->poll            = netif_poll;
     dev->weight          = 64;
     
-    err = register_netdev(dev);
-    if (err){
+    if ( (err = register_netdev(dev)) != 0 )
+    {
         printk(KERN_WARNING "%s> register_netdev err=%d\n", __FUNCTION__, err);
         goto exit;
     }
     np->dev = dev;
     list_add(&np->list, &dev_list);
+
   exit:
-    if(err){
-        if(dev) kfree(dev);
-        dev = NULL;
-    }
-    if(val) *val = dev;
+    if ( (err != 0) && (dev != NULL ) )
+        kfree(dev);
+    else if ( val != NULL )
+        *val = dev;
     return err;
 }
 
@@ -790,9 +775,10 @@ static void netif_driver_status_change(
     netctrl.interface_n = status->nr_interfaces;
     netctrl.connected_n = 0;
 
-    for(i = 0; i < netctrl.interface_n; i++){
-        err = create_netdev(i, NULL);
-        if(err){
+    for ( i = 0; i < netctrl.interface_n; i++ )
+    {
+        if ( (err = create_netdev(i, NULL)) != 0 )
+        {
             netctrl_err(err);
             break;
         }
@@ -832,7 +818,7 @@ static void netif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
 }
 
 
-static int __init init_module(void)
+static int __init netif_init(void)
 {
     ctrl_msg_t                       cmsg;
     netif_fe_driver_status_changed_t st;
@@ -878,13 +864,4 @@ static int __init init_module(void)
     return err;
 }
 
-
-static void cleanup_module(void)
-{
-    /* XXX FIXME */
-    BUG();
-}
-
-
-module_init(init_module);
-module_exit(cleanup_module);
+__initcall(netif_init);
