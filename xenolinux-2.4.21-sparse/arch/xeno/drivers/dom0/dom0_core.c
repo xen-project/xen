@@ -57,14 +57,20 @@ int direct_disc_unmap(unsigned long, unsigned long, int);
 
 static unsigned char readbuf[1204];
 
-static int cmd_read_proc(char *page, char **start, off_t off,
-                         int count, int *eof, void *data)
+static int dom0_cmd_read(struct file *fp, char *buf, size_t count, loff_t *off)
 {
-    strcpy(page, readbuf);
+    int copied, maxlen;
+    if (count > 1024)
+        count = 1024;
+    maxlen = strlen(readbuf);
+    if (count > maxlen)
+      count = maxlen;
+    copied = count - copy_to_user(buf, readbuf, count);
     *readbuf = '\0';
-    *eof = 1;
-    *start = page;
-    return strlen(page);
+    if (copied != count)
+      return -EFAULT;
+    else
+      return copied;
 }
 
 static ssize_t dom_usage_read(struct file * file, char * buff, size_t size, loff_t * off)
@@ -265,13 +271,11 @@ struct file_operations newdom_data_fops = {
     read:    dom_data_read,
 };
 
-static int cmd_write_proc(struct file *file, const char *buffer, 
-                          u_long count, void *data)
+static int dom0_cmd_write(struct file *file, const char *buffer, size_t size,
+			  loff_t *off)
 {
     dom0_op_t op;
     int ret = 0;
-    struct proc_dir_entry * new_dom_id;
-    dom0_newdomain_t * params;
     
     copy_from_user(&op, buffer, sizeof(dom0_op_t));
 
@@ -285,34 +289,18 @@ static int cmd_write_proc(struct file *file, const char *buffer,
         ret = HYPERVISOR_pt_update((void *)op.u.pgupdate.pgt_update_arr,
                                    op.u.pgupdate.num_pgt_updates);
     }
+    else if (op.cmd == DOM0_CREATEDOMAIN)
+    {
+        /* This is now handled through an ioctl interface. Trying to
+	   do it this way means the /proc files for the new domain
+	   don't get created properly. */
+        ret = -EOPNOTSUPP;
+    }
     else
     {
         ret = HYPERVISOR_dom0_op(&op);
-
-        /* if new domain created, create proc entries */
-        if(op.cmd == DOM0_CREATEDOMAIN) {
-            create_proc_dom_entries(ret);
-
-            params = (dom0_newdomain_t *)kmalloc(sizeof(dom0_newdomain_t),
-                                                 GFP_KERNEL);
-            params->memory_kb = op.u.newdomain.memory_kb;
-            params->pg_head = op.u.newdomain.pg_head;
-            params->num_vifs = op.u.newdomain.num_vifs;
-            params->domain = op.u.newdomain.domain;
-
-            /* now notify user space of the new domain's id */
-            new_dom_id = create_proc_entry("new_dom_data", 0600, xeno_base);
-            if ( new_dom_id != NULL )
-            {
-                new_dom_id->owner      = THIS_MODULE;
-                new_dom_id->nlink      = 1;
-                new_dom_id->proc_fops  = &newdom_data_fops; 
-                new_dom_id->data       = (void *)params; 
-            }
-        }
     }
     
- out:
     return ret;   
 }
 
@@ -384,7 +372,7 @@ static int xeno_domains_show(struct seq_file *s, void *v)
                 di -> u.getdominfo.state,
                 di -> u.getdominfo.hyp_events,
                 di -> u.getdominfo.mcu_advance,
-                di -> u.getdominfo.pg_head,
+                (void *)di -> u.getdominfo.pg_head,
                 di -> u.getdominfo.tot_pages,
                 di -> u.getdominfo.name);
 
@@ -410,9 +398,70 @@ static struct file_operations proc_xeno_domains_operations = {
     release:        seq_release,
 };
 
+static int handle_dom0_cmd_createdomain(unsigned long data)
+{
+  struct dom0_createdomain_args argbuf;
+  int namelen;
+  dom0_op_t op;
+  int ret;
+
+  if (copy_from_user(&argbuf, (void *)data, sizeof(argbuf))) {
+    printk("fault getting argbuf.\n");
+    return -EFAULT;
+  }
+
+  op.cmd = DOM0_CREATEDOMAIN;
+  op.u.newdomain.domain = -666;
+  op.u.newdomain.memory_kb = argbuf.kb_mem;
+  op.u.newdomain.num_vifs = 0; /* Not used anymore, I hope... */
+  namelen = strnlen_user(argbuf.name, MAX_DOMAIN_NAME);
+  if (copy_from_user(op.u.newdomain.name, argbuf.name, namelen + 1)) {
+    printk("Fault getting domain name\n");
+    return -EFAULT;
+  }
+
+  /* Error checking?  The old code deosn't appear to do any, and I
+     can't see where the return values are documented... */
+  ret = HYPERVISOR_dom0_op(&op);
+
+  if (op.u.newdomain.domain == -666) {
+    /* HACK: We use this to detect whether the create actually
+       succeeded, because Xen doesn't appear to want to tell us... */
+
+    /* The only time I've actually got this to happen was when trying
+       to crate a domain with more memory than is actually in the
+       machine, so we guess the error code is ENOMEM. */
+    return -ENOMEM;
+  }
+
+  /* Create proc entries */
+  ret = op.u.newdomain.domain;
+  create_proc_dom_entries(ret);
+
+  return ret;
+}
+
+static int dom0_cmd_ioctl(struct inode *inode, struct file *file,
+			  unsigned int cmd, unsigned long data)
+{
+  printk("dom0_cmd ioctl command %x\n", cmd);
+  switch (cmd) {
+  case IOCTL_DOM0_CREATEDOMAIN:
+    return handle_dom0_cmd_createdomain(data);
+  default:
+    printk("Unknown dom0_cmd ioctl!\n");
+    return -EINVAL;
+  }
+}
+
 /***********************************************************************/
 
 
+static struct file_operations dom0_cmd_file_ops = {
+  read : dom0_cmd_read,
+  write : dom0_cmd_write,
+  ioctl : dom0_cmd_ioctl
+};
 
 static int __init init_module(void)
 {
@@ -422,12 +471,12 @@ static int __init init_module(void)
     /* xeno control interface */
     *readbuf = '\0';
     dom0_cmd_intf = create_proc_entry("dom0_cmd", 0600, xeno_base);
+
     if ( dom0_cmd_intf != NULL )
     {
         dom0_cmd_intf->owner      = THIS_MODULE;
         dom0_cmd_intf->nlink      = 1;
-        dom0_cmd_intf->read_proc  = cmd_read_proc;
-        dom0_cmd_intf->write_proc = cmd_write_proc;
+	dom0_cmd_intf->proc_fops  = &dom0_cmd_file_ops;
     }
 
     /* domain list interface */

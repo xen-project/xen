@@ -24,6 +24,8 @@
 #define MAX_CMD_LEN       256
 #define MAX_DOMAIN_NAME    16
 
+#define IOCTL_DOM0_CREATEDOMAIN _IOC(_IOC_NONE, 'x', 0, 0)
+
 typedef struct dom0_newdomain_st 
 {
     unsigned int domain;    // return parameter
@@ -111,5 +113,13 @@ typedef struct dom0_op_st
     u;
 } dom0_op_t;
 #endif
+
+/* Arguments to the CREATEDOMAIN ioctl on /proc/xeno/dom0_cmd.
+   Probably belongs in a Linux include file somewhere... */
+struct dom0_createdomain_args
+{
+  unsigned int kb_mem;
+  const char *name;
+};
 
 #endif

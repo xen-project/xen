@@ -12,6 +12,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <stdlib.h>
+#include <sys/ioctl.h>
+#include <errno.h>
+#include <string.h>
 
 #include "hypervisor_defs.h"
 #include "dom0_ops.h"
@@ -36,46 +39,36 @@ static void PERROR (char *message)
 
 /***********************************************************************/
 
-static dom0_newdomain_t * create_new_domain(long req_mem, char *name)
+static int create_new_domain(long req_mem, char *name)
 {
-    dom0_newdomain_t * dom_data;
     char cmd_path[MAX_PATH];
-    char dom_id_path[MAX_PATH];
-    dom0_op_t dop;
     int cmd_fd;
-    int id_fd;
+    int dom_id;
+    struct dom0_createdomain_args argbuf;
 
     /* open the /proc command interface */
     sprintf(cmd_path, "%s%s%s%s", "/proc/", PROC_XENO_ROOT, "/", PROC_CMD);
-    cmd_fd = open(cmd_path, O_WRONLY);
+    cmd_fd = open(cmd_path, O_RDWR);
     if(cmd_fd < 0){
         PERROR ("Could not open PROC_CMD interface");
-        return 0;
+        return -1;
     }
 
-    dop.cmd = DOM0_CREATEDOMAIN;
-    dop.u.newdomain.memory_kb = req_mem;
-    strncpy (dop.u.newdomain.name, name, MAX_DOMAIN_NAME - 1);
-    dop.u.newdomain.name[MAX_DOMAIN_NAME - 1] = 0;
-
-    write(cmd_fd, &dop, sizeof(dom0_op_t));
+    argbuf.kb_mem = req_mem;
+    argbuf.name = name;
+    dom_id = ioctl(cmd_fd, IOCTL_DOM0_CREATEDOMAIN, &argbuf);
+    if (dom_id < 0) {
+      PERROR("creating new domain");
+    }
     close(cmd_fd);
-
-    sprintf(dom_id_path, "%s%s%s%s", "/proc/", PROC_XENO_ROOT, "/", 
-        PROC_DOM_DATA);
-    while((id_fd = open(dom_id_path, O_RDONLY)) < 0) continue;
-    dom_data = (dom0_newdomain_t *)malloc(sizeof(dom0_newdomain_t));
-    read(id_fd, dom_data, sizeof(dom0_newdomain_t));
-    close(id_fd);
-    
-    return dom_data;
+    return dom_id;
 }    
 
 /***********************************************************************/
 
 int main(int argc, char **argv)
 {
-  dom0_newdomain_t * dom_data;
+  int dom_id;
 
   if (argv[0] != NULL) 
     {
@@ -88,11 +81,13 @@ int main(int argc, char **argv)
       return -1;
     }
 
-  if(!(dom_data = create_new_domain(atol(argv[1]), argv[2]))) 
+  dom_id = create_new_domain(atol(argv[1]), argv[2]);
+
+  if(dom_id < 0)
     {
       return -1;
     }
 
-  fprintf (stdout, "%d\n", dom_data -> domain);
+  fprintf (stdout, "%d\n", dom_id);
   return 0;
 }
