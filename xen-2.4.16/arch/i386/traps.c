@@ -385,53 +385,42 @@ asmlinkage void math_state_restore(struct pt_regs *regs, long error_code)
 }
 
 
-/*
- * Our handling of the processor debug registers is non-trivial.
- * We do not clear them on entry and exit from the kernel. Therefore
- * it is possible to get a watchpoint trap here from inside the kernel.
- * However, the code in ./ptrace.c has ensured that the user can
- * only set watchpoints on userspace addresses. Therefore the in-kernel
- * watchpoint trap can only occur in code which is reading/writing
- * from user space. Such code must not hold kernel locks (since it
- * can equally take a page fault), therefore it is safe to call
- * force_sig_info even though that claims and releases locks.
- * 
- * Code in ./signal.c ensures that the debug control register
- * is restored before we deliver any signal, and therefore that
- * user code runs with the correct debug control register even though
- * we clear it here.
- *
- * Being careful here means that we don't have to be as careful in a
- * lot of more complicated places (task switching can be a bit lazy
- * about restoring all the debug state, and ptrace doesn't have to
- * find every occurrence of the TF bit that could be saved away even
- * by user code)
- */
 asmlinkage void do_debug(struct pt_regs * regs, long error_code)
 {
     unsigned int condition;
     struct task_struct *tsk = current;
+    struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
 
     __asm__ __volatile__("movl %%db6,%0" : "=r" (condition));
 
     /* Mask out spurious debug traps due to lazy DR7 setting */
-    if (condition & (DR_TRAP0|DR_TRAP1|DR_TRAP2|DR_TRAP3)) {
-        if (!tsk->thread.debugreg[7])
-            goto clear_dr7;
+    if ( (condition & (DR_TRAP0|DR_TRAP1|DR_TRAP2|DR_TRAP3)) &&
+         (tsk->thread.debugreg[7] == 0) )
+    {
+        __asm__("movl %0,%%db7" : : "r" (0));
+        return;
     }
 
-    /* Save debug status register where ptrace can see it */
+    if ( (regs->xcs & 3) == 0 )
+    {
+        /* Clear TF just for absolute sanity. */
+        regs->eflags &= ~EF_TF;
+        /*
+         * Basically, we ignore watchpoints when they trigger in
+         * the hypervisor. This may happen when a buffer is passed
+         * to us which previously had a watchpoint set on it.
+         * No need to bump EIP; the only faulting trap is an
+         * instruction breakpoint, which can't happen to us.
+         */
+        return;
+    }
+
+    /* Save debug status register where guest OS can peek at it */
     tsk->thread.debugreg[6] = condition;
 
-    panic("trap up to OS here, pehaps\n");
-
-    /* Disable additional traps. They'll be re-enabled when
-     * the signal is delivered.
-     */
- clear_dr7:
-    __asm__("movl %0,%%db7"
-            : /* no output */
-            : "r" (0));
+    gtb->flags = GTBF_TRAP_NOCODE;
+    gtb->cs    = tsk->thread.traps[1].cs;
+    gtb->eip   = tsk->thread.traps[1].address;
 }
 
 
@@ -541,18 +530,6 @@ void __init trap_init(void)
      * 
      * 2. All others, we set gate DPL == 0. Any use of "INT n" will thus
      *    cause a GPF with CS:EIP pointing at the faulting instruction.
-     *    We can then peek at the instruction at check if it is of the
-     *    form "0xCD <imm8>". If so, we fake out an exception to the
-     *    guest OS. If the protected read page faults, we patch that up as
-     *    a page fault to the guest OS.
-     *    [NB. Of course we check the "soft DPL" to check that guest OS
-     *     wants to handle a particular 'n'. If not, we pass the GPF up
-     *     to the guest OS untouched.]
-     * 
-     * 3. For efficiency, we may want to allow direct traps by the guest
-     *    OS for certain critical vectors (eg. 0x80 in Linux). These must
-     *    therefore not be mapped by hardware interrupts, and so we'd need
-     *    a static list of them, which we add to on demand.
      */
 
     /* Only ring 1 can access monitor services. */
@@ -593,4 +570,70 @@ long do_fpu_taskswitch(void)
     current->flags |= PF_GUEST_STTS;
     stts();
     return 0;
+}
+
+
+long do_set_debugreg(int reg, unsigned long value)
+{
+    int i;
+
+    switch ( reg )
+    {
+    case 0: 
+        if ( value > (PAGE_OFFSET-4) ) return -EPERM;
+        __asm__ ( "movl %0, %%db0" : : "r" (value) );
+        break;
+    case 1: 
+        if ( value > (PAGE_OFFSET-4) ) return -EPERM;
+        __asm__ ( "movl %0, %%db1" : : "r" (value) );
+        break;
+    case 2: 
+        if ( value > (PAGE_OFFSET-4) ) return -EPERM;
+        __asm__ ( "movl %0, %%db2" : : "r" (value) );
+        break;
+    case 3:
+        if ( value > (PAGE_OFFSET-4) ) return -EPERM;
+        __asm__ ( "movl %0, %%db3" : : "r" (value) );
+        break;
+    case 6:
+        /*
+         * DR6: Bits 4-11,16-31 reserved (set to 1).
+         *      Bit 12 reserved (set to 0).
+         */
+        value &= 0xffffefff; /* reserved bits => 0 */
+        value |= 0xffff0ff0; /* reserved bits => 1 */
+        __asm__ ( "movl %0, %%db6" : : "r" (value) );
+        break;
+    case 7:
+        /*
+         * DR7: Bit 10 reserved (set to 1).
+         *      Bits 11-12,14-15 reserved (set to 0).
+         * Privileged bits:
+         *      GD (bit 13): must be 0.
+         *      R/Wn (bits 16-17,20-21,24-25,28-29): mustn't be 10.
+         *      LENn (bits 18-19,22-23,26-27,30-31): mustn't be 10.
+         */
+        /* DR7 == 0 => debugging disabled for this domain. */
+        if ( value != 0 )
+        {
+            value &= 0xffff27ff; /* reserved bits => 0 */
+            value |= 0x00000400; /* reserved bits => 1 */
+            if ( (value & (1<<13)) != 0 ) return -EPERM;
+            for ( i = 0; i < 16; i += 2 )
+                if ( ((value >> (i+16)) & 3) == 2 ) return -EPERM;
+        }
+        __asm__ ( "movl %0, %%db7" : : "r" (value) );
+        break;
+    default:
+        return -EINVAL;
+    }
+
+    current->thread.debugreg[reg] = value;
+    return 0;
+}
+
+unsigned long do_get_debugreg(int reg)
+{
+    if ( (reg < 0) || (reg > 7) ) return -EINVAL;
+    return current->thread.debugreg[reg];
 }

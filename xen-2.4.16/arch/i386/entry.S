@@ -302,6 +302,9 @@ FAULT11:movl %eax,4(%esi)
         movl EFLAGS+4(%esp),%eax
 FAULT12:movl %eax,8(%esi)
         /* Rewrite our stack frame and return to ring 1. */
+        /* IA32 Ref. Vol. 3: TF, VM, RF and NT flags are cleared on trap. */
+        andl $0xfffcbeff,%eax
+        movl %eax,EFLAGS+4(%esp)
         movl %ds,OLDSS+4(%esp)
         movl %esi,OLDESP+4(%esp)
         movzwl %es:GTB_CS(%edx),%eax
@@ -521,6 +524,8 @@ ENTRY(hypervisor_call_table)
         .long SYMBOL_NAME(kill_domain)
         .long SYMBOL_NAME(do_dom0_op)
         .long SYMBOL_NAME(do_network_op)
+        .long SYMBOL_NAME(do_set_debugreg)
+        .long SYMBOL_NAME(do_get_debugreg)
         .rept NR_syscalls-(.-hypervisor_call_table)/4
         .long SYMBOL_NAME(sys_ni_syscall)
 	.endr

@@ -693,6 +693,13 @@ int do_signal(struct pt_regs *regs, sigset_t *oldset)
 			}
 		}
 
+                /* Reenable any watchpoints before delivering the
+                 * signal to user space. The processor register will
+                 * have been cleared if the watchpoint triggered
+                 * inside the kernel.
+                 */
+                HYPERVISOR_set_debugreg(7, current->thread.debugreg[7]);
+
 		/* Whee!  Actually deliver the signal.  */
 		handle_signal(signr, ka, &info, oldset, regs);
 		return 1;
