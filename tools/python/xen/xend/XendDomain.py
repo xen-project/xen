@@ -130,9 +130,11 @@ class XendDomain:
     def initial_refresh(self):
         """Refresh initial domain info from domain_db.
         """
-        #for d in self.domain_db.values(): print 'db dom=', d
+            
+        def cb_all_ok(val):
+            self.refresh()
+
         domlist = xc.domain_getinfo()
-        #for d in domlist: print 'xc dom=', d
         doms = {}
         for d in domlist:
             domid = str(d['dom'])
@@ -140,22 +142,13 @@ class XendDomain:
         dlist = []
         for config in self.domain_db.values():
             domid = str(sxp.child_value(config, 'id'))
-            #print "dom=", domid, "config=", config
             if domid in doms:
-                #print "dom=", domid, "new"
-                deferred = self._new_domain(config, doms[domid])
-                dlist.append(deferred)
+                d_dom = self._new_domain(config, doms[domid])
+                dlist.append(d_dom)
             else:
-                #print "dom=", domid, "del"
                 self._delete_domain(domid)
-        deferred = defer.DeferredList(dlist, fireOnOneErrback=1)
-        def cbok(val):
-            #print "doms:"
-            #for d in self.domain.values(): print 'dom', d
-            self.refresh()
-            #print "XendDomain>initial_refresh> doms:"
-            #for d in self.domain.values(): print 'dom', d
-        deferred.addCallback(cbok)
+        d_all = defer.DeferredList(dlist, fireOnOneErrback=1)
+        d_all.addCallback(cb_all_ok)
 
     def sync(self):
         """Sync domain db to disk.
@@ -179,10 +172,13 @@ class XendDomain:
         @param info:      domain info from xen
         @return: deferred
         """
-        deferred = XendDomainInfo.vm_recreate(savedinfo, info)
-        def fn(dominfo):
+        def cbok(dominfo):
             self.domain[dominfo.id] = dominfo
-        deferred.addCallback(fn)
+            if dominfo.restart_pending():
+                self.domain_restart_add(dominfo)
+        
+        deferred = XendDomainInfo.vm_recreate(savedinfo, info)
+        deferred.addCallback(cbok)
         return deferred
 
     def _add_domain(self, id, info, notify=1):
@@ -250,9 +246,9 @@ class XendDomain:
             if id not in self.domain:
                 savedinfo = None
                 deferred = XendDomainInfo.vm_recreate(savedinfo, d)
-                def fn(dominfo):
+                def cbok(dominfo):
                     self._add_domain(dominfo.id, dominfo)
-                deferred.addCallback(fn)
+                deferred.addCallback(cbok)
         # Remove entries for domains that no longer exist.
         for d in self.domain.values():
             info = doms.get(d.id)
@@ -313,11 +309,11 @@ class XendDomain:
         @param config: configuration
         @return: deferred
         """
-        deferred = XendDomainInfo.vm_create(config)
-        def fn(dominfo):
+        def cbok(dominfo):
             self._add_domain(dominfo.id, dominfo)
             return dominfo
-        deferred.addCallback(fn)
+        deferred = XendDomainInfo.vm_create(config)
+        deferred.addCallback(cbok)
         return deferred
 
     def domain_restart(self, dominfo):
@@ -326,11 +322,12 @@ class XendDomain:
         @param dominfo: domain object
         @return: deferred
         """
-        deferred = dominfo.restart()
-        def fn(dominfo):
+        def cbok(dominfo):
             self._add_domain(dominfo.id, dominfo)
             return dominfo
-        deferred.addCallback(fn)
+        log.info("Restarting domain: id=%s name=%s", dominfo.id, dominfo.name)
+        deferred = dominfo.restart()
+        deferred.addCallback(cbok)
         return deferred        
 
     def domain_configure(self, id, config):
@@ -348,11 +345,11 @@ class XendDomain:
             raise XendError("Invalid domain: " + str(id))
         if dominfo.config:
             raise XendError("Domain already configured: " + str(id))
-        def fn(dominfo):
+        def cbok(dominfo):
             self._add_domain(dominfo.id, dominfo)
             return dominfo
         deferred = dominfo.construct(config)
-        deferred.addCallback(fn)
+        deferred.addCallback(cbok)
         return deferred
     
     def domain_restore(self, src, progress=0):
@@ -363,11 +360,11 @@ class XendDomain:
         @return: deferred
         """
         
-        def fn(dominfo):
+        def cbok(dominfo):
             self._add_domain(dominfo.id, dominfo)
             return dominfo
         deferred = XendDomainInfo.vm_restore(src, progress=progress)
-        deferred.addCallback(fn)
+        deferred.addCallback(cbok)
         return deferred
     
     def domain_get(self, id):
@@ -439,9 +436,12 @@ class XendDomain:
         restart = (force and reason == 'reboot') or dominfo.restart_needed(reason)
         if restart:
             dominfo.restarting()
-            self.restarts[id] = dominfo
-            log.info('Scheduling restart for domain: id=%s name=%s', id, dominfo.name)
-            self.domain_restarts_schedule()
+            self.domain_restart_add(dominfo)
+
+    def domain_restart_add(self, dominfo):
+        self.restarts[dominfo.id] = dominfo
+        log.info('Scheduling restart for domain: id=%s name=%s', dominfo.id, dominfo.name)
+        self.domain_restarts_schedule()
             
     def domain_restart_cancel(self, id):
         """Cancel any restart scheduled for a domain.
@@ -450,6 +450,7 @@ class XendDomain:
         """
         dominfo = self.restarts.get(id)
         if dominfo:
+            log.info('Cancelling restart for domain: id=%s name=%s', dominfo.id, dominfo.name)
             dominfo.restart_cancel()
             del self.restarts[id]
 
@@ -465,18 +466,18 @@ class XendDomain:
             # Remove it from the restarts.
             del self.restarts[id]
             try:
-                log.info('domain_restarts> restart: id=%s config=%s', id, str(dominfo.config))
                 def cbok(dominfo):
-                    log.info('Restarted domain %s as %s', id, dominfo.id)
+                    log.info('Restarted domain id=%s as %s', id, dominfo.id)
                     self.domain_unpause(dominfo.id)
                 def cberr(err):
-                    log.exception("Delayed exception restarting domain")
+                    log.exception("Delayed exception restarting domain: id=%s", id)
                 deferred = self.domain_restart(dominfo)
                 deferred.addCallback(cbok)
                 deferred.addErrback(cberr)
             except:
-                log.exception("Exception restarting domain")
+                log.exception("Exception restarting domain: id=%s", id)
         if len(self.restarts):
+            # Run again later if any restarts remain.
             self.refresh_schedule(delay=5)
         
     def final_domain_destroy(self, id):
@@ -487,7 +488,7 @@ class XendDomain:
         dom = int(id)
         if dom <= 0:
             return 0
-        log.info('Destroying domain %s', str(id))
+        log.info('Destroying domain: id=%s', str(id))
         eserver.inject('xend.domain.destroy', id)
         dominfo = self.domain.get(id)
         if dominfo:

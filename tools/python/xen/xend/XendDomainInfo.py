@@ -65,6 +65,9 @@ restart_modes = [
 STATE_RESTART_PENDING = 'pending'
 STATE_RESTART_BOOTING = 'booting'
 
+STATE_VM_OK         = "ok"
+STATE_VM_TERMINATED = "terminated"
+
 def shutdown_reason(code):
     """Get a shutdown reason from a code.
 
@@ -273,7 +276,11 @@ def vm_recreate(savedinfo, info):
     vm.memory = info['mem_kb']/1024
     start_time = sxp.child_value(savedinfo, 'start_time')
     if start_time is not None:
-        vm.startTime = float(start_time)
+        vm.start_time = float(start_time)
+    vm.restart_state = sxp.child_value(savedinfo, 'restart_state')
+    restart_time = sxp.child_value(savedinfo, 'restart_time')
+    if restart_time is not None:
+        vm.restart_time = float(restart_time)
     config = sxp.child_value(savedinfo, 'config')
     if config:
         d = vm.construct(config)
@@ -339,15 +346,16 @@ def _vm_configure2(val, vm):
 class XendDomainInfo:
     """Virtual machine object."""
 
-    STATE_OK = "ok"
-    STATE_TERMINATED = "terminated"
+    """Minimum time between domain restarts in seconds.
+    """
+    MINIMUM_RESTART_TIME = 10
 
     def __init__(self):
         self.recreate = 0
         self.config = None
         self.id = None
         self.dom = None
-        self.startTime = None
+        self.start_time = None
         self.name = None
         self.memory = None
         self.image = None
@@ -361,11 +369,12 @@ class XendDomainInfo:
         self.blkif_backend = 0
         self.netif_backend = 0
         #todo: state: running, suspended
-        self.state = self.STATE_OK
+        self.state = STATE_VM_OK
         #todo: set to migrate info if migrating
         self.migrate = None
         self.restart_mode = RESTART_ONREBOOT
         self.restart_state = None
+        self.restart_time = None
         self.console_port = None
 
     def setdom(self, dom):
@@ -412,13 +421,17 @@ class XendDomainInfo:
             sxpr.append(['cpu', self.info['cpu']])
             sxpr.append(['cpu_time', self.info['cpu_time']/1e9])    
             
-        if self.startTime:
-            upTime =  time.time() - self.startTime  
-            sxpr.append(['up_time', str(upTime) ])
-            sxpr.append(['start_time', str(self.startTime) ])
+        if self.start_time:
+            up_time =  time.time() - self.start_time  
+            sxpr.append(['up_time', str(up_time) ])
+            sxpr.append(['start_time', str(self.start_time) ])
 
         if self.console:
             sxpr.append(self.console.sxpr())
+        if self.restart_state:
+            sxpr.append(['restart_state', self.restart_state])
+        if self.restart_time:
+            sxpr.append(['restart_time', str(self.restart_time)])
         if self.config:
             sxpr.append(['config', self.config])
         return sxpr
@@ -540,8 +553,11 @@ class XendDomainInfo:
         devices have been released.
         """
         if self.dom is None: return 0
-        if self.restart_state == STATE_RESTART_PENDING and self.console:
-            self.console.deregisterChannel()
+        if self.console:
+            if self.restart_pending():
+                self.console.deregisterChannel()
+            else:
+                self.console.close()
         chan = xend.getDomChannel(self.dom)
         if chan:
             log.debug("Closing channel to domain %d", self.dom)
@@ -551,13 +567,13 @@ class XendDomainInfo:
     def cleanup(self):
         """Cleanup vm resources: release devices.
         """
-        self.state = self.STATE_TERMINATED
+        self.state = STATE_VM_TERMINATED
         self.release_devices()
 
     def is_terminated(self):
         """Check if a domain has been terminated.
         """
-        return self.state == self.STATE_TERMINATED
+        return self.state == STATE_VM_TERMINATED
 
     def release_devices(self):
         """Release all vm devices.
@@ -617,8 +633,8 @@ class XendDomainInfo:
         log.debug('init_domain> Created domain=%d name=%s memory=%d', dom, name, memory)
         self.setdom(dom)
 
-        if self.startTime is None:
-            self.startTime = time.time()
+        if self.start_time is None:
+            self.start_time = time.time()
 
     def build_domain(self, ostype, kernel, ramdisk, cmdline, vifs_n):
         """Build the domain boot image.
@@ -628,7 +644,6 @@ class XendDomainInfo:
             log.warning('kernel cmdline too long, domain %d', self.dom)
         dom = self.dom
         buildfn = getattr(xc, '%s_build' % ostype)
-        #print 'build_domain>', ostype, dom, kernel, cmdline, ramdisk
         flags = 0
         if self.netif_backend: flags |= SIF_NET_BE_DOMAIN
         if self.blkif_backend: flags |= SIF_BLK_BE_DOMAIN
@@ -753,8 +768,31 @@ class XendDomainInfo:
     def restarting(self):
         self.restart_state = STATE_RESTART_PENDING
 
+    def restart_pending(self):
+        return self.restart_state == STATE_RESTART_PENDING
+
+    def restart_check(self):
+        """Check if domain restart is OK.
+        To prevent restart loops, raise an error it is
+        less than MINIMUM_RESTART_TIME seconds since the last restart.
+        """
+        tnow = time.time()
+        if self.restart_time is not None:
+            tdelta = tnow - self.restart_time
+            if tdelta < self.MINIMUM_RESTART_TIME:
+                msg = 'VM %d restarting too fast' % self.dom
+                log.error(msg)
+                raise VmError(msg)
+        self.restart_time = tnow
+
     def restart(self):
+        """Restart the domain after it has exited.
+        Reuses the domain id and console port.
+
+        @return: deferred
+        """
         try:
+            self.restart_check()
             self.restart_state = STATE_RESTART_BOOTING
             d = self.construct(self.config)
         finally:

@@ -431,11 +431,11 @@ def main(argv):
             (var, val) = arg.strip().split('=', 1)
             gopts.setvar(var.strip(), val.strip())
     if opts.vals.config:
-        pass
+        config = opts.vals.config
     else:
         opts.load_defaults()
-    preprocess(opts, opts.vals)
-    config = make_config(opts.vals)
+        preprocess(opts, opts.vals)
+        config = make_config(opts.vals)
     if opts.vals.dryrun:
         PrettyPrint.prettyprint(config)
     else:

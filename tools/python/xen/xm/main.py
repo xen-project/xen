@@ -469,14 +469,19 @@ class ProgConsoles(Prog):
 
     def main(self, args):
         l = server.xend_consoles()
-        print "Dom Port  Id"
+        print "Dom Port  Id Connection"
         for x in l:
             info = server.xend_console(x)
             d = {}
-            d['dom'] = sxp.child(info, 'dst', ['dst', '?', '?'])[1]
-            d['port'] = sxp.child_value(info, 'port', '?')
+            d['dom'] = sxp.child(info, 'domain', '?')[1]
+            d['port'] = sxp.child_value(info, 'console_port', '?')
             d['id'] = sxp.child_value(info, 'id', '?')
-            print "%(dom)3s %(port)4s %(id)3s" % d
+            connected = sxp.child(info, 'connected')
+            if connected:
+                d['conn'] = '%s:%s' % (connected[1], connected[2])
+            else:
+                d['conn'] = ''
+            print "%(dom)3s %(port)4s %(id)3s %(conn)s" % d
 
 xm.prog(ProgConsoles)
 
@@ -496,7 +501,7 @@ class ProgConsole(Prog):
         console = sxp.child(info, "console")
         if not console:
             self.err("No console information")
-        port = sxp.child_value(console, "port")
+        port = sxp.child_value(console, "console_port")
         from xen.util import console_client
         console_client.connect("localhost", int(port))
 
