@@ -26,7 +26,7 @@ install: $(TARGET)
 	install -m0644 include/public/COPYING $(prefix)/usr/include/xen
 
 dist: $(TARGET)
-	$(MAKE) prefix=`pwd`/../install dist=yes install
+	$(MAKE) prefix=`pwd`/../dist/install dist=yes install
 
 clean:
 	$(MAKE) -C figlet clean
