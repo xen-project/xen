@@ -279,7 +279,7 @@ typedef struct {
     memory_t       pages;  /* 16: size of buffer, updated with actual size */
     MEMORY_PADDING;
     /* OUT variables. */
-    dom0_shadow_control_stats_t;
+    dom0_shadow_control_stats_t stats;
 } PACKED dom0_shadow_control_t;
 
 

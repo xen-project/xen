@@ -319,12 +319,17 @@ int xc_linux_save(int xc_handle,
 
     /* Ensure that the domain exists, and that it is stopped. */
 
-    if ( xc_domain_pause( xc_handle, domid, &op, &ctxt ) )
+    if ( xc_domain_pause( xc_handle, domid ) )
     {
 	PERROR("Could not pause domain");
 	goto out;
     }
 
+    if ( xc_domain_getfullinfo( xc_handle, domid, &op, &ctxt) )
+    {
+	PERROR("Could not get full domain info");
+	goto out;
+    }
     memcpy(name, op.u.getdomaininfo.name, sizeof(name));
     shared_info_frame = op.u.getdomaininfo.shared_info_frame;
 
@@ -381,7 +386,7 @@ int xc_linux_save(int xc_handle,
 	    pgd[HYPERVISOR_VIRT_START>>L2_PAGETABLE_SHIFT]>>PAGE_SHIFT;
 
 	live_mfn_to_pfn_table = 
-	    mfn_mapper_map_single(xc_handle, ~0ULL, 
+	    mfn_mapper_map_single(xc_handle, ~0UL, 
 				  PAGE_SIZE*1024, PROT_READ, 
 				  mfn_to_pfn_table_start_mfn );
     }
@@ -805,7 +810,7 @@ int xc_linux_save(int xc_handle,
 		DPRINTF("Start last iteration\n");
 		last_iter = 1;
 
-		xc_domain_pause( xc_handle, domid, &op, NULL );
+		xc_domain_pause( xc_handle, domid );
 
 	    } 
 
@@ -839,13 +844,9 @@ int xc_linux_save(int xc_handle,
     }
 
     /* Get the final execution context */
-    op.cmd = DOM0_GETDOMAININFO;
-    op.u.getdomaininfo.domain = (domid_t)domid;
-    op.u.getdomaininfo.ctxt = &ctxt;
-    if ( (do_dom0_op(xc_handle, &op) < 0) || 
-	 ((u32)op.u.getdomaininfo.domain != domid) )
+    if ( xc_domain_getfullinfo( xc_handle, domid, &op, &ctxt) )
     {
-	PERROR("Could not get info on domain");
+	PERROR("Could not get full domain info");
 	goto out;
     }
 

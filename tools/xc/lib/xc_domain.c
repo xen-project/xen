@@ -117,6 +117,24 @@ int xc_domain_getinfo(int xc_handle,
     return nr_doms;
 }
 
+int xc_domain_getfullinfo(int xc_handle,
+		       u32 domid,
+		       dom0_op_t *op,
+		       full_execution_context_t *ctxt )
+{
+    int rc;
+    op->cmd = DOM0_GETDOMAININFO;
+    op->u.getdomaininfo.domain = (domid_t)domid;
+    op->u.getdomaininfo.ctxt = ctxt;
+
+    rc = do_dom0_op(xc_handle, op);
+    if ( ((u32)op->u.getdomaininfo.domain != domid) && rc > 0 )
+	return -ESRCH;
+    else
+	return rc;
+}
+
+
 int xc_shadow_control(int xc_handle,
                       u32 domid, 
                       unsigned int sop,

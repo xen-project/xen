@@ -426,10 +426,10 @@ static int shadow_mode_table_op(struct domain *d,
     {
 		int i;
 
-		sc->stats.fault_count       = p->mm.shadow_fault_count;
-		sc->stats.dirty_count       = p->mm.shadow_dirty_count;
-		sc->stats.dirty_net_count   = p->mm.shadow_dirty_net_count;
-		sc->stats.dirty_block_count = p->mm.shadow_dirty_block_count;
+		sc->stats.fault_count       = d->mm.shadow_fault_count;
+		sc->stats.dirty_count       = d->mm.shadow_dirty_count;
+		sc->stats.dirty_net_count   = d->mm.shadow_dirty_net_count;
+		sc->stats.dirty_block_count = d->mm.shadow_dirty_block_count;
 	
 		if( d->tot_pages > sc->pages || 
 			!sc->dirty_bitmap || !d->mm.shadow_dirty_bitmap )
