@@ -299,6 +299,7 @@ void do_gettimeofday(struct timeval *tv)
 void do_settimeofday(struct timeval *tv)
 {
     struct timeval newtv;
+    suseconds_t usec;
     
     if ( !independent_wallclock && !(start_info.flags & SIF_INITDOMAIN) )
         return;
@@ -311,12 +312,13 @@ void do_settimeofday(struct timeval *tv)
      * be stale, so we can retry with fresh ones.
      */
  again:
-    tv->tv_usec -= __get_time_delta_usecs();
+    usec = tv->tv_usec - __get_time_delta_usecs();
     if ( unlikely(!TIME_VALUES_UP_TO_DATE) )
     {
         __get_time_values_from_xen();
         goto again;
     }
+    tv->tv_usec = usec;
     
     HANDLE_USEC_UNDERFLOW(*tv);
     
