@@ -290,8 +290,8 @@ void switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 
     if( next_p->mm.shadowmode )
       {
-	write_cr3_counted(pagetable_val(next_p->mm.shadowtable));
 	check_pagetable( next_p->mm.pagetable, "switch" );
+	write_cr3_counted(pagetable_val(next_p->mm.shadowtable));
       }
     else
 #endif

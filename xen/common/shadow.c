@@ -10,7 +10,7 @@
 #ifdef CONFIG_SHADOW
 
 
-#if 1
+#if SHADOW_DEBUG
 #define MEM_VLOG(_f, _a...)                             \
   printk("DOM%llu: (file=shadow.c, line=%d) " _f "\n", \
          current->domain , __LINE__ , ## _a )
@@ -63,11 +63,14 @@ pagetable_t shadow_mk_pagetable( unsigned long gptbase,
 	return mk_pagetable(spfn << PAGE_SHIFT);
 }
 
-void unshadow_table( unsigned long gpfn )
+void unshadow_table( unsigned long gpfn, unsigned int type )
 {
 	unsigned long spfn;
 
-MEM_VLOG("unshadow_table %08lx\n", gpfn );
+    MEM_VLOG("unshadow_table type=%08x gpfn=%08lx, spfn=%08lx",
+		 type,
+		 gpfn,
+		 frame_table[gpfn].shadow_and_flags & PSH_pfn_mask );
 
 	perfc_incrc(unshadow_table_count);
 
@@ -80,8 +83,8 @@ MEM_VLOG("unshadow_table %08lx\n", gpfn );
 	frame_table[gpfn].shadow_and_flags=0;
 	frame_table[spfn].shadow_and_flags=0;
 
-#ifdef DEBUG
-	{ // XXX delete me!
+#if 0 // XXX leave as might be useful for later debugging
+	{ 
 		int i;
 		unsigned long * spl1e = map_domain_mem( spfn<<PAGE_SHIFT );
 
@@ -93,7 +96,21 @@ MEM_VLOG("unshadow_table %08lx\n", gpfn );
 	}
 #endif
 
-	free_domain_page( &frame_table[spfn] );
+	if (type == PGT_l1_page_table)
+		perfc_decr(shadow_l1_pages);
+    else
+		perfc_decr(shadow_l2_pages);
+
+	//free_domain_page( &frame_table[spfn] );
+
+	{
+    unsigned long flags;
+    spin_lock_irqsave(&free_list_lock, flags);
+    list_add(&frame_table[spfn].list, &free_list);
+    free_pfns++;
+    spin_unlock_irqrestore(&free_list_lock, flags);
+	}
+
 }
 
 
@@ -107,6 +124,7 @@ unsigned long shadow_l2_table( unsigned long gpfn )
 	MEM_VVLOG("shadow_l2_table( %08lx )",gpfn);
 
 	perfc_incrc(shadow_l2_table_count);
+	perfc_incr(shadow_l2_pages);
 
     // XXX in future, worry about racing in SMP guests 
     //      -- use cmpxchg with PSH_pending flag to show progress (and spin)
@@ -198,6 +216,8 @@ int shadow_fault( unsigned long va, long error_code )
 
 	MEM_VVLOG("shadow_fault( va=%08lx, code=%ld )", va, error_code );
 
+    check_pagetable( current->mm.pagetable, "pre-sf" );
+
 	if ( unlikely(__get_user(gpte, (unsigned long*)&linear_pg_table[va>>PAGE_SHIFT])) )
 	{
 		MEM_VVLOG("shadow_fault - EXIT: read gpte faulted" );
@@ -250,7 +270,7 @@ int shadow_fault( unsigned long va, long error_code )
 		unsigned long gpde, spde, gl1pfn, sl1pfn;
 
         MEM_VVLOG("3: not shadowed or l2 insufficient gpte=%08lx  spte=%08lx",gpte,spte );
- 
+
         gpde = l2_pgentry_val(linear_l2_table[va>>L2_PAGETABLE_SHIFT]);
 
         gl1pfn = gpde>>PAGE_SHIFT;
@@ -266,6 +286,7 @@ int shadow_fault( unsigned long va, long error_code )
 
             MEM_VVLOG("4a: l1 not shadowed ( %08lx )",sl1pfn);
 	        perfc_incrc(shadow_l1_table_count);
+	        perfc_incr(shadow_l1_pages);
 
             sl1pfn_info->shadow_and_flags = PSH_shadow | gl1pfn;
             frame_table[gl1pfn].shadow_and_flags = PSH_shadowed | sl1pfn;
@@ -336,6 +357,8 @@ int shadow_fault( unsigned long va, long error_code )
     } // end of fixup writing the shadow L1 directly failed
     	
     perfc_incrc(shadow_fixup_count);
+
+    check_pagetable( current->mm.pagetable, "post-sf" );
 
     return 1; // let's try the faulting instruction again...
 
@@ -521,9 +544,11 @@ int check_l1_table( unsigned long va, unsigned long g2, unsigned long s2 )
 	int j;
 	unsigned long *gpl1e, *spl1e;
 
-	gpl1e = (unsigned long *) &(linear_pg_table[ va>>PAGE_SHIFT]);
-	spl1e = (unsigned long *) &(shadow_linear_pg_table[ va>>PAGE_SHIFT]);
+	//gpl1e = (unsigned long *) &(linear_pg_table[ va>>PAGE_SHIFT]);
+	//spl1e = (unsigned long *) &(shadow_linear_pg_table[ va>>PAGE_SHIFT]);
 
+	gpl1e = map_domain_mem( g2<<PAGE_SHIFT );
+	spl1e = map_domain_mem( s2<<PAGE_SHIFT );
 
 	for ( j = 0; j < ENTRIES_PER_L1_PAGETABLE; j++ )
 	{
@@ -532,12 +557,15 @@ int check_l1_table( unsigned long va, unsigned long g2, unsigned long s2 )
 		
 		check_pte( gpte, spte, 1, j );
 	}
+	
+	unmap_domain_mem( spl1e );
+	unmap_domain_mem( gpl1e );
 
 	return 1;
 }
 
 #define FAILPT(_f, _a...)                             \
-{printk("XXX FAILPT" _f "\n", ## _a ); BUG();}
+{printk("XXX FAIL %s-PT" _f "\n", s, ## _a ); BUG();}
 
 int check_pagetable( pagetable_t pt, char *s )
 {
@@ -545,8 +573,6 @@ int check_pagetable( pagetable_t pt, char *s )
 	unsigned long gpfn, spfn;
 	int i;
 	l2_pgentry_t *gpl2e, *spl2e;
-
-return 1;
 
 	sh_check_name = s;
 
@@ -573,10 +599,41 @@ return 1;
 	if ( ! frame_table[spfn].shadow_and_flags == (PSH_shadow | gpfn) )
 		FAILPT("ptbase shadow inconsistent2");
 
+	gpl2e = (l2_pgentry_t *) map_domain_mem( gpfn << PAGE_SHIFT );
+	spl2e = (l2_pgentry_t *) map_domain_mem( spfn << PAGE_SHIFT );
 
-	// use the linear map to get a pointer to the L2
-	gpl2e = (l2_pgentry_t *) &(linear_l2_table[0]);
-	spl2e = (l2_pgentry_t *) &(shadow_linear_l2_table[0]);
+	//ipl2e = (l2_pgentry_t *) map_domain_mem( spfn << PAGE_SHIFT );
+
+
+	if ( memcmp( &spl2e[DOMAIN_ENTRIES_PER_L2_PAGETABLE],
+			&gpl2e[DOMAIN_ENTRIES_PER_L2_PAGETABLE], 
+			((SH_LINEAR_PT_VIRT_START>>(L2_PAGETABLE_SHIFT))-DOMAIN_ENTRIES_PER_L2_PAGETABLE)
+			* sizeof(l2_pgentry_t)) )
+	{
+		printk("gpfn=%08lx spfn=%08lx\n", gpfn, spfn);
+		for (i=DOMAIN_ENTRIES_PER_L2_PAGETABLE; 
+			 i<(SH_LINEAR_PT_VIRT_START>>(L2_PAGETABLE_SHIFT));
+			 i++ )
+			printk("+++ (%d) %08lx %08lx\n",i,
+				   l2_pgentry_val(gpl2e[i]), l2_pgentry_val(spl2e[i]) );
+		FAILPT("hypervisor entries inconsistent");
+	}
+
+	if ( (l2_pgentry_val(spl2e[LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT]) != 
+		  l2_pgentry_val(gpl2e[LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT])) )
+		FAILPT("hypervisor linear map inconsistent");
+
+	if ( (l2_pgentry_val(spl2e[SH_LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT]) != 
+		  ((spfn << PAGE_SHIFT) | __PAGE_HYPERVISOR)) )
+		FAILPT("hypervisor shadow linear map inconsistent %08lx %08lx",
+			   l2_pgentry_val(spl2e[SH_LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT]),
+			   		  (spfn << PAGE_SHIFT) | __PAGE_HYPERVISOR
+			   );
+
+	if ( (l2_pgentry_val(spl2e[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT]) !=
+		  ((__pa(frame_table[gpfn].u.domain->mm.perdomain_pt) | __PAGE_HYPERVISOR))) )
+		FAILPT("hypervisor per-domain map inconsistent");
+
 
 	// check the whole L2
 	for ( i = 0; i < DOMAIN_ENTRIES_PER_L2_PAGETABLE; i++ )
@@ -601,6 +658,8 @@ return 1;
 
 	}
 
+	unmap_domain_mem( spl2e );
+	unmap_domain_mem( gpl2e );
 
 	MEM_VVLOG("PT verified : l2_present = %d, l1_present = %d\n",
 		   sh_l2_present, sh_l1_present );

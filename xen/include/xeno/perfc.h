@@ -11,6 +11,11 @@
  * PERFCOUNTER_CPU (counter, string, size)    define a counter per CPU
  * PERFCOUNTER_ARRY (counter, string, size)   define an array of counters
  * 
+ * unlike "COUNTERS", "STATUS" variables DO NOT RESET
+ * PERFSTATUS (counter, string)               define a new performance stauts
+ * PERFSTATUS_CPU (counter, string, size)     define a status var per CPU
+ * PERFSTATUS_ARRY (counter, string, size)    define an array of status vars
+ * 
  * unsigned long perfc_value  (counter)        get value of a counter  
  * unsigned long perfc_valuec (counter)        get value of a per CPU counter
  * unsigned long perfc_valuea (counter, index) get value of an array counter
@@ -32,6 +37,12 @@
   atomic_t var[NR_CPUS];
 #define PERFCOUNTER_ARRAY( var, name, size ) \
   atomic_t var[size];
+#define PERFSTATUS( var, name ) \
+  atomic_t var[1];
+#define PERFSTATUS_CPU( var, name ) \
+  atomic_t var[NR_CPUS];
+#define PERFSTATUS_ARRAY( var, name, size ) \
+  atomic_t var[size];
 
 struct perfcounter_t 
 {
@@ -47,6 +58,7 @@ extern struct perfcounter_t perfcounters;
 #define perfc_setc(x,v)   atomic_set(&perfcounters.x[smp_processor_id()], v)
 #define perfc_seta(x,y,v) atomic_set(&perfcounters.x[y], v)
 #define perfc_incr(x)     atomic_inc(&perfcounters.x[0])
+#define perfc_decr(x)     atomic_dec(&perfcounters.x[0])
 #define perfc_incrc(x)    atomic_inc(&perfcounters.x[smp_processor_id()])
 #define perfc_incra(x,y)  atomic_inc(&perfcounters.x[y])
 #define perfc_add(x,y)    atomic_add((y), &perfcounters.x[0])

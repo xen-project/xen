@@ -25,7 +25,7 @@
 #define shadow_linear_l2_table ((l2_pgentry_t *)(SH_LINEAR_PT_VIRT_START+(SH_LINEAR_PT_VIRT_START>>(L2_PAGETABLE_SHIFT-L1_PAGETABLE_SHIFT))))
 
 extern pagetable_t shadow_mk_pagetable( unsigned long gptbase, unsigned int shadowmode );
-extern void unshadow_table( unsigned long gpfn );
+extern void unshadow_table( unsigned long gpfn, unsigned int type );
 extern unsigned long shadow_l2_table( unsigned long gpfn );
 extern int shadow_fault( unsigned long va, long error_code );
 extern void shadow_l1_normal_pt_update( unsigned long pa, unsigned long gpte, 
@@ -37,6 +37,8 @@ extern void shadow_l2_normal_pt_update( unsigned long pa, unsigned long gpte );
 #define SHADOW_DEBUG 0
 #define SHADOW_OPTIMISE 1
 
+#endif // end of CONFIG_SHADOW
+
 #if SHADOW_DEBUG
 extern int check_pagetable( pagetable_t pt, char *s );
 #else
@@ -44,5 +46,6 @@ extern int check_pagetable( pagetable_t pt, char *s );
 #endif
 
 
-#endif
+
+
 #endif

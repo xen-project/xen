@@ -30,4 +30,6 @@ PERFCOUNTER_CPU( unshadow_table_count, "unshadow_table count" )
 PERFCOUNTER_CPU( shadow_fixup_count, "shadow_fixup count" )
 PERFCOUNTER_CPU( shadow_update_va_fail, "shadow_update_va_fail" )
 
-
+/* STATUS counters do not reset when 'P' is hit */
+PERFSTATUS( shadow_l2_pages, "current # shadow L2 pages" )
+PERFSTATUS( shadow_l1_pages, "current # shadow L1 pages" )

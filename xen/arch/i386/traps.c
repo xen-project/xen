@@ -340,15 +340,11 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
     }
 
 #ifdef CONFIG_SHADOW
-//printk("1");
-check_pagetable( current->mm.pagetable, "pre-sf" );
     if ( p->mm.shadowmode && addr < PAGE_OFFSET &&
 	 shadow_fault( addr, error_code ) )
       {
-	check_pagetable( current->mm.pagetable, "post-sfa" );
 	return; // return true if fault was handled 
       }
-    check_pagetable( current->mm.pagetable, "post-sfb" );
 #endif
 
     if ( unlikely(!(regs->xcs & 3)) )

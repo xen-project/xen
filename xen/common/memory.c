@@ -764,19 +764,26 @@ void free_page_type(struct pfn_info *page, unsigned int type)
     switch ( type )
     {
     case PGT_l1_page_table:
-        return free_l1_table(page);
+        free_l1_table(page);
+#ifdef CONFIG_SHADOW
+	// assume we're in shadow mode if PSH_shadowed set
+	if ( current->mm.shadowmode && page->shadow_and_flags & PSH_shadowed )
+	    unshadow_table( page-frame_table, type );
+#endif
+	return;
+
     case PGT_l2_page_table:
-        return free_l2_table(page);
+        free_l2_table(page);
+#ifdef CONFIG_SHADOW
+	// assume we're in shadow mode if PSH_shadowed set
+	if ( current->mm.shadowmode && page->shadow_and_flags & PSH_shadowed )
+	    unshadow_table( page-frame_table, type );
+#endif
+	return;
+
     default:
         BUG();
     }
-
-#ifdef CONFIG_SHADOW
-    // assume we're in shadow mode if PSH_shadowed set
-    if ( page->shadow_and_flags & PSH_shadowed )
-      unshadow_table( page-frame_table );
-#endif
-
 }
 
 
@@ -846,7 +853,17 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
 	      shadow_mk_pagetable(pfn << PAGE_SHIFT, current->mm.shadowmode);
 #endif
             invalidate_shadow_ldt();
-            percpu_info[cpu].deferred_ops |= DOP_FLUSH_TLB;
+
+            percpu_info[cpu].deferred_ops &= ~DOP_FLUSH_TLB;
+#ifdef CONFIG_SHADOW
+            if ( unlikely(current->mm.shadowmode) )
+	    {
+                check_pagetable( current->mm.pagetable, "pre-stlb-flush" );
+	        write_cr3_counted(pagetable_val(current->mm.shadowtable));
+            }
+            else
+#endif	  
+	        write_cr3_counted(pagetable_val(current->mm.pagetable));
         }
         else
         {
@@ -1082,7 +1099,10 @@ check_pagetable( current->mm.pagetable, "mmu" ); // XXX XXX XXX XXX XXX
     {
 #ifdef CONFIG_SHADOW
         if ( unlikely(current->mm.shadowmode) )
-	  write_cr3_counted(pagetable_val(current->mm.shadowtable));
+	{
+            check_pagetable( current->mm.pagetable, "pre-stlb-flush" );
+	    write_cr3_counted(pagetable_val(current->mm.shadowtable));
+        }
         else
 #endif	  
 	  write_cr3_counted(pagetable_val(current->mm.pagetable));
