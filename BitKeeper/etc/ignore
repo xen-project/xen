@@ -59,6 +59,13 @@ tools/check/.*
 tools/libxc/xen/*
 tools/misc/miniterm/miniterm
 tools/misc/xen_cpuperf
+tools/vnet/gc
+tools/vnet/gc*/*
+tools/vnet/vnet-module/.tmp_versions/*
+tools/vnet/vnet-module/.*.cmd
+tools/vnet/vnet-module/*.ko
+tools/vnet/vnet-module/vnet_module.mod.*
+tools/vnetd/vnetd
 tools/web-shutdown.tap
 tools/xentrace/xentrace
 tools/xfrd/xfrd

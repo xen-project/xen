@@ -1,0 +1,3 @@
+# Vnet configuration for a vnet with id 98 and message authentication.
+# Configure using 'xm call vnet_add vnet98.sxp'.
+(vnet (id 98) (bridge vnet98) (vnetif vnetif98) (security auth))
