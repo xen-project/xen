@@ -1,371 +1,437 @@
-diff -rup pristine-linux-2.6.11/drivers/char/agp/ali-agp.c linux-2.6.11/drivers/char/agp/ali-agp.c
---- pristine-linux-2.6.11/drivers/char/agp/ali-agp.c	2005-03-02 07:38:13.000000000 +0000
-+++ linux-2.6.11/drivers/char/agp/ali-agp.c	2005-03-11 00:35:21.320192760 +0000
-@@ -150,7 +150,7 @@ static void *m1541_alloc_page(void)
+--- linux-2.6.11/drivers/char/agp/agp.h	2005-03-02 07:38:07 +00:00
++++ linux-2.6.11-agp/drivers/char/agp/agp.h	2005-03-22 11:14:02 +00:00
+@@ -272,6 +272,8 @@
+ #define AGP_GENERIC_SIZES_ENTRIES 11
+ extern struct aper_size_info_16 agp3_generic_sizes[];
+ 
++#define virt_to_gart(x) (phys_to_gart(virt_to_phys(x)))
++#define gart_to_virt(x) (phys_to_virt(gart_to_phys(x)))
+ 
+ extern int agp_off;
+ extern int agp_try_unsupported_boot;
+--- linux-2.6.11/drivers/char/agp/ali-agp.c	2005-03-02 07:38:13 +00:00
++++ linux-2.6.11-agp/drivers/char/agp/ali-agp.c	2005-03-22 11:14:56 +00:00
+@@ -150,7 +150,7 @@
  	pci_read_config_dword(agp_bridge->dev, ALI_CACHE_FLUSH_CTRL, &temp);
  	pci_write_config_dword(agp_bridge->dev, ALI_CACHE_FLUSH_CTRL,
  			(((temp & ALI_CACHE_FLUSH_ADDR_MASK) |
 -			  virt_to_phys(addr)) | ALI_CACHE_FLUSH_EN ));
-+			  virt_to_bus(addr)) | ALI_CACHE_FLUSH_EN ));
++			  virt_to_gart(addr)) | ALI_CACHE_FLUSH_EN ));
  	return addr;
  }
  
-@@ -174,7 +174,7 @@ static void m1541_destroy_page(void * ad
+@@ -174,7 +174,7 @@
  	pci_read_config_dword(agp_bridge->dev, ALI_CACHE_FLUSH_CTRL, &temp);
  	pci_write_config_dword(agp_bridge->dev, ALI_CACHE_FLUSH_CTRL,
  			(((temp & ALI_CACHE_FLUSH_ADDR_MASK) |
 -			  virt_to_phys(addr)) | ALI_CACHE_FLUSH_EN));
-+			  virt_to_bus(addr)) | ALI_CACHE_FLUSH_EN));
++			  virt_to_gart(addr)) | ALI_CACHE_FLUSH_EN));
  	agp_generic_destroy_page(addr);
  }
  
-diff -rup pristine-linux-2.6.11/drivers/char/agp/amd-k7-agp.c linux-2.6.11/drivers/char/agp/amd-k7-agp.c
---- pristine-linux-2.6.11/drivers/char/agp/amd-k7-agp.c	2005-03-02 07:38:33.000000000 +0000
-+++ linux-2.6.11/drivers/char/agp/amd-k7-agp.c	2005-03-11 00:35:21.321192788 +0000
-@@ -43,7 +43,7 @@ static int amd_create_page_map(struct am
+--- linux-2.6.11/drivers/char/agp/amd-k7-agp.c	2005-03-02 07:38:33 +00:00
++++ linux-2.6.11-agp/drivers/char/agp/amd-k7-agp.c	2005-03-22 11:14:56 +00:00
+@@ -43,7 +43,7 @@
  
  	SetPageReserved(virt_to_page(page_map->real));
  	global_cache_flush();
 -	page_map->remapped = ioremap_nocache(virt_to_phys(page_map->real),
-+	page_map->remapped = ioremap_nocache(virt_to_bus(page_map->real),
++	page_map->remapped = ioremap_nocache(virt_to_gart(page_map->real),
  					    PAGE_SIZE);
  	if (page_map->remapped == NULL) {
  		ClearPageReserved(virt_to_page(page_map->real));
-@@ -154,7 +154,7 @@ static int amd_create_gatt_table(void)
+@@ -154,7 +154,7 @@
  
  	agp_bridge->gatt_table_real = (u32 *)page_dir.real;
  	agp_bridge->gatt_table = (u32 __iomem *)page_dir.remapped;
 -	agp_bridge->gatt_bus_addr = virt_to_phys(page_dir.real);
-+	agp_bridge->gatt_bus_addr = virt_to_bus(page_dir.real);
++	agp_bridge->gatt_bus_addr = virt_to_gart(page_dir.real);
  
  	/* Get the address for the gart region.
  	 * This is a bus address even on the alpha, b/c its
-@@ -167,7 +167,7 @@ static int amd_create_gatt_table(void)
+@@ -167,7 +167,7 @@
  
  	/* Calculate the agp offset */
  	for (i = 0; i < value->num_entries / 1024; i++, addr += 0x00400000) {
 -		writel(virt_to_phys(amd_irongate_private.gatt_pages[i]->real) | 1,
-+		writel(virt_to_bus(amd_irongate_private.gatt_pages[i]->real) | 1,
++		writel(virt_to_gart(amd_irongate_private.gatt_pages[i]->real) | 1,
  			page_dir.remapped+GET_PAGE_DIR_OFF(addr));
  		readl(page_dir.remapped+GET_PAGE_DIR_OFF(addr));	/* PCI Posting. */
  	}
-diff -rup pristine-linux-2.6.11/drivers/char/agp/amd64-agp.c linux-2.6.11/drivers/char/agp/amd64-agp.c
---- pristine-linux-2.6.11/drivers/char/agp/amd64-agp.c	2005-03-02 07:38:13.000000000 +0000
-+++ linux-2.6.11/drivers/char/agp/amd64-agp.c	2005-03-11 00:35:21.322192816 +0000
-@@ -218,7 +218,7 @@ static struct aper_size_info_32 amd_8151
+--- linux-2.6.11/drivers/char/agp/amd64-agp.c	2005-03-02 07:38:13 +00:00
++++ linux-2.6.11-agp/drivers/char/agp/amd64-agp.c	2005-03-22 11:14:56 +00:00
+@@ -218,7 +218,7 @@
  
  static int amd_8151_configure(void)
  {
 -	unsigned long gatt_bus = virt_to_phys(agp_bridge->gatt_table_real);
-+	unsigned long gatt_bus = virt_to_bus(agp_bridge->gatt_table_real);
++	unsigned long gatt_bus = virt_to_gart(agp_bridge->gatt_table_real);
  
  	/* Configure AGP regs in each x86-64 host bridge. */
  	for_each_nb() {
-@@ -590,7 +590,7 @@ static void __devexit agp_amd64_remove(s
+@@ -590,7 +590,7 @@
  {
  	struct agp_bridge_data *bridge = pci_get_drvdata(pdev);
  
 -	release_mem_region(virt_to_phys(bridge->gatt_table_real),
-+	release_mem_region(virt_to_bus(bridge->gatt_table_real),
++	release_mem_region(virt_to_gart(bridge->gatt_table_real),
  			   amd64_aperture_sizes[bridge->aperture_size_idx].size);
  	agp_remove_bridge(bridge);
  	agp_put_bridge(bridge);
-diff -rup pristine-linux-2.6.11/drivers/char/agp/ati-agp.c linux-2.6.11/drivers/char/agp/ati-agp.c
---- pristine-linux-2.6.11/drivers/char/agp/ati-agp.c	2005-03-02 07:38:13.000000000 +0000
-+++ linux-2.6.11/drivers/char/agp/ati-agp.c	2005-03-11 00:41:25.848450763 +0000
-@@ -61,7 +61,7 @@ static int ati_create_page_map(ati_page_
+--- linux-2.6.11/drivers/char/agp/ati-agp.c	2005-03-02 07:38:13 +00:00
++++ linux-2.6.11-agp/drivers/char/agp/ati-agp.c	2005-03-22 11:14:56 +00:00
+@@ -61,7 +61,7 @@
  
  	SetPageReserved(virt_to_page(page_map->real));
  	err = map_page_into_agp(virt_to_page(page_map->real));
 -	page_map->remapped = ioremap_nocache(virt_to_phys(page_map->real),
-+	page_map->remapped = ioremap_nocache(virt_to_bus(page_map->real),
++	page_map->remapped = ioremap_nocache(virt_to_gart(page_map->real),
  					    PAGE_SIZE);
  	if (page_map->remapped == NULL || err) {
  		ClearPageReserved(virt_to_page(page_map->real));
-diff -rup pristine-linux-2.6.11/drivers/char/agp/backend.c linux-2.6.11/drivers/char/agp/backend.c
---- pristine-linux-2.6.11/drivers/char/agp/backend.c	2005-03-02 07:38:13.000000000 +0000
-+++ linux-2.6.11/drivers/char/agp/backend.c	2005-03-11 00:35:21.323192844 +0000
-@@ -142,7 +142,7 @@ static int agp_backend_initialize(struct
+--- linux-2.6.11/drivers/char/agp/backend.c	2005-03-02 07:38:13 +00:00
++++ linux-2.6.11-agp/drivers/char/agp/backend.c	2005-03-22 11:14:56 +00:00
+@@ -142,7 +142,7 @@
  			return -ENOMEM;
  		}
  
 -		bridge->scratch_page_real = virt_to_phys(addr);
-+		bridge->scratch_page_real = virt_to_bus(addr);
++		bridge->scratch_page_real = virt_to_gart(addr);
  		bridge->scratch_page =
  		    bridge->driver->mask_memory(bridge->scratch_page_real, 0);
  	}
-@@ -186,7 +186,7 @@ static int agp_backend_initialize(struct
+@@ -186,7 +186,7 @@
  err_out:
  	if (bridge->driver->needs_scratch_page)
  		bridge->driver->agp_destroy_page(
 -				phys_to_virt(bridge->scratch_page_real));
-+				bus_to_virt(bridge->scratch_page_real));
++				gart_to_virt(bridge->scratch_page_real));
  	if (got_gatt)
  		bridge->driver->free_gatt_table();
  	if (got_keylist) {
-@@ -211,7 +211,7 @@ static void agp_backend_cleanup(struct a
+@@ -211,7 +211,7 @@
  	if (bridge->driver->agp_destroy_page &&
  	    bridge->driver->needs_scratch_page)
  		bridge->driver->agp_destroy_page(
 -				phys_to_virt(bridge->scratch_page_real));
-+				bus_to_virt(bridge->scratch_page_real));
++				gart_to_virt(bridge->scratch_page_real));
  }
  
  /* XXX Kludge alert: agpgart isn't ready for multiple bridges yet */
-diff -rup pristine-linux-2.6.11/drivers/char/agp/efficeon-agp.c linux-2.6.11/drivers/char/agp/efficeon-agp.c
---- pristine-linux-2.6.11/drivers/char/agp/efficeon-agp.c	2005-03-02 07:37:30.000000000 +0000
-+++ linux-2.6.11/drivers/char/agp/efficeon-agp.c	2005-03-11 00:35:21.324192872 +0000
-@@ -219,7 +219,7 @@ static int efficeon_create_gatt_table(vo
+--- linux-2.6.11/drivers/char/agp/efficeon-agp.c	2005-03-02 07:37:30 +00:00
++++ linux-2.6.11-agp/drivers/char/agp/efficeon-agp.c	2005-03-22 11:15:17 +00:00
+@@ -219,7 +219,7 @@
  
  		efficeon_private.l1_table[index] = page;
  
 -		value = __pa(page) | pati | present | index;
-+		value = virt_to_bus(page) | pati | present | index;
++		value = virt_to_gart(page) | pati | present | index;
  
  		pci_write_config_dword(agp_bridge->dev,
  			EFFICEON_ATTPAGE, value);
-diff -rup pristine-linux-2.6.11/drivers/char/agp/generic.c linux-2.6.11/drivers/char/agp/generic.c
---- pristine-linux-2.6.11/drivers/char/agp/generic.c	2005-03-02 07:37:55.000000000 +0000
-+++ linux-2.6.11/drivers/char/agp/generic.c	2005-03-11 00:44:53.858248651 +0000
-@@ -151,7 +151,7 @@ void agp_free_memory(struct agp_memory *
+--- linux-2.6.11/drivers/char/agp/generic.c	2005-03-02 07:37:55 +00:00
++++ linux-2.6.11-agp/drivers/char/agp/generic.c	2005-03-22 11:17:37 +00:00
+@@ -151,7 +151,7 @@
  	}
  	if (curr->page_count != 0) {
  		for (i = 0; i < curr->page_count; i++) {
 -			agp_bridge->driver->agp_destroy_page(phys_to_virt(curr->memory[i]));
-+			agp_bridge->driver->agp_destroy_page(bus_to_virt(curr->memory[i]));
++			agp_bridge->driver->agp_destroy_page(gart_to_virt(curr->memory[i]));
  		}
  	}
  	agp_free_key(curr->key);
-@@ -204,7 +204,7 @@ struct agp_memory *agp_allocate_memory(s
+@@ -204,7 +204,7 @@
  			agp_free_memory(new);
  			return NULL;
  		}
 -		new->memory[i] = virt_to_phys(addr);
-+		new->memory[i] = virt_to_bus(addr);
++		new->memory[i] = virt_to_gart(addr);
  		new->page_count++;
  	}
  
-@@ -659,6 +659,7 @@ int agp_generic_create_gatt_table(void)
- 	int i;
- 	void *temp;
- 	struct page *page;
-+	dma_addr_t dma;
- 
- 	/* The generic routines can't handle 2 level gatt's */
- 	if (agp_bridge->driver->size_type == LVL2_APER_SIZE)
-@@ -697,8 +698,10 @@ int agp_generic_create_gatt_table(void)
+@@ -697,8 +697,7 @@
  				break;
  			}
  
 -			table = (char *) __get_free_pages(GFP_KERNEL,
 -							  page_order);
-+			table = dma_alloc_coherent(
-+					&agp_bridge->dev->dev,
-+					PAGE_SIZE << page_order, &dma,
-+					GFP_KERNEL);
++			table = alloc_gatt_pages(page_order);
  
  			if (table == NULL) {
  				i++;
-@@ -729,7 +732,9 @@ int agp_generic_create_gatt_table(void)
+@@ -729,7 +728,7 @@
  		size = ((struct aper_size_info_fixed *) temp)->size;
  		page_order = ((struct aper_size_info_fixed *) temp)->page_order;
  		num_entries = ((struct aper_size_info_fixed *) temp)->num_entries;
 -		table = (char *) __get_free_pages(GFP_KERNEL, page_order);
-+		table = dma_alloc_coherent(
-+				&agp_bridge->dev->dev,
-+				PAGE_SIZE << page_order, &dma, GFP_KERNEL);
++		table = alloc_gatt_pages(page_order);
  	}
  
  	if (table == NULL)
-@@ -744,7 +749,7 @@ int agp_generic_create_gatt_table(void)
+@@ -744,7 +743,7 @@
  	agp_gatt_table = (void *)table;
  
  	agp_bridge->driver->cache_flush();
 -	agp_bridge->gatt_table = ioremap_nocache(virt_to_phys(table),
-+	agp_bridge->gatt_table = ioremap_nocache(virt_to_bus(table),
++	agp_bridge->gatt_table = ioremap_nocache(virt_to_gart(table),
  					(PAGE_SIZE * (1 << page_order)));
  	agp_bridge->driver->cache_flush();
  
-@@ -752,11 +757,12 @@ int agp_generic_create_gatt_table(void)
+@@ -752,11 +751,11 @@
  		for (page = virt_to_page(table); page <= virt_to_page(table_end); page++)
  			ClearPageReserved(page);
  
 -		free_pages((unsigned long) table, page_order);
-+		dma_free_coherent(&agp_bridge->dev->dev, PAGE_SIZE<<page_order,
-+					table, dma);
++		free_gatt_pages(table, page_order);
  
  		return -ENOMEM;
  	}
 -	agp_bridge->gatt_bus_addr = virt_to_phys(agp_bridge->gatt_table_real);
-+	agp_bridge->gatt_bus_addr = virt_to_bus(table);
++	agp_bridge->gatt_bus_addr = virt_to_gart(agp_bridge->gatt_table_real);
  
  	/* AK: bogus, should encode addresses > 4GB */
  	for (i = 0; i < num_entries; i++) {
-@@ -810,7 +816,8 @@ int agp_generic_free_gatt_table(void)
+@@ -810,7 +809,7 @@
  	for (page = virt_to_page(table); page <= virt_to_page(table_end); page++)
  		ClearPageReserved(page);
  
 -	free_pages((unsigned long) agp_bridge->gatt_table_real, page_order);
-+	dma_free_coherent(&agp_bridge->dev->dev, PAGE_SIZE<<page_order,
-+		agp_bridge->gatt_table_real, agp_bridge->gatt_bus_addr);
++	free_gatt_pages(agp_bridge->gatt_table_real, page_order);
  
  	agp_gatt_table = NULL;
  	agp_bridge->gatt_table = NULL;
-diff -rup pristine-linux-2.6.11/drivers/char/agp/hp-agp.c linux-2.6.11/drivers/char/agp/hp-agp.c
---- pristine-linux-2.6.11/drivers/char/agp/hp-agp.c	2005-03-02 07:38:19.000000000 +0000
-+++ linux-2.6.11/drivers/char/agp/hp-agp.c	2005-03-11 00:47:41.424653508 +0000
-@@ -110,7 +110,7 @@ static int __init hp_zx1_ioc_shared(void
+--- linux-2.6.11/drivers/char/agp/hp-agp.c	2005-03-02 07:38:19 +00:00
++++ linux-2.6.11-agp/drivers/char/agp/hp-agp.c	2005-03-22 11:14:56 +00:00
+@@ -110,7 +110,7 @@
  	hp->gart_size = HP_ZX1_GART_SIZE;
  	hp->gatt_entries = hp->gart_size / hp->io_page_size;
  
 -	hp->io_pdir = phys_to_virt(readq(hp->ioc_regs+HP_ZX1_PDIR_BASE));
-+	hp->io_pdir = bus_to_virt(readq(hp->ioc_regs+HP_ZX1_PDIR_BASE));
++	hp->io_pdir = gart_to_virt(readq(hp->ioc_regs+HP_ZX1_PDIR_BASE));
  	hp->gatt = &hp->io_pdir[HP_ZX1_IOVA_TO_PDIR(hp->gart_base)];
  
  	if (hp->gatt[0] != HP_ZX1_SBA_IOMMU_COOKIE) {
-@@ -248,7 +248,7 @@ hp_zx1_configure (void)
+@@ -248,7 +248,7 @@
  	agp_bridge->mode = readl(hp->lba_regs+hp->lba_cap_offset+PCI_AGP_STATUS);
  
  	if (hp->io_pdir_owner) {
 -		writel(virt_to_phys(hp->io_pdir), hp->ioc_regs+HP_ZX1_PDIR_BASE);
-+		writel(virt_to_bus(hp->io_pdir), hp->ioc_regs+HP_ZX1_PDIR_BASE);
++		writel(virt_to_gart(hp->io_pdir), hp->ioc_regs+HP_ZX1_PDIR_BASE);
  		readl(hp->ioc_regs+HP_ZX1_PDIR_BASE);
  		writel(hp->io_tlb_ps, hp->ioc_regs+HP_ZX1_TCNFG);
  		readl(hp->ioc_regs+HP_ZX1_TCNFG);
-diff -rup pristine-linux-2.6.11/drivers/char/agp/i460-agp.c linux-2.6.11/drivers/char/agp/i460-agp.c
---- pristine-linux-2.6.11/drivers/char/agp/i460-agp.c	2005-03-02 07:38:10.000000000 +0000
-+++ linux-2.6.11/drivers/char/agp/i460-agp.c	2005-03-11 00:35:21.327192957 +0000
-@@ -371,7 +371,7 @@ static int i460_alloc_large_page (struct
+--- linux-2.6.11/drivers/char/agp/i460-agp.c	2005-03-02 07:38:10 +00:00
++++ linux-2.6.11-agp/drivers/char/agp/i460-agp.c	2005-03-22 11:14:56 +00:00
+@@ -371,7 +371,7 @@
  	}
  	memset(lp->alloced_map, 0, map_size);
  
 -	lp->paddr = virt_to_phys(lpage);
-+	lp->paddr = virt_to_bus(lpage);
++	lp->paddr = virt_to_gart(lpage);
  	lp->refcount = 0;
  	atomic_add(I460_KPAGES_PER_IOPAGE, &agp_bridge->current_memory_agp);
  	return 0;
-@@ -382,7 +382,7 @@ static void i460_free_large_page (struct
+@@ -382,7 +382,7 @@
  	kfree(lp->alloced_map);
  	lp->alloced_map = NULL;
  
 -	free_pages((unsigned long) phys_to_virt(lp->paddr), I460_IO_PAGE_SHIFT - PAGE_SHIFT);
-+	free_pages((unsigned long) bus_to_virt(lp->paddr), I460_IO_PAGE_SHIFT - PAGE_SHIFT);
++	free_pages((unsigned long) gart_to_virt(lp->paddr), I460_IO_PAGE_SHIFT - PAGE_SHIFT);
  	atomic_sub(I460_KPAGES_PER_IOPAGE, &agp_bridge->current_memory_agp);
  }
  
-diff -rup pristine-linux-2.6.11/drivers/char/agp/intel-agp.c linux-2.6.11/drivers/char/agp/intel-agp.c
---- pristine-linux-2.6.11/drivers/char/agp/intel-agp.c	2005-03-02 07:38:09.000000000 +0000
-+++ linux-2.6.11/drivers/char/agp/intel-agp.c	2005-03-11 00:35:21.328192985 +0000
-@@ -285,7 +285,7 @@ static struct agp_memory *alloc_agpphysm
+--- linux-2.6.11/drivers/char/agp/intel-agp.c	2005-03-02 07:38:09 +00:00
++++ linux-2.6.11-agp/drivers/char/agp/intel-agp.c	2005-03-22 11:14:56 +00:00
+@@ -285,7 +285,7 @@
  	if (new == NULL)
  		return NULL;
  
 -	new->memory[0] = virt_to_phys(addr);
-+	new->memory[0] = virt_to_bus(addr);
++	new->memory[0] = virt_to_gart(addr);
  	if (pg_count == 4) {
  		/* kludge to get 4 physical pages for ARGB cursor */
  		new->memory[1] = new->memory[0] + PAGE_SIZE;
-@@ -328,10 +328,10 @@ static void intel_i810_free_by_type(stru
+@@ -328,10 +328,10 @@
  	agp_free_key(curr->key);
  	if(curr->type == AGP_PHYS_MEMORY) {
  		if (curr->page_count == 4)
 -			i8xx_destroy_pages(phys_to_virt(curr->memory[0]));
-+			i8xx_destroy_pages(bus_to_virt(curr->memory[0]));
++			i8xx_destroy_pages(gart_to_virt(curr->memory[0]));
  		else
  			agp_bridge->driver->agp_destroy_page(
 -				 phys_to_virt(curr->memory[0]));
-+				 bus_to_virt(curr->memory[0]));
++				 gart_to_virt(curr->memory[0]));
  		vfree(curr->memory);
  	}
  	kfree(curr);
-diff -rup pristine-linux-2.6.11/drivers/char/agp/intel-mch-agp.c linux-2.6.11/drivers/char/agp/intel-mch-agp.c
---- pristine-linux-2.6.11/drivers/char/agp/intel-mch-agp.c	2005-03-02 07:37:48.000000000 +0000
-+++ linux-2.6.11/drivers/char/agp/intel-mch-agp.c	2005-03-11 00:49:37.713063638 +0000
-@@ -51,7 +51,7 @@ static struct agp_memory *alloc_agpphysm
+--- linux-2.6.11/drivers/char/agp/intel-mch-agp.c	2005-03-02 07:37:48 +00:00
++++ linux-2.6.11-agp/drivers/char/agp/intel-mch-agp.c	2005-03-22 11:14:56 +00:00
+@@ -51,7 +51,7 @@
  	if (new == NULL)
  		return NULL;
  
 -	new->memory[0] = virt_to_phys(addr);
-+	new->memory[0] = virt_to_bus(addr);
++	new->memory[0] = virt_to_gart(addr);
  	new->page_count = 1;
  	new->num_scratch_pages = 1;
  	new->type = AGP_PHYS_MEMORY;
-@@ -63,7 +63,7 @@ static void intel_i810_free_by_type(stru
+@@ -63,7 +63,7 @@
  {
  	agp_free_key(curr->key);
  	if(curr->type == AGP_PHYS_MEMORY) {
 -		agp_bridge->driver->agp_destroy_page(phys_to_virt(curr->memory[0]));
-+		agp_bridge->driver->agp_destroy_page(bus_to_virt(curr->memory[0]));
++		agp_bridge->driver->agp_destroy_page(gart_to_virt(curr->memory[0]));
  		vfree(curr->memory);
  	}
  	kfree(curr);
-diff -rup pristine-linux-2.6.11/drivers/char/agp/sworks-agp.c linux-2.6.11/drivers/char/agp/sworks-agp.c
---- pristine-linux-2.6.11/drivers/char/agp/sworks-agp.c	2005-03-02 07:38:37.000000000 +0000
-+++ linux-2.6.11/drivers/char/agp/sworks-agp.c	2005-03-11 00:35:21.330193041 +0000
-@@ -51,7 +51,7 @@ static int serverworks_create_page_map(s
+--- linux-2.6.11/drivers/char/agp/sworks-agp.c	2005-03-02 07:38:37 +00:00
++++ linux-2.6.11-agp/drivers/char/agp/sworks-agp.c	2005-03-22 11:14:56 +00:00
+@@ -51,7 +51,7 @@
  	}
  	SetPageReserved(virt_to_page(page_map->real));
  	global_cache_flush();
 -	page_map->remapped = ioremap_nocache(virt_to_phys(page_map->real), 
-+	page_map->remapped = ioremap_nocache(virt_to_bus(page_map->real), 
++	page_map->remapped = ioremap_nocache(virt_to_gart(page_map->real), 
  					    PAGE_SIZE);
  	if (page_map->remapped == NULL) {
  		ClearPageReserved(virt_to_page(page_map->real));
-@@ -162,7 +162,7 @@ static int serverworks_create_gatt_table
+@@ -162,7 +162,7 @@
  	/* Create a fake scratch directory */
  	for(i = 0; i < 1024; i++) {
  		writel(agp_bridge->scratch_page, serverworks_private.scratch_dir.remapped+i);
 -		writel(virt_to_phys(serverworks_private.scratch_dir.real) | 1, page_dir.remapped+i);
-+		writel(virt_to_bus(serverworks_private.scratch_dir.real) | 1, page_dir.remapped+i);
++		writel(virt_to_gart(serverworks_private.scratch_dir.real) | 1, page_dir.remapped+i);
  	}
  
  	retval = serverworks_create_gatt_pages(value->num_entries / 1024);
-@@ -174,7 +174,7 @@ static int serverworks_create_gatt_table
+@@ -174,7 +174,7 @@
  
  	agp_bridge->gatt_table_real = (u32 *)page_dir.real;
  	agp_bridge->gatt_table = (u32 __iomem *)page_dir.remapped;
 -	agp_bridge->gatt_bus_addr = virt_to_phys(page_dir.real);
-+	agp_bridge->gatt_bus_addr = virt_to_bus(page_dir.real);
++	agp_bridge->gatt_bus_addr = virt_to_gart(page_dir.real);
  
  	/* Get the address for the gart region.
  	 * This is a bus address even on the alpha, b/c its
-@@ -187,7 +187,7 @@ static int serverworks_create_gatt_table
+@@ -187,7 +187,7 @@
  	/* Calculate the agp offset */	
  
  	for(i = 0; i < value->num_entries / 1024; i++)
 -		writel(virt_to_phys(serverworks_private.gatt_pages[i]->real)|1, page_dir.remapped+i);
-+		writel(virt_to_bus(serverworks_private.gatt_pages[i]->real)|1, page_dir.remapped+i);
++		writel(virt_to_gart(serverworks_private.gatt_pages[i]->real)|1, page_dir.remapped+i);
  
  	return 0;
  }
-diff -rup pristine-linux-2.6.11/drivers/char/agp/uninorth-agp.c linux-2.6.11/drivers/char/agp/uninorth-agp.c
---- pristine-linux-2.6.11/drivers/char/agp/uninorth-agp.c	2005-03-02 07:38:09.000000000 +0000
-+++ linux-2.6.11/drivers/char/agp/uninorth-agp.c	2005-03-11 00:35:21.330193041 +0000
-@@ -200,7 +200,7 @@ static int uninorth_create_gatt_table(vo
+--- linux-2.6.11/drivers/char/agp/uninorth-agp.c	2005-03-02 07:38:09 +00:00
++++ linux-2.6.11-agp/drivers/char/agp/uninorth-agp.c	2005-03-22 11:14:56 +00:00
+@@ -200,7 +200,7 @@
  
  	agp_bridge->gatt_table_real = (u32 *) table;
  	agp_bridge->gatt_table = (u32 *)table;
 -	agp_bridge->gatt_bus_addr = virt_to_phys(table);
-+	agp_bridge->gatt_bus_addr = virt_to_bus(table);
++	agp_bridge->gatt_bus_addr = virt_to_gart(table);
  
  	for (i = 0; i < num_entries; i++) {
  		agp_bridge->gatt_table[i] =
-diff -rup pristine-linux-2.6.11/include/asm-i386/agp.h linux-2.6.11/include/asm-i386/agp.h
---- pristine-linux-2.6.11/include/asm-i386/agp.h	2005-03-02 07:37:31.000000000 +0000
-+++ linux-2.6.11/include/asm-i386/agp.h	2005-03-11 00:35:21.331193069 +0000
-@@ -3,6 +3,7 @@
+--- linux-2.6.11/include/asm-alpha/agp.h	2005-03-02 07:37:39 +00:00
++++ linux-2.6.11-agp/include/asm-alpha/agp.h	2005-03-22 11:18:34 +00:00
+@@ -10,4 +10,14 @@
+ #define flush_agp_mappings() 
+ #define flush_agp_cache() mb()
  
- #include <asm/pgtable.h>
- #include <asm/cacheflush.h>
-+#include <asm/system.h>
- 
- /* 
-  * Functions to keep the agpgart mappings coherent with the MMU.
-@@ -19,6 +20,6 @@ int unmap_page_from_agp(struct page *pag
- /* Could use CLFLUSH here if the cpu supports it. But then it would
-    need to be called for each cacheline of the whole page so it may not be 
++/* Convert a physical address to an address suitable for the GART. */
++#define phys_to_gart(x) (x)
++#define gart_to_phys(x) (x)
++
++/* GATT allocation. Returns/accepts GATT kernel virtual address. */
++#define alloc_gatt_pages(order)		\
++	((char *)__get_free_pages(GFP_KERNEL, (order)))
++#define free_gatt_pages(table, order)	\
++	free_pages((unsigned long)(table), (order))
++
+ #endif
+--- linux-2.6.11/include/asm-i386/agp.h	2005-03-02 07:37:31 +00:00
++++ linux-2.6.11-agp/include/asm-i386/agp.h	2005-03-22 11:18:39 +00:00
+@@ -21,4 +21,14 @@
     worth it. Would need a page for it. */
--#define flush_agp_cache() asm volatile("wbinvd":::"memory")
-+#define flush_agp_cache() wbinvd()
+ #define flush_agp_cache() asm volatile("wbinvd":::"memory")
  
++/* Convert a physical address to an address suitable for the GART. */
++#define phys_to_gart(x) (x)
++#define gart_to_phys(x) (x)
++
++/* GATT allocation. Returns/accepts GATT kernel virtual address. */
++#define alloc_gatt_pages(order)		\
++	((char *)__get_free_pages(GFP_KERNEL, (order)))
++#define free_gatt_pages(table, order)	\
++	free_pages((unsigned long)(table), (order))
++
+ #endif
+--- linux-2.6.11/include/asm-ia64/agp.h	2005-03-02 07:38:09 +00:00
++++ linux-2.6.11-agp/include/asm-ia64/agp.h	2005-03-22 11:18:45 +00:00
+@@ -18,4 +18,14 @@
+ #define flush_agp_mappings()		/* nothing */
+ #define flush_agp_cache()		mb()
+ 
++/* Convert a physical address to an address suitable for the GART. */
++#define phys_to_gart(x) (x)
++#define gart_to_phys(x) (x)
++
++/* GATT allocation. Returns/accepts GATT kernel virtual address. */
++#define alloc_gatt_pages(order)		\
++	((char *)__get_free_pages(GFP_KERNEL, (order)))
++#define free_gatt_pages(table, order)	\
++	free_pages((unsigned long)(table), (order))
++
+ #endif /* _ASM_IA64_AGP_H */
+--- linux-2.6.11/include/asm-ppc/agp.h	2005-03-02 07:38:08 +00:00
++++ linux-2.6.11-agp/include/asm-ppc/agp.h	2005-03-22 11:18:52 +00:00
+@@ -10,4 +10,14 @@
+ #define flush_agp_mappings()
+ #define flush_agp_cache() mb()
+ 
++/* Convert a physical address to an address suitable for the GART. */
++#define phys_to_gart(x) (x)
++#define gart_to_phys(x) (x)
++
++/* GATT allocation. Returns/accepts GATT kernel virtual address. */
++#define alloc_gatt_pages(order)		\
++	((char *)__get_free_pages(GFP_KERNEL, (order)))
++#define free_gatt_pages(table, order)	\
++	free_pages((unsigned long)(table), (order))
++
+ #endif
+--- linux-2.6.11/include/asm-sparc64/agp.h	2005-03-02 07:37:48 +00:00
++++ linux-2.6.11-agp/include/asm-sparc64/agp.h	2005-03-22 11:18:59 +00:00
+@@ -8,4 +8,14 @@
+ #define flush_agp_mappings() 
+ #define flush_agp_cache() mb()
+ 
++/* Convert a physical address to an address suitable for the GART. */
++#define phys_to_gart(x) (x)
++#define gart_to_phys(x) (x)
++
++/* GATT allocation. Returns/accepts GATT kernel virtual address. */
++#define alloc_gatt_pages(order)		\
++	((char *)__get_free_pages(GFP_KERNEL, (order)))
++#define free_gatt_pages(table, order)	\
++	free_pages((unsigned long)(table), (order))
++
+ #endif
+--- linux-2.6.11/include/asm-x86_64/agp.h	2005-03-02 07:37:30 +00:00
++++ linux-2.6.11-agp/include/asm-x86_64/agp.h	2005-03-22 11:18:22 +00:00
+@@ -19,4 +19,14 @@
+    worth it. Would need a page for it. */
+ #define flush_agp_cache() asm volatile("wbinvd":::"memory")
+ 
++/* Convert a physical address to an address suitable for the GART. */
++#define phys_to_gart(x) (x)
++#define gart_to_phys(x) (x)
++
++/* GATT allocation. Returns/accepts GATT kernel virtual address. */
++#define alloc_gatt_pages(order)		\
++	((char *)__get_free_pages(GFP_KERNEL, (order)))
++#define free_gatt_pages(table, order)	\
++	free_pages((unsigned long)(table), (order))
++
  #endif
