@@ -79,8 +79,8 @@ void vbd_grow(blkif_be_vbd_grow_t *grow)
     vbd_t              *vbd = NULL;
     rb_node_t          *rb;
     blkif_vdev_t        vdevice = grow->vdevice;
-    struct gendisk     *gd;
-    struct hd_struct   *hd;
+    unsigned long       sz;
+    
 
     blkif = blkif_find_by_handle(grow->domid, grow->blkif_handle);
     if ( unlikely(blkif == NULL) )
@@ -119,45 +119,48 @@ void vbd_grow(blkif_be_vbd_grow_t *grow)
         grow->status = BLKIF_BE_STATUS_OUT_OF_MEMORY;
         goto out;
     }
- 
+    
     x->extent.device        = grow->extent.device; 
     x->extent.sector_start  = grow->extent.sector_start; 
     x->extent.sector_length = grow->extent.sector_length; 
     x->next                 = (blkif_extent_le_t *)NULL; 
-
-    gd = get_gendisk(x->extent.device);
-    if ( (gd == NULL) || (gd->part == NULL) )
+    
+    if( !blk_size[MAJOR(x->extent.device)] )
     {
-        grow->status = BLKIF_BE_STATUS_VBD_NOT_FOUND; 
         DPRINTK("vbd_grow: device %08x doesn't exist.\n", x->extent.device);
-        goto out;
+	grow->status = BLKIF_BE_STATUS_EXTENT_NOT_FOUND;
+	goto out;
     }
-
-    if ( (hd = &gd->part[MINOR(x->extent.device)]) == NULL )
+    
+    /* convert blocks (1KB) to sectors */
+    sz = blk_size[MAJOR(x->extent.device)][MINOR(x->extent.device)] * 2;    
+    
+    if ( x->extent.sector_start > 0 )
     {
-        grow->status = BLKIF_BE_STATUS_VBD_NOT_FOUND; 
-        DPRINTK("vbd_grow: HD device %08x doesn't exist.\n", x->extent.device);
-        goto out;
+        DPRINTK("vbd_grow: device %08x start not zero!\n", x->extent.device);
+	grow->status = BLKIF_BE_STATUS_EXTENT_NOT_FOUND;
+	goto out;
     }
-
-    DPRINTK("vbd_grow: requested_len %llu actual_len %lu\n", 
-            x->extent.sector_length, hd->nr_sects);
-
+    
     /*
      * NB. This test assumes sector_start == 0, which is always the case
      * in Xen 1.3. In fact the whole grow/shrink interface could do with
      * some simplification.
      */
-    if ( x->extent.sector_length > hd->nr_sects )
-        x->extent.sector_length = hd->nr_sects;    
+    if ( x->extent.sector_length > sz )
+        x->extent.sector_length = sz;
+    
+    DPRINTK("vbd_grow: requested_len %llu actual_len %lu\n", 
+            x->extent.sector_length, sz);
 
     for ( px = &vbd->extents; *px != NULL; px = &(*px)->next ) 
         continue;
-
+    
     *px = x;
 
     DPRINTK("Successful grow of vdev=%04x (dom=%u)\n",
             vdevice, grow->domid);
+    
     grow->status = BLKIF_BE_STATUS_OKAY;
 
  out:
