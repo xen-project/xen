@@ -37,13 +37,13 @@ struct pfn_info *frame_table;
 unsigned long frame_table_size;
 unsigned long max_page;
 
-extern void init_percpu_info(void);
+extern void arch_init_memory(void);
 
 void __init init_frametable(void *frametable_vstart, unsigned long nr_pages)
 {
     unsigned long mfn;
 
-    init_percpu_info();
+    arch_init_memory();
 
     max_page = nr_pages;
     frame_table_size = nr_pages * sizeof(struct pfn_info);
