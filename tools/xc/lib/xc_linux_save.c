@@ -8,7 +8,6 @@
 
 #include "xc_private.h"
 #include <asm-xen/suspend.h>
-#include <zlib.h>
 
 #define BATCH_SIZE 1024   /* 1024 pages (4MB) at a time */
 
@@ -41,24 +40,18 @@
 })
 
 
-
-static int checked_write(gzFile fd, void *buf, size_t count)
-{
-    int rc;
-    while ( ((rc = gzwrite(fd, buf, count)) == -1) && (errno = EINTR) )
-        continue;
-    return rc == count;
-}
-
 int xc_linux_save(int xc_handle,
                   u64 domid, 
-                  const char *state_file, 
-                  int verbose)
+		  unsigned int flags,
+		  int (*writerfn)(void *, const void *, size_t),
+		  void *writerst )
 {
     dom0_op_t op;
     int rc = 1, i, j, k, n;
     unsigned long mfn;
     unsigned int prev_pc, this_pc;
+    int verbose = flags & XCFLAGS_VERBOSE;
+    //int live = flags & XCFLAGS_LIVE;
 
     /* state of the new MFN mapper */
     mfn_mapper_t *mapper_handle1, *mapper_handle2;
@@ -99,28 +92,6 @@ int xc_linux_save(int xc_handle,
     /* A temporary mapping, and a copy, of the guest's suspend record. */
     suspend_record_t *p_srec, srec;
 
-    /* The name and descriptor of the file that we are writing to. */
-    int    fd;
-    gzFile gfd;
-
-    int pm_handle = -1;
-
-    if ( (fd = open(state_file, O_CREAT|O_EXCL|O_WRONLY, 0644)) == -1 )
-    {
-        PERROR("Could not open file for writing");
-        return 1;
-    }
-
-    /*
-     * Compression rate 1: we want speed over compression. We're mainly going
-     * for those zero pages, after all.
-     */
-    if ( (gfd = gzdopen(fd, "wb1")) == NULL )
-    {
-        ERROR("Could not allocate compression state for state file");
-        close(fd);
-        return 1;
-    }
 
     if ( mlock(&ctxt, sizeof(ctxt) ) )
     {
@@ -324,14 +295,14 @@ int xc_linux_save(int xc_handle,
         goto out;
     }
 
-    if ( !checked_write(gfd, "LinuxGuestRecord",    16) ||
-         !checked_write(gfd, name,                  sizeof(name)) ||
-         !checked_write(gfd, &srec.nr_pfns,         sizeof(unsigned long)) ||
-         !checked_write(gfd, &ctxt,                 sizeof(ctxt)) ||
-         !checked_write(gfd, live_shinfo,           PAGE_SIZE) ||
-         !checked_write(gfd, pfn_to_mfn_frame_list, PAGE_SIZE) )
+    if ( (*writerfn)(writerst, "LinuxGuestRecord",    16) ||
+         (*writerfn)(writerst, name,                  sizeof(name)) ||
+         (*writerfn)(writerst, &srec.nr_pfns,         sizeof(unsigned long)) ||
+         (*writerfn)(writerst, &ctxt,                 sizeof(ctxt)) ||
+         (*writerfn)(writerst, live_shinfo,           PAGE_SIZE) ||
+         (*writerfn)(writerst, pfn_to_mfn_frame_list, PAGE_SIZE) )
     {
-        ERROR("Error when writing to state file");
+        ERROR("Error when writing to state file (1)");
         goto out;
     }
     munmap(live_shinfo, PAGE_SIZE);
@@ -401,15 +372,15 @@ int xc_linux_save(int xc_handle,
 	}
 
 
-	if ( !checked_write(gfd, &j, sizeof(int) ) )
+	if ( (*writerfn)(writerst, &j, sizeof(int) ) )
 	{
-	    ERROR("Error when writing to state file");
+	    ERROR("Error when writing to state file (2)");
 	    goto out;
 	}
 
-	if ( !checked_write(gfd, pfn_type, sizeof(unsigned long)*j ) )
+	if ( (*writerfn)(writerst, pfn_type, sizeof(unsigned long)*j ) )
 	{
-	    ERROR("Error when writing to state file");
+	    ERROR("Error when writing to state file (3)");
 	    goto out;
 	}
 
@@ -430,7 +401,8 @@ int xc_linux_save(int xc_handle,
 		      k++ )
 		{
 		    if ( !(page[k] & _PAGE_PRESENT) ) continue;
-		    mfn = page[k] >> PAGE_SHIFT;
+		    mfn = page[k] >> PAGE_SHIFT;		    
+
 		    if ( !MFN_IS_IN_PSEUDOPHYS_MAP(mfn) )
 		    {
 			ERROR("Frame number in pagetable page is invalid");
@@ -439,11 +411,17 @@ int xc_linux_save(int xc_handle,
 		    page[k] &= PAGE_SIZE - 1;
  		    page[k] |= live_mfn_to_pfn_table[mfn] << PAGE_SHIFT;
 
+		    /*
+		    printf("L%d i=%d pfn=%d mfn=%d k=%d pte=%08lx xpfn=%d\n",
+			   pfn_type[j]>>29,
+			   j,i,mfn,k,page[k],page[k]>>PAGE_SHIFT);
+			   */
+
 		}
 
-		if ( !checked_write(gfd, page, PAGE_SIZE) )
+		if ( (*writerfn)(writerst, page, PAGE_SIZE) )
 		{
-		    ERROR("Error when writing to state file");
+		    ERROR("Error when writing to state file (4)");
 		    goto out;
 		}
 
@@ -451,9 +429,9 @@ int xc_linux_save(int xc_handle,
 	    }
 	    else
 	    {
-		if ( !checked_write(gfd, region_base + (PAGE_SIZE*j), PAGE_SIZE) )
+		if ( (*writerfn)(writerst, region_base + (PAGE_SIZE*j), PAGE_SIZE) )
 		{
-		    ERROR("Error when writing to state file");
+		    ERROR("Error when writing to state file (5)");
 		    goto out;
 		}
 	    }
@@ -468,9 +446,9 @@ int xc_linux_save(int xc_handle,
     rc = 0;
 
     /* Zero terminate */
-    if ( !checked_write(gfd, &rc, sizeof(int)) )
+    if ( (*writerfn)(writerst, &rc, sizeof(int)) )
     {
-	ERROR("Error when writing to state file");
+	ERROR("Error when writing to state file (6)");
 	goto out;
     }
     
@@ -485,16 +463,9 @@ out:
         (void)do_dom0_op(xc_handle, &op);
     }
 
-    gzclose(gfd);
-
     if ( pfn_type != NULL )
         free(pfn_type);
-
-    /* On error, make sure the file is deleted. */
-    if ( rc != 0 )
-        unlink(state_file);
     
     return !!rc;
-
 
 }

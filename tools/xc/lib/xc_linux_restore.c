@@ -45,25 +45,20 @@ static int get_pfn_list(int xc_handle,
     return (ret < 0) ? -1 : op.u.getmemlist.num_pfns;
 }
 
-static int checked_read(gzFile fd, void *buf, size_t count)
-{
-    int rc;
-    while ( ((rc = gzread(fd, buf, count)) == -1) && (errno == EINTR) )
-        continue;
-    return rc == count;
-}
 
 int xc_linux_restore(int xc_handle,
 		     u64 dom,
-                     const char *state_file,
-                     int verbose,
+                     unsigned int flags,
+		     int (*readerfn)(void *, void *, size_t),
+		     void *readerst,
                      u64 *pdomid)
 {
     dom0_op_t op;
     int rc = 1, i, j, n, k;
     unsigned long mfn, pfn, xpfn;
     unsigned int prev_pc, this_pc;
-    
+    int verbose = flags & XCFLAGS_VERBOSE;
+
     /* Number of page frames in use by this Linux session. */
     unsigned long nr_pfns;
 
@@ -98,26 +93,10 @@ int xc_linux_restore(int xc_handle,
     mfn_mapper_t *region_mapper, *mapper_handle1;
     char *region_base;
 
-    /* The name and descriptor of the file that we are reading from. */
-    int    fd;
-    gzFile gfd;
-
     mmu_t *mmu = NULL;
 
     int pm_handle = -1;
 
-    if ( (fd = open(state_file, O_RDONLY)) == -1 )
-    {
-        PERROR("Could not open state file for reading");
-        return 1;
-    }
-
-    if ( (gfd = gzdopen(fd, "rb")) == NULL )
-    {
-        ERROR("Could not allocate decompression state for state file");
-        close(fd);
-        return 1;
-    }
 
     if ( mlock(&ctxt, sizeof(ctxt) ) )
     {   
@@ -128,18 +107,18 @@ int xc_linux_restore(int xc_handle,
     }
 
     /* Start writing out the saved-domain record. */
-    if ( !checked_read(gfd, signature, 16) ||
+    if ( (*readerfn)(readerst, signature, 16) ||
          (memcmp(signature, "LinuxGuestRecord", 16) != 0) )
     {
         ERROR("Unrecognised state format -- no signature found");
         goto out;
     }
 
-    if ( !checked_read(gfd, name,                  sizeof(name)) ||
-         !checked_read(gfd, &nr_pfns,              sizeof(unsigned long)) ||
-         !checked_read(gfd, &ctxt,                 sizeof(ctxt)) ||
-         !checked_read(gfd, shared_info,           PAGE_SIZE) ||
-         !checked_read(gfd, pfn_to_mfn_frame_list, PAGE_SIZE) )
+    if ( (*readerfn)(readerst, name,                  sizeof(name)) ||
+         (*readerfn)(readerst, &nr_pfns,              sizeof(unsigned long)) ||
+         (*readerfn)(readerst, &ctxt,                 sizeof(ctxt)) ||
+         (*readerfn)(readerst, shared_info,           PAGE_SIZE) ||
+         (*readerfn)(readerst, pfn_to_mfn_frame_list, PAGE_SIZE) )
     {
         ERROR("Error when reading from state file");
         goto out;
@@ -250,7 +229,7 @@ int xc_linux_restore(int xc_handle,
             prev_pc = this_pc;
         }
 
-        if ( !checked_read(gfd, &j, sizeof(int)) )
+        if ( (*readerfn)(readerst, &j, sizeof(int)) )
         {
             ERROR("Error when reading from state file");
             goto out;
@@ -260,7 +239,7 @@ int xc_linux_restore(int xc_handle,
 	
 	if(j==0) break;  // our work here is done
 	
-        if ( !checked_read(gfd, region_pfn_type, j*sizeof(unsigned long)) )
+        if ( (*readerfn)(readerst, region_pfn_type, j*sizeof(unsigned long)) )
         {
             ERROR("Error when reading from state file");
             goto out;
@@ -306,21 +285,31 @@ int xc_linux_restore(int xc_handle,
 
             ppage = (unsigned long*) (region_base + i*PAGE_SIZE);
 
-	    if ( !checked_read(gfd, ppage, PAGE_SIZE) )
+	    if ( (*readerfn)(readerst, ppage, PAGE_SIZE) )
 	    {
 		ERROR("Error when reading from state file");
 		goto out;
 	    }
 
-	    if ( region_pfn_type[i] == L1TAB )
+	    switch( region_pfn_type[i] )
+	    {
+	    case 0:
+		break;
+
+	    case L1TAB:
 	    {
 		for ( k = 0; k < 1024; k++ )
 		{
 		    if ( ppage[k] & _PAGE_PRESENT )
 		    {
-			if ( (xpfn = ppage[k] >> PAGE_SHIFT) >= nr_pfns )
+			xpfn = ppage[k] >> PAGE_SHIFT;
+
+/*printf("L1 i=%d pfn=%d mfn=%d k=%d pte=%08lx xpfn=%d\n",
+       i,pfn,mfn,k,ppage[k],xpfn);*/
+
+			if ( xpfn >= nr_pfns )
 			{
-			    ERROR("Frame number in type %d page table is out of range. i=%d k=%d pfn=%d nr_pfns=%d",region_pfn_type[i],i,k,xpfn,nr_pfns);
+			    ERROR("Frame number in type %d page table is out of range. i=%d k=%d pfn=%d nr_pfns=%d",region_pfn_type[i]>>29,i,k,xpfn,nr_pfns);
 			    goto out;
 			}
 #if 0
@@ -335,15 +324,23 @@ int xc_linux_restore(int xc_handle,
 		    }
 		}
 	    }
-	    else if ( region_pfn_type[i] == L2TAB )
+	    break;
+
+	    case L2TAB:
 	    {
 		for ( k = 0; k < (HYPERVISOR_VIRT_START>>L2_PAGETABLE_SHIFT); k++ )
 		{
 		    if ( ppage[k] & _PAGE_PRESENT )
 		    {
-			if ( (xpfn = ppage[k] >> PAGE_SHIFT) >= nr_pfns )
+			xpfn = ppage[k] >> PAGE_SHIFT;
+
+/*printf("L2 i=%d pfn=%d mfn=%d k=%d pte=%08lx xpfn=%d\n",
+       i,pfn,mfn,k,ppage[k],xpfn);*/
+
+			if ( xpfn >= nr_pfns )
 			{
-			    ERROR("Frame number in page table is out of range");
+			    ERROR("Frame number in type %d page table is out of range. i=%d k=%d pfn=%d nr_pfns=%d",region_pfn_type[i]>>29,i,k,xpfn,nr_pfns);
+
 			    goto out;
 			}
 #if 0
@@ -357,6 +354,12 @@ int xc_linux_restore(int xc_handle,
 			ppage[k] |= pfn_to_mfn_table[xpfn] << PAGE_SHIFT;
 		    }
 		}
+	    }
+	    break;
+
+	    default:
+		ERROR("Bogus page type %x page table is out of range. i=%d nr_pfns=%d",region_pfn_type[i],i,nr_pfns);
+		goto out;
 	    }
 
 	    if ( add_mmu_update(xc_handle, mmu,
@@ -545,7 +548,6 @@ int xc_linux_restore(int xc_handle,
     if ( pfn_type != NULL )
         free(pfn_type);
 
-    gzclose(gfd);
 
     if ( rc == 0 )
         *pdomid = dom;

@@ -246,28 +246,4 @@ void * mfn_mapper_queue_entry(mfn_mapper_t *t, int offset,
 /*********************/
 
 
-#if 0
-typedef struct mfn_typer {
-    domid_t dom;
-    int xc_handle;
-    int max;
-    dom0_op_t op;
-} mfn_typer_t;
-
-
-mfn_typer_t *mfn_typer_init(int xc_handle, domid_t dom, int num );
-
-void mfn_typer_queue_entry(mfn_typer_t *t, unsigned long mfn );
-
-int mfn_typer_flush_queue(mfn_typer_t *t);
-#endif
-
-int get_pfn_type_batch(int xc_handle, 
-		       u64 dom, int num, unsigned long *arr);
-
-unsigned int get_pfn_type(int xc_handle, 
-			  unsigned long mfn, 
-			  u64 dom);
-    
-
 #endif /* __XC_PRIVATE_H__ */

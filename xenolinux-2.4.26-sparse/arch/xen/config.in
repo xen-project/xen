@@ -231,6 +231,8 @@ if [ "$CONFIG_XEN_PHYSDEV_ACCESS" = "y" ]; then
    #
    source drivers/input/Config.in
 else
+   define_bool CONFIG_NETDEVICES y
+
    #
    # Block device driver configuration
    #

@@ -58,15 +58,20 @@ int xc_shadow_control(int xc_handle,
                       u64 domid, 
                       unsigned int sop);
 
+#define XCFLAGS_VERBOSE 1
+#define XCFLAGS_LIVE    2
+
 int xc_linux_save(int xc_handle,
                   u64 domid, 
-                  const char *state_file, 
-                  int verbose);
+                  unsigned int flags,
+		  int (*writerfn)(void *, const void *, size_t),
+		  void *writerst );
 
 int xc_linux_restore(int xc_handle,
                      u64 domid,
-                     const char *state_file, 
-                     int verbose,
+                     unsigned int flags,		     
+		     int (*readerfn)(void *, void *, size_t),
+		     void *readerst,
                      u64 *pdomid);
 
 int xc_linux_build(int xc_handle,
