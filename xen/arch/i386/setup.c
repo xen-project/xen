@@ -203,6 +203,8 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
     case X86_VENDOR_AMD:
         init_amd(c);
         break;
+    case X86_VENDOR_UNKNOWN:  /* Connectix Virtual PC reports this */
+	break;
     default:
         panic("Only support Intel processors (P6+)\n");
     }
