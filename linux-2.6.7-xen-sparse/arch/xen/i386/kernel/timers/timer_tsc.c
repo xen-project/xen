@@ -34,12 +34,9 @@ int tsc_disable __initdata = 0;
 extern spinlock_t i8253_lock;
 
 static int use_tsc;
-/* Number of usecs that the last interrupt was delayed */
-static int delay_at_last_interrupt;
 
-static unsigned long last_tsc_low; /* lsb 32 bits of Time Stamp Counter */
-static unsigned long last_tsc_high; /* msb 32 bits of Time Stamp Counter */
 static unsigned long long monotonic_base;
+static u32 monotonic_offset;
 static seqlock_t monotonic_lock = SEQLOCK_UNLOCKED;
 
 /* convert from cycles(64bits) => nanoseconds (64bits)
@@ -85,15 +82,19 @@ static unsigned long fast_gettimeoffset_quotient;
 
 /* These are peridically updated in shared_info, and then copied here. */
 static u32 shadow_tsc_stamp;
-static u64 shadow_system_time;
+u64 shadow_system_time;
 static u32 shadow_time_version;
 static struct timeval shadow_tv;
+static unsigned int rdtsc_bitshift;
+extern u64 processed_system_time;
+
+#define NS_PER_TICK (1000000000ULL/HZ)
 
 /*
  * Reads a consistent set of time-base values from Xen, into a shadow data
  * area. Must be called with the xtime_lock held for writing.
  */
-static void __get_time_values_from_xen(void)
+void __get_time_values_from_xen(void)
 {
 	do {
 		shadow_time_version = HYPERVISOR_shared_info->time_version2;
@@ -120,16 +121,16 @@ static unsigned long get_offset_tsc(void)
 	rdtsc(eax,edx);
 
 	/* .. relative to previous jiffy (32 bits is enough) */
-	eax -= last_tsc_low;	/* tsc_low delta */
+	eax -= (shadow_tsc_stamp << rdtsc_bitshift) & 0xffffffff;
 
 	/*
-         * Time offset = (tsc_low delta) * fast_gettimeoffset_quotient
-         *             = (tsc_low delta) * (usecs_per_clock)
-         *             = (tsc_low delta) * (usecs_per_jiffy / clocks_per_jiffy)
+	 * Time offset = (tsc_low delta) * fast_gettimeoffset_quotient
+	 *             = (tsc_low delta) * (usecs_per_clock)
+	 *             = (tsc_low delta) * (usecs_per_jiffy / clocks_per_jiffy)
 	 *
 	 * Using a mull instead of a divl saves up to 31 clock cycles
 	 * in the critical path.
-         */
+	 */
 
 	__asm__("mull %2"
 		:"=a" (eax), "=d" (edx)
@@ -137,7 +138,7 @@ static unsigned long get_offset_tsc(void)
 		 "0" (eax));
 
 	/* our adjusted time offset in microseconds */
-	return delay_at_last_interrupt + edx;
+	return edx;
 }
 
 static unsigned long long monotonic_clock_tsc(void)
@@ -148,7 +149,7 @@ static unsigned long long monotonic_clock_tsc(void)
 	/* atomically read monotonic base & last_offset */
 	do {
 		seq = read_seqbegin(&monotonic_lock);
-		last_offset = ((unsigned long long)last_tsc_high<<32)|last_tsc_low;
+		last_offset = monotonic_offset << rdtsc_bitshift;
 		base = monotonic_base;
 	} while (read_seqretry(&monotonic_lock, seq));
 
@@ -186,122 +187,25 @@ unsigned long long sched_clock(void)
 
 static void mark_offset_tsc(void)
 {
-	unsigned long lost,delay;
-	unsigned long delta = last_tsc_low;
-#if 0
-	int count;
-	int countmp;
-	static int count1 = 0;
-#endif
-	unsigned long long this_offset, last_offset;
-	static int lost_count = 0;
-	
+	s64 delta;
+	unsigned int ticks = 0;
+
 	write_seqlock(&monotonic_lock);
-	last_offset = ((unsigned long long)last_tsc_high<<32)|last_tsc_low;
-	/*
-	 * It is important that these two operations happen almost at
-	 * the same time. We do the RDTSC stuff first, since it's
-	 * faster. To avoid any inconsistencies, we need interrupts
-	 * disabled locally.
-	 */
 
-	/*
-	 * Interrupts are just disabled locally since the timer irq
-	 * has the SA_INTERRUPT flag set. -arca
-	 */
-	
-	/* read Pentium cycle counter */
+	delta = (s64)(shadow_system_time - processed_system_time);
 
-	rdtsc(last_tsc_low, last_tsc_high);
-
-#if 0
-	spin_lock(&i8253_lock);
-	outb_p(0x00, PIT_MODE);     /* latch the count ASAP */
-
-	count = inb_p(PIT_CH0);    /* read the latched count */
-	count |= inb(PIT_CH0) << 8;
-
-	/*
-	 * VIA686a test code... reset the latch if count > max + 1
-	 * from timer_pit.c - cjb
-	 */
-	if (count > LATCH) {
-		outb_p(0x34, PIT_MODE);
-		outb_p(LATCH & 0xff, PIT_CH0);
-		outb(LATCH >> 8, PIT_CH0);
-		count = LATCH - 1;
+	/* Process elapsed jiffies since last call. */
+	while (delta >= NS_PER_TICK) {
+		ticks++;
+		delta -= NS_PER_TICK;
+		processed_system_time += NS_PER_TICK;
 	}
+	jiffies_64 += ticks - 1;
 
-	spin_unlock(&i8253_lock);
-
-	if (pit_latch_buggy) {
-		/* get center value of last 3 time lutch */
-		if ((count2 >= count && count >= count1)
-		    || (count1 >= count && count >= count2)) {
-			count2 = count1; count1 = count;
-		} else if ((count1 >= count2 && count2 >= count)
-			   || (count >= count2 && count2 >= count1)) {
-			countmp = count;count = count2;
-			count2 = count1;count1 = countmp;
-		} else {
-			count2 = count1; count1 = count; count = count1;
-		}
-	}
-#endif
-
-	/* lost tick compensation */
-	delta = last_tsc_low - delta;
-	{
-		register unsigned long eax, edx;
-		eax = delta;
-		__asm__("mull %2"
-		:"=a" (eax), "=d" (edx)
-		:"rm" (fast_gettimeoffset_quotient),
-		 "0" (eax));
-		delta = edx;
-	}
-	delta += delay_at_last_interrupt;
-	lost = delta/(1000000/HZ);
-	delay = delta%(1000000/HZ);
-	if (lost >= 2) {
-		jiffies_64 += lost-1;
-
-		/* sanity check to ensure we're not always losing ticks */
-		if (lost_count++ > 100) {
-			printk(KERN_WARNING "Losing too many ticks!\n");
-			printk(KERN_WARNING "TSC cannot be used as a timesource.  \n");
-			printk(KERN_WARNING "Possible reasons for this are:\n");
-			printk(KERN_WARNING "  You're running with Speedstep,\n");
-			printk(KERN_WARNING "  You don't have DMA enabled for your hard disk (see hdparm),\n");
-			printk(KERN_WARNING "  Incorrect TSC synchronization on an SMP system (see dmesg).\n");
-			printk(KERN_WARNING "Falling back to a sane timesource now.\n");
-
-			clock_fallback();
-		}
-		/* ... but give the TSC a fair chance */
-		if (lost_count > 25)
-			cpufreq_delayed_get();
-	} else
-		lost_count = 0;
 	/* update the monotonic base value */
-	this_offset = ((unsigned long long)last_tsc_high<<32)|last_tsc_low;
-	monotonic_base += cycles_2_ns(this_offset - last_offset);
+	monotonic_base = shadow_system_time;
+	monotonic_offset = shadow_tsc_stamp;
 	write_sequnlock(&monotonic_lock);
-
-#if 0
-	/* calculate delay_at_last_interrupt */
-	count = ((LATCH-1) - count) * TICK_SIZE;
-	delay_at_last_interrupt = (count + LATCH/2) / LATCH;
-#else
-	delay_at_last_interrupt = 0;
-#endif
-
-	/* catch corner case where tick rollover occured 
-	 * between tsc and pit reads (as noted when 
-	 * usec delta is > 90% # of usecs/tick)
-	 */
-	if (lost && abs(delay - delay_at_last_interrupt) > (900000/HZ))
-		jiffies_64++;
 }
 
 static void delay_tsc(unsigned long loops)
@@ -410,7 +314,7 @@ static unsigned long cpu_khz_ref = 0;
 
 static int
 time_cpufreq_notifier(struct notifier_block *nb, unsigned long val,
-		       void *data)
+		      void *data)
 {
 	struct cpufreq_freqs *freq = data;
 
@@ -486,9 +390,12 @@ static int __init init_tsc(char* override)
 		    "0" (eax), "1" (edx));
 	}
 
+	rdtsc_bitshift = HYPERVISOR_shared_info->tsc_timestamp.tsc_bitshift;
+
 	set_cyc2ns_scale(cpu_khz/1000);
 
 	__get_time_values_from_xen();
+	processed_system_time = shadow_system_time;
 
 	rdtscll(alarm);
 
