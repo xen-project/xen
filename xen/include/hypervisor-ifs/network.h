@@ -18,7 +18,7 @@
 
 #define NETOP_PUSH_BUFFERS    0  /* Notify Xen of new buffers on the rings. */
 #define NETOP_FLUSH_BUFFERS   1  /* Flush all pending request buffers.      */
-
+#define NETOP_RESET_RINGS     2  /* Reset ring indexes on a quiescent vif.  */
 
 typedef struct tx_req_entry_st
 {

@@ -72,6 +72,9 @@ extern void __set_fixmap (enum fixed_addresses idx,
  */
 #define set_fixmap_nocache(idx, phys) \
 		__set_fixmap(idx, phys, PAGE_KERNEL_NOCACHE)
+
+extern void clear_fixmap(enum fixed_addresses idx);
+
 /*
  * used by vmalloc.c.
  *

@@ -45,6 +45,8 @@
 #include <asm/mmu_context.h>
 #include <asm/hypervisor.h>
 #include <asm/hypervisor-ifs/dom0_ops.h>
+#include <linux/netdevice.h>
+#include <linux/tqueue.h>
 
 /*
  * Point at the empty zero page to start with. We map the real shared_info
@@ -1035,33 +1037,82 @@ void __init cpu_init (void)
  * Time-to-die callback handling.
  */
 
-static void time_to_die(int irq, void *unused, struct pt_regs *regs)
+static void die_irq(int irq, void *unused, struct pt_regs *regs)
 {
     extern void ctrl_alt_del(void);
     ctrl_alt_del();
 }
 
-static int __init setup_death_event(void)
+static int __init setup_die_event(void)
 {
-    (void)request_irq(_EVENT_DIE, time_to_die, 0, "die", NULL);
+    (void)request_irq(_EVENT_DIE, die_irq, 0, "die", NULL);
     return 0;
 }
 
-__initcall(setup_death_event);
+__initcall(setup_die_event);
 
 
 /******************************************************************************
  * Stop/pickle callback handling.
  */
 
-static void time_to_stop(int irq, void *unused, struct pt_regs *regs)
+static void stop_task(void *unused)
 {
+    /* Hmmm... a cleaner interface to suspend/resume blkdevs would be nice. */
+    extern void blkdev_suspend(void);
+    extern void blkdev_resume(void);
+    
+    struct net_device *dev;
+    char name[6];
+    int i;
+
+    /* Close down all Ethernet interfaces. */
+    for ( i = 0; i < 10; i++ )
+    {
+        sprintf(name, "eth%d", i);
+        if ( (dev = dev_get_by_name(name)) == NULL )
+            continue;
+        dev_close(dev);
+        dev_put(dev);
+    }
+
+    blkdev_suspend();
+
+    __cli();
+
+    clear_fixmap(FIX_SHARED_INFO);
+
     HYPERVISOR_stop();
+
+    set_fixmap(FIX_SHARED_INFO, start_info.shared_info);
+    HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
+
+    __sti();
+
+    blkdev_resume();
+
+    /* Bring up all Ethernet interfaces. */
+    for ( i = 0; i < 10; i++ )
+    {
+        sprintf(name, "eth%d", i);
+        if ( (dev = dev_get_by_name(name)) == NULL )
+            continue;
+        dev_open(dev);
+        dev_put(dev);
+    }
+}
+
+static struct tq_struct stop_tq;
+
+static void stop_irq(int irq, void *unused, struct pt_regs *regs)
+{
+    stop_tq.routine = stop_task;
+    schedule_task(&stop_tq);
 }
 
 static int __init setup_stop_event(void)
 {
-    (void)request_irq(_EVENT_STOP, time_to_stop, 0, "stop", NULL);
+    (void)request_irq(_EVENT_STOP, stop_irq, 0, "stop", NULL);
     return 0;
 }
 

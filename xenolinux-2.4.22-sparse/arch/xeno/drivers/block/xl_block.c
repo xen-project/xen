@@ -14,13 +14,20 @@ typedef unsigned char byte; /* from linux/ide.h */
 #define XLBLK_RESPONSE_IRQ _EVENT_BLKDEV
 #define DEBUG_IRQ          _EVENT_DEBUG 
 
+#define STATE_ACTIVE    0
+#define STATE_SUSPENDED 1
+#define STATE_CLOSED    2
+static unsigned int state = STATE_SUSPENDED;
+
 static blk_ring_t *blk_ring;
 static unsigned int resp_cons; /* Response consumer for comms ring. */
 static unsigned int req_prod;  /* Private request producer.         */
 static xen_disk_info_t xlblk_disk_info;
 static int xlblk_control_msg_pending;
 
-#define RING_FULL (BLK_RING_INC(req_prod) == resp_cons)
+/* We plug the I/O ring if the driver is suspended or if the ring is full. */
+#define RING_PLUGGED ((BLK_RING_INC(req_prod) == resp_cons) || \
+                      (state != STATE_ACTIVE))
 
 /*
  * Request queues with outstanding work, but ring is currently full.
@@ -338,6 +345,9 @@ static int hypervisor_request(unsigned long   id,
     if ( nr_sectors >= (1<<9) ) BUG();
     if ( (buffer_ma & ((1<<9)-1)) != 0 ) BUG();
 
+    if ( state == STATE_CLOSED )
+        return 1;
+
     switch ( operation )
     {
     case XEN_BLOCK_VBD_CREATE:
@@ -345,7 +355,7 @@ static int hypervisor_request(unsigned long   id,
     case XEN_BLOCK_PHYSDEV_GRANT:
     case XEN_BLOCK_PHYSDEV_PROBE:
     case XEN_BLOCK_PROBE:
-        if ( RING_FULL ) return 1;
+        if ( RING_PLUGGED ) return 1;
 	phys_device = (kdev_t) 0;
 	sector_number = 0;
         DISABLE_SCATTERGATHER();
@@ -372,7 +382,7 @@ static int hypervisor_request(unsigned long   id,
                 DISABLE_SCATTERGATHER();
             return 0;
         }
-        else if ( RING_FULL )
+        else if ( RING_PLUGGED )
         {
             return 1;
         }
@@ -485,6 +495,9 @@ static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
     int i; 
     unsigned long flags; 
     struct buffer_head *bh, *next_bh;
+
+    if ( state == STATE_CLOSED )
+        return;
     
     spin_lock_irqsave(&io_request_lock, flags);	    
 
@@ -534,7 +547,7 @@ static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
         while ( nr_pending != 0 )
         {
             do_xlblk_request(pending_queues[--nr_pending]);
-            if ( RING_FULL ) break;
+            if ( RING_PLUGGED ) break;
         }
     }
 
@@ -569,17 +582,32 @@ int xenolinux_control_msg(int operation, char *buffer, int size)
 }
 
 
-int __init xlblk_init(void)
+static void reset_xlblk_interface(void)
 {
-    int error; 
+    block_io_op_t op; 
 
     xlblk_control_msg_pending = 0;
     nr_pending = 0;
 
-    /* This mapping was created early at boot time. */
+    op.cmd = BLOCK_IO_OP_RESET;
+    if ( HYPERVISOR_block_io_op(&op) != 0 )
+        printk(KERN_ALERT "Possible blkdev trouble: couldn't reset ring\n");
+
+    set_fixmap(FIX_BLKRING_BASE, start_info.blk_ring);
     blk_ring = (blk_ring_t *)fix_to_virt(FIX_BLKRING_BASE);
     blk_ring->req_prod = blk_ring->resp_prod = resp_cons = req_prod = 0;
-    
+
+    wmb();
+    state = STATE_ACTIVE;
+}
+
+
+int __init xlblk_init(void)
+{
+    int error; 
+
+    reset_xlblk_interface();
+
     error = request_irq(XLBLK_RESPONSE_IRQ, xlblk_response_int, 
                         SA_SAMPLE_RANDOM, "blkdev", NULL);
     if ( error )
@@ -639,3 +667,29 @@ static void __exit xlblk_cleanup(void)
 module_init(xlblk_init);
 module_exit(xlblk_cleanup);
 #endif
+
+
+void blkdev_suspend(void)
+{
+    state = STATE_SUSPENDED;
+    wmb();
+
+    while ( resp_cons != blk_ring->req_prod )
+    {
+        barrier();
+        current->state = TASK_INTERRUPTIBLE;
+        schedule_timeout(1);
+    }
+
+    wmb();
+    state = STATE_CLOSED;
+    wmb();
+
+    clear_fixmap(FIX_BLKRING_BASE);
+}
+
+
+void blkdev_resume(void)
+{
+    reset_xlblk_interface();
+}

@@ -246,6 +246,7 @@ long do_block_io_op(block_io_op_t *u_block_io_op)
 {
     long ret = 0;
     block_io_op_t op; 
+    struct task_struct *p = current;
 
     if (copy_from_user(&op, u_block_io_op, sizeof(op)))
         return -EFAULT;
@@ -254,16 +255,31 @@ long do_block_io_op(block_io_op_t *u_block_io_op)
 
     case BLOCK_IO_OP_SIGNAL: 
 	/* simply indicates there're reqs outstanding => add current to list */
-	add_to_blkdev_list_tail(current);
+	add_to_blkdev_list_tail(p);
 	maybe_trigger_io_schedule();
 	break; 
 
     case BLOCK_IO_OP_ATTACH_VBD:  
 	/* attach a VBD to a given domain; caller must be privileged  */
-	if(!IS_PRIV(current))
+	if( !IS_PRIV(p) )
 	    return -EPERM; 
 	ret = vbd_attach(&op.u.attach_info); 
 	break; 
+
+    case BLOCK_IO_OP_RESET:
+        /* Avoid a race with the tasklet. */
+        remove_from_blkdev_list(p);
+        if ( p->blk_req_cons != p->blk_resp_prod )
+        {
+            /* Interface isn't quiescent. */
+            ret = -EINVAL;
+        }
+        else
+        {
+            p->blk_req_cons = p->blk_resp_prod = 0;
+            ret = 0;
+        }
+        break;
 
     default: 
 	ret = -ENOSYS; 

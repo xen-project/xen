@@ -2229,6 +2229,24 @@ long do_net_io_op(unsigned int op, unsigned int idx)
         ret = flush_bufs_for_vif(vif);
         break;
 
+    case NETOP_RESET_RINGS:
+        /* We take the tx_lock to avoid a race with get_tx_bufs. */
+        spin_lock_irq(&vif->tx_lock);
+        if ( (vif->rx_req_cons != vif->rx_resp_prod) || 
+             (vif->tx_req_cons != vif->tx_resp_prod) )
+        {
+            /* The interface isn't quiescent. */
+            ret = -EINVAL; 
+        }
+        else
+        {
+            vif->rx_req_cons = vif->rx_resp_prod = 0;
+            vif->tx_req_cons = vif->tx_resp_prod = 0;
+            ret = 0;
+        }
+        spin_unlock_irq(&vif->tx_lock);
+        break;
+
     default:
         ret = -EINVAL;
         break;

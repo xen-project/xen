@@ -95,9 +95,8 @@ extern char _text, _etext, _edata, __bss_start, _end;
 extern char __init_begin, __init_end;
 
 static inline void set_pte_phys (unsigned long vaddr,
-                                 unsigned long phys, pgprot_t flags)
+                                 unsigned long phys, pgprot_t prot)
 {
-    pgprot_t prot;
     pgd_t *pgd;
     pmd_t *pmd;
     pte_t *pte;
@@ -117,8 +116,6 @@ static inline void set_pte_phys (unsigned long vaddr,
     if (pte_val(*pte))
         pte_ERROR(*pte);
 
-    pgprot_val(prot) = pgprot_val(PAGE_KERNEL) | pgprot_val(flags);
-
     /* We queue directly, avoiding hidden phys->machine translation. */
     queue_l1_entry_update(pte, phys | pgprot_val(prot));
 
@@ -129,8 +126,8 @@ static inline void set_pte_phys (unsigned long vaddr,
     __flush_tlb_one(vaddr);
 }
 
-void __set_fixmap (enum fixed_addresses idx, unsigned long phys, 
-                   pgprot_t flags)
+void __set_fixmap(enum fixed_addresses idx, unsigned long phys, 
+                  pgprot_t flags)
 {
     unsigned long address = __fix_to_virt(idx);
 
@@ -138,7 +135,13 @@ void __set_fixmap (enum fixed_addresses idx, unsigned long phys,
         printk("Invalid __set_fixmap\n");
         return;
     }
-    set_pte_phys(address, phys, flags);
+    set_pte_phys(address, phys, 
+                 __pgprot(pgprot_val(PAGE_KERNEL)|pgprot_val(flags)));
+}
+
+void clear_fixmap(enum fixed_addresses idx)
+{
+    set_pte_phys(__fix_to_virt(idx), 0, __pgprot(0));
 }
 
 static void __init fixrange_init (unsigned long start, 
@@ -228,9 +231,6 @@ void __init paging_init(void)
      */
     vaddr = __fix_to_virt(__end_of_fixed_addresses - 1) & PMD_MASK;
     fixrange_init(vaddr, HYPERVISOR_VIRT_START, init_mm.pgd);
-
-    /* Cheesy: this can probably be moved to the blkdev driver. */
-    set_fixmap(FIX_BLKRING_BASE, start_info.blk_ring);
 
     /* Switch to the real shared_info page, and clear the dummy page. */
     set_fixmap(FIX_SHARED_INFO, start_info.shared_info);

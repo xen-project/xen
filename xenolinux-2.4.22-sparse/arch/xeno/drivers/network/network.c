@@ -44,12 +44,6 @@ static void cleanup_module(void);
 
 static struct list_head dev_list;
 
-/*
- * Needed because network_close() is not properly implemented yet. So
- * an open after a close needs to do much less than the initial open.
- */
-static int opened_once_already = 0;
-
 struct net_private
 {
     struct list_head list;
@@ -58,12 +52,18 @@ struct net_private
     struct net_device_stats stats;
     atomic_t tx_entries;
     unsigned int rx_resp_cons, tx_resp_cons, tx_full;
+    unsigned int net_ring_fixmap_idx;
     net_ring_t *net_ring;
     net_idx_t  *net_idx;
     spinlock_t tx_lock;
     unsigned int idx; /* Domain-specific index of this VIF. */
 
     unsigned int rx_bufs_to_notify;
+
+#define STATE_ACTIVE    0
+#define STATE_SUSPENDED 1
+#define STATE_CLOSED    2
+    unsigned int state;
 
     /*
      * {tx,rx}_skbs store outstanding skbuffs. The first entry in each
@@ -103,14 +103,16 @@ static void dbg_network_int(int irq, void *dev_id, struct pt_regs *ptregs)
 static int network_open(struct net_device *dev)
 {
     struct net_private *np = dev->priv;
-    int i, error = 0;
+    int i;
 
-    if ( opened_once_already )
-    {
-        memset(&np->stats, 0, sizeof(np->stats));
-        netif_start_queue(dev);
-        return 0;
-    }
+    if ( HYPERVISOR_net_io_op(NETOP_RESET_RINGS, np->idx) != 0 )
+        printk(KERN_ALERT "Possible net trouble: couldn't reset ring idxs\n");
+
+    set_fixmap(FIX_NETRING0_BASE + np->net_ring_fixmap_idx, 
+               start_info.net_rings[np->idx]);
+    np->net_ring = (net_ring_t *)fix_to_virt(
+        FIX_NETRING0_BASE + np->net_ring_fixmap_idx);
+    np->net_idx  = &HYPERVISOR_shared_info->net_idx[np->idx];
 
     np->rx_bufs_to_notify = 0;
     np->rx_resp_cons = np->tx_resp_cons = np->tx_full = 0;
@@ -126,38 +128,16 @@ static int network_open(struct net_device *dev)
     for ( i = 0; i < RX_RING_SIZE; i++ )
         np->rx_skbs[i] = (void *)(i+1);
 
-    error = request_irq(NET_IRQ, network_interrupt, 
-                        SA_SAMPLE_RANDOM, "network", dev);
-    if ( error )
-    {
-        printk(KERN_WARNING "%s: Could not allocate network interrupt\n",
-               dev->name);
-        goto fail;
-    }
-
-    error = request_irq(_EVENT_DEBUG, dbg_network_int, SA_SHIRQ,
-                        "debug", dev);
-    if ( error )
-    {
-        printk(KERN_WARNING "%s: Non-fatal error -- no debug interrupt\n",
-               dev->name);
-    }
+    wmb();
+    np->state = STATE_ACTIVE;
 
     network_alloc_rx_buffers(dev);
-
-    printk("XenoLinux Virtual Network Driver installed as %s\n", dev->name);
 
     netif_start_queue(dev);
 
     MOD_INC_USE_COUNT;
 
-    opened_once_already = 1;
-
     return 0;
-
- fail:
-    kfree(np);
-    return error;
 }
 
 
@@ -192,7 +172,8 @@ static void network_tx_buf_gc(struct net_device *dev)
     if ( np->tx_full && (atomic_read(&np->tx_entries) < TX_MAX_ENTRIES) )
     {
         np->tx_full = 0;
-        netif_wake_queue(dev);
+        if ( np->state == STATE_ACTIVE )
+            netif_wake_queue(dev);
     }
 }
 
@@ -214,7 +195,8 @@ static void network_alloc_rx_buffers(struct net_device *dev)
     struct sk_buff *skb;
     unsigned int end = RX_RING_ADD(np->rx_resp_cons, RX_MAX_ENTRIES);    
 
-    if ( (i = np->net_idx->rx_req_prod) == end )
+    if ( ((i = np->net_idx->rx_req_prod) == end) ||
+         (np->state != STATE_ACTIVE) )
         return;
 
     do {
@@ -312,14 +294,16 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 }
 
 
-static void network_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
+static inline void _network_interrupt(struct net_device *dev)
 {
+    struct net_private *np = dev->priv;
     unsigned int i;
     unsigned long flags;
-    struct net_device *dev = (struct net_device *)dev_id;
-    struct net_private *np = dev->priv;
     struct sk_buff *skb;
     rx_resp_entry_t *rx;
+
+    if ( np->state == STATE_CLOSED )
+        return;
     
     spin_lock_irqsave(&np->tx_lock, flags);
     network_tx_buf_gc(dev);
@@ -375,9 +359,46 @@ static void network_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 }
 
 
+static void network_interrupt(int irq, void *unused, struct pt_regs *ptregs)
+{
+    struct list_head *ent;
+    struct net_private *np;
+    list_for_each ( ent, &dev_list )
+    {
+        np = list_entry(ent, struct net_private, list);
+        _network_interrupt(np->dev);
+    }
+}
+
+
 int network_close(struct net_device *dev)
 {
-    netif_stop_queue(dev);
+    struct net_private *np = dev->priv;
+
+    np->state = STATE_SUSPENDED;
+    wmb();
+
+    netif_stop_queue(np->dev);
+
+    HYPERVISOR_net_io_op(NETOP_FLUSH_BUFFERS, np->idx);
+
+    while ( (np->rx_resp_cons != np->net_idx->rx_req_prod) ||
+            (np->tx_resp_cons != np->net_idx->tx_req_prod) )
+    {
+        barrier();
+        current->state = TASK_INTERRUPTIBLE;
+        schedule_timeout(1);
+    }
+
+    wmb();
+    np->state = STATE_CLOSED;
+    wmb();
+
+    /* Now no longer safe to take interrupts for this device. */
+    clear_fixmap(FIX_NETRING0_BASE + np->net_ring_fixmap_idx);
+
+    MOD_DEC_USE_COUNT;
+
     return 0;
 }
 
@@ -471,6 +492,18 @@ int __init init_module(void)
     if ( start_info.dom_id == 0 )
         (void)register_inetaddr_notifier(&notifier_inetdev);
 
+    err = request_irq(NET_IRQ, network_interrupt, 
+                      SA_SAMPLE_RANDOM, "network", NULL);
+    if ( err )
+    {
+        printk(KERN_WARNING "Could not allocate network interrupt\n");
+        goto fail;
+    }
+    
+    err = request_irq(_EVENT_DEBUG, dbg_network_int, SA_SHIRQ, "debug", NULL);
+    if ( err )
+        printk(KERN_WARNING "Non-fatal error -- no debug interrupt\n");
+
     for ( i = 0; i < MAX_DOMAIN_VIFS; i++ )
     {
         if ( start_info.net_rings[i] == 0 )
@@ -487,12 +520,10 @@ int __init init_module(void)
             goto fail;
         }
 
-        set_fixmap(FIX_NETRING0_BASE+fixmap_idx, start_info.net_rings[i]);
-
         np = dev->priv;
-        np->net_ring = (net_ring_t *)fix_to_virt(FIX_NETRING0_BASE+fixmap_idx);
-        np->net_idx  = &HYPERVISOR_shared_info->net_idx[i];
-        np->idx      = i;
+        np->state               = STATE_CLOSED;
+        np->net_ring_fixmap_idx = fixmap_idx;
+        np->idx                 = i;
 
         SET_MODULE_OWNER(dev);
         dev->open            = network_open;
