@@ -12,6 +12,8 @@ CFLAGS  += -iwithprefix include -O3 -Wall -DMONITOR_BASE=$(MONITOR_BASE)
 CFLAGS  += -fomit-frame-pointer -I$(BASEDIR)/include -D__KERNEL__ -DNDEBUG
 #CFLAGS  += -fomit-frame-pointer -I$(BASEDIR)/include -D__KERNEL__
 CFLAGS  += -Wno-pointer-arith -Wredundant-decls -m32
+TARGET_CPU := i686
+CFLAGS += -march=$(TARGET_CPU)
 LDARCHFLAGS := --oformat elf32-i386 
 LDFLAGS := -T xeno.lds -N 
 
