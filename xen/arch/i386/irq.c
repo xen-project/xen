@@ -941,7 +941,8 @@ int setup_irq(unsigned int irq, struct irqaction * new)
 
 #define IRQ_MAX_GUESTS 7
 typedef struct {
-    unsigned int nr_guests;
+    unsigned short nr_guests;
+    unsigned short in_flight;
     struct task_struct *guest[IRQ_MAX_GUESTS];
 } irq_guest_action_t;
 
@@ -955,8 +956,37 @@ static void __do_IRQ_guest(int irq)
     for ( i = 0; i < action->nr_guests; i++ )
     {
         p = action->guest[i];
+        if ( !test_and_set_bit(irq, &p->pirq_mask) )
+            action->in_flight++;
         send_guest_pirq(p, irq);
     }
+}
+
+int pirq_guest_unmask(struct task_struct *p)
+{
+    irq_desc_t *desc;
+    int i, j, pirq;
+    u32 m;
+    shared_info_t *s = p->shared_info;
+
+    for ( i = 0; i < 2; i++ )
+    {
+        m = p->pirq_mask[i];
+        while ( (j = ffs(m)) != 0 )
+        {
+            m &= ~(1 << --j);
+            pirq = (i << 5) + j;
+            desc = &irq_desc[pirq];
+            spin_lock_irq(&desc->lock);
+            if ( !test_bit(p->pirq_to_evtchn[pirq], &s->evtchn_mask[0]) &&
+                 test_and_clear_bit(pirq, &p->pirq_mask) &&
+                 (--((irq_guest_action_t *)desc->action)->in_flight == 0) )
+                desc->handler->end(pirq);
+            spin_unlock_irq(&desc->lock);
+        }
+    }
+
+    return 0;
 }
 
 int pirq_guest_bind(struct task_struct *p, int irq)
@@ -983,7 +1013,8 @@ int pirq_guest_bind(struct task_struct *p, int irq)
             goto out;
 
         action->nr_guests = 0;
-
+        action->in_flight = 0;
+        
         desc->depth = 0;
         desc->status |= IRQ_GUEST;
         desc->status &= ~(IRQ_DISABLED | IRQ_AUTODETECT | IRQ_WAITING);
@@ -1013,6 +1044,10 @@ int pirq_guest_unbind(struct task_struct *p, int irq)
     spin_lock_irqsave(&desc->lock, flags);
 
     action = (irq_guest_action_t *)desc->action;
+
+    if ( test_and_clear_bit(irq, &p->pirq_mask) &&
+         (--action->in_flight == 0) )
+        desc->handler->end(irq);
 
     if ( action->nr_guests == 1 )
     {

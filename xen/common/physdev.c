@@ -564,12 +564,6 @@ static long pci_find_irq(int seg, int bus, int dev, int func, u32 *val)
 }
 
 
-static long pci_unmask_irq(void)
-{
-    return 0;
-}
-
-
 /*
  * demux hypervisor call.
  */
@@ -604,7 +598,7 @@ long do_physdev_op(physdev_op_t *uop)
         break;
 
     case PHYSDEVOP_UNMASK_IRQ:
-        ret = pci_unmask_irq();
+        ret = pirq_guest_unmask(current);
         break;
 
     default:
