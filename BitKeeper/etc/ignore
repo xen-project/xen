@@ -474,3 +474,8 @@ tools/misc/xen_read_console
 extras/mini-os/h/hypervisor-ifs
 xen/BLOG
 xen/drivers/block/xen_vbd.o
+tools/internal/xi_vif_params
+tools/misc/xen_cpuperf
+tools/misc/xen_log
+tools/misc/xen_refresh_dev
+xenolinux-2.4.22-sparse/arch/xeno/drivers/block/device
