@@ -232,17 +232,23 @@ class XendDomain:
                             not(d['running'] or d['paused'] or d['blocked']))
             if dead:
                 casualties.append(d)
+        destroyed = 0
         for d in casualties:
             id = str(d['dom'])
             log.debug('XendDomain>reap> domain died id=%s', id)
             if d['shutdown']:
                 reason = XendDomainInfo.shutdown_reason(d['shutdown_reason'])
                 log.debug('XendDomain>reap> shutdown id=%s reason=%s', id, reason)
+                if reason in ['suspend']:
+                    continue
                 if reason in ['poweroff', 'reboot']:
                     self.domain_restart_schedule(id, reason)
+            destroyed += 1
             self.final_domain_destroy(id)
         if self.domain_restarts_exist():
             self.domain_restarts_schedule()
+        if destroyed:
+            self.refresh_schedule(delay=1)
 
     def refresh(self):
         """Refresh domain list from Xen.
@@ -268,7 +274,7 @@ class XendDomain:
                 d.update(info)
             else:
                 self._delete_domain(d.id)
-        self.reap_schedule(1)
+        self.reap_schedule(delay=1)
 
     def update_domain(self, id):
         """Update the saved info for a domain.
