@@ -207,12 +207,12 @@ static void end_block_io_op(struct buffer_head *bh, int uptodate)
         pending_req->status = 1;
     }
 #ifdef TEST_READ_VALIDITY
-    else
+    else if ( pending_req->operation == READ )
     {
         unsigned long *buff = map_domain_mem(virt_to_phys(bh->b_data));
         if ( (buff[  0] == 0xdeadbeef) &&
              (buff[127] == 0xdeadbeef) )
-            printk("A really fucked buffer at %ld\n", bh->b_rsector);
+            printk("An unmodified buffer at sector %ld\n", bh->b_rsector);
         unmap_domain_mem(buff);
     }
 #endif
