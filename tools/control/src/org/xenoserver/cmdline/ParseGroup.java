@@ -26,7 +26,7 @@ public class ParseGroup extends CommandParser {
     String c = (String) args.removeFirst();
     for (i = 0; i < commands.length; i++) {
       if (commands[i].getName().equals(c)) {
-        if (getFlagParameter(args, '?')) {
+        if (!args.isEmpty() && args.getFirst().equals("-?")) {
           commands[i].printHelpText(null);
         } else {
           commands[i].parse(d, args);
@@ -44,12 +44,10 @@ public class ParseGroup extends CommandParser {
   }
 
   public String getUsage() {
-    // TODO Auto-generated method stub
     return null;
   }
 
   public String getHelpText() {
-    // TODO Auto-generated method stub
     return null;
   }
 

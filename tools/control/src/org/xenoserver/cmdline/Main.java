@@ -17,9 +17,19 @@ public class Main {
       new ParseDomainDestroy(),
       new ParseDomainList()
     };
+  static final CommandParser partitioncommands[] =
+    { new ParsePartitionsList()
+    };
+  static final CommandParser physicalcommands[] =
+    { new ParsePhysicalGrant(),
+      new ParsePhysicalRevoke(),
+      new ParsePhysicalList()
+    };
   static final CommandParser commands[] =
     { help,
-      new ParseGroup( "domain", domaincommands )
+      new ParseGroup( "domain", domaincommands ),
+      new ParseGroup( "partitions", partitioncommands ),
+      new ParseGroup( "physical", physicalcommands )
     };
   static final CommandParser parser = new ParseGroup( null, commands );
 

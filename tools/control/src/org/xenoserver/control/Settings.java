@@ -16,7 +16,9 @@ public final class Settings
   public static final String LOCAL_GW = System.getProperty ("LOCAL_ROUTE");
   public static final boolean TEST = (System.getProperty ("TEST") != null);
   public static final String XI_HELPER = System.getProperty ("XI_HELPER", "xi_helper");
-
+  public static final String PARTITIONS_FILE = System.getProperty("PARTITIONS_FILE", "/proc/partitions");
+  public static final String STATE_INPUT_FILE = System.getProperty("STATE_INPUT_FILE", "/var/lib/xen/vdstate.xml");
+  public static final String STATE_OUTPUT_FILE = System.getProperty("STATE_OUTPUT_FILE", "/var/lib/xen/vdstate.xml");
 
   public static File getDefaultsFile() {
     StringTokenizer tok = new StringTokenizer (DEFAULTS_PATH, ":");
