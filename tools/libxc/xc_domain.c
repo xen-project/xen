@@ -12,6 +12,7 @@ int xc_domain_create(int xc_handle,
                      unsigned int mem_kb, 
                      const char *name,
                      int cpu,
+                     float cpu_weight,
                      u32 *pdomid)
 {
     int err;
@@ -25,7 +26,11 @@ int xc_domain_create(int xc_handle,
     op.u.createdomain.cpu = cpu;
 
     if ( (err = do_dom0_op(xc_handle, &op)) == 0 )
+    {
         *pdomid = (u16)op.u.createdomain.domain;
+        
+         err = xc_domain_setcpuweight(xc_handle, *pdomid, cpu_weight);
+    }
 
     return err;
 }    
@@ -170,6 +175,64 @@ int xc_domain_setname(int xc_handle,
     strncpy(op.u.setdomainname.name, name, MAX_DOMAIN_NAME);
     return do_dom0_op(xc_handle, &op);
 }
+
+int xc_domain_setcpuweight(int xc_handle,
+                           u32 domid,
+                           float weight)
+{
+    int sched_id;
+    int ret;
+    
+    /* Figure out which scheduler is currently used: */
+    if((ret = xc_sched_id(xc_handle, &sched_id)))
+        return ret;
+    
+    switch(sched_id)
+    {
+        case SCHED_BVT:
+        {
+            u32 mcuadv;
+            int warpback;
+            s32 warpvalue;
+            long long warpl;
+            long long warpu;
+
+            /* Preserve all the scheduling parameters apart 
+               of MCU advance. */
+            if((ret = xc_bvtsched_domain_get(xc_handle, domid, &mcuadv, 
+                                &warpback, &warpvalue, &warpl, &warpu)))
+                return ret;
+            
+            /* The MCU advance is inverse of the weight.
+               Default value of the weight is 1, default mcuadv 10.
+               The scaling factor is therefore 10. */
+            if(weight > 0) mcuadv = 10 / weight;
+            
+            ret = xc_bvtsched_domain_set(xc_handle, domid, mcuadv, 
+                                         warpback, warpvalue, warpl, warpu);
+            break;
+        }
+        
+        case SCHED_FBVT:
+        {
+            // TODO
+            break;
+        }
+        case SCHED_RROBIN:
+        {
+            /* The weight cannot be set for RRobin */
+            break;
+        }
+        case SCHED_ATROPOS:
+        {
+            /* TODO - can we set weights in Atropos? */
+            break;
+        }
+    }
+
+    return ret;
+}
+
 
 int xc_domain_setinitialmem(int xc_handle,
                             u32 domid, 

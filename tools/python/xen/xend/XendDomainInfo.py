@@ -490,6 +490,7 @@ class XendDomainInfo:
         try:
             self.name = sxp.child_value(config, 'name')
             self.check_name(self.name)
+            self.cpu_weight = float(sxp.child_value(config, 'cpu_weight'))
             self.memory = int(sxp.child_value(config, 'memory'))
             if self.memory is None:
                 raise VmError('missing memory size')
@@ -709,8 +710,9 @@ class XendDomainInfo:
         memory = self.memory
         name = self.name
         cpu = int(sxp.child_value(self.config, 'cpu', '-1'))
+        cpu_weight = self.cpu_weight
         dom = self.dom or 0
-        dom = xc.domain_create(dom= dom, mem_kb= memory * 1024, name= name, cpu= cpu)
+        dom = xc.domain_create(dom= dom, mem_kb= memory * 1024, name= name, cpu= cpu, cpu_weight= cpu_weight)
         if dom <= 0:
             raise VmError('Creating domain failed: name=%s memory=%d'
                           % (name, memory))
@@ -1137,12 +1139,13 @@ add_device_handler('vbd',  vm_dev_vbd)
 add_device_handler('pci',  vm_dev_pci)
 
 # Ignore the fields we already handle.
-add_config_handler('name',    vm_field_ignore)
-add_config_handler('memory',  vm_field_ignore)
-add_config_handler('cpu',     vm_field_ignore)
-add_config_handler('console', vm_field_ignore)
-add_config_handler('image',   vm_field_ignore)
-add_config_handler('device',  vm_field_ignore)
-add_config_handler('backend', vm_field_ignore)
+add_config_handler('name',       vm_field_ignore)
+add_config_handler('memory',     vm_field_ignore)
+add_config_handler('cpu',        vm_field_ignore)
+add_config_handler('cpu_weight', vm_field_ignore)
+add_config_handler('console',    vm_field_ignore)
+add_config_handler('image',      vm_field_ignore)
+add_config_handler('device',     vm_field_ignore)
+add_config_handler('backend',    vm_field_ignore)
 
 # Register other config handlers.

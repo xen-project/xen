@@ -143,7 +143,7 @@ static inline u32 calc_avt(struct domain *d, s_time_t now)
     ranfor = (u32)(now - d->lastschd);
     mcus = (ranfor + MCU - 1)/MCU;
 
-    return inf->avt + mcus;
+    return inf->avt + mcus * inf->mcu_advance;
 }
 
 
