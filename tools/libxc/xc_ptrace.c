@@ -238,7 +238,7 @@ xc_ptrace(enum __ptrace_request request, pid_t pid, void *addr, void *data)
     xc_domaininfo_t info;
     struct gdb_regs pt;
     long retval = 0;
-    long *guest_va;
+    unsigned long *guest_va;
 
     op.interface_version = DOM0_INTERFACE_VERSION;
     
