@@ -71,8 +71,6 @@
 extern spinlock_t i8259A_lock;
 int pit_latch_buggy;              /* extern */
 
-#include "do_timer.h"
-
 u64 jiffies_64 = INITIAL_JIFFIES;
 
 EXPORT_SYMBOL(jiffies_64);
@@ -86,7 +84,7 @@ spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 spinlock_t i8253_lock = SPIN_LOCK_UNLOCKED;
 EXPORT_SYMBOL(i8253_lock);
 
-struct timer_opts *cur_timer = &timer_none;
+struct timer_opts *cur_timer = &timer_tsc;
 
 /* These are peridically updated in shared_info, and then copied here. */
 u32 shadow_tsc_stamp;
@@ -402,7 +400,9 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 	while (delta >= NS_PER_TICK) {
 		delta -= NS_PER_TICK;
 		processed_system_time += NS_PER_TICK;
-		do_timer_interrupt_hook(regs);
+		do_timer(regs);
+		if (regs)
+		    profile_tick(CPU_PROFILING, regs);
 	}
 
 	/*
@@ -627,7 +627,6 @@ void __init time_init(void)
 	wall_to_monotonic.tv_nsec = -xtime.tv_nsec;
 	processed_system_time = shadow_system_time;
 
-	cur_timer = select_timer();
 	printk(KERN_INFO "Using %s for high-res timesource\n",cur_timer->name);
 
 	time_irq = bind_virq_to_irq(VIRQ_TIMER);
@@ -679,7 +678,7 @@ void time_suspend(void)
 void time_resume(void)
 {
     unsigned long flags;
-    write_lock_irqsave(&xtime_lock, flags);
+    write_seqlock_irqsave(&xtime_lock, flags);
     /* Get timebases for new environment. */ 
     __get_time_values_from_xen();
     /* Reset our own concept of passage of system time. */
@@ -688,7 +687,7 @@ void time_resume(void)
     last_seen_tv.tv_sec = 0;
     /* Make sure we resync UTC time with Xen on next timer interrupt. */
     last_update_from_xen = 0;
-    write_unlock_irqrestore(&xtime_lock, flags);
+    write_sequnlock_irqrestore(&xtime_lock, flags);
 }
 
 /*

@@ -5,7 +5,7 @@
 XENARCH	:= $(subst ",,$(CONFIG_XENARCH))
 
 obj-y :=	timer_tsc.o
-c-obj-y :=	timer.o timer_none.o timer_pit.o
+c-obj-y :=
 
 c-link	:=
 

@@ -210,7 +210,6 @@
 40f5623akIoBsQ3KxSB2kufkbgONXQ linux-2.6.9-xen-sparse/include/asm-xen/asm-i386/fixmap.h
 4118b6a418gnL6AZsTdglC92YGqYTg linux-2.6.9-xen-sparse/include/asm-xen/asm-i386/highmem.h
 40f5623aJVXQwpJMOLE99XgvGsfQ8Q linux-2.6.9-xen-sparse/include/asm-xen/asm-i386/io.h
-40f5623am9BzluYFuV6EQfTd-so3dA linux-2.6.9-xen-sparse/include/asm-xen/asm-i386/mach-xen/do_timer.h
 40f5623aKXkBBxgpLx2NcvkncQ1Yyw linux-2.6.9-xen-sparse/include/asm-xen/asm-i386/mach-xen/irq_vectors.h
 40f5623aDMCsWOFO0jktZ4e8sjwvEg linux-2.6.9-xen-sparse/include/asm-xen/asm-i386/mach-xen/setup_arch_post.h
 40f5623arsFXkGdPvIqvFi3yFXGR0Q linux-2.6.9-xen-sparse/include/asm-xen/asm-i386/mach-xen/setup_arch_pre.h
@@ -229,7 +228,6 @@
 40f5623bG_LzgG6-qwk292nTc5Wabw linux-2.6.9-xen-sparse/include/asm-xen/asm-i386/setup.h
 40f5623bgzm_9vwxpzJswlAxg298Gg linux-2.6.9-xen-sparse/include/asm-xen/asm-i386/synch_bitops.h
 40f5623bVdKP7Dt7qm8twu3NcnGNbA linux-2.6.9-xen-sparse/include/asm-xen/asm-i386/system.h
-40f5623bSgGrvrGRpD71K-lIYqaGgg linux-2.6.9-xen-sparse/include/asm-xen/asm-i386/timer.h
 40f5623bc8LKPRO09wY5dGDnY_YCpw linux-2.6.9-xen-sparse/include/asm-xen/asm-i386/tlbflush.h
 41062ab7uFxnCq-KtPeAm-aV8CicgA linux-2.6.9-xen-sparse/include/asm-xen/asm-i386/vga.h
 40f5623bxUbeGjkRrjDguCy_Gm8RLw linux-2.6.9-xen-sparse/include/asm-xen/asm-i386/xor.h
