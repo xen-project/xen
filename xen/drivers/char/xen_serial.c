@@ -56,15 +56,16 @@ static void serial_rx_int(int irq, void *dev_id, struct pt_regs *regs)
     u_char c; 
     key_handler *handler; 
 
-    /* clear the interrupt by reading the character */
-    c = inb(SERIAL_BASE + NS16550_RBR);
+    while ( (inb(SERIAL_BASE + NS16550_LSR) & 1) == 1 )
+    {
+        c = inb(SERIAL_BASE + NS16550_RBR);
 
-    /* if there's a handler, call it: we trust it won't screw us too badly */
-    if((handler = get_key_handler(c)) != NULL) 
-	(*handler)(c, dev_id, regs); 
+        if( (handler = get_key_handler(c)) != NULL ) 
+            (*handler)(c, dev_id, regs); 
 
-    if(serial_echo) 
-	printk("%c", c); 
+        if ( serial_echo ) 
+            printk("%c", c);
+    } 
 }
 
 void initialize_serial() 
@@ -74,16 +75,17 @@ void initialize_serial()
     /* setup key handler */
     add_key_handler('~', toggle_echo, "toggle serial echo");
     
-    /* Should detect this, but must be a ns16550a at least, surely? */
-    fifo = 1;  
-    if(fifo) {
-	/* Clear FIFOs, enable, trigger at 1 byte */
-	outb(NS16550_FCR_TRG1 | NS16550_FCR_ENABLE |
-	     NS16550_FCR_CLRX  | NS16550_FCR_CLTX, SERIAL_BASE+NS16550_FCR);
-    }
+    /* This assumes we have a 16550. It's pretty darned likely really! */
+    /* Clear FIFOs, enable, trigger at 1 byte */
+    outb(NS16550_FCR_TRG1 | NS16550_FCR_ENABLE |
+         NS16550_FCR_CLRX  | NS16550_FCR_CLTX, 
+         SERIAL_BASE+NS16550_FCR);
 
-    outb(NS16550_MCR_OUT2, SERIAL_BASE + NS16550_MCR);   /* Modem control */
-    outb(NS16550_IER_ERDAI, SERIAL_BASE + NS16550_IER ); /* Setup interrupts */
+    /* Enable receive interrupts. Also remember to keep DTR/RTS asserted. */
+    outb(NS16550_MCR_OUT2|NS16550_MCR_DTR|NS16550_MCR_RTS, 
+         SERIAL_BASE + NS16550_MCR);
+    outb(NS16550_IER_ERDAI, 
+         SERIAL_BASE + NS16550_IER );
 
     if((rc = request_irq(4, serial_rx_int, SA_NOPROFILE, "serial", 0)))
 	printk("initialize_serial: failed to get IRQ4, rc=%d\n", rc); 

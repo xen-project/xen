@@ -218,8 +218,6 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
 }
 
 
-#ifdef CONFIG_OUTPUT_SERIAL
-
 #define SERIAL_BASE 0x3f8
 #define RX_BUF      0
 #define TX_HOLD     0
@@ -239,24 +237,24 @@ void init_serial(void)
     outb(115200/opt_ser_baud, SERIAL_BASE+DIVISOR_LO);
     outb(0, SERIAL_BASE+DIVISOR_HI);
     outb(0x03, SERIAL_BASE+DATA_FORMAT);
+    
+    /* DTR and RTS should both be high, to keep other end happy. */
+    outb(0x02, SERIAL_BASE+LINE_CTL);
 
     /* No interrupts. */
     outb(0x00, SERIAL_BASE+INT_ENABLE);
 }
 
 
+#ifdef CONFIG_OUTPUT_SERIAL
 void putchar_serial(unsigned char c)
 {
     if ( c == '\n' ) putchar_serial('\r');
     while ( !(inb(SERIAL_BASE+LINE_STATUS)&(1<<5)) ) barrier();
     outb(c, SERIAL_BASE+TX_HOLD);
 }
-
 #else
-
-void init_serial(void) {}
 void putchar_serial(unsigned char c) {}
-
 #endif
 
 
