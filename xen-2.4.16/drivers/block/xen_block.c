@@ -251,14 +251,20 @@ static void dispatch_probe_block_io(struct task_struct *p, int index)
     extern void ide_probe_devices(xen_disk_info_t *xdi);
     blk_ring_t *blk_ring = p->blk_ring_base;
     xen_disk_info_t *xdi;
+    unsigned long flags, cpu_mask;
     
     xdi = phys_to_virt((unsigned long)blk_ring->req_ring[index].buffer);
     
     ide_probe_devices(xdi);
 
+    spin_lock_irqsave(&p->blk_ring_lock, flags);
     blk_ring->resp_ring[blk_ring->resp_prod].id = blk_ring->req_ring[index].id;
     blk_ring->resp_ring[blk_ring->resp_prod].status = 0;
     blk_ring->resp_prod = BLK_RESP_RING_INC(blk_ring->resp_prod);
+    spin_unlock_irqrestore(&p->blk_ring_lock, flags);
+
+    cpu_mask = mark_guest_event(p, _EVENT_BLK_RESP);
+    guest_event_notify(cpu_mask); 
 }
 
 static void dispatch_rw_block_io(struct task_struct *p, int index)

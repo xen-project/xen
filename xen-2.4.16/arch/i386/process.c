@@ -19,6 +19,7 @@
 #include <xeno/smp.h>
 #include <asm/ptrace.h>
 #include <xeno/delay.h>
+#include <xeno/interrupt.h>
 #include <asm/mc146818rtc.h>
 
 #include <asm/system.h>
@@ -52,7 +53,7 @@ static void default_idle(void)
 {
     if (!hlt_counter) {
         __cli();
-        if (!current->hyp_events)
+        if (!current->hyp_events && !softirq_pending(smp_processor_id()))
             safe_halt();
         else
             __sti();
@@ -67,6 +68,8 @@ static void default_idle(void)
  */
 void cpu_idle (void)
 {
+    int cpu = smp_processor_id();
+
     ASSERT(current->domain == IDLE_DOMAIN_ID);
 
     current->has_cpu = 1;
@@ -82,9 +85,10 @@ void cpu_idle (void)
 
     for ( ; ; )
     {
-        while (!current->hyp_events)
+        while (!current->hyp_events && !softirq_pending(cpu))
             default_idle();
         do_hyp_events();
+        do_softirq();
     }
 }
 

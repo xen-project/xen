@@ -55,6 +55,13 @@ xlblk_device_t xlblk_device;
 #define XLBLK_DEBUG       0
 #define XLBLK_DEBUG_IOCTL 0
 
+/* Our per-request identifier is a discriminated union, using LSB. */
+#define BH_TO_ID(_bh)   ((void *)(_bh))
+#define REQ_TO_ID(_req) ((void *)((unsigned long)(_req) | 1))
+#define ID_IS_REQ(_id)  ((int)(_id) & 1)
+#define ID_TO_BH(_id)   ((struct buffer_head *)(_id))
+#define ID_TO_REQ(_id)  ((struct request *)((unsigned long)(_id) & ~1))
+
 static blk_ring_t *blk_ring;
 
 /* 
@@ -208,8 +215,7 @@ void hypervisor_request(void *         id,
     void *buffer_pa, *buffer_ma; 
     kdev_t phys_device = (kdev_t) 0;
     unsigned long sector_number = 0;
-    struct gendisk *gd; 
-    
+    struct gendisk *gd;     
 
     buffer_pa = (void *)virt_to_phys(buffer); 
     buffer_ma = (void *)phys_to_machine((unsigned long)buffer_pa); 
@@ -222,7 +228,6 @@ void hypervisor_request(void *         id,
 
 	/*
 	 * map logial major device to the physical device number 
-	 *
 	 *           XLBLK_MAJOR -> IDE0_MAJOR  (123 -> 3)
 	 */
 	if (MAJOR(device) == XLBLK_MAJOR) 
@@ -234,14 +239,11 @@ void hypervisor_request(void *         id,
 	}
 
 	/*
-	 * compute real buffer location on disk
-	 * (from ll_rw_block.c::submit_bh)
+	 * compute real buffer location on disk (from ll_rw_block.c::submit_bh)
 	 */
+	sector_number = block_number;
 
-
-	sector_number = block_number /* * block_size >> 9 */;
-
-	if((gd = (struct gendisk *)xen_disk_info.disks[0].gendisk) != NULL)
+	if ( (gd = (struct gendisk *)xen_disk_info.disks[0].gendisk) != NULL )
 	    sector_number += gd->part[MINOR(device)&IDE_PARTN_MASK].start_sect;
     }
 
@@ -265,8 +267,8 @@ void hypervisor_request(void *         id,
 
     blk_ring->req_prod = BLK_REQ_RING_INC(blk_ring->req_prod);
 
-    switch(mode) { 
-
+    switch ( mode )
+    { 
     case XEN_BLOCK_SYNC:  
 	/* trap into hypervisor */
 	HYPERVISOR_block_io_op();
@@ -299,49 +301,53 @@ void hypervisor_request(void *         id,
 static void do_xlblk_request (request_queue_t *rq)
 {
     struct request *req;
+    struct buffer_head *bh;
+    unsigned long offset;
+    unsigned long length;
+    int rw, nsect;
     
-    if (XLBLK_DEBUG)
+    if ( XLBLK_DEBUG )
 	printk (KERN_ALERT "xlblk.c::do_xlblk_request for '%s'\n", 
 		DEVICE_NAME); 
-    
-    while (!QUEUE_EMPTY)
+
+    /*
+     * XXXXXXX KAF: This is really inefficient!!!!
+     * 
+     * What we really want is a scatter/gather interface, where each 
+     * request maps onto one scatter/gather descriptor.
+     * 
+     * We then don't need to worry about buffer_heads getting serviced out
+     * of order (because we get one reponse when an entire request is done).
+     * 
+     * We should look at SCSI code to see how to queue multiple requests
+     * at once. Quite likely we'll have to take charge of the requests and
+     * peel them off of the request_queue.
+     * 
+     * This is all for another day :-)
+     * 
+     * Just bear in mind that we'd like the following to be a loop!
+     */
+    /* while*/ if ( !QUEUE_EMPTY )
     {
-	struct buffer_head *bh;
-	unsigned long offset;
-	unsigned long length;
-	int rw;
-	
-	if(rq->plugged) 
-	    return ; 
-	
 	req = CURRENT;
-	
+	if ( rq->plugged || (req == NULL) ) return; 
+		
 	if (XLBLK_DEBUG) 
 	    printk (KERN_ALERT
-		    "do_xlblk_request %p: cmd %i, sec %lx, (%li) bh:%p\n",
+		    "do_xlblk_request %p: cmd %i, sec %lx, (%li/%li) bh:%p\n",
 		    req, req->cmd, req->sector,
-		    req->current_nr_sectors, req->bh);
+		    req->current_nr_sectors, req->nr_sectors, req->bh);
 	
-	/* is there space in the tx ring for this request?
-	 * if the ring is full, then leave the request in the queue
-	 *
-	 * THIS IS A BIT BOGUS SINCE XEN COULD BE UPDATING REQ_CONS
-	 * AT THE SAME TIME
-	 */
-        if (BLK_RESP_RING_INC(blk_ring->req_prod) == blk_ring->req_cons)
-        {
-            printk (KERN_ALERT "OOPS, TX LOOKS FULL  cons: %d  prod: %d\n",
-                    blk_ring->req_cons, blk_ring->req_prod);
-            BUG(); 
-            break;
-        }
 	
 	req->errors = 0;
-	blkdev_dequeue_request(req);
-	
-	bh = req->bh;
-	
-	while (bh)
+
+        bh = req->bh;
+        /*
+         * XXX KAF: I get read errors if I turn the following into a loop.
+         * Why doesn't it work? I should even be able to handle out-of-order
+         * responses... :-(
+         */
+        /* while */ if ( bh != NULL )
 	{
 	    offset = bh->b_rsector << 9;
 	    length = bh->b_size;
@@ -354,18 +360,37 @@ static void do_xlblk_request (request_queue_t *rq)
 		BUG();
 	    }
 
-	    hypervisor_request (req, rw == READ ? 
-				XEN_BLOCK_READ : XEN_BLOCK_WRITE, 
-				bh->b_data, bh->b_rsector, bh->b_size, 
-				bh->b_dev, XEN_BLOCK_SYNC);
-	    bh = bh->b_reqnext;
-	}
+            if ( bh->b_reqnext != NULL )
+            {
+                hypervisor_request(
+                    BH_TO_ID(bh),
+                    rw == READ ? XEN_BLOCK_READ : XEN_BLOCK_WRITE, 
+                    bh->b_data, bh->b_rsector, bh->b_size, 
+                    bh->b_dev, XEN_BLOCK_SYNC);
 
-	blkdev_dequeue_request(req);
-
+                /* From ll_rw_blk.c:end_that_request_first(). */
+                nsect = bh->b_size >> 9;
+                req->bh = bh->b_reqnext;
+                bh->b_reqnext = NULL;
+                bh = req->bh;
+                req->hard_sector += nsect;
+                req->hard_nr_sectors -= nsect;
+                req->sector = req->hard_sector;
+                req->nr_sectors = req->hard_nr_sectors;
+                req->current_nr_sectors = bh->b_size >> 9;
+                req->buffer = bh->b_data;
+            }
+            else
+            {
+                hypervisor_request(
+                    REQ_TO_ID(req),
+                    rw == READ ? XEN_BLOCK_READ : XEN_BLOCK_WRITE, 
+                    bh->b_data, bh->b_rsector, bh->b_size, 
+                    bh->b_dev, XEN_BLOCK_SYNC);
+                bh = NULL;
+            }
+        }
     }
-
-    return;
 }
 
 
@@ -382,26 +407,43 @@ static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
 {
     struct request *req;
     int loop;
-    u_long flags; 
+    unsigned long flags; 
+    struct buffer_head *bh;
     
-    for (loop = blk_ring->resp_cons;
-	 loop != blk_ring->resp_prod;
-	 loop = BLK_RESP_RING_INC(loop)) {
+    spin_lock_irqsave(&io_request_lock, flags);	    
 
+    for ( loop = blk_ring->resp_cons;
+	  loop != blk_ring->resp_prod;
+	  loop = BLK_RESP_RING_INC(loop) )
+    {
 	blk_ring_resp_entry_t *bret = &blk_ring->resp_ring[loop];
-	
-	req = (struct request *)bret->id;
-        if ( req == NULL ) continue; /* probes have NULL id */
 
-	spin_lock_irqsave(&io_request_lock, flags);
-	    
-	if (!end_that_request_first(req, 1, "XenBlk"))
-	    end_that_request_last(req);
-	spin_unlock_irqrestore(&io_request_lock, flags);
-	
+        if ( bret->id == NULL ) continue; /* probes have NULL id */
+
+	if ( ID_IS_REQ(bret->id) )
+        {
+            req = ID_TO_REQ(bret->id);
+            if ( end_that_request_first(req, 1, "XenBlk") ) BUG();
+            blkdev_dequeue_request(req);
+            end_that_request_last(req);
+	}
+        else
+        {
+            bh = ID_TO_BH(bret->id);
+            bh->b_end_io(bh, 1);
+        }
     }
     
     blk_ring->resp_cons = loop;
+
+    /*
+     * KAF: I believe this is safe. It also appears to be necessary, if
+     * we left any data outstanding when welast exited do_xlblk_request.
+     * Otherwise we just hang...
+     */
+    do_xlblk_request(BLK_DEFAULT_QUEUE(MAJOR_NR));
+    
+    spin_unlock_irqrestore(&io_request_lock, flags);
 }
 
 
@@ -427,11 +469,13 @@ int __init xlblk_init(void)
 
     hypervisor_request(NULL, XEN_BLOCK_PROBE, (char *) &xen_disk_info,
 		       0, 0, (kdev_t) 0, XEN_BLOCK_SYNC);
-    for (loop = 0; loop < xen_disk_info.count; loop++) 
+    while ( blk_ring->resp_prod != 1 ) barrier();
+    for ( loop = 0; loop < xen_disk_info.count; loop++ )
+    { 
 	printk (KERN_ALERT "  %2d: type: %d, capacity: %ld\n",
 		loop, xen_disk_info.disks[loop].type, 
 		xen_disk_info.disks[loop].capacity);
-
+    }
     
     SET_MODULE_OWNER(&xenolinux_block_fops);
     result = register_blkdev(xlblk_major, "block", &xenolinux_block_fops);
@@ -457,12 +501,16 @@ int __init xlblk_init(void)
     max_sectors[xlblk_major]   = xlblk_max_sectors;
 
     blk_init_queue(BLK_DEFAULT_QUEUE(xlblk_major), do_xlblk_request);
-    /* 
-    ** XXX SMH: we don't leave req on queue => are happy for evelator
-    ** to reorder things including it. (main reason for this decision
-    ** is that it works while 'standard' case doesn't. Ho hum). 
-    */
+
+#if 0 /* KAF: We now do the default thing and leave requests on the queue. */
+    /*
+     * XXX KAF (again): see big XXX comment above. As per SCSI code, we'll
+     * probably add this in so that we can peel off multiple outstanding
+     * requests from teh request queue, giving us easy access to the 
+     * real head that still has work to be sent down to Xen.
+     */
     blk_queue_headactive(BLK_DEFAULT_QUEUE(xlblk_major), 0);
+#endif
 
     xlblk_ide_register_disk(0, xen_disk_info.disks[0].capacity);
 
