@@ -78,7 +78,7 @@ relative_lndir ()
 
 # Get absolute path to the destination directory
 pushd . >/dev/null
-cd ${1}
+cd ${1} || { echo "cannot cd to ${1}"; exit 1; }
 AD=$PWD
 popd >/dev/null
   
@@ -93,7 +93,7 @@ RS=$DESTPATH
 for i in `find . -type f -o -type l` ; do rm -f ${AD}/${i#./} ; done
 
 # We now work from the destination directory
-cd ${AD}
+cd ${AD} || { echo "cannot cd to ${AD}"; exit 1; }
 
 # Remove old symlinks
 for i in `find . -type l`; do rm -f $i; done
