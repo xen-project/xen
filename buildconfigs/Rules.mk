@@ -61,6 +61,9 @@ pristine-%: %.tar.bz2
 %-clean:
 	$(MAKE) -f buildconfigs/mk.$* clean
 
+%-config:
+	$(MAKE) -f buildconfigs/mk.$* config
+
 %-xen.patch: pristine-%
 	rm -rf tmp-$@
 	cp -al $< tmp-$@
