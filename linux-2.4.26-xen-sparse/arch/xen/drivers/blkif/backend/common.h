@@ -15,7 +15,7 @@
 #include <asm/io.h>
 #include "../blkif.h"
 
-#ifndef NDEBUG
+#if 0
 #define ASSERT(_p) \
     if ( !(_p) ) { printk("Assertion '%s' failed, line %d, file %s", #_p , \
     __LINE__, __FILE__); *(int*)0=0; }

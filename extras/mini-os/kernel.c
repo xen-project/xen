@@ -97,22 +97,15 @@ void start_kernel(start_info_t *si)
     
     /* print out some useful information  */
     printk("Xen Minimal OS!\n");
-    printk("start_info:   %p\n",  si);
+    printk("start_info:   %p\n",    si);
     printk("  nr_pages:   %lu",     si->nr_pages);
     printk("  shared_inf: %08lx\n", si->shared_info);
-    printk("  pt_base:    %p",    (void *)si->pt_base); 
+    printk("  pt_base:    %p",      (void *)si->pt_base); 
     printk("  mod_start:  0x%lx\n", si->mod_start);
-    printk("  mod_len:    %lu\n", si->mod_len); 
-#if 0 /* XXX Change to use NETOP_GET_VIF_INFO and BLOCK_IO_OP_RING_ADDRESS */
-    printk("  net_rings: ");
-    for (i = 0; i < MAX_DOMAIN_VIFS; i++) {
-        printk(" %lx", si->net_rings[i]);
-    }; printk("\n");
-    printk("  blk_ring:   0x%lx\n", si->blk_ring);
-    printk("  dom_id:     %ld\n",  si->dom_id);
-#endif
-    printk("  flags:      0x%lx\n", si->flags);
-    printk("  cmd_line:   %s\n",  si->cmd_line ? (const char *)si->cmd_line : "NULL");
+    printk("  mod_len:    %lu\n",   si->mod_len); 
+    printk("  flags:      0x%x\n",  (unsigned int)si->flags);
+    printk("  cmd_line:   %s\n",  
+           si->cmd_line ? (const char *)si->cmd_line : "NULL");
 
 
     /*
@@ -126,7 +119,12 @@ void start_kernel(start_info_t *si)
     /* set up events */
     init_events();
 
-    /* install some handlers */
+    /*
+     * These need to be replaced with event-channel/control-interface
+     * equivalents.
+     */
+#if 0
+    /* Install some handlers. */
     add_ev_action(EV_DIE, &exit_handler);
     enable_ev_action(EV_DIE);
     enable_hypervisor_event(EV_DIE);
@@ -134,6 +132,7 @@ void start_kernel(start_info_t *si)
     add_ev_action(EV_DEBUG, &debug_handler);
     enable_ev_action(EV_DEBUG);
     enable_hypervisor_event(EV_DEBUG);
+#endif
 
     /* init time and timers */
     init_time();

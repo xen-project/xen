@@ -84,7 +84,8 @@ printf(const char *fmt, ...)
 	retval = kvprintf(fmt, printk_buf, 10, ap);
     printk_buf[retval] = '\0';
 	va_end(ap);
-    (void)HYPERVISOR_console_write(printk_buf, strlen(printk_buf));
+    (void)HYPERVISOR_console_io(CONSOLEIO_write, strlen(printk_buf), 
+                                printk_buf);
 	return retval;
 }
 
@@ -95,7 +96,8 @@ vprintf(const char *fmt, va_list ap)
     static char printk_buf[1024];
 	retval = kvprintf(fmt, printk_buf, 10, ap);
     printk_buf[retval] = '\0';
-    (void)HYPERVISOR_console_write(printk_buf, strlen(printk_buf));
+    (void)HYPERVISOR_console_io(CONSOLEIO_write, strlen(printk_buf),
+                                printk_buf);
 	return retval;
 }
 

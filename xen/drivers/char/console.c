@@ -393,69 +393,6 @@ void set_printk_prefix(const char *prefix)
     strcpy(printk_prefix, prefix);
 }
 
-/*
- * This hypercall is deprecated. Only permit its use in debug environments.
- */
-long do_console_write(char *str, unsigned int count)
-{
-#ifndef NDEBUG
-#define SIZEOF_BUF 256
-    unsigned char safe_str[SIZEOF_BUF+1];
-    unsigned char single_line[SIZEOF_BUF+2];
-    unsigned char line_header[30];
-    unsigned char *p;
-    unsigned char  c;
-    unsigned long flags;
-    int            j;
-    
-    if ( count == 0 )
-        return 0;
-
-    if ( count > SIZEOF_BUF ) 
-        count = SIZEOF_BUF;
-    
-    if ( copy_from_user(safe_str, str, count) )
-        return -EFAULT;
-    safe_str[count] = '\0';
-    
-    sprintf(line_header, "DOM%u: ", current->domain);
-    
-    p = safe_str;
-    while ( *p != '\0' )
-    {
-        j = 0;
-
-        while ( (c = *p++) != '\0' )
-        {
-            if ( c == '\n' )
-                break;
-            if ( (c < 32) || (c > 126) )
-                continue;
-            single_line[j++] = c;
-        }
-
-        single_line[j++] = '\n';
-        single_line[j++] = '\0';
-
-        spin_lock_irqsave(&console_lock, flags);
-        __putstr(line_header);
-        __putstr(single_line);
-        spin_unlock_irqrestore(&console_lock, flags);
-    }
-
-    return 0;
-#else
-    if ( !test_and_set_bit(DF_CONWRITEBUG, &current->flags) )
-    {
-        printk("DOM%u is attempting to use the deprecated "
-               "HYPERVISOR_console_write() interface.\n", current->domain);
-        printk(" - For testing, create a debug build of Xen\n");
-        printk(" - For production, your OS must use the new console model\n");
-    }
-    return -ENOSYS;
-#endif
-}
-
 void init_console(void)
 {
     extern unsigned char opt_console[];

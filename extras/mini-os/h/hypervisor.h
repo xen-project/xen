@@ -61,18 +61,6 @@ static __inline__ int HYPERVISOR_mmu_update(mmu_update_t *req,
     return ret;
 }
 
-static __inline__ int HYPERVISOR_console_write(const char *str, int count)
-{
-    int ret;
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret) : "0" (__HYPERVISOR_console_write), 
-        "b" (str), "c" (count) : "memory" );
-
-
-    return ret;
-}
-
 static __inline__ int HYPERVISOR_set_gdt(unsigned long *frame_list, int entries)
 {
     int ret;
@@ -142,7 +130,7 @@ static __inline__ int HYPERVISOR_block(void)
     return ret;
 }
 
-static inline int HYPERVISOR_shutdown(void)
+static __inline__ int HYPERVISOR_shutdown(void)
 {
     int ret;
     __asm__ __volatile__ (
@@ -154,7 +142,7 @@ static inline int HYPERVISOR_shutdown(void)
     return ret;
 }
 
-static inline int HYPERVISOR_reboot(void)
+static __inline__ int HYPERVISOR_reboot(void)
 {
     int ret;
     __asm__ __volatile__ (
@@ -166,7 +154,7 @@ static inline int HYPERVISOR_reboot(void)
     return ret;
 }
 
-static inline int HYPERVISOR_suspend(unsigned long srec)
+static __inline__ int HYPERVISOR_suspend(unsigned long srec)
 {
     int ret;
     /* NB. On suspend, control software expects a suspend record in %esi. */
@@ -276,6 +264,28 @@ static __inline__ int HYPERVISOR_update_va_mapping(
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_update_va_mapping), 
         "b" (page_nr), "c" (new_val), "d" (flags) : "memory" );
+
+    return ret;
+}
+
+static __inline__ int HYPERVISOR_xen_version(int cmd)
+{
+    int ret;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret) : "0" (__HYPERVISOR_xen_version), 
+        "b" (cmd) : "memory" );
+
+    return ret;
+}
+
+static __inline__ int HYPERVISOR_console_io(int cmd, int count, char *str)
+{
+    int ret;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret) : "0" (__HYPERVISOR_console_io),
+        "b" (cmd), "c" (count), "d" (str) : "memory" );
 
     return ret;
 }

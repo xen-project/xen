@@ -247,15 +247,14 @@ extern struct domain *task_list;
 #define DF_CONSTRUCTED  3 /* Has the guest OS been fully built yet?         */
 #define DF_IDLETASK     4 /* Is this one of the per-CPU idle domains?       */
 #define DF_PRIVILEGED   5 /* Is this domain privileged?                     */
-#define DF_CONWRITEBUG  6 /* Has this domain used the obsolete console?     */
-#define DF_PHYSDEV      7 /* May this domain do IO to physical devices?     */
-#define DF_BLOCKED      8 /* Domain is blocked waiting for an event.        */
-#define DF_CTRLPAUSE    9 /* Domain is paused by controller software.       */
-#define DF_SHUTDOWN    10 /* Guest shut itself down for some reason.        */
-#define DF_CRASHED     11 /* Domain crashed inside Xen, cannot continue.    */
-#define DF_DYING       12 /* Death rattle.                                  */
-#define DF_RUNNING     13 /* Currently running on a CPU.                    */
-#define DF_CPUPINNED   14 /* Disables auto-migration.                       */
+#define DF_PHYSDEV      6 /* May this domain do IO to physical devices?     */
+#define DF_BLOCKED      7 /* Domain is blocked waiting for an event.        */
+#define DF_CTRLPAUSE    8 /* Domain is paused by controller software.       */
+#define DF_SHUTDOWN     9 /* Guest shut itself down for some reason.        */
+#define DF_CRASHED     10 /* Domain crashed inside Xen, cannot continue.    */
+#define DF_DYING       11 /* Death rattle.                                  */
+#define DF_RUNNING     12 /* Currently running on a CPU.                    */
+#define DF_CPUPINNED   13 /* Disables auto-migration.                       */
 
 static inline int domain_runnable(struct domain *d)
 {

@@ -13,10 +13,6 @@
 #define NETIF_HASH(_d,_h) (((int)(_d)^(int)(_h))&(NETIF_HASHSZ-1))
 
 static netif_t *netif_hash[NETIF_HASHSZ];
-#ifdef XEN_BRIDGE
-static struct net_device *bridge_dev;
-static struct net_bridge *bridge_br;
-#endif
 
 netif_t *netif_find_by_handle(domid_t domid, unsigned int handle)
 {
@@ -40,9 +36,6 @@ void __netif_disconnect_complete(netif_t *netif)
     unbind_evtchn_from_irq(netif->evtchn);
     vfree(netif->tx); /* Frees netif->rx as well. */
     rtnl_lock();
-#ifdef XEN_BRIDGE
-    (void)br_del_if(bridge_br, netif->dev);
-#endif
     (void)dev_close(netif->dev);
     rtnl_unlock();
 
@@ -125,12 +118,13 @@ void netif_create(netif_be_create_t *create)
     /* Disable queuing. */
     dev->tx_queue_len = 0;
 
-    /* XXX In bridge mode we should force a different MAC from remote end. */
+    /* Force a different MAC from remote end. */
     dev->dev_addr[2] ^= 1;
 
-    err = register_netdev(dev);
-    if (err) {
-        DPRINTK("Could not register new net device %s: err=%d\n", dev->name, err);
+    if ( (err = register_netdev(dev)) != 0 )
+    {
+        DPRINTK("Could not register new net device %s: err=%d\n",
+                dev->name, err);
         create->status = NETIF_BE_STATUS_OUT_OF_MEMORY;
         kfree(dev);
         return;
@@ -242,25 +236,7 @@ void netif_connect(netif_be_connect_t *connect)
     netif_get(netif);
 
     rtnl_lock();
-
     (void)dev_open(netif->dev);
-#ifdef XEN_BRIDGE
-    (void)br_add_if(bridge_br, netif->dev);
-
-    /*
-     * The default config is a very simple binding to eth0.
-     * If eth0 is being used as an IP interface by this OS then someone
-     * must add eth0's IP address to nbe-br, and change the routing table
-     * to refer to nbe-br instead of eth0.
-     */
-    (void)dev_open(bridge_dev);
-    if ( (eth0_dev = __dev_get_by_name("eth0")) != NULL )
-    {
-        (void)dev_open(eth0_dev);
-        (void)br_add_if(bridge_br, eth0_dev);
-    }
-#endif
-
     rtnl_unlock();
 
     (void)request_irq(netif->irq, netif_be_int, 0, netif->dev->name, netif);
@@ -301,25 +277,4 @@ int netif_disconnect(netif_be_disconnect_t *disconnect, u8 rsp_id)
 void netif_interface_init(void)
 {
     memset(netif_hash, 0, sizeof(netif_hash));
-#ifdef XEN_BRIDGE
-    if ( br_add_bridge("nbe-br") != 0 )
-        BUG();
-    bridge_dev = __dev_get_by_name("nbe-br");
-    bridge_br  = (struct net_bridge *)bridge_dev->priv;
-    bridge_br->bridge_hello_time = bridge_br->hello_time = 0;
-    bridge_br->bridge_forward_delay = bridge_br->forward_delay = 0;
-    bridge_br->stp_enabled = 0;
-#endif
 }
-
-#ifndef CONFIG_BRIDGE
-#error Must configure Ethernet bridging in Network Options
-#endif
-#ifndef XEN_BRIDGE
-EXPORT_SYMBOL(br_add_bridge);
-EXPORT_SYMBOL(br_del_bridge);
-EXPORT_SYMBOL(br_add_if);
-EXPORT_SYMBOL(br_del_if);
-EXPORT_SYMBOL(br_get_bridge_ifindices);
-EXPORT_SYMBOL(br_get_port_ifindices);
-#endif
