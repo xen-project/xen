@@ -570,6 +570,7 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
 
     extern void ide_probe_devices(xen_disk_info_t *);
     extern void scsi_probe_devices(xen_disk_info_t *);
+    extern void cciss_probe_devices(xen_disk_info_t *);
     xen_disk_info_t xdi;
     xen_disk_t *xd;
 
@@ -803,6 +804,7 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
     xdi.disks = xd;
     ide_probe_devices(&xdi);
     scsi_probe_devices(&xdi);
+    cciss_probe_devices(&xdi);
     for ( i = 0; i < xdi.count; i++ )
     {
         xen_extent_t e;
