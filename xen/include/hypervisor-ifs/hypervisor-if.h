@@ -48,19 +48,18 @@
 #define __HYPERVISOR_set_callbacks         5
 #define __HYPERVISOR_net_io_op             6
 #define __HYPERVISOR_fpu_taskswitch        7
-#define __HYPERVISOR_yield                 8
-#define __HYPERVISOR_exit                  9
-#define __HYPERVISOR_dom0_op              10
-#define __HYPERVISOR_network_op           11
-#define __HYPERVISOR_block_io_op          12
-#define __HYPERVISOR_set_debugreg         13
-#define __HYPERVISOR_get_debugreg         14
-#define __HYPERVISOR_update_descriptor    15
-#define __HYPERVISOR_set_fast_trap        16
-#define __HYPERVISOR_dom_mem_op           17
-#define __HYPERVISOR_multicall            18
-#define __HYPERVISOR_kbd_op               19
-#define __HYPERVISOR_update_va_mapping    20
+#define __HYPERVISOR_sched_op              8
+#define __HYPERVISOR_dom0_op               9
+#define __HYPERVISOR_network_op           10
+#define __HYPERVISOR_block_io_op          11
+#define __HYPERVISOR_set_debugreg         12
+#define __HYPERVISOR_get_debugreg         13
+#define __HYPERVISOR_update_descriptor    14
+#define __HYPERVISOR_set_fast_trap        15
+#define __HYPERVISOR_dom_mem_op           16
+#define __HYPERVISOR_multicall            17
+#define __HYPERVISOR_kbd_op               18
+#define __HYPERVISOR_update_va_mapping    19
 
 /* And the trap vector is... */
 #define TRAP_INSTR "int $0x82"
@@ -151,6 +150,14 @@
 #define EVENTS_MASTER_ENABLE_MASK 0x80000000UL
 #define EVENTS_MASTER_ENABLE_BIT  31
 
+
+/*
+ * SCHEDOP_* - Scheduler hypercall operations.
+ */
+#define SCHEDOP_yield           0
+#define SCHEDOP_exit            1
+
+ 
 
 #ifndef __ASSEMBLY__
 

@@ -111,9 +111,9 @@ static void __calc_evt(struct task_struct *p)
 }
 
 
-/******************************************************************************
-* Add and remove a domain
-******************************************************************************/
+/*
+ * Add and remove a domain
+ */
 void sched_add_domain(struct task_struct *p) 
 {
     p->state       = TASK_SUSPENDED;
@@ -157,9 +157,9 @@ void init_idle_task(void)
 }
 
 
-/****************************************************************************
+/*
  * wake up a domain which had been sleeping
- ****************************************************************************/
+ */
 int wake_up(struct task_struct *p)
 {
     unsigned long flags;
@@ -194,9 +194,9 @@ int wake_up(struct task_struct *p)
     return ret;
 }
 
-/****************************************************************************
+/*
  * Voluntarily yield the processor to another domain, until an event occurs.
- ****************************************************************************/
+ */
 long do_yield(void)
 {
     current->state = TASK_INTERRUPTIBLE;
@@ -205,18 +205,47 @@ long do_yield(void)
     return 0;
 }
 
-/****************************************************************************
+/*
+ *  Demultiplex scheduler-related hypercalls.
+ */
+long do_sched_op(unsigned long op)
+{
+    long ret = 0;
+
+    switch( op ) 
+    {
+
+    case SCHEDOP_yield:
+    {
+        ret = do_yield();
+        break;
+    }
+
+    case SCHEDOP_exit:
+    {
+        kill_domain();
+        break;
+    }
+
+    default:
+        ret = -ENOSYS;
+    }
+
+    return ret;
+}
+
+/*
  * Control the scheduler
- ****************************************************************************/
+ */
 long sched_bvtctl(unsigned long c_allow)
 {
     ctx_allow = c_allow;
     return 0;
 }
 
-/****************************************************************************
+/*
  * Adjust scheduling parameter for a given domain
- ****************************************************************************/
+ */
 long sched_adjdom(int dom, unsigned long mcu_adv, unsigned long warp, 
                  unsigned long warpl, unsigned long warpu)
 {
@@ -239,14 +268,14 @@ long sched_adjdom(int dom, unsigned long mcu_adv, unsigned long warp,
     return 0;
 }
 
-/****************************************************************************
+/*
  * cause a run through the scheduler when appropriate
  * Appropriate is:
  * - current task is idle task
  * - the current task already ran for it's context switch allowance
  * Otherwise we do a run through the scheduler after the current tasks 
  * context switch allowance is over.
- ****************************************************************************/
+ */
 void reschedule(struct task_struct *p)
 {
     int cpu = p->processor;
@@ -286,13 +315,13 @@ void reschedule(struct task_struct *p)
 }
 
 
-/**************************************************************************** 
+/* 
  * The main function
  * - deschedule the current domain.
  * - pick a new domain.
  *   i.e., the domain with lowest EVT.
  *   The runqueue should be ordered by EVT so that is easy.
- ****************************************************************************/
+ */
 asmlinkage void __enter_scheduler(void)
 {
     struct task_struct *prev, *next, *next_prime, *p;
