@@ -193,8 +193,8 @@ config_handlers = {}
 def add_config_handler(name, h):
     """Add a handler for a config field.
 
-    name     field name
-    h        handler: fn(vm, config, field, index)
+    @param name:     field name
+    @param h:        handler: fn(vm, config, field, index)
     """
     config_handlers[name] = h
 
@@ -212,16 +212,15 @@ image_handlers = {}
 
 def add_image_handler(name, h):
     """Add a handler for an image type
-    name     image type
-    h        handler: fn(config, name, memory, image)
+    @param name:     image type
+    @param h:        handler: fn(config, name, memory, image)
     """
     image_handlers[name] = h
 
 def get_image_handler(name):
     """Get the handler for an image type.
-    name     image type
-
-    returns handler or None
+    @param name:     image type
+    @return: handler or None
     """
     return image_handlers.get(name)
 
@@ -233,17 +232,16 @@ device_handlers = {}
 def add_device_handler(name, h):
     """Add a handler for a device type.
 
-    name      device type
-    h         handler: fn(vm, dev)
+    @param name:     device type
+    @param h:        handler: fn(vm, dev)
     """
     device_handlers[name] = h
 
 def get_device_handler(name):
     """Get the handler for a device type.
 
-    name      device type
-
-    returns handler or None
+    @param name :     device type
+    @return; handler or None
     """
     return device_handlers.get(name)
 
@@ -252,10 +250,9 @@ def vm_create(config):
     If a vm has been partially created and there is an error it
     is destroyed.
 
-    config    configuration
-
-    returns Deferred
-    raises VmError for invalid configuration
+    @param config    configuration
+    @return: Deferred
+    @raise: VmError for invalid configuration
     """
     vm = XendDomainInfo()
     return vm.construct(config)
@@ -314,21 +311,27 @@ def vm_restore(src, progress=0):
     return deferred
     
 def dom_get(dom):
+    """Get info from xen for an existing domain.
+
+    @param dom: domain id
+    @return: info or None
+    """
     domlist = xc.domain_getinfo(dom=dom)
     if domlist and dom == domlist[0]['dom']:
         return domlist[0]
     return None
     
-
 def append_deferred(dlist, v):
+    """Append a value to a deferred list if it is a deferred.
+
+    @param dlist: list of deferreds
+    @param v: value to add
+    """
     if isinstance(v, defer.Deferred):
         dlist.append(v)
 
 def _vm_configure1(val, vm):
     d = vm.create_devices()
-    def cbok(x):
-        return x
-    d.addCallback(cbok)
     d.addCallback(_vm_configure2, vm)
     return d
 
@@ -348,7 +351,7 @@ class XendDomainInfo:
 
     """Minimum time between domain restarts in seconds.
     """
-    MINIMUM_RESTART_TIME = 10
+    MINIMUM_RESTART_TIME = 20
 
     def __init__(self):
         self.recreate = 0
@@ -363,6 +366,7 @@ class XendDomainInfo:
         self.cmdline = None
         self.console = None
         self.devices = {}
+        self.device_index = {}
         self.configs = []
         self.info = None
         self.ipaddrs = []
@@ -378,9 +382,13 @@ class XendDomainInfo:
         self.console_port = None
 
     def setdom(self, dom):
+        """Set the domain id.
+
+        @param dom: domain id
+        """
         self.dom = int(dom)
         self.id = str(dom)
-    
+
     def update(self, info):
         """Update with  info from xc.domain_getinfo().
         """
@@ -437,13 +445,39 @@ class XendDomainInfo:
             sxpr.append(['config', self.config])
         return sxpr
 
+    def check_name(self, name):
+        """Check if a vm name is valid. Valid names start with a non-digit
+        and contain alphabetic characters, digits, or characters in '_-.'.
+        The same name cannot be used for more than one vm at the same time.
+
+        @param name: name
+        @raise: VMerror if invalid
+        """
+        if name is None or name == '':
+            raise VmError('missing vm name')
+        if name[0] in string.digits:
+            raise VmError('invalid vm name')
+        for c in name:
+            if c in string.digits: continue
+            if c in '_-.': continue
+            if c in string.ascii_letters: continue
+            raise VmError('invalid vm name')
+        # See comment in XendDomain constructor about 'xd'.
+        if xd.domain_exists(name):
+            raise VmError('vm name clash: ' + name)
+        
     def construct(self, config):
+        """Construct the vm instance from its configuration.
+
+        @param config: configuration
+        @return: deferred
+        @raise: VmError on error
+        """
         # todo - add support for scheduling params?
         self.config = config
         try:
             self.name = sxp.child_value(config, 'name')
-            if self.name is None:
-                raise VmError('missing domain name')
+            self.check_name(self.name)
             self.memory = int(sxp.child_value(config, 'memory'))
             if self.memory is None:
                 raise VmError('missing memory size')
@@ -462,12 +496,9 @@ class XendDomainInfo:
                 raise VmError('unknown image type: ' + image_name)
             image_handler(self, image)
             deferred = self.configure()
-            def cbok(x):
-                return x
             def cberr(err):
                 self.destroy()
                 return err
-            deferred.addCallback(cbok)
             deferred.addErrback(cberr)
         except StandardError, ex:
             # Catch errors, cleanup and re-raise.
@@ -478,8 +509,10 @@ class XendDomainInfo:
     def config_devices(self, name):
         """Get a list of the 'device' nodes of a given type from the config.
 
-        name	device type
-        return list of device configs
+        @param name: device type
+        @type  name: string
+        @return: device configs
+        @rtype: list
         """
         devices = []
         for d in sxp.children(self.config, 'device'):
@@ -490,31 +523,57 @@ class XendDomainInfo:
         return devices
 
     def config_device(self, type, idx):
+        """Get a device config from the device nodes of a given type
+        from the config.
+
+        @param type: device type
+        @type  type: string
+        @param idx: index
+        @type  idx: int
+        @return config or None
+        """
         devs = self.config_devices(type)
         if 0 <= idx < len(devs):
             return devs[idx]
         else:
             return None
 
+    def next_device_index(self, type):
+        """Get the next index for a given device type.
+
+        @param type: device type
+        @type  type: string
+        @return device index
+        @rtype: int
+        """
+        idx = self.device_index.get(type, 0)
+        self.device_index[type] = idx + 1
+        return idx
+
     def add_device(self, type, dev):
         """Add a device to a virtual machine.
 
-        dev      device to add
+        @param type: device type
+        @param dev:  device to add
         """
         dl = self.devices.get(type, [])
         dl.append(dev)
         self.devices[type] = dl
 
     def get_devices(self, type):
+        """Get a list of the devices of a given type.
+
+        @param type: device type
+        @return: devices
+        """
         val = self.devices.get(type, [])
         return val
 
     def get_device_by_id(self, type, id):
         """Get the device with the given id.
 
-        id       device id
-
-        returns  device or None
+        @param id:       device id
+        @return:  device or None
         """
         dl = self.get_devices(type)
         for d in dl:
@@ -525,20 +584,20 @@ class XendDomainInfo:
     def get_device_by_index(self, type, idx):
         """Get the device with the given index.
 
-        idx       device index
-
-        returns  device or None
+        @param idx: device index
+        @return:  device or None
         """
+        idx = str(idx)
         dl = self.get_devices(type)
-        if 0 <= idx < len(dl):
-            return dl[idx]
-        else:
-            return None
+        for d in dl:
+            if d.getidx() == idx:
+                return d
+        return None
 
     def add_config(self, val):
         """Add configuration data to a virtual machine.
 
-        val      data to add
+        @param val: data to add
         """
         self.configs.append(val)
 
@@ -661,11 +720,11 @@ class XendDomainInfo:
     def create_domain(self, ostype, kernel, ramdisk, cmdline, vifs_n):
         """Create a domain. Builds the image but does not configure it.
 
-        ostype  OS type
-        kernel  kernel image
-        ramdisk kernel ramdisk
-        cmdline kernel commandline
-        vifs_n  number of network interfaces
+        @param ostype:  OS type
+        @param kernel:  kernel image
+        @param ramdisk: kernel ramdisk
+        @param cmdline: kernel commandline
+        @param vifs_n:  number of network interfaces
         """
         if not self.recreate:
             if not os.path.isfile(kernel):
@@ -685,8 +744,8 @@ class XendDomainInfo:
     def create_devices(self):
         """Create the devices for a vm.
 
-        returns Deferred
-        raises VmError for invalid devices
+        @return: Deferred
+        @raise: VmError for invalid devices
         """
         dlist = []
         devices = sxp.children(self.config, 'device')
@@ -730,16 +789,17 @@ class XendDomainInfo:
         """
         dev = self.get_device_by_index(type, idx)
         if not dev:
-            raise VmError('invalid device: %s %d' % (type, idx))
+            raise VmError('invalid device: %s %s' % (type, idx))
         devs = self.devices.get(type)
-        if 0 <= idx < len(devs):
-            del devs[idx]
-        dev_config = self.config_device(type, idx)
+        index = devs.index(dev)
+        dev_config = self.config_device(type, index)
         if dev_config:
             self.config.remove(['device', dev_config])
         dev.destroy()
 
     def configure_console(self):
+        """Configure the vm console port.
+        """
         x = sxp.child_value(self.config, 'console')
         if x:
             try:
@@ -749,12 +809,20 @@ class XendDomainInfo:
             self.console_port = port
 
     def configure_restart(self):
+        """Configure the vm restart mode.
+        """
         r = sxp.child_value(self.config, 'restart', RESTART_ONREBOOT)
         if r not in restart_modes:
             raise VmError('invalid restart mode: ' + str(r))
         self.restart_mode = r;
 
     def restart_needed(self, reason):
+        """Determine if the vm needs to be restarted when shutdown
+        for the given reason.
+
+        @param reason: shutdown reason
+        @return 1 if needs restaert, 0 otherwise
+        """
         if self.restart_mode == RESTART_NEVER:
             return 0
         if self.restart_mode == RESTART_ALWAYS:
@@ -764,12 +832,18 @@ class XendDomainInfo:
         return 0
 
     def restart_cancel(self):
+        """Cancel a vm restart.
+        """
         self.restart_state = None
 
     def restarting(self):
+        """Put the vm into restart mode.
+        """
         self.restart_state = STATE_RESTART_PENDING
 
     def restart_pending(self):
+        """Test if the vm has a pending restart.
+        """
         return self.restart_state == STATE_RESTART_PENDING
 
     def restart_check(self):
@@ -781,7 +855,7 @@ class XendDomainInfo:
         if self.restart_time is not None:
             tdelta = tnow - self.restart_time
             if tdelta < self.MINIMUM_RESTART_TIME:
-                msg = 'VM %d restarting too fast' % self.dom
+                msg = 'VM %s restarting too fast' % self.name
                 log.error(msg)
                 raise VmError(msg)
         self.restart_time = tnow
@@ -830,17 +904,17 @@ class XendDomainInfo:
         """
         if self.blkif_backend:
             d = defer.Deferred()
-            d.callback(1)
+            d.callback(self)
         else:
             d = xend.blkif_create(self.dom, recreate=self.recreate)
         d.addCallback(_vm_configure1, self)
         return d
 
     def dom_configure(self, dom):
-        """Configure a domain.
+        """Configure a vm for an existing domain.
 
-        dom    domain id
-        returns deferred
+        @param dom:    domain id
+        @return: deferred
         """
         d = dom_get(dom)
         if not d:
@@ -860,6 +934,8 @@ class XendDomainInfo:
         return deferred
 
     def configure_fields(self):
+        """Process the vm configuration fields using the registered handlers.
+        """
         dlist = []
         index = {}
         for field in sxp.children(self.config):
@@ -880,11 +956,10 @@ class XendDomainInfo:
 def vm_image_linux(vm, image):
     """Create a VM for a linux image.
 
-    name      vm name
-    memory    vm memory
-    image     image config
-
-    returns vm
+    @param name:      vm name
+    @param memory:    vm memory
+    @param image:     image config
+    @return: vm
     """
     kernel = sxp.child_value(image, "kernel")
     cmdline = ""
@@ -905,11 +980,10 @@ def vm_image_linux(vm, image):
 def vm_image_netbsd(vm, image):
     """Create a VM for a bsd image.
 
-    name      vm name
-    memory    vm memory
-    image     image config
-
-    returns vm
+    @param name:     vm name
+    @param memory:    vm memory
+    @param image:     image config
+    @return: vm
     """
     #todo: Same as for linux. Is that right? If so can unify them.
     kernel = sxp.child_value(image, "kernel")
@@ -932,13 +1006,14 @@ def vm_image_netbsd(vm, image):
 def vm_dev_vif(vm, val, index):
     """Create a virtual network interface (vif).
 
-    vm        virtual machine
-    val       vif config
-    index     vif index
+    @param vm:        virtual machine
+    @param val:       vif config
+    @param index:     vif index
+    @return: deferred
     """
     if vm.netif_backend:
         raise VmError('vif: vif in netif backend domain')
-    vif = index #todo
+    vif = vm.next_device_index('vif')
     vmac = sxp.child_value(val, "mac")
     xend.netif_create(vm.dom, recreate=vm.recreate)
     log.debug("Creating vif dom=%d vif=%d mac=%s", vm.dom, vif, str(vmac))
@@ -954,13 +1029,14 @@ def vm_dev_vif(vm, val, index):
 def vm_dev_vbd(vm, val, index):
     """Create a virtual block device (vbd).
 
-    vm        virtual machine
-    val       vbd config
-    index     vbd index
+    @param vm:        virtual machine
+    @param val:       vbd config
+    @param index:     vbd index
+    @return: deferred
     """
     if vm.blkif_backend:
         raise VmError('vbd: vbd in blkif backend domain')
-    vdev = index
+    vdev = vm.next_device_index('vif')
     uname = sxp.child_value(val, 'uname')
     if not uname:
         raise VmError('vbd: Missing uname')
@@ -978,6 +1054,8 @@ def vm_dev_vbd(vm, val, index):
     return defer
 
 def parse_pci(val):
+    """Parse a pci field.
+    """
     if isinstance(val, types.StringType):
         radix = 10
         if val.startswith('0x') or val.startswith('0X'):
@@ -988,6 +1066,13 @@ def parse_pci(val):
     return v
 
 def vm_dev_pci(vm, val, index):
+    """Add a pci device.
+
+    @param vm: virtual machine
+    @param val: device configuration
+    @param index: device index
+    @return: 0 on success
+    """
     bus = sxp.child_value(val, 'bus')
     if not bus:
         raise VmError('pci: Missing bus')
@@ -1013,78 +1098,21 @@ def vm_dev_pci(vm, val, index):
     return rc
     
 
-def vm_field_vfr(vm, config, val, index):
-    """Handle a vfr field in a config.
-
-    vm        virtual machine
-    config    vm config
-    val       vfr field
-    """
-    # Get the rules and add them.
-    # (vfr (vif (id foo) (ip x.x.x.x)) ... ) 
-    list = sxp.children(val, 'vif')
-    ipaddrs = []
-    for v in list:
-        id = sxp.child_value(v, 'id')
-        if id is None:
-            raise VmError('vfr: missing vif id')
-        id = int(id)
-        dev = vm.get_device_by_index('vif', id)
-        if not dev:
-            raise VmError('vfr: invalid vif id %d' % id)
-        vif = sxp.child_value(dev, 'vif')
-        ip = sxp.child_value(v, 'ip')
-        if not ip:
-            raise VmError('vfr: missing ip address')
-        ipaddrs.append(ip);
-        # todo: Configure the ipaddrs.
-    vm.ipaddrs = ipaddrs
-
-def vnet_bridge(vnet, vmac, dom, idx):
-    """Add the device for the vif to the bridge for its vnet.
-    """
-    vif = "vif%d.%d" % (dom, idx)
-    try:
-        cmd = "(vif.conn (vif %s) (vnet %s) (vmac %s))" % (vif, vnet, vmac)
-        log.debug("vnet_bridge> %s", cmd)
-        out = file("/proc/vnet/policy", "wb")
-        out.write(cmd)
-        err = out.close()
-        log.debug("vnet_bridge> err=%d", err)
-    except IOError, ex:
-        log.exception("vnet_bridge>")
-    
-def vm_field_vnet(vm, config, val, index):
-    """Handle a vnet field in a config.
-
-    vm        virtual machine
-    config    vm config
-    val       vnet field
-    index     index
-    """
-    # Get the vif children. For each vif look up the vif device
-    # with the given id and configure its vnet.
-    # (vnet (vif (id foo) (vnet 2) (mac x:x:x:x:x:x)) ... )
-    vif_vnets = sxp.children(val, 'vif')
-    for v in vif_vnets:
-        id = sxp.child_value(v, 'id')
-        if id is None:
-            raise VmError('vnet: missing vif id')
-        dev = vm.get_device_by_id('vif', id)
-        #vnet = sxp.child_value(v, 'vnet', 1)
-        #mac = sxp.child_value(dev, 'mac')
-        #vif = sxp.child_value(dev, 'vif')
-        #vnet_bridge(vnet, mac, vm.dom, 0)
-        #vm.add_config([ 'vif.vnet', ['id', id], ['vnet', vnet], ['mac', mac]])
-
 def vm_field_ignore(vm, config, val, index):
+    """Dummy config field handler used for fields with built-in handling.
+
+    @param vm:        virtual machine
+    @param config:    vm config
+    @param val:       vfr field
+    @param index:     field index
+    """
     pass
 
-# Register image handlers for linux and bsd.
+# Register image handlers.
 add_image_handler('linux',  vm_image_linux)
 add_image_handler('netbsd', vm_image_netbsd)
 
-# Register device handlers for vifs and vbds.
+# Register device handlers.
 add_device_handler('vif',  vm_dev_vif)
 add_device_handler('vbd',  vm_dev_vbd)
 add_device_handler('pci',  vm_dev_pci)
@@ -1098,6 +1126,4 @@ add_config_handler('image',   vm_field_ignore)
 add_config_handler('device',  vm_field_ignore)
 add_config_handler('backend', vm_field_ignore)
 
-# Register config handlers for vfr and vnet.
-add_config_handler('vfr',  vm_field_vfr)
-add_config_handler('vnet', vm_field_vnet)
+# Register other config handlers.

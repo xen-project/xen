@@ -402,7 +402,7 @@ def make_domain(opts, config):
     except XendError, ex:
         opts.err(str(ex))
 
-    dom = int(sxp.child_value(dominfo, 'id'))
+    dom = sxp.child_value(dominfo, 'name')
     console_info = sxp.child(dominfo, 'console')
     if console_info:
         console_port = int(sxp.child_value(console_info, 'console_port'))
@@ -411,8 +411,8 @@ def make_domain(opts, config):
     
     if server.xend_domain_unpause(dom) < 0:
         server.xend_domain_destroy(dom)
-        opts.err("Failed to unpause domain %d" % dom)
-    opts.info("Started domain %d, console on port %d"
+        opts.err("Failed to unpause domain %s" % dom)
+    opts.info("Started domain %s, console on port %d"
               % (dom, console_port))
     return (dom, console_port)
 
