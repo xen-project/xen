@@ -46,7 +46,7 @@ static struct proc_dir_entry *dom0_cmd_intf;
 static struct proc_dir_entry *dom_list_intf;
 
 unsigned long direct_mmap(unsigned long, unsigned long, pgprot_t, int);
-int direct_unmap(unsigned long, unsigned long);
+int direct_unmap(struct mm_struct *, unsigned long, unsigned long);
 
 static ssize_t dom_usage_read(struct file * file, char * buff, size_t size, loff_t * off)
 {
@@ -339,8 +339,8 @@ static int handle_dom0_cmd_unmapdommem(unsigned long data)
   if (copy_from_user(&argbuf, (void *)data, sizeof(argbuf)))
     return -EFAULT;
 
-  return direct_disc_unmap(argbuf.vaddr, argbuf.start_pfn,
-			   argbuf.tot_pages);
+  return direct_unmap(current->mm, argbuf.vaddr,
+		      argbuf.tot_pages << PAGE_SIZE);
 }
 
 static int dom0_cmd_ioctl(struct inode *inode, struct file *file,

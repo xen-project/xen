@@ -85,7 +85,7 @@ static inline int direct_remappmd_range(struct mm_struct *mm, pmd_t * pmd, unsig
 }
 
 /*  Note: this is only safe if the mm semaphore is held when called. */
-int direct_remap_page_range(unsigned long from, unsigned long phys_addr, unsigned long size, pgprot_t prot)
+static int direct_remap_page_range(unsigned long from, unsigned long phys_addr, unsigned long size, pgprot_t prot)
 {
     int error = 0;
     pgd_t * dir;
@@ -120,8 +120,8 @@ int direct_remap_page_range(unsigned long from, unsigned long phys_addr, unsigne
  * used for remapping discontiguous bits of domain's memory, pages to map are
  * found from frame table beginning at the given first_pg index
  */ 
-int direct_remap_disc_page_range(unsigned long from, 
-                                 unsigned long first_pg, int tot_pages, pgprot_t prot)
+static int direct_remap_disc_page_range(unsigned long from, 
+					unsigned long first_pg, int tot_pages, pgprot_t prot)
 {
     dom0_op_t dom0_op;
     unsigned long *pfns = (unsigned long *)get_free_page(GFP_KERNEL);
@@ -265,7 +265,7 @@ static inline int direct_zap_pmd_range(mmu_gather_t *tlb, pgd_t * dir,
 /*
  * remove user pages in a given range.
  */
-void direct_zap_page_range(struct mm_struct *mm, unsigned long address, unsigned long size)
+static void direct_zap_page_range(struct mm_struct *mm, unsigned long address, unsigned long size)
 {
     mmu_gather_t *tlb;
     pgd_t * dir;
