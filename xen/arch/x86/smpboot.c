@@ -650,7 +650,7 @@ static void __init do_boot_cpu (int apicid)
 
     cpu = ++cpucount;
 
-    if ( (idle = do_createdomain(IDLE_DOMAIN_ID, cpu)) == NULL )
+    if ( (idle = do_createdomain(IDLE_DOMAIN_ID, cpu, 0)) == NULL )
         panic("failed 'createdomain' for CPU %d", cpu);
 
     set_bit(DF_IDLETASK, &idle->flags);

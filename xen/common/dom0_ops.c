@@ -182,9 +182,9 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             pro = op->u.createdomain.cpu % smp_num_cpus;
 
         ret = -ENOMEM;
-        if ( (d = do_createdomain(dom, pro)) == NULL )
+        if ( (d = do_createdomain(dom, pro, op->u.createdomain.weight))==NULL)
             break;
-
+        
         if ( op->u.createdomain.name[0] )
         {
             strncpy(d->name, op->u.createdomain.name, MAX_DOMAIN_NAME);
