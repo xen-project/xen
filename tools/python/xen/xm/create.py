@@ -347,8 +347,9 @@ def preprocess_ip(opts, vals):
     setip = (vals.hostname or vals.netmask
              or vals.gateway or vals.dhcp or vals.interface)
     if not setip: return
+    dummy_nfs_server = '1.2.3.4'
     ip = (vals.ip
-          + ':' + '1.2.3.4'
+          + ':' + (vals.nfs_server or dummy_nfs_server)
           + ':' + vals.gateway
           + ':' + vals.netmask
           + ':' + vals.hostname
@@ -357,11 +358,9 @@ def preprocess_ip(opts, vals):
     vals.cmdline_ip = ip
 
 def preprocess_nfs(opts, vals):
-    if (vals.nfs_root or vals.nfs_server):
-        if (not vals.nfs_root) or (not vals.nfs_server):
-            opts.err('Must set nfs root and nfs server')
-    else:
-        return
+    if not vals.nfs_root: return
+    if not vals.nfs_server:
+        opts.err('Must set nfs root and nfs server')
     nfs = 'nfsroot=' + vals.nfs_server + ':' + vals.nfs_root
     vals.extra = nfs + ' ' + vals.extra
     

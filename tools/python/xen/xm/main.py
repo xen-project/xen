@@ -9,7 +9,7 @@ import socket
 
 from xen.xend import PrettyPrint
 from xen.xend import sxp
-from xen.xend.XendClient import server
+from xen.xend.XendClient import XendError, server
 from xen.xend.XendClient import main as xend_client_main
 from xen.xm import create, shutdown
 
@@ -72,6 +72,8 @@ class Xm:
         except socket.error, ex:
             print >>sys.stderr, ex
             self.err("Error connecting to xend, is xend running?")
+        except XendError, ex:
+            self.err(str(ex))
 
     def main_call(self, args):
         """Main entry point. Dispatches to the progs.

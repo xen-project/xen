@@ -136,7 +136,7 @@ def xend_request(url, method, data=None):
     #if isinstance(val, types.ListType) and sxp.name(val) == 'val':
     #    val = val[1]
     if isinstance(val, types.ListType) and sxp.name(val) == 'err':
-        raise RuntimeError(val[1])
+        raise XendError(val[1])
     if DEBUG: print '**val='; sxp.show(val); print
     return val
 

@@ -107,11 +107,11 @@ class Args:
 
     def call_with_args(self, fn, args, xargs=None):
         (params, keys) = self.get_args(args, xargs=xargs)
-        fn(*params, **keys)
+        return fn(*params, **keys)
 
     def call_with_form_args(self, fn, fargs, xargs=None):
         (params, keys) = self.get_form_args(fargs, xargs=xargs)
-        fn(*params, **keys)
+        return fn(*params, **keys)
 
 class ArgFn(Args):
     """Represent a remote HTTP operation as a function.
