@@ -48,7 +48,7 @@ fault handler spinning waiting to grab the shadow lock. It may have
 intterupts disabled, hence we can't use the normal flush_tlb_cpu
 mechanism.
 
-For the moment, we have a grim hace whereby the spinlock in the shadow
+For the moment, we have a grim race whereby the spinlock in the shadow
 fault handler is actually a try lock, in a loop with a helper for the
 tlb flush code.
 
@@ -374,6 +374,17 @@ static int shadow_mode_table_op(struct domain *d,
 		__scan_shadow_table( m, TABLE_OP_FREE_L1 );
 		
 	send_bitmap:
+		sc->stats.fault_count       = d->mm.shadow_fault_count;
+		sc->stats.dirty_count       = d->mm.shadow_dirty_count;
+		sc->stats.dirty_net_count   = d->mm.shadow_dirty_net_count;
+		sc->stats.dirty_block_count = d->mm.shadow_dirty_block_count;
+
+		d->mm.shadow_fault_count       = 0;
+		d->mm.shadow_dirty_count       = 0;
+		d->mm.shadow_dirty_net_count   = 0;
+		d->mm.shadow_dirty_block_count = 0;
+	
+		sc->pages = d->tot_pages;
 
 		if( d->tot_pages > sc->pages || 
 			!sc->dirty_bitmap || !d->mm.shadow_dirty_bitmap )
@@ -382,12 +393,6 @@ static int shadow_mode_table_op(struct domain *d,
 			goto out;
 		}
 
-		sc->fault_count = d->mm.shadow_fault_count;
-		sc->dirty_count = d->mm.shadow_dirty_count;
-		d->mm.shadow_fault_count = 0;
-		d->mm.shadow_dirty_count = 0;
-	
-		sc->pages = d->tot_pages;
 	
 #define chunk (8*1024) // do this in 1KB chunks for L1 cache
 	
@@ -420,6 +425,11 @@ static int shadow_mode_table_op(struct domain *d,
     case DOM0_SHADOW_CONTROL_OP_PEEK:
     {
 		int i;
+
+		sc->stats.fault_count       = p->mm.shadow_fault_count;
+		sc->stats.dirty_count       = p->mm.shadow_dirty_count;
+		sc->stats.dirty_net_count   = p->mm.shadow_dirty_net_count;
+		sc->stats.dirty_block_count = p->mm.shadow_dirty_block_count;
 	
 		if( d->tot_pages > sc->pages || 
 			!sc->dirty_bitmap || !d->mm.shadow_dirty_bitmap )
@@ -716,7 +726,7 @@ int shadow_fault( unsigned long va, long error_code )
             int i;
             sl1pfn_info = alloc_shadow_page( &current->mm ); 
             sl1pfn_info->type_and_flags = PGT_l1_page_table;
-
+			
             sl1pfn = sl1pfn_info - frame_table;
 
             SH_VVLOG("4a: l1 not shadowed ( %08lx )",sl1pfn);

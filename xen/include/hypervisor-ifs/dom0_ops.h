@@ -255,10 +255,20 @@ typedef struct {
 #define DOM0_SHADOW_CONTROL_OP_OFF         0
 #define DOM0_SHADOW_CONTROL_OP_ENABLE_TEST 1
 #define DOM0_SHADOW_CONTROL_OP_ENABLE_LOGDIRTY 2
+#define DOM0_SHADOW_CONTROL_OP_ENABLE_TRANSLATE 3
 #define DOM0_SHADOW_CONTROL_OP_FLUSH       10     /* table ops */
 #define DOM0_SHADOW_CONTROL_OP_CLEAN       11
 #define DOM0_SHADOW_CONTROL_OP_PEEK        12
 #define DOM0_SHADOW_CONTROL_OP_CLEAN2      13
+
+typedef struct dom0_shadow_control
+{
+    u32 fault_count;
+    u32 dirty_count;
+    u32 dirty_net_count;     
+    u32 dirty_block_count;     
+} dom0_shadow_control_stats_t;
+
 typedef struct {
     /* IN variables. */
     domid_t        domain;            /*  0 */
@@ -269,11 +279,9 @@ typedef struct {
     memory_t       pages;  /* 16: size of buffer, updated with actual size */
     MEMORY_PADDING;
     /* OUT variables. */
-    memory_t       fault_count;       /* 24 */
-    MEMORY_PADDING;
-    memory_t       dirty_count;       /* 32 */
-    MEMORY_PADDING;
-} PACKED dom0_shadow_control_t; /* 40 bytes */
+    dom0_shadow_control_stats_t;
+} PACKED dom0_shadow_control_t;
+
 
 #define DOM0_SETDOMAINNAME     26
 typedef struct {
