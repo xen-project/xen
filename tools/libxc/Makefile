@@ -84,6 +84,11 @@ install: all
 	ln -sf libxc.so.$(MAJOR) $(DESTDIR)/usr/lib/libxc.so
 	$(INSTALL_DATA) xc.h $(DESTDIR)/usr/include
 
+.PHONY: TAGS clean rpm install all
+
+TAGS:
+	etags -t $(SRCS) *.h
+
 clean:
 	rm -rf *.a *.so* *.o *.opic *.rpm $(LIB) *~ $(DEPS) xen
 
