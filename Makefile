@@ -26,3 +26,4 @@ clean:
 	$(MAKE) -C xen clean
 	$(MAKE) -C tools clean
 
+	ln -sf if-$(ARCH) include/hypervisor-ifs/if-arch
