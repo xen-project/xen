@@ -2,11 +2,7 @@
 #define __ARCH_X86_ATOMIC__
 
 #include <xen/config.h>
-
-/*
- * Atomic operations that C can't guarantee us.  Useful for
- * resource counting etc..
- */
+#include <asm/system.h>
 
 #ifdef CONFIG_SMP
 #define LOCK "lock ; "
@@ -15,11 +11,11 @@
 #endif
 
 /*
- * Make sure gcc doesn't try to be clever and move things around
- * on us. We need to use _exactly_ the address the user gave us,
- * not some alias that contains the same information.
+ * NB. I've pushed the volatile qualifier into the operations. This allows
+ * fast accessors such as _atomic_read() and _atomic_set() which don't give
+ * the compiler a fit.
  */
-typedef struct { volatile int counter; } atomic_t;
+typedef struct { int counter; } atomic_t;
 
 #define ATOMIC_INIT(i)	{ (i) }
 
@@ -29,8 +25,9 @@ typedef struct { volatile int counter; } atomic_t;
  * 
  * Atomically reads the value of @v.  Note that the guaranteed
  * useful range of an atomic_t is only 24 bits.
- */ 
-#define atomic_read(v)		((v)->counter)
+ */
+#define _atomic_read(v)		((v).counter)
+#define atomic_read(v)		(*(volatile int *)&((v)->counter))
 
 /**
  * atomic_set - set atomic variable
@@ -40,7 +37,8 @@ typedef struct { volatile int counter; } atomic_t;
  * Atomically sets the value of @v to @i.  Note that the guaranteed
  * useful range of an atomic_t is only 24 bits.
  */ 
-#define atomic_set(v,i)		(((v)->counter) = (i))
+#define _atomic_set(v,i)	(((v).counter) = (i))
+#define atomic_set(v,i)		(*(volatile int *)&((v)->counter) = (i))
 
 /**
  * atomic_add - add integer to atomic variable
@@ -54,8 +52,8 @@ static __inline__ void atomic_add(int i, atomic_t *v)
 {
 	__asm__ __volatile__(
 		LOCK "addl %1,%0"
-		:"=m" (v->counter)
-		:"ir" (i), "m" (v->counter));
+		:"=m" (*(volatile int *)&v->counter)
+		:"ir" (i), "m" (*(volatile int *)&v->counter));
 }
 
 /**
@@ -70,8 +68,8 @@ static __inline__ void atomic_sub(int i, atomic_t *v)
 {
 	__asm__ __volatile__(
 		LOCK "subl %1,%0"
-		:"=m" (v->counter)
-		:"ir" (i), "m" (v->counter));
+		:"=m" (*(volatile int *)&v->counter)
+		:"ir" (i), "m" (*(volatile int *)&v->counter));
 }
 
 /**
@@ -90,8 +88,8 @@ static __inline__ int atomic_sub_and_test(int i, atomic_t *v)
 
 	__asm__ __volatile__(
 		LOCK "subl %2,%0; sete %1"
-		:"=m" (v->counter), "=qm" (c)
-		:"ir" (i), "m" (v->counter) : "memory");
+		:"=m" (*(volatile int *)&v->counter), "=qm" (c)
+		:"ir" (i), "m" (*(volatile int *)&v->counter) : "memory");
 	return c;
 }
 
@@ -106,8 +104,8 @@ static __inline__ void atomic_inc(atomic_t *v)
 {
 	__asm__ __volatile__(
 		LOCK "incl %0"
-		:"=m" (v->counter)
-		:"m" (v->counter));
+		:"=m" (*(volatile int *)&v->counter)
+		:"m" (*(volatile int *)&v->counter));
 }
 
 /**
@@ -121,8 +119,8 @@ static __inline__ void atomic_dec(atomic_t *v)
 {
 	__asm__ __volatile__(
 		LOCK "decl %0"
-		:"=m" (v->counter)
-		:"m" (v->counter));
+		:"=m" (*(volatile int *)&v->counter)
+		:"m" (*(volatile int *)&v->counter));
 }
 
 /**
@@ -140,8 +138,8 @@ static __inline__ int atomic_dec_and_test(atomic_t *v)
 
 	__asm__ __volatile__(
 		LOCK "decl %0; sete %1"
-		:"=m" (v->counter), "=qm" (c)
-		:"m" (v->counter) : "memory");
+		:"=m" (*(volatile int *)&v->counter), "=qm" (c)
+		:"m" (*(volatile int *)&v->counter) : "memory");
 	return c != 0;
 }
 
@@ -160,8 +158,8 @@ static __inline__ int atomic_inc_and_test(atomic_t *v)
 
 	__asm__ __volatile__(
 		LOCK "incl %0; sete %1"
-		:"=m" (v->counter), "=qm" (c)
-		:"m" (v->counter) : "memory");
+		:"=m" (*(volatile int *)&v->counter), "=qm" (c)
+		:"m" (*(volatile int *)&v->counter) : "memory");
 	return c != 0;
 }
 
@@ -181,9 +179,18 @@ static __inline__ int atomic_add_negative(int i, atomic_t *v)
 
 	__asm__ __volatile__(
 		LOCK "addl %2,%0; sets %1"
-		:"=m" (v->counter), "=qm" (c)
-		:"ir" (i), "m" (v->counter) : "memory");
+		:"=m" (*(volatile int *)&v->counter), "=qm" (c)
+		:"ir" (i), "m" (*(volatile int *)&v->counter) : "memory");
 	return c;
+}
+
+static __inline__ atomic_t atomic_compareandswap(
+	atomic_t old, atomic_t new, atomic_t *v)
+{
+	atomic_t rc;
+	rc.counter = 
+		__cmpxchg(&v->counter, old.counter, new.counter, sizeof(int));
+	return rc;
 }
 
 /* Atomic operations are already serializing on x86 */

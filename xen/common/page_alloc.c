@@ -300,12 +300,21 @@ void init_xenheap_pages(unsigned long ps, unsigned long pe)
 unsigned long alloc_xenheap_pages(int order)
 {
     struct pfn_info *pg;
-    int attempts = 0;
+    int i, attempts = 0;
 
  retry:
     if ( unlikely((pg = alloc_heap_pages(MEMZONE_XEN, order)) == NULL) )
         goto no_memory;
+
     memguard_unguard_range(page_to_virt(pg), 1 << (order + PAGE_SHIFT));
+
+    for ( i = 0; i < (1 << order); i++ )
+    {
+        pg[i].u.inuse.count_info = PGC_always_set;
+        pg[i].u.inuse.domain     = NULL;
+        pg[i].u.inuse.type_info  = 0;
+    }
+
     return (unsigned long)page_to_virt(pg);
 
  no_memory:
@@ -343,7 +352,7 @@ struct pfn_info *alloc_domheap_pages(struct domain *d, int order)
 {
     struct pfn_info *pg;
     unsigned long mask, flushed_mask, pfn_stamp, cpu_stamp;
-    int i;
+    int i, j;
 
     ASSERT(!in_irq());
 
@@ -353,19 +362,16 @@ struct pfn_info *alloc_domheap_pages(struct domain *d, int order)
     flushed_mask = 0;
     for ( i = 0; i < (1 << order); i++ )
     {
-        pg[i].u.inuse.domain    = NULL;
-        pg[i].u.inuse.type_info = 0;
-
         if ( (mask = (pg[i].u.free.cpu_mask & ~flushed_mask)) != 0 )
         {
             pfn_stamp = pg[i].tlbflush_timestamp;
-            for ( i = 0; (mask != 0) && (i < smp_num_cpus); i++ )
+            for ( j = 0; (mask != 0) && (j < smp_num_cpus); j++ )
             {
-                if ( mask & (1<<i) )
+                if ( mask & (1<<j) )
                 {
-                    cpu_stamp = tlbflush_time[i];
+                    cpu_stamp = tlbflush_time[j];
                     if ( !NEED_FLUSH(cpu_stamp, pfn_stamp) )
-                        mask &= ~(1<<i);
+                        mask &= ~(1<<j);
                 }
             }
             
@@ -376,6 +382,10 @@ struct pfn_info *alloc_domheap_pages(struct domain *d, int order)
                 flushed_mask |= mask;
             }
         }
+
+        pg[i].u.inuse.count_info = PGC_always_set;
+        pg[i].u.inuse.domain     = NULL;
+        pg[i].u.inuse.type_info  = 0;
     }
 
     if ( d == NULL )
@@ -401,7 +411,7 @@ struct pfn_info *alloc_domheap_pages(struct domain *d, int order)
     {
         pg[i].u.inuse.domain = d;
         wmb(); /* Domain pointer must be visible before updating refcnt. */
-        pg[i].u.inuse.count_info = PGC_allocated | 1;
+        pg[i].u.inuse.count_info |= PGC_allocated | 1;
         list_add_tail(&pg[i].list, &d->page_list);
     }
 
@@ -418,10 +428,13 @@ void free_domheap_pages(struct pfn_info *pg, int order)
     if ( unlikely(IS_XEN_HEAP_FRAME(pg)) )
     {
         spin_lock_recursive(&d->page_alloc_lock);
+
         for ( i = 0; i < (1 << order); i++ )
             list_del(&pg[i].list);
+
         d->xenheap_pages -= 1 << order;
         drop_dom_ref = (d->xenheap_pages == 0);
+
         spin_unlock_recursive(&d->page_alloc_lock);
     }
     else if ( likely(d != NULL) )
@@ -431,9 +444,8 @@ void free_domheap_pages(struct pfn_info *pg, int order)
 
         for ( i = 0; i < (1 << order); i++ )
         {
-            pg[i].tlbflush_timestamp = tlbflush_clock;
-            pg[i].u.inuse.count_info = 0;
-            pg[i].u.free.cpu_mask    = 1 << d->processor;
+            pg[i].tlbflush_timestamp  = tlbflush_clock;
+            pg[i].u.free.cpu_mask     = 1 << d->processor;
             list_del(&pg[i].list);
         }
 

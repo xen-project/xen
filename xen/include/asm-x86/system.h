@@ -30,33 +30,33 @@ static always_inline unsigned long __xchg(unsigned long x, volatile void * ptr, 
 		case 1:
 			__asm__ __volatile__("xchgb %b0,%1"
 				:"=q" (x)
-				:"m" (*__xg(ptr)), "0" (x)
+				:"m" (*__xg((volatile void *)ptr)), "0" (x)
 				:"memory");
 			break;
 		case 2:
 			__asm__ __volatile__("xchgw %w0,%1"
 				:"=r" (x)
-				:"m" (*__xg(ptr)), "0" (x)
+				:"m" (*__xg((volatile void *)ptr)), "0" (x)
 				:"memory");
 			break;
 #if defined(__i386__)
 		case 4:
 			__asm__ __volatile__("xchgl %0,%1"
 				:"=r" (x)
-				:"m" (*__xg(ptr)), "0" (x)
+				:"m" (*__xg((volatile void *)ptr)), "0" (x)
 				:"memory");
 			break;
 #elif defined(__x86_64__)
 		case 4:
 			__asm__ __volatile__("xchgl %k0,%1"
 				:"=r" (x)
-				:"m" (*__xg(ptr)), "0" (x)
+				:"m" (*__xg((volatile void *)ptr)), "0" (x)
 				:"memory");
 			break;
 		case 8:
 			__asm__ __volatile__("xchgq %0,%1"
 				:"=r" (x)
-				:"m" (*__xg(ptr)), "0" (x)
+				:"m" (*__xg((volatile void *)ptr)), "0" (x)
 				:"memory");
 			break;
 #endif
@@ -78,33 +78,33 @@ static always_inline unsigned long __cmpxchg(volatile void *ptr, unsigned long o
 	case 1:
 		__asm__ __volatile__(LOCK_PREFIX "cmpxchgb %b1,%2"
 				     : "=a"(prev)
-				     : "q"(new), "m"(*__xg(ptr)), "0"(old)
+				     : "q"(new), "m"(*__xg((volatile void *)ptr)), "0"(old)
 				     : "memory");
 		return prev;
 	case 2:
 		__asm__ __volatile__(LOCK_PREFIX "cmpxchgw %w1,%2"
 				     : "=a"(prev)
-				     : "q"(new), "m"(*__xg(ptr)), "0"(old)
+				     : "r"(new), "m"(*__xg((volatile void *)ptr)), "0"(old)
 				     : "memory");
 		return prev;
 #if defined(__i386__)
 	case 4:
 		__asm__ __volatile__(LOCK_PREFIX "cmpxchgl %1,%2"
 				     : "=a"(prev)
-				     : "q"(new), "m"(*__xg(ptr)), "0"(old)
+				     : "r"(new), "m"(*__xg((volatile void *)ptr)), "0"(old)
 				     : "memory");
 		return prev;
 #elif defined(__x86_64__)
 	case 4:
 		__asm__ __volatile__(LOCK_PREFIX "cmpxchgl %k1,%2"
 				     : "=a"(prev)
-				     : "q"(new), "m"(*__xg(ptr)), "0"(old)
+				     : "r"(new), "m"(*__xg((volatile void *)ptr)), "0"(old)
 				     : "memory");
 		return prev;
 	case 8:
 		__asm__ __volatile__(LOCK_PREFIX "cmpxchgq %1,%2"
 				     : "=a"(prev)
-				     : "q"(new), "m"(*__xg(ptr)), "0"(old)
+				     : "r"(new), "m"(*__xg((volatile void *)ptr)), "0"(old)
 				     : "memory");
 		return prev;
 #endif
