@@ -147,7 +147,7 @@ install-twisted:
 install-logging: LOGGING=logging-0.4.9.2
 install-logging:
 	[ -f $(LOGGING).tar.gz ] || wget http://www.red-dove.com/$(LOGGING).tar.gz
-	tar -xfz $(LOGGING).tar.gz
+	tar -zxf $(LOGGING).tar.gz
 	( cd $(LOGGING) && python setup.py install )
 
 # handy target to upgrade iptables (use rpm or apt-get in preference)
