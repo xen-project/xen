@@ -1488,9 +1488,6 @@ ptwr_info_t ptwr_info[NR_CPUS] =
       {
           .disconnected = ENTRIES_PER_L2_PAGETABLE,
           .writable_idx = 0,
-#ifdef PTWR_TRACK_DOMAIN
-          .domain = 0,
-#endif
       }
     };
 
@@ -1513,11 +1510,6 @@ void ptwr_reconnect_disconnected(unsigned long addr)
     unsigned long *writable_pte = (unsigned long *)&linear_pg_table
         [ptwr_info[cpu].writable_l1>>PAGE_SHIFT];
 
-#ifdef PTWR_TRACK_DOMAIN
-    if (ptwr_domain[cpu] != current->domain)
-        printk("ptwr_reconnect_disconnected domain mismatch %d != %d\n",
-               ptwr_domain[cpu], current->domain);
-#endif
     PTWR_PRINTK(("[A] page fault in disconn space: addr %08lx space %08lx\n",
                  addr, ptwr_info[cpu].disconnected << L2_PAGETABLE_SHIFT));
     pl2e = &linear_l2_table[ptwr_info[cpu].disconnected];
@@ -1594,20 +1586,6 @@ void ptwr_flush_inactive(void)
     int cpu = smp_processor_id();
     int i, idx;
 
-#ifdef PTWR_TRACK_DOMAIN
-    if (ptwr_info[cpu].domain != current->domain)
-        printk("ptwr_flush_inactive domain mismatch %d != %d\n",
-               ptwr_info[cpu].domain, current->domain);
-#endif
-#if 0
-    {
-        static int maxidx = 0;
-        if (ptwr_info[cpu].writable_idx > maxidx) {
-            maxidx = ptwr_info[cpu].writable_idx;
-            printk("maxidx on cpu %d now %d\n", cpu, maxidx);
-        }
-    }
-#endif
     for (idx = 0; idx < ptwr_info[cpu].writable_idx; idx++) {
         unsigned long *writable_pte = (unsigned long *)&linear_pg_table
             [ptwr_info[cpu].writables[idx]>>PAGE_SHIFT];
@@ -1677,11 +1655,6 @@ int ptwr_do_page_fault(unsigned long addr)
         page = &frame_table[pfn];
         if ( (page->u.inuse.type_info & PGT_type_mask) == PGT_l1_page_table )
         {
-#ifdef PTWR_TRACK_DOMAIN
-            if ( ptwr_info[cpu].domain != current->domain )
-                printk("ptwr_do_page_fault domain mismatch %d != %d\n",
-                       ptwr_info[cpu].domain, current->domain);
-#endif
             pl2e = &linear_l2_table[(page->u.inuse.type_info &
                                      PGT_va_mask) >> PGT_va_shift];
             PTWR_PRINTK(("page_fault on l1 pt at va %08lx, pt for %08x, "

@@ -378,9 +378,6 @@ typedef struct {
     unsigned long writables[PTWR_NR_WRITABLES];
     int writable_idx;
     l1_pgentry_t writable_page[PTWR_NR_WRITABLES][ENTRIES_PER_L1_PAGETABLE];
-#ifdef PTWR_TRACK_DOMAIN
-    domid_t domain;
-#endif
 } __cacheline_aligned ptwr_info_t;
 
 extern ptwr_info_t ptwr_info[];
