@@ -211,7 +211,9 @@ extern unsigned long pg0[];
 #define pte_clear(xp)	do { set_pte(xp, __pte(0)); } while (0)
 
 #define pmd_none(x)	(!pmd_val(x))
-#define pmd_present(x)	(pmd_val(x) & _PAGE_PRESENT)
+/* pmd_present doesn't just test the _PAGE_PRESENT bit since wr.p.t.
+   can temporarily clear it. */
+#define pmd_present(x)	(pmd_val(x))
 /* pmd_clear below */
 #define	pmd_bad(x)	((pmd_val(x) & (~PAGE_MASK & ~_PAGE_USER & ~_PAGE_PRESENT)) != (_KERNPG_TABLE & ~_PAGE_PRESENT))
 
