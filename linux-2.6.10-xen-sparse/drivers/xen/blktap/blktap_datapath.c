@@ -97,7 +97,7 @@ inline int write_resp_to_fe_ring(blkif_t *blkif, blkif_response_t *rsp)
     ar = &active_reqs[ID_TO_IDX(rsp->id)];
     rsp->id = ar->id;
             
-    resp_d = RING_GET_RESPONSE(BLKIF_RING, &blkif->blk_ring,
+    resp_d = RING_GET_RESPONSE(&blkif->blk_ring,
             blkif->blk_ring.rsp_prod_pvt);
     memcpy(resp_d, rsp, sizeof(blkif_response_t));
     wmb();
@@ -118,7 +118,7 @@ inline int write_req_to_be_ring(blkif_request_t *req)
         return 0;
     }
     
-    req_d = RING_GET_REQUEST(BLKIF_RING, &blktap_be_ring,
+    req_d = RING_GET_REQUEST(&blktap_be_ring,
             blktap_be_ring.req_prod_pvt);
     memcpy(req_d, req, sizeof(blkif_request_t));
     wmb();
@@ -129,7 +129,7 @@ inline int write_req_to_be_ring(blkif_request_t *req)
 
 inline void kick_fe_domain(blkif_t *blkif) 
 {
-    RING_PUSH_RESPONSES(BLKIF_RING, &blkif->blk_ring);
+    RING_PUSH_RESPONSES(&blkif->blk_ring);
     notify_via_evtchn(blkif->evtchn);
     DPRINTK("notified FE(dom %u)\n", blkif->domid);
     
@@ -141,7 +141,7 @@ inline void kick_be_domain(void)
         return;
     
     wmb(); /* Ensure that the frontend can see the requests. */
-    RING_PUSH_REQUESTS(BLKIF_RING, &blktap_be_ring);
+    RING_PUSH_REQUESTS(&blktap_be_ring);
     notify_via_evtchn(blktap_be_evtchn);
     DPRINTK("notified BE\n");
 }
@@ -299,7 +299,7 @@ static int do_block_io_op(blkif_t *blkif, int max_to_do)
     
     for ( i = blkif->blk_ring.req_cons; 
          (i != rp) && 
-            !RING_REQUEST_CONS_OVERFLOW(BLKIF_RING, &blkif->blk_ring, i);
+            !RING_REQUEST_CONS_OVERFLOW(&blkif->blk_ring, i);
           i++ )
     {
         
@@ -309,7 +309,7 @@ static int do_block_io_op(blkif_t *blkif, int max_to_do)
             break;
         }
         
-        req_s = RING_GET_REQUEST(BLKIF_RING, &blkif->blk_ring, i);
+        req_s = RING_GET_REQUEST(&blkif->blk_ring, i);
         /* This is a new request:  
          * Assign an active request record, and remap the id. 
          */
@@ -354,10 +354,9 @@ static int do_block_io_op(blkif_t *blkif, int max_to_do)
             /* copy the request message to the BERing */
 
             DPRINTK("blktap: FERing[%u] -> BERing[%u]\n", 
-                    (unsigned)__SHARED_RING_MASK(BLKIF_RING, 
-                        blktap_be_ring.sring, i), 
-                    (unsigned)__SHARED_RING_MASK(BLKIF_RING, 
-                        blktap_be_ring.sring, blktap_be_ring.req_prod_pvt));
+                    (unsigned)i & (RING_SIZE(&blktap_be_ring)-1),
+                    (unsigned)blktap_be_ring.req_prod_pvt & 
+                    (RING_SIZE((&blktap_be_ring)-1)));
             
             write_req_to_be_ring(req_s);
             notify_be = 1;
@@ -398,7 +397,7 @@ irqreturn_t blkif_ptbe_int(int irq, void *dev_id,
       
     for ( i = blktap_be_ring.rsp_cons; i != rp; i++)
     {
-        resp_s = RING_GET_RESPONSE(BLKIF_RING, &blktap_be_ring, i);
+        resp_s = RING_GET_RESPONSE(&blktap_be_ring, i);
         
         /* BE -> FE interposition point is here. */
     
@@ -426,11 +425,9 @@ irqreturn_t blkif_ptbe_int(int irq, void *dev_id,
             /* Copy the response message to FERing */
          
             DPRINTK("blktap: BERing[%u] -> FERing[%u]\n", 
-                    (unsigned)__SHARED_RING_MASK(BLKIF_RING, 
-                        blkif->blk_ring.sring, i), 
-                    (unsigned)__SHARED_RING_MASK(BLKIF_RING, 
-                        blkif->blk_ring.sring, 
-                        blkif->blk_ring.rsp_prod_pvt));
+                    (unsigned)i & (RING_SIZE(&blkif->blk_ring)-1),
+                    (unsigned)blkif->blk_ring.rsp_prod_pvt & 
+                    (RING_SIZE((&blkif->blk_ring)-1)));
 
             write_resp_to_fe_ring(blkif, resp_s);
             kick_fe_domain(blkif);

@@ -214,7 +214,7 @@ static int xhci_queue_req(struct urb *urb)
 #endif
         
 
-        if ( RING_FULL(USBIF_RING, usb_ring) )
+        if ( RING_FULL(usb_ring) )
         {
                 printk(KERN_WARNING
                        "xhci_queue_req(): USB ring full, not queuing request\n");
@@ -222,7 +222,7 @@ static int xhci_queue_req(struct urb *urb)
         }
 
         /* Stick something in the shared communications ring. */
-	req = RING_GET_REQUEST(USBIF_RING, usb_ring, usb_ring->req_prod_pvt);
+	req = RING_GET_REQUEST(usb_ring, usb_ring->req_prod_pvt);
 
         req->operation       = USBIF_OP_IO;
         req->port            = 0; /* We don't care what the port is. */
@@ -251,7 +251,7 @@ static int xhci_queue_req(struct urb *urb)
                 memset(req->setup, 0, 8);
         
         usb_ring->req_prod_pvt++;
-        RING_PUSH_REQUESTS(USBIF_RING, usb_ring);
+        RING_PUSH_REQUESTS(usb_ring);
 
 	notify_via_evtchn(xhci->evtchn);
 
@@ -277,7 +277,7 @@ static inline usbif_request_t *xhci_queue_probe(usbif_vdev_t port)
 	       usbif->resp_prod, xhci->usb_resp_cons);
 #endif
         
-        if ( RING_FULL(USBIF_RING, usb_ring) )
+        if ( RING_FULL(usb_ring) )
         {
                 printk(KERN_WARNING
                        "xhci_queue_probe(): ring full, not queuing request\n");
@@ -285,7 +285,7 @@ static inline usbif_request_t *xhci_queue_probe(usbif_vdev_t port)
         }
 
         /* Stick something in the shared communications ring. */
-        req = RING_GET_REQUEST(USBIF_RING, usb_ring, usb_ring->req_prod_pvt);
+        req = RING_GET_REQUEST(usb_ring, usb_ring->req_prod_pvt);
 
         memset(req, sizeof(*req), 0);
 
@@ -293,7 +293,7 @@ static inline usbif_request_t *xhci_queue_probe(usbif_vdev_t port)
         req->port            = port;
 
         usb_ring->req_prod_pvt++;
-        RING_PUSH_REQUESTS(USBIF_RING, usb_ring);
+        RING_PUSH_REQUESTS(usb_ring);
 
 	notify_via_evtchn(xhci->evtchn);
 
@@ -313,7 +313,7 @@ static int xhci_port_reset(usbif_vdev_t port)
         xhci->awaiting_reset = 1;
         
         /* Stick something in the shared communications ring. */
-	req = RING_GET_REQUEST(USBIF_RING, usb_ring, usb_ring->req_prod_pvt);
+	req = RING_GET_REQUEST(usb_ring, usb_ring->req_prod_pvt);
 
         memset(req, sizeof(*req), 0);
 
@@ -321,7 +321,7 @@ static int xhci_port_reset(usbif_vdev_t port)
         req->port            = port;
         
         usb_ring->req_prod_pvt++;
-	RING_PUSH_REQUESTS(USBIF_RING, usb_ring);
+	RING_PUSH_REQUESTS(usb_ring);
 
 	notify_via_evtchn(xhci->evtchn);
 
@@ -427,7 +427,7 @@ static void xhci_drain_ring(void)
         /* Take items off the comms ring, taking care not to overflow. */
         for ( i = usb_ring->rsp_cons; i != rp; i++ )
         {
-            resp = RING_GET_RESPONSE(USBIF_RING, usb_ring, i);
+            resp = RING_GET_RESPONSE(usb_ring, i);
             
             /* May need to deal with batching and with putting a ceiling on
                the number dispatched for performance and anti-dos reasons */
@@ -1497,8 +1497,8 @@ static void usbif_status_change(usbif_fe_interface_status_changed_t *status)
 
         /* Move from CLOSED to DISCONNECTED state. */
         sring = (usbif_sring_t *)__get_free_page(GFP_KERNEL);
-        SHARED_RING_INIT(USBIF_RING, sring);
-        FRONT_RING_INIT(USBIF_RING, &xhci->usb_ring, sring);
+        SHARED_RING_INIT(sring);
+        FRONT_RING_INIT(&xhci->usb_ring, sring);
         xhci->state  = USBIF_STATE_DISCONNECTED;
 
         /* Construct an interface-CONNECT message for the domain controller. */

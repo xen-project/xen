@@ -228,8 +228,8 @@ void blkif_ptfe_connect(blkif_be_connect_t *connect)
     }
 
     sring = (blkif_sring_t *)vma->addr;
-    SHARED_RING_INIT(BLKIF_RING, sring);
-    BACK_RING_INIT(BLKIF_RING, &blkif->blk_ring, sring);
+    SHARED_RING_INIT(sring);
+    BACK_RING_INIT(&blkif->blk_ring, sring);
     
     blkif->evtchn        = evtchn;
     blkif->irq           = bind_evtchn_to_irq(evtchn);
@@ -301,8 +301,8 @@ static void blkif_ptbe_disconnect(void)
     blkif_sring_t *sring;
     
     sring = (blkif_sring_t *)__get_free_page(GFP_KERNEL);
-    SHARED_RING_INIT(BLKIF_RING, sring);
-    FRONT_RING_INIT(BLKIF_RING, &blktap_be_ring, sring);
+    SHARED_RING_INIT(sring);
+    FRONT_RING_INIT(&blktap_be_ring, sring);
     blktap_be_state  = BLKIF_STATE_DISCONNECTED;
     DPRINTK("Blkif-Passthrough-BE is now DISCONNECTED.\n");
     blkif_ptbe_send_interface_connect();

@@ -50,11 +50,11 @@
  * Extra ring macros to sync a consumer index up to the public producer index. 
  * Generally UNSAFE, but we use it for recovery and shutdown in some cases.
  */
-#define RING_DROP_PENDING_REQUESTS(_p, _r)                              \
+#define RING_DROP_PENDING_REQUESTS(_r)                                  \
     do {                                                                \
         (_r)->req_cons = (_r)->sring->req_prod;                         \
     } while (0)
-#define RING_DROP_PENDING_RESPONSES(_p, _r)                             \
+#define RING_DROP_PENDING_RESPONSES(_r)                                 \
     do {                                                                \
         (_r)->rsp_cons = (_r)->sring->rsp_prod;                         \
     } while (0)
@@ -125,7 +125,7 @@ static void ctrl_if_rxmsg_default_handler(ctrl_msg_t *msg, unsigned long id)
 static void __ctrl_if_tx_tasklet(unsigned long data)
 {
     ctrl_msg_t *msg;
-    int         was_full = RING_FULL(CTRL_RING, &ctrl_if_tx_ring);
+    int         was_full = RING_FULL(&ctrl_if_tx_ring);
     RING_IDX    i, rp;
 
     i  = ctrl_if_tx_ring.rsp_cons;
@@ -134,7 +134,7 @@ static void __ctrl_if_tx_tasklet(unsigned long data)
 
     for ( ; i != rp; i++ )
     {
-        msg = RING_GET_RESPONSE(CTRL_RING, &ctrl_if_tx_ring, i);
+        msg = RING_GET_RESPONSE(&ctrl_if_tx_ring, i);
         
         DPRINTK("Rx-Rsp %u/%u :: %d/%d\n", i-1,
                 ctrl_if_tx_ring.sring->rsp_prod,
@@ -157,7 +157,7 @@ static void __ctrl_if_tx_tasklet(unsigned long data)
     smp_mb();
     ctrl_if_tx_ring.rsp_cons = i;
             
-    if ( was_full && !RING_FULL(CTRL_RING, &ctrl_if_tx_ring) )
+    if ( was_full && !RING_FULL(&ctrl_if_tx_ring) )
     {
         wake_up(&ctrl_if_tx_wait);
         run_task_queue(&ctrl_if_tx_tq);
@@ -193,7 +193,7 @@ static void __ctrl_if_rx_tasklet(unsigned long data)
  
     for ( ; i != rp; i++) 
     {
-        pmsg = RING_GET_REQUEST(CTRL_RING, &ctrl_if_rx_ring, i);
+        pmsg = RING_GET_REQUEST(&ctrl_if_rx_ring, i);
         memcpy(&msg, pmsg, offsetof(ctrl_msg_t, msg));
 
         DPRINTK("Rx-Req %u/%u :: %d/%d\n", i-1,
@@ -227,10 +227,10 @@ static void __ctrl_if_rx_tasklet(unsigned long data)
 static irqreturn_t ctrl_if_interrupt(int irq, void *dev_id,
                                      struct pt_regs *regs)
 {
-    if ( RING_HAS_UNCONSUMED_RESPONSES(CTRL_RING, &ctrl_if_tx_ring) )
+    if ( RING_HAS_UNCONSUMED_RESPONSES(&ctrl_if_tx_ring) )
         tasklet_schedule(&ctrl_if_tx_tasklet);
 
-    if ( RING_HAS_UNCONSUMED_REQUESTS(CTRL_RING, &ctrl_if_rx_ring) )
+    if ( RING_HAS_UNCONSUMED_REQUESTS(&ctrl_if_rx_ring) )
         tasklet_schedule(&ctrl_if_rx_tasklet);
 
     return IRQ_HANDLED;
@@ -248,7 +248,7 @@ ctrl_if_send_message_noblock(
 
     spin_lock_irqsave(&ctrl_if_lock, flags);
 
-    if ( RING_FULL(CTRL_RING, &ctrl_if_tx_ring) )
+    if ( RING_FULL(&ctrl_if_tx_ring) )
     {
         spin_unlock_irqrestore(&ctrl_if_lock, flags);
         return -EAGAIN;
@@ -269,11 +269,11 @@ ctrl_if_send_message_noblock(
             ctrl_if_tx_ring.rsp_cons,
             msg->type, msg->subtype);
 
-    dmsg = RING_GET_REQUEST(CTRL_RING, &ctrl_if_tx_ring, 
+    dmsg = RING_GET_REQUEST(&ctrl_if_tx_ring, 
             ctrl_if_tx_ring.req_prod_pvt);
     memcpy(dmsg, msg, sizeof(*msg));
     ctrl_if_tx_ring.req_prod_pvt++;
-    RING_PUSH_REQUESTS(CTRL_RING, &ctrl_if_tx_ring);
+    RING_PUSH_REQUESTS(&ctrl_if_tx_ring);
 
     spin_unlock_irqrestore(&ctrl_if_lock, flags);
 
@@ -373,7 +373,7 @@ ctrl_if_enqueue_space_callback(
     struct tq_struct *task)
 {
     /* Fast path. */
-    if ( !RING_FULL(CTRL_RING, &ctrl_if_tx_ring) )
+    if ( !RING_FULL(&ctrl_if_tx_ring) )
         return 0;
 
     (void)queue_task(task, &ctrl_if_tx_tq);
@@ -384,7 +384,7 @@ ctrl_if_enqueue_space_callback(
      * certainly return 'not full'.
      */
     smp_mb();
-    return RING_FULL(CTRL_RING, &ctrl_if_tx_ring);
+    return RING_FULL(&ctrl_if_tx_ring);
 }
 
 void
@@ -404,13 +404,13 @@ ctrl_if_send_response(
             ctrl_if_rx_ring.rsp_prod_pvt, 
             msg->type, msg->subtype);
 
-    dmsg = RING_GET_RESPONSE(CTRL_RING, &ctrl_if_rx_ring, 
+    dmsg = RING_GET_RESPONSE(&ctrl_if_rx_ring, 
             ctrl_if_rx_ring.rsp_prod_pvt);
     if ( dmsg != msg )
         memcpy(dmsg, msg, sizeof(*msg));
 
     ctrl_if_rx_ring.rsp_prod_pvt++;
-    RING_PUSH_RESPONSES(CTRL_RING, &ctrl_if_rx_ring);
+    RING_PUSH_RESPONSES(&ctrl_if_rx_ring);
 
     spin_unlock_irqrestore(&ctrl_if_lock, flags);
 
@@ -501,8 +501,8 @@ void ctrl_if_resume(void)
     }
 
     /* Sync up with shared indexes. */
-    RING_DROP_PENDING_RESPONSES(CTRL_RING, &ctrl_if_tx_ring);
-    RING_DROP_PENDING_REQUESTS(CTRL_RING, &ctrl_if_rx_ring);
+    RING_DROP_PENDING_RESPONSES(&ctrl_if_tx_ring);
+    RING_DROP_PENDING_REQUESTS(&ctrl_if_rx_ring);
 
     ctrl_if_evtchn = xen_start_info.domain_controller_evtchn;
     ctrl_if_irq    = bind_evtchn_to_irq(ctrl_if_evtchn);
@@ -521,8 +521,8 @@ void __init ctrl_if_init(void)
     for ( i = 0; i < 256; i++ )
         ctrl_if_rxmsg_handler[i] = ctrl_if_rxmsg_default_handler;
 
-    FRONT_RING_ATTACH(CTRL_RING, &ctrl_if_tx_ring, &ctrl_if->tx_ring);
-    BACK_RING_ATTACH(CTRL_RING, &ctrl_if_rx_ring, &ctrl_if->rx_ring);
+    FRONT_RING_ATTACH(&ctrl_if_tx_ring, &ctrl_if->tx_ring);
+    BACK_RING_ATTACH(&ctrl_if_rx_ring, &ctrl_if->rx_ring);
     
     spin_lock_init(&ctrl_if_lock);
 
@@ -552,7 +552,7 @@ int ctrl_if_transmitter_empty(void)
 
 void ctrl_if_discard_responses(void)
 {
-    RING_DROP_PENDING_RESPONSES(CTRL_RING, &ctrl_if_tx_ring);
+    RING_DROP_PENDING_RESPONSES(&ctrl_if_tx_ring);
 }
 
 EXPORT_SYMBOL(ctrl_if_send_message_noblock);

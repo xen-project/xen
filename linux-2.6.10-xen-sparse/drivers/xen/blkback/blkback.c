@@ -287,7 +287,7 @@ static int do_block_io_op(blkif_t *blkif, int max_to_do)
     rmb(); /* Ensure we see queued requests up to 'rp'. */
 
     for ( i = blk_ring->req_cons; 
-         (i != rp) && !RING_REQUEST_CONS_OVERFLOW(BLKIF_RING, blk_ring, i);
+         (i != rp) && !RING_REQUEST_CONS_OVERFLOW(blk_ring, i);
           i++ )
     {
         if ( (max_to_do-- == 0) || (NR_PENDING_REQS == MAX_PENDING_REQS) )
@@ -296,7 +296,7 @@ static int do_block_io_op(blkif_t *blkif, int max_to_do)
             break;
         }
         
-        req = RING_GET_REQUEST(BLKIF_RING, blk_ring, i);
+        req = RING_GET_REQUEST(blk_ring, i);
         switch ( req->operation )
         {
         case BLKIF_OP_READ:
@@ -561,13 +561,13 @@ static void make_response(blkif_t *blkif, unsigned long id,
 
     /* Place on the response ring for the relevant domain. */ 
     spin_lock_irqsave(&blkif->blk_ring_lock, flags);
-    resp = RING_GET_RESPONSE(BLKIF_RING, blk_ring, blk_ring->rsp_prod_pvt);
+    resp = RING_GET_RESPONSE(blk_ring, blk_ring->rsp_prod_pvt);
     resp->id        = id;
     resp->operation = op;
     resp->status    = st;
     wmb(); /* Ensure other side can see the response fields. */
     blk_ring->rsp_prod_pvt++;
-    RING_PUSH_RESPONSES(BLKIF_RING, blk_ring);
+    RING_PUSH_RESPONSES(blk_ring);
     spin_unlock_irqrestore(&blkif->blk_ring_lock, flags);
 
     /* Kick the relevant domain. */

@@ -398,7 +398,7 @@ static int do_usb_io_op(usbif_priv_t *up, int max_to_do)
     
     /* Take items off the comms ring, taking care not to overflow. */
     for ( i = usb_ring->req_cons; 
-          (i != rp) && !RING_REQUEST_CONS_OVERFLOW(USBIF_RING, usb_ring, i);
+          (i != rp) && !RING_REQUEST_CONS_OVERFLOW(usb_ring, i);
           i++ )
     {
         if ( (max_to_do-- == 0) || (NR_PENDING_REQS == MAX_PENDING_REQS) )
@@ -407,7 +407,7 @@ static int do_usb_io_op(usbif_priv_t *up, int max_to_do)
             break;
         }
 
-        req = RING_GET_REQUEST(USBIF_RING, usb_ring, i);
+        req = RING_GET_REQUEST(usb_ring, i);
         
         switch ( req->operation )
         {
@@ -808,7 +808,7 @@ static void make_response(usbif_priv_t *up, unsigned long id,
 
     /* Place on the response ring for the relevant domain. */ 
     spin_lock_irqsave(&up->usb_ring_lock, flags);
-    resp = RING_GET_RESPONSE(USBIF_RING, usb_ring, usb_ring->rsp_prod_pvt);
+    resp = RING_GET_RESPONSE(usb_ring, usb_ring->rsp_prod_pvt);
     resp->id        = id;
     resp->operation = op;
     resp->status    = st;
@@ -819,7 +819,7 @@ static void make_response(usbif_priv_t *up, unsigned long id,
     dump_response(resp);
 
     usb_ring->rsp_prod_pvt++;
-    RING_PUSH_RESPONSES(USBIF_RING, usb_ring);
+    RING_PUSH_RESPONSES(usb_ring);
     spin_unlock_irqrestore(&up->usb_ring_lock, flags);
 
     /* Kick the relevant domain. */
