@@ -46,7 +46,8 @@ clean: delete-unfresh-files
 	rm -f include/asm-*/asm-offsets.h
 	rm -f tools/figlet/*.o tools/figlet/figlet
 
-$(TARGET): delete-unfresh-files include/xen/compile.h
+$(TARGET): delete-unfresh-files
+	$(MAKE) include/xen/compile.h
 	[ -e include/asm ] || ln -sf asm-$(TARGET_ARCH) include/asm
 	$(MAKE) -C arch/$(TARGET_ARCH) asm-offsets.s
 	$(MAKE) include/asm-$(TARGET_ARCH)/asm-offsets.h
