@@ -9,12 +9,21 @@
 #ifndef __XC_H__
 #define __XC_H__
 
+typedef unsigned char      u8;
+typedef unsigned short     u16;
+typedef unsigned long      u32;
+typedef unsigned long long u64;
+typedef signed char        s8;
+typedef signed short       s16;
+typedef signed long        s32;
+typedef signed long long   s64;
+
 /* Obtain or relinquish a handle on the 'xc' library. */
 int xc_interface_open(void);
 int xc_interface_close(int xc_handle);
 
 typedef struct {
-    unsigned int  domid;
+    u64           domid;
     unsigned int  cpu;
     int           has_cpu;
     int           stopped;
@@ -26,44 +35,46 @@ typedef struct {
 
 int xc_domain_create(int xc_handle, 
                      unsigned int mem_kb, 
-                     const char *name);
+                     const char *name,
+                     u64 *pdomid);
 int xc_domain_start(int xc_handle, 
-                    unsigned int domid);
+                    u64 domid);
 int xc_domain_stop(int xc_handle, 
-                   unsigned int domid);
+                   u64 domid);
 int xc_domain_destroy(int xc_handle, 
-                      unsigned int domid, 
+                      u64 domid, 
                       int force);
 int xc_domain_pincpu(int xc_handle,
-                     unsigned int domid,
+                     u64 domid,
                      int cpu);
 int xc_domain_getinfo(int xc_handle,
-                      unsigned int first_domid, 
+                      u64 first_domid, 
                       unsigned int max_doms,
                       xc_dominfo_t *info);
 
 int xc_linux_save(int xc_handle,
-                  unsigned int domid, 
+                  u64 domid, 
                   const char *state_file, 
                   int verbose);
 int xc_linux_restore(int xc_handle,
                      const char *state_file, 
-                     int verbose);
+                     int verbose,
+                     u64 *pdomid);
 int xc_linux_build(int xc_handle,
-                   unsigned int domid,
+                   u64 domid,
                    const char *image_name,
                    const char *ramdisk_name,
                    const char *cmdline);
 
 int xc_netbsd_build(int xc_handle,
-                    unsigned int domid,
+                    u64 domid,
                     const char *image_name,
                     const char *cmdline);
 
 int xc_bvtsched_global_set(int xc_handle,
                            unsigned long ctx_allow);
 int xc_bvtsched_domain_set(int xc_handle,
-                           unsigned int domid,
+                           u64 domid,
                            unsigned long mcuadv,
                            unsigned long warp,
                            unsigned long warpl,
@@ -80,21 +91,21 @@ typedef struct {
 } xc_vif_stats_t;
 
 int xc_vif_scheduler_set(int xc_handle,
-                         unsigned int domid, 
+                         u64 domid, 
                          unsigned int vifid,
                          xc_vif_sched_params_t *params);
 int xc_vif_scheduler_get(int xc_handle,
-                         unsigned int domid, 
+                         u64 domid, 
                          unsigned int vifid,
                          xc_vif_sched_params_t *params);
 int xc_vif_stats_get(int xc_handle,
-                     unsigned int domid, 
+                     u64 domid, 
                      unsigned int vifid,
                      xc_vif_stats_t *stats);
 
 typedef struct {
-#define XC_VBDDOM_PROBE_ALL (~0U)
-    unsigned int   domid;
+#define XC_VBDDOM_PROBE_ALL (~0ULL)
+    u64            domid;
     unsigned short vbdid;
 #define XC_VBDF_WRITEABLE (1<<0)
     unsigned long  flags;
@@ -108,32 +119,32 @@ typedef struct {
 } xc_vbdextent_t;
 
 int xc_vbd_create(int xc_handle,
-                  unsigned int domid, 
+                  u64 domid, 
                   unsigned short vbdid, 
                   int writeable);
 int xc_vbd_destroy(int xc_handle,
-                   unsigned int domid, 
+                   u64 domid, 
                    unsigned short vbdid);
 int xc_vbd_grow(int xc_handle,
-                unsigned int domid, 
+                u64 domid, 
                 unsigned short vbdid,
                 xc_vbdextent_t *extent);
 int xc_vbd_shrink(int xc_handle,
-                  unsigned int domid, 
+                  u64 domid, 
                   unsigned short vbdid);
 int xc_vbd_setextents(int xc_handle,
-                      unsigned int domid, 
+                      u64 domid, 
                       unsigned short vbdid,
                       unsigned int nr_extents,
                       xc_vbdextent_t *extents);
 int xc_vbd_getextents(int xc_handle,
-                      unsigned int domid, 
+                      u64 domid, 
                       unsigned short vbdid,
                       unsigned int max_extents,
                       xc_vbdextent_t *extents,
                       int *writeable);
 int xc_vbd_probe(int xc_handle,
-                 unsigned int domid,
+                 u64 domid,
                  unsigned int max_vbds,
                  xc_vbd_t *vbds);
 

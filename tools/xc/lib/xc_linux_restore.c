@@ -19,7 +19,7 @@
     } while ( 0 )
 
 static int get_pfn_list(int xc_handle,
-                        int domain_id, 
+                        domid_t domain_id, 
                         unsigned long *pfn_buf, 
                         unsigned long max_pfns)
 {
@@ -103,11 +103,13 @@ static int checked_read(gzFile fd, void *buf, size_t count)
 
 int xc_linux_restore(int xc_handle,
                      const char *state_file,
-                     int verbose)
+                     int verbose,
+                     domid_t *pdomid)
 {
     dom0_op_t op;
     int rc = 1, i, j;
-    unsigned long mfn, pfn, dom = 0;
+    unsigned long mfn, pfn;
+    domid_t dom = 0;
     unsigned int prev_pc, this_pc;
     
     /* Number of page frames in use by this XenoLinux session. */
@@ -370,7 +372,6 @@ int xc_linux_restore(int xc_handle,
     p_srec = map_pfn(pm_handle, mfn);
     p_srec->resume_info.nr_pages    = nr_pfns;
     p_srec->resume_info.shared_info = shared_info_frame << PAGE_SHIFT;
-    p_srec->resume_info.dom_id      = dom;
     p_srec->resume_info.flags       = 0;
     unmap_pfn(pm_handle, p_srec);
 
@@ -470,7 +471,7 @@ int xc_linux_restore(int xc_handle,
     else
     {
         /* Success: print the domain id. */
-        verbose_printf("DOM=%ld\n", dom);
+        verbose_printf("DOM=%llu\n", dom);
     }
 
     if ( pm_handle >= 0 )
@@ -483,5 +484,8 @@ int xc_linux_restore(int xc_handle,
 
     gzclose(gfd);
 
-    return (rc == 0) ? dom : rc;
+    if ( rc == 0 )
+        *pdomid = dom;
+
+    return rc;
 }

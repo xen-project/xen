@@ -17,7 +17,7 @@ void init_fpu(void)
 {
     __asm__("fninit");
     if ( cpu_has_xmm ) load_mxcsr(0x1f80);
-    current->flags |= PF_DONEFPUINIT;
+    set_bit(PF_DONEFPUINIT, &current->flags);
 }
 
 static inline void __save_init_fpu( struct task_struct *tsk )
@@ -29,7 +29,7 @@ static inline void __save_init_fpu( struct task_struct *tsk )
         asm volatile( "fnsave %0 ; fwait"
                       : "=m" (tsk->thread.i387.fsave) );
     }
-    tsk->flags &= ~PF_USEDFPU;
+    clear_bit(PF_USEDFPU, &tsk->flags);
 }
 
 void save_init_fpu( struct task_struct *tsk )
@@ -39,7 +39,7 @@ void save_init_fpu( struct task_struct *tsk )
      * This causes us to set the real flag, so we'll need
      * to temporarily clear it while saving f-p state.
      */
-    if ( tsk->flags & PF_GUEST_STTS ) clts();
+    if ( test_bit(PF_GUEST_STTS, &tsk->flags) ) clts();
     __save_init_fpu(tsk);
     stts();
 }

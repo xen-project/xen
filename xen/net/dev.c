@@ -642,7 +642,7 @@ static void net_rx_action(struct softirq_action *h)
                 skb->data, skb->len, skb->src_vif);
         
         if ( !VIF_LOCAL(skb->dst_vif) )
-            skb->dst_vif = find_vif_by_id(0);
+            skb->dst_vif = find_net_vif(0, 0);
         
         if ( skb->dst_vif != NULL )
         {

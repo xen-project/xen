@@ -72,7 +72,7 @@ pdb_process_query (char *ptr)
 	pdb_out_buffer[buf_idx++] = 'm';
         while ( (p = p->next_task) != &idle0_task )
 	{
-	    int domain = p->domain + PDB_DOMAIN_OFFSET;
+	    domid_t domain = p->domain + PDB_DOMAIN_OFFSET;
 
 	    if (count > 0)
 	        pdb_out_buffer[buf_idx++] = ',';

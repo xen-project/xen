@@ -500,22 +500,21 @@ asmlinkage void math_state_restore(struct pt_regs *regs, long error_code)
     /* Prevent recursion. */
     clts();
 
-    if ( !(current->flags & PF_USEDFPU) )
+    if ( !test_bit(PF_USEDFPU, &current->flags) )
     {
-        if ( current->flags & PF_DONEFPUINIT )
+        if ( test_bit(PF_DONEFPUINIT, &current->flags) )
             restore_fpu(current);
         else
             init_fpu();
-        current->flags |= PF_USEDFPU;   /* So we fnsave on switch_to() */    
+        set_bit(PF_USEDFPU, &current->flags); /* so we fnsave on switch_to() */
     }
 
-    if ( current->flags & PF_GUEST_STTS )
+    if ( test_and_clear_bit(PF_GUEST_STTS, &current->flags) )
     {
         struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
         gtb->flags      = GTBF_TRAP_NOCODE;
         gtb->cs         = current->thread.traps[7].cs;
         gtb->eip        = current->thread.traps[7].address;
-        current->flags &= ~PF_GUEST_STTS;
     }
 }
 
@@ -802,7 +801,7 @@ long do_set_fast_trap(int idx)
 
 long do_fpu_taskswitch(void)
 {
-    current->flags |= PF_GUEST_STTS;
+    set_bit(PF_GUEST_STTS, &current->flags);
     stts();
     return 0;
 }

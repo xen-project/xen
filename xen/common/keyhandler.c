@@ -107,7 +107,7 @@ void do_task_queues(u_char key, void *dev_id, struct pt_regs *regs)
 
     p = &idle0_task;
     do {
-        printk("Xen: DOM %d, CPU %d [has=%c], state = %s, "
+        printk("Xen: DOM %llu, CPU %d [has=%c], state = %s, "
                "hyp_events = %08x\n", 
                p->domain, p->processor, p->has_cpu ? 'T':'F', 
                task_states[p->state], p->hyp_events); 

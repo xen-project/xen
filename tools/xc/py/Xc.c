@@ -24,6 +24,7 @@ static PyObject *pyxc_domain_create(PyObject *self,
 
     unsigned int mem_kb = 65536;
     char        *name   = "(anon)";
+    u64          dom;
     int          ret;
 
     static char *kwd_list[] = { "mem_kb", "name", NULL };
@@ -32,9 +33,10 @@ static PyObject *pyxc_domain_create(PyObject *self,
                                       &mem_kb, &name) )
         return NULL;
 
-    ret = xc_domain_create(xc->xc_handle, mem_kb, name);
-    
-    return PyInt_FromLong(ret);
+    if ( (ret = xc_domain_create(xc->xc_handle, mem_kb, name, &dom)) < 0 )
+        return PyLong_FromLong(ret);
+
+    return PyLong_FromUnsignedLongLong(dom);
 }
 
 static PyObject *pyxc_domain_start(PyObject *self,
@@ -43,12 +45,12 @@ static PyObject *pyxc_domain_start(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
 
-    unsigned int dom;
-    int          ret;
+    u64 dom;
+    int ret;
 
     static char *kwd_list[] = { "dom", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i", kwd_list, &dom) )
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "L", kwd_list, &dom) )
         return NULL;
 
     ret = xc_domain_start(xc->xc_handle, dom);
@@ -62,12 +64,12 @@ static PyObject *pyxc_domain_stop(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
 
-    unsigned int dom;
-    int          ret;
+    u64 dom;
+    int ret;
 
     static char *kwd_list[] = { "dom", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i", kwd_list, &dom) )
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "L", kwd_list, &dom) )
         return NULL;
 
     ret = xc_domain_stop(xc->xc_handle, dom);
@@ -81,12 +83,12 @@ static PyObject *pyxc_domain_destroy(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
 
-    unsigned int dom;
-    int          force = 0, ret;
+    u64 dom;
+    int force = 0, ret;
 
     static char *kwd_list[] = { "dom", "force", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|i", kwd_list, 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "L|i", kwd_list, 
                                       &dom, &force) )
         return NULL;
 
@@ -101,12 +103,12 @@ static PyObject *pyxc_domain_pincpu(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
 
-    unsigned int dom;
-    int cpu, ret;
+    u64 dom;
+    int cpu = -1, ret;
 
     static char *kwd_list[] = { "dom", "cpu", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|i", kwd_list, 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "L|i", kwd_list, 
                                       &dom, &cpu) )
         return NULL;
 
@@ -122,13 +124,13 @@ static PyObject *pyxc_domain_getinfo(PyObject *self,
     XcObject *xc = (XcObject *)self;
     PyObject *list;
 
-    unsigned int  first_dom = 0, max_doms = 1024;
-    int           nr_doms, i;
+    u64 first_dom = 0;
+    int max_doms = 1024, nr_doms, i;
     xc_dominfo_t *info;
 
     static char *kwd_list[] = { "first_dom", "max_doms", NULL };
     
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|ii", kwd_list,
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|Li", kwd_list,
                                       &first_dom, &max_doms) )
         return NULL;
 
@@ -143,7 +145,7 @@ static PyObject *pyxc_domain_getinfo(PyObject *self,
     {
         PyList_SetItem(
             list, i, 
-            Py_BuildValue("{s:i,s:i,s:i,s:i,s:l,s:L,s:s}",
+            Py_BuildValue("{s:L,s:i,s:i,s:i,s:l,s:L,s:s}",
                           "dom",      info[i].domid,
                           "cpu",      info[i].cpu,
                           "running",  info[i].has_cpu,
@@ -165,13 +167,13 @@ static PyObject *pyxc_linux_save(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
 
-    unsigned int dom;
-    char        *state_file;
-    int          progress = 1, ret;
+    u64   dom;
+    char *state_file;
+    int   progress = 1, ret;
 
     static char *kwd_list[] = { "dom", "state_file", "progress", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "is|i", kwd_list, 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "Ls|i", kwd_list, 
                                       &dom, &state_file, &progress) )
         return NULL;
 
@@ -188,6 +190,7 @@ static PyObject *pyxc_linux_restore(PyObject *self,
 
     char        *state_file;
     int          progress = 1, ret;
+    u64          dom;
 
     static char *kwd_list[] = { "state_file", "progress", NULL };
 
@@ -195,9 +198,11 @@ static PyObject *pyxc_linux_restore(PyObject *self,
                                       &state_file, &progress) )
         return NULL;
 
-    ret = xc_linux_restore(xc->xc_handle, state_file, progress);
-    
-    return PyInt_FromLong(ret);
+    ret = xc_linux_restore(xc->xc_handle, state_file, progress, &dom);
+    if ( ret < 0 )
+        return PyLong_FromLong(ret);
+
+    return PyLong_FromUnsignedLongLong(dom);
 }
 
 static PyObject *pyxc_linux_build(PyObject *self,
@@ -206,13 +211,13 @@ static PyObject *pyxc_linux_build(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
 
-    unsigned int dom;
-    char        *image, *ramdisk = NULL, *cmdline = "";
-    int          ret;
+    u64   dom;
+    char *image, *ramdisk = NULL, *cmdline = "";
+    int   ret;
 
     static char *kwd_list[] = { "dom", "image", "ramdisk", "cmdline", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "is|ss", kwd_list, 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "Ls|ss", kwd_list, 
                                       &dom, &image, &ramdisk, &cmdline) )
         return NULL;
 
@@ -227,13 +232,13 @@ static PyObject *pyxc_netbsd_build(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
 
-    unsigned int dom;
-    char        *image, *ramdisk = NULL, *cmdline = "";
-    int          ret;
+    u64   dom;
+    char *image, *ramdisk = NULL, *cmdline = "";
+    int   ret;
 
     static char *kwd_list[] = { "dom", "image", "ramdisk", "cmdline", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "is|ss", kwd_list, 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "Ls|ss", kwd_list, 
                                       &dom, &image, &ramdisk, &cmdline) )
         return NULL;
 
@@ -267,14 +272,14 @@ static PyObject *pyxc_bvtsched_domain_set(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
 
-    unsigned int  dom;
+    u64           dom;
     unsigned long mcuadv, warp, warpl, warpu;
     int           ret;
 
     static char *kwd_list[] = { "dom", "mcuadv", "warp", "warpl", 
                                 "warpu", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "illll", kwd_list, 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "Lllll", kwd_list, 
                                       &dom, &mcuadv, &warp, &warpl, &warpu) )
         return NULL;
 
@@ -290,14 +295,15 @@ static PyObject *pyxc_vif_scheduler_set(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
 
-    unsigned int  dom, vif;
+    u64           dom;
+    unsigned int  vif;
     xc_vif_sched_params_t sched = { 0, 0 };
     int           ret;
 
     static char *kwd_list[] = { "dom", "vif", "credit_bytes", 
                                 "credit_usecs", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "ii|ll", kwd_list, 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "Li|ll", kwd_list, 
                                       &dom, &vif, 
                                       &sched.credit_bytes, 
                                       &sched.credit_usec) )
@@ -315,13 +321,14 @@ static PyObject *pyxc_vif_scheduler_get(PyObject *self,
     XcObject *xc = (XcObject *)self;
     PyObject *dict;
 
-    unsigned int  dom, vif;
+    u64           dom;
+    unsigned int  vif;
     xc_vif_sched_params_t sched;
     int           ret;
 
     static char *kwd_list[] = { "dom", "vif", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "ii", kwd_list, 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "Li", kwd_list, 
                                       &dom, &vif) )
         return NULL;
 
@@ -344,13 +351,14 @@ static PyObject *pyxc_vif_stats_get(PyObject *self,
     XcObject *xc = (XcObject *)self;
     PyObject *dict;
 
-    unsigned int  dom, vif;
+    u64            dom;
+    unsigned int   vif;
     xc_vif_stats_t stats;
-    int           ret;
+    int            ret;
 
     static char *kwd_list[] = { "dom", "vif", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "ii", kwd_list, 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "Li", kwd_list, 
                                       &dom, &vif) )
         return NULL;
 
@@ -374,12 +382,13 @@ static PyObject *pyxc_vbd_create(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
 
-    unsigned int dom, vbd;
+    u64          dom;
+    unsigned int vbd;
     int          writeable, ret;
 
     static char *kwd_list[] = { "dom", "vbd", "writeable", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iii", kwd_list, 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "Lii", kwd_list, 
                                       &dom, &vbd, &writeable) )
         return NULL;
 
@@ -394,12 +403,13 @@ static PyObject *pyxc_vbd_destroy(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
 
-    unsigned int dom, vbd;
+    u64          dom;
+    unsigned int vbd;
     int          ret;
 
     static char *kwd_list[] = { "dom", "vbd", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "ii", kwd_list, 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "Li", kwd_list, 
                                       &dom, &vbd) )
         return NULL;
 
@@ -414,14 +424,15 @@ static PyObject *pyxc_vbd_grow(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
 
-    unsigned int   dom, vbd;
+    u64            dom;
+    unsigned int   vbd;
     xc_vbdextent_t extent;
     int            ret;
 
     static char *kwd_list[] = { "dom", "vbd", "device", 
                                 "start_sector", "nr_sectors", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiill", kwd_list, 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "Liill", kwd_list, 
                                       &dom, &vbd, 
                                       &extent.real_device, 
                                       &extent.start_sector, 
@@ -439,12 +450,13 @@ static PyObject *pyxc_vbd_shrink(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
 
-    unsigned int  dom, vbd;
-    int           ret;
+    u64          dom;
+    unsigned int vbd;
+    int          ret;
 
     static char *kwd_list[] = { "dom", "vbd", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "ii", kwd_list, 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "Li", kwd_list, 
                                       &dom, &vbd) )
         return NULL;
 
@@ -460,13 +472,14 @@ static PyObject *pyxc_vbd_setextents(PyObject *self,
     XcObject *xc = (XcObject *)self;
     PyObject *list, *dict, *obj;
 
-    unsigned int    dom, vbd;
+    u64             dom;
+    unsigned int    vbd;
     xc_vbdextent_t *extents = NULL;
     int             ret, i, nr_extents;
 
     static char *kwd_list[] = { "dom", "vbd", "extents", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiO", kwd_list, 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "LiO", kwd_list, 
                                       &dom, &vbd, &list) )
         goto fail;
 
@@ -520,13 +533,14 @@ static PyObject *pyxc_vbd_getextents(PyObject *self,
     XcObject *xc = (XcObject *)self;
     PyObject *list;
 
-    unsigned int    dom, vbd;
+    u64             dom;
+    unsigned int    vbd;
     xc_vbdextent_t *extents;
     int             i, nr_extents, max_extents;
 
     static char *kwd_list[] = { "dom", "vbd", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "ii", kwd_list, 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "Li", kwd_list, 
                                       &dom, &vbd) )
         return NULL;
 
@@ -570,13 +584,14 @@ static PyObject *pyxc_vbd_probe(PyObject *self,
     XcObject *xc = (XcObject *)self;
     PyObject *list;
 
-    unsigned int dom = XC_VBDDOM_PROBE_ALL, max_vbds = 1024;
+    u64          dom = XC_VBDDOM_PROBE_ALL;
+    unsigned int max_vbds = 1024;
     xc_vbd_t    *info;
     int          nr_vbds, i;
 
     static char *kwd_list[] = { "dom", "max_vbds", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|ii", kwd_list, 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|Li", kwd_list, 
                                       &dom, &max_vbds) )
         return NULL;
 
@@ -591,7 +606,7 @@ static PyObject *pyxc_vbd_probe(PyObject *self,
     {
         PyList_SetItem(
             list, i, 
-            Py_BuildValue("{s:i,s:i,s:i,s:l}",
+            Py_BuildValue("{s:L,s:i,s:i,s:l}",
                           "dom",        info[i].domid,
                           "vbd",        info[i].vbdid,
                           "writeable",  !!(info[i].flags & XC_VBDF_WRITEABLE),
@@ -631,27 +646,27 @@ static PyMethodDef pyxc_methods[] = {
       "Create a new domain.\n"
       " mem_kb [int, 65536]:    Memory allocation, in kilobytes.\n"
       " name   [str, '(anon)']: Informative textual name.\n\n"
-      "Returns: [int] new domain identifier; -1 on error.\n" },
+      "Returns: [long] new domain identifier; -1 on error.\n" },
 
     { "domain_start", 
       (PyCFunction)pyxc_domain_start, 
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Start execution of a domain.\n"
-      " dom [int]: Identifier of domain to be started.\n\n"
+      " dom [long]: Identifier of domain to be started.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "domain_stop", 
       (PyCFunction)pyxc_domain_stop, 
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Stop execution of a domain.\n"
-      " dom [int]: Identifier of domain to be stopped.\n\n"
+      " dom [long]: Identifier of domain to be stopped.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "domain_destroy", 
       (PyCFunction)pyxc_domain_destroy, 
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Destroy a domain.\n"
-      " dom   [int]:    Identifier of domain to be destroyed.\n"
+      " dom   [long]:   Identifier of domain to be destroyed.\n"
       " force [int, 0]: Bool - force immediate destruction?\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
@@ -659,21 +674,21 @@ static PyMethodDef pyxc_methods[] = {
       (PyCFunction)pyxc_domain_pincpu, 
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Pin a domain to a specified CPU.\n"
-      " dom   [int]:    Identifier of domain to be destroyed.\n"
-      " force [int, -1]: CPU to pin to, or -1 to unpin\n\n"
+      " dom [long]:    Identifier of domain to be destroyed.\n"
+      " cpu [int, -1]: CPU to pin to, or -1 to unpin\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "domain_getinfo", 
       (PyCFunction)pyxc_domain_getinfo, 
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Get information regarding a set of domains, in increasing id order.\n"
-      " first_dom [int, 0]:    First domain to retrieve info about.\n"
+      " first_dom [long, 0]:   First domain to retrieve info about.\n"
       " max_doms  [int, 1024]: Maximum number of domains to retrieve info"
       " about.\n\n"
       "Returns: [list of dicts] if list length is less than 'max_doms'\n"
       "         parameter then there was an error, or the end of the\n"
       "         domain-id space was reached.\n"
-      " dom      [int]:  Identifier of domain to which this info pertains\n"
+      " dom      [long]: Identifier of domain to which this info pertains\n"
       " cpu      [int]:  CPU to which this domain is bound\n"
       " running  [int]:  Bool - is the domain currently running?\n"
       " stopped  [int]:  Bool - is the domain suspended?\n"
@@ -685,7 +700,7 @@ static PyMethodDef pyxc_methods[] = {
       (PyCFunction)pyxc_linux_save, 
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Save the CPU and memory state of a Linux guest OS.\n"
-      " dom        [int]:    Identifier of domain to be saved.\n"
+      " dom        [long]:   Identifier of domain to be saved.\n"
       " state_file [str]:    Name of state file. Must not currently exist.\n"
       " progress   [int, 1]: Bool - display a running progress indication?\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
@@ -696,26 +711,26 @@ static PyMethodDef pyxc_methods[] = {
       "Restore the CPU and memory state of a Linux guest OS.\n"
       " state_file [str]:    Name of state file. Must not currently exist.\n"
       " progress   [int, 1]: Bool - display a running progress indication?\n\n"
-      "Returns: [int] new domain identifier on success; -1 on error.\n" },
+      "Returns: [long] new domain identifier on success; -1 on error.\n" },
 
     { "linux_build", 
       (PyCFunction)pyxc_linux_build, 
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Build a new Linux guest OS.\n"
-      " dom     [int]:      Identifier of domain to build into.\n"
+      " dom     [long]:     Identifier of domain to build into.\n"
       " image   [str]:      Name of kernel image file. May be gzipped.\n"
       " ramdisk [str, n/a]: Name of ramdisk file, if any.\n"
       " cmdline [str, n/a]: Kernel parameters, if any.\n\n"
-      "Returns: [int] new domain identifier on success; -1 on error.\n" },
+      "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "netbsd_build", 
       (PyCFunction)pyxc_netbsd_build, 
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Build a new NetBSD guest OS.\n"
-      " dom     [int]:      Identifier of domain to build into.\n"
+      " dom     [long]:     Identifier of domain to build into.\n"
       " image   [str]:      Name of kernel image file. May be gzipped.\n"
       " cmdline [str, n/a]: Kernel parameters, if any.\n\n"
-      "Returns: [int] new domain identifier on success; -1 on error.\n" },
+      "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "bvtsched_global_set", 
       (PyCFunction)pyxc_bvtsched_global_set, 
@@ -728,18 +743,18 @@ static PyMethodDef pyxc_methods[] = {
       (PyCFunction)pyxc_bvtsched_domain_set, 
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Set per-domain tuning parameters for Borrowed Virtual Time scheduler.\n"
-      " dom    [int]: Identifier of domain to be tuned.\n"
-      " mcuadv [int]: Internal BVT parameter.\n"
-      " warp   [int]: Internal BVT parameter.\n"
-      " warpl  [int]: Internal BVT parameter.\n"
-      " warpu  [int]: Internal BVT parameter.\n\n"
+      " dom    [long]: Identifier of domain to be tuned.\n"
+      " mcuadv [int]:  Internal BVT parameter.\n"
+      " warp   [int]:  Internal BVT parameter.\n"
+      " warpl  [int]:  Internal BVT parameter.\n"
+      " warpu  [int]:  Internal BVT parameter.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "vif_scheduler_set", 
       (PyCFunction)pyxc_vif_scheduler_set, 
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Set per-network-interface scheduling parameters.\n"
-      " dom          [int]:    Identifier of domain to be adjusted.\n"
+      " dom          [long]:   Identifier of domain to be adjusted.\n"
       " vif          [int]:    Identifier of VIF to be adjusted.\n"
       " credit_bytes [int, 0]: Tx bytes permitted each interval.\n"
       " credit_usecs [int, 0]: Interval, in usecs. 0 == no scheduling.\n\n"
@@ -749,7 +764,7 @@ static PyMethodDef pyxc_methods[] = {
       (PyCFunction)pyxc_vif_scheduler_get, 
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Query the per-network-interface scheduling parameters.\n"
-      " dom          [int]:    Identifier of domain to be queried.\n"
+      " dom          [long]:   Identifier of domain to be queried.\n"
       " vif          [int]:    Identifier of VIF to be queried.\n\n"
       "Returns: [dict] dictionary is empty on failure.\n"
       " credit_bytes [int]: Tx bytes permitted each interval.\n"
@@ -759,8 +774,8 @@ static PyMethodDef pyxc_methods[] = {
       (PyCFunction)pyxc_vif_stats_get, 
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Query the per-network-interface statistics.\n"
-      " dom          [int]: Identifier of domain to be queried.\n"
-      " vif          [int]: Identifier of VIF to be queried.\n\n"
+      " dom          [long]: Identifier of domain to be queried.\n"
+      " vif          [int]:  Identifier of VIF to be queried.\n\n"
       "Returns: [dict] dictionary is empty on failure.\n"
       " tx_bytes   [long]: Bytes transmitted.\n"
       " tx_packets [long]: Packets transmitted.\n"
@@ -771,44 +786,44 @@ static PyMethodDef pyxc_methods[] = {
       (PyCFunction)pyxc_vbd_create, 
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Create a new virtual block device associated with a given domain.\n"
-      " dom       [int]: Identifier of domain to get a new VBD.\n"
-      " vbd       [int]: Identifier for new VBD.\n"
-      " writeable [int]: Bool - is the new VBD writeable?\n\n"
+      " dom       [long]: Identifier of domain to get a new VBD.\n"
+      " vbd       [int]:  Identifier for new VBD.\n"
+      " writeable [int]:  Bool - is the new VBD writeable?\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "vbd_destroy", 
       (PyCFunction)pyxc_vbd_destroy, 
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Destroy a virtual block device.\n"
-      " dom       [int]: Identifier of domain containing the VBD.\n"
-      " vbd       [int]: Identifier of the VBD.\n\n"
+      " dom       [long]: Identifier of domain containing the VBD.\n"
+      " vbd       [int]:  Identifier of the VBD.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "vbd_grow", 
       (PyCFunction)pyxc_vbd_grow, 
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Grow a virtual block device by appending a new extent.\n"
-      " dom          [int]: Identifier of domain containing the VBD.\n"
-      " vbd          [int]: Identifier of the VBD.\n"
-      " device       [int]: Identifier of the real underlying block device.\n"
-      " start_sector [int]: Real start sector of this extent.\n"
-      " nr_sectors   [int]: Length, in sectors, of this extent.\n\n"
+      " dom          [long]: Identifier of domain containing the VBD.\n"
+      " vbd          [int]:  Identifier of the VBD.\n"
+      " device       [int]:  Identifier of the real underlying block device.\n"
+      " start_sector [int]:  Real start sector of this extent.\n"
+      " nr_sectors   [int]:  Length, in sectors, of this extent.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "vbd_shrink", 
       (PyCFunction)pyxc_vbd_shrink, 
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Shrink a virtual block device by deleting its final extent.\n"
-      " dom          [int]: Identifier of domain containing the VBD.\n"
-      " vbd          [int]: Identifier of the VBD.\n\n"
+      " dom          [long]: Identifier of domain containing the VBD.\n"
+      " vbd          [int]:  Identifier of the VBD.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "vbd_setextents", 
       (PyCFunction)pyxc_vbd_setextents, 
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Set all the extent information for a virtual block device.\n"
-      " dom          [int]: Identifier of domain containing the VBD.\n"
-      " vbd          [int]: Identifier of the VBD.\n"
+      " dom          [long]: Identifier of domain containing the VBD.\n"
+      " vbd          [int]:  Identifier of the VBD.\n"
       " extents      [list of dicts]: Per-extent information.\n"
       "  device       [int]: Identifier of the real underlying block device.\n"
       "  start_sector [int]: Real start sector of this extent.\n"
@@ -819,8 +834,8 @@ static PyMethodDef pyxc_methods[] = {
       (PyCFunction)pyxc_vbd_getextents, 
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Get info on all the extents in a virtual block device.\n"
-      " dom          [int]: Identifier of domain containing the VBD.\n"
-      " vbd          [int]: Identifier of the VBD.\n\n"
+      " dom          [long]: Identifier of domain containing the VBD.\n"
+      " vbd          [int]:  Identifier of the VBD.\n\n"
       "Returns: [list of dicts] per-extent information; empty on error.\n"
       " device       [int]: Identifier of the real underlying block device.\n"
       " start_sector [int]: Real start sector of this extent.\n"
@@ -830,14 +845,14 @@ static PyMethodDef pyxc_methods[] = {
       (PyCFunction)pyxc_vbd_probe, 
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Get information regarding extant virtual block devices.\n"
-      " dom          [int, ALL]:  Domain to query (default is to query all).\n"
+      " dom          [long, ALL]: Domain to query (default is to query all).\n"
       " max_vbds     [int, 1024]: Maximum VBDs to query.\n\n"
       "Returns: [list of dicts] if list length is less than 'max_vbds'\n"
       "         parameter then there was an error, or there were fewer vbds.\n"
-      " dom        [int]: Domain containing this VBD.\n"
-      " vbd        [int]: Domain-specific identifier of this VBD.\n"
-      " writeable  [int]: Bool - is this VBD writeable?\n"
-      " nr_sectors [int]: Size of this VBD, in 512-byte sectors.\n" },
+      " dom        [long]: Domain containing this VBD.\n"
+      " vbd        [int]:  Domain-specific identifier of this VBD.\n"
+      " writeable  [int]:  Bool - is this VBD writeable?\n"
+      " nr_sectors [int]:  Size of this VBD, in 512-byte sectors.\n" },
 
     { "readconsolering", 
       (PyCFunction)pyxc_readconsolering, 

@@ -30,7 +30,7 @@ asmlinkage int sys_iopl(unsigned int new_io_pl)
 
     /* Force the change at ring 0. */
     op.cmd           = DOM0_IOPL;
-    op.u.iopl.domain = start_info.dom_id;
+    op.u.iopl.domain = DOMID_SELF;
     op.u.iopl.iopl   = new_io_pl;
     HYPERVISOR_dom0_op(&op);
 

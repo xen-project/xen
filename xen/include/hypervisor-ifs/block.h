@@ -98,7 +98,7 @@ typedef struct xen_disk
     unsigned short device;       /* device number (opaque 16 bit val)  */
     unsigned short info;         /* device type and flags              */
     unsigned long  capacity;     /* size in terms of #512 byte sectors */
-    unsigned int   domain;       /* if a VBD, domain this 'belongs to' */
+    domid_t        domain;       /* if a VBD, domain this 'belongs to' */
 } xen_disk_t;
 
 typedef struct xen_disk_info

@@ -33,19 +33,17 @@ extern struct mm_struct init_mm;
 #define _HYP_EVENT_NEED_RESCHED 0
 #define _HYP_EVENT_DIE          1
 
-#define PF_DONEFPUINIT  0x1  /* Has the FPU been initialised for this task? */
-#define PF_USEDFPU      0x2  /* Has this task used the FPU since last save? */
-#define PF_GUEST_STTS   0x4  /* Has the guest OS requested 'stts'?          */
-#define PF_CONSTRUCTED  0x8  /* Has the guest OS been fully built yet? */
+#define PF_DONEFPUINIT  0 /* Has the FPU been initialised for this task? */
+#define PF_USEDFPU      1 /* Has this task used the FPU since last save? */
+#define PF_GUEST_STTS   2 /* Has the guest OS requested 'stts'?          */
+#define PF_CONSTRUCTED  3 /* Has the guest OS been fully built yet?      */
+#define PF_IDLETASK     4 /* Is this one of the per-CPU idle domains?    */
+#define PF_PRIVILEGED   5 /* Is this domain privileged?                  */
 
 #include <xeno/vif.h>
 #include <xeno/vbd.h>
 
-/* SMH: replace below when have explicit 'priv' flag or bitmask */
-#define IS_PRIV(_p) ((_p)->domain == 0) 
-
-#define DOMAIN_ID_BITS (16)
-#define MAX_DOMAIN_ID  ((1<<(DOMAIN_ID_BITS))-1)
+#define IS_PRIV(_p) (test_bit(PF_PRIVILEGED, &(_p)->flags))
 
 typedef struct event_channel_st
 {
@@ -92,8 +90,8 @@ struct task_struct
     /*
      * From here on things can be added and shuffled without special attention
      */
-    
-    unsigned int domain;        /* domain id */
+
+    domid_t domain;
 
     spinlock_t       page_list_lock;
     struct list_head page_list;
@@ -185,14 +183,15 @@ struct task_struct
     addr_limit:  KERNEL_DS,      \
     thread:      INIT_THREAD,    \
     prev_task:   &(_t),          \
-    next_task:   &(_t)           \
+    next_task:   &(_t),          \
+    flags:       1<<PF_IDLETASK  \
 }
 
 extern struct task_struct idle0_task;
 
 extern struct task_struct *idle_task[NR_CPUS];
-#define IDLE_DOMAIN_ID   (~0)
-#define is_idle_task(_p) ((_p)->domain == IDLE_DOMAIN_ID)
+#define IDLE_DOMAIN_ID   (~0ULL)
+#define is_idle_task(_p) (test_bit(PF_IDLETASK, &(_p)->flags))
 
 #include <xeno/slab.h>
 
@@ -205,21 +204,21 @@ extern kmem_cache_t *task_struct_cachep;
   atomic_inc(&(_p)->refcnt)
 
 extern struct task_struct *do_createdomain(
-    unsigned int dom_id, unsigned int cpu);
+    domid_t dom_id, unsigned int cpu);
 extern int setup_guestos(
     struct task_struct *p, dom0_createdomain_t *params, unsigned int num_vifs,
     char *data_start, unsigned long data_len, 
     char *cmdline, unsigned long initrd_len);
 extern int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *);
 
-struct task_struct *find_domain_by_id(unsigned int dom);
+struct task_struct *find_domain_by_id(domid_t dom);
 extern void release_task(struct task_struct *);
 extern void __kill_domain(struct task_struct *p);
 extern void kill_domain(void);
 extern void kill_domain_with_errmsg(const char *err);
-extern long kill_other_domain(unsigned int dom, int force);
+extern long kill_other_domain(domid_t dom, int force);
 extern void stop_domain(void);
-extern long stop_other_domain(unsigned int dom);
+extern long stop_other_domain(domid_t dom);
 
 /* arch/process.c */
 void new_thread(struct task_struct *p,
@@ -247,7 +246,7 @@ void schedulers_start(void);
 void sched_add_domain(struct task_struct *p);
 int sched_rem_domain(struct task_struct *p);
 long sched_bvtctl(unsigned long ctx_allow);
-long sched_adjdom(int dom, unsigned long mcu_adv, unsigned long warp, 
+long sched_adjdom(domid_t dom, unsigned long mcu_adv, unsigned long warp, 
                   unsigned long warpl, unsigned long warpu);
 void init_idle_task(void);
 void __wake_up(struct task_struct *p);
@@ -287,7 +286,7 @@ void continue_nonidle_task(void);
 
 /* This hash table is protected by the tasklist_lock. */
 #define TASK_HASH_SIZE 256
-#define TASK_HASH(_id) ((_id)&(TASK_HASH_SIZE-1))
+#define TASK_HASH(_id) ((int)(_id)&(TASK_HASH_SIZE-1))
 extern struct task_struct *task_hash[TASK_HASH_SIZE];
 
 #define REMOVE_LINKS(p) do { \

@@ -318,14 +318,14 @@ void __init setup_arch(char **cmdline_p)
     {
         dom0_op_t op;
         op.cmd           = DOM0_IOPL;
-        op.u.iopl.domain = start_info.dom_id;
+        op.u.iopl.domain = DOMID_SELF;
         op.u.iopl.iopl   = 1;
         if( HYPERVISOR_dom0_op(&op) != 0 )
             panic("Unable to obtain IOPL, despite being SIF_PRIVILEGED");
         current->thread.io_pl = 1;
     }
 
-    if(start_info.flags & SIF_CONSOLE)
+    if ( start_info.flags & SIF_INITDOMAIN )
     {
         if( !(start_info.flags & SIF_PRIVILEGED) )
             panic("Xen granted us console access but not privileged status");

@@ -17,7 +17,7 @@
  * This makes sure that old versions of dom0 tools will stop working in a
  * well-defined way (rather than crashing the machine, for instance).
  */
-#define DOM0_INTERFACE_VERSION   0xAAAA0004
+#define DOM0_INTERFACE_VERSION   0xAAAA0005
 
 
 /*
@@ -51,30 +51,30 @@ typedef struct dom0_createdomain_st
 {
     /* IN parameters. */
     unsigned int memory_kb; 
-    char name[MAX_DOMAIN_NAME];
+    char         name[MAX_DOMAIN_NAME];
     /* OUT parameters. */
-    unsigned int domain; 
+    domid_t      domain; 
 } dom0_createdomain_t;
 
 #define DOM0_STARTDOMAIN      10
 typedef struct dom0_startdomain_st
 {
     /* IN parameters. */
-    unsigned int domain;
+    domid_t domain;
 } dom0_startdomain_t;
 
 #define DOM0_STOPDOMAIN       11
 typedef struct dom0_stopdomain_st
 {
     /* IN parameters. */
-    unsigned int domain;
+    domid_t domain;
 } dom0_stopdomain_t;
 
 #define DOM0_DESTROYDOMAIN     9
 typedef struct dom0_destroydomain_st
 {
     /* IN variables. */
-    unsigned int domain;
+    domid_t      domain;
     int          force;
 } dom0_destroydomain_t;
 
@@ -82,7 +82,7 @@ typedef struct dom0_destroydomain_st
 typedef struct dom0_getmemlist_st
 {
     /* IN variables. */
-    unsigned int  domain;
+    domid_t       domain;
     unsigned long max_pfns;
     void         *buffer;
     /* OUT variables. */
@@ -93,8 +93,8 @@ typedef struct dom0_getmemlist_st
 typedef struct dom0_builddomain_st
 {
     /* IN variables. */
-    unsigned int  domain;
-    unsigned int  num_vifs;
+    domid_t                  domain;
+    unsigned int             num_vifs;
     full_execution_context_t ctxt;
 } dom0_builddomain_t;
 
@@ -109,7 +109,7 @@ typedef struct dom0_bvtctl_st
 typedef struct dom0_adjustdom_st
 {
     /* IN variables. */
-    unsigned int  domain;     /* domain id */
+    domid_t       domain;     /* domain id */
     unsigned long mcu_adv;    /* mcu advance: inverse of weight */
     unsigned long warp;       /* time warp */
     unsigned long warpl;      /* warp limit */
@@ -120,7 +120,7 @@ typedef struct dom0_adjustdom_st
 typedef struct dom0_getdomaininfo_st
 {
     /* IN variables. */
-    unsigned int domain;
+    domid_t domain;
     /* OUT variables. */
     char name[MAX_DOMAIN_NAME];
     int processor;
@@ -141,7 +141,7 @@ typedef struct dom0_getpageframeinfo_st
 {
     /* IN variables. */
     unsigned long pfn;          /* Machine page frame number to query.       */
-    unsigned int domain;        /* To which domain does the frame belong?    */
+    domid_t domain;        /* To which domain does the frame belong?    */
     /* OUT variables. */
     enum { NONE, L1TAB, L2TAB } type; /* Is the page PINNED to a type?       */
 } dom0_getpageframeinfo_t;
@@ -149,7 +149,7 @@ typedef struct dom0_getpageframeinfo_st
 #define DOM0_IOPL             14
 typedef struct dom0_iopl_st
 {
-    unsigned int domain;
+    domid_t domain;
     unsigned int iopl;
 } dom0_iopl_t;
 
@@ -168,7 +168,7 @@ typedef struct dom0_debug_st
 {
     /* IN variables. */
     char opcode;
-    unsigned int domain;
+    domid_t domain;
     int in1, in2, in3, in4;
     /* OUT variables. */
     unsigned int status;
@@ -206,7 +206,7 @@ typedef struct dom0_readconsole_st
 typedef struct dom0_pincpudomain_st
 {
     /* IN variables. */
-    unsigned int domain;
+    domid_t      domain;
     int          cpu;  /* -1 implies unpin */
 } dom0_pincpudomain_t;
 

@@ -21,10 +21,10 @@ extern int pdb_high_bit;
 extern void initialize_pdb(void);
 
 /* Get/set values from generic debug interface. */
-extern int pdb_set_values (int domain, u_char *buffer, 
-			   unsigned long addr, int length);
-extern int pdb_get_values (int domain, u_char *buffer,
-			   unsigned long addr, int length);
+extern int pdb_set_values(domid_t domain, u_char *buffer, 
+                          unsigned long addr, int length);
+extern int pdb_get_values(domid_t domain, u_char *buffer,
+                          unsigned long addr, int length);
 
 /* External entry points. */
 extern int pdb_handle_exception(int exceptionVector,

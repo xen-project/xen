@@ -31,9 +31,10 @@
 rwlock_t tasklist_lock __cacheline_aligned = RW_LOCK_UNLOCKED;
 struct task_struct *task_hash[TASK_HASH_SIZE];
 
-struct task_struct *do_createdomain(unsigned int dom_id, unsigned int cpu)
+struct task_struct *do_createdomain(domid_t dom_id, unsigned int cpu)
 {
     int retval;
+    char buf[100];
     struct task_struct *p = NULL;
     unsigned long flags;
 
@@ -47,7 +48,10 @@ struct task_struct *do_createdomain(unsigned int dom_id, unsigned int cpu)
     p->domain    = dom_id;
     p->processor = cpu;
 
-    sprintf(p->name, "Domain-%d", dom_id);
+    /* We use a large intermediate to avoid overflow in sprintf. */
+    sprintf(buf, "Domain-%llu", dom_id);
+    strncpy(p->name, buf, MAX_DOMAIN_NAME);
+    p->name[MAX_DOMAIN_NAME-1] = '\0';
 
     spin_lock_init(&p->blk_ring_lock);
     spin_lock_init(&p->event_channel_lock);
@@ -79,7 +83,7 @@ struct task_struct *do_createdomain(unsigned int dom_id, unsigned int cpu)
 }
 
 
-struct task_struct *find_domain_by_id(unsigned int dom)
+struct task_struct *find_domain_by_id(domid_t dom)
 {
     struct task_struct *p;
     unsigned long flags;
@@ -103,8 +107,7 @@ struct task_struct *find_domain_by_id(unsigned int dom)
 
 void kill_domain_with_errmsg(const char *err)
 {
-    printk("DOM%d FATAL ERROR: %s\n", 
-           current->domain, err);
+    printk("DOM%llu FATAL ERROR: %s\n", current->domain, err);
     kill_domain();
 }
 
@@ -126,7 +129,7 @@ void __kill_domain(struct task_struct *p)
     if ( !sched_rem_domain(p) )
         return;
 
-    printk("Killing domain %d\n", p->domain);
+    printk("Killing domain %llu\n", p->domain);
 
     unlink_blkdev_info(p);
 
@@ -162,7 +165,7 @@ void kill_domain(void)
 }
 
 
-long kill_other_domain(unsigned int dom, int force)
+long kill_other_domain(domid_t dom, int force)
 {
     struct task_struct *p;
     unsigned long cpu_mask = 0;
@@ -200,7 +203,7 @@ void stop_domain(void)
     __enter_scheduler();
 }
 
-long stop_other_domain(unsigned int dom)
+long stop_other_domain(domid_t dom)
 {
     unsigned long cpu_mask;
     struct task_struct *p;
@@ -208,7 +211,7 @@ long stop_other_domain(unsigned int dom)
     if ( dom == 0 )
         return -EINVAL;
 
-    p = find_domain_by_id (dom);
+    p = find_domain_by_id(dom);
     if ( p == NULL) return -ESRCH;
     
     if ( p->state != TASK_STOPPED )
@@ -452,7 +455,7 @@ void release_task(struct task_struct *p)
     ASSERT(p->state == TASK_DYING);
     ASSERT(!p->has_cpu);
 
-    printk("Releasing task %d\n", p->domain);
+    printk("Releasing task %llu\n", p->domain);
 
     /*
      * This frees up blkdev rings and vbd-access lists. Totally safe since
@@ -480,12 +483,12 @@ int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *builddomain)
     unsigned long phys_l2tab;
     int i;
 
-    if ( (p->flags & PF_CONSTRUCTED) )
+    if ( test_bit(PF_CONSTRUCTED, &p->flags) )
         return -EINVAL;
     
-    p->flags &= ~PF_DONEFPUINIT;
+    clear_bit(PF_DONEFPUINIT, &p->flags);
     if ( builddomain->ctxt.flags & ECF_I387_VALID )
-        p->flags |= PF_DONEFPUINIT;
+        set_bit(PF_DONEFPUINIT, &p->flags);
     memcpy(&p->shared_info->execution_context,
            &builddomain->ctxt.i386_ctxt,
            sizeof(p->shared_info->execution_context));
@@ -526,7 +529,7 @@ int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *builddomain)
     while ( builddomain->num_vifs-- > 0 )
         (void)create_net_vif(p->domain);
 
-    p->flags |= PF_CONSTRUCTED;
+    set_bit(PF_CONSTRUCTED, &p->flags);
     
     return 0;
 }
@@ -553,7 +556,8 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
 {
     struct list_head *list_ent;
     char *src, *vsrc, *dst, *data_start;
-    int i, dom = p->domain;
+    int i;
+    domid_t dom = p->domain;
     unsigned long phys_l1tab, phys_l2tab;
     unsigned long cur_address, alloc_address;
     unsigned long virt_load_address, virt_stack_address;
@@ -571,7 +575,7 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
 
     /* Sanity! */
     if ( p->domain != 0 ) BUG();
-    if ( (p->flags & PF_CONSTRUCTED) ) BUG();
+    if ( test_bit(PF_CONSTRUCTED, &p->flags) ) BUG();
 
     /*
      * This is all a bit grim. We've moved the modules to the "safe" physical 
@@ -589,21 +593,21 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
 
     if ( strncmp(data_start, "XenoGues", 8) )
     {
-        printk("DOM%d: Invalid guest OS image\n", dom);
+        printk("DOM%llu: Invalid guest OS image\n", dom);
         return -1;
     }
 
     virt_load_address = *(unsigned long *)(data_start + 8);
     if ( (virt_load_address & (PAGE_SIZE-1)) )
     {
-        printk("DOM%d: Guest OS load address not page-aligned (%08lx)\n",
+        printk("DOM%llu: Guest OS load address not page-aligned (%08lx)\n",
                dom, virt_load_address);
         return -1;
     }
 
     if ( alloc_new_dom_mem(p, params->memory_kb) )
     {
-        printk("DOM%d: Not enough memory --- reduce dom0_mem ??\n", dom);
+        printk("DOM%llu: Not enough memory --- reduce dom0_mem ??\n", dom);
         return -ENOMEM;
     }
 
@@ -614,7 +618,7 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
 
     if ( data_len > (params->memory_kb << 9) )
     {
-        printk("DOM%d: Guest OS image is too large\n"
+        printk("DOM%llu: Guest OS image is too large\n"
                "       (%luMB is greater than %uMB limit for a\n"
                "        %uMB address space)\n",
                dom, data_len>>20,
@@ -624,7 +628,7 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
         return -1;
     }
 
-    printk("DOM%d: Guest OS virtual load address is %08lx\n", dom,
+    printk("DOM%llu: Guest OS virtual load address is %08lx\n", dom,
            virt_load_address);
     
     SET_GDT_ENTRIES(p, DEFAULT_GDT_ENTRIES);
@@ -753,14 +757,11 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
     virt_startinfo_address->pt_base = virt_load_address + 
         ((p->tot_pages - 1) << PAGE_SHIFT); 
 
-    virt_startinfo_address->dom_id = p->domain;
     virt_startinfo_address->flags  = 0;
     if ( IS_PRIV(p) )
-    {
         virt_startinfo_address->flags |= SIF_PRIVILEGED;
-        if ( CONSOLE_ISOWNER(p) )
-            virt_startinfo_address->flags |= SIF_CONSOLE;
-    }
+    if ( p->domain == 0 )
+        virt_startinfo_address->flags |= SIF_INITDOMAIN;
 
     if ( initrd_len )
     {
@@ -787,12 +788,8 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
     *dst = '\0';
 
     /* If this guy's getting the console we'd better let go. */
-    if ( virt_startinfo_address->flags & SIF_CONSOLE )
-    {
-        /* NB. Should reset the console here. */
+    if ( CONSOLE_ISOWNER(p) )
         opt_console = 0;
-    }  
-
 
     /* Reinstate the caller's page tables. */
     write_cr3_counted(pagetable_val(current->mm.pagetable));
@@ -819,7 +816,7 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
     }
     kfree(xd);
 
-    p->flags |= PF_CONSTRUCTED;
+    set_bit(PF_CONSTRUCTED, &p->flags);
 
     new_thread(p, 
                (unsigned long)virt_load_address, 

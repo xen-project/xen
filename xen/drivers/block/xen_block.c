@@ -567,7 +567,7 @@ static void dump_blockq(u_char key, void *dev_id, struct pt_regs *regs)
     do {
         if ( !is_idle_task(p) )
         {
-            printk("Domain: %d\n", p->domain);
+            printk("Domain: %llu\n", p->domain);
             blk_ring = p->blk_ring_base;
             
             printk("  req_prod:0x%08x, req_cons:0x%08x resp_prod:0x%08x/"

@@ -673,7 +673,9 @@ static void __init do_boot_cpu (int apicid)
 
     if ( (idle = do_createdomain(IDLE_DOMAIN_ID, cpu)) == NULL )
         panic("failed 'createdomain' for CPU %d", cpu);
- 
+
+    set_bit(PF_IDLETASK, &idle->flags);
+
     idle->mm.pagetable = mk_pagetable(__pa(idle_pg_table));
 
     map_cpu_to_boot_apicid(cpu, apicid);

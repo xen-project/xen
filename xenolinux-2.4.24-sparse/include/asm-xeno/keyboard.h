@@ -1,6 +1,9 @@
 /* xenolinux/include/asm-xeno/keyboard.h */
 /* Portions copyright (c) 2003 James Scott, Intel Research Cambridge */
-/* Talks to hypervisor to get PS/2 keyboard and mouse events, and send keyboard and mouse commands */
+/*
+ * Talks to hypervisor to get PS/2 keyboard and mouse events, and send keyboard
+ * and mouse commands
+ */
 
 /*  Based on:
  *  linux/include/asm-i386/keyboard.h
@@ -50,7 +53,7 @@ extern unsigned char pckbd_sysrq_xlate[128];
 
 static inline int xen_kbd_controller_present ()
 {
-    return start_info.flags & SIF_CONSOLE;
+    return start_info.flags & SIF_INITDOMAIN;
 }
 
 /* resource allocation */

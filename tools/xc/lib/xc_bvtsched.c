@@ -18,7 +18,7 @@ int xc_bvtsched_global_set(int xc_handle,
 }
 
 int xc_bvtsched_domain_set(int xc_handle,
-                           unsigned int domid,
+                           domid_t domid,
                            unsigned long mcuadv,
                            unsigned long warp,
                            unsigned long warpl,

@@ -222,6 +222,8 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
     new_dom = do_createdomain(0, 0);
     if ( new_dom == NULL ) panic("Error creating domain 0\n");
 
+    set_bit(PF_PRIVILEGED, &new_dom->flags);
+
     /*
      * We're going to setup domain0 using the module(s) that we stashed safely
      * above our MAX_DIRECTMAP_ADDRESS in boot/Boot.S The second module, if
@@ -620,7 +622,7 @@ int console_export(char *str, int len)
 
     unmap_domain_mem(skb_data);
     
-    skb->dst_vif = find_vif_by_id(0);
+    skb->dst_vif = find_net_vif(0, 0);
     (void)netif_rx(skb);
 
     return 1;
@@ -655,7 +657,7 @@ long do_console_write(char *str, unsigned int count)
         spin_lock_irqsave(&console_lock, flags);
         
         __putstr("DOM"); 
-        sprintf(dom_id, "%d", current->domain);
+        sprintf(dom_id, "%llu", current->domain);
         __putstr(dom_id);
         __putstr(": ");
         

@@ -9,8 +9,8 @@
 #include <asm/desc.h>
 
 /* Offsets in start_info structure */
-#define MOD_START 20
-#define MOD_LEN   24
+#define MOD_START 16
+#define MOD_LEN   20
                 
 startup_32:
         cld

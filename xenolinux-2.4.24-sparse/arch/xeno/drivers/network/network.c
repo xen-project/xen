@@ -498,16 +498,20 @@ static int inetdev_notify(struct notifier_block *this,
     else
         goto out;
 
-    op.u.net_rule.src_vif       = idx;
-    op.u.net_rule.dst_vif       = VIF_PHYSICAL_INTERFACE;
+    op.u.net_rule.src_dom       = 0;
+    op.u.net_rule.src_idx       = idx;
+    op.u.net_rule.dst_dom       = VIF_SPECIAL;
+    op.u.net_rule.dst_idx       = VIF_PHYSICAL_INTERFACE;
     op.u.net_rule.src_addr      = ntohl(ifa->ifa_address);
     op.u.net_rule.src_addr_mask = ~0UL;
     op.u.net_rule.dst_addr      = 0;
     op.u.net_rule.dst_addr_mask = 0;
     (void)HYPERVISOR_network_op(&op);
     
-    op.u.net_rule.src_vif       = VIF_ANY_INTERFACE;
-    op.u.net_rule.dst_vif       = idx;
+    op.u.net_rule.src_dom       = VIF_SPECIAL;
+    op.u.net_rule.src_idx       = VIF_ANY_INTERFACE;
+    op.u.net_rule.dst_dom       = 0;
+    op.u.net_rule.dst_idx       = idx;
     op.u.net_rule.src_addr      = 0;
     op.u.net_rule.src_addr_mask = 0;    
     op.u.net_rule.dst_addr      = ntohl(ifa->ifa_address);
@@ -539,7 +543,7 @@ int __init init_module(void)
      * addresses. All other domains have a privileged "parent" to do this for
      * them at start of day.
      */
-    if ( start_info.dom_id == 0 )
+    if ( start_info.flags & SIF_INITDOMAIN )
         (void)register_inetaddr_notifier(&notifier_inetdev);
 
     err = request_irq(NET_IRQ, network_interrupt, 
@@ -619,7 +623,7 @@ static void cleanup_module(void)
         kfree(dev);
     }
 
-    if ( start_info.dom_id == 0 )
+    if ( start_info.flags & SIF_INITDOMAIN )
         (void)unregister_inetaddr_notifier(&notifier_inetdev);
 }
 

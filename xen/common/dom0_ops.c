@@ -22,21 +22,10 @@ extern unsigned int alloc_new_dom_mem(struct task_struct *, unsigned int);
 /* Basically used to protect the domain-id space. */
 static spinlock_t create_dom_lock = SPIN_LOCK_UNLOCKED;
 
-static unsigned int get_domnr(void)
+static domid_t get_domnr(void)
 {
-    static unsigned int domnr = 0;
-    struct task_struct *p;
-    int tries = 0;
-
-    for ( tries = 0; tries < 1024; tries++ )
-    {
-        domnr = (domnr+1) & ((1<<20)-1);
-        if ( (p = find_domain_by_id(domnr)) == NULL )
-            return domnr;
-        put_task_struct(p);
-    }
-
-    return 0;
+    static domid_t domnr = 0;
+    return ++domnr;
 }
 
 static int msr_cpu_mask;
@@ -101,7 +90,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         ret = -EINVAL;
         if ( p != NULL )
         {
-            if ( (p->flags & PF_CONSTRUCTED) != 0 )
+            if ( test_bit(PF_CONSTRUCTED, &p->flags) )
             {
                 wake_up(p);
                 reschedule(p);
@@ -122,7 +111,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     {
         struct task_struct *p;
         static unsigned int pro = 0;
-        unsigned int dom;
+        domid_t dom;
         ret = -ENOMEM;
         
         spin_lock_irq(&create_dom_lock);
@@ -137,8 +126,8 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
 	if ( op->u.createdomain.name[0] )
         {
-            strncpy (p->name, op->u.createdomain.name, MAX_DOMAIN_NAME);
-            p->name[MAX_DOMAIN_NAME - 1] = 0;
+            strncpy(p->name, op->u.createdomain.name, MAX_DOMAIN_NAME);
+            p->name[MAX_DOMAIN_NAME - 1] = '\0';
 	}
 
         ret = alloc_new_dom_mem(p, op->u.createdomain.memory_kb);
@@ -148,9 +137,9 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             goto exit_create;
         }
 
-        ret = p->domain;
+        ret = 0;
         
-        op->u.createdomain.domain = ret;
+        op->u.createdomain.domain = p->domain;
         copy_to_user(u_dom0_op, op, sizeof(*op));
  
     exit_create:
@@ -160,7 +149,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
     case DOM0_DESTROYDOMAIN:
     {
-        unsigned int dom = op->u.destroydomain.domain;
+        domid_t dom = op->u.destroydomain.domain;
         int force = op->u.destroydomain.force;
         ret = (dom == IDLE_DOMAIN_ID) ? -EPERM : kill_other_domain(dom, force);
     }
@@ -214,7 +203,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
     case DOM0_ADJUSTDOM:
     {
-        unsigned int   dom     = op->u.adjustdom.domain;
+        domid_t        dom     = op->u.adjustdom.domain;
         unsigned long  mcu_adv = op->u.adjustdom.mcu_adv;
         unsigned long  warp    = op->u.adjustdom.warp;
         unsigned long  warpl   = op->u.adjustdom.warpl;
@@ -303,7 +292,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
                 memcpy(&op->u.getdomaininfo.ctxt.i386_ctxt, 
                        &p->shared_info->execution_context,
                        sizeof(p->shared_info->execution_context));
-                if ( p->flags & PF_DONEFPUINIT )
+                if ( test_bit(PF_DONEFPUINIT, &p->flags) )
                     op->u.getdomaininfo.ctxt.flags |= ECF_I387_VALID;
                 memcpy(&op->u.getdomaininfo.ctxt.i387_ctxt,
                        &p->thread.i387,
@@ -354,7 +343,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     {
         struct pfn_info *page;
         unsigned long pfn = op->u.getpageframeinfo.pfn;
-        unsigned int dom = op->u.getpageframeinfo.domain;
+        domid_t dom = op->u.getpageframeinfo.domain;
         struct task_struct *p;
 
         ret = -EINVAL;
@@ -395,7 +384,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
     case DOM0_IOPL:
     {
-        extern long do_iopl(unsigned int, unsigned int);
+        extern long do_iopl(domid_t, unsigned int);
         ret = do_iopl(op->u.iopl.domain, op->u.iopl.iopl);
     }
     break;

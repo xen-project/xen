@@ -297,7 +297,7 @@ void do_settimeofday(struct timeval *tv)
 {
     struct timeval newtv;
     
-    if ( !independent_wallclock && (start_info.dom_id != 0) )
+    if ( !independent_wallclock && !(start_info.flags & SIF_INITDOMAIN) )
         return;
     
     write_lock_irq(&xtime_lock);
@@ -333,7 +333,7 @@ void do_settimeofday(struct timeval *tv)
     last_update_from_xen = 0;
 
 #ifdef CONFIG_XENO_PRIV
-    if ( start_info.dom_id == 0 )
+    if ( start_info.flags & SIF_INITDOMAIN )
     {
         dom0_op_t op;
         last_update_to_rtc = last_update_to_xen = 0;
@@ -445,7 +445,8 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
     }
 
 #ifdef CONFIG_XENO_PRIV
-	if ( (start_info.dom_id == 0) && ((time_status & STA_UNSYNC) == 0) )
+	if ( (start_info.flags & SIF_INITDOMAIN) && 
+         ((time_status & STA_UNSYNC) == 0) )
     {
         /* Send synchronised time to Xen approximately every minute. */
         if ( xtime.tv_sec > (last_update_to_xen + 60) )

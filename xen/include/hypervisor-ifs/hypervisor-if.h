@@ -185,6 +185,10 @@
 
 #ifndef __ASSEMBLY__
 
+typedef u64 domid_t;
+/* DOMID_SELF is used in certain contexts to refer to oneself. */
+#define DOMID_SELF (~1ULL)
+
 #include "network.h"
 #include "block.h"
 
@@ -334,7 +338,6 @@ typedef struct start_info_st {
     /* THE FOLLOWING ARE FILLED IN BOTH ON INITIAL BOOT AND ON RESUME.     */
     unsigned long nr_pages;	  /* total pages allocated to this domain. */
     unsigned long shared_info;	  /* MACHINE address of shared info struct.*/
-    unsigned long dom_id;         /* Domain identifier.                    */
     unsigned long flags;          /* SIF_xxx flags.                        */
     /* THE FOLLOWING ARE ONLY FILLED IN ON INITIAL BOOT (NOT RESUME).      */
     unsigned long pt_base;	  /* VIRTUAL address of page directory.    */
@@ -345,7 +348,7 @@ typedef struct start_info_st {
 
 /* These flags are passed in the 'flags' field of start_info_t. */
 #define SIF_PRIVILEGED 1          /* Is the domain privileged? */
-#define SIF_CONSOLE    2          /* Does the domain own the physical console? */
+#define SIF_INITDOMAIN 2          /* Is thsi the initial control domain? */
 
 /* For use in guest OSes. */
 extern shared_info_t *HYPERVISOR_shared_info;

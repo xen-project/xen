@@ -10,7 +10,8 @@
 
 int xc_domain_create(int xc_handle,
                      unsigned int mem_kb, 
-                     const char *name)
+                     const char *name,
+                     domid_t *pdomid)
 {
     int err;
     dom0_op_t op;
@@ -20,14 +21,15 @@ int xc_domain_create(int xc_handle,
     strncpy(op.u.createdomain.name, name, MAX_DOMAIN_NAME);
     op.u.createdomain.name[MAX_DOMAIN_NAME-1] = '\0';
 
-    err = do_dom0_op(xc_handle, &op);
+    if ( (err = do_dom0_op(xc_handle, &op)) == 0 )
+        *pdomid = op.u.createdomain.domain;
 
-    return (err < 0) ? err : op.u.createdomain.domain;
+    return err;
 }    
 
 
 int xc_domain_start(int xc_handle,
-                    unsigned int domid)
+                    domid_t domid)
 {
     dom0_op_t op;
     op.cmd = DOM0_STARTDOMAIN;
@@ -37,7 +39,7 @@ int xc_domain_start(int xc_handle,
 
 
 int xc_domain_stop(int xc_handle, 
-                   unsigned int domid)
+                   domid_t domid)
 {
     dom0_op_t op;
     op.cmd = DOM0_STOPDOMAIN;
@@ -47,7 +49,7 @@ int xc_domain_stop(int xc_handle,
 
 
 int xc_domain_destroy(int xc_handle,
-                      unsigned int domid, 
+                      domid_t domid, 
                       int force)
 {
     dom0_op_t op;
@@ -58,8 +60,8 @@ int xc_domain_destroy(int xc_handle,
 }
 
 int xc_domain_pincpu(int xc_handle,
-                      unsigned int domid, 
-                      int cpu)
+                     domid_t domid, 
+                     int cpu)
 {
     dom0_op_t op;
     op.cmd = DOM0_PINCPUDOMAIN;
@@ -70,11 +72,12 @@ int xc_domain_pincpu(int xc_handle,
 
 
 int xc_domain_getinfo(int xc_handle,
-                      unsigned int first_domid,
+                      domid_t first_domid,
                       unsigned int max_doms,
                       xc_dominfo_t *info)
 {
-    unsigned int nr_doms, next_domid = first_domid;
+    unsigned int nr_doms;
+    domid_t next_domid = first_domid;
     dom0_op_t op;
 
     for ( nr_doms = 0; nr_doms < max_doms; nr_doms++ )

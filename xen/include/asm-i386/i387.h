@@ -19,14 +19,13 @@ extern void save_init_fpu( struct task_struct *tsk );
 extern void restore_fpu( struct task_struct *tsk );
 
 #define unlazy_fpu( tsk ) do { \
-	if ( tsk->flags & PF_USEDFPU ) \
+	if ( test_bit(PF_USEDFPU, &tsk->flags) ) \
 		save_init_fpu( tsk ); \
 } while (0)
 
 #define clear_fpu( tsk ) do { \
-	if ( tsk->flags & PF_USEDFPU ) { \
+	if ( test_and_clear_bit(PF_USEDFPU, &tsk->flags) ) { \
 		asm volatile("fwait"); \
-		tsk->flags &= ~PF_USEDFPU; \
 		stts(); \
 	} \
 } while (0)

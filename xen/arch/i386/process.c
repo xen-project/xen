@@ -289,7 +289,7 @@ void switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 
 
 /* XXX Currently the 'domain' field is ignored! XXX */
-long do_iopl(unsigned int domain, unsigned int new_io_pl)
+long do_iopl(domid_t domain, unsigned int new_io_pl)
 {
     execution_context_t *ec = get_execution_context();
     ec->eflags = (ec->eflags & 0xffffcfff) | ((new_io_pl&3) << 12);

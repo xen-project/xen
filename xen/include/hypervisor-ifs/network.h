@@ -135,31 +135,26 @@ typedef struct net_rule_st
     u16  src_port_mask;
     u16  dst_port_mask;
     u16  proto;
-    unsigned long src_vif;
-    unsigned long dst_vif;
+    domid_t      src_dom, dst_dom;
+    unsigned int src_idx, dst_idx;
     u16  action;
 } net_rule_t;
 
-#define VIF_DOMAIN_MASK  0xfffff000UL
-#define VIF_DOMAIN_SHIFT 12
-#define VIF_INDEX_MASK   0x00000fffUL
-#define VIF_INDEX_SHIFT  0
-
-/* These are specified in the index if the dom is SPECIAL. */
-#define VIF_SPECIAL      0xfffff000UL
-#define VIF_UNKNOWN_INTERFACE   (VIF_SPECIAL | 0)
-#define VIF_PHYSICAL_INTERFACE  (VIF_SPECIAL | 1)
-#define VIF_ANY_INTERFACE       (VIF_SPECIAL | 2)
+/* These are specified in the 'idx' if the 'dom' is SPECIAL. */
+#define VIF_SPECIAL             (~0ULL)
+#define VIF_UNKNOWN_INTERFACE   0
+#define VIF_PHYSICAL_INTERFACE  1
+#define VIF_ANY_INTERFACE       2
 
 typedef struct vif_query_st
 {
-    unsigned int    domain;
+    domid_t          domain;
     int             *buf;   /* reply buffer -- guest virtual address */
 } vif_query_t;
 
 typedef struct vif_getinfo_st
 {
-    unsigned int        domain;
+    domid_t             domain;
     unsigned int        vif;
 
     /* domain & vif are supplied by dom0, the rest are response fields */
@@ -179,7 +174,7 @@ typedef struct vif_getinfo_st
  */
 typedef struct vif_setparams_st
 {
-    unsigned int        domain;
+    domid_t             domain;
     unsigned int        vif;
     unsigned long       credit_bytes;
     unsigned long       credit_usec;

@@ -12,7 +12,7 @@
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED)
 #define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
 
-static long get_tot_pages(int xc_handle, int domid)
+static long get_tot_pages(int xc_handle, domid_t domid)
 {
     dom0_op_t op;
     op.cmd = DOM0_GETDOMAININFO;
@@ -22,7 +22,7 @@ static long get_tot_pages(int xc_handle, int domid)
 }
 
 static int get_pfn_list(int xc_handle,
-                        int domid, 
+                        domid_t domid, 
                         unsigned long *pfn_buf, 
                         unsigned long max_pfns)
 {
@@ -96,7 +96,7 @@ static int copy_to_domain_page(int pm_handle,
 }
 
 static int setup_guestos(int xc_handle,
-                         int dom, 
+                         domid_t dom, 
                          gzFile kernel_gfd, 
                          gzFile initrd_gfd, 
                          unsigned long tot_pages,
@@ -282,7 +282,6 @@ static int setup_guestos(int xc_handle,
     start_info->mod_len     = initrd_len;
     start_info->nr_pages    = tot_pages;
     start_info->shared_info = shared_info_frame << PAGE_SHIFT;
-    start_info->dom_id      = dom;
     start_info->flags       = 0;
     strncpy(start_info->cmd_line, cmdline, MAX_CMD_LEN);
     start_info->cmd_line[MAX_CMD_LEN-1] = '\0';
@@ -313,7 +312,7 @@ static int setup_guestos(int xc_handle,
 }
 
 int xc_linux_build(int xc_handle,
-                   unsigned int domid,
+                   domid_t domid,
                    const char *image_name,
                    const char *ramdisk_name,
                    const char *cmdline)

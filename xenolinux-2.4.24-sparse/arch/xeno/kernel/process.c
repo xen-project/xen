@@ -394,7 +394,7 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
     {
         dom0_op_t op;
         op.cmd           = DOM0_IOPL;
-        op.u.iopl.domain = start_info.dom_id;
+        op.u.iopl.domain = DOMID_SELF;
         op.u.iopl.iopl   = next->io_pl;
         queue_multicall1(__HYPERVISOR_dom0_op, (unsigned long)&op);
     }

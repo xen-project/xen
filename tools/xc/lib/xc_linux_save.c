@@ -40,7 +40,7 @@
 
 static int check_pfn_ownership(int xc_handle, 
                                unsigned long mfn, 
-                               unsigned int dom)
+                               domid_t dom)
 {
     dom0_op_t op;
     op.cmd = DOM0_GETPAGEFRAMEINFO;
@@ -52,7 +52,7 @@ static int check_pfn_ownership(int xc_handle,
 #define GETPFN_ERR (~0U)
 static unsigned int get_pfn_type(int xc_handle, 
                                  unsigned long mfn, 
-                                 unsigned int dom)
+                                 domid_t dom)
 {
     dom0_op_t op;
     op.cmd = DOM0_GETPAGEFRAMEINFO;
@@ -75,7 +75,7 @@ static int checked_write(gzFile fd, void *buf, size_t count)
 }
 
 int xc_linux_save(int xc_handle,
-                  unsigned int domid, 
+                  domid_t domid, 
                   const char *state_file, 
                   int verbose)
 {

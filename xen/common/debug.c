@@ -23,9 +23,10 @@
 
 /****************************************************************************/
 
-extern int pdb_change_values (int domain, u_char *buffer, unsigned long addr,
-                              int length, int rw);
-extern u_char pdb_linux_get_value (int domain, int pid, unsigned long addr);
+extern int pdb_change_values(domid_t domain, 
+                             u_char *buffer, unsigned long addr,
+                             int length, int rw);
+extern u_char pdb_linux_get_value(domid_t domain, int pid, unsigned long addr);
 
 /*
  * Set memory in a domain's address space
@@ -35,7 +36,8 @@ extern u_char pdb_linux_get_value (int domain, int pid, unsigned long addr);
  * THIS WILL BECOME A MACRO
  */
 
-int pdb_set_values (int domain, u_char *buffer, unsigned long addr, int length)
+int pdb_set_values(domid_t domain, 
+                   u_char *buffer, unsigned long addr, int length)
 {
     int count = pdb_change_values(domain, buffer, addr, length, 2);
 
@@ -63,7 +65,8 @@ int pdb_set_values (int domain, u_char *buffer, unsigned long addr, int length)
  * THIS WILL BECOME A MACRO
  */
 
-int pdb_get_values (int domain, u_char *buffer, unsigned long addr, int length)
+int pdb_get_values(domid_t domain, 
+                   u_char *buffer, unsigned long addr, int length)
 {
     return pdb_change_values(domain, buffer, addr, length, 1);
 }
@@ -75,8 +78,8 @@ int pdb_get_values (int domain, u_char *buffer, unsigned long addr, int length)
  * RW: 1 = read, 2 = write
  */
 
-int pdb_change_values (int domain, u_char *buffer, unsigned long addr,
-		       int length, int rw)
+int pdb_change_values(domid_t domain, u_char *buffer, unsigned long addr,
+                      int length, int rw)
 {
     struct task_struct *p;
     l2_pgentry_t* l2_table = NULL;
@@ -166,7 +169,7 @@ void pdb_do_debug (dom0_op_t *op)
 {
     op->u.debug.status = 0;
 
-    TRC(printk("PDB: op:%c, dom:%x, in1:%x, in2:%x, in3:%x, in4:%x\n",
+    TRC(printk("PDB: op:%c, dom:%llu, in1:%x, in2:%x, in3:%x, in4:%x\n",
 	       op->u.debug.opcode, op->u.debug.domain,
 	       op->u.debug.in1, op->u.debug.in2,
 	       op->u.debug.in3, op->u.debug.in4));
@@ -186,7 +189,7 @@ void pdb_do_debug (dom0_op_t *op)
 	    struct task_struct * p = find_domain_by_id(op->u.debug.domain);
 	    if ( p != NULL )
 	    {
-	        if ( (p->flags & PF_CONSTRUCTED) != 0 )
+	        if ( test_bit(PF_CONSTRUCTED, &p->flags) )
 		{
 		    wake_up(p);
 		    reschedule(p);

@@ -22,6 +22,7 @@ static unsigned char readbuf[1024];
 /* Helpers, implemented at the bottom. */
 u32 getipaddr(const char *buff, unsigned int len);
 u16 antous(const char *buff, int len);
+u64 antoull(const char *buff, int len);
 int anton(const char *buff, int len);
 
 static int vfr_read_proc(char *page, char **start, off_t off,
@@ -141,11 +142,14 @@ static int vfr_write_proc(struct file *file, const char *buffer,
         /* NB. Prefix matches must go first! */
         if (strncmp(&buffer[fs], "src", fl) == 0)
         {
-            op.u.net_rule.src_vif = VIF_ANY_INTERFACE;
+
+            op.u.net_rule.src_dom = VIF_SPECIAL;
+            op.u.net_rule.src_idx = VIF_ANY_INTERFACE;
         }
         else if (strncmp(&buffer[fs], "dst", fl) == 0)
         {
-            op.u.net_rule.dst_vif = VIF_PHYSICAL_INTERFACE;
+            op.u.net_rule.dst_dom = VIF_SPECIAL;
+            op.u.net_rule.dst_idx = VIF_PHYSICAL_INTERFACE;
         }
         else if (strncmp(&buffer[fs], "srcaddr", fl) == 0) 
         {  
@@ -181,19 +185,19 @@ static int vfr_write_proc(struct file *file, const char *buffer,
         }
         else if (strncmp(&buffer[fs], "srcdom", fl) == 0)
         {
-            op.u.net_rule.src_vif |= anton(&buffer[ts], tl)<<VIF_DOMAIN_SHIFT;
+            op.u.net_rule.src_dom = antoull(&buffer[ts], tl);
         }
         else if (strncmp(&buffer[fs], "srcidx", fl) == 0)
         {
-            op.u.net_rule.src_vif |= anton(&buffer[ts], tl);
+            op.u.net_rule.src_idx = anton(&buffer[ts], tl);
         }
         else if (strncmp(&buffer[fs], "dstdom", fl) == 0)
         {
-            op.u.net_rule.dst_vif |= anton(&buffer[ts], tl)<<VIF_DOMAIN_SHIFT;
+            op.u.net_rule.dst_dom = antoull(&buffer[ts], tl);
         }
         else if (strncmp(&buffer[fs], "dstidx", fl) == 0)
         {
-            op.u.net_rule.dst_vif |= anton(&buffer[ts], tl);
+            op.u.net_rule.dst_idx = anton(&buffer[ts], tl);
         }
         else if ( (strncmp(&buffer[fs], "proto", fl) == 0))
         {	
@@ -275,6 +279,23 @@ int anton(const char *buff, int len)
 u16 antous(const char *buff, int len)
 {
     u16 ret;
+    char c;
+
+    ret = 0;
+
+    while ( (len) && ((c = *buff) >= '0') && (c <= '9') )
+    {
+        ret *= 10;
+        ret += c - '0';
+        buff++; len--;
+    }
+
+    return ret;
+}
+
+u64 antoull(const char *buff, int len)
+{
+    u64 ret;
     char c;
 
     ret = 0;

@@ -32,43 +32,43 @@ typedef struct _xen_extent {
 
   
 typedef struct _vbd_create { 
-    unsigned     domain;              /* create VBD for this domain */
+    domid_t      domain;              /* create VBD for this domain */
     u16          vdevice;             /* id by which dom will refer to VBD */ 
     u16          mode;                /* OR of { VBD_MODE_R , VBD_MODE_W } */
 } vbd_create_t; 
 
 typedef struct _vbd_grow { 
-    unsigned     domain;              /* domain in question */
+    domid_t      domain;              /* domain in question */
     u16          vdevice;             /* 16 bit id domain refers to VBD as */
     xen_extent_t extent;              /* the extent to add to this VBD */
 } vbd_grow_t; 
 
 typedef struct _vbd_shrink { 
-    unsigned     domain;              /* domain in question */
+    domid_t      domain;              /* domain in question */
     u16          vdevice;             /* 16 bit id domain refers to VBD as */
 } vbd_shrink_t; 
 
 typedef struct _vbd_setextents { 
-    unsigned     domain;              /* domain in question */
+    domid_t      domain;              /* domain in question */
     u16          vdevice;             /* 16 bit id domain refers to VBD as */
     u16          nr_extents;          /* number of extents in the list */
     xen_extent_t *extents;            /* the extents to add to this VBD */
 } vbd_setextents_t; 
 
 typedef struct _vbd_delete {          
-    unsigned     domain;              /* domain in question */
+    domid_t      domain;              /* domain in question */
     u16          vdevice;             /* 16 bit id domain refers to VBD as */
 } vbd_delete_t; 
 
-#define VBD_PROBE_ALL 0xFFFFFFFF
+#define VBD_PROBE_ALL (~0ULL)
 typedef struct _vbd_probe { 
-    unsigned         domain;          /* domain in question or VBD_PROBE_ALL */
+    domid_t          domain;          /* domain in question or VBD_PROBE_ALL */
     xen_disk_info_t  xdi;             /* where's our space for VBD/disk info */
 } vbd_probe_t; 
 
 typedef struct _vbd_info { 
     /* IN variables  */
-    unsigned      domain;             /* domain in question */
+    domid_t       domain;             /* domain in question */
     u16           vdevice;            /* 16 bit id domain refers to VBD as */ 
     u16           maxextents;         /* max # of extents to return info for */
     xen_extent_t *extents;            /* pointer to space for extent list */

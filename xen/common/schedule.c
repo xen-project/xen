@@ -306,7 +306,7 @@ long sched_bvtctl(unsigned long c_allow)
 }
 
 /* Adjust scheduling parameter for a given domain. */
-long sched_adjdom(int dom, unsigned long mcu_adv, unsigned long warp, 
+long sched_adjdom(domid_t dom, unsigned long mcu_adv, unsigned long warp, 
                  unsigned long warpl, unsigned long warpu)
 {
     struct task_struct *p;
@@ -512,6 +512,7 @@ asmlinkage void __enter_scheduler(void)
      * 'next_prime's evt. Take context switch allowance into account.
      */
     ASSERT(next_prime->evt >= next->evt);
+    
     r_time = ((next_prime->evt - next->evt)/next->mcu_advance) + ctx_allow;
 
  sched_done:
@@ -697,7 +698,8 @@ static void dump_rqueue(struct list_head *queue, char *name)
             (unsigned long) queue->next, (unsigned long) queue->prev);
     list_for_each (list, queue) {
         p = list_entry(list, struct task_struct, run_list);
-        printk("%3d: %3d has=%c mcua=0x%04lX ev=0x%08X av=0x%08X c=0x%X%08X\n",
+        printk("%3d: %llu has=%c mcua=0x%04lX"
+               " ev=0x%08X av=0x%08X c=0x%X%08X\n",
                loop++, p->domain,
                p->has_cpu ? 'T':'F',
                p->mcu_advance, p->evt, p->avt,

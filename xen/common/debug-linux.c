@@ -32,11 +32,13 @@
 
 
 /* adapted from asm-xeno/page.h */
-static inline unsigned long machine_to_phys(int domain, unsigned long machine)
+static inline unsigned long machine_to_phys(domid_t domain, 
+                                            unsigned long machine)
 {
   unsigned long phys;
   pdb_get_values(domain, (u_char *) &phys,
-		 (unsigned long) machine_to_phys_mapping + (machine >> PAGE_SHIFT) * 4,
+		 (unsigned long) machine_to_phys_mapping + 
+                 (machine >> PAGE_SHIFT) * 4,
 		 sizeof(phys));
   phys = (phys << PAGE_SHIFT) | (machine & ~PAGE_MASK);
   return phys;
@@ -61,7 +63,7 @@ static inline unsigned long machine_to_phys(int domain, unsigned long machine)
 */
 
 /* read a byte from a process */
-u_char pdb_linux_get_value (int domain, int pid, unsigned long addr)
+u_char pdb_linux_get_value(domid_t domain, int pid, unsigned long addr)
 {
   u_char result = 0;
   unsigned long task_struct_p, mm_p, pgd, task_struct_pid;
@@ -90,7 +92,7 @@ u_char pdb_linux_get_value (int domain, int pid, unsigned long addr)
   if (task_struct_p == (unsigned long)NULL)
   {
     /* oops */
-    printk ("error: couldn't find process 0x%x in domain %d\n", pid, domain);
+    printk ("error: couldn't find process 0x%x in domain %llu\n", pid, domain);
     return 0;
   }
 
