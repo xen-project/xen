@@ -97,6 +97,10 @@ gopts.var('memory', val='MEMORY',
           fn=set_value, default=128,
           use="Domain memory in MB.")
 
+gopts.var('weight', val='WEIGHT',
+          fn=set_value, default=1,
+          use="Domain cpu weight (default=1).")
+
 gopts.var('console', val='PORT',
           fn=set_int, default=None,
           use="Console port to use. Default is 9600 + domain id.")
@@ -295,7 +299,8 @@ def make_config(vals):
     
     config = ['vm',
               ['name', vals.name ],
-              ['memory', vals.memory ] ]
+              ['memory', vals.memory ],
+              ['weight', vals.weight] ]
     if vals.cpu:
         config.append(['cpu', vals.cpu])
     if vals.blkif:
