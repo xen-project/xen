@@ -12,7 +12,7 @@ def blkdev_name_to_number(name):
 
 
 # lookup_blkdev_partn_info( '/dev/sda3' )
-def lookup_blkdev_partn_info(partition):
+def lookup_raw_partn(partition):
     """Take the given block-device name (e.g., '/dev/sda1', 'hda')
     and return a information tuple ( partn-dev, disc-dev, start-sect,
     nr-sects, type )
@@ -32,11 +32,10 @@ def lookup_blkdev_partn_info(partition):
         fd = os.popen( '/sbin/sfdisk -s ' + drive + ' 2>/dev/null' )
         line = fd.readline()
         if line:
-            return ( blkdev_name_to_number(drive),
-                     blkdev_name_to_number(drive),
+            return [( blkdev_name_to_number(drive),
                      0,
                      string.atol(line) * 2,
-                     'Disk' )
+                     'Disk' )]
         return None
 
     # determine position on disk
@@ -48,13 +47,21 @@ def lookup_blkdev_partn_info(partition):
         m = re.search( '^' + partition + '\s*: start=\s*([0-9]+), ' +
                        'size=\s*([0-9]+), Id=\s*(\S+).*$', line)
         if m:
-            return ( blkdev_name_to_number(partition),
-                     blkdev_name_to_number(drive),
+            return [( blkdev_name_to_number(drive),
                      string.atol(m.group(1)),
                      string.atol(m.group(2)),
-                     m.group(3) )
+                     m.group(3) )]
     return None
 
+def lookup_disk_uname( uname ):
+    ( type, d_name ) = string.split( uname, ':' )
+
+    if type == "phy":
+	segments = lookup_raw_partn( d_name )
+    elif type == "vd":
+	segments = lookup_vd( d_name )
+
+    return segments
 
 def get_current_ipaddr(dev='eth0'):
     """Return a string containing the primary IP address for the given
