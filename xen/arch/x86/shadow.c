@@ -590,10 +590,10 @@ static void alloc_monitor_pagetable(struct exec_domain *ed)
     struct pfn_info *mmfn_info;
     struct domain *d = ed->domain;
 
-    ASSERT(!pagetable_val(ed->arch.monitor_table)); /* we should only get called once */
+    ASSERT(pagetable_val(ed->arch.monitor_table) == 0);
 
     mmfn_info = alloc_domheap_page(NULL);
-    ASSERT( mmfn_info ); 
+    ASSERT(mmfn_info != NULL);
 
     mmfn = (unsigned long) (mmfn_info - frame_table);
     mpl2e = (l2_pgentry_t *) map_domain_mem(mmfn << PAGE_SHIFT);
@@ -2756,7 +2756,7 @@ int _check_pagetable(struct exec_domain *ed, char *s)
     shadow_lock(d);
 
     sh_check_name = s;
-    SH_VVLOG("%s-PT Audit", s);
+    //SH_VVLOG("%s-PT Audit", s);
     sh_l2_present = sh_l1_present = 0;
     perfc_incrc(check_pagetable);
 
@@ -2802,8 +2802,10 @@ int _check_pagetable(struct exec_domain *ed, char *s)
     unmap_domain_mem(spl2e);
     unmap_domain_mem(gpl2e);
 
+#if 0
     SH_VVLOG("PT verified : l2_present = %d, l1_present = %d",
              sh_l2_present, sh_l1_present);
+#endif
 
  out:
     if ( errors )

@@ -222,11 +222,11 @@ struct out_of_sync_entry {
 #define SHADOW_SNAPSHOT_ELSEWHERE (-1L)
 
 /************************************************************************/
-#define SHADOW_DEBUG 0
-#define SHADOW_VERBOSE_DEBUG 0
-#define SHADOW_VVERBOSE_DEBUG 0
-#define SHADOW_HASH_DEBUG 0
-#define FULLSHADOW_DEBUG 0
+#define SHADOW_DEBUG 1
+#define SHADOW_VERBOSE_DEBUG 1
+#define SHADOW_VVERBOSE_DEBUG 1
+#define SHADOW_HASH_DEBUG 1
+#define FULLSHADOW_DEBUG 1
 
 #if SHADOW_DEBUG
 extern int shadow_status_noswap;
@@ -373,7 +373,7 @@ update_hl2e(struct exec_domain *ed, unsigned long va)
     if ( need_flush )
     {
         perfc_incrc(update_hl2e_invlpg);
-        __flush_tlb_one(&linear_pg_table[l1_linear_offset(va)]);
+        local_flush_tlb_one(&linear_pg_table[l1_linear_offset(va)]);
     }
 }
 
@@ -959,7 +959,7 @@ static inline unsigned long ___shadow_status(
                 perfc_incrc(shadow_status_hit_head);
             }
 
-            SH_VVLOG("lookup gpfn=%p => status=%p", key, head->smfn);
+            //SH_VVLOG("lookup gpfn=%p => status=%p", key, head->smfn);
             return head->smfn;
         }
 
@@ -968,7 +968,7 @@ static inline unsigned long ___shadow_status(
     }
     while ( x != NULL );
 
-    SH_VVLOG("lookup gpfn=%p => status=0", key);
+    //SH_VVLOG("lookup gpfn=%p => status=0", key);
     perfc_incrc(shadow_status_miss);
     return 0;
 }

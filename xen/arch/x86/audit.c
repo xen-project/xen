@@ -683,7 +683,7 @@ void _audit_domain(struct domain *d, int flags)
 
     if ( d != current->domain )
         domain_pause(d);
-    synchronise_pagetables(~0UL);
+    sync_lazy_execstate_all();
 
     // Maybe we should just be using BIGLOCK?
     //

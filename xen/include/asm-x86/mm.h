@@ -246,7 +246,8 @@ int check_descriptor(struct desc_struct *d);
 #undef  machine_to_phys_mapping
 #define machine_to_phys_mapping ((u32 *)RDWR_MPT_VIRT_START)
 #define INVALID_M2P_ENTRY        (~0U)
-#define IS_INVALID_M2P_ENTRY(_e) (!!((_e) & (1U<<31)))
+#define VALID_M2P(_e)            (!((_e) & (1U<<31)))
+#define IS_INVALID_M2P_ENTRY(_e) (!VALID_M2P(_e))
 
 /*
  * The phys_to_machine_mapping is the reversed mapping of MPT for full

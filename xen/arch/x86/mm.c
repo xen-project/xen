@@ -199,8 +199,7 @@ void write_ptbase(struct exec_domain *ed)
     write_cr3(pagetable_val(ed->arch.monitor_table));
 }
 
-
-static inline void invalidate_shadow_ldt(struct exec_domain *d)
+void invalidate_shadow_ldt(struct exec_domain *d)
 {
     int i;
     unsigned long pfn;
@@ -1306,6 +1305,7 @@ int new_guest_cr3(unsigned long mfn)
 static void process_deferred_ops(unsigned int cpu)
 {
     unsigned int deferred_ops;
+    struct domain *d = current->domain;
 
     deferred_ops = percpu_info[cpu].deferred_ops;
     percpu_info[cpu].deferred_ops = 0;
@@ -1462,6 +1462,9 @@ int do_mmuext_op(
             type = PGT_l1_page_table | PGT_va_mutable;
 
         pin_page:
+            if ( shadow_mode_enabled(FOREIGNDOM) )
+                type = PGT_writable_page;
+
             okay = get_page_and_type_from_pagenr(op.mfn, type, FOREIGNDOM);
             if ( unlikely(!okay) )
             {
@@ -1516,6 +1519,7 @@ int do_mmuext_op(
 
         case MMUEXT_NEW_BASEPTR:
             okay = new_guest_cr3(op.mfn);
+            percpu_info[cpu].deferred_ops &= ~DOP_FLUSH_TLB;
             break;
         
 #ifdef __x86_64__
@@ -1542,6 +1546,8 @@ int do_mmuext_op(
             break;
     
         case MMUEXT_INVLPG_LOCAL:
+            if ( shadow_mode_enabled(d) )
+                shadow_invlpg(ed, op.linear_addr);
             local_flush_tlb_one(op.linear_addr);
             break;
 
@@ -1556,17 +1562,25 @@ int do_mmuext_op(
             }
             pset = vcpuset_to_pcpuset(d, vset);
             if ( op.cmd == MMUEXT_TLB_FLUSH_MULTI )
+            {
+                BUG_ON(shadow_mode_enabled(d) && ((pset & d->cpuset) != (1<<cpu)));
                 flush_tlb_mask(pset & d->cpuset);
+            }
             else
+            {
+                BUG_ON(shadow_mode_enabled(d) && ((pset & d->cpuset) != (1<<cpu)));
                 flush_tlb_one_mask(pset & d->cpuset, op.linear_addr);
+            }
             break;
         }
 
         case MMUEXT_TLB_FLUSH_ALL:
+            BUG_ON(shadow_mode_enabled(d) && (d->cpuset != (1<<cpu)));
             flush_tlb_mask(d->cpuset);
             break;
     
         case MMUEXT_INVLPG_ALL:
+            BUG_ON(shadow_mode_enabled(d) && (d->cpuset != (1<<cpu)));
             flush_tlb_one_mask(d->cpuset, op.linear_addr);
             break;
 
@@ -1584,6 +1598,15 @@ int do_mmuext_op(
 
         case MMUEXT_SET_LDT:
         {
+            if ( shadow_mode_external(d) )
+            {
+                // ignore this request from an external domain...
+                MEM_LOG("ignoring SET_LDT hypercall from external "
+                        "domain %u\n", d->id);
+                okay = 0;
+                break;
+            }
+
             unsigned long ptr  = op.linear_addr;
             unsigned long ents = op.nr_ents;
             if ( ((ptr & (PAGE_SIZE-1)) != 0) || 
@@ -1732,7 +1755,7 @@ int do_mmu_update(
     unsigned int foreigndom)
 {
     mmu_update_t req;
-    unsigned long va = 0, pfn, prev_pfn = 0;
+    unsigned long va = 0, mfn, prev_mfn = 0, gpfn;
     struct pfn_info *page;
     int rc = 0, okay = 1, i = 0, cpu = smp_processor_id();
     unsigned int cmd, done = 0;
@@ -1746,9 +1769,6 @@ int do_mmu_update(
 
     if ( unlikely(shadow_mode_enabled(d)) )
         check_pagetable(ed, "pre-mmu"); /* debug */
-
-    if ( unlikely(shadow_mode_translate(d)) )
-        domain_crash_synchronous();
 
     if ( unlikely(count & MMU_UPDATE_PREEMPTED) )
     {
@@ -1875,7 +1895,8 @@ int do_mmu_update(
                             __mark_dirty(d, mfn);
 
                         gpfn = __mfn_to_gpfn(d, mfn);
-                        ASSERT(gpfn);
+                        ASSERT(VALID_M2P(gpfn));
+
                         if ( page_is_page_table(page) )
                             shadow_mark_mfn_out_of_sync(ed, gpfn, mfn);
                     }
@@ -2012,7 +2033,10 @@ int update_shadow_va_mapping(unsigned long va,
 
     if ( unlikely(__put_user(val, &l1_pgentry_val(
                                  linear_pg_table[l1_linear_offset(va)]))) )
-        return -EINVAL;
+    {
+        rc = -EINVAL;
+        goto out;
+    }
 
     // also need to update the shadow
 
@@ -2027,6 +2051,7 @@ int update_shadow_va_mapping(unsigned long va,
     if ( shadow_mode_log_dirty(d) )
         mark_dirty(d, va_to_l1mfn(ed, va));
 
+ out:
     shadow_unlock(d);
     check_pagetable(ed, "post-va"); /* debug */
 
@@ -2658,8 +2683,8 @@ int ptwr_do_page_fault(unsigned long addr)
     u32                 l2_idx;
     struct exec_domain *ed = current;
 
-    // not supported in combination with various shadow modes!
-    ASSERT( !shadow_mode_enabled(ed->domain) );
+    if ( unlikely(shadow_mode_enabled(ed->domain)) )
+        return 0;
 
     /*
      * Attempt to read the PTE that maps the VA being accessed. By checking for
