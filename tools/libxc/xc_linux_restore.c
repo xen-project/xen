@@ -214,7 +214,8 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
     if ( xc_domain_setinitialmem(xc_handle, dom, 
                                  nr_pfns * (PAGE_SIZE / 1024)) )
     {
-        xcio_error(ioctxt, "Could not set domain initial memory");
+        xcio_error(ioctxt, "Could not set domain %d initial memory. pfns=%d, %dKB",
+		   dom, nr_pfns,nr_pfns * (PAGE_SIZE / 1024));
         goto out;
     }
 

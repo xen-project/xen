@@ -16,9 +16,11 @@ docs/*.aux
 docs/*.log
 docs/*.pdf
 docs/*.ps
+docs/*.dvi
 docs/*.toc
 docs/interface/*
 docs/user/*
+docs/xend/*
 extras/mini-os/h/hypervisor-ifs
 install
 install/*
@@ -51,4 +53,3 @@ xen/tools/figlet/figlet
 xen/xen
 xen/xen-syms
 xen/xen.*
-xen/common/sched_atropos.c.smh
