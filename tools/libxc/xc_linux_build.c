@@ -538,7 +538,7 @@ static int parseelfimage(char *elfbase,
             return -EINVAL;
         }
 
-        if ( (strstr(guestinfo, "XEN_VER=2.0") == NULL) )
+        if ( (strstr(guestinfo, "XEN_VER=3.0") == NULL) )
         {
             ERROR("Will only load images built for Xen v2.0");
             ERROR("Actually saw: '%s'", guestinfo);

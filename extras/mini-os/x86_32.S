@@ -1,7 +1,7 @@
 #include <os.h>
 
 .section __xen_guest
-        .asciz  "XEN_VER=2.0,LOADER=generic,PT_MODE_WRITABLE"
+        .asciz  "XEN_VER=3.0,LOADER=generic,PT_MODE_WRITABLE"
 .text
 
 .globl _start, shared_info

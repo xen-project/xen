@@ -180,7 +180,7 @@
  * Xen guest identifier and loader selection
  */
 .section __xen_guest
-	.ascii	"GUEST_OS=netbsd,GUEST_VER=2.0,XEN_VER=2.0"
+	.ascii	"GUEST_OS=netbsd,GUEST_VER=2.0,XEN_VER=3.0"
 	.ascii	",LOADER=generic"
 #if (NKSYMS || defined(DDB) || defined(LKM)) && !defined(SYMTAB_SPACE)
 	.ascii	",BSD_SYMTAB"
