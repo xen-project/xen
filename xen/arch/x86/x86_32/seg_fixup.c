@@ -225,8 +225,7 @@ int fixup_seg(u16 seg, int positive_access)
         if ( ((base + limit) < PAGE_SIZE) && positive_access )
         {
             /* Flip to expands-up. */
-            limit >>= 12;
-            limit -= (-PAGE_OFFSET/PAGE_SIZE) + 2;
+            limit = PAGE_OFFSET - base;
             goto flip;
         }
     }
@@ -236,8 +235,7 @@ int fixup_seg(u16 seg, int positive_access)
         if ( ((PAGE_OFFSET - (base + limit)) < PAGE_SIZE) && !positive_access )
         {
             /* Flip to expands-down. */
-            limit >>= 12;
-            limit += (-PAGE_OFFSET/PAGE_SIZE) + 0;
+            limit = -(base & PAGE_MASK);
             goto flip;
         }
     }
@@ -249,9 +247,10 @@ int fixup_seg(u16 seg, int positive_access)
     return 0;
 
  flip:
+    limit = (limit >> 12) - 1;
     a &= ~0x0ffff; a |= limit & 0x0ffff;
     b &= ~0xf0000; b |= limit & 0xf0000;
-    b ^= 1 << 10;
+    b ^= 1 << 10; /* grows-up <-> grows-down */
     /* NB. These can't fault. Checked readable above; must also be writable. */
     table[2*idx+0] = a;
     table[2*idx+1] = b;
