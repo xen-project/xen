@@ -115,7 +115,14 @@ typedef unsigned long memory_t;   /* Full-sized pointer/address/memory-size. */
 typedef unsigned long cpureg_t;   /* Full-sized register.                    */
 
 /*
- * Send an array of these to HYPERVISOR_set_trap_table()
+ * Send an array of these to HYPERVISOR_set_trap_table().
+ * N.B. As in x86/32 mode, the privilege level specifies which modes may enter
+ * a trap via a software interrupt. Since rings 1 and 2 are unavailable, we
+ * allocate privilege levels as follows:
+ *  Level == 0: Noone may enter
+ *  Level == 1: Kernel may enter
+ *  Level == 2: Kernel may enter
+ *  Level == 3: Everyone may enter
  */
 #define TI_GET_DPL(_ti)      ((_ti)->flags & 3)
 #define TI_GET_IF(_ti)       ((_ti)->flags & 4)

@@ -256,6 +256,7 @@ FIX6:   pushl %ebx
         orb   $TF_failsafe_return,EDOMAIN_thread_flags(%ebx)
         pop   %ebx
         jmp   FIX5
+.previous
 .section __pre_ex_table,"a"
 	.long FLT6,FIX6
 .previous

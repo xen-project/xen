@@ -12,4 +12,7 @@
 
 #define KERNEL_MODE(_e, _r) ((_e)->arch.flags & TF_kernel_mode)
 
+#define PERMIT_SOFTINT(_dpl, _e, _r) \
+    ((_dpl) >= (KERNEL_MODE(_e, _r) ? 1 : 3))
+
 #endif
