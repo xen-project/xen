@@ -22,6 +22,27 @@
 
 #define MAX_DOMAIN_NAME    16
 
+/************************************************************************/
+
+#define DOM0_GETMEMLIST        2
+typedef struct dom0_getmemlist_st
+{
+    /* IN variables. */
+    domid_t       domain;
+    unsigned long max_pfns;
+    void         *buffer;
+    /* OUT variables. */
+    unsigned long num_pfns;
+} dom0_getmemlist_t;
+
+#define DOM0_SCHEDCTL          6
+ /* struct sched_ctl_cmd is from sched-ctl.h   */
+typedef struct sched_ctl_cmd dom0_schedctl_t;
+
+#define DOM0_ADJUSTDOM         7
+/* struct sched_adjdom_cmd is from sched-ctl.h */
+typedef struct sched_adjdom_cmd dom0_adjustdom_t;
+
 #define DOM0_CREATEDOMAIN      8
 typedef struct dom0_createdomain_st 
 {
@@ -31,6 +52,14 @@ typedef struct dom0_createdomain_st
     /* OUT parameters. */
     domid_t      domain; 
 } dom0_createdomain_t;
+
+#define DOM0_DESTROYDOMAIN     9
+typedef struct dom0_destroydomain_st
+{
+    /* IN variables. */
+    domid_t      domain;
+    int          force;
+} dom0_destroydomain_t;
 
 #define DOM0_STARTDOMAIN      10
 typedef struct dom0_startdomain_st
@@ -46,42 +75,6 @@ typedef struct dom0_stopdomain_st
     domid_t domain;
 } dom0_stopdomain_t;
 
-#define DOM0_DESTROYDOMAIN     9
-typedef struct dom0_destroydomain_st
-{
-    /* IN variables. */
-    domid_t      domain;
-    int          force;
-} dom0_destroydomain_t;
-
-#define DOM0_GETMEMLIST        2
-typedef struct dom0_getmemlist_st
-{
-    /* IN variables. */
-    domid_t       domain;
-    unsigned long max_pfns;
-    void         *buffer;
-    /* OUT variables. */
-    unsigned long num_pfns;
-} dom0_getmemlist_t;
-
-#define DOM0_BUILDDOMAIN      13
-typedef struct dom0_builddomain_st
-{
-    /* IN variables. */
-    domid_t                  domain;
-    unsigned int             num_vifs;
-    full_execution_context_t ctxt;
-} dom0_builddomain_t;
-
-#define DOM0_SCHEDCTL            6
- /* struct sched_ctl_cmd is from sched-ctl.h   */
-typedef struct sched_ctl_cmd dom0_schedctl_t;
-
-#define DOM0_ADJUSTDOM         7
-/* struct sched_adjdom_cmd is from sched-ctl.h */
-typedef struct sched_adjdom_cmd dom0_adjustdom_t;
-
 #define DOM0_GETDOMAININFO    12
 typedef struct dom0_getdomaininfo_st
 {
@@ -95,22 +88,20 @@ typedef struct dom0_getdomaininfo_st
 #define DOMSTATE_STOPPED             1
     int state;
     int hyp_events;
-    unsigned int tot_pages;
+    unsigned int tot_pages, max_pages;
     long long cpu_time;
     unsigned long shared_info_frame;  /* MFN of shared_info struct */
     full_execution_context_t ctxt;
 } dom0_getdomaininfo_t;
 
-#define DOM0_GETPAGEFRAMEINFO 18
-typedef struct dom0_getpageframeinfo_st
+#define DOM0_BUILDDOMAIN      13
+typedef struct dom0_builddomain_st
 {
     /* IN variables. */
-    unsigned long pfn;     /* Machine page frame number to query.       */
-    domid_t domain;        /* To which domain does the frame belong?    */
-    /* OUT variables. */
-    /* Is the page PINNED to a type? */
-    enum { NONE, L1TAB, L2TAB, L3TAB, L4TAB } type;
-} dom0_getpageframeinfo_t;
+    domid_t                  domain;
+    unsigned int             num_vifs;
+    full_execution_context_t ctxt;
+} dom0_builddomain_t;
 
 #define DOM0_IOPL             14
 typedef struct dom0_iopl_st
@@ -152,6 +143,18 @@ typedef struct dom0_settime_st
     unsigned long secs, usecs;
     u64 system_time;
 } dom0_settime_t;
+
+#define DOM0_GETPAGEFRAMEINFO 18
+typedef struct dom0_getpageframeinfo_st
+{
+    /* IN variables. */
+    unsigned long pfn;     /* Machine page frame number to query.       */
+    domid_t domain;        /* To which domain does the frame belong?    */
+    /* OUT variables. */
+    /* Is the page PINNED to a type? */
+    enum { NONE, L1TAB, L2TAB, L3TAB, L4TAB } type;
+} dom0_getpageframeinfo_t;
+
 
 /*
  * Read console content from Xen buffer ring.
@@ -225,7 +228,7 @@ typedef struct dom0_sched_id_st
 /* 
  * Control shadow pagetables operation
  */
-#define DOM0_SHADOW_CONTROL   25
+#define DOM0_SHADOW_CONTROL  25
 
 #define DOM0_SHADOW_CONTROL_OP_OFF         0
 #define DOM0_SHADOW_CONTROL_OP_ENABLE_TEST 1
@@ -238,6 +241,30 @@ typedef struct dom0_shadow_control_st
     domid_t      domain;
     int          op;
 } dom0_shadow_control_t;
+
+#define DOM0_SETDOMAINNAME     26
+typedef struct dom0_setdomainname_st
+{
+    /* IN variables. */
+    domid_t      domain;
+    char         name[MAX_DOMAIN_NAME];    
+} dom0_setdomainname_t;
+
+#define DOM0_SETDOMAININITIALMEM   27
+typedef struct dom0_setdomaininitialmem_st
+{
+    /* IN variables. */
+    domid_t      domain;
+    unsigned int initial_memkb;  /* use before domain is built */
+} dom0_setdomaininitialmem_t;
+
+#define DOM0_SETDOMAINMAXMEM   28
+typedef struct dom0_setdomainmaxmem_st
+{
+    /* IN variables. */
+    domid_t      domain;
+    unsigned int max_memkb;
+} dom0_setdomainmaxmem_t;
 
 
 typedef struct dom0_op_st
@@ -267,6 +294,9 @@ typedef struct dom0_op_st
         dom0_pcidev_access_t    pcidev_access;
         dom0_sched_id_t         sched_id;
 	dom0_shadow_control_t   shadow_control;
+	dom0_setdomainname_t    setdomainname;
+	dom0_setdomaininitialmem_t setdomaininitialmem;
+	dom0_setdomainmaxmem_t  setdomainmaxmem;
     } u;
 } dom0_op_t;
 

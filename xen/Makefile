@@ -15,7 +15,7 @@ default: $(TARGET)
 	gzip -f -9 < $(TARGET) > $(TARGET).gz
 
 debug:	
-	objdump -D -S $(TARGET) > $(TARGET).s
+	objdump -D -S $(TARGET).dbg > $(TARGET).s
 
 install: $(TARGET)
 	gzip -f -9 < $(TARGET) > $(TARGET).gz

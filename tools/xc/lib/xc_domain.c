@@ -91,6 +91,7 @@ int xc_domain_getinfo(int xc_handle,
         info->has_cpu = op.u.getdomaininfo.has_cpu;
         info->stopped = (op.u.getdomaininfo.state == DOMSTATE_STOPPED);
         info->nr_pages = op.u.getdomaininfo.tot_pages;
+        info->max_memkb = op.u.getdomaininfo.max_pages<<(PAGE_SHIFT-10);
         info->shared_info_frame = op.u.getdomaininfo.shared_info_frame;
         info->cpu_time = op.u.getdomaininfo.cpu_time;
         strncpy(info->name, op.u.getdomaininfo.name, XC_DOMINFO_MAXNAME);
@@ -113,3 +114,37 @@ int xc_shadow_control(int xc_handle,
     op.u.shadow_control.op     = sop;
     return do_dom0_op(xc_handle, &op);
 }
+
+int xc_domain_setname(int xc_handle,
+                      u64 domid, 
+		      char *name)
+{
+    dom0_op_t op;
+    op.cmd = DOM0_SETDOMAINNAME;
+    op.u.setdomainname.domain = (domid_t)domid;
+    strncpy(op.u.setdomainname.name, name, MAX_DOMAIN_NAME);
+    return do_dom0_op(xc_handle, &op);
+}
+
+int xc_domain_setinitialmem(int xc_handle,
+			    u64 domid, 
+			    unsigned int initial_memkb)
+{
+    dom0_op_t op;
+    op.cmd = DOM0_SETDOMAININITIALMEM;
+    op.u.setdomaininitialmem.domain = (domid_t)domid;
+    op.u.setdomaininitialmem.initial_memkb = initial_memkb;
+    return do_dom0_op(xc_handle, &op);
+}
+
+int xc_domain_setmaxmem(int xc_handle,
+			    u64 domid, 
+			    unsigned int max_memkb)
+{
+    dom0_op_t op;
+    op.cmd = DOM0_SETDOMAINMAXMEM;
+    op.u.setdomainmaxmem.domain = (domid_t)domid;
+    op.u.setdomainmaxmem.max_memkb = max_memkb;
+    return do_dom0_op(xc_handle, &op);
+}
+
