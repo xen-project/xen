@@ -28,7 +28,7 @@ dist:	xen tools kernels docs
 	install -m0644 ./README $(DIST_DIR)
 	install -m0755 ./install.sh $(DIST_DIR)
 	mkdir -p $(DIST_DIR)/check
-	cp tools/check/chk /tools/check/check_* $(DIST_DIR)/check
+	install -m0755 tools/check/chk tools/check/check_* $(DIST_DIR)/check
 
 # install everything into the standard system directories
 # NB: install explicitly does not check that everything is up to date!
