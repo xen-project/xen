@@ -735,6 +735,7 @@
 3ddb79c3ezddh34MdelJpa5tNR00Dw xen/include/asm-x86/system.h
 3ddb79c4HugMq7IYGxcQKFBpKwKhzA xen/include/asm-x86/types.h
 40cf1596saFaHD5DC5zvrSn7CDCWGQ xen/include/asm-x86/uaccess.h
+418fbcfe_WliJPToeVM-9VStvym-hw xen/include/asm-x86/x86_32/asm_defns.h
 3ddb79c2ADvRmdexd9y3AYK9_NTx-Q xen/include/asm-x86/x86_32/current.h
 3ddb79c3mbqEM7QQr3zVq7NiBNhouA xen/include/asm-x86/x86_32/regs.h
 3e7f358aG11EvMI9VJ4_9hD4LUO7rQ xen/include/asm-x86/x86_32/string.h

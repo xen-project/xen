@@ -92,16 +92,16 @@ typedef struct
     unsigned long edi;
     unsigned long ebp;
     unsigned long eax;
-    unsigned long ds;
-    unsigned long es;
-    unsigned long fs;
-    unsigned long gs;
     unsigned long _unused;
     unsigned long eip;
     unsigned long cs;
     unsigned long eflags;
     unsigned long esp;
     unsigned long ss;
+    unsigned long es;
+    unsigned long ds;
+    unsigned long fs;
+    unsigned long gs;
 } PACKED execution_context_t;
 
 typedef u64 tsc_timestamp_t; /* RDTSC timestamp */

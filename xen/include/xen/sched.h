@@ -75,15 +75,8 @@ struct exec_domain
     unsigned long event_selector;    /* 08: entry CS  */
     unsigned long event_address;     /* 12: entry EIP */
 
-    /* Saved DS,ES,FS,GS immediately before return to guest OS. */
-    unsigned long failsafe_selectors[4]; /* 16-32 */ 
-
-    /*
-     * END OF FIRST CACHELINE. Stuff above is touched a lot!
-     */
-
-    unsigned long failsafe_selector; /* 32: entry CS  */
-    unsigned long failsafe_address;  /* 36: entry EIP */
+    unsigned long failsafe_selector; /* 16: entry CS  */
+    unsigned long failsafe_address;  /* 20: entry EIP */
 
     /*
      * From here on things can be added and shuffled without special attention

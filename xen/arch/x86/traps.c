@@ -166,25 +166,35 @@ void show_stack(unsigned long *esp)
 void show_registers(struct xen_regs *regs)
 {
     unsigned long esp;
-    unsigned short ss;
+    unsigned short ss, ds, es, fs, gs;
 
-    esp = (unsigned long)(&regs->esp);
-    ss  = __HYPERVISOR_DS;
-    if ( regs->xcs & 3 )
+    if ( regs->cs & 3 )
     {
         esp = regs->esp;
-        ss  = regs->xss & 0xffff;
+        ss  = regs->ss & 0xffff;
+        ds  = regs->ds & 0xffff;
+        es  = regs->es & 0xffff;
+        fs  = regs->fs & 0xffff;
+        gs  = regs->gs & 0xffff;
+    }
+    else
+    {
+        esp = (unsigned long)(&regs->esp);
+        ss  = __HYPERVISOR_DS;
+        ds  = __HYPERVISOR_DS;
+        es  = __HYPERVISOR_DS;
+        fs  = __HYPERVISOR_DS;
+        gs  = __HYPERVISOR_DS;
     }
 
     printk("CPU:    %d\nEIP:    %04x:[<%08lx>]      \nEFLAGS: %08lx\n",
-           smp_processor_id(), 0xffff & regs->xcs, regs->eip, regs->eflags);
+           smp_processor_id(), 0xffff & regs->cs, regs->eip, regs->eflags);
     printk("eax: %08lx   ebx: %08lx   ecx: %08lx   edx: %08lx\n",
            regs->eax, regs->ebx, regs->ecx, regs->edx);
     printk("esi: %08lx   edi: %08lx   ebp: %08lx   esp: %08lx\n",
            regs->esi, regs->edi, regs->ebp, esp);
     printk("ds: %04x   es: %04x   fs: %04x   gs: %04x   ss: %04x\n",
-           regs->xds & 0xffff, regs->xes & 0xffff, 
-           regs->xfs & 0xffff, regs->xgs & 0xffff, ss);
+           ds, es, fs, gs, ss);
 
     show_stack(&regs->esp);
 } 
@@ -212,7 +222,7 @@ static inline void do_trap(int trapnr, char *str,
     trap_info_t *ti;
     unsigned long fixup;
 
-    if (!(regs->xcs & 3))
+    if (!(regs->cs & 3))
         goto xen_fault;
 
     ti = current->thread.traps + trapnr;
@@ -230,7 +240,6 @@ static inline void do_trap(int trapnr, char *str,
     {
         DPRINTK("Trap %d: %08lx -> %08lx\n", trapnr, regs->eip, fixup);
         regs->eip = fixup;
-        regs->xds = regs->xes = regs->xfs = regs->xgs = __HYPERVISOR_DS;
         return;
     }
 
@@ -276,9 +285,9 @@ asmlinkage void do_int3(struct xen_regs *regs, long error_code)
         return;
 #endif
 
-    if ( (regs->xcs & 3) != 3 )
+    if ( (regs->cs & 3) != 3 )
     {
-        if ( unlikely((regs->xcs & 3) == 0) )
+        if ( unlikely((regs->cs & 3) == 0) )
         {
             show_registers(regs);
             panic("CPU%d FATAL TRAP: vector = 3 (Int3)\n"
@@ -374,7 +383,7 @@ asmlinkage void do_page_fault(struct xen_regs *regs, long error_code)
             return; /* successfully copied the mapping */
     }
 
-    if ( unlikely(!(regs->xcs & 3)) )
+    if ( unlikely(!(regs->cs & 3)) )
         goto xen_fault;
 
     ti = ed->thread.traps + 14;
@@ -395,7 +404,6 @@ asmlinkage void do_page_fault(struct xen_regs *regs, long error_code)
         if ( !ed->mm.shadow_mode )
             DPRINTK("Page fault: %08lx -> %08lx\n", regs->eip, fixup);
         regs->eip = fixup;
-        regs->xds = regs->xes = regs->xfs = regs->xgs = __HYPERVISOR_DS;
         return;
     }
 
@@ -443,7 +451,7 @@ asmlinkage void do_general_protection(struct xen_regs *regs, long error_code)
     unsigned long fixup;
 
     /* Badness if error in ring 0, or result of an interrupt. */
-    if ( !(regs->xcs & 3) || (error_code & 1) )
+    if ( !(regs->cs & 3) || (error_code & 1) )
         goto gp_in_kernel;
 
     /*
@@ -470,7 +478,7 @@ asmlinkage void do_general_protection(struct xen_regs *regs, long error_code)
     {
         /* This fault must be due to <INT n> instruction. */
         ti = current->thread.traps + (error_code>>3);
-        if ( TI_GET_DPL(ti) >= (regs->xcs & 3) )
+        if ( TI_GET_DPL(ti) >= (regs->cs & 3) )
         {
 #ifdef XEN_DEBUGGER
             if ( pdb_initialized && (pdb_ctx.system_call != 0) )
@@ -511,7 +519,6 @@ asmlinkage void do_general_protection(struct xen_regs *regs, long error_code)
     {
         DPRINTK("GPF (%04lx): %08lx -> %08lx\n", error_code, regs->eip, fixup);
         regs->eip = fixup;
-        regs->xds = regs->xes = regs->xfs = regs->xgs = __HYPERVISOR_DS;
         return;
     }
 
@@ -657,7 +664,7 @@ asmlinkage void do_debug(struct xen_regs *regs, long error_code)
         return;
     }
 
-    if ( (regs->xcs & 3) == 0 )
+    if ( (regs->cs & 3) == 0 )
     {
         /* Clear TF just for absolute sanity. */
         regs->eflags &= ~EF_TF;
