@@ -41,6 +41,8 @@ UCCL)
 	cd install/boot
 	ln -sf ../../xeno-roots/roots .
 	ln -sf ../../xeno-roots/usr .
+	ln -sf ../lib .
+	ln -sf ../bin .
 	ln -sf /usr/groups/srgboot/${USER}/xenoboot.sh .
 	ln -sf `pwd` /usr/groups/srgboot/${USER}/${DEST_DIR}
 	cd ../..
