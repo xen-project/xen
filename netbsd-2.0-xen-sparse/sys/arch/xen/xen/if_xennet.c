@@ -598,7 +598,7 @@ xennet_rx_push_buffer(struct xennet_softc *sc, int id)
 	xpq_flush_queue();
 
 	/* After all PTEs have been zapped we blow away stale TLB entries. */
-	rx_mcl[nr_pfns-1].args[2] = UVMF_FLUSH_TLB;
+	rx_mcl[nr_pfns-1].args[2] = UVMF_TLB_FLUSH_LOCAL;
 
 	/* Give away a batch of pages. */
 	rx_mcl[nr_pfns].op = __HYPERVISOR_dom_mem_op;
@@ -681,7 +681,7 @@ xen_network_handler(void *arg)
 		mcl->op = __HYPERVISOR_update_va_mapping;
 		mcl->args[0] = sc->sc_rx_bufa[rx->id].xb_rx.xbrx_va;
 		mcl->args[1] = (rx->addr & PG_FRAME) | PG_V|PG_KW;
-		mcl->args[2] = UVMF_FLUSH_TLB; // 0;
+		mcl->args[2] = UVMF_TLB_FLUSH_LOCAL; // 0;
 		mcl++;
 
 		xpmap_phys_to_machine_mapping
@@ -898,7 +898,7 @@ network_alloc_rx_buffers(struct xennet_softc *sc)
 	xpq_flush_queue();
 
 	/* After all PTEs have been zapped we blow away stale TLB entries. */
-	rx_mcl[nr_pfns-1].args[2] = UVMF_FLUSH_TLB;
+	rx_mcl[nr_pfns-1].args[2] = UVMF_TLB_FLUSH_LOCAL;
 
 	/* Give away a batch of pages. */
 	rx_mcl[nr_pfns].op = __HYPERVISOR_dom_mem_op;

@@ -92,24 +92,54 @@ unsigned int get_pfn_type(int xc_handle,
 
 /*******************/
 
-#define FIRST_MMU_UPDATE 1
+int pin_table(
+    int xc_handle, unsigned int type, unsigned long mfn, domid_t dom)
+{
+    int err = 0;
+    struct mmuext_op op;
+    privcmd_hypercall_t hypercall;
+
+    op.cmd = type;
+    op.mfn = mfn;
+
+    hypercall.op     = __HYPERVISOR_mmuext_op;
+    hypercall.arg[0] = (unsigned long)&op;
+    hypercall.arg[1] = 1;
+    hypercall.arg[2] = 0;
+    hypercall.arg[3] = dom;
+
+    if ( mlock(&op, sizeof(op)) != 0 )
+    {
+        PERROR("Could not lock mmuext_op");
+        err = 1;
+        goto out;
+    }
+
+    if ( do_xen_hypercall(xc_handle, &hypercall) < 0 )
+    {
+        ERROR("Failure when submitting mmu updates");
+        err = 1;
+    }
+
+    (void)munlock(&op, sizeof(op));
+
+ out:
+    return err;
+}
 
 static int flush_mmu_updates(int xc_handle, mmu_t *mmu)
 {
     int err = 0;
     privcmd_hypercall_t hypercall;
 
-    if ( mmu->idx == FIRST_MMU_UPDATE )
+    if ( mmu->idx == 0 )
         return 0;
-
-    mmu->updates[0].ptr  = MMU_EXTENDED_COMMAND;
-    mmu->updates[0].val  = MMUEXT_SET_FOREIGNDOM;
-    mmu->updates[0].val |= (unsigned long)mmu->subject << 16;
 
     hypercall.op     = __HYPERVISOR_mmu_update;
     hypercall.arg[0] = (unsigned long)mmu->updates;
     hypercall.arg[1] = (unsigned long)mmu->idx;
     hypercall.arg[2] = 0;
+    hypercall.arg[3] = mmu->subject;
 
     if ( mlock(mmu->updates, sizeof(mmu->updates)) != 0 )
     {
@@ -124,7 +154,7 @@ static int flush_mmu_updates(int xc_handle, mmu_t *mmu)
         err = 1;
     }
 
-    mmu->idx = FIRST_MMU_UPDATE;
+    mmu->idx = 0;
     
     (void)munlock(mmu->updates, sizeof(mmu->updates));
 
@@ -137,7 +167,7 @@ mmu_t *init_mmu_updates(int xc_handle, domid_t dom)
     mmu_t *mmu = malloc(sizeof(mmu_t));
     if ( mmu == NULL )
         return mmu;
-    mmu->idx     = FIRST_MMU_UPDATE;
+    mmu->idx     = 0;
     mmu->subject = dom;
     return mmu;
 }

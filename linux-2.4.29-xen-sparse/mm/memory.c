@@ -911,7 +911,7 @@ static inline void establish_pte(struct vm_area_struct * vma, unsigned long addr
 {
 #ifdef CONFIG_XEN
 	if ( likely(vma->vm_mm == current->mm) ) {
-		HYPERVISOR_update_va_mapping(address, entry, UVMF_INVLPG);
+		HYPERVISOR_update_va_mapping(address, entry, UVMF_INVLPG_LOCAL);
 	} else {
 		set_pte(page_table, entry);
 		flush_tlb_page(vma, address);

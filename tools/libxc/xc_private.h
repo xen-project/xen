@@ -212,4 +212,7 @@ void xc_map_memcpy(unsigned long dst, char *src, unsigned long size,
                    int xch, u32 dom, unsigned long *parray,
                    unsigned long vstart);
 
+int pin_table(
+    int xc_handle, unsigned int type, unsigned long mfn, domid_t dom);
+
 #endif /* __XC_PRIVATE_H__ */

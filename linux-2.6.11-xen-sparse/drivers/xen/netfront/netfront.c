@@ -388,7 +388,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
     }
 
     /* After all PTEs have been zapped we blow away stale TLB entries. */
-    rx_mcl[i-1].args[2] = UVMF_FLUSH_TLB;
+    rx_mcl[i-1].args[2] = UVMF_TLB_FLUSH_ALL;
 
     /* Give away a batch of pages. */
     rx_mcl[i].op = __HYPERVISOR_dom_mem_op;
@@ -588,6 +588,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
         mcl->args[0] = (unsigned long)rx_mmu;
         mcl->args[1] = mmu - rx_mmu;
         mcl->args[2] = 0;
+        mcl->args[3] = DOMID_SELF;
         mcl++;
         (void)HYPERVISOR_multicall(rx_mcl, mcl - rx_mcl);
     }

@@ -111,6 +111,13 @@
 #define MEM_LOG(_f, _a...) ((void)0)
 #endif
 
+/*
+ * Both do_mmuext_op() and do_mmu_update():
+ * We steal the m.s.b. of the @count parameter to indicate whether this
+ * invocation of do_mmu_update() is resuming a previously preempted call.
+ */
+#define MMU_UPDATE_PREEMPTED          (~(~0U>>1))
+
 static int alloc_l2_table(struct pfn_info *page);
 static int alloc_l1_table(struct pfn_info *page);
 static int get_page_from_pagenr(unsigned long page_nr, struct domain *d);
@@ -128,7 +135,7 @@ static int mod_l1_entry(l1_pgentry_t *, l1_pgentry_t);
 static struct {
 #define DOP_FLUSH_TLB   (1<<0) /* Flush the TLB.                 */
 #define DOP_RELOAD_LDT  (1<<1) /* Reload the LDT shadow mapping. */
-    unsigned long  deferred_ops;
+    unsigned int   deferred_ops;
     /* If non-NULL, specifies a foreign subject domain for some operations. */
     struct domain *foreign;
 } __cacheline_aligned percpu_info[NR_CPUS];
@@ -199,12 +206,16 @@ void write_ptbase(struct exec_domain *ed)
     write_cr3(pagetable_val(ed->arch.monitor_table));
 }
 
-static void __invalidate_shadow_ldt(struct exec_domain *d)
+
+static inline void invalidate_shadow_ldt(struct exec_domain *d)
 {
     int i;
     unsigned long pfn;
     struct pfn_info *page;
     
+    if ( d->arch.shadow_ldt_mapcnt == 0 )
+        return;
+
     d->arch.shadow_ldt_mapcnt = 0;
 
     for ( i = 16; i < 32; i++ )
@@ -220,13 +231,6 @@ static void __invalidate_shadow_ldt(struct exec_domain *d)
 
     /* Dispose of the (now possibly invalid) mappings from the TLB.  */
     percpu_info[d->processor].deferred_ops |= DOP_FLUSH_TLB | DOP_RELOAD_LDT;
-}
-
-
-static inline void invalidate_shadow_ldt(struct exec_domain *d)
-{
-    if ( d->arch.shadow_ldt_mapcnt != 0 )
-        __invalidate_shadow_ldt(d);
 }
 
 
@@ -1251,401 +1255,409 @@ int new_guest_cr3(unsigned long pfn)
     return okay;
 }
 
-static int do_extended_command(unsigned long ptr, unsigned long val)
+static void process_deferred_ops(unsigned int cpu)
 {
-    int okay = 1, cpu = smp_processor_id();
-    unsigned int cmd = val & MMUEXT_CMD_MASK, type;
-    unsigned long pfn = ptr >> PAGE_SHIFT;
-    struct pfn_info *page = &frame_table[pfn];
-    struct exec_domain *ed = current;
-    struct domain *d = ed->domain, *e;
-    u32 x, y, _d, _nd;
-    domid_t domid;
-    grant_ref_t gntref;
+    unsigned int deferred_ops;
 
-    switch ( cmd )
-    {
-    case MMUEXT_PIN_L1_TABLE:
-        /*
-         * We insist that, if you pin an L1 page, it's the first thing that
-         * you do to it. This is because we require the backptr to still be
-         * mutable. This assumption seems safe.
-         */
-        type = PGT_l1_page_table | PGT_va_mutable;
+    deferred_ops = percpu_info[cpu].deferred_ops;
+    percpu_info[cpu].deferred_ops = 0;
 
-    pin_page:
-        okay = get_page_and_type_from_pagenr(pfn, type, FOREIGNDOM);
-        if ( unlikely(!okay) )
-        {
-            MEM_LOG("Error while pinning pfn %p", pfn);
-            break;
-        }
-
-        if ( unlikely(test_and_set_bit(_PGT_pinned,
-                                       &page->u.inuse.type_info)) )
-        {
-            MEM_LOG("Pfn %p already pinned", pfn);
-            put_page_and_type(page);
-            okay = 0;
-            break;
-        }
-
-        break;
-
-    case MMUEXT_PIN_L2_TABLE:
-        type = PGT_l2_page_table;
-        goto pin_page;
-
-#ifdef __x86_64__
-    case MMUEXT_PIN_L3_TABLE:
-        type = PGT_l3_page_table;
-        goto pin_page;
-
-    case MMUEXT_PIN_L4_TABLE:
-        type = PGT_l4_page_table;
-        goto pin_page;
-#endif /* __x86_64__ */
-
-    case MMUEXT_UNPIN_TABLE:
-        if ( unlikely(!(okay = get_page_from_pagenr(pfn, FOREIGNDOM))) )
-        {
-            MEM_LOG("Page %p bad domain (dom=%p)",
-                    ptr, page_get_owner(page));
-        }
-        else if ( likely(test_and_clear_bit(_PGT_pinned, 
-                                            &page->u.inuse.type_info)) )
-        {
-            put_page_and_type(page);
-            put_page(page);
-        }
-        else
-        {
-            okay = 0;
-            put_page(page);
-            MEM_LOG("Pfn %p not pinned", pfn);
-        }
-        break;
-
-    case MMUEXT_NEW_BASEPTR:
-        okay = new_guest_cr3(pfn);
-        break;
+    if ( deferred_ops & DOP_FLUSH_TLB )
+        local_flush_tlb();
         
-#ifdef __x86_64__
-    case MMUEXT_NEW_USER_BASEPTR:
-        okay = get_page_and_type_from_pagenr(pfn, PGT_root_page_table, d);
-        if ( unlikely(!okay) )
-        {
-            MEM_LOG("Error while installing new baseptr %p", pfn);
-        }
-        else
-        {
-            unsigned long old_pfn =
-                pagetable_val(ed->arch.guest_table_user) >> PAGE_SHIFT;
-            ed->arch.guest_table_user = mk_pagetable(pfn << PAGE_SHIFT);
-            if ( old_pfn != 0 )
-                put_page_and_type(&frame_table[old_pfn]);
-        }
-        break;
-#endif
-        
-    case MMUEXT_TLB_FLUSH:
-        percpu_info[cpu].deferred_ops |= DOP_FLUSH_TLB;
-        break;
-    
-    case MMUEXT_INVLPG:
-        __flush_tlb_one(ptr);
-        break;
+    if ( deferred_ops & DOP_RELOAD_LDT )
+        (void)map_ldt_shadow_page(0);
 
-    case MMUEXT_FLUSH_CACHE:
-        if ( unlikely(!IS_CAPABLE_PHYSDEV(d)) )
-        {
-            MEM_LOG("Non-physdev domain tried to FLUSH_CACHE.\n");
-            okay = 0;
-        }
-        else
-        {
-            wbinvd();
-        }
-        break;
-
-    case MMUEXT_SET_LDT:
+    if ( unlikely(percpu_info[cpu].foreign != NULL) )
     {
-        unsigned long ents = val >> MMUEXT_CMD_SHIFT;
-        if ( ((ptr & (PAGE_SIZE-1)) != 0) || 
-             (ents > 8192) ||
-             ((ptr+ents*LDT_ENTRY_SIZE) < ptr) ||
-             ((ptr+ents*LDT_ENTRY_SIZE) > PAGE_OFFSET) )
-        {
-            okay = 0;
-            MEM_LOG("Bad args to SET_LDT: ptr=%p, ents=%p", ptr, ents);
-        }
-        else if ( (ed->arch.ldt_ents != ents) || 
-                  (ed->arch.ldt_base != ptr) )
-        {
-            invalidate_shadow_ldt(ed);
-            ed->arch.ldt_base = ptr;
-            ed->arch.ldt_ents = ents;
-            load_LDT(ed);
-            percpu_info[cpu].deferred_ops &= ~DOP_RELOAD_LDT;
-            if ( ents != 0 )
-                percpu_info[cpu].deferred_ops |= DOP_RELOAD_LDT;
-        }
-        break;
-    }
-
-    case MMUEXT_SET_FOREIGNDOM:
-        domid = (domid_t)(val >> 16);
-
-        if ( (e = percpu_info[cpu].foreign) != NULL )
-            put_domain(e);
+        put_domain(percpu_info[cpu].foreign);
         percpu_info[cpu].foreign = NULL;
+    }
+}
 
-        if ( !IS_PRIV(d) )
+static int set_foreigndom(unsigned int cpu, domid_t domid)
+{
+    struct domain *e, *d = current->domain;
+    int okay = 1;
+
+    if ( (e = percpu_info[cpu].foreign) != NULL )
+        put_domain(e);
+    percpu_info[cpu].foreign = NULL;
+    
+    if ( domid == DOMID_SELF )
+        goto out;
+
+    if ( !IS_PRIV(d) )
+    {
+        switch ( domid )
+        {
+        case DOMID_IO:
+            get_knownalive_domain(dom_io);
+            percpu_info[cpu].foreign = dom_io;
+            break;
+        default:
+            MEM_LOG("Dom %u cannot set foreign dom\n", d->id);
+            okay = 0;
+            break;
+        }
+    }
+    else
+    {
+        percpu_info[cpu].foreign = e = find_domain_by_id(domid);
+        if ( e == NULL )
         {
             switch ( domid )
             {
+            case DOMID_XEN:
+                get_knownalive_domain(dom_xen);
+                percpu_info[cpu].foreign = dom_xen;
+                break;
             case DOMID_IO:
                 get_knownalive_domain(dom_io);
                 percpu_info[cpu].foreign = dom_io;
                 break;
             default:
-                MEM_LOG("Dom %u cannot set foreign dom\n", d->id);
+                MEM_LOG("Unknown domain '%u'", domid);
                 okay = 0;
                 break;
             }
         }
-        else
-        {
-            percpu_info[cpu].foreign = e = find_domain_by_id(domid);
-            if ( e == NULL )
-            {
-                switch ( domid )
-                {
-                case DOMID_XEN:
-                    get_knownalive_domain(dom_xen);
-                    percpu_info[cpu].foreign = dom_xen;
-                    break;
-                case DOMID_IO:
-                    get_knownalive_domain(dom_io);
-                    percpu_info[cpu].foreign = dom_io;
-                    break;
-                default:
-                    MEM_LOG("Unknown domain '%u'", domid);
-                    okay = 0;
-                    break;
-                }
-            }
-        }
-        break;
-
-    case MMUEXT_TRANSFER_PAGE:
-        domid  = (domid_t)(val >> 16);
-        gntref = (grant_ref_t)((val & 0xFF00) | ((ptr >> 2) & 0x00FF));
-        
-        if ( unlikely(IS_XEN_HEAP_FRAME(page)) ||
-             unlikely(!pfn_is_ram(pfn)) ||
-             unlikely((e = find_domain_by_id(domid)) == NULL) )
-        {
-            MEM_LOG("Bad frame (%p) or bad domid (%d).\n", pfn, domid);
-            okay = 0;
-            break;
-        }
-
-        spin_lock(&d->page_alloc_lock);
-
-        /*
-         * The tricky bit: atomically release ownership while there is just one
-         * benign reference to the page (PGC_allocated). If that reference
-         * disappears then the deallocation routine will safely spin.
-         */
-        _d  = pickle_domptr(d);
-        _nd = page->u.inuse._domain;
-        y   = page->count_info;
-        do {
-            x = y;
-            if ( unlikely((x & (PGC_count_mask|PGC_allocated)) != 
-                          (1|PGC_allocated)) ||
-                 unlikely(_nd != _d) )
-            {
-                MEM_LOG("Bad page values %p: ed=%p(%u), sd=%p,"
-                        " caf=%08x, taf=%08x\n", page_to_pfn(page),
-                        d, d->id, unpickle_domptr(_nd), x, 
-                        page->u.inuse.type_info);
-                spin_unlock(&d->page_alloc_lock);
-                put_domain(e);
-                return 0;
-            }
-            __asm__ __volatile__(
-                LOCK_PREFIX "cmpxchg8b %2"
-                : "=d" (_nd), "=a" (y),
-                "=m" (*(volatile u64 *)(&page->count_info))
-                : "0" (_d), "1" (x), "c" (NULL), "b" (x) );
-        } 
-        while ( unlikely(_nd != _d) || unlikely(y != x) );
-
-        /*
-         * Unlink from 'd'. At least one reference remains (now anonymous), so
-         * noone else is spinning to try to delete this page from 'd'.
-         */
-        d->tot_pages--;
-        list_del(&page->list);
-        
-        spin_unlock(&d->page_alloc_lock);
-
-        spin_lock(&e->page_alloc_lock);
-
-        /*
-         * Check that 'e' will accept the page and has reservation headroom.
-         * Also, a domain mustn't have PGC_allocated pages when it is dying.
-         */
-        ASSERT(e->tot_pages <= e->max_pages);
-        if ( unlikely(test_bit(DF_DYING, &e->d_flags)) ||
-             unlikely(e->tot_pages == e->max_pages) ||
-             unlikely(!gnttab_prepare_for_transfer(e, d, gntref)) )
-        {
-            MEM_LOG("Transferee has no reservation headroom (%d,%d), or "
-                    "provided a bad grant ref, or is dying (%p).\n",
-                    e->tot_pages, e->max_pages, e->d_flags);
-            spin_unlock(&e->page_alloc_lock);
-            put_domain(e);
-            okay = 0;
-            break;
-        }
-
-        /* Okay, add the page to 'e'. */
-        if ( unlikely(e->tot_pages++ == 0) )
-            get_knownalive_domain(e);
-        list_add_tail(&page->list, &e->page_list);
-        page_set_owner(page, e);
-
-        spin_unlock(&e->page_alloc_lock);
-
-        /* Transfer is all done: tell the guest about its new page frame. */
-        gnttab_notify_transfer(e, gntref, pfn);
-        
-        put_domain(e);
-        break;
-
-    case MMUEXT_REASSIGN_PAGE:
-        if ( unlikely(!IS_PRIV(d)) )
-        {
-            MEM_LOG("Dom %u has no reassignment priv", d->id);
-            okay = 0;
-            break;
-        }
-
-        e = percpu_info[cpu].foreign;
-        if ( unlikely(e == NULL) )
-        {
-            MEM_LOG("No FOREIGNDOM to reassign pfn %p to", pfn);
-            okay = 0;
-            break;
-        }
-
-        /*
-         * Grab both page_list locks, in order. This prevents the page from
-         * disappearing elsewhere while we modify the owner, and we'll need
-         * both locks if we're successful so that we can change lists.
-         */
-        if ( d < e )
-        {
-            spin_lock(&d->page_alloc_lock);
-            spin_lock(&e->page_alloc_lock);
-        }
-        else
-        {
-            spin_lock(&e->page_alloc_lock);
-            spin_lock(&d->page_alloc_lock);
-        }
-
-        /* A domain shouldn't have PGC_allocated pages when it is dying. */
-        if ( unlikely(test_bit(DF_DYING, &e->d_flags)) ||
-             unlikely(IS_XEN_HEAP_FRAME(page)) )
-        {
-            MEM_LOG("Reassignment page is Xen heap, or dest dom is dying.");
-            okay = 0;
-            goto reassign_fail;
-        }
-
-        /*
-         * The tricky bit: atomically change owner while there is just one
-         * benign reference to the page (PGC_allocated). If that reference
-         * disappears then the deallocation routine will safely spin.
-         */
-        _d  = pickle_domptr(d);
-        _nd = page->u.inuse._domain;
-        y   = page->count_info;
-        do {
-            x = y;
-            if ( unlikely((x & (PGC_count_mask|PGC_allocated)) != 
-                          (1|PGC_allocated)) ||
-                 unlikely(_nd != _d) )
-            {
-                MEM_LOG("Bad page values %p: ed=%p(%u), sd=%p,"
-                        " caf=%08x, taf=%08x\n", page_to_pfn(page),
-                        d, d->id, unpickle_domptr(_nd), x,
-                        page->u.inuse.type_info);
-                okay = 0;
-                goto reassign_fail;
-            }
-            __asm__ __volatile__(
-                LOCK_PREFIX "cmpxchg8b %3"
-                : "=d" (_nd), "=a" (y), "=c" (e),
-                "=m" (*(volatile u64 *)(&page->count_info))
-                : "0" (_d), "1" (x), "c" (e), "b" (x) );
-        } 
-        while ( unlikely(_nd != _d) || unlikely(y != x) );
-        
-        /*
-         * Unlink from 'd'. We transferred at least one reference to 'e', so
-         * noone else is spinning to try to delete this page from 'd'.
-         */
-        d->tot_pages--;
-        list_del(&page->list);
-        
-        /*
-         * Add the page to 'e'. Someone may already have removed the last
-         * reference and want to remove the page from 'e'. However, we have
-         * the lock so they'll spin waiting for us.
-         */
-        if ( unlikely(e->tot_pages++ == 0) )
-            get_knownalive_domain(e);
-        list_add_tail(&page->list, &e->page_list);
-
-    reassign_fail:        
-        spin_unlock(&d->page_alloc_lock);
-        spin_unlock(&e->page_alloc_lock);
-        break;
-
-    case MMUEXT_CLEAR_FOREIGNDOM:
-        if ( (e = percpu_info[cpu].foreign) != NULL )
-            put_domain(e);
-        percpu_info[cpu].foreign = NULL;
-        break;
-
-    default:
-        MEM_LOG("Invalid extended pt command 0x%p", val & MMUEXT_CMD_MASK);
-        okay = 0;
-        break;
     }
 
+ out:
     return okay;
 }
 
-int do_mmu_update(
-    mmu_update_t *ureqs, unsigned int count, unsigned int *pdone)
+int do_mmuext_op(
+    struct mmuext_op *uops,
+    unsigned int count,
+    unsigned int *pdone,
+    unsigned int foreigndom)
 {
-/*
- * We steal the m.s.b. of the @count parameter to indicate whether this
- * invocation of do_mmu_update() is resuming a previously preempted call.
- * We steal the next 15 bits to remember the current FOREIGNDOM.
- */
-#define MMU_UPDATE_PREEMPTED          (~(~0U>>1))
-#define MMU_UPDATE_PREEMPT_FDOM_SHIFT ((sizeof(int)*8)-16)
-#define MMU_UPDATE_PREEMPT_FDOM_MASK  (0x7FFFU<<MMU_UPDATE_PREEMPT_FDOM_SHIFT)
+    struct mmuext_op op;
+    int rc = 0, i = 0, okay, cpu = smp_processor_id();
+    unsigned int type, done = 0;
+    struct pfn_info *page;
+    struct exec_domain *ed = current;
+    struct domain *d = ed->domain, *e;
+    u32 x, y, _d, _nd;
 
+    LOCK_BIGLOCK(d);
+
+    cleanup_writable_pagetable(d);
+
+    if ( unlikely(count & MMU_UPDATE_PREEMPTED) )
+    {
+        count &= ~MMU_UPDATE_PREEMPTED;
+        if ( unlikely(pdone != NULL) )
+            (void)get_user(done, pdone);
+    }
+
+    if ( !set_foreigndom(cpu, foreigndom) )
+    {
+        rc = -EINVAL;
+        goto out;
+    }
+
+    if ( unlikely(!array_access_ok(VERIFY_READ, uops, count, sizeof(op))) )
+    {
+        rc = -EFAULT;
+        goto out;
+    }
+
+    for ( i = 0; i < count; i++ )
+    {
+        if ( hypercall_preempt_check() )
+        {
+            rc = hypercall4_create_continuation(
+                __HYPERVISOR_mmuext_op, uops,
+                (count - i) | MMU_UPDATE_PREEMPTED, pdone, foreigndom);
+            break;
+        }
+
+        if ( unlikely(__copy_from_user(&op, uops, sizeof(op)) != 0) )
+        {
+            MEM_LOG("Bad __copy_from_user");
+            rc = -EFAULT;
+            break;
+        }
+
+        okay = 1;
+        page = &frame_table[op.mfn];
+
+        switch ( op.cmd )
+        {
+        case MMUEXT_PIN_L1_TABLE:
+            /*
+             * We insist that, if you pin an L1 page, it's the first thing that
+             * you do to it. This is because we require the backptr to still be
+             * mutable. This assumption seems safe.
+             */
+            type = PGT_l1_page_table | PGT_va_mutable;
+
+        pin_page:
+            okay = get_page_and_type_from_pagenr(op.mfn, type, FOREIGNDOM);
+            if ( unlikely(!okay) )
+            {
+                MEM_LOG("Error while pinning MFN %p", op.mfn);
+                break;
+            }
+            
+            if ( unlikely(test_and_set_bit(_PGT_pinned,
+                                           &page->u.inuse.type_info)) )
+            {
+                MEM_LOG("MFN %p already pinned", op.mfn);
+                put_page_and_type(page);
+                okay = 0;
+                break;
+            }
+            
+            break;
+
+        case MMUEXT_PIN_L2_TABLE:
+            type = PGT_l2_page_table;
+            goto pin_page;
+
+#ifdef __x86_64__
+        case MMUEXT_PIN_L3_TABLE:
+            type = PGT_l3_page_table;
+            goto pin_page;
+
+        case MMUEXT_PIN_L4_TABLE:
+            type = PGT_l4_page_table;
+            goto pin_page;
+#endif /* __x86_64__ */
+
+        case MMUEXT_UNPIN_TABLE:
+            if ( unlikely(!(okay = get_page_from_pagenr(op.mfn, FOREIGNDOM))) )
+            {
+                MEM_LOG("MFN %p bad domain (dom=%p)",
+                        op.mfn, page_get_owner(page));
+            }
+            else if ( likely(test_and_clear_bit(_PGT_pinned, 
+                                                &page->u.inuse.type_info)) )
+            {
+                put_page_and_type(page);
+                put_page(page);
+            }
+            else
+            {
+                okay = 0;
+                put_page(page);
+                MEM_LOG("MFN %p not pinned", op.mfn);
+            }
+            break;
+
+        case MMUEXT_NEW_BASEPTR:
+            okay = new_guest_cr3(op.mfn);
+            break;
+        
+#ifdef __x86_64__
+        case MMUEXT_NEW_USER_BASEPTR:
+            okay = get_page_and_type_from_pagenr(
+                op.mfn, PGT_root_page_table, d);
+            if ( unlikely(!okay) )
+            {
+                MEM_LOG("Error while installing new MFN %p", op.mfn);
+            }
+            else
+            {
+                unsigned long old_mfn =
+                    pagetable_val(ed->arch.guest_table_user) >> PAGE_SHIFT;
+                ed->arch.guest_table_user = mk_pagetable(op.mfn << PAGE_SHIFT);
+                if ( old_mfn != 0 )
+                    put_page_and_type(&frame_table[old_mfn]);
+            }
+            break;
+#endif
+        
+        case MMUEXT_TLB_FLUSH_LOCAL:
+            percpu_info[cpu].deferred_ops |= DOP_FLUSH_TLB;
+            break;
+    
+        case MMUEXT_INVLPG_LOCAL:
+            __flush_tlb_one(op.linear_addr);
+            break;
+
+        case MMUEXT_TLB_FLUSH_MULTI:
+            flush_tlb_mask(d->cpuset); /* XXX KAF XXX */
+            break;
+    
+        case MMUEXT_INVLPG_MULTI:
+            flush_tlb_mask(d->cpuset); /* XXX KAF XXX */
+            break;
+
+        case MMUEXT_TLB_FLUSH_ALL:
+            flush_tlb_mask(d->cpuset);
+            break;
+    
+        case MMUEXT_INVLPG_ALL:
+            flush_tlb_mask(d->cpuset); /* XXX KAF XXX */
+            break;
+
+        case MMUEXT_FLUSH_CACHE:
+            if ( unlikely(!IS_CAPABLE_PHYSDEV(d)) )
+            {
+                MEM_LOG("Non-physdev domain tried to FLUSH_CACHE.\n");
+                okay = 0;
+            }
+            else
+            {
+                wbinvd();
+            }
+            break;
+
+        case MMUEXT_SET_LDT:
+        {
+            unsigned long ptr  = op.linear_addr;
+            unsigned long ents = op.nr_ents;
+            if ( ((ptr & (PAGE_SIZE-1)) != 0) || 
+                 (ents > 8192) ||
+                 ((ptr+ents*LDT_ENTRY_SIZE) < ptr) ||
+                 ((ptr+ents*LDT_ENTRY_SIZE) > PAGE_OFFSET) )
+            {
+                okay = 0;
+                MEM_LOG("Bad args to SET_LDT: ptr=%p, ents=%p", ptr, ents);
+            }
+            else if ( (ed->arch.ldt_ents != ents) || 
+                      (ed->arch.ldt_base != ptr) )
+            {
+                invalidate_shadow_ldt(ed);
+                ed->arch.ldt_base = ptr;
+                ed->arch.ldt_ents = ents;
+                load_LDT(ed);
+                percpu_info[cpu].deferred_ops &= ~DOP_RELOAD_LDT;
+                if ( ents != 0 )
+                    percpu_info[cpu].deferred_ops |= DOP_RELOAD_LDT;
+            }
+            break;
+        }
+
+        case MMUEXT_REASSIGN_PAGE:
+            if ( unlikely(!IS_PRIV(d)) )
+            {
+                MEM_LOG("Dom %u has no reassignment priv", d->id);
+                okay = 0;
+                break;
+            }
+            
+            e = percpu_info[cpu].foreign;
+            if ( unlikely(e == NULL) )
+            {
+                MEM_LOG("No FOREIGNDOM to reassign MFN %p to", op.mfn);
+                okay = 0;
+                break;
+            }
+            
+            /*
+             * Grab both page_list locks, in order. This prevents the page from
+             * disappearing elsewhere while we modify the owner, and we'll need
+             * both locks if we're successful so that we can change lists.
+             */
+            if ( d < e )
+            {
+                spin_lock(&d->page_alloc_lock);
+                spin_lock(&e->page_alloc_lock);
+            }
+            else
+            {
+                spin_lock(&e->page_alloc_lock);
+                spin_lock(&d->page_alloc_lock);
+            }
+            
+            /* A domain shouldn't have PGC_allocated pages when it is dying. */
+            if ( unlikely(test_bit(DF_DYING, &e->d_flags)) ||
+                 unlikely(IS_XEN_HEAP_FRAME(page)) )
+            {
+                MEM_LOG("Reassign page is Xen heap, or dest dom is dying.");
+                okay = 0;
+                goto reassign_fail;
+            }
+
+            /*
+             * The tricky bit: atomically change owner while there is just one
+             * benign reference to the page (PGC_allocated). If that reference
+             * disappears then the deallocation routine will safely spin.
+             */
+            _d  = pickle_domptr(d);
+            _nd = page->u.inuse._domain;
+            y   = page->count_info;
+            do {
+                x = y;
+                if ( unlikely((x & (PGC_count_mask|PGC_allocated)) != 
+                              (1|PGC_allocated)) ||
+                     unlikely(_nd != _d) )
+                {
+                    MEM_LOG("Bad page values %p: ed=%p(%u), sd=%p,"
+                            " caf=%08x, taf=%08x\n", page_to_pfn(page),
+                            d, d->id, unpickle_domptr(_nd), x,
+                            page->u.inuse.type_info);
+                    okay = 0;
+                    goto reassign_fail;
+                }
+                __asm__ __volatile__(
+                    LOCK_PREFIX "cmpxchg8b %3"
+                    : "=d" (_nd), "=a" (y), "=c" (e),
+                    "=m" (*(volatile u64 *)(&page->count_info))
+                    : "0" (_d), "1" (x), "c" (e), "b" (x) );
+            } 
+            while ( unlikely(_nd != _d) || unlikely(y != x) );
+            
+            /*
+             * Unlink from 'd'. We transferred at least one reference to 'e',
+             * so noone else is spinning to try to delete this page from 'd'.
+             */
+            d->tot_pages--;
+            list_del(&page->list);
+            
+            /*
+             * Add the page to 'e'. Someone may already have removed the last
+             * reference and want to remove the page from 'e'. However, we have
+             * the lock so they'll spin waiting for us.
+             */
+            if ( unlikely(e->tot_pages++ == 0) )
+                get_knownalive_domain(e);
+            list_add_tail(&page->list, &e->page_list);
+            
+        reassign_fail:        
+            spin_unlock(&d->page_alloc_lock);
+            spin_unlock(&e->page_alloc_lock);
+            break;
+            
+        default:
+            MEM_LOG("Invalid extended pt command 0x%p", op.cmd);
+            okay = 0;
+            break;
+        }
+
+        if ( unlikely(!okay) )
+        {
+            rc = -EINVAL;
+            break;
+        }
+
+        uops++;
+    }
+
+ out:
+    process_deferred_ops(cpu);
+
+    /* Add incremental work we have done to the @done output parameter. */
+    if ( unlikely(pdone != NULL) )
+        __put_user(done + i, pdone);
+
+    UNLOCK_BIGLOCK(d);
+    return rc;
+}
+
+int do_mmu_update(
+    mmu_update_t *ureqs,
+    unsigned int count,
+    unsigned int *pdone,
+    unsigned int foreigndom)
+{
     mmu_update_t req;
-    unsigned long va = 0, deferred_ops, pfn, prev_pfn = 0;
+    unsigned long va = 0, pfn, prev_pfn = 0;
     struct pfn_info *page;
     int rc = 0, okay = 1, i = 0, cpu = smp_processor_id();
     unsigned int cmd, done = 0;
@@ -1654,7 +1666,6 @@ int do_mmu_update(
     struct exec_domain *ed = current;
     struct domain *d = ed->domain;
     u32 type_info;
-    domid_t domid;
 
     LOCK_BIGLOCK(d);
 
@@ -1666,31 +1677,17 @@ int do_mmu_update(
     if ( unlikely(shadow_mode_translate(d)) )
         domain_crash_synchronous();
 
-    /*
-     * If we are resuming after preemption, read how much work we have already
-     * done. This allows us to set the @done output parameter correctly.
-     * We also reset FOREIGNDOM here.
-     */
-    if ( unlikely(count&(MMU_UPDATE_PREEMPTED|MMU_UPDATE_PREEMPT_FDOM_MASK)) )
+    if ( unlikely(count & MMU_UPDATE_PREEMPTED) )
     {
-        if ( !(count & MMU_UPDATE_PREEMPTED) )
-        {
-            /* Count overflow into private FOREIGNDOM field. */
-            MEM_LOG("do_mmu_update count is too large");
-            rc = -EINVAL;
-            goto out;
-        }
         count &= ~MMU_UPDATE_PREEMPTED;
-        domid = count >> MMU_UPDATE_PREEMPT_FDOM_SHIFT;
-        count &= ~MMU_UPDATE_PREEMPT_FDOM_MASK;
         if ( unlikely(pdone != NULL) )
             (void)get_user(done, pdone);
-        if ( (domid != current->domain->id) &&
-             !do_extended_command(0, MMUEXT_SET_FOREIGNDOM | (domid << 16)) )
-        {
-            rc = -EINVAL;
-            goto out;
-        }
+    }
+
+    if ( !set_foreigndom(cpu, foreigndom) )
+    {
+        rc = -EINVAL;
+        goto out;
     }
 
     perfc_incrc(calls_to_mmu_update); 
@@ -1707,11 +1704,9 @@ int do_mmu_update(
     {
         if ( hypercall_preempt_check() )
         {
-            rc = hypercall3_create_continuation(
+            rc = hypercall4_create_continuation(
                 __HYPERVISOR_mmu_update, ureqs, 
-                (count - i) |
-                (FOREIGNDOM->id << MMU_UPDATE_PREEMPT_FDOM_SHIFT) | 
-                MMU_UPDATE_PREEMPTED, pdone);
+                (count - i) | MMU_UPDATE_PREEMPTED, pdone, foreigndom);
             break;
         }
 
@@ -1863,15 +1858,6 @@ int do_mmu_update(
             put_page(&frame_table[pfn]);
             break;
 
-            /*
-             * MMU_EXTENDED_COMMAND: Extended command is specified
-             * in the least-siginificant bits of the 'value' field.
-             */
-        case MMU_EXTENDED_COMMAND:
-            req.ptr &= ~(sizeof(l1_pgentry_t) - 1);
-            okay = do_extended_command(req.ptr, req.val);
-            break;
-
         default:
             MEM_LOG("Invalid page update command %p", req.ptr);
             break;
@@ -1893,20 +1879,7 @@ int do_mmu_update(
     if ( unlikely(prev_spl1e != 0) ) 
         unmap_domain_mem((void *)prev_spl1e);
 
-    deferred_ops = percpu_info[cpu].deferred_ops;
-    percpu_info[cpu].deferred_ops = 0;
-
-    if ( deferred_ops & DOP_FLUSH_TLB )
-        local_flush_tlb();
-        
-    if ( deferred_ops & DOP_RELOAD_LDT )
-        (void)map_ldt_shadow_page(0);
-
-    if ( unlikely(percpu_info[cpu].foreign != NULL) )
-    {
-        put_domain(percpu_info[cpu].foreign);
-        percpu_info[cpu].foreign = NULL;
-    }
+    process_deferred_ops(cpu);
 
     /* Add incremental work we have done to the @done output parameter. */
     if ( unlikely(pdone != NULL) )
@@ -2016,11 +1989,10 @@ int do_update_va_mapping(unsigned long va,
                          unsigned long val, 
                          unsigned long flags)
 {
-    struct exec_domain      *ed  = current;
-    struct domain           *d   = ed->domain;
-    unsigned int             cpu = ed->processor;
-    unsigned long            deferred_ops;
-    int                      rc = 0;
+    struct exec_domain *ed  = current;
+    struct domain      *d   = ed->domain;
+    unsigned int        cpu = ed->processor;
+    int                 rc = 0;
 
     perfc_incrc(calls_to_update_va);
 
@@ -2046,17 +2018,25 @@ int do_update_va_mapping(unsigned long va,
     if ( unlikely(shadow_mode_enabled(d)) )
         update_shadow_va_mapping(va, val, ed, d);
 
-    deferred_ops = percpu_info[cpu].deferred_ops;
-    percpu_info[cpu].deferred_ops = 0;
-
-    if ( unlikely(deferred_ops & DOP_FLUSH_TLB) || 
-         unlikely(flags & UVMF_FLUSH_TLB) )
+    switch ( flags & UVMF_FLUSH_MASK )
+    {
+    case UVMF_TLB_FLUSH_LOCAL:
         local_flush_tlb();
-    else if ( unlikely(flags & UVMF_INVLPG) )
+        percpu_info[cpu].deferred_ops &= ~DOP_FLUSH_TLB;
+        break;
+    case UVMF_TLB_FLUSH_ALL:
+        flush_tlb_mask(d->cpuset);
+        percpu_info[cpu].deferred_ops &= ~DOP_FLUSH_TLB;
+        break;
+    case UVMF_INVLPG_LOCAL:
         __flush_tlb_one(va);
+        break;
+    case UVMF_INVLPG_ALL:
+        flush_tlb_mask(d->cpuset); /* XXX KAF XXX */
+        break;
+    }
 
-    if ( unlikely(deferred_ops & DOP_RELOAD_LDT) )
-        (void)map_ldt_shadow_page(0);
+    process_deferred_ops(cpu);
     
     UNLOCK_BIGLOCK(d);
 
@@ -2083,9 +2063,6 @@ int do_update_va_mapping_otherdomain(unsigned long va,
     }
 
     rc = do_update_va_mapping(va, val, flags);
-
-    put_domain(d);
-    percpu_info[cpu].foreign = NULL;
 
     return rc;
 }
@@ -3175,6 +3152,97 @@ void audit_domains_key(unsigned char key)
 }
 
 #endif /* NDEBUG */
+
+/* Graveyard: stuff below may be useful in future. */
+#if 0
+    case MMUEXT_TRANSFER_PAGE:
+        domid  = (domid_t)(val >> 16);
+        gntref = (grant_ref_t)((val & 0xFF00) | ((ptr >> 2) & 0x00FF));
+        
+        if ( unlikely(IS_XEN_HEAP_FRAME(page)) ||
+             unlikely(!pfn_is_ram(pfn)) ||
+             unlikely((e = find_domain_by_id(domid)) == NULL) )
+        {
+            MEM_LOG("Bad frame (%p) or bad domid (%d).\n", pfn, domid);
+            okay = 0;
+            break;
+        }
+
+        spin_lock(&d->page_alloc_lock);
+
+        /*
+         * The tricky bit: atomically release ownership while there is just one
+         * benign reference to the page (PGC_allocated). If that reference
+         * disappears then the deallocation routine will safely spin.
+         */
+        _d  = pickle_domptr(d);
+        _nd = page->u.inuse._domain;
+        y   = page->count_info;
+        do {
+            x = y;
+            if ( unlikely((x & (PGC_count_mask|PGC_allocated)) != 
+                          (1|PGC_allocated)) ||
+                 unlikely(_nd != _d) )
+            {
+                MEM_LOG("Bad page values %p: ed=%p(%u), sd=%p,"
+                        " caf=%08x, taf=%08x\n", page_to_pfn(page),
+                        d, d->id, unpickle_domptr(_nd), x, 
+                        page->u.inuse.type_info);
+                spin_unlock(&d->page_alloc_lock);
+                put_domain(e);
+                return 0;
+            }
+            __asm__ __volatile__(
+                LOCK_PREFIX "cmpxchg8b %2"
+                : "=d" (_nd), "=a" (y),
+                "=m" (*(volatile u64 *)(&page->count_info))
+                : "0" (_d), "1" (x), "c" (NULL), "b" (x) );
+        } 
+        while ( unlikely(_nd != _d) || unlikely(y != x) );
+
+        /*
+         * Unlink from 'd'. At least one reference remains (now anonymous), so
+         * noone else is spinning to try to delete this page from 'd'.
+         */
+        d->tot_pages--;
+        list_del(&page->list);
+        
+        spin_unlock(&d->page_alloc_lock);
+
+        spin_lock(&e->page_alloc_lock);
+
+        /*
+         * Check that 'e' will accept the page and has reservation headroom.
+         * Also, a domain mustn't have PGC_allocated pages when it is dying.
+         */
+        ASSERT(e->tot_pages <= e->max_pages);
+        if ( unlikely(test_bit(DF_DYING, &e->d_flags)) ||
+             unlikely(e->tot_pages == e->max_pages) ||
+             unlikely(!gnttab_prepare_for_transfer(e, d, gntref)) )
+        {
+            MEM_LOG("Transferee has no reservation headroom (%d,%d), or "
+                    "provided a bad grant ref, or is dying (%p).\n",
+                    e->tot_pages, e->max_pages, e->d_flags);
+            spin_unlock(&e->page_alloc_lock);
+            put_domain(e);
+            okay = 0;
+            break;
+        }
+
+        /* Okay, add the page to 'e'. */
+        if ( unlikely(e->tot_pages++ == 0) )
+            get_knownalive_domain(e);
+        list_add_tail(&page->list, &e->page_list);
+        page_set_owner(page, e);
+
+        spin_unlock(&e->page_alloc_lock);
+
+        /* Transfer is all done: tell the guest about its new page frame. */
+        gnttab_notify_transfer(e, gntref, pfn);
+        
+        put_domain(e);
+        break;
+#endif
 
 /*
  * Local variables:

@@ -52,7 +52,7 @@ void xen_l1_entry_update(pte_t *ptr, unsigned long val)
     mmu_update_t u;
     u.ptr = virt_to_machine(ptr);
     u.val = val;
-    BUG_ON(HYPERVISOR_mmu_update(&u, 1, NULL) < 0);
+    BUG_ON(HYPERVISOR_mmu_update(&u, 1, NULL, DOMID_SELF) < 0);
 }
 
 void xen_l2_entry_update(pmd_t *ptr, pmd_t val)
@@ -60,71 +60,7 @@ void xen_l2_entry_update(pmd_t *ptr, pmd_t val)
     mmu_update_t u;
     u.ptr = virt_to_machine(ptr);
     u.val = pmd_val_ma(val);
-    BUG_ON(HYPERVISOR_mmu_update(&u, 1, NULL) < 0);
-}
-
-void xen_pt_switch(unsigned long ptr)
-{
-    mmu_update_t u;
-    u.ptr = phys_to_machine(ptr) | MMU_EXTENDED_COMMAND;
-    u.val = MMUEXT_NEW_BASEPTR;
-    BUG_ON(HYPERVISOR_mmu_update(&u, 1, NULL) < 0);
-}
-
-void xen_tlb_flush(void)
-{
-    mmu_update_t u;
-    u.ptr = MMU_EXTENDED_COMMAND;
-    u.val = MMUEXT_TLB_FLUSH;
-    BUG_ON(HYPERVISOR_mmu_update(&u, 1, NULL) < 0);
-}
-
-void xen_invlpg(unsigned long ptr)
-{
-    mmu_update_t u;
-    u.ptr = (ptr & PAGE_MASK) | MMU_EXTENDED_COMMAND;
-    u.val = MMUEXT_INVLPG;
-    BUG_ON(HYPERVISOR_mmu_update(&u, 1, NULL) < 0);
-}
-
-void xen_pgd_pin(unsigned long ptr)
-{
-    mmu_update_t u;
-    u.ptr = phys_to_machine(ptr) | MMU_EXTENDED_COMMAND;
-    u.val = MMUEXT_PIN_L2_TABLE;
-    BUG_ON(HYPERVISOR_mmu_update(&u, 1, NULL) < 0);
-}
-
-void xen_pgd_unpin(unsigned long ptr)
-{
-    mmu_update_t u;
-    u.ptr = phys_to_machine(ptr) | MMU_EXTENDED_COMMAND;
-    u.val = MMUEXT_UNPIN_TABLE;
-    BUG_ON(HYPERVISOR_mmu_update(&u, 1, NULL) < 0);
-}
-
-void xen_pte_pin(unsigned long ptr)
-{
-    mmu_update_t u;
-    u.ptr = phys_to_machine(ptr) | MMU_EXTENDED_COMMAND;
-    u.val = MMUEXT_PIN_L1_TABLE;
-    BUG_ON(HYPERVISOR_mmu_update(&u, 1, NULL) < 0);
-}
-
-void xen_pte_unpin(unsigned long ptr)
-{
-    mmu_update_t u;
-    u.ptr = phys_to_machine(ptr) | MMU_EXTENDED_COMMAND;
-    u.val = MMUEXT_UNPIN_TABLE;
-    BUG_ON(HYPERVISOR_mmu_update(&u, 1, NULL) < 0);
-}
-
-void xen_set_ldt(unsigned long ptr, unsigned long len)
-{
-    mmu_update_t u;
-    u.ptr = ptr | MMU_EXTENDED_COMMAND;
-    u.val = (len << MMUEXT_CMD_SHIFT) | MMUEXT_SET_LDT;
-    BUG_ON(HYPERVISOR_mmu_update(&u, 1, NULL) < 0);
+    BUG_ON(HYPERVISOR_mmu_update(&u, 1, NULL, DOMID_SELF) < 0);
 }
 
 void xen_machphys_update(unsigned long mfn, unsigned long pfn)
@@ -132,7 +68,71 @@ void xen_machphys_update(unsigned long mfn, unsigned long pfn)
     mmu_update_t u;
     u.ptr = (mfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
     u.val = pfn;
-    BUG_ON(HYPERVISOR_mmu_update(&u, 1, NULL) < 0);
+    BUG_ON(HYPERVISOR_mmu_update(&u, 1, NULL, DOMID_SELF) < 0);
+}
+
+void xen_pt_switch(unsigned long ptr)
+{
+    struct mmuext_op op;
+    op.cmd = MMUEXT_NEW_BASEPTR;
+    op.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
+    BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
+}
+
+void xen_tlb_flush(void)
+{
+    struct mmuext_op op;
+    op.cmd = MMUEXT_TLB_FLUSH_LOCAL;
+    BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
+}
+
+void xen_invlpg(unsigned long ptr)
+{
+    struct mmuext_op op;
+    op.cmd = MMUEXT_INVLPG_LOCAL;
+    op.linear_addr = ptr & PAGE_MASK;
+    BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
+}
+
+void xen_pgd_pin(unsigned long ptr)
+{
+    struct mmuext_op op;
+    op.cmd = MMUEXT_PIN_L2_TABLE;
+    op.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
+    BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
+}
+
+void xen_pgd_unpin(unsigned long ptr)
+{
+    struct mmuext_op op;
+    op.cmd = MMUEXT_UNPIN_TABLE;
+    op.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
+    BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
+}
+
+void xen_pte_pin(unsigned long ptr)
+{
+    struct mmuext_op op;
+    op.cmd = MMUEXT_PIN_L1_TABLE;
+    op.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
+    BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
+}
+
+void xen_pte_unpin(unsigned long ptr)
+{
+    struct mmuext_op op;
+    op.cmd = MMUEXT_UNPIN_TABLE;
+    op.mfn = pfn_to_mfn(ptr >> PAGE_SHIFT);
+    BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
+}
+
+void xen_set_ldt(unsigned long ptr, unsigned long len)
+{
+    struct mmuext_op op;
+    op.cmd = MMUEXT_SET_LDT;
+    op.linear_addr = ptr;
+    op.nr_ents = len;
+    BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
 
 #ifdef CONFIG_XEN_PHYSDEV_ACCESS

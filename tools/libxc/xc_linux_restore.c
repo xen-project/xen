@@ -422,10 +422,8 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
     {
         if ( pfn_type[i] == (L1TAB|LPINTAB) )
         {
-            if ( add_mmu_update(xc_handle, mmu,
-                                (pfn_to_mfn_table[i]<<PAGE_SHIFT) | 
-                                MMU_EXTENDED_COMMAND,
-                                MMUEXT_PIN_L1_TABLE) ) {
+            if ( pin_table(xc_handle, MMUEXT_PIN_L1_TABLE,
+                           pfn_to_mfn_table[i], dom) ) {
                 printf("ERR pin L1 pfn=%lx mfn=%lx\n",
                        (unsigned long)i, pfn_to_mfn_table[i]);
                 goto out;
@@ -438,11 +436,8 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
     {
         if ( pfn_type[i] == (L2TAB|LPINTAB) )
         {
-            if ( add_mmu_update(xc_handle, mmu,
-                                (pfn_to_mfn_table[i]<<PAGE_SHIFT) | 
-                                MMU_EXTENDED_COMMAND,
-                                MMUEXT_PIN_L2_TABLE) )
-            {
+            if ( pin_table(xc_handle, MMUEXT_PIN_L2_TABLE,
+                           pfn_to_mfn_table[i], dom) ) {
                 printf("ERR pin L2 pfn=%lx mfn=%lx\n",
                        (unsigned long)i, pfn_to_mfn_table[i]);
                 goto out;
@@ -623,10 +618,12 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
     }
     if ( (ctxt.kernel_ss & 3) == 0 )
         ctxt.kernel_ss = FLAT_KERNEL_DS;
+#if defined(__i386__)
     if ( (ctxt.event_callback_cs & 3) == 0 )
         ctxt.event_callback_cs = FLAT_KERNEL_CS;
     if ( (ctxt.failsafe_callback_cs & 3) == 0 )
         ctxt.failsafe_callback_cs = FLAT_KERNEL_CS;
+#endif
     if ( ((ctxt.ldt_base & (PAGE_SIZE - 1)) != 0) ||
          (ctxt.ldt_ents > 8192) ||
          (ctxt.ldt_base > HYPERVISOR_VIRT_START) ||

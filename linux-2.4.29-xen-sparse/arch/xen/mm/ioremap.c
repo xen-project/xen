@@ -113,12 +113,7 @@ int direct_remap_area_pages(struct mm_struct *mm,
     int i;
     unsigned long start_address;
 #define MAX_DIRECTMAP_MMU_QUEUE 130
-    mmu_update_t u[MAX_DIRECTMAP_MMU_QUEUE], *w, *v;
-
-    u[0].ptr  = MMU_EXTENDED_COMMAND;
-    u[0].val  = MMUEXT_SET_FOREIGNDOM;
-    u[0].val |= (unsigned long)domid << 16;
-    v = w = &u[1];
+    mmu_update_t u[MAX_DIRECTMAP_MMU_QUEUE], *v = u;
 
     start_address = address;
 
@@ -130,11 +125,11 @@ int direct_remap_area_pages(struct mm_struct *mm,
 	    __direct_remap_area_pages( mm,
 				       start_address, 
 				       address-start_address, 
-				       w);
+				       u);
 	    
-	    if ( HYPERVISOR_mmu_update(u, v - u, NULL) < 0 )
+	    if ( HYPERVISOR_mmu_update(u, v - u, NULL, domid) < 0 )
 		return -EFAULT;	    
-	    v = w;
+	    v = u;
 	    start_address = address;
 	}
 
@@ -149,14 +144,14 @@ int direct_remap_area_pages(struct mm_struct *mm,
         v++;
     }
 
-    if ( v != w )
+    if ( v != u )
     {
 	/* get the ptep's filled in */
 	__direct_remap_area_pages(mm,
                                   start_address, 
                                   address-start_address, 
-                                  w);	 
-	if ( unlikely(HYPERVISOR_mmu_update(u, v - u, NULL) < 0) )
+                                  u);	 
+	if ( unlikely(HYPERVISOR_mmu_update(u, v - u, NULL, domid) < 0) )
 	    return -EFAULT;	    
     }
     

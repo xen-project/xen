@@ -449,6 +449,7 @@ ENTRY(hypercall_table)
         .quad SYMBOL_NAME(do_switch_to_user)
         .quad SYMBOL_NAME(do_boot_vcpu)
         .quad SYMBOL_NAME(do_set_segment_base)   /* 25 */
+        .quad SYMBOL_NAME(do_mmuext_op)
         .rept NR_hypercalls-((.-hypercall_table)/4)
         .quad SYMBOL_NAME(do_ni_hypercall)
         .endr

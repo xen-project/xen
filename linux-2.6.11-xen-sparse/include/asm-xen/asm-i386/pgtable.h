@@ -407,7 +407,7 @@ extern void noexec_setup(const char *str);
 	do {								  \
 		if (__dirty) {						  \
 		        if ( likely((__vma)->vm_mm == current->mm) ) {    \
-			    HYPERVISOR_update_va_mapping((__address), (__entry), UVMF_INVLPG); \
+			    HYPERVISOR_update_va_mapping((__address), (__entry), UVMF_INVLPG_LOCAL); \
 			} else {                                          \
                             xen_l1_entry_update((__ptep), (__entry).pte_low); \
 			    flush_tlb_page((__vma), (__address));         \
@@ -455,7 +455,6 @@ void make_pages_writable(void *va, unsigned int nr);
 #define kern_addr_valid(addr)	(1)
 #endif /* !CONFIG_DISCONTIGMEM */
 
-#define DOMID_LOCAL (0xFFFFU)
 int direct_remap_area_pages(struct mm_struct *mm,
                             unsigned long address, 
                             unsigned long machine_addr,

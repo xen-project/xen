@@ -126,16 +126,33 @@ HYPERVISOR_set_trap_table(
 
 static inline int
 HYPERVISOR_mmu_update(
-    mmu_update_t *req, int count, int *success_count)
+    mmu_update_t *req, int count, int *success_count, domid_t domid)
 {
     int ret;
-    unsigned long ign1, ign2, ign3;
+    unsigned long ign1, ign2, ign3, ign4;
 
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret), "=b" (ign1), "=c" (ign2), "=d" (ign3)
+        : "=a" (ret), "=b" (ign1), "=c" (ign2), "=d" (ign3), "=S" (ign4)
 	: "0" (__HYPERVISOR_mmu_update), "1" (req), "2" (count),
-	  "3" (success_count)
+        "3" (success_count), "4" (domid)
+	: "memory" );
+
+    return ret;
+}
+
+static inline int
+HYPERVISOR_mmuext_op(
+    struct mmuext_op *op, int count, int *success_count, domid_t domid)
+{
+    int ret;
+    unsigned long ign1, ign2, ign3, ign4;
+
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret), "=b" (ign1), "=c" (ign2), "=d" (ign3), "=S" (ign4)
+	: "0" (__HYPERVISOR_mmuext_op), "1" (op), "2" (count),
+        "3" (success_count), "4" (domid)
 	: "memory" );
 
     return ret;
