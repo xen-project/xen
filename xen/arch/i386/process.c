@@ -31,6 +31,9 @@
 #include <xeno/irq.h>
 #include <xeno/event.h>
 
+#define GET_SYSCALL_REGS(_p) \
+    (((struct pt_regs *)(THREAD_SIZE + (unsigned long)(_p))) - 1)
+
 asmlinkage void ret_from_newdomain(void) __asm__("ret_from_newdomain");
 
 int hlt_counter;
@@ -247,9 +250,7 @@ void new_thread(struct task_struct *p,
                 unsigned long start_stack,
                 unsigned long start_info)
 {
-    struct pt_regs * regs;
-
-    regs = ((struct pt_regs *) (THREAD_SIZE + (unsigned long) p)) - 1;
+    struct pt_regs *regs = GET_SYSCALL_REGS(p);
     memset(regs, 0, sizeof(*regs));
 
     /*
@@ -344,4 +345,13 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
         loaddebug(next, 7);
     }
 
+}
+
+
+long do_iopl(unsigned int new_iopl)
+{
+    struct pt_regs *regs = GET_SYSCALL_REGS(current);
+    if ( !IS_PRIV(current) ) return -EPERM;
+    regs->eflags = (regs->eflags & 0xffffcfff) | ((new_iopl&3) << 12);
+    return 0;
 }

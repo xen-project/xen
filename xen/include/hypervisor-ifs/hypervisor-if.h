@@ -48,6 +48,7 @@
 #define __HYPERVISOR_dom_mem_op		  17
 #define __HYPERVISOR_multicall		  18
 #define __HYPERVISOR_kbd_op               19
+#define __HYPERVISOR_iopl                 20
 
 /* And the trap vector is... */
 #define TRAP_INSTR "int $0x82"
@@ -242,8 +243,13 @@ typedef struct start_info_st {
     unsigned long net_rings[MAX_DOMAIN_VIFS];
     /* Machine address of block-device ring. Will be page aligned. */
     unsigned long blk_ring;
+    unsigned int  dom_id;
+    unsigned long flags; 
     unsigned char cmd_line[1];	  /* variable-length */
 } start_info_t;
+
+/* These flags are passed in the 'flags' field of start_info_t. */
+#define SIF_PRIVILEGED 1          /* Is thie domain privileged? */
 
 /* For use in guest OSes. */
 extern shared_info_t *HYPERVISOR_shared_info;

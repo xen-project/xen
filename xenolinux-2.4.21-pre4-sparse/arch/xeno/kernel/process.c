@@ -363,7 +363,12 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
     }
 
     if ( next->esp0 != 0 )
+    {
         queue_multicall2(__HYPERVISOR_stack_switch, __KERNEL_DS, next->esp0);
+        /* Next call will silently fail if we are a non-privileged guest OS. */
+        queue_multicall1(__HYPERVISOR_iopl, 
+                         ((((struct pt_regs *)next->esp0)-1)->eflags>>12)&3);
+    }
 
     /* EXECUTE ALL TASK SWITCH XEN SYSCALLS AT THIS POINT. */
     execute_multicall_list();
