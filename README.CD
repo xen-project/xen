@@ -436,6 +436,97 @@ Alternatively, telnet can be used in 'char mode' if the Xen machine is
 connected to a serial-port server.
 
 
+Installing Xen / XenoLinux on a RedHat distribution
+===================================================
+
+When using Xen / Xenolinux on a standard Linux distribution there are
+a couple of things to watch out for:
+
+The first Linux VM that is started when Xen boots start (Domain 0) is
+given direct access to the graphics card, so it may use it as a
+console. Other domains don't have ttyN consoles, so attempts to run a
+'mingetty' against them will fail, generating periodic warning
+messages from 'init' about services respawning too fast. They should
+work for domain0 just fine.
+
+In future, we may make the current 'xencons' accept input as well as
+output, so that a getty can be run against it. In the meantime, other
+domains don't have a console suitable for logging in on, so you'll
+have to run sshd and ssh in to them.
+
+To prevent the warning messages you'll need to remove them from
+/etc/inittab for domains>0.  Due to a bug in the RH9 /etc/rc.sysinit
+script #'ing the lines out of /etc/inittab won't work as it ignores
+the '#' and tries to access them anyway.
+
+Also, because domains>0 don't have any privileged access at all,
+certain commands in the default boot sequence will fail e.g. attempts
+to update the hwclock, change the console font, update the keytable
+map, start apmd (power management), or gpm (mouse cursor).  Either
+ignore the errors, or remove them from the startup scripts.  Deleting
+the following links are a good start: S24pcmcia S09isdn S17keytable
+S26apmd S85gpm
+
+If you want to use a single root file system that works cleanly for
+domain0 and domains>0, one trick is to use different 'init' run
+levels. For example, on the Xen Demo CD we use run level 3 for domain
+0, and run level 4 for domains>0. This enables different startup
+scripts to be run in depending on the run level number passed on the
+kernel command line. The xenctl.xml config file on the CD passes '4'
+on the kernel command line to domains that it starts.
+
+Xenolinux kernels can be built to use runtime loadable modules just
+like normal linux kernels. Modules should be installed under
+/lib/modules in the normal way.
+
+If there's some kernel feature that hasn't been built into our default
+kernel, there's a pretty good change that if its a non-hardware
+related option you'll just be able to enable it and rebuild.  If its
+not on the xconfig menu, hack the arch/xeno/config.in to put the menu
+back in.
+
+If you're going to use the link local 169.254.1.x addresses to
+communicate between VMs, there are a couple of other issues to watch
+out for. RH9 appears to have a bug where by default it configures the
+loopback interface with a 169.254 address, which stops it working
+properly on eth0 for communicating with other domains.
+
+This utterly daft RH9 behaviour can be stopped by appending
+"NOZEROCONF=yes" to /etc/sysconfig/networking-scripts/ifcfg-lo
+
+If you're going to use NFS root files systems mounted either from an
+external server or from domain0 there are a couple of other gotchas.
+The default /etc/sysconfig/iptables rules block NFS, so part way
+through the boot sequence things will suddenly go dead.
+
+If you're planning on having a separate NFS /usr partition, the RH9
+boot scripts don't make life easy, as they attempt to mount NFS file
+systems way to late in the boot process. The easiest way I found to do
+this was to have a '/linuxrc' script run ahead of /sbin/init that
+mounts /usr:
+ #!/bin/bash
+ /sbin/ipconfig lo 127.0.0.1
+ /sbin/portmap
+ /bin/mount /usr
+ exec /sbin/init "$@" <>/dev/console 2>&1
+
+The one slight complication with the above is that /sbib/portmap is
+dynamically linked against /usr/lib/libwrap.so.0 Since this is in
+/usr, it won't work. I solved this by copying the file (and link)
+below the /usr mount point, and just let the file be 'covered' when
+the mount happens.
+
+In some installations, where a shared read-only /usr is being used, it
+may be desirable to move other large directories over into the
+read-only /usr. For example, on the XenDemoCD we replace /bin /lib and
+/sbin with links into /usr/root/bin /usr/root/lib and /usr/root/sbin
+respectively. This creates other problems for running the /linuxrc
+script, requiring bash, portmap, mount, ifconfig, and a handful of
+other shared libraries to be copied below the mount point. I guess I
+should have written a little statically linked C program...
+
+
+
 Description of how the XenDemoCD boots
 ======================================
 
