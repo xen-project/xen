@@ -320,21 +320,6 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 #define set_wmb(var, value) do { var = value; wmb(); } while (0)
 
 
-#define __save_flags(x)                                                       \
-do {                                                                          \
-    (x) = test_bit(EVENTS_MASTER_ENABLE_BIT,                                  \
-                   &HYPERVISOR_shared_info->events_mask);                     \
-    barrier();                                                                \
-} while (0)
-
-#define __restore_flags(x)                                                    \
-do {                                                                          \
-    shared_info_t *_shared = HYPERVISOR_shared_info;                          \
-    if (x) set_bit(EVENTS_MASTER_ENABLE_BIT, &_shared->events_mask);          \
-    barrier();                                                                \
-    if ( unlikely(_shared->events) && (x) ) do_hypervisor_callback(NULL);     \
-} while (0)
-
 #define __cli()                                                               \
 do {                                                                          \
     clear_bit(EVENTS_MASTER_ENABLE_BIT, &HYPERVISOR_shared_info->events_mask);\
@@ -348,6 +333,15 @@ do {                                                                          \
     barrier();                                                                \
     if ( unlikely(_shared->events) ) do_hypervisor_callback(NULL);            \
 } while (0)
+
+#define __save_flags(x)                                                       \
+do {                                                                          \
+    (x) = test_bit(EVENTS_MASTER_ENABLE_BIT,                                  \
+                   &HYPERVISOR_shared_info->events_mask);                     \
+    barrier();                                                                \
+} while (0)
+
+#define __restore_flags(x)      do { if (x) __sti(); } while (0)
 
 #define safe_halt()             ((void)0)
 
