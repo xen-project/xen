@@ -362,6 +362,8 @@ static int __init init_module(void)
 
     /* set up /proc entries for dom 0 */
     create_proc_dom_entries(0);
+
+	printk(KERN_ALERT "bd240 debug: task 1 addr %lx\n", find_task_by_pid(1));
     
     return 0;
 }
