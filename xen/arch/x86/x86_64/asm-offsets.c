@@ -38,14 +38,14 @@ void __dummy__(void)
     OFFSET(XREGS_ss, struct xen_regs, ss);
     BLANK();
 
-    OFFSET(DOMAIN_processor, struct domain, processor);
-    OFFSET(DOMAIN_shared_info, struct domain, shared_info);
-    OFFSET(DOMAIN_event_sel, struct domain, thread.event_selector);
-    OFFSET(DOMAIN_event_addr, struct domain, thread.event_address);
-    OFFSET(DOMAIN_failsafe_sel, struct domain, thread.failsafe_selector);
-    OFFSET(DOMAIN_failsafe_addr, struct domain, thread.failsafe_address);
-    OFFSET(DOMAIN_trap_bounce, struct domain, thread.trap_bounce);
-    OFFSET(DOMAIN_thread_flags, struct domain, thread.flags);
+    OFFSET(EDOMAIN_processor, struct exec_domain, processor);
+    OFFSET(EDOMAIN_vcpu_info, struct exec_domain, vcpu_info);
+    OFFSET(EDOMAIN_event_sel, struct exec_domain, thread.event_selector);
+    OFFSET(EDOMAIN_event_addr, struct exec_domain, thread.event_address);
+    OFFSET(EDOMAIN_failsafe_sel, struct exec_domain, thread.failsafe_selector);
+    OFFSET(EDOMAIN_failsafe_addr, struct exec_domain, thread.failsafe_address);
+    OFFSET(EDOMAIN_trap_bounce, struct exec_domain, thread.trap_bounce);
+    OFFSET(EDOMAIN_thread_flags, struct exec_domain, thread.flags);
     BLANK();
 
     OFFSET(SHINFO_upcall_pending, shared_info_t, 

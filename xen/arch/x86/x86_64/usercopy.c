@@ -88,7 +88,7 @@ unsigned long __clear_user(void *addr, unsigned long size)
 		"	.quad 1b,2b\n"
 		".previous"
 		: [size8] "=c"(size), [dst] "=&D" (__d0)
-		: [size1] "r"(size & 7), "[size8]" (size / 8), "[dst] "(addr),
+		: [size1] "r"(size & 7), "[size8]" (size / 8), "[dst]"(addr),
 		  [zero] "r" (0UL), [eight] "r" (8UL));
 	return size;
 }

@@ -252,11 +252,14 @@ map_domain_mem:
 unmap_domain_mem:
 ret_from_intr:
 #undef machine_to_phys_mapping
+#undef phys_to_machine_mapping
 .globl copy_to_user, set_intr_gate, die, machine_to_phys_mapping
+.globl phys_to_machine_mapping
 copy_to_user:
 set_intr_gate:
 die:
 machine_to_phys_mapping:
+phys_to_machine_mapping:
 .globl copy_from_user, show_registers, do_iopl
 copy_from_user: 
 show_registers: 

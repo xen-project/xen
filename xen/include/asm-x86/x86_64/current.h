@@ -9,18 +9,18 @@ struct domain;
 #define STACK_RESERVED \
     (sizeof(execution_context_t))
 
-static inline struct domain * get_current(void)
+static inline struct exec_domain *get_current(void)
 {
-    struct domain *current;
-    current = read_pda(pcurrent);
-    return current;
+    struct exec_domain *ed;
+    ed = read_pda(pcurrent);
+    return ed;
 }
  
 #define current get_current()
 
-static inline void set_current(struct domain *p)
+static inline void set_current(struct exec_domain *ed)
 {
-    write_pda(pcurrent,p);
+    write_pda(pcurrent, ed);
 }
 
 static inline execution_context_t *get_execution_context(void)

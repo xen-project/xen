@@ -478,17 +478,12 @@ struct mm_struct {
     l1_pgentry_t *perdomain_ptes;
     pagetable_t  pagetable;
 
-#ifdef CONFIG_VMX
-
-#define SHM_full_32     (8) /* full virtualization for 32-bit */
-
-        pagetable_t  monitor_table;
-        l2_pgentry_t *vpagetable;	/* virtual address of pagetable */
-        l2_pgentry_t *shadow_vtable;	/* virtual address of shadow_table */
-        l2_pgentry_t *guest_pl2e_cache;	/* guest page directory cache */
-        unsigned long min_pfn;		/* min host physical */
-        unsigned long max_pfn;		/* max host physical */
-#endif
+    pagetable_t  monitor_table;
+    l2_pgentry_t *vpagetable;	/* virtual address of pagetable */
+    l2_pgentry_t *shadow_vtable;	/* virtual address of shadow_table */
+    l2_pgentry_t *guest_pl2e_cache;	/* guest page directory cache */
+    unsigned long min_pfn;		/* min host physical */
+    unsigned long max_pfn;		/* max host physical */
 
     /* shadow mode status and controls */
     unsigned int shadow_mode;  /* flags to control shadow table operation */

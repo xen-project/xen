@@ -450,7 +450,7 @@ unsigned long shadow_l2_table(
 {
     struct pfn_info *spfn_info;
     unsigned long    spfn;
-    l2_pgentry_t    *spl2e = 0, *gpl2e;
+    l2_pgentry_t    *spl2e = 0;
     unsigned long guest_gpfn;
 
     __get_machine_to_phys(m, guest_gpfn, gpfn);
@@ -471,17 +471,19 @@ unsigned long shadow_l2_table(
  
 #ifdef __i386__
     /* Install hypervisor and 2x linear p.t. mapings. */
-    if (m->shadow_mode == SHM_full_32) 
+    if ( m->shadow_mode == SHM_full_32 )
+    {
         vmx_update_shadow_state(m, gpfn, spfn);
-    else {
+    }
+    else
+    {
         spl2e = (l2_pgentry_t *)map_domain_mem(spfn << PAGE_SHIFT);
-        // can't use the linear map as we may not be in the right PT
-        gpl2e = (l2_pgentry_t *) map_domain_mem(gpfn << PAGE_SHIFT);
         /*
-         * We could proactively fill in PDEs for pages that are already shadowed.
-         * However, we tried it and it didn't help performance. This is simpler.
+         * We could proactively fill in PDEs for pages that are already
+         * shadowed. However, we tried it and it didn't help performance.
+         * This is simpler.
          */
-        memset(spl2e, 0, DOMAIN_ENTRIES_PER_L2_PAGETABLE * sizeof(l2_pgentry_t));
+        memset(spl2e, 0, DOMAIN_ENTRIES_PER_L2_PAGETABLE*sizeof(l2_pgentry_t));
 
         /* Install hypervisor and 2x linear p.t. mapings. */
         memcpy(&spl2e[DOMAIN_ENTRIES_PER_L2_PAGETABLE], 
@@ -497,10 +499,8 @@ unsigned long shadow_l2_table(
     }
 #endif
 
-    if (m->shadow_mode != SHM_full_32) 
-    {                           
+    if ( m->shadow_mode != SHM_full_32 ) 
         unmap_domain_mem(spl2e);
-    }
 
     SH_VLOG("shadow_l2_table( %08lx -> %08lx)", gpfn, spfn);
     return spfn;

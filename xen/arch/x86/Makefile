@@ -12,6 +12,12 @@ OBJS += $(patsubst %.c,%.o,$(wildcard mtrr/*.c))
 
 OBJS := $(subst $(TARGET_SUBARCH)/asm-offsets.o,,$(OBJS))
 
+ifneq ($(TARGET_SUBARCH),i386)
+OBJS := $(subst vmx.o,,$(OBJS))
+OBJS := $(subst vmx_io.o,,$(OBJS))
+OBJS := $(subst vmx_vmcs.o,,$(OBJS))
+endif ($(TARGET_SUBARCH),i386)
+
 default: boot/$(TARGET_SUBARCH).o $(OBJS) boot/mkelf32
 	$(LD) $(LDFLAGS) -r -o arch.o $(OBJS)
 	$(LD) $(LDFLAGS) -T $(TARGET_SUBARCH)/xen.lds -N \

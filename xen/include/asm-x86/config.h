@@ -4,10 +4,13 @@
  * A Linux-style configuration list.
  */
 
-#ifndef __XEN_I386_CONFIG_H__
-#define __XEN_I386_CONFIG_H__
+#ifndef __X86_CONFIG_H__
+#define __X86_CONFIG_H__
 
+#ifdef __i386__
 #define CONFIG_VMX 1
+#endif
+
 #define CONFIG_X86 1
 
 #define CONFIG_SMP 1
@@ -228,4 +231,4 @@ extern unsigned long xenheap_phys_end; /* user-configurable */
 #define ELFSIZE 32
 #endif
 
-#endif /* __XEN_I386_CONFIG_H__ */
+#endif /* __X86_CONFIG_H__ */

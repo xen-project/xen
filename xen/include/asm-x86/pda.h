@@ -9,7 +9,7 @@ struct x8664_pda {
 	unsigned long kernelstack;  /* TOS for current process */ 
 	unsigned long oldrsp; 	    /* user rsp for system call */
 	unsigned long irqrsp;	    /* Old rsp for interrupts. */ 
-	struct domain *pcurrent;	/* Current process */
+	struct exec_domain *pcurrent;	/* Current process */
         int irqcount;		    /* Irq nesting counter. Starts with -1 */  	
 	int cpunumber;		    /* Logical CPU number */
 	char *irqstackptr;	/* top of irqstack */
