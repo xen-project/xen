@@ -530,7 +530,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
         skb->protocol = eth_type_trans(skb, dev);
 
         /* Pass it up. */
-        netif_rx(skb);
+        netif_receive_skb(skb);
         dev->last_rx = jiffies;
     }
 
