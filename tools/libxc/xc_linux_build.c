@@ -127,6 +127,8 @@ static int setup_guestos(int xc_handle,
     unsigned long vpt_end;
     unsigned long v_end;
 
+    char *n_vcpus;
+
     memset(&dsi, 0, sizeof(struct domain_setup_info));
 
     rc = parseelfimage(image, image_size, &dsi);
@@ -335,7 +337,11 @@ static int setup_guestos(int xc_handle,
     /* Mask all upcalls... */
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
         shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
-    shared_info->n_vcpu = 32;
+    n_vcpus = getenv("XEN_VCPUS");
+    if ( n_vcpus )
+	shared_info->n_vcpu = atoi(n_vcpus);
+    else
+	shared_info->n_vcpu = 1;
     munmap(shared_info, PAGE_SIZE);
 
     /* Send the page update requests down to the hypervisor. */
