@@ -558,10 +558,10 @@ static int parseelfimage(char *elfbase,
         phdr = (Elf_Phdr *)(elfbase + ehdr->e_phoff + (h*ehdr->e_phentsize));
         if ( !is_loadable_phdr(phdr) )
             continue;
-        if ( phdr->p_vaddr < kernstart )
-            kernstart = phdr->p_vaddr;
-        if ( (phdr->p_vaddr + phdr->p_memsz) > kernend )
-            kernend = phdr->p_vaddr + phdr->p_memsz;
+        if ( phdr->p_paddr < kernstart )
+            kernstart = phdr->p_paddr;
+        if ( (phdr->p_paddr + phdr->p_memsz) > kernend )
+            kernend = phdr->p_paddr + phdr->p_memsz;
     }
 
     if ( (kernstart > kernend) || 
@@ -611,7 +611,7 @@ loadelfimage(
         
         for ( done = 0; done < phdr->p_filesz; done += chunksz )
         {
-            pa = (phdr->p_vaddr + done) - vstart;
+            pa = (phdr->p_paddr + done) - vstart;
             va = xc_map_foreign_range(
                 xch, dom, PAGE_SIZE, PROT_WRITE, parray[pa>>PAGE_SHIFT]);
             chunksz = phdr->p_filesz - done;
@@ -624,7 +624,7 @@ loadelfimage(
 
         for ( ; done < phdr->p_memsz; done += chunksz )
         {
-            pa = (phdr->p_vaddr + done) - vstart;
+            pa = (phdr->p_paddr + done) - vstart;
             va = xc_map_foreign_range(
                 xch, dom, PAGE_SIZE, PROT_WRITE, parray[pa>>PAGE_SHIFT]);
             chunksz = phdr->p_memsz - done;
