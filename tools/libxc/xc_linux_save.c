@@ -12,8 +12,8 @@
 
 #define BATCH_SIZE 1024   /* 1024 pages (4MB) at a time */
 
-#define DEBUG 1
-#define DDEBUG 1
+#define DEBUG  0
+#define DDEBUG 0
 
 #if DEBUG
 #define DPRINTF(_f, _a...) printf ( _f , ## _a )
@@ -413,12 +413,12 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 
     /* Setup the mfn_to_pfn table mapping */
     mfn_to_pfn_table_start_mfn = xc_get_m2p_start_mfn( xc_handle );
-printf("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n");
+
     live_mfn_to_pfn_table = 
 	xc_map_foreign_range(xc_handle, DOMID_XEN, 
 			      PAGE_SIZE*1024, PROT_READ, 
 			      mfn_to_pfn_table_start_mfn );
-printf("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB\n");
+
     /* Canonicalise the pfn-to-mfn table frame-number list. */
     memcpy( pfn_to_mfn_frame_list, live_pfn_to_mfn_frame_list, PAGE_SIZE );
 
@@ -432,8 +432,8 @@ printf("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB\n");
 
     /* Domain is still running at this point */
 
-    if( live ){
-printf("GO LIVE!!\n");
+    if( live )
+    {
         if ( xc_shadow_control( xc_handle, domid, 
                                 DOM0_SHADOW_CONTROL_OP_ENABLE_LOGDIRTY,
                                 NULL, 0, NULL ) < 0 ) {
@@ -669,7 +669,6 @@ printf("GO LIVE!!\n");
             for ( j = 0; j < batch; j++ ){
                 if ( (pfn_type[j] & LTAB_MASK) == XTAB ){
                     DDPRINTF("type fail: page %i mfn %08lx\n",j,pfn_type[j]);
-printf("type fail: page %i mfn %08lx\n",j,pfn_type[j]);
                     continue;
                 }
   
@@ -902,9 +901,6 @@ printf("type fail: page %i mfn %08lx\n",j,pfn_type[j]);
         goto out;
     }
 
-
-printf("nrpfns according to suspend record is %ld\n", p_srec->nr_pfns );
-
     if (nr_pfns != p_srec->nr_pfns )
     {
 	xcio_error(ioctxt, "Suspend record nr_pfns unexpected (%ld != %ld)",
@@ -940,7 +936,6 @@ printf("nrpfns according to suspend record is %ld\n", p_srec->nr_pfns );
         goto out;
     }
 
-printf("Everything saved OK!\n");
  out:
 
     if ( live_shinfo )          munmap(live_shinfo, PAGE_SIZE);

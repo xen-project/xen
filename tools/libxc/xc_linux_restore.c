@@ -11,7 +11,7 @@
 
 #define MAX_BATCH_SIZE 1024
 
-#define DEBUG 1
+#define DEBUG 0
 
 #if DEBUG
 #define DPRINTF(_f, _a...) printf ( _f , ## _a )
@@ -475,7 +475,6 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
     {
         if ( pfn_type[i] == (L1TAB|LPINTAB) )
         {
-printf("XXXXXXXXXXXXXXX pin L1\n");
             if ( add_mmu_update(xc_handle, mmu,
                                 (pfn_to_mfn_table[i]<<PAGE_SHIFT) | 
                                 MMU_EXTENDED_COMMAND,
@@ -487,7 +486,6 @@ printf("XXXXXXXXXXXXXXX pin L1\n");
         }
         else if ( pfn_type[i] == (L2TAB|LPINTAB) )
         {
-printf("XXXXXXXXXXXXXXX pin L2\n");
             if ( add_mmu_update(xc_handle, mmu,
                                 (pfn_to_mfn_table[i]<<PAGE_SHIFT) | 
                                 MMU_EXTENDED_COMMAND,
