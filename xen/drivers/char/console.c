@@ -235,23 +235,16 @@ static void switch_serial_input(void)
 {
     static char *input_str[2] = { "DOM0", "Xen" };
     xen_rx = !xen_rx;
-    printk("\n*** Serial input -> %s "
+    printk("*** Serial input -> %s "
            "(type 'CTRL-a' three times to switch input to %s).\n",
            input_str[xen_rx], input_str[!xen_rx]);
 }
 
-static void serial_rx(unsigned char c, struct pt_regs *regs)
+static void __serial_rx(unsigned char c, struct pt_regs *regs)
 {
     key_handler *handler;
     unsigned long cpu_mask;
     struct task_struct *p;
-    static int ctrl_a_count = 0;
-
-    if ( (ctrl_a_count = (c == CTRL_A) ? ctrl_a_count+1 : 0) >= 3 )
-    {
-        switch_serial_input();
-        ctrl_a_count = 0;
-    }
 
     if ( xen_rx )
     {
@@ -268,6 +261,29 @@ static void serial_rx(unsigned char c, struct pt_regs *regs)
             guest_event_notify(cpu_mask);
             put_task_struct(p);
         }
+    }
+}
+
+static void serial_rx(unsigned char c, struct pt_regs *regs)
+{
+    static int ctrl_a_count = 0;
+
+    if ( c == CTRL_A )
+    {
+        /* We eat CTRL-a in groups of three to switch console input. */
+        if ( ++ctrl_a_count == 3 )
+        {
+            switch_serial_input();
+            ctrl_a_count = 0;
+        }
+    }
+    else
+    {
+        /* Flush any pending CTRL-a's. They weren't for us. */
+        for ( ; ctrl_a_count != 0; ctrl_a_count-- )
+            __serial_rx(CTRL_A, regs);
+        /* Finally process the just-received character. */
+        __serial_rx(c, regs);
     }
 }
 
