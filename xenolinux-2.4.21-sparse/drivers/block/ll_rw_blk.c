@@ -1505,7 +1505,6 @@ int __init blk_dev_init(void)
     xlblk_init();
     xlseg_init();
     xlseg_proc_init();
-    xlphysdisk_proc_init();
 #endif
 
 	return 0;

@@ -56,8 +56,11 @@ typedef struct proc_mem_data {
 #define DOM_MEM         "mem"
 #define DOM_VIF         "vif"
 #define DOM_USAGE       "usage"
+#define DOM_PHD         "phd"
 
 #define MAP_DISCONT     1
+
+extern struct file_operations dom0_phd_fops;
 
 struct proc_dir_entry *xeno_base;
 static struct proc_dir_entry *dom0_cmd_intf;
@@ -217,6 +220,15 @@ static void create_proc_dom_entries(int dom)
         file->owner         = THIS_MODULE;
         file->nlink         = 1;
         file->proc_fops     = &dom_usage_ops;
+        file->data          = (void *) dom;
+    }
+
+    file = create_proc_entry(DOM_PHD, 0600, dir);
+    if (file != NULL)
+    {
+        file->owner         = THIS_MODULE;
+        file->nlink         = 1;
+        file->proc_fops     = &dom0_phd_fops;
         file->data          = (void *) dom;
     }
 }

@@ -308,7 +308,6 @@ static int hypervisor_request(unsigned long   id,
     case XEN_BLOCK_SEG_CREATE:
     case XEN_BLOCK_SEG_DELETE:
     case XEN_BLOCK_PHYSDEV_GRANT:
-    case XEN_BLOCK_PHYSDEV_REVOKE:
     case XEN_BLOCK_PHYSDEV_PROBE:
     case XEN_BLOCK_PROBE_BLK:
     case XEN_BLOCK_PROBE_SEG:
@@ -482,7 +481,6 @@ static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
         case XEN_BLOCK_PROBE_SEG:
         case XEN_BLOCK_PROBE_BLK:
 	case XEN_BLOCK_PHYSDEV_GRANT:
-	case XEN_BLOCK_PHYSDEV_REVOKE:
 	case XEN_BLOCK_PHYSDEV_PROBE:
             if ( bret->status )
                 printk(KERN_ALERT "Bad return from blkdev control request\n");

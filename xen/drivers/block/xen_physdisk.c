@@ -9,7 +9,7 @@
 
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
 
-#if 0
+#if 1
 #define DPRINTK printk
 #else
 #define DPRINTK(...)
@@ -26,8 +26,6 @@ struct physdisk_ace {
   unsigned short device;
   unsigned long start_sect;
   unsigned long n_sectors;
-#define PHYSDISK_MODE_R 1
-#define PHYSDISK_MODE_W 2
   int mode;
 };
 
@@ -82,17 +80,20 @@ static void xen_physdisk_revoke_access(unsigned short dev,
     cur_ace = list_entry(cur_ace_head, struct physdisk_ace,
 			 list);
     ace_end = cur_ace->start_sect + cur_ace->n_sectors;
-    if (cur_ace->start_sect > kill_zone_end ||
-	ace_end < start_sect)
+    if (cur_ace->start_sect >= kill_zone_end ||
+	ace_end <= start_sect)
       continue;
     
+    DPRINTK("Killing ace [%x, %x) against kill zone [%x, %x)\n",
+	    cur_ace->start_sect, ace_end, start_sect, kill_zone_end);
+
     if (cur_ace->start_sect >= start_sect &&
-	ace_end < kill_zone_end) {
+	ace_end <= kill_zone_end) {
       /* ace entirely within kill zone -> kill it */
       list_del(cur_ace_head);
-      cur_ace_head = cur_ace_head->next;
+      cur_ace_head = cur_ace_head->prev;
       kfree(cur_ace);
-    } else if (ace_end < kill_zone_end) {
+    } else if (ace_end <= kill_zone_end) {
       /* ace start before kill start, ace end in kill zone, 
 	 move ace end. */
       cur_ace->n_sectors = start_sect - cur_ace->start_sect;
@@ -102,9 +103,9 @@ static void xen_physdisk_revoke_access(unsigned short dev,
       cur_ace->start_sect = kill_zone_end;
       cur_ace->n_sectors = ace_end - cur_ace->start_sect;
     } else {
-      /* The fun one: the kill zone entirely includes the ace. */
+      /* The fun one: the ace entirely includes the kill zone. */
       /* Cut the current ace down to just the bit before the kzone,
-	 create a new ace for the bit just after it. */
+	 create a new ace for the bit just after it. */ 
       new_ace = kmalloc(sizeof(*cur_ace), GFP_KERNEL);
       new_ace->device = dev;
       new_ace->start_sect = kill_zone_end;
@@ -114,7 +115,6 @@ static void xen_physdisk_revoke_access(unsigned short dev,
       cur_ace->n_sectors = start_sect - cur_ace->start_sect;
 
       list_add(&new_ace->list, cur_ace_head);
-      cur_ace_head = new_ace->list.next;
     }
   }
 }
@@ -133,13 +133,15 @@ static int xen_physdisk_grant_access(unsigned short dev,
      and we try to grant write access, or vice versa. */
   xen_physdisk_revoke_access(dev, start_sect, n_sectors, p);
   
-  cur_ace = kmalloc(sizeof(*cur_ace), GFP_KERNEL);
-  cur_ace->device = dev;
-  cur_ace->start_sect = start_sect;
-  cur_ace->n_sectors = n_sectors;
-  cur_ace->mode = mode;
+  if (mode) {
+    cur_ace = kmalloc(sizeof(*cur_ace), GFP_KERNEL);
+    cur_ace->device = dev;
+    cur_ace->start_sect = start_sect;
+    cur_ace->n_sectors = n_sectors;
+    cur_ace->mode = mode;
 
-  list_add_tail(&cur_ace->list, &p->physdisk_aces);
+    list_add_tail(&cur_ace->list, &p->physdisk_aces);
+  }
 
   return 0;
 }
@@ -151,27 +153,25 @@ static void xen_physdisk_probe_access(physdisk_probebuf_t *buf,
   int n_aces;
   struct list_head *cur_ace_head;
   struct physdisk_ace *cur_ace;
-  int x;
+  int x = 0;
 
   max_aces = buf->n_aces;
   n_aces = 0;
   list_for_each(cur_ace_head, &p->physdisk_aces) {
-    if (x < buf->start_ind) {
-      x++;
-      continue;
+    x++;
+    if (x >= buf->start_ind) {
+      cur_ace = list_entry(cur_ace_head, struct physdisk_ace,
+			   list);
+      buf->entries[n_aces].device = cur_ace->device;
+      buf->entries[n_aces].start_sect = cur_ace->start_sect;
+      buf->entries[n_aces].n_sectors = cur_ace->n_sectors;
+      buf->entries[n_aces].mode = cur_ace->mode;
+      n_aces++;
+      if (n_aces >= max_aces)
+	break;
     }
-    cur_ace = list_entry(cur_ace_head, struct physdisk_ace,
-			 list);
-    buf->entries[n_aces].device = cur_ace->device;
-    buf->entries[n_aces].start_sect = cur_ace->start_sect;
-    buf->entries[n_aces].n_sectors = cur_ace->n_sectors;
-    buf->entries[n_aces].mode = cur_ace->mode;
-    n_aces++;
-    if (n_aces >= max_aces)
-      break;
   }
   buf->n_aces = n_aces;
-  printk("Found a total of %x aces (max %x).\n", n_aces, max_aces);
 }
 
 int xen_physdisk_grant(xp_disk_t *xpd_in)
@@ -188,7 +188,7 @@ int xen_physdisk_grant(xp_disk_t *xpd_in)
     p = p->next_task;
   } while (p != current && p->domain != xpd->domain);
   if (p->domain != xpd->domain) {
-    DPRINTK("Bad domain! No biscuit!\n");
+    DPRINTK("Bad domain!\n");
     res = 1;
     goto out;
   }
@@ -205,33 +205,6 @@ int xen_physdisk_grant(xp_disk_t *xpd_in)
   return res;
 }
 
-int xen_physdisk_revoke(xp_disk_t *xpd_in)
-{
-  struct task_struct *p;
-  xp_disk_t *xpd = map_domain_mem(virt_to_phys(xpd_in));
-  int res;
-
-  p = current;
-
-  do {
-    p = p->next_task;
-  } while (p != current && p->domain != xpd->domain);
-  if (p->domain != xpd->domain) {
-    res = 1;
-    goto out;
-  }
-  spin_lock(&p->physdev_lock);
-  xen_physdisk_revoke_access(xpd->device,
-			     xpd->start_sect,
-			     xpd->n_sectors,
-			     p);
-  spin_unlock(&p->physdev_lock);
-  res = 0;
- out:
-  unmap_domain_mem(xpd);
-  return res;
-}
-
 int xen_physdisk_probe(physdisk_probebuf_t *buf_in)
 {
   struct task_struct *p;
@@ -241,16 +214,14 @@ int xen_physdisk_probe(physdisk_probebuf_t *buf_in)
   p = current;
   do {
     p = p->next_task;
-  } while (p != current && p->domain != buf->domain);
+  } while (p != current && p->domain != buf->domain);  
   if (p->domain != buf->domain) {
     res = 1;
     goto out;
   }
-  printk("initially %x aces.\n", buf->n_aces);
   spin_lock(&p->physdev_lock);
   xen_physdisk_probe_access(buf, p);
   spin_unlock(&p->physdev_lock);
-  printk("%x aces.\n", buf->n_aces);
   res = 0;
  out:
   unmap_domain_mem(buf);

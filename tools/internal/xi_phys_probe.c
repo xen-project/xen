@@ -11,30 +11,28 @@ int main(int argc, char *argv[])
   physdisk_probebuf_t buf;
   int fd;
   int x;
+  char *strbuf;
 
   if (argc != 2) {
     fprintf(stderr, "Usage: xi_phys_probe <domain_nr>\n");
     return 1;
   }
 
-  fd = open("/proc/xeno/dom0/phd", O_RDONLY);
+  asprintf(&strbuf, "/proc/xeno/dom%s/phd", argv[1]);
+  fd = open(strbuf, O_RDONLY);
   if (fd < 0) {
-    fprintf(stderr, "Can\'t open /proc/xeno/dom0/phd: %s.\n",
-	    strerror(errno));
+    fprintf(stderr, "Can\'t open %s: %s.\n", strbuf, strerror(errno));
     return 1;
   }
+  free(strbuf);
 
   memset(&buf, 0, sizeof(buf));
   buf.n_aces = PHYSDISK_MAX_ACES_PER_REQUEST;
-  while (buf.n_aces == PHYSDISK_MAX_ACES_PER_REQUEST ||
-	 buf.n_aces == 0) {
+  do {
     buf.n_aces = PHYSDISK_MAX_ACES_PER_REQUEST;
-    buf.domain = atol(argv[1]);
     read(fd, &buf, sizeof(buf));
     if (!buf.n_aces)
       break;
-
-    printf("Found %d ACEs\n", buf.n_aces);
 
     for (x = 0; x < buf.n_aces; x++) {
       printf("%x:[%x,%x) : %x\n", buf.entries[x].device,
@@ -43,6 +41,6 @@ int main(int argc, char *argv[])
 	     buf.entries[x].mode);
     }
     buf.start_ind += buf.n_aces;
-  }
+  } while (buf.n_aces == PHYSDISK_MAX_ACES_PER_REQUEST);
   return 0;
 }
