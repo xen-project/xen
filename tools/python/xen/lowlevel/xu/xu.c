@@ -1019,6 +1019,9 @@ static PyObject *xu_message_new(PyObject *self, PyObject *args)
     case TYPE(CMSG_USBIF_BE, CMSG_USBIF_BE_RELEASE_PORT):
         PSTR2CHAR(usbif_be_release_port_t, path);
         break;
+    case TYPE(CMSG_SHUTDOWN, CMSG_SHUTDOWN_SYSRQ):
+        P2C(shutdown_sysrq_t, key, char);
+        break;
     }
 
     if ( dict_items_parsed != PyDict_Size(payload) )
