@@ -1640,14 +1640,15 @@ int ptwr_debug = 0x0;
 
 void ptwr_flush(const int which)
 {
-    unsigned long pte, *ptep;
+    unsigned long pte, *ptep, l1va;
     l1_pgentry_t *pl1e;
     l2_pgentry_t *pl2e, nl2e;
     int cpu = smp_processor_id();
     int i;
 
+    l1va = ptwr_info[cpu].ptinfo[which].l1va;
     ptep = (unsigned long *)&linear_pg_table
-        [ptwr_info[cpu].ptinfo[which].l1va>>PAGE_SHIFT];
+        [l1va>>PAGE_SHIFT];
 
     /* make pt page write protected */
     if ( unlikely(__get_user(pte, ptep)) ) {
@@ -1657,11 +1658,19 @@ void ptwr_flush(const int which)
     PTWR_PRINTK(PP_ALL, ("disconnected_l1va at %p is %08lx\n",
                          ptep, pte));
     pte &= ~_PAGE_RW;
+
+    if ( unlikely(current->mm.shadow_mode) ) {
+	unsigned long spte;
+	l1pte_no_fault(&current->mm, &pte, &spte);
+	__put_user( spte, (unsigned long *)&shadow_linear_pg_table
+		    [l1va>>PAGE_SHIFT] );
+    }
+
     if ( unlikely(__put_user(pte, ptep)) ) {
         MEM_LOG("ptwr: Could not update pte at %p\n", ptep);
         domain_crash();
     }
-    __flush_tlb_one(ptwr_info[cpu].ptinfo[which].l1va);
+    __flush_tlb_one(l1va);
     PTWR_PRINTK(PP_ALL, ("disconnected_l1va at %p now %08lx\n",
                          ptep, pte));
 
@@ -1684,8 +1693,8 @@ void ptwr_flush(const int which)
     }
     unmap_domain_mem(pl1e);
 
-    if (which == PTWR_PT_ACTIVE) {
-	/* reconnect l1 page */
+    if (which == PTWR_PT_ACTIVE && likely(!current->mm.shadow_mode)) {
+	/* reconnect l1 page (no need if shadow mode)*/
 	pl2e = &linear_l2_table[ptwr_info[cpu].active_pteidx];
 	nl2e = mk_l2_pgentry(l2_pgentry_val(*pl2e) | _PAGE_PRESENT);
 	update_l2e(pl2e, *pl2e, nl2e);
@@ -1693,7 +1702,6 @@ void ptwr_flush(const int which)
 
     if ( unlikely(current->mm.shadow_mode) )
     {
-        unsigned long spte;
         unsigned long sstat = 
             get_shadow_status(&current->mm, pte >> PAGE_SHIFT);
 
@@ -1714,9 +1722,6 @@ void ptwr_flush(const int which)
             put_shadow_status(&current->mm);
         } 
 
-        l1pte_no_fault(&current->mm, &pte, &spte);
-        __put_user(spte, (unsigned long *)&shadow_linear_pg_table
-                   [ptwr_info[cpu].ptinfo[which].l1va>>PAGE_SHIFT]);
     }
 
     ptwr_info[cpu].ptinfo[which].l1va = 0;
@@ -1771,9 +1776,9 @@ int ptwr_do_page_fault(unsigned long addr)
                 ptwr_flush(which);
             ptwr_info[cpu].ptinfo[which].l1va = addr | 1;
 
-            if (which == PTWR_PT_ACTIVE) {
+            if (which == PTWR_PT_ACTIVE && likely(!current->mm.shadow_mode)) {
                 ptwr_info[cpu].active_pteidx = va_mask;
-		/* disconnect l1 page */
+		/* disconnect l1 page (unnecessary in shadow mode) */
 		nl2e = mk_l2_pgentry((l2_pgentry_val(*pl2e) & ~_PAGE_PRESENT));
 		update_l2e(pl2e, *pl2e, nl2e);
 		flush_tlb();
@@ -1796,7 +1801,7 @@ int ptwr_do_page_fault(unsigned long addr)
                 domain_crash();
             }
 
-            /* maybe fall through to shadow mode to propagate */
+            /* maybe fall through to shadow mode to propagate writeable L1 */
             return ( !current->mm.shadow_mode );
         }
     }
