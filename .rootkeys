@@ -152,6 +152,7 @@
 40f56237utH41NPukqHksuNf29IC9A linux-2.6.7-xen-sparse/arch/xen/Kconfig.drivers
 40f56237penAAlWVBVDpeQZNFIg8CA linux-2.6.7-xen-sparse/arch/xen/Makefile
 40f56237JTc60m1FRlUxkUaGSQKrNw linux-2.6.7-xen-sparse/arch/xen/boot/Makefile
+40f56237hRxbacU_3PdoAl6DjZ3Jnw linux-2.6.7-xen-sparse/arch/xen/configs/xen0_defconfig
 40f56237wubfjJKlfIzZlI3ZM2VgGA linux-2.6.7-xen-sparse/arch/xen/configs/xenU_defconfig
 40f56237Mta0yHNaMS_qtM2rge0qYA linux-2.6.7-xen-sparse/arch/xen/i386/Kconfig
 40f56238u2CJdXNpjsZgHBxeVyY-2g linux-2.6.7-xen-sparse/arch/xen/i386/Makefile
@@ -180,6 +181,7 @@
 40f56238ILx8xlbywNbzTdv5Zr4xXQ linux-2.6.7-xen-sparse/arch/xen/i386/mm/fault.c
 40f562383SKvDStdtrvzr5fyCbW4rw linux-2.6.7-xen-sparse/arch/xen/i386/mm/hypervisor.c
 40f56239xcNylAxuGsQHwi1AyMLV8w linux-2.6.7-xen-sparse/arch/xen/i386/mm/init.c
+41062ab7CjxC1UBaFhOMWWdhHkIUyg linux-2.6.7-xen-sparse/arch/xen/i386/mm/ioremap.c
 40f5623906UYHv1rsVUeRc0tFT0dWw linux-2.6.7-xen-sparse/arch/xen/i386/mm/pgtable.c
 40f56239zOksGg_H4XD4ye6iZNtoZA linux-2.6.7-xen-sparse/arch/xen/kernel/Makefile
 40f56239bvOjuuuViZ0XMlNiREFC0A linux-2.6.7-xen-sparse/arch/xen/kernel/ctrl_if.c
@@ -213,6 +215,7 @@
 40f5623ayR1vnzfF__htza35a8Ft-g linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/mach-xen/mach_time.h
 40f5623a4YdRdVzYWJzOOoqe8mnrXA linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/mach-xen/mach_timer.h
 40f5623aDLxmbOtUHvkWztKjAO4EjA linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/mach-xen/mach_traps.h
+41062ab7HMSSuaUv3_Z4agLpjSO88A linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/mach-xen/pci-functions.h
 40f5623aDMCsWOFO0jktZ4e8sjwvEg linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/mach-xen/setup_arch_post.h
 40f5623arsFXkGdPvIqvFi3yFXGR0Q linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/mach-xen/setup_arch_pre.h
 40f5623aFTyFTR-vdiA-KaGxk5JOKQ linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/msr.h
@@ -229,6 +232,7 @@
 40f5623bVdKP7Dt7qm8twu3NcnGNbA linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/system.h
 40f5623bSgGrvrGRpD71K-lIYqaGgg linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/timer.h
 40f5623bc8LKPRO09wY5dGDnY_YCpw linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/tlbflush.h
+41062ab7uFxnCq-KtPeAm-aV8CicgA linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/vga.h
 40f5623bxUbeGjkRrjDguCy_Gm8RLw linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/xor.h
 40f5623bqoi4GEoBiiUc6TZk1HjsMg linux-2.6.7-xen-sparse/include/asm-xen/blkif.h
 40f5623bYNP7tHE2zX6YQxp9Zq2utQ linux-2.6.7-xen-sparse/include/asm-xen/ctrl_if.h

@@ -20,7 +20,24 @@ config NO_IDLE_HZ
 	bool
 	default y
 
-source "init/Kconfig"
+
+menu "XEN"
+
+config XEN_PRIVILEGED_GUEST
+	bool "Privileged Guest (domain 0)"
+	default n
+	help
+	  Support for privileged operation (domain 0)
+
+config XEN_PHYSDEV_ACCESS
+	bool "Device-driver domain (physical device access)"
+	default y if XEN_PRIVILEGED_GUEST
+	default n
+	help
+	  Device-driver domain (physical device access)
+
+endmenu
+
 
 #config VT
 #	bool
@@ -49,6 +66,8 @@ config X86_64
 	  Choose this option if your computer is a X86 architecture.
 
 endchoice
+
+source "init/Kconfig"
 
 if X86
 source "arch/xen/i386/Kconfig"

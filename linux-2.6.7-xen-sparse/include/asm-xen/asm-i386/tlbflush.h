@@ -16,17 +16,8 @@
  */
 #define __flush_tlb_global()						\
 	do {								\
-		unsigned int tmpreg;					\
-									\
-		__asm__ __volatile__(					\
-			"movl %1, %%cr4;  # turn off PGE     \n"	\
-			"movl %%cr3, %0;                     \n"	\
-			"movl %0, %%cr3;  # flush TLB        \n"	\
-			"movl %2, %%cr4;  # turn PGE back on \n"	\
-			: "=&r" (tmpreg)				\
-			: "r" (mmu_cr4_features & ~X86_CR4_PGE),	\
-			  "r" (mmu_cr4_features)			\
-			: "memory");					\
+		queue_tlb_flush();					\
+		xen_flush_page_update_queue();				\
 	} while (0)
 
 extern unsigned long pgkern_mask;

@@ -626,6 +626,154 @@ config REGPARM
 	-mregparm=3 is used.
 
 
+if XEN_PHYSDEV_ACCESS
+
+menu "Bus options (PCI, PCMCIA, EISA, MCA, ISA)"
+
+config X86_VISWS_APIC
+	bool
+	depends on X86_VISWS
+	default y
+
+config X86_LOCAL_APIC
+	bool
+	depends on (X86_VISWS || SMP) && !X86_VOYAGER
+	default y
+
+config X86_IO_APIC
+	bool
+	depends on SMP && !(X86_VISWS || X86_VOYAGER)
+	default y
+
+config PCI
+	bool "PCI support" if !X86_VISWS
+	depends on !X86_VOYAGER
+	default y if X86_VISWS
+	help
+	  Find out whether you have a PCI motherboard. PCI is the name of a
+	  bus system, i.e. the way the CPU talks to the other stuff inside
+	  your box. Other bus systems are ISA, EISA, MicroChannel (MCA) or
+	  VESA. If you have PCI, say Y, otherwise N.
+
+	  The PCI-HOWTO, available from
+	  <http://www.tldp.org/docs.html#howto>, contains valuable
+	  information about which PCI hardware does work under Linux and which
+	  doesn't.
+
+choice
+	prompt "PCI access mode"
+	depends on PCI && !X86_VISWS
+	default PCI_GOANY
+	---help---
+	  On PCI systems, the BIOS can be used to detect the PCI devices and
+	  determine their configuration. However, some old PCI motherboards
+	  have BIOS bugs and may crash if this is done. Also, some embedded
+	  PCI-based systems don't have any BIOS at all. Linux can also try to
+	  detect the PCI hardware directly without using the BIOS.
+
+	  With this option, you can specify how Linux should detect the
+	  PCI devices. If you choose "BIOS", the BIOS will be used,
+	  if you choose "Direct", the BIOS won't be used, and if you
+	  choose "MMConfig", then PCI Express MMCONFIG will be used.
+	  If you choose "Any", the kernel will try MMCONFIG, then the
+	  direct access method and falls back to the BIOS if that doesn't
+	  work. If unsure, go with the default, which is "Any".
+
+config PCI_GOBIOS
+	bool "BIOS"
+
+config PCI_GOMMCONFIG
+	bool "MMConfig"
+
+config PCI_GODIRECT
+	bool "Direct"
+
+config PCI_GOANY
+	bool "Any"
+
+endchoice
+
+config PCI_BIOS
+	bool
+	depends on !X86_VISWS && PCI && (PCI_GOBIOS || PCI_GOANY)
+	default y
+
+config PCI_DIRECT
+	bool
+ 	depends on PCI && ((PCI_GODIRECT || PCI_GOANY) || X86_VISWS)
+	default y
+
+config PCI_MMCONFIG
+	bool
+	depends on PCI && (PCI_GOMMCONFIG || PCI_GOANY)
+	select ACPI_BOOT
+	default y
+
+source "drivers/pci/Kconfig"
+
+config ISA
+	bool "ISA support"
+	depends on !(X86_VOYAGER || X86_VISWS)
+	help
+	  Find out whether you have ISA slots on your motherboard.  ISA is the
+	  name of a bus system, i.e. the way the CPU talks to the other stuff
+	  inside your box.  Other bus systems are PCI, EISA, MicroChannel
+	  (MCA) or VESA.  ISA is an older system, now being displaced by PCI;
+	  newer boards don't support it.  If you have ISA, say Y, otherwise N.
+
+config EISA
+	bool "EISA support"
+	depends on ISA
+	---help---
+	  The Extended Industry Standard Architecture (EISA) bus was
+	  developed as an open alternative to the IBM MicroChannel bus.
+
+	  The EISA bus provided some of the features of the IBM MicroChannel
+	  bus while maintaining backward compatibility with cards made for
+	  the older ISA bus.  The EISA bus saw limited use between 1988 and
+	  1995 when it was made obsolete by the PCI bus.
+
+	  Say Y here if you are building a kernel for an EISA-based machine.
+
+	  Otherwise, say N.
+
+source "drivers/eisa/Kconfig"
+
+config MCA
+	bool "MCA support"
+	depends on !(X86_VISWS || X86_VOYAGER)
+	help
+	  MicroChannel Architecture is found in some IBM PS/2 machines and
+	  laptops.  It is a bus system similar to PCI or ISA. See
+	  <file:Documentation/mca.txt> (and especially the web page given
+	  there) before attempting to build an MCA bus kernel.
+
+config MCA
+	depends on X86_VOYAGER
+	default y if X86_VOYAGER
+
+source "drivers/mca/Kconfig"
+
+config SCx200
+	tristate "NatSemi SCx200 support"
+	depends on !X86_VOYAGER
+	help
+	  This provides basic support for the National Semiconductor SCx200 
+	  processor.  Right now this is just a driver for the GPIO pins.
+
+	  If you don't know what to do here, say N.
+
+	  This support is also available as a module.  If compiled as a
+	  module, it will be called scx200.
+
+source "drivers/pcmcia/Kconfig"
+
+source "drivers/pci/hotplug/Kconfig"
+
+endmenu
+
+endif
+
 menu "Kernel hacking"
 
 config DEBUG_KERNEL
