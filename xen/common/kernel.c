@@ -563,6 +563,7 @@ int console_export(char *str, int len)
 
     unmap_domain_mem(skb_data);
     
+    skb->dst_vif = find_vif_by_id(0);
     (void)netif_rx(skb);
 
     return 1;
