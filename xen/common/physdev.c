@@ -65,25 +65,15 @@
 /* bit offsets into state */
 #define ST_BASE_ADDRESS  0   /* bits 0-5: are for base address access */
 #define ST_ROM_ADDRESS   6   /* bit 6: is for rom address access */    
-#define ST_IRQ_DELIVERED 7   /* bit 7: waiting for end irq call */    
 
-typedef struct _phys_dev_st
-{
+typedef struct _phys_dev_st {
     int flags;                       /* flags for access etc */
     struct pci_dev *dev;             /* the device */
     struct list_head node;           /* link to the list */
     struct task_struct *owner;       /* 'owner of this device' */
     int state;                       /* state for various checks */
-
-    hw_irq_controller *new_handler;  /* saved old handler */
-    hw_irq_controller *orig_handler; /* saved old handler */
-
 } phys_dev_t;
 
-
-#define MAX_IRQS 32
-/* an array of device descriptors index by IRQ number */
-static phys_dev_t *irqs[MAX_IRQS];
 
 /*
  * 
@@ -573,201 +563,9 @@ static long pci_find_irq(int seg, int bus, int dev, int func, u32 *val)
     return 0;
 }
 
-static void phys_dev_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
+
+static long pci_unmask_irq(void)
 {
-    phys_dev_t          *pdev;
-
-    if ( (pdev = (phys_dev_t *)dev_id) == NULL )
-    {
-        printk("spurious interrupt, no proper device id, %d\n", irq);
-        return;
-    }
-    
-    /* XXX KAF: introduced race here? */
-    set_bit(ST_IRQ_DELIVERED, &pdev->state);
-    send_guest_pirq(pdev->owner, irq);
-}
-
-/* this is called instead of the PICs original end handler. 
- * the real end handler is only called once the guest signalled the handling
- * of the event. */
-static void end_virt_irq (unsigned int i)
-{
-    /* nothing */
-}
-
-/*
- * a guest request an IRQ from a device to be routed to it
- * - shared interrupts are not allowed for now
- * - we change the hw_irq handler to something else
- */
-static long pci_request_irq(int irq)
-{
-    int err;
-    phys_dev_t *pdev = NULL, *t;
-    hw_irq_controller *new, *orig;
-    struct list_head *tmp;
-
-    printk("request irq %d\n", irq);
-
-    /* find pdev */
-
-    list_for_each(tmp, &current->pcidev_list)
-    {
-        t = list_entry(tmp,  phys_dev_t, node);
-        if ( t->dev->irq == irq )
-        {
-            pdev = t;
-            break;
-        }
-    }
-
-    if ( pdev == NULL )
-    {
-        printk("no device matching IRQ %d\n", irq);
-        return -EINVAL;
-    }
-
-    if ( irq >= MAX_IRQS )
-    {
-        printk("requested IRQ to big %d\n", irq);
-        return -EINVAL;
-    }
-
-    if ( irqs[irq] != NULL )
-    {
-        printk ("irq already in use %d\n", irq);
-        return -EPERM;
-    }
-
-    /* allocate a hw_irq controller and copy the original */
-    if ( !(new  = kmalloc(sizeof(hw_irq_controller), GFP_KERNEL)) )
-    {
-        printf("error allocating new irq controller\n");
-        return -ENOMEM;
-    }
-    orig = irq_desc[irq].handler;
-    new->typename = orig->typename;
-    new->startup = orig->startup;
-    new->shutdown = orig->shutdown;
-    new->enable = orig->enable;
-    new->disable = orig->disable;
-    new->ack = orig->ack;
-    new->end = orig->end;
-    new->set_affinity = orig->set_affinity;
-
-    /* swap the end routine */
-    new->end = end_virt_irq;
-
-    /* change the irq controllers */
-    pdev->orig_handler = orig;
-    pdev->new_handler  = new;
-    irq_desc[irq].handler = new;
-    irqs[irq] = pdev;
-    
-    printk ("setup handler %d\n", irq);
-
-    /* request the IRQ. this is not shared and we use a slow handler! */
-    err = request_irq(irq, phys_dev_interrupt, SA_INTERRUPT,
-                      "foo", (void *)pdev);
-    if ( err )
-    {
-        printk("error requesting irq\n");
-        /* restore original */
-        irq_desc[irq].handler = pdev->orig_handler;
-        /* free memory */
-        kfree(new);
-        return err;
-    }
-
-    printk ("done\n");
-
-    return 0;
-}
-
-static long pci_free_irq(int irq)
-{
-    phys_dev_t *pdev;
-
-    if ( irq >= MAX_IRQS )
-    {
-        printk("requested IRQ to big %d\n", irq);
-        return -EINVAL;
-    }
-
-    if ( irqs[irq] == NULL )
-    {
-        printk ("irq not used %d\n", irq);
-        return -EINVAL;
-    }
-
-    pdev = irqs[irq];
-
-    /* shutdown IRQ */
-    free_irq(irq, (void *)pdev);
-
-    /* restore irq controller  */
-    irq_desc[irq].handler = pdev->orig_handler;
-
-    /* clean up */
-    pdev->orig_handler = NULL;
-    irqs[irq] = NULL;
-    kfree(pdev->new_handler);
-    pdev->new_handler = NULL;
-
-    printk("freed irq %d", irq);
-    return 0;
-}
-
-static long pci_enable_irq(int irq)
-{
-    /* XXX not sure we need this */
-    /* guest can enable phys_irq event for now */
-    return 0;
-}
-
-static long pci_disable_irq(int irq)
-{
-    /* XXX not sure we need this */
-    /* guest can disable phys_irq event for now */
-    return 0;
-}
-
-static long pci_finished_irq(int irq)
-{
-    phys_dev_t *pdev;
-    
-    if ( !(pdev = irqs[irq]) )
-    {
-        printk("finished_irq called for unregistered irq %d\n", irq);
-        return -EINVAL;
-    }
-   
-    if ( pdev->owner != current )
-    {
-        printk("finished_irq called dom not owning irq %d\n", irq);
-        return -EPERM;
-    }
-
-    if ( !test_bit(ST_IRQ_DELIVERED, &pdev->state) )
-    {
-        printk("finished_irq called for undelivered irq %d\n", irq);
-        return -EINVAL;
-    }
-
-#if 0 /* XXX KAF: do we need this? */
-    if ( test_bit(irq, &current->shared_info->physirq_pend) )
-    {
-        printk("finished_irq called for un-acknowleged irq %d\n", irq);        
-        return -EINVAL;
-    }
-#endif
-
-    clear_bit(ST_IRQ_DELIVERED, &pdev->state);
-
-    /* call original end handler */
-    pdev->orig_handler->end(irq);
-
     return 0;
 }
 
@@ -786,43 +584,27 @@ long do_physdev_op(physdev_op_t *uop)
     switch ( op.cmd )
     {
     case PHYSDEVOP_CFGREG_READ:
-        ret = pci_cfgreg_read (op.u.cfg_read.seg, op.u.cfg_read.bus,
-                               op.u.cfg_read.dev, op.u.cfg_read.func,
-                               op.u.cfg_read.reg, op.u.cfg_read.len,
-                               &op.u.cfg_read.value);
+        ret = pci_cfgreg_read(op.u.cfg_read.seg, op.u.cfg_read.bus,
+                              op.u.cfg_read.dev, op.u.cfg_read.func,
+                              op.u.cfg_read.reg, op.u.cfg_read.len,
+                              &op.u.cfg_read.value);
         break;
 
     case PHYSDEVOP_CFGREG_WRITE:
-        ret = pci_cfgreg_write (op.u.cfg_write.seg, op.u.cfg_write.bus,
-                                op.u.cfg_write.dev, op.u.cfg_write.func,
-                                op.u.cfg_write.reg, op.u.cfg_write.len,
-                                op.u.cfg_write.value);
+        ret = pci_cfgreg_write(op.u.cfg_write.seg, op.u.cfg_write.bus,
+                               op.u.cfg_write.dev, op.u.cfg_write.func,
+                               op.u.cfg_write.reg, op.u.cfg_write.len,
+                               op.u.cfg_write.value);
         break;
 
     case PHYSDEVOP_FIND_IRQ:
-        ret = pci_find_irq (op.u.find_irq.seg, op.u.find_irq.bus,
-                            op.u.find_irq.dev, op.u.find_irq.func,
-                            &op.u.find_irq.irq);
+        ret = pci_find_irq(op.u.find_irq.seg, op.u.find_irq.bus,
+                           op.u.find_irq.dev, op.u.find_irq.func,
+                           &op.u.find_irq.irq);
         break;
 
-    case PHYSDEVOP_REQUEST_IRQ:
-        ret = pci_request_irq (op.u.request_irq.irq);
-        break;
-
-    case PHYSDEVOP_FREE_IRQ:
-        ret = pci_free_irq (op.u.free_irq.irq);
-        break;
-
-    case PHYSDEVOP_ENABLE_IRQ:
-        ret = pci_enable_irq (op.u.enable_irq.irq);
-        break;
-
-    case PHYSDEVOP_DISABLE_IRQ:
-        ret = pci_disable_irq (op.u.disable_irq.irq);
-        break;
-
-    case PHYSDEVOP_FINISHED_IRQ:
-        ret = pci_finished_irq (op.u.finished_irq.irq);
+    case PHYSDEVOP_UNMASK_IRQ:
+        ret = pci_unmask_irq();
         break;
 
     default:

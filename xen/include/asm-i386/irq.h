@@ -192,10 +192,10 @@ extern unsigned long prof_shift;
 
 #include <xen/irq.h>
 
-#ifdef CONFIG_SMP /*more of this file should probably be ifdefed SMP */
+#if defined(CONFIG_X86_IO_APIC)
 static inline void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i) {
-	if (IO_APIC_IRQ(i))
-		send_IPI_self(IO_APIC_VECTOR(i));
+        if (IO_APIC_IRQ(i))
+                send_IPI_self(IO_APIC_VECTOR(i));
 }
 #else
 static inline void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i) {}

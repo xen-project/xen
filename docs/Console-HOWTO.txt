@@ -60,8 +60,8 @@ Virtual console for other domains
  the provided init.d script. To integrate startup and shutdown of xend
  in such a system, you will need to run a few configuration commands:
   # chkconfig --add xend
-  # chkconfig --level 35 on
-  # chkconfig --level 01246 off
+  # chkconfig --level 35 xend on
+  # chkconfig --level 01246 xend off
  This will avoid the need to run xend manually from rc.local, for example.
 
  Note that, when a domain is created using xc_dom_create.py, xend MUST

@@ -21,6 +21,7 @@
 #include <xen/errno.h>
 #include <xen/sched.h>
 #include <xen/event.h>
+#include <xen/irq.h>
 
 #include <hypervisor-ifs/hypervisor-if.h>
 #include <hypervisor-ifs/event_channel.h>
@@ -146,7 +147,7 @@ static long evtchn_bind_virq(evtchn_bind_virq_t *bind)
     int virq = bind->virq;
     int port;
 
-    if ( virq >= NR_VIRQS )
+    if ( virq >= ARRAY_SIZE(p->virq_to_evtchn) )
         return -EINVAL;
 
     spin_lock(&p->event_channel_lock);
@@ -171,6 +172,42 @@ static long evtchn_bind_virq(evtchn_bind_virq_t *bind)
 
     if ( port < 0 )
         return port;
+
+    bind->port = port;
+    return 0;
+}
+
+
+static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
+{
+    struct task_struct *p = current;
+    int pirq = bind->pirq;
+    int port, rc;
+
+    if ( pirq >= ARRAY_SIZE(p->pirq_to_evtchn) )
+        return -EINVAL;
+
+    spin_lock(&p->event_channel_lock);
+
+    if ( ((rc = port = p->pirq_to_evtchn[pirq]) != 0) ||
+         ((rc = port = get_free_port(p)) < 0) )
+        goto out;
+
+    p->pirq_to_evtchn[pirq] = port;
+    if ( (rc = pirq_guest_bind(p, pirq)) != 0 )
+    {
+        p->pirq_to_evtchn[pirq] = 0;
+        goto out;
+    }
+
+    p->event_channel[port].state  = ECS_PIRQ;
+    p->event_channel[port].u.pirq = pirq;
+
+ out:
+    spin_unlock(&p->event_channel_lock);
+
+    if ( rc < 0 )
+        return rc;
 
     bind->port = port;
     return 0;
@@ -206,7 +243,8 @@ static long __evtchn_close(struct task_struct *p1, int port1)
         break;
 
     case ECS_PIRQ:
-        p1->pirq_to_evtchn[chn1[port1].u.pirq] = 0;
+        if ( (rc = pirq_guest_unbind(p1, chn1[port1].u.pirq)) == 0 )
+            p1->pirq_to_evtchn[chn1[port1].u.pirq] = 0;
         break;
 
     case ECS_VIRQ:
@@ -396,13 +434,19 @@ long do_event_channel_op(evtchn_op_t *uop)
     {
     case EVTCHNOP_bind_interdomain:
         rc = evtchn_bind_interdomain(&op.u.bind_interdomain);
-        if ( copy_to_user(uop, &op, sizeof(op)) != 0 )
+        if ( (rc == 0) && (copy_to_user(uop, &op, sizeof(op)) != 0) )
             rc = -EFAULT; /* Cleaning up here would be a mess! */
         break;
 
     case EVTCHNOP_bind_virq:
         rc = evtchn_bind_virq(&op.u.bind_virq);
-        if ( copy_to_user(uop, &op, sizeof(op)) != 0 )
+        if ( (rc == 0) && (copy_to_user(uop, &op, sizeof(op)) != 0) )
+            rc = -EFAULT; /* Cleaning up here would be a mess! */
+        break;
+
+    case EVTCHNOP_bind_pirq:
+        rc = evtchn_bind_pirq(&op.u.bind_pirq);
+        if ( (rc == 0) && (copy_to_user(uop, &op, sizeof(op)) != 0) )
             rc = -EFAULT; /* Cleaning up here would be a mess! */
         break;
 
@@ -416,7 +460,7 @@ long do_event_channel_op(evtchn_op_t *uop)
 
     case EVTCHNOP_status:
         rc = evtchn_status(&op.u.status);
-        if ( copy_to_user(uop, &op, sizeof(op)) != 0 )
+        if ( (rc == 0) && (copy_to_user(uop, &op, sizeof(op)) != 0) )
             rc = -EFAULT;
         break;
 

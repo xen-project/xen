@@ -227,8 +227,8 @@ long read_console_ring(unsigned long str, unsigned int count, unsigned cmd)
 static char serial_rx_ring[SERIAL_RX_SIZE];
 static unsigned int serial_rx_cons, serial_rx_prod;
 
-/* CTRL-a switches input direction between Xen and DOM0. */
-#define CTRL_A 0x01
+/* CTRL-g switches input direction between Xen and DOM0. */
+#define CTRL_G 0x07
 static int xen_rx = 1; /* FALSE => serial input passed to domain 0. */
 
 static void switch_serial_input(void)
@@ -236,7 +236,7 @@ static void switch_serial_input(void)
     static char *input_str[2] = { "DOM0", "Xen" };
     xen_rx = !xen_rx;
     printk("*** Serial input -> %s "
-           "(type 'CTRL-a' three times to switch input to %s).\n",
+           "(type 'CTRL-g' three times to switch input to %s).\n",
            input_str[xen_rx], input_str[!xen_rx]);
 }
 
@@ -264,22 +264,22 @@ static void __serial_rx(unsigned char c, struct pt_regs *regs)
 
 static void serial_rx(unsigned char c, struct pt_regs *regs)
 {
-    static int ctrl_a_count = 0;
+    static int ctrl_g_count = 0;
 
-    if ( c == CTRL_A )
+    if ( c == CTRL_G )
     {
-        /* We eat CTRL-a in groups of three to switch console input. */
-        if ( ++ctrl_a_count == 3 )
+        /* We eat CTRL-g in groups of three to switch console input. */
+        if ( ++ctrl_g_count == 3 )
         {
             switch_serial_input();
-            ctrl_a_count = 0;
+            ctrl_g_count = 0;
         }
     }
     else
     {
-        /* Flush any pending CTRL-a's. They weren't for us. */
-        for ( ; ctrl_a_count != 0; ctrl_a_count-- )
-            __serial_rx(CTRL_A, regs);
+        /* Flush any pending CTRL-b's. They weren't for us. */
+        for ( ; ctrl_g_count != 0; ctrl_g_count-- )
+            __serial_rx(CTRL_G, regs);
         /* Finally process the just-received character. */
         __serial_rx(c, regs);
     }
