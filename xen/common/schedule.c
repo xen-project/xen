@@ -208,7 +208,6 @@ long do_yield(void)
  ****************************************************************************/
 long sched_bvtctl(unsigned long c_allow)
 {
-    printk("sched: bvtctl %lu\n", c_allow);
     ctx_allow = c_allow;
     return 0;
 }
@@ -221,8 +220,9 @@ long sched_adjdom(int dom, unsigned long mcu_adv, unsigned long warp,
 {
     struct task_struct *p;
 
-    printk("sched: adjdom %02d %lu %lu %lu %lu\n",
-           dom, mcu_adv, warp, warpl, warpu);
+    /* Sanity -- this can avoid divide-by-zero. */
+    if ( mcu_adv == 0 )
+        return -EINVAL;
 
     p = find_domain_by_id(dom);
     if ( p == NULL ) 

@@ -21,10 +21,10 @@ int main(int argc, char **argv)
 
     op.cmd = DOM0_ADJUSTDOM;
     op.u.adjustdom.domain  = atoi(argv[1]);
-    op.u.adjustdom.mcu_adv = atol(argv[1]);
-    op.u.adjustdom.warp    = atol(argv[1]);
-    op.u.adjustdom.warpl   = atol(argv[1]);
-    op.u.adjustdom.warpu   = atol(argv[1]);
+    op.u.adjustdom.mcu_adv = atol(argv[2]);
+    op.u.adjustdom.warp    = atol(argv[3]);
+    op.u.adjustdom.warpl   = atol(argv[4]);
+    op.u.adjustdom.warpu   = atol(argv[5]);
     if ( do_dom0_op(&op) < 0 )
         return 1;
 
