@@ -65,19 +65,17 @@ facilitates enterprise-grade functionality, including:
 \begin{itemize}
 \item Virtual machines with performance nearly identical to native
   hardware.
-\item Live migration of running virtual machines.
+\item Live migration of running virtual machines between physical hosts.
 \item Excellent hardware support (supports most Linux device drivers).
-\item Suspend to disk / resume from disk of running virtual machines.
-\item Transparent copy-on-write disks for simple sharing across VMs.
 \item Sandboxed, restartable device drivers.
 \end{itemize}
 
-Paravirtualisation allows very high performance virtual machine
-technology, even on architectures like x86 that are traditionally
-hard to virtualise.
+Paravirtualisation permits very high performance virtualisation,
+even on architectures like x86 that are traditionally
+very hard to virtualise.
 The drawback of this approach is that it requires operating systems to
-be {\em ported} to run on Xen.  This process is similar to a port of
-an operating system to a new hardware platform, although the process
+be {\em ported} to run on Xen.  Porting an OS to run on Xen is similar
+to supporting a new hardware platform, however the process
 is simplified because the paravirtual machine architecture is very
 similar to the underlying native hardware. Even though operating system
 kernels must explicitly support Xen, a key feature is that user space
@@ -96,18 +94,15 @@ Possible usage scenarios for Xen include:
       machine.
 \item [Multiple OS configurations.] Run multiple operating systems
       simultaneously, for instance for compatibility or QA purposes.
-\item [Server consolidation.] Move multiple servers onto one box
-      with performance and fault isolation provided at virtual machine
-      boundaries. 
-\item [Cluster computing.] Improve manageability and efficiency by
-      running services in virtual machines, isolated from
-      machine-specifics; load balance using live migration.
-\item [High availability computing.] Run device drivers in sandboxed
-      domains for increased robustness.
-\item [Hardware support for custom OSes.] Export drivers from a
-      mainstream OS (e.g. Linux) with wide-ranging hardware support
-      to your custom OS, avoiding the need for you to port existing
-      drivers.
+\item [Server consolidation.] Move multiple servers onto a single
+      physical host with performance and fault isolation provided at
+      virtual machine boundaries. 
+\item [Cluster computing.] Management at VM granularity provides more
+      flexibility than separately managing each physical host, but
+      better control and isolation than single-system image solutions.
+\item [Hardware support for custom OSes.] Allow devlopment of new OSes
+      while benefitting from the wide-ranging hardware support of
+      existing OSes such as Linux.
 \end{description}
 
 \section{Structure of a Xen-Based System}
@@ -123,44 +118,41 @@ scheduling each application within the time allotted to the VM by Xen.
 The first domain, {\em Domain 0}, is created automatically when the
 system boots and has special management privileges. Domain 0 builds
 other domains and manages their virtual devices. It also performs
-suspend, resume and migration of virtual machines. Where one is
-required, the X server is also run in domain 0.
+administrative tasks such as suspending, resuming and migrating other
+virtual machines.
 
-Within Domain 0, a process called `xend' runs to manage the system.
+Within domain 0, a process called `xend' runs to manage the system.
 Xend is responsible for managing virtual machines and providing access
 to their consoles.  Commands are issued to Xend over an HTTP
 interface, either from a command-line tool or from a web browser.
 
 \section{Hardware Support}
 
-Xen currently runs only on the x86 architecture, although ports to other
-architectures, including x86/64 and IA64, are in progress.
-Xen requires a `P6' or newer processor (e.g. Pentium Pro, Celeron,
+Xen currently runs only on the x86 architecture,
+requiring a `P6' or newer processor (e.g. Pentium Pro, Celeron,
 Pentium II, Pentium III, Pentium IV, Xeon, AMD Athlon, AMD Duron).
 Multiprocessor machines are supported, and we also have basic support
 for HyperThreading (SMT), although this remains a topic for ongoing
-research.  As mentioned above, a port specifically for x86/64 is in
+research. A port specifically for x86/64 is in
 progress, although Xen already runs on such systems in 32-bit legacy
 mode.
 
 Xen can currently use up to 4GB of memory.  It is possible for x86
 machines to address up to 64GB of physical memory but there are no
-plans to support these systems.  The x86\_64 port is the planned route
+plans to support these systems.  The x86/64 port is the planned route
 to supporting larger memory sizes. 
 
 Xen offloads most of the hardware support issues to the guest OS
-running in Domain 0.  Xen itself only contains code to detect and
-start additional processors, set up interrupt routing and perform PCI
-bus enumeration.  Device drivers run within a privileged guest OS
-rather than within Xen itself, meaning that we should be
-compatible with the majority of device hardware supported by Linux.
+running in Domain 0.  Xen itself contains only the code required to
+detect and start secondary processors, set up interrupt routing, and
+perform PCI bus enumeration.  Device drivers run within a privileged
+guest OS rather than within Xen itself. This approach provides
+compatibility with the majority of device hardware supported by Linux.
 The default XenLinux build contains support for relatively modern
 server-class network and disk hardware, but you can add support for
-other hardware by configuring your XenLinux kernel in the normal way
-(e.g. \verb_# make ARCH=xen menuconfig_).
+other hardware by configuring your XenLinux kernel in the normal way.
 
 \section{History}
-
 
 Xen was originally developed by the Systems Research Group at the
 University of Cambridge Computer Laboratory as part of the XenoServers
@@ -174,17 +166,19 @@ isolation and accounting.  The project web page contains further
 information along with pointers to papers and technical reports:
 {\tt http://www.cl.cam.ac.uk/xeno}
 
-Xen has since grown into a project in its own right, enabling us to
-investigate interesting research issues regarding the best techniques
-for virtualising resources such as the CPU, memory, disk and network.
-The project has been bolstered by support from Intel Research
-Cambridge, and HP Labs, who are now working closely with us.
+Xen has since grown into a fully-fledgd project in its own right,
+enabling us to investigate interesting research issues regarding the
+best techniques for virtualising resources such as the CPU, memory,
+disk and network.  The project has been bolstered by support from
+Intel Research Cambridge, and HP Labs, who are now working closely
+with us.
 
-Xen was first described in the 2003 paper at SOSP\footnote{\tt
-http://www.cl.cam.ac.uk/netos/papers/2003-xensosp.pdf}, and the
-first public release (1.0) was made in October 2003.  Since
-then, Xen has been extensively developed and is now used in production
-scenarios on multiple sites.
+Xen was first described in a paper presented at SOSP in
+2003\footnote{\tt
+http://www.cl.cam.ac.uk/netos/papers/2003-xensosp.pdf}, and the first
+public release (1.0) was made that October.  Since then, Xen has
+significantly matured and is now used in production scenarios on
+multiple sites.
 
 Xen 2.0 features greatly enhanced hardware support, configuration
 flexibility, usability and a larger complement of supported operating
@@ -193,54 +187,49 @@ definitive open source solution for virtualisation.
 
 \chapter{Installation}
 
-The Xen distribution includes three main components:  Xen itself,
-utilities to convert a standard Linux tree to run on Xen, and the
-userspace tools required to operate a Xen-based system.
-
-This manual describes how to install the Xen 2.0 distribution from
-source.  Alternatively, there may be packages available for your
-operating system distribution.
+The Xen distribution includes three main components: Xen itself, ports
+of Linux and NetBSD to run on Xen, and the user-space tools required
+to manage a Xen-based system.  This chapter describes how to install
+the Xen 2.0 distribution from source.  Alternatively, there may be
+pre-built packages available as part of your operating system
+distribution.
 
 \section{Prerequisites}
 \label{sec:prerequisites}
 \begin{itemize}
-\item i686-class CPU or newer
-\item A working installation of your favourite Linux distribution.
-\item A working installation of the GRUB bootloader.
-\item An installation of Twisted v1.3 or above (see {\tt
-http://www.twistedmatrix.com}).  There may be a package available for
-your distribution; alternatively it can be installed by running {\tt
-make install-twisted} in the root of the Xen source tree.
-\item Python logging package (see {\tt http://www.red-dove.com/})
-\item The Linux bridge control tools (see {\tt
-http://bridge.sourceforge.net}).  There may be packages of these tools
-available for your distribution.
-\item Linux IP Routing Tools
-\item make
-\item gcc
-\item libcurl
-\item zlib-dev
-\item python-dev
-\item python2.3-pycurl
-\item python2.3-twisted
+\item A working Linux distribution using the GRUB bootloader and
+running on a P6-class (or newer) CPU.
+\item An installation of Twisted v1.3 or above\footnote{{\tt
+http://www.twistedmatrix.com}}. There may be a binary package
+available for your distribution; alternatively it can be installed by
+running `{\sl make install-twisted}' in the root of the Xen source tree.
+\item The Linux bridge control tools\footnote{{\tt
+http://bridge.sourceforge.net}}.
+\item Build tools (gcc v3.2.x or v3.3.x, binutils, GNU make).
+\item Development installation of libcurl.
+\item Development installation of zlib (e.g., zlib-dev).
+\item Development installation of Python v2.2 or later (e.g., python-dev).
 \end{itemize}
-
-\section{Install Bitkeeper (Optional)}
-
-To fetch a local copy, first download the BitKeeper tools.
-Download instructions can be obtained by filling out the provided
-form at: 
-\begin{quote} 
-{\tt http://www.bitmover.com/cgi-bin/download.cgi}
-\end{quote}
-
-The BitKeeper install program is designed to be run with X.  If X is
-not available, you can specify the install directory on the command
-line.
 
 \section{Download the Xen source code}
 
+\subsection{Tarball}
+
+The Xen source tree is available as a compressed tarball from the
+Xen download page (pre-built tarballs are also available from this page):
+\begin{quote} 
+{\tt http://xen.sf.net}
+\end{quote} 
+
 \subsection{Using Bitkeeper}
+
+If you wish to install Xen from a clone of our latest BitKeeper
+repository then you will need to install the BitKeeper tools.
+Download instructions for BitKeeper can be obtained by filling out the
+form at:
+\begin{quote} 
+{\tt http://www.bitmover.com/cgi-bin/download.cgi}
+\end{quote}
 
 The public master BK repository for the 2.0 release lives at: 
 \begin{quote}
@@ -257,41 +246,28 @@ run:
 
 
 Under your current directory, a new directory named `xen-2.0.bk' has
-been created, which contains all the source code for the Xen
-hypervisor and the Xen tools.  The directory also contains `sparse' OS
-source trees, containing only the files that require changes to allow
-the OS to run on Xen.
-
-Once you have cloned the repository, you can update to the newest
-changes to the repository by running:
+been created, which contains all the source code for Xen, the OS
+ports, and the control tools. You can update your repository with the
+latest changes at any time by running:
 \begin{verbatim}
 # cd xen-2.0.bk # to change into the local repository
 # bk pull       # to update the repository
 \end{verbatim}
 
-\subsection{Without Bitkeeper}
-
-The Xen source tree is also available in gzipped tarball form from the
-Xen downloads page:\\
-{\tt http://www.cl.cam.ac.uk/Research/SRG/netos/xen/downloads.html}.
-Prebuilt tarballs are also available from this page but are relatively
- large.
-
-\section{The distribution}
-
-The Xen source code repository is structured as follows:
-
-\begin{description}
-\item[\path{tools/}] Xen node controller daemon (Xend), command line tools, 
-  control libraries
-\item[\path{xen/}] The Xen hypervisor itself.
-\item[\path{linux-2.4.27-xen-sparse/}] Xen support for Linux 2.4
-\item[\path{linux-2.6.9-xen-sparse/}] Xen support for Linux 2.6
-\item[\path{linux-2.6.9-patches/}] Experimental patches for Linux 2.6
-\item[\path{netbsd-2.0-xen-sparse/}] Xen support for NetBSD 2.0
-\item[\path{docs/}] various documentation files for users and developers
-\item[\path{extras/}] currently this contains the Mini OS, aimed at developers
-\end{description}
+%\section{The distribution}
+%
+%The Xen source code repository is structured as follows:
+%
+%\begin{description}
+%\item[\path{tools/}] Xen node controller daemon (Xend), command line tools, 
+%  control libraries
+%\item[\path{xen/}] The Xen VMM.
+%\item[\path{linux-*-xen-sparse/}] Xen support for Linux.
+%\item[\path{linux-*-patches/}] Experimental patches for Linux.
+%\item[\path{netbsd-*-xen-sparse/}] Xen support for NetBSD.
+%\item[\path{docs/}] Various documentation files for users and developers.
+%\item[\path{extras/}] Bonus extras.
+%\end{description}
 
 \section{Build and install}
 
