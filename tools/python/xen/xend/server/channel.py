@@ -45,7 +45,7 @@ class ChannelFactory:
             del self.channels[idx]
             self.notifier.unbind(idx)
 
-    def domChannel(self, dom, remote_port=0):
+    def domChannel(self, dom, local_port=0, remote_port=0):
         """Get the channel for the given domain.
         Construct if necessary.
 
@@ -55,7 +55,8 @@ class ChannelFactory:
         """
         chan = self.getDomChannel(dom)
         if not chan:
-            chan = Channel(self, dom, remote_port=remote_port)
+            chan = Channel(self, dom, local_port=local_port,
+                           remote_port=remote_port)
             self.addChannel(chan)
         return chan
 
@@ -91,10 +92,25 @@ class ChannelFactory:
         """
         self.delChannel(channel.idx)
 
-    def createPort(self, dom, remote_port=0):
+    def createPort(self, dom, local_port=0, remote_port=0):
         """Create a port for a channel to the given domain.
+        If only the domain is specified, a new channel with new port ids is
+        created.  If one port id is specified and the given port id is in use,
+        the other port id is filled.  If one port id is specified and the
+        given port id is not in use, a new channel is created with one port
+        id equal to the given id and a new id for the other end.  If both
+        port ids are specified, a port is reconnected using the given port
+        ids.
+
+        @param dom: domain
+        @param local: local port id to use
+        @type  local: int
+        @param remote: remote port id to use
+        @type  remote: int
+        @return: port object
         """
-        return xu.port(dom, 0, remote_port)
+        return xu.port(dom, local_port=int(local_port),
+                       remote_port=int(remote_port))
 
 def channelFactory():
     """Singleton constructor for the channel factory.
@@ -200,7 +216,7 @@ class Channel(BaseChannel):
     are multiplexed over the channel (console, block devs, net devs).
     """
 
-    def __init__(self, factory, dom, remote_port=0):
+    def __init__(self, factory, dom, local_port=0, remote_port=0):
         """Create a channel to the given domain using the given factory.
 
         Do not call directly, use domChannel on the factory.
@@ -209,7 +225,8 @@ class Channel(BaseChannel):
         # Domain.
         self.dom = int(dom)
         # Domain port (object).
-        self.port = self.factory.createPort(dom, remote_port=remote_port)
+        self.port = self.factory.createPort(dom, local_port=local_port,
+                                            remote_port=remote_port)
         # Channel port (int).
         self.idx = self.port.local_port
         # Registered devices.

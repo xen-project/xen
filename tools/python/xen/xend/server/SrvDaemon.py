@@ -638,11 +638,21 @@ class Daemon:
     def getDomChannel(self, dom):
         """Get the channel to a domain.
 
-        dom domain
-
-        returns channel (or None)
+        @param dom: domain
+        @return: channel (or None)
         """
         return self.channelF.getDomChannel(dom)
+
+    def createDomChannel(self, dom, local_port=0, remote_port=0):
+        """Get the channel to a domain, creating if necessary.
+
+        @param dom: domain
+        @param local_port: optional local port to re-use
+        @param remote_port: optional remote port to re-use
+        @return: channel
+        """
+        return self.channelF.domChannel(dom, local_port=local_port,
+                                        remote_port=remote_port)
 
     def blkif_create(self, dom, recreate=0):
         """Create or get a block device interface controller.
@@ -671,13 +681,12 @@ class Daemon:
     def netif_get(self, dom):
         return self.netifCF.getControllerByDom(dom)
 
-    def console_create(self, dom, console_port=None, remote_port=0):
+    def console_create(self, dom, console_port=None):
         """Create a console for a domain.
         """
         console = self.consoleCF.getControllerByDom(dom)
         if console is None:
-            console = self.consoleCF.createController(dom, console_port,
-                                                      remote_port=remote_port)
+            console = self.consoleCF.createController(dom, console_port)
         return console
 
     def consoles(self):

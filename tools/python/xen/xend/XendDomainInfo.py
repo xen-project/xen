@@ -753,16 +753,33 @@ class XendDomainInfo:
         @param ramdisk: kernel ramdisk
         @param cmdline: kernel commandline
         """
-        #self.init_domain()
+
+        self.create_channel()
         if self.console:
             self.console.registerChannel()
         else:
             self.console = xendConsole.console_create(
-                self.dom, console_port=self.console_port, remote_port=1)
+                self.dom, console_port=self.console_port)
         self.build_domain(ostype, kernel, ramdisk, cmdline)
         self.image = kernel
         self.ramdisk = ramdisk
         self.cmdline = cmdline
+
+    def create_channel(self):
+        """Create the channel to the domain.
+        If saved info is available recreate the channel using the saved ports.
+
+        @return: channel
+        """
+        local = 0
+        remote = 1
+        if self.savedinfo:
+            consinfo = sxp.child(self.savedinfo, "console")
+            if consinfo:
+                local = int(sxp.child_value(consinfo, "local_port", 0))
+                remote = int(sxp.child_value(consinfo, "remote_port", 1))
+        return xend.createDomChannel(self.dom, local_port=local,
+                                     remote_port=remote)
 
     def create_devices(self):
         """Create the devices for a vm.

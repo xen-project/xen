@@ -1054,13 +1054,16 @@ static PyMethodDef xu_port_methods[] = {
 
 staticforward PyTypeObject xu_port_type;
 
-static PyObject *xu_port_new(PyObject *self, PyObject *args)
+static PyObject *xu_port_new(PyObject *self, PyObject *args, PyObject *kwds)
 {
     xu_port_object *xup;
     u32 dom;
     int port1 = 0, port2 = 0;
 
-    if ( !PyArg_ParseTuple(args, "i|ii", &dom, &port1, &port2) )
+    static char *kwd_list[] = { "dom", "local_port", "remote_port", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|ii", kwd_list,
+                                      &dom, &port1, &port2) )
         return NULL;
 
     xup = PyObject_New(xu_port_object, &xu_port_type);
@@ -1435,7 +1438,7 @@ static PyMethodDef xu_methods[] = {
       "Create a new notifier." },
     { "message", xu_message_new, METH_VARARGS, 
       "Create a new communications message." },
-    { "port", xu_port_new, METH_VARARGS, 
+    { "port", (PyCFunction)xu_port_new, METH_VARARGS | METH_KEYWORDS, 
       "Create a new communications port." },
     { "buffer", xu_buffer_new, METH_VARARGS, 
       "Create a new ring buffer." },
