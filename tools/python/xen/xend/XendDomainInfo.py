@@ -295,15 +295,20 @@ def vm_restore(src, progress=0):
     raises   VmError for invalid configuration
     """
     vm = XendDomainInfo()
+    vm.restore = 1
     ostype = "linux" #todo Set from somewhere (store in the src?).
     restorefn = getattr(xc, "%s_restore" % ostype)
     d = restorefn(state_file=src, progress=progress)
     dom = int(d['dom'])
     if dom < 0:
         raise VmError('restore failed')
-    vmconfig = sxp.from_string(d['vmconfig'])
-    vm.config = sxp.child_value(vmconfig, 'config')
-    deferred = vm.dom_configure(dom)
+    try:
+        vmconfig = sxp.from_string(d['vmconfig'])
+        vm.config = sxp.child_value(vmconfig, 'config')
+    except Exception, ex:
+        raise VmError('config error: ' + str(ex))
+    deferred = vm.dom_construct(dom)
+    vm.restore = 0
     def vifs_cb(val, vm):
         vif_up(vm.ipaddrs)
     deferred.addCallback(vifs_cb, vm)
@@ -354,6 +359,7 @@ class XendDomainInfo:
 
     def __init__(self):
         self.recreate = 0
+        self.restore = 0
         self.config = None
         self.id = None
         self.dom = None
@@ -463,7 +469,11 @@ class XendDomainInfo:
             raise VmError('invalid vm name')
         # See comment in XendDomain constructor.
         xd = get_component('xen.xend.XendDomain')
-        if xd.domain_exists(name):
+        dominfo = xd.domain_exists(name)
+        # When creating or rebooting, a domain with my name should not exist.
+        # When restoring, a domain with my name will exist, but it should have
+        # my domain id.
+        if dominfo and (not self.dom or dominfo.dom != self.dom)
             raise VmError('vm name clash: ' + name)
         
     def construct(self, config):
@@ -688,7 +698,12 @@ class XendDomainInfo:
     def init_domain(self):
         """Initialize the domain memory.
         """
-        if self.recreate: return
+        if self.recreate:
+            return
+        if self.start_time is None:
+            self.start_time = time.time()
+        if self.restore:
+            return
         memory = self.memory
         name = self.name
         cpu = int(sxp.child_value(self.config, 'cpu', '-1'))
@@ -699,9 +714,6 @@ class XendDomainInfo:
                           % (name, memory))
         log.debug('init_domain> Created domain=%d name=%s memory=%d', dom, name, memory)
         self.setdom(dom)
-
-        if self.start_time is None:
-            self.start_time = time.time()
 
     def build_domain(self, ostype, kernel, ramdisk, cmdline, vifs_n):
         """Build the domain boot image.
@@ -918,8 +930,8 @@ class XendDomainInfo:
         d.addCallback(_vm_configure1, self)
         return d
 
-    def dom_configure(self, dom):
-        """Configure a vm for an existing domain.
+    def dom_construct(self, dom):
+        """Construct a vm for an existing domain.
 
         @param dom:    domain id
         @return: deferred
@@ -931,7 +943,7 @@ class XendDomainInfo:
             self.setdom(dom)
             self.name = d['name']
             self.memory = d['memory']/1024
-            deferred = self.configure()
+            deferred = self.construct()
             def cberr(err):
                 self.destroy()
                 return err

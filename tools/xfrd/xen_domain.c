@@ -81,13 +81,14 @@ int xen_domain_snd(Conn *xend, IOStream *io, uint32_t dom, char *vmconfig, int v
   exit:
 #else 
     XcIOContext _ioctxt = {}, *ioctxt = &_ioctxt;
-    dprintf("> dom=%d\n", dom);
     ioctxt->domain = dom;
     ioctxt->io = io;
     ioctxt->info = iostdout;
     ioctxt->err = iostderr;
     ioctxt->data = xend;
     ioctxt->suspend = domain_suspend;
+    ioctxt->vmconfig = vmconfig;
+    ioctxt->vmconfig_n = vmconfig_n;
 
     err = xc_linux_save(xcinit(), ioctxt);
 #endif   
