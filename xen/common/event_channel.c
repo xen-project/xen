@@ -21,6 +21,7 @@
 #include <xen/errno.h>
 #include <xen/sched.h>
 #include <xen/event.h>
+#include <xen/irq.h>
 
 #include <hypervisor-ifs/hypervisor-if.h>
 #include <hypervisor-ifs/event_channel.h>
@@ -181,27 +182,32 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
 {
     struct task_struct *p = current;
     int pirq = bind->pirq;
-    int port;
+    int port, rc;
 
     if ( pirq >= ARRAY_SIZE(p->pirq_to_evtchn) )
         return -EINVAL;
 
     spin_lock(&p->event_channel_lock);
 
-    if ( ((port = p->pirq_to_evtchn[pirq]) != 0) ||
-         ((port = get_free_port(p)) < 0) )
+    if ( ((rc = port = p->pirq_to_evtchn[pirq]) != 0) ||
+         ((rc = port = get_free_port(p)) < 0) )
         goto out;
+
+    p->pirq_to_evtchn[pirq] = port;
+    if ( (rc = pirq_guest_bind(p, pirq)) != 0 )
+    {
+        p->pirq_to_evtchn[pirq] = 0;
+        goto out;
+    }
 
     p->event_channel[port].state  = ECS_PIRQ;
     p->event_channel[port].u.pirq = pirq;
 
-    p->pirq_to_evtchn[pirq] = port;
-
  out:
     spin_unlock(&p->event_channel_lock);
 
-    if ( port < 0 )
-        return port;
+    if ( rc < 0 )
+        return rc;
 
     bind->port = port;
     return 0;
@@ -237,7 +243,8 @@ static long __evtchn_close(struct task_struct *p1, int port1)
         break;
 
     case ECS_PIRQ:
-        p1->pirq_to_evtchn[chn1[port1].u.pirq] = 0;
+        if ( (rc = pirq_guest_unbind(p1, chn1[port1].u.pirq)) == 0 )
+            p1->pirq_to_evtchn[chn1[port1].u.pirq] = 0;
         break;
 
     case ECS_VIRQ:
