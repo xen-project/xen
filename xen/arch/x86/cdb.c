@@ -50,7 +50,6 @@ dbg_copy_from_user(void *dest, const void *src, unsigned len)
 		: "0"(len), "1"(dest), "2"(src)
 		: "memory");
 	ASSERT(!local_irq_is_enabled());
-	printf("dbg_copy_from_user returning %d.\n", __d2);
 	return __d2;
 }
 
