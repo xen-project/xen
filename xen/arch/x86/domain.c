@@ -633,7 +633,6 @@ unsigned long hypercall_create_continuation(
 {
     struct mc_state *mcs = &mc_state[smp_processor_id()];
     execution_context_t *ec;
-    unsigned long *preg;
     unsigned int i;
     va_list args;
 
@@ -653,10 +652,34 @@ unsigned long hypercall_create_continuation(
         ec->eax  = op;
         ec->eip -= 2;  /* re-execute 'int 0x82' */
         
-        for ( i = 0, preg = &ec->ebx; i < nr_args; i++, preg++ )
-            *preg = va_arg(args, unsigned long);
-#else
-        preg = NULL; /* XXX x86/64 */
+        for ( i = 0; i < nr_args; i++ )
+        {
+            switch ( i )
+            {
+            case 0: ec->ebx = va_arg(args, unsigned long); break;
+            case 1: ec->ecx = va_arg(args, unsigned long); break;
+            case 2: ec->edx = va_arg(args, unsigned long); break;
+            case 3: ec->esi = va_arg(args, unsigned long); break;
+            case 4: ec->edi = va_arg(args, unsigned long); break;
+            case 5: ec->ebp = va_arg(args, unsigned long); break;
+            }
+        }
+#elif defined(__x86_64__)
+        ec->rax  = op;
+        ec->rip -= 2;  /* re-execute 'syscall' */
+        
+        for ( i = 0; i < nr_args; i++ )
+        {
+            switch ( i )
+            {
+            case 0: ec->rdi = va_arg(args, unsigned long); break;
+            case 1: ec->rsi = va_arg(args, unsigned long); break;
+            case 2: ec->rdx = va_arg(args, unsigned long); break;
+            case 3: ec->r10 = va_arg(args, unsigned long); break;
+            case 4: ec->r8  = va_arg(args, unsigned long); break;
+            case 5: ec->r9  = va_arg(args, unsigned long); break;
+            }
+        }
 #endif
     }
 

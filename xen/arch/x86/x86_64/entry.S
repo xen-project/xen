@@ -11,6 +11,13 @@
 #include <asm/apicdef.h>
 #include <public/xen.h>
 
+
+/*
+ * %rax                            = hypercall vector
+ * %rdi, %rsi, %rdx, %r10, %r8, %9 = hypercall arguments
+ * %r11, %rcx                      = SYSCALL-saved %rflags and %rip
+ * NB. We must move %r10 to %rcx for C function-calling ABI.
+ */
 ENTRY(hypercall)
         sti
         movl  $__GUEST_SS,8(%rsp)
@@ -19,6 +26,7 @@ ENTRY(hypercall)
         pushq %rcx
         pushq $0
         SAVE_ALL
+        movq  %r10,%rcx
         andq  $(NR_hypercalls-1),%rax
         leaq  SYMBOL_NAME(hypercall_table)(%rip),%rcx
         callq *(%rcx,%rax,8)
@@ -39,6 +47,7 @@ restore_all_xen:
 
 error_code:
         SAVE_ALL
+        sti
         movq  %rsp,%rdi
         movl  XREGS_entry_vector(%rsp),%eax
         leaq  SYMBOL_NAME(exception_table)(%rip),%rdx
