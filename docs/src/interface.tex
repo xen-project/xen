@@ -525,7 +525,11 @@ Hypercalls are invoked in a manner analogous to system calls in a
 conventional operating system; a software interrupt is issued which
 vectors to an entry point within Xen. On x86\_32 machines the
 instruction required is {\tt int \$82}; the (real) IDT is setup so
-that this may only be issued from within ring 1.
+that this may only be issued from within ring 1. The particular 
+hypercall to be invoked is contained in {\tt EAX} --- a list 
+mapping these values to symbolic hypercall names can be found 
+in {\tt xen/include/public/xen.h}. 
+
 
 On some occasions a set of hypercalls will be required to carry
 out a higher-level function; a good example is when a guest 
@@ -543,6 +547,9 @@ call\_list}. Each entry contains the hypercall operation code followed
 by up to 7 word-sized arguments.
 \end{quote}
 
+Note that multicalls are provided purely as an optimization; there is
+no requirement to use them when first porting a guest operating
+system.
 
 
 \section{Virtual CPU Setup} 
@@ -561,7 +568,7 @@ use when it wishes to notify the guest OS of an occurrence.
 
 Register the normal (``event'') and failsafe callbacks for 
 event processing. In each case the code segment selector and 
-address withing that segment are provided. The selectors must
+address within that segment are provided. The selectors must
 have RPL 1; in XenLinux we simply use the kernel's CS for both 
 {\tt event\_selector} and {\tt failsafe\_selector}.
 
@@ -572,15 +579,41 @@ when Xen attempts to use the normal callback.
 \end{quote} 
 
 
+After installing the hypervisor callbacks, the guest OS can 
+install a `virtual IDT' by using the following hypercall: 
+
+\begin{quote} 
 \hypercall{set\_trap\_table(trap\_info\_t *table)} 
 
-Install trap handler table.
+Install one or more entries into the per-domain 
+trap handler table (essentially a software version of the IDT). 
+Each entry in the array pointed to by {\tt table} includes the 
+exception vector number with the corresponding segement selector 
+and entry point. Most guest OSes can use the same handlers on 
+Xen as when running on the real hardware; an exception is the 
+page fault handler (exception vector 14) where a modified 
+stack-frame layout is used. 
 
 
+\end{quote} 
+
+Finally, as an optimization it is possible for each guest OS 
+to install one ``fast trap'': this is a trap gate which will 
+allow direct transfer of control from ring 3 into ring 1 without
+indirecting via Xen. In most cases this is suitable for use by 
+the guest OS system call mechanism, although it may be used for
+any purpose. 
+
+
+\begin{quote}
 \hypercall{set\_fast\_trap(int idx)}
 
- install traps to allow guest OS to bypass hypervisor
+Install the handler for exception vector {\tt idx} as the ``fast
+trap'' for this domaim. Note that this installs the current handler 
+(i.e. that which has been installed previously via a call 
+to {\tt set\_trap\_table()}). 
 
+\end{quote}
 
 
 
