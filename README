@@ -142,14 +142,29 @@ To fetch a local copy, install the BitKeeper tools, then run:
 You can do a complete build of Xen, the control tools, and the
 XenLinux kernel images with "make world". This can take 10 minutes
 even on a fast machine. If you're on an SMP machine you may wish to
-give the '-j4' argument to make to get a parallel build. You should
-end up with all the binaries and images being placed in the ./install
-directory tree.  You can then install everything to the standard
-system directories (e.g. /boot, /usr/bin, /usr/lib/python/ etc) by
-taping "make install".
+give the '-j4' argument to make to get a parallel build.  All of the
+files that are built are placed under the ./install directory.  You
+can then install everything to the standard system directories
+(e.g. /boot, /usr/bin, /usr/lib/python/ etc) by typing "make install".
 
+Take a look in install/boot/:
+ install/boot/xen.gz               The Xen 'kernel' (formerly image.gz)
+ install/boot/vmlinuz-2.4.26-xen0  Domain 0 XenLinux kernel (xenolinux.gz)
+ install/boot/vmlinuz-2.4.26-xenU  Unprivileged XenLinux kernel
 
-Inspect the Makefule if you want to see what goes on during a
+The difference between the two Linux kernels that are built is
+due to the configuration file used for each. The "U" suffixed
+unprivileged version doesn't contain any of the physical hardware
+device drivers, so is 30% smaller and hence may be preferred for
+your non-privileged domains.
+
+The install/boot directory will also contain the config files
+used for building the XenLinux kernels, and also versions of Xen
+and XenLinux kernels that contain debug symbols (xen-syms and
+vmlinux-syms-2.4.26-xen0) which are essential for interpreting crash
+dumps.
+
+Inspect the Makefile if you want to see what goes on during a
 build. Building Xen and the tools is straightforward, but XenLinux is
 more complicated. The makefile needs a 'pristine' linux kernel tree
 which it will then add the Xen architecture files to. You can tell the
@@ -173,14 +188,3 @@ smaller than the other kernel with its selection of hardware drivers.
 If you don't want to use bitkeeper to download the source, you can
 download prebuilt binaries and src tar balls from the project
 downloads page:  http://www.cl.cam.ac.uk/netos/xen/downloads/
-
-Using the domain control tools
-==============================
-
-README.CD contains some example invocations.
-
-See example Python scripts in tools/examples/ and the associated README.
-
-Further documentation is in docs/ (e.g., docs/Xen-HOWTO), and also in
-
-
