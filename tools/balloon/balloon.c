@@ -1,7 +1,7 @@
 /******************************************************************************
  * balloon.c
  *
- * Xeno balloon driver userspace control tool. Used to shrink/grow domain's 
+ * Xen balloon driver userspace control tool. Used to shrink/grow domain's 
  * memory.
  *
  * Copyright (c) 2003, B Dragovic
@@ -31,7 +31,7 @@ typedef struct user_balloon_op {
 
 static int open_balloon_proc()
 {
-    return open("/proc/xeno/balloon", O_RDWR);
+    return open("/proc/xen/balloon", O_RDWR);
 }
 
 /* inflate balloon function signals to kernel it should relinquish memory */

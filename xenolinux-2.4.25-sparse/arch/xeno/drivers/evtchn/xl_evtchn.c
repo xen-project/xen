@@ -27,26 +27,26 @@ typedef void (*evtchn_receiver_t)(unsigned int);
 #define PORT_DISCONNECT 0x8000
 #define PORTIDX_MASK    0x7fff
 
-/* /dev/xeno/evtchn resides at device number major=10, minor=200 */
+/* /dev/xen/evtchn resides at device number major=10, minor=200 */
 #define EVTCHN_MINOR 200
 
-/* /dev/xeno/evtchn ioctls: */
+/* /dev/xen/evtchn ioctls: */
 /* EVTCHN_RESET: Clear and reinit the event buffer. Clear error condition. */
 #define EVTCHN_RESET _IO('E', 1)
 
-/* NB. This must be shared amongst drivers if more things go in /dev/xeno */
-static devfs_handle_t xeno_dev_dir;
+/* NB. This must be shared amongst drivers if more things go in /dev/xen */
+static devfs_handle_t xen_dev_dir;
 
-/* Only one process may open /dev/xeno/evtchn at any time. */
+/* Only one process may open /dev/xen/evtchn at any time. */
 static unsigned long evtchn_dev_inuse;
 
-/* Notification ring, accessed via /dev/xeno/evtchn. */
+/* Notification ring, accessed via /dev/xen/evtchn. */
 #define RING_SIZE     2048  /* 2048 16-bit entries */
 #define RING_MASK(_i) ((_i)&(RING_SIZE-1))
 static u16 *ring;
 static unsigned int ring_cons, ring_prod, ring_overflow;
 
-/* Processes wait on this queue via /dev/xeno/evtchn when ring is empty. */
+/* Processes wait on this queue via /dev/xen/evtchn when ring is empty. */
 static DECLARE_WAIT_QUEUE_HEAD(evtchn_wait);
 static struct fasync_struct *evtchn_async_queue;
 
@@ -228,11 +228,16 @@ static ssize_t evtchn_read(struct file *file, char *buf,
 
     add_wait_queue(&evtchn_wait, &wait);
 
-    if ( (count <= 0) || (count > PAGE_SIZE) || ((count&1) != 0) )
+    count &= ~1; /* even number of bytes */
+
+    if ( count == 0 )
     {
-        rc = -EINVAL;
+        rc = 0;
         goto out;
     }
+
+    if ( count > PAGE_SIZE )
+        count = PAGE_SIZE;
 
     for ( ; ; )
     {
@@ -307,11 +312,16 @@ static ssize_t evtchn_write(struct file *file, const char *buf,
     if ( kbuf == NULL )
         return -ENOMEM;
 
-    if ( (count <= 0) || (count > PAGE_SIZE) || ((count&1) != 0) )
+    count &= ~1; /* even number of bytes */
+
+    if ( count == 0 )
     {
-        rc = -EINVAL;
+        rc = 0;
         goto out;
     }
+
+    if ( count > PAGE_SIZE )
+        count = PAGE_SIZE;
 
     if ( copy_from_user(kbuf, buf, count) != 0 )
     {
@@ -427,8 +437,8 @@ static int __init init_module(void)
         return err;
     }
 
-    /* (DEVFS) create directory '/dev/xeno'. */
-    xeno_dev_dir = devfs_mk_dir(NULL, "xeno", NULL);
+    /* (DEVFS) create directory '/dev/xen'. */
+    xen_dev_dir = devfs_mk_dir(NULL, "xen", NULL);
 
     /* (DEVFS) &link_dest[pos] == '../misc/evtchn'. */
     pos = devfs_generate_path(evtchn_miscdev.devfs_handle, 
@@ -437,8 +447,8 @@ static int __init init_module(void)
     if ( pos >= 0 )
         strncpy(&link_dest[pos], "../", 3);
 
-    /* (DEVFS) symlink '/dev/xeno/evtchn' -> '../misc/evtchn'. */
-    (void)devfs_mk_symlink(xeno_dev_dir, 
+    /* (DEVFS) symlink '/dev/xen/evtchn' -> '../misc/evtchn'. */
+    (void)devfs_mk_symlink(xen_dev_dir, 
                            "evtchn", 
                            DEVFS_FL_DEFAULT, 
                            &link_dest[pos],

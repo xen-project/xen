@@ -72,7 +72,7 @@ def setup_vfr_rules_for_vif(dom,vif,addr):
     is expressed as a textual dotted quad, and set up appropriate routing
     rules in Xen. No return value.
     """
-    fd = os.open( '/proc/xeno/vfr', os.O_WRONLY )
+    fd = os.open( '/proc/xen/vfr', os.O_WRONLY )
     if ( re.search( '169\.254', addr) ):
         os.write( fd, 'ADD ACCEPT srcaddr=' + addr +
                   ' srcaddrmask=255.255.255.255' +

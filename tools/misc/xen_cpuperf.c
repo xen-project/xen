@@ -1,10 +1,5 @@
 /*
  * User mode program to prod MSR values through /proc/perfcntr
- *
- *
- * $Id$
- *
- * $Log$
  */
 
 #include <sys/types.h>
@@ -217,7 +212,7 @@ int main(int argc, char **argv)
         }
     }
 
-    if ( (privfd = open("/proc/xeno/privcmd", O_RDWR)) == -1 )
+    if ( (privfd = open("/proc/xen/privcmd", O_RDWR)) == -1 )
     {
         fprintf(stderr, "Could not open privileged Xen control interface.\n");
         exit(1);

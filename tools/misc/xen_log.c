@@ -155,11 +155,11 @@ int main(int argc, char **argv)
                 errno = 2;
                 errexit("daemon");
             } else {
-                openlog("xenolog", LOG_PID, SYSLOGTO);
+                openlog("xen_log", LOG_PID, SYSLOGTO);
             }
             break;
         case 'h':
-            printf("Usage: xenolog [options]\n");
+            printf("Usage: xen_log [options]\n");
             printf("Capture and display output of xen domains.\n\n");
             printf("  -d       Daemonize and send output to syslog.\n");
             exit(0);

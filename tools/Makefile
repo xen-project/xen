@@ -23,6 +23,7 @@ all:
 	$(MAKE) -C misc
 	$(MAKE) -C examples
 	$(MAKE) -C xentrace
+	$(MAKE) -C xend
 
 install: all
 	$(MAKE) -C balloon install
@@ -30,6 +31,7 @@ install: all
 	$(MAKE) -C misc install
 	$(MAKE) -C examples install
 	$(MAKE) -C xentrace install
+	$(MAKE) -C xend install
 
 dist: all
 	$(MAKE) -C balloon dist
@@ -37,6 +39,7 @@ dist: all
 	$(MAKE) -C misc dist
 	$(MAKE) -C examples dist
 	$(MAKE) -C xentrace dist
+	$(MAKE) -C xend dist
 
 clean:
 	$(MAKE) -C balloon clean
@@ -45,4 +48,5 @@ clean:
 	$(MAKE) -C examples clean
 	$(MAKE) -C nsplitd clean
 	$(MAKE) -C xentrace clean
+	$(MAKE) -C xend clean
 
