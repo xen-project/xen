@@ -20,8 +20,16 @@
 #define XEN_BLK_DEBUG 0
 #define XEN_BLK_DEBUG_LEVEL KERN_ALERT
 
-#define XEN_BLK_REQUEST_LIST_SIZE 256                      /* very arbitrary */
 
+/*
+ * KAF XXX: the current state of play with blk_requests.
+ * 
+ * The following infrastructure is really here for future use.
+ * blk_requests are currently not used by any mechanism, but eventually
+ * pending blk_requests will go into an IO scheduler. This entry point
+ * will go where we currently increment 'nr_pending'. The scheduler will
+ * refuse admission of a blk_request if it is already full.
+ */
 typedef struct blk_request
 {
   struct list_head queue;
@@ -29,15 +37,11 @@ typedef struct blk_request
   blk_ring_entry_t request;
   struct task_struct *domain;                           /* requesting domain */
 } blk_request_t;
-
+#define MAX_PENDING_REQS 256                 /* very arbitrary */
+static kmem_cache_t *blk_request_cachep;
+static atomic_t nr_pending, nr_done;
 static int pending_work;              /* which domains have work for us? */
 
-blk_request_t blk_request_list[XEN_BLK_REQUEST_LIST_SIZE];
-
-struct list_head free_queue;          /* unused requests */
-struct list_head pending_queue;       /* waiting for hardware */
-spinlock_t free_queue_lock;
-spinlock_t pending_queue_lock;
 
 /* some definitions */
 void dumpx (char *buffer, int count);
@@ -67,15 +71,14 @@ void end_block_io_op(struct buffer_head * bh)
 	printk(XEN_BLK_DEBUG_LEVEL "XEN end_block_io_op,  bh: %lx\n",
 	       (unsigned long)bh);
     
-    spin_lock_irqsave(&pending_queue_lock, flags);
     if ( (blk_request = (blk_request_t *)bh->b_xen_request) == NULL) 
         goto bad_interrupt;
-    list_del(&blk_request->queue);
-    spin_unlock(&pending_queue_lock);
+    atomic_dec(&nr_pending);
     
     p = blk_request->domain;
 
-    spin_lock(&p->io_done_queue_lock);
+    atomic_inc(&nr_done);
+    spin_lock_irqsave(&p->io_done_queue_lock, flags);
     list_add_tail(&blk_request->queue, &p->io_done_queue);
     /* enqueue work for 'flush_blk_queue' handler */
     cpu_mask = mark_hyp_event(p, _HYP_EVENT_BLK_RX);
@@ -89,7 +92,6 @@ void end_block_io_op(struct buffer_head * bh)
     printk (KERN_ALERT
             "   block io interrupt received for unknown buffer [0x%lx]\n",
             (unsigned long) bh);
-    spin_unlock_irqrestore(&pending_queue_lock, flags);
     BUG();
     return;
 }
@@ -118,7 +120,8 @@ void flush_blk_queue(void)
 	blk_request = list_entry(p->io_done_queue.next, blk_request_t, queue);
 	list_del(&blk_request->queue);
 	spin_unlock_irqrestore(&p->io_done_queue_lock, flags);
-	
+	atomic_dec(&nr_done);
+
 	/* place on ring for guest os */ 
 	blk_ring = p->blk_ring_base;
 	position = blk_ring->brx_prod;
@@ -137,9 +140,7 @@ void flush_blk_queue(void)
 	if ( blk_request->bh )
 	    kfree(blk_request->bh); 
 
-	spin_lock_irqsave(&free_queue_lock, flags);
-	list_add_tail(&blk_request->queue, &free_queue);
-	spin_unlock_irqrestore(&free_queue_lock, flags);
+        kmem_cache_free(blk_request_cachep, blk_request);
 
 	spin_lock_irqsave(&p->io_done_queue_lock, flags);
     }
@@ -285,7 +286,6 @@ int dispatch_rw_block_io (int index)
     struct request_queue *rq;
     int operation;
     blk_request_t *blk_request;
-    unsigned long flags;
     
     /*
      * check to make sure that the block request seems at least
@@ -312,22 +312,12 @@ int dispatch_rw_block_io (int index)
 		"sync" : "async"));
     }
 
-    /* find an empty request slot */
-    spin_lock_irqsave(&free_queue_lock, flags);
-    if (list_empty(&free_queue)) {
-	spin_unlock_irqrestore(&free_queue_lock, flags);
-	return 1;
-    }
+    /* XXX KAF: A bit racey maybe? The whole wake-up pending needs fixing. */
+    if ( atomic_read(&nr_pending) >= MAX_PENDING_REQS )
+        return 1;
+    atomic_inc(&nr_pending);
+    blk_request = kmem_cache_alloc(blk_request_cachep, GFP_ATOMIC);
 
-    blk_request = list_entry(free_queue.next, blk_request_t, queue);
-    list_del(&blk_request->queue);
-    spin_unlock_irqrestore(&free_queue_lock, flags);
-
-    /* place request on pending list */
-    spin_lock_irqsave(&pending_queue_lock, flags);
-    list_add_tail(&blk_request->queue, &pending_queue);
-    spin_unlock_irqrestore(&pending_queue_lock, flags);
-    
     /* we'll be doing this frequently, would a cache be appropriate? */
     /* free in flush_blk_queue */
     bh = (struct buffer_head *) kmalloc(sizeof(struct buffer_head), 
@@ -407,64 +397,31 @@ void dump_queue_head(struct list_head *queue, char *name)
     }
 }
 
+
 static void dump_blockq(u_char key, void *dev_id, struct pt_regs *regs) 
 {
-    u_long flags; 
-
-    printk("Dumping block queues:\n"); 
-
-    spin_lock_irqsave(&free_queue_lock, flags);
-    dump_queue(&free_queue, "FREE QUEUE"); 
-    spin_unlock_irqrestore(&free_queue_lock, flags);
-
-    spin_lock_irqsave(&pending_queue_lock, flags);
-    dump_queue(&pending_queue, "PENDING QUEUE"); 
-    spin_unlock_irqrestore(&pending_queue_lock, flags);
-
-#if 0
-    spin_lock_irqsave(&io_done_queue_lock, flags);
-    dump_queue(&io_done_queue, "IO DONE QUEUE"); 
-    spin_unlock_irqrestore(&io_done_queue_lock, flags);
-#else
-    printk("FIXME: IO_DONE_QUEUE IS NOW PER DOMAIN!!\n");
-#endif
-
-    return; 
+    printk("Dumping block queue stats:\n"); 
+    printk("nr_pending = %d, nr_done = %d\n",
+           atomic_read(&nr_pending), atomic_read(&nr_done));
 }
-
 
 
 /*
  * initialize_block_io
  *
- * initialize everything for block io 
- * called from arch/i386/setup.c::start_of_day
+ * initialize everything for block io called from 
+ * arch/i386/setup.c::start_of_day
  */
-
-void initialize_block_io (){
-
-    int loop;
+void initialize_block_io ()
+{
+    blk_request_cachep = kmem_cache_create(
+        "blk_request_cache", sizeof(blk_request_t),
+        0, SLAB_HWCACHE_ALIGN, NULL, NULL);
     
-    INIT_LIST_HEAD(&free_queue);
-    INIT_LIST_HEAD(&pending_queue);
+    add_key_handler('b', dump_blockq, "dump xen ide blkdev stats"); 
     
-    spin_lock_init(&free_queue_lock);
-    spin_lock_init(&pending_queue_lock);
-    
-    for (loop = 0; loop < XEN_BLK_REQUEST_LIST_SIZE; loop++)
-    {
-	list_add_tail(&blk_request_list[loop].queue, &free_queue);
-    }
-    
-    
-    add_key_handler('b', dump_blockq, "dump xen ide block queues"); 
-    
-    /*
-     * if bit i is true then domain i has work for us to do.
-     */
+    /* If bit i is true then domain i has work for us to do. */
     pending_work = 0;
-    
-    return;
 }
 
 
