@@ -69,7 +69,7 @@ static void __init fixrange_init (unsigned long start,
         if ( !l2_pgentry_empty(*l2e) ) continue;
         page = (unsigned long)get_free_page(GFP_KERNEL);
         clear_page(page);
-        *l2e = mk_l2_pgentry(__pa(page) | PAGE_HYPERVISOR);
+        *l2e = mk_l2_pgentry(__pa(page) | __PAGE_HYPERVISOR);
         vaddr += 1 << L2_PAGETABLE_SHIFT;
     }
 }
@@ -95,7 +95,7 @@ void __init paging_init(void)
     ioremap_pt = (void *)get_free_page(GFP_KERNEL);
     clear_page(ioremap_pt);
     idle0_pg_table[IOREMAP_VIRT_START >> L2_PAGETABLE_SHIFT] = 
-        mk_l2_pgentry(__pa(ioremap_pt) | PAGE_HYPERVISOR);
+        mk_l2_pgentry(__pa(ioremap_pt) | __PAGE_HYPERVISOR);
 
     /* Create read-only mapping of MPT for guest-OS use. */
     idle0_pg_table[READONLY_MPT_VIRT_START >> L2_PAGETABLE_SHIFT] =

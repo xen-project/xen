@@ -367,6 +367,9 @@ static int get_l2_table(unsigned long page_nr)
     p_l2_entry[(PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT) -
               DOMAIN_ENTRIES_PER_L2_PAGETABLE] =
         mk_l2_pgentry(__pa(current->mm.perdomain_pt) | __PAGE_HYPERVISOR);
+    p_l2_entry[(LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT) -
+              DOMAIN_ENTRIES_PER_L2_PAGETABLE] =
+        mk_l2_pgentry((page_nr << PAGE_SHIFT) | __PAGE_HYPERVISOR);
 
  out:
     unmap_domain_mem(p_l2_entry);
@@ -785,7 +788,7 @@ int do_process_page_updates(page_update_request_t *ureqs, int count)
         case PGREQ_NORMAL:
             page = frame_table + pfn;
             flags = page->flags;
-            
+
             if ( DOMAIN_OKAY(flags) )
             {
                 switch ( (flags & PG_type_mask) )

@@ -14,12 +14,6 @@
 #include <asm/atomic.h>
 
 atomic_t tlb_flush_count[NR_CPUS];
-#define __read_cr3(__var)                                               \
-    do {                                                                \
-                __asm__ __volatile (                                    \
-                        "movl %%cr3, %0;"                               \
-                        : "=r" (__var));                                \
-    } while (0)
 
 #define __write_cr3_counted(__pa)                                       \
     do {                                                                \

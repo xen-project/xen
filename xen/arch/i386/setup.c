@@ -272,7 +272,11 @@ void __init cpu_init(void)
     pl2e = idle_pg_table[nr] + (MAPCACHE_VIRT_START >> L2_PAGETABLE_SHIFT);
     mapcache[nr] = (unsigned long *)get_free_page(GFP_KERNEL);
     clear_page(mapcache[nr]);
-    *pl2e = mk_l2_pgentry(__pa(mapcache[nr]) | PAGE_HYPERVISOR);
+    *pl2e = mk_l2_pgentry(__pa(mapcache[nr]) | __PAGE_HYPERVISOR);
+
+    /* Set up linear page table mapping. */
+    idle_pg_table[nr][LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
+        mk_l2_pgentry(__pa(idle_pg_table[nr]) | __PAGE_HYPERVISOR);
 
     init_idle_task();
 }
