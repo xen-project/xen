@@ -490,6 +490,23 @@ void do_xlblk_request(request_queue_t *rq)
 }
 
 
+static void kick_pending_request_queues(void)
+{
+    /* We kick pending request queues if the ring is reasonably empty. */
+    if ( (nr_pending != 0) && 
+         (((req_prod - resp_cons) & (BLK_RING_SIZE - 1)) < 
+          (BLK_RING_SIZE >> 1)) )
+    {
+        /* Attempt to drain the queue, but bail if the ring becomes full. */
+        while ( nr_pending != 0 )
+        {
+            do_xlblk_request(pending_queues[--nr_pending]);
+            if ( RING_PLUGGED ) break;
+        }
+    }
+}
+
+
 static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
 {
     int i; 
@@ -538,18 +555,7 @@ static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
     
     resp_cons = i;
 
-    /* We kick pending request queues if the ring is reasonably empty. */
-    if ( (nr_pending != 0) && 
-         (((req_prod - resp_cons) & (BLK_RING_SIZE - 1)) < 
-          (BLK_RING_SIZE >> 1)) )
-    {
-        /* Attempt to drain the queue, but bail if the ring becomes full. */
-        while ( nr_pending != 0 )
-        {
-            do_xlblk_request(pending_queues[--nr_pending]);
-            if ( RING_PLUGGED ) break;
-        }
-    }
+    kick_pending_request_queues();
 
     spin_unlock_irqrestore(&io_request_lock, flags);
 }
@@ -692,4 +698,7 @@ void blkdev_suspend(void)
 void blkdev_resume(void)
 {
     reset_xlblk_interface();
+    spin_lock_irq(&io_request_lock);
+    kick_pending_request_queues();
+    spin_unlock_irq(&io_request_lock);
 }

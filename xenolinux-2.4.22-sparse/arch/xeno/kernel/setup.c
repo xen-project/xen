@@ -1080,12 +1080,14 @@ static void stop_task(void *unused)
 
     __cli();
 
+    HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
     clear_fixmap(FIX_SHARED_INFO);
 
     HYPERVISOR_stop();
 
     set_fixmap(FIX_SHARED_INFO, start_info.shared_info);
     HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
+    memset(empty_zero_page, 0, PAGE_SIZE);
 
     __sti();
 

@@ -113,8 +113,10 @@ static inline void set_pte_phys (unsigned long vaddr,
     }
     pte = pte_offset(pmd, vaddr);
 
+#if 0 /* Not in Xen, since this breaks clear_fixmap. */
     if (pte_val(*pte))
         pte_ERROR(*pte);
+#endif
 
     /* We queue directly, avoiding hidden phys->machine translation. */
     queue_l1_entry_update(pte, phys | pgprot_val(prot));
