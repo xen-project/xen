@@ -148,9 +148,10 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         if ( p == NULL ) 
             goto exit_create;
 
-	if (op.u.newdomain.name[0]) {
-            strncpy (p -> name, op.u.newdomain.name, MAX_DOMAIN_NAME);
-            p -> name[MAX_DOMAIN_NAME - 1] = 0;
+	if ( op.u.newdomain.name[0] )
+        {
+            strncpy (p->name, op.u.newdomain.name, MAX_DOMAIN_NAME);
+            p->name[MAX_DOMAIN_NAME - 1] = 0;
 	}
 
         ret = alloc_new_dom_mem(p, op.u.newdomain.memory_kb);
@@ -166,7 +167,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         
         op.u.newdomain.domain = ret;
         copy_to_user(u_dom0_op, &op, sizeof(op));
-
+ 
     exit_create:
         spin_unlock_irq(&create_dom_lock);
     }

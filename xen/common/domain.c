@@ -91,7 +91,7 @@ struct task_struct *do_newdomain(unsigned int dom_id, unsigned int cpu)
     task_hash[TASK_HASH(dom_id)] = p;
     write_unlock_irqrestore(&tasklist_lock, flags);
 
-    return(p);
+    return p;
 }
 
 
@@ -128,6 +128,8 @@ void kill_domain_with_errmsg(const char *err)
 void __kill_domain(struct task_struct *p)
 {
     int i;
+    struct task_struct **pp;
+    unsigned long flags;
 
     if ( p->domain == 0 )
     {
@@ -147,6 +149,17 @@ void __kill_domain(struct task_struct *p)
 
     for ( i = 0; i < MAX_DOMAIN_VIFS; i++ )
         unlink_net_vif(p->net_vif_list[i]);
+
+    /*
+     * Note this means that find_domain_by_id may fail, even when the caller
+     * holds a reference to the domain being queried. Take care!
+     */
+    write_lock_irqsave(&tasklist_lock, flags);
+    REMOVE_LINKS(p);
+    pp = &task_hash[TASK_HASH(p->domain)];
+    while ( *pp != p ) *pp = (*pp)->next_hash;
+    *pp = p->next_hash;
+    write_unlock_irqrestore(&tasklist_lock, flags);
 
     if ( p == current )
     {
@@ -289,20 +302,10 @@ void free_all_dom_mem(struct task_struct *p)
 /* Release resources belonging to task @p. */
 void release_task(struct task_struct *p)
 {
-    struct task_struct **pp;
-    unsigned long flags;
-
     ASSERT(p->state == TASK_DYING);
     ASSERT(!p->has_cpu);
 
     printk("Releasing task %d\n", p->domain);
-
-    write_lock_irqsave(&tasklist_lock, flags);
-    REMOVE_LINKS(p);
-    pp = &task_hash[TASK_HASH(p->domain)];
-    while ( *pp != p ) *pp = (*pp)->next_hash;
-    *pp = p->next_hash;
-    write_unlock_irqrestore(&tasklist_lock, flags);
 
     /*
      * This frees up blkdev rings. Totally safe since blkdev ref counting
@@ -318,7 +321,8 @@ void release_task(struct task_struct *p)
     UNSHARE_PFN(virt_to_page(p->shared_info));
     free_page((unsigned long)p->shared_info);
     free_all_dom_mem(p);
-    free_pages((unsigned long)p, 1);
+
+    kmem_cache_free(task_struct_cachep, p);
 }
 
 
