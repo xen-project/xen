@@ -149,7 +149,7 @@
 #define TI_GET_DPL(_ti)      ((_ti)->flags & 3)
 #define TI_GET_IF(_ti)       ((_ti)->flags & 4)
 #define TI_SET_DPL(_ti,_dpl) ((_ti)->flags |= (_dpl))
-#define TI_SET_IF(_ti,_if)   ((_ti)->flags |= (_if))
+#define TI_SET_IF(_ti,_if)   ((_ti)->flags |= ((!!(_if))<<2))
 typedef struct trap_info_st
 {
     unsigned char  vector;  /* exception vector                              */
