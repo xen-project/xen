@@ -109,16 +109,16 @@ typedef struct {
     u64      cpu_time;                /* 40 */
 } PACKED dom0_getdomaininfo_t; /* 48 bytes */
 
-#define DOM0_BUILDDOMAIN      13
+#define DOM0_SETDOMAININFO      13
 typedef struct {
     /* IN variables. */
-    domid_t                 domain;   /*  0 */
-    u16                     __pad0;   /*  2 */
-    u32                     __pad1;   /*  4 */
+    domid_t                   domain;       /*  0 */
+    u16                       exec_domain;  /*  2 */
+    u32                       __pad0;       /*  4 */
     /* IN/OUT parameters */
-    full_execution_context_t *ctxt;   /*  8 */
+    full_execution_context_t *ctxt;         /*  8 */
     MEMORY_PADDING;
-} PACKED dom0_builddomain_t; /* 16 bytes */
+} PACKED dom0_setdomaininfo_t;              /* 16 bytes */
 
 #define DOM0_IOPL             14
 typedef struct {
@@ -426,7 +426,7 @@ typedef struct {
         dom0_getmemlist_t        getmemlist;
         dom0_schedctl_t          schedctl;
         dom0_adjustdom_t         adjustdom;
-        dom0_builddomain_t       builddomain;
+        dom0_setdomaininfo_t     setdomaininfo;
         dom0_getdomaininfo_t     getdomaininfo;
         dom0_getpageframeinfo_t  getpageframeinfo;
         dom0_iopl_t              iopl;
