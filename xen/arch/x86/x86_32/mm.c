@@ -262,6 +262,10 @@ long set_gdt(struct domain *d,
     int i, nr_pages = (entries + 511) / 512;
     struct desc_struct *vgdt;
 
+    vgdt = map_domain_mem(frames[0] << PAGE_SHIFT);
+    memset( vgdt + FIRST_RESERVED_GDT_ENTRY, 0,	    
+           NR_RESERVED_GDT_ENTRIES*8);
+
     /* Check the new GDT. */
     for ( i = 0; i < nr_pages; i++ )
     {
@@ -272,7 +276,6 @@ long set_gdt(struct domain *d,
     }
 
     /* Copy reserved GDT entries to the new GDT. */
-    vgdt = map_domain_mem(frames[0] << PAGE_SHIFT);
     memcpy(vgdt + FIRST_RESERVED_GDT_ENTRY, 
            gdt_table + FIRST_RESERVED_GDT_ENTRY, 
            NR_RESERVED_GDT_ENTRIES*8);

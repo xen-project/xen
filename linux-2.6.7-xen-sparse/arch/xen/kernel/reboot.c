@@ -107,7 +107,11 @@ static void __do_suspend(void)
 
     memcpy(&start_info, &suspend_record->resume_info, sizeof(start_info));
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+    set_fixmap_ma(FIX_SHARED_INFO, start_info.shared_info);
+#else
     set_fixmap(FIX_SHARED_INFO, start_info.shared_info);
+#endif
 
     HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
 
@@ -133,7 +137,6 @@ static void __do_suspend(void)
     netif_resume();
 
     __sti();
-
 
  out:
     if ( suspend_record != NULL )

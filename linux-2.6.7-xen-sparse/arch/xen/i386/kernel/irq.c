@@ -694,6 +694,7 @@ void free_irq(unsigned int irq, void *dev_id)
 	p = &desc->action;
 	for (;;) {
 		struct irqaction * action = *p;
+
 		if (action) {
 			struct irqaction **pp = p;
 			p = &action->next;
@@ -710,7 +711,10 @@ void free_irq(unsigned int irq, void *dev_id)
 
 			/* Wait to make sure it's not being used on another CPU */
 			synchronize_irq(irq);
-			kfree(action);
+
+#define SA_STATIC_ACTION 0x01000000 /* Is it our duty to free the action? */
+			if (!(action->flags & SA_STATIC_ACTION))
+				kfree(action);
 			return;
 		}
 		printk("Trying to free free IRQ%d\n",irq);
