@@ -104,8 +104,10 @@ class XendConsole:
                 self._delete_console(c.id)
 
     def onDomainDied(self, event, val):
+        print 'onDomainDied', "dom=", dom,
         dom = int(val)
         for c in self.consoles():
+            print 'onDomainDied', "dom=", dom, "dom1=", c.dom1, "dom2=", c.dom2
             if (c.dom1 == dom) or (c.dom2 == dom):
                 self._delete_console(c.id)
 

@@ -91,6 +91,7 @@ class Opts:
         self._vals = {}
         self._globals = {}
         self._locals = {}
+        self.quiet = 0
 
     def opt(self, name, **args):
         x = Opt(self, name, **args)

@@ -85,11 +85,10 @@ def reconfigure(interface, bridge):
     if not intf_info['gateway']:
         print 'Gateway not found: ', interface
         return
-    cmd(CMD_IFCONFIG, '%(interface)s 0.0.0.0' % intf_info)
     cmd(CMD_IFCONFIG, '%(bridge)s %(address)s netmask %(mask)s broadcast %(broadcast)s up' % intf_info)
     cmd(CMD_ROUTE, 'add default gateway %(gateway)s dev %(bridge)s' % intf_info)
-    if os.path.exists(CMD_BRCTL):
-        cmd(CMD_BRCTL, 'addif %(bridge)s %(interface)s' % intf_info)
+    cmd(CMD_BRCTL, 'addif %(bridge)s %(interface)s' % intf_info)
+    cmd(CMD_IFCONFIG, '%(interface)s 0.0.0.0' % intf_info)
 
 defaults = {
     'interface': 'eth0',

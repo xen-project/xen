@@ -7,28 +7,28 @@ from xenmgr.XendClient import server
 
 from xenmgr.xm.opts import *
 
-opts = Opts(use="""[options]
+gopts = Opts(use="""[options]
 
 Create a domain.
 """)
 
-opts.opt('help', short='h',
+gopts.opt('help', short='h',
          fn=set_value, default=0,
          use="Print this help.")
 
-opts.opt('quiet', short='q',
+gopts.opt('quiet', short='q',
          fn=set_true, default=0,
          use="Quiet.")
 
-opts.opt('path', val='PATH',
+gopts.opt('path', val='PATH',
          fn=set_value, default='.:/etc/xc',
          use="Search path for default scripts.")
 
-opts.opt('defaults', short='f', val='FILE',
+gopts.opt('defaults', short='f', val='FILE',
          fn=set_value, default='xmdefaults',
          use="Use the given default script.")
 
-opts.opt('config', short='F', val='FILE',
+gopts.opt('config', short='F', val='FILE',
          fn=set_value, default=None,
          use='Domain configuration to use.')
 
@@ -38,102 +38,103 @@ def set_var(opt, k, v):
         (k, v) = string.split(d, '=')
         opt.opts.setvar(k, v)
 
-opts.opt('define', short='D', val='VAR=VAL',
+gopts.opt('define', short='D', val='VAR=VAL',
          fn=set_var, default=None,
          use="""Set variables before loading defaults, e.g. '-D vmid=3;ip=1.2.3.4'
          to set vmid and ip.""")
 
-opts.opt('dryrun', short='n',
+gopts.opt('dryrun', short='n',
          fn=set_true, default=0,
          use="Dry run - print the config but don't create the domain.")
 
-opts.opt('console', short='c',
+gopts.opt('console', short='c',
          fn=set_true, default=0,
          use="Connect to console after domain is created.")
 
-opts.opt('kernel', short='k', val='FILE',
+gopts.opt('kernel', short='k', val='FILE',
+         fn=set_value, default=None,
          use="Path to kernel image.")
 
-opts.opt('ramdisk', short='r', val='FILE',
+gopts.opt('ramdisk', short='r', val='FILE',
          fn=set_value, default='',
          use="Path to ramdisk.")
 
-opts.opt('builder', short='b', val='FUNCTION',
+gopts.opt('builder', short='b', val='FUNCTION',
          fn=set_value, default='linux',
          use="Function to use to build the domain.")
 
-opts.opt('memory', short='m', val='MEMORY',
+gopts.opt('memory', short='m', val='MEMORY',
          fn=set_value, default=128,
          use="Domain memory in MB.")
 
-opts.opt('disk', short='d', val='phy:DEV,VDEV,MODE',
+gopts.opt('disk', short='d', val='phy:DEV,VDEV,MODE',
          fn=append_value, default=[],
          use="""Add a disk device to a domain. The physical device is DEV, which
          is exported to the domain as VDEV. The disk is read-only if MODE is r,
          read-write if mode is 'w'.""")
 
-opts.opt('pci', val='BUS,DEV,FUNC',
+gopts.opt('pci', val='BUS,DEV,FUNC',
          fn=append_value, default=[],
-         use="""Add a PCI device to a domain.""")
+         use="""Add a PCI device to a domain, using given params (in hex).""")
 
-opts.opt('ipaddr', short='i', val="IPADDR",
+gopts.opt('ipaddr', short='i', val="IPADDR",
          fn=append_value, default=[],
          use="Add an IP address to the domain.")
 
-opts.opt('mac', short='M', val="MAC",
+gopts.opt('mac', short='M', val="MAC",
          fn=append_value, default=[],
          use="""Add a network interface with the given mac address to the domain.
          More than one interface may be specified. Interfaces with unspecified MAC addresses
          are allocated a random address.""")
 
-opts.opt('nics', val="N",
+gopts.opt('nics', val="N",
          fn=set_int, default=1,
          use="Set the number of network interfaces.")
 
-opts.opt('vnet', val='VNET',
+gopts.opt('vnet', val='VNET',
          fn=append_value, default=[],
          use="""Define the vnets for the network interfaces.
          More than one vnet may be given, they are used in order.
          """)
 
-opts.opt('root', short='R', val='DEVICE',
+gopts.opt('root', short='R', val='DEVICE',
          fn=set_value, default='',
          use="""Set the root= parameter on the kernel command line.
          Use a device, e.g. /dev/sda1, or /dev/nfs for NFS root.""")
 
-opts.opt('extra', short='E', val="ARGS",
+gopts.opt('extra', short='E', val="ARGS",
          fn=set_value, default='',
          use="Set extra arguments to append to the kernel command line.")
 
-opts.opt('ip', short='I', val='IPADDR',
+gopts.opt('ip', short='I', val='IPADDR',
          fn=set_value, default='',
          use="Set the kernel IP interface address.")
 
-opts.opt('gateway', val="IPADDR",
+gopts.opt('gateway', val="IPADDR",
          fn=set_value, default='',
          use="Set kernel IP gateway.")
 
-opts.opt('netmask', val="MASK",
+gopts.opt('netmask', val="MASK",
          fn=set_value, default = '',
          use="Set kernel IP netmask.")
 
-opts.opt('hostname', val="NAME",
+gopts.opt('hostname', val="NAME",
          fn=set_value, default='',
          use="Set kernel IP hostname.")
 
-opts.opt('interface', val="INTF",
+gopts.opt('interface', val="INTF",
          fn=set_value, default="eth0",
          use="Set the kernel IP interface name.")
 
-opts.opt('dhcp', val="off|dhcp",
+gopts.opt('dhcp', val="off|dhcp",
          fn=set_value, default='off',
          use="Set kernel dhcp option.")
 
-opts.opt('nfs_server', val="IPADDR",
+gopts.opt('nfs_server', val="IPADDR",
          fn=set_value, default=None,
          use="Set the address of the NFS server for NFS root.")
 
-opts.opt('nfs_root', val="PATH",
+gopts.opt('nfs_root', val="PATH",
          fn=set_value, default=None,
          use="Set the path of the root NFS directory.")
 
@@ -160,7 +161,7 @@ def make_config(opts):
         config_image.append(['ip', cmdline_ip])
     if opts.root:
         cmdline_root = strip('root=', opts.root)
-        config_image.append(['root', opts.root])
+        config_image.append(['root', cmdline_root])
     if opts.extra:
         config_image.append(['args', opts.extra])
     config.append(['image', config_image ])
@@ -221,7 +222,9 @@ def preprocess_pci(opts):
         d = v.split(',')
         if len(d) != 3:
             opts.err('Invalid pci specifier: ' + v)
-        pci.append(d)
+        # Components are in hex: add hex specifier.
+        hexd = map(lambda v: '0x'+v, d)
+        pci.append(hexd)
     opts.pci = pci
 
 def preprocess_ip(opts):
@@ -247,6 +250,8 @@ def preprocess_nfs(opts):
     opts.extra = nfs + ' ' + opts.extra
     
 def preprocess(opts):
+    if not opts.kernel:
+        opts.err("No kernel specified")
     preprocess_disk(opts)
     preprocess_pci(opts)
     preprocess_ip(opts)
@@ -278,6 +283,7 @@ def make_domain(opts, config):
     return (dom, console_port)
 
 def main(argv):
+    opts = gopts
     args = opts.parse(argv)
     if opts.config:
         pass
@@ -285,6 +291,7 @@ def main(argv):
         opts.load_defaults()
     if opts.help:
         opts.usage()
+        return
     preprocess(opts)
     config = make_config(opts)
     if opts.dryrun:

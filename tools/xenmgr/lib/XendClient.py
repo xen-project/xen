@@ -244,29 +244,12 @@ class Xend:
         return xend_get(self.domainurl(id),
                         { 'op'      : 'vifs' })
     
-    def xend_domain_vif_stats(self, id, vif):
-        return xend_get(self.domainurl(id),
-                        { 'op'      : 'vif_stats',
-                          'vif'     : vif})
-
     def xend_domain_vif_ip_add(self, id, vif, ipaddr):
         return xend_call(self.domainurl(id),
                          {'op'      : 'vif_ip_add',
                           'vif'     : vif,
                           'ip'      : ipaddr })
         
-    def xend_domain_vif_scheduler_set(id, vif, bytes, usecs):
-        return xend_call(self.domainurl(id),
-                         {'op'      : 'vif_scheduler_set',
-                          'vif'     : vif,
-                          'bytes'   : bytes,
-                          'usecs'   : usecs })
-
-    def xend_domain_vif_scheduler_get(id, vif):
-        return xend_get(self.domainurl(id),
-                         {'op'      : 'vif_scheduler_get',
-                          'vif'     : vif})
-
     def xend_domain_vbds(self, id):
         return xend_get(self.domainurl(id),
                         {'op'       : 'vbds'})
@@ -275,18 +258,6 @@ class Xend:
         return xend_get(self.domainurl(id),
                         {'op'       : 'vbd',
                          'vbd'      : vbd})
-
-##     def xend_domain_vbd_add(self, id, uname, dev, mode):
-##         return xend_call(self.domainurl(id),
-##                          {'op'      : 'vbd_add',
-##                           'uname'   : uname,
-##                           'dev'     : dev,
-##                           'mode'    : mode})
-
-##     def xend_domain_vbd_remove(self, id, dev):
-##         return xend_call(self.domainurl(id),
-##                          {'op'      : 'vbd_remove',
-##                           'dev'     : dev})
 
     def xend_consoles(self):
         return xend_get(self.consoleurl())
