@@ -111,6 +111,7 @@
 3f1056a9L_kqHcFheV00KbKBzv9j5w linux-2.4.29-xen-sparse/include/asm-xen/vga.h
 40659defgWA92arexpMGn8X3QMDj3w linux-2.4.29-xen-sparse/include/asm-xen/xor.h
 3f056927gMHl7mWB89rb73JahbhQIA linux-2.4.29-xen-sparse/include/linux/blk.h
+42305f54mFScQCttpj57EIm60BnxIg linux-2.4.29-xen-sparse/include/linux/highmem.h
 419e0488SBzS3mdUhwgsES5a5e3abA linux-2.4.29-xen-sparse/include/linux/irq.h
 4124f66fPHG6yvB_vXmesjvzrJ3yMg linux-2.4.29-xen-sparse/include/linux/mm.h
 401c0590D_kwJDU59X8NyvqSv_Cl2A linux-2.4.29-xen-sparse/include/linux/sched.h
@@ -247,10 +248,12 @@
 4122466356eIBnC9ot44WSVVIFyhQA linux-2.6.10-xen-sparse/include/asm-xen/queues.h
 3f689063BoW-HWV3auUJ-OqXfcGArw linux-2.6.10-xen-sparse/include/asm-xen/xen_proc.h
 419b4e93z2S0gR17XTy8wg09JEwAhg linux-2.6.10-xen-sparse/include/linux/gfp.h
+42305f545Vc5SLCUewZ2-n-P9JJhEQ linux-2.6.10-xen-sparse/include/linux/highmem.h
 419dfc609zbti8rqL60tL2dHXQ_rvQ linux-2.6.10-xen-sparse/include/linux/irq.h
 4124f66f4NaKNa0xPiGGykn9QaZk3w linux-2.6.10-xen-sparse/include/linux/skbuff.h
 419dfc6awx7w88wk6cG9P3mPidX6LQ linux-2.6.10-xen-sparse/kernel/irq/manage.c
 40f56a0ddHCSs3501MY4hRf22tctOw linux-2.6.10-xen-sparse/mkbuildtree
+42305f54Q6xJ1bXcQJlCQq1m-e2C8g linux-2.6.10-xen-sparse/mm/highmem.c
 412f46c0LJuKAgSPGoC0Z1DEkLfuLA linux-2.6.10-xen-sparse/mm/memory.c
 410a94a4KT6I6X0LVc7djB39tRDp4g linux-2.6.10-xen-sparse/mm/page_alloc.c
 41505c572m-s9ATiO1LiD1GPznTTIg linux-2.6.10-xen-sparse/net/core/skbuff.c
