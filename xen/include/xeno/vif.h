@@ -81,7 +81,6 @@ do {                                                               \
 net_vif_t *create_net_vif(int domain);
 void destroy_net_vif(net_vif_t *vif);
 void unlink_net_vif(net_vif_t *vif);
-void add_default_net_rule(unsigned long vif_id, u32 ipaddr);
 net_vif_t *net_get_target_vif(u8 *data, unsigned int len, net_vif_t *src_vif);
 net_vif_t *find_vif_by_id(unsigned long id);
 

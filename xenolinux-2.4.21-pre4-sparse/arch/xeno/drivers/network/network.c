@@ -58,6 +58,7 @@ struct net_private
     net_ring_t *net_ring;
     net_idx_t  *net_idx;
     spinlock_t tx_lock;
+    unsigned int idx; /* Domain-specific index of this VIF. */
 
     /*
      * {tx,rx}_skbs store outstanding skbuffs. The first entry in each
@@ -412,6 +413,96 @@ static struct net_device_stats *network_get_stats(struct net_device *dev)
 }
 
 
+/*
+ * This notifier is installed for domain 0 only.
+ * All other domains have VFR rules installed on their behalf by domain 0
+ * when they are created. For bootstrap, Xen creates wildcard rules for
+ * domain 0 -- this notifier is used to detect when we find our proper
+ * IP address, so we can poke down proper rules and remove the wildcards.
+ */
+static int inetdev_notify(struct notifier_block *this, 
+                          unsigned long event, 
+                          void *ptr)
+{
+    struct in_ifaddr  *ifa  = (struct in_ifaddr *)ptr; 
+    struct net_device *dev = ifa->ifa_dev->dev;
+    struct list_head  *ent;
+    struct net_private *np;
+    int idx = -1;
+    network_op_t op;
+    static int removed_bootstrap_rules = 0;
+
+    list_for_each ( ent, &dev_list )
+    {
+        np  = list_entry(dev_list.next, struct net_private, list);
+        if ( np->dev == dev )
+            idx = np->idx;
+    }
+
+    if ( idx == -1 )
+        goto out;
+    
+    memset(&op, 0, sizeof(op));
+    op.u.net_rule.proto         = NETWORK_PROTO_ANY;
+    op.u.net_rule.action        = NETWORK_ACTION_ACCEPT;
+
+    if ( event == NETDEV_UP )
+        op.cmd = NETWORK_OP_ADDRULE;
+    else if ( event == NETDEV_DOWN )
+        op.cmd = NETWORK_OP_DELETERULE;
+    else
+        goto out;
+
+    op.u.net_rule.src_vif       = idx;
+    op.u.net_rule.dst_vif       = VIF_PHYSICAL_INTERFACE;
+    op.u.net_rule.src_addr      = ntohl(ifa->ifa_address);
+    op.u.net_rule.src_addr_mask = ~0UL;
+    op.u.net_rule.dst_addr      = 0;
+    op.u.net_rule.dst_addr_mask = 0;
+    (void)HYPERVISOR_network_op(&op);
+    
+    op.u.net_rule.src_vif       = VIF_ANY_INTERFACE;
+    op.u.net_rule.dst_vif       = idx;
+    op.u.net_rule.src_addr      = 0;
+    op.u.net_rule.src_addr_mask = 0;    
+    op.u.net_rule.dst_addr      = ntohl(ifa->ifa_address);
+    op.u.net_rule.dst_addr_mask = ~0UL;
+    (void)HYPERVISOR_network_op(&op);
+
+    /*
+     * Xen creates a pair of bootstrap rules which allows domain 0 to
+     * send and receive any packet. These rules can be removed once we
+     * have configured an IP address.
+     */
+    if ( (idx == 0) && (event == NETDEV_UP) && !removed_bootstrap_rules )
+    {
+        memset(&op, 0, sizeof(op));
+        op.cmd = NETWORK_OP_DELETERULE;
+        op.u.net_rule.proto         = NETWORK_PROTO_ANY;
+        op.u.net_rule.action        = NETWORK_ACTION_ACCEPT;
+
+        op.u.net_rule.src_vif       = 0;
+        op.u.net_rule.dst_vif       = VIF_PHYSICAL_INTERFACE;
+        (void)HYPERVISOR_network_op(&op);
+
+        op.u.net_rule.src_vif       = VIF_ANY_INTERFACE;
+        op.u.net_rule.dst_vif       = 0;
+        (void)HYPERVISOR_network_op(&op);
+
+        removed_bootstrap_rules = 1;
+    }
+    
+ out:
+    return NOTIFY_DONE;
+}
+
+static struct notifier_block notifier_inetdev = {
+    .notifier_call  = inetdev_notify,
+    .next           = NULL,
+    .priority       = 0
+};
+
+
 int __init init_module(void)
 {
     int i, fixmap_idx=-1, err;
@@ -419,6 +510,14 @@ int __init init_module(void)
     struct net_private *np;
 
     INIT_LIST_HEAD(&dev_list);
+
+    /*
+     * Domain 0 must poke its own network rules as it discovers its IP
+     * addresses. All other domains have a privileged "parent" to do this
+     * for them at start of day.
+     */
+    if ( start_info.dom_id == 0 )
+        (void)register_inetaddr_notifier(&notifier_inetdev);
 
     for ( i = 0; i < MAX_DOMAIN_VIFS; i++ )
     {
@@ -441,6 +540,7 @@ int __init init_module(void)
         np = dev->priv;
         np->net_ring = (net_ring_t *)fix_to_virt(FIX_NETRING0_BASE+fixmap_idx);
         np->net_idx  = &HYPERVISOR_shared_info->net_idx[i];
+        np->idx      = i;
 
         SET_MODULE_OWNER(dev);
         dev->open            = network_open;
@@ -482,6 +582,9 @@ static void cleanup_module(void)
         unregister_netdev(dev);
         kfree(dev);
     }
+
+    if ( start_info.dom_id == 0 )
+        (void)unregister_inetaddr_notifier(&notifier_inetdev);
 }
 
 

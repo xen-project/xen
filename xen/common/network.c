@@ -251,38 +251,6 @@ int delete_net_rule(net_rule_t *rule)
     return 0;
 }
  
-/* add_default_net_rule - Set up default network path (ie for dom0).
- * 
- * this is a utility function to route all traffic with the specified
- * ip address to the specified vif.  It's used to set up domain zero.
- */
-
-void add_default_net_rule(unsigned long vif_id, u32 ipaddr)
-{
-    net_rule_t new_rule;
-
-    //outbound rule.
-    memset(&new_rule, 0, sizeof(net_rule_t));
-    new_rule.src_addr = ipaddr;
-    new_rule.src_addr_mask = 0xffffffff;
-    new_rule.src_vif = vif_id;
-    new_rule.dst_vif = VIF_PHYSICAL_INTERFACE;
-    new_rule.action = NETWORK_ACTION_ACCEPT;
-    new_rule.proto = NETWORK_PROTO_ANY;
-    add_net_rule(&new_rule);
-
-    //inbound rule;
-    memset(&new_rule, 0, sizeof(net_rule_t));
-    new_rule.dst_addr = ipaddr;
-    new_rule.dst_addr_mask = 0xffffffff;
-    new_rule.src_vif = VIF_ANY_INTERFACE;
-    new_rule.dst_vif = vif_id;
-    new_rule.action = NETWORK_ACTION_ACCEPT;
-    new_rule.proto = NETWORK_PROTO_ANY;
-    add_net_rule(&new_rule);
-
-}
-
 /* print_net_rule - Print a single net rule.
  */
 
@@ -370,6 +338,8 @@ static net_vif_t *net_find_rule(u8 nproto, u8 tproto, u32 src_addr,
     {
         if ( ((ent->r.src_vif == src_vif)
               || (ent->r.src_vif == VIF_ANY_INTERFACE)) &&
+
+             (src_vif != ent->r.dst_vif) &&
 
              (!((ent->r.src_addr ^ src_addr) & ent->r.src_addr_mask )) &&
              (!((ent->r.dst_addr ^ dst_addr) & ent->r.dst_addr_mask )) &&
@@ -504,9 +474,10 @@ long do_network_op(network_op_t *u_network_op)
 
     case NETWORK_OP_GETRULELIST:
     {
-        // This should eventually ship a rule list up to the VM
-        // to be printed in its procfs.  For now, we just print the rules.
-        
+        /*
+         * This should ship a rule list up to the guest OS. For now
+         * we just dump the rules to our own console.
+         */
         print_net_rule_list();
     }
     break;
@@ -525,9 +496,29 @@ long do_network_op(network_op_t *u_network_op)
 
 void __init net_init (void)
 {
+    net_rule_t new_rule;
+
     net_rule_list = NULL;
-    net_vif_cache = kmem_cache_create("net_vif_cache", sizeof(net_vif_t),
-                                    0, SLAB_HWCACHE_ALIGN, NULL, NULL);
-    net_rule_cache = kmem_cache_create("net_rule_cache", sizeof(net_rule_ent_t),
-                                    0, SLAB_HWCACHE_ALIGN, NULL, NULL);
+    net_vif_cache = kmem_cache_create("net_vif_cache", 
+                                      sizeof(net_vif_t),
+                                      0, SLAB_HWCACHE_ALIGN, NULL, NULL);
+    net_rule_cache = kmem_cache_create("net_rule_cache", 
+                                       sizeof(net_rule_ent_t),
+                                       0, SLAB_HWCACHE_ALIGN, NULL, NULL);
+
+    /* Bootstrap outbound rule. */
+    memset(&new_rule, 0, sizeof(net_rule_t));
+    new_rule.src_vif = 0;
+    new_rule.dst_vif = VIF_PHYSICAL_INTERFACE;
+    new_rule.action = NETWORK_ACTION_ACCEPT;
+    new_rule.proto = NETWORK_PROTO_ANY;
+    add_net_rule(&new_rule);
+
+    /* Bootstrap inbound rule. */
+    memset(&new_rule, 0, sizeof(net_rule_t));
+    new_rule.src_vif = VIF_ANY_INTERFACE;
+    new_rule.dst_vif = 0;
+    new_rule.action = NETWORK_ACTION_ACCEPT;
+    new_rule.proto = NETWORK_PROTO_ANY;
+    add_net_rule(&new_rule);
 }

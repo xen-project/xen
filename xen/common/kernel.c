@@ -32,7 +32,6 @@ void init_serial(void);
 void start_of_day(void);
 
 /* Command line options and variables. */
-unsigned long opt_dom0_ip = 0;
 unsigned int opt_ser_baud = 9600;  /* default baud for COM1 */
 unsigned int opt_dom0_mem = 16000; /* default kbytes for DOM0 */
 unsigned int opt_ne_base = 0; /* NE2k NICs cannot be probed */
@@ -45,7 +44,6 @@ static struct {
     void *var;
 } opts[] = {
     { "ser_baud", OPT_UINT, &opt_ser_baud },
-    { "dom0_ip",  OPT_IP,   &opt_dom0_ip },
     { "dom0_mem", OPT_UINT, &opt_dom0_mem }, 
     { "ne_base",  OPT_UINT, &opt_ne_base },
     { "ifname",   OPT_STR,  &opt_ifname },
@@ -182,11 +180,6 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
     /* Create initial domain 0. */
     dom0_params.num_vifs  = 1;
     dom0_params.memory_kb = opt_dom0_mem;
-
-    if ( opt_dom0_ip == 0 )
-        panic("Must specify an IP address for domain 0!\n");
-
-    add_default_net_rule(0, opt_dom0_ip); // add vfr info for dom0
 
     new_dom = do_newdomain(0, 0);
     if ( new_dom == NULL ) panic("Error creating domain 0\n");
@@ -506,8 +499,8 @@ int console_export(char *str, int len)
     iph->id      = 0xdead;
     iph->ttl     = 255;
     iph->protocol= 17;
-    iph->daddr   = htonl(opt_dom0_ip);
-    iph->saddr   = htonl(0xa9fe0001); 
+    iph->daddr   = htonl(0xa9fe0001);  /* 169.254.0.1 */
+    iph->saddr   = htonl(0xa9fe0001);  /* 169.254.0.1 */
     iph->tot_len = htons(hdr_size + len); 
     iph->check	 = 0;
     iph->check   = compute_cksum((__u16 *)iph, sizeof(struct my_iphdr)/2); 
