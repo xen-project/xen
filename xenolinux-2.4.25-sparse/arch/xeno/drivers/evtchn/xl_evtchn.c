@@ -21,18 +21,7 @@
 #include <linux/devfs_fs_kernel.h>
 #include <linux/stat.h>
 #include <linux/poll.h>
-
-typedef void (*evtchn_receiver_t)(unsigned int);
-#define PORT_NORMAL     0x0000
-#define PORT_DISCONNECT 0x8000
-#define PORTIDX_MASK    0x7fff
-
-/* /dev/xen/evtchn resides at device number major=10, minor=200 */
-#define EVTCHN_MINOR 200
-
-/* /dev/xen/evtchn ioctls: */
-/* EVTCHN_RESET: Clear and reinit the event buffer. Clear error condition. */
-#define EVTCHN_RESET _IO('E', 1)
+#include <asm/evtchn.h>
 
 /* NB. This must be shared amongst drivers if more things go in /dev/xen */
 static devfs_handle_t xen_dev_dir;
@@ -110,18 +99,22 @@ int evtchn_free_port(unsigned int port)
 void evtchn_clear_port(unsigned int port)
 {
     unsigned int p = port & PORTIDX_MASK;
+    unsigned long flags;
+
+    spin_lock_irqsave(&lock, flags);
+
     if ( unlikely(port & PORT_DISCONNECT) )
     {
-        clear_bit(p, &HYPERVISOR_shared_info->event_channel_disc[0]);
-        wmb(); /* clear the source first, then our quenchmask */
         clear_bit(p, &disc_outstanding[0]);
+        clear_bit(p, &HYPERVISOR_shared_info->event_channel_disc[0]);
     }
     else
     {
-        clear_bit(p, &HYPERVISOR_shared_info->event_channel_pend[0]);
-        wmb(); /* clear the source first, then our quenchmask */
         clear_bit(p, &pend_outstanding[0]);
+        clear_bit(p, &HYPERVISOR_shared_info->event_channel_pend[0]);
     }
+
+    spin_unlock_irqrestore(&lock, flags);
 }
 
 static inline void process_bitmask(u32 *sel, 
@@ -168,7 +161,6 @@ static inline void process_bitmask(u32 *sel,
             }
         }
     }
-
 }
 
 static void evtchn_interrupt(int irq, void *dev_id, struct pt_regs *regs)
@@ -267,33 +259,37 @@ static ssize_t evtchn_read(struct file *file, char *buf,
         schedule();
     }
 
-    rc = -EFAULT;
-
-    /* Byte length of first chunk. May be truncated by ring wrap. */
+    /* Byte lengths of two chunks. Chunk split (if any) is at ring wrap. */
     if ( ((c ^ p) & RING_SIZE) != 0 )
-        bytes1 = (RING_SIZE - RING_MASK(c)) * sizeof(u16);
-    else
-        bytes1 = (p - c) * sizeof(u16);
-
-    /* Further truncate chunk length according to caller's maximum count. */
-    if ( bytes1 > count )
-        bytes1 = count;
-
-    /* Copy the first chunk. */
-    if ( copy_to_user(buf, &ring[c], bytes1) != 0 )
-        goto out;
-
-    /* More bytes to copy? */
-    if ( count > bytes1 )
     {
+        bytes1 = (RING_SIZE - RING_MASK(c)) * sizeof(u16);
         bytes2 = RING_MASK(p) * sizeof(u16);
-        if ( bytes2 > count )
-            bytes2 = count;
-        if ( (bytes2 != 0) && copy_to_user(&buf[bytes1], &ring[0], bytes2) )
-            goto out;
+    }
+    else
+    {
+        bytes1 = (p - c) * sizeof(u16);
+        bytes2 = 0;
     }
 
-    ring_cons = (bytes1 + bytes2) / sizeof(u16);
+    /* Truncate chunks according to caller's maximum byte count. */
+    if ( bytes1 > count )
+    {
+        bytes1 = count;
+        bytes2 = 0;
+    }
+    else if ( (bytes1 + bytes2) > count )
+    {
+        bytes2 = count - bytes1;
+    }
+
+    if ( copy_to_user(buf, &ring[RING_MASK(c)], bytes1) ||
+         ((bytes2 != 0) && copy_to_user(&buf[bytes1], &ring[0], bytes2)) )
+    {
+        rc = -EFAULT;
+        goto out;
+    }
+
+    ring_cons += (bytes1 + bytes2) / sizeof(u16);
 
     rc = bytes1 + bytes2;
 
@@ -464,6 +460,11 @@ static int __init init_module(void)
         printk(KERN_ALERT "Could not allocate evtchn receive interrupt\n");
         return err;
     }
+
+    /* Kickstart servicing of notifications. */
+    evtchn_interrupt(0, NULL, NULL);
+
+    printk("Event-channel driver installed.\n");
 
     return 0;
 }

@@ -236,6 +236,12 @@ def make_domain():
             xc.domain_destroy ( dom=id )
             sys.exit()
 
+    ports = xc.evtchn_open( dom2=id )
+    if not ports:
+        print "Error creating initial event channel"
+        xc.domain_destroy ( dom=id )
+        sys.exit()
+
     # setup the virtual block devices
 
     # set the expertise level appropriately
@@ -277,7 +283,7 @@ def make_domain():
         xc.domain_destroy ( dom=id )
         sys.exit()
 
-    return id
+    return (id, 9600+ports['port1'])
 # end of make_domain()
 
 def mkpidfile():
@@ -305,8 +311,8 @@ def death_handler(dummy1,dummy2):
 # The starting / monitoring of the domain actually happens here...
 
 # start the domain and record its ID number
-current_id = make_domain()
-output("VM started in domain %d" % current_id)
+(current_id, current_port) = make_domain()
+output("VM started in domain %d. Console I/O available on TCP port %d." % (current_id,current_port))
 
 # if the auto_restart flag is set then keep polling to see if the domain is
 # alive - restart if it is not by calling make_domain() again (it's necessary
@@ -337,6 +343,6 @@ if auto_restart:
 	    output("Auto-restart daemon: Domain %d has terminated, restarting VM in new domain"
                                      % current_id)
             rmpidfile()
-	    current_id = make_domain()
+	    (current_id, current_port) = make_domain()
             mkpidfile()
-	    output("Auto-restart daemon: VM restarted in domain %d" % current_id)
+	    output("Auto-restart daemon: VM restarted in domain %d. Console on port %d." % (current_id,current_port))

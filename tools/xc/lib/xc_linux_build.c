@@ -322,7 +322,7 @@ int xc_linux_build(int xc_handle,
         goto error_out;
     }
 
-    if ( ramdisk_name != NULL )
+    if ( (ramdisk_name != NULL) && (strlen(ramdisk_name) != 0) )
     {
         initrd_fd = open(ramdisk_name, O_RDONLY);
         if ( initrd_fd < 0 )

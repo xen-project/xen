@@ -57,9 +57,9 @@ SUBDIRS += arch/xeno/drivers/dom0
 endif
 
 CORE_FILES += arch/xeno/kernel/kernel.o arch/xeno/mm/mm.o
+CORE_FILES += arch/xeno/drivers/evtchn/evtchn.o
 CORE_FILES += arch/xeno/drivers/console/con.o
 CORE_FILES += arch/xeno/drivers/block/blk.o
-CORE_FILES += arch/xeno/drivers/evtchn/evtchn.o
 CORE_FILES += arch/xeno/drivers/network/net.o
 ifdef CONFIG_XENO_PRIV
 CORE_FILES += arch/xeno/drivers/dom0/dom0.o

@@ -230,9 +230,6 @@ static long __event_channel_close(struct task_struct *p1, int port1)
     guest_event_notify(cpu_mask);
 
  out:
-    spin_unlock(&p1->event_channel_lock);
-    put_task_struct(p1);
-
     if ( p2 != NULL )
     {
         if ( p1 != p2 )
@@ -240,6 +237,8 @@ static long __event_channel_close(struct task_struct *p1, int port1)
         put_task_struct(p2);
     }
     
+    spin_unlock(&p1->event_channel_lock);
+
     return rc;
 }
 

@@ -531,6 +531,10 @@ int set_timeout_timer(void)
     if ( (timer = next_timer_event()) != NULL )
         alarm = __jiffies_to_st(timer->expires);
 
+    /* Tasks on the timer task queue expect to be executed on the next tick. */
+    if ( TQ_ACTIVE(tq_timer) )
+        alarm = __jiffies_to_st(jiffies + 1);
+
     /* Failure is pretty bad, but we'd best soldier on. */
     if ( HYPERVISOR_set_timer_op(alarm) != 0 )
         ret = -1;

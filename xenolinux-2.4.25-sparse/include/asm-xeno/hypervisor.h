@@ -432,6 +432,17 @@ static inline int HYPERVISOR_update_va_mapping(
     return ret;
 }
 
+static inline int HYPERVISOR_event_channel_op(void *op)
+{
+    int ret;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret) : "0" (__HYPERVISOR_event_channel_op),
+        "b" (op) : "memory" );
+
+    return ret;
+}
+
 static inline int HYPERVISOR_xen_version(int cmd)
 {
     int ret;
