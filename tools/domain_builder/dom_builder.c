@@ -25,6 +25,9 @@
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED)
 #define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED|_PAGE_DIRTY)
 
+/* Round _n up to nearest multiple of _m. */
+#define ROUND_UP(_n,_m) (((_n) + (_m) - 1) / (_m))
+
 /* standardized error reporting function */
 static void dberr(char *msg)
 {
@@ -230,25 +233,32 @@ out:
  * requests that are handeled by the hypervisor in the ordinary
  * manner. this way, many potentially messy things are avoided...
  */ 
-static dom_meminfo_t * setup_guestos(int dom, int kernel_fd, 
+#define PAGE_TO_VADDR(_pfn) ((void *)(dom_mem->vaddr + ((_pfn) * PAGE_SIZE)))
+static dom_meminfo_t *setup_guestos(int dom, int kernel_fd, 
     unsigned long virt_load_addr, size_t ksize, dom_mem_t *dom_mem)
 {
-    dom_meminfo_t * meminfo = (dom_meminfo_t *)malloc(sizeof(dom_meminfo_t));
-    unsigned long * page_array = (unsigned long *)(dom_mem->vaddr);
-    page_update_request_t * pgt_updates = (page_update_request_t *)
-        (dom_mem->vaddr + ((ksize + (PAGE_SIZE-1)) & PAGE_MASK));
+    dom_meminfo_t *meminfo;
+    unsigned long *page_array;
+    page_update_request_t *pgt_updates;
     dom_mem_t mem_map;
-    dom_meminfo_t * ret = NULL;
-    int alloc_index = dom_mem->tot_pages - 1, num_pt_pages;
+    dom_meminfo_t *ret = NULL;
+    int alloc_index, num_pt_pages;
     unsigned long l2tab;
     unsigned long l1tab = 0;
     unsigned long num_pgt_updates = 0;
-    unsigned long pgt_update_arr = (unsigned long)pgt_updates;
     unsigned long count, pt_start;
+    dom0_op_t pgupdate_req;
+    char cmd_path[MAX_PATH];
+    int cmd_fd;
 
-    /* Count bottom-level PTs. Round up to a whole PT. */
-    num_pt_pages = 
-        (l1_table_offset(virt_load_addr) + dom_mem->tot_pages + 1023) / 1024;
+    meminfo     = (dom_meminfo_t *)malloc(sizeof(dom_meminfo_t));
+    page_array  = (unsigned long *)dom_mem->vaddr;
+    pgt_updates = (page_update_request_t *)dom_mem->vaddr;
+    alloc_index = dom_mem->tot_pages - 1;
+
+    /* Count bottom-level PTs, rounding up. Include one PTE for shared info. */
+    num_pt_pages = ROUND_UP(l1_table_offset(virt_load_addr) +
+                            dom_mem->tot_pages + 1, 1024);
     /* We must also count the page directory. */
     num_pt_pages++;
 
@@ -259,19 +269,10 @@ static dom_meminfo_t * setup_guestos(int dom, int kernel_fd,
      * end of the allocated physical address space.
      */
     l2tab = *(page_array + alloc_index) << PAGE_SHIFT; 
+    memset(PAGE_TO_VADDR(alloc_index), 0, PAGE_SIZE);
     alloc_index--;
     meminfo->l2_pgt_addr = l2tab;
     meminfo->virt_shinfo_addr = virt_load_addr + nr_2_page(dom_mem->tot_pages);
-    count = ((unsigned long)pgt_updates - (unsigned long)(dom_mem->vaddr)) 
-        >> PAGE_SHIFT;
-
-    /* zero out l2 page */
-    if(map_dom_mem(l2tab >> PAGE_SHIFT, 1, dom_mem->domain, &mem_map)){
-        dberr("Unable to map l2 page into Domain Builder.");
-        goto out;
-    }
-    memset((void *)mem_map.vaddr, 0, PAGE_SIZE);
-    dom_mem_cleanup(&mem_map);
 
     /* pin down l2tab addr as page dir page - causes hypervisor to provide
      * correct protection for the page
@@ -281,28 +282,16 @@ static dom_meminfo_t * setup_guestos(int dom, int kernel_fd,
     pgt_updates++;
     num_pgt_updates++;
 
-    /* this loop initializes page tables and does one extra entry 
-     * to be used by the shared info page. shared info is not in
-     * the domains physical address space and is not owned by the
-     * domain.
-     */
+    /* Initialise the page tables. */
     l2tab += l2_table_offset(virt_load_addr) * sizeof(l2_pgentry_t);
-    for(count = 0;
-        count < dom_mem->tot_pages + 1; 
-        count++){
-        
-        if(!((unsigned long)l1tab & (PAGE_SIZE-1))){
+    for ( count = 0; count < dom_mem->tot_pages; count++ )
+    {    
+        if ( !((unsigned long)l1tab & (PAGE_SIZE-1)) ) 
+        {
             l1tab = *(page_array + alloc_index) << PAGE_SHIFT;
+            memset(PAGE_TO_VADDR(alloc_index), 0, PAGE_SIZE);
             alloc_index--;
 			
-            /* zero out l1 page */
-            if(map_dom_mem(l1tab >> PAGE_SHIFT, 1, dom_mem->domain, &mem_map)){
-                dberr("Unable to map l1 page into Domain Builder.");
-                goto out;
-            }
-            memset((void *)mem_map.vaddr, 0, PAGE_SIZE);
-            dom_mem_cleanup(&mem_map);
-
             l1tab += l1_table_offset(virt_load_addr + nr_2_page(count)) 
                 * sizeof(l1_pgentry_t);
 
@@ -342,27 +331,23 @@ static dom_meminfo_t * setup_guestos(int dom, int kernel_fd,
     meminfo->virt_startinfo_addr = virt_load_addr + nr_2_page(alloc_index - 1);
     meminfo->domain = dom;
 
-    /* copy the guest os image */
+    /*
+     * Send the page update requests down to the hypervisor.
+     * NB. We must do this before loading the guest OS image!
+     */
+    sprintf(cmd_path, "%s%s%s%s", "/proc/", PROC_XENO_ROOT, "/", PROC_CMD);
+    if ( (cmd_fd = open(cmd_path, O_WRONLY)) < 0 ) goto out;
+    pgupdate_req.cmd = DO_PGUPDATES;
+    pgupdate_req.u.pgupdate.pgt_update_arr  = (unsigned long)dom_mem->vaddr;
+    pgupdate_req.u.pgupdate.num_pgt_updates = num_pgt_updates;
+    write(cmd_fd, &pgupdate_req, sizeof(dom0_op_t));
+    close(cmd_fd);
+
+    /* Load the guest OS image. */
     if(!(read(kernel_fd, (char *)dom_mem->vaddr, ksize) > 0)){
         dberr("Error reading kernel image, could not"
               " read the whole image. Terminating.\n");
         goto out;
-    }
-
-    {
-        dom0_op_t pgupdate_req;
-        char cmd_path[MAX_PATH];
-        int cmd_fd;
-
-        sprintf(cmd_path, "%s%s%s%s", "/proc/", PROC_XENO_ROOT, "/", PROC_CMD);
-        if ( (cmd_fd = open(cmd_path, O_WRONLY)) < 0 ) goto out;
-
-        pgupdate_req.cmd = DO_PGUPDATES;
-        pgupdate_req.u.pgupdate.pgt_update_arr  = pgt_update_arr;
-        pgupdate_req.u.pgupdate.num_pgt_updates = num_pgt_updates;
-
-        write(cmd_fd, &pgupdate_req, sizeof(dom0_op_t));
-        close(cmd_fd);
     }
 
     ret = meminfo;
