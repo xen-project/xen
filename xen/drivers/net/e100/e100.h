@@ -484,7 +484,6 @@ typedef struct net_device_stats net_dev_stats_t;
 #define TCBS_AVAIL(X)     (NEXT_TCB_TOUSE( NEXT_TCB_TOUSE((X).tail)) != (X).head)
 
 #define RFD_POINTER(skb,bdp)      ((rfd_t *) (((unsigned char *)((skb)->data))-((bdp)->rfd_size)))
-#define SKB_RFD_STATUS(skb,bdp)   ((RFD_POINTER((skb),(bdp)))->rfd_header.cb_status)
 
 /* ====================================================================== */
 /*                              82557                                     */
@@ -976,6 +975,16 @@ extern unsigned char e100_configure_device(struct e100_private *bdp);
 #ifdef E100_CU_DEBUG
 extern unsigned char e100_cu_unknown_state(struct e100_private *bdp);
 #endif
+
+static inline u16 SKB_RFD_STATUS(struct sk_buff *skb, struct e100_private *bdp)
+{
+    u16    status;
+    rfd_t *rfd = RFD_POINTER(skb, bdp);
+    rfd = map_domain_mem(__pa(rfd));
+    status = rfd->rfd_header.cb_status;
+    unmap_domain_mem(rfd);
+    return status;
+}
 
 #define ROM_TEST_FAIL		0x01
 #define REGISTER_TEST_FAIL	0x02

@@ -1092,6 +1092,7 @@ e100_xmit_frame(struct sk_buff *skb, struct net_device *dev)
 	struct e100_private *bdp = dev->priv;
 
 	if (!spin_trylock(&bdp->bd_non_tx_lock)) {
+		printk("Couldn't acqure lock in e100_xmit_frame\n");
 		notify_stop = true;
 		rc = 1;
 		goto exit2;
@@ -1099,6 +1100,10 @@ e100_xmit_frame(struct sk_buff *skb, struct net_device *dev)
 
 	if (!TCBS_AVAIL(bdp->tcb_pool) ||
 	    (bdp->non_tx_command_state != E100_NON_TX_IDLE)) {
+		printk("Bailing from e100_tx_frame %d, %d, %d\n",
+			TCBS_AVAIL(bdp->tcb_pool),
+			bdp->non_tx_command_state,
+			E100_NON_TX_IDLE);
 		notify_stop = true;
 		rc = 1;
 		goto exit1;
