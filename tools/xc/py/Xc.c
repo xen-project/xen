@@ -164,7 +164,8 @@ static PyObject *pyxc_domain_getinfo(PyObject *self,
     {
         PyList_SetItem(
             list, i, 
-            Py_BuildValue("{s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:l,s:L,s:s,s:l}",
+            Py_BuildValue("{s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i"
+                          ",s:l,s:L,s:s,s:l,s:i}",
                           "dom",       info[i].domid,
                           "cpu",       info[i].cpu,
                           "dying",     info[i].dying,
@@ -176,7 +177,8 @@ static PyObject *pyxc_domain_getinfo(PyObject *self,
                           "mem_kb",    info[i].nr_pages*4,
                           "cpu_time",  info[i].cpu_time,
                           "name",      info[i].name,
-                          "maxmem_kb", info[i].max_memkb
+                          "maxmem_kb", info[i].max_memkb,
+                          "shutdown_reason", info[i].shutdown_reason
                 ));
     }
 
@@ -1062,7 +1064,9 @@ static PyMethodDef pyxc_methods[] = {
       " running  [int]:  Bool - is the domain currently running?\n"
       " mem_kb   [int]:  Memory reservation, in kilobytes\n"
       " cpu_time [long]: CPU time consumed, in nanoseconds\n"
-      " name     [str]:  Identifying name\n" },
+      " name     [str]:  Identifying name\n"
+      " shutdown_reason [int]: Numeric code from guest OS, explaining "
+      "reason why it shut itself down.\n" },
 
     { "linux_save", 
       (PyCFunction)pyxc_linux_save, 

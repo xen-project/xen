@@ -99,6 +99,10 @@ int xc_domain_getinfo(int xc_handle,
         info->blocked  = (op.u.getdomaininfo.flags & DOMFLAGS_BLOCKED);
         info->running  = (op.u.getdomaininfo.flags & DOMFLAGS_RUNNING);
 
+        info->shutdown_reason = 
+            (op.u.getdomaininfo.flags>>DOMFLAGS_SHUTDOWNSHIFT) & 
+            DOMFLAGS_SHUTDOWNMASK;
+
         info->nr_pages = op.u.getdomaininfo.tot_pages;
         info->max_memkb = op.u.getdomaininfo.max_pages<<(PAGE_SHIFT-10);
         info->shared_info_frame = op.u.getdomaininfo.shared_info_frame;
