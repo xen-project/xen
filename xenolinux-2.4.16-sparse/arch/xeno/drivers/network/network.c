@@ -213,13 +213,6 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 
 static void network_free_rx_buffers(struct net_device *dev)
 {
-    /*
-     * XXXX This cannot be done safely until be have a proper interface
-     * for setting up and tearing down virtual interfaces on the fly.
-     * Currently the receive buffers are locked down by Xen and we have
-     * no sensible way of retrieving them.
-     */
-#if 0
     unsigned int i;
     struct net_private *np = dev->priv;
     struct sk_buff *skb;    
@@ -229,7 +222,6 @@ static void network_free_rx_buffers(struct net_device *dev)
         skb = np->rx_skb_ring[i];
         dev_kfree_skb(skb);
     }
-#endif
 }
 
 static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
@@ -352,14 +344,27 @@ int network_close(struct net_device *dev)
     struct net_private *np = dev->priv;
 
     netif_stop_queue(dev);
+
     free_irq(NET_RX_IRQ, dev);
     free_irq(NET_TX_IRQ, dev);
+
+    /*
+     * XXXX This cannot be done safely until be have a proper interface
+     * for setting up and tearing down virtual interfaces on the fly.
+     * Currently the receive buffers are locked down by Xen and we have
+     * no sensible way of retrieving them.
+     */
+#if 0
     network_free_rx_buffers(dev);
     kfree(np->net_ring->rx_ring);
     kfree(np->net_ring->tx_ring);
+#endif
+
     kfree(np->rx_skb_ring);
     kfree(np->tx_skb_ring);
+
     MOD_DEC_USE_COUNT;
+
     return 0;
 }
 
