@@ -19,6 +19,7 @@
         movq (reg),reg;
 
         ALIGN
+/* %rbx: struct exec_domain */
 restore_all_guest:
         btr   $_TF_failsafe_return,EDOMAIN_thread_flags(%rbx)
         jc    failsafe_callback
@@ -37,9 +38,11 @@ restore_all_guest:
 1:      sysretl
 
         ALIGN
+/* No special register assumptions. */
 iret_exit_to_guest:
         addq  $8,%rsp
 FLT1:   iretq
+
 .section .fixup,"ax"
 FIX1:   popq  -15*8-8(%rsp)            # error_code/entry_vector
         SAVE_ALL                       # 15*8 bytes pushed
@@ -79,6 +82,7 @@ failsafe_callback:
         RESTORE_ALL
         addq $8,%rsp
 FLT2:   iret 
+
 .section .fixup,"ax"
 FIX2:   pushq %rbx
         GET_CURRENT(%rbx)
@@ -91,6 +95,7 @@ FIX2:   pushq %rbx
 .previous
 
         ALIGN
+/* No special register assumptions. */
 restore_all_xen:
         RESTORE_ALL
         addq  $8,%rsp
@@ -130,6 +135,7 @@ ENTRY(syscall_enter)
         pushq restore_all_guest(%rip)
         jmp   create_bounce_frame
 
+/* %rbx: struct exec_domain */
 hypercall:
         sti
         movq  %r10,%rcx
@@ -138,6 +144,7 @@ hypercall:
         callq *(%r10,%rax,8)
         movq %rax,XREGS_rax(%rsp)       # save the return value
 
+/* %rbx: struct exec_domain */
 test_all_events:
         cli                             # tests must not race interrupts
 /*test_softirqs:*/  
@@ -163,6 +170,7 @@ test_all_events:
         jmp   restore_all_guest
 
         ALIGN
+/* %rbx: struct exec_domain */
 process_softirqs:
         sti       
         call SYMBOL_NAME(do_softirq)
@@ -170,8 +178,8 @@ process_softirqs:
                 
 /* CREATE A BASIC EXCEPTION FRAME ON GUEST OS STACK:                     */
 /*   { RCX, R11, [DS-GS,] [CR2,] [ERRCODE,] RIP, CS, RFLAGS, RSP, SS }   */
-/* %rdx == trap_bounce, %rbx == task_struct                              */
-/* %rax,%rcx are clobbered. %rsi contains new XREGS_rsp.                 */
+/* %rdx: trap_bounce, %rbx: struct exec_domain                           */
+/* On return only %rbx is guaranteed non-clobbered.                      */
 create_bounce_frame:
         /* Push new frame at existing %rsp if already in guest-OS mode. */
         movq  XREGS_rsp+8(%rsp),%rsi
@@ -225,19 +233,16 @@ FLT14:  movq  %rax,(%rsi)               # R11
 FLT15:  movq  %rax,(%rsi)               # RCX
         /* Rewrite our stack frame and return to guest-OS mode. */
         /* IA32 Ref. Vol. 3: TF, VM, RF and NT flags are cleared on trap. */
-        movb  $0,TRAPBOUNCE_flags(%rdx)
-        bts   $_TF_kernel_mode,EDOMAIN_thread_flags(%rbx)
-        jc    1f
-        swapgs
-        movq  %rbx,%rdi
-        call  SYMBOL_NAME(write_ptbase)
-1:      movl  $TRAP_syscall,XREGS_entry_vector+8(%rsp)
+        movl  $TRAP_syscall,XREGS_entry_vector+8(%rsp)
         andl  $0xfffcbeff,XREGS_eflags+8(%rsp)
         movl  $__GUEST_SS,XREGS_ss+8(%rsp)
         movq  %rsi,XREGS_rsp+8(%rsp)
         movl  $__GUEST_CS,XREGS_cs+8(%rsp)
         movq  TRAPBOUNCE_eip(%rdx),%rax
         movq  %rax,XREGS_rip+8(%rsp)
+        movb  $0,TRAPBOUNCE_flags(%rdx)
+        testb $TF_kernel_mode,EDOMAIN_thread_flags(%rbx)
+        jz    SYMBOL_NAME(toggle_guest_mode)
         ret
 .section .fixup,"ax"
 FIX3:   sti
@@ -264,6 +269,7 @@ DBLFLT2:jmp   process_guest_exception_and_events
 .previous
 
         ALIGN
+/* %rbx: struct exec_domain */
 process_guest_exception_and_events:
         leaq  EDOMAIN_trap_bounce(%rbx),%rdx
         testb $TBF_EXCEPTION,TRAPBOUNCE_flags(%rdx)
@@ -273,6 +279,7 @@ process_guest_exception_and_events:
         jmp   test_all_events
 
         ALIGN
+/* No special register assumptions. */
 ENTRY(ret_from_intr)
         GET_CURRENT(%rbx)
         testb $3,XREGS_cs(%rsp)
@@ -280,6 +287,7 @@ ENTRY(ret_from_intr)
         jmp   restore_all_xen
 
         ALIGN
+/* No special register assumptions. */
 error_code:
         SAVE_ALL
         testb $X86_EFLAGS_IF>>8,XREGS_eflags+1(%rsp)
@@ -294,6 +302,7 @@ error_code:
         jz    restore_all_xen
         jmp   process_guest_exception_and_events
 
+/* No special register assumptions. */
 exception_with_ints_disabled:
         testb $3,XREGS_cs(%rsp)         # interrupts disabled outside Xen?
         jnz   1b                        # it really does happen!
@@ -315,6 +324,7 @@ exception_with_ints_disabled:
         movq  %rax,XREGS_kernel_sizeof(%rsp)
         jmp   restore_all_xen           # return to fixup code
 
+/* No special register assumptions. */
 FATAL_exception_with_ints_disabled:
         movl  XREGS_entry_vector(%rsp),%edi
         movq  %rsp,%rsi

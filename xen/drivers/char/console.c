@@ -553,6 +553,8 @@ static int __init debugtrace_init(void)
     debugtrace_buf = (unsigned char *)alloc_xenheap_pages(order);
     ASSERT(debugtrace_buf != NULL);
 
+    memset(debugtrace_buf, '\0', debugtrace_bytes);
+
     return 0;
 }
 __initcall(debugtrace_init);

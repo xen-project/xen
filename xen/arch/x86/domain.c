@@ -541,6 +541,14 @@ void new_thread(struct exec_domain *d,
 
 #ifdef __x86_64__
 
+void toggle_guest_mode(struct exec_domain *ed)
+{
+    ed->arch.flags ^= TF_kernel_mode;
+    __asm__ __volatile__ ( "swapgs" );
+    update_pagetables(ed);
+    write_ptbase(ed);
+}
+
 #define loadsegment(seg,value) ({               \
     int __r = 1;                                \
     __asm__ __volatile__ (                      \
@@ -655,12 +663,7 @@ static void switch_segments(
         }
 
         if ( !(n->arch.flags & TF_kernel_mode) )
-        {
-            n->arch.flags |= TF_kernel_mode;
-            __asm__ __volatile__ ( "swapgs" );
-            update_pagetables(n);
-            write_ptbase(n);
-        }
+            toggle_guest_mode(n);
 
         regs->entry_vector  = TRAP_syscall;
         regs->rflags       &= 0xFFFCBEFFUL;
@@ -681,10 +684,7 @@ long do_switch_to_user(void)
          unlikely(pagetable_val(ed->arch.guest_table_user) == 0) )
         return -EFAULT;
 
-    ed->arch.flags &= ~TF_kernel_mode;
-    __asm__ __volatile__ ( "swapgs" );
-    update_pagetables(ed);
-    write_ptbase(ed);
+    toggle_guest_mode(ed);
 
     regs->rip    = stu.rip;
     regs->cs     = stu.cs;
