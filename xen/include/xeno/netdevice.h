@@ -599,6 +599,8 @@ extern unsigned long	netdev_fc_xoff;
 extern int		netdev_set_master(struct net_device *dev, struct net_device *master);
 extern struct sk_buff * skb_checksum_help(struct sk_buff *skb);
 
+extern void alert_slow_netdevice(struct net_device *dev, char *nictype);
+
 #endif /* __KERNEL__ */
 
 #endif	/* _LINUX_DEV_H */

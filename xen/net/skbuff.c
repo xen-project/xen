@@ -430,6 +430,57 @@ struct sk_buff *skb_copy(const struct sk_buff *skb, int gfp_mask)
     return n;
 }
 
+/* Keep head the same: replace data */
+int skb_linearize(struct sk_buff *skb, int gfp_mask)
+{
+	unsigned int size;
+	u8 *data;
+	long offset;
+	int headerlen = skb->data - skb->head;
+	int expand = (skb->tail+skb->data_len) - skb->end;
+
+	if (skb_shinfo(skb)->nr_frags == 0)
+		return 0;
+
+	if (expand <= 0)
+		expand = 0;
+
+	size = (skb->end - skb->head + expand);
+	size = SKB_DATA_ALIGN(size);
+	data = kmalloc(size + sizeof(struct skb_shared_info), gfp_mask);
+	if (data == NULL)
+		return -ENOMEM;
+
+	/* Copy entire thing */
+	if (skb_copy_bits(skb, -headerlen, data, headerlen+skb->len))
+		BUG();
+
+	/* Offset between the two in bytes */
+	offset = data - skb->head;
+
+	/* Free old data. */
+	skb_release_data(skb);
+
+	skb->head = data;
+	skb->end  = data + size;
+
+	/* Set up new pointers */
+	skb->h.raw += offset;
+	skb->nh.raw += offset;
+	skb->mac.raw += offset;
+	skb->tail += offset;
+	skb->data += offset;
+
+	skb->skb_type = SKB_NORMAL;
+
+	/* Set up shinfo */
+	skb_shinfo(skb)->nr_frags = 0;
+
+	skb->tail += skb->data_len;
+	skb->data_len = 0;
+	return 0;
+}
+
 /* Copy some data bits from skb to kernel buffer. */
 
 int skb_copy_bits(const struct sk_buff *skb, int offset, void *to, int len)

@@ -1,0 +1,14 @@
+
+Recommended (cards tested and working at full efficiency):
+ 3com 3c905   (3c59x.c Linux driver)
+ Broadcom tg3 (tg3.c Linux driver)
+ Intel e1000  (e1000 Linux driver)
+ Intel e100   (e100 Linux driver) [*]
+
+Driver ported, but may not be tested, and won't work at full 
+efficiency (extra copies are incurred within Xen):
+ ne2k, pcnet32/lance, rtl8139, tulip, via-rhine, 
+
+*: Note that certain revisions of e100 do not support
+   scatter/gather DMA. These cards will incur an extra 
+   copy within Xen for every transmitted packet.

@@ -575,6 +575,19 @@ void unregister_netdev(struct net_device *dev)
 EXPORT_SYMBOL(register_netdev);
 EXPORT_SYMBOL(unregister_netdev);
 
+
+void alert_slow_netdevice(struct net_device *dev, char *nictype)
+{
+    printk("***************************\n");
+    printk("* WARNING FOR NET DEVICE %s (NIC type '%s'):\n", 
+           dev->name, nictype);
+    printk("* This NIC cannot support fully efficient networking in Xen.\n");
+    printk("* In particular, extra packet copies will be incurred!\n");
+    printk("* See documentation for a list of recommended NIC types\n");
+    printk("***************************\n");
+}
+
+
 #ifdef CONFIG_TR
 
 void tr_setup(struct net_device *dev)

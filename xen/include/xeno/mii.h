@@ -70,6 +70,8 @@
 #define ADVERTISE_LPACK         0x4000  /* Ack link partners response  */
 #define ADVERTISE_NPAGE         0x8000  /* Next page bit               */
 
+#define ADVERTISE_FULL (ADVERTISE_100FULL | ADVERTISE_10FULL | \
+			ADVERTISE_CSMA)
 #define ADVERTISE_ALL (ADVERTISE_10HALF | ADVERTISE_10FULL | \
                        ADVERTISE_100HALF | ADVERTISE_100FULL)
 
@@ -100,6 +102,39 @@
 #define NWAYTEST_RESV1          0x00ff  /* Unused...                   */
 #define NWAYTEST_LOOPBACK       0x0100  /* Enable loopback for N-way   */
 #define NWAYTEST_RESV2          0xfe00  /* Unused...                   */
+
+
+struct mii_if_info {
+	int phy_id;
+	int advertising;
+	int phy_id_mask;
+	int reg_num_mask;
+
+	unsigned int full_duplex : 1;	/* is full duplex? */
+	unsigned int force_media : 1;	/* is autoneg. disabled? */
+
+	struct net_device *dev;
+	int (*mdio_read) (struct net_device *dev, int phy_id, int location);
+	void (*mdio_write) (struct net_device *dev, int phy_id, int location, int val);
+};
+
+struct ethtool_cmd;
+struct mii_ioctl_data;
+
+#if 0
+extern int mii_link_ok (struct mii_if_info *mii);
+extern int mii_nway_restart (struct mii_if_info *mii);
+extern int mii_ethtool_gset(struct mii_if_info *mii, struct ethtool_cmd *ecmd);
+extern int mii_ethtool_sset(struct mii_if_info *mii, struct ethtool_cmd *ecmd);
+extern void mii_check_link (struct mii_if_info *mii);
+extern unsigned int mii_check_media (struct mii_if_info *mii,
+				     unsigned int ok_to_print,
+				     unsigned int init_media);
+extern int generic_mii_ioctl(struct mii_if_info *mii_if,
+                      	     struct mii_ioctl_data *mii_data, int cmd,
+			     unsigned int *duplex_changed);
+#endif
+
 
 /* This structure is used in all SIOCxMIIxxx ioctl calls */
 struct mii_ioctl_data {
