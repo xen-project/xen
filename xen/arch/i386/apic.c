@@ -839,7 +839,7 @@ int __init APIC_init_uniprocessor (void)
 
     connect_bsp_APIC();
 
-    phys_cpu_present_map = 1;
+    cpu_online_map = phys_cpu_present_map = 1;
     apic_write_around(APIC_ID, boot_cpu_physical_apicid);
 
     apic_pm_init2();
