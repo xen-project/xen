@@ -77,8 +77,14 @@ struct timespec millis_to_timespec(unsigned long millis)
  */
 void write_rec(unsigned int cpu, struct t_rec *rec, FILE *out)
 {
-    fwrite(&cpu, sizeof(cpu), 1, out);
-    fwrite(rec, sizeof(*rec), 1, out);
+    size_t written = 0;
+    written += fwrite(&cpu, sizeof(cpu), 1, out);
+    written += fwrite(rec, sizeof(*rec), 1, out);
+    if ( written != 2 )
+    {
+        PERROR("Failed to write trace record");
+        exit(EXIT_FAILURE);
+    }
 }
 
 /**

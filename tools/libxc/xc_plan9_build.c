@@ -58,33 +58,6 @@ memcpy_toguest(int xc_handle, u32 dom, void *v, int size,
 	return ret;
 }
 
-/* this is a function which can go away. It dumps a hunk of 
- * guest pages to a file (/tmp/dumpit); handy for debugging
- * your image builder. 
- * Xen guys, nuke this if you wish.
- */
-void
-dumpit(int xc_handle, u32 dom,
-       int start_page, int tot, unsigned long *page_array)
-{
-	int i, ofd;
-	unsigned char *vaddr;
-
-	ofd = open("/tmp/dumpit", O_RDWR);
-	for (i = start_page; i < tot; i++) {
-		vaddr = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
-					     PROT_READ | PROT_WRITE,
-					     page_array[i]);
-		if (!vaddr) {
-			fprintf(stderr, "Page %d\n", i);
-			perror("shit");
-			read(0, &i, 1);
-			return;
-		}
-		write(ofd, vaddr, 4096);
-		munmap(vaddr, PAGE_SIZE);
-	}
-}
 int
 blah(char *b)
 {

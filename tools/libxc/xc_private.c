@@ -276,12 +276,14 @@ unsigned long xc_get_filesz(int fd)
     unsigned long sz;
 
     lseek(fd, 0, SEEK_SET);
-    read(fd, &sig, sizeof(sig));
+    if ( read(fd, &sig, sizeof(sig)) != sizeof(sig) )
+        return 0;
     sz = lseek(fd, 0, SEEK_END);
     if ( sig == 0x8b1f ) /* GZIP signature? */
     {
         lseek(fd, -4, SEEK_END);
-        read(fd, &_sz, 4);
+        if ( read(fd, &_sz, 4) != 4 )
+            return 0;
         sz = _sz;
     }
     lseek(fd, 0, SEEK_SET);
@@ -302,7 +304,11 @@ char *xc_read_kernel_image(const char *filename, unsigned long *size)
         goto out;
     }
 
-    *size = xc_get_filesz(kernel_fd);
+    if ( (*size = xc_get_filesz(kernel_fd)) == 0 )
+    {
+        PERROR("Could not read kernel image");
+        goto out;
+    }
 
     if ( (kernel_gfd = gzdopen(kernel_fd, "rb")) == NULL )
     {

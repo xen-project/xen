@@ -430,10 +430,8 @@ static PyObject *pyxc_vmx_build(PyObject *self,
     printf ("numItems: %d\n", numItems);
     mem_map.nr_map = numItems;
    
-
     /* should raise an error here. */
     if (numItems < 0) return NULL; /* Not a list */
-
 
     /* iterate over items of the list, grabbing ranges and parsing them */
     for (i = 1; i <= numItems; i++) {	// skip over "memmap"
@@ -461,8 +459,10 @@ static PyObject *pyxc_vmx_build(PyObject *self,
 	    sf2 = PyString_AsString(f2);
 	    lf3 = PyLong_AsLong(f3);
 	    lf4 = PyLong_AsLong(f4);
-	    sscanf(sf1, "%lx", &lf1);
-	    sscanf(sf2, "%lx", &lf2);
+	    if ( sscanf(sf1, "%lx", &lf1) != 1 )
+                return NULL;
+	    if ( sscanf(sf2, "%lx", &lf2) != 1 )
+                return NULL;
 
             mem_map.map[i-1].addr = lf1;
             mem_map.map[i-1].size = lf2 - lf1;
