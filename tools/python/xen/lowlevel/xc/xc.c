@@ -758,6 +758,50 @@ static PyObject *pyxc_rrobin_global_set(PyObject *self,
     return zero;
 }
 
+static PyObject *pyxc_sedf_domain_set(PyObject *self,
+                                         PyObject *args,
+                                         PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+    u32 domid;
+    u64 period, slice;
+    
+    static char *kwd_list[] = { "dom", "period", "slice", NULL };
+    
+    if( !PyArg_ParseTupleAndKeywords(args, kwds, "iLL", kwd_list, &domid,
+                                     &period, &slice) )
+        return NULL;
+   
+    if ( xc_sedf_domain_set(xc->xc_handle, domid, period, slice) != 0 )
+        return PyErr_SetFromErrno(xc_error);
+
+    Py_INCREF(zero);
+    return zero;
+}
+
+static PyObject *pyxc_sedf_domain_get(PyObject *self,
+                                         PyObject *args,
+                                         PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+    u32 domid;
+    u64 period, slice;
+        
+    static char *kwd_list[] = { "dom", NULL };
+
+    if( !PyArg_ParseTupleAndKeywords(args, kwds, "i", kwd_list, &domid) )
+        return NULL;
+    
+    if ( xc_sedf_domain_get( xc->xc_handle, domid, &period,
+                                &slice) )
+        return PyErr_SetFromErrno(xc_error);
+
+    return Py_BuildValue("{s:i,s:L,s:L}",
+                         "domain",  domid,
+                         "period",  period,
+                         "slice",   slice);
+}
+
 static PyObject *pyxc_shadow_control(PyObject *self,
                                      PyObject *args,
                                      PyObject *kwds)
@@ -984,6 +1028,26 @@ static PyMethodDef pyxc_methods[] = {
       "Get Round Robin scheduler settings\n"
       "Returns [dict]:\n"
       " slice  [long]: Scheduler time slice.\n" },    
+    
+    { "sedf_domain_set",
+      (PyCFunction)pyxc_sedf_domain_set,
+      METH_KEYWORDS, "\n"
+      "Set the scheduling parameters for a domain when running with Atropos.\n"
+      " dom      [int]:  domain to set\n"
+      " period   [long]: domain's scheduling period\n"
+      " slice    [long]: domain's slice per period\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "sedf_domain_get",
+      (PyCFunction)pyxc_sedf_domain_get,
+      METH_KEYWORDS, "\n"
+      "Get the current scheduling parameters for a domain when running with\n"
+      "the Atropos scheduler."
+      " dom      [int]: domain to query\n"
+      "Returns:  [dict]\n"
+      " domain   [int]: domain ID\n"
+      " period   [long]: scheduler period\n"
+      " slice    [long]: CPU reservation per period\n"},
 
     { "evtchn_alloc_unbound", 
       (PyCFunction)pyxc_evtchn_alloc_unbound,

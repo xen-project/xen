@@ -68,10 +68,12 @@ schedule_data_t schedule_data[NR_CPUS];
 extern struct scheduler sched_bvt_def;
 extern struct scheduler sched_rrobin_def;
 extern struct scheduler sched_atropos_def;
+extern struct scheduler sched_sedf_def;
 static struct scheduler *schedulers[] = { 
     &sched_bvt_def,
     &sched_rrobin_def,
     &sched_atropos_def,
+    &sched_sedf_def,
     NULL
 };
 
@@ -285,7 +287,7 @@ long sched_adjdom(struct sched_adjdom_cmd *cmd)
 
     if ( cmd->sched_id != ops.sched_id )
         return -EINVAL;
-
+    
     if ( cmd->direction != SCHED_INFO_PUT && cmd->direction != SCHED_INFO_GET )
         return -EINVAL;
 

@@ -272,6 +272,12 @@ class Xend:
                               'latency' : latency,
                               'xtratime': xtratime })
 
+    def xend_domain_cpu_sedf_set(self, id, period, slice):
+        return self.xendPost(self.domainurl(id),
+                             {'op'      : 'cpu_sedf_set',
+                              'period'  : period,
+                              'slice'   : slice })
+
     def xend_domain_maxmem_set(self, id, memory):
         return self.xendPost(self.domainurl(id),
                              { 'op'     : 'maxmem_set',

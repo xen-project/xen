@@ -336,6 +336,7 @@
 3fbba6dctWRWlFJkYb6hdix2X4WMuw tools/libxc/xc_private.c
 3fbba6dcbVrG2hPzEzwdeV_UC8kydQ tools/libxc/xc_private.h
 40589968UQFnJeOMn8UIFLbXBuwXjw tools/libxc/xc_rrobin.c
+41ebbfe9U0b0kI-HgjK7VEY4EvW7_w tools/libxc/xc_sedf.c
 40e1b09dMYB4ItGCqcMIzirdMd9I-w tools/libxutil/Makefile
 40e033325Sjqs-_4TuzeUEprP_gYFg tools/libxutil/allocate.c
 40e03332KYz7o1bn2MG_KPbBlyoIMA tools/libxutil/allocate.h
@@ -715,6 +716,7 @@
 4064773cJ31vZt-zhbSoxqft1Jaw0w xen/common/sched_atropos.c
 40589968dD2D1aejwSOvrROg7fOvGQ xen/common/sched_bvt.c
 40589968be_t_n0-w6ggceW7h-sx0w xen/common/sched_rrobin.c
+41ebbfe9oF1BF3cH5v7yE3eOL9uPbA xen/common/sched_sedf.c
 3e397e6619PgAfBbw2XFbXkewvUWgw xen/common/schedule.c
 3ddb79bdB9RNMnkQnUyZ5C9hhMSQQw xen/common/slab.c
 3ddb79bd0gVQYmL2zvuJnldvD0AGxQ xen/common/softirq.c
