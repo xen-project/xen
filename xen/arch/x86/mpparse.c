@@ -1120,7 +1120,7 @@ void __init mp_override_legacy_irq (
 	 *      erroneously sets the trigger to level, resulting in a HUGE 
 	 *      increase of timer interrupts!
 	 */
-	if ((bus_irq == 0) && (global_irq == 2) && (trigger == 3))
+	if ((bus_irq == 0) && (trigger == 3))
 		trigger = 1;
 
 	intsrc.mpc_type = MP_INTSRC;
@@ -1141,7 +1141,7 @@ void __init mp_override_legacy_irq (
 	 * Otherwise create a new entry (e.g. global_irq == 2).
 	 */
 	for (i = 0; i < mp_irq_entries; i++) {
-		if ((mp_irqs[i].mpc_dstapic == intsrc.mpc_dstapic) 
+		if ((mp_irqs[i].mpc_srcbus == intsrc.mpc_srcbus) 
 			&& (mp_irqs[i].mpc_srcbusirq == intsrc.mpc_srcbusirq)) {
 			mp_irqs[i] = intsrc;
 			found = 1;
@@ -1202,13 +1202,14 @@ void __init mp_config_acpi_legacy_irqs (void)
 	 */
 	for (i = 0; i < 16; i++) {
 
-		if (i == 2) continue;			/* Don't connect IRQ2 */
+		if (i == 2)
+			continue;			/* Don't connect IRQ2 */
 
 		mp_irqs[mp_irq_entries].mpc_type = MP_INTSRC;
 		mp_irqs[mp_irq_entries].mpc_irqflag = 0;	/* Conforming */
 		mp_irqs[mp_irq_entries].mpc_srcbus = MP_ISA_BUS;
 		mp_irqs[mp_irq_entries].mpc_dstapic = mp_ioapics[ioapic].mpc_apicid;
-		mp_irqs[mp_irq_entries].mpc_irqtype = i ? mp_INT : mp_ExtINT;   /* 8259A to #0 */
+		mp_irqs[mp_irq_entries].mpc_irqtype = mp_INT;
 		mp_irqs[mp_irq_entries].mpc_srcbusirq = i;	   /* Identity mapped */
 		mp_irqs[mp_irq_entries].mpc_dstirq = i;
 
@@ -1226,72 +1227,6 @@ void __init mp_config_acpi_legacy_irqs (void)
 			panic("Max # of irq sources exceeded!\n");
 	}
 }
-
-/*extern FADT_DESCRIPTOR acpi_fadt;*/
-
-void __init mp_config_ioapic_for_sci(int irq)
-{
-	int ioapic;
-	int ioapic_pin;
-	struct acpi_table_madt* madt;
-	struct acpi_table_int_src_ovr *entry = NULL;
-	acpi_interrupt_flags flags;
-	void *madt_end;
-	acpi_status status;
-
-	/*
-	 * Ensure that if there is an interrupt source override entry
-	 * for the ACPI SCI, we leave it as is. Unfortunately this involves
-	 * walking the MADT again.
-	 */
-	status = acpi_get_firmware_table("APIC", 1, ACPI_LOGICAL_ADDRESSING,
-		(struct acpi_table_header **) &madt);
-	if (ACPI_SUCCESS(status)) {
-		madt_end = (void *) (unsigned long)madt + madt->header.length;
-
-		entry = (struct acpi_table_int_src_ovr *)
-                ((unsigned long) madt + sizeof(struct acpi_table_madt));
-
-		while ((void *) entry < madt_end) {
-                	if (entry->header.type == ACPI_MADT_INT_SRC_OVR &&
-			    acpi_fadt.sci_int == entry->bus_irq)
-				goto found;
-			
-                	entry = (struct acpi_table_int_src_ovr *)
-                	        ((unsigned long) entry + entry->header.length);
-        	}
-	}
-	/*
-	 * Although the ACPI spec says that the SCI should be level/low
-	 * don't reprogram it unless there is an explicit MADT OVR entry
-	 * instructing us to do so -- otherwise we break Tyan boards which
-	 * have the SCI wired edge/high but no MADT OVR.
-	 */
-	return;
-
-found:
-	/*
-	 * See the note at the end of ACPI 2.0b section
-	 * 5.2.10.8 for what this is about.
-	 */
-	flags = entry->flags;
-	acpi_fadt.sci_int = entry->global_irq;
-	irq = entry->global_irq;
-	
-	ioapic = mp_find_ioapic(irq);
-
-	ioapic_pin = irq - mp_ioapic_routing[ioapic].irq_start;
-
-	/*
-	 * MPS INTI flags:
-	 *  trigger: 0=default, 1=edge, 3=level
-	 *  polarity: 0=default, 1=high, 3=low
-	 * Per ACPI spec, default for SCI means level/low.
-	 */
-	io_apic_set_pci_routing(ioapic, ioapic_pin, irq, 
-		(flags.trigger == 1 ? 0 : 1), (flags.polarity == 1 ? 0 : 1));
-}
-
 
 #ifdef CONFIG_ACPI_PCI
 
@@ -1351,7 +1286,7 @@ void __init mp_parse_prt (void)
 			continue;
 		}
 		if ((1<<bit) & mp_ioapic_routing[ioapic].pin_programmed[idx]) {
-			printk(KERN_DEBUG "Pin %d-%d already programmed\n",
+			Dprintk(KERN_DEBUG "Pin %d-%d already programmed\n",
 				mp_ioapic_routing[ioapic].apic_id, ioapic_pin);
 			entry->irq = irq;
 			continue;
