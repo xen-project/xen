@@ -77,7 +77,10 @@ struct list_head *find_direct(struct list_head *list, unsigned long addr)
     for ( curr = direct_list->next; curr != direct_list; curr = curr->next )
     {
         node = list_entry(curr, direct_mmap_node_t, list);
-        if( node->vm_start >= addr ) break;
+        if( node->vm_start >= addr ){
+			printk(KERN_ALERT "bd240 debug: find_direct: hit %lx\n", node->vm_start); 
+			break;
+		}
     }
 
     return curr;

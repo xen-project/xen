@@ -184,15 +184,16 @@ unsigned long direct_mmap(unsigned long phys_addr, unsigned long size,
     /* add node on the list of directly mapped areas, make sure the
 	 * list remains sorted.
 	 */ 
-    //dmmap = (direct_mmap_node_t *)kmalloc(sizeof(direct_mmap_node_t), GFP_KERNEL);
     dmmap = (direct_mmap_node_t *)kmalloc(KMALLOC_SIZE, GFP_KERNEL);
     dmmap->vm_start = addr;
     dmmap->vm_end = addr + size;
 	entry = find_direct(&current->mm->context.direct_list, addr);
 	if(entry != &current->mm->context.direct_list){
 		list_add_tail(&dmmap->list, entry);
+		printk(KERN_ALERT "bd240 debug: added node %lx in the middle\n", node->vm_start);
 	} else {
     	list_add(&dmmap->list, &current->mm->context.direct_list);
+		printk(KERN_ALERT "bd240 debug: added node %lx at tail\n", node->vm_start);
 	}
 
     /* and perform the mapping */
