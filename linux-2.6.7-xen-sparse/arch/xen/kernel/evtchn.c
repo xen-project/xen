@@ -7,6 +7,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/irq.h>
 #include <linux/interrupt.h>
 #include <linux/sched.h>
@@ -81,7 +82,7 @@ void evtchn_do_upcall(struct pt_regs *regs)
 
     local_irq_restore(flags);
 }
-
+EXPORT_SYMBOL(evtchn_do_upcall);
 
 static int find_unbound_irq(void)
 {

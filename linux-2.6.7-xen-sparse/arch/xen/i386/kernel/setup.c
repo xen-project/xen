@@ -137,8 +137,10 @@ static struct resource data_resource = { "Kernel data", 0, 0 };
  * page as soon as fixmap is up and running.
  */
 shared_info_t *HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
+EXPORT_SYMBOL(HYPERVISOR_shared_info);
 
 unsigned long *phys_to_machine_mapping;
+EXPORT_SYMBOL(phys_to_machine_mapping);
 
 multicall_entry_t multicall_list[8];
 int nr_multicall_ents = 0;
