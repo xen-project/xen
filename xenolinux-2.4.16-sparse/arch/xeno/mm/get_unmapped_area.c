@@ -118,7 +118,7 @@ addr, unsigned long len, unsigned long pgoff, unsigned long flags)
     {
         if ( TASK_SIZE - len < addr ) return -ENOMEM;
 
-        if ( vma && (vma->vm_start < node->vm_start) )
+        if ( vma && ((curr == direct_list) || (vma->vm_start < node->vm_start)))
         {
             /* Do we fit before VMA node? */
             if ( addr + len <= vma->vm_start ) return addr;
@@ -135,7 +135,7 @@ addr, unsigned long len, unsigned long pgoff, unsigned long flags)
         }
         else
         {
-            /* Reached end of VMA and direct_map lists */
+            /* !vma && curr == direct_list */
             return addr;
         }
     }
