@@ -59,7 +59,7 @@ active_req_t *lookup_active_req(ACTIVE_RING_IDX idx)
     return &active_reqs[idx];   
 }
 
-inline void active_reqs_init(void)
+void active_reqs_init(void)
 {
     ACTIVE_RING_IDX i;
     
@@ -79,13 +79,6 @@ static inline unsigned long MAKE_ID(domid_t fe_dom, ACTIVE_RING_IDX idx)
 {
     return ( (fe_dom << 16) | idx );
 }
-
-inline unsigned int ID_TO_IDX(unsigned long id) 
-{ 
-        return ( id & 0x0000ffff );
-}
-
-inline domid_t ID_TO_DOM(unsigned long id) { return (id >> 16); }
 
 /*-----[ Ring helpers ]---------------------------------------------------*/
 
@@ -127,7 +120,7 @@ inline int write_req_to_be_ring(blkif_request_t *req)
     return 0;
 }
 
-inline void kick_fe_domain(blkif_t *blkif) 
+void kick_fe_domain(blkif_t *blkif) 
 {
     RING_PUSH_RESPONSES(&blkif->blk_ring);
     notify_via_evtchn(blkif->evtchn);
@@ -135,7 +128,7 @@ inline void kick_fe_domain(blkif_t *blkif)
     
 }
 
-inline void kick_be_domain(void)
+void kick_be_domain(void)
 {
     if ( blktap_be_state != BLKIF_STATE_CONNECTED ) 
         return;

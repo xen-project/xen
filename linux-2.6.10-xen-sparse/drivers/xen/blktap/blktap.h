@@ -110,10 +110,18 @@ typedef struct {
 typedef unsigned int ACTIVE_RING_IDX;
 
 active_req_t *lookup_active_req(ACTIVE_RING_IDX idx);
-inline unsigned int ID_TO_IDX(unsigned long id);
-inline domid_t ID_TO_DOM(unsigned long id);
 
-inline void active_reqs_init(void);
+extern inline unsigned int ID_TO_IDX(unsigned long id) 
+{ 
+    return ( id & 0x0000ffff );
+}
+
+extern inline domid_t ID_TO_DOM(unsigned long id) 
+{ 
+    return (id >> 16); 
+}
+
+void active_reqs_init(void);
 
 /* -------[ interposition -> character device interface ]------------- */
 
@@ -224,8 +232,8 @@ int write_resp_to_fe_ring(blkif_t *blkif, blkif_response_t *rsp);
 int write_req_to_be_ring(blkif_request_t *req);
 
 /* event notification functions */
-inline void kick_fe_domain(blkif_t *blkif);
-inline void kick_be_domain(void);
+void kick_fe_domain(blkif_t *blkif);
+void kick_be_domain(void);
 
 /* Interrupt handlers. */
 irqreturn_t blkif_ptbe_int(int irq, void *dev_id, 
