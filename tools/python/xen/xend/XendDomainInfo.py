@@ -283,7 +283,7 @@ def vm_restore(src, progress=0):
     d = restorefn(state_file=src, progress=progress)
     dom = int(d['dom'])
     if dom < 0:
-        raise VMError('restore failed')
+        raise VmError('restore failed')
     vmconfig = sxp.from_string(d['vmconfig'])
     vm.config = sxp.child_value(vmconfig, 'config')
     deferred = vm.dom_configure(dom)
@@ -611,7 +611,7 @@ class XendDomainInfo:
             if not os.path.isfile(kernel):
                 raise VmError('Kernel image does not exist: %s' % kernel)
             if ramdisk and not os.path.isfile(ramdisk):
-                raise VMError('Kernel ramdisk does not exist: %s' % ramdisk)
+                raise VmError('Kernel ramdisk does not exist: %s' % ramdisk)
         print 'create-domain> init_domain...'
         self.init_domain()
         print 'create_domain>', 'dom=', self.dom
@@ -691,7 +691,7 @@ class XendDomainInfo:
         """
         d = dom_get(dom)
         if not d:
-            raise VMError("Domain not found: %d" % dom)
+            raise VmError("Domain not found: %d" % dom)
         try:
             self.setdom(dom)
             self.name = d['name']
@@ -807,10 +807,10 @@ def vm_dev_vbd(vm, val, index):
     vdev = index
     uname = sxp.child_value(val, 'uname')
     if not uname:
-        raise VMError('vbd: Missing uname')
+        raise VmError('vbd: Missing uname')
     dev = sxp.child_value(val, 'dev')
     if not dev:
-        raise VMError('vbd: Missing dev')
+        raise VmError('vbd: Missing dev')
     mode = sxp.child_value(val, 'mode', 'r')
     defer = make_disk(vm.dom, uname, dev, mode, vm.recreate)
     def fn(vbd):
@@ -833,24 +833,24 @@ def parse_pci(val):
 def vm_dev_pci(vm, val, index):
     bus = sxp.child_value(val, 'bus')
     if not bus:
-        raise VMError('pci: Missing bus')
+        raise VmError('pci: Missing bus')
     dev = sxp.child_value(val, 'dev')
     if not dev:
-        raise VMError('pci: Missing dev')
+        raise VmError('pci: Missing dev')
     func = sxp.child_value(val, 'func')
     if not func:
-        raise VMError('pci: Missing func')
+        raise VmError('pci: Missing func')
     try:
         bus = parse_pci(bus)
         dev = parse_pci(dev)
         func = parse_pci(func)
     except:
-        raise VMError('pci: invalid parameter')
+        raise VmError('pci: invalid parameter')
     rc = xc.physdev_pci_access_modify(dom=vm.dom, bus=bus, dev=dev,
                                       func=func, enable=1)
     if rc < 0:
         #todo non-fatal
-        raise VMError('pci: Failed to configure device: bus=%s dev=%s func=%s' %
+        raise VmError('pci: Failed to configure device: bus=%s dev=%s func=%s' %
                       (bus, dev, func))
     return rc
     
