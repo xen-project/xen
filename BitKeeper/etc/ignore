@@ -79,6 +79,8 @@ xen/figlet/figlet
 xen/include/asm
 xen/include/asm-*/asm-offsets.h
 xen/include/hypervisor-ifs/arch
+xen/include/xen/*.new
+xen/include/xen/banner.h
 xen/include/xen/compile.h
 xen/tools/elf-reloc
 xen/tools/figlet/figlet
