@@ -40,6 +40,11 @@ void start_of_day(void);
 
 /* opt_console: comma-separated list of console outputs. */
 unsigned char opt_console[30] = "com1,vga";
+/* opt_conswitch: a character pair controlling console switching. */
+/* Char 1: CTRL+<char1> is used to switch console input between Xen and DOM0 */
+/* Char 2: If this character is 'x', then do not auto-switch to DOM0 when it */
+/*         boots. Any other value, or omitting the char, enables auto-switch */
+unsigned char opt_conswitch[5] = "a"; /* NB. '`' would disable switching. */
 /* opt_com[12]: Config serial port with a string <baud>,DPS,<io-base>,<irq>. */
 unsigned char opt_com1[30] = "", opt_com2[30] = "";
 /* opt_dom0_mem: Kilobytes of memory allocated to domain 0. */
@@ -82,6 +87,7 @@ static struct {
     void *var;
 } opts[] = {
     { "console",           OPT_STR,  &opt_console },
+    { "conswitch",         OPT_STR,  &opt_conswitch },
     { "com1",              OPT_STR,  &opt_com1 },
     { "com2",              OPT_STR,  &opt_com2 },
     { "dom0_mem",          OPT_UINT, &opt_dom0_mem }, 
@@ -224,7 +230,6 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
            (FRAMETABLE_VIRT_END - FRAMETABLE_VIRT_START));
 
     init_frametable((void *)FRAMETABLE_VIRT_START, max_page);
-
 
 #elif defined(__x86_64__)
 

@@ -141,29 +141,43 @@ static void add_to_blkdev_list_tail(blkif_t *blkif)
  * SCHEDULER FUNCTIONS
  */
 
-static void io_schedule(unsigned long unused)
+static DECLARE_WAIT_QUEUE_HEAD(io_schedule_wait);
+
+static int io_schedule(void *arg)
 {
+    DECLARE_WAITQUEUE(wq, current);
+
     blkif_t          *blkif;
     struct list_head *ent;
 
-    /* Queue up a batch of requests. */
-    while ( (NR_PENDING_REQS < MAX_PENDING_REQS) &&
-            !list_empty(&io_schedule_list) )
+    for ( ; ; )
     {
-        ent = io_schedule_list.next;
-        blkif = list_entry(ent, blkif_t, blkdev_list);
-        blkif_get(blkif);
-        remove_from_blkdev_list(blkif);
-        if ( do_block_io_op(blkif, BATCH_PER_DOMAIN) )
-            add_to_blkdev_list_tail(blkif);
-        blkif_put(blkif);
+        /* Wait for work to do. */
+        add_wait_queue(&io_schedule_wait, &wq);
+        set_current_state(TASK_INTERRUPTIBLE);
+        if ( (NR_PENDING_REQS == MAX_PENDING_REQS) || 
+             list_empty(&io_schedule_list) )
+            schedule();
+        __set_current_state(TASK_RUNNING);
+        remove_wait_queue(&io_schedule_wait, &wq);
+
+        /* Queue up a batch of requests. */
+        while ( (NR_PENDING_REQS < MAX_PENDING_REQS) &&
+                !list_empty(&io_schedule_list) )
+        {
+            ent = io_schedule_list.next;
+            blkif = list_entry(ent, blkif_t, blkdev_list);
+            blkif_get(blkif);
+            remove_from_blkdev_list(blkif);
+            if ( do_block_io_op(blkif, BATCH_PER_DOMAIN) )
+                add_to_blkdev_list_tail(blkif);
+            blkif_put(blkif);
+        }
+        
+        /* Push the batch through to disc. */
+        run_task_queue(&tq_disk);
     }
-
-    /* Push the batch through to disc. */
-    run_task_queue(&tq_disk);
 }
-
-static DECLARE_TASKLET(io_schedule_tasklet, io_schedule, 0);
 
 static void maybe_trigger_io_schedule(void)
 {
@@ -176,7 +190,7 @@ static void maybe_trigger_io_schedule(void)
 
     if ( (NR_PENDING_REQS < (MAX_PENDING_REQS/2)) &&
          !list_empty(&io_schedule_list) )
-        tasklet_schedule(&io_schedule_tasklet);
+        wake_up(&io_schedule_wait);
 }
 
 
@@ -483,7 +497,7 @@ void blkif_deschedule(blkif_t *blkif)
     remove_from_blkdev_list(blkif);
 }
 
-static int __init init_module(void)
+static int __init blkif_init(void)
 {
     int i;
 
@@ -505,6 +519,9 @@ static int __init init_module(void)
     spin_lock_init(&io_schedule_list_lock);
     INIT_LIST_HEAD(&io_schedule_list);
 
+    if ( kernel_thread(io_schedule, 0, CLONE_FS | CLONE_FILES) < 0 )
+        BUG();
+
     buffer_head_cachep = kmem_cache_create(
         "buffer_head_cache", sizeof(struct buffer_head),
         0, SLAB_HWCACHE_ALIGN, NULL, NULL);
@@ -514,10 +531,4 @@ static int __init init_module(void)
     return 0;
 }
 
-static void cleanup_module(void)
-{
-    BUG();
-}
-
-module_init(init_module);
-module_exit(cleanup_module);
+__initcall(blkif_init);

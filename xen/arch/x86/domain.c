@@ -445,12 +445,8 @@ void domain_relinquish_memory(struct domain *d)
     struct pfn_info  *page;
     unsigned long     x, y;
 
-    /*
-     * If we're executing the idle task then we may still be running over the 
-     * dead domain's page tables. We'd better fix that before freeing them!
-     */
-    if ( is_idle_task(current) )
-        write_ptbase(&current->mm);
+    /* Ensure that noone is running over the dead domain's page tables. */
+    synchronise_pagetables(~0UL);
 
     /* Exit shadow mode before deconstructing final guest page table. */
     shadow_mode_disable(d);

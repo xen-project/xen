@@ -7,7 +7,7 @@
 # chkconfig: 2345 99 00
 # description: Starts and stops the Xen control daemon.
 
-. /etc/init.d/functions
+. /etc/init.d/functions || . /etc/init.d/functions.sh
 
 case "$1" in
   start)
