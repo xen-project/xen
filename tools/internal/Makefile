@@ -36,7 +36,7 @@ rpm: all
 	rm -rf staging
 	mkdir staging
 	mkdir staging/i386
-	rpm --define "staging$$PWD/staging" --define '_builddir.' --define "_rpmdir$$PWD/staging" -bb rpm.spec
+	rpmbuild --define "staging$$PWD/staging" --define '_builddir.' --define "_rpmdir$$PWD/staging" -bb rpm.spec
 	mv staging/i386/*.rpm .
 	rm -rf staging
 
