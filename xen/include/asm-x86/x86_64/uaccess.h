@@ -4,36 +4,22 @@
 /*
  * User space memory access functions
  */
-#include <linux/config.h>
-#include <linux/compiler.h>
-#include <linux/errno.h>
-#include <linux/sched.h>
-#include <linux/prefetch.h>
+#include <xen/config.h>
+#include <xen/compiler.h>
+#include <xen/errno.h>
+#include <xen/sched.h>
+#include <xen/prefetch.h>
 #include <asm/page.h>
+
+/* No user-pointer checking. */
+#define __user
+#define __force
+#define __chk_user_ptr(_p) ((void)0)
 
 #define VERIFY_READ 0
 #define VERIFY_WRITE 1
 
-/*
- * The fs value determines whether argument validity checking should be
- * performed or not.  If get_fs() == USER_DS, checking is performed, with
- * get_fs() == KERNEL_DS, checking is bypassed.
- *
- * For historical reasons, these macros are grossly misnamed.
- */
-
-#define MAKE_MM_SEG(s)	((mm_segment_t) { (s) })
-
-#define KERNEL_DS	MAKE_MM_SEG(0xFFFFFFFFFFFFFFFFUL)
-#define USER_DS		MAKE_MM_SEG(PAGE_OFFSET)
-
-#define get_ds()	(KERNEL_DS)
-#define get_fs()	(current_thread_info()->addr_limit)
-#define set_fs(x)	(current_thread_info()->addr_limit = (x))
-
-#define segment_eq(a,b)	((a).seg == (b).seg)
-
-#define __addr_ok(addr) (!((unsigned long)(addr) & (current_thread_info()->addr_limit.seg)))
+#define __addr_ok(addr) ((unsigned long)(addr) < HYPERVISOR_VIRT_START)
 
 /*
  * Uhhuh, this needs 65-bit arithmetic. We have a carry..
@@ -44,7 +30,7 @@
 	asm("# range_ok\n\r" \
 		"addq %3,%1 ; sbbq %0,%0 ; cmpq %1,%4 ; sbbq $0,%0"  \
 		:"=&r" (flag), "=r" (sum) \
-		:"1" (addr),"g" ((long)(size)),"g" (current_thread_info()->addr_limit.seg)); \
+		:"1" (addr),"g" ((long)(size)),"r" (HYPERVISOR_VIRT_START)); \
 	flag; })
 
 #define access_ok(type, addr, size) (__range_not_ok(addr,size) == 0)
