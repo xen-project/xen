@@ -110,6 +110,7 @@
 3e5a4e66mrtlmV75L1tjKDg8RaM5gA linux-2.4.26-xen-sparse/drivers/block/ll_rw_blk.c
 3f108aeaLcGDgQdFAANLTUEid0a05w linux-2.4.26-xen-sparse/drivers/char/mem.c
 3e5a4e66rw65CxyolW9PKz4GG42RcA linux-2.4.26-xen-sparse/drivers/char/tty_io.c
+40c9c0c1pPwYE3-4i-oI3ubUu7UgvQ linux-2.4.26-xen-sparse/drivers/scsi/aic7xxx/Makefile
 3e5a4e669uzIE54VwucPYtGwXLAbzA linux-2.4.26-xen-sparse/fs/exec.c
 3e5a4e66wbeCpsJgVf_U8Jde-CNcsA linux-2.4.26-xen-sparse/include/asm-xen/bugs.h
 4048c0ddxnIa2GpBAVR-mY6mNSdeJg linux-2.4.26-xen-sparse/include/asm-xen/ctrl_if.h

@@ -25,3 +25,8 @@ xen/include/xen/compile.h
 xen/tools/elf-reloc
 xen/tools/figlet/figlet
 TAGS
+linux-2.4.26-xen-sparse/drivers/scsi/aic7xxx/Makefile~
+linux-2.4.26-xen/.config.old
+linux-2.4.26-xen/.depend
+linux-2.4.26-xen/.hdepend
+linux-2.4.26-xen/.version
