@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 #  -*- mode: python; -*-
 import sys
+
+# Default install path for Xen binary packages.
+sys.path.append('/lib/python')
 from xen.xm import main
 
 main.main(sys.argv)

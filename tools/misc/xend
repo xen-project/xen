@@ -22,6 +22,10 @@
 import os
 import sys
 
+# Default install path for Xen binary packages.
+sys.path.append('/lib/python')
+from xen.xend.server import SrvDaemon
+
 class CheckError(ValueError):
     pass
 
@@ -93,7 +97,6 @@ def main():
         check_user()
     except CheckError:
         sys.exit(1)
-    from xen.xend.server import SrvDaemon
     daemon = SrvDaemon.instance()
     if not sys.argv[1:]:
         print 'usage: %s {start|stop|restart}' % sys.argv[0]
