@@ -13,7 +13,6 @@ endif
 
 ifneq ($(crash_debug),y)
 OBJS := $(patsubst cdb%.o,,$(OBJS))
-OBJS := $(patsubst $(TARGET_SUBARCH)/cdb%.o,,$(OBJS))
 endif
 
 default: $(TARGET)

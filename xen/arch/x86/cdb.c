@@ -317,7 +317,7 @@ xdb_ctx = {
 	serhnd : -1
 };
 
-void
+int
 __trap_to_cdb(struct xen_regs *regs)
 {
 	int resume = 0;

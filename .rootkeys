@@ -923,7 +923,7 @@
 41f97ef5139vN42cOYHfX_Ac8WOOjA xen/arch/x86/vmx_platform.c
 41c0c4128URE0dxcO15JME_MuKBPfg xen/arch/x86/vmx_vmcs.c
 419cbedeQDg8IrO3izo3o5rQNlo0kQ xen/arch/x86/x86_32/asm-offsets.c
-4107c15e_NqNYew2EXroXz2mgTAMWQ xen/arch/x86/x86_32/cdb_trap.S
+4107c15e_NqNYew2EXroXz2mgTAMWQ xen/arch/x86/x86_32/call_with_regs.S
 4202391dkvdTZ8GhWXe3Gqf9EOgWXg xen/arch/x86/x86_32/domain_build.c
 3e32af9aRnYGl4GMOaDKp7JdfhOGhg xen/arch/x86/x86_32/domain_page.c
 3ddb79bcecupHj56ZbTa3B0FxDowMg xen/arch/x86/x86_32/entry.S
