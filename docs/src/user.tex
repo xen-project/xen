@@ -684,7 +684,7 @@ machine ID~1 you should type:
 
 \begin{quote}
 \begin{verbatim}
-# xm create -c myvmconfig vmid=1
+# xm create -c myvmconf vmid=1
 \end{verbatim}
 \end{quote}
 
@@ -894,7 +894,14 @@ to filesystems stored on local disk when a domain is migrated.
 Administrators should choose an appropriate storage solution
 (i.e. SAN, NAS, etc.) to ensure that domain filesystems are also
 available on their destination node. GNBD is a good method for
-exporting a volume from one machine to another, as is iSCSI.
+exporting a volume from one machine to another. iSCSI can do a similar
+job, but is more complex to set up.
+
+When a domain migrates, it's MAC and IP address move with it, thus it
+is only possible to migrate VMs within the same layer-2 network and IP
+subnet. If the destination node is on a different subnet, the
+administrator would need to manually configure a suitable etherip or
+IP tunnel in the domain 0 of the remote node. 
 
 A domain may be migrated using the \path{xm migrate} command.  To
 live migrate a domain to another machine, we would use
@@ -1007,11 +1014,10 @@ Block devices should typically only be shared between domains in a
 read-only fashion otherwise the Linux kernel's file systems will get
 very confused as the file system structure may change underneath them
 (having the same ext3 partition mounted rw twice is a sure fire way to
-cause irreparable damage)!  \xend will attempt to prevent you from
+cause irreparable damage)!  \Xend will attempt to prevent you from
 doing this by checking that the device is not mounted read-write in
 domain 0, and hasn't already been exported read-write to another
 domain.
-
 If you want read-write sharing, export the directory to other domains
 via NFS from domain0 (or use a cluster file system such as GFS or
 ocfs2).
