@@ -48,6 +48,7 @@
 #define __HYPERVISOR_grant_table_op       20
 #define __HYPERVISOR_vm_assist            21
 #define __HYPERVISOR_update_va_mapping_otherdomain 22
+#define __HYPERVISOR_switch_vm86          23
 
 /*
  * MULTICALLS

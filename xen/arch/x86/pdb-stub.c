@@ -1083,13 +1083,17 @@ int pdb_handle_exception(int exceptionVector,
     int watchdog_save;
     unsigned long cr3 = read_cr3();
 
+    /* No vm86 handling here as yet. */
+    if ( VM86_MODE(xen_regs) )
+        return 1;
+
     /* If the exception is an int3 from user space then pdb is only
        interested if it re-wrote an instruction set the breakpoint.
        This occurs when leaving a system call from a domain.
     */
-    if ( exceptionVector == 3 &&
-	 (xen_regs->cs & 3) == 3 && 
-	 xen_regs->eip != pdb_system_call_next_addr + 1)
+    if ( (exceptionVector == 3) &&
+	 RING_3(xen_regs) && 
+	 (xen_regs->eip != (pdb_system_call_next_addr + 1)) )
     {
         TRC(printf("pdb: user bkpt (0x%x) at 0x%x:0x%lx:0x%x\n", 
 		   exceptionVector, xen_regs->cs & 3, cr3, xen_regs->eip));

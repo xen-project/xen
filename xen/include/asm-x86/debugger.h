@@ -55,7 +55,8 @@ static inline int debugger_trap_entry(
         break;
 
     case TRAP_gp_fault:        
-        if ( ((regs->cs & 3) != 0) && ((regs->error_code & 3) == 2) &&
+        if ( (VM86_MODE(regs) || !RING_0(regs)) &&
+             ((regs->error_code & 3) == 2) &&
              pdb_initialized && (pdb_ctx.system_call != 0) )
         {
             unsigned long cr3 = read_cr3();
