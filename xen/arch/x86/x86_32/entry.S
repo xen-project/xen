@@ -602,7 +602,7 @@ ENTRY(nmi)
         # reload DS and ES when handling them.
         inb   $0x61,%al
         testb $0x80,%al
-        jne   nmi_parity_err
+        je   nmi_parity_err
         testb $0x40,%al
         jne   nmi_io_err
         movl  %eax,%ebx
@@ -660,14 +660,22 @@ nmi_parity_err:
         movl $(__HYPERVISOR_DS),%edx
         movl %edx,%ds
         movl %edx,%es
-        jmp  SYMBOL_NAME(mem_parity_error)
+        movl %esp,%edx
+        push %edx
+        push %eax
+        call SYMBOL_NAME(mem_parity_error)
+        ud2
         
 nmi_io_err: 
         movl $(__HYPERVISOR_DS),%edx
         movl %edx,%ds
         movl %edx,%es
-        jmp  SYMBOL_NAME(io_check_error)                        
-        
+        movl %esp,%edx
+        push %edx
+        push %eax
+        call SYMBOL_NAME(io_check_error)                        
+        ud2   
+             
 .data
 ENTRY(hypercall_table)
         .long SYMBOL_NAME(do_set_trap_table)     /*  0 */

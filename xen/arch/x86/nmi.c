@@ -20,6 +20,7 @@
 #include <xen/delay.h>
 #include <xen/time.h>
 #include <xen/sched.h>
+#include <xen/console.h>
 #include <asm/mc146818rtc.h>
 #include <asm/smp.h>
 #include <asm/msr.h>
@@ -271,7 +272,6 @@ void touch_nmi_watchdog (void)
 
 void nmi_watchdog_tick (struct pt_regs * regs)
 {
-    extern spinlock_t console_lock;
     extern void die(const char * str, struct pt_regs * regs, long err);
 
     int sum, cpu = smp_processor_id();
@@ -285,8 +285,9 @@ void nmi_watchdog_tick (struct pt_regs * regs)
          * before doing the oops ...
          */
         alert_counter[cpu]++;
-        if (alert_counter[cpu] == 5*nmi_hz) {
-            console_lock = SPIN_LOCK_UNLOCKED;
+        if ( alert_counter[cpu] == 5*nmi_hz )
+        {
+            console_force_unlock();
             die("NMI Watchdog detected LOCKUP on CPU", regs, cpu);
         }
     } 
