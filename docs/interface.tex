@@ -15,10 +15,11 @@
 \vfill
 \begin{tabular}{l}
 {\Huge \bf Interface manual} \\[4mm]
-{\huge Xen v1.1 for x86} \\[80mm]
-{\Large Copyright (c) 2003, The Xen Team} \\[3mm]
+{\huge Xen v1.3 for x86} \\[80mm]
+
+{\Large Xen is Copyright (c) 2004, The Xen Team} \\[3mm]
 {\Large University of Cambridge, UK} \\[20mm]
-{\large Last updated on 28th October, 2003}
+{\large Last updated on 18th January, 2004}
 \end{tabular}
 \vfill
 \end{center}
@@ -44,19 +45,396 @@
 \setstretch{1.15}
 
 \chapter{Introduction}
+Xen allows the hardware resouces of a machine to be virtualized and
+dynamically partitioned such as to allow multiple different 'guest'
+operating system images to be run simultaneously.
+
+Virtualizing the machine in this manner provides flexibility allowing
+different users to choose their preferred operating system (Windows,
+Linux, FreeBSD, or a custom operating system). Furthermore, Xen provides
+secure partitioning between these 'domains', and enables better resource
+accounting and QoS isolation than can be achieved with a conventional
+operating system.
+
+The hypervisor runs directly on server hardware and dynamically partitions
+it between a number of {\it domains}, each of which hosts an instance
+of a {\it guest operating system}. The hypervisor provides just enough
+abstraction of the machine to allow effective isolation and resource 
+management between these domains.
+
+Xen essentially takes a virtual machine approach as pioneered by IBM VM/370.
+However, unlike VM/370 or more recent efforts such as VMWare and Virtual PC,
+Xen doesn not attempt to completely virtualize the underlying hardware. Instead
+parts of the hosted guest operating systems to work with the hypervisor; the
+operating system is effectively ported to a new target architecture, typically
+requiring changes in just the machine-dependent code. The user-level API is
+unchanged, thus existing binaries and operating system distributions can work
+unmodified.
+
+In addition to exporting virtualized instances of CPU, memory, network and
+block devicees, Xen exposes a control interface to set how these resources
+are shared between the running domains. The control interface is privileged
+and may only be accessed by one particular virtual machine: {\it domain0}.
+This domain is a required part of any Xen-base server and runs the application
+software that manages the control-plane aspects of the platform. Running the
+control software in {\it domain0}, distinct from the hypervisor itself, allows
+the Xen framework to separate the notions of {\it mechanism} and {\it policy}
+within the system.
+
 
 \chapter{CPU state}
 
+All privileged state must be handled by Xen. The guest OS has no direct access
+to CR3 and is not permitted to update privileged bits in EFLAGS.
+
 \chapter{Exceptions}
+The IDT is virtualised by submitting a virtual 'trap
+table' to Xen. Most trap handlers are identical to native x86
+handlers. The page-fault handler is a noteable exception.
 
 \chapter{Interrupts and events}
+Interrupts are virtualized by mapping them to events, which are delivered 
+asynchronously to the target domain. A guest OS can map these events onto
+its standard interrupt dispatch mechanisms, such as a simple vectoring 
+scheme. Each physical interrupt source controlled by the hypervisor, including
+network devices, disks, or the timer subsystem, is responsible for identifying
+the target for an incoming interrupt and sending an event to that domain.
+
+This demultiplexing mechanism also provides a device-specific mechanism for 
+event coalescing or hold-off. For example, a guest OS may request to only 
+actually receive an event after {\it n} packets are queued ready for delivery
+to it, {\it t} nanoseconds after the first packet arrived (which ever is true
+first). This allows latency and throughput requirements to be addressed on a
+domain-specific basis.
 
 \chapter{Time}
+Guest operating systems need to be aware of the passage of real time and their
+own ``virtual time'', i.e. the time they have been executing. Furthermore, a
+notion of time is required in the hypervisor itself for scheduling and the
+activities that relate to it. To this end the hypervisor provides for notions
+of time: cycle counter time, system time, wall clock time, domain virtual 
+time.
+
+
+\section{Cycle counter time}
+This provides the finest-grained, free-running time reference, with the approximate
+frequency being publicly accessible. The cycle counter time is used to accurately
+extrapolate the other time references. On SMP machines it is currently assumed
+that the cycle counter time is synchronised between CPUs. The current x86-based
+implementation achieves this within inter-CPU communication latencies.
+
+\section{System time}
+This is a 64-bit value containing the nanoseconds elapsed since boot time. Unlike
+cycle counter time, system time accurately reflects the passage of real time, i.e.
+it is adjusted several times a second for timer drift. This is done by running an
+NTP client in {\it domain0} on behalf of the machine, feeding updates to the 
+hypervisor. Intermediate values can be extrapolated using the cycle counter. 
+
+\section{Wall clock time}
+This is the actual ``time of day'' Unix style struct timeval (i.e. seconds and
+microseconds since 1 January 1970, adjusted by leap seconds etc.). Again, an 
+NTP client hosted by {\it domain0} can help maintain this value. To guest 
+operating systems this value will be reported instead of the hardware RTC
+clock value and they can use the system time and cycle counter times to start
+and remain perfectly in time.
+
+
+\section{Domain virtual time}
+This progresses at the same pace as cycle counter time, but only while a domain
+is executing. It stops while a domain is de-scheduled. Therefore the share of the 
+CPU that a domain receives is indicated by the rate at which its domain virtual
+time increases, relative to the rate at which cycle counter time does so.
 
 \chapter{Memory}
 
-\chapter{I/O}
+The hypervisor is responsible for providing memory to each of the domains running 
+over it. However, the Xen hypervisor's duty is restricted to managing physical
+memory and to policing page table updates. All other memory management functions
+are handly externally. Start-of-day issues such as building initial page tables
+for a domain, loading its kernel image and so on are done by the {\it domain builder}
+running in user-space with {\it domain0}. Paging to disk and swapping is handled
+by the guest operating systems themselves, if they need it.
+
+On a Xen-based system, the hypervisor itself runs in {\it ring 0}. It has full
+access to the physical memory available in the system and is responsible for 
+allocating portions of it to the domains. Guest operating systems run in and use
+{\it rings 1}, {\it 2} and {\it 3} as they see fit, aside from the fact that
+segmentation is used to prevent the guest OS from accessing a portion of the 
+linear address space that is reserved for use by the hypervisor. This approach
+allows transitions between the guest OS and hypervisor without flushing the TLB.
+We expect most guest operating systems will use ring 1 for their own operation
+and place applications (if they support such a notion) in ring 3.
+
+\section{Physical Memory Allocation}
+The hypervisor reserves a small fixed portion of physical memory at system boot
+time. This special memory region is located at the beginning of physical memory
+and is mapped at the very top of every virtual address space. 
+
+Any physical memory that is not used directly by the hypervisor is divided into
+pages and is available for allocation to domains. The hypervisor tracks which
+pages are free and which pages have been allocated to each domain. When a new
+domain is initialized, the hypervisor allocates it pages drawn from the free 
+list. The amount of memory required by the domain is passed to the hypervisor
+as one of the parameters for new domain initialization by the domain builder.
+
+Domains can never be allocated further memory beyond that which was requested
+for them on initialization. However, a domain can return pages to the hypervisor
+if it discovers that its memory requirements have diminished.
+
+% put reasons for why pages might be returned here.
+\section{Page Table Updates}
+In addition to managing physical memory allocation, the hypervisor is also in
+charge of performing page table updates on behalf of the domains. This is 
+neccessary to prevent domains from adding arbitrary mappings to their page
+tables or introducing mappings to other's page tables.
+
+
+
+
+\section{Pseudo-Physical Memory}
+The usual problem of external fragmentation means that a domain is unlikely to
+receive a contiguous stretch of physical memory. However, most guest operating
+systems do not have built-in support for operating in a fragmented physical
+address space e.g. Linux has to have a one-to-one mapping for it physical
+memory. There a notion of {\it pseudo physical memory} is introdouced. 
+Once a domain is allocated a number of pages, at its start of the day, one of
+the first things it needs to do is build its own {\it real physical} to 
+{\it pseudo physical} mapping. From that moment onwards {\it pseudo physical}
+address are used instead of discontiguous {\it real physical} addresses. Thus,
+the rest of the guest OS code has an impression of operating in a contiguous
+address space. Guest OS page tables contain real physical addresses. Mapping
+{\it pseudo physical} to {\it real physical} addresses is need on page
+table updates and also on remapping memory regions with the guest OS.
+
+
+
+\chapter{Network I/O}
+Since the hypervisor must multiplex network resources, its network subsystem
+may be viewed as a virtual network switching element with each domain having
+one or more virtual network interfaces to this network.
+
+The hypervisor acts conceptually as an IP router, forwarding each domain's
+traffic according to a set of rules.
+
+\section{Hypervisor Packet Handling}
+The hypervisor is responsible primarily for {\it data-path} operations.
+In terms of networking this means packet transmission and reception.
+
+On the transmission side, the hypervisor needs to perform two key actions:
+\begin{itemize}
+\item {\tt Validation:} A domain is only allowed to emit packets matching a certain
+specification; for example, ones in which the source IP address matches
+one assigned to the virtual interface over which it is sent. The hypervisor
+is responsible for ensuring any such requirements are met, either by checking
+or by stamping outgoing packets with prescribed values for certain fields.
+
+\item {\tt Scheduling:} Since a number of domains can share a single ``real'' network 
+interface, the hypervisor must mediate access when several domains each 
+have packets queued for transmission. Of course, this general scheduling
+function subsumes basic shaping or rate-limiting schemes.
+
+\item {\tt Logging and Accounting:} The hypervisor can be configured with classifier 
+rules that control how packets are accounted or logged. For example, 
+{\it domain0} could request that it receives a log message or copy of the
+packet whenever another domain attempts to send a TCP packet containg a 
+SYN.
+\end{itemize}
+On the recive side, the hypervisor's role is relatively straightforward:
+once a packet is received, it just needs to determine the virtual interface(s)
+to which it must be delivered and deliver it via page-flipping. 
+
+
+\section{Data Transfer}
+
+Each virtual interface uses two ``descriptor rings'', one for transmit,
+the other for receive. Each descriptor identifies a block of contiguous
+physical memory allocated to the domain. There are four cases:
+
+\begin{itemize}
+
+\item The transmit ring carries packets to transmit from the domain to the
+hypervisor.
+
+\item The return path of the transmit ring carries ``empty'' descriptors
+indicating that the contents have been transmitted and the memory can be
+re-used.
+
+\item The receive ring carries empty descriptors from the domain to the 
+hypervisor; these provide storage space for that domain's received packets.
+
+\item The return path of the receive ring carries packets that have been
+received.
+\end{itemize}
+
+Real physical addresses are used throughout, with the domain performing 
+translation from pseudo-physical addresses if that is necessary.
+
+If a domain does not keep its receive ring stocked with empty buffers then 
+packets destined to it may be dropped. This provides some defense against 
+receiver-livelock problems because an overload domain will cease to receive
+further data. Similarly, on the transmit path, it provides the application
+with feedback on the rate at which packets are able to leave the system.
+
+Synchronization between the hypervisor and the domain is achieved using 
+counters held in shared memory that is accessible to both. Each ring has
+associated producer and consumer indices indicating the area in the ring
+that holds descriptors that contain data. After receiving {\it n} packets
+or {\t nanoseconds} after receiving the first packet, the hypervisor sends
+an event to the domain. 
+
+\chapter{Block I/O}
+
+\section{Virtual Block Devices (VBDs)}
+
+All guest OS disk access goes through the VBD interface. The VBD interface
+provides the administrator with the ability to selectively grant domains 
+access to portions of block storage devices visible to the system.
+
+A VBD can also be comprised of a set of extents from multiple storage devices.
+This provides the same functionality as a concatenated disk driver.
+
+\section{Virtual Disks (VDs)}
+
+VDs are an abstraction built on top of the VBD interface. One can reserve disk
+space for use by the VD layer. This space is then managed as a pool of free extents.
+The VD tools can automatically allocate collections of extents from this pool to
+create ``virtual disks'' on demand. 
+
+\subsection{Virtual Disk Management}
+The VD management code consists of a set of python libraries. It can therefore
+be accessed by custom scripts as well as the convenience scripts provided. The
+VD database is a SQLite database in /var/db/xen\_vdisk.sqlite.
+
+The VD scripts and general VD usage are documented in the VBD-HOWTO.txt.
+
+\subsection{Data Transfer}
+Domains which have been granted access to a logical block device are permitted
+to read and write it directly through the hypervisor, rather than requiring
+{\it domain0} to mediate every data access. 
+
+In overview, the same style of descriptor-ring that is used for network
+packets is used here. Each domain has one ring that carries operation requests to the 
+hypervisor and carries the results back again. 
+
+Rather than copying data in and out of the hypervisor, we use page pinning to
+enable DMA transfers directly between the physical device and the domain's 
+buffers. Disk read operations are straightforward; the hypervisor just needs
+to know which pages have pending DMA transfers, and prevent the guest OS from
+giving the page back to the hypervisor, or to use them for storing page tables.
+
+%block API here 
 
 \chapter{Privileged operations}
+{\it Domain0} is responsible for building all other domains on the server
+and providing control interfaces for managing scheduling, networking, and
+blocks.
+
+
+\chapter{Hypervisor calls}
+
+\section{ set\_trap\_table(trap\_info\_t *table)} 
+
+Install trap handler table.
+
+\section{ mmu\_update(mmu\_update\_t *req, int count)} 
+Update the page table for the domain. Updates can be batched.
+The update types are: 
+
+{\it MMU\_NORMAL\_PT\_UPDATE}:
+
+{\it MMU\_UNCHECKED\_PT\_UPDATE}:
+
+{\it MMU\_MACHPHYS\_UPDATE}:
+
+{\it MMU\_EXTENDED\_COMMAND}:
+
+\section{ console\_write(const char *str, int count)}
+Output buffer str to the console.
+
+\section{ set\_gdt(unsigned long *frame\_list, int entries)} 
+Set the global descriptor table - virtualization for lgdt.
+
+\section{ stack\_switch(unsigned long ss, unsigned long esp)} 
+Request context switch from hypervisor.
+
+\section{ set\_callbacks(unsigned long event\_selector, unsigned long event\_address,
+                        unsigned long failsafe\_selector, unsigned long failsafe\_address) } 
+ Register OS event processing routine. In Linux both the event\_selector and 
+failsafe\_selector are the kernel's CS. The value event\_address specifies the address for
+an interrupt handler dispatch routine and failsafe\_address specifies a handler for 
+application faults.
+
+\section{ net\_io\_op(netop\_t *op)}  
+Notify hypervisor of updates to transmit and/or receive descriptor rings.
+
+\section{ fpu\_taskswitch(void)} 
+Notify hypervisor that fpu registers needed to be save on context switch.
+
+\section{ sched\_op(unsigned long op)} 
+Request scheduling operation from hypervisor. The options are: yield, stop, and exit.
+
+\section{ dom0\_op(dom0\_op\_t *op)} 
+Administrative domain operations for domain management. The options are:
+
+{\it DOM0\_CREATEDOMAIN}: create new domain, specifying the name and memory usage
+in kilobytes.
+
+{\it DOM0\_STARTDOMAIN}: make domain schedulable
+
+{\it DOM0\_STOPDOMAIN}: mark domain as unschedulable
+
+{\it DOM0\_DESTROYDOMAIN}: deallocate resources associated with the domain
+
+{\it DOM0\_GETMEMLIST}: get list of pages used by the domain
+
+{\it DOM0\_BUILDDOMAIN}: do final guest OS setup for domain
+
+{\it DOM0\_BVTCTL}: adjust scheduler context switch time
+
+{\it DOM0\_ADJUSTDOM}: adjust scheduling priorities for domain
+
+{\it DOM0\_GETDOMAINFO}: get statistics about the domain
+
+{\it DOM0\_IOPL}:
+
+{\it DOM0\_MSR}:
+
+{\it DOM0\_DEBUG}:
+
+{\it DOM0\_SETTIME}: set system time
+
+{\it DOMO\_READCONSOLE}: read console content from hypervisor buffer ring
+
+{\it DOMO\_PINCPUDOMAIN}: pin domain to a particular CPU
+
+
+\section{network\_op(network\_op\_t *op)} 
+update network ruleset
+
+\section{ block\_io\_op(block\_io\_op\_t *op)}
+
+\section{ set\_debugreg(int reg, unsigned long value)}
+set debug register reg to value
+
+\section{ get\_debugreg(int reg)}
+ get the debug register reg
+
+\section{ update\_descriptor(unsigned long pa, unsigned long word1, unsigned long word2)} 
+
+\section{ set\_fast\_trap(int idx)}
+ install traps to allow guest OS to bypass hypervisor
+
+\section{ dom\_mem\_op(dom\_mem\_op\_t *op)}
+ increase or decrease memory reservations for guest OS
+
+\section{ multicall(multicall\_entry\_t *call\_list, int nr\_calls)}
+ execute a series of hypervisor calls
+
+\section{ kbd\_op(unsigned char op, unsigned char val)}
+
+\section{update\_va\_mapping(unsigned long page\_nr, unsigned long val, unsigned long flags)}
+
+\section{ event\_channel\_op(unsigned int cmd, unsigned int id)} 
+inter-domain event-channel management, options are: open, close, send, and status.
 
 \end{document}
