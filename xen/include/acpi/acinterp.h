@@ -330,7 +330,7 @@ acpi_ex_release_mutex (
 
 void
 acpi_ex_release_all_mutexes (
-	struct acpi_thread_state        *thread);
+	struct acpi_thread_state        *acpi_thread);
 
 void
 acpi_ex_unlink_mutex (
@@ -339,7 +339,7 @@ acpi_ex_unlink_mutex (
 void
 acpi_ex_link_mutex (
 	union acpi_operand_object       *obj_desc,
-	struct acpi_thread_state        *thread);
+	struct acpi_thread_state        *acpi_thread);
 
 /*
  * exprep - ACPI AML (p-code) execution - prep utilities

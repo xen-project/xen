@@ -77,9 +77,9 @@ include/xen/compile.h: include/xen/compile.h.in include/xen/banner.h
 	@mv -f $@.new $@
 
 tools/figlet/figlet: tools/figlet/figlet.o
-	$(CC) -o $@ $<
+	$(HOSTCC) -o $@ $<
 tools/figlet/figlet.o: tools/figlet/figlet.c
-	$(CC) -o $@ -c $<
+	$(HOSTCC) -o $@ -c $<
 
 include/xen/banner.h: tools/figlet/figlet tools/figlet/xen.flf
 	tools/figlet/figlet -d tools/figlet Xen $(XEN_VERSION).$(XEN_SUBVERSION)$(XEN_EXTRAVERSION) > $@.new

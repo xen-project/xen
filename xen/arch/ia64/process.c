@@ -21,7 +21,7 @@
 #include <asm/io.h>
 #include <asm/processor.h>
 #include <asm/desc.h>
-#include <asm/ldt.h>
+//#include <asm/ldt.h>
 #include <xen/irq.h>
 #include <xen/event.h>
 #include <asm/regionreg.h>
@@ -31,6 +31,7 @@
 #include <asm/hpsim_ssc.h>
 #include <asm/dom_fw.h>
 
+extern unsigned long vcpu_get_itir_on_fault(struct exec_domain *, UINT64);
 extern struct ia64_sal_retval pal_emulator_static(UINT64);
 extern struct ia64_sal_retval sal_emulator(UINT64,UINT64,UINT64,UINT64,UINT64,UINT64,UINT64,UINT64);
 
@@ -49,7 +50,7 @@ extern unsigned long dom0_start, dom0_size;
 			IA64_PSR_ID | IA64_PSR_DA | IA64_PSR_DD | \
 			IA64_PSR_SS | IA64_PSR_RI | IA64_PSR_ED | IA64_PSR_IA)
 
-#define PSCB(x)	x->shared_info->arch
+#define PSCB(x,y)	x->vcpu_info->arch.y
 
 extern unsigned long vcpu_verbose;
 
@@ -59,17 +60,17 @@ long do_iopl(domid_t domain, unsigned int new_io_pl)
 	return 0;
 }
 
-void schedule_tail(struct domain *next)
+void schedule_tail(struct exec_domain *next)
 {
 	unsigned long rr7;
-	printk("current=%lx,shared_info=%lx\n",current,current->shared_info);
-	printk("next=%lx,shared_info=%lx\n",next,next->shared_info);
+	printk("current=%lx,shared_info=%lx\n",current,current->vcpu_info);
+	printk("next=%lx,shared_info=%lx\n",next,next->vcpu_info);
 	if (rr7 = load_region_regs(current)) {
 		printk("schedule_tail: change to rr7 not yet implemented\n");
 	}
 }
 
-extern TR_ENTRY *match_tr(struct domain *d, unsigned long ifa);
+extern TR_ENTRY *match_tr(struct exec_domain *ed, unsigned long ifa);
 
 void tdpfoo(void) { }
 
@@ -80,7 +81,7 @@ void tdpfoo(void) { }
 unsigned long translate_domain_pte(unsigned long pteval,
 	unsigned long address, unsigned long itir)
 {
-	struct domain *d = (struct domain *) current;
+	struct domain *d = current->domain;
 	unsigned long mask, pteval2, mpaddr;
 	unsigned long lookup_domain_mpa(struct domain *,unsigned long);
 	extern struct domain *dom0;
@@ -113,22 +114,22 @@ unsigned long translate_domain_mpaddr(unsigned long mpaddr)
 	extern unsigned long lookup_domain_mpa(struct domain *,unsigned long);
 	unsigned long pteval;
 
-	if (current == dom0) {
+	if (current->domain == dom0) {
 		if (mpaddr < dom0_start || mpaddr >= dom0_start + dom0_size) {
 			printk("translate_domain_mpaddr: out-of-bounds dom0 mpaddr %p! continuing...\n",mpaddr);
 			tdpfoo();
 		}
 	}
-	pteval = lookup_domain_mpa(current,mpaddr);
+	pteval = lookup_domain_mpa(current->domain,mpaddr);
 	return ((pteval & _PAGE_PPN_MASK) | (mpaddr & ~PAGE_MASK));
 }
 
 void reflect_interruption(unsigned long ifa, unsigned long isr, unsigned long itiriim, struct pt_regs *regs, unsigned long vector)
 {
-	unsigned long vcpu_get_ipsr_int_state(struct domain *,unsigned long);
-	unsigned long vcpu_get_rr_ve(struct domain *,unsigned long);
-	unsigned long vcpu_get_itir_on_fault(struct domain *,unsigned long);
-	struct domain *d = (struct domain *) current;
+	unsigned long vcpu_get_ipsr_int_state(struct exec_domain *,unsigned long);
+	unsigned long vcpu_get_rr_ve(struct exec_domain *,unsigned long);
+	struct domain *d = current->domain;
+	struct exec_domain *ed = current;
 
 	if (vector == IA64_EXTINT_VECTOR) {
 		
@@ -140,8 +141,8 @@ void reflect_interruption(unsigned long ifa, unsigned long isr, unsigned long it
 			first_extint = 0;
 		}
 	}
-	if (!PSCB(d).interrupt_collection_enabled) {
-		if (!(PSCB(d).ipsr & IA64_PSR_DT)) {
+	if (!PSCB(ed,interrupt_collection_enabled)) {
+		if (!(PSCB(ed,ipsr) & IA64_PSR_DT)) {
 			printf("psr.dt off, trying to deliver nested dtlb!\n");
 			while(1);
 		}
@@ -149,49 +150,49 @@ void reflect_interruption(unsigned long ifa, unsigned long isr, unsigned long it
 		if (vector != IA64_DATA_TLB_VECTOR &&
 		    vector != IA64_DATA_TLB_VECTOR) {
 printf("psr.ic off, delivering fault=%lx,iip=%p,isr=%p,PSCB.iip=%p\n",
-	vector,regs->cr_iip,isr,PSCB(d).iip);
+	vector,regs->cr_iip,isr,PSCB(ed,iip));
 			while(1);
 			
 		}
 //printf("Delivering NESTED DATA TLB fault\n");
 		vector = IA64_DATA_NESTED_TLB_VECTOR;
-		regs->cr_iip = ((unsigned long) PSCB(d).iva + vector) & ~0xffUL;
+		regs->cr_iip = ((unsigned long) PSCB(ed,iva) + vector) & ~0xffUL;
 		regs->cr_ipsr = (regs->cr_ipsr & ~DELIVER_PSR_CLR) | DELIVER_PSR_SET;
 // NOTE: nested trap must NOT pass PSCB address
-		//regs->r31 = (unsigned long) &PSCB(d);
+		//regs->r31 = (unsigned long) &PSCB(ed);
 		return;
 
 	}
-	if ((vector & 0xf) != IA64_FORCED_IFA) PSCB(d).ifa = ifa;
-	else ifa = PSCB(d).ifa;
+	if ((vector & 0xf) != IA64_FORCED_IFA) PSCB(ed,ifa) = ifa;
+	else ifa = PSCB(ed,ifa);
 	vector &= ~0xf;
 //	always deliver on ALT vector (for now?) because no VHPT
-//	if (!vcpu_get_rr_ve(d,ifa)) {
+//	if (!vcpu_get_rr_ve(ed,ifa)) {
 		if (vector == IA64_DATA_TLB_VECTOR)
 			vector = IA64_ALT_DATA_TLB_VECTOR;
 		else if (vector == IA64_INST_TLB_VECTOR)
 			vector = IA64_ALT_INST_TLB_VECTOR;
 //	}
-	PSCB(d).unat = regs->ar_unat;  // not sure if this is really needed?
-	PSCB(d).precover_ifs = regs->cr_ifs;
-	vcpu_bsw0(d);
-	PSCB(d).ipsr = vcpu_get_ipsr_int_state(d,regs->cr_ipsr);
+	PSCB(ed,unat) = regs->ar_unat;  // not sure if this is really needed?
+	PSCB(ed,precover_ifs) = regs->cr_ifs;
+	vcpu_bsw0(ed);
+	PSCB(ed,ipsr) = vcpu_get_ipsr_int_state(ed,regs->cr_ipsr);
 	if (vector == IA64_BREAK_VECTOR || vector == IA64_SPECULATION_VECTOR)
-		PSCB(d).iim = itiriim;
-	else PSCB(d).itir = vcpu_get_itir_on_fault(d,ifa);
-	PSCB(d).isr = isr; // this is unnecessary except for interrupts!
-	PSCB(d).iip = regs->cr_iip;
-	PSCB(d).ifs = 0;
-	PSCB(d).incomplete_regframe = 0;
+		PSCB(ed,iim) = itiriim;
+	else PSCB(ed,itir) = vcpu_get_itir_on_fault(ed,ifa);
+	PSCB(ed,isr) = isr; // this is unnecessary except for interrupts!
+	PSCB(ed,iip) = regs->cr_iip;
+	PSCB(ed,ifs) = 0;
+	PSCB(ed,incomplete_regframe) = 0;
 
-	regs->cr_iip = ((unsigned long) PSCB(d).iva + vector) & ~0xffUL;
+	regs->cr_iip = ((unsigned long) PSCB(ed,iva) + vector) & ~0xffUL;
 	regs->cr_ipsr = (regs->cr_ipsr & ~DELIVER_PSR_CLR) | DELIVER_PSR_SET;
 // FIXME: NEED TO PASS PSCB, BUT **NOT** IN R31 WHICH IS BEING USED FOR ar.pr
 // IN ANY CASE, PASS PINNED ADDRESS, NOT THIS ONE
-	//regs->r31 = (unsigned long) &PSCB(d);
+	//regs->r31 = (unsigned long) &PSCB(ed);
 
-	PSCB(d).interrupt_delivery_enabled = 0;
-	PSCB(d).interrupt_collection_enabled = 0;
+	PSCB(ed,interrupt_delivery_enabled) = 0;
+	PSCB(ed,interrupt_collection_enabled) = 0;
 }
 
 void foodpi(void) {}
@@ -201,11 +202,12 @@ void foodpi(void) {}
 // NEVER successful if already reflecting a trap/fault because psr.i==0
 void deliver_pending_interrupt(struct pt_regs *regs)
 {
-	struct domain *d = (struct domain *) current;
+	struct domain *d = current->domain;
+	struct exec_domain *ed = current;
 	// FIXME: Will this work properly if doing an RFI???
 	if (!is_idle_task(d) && user_mode(regs)) {
-		vcpu_poke_timer(d);
-		if (vcpu_deliverable_interrupts(d)) {
+		vcpu_poke_timer(ed);
+		if (vcpu_deliverable_interrupts(ed)) {
 			unsigned long isr = regs->cr_ipsr & IA64_PSR_RI;
 			foodpi();
 			reflect_interruption(0,isr,0,regs,IA64_EXTINT_VECTOR);
@@ -213,13 +215,13 @@ void deliver_pending_interrupt(struct pt_regs *regs)
 	}
 }
 
-int handle_lazy_cover(struct domain *d, unsigned long isr, struct pt_regs *regs)
+int handle_lazy_cover(struct exec_domain *ed, unsigned long isr, struct pt_regs *regs)
 {
-	if (!PSCB(d).interrupt_collection_enabled) {
+	if (!PSCB(ed,interrupt_collection_enabled)) {
 		if (isr & IA64_ISR_IR) {
 //			printf("Handling lazy cover\n");
-			PSCB(d).ifs = regs->cr_ifs;
-			PSCB(d).incomplete_regframe = 1;
+			PSCB(ed,ifs) = regs->cr_ifs;
+			PSCB(ed,incomplete_regframe) = 1;
 			regs->cr_ifs = 0;
 			return(1); // retry same instruction with cr.ifs off
 		}
@@ -231,7 +233,8 @@ int handle_lazy_cover(struct domain *d, unsigned long isr, struct pt_regs *regs)
 
 void xen_handle_domain_access(unsigned long address, unsigned long isr, struct pt_regs *regs, unsigned long itir)
 {
-	struct domain *d = (struct domain *) current;
+	struct domain *d = (struct domain *) current->domain;
+	struct domain *ed = (struct exec_domain *) current;
 	TR_ENTRY *trp;
 	unsigned long psr = regs->cr_ipsr, mask, flags;
 	unsigned long iip = regs->cr_iip;
@@ -248,7 +251,7 @@ void xen_handle_domain_access(unsigned long address, unsigned long isr, struct p
 
 		// got here trying to read a privop bundle
 	     	//if (d->metaphysical_mode) {
-     	if (d->metaphysical_mode && !(address>>61)) {  //FIXME
+     	if (PSCB(current,metaphysical_mode) && !(address>>61)) {  //FIXME
 		if (d == dom0) {
 			if (address < dom0_start || address >= dom0_start + dom0_size) {
 				printk("xen_handle_domain_access: out-of-bounds"
@@ -259,7 +262,7 @@ void xen_handle_domain_access(unsigned long address, unsigned long isr, struct p
 		pteval = lookup_domain_mpa(d,address);
 		//FIXME: check return value?
 		// would be nice to have a counter here
-		vcpu_itc_no_srlz(d,2,address,pteval,PAGE_SHIFT);
+		vcpu_itc_no_srlz(ed,2,address,pteval,PAGE_SHIFT);
 		return;
 	}
 if (address < 0x4000) printf("WARNING: page_fault @%p, iip=%p\n",address,iip);
@@ -269,7 +272,7 @@ if (address < 0x4000) printf("WARNING: page_fault @%p, iip=%p\n",address,iip);
 		while(1);
 	}
 		
-	fault = vcpu_tpa(d,address,&mpaddr);
+	fault = vcpu_tpa(ed,address,&mpaddr);
 	if (fault != IA64_NO_FAULT) {
 		// this is hardcoded to handle __get_domain_bundle only
 		regs->r8 = 0; regs->r9 = 0;
@@ -287,12 +290,12 @@ if (address < 0x4000) printf("WARNING: page_fault @%p, iip=%p\n",address,iip);
 	// would be nice to have a counter here
 	//printf("Handling privop data TLB miss\n");
 	// FIXME, must be inlined or potential for nested fault here!
-	vcpu_itc_no_srlz(d,2,address,pteval,PAGE_SHIFT);
+	vcpu_itc_no_srlz(ed,2,address,pteval,PAGE_SHIFT);
 }
 
 void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_regs *regs, unsigned long itir)
 {
-	struct domain *d = (struct domain *) current;
+	struct domain *d = (struct domain *) current->domain;
 	TR_ENTRY *trp;
 	unsigned long psr = regs->cr_ipsr, mask, flags;
 	unsigned long iip = regs->cr_iip;
@@ -317,30 +320,30 @@ void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_reg
 	// FIXME: no need to pass itir in to this routine as we need to
 	// compute the virtual itir anyway (based on domain's RR.ps)
 	// AND ACTUALLY reflect_interruption doesn't use it anyway!
-	itir = vcpu_get_itir_on_fault(d,address);
+	itir = vcpu_get_itir_on_fault(current,address);
 
-	if (d->metaphysical_mode && (is_data || !(address>>61))) {  //FIXME
+	if (PSCB(current,metaphysical_mode) && (is_data || !(address>>61))) {  //FIXME
 		// FIXME should validate mpaddr here
 		if (d == dom0) {
 			if (address < dom0_start || address >= dom0_start + dom0_size) {
 				printk("ia64_do_page_fault: out-of-bounds dom0 mpaddr %p, iip=%p! continuing...\n",address,iip);
-				printk("ia64_do_page_fault: out-of-bounds dom0 mpaddr %p, old iip=%p!\n",address,d->shared_info->arch.iip);
+				printk("ia64_do_page_fault: out-of-bounds dom0 mpaddr %p, old iip=%p!\n",address,current->vcpu_info->arch.iip);
 				tdpfoo();
 			}
 		}
 		pteval = lookup_domain_mpa(d,address);
 		// FIXME, must be inlined or potential for nested fault here!
-		vcpu_itc_no_srlz(d,is_data?2:1,address,pteval,PAGE_SHIFT);
+		vcpu_itc_no_srlz(current,is_data?2:1,address,pteval,PAGE_SHIFT);
 		return;
 	}
-	if (trp = match_tr(d,address)) {
+	if (trp = match_tr(current,address)) {
 		// FIXME address had better be pre-validated on insert
 		pteval = translate_domain_pte(trp->page_flags,address,trp->itir);
-		vcpu_itc_no_srlz(d,is_data?2:1,address,pteval,(trp->itir>>2)&0x3f);
+		vcpu_itc_no_srlz(current,is_data?2:1,address,pteval,(trp->itir>>2)&0x3f);
 		return;
 	}
 	vector = is_data ? IA64_DATA_TLB_VECTOR : IA64_INST_TLB_VECTOR;
-	if (handle_lazy_cover(d, isr, regs)) return;
+	if (handle_lazy_cover(current, isr, regs)) return;
 if (!(address>>61)) { printf("ia64_do_page_fault: @%p???, iip=%p, itc=%p (spinning...)\n",address,iip,ia64_get_itc()); while(1); }
 	if ((isr & IA64_ISR_SP)
 	    || ((isr & IA64_ISR_NA) && (isr & IA64_ISR_CODE_MASK) == IA64_ISR_CODE_LFETCH))
@@ -683,7 +686,8 @@ void
 ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long isr, unsigned long iim)
 {
 	static int first_time = 1;
-	struct domain *d = (struct domain *) current;
+	struct domain *d = (struct domain *) current->domain;
+	struct exec_domain *ed = (struct domain *) current;
 	extern unsigned long running_on_sim;
 
 	if (first_time) {
@@ -706,16 +710,16 @@ ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long isr, u
 			regs->r10 = x.v1; regs->r11 = x.v2;
 			break;
 		    case FW_HYPERCALL_SAL_CALL:
-			x = sal_emulator(vcpu_get_gr(d,32),vcpu_get_gr(d,33),
-				vcpu_get_gr(d,34),vcpu_get_gr(d,35),
-				vcpu_get_gr(d,36),vcpu_get_gr(d,37),
-				vcpu_get_gr(d,38),vcpu_get_gr(d,39));
+			x = sal_emulator(vcpu_get_gr(ed,32),vcpu_get_gr(ed,33),
+				vcpu_get_gr(ed,34),vcpu_get_gr(ed,35),
+				vcpu_get_gr(ed,36),vcpu_get_gr(ed,37),
+				vcpu_get_gr(ed,38),vcpu_get_gr(ed,39));
 			regs->r8 = x.status; regs->r9 = x.v0;
 			regs->r10 = x.v1; regs->r11 = x.v2;
 			break;
 		    case FW_HYPERCALL_EFI_RESET_SYSTEM:
 			printf("efi.reset_system called ");
-			if (current == dom0) {
+			if (current->domain == dom0) {
 				printf("(by dom0)\n ");
 				(*efi.reset_system)(EFI_RESET_WARM,0,0,NULL);
 			}
@@ -726,8 +730,8 @@ ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long isr, u
 			{
 			unsigned long *tv, *tc;
 			fooefi();
-			tv = vcpu_get_gr(d,32);
-			tc = vcpu_get_gr(d,33);
+			tv = vcpu_get_gr(ed,32);
+			tc = vcpu_get_gr(ed,33);
 			//printf("efi_get_time(%p,%p) called...",tv,tc);
 			tv = __va(translate_domain_mpaddr(tv));
 			if (tc) tc = __va(translate_domain_mpaddr(tc));
@@ -761,12 +765,13 @@ void
 ia64_handle_privop (unsigned long ifa, struct pt_regs *regs, unsigned long isr, unsigned long itir)
 {
 	IA64FAULT vector;
-	struct domain *d = (struct domain *) current;
+	struct domain *d = current->domain;
+	struct exec_domain *ed = current;
 	// FIXME: no need to pass itir in to this routine as we need to
 	// compute the virtual itir anyway (based on domain's RR.ps)
 	// AND ACTUALLY reflect_interruption doesn't use it anyway!
-	itir = vcpu_get_itir_on_fault(d,ifa);
-	vector = priv_emulate((struct domain *)current,regs,isr);
+	itir = vcpu_get_itir_on_fault(ed,ifa);
+	vector = priv_emulate(current,regs,isr);
 	if (vector == IA64_RETRY) {
 		reflect_interruption(ifa,isr,itir,regs,
 			IA64_ALT_DATA_TLB_VECTOR | IA64_FORCED_IFA);
@@ -782,11 +787,11 @@ UINT64 int_counts[INTR_TYPE_MAX];
 void
 ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long isr, unsigned long iim, unsigned long vector)
 {
-	extern unsigned long vcpu_get_itir_on_fault(struct domain *vcpu, UINT64 ifa);
-	struct domain *d = (struct domain *) current;
+	struct domain *d = (struct domain *) current->domain;
+	struct exec_domain *ed = (struct domain *) current;
 	unsigned long check_lazy_cover = 0;
 	unsigned long psr = regs->cr_ipsr;
-	unsigned long itir = vcpu_get_itir_on_fault(d,ifa);
+	unsigned long itir = vcpu_get_itir_on_fault(ed,ifa);
 
 	if (!(psr & IA64_PSR_CPL)) {
 		printf("ia64_handle_reflection: reflecting with priv=0!!\n");
@@ -795,7 +800,7 @@ ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long i
 	// FIXME: no need to pass itir in to this routine as we need to
 	// compute the virtual itir anyway (based on domain's RR.ps)
 	// AND ACTUALLY reflect_interruption doesn't use it anyway!
-	itir = vcpu_get_itir_on_fault(d,ifa);
+	itir = vcpu_get_itir_on_fault(ed,ifa);
 	switch(vector) {
 	    case 8:
 		vector = IA64_DIRTY_BIT_VECTOR; break;
@@ -813,7 +818,7 @@ ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long i
 		vector = IA64_DISABLED_FPREG_VECTOR; break;
 	    case 26:
 printf("*** NaT fault... attempting to handle as privop\n");
-		vector = priv_emulate(d,regs,isr);
+		vector = priv_emulate(ed,regs,isr);
 		if (vector == IA64_NO_FAULT) {
 printf("*** Handled privop masquerading as NaT fault\n");
 			return;
@@ -831,6 +836,6 @@ printf("*** Handled privop masquerading as NaT fault\n");
 		while(vector);
 		return;
 	}
-	if (check_lazy_cover && handle_lazy_cover(d, isr, regs)) return;
+	if (check_lazy_cover && handle_lazy_cover(ed, isr, regs)) return;
 	reflect_interruption(ifa,isr,itir,regs,vector);
 }

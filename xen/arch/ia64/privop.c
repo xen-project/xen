@@ -7,7 +7,6 @@
  */
 
 #include <asm/privop.h>
-#include <asm/privify.h>
 #include <asm/vcpu.h>
 #include <asm/processor.h>
 #include <asm/delay.h>	// Debug only
@@ -20,7 +19,7 @@ Hypercall bundle creation
 **************************************************************************/
 
 
-void build_hypercall_bundle(UINT64 *imva, UINT64 breakimm, UINT64 hypnum, UINT64 ret)
+void build_hypercall_bundle(UINT64 *imva, UINT64 brkimm, UINT64 hypnum, UINT64 ret)
 {
 	INST64_A5 slot0;
 	INST64_I19 slot1;
@@ -32,10 +31,10 @@ void build_hypercall_bundle(UINT64 *imva, UINT64 breakimm, UINT64 hypnum, UINT64
 	slot0.qp = 0; slot0.r1 = 2; slot0.r3 = 0; slot0.major = 0x9;
 	slot0.imm7b = hypnum; slot0.imm9d = hypnum >> 7;
 	slot0.imm5c = hypnum >> 16; slot0.s = 0;
-	// slot1: break breakimm
+	// slot1: break brkimm
 	slot1.inst = 0;
 	slot1.qp = 0; slot1.x6 = 0; slot1.x3 = 0; slot1.major = 0x0;
-	slot1.imm20 = breakimm; slot1.i = breakimm >> 20;
+	slot1.imm20 = brkimm; slot1.i = brkimm >> 20;
 	// if ret slot2: br.ret.sptk.many rp
 	// else slot2: br.cond.sptk.many rp
 	slot2.inst = 0; slot2.qp = 0; slot2.p = 1; slot2.b2 = 0;

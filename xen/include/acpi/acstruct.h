@@ -112,7 +112,7 @@ struct acpi_walk_state
 	union acpi_parse_object             *next_op;                           /* next op to be processed */
 	acpi_parse_downwards                descending_callback;
 	acpi_parse_upwards                  ascending_callback;
-	struct acpi_thread_state            *thread;
+	struct acpi_thread_state            *acpi_thread;
 	struct acpi_walk_state              *next;                              /* Next walk_state in list */
 };
 
