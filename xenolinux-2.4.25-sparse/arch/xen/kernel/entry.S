@@ -15,7 +15,7 @@
  * I changed all the .align's to 4 (16 byte alignment), as that's faster
  * on a 486.
  *
- * Stack layout in 'ret_from_system_call':
+ * Stack layout in 'ret_to_user':
  * 	ptrace needs to have all regs on the stack.
  *	if the order here is changed, it needs to be
  *	updated in fork.c:copy_process, signal.c:do_signal,
@@ -157,7 +157,7 @@ ENTRY(lcall7)
 	call *%edx
 	addl $4, %esp
 	popl %eax
-	jmp ret_from_sys_call
+	jmp ret_to_user
 
 ENTRY(lcall27)
 	pushfl			# We get a different stack layout with call
@@ -181,7 +181,7 @@ ENTRY(lcall27)
 	call *%edx
 	addl $4, %esp
 	popl %eax
-	jmp ret_from_sys_call
+	jmp ret_to_user
 
 ENTRY(ret_from_fork)
 	pushl %ebx
@@ -190,7 +190,7 @@ ENTRY(ret_from_fork)
 	GET_CURRENT(%ebx)
 	testb $0x02,tsk_ptrace(%ebx)	# PT_TRACESYS
 	jne tracesys_exit
-	jmp	ret_from_sys_call
+	jmp ret_to_user
 
 /*
  * Return to user mode is not as complex as all this looks,
@@ -208,15 +208,15 @@ ENTRY(system_call)
 	jae badsys
 	call *SYMBOL_NAME(sys_call_table)(,%eax,4)
 	movl %eax,EAX(%esp)		# save the return value
-ENTRY(ret_from_sys_call)
+ret_to_user:
         movl SYMBOL_NAME(HYPERVISOR_shared_info),%esi
         movb $1,evtchn_upcall_mask(%esi) # make tests atomic
-ret_syscall_tests:
+ret_to_user_nocli:
 	cmpl $0,need_resched(%ebx)
-	jne reschedule
+	jne  reschedule
 	cmpl $0,sigpending(%ebx)
 	je   safesti                    # ensure need_resched updates are seen
-signal_return:
+/*signal_return:*/
 	movb $0,evtchn_upcall_mask(%esi) # reenable event callbacks
 	movl %esp,%eax
 	xorl %edx,%edx
@@ -238,10 +238,10 @@ tracesys:
 	movl %eax,EAX(%esp)		# save the return value
 tracesys_exit:
 	call SYMBOL_NAME(syscall_trace)
-	jmp ret_from_sys_call
+	jmp ret_to_user
 badsys:
 	movl $-ENOSYS,EAX(%esp)
-	jmp ret_from_sys_call
+	jmp ret_to_user
 
 	ALIGN
 ENTRY(ret_from_intr)
@@ -249,14 +249,14 @@ ENTRY(ret_from_intr)
 ret_from_exception:
 	movb CS(%esp),%al
 	testl $2,%eax
-	jne ret_from_sys_call
+	jne ret_to_user
 	jmp restore_all
 
 	ALIGN
 reschedule:
         movb $0,evtchn_upcall_mask(%esi)  # reenable event callbacks
 	call SYMBOL_NAME(schedule)        # test
-	jmp  ret_from_sys_call
+	jmp  ret_to_user
 
 ENTRY(divide_error)
 	pushl $0		# no error code
@@ -316,7 +316,7 @@ ENTRY(hypervisor_callback)
         movl SYMBOL_NAME(HYPERVISOR_shared_info),%esi
         movb CS(%esp),%cl
 	test $2,%cl          # slow return to ring 2 or 3
-	jne  ret_syscall_tests
+	jne  ret_to_user_nocli
 safesti:movb $0,evtchn_upcall_mask(%esi) # reenable event callbacks
 scrit:  /**** START OF CRITICAL REGION ****/
         testb $0xFF,evtchn_upcall_pending(%esi)

@@ -351,9 +351,13 @@ do {                                                                          \
 
 #define __save_and_sti(x)                                                     \
 do {                                                                          \
+    shared_info_t *_shared = HYPERVISOR_shared_info;                          \
     barrier();                                                                \
-    (x) = HYPERVISOR_shared_info->vcpu_data[0].evtchn_upcall_mask;            \
-    HYPERVISOR_shared_info->vcpu_data[0].evtchn_upcall_mask = 0;              \
+    (x) = _shared->vcpu_data[0].evtchn_upcall_mask;                           \
+    _shared->vcpu_data[0].evtchn_upcall_mask = 0;                             \
+    barrier(); /* unmask then check (avoid races) */                          \
+    if ( unlikely(_shared->vcpu_data[0].evtchn_upcall_pending) )              \
+        evtchn_do_upcall(NULL);                                               \
 } while (0)
 
 #define local_irq_save(x)       __save_and_cli(x)

@@ -492,8 +492,7 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
     write_lock(&xtime_lock);
-    while ( !TIME_VALUES_UP_TO_DATE )
-        do_timer_interrupt(irq, NULL, regs);
+    do_timer_interrupt(irq, NULL, regs);
     write_unlock(&xtime_lock);
 }
 

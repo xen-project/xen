@@ -558,8 +558,6 @@ static void t_timer_fn(unsigned long unused)
 
     TRACE_0D(TRC_SCHED_T_TIMER_FN);
 
-    TRACE_0D(TRC_SCHED_T_TIMER_FN);
-
     if ( !is_idle_task(p) )
         send_guest_virq(p, VIRQ_TIMER);
 

@@ -56,7 +56,7 @@ static inline void evtchn_set_pending(struct task_struct *p, int port)
          !test_and_set_bit(port>>5, &s->evtchn_pending_sel) )
     {
         /* The VCPU pending flag must be set /after/ update to evtchn-pend. */
-        p->shared_info->vcpu_data[0].evtchn_upcall_pending = 1;
+        s->vcpu_data[0].evtchn_upcall_pending = 1;
         guest_schedule_to_run(p);
     }
 }
