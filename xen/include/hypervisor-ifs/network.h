@@ -17,14 +17,14 @@
 
 typedef struct tx_req_entry_st
 {
-    unsigned long  id;
-    unsigned long  addr;   /* machine address of packet */
+    unsigned short id;
     unsigned short size;   /* packet size in bytes */
+    unsigned long  addr;   /* machine address of packet */
 } tx_req_entry_t;
 
 typedef struct tx_resp_entry_st
 {
-    unsigned long  id;
+    unsigned short id;
     unsigned char  status;
 } tx_resp_entry_t;
 
@@ -37,13 +37,13 @@ typedef union tx_entry_st
 
 typedef struct rx_req_entry_st
 {
-    unsigned long  id;
+    unsigned short id;
     unsigned long  addr;   /* machine address of PTE to swizzle */
 } rx_req_entry_t;
 
 typedef struct rx_resp_entry_st
 {
-    unsigned long  id;
+    unsigned short id;
     unsigned short size;   /* received packet size in bytes */
     unsigned char  status; /* per descriptor status */
     unsigned char  offset; /* offset in page of received pkt */
@@ -59,22 +59,26 @@ typedef union rx_entry_st
 #define TX_RING_SIZE 256
 #define RX_RING_SIZE 256
 
+#define MAX_DOMAIN_VIFS 8
+
+/* This structure must fit in a memory page. */
 typedef struct net_ring_st
+{
+    tx_entry_t tx_ring[TX_RING_SIZE];
+    rx_entry_t rx_ring[RX_RING_SIZE];
+} net_ring_t;
+
+typedef struct net_idx_st
 {
     /*
      * Guest OS places packets into ring at tx_req_prod.
      * Guest OS receives DOMAIN_EVENT_NET_TX when tx_resp_prod passes tx_event.
-     */
-    tx_entry_t	*tx_ring;
-    unsigned int tx_req_prod, tx_resp_prod, tx_event;
-
-    /*
      * Guest OS places empty buffers into ring at rx_req_prod.
      * Guest OS receives DOMAIN_EVENT_NET_RX when rx_rssp_prod passes rx_event.
      */
-    rx_entry_t	*rx_ring;
+    unsigned int tx_req_prod, tx_resp_prod, tx_event;
     unsigned int rx_req_prod, rx_resp_prod, rx_event;
-} net_ring_t;
+} net_idx_t;
 
 /*
  * Packet routing/filtering code follows:
@@ -144,7 +148,6 @@ int add_net_rule(net_rule_t *rule);
 
 /* Descriptor status values */
 #define RING_STATUS_OK               0  /* Everything is gravy. */
-#define RING_STATUS_ERR_CFU          1  /* Copy from user problems. */
-#define RING_STATUS_BAD_PAGE         2  /* What they gave us was pure evil */
+#define RING_STATUS_BAD_PAGE         1  /* What they gave us was pure evil */
 
 #endif

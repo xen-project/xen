@@ -62,13 +62,9 @@ struct task_struct *do_newdomain(unsigned int dom_id, unsigned int cpu)
 
     p->addr_limit = USER_DS;
     p->active_mm  = &p->mm;
-    p->num_net_vifs = 0;
 
     sched_add_domain(p);
 
-    INIT_LIST_HEAD(&p->net_vifs);
-
-    p->net_ring_base = (net_ring_t *)(p->shared_info + 1);
     INIT_LIST_HEAD(&p->pg_head);
     p->max_pages = p->tot_pages = 0;
     write_lock_irqsave(&tasklist_lock, flags);
@@ -112,8 +108,7 @@ void kill_domain_with_errmsg(const char *err)
 
 void __kill_domain(struct task_struct *p)
 {
-    struct list_head *ent;
-    net_vif_t *vif;
+    int i;
 
     if ( p->domain == 0 )
     {
@@ -128,11 +123,8 @@ void __kill_domain(struct task_struct *p)
 
     unlink_blkdev_info(p);
 
-    while ( (ent = p->net_vifs.next) != &p->net_vifs )
-    {
-        vif = list_entry(ent, net_vif_t, dom_list);
-        unlink_net_vif(vif);
-    }    
+    for ( i = 0; i < MAX_DOMAIN_VIFS; i++ )
+        unlink_net_vif(p->net_vif_list[i]);
 
     if ( p == current )
     {
@@ -300,8 +292,9 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
     start_info_t * virt_startinfo_addr;
     unsigned long virt_stack_addr;
     unsigned long phys_l2tab;
-    net_ring_t *net_ring;
+    net_ring_t *shared_rings;
     net_vif_t *net_vif;
+    int i;
 
     /* High entries in page table must contain hypervisor
      * mem mappings - set them up.
@@ -363,15 +356,16 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
     /* Add virtual network interfaces and point to them in startinfo. */
     while (meminfo->num_vifs-- > 0) {
         net_vif = create_net_vif(p->domain);
-        net_ring = net_vif->net_ring;
-        if (!net_ring) panic("no network ring!\n");
+        shared_rings = net_vif->shared_rings;
+        if (!shared_rings) panic("no network ring!\n");
     }
 
-/* XXX SMH: horrible hack to convert hypervisor VAs in SHIP to guest VAs  */
-#define SH2G(_x) (meminfo->virt_shinfo_addr | (((unsigned long)(_x)) & 0xFFF))
-
-    virt_startinfo_addr->net_rings = (net_ring_t *)SH2G(p->net_ring_base); 
-    virt_startinfo_addr->num_net_rings = p->num_net_vifs;
+    for ( i = 0; i < MAX_DOMAIN_VIFS; i++ )
+    {
+        if ( p->net_vif_list[i] == NULL ) continue;
+        virt_startinfo_addr->net_rings[i] = 
+            virt_to_phys(p->net_vif_list[i]->shared_rings);
+    }
 
     /* Add block io interface */
     virt_startinfo_addr->blk_ring = virt_to_phys(p->blk_ring_base);
@@ -422,7 +416,7 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params,
     l2_pgentry_t *l2tab, *l2start;
     l1_pgentry_t *l1tab = NULL, *l1start = NULL;
     struct pfn_info *page = NULL;
-    net_ring_t *net_ring;
+    net_ring_t *shared_rings;
     net_vif_t *net_vif;
 
     /* Sanity! */
@@ -581,7 +575,6 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params,
     p->shared_info->cpu_freq     = cpu_freq;
     p->shared_info->domain_time  = 0;
 
-
     virt_startinfo_address = (start_info_t *)
         (virt_load_address + ((alloc_index - 1) << PAGE_SHIFT));
     virt_stack_address  = (unsigned long)virt_startinfo_address;
@@ -628,16 +621,16 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params,
     /* Add virtual network interfaces and point to them in startinfo. */
     while (params->num_vifs-- > 0) {
         net_vif = create_net_vif(dom);
-        net_ring = net_vif->net_ring;
-        if (!net_ring) panic("no network ring!\n");
+        shared_rings = net_vif->shared_rings;
+        if (!shared_rings) panic("no network ring!\n");
     }
 
-/* XXX SMH: horrible hack to convert hypervisor VAs in SHIP to guest VAs  */
-#define SHIP2GUEST(_x) (virt_shinfo_address | (((unsigned long)(_x)) & 0xFFF))
-
-    virt_startinfo_address->net_rings = 
-    (net_ring_t *)SHIP2GUEST(p->net_ring_base); 
-    virt_startinfo_address->num_net_rings = p->num_net_vifs;
+    for ( i = 0; i < MAX_DOMAIN_VIFS; i++ )
+    {
+        if ( p->net_vif_list[i] == NULL ) continue;
+        virt_startinfo_address->net_rings[i] = 
+            virt_to_phys(p->net_vif_list[i]->shared_rings);
+    }
 
     /* Add block io interface */
     virt_startinfo_address->blk_ring = virt_to_phys(p->blk_ring_base); 

@@ -217,6 +217,14 @@ typedef struct shared_info_st {
     unsigned long long wall_timeout;
     unsigned long long domain_timeout;
 
+    /*
+     * The index structures are all stored here for convenience. The rings 
+     * themselves are allocated by Xen but the guestos must create its own 
+     * mapping -- the machine address is given in the startinfo structure to 
+     * allow this to happen.
+     */
+    net_idx_t net_idx[MAX_DOMAIN_VIFS];
+
 } shared_info_t;
 
 /*
@@ -228,9 +236,10 @@ typedef struct start_info_st {
     unsigned long  pt_base;	  /* VIRTUAL address of page directory */
     unsigned long mod_start;	  /* VIRTUAL address of pre-loaded module */
     unsigned long mod_len;	  /* size (bytes) of pre-loaded module */
-    net_ring_t *net_rings;	  /* network rings (VIRTUAL ADDRESS) */
-    int num_net_rings;
-    unsigned long blk_ring;	  /* block io ring (MACHINE ADDRESS) */
+    /* Machine address of net rings for each VIF. Will be page aligned. */
+    unsigned long net_rings[MAX_DOMAIN_VIFS];
+    /* Machine address of block-device ring. Will be page aligned. */
+    unsigned long blk_ring;
     unsigned char cmd_line[1];	  /* variable-length */
 } start_info_t;
 

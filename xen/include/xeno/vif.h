@@ -27,59 +27,51 @@
 
 typedef struct rx_shadow_entry_st 
 {
-    unsigned long  id;
     /* IN vars */
-    unsigned long  addr;
-    /* OUT vars */
-    unsigned short size;
-    unsigned char  status;
-    unsigned char  offset;
+    unsigned short id;
+    unsigned long  pte_ptr;
+    unsigned long  buf_pfn;
     /* PRIVATE vars */
     unsigned long  flush_count;
 } rx_shadow_entry_t;
 
 typedef struct tx_shadow_entry_st 
 {
-    unsigned long  id;
     /* IN vars */
+    unsigned short id;
     void          *header;
     unsigned long  payload;
-    unsigned short size;
     /* OUT vars */
+    unsigned short size;
     unsigned char  status;
 } tx_shadow_entry_t;
 
-typedef struct net_shadow_ring_st {
-    rx_shadow_entry_t *rx_ring;
-    unsigned int rx_prod;  /* More buffers for filling go here. */
-    unsigned int rx_idx;   /* Next buffer to fill is here. */
-    unsigned int rx_cons;  /* Next buffer to create response for is here. */
+typedef struct net_vif_st {
+    /* The shared rings and indexes. */
+    net_ring_t         *shared_rings;
+    net_idx_t          *shared_idxs;
 
-    tx_shadow_entry_t *tx_ring;
-    /*
-     * These cannot be derived from shared variables, as not all packets
-     * will end up on the shadow ring (eg. locally delivered packets).
-     */
+    /* The private rings and indexes. */
+    rx_shadow_entry_t rx_shadow_ring[RX_RING_SIZE];
+    unsigned int rx_prod;  /* More buffers for filling go here. */
+    unsigned int rx_cons;  /* Next buffer to fill is here. */
+    tx_shadow_entry_t tx_shadow_ring[TX_RING_SIZE];
     unsigned int tx_prod;  /* More packets for sending go here. */
     unsigned int tx_idx;   /* Next packet to send is here. */
-    unsigned int tx_transmitted_prod; /* Next packet to finish transmission. */
     unsigned int tx_cons;  /* Next packet to create response for is here. */
 
-    /* Indexes into shared ring. */
+    /* Private indexes into shared ring. */
     unsigned int rx_req_cons;
     unsigned int rx_resp_prod; /* private version of shared variable */
     unsigned int tx_req_cons;
     unsigned int tx_resp_prod; /* private version of shared variable */
-} net_shadow_ring_t;
 
-typedef struct net_vif_st {
-    net_ring_t         *net_ring;
-    net_shadow_ring_t  *shadow_ring;
+    /* Miscellaneous private stuff. */
     int                 id;
     struct task_struct *domain;
     struct list_head    list;     /* scheduling list */
-    struct list_head    dom_list; /* domain list     */
     atomic_t            refcnt;
+    spinlock_t          rx_lock, tx_lock;
 } net_vif_t;
 
 #define get_vif(_v) (atomic_inc(&(_v)->refcnt))
@@ -89,7 +81,6 @@ do {                                                               \
 } while (0)                                                        \
 
 /* VIF-related defines. */
-#define MAX_GUEST_VIFS    2 // each VIF is a small overhead in task_struct
 #define MAX_SYSTEM_VIFS 256  
 
 /* vif globals */

@@ -60,6 +60,11 @@ static inline void flush_tlb_mm(struct mm_struct *mm)
 		__flush_tlb();
 }
 
+static inline void flush_tlb_cpu(unsigned int cpu)
+{
+    __flush_tlb();
+}
+
 #if 0
 static inline void flush_tlb_page(struct vm_area_struct *vma,
 	unsigned long addr)
@@ -86,13 +91,21 @@ static inline void flush_tlb_range(struct mm_struct *mm,
 extern void flush_tlb_all(void);
 extern void flush_tlb_current_task(void);
 extern void flush_tlb_mm(struct mm_struct *);
-/*extern void flush_tlb_page(struct vm_area_struct *, unsigned long);*/
 
 #define flush_tlb()	flush_tlb_current_task()
 
 static inline void flush_tlb_range(struct mm_struct * mm, unsigned long start, unsigned long end)
 {
 	flush_tlb_mm(mm);
+}
+
+extern void flush_tlb_others(unsigned long cpumask);
+static inline void flush_tlb_cpu(unsigned int cpu)
+{
+    if ( cpu == smp_processor_id() )
+        __flush_tlb();
+    else
+        flush_tlb_others(1<<cpu);
 }
 
 #define TLBSTATE_OK	1

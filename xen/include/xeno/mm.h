@@ -97,7 +97,6 @@ typedef struct pfn_info {
 #define PGT_gdt_page        (5<<24) /* using this page in a GDT? */
 #define PGT_ldt_page        (6<<24) /* using this page in an LDT? */
 #define PGT_writeable_page  (7<<24) /* has writable mappings of this page? */
-#define PGT_net_rx_buf      (8<<24) /* this page taken by the net code. */
 
 /*
  * This bit indicates that the TLB must be flushed when the type count of this

@@ -255,8 +255,10 @@ static inline void send_IPI_all(int vector)
  */
 
 static volatile unsigned long flush_cpumask;
+#if 0
 static struct mm_struct * flush_mm;
 static unsigned long flush_va;
+#endif
 static spinlock_t tlbstate_lock = SPIN_LOCK_UNLOCKED;
 #define FLUSH_ALL	0xffffffff
 
@@ -323,90 +325,55 @@ asmlinkage void smp_invalidate_interrupt (void)
 
     if (!test_bit(cpu, &flush_cpumask))
         return;
-    /* 
-     * This was a BUG() but until someone can quote me the
-     * line from the intel manual that guarantees an IPI to
-     * multiple CPUs is retried _only_ on the erroring CPUs
-     * its staying as a return
-     *
-     * BUG();
-     */
-		 
+
+#if 0		 
     if (flush_mm == cpu_tlbstate[cpu].active_mm) {
         if (cpu_tlbstate[cpu].state == TLBSTATE_OK) {
             if (flush_va == FLUSH_ALL)
+#endif
                 local_flush_tlb();
+#if 0
             else
                 __flush_tlb_one(flush_va);
         } else
             leave_mm(cpu);
     }
+#endif
     ack_APIC_irq();
     clear_bit(cpu, &flush_cpumask);
 }
 
-static void flush_tlb_others (unsigned long cpumask, struct mm_struct *mm,
-                              unsigned long va)
+void flush_tlb_others(unsigned long cpumask)
 {
-    /*
-     * A couple of (to be removed) sanity checks:
-	 *
-	 * - we do not send IPIs to not-yet booted CPUs.
-	 * - current CPU must not be in mask
-	 * - mask must exist :)
-	 */
-    if (!cpumask)
-        BUG();
-    if ((cpumask & cpu_online_map) != cpumask)
-        BUG();
-    if (cpumask & (1 << smp_processor_id()))
-        BUG();
-    if (!mm)
-        BUG();
-
-	/*
-	 * i'm not happy about this global shared spinlock in the
-	 * MM hot path, but we'll see how contended it is.
-	 * Temporarily this turns IRQs off, so that lockups are
-	 * detected by the NMI watchdog.
-	 */
     spin_lock(&tlbstate_lock);
-	
-    flush_mm = mm;
-    flush_va = va;
     atomic_set_mask(cpumask, &flush_cpumask);
-    /*
-     * We have to send the IPI only to
-     * CPUs affected.
-	 */
     send_IPI_mask(cpumask, INVALIDATE_TLB_VECTOR);
-
-    while (flush_cpumask)
-        /* nothing. lockup detection does not belong here */;
-
-    flush_mm = NULL;
-    flush_va = 0;
+    while (flush_cpumask) continue;
     spin_unlock(&tlbstate_lock);
 }
 	
 void flush_tlb_current_task(void)
 {
+#if 0
     struct mm_struct *mm = &current->mm;
     unsigned long cpu_mask = mm->cpu_vm_mask & ~(1 << smp_processor_id());
 
     local_flush_tlb();
     if (cpu_mask)
         flush_tlb_others(cpu_mask, mm, FLUSH_ALL);
+#endif
 }
 
 void flush_tlb_mm (struct mm_struct * mm)
 {
+#if 0
     unsigned long cpu_mask = mm->cpu_vm_mask & ~(1 << smp_processor_id());
 
     if (current->active_mm == mm)
         local_flush_tlb();
     if (cpu_mask)
         flush_tlb_others(cpu_mask, mm, FLUSH_ALL);
+#endif
 }
 
 #if 0

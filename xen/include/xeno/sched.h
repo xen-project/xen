@@ -50,8 +50,7 @@ extern struct mm_struct init_mm;
 }
 
 #define _HYP_EVENT_NEED_RESCHED 0
-#define _HYP_EVENT_NET          1
-#define _HYP_EVENT_DIE          2
+#define _HYP_EVENT_DIE          1
 
 #define PF_DONEFPUINIT  0x1  /* Has the FPU been initialised for this task? */
 #define PF_USEDFPU      0x2  /* Has this task used the FPU since last save? */
@@ -118,9 +117,7 @@ struct task_struct {
     long uwarped;                   /* time it ran unwarped last time */
 
     /* Network I/O */
-    net_ring_t *net_ring_base;
-    struct list_head net_vifs;
-    int num_net_vifs;
+    net_vif_t *net_vif_list[MAX_DOMAIN_VIFS];
 
     /* Block I/O */
     blk_ring_t *blk_ring_base;

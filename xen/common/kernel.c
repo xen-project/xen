@@ -176,7 +176,6 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
     current->shared_info = (void *)get_free_page(GFP_KERNEL);
     memset(current->shared_info, 0, sizeof(shared_info_t));
     set_fs(USER_DS);
-    current->num_net_vifs = 0;
 
     start_of_day();
 

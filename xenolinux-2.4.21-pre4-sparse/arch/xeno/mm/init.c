@@ -236,10 +236,7 @@ void __init paging_init(void)
 	vaddr = __fix_to_virt(__end_of_fixed_addresses - 1) & PMD_MASK;
 	fixrange_init(vaddr, HYPERVISOR_VIRT_START, init_mm.pgd);
 
-	/*
-	 * XXX We do this conversion early, so that all other page tables
-	 * will automatically get this mapping.
-	 */
+	/* Cheesy: this can probably be moved to the blkdev driver. */
 	set_fixmap(FIX_BLKRING_BASE, start_info.blk_ring);
 
 #ifdef CONFIG_HIGHMEM

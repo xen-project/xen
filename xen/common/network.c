@@ -50,44 +50,43 @@ void print_net_rule_list();
 
 net_vif_t *create_net_vif(int domain)
 {
-    net_vif_t *new_vif;
-    net_ring_t *new_ring;
-    net_shadow_ring_t *shadow_ring;
-    struct task_struct *dom_task;
+    int dom_vif_idx;
+    net_vif_t *new_vif = NULL;
+    net_ring_t *new_ring = NULL;
+    struct task_struct *p = NULL;
     unsigned long flags;
 
-    if ( !(dom_task = find_domain_by_id(domain)) )
+    if ( !(p = find_domain_by_id(domain)) )
         return NULL;
     
+    for ( dom_vif_idx = 0; dom_vif_idx < MAX_DOMAIN_VIFS; dom_vif_idx++ )
+        if ( p->net_vif_list[dom_vif_idx] == NULL ) break;
+    if ( dom_vif_idx == MAX_DOMAIN_VIFS )
+        goto fail;
+
     if ( (new_vif = kmem_cache_alloc(net_vif_cache, GFP_KERNEL)) == NULL )
-        return NULL;
+        goto fail;
+
+    memset(new_vif, 0, sizeof(*new_vif));
     
-    new_ring = dom_task->net_ring_base + dom_task->num_net_vifs;
-    memset(new_ring, 0, sizeof(net_ring_t));
-
-    shadow_ring = kmalloc(sizeof(net_shadow_ring_t), GFP_KERNEL);
-    if ( shadow_ring == NULL ) goto fail;
-    memset(shadow_ring, 0, sizeof(*shadow_ring));
-
-    shadow_ring->rx_ring = kmalloc(RX_RING_SIZE
-                    * sizeof(rx_shadow_entry_t), GFP_KERNEL);
-    shadow_ring->tx_ring = kmalloc(TX_RING_SIZE
-                    * sizeof(tx_shadow_entry_t), GFP_KERNEL);
-    if ( (shadow_ring->rx_ring == NULL) || (shadow_ring->tx_ring == NULL) )
-            goto fail;
+    if ( sizeof(net_ring_t) > PAGE_SIZE ) BUG();
+    new_ring = (net_ring_t *)get_free_page(GFP_KERNEL);
+    clear_page(new_ring);
+    SHARE_PFN_WITH_DOMAIN(virt_to_page(new_ring), domain);
 
     /*
      * Fill in the new vif struct. Note that, while the vif's refcnt is
      * non-zero, we hold a reference to the task structure.
      */
     atomic_set(&new_vif->refcnt, 1);
-    new_vif->net_ring    = new_ring;
-    new_vif->shadow_ring = shadow_ring;
-    new_vif->domain      = dom_task;
-    new_vif->list.next   = NULL;
+    new_vif->shared_rings = new_ring;
+    new_vif->shared_idxs  = &p->shared_info->net_idx[dom_vif_idx];
+    new_vif->domain       = p;
+    new_vif->list.next    = NULL;
+    spin_lock_init(&new_vif->rx_lock);
+    spin_lock_init(&new_vif->tx_lock);
 
-    list_add(&new_vif->dom_list, &dom_task->net_vifs);
-    dom_task->num_net_vifs++;
+    p->net_vif_list[dom_vif_idx] = new_vif;
 
     write_lock_irqsave(&sys_vif_lock, flags);
     new_vif->id = sys_vif_count;
@@ -96,16 +95,11 @@ net_vif_t *create_net_vif(int domain)
     
     return new_vif;
     
-fail:
-    kmem_cache_free(net_vif_cache, new_vif);
-    if ( shadow_ring != NULL )
-    {
-        if ( shadow_ring->rx_ring ) kfree(shadow_ring->rx_ring);
-        if ( shadow_ring->tx_ring ) kfree(shadow_ring->tx_ring);
-        kfree(shadow_ring);
-    }
-
-    free_task_struct(dom_task);
+ fail:
+    if ( new_vif != NULL )
+        kmem_cache_free(net_vif_cache, new_vif);
+    if ( p != NULL )
+        free_task_struct(p);
     return NULL;
 }
 
@@ -118,25 +112,33 @@ void destroy_net_vif(net_vif_t *vif)
 
     /* Return any outstanding receive buffers to the guest OS. */
     spin_lock_irqsave(&p->page_lock, flags);
-    for ( i  = vif->shadow_ring->rx_idx; 
-          i != vif->shadow_ring->rx_req_cons;
-          i  = ((i+1) & (RX_RING_SIZE-1)) )
+    for ( i = vif->rx_cons; i != vif->rx_prod; i = ((i+1) & (RX_RING_SIZE-1)) )
     {
-        rx_shadow_entry_t *rx = vif->shadow_ring->rx_ring + i;
-        if ( rx->status != RING_STATUS_OK ) continue;
-        pte  = map_domain_mem(rx->addr);
-        *pte |= _PAGE_PRESENT;
-        page = frame_table + (*pte >> PAGE_SHIFT);
-        page->flags &= ~PG_type_mask;
-        if ( (*pte & _PAGE_RW) ) 
+        rx_shadow_entry_t *rx = vif->rx_shadow_ring + i;
+
+        /* Release the page-table page. */
+        page = frame_table + (rx->pte_ptr >> PAGE_SHIFT);
+        put_page_type(page);
+        put_page_tot(page);
+
+        /* Give the buffer page back to the domain. */
+        page = frame_table + rx->buf_pfn;
+        list_add(&page->list, &p->pg_head);
+        page->flags = vif->domain->domain;
+
+        /* Patch up the PTE if it hasn't changed under our feet. */
+        pte = map_domain_mem(rx->pte_ptr);
+        if ( !(*pte & _PAGE_PRESENT) )
+        {
+            *pte = (rx->buf_pfn<<PAGE_SHIFT) | (*pte & ~PAGE_MASK) | 
+                _PAGE_RW | _PAGE_PRESENT;
             page->flags |= PGT_writeable_page | PG_need_flush;
+            page->type_count = page->tot_count = 1;
+        }
         unmap_domain_mem(pte);
     }
     spin_unlock_irqrestore(&p->page_lock, flags);
 
-    kfree(vif->shadow_ring->tx_ring);
-    kfree(vif->shadow_ring->rx_ring);
-    kfree(vif->shadow_ring);
     kmem_cache_free(net_vif_cache, vif);
     free_task_struct(p);
 }
@@ -144,11 +146,16 @@ void destroy_net_vif(net_vif_t *vif)
 void unlink_net_vif(net_vif_t *vif)
 {
     unsigned long flags;
-    list_del(&vif->dom_list);
-    vif->domain->num_net_vifs--;
+    int i;
+
+    for ( i = 0; i < MAX_DOMAIN_VIFS; i++ )
+        if ( vif->domain->net_vif_list[i] == vif )
+            vif->domain->net_vif_list[i] = NULL;
+    
     write_lock_irqsave(&sys_vif_lock, flags);
     sys_vif_list[vif->id] = NULL;
     write_unlock_irqrestore(&sys_vif_lock, flags);
+    
     put_vif(vif);
 }
 

@@ -56,8 +56,25 @@ struct net_private
     atomic_t tx_entries;
     unsigned int rx_resp_cons, tx_resp_cons, tx_full;
     net_ring_t *net_ring;
+    net_idx_t  *net_idx;
     spinlock_t tx_lock;
+
+    /*
+     * {tx,rx}_skbs store outstanding skbuffs. The first entry in each
+     * array is an index into a chain of free entries.
+     */
+    struct sk_buff *tx_skbs[TX_RING_SIZE];
+    struct sk_buff *rx_skbs[RX_RING_SIZE];
 };
+
+/* Access macros for acquiring freeing slots in {tx,rx}_skbs[]. */
+#define ADD_ID_TO_FREELIST(_list, _id)             \
+    (_list)[(_id)] = (_list)[0];                   \
+    (_list)[0]     = (void *)(unsigned long)(_id);
+#define GET_ID_FROM_FREELIST(_list)                \
+ ({ unsigned long _id = (unsigned long)(_list)[0]; \
+    (_list)[0]  = (_list)[_id];                    \
+    _id; })
 
 
 static void dbg_network_int(int irq, void *dev_id, struct pt_regs *ptregs)
@@ -67,33 +84,33 @@ static void dbg_network_int(int irq, void *dev_id, struct pt_regs *ptregs)
     printk(KERN_ALERT "tx_full = %d, tx_entries = %d, tx_resp_cons = %d,"
            " tx_req_prod = %d, tx_resp_prod = %d, tx_event = %d, state=%d\n",
            np->tx_full, atomic_read(&np->tx_entries), np->tx_resp_cons, 
-           np->net_ring->tx_req_prod, np->net_ring->tx_resp_prod, 
-           np->net_ring->tx_event,
+           np->net_idx->tx_req_prod, np->net_idx->tx_resp_prod, 
+           np->net_idx->tx_event,
            test_bit(__LINK_STATE_XOFF, &dev->state));
+    printk(KERN_ALERT "rx_resp_cons = %d,"
+           " rx_req_prod = %d, rx_resp_prod = %d, rx_event = %d\n",
+           np->rx_resp_cons, np->net_idx->rx_req_prod,
+           np->net_idx->rx_resp_prod, np->net_idx->rx_event);
 }
 
 
 static int network_open(struct net_device *dev)
 {
     struct net_private *np = dev->priv;
-    int error = 0;
+    int i, error = 0;
 
     np->rx_resp_cons = np->tx_resp_cons = np->tx_full = 0;
     memset(&np->stats, 0, sizeof(np->stats));
     spin_lock_init(&np->tx_lock);
     atomic_set(&np->tx_entries, 0);
     memset(np->net_ring, 0, sizeof(*np->net_ring));
+    memset(np->net_idx, 0, sizeof(*np->net_idx));
 
-    np->net_ring->tx_ring = kmalloc(TX_RING_SIZE * sizeof(tx_entry_t), 
-                                    GFP_KERNEL);
-    np->net_ring->rx_ring = kmalloc(RX_RING_SIZE * sizeof(rx_entry_t), 
-                                    GFP_KERNEL);
-    if ( (np->net_ring->tx_ring == NULL) || (np->net_ring->rx_ring == NULL) )
-    {
-        printk(KERN_WARNING "%s; Could not allocate ring memory\n", dev->name);
-        error = -ENOBUFS;
-        goto fail;
-    }
+    /* Initialise {tx,rx}_skbs to be a free chain containing every entry. */
+    for ( i = 0; i < TX_RING_SIZE; i++ )
+        np->tx_skbs[i] = (void *)(i+1);
+    for ( i = 0; i < RX_RING_SIZE; i++ )
+        np->rx_skbs[i] = (void *)(i+1);
 
     network_alloc_rx_buffers(dev);
 
@@ -135,8 +152,6 @@ static int network_open(struct net_device *dev)
     return 0;
 
  fail:
-    if ( np->net_ring->rx_ring ) kfree(np->net_ring->rx_ring);
-    if ( np->net_ring->tx_ring ) kfree(np->net_ring->tx_ring);
     kfree(np);
     return error;
 }
@@ -154,11 +169,12 @@ static void network_tx_buf_gc(struct net_device *dev)
     spin_lock_irqsave(&np->tx_lock, flags);
 
     do {
-        prod = np->net_ring->tx_resp_prod;
+        prod = np->net_idx->tx_resp_prod;
 
         for ( i = np->tx_resp_cons; i != prod; i = TX_RING_INC(i) )
         {
-            skb = (struct sk_buff *)tx_ring[i].resp.id;
+            skb = np->tx_skbs[tx_ring[i].resp.id];
+            ADD_ID_TO_FREELIST(np->tx_skbs, tx_ring[i].resp.id);
             dev_kfree_skb_any(skb);
             atomic_dec(&np->tx_entries);
         }
@@ -166,11 +182,11 @@ static void network_tx_buf_gc(struct net_device *dev)
         np->tx_resp_cons = prod;
         
         /* Set a new event, then check for race with update of tx_cons. */
-        np->net_ring->tx_event =
+        np->net_idx->tx_event =
             TX_RING_ADD(prod, (atomic_read(&np->tx_entries)>>1) + 1);
         smp_mb();
     }
-    while ( prod != np->net_ring->tx_resp_prod );
+    while ( prod != np->net_idx->tx_resp_prod );
 
     if ( np->tx_full && (atomic_read(&np->tx_entries) < TX_MAX_ENTRIES) )
     {
@@ -192,24 +208,28 @@ inline pte_t *get_ppte(void *addr)
 
 static void network_alloc_rx_buffers(struct net_device *dev)
 {
-    unsigned int i;
+    unsigned int i, id;
     struct net_private *np = dev->priv;
     struct sk_buff *skb;
     unsigned int end = RX_RING_ADD(np->rx_resp_cons, RX_MAX_ENTRIES);    
 
-    for ( i = np->net_ring->rx_req_prod; i != end; i = RX_RING_INC(i) )
+    for ( i = np->net_idx->rx_req_prod; i != end; i = RX_RING_INC(i) )
     {
         skb = dev_alloc_skb(RX_BUF_SIZE);
         if ( skb == NULL ) break;
         skb->dev = dev;
-        np->net_ring->rx_ring[i].req.id   = (unsigned long)skb;
+
+        id = GET_ID_FROM_FREELIST(np->rx_skbs);
+        np->rx_skbs[id] = skb;
+
+        np->net_ring->rx_ring[i].req.id   = (unsigned short)id;
         np->net_ring->rx_ring[i].req.addr = 
             virt_to_machine(get_ppte(skb->head));
     }
 
-    np->net_ring->rx_req_prod = i;
+    np->net_idx->rx_req_prod = i;
 
-    np->net_ring->rx_event = RX_RING_INC(np->rx_resp_cons);
+    np->net_idx->rx_event = RX_RING_INC(np->rx_resp_cons);
 
     /*
      * We may have allocated buffers which have entries outstanding in
@@ -227,17 +247,17 @@ static void network_free_rx_buffers(struct net_device *dev)
     struct sk_buff *skb;    
 
     for ( i  = np->rx_resp_cons; 
-          i != np->net_ring->rx_req_prod; 
+          i != np->net_idx->rx_req_prod; 
           i  = RX_RING_INC(i) )
     {
-        skb = (struct sk_buff *)np->net_ring->rx_ring[i].req.id;
+        skb = np->rx_skbs[np->net_ring->rx_ring[i].req.id];
         dev_kfree_skb_any(skb);
     }
 }
 
 static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-    unsigned int i;
+    unsigned int i, id;
     struct net_private *np = (struct net_private *)dev->priv;
 
     if ( np->tx_full )
@@ -246,7 +266,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
         netif_stop_queue(dev);
         return -ENOBUFS;
     }
-    i = np->net_ring->tx_req_prod;
+    i = np->net_idx->tx_req_prod;
 
     if ( (((unsigned long)skb->data & ~PAGE_MASK) + skb->len) >= PAGE_SIZE )
     {
@@ -258,11 +278,14 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
         skb = new_skb;
     }   
     
-    np->net_ring->tx_ring[i].req.id   = (unsigned long)skb;
+    id = GET_ID_FROM_FREELIST(np->tx_skbs);
+    np->tx_skbs[id] = skb;
+
+    np->net_ring->tx_ring[i].req.id   = (unsigned short)id;
     np->net_ring->tx_ring[i].req.addr =
         phys_to_machine(virt_to_phys(skb->data));
     np->net_ring->tx_ring[i].req.size = skb->len;
-    np->net_ring->tx_req_prod = TX_RING_INC(i);
+    np->net_idx->tx_req_prod = TX_RING_INC(i);
     atomic_inc(&np->tx_entries);
 
     np->stats.tx_bytes += skb->len;
@@ -294,11 +317,13 @@ static void network_rx_int(int irq, void *dev_id, struct pt_regs *ptregs)
     
  again:
     for ( i  = np->rx_resp_cons; 
-          i != np->net_ring->rx_resp_prod; 
+          i != np->net_idx->rx_resp_prod; 
           i  = RX_RING_INC(i) )
     {
         rx  = &np->net_ring->rx_ring[i].resp;
-        skb = (struct sk_buff *)rx->id;
+
+        skb = np->rx_skbs[rx->id];
+        ADD_ID_TO_FREELIST(np->rx_skbs, rx->id);
 
         if ( rx->status != RING_STATUS_OK )
         {
@@ -344,7 +369,7 @@ static void network_rx_int(int irq, void *dev_id, struct pt_regs *ptregs)
     
     /* Deal with hypervisor racing our resetting of rx_event. */
     smp_mb();
-    if ( np->net_ring->rx_resp_prod != i ) goto again;
+    if ( np->net_idx->rx_resp_prod != i ) goto again;
 }
 
 
@@ -389,14 +414,21 @@ static struct net_device_stats *network_get_stats(struct net_device *dev)
 
 int __init init_module(void)
 {
-    int i, err;
+    int i, fixmap_idx=-1, err;
     struct net_device *dev;
     struct net_private *np;
 
     INIT_LIST_HEAD(&dev_list);
 
-    for ( i = 0; i < start_info.num_net_rings; i++ )
+    for ( i = 0; i < MAX_DOMAIN_VIFS; i++ )
     {
+        if ( start_info.net_rings[i] == 0 )
+            continue;
+
+        /* We actually only support up to 4 vifs right now. */
+        if ( ++fixmap_idx == 4 )
+            break;
+
         dev = alloc_etherdev(sizeof(struct net_private));
         if ( dev == NULL )
         {
@@ -404,8 +436,11 @@ int __init init_module(void)
             goto fail;
         }
 
+        set_fixmap(FIX_NETRING0_BASE+fixmap_idx, start_info.net_rings[i]);
+
         np = dev->priv;
-        np->net_ring = start_info.net_rings + i;
+        np->net_ring = (net_ring_t *)fix_to_virt(FIX_NETRING0_BASE+fixmap_idx);
+        np->net_idx  = &HYPERVISOR_shared_info->net_idx[i];
 
         SET_MODULE_OWNER(dev);
         dev->open            = network_open;
