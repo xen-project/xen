@@ -473,28 +473,16 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
      */
     for ( i = 0; i < nr_pfns; i++ )
     {
-        if ( pfn_type[i] == (L1TAB|LPINTAB) )
+        if ( pfn_type[i] != (L2TAB|LPINTAB) )
+            continue;
+        if ( add_mmu_update(xc_handle, mmu,
+                            (pfn_to_mfn_table[i]<<PAGE_SHIFT) | 
+                            MMU_EXTENDED_COMMAND,
+                            MMUEXT_PIN_TABLE) )
         {
-            if ( add_mmu_update(xc_handle, mmu,
-                                (pfn_to_mfn_table[i]<<PAGE_SHIFT) | 
-                                MMU_EXTENDED_COMMAND,
-                                MMUEXT_PIN_L1_TABLE) ) {
-                printf("ERR pin L1 pfn=%lx mfn=%lx\n",
-                       (unsigned long)i, pfn_to_mfn_table[i]);
-                goto out;
-            }
-        }
-        else if ( pfn_type[i] == (L2TAB|LPINTAB) )
-        {
-            if ( add_mmu_update(xc_handle, mmu,
-                                (pfn_to_mfn_table[i]<<PAGE_SHIFT) | 
-                                MMU_EXTENDED_COMMAND,
-                                MMUEXT_PIN_L2_TABLE) )
-            {
-                printf("ERR pin L2 pfn=%lx mfn=%lx\n",
-                       (unsigned long)i, pfn_to_mfn_table[i]);
-                goto out;
-            }
+            printf("ERR pin L2 pfn=%lx mfn=%lx\n",
+                   (unsigned long)i, pfn_to_mfn_table[i]);
+            goto out;
         }
     }
 

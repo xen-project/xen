@@ -104,9 +104,9 @@
  * ptr[1:0] == MMU_EXTENDED_COMMAND:
  * val[7:0] -- MMUEXT_* command.
  * 
- *   val[7:0] == MMUEXT_(UN)PIN_*_TABLE:
- *   ptr[:2]  -- Machine address of frame to be (un)pinned as a p.t. page.
- *               The frame must belong to the FD, if one is specified.
+ *   val[7:0] == MMUEXT_[UN]PIN_TABLE:
+ *   ptr[:2]  -- Machine address of frame to be (un)pinned as a top-level p.t.
+ *               page. The frame must belong to the FD, if one is specified.
  * 
  *   val[7:0] == MMUEXT_NEW_BASEPTR:
  *   ptr[:2]  -- Machine address of new page-table base to install in MMU.
@@ -142,10 +142,7 @@
 #define MMU_NORMAL_PT_UPDATE     0 /* checked '*ptr = val'. ptr is MA.       */
 #define MMU_MACHPHYS_UPDATE      2 /* ptr = MA of frame to modify entry for  */
 #define MMU_EXTENDED_COMMAND     3 /* least 8 bits of val demux further      */
-#define MMUEXT_PIN_L1_TABLE      0 /* ptr = MA of frame to pin               */
-#define MMUEXT_PIN_L2_TABLE      1 /* ptr = MA of frame to pin               */
-#define MMUEXT_PIN_L3_TABLE      2 /* ptr = MA of frame to pin               */
-#define MMUEXT_PIN_L4_TABLE      3 /* ptr = MA of frame to pin               */
+#define MMUEXT_PIN_TABLE         0 /* ptr = MA of frame to pin               */
 #define MMUEXT_UNPIN_TABLE       4 /* ptr = MA of frame to unpin             */
 #define MMUEXT_NEW_BASEPTR       5 /* ptr = MA of new pagetable base         */
 #define MMUEXT_TLB_FLUSH         6 /* ptr = NULL                             */

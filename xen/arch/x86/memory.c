@@ -455,7 +455,8 @@ get_page_from_l1e(
 /* NB. Virtual address 'l2e' maps to a machine address within frame 'pfn'. */
 static int 
 get_page_from_l2e(
-    l2_pgentry_t l2e, unsigned long pfn, struct domain *d, unsigned long va_idx)
+    l2_pgentry_t l2e, unsigned long pfn,
+    struct domain *d, unsigned long va_idx)
 {
     int rc;
 
@@ -471,7 +472,7 @@ get_page_from_l2e(
 
     rc = get_page_and_type_from_pagenr(
         l2_pgentry_to_pagenr(l2e), 
-	PGT_l1_page_table | (va_idx<<PGT_va_shift), d);
+        PGT_l1_page_table | (va_idx<<PGT_va_shift), d);
 
     if ( unlikely(!rc) )
         return get_linear_pagetable(l2e, pfn, d);
@@ -671,8 +672,8 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
             return update_l2e(pl2e, ol2e, nl2e);
 
         if ( unlikely(!get_page_from_l2e(nl2e, pfn, current, 
-					((unsigned long)
-					 pl2e & ~PAGE_MASK) >> 2 )) )
+					((unsigned long)pl2e & 
+                                         ~PAGE_MASK) >> 2)) )
             return 0;
 
         if ( unlikely(!update_l2e(pl2e, ol2e, nl2e)) )
@@ -826,21 +827,9 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
 
     switch ( cmd )
     {
-    case MMUEXT_PIN_L1_TABLE:
-    case MMUEXT_PIN_L2_TABLE:
-
-	/* When we pin an L1 page we now insist that the va
-	   backpointer (used for writable page tables) must still be
-	   mutable. This is an additional restriction even for guests
-	   that don't use writable page tables, but I don't think it
-	   will break anything as guests typically pin pages before
-	   they are used, hence they'll still be mutable. */
-
+    case MMUEXT_PIN_TABLE:
         okay = get_page_and_type_from_pagenr(
-            pfn, 
-            ((cmd==MMUEXT_PIN_L2_TABLE) ? 
-	     PGT_l2_page_table : (PGT_l1_page_table | PGT_va_mutable) ) ,
-            FOREIGNDOM);
+            pfn, PGT_l2_page_table, FOREIGNDOM);
 
         if ( unlikely(!okay) )
         {
@@ -1183,6 +1172,7 @@ int do_mmu_update(mmu_update_t *ureqs, int count, int *success_count)
     unsigned long prev_spfn = 0;
     l1_pgentry_t *prev_spl1e = 0;
     struct domain *d = current;
+    u32 type_info;
 
     perfc_incrc(calls_to_mmu_update); 
     perfc_addc(num_page_updates, count);
@@ -1231,10 +1221,11 @@ int do_mmu_update(mmu_update_t *ureqs, int count, int *success_count)
             }
 
             page = &frame_table[pfn];
-            switch ( (page->u.inuse.type_info & PGT_type_mask) )
+            switch ( (type_info = page->u.inuse.type_info) & PGT_type_mask )
             {
             case PGT_l1_page_table: 
-                if ( likely(passive_get_page_type(page, PGT_l1_page_table)) )
+                if ( likely(get_page_type(
+                    page, type_info & (PGT_type_mask|PGT_va_mask))) )
                 {
                     okay = mod_l1_entry((l1_pgentry_t *)va, 
                                         mk_l1_pgentry(req.val)); 
@@ -1484,11 +1475,11 @@ void ptwr_reconnect_disconnected(unsigned long addr)
         [ptwr_info[cpu].writable_l1>>PAGE_SHIFT];
 
 #ifdef PTWR_TRACK_DOMAIN
-    if (ptwr_domain[cpu] != get_current()->domain)
+    if (ptwr_domain[cpu] != current->domain)
         printk("ptwr_reconnect_disconnected domain mismatch %d != %d\n",
-               ptwr_domain[cpu], get_current()->domain);
+               ptwr_domain[cpu], current->domain);
 #endif
-    PTWR_PRINTK(("[A] page fault in disconnected space: addr %08lx space %08lx\n",
+    PTWR_PRINTK(("[A] page fault in disconn space: addr %08lx space %08lx\n",
                  addr, ptwr_info[cpu].disconnected << L2_PAGETABLE_SHIFT));
     pl2e = &linear_l2_table[ptwr_info[cpu].disconnected];
 
@@ -1560,9 +1551,9 @@ void ptwr_flush_inactive(void)
     int i, idx;
 
 #ifdef PTWR_TRACK_DOMAIN
-    if (ptwr_info[cpu].domain != get_current()->domain)
+    if (ptwr_info[cpu].domain != current->domain)
         printk("ptwr_flush_inactive domain mismatch %d != %d\n",
-               ptwr_info[cpu].domain, get_current()->domain);
+               ptwr_info[cpu].domain, current->domain);
 #endif
 #if 0
     {
@@ -1643,9 +1634,9 @@ int ptwr_do_page_fault(unsigned long addr)
         if ( (page->u.inuse.type_info & PGT_type_mask) == PGT_l1_page_table )
         {
 #ifdef PTWR_TRACK_DOMAIN
-            if ( ptwr_info[cpu].domain != get_current()->domain )
+            if ( ptwr_info[cpu].domain != current->domain )
                 printk("ptwr_do_page_fault domain mismatch %d != %d\n",
-                       ptwr_info[cpu].domain, get_current()->domain);
+                       ptwr_info[cpu].domain, current->domain);
 #endif
             pl2e = &linear_l2_table[(page->u.inuse.type_info &
                                      PGT_va_mask) >> PGT_va_shift];
