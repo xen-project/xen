@@ -2279,7 +2279,6 @@ void audit_domain(struct domain *d)
     }
 
     /* PHASE 3 */
-
     list_ent = d->page_list.next;
     for ( i = 0; (list_ent != &d->page_list); i++ )
     {
@@ -2300,7 +2299,12 @@ void audit_domain(struct domain *d)
                 if ( pt[i] & _PAGE_PRESENT )
                 {
                     unsigned long l1pfn = pt[i]>>PAGE_SHIFT;
-                    struct pfn_info *l1page = &frame_table[l1pfn];
+                    struct pfn_info *l1page;
+
+                    if (l1pfn>max_page)
+                        continue;
+
+                    l1page = &frame_table[l1pfn];
 
                     if ( l1page->u.inuse.domain == d)
                         adjust(l1page, 1, 1);
@@ -2321,7 +2325,12 @@ void audit_domain(struct domain *d)
                 if ( pt[i] & _PAGE_PRESENT )
                 {
                     unsigned long l1pfn = pt[i]>>PAGE_SHIFT;
-                    struct pfn_info *l1page = &frame_table[l1pfn];
+                    struct pfn_info *l1page;
+
+                    if (l1pfn>max_page)
+                        continue;
+
+                    l1page = &frame_table[l1pfn];
 
                     if ( (l1page->u.inuse.domain != d) ||
                          (l1pfn < 0x100) || (l1pfn > max_page) )
