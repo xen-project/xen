@@ -17,11 +17,10 @@ static dev_t physdev_to_xldev(unsigned short physdev)
 {
     switch (physdev & XENDEV_TYPE_MASK) {
     case XENDEV_IDE:
-	switch (physdev & XENDEV_IDX_MASK) {
-	case 0...(XLIDE_DEVS_PER_MAJOR - 1):
+        if ( (physdev & XENDEV_IDX_MASK) < XLIDE_DEVS_PER_MAJOR) {
 	    return MKDEV(XLIDE_MAJOR_0,
 			 (physdev & XENDEV_IDX_MASK) << XLIDE_PARTN_SHIFT);
-	case XLIDE_DEVS_PER_MAJOR...(XLIDE_DEVS_PER_MAJOR * 2 - 1):
+	} else if ( (physdev & XENDEV_IDX_MASK) < (XLIDE_DEVS_PER_MAJOR * 2)) {
 	    return MKDEV(XLIDE_MAJOR_1,
 			 (physdev & XENDEV_IDX_MASK) << XLIDE_PARTN_SHIFT);
 	}
