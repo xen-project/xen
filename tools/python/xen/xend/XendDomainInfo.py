@@ -349,6 +349,7 @@ class XendDomainInfo:
         self.migrate = None
         #Whether to auto-restart
         self.restart_mode = RESTART_ONREBOOT
+        self.console_port = None
 
     def setdom(self, dom):
         self.dom = int(dom)
@@ -403,7 +404,12 @@ class XendDomainInfo:
         self.config = config
         try:
             self.name = sxp.child_value(config, 'name')
-            self.memory = int(sxp.child_value(config, 'memory', '128'))
+            if self.name is None:
+                raise VmError('missing domain name')
+            self.memory = int(sxp.child_value(config, 'memory'))
+            if self.memory is None:
+                raise VmError('missing memory size')
+            self.configure_console()
             self.configure_restart()
             self.configure_backends()
             image = sxp.child_value(config, 'image')
@@ -617,7 +623,7 @@ class XendDomainInfo:
             if ramdisk and not os.path.isfile(ramdisk):
                 raise VmError('Kernel ramdisk does not exist: %s' % ramdisk)
         self.init_domain()
-        self.console = xendConsole.console_create(self.dom)
+        self.console = xendConsole.console_create(self.dom, console_port=self.console_port)
         self.build_domain(ostype, kernel, ramdisk, cmdline, vifs_n)
         self.image = kernel
         self.ramdisk = ramdisk
@@ -679,6 +685,15 @@ class XendDomainInfo:
         if dev_config:
             self.config.remove(['device', dev_config])
         dev.destroy()
+
+    def configure_console(self):
+        x = sxp.child_value(self.config, 'console')
+        if x:
+            try:
+                port = int(x)
+            except:
+                raise VmError('invalid console:' + str(x))
+            self.console_port = port
 
     def configure_restart(self):
         r = sxp.child_value(self.config, 'restart', RESTART_ONREBOOT)

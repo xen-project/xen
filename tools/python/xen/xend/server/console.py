@@ -6,6 +6,7 @@ from twisted.protocols import telnet
 
 from xen.lowlevel import xu
 
+from xen.xend.XendError import XendError
 from xen.xend import EventServer
 eserver = EventServer.instance()
 
@@ -77,6 +78,9 @@ class ConsoleControllerFactory(controller.ControllerFactory):
     def createInstance(self, dom, console_port=None):
         if console_port is None:
             console_port = CONSOLE_PORT_BASE + dom
+        for c in self.getInstances():
+            if c.console_port == console_port:
+                raise XendError('console port in use: ' + str(console_port))
         console = ConsoleController(self, dom, console_port)
         self.addInstance(console)
         eserver.inject('xend.console.create',

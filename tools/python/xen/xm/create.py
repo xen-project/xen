@@ -68,38 +68,42 @@ gopts.opt('load', short='L', val='FILE',
           use='Domain saved state to load.')
 
 gopts.opt('dryrun', short='n',
-         fn=set_true, default=0,
-         use="""Dry run - print the config but don't create the domain.
+          fn=set_true, default=0,
+          use="""Dry run - print the config but don't create the domain.
 The defaults file is loaded and the SXP configuration is created and printed.         
 """)
 
 gopts.opt('console_autoconnect', short='c',
-         fn=set_true, default=0,
-         use="Connect to console after domain is created.")
+          fn=set_true, default=0,
+          use="Connect to console after domain is created.")
 
 gopts.var('name', val='NAME',
           fn=set_value, default=None,
           use="Domain name.")
 
 gopts.var('kernel', val='FILE',
-         fn=set_value, default=None,
-         use="Path to kernel image.")
+          fn=set_value, default=None,
+          use="Path to kernel image.")
 
 gopts.var('ramdisk', val='FILE',
-         fn=set_value, default='',
-         use="Path to ramdisk.")
+          fn=set_value, default='',
+          use="Path to ramdisk.")
 
 gopts.var('builder', val='FUNCTION',
-         fn=set_value, default='linux',
-         use="Function to use to build the domain.")
+          fn=set_value, default='linux',
+          use="Function to use to build the domain.")
 
 gopts.var('memory', val='MEMORY',
-         fn=set_value, default=128,
-         use="Domain memory in MB.")
+          fn=set_value, default=128,
+          use="Domain memory in MB.")
+
+gopts.var('console', val='PORT',
+          fn=set_int, default=None,
+          use="Console port to use. Default is 9600 + domain id.")
 
 gopts.var('restart', val='onreboot|always|never',
-         fn=set_value, default=None,
-         use="""Whether the domain should be restarted on exit.
+          fn=set_value, default=None,
+          use="""Whether the domain should be restarted on exit.
          - onreboot: restart on exit with shutdown code reboot
          - always:   always restart on exit, ignore exit code
          - never:    never restart on exit, ignore exit code
@@ -114,27 +118,27 @@ gopts.var('netif', val='no|yes',
           use="Make the domain a network interface backend.")
 
 gopts.var('disk', val='phy:DEV,VDEV,MODE',
-         fn=append_value, default=[],
-         use="""Add a disk device to a domain. The physical device is DEV,
+          fn=append_value, default=[],
+          use="""Add a disk device to a domain. The physical device is DEV,
          which is exported to the domain as VDEV. The disk is read-only if MODE
          is 'r', read-write if MODE is 'w'.
          The option may be repeated to add more than one disk.
          """)
 
 gopts.var('pci', val='BUS,DEV,FUNC',
-         fn=append_value, default=[],
-         use="""Add a PCI device to a domain, using given params (in hex).
+          fn=append_value, default=[],
+          use="""Add a PCI device to a domain, using given params (in hex).
          For example '-pci c0,02,1a'.
          The option may be repeated to add more than one pci device.
          """)
 
 gopts.var('ipaddr', val="IPADDR",
-         fn=append_value, default=[],
-         use="Add an IP address to the domain.")
+          fn=append_value, default=[],
+          use="Add an IP address to the domain.")
 
 gopts.var('vif', val="mac=MAC,bridge=BRIDGE,script=SCRIPT",
-         fn=append_value, default=[],
-         use="""Add a network interface with the given MAC address and bridge.
+          fn=append_value, default=[],
+          use="""Add a network interface with the given MAC address and bridge.
          The vif is configured by calling the given configuration script.
          If mac is not specified a random MAC address is used.
          If bridge is not specified the default bridge is used.
@@ -144,53 +148,53 @@ gopts.var('vif', val="mac=MAC,bridge=BRIDGE,script=SCRIPT",
          """)
 
 gopts.var('nics', val="NUM",
-         fn=set_int, default=1,
-         use="""Set the number of network interfaces.
+          fn=set_int, default=1,
+          use="""Set the number of network interfaces.
          Use the vif option to define interface parameters, otherwise
          defaults are used. Specifying vifs will increase the
          number of interfaces as needed.
          """)
 
 gopts.var('root', val='DEVICE',
-         fn=set_value, default='',
-         use="""Set the root= parameter on the kernel command line.
+          fn=set_value, default='',
+          use="""Set the root= parameter on the kernel command line.
          Use a device, e.g. /dev/sda1, or /dev/nfs for NFS root.""")
 
 gopts.var('extra', val="ARGS",
-         fn=set_value, default='',
-         use="Set extra arguments to append to the kernel command line.")
+          fn=set_value, default='',
+          use="Set extra arguments to append to the kernel command line.")
 
 gopts.var('ip', val='IPADDR',
-         fn=set_value, default='',
-         use="Set the kernel IP interface address.")
+          fn=set_value, default='',
+          use="Set the kernel IP interface address.")
 
 gopts.var('gateway', val="IPADDR",
-         fn=set_value, default='',
-         use="Set the kernel IP gateway.")
+          fn=set_value, default='',
+          use="Set the kernel IP gateway.")
 
 gopts.var('netmask', val="MASK",
-         fn=set_value, default = '',
-         use="Set the kernel IP netmask.")
+          fn=set_value, default = '',
+          use="Set the kernel IP netmask.")
 
 gopts.var('hostname', val="NAME",
-         fn=set_value, default='',
-         use="Set the kernel IP hostname.")
+          fn=set_value, default='',
+          use="Set the kernel IP hostname.")
 
 gopts.var('interface', val="INTF",
-         fn=set_value, default="eth0",
-         use="Set the kernel IP interface name.")
+          fn=set_value, default="eth0",
+          use="Set the kernel IP interface name.")
 
 gopts.var('dhcp', val="off|dhcp",
-         fn=set_value, default='off',
-         use="Set the kernel dhcp option.")
+          fn=set_value, default='off',
+          use="Set the kernel dhcp option.")
 
 gopts.var('nfs_server', val="IPADDR",
-         fn=set_value, default=None,
-         use="Set the address of the NFS server for NFS root.")
+          fn=set_value, default=None,
+          use="Set the address of the NFS server for NFS root.")
 
 gopts.var('nfs_root', val="PATH",
-         fn=set_value, default=None,
-         use="Set the path of the root NFS directory.")
+          fn=set_value, default=None,
+          use="Set the path of the root NFS directory.")
 
 def strip(pre, s):
     """Strip prefix 'pre' if present.
@@ -244,7 +248,7 @@ def randomMAC():
     The remaining 3 fields are random, with the first bit of the first
     random field set 0.
 
-    returns array of 6 ints
+    returns MAC address string
     """
     mac = [ 0xaa, 0x00, 0x00,
             random.randint(0x00, 0x7f),
@@ -300,6 +304,8 @@ def make_config(vals):
         config.append(['backend', ['netif']])
     if vals.restart:
         config.append(['restart', vals.restart])
+    if vals.console:
+        config.append(['console', vals.console])
     
     configure_image(config, vals)
     config_devs = []
@@ -349,6 +355,7 @@ def preprocess_vifs(opts, vals):
 
 def preprocess_ip(opts, vals):
     setip = (vals.hostname or vals.netmask
+             or vals.nfs_server
              or vals.gateway or vals.dhcp or vals.interface)
     if not setip: return
     dummy_nfs_server = '1.2.3.4'
