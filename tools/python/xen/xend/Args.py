@@ -1,4 +1,6 @@
 import types
+import StringIO
+
 import sxp
 
 class ArgError(StandardError):
@@ -50,39 +52,48 @@ class Args:
     def get_form_args(self, f, xargs=None):
         d = {}
         for (k, v) in f.items():
-            n = len(v)
             if ((k not in self.arg_dict) and
                 (k not in self.key_dict)):
                 continue
-            if n == 0:
-                continue
-            elif n == 1:
-                d[k] = v[0]
+            if isinstance(v, types.ListType):
+                n = len(v)
+                if n == 0:
+                    continue
+                elif n == 1:
+                    val = v[0]
+                else:
+                    raise ArgError('Too many values for %s' % k)
             else:
-                raise ArgError('Too many values for %s' % k)
+                val = v
+            d[k] = val
         return self.get_args(d, xargs=xargs)
 
     def coerce(self, type, v):
         try:
             if type == 'int':
-                return int(v)
-            if type == 'str':
-                return str(v)
-            if type == 'sxpr':
-                return self.sxpr(v)
+                val = int(v)
+            elif type == 'str':
+                val = str(v)
+            elif type == 'sxpr':
+                val = self.sxpr(v)
+            else:
+                raise ArgError('invalid type:' + str(type))
+            return val
         except ArgError:
             raise
         except StandardError, ex:
             raise ArgError(str(ex))
 
     def sxpr(self, v):
-        if instanceof(v, types.ListType):
-            return v
-        if instanceof(v, types.File) or hasattr(v, 'readline'):
-            return sxpr_file(v)
-        if instanceof(v, types.StringType):
-            return sxpr_file(StringIO(v))
-        return str(v)
+        if isinstance(v, types.ListType):
+            val = v
+        elif isinstance(v, types.FileType) or hasattr(v, 'readline'):
+            val = self.sxpr_file(v)
+        elif isinstance(v, types.StringType):
+            val = self.sxpr_file(StringIO.StringIO(v))
+        else:
+            val = str(v)
+        return val
 
     def sxpr_file(self, fin):
         try:
