@@ -269,6 +269,8 @@ long do_block_io_op(block_io_op_t *u_block_io_op)
     case BLOCK_IO_OP_VBD_INFO: 
 	/* query information about a particular VBD */
 	ret = vbd_info(&op.u.info_params); 
+	if(ret == 0)
+	    copy_to_user(u_block_io_op, &op, sizeof(op)); 
 	break; 
 
     default: 

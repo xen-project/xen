@@ -121,6 +121,7 @@ long vbd_add(vbd_add_t *add_params)
     } 
 
     put_task_struct(p);
+
     return 0; 
 }
 
@@ -201,7 +202,8 @@ static int vbd_probe_devices(xen_disk_info_t *xdi, struct task_struct *p)
 long vbd_probe(vbd_probe_t *probe_params) 
 {
     struct task_struct *p = NULL; 
-    int ret;  
+    short putp = 0; 
+    int ret = 0;  
 
     if(probe_params->domain) { 
 
@@ -212,13 +214,14 @@ long vbd_probe(vbd_probe_t *probe_params)
 	if(probe_params->domain != VBD_PROBE_ALL) { 
 
 	    p = find_domain_by_id(probe_params->domain);
-	
+	    
 	    if (!p) { 
 		printk("vbd_probe attempted for non-existent domain %d\n", 
 		       probe_params->domain); 
 		return -EINVAL; 
 	    }
 
+	    putp = 1; 
 	}
 
     } else 
@@ -231,11 +234,11 @@ long vbd_probe(vbd_probe_t *probe_params)
 	/* privileged domains always get access to the 'real' devices */
 	if((ret = ide_probe_devices(&probe_params->xdi))) {
 	    printk("vbd_probe: error %d in probing ide devices\n", ret); 
-	    return ret; 
+	    goto out; 
 	}
 	if((ret = scsi_probe_devices(&probe_params->xdi))) { 
 	    printk("vbd_probe: error %d in probing scsi devices\n", ret); 
-	    return ret; 
+	    goto out; 
 	}
     } 
     
@@ -253,7 +256,7 @@ long vbd_probe(vbd_probe_t *probe_params)
 		    printk("vbd_probe: error %d in probing virtual devices\n",
 			   ret); 
 		    read_unlock_irqrestore(&tasklist_lock, flags);
-		    return ret; 
+		    goto out; 
 		}
 	    }
 	}
@@ -265,18 +268,66 @@ long vbd_probe(vbd_probe_t *probe_params)
 	/* probe for disks and VBDs for just 'p' */
 	if((ret = vbd_probe_devices(&probe_params->xdi, p))) { 
 	    printk("vbd_probe: error %d in probing virtual devices\n", ret); 
-	    return ret; 
+	    goto out; 
 	}
 
     }
 
+ out: 
+    if(putp) 
+	put_task_struct(p); 
 
-    return 0; 
+    return ret; 
 }
 
 long vbd_info(vbd_info_t *info_params) 
 {
-    return -ENOSYS; 
+    struct task_struct *p = NULL; 
+    xen_extent_le_t *x; 
+    xen_extent_t *extents; 
+    vbd_t *v; 
+    int h, ret = 0;  
+   
+    if(info_params->domain != current->domain && !IS_PRIV(current))
+	return -EPERM; 
+
+    p = find_domain_by_id(info_params->domain);
+    
+    if (!p) { 
+	printk("vbd_info attempted for non-existent domain %d\n", 
+	       info_params->domain); 
+	return -EINVAL; 
+    }
+
+    h = HSH(info_params->vdevice); 
+
+    for(v = p->vbdtab[h]; v; v = v->next) 
+	if(v->vdevice == info_params->vdevice)
+	    break; 
+
+    if(!v) {
+	printk("vbd_info attempted on non-existent VBD.\n"); 
+	ret = -EINVAL; 
+	goto out; 
+    }
+
+    info_params->mode     = v->mode; 
+    info_params->nextents = 0; 
+
+    extents = info_params->extents; // convenience 
+
+    for(x = v->extents; x; x = x->next) {
+	if((ret = copy_to_user(extents++, &x->extent, 
+			       sizeof(xen_extent_t))) < 0) {
+	    printk("vbd_info: copy_to_user failed [rc=%d]\n", ret); 
+	    goto out; 
+	} 
+	info_params->nextents++; 
+    }
+
+ out: 
+    put_task_struct(p); 
+    return ret; 
 }
 
 
