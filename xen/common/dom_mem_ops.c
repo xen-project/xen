@@ -98,7 +98,7 @@ long do_dom_mem_op(unsigned int   op,
     struct domain *d;
     long           rc;
 
-    d = (domid == DOMID_SELF) ? current : find_domain_by_id(domid);
+    d = ( (domid == DOMID_SELF) || (!IS_PRIV(current)) ) ? current : find_domain_by_id(domid);
     if ( d == NULL )
 	return -ESRCH;
 
