@@ -28,7 +28,11 @@ extern int do_timer_lists_from_pit;
 char ignore_irq13;		/* set if exception 16 works */
 struct cpuinfo_x86 boot_cpu_data = { 0, 0, 0, 0, -1 };
 
+#if defined(__x86_64__)
+unsigned long mmu_cr4_features = X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE;
+#else
 unsigned long mmu_cr4_features = X86_CR4_PSE | X86_CR4_PGE;
+#endif
 EXPORT_SYMBOL(mmu_cr4_features);
 
 unsigned long wait_init_idle;
