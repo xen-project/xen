@@ -193,7 +193,9 @@ void domain_wake(struct domain *d)
         d->wokenup = NOW();
 #endif
     }
-
+    
+    clear_bit(DF_MIGRATED, &d->flags);
+    
     spin_unlock_irqrestore(&d->state_lock, flags);
 }
 

@@ -248,6 +248,8 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         else
         {
             domain_pause(d);
+            if(d->processor != cpu % smp_num_cpus)
+                set_bit(DF_MIGRATED, &d->flags);
             set_bit(DF_CPUPINNED, &d->flags);
             d->processor = cpu % smp_num_cpus;
             domain_unpause(d);
