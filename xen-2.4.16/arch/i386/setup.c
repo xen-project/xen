@@ -193,6 +193,9 @@ void __init cpu_init(void)
     /* No nested task. */
     __asm__("pushfl ; andl $0xffffbfff,(%esp) ; popfl");
 
+    /* Ensure FPU gets initialised for each domain. */
+    stts();
+
     /* Set up and load the per-CPU TSS and LDT. */
     t->ss0  = __HYPERVISOR_DS;
     t->esp0 = current->thread.esp0;

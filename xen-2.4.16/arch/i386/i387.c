@@ -22,20 +22,26 @@ void init_fpu(void)
 
 static inline void __save_init_fpu( struct task_struct *tsk )
 {
-	if ( cpu_has_fxsr ) {
-		asm volatile( "fxsave %0 ; fnclex"
-			      : "=m" (tsk->thread.i387.fxsave) );
-	} else {
-		asm volatile( "fnsave %0 ; fwait"
-			      : "=m" (tsk->thread.i387.fsave) );
-	}
-	tsk->flags &= ~PF_USEDFPU;
+    if ( cpu_has_fxsr ) {
+        asm volatile( "fxsave %0 ; fnclex"
+                      : "=m" (tsk->thread.i387.fxsave) );
+    } else {
+        asm volatile( "fnsave %0 ; fwait"
+                      : "=m" (tsk->thread.i387.fsave) );
+    }
+    tsk->flags &= ~PF_USEDFPU;
 }
 
 void save_init_fpu( struct task_struct *tsk )
 {
-	__save_init_fpu(tsk);
-	stts();
+    /*
+     * The guest OS may have set the 'virtual STTS' flag.
+     * This causes us to set the real flag, so we'll need
+     * to temporarily clear it while saving f-p state.
+     */
+    if ( tsk->flags & PF_GUEST_STTS ) clts();
+    __save_init_fpu(tsk);
+    stts();
 }
 
 void restore_fpu( struct task_struct *tsk )
