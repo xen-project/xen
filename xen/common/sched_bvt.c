@@ -180,13 +180,16 @@ int bvt_alloc_task(struct domain *p)
 /*
  * Add and remove a domain
  */
-void bvt_add_task(struct domain *p) 
+void bvt_add_task(struct domain *p, float weight) 
 {
     struct bvt_dom_info *inf = BVT_INFO(p);
     ASSERT(inf != NULL);
     ASSERT(p   != NULL);
 
-    inf->mcu_advance = MCU_ADVANCE;
+    if(weight > 0)
+        inf->mcu_advance = MCU_ADVANCE / weight;
+    else
+        inf->mcu_advance = MCU_ADVANCE;
     inf->domain = p;
     inf->warpback    = 0;
     /* Set some default values here. */
@@ -224,7 +227,7 @@ int bvt_init_idle_task(struct domain *p)
 
     if(bvt_alloc_task(p) < 0) return -1;
 
-    bvt_add_task(p);
+    bvt_add_task(p, 0);
 
     spin_lock_irqsave(&CPU_INFO(p->processor)->run_lock, flags);
     

@@ -55,6 +55,10 @@ name = "VM%d" % vmid
 # Which CPU to start domain on? 
 #cpu = -1   # leave to Xen to pick
 cpu = vmid  # set based on vmid (mod number of CPUs)
+# The weight (CPU share) of the domain. Works with all
+# schedulers that have notion of weight (eg BVT). 
+# Default is 1. Float values can be used.
+#weight = 1.5
 
 #----------------------------------------------------------------------------
 # Define network interfaces.
