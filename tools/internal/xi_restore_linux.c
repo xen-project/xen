@@ -15,6 +15,13 @@ static char *argv0 = "internal_restore_linux";
 /* A table mapping each PFN to its new MFN. */
 static unsigned long *pfn_to_mfn_table;
 
+/* This may allow us to create a 'quiet' command-line option, if necessary. */
+#define verbose_printf(_f, _a...) \
+    do {                          \
+        printf( _f , ## _a );     \
+        fflush(stdout);           \
+    } while ( 0 )
+
 static int get_pfn_list(
     int domain_id, unsigned long *pfn_buf, unsigned long max_pfns)
 {
@@ -126,6 +133,7 @@ int main(int argc, char **argv)
     dom0_op_t op;
     int rc = 1, i, j;
     unsigned long mfn, pfn, dom = 0;
+    unsigned int prev_pc, this_pc;
     
     /* Number of page frames in use by this XenoLinux session. */
     unsigned long nr_pfns;
@@ -256,12 +264,22 @@ int main(int argc, char **argv)
         goto out;
     }
 
+    verbose_printf("Reloading memory pages:   0%%");
+
     /*
      * Now simply read each saved frame into its new machine frame.
      * We uncanonicalise page tables as we go.
      */
+    prev_pc = 0;
     for ( i = 0; i < nr_pfns; i++ )
     {
+        this_pc = (i * 100) / nr_pfns;
+        if ( (this_pc - prev_pc) >= 5 )
+        {
+            verbose_printf("\b\b\b\b%3d%%", this_pc);
+            prev_pc = this_pc;
+        }
+
         mfn = pfn_to_mfn_table[i];
 
         if ( !checked_read(fd, page, PAGE_SIZE) )
@@ -347,6 +365,8 @@ int main(int argc, char **argv)
 
     if ( flush_mmu_updates() )
         goto out;
+
+    verbose_printf("\b\b\b\b100%%\nMemory reloaded.\n");
 
     /* Uncanonicalise the suspend-record frame number and poke resume rec. */
     pfn = ctxt.i386_ctxt.esi;
@@ -446,13 +466,20 @@ int main(int argc, char **argv)
     rc = do_dom0_op(&op);
 
  out:
-    /* If we experience an error then kill the half-constructed domain. */
-    if ( (rc != 0) && (dom != 0) )
+    if ( rc != 0 )
     {
-        op.cmd = DOM0_DESTROYDOMAIN;
-        op.u.destroydomain.domain = dom;
-        op.u.destroydomain.force  = 1;
-        (void)do_dom0_op(&op);
+        if ( dom != 0 )
+        {
+            op.cmd = DOM0_DESTROYDOMAIN;
+            op.u.destroydomain.domain = dom;
+            op.u.destroydomain.force  = 1;
+            (void)do_dom0_op(&op);
+        }
+    }
+    else
+    {
+        /* Success: print the domain id. */
+        printf("DOM=%ld\n", dom);
     }
 
     return !!rc;

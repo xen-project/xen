@@ -138,7 +138,7 @@
 #include <asm/uaccess.h>
 #include <asm/domain_page.h>
 
-#if 1
+#if 0
 #define MEM_LOG(_f, _a...) printk("DOM%d: (file=memory.c, line=%d) " _f "\n", current->domain, __LINE__, ## _a )
 #else
 #define MEM_LOG(_f, _a...) ((void)0)
@@ -395,6 +395,8 @@ static int get_twisted_l2_table(unsigned long entry_pfn, l2_pgentry_t l2e)
 
 static int get_l2_table(unsigned long page_nr)
 {
+    struct pfn_info *page;
+    struct task_struct *p;
     l2_pgentry_t *p_l2_entry, l2_entry;
     int i, ret=0;
    
@@ -424,12 +426,22 @@ static int get_l2_table(unsigned long page_nr)
     memcpy(p_l2_entry, 
            &idle_pg_table[DOMAIN_ENTRIES_PER_L2_PAGETABLE],
            HYPERVISOR_ENTRIES_PER_L2_PAGETABLE * sizeof(l2_pgentry_t));
-    p_l2_entry[(PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT) -
-              DOMAIN_ENTRIES_PER_L2_PAGETABLE] =
-        mk_l2_pgentry(__pa(current->mm.perdomain_pt) | __PAGE_HYPERVISOR);
     p_l2_entry[(LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT) -
               DOMAIN_ENTRIES_PER_L2_PAGETABLE] =
         mk_l2_pgentry((page_nr << PAGE_SHIFT) | __PAGE_HYPERVISOR);
+
+    /*
+     * The per-domain PGD is slightly tricky, as we may not be executing
+     * in the context of the correct domain (DOM0 builds pt's for others).
+     */
+    page = frame_table + page_nr;
+    if ( (p = find_domain_by_id(page->flags & PG_domain_mask)) != NULL )
+    {
+        p_l2_entry[(PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT) -
+                  DOMAIN_ENTRIES_PER_L2_PAGETABLE] =
+            mk_l2_pgentry(__pa(p->mm.perdomain_pt) | __PAGE_HYPERVISOR);
+        put_task_struct(p);
+    }
 
  out:
     unmap_domain_mem(p_l2_entry);

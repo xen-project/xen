@@ -17,6 +17,13 @@ static unsigned long *pfn_to_mfn_table;
 /* A table mapping each current MFN to its canonical PFN. */
 static unsigned long *mfn_to_pfn_table;
 
+/* This may allow us to create a 'quiet' command-line option, if necessary. */
+#define verbose_printf(_f, _a...) \
+    do {                          \
+        printf( _f , ## _a );     \
+        fflush(stdout);           \
+    } while ( 0 )
+
 static int devmem_fd;
 
 static int init_pfn_mapper(void)
@@ -100,6 +107,7 @@ int main(int argc, char **argv)
     dom0_op_t op;
     int rc = 1, i, j;
     unsigned long mfn, dom;
+    unsigned int prev_pc, this_pc;
 
     /* Remember if we stopped the guest, so we can restart it on exit. */
     int we_stopped_it = 0;
@@ -319,9 +327,19 @@ int main(int argc, char **argv)
     }
     unmap_pfn(ppage);
 
+    verbose_printf("Saving memory pages:   0%%");
+
     /* Now write out each data page, canonicalising page tables as we go... */
+    prev_pc = 0;
     for ( i = 0; i < srec.nr_pfns; i++ )
     {
+        this_pc = (i * 100) / srec.nr_pfns;
+        if ( (this_pc - prev_pc) >= 5 )
+        {
+            verbose_printf("\b\b\b\b%3d%%", this_pc);
+            prev_pc = this_pc;
+        }
+
         mfn = pfn_to_mfn_table[i];
 
         ppage = map_pfn(mfn);
@@ -353,6 +371,8 @@ int main(int argc, char **argv)
             goto out;
         }
     }
+
+    verbose_printf("\b\b\b\b100%%\nMemory saved.\n");
 
     /* Success! */
     rc = 0;
