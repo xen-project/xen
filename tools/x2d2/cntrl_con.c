@@ -40,7 +40,6 @@ domain_created(const char *name, int mem_kb, int domid)
 
 	pthread_mutex_init(&d->mux, NULL);
 	pthread_cond_init(&d->cond, NULL);
-
 	pthread_create(&d->thread, NULL, domain_thread_func, d);
 
 	list_insert_after(&d->domain_list, &head_domain);
@@ -164,7 +163,7 @@ create_command_handler(struct open_connection *oc, const struct command *ign,
 		send_message(oc, "E01 failed to parse %s\n", args);
 		return;
 	}
-	r = xc_domain_create(xc_handle, mem_kb, name, -1, 0, &domid);
+	r = xc_domain_create(xc_handle, mem_kb, -1, 0, &domid);
 	if (r < 0) {
 		send_message(oc, "E02 creating domain (%s)\n",
 			     strerror(errno));
@@ -377,8 +376,8 @@ destroy_command_handler(struct open_connection *oc,
 
 	r = xc_domain_destroy(xc_handle, domid);
 	if (r < 0) {
-		send_message(oc, "E19 error destroying domain %d: %s\n",
-			     domid, sys_errlist[errno]);
+		send_message( oc, "E19 error destroying domain %d: %s\n",
+			      domid, strerror(errno) );
 		return;
 	}
 	d->state = DOM_STATE_DEAD;

@@ -1,10 +1,22 @@
-CFLAGS+=-Wall -g -Werror
+XEN_ROOT=../..
+include $(XEN_ROOT)/tools/Make.defs
 
-SRCS=main.c cntrl_con.c util.c
+CC       = gcc
+CFLAGS   = -Wall -Werror -g
 
-all: minixend
+CFLAGS  += -I $(XEN_XC)
+CFLAGS  += -I $(XEN_LIBXC)
+CFLAGS  += -I $(XEN_LIBXUTIL)
 
-#$(SRCS): minixend.h
+HDRS     = $(wildcard *.h)
+OBJS     = $(patsubst %.c,%.o,$(wildcard *.c))
 
-minixend: $(subst .c,.o,$(SRCS))
-	gcc $^ -o $@ $(LDFLAGS) -lxc -lpthread
+BIN      = minixend
+
+all: $(BIN)
+
+clean:
+	$(RM) *.a *.so *.o *.rpm $(BIN)
+
+$(BIN): $(OBJS)
+	$(CC) $(CFLAGS) $^ -o $@ -L$(XEN_LIBXC) -L$(XEN_LIBXUTIL) -lxc -lxutil -lpthread
