@@ -32,6 +32,7 @@
 #define X86_VENDOR_TRANSMETA 7
 #define X86_VENDOR_NSC 8
 #define X86_VENDOR_SIS 9
+#define X86_VENDOR_NUM 10
 #define X86_VENDOR_UNKNOWN 0xff
 
 /*
@@ -255,6 +256,16 @@ static inline unsigned int cpuid_edx(unsigned int op)
 #define write_cr0(x) \
 	__asm__("mov"__OS" %0,%%cr0": :"r" (x));
 
+#define read_cr4() ({ \
+	unsigned int __dummy; \
+	__asm__( \
+		"movl %%cr4,%0\n\t" \
+		:"=r" (__dummy)); \
+	__dummy; \
+})
+
+#define write_cr4(x) \
+	__asm__("movl %0,%%cr4": :"r" (x));
 
 /*
  * Save the cr4 feature set we're using (ie
@@ -283,6 +294,37 @@ static inline void clear_in_cr4 (unsigned long mask)
             : : "irg" (~mask)
             :"ax");
 }
+
+/*
+ *      NSC/Cyrix CPU configuration register indexes
+ */
+
+#define CX86_PCR0 0x20
+#define CX86_GCR  0xb8
+#define CX86_CCR0 0xc0
+#define CX86_CCR1 0xc1
+#define CX86_CCR2 0xc2
+#define CX86_CCR3 0xc3
+#define CX86_CCR4 0xe8
+#define CX86_CCR5 0xe9
+#define CX86_CCR6 0xea
+#define CX86_CCR7 0xeb
+#define CX86_PCR1 0xf0
+#define CX86_DIR0 0xfe
+#define CX86_DIR1 0xff
+#define CX86_ARR_BASE 0xc4
+#define CX86_RCR_BASE 0xdc
+
+/*
+ *      NSC/Cyrix CPU indexed register access macros
+ */
+
+#define getCx86(reg) ({ outb((reg), 0x22); inb(0x23); })
+
+#define setCx86(reg, data) do { \
+	outb((reg), 0x22); \
+	outb((data), 0x23); \
+} while (0)
 
 #define IOBMP_BYTES             8192
 #define IOBMP_BYTES_PER_SELBIT  (IOBMP_BYTES / 64)

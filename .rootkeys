@@ -658,6 +658,13 @@
 3ddb79bdqfIcjkz_h9Hvtp8Tk_19Zw xen/arch/x86/irq.c
 40ec29ffuOa1ZvmJHzFKyZn4k_RcXg xen/arch/x86/memory.c
 3ddb79bdS4UeWWXDH-FaBKqcpMFcnw xen/arch/x86/mpparse.c
+41aaf566Z4sTDgJ77eEg0TzzQ1ka6Q xen/arch/x86/mtrr/amd.c
+41aaf566TOpOBXT00wwQGUh20f1rlA xen/arch/x86/mtrr/centaur.c
+41aaf566yhr0zKYnGVSOQpkWMM0Kiw xen/arch/x86/mtrr/cyrix.c
+41aaf567t3hFKsyfEFoy3KAnB-bj8w xen/arch/x86/mtrr/generic.c
+41aaf567tqrKGSTDK8OVeAbpeoccPw xen/arch/x86/mtrr/main.c
+41aaf567a36esU-rUK7twPiv-yTFyw xen/arch/x86/mtrr/mtrr.h
+41aaf567DcTL6pqVtLZJI5cSryyA1A xen/arch/x86/mtrr/state.c
 3f12cff65EV3qOG2j37Qm0ShgvXGRw xen/arch/x86/nmi.c
 3ddb79bdHe6_Uij4-glW91vInNtBYQ xen/arch/x86/pci-irq.c
 3ddb79bcZ_2FxINljqNSkqa17ISyJw xen/arch/x86/pci-pc.c
@@ -793,6 +800,7 @@
 40ec25fd7cSvbP7Biw91zaU_g0xsEQ xen/include/asm-x86/mm.h
 3ddb79c3n_UbPuxlkNxvvLycClIkxA xen/include/asm-x86/mpspec.h
 3ddb79c2wa0dA_LGigxOelSGbJ284Q xen/include/asm-x86/msr.h
+41aaf567Mi3OishhvrCtET1y-mxQBg xen/include/asm-x86/mtrr.h
 41a61536MFhNalgbVmYGXAhQsPTZNw xen/include/asm-x86/multicall.h
 3ddb79c3xjYnrv5t3VqYlR4tNEOl4Q xen/include/asm-x86/page.h
 3ddb79c3ysKUbxZuwKBRK3WXU2TlEg xen/include/asm-x86/pci.h
