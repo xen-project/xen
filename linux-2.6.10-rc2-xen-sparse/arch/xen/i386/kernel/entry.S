@@ -93,7 +93,7 @@ VM_MASK		= 0x00020000
 #define preempt_stop		XEN_BLOCK_EVENTS(%esi)
 #else
 #define preempt_stop
-#define resume_kernel		restore_all_enable_events
+#define resume_kernel		restore_all
 #endif
 
 #define SAVE_ALL_NO_EVENTMASK \
@@ -109,7 +109,7 @@ VM_MASK		= 0x00020000
 	pushl %ebx; \
 	movl $(__USER_DS), %edx; \
 	movl %edx, %ds; \
-	movl %edx, %es
+	movl %edx, %es;
 
 #define SAVE_ALL \
 	SAVE_ALL_NO_EVENTMASK; \
@@ -397,6 +397,7 @@ vector=vector+1
 	ALIGN
 common_interrupt:
 	SAVE_ALL
+	movl %esp,%eax
 	call do_IRQ
 	jmp ret_from_intr
 
@@ -404,7 +405,8 @@ common_interrupt:
 ENTRY(name)				\
 	pushl $nr-256;			\
 	SAVE_ALL			\
-	call smp_/**/name;	\
+	movl %esp,%eax;			\
+	call smp_/**/name;		\
 	jmp ret_from_intr;
 
 /* The include is where all of the SMP etc. interrupts come from */
@@ -437,7 +439,7 @@ error_code:
 	movl %ecx, %es
 	movl %esp,%eax			# pt_regs pointer
 	XEN_GET_VCPU_INFO(%esi)
-	XEN_SAVE_UPCALL_MASK(%esi,%dl,EVENT_MASK+8)
+	XEN_SAVE_UPCALL_MASK(%esi,%bl,EVENT_MASK)
 	call *%edi
 	jmp ret_from_exception
 
@@ -596,7 +598,7 @@ debug_stack_correct:
 	movl %esp,%eax			# pt_regs pointer
 	call do_debug
 	testl %eax,%eax
-	jnz restore
+	jnz restore_all
 	jmp ret_from_exception
 
 #if 0 /* XEN */
@@ -721,7 +723,7 @@ ENTRY(page_fault)
 	movl %eax, %es
 	movl %esp,%eax			/* pt_regs pointer */
 	XEN_GET_VCPU_INFO(%esi)
-	XEN_SAVE_UPCALL_MASK(%esi,%bl,EVENT_MASK+12)
+	XEN_SAVE_UPCALL_MASK(%esi,%bl,EVENT_MASK)
 	call do_page_fault
 	jmp ret_from_exception
 
