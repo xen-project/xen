@@ -52,10 +52,10 @@ static void dom_mem_cleanup(dom_mem_t * dom_mem)
     if(mem_fd < 0){
         perror(PERR_STRING);
     }
-
-	if(write(mem_fd, (dom_mem_t *)dom_mem, sizeof(dom_mem_t)) < 0){
-		dbstatus("Error unmapping domain's memory.\n");
-	}
+    
+    if(write(mem_fd, (dom_mem_t *)dom_mem, sizeof(dom_mem_t)) < 0){
+	dbstatus("Error unmapping domain's memory.\n");
+    }
 
     close(mem_fd);
 }
@@ -163,7 +163,7 @@ static dom0_newdomain_t * create_new_domain(long req_mem)
     close(id_fd);
     
     sprintf(cmd_path, "Reserved %ld kbytes memory and assigned id %d to the"
-                    "new domain.", req_mem, dom_data->domain);
+	    " new domain.", req_mem, dom_data->domain);
     dbstatus(cmd_path);
 
     return dom_data;
@@ -386,6 +386,7 @@ static int launch_domain(dom_meminfo_t  * meminfo)
     dbstatus("Launched the new domain!");
 
     close(cmd_fd);
+    return 0;
 }
 
 int main(int argc, char **argv)
@@ -401,50 +402,44 @@ int main(int argc, char **argv)
     int kernel_fd;
     int count;
     int cmd_len;
-    int ret = 0;
+    int rc = -1;
 
-	unsigned long addr;
+    unsigned long addr;
 
-    if(argc < 4){
+    if(argc < 4) {
         dberr("Usage: dom_builder <kbytes_mem> <image> <num_vifs> "
-                        "<boot_params>\n");
-        ret = -1;
+	      "<boot_params>\n");
         goto out;
     }
 
     /* create new domain and set up all the neccessary mappings */
 
     kernel_fd = do_kernel_chcks(argv[2], atol(argv[1]), &load_addr, &ksize);
-    if(kernel_fd < 0){
-        ret = -1;
+    if(kernel_fd < 0) {
+	rc = errno; 
         goto out;
     }
-
+    
     /* request the creation of new domain */
-    dom_data = create_new_domain(atol(argv[1]));
-    if(dom_data == 0){
-        ret = -1;
+    if(!(dom_data = create_new_domain(atol(argv[1])))) 
         goto out;
-    }
 
     /* map domain's memory */
-    if(map_dom_mem(dom_data->pg_head, dom_data->memory_kb >> (PAGE_SHIFT - 10), 
-        dom_data->domain, &dom_os_image)){
-        ret = -1;
+    if(map_dom_mem(dom_data->pg_head, dom_data->memory_kb >> (PAGE_SHIFT-10), 
+		   dom_data->domain, &dom_os_image))
         goto out;
-    }
 
     /* the following code does the actual domain building */
-    meminfo = setup_guestos(dom_data->domain, kernel_fd, load_addr, ksize, 
-        &dom_os_image);
-    if(meminfo == NULL){
-		printf("Domain Builder: debug: meminfo NULL\n");
-        ret = -1;
-        dom_mem_cleanup(&dom_os_image);
+    meminfo = setup_guestos(dom_data->domain, kernel_fd, load_addr, 
+			    ksize, &dom_os_image); 
+    
+    /* and unmap the new domain's memory image since we no longer need it */
+    dom_mem_cleanup(&dom_os_image);
+
+    if(!meminfo) { 
+	printf("Domain Builder: debug: meminfo NULL\n");
         goto out;
     }
-
-    dom_mem_cleanup(&dom_os_image);
 
     meminfo->virt_load_addr = load_addr;
     meminfo->num_vifs = atoi(argv[3]);
@@ -471,13 +466,11 @@ int main(int argc, char **argv)
     dbstatus(status);
     
     /* and launch the domain */
-    if(launch_domain(meminfo) != 0)
-	ret = -1;
-
+    rc = launch_domain(meminfo); 
     
 out:
-    if( ret >= 0 )
+    if( rc >= 0 )
        return meminfo->domain;
     else 
-       return ret;
+       return rc;
 }
