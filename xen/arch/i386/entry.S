@@ -406,7 +406,11 @@ create_bounce_frame:
         jz   1f /* jump if returning to an existing ring-1 activation */
         /* obtain ss/esp from TSS -- no current ring-1 activations */
         movzwl PROCESSOR(%ebx),%eax
-        shll $8,%eax /* multiply by 256 */
+        /* next 4 lines multiply %eax by 8320, which is sizeof(tss_struct) */
+        movl %eax, %ecx
+        shll $7, %ecx
+        shll $13, %eax
+        addl %ecx,%eax
         addl $init_tss + 12,%eax
         movl (%eax),%esi /* tss->esp1 */
 FAULT6: movl 4(%eax),%ds /* tss->ss1  */
