@@ -12,9 +12,10 @@ import sys
 
 from getopt import getopt
 
-CMD_IFCONFIG = '/sbin/ifconfig'
-CMD_ROUTE    = '/sbin/route'
-CMD_BRCTL    = '/usr/local/sbin/brctl'
+os.defpath = os.defpath+':/sbin:/usr/sbin:/usr/local/sbin'
+CMD_IFCONFIG = 'ifconfig'
+CMD_ROUTE    = 'route'
+CMD_BRCTL    = 'brctl'
 
 def routes():
     """Return a list of the routes.
