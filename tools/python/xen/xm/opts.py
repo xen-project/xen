@@ -283,10 +283,14 @@ class Opts:
                 self.usage()
         xargs = []
         for arg in args:
-            (k, v) = arg.split('=', 1)
-            for opt in self.options:
-                if opt.specify(k, v): break
-            else:
+            isvar = 0
+            if '=' in arg:
+                (k, v) = arg.split('=', 1)
+                for opt in self.options:
+                    if opt.specify(k, v):
+                        isvar = 1
+                        break
+            if not isvar:
                 xargs.append(arg)
         return xargs
 
