@@ -7,6 +7,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/signal.h>
@@ -22,12 +23,12 @@
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/console.h>
-#include <asm-xen/evtchn.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/uaccess.h>
 #include <asm/hypervisor.h>
 #include <asm/hypervisor-ifs/event_channel.h>
+#include <asm-xen/evtchn.h>
 #include <asm-xen/ctrl_if.h>
 
 /*
@@ -63,22 +64,24 @@ static unsigned int wc, wp; /* write_cons, write_prod */
 /* This lock protects accesses to the common transmit buffer. */
 static spinlock_t xencons_lock = SPIN_LOCK_UNLOCKED;
 
-static struct tty_driver *xencons_driver;
-
-#define NUM_XENCONS 1
-
 /* Common transmit-kick routine. */
 static void __xencons_tx_flush(void);
 
 /* This task is used to defer sending console data until there is space. */
 static void xencons_tx_flush_task_routine(void *data);
-#if 0				/* XXXcl tq */
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+static struct tty_driver *xencons_driver;
+static DECLARE_WORK(xencons_tx_flush_task,
+                    xencons_tx_flush_task_routine,
+                    NULL);
+#else
+static struct tty_driver xencons_driver;
 static struct tq_struct xencons_tx_flush_task = {
     routine: xencons_tx_flush_task_routine
 };
-#else
-static DECLARE_WORK(xencons_tx_flush_task, xencons_tx_flush_task_routine,
-                    NULL);
+#define irqreturn_t void
+#define IRQ_HANDLED
 #endif
 
 
@@ -112,7 +115,8 @@ static void kcons_write_dom0(
 
     while ( count > 0 )
     {
-        if ( (rc = HYPERVISOR_console_io(CONSOLEIO_write, count, (char *)s)) > 0 )
+        if ( (rc = HYPERVISOR_console_io(CONSOLEIO_write,
+                                         count, (char *)s)) > 0 )
         {
             count -= rc;
             s += rc;
@@ -122,11 +126,18 @@ static void kcons_write_dom0(
     }
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 static struct tty_driver *kcons_device(struct console *c, int *index)
 {
     *index = c->index;
     return xencons_driver;
 }
+#else
+static kdev_t kcons_device(struct console *c)
+{
+    return MKDEV(TTY_MAJOR, (xc_mode == XC_SERIAL) ? 64 : 1);
+}
+#endif
 
 static struct console kcons_info = {
     device:  kcons_device,
@@ -134,7 +145,13 @@ static struct console kcons_info = {
     index:   -1
 };
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+#define __RETCODE 0
 static int __init xen_console_init(void)
+#else
+#define __RETCODE
+void xen_console_init(void)
+#endif
 {
     if ( start_info.flags & SIF_INITDOMAIN )
     {
@@ -150,7 +167,7 @@ static int __init xen_console_init(void)
     }
 
     if ( xc_mode == XC_OFF )
-        return 0;
+        return __RETCODE;
 
     if ( xc_mode == XC_SERIAL )
         strcpy(kcons_info.name, "ttyS");
@@ -158,10 +175,11 @@ static int __init xen_console_init(void)
         strcpy(kcons_info.name, "tty");
 
     register_console(&kcons_info);
-    return 0;
+    return __RETCODE;
 }
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 console_initcall(xen_console_init);
-
+#endif
 
 /*** Useful function for console debugging -- goes straight to Xen. ***/
 asmlinkage int xprintk(const char *fmt, ...)
@@ -222,6 +240,16 @@ void xencons_force_flush(void)
 
 
 /******************** User-space console driver (/dev/console) ************/
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+#define DRV(_d)         (_d)
+#define TTY_INDEX(_tty) ((_tty)->index)
+#else
+static int xencons_refcount;
+static struct tty_struct *xencons_table[MAX_NR_CONSOLES];
+#define DRV(_d)         (&(_d))
+#define TTY_INDEX(_tty) (MINOR((_tty)->device) - xencons_driver.minor_start)
+#endif
 
 static struct termios *xencons_termios[MAX_NR_CONSOLES];
 static struct termios *xencons_termios_locked[MAX_NR_CONSOLES];
@@ -284,11 +312,7 @@ static void __xencons_tx_flush(void)
 
             if ( ctrl_if_send_message_noblock(&msg, NULL, 0) == 0 )
                 x_char = 0;
-#if 0				/* XXXcl tq */
             else if ( ctrl_if_enqueue_space_callback(&xencons_tx_flush_task) )
-#else
-            else if ( ctrl_if_enqueue_space_callback(&xencons_tx_flush_task) )
-#endif
                 break;
 
             work_done = 1;
@@ -309,11 +333,7 @@ static void __xencons_tx_flush(void)
             
             if ( ctrl_if_send_message_noblock(&msg, NULL, 0) == 0 )
                 wc += sz;
-#if 0				/* XXXcl tq */
             else if ( ctrl_if_enqueue_space_callback(&xencons_tx_flush_task) )
-#else
-            else if ( ctrl_if_enqueue_space_callback(&xencons_tx_flush_task) )
-#endif
                 break;
 
             work_done = 1;
@@ -339,7 +359,8 @@ static void xencons_tx_flush_task_routine(void *data)
 }
 
 /* Privileged receive callback and transmit kicker. */
-static irqreturn_t xencons_priv_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t xencons_priv_interrupt(int irq, void *dev_id,
+                                          struct pt_regs *regs)
 {
     static char   rbuf[16];
     int           i, l;
@@ -379,6 +400,9 @@ static void xencons_send_xchar(struct tty_struct *tty, char ch)
 {
     unsigned long flags;
 
+    if ( TTY_INDEX(tty) != 0 )
+        return;
+
     spin_lock_irqsave(&xencons_lock, flags);
     x_char = ch;
     __xencons_tx_flush();
@@ -387,12 +411,18 @@ static void xencons_send_xchar(struct tty_struct *tty, char ch)
 
 static void xencons_throttle(struct tty_struct *tty)
 {
+    if ( TTY_INDEX(tty) != 0 )
+        return;
+
     if ( I_IXOFF(tty) )
         xencons_send_xchar(tty, STOP_CHAR(tty));
 }
 
 static void xencons_unthrottle(struct tty_struct *tty)
 {
+    if ( TTY_INDEX(tty) != 0 )
+        return;
+
     if ( I_IXOFF(tty) )
     {
         if ( x_char != 0 )
@@ -405,6 +435,9 @@ static void xencons_unthrottle(struct tty_struct *tty)
 static void xencons_flush_buffer(struct tty_struct *tty)
 {
     unsigned long flags;
+
+    if ( TTY_INDEX(tty) != 0 )
+        return;
 
     spin_lock_irqsave(&xencons_lock, flags);
     wc = wp = 0;
@@ -428,6 +461,9 @@ static int xencons_write(struct tty_struct *tty, int from_user,
 
     if ( from_user && verify_area(VERIFY_READ, buf, count) )
         return -EINVAL;
+
+    if ( TTY_INDEX(tty) != 0 )
+        return count;
 
     spin_lock_irqsave(&xencons_lock, flags);
 
@@ -454,6 +490,9 @@ static void xencons_put_char(struct tty_struct *tty, u_char ch)
 {
     unsigned long flags;
 
+    if ( TTY_INDEX(tty) != 0 )
+        return;
+
     spin_lock_irqsave(&xencons_lock, flags);
     (void)__xencons_put_char(ch);
     spin_unlock_irqrestore(&xencons_lock, flags);
@@ -462,6 +501,9 @@ static void xencons_put_char(struct tty_struct *tty, u_char ch)
 static void xencons_flush_chars(struct tty_struct *tty)
 {
     unsigned long flags;
+
+    if ( TTY_INDEX(tty) != 0 )
+        return;
 
     spin_lock_irqsave(&xencons_lock, flags);
     __xencons_tx_flush();
@@ -472,7 +514,10 @@ static void xencons_wait_until_sent(struct tty_struct *tty, int timeout)
 {
     unsigned long orig_jiffies = jiffies;
 
-    while ( tty->driver->chars_in_buffer(tty) )
+    if ( TTY_INDEX(tty) != 0 )
+        return;
+
+    while ( DRV(tty->driver)->chars_in_buffer(tty) )
     {
         set_current_state(TASK_INTERRUPTIBLE);
         schedule_timeout(1);
@@ -487,16 +532,12 @@ static void xencons_wait_until_sent(struct tty_struct *tty, int timeout)
 
 static int xencons_open(struct tty_struct *tty, struct file *filp)
 {
-    int line;
     unsigned long flags;
 
-    MOD_INC_USE_COUNT;
-    line = tty->index;
-    if ( line < 0 || line >= NUM_XENCONS )
-    {
-        MOD_DEC_USE_COUNT;
+    if ( TTY_INDEX(tty) != 0 )
         return -ENODEV;
-    }
+
+    MOD_INC_USE_COUNT;
 
     spin_lock_irqsave(&xencons_lock, flags);
     tty->driver_data = NULL;
@@ -512,12 +553,15 @@ static void xencons_close(struct tty_struct *tty, struct file *filp)
 {
     unsigned long flags;
 
+    if ( TTY_INDEX(tty) != 0 )
+        return;
+
     if ( tty->count == 1 )
     {
         tty->closing = 1;
         tty_wait_until_sent(tty, 0);
-        if ( tty->driver->flush_buffer != NULL )
-            tty->driver->flush_buffer(tty);
+        if ( DRV(tty->driver)->flush_buffer != NULL )
+            DRV(tty->driver)->flush_buffer(tty);
         if ( tty->ldisc.flush_buffer != NULL )
             tty->ldisc.flush_buffer(tty);
         tty->closing = 0;
@@ -529,6 +573,7 @@ static void xencons_close(struct tty_struct *tty, struct file *filp)
     MOD_DEC_USE_COUNT;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 static struct tty_operations xencons_ops = {
     .open = xencons_open,
     .close = xencons_close,
@@ -543,42 +588,66 @@ static struct tty_operations xencons_ops = {
     .unthrottle = xencons_unthrottle,
     .wait_until_sent = xencons_wait_until_sent,
 };
+#endif
 
 static int __init xencons_init(void)
 {
-    xencons_driver = alloc_tty_driver(NUM_XENCONS); /* XXX */
-    if (!xencons_driver)
-	return -ENOMEM;
-
-    xencons_driver->major           = TTY_MAJOR;
-    xencons_driver->type            = TTY_DRIVER_TYPE_SERIAL;
-    xencons_driver->subtype         = SERIAL_TYPE_NORMAL;
-    xencons_driver->init_termios    = tty_std_termios;
-    xencons_driver->flags           = 
-        TTY_DRIVER_REAL_RAW | TTY_DRIVER_RESET_TERMIOS | TTY_DRIVER_NO_DEVFS;
-    xencons_driver->termios         = xencons_termios;
-    xencons_driver->termios_locked  = xencons_termios_locked;
-
     if ( xc_mode == XC_OFF )
         return 0;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+    xencons_driver = alloc_tty_driver((xc_mode == XC_SERIAL) ? 
+                                      1 : MAX_NR_CONSOLES);
+    if ( xencons_driver == NULL )
+        return -ENOMEM;
+#else
+    memset(&xencons_driver, 0, sizeof(struct tty_driver));
+    xencons_driver.magic       = TTY_DRIVER_MAGIC;
+    xencons_driver.refcount    = &xencons_refcount;
+    xencons_driver.table       = xencons_table;
+    xencons_driver.num         = (xc_mode == XC_SERIAL) ? 1 : MAX_NR_CONSOLES;
+#endif
+
+    DRV(xencons_driver)->major           = TTY_MAJOR;
+    DRV(xencons_driver)->type            = TTY_DRIVER_TYPE_SERIAL;
+    DRV(xencons_driver)->subtype         = SERIAL_TYPE_NORMAL;
+    DRV(xencons_driver)->init_termios    = tty_std_termios;
+    DRV(xencons_driver)->flags           = 
+        TTY_DRIVER_REAL_RAW | TTY_DRIVER_RESET_TERMIOS | TTY_DRIVER_NO_DEVFS;
+    DRV(xencons_driver)->termios         = xencons_termios;
+    DRV(xencons_driver)->termios_locked  = xencons_termios_locked;
+
     if ( xc_mode == XC_SERIAL )
     {
-        xencons_driver->name        = "ttyS";
-        xencons_driver->minor_start = 64;
-        xencons_driver->num         = 1;
+        DRV(xencons_driver)->name        = "ttyS";
+        DRV(xencons_driver)->minor_start = 64;
     }
     else
     {
-        xencons_driver->name        = "tty";
-        xencons_driver->minor_start = 1;
-        xencons_driver->num         = MAX_NR_CONSOLES;
+        DRV(xencons_driver)->name        = "tty";
+        DRV(xencons_driver)->minor_start = 1;
     }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
     tty_set_operations(xencons_driver, &xencons_ops);
+#else
+    xencons_driver.open            = xencons_open;
+    xencons_driver.close           = xencons_close;
+    xencons_driver.write           = xencons_write;
+    xencons_driver.write_room      = xencons_write_room;
+    xencons_driver.put_char        = xencons_put_char;
+    xencons_driver.flush_chars     = xencons_flush_chars;
+    xencons_driver.chars_in_buffer = xencons_chars_in_buffer;
+    xencons_driver.send_xchar      = xencons_send_xchar;
+    xencons_driver.flush_buffer    = xencons_flush_buffer;
+    xencons_driver.throttle        = xencons_throttle;
+    xencons_driver.unthrottle      = xencons_unthrottle;
+    xencons_driver.wait_until_sent = xencons_wait_until_sent;
+#endif
 
-    if ( tty_register_driver(xencons_driver) )
-        panic("Couldn't register Xen virtual console driver as %s\n",xencons_driver->name);
+    if ( tty_register_driver(DRV(xencons_driver)) )
+        panic("Couldn't register Xen virtual console driver as %s\n",
+              DRV(xencons_driver)->name);
 
     if ( start_info.flags & SIF_INITDOMAIN )
     {
@@ -591,7 +660,8 @@ static int __init xencons_init(void)
         (void)ctrl_if_register_receiver(CMSG_CONSOLE, xencons_rx, 0);
     }
 
-    printk("Xen virtual console successfully installed as %s\n",xencons_driver->name);
+    printk("Xen virtual console successfully installed as %s\n",
+           DRV(xencons_driver)->name);
     
     return 0;
 }
@@ -600,7 +670,7 @@ static void __exit xencons_fini(void)
 {
     int ret;
 
-    if ( (ret = tty_unregister_driver(xencons_driver)) != 0 )
+    if ( (ret = tty_unregister_driver(DRV(xencons_driver))) != 0 )
         printk(KERN_ERR "Unable to unregister Xen console driver: %d\n", ret);
 
     if ( start_info.flags & SIF_INITDOMAIN )
