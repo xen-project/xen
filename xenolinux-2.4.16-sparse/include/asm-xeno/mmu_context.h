@@ -1,3 +1,4 @@
+
 #ifndef __I386_MMU_CONTEXT_H
 #define __I386_MMU_CONTEXT_H
 
@@ -9,8 +10,12 @@
 /*
  * possibly do the LDT unload here?
  */
-#define destroy_context(mm)		do { } while(0)
-#define init_new_context(tsk,mm)	0
+
+extern int init_new_context(struct task_struct *tsk, struct mm_struct *);
+extern void destroy_context(struct mm_struct *);
+
+//#define destroy_context(mm)		do { } while(0)
+//#define init_new_context(tsk,mm)	0
 
 #ifdef CONFIG_SMP
 

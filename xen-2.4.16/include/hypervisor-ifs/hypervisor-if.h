@@ -201,6 +201,8 @@ typedef struct start_info_st {
     int num_net_rings;
     blk_ring_t *blk_ring;         /* block io communication rings */
     unsigned long frame_table;    /* mapping of the frame_table for dom0 */
+    unsigned long frame_table_len;
+    unsigned long frame_table_pa; /* frame_table physical address */
     unsigned char cmd_line[1];    /* variable-length */
 } start_info_t;
 

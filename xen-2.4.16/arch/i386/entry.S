@@ -102,7 +102,7 @@ PROCESSOR       =  0
 STATE           =  4
 HYP_EVENTS      =  8
 DOMAIN          = 12        
-SHARED_INFO     = 16
+SHARED_INFO     = 24
 
 /* Offsets in shared_info_t */
 EVENTS          =  0

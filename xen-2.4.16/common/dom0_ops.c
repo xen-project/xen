@@ -1,3 +1,4 @@
+
 /******************************************************************************
  * dom0_ops.c
  * 
@@ -13,6 +14,7 @@
 #include <xeno/sched.h>
 #include <xeno/event.h>
 
+extern unsigned int alloc_new_dom_mem(struct task_struct *, unsigned int);
 
 static unsigned int get_domnr(void)
 {
@@ -42,6 +44,21 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     switch ( op.cmd )
     {
 
+    case DOM0_STARTDOM:
+    {
+        struct task_struct * p = find_domain_by_id(op.u.meminfo.domain);
+        ret = final_setup_guestos(p, &op.u.meminfo);
+        if( ret != 0 ){
+            p->state = TASK_DYING;
+            release_task(p);
+            break;
+        }
+        wake_up(p);
+        reschedule(p);
+        ret = p->domain;
+    }
+    break;
+
     case DOM0_NEWDOMAIN:
     {
         struct task_struct *p;
@@ -54,6 +71,20 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         p->domain = dom;
         pro = (pro+1) % smp_num_cpus;
         p->processor = pro;
+
+        /* if we are not booting dom 0 than only mem 
+         * needs to be allocated
+         */
+        if(dom != 0){
+            if(alloc_new_dom_mem(p, op.u.newdomain.memory_kb) != 0){
+                ret = -1;
+                break;
+            }
+            ret = p->domain;
+            break;
+        }
+
+        /* executed only in case of domain 0 */
         ret = setup_guestos(p, &op.u.newdomain);    /* Load guest OS into @p */
         if ( ret != 0 ) 
         {
@@ -78,6 +109,16 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         {
             ret = kill_other_domain(dom);
         }
+    }
+    break;
+
+    case DOM0_MAPTASK:
+    {
+        unsigned int dom = op.u.mapdomts.domain;
+        
+        op.u.mapdomts.ts_phy_addr = __pa(find_domain_by_id(dom));
+        copy_to_user(u_dom0_op, &op, sizeof(op));
+
     }
     break;
 
