@@ -1,5 +1,4 @@
 
-
 /******************************************************************************
  * memory.c
  * 
@@ -449,6 +448,9 @@ static void put_page(unsigned long page_nr, int writeable)
             (((page->flags & PG_type_mask) == PGT_none) &&
              (page_type_count(page) == 0)));
     }
+
+	if(!((!writeable) || (page_type_count(page) != 0)))
+		printk("bd240 debug: put_page failed ASSERT: page num %lx\n", page_nr);
 
     ASSERT((!writeable) || (page_type_count(page) != 0));
     if ( writeable && (put_page_type(page) == 0) )
