@@ -35,8 +35,13 @@ int xc_readconsolering(int xc_handle,
     op.u.readconsole.count = max_chars;
     op.u.readconsole.cmd = clear ? CONSOLE_RING_CLEAR : 0;
 
-    if ( (ret = do_dom0_op(xc_handle, &op)) > 0 )
+    if ( (ret = mlock(str, max_chars)) != 0 )
+        return ret;
+
+    if ( (ret = do_dom0_op(xc_handle, &op)) >= 0 )
         str[ret] = '\0';
+
+    (void)munlock(str, max_chars);
 
     return ret;
 }    
