@@ -229,24 +229,31 @@ static unsigned int serial_rx_cons, serial_rx_prod;
 
 /* CTRL-a switches input direction between Xen and DOM0. */
 #define CTRL_A 0x01
+static int xen_rx = 1; /* FALSE => serial input passed to domain 0. */
+
+static void switch_serial_input(void)
+{
+    static char *input_str[2] = { "DOM0", "Xen" };
+    xen_rx = !xen_rx;
+    printk("\n*** Serial input -> %s "
+           "(type 'CTRL-a' three times to switch input to %s).\n",
+           input_str[xen_rx], input_str[!xen_rx]);
+}
 
 static void serial_rx(unsigned char c, struct pt_regs *regs)
 {
     key_handler *handler;
     unsigned long cpu_mask;
     struct task_struct *p;
-    static char *input_str[2] = { "DOM0", "Xen" };
-    static int xen_rx = 1; /* FALSE => serial input passed to domain 0. */
+    static int ctrl_a_count = 0;
 
-    if ( c == CTRL_A )
+    if ( (ctrl_a_count = (c == CTRL_A) ? ctrl_a_count+1 : 0) >= 3 )
     {
-        xen_rx = !xen_rx;
-        serial_putc(sercon_handle, '\n');
-        printk("*** Serial input -> %s "
-               "(type 'CTRL-a' to switch input to %s).\n",
-               input_str[xen_rx], input_str[!xen_rx]);
+        switch_serial_input();
+        ctrl_a_count = 0;
     }
-    else if ( xen_rx )
+
+    if ( xen_rx )
     {
         if ( (handler = get_key_handler(c)) != NULL )
             (*handler)(c, NULL, regs);
@@ -460,7 +467,7 @@ void console_endboot(int disable_vga)
     if ( disable_vga )
         vgacon_enabled = 0;
     /* Serial input is directed to DOM0 by default. */
-    serial_rx(CTRL_A, NULL);
+    switch_serial_input();
 }
 
 
