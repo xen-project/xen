@@ -25,6 +25,7 @@
 
 extern unsigned int alloc_new_dom_mem(struct domain *, unsigned int);
 extern long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op);
+extern void arch_getdomaininfo_ctxt(struct domain *, full_execution_context_t *);
 
 long do_dom0_op(dom0_op_t *u_dom0_op)
 {
@@ -251,6 +252,81 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             
             put_domain(d);
         }
+    }
+    break;
+
+    case DOM0_GETDOMAININFO:
+    { 
+        full_execution_context_t *c;
+        struct domain            *d;
+        unsigned long             flags;
+
+        read_lock_irqsave(&tasklist_lock, flags);
+
+        for_each_domain ( d )
+        {
+            if ( d->domain >= op->u.getdomaininfo.domain )
+                break;
+        }
+
+        if ( (d == NULL) || !get_domain(d) )
+        {
+            read_unlock_irqrestore(&tasklist_lock, flags);
+            ret = -ESRCH;
+            break;
+        }
+
+        read_unlock_irqrestore(&tasklist_lock, flags);
+
+        op->u.getdomaininfo.domain = d->domain;
+        strcpy(op->u.getdomaininfo.name, d->name);
+        
+        op->u.getdomaininfo.flags =
+            (test_bit(DF_DYING,     &d->flags) ? DOMFLAGS_DYING    : 0) |
+            (test_bit(DF_CRASHED,   &d->flags) ? DOMFLAGS_CRASHED  : 0) |
+            (test_bit(DF_SHUTDOWN,  &d->flags) ? DOMFLAGS_SHUTDOWN : 0) |
+            (test_bit(DF_CTRLPAUSE, &d->flags) ? DOMFLAGS_PAUSED   : 0) |
+            (test_bit(DF_BLOCKED,   &d->flags) ? DOMFLAGS_BLOCKED  : 0) |
+            (test_bit(DF_RUNNING,   &d->flags) ? DOMFLAGS_RUNNING  : 0);
+
+        op->u.getdomaininfo.flags |= d->processor << DOMFLAGS_CPUSHIFT;
+        op->u.getdomaininfo.flags |= 
+            d->shutdown_code << DOMFLAGS_SHUTDOWNSHIFT;
+
+        op->u.getdomaininfo.tot_pages   = d->tot_pages;
+        op->u.getdomaininfo.max_pages   = d->max_pages;
+        op->u.getdomaininfo.cpu_time    = d->cpu_time;
+        op->u.getdomaininfo.shared_info_frame = 
+            __pa(d->shared_info) >> PAGE_SHIFT;
+
+        if ( op->u.getdomaininfo.ctxt != NULL )
+        {
+            if ( (c = kmalloc(sizeof(*c))) == NULL )
+            {
+                ret = -ENOMEM;
+                put_domain(d);
+                break;
+            }
+
+            if ( d != current )
+                domain_pause(d);
+
+            arch_getdomaininfo_ctxt(d,c);
+
+            if ( d != current )
+                domain_unpause(d);
+
+            if ( copy_to_user(op->u.getdomaininfo.ctxt, c, sizeof(*c)) )
+                ret = -EINVAL;
+
+            if ( c != NULL )
+                kfree(c);
+        }
+
+        if ( copy_to_user(u_dom0_op, op, sizeof(*op)) )     
+            ret = -EINVAL;
+
+        put_domain(d);
     }
     break;
 
