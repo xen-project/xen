@@ -355,24 +355,6 @@ int blktap_write_be_ring(blkif_response_t *rsp)
     return 0;
 }
 
-static void blktap_fast_flush_area(int idx, int nr_pages)
-{
-    multicall_entry_t mcl[MMAP_PAGES_PER_REQUEST];
-    int               i;
-
-    for ( i = 0; i < nr_pages; i++ )
-    {
-        mcl[i].op = __HYPERVISOR_update_va_mapping;
-        mcl[i].args[0] = MMAP_VADDR(idx, i);
-        mcl[i].args[1] = 0;
-        mcl[i].args[2] = 0;
-    }
-
-    mcl[nr_pages-1].args[2] = UVMF_FLUSH_TLB;
-    if ( unlikely(HYPERVISOR_multicall(mcl, nr_pages) != 0) )
-        BUG();
-}
-
 static int blktap_read_fe_ring(void)
 {
     /* This is called to read responses from the UFE ring. */
@@ -398,7 +380,8 @@ static int blktap_read_fe_ring(void)
             DPRINTK("resp->fe_ring\n");
             ar = lookup_active_req(ID_TO_IDX(resp_s->id));
             blkif = ar->blkif;
-            blktap_fast_flush_area(ID_TO_IDX(resp_s->id), ar->nr_pages);
+            zap_page_range(blktap_vma, MMAP_VADDR(ID_TO_IDX(resp_s->id), 0), 
+                    ar->nr_pages << PAGE_SHIFT, NULL);
             write_resp_to_fe_ring(blkif, resp_s);
             kick_fe_domain(blkif);
         }
