@@ -27,10 +27,8 @@ segment_t xsegments[XEN_MAX_SEGMENTS];
  * xen_segment_map_request
  *
  * xen_device must be a valid device.
- */
-
-/*
- * NB. Al offsets and sizes here are in sector units.
+ * 
+ * NB. All offsets and sizes here are in sector units.
  * eg. 'size == 1' means an actual size of 512 bytes.
  */
 int xen_segment_map_request(
@@ -45,32 +43,36 @@ int xen_segment_map_request(
     segment_number &= XENDEV_IDX_MASK;
     if ( segment_number >= XEN_MAX_SEGMENTS )
     {
-      DPRINTK("invalid segment number. %d %d\n",
-	      segment_number, XEN_MAX_SEGMENTS);
-      goto fail;
+        DPRINTK("invalid segment number. %d %d\n",
+                segment_number, XEN_MAX_SEGMENTS);
+        goto fail;
     }
 
     seg = p->segment_list[segment_number];
     if ( seg == NULL ) 
     {
-      DPRINTK("segment is null. %d\n", segment_number);
-      goto fail;
+        DPRINTK("segment is null. %d\n", segment_number);
+        goto fail;
     }
 
     /* check domain permissions */
     if ( seg->domain != p->domain )
     {
-      DPRINTK("segment is for another domain. %d %d\n",
-	      seg->domain, p->domain);
-      goto fail;
+        DPRINTK("seg is for another domain. %d %d\n", seg->domain, p->domain);
+        goto fail;
     }
 
     /* check rw access */
-    if ((operation == WRITE && seg->mode != XEN_SEGMENT_RW) ||
-        (operation == READ  && seg->mode == XEN_SEGMENT_UNUSED))
+    if ( ((operation == WRITE) && (seg->mode != XEN_SEGMENT_RW)) ||
+         ((operation == READ)  && (seg->mode == XEN_SEGMENT_UNUSED)) )
     {
-        DPRINTK("illegal operation: %d %d\n",
-		operation, seg->mode);
+        DPRINTK("illegal operation: %d %d\n", operation, seg->mode);
+        goto fail;
+    }
+
+    if ( (nr_sects + sect_nr) <= sect_nr )
+    {
+        DPRINTK("sector + size wrap! %08lx %04x\n", sect_nr, nr_sects);
         goto fail;
     }
 
@@ -86,9 +88,9 @@ int xen_segment_map_request(
 
     if ( (sum + ext->size) <= sect_nr ) 
     {
-      DPRINTK("extent size mismatch: %d %d : %d %ld %ld\n",
-	      i, seg->num_extents, sum, ext->size, sect_nr);
-      goto fail;
+        DPRINTK("extent size mismatch: %d %d : %d %ld %ld\n",
+                i, seg->num_extents, sum, ext->size, sect_nr);
+        goto fail;
     }
 
     pseg->sector_number = (sect_nr - sum) + ext->offset;
@@ -98,8 +100,8 @@ int xen_segment_map_request(
     if ( pseg->dev == 0 ) 
     {
         DPRINTK ("invalid device 0x%x 0x%lx 0x%lx\n", 
-		 ext->disk, ext->offset, ext->size);
-	goto fail;
+                 ext->disk, ext->offset, ext->size);
+        goto fail;
     }
 
     /* We're finished if the virtual extent didn't overrun the phys extent. */
@@ -110,8 +112,8 @@ int xen_segment_map_request(
     if ( (i+1) == seg->num_extents ) 
     {
         DPRINTK ("not enough extents %d %d\n",
-		 i, seg->num_extents);
-	goto fail;
+                 i, seg->num_extents);
+        goto fail;
     }
 
     pseg[1].nr_sects = (sect_nr + nr_sects) - (sum + ext->size);
@@ -122,50 +124,27 @@ int xen_segment_map_request(
     if ( pseg[1].dev == 0 ) 
     {
         DPRINTK ("bogus device for pseg[1] \n");
-	goto fail;
+        goto fail;
     }
 
     /* We don't allow overrun onto a third physical extent. */
-    if ( (sum + ext[0].size + ext[1].size) < 
-         (pseg[1].sector_number + pseg[1].nr_sects) )
+    if ( pseg[1].nr_sects > ext[1].size )
     {
         DPRINTK ("third extent\n");
         DPRINTK (" sum:%d, e0:%ld, e1:%ld   p1.sect:%ld p1.nr:%d\n",
-		 sum, ext[0].size, ext[1].size, 
-		 pseg[1].sector_number, pseg[1].nr_sects);
+                 sum, ext[0].size, ext[1].size, 
+                 pseg[1].sector_number, pseg[1].nr_sects);
         goto fail;    
     }
 
     return 2;                   /* We overran onto a second physical extent. */
 
  fail:
-
     DPRINTK ("xen_segment_map_request failure\n");
     DPRINTK ("operation: %d\n", operation);
     DPRINTK ("segment number: %d\n", segment_number);
     DPRINTK ("sect_nr: %ld 0x%lx\n", sect_nr, sect_nr);
     DPRINTK ("nr_sects: %d 0x%x\n", nr_sects, nr_sects);
-
-    if (0)
-    {
-      segment_t *xseg;
-      extent_t  *xext;
-      int xsum, xi;
-
-      xseg = p->segment_list[segment_number];
-
-      xsum = 0; xi = 0;
-      xext = xseg->extents;
-
-      while ( (xi < xseg->num_extents) && ((xsum + xext->size) <= sect_nr) )
-      {
-	DPRINTK (" xi:%d, num_ext:%d, xsum:%d, size:%lx, sect_nr:%lx\n",
-		 xi, xseg->num_extents, xsum, xext->size, sect_nr);
-	xsum += xext->size;
-        xext++; xi++;
-      }
-    }
-
     return -1;
 }
 
@@ -238,8 +217,8 @@ int xen_segment_create(xv_disk_t *xvd_in)
     for (idx = 0; idx < XEN_MAX_SEGMENTS; idx++)
     {
         if (xsegments[idx].mode == XEN_SEGMENT_UNUSED ||
-	    (xsegments[idx].domain == xvd->domain &&
-	     xsegments[idx].segment_number == xvd->segment)) break;
+            (xsegments[idx].domain == xvd->domain &&
+             xsegments[idx].segment_number == xvd->segment)) break;
     }
     if (idx == XEN_MAX_SEGMENTS)
     {
@@ -274,12 +253,12 @@ int xen_segment_create(xv_disk_t *xvd_in)
     p = current;
     do
     {
-      p = p->next_task;
+        p = p->next_task;
     } while (p != current && p->domain != xvd->domain);
 
     if (p->domain == xvd->domain)
     {
-      p->segment_list[xvd->segment] = &xsegments[idx];
+        p->segment_list[xvd->segment] = &xsegments[idx];
     }
 
     unmap_domain_mem(xvd);
@@ -330,12 +309,12 @@ static void dump_segments(u_char key, void *dev_id, struct pt_regs *regs)
         printk("  domain %d: ", p->domain);
         for (loop = 0; loop < XEN_MAX_SEGMENTS; loop++)
         {
-	  if (p->segment_list[loop])
-	  {
-	    printk (" %d", p->segment_list[loop] - xsegments);
-	  }
+            if (p->segment_list[loop])
+            {
+                printk (" %d", p->segment_list[loop] - xsegments);
+            }
         }
-	printk("\n");
+        printk("\n");
         p = p->next_task;
     } while (p != current);
 }
