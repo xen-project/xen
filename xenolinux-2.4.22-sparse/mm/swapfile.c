@@ -522,6 +522,7 @@ static int try_to_unuse(unsigned int type)
 	int i = 0;
 	int retval = 0;
 	int reset_overflow = 0;
+	int shmem;
 
 	/*
 	 * When searching mms for an entry, a good strategy is to
@@ -600,11 +601,12 @@ static int try_to_unuse(unsigned int type)
 		 * Whenever we reach init_mm, there's no address space
 		 * to search, but use it as a reminder to search shmem.
 		 */
+		shmem = 0;
 		swcount = *swap_map;
 		if (swcount > 1) {
 			flush_page_to_ram(page);
 			if (start_mm == &init_mm)
-				shmem_unuse(entry, page);
+				shmem = shmem_unuse(entry, page);
 			else
 				unuse_process(start_mm, entry, page);
 		}
@@ -621,7 +623,9 @@ static int try_to_unuse(unsigned int type)
 				swcount = *swap_map;
 				if (mm == &init_mm) {
 					set_start_mm = 1;
-					shmem_unuse(entry, page);
+					spin_unlock(&mmlist_lock);
+					shmem = shmem_unuse(entry, page);
+					spin_lock(&mmlist_lock);
 				} else
 					unuse_process(mm, entry, page);
 				if (set_start_mm && *swap_map < swcount) {
@@ -670,14 +674,23 @@ static int try_to_unuse(unsigned int type)
 		 * read from disk into another page.  Splitting into two
 		 * pages would be incorrect if swap supported "shared
 		 * private" pages, but they are handled by tmpfs files.
-		 * Note shmem_unuse already deleted its from swap cache.
+		 *
+		 * Note shmem_unuse already deleted swappage from cache,
+		 * unless corresponding filepage found already in cache:
+		 * in which case it left swappage in cache, lowered its
+		 * swap count to pass quickly through the loops above,
+		 * and now we must reincrement count to try again later.
 		 */
 		if ((*swap_map > 1) && PageDirty(page) && PageSwapCache(page)) {
 			rw_swap_page(WRITE, page);
 			lock_page(page);
 		}
-		if (PageSwapCache(page))
-			delete_from_swap_cache(page);
+		if (PageSwapCache(page)) {
+			if (shmem)
+				swap_duplicate(entry);
+			else
+				delete_from_swap_cache(page);
+		}
 
 		/*
 		 * So we could skip searching mms once swap count went

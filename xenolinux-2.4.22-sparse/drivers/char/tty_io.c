@@ -146,6 +146,7 @@ extern long vme_scc_console_init(void);
 extern int serial167_init(void);
 extern long serial167_console_init(void);
 extern void console_8xx_init(void);
+extern void au1x00_serial_console_init(void);
 extern int rs_8xx_init(void);
 extern void mac_scc_console_init(void);
 extern void hwc_console_init(void);
@@ -158,10 +159,14 @@ extern void rs285_console_init(void);
 extern void sa1100_rs_console_init(void);
 extern void sgi_serial_console_init(void);
 extern void sci_console_init(void);
+extern void dec_serial_console_init(void);
 extern void tx3912_console_init(void);
 extern void tx3912_rs_init(void);
 extern void txx927_console_init(void);
+extern void txx9_rs_init(void);
+extern void txx9_serial_console_init(void);
 extern void sb1250_serial_console_init(void);
+extern void arc_console_init(void);
 
 #ifndef MIN
 #define MIN(a,b)	((a) < (b) ? (a) : (b))
@@ -2246,8 +2251,8 @@ void __init console_init(void)
 	con_init();
 #endif
 
-#ifdef CONFIG_AU1000_SERIAL_CONSOLE
-	au1000_serial_console_init();
+#ifdef CONFIG_AU1X00_SERIAL_CONSOLE
+	au1x00_serial_console_init();
 #endif
 #ifdef CONFIG_SERIAL_CONSOLE
 #if (defined(CONFIG_8xx) || defined(CONFIG_8260))
@@ -2264,9 +2269,6 @@ void __init console_init(void)
 #elif defined(CONFIG_SERIAL)
 	serial_console_init();
 #endif /* CONFIG_8xx */
-#ifdef CONFIG_SGI_SERIAL
-	sgi_serial_console_init();
-#endif
 #if defined(CONFIG_MVME162_SCC) || defined(CONFIG_BVME6000_SCC) || defined(CONFIG_MVME147_SCC)
 	vme_scc_console_init();
 #endif
@@ -2276,6 +2278,9 @@ void __init console_init(void)
 #if defined(CONFIG_SH_SCI)
 	sci_console_init();
 #endif
+#endif
+#ifdef CONFIG_SERIAL_DEC_CONSOLE
+	dec_serial_console_init();
 #endif
 #ifdef CONFIG_TN3270_CONSOLE
 	tub3270_con_init();
@@ -2307,8 +2312,14 @@ void __init console_init(void)
 #ifdef CONFIG_TXX927_SERIAL_CONSOLE
 	txx927_console_init();
 #endif
+#ifdef CONFIG_SERIAL_TXX9_CONSOLE
+	txx9_serial_console_init();
+#endif
 #ifdef CONFIG_SIBYTE_SB1250_DUART_CONSOLE
 	sb1250_serial_console_init();
+#endif
+#ifdef CONFIG_IP22_SERIAL
+	sgi_serial_console_init();
 #endif
 }
 

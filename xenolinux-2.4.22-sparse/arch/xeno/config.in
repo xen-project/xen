@@ -165,6 +165,9 @@ if [ "$CONFIG_DEBUG_KERNEL" != "n" ]; then
    bool '  Compile the kernel with frame pointers' CONFIG_FRAME_POINTER
 fi
 
+source drivers/acpi/Config.in
+
 endmenu
 
+source crypto/Config.in
 source lib/Config.in

@@ -179,11 +179,13 @@ static inline unsigned long move_vma(struct vm_area_struct * vma,
 	}
 
 	if (!move_page_tables(current->mm, new_addr, addr, old_len)) {
+		unsigned long vm_locked = vma->vm_flags & VM_LOCKED;
+
 		if (allocated_vma) {
 			*new_vma = *vma;
 			new_vma->vm_start = new_addr;
 			new_vma->vm_end = new_addr+new_len;
-			new_vma->vm_pgoff += (addr - vma->vm_start) >> PAGE_SHIFT;
+			new_vma->vm_pgoff += (addr-vma->vm_start) >> PAGE_SHIFT;
 			new_vma->vm_raend = 0;
 			if (new_vma->vm_file)
 				get_file(new_vma->vm_file);
@@ -191,12 +193,15 @@ static inline unsigned long move_vma(struct vm_area_struct * vma,
 				new_vma->vm_ops->open(new_vma);
 			insert_vm_struct(current->mm, new_vma);
 		}
+
 		do_munmap(current->mm, addr, old_len);
+
 		current->mm->total_vm += new_len >> PAGE_SHIFT;
-		if (new_vma->vm_flags & VM_LOCKED) {
+		if (vm_locked) {
 			current->mm->locked_vm += new_len >> PAGE_SHIFT;
-			make_pages_present(new_vma->vm_start,
-					   new_vma->vm_end);
+			if (new_len > old_len)
+				make_pages_present(new_addr + old_len,
+						   new_addr + new_len);
 		}
 		return new_addr;
 	}

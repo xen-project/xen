@@ -12,8 +12,8 @@
 #     <http://nevod.perm.su/service/linux/doc/kernel/Configure.help>
 #   - French, by Pierre Tane <mailto:tanep@bigfoot.com>, at
 #     <http://www.traduc.org/kernelfr/>
-#   - Polish, by Dominik Mierzejewski <mailto:dmierzej@elka.pw.edu.pl>, at
-#     <http://home.elka.pw.edu.pl/~dmierzej/linux/kernel/>
+#   - Polish, by Dominik Mierzejewski <mailto:dominik@piorunek.pl>, at
+#     <http://www.piorunek.pl/~dominik/linux/kernel/>
 #   - German, by SuSE, at <http://www.suse.de/~ke/kernel/>. This patch
 #     also includes infrastructure to support different languages.
 #   - Catalan, by Antoni Bella <mailto:bella5@teleline.es>, at
@@ -466,6 +466,18 @@ CONFIG_BLK_DEV_INITRD
   procedure. It is typically used to load modules needed to mount the
   "real" root file system, etc. See <file:Documentation/initrd.txt>
   for details.
+
+Embed root filesystem ramdisk into the kernel
+CONFIG_EMBEDDED_RAMDISK
+  Select this option if you want to build the ramdisk image into the
+  the final kernel binary.
+
+Filename of gziped ramdisk image
+CONFIG_EMBEDDED_RAMDISK_IMAGE
+  This is the filename of the ramdisk image to be built into the
+  kernel.  Relative pathnames are relative to arch/mips/ramdisk/.
+  The ramdisk image is not part of the kernel distribution; you must
+  provide one yourself.
 
 Loopback device support
 CONFIG_BLK_DEV_LOOP
@@ -1482,6 +1494,11 @@ CONFIG_BLK_DEV_IDEDMA_PMAC
   to transfer data to and from memory.  Saying Y is safe and improves
   performance.
 
+Broadcom SiByte onboard IDE support
+CONFIG_BLK_DEV_IDE_SIBYTE
+  Include the driver for on-board IDE on the SiByte Generic Bus.  Note
+  that this limits the number of IDE devices to 4 (ide0...ide3).
+
 Use DMA by default
 CONFIG_BLK_DEV_IDEDMA_PMAC_AUTO
   This option allows the driver for the built-in IDE controller on
@@ -2103,6 +2120,78 @@ CONFIG_MIPS_MALTA
   This enables support for the VR5000-based MIPS Malta evaluation
   board.
 
+# Choice: bcmboard
+Support for Broadcom SiByte boards
+CONFIG_SIBYTE_SWARM
+  Enable support for boards based on the Broadcom SiByte family:
+
+  BCM91250A-SWARM    BCM1250 ATX size Eval Board (BCM91250A-SWARM)
+
+  BCM91250E-Sentosa  BCM1250 PCI card Eval Board (BCM91250E-Sentosa)
+
+  BCM91125E-Rhone    BCM1125 PCI card Eval Board (BCM91125E-Rhone)
+
+  Other              Non-Broadcom SiByte-based platform
+
+# Choice: bcmsoc
+Support for Broadcom BCM1xxx SOCs
+CONFIG_SIBYTE_SB1250
+
+  BCM1250     Dual-CPU SB1 with PCI and HyperTransport.
+
+  BCM1120     Uniprocessor SB1.
+
+  BCM1125     Uniprocessor SB1 with PCI (and HyperTransport for 1125H).
+
+BCM1250 Stepping
+CONFIG_CPU_SB1_PASS_1
+  Which pass of the SOC is supported (see the "system_revision"
+  register in the User Manual for more discussion of revisions):
+
+  Pass1    1250 "Pass 1"
+
+  An       1250 "Pass 2"
+
+  Bn       1250 "Pass 2.2"
+
+  Cn       1250 "Pass 3"
+
+BCM112x Stepping
+CONFIG_CPU_SB1_PASS_2
+  Which pass of the SOC is supported (see the "system_revision"
+  register in the User Manual for more discussion of revisions):
+
+  Hybrid   1250 "Pass 2"
+
+  An       112x "Pass 1"
+
+Booting from CFE
+CONFIG_SIBYTE_CFE
+  Make use of the CFE API for enumerating available memory,
+  controlling secondary CPUs, and possibly console output.
+
+Use firmware console
+CONFIG_SIBYTE_CFE_CONSOLE
+  Use the CFE API's console write routines during boot.  Other console
+  options (VT console, sb1250 duart console, etc.) should not be
+  configured.
+
+Support for Bus Watcher statistics
+CONFIG_SIBYTE_BUS_WATCHER
+  Handle and keep statistics on the bus error interrupts (COR_ECC,
+  BAD_ECC, IO_BUS).
+
+Corelis Debugger
+CONFIG_SB1XXX_CORELIS
+  Select compile flags that produce code that can be processed by the
+  Corelis mksym utility and UDB Emulator.
+
+DMA for page clear and copy
+CONFIG_SIBYTE_DMA_PAGEOPS
+  Instead of using the CPU to zero and copy pages, use a Data Mover
+  channel.  These DMA channels are otherwise unused by the standard
+  SiByte Linux port.  Seems to give a small performance benefit.
+
 Support for Galileo Evaluation board or CoSine Orion
 CONFIG_ORION
   Say Y if configuring for the Galileo evaluation board
@@ -2172,11 +2261,6 @@ CONFIG_JAZZ_ESP
   4000, Acer PICA, Olivetti M700-10 and a few other identical OEM
   systems.
 
-MIPS GT96100 support
-CONFIG_MIPS_GT96100
-  Say Y here to support the Galileo Technology GT96100 communications
-  controller card.  There is a web page at <http://www.galileot.com/>.
-
 MIPS GT96100 Ethernet support
 CONFIG_MIPS_GT96100ETH
   Say Y here to support the Ethernet subsystem on your GT96100 card.
@@ -2189,15 +2273,30 @@ CONFIG_SCSI_ZALON
   workstations).  Say Y here to make sure it gets initialized
   correctly before the Linux kernel tries to talk to the controller.
 
-Kernel floating-point instruction emulation
-CONFIG_MIPS_FPU_EMULATOR
-  This option enables the MIPS software floating support.  Due to
-  the way floating point works you should always enable this option
-  unless you exactly know what you're doing.
-
 SGI PROM Console Support
 CONFIG_SGI_PROM_CONSOLE
   Say Y here to set up the boot console on serial port 0.
+
+DECstation serial support
+CONFIG_SERIAL_DEC
+  This selects whether you want to be asked about drivers for
+  DECstation serial ports.
+
+  Note that the answer to this question won't directly affect the
+  kernel: saying N will just cause the configurator to skip all
+  the questions about DECstation serial ports.
+
+  If unsure, say Y.
+
+Support for console on a DECstation serial port
+CONFIG_SERIAL_DEC_CONSOLE
+  If you say Y here, it will be possible to use a serial port as the
+  system console (the system console is the device which receives all
+  kernel messages and warnings and which allows logins in single user
+  mode).  Note that the firmware uses ttyS0 as the serial console on
+  the Maxine and ttyS2 on the others.
+
+  If unsure, say Y.
 
 DZ11 Serial Support
 CONFIG_DZ
@@ -2318,6 +2417,8 @@ CONFIG_CPU_R3000
 
   R10000   MIPS Technologies R10000-series processors.
 
+  SB1      Broadcom SiByte SB1 processor.
+
 R6000
 CONFIG_CPU_R6000
   MIPS Technologies R6000-series processors, including the 64474,
@@ -2347,6 +2448,10 @@ CONFIG_CPU_R8000
 R10000
 CONFIG_CPU_R10000
   MIPS Technologies R10000-series processors.
+
+SB1
+CONFIG_CPU_SB1
+  Broadcom SiByte SB1 processor.
 
 Discontiguous Memory Support
 CONFIG_DISCONTIGMEM
@@ -2596,6 +2701,17 @@ CONFIG_IP_NF_IPTABLES
 
   If you want to compile it as a module, say M here and read
   <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+recent match support
+CONFIG_IP_NF_MATCH_RECENT
+  This match is used for creating one or many lists of recently
+  used addresses and then matching against that/those list(s).
+
+  Short options are available by using 'iptables -m recent -h'
+  Official Website: <http://snowman.net/projects/ipt_recent/>
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.
 
 limit match support
 CONFIG_IP_NF_MATCH_LIMIT
@@ -3060,6 +3176,11 @@ CONFIG_IP6_NF_TARGET_MARK
   If you want to compile it as a module, say M here and read
   <file:Documentation/modules.txt>.  If unsure, say `N'.
 
+ARP payload mangling
+CONFIG_IP_NF_ARP_MANGLE
+  Allows altering the ARP packet payload: source and destination
+  hardware and network addresses.
+
 TCP Explicit Congestion Notification support
 CONFIG_INET_ECN
   Explicit Congestion Notification (ECN) allows routers to notify
@@ -3349,7 +3470,7 @@ CONFIG_ALPHA_SRM
   here. If MILO doesn't work on your system (true for Jensen
   motherboards), you can bypass it altogether and boot Linux directly
   from an SRM console; say Y here in order to do that. Note that you
-  won't be able to boot from an IDE disk using SRM.
+  won't be able to boot from an IDE disk using old versions of SRM.
 
   If unsure, say N.
 
@@ -3440,17 +3561,10 @@ CONFIG_SERIAL_MULTIPORT
   servicing. Say Y here to enable the serial driver to take advantage
   of those special I/O ports.
 
-SGI Zilog85C30 serial support
-CONFIG_SGI_SERIAL
-  If you want to use your SGI's built-in serial ports under Linux,
+SGI IP22 Zilog85C30 serial support
+CONFIG_IP22_SERIAL
+  If you want to use your IP22's built-in serial ports under Linux,
   answer Y.
-
-SGI Newport Graphics support
-CONFIG_SGI_NEWPORT_GFX
-  If you have an SGI machine and you want to compile the graphics
-  drivers, say Y here. This will include the code for the
-  /dev/graphics and /dev/gfx drivers into the kernel for supporting
-  virtualized access to your graphics hardware.
 
 SGI Newport Console support
 CONFIG_SGI_NEWPORT_CONSOLE
@@ -3613,6 +3727,14 @@ Serverworks LE/HE support
 CONFIG_AGP_SWORKS
   Say Y here to support the Serverworks AGP card.  See 
   <http://www.serverworks.com/> for product descriptions and images.
+
+NVIDIA chipset support
+CONFIG_AGP_NVIDIA
+  This option gives you AGP support for the GLX component of the
+  XFree86 4.x on NVIDIA nForce/nForce2 chipsets.
+
+  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
+  use GLX or DRI.  If unsure, say N.
 
 ALI chipset support
 CONFIG_AGP_ALI
@@ -3984,6 +4106,11 @@ CONFIG_TCIC
   host bridges. These are only found on a handful of old systems.
   "Bridge" is the name used for the hardware inside your computer that
   PCMCIA cards are plugged into. If unsure, say N.
+
+CONFIG_PCMCIA_SIBYTE
+  Say Y here to include support for the SiByte SOC's built-in PCMCIA
+  interface.  Only ATA cards and CompactFlash are currently
+  supported.
 
 System V IPC
 CONFIG_SYSVIPC
@@ -4505,21 +4632,20 @@ CONFIG_FB_ATY128
 
 Maxine (Personal DECstation) onboard framebuffer support
 CONFIG_FB_MAXINE
-  Say Y here to directly support the on-board framebuffer in the
-  Maxine (5000/20, /25, /33) version of the DECstation.  There is a
-  page dedicated to Linux on DECstations at <http://decstation.unix-ag.org/>.
+  Support for the onboard framebuffer (1024x768x8) in the Personal
+  DECstation series (Personal DECstation 5000/20, /25, /33, /50,
+  Codename "Maxine").
 
 PMAG-BA TURBOchannel framebuffer support
 CONFIG_FB_PMAG_BA
-  Say Y here to directly support the on-board PMAG-BA framebuffer in
-  the 5000/1xx versions of the DECstation.  There is a page dedicated
-  to Linux on DECstations at <http://decstation.unix-ag.org/>.
+  Support for the PMAG-BA TURBOchannel framebuffer card (1024x864x8)
+  used mainly in the MIPS-based DECstation series.
 
 PMAGB-B TURBOchannel framebuffer support
 CONFIG_FB_PMAGB_B
-  Say Y here to directly support the on-board PMAGB-B framebuffer in
-  the 5000/1xx versions of the DECstation.  There is a page dedicated
-  to Linux on DECstations at <http://decstation.unix-ag.org/>.
+  Support for the PMAGB-B TURBOchannel framebuffer card used mainly
+  in the MIPS-based DECstation series. The card is currently only 
+  supported in 1280x1024x8 mode.  
 
 FutureTV PCI card
 CONFIG_ARCH_FTVPCI
@@ -4800,27 +4926,46 @@ CONFIG_FB_MATROX_MYSTIQUE
   packed pixel and 32 bpp packed pixel. You can also use font widths
   different from 8.
 
-Matrox G100/G200/G400/G450/G550 support
-CONFIG_FB_MATROX_G100
-  Say Y here if you have a Matrox G100, G200, G400, G450, or G550
-  based video card. If you select "Advanced lowlevel driver options",
-  you should check 8 bpp packed pixel, 16 bpp packed pixel, 24 bpp
-  packed pixel and 32 bpp packed pixel. You can also use font widths
+CONFIG_FB_MATROX_G450
+  Say Y here if you have a Matrox G100, G200, G400, G450 or G550 based
+  video card. If you select "Advanced lowlevel driver options", you
+  should check 8 bpp packed pixel, 16 bpp packed pixel, 24 bpp packed
+  pixel and 32 bpp packed pixel. You can also use font widths
+  different from 8.
+
+  If you need support for G400 secondary head, you must first say Y to
+  "I2C support" and "I2C bit-banging support" in the character devices
+  section, and then to "Matrox I2C support" and "G400 second head
+  support" here in the framebuffer section. G450/G550 secondary head
+  and digital output are supported without additional modules.
+  
+  The driver starts in monitor mode. You must use the matroxset tool 
+  (available at <ftp://platan.vc.cvut.cz/pub/linux/matrox-latest/>) to 
+  swap primary and secondary head outputs, or to change output mode.  
+  Secondary head driver always start in 640x480 resolution and you 
+  must use fbset to change it.
+
+  Do not forget that second head supports only 16 and 32 bpp
+  packed pixels, so it is a good idea to compile them into the kernel
+  too. You can use only some font widths, as the driver uses generic
+  painting procedures (the secondary head does not use acceleration
+  engine).
+  
+  G450/G550 hardware can display TV picture only from secondary CRTC,
+  and it performs no scaling, so picture must have 525 or 625 lines.
+
+CONFIG_FB_MATROX_G100A
+  Say Y here if you have a Matrox G100, G200 or G400 based
+  video card. If you select "Advanced lowlevel driver options", you
+  should check 8 bpp packed pixel, 16 bpp packed pixel, 24 bpp packed
+  pixel and 32 bpp packed pixel. You can also use font widths
   different from 8.
 
   If you need support for G400 secondary head, you must first say Y to
   "I2C support" and "I2C bit-banging support" in the character devices
   section, and then to "Matrox I2C support" and "G400 second head
   support" here in the framebuffer section.
-  
-  If you have G550, you must also compile support for G450/G550 secondary
-  head into kernel, otherwise picture will be shown only on the output you
-  are probably not using...
 
-  If you need support for G450 or G550 secondary head, say Y to
-  "Matrox G450/G550 second head support" below.
-
-Matrox I2C support
 CONFIG_FB_MATROX_I2C
   This drivers creates I2C buses which are needed for accessing the
   DDC (I2C) bus present on all Matroxes, an I2C bus which
@@ -4863,32 +5008,14 @@ CONFIG_FB_MATROX_MAVEN
   painting procedures (the secondary head does not use acceleration
   engine).
 
-Matrox G450 second head support
-CONFIG_FB_MATROX_G450
-  Say Y or M here if you want to use a secondary head (meaning two
-  monitors in parallel) on G450, or if you are using analog output
-  of G550.
-
-  If you compile it as module, two modules are created,
-  matroxfb_crtc2.o and matroxfb_g450.o. Both modules are needed if you
-  want two independent display devices.
-
-  The driver starts in monitor mode and currently does not support
-  output in TV modes.  You must use the matroxset tool (available
-  at <ftp://platan.vc.cvut.cz/pub/linux/matrox-latest/>) to swap
-  primary and secondary head outputs.  Secondary head driver always
-  start in 640x480 resolution and you must use fbset to change it.
-
-  Note on most G550 cards the analog output is the secondary head,
-  so you will need to say Y here to use it.
-
-  Also do not forget that second head supports only 16 and 32 bpp
-  packed pixels, so it is a good idea to compile them into the kernel
-  too. You can use only some font widths, as the driver uses generic
-  painting procedures (the secondary head does not use acceleration
-  engine).
-
-Matrox unified driver multihead support
+CONFIG_FB_MATROX_PROC
+  Say Y or M here if you want to access some informations about driver
+  state through /proc interface.
+  
+  You should download matrox_pins tool (available at
+  <ftp://platan.vc.cvut.cz/pub/linux/matrox-latest/>) to get human
+  readable output.
+  
 CONFIG_FB_MATROX_MULTIHEAD
   Say Y here if you have more than one (supported) Matrox device in
   your computer and you want to use all of them for different monitors
@@ -5483,11 +5610,6 @@ CONFIG_IP_ROUTE_VERBOSE
   attack or a misconfigured system somewhere. The information is
   handled by the klogd daemon which is responsible for kernel messages
   ("man klogd").
-
-Large routing tables
-CONFIG_IP_ROUTE_LARGE_TABLES
-  If you have routing zones that grow to more than about 64 entries,
-  you may want to say Y here to speed up the routing process.
 
 Fast network address translation
 CONFIG_IP_ROUTE_NAT
@@ -6912,6 +7034,15 @@ CONFIG_ATM_FORE200E_DEBUG
   the performances of the driver, and the size of your syslog files!
   Keep the debugging level to 0 during normal operations.
 
+ForeRunner HE Series
+CONFIG_ATM_HE
+  This is a driver for the Marconi ForeRunner HE-series ATM adapter
+  cards. It simultaneously supports the 155 and 622 versions.
+
+Use S/UNI PHY driver
+  Support for the S/UNI-Ultra and S/UNI-622 found in the ForeRunner
+  HE cards.  This driver provides carrier detection some statistics.
+
 PPP over ATM
 CONFIG_PPPOATM
   Support PPP (Point to Point Protocol) encapsulated in ATM frames.
@@ -7298,47 +7429,40 @@ CONFIG_SCSI_AHA1740
 
 Adaptec AIC7xxx support
 CONFIG_SCSI_AIC7XXX
-  This driver supports all of Adaptec's PCI based SCSI controllers
-  (not the hardware RAID controllers though) as well as the aic7770
-  based EISA and VLB SCSI controllers (the 274x and 284x series).
-  This is an Adaptec sponsored driver written by Justin Gibbs.  It is
-  intended to replace the previous aic7xxx driver maintained by Doug
-  Ledford since Doug is no longer maintaining that driver.
+  This driver supports all of Adaptec's Fast through Ultra 160 PCI
+  based SCSI controllers as well as the aic7770 based EISA and VLB
+  SCSI controllers (the 274x and 284x series).  For AAA and ARO based
+  configurations, only SCSI functionality is provided.
 
   If you want to compile the driver as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want),
   say M here and read <file:Documentation/modules.txt>.  The module
   will be called aic7xxx.o.
 
-Adaptec I2O RAID support
-CONFIG_SCSI_DPT_I2O
-  This driver supports all of Adaptec's I2O based RAID controllers as 
-  well as the DPT SmartRaid V cards.  This is an Adaptec maintained
-  driver by Deanna Bonds.  See <file:drivers/scsi/README.dpti>.
-
-  This driver is also available as a module ( = code which can be
-  inserted in and removed from the running kernel whenever you want).
-  If you want to compile it as a module, say M here and read
-  <file:Documentation/modules.txt>.  The module will be called
-  dpt_i2o.o.
-
-Default number of TCQ commands per device
+Maximum number of TCQ commands per device
 CONFIG_AIC7XXX_CMDS_PER_DEVICE
   Specify the number of commands you would like to allocate per SCSI
   device when Tagged Command Queueing (TCQ) is enabled on that device.
 
   This is an upper bound value for the number of tagged transactions
   to be used for any device.  The aic7xxx driver will automatically
-  vary this number based on device behaviour.  For devices with a
+  vary this number based on device behavior.  For devices with a
   fixed maximum, the driver will eventually lock to this maximum
   and display a console message indicating this value.
 
-  Note: Unless you experience some type of device failure, the default
-	value, no enforced limit, should work for you.
+  Due to resource allocation issues in the Linux SCSI mid-layer, using
+  a high number of commands per device may result in memory allocation
+  failures when many devices are attached to the system.  For this reason,
+  the default is set to 32.  Higher values may result in higer performance
+  on some devices.  The upper bound is 253. 0 disables tagged queueing.
 
-  Default: 253
+  Per device tag depth can be controlled via the kernel command line
+  "tag_info" option.  See drivers/scsi/aic7xxx/README.aic7xxx
+  for details.
 
-Delay in seconds after SCSI bus reset
+  Default: 32
+
+Initial bus reset delay in milli-seconds
 CONFIG_AIC7XXX_RESET_DELAY_MS
   The number of milliseconds to delay after an initial bus reset.
   The bus settle delay following all error recovery actions is
@@ -7346,15 +7470,42 @@ CONFIG_AIC7XXX_RESET_DELAY_MS
 
   Default: 15000 (15 seconds)
 
-Build Adapter Firmware with Kernel Build
+Probe for EISA and VL AIC7XXX Adapters
+CONFIG_AIC7XXX_PROBE_EISA_VL
+   Probe for EISA and VLB Aic7xxx controllers.  In many newer systems,
+   the invasive probes necessary to detect these controllers can cause
+   other devices to fail.  For this reason, the non-PCI probe code is
+   disabled by default.  The current value of this option can be "toggled"
+   via the no_probe kernel command line option.
+
 CONFIG_AIC7XXX_BUILD_FIRMWARE
   This option should only be enabled if you are modifying the firmware
   source to the aic7xxx driver and wish to have the generated firmware
   include files updated during a normal kernel build.  The assembler
   for the firmware requires lex and yacc or their equivalents, as well
   as the db v1 library.  You may have to install additional packages
-  or modify the assembler make file or the files it includes if your
+  or modify the assembler Makefile or the files it includes if your
   build environment is different than that of the author.
+
+Compile in Debugging Code
+CONFIG_AIC7XXX_DEBUG_ENABLE
+  Compile in aic7xxx debugging code that can be useful in diagnosing
+  driver errors.
+
+Debug code enable mask (2048 for all debugging)
+CONFIG_AIC7XXX_DEBUG_MASK
+  Bit mask of debug options that is only valid if the
+  CONFIG_AIC7XXX_DEBUG_ENBLE option is enabled.  The bits in this mask
+  are defined in the drivers/scsi/aic7xxx/aic7xxx.h - search for the
+  variable ahc_debug in that file to find them.
+
+  Default: 0
+
+Decode registers during diagnostics
+CONFIG_AIC7XXX_REG_PRETTY_PRINT
+  Compile in register value tables for the output of expanded register
+  contents in diagnostics.  This make it much easier to understand debug
+  output without having to refer to a data book and/or the aic7xxx.reg file.
 
 Old Adaptec AIC7xxx support
 CONFIG_SCSI_AIC7XXX_OLD
@@ -7463,6 +7614,83 @@ CONFIG_AIC7XXX_OLD_PROC_STATS
   you also say Y to "/proc file system support", below.
 
   If unsure, say N.
+
+CONFIG_SCSI_AIC79XX
+  This driver supports all of Adaptec's Ultra 320 PCI-X based SCSI controllers.
+
+CONFIG_AIC79XX_CMDS_PER_DEVICE 32
+  Specify the number of commands you would like to allocate per SCSI
+  device when Tagged Command Queueing (TCQ) is enabled on that device.
+
+  This is an upper bound value for the number of tagged transactions
+  to be used for any device.  The aic7xxx driver will automatically
+  vary this number based on device behavior.  For devices with a
+  fixed maximum, the driver will eventually lock to this maximum
+  and display a console message indicating this value.
+
+  Due to resource allocation issues in the Linux SCSI mid-layer, using
+  a high number of commands per device may result in memory allocation
+  failures when many devices are attached to the system.  For this reason,
+  the default is set to 32.  Higher values may result in higer performance
+  on some devices.  The upper bound is 253.
+
+  Per device tag depth can be controlled via the kernel command line
+  "tag_info" option.  See drivers/scsi/aic7xxx/README.aic79xx
+  for details.
+
+  Default: 32
+
+CONFIG_AIC79XX_RESET_DELAY_MS 15000
+  The number of milliseconds to delay after an initial bus reset.
+  The bus settle delay following all error recovery actions is
+  dictated by the SCSI layer and is not affected by this value.
+
+  Default: 15000 (15 seconds)
+
+CONFIG_AIC79XX_BUILD_FIRMWARE
+  This option should only be enabled if you are modifying the firmware
+  source to the aic7xxx driver and wish to have the generated firmware
+  include files updated during a normal kernel build.  The assembler
+  for the firmware requires lex and yacc or their equivalents, as well
+  as the db v1 library.  You may have to install additional packages
+  or modify the assembler Makefile or the files it includes if your
+  build environment is different than that of the author.
+
+CONFIG_AIC79XX_ENABLE_RD_STRM
+  Read Streaming is a U320 protocol option that should enhance performance.
+  Early U320 drive firmware actually performs slower with read streaming
+  enabled so it is disabled by default.  Read Streaming can be configured
+  in much the same way as tagged queueing using the "rd_strm" command line
+  option.  See drivers/scsi/aic7xxx/README.aic79xx for details.
+
+CONFIG_AIC79XX_DEBUG_ENABLE
+  Compile in aic79xx debugging code that can be useful in diagnosing
+  driver errors.
+
+CONFIG_AIC79XX_DEBUG_MASK
+  Bit mask of debug options that is only valid if the
+  CONFIG_AIC79XX_DEBUG_ENBLE option is enabled.  The bits in this mask
+  are defined in the drivers/scsi/aic7xxx/aic79xx.h - search for the
+  variable ahd_debug in that file to find them.
+
+  Default: 0
+
+CONFIG_AIC79XX_REG_PRETTY_PRINT
+  Compile in register value tables for the output of expanded register
+  contents in diagnostics.  This make it much easier to understand debug
+  output without having to refer to a data book and/or the aic7xxx.reg file.
+
+Adaptec I2O RAID support
+CONFIG_SCSI_DPT_I2O
+  This driver supports all of Adaptec's I2O based RAID controllers as 
+  well as the DPT SmartRaid V cards.  This is an Adaptec maintained
+  driver by Deanna Bonds.  See <file:drivers/scsi/README.dpti>.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  If you want to compile it as a module, say M here and read
+  <file:Documentation/modules.txt>.  The module will be called
+  dpt_i2o.o.
 
 IBM ServeRAID support
 CONFIG_SCSI_IPS
@@ -11497,6 +11725,18 @@ CONFIG_E2100
   module, say M here and read <file:Documentation/modules.txt> as well
   as <file:Documentation/networking/net-modules.txt>.
 
+Broadcom 4400 ethernet support (EXPERIMENTAL)
+CONFIG_B44
+  If you have a network (Ethernet) controller of this type, say Y and
+  read the Ethernet-HOWTO, available from
+  <http://www.tldp.org/docs.html#howto>.
+
+  If you want to compile this as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt> as well as
+  <file:Documentation/networking/net-modules.txt>.  The module will be
+  called b44.
+
 CS89x0 support (Daynaport CS and LC cards)
 CONFIG_CS89x0
   Support for CS89x0 chipset based Ethernet cards. If you have a
@@ -11868,15 +12108,6 @@ CONFIG_TULIP
   The module will be called tulip.o.  If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt> as well
   as <file:Documentation/networking/net-modules.txt>.
-
-New Tulip bus configuration
-CONFIG_TULIP_MWI 
-  This configures your Tulip card specifically for the card and
-  system cache line size type you are using.
-
-  This is experimental code, not yet tested on many boards.
-
-  If unsure, say N.
 
 Use PCI shared memory for NIC registers
 CONFIG_TULIP_MMIO
@@ -12797,9 +13028,17 @@ CONFIG_QUOTA
   If you say Y here, you will be able to set per user limits for disk
   usage (also called disk quotas). Currently, it works only for the
   ext2 file system. You need additional software in order to use quota
-  support; for details, read the Quota mini-HOWTO, available from
+  support (you can download sources from
+  <http://www.sf.net/projects/linuxquota/>). For further details, read
+  the Quota mini-HOWTO, available from
   <http://www.tldp.org/docs.html#howto>. Probably the quota
   support is only useful for multi user systems. If unsure, say N.
+
+VFS v0 quota format support
+CONFIG_QFMT_V2
+  This quota format allows using quotas with 32-bit UIDs/GIDs. If you
+  need this functionality say Y here. Note that you will need latest
+  quota utilities for new quota format with this kernel.
 
 Memory Technology Device (MTD) support
 CONFIG_MTD
@@ -12861,21 +13100,39 @@ CONFIG_MTD_REDBOOT_PARTS
   <file:Documentation/modules.txt>. The module will be called
   redboot.o
 
-Compaq bootldr partition table parsing
-CONFIG_MTD_BOOTLDR_PARTS
-  The Compaq bootldr deals with multiple 'images' in flash devices
-  by putting a table in one of the first erase blocks of the device,
-  similar to a partition table, which gives the offsets, lengths and
-  names of all the images stored in the flash.
-
-  If you need code which can detect and parse this table, and register
-  MTD 'partitions' corresponding to each image in the table, enable
-  this option.
+CONFIG_MTD_CMDLINE_PARTS
+  Allow generic configuration of the MTD paritition tables via the kernel
+  command line. Multiple flash resources are supported for hardware where
+  different kinds of flash memory are available. 
 
   You will still need the parsing functions to be called by the driver
   for your particular device. It won't happen automatically. The 
   SA1100 map driver (CONFIG_MTD_SA1100) has an option for this, for 
   example.
+
+  The format for the command line is as follows:
+
+  mtdparts=<mtddef>[;<mtddef]
+  <mtddef>  := <mtd-id>:<partdef>[,<partdef>]
+  <partdef> := <size>[@offset][<name>][ro]
+  <mtd-id>  := unique id used in mapping driver/device
+  <size>    := standard linux memsize OR "-" to denote all 
+  remaining space
+  <name>    := (NAME)
+
+  Due to the way Linux handles the command line, no spaces are 
+  allowed in the partition definition, including mtd id's and partition 
+  names.
+
+  Examples:
+
+  1 flash resource (mtd-id "sa1100"), with 1 single writable partition:
+  mtdparts=sa1100:-
+
+  Same flash, but 2 named partitions, the first one being read-only:
+  mtdparts=sa1100:256k(ARMboot)ro,-(root)
+
+  If unsure, say 'N'.
 
 ARM Firmware Suite flash layout / partition parsing
 CONFIG_MTD_AFS_PARTS
@@ -13044,6 +13301,10 @@ CONFIG_MTD_CFI_B4
   If you wish to support CFI devices on a physical bus which is
   32 bits wide, say 'Y'.
 
+CONFIG_MTD_CFI_B8
+  If you wish to support CFI devices on a physical bus which is
+  64 bits wide, say 'Y'.
+
 Support 1-chip flash interleave
 CONFIG_MTD_CFI_I1
   If your flash chips are not interleaved - i.e. you only have one
@@ -13057,6 +13318,10 @@ CONFIG_MTD_CFI_I2
 Support 4-chip flash interleave
 CONFIG_MTD_CFI_I4
   If your flash chips are interleaved in fours - i.e. you have four
+  flash chips addressed by each bus cycle, then say 'Y'.
+
+CONFIG_MTD_CFI_I8
+  If your flash chips are interleaved in eights - i.e. you have eight
   flash chips addressed by each bus cycle, then say 'Y'.
 
 # Choice: mtd_data_swap
@@ -13122,6 +13387,11 @@ CONFIG_MTD_AMDSTD
   If you want to compile it as a module, say M here and read
   <file:Documentation/modules.txt>. The module will be called
   amd_flash.o
+
+CONFIG_MTD_CFI_STAA
+  The Common Flash Interface defines a number of different command
+  sets which a CFI-compliant chip may claim to implement. This code
+  provides support for one of those command sets.
 
 Support for RAM chips in bus mapping
 CONFIG_MTD_RAM
@@ -13543,6 +13813,18 @@ CONFIG_MTD_SLRAM
   <file:Documentation/modules.txt>. The module will be called
   slram.o
 
+DEC MS02-NV NVRAM module support
+CONFIG_MTD_MS02NV
+  This is a MTD driver for the DEC's MS02-NV (54-20948-01) battery
+  backed-up NVRAM module.  The module was originally meant as an NFS
+  accelerator.  Say Y here if you have a DECstation 5000/2x0 or a
+  DECsystem 5900 equipped with such a module.
+
+  If you want to compile this driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module will
+  be called ms02-nv.o.
+
 Debugging RAM test driver
 CONFIG_MTD_MTDRAM
   This enables a test MTD device driver which uses vmalloc() to
@@ -13927,11 +14209,12 @@ CONFIG_USB_POWERMATE
   The module will be called powermate.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
 
-Aiptek 6000U/8000U tablet support
+Aiptek HyperPen tablet support
 CONFIG_USB_AIPTEK
-  Say Y here if you want to use the USB version of the Aiptek 6000U/8000U
-  tablet.  Make sure to say Y to "Event interface support"
-  (CONFIG_INPUT_EVDEV) as well.
+  Say Y here if you want to use the USB version of the Aiptek HyperPen
+  Digital Tablet (models 4000U, 5000U, 6000U, 8000U, and 12000U.)
+  Make sure to say Y to "Mouse support" (CONFIG_INPUT_MOUSEDEV) and/or
+  "Event interface support" (CONFIG_INPUT_EVDEV) as well.
 
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
@@ -14628,6 +14911,24 @@ CONFIG_USB_CATC
   The module will be called catc.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
 
+USB ASIX AX88172 based ethernet device support
+CONFIG_USB_AX8817X
+  Say Y if you want to use one of the following 10/100 USB2 Ethernet
+  devices based on the ASIX AX88172 chip.  Supported devices are:
+    Linksys USB200M
+    Netgear FA120
+    D-Link DUB-E100
+    Hawking UF200
+
+  This driver makes the adapter appear as a normal Ethernet interface,
+  typically on eth0, if it is the only ethernet device, or perhaps on
+  eth1, if you have a PCI or ISA ethernet card installed.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called ax8817x.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
 USB Kodak DC-2xx Camera support
 CONFIG_USB_DC2XX
   Say Y here if you want to connect this type of still camera to your
@@ -14910,6 +15211,17 @@ CONFIG_USB_DSBR
   inserted in and removed from the running kernel whenever you want).
   The module will be called dsbr100.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
+
+Alcatel Speedtouch USB support
+CONFIG_USB_SPEEDTOUCH
+  Say Y here if you have an Alcatel SpeedTouch USB or SpeedTouch 330
+  modem.  In order to use your modem you will need to install some user
+  space tools, see <http://www.linux-usb.org/SpeedTouch/> for details.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called speedtch.o. If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
 
 Always do synchronous disk IO for UBD
 CONFIG_BLK_DEV_UBD_SYNC
@@ -15811,6 +16123,30 @@ CONFIG_NFS_V3
 
   If unsure, say N.
 
+Allow direct I/O on files in NFS
+CONFIG_NFS_DIRECTIO
+  There are important applications whose performance or correctness
+  depends on uncached access to file data.  Database clusters (multiple
+  copies of the same instance running on separate hosts) implement their
+  own cache coherency protocol that subsumes the NFS cache protocols.
+  Applications that process datasets considerably larger than the client's
+  memory do not always benefit from a local cache.  A streaming video
+  server, for instance, has no need to cache the contents of a file.
+
+  This option enables applications to perform direct I/O on files in NFS
+  file systems using the O_DIRECT open() flag.  When O_DIRECT is set for
+  files, their data is not cached in the system's page cache.  Direct
+  read and write operations are aligned to block boundaries.  Data is
+  moved to and from user-level application buffers directly.
+
+  Unless your program is designed to use O_DIRECT properly, you are much
+  better off allowing the NFS client to manage caching for you.  Misusing
+  O_DIRECT can cause poor server performance or network storms.  This
+  kernel build option defaults OFF to avoid exposing system administrators
+  unwittingly to a potentially hazardous feature.
+
+  If unsure, say N.
+
 Root file system on NFS
 CONFIG_ROOT_NFS
   If you want your Linux box to mount its whole root file system (the
@@ -15967,7 +16303,7 @@ CONFIG_AFFS_FS
   say M here and read <file:Documentation/modules.txt>.  If unsure,
   say N.
 
-Apple Macintosh file system support
+Apple HFS file system support
 CONFIG_HFS_FS
   If you say Y here, you will be able to mount Macintosh-formatted
   floppy disks and hard drive partitions with full read-write access.
@@ -15979,6 +16315,21 @@ CONFIG_HFS_FS
   whenever you want). The module is called hfs.o.  If you want to
   compile it as a module, say M here and read
   <file:Documentation/modules.txt>.
+
+Apple HFS+ (Extended HFS) file system support
+CONFIG_HFSPLUS_FS
+  If you say Y here, you will be able to mount extended format
+  Macintosh-formatted hard drive partitions with full read-write access.
+
+  This file system is often called HFS+ and was introduced with
+  MacOS 8. It includes all Mac specific filesystem data such as
+  data forks and creator codes, but it also has several UNIX
+  style features such as file ownership and permissions.
+
+  This file system is also available as a module ( = code which can
+  be inserted in and removed from the running kernel whenever you
+  want). The module is called hfsplus.o. If you want to compile it
+  as a module, say M here and read Documentation/modules.txt.
 
 ROM file system support
 CONFIG_ROMFS_FS
@@ -17306,6 +17657,13 @@ CONFIG_SERIAL_CONSOLE
 
   If unsure, say N.
 
+Support for serial port described by EFI HCDP table
+CONFIG_SERIAL_HCDP
+  If you wish to make the serial console port described by the EFI
+  HCDP table available for use as serial console or general
+  purpose port, say Y here. See
+  <http://www.dig64.org/specifications/DIG64_HCDPv10a_01.pdf>.
+
 Support for PowerMac serial ports
 CONFIG_MAC_SERIAL
   If you have Macintosh style serial ports (8 pin mini-DIN), say Y
@@ -17888,6 +18246,16 @@ CONFIG_ITE_I2C_ADAP
   it as a module, say M here and read
   <file:Documentation/modules.txt>.
   The module will be called i2c-adap-ite.o.
+
+SiByte I2C Algorithm
+CONFIG_I2C_ALGO_SIBYTE
+  Supports the SiByte SOC on-chip I2C interfaces (2 channels).
+
+MAX1617 Temperature Sensor
+CONFIG_I2C_MAX1617
+  This builds a simple polling driver for the Maxim 1617 temperature
+  sensor.  Currently the device is only supported on a SiByte I2C
+  adapter, and the driver prints status updates to the system log.
 
 I2C device interface
 CONFIG_I2C_CHARDEV
@@ -18621,6 +18989,25 @@ CONFIG_ACPI
   The ACPI Sourceforge project may also be of interest:
   <http://sf.net/projects/acpi/>
 
+ACPI Processor Enumeration for HT
+CONFIG_ACPI_HT_ONLY
+  ACPI enumerates both logical (a.k.a. Hyper-Threaded -- HT)
+  and physical processors.  It is designed to obsolete several older
+  specifications, including the MultiProcessor Specification (MPS),
+  which supported only physical processors.
+
+  CONFIG_ACPI_HT_ONLY includes just the minimal ACPI boot-time code
+  necessary to enumerate logical processors and enable HT.
+
+  CONFIG_ACPI includes this code, plus IO APIC enumeration,
+  and the hooks to run the ACPI AML interpreter for run-time events.
+
+  When CONFIG_ACPI is selected, the command-line option "acpi=ht"
+  is available to run just the ACPI boot-time code -- just as if
+  only CONFIG_ACPI_HT_ONLY were selected.
+
+  Note that "acpi=off" can be used to disable all ACPI code in the kernel.
+
 Enable ACPI 2.0 with errata 1.3
 CONFIG_ACPI20
   Enable support for the 2.0 version of the ACPI interpreter.  See the
@@ -18636,6 +19023,14 @@ CONFIG_ACPI_DEBUG
   The ACPI driver can optionally report errors with a great deal
   of verbosity. Saying Y enables these statements. This will increase
   your kernel size by around 50K.
+
+ACPI Relaxed AML Checking
+CONFIG_ACPI_RELAXED_AML
+  If you say `Y' here, the ACPI interpreter will relax its checking
+  for valid AML and will ignore some AML mistakes, such as off-by-one
+  errors in region sizes.  Some laptops may require this option.  In
+  particular, many Toshiba laptops require this for correct operation
+  of the AC module.
 
 ACPI Bus Manager
 CONFIG_ACPI_BUSMGR
@@ -18662,6 +19057,20 @@ CONFIG_ACPI_BUTTON
   down the system.  Until then, you can cat it, and see output when
   a button is pressed.
 
+CONFIG_ACPI_BATTERY
+  This driver adds support for battery information through
+  /proc/acpi/battery. If you have a mobile system with a battery, 
+  say Y.
+
+CONFIG_ACPI_FAN
+  This driver adds support for ACPI fan devices, allowing user-mode 
+  applications to perform basic fan control (on, off, status).
+
+CONFIG_ACPI_PROCESSOR
+  This driver installs ACPI as the idle handler for Linux, and uses
+  ACPI C2 and C3 processor states to save power, on systems that
+  support it.
+
 ACPI AC Adapter
 CONFIG_ACPI_AC
   This driver adds support for the AC Adapter object, which indicates
@@ -18683,6 +19092,53 @@ ACPI Thermal
 CONFIG_ACPI_THERMAL
   This driver handles overheating conditions on laptops. It is HIGHLY
   recommended, as your laptop CPU may be damaged without it.
+
+ACPI ASUS/Medion Laptop Extras
+CONFIG_ACPI_ASUS
+  This driver provides support for extra features of ACPI-compatible
+  ASUS laptops. As some of Medion laptops are made by ASUS, it may also
+  support some Medion laptops (such as 9675 for example).  It makes all
+  the extra buttons generate standard ACPI events that go through
+  /proc/acpi/events, and (on some models) adds support for changing the
+  display brightness and output, switching the LCD backlight on and off,
+  and most importantly, allows you to blink those fancy LEDs intended
+  for reporting mail and wireless status.
+  
+  All settings are changed via /proc/acpi/asus directory entries. Owner
+  and group for these entries can be set with asus_uid and asus_gid
+  parameters.
+  
+  More information and a userspace daemon for handling the extra buttons
+  at <http://sourceforge.net/projects/acpi4asus/>.
+  
+  If you have an ACPI-compatible ASUS laptop, say Y or M here. This
+  driver is still under development, so if your laptop is unsupported or
+  something works not quite as expected, please use the mailing list
+  available on the above page (acpi4asus-user@lists.sourceforge.net)
+  
+ACPI Toshiba Laptop Extras
+CONFIG_ACPI_TOSHIBA
+  This driver adds support for access to certain system settings
+  on "legacy free" Toshiba laptops.  These laptops can be recognized by
+  their lack of a BIOS setup menu and APM support.
+
+  On these machines, all system configuration is handled through the
+  ACPI.  This driver is required for access to controls not covered
+  by the general ACPI drivers, such as LCD brightness, video output,
+  etc.
+
+  This driver differs from the non-ACPI Toshiba laptop driver (located
+  under "Processor type and features") in several aspects.
+  Configuration is accessed by reading and writing text files in the
+  /proc tree instead of by program interface to /dev.  Furthermore, no
+  power management functions are exposed, as those are handled by the
+  general ACPI drivers.
+
+  More information about this driver is available at
+  <http://memebeam.org/toys/ToshibaAcpiDriver>.
+
+  If you have a legacy free Toshiba laptop (such as the Libretto L1
+  series), say Y.
 
 Advanced Power Management BIOS support
 CONFIG_APM
@@ -19189,6 +19645,17 @@ CONFIG_RTC
   inserted in and removed from the running kernel whenever you want).
   The module is called rtc.o. If you want to compile it as a module,
   say M here and read <file:Documentation/modules.txt>.
+
+Generic MIPS RTC Support
+CONFIG_MIPS_RTC
+
+  If your machine is a MIPS machine, this option provides a simple,
+  generic RTC driver for /dev/rtc device.  It only implements two IOCTL 
+  operations of the standard PC RTC driver: RTC_RD_TIME and RTC_SET_TIME.
+  It is sufficient to run hwclock program. 
+
+  You should say Y here if there is no machine-specific RTC driver for your
+  MIPS machine but you do want a simple RTC driver for your RTC device.
 
 Generic Real Time Clock Support
 CONFIG_GEN_RTC
@@ -19940,6 +20407,14 @@ CONFIG_SOUND_CS4232
   See <file:Documentation/sound/CS4232> for more information on
   configuring this card.
 
+Support for Crystal CS4297a on SiByte syncser
+CONFIG_SOUND_BCM_CS4297A
+  The BCM91250A has a Crystal CS4297a on synchronous serial port B (in
+  addition to the DB-9 serial port).  Say Y or M here to enable the
+  sound chip instead of the UART.  Also note that CONFIG_KGDB should
+  not be enabled at the same time, since it also attempts to use this
+  UART port.
+
 Support for Yamaha OPL3-SA2 and SA3 based PnP cards
 CONFIG_SOUND_OPL3SA2
   Say Y or M if you have a card based on one of these Yamaha sound
@@ -20542,6 +21017,23 @@ CONFIG_MIPS32_COMPAT
   compatibility. Since all software available for Linux/MIPS is
   currently 32-bit you should say Y here.
 
+Kernel support for o32 binaries
+CONFIG_MIPS32_O32
+  Select this option if you want to run o32 binaries.  These are pure
+  32-bit binaries as used by the 32-bit Linux/MIPS port.  Most of
+  existing binaries are in this format.
+
+  If unsure, say Y.
+
+Kernel support for n32 binaries
+CONFIG_MIPS32_N32
+  Select this option if you want to run n32 binaries.  These are
+  64-bit binaries using 32-bit quantities for addressing and certain
+  data that would normally be 64-bit.  They are used in special
+  cases.
+
+  If unsure, say N.
+
 Build fp exception handler module
 CONFIG_MIPS_FPE_MODULE
   Build the floating point exception handler module. This option is
@@ -20610,19 +21102,12 @@ CONFIG_NINO_16MB
   Palm PCs from Philips (INCOMPLETE).
 Model-300/301/302/319
 
-Low-level debugging
-CONFIG_LL_DEBUG
-  Enable low-level debugging assertion macros in the kernel code.
-  Currently used only by the time services code in the MIPS port.
-  Don't turn this on unless you know what you are doing.
-
-Remote GDB kernel debugging
-CONFIG_REMOTE_DEBUG
-  If you say Y here, it will be possible to remotely debug the MIPS
-  kernel using gdb. This enlarges your kernel image disk size by
-  several megabytes and requires a machine with more than 16 MB,
-  better 32 MB RAM to avoid excessive linking time. This is only
-  useful for kernel hackers. If unsure, say N.
+Enable run-time debugging
+CONFIG_RUNTIME_DEBUG
+  If you say Y here, some debugging macros will do run-time checking.
+  If you say N here, those macros will mostly turn to no-ops.  Currently
+  supported by MIPS arch.  See include/asm-mips/debug.h for debuging macros.
+  If unsure, say N.
 
 Run uncached
 CONFIG_MIPS_UNCACHED
@@ -20691,6 +21176,17 @@ CONFIG_ISDN_PPP
   need a special version of pppd (called ipppd) for using this
   feature. See <file:Documentation/isdn/README.syncppp> and
   <file:Documentation/isdn/syncPPP.FAQ> for more information.
+
+PPP filtering for ISDN
+CONFIG_IPPP_FILTER
+  Say Y here if you want to be able to filter the packets passing over
+  IPPP interfaces.  This allows you to control which packets count as
+  activity (i.e. which packets will reset the idle timer or bring up
+  a demand-dialled link) and which packets are to be dropped entirely.
+  You need to say Y here if you wish to use the pass-filter and
+  active-filter options to ipppd.
+
+  If unsure, say N.
 
 Support generic MP (RFC 1717)
 CONFIG_ISDN_MPP
@@ -21540,6 +22036,7 @@ CONFIG_BLUEZ
                SCO Module (SCO links)
                RFCOMM Module (RFCOMM protocol)
                BNEP Module (BNEP protocol)
+               CMTP Module (CMTP protocol)
 
   Say Y here to enable Linux Bluetooth support and to build BlueZ Core
   layer.
@@ -21593,6 +22090,15 @@ CONFIG_BLUEZ_BNEP
 
   Say Y here to compile BNEP support into the kernel or say M to
   compile it as module (bnep.o).
+
+CMTP protocol support
+CONFIG_BLUEZ_CMTP
+  CMTP (CAPI Message Transport Protocol) is a transport layer
+  for CAPI messages. CMTP is required for the Bluetooth Common
+  ISDN Access Profile.
+
+  Say Y here to compile CMTP support into the kernel or say M to
+  compile it as module (cmtp.o).
 
 BNEP multicast filter support
 CONFIG_BLUEZ_BNEP_MC_FILTER
@@ -21670,6 +22176,16 @@ CONFIG_BLUEZ_HCIVHCI
   Say Y here to compile support for virtual HCI devices into the
   kernel or say M to compile it as module (hci_vhci.o).
 
+HCI BFUSB device driver
+CONFIG_BLUEZ_HCIBFUSB
+  Bluetooth HCI BlueFRITZ! USB driver.
+  This driver provides support for Bluetooth USB devices with AVM
+  interface:
+     AVM BlueFRITZ! USB
+
+  Say Y here to compile support for HCI BFUSB devices into the
+  kernel or say M to compile it as module (bfusb.o).
+
 HCI DTL1 (PC Card) device driver
 CONFIG_BLUEZ_HCIDTL1
   Bluetooth HCI DTL1 (PC Card) driver.
@@ -21727,6 +22243,24 @@ SuperH RTC support
 CONFIG_SH_RTC
   Selecting this option will allow the Linux kernel to emulate
   PC's RTC.
+
+  If unsure, say N.
+
+SuperH peripheral clock frequency
+CONFIG_SH_PCLK_FREQ
+  Set this value or add "sh_pclk=" command line option to tell
+  peripheral clock frequency to kernel, if your system has no RTC.
+  Otherwise leave it 0, and kernel measures peripheral clock frequency
+  using TMU and RTC while system startup.
+
+  If unsure, set 0.
+
+Wakeup UBC on startup
+CONFIG_UBC_WAKEUP
+  Selecting this option will wakeup the User Break Controller (UBC) on
+  startup. Although the UBC is left in an awake state when the processor
+  comes up, some boot loaders misbehave by putting the UBC to sleep in a
+  power saving state, which causes issues with things like ptrace().
 
   If unsure, say N.
 
@@ -23557,6 +24091,12 @@ CONFIG_VIDEO_W9966
   Check out <file:drivers/media/video4linux/w9966.txt> and
   <file:drivers/media/video/w9966.c> for more information.
 
+Philips SAA7114H for SiByte BCM91250A
+CONFIG_VIDEO_SWARM_7114H
+  Say Y or M to build the video4linux driver for the Philips SAA7114H
+  video decoder on Broadcom SWARM board (BCM91250A).  The decoder chip
+  is on the BCM1250's "E2" 8-bit FIFO port.
+
 CPiA Video For Linux
 CONFIG_VIDEO_CPIA
   This is the video4linux driver for cameras based on Vision's CPiA
@@ -23815,6 +24355,20 @@ CONFIG_IUCV
   Select this option if you want to use inter-user communication
   vehicle networking under VM or VIF.  This option is also available
   as a module which will be called iucv.o. If unsure, say "Y".
+
+Process warning machine checks
+CONFIG_MACHCHK_WARNING
+  Select this option if you want the machine check handler on IBM S/390 or 
+  zSeries to process warning machine checks (e.g. on power failures). 
+  If unsure, say "Y".
+
+Use chscs for Common I/O
+CONFIG_CHSC
+  Select this option if you want the s390 common I/O layer to use information
+  obtained by channel subsystem calls. This will enable Linux to process link
+  failures and resource accessibility events. Moreover, if you have procfs
+  enabled, you'll be able to toggle chpids logically offline and online. Even
+  if you don't understand what this means, you should say "Y".
 
 Process warning machine checks
 CONFIG_MACHCHK_WARNING
@@ -26097,6 +26651,9 @@ CONFIG_SH_GENERIC
   Select SolutionEngine if configuring for a Hitachi SH7709
   or SH7750/7750S evaluation board.
 
+  Select SHMobileSolutionEngine if configuring for SH-Mobile Solution
+  Engine.
+
   Select Overdrive if configuring for a ST407750 Overdrive board.
   More information at
   <http://linuxsh.sourceforge.net/docs/7750overdrive.php3>.
@@ -26150,6 +26707,11 @@ CONFIG_SH_7751_SOLUTION_ENGINE
   Select 7751 SolutionEngine if configuring for a Hitachi SH7751
   evaluation board.
 
+SHMobileSolutionEngine
+CONFIG_SH_MOBILE_SOLUTION_ENGINE
+  Select SHMobileSolutionEngine if configuring for SH-Mobile Solution
+  Engine.
+
 Overdrive
 CONFIG_SH_OVERDRIVE
   Select Overdrive if configuring for a ST407750 Overdrive board.
@@ -26197,6 +26759,14 @@ CONFIG_SH_DREAMCAST
   <http://www.m17n.org/linux-sh/dreamcast/>.  There is a
   Dreamcast project is at <http://linuxdc.sourceforge.net/>.
 
+SH-2000
+CONFIG_SH_SH2000
+  SH-2000 is a single-board computer based around SH7709A chip
+  intended for embedded applications.
+  It has an Ethernet interface (CS8900A), direct connected
+  Compact Flash socket, three serial ports and PC-104 bus.
+  More information at <http://sh2000.sh-linux.org>.
+
 BareCPU
 CONFIG_SH_UNKNOWN
   "Bare CPU" aka "unknown" means an SH-based system which is not one
@@ -26226,6 +26796,12 @@ CONFIG_CPU_SUBTYPE_SH7707
   Select SH7751 if you have a SH7751
 
   Select ST40STB1 if you have a ST40STB1
+  Select ST40RA/ST40STB1 if you have a ST40RA
+                         (previously known as ST40STB1).
+
+  Select ST40GX1 if you have an ST40GX1.
+
+  Select SH7300 if you have a HD6417300 CPU.
 
 SH7708
 CONFIG_CPU_SUBTYPE_SH7708
@@ -26239,6 +26815,35 @@ CONFIG_CPU_SUBTYPE_SH7709
 SH7750
 CONFIG_CPU_SUBTYPE_SH7750
   Select SH7750 if you have a 200 Mhz SH-4 HD6417750 CPU.
+
+SH7751
+CONFIG_CPU_SUBTYPE_SH7751
+  Select SH7750 if you have a 166 Mhz SH-4 HD6417751 CPU.
+
+ST40RA/ST40STB1
+CONFIG_CPU_SUBTYPE_ST40STB1
+  Select ST40RA/ST40STB1 if you have a ST40RA. This chip was
+  previously called the ST40STB1. Early versions were also
+  erronously labelled ST40AR166.
+
+ST40GX1
+CONFIG_CPU_SUBTYPE_ST40GX1
+  Select ST40GX1 if you have a ST40GX1 CPU.
+
+SH7300
+CONFIG_CPU_SUBTYPE_SH7300
+  Select SH7300 if you have a HD6417300 CPU.
+
+Memory on LMI
+CONFIG_ST40_LMI_MEMORY
+  Currently all ST40 CPUs have two external buses the
+  'Local Memory Interface' (LMI) which supports SDRAM and
+  DDR SDRAM, and the 'Enhanced flash Memory Interface' (EMI),
+  which supports SDRAM, Flash, peripherials and MPX. Linux
+  can support memory on either of these buses, it is simply
+  necessary to specify its base address. This option is simply
+  a shortcut method of specifying that RAM starts from the
+  bottom of the LMI.
 
 Physical memory start address
 CONFIG_MEMORY_START
@@ -26610,6 +27215,140 @@ CONFIG_MTD_SCx200_DOCFLASH
 
   If compiled as a module, it will be called scx200_docflash.o.
 
+BIOS flash chip on AMD76x southbridge
+CONFIG_MTD_AMD76XROM
+  Support for treating the BIOS flash chip on AMD76x motherboards
+  as an MTD device - with this you can reprogram your BIOS.
+
+  BE VERY CAREFUL.
+
+  If compiled as a module, it will be called amd76xrom.o.
+
+BIOS flash chip on Intel Hub Controller 2
+CONFIG_MTD_ICH2ROM
+  Support for treating the BIOS flash chip on ICH2 motherboards
+  as an MTD device - with this you can reprogram your BIOS.
+
+  BE VERY CAREFUL.
+
+  If compiled as a module, it will be called ich2rom.o.
+
+BIOS flash chip on Intel SCB2 boards
+CONFIG_MTD_SCB2_FLASH
+  Support for treating the BIOS flash chip on Intel SCB2 boards
+  as an MTD device - with this you can reprogram your BIOS.
+
+  BE VERY CAREFUL.
+
+  If compiled as a module, it will be called scb2_flash.o.
+
+Flash chips on Tsunami TIG bus
+CONFIG_MTD_TSUNAMI
+  Support for the flash chip on Tsunami TIG bus.
+
+  If compiled as a module, it will be called tsunami_flash.o.
+
+Flash chips on LASAT board
+CONFIG_MTD_LASAT
+  Support for the flash chips on the Lasat 100 and 200 boards.
+
+  If compiled as a module, it will be called lasat.o.
+
+CFI flash device on SnapGear/SecureEdge
+CONFIG_MTD_NETtel
+  Support for flash chips on NETtel/SecureEdge/SnapGear boards.
+
+  If compiled as a module, it will be called nettel.o.
+
+CFI Flash device mapped on DIL/Net PC
+CONFIG_MTD_DILNETPC
+  MTD map driver for SSV DIL/Net PC Boards "DNP" and "ADNP".
+  For details, see <http://www.ssv-embedded.de/ssv/pc104/p169.htm>
+   and <http://www.ssv-embedded.de/ssv/pc104/p170.htm>
+
+  If compiled as a module, it will be called dilnetpc.o.
+
+Size of DIL/Net PC flash boot partition
+CONFIG_MTD_DILNETPC_BOOTSIZE
+  The amount of space taken up by the kernel or Etherboot
+  on the DIL/Net PC flash chips.
+
+CFI Flash device mapped on Epxa10db
+CONFIG_MTD_EPXA10DB
+  This enables support for the flash devices on the Altera
+  Excalibur XA10 Development Board. If you are building a kernel
+  for on of these boards then you should say 'Y' otherwise say 'N'.
+
+  If compiled as a module, it will be called epxa10db-flash.o.
+
+CFI Flash device mapped on the FortuNet board
+CONFIG_MTD_FORTUNET
+  This enables access to the Flash on the FortuNet board.  If you
+  have such a board, say 'Y'.
+
+  If compiled as a module, it will be called fortunet.o.
+
+NV-RAM mapping AUTCPU12 board
+CONFIG_MTD_AUTCPU12
+  This enables access to the NV-RAM on autronix autcpu12 board.
+  If you have such a board, say 'Y'.
+
+  If compiled as a module, it will be called autcpu12-nvram.o.
+
+CFI Flash device mapped on EDB7312
+CONFIG_MTD_EDB7312
+  This enables access to the CFI Flash on the Cogent EDB7312 board.
+  If you have such a board, say 'Y' here.
+
+  If compiled as a module, it will be called edb7312.o.
+
+JEDEC Flash device mapped on impA7
+CONFIG_MTD_IMPA7
+  This enables access to the NOR Flash on the impA7 board of
+  implementa GmbH. If you have such a board, say 'Y' here.
+
+  If compiled as a module, it will be called impa7.o.
+
+JEDEC Flash device mapped on Ceiva/Polaroid PhotoMax Digital Picture Frame
+CONFIG_MTD_CEIVA
+  This enables access to the flash chips on the Ceiva/Polaroid
+  PhotoMax Digital Picture Frame.
+  If you have such a device, say 'Y'.
+
+  If compiled as a module, it will be called ceiva.o.
+
+System flash on MBX860 board
+CONFIG_MTD_MBX860
+  This enables access routines for the flash chips on the Motorola
+  MBX860 board. If you have one of these boards and would like
+  to use the flash chips on it, say 'Y'.
+
+  If compiled as a module, it will be called mbx860.o.
+
+PCI MTD driver
+CONFIG_MTD_PCI
+  Mapping for accessing flash devices on add-in cards like the Intel XScale
+  IQ80310 card, and the Intel EBSA285 card in blank ROM programming mode
+  (please see the manual for the link settings).
+
+  If compiled as a module, it will be called pci.o.
+
+  If you are not sure, say N.
+
+PCMCIA MTD driver
+CONFIG_MTD_PCMCIA
+  Map driver for accessing PCMCIA linear flash memory cards. These
+  cards are usually around 4-16MiB in size. This does not include
+  Compact Flash cards which are treated as IDE devices.
+
+  If compiled as a module, it will be called pcmciamtd.o.
+
+Generic uClinux RAM/ROM filesystem support
+CONFIG_MTD_UCLINUX
+  Map driver to support image based filesystems for uClinux.
+
+  If compiled as a module, it will be called uclinux.o.
+
 NatSemi SCx200 I2C using GPIO pins
 CONFIG_SCx200_GPIO
   Enable the use of two GPIO pins of a SCx200 processor as an I2C bus.
@@ -26667,6 +27406,105 @@ CONFIG_IPMI_KCS
 IPMI Watchdog Timer
 CONFIG_IPMI_WATCHDOG
   This enables the IPMI watchdog timer.
+
+CRC32 functions
+CONFIG_CRC32
+  This option is provided for the case where no in-kernel-tree
+  modules require CRC32 functions, but a module built outside the
+  kernel tree does. Such modules that use library CRC32 functions
+  require that you say M or Y here.
+
+CONFIG_CRYPTO
+  This option provides the core Cryptographic API.
+
+CONFIG_CRYPTO_HMAC
+  HMAC: Keyed-Hashing for Message Authentication (RFC2104).
+  This is required for IPSec.
+
+CONFIG_CRYPTO_NULL
+  These are 'Null' algorithms, used by IPsec, which do nothing.
+
+CONFIG_CRYPTO_MD4
+  MD4 message digest algorithm (RFC1320).
+  
+CONFIG_CRYPTO_MD5
+  MD5 message digest algorithm (RFC1321).
+
+CONFIG_CRYPTO_SHA1
+  SHA-1 secure hash standard (FIPS 180-1/DFIPS 180-2).
+
+CONFIG_CRYPTO_SHA256
+  SHA256 secure hash standard (DFIPS 180-2).
+
+  This version of SHA implements a 256 bit hash with 128 bits of
+  security against collision attacks.
+
+CONFIG_CRYPTO_SHA512
+  SHA512 secure hash standard (DFIPS 180-2).
+
+  This version of SHA implements a 512 bit hash with 256 bits of
+  security against collision attacks.
+
+  This code also includes SHA-384, a 384 bit hash with 192 bits
+  of security against collision attacks.
+
+CONFIG_CRYPTO_DES
+  DES cipher algorithm (FIPS 46-2), and Triple DES EDE (FIPS 46-3).
+
+CONFIG_CRYPTO_BLOWFISH
+  Blowfish cipher algorithm, by Bruce Schneier.
+
+  This is a variable key length cipher which can use keys from 32
+  bits to 448 bits in length.  It's fast, simple and specifically
+  designed for use on "large microprocessors".
+
+  See also <http://www.counterpane.com/blowfish.html>.
+
+CONFIG_CRYPTO_TWOFISH
+  Twofish cipher algorithm.
+
+  Twofish was submitted as an AES (Advanced Encryption Standard)
+  candidate cipher by researchers at CounterPane Systems.  It is a
+  16 round block cipher supporting key sizes of 128, 192, and 256
+  bits.
+
+  See also:
+  http://www.counterpane.com/twofish.html
+
+CONFIG_CRYPTO_SERPENT
+  Serpent cipher algorithm, by Anderson, Biham & Knudsen.
+
+  Keys are allowed to be from 0 to 256 bits in length, in steps
+  of 8 bits.
+
+  See also:
+  http://www.cl.cam.ac.uk/~rja14/serpent.html
+
+CONFIG_CRYPTO_AES
+  AES cipher algorithms (FIPS-197). AES uses the Rijndael 
+  algorithm.
+
+  Rijndael appears to be consistently a very good performer in
+  both hardware and software across a wide range of computing 
+  environments regardless of its use in feedback or non-feedback 
+  modes. Its key setup time is excellent, and its key agility is 
+  good. Rijndael's very low memory requirements make it very well 
+  suited for restricted-space environments, in which it also 
+  demonstrates excellent performance. Rijndael's operations are 
+  among the easiest to defend against power and timing attacks.	
+
+  The AES specifies three key sizes: 128, 192 and 256 bits	  
+
+  See http://csrc.nist.gov/encryption/aes/ for more information.
+
+CONFIG_CRYPTO_DEFLATE
+  This is the Deflate algorithm (RFC1951), specified for use in
+  IPSec with the IPCOMP protocol (RFC3173, RFC2394).
+
+  You will most probably want this if using IPSec.
+
+CONFIG_CRYPTO_TEST
+  Quick & dirty crypto test module.
 
 #
 # A couple of things I keep forgetting:

@@ -401,5 +401,6 @@ extern int is_sony_vaio_laptop;
 
 #define BROKEN_ACPI_Sx		0x0001
 #define BROKEN_INIT_AFTER_S1	0x0002
+#define BROKEN_PNP_BIOS		0x0004
 
 #endif
