@@ -47,6 +47,10 @@
 #define XEN_BLOCK_SEG_CREATE   7  /* create segment (vhd) */
 #define XEN_BLOCK_SEG_DELETE   8  /* delete segment (vhd) */
 #define XEN_BLOCK_PROBE_SEG    9  /* get vhd config from hypervisor */
+#define XEN_BLOCK_PHYSDEV_GRANT 10 /* grant access to range of disk blocks */
+#define XEN_BLOCK_PHYSDEV_REVOKE 11 /* revoke access to range of disk blocks */
+#define XEN_BLOCK_PHYSDEV_PROBE 12 /* probe for a domain's physdev
+				      accesses */
 
 /* NB. Ring size must be small enough for sizeof(blk_ring_t) <= PAGE_SIZE. */
 #define BLK_RING_SIZE        64
@@ -138,5 +142,27 @@ typedef struct xv_disk
   int ext_count;                          /* number of xv_extent_t to follow */
   xv_extent_t extents[XEN_MAX_DISK_COUNT];    /* arbitrary reuse of constant */
 } xv_disk_t;
+
+typedef struct xp_disk
+{
+  int mode;
+  int domain;
+  unsigned short device;
+  unsigned long start_sect;
+  unsigned long n_sectors;
+} xp_disk_t;
+
+#define PHYSDISK_MAX_ACES_PER_REQUEST 254
+typedef struct {
+  int n_aces;
+  int domain;
+  int start_ind;
+  struct {
+    unsigned short device;
+    unsigned long start_sect;
+    unsigned long n_sectors;
+    unsigned mode;
+  } entries[PHYSDISK_MAX_ACES_PER_REQUEST];
+} physdisk_probebuf_t;
 
 #endif

@@ -103,12 +103,16 @@
 3ee609b3Yr4aggmLSKmhiIzT8-nURA tools/internal/dom0_ops.h
 3eb781fddjylXbsepjppUyIXa5lcaQ tools/internal/hypervisor_defs.h
 3eb781fdKiQbgozBsgs_zzJQ9ubehw tools/internal/mem_defs.h
+3f04589dFbtsbWWwAXq3I92UiAogCg tools/internal/physdev.h
 3ec61e1bJCeJJu0SsptmDpA1xKvwvw tools/internal/rpm.spec
 3eb781fdgbSkh2O6JQS-65Dz4n0ItQ tools/internal/xi_build.c
 3eb781fdW1SAyiaC4mTsXq_9fRHh-A tools/internal/xi_create.c
 3eb781fdcJ0fF7rWfzAOArW-x4-gwA tools/internal/xi_destroy.c
 3ec43c5dmQxGDvgJJXbV1yLxT30Y1A tools/internal/xi_helper
 3eb83c3bZeECmphOKOJxSu4Lo1LpBw tools/internal/xi_list
+3f0458aaXhD8BQAggO81gv30RQ-ifA tools/internal/xi_phys_grant.c
+3f0458aaJHmlzkDwf0qxEzAcjX55sg tools/internal/xi_phys_probe.c
+3f0458aaVAbFSwptQbQAnDOiZlwQ3w tools/internal/xi_phys_revoke.c
 3eb781fd8oRfPgH7qTh7xvgmwD6NgA tools/internal/xi_start.c
 3eb781fd0Eo9K1jEFCSAVzO51i_ngg tools/internal/xi_stop.c
 3eb781fd7211MZsLxJSiuy7W4KnJXg tools/internal/xi_vifinit
@@ -194,6 +198,7 @@
 3ddb79beNQVrdGyoI4njXhgAjD6a4A xen/drivers/block/genhd.c
 3ddb79beyWwLRP_BiM2t1JKgr_plEw xen/drivers/block/ll_rw_blk.c
 3e4a8cb7RhubVgsPwO7cK0pgAN8WCQ xen/drivers/block/xen_block.c
+3f045882spujO81dMl-fYWGiZ8WcPw xen/drivers/block/xen_physdisk.c
 3e5d129asHNyZOjBKTkqs-9AFzxemA xen/drivers/block/xen_segment.c
 3e9c248afxxsnAzIt2na7Ej24yNFzg xen/drivers/cdrom/Makefile
 3e9c248ajUkn2W3n4vgm72Hp2ftZ8A xen/drivers/cdrom/cdrom.c
@@ -481,6 +486,8 @@
 3e5a4e65pP5spJErBW69pJxSSdK9RA xenolinux-2.4.21-sparse/arch/xeno/drivers/block/xl_block.c
 3e67f822FOPwqHiaRKbrskgWgoNL5g xenolinux-2.4.21-sparse/arch/xeno/drivers/block/xl_block.h
 3e677190SjkzJIvFifRVeYpIZOCtYA xenolinux-2.4.21-sparse/arch/xeno/drivers/block/xl_ide.c
+3f045897EIYU5l5jxFBpeF1Z0ZOTwA xenolinux-2.4.21-sparse/arch/xeno/drivers/block/xl_physdisk_proc.c
+3f045a16wW57GFQ3r3Ta2cJOo1ierQ xenolinux-2.4.21-sparse/arch/xeno/drivers/block/xl_physdisk_proc.c~
 3e677193nOKKTLJzcAu4SYdbZaia8g xenolinux-2.4.21-sparse/arch/xeno/drivers/block/xl_scsi.c
 3e676eb5RXnHzSHgA1BvM0B1aIm4qg xenolinux-2.4.21-sparse/arch/xeno/drivers/block/xl_segment.c
 3e5d129aDldt6geU2-2SzBae34sQzg xenolinux-2.4.21-sparse/arch/xeno/drivers/block/xl_segment_proc.c
