@@ -532,7 +532,7 @@ int set_timeout_timer(void)
         alarm = __jiffies_to_st(timer->expires);
 
     /* Failure is pretty bad, but we'd best soldier on. */
-    if ( HYPERVISOR_set_dom_timer(alarm) != 0 )
+    if ( HYPERVISOR_set_timer_op(alarm) != 0 )
         ret = -1;
     
     spin_unlock(&timerlist_lock);
