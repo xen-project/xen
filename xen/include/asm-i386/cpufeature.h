@@ -10,9 +10,9 @@
 /* Sample usage: CPU_FEATURE_P(cpu.x86_capability, FPU) */
 #define CPU_FEATURE_P(CAP, FEATURE) test_bit(CAP, X86_FEATURE_##FEATURE ##_BIT)
 
-#define NCAPINTS	4	/* Currently we have 4 32-bit words worth of info */
+#define NCAPINTS	6	/* Currently we have 6 32-bit words worth of info */
 
-/* Intel-defined CPU features, CPUID level 0x00000001, word 0 */
+/* Intel-defined CPU features, CPUID level 0x00000001 (edx), word 0 */
 #define X86_FEATURE_FPU		(0*32+ 0) /* Onboard FPU */
 #define X86_FEATURE_VME		(0*32+ 1) /* Virtual Mode Extensions */
 #define X86_FEATURE_DE		(0*32+ 2) /* Debugging Extensions */
@@ -47,6 +47,7 @@
 /* AMD-defined CPU features, CPUID level 0x80000001, word 1 */
 /* Don't duplicate feature flags which are redundant with Intel! */
 #define X86_FEATURE_SYSCALL	(1*32+11) /* SYSCALL/SYSRET */
+#define X86_FEATURE_MP		(1*32+19) /* MP Capable. */
 #define X86_FEATURE_MMXEXT	(1*32+22) /* AMD MMX extensions */
 #define X86_FEATURE_LM		(1*32+29) /* Long Mode (x86-64) */
 #define X86_FEATURE_3DNOWEXT	(1*32+30) /* AMD 3DNow! extensions */
@@ -63,8 +64,42 @@
 #define X86_FEATURE_K6_MTRR	(3*32+ 1) /* AMD K6 nonstandard MTRRs */
 #define X86_FEATURE_CYRIX_ARR	(3*32+ 2) /* Cyrix ARRs (= MTRRs) */
 #define X86_FEATURE_CENTAUR_MCR	(3*32+ 3) /* Centaur MCRs (= MTRRs) */
+/* cpu types for specific tunings: */
+#define X86_FEATURE_K8		(3*32+ 4) /* Opteron, Athlon64 */
+#define X86_FEATURE_K7		(3*32+ 5) /* Athlon */
+#define X86_FEATURE_P3		(3*32+ 6) /* P3 */
+#define X86_FEATURE_P4		(3*32+ 7) /* P4 */
+
+/* Intel-defined CPU features, CPUID level 0x00000001 (ecx), word 4 */
+#define X86_FEATURE_EST		(4*32+ 7) /* Enhanced SpeedStep */
+
+/* VIA/Cyrix/Centaur-defined CPU features, CPUID level 0xC0000001, word 5 */
+#define X86_FEATURE_XSTORE	(5*32+ 2) /* on-CPU RNG present (xstore insn) */
+
 
 #define cpu_has(c, bit)		test_bit(bit, (c)->x86_capability)
+#define boot_cpu_has(bit)	test_bit(bit, boot_cpu_data.x86_capability)
+
+#define cpu_has_fpu		boot_cpu_has(X86_FEATURE_FPU)
+#define cpu_has_vme		boot_cpu_has(X86_FEATURE_VME)
+#define cpu_has_de		boot_cpu_has(X86_FEATURE_DE)
+#define cpu_has_pse		boot_cpu_has(X86_FEATURE_PSE)
+#define cpu_has_tsc		boot_cpu_has(X86_FEATURE_TSC)
+#define cpu_has_pae		boot_cpu_has(X86_FEATURE_PAE)
+#define cpu_has_pge		boot_cpu_has(X86_FEATURE_PGE)
+#define cpu_has_sse2		boot_cpu_has(X86_FEATURE_XMM2)
+#define cpu_has_apic		boot_cpu_has(X86_FEATURE_APIC)
+#define cpu_has_sep		boot_cpu_has(X86_FEATURE_SEP)
+#define cpu_has_mtrr		boot_cpu_has(X86_FEATURE_MTRR)
+#define cpu_has_mmx		boot_cpu_has(X86_FEATURE_MMX)
+#define cpu_has_fxsr		boot_cpu_has(X86_FEATURE_FXSR)
+#define cpu_has_xmm		boot_cpu_has(X86_FEATURE_XMM)
+#define cpu_has_ht		boot_cpu_has(X86_FEATURE_HT)
+#define cpu_has_mp		boot_cpu_has(X86_FEATURE_MP)
+#define cpu_has_k6_mtrr		boot_cpu_has(X86_FEATURE_K6_MTRR)
+#define cpu_has_cyrix_arr	boot_cpu_has(X86_FEATURE_CYRIX_ARR)
+#define cpu_has_centaur_mcr	boot_cpu_has(X86_FEATURE_CENTAUR_MCR)
+#define cpu_has_xstore		boot_cpu_has(X86_FEATURE_XSTORE)
 
 #endif /* __ASM_I386_CPUFEATURE_H */
 

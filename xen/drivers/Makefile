@@ -1,6 +1,7 @@
 
 default:
 	$(MAKE) -C char
+	$(MAKE) -C acpi
 	$(MAKE) -C pci
 	if [ "$(nodev)" != "y" ]; then \
 	$(MAKE) -C net ; \
@@ -13,6 +14,7 @@ default:
 
 clean:
 	$(MAKE) -C char clean
+	$(MAKE) -C acpi clean
 	$(MAKE) -C pci clean
 	$(MAKE) -C net clean
 	$(MAKE) -C block clean

@@ -6,6 +6,7 @@
 #include <xen/sched.h>
 #include <xen/pci.h>
 #include <xen/serial.h>
+#include <xen/acpi.h>
 #include <asm/bitops.h>
 #include <asm/smp.h>
 #include <asm/processor.h>
@@ -16,12 +17,28 @@
 #include <asm/pdb.h>
 #include <xen/trace.h>
 
-struct cpuinfo_x86 boot_cpu_data = { 0 };
+char ignore_irq13;		/* set if exception 16 works */
+struct cpuinfo_x86 boot_cpu_data = { 0, 0, 0, 0, -1, 1, 0, 0, -1 };
+
 /* Lots of nice things, since we only target PPro+. */
 unsigned long mmu_cr4_features = X86_CR4_PSE | X86_CR4_PGE;
+EXPORT_SYMBOL(mmu_cr4_features);
+
 unsigned long wait_init_idle;
 
 struct task_struct *idle_task[NR_CPUS] = { &idle0_task };
+
+#ifdef	CONFIG_ACPI_INTERPRETER
+	int acpi_disabled = 0;
+#else
+	int acpi_disabled = 1;
+#endif
+EXPORT_SYMBOL(acpi_disabled);
+
+#ifdef	CONFIG_ACPI_BOOT
+extern	int __initdata acpi_ht;
+int acpi_force __initdata = 0;
+#endif
 
 int phys_proc_id[NR_CPUS];
 int logical_proc_id[NR_CPUS];
@@ -363,6 +380,8 @@ void __init start_of_day(void)
     }
 #endif
     paging_init();                /* not much here now, but sets up fixmap */
+    if ( !opt_noacpi )
+        acpi_boot_init();
 #ifdef CONFIG_SMP
     if ( smp_found_config ) 
         get_smp_config();

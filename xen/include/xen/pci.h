@@ -520,6 +520,32 @@ struct pci_driver {
 	int  (*enable_wake) (struct pci_dev *dev, u32 state, int enable);   /* Enable wake event */
 };
 
+/**
+ * PCI_DEVICE - macro used to describe a specific pci device
+ * @vend: the 16 bit PCI Vendor ID
+ * @dev: the 16 bit PCI Device ID
+ *
+ * This macro is used to create a struct pci_device_id that matches a
+ * specific device.  The subvendor and subdevice fields will be set to
+ * PCI_ANY_ID.
+ */
+#define PCI_DEVICE(vend,dev) \
+	.vendor = (vend), .device = (dev), \
+	.subvendor = PCI_ANY_ID, .subdevice = PCI_ANY_ID
+
+/**
+ * PCI_DEVICE_CLASS - macro used to describe a specific pci device class
+ * @dev_class: the class, subclass, prog-if triple for this device
+ * @dev_class_mask: the class mask for this device
+ *
+ * This macro is used to create a struct pci_device_id that matches a
+ * specific PCI class.  The vendor, device, subvendor, and subdevice 
+ * fields will be set to PCI_ANY_ID.
+ */
+#define PCI_DEVICE_CLASS(dev_class,dev_class_mask) \
+	.class = (dev_class), .class_mask = (dev_class_mask), \
+	.vendor = PCI_ANY_ID, .device = PCI_ANY_ID, \
+	.subvendor = PCI_ANY_ID, .subdevice = PCI_ANY_ID
 
 /* these external functions are only available when PCI support is enabled */
 #ifdef CONFIG_PCI
@@ -602,7 +628,6 @@ void pci_set_master(struct pci_dev *dev);
 #define HAVE_PCI_SET_MWI
 int pci_set_mwi(struct pci_dev *dev);
 void pci_clear_mwi(struct pci_dev *dev);
-int pdev_set_mwi(struct pci_dev *dev);
 int pci_set_dma_mask(struct pci_dev *dev, u64 mask);
 int pci_dac_set_dma_mask(struct pci_dev *dev, u64 mask);
 int pci_assign_resource(struct pci_dev *dev, int i);

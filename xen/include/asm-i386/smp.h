@@ -1,16 +1,30 @@
 #ifndef __ASM_SMP_H
 #define __ASM_SMP_H
 
+/*
+ * We need the APIC definitions automatically as part of 'smp.h'
+ */
+#ifndef __ASSEMBLY__
 #include <xen/config.h>
+/*#include <xen/threads.h>*/
 #include <asm/ptrace.h>
+#endif
 
-#ifdef CONFIG_SMP
-#define TARGET_CPUS cpu_online_map
-#else
-#define TARGET_CPUS 0x01
+#ifdef CONFIG_X86_LOCAL_APIC
+#ifndef __ASSEMBLY__
+#include <asm/fixmap.h>
+#include <asm/bitops.h>
+#include <asm/mpspec.h>
+#ifdef CONFIG_X86_IO_APIC
+#include <asm/io_apic.h>
+#endif
+#include <asm/apic.h>
+#endif
 #endif
 
 #ifdef CONFIG_SMP
+#ifndef __ASSEMBLY__
+
 /*
  * Private routines/data
  */
@@ -20,8 +34,12 @@ extern unsigned long phys_cpu_present_map;
 extern unsigned long cpu_online_map;
 extern volatile unsigned long smp_invalidate_needed;
 extern int pic_mode;
+extern int smp_num_siblings;
+extern int cpu_sibling_map[];
+
 extern void smp_flush_tlb(void);
 extern void smp_message_irq(int cpl, void *dev_id, struct pt_regs *regs);
+extern void smp_send_reschedule(int cpu);
 extern void smp_invalidate_rcv(void);		/* Process an NMI */
 extern void (*mtrr_hook) (void);
 extern void zap_low_mappings (void);
@@ -54,6 +72,7 @@ extern volatile int logical_apicid_to_cpu[MAX_APICID];
  * General functions that each host system must provide.
  */
  
+/*extern void smp_boot_cpus(void);*/
 extern void smp_store_cpu_info(int id);		/* Store per CPU info (like the initial udelay numbers */
 
 /*
@@ -63,9 +82,6 @@ extern void smp_store_cpu_info(int id);		/* Store per CPU info (like the initial
  */
 
 #define smp_processor_id() (current->processor)
-
-#include <asm/fixmap.h>
-#include <asm/apic.h>
 
 static __inline int hard_smp_processor_id(void)
 {
@@ -78,6 +94,22 @@ static __inline int logical_smp_processor_id(void)
 	/* we don't want to mark this access volatile - bad code generation */
 	return GET_APIC_LOGICAL_ID(*(unsigned long *)(APIC_BASE+APIC_LDR));
 }
+
+#endif /* !__ASSEMBLY__ */
+
+#define NO_PROC_ID		0xFF		/* No processor magic marker */
+
+/*
+ *	This magic constant controls our willingness to transfer
+ *	a process across CPUs. Such a transfer incurs misses on the L1
+ *	cache, and on a P6 or P5 with multiple L2 caches L2 hits. My
+ *	gut feeling is this will vary by board in value. For a board
+ *	with separate L2 cache it probably depends also on the RSS, and
+ *	for a board with shared L2 cache it ought to decay fast as other
+ *	processes are run.
+ */
+ 
+#define PROC_CHANGE_PENALTY	15		/* Schedule penalty */
 
 #endif
 #endif

@@ -6,11 +6,12 @@
 
 #include <xen/config.h>
 #include <xen/types.h>
-/*#include <xen/kernel.h>*/
+#include <xen/kernel.h>
 #include <xen/sched.h>
 #include <xen/pci.h>
 #include <xen/init.h>
 #include <xen/ioport.h>
+#include <xen/acpi.h>
 
 /*#include <asm/segment.h>*/
 #include <asm/io.h>
@@ -31,6 +32,8 @@ struct pci_ops *pci_root_ops = NULL;
 
 int (*pci_config_read)(int seg, int bus, int dev, int fn, int reg, int len, u32 *value) = NULL;
 int (*pci_config_write)(int seg, int bus, int dev, int fn, int reg, int len, u32 value) = NULL;
+
+static int pci_using_acpi_prt = 0;
 
 #ifdef CONFIG_MULTIQUAD
 #define BUS2QUAD(global) (mp_bus_id_to_node[global])
@@ -442,36 +445,21 @@ static struct pci_ops pci_direct_conf2 = {
 static int __devinit pci_sanity_check(struct pci_ops *o)
 {
 	u16 x;
-	struct pci_bus *bus;		/* Fake bus and device */
-	struct pci_dev *dev;
-	int ret = 0;
+	struct pci_bus bus;		/* Fake bus and device */
+	struct pci_dev dev;
 
 	if (pci_probe & PCI_NO_CHECKS)
 		return 1;
-
-	bus = kmalloc(sizeof(*bus), GFP_KERNEL);
-	dev = kmalloc(sizeof(*dev), GFP_KERNEL);
-	if ( (bus == NULL) || (dev == NULL) )
-		goto out;
-
-	bus->number = 0;
-	dev->bus = bus;
-	for(dev->devfn=0; dev->devfn < 0x100; dev->devfn++)
-		if ((!o->read_word(dev, PCI_CLASS_DEVICE, &x) &&
+	bus.number = 0;
+	dev.bus = &bus;
+	for(dev.devfn=0; dev.devfn < 0x100; dev.devfn++)
+		if ((!o->read_word(&dev, PCI_CLASS_DEVICE, &x) &&
 		     (x == PCI_CLASS_BRIDGE_HOST || x == PCI_CLASS_DISPLAY_VGA)) ||
-		    (!o->read_word(dev, PCI_VENDOR_ID, &x) &&
+		    (!o->read_word(&dev, PCI_VENDOR_ID, &x) &&
 		     (x == PCI_VENDOR_ID_INTEL || x == PCI_VENDOR_ID_COMPAQ)))
-		{
-			ret = 1;
-			break;
-		}
- out:
-	if ( bus != NULL )
-		kfree(bus);
-	if ( dev != NULL)
-		kfree(dev);
+			return 1;
 	DBG("PCI: Sanity check failed\n");
-	return ret;
+	return 0;
 }
 
 static struct pci_ops * __devinit pci_check_direct(void)
@@ -1032,7 +1020,8 @@ struct irq_routing_table * __devinit pcibios_get_irq_routing_table(void)
 		"xor %%ah, %%ah\n"
 		"1:"
 		: "=a" (ret),
-		  "=b" (map)
+		  "=b" (map),
+		  "+m" (opt)
 		: "0" (PCIBIOS_GET_ROUTING_OPTIONS),
 		  "1" (0),
 		  "D" ((long) &opt),
@@ -1372,6 +1361,23 @@ void __devinit  pcibios_fixup_bus(struct pci_bus *b)
 	pci_read_bridge_bases(b);
 }
 
+struct pci_bus * __devinit pcibios_scan_root(int busnum)
+{
+	struct list_head *list;
+	struct pci_bus *bus;
+
+	list_for_each(list, &pci_root_buses) {
+		bus = pci_bus_b(list);
+		if (bus->number == busnum) {
+			/* Already scanned */
+			return bus;
+		}
+	}
+
+	printk("PCI: Probing PCI hardware (bus %02x)\n", busnum);
+
+	return pci_scan_bus(busnum, pci_root_ops, NULL);
+}
 
 void __devinit pcibios_config_init(void)
 {
@@ -1424,8 +1430,22 @@ void __init pcibios_init(void)
 		return;
 	}
 
+	pcibios_set_cacheline_size();
+
 	printk(KERN_INFO "PCI: Probing PCI hardware\n");
-	pci_root_bus = pci_scan_bus(0, pci_root_ops, NULL);
+#ifdef CONFIG_ACPI_PCI
+	if (!acpi_noirq && !acpi_pci_irq_init()) {
+		pci_using_acpi_prt = 1;
+		printk(KERN_INFO "PCI: Using ACPI for IRQ routing\n");
+		printk(KERN_INFO "PCI: if you experience problems, try using option 'pci=noacpi' or even 'acpi=off'\n");
+	}
+#endif
+	if (!pci_using_acpi_prt) {
+		pci_root_bus = pcibios_scan_root(0);
+		pcibios_irq_init();
+		pcibios_fixup_peer_bridges();
+		pcibios_fixup_irqs();
+	}
 	if (clustered_apic_mode && (numnodes > 1)) {
 		for (quad = 1; quad < numnodes; ++quad) {
 			printk("Scanning PCI bus %d for quad %d\n", 
@@ -1435,9 +1455,6 @@ void __init pcibios_init(void)
 		}
 	}
 
-	pcibios_irq_init();
-	pcibios_fixup_peer_bridges();
-	pcibios_fixup_irqs();
 	pcibios_resource_survey();
 
 #ifdef CONFIG_PCI_BIOS
@@ -1489,6 +1506,9 @@ char * __devinit  pcibios_setup(char *str)
 	} else if (!strncmp(str, "lastbus=", 8)) {
 		pcibios_last_bus = simple_strtol(str+8, NULL, 0);
 		return NULL;
+	} else if (!strncmp(str, "noacpi", 6)) {
+		acpi_noirq_set();
+		return NULL;
 	}
 	return str;
 }
@@ -1504,6 +1524,15 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
 
 	if ((err = pcibios_enable_resources(dev, mask)) < 0)
 		return err;
+
+#ifdef CONFIG_ACPI_PCI
+	if (pci_using_acpi_prt) {
+		acpi_pci_irq_enable(dev);
+		return 0;
+	}
+#endif
+
 	pcibios_enable_irq(dev);
+
 	return 0;
 }

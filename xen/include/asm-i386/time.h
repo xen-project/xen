@@ -18,6 +18,4 @@
 
 typedef s64 s_time_t;  /* system time */
 
-extern int using_apic_timer;
-
 #endif /* _ASM_TIME_H_ */

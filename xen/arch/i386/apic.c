@@ -1,23 +1,3 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4 -*-
- ****************************************************************************
- * (C) 2002 - Rolf Neugebauer - Intel Research Cambridge
- ****************************************************************************
- *
- *        File: apic.c
- *      Author: 
- *     Changes: 
- *              
- *        Date: Nov 2002
- * 
- * Environment: Xen Hypervisor
- * Description: programmable APIC timer interface for accurate timers
- *              modified version of Linux' apic.c
- *
- ****************************************************************************
- * $Id: c-insert.c,v 1.7 2002/11/08 16:04:34 rn Exp $
- ****************************************************************************
- */
-
 /*
  *  Local APIC handling, local APIC timers
  *
@@ -28,6 +8,8 @@
  *                  thanks to Eric Gilmore
  *                  and Rolf G. Tews
  *                  for testing these extensively.
+ *	Maciej W. Rozycki	:	Various updates and fixes.
+ *	Mikael Pettersson	:	Power Management for UP-APIC.
  */
 
 
@@ -52,16 +34,11 @@
 #include <xen/ac_timer.h>
 #include <xen/perfc.h>
 
-#undef APIC_TIME_TRACE
-#ifdef APIC_TIME_TRACE
-#define TRC(_x) _x
-#else
-#define TRC(_x)
-#endif
-
 
 /* Using APIC to generate smp_local_timer_interrupt? */
 int using_apic_timer = 0;
+
+static int enabled_via_apicbase;
 
 int get_maxlvt(void)
 {
@@ -74,13 +51,21 @@ int get_maxlvt(void)
     return maxlvt;
 }
 
-static void clear_local_APIC(void)
+void clear_local_APIC(void)
 {
     int maxlvt;
     unsigned long v;
 
     maxlvt = get_maxlvt();
 
+    /*
+     * Masking an LVT entry on a P6 can trigger a local APIC error
+     * if the vector is zero. Mask LVTERR first to prevent this.
+     */
+    if (maxlvt >= 3) {
+        v = ERROR_APIC_VECTOR; /* any non-zero vector will do */
+        apic_write_around(APIC_LVTERR, v | APIC_LVT_MASKED);
+    }
     /*
      * Careful: we have to set masks only first to deassert
      * any level-triggered sources.
@@ -91,10 +76,6 @@ static void clear_local_APIC(void)
     apic_write_around(APIC_LVT0, v | APIC_LVT_MASKED);
     v = apic_read(APIC_LVT1);
     apic_write_around(APIC_LVT1, v | APIC_LVT_MASKED);
-    if (maxlvt >= 3) {
-        v = apic_read(APIC_LVTERR);
-        apic_write_around(APIC_LVTERR, v | APIC_LVT_MASKED);
-    }
     if (maxlvt >= 4) {
         v = apic_read(APIC_LVTPC);
         apic_write_around(APIC_LVTPC, v | APIC_LVT_MASKED);
@@ -110,6 +91,12 @@ static void clear_local_APIC(void)
         apic_write_around(APIC_LVTERR, APIC_LVT_MASKED);
     if (maxlvt >= 4)
         apic_write_around(APIC_LVTPC, APIC_LVT_MASKED);
+    v = GET_APIC_VERSION(apic_read(APIC_LVR));
+    if (APIC_INTEGRATED(v)) {	/* !82489DX */
+        if (maxlvt > 3)
+            apic_write(APIC_ESR, 0);
+        apic_read(APIC_ESR);
+    }
 }
 
 void __init connect_bsp_APIC(void)
@@ -157,6 +144,13 @@ void disable_local_APIC(void)
     value = apic_read(APIC_SPIV);
     value &= ~APIC_SPIV_APIC_ENABLED;
     apic_write_around(APIC_SPIV, value);
+
+    if (enabled_via_apicbase) {
+        unsigned int l, h;
+        rdmsr(MSR_IA32_APICBASE, l, h);
+        l &= ~MSR_IA32_APICBASE_ENABLE;
+        wrmsr(MSR_IA32_APICBASE, l, h);
+    }
 }
 
 /*
@@ -222,7 +216,9 @@ int __init verify_local_APIC(void)
 
 void __init sync_Arb_IDs(void)
 {
-    /* Wait for idle. */
+    /*
+     * Wait for idle.
+     */
     apic_wait_icr_idle();
 
     Dprintk("Synchronizing Arb IDs.\n");
@@ -243,6 +239,12 @@ extern void __error_in_apic_c (void);
  */
 void __init init_bsp_APIC(void)
 {
+}
+
+static unsigned long calculate_ldr(unsigned long old)
+{
+    unsigned long id = 1UL << smp_processor_id();
+    return (old & ~APIC_LDR_MASK)|SET_APIC_LOGICAL_ID(id);
 }
 
 void __init setup_local_APIC (void)
@@ -270,15 +272,13 @@ void __init setup_local_APIC (void)
      * Put the APIC into flat delivery mode.
      * Must be "all ones" explicitly for 82489DX.
      */
-    apic_write_around(APIC_DFR, 0xffffffff);
+    apic_write_around(APIC_DFR, APIC_DFR_FLAT);
 
     /*
      * Set up the logical destination ID.
      */
     value = apic_read(APIC_LDR);
-    value &= ~APIC_LDR_MASK;
-    value |= (1<<(smp_processor_id()+24));
-    apic_write_around(APIC_LDR, value);
+    apic_write_around(APIC_LDR, calculate_ldr(value));
 
     /*
      * Set Task Priority to 'accept all'. We never change this
@@ -380,6 +380,8 @@ static int __init detect_init_APIC (void)
     case X86_VENDOR_AMD:
         if (boot_cpu_data.x86 == 6 && boot_cpu_data.x86_model > 1)
             break;
+        if (boot_cpu_data.x86 == 15 && cpu_has_apic)
+            break;
         goto no_apic;
     case X86_VENDOR_INTEL:
         if (boot_cpu_data.x86 == 6 ||
@@ -403,6 +405,7 @@ static int __init detect_init_APIC (void)
             l &= ~MSR_IA32_APICBASE_BASE;
             l |= MSR_IA32_APICBASE_ENABLE | APIC_DEFAULT_PHYS_BASE;
             wrmsr(MSR_IA32_APICBASE, l, h);
+            enabled_via_apicbase = 1;
         }
     }
 
@@ -416,6 +419,12 @@ static int __init detect_init_APIC (void)
     set_bit(X86_FEATURE_APIC, &boot_cpu_data.x86_capability);
     mp_lapic_addr = APIC_DEFAULT_PHYS_BASE;
     boot_cpu_physical_apicid = 0;
+
+    /* The BIOS may have set up the APIC at some other address */
+    rdmsr(MSR_IA32_APICBASE, l, h);
+    if (l & MSR_IA32_APICBASE_ENABLE)
+        mp_lapic_addr = l & MSR_IA32_APICBASE_BASE;
+
 	if (nmi_watchdog != NMI_NONE)
 		nmi_watchdog = NMI_LOCAL_APIC;
 

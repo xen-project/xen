@@ -57,7 +57,7 @@ static inline void release_irqlock(int cpu)
 {
 	/* if we didn't own the irq lock, just ignore.. */
 	if (global_irq_holder == (unsigned char) cpu) {
-		global_irq_holder = 0xff;
+		global_irq_holder = NO_PROC_ID;
 		clear_bit(0,&global_irq_lock);
 	}
 }
@@ -65,6 +65,8 @@ static inline void release_irqlock(int cpu)
 static inline void irq_enter(int cpu, int irq)
 {
 	++local_irq_count(cpu);
+
+	smp_mb();
 
 	while (test_bit(0,&global_irq_lock)) {
 		cpu_relax();
