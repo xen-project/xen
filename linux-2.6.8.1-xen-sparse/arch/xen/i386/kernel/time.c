@@ -376,7 +376,10 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 	if (delta < 0) {
 		if (!TIME_VALUES_UP_TO_DATE)
 			goto retry;
-		printk("Timer ISR: Time went backwards: %lld\n", delta);
+		printk("Timer ISR: Time went backwards: %lld %lld %ld %lld\n",
+		       delta, shadow_system_time,
+		       (cur_timer->get_offset() * NSEC_PER_USEC), 
+		       processed_system_time);
 		return;
 	}
 
