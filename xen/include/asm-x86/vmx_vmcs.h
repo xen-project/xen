@@ -207,7 +207,7 @@ extern unsigned int opt_vmx_debug_level;
     do {                                                        \
         printk("__vmx_bug at %s:%d\n", __FILE__, __LINE__);     \
         show_registers(regs);                                   \
-        domain_crash();                                         \
+        domain_crash_synchronous();                             \
     } while (0)
 
 #endif /* ASM_X86_VMX_VMCS_H__ */

@@ -195,7 +195,7 @@ void vmx_io_assist(struct exec_domain *ed)
     if (vio == 0) {
         VMX_DBG_LOG(DBG_LEVEL_1, 
                     "bad shared page: %lx", (unsigned long) vio);
-        domain_crash();
+        domain_crash_synchronous();
     }
     p = &vio->vp_ioreq;
 
@@ -314,7 +314,7 @@ static inline int find_highest_pending_irq(struct exec_domain *d)
     if (vio == 0) {
         VMX_DBG_LOG(DBG_LEVEL_1, 
                     "bad shared page: %lx", (unsigned long) vio);
-        domain_crash();
+        domain_crash_synchronous();
     }
         
     return find_highest_irq(&vio->vp_intr[0]);
@@ -328,7 +328,7 @@ static inline void clear_highest_bit(struct exec_domain *d, int vector)
     if (vio == 0) {
         VMX_DBG_LOG(DBG_LEVEL_1, 
                     "bad shared page: %lx", (unsigned long) vio);
-        domain_crash();
+        domain_crash_synchronous();
     }
         
     clear_bit(vector, &vio->vp_intr[0]);

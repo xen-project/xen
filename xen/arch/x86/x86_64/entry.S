@@ -179,7 +179,7 @@ create_bounce_frame:
         jb    1f                        # In +ve address space? Then okay.
         movq  $HYPERVISOR_VIRT_END+60,%rax
         cmpq  %rax,%rsi
-        jb    domain_crash              # Above Xen private area? Then okay.
+        jb    domain_crash_synchronous  # Above Xen private area? Then okay.
 1:      subq  $40,%rsi
         movq  XREGS_ss+8(%rsp),%rax
 FLT2:   movq  %rax,32(%rsi)             # SS
@@ -230,11 +230,13 @@ FLT14:  movq  %rax,(%rsi)               # RCX
         movb  $0,TRAPBOUNCE_flags(%rdx)
         ret
 .section __ex_table,"a"
-        .quad  FLT2,domain_crash ,  FLT3,domain_crash ,  FLT4,domain_crash
-        .quad  FLT5,domain_crash ,  FLT6,domain_crash ,  FLT7,domain_crash
-        .quad  FLT8,domain_crash ,  FLT9,domain_crash , FLT10,domain_crash
-        .quad FLT11,domain_crash , FLT12,domain_crash , FLT13,domain_crash
-        .quad FLT14,domain_crash
+        .quad  FLT2,domain_crash_synchronous ,  FLT3,domain_crash_synchronous
+        .quad  FLT4,domain_crash_synchronous ,  FLT5,domain_crash_synchronous
+        .quad  FLT6,domain_crash_synchronous ,  FLT7,domain_crash_synchronous
+        .quad  FLT8,domain_crash_synchronous ,  FLT9,domain_crash_synchronous
+        .quad FLT10,domain_crash_synchronous , FLT11,domain_crash_synchronous
+        .quad FLT12,domain_crash_synchronous , FLT13,domain_crash_synchronous
+        .quad FLT14,domain_crash_synchronous
 .previous
 
         ALIGN

@@ -655,15 +655,13 @@ int shadow_fault(unsigned long va, struct xen_regs *regs)
                              &linear_pg_table[va >> PAGE_SHIFT])) )
     {
         SH_VVLOG("shadow_fault - EXIT: read gpte faulted2" );
-        shadow_unlock(d);
-        return 0;
+        goto fail;
     }
 
     if ( unlikely(!(gpte & _PAGE_PRESENT)) )
     {
         SH_VVLOG("shadow_fault - EXIT: gpte not present2 (%lx)",gpte );
-        shadow_unlock(d);
-        return 0;
+        goto fail;
     }
 
     /* Write fault? */
@@ -673,8 +671,7 @@ int shadow_fault(unsigned long va, struct xen_regs *regs)
         {
             /* Write fault on a read-only mapping. */
             SH_VVLOG("shadow_fault - EXIT: wr fault on RO page (%lx)", gpte);
-            shadow_unlock(d);
-            return 0;
+            goto fail;
         }
 
         l1pte_write_fault(d, &gpte, &spte);
@@ -691,7 +688,10 @@ int shadow_fault(unsigned long va, struct xen_regs *regs)
     /* XXX Watch out for read-only L2 entries! (not used in Linux). */
     if ( unlikely(__put_user(gpte, (unsigned long *)
                              &linear_pg_table[va >> PAGE_SHIFT])) )
+    {
         domain_crash();
+        goto fail;
+    }
 
     /*
      * Update of shadow PTE can fail because the L1 p.t. is not shadowed,
@@ -712,6 +712,10 @@ int shadow_fault(unsigned long va, struct xen_regs *regs)
 
     check_pagetable(d, ed->arch.guest_table, "post-sf");
     return EXCRET_fault_fixed;
+
+ fail:
+    shadow_unlock(d);
+    return 0;
 }
 
 

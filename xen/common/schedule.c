@@ -69,16 +69,13 @@ static void dom_timer_fn(unsigned long data);
 struct schedule_data schedule_data[NR_CPUS];
 
 extern struct scheduler sched_bvt_def;
-// extern struct scheduler sched_rrobin_def;
-// extern struct scheduler sched_atropos_def;
 static struct scheduler *schedulers[] = { 
     &sched_bvt_def,
-//     &sched_rrobin_def,
-//     &sched_atropos_def,
     NULL
 };
 
-/* Operations for the current scheduler. */
+static void __enter_scheduler(void);
+
 static struct scheduler ops;
 
 #define SCHED_OP(fn, ...)                                 \
@@ -366,7 +363,7 @@ long sched_adjdom(struct sched_adjdom_cmd *cmd)
  * - deschedule the current domain (scheduler independent).
  * - pick a new domain (scheduler dependent).
  */
-void __enter_scheduler(void)
+static void __enter_scheduler(void)
 {
     struct exec_domain *prev = current, *next = NULL;
     int                 cpu = prev->processor;

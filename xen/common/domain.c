@@ -161,12 +161,18 @@ void domain_crash(void)
     set_bit(DF_CRASHED, &d->d_flags);
 
     send_guest_virq(dom0->exec_domain[0], VIRQ_DOM_EXC);
-    
-    __enter_scheduler();
-    BUG();
+
+    raise_softirq(SCHEDULE_SOFTIRQ);
 }
 
-extern void trap_to_xendbg(void);
+
+void domain_crash_synchronous(void)
+{
+    domain_crash();
+    for ( ; ; )
+        do_softirq();
+}
+
 
 void domain_shutdown(u8 reason)
 {
@@ -191,18 +197,14 @@ void domain_shutdown(u8 reason)
         }
     }
 
-    if ( reason == SHUTDOWN_crash )
-    {
-        domain_crash();
-        BUG();
-    }
-
-    d->shutdown_code = reason;
-    set_bit(DF_SHUTDOWN, &d->d_flags);
+    if ( (d->shutdown_code = reason) == SHUTDOWN_crash )
+        set_bit(DF_CRASHED, &d->d_flags);
+    else
+        set_bit(DF_SHUTDOWN, &d->d_flags);
 
     send_guest_virq(dom0->exec_domain[0], VIRQ_DOM_EXC);
 
-    __enter_scheduler();
+    raise_softirq(SCHEDULE_SOFTIRQ);
 }
 
 unsigned int alloc_new_dom_mem(struct domain *d, unsigned int kbytes)

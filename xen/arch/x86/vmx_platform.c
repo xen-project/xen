@@ -436,7 +436,7 @@ static void send_mmio_req(unsigned long gpa,
         
     if (vio == NULL) {
         printk("bad shared page\n");
-        domain_crash(); 
+        domain_crash_synchronous(); 
     }
     p = &vio->vp_ioreq;
         
@@ -490,13 +490,13 @@ void handle_mmio(unsigned long va, unsigned long gpa)
     ret = inst_copy_from_guest(inst, eip, inst_len);
     if (ret != inst_len) {
         printk("handle_mmio - EXIT: get guest instruction fault\n");
-        domain_crash();
+        domain_crash_synchronous();
     }
 
     init_instruction(&mmio_inst);
     
     if (vmx_decode(check_prefix(inst, &mmio_inst), &mmio_inst) == DECODE_failure)
-        domain_crash();
+        domain_crash_synchronous();
 
     __vmwrite(GUEST_EIP, eip + inst_len);
     store_xen_regs(inst_decoder_regs);
@@ -510,7 +510,7 @@ void handle_mmio(unsigned long va, unsigned long gpa)
             return ;
         } else {
             printk("handle_mmio - EXIT: movz error!\n");
-            domain_crash();
+            domain_crash_synchronous();
         }
     }
 
@@ -539,14 +539,14 @@ void handle_mmio(unsigned long va, unsigned long gpa)
                 index = operand_index(mmio_inst.operand[0]);
                 value = get_reg_value(size, index, 0, inst_decoder_regs);
             } else {
-                domain_crash();
+                domain_crash_synchronous();
             }
             send_mmio_req(gpa, &mmio_inst, value, 0, 0);
             return;
         }
-        domain_crash();
     }
-    domain_crash();
+
+    domain_crash_synchronous();
 }
 
 #endif /* CONFIG_VMX */
