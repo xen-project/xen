@@ -25,9 +25,11 @@
 #include <linux/config.h>
 #include <linux/init.h>
 #include <linux/sched.h>
+#include <linux/slab.h>
 #include <linux/kernel.h>
-#include <linux/highmem.h>
+#include <linux/pagemap.h>
 #include <linux/vmalloc.h>
+#include <linux/highmem.h>
 #include <asm/fixmap.h>
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
@@ -42,6 +44,29 @@
 #else
 #define ASSERT(_p) ((void)0)
 #define DPRINTK(_f, _a...) ((void)0)
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+#define TestSetPageLocked(_p) TryLockPage(_p)
+#define PageAnon(_p)          0 /* no equivalent in 2.4 */
+#define pte_offset_kernel     pte_offset
+extern int __vmalloc_area_pages(unsigned long address,
+                                unsigned long size,
+                                int gfp_mask,
+                                pgprot_t prot,
+                                struct page ***pages);
+#else
+static inline int __vmalloc_area_pages(unsigned long address,
+                                unsigned long size,
+                                int gfp_mask,
+                                pgprot_t prot,
+                                struct page ***pages)
+{
+    struct vm_struct vma;
+    vma.addr = (void *)address;
+    vma.size = size + PAGE_SIZE; /* retarded interface */
+    return map_vm_area(&vma, prot, pages);
+}
 #endif
 
 static unsigned char *fixup_buf;
@@ -214,35 +239,41 @@ static unsigned int parse_insn(unsigned char *insn,
  * Mainly this function checks that our patches can't erroneously get flushed
  * to a file on disc, which would screw us after reboot!
  */
-static int safe_to_patch(unsigned long addr)
+#define SUCCESS 1
+#define FAIL    0
+static int safe_to_patch(struct mm_struct *mm, unsigned long addr)
 {
-    struct mm_struct      *mm = current->mm;
     struct vm_area_struct *vma;
     struct file           *file;
     unsigned char          _name[30], *name;
 
     /* Always safe to patch the fixup buffer. */
     if ( addr <= (FIXUP_BUF_USER + FIXUP_BUF_SIZE) )
-        return 1;
-
-    down_read(&mm->mmap_sem);
+        return SUCCESS;
 
     if ( (vma = find_vma(current->mm, addr)) == NULL )
     {
         DPRINTK("No VMA contains fault address.");
-        goto fail;
+        return FAIL;
     }
 
-    /* No backing file, so safe to patch. */
+    /* Only patch shared libraries. */
     if ( (file = vma->vm_file) == NULL )
-        goto success;
+    {
+        DPRINTK("VMA is anonymous!");
+        return FAIL;
+    }
 
     /* No shared mappings => nobody can dirty the file. */
     /* XXX Note the assumption that noone will dirty the file in future! */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
     if ( file->f_mapping->i_mmap_writable != 0 )
+#else
+    if ( file->f_dentry->d_inode->i_mapping->i_mmap_shared != NULL )
+#endif
     {
         DPRINTK("Shared mappings exist.");
-        goto fail;
+        return FAIL;
     }
 
     /*
@@ -251,24 +282,19 @@ static int safe_to_patch(unsigned long addr)
      * unlinking the old files and installing completely fresh ones. :-)
      */
     name = d_path(file->f_dentry, file->f_vfsmnt, _name, sizeof(_name));
-    if ( strncmp("/lib/tls", name, 8) != 0 )
+    if ( IS_ERR(name) || (strncmp("/lib/tls", name, 8) != 0) )
     {
         DPRINTK("Backing file is not in /lib/tls");
-        goto fail;
+        return FAIL;
     }
 
- success:
-    up_read(&mm->mmap_sem);
-    return 1;
-
- fail:
-    up_read(&mm->mmap_sem);
-    return 0;
+    return SUCCESS;
 }
 
 asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
 {
     static unsigned int fixup_idx = 0;
+    struct mm_struct *mm = current->mm;
     unsigned int fi;
     int save_indirect_reg, hash, i;
     unsigned int insn_len = (unsigned int)error_code, new_insn_len;
@@ -288,13 +314,16 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
         return;
     }
 
-    if ( unlikely(!safe_to_patch(eip)) )
-        return;
+    /* Hold the mmap_sem to prevent the mapping from disappearing under us. */
+    down_read(&mm->mmap_sem);
+
+    if ( unlikely(!safe_to_patch(mm, eip)) )
+        goto out;
 
     if ( unlikely(copy_from_user(b, (void *)eip, sizeof(b)) != 0) )
     {
         DPRINTK("Could not read instruction bytes from user space.");
-        return;
+        goto out;
     }
 
     /* Already created a fixup for this code sequence? */
@@ -312,7 +341,7 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
         if ( !printed )
             printk(KERN_ALERT "WARNING: Out of room in segment-fixup page.\n");
         printed = 1;
-        return;
+        goto out;
     }
 
     /* Must be a handleable opcode with GS override. */
@@ -320,7 +349,7 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
          !test_bit((unsigned int)b[1], (unsigned long *)handleable_code) )
     {
         DPRINTK("No GS override, or not a MOV (%02x %02x).", b[0], b[1]);
-        return;
+        goto out;
     }
 
     modrm = b[2];
@@ -335,7 +364,7 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
     if ( rm == 4 )
     {
         DPRINTK("We don't grok SIB bytes.");
-        return;
+        goto out;
     }
 
     /* Ensure Mod/RM specifies (r32) or disp8(r32). */
@@ -345,14 +374,14 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
         if ( rm == 5 )
         {
             DPRINTK("Unhandleable disp32 EA %d.", rm);
-            return;
+            goto out;
         }
         break;            /* m32 == (r32) */
     case 1:
         break;            /* m32 == disp8(r32) */
     default:
         DPRINTK("Unhandleable Mod value %d.", mod);
-        return;
+        goto out;
     }
 
     /* Indirect jump pointer. */
@@ -398,7 +427,7 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
                        parse_insn(&b[insn_len], &opcode, &decode)) == 0) )
         {
             DPRINTK("Could not decode following instruction.");
-            return;
+            goto out;
         }
 
         if ( (decode & CODE_MASK) == JMP )
@@ -520,7 +549,7 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
                      test_bit(opcode, (unsigned long *)opcode_uses_reg) )
                 {
                     DPRINTK("Data movement to ESP unsupported.");
-                    return;
+                    goto out;
                 }
 
                 if ( rm == 4 )
@@ -528,7 +557,7 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
                     if ( mod == 3 )
                     {
                         DPRINTK("Data movement to ESP is unsupported.");
-                        return;
+                        goto out;
                     }
 
                     sib = fixup_buf[fi++] = b[insn_len++];
@@ -585,14 +614,14 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
         if ( (insn_len += new_insn_len) > 20 )
         {
             DPRINTK("Code to patch is too long!");
-            return;
+            goto out;
         }
 
         /* Can't have a RET in the middle of a patch sequence. */
         if ( (opcode == 0xc3) && (insn_len < PATCH_LEN) )
         {
             DPRINTK("RET in middle of patch seq!\n");
-            return;
+            goto out;
         }
     }
 
@@ -601,7 +630,7 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
     if ( unlikely(fe == NULL) )
     {
         DPRINTK("Not enough memory to allocate a fixup_entry.");
-        return;
+        goto out;
     }
     fe->patched_code_len = insn_len;
     memcpy(fe->patched_code, b, insn_len);
@@ -619,7 +648,13 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
     if ( unlikely(((eip ^ (eip + fe->patched_code_len)) & PAGE_MASK) != 0) )
     {
         DPRINTK("Patch instruction would straddle a page boundary.");
-        return;
+        goto out;
+    }
+
+    if ( put_user(eip + PATCH_LEN, (unsigned long *)regs->esp - 1) != 0 )
+    {
+        DPRINTK("Failed to place return address on user stack.");
+        goto out;
     }
 
     /* Create the patching instructions in a temporary buffer. */
@@ -630,40 +665,56 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
     for ( i = 5; i < fe->patched_code_len; i++ )
         patch[i] = 0x90; /* nop */
 
-    /* Find the physical page that is to be patched. Check it isn't dirty. */
+    spin_lock(&mm->page_table_lock);
+
+    /* Find the physical page that is to be patched. */
     pgd = pgd_offset(current->mm, eip);
     pmd = pmd_offset(pgd, eip);
     pte = pte_offset_kernel(pmd, eip);
     page = pte_page(*pte);
-    if ( unlikely(PageDirty(page)) )
+
+    /*
+     * We get lock to prevent page going AWOL on us. Also a locked page
+     * might be getting flushed to disc!
+     */
+    if ( unlikely(TestSetPageLocked(page)) )
     {
-        DPRINTK("Page is already dirty.");
-        return;
+        DPRINTK("Page is locked.");
+        spin_unlock(&mm->page_table_lock);
+        goto out;
     }
 
-    if ( put_user(eip + PATCH_LEN, (unsigned long *)regs->esp - 1) != 0 )
+    /*
+     * If page is dirty it will get flushed back to disc - bad news! An
+     * anonymous page may be moulinexed under our feet by another thread.
+     */
+    if ( unlikely(PageDirty(page)) || unlikely(PageAnon(page)) )
     {
-        DPRINTK("Failed to place return address on user stack.");
-        return;
+        DPRINTK("Page is dirty or anonymous.");
+        unlock_page(page);
+        spin_unlock(&mm->page_table_lock);
+        goto out;
     }
+
+    veip = kmap(page);
+    memcpy((char *)veip + (eip & ~PAGE_MASK), patch, fe->patched_code_len);
+    kunmap(page);
+
+    unlock_page(page);
+    spin_unlock(&mm->page_table_lock);
 
     /* Success! Return to user land to execute 2nd insn of the pair. */
     regs->esp -= 4;
     regs->eip = FIXUP_BUF_USER + fe->return_idx;
 
-    /* [SMP] Need to pause other threads while patching. */
-    veip = kmap(page);
-    memcpy((char *)veip + (eip & ~PAGE_MASK), patch, fe->patched_code_len);
-    kunmap(page);
-
-    return;
+ out:
+    up_read(&mm->mmap_sem);
 }
 
 static int nosegfixup = 0;
 
 static int __init fixup_init(void)
 {
-    struct vm_struct vma;
     struct page *_pages[1<<FIXUP_BUF_ORDER], **pages=_pages;
     int i;
 
@@ -677,9 +728,8 @@ static int __init fixup_init(void)
     for ( i = 0; i < (1<<FIXUP_BUF_ORDER); i++ )
         _pages[i] = virt_to_page(fixup_buf) + i;
 
-    vma.addr = (void *)FIXUP_BUF_USER;
-    vma.size = FIXUP_BUF_SIZE + PAGE_SIZE; /* fucking stupid interface */
-    if ( map_vm_area(&vma, PAGE_READONLY, &pages) != 0 )
+    if ( __vmalloc_area_pages(FIXUP_BUF_USER, FIXUP_BUF_SIZE, 
+                              0, PAGE_READONLY, &pages) != 0 )
         BUG();
 
     memset(fixup_hash, 0, sizeof(fixup_hash));

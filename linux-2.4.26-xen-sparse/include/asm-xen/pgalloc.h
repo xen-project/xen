@@ -54,11 +54,15 @@ static inline pgd_t *get_pgd_slow(void)
 			if (!pmd)
 				goto out_oom;
 			clear_page(pmd);
-			set_pgd(pgd + i, __pgd(1 + __pa(pmd)));
+			set_pgd(pgd + FIRST_USER_PGD_NR, __pgd(1 + __pa(pmd)));
 		}
-		memcpy(pgd + USER_PTRS_PER_PGD,
-			swapper_pg_dir + USER_PTRS_PER_PGD,
-			(PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
+		memcpy(pgd,
+			swapper_pg_dir,
+			FIRST_USER_PGD_NR * sizeof(pgd_t));
+		memcpy(pgd + FIRST_USER_PGD_NR + USER_PTRS_PER_PGD,
+			swapper_pg_dir + FIRST_USER_PGD_NR + USER_PTRS_PER_PGD,
+			(PTRS_PER_PGD - USER_PTRS_PER_PGD -
+			 FIRST_USER_PGD_NR) * sizeof(pgd_t));
 	}
 	return pgd;
 out_oom:
@@ -75,13 +79,17 @@ static inline pgd_t *get_pgd_slow(void)
 	pgd_t *pgd = (pgd_t *)__get_free_page(GFP_KERNEL);
 
 	if (pgd) {
-		memset(pgd, 0, USER_PTRS_PER_PGD * sizeof(pgd_t));
-		memcpy(pgd + USER_PTRS_PER_PGD,
-			init_mm.pgd + USER_PTRS_PER_PGD,
-			(PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
+		memset(pgd + FIRST_USER_PGD_NR,
+			0, USER_PTRS_PER_PGD*sizeof(pgd_t));
+		memcpy(pgd,
+			init_mm.pgd,
+			FIRST_USER_PGD_NR * sizeof(pgd_t));
+		memcpy(pgd + FIRST_USER_PGD_NR + USER_PTRS_PER_PGD,
+			init_mm.pgd + FIRST_USER_PGD_NR + USER_PTRS_PER_PGD,
+			(PTRS_PER_PGD - USER_PTRS_PER_PGD -
+			 FIRST_USER_PGD_NR) * sizeof(pgd_t));
                 __make_page_readonly(pgd);
 		queue_pgd_pin(__pa(pgd));
-
 	}
 	return pgd;
 }

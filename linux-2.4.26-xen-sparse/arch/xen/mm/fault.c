@@ -105,7 +105,8 @@ asmlinkage void do_page_fault(struct pt_regs *regs,
         }
 #endif
 
-        if ( flush_page_update_queue() != 0 ) return;
+	if ( flush_page_update_queue() != 0 )
+		return;
 
 	/*
 	 * We fault-in kernel-space virtual memory on-demand. The
@@ -120,8 +121,10 @@ asmlinkage void do_page_fault(struct pt_regs *regs,
 	 * (error_code & 4) == 0, and that the fault was not a
 	 * protection error (error_code & 1) == 0.
 	 */
-	if (address >= TASK_SIZE && !(error_code & 5))
-		goto vmalloc_fault;
+	if (unlikely(address >= TASK_SIZE) ||
+	    unlikely(address < (FIRST_USER_PGD_NR<<PGDIR_SHIFT)))
+		if (!(error_code & 5))
+			goto vmalloc_fault;
 
 	mm = tsk->mm;
 	info.si_code = SEGV_MAPERR;
