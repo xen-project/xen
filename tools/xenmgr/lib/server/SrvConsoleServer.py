@@ -8,6 +8,8 @@ import os
 import os.path
 import signal
 import sys
+import threading
+import linecache
 import socket
 import pwd
 import re
@@ -482,7 +484,7 @@ class Daemon:
         while code > 0:
             code = os.waitpid(-1, os.WNOHANG)
 
-    def start(self):
+    def start(self,trace=0):
         if self.cleanup(kill=False):
             return 1
 
@@ -506,8 +508,53 @@ class Daemon:
         # Child
         logfile = self.open_logfile()
         self.redirect_output(logfile)
+        if trace:
+            self.tracefile = open('/var/log/xend.trace', 'w+', 1)
+            self.traceindent = 0
+            sys.settrace(self.trace)
+            try:
+                threading.settrace(self.trace) # Only in Python >= 2.3
+            except:
+                pass
         self.run()
         return 0
+
+    def print_trace(self,str):
+        for i in range(self.traceindent):
+            self.tracefile.write("    ")
+        self.tracefile.write(str)
+            
+    def trace(self, frame, event, arg):
+        if event == 'call':
+            code = frame.f_code
+            filename = code.co_filename
+            m = re.search('.*xenmgr/(.*)', code.co_filename)
+            if not m:
+                return None
+            modulename = m.group(1)
+            if re.search('sxp.py', modulename):
+                return None
+            self.traceindent += 1
+            self.print_trace("++++ %s:%s\n"
+                             % (modulename, code.co_name))
+        elif event == 'line':
+            filename = frame.f_code.co_filename
+            lineno = frame.f_lineno
+            self.print_trace("%4d %s" %
+                             (lineno, linecache.getline(filename, lineno)))
+        elif event == 'return':
+            code = frame.f_code
+            filename = code.co_filename
+            m = re.search('.*xenmgr/(.*)', code.co_filename)
+            if not m:
+                return None
+            modulename = m.group(1)
+            self.print_trace("---- %s:%s\n"
+                             % (modulename, code.co_name))
+            self.traceindent -= 1
+        elif event == 'exception':
+            pass
+        return self.trace
 
     def open_logfile(self):
         if not os.path.exists(CONTROL_DIR):
