@@ -147,6 +147,9 @@ int physdev_pci_access_modify(
 
     /* Make the domain privileged. */
     set_bit(PF_PHYSDEV, &p->flags);
+	/* FIXME: MAW for now make the domain REALLY privileged so that it
+	 * can run a backend driver (hw access should work OK otherwise) */
+	set_bit(PF_PRIVILEGED, &p->flags);
 
     /* Grant write access to the specified device. */
     if ( (pdev = pci_find_slot(bus, PCI_DEVFN(dev, func))) == NULL )

@@ -513,18 +513,19 @@ static PyObject *pyxc_linux_build(PyObject *self,
 
     u32   dom;
     char *image, *ramdisk = NULL, *cmdline = "";
-    int   control_evtchn;
+    int   control_evtchn, flags = 0;
 
     static char *kwd_list[] = { "dom", "control_evtchn", 
-                                "image", "ramdisk", "cmdline", NULL };
+                                "image", "ramdisk", "cmdline", "flags",
+				NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iis|ss", kwd_list, 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iis|ssi", kwd_list, 
                                       &dom, &control_evtchn, 
-                                      &image, &ramdisk, &cmdline) )
+                                      &image, &ramdisk, &cmdline, &flags) )
         return NULL;
 
-    if ( xc_linux_build(xc->xc_handle, dom, image, 
-                        ramdisk, cmdline, control_evtchn) != 0 )
+    if ( xc_linux_build(xc->xc_handle, dom, image,
+                        ramdisk, cmdline, control_evtchn, flags) != 0 )
         return PyErr_SetFromErrno(xc_error);
     
     Py_INCREF(zero);

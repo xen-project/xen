@@ -150,3 +150,14 @@ def new_network_interface(dom, handle=-1):
 
     # Response is deferred until back-end driver sends acknowledgement.
     return None
+
+##
+## set_network_backend
+##   Authorise a domain to act as the net backend (assumes we only have one
+##   backend driver for now).  After this call, back end "up" notifications
+##   for the network will only be accepted from this domain.
+##
+def set_network_backend(dom):
+    if xend.netif.be_port: xend.netif.recovery = True
+    xend.netif.be_port = xend.main.port_from_dom(dom)
+    return { 'success' : True }

@@ -732,8 +732,11 @@ static int __init init_module(void)
 {
     int i;
 
-    if ( !(start_info.flags & SIF_INITDOMAIN) )
+    if ( !(start_info.flags & SIF_NET_BE_DOMAIN) &&
+	 !(start_info.flags & SIF_INIT_DOMAIN) )
         return 0;
+
+    printk("Initialising Xen virtual ethernet backend driver\n");
 
     skb_queue_head_init(&rx_queue);
     skb_queue_head_init(&tx_queue);

@@ -398,7 +398,9 @@ typedef struct {
 
 /* These flags are passed in the 'flags' field of start_info_t. */
 #define SIF_PRIVILEGED 1          /* Is the domain privileged? */
-#define SIF_INITDOMAIN 2          /* Is thsi the initial control domain? */
+#define SIF_INITDOMAIN 2          /* Is this the initial control domain? */
+#define SIF_BLK_BE_DOMAIN 4       /* Is this a block backend domain? */
+#define SIF_NET_BE_DOMAIN 8       /* Is this a net backend domain? */
 
 /* For use in guest OSes. */
 extern shared_info_t *HYPERVISOR_shared_info;

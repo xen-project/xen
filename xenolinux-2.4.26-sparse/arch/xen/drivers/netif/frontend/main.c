@@ -28,6 +28,8 @@
 #include <asm/evtchn.h>
 #include <asm/ctrl_if.h>
 
+#include <asm/page.h>
+
 #include "../netif.h"
 
 #define RX_BUF_SIZE ((PAGE_SIZE/2)+1) /* Fool the slab allocator :-) */
@@ -55,6 +57,7 @@ struct net_private
     netif_rx_interface_t *rx;
 
     spinlock_t   tx_lock;
+    spinlock_t   rx_lock;
 
     unsigned int handle;
     unsigned int evtchn;
@@ -83,7 +86,6 @@ struct net_private
     (_list)[0]  = (_list)[_id];                    \
     (unsigned short)_id; })
 
-
 static struct net_device *find_dev_by_handle(unsigned int handle)
 {
     struct list_head *ent;
@@ -109,6 +111,7 @@ static int network_open(struct net_device *dev)
     np->rx_resp_cons = np->tx_resp_cons = np->tx_full = 0;
     memset(&np->stats, 0, sizeof(np->stats));
     spin_lock_init(&np->tx_lock);
+    spin_lock_init(&np->rx_lock);
 
     /* Initialise {tx,rx}_skbs to be a free chain containing every entry. */
     for ( i = 0; i <= NETIF_TX_RING_SIZE; i++ )
@@ -198,8 +201,9 @@ static void network_alloc_rx_buffers(struct net_device *dev)
             panic("alloc_skb needs to provide us page-aligned buffers.");
 
         id = GET_ID_FROM_FREELIST(np->rx_skbs);
-        np->rx_skbs[id] = skb;
 
+        np->rx_skbs[id] = skb;
+        
         np->rx->ring[MASK_NET_RX_IDX(i)].req.id = id;
         
         rx_pfn_array[nr_pfns] = virt_to_machine(skb->head) >> PAGE_SHIFT;
@@ -267,6 +271,13 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
     
     spin_lock_irq(&np->tx_lock);
 
+    /* if the backend isn't available then don't do anything! */
+    if ( !netif_carrier_ok(dev) )
+    {
+        spin_unlock_irq(&np->tx_lock);
+        return 1;
+    }
+
     i = np->tx->req_prod;
 
     id = GET_ID_FROM_FREELIST(np->tx_skbs);
@@ -310,6 +321,13 @@ static void netif_int(int irq, void *dev_id, struct pt_regs *ptregs)
     unsigned long flags;
 
     spin_lock_irqsave(&np->tx_lock, flags);
+    
+    if( !netif_carrier_ok(dev) )
+    {
+        spin_unlock_irqrestore(&np->tx_lock, flags);
+        return;
+    }
+    
     network_tx_buf_gc(dev);
     spin_unlock_irqrestore(&np->tx_lock, flags);
 
@@ -329,6 +347,15 @@ static int netif_poll(struct net_device *dev, int *pbudget)
     int work_done, budget, more_to_do = 1;
     struct sk_buff_head rxq;
     unsigned long flags;
+
+    spin_lock(&np->rx_lock);
+
+    /* if the device is undergoing recovery then don't do anything */
+    if ( !netif_carrier_ok(dev) )
+    {
+        spin_unlock(&np->rx_lock);
+        return 0;
+    }
 
     skb_queue_head_init(&rxq);
 
@@ -425,6 +452,8 @@ static int netif_poll(struct net_device *dev, int *pbudget)
         local_irq_restore(flags);
     }
 
+    spin_unlock(&np->rx_lock);
+
     return more_to_do;
 }
 
@@ -465,7 +494,10 @@ static void netif_status_change(netif_fe_interface_status_changed_t *status)
     netif_fe_interface_connect_t up;
     struct net_device *dev;
     struct net_private *np;
-    
+    int i;
+
+    unsigned long tsc;
+
     if ( status->handle != 0 )
     {
         printk(KERN_WARNING "Status change on unsupported netif %d\n",
@@ -488,7 +520,29 @@ static void netif_status_change(netif_fe_interface_status_changed_t *status)
         {
             printk(KERN_WARNING "Unexpected netif-DISCONNECTED message"
                    " in state %d\n", np->state);
-            break;
+	    printk(KERN_INFO "Attempting to reconnect network interface\n");
+
+            /* Begin interface recovery.
+             * TODO: Change the Xend<->Guest protocol so that a recovery
+             * is initiated by a special "RESET" message - disconnect could
+             * just mean we're not allowed to use this interface any more.
+             */
+
+            /* Stop old i/f to prevent errors whilst we rebuild the state. */
+            spin_lock_irq(&np->tx_lock);
+            spin_lock_irq(&np->rx_lock);
+            netif_stop_queue(dev);
+            netif_carrier_off(dev);
+            np->state  = NETIF_STATE_DISCONNECTED;
+            spin_unlock_irq(&np->rx_lock);
+            spin_unlock_irq(&np->tx_lock);
+
+            /* Free resources. */
+            free_irq(np->irq, dev);
+            unbind_evtchn_from_irq(np->evtchn);
+
+	    free_page((unsigned long)np->tx);
+            free_page((unsigned long)np->rx);
         }
 
         /* Move from CLOSED to DISCONNECTED state. */
@@ -521,12 +575,83 @@ static void netif_status_change(netif_fe_interface_status_changed_t *status)
 
         memcpy(dev->dev_addr, status->mac, ETH_ALEN);
 
+        if(netif_carrier_ok(dev))
+            np->state = NETIF_STATE_CONNECTED;
+        else
+        {
+            int i, requeue_idx;
+            netif_tx_request_t *tx;
+
+            spin_lock_irq(&np->rx_lock);
+            spin_lock(&np->tx_lock);
+
+            /* Recovery procedure: */
+
+            /* Step 1: Reinitialise variables. */
+            np->rx_resp_cons = np->tx_resp_cons = np->tx_full = 0;
+            np->rx->event = 1;
+
+            /* Step 1: Rebuild the RX and TX ring contents.
+             * NB. We could just throw away the queued TX packets but we hope
+             * that sending them out might do some good.  We have to rebuild
+             * the RX ring because some of our pages are currently flipped out
+             * so we can't just free the RX skbs.
+	     * NB2. Freelist index entries are always going to be less than
+	     *  __PAGE_OFFSET, whereas pointers to skbs will always be equal or
+	     * greater than __PAGE_OFFSET, so we use this to distinguish them.
+             */
+
+            /* Rebuild the TX buffer freelist and the TX ring itself.
+             * NB. This reorders packets :-( We could keep more private state
+             * to avoid this but maybe it doesn't matter so much given the
+             * interface has been down.
+             */
+            for ( requeue_idx = 0, i = 1; i <= NETIF_TX_RING_SIZE; i++ )
+            {
+                if ( np->tx_skbs[i] >= __PAGE_OFFSET )
+                {
+                    struct sk_buff *skb = np->tx_skbs[i];
+                    
+                    tx = &np->tx->ring[MASK_NET_TX_IDX(requeue_idx++)].req;
+                    
+                    tx->id   = i;
+                    tx->addr = virt_to_machine(skb->data);
+                    tx->size = skb->len;
+                    
+                    np->stats.tx_bytes += skb->len;
+                    np->stats.tx_packets++;
+                }
+            }
+            wmb();
+            np->tx->req_prod = requeue_idx;
+
+            /* Rebuild the RX buffer freelist and the RX ring itself. */
+            for ( requeue_idx = 0, i = 1; i <= NETIF_RX_RING_SIZE; i++ )
+                if ( np->rx_skbs[i] >= __PAGE_OFFSET )
+                    np->rx->ring[requeue_idx++].req.id = i;
+            wmb();                
+            np->rx->req_prod = requeue_idx;
+
+            /* Step 4: All public and private state should now be sane.  Start
+             * sending and receiving packets again and give the driver domain a
+	     * kick because we've probably just queued some packets. */
+
+            netif_carrier_on(dev);
+            netif_start_queue(dev);
+            np->state = NETIF_STATE_ACTIVE;
+
+            notify_via_evtchn(status->evtchn);  
+
+            printk(KERN_INFO "Recovery completed\n");
+
+            spin_unlock(&np->tx_lock);
+            spin_unlock_irq(&np->rx_lock);
+        }
+
         np->evtchn = status->evtchn;
         np->irq = bind_evtchn_to_irq(np->evtchn);
         (void)request_irq(np->irq, netif_int, SA_SAMPLE_RANDOM, 
-                      dev->name, dev);
-        
-        np->state = NETIF_STATE_CONNECTED;
+                          dev->name, dev);
         break;
 
     default:
@@ -568,8 +693,11 @@ static int __init init_module(void)
     struct net_device *dev;
     struct net_private *np;
 
-    if ( start_info.flags & SIF_INITDOMAIN )
+    if ( start_info.flags & SIF_INITDOMAIN
+         || start_info.flags & SIF_NET_BE_DOMAIN )
         return 0;
+
+    printk("Initialising Xen virtual ethernet frontend driver");
 
     INIT_LIST_HEAD(&dev_list);
 
@@ -608,8 +736,9 @@ static int __init init_module(void)
     cmsg.length    = sizeof(netif_fe_driver_status_changed_t);
     st.status      = NETIF_DRIVER_STATUS_UP;
     memcpy(cmsg.msg, &st, sizeof(st));
-    ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
 
+    ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
+    
     /*
      * We should read 'nr_interfaces' from response message and wait
      * for notifications before proceeding. For now we assume that we

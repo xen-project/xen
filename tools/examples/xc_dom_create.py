@@ -25,6 +25,7 @@ Arguments to control the parsing of the defaults file:
  -h               -- Print extended help message, including all arguments
  -n               -- Dry run only, don't actually create domain
  -q               -- Quiet - write output only to the system log
+ -s               -- Don't start the domain, just build it.
 """ % (sys.argv[0], xc_config_file)
 
 def extra_usage ():
@@ -89,12 +90,13 @@ vbd_expert=0; auto_restart=False;
 vbd_list = []; cmdline_ip = ''; cmdline_root=''; cmdline_extra=''
 pci_device_list = []; console_port = -1
 auto_console = False
+dontstart = False
 
 ##### Determine location of defaults file
 #####
 
 try:
-    opts, args = getopt.getopt(sys.argv[1:], "h?nqcf:D:k:r:b:m:N:a:e:d:i:I:R:E:L:" )
+    opts, args = getopt.getopt(sys.argv[1:], "h?nqcsf:D:k:r:b:m:N:a:e:d:i:I:R:E:L:" )
 
     for opt in opts:
 	if opt[0] == '-f': config_file= opt[1]
@@ -106,6 +108,7 @@ try:
 		exec "%s='%s'" % (l,r)
         if opt[0] == '-q': quiet = True
         if opt[0] == '-L': restore = True; state_file = opt[1]
+        if opt[0] == '-s': dontstart = True
 
 
 except getopt.GetoptError:
@@ -258,7 +261,7 @@ def make_domain():
             sys.exit()
     else:
 
-        ret = eval('xc.%s_build ( dom=id, image=image, ramdisk=ramdisk, cmdline=cmdline, control_evtchn=cons_response["remote_port"] )' % builder_fn )
+        ret = eval('xc.%s_build ( dom=id, image=image, ramdisk=ramdisk, cmdline=cmdline, control_evtchn=cons_response["remote_port"], flags=flags )' % builder_fn )
         if ret < 0:
             print "Error building Linux guest OS: "
             print "Return code = " + str(ret)
@@ -334,16 +337,28 @@ def make_domain():
                 sys.exit()
 
     if new_io_world:
-        cmsg = 'new_network_interface(dom='+str(id)+')'
-        xend_response = xenctl.utils.xend_control_message(cmsg)
-        if not xend_response['success']:
-            print "Error creating network interface"
-            print "Error type: " + xend_response['error_type']
-            if xend_response['error_type'] == 'exception':
-                print "Exception type: " + xend_response['exception_type']
-                print "Exception val:  " + xend_response['exception_value']
-            xc.domain_destroy ( dom=id )
-            sys.exit()
+        if not (flags & 8): # If it's not the net backend, give it a frontend.
+            cmsg = 'new_network_interface(dom='+str(id)+')'
+            xend_response = xenctl.utils.xend_control_message(cmsg)
+            if not xend_response['success']:
+                print "Error creating network interface"
+                print "Error type: " + xend_response['error_type']
+                if xend_response['error_type'] == 'exception':
+                    print "Exception type: " + xend_response['exception_type']
+                    print "Exception val:  " + xend_response['exception_value']
+                    xc.domain_destroy ( dom=id )
+                    sys.exit()
+        else: # It's a new net backend - notify Xend.
+            cmsg = 'set_network_backend(dom='+str(id)+')'
+            xend_response = xenctl.utils.xend_control_message(cmsg)
+            if not xend_response['success']:
+                print "Error registering network backend"
+                print "Error type: " + xend_response['error_type']
+                if xend_response['error_type'] == 'exception':
+                    print "Exception type: " + xend_response['exception_type']
+                    print "Exception val:  " + xend_response['exception_value']
+                    xc.domain_destroy ( dom=id )
+                    sys.exit()
     else:
         # setup virtual firewall rules for all aliases
         for ip in vfr_ipaddr:
@@ -372,10 +387,11 @@ def make_domain():
 		os.system('/usr/sbin/arping -A -b -I eth0 -c 1 -s %s %s' % (ip,gw))
 	if not nlb: print >>open('/proc/sys/net/ipv4/ip_nonlocal_bind','w'), '0'
 
-    if xc.domain_start( dom=id ) < 0:
-        print "Error starting domain"
-        xc.domain_destroy ( dom=id )
-        sys.exit()
+    if not dontstart:
+        if xc.domain_start( dom=id ) < 0:
+            print "Error starting domain"
+            xc.domain_destroy ( dom=id )
+            sys.exit()
 
     return (id, cons_response['console_port'])
 # end of make_domain()

@@ -86,7 +86,8 @@ int xc_linux_build(int xc_handle,
                    const char *image_name,
                    const char *ramdisk_name,
                    const char *cmdline,
-                   unsigned int control_evtchn);
+                   unsigned int control_evtchn,
+		   unsigned long flags);
 
 int xc_netbsd_build(int xc_handle,
                     u32 domid,

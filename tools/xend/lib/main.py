@@ -47,7 +47,7 @@ def daemon_loop():
 
     # Lists of all interfaces, indexed by local event-channel port.
     port_list = {}
-
+    
     xc = Xc.new()
 
     # Ignore writes to disconnected sockets. We clean up differently.
@@ -199,7 +199,7 @@ def daemon_loop():
                     xend.blkif.backend_rx_req(port, msg)
                 elif type == CMSG_NETIF_FE and net_if:
                     net_if.ctrlif_rx_req(port, msg)
-                elif type == CMSG_NETIF_BE and port == dom0_port:
+                elif type == CMSG_NETIF_BE and port == xend.netif.be_port:
                     xend.netif.backend_rx_req(port, msg)
                 else:
                     port.write_response(msg)
@@ -211,7 +211,7 @@ def daemon_loop():
                 type = (msg.get_header())['type']
                 if type == CMSG_BLKIF_BE and port == dom0_port:
                     xend.blkif.backend_rx_rsp(port, msg)
-                elif type == CMSG_NETIF_BE and port == dom0_port:
+                elif type == CMSG_NETIF_BE and port == xend.netif.be_port:
                     xend.netif.backend_rx_rsp(port, msg)
 
             # Send console data.
@@ -231,7 +231,7 @@ def daemon_loop():
                 work_done = True
                 
             # Back-end network-device work.
-            if port == dom0_port and xend.netif.backend_do_work(port):
+            if port == xend.netif.be_port and xend.netif.backend_do_work(port):
                 work_done = True
                 
             # Finally, notify the remote end of any work that we did.
