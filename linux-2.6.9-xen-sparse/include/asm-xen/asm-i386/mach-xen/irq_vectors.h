@@ -126,10 +126,10 @@
  */
 
 #define PIRQ_BASE   0
-#define NR_PIRQS  128
+#define NR_PIRQS  256
 
 #define DYNIRQ_BASE (PIRQ_BASE + NR_PIRQS)
-#define NR_DYNIRQS  128
+#define NR_DYNIRQS  256
 
 #define NR_IRQS   (NR_PIRQS + NR_DYNIRQS)
 #define NR_IRQ_VECTORS NR_IRQS
