@@ -137,14 +137,49 @@ static struct {
  */
 #define FOREIGNDOM (percpu_info[smp_processor_id()].foreign ? : current)
 
-void ptwr_init_backpointers(void);
+/* Private domain structs for DOMID_XEN and DOMID_IO. */
+static struct domain *dom_xen, *dom_io;
 
 void arch_init_memory(void)
 {
+    static void ptwr_init_backpointers(void);
+    unsigned long mfn;
+
     memset(percpu_info, 0, sizeof(percpu_info));
 
     vm_assist_info[VMASST_TYPE_writeable_pagetables].enable =
         ptwr_init_backpointers;
+
+    /* Initialise to a magic of 0x55555555 so easier to spot bugs later. */
+    memset(machine_to_phys_mapping, 0x55, 4<<20);
+
+    /*
+     * Initialise our DOMID_XEN domain.
+     * Any Xen-heap pages that we will allow to be mapped will have
+     * their domain field set to dom_xen.
+     */
+    dom_xen = alloc_domain_struct();
+    atomic_set(&dom_xen->refcnt, 1);
+    dom_xen->domain = DOMID_XEN;
+
+    /*
+     * Initialise our DOMID_IO domain.
+     * This domain owns no pages but is considered a special case when
+     * mapping I/O pages, as the mappings occur at the priv of the caller.
+     */
+    dom_io = alloc_domain_struct();
+    atomic_set(&dom_io->refcnt, 1);
+    dom_io->domain = DOMID_IO;
+
+    /* M2P table is mappable read-only by privileged domains. */
+    for ( mfn = virt_to_phys(&machine_to_phys_mapping[0<<20])>>PAGE_SHIFT;
+          mfn < virt_to_phys(&machine_to_phys_mapping[1<<20])>>PAGE_SHIFT;
+          mfn++ )
+    {
+        frame_table[mfn].u.inuse.count_info = 1 | PGC_allocated;
+        frame_table[mfn].u.inuse.type_info  = 1 | PGT_gdt_page; /* non-RW */
+        frame_table[mfn].u.inuse.domain     = dom_xen;
+    }
 }
 
 static void __invalidate_shadow_ldt(struct domain *d)
@@ -178,7 +213,7 @@ static inline void invalidate_shadow_ldt(struct domain *d)
 }
 
 
-int alloc_segdesc_page(struct pfn_info *page)
+static int alloc_segdesc_page(struct pfn_info *page)
 {
     unsigned long *descs = map_domain_mem((page-frame_table) << PAGE_SHIFT);
     int i;
@@ -345,11 +380,15 @@ get_page_from_l1e(
 
     if ( unlikely(!pfn_is_ram(pfn)) )
     {
-        if ( IS_PRIV(current) )
+        /* Revert to caller privileges if FD == DOMID_IO. */
+        if ( d == dom_io )
+            d = current;
+
+        if ( IS_PRIV(d) )
             return 1;
 
-        if ( IS_CAPABLE_PHYSDEV(current) )
-            return domain_iomem_in_pfn(current, pfn);
+        if ( IS_CAPABLE_PHYSDEV(d) )
+            return domain_iomem_in_pfn(d, pfn);
 
         MEM_LOG("Non-privileged attempt to map I/O space %08lx", pfn);
         return 0;
@@ -827,9 +866,16 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
 
         if ( !IS_PRIV(d) )
         {
-            MEM_LOG("Dom %u has no privilege to set subject domain",
-                    d->domain);
-            okay = 0;
+            switch ( domid )
+            {
+            case DOMID_IO:
+                get_knownalive_domain(e = dom_io);
+                break;
+            default:
+                MEM_LOG("Dom %u cannot set foreign dom\n", d->domain);
+                okay = 0;
+                break;
+            }
         }
         else
         {
@@ -839,8 +885,19 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
             percpu_info[cpu].foreign = e = find_domain_by_id(domid);
             if ( e == NULL )
             {
-                MEM_LOG("Unknown domain '%u'", domid);
-                okay = 0;
+                switch ( domid )
+                {
+                case DOMID_XEN:
+                    get_knownalive_domain(e = dom_xen);
+                    break;
+                case DOMID_IO:
+                    get_knownalive_domain(e = dom_io);
+                    break;
+                default:
+                    MEM_LOG("Unknown domain '%u'", domid);
+                    okay = 0;
+                    break;
+                }
             }
         }
         break;
@@ -926,7 +983,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
          * the lock so they'll spin waiting for us.
          */
         if ( unlikely(e->tot_pages++ == 0) )
-            get_domain(e);
+            get_knownalive_domain(e);
         list_add_tail(&page->list, &e->page_list);
 
     reassign_fail:        
@@ -1493,7 +1550,7 @@ int ptwr_do_page_fault(unsigned long addr)
     return 0;
 }
 
-void ptwr_init_backpointers(void)
+static void ptwr_init_backpointers(void)
 {
     struct pfn_info *page;
     unsigned long pde;

@@ -247,6 +247,9 @@ static int mmap_mem(struct file * file, struct vm_area_struct * vma)
 	if (!(start_info.flags & SIF_PRIVILEGED))
 		return -ENXIO;
 
+	if (file->private_data == NULL)
+		file->private_data = (void *)(unsigned long)DOMID_IO;
+
 	/* DONTCOPY is essential for Xen as copy_page_range is broken. */
 	vma->vm_flags |= VM_RESERVED | VM_IO | VM_DONTCOPY;
 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);

@@ -304,9 +304,6 @@ void cmain(multiboot_info_t *mbi)
 
     start_of_day();
 
-    /* Add CPU0 idle task to the task hash list */
-    task_hash[TASK_HASH(IDLE_DOMAIN_ID)] = &idle0_task;
-
     /* Create initial domain 0. */
     new_dom = do_createdomain(0, 0);
     if ( new_dom == NULL )

@@ -138,17 +138,10 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
         if ( (m.addr + (m.num<<PAGE_SHIFT)) > vma->vm_end )
         { ret = -EFAULT; goto batch_err; }
 
-        if ( m.dom != 0 )
-        {
-            u[0].ptr  = MMU_EXTENDED_COMMAND;
-            u[0].val  = MMUEXT_SET_FOREIGNDOM;
-            u[0].val |= (unsigned long)m.dom << 16;
-            v = w = &u[1];
-        }
-        else
-        {
-            v = w = &u[0];
-        }
+        u[0].ptr  = MMU_EXTENDED_COMMAND;
+        u[0].val  = MMUEXT_SET_FOREIGNDOM;
+        u[0].val |= (unsigned long)m.dom << 16;
+        v = w = &u[1];
 
         p = m.arr;
         addr = m.addr;
