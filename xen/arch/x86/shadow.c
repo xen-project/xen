@@ -51,7 +51,7 @@ static inline void free_shadow_page(
     free_domheap_page(page);
 }
 
-static void __free_shadow_table(struct mm_struct *m)
+static void free_shadow_state(struct mm_struct *m)
 {
     int                   i, free = 0;
     struct shadow_status *x, *n;
@@ -108,7 +108,7 @@ static void __free_shadow_table(struct mm_struct *m)
     SH_LOG("Free shadow table. Freed=%d.", free);
 }
 
-static inline int __clear_shadow_page(
+static inline int clear_shadow_page(
     struct mm_struct *m, struct shadow_status *x)
 {
     unsigned long   *p;
@@ -135,7 +135,7 @@ static inline int __clear_shadow_page(
     return restart;
 }
 
-static void __clear_shadow_state(struct mm_struct *m)
+static void clear_shadow_state(struct mm_struct *m)
 {
     int                   i;
     struct shadow_status *x;
@@ -150,11 +150,11 @@ static void __clear_shadow_state(struct mm_struct *m)
         if ( x->pfn == 0 )
             continue;
 
-        if ( __clear_shadow_page(m, x) )
+        if ( clear_shadow_page(m, x) )
             goto retry;
 
         for ( x = x->next; x != NULL; x = x->next )
-            if ( __clear_shadow_page(m, x) )
+            if ( clear_shadow_page(m, x) )
                 goto retry;
 
         shadow_audit(m, 0);
@@ -209,7 +209,7 @@ void __shadow_mode_disable(struct domain *d)
     struct mm_struct *m = &d->mm;
     struct shadow_status *x, *n;
 
-    __free_shadow_table(m);
+    free_shadow_state(m);
     m->shadow_mode = 0;
 
     SH_VLOG("freed tables count=%d l1=%d l2=%d",
@@ -246,7 +246,7 @@ static int shadow_mode_table_op(
     struct mm_struct *m = &d->mm;
     int               i, rc = 0;
 
-    ASSERT(spin_is_locked(&d->mm.shadow_lock));
+    ASSERT(spin_is_locked(&m->shadow_lock));
 
     SH_VLOG("shadow mode table op %08lx %08lx count %d",
             pagetable_val(m->pagetable), pagetable_val(m->shadow_table),
@@ -256,35 +256,41 @@ static int shadow_mode_table_op(
 
     switch ( op )
     {
+        /* XXX KAF: Do we really need this function? Is it any use? */
     case DOM0_SHADOW_CONTROL_OP_FLUSH:
-        __free_shadow_table( m );  
+        free_shadow_state(m);
 
-        d->mm.shadow_fault_count       = 0;
-        d->mm.shadow_dirty_count       = 0;
-        d->mm.shadow_dirty_net_count   = 0;
-        d->mm.shadow_dirty_block_count = 0;
+        m->shadow_fault_count       = 0;
+        m->shadow_dirty_count       = 0;
+        m->shadow_dirty_net_count   = 0;
+        m->shadow_dirty_block_count = 0;
 
         break;
    
     case DOM0_SHADOW_CONTROL_OP_CLEAN:
-        __clear_shadow_state(m);
+        /*
+         * XXX KAF: Why not just free_shadow_state()? Is zeroing L2's faster?
+         * If so, why wouldn't zeroing L1's be better than freeing them, as we
+         * do now?
+         */
+        clear_shadow_state(m);
 
-        sc->stats.fault_count       = d->mm.shadow_fault_count;
-        sc->stats.dirty_count       = d->mm.shadow_dirty_count;
-        sc->stats.dirty_net_count   = d->mm.shadow_dirty_net_count;
-        sc->stats.dirty_block_count = d->mm.shadow_dirty_block_count;
+        sc->stats.fault_count       = m->shadow_fault_count;
+        sc->stats.dirty_count       = m->shadow_dirty_count;
+        sc->stats.dirty_net_count   = m->shadow_dirty_net_count;
+        sc->stats.dirty_block_count = m->shadow_dirty_block_count;
 
-        d->mm.shadow_fault_count       = 0;
-        d->mm.shadow_dirty_count       = 0;
-        d->mm.shadow_dirty_net_count   = 0;
-        d->mm.shadow_dirty_block_count = 0;
+        m->shadow_fault_count       = 0;
+        m->shadow_dirty_count       = 0;
+        m->shadow_dirty_net_count   = 0;
+        m->shadow_dirty_block_count = 0;
  
         if ( (d->max_pages > sc->pages) || 
              (sc->dirty_bitmap == NULL) || 
-             (d->mm.shadow_dirty_bitmap == NULL) )
+             (m->shadow_dirty_bitmap == NULL) )
         {
             rc = -EINVAL;
-            goto out;
+            break;
         }
  
         sc->pages = d->max_pages;
@@ -297,41 +303,41 @@ static int shadow_mode_table_op(
      
             copy_to_user(
                 sc->dirty_bitmap + (i/(8*sizeof(unsigned long))),
-                d->mm.shadow_dirty_bitmap +(i/(8*sizeof(unsigned long))),
+                m->shadow_dirty_bitmap +(i/(8*sizeof(unsigned long))),
                 bytes);
      
             memset(
-                d->mm.shadow_dirty_bitmap + (i/(8*sizeof(unsigned long))),
+                m->shadow_dirty_bitmap + (i/(8*sizeof(unsigned long))),
                 0, bytes);
         }
 
         break;
 
     case DOM0_SHADOW_CONTROL_OP_PEEK:
-        sc->stats.fault_count       = d->mm.shadow_fault_count;
-        sc->stats.dirty_count       = d->mm.shadow_dirty_count;
-        sc->stats.dirty_net_count   = d->mm.shadow_dirty_net_count;
-        sc->stats.dirty_block_count = d->mm.shadow_dirty_block_count;
+        sc->stats.fault_count       = m->shadow_fault_count;
+        sc->stats.dirty_count       = m->shadow_dirty_count;
+        sc->stats.dirty_net_count   = m->shadow_dirty_net_count;
+        sc->stats.dirty_block_count = m->shadow_dirty_block_count;
  
         if ( (d->max_pages > sc->pages) || 
              (sc->dirty_bitmap == NULL) || 
-             (d->mm.shadow_dirty_bitmap == NULL) )
+             (m->shadow_dirty_bitmap == NULL) )
         {
             rc = -EINVAL;
-            goto out;
+            break;
         }
  
         sc->pages = d->max_pages;
         copy_to_user(
-            sc->dirty_bitmap, d->mm.shadow_dirty_bitmap, (d->max_pages+7)/8);
+            sc->dirty_bitmap, m->shadow_dirty_bitmap, (d->max_pages+7)/8);
 
         break;
 
     default:
-        BUG();
+        rc = -EINVAL;
+        break;
     }
 
- out:
     SH_VLOG("shadow mode table op : page count %d", m->shadow_page_count);
     shadow_audit(m, 1);
     __shadow_mk_pagetable(m);
@@ -340,8 +346,8 @@ static int shadow_mode_table_op(
 
 int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
 {
-    unsigned int cmd = sc->op;
-    int          rc  = 0;
+    unsigned int op = sc->op;
+    int          rc = 0;
 
     if ( unlikely(d == current) )
     {
@@ -354,7 +360,7 @@ int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
 
     shadow_lock(&d->mm);
 
-    switch ( cmd )
+    switch ( op )
     {
     case DOM0_SHADOW_CONTROL_OP_OFF:
         shadow_mode_disable(d);
@@ -371,12 +377,7 @@ int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
         break;
 
     default:
-        if ( shadow_mode(d) && 
-             (cmd >= DOM0_SHADOW_CONTROL_OP_FLUSH) && 
-             (cmd <= DOM0_SHADOW_CONTROL_OP_PEEK) )
-            rc = shadow_mode_table_op(d, sc);
-        else
-            rc = -EINVAL;
+        rc = shadow_mode(d) ? shadow_mode_table_op(d, sc) : -EINVAL;
         break;
     }
 
