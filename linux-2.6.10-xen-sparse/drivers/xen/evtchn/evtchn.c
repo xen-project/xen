@@ -61,8 +61,8 @@ static devfs_handle_t xen_dev_dir;
 
 struct per_user_data {
     /* Notification ring, accessed via /dev/xen/evtchn. */
-#   define RING_SIZE     2048  /* 2048 16-bit entries */
-#   define RING_MASK(_i) ((_i)&(RING_SIZE-1))
+#   define EVTCHN_RING_SIZE     2048  /* 2048 16-bit entries */
+#   define EVTCHN_RING_MASK(_i) ((_i)&(EVTCHN_RING_SIZE-1))
     u16 *ring;
     unsigned int ring_cons, ring_prod, ring_overflow;
 
@@ -86,9 +86,9 @@ void evtchn_device_upcall(int port)
 
     if ( (u = port_user[port]) != NULL )
     {
-        if ( (u->ring_prod - u->ring_cons) < RING_SIZE )
+        if ( (u->ring_prod - u->ring_cons) < EVTCHN_RING_SIZE )
         {
-            u->ring[RING_MASK(u->ring_prod)] = (u16)port;
+            u->ring[EVTCHN_RING_MASK(u->ring_prod)] = (u16)port;
             if ( u->ring_cons == u->ring_prod++ )
             {
                 wake_up_interruptible(&u->evtchn_wait);
@@ -154,10 +154,10 @@ static ssize_t evtchn_read(struct file *file, char *buf,
     }
 
     /* Byte lengths of two chunks. Chunk split (if any) is at ring wrap. */
-    if ( ((c ^ p) & RING_SIZE) != 0 )
+    if ( ((c ^ p) & EVTCHN_RING_SIZE) != 0 )
     {
-        bytes1 = (RING_SIZE - RING_MASK(c)) * sizeof(u16);
-        bytes2 = RING_MASK(p) * sizeof(u16);
+        bytes1 = (EVTCHN_RING_SIZE - EVTCHN_RING_MASK(c)) * sizeof(u16);
+        bytes2 = EVTCHN_RING_MASK(p) * sizeof(u16);
     }
     else
     {
@@ -176,7 +176,7 @@ static ssize_t evtchn_read(struct file *file, char *buf,
         bytes2 = count - bytes1;
     }
 
-    if ( copy_to_user(buf, &u->ring[RING_MASK(c)], bytes1) ||
+    if ( copy_to_user(buf, &u->ring[EVTCHN_RING_MASK(c)], bytes1) ||
          ((bytes2 != 0) && copy_to_user(&buf[bytes1], &u->ring[0], bytes2)) )
     {
         rc = -EFAULT;

@@ -75,6 +75,8 @@ tools/vnetd/vnetd
 tools/web-shutdown.tap
 tools/x2d2/minixend
 tools/xentrace/xentrace
+tools/xcs/xcs
+tools/xcs/xcsdump
 tools/xfrd/xfrd
 xen/BLOG
 xen/arch/x86/asm-offsets.s

@@ -10,6 +10,7 @@
 #ifndef __XEN_PUBLIC_IO_DOMAIN_CONTROLLER_H__
 #define __XEN_PUBLIC_IO_DOMAIN_CONTROLLER_H__
 
+#include "ring.h"
 
 /*
  * Reason codes for SCHEDOP_shutdown. These are opaque to Xen but may be
@@ -33,15 +34,24 @@ typedef struct {
     u8 msg[60];  /*  4: type-specific message data */
 } PACKED control_msg_t; /* 64 bytes */
 
+/* These are used by the control message deferred ring. */
 #define CONTROL_RING_SIZE 8
 typedef u32 CONTROL_RING_IDX;
 #define MASK_CONTROL_IDX(_i) ((_i)&(CONTROL_RING_SIZE-1))
 
+/*
+ * Generate control ring structures and types.
+ *
+ * CONTROL_RING_MEM is currently an 8-slot ring of ctrl_msg_t structs and
+ * two 32-bit counters:  (64 * 8) + (2 * 4) = 520
+ */
+#define CONTROL_RING_MEM 520 
+#define CTRL_RING RING_PARAMS(control_msg_t, control_msg_t, CONTROL_RING_MEM)
+DEFINE_RING_TYPES(ctrl, CTRL_RING);
+
 typedef struct {
-    control_msg_t tx_ring[CONTROL_RING_SIZE];   /*    0: guest -> controller */
-    control_msg_t rx_ring[CONTROL_RING_SIZE];   /*  512: controller -> guest */
-    CONTROL_RING_IDX tx_req_prod, tx_resp_prod; /* 1024, 1028 */
-    CONTROL_RING_IDX rx_req_prod, rx_resp_prod; /* 1032, 1036 */
+    ctrl_sring_t tx_ring; /*    0: guest -> controller  */
+    ctrl_sring_t rx_ring; /*  520: controller -> guest  */
 } PACKED control_if_t; /* 1040 bytes */
 
 /*

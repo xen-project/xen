@@ -47,6 +47,19 @@
 #endif
 
 /*
+ * Extra ring macros to sync a consumer index up to the public producer index. 
+ * Generally UNSAFE, but we use it for recovery and shutdown in some cases.
+ */
+#define RING_DROP_PENDING_REQUESTS(_p, _r)                              \
+    do {                                                                \
+        (_r)->req_cons = (_r)->sring->req_prod;                         \
+    } while (0)
+#define RING_DROP_PENDING_RESPONSES(_p, _r)                             \
+    do {                                                                \
+        (_r)->rsp_cons = (_r)->sring->rsp_prod;                         \
+    } while (0)
+
+/*
  * Only used by initial domain which must create its own control-interface
  * event channel. This value is picked up by the user-space domain controller
  * via an ioctl.
@@ -59,8 +72,8 @@ static spinlock_t ctrl_if_lock;
 
 static struct irqaction ctrl_if_irq_action;
 
-static CONTROL_RING_IDX ctrl_if_tx_resp_cons;
-static CONTROL_RING_IDX ctrl_if_rx_req_cons;
+static ctrl_front_ring_t ctrl_if_tx_ring;
+static ctrl_back_ring_t  ctrl_if_rx_ring;
 
 /* Incoming message requests. */
     /* Primary message type -> message handler. */
@@ -97,8 +110,6 @@ static void __ctrl_if_rx_tasklet(unsigned long data);
 static DECLARE_TASKLET(ctrl_if_rx_tasklet, __ctrl_if_rx_tasklet, 0);
 
 #define get_ctrl_if() ((control_if_t *)((char *)HYPERVISOR_shared_info + 2048))
-#define TX_FULL(_c)   \
-    (((_c)->tx_req_prod - ctrl_if_tx_resp_cons) == CONTROL_RING_SIZE)
 
 static void ctrl_if_notify_controller(void)
 {
@@ -113,21 +124,20 @@ static void ctrl_if_rxmsg_default_handler(ctrl_msg_t *msg, unsigned long id)
 
 static void __ctrl_if_tx_tasklet(unsigned long data)
 {
-    control_if_t *ctrl_if = get_ctrl_if();
-    ctrl_msg_t   *msg;
-    int           was_full = TX_FULL(ctrl_if);
-    CONTROL_RING_IDX rp;
+    ctrl_msg_t *msg;
+    int         was_full = RING_FULL(CTRL_RING, &ctrl_if_tx_ring);
+    RING_IDX    i, rp;
 
-    rp = ctrl_if->tx_resp_prod;
+    i  = ctrl_if_tx_ring.rsp_cons;
+    rp = ctrl_if_tx_ring.sring->rsp_prod;
     rmb(); /* Ensure we see all requests up to 'rp'. */
 
-    while ( ctrl_if_tx_resp_cons != rp )
+    for ( ; i != rp; i++ )
     {
-        msg = &ctrl_if->tx_ring[MASK_CONTROL_IDX(ctrl_if_tx_resp_cons)];
-
-        DPRINTK("Rx-Rsp %u/%u :: %d/%d\n", 
-                ctrl_if_tx_resp_cons,
-                ctrl_if->tx_resp_prod,
+        msg = RING_GET_RESPONSE(CTRL_RING, &ctrl_if_tx_ring, i);
+        
+        DPRINTK("Rx-Rsp %u/%u :: %d/%d\n", i-1,
+                ctrl_if_tx_ring.sring->rsp_prod,
                 msg->type, msg->subtype);
 
         /* Execute the callback handler, if one was specified. */
@@ -138,16 +148,16 @@ static void __ctrl_if_tx_tasklet(unsigned long data)
             smp_mb(); /* Execute, /then/ free. */
             ctrl_if_txmsg_id_mapping[msg->id].fn = NULL;
         }
-
-        /*
-         * Step over the message in the ring /after/ finishing reading it. As 
-         * soon as the index is updated then the message may get blown away.
-         */
-        smp_mb();
-        ctrl_if_tx_resp_cons++;
     }
 
-    if ( was_full && !TX_FULL(ctrl_if) )
+    /*
+     * Step over messages in the ring /after/ finishing reading them. As soon 
+     * as the index is updated then the message may get blown away.
+     */
+    smp_mb();
+    ctrl_if_tx_ring.rsp_cons = i;
+            
+    if ( was_full && !RING_FULL(CTRL_RING, &ctrl_if_tx_ring) )
     {
         wake_up(&ctrl_if_tx_wait);
         run_task_queue(&ctrl_if_tx_tq);
@@ -172,24 +182,27 @@ static void __ctrl_if_rxmsg_deferred(void *unused)
 
 static void __ctrl_if_rx_tasklet(unsigned long data)
 {
-    control_if_t *ctrl_if = get_ctrl_if();
     ctrl_msg_t    msg, *pmsg;
-    CONTROL_RING_IDX rp, dp;
+    CONTROL_RING_IDX dp;
+    RING_IDX rp, i;
 
+    i  = ctrl_if_rx_ring.req_cons;
+    rp = ctrl_if_rx_ring.sring->req_prod;
     dp = ctrl_if_rxmsg_deferred_prod;
-    rp = ctrl_if->rx_req_prod;
     rmb(); /* Ensure we see all requests up to 'rp'. */
-
-    while ( ctrl_if_rx_req_cons != rp )
+ 
+    for ( ; i != rp; i++) 
     {
-        pmsg = &ctrl_if->rx_ring[MASK_CONTROL_IDX(ctrl_if_rx_req_cons++)];
+        pmsg = RING_GET_REQUEST(CTRL_RING, &ctrl_if_rx_ring, i);
         memcpy(&msg, pmsg, offsetof(ctrl_msg_t, msg));
 
-        DPRINTK("Rx-Req %u/%u :: %d/%d\n", 
-                ctrl_if_rx_req_cons-1,
-                ctrl_if->rx_req_prod,
+        DPRINTK("Rx-Req %u/%u :: %d/%d\n", i-1,
+                ctrl_if_rx_ring.sring->req_prod,
                 msg.type, msg.subtype);
 
+        if ( msg.length > sizeof(msg.msg) )
+            msg.length = sizeof(msg.msg);
+        
         if ( msg.length != 0 )
             memcpy(msg.msg, pmsg->msg, msg.length);
 
@@ -200,6 +213,8 @@ static void __ctrl_if_rx_tasklet(unsigned long data)
         else
             (*ctrl_if_rxmsg_handler[msg.type])(&msg, 0);
     }
+
+    ctrl_if_rx_ring.req_cons = i;
 
     if ( dp != ctrl_if_rxmsg_deferred_prod )
     {
@@ -212,12 +227,10 @@ static void __ctrl_if_rx_tasklet(unsigned long data)
 static irqreturn_t ctrl_if_interrupt(int irq, void *dev_id,
                                      struct pt_regs *regs)
 {
-    control_if_t *ctrl_if = get_ctrl_if();
-
-    if ( ctrl_if_tx_resp_cons != ctrl_if->tx_resp_prod )
+    if ( RING_HAS_UNCONSUMED_RESPONSES(CTRL_RING, &ctrl_if_tx_ring) )
         tasklet_schedule(&ctrl_if_tx_tasklet);
 
-    if ( ctrl_if_rx_req_cons != ctrl_if->rx_req_prod )
+    if ( RING_HAS_UNCONSUMED_REQUESTS(CTRL_RING, &ctrl_if_rx_ring) )
         tasklet_schedule(&ctrl_if_rx_tasklet);
 
     return IRQ_HANDLED;
@@ -229,13 +242,13 @@ ctrl_if_send_message_noblock(
     ctrl_msg_handler_t hnd,
     unsigned long id)
 {
-    control_if_t *ctrl_if = get_ctrl_if();
     unsigned long flags;
+    ctrl_msg_t   *dmsg;
     int           i;
 
     spin_lock_irqsave(&ctrl_if_lock, flags);
 
-    if ( TX_FULL(ctrl_if) )
+    if ( RING_FULL(CTRL_RING, &ctrl_if_tx_ring) )
     {
         spin_unlock_irqrestore(&ctrl_if_lock, flags);
         return -EAGAIN;
@@ -252,14 +265,15 @@ ctrl_if_send_message_noblock(
     }
 
     DPRINTK("Tx-Req %u/%u :: %d/%d\n", 
-            ctrl_if->tx_req_prod, 
-            ctrl_if_tx_resp_cons,
+            ctrl_if_tx_ring.req_prod_pvt, 
+            ctrl_if_tx_ring.rsp_cons,
             msg->type, msg->subtype);
 
-    memcpy(&ctrl_if->tx_ring[MASK_CONTROL_IDX(ctrl_if->tx_req_prod)], 
-           msg, sizeof(*msg));
-    wmb(); /* Write the message before letting the controller peek at it. */
-    ctrl_if->tx_req_prod++;
+    dmsg = RING_GET_REQUEST(CTRL_RING, &ctrl_if_tx_ring, 
+            ctrl_if_tx_ring.req_prod_pvt);
+    memcpy(dmsg, msg, sizeof(*msg));
+    ctrl_if_tx_ring.req_prod_pvt++;
+    RING_PUSH_REQUESTS(CTRL_RING, &ctrl_if_tx_ring);
 
     spin_unlock_irqrestore(&ctrl_if_lock, flags);
 
@@ -358,10 +372,8 @@ int
 ctrl_if_enqueue_space_callback(
     struct tq_struct *task)
 {
-    control_if_t *ctrl_if = get_ctrl_if();
-
     /* Fast path. */
-    if ( !TX_FULL(ctrl_if) )
+    if ( !RING_FULL(CTRL_RING, &ctrl_if_tx_ring) )
         return 0;
 
     (void)queue_task(task, &ctrl_if_tx_tq);
@@ -372,14 +384,13 @@ ctrl_if_enqueue_space_callback(
      * certainly return 'not full'.
      */
     smp_mb();
-    return TX_FULL(ctrl_if);
+    return RING_FULL(CTRL_RING, &ctrl_if_tx_ring);
 }
 
 void
 ctrl_if_send_response(
     ctrl_msg_t *msg)
 {
-    control_if_t *ctrl_if = get_ctrl_if();
     unsigned long flags;
     ctrl_msg_t   *dmsg;
 
@@ -390,15 +401,16 @@ ctrl_if_send_response(
     spin_lock_irqsave(&ctrl_if_lock, flags);
 
     DPRINTK("Tx-Rsp %u :: %d/%d\n", 
-            ctrl_if->rx_resp_prod, 
+            ctrl_if_rx_ring.rsp_prod_pvt, 
             msg->type, msg->subtype);
 
-    dmsg = &ctrl_if->rx_ring[MASK_CONTROL_IDX(ctrl_if->rx_resp_prod)];
+    dmsg = RING_GET_RESPONSE(CTRL_RING, &ctrl_if_rx_ring, 
+            ctrl_if_rx_ring.rsp_prod_pvt);
     if ( dmsg != msg )
         memcpy(dmsg, msg, sizeof(*msg));
 
-    wmb(); /* Write the message before letting the controller peek at it. */
-    ctrl_if->rx_resp_prod++;
+    ctrl_if_rx_ring.rsp_prod_pvt++;
+    RING_PUSH_RESPONSES(CTRL_RING, &ctrl_if_rx_ring);
 
     spin_unlock_irqrestore(&ctrl_if_lock, flags);
 
@@ -469,8 +481,6 @@ void ctrl_if_suspend(void)
 
 void ctrl_if_resume(void)
 {
-    control_if_t *ctrl_if = get_ctrl_if();
-
     if ( xen_start_info.flags & SIF_INITDOMAIN )
     {
         /*
@@ -491,8 +501,8 @@ void ctrl_if_resume(void)
     }
 
     /* Sync up with shared indexes. */
-    ctrl_if_tx_resp_cons = ctrl_if->tx_resp_prod;
-    ctrl_if_rx_req_cons  = ctrl_if->rx_resp_prod;
+    RING_DROP_PENDING_RESPONSES(CTRL_RING, &ctrl_if_tx_ring);
+    RING_DROP_PENDING_REQUESTS(CTRL_RING, &ctrl_if_rx_ring);
 
     ctrl_if_evtchn = xen_start_info.domain_controller_evtchn;
     ctrl_if_irq    = bind_evtchn_to_irq(ctrl_if_evtchn);
@@ -505,11 +515,15 @@ void ctrl_if_resume(void)
 
 void __init ctrl_if_init(void)
 {
-        int i;
+    control_if_t *ctrl_if = get_ctrl_if();
+    int i;
 
     for ( i = 0; i < 256; i++ )
         ctrl_if_rxmsg_handler[i] = ctrl_if_rxmsg_default_handler;
 
+    FRONT_RING_ATTACH(CTRL_RING, &ctrl_if_tx_ring, &ctrl_if->tx_ring);
+    BACK_RING_ATTACH(CTRL_RING, &ctrl_if_rx_ring, &ctrl_if->rx_ring);
+    
     spin_lock_init(&ctrl_if_lock);
 
     ctrl_if_resume();
@@ -532,12 +546,13 @@ __initcall(ctrl_if_late_setup);
 
 int ctrl_if_transmitter_empty(void)
 {
-    return (get_ctrl_if()->tx_req_prod == ctrl_if_tx_resp_cons);
+    return (ctrl_if_tx_ring.sring->req_prod == ctrl_if_tx_ring.rsp_cons);
+    
 }
 
 void ctrl_if_discard_responses(void)
 {
-    ctrl_if_tx_resp_cons = get_ctrl_if()->tx_resp_prod;
+    RING_DROP_PENDING_RESPONSES(CTRL_RING, &ctrl_if_tx_ring);
 }
 
 EXPORT_SYMBOL(ctrl_if_send_message_noblock);

@@ -118,9 +118,9 @@ class NotifierPort(abstract.FileDescriptor):
         if hasattr(self, 'protocol'):
             self.protocol.doStop()
         self.connected = 0
-        #self.notifier.close() # Not implemented.
-        os.close(self.fileno())
-        del self.notifier
+        #self.notifier.close()   # (this said:) Not implemented.
+        #os.close(self.fileno()) # But yes it is...
+        del self.notifier        # ...as _dealloc!
         if hasattr(self, 'd'):
             self.d.callback(None)
             del self.d

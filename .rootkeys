@@ -622,6 +622,15 @@
 4194e8612TrrMvC8ZlA4h2ZYCPWz4g tools/x2d2/minixend.c
 4194e861x2eqNCD61RYPCUEBVdMYuw tools/x2d2/minixend.h
 4194e861A4V9VbD_FYmgXpYEj5YwVg tools/x2d2/util.c
+41d58ba63w1WfBmd6Cr_18nhLNv7PA tools/xcs/Makefile
+41d58ba6NxgkfzD_rmsGjgd_zJ3H_w tools/xcs/bindings.c
+41d58ba6I2umi60mShq4Pl0RDg7lzQ tools/xcs/connection.c
+41d58ba6YyYu53bFuoIAw9hNNmneEg tools/xcs/ctrl_interface.c
+41d58ba6Ru9ZbhTjgYX_oiszSIwCww tools/xcs/evtchn.c
+41d58ba6x9KO1CQBT7kKOKq_pJYC3g tools/xcs/xcs.c
+41d58ba6R6foSMtSFEcu-yxWFrT8VQ tools/xcs/xcs.h
+41d58ba6qyr2BkTcH2WlNBYLRyl2Yw tools/xcs/xcs_proto.h
+41d58ba6ijEF6fedqRO5vFu7uCirZg tools/xcs/xcsdump.c
 403a3edbrr8RE34gkbR40zep98SXbg tools/xentrace/Makefile
 40a107afN60pFdURgBv9KwEzgRl5mQ tools/xentrace/formats
 4050c413PhhLNAYk3TEwP37i_iLw9Q tools/xentrace/xentrace.8

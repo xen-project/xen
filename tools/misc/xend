@@ -21,6 +21,12 @@
 """
 import os
 import sys
+import socket
+import time
+
+XCS_PORT = 1633
+XCS_EXEC = "/usr/sbin/xcs"
+XCS_LOGFILE = "/var/log/xcs.log"
 
 # Default install path for Xen binary packages.
 sys.path.append('/lib/python')
@@ -89,6 +95,18 @@ def check_user():
         msg("Xend must be run as root.")
         hline()
         raise CheckError("invalid user")
+
+def xcs_running():
+    """ See if the control switch is running.
+    """
+    ret = 1
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.connect( ("127.0.0.1", XCS_PORT) )
+    except:
+        ret = 0
+    s.close()
+    return (ret)
     
 def main():
     try:
@@ -97,6 +115,31 @@ def main():
         check_user()
     except CheckError:
         sys.exit(1)
+    
+    if (not xcs_running()):
+        if os.fork():
+            time.sleep(1) # let xcs start
+        else:
+            try:
+                logfile = os.open(XCS_LOGFILE, 
+                                  os.O_WRONLY|os.O_APPEND|os.O_CREAT)
+                os.close(1)
+                os.dup(logfile)
+                os.close(2)
+                os.dup(logfile)
+                os.close(logfile)
+                os.execlp(XCS_EXEC, XCS_EXEC)
+            except:
+                hline()
+                msg("Tried to start xcs, but failed. Is it installed?")
+                hline()
+                raise CheckError("couldn't start xcs")
+        if (not xcs_running()):
+            hline()
+            msg("Failed to start the control interface switch.")
+            hline()
+            raise CheckError("xcs not running")
+        
     daemon = SrvDaemon.instance()
     if not sys.argv[1:]:
         print 'usage: %s {start|stop|restart}' % sys.argv[0]

@@ -171,8 +171,10 @@ class VirqChannel(BaseChannel):
         """
         BaseChannel.__init__(self, factory)
         self.virq = virq
+        self.factory = factory
         # Notification port (int).
-        self.port = xc.evtchn_bind_virq(virq)
+        #self.port = xc.evtchn_bind_virq(virq)
+        self.port = factory.notifier.bind_virq(virq)
         self.idx = self.port
         # Clients to call when a virq arrives.
         self.clients = []
@@ -208,7 +210,8 @@ class VirqChannel(BaseChannel):
             c.virqReceived(self.virq)
 
     def notify(self):
-        xc.evtchn_send(self.port)
+        # xc.evtchn_send(self.port)
+        self.factory.notifier.virq_send(self.port)
 
 
 class Channel(BaseChannel):
@@ -279,6 +282,7 @@ class Channel(BaseChannel):
         self.devs.append(dev)
         for ty in types:
             self.devs_by_type[ty] = dev
+        self.port.register(ty)
 
     def deregisterDevice(self, dev):
         """Remove the registration for a device controller.
@@ -290,6 +294,7 @@ class Channel(BaseChannel):
         types = [ ty for (ty, d) in self.devs_by_type.items() if d == dev ]
         for ty in types:
             del self.devs_by_type[ty]
+            self.port.deregister(ty)
 
     def getDevice(self, type):
         """Get the device controller handling a message type.
