@@ -311,9 +311,19 @@ CONFIG_DEBUG_KERNEL=y
 # CONFIG_DEBUG_BUGVERBOSE is not set
 CONFIG_KALLSYMS=y
 # CONFIG_FRAME_POINTER is not set
+#
+# ACPI Support
+#
+# CONFIG_ACPI is not set
+
+#
+# Cryptographic options
+#
+# CONFIG_CRYPTO is not set
 
 #
 # Library routines
 #
+# CONFIG_CRC32 is not set
 CONFIG_ZLIB_INFLATE=y
 # CONFIG_ZLIB_DEFLATE is not set
