@@ -4,9 +4,9 @@ include $(BASEDIR)/Rules.mk
 # naive OBJS rule gets link order wrong
 SCSI_OBJS := scsi.o hosts.o scsicam.o scsi_dma.o scsi_error.o
 SCSI_OBJS += scsi_ioctl.o scsi_lib.o scsi_merge.o scsi_proc.o 
-SCSI_OBJS += scsi_queue.o scsi_scan.o scsi_syms.o constants.o 
-SCSI_OBJS += sd.o aacraid/aacraid.o aic7xxx/aic7xxx.o megaraid.o
-SCSI_OBJS += BusLogic.o
+SCSI_OBJS += scsi_queue.o scsi_scan.o scsi_syms.o scsi_obsolete.o
+SCSI_OBJS += constants.o sd.o aacraid/aacraid.o aic7xxx/aic7xxx.o
+SCSI_OBJS += megaraid.o BusLogic.o
 
 default: $(OBJS)
 	$(MAKE) -C aacraid
