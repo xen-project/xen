@@ -29,11 +29,11 @@
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
 #define round_pgdown(_p)  ((_p)&PAGE_MASK)
 
-int construct_dom0(struct domain *p, 
+int construct_dom0(struct domain *d,
                    unsigned long alloc_start,
                    unsigned long alloc_end,
-                   char *image_start, unsigned long image_len, 
-                   char *initrd_start, unsigned long initrd_len,
+                   unsigned long _image_start, unsigned long image_len, 
+                   unsigned long _initrd_start, unsigned long initrd_len,
                    char *cmdline)
 {
     char *dst;
@@ -46,7 +46,9 @@ int construct_dom0(struct domain *p,
     l1_pgentry_t *l1tab = NULL, *l1start = NULL;
     struct pfn_info *page = NULL;
     start_info_t *si;
-    struct exec_domain *ed = p->exec_domain[0];
+    struct exec_domain *ed = d->exec_domain[0];
+    char *image_start  = __va(_image_start);
+    char *initrd_start = __va(_initrd_start);
 
     /*
      * This fully describes the memory layout of the initial domain. All 
@@ -72,9 +74,9 @@ int construct_dom0(struct domain *p,
     extern void physdev_init_dom0(struct domain *);
 
     /* Sanity! */
-    if ( p->id != 0 ) 
+    if ( d->id != 0 ) 
         BUG();
-    if ( test_bit(DF_CONSTRUCTED, &p->d_flags) ) 
+    if ( test_bit(DF_CONSTRUCTED, &d->d_flags) ) 
         BUG();
 
     memset(&dsi, 0, sizeof(struct domain_setup_info));
@@ -99,13 +101,10 @@ int construct_dom0(struct domain *p,
 
     /* Set up domain options */
     if ( dsi.use_writable_pagetables )
-        vm_assist(p, VMASST_CMD_enable, VMASST_TYPE_writable_pagetables);
+        vm_assist(d, VMASST_CMD_enable, VMASST_TYPE_writable_pagetables);
 
-    if ( (dsi.v_start & (PAGE_SIZE-1)) != 0 )
-    {
-        printk("Initial guest OS must load to a page boundary.\n");
-        return -EINVAL;
-    }
+    /* Align load address to 4MB boundary. */
+    dsi.v_start &= ~((1UL<<22)-1);
 
     /*
      * Why do we need this? The number of page-table frames depends on the 
@@ -126,10 +125,10 @@ int construct_dom0(struct domain *p,
         vstartinfo_end   = vstartinfo_start + PAGE_SIZE;
         vstack_start     = vstartinfo_end;
         vstack_end       = vstack_start + PAGE_SIZE;
-        v_end            = (vstack_end + (1<<22)-1) & ~((1<<22)-1);
-        if ( (v_end - vstack_end) < (512 << 10) )
-            v_end += 1 << 22; /* Add extra 4MB to get >= 512kB padding. */
-        if ( (((v_end - dsi.v_start + ((1<<L2_PAGETABLE_SHIFT)-1)) >> 
+        v_end            = (vstack_end + (1UL<<22)-1) & ~((1UL<<22)-1);
+        if ( (v_end - vstack_end) < (512UL << 10) )
+            v_end += 1UL << 22; /* Add extra 4MB to get >= 512kB padding. */
+        if ( (((v_end - dsi.v_start + ((1UL<<L2_PAGETABLE_SHIFT)-1)) >> 
                L2_PAGETABLE_SHIFT) + 1) <= nr_pt_pages )
             break;
     }
@@ -137,18 +136,18 @@ int construct_dom0(struct domain *p,
     printk("PHYSICAL MEMORY ARRANGEMENT:\n"
            " Kernel image:  %p->%p\n"
            " Initrd image:  %p->%p\n"
-           " Dom0 alloc.:   %08lx->%08lx\n",
-           image_start, image_start + image_len,
-           initrd_start, initrd_start + initrd_len,
+           " Dom0 alloc.:   %p->%p\n",
+           _image_start, _image_start + image_len,
+           _initrd_start, _initrd_start + initrd_len,
            alloc_start, alloc_end);
     printk("VIRTUAL MEMORY ARRANGEMENT:\n"
-           " Loaded kernel: %08lx->%08lx\n"
-           " Init. ramdisk: %08lx->%08lx\n"
-           " Phys-Mach map: %08lx->%08lx\n"
-           " Page tables:   %08lx->%08lx\n"
-           " Start info:    %08lx->%08lx\n"
-           " Boot stack:    %08lx->%08lx\n"
-           " TOTAL:         %08lx->%08lx\n",
+           " Loaded kernel: %p->%p\n"
+           " Init. ramdisk: %p->%p\n"
+           " Phys-Mach map: %p->%p\n"
+           " Page tables:   %p->%p\n"
+           " Start info:    %p->%p\n"
+           " Boot stack:    %p->%p\n"
+           " TOTAL:         %p->%p\n",
            dsi.v_kernstart, dsi.v_kernend, 
            vinitrd_start, vinitrd_end,
            vphysmap_start, vphysmap_end,
@@ -156,7 +155,7 @@ int construct_dom0(struct domain *p,
            vstartinfo_start, vstartinfo_end,
            vstack_start, vstack_end,
            dsi.v_start, v_end);
-    printk(" ENTRY ADDRESS: %08lx\n", dsi.v_kernentry);
+    printk(" ENTRY ADDRESS: %p\n", dsi.v_kernentry);
 
     if ( (v_end - dsi.v_start) > (nr_pages * PAGE_SIZE) )
     {
@@ -166,32 +165,30 @@ int construct_dom0(struct domain *p,
         return -ENOMEM;
     }
 
-    /*
-     * Protect the lowest 1GB of memory. We use a temporary mapping there
-     * from which we copy the kernel and ramdisk images.
-     */
-    if ( dsi.v_start < (1<<30) )
+    /* Overlap with Xen protected area? */
+    if ( (dsi.v_start < HYPERVISOR_VIRT_END) &&
+         (v_end > HYPERVISOR_VIRT_START) )
     {
-        printk("Initial loading isn't allowed to lowest 1GB of memory.\n");
+        printk("DOM0 image overlaps with Xen private area.\n");
         return -EINVAL;
     }
 
     /* Paranoia: scrub DOM0's memory allocation. */
     printk("Scrubbing DOM0 RAM: ");
-    dst = (char *)alloc_start;
-    while ( dst < (char *)alloc_end )
+    dst = __va(alloc_start);
+    while ( __pa(dst) < alloc_end )
     {
 #define SCRUB_BYTES (100 * 1024 * 1024) /* 100MB */
         printk(".");
         touch_nmi_watchdog();
-        if ( ((char *)alloc_end - dst) > SCRUB_BYTES )
+        if ( (alloc_end - __pa(dst)) > SCRUB_BYTES )
         {
             memset(dst, 0, SCRUB_BYTES);
             dst += SCRUB_BYTES;
         }
         else
         {
-            memset(dst, 0, (char *)alloc_end - dst);
+            memset(dst, 0, alloc_end - __pa(dst));
             break;
         }
     }
@@ -203,11 +200,11 @@ int construct_dom0(struct domain *p,
           mfn++ )
     {
         page = &frame_table[mfn];
-        page_set_owner(page, p);
+        page_set_owner(page, d);
         page->u.inuse.type_info = 0;
         page->count_info        = PGC_allocated | 1;
-        list_add_tail(&page->list, &p->page_list);
-        p->tot_pages++; p->max_pages++;
+        list_add_tail(&page->list, &d->page_list);
+        d->tot_pages++; d->max_pages++;
     }
 
     mpt_alloc = (vpt_start - dsi.v_start) + alloc_start;
@@ -231,7 +228,7 @@ int construct_dom0(struct domain *p,
     l2tab[LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
         mk_l2_pgentry((unsigned long)l2start | __PAGE_HYPERVISOR);
     l2tab[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] =
-        mk_l2_pgentry(__pa(p->mm_perdomain_pt) | __PAGE_HYPERVISOR);
+        mk_l2_pgentry(__pa(d->mm_perdomain_pt) | __PAGE_HYPERVISOR);
     ed->mm.pagetable = mk_pagetable((unsigned long)l2start);
 
     l2tab += l2_table_offset(dsi.v_start);
@@ -250,7 +247,7 @@ int construct_dom0(struct domain *p,
         *l1tab++ = mk_l1_pgentry((mfn << PAGE_SHIFT) | L1_PROT);
         
         page = &frame_table[mfn];
-        if ( !get_page_and_type(page, p, PGT_writable_page) )
+        if ( !get_page_and_type(page, d, PGT_writable_page) )
             BUG();
 
         mfn++;
@@ -275,10 +272,10 @@ int construct_dom0(struct domain *p,
              * Installed as CR3: increment both the ref_count and type_count.
              * Net: just increment the ref_count.
              */
-            get_page(page, p); /* an extra ref because of readable mapping */
+            get_page(page, d); /* an extra ref because of readable mapping */
 
             /* Get another ref to L2 page so that it can be pinned. */
-            if ( !get_page_and_type(page, p, PGT_l2_page_table) )
+            if ( !get_page_and_type(page, d, PGT_l2_page_table) )
                 BUG();
             set_bit(_PGT_pinned, &page->u.inuse.type_info);
         }
@@ -295,7 +292,7 @@ int construct_dom0(struct domain *p,
              * increment both the ref_count and type_count.
              * Net: just increment the ref_count.
              */
-            get_page(page, p); /* an extra ref because of readable mapping */
+            get_page(page, d); /* an extra ref because of readable mapping */
         }
         l1tab++;
         if( !((unsigned long)l1tab & (PAGE_SIZE - 1)) )
@@ -303,12 +300,12 @@ int construct_dom0(struct domain *p,
     }
 
     /* Set up shared-info area. */
-    update_dom_time(p);
-    p->shared_info->domain_time = 0;
+    update_dom_time(d);
+    d->shared_info->domain_time = 0;
     /* Mask all upcalls... */
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
-        p->shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
-    p->shared_info->n_vcpu = smp_num_cpus;
+        d->shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
+    d->shared_info->n_vcpu = smp_num_cpus;
 
     /* Install the new page tables. */
     __cli();
@@ -324,15 +321,15 @@ int construct_dom0(struct domain *p,
     /* Set up start info area. */
     si = (start_info_t *)vstartinfo_start;
     memset(si, 0, PAGE_SIZE);
-    si->nr_pages     = p->tot_pages;
-    si->shared_info  = virt_to_phys(p->shared_info);
+    si->nr_pages     = d->tot_pages;
+    si->shared_info  = virt_to_phys(d->shared_info);
     si->flags        = SIF_PRIVILEGED | SIF_INITDOMAIN;
     si->pt_base      = vpt_start;
     si->nr_pt_frames = nr_pt_pages;
     si->mfn_list     = vphysmap_start;
 
     /* Write the phys->machine and machine->phys table entries. */
-    for ( pfn = 0; pfn < p->tot_pages; pfn++ )
+    for ( pfn = 0; pfn < d->tot_pages; pfn++ )
     {
         mfn = pfn + (alloc_start>>PAGE_SHIFT);
 #ifndef NDEBUG
@@ -348,7 +345,7 @@ int construct_dom0(struct domain *p,
     {
         si->mod_start = vinitrd_start;
         si->mod_len   = initrd_len;
-        printk("Initrd len 0x%lx, start at 0x%08lx\n",
+        printk("Initrd len 0x%lx, start at 0x%p\n",
                si->mod_len, si->mod_start);
     }
 
@@ -375,17 +372,32 @@ int construct_dom0(struct domain *p,
     zap_low_mappings(); /* Do the same for the idle page tables. */
     
     /* DOM0 gets access to everything. */
-    physdev_init_dom0(p);
+    physdev_init_dom0(d);
 
-    set_bit(DF_CONSTRUCTED, &p->d_flags);
+    set_bit(DF_CONSTRUCTED, &d->d_flags);
 
     new_thread(ed, dsi.v_kernentry, vstack_end, vstartinfo_start);
 
 #if 0 /* XXXXX DO NOT CHECK IN ENABLED !!! (but useful for testing so leave) */
-    shadow_lock(&p->mm);
+    shadow_lock(&d->mm);
     shadow_mode_enable(p, SHM_test); 
-    shadow_unlock(&p->mm);
+    shadow_unlock(&d->mm);
 #endif
 
     return 0;
+}
+
+int elf_sanity_check(Elf_Ehdr *ehdr)
+{
+    if ( !IS_ELF(*ehdr) ||
+         (ehdr->e_ident[EI_CLASS] != ELFCLASS64) ||
+         (ehdr->e_ident[EI_DATA] != ELFDATA2LSB) ||
+         (ehdr->e_type != ET_EXEC) ||
+         (ehdr->e_machine != EM_X86_64) )
+    {
+        printk("DOM0 image is not x86/64-compatible executable Elf image.\n");
+        return 0;
+    }
+
+    return 1;
 }

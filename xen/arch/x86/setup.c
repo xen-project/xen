@@ -625,10 +625,10 @@ void __init __start_xen(multiboot_info_t *mbi)
      * above our heap. The second module, if present, is an initrd ramdisk.
      */
     if ( construct_dom0(dom0, dom0_memory_start, dom0_memory_end,
-                        (char *)initial_images_start, 
+                        initial_images_start, 
                         mod[0].mod_end-mod[0].mod_start,
                         (mbi->mods_count == 1) ? 0 :
-                        (char *)initial_images_start + 
+                        initial_images_start + 
                         (mod[1].mod_start-mod[0].mod_start),
                         (mbi->mods_count == 1) ? 0 :
                         mod[mbi->mods_count-1].mod_end - mod[1].mod_start,
