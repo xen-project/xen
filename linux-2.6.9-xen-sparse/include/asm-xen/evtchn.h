@@ -48,7 +48,7 @@ void force_evtchn_callback(void);
 void evtchn_do_upcall(struct pt_regs *regs);
 
 /* Entry point for notifications into the userland character device. */
-void evtchn_device_upcall(int port);
+asmlinkage void evtchn_device_upcall(int port);
 
 static inline void mask_evtchn(int port)
 {
