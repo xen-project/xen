@@ -14,6 +14,10 @@
 #include <asm-xen/balloon.h>
 #include <asm-xen/evtchn.h>
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+#include <linux/delay.h>
+#endif
+
 static void netif_idx_release(u16 pending_idx);
 static void netif_page_release(struct page *page);
 static void make_tx_response(netif_t *netif, 
@@ -500,7 +504,11 @@ static void net_tx_action(unsigned long unused)
                 netif->credit_timeout.expires  = next_credit;
                 netif->credit_timeout.data     = (unsigned long)netif;
                 netif->credit_timeout.function = tx_credit_callback;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
                 add_timer_on(&netif->credit_timeout, smp_processor_id());
+#else
+                add_timer(&netif->credit_timeout); 
+#endif
                 break;
             }
         }
