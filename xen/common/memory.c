@@ -988,9 +988,8 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
 }
 
 
-int do_mmu_update(mmu_update_t *ureqs, int * p_count)
+int do_mmu_update(mmu_update_t *ureqs, int count, int *success_count)
 {
-    int count;
     mmu_update_t req;
     unsigned long va = 0, deferred_ops, pfn, prev_pfn = 0;
     struct pfn_info *page;
@@ -998,11 +997,6 @@ int do_mmu_update(mmu_update_t *ureqs, int * p_count)
     unsigned int cmd;
     unsigned long prev_spfn = 0;
     l1_pgentry_t *prev_spl1e = 0;
-
-    if ( unlikely( get_user(count, p_count) ) )
-    {
-	return -EFAULT;
-    }
 
     perfc_incrc(calls_to_mmu_update); 
     perfc_addc(num_page_updates, count);
@@ -1160,8 +1154,8 @@ int do_mmu_update(mmu_update_t *ureqs, int * p_count)
         percpu_info[cpu].gps = percpu_info[cpu].pts = NULL;
     }
 
-    if ( unlikely(rc) )
-	put_user( count, p_count );
+    if ( unlikely(success_count != NULL) )
+	put_user(count, success_count);
 
     return rc;
 }

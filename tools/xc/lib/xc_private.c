@@ -323,7 +323,8 @@ static int flush_mmu_updates(int xc_handle, mmu_t *mmu)
 
     hypercall.op     = __HYPERVISOR_mmu_update;
     hypercall.arg[0] = (unsigned long)mmu->updates;
-    hypercall.arg[1] = (unsigned long)&(mmu->idx);
+    hypercall.arg[1] = (unsigned long)mmu->idx;
+    hypercall.arg[2] = 0;
 
     if ( mlock(mmu->updates, sizeof(mmu->updates)) != 0 )
     {

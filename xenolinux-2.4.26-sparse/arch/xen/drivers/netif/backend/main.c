@@ -231,6 +231,7 @@ static void net_rx_action(unsigned long unused)
         mcl[1].op = __HYPERVISOR_mmu_update;
         mcl[1].args[0] = (unsigned long)mmu;
         mcl[1].args[1] = 4;
+        mcl[1].args[2] = 0;
 
         mmu += 4;
         mcl += 2;

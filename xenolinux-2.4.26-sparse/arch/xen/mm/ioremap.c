@@ -42,18 +42,11 @@ static inline void direct_remap_area_pte(pte_t *pte,
         BUG();
 
     do {
-#if 0 // XXX
-        if (!pte_none(*pte)) {
-            printk("direct_remap_area_pte: page already exists\n");
-            BUG();
-        }
-#endif
         (*v)->ptr = virt_to_machine(pte);
         (*v)++;
         address += PAGE_SIZE;
         pte++;
     } while (address && (address < end));
-    return ;
 }
 
 static inline int direct_remap_area_pmd(struct mm_struct *mm,
@@ -71,7 +64,7 @@ static inline int direct_remap_area_pmd(struct mm_struct *mm,
     if (address >= end)
         BUG();
     do {
-        pte_t * pte = pte_alloc(mm, pmd, address);
+        pte_t *pte = pte_alloc(mm, pmd, address);
         if (!pte)
             return -ENOMEM;
         direct_remap_area_pte(pte, address, end - address, v);
@@ -117,7 +110,7 @@ int direct_remap_area_pages(struct mm_struct *mm,
                             pgprot_t prot,
                             domid_t  domid)
 {
-    int i, count;
+    int i;
     unsigned long start_address;
 #define MAX_DIRECTMAP_MMU_QUEUE 130
     mmu_update_t u[MAX_DIRECTMAP_MMU_QUEUE], *w, *v;
@@ -141,39 +134,42 @@ int direct_remap_area_pages(struct mm_struct *mm,
 
     start_address = address;
 
-    for(i=0; i<size; 
-	i+=PAGE_SIZE, machine_addr+=PAGE_SIZE, address+=PAGE_SIZE, v++)
+    for( i = 0; i < size; i += PAGE_SIZE )
     {
-	if( (v-u) == MAX_DIRECTMAP_MMU_QUEUE )
+	if ( (v - u) == MAX_DIRECTMAP_MMU_QUEUE )
 	{
-	    /* get the ptep's filled in */
+	    /* Fill in the PTE pointers. */
 	    __direct_remap_area_pages( mm,
 				       start_address, 
 				       address-start_address, 
 				       w);
 	    
-	    count = v-u;
-	    if ( HYPERVISOR_mmu_update(u, &count) < 0 )
+	    if ( HYPERVISOR_mmu_update(u, v - u, NULL) < 0 )
 		return -EFAULT;	    
-	    v=w;
+	    v = w;
 	    start_address = address;
 	}
 
-	/* fill in the machine addresses */
+	/*
+         * Fill in the machine address: PTE ptr is done later by
+         * __direct_remap_area_pages(). 
+         */
         v->val = (machine_addr & PAGE_MASK) | pgprot_val(prot) | _PAGE_IO;
+
+        machine_addr += PAGE_SIZE;
+        address += PAGE_SIZE; 
+        v++;
     }
 
-    if(v!=w)
+    if ( v != w )
     {
 	/* get the ptep's filled in */
-	__direct_remap_area_pages( mm,
-				   start_address, 
-				   address-start_address, 
-				   w);	 
-	count = v-u;
-	if ( HYPERVISOR_mmu_update(u, &count) < 0 )
+	__direct_remap_area_pages(mm,
+                                  start_address, 
+                                  address-start_address, 
+                                  w);	 
+	if ( unlikely(HYPERVISOR_mmu_update(u, v - u, NULL) < 0) )
 	    return -EFAULT;	    
-
     }
     
     return 0;

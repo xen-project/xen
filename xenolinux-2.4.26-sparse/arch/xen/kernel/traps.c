@@ -317,12 +317,11 @@ asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
 		__asm__ __volatile__ ( "sldt %0" : "=r" (ldt) );
 		if ( ldt == 0 )
 		{
-		    int count = 1;
 		    mmu_update_t u;
 		    u.ptr  = MMU_EXTENDED_COMMAND;
 		    u.ptr |= (unsigned long)&default_ldt[0];
 		    u.val  = MMUEXT_SET_LDT | (5 << MMUEXT_CMD_SHIFT);
-		    if ( unlikely(HYPERVISOR_mmu_update(&u, &count) < 0) )
+		    if ( unlikely(HYPERVISOR_mmu_update(&u, 1, NULL) < 0) )
 		    {
 			show_trace(NULL);
 			panic("Failed to install default LDT");
@@ -644,7 +643,7 @@ void __init trap_init(void)
  * don't set them to safe values on entry to the kernel). At *any* point Xen 
  * may be entered due to a hardware interrupt --- on exit from Xen an invalid 
  * FS/GS will cause our failsafe_callback to be executed. This could occur, 
- * for example, while the mmmu_update_queue is in an inconsistent state. This
+ * for example, while the mmu_update_queue is in an inconsistent state. This
  * is disastrous because the normal page-fault handler touches the update
  * queue!
  * 

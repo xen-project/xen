@@ -384,6 +384,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
         mcl->op = __HYPERVISOR_mmu_update;
         mcl->args[0] = (unsigned long)rx_mmu;
         mcl->args[1] = mmu - rx_mmu;
+        mcl->args[2] = 0;
         mcl++;
         (void)HYPERVISOR_multicall(rx_mcl, mcl - rx_mcl);
     }
