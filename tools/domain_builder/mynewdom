@@ -21,7 +21,10 @@ LO=`echo $ADDR | sed -e 's/[0-9]\+\.[0-9]\+\.[0-9]\+\.\([0-9]\+\)/\1/'`
 HI=`echo $ADDR | sed -e 's/\([0-9]\+\.[0-9]\+\.[0-9]\+\)\.[0-9]\+/\1/'`
 NEWADDR=$HI.$[LO+DOM]
 
-echo New IP address : ${NEWADDR}
+NEWNAME=$NEWADDR
+LOOKUP=`host $NEWADDR`
+echo $LOOKUP | grep 'domain name pointer' && NEWNAME=`echo $LOOKUP | sed -e 's!.*domain name pointer \([^ ]\+\).$!\1!'`
+echo New IP address : ${NEWADDR}  name : ${NEWNAME}
 
 CMDLINE=`cat /proc/cmdline`
 case $CMDLINE in
