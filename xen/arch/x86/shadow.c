@@ -325,6 +325,12 @@ static int shadow_mode_table_op(struct domain *d,
     {
     case DOM0_SHADOW_CONTROL_OP_FLUSH:
         __free_shadow_table( m );  
+
+		d->mm.shadow_fault_count       = 0;
+		d->mm.shadow_dirty_count       = 0;
+		d->mm.shadow_dirty_net_count   = 0;
+		d->mm.shadow_dirty_block_count = 0;
+
         break;
    
     case DOM0_SHADOW_CONTROL_OP_CLEAN:   // zero all-non hypervisor
