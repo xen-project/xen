@@ -5,7 +5,7 @@ default: $(OBJS)
 	$(MAKE) -C tulip
 	$(MAKE) -C e100
 	$(MAKE) -C e1000
-	$(LD) -r -o driver.o e100/e100.o e1000/e1000.o $(OBJS) tulip/tulip.o
+	$(LD) -r -o driver.o e1000/e1000.o $(OBJS) e100/e100.o tulip/tulip.o
 
 clean:
 	$(MAKE) -C tulip clean
