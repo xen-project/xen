@@ -7,7 +7,7 @@ HDRS     = $(wildcard *.h)
 SRCS     = $(wildcard *.c)
 OBJS     = $(patsubst %.c,%.o,$(SRCS))
 
-TARGETS  = xen_read_console xen_log xen_cpuperf xen_refresh_dev
+TARGETS  = xen_read_console xen_cpuperf xen_refresh_dev
 
 INSTALL  = $(TARGETS) xen-mkdevnodes xen_nat_enable xen-clone 
 
