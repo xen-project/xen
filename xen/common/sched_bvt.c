@@ -98,8 +98,9 @@ static inline int __task_on_runqueue(struct domain *d)
 static void warp_timer_fn(unsigned long pointer)
 {
     struct bvt_dom_info *inf = (struct bvt_dom_info *)pointer;
-
-printk("--> Warp timer fired for %d\n", inf->domain->domain);
+    unsigned long flags; 
+    
+    spin_lock_irqsave(&CPU_INFO(inf->domain->processor)->run_lock, flags);
     inf->warp = 0;
     /* unwarp equal to zero => stop warping */
     if(inf->warpu == 0)
@@ -110,7 +111,9 @@ printk("--> Warp timer fired for %d\n", inf->domain->domain);
     
     /* set unwarp timer */
     inf->unwarp_timer.expires = NOW() + inf->warpu;
+    rem_ac_timer(&inf->unwarp_timer);
     add_ac_timer(&inf->unwarp_timer);
+    spin_unlock_irqrestore(&CPU_INFO(inf->domain->processor)->run_lock, flags);
 
 reschedule:
     cpu_raise_softirq(inf->domain->processor, SCHEDULE_SOFTIRQ);   
@@ -119,13 +122,16 @@ reschedule:
 static void unwarp_timer_fn(unsigned long pointer)
 {
      struct bvt_dom_info *inf = (struct bvt_dom_info *)pointer;
+     unsigned long flags;
 
-printk("---> UnWarp timer fired for %d\n", inf->domain->domain);
+     spin_lock_irqsave(&CPU_INFO(inf->domain->processor)->run_lock, flags);
     if(inf->warpback)
     {
         inf->warp = 1;
         cpu_raise_softirq(inf->domain->processor, SCHEDULE_SOFTIRQ);   
     }
+    
+    spin_unlock_irqrestore(&CPU_INFO(inf->domain->processor)->run_lock, flags);
 }
 
 
@@ -262,9 +268,6 @@ void bvt_wake(struct domain *d)
         inf->avt = CPU_SVT(cpu);
 
     /* Deal with warping here. */
-    // TODO rewrite
-    //inf->warpback  = 1;
-    //inf->warped    = now;
     inf->evt = calc_evt(d, inf->avt);
     spin_unlock_irqrestore(&CPU_INFO(cpu)->run_lock, flags);
     
@@ -323,7 +326,6 @@ void bvt_free_task(struct domain *p)
  */
 static void bvt_do_block(struct domain *p)
 {
-    // TODO what when blocks? BVT_INFO(p)->warpback = 0; 
 }
 
 /* Control the scheduler. */
@@ -371,16 +373,17 @@ int bvt_adjdom(struct domain *p,
         
         spin_lock_irqsave(&CPU_INFO(p->processor)->run_lock, flags);   
         inf->mcu_advance = mcu_adv;
-        inf->warpback = warpback; // TODO - temporary 
-        inf->warp = 1;
+        inf->warpback = warpback;  
+        /* The warp should be the same as warpback */
+        inf->warp = warpback;
         inf->warp_value = warpvalue;
         inf->warpl = warpl;
         inf->warpu = warpu;
 
         DPRINTK("Get domain %u bvt mcu_adv=%u, warpback=%d, warpvalue=%d"
-                "warpl=%lld, warpu=%lld\n",
+                "warpl=%lld, warpu=%lld, values(%lld, %lld)\n",
                 p->domain, inf->mcu_advance, inf->warpback, inf->warp_value,
-                inf->warpl, inf->warpu);
+                inf->warpl, inf->warpu, warpl, warpu);
 
         spin_unlock_irqrestore(&CPU_INFO(p->processor)->run_lock, flags);
     }
@@ -434,7 +437,9 @@ static task_slice_t bvt_do_schedule(s_time_t now)
         prev_inf->avt = calc_avt(prev, now);
         prev_inf->evt = calc_evt(prev, prev_inf->avt);
        
-        rem_ac_timer(&prev_inf->warp_timer);
+        if(prev_inf->warpback && prev_inf->warpl > 0)
+            rem_ac_timer(&prev_inf->warp_timer);
+        
         __del_from_runqueue(prev);
         
         if ( domain_runnable(prev) )
@@ -484,6 +489,14 @@ static task_slice_t bvt_do_schedule(s_time_t now)
             min_avt = p_inf->avt;
     }
     
+    if(next_inf->warp && next_inf->warpl > 0)
+    {
+        /* Set the timer up */ 
+        next_inf->warp_timer.expires = now + next_inf->warpl;
+        /* Add it to the heap */
+        add_ac_timer(&next_inf->warp_timer);
+    }
+   
     spin_unlock_irqrestore(&CPU_INFO(cpu)->run_lock, flags);
  
     /* Extract the domain pointers from the dom infos */
@@ -543,13 +556,6 @@ static task_slice_t bvt_do_schedule(s_time_t now)
     ASSERT(r_time >= ctx_allow);
 
  sched_done:
-    if(next_inf->warp && next_inf->warpl > 0) // TODO - already added?
-    {
-        /* Set the timer up */ 
-        next_inf->warp_timer.expires = now + next_inf->warpl;
-        /* Add it to the heap */
-        add_ac_timer(&next_inf->warp_timer);
-    }
     ret.task = next;
     ret.time = r_time;
     return ret;

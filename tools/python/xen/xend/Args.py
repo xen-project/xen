@@ -72,6 +72,8 @@ class Args:
         try:
             if type == 'int':
                 val = int(v)
+            elif type == 'long':
+                val = long(v)
             elif type == 'str':
                 val = str(v)
             elif type == 'sxpr':

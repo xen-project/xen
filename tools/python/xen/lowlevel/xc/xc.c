@@ -445,7 +445,7 @@ static PyObject *pyxc_bvtsched_domain_set(PyObject *self,
     static char *kwd_list[] = { "dom", "mcuadv", "warpback", "warpvalue",
                                 "warpl", "warpu", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiill", kwd_list,
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiiiLL", kwd_list,
                                       &dom, &mcuadv, &warpback, &warpvalue, 
                                       &warpl, &warpu) )
         return NULL;

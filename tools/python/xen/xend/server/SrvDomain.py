@@ -112,8 +112,8 @@ class SrvDomain(SrvDir):
                      ['mcuadv', 'int'],
                      ['warpback', 'int'],
                      ['warpvalue', 'int'],
-                     ['warpl', 'int'],
-                     ['warpu', 'int']])
+                     ['warpl', 'long'],
+                     ['warpu', 'long']])
         val = fn(req.args, {'dom': self.dom.name})
         return val
     

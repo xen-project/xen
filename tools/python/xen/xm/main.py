@@ -497,7 +497,7 @@ class ProgBvt(Prog):
 
     def main(self, args):
         if len(args) != 7: self.err("%s: Invalid argument(s)" % args[0])
-        v = map(int, args[1:7])
+        v = map(long, args[1:7])
         server.xend_domain_cpu_bvt_set(*v)
 
 xm.prog(ProgBvt)
