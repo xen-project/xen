@@ -549,7 +549,10 @@ static void dispatch_usb_io(usbif_priv_t *up, usbif_request_t *req)
          * because various error checks get confused otherwise.  We just do
          * configuration settings here, under controlled conditions.
          */
-        usb_set_configuration(port->dev, setup[2]);
+
+      /* Ignore configuration setting and hope that the host kernel
+	 did it right. */
+      //        usb_set_configuration(port->dev, setup[2]);
 
         make_response(up, req->id, req->operation, 0, 0, 0);
 
