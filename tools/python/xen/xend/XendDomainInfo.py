@@ -369,6 +369,7 @@ class XendDomainInfo:
         self.config = None
         self.id = None
         self.dom = None
+        self.cpu_weight = 1
         self.start_time = None
         self.name = None
         self.memory = None
@@ -499,7 +500,10 @@ class XendDomainInfo:
         try:
             self.name = sxp.child_value(config, 'name')
             self.check_name(self.name)
-	    self.cpu_weight = float(sxp.child_value(config, 'cpu_weight', '1'))
+            try:
+                self.cpu_weight = float(sxp.child_value(config, 'cpu_weight', '1'))
+            except:
+                raise VmError('invalid cpu weight')
             if self.restore and self.dom:
                 xc.domain_setname(self.dom, self.name)
             self.memory = int(sxp.child_value(config, 'memory'))

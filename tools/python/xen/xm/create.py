@@ -101,9 +101,10 @@ gopts.var('memory', val='MEMORY',
           fn=set_value, default=128,
           use="Domain memory in MB.")
 
-gopts.var('cpu_weight', val='CPU_WEIGHT',
-          fn=set_value, default=1,
-          use="CPU weight.")
+gopts.var('cpu_weight', val='WEIGHT',
+          fn=set_float, default=1,
+          use="""Set the new domain's cpu weight. WEIGHT is a float that controls the
+domain's share of the cpu.""")
 
 gopts.var('console', val='PORT',
           fn=set_int, default=None,

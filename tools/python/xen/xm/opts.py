@@ -409,13 +409,21 @@ def set_bool(opt, k, v):
         
 
 def set_value(opt, k, v):
-    """Set an option to a valoue."""
+    """Set an option to a value."""
     opt.set(v)
 
 def set_int(opt, k, v):
     """Set an option to an integer value."""
     try:
         v = int(v)
+    except:
+        opt.opts.err('Invalid value: ' + str(v))
+    opt.set(v)
+
+def set_float(opt, k, v):
+    """Set an option to a float value."""
+    try:
+        v = float(v)
     except:
         opt.opts.err('Invalid value: ' + str(v))
     opt.set(v)

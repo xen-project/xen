@@ -61,6 +61,7 @@ The top-level element, a virtual machine configuration.
     <li>id: int, optional, default generated. Domain unique id.
     <li>memory: int, required. Domain memory in MB.
     <li>cpu: int, optional. Cpu to run on.
+    <li>cpu_weight, float, optional, default 1. Cpu weight - controls share of CPU.
     <li>image: linux | netbsd | ..., required. Domain image (OS-specific element).
     <li>backend: any backend device type, optional, default none.
     <li>device: any device type, optional, repeats. Device.
