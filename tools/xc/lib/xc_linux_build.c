@@ -304,9 +304,9 @@ static int setup_guestos(int xc_handle,
  error_out:
     if ( pm_handle >= 0 )
         (void)close_pfn_mapper(pm_handle);
-    if ( page_array == NULL )
+    if ( page_array )
         free(page_array);
-    if ( pgt_update_arr == NULL )
+    if ( pgt_update_arr )
         free(pgt_update_arr);
     return -1;
 }
