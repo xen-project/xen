@@ -25,12 +25,6 @@ class SrvNode(SrvDir):
         val = self.xn.reboot()
         return val
 
-    def op_cpu_rrobin_slice_set(self, op, req):
-        fn = FormFn(self.xn.cpu_rrobin_slice_set,
-                    [['slice', 'int']])
-        val = fn(req.args, {})
-        return val
-
     def op_cpu_bvt_slice_set(self, op, req):
         fn = FormFn(self.xn.cpu_bvt_slice_set,
                     [['ctx_allow', 'int']])

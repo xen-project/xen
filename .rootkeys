@@ -20,6 +20,7 @@
 4022a73cgxX1ryj1HgS-IwwB6NUi2A docs/misc/XenDebugger-HOWTO
 412f4bd9sm5mCQ8BkrgKcAKZGadq7Q docs/misc/blkif-drivers-explained.txt
 420b949cy9ZGzED74Fz_DaWlK7tT4g docs/misc/crashdb.txt
+4251a1f82AexscYEiF4Iku8Gc_kWfQ docs/misc/grant-tables.txt
 40d6ccbfKKBq8jE0ula4eHEzBiQuDA docs/misc/xen_config.html
 410a4c2bAO_m_l4RsiiPHnZ4ixHWbQ docs/misc/xend.tex
 3f9e7d564bWFB-Czjv1qdmE6o0GqNg docs/src/interface.tex
@@ -712,7 +713,6 @@
 41cc934abX-QLXJXW_clV_wRjM0zYg tools/libxc/plan9a.out.h
 3fbba6dc1uU7U3IFeF6A-XEOYF2MkQ tools/libxc/rpm.spec
 3fbba6dcrNxtygEcgJYAJJ1gCQqfsA tools/libxc/xc.h
-40589968oCfoUlXd460CjVAkBE8IBA tools/libxc/xc_atropos.c
 3fbba6dbEVkVMX0JuDFzap9jeaucGA tools/libxc/xc_bvtsched.c
 3fbba6dbasJQV-MVElDC0DGSHMiL5w tools/libxc/xc_domain.c
 40278d99BLsfUv3qxv0I8C1sClZ0ow tools/libxc/xc_elf.h
@@ -729,7 +729,6 @@
 3fbba6dctWRWlFJkYb6hdix2X4WMuw tools/libxc/xc_private.c
 3fbba6dcbVrG2hPzEzwdeV_UC8kydQ tools/libxc/xc_private.h
 42337174PxyzzPk62raDiYCIsfStDg tools/libxc/xc_ptrace.c
-40589968UQFnJeOMn8UIFLbXBuwXjw tools/libxc/xc_rrobin.c
 41dde8b0pLfAKMs_L9Uri2hnzHiCRQ tools/libxc/xc_vmx_build.c
 40e1b09dMYB4ItGCqcMIzirdMd9I-w tools/libxutil/Makefile
 40e033325Sjqs-_4TuzeUEprP_gYFg tools/libxutil/allocate.c
@@ -1218,9 +1217,7 @@
 3e54c38dkHAev597bPr71-hGzTdocg xen/common/perfc.c
 4051bcecFeq4DE70p4zGO5setf47CA xen/common/physdev.c
 3ddb79bdHqdQpATqC0rmUZNbsb6L6A xen/common/resource.c
-4064773cJ31vZt-zhbSoxqft1Jaw0w xen/common/sched_atropos.c
 40589968dD2D1aejwSOvrROg7fOvGQ xen/common/sched_bvt.c
-40589968be_t_n0-w6ggceW7h-sx0w xen/common/sched_rrobin.c
 3e397e6619PgAfBbw2XFbXkewvUWgw xen/common/schedule.c
 3ddb79bd0gVQYmL2zvuJnldvD0AGxQ xen/common/softirq.c
 3e7f358awXBC3Vw-wFRwPw18qL1khg xen/common/string.c

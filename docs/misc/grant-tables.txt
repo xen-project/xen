@@ -1,0 +1,325 @@
+********************************************************************************
+ A Rough Introduction to Using Grant Tables
+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                                              Christopher Clark, March, 2005.
+
+Grant tables are a mechanism for sharing and transferring frames between
+domains, without requiring the participating domains to be privileged.
+
+The first mode of use allows domA to grant domB access to a specific frame,
+whilst retaining ownership. The block front driver uses this to grant memory
+access to the block back driver, so that it may read or write as requested.
+
+ 1. domA creates a grant access reference, and transmits the ref id to domB.
+ 2. domB uses the reference to map the granted frame.
+ 3. domB performs the memory access.
+ 4. domB unmaps the granted frame.
+ 5. domA removes its grant.
+
+
+The second mode allows domA to accept a transfer of ownership of a frame from
+domB. The net front and back driver will use this for packet tx/rx. This
+mechanism is still being implemented, though the xen<->guest interface design
+is complete.
+
+ 1. domA creates an accept transfer grant reference, and transmits it to domB.
+ 2. domB uses the ref to hand over a frame it owns.
+ 3. domA accepts the transfer
+ 4. domA clears the used reference.
+
+
+********************************************************************************
+ Data structures
+ ~~~~~~~~~~~~~~~
+
+ The following data structures are used by Xen and the guests to implement
+ grant tables:
+
+ 1. Shared grant entries
+ 2. Active grant entries
+ 3. Map tracking
+
+ These are not the users primary interface to grant tables, but are discussed
+ because an understanding of how they work may be useful. Each of these is a
+ finite resource.
+
+ Shared grant entries
+ ~~~~~~~~~~~~~~~~~~~~
+
+ A set of pages are shared between Xen and a guest, holding the shared grant
+ entries. The guest writes into these entries to create grant references. The
+ index of the entry is transmitted to the remote domain: this is the
+ reference used to activate an entry. Xen will write into a shared entry to
+ indicate to a guest that its grant is in use.
+  sha->domid : remote domain being granted rights
+  sha->frame : machine frame being granted
+  sha->flags : allow access, allow transfer, remote is reading/writing, etc.
+
+ Active grant entries
+ ~~~~~~~~~~~~~~~~~~~~
+
+ Xen maintains a set of private frames per domain, holding the active grant
+ entries for safety, and to reference count mappings.
+  act->domid : remote domain being granted rights
+  act->frame : machine frame being granted
+  act->pin   : used to hold reference counts
+
+ Map tracking
+ ~~~~~~~~~~~~
+
+ Every time a frame is mapped, a map track entry is stored in the metadata of
+ the mapping domain. The index of this entry is returned from the map call,
+ and is used to unmap the frame. Map track entries are also searched whenever a
+ page table entry containing a foreign frame number is overwritten: the first
+ matching map track entry is then removed, as if unmap had been invoked.
+ These are not used by the transfer mechanism.
+  map->domid         : owner of the mapped frame
+  map->ref_and_flags : grant reference, ro/rw, mapped for host or device access
+
+********************************************************************************
+
+ Granting a foreign domain access to frames
+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+ domA [frame]--> domB
+
+
+ domA:  #include <asm-xen/gnttab.h>
+        grant_ref_t gref[BATCH_SIZE];
+
+        for ( i = 0; i < BATCH_SIZE; i++ )
+            gref[i] = gnttab_grant_foreign_access( domBid, mfn, (readonly ? 1 : 0) );
+
+
+ .. gref is then somehow transmitted to domB for use.
+
+
+ Mapping foreign frames
+ ~~~~~~~~~~~~~~~~~~~~~~
+
+ domB:  #include <asm-xen/hypervisor.h>
+        unsigned long       mmap_vstart;
+        gnttab_op_t         aop[BATCH_SIZE];
+        grant_ref_t         mapped_handle[BATCH_SIZE];
+
+        if ( (mmap_vstart = allocate_empty_lowmem_region(BATCH_SIZE)) == 0 )
+            BUG();
+
+        for ( i = 0; i < BATCH_SIZE; i++ )
+        {
+            aop[i].u.map_grant_ref.host_virt_addr =
+                                              mmap_vstart + (i * PAGE_SIZE);
+            aop[i].u.map_grant_ref.dom      = domAid;
+            aop[i].u.map_grant_ref.ref      = gref[i];
+            aop[i].u.map_grant_ref.flags    = ( GNTMAP_host_map | GNTMAP_readonly );
+        }
+
+        if ( unlikely(HYPERVISOR_grant_table_op(
+                        GNTTABOP_map_grant_ref, aop, BATCH_SIZE)))
+            BUG();
+
+        for ( i = 0; i < BATCH_SIZE; i++ )
+        {
+            if ( unlikely(aop[i].u.map_grant_ref.dev_bus_addr == 0) )
+            {
+                tidyup_all(aop, i);
+                goto panic;
+            }
+
+            phys_to_machine_mapping[__pa(mmap_vstart + (i * PAGE_SIZE))>>PAGE_SHIFT] =
+                FOREIGN_FRAME(aop[i].u.map_grant_ref.dev_bus_addr);
+
+            mapped_handle[i] = aop[i].u.map_grant_ref.handle;
+        }
+
+
+
+ Unmapping foreign frames
+ ~~~~~~~~~~~~~~~~~~~~~~~~
+
+ domB:
+        for ( i = 0; i < BATCH_SIZE; i++ )
+        {
+            aop[i].u.unmap_grant_ref.host_virt_addr = mmap_vstart + (i * PAGE_SIZE);
+            aop[i].u.unmap_grant_ref.dev_bus_addr   = 0;
+            aop[i].u.unmap_grant_ref.handle         = mapped_handle[i];
+        }
+        if ( unlikely(HYPERVISOR_grant_table_op(
+                        GNTTABOP_unmap_grant_ref, aop, BATCH_SIZE)))
+            BUG();
+
+
+ Ending foreign access
+ ~~~~~~~~~~~~~~~~~~~~~
+
+    Note that this only prevents further mappings; it does _not_ revoke access.
+    Should _only_ be used when the remote domain has unmapped the frame.
+    gnttab_query_foreign_access( gref ) will indicate the state of any mapping.
+
+ domA:
+        if ( gnttab_query_foreign_access( gref[i] ) == 0 )
+            gnttab_end_foreign_access( gref[i], readonly );
+
+        TODO: readonly yet to be implemented.
+
+
+********************************************************************************
+
+ Transferring ownership of a frame to another domain
+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+ [ XXX: Transfer mechanism is alpha-calibre code, untested, use at own risk XXX ]
+ [ XXX: show use of batch operations below, rather than single frame XXX ]
+ [ XXX: linux internal interface could/should be wrapped to be tidier XXX ]
+
+
+ Prepare to accept a frame from a foreign domain
+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  domA:
+        if ( (p = alloc_page(GFP_HIGHUSER)) == NULL )
+        {
+            printk("Cannot alloc a frame to surrender\n");
+            break;
+        }
+        pfn = p - mem_map;
+        mfn = phys_to_machine_mapping[pfn];
+                                                                                       
+        if ( !PageHighMem(p) )
+        {
+            v = phys_to_virt(pfn << PAGE_SHIFT);
+            scrub_pages(v, 1);
+            queue_l1_entry_update(get_ptep((unsigned long)v), 0);
+        }
+                                                                                       
+        /* Ensure that ballooned highmem pages don't have cached mappings. */
+        kmap_flush_unused();
+
+        /* Flush updates through and flush the TLB. */
+        xen_tlb_flush();
+                                                                                       
+        phys_to_machine_mapping[pfn] = INVALID_P2M_ENTRY;
+                                                                                       
+        if ( HYPERVISOR_dom_mem_op(
+            MEMOP_decrease_reservation, &mfn, 1, 0) != 1 )
+        {
+            printk("MEMOP_decrease_reservation failed\n");
+            /* er... ok. free the page then */
+            __free_page(p);
+            break;
+        }
+                                                                                       
+        accepting_pfn = pfn;
+        ref = gnttab_grant_foreign_transfer( (domid_t) args.arg[0], pfn );
+        printk("Accepting dom %lu frame at ref (%d)\n", args.arg[0], ref);
+                                                                                       
+
+ Transfer a frame to a foreign domain
+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  domB:
+        mmu_update_t            update;
+        domid_t                 domid;
+        grant_ref_t             gref;
+        unsigned long           pfn, mfn, *v;
+        struct page            *transfer_page = 0;
+                                                                                       
+        /* alloc a page and grant access.
+         * alloc page returns a page struct. */
+        if ( (transfer_page = alloc_page(GFP_HIGHUSER)) == NULL )
+            return -ENOMEM;
+
+        pfn = transfer_page - mem_map;
+        mfn = phys_to_machine_mapping[pfn];
+
+        /* need to remove all references to this page */
+        if ( !PageHighMem(transfer_page) )
+        {
+            v = phys_to_virt(pfn << PAGE_SHIFT);
+            scrub_pages(v, 1);
+            sprintf((char *)v, "This page (%lx) was transferred.\n", mfn);
+            queue_l1_entry_update(get_ptep((unsigned long)v), 0);
+        }
+#ifdef CONFIG_XEN_SCRUB_PAGES
+        else
+        {
+            v = kmap(transfer_page);
+            scrub_pages(v, 1);
+            sprintf((char *)v, "This page (%lx) was transferred.\n", mfn);
+            kunmap(transfer_page);
+        }
+#endif
+        /* Delete any cached kmappings */
+        kmap_flush_unused();
+
+        /* Flush updates through and flush the TLB */
+        xen_tlb_flush();
+
+        /* invalidate in P2M */
+        phys_to_machine_mapping[pfn] = INVALID_P2M_ENTRY;
+
+        domid = (domid_t)args.arg[0];
+        gref  = (grant_ref_t)args.arg[1];
+
+        update.ptr  = MMU_EXTENDED_COMMAND;
+        update.ptr |= ((gref & 0x00FF) << 2);
+        update.ptr |= mfn << PAGE_SHIFT;
+                                                                                       
+        update.val  = MMUEXT_TRANSFER_PAGE;
+        update.val |= (domid << 16);
+        update.val |= (gref & 0xFF00);
+                                                                                       
+        ret = HYPERVISOR_mmu_update(&update, 1, NULL);
+                                                                                       
+
+ Map a transferred frame
+ ~~~~~~~~~~~~~~~~~~~~~~~
+
+ TODO:
+
+
+ Clear the used transfer reference
+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+ TODO:
+
+
+********************************************************************************
+
+ Using a private reserve of grant references
+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Where it is known in advance how many grant references are required, and
+failure to allocate them on demand would cause difficulty, a batch can be
+allocated and held in a private reserve.
+
+To reserve a private batch:
+
+    /* housekeeping data - treat as opaque: */
+    grant_ref_t gref_head, gref_terminal;
+
+    if ( 0 > gnttab_alloc_grant_references( number_to_reserve,
+                                            &gref_head, &gref_terminal ))
+        return -ENOSPC;
+
+
+To release a batch back to the shared pool:
+
+    gnttab_free_grant_references( number_reserved, gref_head );
+
+
+To claim a reserved reference:
+
+    ref = gnttab_claim_grant_reference( &gref_head, gref_terminal );
+
+
+To release a claimed reference back to the reserve pool:
+
+    gnttab_release_grant_reference( &gref_head, gref );
+
+
+To use a claimed reference to grant access, use these alternative functions
+that take an additional parameter of the grant reference to use:
+
+    gnttab_grant_foreign_access_ref
+    gnttab_grant_foreign_transfer_ref

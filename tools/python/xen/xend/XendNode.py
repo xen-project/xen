@@ -30,12 +30,6 @@ class XendNode:
     def cpu_bvt_slice_get(self):
         return self.xc.bvtsched_global_get()
     
-    def cpu_rrobin_slice_set(self, slice):
-        return self.xc.rrobin_global_set(slice=slice)
-
-    def cpu_rrobin_slice_get(self):
-        return self.xc.rrobin_global_get()
-
     def info(self):
         return self.nodeinfo() + self.physinfo()
 

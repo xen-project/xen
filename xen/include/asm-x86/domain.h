@@ -2,6 +2,8 @@
 #ifndef __ASM_DOMAIN_H__
 #define __ASM_DOMAIN_H__
 
+#include <xen/mm.h>
+
 struct trap_bounce {
     unsigned long  error_code;
     unsigned long  cr2;
@@ -17,6 +19,9 @@ struct arch_domain
     l2_pgentry_t *mm_perdomain_l2;
     l3_pgentry_t *mm_perdomain_l3;
 #endif
+
+    /* Writable pagetables. */
+    struct ptwr_info ptwr[2];
 
     /* I/O-port access bitmap mask. */
     u8 *iobmp_mask;       /* Address of IO bitmap mask, or NULL.      */

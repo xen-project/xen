@@ -543,7 +543,7 @@ void free_domheap_pages(struct pfn_info *pg, unsigned int order)
 
     if ( unlikely(IS_XEN_HEAP_FRAME(pg)) )
     {
-        /* NB. May recursively lock from domain_relinquish_memory(). */
+        /* NB. May recursively lock from relinquish_memory(). */
         spin_lock_recursive(&d->page_alloc_lock);
 
         for ( i = 0; i < (1 << order); i++ )
@@ -556,7 +556,7 @@ void free_domheap_pages(struct pfn_info *pg, unsigned int order)
     }
     else if ( likely(d != NULL) )
     {
-        /* NB. May recursively lock from domain_relinquish_memory(). */
+        /* NB. May recursively lock from relinquish_memory(). */
         spin_lock_recursive(&d->page_alloc_lock);
 
         for ( i = 0; i < (1 << order); i++ )

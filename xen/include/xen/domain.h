@@ -6,10 +6,6 @@
  * Arch-specifics.
  */
 
-extern struct domain *arch_alloc_domain_struct(void);
-
-extern void arch_free_domain_struct(struct domain *d);
-
 struct exec_domain *arch_alloc_exec_domain_struct(void);
 
 extern void arch_free_exec_domain_struct(struct exec_domain *ed);
@@ -23,7 +19,7 @@ extern int  arch_set_info_guest(
 
 extern void free_perdomain_pt(struct domain *d);
 
-extern void domain_relinquish_memory(struct domain *d);
+extern void domain_relinquish_resources(struct domain *d);
 
 extern void dump_pageframe_info(struct domain *d);
 

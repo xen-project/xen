@@ -16,7 +16,6 @@ vpath %c       $(XEN_LIBXUTIL)
 INCLUDES += -I $(XEN_LIBXUTIL)
 
 SRCS     :=
-SRCS     += xc_atropos.c
 SRCS     += xc_bvtsched.c
 SRCS     += xc_domain.c
 SRCS     += xc_evtchn.c
@@ -30,7 +29,6 @@ SRCS     += xc_misc.c
 SRCS     += xc_physdev.c
 SRCS     += xc_private.c
 SRCS     += xc_ptrace.c
-SRCS     += xc_rrobin.c
 SRCS     += xc_vmx_build.c
 
 CFLAGS   += -Wall

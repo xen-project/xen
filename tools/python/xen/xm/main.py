@@ -566,40 +566,6 @@ class ProgBvtslice(Prog):
 
 xm.prog(ProgBvtslice)
 
-
-class ProgAtropos(Prog):
-    group = 'scheduler'
-    name= "atropos"
-    info = """Set atropos parameters."""
-
-    def help(self, args):
-        print args[0], "DOM PERIOD SLICE LATENCY XTRATIME"
-        print "\nSet atropos parameters."
-
-    def main(self, args):
-        if len(args) != 6: self.err("%s: Invalid argument(s)" % args[0])
-        dom = args[1]
-        v = map(int, args[2:6])
-        server.xend_domain_cpu_atropos_set(dom, *v)
-
-xm.prog(ProgAtropos)
-
-class ProgRrobin(Prog):
-    group = 'scheduler'
-    name = "rrobin"
-    info = """Set round robin slice."""
-
-    def help(self, args):
-        print args[0], "SLICE"
-        print "\nSet round robin scheduler slice."
-
-    def main(self, args):
-        if len(args) != 2: self.err("%s: Invalid argument(s)" % args[0])
-        rrslice = int(args[1])
-        server.xend_node_rrobin_set(rrslice)
-
-xm.prog(ProgRrobin)
-
 class ProgInfo(Prog):
     group = 'host'
     name = "info"

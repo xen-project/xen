@@ -257,20 +257,6 @@ int xc_bvtsched_domain_get(int xc_handle,
                            long long *warpl,
                            long long *warpu);
 
-int xc_atropos_domain_set(int xc_handle,
-                          u32 domid,
-                          u64 period, u64 slice, u64 latency,
-                          int xtratime);
-
-int xc_atropos_domain_get(int xc_handle,
-                          u32 domid,
-                          u64* period, u64 *slice, u64 *latency,
-                          int *xtratime);
-
-int xc_rrobin_global_set(int xc_handle, u64 slice);
-
-int xc_rrobin_global_get(int xc_handle, u64 *slice);
-
 typedef evtchn_status_t xc_evtchn_status_t;
 
 /*

@@ -22,6 +22,7 @@ fi
 bool 'Scrub memory before freeing it to Xen' CONFIG_XEN_SCRUB_PAGES
 bool 'Network-device frontend driver' CONFIG_XEN_NETDEV_FRONTEND
 bool 'Block-device frontend driver' CONFIG_XEN_BLKDEV_FRONTEND
+bool 'Block-device uses grant tables' CONFIG_XEN_BLKDEV_GRANT
 bool 'USB-device frontend driver' CONFIG_XEN_USB_FRONTEND
 endmenu
 # The IBM S/390 patch needs this.

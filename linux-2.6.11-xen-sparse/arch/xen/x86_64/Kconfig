@@ -8,30 +8,13 @@
 #
 
 menu "X86_64 processor configuration"
-	depends XEN_X86_64
 
 config XENARCH
 	string
 	default x86_64
 
-config X86_64
-	bool
-	default y
-	help
-	  Port to the x86-64 architecture. x86-64 is a 64-bit extension to the
-	  classical 32-bit x86 architecture. For details see
-	  <http://www.x86-64.org/>.
-
-config X86
-        bool
-        default y
-
 config 64BIT
 	def_bool y
-
-#config X86
-#	bool
-#	default y
 
 config MMU
 	bool
@@ -105,10 +88,10 @@ choice
 	prompt "Processor family"
 	default MK8
 
-config MK8
-	bool "AMD-Opteron/Athlon64"
-	help
-	  Optimize for AMD Opteron/Athlon64/Hammer/K8 CPUs.
+#config MK8
+#	bool "AMD-Opteron/Athlon64"
+#	help
+#	  Optimize for AMD Opteron/Athlon64/Hammer/K8 CPUs.
 
 config MPSC
        bool "Intel x86-64"

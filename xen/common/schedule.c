@@ -94,7 +94,7 @@ void free_domain_struct(struct domain *d)
         if ( d->exec_domain[i] )
             arch_free_exec_domain_struct(d->exec_domain[i]);
 
-    arch_free_domain_struct(d);
+    xfree(d);
 }
 
 struct exec_domain *alloc_exec_domain_struct(struct domain *d,
@@ -147,7 +147,7 @@ struct domain *alloc_domain_struct(void)
 {
     struct domain *d;
 
-    if ( (d = arch_alloc_domain_struct()) == NULL )
+    if ( (d = xmalloc(struct domain)) == NULL )
         return NULL;
     
     memset(d, 0, sizeof(*d));
@@ -158,7 +158,7 @@ struct domain *alloc_domain_struct(void)
     return d;
 
  out:
-    arch_free_domain_struct(d);
+    xfree(d);
     return NULL;
 }
 
@@ -242,11 +242,19 @@ void domain_wake(struct exec_domain *ed)
 /* Block the currently-executing domain until a pertinent event occurs. */
 long do_block(void)
 {
-    ASSERT(current->domain->id != IDLE_DOMAIN_ID);
-    current->vcpu_info->evtchn_upcall_mask = 0;
-    set_bit(EDF_BLOCKED, &current->ed_flags);
-    TRACE_2D(TRC_SCHED_BLOCK, current->domain->id, current);
-    __enter_scheduler();
+    struct exec_domain *ed = current;
+
+    TRACE_2D(TRC_SCHED_BLOCK, ed->domain->id, ed);
+
+    ed->vcpu_info->evtchn_upcall_mask = 0;
+    set_bit(EDF_BLOCKED, &ed->ed_flags);
+
+    /* Check for events /after/ blocking: avoids wakeup waiting race. */
+    if ( event_pending(ed) )
+        clear_bit(EDF_BLOCKED, &ed->ed_flags);
+    else
+        __enter_scheduler();
+
     return 0;
 }
 
@@ -371,15 +379,6 @@ static void __enter_scheduler(void)
     
     ASSERT(!in_irq());
 
-    if ( test_bit(EDF_BLOCKED, &prev->ed_flags) )
-    {
-        /* This check is needed to avoid a race condition. */
-        if ( event_pending(prev) )
-            clear_bit(EDF_BLOCKED, &prev->ed_flags);
-        else
-            SCHED_OP(do_block, prev);
-    }
-
     prev->cpu_time += now - prev->lastschd;
 
     /* get policy-specific decision on scheduling... */
@@ -405,16 +404,6 @@ static void __enter_scheduler(void)
         return;
     
     perfc_incrc(sched_ctx);
-
-    // Q: With full shadow mode, do we need to flush out-of-sync pages
-    //    before switching domains?  Current belief is NO.
-
-    if ( !is_idle_task(prev->domain) )
-    {
-        LOCK_BIGLOCK(prev->domain);
-        cleanup_writable_pagetable(prev->domain);
-        UNLOCK_BIGLOCK(prev->domain);
-    }
 
 #if defined(WAKE_HISTO)
     if ( !is_idle_task(next) && next->wokenup ) {

@@ -135,9 +135,14 @@ static vdisk_t * xlvbd_probe(int *ret)
     memset(&req, 0, sizeof(req));
     req.operation = BLKIF_OP_PROBE;
     req.nr_segments = 1;
+#ifdef CONFIG_XEN_BLKDEV_GRANT
+    blkif_control_probe_send(&req, &rsp,
+                             (unsigned long)(virt_to_machine(buf)));
+#else
     req.frame_and_sects[0] = virt_to_machine(buf) | 7;
 
     blkif_control_send(&req, &rsp);
+#endif
     if ( rsp.status <= 0 ) {
         printk(KERN_ALERT "Could not probe disks (%d)\n", rsp.status);
         goto out;
