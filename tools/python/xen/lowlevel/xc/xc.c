@@ -16,6 +16,7 @@
 #include <arpa/inet.h>
 #include "xc_private.h"
 #include "gzip_stream.h"
+#include "linux_boot_params.h"
 
 /* Needed for Python versions earlier than 2.3. */
 #ifndef PyMODINIT_FUNC
@@ -389,6 +390,87 @@ static PyObject *pyxc_plan9_build(PyObject *self,
                         cmdline, control_evtchn, flags) != 0 )
         return PyErr_SetFromErrno(xc_error);
 
+    Py_INCREF(zero);
+    return zero;
+}
+
+static PyObject *pyxc_vmx_build(PyObject *self,
+                                  PyObject *args,
+                                  PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+
+    u32   dom;
+    char *image, *ramdisk = NULL, *cmdline = "";
+    PyObject *memmap;
+    int   control_evtchn, flags = 0;
+    int numItems, i;
+    struct mem_map mem_map;
+
+    static char *kwd_list[] = { "dom", "control_evtchn", 
+                                "image", "memmap",
+				"ramdisk", "cmdline", "flags",
+                                NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iisO!|ssi", kwd_list, 
+                                      &dom, &control_evtchn, 
+                                      &image, &PyList_Type, &memmap,
+				      &ramdisk, &cmdline, &flags) )
+        return NULL;
+
+    memset(&mem_map, 0, sizeof(mem_map));
+    /* Parse memmap */
+
+    /* get the number of lines passed to us */
+    numItems = PyList_Size(memmap) - 1;	/* removing the line 
+					   containing "memmap" */
+    printf ("numItems: %d\n", numItems);
+    mem_map.nr_map = numItems;
+   
+
+    /* should raise an error here. */
+    if (numItems < 0) return NULL; /* Not a list */
+
+
+    /* iterate over items of the list, grabbing ranges and parsing them */
+    for (i = 1; i <= numItems; i++) {	// skip over "memmap"
+	    PyObject *item, *f1, *f2, *f3, *f4;
+	    int numFields;
+	    unsigned long lf1, lf2, lf3, lf4;
+	    char *sf1, *sf2;
+	    
+	    /* grab the string object from the next element of the list */
+	    item = PyList_GetItem(memmap, i); /* Can't fail */
+
+	    /* get the number of lines passed to us */
+	    numFields = PyList_Size(item);
+
+	    if (numFields != 4)
+		    return NULL;
+
+	    f1 = PyList_GetItem(item, 0);
+	    f2 = PyList_GetItem(item, 1);
+	    f3 = PyList_GetItem(item, 2);
+	    f4 = PyList_GetItem(item, 3);
+
+	    /* Convert objects to strings/longs */
+	    sf1 = PyString_AsString(f1);
+	    sf2 = PyString_AsString(f2);
+	    lf3 = PyLong_AsLong(f3);
+	    lf4 = PyLong_AsLong(f4);
+	    sscanf(sf1, "%lx", &lf1);
+	    sscanf(sf2, "%lx", &lf2);
+
+            mem_map.map[i-1].addr = lf1;
+            mem_map.map[i-1].size = lf2 - lf1;
+            mem_map.map[i-1].type = lf3;
+            mem_map.map[i-1].caching_attr = lf4;
+    }
+
+    if ( xc_vmx_build(xc->xc_handle, dom, image, &mem_map,
+                        ramdisk, cmdline, control_evtchn, flags) != 0 )
+        return PyErr_SetFromErrno(xc_error);
+    
     Py_INCREF(zero);
     return zero;
 }
@@ -939,6 +1021,17 @@ static PyMethodDef pyxc_methods[] = {
       "Build a new Linux guest OS.\n"
       " dom     [int]:      Identifier of domain to build into.\n"
       " image   [str]:      Name of kernel image file. May be gzipped.\n"
+      " ramdisk [str, n/a]: Name of ramdisk file, if any.\n"
+      " cmdline [str, n/a]: Kernel parameters, if any.\n\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "vmx_build", 
+      (PyCFunction)pyxc_vmx_build, 
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Build a new Linux guest OS.\n"
+      " dom     [int]:      Identifier of domain to build into.\n"
+      " image   [str]:      Name of kernel image file. May be gzipped.\n"
+      " memmap  [str]: 	    Memory map.\n\n"
       " ramdisk [str, n/a]: Name of ramdisk file, if any.\n"
       " cmdline [str, n/a]: Kernel parameters, if any.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },

@@ -8,6 +8,9 @@ XEN_CONFIG_DIR = /etc/xen
 XEN_CONFIGS = xend-config.sxp
 XEN_CONFIGS += xmexample1 
 XEN_CONFIGS += xmexample2
+XEN_CONFIGS += xmexample.vmx
+XEN_CONFIGS += mem-map.sxp
+XEN_CONFIGS += bochsrc
 
 # Xen script dir and scripts to go there.
 XEN_SCRIPT_DIR = /etc/xen/scripts

@@ -10,6 +10,8 @@
 #define __XC_H__
 
 #include <stdint.h>
+#include "linux_boot_params.h"
+
 typedef uint8_t            u8;
 typedef uint16_t           u16;
 typedef uint32_t           u32;
@@ -104,6 +106,15 @@ xc_plan9_build (int xc_handle,
                 const char *cmdline, 
 		unsigned int control_evtchn, 
 		unsigned long flags);
+
+int xc_vmx_build(int xc_handle,
+                 u32 domid,
+                 const char *image_name,
+                 struct mem_map *memmap,
+                 const char *ramdisk_name,
+                 const char *cmdline,
+                 unsigned int control_evtchn,
+                 unsigned long flags);
 
 int xc_bvtsched_global_set(int xc_handle,
                            unsigned long ctx_allow);
@@ -207,5 +218,8 @@ void *xc_map_foreign_range(int xc_handle, u32 dom,
 
 void *xc_map_foreign_batch(int xc_handle, u32 dom, int prot,
                            unsigned long *arr, int num );
+
+int xc_get_pfn_list(int xc_handle, u32 domid, unsigned long *pfn_buf, 
+		    unsigned long max_pfns);
 
 #endif /* __XC_H__ */

@@ -1,0 +1,19 @@
+#megs: 32
+#romimage: file=$BXSHARE/BIOS-bochs-latest, address=0xf0000
+#vgaromimage: $BXSHARE/VGABIOS-lgpl-latest
+floppya: 1_44=a.img, status=inserted
+floppyb: 1_44=b.img, status=inserted
+#ata0-master: type=disk, path=minibootable.img, cylinders=900, heads=15, spt=17
+# if you don't use absolute paths below, bochs looks under the cwd of xend, 
+# which is usually "/"
+ata0-master: type=disk, path=/tmp/min-fc2-i386.img, cylinders=800, heads=4, spt=32
+boot: c
+
+log: /tmp/bochsout.txt
+#debug: action=report
+info: action=report
+error: action=report
+panic: action=ask
+
+mouse: enabled=0
+ips: 1500000

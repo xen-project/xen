@@ -320,14 +320,18 @@
 401d7e16UgeqroJQTIhwkrDVkoWgZQ tools/examples/README
 41597996VhTbNuHbuscYSfRb-WR6fA tools/examples/block-enbd
 41597996GHP2_yVih2UspXh328fgMQ tools/examples/block-file
+41dde8af16Hulg1pgW8aOnbbxyrl7w tools/examples/bochsrc
 405ff55dawQyCHFEnJ067ChPRoXBBA tools/examples/init.d/xend
 40278d94cIUWl2eRgnwZtr4hTyWT1Q tools/examples/init.d/xendomains
+41dde8afTUuvdtFUlOx0ZRusKxyd8w tools/examples/mem-map.sxp
 40ee75a9xFz6S05sDKu-JCLqyVTkDA tools/examples/network
 40ee75a967sxgcRY4Q7zXoVUaJ4flA tools/examples/vif-bridge
 40ee75a93cqxHp6MiYXxxwR5j2_8QQ tools/examples/xend-config.sxp
+41dde8af6M2Pm1Rrv_f5jEFC_BIOIA tools/examples/xmexample.vmx
 41090ec8Pj_bkgCBpg2W7WfmNkumEA tools/examples/xmexample1
 40cf2937oKlROYOJTN8GWwWM5AmjBg tools/examples/xmexample2
 3fbba6dbDfYvJSsw9500b4SZyUhxjQ tools/libxc/Makefile
+41dde8afKYRKxS4XtLv1KUegGQy_bg tools/libxc/linux_boot_params.h
 41cc934abX-QLXJXW_clV_wRjM0zYg tools/libxc/plan9a.out.h
 3fbba6dc1uU7U3IFeF6A-XEOYF2MkQ tools/libxc/rpm.spec
 3fbba6dcrNxtygEcgJYAJJ1gCQqfsA tools/libxc/xc.h
@@ -347,6 +351,7 @@
 3fbba6dctWRWlFJkYb6hdix2X4WMuw tools/libxc/xc_private.c
 3fbba6dcbVrG2hPzEzwdeV_UC8kydQ tools/libxc/xc_private.h
 40589968UQFnJeOMn8UIFLbXBuwXjw tools/libxc/xc_rrobin.c
+41dde8b0pLfAKMs_L9Uri2hnzHiCRQ tools/libxc/xc_vmx_build.c
 40e1b09dMYB4ItGCqcMIzirdMd9I-w tools/libxutil/Makefile
 40e033325Sjqs-_4TuzeUEprP_gYFg tools/libxutil/allocate.c
 40e03332KYz7o1bn2MG_KPbBlyoIMA tools/libxutil/allocate.h
@@ -473,6 +478,7 @@
 40dfd40aGqGkiopOOgJxSF4iCbHM0Q tools/python/xen/util/__init__.py
 4055ee4dwy4l0MghZosxoiu6zmhc9Q tools/python/xen/util/console_client.py
 40c9c468IienauFHQ_xJIcqnPJ8giQ tools/python/xen/util/ip.py
+41dde8b0yuJX-S79w4xJKxBQ-Mhp1A tools/python/xen/util/memmap.py
 4059c6a0pnxhG8hwSOivXybbGOwuXw tools/python/xen/util/tempfile.py
 40c9c468SNuObE_YWARyS0hzTPSzKg tools/python/xen/xend/Args.py
 41597996WNvJA-DVCBmc0xU9w_XmoA tools/python/xen/xend/Blkctl.py

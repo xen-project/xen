@@ -210,6 +210,18 @@ gopts.var('nfs_root', val="PATH",
           fn=set_value, default=None,
           use="Set the path of the root NFS directory.")
 
+gopts.var('memmap', val='FILE',
+          fn=set_value, default='',
+          use="Path to memap SXP file.")
+
+gopts.var('device_model', val='FILE',
+          fn=set_value, default='',
+          use="Path to device model program.")
+
+gopts.var('device_config', val='FILE',
+          fn=set_value, default='',
+          use="Path to device model configuration.")
+
 def strip(pre, s):
     """Strip prefix 'pre' if present.
     """
@@ -309,6 +321,15 @@ def configure_vfr(config, vals):
          config_vfr.append(['vif', ['id', idx], ['ip', ip]])
      config.append(config_vfr)
 
+def configure_vmx(config_devs, vals):
+    """Create the config for VMX devices.
+    """
+    memmap = vals.memmap
+    device_model = vals.device_model
+    device_config = vals.device_config
+    config_devs.append(['memmap', memmap])
+    config_devs.append(['device_model', device_model])
+    config_devs.append(['device_config', device_config])
 
 def make_config(vals):
     """Create the domain configuration.
@@ -337,6 +358,7 @@ def make_config(vals):
     configure_disks(config_devs, vals)
     configure_pci(config_devs, vals)
     configure_vifs(config_devs, vals)
+    configure_vmx(config_devs, vals)
     config += config_devs
     return config
 
