@@ -231,6 +231,12 @@ fastcall void do_page_fault(struct pt_regs *regs, unsigned long error_code,
 	error_code |= (regs->xcs & 2) << 1;
 	if (regs->eflags & X86_EFLAGS_VM)
 		error_code |= 4;
+
+#ifdef CONFIG_XEN_BATCH_MODE2
+    /* ensure all updates have completed */
+    flush_page_update_queue();
+#endif
+
 		
  	if (notify_die(DIE_PAGE_FAULT, "page fault", regs, error_code, 14,
  					SIGSEGV) == NOTIFY_STOP)

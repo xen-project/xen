@@ -152,6 +152,10 @@ void clear_page_tables(struct mmu_gather *tlb, unsigned long first, int nr)
 		free_one_pgd(tlb, page_dir);
 		page_dir++;
 	} while (--nr);
+#ifdef CONFIG_XEN_BATCH_MODE2
+    XEN_flush_page_update_queue();
+#endif
+
 }
 
 pte_t fastcall * pte_alloc_map(struct mm_struct *mm, pmd_t *pmd, unsigned long address)
@@ -326,8 +330,15 @@ skip_copy_pte_range:
 				 * in the parent and the child
 				 */
 				if (cow) {
+#ifdef CONFIG_XEN_BATCH_MODE2
+/* XEN modification: modified ordering here to avoid RaW hazard. */
+                    pte = *src_pte;
+					pte = pte_wrprotect(pte);
+					ptep_set_wrprotect(src_pte);
+#else
 					ptep_set_wrprotect(src_pte);
 					pte = *src_pte;
+#endif
 				}
 
 				/*
@@ -1451,7 +1462,20 @@ static int do_swap_page(struct mm_struct * mm,
 	unlock_page(page);
 
 	flush_icache_page(vma, page);
+
+#ifdef CONFIG_XEN_BATCH_MODE2
+	if ( likely(vma->vm_mm == current->mm) ) {
+		XEN_flush_page_update_queue();
+		HYPERVISOR_update_va_mapping(address, pte, 0);
+	} else {
+		set_pte(page_table, pte);
+		XEN_flush_page_update_queue();        
+	}
+#else
 	set_pte(page_table, pte);
+#endif
+
+
 	page_add_anon_rmap(page, vma, address);
 
 	if (write_access) {
@@ -1516,7 +1540,17 @@ do_anonymous_page(struct mm_struct *mm, struct vm_area_struct *vma,
 		page_add_anon_rmap(page, vma, addr);
 	}
 
+#ifdef CONFIG_XEN_BATCH_MODE2
+	if ( likely(vma->vm_mm == current->mm) ) {
+		XEN_flush_page_update_queue();
+		HYPERVISOR_update_va_mapping(addr, entry, 0);
+	} else {
+		set_pte(page_table, entry);
+		XEN_flush_page_update_queue();
+	}
+#else
 	ptep_establish_new(vma, addr, page_table, entry);
+#endif
 	pte_unmap(page_table);
 
 	/* No need to invalidate - it was non-present before */
@@ -1621,7 +1655,17 @@ retry:
 		entry = mk_pte(new_page, vma->vm_page_prot);
 		if (write_access)
 			entry = maybe_mkwrite(pte_mkdirty(entry), vma);
+#ifdef CONFIG_XEN_BATCH_MODE2
+		if ( likely(vma->vm_mm == current->mm) ) {
+			XEN_flush_page_update_queue();
+			HYPERVISOR_update_va_mapping(address, entry, 0);
+		} else {
+			set_pte(page_table, entry);
+			XEN_flush_page_update_queue();
+		}
+#else
 		ptep_establish_new(vma, address, page_table, entry);
+#endif
 		if (anon) {
 			lru_cache_add_active(new_page);
 			page_add_anon_rmap(new_page, vma, address);
