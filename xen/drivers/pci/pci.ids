@@ -3062,15 +3062,25 @@
 		1148 5843  FDDI SK-5843 (SK-NET FDDI-LP64)
 		1148 5844  FDDI SK-5844 (SK-NET FDDI-LP64 DAS)
 	4200  Token Ring adapter
-	4300  Gigabit Ethernet
-		1148 9821  SK-9821 (1000Base-T single link)
-		1148 9822  SK-9822 (1000Base-T dual link)
-		1148 9841  SK-9841 (1000Base-LX single link)
-		1148 9842  SK-9842 (1000Base-LX dual link)
-		1148 9843  SK-9843 (1000Base-SX single link)
-		1148 9844  SK-9844 (1000Base-SX dual link)
-		1148 9861  SK-9861 (1000Base-SX VF45 single link)
-		1148 9862  SK-9862 (1000Base-SX VF45 dual link)
+	4300  SK-98xx Gigabit Ethernet Server Adapter
+		1148 9821  SK-9821 Gigabit Ethernet 1000Base-T Server Adapter
+		1148 9822  SK-9822 Gigabit Ethernet 1000Base-T Dual Port Server Adapter
+		1148 9841  SK-9841 Gigabit Ethernet 1000Base-LX Server Adapter
+		1148 9842  SK-9842 Gigabit Ethernet 1000Base-LX Dual Port Server Adapter
+		1148 9843  SK-9843 Gigabit Ethernet 1000Base-SX Server Adapter
+		1148 9844  SK-9844 Gigabit Ethernet 1000Base-SX Dual Port Server Adapter
+		1148 9861  SK-9861 Gigabit Ethernet 1000Base-SX Server Adapter
+		1148 9862  SK-9862 Gigabit Ethernet 1000Base-SX Dual Port Server Adapter
+		1148 9871  SK-9871 Gigabit Ethernet 1000Base-ZX Server Adapter
+		1148 9872  SK-9872 Gigabit Ethernet 1000Base-ZX Dual Port Server Adapter
+	4320  SK-98xx Gigabit Ethernet Server Adapter
+		1148 9521  SK-9521 10/100/1000Base-T Adapter
+		1148 5021  SK-9821 V2.0 Gigabit Ethernet 10/100/1000Base-T Adapter
+		1148 5041  SK-9841 V2.0 Gigabit Ethernet 1000Base-LX Adapter
+		1148 5043  SK-9843 V2.0 Gigabit Ethernet 1000Base-SX Adapter
+		1148 5051  SK-9851 V2.0 Gigabit Ethernet 1000Base-SX Adapter
+		1148 5061  SK-9861 V2.0 Gigabit Ethernet 1000Base-SX Adapter
+		1148 5071  SK-9871 V2.0 Gigabit Ethernet 1000Base-ZX Adapter
 	4400  Gigabit Ethernet
 1149  Win System Corporation
 114a  VMIC
@@ -5078,6 +5088,9 @@
 	164d  NetXtreme BCM5702FE Gigabit Ethernet
 	16a6  NetXtreme BCM5702X Gigabit Ethernet
 	16a7  NetXtreme BCM5703X Gigabit Ethernet
+	16a8  NetXtreme BCM5704S Gigabit Ethernet
+	16c6  NetXtreme BCM5702A3 Gigabit Ethernet
+	16c7  NetXtreme BCM5703A3 Gigabit Ethernet
 	4212  BCM v.90 56k modem
 	5820  BCM5820 Crypto Accelerator
 	5821  BCM5821 Crypto Accelerator

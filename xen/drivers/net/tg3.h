@@ -21,7 +21,8 @@
 #define TG3_BDINFO_NIC_ADDR		0xcUL /* 32-bit */
 #define TG3_BDINFO_SIZE			0x10UL
 
-#define RX_COPY_THRESHOLD  		0 //256
+/* XXX Xen: No copy break. */
+#define RX_COPY_THRESHOLD  		0 /*256*/
 
 #define RX_STD_MAX_SIZE			1536
 #define RX_JUMBO_MAX_SIZE		0xdeadbeef /* XXX */
@@ -456,6 +457,7 @@
 #define  RCV_RULE_DISABLE_MASK		 0x7fffffff
 #define MAC_RCV_RULE_CFG		0x00000500
 #define  RCV_RULE_CFG_DEFAULT_CLASS	0x00000008
+#define MAC_LOW_WMARK_MAX_RX_FRAME	0x00000504
 /* 0x504 --> 0x590 unused */
 #define MAC_SERDES_CFG			0x00000590
 #define MAC_SERDES_STAT			0x00000594
@@ -1139,7 +1141,6 @@
 #define  GRC_MISC_CFG_BOARD_ID_5704	0x00000000
 #define  GRC_MISC_CFG_BOARD_ID_5704CIOBE 0x00004000
 #define  GRC_MISC_CFG_BOARD_ID_5704_A2	0x00008000
-#define  GRC_MISC_CFG_BOARD_ID_5704_X	0x0000C000
 #define  GRC_MISC_CFG_BOARD_ID_AC91002A1 0x00018000
 #define GRC_LOCAL_CTRL			0x00006808
 #define  GRC_LCLCTRL_INT_ACTIVE		0x00000001
@@ -1795,6 +1796,7 @@ struct tg3 {
 #define TG3_FLAG_USE_LINKCHG_REG	0x00000008
 #define TG3_FLAG_USE_MI_INTERRUPT	0x00000010
 #define TG3_FLAG_ENABLE_ASF		0x00000020
+#define TG3_FLAG_5701_REG_WRITE_BUG	0x00000040
 #define TG3_FLAG_POLL_SERDES		0x00000080
 #define TG3_FLAG_MBOX_WRITE_REORDER	0x00000100
 #define TG3_FLAG_PCIX_TARGET_HWBUG	0x00000200
@@ -1820,6 +1822,8 @@ struct tg3 {
 #define TG3_FLAG_GOT_SERDES_FLOWCTL	0x20000000
 #define TG3_FLAG_SPLIT_MODE		0x40000000
 #define TG3_FLAG_INIT_COMPLETE		0x80000000
+	u32				tg3_flags2;
+#define TG3_FLG2_RESTART_TIMER		0x00000001
 
 	u32				split_mode_max_reqs;
 #define SPLIT_MODE_5704_MAX_REQ		3
@@ -1888,6 +1892,7 @@ struct tg3 {
 
 	struct tg3_hw_stats		*hw_stats;
 	dma_addr_t			stats_mapping;
+	struct tq_struct		reset_task;
 };
 
 #endif /* !(_T3_H) */
