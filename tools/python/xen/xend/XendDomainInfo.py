@@ -449,9 +449,9 @@ class XendDomainInfo:
 
             self.init_domain()
             self.configure_console()
+            self.configure_backends()
             self.construct_image()
             self.configure_restart()
-            self.configure_backends()
             deferred = self.configure()
             def cberr(err):
                 self.destroy()
