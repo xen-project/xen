@@ -231,7 +231,7 @@ int construct_dom0(struct domain *d,
         mk_l2_pgentry((unsigned long)l2start | __PAGE_HYPERVISOR);
     l2tab[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] =
         mk_l2_pgentry(__pa(d->arch.mm_perdomain_pt) | __PAGE_HYPERVISOR);
-    ed->arch.pagetable = mk_pagetable((unsigned long)l2start);
+    ed->arch.guest_table = mk_pagetable((unsigned long)l2start);
 
     l2tab += l2_table_offset(dsi.v_start);
     mfn = alloc_start >> PAGE_SHIFT;

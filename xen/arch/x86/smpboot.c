@@ -668,7 +668,7 @@ static void __init do_boot_cpu (int apicid)
 
     set_bit(DF_IDLETASK, &idle->d_flags);
 
-    ed->arch.pagetable = mk_pagetable(__pa(idle_pg_table));
+    ed->arch.guest_table = mk_pagetable(__pa(idle_pg_table));
 
     map_cpu_to_boot_apicid(cpu, apicid);
 

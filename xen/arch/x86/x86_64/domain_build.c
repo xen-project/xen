@@ -239,7 +239,7 @@ int construct_dom0(struct domain *d,
         mk_l4_pgentry(__pa(l4start) | __PAGE_HYPERVISOR);
     l4tab[l4_table_offset(PERDOMAIN_VIRT_START)] =
         mk_l4_pgentry(__pa(d->arch.mm_perdomain_l3) | __PAGE_HYPERVISOR);
-    ed->arch.pagetable = mk_pagetable(__pa(l4start));
+    ed->arch.guest_table = mk_pagetable(__pa(l4start));
 
     l4tab += l4_table_offset(dsi.v_start);
     mfn = alloc_start >> PAGE_SHIFT;

@@ -205,16 +205,16 @@ void write_ptbase(struct exec_domain *ed)
               pagetable_val(ed->arch.monitor_table) :
               pagetable_val(ed->arch.shadow_table));
     else
-        pa = pagetable_val(ed->arch.pagetable);
+        pa = pagetable_val(ed->arch.guest_table);
 #else
     if ( unlikely(shadow_mode(d)) )
         pa = pagetable_val(ed->arch.shadow_table);    
 #ifdef __x86_64__
     else if ( !(ed->arch.flags & TF_kernel_mode) )
-        pa = pagetable_val(ed->arch.pagetable_user);
+        pa = pagetable_val(ed->arch.guest_table_user);
 #endif
     else
-        pa = pagetable_val(ed->arch.pagetable);
+        pa = pagetable_val(ed->arch.guest_table);
 #endif
 
     write_cr3(pa);
@@ -1249,8 +1249,8 @@ int new_guest_cr3(unsigned long pfn)
         invalidate_shadow_ldt(ed);
 
         percpu_info[cpu].deferred_ops &= ~DOP_FLUSH_TLB;
-        old_base_pfn = pagetable_val(ed->arch.pagetable) >> PAGE_SHIFT;
-        ed->arch.pagetable = mk_pagetable(pfn << PAGE_SHIFT);
+        old_base_pfn = pagetable_val(ed->arch.guest_table) >> PAGE_SHIFT;
+        ed->arch.guest_table = mk_pagetable(pfn << PAGE_SHIFT);
 
         shadow_mk_pagetable(ed);
 
@@ -1355,8 +1355,8 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         else
         {
             unsigned long old_pfn =
-                pagetable_val(ed->arch.pagetable_user) >> PAGE_SHIFT;
-            ed->arch.pagetable_user = mk_pagetable(pfn << PAGE_SHIFT);
+                pagetable_val(ed->arch.guest_table_user) >> PAGE_SHIFT;
+            ed->arch.guest_table_user = mk_pagetable(pfn << PAGE_SHIFT);
             if ( old_pfn != 0 )
                 put_page_and_type(&frame_table[old_pfn]);
         }
@@ -1676,7 +1676,7 @@ int do_mmu_update(
     cleanup_writable_pagetable(d);
 
     if ( unlikely(shadow_mode(d)) )
-        check_pagetable(d, ed->arch.pagetable, "pre-mmu"); /* debug */
+        check_pagetable(d, ed->arch.guest_table, "pre-mmu"); /* debug */
 
     /*
      * If we are resuming after preemption, read how much work we have already
@@ -1924,7 +1924,7 @@ int do_mmu_update(
         __put_user(done + i, pdone);
 
     if ( unlikely(shadow_mode(d)) )
-        check_pagetable(d, ed->arch.pagetable, "post-mmu"); /* debug */
+        check_pagetable(d, ed->arch.guest_table, "post-mmu"); /* debug */
 
     UNLOCK_BIGLOCK(d);
     return rc;
@@ -1983,7 +1983,7 @@ int do_update_va_mapping(unsigned long va,
         if ( shadow_mode(d) == SHM_logdirty )
             mark_dirty(d, va_to_l1mfn(va));
   
-        check_pagetable(d, ed->arch.pagetable, "va"); /* debug */
+        check_pagetable(d, ed->arch.guest_table, "va"); /* debug */
     }
 
     deferred_ops = percpu_info[cpu].deferred_ops;
@@ -2645,7 +2645,7 @@ void audit_domain(struct domain *d)
     synchronise_pagetables(~0UL);
 
     printk("pt base=%lx sh_info=%x\n",
-           pagetable_val(d->exec_domain[0]->arch.pagetable)>>PAGE_SHIFT,
+           pagetable_val(d->exec_domain[0]->arch.guest_table)>>PAGE_SHIFT,
            virt_to_page(d->shared_info)-frame_table);
            
     spin_lock(&d->page_alloc_lock);
@@ -2694,8 +2694,8 @@ void audit_domain(struct domain *d)
 
 
     /* PHASE 1 */
-    if ( pagetable_val(d->exec_domain[0]->arch.pagetable) )
-        adjust(&frame_table[pagetable_val(d->exec_domain[0]->arch.pagetable)
+    if ( pagetable_val(d->exec_domain[0]->arch.guest_table) )
+        adjust(&frame_table[pagetable_val(d->exec_domain[0]->arch.guest_table)
                            >>PAGE_SHIFT], -1, 1);
 
     list_ent = d->page_list.next;
@@ -2952,9 +2952,9 @@ void audit_domain(struct domain *d)
 
     spin_unlock(&d->page_alloc_lock);
 
-    if ( pagetable_val(d->exec_domain[0]->arch.pagetable) )
+    if ( pagetable_val(d->exec_domain[0]->arch.guest_table) )
         adjust(&frame_table[pagetable_val(
-            d->exec_domain[0]->arch.pagetable)>>PAGE_SHIFT], 1, 1);
+            d->exec_domain[0]->arch.guest_table)>>PAGE_SHIFT], 1, 1);
 
     printk("Audit %d: Done. pages=%d l1=%d l2=%d ctot=%d ttot=%d\n", d->id, i, l1, l2, ctot, ttot );
 

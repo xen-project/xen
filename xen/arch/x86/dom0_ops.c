@@ -395,7 +395,7 @@ void arch_getdomaininfo_ctxt(
     c->kernel_ss  = ed->arch.kernel_ss;
     c->kernel_esp = ed->arch.kernel_sp;
     c->pt_base   = 
-        pagetable_val(ed->arch.pagetable);
+        pagetable_val(ed->arch.guest_table);
     memcpy(c->debugreg, 
            ed->arch.debugreg, 
            sizeof(ed->arch.debugreg));

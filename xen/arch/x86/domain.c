@@ -467,8 +467,8 @@ int arch_final_setup_guest(
     d->arch.failsafe_address  = c->failsafe_callback_eip;
     
     phys_basetab = c->pt_base;
-    d->arch.pagetable = mk_pagetable(phys_basetab);
-    d->arch.phys_table = d->arch.pagetable;
+    d->arch.guest_table = mk_pagetable(phys_basetab);
+    d->arch.phys_table = d->arch.guest_table;
     if ( !get_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT], d->domain, 
                             PGT_base_page_table) )
         return -EINVAL;
@@ -658,7 +658,7 @@ long do_switch_to_user(void)
     struct exec_domain    *ed = current;
 
     if ( unlikely(copy_from_user(&stu, (void *)regs->rsp, sizeof(stu))) ||
-         unlikely(pagetable_val(ed->arch.pagetable_user) == 0) )
+         unlikely(pagetable_val(ed->arch.guest_table_user) == 0) )
         return -EFAULT;
 
     ed->arch.flags &= ~TF_kernel_mode;
@@ -947,19 +947,19 @@ void domain_relinquish_memory(struct domain *d)
     /* Drop the in-use references to page-table bases. */
     for_each_exec_domain ( d, ed )
     {
-        if ( pagetable_val(ed->arch.pagetable) != 0 )
+        if ( pagetable_val(ed->arch.guest_table) != 0 )
         {
             put_page_and_type(
-                &frame_table[pagetable_val(ed->arch.pagetable) >> PAGE_SHIFT]);
-            ed->arch.pagetable = mk_pagetable(0);
+                &frame_table[pagetable_val(ed->arch.guest_table) >> PAGE_SHIFT]);
+            ed->arch.guest_table = mk_pagetable(0);
         }
 
-        if ( pagetable_val(ed->arch.pagetable_user) != 0 )
+        if ( pagetable_val(ed->arch.guest_table_user) != 0 )
         {
             put_page_and_type(
-                &frame_table[pagetable_val(ed->arch.pagetable_user) >>
+                &frame_table[pagetable_val(ed->arch.guest_table_user) >>
                             PAGE_SHIFT]);
-            ed->arch.pagetable_user = mk_pagetable(0);
+            ed->arch.guest_table_user = mk_pagetable(0);
         }
     }
 
