@@ -8,7 +8,7 @@ __  __            ____    ___
 ###############################
 
 University of Cambridge Computer Laboratory
-28 Aug 2004
+28 October 2004
 
 http://www.cl.cam.ac.uk/netos/xen
 
@@ -100,7 +100,7 @@ more normal to use some smaller number, perhaps 10-20.
 A common question is "how many virtual machines can I run on hardware
 xyz?". The answer is very application dependent, but the rule of thumb
 is that you should expect to be able to run the same workload under
-multiple guest OSes that you could run under a single Linux instance,
+multiple guest OSs that you could run under a single Linux instance,
 with an additional overhead of a few MB per OS instance.
 
 One key feature in this new release of Xen is `live migration'. This
@@ -109,7 +109,6 @@ physical Xen machines, with typical downtimes of just a few tens of
 milliseconds. This is really useful for admins that want to take a
 node down for maintenance, or to load balance a large number of
 virtual machines across a cluster.
-
 
 
 Hardware support
@@ -132,9 +131,8 @@ run on Opterons in 32-bit mode just fine).
 Xen can currently use up to 4GB of memory. It's possible for x86
 machines to address more than that (64GB), but it requires using a
 different page table format (3-level rather than 2-level) that we
-currently don't support. Adding 3-level PAE support wouldn't be
-difficult, but we'd also need to add support to all the guest
-OSs. Volunteers welcome!
+don't currently support, as we are concentrating on an x86_64 port
+that will more easily support large-memory configurations.
 
 In contrast to previous Xen versions, in Xen 2.0 device drivers run
 within a privileged guest OS rather than within Xen itself. This means
@@ -204,6 +202,7 @@ If you don't want to use bitkeeper to download the source, you can
 download prebuilt binaries and src tar balls from the project
 downloads page:  http://www.cl.cam.ac.uk/netos/xen/downloads/
 
+
 Using the domain control tools
 ==============================
 
@@ -212,8 +211,6 @@ daemon: "xend start".
 The primary tool for starting and controlling domains is "xm". 
 "xm help <cmd>" will tell you how to use it.
 
-README.CD contains some example invocations.
-
-Further documentation is in docs/ (e.g., docs/Xen-HOWTO), and also in
-
-
+Further documentation is in the docs/ directory. Postscript, PDF and
+HTML versions of the user manual can be found in the ps/, pdf/ and
+html/ subdirectories.
