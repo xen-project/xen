@@ -35,6 +35,7 @@
  */
 
 void init_page_allocator(unsigned long min, unsigned long max);
+void release_bytes_to_allocator(unsigned long min, unsigned long max);
 unsigned long __get_free_pages(int mask, int order);
 void __free_pages(unsigned long p, int order);
 #define get_free_page(_m) (__get_free_pages((_m),0))
@@ -51,10 +52,6 @@ void __free_pages(unsigned long p, int order);
  * with struct pfn_info and frame_table respectively. Boris Dragovic
  */
 
-/*
- * This is still fatter than I'd like. Do we need the count?
- * Do we need the flags? The list at least seems req'd by slab.c.
- */
 typedef struct pfn_info {
     struct list_head list;      /* ->mapping has some page lists. */
     unsigned long flags;        /* atomic flags. */
@@ -99,6 +96,19 @@ typedef struct pfn_info {
 #define PGT_ldt_page        (6<<24) /* using this page in an LDT? */
 #define PGT_writeable_page  (7<<24) /* has writable mappings of this page? */
 #define PGT_net_rx_buf      (8<<24) /* this page has been pirated by the net code. */
+
+/*
+ * This bit is sometimes set by Xen when it holds a writeable reference to a 
+ * page that shouldn't cause a TLB flush when it is dropped. For example, a 
+ * disk write to a page with initial type_count == 0, which returns to 0 after 
+ * the I/O. In this case, we'd normally flush the TLB because a writeable page 
+ * has just lost its mutually-exclusive type. But this isn't necessary here 
+ * because the writeable reference never made it into user-accessible TLB 
+ * (didn't make it into TLB at all, in fact).
+ * 
+ * This bit is obviously nuked in a few places, for safety.
+ */
+#define PG_noflush          (1<<28)
 
 #define PageSlab(page)		test_bit(PG_slab, &(page)->flags)
 #define PageSetSlab(page)	set_bit(PG_slab, &(page)->flags)

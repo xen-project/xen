@@ -1,8 +1,8 @@
 #include <stdarg.h>
 #include <xeno/lib.h>
 #include <xeno/errno.h>
-#include <xeno/multiboot.h>
 #include <xeno/spinlock.h>
+#include <xeno/multiboot.h>
 #include <xeno/sched.h>
 #include <xeno/mm.h>
 #include <xeno/delay.h>
@@ -26,10 +26,6 @@ struct e820entry {
     unsigned long size_lo, size_hi;        /* size of memory segment */
     unsigned long type;                    /* type of memory segment */
 };
-
-/* Used by domain.c:setup_guestos */
-int nr_mods;
-module_t *mod;
 
 void init_vga(void);
 void init_serial(void);
@@ -65,6 +61,7 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
     dom0_newdomain_t dom0_params;
     unsigned long max_page;
     unsigned char *cmdline;
+    module_t *mod;
     int i;
 
     /*
@@ -119,8 +116,7 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
     }
 #endif
 
-    nr_mods = mbi->mods_count;
-    mod     = (module_t *)__va(mbi->mods_addr);
+    mod = (module_t *)__va(mbi->mods_addr);
 
     /* Parse the command line. */
     cmdline = (unsigned char *)(mbi->cmdline ? __va(mbi->cmdline) : NULL);
@@ -174,7 +170,7 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
     printk("Initialised all memory on a %luMB machine\n",
            max_page >> (20-PAGE_SHIFT));
 
-    init_page_allocator(mod[nr_mods-1].mod_end, MAX_MONITOR_ADDRESS);
+    init_page_allocator(mod[0].mod_end, MAX_MONITOR_ADDRESS);
  
     /* These things will get done by do_newdomain() for all other tasks. */
     current->shared_info = (void *)get_free_page(GFP_KERNEL);
@@ -195,11 +191,16 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
 
     new_dom = do_newdomain(0, 0);
     if ( new_dom == NULL ) panic("Error creating domain 0\n");
-    if ( setup_guestos(new_dom, &dom0_params) != 0 )
-    {
-        panic("Could not set up DOM0 guest OS\n");
-    }
-	update_dom_time(new_dom->shared_info);
+    if ( setup_guestos(new_dom, 
+                       &dom0_params, 
+                       __va(mod[0].mod_start), 
+                       mod[0].mod_end - mod[0].mod_start, 
+                       __va(mod[0].string))
+         != 0 ) panic("Could not set up DOM0 guest OS\n");
+
+    release_bytes_to_allocator(__pa(&_end), mod[0].mod_end);
+
+    update_dom_time(new_dom->shared_info);
     wake_up(new_dom);
 
     cpu_idle();

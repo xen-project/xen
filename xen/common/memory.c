@@ -275,6 +275,7 @@ static int inc_page_refcnt(unsigned long page_nr, unsigned int type)
             return -1;
         }
 
+        page->flags &= ~PG_type_mask;
         page->flags |= type;
     }
 
@@ -286,7 +287,6 @@ static int inc_page_refcnt(unsigned long page_nr, unsigned int type)
 static int dec_page_refcnt(unsigned long page_nr, unsigned int type)
 {
     struct pfn_info *page;
-    int ret;
 
     if ( page_nr >= max_page )
     {
@@ -303,9 +303,8 @@ static int dec_page_refcnt(unsigned long page_nr, unsigned int type)
         return -1;
     }
     ASSERT(page_type_count(page) != 0);
-    if ( (ret = put_page_type(page)) == 0 ) page->flags &= ~PG_type_mask;
     put_page_tot(page);
-    return ret;
+    return put_page_type(page);
 }
 
 
@@ -439,8 +438,10 @@ static int get_page(unsigned long page_nr, int writeable)
                         page_type_count(page));
                 return(-1);
             }
+            page->flags &= ~PG_type_mask;
             page->flags |= PGT_writeable_page;
         }
+        page->flags &= ~PG_noflush;
         get_page_type(page);
     }
 
@@ -501,10 +502,7 @@ static void put_page(unsigned long page_nr, int writeable)
            ((page_type_count(page) != 0) && 
             ((page->flags & PG_type_mask) == PGT_writeable_page)));
     if ( writeable && (put_page_type(page) == 0) )
-    {
         tlb_flush[smp_processor_id()] = 1;
-        page->flags &= ~PG_type_mask;
-    }
     put_page_tot(page);
 }
 
