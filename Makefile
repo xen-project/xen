@@ -83,6 +83,9 @@ config-xen%:
 else
 config-xen%:
 	$(MAKE) -C $(CDIR) ARCH=xen mrproper
+	@[ -e $(LINUX_CONFIG_DIR)/config-$(LINUX_VER)-$(subst config-,,$@) ] \
+	  && cp $(LINUX_CONFIG_DIR)/config-$(LINUX_VER)-$(subst config-,,$@) \
+		$(CDIR)/.config || \
 	$(MAKE) -C $(CDIR) ARCH=xen $(subst config-,,$@)_defconfig
 endif
 
