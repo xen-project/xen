@@ -1932,6 +1932,9 @@ void update_shadow_va_mapping(unsigned long va,
          * page was not shadowed, or that the L2 entry has not yet been
          * updated to reflect the shadow.
          */
+        if ( shadow_mode_external(current->domain) )
+            BUG(); // can't use linear_l2_table with external tables.
+
         l2_pgentry_t gpde = linear_l2_table[l2_table_offset(va)];
         unsigned long gpfn = l2_pgentry_val(gpde) >> PAGE_SHIFT;
 
@@ -2052,12 +2055,7 @@ int do_update_va_mapping(unsigned long va,
         rc = -EINVAL;
 
     if ( unlikely(shadow_mode_enabled(d)) )
-    {
-        if ( shadow_mode_external(current->domain) )
-            BUG(); // can't use linear_l2_table with external tables.
-
         update_shadow_va_mapping(va, val, ed, d);
-    }
 
     deferred_ops = percpu_info[cpu].deferred_ops;
     percpu_info[cpu].deferred_ops = 0;
