@@ -226,7 +226,7 @@ static void __invalidate_shadow_ldt(struct exec_domain *d)
 
     for ( i = 16; i < 32; i++ )
     {
-        pfn = l1_pgentry_to_pagenr(d->arch.perdomain_ptes[i]);
+        pfn = l1_pgentry_to_pfn(d->arch.perdomain_ptes[i]);
         if ( pfn == 0 ) continue;
         d->arch.perdomain_ptes[i] = mk_l1_pgentry(0);
         page = &frame_table[pfn];
@@ -364,14 +364,14 @@ get_linear_pagetable(
     if ( (l2_pgentry_val(l2e) >> PAGE_SHIFT) != pfn )
     {
         /* Make sure the mapped frame belongs to the correct domain. */
-        if ( unlikely(!get_page_from_pagenr(l2_pgentry_to_pagenr(l2e), d)) )
+        if ( unlikely(!get_page_from_pagenr(l2_pgentry_to_pfn(l2e), d)) )
             return 0;
 
         /*
          * Make sure that the mapped frame is an already-validated L2 table. 
          * If so, atomically increment the count (checking for overflow).
          */
-        page = &frame_table[l2_pgentry_to_pagenr(l2e)];
+        page = &frame_table[l2_pgentry_to_pfn(l2e)];
         y = page->u.inuse.type_info;
         do {
             x = y;
@@ -395,7 +395,7 @@ get_page_from_l1e(
     l1_pgentry_t l1e, struct domain *d)
 {
     unsigned long l1v = l1_pgentry_val(l1e);
-    unsigned long pfn = l1_pgentry_to_pagenr(l1e);
+    unsigned long pfn = l1_pgentry_to_pfn(l1e);
     struct pfn_info *page = &frame_table[pfn];
     extern int domain_iomem_in_pfn(struct domain *d, unsigned long pfn);
 
@@ -449,7 +449,7 @@ get_page_from_l2e(
     }
 
     rc = get_page_and_type_from_pagenr(
-        l2_pgentry_to_pagenr(l2e), 
+        l2_pgentry_to_pfn(l2e), 
         PGT_l1_page_table | (va_idx<<PGT_va_shift), d);
 
     if ( unlikely(!rc) )
@@ -462,7 +462,7 @@ get_page_from_l2e(
 static void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
 {
     unsigned long    l1v  = l1_pgentry_val(l1e);
-    unsigned long    pfn  = l1_pgentry_to_pagenr(l1e);
+    unsigned long    pfn  = l1_pgentry_to_pfn(l1e);
     struct pfn_info *page = &frame_table[pfn];
     struct domain   *e;
 
@@ -512,7 +512,7 @@ static void put_page_from_l2e(l2_pgentry_t l2e, unsigned long pfn)
 {
     if ( (l2_pgentry_val(l2e) & _PAGE_PRESENT) && 
          ((l2_pgentry_val(l2e) >> PAGE_SHIFT) != pfn) )
-        put_page_and_type(&frame_table[l2_pgentry_to_pagenr(l2e)]);
+        put_page_and_type(&frame_table[l2_pgentry_to_pfn(l2e)]);
 }
 
 
@@ -1670,7 +1670,7 @@ void destroy_gdt(struct exec_domain *ed)
 
     for ( i = 0; i < 16; i++ )
     {
-        if ( (pfn = l1_pgentry_to_pagenr(ed->arch.perdomain_ptes[i])) != 0 )
+        if ( (pfn = l1_pgentry_to_pfn(ed->arch.perdomain_ptes[i])) != 0 )
             put_page_and_type(&frame_table[pfn]);
         ed->arch.perdomain_ptes[i] = mk_l1_pgentry(0);
     }
@@ -1798,7 +1798,7 @@ long do_update_descriptor(
     case PGT_gdt_page:
         /* Disallow updates of Xen-reserved descriptors in the current GDT. */
         for_each_exec_domain(current->domain, ed) {
-            if ( (l1_pgentry_to_pagenr(ed->arch.perdomain_ptes[0]) == pfn) &&
+            if ( (l1_pgentry_to_pfn(ed->arch.perdomain_ptes[0]) == pfn) &&
                  (((pa&(PAGE_SIZE-1))>>3) >= FIRST_RESERVED_GDT_ENTRY) &&
                  (((pa&(PAGE_SIZE-1))>>3) <= LAST_RESERVED_GDT_ENTRY) )
                 goto out;
@@ -1939,7 +1939,7 @@ void ptwr_flush(const int which)
                     l1pte_propagate_from_guest(
                         d, &l1_pgentry_val(nl1e), 
                         &l1_pgentry_val(sl1e[i]));
-                put_page_type(&frame_table[l1_pgentry_to_pagenr(nl1e)]);
+                put_page_type(&frame_table[l1_pgentry_to_pfn(nl1e)]);
             }
             continue;
         }

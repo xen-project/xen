@@ -294,7 +294,7 @@ int construct_dom0(struct domain *d,
     for ( count = 0; count < nr_pt_pages; count++ ) 
     {
         *l1tab = mk_l1_pgentry(l1_pgentry_val(*l1tab) & ~_PAGE_RW);
-        page = &frame_table[l1_pgentry_to_pagenr(*l1tab)];
+        page = &frame_table[l1_pgentry_to_pfn(*l1tab)];
 
         /* Read-only mapping + PGC_allocated + page-table page. */
         page->count_info         = PGC_allocated | 3;
