@@ -513,7 +513,7 @@ void __init __start_xen(multiboot_info_t *mbi)
             e820_raw[e820_raw_nr].size = 
                 ((u64)map->length_high << 32) | (u64)map->length_low;
             e820_raw[e820_raw_nr].type = 
-                (map->type > E820_NVS) ? E820_RESERVED : map->type;
+                (map->type > E820_SHARED_PAGE) ? E820_RESERVED : map->type;
             e820_raw_nr++;
             bytes += map->size + 4;
         }

@@ -5,10 +5,12 @@
 
 #define E820MAX	32
 
-#define E820_RAM	1
-#define E820_RESERVED	2
-#define E820_ACPI	3
-#define E820_NVS	4
+#define E820_RAM          1
+#define E820_RESERVED     2
+#define E820_ACPI         3
+#define E820_NVS          4
+#define E820_IO          16
+#define E820_SHARED_PAGE 17
 
 #ifndef __ASSEMBLY__
 struct e820entry {
