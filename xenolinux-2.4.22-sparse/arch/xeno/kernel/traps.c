@@ -305,6 +305,24 @@ DO_ERROR(18, SIGBUS, "machine check", machine_check)
 
 asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
 {
+	/*
+	 * If we trapped on an LDT access then ensure that the default_ldt is
+	 * loaded, if nothing else. We load default_ldt lazily because LDT
+	 * switching costs time and many applications don't need it.
+	 */
+	if ( unlikely((error_code & 6) == 4) )
+	{
+		unsigned long ldt;
+		flush_page_update_queue(); /* ensure LDTR is up to date */
+		__asm__ __volatile__ ( "sldt %0" : "=r" (ldt) );
+		if ( likely(ldt == 0) )
+		{
+			queue_set_ldt((unsigned long)&default_ldt[0], 5);
+			flush_page_update_queue();
+			return;
+		}
+	}
+
 	if (!(regs->xcs & 2))
 		goto gp_in_kernel;
 

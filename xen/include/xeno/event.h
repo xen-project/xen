@@ -28,31 +28,39 @@
  */
 static inline unsigned long mark_guest_event(struct task_struct *p, int event)
 {
+    unsigned long flags, cpu_mask;
+
     if ( test_and_set_bit(event, &p->shared_info->events) )
         return 0;
 
-    /*
-     * No need for the runqueue_lock! The check below does not race
-     * with the setting of has_cpu, because that is set with runqueue_lock
-     * held. The lock must be released before hypervisor exit (and so
-     * a write barrier executed). And, just before hypervisor exit, 
-     * outstanding events are checked. So bit is certainly set early enough.
-     */
-    smp_mb();
-    if ( p->state == TASK_INTERRUPTIBLE ) wake_up(p);
-    reschedule(p);
-    return p->has_cpu ? (1 << p->processor) : 0;
+    spin_lock_irqsave(&schedule_lock[p->processor], flags);
+    if ( p->state == TASK_INTERRUPTIBLE )
+        __wake_up(p);
+    cpu_mask = __reschedule(p);
+    if ( p->has_cpu )
+        cpu_mask |= 1 << p->processor;
+    spin_unlock_irqrestore(&schedule_lock[p->processor], flags);
+
+    return cpu_mask;
 }
 
 /* As above, but hyp_events are handled within the hypervisor. */
 static inline unsigned long mark_hyp_event(struct task_struct *p, int event)
 {
+    unsigned long flags, cpu_mask;
+
     if ( test_and_set_bit(event, &p->hyp_events) )
         return 0;
-    smp_mb();
-    if ( p->state == TASK_INTERRUPTIBLE ) wake_up(p);
-    reschedule(p);
-    return p->has_cpu ? (1 << p->processor) : 0;
+
+    spin_lock_irqsave(&schedule_lock[p->processor], flags);
+    if ( p->state == TASK_INTERRUPTIBLE )
+        __wake_up(p);
+    cpu_mask = __reschedule(p);
+    if ( p->has_cpu )
+        cpu_mask |= 1 << p->processor;
+    spin_unlock_irqrestore(&schedule_lock[p->processor], flags);
+
+    return cpu_mask;
 }
 
 /* Notify the given set of CPUs that guest events may be outstanding. */

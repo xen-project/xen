@@ -233,7 +233,7 @@ extern void free_irq(unsigned int, void *);
 extern unsigned long wait_init_idle;
 #define init_idle() clear_bit(smp_processor_id(), &wait_init_idle);
 
-
+extern spinlock_t schedule_lock[NR_CPUS] __cacheline_aligned;
 
 /*
  * Scheduler functions (in schedule.c)
@@ -247,8 +247,10 @@ long sched_bvtctl(unsigned long ctx_allow);
 long sched_adjdom(int dom, unsigned long mcu_adv, unsigned long warp, 
                   unsigned long warpl, unsigned long warpu);
 void init_idle_task(void);
-int  wake_up(struct task_struct *p);
+void __wake_up(struct task_struct *p);
+void wake_up(struct task_struct *p);
 long do_yield(void);
+unsigned long __reschedule(struct task_struct *p);
 void reschedule(struct task_struct *p);
 
 /* NB. Limited entry in Xen. Not for arbitrary use! */

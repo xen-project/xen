@@ -821,8 +821,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         else if ( (current->mm.ldt_ents != ents) || 
                   (current->mm.ldt_base != ptr) )
         {
-            if ( current->mm.ldt_ents != 0 )
-                invalidate_shadow_ldt();
+            invalidate_shadow_ldt();
             current->mm.ldt_base = ptr;
             current->mm.ldt_ents = ents;
             load_LDT(current);

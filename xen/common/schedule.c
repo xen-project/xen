@@ -43,7 +43,6 @@ static s32 ctx_allow = (s32)MILLISECS(5);     /* context switch allowance */
 
 typedef struct schedule_data_st
 {
-    spinlock_t          lock;           /* lock for protecting this */
     struct list_head    runqueue;       /* runqueue */
     struct task_struct *curr;           /* current task */
     struct task_struct *idle;           /* idle task for this cpu */
@@ -54,6 +53,8 @@ typedef struct schedule_data_st
 #endif
 } __cacheline_aligned schedule_data_t;
 static schedule_data_t schedule_data[NR_CPUS];
+
+spinlock_t schedule_lock[NR_CPUS] __cacheline_aligned;
 
 /* Skanky periodic event to all guests. This must die in the next release! */
 static struct ac_timer v_timer; 
@@ -128,8 +129,7 @@ void sched_add_domain(struct task_struct *p)
 
     if ( p->domain == IDLE_DOMAIN_ID )
     {
-        p->avt = 0xffffffff;
-        p->evt = 0xffffffff;
+        p->avt = p->evt = ~0U;
         schedule_data[p->processor].idle = p;
     } 
     else 
@@ -159,29 +159,21 @@ void init_idle_task(void)
 {
     unsigned long flags;
     struct task_struct *p = current;
-    spin_lock_irqsave(&schedule_data[p->processor].lock, flags);
+    spin_lock_irqsave(&schedule_lock[p->processor], flags);
     p->has_cpu = 1;
     p->state = TASK_RUNNING;
     if ( !__task_on_runqueue(p) )
         __add_to_runqueue_head(p);
-    spin_unlock_irqrestore(&schedule_data[p->processor].lock, flags);
+    spin_unlock_irqrestore(&schedule_lock[p->processor], flags);
 }
 
 
-/*
- * wake up a domain which had been sleeping
- */
-int wake_up(struct task_struct *p)
+void __wake_up(struct task_struct *p)
 {
-    unsigned long flags;
-    int ret = 0;
+    ASSERT(p->state != TASK_DYING);
 
-    spin_lock_irqsave(&schedule_data[p->processor].lock, flags);
-
-    /* XXX RN: should we warp here? Might be a good idea to also boost a 
-     * domain which currently is unwarped and on run queue and 
-     * the receives an event. */
-    if ( __task_on_runqueue(p) ) goto out;
+    if ( unlikely(__task_on_runqueue(p)) )
+        return;
 
     p->state = TASK_RUNNING;
     __add_to_runqueue_head(p);
@@ -198,16 +190,17 @@ int wake_up(struct task_struct *p)
 #ifdef SCHED_HISTO
     p->wokenup = NOW();
 #endif
-
-    ret = 1;
- out:
-    spin_unlock_irqrestore(&schedule_data[p->processor].lock, flags);
-    return ret;
 }
 
-/*
- * Voluntarily yield the processor to another domain, until an event occurs.
- */
+void wake_up(struct task_struct *p)
+{
+    unsigned long flags;
+    spin_lock_irqsave(&schedule_lock[p->processor], flags);
+    __wake_up(p);
+    spin_unlock_irqrestore(&schedule_lock[p->processor], flags);
+}
+
+/* Voluntarily yield the processor to another domain, until an event occurs. */
 long do_yield(void)
 {
     current->state = TASK_INTERRUPTIBLE;
@@ -216,9 +209,7 @@ long do_yield(void)
     return 0;
 }
 
-/*
- *  Demultiplex scheduler-related hypercalls.
- */
+/* Demultiplex scheduler-related hypercalls. */
 long do_sched_op(unsigned long op)
 {
     long ret = 0;
@@ -251,18 +242,14 @@ long do_sched_op(unsigned long op)
     return ret;
 }
 
-/*
- * Control the scheduler
- */
+/* Control the scheduler. */
 long sched_bvtctl(unsigned long c_allow)
 {
     ctx_allow = c_allow;
     return 0;
 }
 
-/*
- * Adjust scheduling parameter for a given domain
- */
+/* Adjust scheduling parameter for a given domain. */
 long sched_adjdom(int dom, unsigned long mcu_adv, unsigned long warp, 
                  unsigned long warpl, unsigned long warpu)
 {
@@ -276,9 +263,9 @@ long sched_adjdom(int dom, unsigned long mcu_adv, unsigned long warp,
     if ( p == NULL ) 
         return -ESRCH;
 
-    spin_lock_irq(&schedule_data[p->processor].lock);   
+    spin_lock_irq(&schedule_lock[p->processor]);   
     p->mcu_advance = mcu_adv;
-    spin_unlock_irq(&schedule_data[p->processor].lock); 
+    spin_unlock_irq(&schedule_lock[p->processor]); 
 
     put_task_struct(p);
 
@@ -293,18 +280,15 @@ long sched_adjdom(int dom, unsigned long mcu_adv, unsigned long warp,
  * Otherwise we do a run through the scheduler after the current tasks 
  * context switch allowance is over.
  */
-void reschedule(struct task_struct *p)
+unsigned long __reschedule(struct task_struct *p)
 {
     int cpu = p->processor;
     struct task_struct *curr;
-    unsigned long flags;
     s_time_t now, min_time;
 
-    if ( p->has_cpu )
-        return;
+    if ( unlikely(p->has_cpu || !__task_on_runqueue(p)) )
+        return 0;
 
-    spin_lock_irqsave(&schedule_data[cpu].lock, flags);
-    
     now = NOW();
     curr = schedule_data[cpu].curr;
     /* domain should run at least for ctx_allow */
@@ -312,23 +296,26 @@ void reschedule(struct task_struct *p)
 
     if ( is_idle_task(curr) || (min_time <= now) )
     {
-        /* reschedule */
         set_bit(_HYP_EVENT_NEED_RESCHED, &curr->hyp_events);
-
-        spin_unlock_irqrestore(&schedule_data[cpu].lock, flags);
-
-        if ( cpu != smp_processor_id() )
-            smp_send_event_check_cpu(cpu);
-
-        return;
+        return (1 << p->processor);
     }
 
     /* current hasn't been running for long enough -> reprogram timer.
      * but don't bother if timer would go off soon anyway */
     if ( schedule_data[cpu].s_timer.expires > min_time + TIME_SLOP )
         mod_ac_timer(&schedule_data[cpu].s_timer, min_time);
-    
-    spin_unlock_irqrestore(&schedule_data[cpu].lock, flags);
+
+    return 0;
+}
+
+
+void reschedule(struct task_struct *p)
+{
+    unsigned long flags, cpu_mask;
+    spin_lock_irqsave(&schedule_lock[p->processor], flags);
+    cpu_mask = __reschedule(p);
+    spin_unlock_irqrestore(&schedule_lock[p->processor], flags);
+    hyp_event_notify(cpu_mask);
 }
 
 
@@ -341,9 +328,9 @@ void reschedule(struct task_struct *p)
  */
 asmlinkage void __enter_scheduler(void)
 {
-    struct task_struct *prev, *next, *next_prime, *p;
+    struct task_struct *prev = current, *next = NULL, *next_prime, *p;
     struct list_head   *tmp;
-    int                 this_cpu;
+    int                 this_cpu = prev->processor;
     s_time_t            now;
     s32                 r_time;     /* time for new dom to run */
     s32                 ranfor;     /* assume we never run longer than 2.1s! */
@@ -352,69 +339,41 @@ asmlinkage void __enter_scheduler(void)
 
     perfc_incrc(sched_run);
 
-    prev = current;
-    next = NULL;
-
-    this_cpu = prev->processor;
-
-    spin_lock_irq(&schedule_data[this_cpu].lock);
+    spin_lock_irq(&schedule_lock[this_cpu]);
 
     now = NOW();
 
-    /* remove timer, if still on list  */
     rem_ac_timer(&schedule_data[this_cpu].s_timer);
-
-    /* deschedule the current domain */
 
     ASSERT(!in_interrupt());
     ASSERT(__task_on_runqueue(prev));
+    ASSERT(prev->state != TASK_UNINTERRUPTIBLE);
 
-    if ( is_idle_task(prev) ) 
-        goto deschedule_done;
-
-    /* do some accounting */
-    ranfor = (s32)(now - prev->lastschd);
-    prev->cpu_time += ranfor;
-    
-    /* calculate mcu and update avt */
-    mcus = ranfor/MCU;
-    if (ranfor % MCU) mcus ++;  /* always round up */
-    prev->avt += mcus * prev->mcu_advance;
-
-    /* recalculate evt */
-    __calc_evt(prev);
-
-    /* dequeue */
-    __del_from_runqueue(prev);
-    
-    switch ( prev->state )
+    if ( likely(!is_idle_task(prev)) ) 
     {
-    case TASK_INTERRUPTIBLE:
-        if ( signal_pending(prev) )
+        ranfor = (s32)(now - prev->lastschd);
+        prev->cpu_time += ranfor;
+    
+        /* Calculate mcu and update avt. */
+        mcus = (ranfor + MCU - 1) / MCU;
+        prev->avt += mcus * prev->mcu_advance;
+        
+        __calc_evt(prev);
+        
+        __del_from_runqueue(prev);
+        
+        if ( likely(prev->state == TASK_RUNNING) ||
+             unlikely((prev->state == TASK_INTERRUPTIBLE) && 
+                      signal_pending(prev)) )
         {
-            prev->state = TASK_RUNNING; /* but has events pending */
-            break;
+            prev->state = TASK_RUNNING;
+            __add_to_runqueue_tail(prev);
         }
-    case TASK_UNINTERRUPTIBLE:
-    case TASK_DYING:
-    case TASK_STOPPED:
-    default:
-        /* Done if not running. Else continue. */
-        goto deschedule_done;
-    case TASK_RUNNING:;
     }
 
-    /* requeue */
-    __add_to_runqueue_tail(prev);
-    
- deschedule_done:
     clear_bit(_HYP_EVENT_NEED_RESCHED, &prev->hyp_events);
 
-    /*
-     * Pick a new domain
-     */
-
-    /* we should at least have the idle task */
+    /* We should at least have the idle task */
     ASSERT(!list_empty(&schedule_data[this_cpu].runqueue));
 
     /*
@@ -425,64 +384,76 @@ asmlinkage void __enter_scheduler(void)
     next       = schedule_data[this_cpu].idle;
     next_prime = NULL;
 
-    next_evt       = 0xffffffff;
-    next_prime_evt = 0xffffffff;
-    min_avt        = 0xffffffff;    /* to calculate svt */
+    next_evt       = ~0U;
+    next_prime_evt = ~0U;
+    min_avt        = ~0U;
 
-    list_for_each(tmp, &schedule_data[this_cpu].runqueue) {
+    list_for_each ( tmp, &schedule_data[this_cpu].runqueue )
+    {
         p = list_entry(tmp, struct task_struct, run_list);
-        if (p->evt < next_evt) {
+        if ( p->evt < next_evt )
+        {
             next_prime     = next;
             next_prime_evt = next_evt;
             next = p;
             next_evt = p->evt;
-        } else if (next_prime_evt == 0xffffffff) {
+        } 
+        else if ( next_prime_evt == ~0U )
+        {
             next_prime_evt = p->evt;
             next_prime     = p;
-        } else if (p->evt < next_prime_evt) {
+        } 
+        else if ( p->evt < next_prime_evt )
+        {
             next_prime_evt = p->evt;
             next_prime     = p;
         }
-        /* determine system virtual time */
-        if (p->avt < min_avt)
+
+        /* Determine system virtual time. */
+        if ( p->avt < min_avt )
             min_avt = p->avt;
     }
-    ASSERT(next != NULL);   /* we should have at least the idle task */
 
-    /* update system virtual time  */
-    if (min_avt != 0xffffffff) schedule_data[this_cpu].svt = min_avt;
+    /* Update system virtual time. */
+    if ( min_avt != ~0U )
+        schedule_data[this_cpu].svt = min_avt;
 
     /* check for virtual time overrun on this cpu */
-    if (schedule_data[this_cpu].svt >= 0xf0000000) {
+    if ( schedule_data[this_cpu].svt >= 0xf0000000 )
+    {
         u_long t_flags; 
         write_lock_irqsave(&tasklist_lock, t_flags); 
         p = &idle0_task;
         do {
-            if (p->processor == this_cpu && !is_idle_task(p)) {
+            if ( (p->processor == this_cpu) && !is_idle_task(p) )
+            {
                 p->evt -= 0xe0000000;
                 p->avt -= 0xe0000000;
             }
-        } while ( (p = p->next_task) != &idle0_task );
+        } 
+        while ( (p = p->next_task) != &idle0_task );
         write_unlock_irqrestore(&tasklist_lock, t_flags); 
         schedule_data[this_cpu].svt -= 0xe0000000;
     }
 
     /* work out time for next run through scheduler */
-    if (is_idle_task(next)) {
+    if ( is_idle_task(next) ) 
+    {
         r_time = ctx_allow;
         goto sched_done;
     }
 
-    if (next_prime == NULL || is_idle_task(next_prime)) {
-        /* we have only one runable task besides the idle task */
+    if ( (next_prime == NULL) || is_idle_task(next_prime) )
+    {
+        /* We have only one runnable task besides the idle task. */
         r_time = 10 * ctx_allow;     /* RN: random constant */
         goto sched_done;
     }
 
     /*
-     * if we are here we have two runable tasks.
-     * work out how long 'next' can run till its evt is greater than
-     * 'next_prime's evt. Taking context switch allowance into account.
+     * If we are here then we have two runnable tasks.
+     * Work out how long 'next' can run till its evt is greater than
+     * 'next_prime's evt. Take context switch allowance into account.
      */
     ASSERT(next_prime->evt >= next->evt);
     r_time = ((next_prime->evt - next->evt)/next->mcu_advance) + ctx_allow;
@@ -491,7 +462,8 @@ asmlinkage void __enter_scheduler(void)
     ASSERT(r_time >= ctx_allow);
 
 #ifndef NDEBUG
-    if (r_time < ctx_allow) {
+    if ( r_time < ctx_allow )
+    {
         printk("[%02d]: %lx\n", this_cpu, (unsigned long)r_time);
         dump_rqueue(&schedule_data[this_cpu].runqueue, "foo");
     }
@@ -508,7 +480,7 @@ asmlinkage void __enter_scheduler(void)
     schedule_data[this_cpu].s_timer.expires  = now + r_time;
     add_ac_timer(&schedule_data[this_cpu].s_timer);
 
-    spin_unlock_irq(&schedule_data[this_cpu].lock);
+    spin_unlock_irq(&schedule_lock[this_cpu]);
 
     /* done, switch tasks */
     if ( unlikely(prev == next) )
@@ -610,7 +582,7 @@ void __init scheduler_init(void)
     for ( i = 0; i < NR_CPUS; i++ )
     {
         INIT_LIST_HEAD(&schedule_data[i].runqueue);
-        spin_lock_init(&schedule_data[i].lock);
+        spin_lock_init(&schedule_lock[i]);
         schedule_data[i].curr = &idle0_task;
         
         init_ac_timer(&schedule_data[i].s_timer);
@@ -688,10 +660,10 @@ void dump_runq(u_char key, void *dev_id, struct pt_regs *regs)
     printk("BVT: mcu=0x%08Xns ctx_allow=0x%08Xns NOW=0x%08X%08X\n",
            (u32)MCU, (u32)ctx_allow, (u32)(now>>32), (u32)now); 
     for (i = 0; i < smp_num_cpus; i++) {
-        spin_lock_irqsave(&schedule_data[i].lock, flags);
+        spin_lock_irqsave(&schedule_lock[i], flags);
         printk("CPU[%02d] svt=0x%08X ", i, (s32)schedule_data[i].svt);
         dump_rqueue(&schedule_data[i].runqueue, "rq"); 
-        spin_unlock_irqrestore(&schedule_data[i].lock, flags);
+        spin_unlock_irqrestore(&schedule_lock[i], flags);
     }
     return; 
 }
