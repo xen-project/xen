@@ -41,6 +41,9 @@ string_param("badpage", opt_badpage);
 #define round_pgdown(_p)  ((_p)&PAGE_MASK)
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
 
+static spinlock_t page_scrub_lock;
+struct list_head page_scrub_list;
+
 /*********************
  * ALLOCATION BITMAP
  *  One bit per page of memory. Bit set => page is allocated.
@@ -627,9 +630,6 @@ unsigned long avail_domheap_pages(void)
 /*************************
  * PAGE SCRUBBING
  */
-
-static spinlock_t page_scrub_lock;
-struct list_head page_scrub_list;
 
 static void page_scrub_softirq(void)
 {
