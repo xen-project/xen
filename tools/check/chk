@@ -63,7 +63,7 @@ done
 echo >> ${info}
 
 if [ "$failed" == "1" ] ; then
-    echo "Checks failed. See ${info} for details."
+    echo "Checks failed. See `pwd`/${info} for details."
     echo "FAILED" >> ${info}
     exit 1
 else

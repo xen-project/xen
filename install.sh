@@ -26,4 +26,9 @@ echo "Installing Xen from '$src' to '$dst'..."
 cp -fdR $src/* $dst
 echo "All done."
 
+echo "Checking to see whether prerequisite tools are installed..."
+cd $src/../check
+./chk install
+echo "All done."
+
 exit 0
