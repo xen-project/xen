@@ -172,8 +172,8 @@ ignore_int:
 bad_cpu_msg:
         .asciz  "Bad CPU type. Need P6+."
         ALIGN
-bad_cpu: 
-        call    init_serial
+bad_cpu:
+/* NB. We assume the UART is set up correctly. */
         mov     $bad_cpu_msg,%esi
 1:      lodsb
         test    %al,%al
