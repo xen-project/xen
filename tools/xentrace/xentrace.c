@@ -26,8 +26,7 @@
 /* from xen/include/hypervisor-ifs */
 #include <trace.h>
 
-extern FILE *stdout;
-
+extern FILE *stderr;
 
 /***** Compile time configuration of defaults ********************************/
 
@@ -53,7 +52,6 @@ int interrupted = 0; /* gets set if we get a SIGHUP */
 void close_handler(int signal)
 {
     interrupted = 1;
-    fprintf(stderr,"Received signal %d, now exiting\n", signal);
 }
 
 /**
@@ -70,22 +68,20 @@ struct timespec millis_to_timespec(unsigned long millis)
     return spec;
 }
 
-
 /**
- * print_rec - plain print an event given a pointer to its start
- * @cpu:       CPU the data came from
- * @data:      pointer to the start of the event data
- * @out:       file stream to print out to
+ * write_rec - output a trace record in binary format
+ * @cpu      - source buffer CPU ID
+ * @rec      - trace record to output
+ * @out      - output stream
  *
- * Takes a pointer to a record and prints out the data.
+ * Outputs the trace record to a filestream, prepending the CPU ID of the
+ * source trace buffer.
  */
-void print_rec(unsigned int cpu, struct t_rec *rec, FILE *out)
-{    
-    fprintf(out, "%u %llu %lu %lu %lu %lu %lu %lu\n",
-	    cpu, rec->cycles, rec->event, rec->d1, rec->d2,
-	    rec->d3, rec->d4, rec->d5);
+void write_rec(unsigned int cpu, struct t_rec *rec, FILE *out)
+{
+    fwrite(&cpu, sizeof(cpu), 1, out);
+    fwrite(rec, sizeof(*rec), 1, out);
 }
-
 
 /**
  * get_tbufs - get pointer to and size of the trace buffers
@@ -321,11 +317,11 @@ int monitor_tbufs(FILE *logfile)
             {
                 /* output pre-wrap data */
                 for(j = 0; j < prewrap; j++)
-                    print_rec(i, data[i] + tails[i] + j, logfile);
+                    write_rec(i, data[i] + tails[i] + j, logfile);
                 
                 /* output post-wrap data, if any */                    
                 for(j = 0; j < (newdata - prewrap); j++)
-                    print_rec(i, data[i] + j, logfile);  
+                    write_rec(i, data[i] + j, logfile);  
                 
                 tails[i] += newdata;
                 if(tails[i] >= meta[i]->size) tails[i] = 0;
@@ -418,9 +414,10 @@ const struct argp parser_def =
     "Tool to capure Xen trace buffer data"
     "\v"
     "This tool is used to capture trace buffer data from Xen.  The data is "
-    "output as space-separated decimal numbers, represented in ASCII, in "
-    "the following order:\n\n"
-    "  CPU TSC EVENT DATA1 DATA2 DATA3 DATA4 DATA5\n"
+    "output in a binary format, in the following order:\n\n"
+    "  CPU(uint) TSC(u64) EVENT(u32) D1 D2 D3 D4 D5 (all u32)\n\n"
+    "The output should be parsed using the tool xentrace_format, which can "
+    "produce human-readable output in ASCII format."
 };
 
 
@@ -430,8 +427,8 @@ const char *argp_program_bug_address = "<mark.a.williamson@intel.com>";
     
 int main(int argc, char **argv)
 {
-    int ret;
-    FILE *logfile = stdout;
+    int outfd = 1, ret;
+    FILE *logfile;
     struct sigaction act;
 
     opts.outfile = 0;
@@ -441,7 +438,21 @@ int main(int argc, char **argv)
     argp_parse(&parser_def, argc, argv, 0, 0, &opts);
 
     if ( opts.outfile )
-        logfile = fopen(opts.outfile, "w");
+        outfd = open(opts.outfile, O_WRONLY | O_CREAT);
+
+    if(outfd < 0)
+    {
+        perror("Could not open output file");
+        exit(EXIT_FAILURE);
+    }        
+
+    if(isatty(outfd))
+    {
+        fprintf(stderr, "Cannot output to a TTY, specify a log file.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    logfile = fdopen(outfd, "w");
     
     /* ensure that if we get a signal, we'll do cleanup, then exit */
     act.sa_handler = close_handler;

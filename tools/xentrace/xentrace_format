@@ -4,14 +4,15 @@
 
 # Program for reformatting trace buffer output according to user-supplied rules
 
-import re, sys, string, signal
+import re, sys, string, signal, struct
 
 def usage():
     print >> sys.stderr, \
           "Usage: " + sys.argv[0] + """ defs-file
-          Parses trace data in ASCII format and reformats it according to the
-          rules in a file of definitions.  The rules in this file should have
-          the format ({ and } show grouping and are not part of the syntax):
+          Parses trace data in binary format, as output by Xentrace and
+          reformats it according to the rules in a file of definitions.  The
+          rules in this file should have the format ({ and } show grouping
+          and are not part of the syntax):
 
           {event_id}{whitespace}{text format string}
 
@@ -68,31 +69,29 @@ interrupted = 0
 
 defs = read_defs(sys.argv[1])
 
-reg = re.compile('(\d+) (\d+) (\d+) (.*)')
+# structure of trace record + prepended CPU id (as output by xentrace):
+# CPU(I) TSC(Q) EVENT(L) D1(L) D2(L) D3(L) D4(L) D5(L)
+TRCREC = "IQLLLLLL"
 
 while not interrupted:
     try:
-        line = sys.stdin.readline()
+        line = sys.stdin.read(struct.calcsize(TRCREC))
         if not line:
             break
-        
-        m = reg.match(line)
 
-        if not m: print >> sys.stderr, "Invalid input line."
+        (cpu, tsc, event, d1, d2, d3, d4, d5) = struct.unpack(TRCREC, line)
 
-        s = string.split(m.group(4))
+        args = {'cpu'   : cpu,
+                'tsc'   : tsc,
+                'event' : event,
+                '1'     : d1,
+                '2'     : d2,
+                '3'     : d3,
+                '4'     : d4,
+                '5'     : d5    }
 
-        args = {'cpu'   : eval(m.group(1)),
-                'tsc'   : eval(m.group(2)),
-                'event' : eval(m.group(3)) }
-
-        i = 1
-        for item in s:
-            args[str(i)] = eval(item)
-            i += 1
-
-        if defs.has_key(m.group(3)): print defs[m.group(3)] % args
+        if defs.has_key(str(event)): print defs[str(event)] % args
         # silently skip lines we don't have a format for - a 'complain' option
         # should be added if needed
 
-    except IOError: sys.exit()
+    except IOError, struct.error: sys.exit()

@@ -10,16 +10,21 @@ xentrace \- capture Xen trace buffer data
 ]
 .SH DESCRIPTION
 .B xentrace
-is used to dump data from Xen's per-cpu trace buffers.  Records
-are dumped in ASCII format, onto the standard output or a \fIFILE\fP
-specified on the command line.
-Trace records are formatted as follows:
+is used to capture trace buffer data from Xen.  The data is
+output in the following binary format (host endian):
 .PP
-                    CPU TSC EVENT D1 D2 D3 D4 D5
+    CPU(uint) TSC(u64) EVENT(u32) D1 D2 D3 D4 D5 (all u32)
 .PP
 Where CPU is the processor number, TSC is the record's timestamp
 (the value of the CPU cycle counter), EVENT is the event ID and
 D1...D5 are the trace data.
+
+Data is dumped onto the standard output (which must not be a TTY) or a
+\fIFILE\fP specified on the command line.
+
+The output should be parsed using the tool xentrace_format, which can
+produce human-readable output in ASCII format.
+
 
 .SS Options
 .TP
