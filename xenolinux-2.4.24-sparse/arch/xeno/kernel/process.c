@@ -371,6 +371,15 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 
     __cli();
 
+    /*
+     * We clobber FS and GS here so that we avoid a GPF when restoring previous
+     * task's FS/GS values in Xen when the LDT is switched. If we don't do this
+     * then we can end up erroneously re-flushing the page-update queue when
+     * we 'execute_multicall_list'.
+     */
+    __asm__ __volatile__ ( 
+        "xorl %%eax,%%eax; movl %%eax,%%fs; movl %%eax,%%gs" : : : "eax" );
+
     MULTICALL_flush_page_update_queue();
 
     /*
