@@ -70,6 +70,8 @@ typedef struct {
 	TR_ENTRY dtrs[NDTRS];
 	TR_ENTRY itlb;
 	TR_ENTRY dtlb;
+	unsigned long itlb_pte;
+	unsigned long dtlb_pte;
 	unsigned long irr[4];
 	unsigned long insvc[4];
 	unsigned long iva;

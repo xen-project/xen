@@ -1,5 +1,5 @@
---- /home/djm/src/xen/xeno-ia64.bk/xen/linux-2.6.7/arch/ia64/kernel/time.c	2004-06-15 23:19:01.000000000 -0600
-+++ /home/djm/src/xen/xeno-ia64.bk/xen/arch/ia64/time.c	2004-11-23 17:25:18.000000000 -0700
+--- ../../linux-2.6.7/arch/ia64/kernel/time.c	2004-06-15 23:19:01.000000000 -0600
++++ arch/ia64/time.c	2005-03-08 08:05:00.000000000 -0700
 @@ -10,16 +10,22 @@
   */
  #include <linux/config.h>
@@ -33,7 +33,7 @@
  
  extern unsigned long wall_jiffies;
  
-@@ -45,6 +54,59 @@
+@@ -45,6 +54,58 @@
  
  #endif
  
@@ -45,8 +45,7 @@
 +
 +static inline u64 get_time_delta(void)
 +{
-+	printf("get_time_delta: called, not implemented\n");
-+	return 0;
++	return ia64_get_itc();
 +}
 +
 +s_time_t get_s_time(void)
@@ -74,7 +73,7 @@
 +void update_dom_time(struct domain *d)
 +{
 +// FIXME: implement this?
-+	printf("update_dom_time: called, not implemented, skipping\n");
++//	printf("update_dom_time: called, not implemented, skipping\n");
 +}
 +
 +/* Set clock to <secs,usecs> after 00:00:00 UTC, 1 January, 1970. */
@@ -93,7 +92,7 @@
  static void
  itc_reset (void)
  {
-@@ -80,12 +142,15 @@
+@@ -80,12 +141,15 @@
  	return (elapsed_cycles*local_cpu_data->nsec_per_cyc) >> IA64_NSEC_PER_CYC_SHIFT;
  }
  
@@ -109,7 +108,7 @@
  int
  do_settimeofday (struct timespec *tv)
  {
-@@ -95,7 +160,9 @@
+@@ -95,7 +159,9 @@
  	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
  		return -EINVAL;
  
@@ -119,7 +118,7 @@
  	{
  		/*
  		 * This is revolting. We need to set "xtime" correctly. However, the value
-@@ -117,12 +184,15 @@
+@@ -117,12 +183,15 @@
  		time_esterror = NTP_PHASE_LIMIT;
  		time_interpolator_reset();
  	}
@@ -135,7 +134,7 @@
  
  void
  do_gettimeofday (struct timeval *tv)
-@@ -185,6 +255,7 @@
+@@ -185,6 +254,7 @@
  }
  
  EXPORT_SYMBOL(do_gettimeofday);
@@ -143,7 +142,7 @@
  
  /*
   * The profiling function is SMP safe. (nothing can mess
-@@ -195,6 +266,9 @@
+@@ -195,6 +265,9 @@
  static inline void
  ia64_do_profile (struct pt_regs * regs)
  {
@@ -153,7 +152,7 @@
  	unsigned long ip, slot;
  	extern cpumask_t prof_cpu_mask;
  
-@@ -231,24 +305,88 @@
+@@ -231,24 +304,89 @@
  		ip = prof_len-1;
  	atomic_inc((atomic_t *)&prof_buffer[ip]);
  }
@@ -219,6 +218,7 @@
 +			domain_wake(current);
 +		}
 +	}
++	raise_actimer_softirq();
 +#endif
  
 +#ifndef XEN

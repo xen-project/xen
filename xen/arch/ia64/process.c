@@ -239,8 +239,9 @@ void xen_handle_domain_access(unsigned long address, unsigned long isr, struct p
 	unsigned long psr = regs->cr_ipsr, mask, flags;
 	unsigned long iip = regs->cr_iip;
 	// FIXME should validate address here
-	unsigned long pteval, mpaddr;
+	unsigned long pteval, mpaddr, ps;
 	unsigned long lookup_domain_mpa(struct domain *,unsigned long);
+	unsigned long match_dtlb(struct exec_domain *,unsigned long, unsigned long *, unsigned long *);
 	IA64FAULT fault;
 #ifndef USER_ACCESS
 	extern void __get_domain_bundle(void);
@@ -264,7 +265,7 @@ void xen_handle_domain_access(unsigned long address, unsigned long isr, struct p
 		pteval = lookup_domain_mpa(d,address);
 		//FIXME: check return value?
 		// would be nice to have a counter here
-		vcpu_itc_no_srlz(ed,2,address,pteval,PAGE_SHIFT);
+		vcpu_itc_no_srlz(ed,2,address,pteval,-1UL,PAGE_SHIFT);
 		return;
 	}
 #ifndef USER_ACCESS
@@ -276,6 +277,12 @@ void xen_handle_domain_access(unsigned long address, unsigned long isr, struct p
 #endif
 if (address < 0x4000) printf("WARNING: page_fault @%p, iip=%p\n",address,iip);
 		
+	// if we are fortunate enough to have it in the 1-entry TLB...
+	if (pteval = match_dtlb(ed,address,&ps,NULL)) {
+		vcpu_itc_no_srlz(ed,6,address,pteval,-1UL,ps);
+		return;
+	}
+	// look in the TRs
 	fault = vcpu_tpa(ed,address,&mpaddr);
 	if (fault != IA64_NO_FAULT) {
 #ifndef USER_ACCESS
@@ -314,7 +321,7 @@ if (address < 0x4000) printf("WARNING: page_fault @%p, iip=%p\n",address,iip);
 	// would be nice to have a counter here
 	//printf("Handling privop data TLB miss\n");
 	// FIXME, must be inlined or potential for nested fault here!
-	vcpu_itc_no_srlz(ed,2,address,pteval,PAGE_SHIFT);
+	vcpu_itc_no_srlz(ed,2,address,pteval,-1UL,PAGE_SHIFT);
 }
 
 void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_regs *regs, unsigned long itir)
@@ -357,13 +364,13 @@ void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_reg
 		}
 		pteval = lookup_domain_mpa(d,address);
 		// FIXME, must be inlined or potential for nested fault here!
-		vcpu_itc_no_srlz(current,is_data?2:1,address,pteval,PAGE_SHIFT);
+		vcpu_itc_no_srlz(current,is_data?2:1,address,pteval,-1UL,PAGE_SHIFT);
 		return;
 	}
 	if (trp = match_tr(current,address)) {
 		// FIXME address had better be pre-validated on insert
 		pteval = translate_domain_pte(trp->page_flags,address,trp->itir);
-		vcpu_itc_no_srlz(current,is_data?2:1,address,pteval,(trp->itir>>2)&0x3f);
+		vcpu_itc_no_srlz(current,is_data?2:1,address,pteval,-1UL,(trp->itir>>2)&0x3f);
 		return;
 	}
 	vector = is_data ? IA64_DATA_TLB_VECTOR : IA64_INST_TLB_VECTOR;
