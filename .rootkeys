@@ -194,6 +194,8 @@
 40f56239pYRq5yshPTkv3ujXKc8K6g linux-2.6.7-xen-sparse/arch/xen/kernel/empty.c
 40f56239sFcjHiIRmnObRIDF-zaeKQ linux-2.6.7-xen-sparse/arch/xen/kernel/process.c
 40f562392LBhwmOxVPsYdkYXMxI_ZQ linux-2.6.7-xen-sparse/arch/xen/kernel/reboot.c
+3f68905c5eiA-lBMQSvXLMWS1ikDEA linux-2.6.7-xen-sparse/arch/xen/kernel/xen_proc.c
+4108f5c1WfTIrs0HZFeV39sttekCTw linux-2.6.7-xen-sparse/drivers/char/mem.c
 40f56239Dp_vMTgz8TEbvo1hjHGc3w linux-2.6.7-xen-sparse/drivers/xen/Makefile
 40f56239Sfle6wGv5FS0wjS_HI150A linux-2.6.7-xen-sparse/drivers/xen/block/Kconfig
 40f562395atl9x4suKGhPkjqLOXESg linux-2.6.7-xen-sparse/drivers/xen/block/Makefile
@@ -207,6 +209,8 @@
 40f56239lrg_Ob0BJ8WBFS1zeg2CYw linux-2.6.7-xen-sparse/drivers/xen/net/Kconfig
 40f56239Wd4k_ycG_mFsSO1r5xKdtQ linux-2.6.7-xen-sparse/drivers/xen/net/Makefile
 405853f6nbeazrNyEWNHBuoSg2PiPA linux-2.6.7-xen-sparse/drivers/xen/net/network.c
+4108f5c1ppFXVpQzCOAZ6xXYubsjKA linux-2.6.7-xen-sparse/drivers/xen/privcmd/Makefile
+3e5a4e65IUfzzMu2kZFlGEB8-rpTaA linux-2.6.7-xen-sparse/drivers/xen/privcmd/privcmd.c
 40f56239YAjS52QG2FIAQpHDZAdGHg linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/desc.h
 4107adf1E5O4ztGHNGMzCCNhcvqNow linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/dma-mapping.h
 40f5623anSzpuEHgiNmQ56fIRfCoaQ linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/e820.h
@@ -255,7 +259,9 @@
 40f5623cb_pJrLt3h_nAzvJsjsV0rQ linux-2.6.7-xen-sparse/include/asm-xen/hypervisor-ifs/trace.h
 40f5623cndVUFlkxpf7Lfx7xu8madQ linux-2.6.7-xen-sparse/include/asm-xen/multicall.h
 40f5623cTZ80EwjWUBlh44A9F9i_Lg linux-2.6.7-xen-sparse/include/asm-xen/netif.h
+3f108af1ylCIm82H052FVTfXACBHrw linux-2.6.7-xen-sparse/include/asm-xen/proc_cmd.h
 40f5623cBiQhPHILVLrl3xa6bDBaRg linux-2.6.7-xen-sparse/include/asm-xen/xen.h
+3f689063BoW-HWV3auUJ-OqXfcGArw linux-2.6.7-xen-sparse/include/asm-xen/xen_proc.h
 40f56a0ddHCSs3501MY4hRf22tctOw linux-2.6.7-xen-sparse/mkbuildtree
 40e1b09db5mN69Ijj0X_Eol-S7dXiw tools/Make.defs
 3f776bd1Hy9rn69ntXBhPReUFw9IEA tools/Makefile
