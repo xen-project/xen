@@ -297,6 +297,10 @@ int dispatch_rw_block_io (int index)
 	BUG();
     }
     
+    if(blk_ring->btx_ring[index].buffer == NULL) { 
+	printk(KERN_ALERT "xen_block: bogus buffer from guestOS\n"); 
+	BUG();
+    }
 
     if (XEN_BLK_DEBUG) {
 	printk(XEN_BLK_DEBUG_LEVEL "    btx_cons: %d  btx_prod %d  index: %d "

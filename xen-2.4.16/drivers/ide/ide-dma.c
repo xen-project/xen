@@ -290,8 +290,14 @@ static int ide_build_sglist (ide_hwif_t *hwif, struct request *rq)
 			sge->page = bh->b_page;
 			sge->offset = bh_offset(bh);
 		} else {
+
+		   
+#if 0 
+		    /* below is wrong for xen since b_data is actually
+		       a 'physical / virtual' thingy. Ask KAF. */
 			if (((unsigned long) bh->b_data) < PAGE_SIZE)
 				BUG();
+#endif
 
 			sge->address = bh->b_data;
 		}

@@ -20,3 +20,5 @@ xenolinux-2.4.16-sparse/arch/xeno/drivers/block/Makefile.orig
 xenolinux-2.4.16-sparse/arch/xeno/drivers/block/block.c.orig
 xenolinux-2.4.16-sparse/scripts/kconfig.tk
 xen-2.4.16/foo
+xen-2.4.16/common/domain.c.smh
+URK
