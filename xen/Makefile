@@ -105,7 +105,7 @@ include/asm-$(TARGET_ARCH)/asm-offsets.h: arch/$(TARGET_ARCH)/asm-offsets.s
 
 .PHONY: default debug install dist clean delete-unfresh-files TAGS
 
-SUBDIRS = arch common drivers 
+SUBDIRS = arch/$(TARGET_ARCH) common drivers 
 TAGS: 
 	( find include/asm-$(TARGET_ARCH) -name '*.h'; \
 	  find include -type d \( -name "asm-*" -o -name config \) -prune -o \
