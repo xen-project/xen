@@ -43,7 +43,12 @@ extern void tapechar_init(void);
  */
 static inline int uncached_access(struct file *file, unsigned long addr)
 {
-#if defined(__i386__)
+#ifdef CONFIG_XEN
+        if (file->f_flags & O_SYNC)
+                return 1;
+        /* Xen sets correct MTRR type on non-RAM for us. */
+        return 0;
+#elif defined(__i386__)
 	/*
 	 * On the PPro and successors, the MTRRs are used to set
 	 * memory types for physical addresses outside main memory,
@@ -193,7 +198,6 @@ static ssize_t write_mem(struct file * file, const char __user * buf,
 
 static int mmap_mem(struct file * file, struct vm_area_struct * vma)
 {
-#if !defined(CONFIG_XEN)
 	unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
 	int uncached;
 
@@ -212,28 +216,16 @@ static int mmap_mem(struct file * file, struct vm_area_struct * vma)
 	if (uncached)
 		vma->vm_flags |= VM_IO;
 
+#if defined(CONFIG_XEN)
+	if (io_remap_page_range(vma, vma->vm_start, offset, 
+				vma->vm_end-vma->vm_start, vma->vm_page_prot))
+		return -EAGAIN;
+#else
 	if (remap_page_range(vma, vma->vm_start, offset, vma->vm_end-vma->vm_start,
 			     vma->vm_page_prot))
 		return -EAGAIN;
-	return 0;
-#elif !defined(CONFIG_XEN_PRIVILEGED_GUEST)
-	return -ENXIO;
-#else
-	unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
-
-	if (!(xen_start_info.flags & SIF_PRIVILEGED))
-		return -ENXIO;
-
-	/* Currently we're not smart about setting PTE cacheability. */
-	vma->vm_flags |= VM_RESERVED | VM_IO;
-	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-
-	if (direct_remap_area_pages(vma->vm_mm, vma->vm_start, offset, 
-				vma->vm_end-vma->vm_start, vma->vm_page_prot,
-				DOMID_IO))
-		return -EAGAIN;
-	return 0;
 #endif
+	return 0;
 }
 
 extern long vread(char *buf, char *addr, unsigned long count);

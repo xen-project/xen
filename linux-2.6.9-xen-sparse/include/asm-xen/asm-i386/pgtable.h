@@ -487,7 +487,8 @@ static inline unsigned long arbitrary_virt_to_phys(void *va)
 #define kern_addr_valid(addr)	(1)
 #endif /* !CONFIG_DISCONTIGMEM */
 
-#define io_remap_page_range remap_page_range
+#define io_remap_page_range(vma,from,phys,size,prot)                     \
+        direct_remap_area_pages(vma->vm_mm,from,phys,size,prot,DOMID_IO)
 
 #define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_YOUNG
 #define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_DIRTY
