@@ -327,10 +327,6 @@ __trap_to_cdb(struct xen_regs *regs)
 		return;
 	}
 
-	/* Try to make things a little more stable by disabling
-	   interrupts while we're here. */
-	local_irq_save(flags);
-
 	/* We rely on our caller to ensure we're only on one processor
 	 * at a time... We should probably panic here, but given that
 	 * we're a debugger we should probably be a little tolerant of
@@ -346,11 +342,15 @@ __trap_to_cdb(struct xen_regs *regs)
 	if (!atomic_dec_and_test(&xendbg_running)) {
 		printk("WARNING WARNING WARNING: Avoiding recursive xendbg.\n");
 		atomic_inc(&xendbg_running);
-		local_irq_restore(flags);
 		return;
 	}
 
 	smp_send_stop();
+
+	/* Try to make things a little more stable by disabling
+	   interrupts while we're here. */
+	local_irq_save(flags);
+
 	old_watchdog = watchdog_on;
 	watchdog_on = 0;
 
