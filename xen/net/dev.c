@@ -657,10 +657,11 @@ static void add_to_net_schedule_list_tail(net_vif_t *vif)
 /* Destructor function for tx skbs. */
 static void tx_skb_release(struct sk_buff *skb)
 {
-    int i;
+    int i, send = 0;
     net_vif_t *vif = sys_vif_list[skb->src_vif];
     unsigned int idx;
     tx_shadow_entry_t *tx;
+    unsigned long cpu_mask;
     
     for ( i = 0; i < skb_shinfo(skb)->nr_frags; i++ )
         put_page_tot(skb_shinfo(skb)->frags[i].page);
@@ -691,9 +692,7 @@ static void tx_skb_release(struct sk_buff *skb)
         if ( idx == vif->shadow_ring->tx_idx ) BUG();
         tx  = &vif->shadow_ring->tx_ring[idx];
         vif->shadow_ring->tx_cons = TX_RING_INC(idx);
-        if ( vif->shadow_ring->tx_cons == vif->net_ring->tx_event )
-            set_bit(_EVENT_NET_TX, 
-                    &sys_vif_list[skb->src_vif]->domain->shared_info->events);
+        if ( vif->shadow_ring->tx_cons == vif->net_ring->tx_event ) send = 1;
     } while ( tx->status != RING_STATUS_OK );
 
     /* Now skip over any more bad descriptors, up to the next good one. */
@@ -705,13 +704,19 @@ static void tx_skb_release(struct sk_buff *skb)
              (tx->status == RING_STATUS_OK) )
             break;
         vif->shadow_ring->tx_cons = TX_RING_INC(idx);
-        if ( vif->shadow_ring->tx_cons == vif->net_ring->tx_event )
-            set_bit(_EVENT_NET_TX, 
-                    &sys_vif_list[skb->src_vif]->domain->shared_info->events);
+        if ( vif->shadow_ring->tx_cons == vif->net_ring->tx_event ) send = 1;
     } while ( 1 );
 
-    /* Finally, update shared consumer index to the new private value. */
+    /* Update shared consumer index to the new private value. */
     vif->net_ring->tx_cons = vif->shadow_ring->tx_cons;
+
+    /* Send a transmit event if requested. */
+    if ( send )
+    {
+        cpu_mask = mark_guest_event(
+            sys_vif_list[skb->src_vif]->domain, _EVENT_NET_TX);
+        guest_event_notify(cpu_mask);
+    }
 }
 
     

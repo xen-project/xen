@@ -23,6 +23,7 @@
 
 #include <asm/io.h>
 #include <net/sock.h>
+#include <net/pkt_sched.h>
 
 #define NET_TX_IRQ _EVENT_NET_TX
 #define NET_RX_IRQ _EVENT_NET_RX
@@ -185,7 +186,8 @@ static void network_tx_buf_gc(struct net_device *dev)
         np->tx_idx = i;
         
         /* Set a new event, then check for race with update of tx_cons. */
-        np->net_ring->tx_event = TX_RING_INC(cons);
+        np->net_ring->tx_event =
+            TX_RING_ADD(cons, (atomic_read(&np->tx_entries)>>1) + 1);
         smp_mb();
     }
     while ( cons != np->net_ring->tx_cons );
