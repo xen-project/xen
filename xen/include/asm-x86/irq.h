@@ -86,6 +86,8 @@ extern char _stext, _etext;
 #define __STR(x) #x
 #define STR(x) __STR(x)
 
+#if defined(__i386__)
+
 #define SAVE_ALL \
 	"cld\n\t" \
 	"pushl %gs\n\t" \
@@ -105,8 +107,11 @@ extern char _stext, _etext;
 	"movl %edx,%fs\n\t" \
 	"movl %edx,%gs\n\t"
 
-#define IRQ_NAME2(nr) nr##_interrupt(void)
-#define IRQ_NAME(nr) IRQ_NAME2(IRQ##nr)
+#else
+
+#define SAVE_ALL
+
+#endif
 
 #define BUILD_SMP_INTERRUPT(x,v) XBUILD_SMP_INTERRUPT(x,v)
 #define XBUILD_SMP_INTERRUPT(x,v)\
@@ -115,7 +120,7 @@ asmlinkage void call_##x(void); \
 __asm__( \
 "\n"__ALIGN_STR"\n" \
 SYMBOL_NAME_STR(x) ":\n\t" \
-	"pushl $"#v"\n\t" \
+	"push"__OS" $"#v"\n\t" \
 	SAVE_ALL \
 	SYMBOL_NAME_STR(call_##x)":\n\t" \
 	"call "SYMBOL_NAME_STR(smp_##x)"\n\t" \
@@ -128,13 +133,13 @@ asmlinkage void call_##x(void); \
 __asm__( \
 "\n"__ALIGN_STR"\n" \
 SYMBOL_NAME_STR(x) ":\n\t" \
-	"pushl $"#v"\n\t" \
+	"push"__OS" $"#v"\n\t" \
 	SAVE_ALL \
-	"movl %esp,%eax\n\t" \
-	"pushl %eax\n\t" \
+	"mov %"__OP"sp,%"__OP"ax\n\t" \
+	"push %"__OP"ax\n\t" \
 	SYMBOL_NAME_STR(call_##x)":\n\t" \
 	"call "SYMBOL_NAME_STR(smp_##x)"\n\t" \
-	"addl $4,%esp\n\t" \
+	"add $4,%"__OP"sp\n\t" \
 	"jmp ret_from_intr\n");
 
 #define BUILD_COMMON_IRQ() \
@@ -147,12 +152,15 @@ __asm__( \
 	"call " SYMBOL_NAME_STR(do_IRQ) "\n\t" \
 	"jmp ret_from_intr\n");
 
+#define IRQ_NAME2(nr) nr##_interrupt(void)
+#define IRQ_NAME(nr) IRQ_NAME2(IRQ##nr)
+
 #define BUILD_IRQ(nr) \
 asmlinkage void IRQ_NAME(nr); \
 __asm__( \
 "\n"__ALIGN_STR"\n" \
 SYMBOL_NAME_STR(IRQ) #nr "_interrupt:\n\t" \
-	"pushl $"#nr"\n\t" \
+	"push"__OS" $"#nr"\n\t" \
 	"jmp common_interrupt");
 
 extern unsigned long prof_cpu_mask;

@@ -54,6 +54,8 @@ int acpi_force __initdata = 0;
 int phys_proc_id[NR_CPUS];
 int logical_proc_id[NR_CPUS];
 
+#if defined(__i386__)
+
 /* Standard macro to see if a specific flag is changeable */
 static inline int flag_is_changeable_p(u32 flag)
 {
@@ -80,6 +82,12 @@ static int __init have_cpuid_p(void)
 {
     return flag_is_changeable_p(X86_EFLAGS_ID);
 }
+
+#elif defined(__x86_64__)
+
+#define have_cpuid_p() (1)
+
+#endif
 
 void __init get_cpu_vendor(struct cpuinfo_x86 *c)
 {
@@ -259,6 +267,7 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 unsigned long cpu_initialized;
 void __init cpu_init(void)
 {
+#if defined(__i386__) /* XXX */
     int nr = smp_processor_id();
     struct tss_struct * t = &init_tss[nr];
 
@@ -297,6 +306,7 @@ void __init cpu_init(void)
     write_ptbase(&current->mm);
 
     init_idle_task();
+#endif
 }
 
 static void __init do_initcalls(void)

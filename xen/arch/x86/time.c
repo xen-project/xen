@@ -107,7 +107,8 @@ static struct irqaction irq0 = { timer_interrupt, "timer", NULL};
 
 static unsigned long __init calibrate_tsc(void)
 {
-    unsigned long startlow, starthigh, endlow, endhigh, count;
+    u64 start, end, diff;
+    unsigned long count;
 
     /* Set the Gate high, disable speaker */
     outb((inb(0x61) & ~0x02) | 0x01, 0x61);
@@ -123,22 +124,24 @@ static unsigned long __init calibrate_tsc(void)
     outb(CALIBRATE_LATCH & 0xff, 0x42); /* LSB of count */
     outb(CALIBRATE_LATCH >> 8, 0x42);   /* MSB of count */
 
-    rdtsc(startlow, starthigh);
+    rdtscll(start);
     for ( count = 0; (inb(0x61) & 0x20) == 0; count++ )
         continue;
-    rdtsc(endlow, endhigh);
+    rdtscll(end);
 
     /* Error if the CTC doesn't behave itself. */
     if ( count == 0 )
         return 0;
 
-    /* [endhigh:endlow] = [endhigh:endlow] - [starthigh:startlow] */
-    __asm__( "subl %2,%0 ; sbbl %3,%1"
-             : "=a" (endlow), "=d" (endhigh)
-             : "g" (startlow), "g" (starthigh), "0" (endlow), "1" (endhigh) );
+    diff = end - start;
 
+#if defined(_i386__)
     /* If quotient doesn't fit in 32 bits then we return error (zero). */
-    return endhigh ? 0 : endlow;
+    if ( diff & ~0xffffffffULL )
+        return 0;
+#endif
+
+    return (unsigned long)diff;
 }
 
 

@@ -491,9 +491,9 @@ void __init init_apic_mappings(void)
  *****************************************************************************/
 
 /* used for system time scaling */
-static unsigned int bus_freq;
-static u32          bus_cycle;   /* length of one bus cycle in pico-seconds */
-static u32          bus_scale;   /* scaling factor convert ns to bus cycles */
+static unsigned long bus_freq;    /* KAF: pointer-size avoids compile warns. */
+static u32           bus_cycle;   /* length of one bus cycle in pico-seconds */
+static u32           bus_scale;   /* scaling factor convert ns to bus cycles */
 
 /*
  * The timer chip is already set up at HZ interrupts per second here,
