@@ -559,7 +559,7 @@ void enable_irq(unsigned int irq)
  * SMP cross-CPU interrupts have their own specific
  * handlers).
  */
-asmlinkage unsigned int do_IRQ(int irq, struct pt_regs *regs)
+asmlinkage unsigned int do_IRQ(struct pt_regs *regs)
 {	
 	/* 
 	 * We ack quickly, we don't want the irq controller
@@ -571,6 +571,7 @@ asmlinkage unsigned int do_IRQ(int irq, struct pt_regs *regs)
 	 * 0 return value means that this irq is already being
 	 * handled by some other CPU. (or is disabled)
 	 */
+	int irq = regs->orig_eax & 0xff; /* high bits used in ret_from_ code */
 	int cpu = smp_processor_id();
 	irq_desc_t *desc = irq_desc + irq;
 	struct irqaction * action;
@@ -731,6 +732,53 @@ int request_irq(unsigned int irq,
 	return retval;
 }
 
+/*
+ * Internal function to unregister an irqaction - typically used to
+ * deallocate special interrupts that are part of the architecture.
+ */
+int teardown_irq(unsigned int irq, struct irqaction * old)
+{
+	irq_desc_t *desc;
+	struct irqaction **p;
+	unsigned long flags;
+
+	if (irq >= NR_IRQS)
+		return -ENOENT;
+
+	desc = irq_desc + irq;
+	spin_lock_irqsave(&desc->lock,flags);
+	p = &desc->action;
+	for (;;) {
+		struct irqaction * action = *p;
+		if (action) {
+			struct irqaction **pp = p;
+			p = &action->next;
+			if (action != old)
+				continue;
+
+			/* Found it - now remove it from the list of entries */
+			*pp = action->next;
+			if (!desc->action) {
+				desc->status |= IRQ_DISABLED;
+				desc->handler->shutdown(irq);
+			}
+			spin_unlock_irqrestore(&desc->lock,flags);
+
+#ifdef CONFIG_SMP
+			/* Wait to make sure it's not being used on another CPU */
+			while (desc->status & IRQ_INPROGRESS) {
+				barrier();
+				cpu_relax();
+			}
+#endif
+			return 0;
+		}
+		printk("Trying to free free IRQ%d\n",irq);
+		spin_unlock_irqrestore(&desc->lock,flags);
+		return -ENOENT;
+	}
+}
+
 /**
  *	free_irq - free an interrupt
  *	@irq: Interrupt line to free
@@ -752,7 +800,7 @@ int request_irq(unsigned int irq,
 void free_irq(unsigned int irq, void *dev_id)
 {
 	irq_desc_t *desc;
-	struct irqaction **p;
+	struct irqaction *action;
 	unsigned long flags;
 
 	if (irq >= NR_IRQS)
@@ -760,39 +808,19 @@ void free_irq(unsigned int irq, void *dev_id)
 
 	desc = irq_desc + irq;
 	spin_lock_irqsave(&desc->lock,flags);
-	p = &desc->action;
-	for (;;) {
-		struct irqaction * action = *p;
-		if (action) {
-			struct irqaction **pp = p;
-			p = &action->next;
-			if (action->dev_id != dev_id)
-				continue;
+	for (action = desc->action; action != NULL; action = action->next) {
+		if (action->dev_id != dev_id)
+			continue;
 
-			/* Found it - now remove it from the list of entries */
-			*pp = action->next;
-			if (!desc->action) {
-				desc->status |= IRQ_DISABLED;
-				desc->handler->shutdown(irq);
-			}
-			spin_unlock_irqrestore(&desc->lock,flags);
-
-#ifdef CONFIG_SMP
-			/* Wait to make sure it's not being used on another CPU */
-			while (desc->status & IRQ_INPROGRESS) {
-				barrier();
-				cpu_relax();
-			}
-#endif
-#define SA_STATIC_ACTION 0x01000000 /* Is it our duty to free the action? */
-			if (!(action->flags & SA_STATIC_ACTION))
-				kfree(action);
-			return;
-		}
-		printk("Trying to free free IRQ%d\n",irq);
 		spin_unlock_irqrestore(&desc->lock,flags);
+
+		if (teardown_irq(irq, action) == 0)
+			kfree(action);
 		return;
 	}
+	printk("Trying to free free IRQ%d\n",irq);
+	spin_unlock_irqrestore(&desc->lock,flags);
+	return;
 }
 
 /*
