@@ -173,6 +173,10 @@ static __inline__ int get_order(unsigned long size)
 #define VM_DATA_DEFAULT_FLAGS	(VM_READ | VM_WRITE | VM_EXEC | \
 				 VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC)
 
+/* VIRT <-> MACHINE conversion */
+#define virt_to_machine(_a) (phys_to_machine(__pa(_a)))
+#define machine_to_virt(_m) (__va(machine_to_phys(_m)))
+
 #endif /* __KERNEL__ */
 
 #endif /* _I386_PAGE_H */

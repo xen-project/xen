@@ -53,7 +53,7 @@ typedef struct proc_mem_data {
 
 #define MAP_DISCONT     1
 
-static struct proc_dir_entry *xeno_base;
+struct proc_dir_entry *xeno_base;
 static struct proc_dir_entry *dom0_cmd_intf;
 static struct proc_dir_entry *proc_ft;
 

@@ -47,12 +47,14 @@ HEAD := arch/xeno/kernel/head.o arch/xeno/kernel/init_task.o
 SUBDIRS += arch/xeno/kernel arch/xeno/mm arch/xeno/lib
 SUBDIRS += arch/xeno/drivers/console arch/xeno/drivers/network
 SUBDIRS += arch/xeno/drivers/dom0 arch/xeno/drivers/block
+SUBDIRS += arch/xeno/drivers/balloon
 
 CORE_FILES += arch/xeno/kernel/kernel.o arch/xeno/mm/mm.o
 CORE_FILES += arch/xeno/drivers/console/con.o
 CORE_FILES += arch/xeno/drivers/block/blk.o
 CORE_FILES += arch/xeno/drivers/network/net.o
 CORE_FILES += arch/xeno/drivers/dom0/dom0.o
+CORE_FILES += arch/xeno/drivers/balloon/balloon_driver.o
 LIBS := $(TOPDIR)/arch/xeno/lib/lib.a $(LIBS) $(TOPDIR)/arch/xeno/lib/lib.a
 
 arch/xeno/kernel: dummy
@@ -72,6 +74,9 @@ arch/xeno/drivers/block: dummy
 
 arch/xeno/drivers/dom0: dummy
 	$(MAKE) linuxsubdirs SUBDIRS=arch/xeno/drivers/dom0
+
+arch/xeno/drivers/balloon: dummy
+	$(MAKE) linuxsubdirs SUBDIRS=arch/xeno/drivers/balloon
 
 MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
 

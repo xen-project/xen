@@ -76,7 +76,7 @@ void halt_machine(u_char key, void *dev_id, struct pt_regs *regs)
 /* XXX SMH: this is keir's fault */
 static char *task_states[] = 
 { 
-    "Running", 
+    "Runnable", 
     "Interruptible Sleep", 
     "Uninterruptible Sleep", 
     NULL, "Stopped", 
@@ -104,9 +104,8 @@ void do_task_queues(u_char key, void *dev_id, struct pt_regs *regs)
 	    printk("Notifying guest...\n"); 
 	    set_bit(_EVENT_DEBUG, &s->events); 
 	}
-    }
+    } while ( (p = p->next_task) != &idle0_task );
 
-    while ( (p = p->next_task) != &idle0_task );
     read_unlock_irqrestore(&tasklist_lock, flags); 
 }
 
