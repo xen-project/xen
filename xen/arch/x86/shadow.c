@@ -583,6 +583,11 @@ void shadow_mode_init(void)
 {
 }
 
+int _shadow_mode_enabled(struct domain *d)
+{
+    return shadow_mode_enabled(d);
+}
+
 static void alloc_monitor_pagetable(struct exec_domain *ed)
 {
     unsigned long mmfn;
@@ -2623,21 +2628,7 @@ static int check_l1_table(
     // thus potentially out-of-sync) guest page.
     //
     if ( VM_ASSIST(d, VMASST_TYPE_writable_pagetables) )
-    {
-        int cpu = current->processor;
-
-        for ( i = 0; i < ARRAY_SIZE(ptwr_info->ptinfo); i++)
-        {
-            if ( ptwr_info[cpu].ptinfo[i].l1va &&
-                 ((v2m(ptwr_info[cpu].ptinfo[i].pl1e) >> PAGE_SHIFT) == gmfn) )
-            {
-                unsigned long old = gmfn;
-                gmfn = (v2m(ptwr_info[cpu].ptinfo[i].page) >> PAGE_SHIFT);
-                printk("hit1 ptwr_info[%d].ptinfo[%d].l1va, mfn=0x%08x, snapshot=0x%08x\n",
-                       cpu, i, old, gmfn);
-            }
-        }
-    }
+        BUG();
 
     if ( page_out_of_sync(pfn_to_page(gmfn)) )
     {

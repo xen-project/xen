@@ -2683,7 +2683,7 @@ int ptwr_do_page_fault(struct domain *d, unsigned long addr)
     int              which;
     u32              l2_idx;
 
-    if ( unlikely(shadow_mode_enabled(ed->domain)) )
+    if ( unlikely(shadow_mode_enabled(d)) )
         return 0;
 
     /*

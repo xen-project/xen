@@ -4,8 +4,8 @@
 
 #include <xen/config.h>
 #include <xen/list.h>
-#include <xen/sched.h>
 #include <asm/io.h>
+#include <asm/uaccess.h>
 
 /*
  * Per-page-frame information.
@@ -150,6 +150,7 @@ extern void invalidate_shadow_ldt(struct exec_domain *d);
 extern int shadow_remove_all_write_access(
     struct domain *d, unsigned long gpfn, unsigned long gmfn);
 extern u32 shadow_remove_all_access( struct domain *d, unsigned long gmfn);
+extern int _shadow_mode_enabled(struct domain *d);
 
 static inline void put_page(struct pfn_info *page)
 {
@@ -181,12 +182,9 @@ static inline int get_page(struct pfn_info *page,
              unlikely((nx & PGC_count_mask) == 0) || /* Count overflow? */
              unlikely(d != _domain) )                /* Wrong owner? */
         {
-            if ( !domain->arch.shadow_mode )
-                DPRINTK("Error pfn %p: rd=%p(%d), od=%p(%d), caf=%08x, "
-                        "taf=%08x\n",
-                        page_to_pfn(page), domain, (domain ? domain->id : -1),
-                        page_get_owner(page),
-                        (page_get_owner(page) ? page_get_owner(page)->id : -1),
+            if ( !_shadow_mode_enabled(domain) )
+                DPRINTK("Error pfn %p: rd=%p, od=%p, caf=%08x, taf=%08x\n",
+                        page_to_pfn(page), domain, unpickle_domptr(d),
                         x, page->u.inuse.type_info);
             return 0;
         }
