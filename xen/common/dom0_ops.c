@@ -79,9 +79,13 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     case DOM0_BUILDDOMAIN:
     {
         struct task_struct * p = find_domain_by_id(op.u.meminfo.domain);
-        if ( (ret = final_setup_guestos(p, &op.u.meminfo)) == 0 )
-            ret = p->domain;
-        put_task_struct(p);
+        ret = -EINVAL;
+        if ( p != NULL )
+        {
+            if ( (ret = final_setup_guestos(p, &op.u.meminfo)) == 0 )
+                ret = p->domain;
+            put_task_struct(p);
+        }
     }
     break;
 
@@ -94,14 +98,14 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             wake_up(p);
             reschedule(p);
             ret = p->domain;
+            put_task_struct(p);
         }
-        put_task_struct(p);
     }
     break;
 
     case DOM0_STOPDOMAIN:
     {
-        ret = stop_other_domain (op.u.meminfo.domain);
+        ret = stop_other_domain(op.u.meminfo.domain);
     }
     break;
 
@@ -153,14 +157,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     {
         unsigned int dom = op.u.killdomain.domain;
         int force = op.u.killdomain.force;
-        if ( dom == IDLE_DOMAIN_ID )
-        {
-            ret = -EPERM;
-        }
-        else
-        {
-            ret = kill_other_domain(dom, force);
-        }
+        ret = (dom == IDLE_DOMAIN_ID) ? -EPERM : kill_other_domain(dom, force);
     }
     break;
 
@@ -179,15 +176,10 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         unsigned long  warp    = op.u.adjustdom.warp;
         unsigned long  warpl   = op.u.adjustdom.warpl;
         unsigned long  warpu   = op.u.adjustdom.warpu;
-        
-        if ( dom == IDLE_DOMAIN_ID )
-        {
-            ret = -EPERM;
-        }
-        else
-        {
+
+        ret = -EPERM;
+        if ( dom != IDLE_DOMAIN_ID )
             ret = sched_adjdom(dom, mcu_adv, warp, warpl, warpu);
-        }
     }
     break;
 
