@@ -269,8 +269,10 @@ retry:
     }
 
 
-    if( ++i < 3 )
+    if( ++i < 100 )
     {
+	xcio_error(ioctxt, "Retry suspend domain (%lx)",
+		   op->u.getdomaininfo.flags);
 	usleep(10000);  // 10ms	
 	goto retry;
     }
