@@ -56,6 +56,10 @@ void ide_probe_devices(xen_disk_info_t* xdi)
 
             xdi->disks[xdi->count].device   = device; 
             xdi->disks[xdi->count].info     = type; 
+
+	    if(type == XD_TYPE_CDROM) 
+		xdi->disks[xdi->count].info |= XD_FLAG_RO; 
+
             xdi->disks[xdi->count].capacity = capacity;
             xdi->count++;
 
