@@ -44,7 +44,7 @@ class XendRoot:
     config_var     = "XEND_CONFIG"
 
     """Where network control scripts live."""
-    network_script_dir = "/etc/xen"
+    network_script_dir = "/etc/xen/scripts"
 
     logfile_default = "/var/log/xend.log"
 
