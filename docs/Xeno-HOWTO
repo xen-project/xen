@@ -210,7 +210,7 @@ UDP packets to  the local virtual network. Those  packets are received
 by xen_read_console running in Domain  0 and output are printed out to
 the standard output.
 
-Now edit the tools/examples/xi_createlinuxdom.py script to your taste. This
+Now edit the tools/examples/createlinuxdom.py script to your taste. This
 should then be executed as root to create a new domain.
 
 You should be able to see XenoLinux boot message on standard output
@@ -221,14 +221,14 @@ List and Stop Domains
 ==============================
 
 You can see a list of existing domains with:
-# tools/examples/xi_listdoms.py
+# tools/examples/listdoms.py
 
 In order to stop a domain, you use:
-# tools/examples/xi_stopdom.py <domain_id>
+# tools/examples/stopdom.py <domain_id>
 
 To destroy a domain use ('force' causes an immediate destruction
 without waiting for the guest OS to shut down cleanly):
-# tools/examples/xi_destroydom.py <domain_id> [force]
+# tools/examples/destroydom.py <domain_id> [force]
 
 
 Other Control Tasks using Python

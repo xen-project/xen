@@ -12,20 +12,26 @@ nfsserv = nfspath = root_partn = usr_partn = ""
 # STEP 1. Specify kernel image file.
 image = "FULL_PATH_TO_IMAGE"
 
-# STEP 2. Specify IP address, netmask and gateway for the new domain.
+# STEP 2. How many megabytes of memory for the new domain?
+memory_megabytes = 64
+
+# STEP 3. A handy name for your new domain.
+domain_name = "My new domain"
+
+# STEP 4. Specify IP address, netmask and gateway for the new domain.
 ipaddr  = "ADDRESS"
 netmask = XenoUtil.get_current_ipmask()
 gateway = XenoUtil.get_current_ipgw()
 
-# STEP 3a. Specify NFS server and path to rootfs (only needed for network boot)
+# STEP 5a. Specify NFS server and path to rootfs (only needed for network boot)
 nfsserv = "ADDRESS"
 nfspath = "FULL_PATH_TO_ROOT_DIR"
 
-# STEP 3b. Specify root (and possibly /usr) on local disc (if not NFS booting)
+# STEP 5b. Specify root (and possibly /usr) on local disc (if not NFS booting)
 #root_partn = "/dev/sda2"
 #usr_partn  = "/dev/sda6"
 
-# STEP 4. Check that the following cmdline setup is to your taste.
+# STEP 6. Check that the following cmdline setup is to your taste.
 cmdline = "ip="+ipaddr+":"+nfsserv+":"+gateway+":"+netmask+"::eth0:off"
 if root_partn:
     # Boot from local disc. May specify a separate /usr.
@@ -55,7 +61,7 @@ if not os.path.isfile( image ):
 
 xc = Xc.new()
 
-id = xc.domain_create()
+id = xc.domain_create( mem_kb=memory_megabytes*1024, name=domain_name )
 if id <= 0:
     print "Error creating domain"
     sys.exit()

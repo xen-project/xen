@@ -154,14 +154,6 @@ There's also a pre-built source tree on the project downloads page.
 Using the domain control tools
 ==============================
 
-The README.CD file contains some examples of how to use 'xenctl' and
-the other domain control tools. Invoking the tool without any
-arguments prints some usage inforamtion. There's also some
-documentation in the the repository under tools/control/doc
+See example Python scripts in tools/examples/
 
-
-
-Ian Pratt
-9 Sep 2003
-
-
+Further documentation is in docs/ (e.g., docs/Xeno-HOWTO).

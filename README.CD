@@ -123,14 +123,9 @@ benchmarks we used in the SOSP paper.
 Starting other domains
 ======================
 
-There's a web interface for starting and managing other domains (VMs),
-but since we generally use the command line tools they're probably
-rather better debugged at present. The key command is 'xenctl' which
-lives in /usr/local/bin and uses /etc/xenctl.xml for its default
-configuration. Run 'xenctl' without any arguments to get a help
-message. Note that xenctl is a java front end to various underlying 
-internal tools written in C (xi_*). Running off CD, it seems to take 
-an age to start...
+Xen's privileged control interfaces can be accessed using a handy C
+library (libxc.so) or an even easier-to-use Python wrapper module
+(Xc). Example script templates are provided in tools/examples/.
 
 Abyway, the first thing to do is to set up a window in which you will
 receive console output from other domains. Console output will arrive
@@ -150,42 +145,15 @@ Next, run a the xen UDP console displayer:
   xen_read_console &
 
 
-As mentioned above, xenctl uses /etc/xenctl.xml as its default
-configuration. The directory contains two different configs depending
-on whether you want to use NAT, or multiple sequential external IPs
-(it's possible to override any of the parameters on the command line
-if you want to set specific IPs, etc).
+As mentioned above, a template Python script is provided:
+tools/examples/craetelinuxdom.py. This can be modified to set up a
+virtual Ethernet interface, access to local discs, and various other
+parameters.
 
-The default configuration file supports NAT. To change to use multiple IPs:
+When you execute your modified screipt, you should see the domain
+booting on your xen_read_console window.
 
- cp /etc/xenctl.xml-publicip /etc/xenctl.xml
-
-A sequence of commands must be given to xenctl to start a new 
-domain. First a new domain must be created, which requires specifying
-the initial memory allocation, the kernel image to use, and the kernel
-command line. As well as the root file system details, you'll need to
-set the IP address on the command line: since Xen currently doesn't
-support a virtual console for domains >1, you won't be able to log to
-your new domain unless you've got networking configured and an sshd
-running! (using dhcp for new domains should work too).
-
-After creating the domain, xenctl must be used to grant the domain
-access to other resources such as physical or virtual disk partions.
-Then, the domain must be started.
-
-These commands can be entered manually, but for convenience, xenctl
-will also read them from a script and infer which domain number you're
-referring to (-nX). To use the sample script:
-
- xenctl script -f/etc/xen-mynewdom     [NB: no space after the -f]
-
-You should see the domain booting on your xen_read_console window.
-
-The xml defaults start another domain running off the CD, using a
-separate RAM-based file system for mutable data in root (just like
-domain 0). 
-
-The new domain is started with a '4' on the kernel command line to
+The new domain may be started with a '4' on the kernel command line to
 tell 'init' to go to runlevel 4 rather than the default of 3. This is
 done simply to suppress a bunch of harmless error messages that would
 otherwise occur when the new (unprivileged) domain tried to access
@@ -204,31 +172,22 @@ virtual machine remotely, use:
 If you configured the new domain with its own IP address, you should
 be able to ssh into it directly.
 
+Script 'tools/examples/listdoms.py' demonstrates how to generate a
+list of all extant domains. Prettier printing is an exercise for the
+reader!
 
-"xenctl domain list" provides status information about running domains,
-though is currently only allowed to be run by domain 0. It accesses
-/proc/xeno/domains to read this information from Xen. You can also use
-xenctl to 'stop' (pause) a domain, or 'kill' a domain. You can either
-kill it nicely by sending a shutdown event and waiting for it to
-terminate, or blow the sucker away with extreme prejudice. 
-
-If you want to configure a new domain differently, type 'xenctl' to
-get a list of arguments, e.g. at the 'xenctl domain new' command line
-use the "-4" option to set a diffrent IPv4 address. 
-
-xenctl can be used to set the new kernel's command line, and hence
-determine what it uses as a root file system, etc. Although the default
-is to boot in the same manner that domain0 did (using the RAM-based
-file system for root and the CD for /usr) it's possible to configure any
-of the following possibilities, for example:
+createlinuxdom.py can be used to set the new kernel's command line,
+and hence determine what it uses as a root file system, etc. Although
+the default is to boot in the same manner that domain0 did (using the
+RAM-based file system for root and the CD for /usr) it's possible to
+configure any of the following possibilities, for example:
 
  * initrd=/boot/initrd init=/linuxrc
      boot using an initial ram disk, executing /linuxrc (as per this CD)     
 
  * root=/dev/hda3 ro
      boot using a standard hard disk partition as root
-     !!! remember to do "xenctl physical grant -phda3 -w -n<dom>" first
-     (grant domain <dom> read/write access to partition 3)
+     !!! remember to grant access in createlinuxdom.py.
 
  * root=/dev/xvda1 ro
      boot using a pre-configured 'virtual block device' that will be
@@ -240,28 +199,16 @@ of the following possibilities, for example:
      remote NFS server, or from an NFS server running in another
      domain. The latter is rather a useful option.
 
-
 A typical setup might be to allocate a standard disk partition for
 each domain and populate it with files. To save space, having a shared
 read-only usr partition might make sense.
 
-Alternatively, you can use 'virtual disks', which are stored as files
-within a custom file system. "xenctl partitions add" can be used to
-'format' a partition with the file system, and then virtual disks can
-be created with "xenctl vd create". Virtual disks can then be attached
-to a running domain as a 'virtual block device' using "xenctl vbd
-create". The virtual disk can optionally be partitioned (e.g. "fdisk
-/dev/xvda") or have a file system created on it directly (e.g. "mkfs
--t ext3 /dev/xvda").  The virtual disk can then be accessed by a
-virtual block device associated with another domain, and even used as
-a boot device.
-
-Both virtual disks and real partitions should only be shared between
-domains in a read-only fashion otherwise the linux kernels will
-obviously get very confused as the file system structure may change
-underneath them (having the same partition mounted rw twice is a sure
-fire way to cause irreparable damage)!  If you want read-write
-sharing, export the directory to other domains via NFS from domain0.
+Block devices should only be shared between domains in a read-only
+fashion otherwise the linux kernels will obviously get very confused
+as the file system structure may change underneath them (having the
+same partition mounted rw twice is a sure fire way to cause
+irreparable damage)!  If you want read-write sharing, export the
+directory to other domains via NFS from domain0.
 
 
 Troubleshooting Problems
@@ -478,8 +425,7 @@ domain0 and domains>0, one trick is to use different 'init' run
 levels. For example, on the Xen Demo CD we use run level 3 for domain
 0, and run level 4 for domains>0. This enables different startup
 scripts to be run in depending on the run level number passed on the
-kernel command line. The xenctl.xml config file on the CD passes '4'
-on the kernel command line to domains that it starts.
+kernel command line.
 
 Xenolinux kernels can be built to use runtime loadable modules just
 like normal linux kernels. Modules should be installed under

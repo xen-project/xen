@@ -3,23 +3,6 @@
 Known limitations and work in progress
 ======================================
 
-The "xenctl" tool used for controling domains is still rather clunky
-and not very user friendly. In particular, it should have an option to
-create and start a domain with all the necessary parameters set from a
-named xml file. Update: the 'xenctl script' functionality combined
-with the '-i' option to 'domain new' sort of does this.
-
-The java xenctl tool is really just a frontend for a bunch of C tools
-named xi_* that do the actual work of talking to Xen and setting stuff
-up. Some local users prefer to drive the xi_ tools directly, typically
-from simple shell scripts. These tools are even less user friendly
-than xenctl but its arguably clearer what's going on.
-
-There's also a nice web based interface for controlling domains that
-uses apache/tomcat. Unfortunately, this has fallen out of sync with
-respect to the underlying tools, so is currently not built by default
-and needs fixing. It shouldn't be hard to bring it up to date.
-
 The current Xen Virtual Firewall Router (VFR) implementation in the
 snapshot tree is very rudimentary, and in particular, lacks the RSIP
 IP port-space sharing across domains that provides a better
@@ -28,38 +11,13 @@ development which also supports much better logging and auditing
 support. For now, if you want NAT, see the xen_nat_enable scripts and
 get domain0 to do it for you.
 
-The current network scheduler is just simple round-robin between
-domains, without any rate limiting or rate guarantees. Dropping in a
-new scheduler is straightforward, and is planned as part of the
-VFRv2 work package.
-
-Another area that needs further work is the interface between Xen and
-domain0 user space where the various XenoServer control daemons run.
-The current interface is somewhat ad-hoc, making use of various
-/proc/xeno entries that take a random assortment of arguments. We
-intend to reimplement this to provide a consistent means of feeding
-back accounting and logging information to the control daemon, and
-enabling control instructions to be sent the other way (e.g. domain 3:
-reduce your memory footprint to 10000 pages. You have 1s to comply.)
-We should also use the same interface to provide domains with a
-read/write virtual console interface. The current implemenation is
-output only, though domain0 can use the VGA console read/write.
-
-There's also a number of memory management hacks that didn't make this
-release: We have plans for a "universal buffer cache" that enables
-otherwise unused system memory to be used by domains in a read-only
-fashion. We also have plans for inter-domain shared-memory to enable
-high-performance bulk transport for cases where the usual internal
-networking performance isn't good enough (e.g. communication with a
-internal file server on another domain).
-
-We also have plans to implement domain suspend/resume-to-file. This is
-basically an extension to the current domain building process to
-enable domain0 to read out all of the domain's state and store it in a
-file. There are complications here due to Xen's para-virtualised
-design, whereby since the physical machine memory pages available to
-the guest OS are likely to be different when the OS is resumed, we
-need to re-write the page tables appropriately. 
+There are also a number of memory management enhancements that didn't
+make this release: We have plans for a "universal buffer cache" that
+enables otherwise unused system memory to be used by domains in a
+read-only fashion. We also have plans for inter-domain shared-memory
+to enable high-performance bulk transport for cases where the usual
+internal networking performance isn't good enough (e.g. communication
+with a internal file server on another domain).
 
 We have the equivalent of balloon driver functionality to control
 domain's memory usage, enabling a domain to give back unused pages to
