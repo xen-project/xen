@@ -1,12 +1,20 @@
+
+/*
+ * pervasive debugger
+ * www.cl.cam.ac.uk/netos/pdb
+ *
+ * alex ho
+ * 2004
+ * university of cambridge computer laboratory
+ *
+ * linux specific pdb stuff 
+ */
+
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/lib.h>
 #include <hypervisor-ifs/dom0_ops.h>
 #include <asm/pdb.h>
-
-/* 
- * linux specific pdb stuff 
- */
 
 /* from linux/sched.h */
 #define PIDHASH_SZ (4096 >> 2)
@@ -30,9 +38,7 @@
 #define ENTRIES_PER_L1_PAGETABLE 1024
 #define L1_PAGE_BITS ( (ENTRIES_PER_L1_PAGETABLE - 1) << PAGE_SHIFT )
 
-
 void pdb_linux_process_details (unsigned long cr3, int pid, char *buffer);
-
 
 /* adapted from asm-xen/page.h */
 static inline unsigned long machine_to_phys(unsigned long cr3,
@@ -46,9 +52,8 @@ static inline unsigned long machine_to_phys(unsigned long cr3,
   return phys;
 }
 
-
-#define pidhash_addr         0xc01971e0UL
-#define init_task_union_addr 0xc0182000UL
+unsigned long pdb_pidhash_addr         = 0xc01971e0UL;
+unsigned long pdb_init_task_union_addr = 0xc0182000UL;
 
 #define task_struct_mm_offset        0x2c
 #define task_struct_next_task_offset 0x48
@@ -59,16 +64,18 @@ static inline unsigned long machine_to_phys(unsigned long cr3,
 
 #define mm_struct_pgd_offset         0x0c
 
-/* read a byte from a process */
-u_char pdb_linux_get_value(int pid, unsigned long cr3, unsigned long addr)
+/*
+ * find the task structure of a process (pid)
+ * given the cr3 of the guest os.
+ */
+unsigned long pdb_linux_pid_task_struct (unsigned long cr3, int pid)
 {
-  u_char result = 0;
-  unsigned long task_struct_p, mm_p, pgd, task_struct_pid;
-  unsigned long l2tab, page;
+  unsigned long task_struct_p = (unsigned long) NULL;
+  unsigned long task_struct_pid;
 
   /* find the task_struct of the given process */
   pdb_get_values((u_char *) &task_struct_p, sizeof(task_struct_p),
-		 cr3, pidhash_addr + pid_hashfn(pid) * 4);
+		 cr3, pdb_pidhash_addr + pid_hashfn(pid) * 4);
 
   /* find the correct task struct */
   while (task_struct_p != (unsigned long)NULL)
@@ -79,15 +86,32 @@ u_char pdb_linux_get_value(int pid, unsigned long cr3, unsigned long addr)
     {
       break;
     }
-    
+
     pdb_get_values((u_char *) &task_struct_p, sizeof(task_struct_p),
 		   cr3, task_struct_p + task_struct_pidhash_next_offset);
   }
-  if (task_struct_p == (unsigned long)NULL)
+  if (task_struct_p == (unsigned long) NULL)
   {
     /* oops */
-    printk ("error: pdb couldn't find process 0x%x\n", pid);
-    return 0;
+    printk ("pdb error: couldn't find process 0x%x (0x%lx)\n", pid, cr3);
+  }
+
+  return task_struct_p;
+}
+
+/*
+ * find the ptbr of a process (pid)
+ * given the cr3 of the guest os.
+ */
+unsigned long pdb_linux_pid_ptbr (unsigned long cr3, int pid)
+{
+  unsigned long task_struct_p;
+  unsigned long mm_p, pgd;
+
+  task_struct_p = pdb_linux_pid_task_struct(cr3, pid);
+  if (task_struct_p == (unsigned long) NULL)
+  {
+    return (unsigned long) NULL;
   }
 
   /* get the mm_struct within the task_struct */
@@ -96,6 +120,27 @@ u_char pdb_linux_get_value(int pid, unsigned long cr3, unsigned long addr)
   /* get the page global directory (cr3) within the mm_struct */
   pdb_get_values((u_char *) &pgd, sizeof(pgd),
 		 cr3, mm_p + mm_struct_pgd_offset);
+
+  return pgd;
+}
+
+
+
+/* read a byte from a process 
+ *
+ * in: pid: process id
+ *     cr3: ptbr for the process' domain
+ *     addr: address to read
+ */
+
+u_char pdb_linux_get_value(int pid, unsigned long cr3, unsigned long addr)
+{
+  u_char result = 0;
+  unsigned long pgd;
+  unsigned long l2tab, page;
+
+  /* get the process' pgd */
+  pgd = pdb_linux_pid_ptbr(cr3, pid);
 
   /* get the l2 table entry */
   pdb_get_values((u_char *) &l2tab, sizeof(l2tab),
@@ -114,8 +159,22 @@ u_char pdb_linux_get_value(int pid, unsigned long cr3, unsigned long addr)
   return result;
 }
 
-/* return 1 if is the virtual address is in the operating system's
-   address space, else 0 */
+void pdb_linux_get_values(char *buffer, int length, unsigned long address,
+			  int pid, unsigned long cr3)
+{
+    int loop;
+
+    /* yes, this can be optimized... a lot */
+    for (loop = 0; loop < length; loop++)
+    {
+        buffer[loop] = pdb_linux_get_value(pid, cr3, address + loop);
+    }
+}
+
+/*
+ * return 1 if is the virtual address is in the operating system's
+ * address space, else 0 
+ */
 int pdb_linux_address_space (unsigned long addr)
 {
     return (addr > PAGE_OFFSET);
@@ -135,9 +194,9 @@ int pdb_linux_process_list (unsigned long cr3, int array[], int max)
 
   /* task_p = init_task->next_task  */
   pdb_get_values((u_char *) &task_p, sizeof(task_p),
-		 cr3, init_task_union_addr + task_struct_next_task_offset);
+		 cr3, pdb_init_task_union_addr + task_struct_next_task_offset);
   
-  while (task_p != init_task_union_addr)
+  while (task_p != pdb_init_task_union_addr)
   {
       pdb_get_values((u_char *) &pid, sizeof(pid),
 		     cr3, task_p + task_struct_pid_offset);
@@ -153,35 +212,14 @@ int pdb_linux_process_list (unsigned long cr3, int array[], int max)
   return count;
 }
 
-/* get additional details about a particular process:
+/*
+ * get additional details about a particular process
  */
 void pdb_linux_process_details (unsigned long cr3, int pid, char *buffer)
 {
-  unsigned long task_struct_p, task_struct_pid;
+  unsigned long task_struct_p;
 
-  /* find the task_struct of the given process */
-  pdb_get_values((u_char *) &task_struct_p, sizeof(task_struct_p),
-		 cr3, pidhash_addr + pid_hashfn(pid) * 4);
-
-  /* find the correct task struct */
-  while (task_struct_p != (unsigned long)NULL)
-  {
-    pdb_get_values((u_char *) &task_struct_pid, sizeof(task_struct_pid),
-		   cr3, task_struct_p + task_struct_pid_offset);
-    if (task_struct_pid == pid)
-    {
-      break;
-    }
-
-    pdb_get_values((u_char *) &task_struct_p, sizeof(task_struct_p),
-		   cr3, task_struct_p + task_struct_pidhash_next_offset);
-  }
-  if (task_struct_p == (unsigned long)NULL)
-  {
-    /* oops */
-    printk ("error: pdb couldn't find process 0x%x\n", pid);
-    return;
-  }
+  task_struct_p = pdb_linux_pid_task_struct(cr3, pid);
 
   pdb_get_values((u_char *) buffer, task_struct_comm_length,
 		 cr3, task_struct_p + task_struct_comm_offset);

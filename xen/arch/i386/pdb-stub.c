@@ -1,10 +1,13 @@
 
 /*
  * pervasive debugger
+ * www.cl.cam.ac.uk/netos/pdb
  *
  * alex ho
  * 2004
  * university of cambridge computer laboratory
+ *
+ * code adapted originally from kgdb & nemesis
  */
 
 #include <xen/lib.h>
@@ -32,9 +35,7 @@
 
 #define BUFMAX 400
 
-#define PDB_ID_OFFSET 2        /* all threads & domains are positive numbers */
-
-static const char hexchars[]="0123456789abcdef";
+static const char hexchars[] = "0123456789abcdef";
 
 static int remote_debug;
 
@@ -46,22 +47,29 @@ static int  pdb_in_buffer_ptr;
 static unsigned char  pdb_in_checksum;
 static unsigned char  pdb_xmit_checksum;
 
-struct pdb_ctx_element
-{
-    int ctrl;
-    int info;
-    unsigned long ctrl_cr3;
-    unsigned long info_cr3;
-};
+/* function pointers in the near future... */
+unsigned long pdb_linux_pid_ptbr (unsigned long cr3, int pid);
+void pdb_linux_get_values(char *buffer, int length, unsigned long address,
+			  int pid, unsigned long cr3);
 
-#define pdb_ctx_count 3
-enum pdb_levels {PDB_LVL_XEN = 0, PDB_LVL_GUESTOS, PDB_LVL_PROCESS};
-struct pdb_ctx_element pdb_ctx[pdb_ctx_count];
-int pdb_level = PDB_LVL_XEN;
+struct pdb_context
+{
+    int valid;
+    int domain;
+    int process;
+    unsigned long ptbr;                   /* cached page table base register */
+};
+struct pdb_context pdb_ctx;
+
+int pdb_continue_thread = 0;
+int pdb_general_thread = 0;
 
 void pdb_put_packet (unsigned char *buffer, int ack);
 
 int pdb_initialized = 0;
+int pdb_page_fault_possible = 0;
+int pdb_page_fault_scratch = 0;                     /* just a handy variable */
+int pdb_page_fault = 0;
 static int pdb_serhnd = -1;
 static int pdb_stepping = 0;
 
@@ -75,16 +83,6 @@ static inline unsigned char pdb_get_char(void)
     return serial_getc(pdb_serhnd);
 }
 
-static volatile int mem_err = 0;
-void set_mem_err (void)                                   /* NOT USED YET... */
-{
-    mem_err = 1;
-}
-
-/* These are separate functions so that they are so short and sweet
-   that the compiler won't save any registers (if there is a fault
-   to mem_fault, they won't get restored, so there better not be any
-   saved).  */
 int
 get_char (char *addr)
 {
@@ -106,38 +104,17 @@ pdb_process_query (char *ptr)
     }
     else if (strcmp(ptr, "fThreadInfo") == 0)
     {
+#ifdef PDB_PAST
         struct task_struct *p;
         u_long flags;
-	int buf_idx = 0;
+#endif /* PDB_PAST */
 
-	{                                                /* case pdb_lvl_xen */
-	    int count = 0;
+        int buf_idx = 0;
 
-	    read_lock_irqsave (&tasklist_lock, flags);
+	pdb_out_buffer[buf_idx++] = 'l';
+	pdb_out_buffer[buf_idx++] = 0;
 
-	    pdb_out_buffer[buf_idx++] = 'm';
-	    for_each_domain ( p )
-	    {
-	        domid_t domain = p->domain + PDB_ID_OFFSET;
-
-		if (count > 0)
-		{
-		    pdb_out_buffer[buf_idx++] = ',';
-		}
-		if (domain > 15)
-		{
-		    pdb_out_buffer[buf_idx++] = hexchars[domain >> 4];
-		}
-		pdb_out_buffer[buf_idx++] = hexchars[domain % 16];
-		count++;
-	    }
-	    pdb_out_buffer[buf_idx++] = 0;
-
-	    read_unlock_irqrestore(&tasklist_lock, flags);
-	}
-
-#ifdef PDB_FUTURE
-
+#ifdef PDB_PAST
 	switch (pdb_level)
 	{
 	case PDB_LVL_XEN:                        /* return a list of domains */
@@ -172,7 +149,7 @@ pdb_process_query (char *ptr)
 	    int foobar[20];
 	    int loop, total;
 
-	    /* *** BUG: this cr3 is wrong wrong wrong */
+                                                       /* this cr3 is wrong! */
 	    total = pdb_linux_process_list(pdb_ctx[pdb_level].info_cr3,
 					   foobar, 20);
 
@@ -201,8 +178,7 @@ pdb_process_query (char *ptr)
 	default:
 	    break;
 	}
-
-#endif /* PDB_FUTURE */
+#endif /* PDB_PAST */
 
     }
     else if (strcmp(ptr, "sThreadInfo") == 0)
@@ -214,6 +190,16 @@ pdb_process_query (char *ptr)
     }
     else if (strncmp(ptr, "ThreadExtraInfo,", 16) == 0)
     {
+        int thread = 0;
+	char *message = "foobar ?";
+
+	ptr += 16;
+        if (hexToInt (&ptr, &thread))
+	{
+            mem2hex (message, pdb_out_buffer, strlen(message) + 1);
+	}
+
+#ifdef PDB_PAST
         int thread = 0;
 	char message[16];
 	struct task_struct *p;
@@ -227,6 +213,7 @@ pdb_process_query (char *ptr)
 	{
             mem2hex ((char *)message, pdb_out_buffer, strlen(message) + 1);
 	}
+#endif /* PDB_PAST */
 
 #ifdef PDB_FUTURE
       {
@@ -249,7 +236,7 @@ pdb_process_query (char *ptr)
     }
     else
     {
-        printk("pdb_process_query: unknown query [%s]\n", ptr);
+        printk("pdb: error, unknown query [%s]\n", ptr);
     }
 }
 
@@ -341,36 +328,48 @@ pdb_process_command (char *ptr, struct pt_regs *regs, unsigned long cr3,
 
     pdb_out_buffer[0] = 0;
 
-    if (pdb_ctx[pdb_level].ctrl_cr3 == 0 &&
-	pdb_ctx[pdb_level].ctrl >= 0)
+    if (pdb_ctx.valid == 1)
     {
-        struct task_struct *p;
+        if (pdb_ctx.domain == -1)                        /* pdb context: xen */
+	{
+	    struct task_struct *p;
 
-	p = find_domain_by_id(pdb_ctx[pdb_level].ctrl);
-	if (p->mm.shadow_mode)
-	  pdb_ctx[pdb_level].ctrl_cr3 = pagetable_val(p->mm.shadow_table);
-	else
-	  pdb_ctx[pdb_level].ctrl_cr3 = pagetable_val(p->mm.pagetable);
-	put_task_struct(p);
+	    p = &idle0_task;
+	    if (p->mm.shadow_mode)
+	        pdb_ctx.ptbr = pagetable_val(p->mm.shadow_table);
+	    else
+	        pdb_ctx.ptbr = pagetable_val(p->mm.pagetable);
+	}
+	else if (pdb_ctx.process == -1)             /* pdb context: guest os */
+	{
+	    struct task_struct *p;
 
-	TRC(printk ("PROCESS: PDB SET CONTROL DOMAIN TO 0x%lx 0x%x\n",
-		pdb_ctx[pdb_level].ctrl_cr3, 
-		pdb_ctx[pdb_level].ctrl));
-    }
-    if (pdb_ctx[pdb_level].info_cr3 == 0 &&
-	pdb_ctx[pdb_level].info >= 0)
-    {
-        struct task_struct *p;
+	    p = find_domain_by_id(pdb_ctx.domain);
+	    if (p->mm.shadow_mode)
+	        pdb_ctx.ptbr = pagetable_val(p->mm.shadow_table);
+	    else
+	        pdb_ctx.ptbr = pagetable_val(p->mm.pagetable);
+	    put_task_struct(p);
+	}
+	else                                         /* pdb context: process */
+	{
+	    struct task_struct *p;
+	    unsigned long domain_ptbr;
 
-	p = find_domain_by_id(pdb_ctx[pdb_level].info);
-	if (p->mm.shadow_mode)
-	  pdb_ctx[pdb_level].info_cr3 = pagetable_val(p->mm.shadow_table);
-	else
-	  pdb_ctx[pdb_level].info_cr3 = pagetable_val(p->mm.pagetable);
-	put_task_struct(p);
-	TRC(printk ("PROCESS: PDB SET INFO DOMAIN TO 0x%lx 0x%x\n",
-		pdb_ctx[pdb_level].info_cr3, 
-		pdb_ctx[pdb_level].info));
+	    p = find_domain_by_id(pdb_ctx.domain);
+	    if (p->mm.shadow_mode)
+	        domain_ptbr = pagetable_val(p->mm.shadow_table);
+	    else
+	        domain_ptbr = pagetable_val(p->mm.pagetable);
+	    put_task_struct(p);
+
+	    pdb_ctx.ptbr = domain_ptbr;
+	    /* pdb_ctx.ptbr = pdb_linux_pid_ptbr(domain_ptbr, pdb_ctx.process); */
+	}
+
+	pdb_ctx.valid = 0;
+	TRC(printk ("pdb change context (dom:%d, proc:%d) now 0x%lx\n",
+		    pdb_ctx.domain, pdb_ctx.process, pdb_ctx.ptbr));
     }
 
     switch (*ptr++)
@@ -458,48 +457,20 @@ pdb_process_command (char *ptr, struct pt_regs *regs, unsigned long cr3,
 
         if (hexToInt (&next, &thread))
         {
-            if (thread > 0)
-            {
-                thread = thread - PDB_ID_OFFSET;
-            }
             if (*ptr == 'c')
             {
-	        pdb_ctx[pdb_level].ctrl = thread;
-
-		if (thread > 0)
-		{
-		    struct task_struct *p = find_domain_by_id(thread);
-		    if (p->mm.shadow_mode)
-		      pdb_ctx[pdb_level].ctrl_cr3 = pagetable_val(p->mm.shadow_table);
-		    else
-		      pdb_ctx[pdb_level].ctrl_cr3 = pagetable_val(p->mm.pagetable);
-		    put_task_struct(p);
-		    TRC(printk ("PDB SET CONTROL DOMAIN TO 0x%lx 0x%x\n",
-			    pdb_ctx[pdb_level].ctrl_cr3,
-			    pdb_ctx[pdb_level].ctrl));
-		}
+	        pdb_continue_thread = thread;
             }
             else if (*ptr == 'g')
             {
-	        pdb_ctx[pdb_level].info = thread;
-
-		if (thread > 0)
-		{
-		    struct task_struct *p = find_domain_by_id(thread);
-		    if (p->mm.shadow_mode)
-		      pdb_ctx[pdb_level].info_cr3 = pagetable_val(p->mm.shadow_table);
-		    else
-		      pdb_ctx[pdb_level].info_cr3 = pagetable_val(p->mm.pagetable);
-		    put_task_struct(p);
-		    TRC(printk ("PDB SET INFO DOMAIN TO 0x%lx 0x%x\n",
-			    pdb_ctx[pdb_level].info_cr3,
-			    pdb_ctx[pdb_level].info));
-		}
+	        pdb_general_thread = thread;
             }
             else
             {
-                printk ("ack, unknown command %c (thread: %d)\n", 
+                printk ("pdb error: unknown set thread command %c (%d)\n", 
                         *ptr, thread);
+		strcpy (pdb_out_buffer, "E00");
+		break;
             }
         }
         strcpy (pdb_out_buffer, "OK");
@@ -528,20 +499,31 @@ pdb_process_command (char *ptr, struct pt_regs *regs, unsigned long cr3,
                 if (hexToInt (&ptr, &length))
                 {
                     ptr = 0;
-                    mem_err = 0;
 
-                    if (pdb_ctx[pdb_level].info >= 0)
+		    pdb_page_fault_possible = 1;
+		    pdb_page_fault = 0;
+		    if (addr >= PAGE_OFFSET)
+		    {
+                        mem2hex ((char *) addr, pdb_out_buffer, length); 
+		    }
+		    else if (pdb_ctx.process != -1)
+		    {
+		        pdb_linux_get_values(pdb_buffer, length, addr, 
+					     pdb_ctx.process, pdb_ctx.ptbr);
+                        mem2hex (pdb_buffer, pdb_out_buffer, length); 
+		    }
+                    else
                     {
-		        pdb_get_values(pdb_buffer, length,
-				       pdb_ctx[pdb_level].info_cr3, addr);
+		        pdb_get_values (pdb_buffer, length, 
+					pdb_ctx.ptbr, addr);
                         mem2hex (pdb_buffer, pdb_out_buffer, length);
                     }
-                    else
-                        mem2hex ((char *) addr, pdb_out_buffer, length); 
-                    if (mem_err)
-                    {
+
+		    pdb_page_fault_possible = 0;
+		    if (pdb_page_fault)
+		    {
                         strcpy (pdb_out_buffer, "E03");
-                    }
+		    }
                 }
 	    
         if (ptr)
@@ -560,13 +542,20 @@ pdb_process_command (char *ptr, struct pt_regs *regs, unsigned long cr3,
                 if (hexToInt (&ptr, &length))
                     if (*(ptr++) == ':')
                     {
-                        mem_err = 0;
 
-                        /* pdb_set_values(ptr, length, cr3, addr); */
-                        pdb_set_values(ptr, length, 
-				       pdb_ctx[pdb_level].info_cr3, addr);
-
-                        if (mem_err)
+		        pdb_page_fault_possible = 1;
+			pdb_page_fault = 0;
+			if (addr >= PAGE_OFFSET)
+			{
+			    hex2mem (ptr, (char *)addr, length);
+			}
+			else
+			{
+			    pdb_set_values (ptr, length,
+					    pdb_ctx.ptbr, addr);
+			}
+			pdb_page_fault_possible = 0;
+                        if (pdb_page_fault)
                         {
                             strcpy (pdb_out_buffer, "E03");
                         }
@@ -589,17 +578,9 @@ pdb_process_command (char *ptr, struct pt_regs *regs, unsigned long cr3,
 
         if (hexToInt (&ptr, &id))
         {
-	        {                                        /* case pdb_lvl_xen */
-		    struct task_struct *p;
-		    id -= PDB_ID_OFFSET;
-		    if ( (p = find_domain_by_id(id)) == NULL)
-		        strcpy (pdb_out_buffer, "E00");
-		    else
-		        strcpy (pdb_out_buffer, "OK");
-		    put_task_struct(p);
-		}
+	    strcpy (pdb_out_buffer, "E00");
 
-#ifdef PDB_FUTURE
+#ifdef PDB_PAST
 
 	    switch (pdb_level)                             /* previous level */
 	    {
@@ -647,7 +628,7 @@ pdb_process_command (char *ptr, struct pt_regs *regs, unsigned long cr3,
 		}
 	    }
 
-#endif /* PDB_FUTURE */
+#endif /* PDB_PAST */
         }
         break;
     }
@@ -981,14 +962,21 @@ int pdb_change_values_one_page(u_char *buffer, int length,
     l2_table += l2_table_offset(addr);
     if (!(l2_pgentry_val(*l2_table) & _PAGE_PRESENT)) 
     {
-        struct task_struct *p = find_domain_by_id(0);
-	printk ("pdb error: cr3: 0x%lx    dom0cr3:  0x%lx\n",  cr3,
-		p->mm.shadow_mode ? pagetable_val(p->mm.shadow_table)
-		                  : pagetable_val(p->mm.pagetable));
-	put_task_struct(p);
-
-	printk ("pdb error: L2:0x%p (0x%lx) \n", 
-		l2_table, l2_pgentry_val(*l2_table));
+	if (pdb_page_fault_possible == 1)
+	{
+	    pdb_page_fault = 1;
+	    TRC(printk("pdb: L2 error (0x%lx)\n", addr));
+	}
+	else
+	{
+	    struct task_struct *p = find_domain_by_id(0);
+	    printk ("pdb error: cr3: 0x%lx    dom0cr3:  0x%lx\n",  cr3,
+		    p->mm.shadow_mode ? pagetable_val(p->mm.shadow_table)
+		    : pagetable_val(p->mm.pagetable));
+	    put_task_struct(p);
+	    printk ("pdb error: L2:0x%p (0x%lx)\n", 
+		    l2_table, l2_pgentry_val(*l2_table));
+	}
 	goto exit2;
     }
 
@@ -1012,9 +1000,17 @@ int pdb_change_values_one_page(u_char *buffer, int length,
 	l1_table += l1_table_offset(addr); 
 	if (!(l1_pgentry_val(*l1_table) & _PAGE_PRESENT))
 	{
-	    printk ("L2:0x%p (0x%lx) L1:0x%p (0x%lx)\n", 
-		    l2_table, l2_pgentry_val(*l2_table),
-		    l1_table, l1_pgentry_val(*l1_table));
+	    if (pdb_page_fault_possible == 1)
+	    {
+	        pdb_page_fault = 1;
+		TRC(printk ("pdb: L1 error (0x%lx)\n", addr));
+	    }
+	    else
+	    {
+	        printk ("L2:0x%p (0x%lx) L1:0x%p (0x%lx)\n", 
+			l2_table, l2_pgentry_val(*l2_table),
+			l1_table, l1_pgentry_val(*l1_table));
+	    }
 	    goto exit1;
 	}
 
@@ -1028,11 +1024,11 @@ int pdb_change_values_one_page(u_char *buffer, int length,
         memcpy (buffer, page, length);
 	bytes = length;
 	break;
-    case __PDB_SET_VAL:                                         /* write */
+    case __PDB_SET_VAL:                                             /* write */
         hex2mem (buffer, page, length);
 	bytes = length;
 	break;
-    default:                                                  /* unknown */
+    default:                                                      /* unknown */
         printk ("error: unknown RW flag: %d\n", rw);
 	return 0;
     }
@@ -1178,9 +1174,6 @@ int pdb_handle_exception(int exceptionVector,
         xen_regs->eip--;
     }
 
-    watchdog_save = watchdog_on;
-    watchdog_on = 0;
-
     /* Generate a signal for GDB. */
     switch ( exceptionVector )
     {
@@ -1202,6 +1195,9 @@ int pdb_handle_exception(int exceptionVector,
     pdb_out_buffer[3] = 0;
     pdb_put_packet(pdb_out_buffer, 1);
 
+    watchdog_save = watchdog_on;
+    watchdog_on = 0;
+
     do {
         pdb_out_buffer[0] = 0;
 	pdb_get_packet(pdb_in_buffer);
@@ -1222,7 +1218,6 @@ void pdb_key_pressed(u_char key, void *dev_id, struct pt_regs *regs)
 void initialize_pdb()
 {
     extern char opt_pdb[];
-    int loop;
 
     /* Certain state must be initialised even when PDB will not be used. */
     memset((void *) &breakpoints, 0, sizeof(breakpoints));
@@ -1238,15 +1233,13 @@ void initialize_pdb()
         return;
     }
 
-    for (loop = 0; loop < pdb_ctx_count; loop++)
-    {
-        pdb_ctx[loop].ctrl = -1;
-	pdb_ctx[loop].info = -1;
-        pdb_ctx[loop].ctrl_cr3 = 0;
-	pdb_ctx[loop].info_cr3 = 0;
-    }
+    pdb_ctx.valid = 1;
+    pdb_ctx.domain = -1;
+    pdb_ctx.process = -1;
+    pdb_ctx.ptbr = 0;
 
-    printk("Initialized pervasive debugger (PDB) on port %s\n", opt_pdb);
+    printk("pdb: pervasive debugger (%s)   www.cl.cam.ac.uk/netos/pdb\n", 
+	   opt_pdb);
 
     /* Acknowledge any spurious GDB packets. */
     pdb_put_char('+');
