@@ -63,7 +63,7 @@ struct task_struct *do_newdomain(unsigned int dom_id, unsigned int cpu)
 
     p->net_ring_base = (net_ring_t *)(p->shared_info + 1);
     INIT_LIST_HEAD(&p->pg_head);
-    p->tot_pages = 0;
+    p->max_pages = p->tot_pages = 0;
     write_lock_irqsave(&tasklist_lock, flags);
     SET_LINKS(p);
     write_unlock_irqrestore(&tasklist_lock, flags);
@@ -176,6 +176,9 @@ unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes)
     spin_unlock_irqrestore(&free_list_lock, flags);
     
     p->tot_pages = req_pages;
+
+    // temporary, max_pages should be explicitly specified
+    p->max_pages = p->tot_pages;
 
     return 0;
 }

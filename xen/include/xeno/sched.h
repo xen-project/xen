@@ -67,7 +67,8 @@ struct task_struct {
     shared_info_t *shared_info;
     
     struct list_head pg_head;
-    unsigned int tot_pages;
+    unsigned int tot_pages;     /* number of pages currently possesed */
+    unsigned int max_pages;     /* max number of pages that can be possesed */
 
     /* Network I/O */
     net_ring_t *net_ring_base;

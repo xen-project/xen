@@ -313,4 +313,15 @@ static inline int HYPERVISOR_set_fast_trap(int idx)
     return ret;
 }
 
+static inline int HYPERVISOR_dom_mem_op(void *dom_mem_op)
+{
+    int ret;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret) : "0" (__HYPERVISOR_dom_mem_op),
+        "b" (dom_mem_op) : "memory" );
+
+    return ret;
+}
+
 #endif /* __HYPERVISOR_H__ */
