@@ -137,9 +137,8 @@ elif cmd == 'list':
         d['mem'] = int(sxp.child_value(info, 'memory', '0'))
         d['cpu'] = int(sxp.child_value(info, 'cpu', '0'))
         d['state'] = sxp.child_value(info, 'state', '??')
-        d['cpu_time'] = float(sxp.child_value(info, 'cpu_time', '0')
-        print ("%(dom)-4d %(name)-16s %(mem)7d %(cpu)3d %(state)5s %(cpu_time)8.2f"
-               % d)
+        d['cpu_time'] = float(sxp.child_value(info, 'cpu_time', '0'))
+        print ("%(dom)-4d %(name)-16s %(mem)7d %(cpu)3d %(state)5s %(cpu_time)8.2f" % d)
 
 elif cmd == 'unwatch':
     auto_restart_kill(dom)
