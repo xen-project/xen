@@ -307,7 +307,6 @@ irqreturn_t smp_invalidate_interrupt(int irq, void *dev_id,
 		} else
 			leave_mm(cpu);
 	}
-	xxprint("smp_invalidate_interrupt\n");
 	smp_mb__before_clear_bit();
 	cpu_clear(cpu, flush_cpumask);
 	smp_mb__after_clear_bit();
@@ -362,7 +361,6 @@ static void flush_tlb_others(cpumask_t cpumask, struct mm_struct *mm,
 	 */
 	send_IPI_mask(cpumask, INVALIDATE_TLB_VECTOR);
 
-	xxprint("flush_tlb_others lockup");
 	while (!cpus_empty(flush_cpumask))
 		/* nothing. lockup detection does not belong here */
 		mb();
