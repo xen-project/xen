@@ -27,7 +27,7 @@ endif
 	$(MAKE) -C ioemu install
 
 dist: $(TARGET)
-	$(MAKE) prefix=`pwd`/../dist/install dist=yes install
+	$(MAKE) prefix=$(CURDIR)/../dist/install dist=yes install
 
 clean:
 	$(MAKE) -C libxutil clean

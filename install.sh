@@ -23,6 +23,15 @@ if ! [ -d $dst ]; then
 fi
 
 echo "Installing Xen from '$src' to '$dst'..."
+cd $src/boot
+(echo '2.6.*' -2.6; echo '2.4.*' -2.4; echo '2.*.*' '') | while read mv
+do
+  l=$(eval ls -t vmlinuz-$m-xen0 2>/dev/null | head -n 1)
+  [ -e "$l" ] && ln -fs "$l" vmlinuz${v}-xen0
+  l=$(eval ls -t vmlinuz-$m-xenU 2>/dev/null | head -n 1)
+  [ -e "$l" ] && ln -fs "$l" vmlinuz${v}-xenU
+done
+cd -
 cp -fdR $src/* $dst
 echo "All done."
 

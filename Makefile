@@ -2,8 +2,13 @@
 # Grand Unified Makefile for Xen.
 #
 
-DIST_DIR    ?= $(shell pwd)/dist
-INSTALL_DIR ?= $(DIST_DIR)/install
+DIST_DIR	:= $(CURDIR)/dist
+DESTDIR		:= $(DIST_DIR)/install
+
+INSTALL		:= install
+INSTALL_DIR	:= $(INSTALL) -d -m0755
+INSTALL_DATA	:= $(INSTALL) -m0644
+INSTALL_PROG	:= $(INSTALL) -m0755
 
 KERNELS ?= linux-2.6-xen0 linux-2.6-xenU
 # linux-2.4-xen0 linux-2.4-xenU netbsd-2.0-xenU
@@ -14,7 +19,7 @@ ALLSPARSETREES = $(patsubst %-xen-sparse,%,$(wildcard *-xen-sparse))
 XKERNELS := $(foreach kernel, $(KERNELS), $(patsubst buildconfigs/mk.%,%,$(wildcard buildconfigs/mk.$(kernel))) )
 
 
-export INSTALL_DIR
+export DESTDIR
 
 include buildconfigs/Rules.mk
 
@@ -35,34 +40,36 @@ install-tools:
 	$(MAKE) -C tools install
 
 install-kernels:
-	$(shell cp -a $(INSTALL_DIR)/boot/* /boot/)
-	$(shell cp -a $(INSTALL_DIR)/lib/modules/* /lib/modules/)
-	$(shell cp -dR $(INSTALL_DIR)/boot/*$(LINUX_VER)* $(prefix)/boot/)
-	$(shell cp -dR $(INSTALL_DIR)/lib/modules/* $(prefix)/lib/modules/)
+	cp -a $(INSTALL_DIR)/boot/* /boot/
+	cp -a $(INSTALL_DIR)/lib/modules/* /lib/modules/
+	cp -dR $(INSTALL_DIR)/boot/*$(LINUX_VER)* $(prefix)/boot/
+	cp -dR $(INSTALL_DIR)/lib/modules/* $(prefix)/lib/modules/
 
 install-docs:
 	sh ./docs/check_pkgs && $(MAKE) -C docs install || true
+	sh ./docs/check_pkgs
+	-$(MAKE) -C docs install
 
 # build and install everything into local dist directory
 dist: xen tools kernels docs
-	install -m0644 ./COPYING $(DIST_DIR)
-	install -m0644 ./README $(DIST_DIR)
-	install -m0755 ./install.sh $(DIST_DIR)
-	mkdir -p $(DIST_DIR)/check
-	install -m0755 tools/check/chk tools/check/check_* $(DIST_DIR)/check
+	$(INSTALL_DIR) $(DIST_DIR)/check
+	$(INSTALL_DATA) ./COPYING $(DIST_DIR)
+	$(INSTALL_DATA) ./README $(DIST_DIR)
+	$(INSTALL_PROG) ./install.sh $(DIST_DIR)
+	$(INSTALL_PROG) tools/check/chk tools/check/check_* $(DIST_DIR)/check
 
 xen:
-	$(MAKE) prefix=$(INSTALL_DIR) dist=yes -C xen install
+	$(MAKE) dist=yes -C xen install
 
 tools:
-	$(MAKE) prefix=$(INSTALL_DIR) dist=yes -C tools install
+	$(MAKE) dist=yes -C tools install
 
 kernels:
 	for i in $(XKERNELS) ; do $(MAKE) $$i-build || exit 1; done
 
 docs:
-	sh ./docs/check_pkgs && \
-		$(MAKE) prefix=$(INSTALL_DIR) dist=yes -C docs install || true
+	sh ./docs/check_pkgs
+	-$(MAKE) dist=yes -C docs install
 
 # Build all the various kernels and modules
 kbuild: kernels
@@ -103,20 +110,19 @@ mrproper: clean
 install-twisted:
 	wget http://www.twistedmatrix.com/products/get-current.epy
 	tar -zxf Twisted-*.tar.gz
-	( cd Twisted-* ; python setup.py install )
+	cd Twisted-* && python setup.py install
 
 install-logging: LOGGING=logging-0.4.9.2
 install-logging:
 	[ -f $(LOGGING).tar.gz ] || wget http://www.red-dove.com/$(LOGGING).tar.gz
 	tar -zxf $(LOGGING).tar.gz
-	( cd $(LOGGING) && python setup.py install )
+	cd $(LOGGING) && python setup.py install
 
 # handy target to upgrade iptables (use rpm or apt-get in preference)
 install-iptables:
 	wget http://www.netfilter.org/files/iptables-1.2.11.tar.bz2
-	tar -jxf iptables-*.tar.bz2
-	( cd iptables-* ; \
-	  make PREFIX= KERNEL_DIR=../linux-$(LINUX_VER)-xen0 install)
+	tar -jxf iptables-1.2.11.tar.bz2
+	$(MAKE) -C iptables-1.2.11 PREFIX= KERNEL_DIR=../linux-$(LINUX_VER)-xen0 install
 
 help:
 	@echo 'Installation targets:'

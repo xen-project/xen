@@ -1059,7 +1059,9 @@
 3ddb79c25UE59iu4JJcbRalx95mvcg xen/include/public/xen.h
 3e397e66m2tO3s-J8Jnr7Ws_tGoPTg xen/include/xen/ac_timer.h
 40715b2epYl2jBbxzz9CI2rgIca7Zg xen/include/xen/acpi.h
+41f2cea7ZvnB9JC4qkiq1K8H7xJw5Q xen/include/xen/banner.h
 3ddb79c0c0cX_DZE209-Bb-Rx1v-Aw xen/include/xen/cache.h
+41f2cea7Yna7xc0X9fyavIjoSFFeVg xen/include/xen/compile.h.in
 3f840f12CkbYSlwMrY2S11Mpyxg7Nw xen/include/xen/compiler.h
 3ddb79c259jh8hE7vre_8NuE7nwNSA xen/include/xen/config.h
 3eb165e0eawr3R-p2ZQtSdLWtLRN_A xen/include/xen/console.h
