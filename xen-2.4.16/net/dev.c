@@ -1977,21 +1977,17 @@ long do_net_update(void)
 
             if ( skb != NULL )
             {
-                skb_get(skb); /* get a reference for non-local delivery */
                 skb->protocol = eth_type_trans(skb, skb->dev);
                 skb->src_vif = current_vif->id; 
                 net_get_target_vif(skb);
                 if ( skb->dst_vif > VIF_PHYSICAL_INTERFACE )
                 {
-                    if (netif_rx(skb) == 0)
-                        /* Give up non-local reference. Packet delivered locally. */
-                        kfree_skb(skb);
+                    (void)netif_rx(skb);
                 }
                 else if ( skb->dst_vif == VIF_PHYSICAL_INTERFACE )
                 {
-
-                        skb_push(skb, skb->dev->hard_header_len);
-                        dev_queue_xmit(skb);
+                    skb_push(skb, skb->dev->hard_header_len);
+                    dev_queue_xmit(skb);
                 } 
                 else
                 {
