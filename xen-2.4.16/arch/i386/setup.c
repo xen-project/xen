@@ -227,9 +227,6 @@ void __init cpu_init(void)
     mapcache[nr] = (unsigned long *)get_free_page(GFP_KERNEL);
     clear_page(mapcache[nr]);
     *pl2e = mk_l2_pgentry(__pa(mapcache[nr]) | PAGE_HYPERVISOR);
-
-    /* Stick the idle task on the run queue. */
-    (void)wake_up(current);
 }
 
 static void __init do_initcalls(void)

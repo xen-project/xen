@@ -68,7 +68,10 @@ static void default_idle(void)
 void cpu_idle (void)
 {
     ASSERT(current->domain == IDLE_DOMAIN_ID);
+
     current->has_cpu = 1;
+    (void)wake_up(current);
+    schedule();
 
     /*
      * Declares CPU setup done to the boot processor.

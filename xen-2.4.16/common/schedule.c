@@ -93,7 +93,7 @@ void sched_add_domain(struct task_struct *p)
  */
 void sched_rem_domain(struct task_struct *p) 
 {
-	p->state = TASK_DYING;
+    p->state = TASK_DYING;
 }
 
 
@@ -183,9 +183,7 @@ long do_sched_op(void)
     return 0;
 }
 
-/*
- * 
- */
+
 void reschedule(struct task_struct *p)
 {
     int cpu = p->processor;
@@ -226,7 +224,7 @@ asmlinkage void schedule(void)
 
     spin_lock_irq(&schedule_data[this_cpu].lock);
 
-    //ASSERT(!in_interrupt());
+    /*ASSERT(!in_interrupt());*/
     ASSERT(__task_on_runqueue(prev));
 
 	__move_last_runqueue(prev);
@@ -275,7 +273,7 @@ asmlinkage void schedule(void)
     if ( prev->state == TASK_DYING ) release_task(prev);
 
  same_process:
-	update_dom_time(current->shared_info);
+    update_dom_time(current->shared_info);
 
     if ( test_bit(_HYP_EVENT_NEED_RESCHED, &current->hyp_events) )
         goto need_resched_back;
@@ -288,50 +286,50 @@ asmlinkage void schedule(void)
 static __cacheline_aligned int count[NR_CPUS];
 static void sched_timer(unsigned long foo)
 {
-	int 				cpu  = smp_processor_id();
+    int 				cpu  = smp_processor_id();
     struct task_struct *curr = schedule_data[cpu].curr;
-	s_time_t			now;
-	int 				res;
+    s_time_t			now;
+    int 				res;
 
-	/* reschedule after each 5 ticks */
-	if (count[cpu] >= 5) {
-		set_bit(_HYP_EVENT_NEED_RESCHED, &curr->hyp_events);
-		count[cpu] = 0;
-	}
-	count[cpu]++;
+    /* reschedule after each 5 ticks */
+    if (count[cpu] >= 5) {
+        set_bit(_HYP_EVENT_NEED_RESCHED, &curr->hyp_events);
+        count[cpu] = 0;
+    }
+    count[cpu]++;
 
-	/*
-     * deliver virtual timer interrups to domains if we are CPU 0
-     * XXX RN: We don't have a per CPU list of domains yet. Otherwise 
-     * would use that. Plus, this should be removed anyway once
-     * Domains "know" about virtual time and timeouts. But, it's better
-     * here then where it was before.
+    /*
+     * deliver virtual timer interrups to domains if we are CPU 0 XXX RN: We
+     * don't have a per CPU list of domains yet. Otherwise would use that.
+     * Plus, this should be removed anyway once Domains "know" about virtual
+     * time and timeouts. But, it's better here then where it was before.
      */
-	if (cpu == 0) {
-		struct task_struct *p;
-		unsigned long cpu_mask = 0;
+    if (cpu == 0) {
+        struct task_struct *p;
+        unsigned long cpu_mask = 0;
 
-		/* send virtual timer interrupt */
-		read_lock(&tasklist_lock);
-		p = &idle0_task;
-		do {
-			cpu_mask |= mark_guest_event(p, _EVENT_TIMER);
-		}
-		while ( (p = p->next_task) != &idle0_task );
-		read_unlock(&tasklist_lock);
-		guest_event_notify(cpu_mask);
-	}
+        /* send virtual timer interrupt */
+        read_lock(&tasklist_lock);
+        p = &idle0_task;
+        do {
+            if ( is_idle_task(p) ) continue;
+            cpu_mask |= mark_guest_event(p, _EVENT_TIMER);
+        }
+        while ( (p = p->next_task) != &idle0_task );
+        read_unlock(&tasklist_lock);
+        guest_event_notify(cpu_mask);
+    }
 
  again:
-	now = NOW();
-	s_timer[cpu].expires  = now + MILLISECS(10);
-	res=add_ac_timer(&s_timer[cpu]);
+    now = NOW();
+    s_timer[cpu].expires  = now + MILLISECS(10);
+    res=add_ac_timer(&s_timer[cpu]);
 
- 	TRC(printk("SCHED[%02d] timer(): now=0x%08X%08X timo=0x%08X%08X\n",
- 			   cpu, (u32)(now>>32), (u32)now,
- 			   (u32)(s_timer[cpu].expires>>32), (u32)s_timer[cpu].expires));
-	if (res==1)
-		goto again;
+    TRC(printk("SCHED[%02d] timer(): now=0x%08X%08X timo=0x%08X%08X\n",
+               cpu, (u32)(now>>32), (u32)now,
+               (u32)(s_timer[cpu].expires>>32), (u32)s_timer[cpu].expires));
+    if (res==1)
+        goto again;
 
 }
 
@@ -343,7 +341,7 @@ void __init scheduler_init(void)
 {
     int i;
 
-	printk("Initialising schedulers\n");
+    printk("Initialising schedulers\n");
 
     for ( i = 0; i < NR_CPUS; i++ )
     {
@@ -352,9 +350,9 @@ void __init scheduler_init(void)
         schedule_data[i].prev = &idle0_task;
         schedule_data[i].curr = &idle0_task;
 		
-		/* a timer for each CPU  */
-		init_ac_timer(&s_timer[i]);
-		s_timer[i].function = &sched_timer;
+        /* a timer for each CPU  */
+        init_ac_timer(&s_timer[i]);
+        s_timer[i].function = &sched_timer;
     }
 }
 
@@ -362,11 +360,11 @@ void __init scheduler_init(void)
  * Start a scheduler for each CPU
  * This has to be done *after* the timers, e.g., APICs, have been initialised
  */
-void schedulers_start(void) {
-	
-	printk("Start schedulers\n");
-	__cli();
-	sched_timer(0);
-	smp_call_function((void *)sched_timer, NULL, 1, 1);
-	__sti();
+void schedulers_start(void) 
+{	
+    printk("Start schedulers\n");
+    __cli();
+    sched_timer(0);
+    smp_call_function((void *)sched_timer, NULL, 1, 1);
+    __sti();
 }
