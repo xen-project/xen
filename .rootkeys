@@ -247,7 +247,9 @@
 3ddb79b7UG2QiRAU-Wvc1Y_BLigu1Q xenolinux-2.4.16-sparse/arch/xeno/drivers/console/console.c
 3ddb79b75eo4PRXkT6Th9popt_SJhg xenolinux-2.4.16-sparse/arch/xeno/drivers/dom0/Makefile
 3ddb79b7Xyaoep6U0kLvx6Kx7OauDw xenolinux-2.4.16-sparse/arch/xeno/drivers/dom0/dom0_core.c
+3df9ce13K7qSLBtHV-01QHPW62649Q xenolinux-2.4.16-sparse/arch/xeno/drivers/dom0/dom0_memory.c
 3ddb79b7PulSkF9m3c7K5MkxHRf4hA xenolinux-2.4.16-sparse/arch/xeno/drivers/dom0/dom0_ops.h
+3df9ce13tITy-OuYx_zQemsvqqLTWA xenolinux-2.4.16-sparse/arch/xeno/drivers/dom0/hypervisor_defs.h
 3ddba759XOjcl_OF-52dOYq7sgMykQ xenolinux-2.4.16-sparse/arch/xeno/drivers/dom0/vfr.c
 3ddb79b7s7yYBioHidSkIoHtQxYmOw xenolinux-2.4.16-sparse/arch/xeno/drivers/network/Makefile
 3ddb79b7CpLL98ScdpbKkVBktlbCtQ xenolinux-2.4.16-sparse/arch/xeno/drivers/network/network.c
@@ -283,8 +285,10 @@
 3ddb79b8qdD_svLCCAja_oP2w4Tn8Q xenolinux-2.4.16-sparse/arch/xeno/mm/Makefile
 3ddb79b8ukY8dsPYmR8eNk-aCzFPsQ xenolinux-2.4.16-sparse/arch/xeno/mm/extable.c
 3ddb79b856Zta9b3s0bgUCGbG1blvQ xenolinux-2.4.16-sparse/arch/xeno/mm/fault.c
+3df9ce13dZ6UGDjZbUeZfyH4Hy6aCA xenolinux-2.4.16-sparse/arch/xeno/mm/get_unmapped_area.c
 3ddb79b85fpsKT8A9WYnuJg03b715g xenolinux-2.4.16-sparse/arch/xeno/mm/hypervisor.c
 3ddb79b83Zj7Xn2QVhU4HeMuAC9FjA xenolinux-2.4.16-sparse/arch/xeno/mm/init.c
+3df9ce13TRWIv0Mawm15zESP7jcT7A xenolinux-2.4.16-sparse/arch/xeno/mm/mmu_context.c
 3ddb79b7aKdTkbr3u6aze8tVwGh_TQ xenolinux-2.4.16-sparse/arch/xeno/vmlinux.lds
 3ddb79bbx682YH6vR2zbVOXwg73ULg xenolinux-2.4.16-sparse/drivers/block/ll_rw_blk.c
 3ddb79bcJfHdwrPsjqgI33_OsGdVCg xenolinux-2.4.16-sparse/drivers/block/rd.c

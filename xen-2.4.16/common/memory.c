@@ -1,3 +1,5 @@
+
+
 /******************************************************************************
  * memory.c
  * 
@@ -439,11 +441,15 @@ static void put_page(unsigned long page_nr, int writeable)
     struct pfn_info *page;
     ASSERT(page_nr < max_page);
     page = frame_table + page_nr;
-    ASSERT((page->flags & PG_domain_mask) == current->domain);
-    ASSERT((((page->flags & PG_type_mask) == PGT_writeable_page) &&
-            (page_type_count(page) != 0)) ||
-           (((page->flags & PG_type_mask) == PGT_none) &&
-            (page_type_count(page) == 0)));
+
+    if(current->domain != 0){
+        ASSERT((page->flags & PG_domain_mask) == current->domain);
+        ASSERT((((page->flags & PG_type_mask) == PGT_writeable_page) &&
+             (page_type_count(page) != 0)) ||
+            (((page->flags & PG_type_mask) == PGT_none) &&
+             (page_type_count(page) == 0)));
+    }
+
     ASSERT((!writeable) || (page_type_count(page) != 0));
     if ( writeable && (put_page_type(page) == 0) )
         page->flags &= ~PG_type_mask;
@@ -559,39 +565,23 @@ int do_process_page_updates(page_update_request_t *updates, int count)
             kill_domain_with_errmsg("Cannot read page update request");
         }
 
+        pfn = cur.ptr >> PAGE_SHIFT;
+        if ( pfn >= max_page )
+        {
+            MEM_LOG("Page out of range (%08lx > %08lx)", pfn, max_page);
+            kill_domain_with_errmsg("Page update request out of range");
+        }
+
         err = 1;
 
-        pfn = cur.ptr >> PAGE_SHIFT;
-        if ( !pfn )
+        /* Least significant bits of 'ptr' demux the operation type. */
+        switch ( cur.ptr & (sizeof(l1_pgentry_t)-1) )
         {
-            switch ( cur.ptr )
-            {
-            case PGREQ_ADD_BASEPTR:
-                err = get_l2_table(cur.val >> PAGE_SHIFT);
-                break;
-            case PGREQ_REMOVE_BASEPTR:
-                if ( cur.val == __pa(pagetable_ptr(current->mm.pagetable)) )
-                {
-                    MEM_LOG("Attempt to remove current baseptr! %08lx",
-                            cur.val);
-                }
-                else
-                {
-                    err = put_l2_table(cur.val >> PAGE_SHIFT);
-                }
-                break;
-            default:
-                MEM_LOG("Invalid page update command %08lx", cur.ptr);
-                break;
-            }
-        }
-        else if ( (cur.ptr & (sizeof(l1_pgentry_t)-1)) || (pfn >= max_page) )
-        {
-            MEM_LOG("Page out of range (%08lx>%08lx) or misalign %08lx",
-                    pfn, max_page, cur.ptr);
-        }
-        else
-        {
+
+            /*
+             * PGREQ_NORMAL: Normal update to any level of page table.
+             */
+        case PGREQ_NORMAL:
             page = frame_table + pfn;
             flags = page->flags;
             if ( (flags & PG_domain_mask) == current->domain )
@@ -607,20 +597,63 @@ int do_process_page_updates(page_update_request_t *updates, int count)
                                        mk_l2_pgentry(cur.val)); 
                     break;
                 default:
-                    /*
-                     * This might occur if a page-table update is
-                     * requested before we've inferred the type
-                     * of the containing page. It shouldn't happen
-                     * if page tables are built strictly top-down, so
-                     * we have a MEM_LOG warning message.
-                     */
-                    MEM_LOG("Unnecessary update to non-pt page %08lx",
-                            cur.ptr);
-                    *(unsigned long *)__va(cur.ptr) = cur.val;
-                    err = 0;
+                    MEM_LOG("Update to non-pt page %08lx", cur.ptr);
                     break;
                 }
             }
+            break;
+
+            /*
+             * PGREQ_ADD_BASEPTR: Announce a new top-level page table.
+             */
+        case PGREQ_ADD_BASEPTR:
+            err = get_l2_table(cur.val >> PAGE_SHIFT);
+            break;
+
+            /*
+             * PGREQ_REMOVE_BASEPTR: Destroy reference to a top-level page
+             * table.
+             */
+        case PGREQ_REMOVE_BASEPTR:
+            pfn = cur.val >> PAGE_SHIFT;
+            if ( pfn != (__pa(pagetable_ptr(current->mm.pagetable))
+                         >> PAGE_SHIFT) )
+            {
+                err = put_l2_table(pfn);
+            }
+            else
+            {
+                MEM_LOG("Attempt to remove current baseptr! %08lx",
+                        cur.val);
+            }
+            break;
+
+            /*
+             * PGREQ_UNCHECKED_UPDATE: Make an unchecked update to a
+             * bottom-level page-table entry.
+             * Restrictions apply:
+             *  1. Update only allowed by domain 0.
+             *  2. Update must be to a level-1 pte belonging to dom0.
+             */
+        case PGREQ_UNCHECKED_UPDATE:
+            cur.ptr &= ~(sizeof(l1_pgentry_t) - 1);
+            page = frame_table + pfn;
+            flags = page->flags;
+            if ( (flags | current->domain) == PGT_l1_page_table )
+            {
+                *(unsigned long *)__va(cur.ptr) = cur.val;
+                err = 0;
+            }
+            else
+            {
+                MEM_LOG("UNCHECKED_UPDATE: Bad domain %d, or"
+                        " bad pte type %08lx", current->domain, flags);
+            }
+            break;
+
+        default:
+            MEM_LOG("Invalid page update command %08lx", cur.ptr);
+            break;
         }
 
         if ( err )

@@ -3,6 +3,8 @@
 
 #include <linux/config.h>
 
+#define HAVE_ARCH_UNMAPPED_AREA
+
 /*
  * The Linux memory management assumes a three-level page table setup. On
  * the i386, we use that, but "fold" the mid level into the top-level page

@@ -1,3 +1,4 @@
+
 #ifndef _LINUX_SCHED_H
 #define _LINUX_SCHED_H
 
@@ -41,9 +42,18 @@ extern struct mm_struct init_mm;
 #include <xeno/block.h>
 
 struct task_struct {
+
     int processor;
     int state, hyp_events;
     unsigned int domain;
+
+    /* index into frame_table threading pages belonging to this
+     * domain together. these are placed at the top of the structure
+     * to avoid nasty padding for various kernel structs when using
+     * task_struct in user space
+     */
+    unsigned long pg_head;
+    unsigned int tot_pages;
 
     /* An unsafe pointer into a shared data area. */
     shared_info_t *shared_info;
@@ -75,13 +85,7 @@ struct task_struct {
     struct mm_struct *active_mm;
     struct thread_struct thread;
     struct task_struct *prev_task, *next_task;
-	
-    /* index into frame_table threading pages belonging to this
-     * domain together
-     */
-    unsigned long pg_head;
-    unsigned int tot_pages;
-
+    
     unsigned long flags;
 };
 
@@ -126,6 +130,7 @@ extern struct task_struct first_task_struct;
 
 extern struct task_struct *do_newdomain(void);
 extern int setup_guestos(struct task_struct *p, dom0_newdomain_t *params);
+extern int final_setup_guestos(struct task_struct *p, dom_meminfo_t *);
 
 struct task_struct *find_domain_by_id(unsigned int dom);
 extern void release_task(struct task_struct *);

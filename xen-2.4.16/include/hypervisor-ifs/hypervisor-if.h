@@ -1,3 +1,4 @@
+
 /******************************************************************************
  * hypervisor-if.h
  * 
@@ -21,8 +22,15 @@ typedef struct trap_info_st
 
 typedef struct
 {
-#define PGREQ_ADD_BASEPTR    0
-#define PGREQ_REMOVE_BASEPTR 1
+/* PGREQ_XXX: specified in lest-significant bits of 'ptr' field. */
+/* A normal page-table update request. */
+#define PGREQ_NORMAL           0
+/* Announce a new top-level page table. */
+#define PGREQ_ADD_BASEPTR      1
+/* Destroy an existing top-level page table. */
+#define PGREQ_REMOVE_BASEPTR   2
+/* Make an unchecked update to a base-level pte. */
+#define PGREQ_UNCHECKED_UPDATE 3
     unsigned long ptr, val; /* *ptr = val */
 } page_update_request_t;
 
@@ -144,6 +152,8 @@ typedef struct start_info_st {
     int num_net_rings;
     blk_ring_t *blk_ring;         /* block io communication rings */
     unsigned long frame_table;    /* mapping of the frame_table for dom0 */
+    unsigned long frame_table_len;
+    unsigned long frame_table_pa; /* frame_table physical address */
     unsigned char cmd_line[1];    /* variable-length */
 } start_info_t;
 
