@@ -725,6 +725,7 @@ ENTRY(hypervisor_call_table)
         .long SYMBOL_NAME(do_multicall)
         .long SYMBOL_NAME(do_kbd_op)
         .long SYMBOL_NAME(do_update_va_mapping)
+        .long SYMBOL_NAME(do_event_channel_op)
         .rept NR_syscalls-((.-hypervisor_call_table)/4)
         .long SYMBOL_NAME(sys_ni_syscall)
-	.endr
+        .endr

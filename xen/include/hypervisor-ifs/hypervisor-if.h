@@ -60,6 +60,7 @@
 #define __HYPERVISOR_multicall            17
 #define __HYPERVISOR_kbd_op               18
 #define __HYPERVISOR_update_va_mapping    19
+#define __HYPERVISOR_event_channel_op     20
 
 /* And the trap vector is... */
 #define TRAP_INSTR "int $0x82"
@@ -91,6 +92,7 @@
 #define EVENT_NET      0x10 /* There are packets for transmission. */
 #define EVENT_PS2      0x20 /* PS/2 keyboard or mouse event(s) */
 #define EVENT_STOP     0x40 /* Prepare for stopping and possible pickling */
+#define EVENT_EVTCHN   0x80 /* Event pending on an event channel */
 
 /* Bit offsets, as opposed to the above masks. */
 #define _EVENT_BLKDEV   0
@@ -100,6 +102,7 @@
 #define _EVENT_NET      4
 #define _EVENT_PS2      5
 #define _EVENT_STOP     6
+#define _EVENT_EVTCHN   7
 
 /*
  * Virtual addresses beyond this are not modifiable by guest OSes. The 
@@ -160,7 +163,21 @@
 #define SCHEDOP_exit            1
 #define SCHEDOP_stop            2
 
- 
+/*
+ * EVTCHNOP_* - Event channel operations.
+ */
+#define EVTCHNOP_open           0  /* Open channel to <target domain>.    */
+#define EVTCHNOP_close          1  /* Close <channel id>.                 */
+#define EVTCHNOP_send           2  /* Send event on <channel id>.         */
+#define EVTCHNOP_status         3  /* Get status of <channel id>.         */
+
+/*
+ * EVTCHNSTAT_* - Non-error return values from EVTCHNOP_status.
+ */
+#define EVTCHNSTAT_closed       0  /* Chennel is not in use.              */
+#define EVTCHNSTAT_disconnected 1  /* Channel is not connected to remote. */
+#define EVTCHNSTAT_connected    2  /* Channel is connected to remote.     */
+
 
 #ifndef __ASSEMBLY__
 
@@ -236,6 +253,30 @@ typedef struct shared_info_st {
      * kind of interrupt-enable flag).
      */
     unsigned long events_mask;
+
+    /*
+     * A domain can have up to 1024 bidirectional event channels to/from other
+     * domains. Domains must agree out-of-band to set up a connection, and then
+     * each must explicitly request a connection to the other. When both have
+     * made the request the channel is fully allocated and set up.
+     * 
+     * An event channel is a single sticky 'bit' of information. Setting the
+     * sticky bit also causes an upcall into the target domain. In this way
+     * events can be seen as an IPI [Inter-Process(or) Interrupt].
+     * 
+     * A guest can see which of its event channels are pending by reading the
+     * 'event_channel_pend' bitfield. To avoid a linear scan of the entire
+     * bitfield there is a 'selector' which indicates which words in the
+     * bitfield contain at least one set bit.
+     * 
+     * There is a similar bitfield to indicate which event channels have been
+     * disconnected by the remote end. There is also a 'selector' for this
+     * field.
+     */
+    u32 event_channel_pend[32];
+    u32 event_channel_pend_sel;
+    u32 event_channel_disc[32];
+    u32 event_channel_disc_sel;
 
     /*
      * Time: The following abstractions are exposed: System Time, Clock Time,

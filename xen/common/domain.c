@@ -52,6 +52,7 @@ struct task_struct *do_createdomain(unsigned int dom_id, unsigned int cpu)
 
     spin_lock_init(&p->blk_ring_lock);
     spin_lock_init(&p->page_lock);
+    spin_lock_init(&p->event_channel_lock);
 
     p->shared_info = (void *)get_free_page(GFP_KERNEL);
     memset(p->shared_info, 0, PAGE_SIZE);
@@ -288,6 +289,8 @@ void free_all_dom_mem(struct task_struct *p)
 /* Release resources belonging to task @p. */
 void release_task(struct task_struct *p)
 {
+    extern void destroy_event_channels(struct task_struct *);
+
     ASSERT(p->state == TASK_DYING);
     ASSERT(!p->has_cpu);
 
@@ -300,6 +303,7 @@ void release_task(struct task_struct *p)
     destroy_blkdev_info(p);
 
     /* Free all memory associated with this domain. */
+    destroy_event_channels(p);
     free_page((unsigned long)p->mm.perdomain_pt);
     UNSHARE_PFN(virt_to_page(p->shared_info));
     free_page((unsigned long)p->shared_info);

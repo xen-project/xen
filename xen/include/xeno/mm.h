@@ -78,7 +78,7 @@ typedef struct pfn_info {
 #define page_type_count(p)	 ((p)->type_count)
 #define set_page_type_count(p,v) ((p)->type_count = v)
 
-#define PG_domain_mask 0x00ffffff /* owning domain (24 bits) */
+#define PG_domain_mask MAX_DOMAIN_ID /* owning domain (16 bits) */
 /* hypervisor flags (domain == 0) */
 #define PG_slab	       24
 /* domain flags (domain != 0) */
