@@ -19,7 +19,8 @@ debug:
 
 install: $(TARGET)
 	gzip -f -9 < $(TARGET) > $(TARGET).gz
-	cp $(TARGET).gz ../../install/boot/
+	mkdir -p ../../install/boot
+	cp -a $(TARGET).gz ../../install/boot/
 
 clean: delete-links
 	$(MAKE) -C tools clean

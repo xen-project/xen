@@ -1,2 +1,5 @@
-#!/bin/sh
+#!/bin/sh -x
+set -e
+ln -s xenolinux-2.4.22-sparse xenolinux-sparse
+(find -depth -type d -print | xargs -r rmdir 2>/dev/null) || true
 exit 0

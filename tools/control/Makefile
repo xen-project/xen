@@ -1,6 +1,8 @@
-default: cmdline web
+#default: cmdline web
+default: cmdline
 
-install: install-cmdline install-web
+#install: install-cmdline install-web
+install: install-cmdline
 
 clean: clean-cmdline clean-web
 
@@ -10,7 +12,8 @@ cmdline: FORCE
 	ant -buildfile build-cmdline.xml dist
 
 install-cmdline: cmdline
-	cp xenctl-cmdline.jar xenctl ../../../install/bin
+	mkdir -p ../../../install/bin
+	cp -a xenctl-cmdline.jar xenctl ../../../install/bin
 	chmod 755 ../../../install/bin/xenctl
 
 clean-cmdline:
