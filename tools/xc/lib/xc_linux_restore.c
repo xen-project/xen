@@ -8,7 +8,6 @@
 
 #include "xc_private.h"
 #include <asm-xen/suspend.h>
-#include <zlib.h>
 
 #define MAX_BATCH_SIZE 1024
 
@@ -20,14 +19,6 @@
 #define DPRINTF(_f, _a...) ((void)0)
 #endif
 
-
-/* This may allow us to create a 'quiet' command-line option, if necessary. */
-#define verbose_printf(_f, _a...) \
-    do {                          \
-        if ( !verbose ) break;    \
-        printf( _f , ## _a );     \
-        fflush(stdout);           \
-    } while ( 0 )
 
 static int get_pfn_list(int xc_handle,
                         u32 domain_id, 
@@ -54,19 +45,44 @@ static int get_pfn_list(int xc_handle,
     return (ret < 0) ? -1 : op.u.getmemlist.num_pfns;
 }
 
+/** Read the vmconfig string from the state input.
+ * It is stored as a 4-byte count 'n' followed by n bytes.
+ * The config data is stored in a new string in 'ioctxt->vmconfig',
+ * and is null-terminated. The count is stored in 'ioctxt->vmconfig_n'.
+ *
+ * @param ioctxt i/o context
+ * @return 0 on success, non-zero on error.
+ */
+static int read_vmconfig(XcIOContext *ioctxt){
+    int err = -1;
+    if(xcio_read(ioctxt, &ioctxt->vmconfig_n, sizeof(ioctxt->vmconfig_n))){
+        goto exit;
+    }
+    ioctxt->vmconfig = malloc(ioctxt->vmconfig_n + 1);
+    if(!ioctxt->vmconfig) goto exit;
+    if(xcio_read(ioctxt, ioctxt->vmconfig, ioctxt->vmconfig_n)){
+        goto exit;
+    }
+    ioctxt->vmconfig[ioctxt->vmconfig_n] = '\0';
+    err = 0;
+  exit:
+    if(err){
+        if(ioctxt->vmconfig){
+            free(ioctxt->vmconfig);
+        }
+        ioctxt->vmconfig = NULL;
+        ioctxt->vmconfig_n = 0;
+    }
+    return err;
+}
 
-int xc_linux_restore(int xc_handle,
-                     u32 dom,
-                     unsigned int flags,
-                     int (*readerfn)(void *, void *, size_t),
-                     void *readerst,
-                     u32 *pdomid)
+int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
 {
     dom0_op_t op;
-    int rc = 1, i, j, n, k;
+    int rc = 1, i, n, k;
     unsigned long mfn, pfn, xpfn;
     unsigned int prev_pc, this_pc;
-    int verbose = flags & XCFLAGS_VERBOSE;
+    u32 dom = ioctxt->domain;
     int verify = 0; 
 
     /* Number of page frames in use by this Linux session. */
@@ -115,8 +131,7 @@ int xc_linux_restore(int xc_handle,
     /* used by debug verify code */
     unsigned long buf[PAGE_SIZE/sizeof(unsigned long)];
 
-    if ( mlock(&ctxt, sizeof(ctxt) ) )
-    {   
+    if ( mlock(&ctxt, sizeof(ctxt) ) ) {   
         /* needed for when we do the build dom0 op, 
            but might as well do early */
         PERROR("Unable to mlock ctxt");
@@ -124,35 +139,36 @@ int xc_linux_restore(int xc_handle,
     }
 
     /* Start writing out the saved-domain record. */
-    if ( (*readerfn)(readerst, signature, 16) ||
-         (memcmp(signature, "LinuxGuestRecord", 16) != 0) )
-    {
-        ERROR("Unrecognised state format -- no signature found");
+    if ( xcio_read(ioctxt, signature, 16) ||
+         (memcmp(signature, "LinuxGuestRecord", 16) != 0) ) {
+        xcio_error(ioctxt, "Unrecognised state format -- no signature found");
         goto out;
     }
 
-    if ( (*readerfn)(readerst, name,                  sizeof(name)) ||
-         (*readerfn)(readerst, &nr_pfns,              sizeof(unsigned long)) ||
-         (*readerfn)(readerst, pfn_to_mfn_frame_list, PAGE_SIZE) )
-    {
-        ERROR("Error when reading from state file");
+    if ( xcio_read(ioctxt, name,                  sizeof(name)) ||
+         xcio_read(ioctxt, &nr_pfns,              sizeof(unsigned long)) ||
+         xcio_read(ioctxt, pfn_to_mfn_frame_list, PAGE_SIZE) ) {
+        xcio_error(ioctxt, "Error reading header");
         goto out;
     }
 
-    for ( i = 0; i < MAX_DOMAIN_NAME; i++ )
-    {
+    if(read_vmconfig(ioctxt)){
+        xcio_error(ioctxt, "Error writing vmconfig");
+        goto out;
+    }
+
+    for ( i = 0; i < MAX_DOMAIN_NAME; i++ ) {
         if ( name[i] == '\0' ) break;
         if ( name[i] & 0x80 )
         {
-            ERROR("Random characters in domain name");
+            xcio_error(ioctxt, "Random characters in domain name");
             goto out;
         }
     }
     name[MAX_DOMAIN_NAME-1] = '\0';
 
-    if ( nr_pfns > 1024*1024 )
-    {
-        ERROR("Invalid state file -- pfn count out of range");
+    if ( nr_pfns > 1024*1024 ) {
+        xcio_error(ioctxt, "Invalid state file -- pfn count out of range");
         goto out;
     }
 
@@ -162,22 +178,19 @@ int xc_linux_restore(int xc_handle,
     region_mfn       = calloc(1, 4 * MAX_BATCH_SIZE);    
 
     if ( (pfn_to_mfn_table == NULL) || (pfn_type == NULL) || 
-         (region_mfn == NULL) )
-    {
+         (region_mfn == NULL) ) {
         errno = ENOMEM;
         goto out;
     }
     
-    if ( mlock(region_mfn, 4 * MAX_BATCH_SIZE ) )
-    {
-        ERROR("Could not mlock region_mfn");
+    if ( mlock(region_mfn, 4 * MAX_BATCH_SIZE ) ) {
+        xcio_error(ioctxt, "Could not mlock region_mfn");
         goto out;
     }
 
     /* Set the domain's name to that from the restore file */
-    if ( xc_domain_setname( xc_handle, dom, name ) )
-    {
-        ERROR("Could not set domain name");
+    if ( xc_domain_setname( xc_handle, dom, name ) ) {
+        xcio_error(ioctxt, "Could not set domain name");
         goto out;
     }
 
@@ -187,7 +200,7 @@ int xc_linux_restore(int xc_handle,
     if ( xc_domain_setinitialmem(xc_handle, dom, 
                                  nr_pfns * (PAGE_SIZE / 1024)) )
     {
-        ERROR("Could not set domain initial memory");
+        xcio_error(ioctxt, "Could not set domain initial memory");
         goto out;
     }
 
@@ -195,9 +208,8 @@ int xc_linux_restore(int xc_handle,
     op.cmd = DOM0_GETDOMAININFO;
     op.u.getdomaininfo.domain = (domid_t)dom;
     op.u.getdomaininfo.ctxt = NULL;
-    if ( do_dom0_op(xc_handle, &op) < 0 )
-    {
-        ERROR("Could not get information on new domain");
+    if ( do_dom0_op(xc_handle, &op) < 0 ) {
+        xcio_error(ioctxt, "Could not get information on new domain");
         goto out;
     }
     shared_info_frame = op.u.getdomaininfo.shared_info_frame;
@@ -208,19 +220,17 @@ int xc_linux_restore(int xc_handle,
 
 
     /* Build the pfn-to-mfn table. We choose MFN ordering returned by Xen. */
-    if ( get_pfn_list(xc_handle, dom, pfn_to_mfn_table, nr_pfns) != nr_pfns )
-    {
-        ERROR("Did not read correct number of frame numbers for new dom");
+    if ( get_pfn_list(xc_handle, dom, pfn_to_mfn_table, nr_pfns) != nr_pfns ) {
+        xcio_error(ioctxt, "Did not read correct number of frame numbers for new dom");
         goto out;
     }
 
-    if ( (mmu = init_mmu_updates(xc_handle, dom)) == NULL )
-    {
-        ERROR("Could not initialise for MMU updates");
+    if ( (mmu = init_mmu_updates(xc_handle, dom)) == NULL ) {
+        xcio_error(ioctxt, "Could not initialise for MMU updates");
         goto out;
     }
 
-    verbose_printf("Reloading memory pages:   0%%");
+    xcio_info(ioctxt, "Reloading memory pages:   0%%");
 
     /*
      * Now simply read each saved frame into its new machine frame.
@@ -229,56 +239,45 @@ int xc_linux_restore(int xc_handle,
     prev_pc = 0;
 
     n=0;
-    while(1)
-    {
+    while(1) {
         int j;
         unsigned long region_pfn_type[MAX_BATCH_SIZE];
 
         this_pc = (n * 100) / nr_pfns;
-        if ( (this_pc - prev_pc) >= 5 )
-        {
-            verbose_printf("\b\b\b\b%3d%%", this_pc);
+        if ( (this_pc - prev_pc) >= 5 ) {
+            xcio_info(ioctxt, "\b\b\b\b%3d%%", this_pc);
             prev_pc = this_pc;
         }
 
-        if ( (*readerfn)(readerst, &j, sizeof(int)) )
-        {
-            ERROR("Error when reading from state file");
+        if ( xcio_read(ioctxt, &j, sizeof(int)) ) {
+            xcio_error(ioctxt, "Error when reading from state file");
             goto out;
         }
 
         DPRINTF("batch %d\n",j);
  
-        if ( j == -1 )
-        {
+        if ( j == -1 ) {
             verify = 1;
             printf("Entering page verify mode\n");
             continue;
         }
 
-        if ( j == 0 ) 
-            break;  /* our work here is done */
+        if ( j == 0 ) break;  /* our work here is done */
 
-        if( j > MAX_BATCH_SIZE )
-        {
-            ERROR("Max batch size exceeded. Giving up.");
+        if( j > MAX_BATCH_SIZE ) {
+            xcio_error(ioctxt, "Max batch size exceeded. Giving up.");
             goto out;
         }
  
-        if ( (*readerfn)(readerst, region_pfn_type, j*sizeof(unsigned long)) )
-        {
-            ERROR("Error when reading from state file");
+        if ( xcio_read(ioctxt, region_pfn_type, j*sizeof(unsigned long)) ) {
+            xcio_error(ioctxt, "Error when reading from state file");
             goto out;
         }
 
-        for(i=0;i<j;i++)
-        {
-            if ( (region_pfn_type[i] & LTAB_MASK) == XTAB)
-            {
+        for(i=0; i<j; i++) {
+            if ( (region_pfn_type[i] & LTAB_MASK) == XTAB) {
                 region_mfn[i] = 0; /* we know map will fail, but don't care */
-            }
-            else
-            {  
+            } else {  
                 pfn = region_pfn_type[i] & ~LTAB_MASK;
                 region_mfn[i] = pfn_to_mfn_table[pfn];
             }          
@@ -287,24 +286,20 @@ int xc_linux_restore(int xc_handle,
         if ( (region_base = mfn_mapper_map_batch( xc_handle, dom, 
                                                   PROT_WRITE,
                                                   region_mfn,
-                                                  j )) == 0)
-        {
-            PERROR("map batch failed");
+                                                  j )) == 0) {
+            xcio_error(ioctxt, "map batch failed");
             goto out;
         }
 
-        for(i=0;i<j;i++)
-        {
+        for(i=0;i<j;i++) {
             unsigned long *ppage;
 
             pfn = region_pfn_type[i] & ~LTAB_MASK;
 
-            if ( (region_pfn_type[i] & LTAB_MASK) == XTAB)
-                continue;
+            if ( (region_pfn_type[i] & LTAB_MASK) == XTAB) continue;
 
-            if (pfn>nr_pfns)
-            {
-                ERROR("pfn out of range");
+            if (pfn>nr_pfns) {
+                xcio_error(ioctxt, "pfn out of range");
                 goto out;
             }
 
@@ -314,36 +309,32 @@ int xc_linux_restore(int xc_handle,
 
             mfn = pfn_to_mfn_table[pfn];
 
-            if ( verify )
+            if ( verify ) {
                 ppage = (unsigned long*) buf;  /* debug case */
-            else
+            } else {
                 ppage = (unsigned long*) (region_base + i*PAGE_SIZE);
+            }
 
-            if ( (*readerfn)(readerst, ppage, PAGE_SIZE) )
-            {
-                ERROR("Error when reading from state file");
+            if ( xcio_read(ioctxt, ppage, PAGE_SIZE) ) {
+                xcio_error(ioctxt, "Error when reading from state file");
                 goto out;
             }
 
-            switch( region_pfn_type[i] )
-            {
+            switch( region_pfn_type[i] ) {
             case 0:
                 break;
 
             case L1TAB:
             {
-                for ( k = 0; k < 1024; k++ )
-                {
-                    if ( ppage[k] & _PAGE_PRESENT )
-                    {
+                for ( k = 0; k < 1024; k++ ) {
+                    if ( ppage[k] & _PAGE_PRESENT ) {
                         xpfn = ppage[k] >> PAGE_SHIFT;
 
-                        if ( xpfn >= nr_pfns )
-                        {
-                            ERROR("Frame number in type %d page table is "
-                                  "out of range. i=%d k=%d pfn=0x%x "
-                                  "nr_pfns=%d", region_pfn_type[i]>>28, i, 
-                                  k, xpfn,nr_pfns);
+                        if ( xpfn >= nr_pfns ) {
+                            xcio_error(ioctxt, "Frame number in type %lu page table is "
+                                  "out of range. i=%d k=%d pfn=0x%lx "
+                                  "nr_pfns=%lu", region_pfn_type[i]>>28, i, 
+                                  k, xpfn, nr_pfns);
                             goto out;
                         }
 
@@ -359,16 +350,13 @@ int xc_linux_restore(int xc_handle,
             {
                 for ( k = 0; 
                       k < (HYPERVISOR_VIRT_START>>L2_PAGETABLE_SHIFT); 
-                      k++ )
-                {
-                    if ( ppage[k] & _PAGE_PRESENT )
-                    {
+                      k++ ) {
+                    if ( ppage[k] & _PAGE_PRESENT ) {
                         xpfn = ppage[k] >> PAGE_SHIFT;
 
-                        if ( xpfn >= nr_pfns )
-                        {
-                            ERROR("Frame number in type %d page table is "
-                                  "out of range. i=%d k=%d pfn=%d nr_pfns=%d",
+                        if ( xpfn >= nr_pfns ) {
+                            xcio_error(ioctxt, "Frame number in type %lu page table is "
+                                  "out of range. i=%d k=%d pfn=%lu nr_pfns=%lu",
                                   region_pfn_type[i]>>28, i, k, xpfn, nr_pfns);
 
                             goto out;
@@ -383,24 +371,21 @@ int xc_linux_restore(int xc_handle,
             break;
 
             default:
-                ERROR("Bogus page type %x page table is out of range."
-                      " i=%d nr_pfns=%d", region_pfn_type[i], i, nr_pfns);
+                xcio_error(ioctxt, "Bogus page type %lx page table is out of range."
+                      " i=%d nr_pfns=%lu", region_pfn_type[i], i, nr_pfns);
                 goto out;
 
             } /* end of page type switch statement */
 
-            if ( verify )
-            {
+            if ( verify ) {
                 int res = memcmp(buf, (region_base + i*PAGE_SIZE), PAGE_SIZE );
-                if (res)
-                {
+                if (res) {
                     int v;
-                    printf("************** pfn=%x type=%x gotcs=%08lx "
+                    printf("************** pfn=%lx type=%lx gotcs=%08lx "
                            "actualcs=%08lx\n", pfn, pfn_type[pfn], 
                            csum_page(region_base + i*PAGE_SIZE), 
                            csum_page(buf));
-                    for ( v = 0; v < 4; v++ )
-                    {
+                    for ( v = 0; v < 4; v++ ) {
                         unsigned long *p = (unsigned long *)
                             (region_base + i*PAGE_SIZE);
                         if ( buf[v] != p[v] )
@@ -411,8 +396,7 @@ int xc_linux_restore(int xc_handle,
             }
 
             if ( add_mmu_update(xc_handle, mmu,
-                                (mfn<<PAGE_SHIFT) | MMU_MACHPHYS_UPDATE, pfn) )
-            {
+                                (mfn<<PAGE_SHIFT) | MMU_MACHPHYS_UPDATE, pfn) ) {
                 printf("machpys mfn=%ld pfn=%ld\n",mfn,pfn);
                 goto out;
             }
@@ -431,44 +415,36 @@ int xc_linux_restore(int xc_handle,
      * Pin page tables. Do this after writing to them as otherwise Xen
      * will barf when doing the type-checking.
      */
-    for ( i = 0; i < nr_pfns; i++ )
-    {
-        if ( pfn_type[i] == L1TAB )
-        {
+    for ( i = 0; i < nr_pfns; i++ ) {
+        if ( pfn_type[i] == L1TAB ) {
             if ( add_mmu_update(xc_handle, mmu,
                                 (pfn_to_mfn_table[i]<<PAGE_SHIFT) | 
                                 MMU_EXTENDED_COMMAND,
-                                MMUEXT_PIN_L1_TABLE) )
-            {
+                                MMUEXT_PIN_L1_TABLE) ) {
                 printf("ERR pin L1 pfn=%lx mfn=%lx\n",
-                       i, pfn_to_mfn_table[i]);
+                       (unsigned long)i, pfn_to_mfn_table[i]);
                 goto out;
             }
-        }
-        else if ( pfn_type[i] == L2TAB )
-        {
+        } else if ( pfn_type[i] == L2TAB ) {
             if ( add_mmu_update(xc_handle, mmu,
                                 (pfn_to_mfn_table[i]<<PAGE_SHIFT) | 
                                 MMU_EXTENDED_COMMAND,
-                                MMUEXT_PIN_L2_TABLE) )
-            {
+                                MMUEXT_PIN_L2_TABLE) ) {
                 printf("ERR pin L2 pfn=%lx mfn=%lx\n",
-                       i, pfn_to_mfn_table[i]);
+                       (unsigned long)i, pfn_to_mfn_table[i]);
                 goto out;
             }
         }
     }
 
-    if ( finish_mmu_updates(xc_handle, mmu) )
-        goto out;
+    if ( finish_mmu_updates(xc_handle, mmu) ) goto out;
 
-    verbose_printf("\b\b\b\b100%%\nMemory reloaded.\n");
+    xcio_info(ioctxt, "\b\b\b\b100%%\nMemory reloaded.\n");
 
 
-    if ( (*readerfn)(readerst, &ctxt,                 sizeof(ctxt)) ||
-         (*readerfn)(readerst, shared_info,           PAGE_SIZE) )
-    {
-        ERROR("Error when reading from state file");
+    if ( xcio_read(ioctxt, &ctxt,                 sizeof(ctxt)) ||
+         xcio_read(ioctxt, shared_info,           PAGE_SIZE) ) {
+        xcio_error(ioctxt, "Error when reading from state file");
         goto out;
     }
 
@@ -476,7 +452,7 @@ int xc_linux_restore(int xc_handle,
     pfn = ctxt.cpu_ctxt.esi;
     if ( (pfn >= nr_pfns) || (pfn_type[pfn] != NOTAB) )
     {
-        ERROR("Suspend record frame number is bad");
+        xcio_error(ioctxt, "Suspend record frame number is bad");
         goto out;
     }
     ctxt.cpu_ctxt.esi = mfn = pfn_to_mfn_table[pfn];
@@ -487,17 +463,14 @@ int xc_linux_restore(int xc_handle,
     unmap_pfn(pm_handle, p_srec);
 
     /* Uncanonicalise each GDT frame number. */
-    if ( ctxt.gdt_ents > 8192 )
-    {
-        ERROR("GDT entry count out of range");
+    if ( ctxt.gdt_ents > 8192 ) {
+        xcio_error(ioctxt, "GDT entry count out of range");
         goto out;
     }
-    for ( i = 0; i < ctxt.gdt_ents; i += 512 )
-    {
+    for ( i = 0; i < ctxt.gdt_ents; i += 512 ) {
         pfn = ctxt.gdt_frames[i];
-        if ( (pfn >= nr_pfns) || (pfn_type[pfn] != NOTAB) )
-        {
-            ERROR("GDT frame number is bad");
+        if ( (pfn >= nr_pfns) || (pfn_type[pfn] != NOTAB) ) {
+            xcio_error(ioctxt, "GDT frame number is bad");
             goto out;
         }
         ctxt.gdt_frames[i] = pfn_to_mfn_table[pfn];
@@ -505,11 +478,10 @@ int xc_linux_restore(int xc_handle,
 
     /* Uncanonicalise the page table base pointer. */
     pfn = ctxt.pt_base >> PAGE_SHIFT;
-    if ( (pfn >= nr_pfns) || (pfn_type[pfn] != L2TAB) )
-    {
-        printf("PT base is bad. pfn=%d nr=%d type=%08lx %08lx\n",
-               pfn, nr_pfns, pfn_type[pfn], L2TAB);
-        ERROR("PT base is bad.");
+    if ( (pfn >= nr_pfns) || (pfn_type[pfn] != L2TAB) ) {
+        printf("PT base is bad. pfn=%lu nr=%lu type=%08lx %08lx\n",
+               pfn, nr_pfns, pfn_type[pfn], (unsigned long)L2TAB);
+        xcio_error(ioctxt, "PT base is bad.");
         goto out;
     }
     ctxt.pt_base = pfn_to_mfn_table[pfn] << PAGE_SHIFT;
@@ -527,14 +499,12 @@ int xc_linux_restore(int xc_handle,
 
 
     /* Uncanonicalise the pfn-to-mfn table frame-number list. */
-    for ( i = 0; i < (nr_pfns+1023)/1024; i++ )
-    {
+    for ( i = 0; i < (nr_pfns+1023)/1024; i++ ) {
         unsigned long pfn, mfn;
 
         pfn = pfn_to_mfn_frame_list[i];
-        if ( (pfn >= nr_pfns) || (pfn_type[pfn] != NOTAB) )
-        {
-            ERROR("PFN-to-MFN frame number is bad");
+        if ( (pfn >= nr_pfns) || (pfn_type[pfn] != NOTAB) ) {
+            xcio_error(ioctxt, "PFN-to-MFN frame number is bad");
             goto out;
         }
         mfn = pfn_to_mfn_table[pfn];
@@ -545,9 +515,8 @@ int xc_linux_restore(int xc_handle,
           mfn_mapper_map_batch(xc_handle, dom, 
                                PROT_WRITE,
                                pfn_to_mfn_frame_list,
-                               (nr_pfns+1023)/1024 )) == 0 )
-    {
-        ERROR("Couldn't map pfn_to_mfn table");
+                               (nr_pfns+1023)/1024 )) == 0 ) {
+        xcio_error(ioctxt, "Couldn't map pfn_to_mfn table");
         goto out;
     }
 
@@ -569,24 +538,26 @@ int xc_linux_restore(int xc_handle,
      *  9. debugregs are checked by Xen.
      *  10. callback code selectors need checking.
      */
-    for ( i = 0; i < 256; i++ )
-    {
+    for ( i = 0; i < 256; i++ ) {
         ctxt.trap_ctxt[i].vector = i;
         if ( (ctxt.trap_ctxt[i].cs & 3) == 0 )
             ctxt.trap_ctxt[i].cs = FLAT_GUESTOS_CS;
     }
-    if ( (ctxt.guestos_ss & 3) == 0 )
+    if ( (ctxt.guestos_ss & 3) == 0 ){
         ctxt.guestos_ss = FLAT_GUESTOS_DS;
-    if ( (ctxt.event_callback_cs & 3) == 0 )
+    }
+    if ( (ctxt.event_callback_cs & 3) == 0 ){
         ctxt.event_callback_cs = FLAT_GUESTOS_CS;
-    if ( (ctxt.failsafe_callback_cs & 3) == 0 )
+    }
+    if ( (ctxt.failsafe_callback_cs & 3) == 0 ){
         ctxt.failsafe_callback_cs = FLAT_GUESTOS_CS;
+    }
     if ( ((ctxt.ldt_base & (PAGE_SIZE - 1)) != 0) ||
          (ctxt.ldt_ents > 8192) ||
          (ctxt.ldt_base > HYPERVISOR_VIRT_START) ||
          ((ctxt.ldt_base + ctxt.ldt_ents*8) > HYPERVISOR_VIRT_START) )
     {
-        ERROR("Bad LDT base or size");
+        xcio_error(ioctxt, "Bad LDT base or size");
         goto out;
     }
    
@@ -597,34 +568,33 @@ int xc_linux_restore(int xc_handle,
 
     /* don't start the domain as we have console etc to set up */
   
-    if( rc == 0 )
-    {
+    if( rc == 0 ) {
         /* Success: print the domain id. */
-        verbose_printf("DOM=%u\n", dom);
+        xcio_info(ioctxt, "DOM=%lu\n", dom);
         return 0;
     }
 
 
  out:
-    if ( (rc != 0) && (dom != 0) )
+    if ( (rc != 0) && (dom != 0) ){
         xc_domain_destroy(xc_handle, dom);
-
-    if ( mmu != NULL )
+    }
+    if ( mmu != NULL ){
         free(mmu);
-
-    if ( pm_handle >= 0 )
+    }
+    if ( pm_handle >= 0 ){
         (void)close_pfn_mapper(pm_handle);
-
-    if ( pfn_to_mfn_table != NULL )
+    }
+    if ( pfn_to_mfn_table != NULL ){
         free(pfn_to_mfn_table);
-    if ( pfn_type != NULL )
+    }
+    if ( pfn_type != NULL ){
         free(pfn_type);
+    }
 
-
-    if ( rc == 0 )
-        *pdomid = dom;
-
+    if ( rc == 0 ){
+        ioctxt->domain = dom;
+    }
     DPRINTF("Restore exit with rc=%d\n",rc);
-
     return rc;
 }

@@ -14,6 +14,8 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <arpa/inet.h>
+#include "xc_private.h"
+#include "gzip_stream.h"
 
 /* Needed for Python versions earlier than 2.3. */
 #ifndef PyMODINIT_FUNC
@@ -189,115 +191,31 @@ static PyObject *pyxc_domain_getinfo(PyObject *self,
     return list;
 }
 
-static PyObject *tcp_save(XcObject *xc, u32 dom, char *url, unsigned flags){
-#define max_namelen 64
-    char server[max_namelen];
-    char *port_s;
-    int port=777;
-    int sd = -1;
-    struct hostent *h;
-    struct sockaddr_in s;
-    int sockbufsize;
+static int file_save(XcObject *xc, XcIOContext *ctxt, char *state_file){
     int rc = -1;
-    
-    int writerfn(void *fd, const void *buf, size_t count) {
-        int tot = 0, rc;
-        do {
-            rc = write( (int) fd, ((char*)buf)+tot, count-tot );
-            if ( rc < 0 ) { perror("WRITE"); return rc; };
-            tot += rc;
-        }
-        while ( tot < count );
-        return 0;
+    int fd = -1;
+    int open_flags = (O_CREAT | O_EXCL | O_WRONLY);
+    int open_mode = 0644;
+
+    fd = open(state_file, open_flags, open_mode);
+    if(fd < 0){
+        xcio_perror(ctxt, "Could not open file for writing");
+        goto exit;
     }
-    
-    strncpy( server, url+strlen("tcp://"), max_namelen);
-    server[max_namelen-1]='\0';
-    if ( (port_s = strchr(server,':')) != NULL ) {
-        *port_s = '\0';
-        port = atoi(port_s+1);
+    /* Compression rate 1: we want speed over compression. 
+     * We're mainly going for those zero pages, after all.
+     */
+    ctxt->io = gzip_stream_fdopen(fd, "wb1");
+    if(!ctxt->io){
+        xcio_perror(ctxt, "Could not allocate compression state");
+        goto exit;
     }
-    printf("X server=%s port=%d\n",server,port);
-    h = gethostbyname(server);
-    sd = socket(AF_INET, SOCK_STREAM,0);
-    if (sd < 0) goto serr;
-    s.sin_family = AF_INET;
-    bcopy ( h->h_addr, &(s.sin_addr.s_addr), h->h_length);
-    s.sin_port = htons(port);
-    if ( connect(sd, (struct sockaddr *) &s, sizeof(s)) ) goto serr;
-    sockbufsize=128*1024;
-    if ( setsockopt(sd, SOL_SOCKET, SO_SNDBUF, &sockbufsize, sizeof sockbufsize) < 0 ) goto serr;
-
-    if ( xc_linux_save(xc->xc_handle, dom, flags, writerfn, (void*)sd) == 0 ) {
-        if ( read( sd, &rc, sizeof(int) ) != sizeof(int) ) goto serr;
-  
-        if ( rc == 0 ) {
-                printf("Migration succesful -- destroy local copy\n");
-                xc_domain_destroy(xc->xc_handle, dom);
-                close(sd);
-                Py_INCREF(zero);
-                return zero;
-        } else {
-            errno = rc;
-        }
-    }
-
-  serr:
-    printf("Migration failed -- restart local copy\n");
-    xc_domain_unpause(xc->xc_handle, dom);
-    PyErr_SetFromErrno(xc_error);
-    if ( sd >= 0 ) close(sd);
-    return NULL;
-
-}
-
-static PyObject *file_save(XcObject *xc, u32 dom, char *state_file, unsigned flags){
-        int fd = -1;
-        gzFile gfd = NULL;
-
-        int writerfn(void *fd, const void *buf, size_t count) {
-            int rc;
-            while ( ((rc = gzwrite( (gzFile*)fd, (void*)buf, count)) == -1) && 
-                    (errno = EINTR) )
-                continue;
-            return ! (rc == count);
-        }
-
-        if (strncmp(state_file,"file:",strlen("file:")) == 0){
-            state_file += strlen("file:");
-        }
-
-        if ( (fd = open(state_file, O_CREAT|O_EXCL|O_WRONLY, 0644)) == -1 ) {
-            perror("Could not open file for writing");
-            goto err;
-        }
-        /*
-         * Compression rate 1: we want speed over compression. 
-         * We're mainly going for those zero pages, after all.
-         */
-        if ( (gfd = gzdopen(fd, "wb1")) == NULL ) {
-            perror("Could not allocate compression state for state file");
-            close(fd);
-            goto err;
-        }
-        if ( xc_linux_save(xc->xc_handle, dom, flags, writerfn, gfd) == 0 ) {
-            /* kill domain. We don't want to do this for checkpointing, but
-               if we don't do it here I think people will hurt themselves
-               by accident... */
-            xc_domain_destroy(xc->xc_handle, dom);
-            gzclose(gfd);
-            close(fd);
-
-            Py_INCREF(zero);
-            return zero;
-        }
-
-    err:
-        PyErr_SetFromErrno(xc_error);
-        if ( gfd != NULL ) gzclose(gfd);
-        if ( fd >= 0 ) close(fd);
-        unlink(state_file);
-        return NULL;
+    rc = xc_linux_save(xc->xc_handle, ctxt);
+  exit:
+    if(ctxt->io) IOStream_close(ctxt->io);
+    if(fd >= 0) close(fd);
+    unlink(state_file);
+    return rc;
 }
 
 static PyObject *pyxc_linux_save(PyObject *self,
@@ -306,33 +224,54 @@ static PyObject *pyxc_linux_save(PyObject *self,
 {
     XcObject *xc = (XcObject *)self;
 
-    u32   dom;
+    u32 dom;
     char *state_file;
-    int   progress = 1, live = -1, debug = 0;
+    int progress = 1, debug = 0;
     unsigned int flags = 0;
     PyObject *val = NULL;
+    int rc = -1;
+    XcIOContext ioctxt = { .info = iostdout, .err = iostderr };
 
-    static char *kwd_list[] = { "dom", "state_file", "progress", 
-                                "live", "debug", NULL };
+    static char *kwd_list[] = { "dom", "state_file", "vmconfig", "progress", "debug", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "is|iii", kwd_list, 
-                                      &dom, &state_file, &progress, 
-                                      &live, &debug) )
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "is|siii", kwd_list, 
+                                     &ioctxt.domain,
+                                     &state_file,
+                                     &ioctxt.vmconfig,
+                                     &progress, 
+                                     &debug)){
         goto exit;
-
-    if (progress)  flags |= XCFLAGS_VERBOSE;
-    if (live == 1) flags |= XCFLAGS_LIVE;
-    if (debug)     flags |= XCFLAGS_DEBUG;
-
-    if ( strncmp(state_file,"tcp:", strlen("tcp:")) == 0 ) {
-        /* default to live for tcp */
-        if (live == -1) flags |= XCFLAGS_LIVE;
-        val = tcp_save(xc, dom, state_file, flags);
-    } else {
-        val = file_save(xc, dom, state_file, flags);
     }
+    ioctxt.vmconfig_n = (ioctxt.vmconfig ? strlen(ioctxt.vmconfig) : 0);
+    if (progress)  ioctxt.flags |= XCFLAGS_VERBOSE;
+    if (debug)     ioctxt.flags |= XCFLAGS_DEBUG;
+    if(!state_file || state_file[0] == '\0') goto exit;
+    rc = file_save(xc, &ioctxt, state_file);
+    if(rc){
+        PyErr_SetFromErrno(xc_error);
+        goto exit;
+    } 
+    //xc_domain_destroy(xc->xc_handle, dom);
+    Py_INCREF(zero);
+    val = zero;
   exit:
     return val;
+}
+
+
+static int file_restore(XcObject *xc, XcIOContext *ioctxt, char *state_file){
+    int rc = -1;
+
+    ioctxt->io = gzip_stream_fopen(state_file, "rb");
+    if (!ioctxt->io) {
+        xcio_perror(ioctxt, "Could not open file for reading");
+        goto exit;
+    }
+
+    rc = xc_linux_restore(xc->xc_handle, ioctxt);
+  exit:
+    if(ioctxt->io) IOStream_close(ioctxt->io);
+    return rc;
 }
 
 static PyObject *pyxc_linux_restore(PyObject *self,
@@ -340,161 +279,37 @@ static PyObject *pyxc_linux_restore(PyObject *self,
                                     PyObject *kwds)
 {
     XcObject *xc = (XcObject *)self;
+    char *state_file;
+    int progress = 1, debug = 0;
+    u32 dom;
+    PyObject *val = NULL;
+    XcIOContext ioctxt = { .info = iostdout, .err = iostderr };
+    int rc =-1;
 
-    char        *state_file;
-    int          progress = 1;
-    u32          dom;
-    unsigned int flags = 0;
+    static char *kwd_list[] = { "state_file", "progress", "debug", NULL };
 
-    static char *kwd_list[] = { "dom", "state_file", "progress", NULL };
-
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "is|i", kwd_list, 
-                                      &dom, &state_file, &progress) )
-        return NULL;
-
-    if ( progress )
-        flags |= XCFLAGS_VERBOSE;
-
-    if ( strncmp(state_file,"tcp:", strlen("tcp:")) == 0 )
-    {
-#define max_namelen 64
-        char server[max_namelen];
-        char *port_s;
-        int port=777;
-        int ld = -1, sd = -1;
-        struct hostent *h;
-        struct sockaddr_in s, d, p;
-        socklen_t dlen, plen;
-        int sockbufsize;
-        int on = 1, rc = -1;
-
-        int readerfn(void *fd, void *buf, size_t count)
-        {
-            int rc, tot = 0;
-            do { 
-                rc = read( (int) fd, ((char*)buf)+tot, count-tot ); 
-                if ( rc < 0 ) { perror("READ"); return rc; }
-                if ( rc == 0 ) { printf("read: need %d, tot=%d got zero\n",
-                                        count-tot, tot); return -1; }
-                tot += rc;
-            } 
-            while ( tot < count );
-            return 0;
-        }
-
-        strncpy( server, state_file+strlen("tcp://"), max_namelen);
-        server[max_namelen-1]='\0';
-        if ( (port_s = strchr(server,':')) != NULL )
-        {
-            *port_s = '\0';
-            port = atoi(port_s+1);
-        }
-
-        printf("X server=%s port=%d\n",server,port);
- 
-        h = gethostbyname(server);
-        ld = socket (AF_INET,SOCK_STREAM,0);
-        if ( ld < 0 ) goto serr;
-        s.sin_family = AF_INET;
-        s.sin_addr.s_addr = htonl(INADDR_ANY);
-        s.sin_port = htons(port);
-
-        if ( setsockopt(ld, SOL_SOCKET, SO_REUSEADDR, &on, sizeof (on)) < 0 )
-            goto serr;
-
-        if ( bind(ld, (struct sockaddr *) &s, sizeof(s)) ) 
-            goto serr;
-
-        if ( listen(ld, 1) )
-            goto serr;
-
-        dlen=sizeof(struct sockaddr);
-        if ( (sd = accept(ld, (struct sockaddr *) &d, &dlen )) < 0 )
-            goto serr;
-
-        plen = sizeof(p);
-        if ( getpeername(sd, (struct sockaddr_in *) &p, 
-                         &plen) < 0 )
-            goto serr;
-
-        printf("Accepted connection from %s\n", inet_ntoa(p.sin_addr));
- 
-        sockbufsize=128*1024;
-        if ( setsockopt(sd, SOL_SOCKET, SO_SNDBUF, &sockbufsize, 
-                        sizeof sockbufsize) < 0 ) 
-            goto serr;
-
-        rc = xc_linux_restore(xc->xc_handle, dom, flags, 
-                              readerfn, (void*)sd, &dom);
-
-        write( sd, &rc, sizeof(int) ); 
-
-        if (rc == 0)
-        {
-            close(sd);
-            Py_INCREF(zero);
-            return zero;
-        }
-        errno = rc;
-
-    serr:
-        PyErr_SetFromErrno(xc_error);
-        if ( ld >= 0 ) close(ld);
-        if ( sd >= 0 ) close(sd);
-        return NULL;
-    }    
-    else
-    {
-        int fd = -1;
-        gzFile gfd = NULL;
-
-        int readerfn(void *fd, void *buf, size_t count)
-        {
-            int rc;
-            while ( ((rc = gzread( (gzFile*)fd, (void*)buf, count)) == -1) && 
-                    (errno = EINTR) )
-                continue;
-            return ! (rc == count);
-        }
-
-        if ( strncmp(state_file,"file:",strlen("file:")) == 0 )
-            state_file += strlen("file:");
-
-        if ( (fd = open(state_file, O_RDONLY)) == -1 )
-        {
-            perror("Could not open file for writing");
-            goto err;
-        }
-
-        /*
-         * Compression rate 1: we want speed over compression. 
-         * We're mainly going for those zero pages, after all.
-         */
-        if ( (gfd = gzdopen(fd, "rb")) == NULL )
-        {
-            perror("Could not allocate compression state for state file");
-            close(fd);
-            goto err;
-        }
-
-
-        if ( xc_linux_restore(xc->xc_handle, dom, flags, 
-                              readerfn, gfd, &dom) == 0 )
-        {
-            gzclose(gfd);
-            close(fd);
-
-            Py_INCREF(zero);
-            return zero;
-        }
-
-    err:
-        PyErr_SetFromErrno(xc_error);
-        if ( gfd != NULL ) gzclose(gfd);
-        if ( fd >= 0 ) close(fd);
-        return NULL;
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "is|ii", kwd_list, 
+                                     &ioctxt.domain,
+                                     &state_file,
+                                     &progress,
+                                     &debug)){
+        goto exit;
     }
+    if (progress) ioctxt.flags |= XCFLAGS_VERBOSE;
+    if (debug)    ioctxt.flags |= XCFLAGS_DEBUG;
 
+    if(!state_file || state_file[0] == '\0') goto exit;
+    rc = file_restore(xc, &ioctxt, state_file);
+    if(rc){
+        PyErr_SetFromErrno(xc_error);
+        goto exit;
+    }
+    val = Py_BuildValue("{s:i,s:s}",
+                        "dom", ioctxt.domain,
+                        "vmconfig", ioctxt.vmconfig);
+    //? free(ioctxt.vmconfig);
+  exit:
+    return val;
 }
 
 static PyObject *pyxc_linux_build(PyObject *self,

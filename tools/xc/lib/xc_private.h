@@ -136,6 +136,8 @@ int close_pfn_mapper(int pm_handle);
 void *map_pfn_writeable(int pm_handle, unsigned long pfn);
 void *map_pfn_readonly(int pm_handle, unsigned long pfn);
 void unmap_pfn(int pm_handle, void *vaddr);
+int get_pfn_type_batch(int xc_handle, u32 dom, int num, unsigned long *arr);
+unsigned long csum_page (void * page);
 
 /*
  * MMU updates.
@@ -202,4 +204,5 @@ void * mfn_mapper_queue_entry(mfn_mapper_t *t, int offset,
 
 long long  xc_domain_get_cpu_usage( int xc_handle, domid_t domid );
 
+#include "xc_io.h"
 #endif /* __XC_PRIVATE_H__ */

@@ -5,9 +5,6 @@
 # This file expects the variable 'vmid' to be set.
 #============================================================================
 
-import sys
-import xenctl.ip
-
 try:
     vmid = int(vmid) # convert to integer
 except:

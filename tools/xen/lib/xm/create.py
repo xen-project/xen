@@ -8,7 +8,7 @@ from xen.xend import sxp
 from xen.xend import PrettyPrint
 from xen.xend.XendClient import server
 
-from xen.xend.xm.opts import *
+from xen.xm.opts import *
 
 gopts = Opts(use="""[options]
 
