@@ -51,7 +51,7 @@ void *map_domain_mem(unsigned long pa)
         if ( cache[idx] == 0 ) break;
     }
 
-    cache[idx] = (pa & PAGE_MASK) | PAGE_HYPERVISOR;
+    cache[idx] = (pa & PAGE_MASK) | __PAGE_HYPERVISOR;
 
     local_irq_restore(flags);
 
