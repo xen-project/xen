@@ -539,10 +539,10 @@ static void shadow_map_l1_into_current_l2(unsigned long va)
         __shadow_set_pl2e(m, va, spl2e);
 
         gpl1e = (unsigned long *) &(linear_pg_table[
-            (va>>L1_PAGETABLE_SHIFT) & (ENTRIES_PER_L1_PAGETABLE-1)]);
+            (va>>L1_PAGETABLE_SHIFT) & ~(ENTRIES_PER_L1_PAGETABLE-1)]);
 
         spl1e = (unsigned long *) &(shadow_linear_pg_table[
-            (va>>L1_PAGETABLE_SHIFT) & (ENTRIES_PER_L1_PAGETABLE-1)]);
+            (va>>L1_PAGETABLE_SHIFT) & ~(ENTRIES_PER_L1_PAGETABLE-1)]);
 
         for ( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ )
             l1pte_propagate_from_guest(m, &gpl1e[i], &spl1e[i]);
