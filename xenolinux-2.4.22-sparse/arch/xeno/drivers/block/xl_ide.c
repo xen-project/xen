@@ -94,7 +94,7 @@ static void setup_major(struct gendisk **pgd,
              (disk < base) || (disk >= (base + XLIDE_DEVS_PER_MAJOR)) ) 
             continue;
 
-        ((xl_disk_t *)gd->real_devices)[disk].capacity =
+        ((xl_disk_t *)gd->real_devices)[disk-base].capacity =
             xdi->disks[i].capacity;
 
         switch (xdi->disks[i].type) 
