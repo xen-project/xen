@@ -30,8 +30,7 @@
 #include <asm/page.h>
 #include <asm/flushtlb.h>
 
-// XXX SMP bug -- these should not be statics...
-//
+/* XXX SMP bug -- these should not be statics... */
 static int ttot=0, ctot=0, io_mappings=0, lowmem_mappings=0;
 static int l1, l2, oos_count, page_count;
 
@@ -538,10 +537,14 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
         }
     }
 
+#ifdef __i386__
     if ( shadow_mode_external(d) )
         l2limit = L2_PAGETABLE_ENTRIES;
     else
         l2limit = DOMAIN_ENTRIES_PER_L2_PAGETABLE;
+#else
+    l2limit = 0; /* XXX x86/64 XXX */
+#endif
 
     adjust_for_pgtbase();
 
@@ -553,7 +556,6 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
         adjust_shadow_tables();
     }
 
-    //printk("d->shared_info=%p __pa()=%p\n", d->shared_info, __pa(d->shared_info));
     adjust(virt_to_page(d->shared_info), 1);
 
     return errors;

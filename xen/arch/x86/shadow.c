@@ -322,10 +322,14 @@ free_shadow_hl2_table(struct domain *d, unsigned long smfn)
     l1_pgentry_t *hl2 = map_domain_mem(smfn << PAGE_SHIFT);
     int i, limit;
 
+#ifdef __i386__
     if ( shadow_mode_external(d) )
         limit = L2_PAGETABLE_ENTRIES;
     else
         limit = DOMAIN_ENTRIES_PER_L2_PAGETABLE;
+#else
+    limit = 0; /* XXX x86/64 XXX */
+#endif
 
     for ( i = 0; i < limit; i++ )
     {
@@ -604,9 +608,11 @@ static void alloc_monitor_pagetable(struct exec_domain *ed)
     mpl2e = (l2_pgentry_t *) map_domain_mem(mmfn << PAGE_SHIFT);
     memset(mpl2e, 0, PAGE_SIZE);
 
+#ifdef __i386__ /* XXX screws x86/64 build */
     memcpy(&mpl2e[DOMAIN_ENTRIES_PER_L2_PAGETABLE], 
            &idle_pg_table[DOMAIN_ENTRIES_PER_L2_PAGETABLE],
            HYPERVISOR_ENTRIES_PER_L2_PAGETABLE * sizeof(l2_pgentry_t));
+#endif
 
     mpl2e[l2_table_offset(PERDOMAIN_VIRT_START)] =
         mk_l2_pgentry((__pa(d->arch.mm_perdomain_pt) & PAGE_MASK) 
@@ -1306,10 +1312,14 @@ shadow_hl2_table(struct domain *d, unsigned long gpfn, unsigned long gmfn,
 
     hl2 = map_domain_mem(hl2mfn << PAGE_SHIFT);
 
+#ifdef __i386__
     if ( shadow_mode_external(d) )
         limit = L2_PAGETABLE_ENTRIES;
     else
         limit = DOMAIN_ENTRIES_PER_L2_PAGETABLE;
+#else
+    limit = 0; /* XXX x86/64 XXX */
+#endif
 
     memset(hl2, 0, limit * sizeof(l1_pgentry_t));
 
@@ -2712,10 +2722,14 @@ int check_l2_table(
                (__pa(d->arch.mm_perdomain_pt) | __PAGE_HYPERVISOR));
     }
 
+#ifdef __i386__
     if ( shadow_mode_external(d) )
         limit = L2_PAGETABLE_ENTRIES;
     else
         limit = DOMAIN_ENTRIES_PER_L2_PAGETABLE;
+#else
+    limit = 0; /* XXX x86/64 XXX */
+#endif
 
     /* Check the whole L2. */
     for ( i = 0; i < limit; i++ )
@@ -2773,10 +2787,14 @@ int _check_pagetable(struct exec_domain *ed, char *s)
     spl2e = (l2_pgentry_t *) map_domain_mem( smfn << PAGE_SHIFT );
 
     /* Go back and recurse. */
+#ifdef __i386__
     if ( shadow_mode_external(d) )
         limit = L2_PAGETABLE_ENTRIES;
     else
         limit = DOMAIN_ENTRIES_PER_L2_PAGETABLE;
+#else
+    limit = 0; /* XXX x86/64 XXX */
+#endif
 
     for ( i = 0; i < limit; i++ )
     {
