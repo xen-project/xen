@@ -459,37 +459,24 @@ static void relinquish_list(struct domain *d, struct list_head *list)
     /* Use a recursive lock, as we may enter 'free_domheap_page'. */
     spin_lock_recursive(&d->page_alloc_lock);
 
-    /*
-     * Careful! Any time we might decrement a page's reference count we
-     * might invalidate our page pointer or our pointer into the page list.
-     * In such cases we have to exit the current iteration of the loop and
-     * start back at the beginning of the list. We are guaranteed to make
-     * forward progress because nothign will get added to the list (the domain
-     * is dying) and no pages will become pinned after we unpin them.
-     */
     ent = list->next;
     while ( ent != list )
     {
         page = list_entry(ent, struct pfn_info, list);
 
-        if ( test_and_clear_bit(_PGT_pinned, &page->u.inuse.type_info) )
+        /* Grab a reference to the page so it won't disappear from under us. */
+        if ( unlikely(!get_page(page, d)) )
         {
-            /* NB. Check the allocation pin /before/ put_page_and_type()! */
-            if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
-                put_page(page);
-            put_page_and_type(page);
-            /* May have lost our place in the list - start over. */
-            ent = list->next;
+            /* Couldn't get a reference -- someone is freeing this page. */
+            ent = ent->next;
             continue;
         }
 
+        if ( test_and_clear_bit(_PGT_pinned, &page->u.inuse.type_info) )
+            put_page_and_type(page);
+
         if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
-        {
             put_page(page);
-            /* May have lost our place in the list - start over. */
-            ent = list->next;
-            continue;
-        }
 
         /*
          * Forcibly invalidate base page tables at this point to break circular
@@ -498,40 +485,27 @@ static void relinquish_list(struct domain *d, struct list_head *list)
          * tables are not in use so a non-zero count means circular reference.
          */
         y = page->u.inuse.type_info;
-        do {
+        for ( ; ; )
+        {
             x = y;
             if ( likely((x & (PGT_type_mask|PGT_validated)) != 
                         (PGT_base_page_table|PGT_validated)) )
-            {
-                /*
-                 * We have done no work on this iteration, so it is safe
-                 * to move on to the next page in the list.
-                 */
-                ent = ent->next;
                 break;
-            }
+
             y = cmpxchg(&page->u.inuse.type_info, x, x & ~PGT_validated);
             if ( likely(y == x) )
             {
                 free_page_type(page, PGT_base_page_table);
-                /* May have lost our place in the list - start over. */
-                ent = list->next;
+                break;
             }
         }
-        while ( unlikely(y != x) );
+
+        /* Follow the list chain and /then/ potentially free the page. */
+        ent = ent->next;
+        put_page(page);
     }
 
     spin_unlock_recursive(&d->page_alloc_lock);
-
-    /*
-     * Another CPU may have raced us to free some pages. Wait for those
-     * to trickle out now that we have released the lock.
-     */
-    while ( !list_empty(list) )
-    {
-        smp_mb();
-        cpu_relax();
-    }
 }
 
 
