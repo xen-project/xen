@@ -200,35 +200,16 @@ void __init sync_Arb_IDs(void)
 extern void __error_in_apic_c (void);
 
 /*
- * An initial setup of the virtual wire mode.
+ * WAS: An initial setup of the virtual wire mode.
+ * NOW: We don't bother doing anything. All we need at this point
+ * is to receive timer ticks, so that 'jiffies' is incremented.
+ * If we're SMP, then we can assume BIOS did setup for us.
+ * If we're UP, then the APIC should be disabled (it is at reset).
+ * If we're UP and APIC is enabled, then BIOS is clever and has 
+ * probably done initial interrupt routing for us.
  */
 void __init init_bsp_APIC(void)
 {
-    unsigned long l, h;
-
-    /*
-     * Don't do the setup now if we have a SMP BIOS as the
-     * through-I/O-APIC virtual wire mode might be active.
-     */
-    if (smp_found_config || !cpu_has_apic)
-        return;
-
-    /*
-     * Our best bet here is to disable the APIC. This should be safe, as it
-     * ought to be a uniprocessor box (we tested for an SMP configuration
-     * already), so we shouldn't be getting interrupt messages in serial-bus
-     * form from an IO APIC. The APIC will be enabled again later, so don't
-     * worry :-) Doing the easy thing here should make boot-time more reliable.
-     */
-    printk("Disabling local APIC during early boot sequence...\n");
-    rdmsr(MSR_IA32_APICBASE, l, h);
-    l &= ~MSR_IA32_APICBASE_BASE;
-    wrmsr(MSR_IA32_APICBASE, l, h);
-
-    /* We should now be in non-APIC mode. */
-    l = cpuid_edx(1);
-    if ( test_bit(X86_FEATURE_APIC, &l) ) BUG();
-    clear_bit(X86_FEATURE_APIC, &boot_cpu_data.x86_capability);
 }
 
 void __init setup_local_APIC (void)

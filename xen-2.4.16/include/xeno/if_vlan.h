@@ -183,7 +183,11 @@ static inline int __vlan_hwaccel_rx(struct sk_buff *skb,
 		break;
 	};
 
+#ifdef NAPI
 	return (polling ? netif_receive_skb(skb) : netif_rx(skb));
+#else
+        return netif_rx(skb);
+#endif
 }
 
 static inline int vlan_hwaccel_rx(struct sk_buff *skb,

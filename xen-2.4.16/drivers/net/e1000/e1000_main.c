@@ -210,10 +210,13 @@ static int __init
 e1000_init_module(void)
 {
 	int ret;
+
+#if 0 /* Avoid disconcerting noise. */
 	printk(KERN_INFO "%s - version %s\n",
 	       e1000_driver_string, e1000_driver_version);
 
 	printk(KERN_INFO "%s\n", e1000_copyright);
+#endif
 
 	ret = pci_module_init(&e1000_driver);
 //	if(ret >= 0)
@@ -1470,7 +1473,7 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 static void
 e1000_tx_timeout(struct net_device *netdev)
 {
-	struct e1000_adapter *adapter = netdev->priv;
+    //struct e1000_adapter *adapter = netdev->priv;
 
 	/* Do the reset outside of interrupt context */
 	//schedule_task(&adapter->tx_timeout_task); XXXX Not in Xen!!!

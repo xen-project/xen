@@ -2000,9 +2000,9 @@ static int tg3_poll(struct net_device *netdev, int *budget)
 {
 	struct tg3 *tp = netdev->priv;
 	struct tg3_hw_status *sblk = tp->hw_status;
-	unsigned long flags;
 	int done;
 #ifdef NAPI
+	unsigned long flags;
 	spin_lock_irqsave(&tp->lock, flags);
 #endif
 	if (!(tp->tg3_flags &
@@ -2023,10 +2023,9 @@ static int tg3_poll(struct net_device *netdev, int *budget)
 
 	done = 1;
 	if (sblk->idx[0].rx_producer != tp->rx_rcb_ptr) {
-		int orig_budget = *budget;
 		int work_done;
-
 #ifdef NAPI
+		int orig_budget = *budget;
 		if (orig_budget > netdev->quota)
 			orig_budget = netdev->quota;
 
@@ -2075,7 +2074,9 @@ static void tg3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_id;
 	struct tg3 *tp = dev->priv;
+#ifdef NAPI
 	struct tg3_hw_status *sblk = tp->hw_status;
+#endif
 	unsigned long flags;
 
 	spin_lock_irqsave(&tp->lock, flags);
