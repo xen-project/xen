@@ -183,20 +183,22 @@ do_multicall:
 multicall_loop:
         pushl %ecx
 multicall_fault1: 
-        pushl 20(%ebx)
+        pushl 20(%ebx)      # args[4]
 multicall_fault2: 
-        pushl 16(%ebx)
+        pushl 16(%ebx)      # args[3]
 multicall_fault3: 
-        pushl 12(%ebx)
+        pushl 12(%ebx)      # args[2]
 multicall_fault4: 
-        pushl 8(%ebx)
+        pushl 8(%ebx)       # args[1]
 multicall_fault5: 
-        pushl 4(%ebx)
+        pushl 4(%ebx)       # args[0]
 multicall_fault6: 
-        movl  (%ebx),%eax
+        movl  (%ebx),%eax   # op
         andl  $255,%eax
         call  *SYMBOL_NAME(hypervisor_call_table)(,%eax,4)
 multicall_return_from_call:
+multicall_fault7:
+        movl  %eax,24(%ebx) # args[5] == result
         addl  $20,%esp
         popl  %ecx
         addl  $(ARGS_PER_MULTICALL_ENTRY*4),%ebx
@@ -745,6 +747,7 @@ ENTRY(hypervisor_call_table)
         .long SYMBOL_NAME(do_xen_version)
         .long SYMBOL_NAME(do_console_io)
         .long SYMBOL_NAME(do_physdev_op)
+        .long SYMBOL_NAME(do_update_va_mapping_otherdomain) /* 25 */
         .rept NR_syscalls-((.-hypervisor_call_table)/4)
         .long SYMBOL_NAME(do_ni_syscall)
         .endr

@@ -324,8 +324,7 @@ struct pfn_info *alloc_domain_page(struct task_struct *p)
     page->type_and_flags = 0;
     if ( p != NULL )
     {
-        if ( unlikely(in_irq()) )
-            BUG();
+        ASSERT(!in_irq());
         wmb(); /* Domain pointer must be visible before updating refcnt. */
         spin_lock(&p->page_list_lock);
         if ( unlikely(p->tot_pages >= p->max_pages) )
@@ -369,7 +368,7 @@ void free_domain_page(struct pfn_info *page)
         if ( !(page->count_and_flags & PGC_zombie) )
         {
             page->tlbflush_timestamp = tlbflush_clock;
-	    if (p)
+	    if ( likely(p != NULL) )
 	    {
                 page->u.cpu_mask = 1 << p->processor;
                 spin_lock(&p->page_list_lock);

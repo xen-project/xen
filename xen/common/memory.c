@@ -1209,6 +1209,33 @@ int do_update_va_mapping(unsigned long page_nr,
     return err;
 }
 
+int do_update_va_mapping_otherdomain(unsigned long page_nr, 
+                                     unsigned long val, 
+                                     unsigned long flags,
+                                     domid_t domid)
+{
+    unsigned int cpu = smp_processor_id();
+    struct task_struct *p;
+    int rc;
+
+    if ( unlikely(!IS_PRIV(current)) )
+        return -EPERM;
+
+    percpu_info[cpu].gps = p = find_domain_by_id(domid);
+    if ( unlikely(p == NULL) )
+    {
+        MEM_LOG("Unknown domain '%llu'", domid);
+        return -ESRCH;
+    }
+
+    rc = do_update_va_mapping(page_nr, val, flags);
+
+    put_task_struct(p);
+    percpu_info[cpu].gps = NULL;
+
+    return rc;
+}
+
 
 #ifndef NDEBUG
 /*
