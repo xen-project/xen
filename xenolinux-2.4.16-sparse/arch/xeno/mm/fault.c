@@ -155,8 +155,31 @@ asmlinkage void do_page_fault(struct pt_regs *regs,
 	siginfo_t info;
 
         /* Set the "privileged fault" bit to something sane. */
-        error_code &= ~4;
+        error_code &= 3;
         error_code |= (regs->xcs & 2) << 1;
+
+#if PT_UPDATE_DEBUG > 0
+        if ( (error_code == 0) && (address >= TASK_SIZE) )
+        {
+            unsigned long paddr = __pa(address);
+            int i;
+            for ( i = 0; i < pt_update_queue_idx; i++ )
+            {
+                if ( update_debug_queue[i].ptr == paddr )
+                {
+                    printk("XXX now(EIP=%08lx:ptr=%08lx) "
+                           "then(%s/%d:p/v=%08lx/%08lx)\n",
+                           regs->eip, address,
+                           update_debug_queue[i].file,
+                           update_debug_queue[i].line,
+                           update_debug_queue[i].ptr,
+                           update_debug_queue[i].val);
+                }
+            }
+        }
+#endif
+
+        if ( flush_page_update_queue() != 0 ) return;
 
 	/*
 	 * We fault-in kernel-space virtual memory on-demand. The
@@ -291,12 +314,14 @@ no_context:
 	printk(" printing eip:\n");
 	printk("%08lx\n", regs->eip);
         page = ((unsigned long *) cur_pgd)[address >> 22];
-        printk(KERN_ALERT "*pde = %08lx\n", page);
+        printk(KERN_ALERT "*pde = %08lx(%08lx)\n", page, page - start_info.phys_base);
         if (page & 1) {
                 page &= PAGE_MASK;
                 address &= 0x003ff000;
+                page -= start_info.phys_base;
                 page = ((unsigned long *) __va(page))[address >> PAGE_SHIFT];
-                printk(KERN_ALERT "*pte = %08lx\n", page);
+                printk(KERN_ALERT "*pte = %08lx(%08lx)\n", page, 
+                       page - start_info.phys_base);
         }
  	die("Oops", regs, error_code);
 	bust_spinlocks(0);
@@ -366,6 +391,7 @@ vmalloc_fault:
 		if (!pmd_present(*pmd_k))
 			goto no_context;
 		set_pmd(pmd, *pmd_k);
+                XENO_flush_page_update_queue(); /* flush PMD update */
 
 		pte_k = pte_offset(pmd_k, address);
 		if (!pte_present(*pte_k))

@@ -7,52 +7,162 @@
  */
 
 #include <linux/config.h>
+#include <linux/sched.h>
 #include <asm/hypervisor.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
 
-#define QUEUE_SIZE 1
+#define QUEUE_SIZE 2048
 static page_update_request_t update_queue[QUEUE_SIZE];
+unsigned int pt_update_queue_idx = 0;
+#define idx pt_update_queue_idx
+
+#if PT_UPDATE_DEBUG > 0
+page_update_debug_t update_debug_queue[QUEUE_SIZE] = {{0}};
+#undef queue_l1_entry_update
+#undef queue_l2_entry_update
+static void DEBUG_allow_pt_reads(void)
+{
+    pte_t *pte;
+    page_update_request_t update;
+    int i;
+    for ( i = idx-1; i >= 0; i-- )
+    {
+        pte = update_debug_queue[i].ptep;
+        if ( pte == NULL ) continue;
+        update_debug_queue[i].ptep = NULL;
+        update.ptr = __pa(pte) + start_info.phys_base;
+        update.val = update_debug_queue[i].pteval;
+        HYPERVISOR_pt_update(&update, 1);
+    }
+}
+static void DEBUG_disallow_pt_read(unsigned long pa)
+{
+    pte_t *pte;
+    pmd_t *pmd;
+    pgd_t *pgd;
+    unsigned long pteval;
+    /*
+     * We may fault because of an already outstanding update.
+     * That's okay -- it'll get fixed up in the fault handler.
+     */
+    page_update_request_t update;
+    unsigned long va = (unsigned long)__va(pa);
+    pgd = pgd_offset_k(va);
+    pmd = pmd_offset(pgd, va);
+    pte = pte_offset(pmd, va);
+    update.ptr = __pa(pte) + start_info.phys_base;
+    pteval = *(unsigned long *)pte;
+    update.val = pteval & ~_PAGE_PRESENT;
+    HYPERVISOR_pt_update(&update, 1);
+    update_debug_queue[idx].ptep = pte;
+    update_debug_queue[idx].pteval = pteval;
+}
+#endif
+
+#if PT_UPDATE_DEBUG > 1
+#undef queue_pt_switch
+#undef queue_tlb_flush
+#undef queue_invlpg
+#undef queue_pgd_pin
+#undef queue_pgd_unpin
+#undef queue_pte_pin
+#undef queue_pte_unpin
+#endif
+
+
+/*
+ * This is the current pagetable base pointer, which is updated
+ * on context switch.
+ */
+unsigned long pt_baseptr;
+
+void _flush_page_update_queue(void)
+{
+    if ( idx == 0 ) return;
+#if PT_UPDATE_DEBUG > 1
+    printk("Flushing %d entries from pt update queue\n", idx);
+#endif
+#if PT_UPDATE_DEBUG > 0
+    DEBUG_allow_pt_reads();
+#endif
+    HYPERVISOR_pt_update(update_queue, idx);
+    idx = 0;
+}
+
+static void increment_index(void)
+{
+    if ( ++idx == QUEUE_SIZE ) _flush_page_update_queue();
+}
 
 void queue_l1_entry_update(unsigned long ptr, unsigned long val)
 {
-    update_queue[0].ptr = ptr + start_info.phys_base;
-    update_queue[0].val = val;
-    flush_page_update_queue();
+#if PT_UPDATE_DEBUG > 0
+    DEBUG_disallow_pt_read(ptr);
+#endif
+    update_queue[idx].ptr = ptr + start_info.phys_base;
+    update_queue[idx].val = val;
+    increment_index();
 }
 
 void queue_l2_entry_update(unsigned long ptr, unsigned long val)
 {
-    update_queue[0].ptr = ptr + start_info.phys_base;
-    update_queue[0].val = val;
-    flush_page_update_queue();
+    update_queue[idx].ptr = ptr + start_info.phys_base;
+    update_queue[idx].val = val;
+    increment_index();
 }
 
-void queue_baseptr_create(unsigned long ptr)
+void queue_pt_switch(unsigned long ptr)
 {
-    update_queue[0].ptr = PGREQ_ADD_BASEPTR;
-    update_queue[0].val = ptr + start_info.phys_base;
-    flush_page_update_queue();
-}
-
-void queue_baseptr_remove(unsigned long ptr)
-{
-    update_queue[0].ptr = PGREQ_REMOVE_BASEPTR;
-    update_queue[0].val = ptr + start_info.phys_base;
-    flush_page_update_queue();
+    update_queue[idx].ptr  = ptr + start_info.phys_base;
+    update_queue[idx].ptr |= PGREQ_EXTENDED_COMMAND;
+    update_queue[idx].val  = PGEXT_NEW_BASEPTR;
+    increment_index();
 }
 
 void queue_tlb_flush(void)
 {
-    /* nothing */
+    update_queue[idx].ptr  = PGREQ_EXTENDED_COMMAND;
+    update_queue[idx].val  = PGEXT_TLB_FLUSH;
+    increment_index();
 }
 
-void queue_tlb_flush_one(unsigned long ptr)
+void queue_invlpg(unsigned long ptr)
 {
-    /* nothing */
+    update_queue[idx].ptr  = PGREQ_EXTENDED_COMMAND;
+    update_queue[idx].val  = ptr & PAGE_MASK;
+    update_queue[idx].val |= PGEXT_INVLPG;
+    increment_index();
 }
 
-void flush_page_update_queue(void)
+void queue_pgd_pin(unsigned long ptr)
 {
-    HYPERVISOR_pt_update(update_queue, 1);
+    update_queue[idx].ptr  = ptr + start_info.phys_base;
+    update_queue[idx].ptr |= PGREQ_EXTENDED_COMMAND;
+    update_queue[idx].val  = PGEXT_PIN_L2_TABLE;
+    increment_index();
+}
+
+void queue_pgd_unpin(unsigned long ptr)
+{
+    update_queue[idx].ptr  = ptr + start_info.phys_base;
+    update_queue[idx].ptr |= PGREQ_EXTENDED_COMMAND;
+    update_queue[idx].val  = PGEXT_UNPIN_TABLE;
+    increment_index();
+}
+
+void queue_pte_pin(unsigned long ptr)
+{
+    update_queue[idx].ptr  = ptr + start_info.phys_base;
+    update_queue[idx].ptr |= PGREQ_EXTENDED_COMMAND;
+    update_queue[idx].val  = PGEXT_PIN_L1_TABLE;
+    increment_index();
+}
+
+void queue_pte_unpin(unsigned long ptr)
+{
+    update_queue[idx].ptr  = ptr + start_info.phys_base;
+    update_queue[idx].ptr |= PGREQ_EXTENDED_COMMAND;
+    update_queue[idx].val  = PGEXT_UNPIN_TABLE;
+    increment_index();
 }

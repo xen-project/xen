@@ -188,7 +188,7 @@ unsigned long __get_free_pages(int mask, int order)
     if ( i == FREELIST_SIZE )
     {
         printk("Cannot handle page request order %d!\n", order);
-	return NULL; 
+	return 0;
     }
  
     /* Unlink a chunk. */

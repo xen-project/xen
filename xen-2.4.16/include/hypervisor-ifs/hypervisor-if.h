@@ -21,9 +21,30 @@ typedef struct trap_info_st
 
 typedef struct
 {
-#define PGREQ_ADD_BASEPTR    0
-#define PGREQ_REMOVE_BASEPTR 1
+/*
+ * PGREQ_XXX: specified in least-significant bits of 'ptr' field.
+ * All requests specify relevent PTE or PT address in 'ptr'.
+ * Normal requests specify update value in 'value'.
+ * Extended requests specify command in least 8 bits of 'value'.
+ */
+/* A normal page-table update request. */
+#define PGREQ_NORMAL           0
+/* Make an unchecked update to a base-level pte. */
+#define PGREQ_UNCHECKED_UPDATE 1
+/* An extended command. */
+#define PGREQ_EXTENDED_COMMAND 2
     unsigned long ptr, val; /* *ptr = val */
+/* Announce a new top-level page table. */
+#define PGEXT_PIN_L1_TABLE      0
+#define PGEXT_PIN_L2_TABLE      1
+#define PGEXT_PIN_L3_TABLE      2
+#define PGEXT_PIN_L4_TABLE      3
+#define PGEXT_UNPIN_TABLE       4
+#define PGEXT_NEW_BASEPTR       5
+#define PGEXT_TLB_FLUSH         6
+#define PGEXT_INVLPG            7
+#define PGEXT_CMD_MASK        255
+#define PGEXT_CMD_SHIFT         8
 } page_update_request_t;
 
 
@@ -32,7 +53,7 @@ typedef struct
 #define __HYPERVISOR_set_trap_table  0
 #define __HYPERVISOR_pt_update       1
 #define __HYPERVISOR_console_write   2
-#define __HYPERVISOR_set_pagetable   3
+/* vector 3 unused */
 #define __HYPERVISOR_set_guest_stack 4
 #define __HYPERVISOR_net_update      5
 #define __HYPERVISOR_fpu_taskswitch  6

@@ -62,6 +62,13 @@ typedef struct pfn_info {
     unsigned long type_count;   /* pagetable/dir, or domain-writeable refs. */
 } frame_table_t;
 
+/*
+ * We use a high bit to indicate that a page is pinned.
+ * We do not use the top bit as that would mean that we'd get confused with
+ * -ve error numbers in some places in common/memory.c.
+ */
+#define REFCNT_PIN_BIT 0x40000000UL
+
 #define get_page_tot(p)		 ((p)->tot_count++)
 #define put_page_tot(p)		 (--(p)->tot_count)
 #define page_tot_count(p)	 ((p)->tot_count)

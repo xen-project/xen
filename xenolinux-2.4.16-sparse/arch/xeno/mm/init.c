@@ -46,15 +46,11 @@ int do_check_pgt_cache(int low, int high)
     int freed = 0;
     if(pgtable_cache_size > high) {
         do {
-            if (pgd_quicklist) {
+            if (!QUICKLIST_EMPTY(pgd_quicklist)) {
                 free_pgd_slow(get_pgd_fast());
                 freed++;
             }
-            if (pmd_quicklist) {
-                pmd_free_slow(pmd_alloc_one_fast(NULL, 0));
-                freed++;
-            }
-            if (pte_quicklist) {
+            if (!QUICKLIST_EMPTY(pte_quicklist)) {
                 pte_free_slow(pte_alloc_one_fast(NULL, 0));
                 freed++;
             }

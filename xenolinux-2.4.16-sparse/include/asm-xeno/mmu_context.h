@@ -45,7 +45,8 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next, str
 		set_bit(cpu, &next->context.cpuvalid);
 		/* Re-load page tables */
                 cur_pgd = next->pgd;
-                HYPERVISOR_set_pagetable(__pa(cur_pgd) + start_info.phys_base);
+                queue_pt_switch(__pa(cur_pgd));
+                XENO_flush_page_update_queue();
 	}
 #ifdef CONFIG_SMP
 	else {

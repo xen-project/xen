@@ -145,13 +145,19 @@ void __init setup_arch(char **cmdline_p)
     unsigned long bootmap_size;
     char str[256]; int strcnt;
 
-    void hypervisor_callback(void);
-    void failsafe_callback(void);
+    extern void hypervisor_callback(void);
+    extern void failsafe_callback(void);
+
+    extern unsigned long cpu0_pte_quicklist[];
+    extern unsigned long cpu0_pgd_quicklist[];
 
     HYPERVISOR_shared_info->event_address    = 
         (unsigned long)hypervisor_callback;
     HYPERVISOR_shared_info->failsafe_address =
         (unsigned long)failsafe_callback;
+
+    boot_cpu_data.pgd_quick = cpu0_pgd_quicklist;
+    boot_cpu_data.pte_quick = cpu0_pte_quicklist;
 
     ROOT_DEV = MKDEV(RAMDISK_MAJOR,0);
     memset(&drive_info, 0, sizeof(drive_info));

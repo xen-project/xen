@@ -290,6 +290,7 @@
 3ddb79bbx682YH6vR2zbVOXwg73ULg xenolinux-2.4.16-sparse/drivers/block/ll_rw_blk.c
 3ddb79bcJfHdwrPsjqgI33_OsGdVCg xenolinux-2.4.16-sparse/drivers/block/rd.c
 3ddb79bcpVu-IbnqwQqpRqsEbLpsuw xenolinux-2.4.16-sparse/drivers/char/tty_io.c
+3e15d5273gfR2fbcYe05kqBSAvCX_w xenolinux-2.4.16-sparse/fs/exec.c
 3ddb79bba_zKpuurHVeWfgDkyPoq8A xenolinux-2.4.16-sparse/fs/nfs/nfsroot.c
 3ddb79b8VFtfWSCrXKPN2K21zd_vtw xenolinux-2.4.16-sparse/include/asm-xeno/a.out.h
 3ddb79b8Zzi13p3OAPV25QgiC3THAQ xenolinux-2.4.16-sparse/include/asm-xeno/apic.h
@@ -400,3 +401,6 @@
 3ddb79bb_7YG4U75ZmEic9YXWTW7Vw xenolinux-2.4.16-sparse/include/linux/sunrpc/debug.h
 3ddb79bcxkVPfWlZ1PQKvDrfArzOVw xenolinux-2.4.16-sparse/kernel/panic.c
 3ddb79bbP31im-mx2NbfthSeqty1Dg xenolinux-2.4.16-sparse/mk
+3e15d52e0_j129JPvo7xfYGndVFpwQ xenolinux-2.4.16-sparse/mm/memory.c
+3e15d535DLvpzTrLRUIerB69LpJD1g xenolinux-2.4.16-sparse/mm/mremap.c
+3e15d531m1Y1_W8ki64AFOU_ua4C4w xenolinux-2.4.16-sparse/mm/swapfile.c

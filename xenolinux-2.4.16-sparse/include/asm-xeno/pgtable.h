@@ -37,10 +37,10 @@ extern void paging_init(void);
 
 extern unsigned long pgkern_mask;
 
-#define __flush_tlb() queue_tlb_flush()
+#define __flush_tlb() ({ queue_tlb_flush(); XENO_flush_page_update_queue(); })
 #define __flush_tlb_global() __flush_tlb()
 #define __flush_tlb_all() __flush_tlb_global()
-#define __flush_tlb_one(addr) queue_tlb_flush_one(addr)
+#define __flush_tlb_one(addr) ({ queue_invlpg(addr); XENO_flush_page_update_queue(); })
 
 /*
  * ZERO_PAGE is a global shared page that is always zero: used
@@ -281,7 +281,7 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 
 /* Find an entry in the third-level page table.. */
 #define __pte_offset(address) \
-		((address >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
+                ((address >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
 #define pte_offset(dir, address) ((pte_t *) pmd_page(*(dir)) + \
 			__pte_offset(address))
 
