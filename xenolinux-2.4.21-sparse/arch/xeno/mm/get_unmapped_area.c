@@ -14,6 +14,28 @@
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
 
+extern int direct_unmap(unsigned long, unsigned long);
+
+
+int init_direct_list(struct mm_struct *mm)
+{
+    INIT_LIST_HEAD(&mm->context.direct_list);
+    return 0;
+}
+
+
+void destroy_direct_list(struct mm_struct *mm)
+{
+    struct list_head *curr, *direct_list = &mm->context.direct_list;
+    while ( (curr = direct_list->next) != direct_list )
+    {
+        direct_mmap_node_t *node = list_entry(curr, direct_mmap_node_t, list);
+        if ( direct_unmap(node->vm_start, node->vm_end - node->vm_start) != 0 )
+            BUG();
+    }
+}
+
+
 struct list_head *find_direct(struct list_head *list, unsigned long addr)
 {
     struct list_head * curr;
@@ -28,6 +50,7 @@ struct list_head *find_direct(struct list_head *list, unsigned long addr)
 
     return curr;
 }
+
 
 unsigned long arch_get_unmapped_area(struct file *filp, 
                                      unsigned long addr, 
