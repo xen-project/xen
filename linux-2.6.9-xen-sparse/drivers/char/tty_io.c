@@ -1741,7 +1741,7 @@ retry_open:
 		goto got_driver;
 	}
 #ifdef CONFIG_VT
-	if (console_use_vt && device == MKDEV(TTY_MAJOR,0)) {
+	if (device == MKDEV(TTY_MAJOR,0)) {
 		extern int fg_console;
 		extern struct tty_driver *console_driver;
 		driver = console_driver;
@@ -1961,7 +1961,7 @@ static int tiocswinsz(struct tty_struct *tty, struct tty_struct *real_tty,
 	if (!memcmp(&tmp_ws, &tty->winsize, sizeof(*arg)))
 		return 0;
 #ifdef CONFIG_VT
-	if (console_use_vt && tty->driver->type == TTY_DRIVER_TYPE_CONSOLE) {
+	if (tty->driver->type == TTY_DRIVER_TYPE_CONSOLE) {
 		unsigned int currcons = tty->index;
 		int rc;
 
