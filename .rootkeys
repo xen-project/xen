@@ -126,6 +126,8 @@
 409ba2e7akOFqQUg6Qyg2s28xcXiMg linux-2.4.27-xen-sparse/mm/page_alloc.c
 3e5a4e683HKVU-sxtagrDasRB8eBVw linux-2.4.27-xen-sparse/mm/swapfile.c
 41180721bNns9Na7w1nJ0ZVt8bhUNA linux-2.4.27-xen-sparse/mm/vmalloc.c
+413aa1d0oNP8HXLvfPuMe6cSroUfSA linux-2.6.8.1-patches/agpgart.patch
+413aa1d0ewvSv-ohnNnQQNGsbPTTNA linux-2.6.8.1-patches/drm.patch
 40f562372u3A7_kfbYYixPHJJxYUxA linux-2.6.8.1-xen-sparse/arch/xen/Kconfig
 40f56237utH41NPukqHksuNf29IC9A linux-2.6.8.1-xen-sparse/arch/xen/Kconfig.drivers
 40f56237penAAlWVBVDpeQZNFIg8CA linux-2.6.8.1-xen-sparse/arch/xen/Makefile
