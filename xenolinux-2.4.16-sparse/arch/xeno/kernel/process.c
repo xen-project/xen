@@ -337,7 +337,7 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 
     unlazy_fpu(prev_p);
 
-    HYPERVISOR_set_guest_stack(__KERNEL_DS, next->esp0);
+    HYPERVISOR_stack_and_ldt_switch(__KERNEL_DS, next->esp0, 0);
 
     /*
      * Save away %fs and %gs. No need to save %es and %ds, as

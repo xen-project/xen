@@ -194,7 +194,10 @@ void __init cpu_init(void)
         panic("CPU#%d already initialized!!!\n", nr);
     printk("Initializing CPU#%d\n", nr);
 
-    __asm__ __volatile__("lgdt %0": "=m" (gdt_descr));
+    /* Set up GDT and IDT. */
+    SET_GDT_ENTRIES(current, DEFAULT_GDT_ENTRIES);
+    SET_GDT_ADDRESS(current, DEFAULT_GDT_ADDRESS);
+    __asm__ __volatile__("lgdt %0": "=m" (*current->mm.gdt));
     __asm__ __volatile__("lidt %0": "=m" (idt_descr));
 
     /* No nested task. */

@@ -19,13 +19,29 @@ extern rwlock_t tasklist_lock;
 
 struct mm_struct {
     unsigned long cpu_vm_mask;
+    /*
+     * Every domain has a L1 pagetable of its own. Per-domain mappings
+     * are put in this table (eg. the current GDT is mapped here).
+     */
+    l2_pgentry_t *perdomain_pt;
     pagetable_t  pagetable;
+    /* Current LDT selector. */
+    unsigned int ldt_sel;
+    /* Next entry is passed to LGDT on domain switch. */
+    char gdt[6];
 };
+
+/* Convenient accessor for mm.gdt. */
+#define SET_GDT_ENTRIES(_p, _e) ((*(u16 *)((_p)->mm.gdt + 0)) = (_e))
+#define SET_GDT_ADDRESS(_p, _a) ((*(u32 *)((_p)->mm.gdt + 2)) = (_a))
+#define GET_GDT_ENTRIES(_p)     ((*(u16 *)((_p)->mm.gdt + 0)))
+#define GET_GDT_ADDRESS(_p)     ((*(u32 *)((_p)->mm.gdt + 2)))
 
 extern struct mm_struct init_mm;
 #define IDLE0_MM                                                    \
 {                                                                   \
     cpu_vm_mask: 0,                                                 \
+    perdomain_pt: 0,                                                \
     pagetable:   mk_pagetable(__pa(idle0_pg_table))                 \
 }
 

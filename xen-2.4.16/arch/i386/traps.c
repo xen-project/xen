@@ -514,11 +514,6 @@ void set_tss_desc(unsigned int n, void *addr)
     _set_tssldt_desc(gdt_table+__TSS(n), (int)addr, 235, 0x89);
 }
 
-void set_ldt_desc(unsigned int n, void *addr, unsigned int size)
-{
-    _set_tssldt_desc(gdt_table+__LDT(n), (int)addr, ((size << 3)-1), 0x82);
-}
-
 void __init trap_init(void)
 {
     set_trap_gate(0,&divide_error);

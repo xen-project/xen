@@ -225,11 +225,7 @@ ENTRY(gdt_table)
         .quad 0x00cff2000000bfff     /* 0x2b ring 3 3.95GB data at 0x0 */
         .quad 0x00cf9a000000ffff     /* 0x30 ring 0 4.00GB code at 0x0 */
         .quad 0x00cf92000000ffff     /* 0x38 ring 0 4.00GB data at 0x0 */
-        .quad 0x0000000000000000
-        .quad 0x0000000000000000
-        .quad 0x0000000000000000
-        .quad 0x0000000000000000
-        .fill NR_CPUS*4,8,0             /* space for TSS's and LDT's */
+        .fill NR_CPUS,8,0             /* space for TSS's */
 
 # The following adds 12kB to the kernel file size.
         .org 0x1000

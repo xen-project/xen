@@ -51,21 +51,34 @@ typedef struct
 } page_update_request_t;
 
 
+/*
+ * Segment descriptor tables.
+ */
+/* 8 entries, plus a TSS entry for each CPU (up to 32 CPUs). */
+#define FIRST_DOMAIN_GDT_ENTRY  40
+/* These are flat segments for domain bootstrap and fallback. */
+#define FLAT_RING1_CS           0x11
+#define FLAT_RING1_DS           0x19
+#define FLAT_RING3_CS           0x23
+#define FLAT_RING3_DS           0x2b
+
+
 /* EAX = vector; EBX, ECX, EDX, ESI, EDI = args 1, 2, 3, 4, 5. */
 
-#define __HYPERVISOR_set_trap_table  0
-#define __HYPERVISOR_pt_update       1
-#define __HYPERVISOR_console_write   2
-/* vector 3 unused */
-#define __HYPERVISOR_set_guest_stack 4
-#define __HYPERVISOR_net_update      5
-#define __HYPERVISOR_fpu_taskswitch  6
-#define __HYPERVISOR_yield           7
-#define __HYPERVISOR_exit            8
-#define __HYPERVISOR_dom0_op         9
-#define __HYPERVISOR_network_op     10
-#define __HYPERVISOR_set_debugreg   11
-#define __HYPERVISOR_get_debugreg   12
+#define __HYPERVISOR_set_trap_table        0
+#define __HYPERVISOR_pt_update             1
+#define __HYPERVISOR_console_write         2
+#define __HYPERVISOR_set_gdt               3
+#define __HYPERVISOR_stack_and_ldt_switch  4
+#define __HYPERVISOR_net_update            5
+#define __HYPERVISOR_fpu_taskswitch        6
+#define __HYPERVISOR_yield                 7
+#define __HYPERVISOR_exit                  8
+#define __HYPERVISOR_dom0_op               9
+#define __HYPERVISOR_network_op           10
+#define __HYPERVISOR_set_debugreg         11
+#define __HYPERVISOR_get_debugreg         12
+#define __HYPERVISOR_update_descriptor    13
 
 #define TRAP_INSTR "int $0x82"
 

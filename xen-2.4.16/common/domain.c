@@ -43,7 +43,10 @@ struct task_struct *do_newdomain(void)
     if (!p) goto newdomain_out;
     memset(p, 0, sizeof(*p));
     p->shared_info = (void *)get_free_page(GFP_KERNEL);
-    memset(p->shared_info, 0, sizeof(shared_info_t));
+    memset(p->shared_info, 0, PAGE_SIZE);
+
+    SET_GDT_ENTRIES(p, DEFAULT_GDT_ENTRIES);
+    SET_GDT_ADDRESS(p, DEFAULT_GDT_ADDRESS);
 
     p->addr_limit = USER_DS;
     p->state      = TASK_UNINTERRUPTIBLE;
@@ -247,6 +250,7 @@ void release_task(struct task_struct *p)
     {
         destroy_net_vif(p);
     }
+    if ( p->mm.perdomain_pt ) free_page((unsigned long)p->mm.perdomain_pt);
     free_page((unsigned long)p->shared_info);
     free_task_struct(p);
 }
@@ -462,6 +466,8 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     phys_l2tab = ALLOC_FRAME_FROM_DOMAIN();
     l2tab = map_domain_mem(phys_l2tab);
     memcpy(l2tab, idle_pg_table[p->processor], PAGE_SIZE);
+    l2tab[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] =
+        mk_l2_pgentry(__pa(p->mm.perdomain_pt) | __PAGE_HYPERVISOR);
     memset(l2tab, 0, DOMAIN_ENTRIES_PER_L2_PAGETABLE*sizeof(l2_pgentry_t));
     p->mm.pagetable = mk_pagetable(phys_l2tab);
 

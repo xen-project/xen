@@ -380,6 +380,10 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
     asm volatile("movl %%fs,%0":"=m" (*(int *)&prev->fs));
     asm volatile("movl %%gs,%0":"=m" (*(int *)&prev->gs));
 
+    /* Switch GDT and LDT. */
+    __asm__ __volatile__ ("lgdt %0" : "=m" (*next_p->mm.gdt));
+    __load_LDT(next_p->mm.ldt_sel);
+
     /*
      * Restore %fs and %gs.
      */

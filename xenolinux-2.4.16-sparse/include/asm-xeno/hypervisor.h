@@ -171,14 +171,26 @@ static inline int HYPERVISOR_console_write(const char *str, int count)
     return ret;
 }
 
-static inline int HYPERVISOR_set_guest_stack(
-    unsigned long ss, unsigned long esp)
+static inline int HYPERVISOR_set_gdt(unsigned long *frame_list, int entries)
 {
     int ret;
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret) : "0" (__HYPERVISOR_set_guest_stack),
-        "b" (ss), "c" (esp) );
+        : "=a" (ret) : "0" (__HYPERVISOR_set_gdt), 
+        "b" (frame_list), "c" (entries) );
+
+
+    return ret;
+}
+
+static inline int HYPERVISOR_stack_and_ldt_switch(
+    unsigned long ss, unsigned long esp, unsigned long ldts)
+{
+    int ret;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret) : "0" (__HYPERVISOR_stack_and_ldt_switch),
+        "b" (ss), "c" (esp), "d" (ldts) );
 
     return ret;
 }
@@ -263,6 +275,19 @@ static inline unsigned long HYPERVISOR_get_debugreg(int reg)
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_get_debugreg),
         "b" (reg) );
+
+    return ret;
+}
+
+static inline int HYPERVISOR_update_descriptor(
+    unsigned long pa, unsigned long word1, unsigned long word2)
+{
+    int ret;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret) : "0" (__HYPERVISOR_set_gdt), 
+        "b" (pa), "c" (word1), "d" (word2) );
+
 
     return ret;
 }

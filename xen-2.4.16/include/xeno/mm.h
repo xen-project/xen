@@ -4,6 +4,7 @@
 
 #include <xeno/config.h>
 #include <asm/atomic.h>
+#include <asm/desc.h>
 #include <xeno/list.h>
 #include <hypervisor-ifs/hypervisor-if.h>
 
@@ -89,13 +90,15 @@ typedef struct pfn_info {
  * references exist of teh current type. A change in type can only occur
  * when type_count == 0.
  */
-#define PG_type_mask        (7<<25) /* bits 25-27 */
-#define PGT_none            (0<<25) /* no special uses of this page */
-#define PGT_l1_page_table   (1<<25) /* using this page as an L1 page table? */
-#define PGT_l2_page_table   (2<<25) /* using this page as an L2 page table? */
-#define PGT_l3_page_table   (3<<25) /* using this page as an L3 page table? */
-#define PGT_l4_page_table   (4<<25) /* using this page as an L4 page table? */
-#define PGT_writeable_page  (7<<25) /* has writable mappings of this page? */
+#define PG_type_mask        (7<<24) /* bits 24-26 */
+#define PGT_none            (0<<24) /* no special uses of this page */
+#define PGT_l1_page_table   (1<<24) /* using this page as an L1 page table? */
+#define PGT_l2_page_table   (2<<24) /* using this page as an L2 page table? */
+#define PGT_l3_page_table   (3<<24) /* using this page as an L3 page table? */
+#define PGT_l4_page_table   (4<<24) /* using this page as an L4 page table? */
+#define PGT_gdt_page        (5<<24) /* using this page in a GDT? */
+#define PGT_ldt_page        (6<<24) /* using this page in an LDT? */
+#define PGT_writeable_page  (7<<24) /* has writable mappings of this page? */
 
 #define PageSlab(page)		test_bit(PG_slab, &(page)->flags)
 #define PageSetSlab(page)	set_bit(PG_slab, &(page)->flags)
@@ -113,5 +116,8 @@ void init_frametable(unsigned long nr_pages);
 
 /* Part of the domain API. */
 int do_process_page_updates(page_update_request_t *updates, int count);
+
+#define DEFAULT_GDT_ENTRIES     ((FIRST_DOMAIN_GDT_ENTRY*8)-1)
+#define DEFAULT_GDT_ADDRESS     ((unsigned long)gdt_table)
 
 #endif /* __XENO_MM_H__ */
