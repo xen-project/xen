@@ -203,6 +203,7 @@ static int xhci_construct_isoc(usbif_request_t *req, struct urb *urb)
  */
 static int xhci_queue_req(struct urb *urb)
 {
+        unsigned long flags;
         usbif_request_t *req;
         usbif_front_ring_t *usb_ring = &xhci->usb_ring;
 
@@ -213,11 +214,13 @@ static int xhci_queue_req(struct urb *urb)
                usbif->resp_prod, xhci->usb_resp_cons);
 #endif
         
+        spin_lock_irqsave(&xhci->ring_lock, flags);
 
         if ( RING_FULL(usb_ring) )
         {
                 printk(KERN_WARNING
                        "xhci_queue_req(): USB ring full, not queuing request\n");
+                spin_unlock_irqrestore(&xhci->ring_lock, flags);
                 return -ENOBUFS;
         }
 
@@ -253,6 +256,8 @@ static int xhci_queue_req(struct urb *urb)
         usb_ring->req_prod_pvt++;
         RING_PUSH_REQUESTS(usb_ring);
 
+        spin_unlock_irqrestore(&xhci->ring_lock, flags);
+
 	notify_via_evtchn(xhci->evtchn);
 
         DPRINTK("Queued request for an URB.\n");
@@ -276,11 +281,15 @@ static inline usbif_request_t *xhci_queue_probe(usbif_vdev_t port)
                virt_to_machine(&usbif->req_prod),
 	       usbif->resp_prod, xhci->usb_resp_cons);
 #endif
-        
+ 
+        /* This is always called from the timer interrupt. */
+        spin_lock(&xhci->ring_lock);
+       
         if ( RING_FULL(usb_ring) )
         {
                 printk(KERN_WARNING
                        "xhci_queue_probe(): ring full, not queuing request\n");
+                spin_unlock(&xhci->ring_lock);
                 return NULL;
         }
 
@@ -295,6 +304,8 @@ static inline usbif_request_t *xhci_queue_probe(usbif_vdev_t port)
         usb_ring->req_prod_pvt++;
         RING_PUSH_REQUESTS(usb_ring);
 
+        spin_unlock(&xhci->ring_lock);
+
 	notify_via_evtchn(xhci->evtchn);
 
         return req;
@@ -307,6 +318,17 @@ static int xhci_port_reset(usbif_vdev_t port)
 {
         usbif_request_t *req;
         usbif_front_ring_t *usb_ring = &xhci->usb_ring;
+
+        /* Only ever happens from process context (hub thread). */
+        spin_lock_irq(&xhci->ring_lock);
+
+        if ( RING_FULL(usb_ring) )
+        {
+                printk(KERN_WARNING
+                       "xhci_port_reset(): ring full, not queuing request\n");
+                spin_unlock_irq(&xhci->ring_lock);
+                return -ENOBUFS;
+        }
 
         /* We only reset one port at a time, so we only need one variable per
          * hub. */
@@ -322,6 +344,8 @@ static int xhci_port_reset(usbif_vdev_t port)
         
         usb_ring->req_prod_pvt++;
 	RING_PUSH_REQUESTS(usb_ring);
+
+        spin_unlock_irq(&xhci->ring_lock);
 
 	notify_via_evtchn(xhci->evtchn);
 
@@ -1529,6 +1553,10 @@ static void usbif_status_change(usbif_fe_interface_status_changed_t *status)
 	xhci->rh.numports = status->num_ports;
 
         xhci->rh.ports = kmalloc (sizeof(xhci_port_t) * xhci->rh.numports, GFP_KERNEL);
+	
+	if ( xhci->rh.ports == NULL )
+            goto alloc_ports_nomem;
+	
         memset(xhci->rh.ports, 0, sizeof(xhci_port_t) * xhci->rh.numports);
 
 	usb_connect(xhci->rh.dev);
@@ -1553,7 +1581,7 @@ static void usbif_status_change(usbif_fe_interface_status_changed_t *status)
                 xhci->evtchn, xhci->irq);
 
         xhci->state = USBIF_STATE_CONNECTED;
-        
+
         break;
 
     default:
@@ -1561,6 +1589,12 @@ static void usbif_status_change(usbif_fe_interface_status_changed_t *status)
                status->status);
         break;
     }
+
+    return;
+
+ alloc_ports_nomem:
+    printk(KERN_WARNING "Failed to allocate port memory, XHCI failed to connect.\n");
+    return;
 }
 
 /**

@@ -74,6 +74,7 @@ struct xhci {
 
 	struct virt_root_hub rh;	/* private data of the virtual root hub */
 
+        spinlock_t ring_lock;
         usbif_front_ring_t usb_ring;
 
         int awaiting_reset;
