@@ -14,6 +14,7 @@
 struct xendbg_context {
 	int serhnd;
 	u8 reply_csum;
+	int currently_attached:1;
 };
 
 static void
@@ -250,9 +251,20 @@ process_command(char *received_packet, struct pt_regs *regs,
 			break;
 		case 'D':
 			resume = 1;
+			ctx->currently_attached = 0;
 			retry = xendbg_send_reply("", ctx);
 			break;
 		case 'c': /* Resume at current address */
+			ctx->currently_attached = 1;
+			resume = 1;
+			retry = 0;
+			break;
+		case 'Z': /* We need to claim to support these or gdb
+			     won't let you continue the process. */
+		case 'z':
+			retry = xendbg_send_reply("OK", ctx);
+			break;
+
 		case 's': /* Single step */
 		case '?':
 			retry = xendbg_send_reply("S01", ctx);
@@ -305,6 +317,13 @@ __trap_to_xendbg(struct pt_regs *regs)
 	/* Try to make things a little more stable by disabling
 	   interrupts while we're here. */
 	local_irq_save(flags);
+
+	/* If gdb is already attached, tell it we've stopped again. */
+	if (xdb_ctx.currently_attached) {
+		do {
+			r = xendbg_send_reply("S01", &xdb_ctx);
+		} while (r != 0);
+	}
 
 	while (resume == 0) {
 		r = receive_command(recv_buf, &xdb_ctx);
