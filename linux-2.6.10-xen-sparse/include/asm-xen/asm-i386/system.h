@@ -119,13 +119,8 @@ static inline unsigned long _get_base(char * addr)
 
 #endif	/* __KERNEL__ */
 
-static inline void wbinvd(void)
-{
-	mmu_update_t u;
-	u.ptr = MMU_EXTENDED_COMMAND;
-	u.val = MMUEXT_FLUSH_CACHE;
-	(void)HYPERVISOR_mmu_update(&u, 1, NULL);
-}
+#define wbinvd() \
+	__asm__ __volatile__ ("wbinvd": : :"memory");
 
 static inline unsigned long get_limit(unsigned long segment)
 {
