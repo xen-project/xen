@@ -174,7 +174,7 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
     init_serial();
 
     printk(XEN_BANNER);
-    printk(" http://www.cl.cam.ac.uk/xeno\n");
+    printk(" http://www.cl.cam.ac.uk/netos/xen\n");
     printk(" University of Cambridge Computer Laboratory\n\n");
     printk(" Xen version %d.%d%s (%s@%s) (%s) %s\n\n",
            XEN_VERSION, XEN_SUBVERSION, XEN_EXTRAVERSION,
