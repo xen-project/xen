@@ -721,7 +721,7 @@ void __init trap_init(void)
     tss->cs     = __HYPERVISOR_CS;
     tss->eip    = (unsigned long)do_double_fault;
     tss->eflags = 2;
-    tss->bitmap = INVALID_IO_BITMAP_OFFSET;
+    tss->bitmap = IOBMP_INVALID_OFFSET;
     _set_tssldt_desc(gdt_table+__DOUBLEFAULT_TSS_ENTRY,
                      (int)tss, 235, 0x89);
 
