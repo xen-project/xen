@@ -19,7 +19,6 @@ install: all
 	cp -a $(INSTALL) ../../../install/bin
 	chmod 755 ../../../install/bin/xen-mkdevnodes
 	chmod 755 ../../../install/bin/xen-clone
-	chmod 755 ../../../install/bin/xen_log
 	$(MAKE) -C miniterm install
 
 clean:
