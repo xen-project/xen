@@ -1,0 +1,17 @@
+#!/bin/sh
+
+VIFINIT=./vifinit
+DOM_BUILDER=./domain_builder
+
+DOM=$2
+
+ADDR=`/sbin/ifconfig eth0 | grep inet.addr | sed -e 's/.*inet addr:\([0-9.]*\) .*/\1/'`
+
+LO=`echo $ADDR | sed -e 's/[0-9]\+\.[0-9]\+\.[0-9]\+\.\([0-9]\+\)/\1/'`
+HI=`echo $ADDR | sed -e 's/\([0-9]\+\.[0-9]\+\.[0-9]\+\)\.[0-9]\+/\1/'`
+
+NEWADDR=$HI.$[LO+DOM]
+
+$VIFINIT $DOM $NEWADDR
+
+$DOM_BUILDER 16000 $1 1
