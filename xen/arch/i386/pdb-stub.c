@@ -7,16 +7,16 @@
  * university of cambridge computer laboratory
  */
 
-#include <xeno/lib.h>
-#include <xeno/sched.h>
+#include <xen/lib.h>
+#include <xen/sched.h>
 #include <asm-i386/ptrace.h>
-#include <xeno/keyhandler.h> 
+#include <xen/keyhandler.h> 
 #include <asm/apic.h>
 #include <asm/domain_page.h>                           /* [un]map_domain_mem */
 #include <asm/processor.h>
 #include <asm/pdb.h>
-#include <xeno/list.h>
-#include <xeno/serial.h>
+#include <xen/list.h>
+#include <xen/serial.h>
 
 #define DEBUG_TRACE
 #ifdef DEBUG_TRACE
@@ -347,7 +347,10 @@ pdb_process_command (char *ptr, struct pt_regs *regs, unsigned long cr3,
         struct task_struct *p;
 
 	p = find_domain_by_id(pdb_ctx[pdb_level].ctrl);
-	pdb_ctx[pdb_level].ctrl_cr3 = pagetable_val(p->mm.pagetable);
+	if (p->mm.shadow_mode)
+	  pdb_ctx[pdb_level].ctrl_cr3 = pagetable_val(p->mm.shadow_table);
+	else
+	  pdb_ctx[pdb_level].ctrl_cr3 = pagetable_val(p->mm.pagetable);
 	put_task_struct(p);
 	printk ("PROCESS: PDB SET CONTROL DOMAIN TO 0x%lx 0x%x\n",
 		pdb_ctx[pdb_level].ctrl_cr3, 
@@ -359,7 +362,10 @@ pdb_process_command (char *ptr, struct pt_regs *regs, unsigned long cr3,
         struct task_struct *p;
 
 	p = find_domain_by_id(pdb_ctx[pdb_level].info);
-	pdb_ctx[pdb_level].info_cr3 = pagetable_val(p->mm.pagetable);
+	if (p->mm.shadow_mode)
+	  pdb_ctx[pdb_level].info_cr3 = pagetable_val(p->mm.shadow_table);
+	else
+	  pdb_ctx[pdb_level].info_cr3 = pagetable_val(p->mm.pagetable);
 	put_task_struct(p);
 	printk ("PROCESS: PDB SET INFO DOMAIN TO 0x%lx 0x%x\n",
 		pdb_ctx[pdb_level].info_cr3, 
@@ -462,7 +468,10 @@ pdb_process_command (char *ptr, struct pt_regs *regs, unsigned long cr3,
 		if (thread > 0)
 		{
 		    struct task_struct *p = find_domain_by_id(thread);
-		    pdb_ctx[pdb_level].ctrl_cr3 = pagetable_val(p->mm.pagetable);
+		    if (p->mm.shadow_mode)
+		      pdb_ctx[pdb_level].ctrl_cr3 = pagetable_val(p->mm.shadow_table);
+		    else
+		      pdb_ctx[pdb_level].ctrl_cr3 = pagetable_val(p->mm.pagetable);
 		    put_task_struct(p);
 		    printk ("PDB SET CONTROL DOMAIN TO 0x%lx 0x%x\n",
 			    pdb_ctx[pdb_level].ctrl_cr3,
@@ -476,7 +485,10 @@ pdb_process_command (char *ptr, struct pt_regs *regs, unsigned long cr3,
 		if (thread > 0)
 		{
 		    struct task_struct *p = find_domain_by_id(thread);
-		    pdb_ctx[pdb_level].info_cr3 = pagetable_val(p->mm.pagetable);
+		    if (p->mm.shadow_mode)
+		      pdb_ctx[pdb_level].info_cr3 = pagetable_val(p->mm.shadow_table);
+		    else
+		      pdb_ctx[pdb_level].info_cr3 = pagetable_val(p->mm.pagetable);
 		    put_task_struct(p);
 		    printk ("PDB SET INFO DOMAIN TO 0x%lx 0x%x\n",
 			    pdb_ctx[pdb_level].info_cr3,
@@ -969,8 +981,9 @@ int pdb_change_values_one_page(u_char *buffer, int length,
     if (!(l2_pgentry_val(*l2_table) & _PAGE_PRESENT)) 
     {
         struct task_struct *p = find_domain_by_id(0);
-	printk ("cr3: 0x%lx    dom0cr3:  0x%lx\n", 
-		cr3, pagetable_val(p->mm.pagetable));
+	printk ("cr3: 0x%lx    dom0cr3:  0x%lx\n",  cr3,
+		p->mm.shadow_mode ? pagetable_val(p->mm.shadow_table)
+		                  : pagetable_val(p->mm.pagetable));
 	put_task_struct(p);
 
 	printk ("L2:0x%p (0x%lx) \n", l2_table, l2_pgentry_val(*l2_table));

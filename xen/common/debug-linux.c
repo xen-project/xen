@@ -1,6 +1,6 @@
-#include <xeno/config.h>
-#include <xeno/types.h>
-#include <xeno/lib.h>
+#include <xen/config.h>
+#include <xen/types.h>
+#include <xen/lib.h>
 #include <hypervisor-ifs/dom0_ops.h>
 #include <asm/pdb.h>
 
@@ -12,11 +12,11 @@
 #define PIDHASH_SZ (4096 >> 2)
 #define pid_hashfn(x)	((((x) >> 8) ^ (x)) & (PIDHASH_SZ - 1))
 
-/* from asm-xeno/pgtable-2level.h */
+/* from asm-xen/pgtable-2level.h */
 #define PGDIR_SHIFT	22
 #define PTRS_PER_PGD	1024
 
-/* from asm-xeno/page.h */
+/* from asm-xen/page.h */
 #define PAGE_SHIFT	12
 #define PAGE_SIZE	(1UL << PAGE_SHIFT)
 #define PAGE_MASK	(~(PAGE_SIZE-1))
@@ -34,7 +34,7 @@
 void pdb_linux_process_details (unsigned long cr3, int pid, char *buffer);
 
 
-/* adapted from asm-xeno/page.h */
+/* adapted from asm-xen/page.h */
 static inline unsigned long machine_to_phys(unsigned long cr3,
                                             unsigned long machine)
 {

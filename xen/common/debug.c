@@ -4,12 +4,12 @@
  * xen pervasive debugger
  */
 
-#include <xeno/config.h>
-#include <xeno/types.h>
-#include <xeno/lib.h>
+#include <xen/config.h>
+#include <xen/types.h>
+#include <xen/lib.h>
 #include <hypervisor-ifs/dom0_ops.h>
-#include <xeno/sched.h>
-#include <xeno/event.h>
+#include <xen/sched.h>
+#include <xen/event.h>
 #include <asm/page.h>
 #include <asm/pdb.h>
 
@@ -73,7 +73,10 @@ void pdb_do_debug (dom0_op_t *op)
 	    struct task_struct *p;
 
 	    p = find_domain_by_id(op->u.debug.domain);
-	    cr3 = pagetable_val(p->mm.pagetable);
+	    if (p->mm.shadow_mode)
+	      cr3 = pagetable_val(p->mm.shadow_table);
+	    else
+	      cr3 = pagetable_val(p->mm.pagetable);
 
             for (loop = 0; loop < op->u.debug.in2; loop++)         /* length */
             { 
@@ -91,15 +94,13 @@ void pdb_do_debug (dom0_op_t *op)
         }
         case 's' :
 	{
-	    unsigned long cpu_mask;
 	    struct task_struct * p = find_domain_by_id(op->u.debug.domain);
 
 	    if (p != NULL)
 	    {
 	        if (p->state != TASK_STOPPED)
 		{
-		    cpu_mask = mark_guest_event(p, _EVENT_STOP);
-		    guest_event_notify(cpu_mask);
+		  send_guest_virq(p, VIRQ_STOP);
 		}
 		put_task_struct(p);
 	    }

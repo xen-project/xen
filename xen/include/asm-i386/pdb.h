@@ -12,7 +12,7 @@
 #define __PDB_H__
 
 #include <asm/ptrace.h>
-#include <xeno/list.h>
+#include <xen/list.h>
 #include <hypervisor-ifs/hypervisor-if.h>                   /* for domain id */
 
 extern int pdb_initialized;
