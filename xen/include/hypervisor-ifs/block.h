@@ -9,14 +9,6 @@
 #define __BLOCK_H__
 
 /*
- * Command values for block_io_op()
- */
-
-#define BLKOP_PUSH_BUFFERS   0  /* Notify Xen of new requests on the ring. */
-#define BLKOP_FLUSH_BUFFERS  1  /* Flush all pending request buffers.      */
-
-
-/*
  * Device numbers
  */
 

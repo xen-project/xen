@@ -472,3 +472,5 @@ xen/drivers/net/dummy.o
 tools/misc/miniterm/miniterm
 tools/misc/xen_read_console
 extras/mini-os/h/hypervisor-ifs
+xen/BLOG
+xen/drivers/block/xen_vbd.o
