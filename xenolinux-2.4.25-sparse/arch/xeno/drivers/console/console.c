@@ -79,7 +79,7 @@ static void priv_conwrite(const char *s, unsigned int count)
 
     while ( count > 0 )
     {
-        if ( (rc = HYPERVISOR_serial_io(SERIALIO_write, count, s)) > 0 )
+        if ( (rc = HYPERVISOR_console_io(CONSOLEIO_write, count, s)) > 0 )
         {
             count -= rc;
             s += rc;
@@ -174,7 +174,7 @@ static void __do_console_io(void)
     if ( start_info.flags & SIF_INITDOMAIN )
     {
         /* Receive work. */
-        while ( (len = HYPERVISOR_serial_io(SERIALIO_read, 16, rbuf)) > 0 )
+        while ( (len = HYPERVISOR_console_io(CONSOLEIO_read, 16, rbuf)) > 0 )
             for ( i = 0; i < len; i++ )
                 tty_insert_flip_char(xeno_console_tty, rbuf[i], 0);
         if ( xeno_console_tty->flip.count != 0 )

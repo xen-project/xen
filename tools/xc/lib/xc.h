@@ -178,6 +178,13 @@ int xc_evtchn_status(int xc_handle,
                      int *port2,
                      int *chn_status);
 
+int xc_physdev_pci_access_modify(int xc_handle,
+                                 u64 domid,
+                                 int bus,
+                                 int dev,
+                                 int func,
+                                 int enable);
+
 int xc_readconsolering(int xc_handle,
                        char *str, 
                        unsigned int max_chars, 

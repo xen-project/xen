@@ -892,6 +892,29 @@ static PyObject *pyxc_evtchn_status(PyObject *self,
     return dict;
 }
 
+static PyObject *pyxc_physdev_pci_access_modify(PyObject *self,
+                                                PyObject *args,
+                                                PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+    u64 dom;
+    int bus, dev, func, enable, ret;
+
+    static char *kwd_list[] = { "dom", "bus", "dev", "func", "enable", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "Liiii", kwd_list, 
+                                      &dom, &bus, &dev, &func, &enable) )
+    {
+        DPRINTF("could not parse parameter list.");
+        return NULL;
+    }
+
+    ret = xc_physdev_pci_access_modify(
+        xc->xc_handle, dom, bus, dev, func, enable);
+    
+    return PyInt_FromLong(ret);
+}
+
 static PyObject *pyxc_readconsolering(PyObject *self,
                                       PyObject *args,
                                       PyObject *kwds)
@@ -924,9 +947,7 @@ static PyObject *pyxc_physinfo(PyObject *self,
     int xc_ret;
     xc_physinfo_t info;
     
-    xc_ret = xc_physinfo(xc->xc_handle, &info);
-
-    if(!xc_ret)
+    if ( (xc_ret = xc_physinfo(xc->xc_handle, &info)) == 0 )
     {
         ret_obj = Py_BuildValue("{s:i,s:i,s:l,s:l,s:l}",
                                 "ht_per_core", info.ht_per_core,
@@ -937,7 +958,8 @@ static PyObject *pyxc_physinfo(PyObject *self,
     }
     else
     {
-        ret_obj = Py_BuildValue(""); /* None */
+        Py_INCREF(Py_None);
+        ret_obj = Py_None;
     }
     
     return ret_obj;
@@ -978,7 +1000,7 @@ static PyMethodDef pyxc_methods[] = {
       (PyCFunction)pyxc_domain_pincpu, 
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Pin a domain to a specified CPU.\n"
-      " dom [long]:    Identifier of domain to be destroyed.\n"
+      " dom [long]:    Identifier of domain to be pinned.\n"
       " cpu [int, -1]: CPU to pin to, or -1 to unpin\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
@@ -1195,6 +1217,17 @@ static PyMethodDef pyxc_methods[] = {
       " dom  [long]: Port-id for endpoint at dom1.\n"
       " port [int]:  Port-id for endpoint at dom2.\n" },
 
+    { "physdev_pci_access_modify",
+      (PyCFunction)pyxc_physdev_pci_access_modify,
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Allow a domain access to a PCI device\n"
+      " dom    [long]: Identifier of domain to be allowed access.\n"
+      " bus    [int]:  PCI bus\n"
+      " dev    [int]:  PCI slot\n"
+      " func   [int]:  PCI function\n"
+      " enable [int]:  Non-zero means enable access; else disable access\n\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+ 
     { "readconsolering", 
       (PyCFunction)pyxc_readconsolering, 
       METH_VARARGS | METH_KEYWORDS, "\n"

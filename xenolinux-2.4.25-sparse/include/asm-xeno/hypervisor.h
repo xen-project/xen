@@ -440,12 +440,12 @@ static inline int HYPERVISOR_xen_version(int cmd)
     return ret;
 }
 
-static inline int HYPERVISOR_serial_io(int cmd, int count, char *str)
+static inline int HYPERVISOR_console_io(int cmd, int count, char *str)
 {
     int ret;
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret) : "0" (__HYPERVISOR_serial_io),
+        : "=a" (ret) : "0" (__HYPERVISOR_console_io),
         "b" (cmd), "c" (count), "d" (str) : "memory" );
 
     return ret;
