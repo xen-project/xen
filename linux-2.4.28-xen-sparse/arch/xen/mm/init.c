@@ -377,7 +377,7 @@ static int __init free_pages_init(void)
     }
 #ifdef CONFIG_HIGHMEM
     for (pfn = highend_pfn-1; pfn >= highstart_pfn; pfn--)
-        one_highpage_init((struct page *) (mem_map + pfn), pfn,
+        one_highpage_init((struct page *) (mem_map + pfn),
                           (pfn < xen_start_info.nr_pages));
     totalram_pages += totalhigh_pages;
 #endif

@@ -5,55 +5,46 @@
  * Block request routing data path.
  * 
  * Copyright (c) 2004, Andrew Warfield
- *
+ * -- see full header in blktap.c
  */
  
 #include "blktap.h"
+#include <asm-xen/evtchn.h>
 
 /*-----[ The data paths ]-------------------------------------------------*/
- 
-/* Connections to the frontend domains.*/
-blkif_t   ptfe_blkif; 
- 
+
 /* Connection to a single backend domain. */
-blkif_ring_t *blk_ptbe_ring;   /* Ring from the PT to the BE dom    */ 
-BLKIF_RING_IDX ptbe_resp_cons; /* Response consumer for comms ring. */
-BLKIF_RING_IDX ptbe_req_prod;  /* Private request producer.         */
-
-/* Rings up to user space. */ 
-blkif_req_ring_t fe_ring;// = BLKIF_REQ_RING_INIT;
-blkif_rsp_ring_t be_ring;// = BLKIF_RSP_RING_INIT;
-
-/*-----[ Ring helpers ]---------------------------------------------------*/
-
-inline int BLKTAP_RING_FULL(blkif_generic_ring_t *ring)
-{
-    if (ring->type == BLKIF_REQ_RING_TYPE) {
-        blkif_req_ring_t *r = (blkif_req_ring_t *)ring;
-        return ( ( r->req_prod - r->rsp_cons ) == BLKIF_RING_SIZE );
-    }
-    
-    /* for now assume that there is always room in the response path. */
-    return 0;
-}
+blkif_front_ring_t blktap_be_ring;
 
 /*-----[ Tracking active requests ]---------------------------------------*/
 
 /* this must be the same as MAX_PENDING_REQS in blkback.c */
-#define MAX_ACTIVE_REQS 64
+#define MAX_ACTIVE_REQS ((ACTIVE_RING_IDX)64U)
 
-active_req_t  active_reqs[MAX_ACTIVE_REQS];
-unsigned char active_req_ring[MAX_ACTIVE_REQS];
-spinlock_t    active_req_lock = SPIN_LOCK_UNLOCKED;
-typedef unsigned int ACTIVE_RING_IDX;
-ACTIVE_RING_IDX active_prod, active_cons;
+active_req_t     active_reqs[MAX_ACTIVE_REQS];
+ACTIVE_RING_IDX  active_req_ring[MAX_ACTIVE_REQS];
+spinlock_t       active_req_lock = SPIN_LOCK_UNLOCKED;
+ACTIVE_RING_IDX  active_prod, active_cons;
 #define MASK_ACTIVE_IDX(_i) ((_i)&(MAX_ACTIVE_REQS-1))
 #define ACTIVE_IDX(_ar) (_ar - active_reqs)
+#define NR_ACTIVE_REQS (MAX_ACTIVE_REQS - active_prod + active_cons)
 
 inline active_req_t *get_active_req(void) 
 {
-    ASSERT(active_cons != active_prod);    
-    return &active_reqs[MASK_ACTIVE_IDX(active_cons++)];
+    ACTIVE_RING_IDX idx;
+    active_req_t *ar;
+    unsigned long flags;
+        
+    ASSERT(active_cons != active_prod);   
+    
+    spin_lock_irqsave(&active_req_lock, flags);
+    idx =  active_req_ring[MASK_ACTIVE_IDX(active_cons++)];
+    ar = &active_reqs[idx];
+if (ar->inuse) WPRINTK("AR INUSE! (%lu)\n", ar->id);
+ar->inuse = 1;
+    spin_unlock_irqrestore(&active_req_lock, flags);
+    
+    return ar;
 }
 
 inline void free_active_req(active_req_t *ar) 
@@ -61,8 +52,14 @@ inline void free_active_req(active_req_t *ar)
     unsigned long flags;
         
     spin_lock_irqsave(&active_req_lock, flags);
+ar->inuse = 0;
     active_req_ring[MASK_ACTIVE_IDX(active_prod++)] = ACTIVE_IDX(ar);
     spin_unlock_irqrestore(&active_req_lock, flags);
+}
+
+active_req_t *lookup_active_req(ACTIVE_RING_IDX idx)
+{
+    return &active_reqs[idx];   
 }
 
 inline void active_reqs_init(void)
@@ -76,55 +73,256 @@ inline void active_reqs_init(void)
         active_req_ring[i] = i;
 }
 
+/* Requests passing through the tap to the backend hijack the id field
+ * in the request message.  In it we put the AR index _AND_ the fe domid.
+ * the domid is used by the backend to map the pages properly.
+ */
+
+static inline unsigned long MAKE_ID(domid_t fe_dom, ACTIVE_RING_IDX idx)
+{
+    return ( (fe_dom << 16) | idx );
+}
+
+inline unsigned int ID_TO_IDX(unsigned long id) 
+{ 
+        return ( id & 0x0000ffff );
+}
+
+inline domid_t ID_TO_DOM(unsigned long id) { return (id >> 16); }
+
+/*-----[ Ring helpers ]---------------------------------------------------*/
+
+inline int write_resp_to_fe_ring(blkif_t *blkif, blkif_response_t *rsp)
+{
+    blkif_response_t *resp_d;
+    active_req_t *ar;
+    
+    /* remap id, and free the active req. blkif lookup goes here too.*/
+    ar = &active_reqs[ID_TO_IDX(rsp->id)];
+    /* WPRINTK("%3u > %3lu\n", ID_TO_IDX(rsp->id), ar->id); */
+    rsp->id = ar->id;
+    free_active_req(ar);
+            
+    resp_d = RING_GET_RESPONSE(BLKIF_RING, &blkif->blk_ring,
+            blkif->blk_ring.rsp_prod_pvt);
+    memcpy(resp_d, rsp, sizeof(blkif_response_t));
+    wmb();
+    blkif->blk_ring.rsp_prod_pvt++;
+            
+    return 0;
+}
+
+inline int write_req_to_be_ring(blkif_request_t *req)
+{
+    blkif_request_t *req_d;
+
+    req_d = RING_GET_REQUEST(BLKIF_RING, &blktap_be_ring,
+            blktap_be_ring.req_prod_pvt);
+    memcpy(req_d, req, sizeof(blkif_request_t));
+    wmb();
+    blktap_be_ring.req_prod_pvt++;
+            
+    return 0;
+}
+
+inline void kick_fe_domain(blkif_t *blkif) 
+{
+    RING_PUSH_RESPONSES(BLKIF_RING, &blkif->blk_ring);
+    notify_via_evtchn(blkif->evtchn);
+    DPRINTK("notified FE(dom %u)\n", blkif->domid);
+    
+}
+
+inline void kick_be_domain(void)
+{
+    wmb(); /* Ensure that the frontend can see the requests. */
+    RING_PUSH_REQUESTS(BLKIF_RING, &blktap_be_ring);
+    notify_via_evtchn(blkif_ptbe_evtchn);
+    DPRINTK("notified BE\n");
+}
+
 /*-----[ Data to/from Frontend (client) VMs ]-----------------------------*/
+
+/*-----[ Scheduler list maint -from blkback ]--- */
+
+static struct list_head blkio_schedule_list;
+static spinlock_t blkio_schedule_list_lock;
+
+static int __on_blkdev_list(blkif_t *blkif)
+{
+    return blkif->blkdev_list.next != NULL;
+}
+
+static void remove_from_blkdev_list(blkif_t *blkif)
+{
+    unsigned long flags;
+    if ( !__on_blkdev_list(blkif) ) return;
+    spin_lock_irqsave(&blkio_schedule_list_lock, flags);
+    if ( __on_blkdev_list(blkif) )
+    {
+        list_del(&blkif->blkdev_list);
+        blkif->blkdev_list.next = NULL;
+        blkif_put(blkif);
+    }
+    spin_unlock_irqrestore(&blkio_schedule_list_lock, flags);
+}
+
+static void add_to_blkdev_list_tail(blkif_t *blkif)
+{
+    unsigned long flags;
+    if ( __on_blkdev_list(blkif) ) return;
+    spin_lock_irqsave(&blkio_schedule_list_lock, flags);
+    if ( !__on_blkdev_list(blkif) && (blkif->status == CONNECTED) )
+    {
+        list_add_tail(&blkif->blkdev_list, &blkio_schedule_list);
+        blkif_get(blkif);
+    }
+    spin_unlock_irqrestore(&blkio_schedule_list_lock, flags);
+}
+
+
+/*-----[ Scheduler functions - from blkback ]--- */
+
+static DECLARE_WAIT_QUEUE_HEAD(blkio_schedule_wait);
+
+static int do_block_io_op(blkif_t *blkif, int max_to_do);
+
+static int blkio_schedule(void *arg)
+{
+    DECLARE_WAITQUEUE(wq, current);
+
+    blkif_t          *blkif;
+    struct list_head *ent;
+
+    daemonize(
+        "xentapd"
+        );
+
+    for ( ; ; )
+    {
+        /* Wait for work to do. */
+        add_wait_queue(&blkio_schedule_wait, &wq);
+        set_current_state(TASK_INTERRUPTIBLE);
+        if ( (NR_ACTIVE_REQS == MAX_ACTIVE_REQS) || 
+             list_empty(&blkio_schedule_list) )
+            schedule();
+        __set_current_state(TASK_RUNNING);
+        remove_wait_queue(&blkio_schedule_wait, &wq);
+
+        /* Queue up a batch of requests. */
+        while ( (NR_ACTIVE_REQS < MAX_ACTIVE_REQS) &&
+                !list_empty(&blkio_schedule_list) )
+        {
+            ent = blkio_schedule_list.next;
+            blkif = list_entry(ent, blkif_t, blkdev_list);
+            blkif_get(blkif);
+            remove_from_blkdev_list(blkif);
+            if ( do_block_io_op(blkif, BATCH_PER_DOMAIN) )
+                add_to_blkdev_list_tail(blkif);
+            blkif_put(blkif);
+        }
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+        /* Push the batch through to disc. */
+        run_task_queue(&tq_disk);
+#endif
+    }
+}
+
+static void maybe_trigger_blkio_schedule(void)
+{
+    /*
+     * Needed so that two processes, who together make the following predicate
+     * true, don't both read stale values and evaluate the predicate
+     * incorrectly. Incredibly unlikely to stall the scheduler on x86, but...
+     */
+    smp_mb();
+
+    if ( (NR_ACTIVE_REQS < (MAX_ACTIVE_REQS)) && /* XXX!!! was M_A_R/2*/
+         !list_empty(&blkio_schedule_list) ) 
+        wake_up(&blkio_schedule_wait);
+}
+
+void blkif_deschedule(blkif_t *blkif)
+{
+    remove_from_blkdev_list(blkif);
+}
+
+void __init blkdev_schedule_init(void)
+{
+    spin_lock_init(&blkio_schedule_list_lock);
+    INIT_LIST_HEAD(&blkio_schedule_list);
+
+    if ( kernel_thread(blkio_schedule, 0, CLONE_FS | CLONE_FILES) < 0 )
+        BUG();
+}
+    
+/*-----[ Interrupt entry from a frontend ]------ */
 
 irqreturn_t blkif_ptfe_int(int irq, void *dev_id, struct pt_regs *regs)
 {
+    blkif_t *blkif = dev_id;
+
+    add_to_blkdev_list_tail(blkif);
+    maybe_trigger_blkio_schedule();
+    return IRQ_HANDLED;
+}
+
+/*-----[ Other Frontend Ring functions ]-------- */
+
+/* irqreturn_t blkif_ptfe_int(int irq, void *dev_id, struct pt_regs *regs)*/
+static int do_block_io_op(blkif_t *blkif, int max_to_do)
+{
     /* we have pending messages from the real frontend. */
 
-    blkif_request_t *req_s, *req_d;
-    BLKIF_RING_IDX fe_rp;
+    blkif_request_t *req_s;
+    RING_IDX i, rp;
     unsigned long flags;
-    int notify;
-    unsigned long i;
     active_req_t *ar;
+    int more_to_do = 0;
+    int notify_be = 0, notify_user = 0;
     
     DPRINTK("PT got FE interrupt.\n");
+
+    if (NR_ACTIVE_REQS == MAX_ACTIVE_REQS) return 1;
     
     /* lock both rings */
     spin_lock_irqsave(&blkif_io_lock, flags);
 
-    /* While there are REQUESTS on FERing: */
-    fe_rp = ptfe_blkif.blk_ring_base->req_prod;
+    rp = blkif->blk_ring.sring->req_prod;
     rmb();
-    notify = (ptfe_blkif.blk_req_cons != fe_rp);
-
-    for (i = ptfe_blkif.blk_req_cons; i != fe_rp; i++) {
-
-        /* Get the next request */
-        req_s = &ptfe_blkif.blk_ring_base->ring[MASK_BLKIF_IDX(i)].req;
+    
+    for ( i = blkif->blk_ring.req_cons; 
+         (i != rp) && 
+            !RING_REQUEST_CONS_OVERFLOW(BLKIF_RING, &blkif->blk_ring, i);
+          i++ )
+    {
         
+        if ((--max_to_do == 0) || (NR_ACTIVE_REQS == MAX_ACTIVE_REQS)) 
+        {
+            more_to_do = 1;
+            break;
+        }
+        
+        req_s = RING_GET_REQUEST(BLKIF_RING, &blkif->blk_ring, i);
         /* This is a new request:  
          * Assign an active request record, and remap the id. 
          */
         ar = get_active_req();
         ar->id = req_s->id;
-        req_s->id = ACTIVE_IDX(ar);
-        DPRINTK("%3lu < %3lu\n", req_s->id, ar->id);
+        ar->blkif = blkif;
+        req_s->id = MAKE_ID(blkif->domid, ACTIVE_IDX(ar));
+        /* WPRINTK("%3u < %3lu\n", ID_TO_IDX(req_s->id), ar->id); */
 
         /* FE -> BE interposition point is here. */
         
         /* ------------------------------------------------------------- */
         /* BLKIF_OP_PROBE_HACK:                                          */
-        /* Until we have grant tables, we need to allow the backent to   */
-        /* map pages that are either from this domain, or more commonly  */
-        /* from the real front end.  We achieve this in a terrible way,  */
-        /* by passing the front end's domid allong with PROBE messages   */
-        /* Once grant tables appear, this should all go away.            */
+        /* Signal to the backend that we are a tap domain.               */
 
         if (req_s->operation == BLKIF_OP_PROBE) {
-            DPRINTK("Adding FE domid to PROBE request.\n");
-            (domid_t)(req_s->frame_and_sects[1]) = ptfe_blkif.domid;
+            DPRINTK("Adding BLKTAP_COOKIE to PROBE request.\n");
+            req_s->frame_and_sects[1] = BLKTAP_COOKIE;
         }
 
         /* ------------------------------------------------------------- */
@@ -137,12 +335,9 @@ irqreturn_t blkif_ptfe_int(int irq, void *dev_id, struct pt_regs *regs)
             /* In MODE_INTERCEPT_FE, map attached pages into the app vma */
             /* In MODE_COPY_FE_PAGES, copy attached pages into the app vma */
 
-            /* XXX: mapping/copying of attached pages is still not done! */
-
             DPRINTK("req->UFERing\n"); 
             blktap_write_fe_ring(req_s);
-
-
+            notify_user = 1;
         }
 
         /* If we are not in MODE_INTERCEPT_FE or MODE_INTERCEPT_BE: */
@@ -153,61 +348,27 @@ irqreturn_t blkif_ptfe_int(int irq, void *dev_id, struct pt_regs *regs)
             /* copy the request message to the BERing */
 
             DPRINTK("blktap: FERing[%u] -> BERing[%u]\n", 
-                    (unsigned)MASK_BLKIF_IDX(i), 
-                    (unsigned)MASK_BLKIF_IDX(ptbe_req_prod));
-
-            req_d = &blk_ptbe_ring->ring[MASK_BLKIF_IDX(ptbe_req_prod)].req;
+                    (unsigned)__SHARED_RING_MASK(BLKIF_RING, 
+                        blktap_be_ring.sring, i), 
+                    (unsigned)__SHARED_RING_MASK(BLKIF_RING, 
+                        blktap_be_ring.sring, blktap_be_ring.req_prod_pvt));
             
-            memcpy(req_d, req_s, sizeof(blkif_request_t));
-
-            ptbe_req_prod++;
+            write_req_to_be_ring(req_s);
+            notify_be = 1;
         }
     }
 
-    ptfe_blkif.blk_req_cons = i;
-
-    /* If we have forwarded any responses, notify the appropriate ends. */
-    if (notify) {
-
-        /* we have sent stuff to the be, notify it. */
-        if ( !((blktap_mode & BLKTAP_MODE_INTERCEPT_FE) ||
-               (blktap_mode & BLKTAP_MODE_INTERCEPT_BE)) ) {
-            wmb();
-            blk_ptbe_ring->req_prod = ptbe_req_prod;
-
-            notify_via_evtchn(blkif_ptbe_evtchn);
-            DPRINTK(" -- and notified.\n");
-        }
-
-        /* we sent stuff to the app, notify it. */
-        if ( (blktap_mode & BLKTAP_MODE_INTERCEPT_FE) ||
-             (blktap_mode & BLKTAP_MODE_COPY_FE) ) {
-
-            blktap_kick_user();
-        }
-    }
-
+    blkif->blk_ring.req_cons = i;
+    
     /* unlock rings */
     spin_unlock_irqrestore(&blkif_io_lock, flags);
-
-    return IRQ_HANDLED;
-}
-
-inline int write_req_to_be_ring(blkif_request_t *req)
-{
-    blkif_request_t *req_d;
-
-    req_d = &blk_ptbe_ring->ring[MASK_BLKIF_IDX(ptbe_req_prod)].req;
-    memcpy(req_d, req, sizeof(blkif_request_t));
-    ptbe_req_prod++;
-
-    return 0;
-}
-
-inline void kick_be_domain(void) {
-    wmb();
-    blk_ptbe_ring->req_prod = ptbe_req_prod;
-    notify_via_evtchn(blkif_ptbe_evtchn);
+    
+    if (notify_user)
+        blktap_kick_user();
+    if (notify_be)
+        kick_be_domain();
+    
+    return more_to_do;
 }
 
 /*-----[ Data to/from Backend (server) VM ]------------------------------*/
@@ -216,31 +377,27 @@ inline void kick_be_domain(void) {
 irqreturn_t blkif_ptbe_int(int irq, void *dev_id, 
                                   struct pt_regs *ptregs)
 {
-    blkif_response_t  *resp_s, *resp_d;
-    BLKIF_RING_IDX be_rp;
+    blkif_response_t  *resp_s;
+    blkif_t *blkif;
+    RING_IDX rp, i;
     unsigned long flags;
-    int notify;
-    unsigned long i;
-    active_req_t *ar;
 
     DPRINTK("PT got BE interrupt.\n");
 
     /* lock both rings */
     spin_lock_irqsave(&blkif_io_lock, flags);
     
-    /* While there are RESPONSES on BERing: */
-    be_rp = blk_ptbe_ring->resp_prod;
+    rp = blktap_be_ring.sring->rsp_prod;
     rmb();
-    notify = (ptbe_resp_cons != be_rp);
-    
-    for ( i = ptbe_resp_cons; i != be_rp; i++ )
+      
+    for ( i = blktap_be_ring.rsp_cons; i != rp; i++)
     {
-        /* BE -> FE interposition point is here. */
+        resp_s = RING_GET_RESPONSE(BLKIF_RING, &blktap_be_ring, i);
         
-        /* Get the next response */
-        resp_s = &blk_ptbe_ring->ring[MASK_BLKIF_IDX(i)].resp;
+        /* BE -> FE interposition point is here. */
     
-       
+        blkif = active_reqs[ID_TO_IDX(resp_s->id)].blkif;
+        
         /* If we are in MODE_INTERCEPT_BE or MODE_COPY_BE: */
         if ( (blktap_mode & BLKTAP_MODE_INTERCEPT_BE) ||
              (blktap_mode & BLKTAP_MODE_COPY_BE) ) {
@@ -249,10 +406,9 @@ irqreturn_t blkif_ptbe_int(int irq, void *dev_id,
             /* In MODE_INTERCEPT_BE, map attached pages into the app vma */
             /* In MODE_COPY_BE_PAGES, copy attached pages into the app vma */
 
-            /* XXX: copy/map the attached page! */
-
             DPRINTK("rsp->UBERing\n"); 
             blktap_write_be_ring(resp_s);
+            blktap_kick_user();
 
         }
        
@@ -264,254 +420,49 @@ irqreturn_t blkif_ptbe_int(int irq, void *dev_id,
             /* Copy the response message to FERing */
          
             DPRINTK("blktap: BERing[%u] -> FERing[%u]\n", 
-                    (unsigned) MASK_BLKIF_IDX(i), 
-                    (unsigned) MASK_BLKIF_IDX(ptfe_blkif.blk_resp_prod));
+                    (unsigned)__SHARED_RING_MASK(BLKIF_RING, 
+                        blkif->blk_ring.sring, i), 
+                    (unsigned)__SHARED_RING_MASK(BLKIF_RING, 
+                        blkif->blk_ring.sring, 
+                        blkif->blk_ring.rsp_prod_pvt));
 
-            /* remap id, and free the active req. blkif lookup goes here too.*/
-            ar = &active_reqs[resp_s->id];
-            DPRINTK("%3lu > %3lu\n", resp_s->id, ar->id);
-            resp_s->id = ar->id;
-            free_active_req(ar);
-           
-            resp_d = &ptfe_blkif.blk_ring_base->ring[
-                MASK_BLKIF_IDX(ptfe_blkif.blk_resp_prod)].resp;
-
-            memcpy(resp_d, resp_s, sizeof(blkif_response_t));
-            
-            ptfe_blkif.blk_resp_prod++;
+            write_resp_to_fe_ring(blkif, resp_s);
+            kick_fe_domain(blkif);
 
         }
     }
-
-    ptbe_resp_cons = i;
     
-    /* If we have forwarded any responses, notify the apropriate domains. */
-    if (notify) {
-
-        /* we have sent stuff to the fe.  notify it. */
-        if ( !((blktap_mode & BLKTAP_MODE_INTERCEPT_BE) ||
-               (blktap_mode & BLKTAP_MODE_INTERCEPT_FE)) ) {
-            wmb();
-            ptfe_blkif.blk_ring_base->resp_prod = ptfe_blkif.blk_resp_prod;
-        
-            notify_via_evtchn(ptfe_blkif.evtchn);
-            DPRINTK(" -- and notified.\n");
-        }
-
-        /* we sent stuff to the app, notify it. */
-        if ( (blktap_mode & BLKTAP_MODE_INTERCEPT_BE) ||
-             (blktap_mode & BLKTAP_MODE_COPY_BE) ) {
-
-            blktap_kick_user();
-        }
-    }
+    blktap_be_ring.rsp_cons = i;
+    
 
     spin_unlock_irqrestore(&blkif_io_lock, flags);
+    
     return IRQ_HANDLED;
 }
 
-inline int write_resp_to_fe_ring(blkif_response_t *rsp)
+/* Debug : print the current ring indices. */
+
+void print_vm_ring_idxs(void)
 {
-    blkif_response_t *resp_d;
-    active_req_t *ar;
-    
-    /* remap id, and free the active req. blkif lookup goes here too.*/
-    ar = &active_reqs[rsp->id];
-    DPRINTK("%3lu > %3lu\n", rsp->id, ar->id);
-    rsp->id = ar->id;
-    free_active_req(ar);
+    int i;
+    blkif_t *blkif;
             
-    resp_d = &ptfe_blkif.blk_ring_base->ring[
-        MASK_BLKIF_IDX(ptfe_blkif.blk_resp_prod)].resp;
-
-    memcpy(resp_d, rsp, sizeof(blkif_response_t));
-    ptfe_blkif.blk_resp_prod++;
-
-    return 0;
-}
-
-inline void kick_fe_domain(void) {
-    wmb();
-    ptfe_blkif.blk_ring_base->resp_prod = ptfe_blkif.blk_resp_prod;
-    notify_via_evtchn(ptfe_blkif.evtchn);
-    
-}
-
-static inline void flush_requests(void)
-{
-    wmb(); /* Ensure that the frontend can see the requests. */
-    blk_ptbe_ring->req_prod = ptbe_req_prod;
-    notify_via_evtchn(blkif_ptbe_evtchn);
-}
-
-/*-----[ Data to/from user space ]----------------------------------------*/
-
-
-int blktap_write_fe_ring(blkif_request_t *req)
-{
-    blkif_request_t *target;
-    int error, i;
-
-    /*
-     * This is called to pass a request from the real frontend domain's
-     * blkif ring to the character device.
-     */
-
-    if ( ! blktap_ring_ok ) {
-        DPRINTK("blktap: fe_ring not ready for a request!\n");
-        return 0;
+    WPRINTK("FE Rings: \n---------\n");
+    for ( i = 0; i < 50; i++) { 
+        blkif = blkif_find_by_handle((domid_t)i, 0);
+        if (blkif != NULL)
+            WPRINTK("%2d: req_cons: %2d, rsp_prod_prv: %2d "
+                "| req_prod: %2d, rsp_prod: %2d\n", i, 
+                blkif->blk_ring.req_cons,
+                blkif->blk_ring.rsp_prod_pvt,
+                blkif->blk_ring.sring->req_prod,
+                blkif->blk_ring.sring->rsp_prod);
     }
-
-    if ( BLKTAP_RING_FULL(RING(&fe_ring)) ) {
-        DPRINTK("blktap: fe_ring is full, can't add.\n");
-        return 0;
-    }
-
-    target = &fe_ring.ring->ring[MASK_BLKIF_IDX(fe_ring.req_prod)].req;
-    memcpy(target, req, sizeof(*req));
-
-/* maybe move this stuff out into a seperate func ------------------- */
-
-    /*
-     * For now, map attached page into a fixed position into the vma.
-     * XXX: make this map to a free page.
-     */
-
-    /* Attempt to map the foreign pages directly in to the application */
-    for (i=0; i<target->nr_segments; i++) {
-
-        /* get an unused virtual address from the char device */
-        /* store the old page address */
-        /* replace the address with the virtual address */
-
-        /* blktap_vma->vm_start+((2+i)*PAGE_SIZE) */
-
-        error = direct_remap_area_pages(blktap_vma->vm_mm, 
-                                        MMAP_VADDR(req->id, i), 
-                                        target->frame_and_sects[0] & PAGE_MASK,
-                                        PAGE_SIZE,
-                                        blktap_vma->vm_page_prot,
-                                        ptfe_blkif.domid);
-        if ( error != 0 ) {
-            printk(KERN_INFO "remapping attached page failed! (%d)\n", error);
-            return 0;
-        }
-    }
-    /* fix the address of the attached page in the message. */
-    /* TODO:      preserve the segment number stuff here... */
-    /* target->frame_and_sects[0] = blktap_vma->vm_start + PAGE_SIZE;*/
-/* ------------------------------------------------------------------ */
-
-    
-    fe_ring.req_prod++;
-
-    return 0;
-}
-
-int blktap_write_be_ring(blkif_response_t *rsp)
-{
-    blkif_response_t *target;
-
-    /*
-     * This is called to pass a request from the real backend domain's
-     * blkif ring to the character device.
-     */
-
-    if ( ! blktap_ring_ok ) {
-        DPRINTK("blktap: be_ring not ready for a request!\n");
-        return 0;
-    }
-
-    if ( BLKTAP_RING_FULL(RING(&be_ring)) ) {
-        DPRINTK("blktap: be_ring is full, can't add.\n");
-        return 0;
-    }
-
-    target = &be_ring.ring->ring[MASK_BLKIF_IDX(be_ring.rsp_prod)].resp;
-    memcpy(target, rsp, sizeof(*rsp));
-
-
-    /* XXX: map attached pages and fix-up addresses in the copied address. */
-
-    be_ring.rsp_prod++;
-
-    return 0;
-}
-
-int blktap_read_fe_ring(void)
-{
-    /* This is called to read responses from the UFE ring. */
-
-    BLKIF_RING_IDX fe_rp;
-    unsigned long i;
-    int notify;
-
-    DPRINTK("blktap_read_fe_ring()\n");
-
-    fe_rp = fe_ring.ring->resp_prod;
-    rmb();
-    notify = (fe_rp != fe_ring.rsp_cons);
-
-    /* if we are forwarding from UFERring to FERing */
-    if (blktap_mode & BLKTAP_MODE_INTERCEPT_FE) {
-
-        /* for each outstanding message on the UFEring  */
-        for ( i = fe_ring.rsp_cons; i != fe_rp; i++ ) {
-
-            /* XXX: remap pages on that message as necessary */
-            /* copy the message to the UBEring */
-
-            DPRINTK("resp->fe_ring\n");
-            write_resp_to_fe_ring(&fe_ring.ring->ring[MASK_BLKIF_IDX(i)].resp);
-        }
-    
-        fe_ring.rsp_cons = fe_rp;
-
-        /* notify the fe if necessary */
-        if ( notify ) {
-            DPRINTK("kick_fe_domain()\n");
-            kick_fe_domain();
-        }
-    }
-
-    return 0;
-}
-
-int blktap_read_be_ring(void)
-{
-    /* This is called to read responses from the UBE ring. */
-
-    BLKIF_RING_IDX be_rp;
-    unsigned long i;
-    int notify;
-
-    DPRINTK("blktap_read_be_ring()\n");
-
-    be_rp = be_ring.ring->req_prod;
-    rmb();
-    notify = (be_rp != be_ring.req_cons);
-
-    /* if we are forwarding from UFERring to FERing */
-    if (blktap_mode & BLKTAP_MODE_INTERCEPT_BE) {
-
-        /* for each outstanding message on the UFEring  */
-        for ( i = be_ring.req_cons; i != be_rp; i++ ) {
-
-            /* XXX: remap pages on that message as necessary */
-            /* copy the message to the UBEring */
-
-            DPRINTK("req->be_ring\n");
-            write_req_to_be_ring(&be_ring.ring->ring[MASK_BLKIF_IDX(i)].req);
-        }
-    
-        be_ring.req_cons = be_rp;
-
-        /* notify the fe if necessary */
-        if ( notify ) {
-            DPRINTK("kick_be_domain()\n");
-            kick_be_domain();
-        }
-    }
-
-    return 0;
-}
+    WPRINTK("BE Ring: \n--------\n");
+    WPRINTK("BE: rsp_cons: %2d, req_prod_prv: %2d "
+        "| req_prod: %2d, rsp_prod: %2d\n",
+        blktap_be_ring.rsp_cons,
+        blktap_be_ring.req_prod_pvt,
+        blktap_be_ring.sring->req_prod,
+        blktap_be_ring.sring->rsp_prod);
+}        
