@@ -379,37 +379,28 @@ unsigned long load_region_regs(struct exec_domain *ed)
 		rrv.rid = ed->domain->metaphysical_rid;
 		rrv.ps = PAGE_SHIFT;
 		rrv.ve = 1;
-		rr0 = rr1 = rr2 = rr3 = rr4 = rr5 = rrv.rrval;
-		rrv.ve = 0;
-		rr6 = rrv.rrval;
+		rr0 = rrv.rrval;
 		set_rr_no_srlz(0x0000000000000000L, rr0);
-		set_rr_no_srlz(0x2000000000000000L, rr1);
-		set_rr_no_srlz(0x4000000000000000L, rr2);
-		set_rr_no_srlz(0x6000000000000000L, rr3);
-		set_rr_no_srlz(0x8000000000000000L, rr4);
-		set_rr_no_srlz(0xa000000000000000L, rr5);
-		set_rr_no_srlz(0xc000000000000000L, rr6);
-		// skip rr7 when in metaphysical mode
+		ia64_srlz_d();
 	}
 	else {
 		rr0 =  ed->vcpu_info->arch.rrs[0];
-		rr1 =  ed->vcpu_info->arch.rrs[1];
-		rr2 =  ed->vcpu_info->arch.rrs[2];
-		rr3 =  ed->vcpu_info->arch.rrs[3];
-		rr4 =  ed->vcpu_info->arch.rrs[4];
-		rr5 =  ed->vcpu_info->arch.rrs[5];
-		rr6 =  ed->vcpu_info->arch.rrs[6];
-		rr7 =  ed->vcpu_info->arch.rrs[7];
 		if (!set_one_rr(0x0000000000000000L, rr0)) bad |= 1;
-		if (!set_one_rr(0x2000000000000000L, rr1)) bad |= 2;
-		if (!set_one_rr(0x4000000000000000L, rr2)) bad |= 4;
-		if (!set_one_rr(0x6000000000000000L, rr3)) bad |= 8;
-		if (!set_one_rr(0x8000000000000000L, rr4)) bad |= 0x10;
-		if (!set_one_rr(0xa000000000000000L, rr5)) bad |= 0x20;
-		if (!set_one_rr(0xc000000000000000L, rr6)) bad |= 0x40;
-		if (!set_one_rr(0xe000000000000000L, rr7)) bad |= 0x80;
 	}
-	ia64_srlz_d();
+	rr1 =  ed->vcpu_info->arch.rrs[1];
+	rr2 =  ed->vcpu_info->arch.rrs[2];
+	rr3 =  ed->vcpu_info->arch.rrs[3];
+	rr4 =  ed->vcpu_info->arch.rrs[4];
+	rr5 =  ed->vcpu_info->arch.rrs[5];
+	rr6 =  ed->vcpu_info->arch.rrs[6];
+	rr7 =  ed->vcpu_info->arch.rrs[7];
+	if (!set_one_rr(0x2000000000000000L, rr1)) bad |= 2;
+	if (!set_one_rr(0x4000000000000000L, rr2)) bad |= 4;
+	if (!set_one_rr(0x6000000000000000L, rr3)) bad |= 8;
+	if (!set_one_rr(0x8000000000000000L, rr4)) bad |= 0x10;
+	if (!set_one_rr(0xa000000000000000L, rr5)) bad |= 0x20;
+	if (!set_one_rr(0xc000000000000000L, rr6)) bad |= 0x40;
+	if (!set_one_rr(0xe000000000000000L, rr7)) bad |= 0x80;
 	if (bad) {
 		panic_domain(0,"load_region_regs: can't set! bad=%lx\n",bad);
 	}

@@ -147,7 +147,7 @@ void reflect_interruption(unsigned long ifa, unsigned long isr, unsigned long it
 		}
 		vector &= ~0xf;
 		if (vector != IA64_DATA_TLB_VECTOR &&
-		    vector != IA64_DATA_TLB_VECTOR) {
+		    vector != IA64_ALT_DATA_TLB_VECTOR) {
 panic_domain(regs,"psr.ic off, delivering fault=%lx,iip=%p,ifa=%p,isr=%p,PSCB.iip=%p\n",
 	vector,regs->cr_iip,ifa,isr,PSCB(ed,iip));
 			
