@@ -1,5 +1,6 @@
 \documentclass[11pt,twoside,final,openright]{xenstyle}
 \usepackage{a4,graphicx,setspace,times}
+\usepackage{comment,parskip}
 \setstretch{1.15}
 
 \begin{document}
@@ -64,212 +65,206 @@ provides secure partitioning between virtual machines (known as
 accounting and QoS isolation than can be achieved with a conventional
 operating system. 
 
-Xen essentially takes a `wholemachine' virtualization approach as
+Xen essentially takes a `whole machine' virtualization approach as
 pioneered by IBM VM/370.  However, unlike VM/370 or more recent
-efforts such as VMWare and Virtual PC, Xen doesn not attempt to
+efforts such as VMWare and Virtual PC, Xen does not attempt to
 completely virtualize the underlying hardware.  Instead parts of the
-hosted guest operating systems are modified to work with the
-VMM; the operating system is effectively ported to a new target
-architecture, typically requiring changes in just the
-machine-dependent code.  The user-level API is unchanged, thus
-existing binaries and operating system distributions work without
-modification. 
+hosted guest operating systems are modified to work with the VMM; the
+operating system is effectively ported to a new target architecture,
+typically requiring changes in just the machine-dependent code.  The
+user-level API is unchanged, and so existing binaries and operating
+system distributions work without modification.
 
 In addition to exporting virtualized instances of CPU, memory, network
 and block devices, Xen exposes a control interface to manage how these
 resources are shared between the running domains. Access to the
 control interface is restricted: it may only be used by one
-specially-privileged VM, known as {\em Domain-0}.  This domain is a
-required part of any Xen-base server and runs the application software
+specially-privileged VM, known as {\em domain-0}.  This domain is a
+required part of any Xen-based server and runs the application software
 that manages the control-plane aspects of the platform.  Running the
 control software in {\it domain-0}, distinct from the hypervisor
-itself, allows the Xen framework to separate the notions of {\it
-mechanism} and {\it policy} within the system.
+itself, allows the Xen framework to separate the notions of 
+mechanism and policy within the system.
 
 
-\chapter{CPU state}
 
-All privileged state must be handled by Xen.  The guest OS has no
-direct access to CR3 and is not permitted to update privileged bits in
-EFLAGS.
-
-
-\chapter{Exceptions}
-
-The IDT is virtualised by submitting to Xen a table of trap handlers.
-Most trap handlers are identical to native x86 handlers, although the
-page-fault handler is a noteable exception.
-
-
-\chapter{Interrupts and events}
-
-Interrupts are virtualized by mapping them to events, which are delivered 
-asynchronously to the target domain.  A guest OS can map these events onto
-its standard interrupt dispatch mechanisms, such as a simple vectoring 
-scheme.  Each physical interrupt source controlled by the hypervisor, including
-network devices, disks, or the timer subsystem, is responsible for identifying
-the target for an incoming interrupt and sending an event to that domain.
-
-This demultiplexing mechanism also provides a device-specific mechanism for 
-event coalescing or hold-off.  For example, a guest OS may request to only 
-actually receive an event after {\it n} packets are queued ready for delivery
-to it, {\it t} nanoseconds after the first packet arrived (which ever is true
-first).  This allows latency and throughput requirements to be addressed on a
-domain-specific basis.
-
-
-\chapter{Time}
-
-Guest operating systems need to be aware of the passage of both real
-(or wallclock) time and their own `virtual time' (i.e., the time for
-which they have been executing) Furthermore, a notion of time is
-required in the hypervisor itself for scheduling and the activities
-that relate to it.  To this end the hypervisor provides for notions of
-time: cycle counter time, system time, wall clock time, domain virtual
-time.
-
-\section{Cycle counter time}
-
-This provides the finest-grained, free-running time reference, with the
-approximate frequency being publicly accessible.  The cycle counter time is
-used to accurately extrapolate the other time references.  On SMP machines
-it is currently assumed that the cycle counter time is synchronised between
-CPUs.  The current x86-based implementation achieves this within inter-CPU
-communication latencies.
-
-\section{System time}
-
-This is a 64-bit value containing the nanoseconds elapsed since boot
-time.  Unlike cycle counter time, system time accurately reflects the
-passage of real time, i.e.  it is adjusted several times a second for timer
-drift.  This is done by running an NTP client in {\it domain0} on behalf of
-the machine, feeding updates to the hypervisor.  Intermediate values can be
-extrapolated using the cycle counter.
-
-\section{Wall clock time}
-
-This is the actual ``time of day'' Unix style struct timeval (i.e. seconds and
-microseconds since 1 January 1970, adjusted by leap seconds etc.).  Again, an 
-NTP client hosted by {\it domain0} can help maintain this value.  To guest 
-operating systems this value will be reported instead of the hardware RTC
-clock value and they can use the system time and cycle counter times to start
-and remain perfectly in time.
-
-\section{Domain virtual time}
-
-This progresses at the same pace as cycle counter time, but only while a
-domain is executing.  It stops while a domain is de-scheduled.  Therefore the
-share of the CPU that a domain receives is indicated by the rate at which
-its domain virtual time increases, relative to the rate at which cycle
-counter time does so.
-
-\section{Time interface}
-
-Xen exports some timestamps to guest operating systems through their shared
-info page.  Timestamps are provided for system time and wall-clock time.  Xen
-also provides the cycle counter values at the time of the last update
-allowing guests to calculate the current values.  The cpu frequency and a
-scaling factor are provided for guests to convert cycle counter values to
-real time.  Since all time stamps need to be updated and read
-\emph{atomically} two version numbers are also stored in the shared info
-page.
-
-Xen will ensure that the time stamps are updated frequently enough to avoid
-an overflow of the cycle counter values.  A guest can check if its notion of
-time is up-to-date by comparing the version numbers.
-
-\section{Timer events}
-
-Xen maintains a periodic timer (currently with a 10ms period) which sends a
-timer event to the currently executing domain.  This allows Guest OSes to
-keep track of the passing of time when executing.  The scheduler also
-arranges for a newly activated domain to receive a timer event when
-scheduled so that the Guest OS can adjust to the passage of time while it
-has been inactive.
-
-In addition, Xen exports a hypercall interface to each domain which allows
-them to request a timer event sent to them at the specified system
-time.  Guest OSes may use this timer to implement timeout values when they
-block.
-
-
-\chapter{Memory}
-
-The hypervisor is responsible for providing memory to each of the
-domains running over it.  However, the Xen hypervisor's duty is
-restricted to managing physical memory and to policying page table
-updates.  All other memory management functions are handled
-externally.  Start-of-day issues such as building initial page tables
-for a domain, loading its kernel image and so on are done by the {\it
-domain builder} running in user-space in {\it domain0}.  Paging to
-disk and swapping is handled by the guest operating systems
-themselves, if they need it.
+\chapter{Virtual Architecture}
 
 On a Xen-based system, the hypervisor itself runs in {\it ring 0}.  It
 has full access to the physical memory available in the system and is
 responsible for allocating portions of it to the domains.  Guest
 operating systems run in and use {\it rings 1}, {\it 2} and {\it 3} as
-they see fit, aside from the fact that segmentation is used to prevent
-the guest OS from accessing a portion of the linear address space that
-is reserved for use by the hypervisor.  This approach allows
-transitions between the guest OS and hypervisor without flushing the
-TLB.  We expect most guest operating systems will use ring 1 for their
-own operation and place applications (if they support such a notion)
-in ring 3.
+they see fit. Segmentation is used to prevent the guest OS from
+accessing the portion of the address space that is reserved for
+Xen. We expect most guest operating systems will use ring 1 for their
+own operation and place applications in ring 3.
 
-\section{Physical Memory Allocation}
+In this chapter we consider the basic virtual architecture provided 
+by Xen: the basic CPU state, exception and interrupt handling, and
+time. Other aspects such as memory and device access are discussed 
+in later chapters. 
 
-The hypervisor reserves a small fixed portion of physical memory at
-system boot time.  This special memory region is located at the
-beginning of physical memory and is mapped at the very top of every
-virtual address space.
+\section{CPU state}
 
-Any physical memory that is not used directly by the hypervisor is divided into
-pages and is available for allocation to domains.  The hypervisor tracks which
-pages are free and which pages have been allocated to each domain.  When a new
-domain is initialized, the hypervisor allocates it pages drawn from the free 
-list.  The amount of memory required by the domain is passed to the hypervisor
-as one of the parameters for new domain initialization by the domain builder.
+All privileged state must be handled by Xen.  The guest OS has no
+direct access to CR3 and is not permitted to update privileged bits in
+EFLAGS. Guest OSes use \emph{hypercalls} to invoke operations in Xen; 
+these are analagous to system calls but occur from ring 1 to ring 0. 
 
-Domains can never be allocated further memory beyond that which was
-requested for them on initialization.  However, a domain can return
-pages to the hypervisor if it discovers that its memory requirements
-have diminished.
+
+\section{Exceptions}
+
+The IDT is virtualised by submitting to Xen a table of trap handlers.
+Most trap handlers are identical to native x86 handlers, although the
+page-fault handler is somewhat different.
+
+
+\section{Interrupts and events}
+
+Interrupts are virtualized by mapping them to events, which are
+delivered asynchronously to the target domain.  A guest OS can map
+these events onto its standard interrupt dispatch mechanisms.  Xen 
+is responsible for determining the target domain that will handle 
+each physical interrupt source. 
+
+
+\section{Time}
+
+Guest operating systems need to be aware of the passage of both real
+(or wallclock) time and their own `virtual time' (the time for
+which they have been executing). Furthermore, Xen has a notion of 
+time which is used for scheduling. The following notions of 
+time are provided: 
+
+\begin{description}
+\item[Cycle counter time.]
+
+This provides a fine-grained time reference.  The cycle counter time is
+used to accurately extrapolate the other time references.  On SMP machines
+it is currently assumed that the cycle counter time is synchronised between
+CPUs.  The current x86-based implementation achieves this within inter-CPU
+communication latencies.
+
+\item[System time.]
+
+This is a 64-bit counter which holds the number of nanoseconds that
+have elapsed since system boot.
+
+
+\item[Wall clock time.]
+
+This is the time of day in a Unix-style {\tt struct timeval} (seconds
+and microseconds since 1 January 1970, adjusted by leap seconds).  An
+NTP client hosted by {\it domain-0} can keep this value accurate.  
+
+
+\item[Domain virtual time.]
+
+This progresses at the same pace as system time, but only while a
+domain is executing --- it stops while a domain is de-scheduled.
+Therefore the share of the CPU that a domain receives is indicated by
+the rate at which its virtual time increases.
+
+\end{description}
+
+
+Xen exports timestamps for system time and wall-clock time to guest
+operating systems through a shared page of memory.  Xen also provides
+the cycle counter time at the instant the timestamps were calculated,
+and the CPU frequency in Hertz.  This allows the guest to extrapolate
+system and wall-clock times accurately based on the current cycle
+counter time.
+
+Since all time stamps need to be updated and read \emph{atomically}
+two version numbers are also stored in the shared info page. The 
+first is incremented prior to an update, while the second is only
+incremented afterwards. Thus a guest can be sure that it read a consistent 
+state by checking the two version numbers are equal. 
+
+Xen includes a periodic ticker which sends a timer event to the
+currently executing domain every 10ms.  The Xen scheduler also sends a
+timer event whenever a domain is scheduled; this allows the guest OS
+to adjust for the time that has passed while it has been inactive.  In
+addition, Xen allows each domain to request that they receive a timer
+event sent at a specified system time.  Guest OSes may use this timer to
+implement timeout values when they block.
+
+
+\chapter{Memory}
+
+Xen is responsible for managing the allocation of physical memory to
+domains, and for ensuring safe use of the paging and segmentation
+hardware.
+
+
+\section{Memory Allocation}
+
+Xen resides within a small fixed portion of physical memory and
+reserves the top 64MB of every virtual address space. The remaining
+physical memory is available for allocation to domains at a page
+granularity.  Xen tracks the ownership and use of each page, which
+allows it to enforce secure partitioning between domains.
+
+Each domain has a maximum and current physical memory allocation. 
+A guest OS may run a `balloon driver' to dynamically adjust its 
+current memory allocation up to its limit. 
+
 
 \section{Page Table Updates}
 
-In addition to managing physical memory allocation, the hypervisor is also in
-charge of performing page table updates on behalf of the domains.  This is 
-necessary to prevent domains from adding arbitrary mappings to their page
-tables or introducing mappings to other's page tables.
+In the default mode of operation, Xen enforces read-only access to
+page tables and requires guest operating systems to explicitly request
+any modifications.  Xen validates all such requests and only applies
+updates that it deems safe.  This is necessary to prevent domains from
+adding arbitrary mappings to their page tables.
 
-\section{Writable Page Tables}
+To aid validation, Xen associates a type and reference count with each
+memory page. A page has one of the following
+mutually-exclusive types at any point in time: page directory ({\sf
+PD}), page table ({\sf PT}), local descriptor table ({\sf LDT}),
+global descriptor table ({\sf GDT}), or writable ({\sf RW}). Note that
+a guest OS may always create readable mappings of its own memory 
+regardless of its current type. 
+%%% XXX: possibly explain more about ref count 'lifecyle' here?
+This mechanism is used to
+maintain the invariants required for safety; for example, a domain
+cannot have a writable mapping to any part of a page table as this
+would require the page concerned to simultaneously be of types {\sf
+  PT} and {\sf RW}.
 
-Rather than using the explicit page-update interface that Xen
-provides, guests may also be provided with the illusion that their
-page tables are directly writable. Of course this is not really the
-case, since Xen must validate modifications to ensure secure
-partitioning of domains. Instead, Xen detects any write attempt to a
-memory page that is currently part of a page table. If such an access
-occurs, Xen temporarily allows write access to that page while at the
-same time {\em disconnecting} it from the page table that is currently
-in use. This allows the guest to safely make updates to the page
-because the newly-updated entries cannot be used by the MMU until Xen
-revalidates and {\em reconnects} the page.
 
+%\section{Writable Page Tables}
+
+Xen also provides an alternative mode of operation in which guests be
+have the illusion that their page tables are directly writable.  Of
+course this is not really the case, since Xen must still validate
+modifications to ensure secure partitioning. To this end, Xen traps
+any write attempt to a memory page of type {\sf PT} (i.e., that is
+currently part of a page table).  If such an access occurs, Xen
+temporarily allows write access to that page while at the same time
+{\em disconnecting} it from the page table that is currently in
+use. This allows the guest to safely make updates to the page because
+the newly-updated entries cannot be used by the MMU until Xen
+revalidates and reconnects the page.
 Reconnection occurs automatically in a number of situations: for
 example, when the guest modifies a different page-table page, when the
 domain is preempted, or whenever the guest uses Xen's explicit
 page-table update interfaces.
 
+
 \section{Segment Descriptor Tables}
 
-On boot a guest is supplied with a default GDT, which is {\em not}
-taken from its own memory allocation.  If the guest wishes to use other
-than the default `flat' ring-1 and ring-3 segments that this default
-table provides, it must register a custom GDT and/or LDT with Xen,
-allocated from its own memory.
+On boot a guest is supplied with a default GDT, which does not reside
+within its own memory allocation.  If the guest wishes to use other
+than the default `flat' ring-1 and ring-3 segments that this GDT
+provides, it must register a custom GDT and/or LDT with Xen,
+allocated from its own memory. Note that a number of GDT 
+entries are reserved by Xen -- any custom GDT must also include
+sufficent space for these entries. 
 
+For example, the following hypercall is used to specify a new GDT: 
+
+\begin{quote}
 int {\bf set\_gdt}(unsigned long *{\em frame\_list}, int {\em entries})
 
 {\em frame\_list}: An array of up to 16 page frames within which the
@@ -279,12 +274,18 @@ mappings, no use as a page-table page, and so on).
 
 {\em entries}: The number of descriptor-entry slots in the GDT.  Note
 that the table must be large enough to contain Xen's reserved entries;
-thus we must have '{\em entries $>$ LAST\_RESERVED\_GDT\_ENTRY}'.
+thus we must have `{\em entries $>$ LAST\_RESERVED\_GDT\_ENTRY}\ '.
 Note also that, after registering the GDT, slots {\em FIRST\_} through
 {\em LAST\_RESERVED\_GDT\_ENTRY} are no longer usable by the guest and
 may be overwritten by Xen.
+\end{quote}
+
+
+XXX SMH: HERE 
+
 
 \section{Pseudo-Physical Memory}
+
 The usual problem of external fragmentation means that a domain is
 unlikely to receive a contiguous stretch of physical memory.  However,
 most guest operating systems do not have built-in support for
@@ -301,6 +302,21 @@ impression of operating in a contiguous address space.  Guest OS page
 tables contain real physical addresses.  Mapping {\it pseudo physical}
 to {\it real physical} addresses is needed on page table updates and
 also on remapping memory regions with the guest OS.
+
+\section{start of day xxx}
+
+
+Start-of-day issues such as building initial page tables
+for a domain, loading its kernel image and so on are done by the {\it
+domain builder} running in user-space in {\it domain0}.  Paging to
+disk and swapping is handled by the guest operating systems
+themselves, if they need it.
+
+The amount of memory required by the domain is passed to the hypervisor
+as one of the parameters for new domain initialization by the domain builder.
+
+
+
 
 
 
@@ -443,6 +459,8 @@ Xen's internal scheduler API.
 
 More information on the characteristics and use of these schedulers is
 available in { \tt Sched-HOWTO.txt }.
+
+\begin{comment}
 
 \section{Scheduling API}
 
@@ -966,5 +984,7 @@ Interact with the console, operations are:
 
 \hypercall{ update\_va\_mapping\_otherdomain(unsigned long page\_nr, unsigned long val, unsigned long flags, uint16\_t domid)}
 
+
+\end{comment}
 
 \end{document}
