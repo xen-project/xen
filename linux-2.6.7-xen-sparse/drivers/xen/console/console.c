@@ -535,7 +535,7 @@ static int xencons_open(struct tty_struct *tty, struct file *filp)
     unsigned long flags;
 
     if ( TTY_INDEX(tty) != 0 )
-        return -ENODEV;
+        return 0;
 
     MOD_INC_USE_COUNT;
 

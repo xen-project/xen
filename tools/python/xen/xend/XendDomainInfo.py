@@ -136,7 +136,7 @@ def make_disk(dom, uname, dev, mode, recreate=0):
     """
     segments = lookup_disk_uname(uname)
     if not segments:
-        raise VmError("vbd: Segments not foundXXXXXX: uname=%s" % uname)
+        raise VmError("vbd: Segments not found: uname=%s" % uname)
     if len(segments) > 1:
         raise VmError("vbd: Multi-segment vdisk: uname=%s" % uname)
     segment = segments[0]
