@@ -7,6 +7,14 @@
 #include <Python.h>
 #include <xc.h>
 
+#if 1
+#define DPRINTF(_f, _a...)                  \
+    fprintf(stderr, "%s:%s:%d:: " _f "\n" , \
+            __FILE__ , __FUNCTION__ , __LINE__ , ## _a)
+#else
+#define DPRINTF(_f, _a...) ((void)0)
+#endif
+
 typedef struct {
     PyObject_HEAD;
     int xc_handle;
@@ -31,7 +39,10 @@ static PyObject *pyxc_domain_create(PyObject *self,
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|is", kwd_list, 
                                       &mem_kb, &name) )
+    {
+        DPRINTF("could not parse parameter list.");
         return NULL;
+    }
 
     if ( (ret = xc_domain_create(xc->xc_handle, mem_kb, name, &dom)) < 0 )
         return PyLong_FromLong(ret);
@@ -51,7 +62,10 @@ static PyObject *pyxc_domain_start(PyObject *self,
     static char *kwd_list[] = { "dom", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "L", kwd_list, &dom) )
+    {
+        DPRINTF("could not parse parameter list.");
         return NULL;
+    }
 
     ret = xc_domain_start(xc->xc_handle, dom);
     
@@ -70,7 +84,10 @@ static PyObject *pyxc_domain_stop(PyObject *self,
     static char *kwd_list[] = { "dom", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "L", kwd_list, &dom) )
+    {
+        DPRINTF("could not parse parameter list.");
         return NULL;
+    }
 
     ret = xc_domain_stop(xc->xc_handle, dom);
     
@@ -90,7 +107,10 @@ static PyObject *pyxc_domain_destroy(PyObject *self,
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "L|i", kwd_list, 
                                       &dom, &force) )
+    {
+        DPRINTF("could not parse parameter list.");
         return NULL;
+    }
 
     ret = xc_domain_destroy(xc->xc_handle, dom, force);
     
@@ -110,7 +130,10 @@ static PyObject *pyxc_domain_pincpu(PyObject *self,
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "L|i", kwd_list, 
                                       &dom, &cpu) )
+    {
+        DPRINTF("could not parse parameter list.");
         return NULL;
+    }
 
     ret = xc_domain_pincpu(xc->xc_handle, dom, cpu);
     
@@ -132,13 +155,20 @@ static PyObject *pyxc_domain_getinfo(PyObject *self,
     
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|Li", kwd_list,
                                       &first_dom, &max_doms) )
+    {
+        DPRINTF("could not parse parameter list.");
         return NULL;
+    }
 
-    info = malloc(max_doms * sizeof(xc_dominfo_t));
-    if ( info == NULL )
+    if ( (info = malloc(max_doms * sizeof(xc_dominfo_t))) == NULL )
+    {
+        DPRINTF("out of memory.");
         nr_doms = 0;
+    }
     else
+    {
         nr_doms = xc_domain_getinfo(xc->xc_handle, first_dom, max_doms, info);
+    }
     
     list = PyList_New(nr_doms);
     for ( i = 0 ; i < nr_doms; i++ )
@@ -175,7 +205,10 @@ static PyObject *pyxc_linux_save(PyObject *self,
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "Ls|i", kwd_list, 
                                       &dom, &state_file, &progress) )
+    {
+        DPRINTF("could not parse parameter list.");
         return NULL;
+    }
 
     ret = xc_linux_save(xc->xc_handle, dom, state_file, progress);
     
@@ -196,7 +229,10 @@ static PyObject *pyxc_linux_restore(PyObject *self,
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "s|i", kwd_list, 
                                       &state_file, &progress) )
+    {
+        DPRINTF("could not parse parameter list.");
         return NULL;
+    }
 
     ret = xc_linux_restore(xc->xc_handle, state_file, progress, &dom);
     if ( ret < 0 )
@@ -219,7 +255,10 @@ static PyObject *pyxc_linux_build(PyObject *self,
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "Ls|ss", kwd_list, 
                                       &dom, &image, &ramdisk, &cmdline) )
+    {
+        DPRINTF("could not parse parameter list.");
         return NULL;
+    }
 
     ret = xc_linux_build(xc->xc_handle, dom, image, ramdisk, cmdline);
     
@@ -240,7 +279,10 @@ static PyObject *pyxc_netbsd_build(PyObject *self,
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "Ls|ss", kwd_list, 
                                       &dom, &image, &ramdisk, &cmdline) )
+    {
+        DPRINTF("could not parse parameter list.");
         return NULL;
+    }
 
     ret = xc_netbsd_build(xc->xc_handle, dom, image, cmdline);
     
@@ -259,7 +301,10 @@ static PyObject *pyxc_bvtsched_global_set(PyObject *self,
     static char *kwd_list[] = { "ctx_allow", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "l", kwd_list, &ctx_allow) )
+    {
+        DPRINTF("could not parse parameter list.");
         return NULL;
+    }
 
     ret = xc_bvtsched_global_set(xc->xc_handle, ctx_allow);
     
@@ -281,7 +326,10 @@ static PyObject *pyxc_bvtsched_domain_set(PyObject *self,
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "Lllll", kwd_list, 
                                       &dom, &mcuadv, &warp, &warpl, &warpu) )
+    {
+        DPRINTF("could not parse parameter list.");
         return NULL;
+    }
 
     ret = xc_bvtsched_domain_set(xc->xc_handle, dom, mcuadv, 
                                  warp, warpl, warpu);
@@ -307,7 +355,10 @@ static PyObject *pyxc_vif_scheduler_set(PyObject *self,
                                       &dom, &vif, 
                                       &sched.credit_bytes, 
                                       &sched.credit_usec) )
+    {
+        DPRINTF("could not parse parameter list.");
         return NULL;
+    }
 
     ret = xc_vif_scheduler_set(xc->xc_handle, dom, vif, &sched);
     
@@ -330,7 +381,10 @@ static PyObject *pyxc_vif_scheduler_get(PyObject *self,
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "Li", kwd_list, 
                                       &dom, &vif) )
+    {
+        DPRINTF("could not parse parameter list.");
         return NULL;
+    }
 
     ret = xc_vif_scheduler_get(xc->xc_handle, dom, vif, &sched);
 
@@ -360,7 +414,10 @@ static PyObject *pyxc_vif_stats_get(PyObject *self,
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "Li", kwd_list, 
                                       &dom, &vif) )
+    {
+        DPRINTF("could not parse parameter list.");
         return NULL;
+    }
 
     ret = xc_vif_stats_get(xc->xc_handle, dom, vif, &stats);
 
@@ -390,7 +447,10 @@ static PyObject *pyxc_vbd_create(PyObject *self,
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "Lii", kwd_list, 
                                       &dom, &vbd, &writeable) )
+    {
+        DPRINTF("could not parse parameter list.");
         return NULL;
+    }
 
     ret = xc_vbd_create(xc->xc_handle, dom, vbd, writeable);
     
@@ -411,7 +471,10 @@ static PyObject *pyxc_vbd_destroy(PyObject *self,
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "Li", kwd_list, 
                                       &dom, &vbd) )
+    {
+        DPRINTF("could not parse parameter list.");
         return NULL;
+    }
 
     ret = xc_vbd_destroy(xc->xc_handle, dom, vbd);
     
@@ -437,7 +500,10 @@ static PyObject *pyxc_vbd_grow(PyObject *self,
                                       &extent.real_device, 
                                       &extent.start_sector, 
                                       &extent.nr_sectors) )
+    {
+        DPRINTF("could not parse parameter list.");
         return NULL;
+    }
 
     ret = xc_vbd_grow(xc->xc_handle, dom, vbd, &extent);
     
@@ -458,7 +524,10 @@ static PyObject *pyxc_vbd_shrink(PyObject *self,
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "Li", kwd_list, 
                                       &dom, &vbd) )
+    {
+        DPRINTF("could not parse parameter list.");
         return NULL;
+    }
 
     ret = xc_vbd_shrink(xc->xc_handle, dom, vbd);
     
@@ -481,34 +550,95 @@ static PyObject *pyxc_vbd_setextents(PyObject *self,
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "LiO", kwd_list, 
                                       &dom, &vbd, &list) )
+    {
+        DPRINTF("could not parse parameter list.");
         goto fail;
+    }
 
     if ( (nr_extents = PyList_Size(list)) < 0 )
+    {
+        DPRINTF("parameter 'extents' is not a list.");
         goto fail;
+    }
 
     if ( nr_extents != 0 )
     {
         extents = malloc(nr_extents * sizeof(xc_vbdextent_t));
         if ( extents == NULL )
+        {
+            DPRINTF("out of memory.");
             goto fail;
+        }
 
         for ( i = 0; i < nr_extents; i++ )
         {
             dict = PyList_GetItem(list, i);
             if ( !PyDict_Check(dict) )
+            {
+                DPRINTF("extent %d -- extent is not a dictionary.", i);
                 goto fail;
-            if ( ((obj = PyDict_GetItemString(dict, "device")) == NULL) ||
-                 !PyInt_Check(obj) )
+            }
+
+            if ( (obj = PyDict_GetItemString(dict, "device")) == NULL )
+            {
+                DPRINTF("extent %d -- 'device' is not in the dictionary.", i);
                 goto fail;
-            extents[i].real_device = (unsigned short)PyInt_AsLong(obj);
-            if ( ((obj = PyDict_GetItemString(dict,"start_sector")) == NULL) ||
-                 !PyLong_Check(obj) )
+            }
+            if ( PyInt_Check(obj) )
+            {
+                extents[i].real_device = (unsigned short)PyInt_AsLong(obj);
+            }
+            else if ( PyLong_Check(obj) )
+            {
+                extents[i].real_device = (unsigned short)PyLong_AsLong(obj);
+            }
+            else
+            {
+                DPRINTF("extent %d -- 'device' is not an int or long.", i);
                 goto fail;
-            extents[i].start_sector = PyLong_AsUnsignedLongLong(obj);
-            if ( ((obj = PyDict_GetItemString(dict, "nr_sectors")) == NULL) ||
-                 !PyLong_Check(obj) )
+            }
+
+            if ( (obj = PyDict_GetItemString(dict, "start_sector")) == NULL )
+            {
+                DPRINTF("extent %d -- 'start_sector' is not "
+                        "in the dictionary.", i);
                 goto fail;
-            extents[i].nr_sectors = PyLong_AsUnsignedLongLong(obj);        
+            }
+            if ( PyInt_Check(obj) )
+            {
+                extents[i].start_sector = PyInt_AsLong(obj);
+            }
+            else if ( PyLong_Check(obj) )
+            {
+                extents[i].start_sector = PyLong_AsUnsignedLongLong(obj);
+            }
+            else
+            {
+                DPRINTF("extent %d -- 'start_sector' is not "
+                        "an int or long.", i);
+                goto fail;
+            }
+
+            if ( (obj = PyDict_GetItemString(dict, "nr_sectors")) == NULL )
+            {
+                DPRINTF("extent %d -- 'nr_sectors' is not "
+                        "in the dictionary.", i);
+                goto fail;
+            }
+            if ( PyInt_Check(obj) )
+            {
+                extents[i].nr_sectors = PyInt_AsLong(obj);
+            }
+            else if ( PyLong_Check(obj) )
+            {
+                extents[i].nr_sectors = PyLong_AsUnsignedLongLong(obj);
+            }
+            else
+            {
+                DPRINTF("extent %d -- 'nr_sectors' is not "
+                        "an int or long.", i);
+                goto fail;
+            }
         }
     }
 
@@ -542,13 +672,21 @@ static PyObject *pyxc_vbd_getextents(PyObject *self,
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "Li", kwd_list, 
                                       &dom, &vbd) )
+    {
+        DPRINTF("could not parse parameter list.");
         return NULL;
+    }
 
     extents = malloc(MAX_EXTENTS * sizeof(xc_vbdextent_t));
     if ( extents == NULL )
+    {
+        DPRINTF("out of memory.");
         max_extents = 0;
+    }
     else
+    {
         max_extents = MAX_EXTENTS;
+    }
 
     nr_extents = xc_vbd_getextents(xc->xc_handle, dom, vbd, max_extents,
                                    extents, NULL);
@@ -593,13 +731,21 @@ static PyObject *pyxc_vbd_probe(PyObject *self,
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|Li", kwd_list, 
                                       &dom, &max_vbds) )
+    {
+        DPRINTF("could not parse parameter list.");
         return NULL;
+    }
 
     info = malloc(max_vbds * sizeof(xc_vbd_t));
     if ( info == NULL )
+    {
+        DPRINTF("out of memory.");
         nr_vbds = 0;
+    }
     else
+    {
         nr_vbds = xc_vbd_probe(xc->xc_handle, dom, max_vbds, info);
+    }
 
     list = PyList_New(nr_vbds);
     for ( i = 0; i < nr_vbds; i++ )
@@ -632,7 +778,10 @@ static PyObject *pyxc_readconsolering(PyObject *self,
     static char *kwd_list[] = { "clear", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|i", kwd_list, &clear) )
+    {
+        DPRINTF("could not parse parameter list.");
         return NULL;
+    }
 
     ret = xc_readconsolering(xc->xc_handle, str, sizeof(str), clear);
 
