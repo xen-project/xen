@@ -6,6 +6,7 @@
 #include <asm/bitops.h>
 #include <xeno/list.h>
 #include <xeno/kdev_t.h>
+#include <xeno/sched.h>
 
 /* Some defines from fs.h that may actually be useful to the blkdev layer. */
 #define READ 0
@@ -13,6 +14,9 @@
 #define READA 2
 #define BLOCK_SIZE_BITS 10
 #define BLOCK_SIZE (1<<BLOCK_SIZE_BITS)
+
+extern void init_blkdev_info(struct task_struct *);
+extern void destroy_blkdev_info(struct task_struct *);
 
 extern int unregister_blkdev(unsigned int, const char *);
 extern int invalidate_device(kdev_t, int);

@@ -76,6 +76,7 @@ struct task_struct {
 
     /* Block I/O */
     blk_ring_t *blk_ring_base;
+    struct list_head blkdev_list;
     spinlock_t blk_ring_lock;
 
     int has_cpu, policy, counter;

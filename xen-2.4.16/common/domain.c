@@ -15,6 +15,7 @@
 #include <asm/flushtlb.h>
 #include <asm/msr.h>
 #include <xeno/multiboot.h>
+#include <xeno/blkdev.h>
 
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED)
 #define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED|_PAGE_DIRTY)
@@ -48,10 +49,7 @@ struct task_struct *do_newdomain(unsigned int dom_id, unsigned int cpu)
     memset(p->shared_info, 0, PAGE_SIZE);
     SHARE_PFN_WITH_DOMAIN(virt_to_page(p->shared_info), dom_id);
 
-    if ( sizeof(*p->blk_ring_base) > PAGE_SIZE ) BUG();
-    p->blk_ring_base = (blk_ring_t *)get_free_page(GFP_KERNEL);
-    memset(p->blk_ring_base, 0, PAGE_SIZE);
-    SHARE_PFN_WITH_DOMAIN(virt_to_page(p->blk_ring_base), dom_id);
+    init_blkdev_info(p);
 
     SET_GDT_ENTRIES(p, DEFAULT_GDT_ENTRIES);
     SET_GDT_ADDRESS(p, DEFAULT_GDT_ADDRESS);
@@ -216,8 +214,7 @@ void release_task(struct task_struct *p)
     }
     if ( p->mm.perdomain_pt ) free_page((unsigned long)p->mm.perdomain_pt);
 
-    UNSHARE_PFN(virt_to_page(p->blk_ring_base));
-    free_page((unsigned long)p->blk_ring_base);
+    destroy_blkdev_info(p);
 
     UNSHARE_PFN(virt_to_page(p->shared_info));
     free_page((unsigned long)p->shared_info);
