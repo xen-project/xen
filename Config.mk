@@ -1,7 +1,14 @@
 # -*- mode: Makefile; -*-
+
 # Currently supported architectures: x86_32, x86_64
 XEN_COMPILE_ARCH    ?= $(shell uname -m | sed -e s/i.86/x86_32/)
 XEN_TARGET_ARCH     ?= $(XEN_COMPILE_ARCH)
+
+# Set ARCH/SUBARCH appropriately.
+override COMPILE_SUBARCH := $(XEN_COMPILE_ARCH)
+override TARGET_SUBARCH  := $(XEN_TARGET_ARCH)
+override COMPILE_ARCH    := $(patsubst x86%,x86,$(XEN_COMPILE_ARCH))
+override TARGET_ARCH     := $(patsubst x86%,x86,$(XEN_TARGET_ARCH))
 
 #
 # Tool configuration Makefile fragment

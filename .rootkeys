@@ -209,8 +209,8 @@
 40f56237utH41NPukqHksuNf29IC9A linux-2.6.11-xen-sparse/arch/xen/Kconfig.drivers
 40f56237penAAlWVBVDpeQZNFIg8CA linux-2.6.11-xen-sparse/arch/xen/Makefile
 40f56237JTc60m1FRlUxkUaGSQKrNw linux-2.6.11-xen-sparse/arch/xen/boot/Makefile
-40f56237hRxbacU_3PdoAl6DjZ3Jnw linux-2.6.11-xen-sparse/arch/xen/configs/xen0_defconfig
-40f56237wubfjJKlfIzZlI3ZM2VgGA linux-2.6.11-xen-sparse/arch/xen/configs/xenU_defconfig
+40f56237hRxbacU_3PdoAl6DjZ3Jnw linux-2.6.11-xen-sparse/arch/xen/configs/xen0_defconfig_x86_32
+40f56237wubfjJKlfIzZlI3ZM2VgGA linux-2.6.11-xen-sparse/arch/xen/configs/xenU_defconfig_x86_32
 40f56237Mta0yHNaMS_qtM2rge0qYA linux-2.6.11-xen-sparse/arch/xen/i386/Kconfig
 40f56238u2CJdXNpjsZgHBxeVyY-2g linux-2.6.11-xen-sparse/arch/xen/i386/Makefile
 40f56238eczveJ86k_4hNxCLRQIF-g linux-2.6.11-xen-sparse/arch/xen/i386/kernel/Makefile
