@@ -314,7 +314,7 @@ asmlinkage void schedule(void)
 
     now = NOW();
 
-    /* remove timer, if till on list  */
+    /* remove timer, if still on list  */
     rem_ac_timer(&schedule_data[this_cpu].s_timer);
 
     /* deschedule the current domain */
@@ -382,7 +382,6 @@ asmlinkage void schedule(void)
     next_prime_evt = 0xffffffff;
     min_avt        = 0xffffffff;    /* to calculate svt */
 
-
     list_for_each(tmp, &schedule_data[this_cpu].runqueue) {
         p = list_entry(tmp, struct task_struct, run_list);
         if (p->evt < next_evt) {
@@ -406,6 +405,22 @@ asmlinkage void schedule(void)
     /* update system virtual time  */
     if (min_avt != 0xffffffff) schedule_data[this_cpu].svt = min_avt;
 
+    /* check for virtual time overrun on this cpu */
+    if (schedule_data[this_cpu].svt >= 0xf0000000) {
+        u_long t_flags; 
+        write_lock_irqsave(&tasklist_lock, t_flags); 
+        p = &idle0_task;
+        do {
+            if (p->processor == this_cpu && !is_idle_task(p)) {
+                p->evt -= 0xe0000000;
+                p->avt -= 0xe0000000;
+            }
+        } while ( (p = p->next_task) != &idle0_task );
+        write_unlock_irqrestore(&tasklist_lock, t_flags); 
+        schedule_data[this_cpu].svt -= 0xe0000000;
+    }
+
+    /* work out time for next run through scheduler */
     if (is_idle_task(next)) {
         r_time = ctx_allow;
         goto sched_done;
@@ -449,6 +464,7 @@ asmlinkage void schedule(void)
 
     spin_unlock_irq(&schedule_data[this_cpu].lock);
 
+    /* done, switch tasks */
     if ( unlikely(prev == next) )
     {
         /* We won't go through the normal tail, so do this by hand */

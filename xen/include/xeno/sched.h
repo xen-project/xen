@@ -115,8 +115,8 @@ struct task_struct
     s_time_t wokenup;               /* time domain got woken up */
 
     unsigned long mcu_advance;      /* inverse of weight */
-    s32  avt;                       /* actual virtual time */
-    s32  evt;                       /* effective virtual time */
+    u32  avt;                       /* actual virtual time */
+    u32  evt;                       /* effective virtual time */
     int  warpback;                  /* warp?  */
     long warp;                      /* virtual time warp */
     long warpl;                     /* warp limit */
