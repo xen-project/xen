@@ -28,6 +28,7 @@
 3f05631dswxJX_TpcuG6tBstyHSetg tools/control/src/org/xenoserver/cmdline/ParsePhysicalGrant.java
 3f05631dMY7PMkwSY7zBFelGJ8goVg tools/control/src/org/xenoserver/cmdline/ParsePhysicalList.java
 3f05631dYDFXv6mwNFAgz3ta9kShJA tools/control/src/org/xenoserver/cmdline/ParsePhysicalRevoke.java
+3f5f3d95BlaPZ2JHfpjHuHscx2SJow tools/control/src/org/xenoserver/cmdline/ParseScript.java
 3f0bdfabfXM4tMbvmV06di5U-5FfqA tools/control/src/org/xenoserver/cmdline/ParseVbdCreate.java
 3f0bec93F_VDIcn9oeXwJYwydX20kg tools/control/src/org/xenoserver/cmdline/ParseVbdShow.java
 3f098761TRsbDk9woUM846Q6_F7EmA tools/control/src/org/xenoserver/cmdline/ParseVdCreate.java
