@@ -8,17 +8,17 @@
  *	later.
  */
 
+#include <xen/config.h>
 #include <xen/irq.h>
 #include <xen/sched.h>
 #include <xen/delay.h>
+#include <xen/perfc.h>
 #include <xen/spinlock.h>
 #include <asm/smp.h>
 #include <asm/mc146818rtc.h>
 #include <asm/flushtlb.h>
 #include <asm/smpboot.h>
 #include <asm/hardirq.h>
-
-#ifdef CONFIG_SMP
 
 /*
  *	Some notes on x86 processor bugs affecting SMP operation:
@@ -420,5 +420,3 @@ asmlinkage void smp_call_function_interrupt(void)
         atomic_inc(&call_data->finished);
     }
 }
-
-#endif /* CONFIG_SMP */

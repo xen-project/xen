@@ -89,19 +89,9 @@ struct exec_domain
     struct arch_exec_domain arch;
 };
 
-/*
-** SMH: do_mmu_update() grabs big_lock and subsequently can fault 
-** on map_ldt_shadow_page(), enter do_page_fault() and then deadlock 
-** trying to reacquire big_lock. A temporary fix is to make big_lock
-** recursive; overall probably needs more thought. 
-*/
-#if 0
-#define LOCK_BIGLOCK(_d) spin_lock(&(_d)->big_lock)
-#define UNLOCK_BIGLOCK(_d) spin_unlock(&(_d)->big_lock)
-#else
+/* Per-domain lock can be recursively acquired in fault handlers. */
 #define LOCK_BIGLOCK(_d) spin_lock_recursive(&(_d)->big_lock)
 #define UNLOCK_BIGLOCK(_d) spin_unlock_recursive(&(_d)->big_lock)
-#endif
 
 struct domain
 {

@@ -24,11 +24,12 @@
 #include <xen/init.h>
 #include <xen/types.h>
 #include <xen/lib.h>
-#include <asm/page.h>
+#include <xen/perfc.h>
 #include <xen/spinlock.h>
 #include <xen/slab.h>
 #include <xen/irq.h>
 #include <asm/domain_page.h>
+#include <asm/page.h>
 
 /*
  * Comma-separated list of hexadecimal page numbers containing bad bytes.

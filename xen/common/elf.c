@@ -9,6 +9,7 @@
 #include <xen/lib.h>
 #include <xen/mm.h>
 #include <xen/elf.h>
+#include <xen/sched.h>
 
 #ifdef CONFIG_X86
 #define FORCE_XENELF_IMAGE 1

@@ -22,6 +22,7 @@ typedef int64_t            s64;
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/lib.h>
+#include <xen/mm.h>
 #include <asm/regs.h>
 #endif
 #include <asm-x86/x86_emulate.h>
