@@ -1,0 +1,23 @@
+
+xen-clone
+
+usage: xen-clone <bk_repository> <dest_dir> <orig_linux_dir>
+
+This script can be used to 'bk clone' and build a xen and xenolinux image 
+from the master BK repository, either from a local copy, or from the
+public repository bk://xen.bkbits.net/xeno.bk
+
+In many circumstances, it can be invoked without any arguments and
+just `does the right thing'.
+
+The default dest_dir is 'xeno-clone', relative to the current directory.
+
+To build xenolinux, the script needs a pristine copy of the equivalent 
+linux tree. The script looks in a couple of places on the local filesystem, 
+then tries a download from from ftp://ftp.kernel.org/pub/linux/kernel/v2.4/
+
+The script also tries a number of optional UCCL site-specific operations
+that configure the test machine booting infrastructure to boot the 
+resultant image.
+
+

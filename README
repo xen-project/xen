@@ -1,0 +1,211 @@
+#############################
+ __  __            _   ___  
+ \ \/ /___ _ __   / | / _ \ 
+  \  // _ \ '_ \  | || | | |
+  /  \  __/ | | | | || |_| |
+ /_/\_\___|_| |_| |_(_)___/ 
+                                                   
+#############################
+
+University of Cambridge Computer Laboratory
+31 Aug 2003
+
+http://www.cl.cam.ac.uk/netos/xen
+
+About the Xen Virtual Machine Monitor
+=====================================
+
+"Xen" is a Virtual Machine Monitor (VMM) developed by the Systems
+Research Group of the University of Cambridge Computer Laboratory, as
+part of the UK-EPSRC funded XenoServers project.
+
+The XenoServers project aims to provide a "public infrastructure for
+global distributed computing", and Xen plays a key part in that,
+allowing us to efficiently partition a single machine to enable
+multiple independent clients to run their operating systems and
+applications in an environment providing protection, resource
+isolation and accounting.  The project web page contains further
+information along with pointers to papers and technical reports:
+http://www.cl.cam.ac.uk/xeno
+
+Xen has since grown into a project in its own right, enabling us to
+investigate interesting research issues regarding the best techniques
+for virtualizing resources such as the CPU, memory, disk and network.
+The project has been bolstered by support from Intel Research
+Cambridge, who are now working closely with us. We've now also
+received support from Microsoft Research Cambridge to port Windows XP
+to run on Xen.
+
+Xen enables multiple operating system images to be run simultaneously
+on the same hardware with very low performance overhead --- much lower
+than commercial offerings on the same x86 platform.
+
+This is achieved by requiring OSs to be specifically ported to run on
+Xen, rather than allowing unmodified OS images to be used. Crucially,
+only the OS needs to be changed -- all of the user-level application
+binaries, libraries etc can run unmodified. Hence, the modified OS
+kernel can typically just be dropped into any existing OS distribution
+or installation.
+
+Xen currently runs on the x86 architecture, but could in principle be
+ported to other CPUs. In fact, it would have been rather easier to
+write Xen for pretty much any other architecture as x86 doesn't do us
+any favours at all. The best description of Xen's deign,
+implementation and performance is contained in our October 2003 SOSP
+paper: http://www.cl.cam.ac.uk/netos/papers/2003-xensosp.pdf
+
+We have been working on porting 3 different operating systems to run
+on Xen: Linux 2.4, Windows XP, and NetBSD.
+
+The Linux 2.4 port (currently Linux 2.4.22) works very well -- we
+regularly use it to host complex applications such as PostgreSQL,
+Apache, BK servers etc. It runs all applications we've tried.  We
+refer to our version of Linux ported to run on Xen as "XenoLinux",
+through really it's just standard Linux ported to a new virtual CPU
+architecture that we call xeno-x86 (abbreviated to just "xeno").
+
+Unfortunately, the NetBSD port has stalled due to lack of man
+power. We believe most of the hard stuff has already been done, and
+are hoping to get the ball rolling again soon. In hindsight, a FreeBSD
+4 port might have been more useful to the community. 
+
+The Windows XP port is nearly finished. It's running user space
+applications and is generally in pretty good shape thanks to some hard
+work by the team over the summer.  Of course, there are issues with
+releasing this code to others.  We should be able to release the
+source and binaries to anyone else that's signed the Microsoft
+academic source license, which these days has very reasonable
+terms. We are in discussions with Microsoft about the possibility of
+being able to make binary releases to a larger user
+community. Obviously, there are issues with product activation in this
+environment and such like, which need to be thought through.
+
+So, for the moment, you only get to run multiple copies of Linux on
+Xen, but we hope this will change before too long.  Even running
+multiple copies of the same OS can be very useful, as it provides a
+means of containing faults to one OS image, and also for providing
+performance isolation between the various OS, enabling you to either
+restrict, or reserve resources for, particular VM instances.
+
+Its also useful for development -- each version of Linux can have
+different patches applied, enabling different kernels to be tried
+out. For example, the "vservers" patch used by PlanetLab applies
+cleanly to our ported version of Linux.
+
+We've successfully booted over 128 copies of Linux on the same machine
+(a dual CPU hyperthreaded Xeon box) but we imagine that it would be
+more normal to use some smaller number, perhaps 10-20.
+
+Known limitations and work in progress
+======================================
+
+The "xenctl" tool is still rather clunky and not very user
+friendly. In particular, it should have an option to create and start
+a domain with all the necessary parameters set from a named xml file.
+
+The java xenctl tool is really just a frontend for a bunch of C tools
+named xi_* that do the actual work of talking to Xen and setting stuff
+up. Some local users prefer to drive the xi_ tools directly, typically
+from simple shell scripts. These tools are even less user friendly
+than xenctl but its arguably clearer what's going on.
+
+There's also a web based interface for controlling domains that uses
+apache/tomcat, but it has fallen out of sync with respect to the
+underlying tools, so doesn't always work as expected and needs to be
+fixed.
+
+The current Virtual Firewall Router (VFR) implementation in the
+snapshot tree is very rudimentary, and in particular, lacks the IP
+port-space sharing across domains that we've proposed that promises to
+provide a better alternative to NAT.  There's a complete new
+implementation under development which also supports much better
+logging and auditing support.  The current network scheduler is just
+simple round-robin between domains, without any rate limiting or rate
+guarantees. Dropping in a new scheduler should be straightforward, and
+is planned as part of the VFRv2 work package.
+
+Another area that needs further work is the interface between Xen and
+domain0 user space where the various XenoServer control daemons run.
+The current interface is somewhat ad-hoc, making use of various
+/proc/xeno entries that take a random assortment of arguments. We
+intend to reimplement this to provide a consistent means of feeding
+back accounting and logging information to the control daemon.
+
+There's also a number of memory management hacks that didn't make this
+release: We have plans for a "universal buffer cache" that enables
+otherwise unused system memory to be used by domains in a read-only
+fashion. We also have plans for inter-domain shared-memory to enable
+high-performance bulk transport for cases where the usual internal
+networking performance isn't good enough (e.g. communication with a
+internal file server on another domain).
+
+We also have plans to implement domain suspend/resume-to-file. This is
+basically an extension to the current domain building process to
+enable domain0 to read out all of the domain's state and store it in a
+file. There are complications here due to Xen's para-virtualised
+design, whereby since the physical machine memory pages available to
+the guest OS are likely to be different when the OS is resumed, we
+need to re-write the page tables appropriately. 
+
+We have the equivalent of balloon driver functionality to control
+domain's memory usage, enabling a domain to give back unused pages to
+Xen. This needs properly documenting, and perhaps a way of domain0
+signalling to a domain that it requires it to reduce its memory
+footprint, rather than just the domain volunteering.
+
+The current disk scheduler is rather simplistic (batch round robin),
+and could be replaced by e.g. Cello if we have QoS isolation
+problems. For most things it seems to work OK, but there's currently
+no service differentiation or weighting.
+
+Currently, although Xen runs on SMP and SMT (hyperthreaded) machines,
+the scheduling is far from smart -- domains are currently statically
+assigned to a CPU when they are created (in a round robin fashion).
+The scheduler needs to be modified such that before going idle a
+logical CPU looks for work on other run queues (particularly on the
+same physical CPU). 
+
+Xen currently only supports uniprocessor guest OSes. We have designed
+the Xen interface with MP guests in mind, and plan to build an MP
+Linux guest in due course. Basically, an MP guest would consist of
+multiple scheduling domains (one per CPU) sharing a single memory
+protection domain. The only extra complexity for the Xen VM system is
+ensuring that when a page transitions from holding a page table or
+page directory to a write-able page, we must ensure that no other CPU
+still has the page in its TLB to ensure memory system integrity.  One
+other issue for supporting MP guests is that we'll need some sort of
+CPU gang scheduler, which will require some research.
+
+
+Hardware support
+================
+
+Xen is intended to be run on server-class machines, and the current
+list of supported hardware very much reflects this, avoiding the need
+for us to write drivers for "legacy" hardware.
+
+Xen requires a "P6" or newer processor (e.g. Pentium Pro, Celeron,
+Pentium II, Pentium III, Pentium IV, Xeon, AMD Athlon, AMD Duron).
+Multiprocessor machines are supported, and we also have basic support
+for HyperThreading (SMT), though this remains a topic for ongoing
+research. We're also looking at an AMD x86_64 port (though it should
+run on Opterons in 32 bit mode just fine).
+
+Xen can currently use up to 4GB of memory. Its possible for x86
+machines to address more than that (64GB), but it requires using a
+different page table format (3-level rather than 2-level) that we
+currently don't support. Adding 3-level PAE support wouldn't be
+difficult, but we'd also need to add support to all the guest
+OSs. Volunteers welcome!
+
+We currently support a relative modern set of network cards: Intel
+e1000, Broadcom BCM 57xx (tg3), 3COM 3c905 (3c59x). Adding support for
+other NICs that support hardware DMA scatter/gather from half-word
+aligned addresses is relatively straight forward, by porting the
+equivalent Linux driver. Drivers for a number of other older cards
+have recently been added [pcnet32, e100, tulip], but are untested and
+not recommended.
+
+
+Ian Pratt
+9 Sep 2003

@@ -1,0 +1,78 @@
+#!/bin/sh -x
+
+# usage: xen-clone bk_repository dest_dir orig_linux_dir
+# 
+# this script contains some CL site specific details, but can easily be adapted
+#
+
+# test which site we're on
+[ -d /usr/groups/xeno/ -a -d /usr/groups/srgboot ] && SITE=UCCL
+
+case "$SITE" in
+UCCL)
+	BK_REP=${1:-/usr/groups/xeno/BK/xeno.bk}
+	# BK_REP=${1:-xeno-master/xeno.bk}
+	LINUX_DIR=${3:-/usr/groups/xeno/archive/}
+	;;
+*)
+	BK_REP=${1:-bk://xen.bkbits.net/xeno.bk}
+	# BK_REP=${1:-ssh://xen@xen.bkbits.net/xeno.bk}
+	LINUX_DIR=${3:-..}
+;;
+esac
+
+DEST_DIR=${2:-xeno-clone}
+DEST_BK_REP=`basename ${BK_REP}`
+
+echo usage: xen-clone bk_repository dest_dir orig_linux_dir
+echo Source BK Repository : ${BK_REP}
+echo Destination Dir/Repository : ${DEST_DIR}/${DEST_BK_REP}
+echo Pristine Linux Source directory : ${LINUX_DIR}
+
+mkdir -p ${DEST_DIR}
+cd ${DEST_DIR}
+TOP=`/bin/pwd`
+
+# site-specific set up of installation directories
+case "$SITE" in
+CL)
+	PATH=$PATH:/usr/groups/xeno/build_tools/bin
+	mkdir -p install/boot
+	cd install/boot
+	ln -sf ../../xeno-roots/roots .
+	ln -sf ../../xeno-roots/usr .
+	ln -sf /usr/groups/srgboot/${USER}/xenoboot.sh .
+	ln -sf `pwd` /usr/groups/srgboot/${USER}/${DEST_DIR}
+	cd ../..
+	;;
+esac
+
+# clone the master repository (now checked-out by default)
+bk clone ${BK_REP} ${DEST_BK_REP}
+
+# identify this version of linux
+LINUX_VER=`/bin/ls -ld ${DEST_BK_REP}/xenolinux-sparse | sed -e 's!^.*xenolinux-\([0-9.]\+\)-sparse!\1!'`
+
+# copy in the master Linux tree for this kernel
+tar -zxf ${LINUX_DIR}/linux-${LINUX_VER}.tar.gz || tar -zxf ${LINUX_DIR}/linux-${LINUX_VER}.tgz || cp -a ${LINUX_DIR}/linux-${LINUX_VER} . ||  wget ftp://ftp.kernel.org/pub/linux/kernel/v2.4/linux-${LINUX_VER}.tar.gz -O- | tar -zxf - || exit -1
+
+# build and install Xen and tools
+cd ${DEST_BK_REP}
+make install
+
+# Turn linux into xenolinux then build it
+cd xenolinux-${LINUX_VER}-sparse
+./mkbuildtree ../../linux-${LINUX_VER}
+cd ../..
+mv linux-${LINUX_VER} xenolinux-${LINUX_VER}
+cd xenolinux-${LINUX_VER}
+export ARCH=xeno
+export INSTALL_MOD_PATH=${TOP}/install
+make oldconfig
+make dep
+make bzImage
+make install
+make modules
+make modules_install
+cd ..
+
