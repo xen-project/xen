@@ -1,5 +1,5 @@
 
-MAJOR    = 1.3
+MAJOR    = 2.0
 MINOR    = 0
 SONAME   = libxc.so.$(MAJOR)
 
