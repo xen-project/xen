@@ -18,6 +18,14 @@ class SrvDomain(SrvDir):
         self.xd = XendDomain.instance()
         self.xconsole = XendConsole.instance()
 
+    def op_configure(self, op, req):
+        fn = FormFn(self.xd.domain_configure,
+                    [['dom', 'int'],
+                     ['config', 'sxp']])
+        val = fn(req.args, {'dom': self.dom.id})
+        #todo: may need to add ok and err callbacks.
+        return val
+
     def op_unpause(self, op, req):
         val = self.xd.domain_unpause(self.dom.id)
         return val
@@ -27,7 +35,6 @@ class SrvDomain(SrvDir):
         return val
 
     def op_shutdown(self, op, req):
-        #val = self.xd.domain_shutdown(self.dom.id)
         fn = FormFn(self.xd.domain_shutdown,
                     [['dom', 'int'],
                      ['reason', 'str']])
@@ -202,8 +209,22 @@ class SrvDomain(SrvDir):
         req.write('<form method="post" action="%s">' % req.prePathURL())
         req.write('<input type="submit" name="op" value="unpause">')
         req.write('<input type="submit" name="op" value="pause">')
-        req.write('<input type="submit" name="op" value="shutdown">')
         req.write('<input type="submit" name="op" value="destroy">')
+        req.write('</form>')
+
+        req.write('<form method="post" action="%s">' % req.prePathURL())
+        req.write('<input type="submit" name="op" value="shutdown">')
+        req.write('<input type="radio" name="reason" value="poweroff" checked>Poweroff<br>')
+        req.write('<input type="radio" name="reason" value="halt">Halt<br>')
+        req.write('<input type="radio" name="reason" value="reboot">Reboot<br>')
+        req.write('</form>')
+        
+        req.write('<form method="post" action="%s">' % req.prePathURL())
+        req.write('<br><input type="submit" name="op" value="save">')
+        req.write('To file: <input type="text" name="file">')
+        req.write('</form>')
+        
+        req.write('<form method="post" action="%s">' % req.prePathURL())
         req.write('<br><input type="submit" name="op" value="migrate">')
-        req.write('To: <input type="text" name="destination">')
+        req.write('To host: <input type="text" name="destination">')
         req.write('</form>')

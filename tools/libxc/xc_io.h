@@ -1,6 +1,7 @@
 #ifndef __XC_XC_IO_H__
 #define __XC_XC_IO_H__
 
+#include <errno.h>
 #include "xc_private.h"
 #include "iostream.h"
 
@@ -12,7 +13,20 @@ typedef struct XcIOContext {
     IOStream *err;
     char *vmconfig;
     int vmconfig_n;
+    int (*suspend)(u32 domain, void *data);
+    void *data;
 } XcIOContext;
+
+static inline int xcio_suspend_domain(XcIOContext *ctxt){
+    int err = 0;
+
+    if(ctxt->suspend){
+        err = ctxt->suspend(ctxt->domain, ctxt->data);
+    } else {
+        err = -EINVAL;
+    }
+    return err;
+}
 
 static inline int xcio_read(XcIOContext *ctxt, void *buf, int n){
     int rc;

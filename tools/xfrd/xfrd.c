@@ -93,22 +93,26 @@ Sxpr oxfr_configure; // (xfr.configure <vmid> <vmconfig>)
 Sxpr oxfr_err;       // (xfr.err <code>)
 Sxpr oxfr_hello;     // (xfr.hello <major> <minor>)
 Sxpr oxfr_migrate;   // (xfr.migrate <vmid> <vmconfig> <host> <port>)
-Sxpr oxfr_ok;        // (xfr.ok <value>)
+Sxpr oxfr_migrate_ok;// (xfr.migrate.ok <value>)
 Sxpr oxfr_progress;  // (xfr.progress <percent> <rate: kb/s>)
 Sxpr oxfr_save;      // (xfr.save <vmid> <vmconfig> <file>)
-Sxpr oxfr_suspend;   // (xfr.suspend <vmid>)
+Sxpr oxfr_save_ok;   // (xfr.save.ok)
+Sxpr oxfr_vm_suspend;// (xfr.vm.suspend <vmid>)
 Sxpr oxfr_xfr;       // (xfr.xfr <vmid>)
+Sxpr oxfr_xfr_ok;    // (xfr.xfr.ok <vmid>)
 
 void xfr_init(void){
-    oxfr_configure = intern("xfr.configure");
-    oxfr_err       = intern("xfr.err");
-    oxfr_hello     = intern("xfr.hello");
-    oxfr_migrate   = intern("xfr.migrate");
-    oxfr_ok        = intern("xfr.ok");
-    oxfr_progress  = intern("xfr.progress");
-    oxfr_save      = intern("xfr.save");
-    oxfr_suspend   = intern("xfr.suspend");
-    oxfr_xfr       = intern("xfr.xfr");
+    oxfr_configure      = intern("xfr.configure");
+    oxfr_err            = intern("xfr.err");
+    oxfr_hello          = intern("xfr.hello");
+    oxfr_migrate        = intern("xfr.migrate");
+    oxfr_migrate_ok     = intern("xfr.migrate.ok");
+    oxfr_progress       = intern("xfr.progress");
+    oxfr_save           = intern("xfr.save");
+    oxfr_save_ok        = intern("xfr.save.ok");
+    oxfr_vm_suspend     = intern("xfr.vm.suspend");
+    oxfr_xfr            = intern("xfr.xfr");
+    oxfr_xfr_ok         = intern("xfr.xfr.ok");
 }
 
 #ifndef TRUE
@@ -518,11 +522,27 @@ int xfr_send_xfr(Conn *conn, uint32_t vmid){
     return (err < 0 ? err : 0);
 }
 
-int xfr_send_ok(Conn *conn, uint32_t vmid){
+int xfr_send_xfr_ok(Conn *conn, uint32_t vmid){
     int err = 0;
 
     err = IOStream_print(conn->out, "(%s %d)",
-                         atom_name(oxfr_ok), vmid);
+                         atom_name(oxfr_xfr_ok), vmid);
+    return (err < 0 ? err : 0);
+}
+
+int xfr_send_migrate_ok(Conn *conn, uint32_t vmid){
+    int err = 0;
+
+    err = IOStream_print(conn->out, "(%s %d)",
+                         atom_name(oxfr_migrate_ok), vmid);
+    return (err < 0 ? err : 0);
+}
+
+int xfr_send_save_ok(Conn *conn){
+    int err = 0;
+
+    err = IOStream_print(conn->out, "(%s)",
+                         atom_name(oxfr_save_ok));
     return (err < 0 ? err : 0);
 }
 
@@ -530,8 +550,22 @@ int xfr_send_suspend(Conn *conn, uint32_t vmid){
     int err = 0;
 
     err = IOStream_print(conn->out, "(%s %d)",
-                         atom_name(oxfr_suspend), vmid);
+                         atom_name(oxfr_vm_suspend), vmid);
     return (err < 0 ? err : 0);
+}
+
+/** Suspend a vm on behalf of save/migrate.
+ */
+int xfr_vm_suspend(Conn *xend, uint32_t vmid){
+    int err = 0;
+    dprintf("> vmid=%u\n", vmid);
+    err = xfr_send_suspend(xend, vmid);
+    if(err) goto exit;
+    IOStream_flush(xend->out);
+    err = xfr_response(xend);
+  exit:
+    dprintf("< err=%d\n", err);
+    return err;
 }
 
 /** Get vm state. Send transfer message.
@@ -561,7 +595,7 @@ int xfr_send_state(XfrState *state, Conn *xend, Conn *peer){
         int errcode;
         err = intof(sxpr_childN(sxpr, 0, ONONE), &errcode);
         if(!err) err = errcode;
-    } else if(sxpr_elementp(sxpr, oxfr_ok)){
+    } else if(sxpr_elementp(sxpr, oxfr_xfr_ok)){
         // Ok - get the new domain id.
         err = intof(sxpr_childN(sxpr, 0, ONONE), &state->vmid_new);
         xfr_error(peer, err);
@@ -592,7 +626,7 @@ int xfr_send_done(XfrState *state, Conn *xend){
         err = xfr_error(xend, first_err);
     } else {
         // Report new domain id to xend.
-        err = xfr_send_ok(xend, state->vmid_new);
+        err = xfr_send_migrate_ok(xend, state->vmid_new);
     }  
 
     XfrState_set_err(state, err);
@@ -677,17 +711,25 @@ int xfr_save(Args *args, XfrState *state, Conn *xend, char *file){
     int err = 0;
     IOStream *io = NULL;
 
+    dprintf("> file=%s\n", file);
     io = file_stream_fopen(file, "wb");
     if(!io){
+        dprintf("> Failed to open %s\n", file);
         err = -EIO;
         goto exit;
     }
     err = xen_domain_snd(xend, io, state->vmid, state->vmconfig, state->vmconfig_n);
+    if(err){
+        err = xfr_error(xend, err);
+    } else {
+        err = xfr_send_save_ok(xend);
+    }
   exit:
     if(io){
         IOStream_close(io);
         IOStream_free(io);
     }
+    dprintf("< err=%d\n", err);
     return err;
 }
 
@@ -709,7 +751,7 @@ int xfr_recv(Args *args, XfrState *state, Conn *peer){
     if(err) goto exit;
 
     // Report new domain id to peer.
-    err = xfr_send_ok(peer, state->vmid_new);
+    err = xfr_send_xfr_ok(peer, state->vmid_new);
     if(err) goto exit;
     // Get the final ok.
     err = xfr_response(peer);

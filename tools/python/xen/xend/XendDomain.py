@@ -311,6 +311,42 @@ class XendDomain:
             return dominfo
         deferred.addCallback(fn)
         return deferred
+
+    def domain_configure(self, id, config):
+        """Configure an existing domain. This is intended for internal
+        use by domain restore and migrate.
+
+        @param id:     domain id
+        @param config: configuration
+        @return: deferred
+        """
+        dom = int(id)
+        dominfo = self.domain_get(dom)
+        if not dominfo:
+            raise ValueError("Invalid domain: " + str(id))
+        if dominfo.config:
+            raise ValueError("Domain already configured: " + str(id))
+        def fn(dominfo):
+            self._add_domain(dominfo.id, dominfo)
+            return dominfo
+        deferred = dominfo.construct(config)
+        deferred.addCallback(fn)
+        return deferred
+    
+    def domain_restore(self, src, progress=0):
+        """Restore a domain from file.
+
+        @param src:      source file
+        @param progress: output progress if true
+        @return: deferred
+        """
+        
+        def fn(dominfo):
+            self._add_domain(dominfo.id, dominfo)
+            return dominfo
+        deferred = XendDomainInfo.vm_restore(src, progress=progress)
+        deferred.addCallback(fn)
+        return deferred
     
     def domain_get(self, id):
         """Get up-to-date info about a domain.
@@ -345,6 +381,8 @@ class XendDomain:
          - poweroff: domain will restart if has autorestart set.
          - reboot: domain will restart.
          - halt: domain will not restart (even if has autorestart set).
+
+         Returns immediately.
 
         @param id:     domain id
         @param reason: shutdown type: poweroff, reboot, suspend, halt
@@ -443,7 +481,7 @@ class XendDomain:
 
     def domain_destroy(self, id):
         """Terminate domain immediately.
-        Camcels any restart for the domain.
+        Cancels any restart for the domain.
 
         @param id: domain id
         """
@@ -456,6 +494,7 @@ class XendDomain:
         """Start domain migration.
 
         @param id: domain id
+        @return: deferred
         """
         # Need a cancel too?
         # Don't forget to cancel restart for it.
@@ -464,41 +503,16 @@ class XendDomain:
         return xmigrate.migrate_begin(dom, dst)
 
     def domain_save(self, id, dst, progress=0):
-        """Save domain state to file, destroy domain on success.
-        Leave domain running on error.
+        """Start saving a domain to file.
 
         @param id:       domain id
         @param dst:      destination file
         @param progress: output progress if true
+        @return: deferred
         """
         dom = int(id)
-        dominfo = self.domain_get(id)
-        if not dominfo:
-            return -1
-        vmconfig = sxp.to_string(dominfo.sxpr())
-        self.domain_pause(id)
-        eserver.inject('xend.domain.save', id)
-        try:
-            rc = xc.linux_save(dom=dom, state_file=dst,
-                               vmconfig=vmconfig, progress=progress)
-        except:
-            rc = -1
-        if rc == 0:
-            self.domain_destroy(id)
-        else:
-            self.domain_unpause(id)
-        return rc
-    
-    def domain_restore(self, src, progress=0):
-        """Restore domain from file.
-
-        @param src :     source file
-        @param progress: output progress if true
-        @return: domain object
-        """
-        dominfo = XendDomainInfo.vm_restore(src, progress=progress)
-        self._add_domain(dominfo.id, dominfo)
-        return dominfo
+        xmigrate = XendMigrate.instance()
+        return xmigrate.save_begin(dom, dst)
     
     def domain_pincpu(self, dom, cpu):
         """Pin a domain to a cpu.
