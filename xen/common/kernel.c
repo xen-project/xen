@@ -166,12 +166,7 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
     /* INITIALISE SERIAL LINE (printk will work okay from here on). */
     init_serial();
 
-    /* Print the intro banner. The ASCII art is ugle since '\\' -> '\'. */
-    printk(" __  __            _   ___    _          _        \n");
-    printk(" \\ \\/ /___ _ __   / | / _ \\  | |__   ___| |_ __ _ \n");
-    printk("  \\  // _ \\ '_ \\  | || | | | | '_ \\ / _ \\ __/ _` |\n");
-    printk("  /  \\  __/ | | | | || |_| | | |_) |  __/ || (_| |\n");
-    printk(" /_/\\_\\___|_| |_| |_(_)___/  |_.__/ \\___|\\__\\__,_|\n\n");
+    printk(XEN_BANNER);
     printk(" http://www.cl.cam.ac.uk/xeno\n");
     printk(" University of Cambridge Computer Laboratory\n\n");
     printk(" Xen version %d.%d%s (%s@%s) (%s) %s\n\n",
@@ -385,14 +380,22 @@ static inline void __putstr(const char *str)
 void printf (const char *fmt, ...)
 {
     va_list args;
-    char buf[128], *p;
+    char buf[128], *p = fmt;
     unsigned long flags;
 
-    va_start(args, fmt);
-    (void)vsnprintf(buf, sizeof(buf), fmt, args);
-    va_end(args);
-  
-    p = buf; 
+    /*
+     * If the format string contains '%' descriptors then we have to parse it 
+     * before printing it. We parse it into a fixed-length buffer. Long 
+     * strings should therefore _not_ contain '%' characters!
+     */
+    if ( strchr(fmt, '%') != NULL )
+    {
+        va_start(args, fmt);
+        (void)vsnprintf(buf, sizeof(buf), fmt, args);
+        va_end(args);        
+        p = buf; 
+    }
+
     spin_lock_irqsave(&console_lock, flags);
     while ( *p ) putchar(*p++);
     spin_unlock_irqrestore(&console_lock, flags);

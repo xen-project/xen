@@ -1,0 +1,9 @@
+
+NB. This is a very hacked version of Figlet 2.2.1. 
+
+Don't use this outside the Xen build system. A proper version of Figlet
+can be had from <http://www.figlet.org>.
+
+The distribution license is intact in the LICENSE file.
+
+ -- Keir Fraser (2/5/2003)
