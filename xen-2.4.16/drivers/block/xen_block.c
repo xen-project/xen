@@ -14,6 +14,7 @@
 #include <hypervisor-ifs/hypervisor-if.h>
 #include <asm-i386/io.h>
 #include <asm/spinlock.h>
+#include <xeno/perfc.h>                              /* performance counters */
 
 #include <xeno/keyhandler.h>
 
@@ -118,6 +119,8 @@ void flush_blk_queue(void)
 	blk_request = list_entry(io_done_queue.next, blk_request_t, queue);
 	list_del (&blk_request->queue);
 	spin_unlock_irqrestore(&io_done_queue_lock, flags);
+
+	perf_incr(blockio_rx);
 	
 	/* place on ring for guest os */ 
 	blk_ring = blk_request->domain->blk_ring_base;
@@ -211,6 +214,7 @@ long do_block_io_op_domain (struct task_struct* task)
 	 loop != blk_ring->btx_prod; 
 	 loop = BLK_TX_RING_INC(loop)) {
 
+	perf_incr(blockio_tx);
 	status = 1;
 
 	switch (blk_ring->btx_ring[loop].operation) {

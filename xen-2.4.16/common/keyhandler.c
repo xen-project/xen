@@ -1,6 +1,8 @@
 #include <xeno/keyhandler.h> 
 #include <xeno/reboot.h>
 
+extern void perfc_printall (u_char key, void *dev_id, struct pt_regs *regs);
+
 #define KEY_MAX 256
 #define STR_MAX  64
 
@@ -120,8 +122,9 @@ void initialize_keytable()
     /* setup own handlers */
     add_key_handler('d', dump_registers, "dump registers"); 
     add_key_handler('h', show_handlers, "show this message");
+    add_key_handler('p', perfc_printall, "print performance counters"); 
     add_key_handler('q', do_task_queues, "dump task queues + guest state");
-    add_key_handler('r', halt_machine, "reboot machine ungracefully"); 
+    add_key_handler('R', halt_machine, "reboot machine ungracefully"); 
     
     return; 
 }
