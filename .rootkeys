@@ -442,6 +442,7 @@
 40cf2937Z8WCNOnO2FcWdubvEAF9QQ tools/python/xen/xm/shutdown.py
 40fcefb2K1xqVVT4D-p7nL2GzS4scg tools/sv/Main.rpy
 40ffbcb66Dj5F-1kCK9BcgSqCWkt1w tools/sv/Makefile
+4120b0e5L_nW-u0MWRfIdXg4ng4OjA tools/sv/images/destroy.png
 4107c921_OR9NTSv2dKFiLCXxrXoxA tools/sv/images/finish.png
 40fcefb3wXQMsl9WkgQAVtdrupm4sw tools/sv/images/left-end-highlight.jpg
 40fcefb3K6ESt5sQhD9aCQRscQIlXQ tools/sv/images/left-end-no-highlight.jpg
@@ -459,6 +460,9 @@
 40fcefb3dgsa24WLk_BJeYQHrDLuOg tools/sv/images/seperator-right-highlight.jpg
 40fcefb3FtiX4Pd2kT8wDlp8u8xRhQ tools/sv/images/seperator.jpg
 41013a82sUdUqBv8EoAUJii3gsZ-4g tools/sv/images/shutdown.png
+4120b0e5RyNoIQNMjUs4A2kshovjaQ tools/sv/images/small-destroy.png
+4120b0e6vW66wW6WvjQyFD0AZH2tng tools/sv/images/small-pause.png
+4120b0e6USof7ieyGxEvtCdTMpxaQw tools/sv/images/small-unpause.png
 4104ffca-jPHLVOrW0n0VghEXXtKxg tools/sv/images/unpause.png
 40fcefb3yMSrZvApO9ToIi-iQwnchA tools/sv/images/xen.png
 41013a83z27rKvWIxAfUBMVZ1eDCDg tools/sv/inc/script.js

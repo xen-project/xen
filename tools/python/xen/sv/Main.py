@@ -4,6 +4,8 @@ from xen.sv.NodeInfo import NodeInfo
 from xen.sv.DomInfo  import DomInfo
 from xen.sv.CreateDomain import CreateDomain
 
+from xen.xend.XendClient import server
+
 from xen.sv.util import getVar
 
 class Main( HTMLBase ):
@@ -20,14 +22,18 @@ class Main( HTMLBase ):
     def render_POST( self, request ):
     
     	#decide what module post'd the action
+                
+    	args = getVar( 'args', request )
 
         mod = getVar( 'mod', request )
                 
-        if not mod is None:
+        if not mod is None and args is None:
             module = self.modules[ mod ]
             #check module exists
             if module:
-               module( self.mainUrlWriter ).perform( request )     
+               module( self.mainUrlWriter ).perform( request )
+        else:
+            self.perform( request )     
     
         return self.render_GET( request )
 
@@ -80,3 +86,18 @@ class Main( HTMLBase ):
         
         request.write( "</table>\n" )
         
+                
+    def op_destroy( self, request ):
+    	dom = getVar( 'args', request )
+        if not dom is None and dom != "0":
+            server.xend_domain_destroy( int( dom ), "halt" ) 
+                 
+    def op_pause( self, request ):
+    	dom = getVar( 'args', request )
+        if not dom is None and dom != "0":
+            server.xend_domain_pause( int( dom ) )      
+    
+    def op_unpause( self, request ):
+    	dom = getVar( 'args', request )
+        if not dom is None and dom != "0":
+            server.xend_domain_unpause( int( dom ) )      

@@ -33,7 +33,12 @@ install:
 	install -m0644 images/reboot.png $(sv_insdir)/images
 	install -m0644 images/pause.png $(sv_insdir)/images
 	install -m0644 images/unpause.png $(sv_insdir)/images
+	install -m0644 images/destroy.png $(sv_insdir)/images
         
+	install -m0644 images/small-destroy.png $(sv_insdir)/images        
+	install -m0644 images/small-pause.png $(sv_insdir)/images   
+	install -m0644 images/small-unpause.png $(sv_insdir)/images
+                        
 	install -m0644 images/next.png $(sv_insdir)/images
 	install -m0644 images/previous.png $(sv_insdir)/images        
 	install -m0644 images/finish.png $(sv_insdir)/images 

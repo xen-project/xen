@@ -1,4 +1,5 @@
 from twisted.web.resource import Resource
+from xen.sv.util import *
 
 class HTMLBase( Resource ):
 
@@ -28,6 +29,7 @@ class HTMLBase( Resource ):
 
     def write_BOTTOM( self, request ):
         request.write('<input type="hidden" name="op" value="">')
+        request.write('<input type="hidden" name="args" value="">')
         request.write('</form>')
         request.write( "</body></html>" )
 
