@@ -7,9 +7,9 @@ HDRS     = $(wildcard *.h)
 SRCS     = $(wildcard *.c)
 OBJS     = $(patsubst %.c,%.o,$(SRCS))
 
-TARGETS  = xen_read_console xen_cpuperf xen_refresh_dev
+TARGETS  = xen_read_console xen_log xen_cpuperf xen_refresh_dev
 
-INSTALL  = $(TARGETS) xen-mkdevnodes xen-clone
+INSTALL  = $(TARGETS) xen-mkdevnodes xen-clone xen_log
 
 all: $(TARGETS)
 	$(MAKE) -C miniterm	
@@ -19,6 +19,7 @@ install: all
 	cp -a $(INSTALL) ../../../install/bin
 	chmod 755 ../../../install/bin/xen-mkdevnodes
 	chmod 755 ../../../install/bin/xen-clone
+	chmod 755 ../../../install/bin/xen_log
 	$(MAKE) -C miniterm install
 
 clean:
