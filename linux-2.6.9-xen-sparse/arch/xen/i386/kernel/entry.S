@@ -231,8 +231,8 @@ need_resched:
 	movl TI_flags(%ebp), %ecx	# need_resched set ?
 	testb $_TIF_NEED_RESCHED, %cl
 	jz restore_all
-	testl $IF_MASK,EFLAGS(%esp)     # interrupts off (exception path) ?
-	jz restore_all
+	testb $0xFF,EVENT_MASK(%esp)	# interrupts off (exception path) ?
+	jnz restore_all
 	movl $PREEMPT_ACTIVE,TI_preempt_count(%ebp)
 	XEN_UNBLOCK_EVENTS(%esi)
 	call schedule
@@ -552,13 +552,13 @@ critical_fixup_table:
 
 # Hypervisor uses this for application faults while it executes.
 ENTRY(failsafe_callback)
-1:      popl %ds
-2:      popl %es
-3:      popl %fs
-4:      pop  %gs
-        subl $4,%esp
-        SAVE_ALL
-        jmp  ret_from_exception
+1:	popl %ds
+2:	popl %es
+3:	popl %fs
+4:	popl %gs
+	subl $4,%esp
+	SAVE_ALL
+	jmp  ret_from_exception
 .section .fixup,"ax";	\
 6:	movl $0,(%esp);	\
 	jmp 1b;		\
