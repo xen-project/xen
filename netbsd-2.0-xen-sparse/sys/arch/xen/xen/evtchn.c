@@ -80,7 +80,6 @@ static int irq_bindcount[NR_IRQS];
 static int xen_die_handler(void *);
 #endif
 static int xen_debug_handler(void *);
-static int xen_misdirect_handler(void *);
 
 void
 events_default_setup()
@@ -109,10 +108,6 @@ init_events()
 
 	irq = bind_virq_to_irq(VIRQ_DEBUG);
 	event_set_handler(irq, &xen_debug_handler, NULL, IPL_DEBUG);
-	hypervisor_enable_irq(irq);
-
-	irq = bind_virq_to_irq(VIRQ_MISDIRECT);
-	event_set_handler(irq, &xen_misdirect_handler, NULL, IPL_DIE);
 	hypervisor_enable_irq(irq);
 
 	/* This needs to be done early, but after the IRQ subsystem is
@@ -368,15 +363,5 @@ static int
 xen_debug_handler(void *arg)
 {
 	printf("debug event\n");
-	return 0;
-}
-
-static int
-xen_misdirect_handler(void *arg)
-{
-#if 0
-	char *msg = "misdirect\n";
-	(void)HYPERVISOR_console_io(CONSOLEIO_write, strlen(msg), msg);
-#endif
 	return 0;
 }
