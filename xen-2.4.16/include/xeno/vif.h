@@ -1,7 +1,9 @@
 /* vif.h
  * 
- * this is the hypervisor end of the network code.  The net_ring structure
+ * This is the hypervisor end of the network code.  The net_ring structure
  * stored in each vif is placed on a shared page to interact with the guest VM.
+ *
+ * Copyright (c) 2002, A K Warfield and K A Fraser
  */
 
 /* virtual network interface struct and associated defines. */
@@ -26,7 +28,7 @@ typedef struct net_vif_st {
 
 /* VIF-related defines. */
 #define MAX_GUEST_VIFS    2 // each VIF is a small overhead in task_struct
-#define MAX_SYSTEM_VIFS 256 // trying to avoid dynamic allocation 
+#define MAX_SYSTEM_VIFS 256  
 
 /* vif globals */
 extern int sys_vif_count;

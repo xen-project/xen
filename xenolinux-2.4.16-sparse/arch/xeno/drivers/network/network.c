@@ -20,7 +20,6 @@
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/init.h>
-#include <linux/ip.h> //remove this.
 
 #include <net/sock.h>
 
@@ -226,11 +225,6 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
     unsigned int i;
     struct net_private *np = (struct net_private *)dev->priv;
     
-if ((np->id > 0) || ((skb->len > 20) 
-                && (skb->nh.iph != NULL) 
-                && (skb->nh.iph->protocol == 1)))
-    printk(KERN_WARNING "TX on vif %d (dev:%p)\n", np->id, dev);
-    
     if ( np->tx_full )
     {
         printk(KERN_WARNING "%s: full queue wasn't stopped!\n", dev->name);
@@ -287,17 +281,8 @@ static void network_rx_int(int irq, void *dev_id, struct pt_regs *ptregs)
         skb->protocol = eth_type_trans(skb, dev);
         np->stats.rx_packets++;
         np->stats.rx_bytes += np->net_ring->rx_ring[i].size;
-
-if (((skb->len > 20)
-    && ((*(unsigned char *)(skb->data + 9) == 1) || (np->id > 0)) ))
-    printk(KERN_WARNING "RX on vif %d (dev:%p)\n", np->id, dev);
-if ((skb != NULL) && (skb->data != NULL) && (skb->len > 20) && ntohl(*(unsigned long *)(skb->data + 16)) == 167903489)
-    printk(KERN_WARNING "RX INT (driver): pkt_type is %d.!", skb->pkt_type);
-
         netif_rx(skb);
         dev->last_rx = jiffies;
-                
-
     }
 
     np->rx_idx = i;
@@ -307,7 +292,6 @@ if ((skb != NULL) && (skb->data != NULL) && (skb->len > 20) && ntohl(*(unsigned 
     /* Deal with hypervisor racing our resetting of rx_event. */
     smp_mb();
     if ( np->net_ring->rx_cons != i ) { 
-//printk("redoing network rx...\n"); 
                 goto again;
         }
 }
@@ -371,7 +355,7 @@ int __init init_module(void)
         dev->get_stats       = network_get_stats;
 
         memset(dev->dev_addr, 0, ETH_ALEN);
-        *(unsigned int *)(dev->dev_addr) = i;
+        *(unsigned int *)(dev->dev_addr + 1) = i;
 
         if ( (err = register_netdev(dev)) != 0 )
         {
@@ -382,7 +366,6 @@ int __init init_module(void)
         np->dev = dev;
         np->id = i;
         list_add(&np->list, &dev_list);
-printk(KERN_WARNING "Added VIF, ifindex is %d.\n", dev->ifindex);
     }
 
     return 0;
