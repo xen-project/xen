@@ -83,7 +83,9 @@ def blkdev_name_to_number(name):
     'hda') and return the device number used by the OS. """
 
     if not re.match( '^/dev/', name ):
-        n = '/dev/' + name
+	n = '/dev/' + name
+    else:
+	n = name
         
     try:
 	return os.stat(n).st_rdev
