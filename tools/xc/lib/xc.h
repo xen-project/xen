@@ -44,7 +44,8 @@ int xc_linux_save(int xc_handle,
                   const char *state_file, 
                   int verbose);
 int xc_linux_restore(int xc_handle,
-                     const char *state_file, int verbose);
+                     const char *state_file, 
+                     int verbose);
 int xc_linux_build(int xc_handle,
                    unsigned int domid,
                    const char *image_name,
@@ -114,7 +115,6 @@ int xc_vbd_delete_extent(int xc_handle,
                          unsigned long nr_sectors);
 int xc_vbd_probe(int xc_handle,
                  unsigned int domid,
-                 unsigned short vbdid,
                  unsigned int max_vbds,
                  xc_vbd_t *vbds);
 

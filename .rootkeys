@@ -212,6 +212,9 @@
 3fbba6dc38q-ioRlwSR_quw4G3qUeQ tools/xc/lib/libxc_vif.c
 3fbba6dc1uU7U3IFeF6A-XEOYF2MkQ tools/xc/lib/rpm.spec
 3fbba6dcrNxtygEcgJYAJJ1gCQqfsA tools/xc/lib/xc.h
+3fbd0a3dTwnDcfdw0-v46dPbX98zDw tools/xc/py/Makefile
+3fbd0a40yT6G3M9hMpaz5xTUdl0E4g tools/xc/py/setup.py
+3fbd0a42l40lM0IICw2jXbQBVZSdZg tools/xc/py/xc_py.c
 3f72f1bdJPsV3JCnBqs9ddL9tr6D2g xen/COPYING
 3f841450eJvqAD1Dldc0_aOweGiglQ xen/GUEST_CHANGES
 3ddb79bcbOVHh38VJzc97-JEGD4dJQ xen/Makefile

@@ -81,6 +81,7 @@ int xc_domain_getinfo(int xc_handle,
         info->name[XC_DOMINFO_MAXNAME-1] = '\0';
 
         next_domid = op.u.getdomaininfo.domain + 1;
+        info++;
     }
 
     return nr_doms;

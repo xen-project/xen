@@ -317,11 +317,11 @@ static int setup_guestos(int xc_handle,
     return -1;
 }
 
-int xc_domain_build(int xc_handle,
-                    unsigned int domid,
-                    const char *image_name,
-                    const char *ramdisk_name,
-                    const char *cmdline)
+int xc_linux_build(int xc_handle,
+                   unsigned int domid,
+                   const char *image_name,
+                   const char *ramdisk_name,
+                   const char *cmdline)
 {
     dom0_op_t launch_op, op;
     unsigned long load_addr;

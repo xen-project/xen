@@ -8,7 +8,10 @@
 
 int xc_interface_open(void)
 {
-    return open("/proc/xeno/privcmd", O_RDWR);
+    int fd = open("/proc/xeno/privcmd", O_RDWR);
+    if ( fd == -1 )
+        PERROR("Could not obtain handle on privileged command interface");
+    return fd;
 }
 
 int xc_interface_close(int xc_handle)

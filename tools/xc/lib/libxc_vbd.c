@@ -73,7 +73,6 @@ int xc_vbd_delete_extent(int xc_handle,
 
 int xc_vbd_probe(int xc_handle,
                  unsigned int domid,
-                 unsigned short vbdid,
                  unsigned int max_vbds,
                  xc_vbd_t *vbds)
 {
@@ -82,7 +81,7 @@ int xc_vbd_probe(int xc_handle,
     int i, j, ret, allocsz = max_vbds * sizeof(xen_disk_t); 
 
     op.cmd = BLOCK_IO_OP_VBD_PROBE; 
-    op.u.probe_params.domain    = domid; 
+    op.u.probe_params.domain = domid; 
     
     xdi->max   = max_vbds;
     xdi->disks = malloc(allocsz);
