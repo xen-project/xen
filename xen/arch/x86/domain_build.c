@@ -10,19 +10,28 @@
 #include <xen/sched.h>
 #include <xen/smp.h>
 #include <xen/delay.h>
+#include <xen/event.h>
+#include <xen/elf.h>
+#include <xen/kernel.h>
 #include <asm/regs.h>
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/processor.h>
-#include <asm/shadow.h>
 #include <asm/desc.h>
 #include <asm/i387.h>
-#include <xen/event.h>
-#include <xen/elf.h>
-#include <xen/kernel.h>
+#include <asm/shadow.h>
 
+/* opt_dom0_mem: Kilobytes of memory allocated to domain 0. */
+static unsigned int opt_dom0_mem = 0;
+integer_param("dom0_mem", opt_dom0_mem);
+
+#if defined(__i386__)
+/* No ring-3 access in initial leaf page tables. */
+#define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED)
+#elif defined(__x86_64__)
 /* Allow ring-3 access in long mode as guest cannot use ring 1. */
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_USER)
+#endif
 #define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_USER)
 #define L3_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_USER)
 #define L4_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_USER)
@@ -30,9 +39,19 @@
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
 #define round_pgdown(_p)  ((_p)&PAGE_MASK)
 
+static struct pfn_info *alloc_largest(struct domain *d, unsigned long max)
+{
+    struct pfn_info *page;
+    unsigned int order = get_order(max * PAGE_SIZE);
+    if ( (max & (max-1)) != 0 )
+        order--;
+    while ( (page = alloc_domheap_pages(d, order)) == NULL )
+        if ( order-- == 0 )
+            break;
+    return page;
+}
+
 int construct_dom0(struct domain *d,
-                   unsigned long alloc_start,
-                   unsigned long alloc_end,
                    unsigned long _image_start, unsigned long image_len, 
                    unsigned long _initrd_start, unsigned long initrd_len,
                    char *cmdline)
@@ -40,18 +59,25 @@ int construct_dom0(struct domain *d,
     char *dst;
     int i, rc;
     unsigned long pfn, mfn;
-    unsigned long nr_pages = (alloc_end - alloc_start) >> PAGE_SHIFT;
+    unsigned long nr_pages;
     unsigned long nr_pt_pages;
+    unsigned long alloc_start;
+    unsigned long alloc_end;
     unsigned long count;
-    l4_pgentry_t *l4tab = NULL, *l4start = NULL;
-    l3_pgentry_t *l3tab = NULL, *l3start = NULL;
-    l2_pgentry_t *l2tab = NULL, *l2start = NULL;
-    l1_pgentry_t *l1tab = NULL, *l1start = NULL;
     struct pfn_info *page = NULL;
     start_info_t *si;
     struct exec_domain *ed = d->exec_domain[0];
+#if defined(__i386__)
+    char *image_start  = (char *)_image_start;  /* use lowmem mappings */
+    char *initrd_start = (char *)_initrd_start; /* use lowmem mappings */
+#elif defined(__x86_64__)
     char *image_start  = __va(_image_start);
     char *initrd_start = __va(_initrd_start);
+    l4_pgentry_t *l4tab = NULL, *l4start = NULL;
+    l3_pgentry_t *l3tab = NULL, *l3start = NULL;
+#endif
+    l2_pgentry_t *l2tab = NULL, *l2start = NULL;
+    l1_pgentry_t *l1tab = NULL, *l1start = NULL;
 
     /*
      * This fully describes the memory layout of the initial domain. All 
@@ -86,18 +112,17 @@ int construct_dom0(struct domain *d,
 
     printk("*** LOADING DOMAIN 0 ***\n");
 
-    /*
-     * This is all a bit grim. We've moved the modules to the "safe" physical 
-     * memory region above MAP_DIRECTMAP_ADDRESS (48MB). Later in this 
-     * routine we're going to copy it down into the region that's actually 
-     * been allocated to domain 0. This is highly likely to be overlapping, so 
-     * we use a forward copy.
-     * 
-     * MAP_DIRECTMAP_ADDRESS should be safe. The worst case is a machine with 
-     * 4GB and lots of network/disk cards that allocate loads of buffers. 
-     * We'll have to revisit this if we ever support PAE (64GB).
-     */
-
+    /* By default DOM0 is allocated all available memory. */
+    if ( (nr_pages = opt_dom0_mem >> (PAGE_SHIFT - 10)) == 0 )
+        nr_pages = avail_domheap_pages() +
+            ((initrd_len + PAGE_SIZE - 1) >> PAGE_SHIFT) +
+            ((image_len  + PAGE_SIZE - 1) >> PAGE_SHIFT);
+    d->max_pages = nr_pages;
+    if ( (page = alloc_largest(d, nr_pages)) == NULL )
+        panic("Not enough RAM for DOM0 reservation.\n");
+    alloc_start = page_to_phys(page);
+    alloc_end   = alloc_start + (d->tot_pages << PAGE_SHIFT);
+    
     rc = parseelfimage(image_start, image_len, &dsi);
     if ( rc != 0 )
         return rc;
@@ -131,6 +156,11 @@ int construct_dom0(struct domain *d,
         v_end            = (vstack_end + (1UL<<22)-1) & ~((1UL<<22)-1);
         if ( (v_end - vstack_end) < (512UL << 10) )
             v_end += 1UL << 22; /* Add extra 4MB to get >= 512kB padding. */
+#if defined(__i386__)
+        if ( (((v_end - dsi.v_start + ((1UL<<L2_PAGETABLE_SHIFT)-1)) >> 
+               L2_PAGETABLE_SHIFT) + 1) <= nr_pt_pages )
+            break;
+#elif defined(__x86_64__)
 #define NR(_l,_h,_s) \
     (((((_h) + ((1UL<<(_s))-1)) & ~((1UL<<(_s))-1)) - \
        ((_l) & ~((1UL<<(_s))-1))) >> (_s))
@@ -140,15 +170,12 @@ int construct_dom0(struct domain *d,
               NR(dsi.v_start, v_end, L2_PAGETABLE_SHIFT))  /* # L1 */
              <= nr_pt_pages )
             break;
+#endif
     }
 
-    printk("PHYSICAL MEMORY ARRANGEMENT:\n"
-           " Kernel image:  %p->%p\n"
-           " Initrd image:  %p->%p\n"
-           " Dom0 alloc.:   %p->%p\n",
-           _image_start, _image_start + image_len,
-           _initrd_start, _initrd_start + initrd_len,
-           alloc_start, alloc_end);
+    if ( (v_end - dsi.v_start) > (alloc_end - alloc_start) )
+        panic("Insufficient contiguous RAM to build kernel image.\n");
+
     printk("VIRTUAL MEMORY ARRANGEMENT:\n"
            " Loaded kernel: %p->%p\n"
            " Init. ramdisk: %p->%p\n"
@@ -174,48 +201,6 @@ int construct_dom0(struct domain *d,
         return -ENOMEM;
     }
 
-    /* Overlap with Xen protected area? */
-    if ( (dsi.v_start < HYPERVISOR_VIRT_END) &&
-         (v_end > HYPERVISOR_VIRT_START) )
-    {
-        printk("DOM0 image overlaps with Xen private area.\n");
-        return -EINVAL;
-    }
-
-    /* Paranoia: scrub DOM0's memory allocation. */
-    printk("Scrubbing DOM0 RAM: ");
-    dst = __va(alloc_start);
-    while ( __pa(dst) < alloc_end )
-    {
-#define SCRUB_BYTES (100 * 1024 * 1024) /* 100MB */
-        printk(".");
-        touch_nmi_watchdog();
-        if ( (alloc_end - __pa(dst)) > SCRUB_BYTES )
-        {
-            memset(dst, 0, SCRUB_BYTES);
-            dst += SCRUB_BYTES;
-        }
-        else
-        {
-            memset(dst, 0, alloc_end - __pa(dst));
-            break;
-        }
-    }
-    printk("done.\n");
-
-    /* Construct a frame-allocation list for the initial domain. */
-    for ( mfn = (alloc_start>>PAGE_SHIFT);
-          mfn < (alloc_end>>PAGE_SHIFT);
-          mfn++ )
-    {
-        page = &frame_table[mfn];
-        page_set_owner(page, d);
-        page->u.inuse.type_info = 0;
-        page->count_info        = PGC_allocated | 1;
-        list_add_tail(&page->list, &d->page_list);
-        d->tot_pages++; d->max_pages++;
-    }
-
     mpt_alloc = (vpt_start - dsi.v_start) + alloc_start;
 
     SET_GDT_ENTRIES(ed, DEFAULT_GDT_ENTRIES);
@@ -230,6 +215,103 @@ int construct_dom0(struct domain *d,
     ed->arch.kernel_ss = FLAT_KERNEL_SS;
     for ( i = 0; i < 256; i++ ) 
         ed->arch.traps[i].cs = FLAT_KERNEL_CS;
+
+#if defined(__i386__)
+
+    /*
+     * Protect the lowest 1GB of memory. We use a temporary mapping there
+     * from which we copy the kernel and ramdisk images.
+     */
+    if ( dsi.v_start < (1UL<<30) )
+    {
+        printk("Initial loading isn't allowed to lowest 1GB of memory.\n");
+        return -EINVAL;
+    }
+
+    /* WARNING: The new domain must have its 'processor' field filled in! */
+    l2start = l2tab = (l2_pgentry_t *)mpt_alloc; mpt_alloc += PAGE_SIZE;
+    memcpy(l2tab, &idle_pg_table[0], PAGE_SIZE);
+    l2tab[LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
+        mk_l2_pgentry((unsigned long)l2start | __PAGE_HYPERVISOR);
+    l2tab[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] =
+        mk_l2_pgentry(__pa(d->arch.mm_perdomain_pt) | __PAGE_HYPERVISOR);
+    ed->arch.guest_table = mk_pagetable((unsigned long)l2start);
+
+    l2tab += l2_table_offset(dsi.v_start);
+    mfn = alloc_start >> PAGE_SHIFT;
+    for ( count = 0; count < ((v_end-dsi.v_start)>>PAGE_SHIFT); count++ )
+    {
+        if ( !((unsigned long)l1tab & (PAGE_SIZE-1)) )
+        {
+            l1start = l1tab = (l1_pgentry_t *)mpt_alloc; 
+            mpt_alloc += PAGE_SIZE;
+            *l2tab++ = mk_l2_pgentry((unsigned long)l1start | L2_PROT);
+            clear_page(l1tab);
+            if ( count == 0 )
+                l1tab += l1_table_offset(dsi.v_start);
+        }
+        *l1tab++ = mk_l1_pgentry((mfn << PAGE_SHIFT) | L1_PROT);
+        
+        page = &frame_table[mfn];
+        if ( !get_page_and_type(page, d, PGT_writable_page) )
+            BUG();
+
+        mfn++;
+    }
+
+    /* Pages that are part of page tables must be read only. */
+    l2tab = l2start + l2_table_offset(vpt_start);
+    l1start = l1tab = (l1_pgentry_t *)l2_pgentry_to_phys(*l2tab);
+    l1tab += l1_table_offset(vpt_start);
+    for ( count = 0; count < nr_pt_pages; count++ ) 
+    {
+        *l1tab = mk_l1_pgentry(l1_pgentry_val(*l1tab) & ~_PAGE_RW);
+        page = &frame_table[l1_pgentry_to_pfn(*l1tab)];
+        if ( count == 0 )
+        {
+            page->u.inuse.type_info &= ~PGT_type_mask;
+            page->u.inuse.type_info |= PGT_l2_page_table;
+
+            /*
+             * No longer writable: decrement the type_count.
+             * Installed as CR3: increment both the ref_count and type_count.
+             * Net: just increment the ref_count.
+             */
+            get_page(page, d); /* an extra ref because of readable mapping */
+
+            /* Get another ref to L2 page so that it can be pinned. */
+            if ( !get_page_and_type(page, d, PGT_l2_page_table) )
+                BUG();
+            set_bit(_PGT_pinned, &page->u.inuse.type_info);
+        }
+        else
+        {
+            page->u.inuse.type_info &= ~PGT_type_mask;
+            page->u.inuse.type_info |= PGT_l1_page_table;
+            page->u.inuse.type_info |= 
+                ((dsi.v_start>>L2_PAGETABLE_SHIFT)+(count-1))<<PGT_va_shift;
+
+            /*
+             * No longer writable: decrement the type_count.
+             * This is an L1 page, installed in a validated L2 page:
+             * increment both the ref_count and type_count.
+             * Net: just increment the ref_count.
+             */
+            get_page(page, d); /* an extra ref because of readable mapping */
+        }
+        if ( !((unsigned long)++l1tab & (PAGE_SIZE - 1)) )
+            l1start = l1tab = (l1_pgentry_t *)l2_pgentry_to_phys(*++l2tab);
+    }
+
+#elif defined(__x86_64__)
+
+    /* Overlap with Xen protected area? */
+    if ( (dsi.v_start < HYPERVISOR_VIRT_END) &&
+         (v_end > HYPERVISOR_VIRT_START) )
+    {
+        printk("DOM0 image overlaps with Xen private area.\n");
+        return -EINVAL;
+    }
 
     /* WARNING: The new domain must have its 'processor' field filled in! */
     phys_to_page(mpt_alloc)->u.inuse.type_info = PGT_l4_page_table;
@@ -320,6 +402,8 @@ int construct_dom0(struct domain *d,
         }
     }
 
+#endif /* __x86_64__ */
+
     /* Set up shared-info area. */
     update_dom_time(d);
     d->shared_info->domain_time = 0;
@@ -335,17 +419,23 @@ int construct_dom0(struct domain *d,
     __cli();
     write_ptbase(ed);
 
-    /* Copy the OS image. */
+    /* Copy the OS image and free temporary buffer. */
     (void)loadelfimage(image_start);
+    init_domheap_pages(
+        _image_start, (_image_start+image_len+PAGE_SIZE-1) & PAGE_MASK);
 
-    /* Copy the initial ramdisk. */
+    /* Copy the initial ramdisk and free temporary buffer. */
     if ( initrd_len != 0 )
+    {
         memcpy((void *)vinitrd_start, initrd_start, initrd_len);
+        init_domheap_pages(
+            _initrd_start, (_initrd_start+initrd_len+PAGE_SIZE-1) & PAGE_MASK);
+    }
     
     /* Set up start info area. */
     si = (start_info_t *)vstartinfo_start;
     memset(si, 0, PAGE_SIZE);
-    si->nr_pages     = d->tot_pages;
+    si->nr_pages     = nr_pages;
     si->shared_info  = virt_to_phys(d->shared_info);
     si->flags        = SIF_PRIVILEGED | SIF_INITDOMAIN;
     si->pt_base      = vpt_start;
@@ -363,6 +453,22 @@ int construct_dom0(struct domain *d,
 #endif
         ((u32 *)vphysmap_start)[pfn] = mfn;
         machine_to_phys_mapping[mfn] = pfn;
+    }
+    while ( pfn < nr_pages )
+    {
+        if ( (page = alloc_largest(d, nr_pages - d->tot_pages)) == NULL )
+            panic("Not enough RAM for DOM0 reservation.\n");
+        while ( pfn < d->tot_pages )
+        {
+            mfn = page_to_pfn(page);
+#ifndef NDEBUG
+#define pfn (nr_pages - 1 - (pfn - ((alloc_end - alloc_start) >> PAGE_SHIFT)))
+#endif
+            ((u32 *)vphysmap_start)[pfn] = mfn;
+            machine_to_phys_mapping[mfn] = pfn;
+#undef pfn
+            page++; pfn++;
+        }
     }
 
     if ( initrd_len != 0 )
@@ -389,6 +495,14 @@ int construct_dom0(struct domain *d,
     write_ptbase(current);
     __sti();
 
+#if defined(__i386__)
+    /* Destroy low mappings - they were only for our convenience. */
+    for ( i = 0; i < DOMAIN_ENTRIES_PER_L2_PAGETABLE; i++ )
+        if ( l2_pgentry_val(l2start[i]) & _PAGE_PSE )
+            l2start[i] = mk_l2_pgentry(0);
+    zap_low_mappings(); /* Do the same for the idle page tables. */
+#endif
+    
     /* DOM0 gets access to everything. */
     physdev_init_dom0(d);
 
@@ -402,12 +516,17 @@ int construct_dom0(struct domain *d,
 int elf_sanity_check(Elf_Ehdr *ehdr)
 {
     if ( !IS_ELF(*ehdr) ||
+#if defined(__i386__)
+         (ehdr->e_ident[EI_CLASS] != ELFCLASS32) ||
+         (ehdr->e_machine != EM_386) ||
+#elif defined(__x86_64__)
          (ehdr->e_ident[EI_CLASS] != ELFCLASS64) ||
+         (ehdr->e_machine != EM_X86_64) ||
+#endif
          (ehdr->e_ident[EI_DATA] != ELFDATA2LSB) ||
-         (ehdr->e_type != ET_EXEC) ||
-         (ehdr->e_machine != EM_X86_64) )
+         (ehdr->e_type != ET_EXEC) )
     {
-        printk("DOM0 image is not x86/64-compatible executable Elf image.\n");
+        printk("DOM0 image is not a Xen-compatible Elf image.\n");
         return 0;
     }
 

@@ -13,17 +13,20 @@
 #define PSH_hl2         (1<<30) /* page is an hl2 */
 #define PSH_pfn_mask    ((1<<21)-1)
 
-/* Shadow PT operation mode : shadow-mode variable in arch_domain. */
-
+/* Shadow PT operation mode: shadow-mode variable in arch_domain. */
 #define SHM_enable    (1<<0) /* we're in one of the shadow modes */
 #define SHM_log_dirty (1<<1) /* enable log dirty mode */
-#define SHM_translate (1<<2) /* do p2m tranaltion on guest tables */
+#define SHM_translate (1<<2) /* do p2m translation on guest tables */
 #define SHM_external  (1<<3) /* external page table, not used by Xen */
 
 #define shadow_mode_enabled(_d)   ((_d)->arch.shadow_mode)
 #define shadow_mode_log_dirty(_d) ((_d)->arch.shadow_mode & SHM_log_dirty)
 #define shadow_mode_translate(_d) ((_d)->arch.shadow_mode & SHM_translate)
+#ifndef __x86_64__ /* XXX Currently breaks the 64-bit build. */
 #define shadow_mode_external(_d)  ((_d)->arch.shadow_mode & SHM_external)
+#else
+#define shadow_mode_external(_d)  (0)
+#endif
 
 #define shadow_linear_pg_table ((l1_pgentry_t *)SH_LINEAR_PT_VIRT_START)
 #define shadow_linear_l2_table ((l2_pgentry_t *)(SH_LINEAR_PT_VIRT_START + \
@@ -804,6 +807,10 @@ static inline void update_pagetables(struct exec_domain *ed)
 
     if ( !shadow_mode_external(d) )
     {
+        /*
+         * Internal page tables:
+         * No need to allocate a separate page table for Xen.
+         */
 #ifdef __x86_64__
         if ( !(ed->arch.flags & TF_kernel_mode) )
             ed->arch.monitor_table = ed->arch.guest_table_user;
@@ -816,9 +823,10 @@ static inline void update_pagetables(struct exec_domain *ed)
     }
     else
     {
-        // External page tables...
-        // Allocate a monitor page table if we don't already have one.
-        //
+        /*
+         * External page tables:
+         * Allocate a monitor page table if we don't already have one.
+         */
         if ( unlikely(!pagetable_val(ed->arch.monitor_table)) )
             ed->arch.monitor_table =
                 mk_pagetable(alloc_monitor_pagetable(ed) << PAGE_SHIFT);
