@@ -294,13 +294,17 @@ static void vmx_io_instruction(struct xen_regs *regs,
     vcpu_iodata_t *vio;
     ioreq_t *p;
     unsigned long addr;
-    unsigned long eip;
+    unsigned long eip, cs, eflags;
+    int vm86;
 
     __vmread(GUEST_EIP, &eip);
+    __vmread(GUEST_CS_SELECTOR, &cs);
+    __vmread(GUEST_EFLAGS, &eflags);
+    vm86 = eflags & X86_EFLAGS_VM ? 1 : 0;
 
     VMX_DBG_LOG(DBG_LEVEL_1, 
-            "vmx_io_instruction: eip=%p, exit_qualification = %lx",
-            eip, exit_qualification);
+            "vmx_io_instruction: vm86 %d, eip=%p:%p, exit_qualification = %lx",
+            vm86, cs, eip, exit_qualification);
 
     if (test_bit(6, &exit_qualification))
         addr = (exit_qualification >> 16) & (0xffff);
@@ -325,17 +329,29 @@ static void vmx_io_instruction(struct xen_regs *regs,
     p->size = (exit_qualification & 7) + 1;
 
     if (test_bit(4, &exit_qualification)) {
-        unsigned long eflags;
-
-        __vmread(GUEST_EFLAGS, &eflags);
         p->df = (eflags & X86_EFLAGS_DF) ? 1 : 0;
         p->pdata_valid = 1;
-        p->u.pdata = (void *) ((p->dir == IOREQ_WRITE) ?
-            regs->esi
-            : regs->edi);
+
+        if (vm86) {
+            unsigned long seg;
+            if (p->dir == IOREQ_WRITE) {
+                __vmread(GUEST_DS_SELECTOR, &seg);
+                p->u.pdata = (void *)
+                        ((seg << 4) | (regs->esi & 0xFFFF));
+            } else {
+                __vmread(GUEST_ES_SELECTOR, &seg);
+                p->u.pdata = (void *)
+                        ((seg << 4) | (regs->edi & 0xFFFF));
+            }
+        } else {
+               p->u.pdata = (void *) ((p->dir == IOREQ_WRITE) ?
+                   regs->esi : regs->edi);
+        }
         p->u.pdata = (void *) gva_to_gpa(p->u.data);
+
+
         if (test_bit(5, &exit_qualification))
-            p->count = regs->ecx;
+	    p->count = vm86 ? regs->ecx & 0xFFFF : regs->ecx;
         if ((p->u.data & PAGE_MASK) != 
             ((p->u.data + p->count * p->size - 1) & PAGE_MASK)) {
             printk("stringio crosses page boundary!\n");
@@ -368,13 +384,20 @@ static void vmx_io_instruction(struct xen_regs *regs,
     do_block();
 }
 
+static int
+vm86assist(struct exec_domain *d)
+{
+    /* stay tuned ... */
+    return 0;
+}
+
 #define CASE_GET_REG(REG, reg)  \
     case REG_ ## REG: value = regs->reg; break
 
 /*
  * Write to control registers
  */
-static void mov_to_cr(int gp, int cr, struct xen_regs *regs)
+static int mov_to_cr(int gp, int cr, struct xen_regs *regs)
 {
     unsigned long value;
     unsigned long old_cr;
@@ -454,8 +477,21 @@ static void mov_to_cr(int gp, int cr, struct xen_regs *regs)
                     d->arch.arch_vmx.cpu_cr3, mfn);
             /* undo the get_page done in the para virt case */
             put_page_and_type(&frame_table[old_base_mfn]);
+        } else {
+            if ((value & X86_CR0_PE) == 0) {
+		unsigned long eip;
 
-        }
+	        __vmread(GUEST_EIP, &eip);
+                VMX_DBG_LOG(DBG_LEVEL_1,
+			"Disabling CR0.PE at %%eip 0x%lx", eip);
+		if (vm86assist(d)) {
+	            __vmread(GUEST_EIP, &eip);
+		    VMX_DBG_LOG(DBG_LEVEL_1,
+			"Transfering control to vm86assist %%eip 0x%lx", eip);
+		    return 0; /* do not update eip! */
+		}
+	    }
+	}
         break;
     }
     case 3: 
@@ -534,7 +570,9 @@ static void mov_to_cr(int gp, int cr, struct xen_regs *regs)
         printk("invalid cr: %d\n", gp);
         __vmx_bug(regs);
     }
-}   
+
+    return 1;
+}
 
 #define CASE_SET_REG(REG, reg)      \
     case REG_ ## REG:       \
@@ -575,7 +613,7 @@ static void mov_from_cr(int cr, int gp, struct xen_regs *regs)
     VMX_DBG_LOG(DBG_LEVEL_VMMU, "mov_from_cr: CR%d, value = %lx,", cr, value);
 }
 
-static void vmx_cr_access (unsigned long exit_qualification, struct xen_regs *regs)
+static int vmx_cr_access(unsigned long exit_qualification, struct xen_regs *regs)
 {
     unsigned int gp, cr;
     unsigned long value;
@@ -584,8 +622,7 @@ static void vmx_cr_access (unsigned long exit_qualification, struct xen_regs *re
     case TYPE_MOV_TO_CR:
         gp = exit_qualification & CONTROL_REG_ACCESS_REG;
         cr = exit_qualification & CONTROL_REG_ACCESS_NUM;
-        mov_to_cr(gp, cr, regs);
-        break;
+        return mov_to_cr(gp, cr, regs);
     case TYPE_MOV_FROM_CR:
         gp = exit_qualification & CONTROL_REG_ACCESS_REG;
         cr = exit_qualification & CONTROL_REG_ACCESS_NUM;
@@ -604,6 +641,7 @@ static void vmx_cr_access (unsigned long exit_qualification, struct xen_regs *re
         __vmx_bug(regs);
         break;
     }
+    return 1;
 }
 
 static inline void vmx_do_msr_read(struct xen_regs *regs)
@@ -619,7 +657,7 @@ static inline void vmx_do_msr_read(struct xen_regs *regs)
 }
 
 /*
- * Need to use this exit to rescheule
+ * Need to use this exit to reschedule
  */
 static inline void vmx_vmexit_do_hlt(void)
 {
@@ -891,8 +929,8 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
 
         VMX_DBG_LOG(DBG_LEVEL_1, "eip = %lx, inst_len =%lx, exit_qualification = %lx", 
                 eip, inst_len, exit_qualification);
-        vmx_cr_access(exit_qualification, &regs);
-        __update_guest_eip(inst_len);
+        if (vmx_cr_access(exit_qualification, &regs))
+	    __update_guest_eip(inst_len);
         break;
     }
     case EXIT_REASON_DR_ACCESS:

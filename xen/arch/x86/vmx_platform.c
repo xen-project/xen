@@ -55,6 +55,8 @@ static void store_xen_regs(struct xen_regs *regs)
     __vmread(GUEST_ESP, &regs->esp);
     __vmread(GUEST_EFLAGS, &regs->eflags);
     __vmread(GUEST_CS_SELECTOR, &regs->cs);
+    __vmread(GUEST_DS_SELECTOR, &regs->ds);
+    __vmread(GUEST_ES_SELECTOR, &regs->es);
     __vmread(GUEST_EIP, &regs->eip);
 }
 
@@ -144,19 +146,27 @@ static inline unsigned char *check_prefix(unsigned char *inst, struct instructio
     while (1) {
         switch (*inst) {
             case 0xf3: //REPZ
+	    	thread_inst->flags = REPZ;
+		break;
             case 0xf2: //REPNZ
+	    	thread_inst->flags = REPNZ;
+		break;
             case 0xf0: //LOCK
+	    	break;
             case 0x2e: //CS
             case 0x36: //SS
             case 0x3e: //DS
             case 0x26: //ES
             case 0x64: //FS
             case 0x65: //GS
+		thread_inst->seg_sel = *inst;
                 break;
             case 0x66: //32bit->16bit
                 thread_inst->op_size = WORD;
                 break;
             case 0x67:
+		printf("Not handling 0x67 (yet)\n");
+		domain_crash_synchronous(); 
                 break;
             default:
                 return inst;
@@ -165,7 +175,7 @@ static inline unsigned char *check_prefix(unsigned char *inst, struct instructio
     }
 }
 
-static inline unsigned long get_immediate(const unsigned char *inst, int op_size)
+static inline unsigned long get_immediate(int op16, const unsigned char *inst, int op_size)
 {
     int mod, reg, rm;
     unsigned long val = 0;
@@ -183,14 +193,21 @@ static inline unsigned long get_immediate(const unsigned char *inst, int op_size
     switch(mod) {
         case 0:
             if (rm == 5) {
-                inst = inst + 4; //disp32, skip 4 bytes
+		if (op16)
+                    inst = inst + 2; //disp16, skip 2 bytes
+		else
+                    inst = inst + 4; //disp32, skip 4 bytes
             }
             break;
         case 1:
             inst++; //disp8, skip 1 byte
             break;
         case 2:
-            inst = inst + 4; //disp32, skip 4 bytes
+	    if (op16)
+                inst = inst + 2; //disp16, skip 2 bytes
+	    else
+                inst = inst + 4; //disp32, skip 4 bytes
+            break;
     }
     for (i = 0; i < op_size; i++) {
         val |= (*inst++ & 0xff) << (8 * i);
@@ -218,7 +235,21 @@ static inline int get_index(const unsigned char *inst)
 
 static int vmx_decode(const unsigned char *inst, struct instruction *thread_inst)
 {
-    int index;
+    unsigned long eflags;
+    int index, vm86 = 0;
+
+    __vmread(GUEST_EFLAGS, &eflags);
+    if (eflags & X86_EFLAGS_VM)
+	vm86 = 1;
+
+    if (vm86) { /* meaning is reversed */
+       if (thread_inst->op_size == WORD)
+           thread_inst->op_size = LONG;
+       else if (thread_inst->op_size == LONG)
+           thread_inst->op_size = WORD;
+       else if (thread_inst->op_size == 0)
+           thread_inst->op_size = WORD;
+    }
 
     switch(*inst) {
         case 0x88:
@@ -258,7 +289,6 @@ static int vmx_decode(const unsigned char *inst, struct instruction *thread_inst
             printk("%x, This opcode hasn't been handled yet!", *inst);
             return DECODE_failure;
             /* Not handle it yet. */
-
         case 0xa0:
             /* mov byte to al */
             thread_inst->op_size = BYTE;
@@ -291,7 +321,6 @@ static int vmx_decode(const unsigned char *inst, struct instruction *thread_inst
             /* movsb */
             thread_inst->op_size = BYTE;
             strcpy((char *)thread_inst->i_name, "movs");
-            
             return DECODE_success;
         case 0xa5:
             /* movsw/movsl */
@@ -299,16 +328,28 @@ static int vmx_decode(const unsigned char *inst, struct instruction *thread_inst
             } else {
                 thread_inst->op_size = LONG;
             }
-            
             strcpy((char *)thread_inst->i_name, "movs");
-            
             return DECODE_success;
-
+        case 0xaa:
+            /* stosb */
+            thread_inst->op_size = BYTE;
+            strcpy((char *)thread_inst->i_name, "stosb");
+            return DECODE_success;
+       case 0xab:
+            /* stosw/stosl */
+            if (thread_inst->op_size == WORD) {
+                strcpy((char *)thread_inst->i_name, "stosw");
+            } else {
+                thread_inst->op_size = LONG;
+                strcpy((char *)thread_inst->i_name, "stosl");
+            }
+            return DECODE_success;
         case 0xc6:
             /* mov imm8 to m8 */
             thread_inst->op_size = BYTE;
             thread_inst->operand[0] = mk_operand(BYTE, 0, 0, IMMEDIATE);
-            thread_inst->immediate = get_immediate((inst+1), thread_inst->op_size);
+            thread_inst->immediate = get_immediate(vm86,
+					(inst+1), thread_inst->op_size);
             break;
         case 0xc7:
             /* mov imm16/32 to m16/32 */
@@ -318,9 +359,9 @@ static int vmx_decode(const unsigned char *inst, struct instruction *thread_inst
                 thread_inst->op_size = LONG;
                 thread_inst->operand[0] = mk_operand(LONG, 0, 0, IMMEDIATE);
             }
-            thread_inst->immediate = get_immediate((inst+1), thread_inst->op_size);
+            thread_inst->immediate = get_immediate(vm86,
+					(inst+1), thread_inst->op_size);
             break;
-
         case 0x0f:
             break;
         default:
@@ -425,6 +466,7 @@ static void send_mmio_req(unsigned long gpa,
     struct exec_domain *d = current;
     vcpu_iodata_t *vio;
     ioreq_t *p;
+    int vm86;
     struct mi_per_cpu_info *mpci_p;
     struct xen_regs *inst_decoder_regs;
     extern long evtchn_send(int lport);
@@ -432,53 +474,59 @@ static void send_mmio_req(unsigned long gpa,
 
     mpci_p = &current->arch.arch_vmx.vmx_platform.mpci;
     inst_decoder_regs = mpci_p->inst_decoder_regs;
+
     vio = (vcpu_iodata_t *) d->arch.arch_vmx.vmx_platform.shared_page_va;
-        
     if (vio == NULL) {
         printk("bad shared page\n");
         domain_crash_synchronous(); 
     }
     p = &vio->vp_ioreq;
-        
+
+    vm86 = inst_decoder_regs->eflags & X86_EFLAGS_VM;
+
     set_bit(ARCH_VMX_IO_WAIT, &d->arch.arch_vmx.flags);
     p->dir = dir;
     p->pdata_valid = pvalid;
-    p->count = 1;
 
     p->port_mm = 1;
     p->size = inst_p->op_size;
     p->addr = gpa;
     p->u.data = value;
 
-    // p->state = STATE_UPSTREAM_SENDING;
     p->state = STATE_IOREQ_READY;
 
-    // Try to use ins/outs' framework
-    if (pvalid) {
-        // Handle "movs"
-        p->u.pdata = (void *) ((p->dir == IOREQ_WRITE) ?
-                               inst_decoder_regs->esi
-                               : inst_decoder_regs->edi); 
-        p->u.pdata = (void *) gva_to_gpa(p->u.data);
-        p->count = inst_decoder_regs->ecx;
-        inst_decoder_regs->ecx = 0;
+    if (inst_p->flags & REPZ) {
+        if (vm86)
+            p->count = inst_decoder_regs->ecx & 0xFFFF;
+        else
+            p->count = inst_decoder_regs->ecx;
         p->df = (inst_decoder_regs->eflags & EF_DF) ? 1 : 0;
-    }
+    } else
+        p->count = 1;
+
+    if (pvalid)
+        p->u.pdata = (void *) gva_to_gpa(p->u.data);
+
+#if 0
+    printf("send_mmio_req: eip 0x%lx:0x%lx, dir %d, pdata_valid %d, ",
+	inst_decoder_regs->cs, inst_decoder_regs->eip, p->dir, p->pdata_valid);
+    printf("port_mm %d, size %lld, addr 0x%llx, value 0x%lx, count %lld\n",
+	p->port_mm, p->size, p->addr, value, p->count);
+#endif
 
     evtchn_send(IOPACKET_PORT);
     do_block(); 
-
 }
 
 void handle_mmio(unsigned long va, unsigned long gpa)
 {
-    unsigned long eip;
-    unsigned long inst_len;
+    unsigned long eip, eflags, cs;
+    unsigned long inst_len, inst_addr;
     struct mi_per_cpu_info *mpci_p;
     struct xen_regs *inst_decoder_regs;
     struct instruction mmio_inst;
     unsigned char inst[MAX_INST_LEN];
-    int ret;
+    int vm86, ret;
      
     mpci_p = &current->arch.arch_vmx.vmx_platform.mpci;
     inst_decoder_regs = mpci_p->inst_decoder_regs;
@@ -486,12 +534,29 @@ void handle_mmio(unsigned long va, unsigned long gpa)
     __vmread(GUEST_EIP, &eip);
     __vmread(INSTRUCTION_LEN, &inst_len);
 
+    __vmread(GUEST_EFLAGS, &eflags);
+    vm86 = eflags & X86_EFLAGS_VM;
+
+    if (vm86) {
+        __vmread(GUEST_CS_SELECTOR, &cs);
+        inst_addr = (cs << 4) | eip;
+    } else
+        inst_addr = eip; /* XXX should really look at GDT[cs].base too */
+
     memset(inst, '0', MAX_INST_LEN);
-    ret = inst_copy_from_guest(inst, eip, inst_len);
+    ret = inst_copy_from_guest(inst, inst_addr, inst_len);
     if (ret != inst_len) {
         printk("handle_mmio - EXIT: get guest instruction fault\n");
         domain_crash_synchronous();
     }
+
+#if 0
+    printk("handle_mmio: cs:eip 0x%lx:0x%lx(0x%lx): opcode",
+        cs, eip, inst_addr, inst_len);
+    for (ret = 0; ret < inst_len; ret++)
+        printk(" %02x", inst[ret]);
+    printk("\n");
+#endif
 
     init_instruction(&mmio_inst);
     
@@ -506,7 +571,7 @@ void handle_mmio(unsigned long va, unsigned long gpa)
         if (read_from_mmio(&mmio_inst)) {
             // Send the request and waiting for return value.
             mpci_p->mmio_target = mmio_inst.operand[1] | WZEROEXTEND;
-            send_mmio_req(gpa, &mmio_inst, 0, 1, 0);
+            send_mmio_req(gpa, &mmio_inst, 0, IOREQ_READ, 0);
             return ;
         } else {
             printk("handle_mmio - EXIT: movz error!\n");
@@ -515,10 +580,32 @@ void handle_mmio(unsigned long va, unsigned long gpa)
     }
 
     if (!strncmp((char *)mmio_inst.i_name, "movs", 4)) {
-        int tmp_dir;
+	unsigned long addr = 0;
+	int dir;
 
-        tmp_dir = ((va == inst_decoder_regs->edi) ? IOREQ_WRITE : IOREQ_READ);
-        send_mmio_req(gpa, &mmio_inst, 0, tmp_dir, 1);
+	if (vm86) {
+	    unsigned long seg;
+
+	    __vmread(GUEST_ES_SELECTOR, &seg);
+	    if (((seg << 4) | (inst_decoder_regs->edi & 0xFFFF)) == va) {
+		dir = IOREQ_WRITE;
+		__vmread(GUEST_DS_SELECTOR, &seg);
+		addr = (seg << 4) | (inst_decoder_regs->esi & 0xFFFF);
+	    } else {
+		dir = IOREQ_READ;
+		addr = (seg << 4) | (inst_decoder_regs->edi & 0xFFFF);
+	    }
+	} else { /* XXX should really look at GDT[ds/es].base too */
+	    if (va == inst_decoder_regs->edi) {
+		dir = IOREQ_WRITE;
+		addr = inst_decoder_regs->esi;
+	    } else {
+		dir = IOREQ_READ;
+		addr = inst_decoder_regs->edi;
+	    }
+	}
+
+	send_mmio_req(gpa, &mmio_inst, addr, dir, 1);
         return;
     }
 
@@ -529,7 +616,7 @@ void handle_mmio(unsigned long va, unsigned long gpa)
         if (read_from_mmio(&mmio_inst)) {
             // Send the request and waiting for return value.
             mpci_p->mmio_target = mmio_inst.operand[1];
-            send_mmio_req(gpa, &mmio_inst, value, 1, 0);
+            send_mmio_req(gpa, &mmio_inst, value, IOREQ_READ, 0);
         } else {
             // Write to MMIO
             if (mmio_inst.operand[0] & IMMEDIATE) {
@@ -541,9 +628,14 @@ void handle_mmio(unsigned long va, unsigned long gpa)
             } else {
                 domain_crash_synchronous();
             }
-            send_mmio_req(gpa, &mmio_inst, value, 0, 0);
+            send_mmio_req(gpa, &mmio_inst, value, IOREQ_WRITE, 0);
             return;
         }
+    }
+
+    if (!strncmp((char *)mmio_inst.i_name, "stos", 4)) {
+	send_mmio_req(gpa, &mmio_inst,
+		inst_decoder_regs->eax, IOREQ_WRITE, 0);
     }
 
     domain_crash_synchronous();

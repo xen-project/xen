@@ -51,7 +51,7 @@ ioreq_t* bx_cpu_c::__get_ioreq(void)
 	if (req->state == STATE_IOREQ_READY) {
 		req->state = STATE_IOREQ_INPROCESS;
 	} else {
-		BX_INFO(("False I/O requrest ... in-service already: %lx, pvalid: %lx,port: %lx, data: %lx, count: %lx, size: %lx\n", req->state, req->pdata_valid, req->addr, req->u.data, req->count, req->size));
+		BX_INFO(("False I/O request ... in-service already: %lx, pvalid: %lx,port: %lx, data: %lx, count: %lx, size: %lx\n", req->state, req->pdata_valid, req->addr, req->u.data, req->count, req->size));
 		req = NULL;
 	}
 
@@ -95,6 +95,8 @@ void bx_cpu_c::dispatch_ioreq(ioreq_t *req)
 	}
 	if (req->port_mm == 0){//port io
 		if(req->dir == IOREQ_READ){//read
+			//BX_INFO(("pio: <READ>addr:%llx, value:%llx, size: %llx, count: %llx\n", req->addr, req->u.data, req->size, req->count));
+
 			if (!req->pdata_valid)
 				req->u.data = BX_INP(req->addr, req->size);
 			else {
@@ -107,6 +109,8 @@ void bx_cpu_c::dispatch_ioreq(ioreq_t *req)
 				}
 			}
 		} else if(req->dir == IOREQ_WRITE) {
+			//BX_INFO(("pio: <WRITE>addr:%llx, value:%llx, size: %llx, count: %llx\n", req->addr, req->u.data, req->size, req->count));
+
 			if (!req->pdata_valid) {
 				BX_OUTP(req->addr, (dma_addr_t) req->u.data, req->size);
 			} else {
@@ -123,20 +127,29 @@ void bx_cpu_c::dispatch_ioreq(ioreq_t *req)
 	} else if (req->port_mm == 1){//memory map io
 		if (!req->pdata_valid) {
 			if(req->dir == IOREQ_READ){//read
-				BX_MEM_READ_PHYSICAL(req->addr, req->size, &req->u.data);
-			} else if(req->dir == IOREQ_WRITE)//write
-				BX_MEM_WRITE_PHYSICAL(req->addr, req->size, &req->u.data);
+				//BX_INFO(("mmio[value]: <READ> addr:%llx, value:%llx, size: %llx, count: %llx\n", req->addr, req->u.data, req->size, req->count));
+
+				for (i = 0; i < req->count; i++) {
+					BX_MEM_READ_PHYSICAL(req->addr, req->size, &req->u.data);
+				}
+			} else if(req->dir == IOREQ_WRITE) {//write
+				//BX_INFO(("mmio[value]: <WRITE> addr:%llx, value:%llx, size: %llx, count: %llx\n", req->addr, req->u.data, req->size, req->count));
+
+				for (i = 0; i < req->count; i++) {
+					BX_MEM_WRITE_PHYSICAL(req->addr, req->size, &req->u.data);
+				}
+			}
 		} else {
 			//handle movs
 			unsigned long tmp;
 			if (req->dir == IOREQ_READ) {
-				//BX_INFO(("<READ>addr:%llx, pdata:%llx, size: %x, count: %x\n", req->addr, req->u.pdata, req->size, req->count));
+				//BX_INFO(("mmio[pdata]: <READ>addr:%llx, pdata:%llx, size: %x, count: %x\n", req->addr, req->u.pdata, req->size, req->count));
 				for (i = 0; i < req->count; i++) {
 					BX_MEM_READ_PHYSICAL(req->addr + (sign * i * req->size), req->size, &tmp);
 					BX_MEM_WRITE_PHYSICAL((dma_addr_t) req->u.pdata + (sign * i * req->size), req->size, &tmp);
 				}
 			} else if (req->dir == IOREQ_WRITE) {
-				//BX_INFO(("<WRITE>addr:%llx, pdata:%llx, size: %x, count: %x\n", req->addr, req->u.pdata, req->size, req->count));
+				//BX_INFO(("mmio[pdata]: <WRITE>addr:%llx, pdata:%llx, size: %x, count: %x\n", req->addr, req->u.pdata, req->size, req->count));
 				for (i = 0; i < req->count; i++) {
 					BX_MEM_READ_PHYSICAL((dma_addr_t)req->u.pdata + (sign * i * req->size), req->size, &tmp);
 					BX_MEM_WRITE_PHYSICAL(req->addr + (sign * i * req->size), req->size, &tmp);
