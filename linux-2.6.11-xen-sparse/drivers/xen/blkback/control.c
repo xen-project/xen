@@ -15,57 +15,31 @@ static void blkif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
     switch ( msg->subtype )
     {
     case CMSG_BLKIF_BE_CREATE:
-        if ( msg->length != sizeof(blkif_be_create_t) )
-            goto parse_error;
         blkif_create((blkif_be_create_t *)&msg->msg[0]);
         break;        
     case CMSG_BLKIF_BE_DESTROY:
-        if ( msg->length != sizeof(blkif_be_destroy_t) )
-            goto parse_error;
         blkif_destroy((blkif_be_destroy_t *)&msg->msg[0]);
         break;        
     case CMSG_BLKIF_BE_CONNECT:
-        if ( msg->length != sizeof(blkif_be_connect_t) )
-            goto parse_error;
         blkif_connect((blkif_be_connect_t *)&msg->msg[0]);
         break;        
     case CMSG_BLKIF_BE_DISCONNECT:
-        if ( msg->length != sizeof(blkif_be_disconnect_t) )
-            goto parse_error;
         if ( !blkif_disconnect((blkif_be_disconnect_t *)&msg->msg[0],msg->id) )
             return; /* Sending the response is deferred until later. */
         break;        
     case CMSG_BLKIF_BE_VBD_CREATE:
-        if ( msg->length != sizeof(blkif_be_vbd_create_t) )
-            goto parse_error;
         vbd_create((blkif_be_vbd_create_t *)&msg->msg[0]);
         break;
     case CMSG_BLKIF_BE_VBD_DESTROY:
-        if ( msg->length != sizeof(blkif_be_vbd_destroy_t) )
-            goto parse_error;
         vbd_destroy((blkif_be_vbd_destroy_t *)&msg->msg[0]);
         break;
-    case CMSG_BLKIF_BE_VBD_GROW:
-        if ( msg->length != sizeof(blkif_be_vbd_grow_t) )
-            goto parse_error;
-        vbd_grow((blkif_be_vbd_grow_t *)&msg->msg[0]);
-        break;
-    case CMSG_BLKIF_BE_VBD_SHRINK:
-        if ( msg->length != sizeof(blkif_be_vbd_shrink_t) )
-            goto parse_error;
-        vbd_shrink((blkif_be_vbd_shrink_t *)&msg->msg[0]);
-        break;
     default:
-        goto parse_error;
+        DPRINTK("Parse error while reading message subtype %d, len %d\n",
+                msg->subtype, msg->length);
+        msg->length = 0;
+        break;
     }
 
-    ctrl_if_send_response(msg);
-    return;
-
- parse_error:
-    DPRINTK("Parse error while reading message subtype %d, len %d\n",
-            msg->subtype, msg->length);
-    msg->length = 0;
     ctrl_if_send_response(msg);
 }
 

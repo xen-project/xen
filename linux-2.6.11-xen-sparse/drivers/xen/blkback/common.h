@@ -31,8 +31,10 @@
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 typedef struct rb_root rb_root_t;
 typedef struct rb_node rb_node_t;
+extern void bdev_put(struct block_device *bdev);
 #else
 struct block_device;
+#define bdev_put(_b) ((void)0)
 #endif
 
 typedef struct blkif_st {
@@ -80,24 +82,16 @@ blkif_t *blkif_find_by_handle(domid_t domid, unsigned int handle);
             blkif_disconnect_complete(_b);        \
     } while (0)
 
-/* An entry in a list of xen_extents. */
-typedef struct _blkif_extent_le { 
-    blkif_extent_t extent;               /* an individual extent */
-    struct _blkif_extent_le *next;       /* and a pointer to the next */ 
-    struct block_device *bdev;
-} blkif_extent_le_t; 
-
 typedef struct _vbd { 
-    blkif_vdev_t       vdevice;   /* what the domain refers to this vbd as */
-    unsigned char      readonly;  /* Non-zero -> read-only */
-    unsigned char      type;      /* VDISK_TYPE_xxx */
-    blkif_extent_le_t *extents;   /* list of xen_extents making up this vbd */
-    rb_node_t          rb;        /* for linking into R-B tree lookup struct */
+    blkif_vdev_t   vdevice;     /* what the domain refers to this vbd as */
+    unsigned char  readonly;    /* Non-zero -> read-only */
+    unsigned char  type;        /* VDISK_TYPE_xxx */
+    blkif_pdev_t   pdevice;     /* phys device that this vbd maps to */
+    struct block_device *bdev;
+    rb_node_t      rb;          /* for linking into R-B tree lookup struct */
 } vbd_t; 
 
 void vbd_create(blkif_be_vbd_create_t *create); 
-void vbd_grow(blkif_be_vbd_grow_t *grow); 
-void vbd_shrink(blkif_be_vbd_shrink_t *shrink);
 void vbd_destroy(blkif_be_vbd_destroy_t *delete); 
 int vbd_probe(blkif_t *blkif, vdisk_t *vbd_info, int max_vbds);
 void destroy_all_vbds(blkif_t *blkif);

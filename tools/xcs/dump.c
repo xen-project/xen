@@ -172,6 +172,7 @@ void dump_msg(const control_msg_t *msg, uint64_t flags)
 			debug_begin("BLKIF_BE", "VBD_CREATE");
 			debug_field(load, domid, "%u");
 			debug_field(load, blkif_handle, "%u");
+			debug_field(load, pdevice, "%u");
 			debug_field(load, vdevice, "%u");
 			debug_field(load, readonly, "%u");
 			debug_field(load, status, "%u");
@@ -185,27 +186,6 @@ void dump_msg(const control_msg_t *msg, uint64_t flags)
 			debug_field(load, vdevice, "%u");
 			debug_field(load, status, "%u");
 			debug_end("BLKIF_BE", "VBD_DESTROY");
-		} else if (msg->subtype == CMSG_BLKIF_BE_VBD_GROW) {
-			blkif_be_vbd_grow_t *load;
-			load = (blkif_be_vbd_grow_t *)msg->msg;
-			debug_begin("BLKIF_BE", "VBD_GROW");
-			debug_field(load, domid, "%u");
-			debug_field(load, blkif_handle, "%u");
-			debug_field(load, extent.sector_start, "%llu");
-			debug_field(load, extent.sector_length, "%llu");
-			debug_field(load, extent.device, "%u");
-			debug_field(load, vdevice, "%u");
-			debug_field(load, status, "%u");
-			debug_end("BLKIF_BE", "VBD_GROW");
-		} else if (msg->subtype == CMSG_BLKIF_BE_VBD_SHRINK) {
-			blkif_be_vbd_shrink_t *load;
-			load = (blkif_be_vbd_shrink_t *)msg->msg;
-			debug_begin("BLKIF_BE", "VBD_SHRINK");
-			debug_field(load, domid, "%u");
-			debug_field(load, blkif_handle, "%u");
-			debug_field(load, vdevice, "%u");
-			debug_field(load, status, "%u");
-			debug_end("BLKIF_BE", "VBD_SHRINK");
 		} else if (msg->subtype == CMSG_BLKIF_BE_DRIVER_STATUS) {
 			blkif_be_driver_status_t *load;
 			load = (blkif_be_driver_status_t *)msg->msg;

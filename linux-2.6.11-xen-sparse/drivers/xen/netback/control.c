@@ -13,42 +13,28 @@ static void netif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
     switch ( msg->subtype )
     {
     case CMSG_NETIF_BE_CREATE:
-        if ( msg->length != sizeof(netif_be_create_t) )
-            goto parse_error;
         netif_create((netif_be_create_t *)&msg->msg[0]);
         break;        
     case CMSG_NETIF_BE_DESTROY:
-        if ( msg->length != sizeof(netif_be_destroy_t) )
-            goto parse_error;
         netif_destroy((netif_be_destroy_t *)&msg->msg[0]);
         break;  
     case CMSG_NETIF_BE_CREDITLIMIT:
-        if ( msg->length != sizeof(netif_be_creditlimit_t) )
-            goto parse_error;
         netif_creditlimit((netif_be_creditlimit_t *)&msg->msg[0]);
         break;       
     case CMSG_NETIF_BE_CONNECT:
-        if ( msg->length != sizeof(netif_be_connect_t) )
-            goto parse_error;
         netif_connect((netif_be_connect_t *)&msg->msg[0]);
         break; 
     case CMSG_NETIF_BE_DISCONNECT:
-        if ( msg->length != sizeof(netif_be_disconnect_t) )
-            goto parse_error;
         if ( !netif_disconnect((netif_be_disconnect_t *)&msg->msg[0],msg->id) )
             return; /* Sending the response is deferred until later. */
         break;        
     default:
-        goto parse_error;
+        DPRINTK("Parse error while reading message subtype %d, len %d\n",
+                msg->subtype, msg->length);
+        msg->length = 0;
+        break;
     }
 
-    ctrl_if_send_response(msg);
-    return;
-
- parse_error:
-    DPRINTK("Parse error while reading message subtype %d, len %d\n",
-            msg->subtype, msg->length);
-    msg->length = 0;
     ctrl_if_send_response(msg);
 }
 

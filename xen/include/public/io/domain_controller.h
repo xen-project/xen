@@ -169,8 +169,6 @@ typedef struct {
 #define CMSG_BLKIF_BE_DISCONNECT  3  /* Disconnect i/f from remote driver.   */
 #define CMSG_BLKIF_BE_VBD_CREATE  4  /* Create a new VBD for an interface.   */
 #define CMSG_BLKIF_BE_VBD_DESTROY 5  /* Delete a VBD from an interface.      */
-#define CMSG_BLKIF_BE_VBD_GROW    6  /* Append an extent to a given VBD.     */
-#define CMSG_BLKIF_BE_VBD_SHRINK  7  /* Remove last extent from a given VBD. */
 
 /* Messages to domain controller. */
 #define CMSG_BLKIF_BE_DRIVER_STATUS 32
@@ -178,12 +176,6 @@ typedef struct {
 /*
  * Message request/response definitions for block-device messages.
  */
-
-typedef struct {
-    blkif_sector_t sector_start;   /*  0 */
-    blkif_sector_t sector_length;  /*  8 */
-    blkif_pdev_t   device;         /* 16 */
-} PACKED blkif_extent_t; /* 20 bytes */
 
 /* Non-specific 'okay' return. */
 #define BLKIF_BE_STATUS_OKAY                0
@@ -196,7 +188,7 @@ typedef struct {
 #define BLKIF_BE_STATUS_VBD_EXISTS          5
 #define BLKIF_BE_STATUS_VBD_NOT_FOUND       6
 #define BLKIF_BE_STATUS_OUT_OF_MEMORY       7
-#define BLKIF_BE_STATUS_EXTENT_NOT_FOUND    8
+#define BLKIF_BE_STATUS_PHYSDEV_NOT_FOUND   8
 #define BLKIF_BE_STATUS_MAPPING_ERROR       9
 
 /* This macro can be used to create an array of descriptive error strings. */
@@ -281,11 +273,12 @@ typedef struct {
     domid_t    domid;         /*  0: Identify blkdev interface.          */
     u16        __pad;
     u32        blkif_handle;  /*  4: ...ditto...                         */
-    blkif_vdev_t vdevice;     /*  8: Interface-specific id for this VBD. */
-    u16        readonly;      /* 10: Non-zero -> VBD isn't writable.     */
+    blkif_pdev_t pdevice;     /*  8 */
+    blkif_vdev_t vdevice;     /* 12: Interface-specific id for this VBD. */
+    u16        readonly;      /* 14: Non-zero -> VBD isn't writable.     */
     /* OUT */
-    u32        status;        /* 12 */
-} PACKED blkif_be_vbd_create_t; /* 16 bytes */
+    u32        status;        /* 16 */
+} PACKED blkif_be_vbd_create_t; /* 20 bytes */
 
 /* CMSG_BLKIF_BE_VBD_DESTROY */
 typedef struct {
@@ -298,31 +291,6 @@ typedef struct {
     /* OUT */
     u32        status;        /* 12 */
 } PACKED blkif_be_vbd_destroy_t; /* 16 bytes */
-
-/* CMSG_BLKIF_BE_VBD_GROW */
-typedef struct { 
-    /* IN */
-    domid_t    domid;         /*  0: Identify blkdev interface.          */
-    u16        __pad0;        /*  2 */
-    u32        blkif_handle;  /*  4: ...ditto...                         */
-    blkif_extent_t extent;    /*  8: Physical extent to append to VBD.   */
-    blkif_vdev_t vdevice;     /* 28: Interface-specific id of the VBD.   */
-    u16        __pad1;        /* 30 */
-    /* OUT */
-    u32        status;        /* 32 */
-} PACKED blkif_be_vbd_grow_t; /* 36 bytes */
-
-/* CMSG_BLKIF_BE_VBD_SHRINK */
-typedef struct { 
-    /* IN */
-    domid_t    domid;         /*  0: Identify blkdev interface.          */
-    u16        __pad0;        /*  2 */
-    u32        blkif_handle;  /*  4: ...ditto...                         */
-    blkif_vdev_t vdevice;     /*  8: Interface-specific id of the VBD.   */
-    u16        __pad1;        /* 10 */
-    /* OUT */
-    u32        status;        /* 12 */
-} PACKED blkif_be_vbd_shrink_t; /* 16 bytes */
 
 /*
  * CMSG_BLKIF_BE_DRIVER_STATUS:

@@ -1322,20 +1322,14 @@ static void blkif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
     switch ( msg->subtype )
     {
     case CMSG_BLKIF_FE_INTERFACE_STATUS:
-        if ( msg->length != sizeof(blkif_fe_interface_status_t) )
-            goto parse_error;
         blkif_status((blkif_fe_interface_status_t *)
                      &msg->msg[0]);
-        break;        
+        break;
     default:
-        goto parse_error;
+        msg->length = 0;
+        break;
     }
 
-    ctrl_if_send_response(msg);
-    return;
-
- parse_error:
-    msg->length = 0;
     ctrl_if_send_response(msg);
 }
 

@@ -305,21 +305,16 @@ static void balloon_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
     case CMSG_MEM_REQUEST_SET:
     {
         mem_request_t *req = (mem_request_t *)&msg->msg[0];
-        if ( msg->length != sizeof(mem_request_t) )
-            goto parse_error;
         set_new_target(req->target);
         req->status = 0;
     }
     break;        
+
     default:
-        goto parse_error;
+        msg->length = 0;
+        break;
     }
 
-    ctrl_if_send_response(msg);
-    return;
-
- parse_error:
-    msg->length = 0;
     ctrl_if_send_response(msg);
 }
 

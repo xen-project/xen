@@ -426,14 +426,14 @@ void blkif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
         switch ( msg->subtype )
         {
         case CMSG_BLKIF_FE_INTERFACE_STATUS:
-            if ( msg->length != sizeof(blkif_fe_interface_status_t) )
-                goto parse_error;
             blkif_ptbe_status((blkif_fe_interface_status_t *) &msg->msg[0]);
-            break;        
+            break;
 
         default:
             goto parse_error;
         }
+
+        break;
 
     case CMSG_BLKIF_BE:
         
@@ -448,23 +448,15 @@ void blkif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
         switch ( msg->subtype )
         {
         case CMSG_BLKIF_BE_CREATE:
-            if ( msg->length != sizeof(blkif_be_create_t) )
-                goto parse_error;
             blkif_ptfe_create((blkif_be_create_t *)&msg->msg[0]);
             break; 
         case CMSG_BLKIF_BE_DESTROY:
-            if ( msg->length != sizeof(blkif_be_destroy_t) )
-                goto parse_error;
             blkif_ptfe_destroy((blkif_be_destroy_t *)&msg->msg[0]);
             break;        
         case CMSG_BLKIF_BE_CONNECT:
-            if ( msg->length != sizeof(blkif_be_connect_t) )
-                goto parse_error;
             blkif_ptfe_connect((blkif_be_connect_t *)&msg->msg[0]);
             break;        
         case CMSG_BLKIF_BE_DISCONNECT:
-            if ( msg->length != sizeof(blkif_be_disconnect_t) )
-                goto parse_error;
             if ( !blkif_ptfe_disconnect((blkif_be_disconnect_t *)&msg->msg[0],
                     msg->id) )
                 return;
@@ -482,19 +474,11 @@ void blkif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
             ((blkif_be_vbd_destroy_t *)&msg->msg[0])->status
                 = BLKIF_BE_STATUS_OKAY;
             break;
-        case CMSG_BLKIF_BE_VBD_GROW:
-            DPRINTK("PT got VBD_GROW\n");
-            ((blkif_be_vbd_grow_t *)&msg->msg[0])->status
-                = BLKIF_BE_STATUS_OKAY;
-            break;
-        case CMSG_BLKIF_BE_VBD_SHRINK:
-            DPRINTK("PT got VBD_SHRINK\n");
-            ((blkif_be_vbd_shrink_t *)&msg->msg[0])->status
-                = BLKIF_BE_STATUS_OKAY;
-            break;
         default:
             goto parse_error;
         }
+
+        break;
     }
 
     ctrl_if_send_response(msg);

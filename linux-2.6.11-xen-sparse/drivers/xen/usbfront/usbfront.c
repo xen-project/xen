@@ -1629,22 +1629,16 @@ static void usbif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
     switch ( msg->subtype )
     {
     case CMSG_USBIF_FE_INTERFACE_STATUS_CHANGED:
-        if ( msg->length != sizeof(usbif_fe_interface_status_changed_t) )
-            goto parse_error;
         usbif_status_change((usbif_fe_interface_status_changed_t *)
                             &msg->msg[0]);
-        break;        
+        break;
 
         /* New interface...? */
     default:
-        goto parse_error;
+        msg->length = 0;
+        break;
     }
 
-    ctrl_if_send_response(msg);
-    return;
-
- parse_error:
-    msg->length = 0;
     ctrl_if_send_response(msg);
 }
 

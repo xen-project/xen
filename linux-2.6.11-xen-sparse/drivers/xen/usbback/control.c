@@ -15,47 +15,31 @@ static void usbif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
     switch ( msg->subtype )
     {
     case CMSG_USBIF_BE_CREATE:
-        if ( msg->length != sizeof(usbif_be_create_t) )
-            goto parse_error;
         usbif_create((usbif_be_create_t *)&msg->msg[0]);
         break;        
     case CMSG_USBIF_BE_DESTROY:
-        if ( msg->length != sizeof(usbif_be_destroy_t) )
-            goto parse_error;
         usbif_destroy((usbif_be_destroy_t *)&msg->msg[0]);
         break;        
     case CMSG_USBIF_BE_CONNECT:
-        if ( msg->length != sizeof(usbif_be_connect_t) )
-            goto parse_error;
         usbif_connect((usbif_be_connect_t *)&msg->msg[0]);
         break;        
     case CMSG_USBIF_BE_DISCONNECT:
-        if ( msg->length != sizeof(usbif_be_disconnect_t) )
-            goto parse_error;
         if ( !usbif_disconnect((usbif_be_disconnect_t *)&msg->msg[0],msg->id) )
             return; /* Sending the response is deferred until later. */
         break;        
     case CMSG_USBIF_BE_CLAIM_PORT:
-        if ( msg->length != sizeof(usbif_be_claim_port_t) )
-            goto parse_error;
 	usbif_claim_port((usbif_be_claim_port_t *)&msg->msg[0]);
         break;
     case CMSG_USBIF_BE_RELEASE_PORT:
-        if ( msg->length != sizeof(usbif_be_release_port_t) )
-            goto parse_error;
         usbif_release_port((usbif_be_release_port_t *)&msg->msg[0]);
         break;
     default:
-        goto parse_error;
+        DPRINTK("Parse error while reading message subtype %d, len %d\n",
+                msg->subtype, msg->length);
+        msg->length = 0;
+        break;
     }
 
-    ctrl_if_send_response(msg);
-    return;
-
- parse_error:
-    DPRINTK("Parse error while reading message subtype %d, len %d\n",
-            msg->subtype, msg->length);
-    msg->length = 0;
     ctrl_if_send_response(msg);
 }
 

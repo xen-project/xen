@@ -1097,18 +1097,13 @@ static void netif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
 
     switch (msg->subtype) {
     case CMSG_NETIF_FE_INTERFACE_STATUS:
-        if (msg->length != sizeof(netif_fe_interface_status_t))
-            goto error;
         netif_interface_status((netif_fe_interface_status_t *) &msg->msg[0]);
         break;
 
     case CMSG_NETIF_FE_DRIVER_STATUS:
-        if (msg->length != sizeof(netif_fe_driver_status_t))
-            goto error;
         netif_driver_status((netif_fe_driver_status_t *) &msg->msg[0]);
         break;
 
-    error:
     default:
         msg->length = 0;
         break;

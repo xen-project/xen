@@ -67,6 +67,19 @@ static PEND_RING_IDX pending_prod, pending_cons;
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
 static kmem_cache_t *buffer_head_cachep;
+#else
+static request_queue_t *plugged_queue;
+void bdev_put(struct block_device *bdev)
+{
+    request_queue_t *q = plugged_queue;
+    /* We might be giving up last reference to plugged queue. Flush if so. */
+    if ( (q != NULL) &&
+         (q == bdev_get_queue(bdev)) && 
+         (cmpxchg(&plugged_queue, q, NULL) == q) )
+        blk_run_queue(q);
+    /* It's now safe to drop the block device. */
+    blkdev_put(bdev);
+}
 #endif
 
 #ifdef CONFIG_XEN_BLKDEV_TAP_BE
@@ -189,9 +202,15 @@ static int blkio_schedule(void *arg)
             blkif_put(blkif);
         }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
         /* Push the batch through to disc. */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
         run_task_queue(&tq_disk);
+#else
+        if ( plugged_queue != NULL )
+        {
+            blk_run_queue(plugged_queue);
+            plugged_queue = NULL;
+        }
 #endif
     }
 }
@@ -512,6 +531,7 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
     for ( i = 0; i < nr_psegs; i++ )
     {
         struct bio *bio;
+        request_queue_t *q;
 
         bio = bio_alloc(GFP_ATOMIC, 1);
         if ( unlikely(bio == NULL) )
@@ -531,7 +551,14 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
             phys_seg[i].nr_sects << 9,
             phys_seg[i].buffer & ~PAGE_MASK);
 
-        submit_bio(operation | (1 << BIO_RW_SYNC), bio);
+        if ( (q = bdev_get_queue(bio->bi_bdev)) != plugged_queue )
+        {
+            if ( plugged_queue != NULL )
+                blk_run_queue(plugged_queue);
+            plugged_queue = q;
+        }
+
+        submit_bio(operation, bio);
     }
 #endif
 

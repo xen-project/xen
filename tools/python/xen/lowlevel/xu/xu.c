@@ -659,6 +659,7 @@ static PyObject *xu_message_get_payload(PyObject *self, PyObject *args)
     case TYPE(CMSG_BLKIF_BE, CMSG_BLKIF_BE_VBD_CREATE):
         C2P(blkif_be_vbd_create_t, domid,        Int, Long);
         C2P(blkif_be_vbd_create_t, blkif_handle, Int, Long);
+        C2P(blkif_be_vbd_create_t, pdevice,      Int, Long);
         C2P(blkif_be_vbd_create_t, vdevice,      Int, Long);
         C2P(blkif_be_vbd_create_t, readonly,     Int, Long);
         C2P(blkif_be_vbd_create_t, status,       Int, Long);
@@ -668,23 +669,6 @@ static PyObject *xu_message_get_payload(PyObject *self, PyObject *args)
         C2P(blkif_be_vbd_destroy_t, blkif_handle, Int, Long);
         C2P(blkif_be_vbd_destroy_t, vdevice,      Int, Long);
         C2P(blkif_be_vbd_destroy_t, status,       Int, Long);
-        return dict;
-    case TYPE(CMSG_BLKIF_BE, CMSG_BLKIF_BE_VBD_GROW):
-        C2P(blkif_be_vbd_grow_t, domid,         Int, Long);
-        C2P(blkif_be_vbd_grow_t, blkif_handle,  Int, Long);
-        C2P(blkif_be_vbd_grow_t, vdevice,       Int, Long);
-        C2P(blkif_be_vbd_grow_t, extent.sector_start, 
-             Long, UnsignedLongLong);
-        C2P(blkif_be_vbd_grow_t, extent.sector_length, 
-             Long, UnsignedLongLong);
-        C2P(blkif_be_vbd_grow_t, extent.device, Int, Long);
-        C2P(blkif_be_vbd_grow_t, status,        Int, Long);
-        return dict;
-    case TYPE(CMSG_BLKIF_BE, CMSG_BLKIF_BE_VBD_SHRINK):
-        C2P(blkif_be_vbd_shrink_t, domid,        Int, Long);
-        C2P(blkif_be_vbd_shrink_t, blkif_handle, Int, Long);
-        C2P(blkif_be_vbd_shrink_t, vdevice,      Int, Long);
-        C2P(blkif_be_vbd_shrink_t, status,       Int, Long);
         return dict;
     case TYPE(CMSG_BLKIF_BE, CMSG_BLKIF_BE_DRIVER_STATUS):
         C2P(blkif_be_driver_status_t, status, Int, Long);
@@ -894,6 +878,7 @@ static PyObject *xu_message_new(PyObject *self, PyObject *args)
     case TYPE(CMSG_BLKIF_BE, CMSG_BLKIF_BE_VBD_CREATE):
         P2C(blkif_be_vbd_create_t, domid,        u32);
         P2C(blkif_be_vbd_create_t, blkif_handle, u32);
+        P2C(blkif_be_vbd_create_t, pdevice,      blkif_pdev_t);
         P2C(blkif_be_vbd_create_t, vdevice,      blkif_vdev_t);
         P2C(blkif_be_vbd_create_t, readonly,     u16);
         break;
@@ -901,19 +886,6 @@ static PyObject *xu_message_new(PyObject *self, PyObject *args)
         P2C(blkif_be_vbd_destroy_t, domid,        u32);
         P2C(blkif_be_vbd_destroy_t, blkif_handle, u32);
         P2C(blkif_be_vbd_destroy_t, vdevice,      blkif_vdev_t);
-        break;
-    case TYPE(CMSG_BLKIF_BE, CMSG_BLKIF_BE_VBD_GROW):
-        P2C(blkif_be_vbd_grow_t, domid,                u32);
-        P2C(blkif_be_vbd_grow_t, blkif_handle,         u32);
-        P2C(blkif_be_vbd_grow_t, vdevice,              blkif_vdev_t);
-        P2C(blkif_be_vbd_grow_t, extent.sector_start,  blkif_sector_t);
-        P2C(blkif_be_vbd_grow_t, extent.sector_length, blkif_sector_t);
-        P2C(blkif_be_vbd_grow_t, extent.device,        blkif_pdev_t);
-        break;
-    case TYPE(CMSG_BLKIF_BE, CMSG_BLKIF_BE_VBD_SHRINK):
-        P2C(blkif_be_vbd_shrink_t, domid,        u32);
-        P2C(blkif_be_vbd_shrink_t, blkif_handle, u32);
-        P2C(blkif_be_vbd_shrink_t, vdevice,      blkif_vdev_t);
         break;
     case TYPE(CMSG_NETIF_FE, CMSG_NETIF_FE_INTERFACE_STATUS):
         P2C(netif_fe_interface_status_t, handle, u32);
