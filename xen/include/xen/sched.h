@@ -92,6 +92,8 @@ struct exec_domain
 
     struct thread_struct thread;
 
+    struct ac_timer  timer;         /* one-shot timer for timeout values */
+
     s_time_t         lastschd;      /* time this domain was last scheduled */
     s_time_t         lastdeschd;    /* time this domain was last descheduled */
     s_time_t         cpu_time;      /* total CPU time received till now */
@@ -121,7 +123,6 @@ struct domain {
 
     /* Scheduling. */
     int              shutdown_code; /* code value from OS (if DF_SHUTDOWN). */
-    struct ac_timer  timer;         /* one-shot timer for timeout values */
     void            *sched_priv;    /* scheduler-specific data */
 
     struct domain *next_list, *next_hash;

@@ -181,20 +181,17 @@ void sched_add_domain(struct exec_domain *ed)
     /* Must be unpaused by control software to start execution. */
     set_bit(EDF_CTRLPAUSE, &ed->ed_flags);
 
-    if (ed->eid == 0)
+    if ( d->id != IDLE_DOMAIN_ID )
     {
-        if ( d->id != IDLE_DOMAIN_ID )
-        {
-            /* Initialise the per-domain timer. */
-            init_ac_timer(&d->timer);
-            d->timer.cpu      = ed->processor;
-            d->timer.data     = (unsigned long)d;
-            d->timer.function = &dom_timer_fn;
-        }
-        else
-        {
-            schedule_data[ed->processor].idle = ed;
-        }
+        /* Initialise the per-domain timer. */
+        init_ac_timer(&ed->timer);
+        ed->timer.cpu      = ed->processor;
+        ed->timer.data     = (unsigned long)ed;
+        ed->timer.function = &dom_timer_fn;
+    }
+    else
+    {
+        schedule_data[ed->processor].idle = ed;
     }
 
     SCHED_OP(add_task, ed);
@@ -204,7 +201,10 @@ void sched_add_domain(struct exec_domain *ed)
 
 void sched_rem_domain(struct domain *d) 
 {
-    rem_ac_timer(&d->timer);
+    struct exec_domain *ed;
+
+    for_each_exec_domain(d, ed)
+        rem_ac_timer(&ed->timer);
     SCHED_OP(rem_task, d);
     TRACE_2D(TRC_SCHED_DOM_REM, d->id, d);
 }
@@ -311,7 +311,7 @@ long do_sched_op(unsigned long op)
 /* Per-domain one-shot-timer hypercall. */
 long do_set_timer_op(unsigned long timeout_hi, unsigned long timeout_lo)
 {
-    struct domain *p = current->domain;
+    struct exec_domain *p = current;
 
     rem_ac_timer(&p->timer);
     
@@ -321,7 +321,8 @@ long do_set_timer_op(unsigned long timeout_hi, unsigned long timeout_lo)
         add_ac_timer(&p->timer);
     }
 
-    TRACE_4D(TRC_SCHED_SET_TIMER, p->id, p, timeout_hi, timeout_lo);
+    TRACE_5D(TRC_SCHED_SET_TIMER, p->domain->id, p->eid, p, timeout_hi,
+             timeout_lo);
 
     return 0;
 }
@@ -515,10 +516,10 @@ static void t_timer_fn(unsigned long unused)
 /* Domain timer function, sends a virtual timer interrupt to domain */
 static void dom_timer_fn(unsigned long data)
 {
-    struct domain *p = (struct domain *)data;
-    struct exec_domain *ed = p->exec_domain[0];
+    struct exec_domain *ed = (struct exec_domain *)data;
+    struct domain *d = ed->domain;
     TRACE_0D(TRC_SCHED_DOM_TIMER_FN);
-    update_dom_time(p);
+    update_dom_time(d);
     send_guest_virq(ed, VIRQ_TIMER);
 }
 
