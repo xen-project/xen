@@ -56,32 +56,24 @@ extern unsigned char pckbd_sysrq_xlate[128];
 
 static inline int xen_kbd_controller_present ()
 {
-	if( start_info.flags & SIF_CONSOLE )
-		{
-		printk("Enable keyboard\n");
-		return 1;
-		}
-	else
-		return 0;
+    return start_info.flags & SIF_CONSOLE;
 }
 
 /* resource allocation */
 #define kbd_request_region() do { } while (0)
 #define kbd_request_irq(handler) request_irq(_EVENT_KBD, handler, 0, "PS/2 kbd", NULL)
 
-// could implement these with command to xen to filter mouse stuff...
+/* could implement these with command to xen to filter mouse stuff... */
 #define aux_request_irq(hand, dev_id) 0
 #define aux_free_irq(dev_id) do { } while(0)
 
 /* Some stoneage hardware needs delays after some operations.  */
 #define kbd_pause() do { } while(0)
 
-
 static unsigned char kbd_current_scancode = 0;
 
 static unsigned char kbd_read_input(void) 
 {
-  //xprintk("kbd_read_input: returning scancode 0x%2x\n", kbd_current_scancode);
   return kbd_current_scancode;
 }
 
@@ -89,13 +81,12 @@ static unsigned char kbd_read_status(void)
 {
   long res;
   res = HYPERVISOR_kbd_op(KBD_OP_READ,0);
-  if(res<0) {
-    //printk("kbd_read_status: error from hypervisor: %d", res);
+  if ( res<0 ) 
+  {
     kbd_current_scancode = 0;
-    return 0; // error with our request - wrong domain?
+    return 0; /* error with our request - wrong domain? */
   }
   kbd_current_scancode = KBD_CODE_SCANCODE(res);
-  //printk("kbd_read_status: returning status 0x%2x\n", KBD_CODE_STATUS(res));
   return KBD_CODE_STATUS(res);
 }
 

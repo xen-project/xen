@@ -166,7 +166,8 @@ void __init setup_arch(char **cmdline_p)
     ROOT_DEV = MKDEV(RAMDISK_MAJOR,0);
     memset(&drive_info, 0, sizeof(drive_info));
     memset(&screen_info, 0, sizeof(screen_info));
-    // this is drawn from a dump from vgacon:startup in standard linux
+    
+    /* This is drawn from a dump from vgacon:startup in standard Linux. */
     screen_info.orig_video_mode = 3; 
     screen_info.orig_video_isVGA = 1;
     screen_info.orig_video_lines = 25;
@@ -321,7 +322,7 @@ void __init setup_arch(char **cmdline_p)
         if( !(start_info.flags & SIF_PRIVILEGED) )
             panic("Xen granted us console access but not privileged status");
 
-#ifdef CONFIG_VT
+#if defined(CONFIG_VT)
 #if defined(CONFIG_VGA_CONSOLE)
         conswitchp = &vga_con;
 #elif defined(CONFIG_DUMMY_CONSOLE)
