@@ -131,6 +131,10 @@ extern void perfc_reset (u_char key, void *dev_id, struct pt_regs *regs);
 extern void dump_runq(u_char key, void *dev_id, struct pt_regs *regs);
 extern void print_sched_histo(u_char key, void *dev_id, struct pt_regs *regs);
 extern void reset_sched_histo(u_char key, void *dev_id, struct pt_regs *regs);
+#ifndef NDEBUG
+void reaudit_pages(u_char key, void *dev_id, struct pt_regs *regs);
+void audit_all_pages(u_char key, void *dev_id, struct pt_regs *regs);
+#endif
 
 
 void initialize_keytable() 
@@ -152,5 +156,8 @@ void initialize_keytable()
     add_key_handler('r', dump_runq,      "dump run queues");
     add_key_handler('B', kill_dom0,      "reboot machine gracefully"); 
     add_key_handler('R', halt_machine,   "reboot machine ungracefully"); 
-    return; 
+#ifndef NDEBUG
+    add_key_handler('m', reaudit_pages, "re-audit pages");
+    add_key_handler('M', audit_all_pages, "audit all pages");
+#endif
 }
