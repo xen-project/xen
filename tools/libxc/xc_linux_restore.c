@@ -325,7 +325,7 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
             }          
         }
  
-        if ( (region_base = mfn_mapper_map_batch( xc_handle, dom, 
+        if ( (region_base = xc_map_foreign_batch( xc_handle, dom, 
                                                   PROT_WRITE,
                                                   region_mfn,
                                                   j )) == 0 )
@@ -631,7 +631,7 @@ printf("XXXXXXXXXXXXXXX pin L2\n");
     }
     
     if ( (live_pfn_to_mfn_table = 
-          mfn_mapper_map_batch(xc_handle, dom, 
+	  xc_map_foreign_batch(xc_handle, dom, 
                                PROT_WRITE,
                                pfn_to_mfn_frame_list,
                                (nr_pfns+1023)/1024 )) == 0 )

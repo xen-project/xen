@@ -133,7 +133,7 @@ void unmap_pfn(void *pm_handle, void *vaddr)
 
 /*******************/
 
-void *mfn_mapper_map_batch(int xc_handle, domid_t dom, int prot,
+void *xc_map_foreign_batch(int xc_handle, u32 dom, int prot,
                            unsigned long *arr, int num )
 {
     privcmd_mmapbatch_t ioctlx; 
@@ -158,7 +158,7 @@ void *mfn_mapper_map_batch(int xc_handle, domid_t dom, int prot,
 
 /*******************/
 
-void *mfn_mapper_map_single(int xc_handle, domid_t dom,
+void *xc_map_foreign_range(int xc_handle, u32 dom,
                             int size, int prot,
                             unsigned long mfn )
 {

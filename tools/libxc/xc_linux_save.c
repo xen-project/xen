@@ -30,18 +30,8 @@
 /*
  * Returns TRUE if the given machine frame number has a unique mapping
  * in the guest's pseudophysical map.
- * 0x80000000-3 mark the shared_info, and blk/net rings
  */
 
-#if 0 
-#define MFN_IS_IN_PSEUDOPHYS_MAP(_mfn)                                    \
-    (((_mfn) < (1024*1024)) &&                                            \
-     (((live_mfn_to_pfn_table[_mfn] < nr_pfns) &&                         \
-       (live_pfn_to_mfn_table[live_mfn_to_pfn_table[_mfn]] == (_mfn))) || \
-      ((live_mfn_to_pfn_table[_mfn] >= 0x80000000) &&                     \
-       (live_mfn_to_pfn_table[_mfn] <= 0x80000003)) ||                    \
-      (live_pfn_to_mfn_table[live_mfn_to_pfn_table[_mfn]] == 0x80000004)))
-#endif
 #define MFN_IS_IN_PSEUDOPHYS_MAP(_mfn)                                    \
     (((_mfn) < (1024*1024)) &&                                            \
      ((live_mfn_to_pfn_table[_mfn] < nr_pfns) &&                         \
@@ -59,6 +49,8 @@
         *(_pmfn) = live_mfn_to_pfn_table[mfn]; \
     _res;                                      \
 })
+
+#define is_mapped(pfn) (!((pfn) & 0x80000000UL))
 
 static inline int test_bit ( int nr, volatile void * addr)
 {
@@ -384,7 +376,7 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 
 
     /* Map the shared info frame */
-    live_shinfo = mfn_mapper_map_single(xc_handle, domid,
+    live_shinfo = xc_map_foreign_range(xc_handle, domid,
                                         PAGE_SIZE, PROT_READ,
                                         shared_info_frame);
 
@@ -395,7 +387,7 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 
     /* the pfn_to_mfn_frame_list fits in a single page */
     live_pfn_to_mfn_frame_list = 
-        mfn_mapper_map_single(xc_handle, domid, 
+        xc_map_foreign_range(xc_handle, domid, 
                               PAGE_SIZE, PROT_READ, 
                               live_shinfo->arch.pfn_to_mfn_frame_list );
 
@@ -410,7 +402,7 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
        (its not clear why it would want to change them, and we'll be OK
        from a safety POV anyhow. */
 
-    live_pfn_to_mfn_table = mfn_mapper_map_batch(xc_handle, domid, 
+    live_pfn_to_mfn_table = xc_map_foreign_batch(xc_handle, domid, 
                                                  PROT_READ,
                                                  live_pfn_to_mfn_frame_list,
                                                  (nr_pfns+1023)/1024 );  
@@ -421,12 +413,12 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 
     /* Setup the mfn_to_pfn table mapping */
     mfn_to_pfn_table_start_mfn = xc_get_m2p_start_mfn( xc_handle );
-
+printf("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n");
     live_mfn_to_pfn_table = 
-	mfn_mapper_map_single(xc_handle, DOMID_XEN, 
+	xc_map_foreign_range(xc_handle, DOMID_XEN, 
 			      PAGE_SIZE*1024, PROT_READ, 
 			      mfn_to_pfn_table_start_mfn );
-
+printf("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB\n");
     /* Canonicalise the pfn-to-mfn table frame-number list. */
     memcpy( pfn_to_mfn_frame_list, live_pfn_to_mfn_frame_list, PAGE_SIZE );
 
@@ -530,7 +522,7 @@ printf("GO LIVE!!\n");
 	{
 	    mfn = live_pfn_to_mfn_table[i];
 	    
-	    if( (live_mfn_to_pfn_table[mfn] != i) && (mfn != 0x80000001) )
+	    if( (live_mfn_to_pfn_table[mfn] != i) && (mfn != 0xffffffffUL) )
 	    {
 		printf("i=0x%x mfn=%lx live_mfn_to_pfn_table=%lx\n",
 		       i,mfn,live_mfn_to_pfn_table[mfn]);
@@ -629,7 +621,8 @@ printf("GO LIVE!!\n");
                 pfn_batch[batch] = n;
                 pfn_type[batch] = live_pfn_to_mfn_table[n];
 
-                if( pfn_type[batch] == 0x80000001 ){
+                if( ! is_mapped(pfn_type[batch]) )
+		{
                     /* not currently in pusedo-physical map -- set bit
                        in to_fix that we must send this page in last_iter
                        unless its sent sooner anyhow */
@@ -660,7 +653,7 @@ printf("GO LIVE!!\n");
             if ( batch == 0 )
                 goto skip; /* vanishingly unlikely... */
       
-            if ( (region_base = mfn_mapper_map_batch(xc_handle, domid, 
+            if ( (region_base = xc_map_foreign_batch(xc_handle, domid, 
                                                      PROT_READ,
                                                      pfn_type,
                                                      batch)) == 0 ){
@@ -870,7 +863,7 @@ printf("type fail: page %i mfn %08lx\n",j,pfn_type[j]);
 
 	for ( i = 0, j = 0; i < nr_pfns; i++ )
 	{
-	    if ( live_pfn_to_mfn_table[i] >= 0x80000000UL )
+	    if ( ! is_mapped(live_pfn_to_mfn_table[i]) )
 		j++;
 	}
 
@@ -882,7 +875,7 @@ printf("type fail: page %i mfn %08lx\n",j,pfn_type[j]);
 
 	for ( i = 0, j = 0; i < nr_pfns; )
 	{
-	    if ( live_pfn_to_mfn_table[i] >= 0x80000000UL )
+	    if ( ! is_mapped(live_pfn_to_mfn_table[i]) )
 	    {
 		pfntab[j++] = i;
 	    }
@@ -901,7 +894,7 @@ printf("type fail: page %i mfn %08lx\n",j,pfn_type[j]);
 
     /* Map the suspend-record MFN to pin it. The page must be owned by 
        domid for this to succeed. */
-    p_srec = mfn_mapper_map_single(xc_handle, domid,
+    p_srec = xc_map_foreign_range(xc_handle, domid,
                                    sizeof(*p_srec), PROT_READ, 
                                    ctxt.cpu_ctxt.esi);
     if (!p_srec){
