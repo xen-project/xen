@@ -334,6 +334,8 @@ struct pfn_info *alloc_domain_page(struct task_struct *p)
         spin_lock(&p->page_list_lock);
         if ( unlikely(p->tot_pages >= p->max_pages) )
         {
+            DPRINTK("Over-allocation for domain %llu: %u >= %u\n",
+                    p->domain, p->tot_pages, p->max_pages);
             spin_unlock(&p->page_list_lock);
             goto free_and_exit;
         }
@@ -884,7 +886,7 @@ int construct_dom0(struct task_struct *p,
         page->type_and_flags  = 0;
         page->count_and_flags = PGC_allocated | 1;
         list_add_tail(&page->list, &p->page_list);
-        p->tot_pages++;
+        p->tot_pages++; p->max_pages++;
     }
 
     mpt_alloc = (vpt_start - v_start) + alloc_start;

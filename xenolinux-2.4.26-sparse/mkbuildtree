@@ -163,7 +163,6 @@ ln -sf ../asm-i386/mtrr.h
 ln -sf ../asm-i386/namei.h 
 ln -sf ../asm-i386/param.h 
 ln -sf ../asm-i386/parport.h 
-ln -sf ../asm-i386/pci.h
 ln -sf ../asm-i386/pgtable-3level.h 
 ln -sf ../asm-i386/poll.h 
 ln -sf ../asm-i386/posix_types.h 

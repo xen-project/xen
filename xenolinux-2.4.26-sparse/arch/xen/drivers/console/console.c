@@ -513,7 +513,7 @@ static int __init xencons_init(void)
     }
     else
     {
-        (void)ctrl_if_register_receiver(CMSG_CONSOLE, xencons_rx);
+        (void)ctrl_if_register_receiver(CMSG_CONSOLE, xencons_rx, 0);
     }
 
     printk("Xen virtual console successfully installed\n");

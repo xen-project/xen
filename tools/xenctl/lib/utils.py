@@ -54,15 +54,13 @@ def get_current_ipmask(dev='eth0'):
             return m.group(1)
     return None
 
-def get_current_ipgw(dev='eth0'):
-    """Return a string containing the IP gateway for the given
-    network interface (default 'eth0').
-    """
+def get_current_ipgw():
+    """Return a string containing the default IP gateway."""
     fd = os.popen( '/sbin/route -n' )
     lines = fd.readlines()
     for line in lines:
-        m = re.search( '^\S+\s+([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)' +
-                       '\s+\S+\s+\S*G.*' + dev + '.*', line )
+        m = re.search( '^0.0.0.0+\s+([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)' +
+                       '\s+0.0.0.0+\s+\S*G.*', line )
         if m:
             return m.group(1)
     return None

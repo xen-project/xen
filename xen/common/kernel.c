@@ -105,7 +105,6 @@ static struct {
 void cmain(unsigned long magic, multiboot_info_t *mbi)
 {
     struct task_struct *new_dom;
-    dom0_createdomain_t dom0_params;
     unsigned long max_page;
     unsigned char *cmdline;
     module_t *mod = (module_t *)__va(mbi->mods_addr);
@@ -263,7 +262,6 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
     task_hash[TASK_HASH(IDLE_DOMAIN_ID)] = &idle0_task;
 
     /* Create initial domain 0. */
-    dom0_params.memory_kb = opt_dom0_mem;
     new_dom = do_createdomain(0, 0);
     if ( new_dom == NULL )
         panic("Error creating domain 0\n");

@@ -10,6 +10,7 @@
 #include <linux/rbtree.h>
 #include <linux/interrupt.h>
 #include <linux/slab.h>
+#include <linux/blkdev.h>
 #include <asm/ctrl_if.h>
 #include <asm/io.h>
 #include "../blkif.h"

@@ -468,7 +468,6 @@ typedef struct {
     unsigned int   evtchn;            /* Event channel for notifications.    */
     unsigned long  tx_shmem_frame;    /* Page cont. tx shared comms window.  */
     unsigned long  rx_shmem_frame;    /* Page cont. rx shared comms window.  */
-    unsigned long  shmem_frame;       
     /* OUT */
     unsigned int   status;
 } netif_be_connect_t; 

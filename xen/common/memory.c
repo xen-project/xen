@@ -940,16 +940,24 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         }
         break;
 
+        /* XXX This function is racey! */
     case MMUEXT_REASSIGN_PAGE:
-        if ( !IS_PRIV(current) )
+        if ( unlikely(!IS_PRIV(current)) )
         {
             MEM_LOG("Dom %llu has no privilege to reassign page ownership",
                     current->domain);
             okay = 0;
         }
-        else if ( percpu_info[cpu].gps != NULL )
+        else if ( likely(percpu_info[cpu].gps != NULL) )
         {
+            current->tot_pages--;
+            percpu_info[cpu].gps->tot_pages++;
             page->u.domain = percpu_info[cpu].gps;
+        }
+        else
+        {
+            MEM_LOG("No GPS to reassign pfn %08lx to\n", pfn);
+            okay = 0;
         }
         break;
 

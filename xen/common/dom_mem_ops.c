@@ -27,13 +27,21 @@ static long alloc_dom_mem(struct task_struct *p, reservation_increase_t op)
     {
         /* Leave some slack pages; e.g., for the network. */
         if ( unlikely(free_pfns < (SLACK_DOMAIN_MEM_KILOBYTES >> 
-                                   (PAGE_SHIFT-10))) ) 
+                                   (PAGE_SHIFT-10))) )
+        {
+            DPRINTK("Not enough slack: %u %u\n",
+                    free_pfns,
+                    SLACK_DOMAIN_MEM_KILOBYTES >> (PAGE_SHIFT-10));
             break;
+        }
 
         /* NB. 'alloc_domain_page' does limit checking on pages per domain. */
         if ( unlikely((page = alloc_domain_page(p)) == NULL) )
+        {
+            DPRINTK("Could not allocate a frame\n");
             break;
-        
+        }
+
         /* Inform the domain of the new page's machine address. */ 
         mpfn = (unsigned long)(page - frame_table);
         copy_to_user(op.pages, &mpfn, sizeof(mpfn));

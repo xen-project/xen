@@ -4,7 +4,7 @@
 ## Copyright (c) 2004, K A Fraser (University of Cambridge)
 #############################################################
 
-import xend.blkif, xend.console, xend.main, xend.utils
+import xend.blkif, xend.netif, xend.console, xend.main, xend.utils
 
 
 ##
@@ -110,6 +110,43 @@ def new_block_device(dom, handle, vdev, pdev, start_sect, nr_sect, readonly):
         response['error_type'] = 'Vdevice (dom=%d,handle=%d,vdevice=%d) ' + \
                                  'already exists' % (dom, handle, vdev)
         return response
+
+    # Response is deferred until back-end driver sends acknowledgement.
+    return None
+
+
+##
+## new_network_interface:
+##  Create a new network interface for the specified domain @dom.
+##
+def new_network_interface(dom, handle=-1):
+    # By default we create an interface with handle zero.
+    if handle < 0:
+        handle = 0
+
+    # We only support one interface per domain, which must have handle zero.
+    if handle != 0:
+        response = { 'success': False }
+        response['error_type'] = 'Bad handle %d (only handle 0 ' + \
+                                 'is supported)' % handle
+        return response
+
+    # Find local event-channel port associated with the specified domain.
+    port = xend.main.port_from_dom(dom)
+    if not port:
+        response = { 'success': False }
+        response['error_type'] = 'Unknown domain %d' % dom
+        return response
+
+    # The interface must not already exist.
+    if xend.netif.interface.list.has_key(port.local_port):
+        response = { 'success': False }
+        response['error_type'] = 'Interface (dom=%d,handle=%d) already ' + \
+                                 'exists' % (dom, handle)
+        return response
+
+    # Create the new interface. Initially no virtual devices are attached.
+    xend.netif.interface(dom, port.local_port)
 
     # Response is deferred until back-end driver sends acknowledgement.
     return None

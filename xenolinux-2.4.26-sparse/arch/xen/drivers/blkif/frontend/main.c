@@ -24,8 +24,6 @@ typedef unsigned char byte; /* from linux/ide.h */
 static unsigned int blkif_state = BLKIF_STATE_CLOSED;
 static unsigned int blkif_evtchn, blkif_irq;
 
-static struct tq_struct blkif_statechange_tq;
-
 static int blkif_control_rsp_valid;
 static blkif_response_t blkif_control_rsp;
 
@@ -302,11 +300,18 @@ static int blkif_queue_request(unsigned long   id,
     struct gendisk     *gd;
     blkif_request_t    *req;
     struct buffer_head *bh;
+    unsigned int        fsect, lsect;
 
-    if ( unlikely(nr_sectors >= (1<<9)) )
-        BUG();
+    fsect = (buffer_ma & ~PAGE_MASK) >> 9;
+    lsect = fsect + nr_sectors - 1;
+
+    /* Buffer must be sector-aligned. Extent mustn't cross a page boundary. */
     if ( unlikely((buffer_ma & ((1<<9)-1)) != 0) )
         BUG();
+    if ( lsect > 7 )
+        BUG();
+
+    buffer_ma &= PAGE_MASK;
 
     if ( unlikely(blkif_state != BLKIF_STATE_CONNECTED) )
         return 1;
@@ -341,8 +346,9 @@ static int blkif_queue_request(unsigned long   id,
             bh = (struct buffer_head *)id;
             bh->b_reqnext = (struct buffer_head *)req->id;
             req->id = id;
-            req->buffer_and_sects[req->nr_segments] = buffer_ma | nr_sectors;
-            if ( ++req->nr_segments < MAX_BLK_SEGS )
+            req->frame_and_sects[req->nr_segments] = 
+                buffer_ma | (fsect<<3) | lsect;
+            if ( ++req->nr_segments < BLKIF_MAX_SEGMENTS_PER_REQUEST )
                 sg_next_sect += nr_sectors;
             else
                 DISABLE_SCATTERGATHER();
@@ -371,7 +377,7 @@ static int blkif_queue_request(unsigned long   id,
     req->sector_number = (blkif_sector_t)sector_number;
     req->device        = device; 
     req->nr_segments   = 1;
-    req->buffer_and_sects[0] = buffer_ma | nr_sectors;
+    req->frame_and_sects[0] = buffer_ma | (fsect<<3) | lsect;
     req_prod++;
 
     return 0;
@@ -556,46 +562,11 @@ void blkif_control_send(blkif_request_t *req, blkif_response_t *rsp)
 }
 
 
-static void blkif_bringup_phase1(void *unused)
+static void blkif_status_change(blkif_fe_interface_status_changed_t *status)
 {
     ctrl_msg_t                   cmsg;
     blkif_fe_interface_connect_t up;
 
-    /* Move from CLOSED to DISCONNECTED state. */
-    blk_ring = (blkif_ring_t *)__get_free_page(GFP_KERNEL);
-    blk_ring->req_prod = blk_ring->resp_prod = resp_cons = req_prod = 0;
-    blkif_state  = BLKIF_STATE_DISCONNECTED;
-
-    /* Construct an interface-CONNECT message for the domain controller. */
-    cmsg.type      = CMSG_BLKIF_FE;
-    cmsg.subtype   = CMSG_BLKIF_FE_INTERFACE_CONNECT;
-    cmsg.length    = sizeof(blkif_fe_interface_connect_t);
-    up.handle      = 0;
-    up.shmem_frame = virt_to_machine(blk_ring) >> PAGE_SHIFT;
-    memcpy(cmsg.msg, &up, sizeof(up));
-
-    /* Tell the controller to bring up the interface. */
-    ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
-}
-
-static void blkif_bringup_phase2(void *unused)
-{
-    blkif_irq = bind_evtchn_to_irq(blkif_evtchn);
-    (void)request_irq(blkif_irq, blkif_int, 0, "blkif", NULL);
-
-    /* Probe for discs that are attached to the interface. */
-    xlvbd_init();
-
-    blkif_state = BLKIF_STATE_CONNECTED;
-
-    /* Kick pending requests. */
-    spin_lock_irq(&io_request_lock);
-    kick_pending_request_queues();
-    spin_unlock_irq(&io_request_lock);
-}
-
-static void blkif_status_change(blkif_fe_interface_status_changed_t *status)
-{
     if ( status->handle != 0 )
     {
         printk(KERN_WARNING "Status change on unsupported blkif %d\n",
@@ -617,8 +588,22 @@ static void blkif_status_change(blkif_fe_interface_status_changed_t *status)
                    " in state %d\n", blkif_state);
             break;
         }
-        blkif_statechange_tq.routine = blkif_bringup_phase1;
-        schedule_task(&blkif_statechange_tq);
+
+        /* Move from CLOSED to DISCONNECTED state. */
+        blk_ring = (blkif_ring_t *)__get_free_page(GFP_KERNEL);
+        blk_ring->req_prod = blk_ring->resp_prod = resp_cons = req_prod = 0;
+        blkif_state  = BLKIF_STATE_DISCONNECTED;
+
+        /* Construct an interface-CONNECT message for the domain controller. */
+        cmsg.type      = CMSG_BLKIF_FE;
+        cmsg.subtype   = CMSG_BLKIF_FE_INTERFACE_CONNECT;
+        cmsg.length    = sizeof(blkif_fe_interface_connect_t);
+        up.handle      = 0;
+        up.shmem_frame = virt_to_machine(blk_ring) >> PAGE_SHIFT;
+        memcpy(cmsg.msg, &up, sizeof(up));
+        
+        /* Tell the controller to bring up the interface. */
+        ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
         break;
 
     case BLKIF_INTERFACE_STATUS_CONNECTED:
@@ -628,9 +613,20 @@ static void blkif_status_change(blkif_fe_interface_status_changed_t *status)
                    " in state %d\n", blkif_state);
             break;
         }
+
         blkif_evtchn = status->evtchn;
-        blkif_statechange_tq.routine = blkif_bringup_phase2;
-        schedule_task(&blkif_statechange_tq);
+        blkif_irq = bind_evtchn_to_irq(blkif_evtchn);
+        (void)request_irq(blkif_irq, blkif_int, 0, "blkif", NULL);
+        
+        /* Probe for discs that are attached to the interface. */
+        xlvbd_init();
+        
+        blkif_state = BLKIF_STATE_CONNECTED;
+        
+        /* Kick pending requests. */
+        spin_lock_irq(&io_request_lock);
+        kick_pending_request_queues();
+        spin_unlock_irq(&io_request_lock);
         break;
 
     default:
@@ -675,7 +671,11 @@ int __init xlblk_init(void)
     ctrl_msg_t                       cmsg;
     blkif_fe_driver_status_changed_t st;
 
-    (void)ctrl_if_register_receiver(CMSG_BLKIF_FE, blkif_ctrlif_rx);
+    if ( start_info.flags & SIF_INITDOMAIN )
+        return 0;
+
+    (void)ctrl_if_register_receiver(CMSG_BLKIF_FE, blkif_ctrlif_rx,
+                                    CALLBACK_IN_BLOCKING_CONTEXT);
 
     /* Send a driver-UP notification to the domain controller. */
     cmsg.type      = CMSG_BLKIF_FE;

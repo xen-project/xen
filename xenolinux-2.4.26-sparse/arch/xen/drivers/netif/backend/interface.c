@@ -7,6 +7,7 @@
  */
 
 #include "common.h"
+#include <linux/rtnetlink.h>
 
 #define NETIF_HASHSZ 1024
 #define NETIF_HASH(_d,_h) \
@@ -14,6 +15,7 @@
 
 static netif_t *netif_hash[NETIF_HASHSZ];
 static struct net_device *bridge_dev;
+static struct net_bridge *bridge_br;
 
 netif_t *netif_find_by_handle(domid_t domid, unsigned int handle)
 {
@@ -36,8 +38,10 @@ void __netif_disconnect_complete(netif_t *netif)
      */
     unbind_evtchn_from_irq(netif->evtchn);
     vfree(netif->tx); /* Frees netif->rx as well. */
-    (void)br_del_if((struct net_bridge *)bridge_dev->priv, netif->dev);
+    rtnl_lock();
+    (void)br_del_if(bridge_br, netif->dev);
     (void)dev_close(netif->dev);
+    rtnl_unlock();
 
     /* Construct the deferred response message. */
     cmsg.type         = CMSG_NETIF_BE;
@@ -73,7 +77,7 @@ void netif_create(netif_be_create_t *create)
     struct net_device *dev;
     netif_t          **pnetif, *netif;
 
-    dev = alloc_netdev(sizeof(netif_t), "netif-be-%d", ether_setup);
+    dev = alloc_netdev(sizeof(netif_t), "nbe-if%d", ether_setup);
     if ( dev == NULL )
     {
         DPRINTK("Could not create netif: out of memory\n");
@@ -111,7 +115,10 @@ void netif_create(netif_be_create_t *create)
     dev->hard_start_xmit = netif_be_start_xmit;
     dev->get_stats       = netif_be_get_stats;
     memcpy(dev->dev_addr, create->mac, ETH_ALEN);
-    
+
+    /* XXX In bridge mode we should force a different MAC from remote end. */
+    dev->dev_addr[2] ^= 1;
+
     if ( register_netdev(dev) != 0 )
     {
         DPRINTK("Could not register new net device\n");
@@ -225,15 +232,27 @@ void netif_connect(netif_be_connect_t *connect)
     netif->status         = CONNECTED;
     netif_get(netif);
 
+    rtnl_lock();
+
     (void)dev_open(netif->dev);
-    (void)br_add_if((struct net_bridge *)bridge_dev->priv, netif->dev);
-    /* At this point we try to ensure that eth0 is attached to the bridge. */
+    (void)br_add_if(bridge_br, netif->dev);
+
+    /*
+     * The default config is a very simple binding to eth0.
+     * If eth0 is being used as an IP interface by this OS then someone
+     * must add eth0's IP address to nbe-br, and change the routing table
+     * to refer to nbe-br instead of eth0.
+     */
+    (void)dev_open(bridge_dev);
     if ( (eth0_dev = __dev_get_by_name("eth0")) != NULL )
     {
         (void)dev_open(eth0_dev);
-        (void)br_add_if((struct net_bridge *)bridge_dev->priv, eth0_dev);
+        (void)br_add_if(bridge_br, eth0_dev);
     }
-    (void)request_irq(netif->irq, netif_be_int, 0, "netif-backend", netif);
+
+    rtnl_unlock();
+
+    (void)request_irq(netif->irq, netif_be_int, 0, netif->dev->name, netif);
     netif_start_queue(netif->dev);
 
     connect->status = NETIF_BE_STATUS_OKAY;
@@ -271,8 +290,11 @@ int netif_disconnect(netif_be_disconnect_t *disconnect, u8 rsp_id)
 void netif_interface_init(void)
 {
     memset(netif_hash, 0, sizeof(netif_hash));
-    if ( br_add_bridge("netif-backend") != 0 )
+    if ( br_add_bridge("nbe-br") != 0 )
         BUG();
-    bridge_dev = __dev_get_by_name("netif-be-bridge");
-    (void)dev_open(bridge_dev);
+    bridge_dev = __dev_get_by_name("nbe-br");
+    bridge_br  = (struct net_bridge *)bridge_dev->priv;
+    bridge_br->bridge_hello_time = bridge_br->hello_time = 0;
+    bridge_br->bridge_forward_delay = bridge_br->forward_delay = 0;
+    bridge_br->stp_enabled = 0;
 }

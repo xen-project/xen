@@ -33,8 +33,19 @@ static struct irqaction ctrl_if_irq_action;
 static CONTROL_RING_IDX ctrl_if_tx_resp_cons;
 static CONTROL_RING_IDX ctrl_if_rx_req_cons;
 
-/* Incoming message requests: primary message type -> message handler. */
+/* Incoming message requests. */
+    /* Primary message type -> message handler. */
 static ctrl_msg_handler_t ctrl_if_rxmsg_handler[256];
+    /* Primary message type -> callback in process context? */
+static unsigned long ctrl_if_rxmsg_blocking_context[256/sizeof(unsigned long)];
+    /* Is it late enough during bootstrap to use schedule_task()? */
+static int safe_to_schedule_task;
+    /* Passed to schedule_task(). */
+static struct tq_struct ctrl_if_rxmsg_deferred_tq;
+    /* Queue up messages to be handled in process context. */
+static ctrl_msg_t ctrl_if_rxmsg_deferred[CONTROL_RING_SIZE];
+static CONTROL_RING_IDX ctrl_if_rxmsg_deferred_prod;
+static CONTROL_RING_IDX ctrl_if_rxmsg_deferred_cons;
 
 /* Incoming message responses: message identifier -> message handler/id. */
 static struct {
@@ -99,22 +110,40 @@ static void __ctrl_if_tx_tasklet(unsigned long data)
     }
 }
 
+static void __ctrl_if_rxmsg_deferred(void *unused)
+{
+    ctrl_msg_t *msg;
+
+    while ( ctrl_if_rxmsg_deferred_cons != ctrl_if_rxmsg_deferred_prod )
+    {
+        msg = &ctrl_if_rxmsg_deferred[MASK_CONTROL_IDX(
+            ctrl_if_rxmsg_deferred_cons++)];
+        (*ctrl_if_rxmsg_handler[msg->type])(msg, 0);
+    }
+}
+
 static void __ctrl_if_rx_tasklet(unsigned long data)
 {
     control_if_t *ctrl_if = get_ctrl_if();
-    ctrl_msg_t   *msg;
+    ctrl_msg_t    msg, *pmsg;
 
     while ( ctrl_if_rx_req_cons != ctrl_if->rx_req_prod )
     {
-        /*
-         * We need no locking or barriers here. There will be one and only one
-         * response as a result of each callback, so the callback handler
-         * doesn't need to worry about the 'msg' being overwritten until:
-         *  1. It returns (if the message must persist then it must be copied).
-         *  2. A response is sent (the response may overwrite the request).
-         */
-        msg = &ctrl_if->rx_ring[MASK_CONTROL_IDX(ctrl_if_rx_req_cons++)];
-        (*ctrl_if_rxmsg_handler[msg->type])(msg, 0);
+        pmsg = &ctrl_if->rx_ring[MASK_CONTROL_IDX(ctrl_if_rx_req_cons++)];
+        memcpy(&msg, pmsg, offsetof(ctrl_msg_t, msg));
+        if ( msg.length != 0 )
+            memcpy(msg.msg, pmsg->msg, msg.length);
+        if ( test_bit(msg.type, &ctrl_if_rxmsg_blocking_context) )
+        {
+            pmsg = &ctrl_if_rxmsg_deferred[MASK_CONTROL_IDX(
+                ctrl_if_rxmsg_deferred_prod++)];
+            memcpy(pmsg, &msg, offsetof(ctrl_msg_t, msg) + msg.length);
+            schedule_task(&ctrl_if_rxmsg_deferred_tq);
+        }
+        else
+        {
+            (*ctrl_if_rxmsg_handler[msg.type])(&msg, 0);
+        }
     }
 }
 
@@ -243,22 +272,36 @@ void ctrl_if_send_response(ctrl_msg_t *msg)
     ctrl_if_notify_controller();
 }
 
-int ctrl_if_register_receiver(u8 type, ctrl_msg_handler_t hnd)
+int ctrl_if_register_receiver(
+    u8 type, 
+    ctrl_msg_handler_t hnd, 
+    unsigned int flags)
 {
-    unsigned long flags;
+    unsigned long _flags;
     int inuse;
 
-    spin_lock_irqsave(&ctrl_if_lock, flags);
+    spin_lock_irqsave(&ctrl_if_lock, _flags);
 
     inuse = (ctrl_if_rxmsg_handler[type] != ctrl_if_rxmsg_default_handler);
 
     if ( inuse )
+    {
         printk(KERN_INFO "Receiver %p already established for control "
                "messages of type %d.\n", ctrl_if_rxmsg_handler[type], type);
+    }
     else
+    {
         ctrl_if_rxmsg_handler[type] = hnd;
+        clear_bit(type, &ctrl_if_rxmsg_blocking_context);
+        if ( flags == CALLBACK_IN_BLOCKING_CONTEXT )
+        {
+            set_bit(type, &ctrl_if_rxmsg_blocking_context);
+            if ( !safe_to_schedule_task )
+                BUG();
+        }
+    }
 
-    spin_unlock_irqrestore(&ctrl_if_lock, flags);
+    spin_unlock_irqrestore(&ctrl_if_lock, _flags);
 
     return !inuse;
 }
@@ -326,11 +369,21 @@ void __init ctrl_if_init(void)
 
     for ( i = 0; i < 256; i++ )
         ctrl_if_rxmsg_handler[i] = ctrl_if_rxmsg_default_handler;
+    ctrl_if_rxmsg_deferred_tq.routine = __ctrl_if_rxmsg_deferred;
 
     spin_lock_init(&ctrl_if_lock);
 
     ctrl_if_resume();
 }
+
+
+/* This is called after it is safe to call schedule_task(). */
+static int __init ctrl_if_late_setup(void)
+{
+    safe_to_schedule_task = 1;
+    return 0;
+}
+__initcall(ctrl_if_late_setup);
 
 
 /*
