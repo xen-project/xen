@@ -71,8 +71,7 @@
 #include <string.h>
 #include <signal.h>
 #include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
+#include <sys/un.h>
 #include <errno.h>
 #include <malloc.h>
 #include <fcntl.h>
@@ -89,27 +88,28 @@ static int dom_port_map_size = 0;
 
 static void map_dom_to_port(u32 dom, int port)
 {
-	if (dom >= dom_port_map_size) {
-		dom_port_map = (int *)realloc(dom_port_map,
-					      (dom + 10) * sizeof(dom_port_map[0]));
+    if (dom >= dom_port_map_size) {
+        dom_port_map = (int *)realloc(dom_port_map,
+                                      (dom + 256) * sizeof(dom_port_map[0]));
 
-		if (dom_port_map == NULL) {
-			perror("realloc(dom_port_map)");
-			exit(1);
-		}
+        if (dom_port_map == NULL) {
+            perror("realloc(dom_port_map)");
+            exit(1);
+        }
 
-		for (; dom_port_map_size < dom + 10; dom_port_map_size++) {
-			dom_port_map[dom_port_map_size] = -1;
-		}
-	}
+        for (; dom_port_map_size < dom + 10; dom_port_map_size++) {
+            dom_port_map[dom_port_map_size] = -1;
+        }
+    }
 
-	dom_port_map[dom] = port;
+    dom_port_map[dom] = port;
 }
 
-static int dom_to_port(u32 dom) {
-	if (dom >= dom_port_map_size) return -1;
+static int dom_to_port(u32 dom) 
+{
+    if (dom >= dom_port_map_size) return -1;
 
-	return dom_port_map[dom];
+    return dom_port_map[dom];
 }
 
 static void init_interfaces(void)
@@ -218,37 +218,34 @@ void put_interface(control_channel_t *cc)
 /* ------[ Simple helpers ]------------------------------------------------*/
 
 /* listen_socket() is straight from paul sheer's useful select_tut manpage. */
-static int listen_socket (int listen_port) 
+static int listen_socket (char *listen_path) 
 {
-    struct sockaddr_in a;
+    struct sockaddr_un a;
     int s;
     int yes;
 
-    if ((s = socket (AF_INET, SOCK_STREAM, 0)) < 0) 
+    if ((s = socket (AF_UNIX, SOCK_STREAM, 0)) < 0) 
     {
         perror ("socket");
         return -1;
     }
     
     yes = 1;
-    if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR,
-        (char *) &yes, sizeof (yes)) < 0) 
-    {
-        perror ("setsockopt");
-        close (s);
-        return -1;
-    }
 
     memset (&a, 0, sizeof (a));
-    a.sin_port = htons (listen_port);
-    a.sin_family = AF_INET;
+    a.sun_family = AF_UNIX;
+    strcpy(a.sun_path, listen_path);
+
+    /* remove an old socket if it exists. */
+    unlink(listen_path);
+
     if (bind(s, (struct sockaddr *) &a, sizeof (a)) < 0) 
     {
         perror ("bind");
         close (s);
         return -1;
     }
-    printf ("accepting connections on port %d\n", (int) listen_port);
+    printf ("accepting connections on path %s\n", listen_path);
     listen (s, 10);
     return s;
 }
@@ -626,13 +623,13 @@ void gc_ufd_list( unbound_fd_t **ufd )
     }
 }
 
-int main (int argc, char*argv[])
+int main (int argc, char *argv[])
 {
     int listen_fd, evtchn_fd;
     unbound_fd_t *unbound_fd_list = NULL, **ufd;
     struct timeval timeout = { XCS_GC_INTERVAL, 0 };
     connection_t **con;
-    
+
     /* Initialize xc and event connections. */
     if (ctrl_chan_init() != 0)
     {
@@ -650,7 +647,7 @@ int main (int argc, char*argv[])
     init_interfaces();
     init_bindings();
     
-    listen_fd = listen_socket(XCS_TCP_PORT);
+    listen_fd = listen_socket(XCS_SUN_PATH);
    
     /* detach from our controlling tty so that a shell does hang waiting for
        stopped jobs. */
@@ -742,7 +739,7 @@ int main (int argc, char*argv[])
         /* CASE 2: New connection on the listen port. */
         if ( FD_ISSET ( listen_fd, &rd ))
         {
-            struct sockaddr_in remote_addr;
+            struct sockaddr_un remote_addr;
             int size;
             memset (&remote_addr, 0, sizeof (remote_addr));
             size = sizeof remote_addr;

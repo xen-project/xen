@@ -9,7 +9,7 @@
 #ifndef  __XCS_PROTO_H__
 #define  __XCS_PROTO_H__
 
-#define XCS_TCP_PORT     1633
+#define XCS_SUN_PATH     "/var/xen/xcs_socket"
 
 /* xcs message types: */
 #define XCS_CONNECT_CTRL       0 /* This is a control connection.     */

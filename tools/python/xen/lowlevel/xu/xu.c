@@ -13,10 +13,10 @@
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
+#include <sys/un.h>
 #include <sys/mman.h>
 #include <sys/poll.h>
 #include <sys/sysmacros.h>
-#include <netinet/in.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
@@ -87,36 +87,34 @@ static int xcs_ctrl_read(xcs_msg_t *msg);
 static int xcs_data_send(xcs_msg_t *msg);
 static int xcs_data_read(xcs_msg_t *msg);
 
-static int xcs_connect(char *ip, short port)
+static int xcs_connect(char *path)
 {
-    struct sockaddr_in addr;
-    int ret, flags;
+    struct sockaddr_un addr;
+    int ret, len, flags;
     xcs_msg_t msg;
 
     if (xcs_data_fd != -1) /* already connected */
         return 0;
     
-    xcs_ctrl_fd = socket(AF_INET, SOCK_STREAM, 0);
+    xcs_ctrl_fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (xcs_ctrl_fd < 0)
     {
         printf("error creating xcs socket!\n");
         goto fail;
     }
     
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(port);
-    addr.sin_addr.s_addr = inet_addr(ip);
-    memset(&(addr.sin_zero), '\0', 8);
+    addr.sun_family = AF_UNIX;
+    strcpy(addr.sun_path, path);
+    len = sizeof(addr.sun_family) + strlen(addr.sun_path) + 1;
 
-    ret = connect(xcs_ctrl_fd, (struct sockaddr *)&addr, 
-            sizeof(struct sockaddr));
+    ret = connect(xcs_ctrl_fd, (struct sockaddr *)&addr, len);
     if (ret < 0) 
     {
         printf("error connecting to xcs(ctrl)! (%d)\n", errno);
         goto ctrl_fd_fail;
     }
 
-    //set_cloexec(xcs_ctrl_fd);
+    /*set_cloexec(xcs_ctrl_fd);*/
             
     msg.type = XCS_CONNECT_CTRL;
     msg.u.connect.session_id = xcs_session_id;
@@ -131,20 +129,18 @@ static int xcs_connect(char *ip, short port)
     xcs_session_id = msg.u.connect.session_id;
     
     /* now the data connection. */
-    xcs_data_fd = socket(AF_INET, SOCK_STREAM, 0);
+    xcs_data_fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (xcs_data_fd < 0)
     {
         printf("error creating xcs data socket!\n");
         goto ctrl_fd_fail;
     }
     
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(port);
-    addr.sin_addr.s_addr = inet_addr(ip);
-    memset(&(addr.sin_zero), '\0', 8);
+    addr.sun_family = AF_UNIX;
+    strcpy(addr.sun_path, path);
+    len = sizeof(addr.sun_family) + strlen(addr.sun_path) + 1;
     
-    ret = connect(xcs_data_fd, (struct sockaddr *)&addr, 
-            sizeof(struct sockaddr));
+    ret = connect(xcs_data_fd, (struct sockaddr *)&addr, len);
     if (ret < 0) 
     {
         printf("error connecting to xcs(data)! (%d)\n", errno);
@@ -447,7 +443,7 @@ static PyObject *xu_notifier_new(PyObject *self, PyObject *args)
     for (i = 0; i < XCS_RING_SIZE; i++) 
         REQ_RING_ENT(i) = RSP_RING_ENT(i) = NULL;
     
-    (void)xcs_connect("127.0.0.1", XCS_TCP_PORT);
+    (void)xcs_connect(XCS_SUN_PATH);
     
 
     return (PyObject *)xun;
