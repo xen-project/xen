@@ -580,6 +580,9 @@ int do_process_page_updates(page_update_request_t *updates, int count)
                     err = put_l2_table(cur.val >> PAGE_SHIFT);
                 }
                 break;
+            default:
+                MEM_LOG("Invalid page update command %08lx", cur.ptr);
+                break;
             }
         }
         else if ( (cur.ptr & (sizeof(l1_pgentry_t)-1)) || (pfn >= max_page) )
@@ -602,6 +605,19 @@ int do_process_page_updates(page_update_request_t *updates, int count)
                 case PGT_l2_page_table: 
                     err = mod_l2_entry((l2_pgentry_t *)__va(cur.ptr),
                                        mk_l2_pgentry(cur.val)); 
+                    break;
+                default:
+                    /*
+                     * This might occur if a page-table update is
+                     * requested before we've inferred the type
+                     * of the containing page. It shouldn't happen
+                     * if page tables are built strictly top-down, so
+                     * we have a MEM_LOG warning message.
+                     */
+                    MEM_LOG("Unnecessary update to non-pt page %08lx",
+                            cur.ptr);
+                    *(unsigned long *)__va(cur.ptr) = cur.val;
+                    err = 0;
                     break;
                 }
             }
