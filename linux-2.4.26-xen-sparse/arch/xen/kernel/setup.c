@@ -162,6 +162,36 @@ static void __init parse_mem_cmdline (char ** cmdline_p)
     *cmdline_p = command_line;
 }
 
+/*
+ * Every exception-fixup table is sorted (i.e., kernel main table, and every
+ * module table. Some elements may be out of order if they reference text.init,
+ * for example. 
+ */
+static void sort_exception_table(struct exception_table_entry *start,
+                                 struct exception_table_entry *end)
+{
+    struct exception_table_entry *p, *q, tmp;
+
+    for ( p = start; p < end; p++ )
+    {
+        for ( q = p-1; q > start; q-- )
+            if ( p->insn > q->insn )
+                break;
+        if ( ++q != p )
+        {
+            tmp = *p;
+            memmove(q+1, q, (p-q)*sizeof(*p));
+            *q = tmp;
+        }
+    }
+}
+
+int xen_module_init(struct module *mod)
+{
+    sort_exception_table(mod->ex_table_start, mod->ex_table_end);
+    return 0;
+}
+
 void __init setup_arch(char **cmdline_p)
 {
     unsigned long bootmap_size, start_pfn, max_low_pfn;
@@ -172,10 +202,16 @@ void __init setup_arch(char **cmdline_p)
     extern unsigned long cpu0_pte_quicklist[];
     extern unsigned long cpu0_pgd_quicklist[];
 
+    extern const struct exception_table_entry __start___ex_table[];
+    extern const struct exception_table_entry __stop___ex_table[];
+
     /* Force a quick death if the kernel panics. */
     extern int panic_timeout;
     if ( panic_timeout == 0 )
         panic_timeout = 1;
+
+    /* Ensure that the kernel exception-fixup table is sorted. */
+    sort_exception_table(__start___ex_table, __stop___ex_table);
 
 #ifndef CONFIG_HIGHIO
     blk_nohighio = 1;

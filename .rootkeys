@@ -117,6 +117,7 @@
 3e5a4e673p7PEOyHFm3nHkYX6HQYBg linux-2.4.26-xen-sparse/include/asm-xen/irq.h
 3ead095db_LRUXnxaqs0dA1DWhPoQQ linux-2.4.26-xen-sparse/include/asm-xen/keyboard.h
 3e5a4e678ddsQOpbSiRdy1GRcDc9WA linux-2.4.26-xen-sparse/include/asm-xen/mmu_context.h
+40d06e5b2YWInUX1Xv9amVANwd_2Xg linux-2.4.26-xen-sparse/include/asm-xen/module.h
 3f8707e7ZmZ6TxyX0ZUEfvhA2Pb_xQ linux-2.4.26-xen-sparse/include/asm-xen/msr.h
 3e7270deQqtGPSnFxcW4AvJZuTUWfg linux-2.4.26-xen-sparse/include/asm-xen/multicall.h
 3e5a4e67mnQfh-R8KcQCaVo2Oho6yg linux-2.4.26-xen-sparse/include/asm-xen/page.h

@@ -3,6 +3,7 @@
 *.pyc
 *.so
 *.so.*
+*.tar.gz
 *~
 BitKeeper/*/*
 PENDING/*
@@ -10,8 +11,6 @@ TAGS
 extras/mini-os/h/hypervisor-ifs
 install
 install/*
-linux-*-xen/*
-linux-*.tar.gz
 linux-2.4.26-xen/*
 linux-xen-sparse
 tools/*/build/lib*/*.py
@@ -20,7 +19,6 @@ tools/misc/miniterm/miniterm
 tools/misc/xen_cpuperf
 tools/misc/xen_log
 tools/misc/xen_read_console
-tools/xend-2004-06-10_1309.tgz
 tools/xentrace/xentrace
 xen/drivers/pci/classlist.h
 xen/drivers/pci/devlist.h

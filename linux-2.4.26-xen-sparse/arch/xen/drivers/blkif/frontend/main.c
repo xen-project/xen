@@ -799,13 +799,9 @@ module_exit(xlblk_cleanup);
 
 void blkdev_suspend(void)
 {
-    /* XXX FIXME */
-    BUG();
 }
 
 
 void blkdev_resume(void)
 {
-    /* XXX FIXME */
-    BUG();
 }

@@ -309,8 +309,15 @@ static inline void flush_write_buffers(void)
 
 #ifdef SLOW_IO_BY_JUMPING
 #define __SLOW_DOWN_IO "\njmp 1f\n1:\tjmp 1f\n1:"
-#else
+#elif defined(__UNSAFE_IO__)
 #define __SLOW_DOWN_IO "\noutb %%al,$0x80"
+#else
+#define __SLOW_DOWN_IO "\n1: outb %%al,$0x80\n"           \
+                       "2:\n"                             \
+                       ".section __ex_table,\"a\"\n\t"    \
+                       ".align 4\n\t"                     \
+                       ".long 1b,2b\n"                    \
+                       ".previous"
 #endif
 
 #ifdef REALLY_SLOW_IO
@@ -329,8 +336,18 @@ extern void *xquad_portio;    /* Where the IO area was mapped */
 #define __OUT1(s,x) \
 static inline void out##s(unsigned x value, unsigned short port) {
 
+#ifdef __UNSAFE_IO__
 #define __OUT2(s,s1,s2) \
 __asm__ __volatile__ ("out" #s " %" s1 "0,%" s2 "1"
+#else
+#define __OUT2(s,s1,s2)                                  \
+__asm__ __volatile__ ("1: out" #s " %" s1 "0,%" s2 "1\n" \
+                      "2:\n"                             \
+                      ".section __ex_table,\"a\"\n\t"    \
+                      ".align 4\n\t"                     \
+                      ".long 1b,2b\n"                    \
+                      ".previous"
+#endif
 
 #if defined (CONFIG_MULTIQUAD) && !defined(STANDALONE)
 #define __OUTQ(s,ss,x)    /* Do the equivalent of the portio op on quads */ \
@@ -378,8 +395,22 @@ __OUTQ(s,s##_p,x)
 #define __IN1(s) \
 static inline RETURN_TYPE in##s(unsigned short port) { RETURN_TYPE _v;
 
+#ifdef __UNSAFE_IO__
 #define __IN2(s,s1,s2) \
 __asm__ __volatile__ ("in" #s " %" s2 "1,%" s1 "0"
+#else
+#define __IN2(s,s1,s2) \
+__asm__ __volatile__ ("1: in" #s " %" s2 "1,%" s1 "0\n" \
+                      "2:\n"                            \
+                      ".section .fixup,\"ax\"\n"        \
+                      "3: mov" #s " $~0,%" s1 "0\n\t"   \
+                      "jmp 2b\n"                        \
+                      ".previous\n"                     \
+                      ".section __ex_table,\"a\"\n\t"   \
+                      ".align 4\n\t"                    \
+                      ".long 1b,3b\n"                   \
+                      ".previous"
+#endif
 
 #if !defined(CONFIG_MULTIQUAD) || defined(STANDALONE)
 #define __IN(s,s1,i...) \

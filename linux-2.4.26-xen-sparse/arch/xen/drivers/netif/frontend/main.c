@@ -100,7 +100,6 @@ static struct net_device *find_dev_by_handle(unsigned int handle)
 }
 
 #define MULTIVIF
-//#ifdef MULTIVIF
 
 /** Network interface info. */
 struct netif_ctrl {
@@ -112,10 +111,11 @@ struct netif_ctrl {
     int err;
 };
 
-static struct netif_ctrl netctrl = {};
+static struct netif_ctrl netctrl;
 
-static void netctrl_init(void){
-    netctrl = (struct netif_ctrl){};
+static void netctrl_init(void)
+{
+    memset(&netctrl, 0, sizeof(netctrl));
     netctrl.interface_n = -1;
 }
 
@@ -163,8 +163,6 @@ static int netctrl_connected_count(void)
     netctrl.connected_n = connected;
     return connected;
 }
-
-//#endif
 
 static int network_open(struct net_device *dev)
 {
@@ -636,12 +634,12 @@ static void netif_status_change(netif_fe_interface_status_changed_t *status)
     struct net_device *dev;
     struct net_private *np;
     
-//#ifdef MULTIVIF
-    if(netctrl.interface_n <= 0){
+    if ( netctrl.interface_n <= 0 )
+    {
         printk(KERN_WARNING "Status change: no interfaces\n");
         return;
     }
-//#endif
+
     dev = find_dev_by_handle(status->handle);
     if(!dev){
         printk(KERN_WARNING "Status change: invalid netif handle %u\n",
@@ -790,11 +788,12 @@ static int create_netdev(int handle, struct net_device **val){
     return err;
 }
 
-//#ifdef MULTIVIF
-/** Initialize the network control interface. Set the number of network devices
+/*
+ * Initialize the network control interface. Set the number of network devices
  * and create them.
  */
-static void netif_driver_status_change(netif_fe_driver_status_changed_t *status)
+static void netif_driver_status_change(
+    netif_fe_driver_status_changed_t *status)
 {
     int err = 0;
     int i;
@@ -810,12 +809,11 @@ static void netif_driver_status_change(netif_fe_driver_status_changed_t *status)
         }
     }
 }
-//#endif
-
 
 static void netif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
 {
     int respond = 1;
+
     switch ( msg->subtype )
     {
     case CMSG_NETIF_FE_INTERFACE_STATUS_CHANGED:
@@ -824,24 +822,24 @@ static void netif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
         netif_status_change((netif_fe_interface_status_changed_t *)
                             &msg->msg[0]);
         break;
-//#ifdef MULTIVIF
+
     case CMSG_NETIF_FE_DRIVER_STATUS_CHANGED:
         if ( msg->length != sizeof(netif_fe_driver_status_changed_t) )
             goto error;
         netif_driver_status_change((netif_fe_driver_status_changed_t *)
                                    &msg->msg[0]);
-        // Message is a response, so do not respond.
+        /* Message is a response */
         respond = 0;
         break;
-//#endif
-      error:
+
+    error:
     default:
         msg->length = 0;
         break;
     }
-    if(respond){
+
+    if ( respond )
         ctrl_if_send_response(msg);
-    }
 }
 
 
@@ -880,15 +878,11 @@ static int __init init_module(void)
 
 #ifdef MULTIVIF
     /* Wait for all interfaces to be connected. */
-    for(wait_i = 0; 1; wait_i++) {
-        if(wait_i < wait_n){
-            err = netctrl_connected();
-        } else {
-            err = -ENETDOWN;
-        }
-        if(err < 0) goto exit;
-        if(err > 0){
-            err = 0;
+    for ( wait_i = 0; ; wait_i++)
+    {
+        if ( (err = (wait_i < wait_n) ? netctrl_connected() : -ENETDOWN) != 0 )
+        {
+            err = (err > 0) ? 0 : err;
             break;
         }
         set_current_state(TASK_INTERRUPTIBLE);
@@ -896,8 +890,9 @@ static int __init init_module(void)
      }
 #endif
 
- exit:
-    if(err) cleanup_module();
+    if ( err )
+        ctrl_if_unregister_receiver(CMSG_NETIF_FE, netif_ctrlif_rx);
+
     return err;
 }
 
