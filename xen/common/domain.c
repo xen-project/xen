@@ -386,4 +386,5 @@ long vm_assist(struct domain *p, unsigned int cmd, unsigned int type)
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

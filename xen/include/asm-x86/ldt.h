@@ -36,4 +36,5 @@ static inline void load_LDT(struct exec_domain *ed)
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

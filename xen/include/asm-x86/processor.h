@@ -519,4 +519,5 @@ asmlinkage void fatal_trap(int trapnr, struct xen_regs *regs);
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

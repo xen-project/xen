@@ -630,4 +630,5 @@ void __init __start_xen(multiboot_info_t *mbi)
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

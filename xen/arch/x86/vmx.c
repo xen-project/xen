@@ -948,4 +948,5 @@ asmlinkage void load_cr2(void)
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

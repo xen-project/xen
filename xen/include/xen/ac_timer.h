@@ -96,4 +96,5 @@ extern int reprogram_ac_timer(s_time_t timeout);
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

@@ -24,4 +24,5 @@ struct tss_struct init_tss[NR_CPUS];
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

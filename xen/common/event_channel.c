@@ -667,4 +667,5 @@ void destroy_event_channels(struct domain *d)
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

@@ -542,4 +542,5 @@ int elf_sanity_check(Elf_Ehdr *ehdr)
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

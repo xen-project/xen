@@ -615,4 +615,5 @@ unsigned long avail_domheap_pages(void)
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

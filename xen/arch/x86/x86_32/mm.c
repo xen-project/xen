@@ -393,4 +393,5 @@ void memguard_unguard_range(void *p, unsigned long l)
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

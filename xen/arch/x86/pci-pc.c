@@ -1553,4 +1553,5 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
  * c-basic-offset: 8
  * tab-width: 8
  * indent-tabs-mode: t
+ * End:
  */

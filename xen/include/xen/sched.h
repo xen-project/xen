@@ -408,4 +408,5 @@ static inline void domain_unpause_by_systemcontroller(struct domain *d)
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

@@ -106,4 +106,5 @@ typedef l4_pgentry_t root_pgentry_t;
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

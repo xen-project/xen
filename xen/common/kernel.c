@@ -94,4 +94,5 @@ long do_ni_hypercall(void)
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

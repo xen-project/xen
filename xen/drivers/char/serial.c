@@ -486,4 +486,5 @@ void serial_force_unlock(int handle)
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

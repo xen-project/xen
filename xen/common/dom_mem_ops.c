@@ -174,4 +174,5 @@ do_dom_mem_op(unsigned long  op,
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

@@ -642,4 +642,5 @@ void __out_of_line_bug(int line)
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

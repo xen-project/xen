@@ -424,4 +424,5 @@ void vmx_do_resume(struct exec_domain *d)
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */
