@@ -138,9 +138,6 @@
 #define offsetof(_p,_f) ((unsigned long)&(((_p *)0)->_f))
 #define struct_cpy(_x,_y) (memcpy((_x),(_y),sizeof(*(_x))))
 
-#define likely(_x) (_x)
-#define unlikely(_x) (_x)
-
 #define dev_probe_lock() ((void)0)
 #define dev_probe_unlock() ((void)0)
 
@@ -149,6 +146,8 @@
 #define capable(_c) 0
 
 #ifndef __ASSEMBLY__
+
+#include <xeno/compiler.h>
 
 extern unsigned long _end; /* standard ELF symbol */
 extern void __out_of_line_bug(int line) __attribute__((noreturn));

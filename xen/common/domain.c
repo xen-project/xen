@@ -163,8 +163,6 @@ void __kill_domain(struct task_struct *p)
 
 void kill_domain(void)
 {
-    /* May have been in middle of a p.t. update with WP bit cleared. */
-    write_cr0(read_cr0()|X86_CR0_WP);
     __kill_domain(current);
 }
 

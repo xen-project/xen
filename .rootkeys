@@ -475,6 +475,7 @@
 3ddb79c1pwmlw8VXW8aaSKAVGVmjDA xen/include/xeno/byteorder/swabb.h
 3ddb79c0c0cX_DZE209-Bb-Rx1v-Aw xen/include/xeno/cache.h
 3e9c248aEG_nCngztiFmv5CfayNkcA xen/include/xeno/cdrom.h
+3f840f12CkbYSlwMrY2S11Mpyxg7Nw xen/include/xeno/compiler.h
 3ddb79c259jh8hE7vre_8NuE7nwNSA xen/include/xeno/config.h
 3eb165e0eawr3R-p2ZQtSdLWtLRN_A xen/include/xeno/console.h
 3f0c428eIwGr7n9fj4FkBdX2YvA_Rw xen/include/xeno/crc32.h
