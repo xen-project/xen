@@ -64,6 +64,8 @@ struct net_private
     spinlock_t tx_lock;
     unsigned int idx; /* Domain-specific index of this VIF. */
 
+    unsigned int rx_bufs_to_notify;
+
     /*
      * {tx,rx}_skbs store outstanding skbuffs. The first entry in each
      * array is an index into a chain of free entries.
@@ -111,6 +113,7 @@ static int network_open(struct net_device *dev)
         return 0;
     }
 
+    np->rx_bufs_to_notify = 0;
     np->rx_resp_cons = np->tx_resp_cons = np->tx_full = 0;
     memset(&np->stats, 0, sizeof(np->stats));
     spin_lock_init(&np->tx_lock);
@@ -165,11 +168,8 @@ static void network_tx_buf_gc(struct net_device *dev)
     unsigned int i;
     struct net_private *np = dev->priv;
     struct sk_buff *skb;
-    unsigned long flags;
     unsigned int prod;
     tx_entry_t *tx_ring = np->net_ring->tx_ring;
-
-    spin_lock_irqsave(&np->tx_lock, flags);
 
     do {
         prod = np->net_idx->tx_resp_prod;
@@ -196,8 +196,6 @@ static void network_tx_buf_gc(struct net_device *dev)
         np->tx_full = 0;
         netif_wake_queue(dev);
     }
-
-    spin_unlock_irqrestore(&np->tx_lock, flags);
 }
 
 
@@ -230,19 +228,26 @@ static void network_alloc_rx_buffers(struct net_device *dev)
         np->net_ring->rx_ring[i].req.id   = (unsigned short)id;
         np->net_ring->rx_ring[i].req.addr = 
             virt_to_machine(get_ppte(skb->head));
+
+        np->rx_bufs_to_notify++;
     }
 
-    /*
-     * We may have allocated buffers which have entries outstanding in
-     * the page update queue -- make sure we flush those first!
-     */
-    flush_page_update_queue();
+    if ( np->rx_bufs_to_notify > (RX_MAX_ENTRIES/4) )
+    {
+        /*
+         * We may have allocated buffers which have entries outstanding in the 
+         * page update queue -- make sure we flush those first!
+         */
+        flush_page_update_queue();
 
-    np->net_idx->rx_req_prod = i;
+        np->net_idx->rx_req_prod = i;
+        
+        np->net_idx->rx_event = RX_RING_INC(np->rx_resp_cons);
+        
+        HYPERVISOR_net_update();
 
-    np->net_idx->rx_event = RX_RING_INC(np->rx_resp_cons);
-
-    HYPERVISOR_net_update();
+        np->rx_bufs_to_notify = 0;
+    }
 }
 
 
@@ -272,7 +277,6 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
         netif_stop_queue(dev);
         return -ENOBUFS;
     }
-    i = np->net_idx->tx_req_prod;
 
     if ( (((unsigned long)skb->data & ~PAGE_MASK) + skb->len) >= PAGE_SIZE )
     {
@@ -284,6 +288,10 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
         skb = new_skb;
     }   
     
+    spin_lock_irq(&np->tx_lock);
+
+    i = np->net_idx->tx_req_prod;
+
     id = GET_ID_FROM_FREELIST(np->tx_skbs);
     np->tx_skbs[id] = skb;
 
@@ -294,18 +302,18 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
     np->net_idx->tx_req_prod = TX_RING_INC(i);
     atomic_inc(&np->tx_entries);
 
-    np->stats.tx_bytes += skb->len;
-    np->stats.tx_packets++;
+    network_tx_buf_gc(dev);
 
-    spin_lock_irq(&np->tx_lock);
     if ( atomic_read(&np->tx_entries) >= TX_MAX_ENTRIES )
     {
         np->tx_full = 1;
         netif_stop_queue(dev);
     }
+
     spin_unlock_irq(&np->tx_lock);
 
-    network_tx_buf_gc(dev);
+    np->stats.tx_bytes += skb->len;
+    np->stats.tx_packets++;
 
     HYPERVISOR_net_update();
 
@@ -316,12 +324,15 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 static void network_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 {
     unsigned int i;
+    unsigned long flags;
     struct net_device *dev = (struct net_device *)dev_id;
     struct net_private *np = dev->priv;
     struct sk_buff *skb;
     rx_resp_entry_t *rx;
     
+    spin_lock_irqsave(&np->tx_lock, flags);
     network_tx_buf_gc(dev);
+    spin_unlock_irqrestore(&np->tx_lock, flags);
 
  again:
     for ( i  = np->rx_resp_cons; 

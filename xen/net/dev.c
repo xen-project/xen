@@ -1811,6 +1811,8 @@ long do_net_update(void)
     u8 *g_data;
     unsigned short protocol;
 
+    perfc_incr(net_hypercalls);
+
     for ( idx = 0; idx < MAX_DOMAIN_VIFS; idx++ )
     {
         if ( (vif = current->net_vif_list[idx]) == NULL )

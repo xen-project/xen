@@ -9,6 +9,7 @@ PERFCOUNTER_CPU( sched_run1,   "sched: calls to schedule" )
 PERFCOUNTER_CPU( sched_run2,   "sched: runs through scheduler" )
 PERFCOUNTER_CPU( sched_ctx,    "sched: context switches" )
 
+PERFCOUNTER( net_hypercalls, "network hypercalls" )
 PERFCOUNTER( net_rx_capacity_drop, "net rx capacity drop" )
 PERFCOUNTER( net_rx_delivered, "net rx delivered" )
 PERFCOUNTER( net_rx_tlbflush, "net rx tlb flushes" )
