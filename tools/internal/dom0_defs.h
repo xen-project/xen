@@ -51,7 +51,7 @@ static inline int do_privcmd(unsigned int cmd, unsigned long data)
         PERROR("Error when executing privileged control ioctl");
 #endif
         close(fd);
-        return -1;
+        return ret;
     }
 
     close(fd);
@@ -79,7 +79,7 @@ static inline int do_dom0_op(dom0_op_t *op)
         goto out1;
     }
 
-    if ( do_xen_hypercall(&hypercall) < 0 )
+    if ( (ret = do_xen_hypercall(&hypercall)) < 0 )
     {
         if ( errno == EACCES )
             fprintf(stderr, "Dom0 operation failed -- need to"
@@ -107,7 +107,7 @@ static inline int do_network_op(network_op_t *op)
         goto out1;
     }
 
-    if ( do_xen_hypercall(&hypercall) < 0 )
+    if ( (ret = do_xen_hypercall(&hypercall)) < 0 )
         goto out2;
 
     ret = 0;
