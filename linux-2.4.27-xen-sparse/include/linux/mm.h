@@ -336,7 +336,10 @@ typedef struct page {
 	set_bit(PG_foreign, &(page)->flags);	\
 	(page)->mapping = (void *)dtor;		\
 } while (0)
-#define ClearPageForeign(page)	clear_bit(PG_foreign, &(page)->flags)
+#define ClearPageForeign(page) do {		\
+	clear_bit(PG_foreign, &(page)->flags);	\
+	(page)->mapping = NULL;			\
+} while (0)
 #define PageForeignDestructor(page)	\
 	( (void (*) (struct page *)) (page)->mapping )
 #else
