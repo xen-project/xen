@@ -730,6 +730,7 @@ static int sedf_adjdom(struct domain *p, struct sched_adjdom_cmd *cmd) {
 		}
 		else {
 			//time driven domains
+			DOM_INFO(p)->weight = 0;
 			if(cmd->u.sedf.slice > cmd->u.sedf.period )		/* sanity checking! */
 				return -EINVAL;
 			DOM_INFO(p)->period_orig = 
