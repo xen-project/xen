@@ -1,15 +1,38 @@
+
+/*
+ * pervasive debugger
+ *
+ * alex ho
+ * 2004
+ * university of cambridge computer laboratory
+ */
+
 #include <xeno/lib.h>
 #include <xeno/sched.h>
 #include <asm-i386/ptrace.h>
 #include <xeno/keyhandler.h> 
 #include <asm/apic.h>
+#include <asm/domain_page.h>                           /* [un]map_domain_mem */
+#include <asm/processor.h>
 #include <asm/pdb.h>
 #include <xeno/list.h>
 #include <xeno/serial.h>
 
+#define DEBUG_TRACE
+#ifdef DEBUG_TRACE
+#define TRC(_x) _x
+#else
+#define TRC(_x)
+#endif
+
+#define DEBUG_EXCEPTION     0x01
+#define BREAKPT_EXCEPTION   0x03
+#define PDB_LIVE_EXCEPTION  0x58
+#define KEYPRESS_EXCEPTION  0x88
+
 #define BUFMAX 400
 
-#define PDB_DOMAIN_OFFSET 2              /* all domains are positive numbers */
+#define PDB_ID_OFFSET 2        /* all threads & domains are positive numbers */
 
 static const char hexchars[]="0123456789abcdef";
 
@@ -23,14 +46,24 @@ static int  pdb_in_buffer_ptr;
 static unsigned char  pdb_in_checksum;
 static unsigned char  pdb_xmit_checksum;
 
-static int pdb_ctrl_thread = -1;
-static int pdb_info_thread = -1;
-static int pdb_stepping = 0;
+struct pdb_ctx_element
+{
+    int ctrl;
+    int info;
+    unsigned long ctrl_cr3;
+    unsigned long info_cr3;
+};
+
+#define pdb_ctx_count 3
+enum pdb_levels {PDB_LVL_XEN = 0, PDB_LVL_GUESTOS, PDB_LVL_PROCESS};
+struct pdb_ctx_element pdb_ctx[pdb_ctx_count];
+int pdb_level = PDB_LVL_XEN;
 
 void pdb_put_packet (unsigned char *buffer, int ack);
 
 int pdb_initialized = 0;
-static int pdb_serhnd      = -1;
+static int pdb_serhnd = -1;
+static int pdb_stepping = 0;
 
 static inline void pdb_put_char(unsigned char c)
 {
@@ -75,46 +108,136 @@ pdb_process_query (char *ptr)
     {
         struct task_struct *p;
         u_long flags;
-	int count = 0, buf_idx = 0;
+	int buf_idx = 0;
 
-        read_lock_irqsave (&tasklist_lock, flags);
+	{                                                /* case pdb_lvl_xen */
+	    int count = 0;
 
-	pdb_out_buffer[buf_idx++] = 'm';
-        for_each_domain ( p )
-	{
-	    domid_t domain = p->domain + PDB_DOMAIN_OFFSET;
+	    read_lock_irqsave (&tasklist_lock, flags);
 
-	    if (count > 0)
-	        pdb_out_buffer[buf_idx++] = ',';
-	    /*
-              if (domain < 0)
-              {   pdb_out_buffer[buf_idx++] = '-'; domain = domain * -1; }
-	    */
-	    if (domain > 15)
+	    pdb_out_buffer[buf_idx++] = 'm';
+	    for_each_domain ( p )
 	    {
-	        pdb_out_buffer[buf_idx++] = hexchars[domain >> 4];
-	    }
-	    pdb_out_buffer[buf_idx++] = hexchars[domain % 16];
-	    count++;
-	}
-	pdb_out_buffer[buf_idx++] = 'l';
-	pdb_out_buffer[buf_idx++] = 0;
+	        domid_t domain = p->domain + PDB_ID_OFFSET;
 
-        read_unlock_irqrestore(&tasklist_lock, flags);
+		if (count > 0)
+		{
+		    pdb_out_buffer[buf_idx++] = ',';
+		}
+		if (domain > 15)
+		{
+		    pdb_out_buffer[buf_idx++] = hexchars[domain >> 4];
+		}
+		pdb_out_buffer[buf_idx++] = hexchars[domain % 16];
+		count++;
+	    }
+	    pdb_out_buffer[buf_idx++] = 0;
+
+	    read_unlock_irqrestore(&tasklist_lock, flags);
+	}
+
+#ifdef PDB_FUTURE
+
+	switch (pdb_level)
+	{
+	case PDB_LVL_XEN:                        /* return a list of domains */
+	{
+	    int count = 0;
+
+	    read_lock_irqsave (&tasklist_lock, flags);
+
+	    pdb_out_buffer[buf_idx++] = 'm';
+	    for_each_domain ( p )
+	    {
+	        domid_t domain = p->domain + PDB_ID_OFFSET;
+
+		if (count > 0)
+		{
+		    pdb_out_buffer[buf_idx++] = ',';
+		}
+		if (domain > 15)
+		{
+		    pdb_out_buffer[buf_idx++] = hexchars[domain >> 4];
+		}
+		pdb_out_buffer[buf_idx++] = hexchars[domain % 16];
+		count++;
+	    }
+	    pdb_out_buffer[buf_idx++] = 0;
+
+	    read_unlock_irqrestore(&tasklist_lock, flags);
+	    break;
+	}
+	case PDB_LVL_GUESTOS:                  /* return a list of processes */
+	{
+	    int foobar[20];
+	    int loop, total;
+
+	    /* *** BUG: this cr3 is wrong wrong wrong */
+	    total = pdb_linux_process_list(pdb_ctx[pdb_level].info_cr3,
+					   foobar, 20);
+
+	    pdb_out_buffer[buf_idx++] = 'm';     
+	    pdb_out_buffer[buf_idx++] = '1';              /* 1 is to go back */
+	    for (loop = 0; loop < total; loop++)
+	    {
+	        int pid = foobar[loop] + PDB_ID_OFFSET;
+
+		pdb_out_buffer[buf_idx++] = ',';
+		if (pid > 15)
+		{
+		    pdb_out_buffer[buf_idx++] = hexchars[pid >> 4];
+		}
+		pdb_out_buffer[buf_idx++] = hexchars[pid % 16];
+	    }
+	    pdb_out_buffer[buf_idx++] = 0;
+	    break;
+	}
+	case PDB_LVL_PROCESS:                                     /* hmmm... */
+	{
+	    pdb_out_buffer[buf_idx++] = 'm';
+	    pdb_out_buffer[buf_idx++] = '1';              /* 1 is to go back */
+	    break;
+	}
+	default:
+	    break;
+	}
+
+#endif /* PDB_FUTURE */
+
     }
     else if (strcmp(ptr, "sThreadInfo") == 0)
     {
+        int buf_idx = 0;
+
+	pdb_out_buffer[buf_idx++] = 'l';
+	pdb_out_buffer[buf_idx++] = 0;
     }
     else if (strncmp(ptr, "ThreadExtraInfo,", 16) == 0)
     {
         int thread = 0;
-	char *message = "whatever!";
+	char message[16];
+	struct task_struct *p;
+
+	p = find_domain_by_id(pdb_ctx[pdb_level].info);
+	strncpy (message, p->name, 16);
+	put_task_struct(p);
 
 	ptr += 16;
         if (hexToInt (&ptr, &thread))
 	{
             mem2hex ((char *)message, pdb_out_buffer, strlen(message) + 1);
 	}
+
+#ifdef PDB_FUTURE
+      {
+	char string[task_struct_comm_length];
+
+	string[0] = 0;
+	pdb_linux_process_details (cr3, pid, string);
+	printk (" (%s)", string);
+      }
+#endif /* PDB_FUTURE*/
+
     }
     else if (strcmp(ptr, "Offsets") == 0)
     {
@@ -206,17 +329,42 @@ pdb_gdb_to_x86_regs (struct pt_regs *regs, char *buffer)
 }
 
 int
-pdb_process_command (char *ptr, struct pt_regs *regs)
+pdb_process_command (char *ptr, struct pt_regs *regs, unsigned long cr3,
+		     int sigval)
 {
-    int sigval = 10;
     int length;
     unsigned long addr;
     int ack = 1;                           /* wait for ack in pdb_put_packet */
     int go = 0;
 
-    DPRINTK("pdb: [%s]\n", ptr);
+    TRC(printf("pdb: [%s]\n", ptr));
 
     pdb_out_buffer[0] = 0;
+
+    if (pdb_ctx[pdb_level].ctrl_cr3 == 0 &&
+	pdb_ctx[pdb_level].ctrl >= 0)
+    {
+        struct task_struct *p;
+
+	p = find_domain_by_id(pdb_ctx[pdb_level].ctrl);
+	pdb_ctx[pdb_level].ctrl_cr3 = pagetable_val(p->mm.pagetable);
+	put_task_struct(p);
+	printk ("PROCESS: PDB SET CONTROL DOMAIN TO 0x%lx 0x%x\n",
+		pdb_ctx[pdb_level].ctrl_cr3, 
+		pdb_ctx[pdb_level].ctrl);
+    }
+    if (pdb_ctx[pdb_level].info_cr3 == 0 &&
+	pdb_ctx[pdb_level].info >= 0)
+    {
+        struct task_struct *p;
+
+	p = find_domain_by_id(pdb_ctx[pdb_level].info);
+	pdb_ctx[pdb_level].info_cr3 = pagetable_val(p->mm.pagetable);
+	put_task_struct(p);
+	printk ("PROCESS: PDB SET INFO DOMAIN TO 0x%lx 0x%x\n",
+		pdb_ctx[pdb_level].info_cr3, 
+		pdb_ctx[pdb_level].info);
+    }
 
     switch (*ptr++)
     {
@@ -228,15 +376,14 @@ pdb_process_command (char *ptr, struct pt_regs *regs)
         break;
     case 'S':                                            /* step with signal */
     case 's':                                                        /* step */
-        regs->eflags |= 0x100;
+        regs->eflags |= X86_EFLAGS_TF;
         pdb_stepping = 1;
         return 1;                                        
         /* not reached */
     case 'C':                                        /* continue with signal */
     case 'c':                                                    /* continue */
-        regs->eflags &= ~0x100;
-        /* jump out before replying to gdb */
-        return 1;
+        regs->eflags &= ~X86_EFLAGS_TF;
+        return 1;                         /* jump out before replying to gdb */
         /* not reached */
     case 'd':
         remote_debug = !(remote_debug);                 /* toggle debug flag */
@@ -301,19 +448,40 @@ pdb_process_command (char *ptr, struct pt_regs *regs)
     {
         int thread;
         char *next = &ptr[1];
+
         if (hexToInt (&next, &thread))
         {
             if (thread > 0)
             {
-                thread = thread - PDB_DOMAIN_OFFSET;
+                thread = thread - PDB_ID_OFFSET;
             }
             if (*ptr == 'c')
             {
-                pdb_ctrl_thread = thread;
+	        pdb_ctx[pdb_level].ctrl = thread;
+
+		if (thread > 0)
+		{
+		    struct task_struct *p = find_domain_by_id(thread);
+		    pdb_ctx[pdb_level].ctrl_cr3 = pagetable_val(p->mm.pagetable);
+		    put_task_struct(p);
+		    printk ("PDB SET CONTROL DOMAIN TO 0x%lx 0x%x\n",
+			    pdb_ctx[pdb_level].ctrl_cr3,
+			    pdb_ctx[pdb_level].ctrl);
+		}
             }
             else if (*ptr == 'g')
             {
-                pdb_info_thread = thread;
+	        pdb_ctx[pdb_level].info = thread;
+
+		if (thread > 0)
+		{
+		    struct task_struct *p = find_domain_by_id(thread);
+		    pdb_ctx[pdb_level].info_cr3 = pagetable_val(p->mm.pagetable);
+		    put_task_struct(p);
+		    printk ("PDB SET INFO DOMAIN TO 0x%lx 0x%x\n",
+			    pdb_ctx[pdb_level].info_cr3,
+			    pdb_ctx[pdb_level].info);
+		}
             }
             else
             {
@@ -349,9 +517,10 @@ pdb_process_command (char *ptr, struct pt_regs *regs)
                     ptr = 0;
                     mem_err = 0;
 
-                    if (pdb_info_thread >= 0)
+                    if (pdb_ctx[pdb_level].info >= 0)
                     {
-                        pdb_get_values(pdb_info_thread, pdb_buffer, addr, length);
+		        pdb_get_values(pdb_buffer, length,
+				       pdb_ctx[pdb_level].info_cr3, addr);
                         mem2hex (pdb_buffer, pdb_out_buffer, length);
                     }
                     else
@@ -380,8 +549,9 @@ pdb_process_command (char *ptr, struct pt_regs *regs)
                     {
                         mem_err = 0;
 
-                        pdb_set_values(pdb_info_thread, 
-                                       ptr, addr, length);
+                        /* pdb_set_values(ptr, length, cr3, addr); */
+                        pdb_set_values(ptr, length, 
+				       pdb_ctx[pdb_level].info_cr3, addr);
 
                         if (mem_err)
                         {
@@ -402,20 +572,73 @@ pdb_process_command (char *ptr, struct pt_regs *regs)
     }
     case 'T':
     {
-        int thread;
-        if (hexToInt (&ptr, &thread))
+        int id;
+
+        if (hexToInt (&ptr, &id))
         {
-	    struct task_struct *p;
-            thread -= PDB_DOMAIN_OFFSET;
-            if ( (p = find_domain_by_id(thread)) == NULL)
-                strcpy (pdb_out_buffer, "E00");
-            else
-                strcpy (pdb_out_buffer, "OK");
-            put_task_struct(p);
+	        {                                        /* case pdb_lvl_xen */
+		    struct task_struct *p;
+		    id -= PDB_ID_OFFSET;
+		    if ( (p = find_domain_by_id(id)) == NULL)
+		        strcpy (pdb_out_buffer, "E00");
+		    else
+		        strcpy (pdb_out_buffer, "OK");
+		    put_task_struct(p);
+		}
+
+#ifdef PDB_FUTURE
+
+	    switch (pdb_level)                             /* previous level */
+	    {
+	        case PDB_LVL_XEN:
+		{
+		    struct task_struct *p;
+		    id -= PDB_ID_OFFSET;
+		    if ( (p = find_domain_by_id(id)) == NULL)
+		        strcpy (pdb_out_buffer, "E00");
+		    else
+		        strcpy (pdb_out_buffer, "OK");
+		    put_task_struct(p);
+
+		    pdb_level = PDB_LVL_GUESTOS;
+		    pdb_ctx[pdb_level].ctrl = id;
+		    pdb_ctx[pdb_level].info = id;
+		    break;
+		}
+	        case PDB_LVL_GUESTOS:
+		{
+		    if (pdb_level == -1)
+		    {
+		        pdb_level = PDB_LVL_XEN;
+		    }
+		    else
+		    {
+		        pdb_level = PDB_LVL_PROCESS;
+			pdb_ctx[pdb_level].ctrl = id;
+			pdb_ctx[pdb_level].info = id;
+		    }
+		    break;
+		}
+	        case PDB_LVL_PROCESS:
+		{
+		    if (pdb_level == -1)
+		    {
+		        pdb_level = PDB_LVL_GUESTOS;
+		    }
+		    break;
+		}
+	        default:
+		{
+		    printk ("pdb internal error: invalid level [%d]\n", 
+			    pdb_level);
+		}
+	    }
+
+#endif /* PDB_FUTURE */
         }
         break;
     }
-    }                                                          /* switch */
+    }
 
     /* reply to the request */
     pdb_put_packet (pdb_out_buffer, ack);
@@ -436,6 +659,9 @@ int pdb_serial_input(u_char c, struct pt_regs *regs)
 {
     int out = 1;
     int loop, count;
+    unsigned long cr3;
+
+    __asm__ __volatile__ ("movl %%cr3,%0" : "=r" (cr3) : );
 
     switch (pdb_debug_state)
     {
@@ -489,7 +715,8 @@ int pdb_serial_input(u_char c, struct pt_regs *regs)
 		    pdb_in_buffer[loop - 3] = pdb_in_buffer[loop];
 	    }
 
-	    pdb_process_command (pdb_in_buffer, regs);
+	    pdb_process_command (pdb_in_buffer, regs, cr3,
+				 PDB_LIVE_EXCEPTION);
 	}
 	pdb_debug_state = 0;
 	break;
@@ -594,18 +821,20 @@ hexToInt (char **ptr, int *intValue)
  */
 struct pdb_breakpoint breakpoints;
 
-void pdb_bkpt_add (unsigned long address)
+void pdb_bkpt_add (unsigned long cr3, unsigned long address)
 {
     struct pdb_breakpoint *bkpt = kmalloc(sizeof(*bkpt), GFP_KERNEL);
+    bkpt->cr3 = cr3;
     bkpt->address = address;
     list_add(&bkpt->list, &breakpoints.list);
 }
 
 /*
  * Check to see of the breakpoint is in the list of known breakpoints 
- * Return 1 if it has been set, 0 otherwise.
+ * Return 1 if it has been set, NULL otherwise.
  */
-struct pdb_breakpoint* pdb_bkpt_search (unsigned long address)
+struct pdb_breakpoint* pdb_bkpt_search (unsigned long cr3, 
+					unsigned long address)
 {
     struct list_head *list_entry;
     struct pdb_breakpoint *bkpt;
@@ -613,7 +842,7 @@ struct pdb_breakpoint* pdb_bkpt_search (unsigned long address)
     list_for_each(list_entry, &breakpoints.list)
     {
         bkpt = list_entry(list_entry, struct pdb_breakpoint, list);
-	if ( bkpt->address == address )
+	if ( bkpt->cr3 == cr3 && bkpt->address == address )
             return bkpt;
     }
 
@@ -624,7 +853,7 @@ struct pdb_breakpoint* pdb_bkpt_search (unsigned long address)
  * Remove a breakpoint to the list of known breakpoints.
  * Return 1 if the element was not found, otherwise 0.
  */
-int pdb_bkpt_remove (unsigned long address)
+int pdb_bkpt_remove (unsigned long cr3, unsigned long address)
 {
     struct list_head *list_entry;
     struct pdb_breakpoint *bkpt;
@@ -632,7 +861,7 @@ int pdb_bkpt_remove (unsigned long address)
     list_for_each(list_entry, &breakpoints.list)
     {
         bkpt = list_entry(list_entry, struct pdb_breakpoint, list);
-	if ( bkpt->address == address )
+	if ( bkpt->cr3 == cr3 && bkpt->address == address )
 	{
             list_del(&bkpt->list);
             kfree(bkpt);
@@ -641,6 +870,166 @@ int pdb_bkpt_remove (unsigned long address)
     }
 
     return 1;
+}
+
+/*
+ * Check to see if a memory write is really gdb setting a breakpoint
+ */
+void pdb_bkpt_check (u_char *buffer, int length,
+		     unsigned long cr3, unsigned long addr)
+{
+    if (length == 1 && buffer[0] == 'c' && buffer[1] == 'c')
+    {
+        /* inserting a new breakpoint */
+        pdb_bkpt_add(cr3, addr);
+        TRC(printk("pdb breakpoint detected at 0x%lx:0x%lx\n", cr3, addr));
+    }
+    else if ( pdb_bkpt_remove(cr3, addr) == 0 )
+    {
+        /* removing a breakpoint */
+        TRC(printk("pdb breakpoint cleared at 0x%lx:0x%lx\n", cr3, addr));
+    }
+}
+
+/***********************************************************************/
+
+int pdb_change_values(u_char *buffer, int length,
+		      unsigned long cr3, unsigned long addr, int rw);
+int pdb_change_values_one_page(u_char *buffer, int length,
+			       unsigned long cr3, unsigned long addr, int rw);
+
+#define __PDB_GET_VAL 1
+#define __PDB_SET_VAL 2
+
+/*
+ * Set memory in a domain's address space
+ * Set "length" bytes at "address" from "domain" to the values in "buffer".
+ * Return the number of bytes set, 0 if there was a problem.
+ */
+
+int pdb_set_values(u_char *buffer, int length,
+		   unsigned long cr3, unsigned long addr)
+{
+    int count = pdb_change_values(buffer, length, cr3, addr, __PDB_SET_VAL);
+    pdb_bkpt_check(buffer, length, cr3, addr);
+    return count;
+}
+
+/*
+ * Read memory from a domain's address space.
+ * Fetch "length" bytes at "address" from "domain" into "buffer".
+ * Return the number of bytes read, 0 if there was a problem.
+ */
+
+int pdb_get_values(u_char *buffer, int length,
+		   unsigned long cr3, unsigned long addr)
+{
+  return pdb_change_values(buffer, length, cr3, addr, __PDB_GET_VAL);
+}
+
+/*
+ * Read or write memory in an address space
+ */
+int pdb_change_values(u_char *buffer, int length,
+		      unsigned long cr3, unsigned long addr, int rw)
+{
+    int remaining;                /* number of bytes to touch past this page */
+    int bytes = 0;
+
+    while ( (remaining = (addr + length - 1) - (addr | (PAGE_SIZE - 1))) > 0)
+    {
+        bytes += pdb_change_values_one_page(buffer, length - remaining, 
+					    cr3, addr, rw);
+	buffer = buffer + (2 * (length - remaining));
+	length = remaining;
+	addr = (addr | (PAGE_SIZE - 1)) + 1;
+    }
+
+    bytes += pdb_change_values_one_page(buffer, length, cr3, addr, rw);
+    return bytes;
+}
+
+/*
+ * Change memory in a process' address space in one page
+ * Read or write "length" bytes at "address" into/from "buffer"
+ * from the virtual address space referenced by "cr3".
+ * Return the number of bytes read, 0 if there was a problem.
+ */
+
+int pdb_change_values_one_page(u_char *buffer, int length,
+			       unsigned long cr3, unsigned long addr, int rw)
+{
+    l2_pgentry_t* l2_table = NULL;
+    l1_pgentry_t* l1_table = NULL;
+    u_char *page;
+    int bytes = 0;
+
+    l2_table = map_domain_mem(cr3); 
+    l2_table += l2_table_offset(addr);
+    if (!(l2_pgentry_val(*l2_table) & _PAGE_PRESENT)) 
+    {
+        struct task_struct *p = find_domain_by_id(0);
+	printk ("cr3: 0x%lx    dom0cr3:  0x%lx\n", 
+		cr3, pagetable_val(p->mm.pagetable));
+	put_task_struct(p);
+
+	printk ("L2:0x%p (0x%lx) \n", l2_table, l2_pgentry_val(*l2_table));
+	goto exit2;
+    }
+
+    if (l2_pgentry_val(*l2_table) & _PAGE_PSE)
+    {
+#define PSE_PAGE_SHIFT           L2_PAGETABLE_SHIFT
+#define PSE_PAGE_SIZE	         (1UL << PSE_PAGE_SHIFT)
+#define PSE_PAGE_MASK	         (~(PSE_PAGE_SIZE-1))
+
+#define L1_PAGE_BITS ( (ENTRIES_PER_L1_PAGETABLE - 1) << L1_PAGETABLE_SHIFT )
+
+#define pse_pgentry_to_phys(_x) (l2_pgentry_val(_x) & PSE_PAGE_MASK)
+
+        page = map_domain_mem(pse_pgentry_to_phys(*l2_table) +    /* 10 bits */
+			      (addr & L1_PAGE_BITS));             /* 10 bits */
+	page += addr & (PAGE_SIZE - 1);                           /* 12 bits */
+    }
+    else
+    {
+        l1_table = map_domain_mem(l2_pgentry_to_phys(*l2_table));
+	l1_table += l1_table_offset(addr); 
+	if (!(l1_pgentry_val(*l1_table) & _PAGE_PRESENT))
+	{
+	    printk ("L2:0x%p (0x%lx) L1:0x%p (0x%lx)\n", 
+		    l2_table, l2_pgentry_val(*l2_table),
+		    l1_table, l1_pgentry_val(*l1_table));
+	    goto exit1;
+	}
+
+	page = map_domain_mem(l1_pgentry_to_phys(*l1_table));
+	page += addr & (PAGE_SIZE - 1);
+    }
+
+    switch (rw)
+    {
+    case __PDB_GET_VAL:                                              /* read */
+        memcpy (buffer, page, length);
+	bytes = length;
+	break;
+    case __PDB_SET_VAL:                                         /* write */
+        hex2mem (buffer, page, length);
+	bytes = length;
+	break;
+    default:                                                  /* unknown */
+        printk ("error: unknown RW flag: %d\n", rw);
+	return 0;
+    }
+
+    unmap_domain_mem((void *)page); 
+exit1:
+    if (l1_table != NULL)
+        unmap_domain_mem((void *)l1_table);
+exit2:
+    unmap_domain_mem((void *)l2_table);
+
+    return bytes;
 }
 
 /***********************************************************************/
@@ -716,7 +1105,7 @@ void pdb_get_packet(char *buffer)
 	        pdb_put_char('+');
 		if (buffer[2] == ':')
 		{
-		    printk ("gdb packet found with sequence ID\n");
+		    printk ("pdb: obsolete gdb packet (sequence ID)\n");
 		}
 	    }
 	    else
@@ -735,38 +1124,40 @@ void pdb_get_packet(char *buffer)
  * be propagated to the guest os.
  */
 
-#define DEBUG_EXCEPTION     0x01
-#define BREAKPT_EXCEPTION   0x03
-#define KEYPRESS_EXCEPTION  0x88
-
 int pdb_handle_exception(int exceptionVector,
 			 struct pt_regs *xen_regs)
 {
     int signal = 0;
+    struct pdb_breakpoint* bkpt;
     int watchdog_save;
+    unsigned long cr3;
+
+    __asm__ __volatile__ ("movl %%cr3,%0" : "=r" (cr3) : );
 
     /*
      * If PDB didn't set the breakpoint, is not single stepping, and the user
      * didn't press the magic debug key, then we don't handle the exception.
      */
-    if ( (pdb_bkpt_search(xen_regs->eip - 1) == NULL) &&
-         !pdb_stepping && (exceptionVector != KEYPRESS_EXCEPTION) )
+    bkpt = pdb_bkpt_search(cr3, xen_regs->eip - 1);
+    if ( (bkpt == NULL) &&
+         !pdb_stepping && (exceptionVector != KEYPRESS_EXCEPTION) &&
+	 xen_regs->eip < 0xc0000000)                   /* xenolinux for now! */
     {
-        DPRINTK("pdb: external breakpoint at 0x%lx\n", xen_regs->eip);
+        TRC(printf("pdb: user bkpt at 0x%lx:0x%lx\n", cr3, xen_regs->eip));
 	return 1;
     }
 
-    printk("pdb_handle_exception [0x%x][0x%lx]\n",
-           exceptionVector, xen_regs->eip);
+    printk("pdb_handle_exception [0x%x][0x%lx:0x%lx]\n",
+           exceptionVector, cr3, xen_regs->eip);
 
     if ( pdb_stepping )
     {
         /* Stepped one instruction; now return to normal execution. */
-        xen_regs->eflags &= ~0x100;
+        xen_regs->eflags &= ~X86_EFLAGS_TF;
         pdb_stepping = 0;
     }
 
-    if ( exceptionVector == BREAKPT_EXCEPTION )
+    if ( exceptionVector == BREAKPT_EXCEPTION && bkpt != NULL)
     {
         /* Executed Int3: replace breakpoint byte with real program byte. */
         xen_regs->eip--;
@@ -800,7 +1191,7 @@ int pdb_handle_exception(int exceptionVector,
         pdb_out_buffer[0] = 0;
 	pdb_get_packet(pdb_in_buffer);
     }
-    while ( pdb_process_command(pdb_in_buffer, xen_regs) == 0 );
+    while ( pdb_process_command(pdb_in_buffer, xen_regs, cr3, signal) == 0 );
 
     watchdog_on = watchdog_save;
 
@@ -816,9 +1207,10 @@ void pdb_key_pressed(u_char key, void *dev_id, struct pt_regs *regs)
 void initialize_pdb()
 {
     extern char opt_pdb[];
+    int loop;
 
     /* Certain state must be initialised even when PDB will not be used. */
-    breakpoints.address = 0;
+    memset((void *) &breakpoints, 0, sizeof(breakpoints));
     INIT_LIST_HEAD(&breakpoints.list);
     pdb_stepping = 0;
 
@@ -827,14 +1219,22 @@ void initialize_pdb()
 
     if ( (pdb_serhnd = parse_serial_handle(opt_pdb)) == -1 )
     {
-        printk("Failed to initialise PDB on port %s\n", opt_pdb);
+        printk("error: failed to initialize PDB on port %s\n", opt_pdb);
         return;
     }
 
-    printk("Initialised pervasive debugger (PDB) on port %s\n", opt_pdb);
+    for (loop = 0; loop < pdb_ctx_count; loop++)
+    {
+        pdb_ctx[loop].ctrl = -1;
+	pdb_ctx[loop].info = -1;
+        pdb_ctx[loop].ctrl_cr3 = 0;
+	pdb_ctx[loop].info_cr3 = 0;
+    }
+
+    printk("Initialized pervasive debugger (PDB) on port %s\n", opt_pdb);
 
     /* Acknowledge any spurious GDB packets. */
-    serial_putc(pdb_serhnd, '+');
+    pdb_put_char('+');
 
     add_key_handler('D', pdb_key_pressed, "enter pervasive debugger");
 
