@@ -208,8 +208,10 @@ void bvt_wake(struct domain *d)
 
     now = NOW();
 
-    /* Set the BVT parameters. */
-    if ( inf->avt < CPU_SVT(cpu) )
+    /* Set the BVT parameters. AVT should always be updated 
+        if CPU migration ocurred.*/
+    if ( inf->avt < CPU_SVT(cpu) || 
+            unlikely(test_bit(DF_MIGRATED, &d->flags)) )
         inf->avt = CPU_SVT(cpu);
 
     /* Deal with warping here. */
@@ -227,7 +229,6 @@ void bvt_wake(struct domain *d)
     min_time = curr->lastschd + curr->min_slice;
 
     spin_unlock_irqrestore(&schedule_data[cpu].schedule_lock, flags);   
-   
     if ( is_idle_task(curr) || (min_time <= now) )
         cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
     else if ( schedule_data[cpu].s_timer.expires > (min_time + TIME_SLOP) )
