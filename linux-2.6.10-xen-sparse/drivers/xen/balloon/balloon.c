@@ -92,6 +92,7 @@ static struct timer_list balloon_timer;
 #define UNLIST_PAGE(p)  ( list_del(&p->list) )
 #define pte_offset_kernel pte_offset
 #define subsys_initcall(_fn) __initcall(_fn)
+#define pfn_to_page(_pfn) (mem_map + (_pfn))
 #endif
 
 #define IPRINTK(fmt, args...) \
@@ -245,11 +246,10 @@ static void balloon_process(void *unused)
 
             pfn = page - mem_map;
             mfn_list[i] = phys_to_machine_mapping[pfn];
-            phys_to_machine_mapping[pfn] = INVALID_P2M_ENTRY;
 
             if ( !PageHighMem(page) )
             {
-                v = phys_to_virt((page - mem_map) << PAGE_SHIFT);
+                v = phys_to_virt(pfn << PAGE_SHIFT);
                 scrub_pages(v, 1);
                 queue_l1_entry_update(get_ptep((unsigned long)v), 0);
             }
@@ -260,13 +260,22 @@ static void balloon_process(void *unused)
                 scrub_pages(v, 1);
                 kunmap(page);
             }
-#endif            
-
-            balloon_append(page);
+#endif
         }
+
+        /* Ensure that ballooned highmem pages don't have cached mappings. */
+        kmap_flush_unused();
 
         /* Flush updates through and flush the TLB. */
         xen_tlb_flush();
+
+        /* No more mappings: invalidate pages in P2M and add to balloon. */
+        for ( i = 0; i < debt; i++ )
+        {
+            pfn = mfn_to_pfn(mfn_list[i]);
+            phys_to_machine_mapping[pfn] = INVALID_P2M_ENTRY;
+            balloon_append(pfn_to_page(pfn));
+        }
 
         if ( HYPERVISOR_dom_mem_op(
             MEMOP_decrease_reservation, mfn_list, debt, 0) != debt )
