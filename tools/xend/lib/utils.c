@@ -607,6 +607,7 @@ static PyObject *xu_message_new(PyObject *self, PyObject *args)
     case TYPE(CMSG_NETIF_FE, CMSG_NETIF_FE_DRIVER_STATUS_CHANGED):
         P2C(netif_fe_driver_status_changed_t, status,        u32);
         P2C(netif_fe_driver_status_changed_t, nr_interfaces, u32);
+        break;
     }
 
     if ( dict_items_parsed != PyDict_Size(payload) )

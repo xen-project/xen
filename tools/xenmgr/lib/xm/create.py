@@ -30,7 +30,11 @@ gopts.opt('defaults', short='f', val='FILE',
 
 gopts.opt('config', short='F', val='FILE',
          fn=set_value, default=None,
-         use='Domain configuration to use.')
+         use='Domain configuration to use (SXP).')
+
+gopts.opt('load', short='L', val='FILE',
+          fn=set_value, default=None,
+          use='Domain saved state to load.')
 
 def set_var(opt, k, v):
     opt.set(v)
@@ -231,6 +235,7 @@ def preprocess_ip(opts):
     setip = (opts.hostname or opts.netmask
              or opts.gateway or opts.dhcp or opts.interface)
     if not setip: return
+    if not opts
     ip = (opts.ip
           + ':'
           + ':' + opts.gateway
@@ -261,10 +266,9 @@ def make_domain(opts, config):
     """Create, build and start a domain.
     Returns: [int] the ID of the new domain.
     """
-    restore = 0 #todo
-
-    if restore:
-        dominfo = server.xend_domain_restore(state_file, config)
+    if opts.load:
+        filename = os.path.abspath(opts.load)
+        dominfo = server.xend_domain_restore(filename, config)
     else:
         dominfo = server.xend_domain_create(config)
 
@@ -285,13 +289,13 @@ def make_domain(opts, config):
 def main(argv):
     opts = gopts
     args = opts.parse(argv)
+    if opts.help:
+        opts.usage()
+        return
     if opts.config:
         pass
     else:
         opts.load_defaults()
-    if opts.help:
-        opts.usage()
-        return
     preprocess(opts)
     config = make_config(opts)
     if opts.dryrun:

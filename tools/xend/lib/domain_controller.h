@@ -523,21 +523,20 @@ typedef struct {
  */
 
 /*
- * Subtypes for console messages.
+ * Subtypes for suspend messages.
  */
 /* None. */
 
 
 /******************************************************************************
- * CONSOLE DEFINITIONS
+ * SHUTDOWN DEFINITIONS
  */
 
 /*
- * Subtypes for console messages.
+ * Subtypes for shutdown messages.
  */
 #define CMSG_SHUTDOWN_HALT      0   /* Shutdown and halt (don't die). */
 #define CMSG_SHUTDOWN_POWEROFF  1   /* 'Poweroff' => clean death.     */
 #define CMSG_SHUTDOWN_REBOOT    2   /* Shutdown and restart.          */
-
 
 #endif /* __DOMAIN_CONTROLLER_H__ */
