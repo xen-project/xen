@@ -633,8 +633,11 @@ static void page_scrub_softirq(void)
         
         /* Peel up to 16 pages from the list. */
         for ( i = 0; i < 16; i++ )
-            if ( (ent = ent->next) == &page_scrub_list )
+        {
+            if ( ent->next == &page_scrub_list )
                 break;
+            ent = ent->next;
+        }
         
         /* Remove peeled pages from the list. */
         ent->next->prev = &page_scrub_list;
