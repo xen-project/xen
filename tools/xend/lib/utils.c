@@ -22,6 +22,8 @@
 #include <signal.h>
 #include <xc.h>
 
+#include <asm-xen/proc_cmd.h>
+
 #include <hypervisor-if.h>
 #include "domain_controller.h"
 
@@ -684,8 +686,23 @@ static PyObject *xu_port_new(PyObject *self, PyObject *args)
         goto fail2;
     }
 
-    if ( xc_evtchn_bind_interdomain(xup->xc_handle, 
-                                    DOMID_SELF, dom, &port1, &port2) != 0 )
+    if ( dom == 0ULL )
+    {
+        /*
+         * The control-interface event channel for DOM0 is already set up.
+         * We use an ioctl to discover the port at our end of the channel.
+         */
+        port1 = ioctl(xup->xc_handle, IOCTL_PRIVCMD_INITDOMAIN_EVTCHN, NULL);
+        port2 = -1; /* We don't need the remote end of the DOM0 link. */
+        if ( port1 < 0 )
+        {
+            PyErr_SetString(port_error, "Could not open channel to DOM0");
+            goto fail3;
+        }
+    }
+    else if ( xc_evtchn_bind_interdomain(xup->xc_handle, 
+                                         DOMID_SELF, dom, 
+                                         &port1, &port2) != 0 )
     {
         PyErr_SetString(port_error, "Could not open channel to domain");
         goto fail3;
@@ -744,7 +761,8 @@ static void xu_port_dealloc(PyObject *self)
 {
     xu_port_object *xup = (xu_port_object *)self;
     unmap_control_interface(xup->mem_fd, xup->interface);
-    (void)xc_evtchn_close(xup->xc_handle, DOMID_SELF, xup->local_port);
+    if ( xup->remote_dom != 0ULL )
+        (void)xc_evtchn_close(xup->xc_handle, DOMID_SELF, xup->local_port);
     (void)xc_interface_close(xup->xc_handle);
     (void)close(xup->mem_fd);
     PyObject_Del(self);

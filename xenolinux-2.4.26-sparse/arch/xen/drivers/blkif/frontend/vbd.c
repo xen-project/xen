@@ -1,13 +1,13 @@
 /******************************************************************************
- * vbd.c
+ * arch/xen/drivers/blkif/frontend/vbd.c
  * 
- * Xenolinux virtual block-device driver (xvd).
+ * Xenolinux virtual block-device driver.
  * 
  * Copyright (c) 2003-2004, Keir Fraser & Steve Hand
  * Modifications by Mark A. Williamson are (c) Intel Research Cambridge
  */
 
-#include "block.h"
+#include "common.h"
 #include <linux/blk.h>
 
 /*
@@ -43,54 +43,59 @@ static int xlvbd_blksize_size[256];
 static int xlvbd_hardsect_size[256];
 static int xlvbd_max_sectors[256];
 
-/* Information from Xen about our VBDs. */
+/* Information about our VBDs. */
 #define MAX_VBDS 64
 static int nr_vbds;
-static xen_disk_t *vbd_info;
+static vdisk_t *vbd_info;
 
 static struct block_device_operations xlvbd_block_fops = 
 {
-    open:               xen_block_open,
-    release:            xen_block_release,
-    ioctl:              xen_block_ioctl,
-    check_media_change: xen_block_check,
-    revalidate:         xen_block_revalidate,
+    open:               blkif_open,
+    release:            blkif_release,
+    ioctl:              blkif_ioctl,
+    check_media_change: blkif_check,
+    revalidate:         blkif_revalidate,
 };
 
-static int xlvbd_get_vbd_info(xen_disk_t *disk_info)
+static int xlvbd_get_vbd_info(vdisk_t *disk_info)
 {
-    int error;
-    block_io_op_t op; 
+    vdisk_t         *buf = (vdisk_t *)__get_free_page(GFP_KERNEL);
+    blkif_request_t  req;
+    blkif_response_t rsp;
+    int              nr;
 
-    /* Probe for disk information. */
-    memset(&op, 0, sizeof(op)); 
-    op.cmd = BLOCK_IO_OP_VBD_PROBE; 
-    op.u.probe_params.domain    = 0; 
-    op.u.probe_params.xdi.max   = MAX_VBDS;
-    op.u.probe_params.xdi.disks = disk_info;
-    op.u.probe_params.xdi.count = 0;
+    memset(&req, 0, sizeof(req));
+    req.operation   = BLKIF_OP_PROBE;
+    req.nr_segments = 1;
+    req.buffer_and_sects[0] = virt_to_machine(buf) | (PAGE_SIZE/512);
 
-    if ( (error = HYPERVISOR_block_io_op(&op)) != 0 )
+    blkif_control_send(&req, &rsp);
+
+    if ( rsp.status <= 0 )
     {
-        printk(KERN_ALERT "Could not probe disks (%d)\n", error);
+        printk(KERN_ALERT "Could not probe disks (%d)\n", rsp.status);
         return -1;
     }
 
-    return op.u.probe_params.xdi.count;
+    if ( (nr = rsp.status) > MAX_VBDS )
+         nr = MAX_VBDS;
+    memcpy(disk_info, buf, nr * sizeof(vdisk_t));
+
+    return nr;
 }
 
 /*
  * xlvbd_init_device - initialise a VBD device
- * @disk:              a xen_disk_t describing the VBD
+ * @disk:              a vdisk_t describing the VBD
  *
- * Takes a xen_disk_t * that describes a VBD the domain has access to.
+ * Takes a vdisk_t * that describes a VBD the domain has access to.
  * Performs appropriate initialisation and registration of the device.
  *
  * Care needs to be taken when making re-entrant calls to ensure that
  * corruption does not occur.  Also, devices that are in use should not have
  * their details updated.  This is the caller's responsibility.
  */
-static int xlvbd_init_device(xen_disk_t *xd)
+static int xlvbd_init_device(vdisk_t *xd)
 {
     int device = xd->device;
     int major  = MAJOR(device); 
@@ -181,11 +186,11 @@ static int xlvbd_init_device(xen_disk_t *xd)
             read_ahead[major]    = 8;
         }
 
-        blk_init_queue(BLK_DEFAULT_QUEUE(major), do_xlblk_request);
+        blk_init_queue(BLK_DEFAULT_QUEUE(major), do_blkif_request);
 
         /*
          * Turn off barking 'headactive' mode. We dequeue buffer heads as
-         * soon as we pass them down to Xen.
+         * soon as we pass them to the back-end driver.
          */
         blk_queue_headactive(BLK_DEFAULT_QUEUE(major), 0);
 
@@ -431,12 +436,12 @@ static int xlvbd_remove_device(int device)
 void xlvbd_update_vbds(void)
 {
     int i, j, k, old_nr, new_nr;
-    xen_disk_t *old_info, *new_info, *merged_info;
+    vdisk_t *old_info, *new_info, *merged_info;
 
     old_info = vbd_info;
     old_nr   = nr_vbds;
 
-    new_info = kmalloc(MAX_VBDS * sizeof(xen_disk_t), GFP_KERNEL);
+    new_info = kmalloc(MAX_VBDS * sizeof(vdisk_t), GFP_KERNEL);
     if ( unlikely(new_nr = xlvbd_get_vbd_info(new_info)) < 0 )
     {
         kfree(new_info);
@@ -448,7 +453,7 @@ void xlvbd_update_vbds(void)
      * old list and new list do not overlap at all, and we cannot yet destroy
      * VBDs in the old list because the usage counts are busy.
      */
-    merged_info = kmalloc((old_nr + new_nr) * sizeof(xen_disk_t), GFP_KERNEL);
+    merged_info = kmalloc((old_nr + new_nr) * sizeof(vdisk_t), GFP_KERNEL);
 
     /* @i tracks old list; @j tracks new list; @k tracks merged list. */
     i = j = k = 0;
@@ -458,13 +463,13 @@ void xlvbd_update_vbds(void)
         if ( old_info[i].device < new_info[j].device )
         {
             if ( xlvbd_remove_device(old_info[i].device) != 0 )
-                memcpy(&merged_info[k++], &old_info[i], sizeof(xen_disk_t));
+                memcpy(&merged_info[k++], &old_info[i], sizeof(vdisk_t));
             i++;
         }
         else if ( old_info[i].device > new_info[j].device )
         {
             if ( xlvbd_init_device(&new_info[j]) == 0 )
-                memcpy(&merged_info[k++], &new_info[j], sizeof(xen_disk_t));
+                memcpy(&merged_info[k++], &new_info[j], sizeof(vdisk_t));
             j++;
         }
         else
@@ -472,9 +477,9 @@ void xlvbd_update_vbds(void)
             if ( ((old_info[i].capacity == new_info[j].capacity) &&
                   (old_info[i].info == new_info[j].info)) ||
                  (xlvbd_remove_device(old_info[i].device) != 0) )
-                memcpy(&merged_info[k++], &old_info[i], sizeof(xen_disk_t));
+                memcpy(&merged_info[k++], &old_info[i], sizeof(vdisk_t));
             else if ( xlvbd_init_device(&new_info[j]) == 0 )
-                memcpy(&merged_info[k++], &new_info[j], sizeof(xen_disk_t));
+                memcpy(&merged_info[k++], &new_info[j], sizeof(vdisk_t));
             i++; j++;
         }
     }
@@ -482,13 +487,13 @@ void xlvbd_update_vbds(void)
     for ( ; i < old_nr; i++ )
     {
         if ( xlvbd_remove_device(old_info[i].device) != 0 )
-            memcpy(&merged_info[k++], &old_info[i], sizeof(xen_disk_t));
+            memcpy(&merged_info[k++], &old_info[i], sizeof(vdisk_t));
     }
 
     for ( ; j < new_nr; j++ )
     {
         if ( xlvbd_init_device(&new_info[j]) == 0 )
-            memcpy(&merged_info[k++], &new_info[j], sizeof(xen_disk_t));
+            memcpy(&merged_info[k++], &new_info[j], sizeof(vdisk_t));
     }
 
     vbd_info = merged_info;
@@ -500,12 +505,12 @@ void xlvbd_update_vbds(void)
 
 
 /*
- * Set up all the linux device goop for the virtual block devices (vbd's) that 
- * xen tells us about. Note that although from xen's pov VBDs are addressed 
- * simply an opaque 16-bit device number, the domain creation tools 
+ * Set up all the linux device goop for the virtual block devices (vbd's) that
+ * we know about. Note that although from the backend driver's p.o.v. VBDs are
+ * addressed simply an opaque 16-bit device number, the domain creation tools 
  * conventionally allocate these numbers to correspond to those used by 'real' 
  * linux -- this is just for convenience as it means e.g. that the same 
- * /etc/fstab can be used when booting with or without xen.
+ * /etc/fstab can be used when booting with or without Xen.
  */
 int __init xlvbd_init(void)
 {
@@ -537,7 +542,7 @@ int __init xlvbd_init(void)
         xlvbd_max_sectors[i]   = 128;
     }
 
-    vbd_info = kmalloc(MAX_VBDS * sizeof(xen_disk_t), GFP_KERNEL);
+    vbd_info = kmalloc(MAX_VBDS * sizeof(vdisk_t), GFP_KERNEL);
     nr_vbds  = xlvbd_get_vbd_info(vbd_info);
 
     if ( nr_vbds < 0 )

@@ -4,7 +4,8 @@ from distutils.core import setup, Extension
 utils = Extension("utils",
                   extra_compile_args   = ["-fno-strict-aliasing"],
                   include_dirs         = ["../xc/lib",
-                                          "../../xen/include/hypervisor-ifs"],
+                                          "../../xen/include/hypervisor-ifs",
+                                          "../../xenolinux-sparse/include"],
                   library_dirs         = ["../xc/lib"],
                   libraries            = ["xc"],
                   sources              = ["lib/utils.c"])

@@ -16,24 +16,27 @@
 #define BLKIF_OP_WRITE     1
 #define BLKIF_OP_PROBE     2
 
-/* NB. Ring size must be small enough for sizeof(blk_ring_t) <= PAGE_SIZE. */
+/* NB. Ring size must be small enough for sizeof(blkif_ring_t) <= PAGE_SIZE. */
 #define BLKIF_RING_SIZE        64
 
 /*
  * Maximum scatter/gather segments per request.
- * This is carefully chosen so that sizeof(blk_ring_t) <= PAGE_SIZE.
+ * This is carefully chosen so that sizeof(blkif_ring_t) <= PAGE_SIZE.
  * NB. This could be 12 if the ring indexes weren't stored in the same page.
  */
-#define BLKIF_REQUEST_MAX_SEGMENTS 11
+#define BLKIF_MAX_SEGMENTS_PER_REQUEST 11
+
+#define BLKIF_MAX_SECTORS_PER_SEGMENT  16
 
 typedef struct {
     unsigned char  operation;        /* BLKIF_OP_???                         */
-    unsigned char  nr_segments;      /* number of segments (<= MAX_BLK_SEGS) */
+    unsigned char  nr_segments;      /* number of segments                   */
     blkif_vdev_t   device;           /* only for read/write requests         */
     unsigned long  id;               /* private guest value, echoed in resp  */
-    xen_sector_t   sector_number;    /* start sector idx on disk (r/w only)  */
-    /* Least 9 bits is 'nr_sects'. High 23 bits is the address.      */
-    unsigned long  buffer_and_sects[MAX_BLK_SEGS];
+    blkif_sector_t sector_number;    /* start sector idx on disk (r/w only)  */
+    /* Least 9 bits is 'nr_sects'. High 23 bits is the address.       */
+    /* We must have '0 <= nr_sects <= BLKIF_MAX_SECTORS_PER_SEGMENT'. */
+    unsigned long  buffer_and_sects[BLKIF_MAX_SEGMENTS_PER_REQUEST];
 } blkif_request_t;
 
 typedef struct {
@@ -59,8 +62,8 @@ typedef unsigned int BLKIF_RING_IDX;
 #define MASK_BLKIF_IDX(_i) ((_i)&(BLKIF_RING_SIZE-1))
 
 typedef struct {
-    BLKIF_RING_IDX req_prod;  /* Request producer. Updated by guest OS. */
-    BLKIF_RING_IDX resp_prod; /* Response producer. Updated by Xen.     */
+    BLKIF_RING_IDX req_prod;  /* Request producer. Updated by front-end. */
+    BLKIF_RING_IDX resp_prod; /* Response producer. Updated by back-end. */
     union {
         blkif_request_t  req;
         blkif_response_t resp;
@@ -103,7 +106,7 @@ typedef struct {
 typedef struct {
     blkif_vdev_t   device;       /* Device number (opaque 16 bit value). */
     unsigned short info;         /* Device type and flags (VDISK_*).     */
-    xen_sector_t   capacity;     /* Size in terms of 512-byte sectors.   */
+    blkif_sector_t capacity;     /* Size in terms of 512-byte sectors.   */
 } vdisk_t;
 
 #endif /* __SHARED_BLKIF_H__ */

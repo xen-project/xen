@@ -24,6 +24,18 @@
 #define MAX_PENDING_REQS 64
 #define BATCH_PER_DOMAIN 16
 
+static struct vm_struct *mmap_vma;
+#define MMAP_PAGES_PER_SEGMENT \
+    ((BLKIF_MAX_SEGMENTS_PER_REQUEST >> (PAGE_SHIFT-9)) + 1)
+#define MMAP_PAGES_PER_REQUEST \
+    (2 * BLKIF_MAX_SEGMENTS_PER_REQUEST * MMAP_PAGES_PER_SEGMENT)
+#define MMAP_PAGES             \
+    (MAX_PENDING_REQS * MMAP_PAGES_PER_REQUEST)
+#define MMAP_VADDR(_req,_seg)            \
+    ((unsigned long)mmap_vma->addr +     \
+     ((_req) * MMAP_PAGES_PER_REQUEST) + \
+     ((_seg) * MMAP_PAGES_PER_SEGMENT))
+
 /*
  * Each outstanding request that we've passed to the lower device layers has a 
  * 'pending_req' allocated to it. Each buffer_head that completes decrements 
@@ -46,22 +58,11 @@ static PEND_RING_IDX pending_prod, pending_cons;
 
 static kmem_cache_t *buffer_head_cachep;
 
-static struct buffer_head *completed_bhs[NR_CPUS] __cacheline_aligned;
-
-static int lock_buffer(blkif_t *blkif,
-                       unsigned long buffer,
-                       unsigned short size,
-                       int writeable_buffer);
-static void unlock_buffer(unsigned long buffer,
-                          unsigned short size,
-                          int writeable_buffer);
-
-static void io_schedule(unsigned long unused);
 static int do_block_io_op(blkif_t *blkif, int max_to_do);
-static void dispatch_rw_block_io(blkif_t *blkif,
-                                 blk_ring_req_entry_t *req);
+static void dispatch_probe(blkif_t *blkif, blkif_request_t *req);
+static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req);
 static void make_response(blkif_t *blkif, unsigned long id, 
-                          unsigned short op, unsigned long st);
+                          unsigned short op, int st);
 
 
 /******************************************************************
@@ -108,8 +109,6 @@ static void add_to_blkdev_list_tail(blkif_t *blkif)
  * SCHEDULER FUNCTIONS
  */
 
-static DECLARE_TASKLET(io_schedule_tasklet, io_schedule, 0);
-
 static void io_schedule(unsigned long unused)
 {
     blkif_t          *blkif;
@@ -131,6 +130,8 @@ static void io_schedule(unsigned long unused)
     /* Push the batch through to disc. */
     run_task_queue(&tq_disk);
 }
+
+static DECLARE_TASKLET(io_schedule_tasklet, io_schedule, 0);
 
 static void maybe_trigger_io_schedule(void)
 {
@@ -155,28 +156,25 @@ static void maybe_trigger_io_schedule(void)
 static void end_block_io_op(struct buffer_head *bh, int uptodate)
 {
     pending_req_t *pending_req = bh->b_private;
+    unsigned long  flags;
 
     /* An error fails the entire request. */
     if ( !uptodate )
     {
         DPRINTK("Buffer not up-to-date at end of operation\n");
-        pending_req->status = 2;
+        pending_req->status = BLKIF_RSP_ERROR;
     }
 
-    unlock_buffer(virt_to_phys(bh->b_data), 
-                  bh->b_size, 
-                  (pending_req->operation==READ));
-    
     if ( atomic_dec_and_test(&pending_req->pendcnt) )
     {
+        int pending_idx = pending_req - pending_reqs;
+        vmfree_area_pages(MMAP_VADDR(pending_idx, 0), MMAP_PAGES_PER_REQUEST);
         make_response(pending_req->blkif, pending_req->id,
                       pending_req->operation, pending_req->status);
         blkif_put(pending_req->blkif);
-        spin_lock(&pend_prod_lock);
-        pending_ring[MASK_PEND_IDX(pending_prod)] = 
-            pending_req - pending_reqs;
-        pending_prod++;
-        spin_unlock(&pend_prod_lock);
+        spin_lock_irqsave(&pend_prod_lock, flags);
+        pending_ring[MASK_PEND_IDX(pending_prod++)] = pending_idx;
+        spin_unlock_irqrestore(&pend_prod_lock, flags);
         maybe_trigger_io_schedule();
     }
 }
@@ -200,45 +198,10 @@ void blkif_be_int(int irq, void *dev_id, struct pt_regs *regs)
  * DOWNWARD CALLS -- These interface with the block-device layer proper.
  */
 
-static int lock_buffer(blkif_t *blkif,
-                       unsigned long buffer,
-                       unsigned short size,
-                       int writeable_buffer)
-{
-    unsigned long    pfn;
-
-    for ( pfn = buffer >> PAGE_SHIFT; 
-          pfn < ((buffer + size + PAGE_SIZE - 1) >> PAGE_SHIFT);
-          pfn++ )
-    {
-    }
-
-    return 1;
-
- fail:
-    while ( pfn-- > (buffer >> PAGE_SHIFT) )
-    {        
-    }
-    return 0;
-}
-
-static void unlock_buffer(unsigned long buffer,
-                          unsigned short size,
-                          int writeable_buffer)
-{
-    unsigned long pfn;
-
-    for ( pfn = buffer >> PAGE_SHIFT; 
-          pfn < ((buffer + size + PAGE_SIZE - 1) >> PAGE_SHIFT);
-          pfn++ )
-    {
-    }
-}
-
 static int do_block_io_op(blkif_t *blkif, int max_to_do)
 {
-    blk_ring_t *blk_ring = blkif->blk_ring_base;
-    blk_ring_req_entry_t *req;
+    blkif_ring_t *blk_ring = blkif->blk_ring_base;
+    blkif_request_t *req;
     BLK_RING_IDX i;
     int more_to_do = 0;
 
@@ -262,11 +225,15 @@ static int do_block_io_op(blkif_t *blkif, int max_to_do)
             dispatch_rw_block_io(blkif, req);
             break;
 
+        case BLKIF_OP_PROBE:
+            dispatch_probe(blkif, req);
+            break;
+
         default:
             DPRINTK("error: unknown block io operation [%d]\n",
                     blk_ring->ring[i].req.operation);
             make_response(blkif, blk_ring->ring[i].req.id, 
-                          blk_ring->ring[i].req.operation, 1);
+                          blk_ring->ring[i].req.operation, BLKIF_RSP_ERROR);
             break;
         }
     }
@@ -275,24 +242,62 @@ static int do_block_io_op(blkif_t *blkif, int max_to_do)
     return more_to_do;
 }
 
-static void dispatch_rw_block_io(blkif_t *blkif,
-                                 blk_ring_req_entry_t *req)
+static void dispatch_probe(blkif_t *blkif, blkif_request_t *req)
+{
+    int      i, rc, pending_idx = pending_ring[MASK_PEND_IDX(pending_cons)];
+    pgprot_t prot;
+
+    /* Check that number of segments is sane. */
+    if ( unlikely(req->nr_segments == 0) || 
+         unlikely(req->nr_segments > BLKIF_MAX_SEGMENTS_PER_REQUEST) )
+    {
+        DPRINTK("Bad number of segments in request (%d)\n", req->nr_segments);
+        goto bad_descriptor;
+    }
+
+    prot = __pgprot(_PAGE_PRESENT|_PAGE_DIRTY|_PAGE_ACCESSED|_PAGE_RW);
+    for ( i = 0; i < req->nr_segments; i++ )
+    {
+        if ( (req->buffer_and_sects[i] & ~PAGE_MASK) != (PAGE_SIZE / 512) )
+            goto bad_descriptor;
+        if ( direct_remap_area_pages(&init_mm, 
+                                     MMAP_VADDR(pending_idx, i),
+                                     req->buffer_and_sects[i] & PAGE_MASK, 
+                                     PAGE_SIZE, prot, blkif->domid) != 0 )
+            goto bad_descriptor;
+    }
+
+    rc = vbd_probe(blkif, (vdisk_t *)MMAP_VADDR(pending_idx, 0), 
+                   (req->nr_segments * PAGE_SIZE) / sizeof(vdisk_t));
+
+    vmfree_area_pages(MMAP_VADDR(pending_idx, 0), 
+                      MMAP_PAGES_PER_REQUEST);
+    make_response(blkif, req->id, req->operation, rc);
+    return;
+
+ bad_descriptor:
+    vmfree_area_pages(MMAP_VADDR(pending_idx, 0), MMAP_PAGES_PER_REQUEST);
+    make_response(blkif, req->id, req->operation, BLKIF_RSP_ERROR);
+}
+
+static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 {
     extern void ll_rw_block(int rw, int nr, struct buffer_head * bhs[]); 
     struct buffer_head *bh;
     int operation = (req->operation == XEN_BLOCK_WRITE) ? WRITE : READ;
     unsigned short nr_sects;
     unsigned long buffer;
-    int i, tot_sects;
+    int i, tot_sects, pending_idx = pending_ring[MASK_PEND_IDX(pending_cons)];
     pending_req_t *pending_req;
+    pgprot_t       prot;
 
     /* We map virtual scatter/gather segments to physical segments. */
     int new_segs, nr_psegs = 0;
-    phys_seg_t phys_seg[MAX_BLK_SEGS * 2];
+    phys_seg_t phys_seg[BLKIF_MAX_SEGMENTS_PER_REQUEST * 2];
 
     /* Check that number of segments is sane. */
     if ( unlikely(req->nr_segments == 0) || 
-         unlikely(req->nr_segments > MAX_BLK_SEGS) )
+         unlikely(req->nr_segments > BLKIF_MAX_SEGMENTS_PER_REQUEST) )
     {
         DPRINTK("Bad number of segments in request (%d)\n", req->nr_segments);
         goto bad_descriptor;
@@ -310,8 +315,11 @@ static void dispatch_rw_block_io(blkif_t *blkif,
         nr_sects = req->buffer_and_sects[i] &  0x1FF;
 
         if ( unlikely(nr_sects == 0) )
+            continue;
+
+        if ( unlikely(nr_sects > BLKIF_MAX_SECTORS_PER_SEGMENT) )
         {
-            DPRINTK("zero-sized data request\n");
+            DPRINTK("Too many sectors in segment\n");
             goto bad_descriptor;
         }
 
@@ -333,29 +341,40 @@ static void dispatch_rw_block_io(blkif_t *blkif,
         }
   
         nr_psegs += new_segs;
-        ASSERT(nr_psegs <= MAX_BLK_SEGS*2);
+        ASSERT(nr_psegs <= BLKIF_MAX_SEGMENTS_PER_REQUEST*2);
     }
+
+    /* Nonsensical zero-sized request? */
+    if ( unlikely(nr_psegs == 0) )
+        goto bad_descriptor;
+
+    if ( operation == READ )
+        prot = __pgprot(_PAGE_PRESENT|_PAGE_DIRTY|_PAGE_ACCESSED|_PAGE_RW);
+    else
+        prot = __pgprot(_PAGE_PRESENT|_PAGE_DIRTY|_PAGE_ACCESSED);
 
     for ( i = 0; i < nr_psegs; i++ )
     {
-        if ( unlikely(!lock_buffer(blkif, phys_seg[i].buffer, 
-                                   phys_seg[i].nr_sects << 9,
-                                   operation==READ)) )
+        unsigned long sz = ((phys_seg[i].buffer & ~PAGE_MASK) + 
+                            (phys_seg[i].nr_sects << 9) + 
+                            (PAGE_SIZE - 1)) & PAGE_MASK;
+        if ( direct_remap_area_pages(&init_mm, 
+                                     MMAP_VADDR(pending_idx, i),
+                                     phys_seg[i].buffer & PAGE_MASK, 
+                                     sz, prot, blkif->domid) != 0 )
         {
             DPRINTK("invalid buffer\n");
-            while ( i-- > 0 )
-                unlock_buffer(phys_seg[i].buffer, 
-                              phys_seg[i].nr_sects << 9,
-                              operation==READ);
+            vmfree_area_pages(MMAP_VADDR(pending_idx, 0), 
+                              MMAP_PAGES_PER_REQUEST);
             goto bad_descriptor;
         }
     }
 
-    pending_req = &pending_reqs[pending_ring[MASK_PEND_IDX(pending_cons++)]];
+    pending_req = &pending_reqs[pending_idx];
     pending_req->blkif     = blkif;
     pending_req->id        = req->id;
     pending_req->operation = operation;
-    pending_req->status    = 0;
+    pending_req->status    = BLKIF_RSP_ERROR;
     atomic_set(&pending_req->pendcnt, nr_psegs);
 
     blkif_get(blkif);
@@ -371,11 +390,8 @@ static void dispatch_rw_block_io(blkif_t *blkif,
         bh->b_size          = phys_seg[i].nr_sects << 9;
         bh->b_dev           = phys_seg[i].dev;
         bh->b_rsector       = (unsigned long)phys_seg[i].sector_number;
-
-        /* SMH: we store a 'pseudo-virtual' bogus address in b_data since
-           later code will undo this transformation (i.e. +-PAGE_OFFSET). */
-        bh->b_data          = phys_to_virt(phys_seg[i].buffer);
- 
+        bh->b_data          = (char *)MMAP_VADDR(pending_idx, i) + 
+            (phys_seg[i].buffer & ~PAGE_MASK);
         /* SMH: bh_phys() uses the below field as a 'cheap' virt_to_phys */
         bh->b_page          = &mem_map[phys_seg[i].buffer>>PAGE_SHIFT]; 
         bh->b_end_io        = end_block_io_op;
@@ -391,10 +407,11 @@ static void dispatch_rw_block_io(blkif_t *blkif,
         submit_bh(operation, bh);
     }
 
+    pending_cons++;
     return;
 
  bad_descriptor:
-    make_response(blkif, req->id, req->operation, 1);
+    make_response(blkif, req->id, req->operation, BLKIF_RSP_ERROR);
 } 
 
 
@@ -405,12 +422,13 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 
 
 static void make_response(blkif_t *blkif, unsigned long id, 
-                          unsigned short op, unsigned long st)
+                          unsigned short op, int st)
 {
-    blk_ring_resp_entry_t *resp;
+    blkif_response_t *resp;
+    unsigned long     flags;
 
     /* Place on the response ring for the relevant domain. */ 
-    spin_lock(&blkif->blk_ring_lock);
+    spin_lock_irqsave(&blkif->blk_ring_lock, flags);
     resp = &blkif->blk_ring_base->
         ring[MASK_BLK_IDX(blkif->blk_resp_prod)].resp;
     resp->id        = id;
@@ -418,48 +436,13 @@ static void make_response(blkif_t *blkif, unsigned long id,
     resp->status    = st;
     wmb();
     blkif->blk_ring_base->resp_prod = ++blkif->blk_resp_prod;
-    spin_unlock(&blkif->blk_ring_lock);
+    spin_unlock_irqrestore(&blkif->blk_ring_lock, flags);
 
     /* Kick the relevant domain. */
     notify_via_evtchn(blkif->evtchn);
 }
 
-static void blkif_debug_int(int irq, void *unused, struct pt_regs *regs)
-{
-#if 0
-    unsigned long flags;
-    struct task_struct *p;
-    blk_ring_t *blk_ring;
-    int i;
-
-    printk("Dumping block queue stats: nr_pending = %d"
-           " (prod=0x%08x,cons=0x%08x)\n",
-           NR_PENDING_REQS, pending_prod, pending_cons);
-
-    read_lock_irqsave(&tasklist_lock, flags);
-    for_each_domain ( p )
-    {
-        printk("Domain: %llu\n", blkif->domain);
-        blk_ring = blkif->blk_ring_base;
-        printk("  req_prod:0x%08x, req_cons:0x%08x resp_prod:0x%08x/"
-               "0x%08x on_list=%d\n",
-               blk_ring->req_prod, blkif->blk_req_cons,
-               blk_ring->resp_prod, blkif->blk_resp_prod,
-               __on_blkdev_list(p));
-    }
-    read_unlock_irqrestore(&tasklist_lock, flags);
-
-    for ( i = 0; i < MAX_PENDING_REQS; i++ )
-    {
-        printk("Pend%d: dom=%p, id=%08lx, cnt=%d, op=%d, status=%d\n",
-               i, pending_reqs[i].domain, pending_reqs[i].id,
-               atomic_read(&pending_reqs[i].pendcnt), 
-               pending_reqs[i].operation, pending_reqs[i].status);
-    }
-#endif
-}
-
-void unlink_blkdev_info(blkif_t *blkif)
+void blkif_deschedule(blkif_t *blkif)
 {
     unsigned long flags;
 
@@ -477,25 +460,28 @@ static int __init init_module(void)
 {
     int i;
 
+    blkif_interface_init();
+
+    if ( (mmap_vma = get_vm_area(MMAP_PAGES * PAGE_SIZE, VM_IOREMAP)) == NULL )
+    {
+        printk(KERN_WARNING "Could not allocate VMA for blkif backend.\n");
+        return -ENOMEM;
+    }
+
     pending_cons = 0;
     pending_prod = MAX_PENDING_REQS;
     memset(pending_reqs, 0, sizeof(pending_reqs));
     for ( i = 0; i < MAX_PENDING_REQS; i++ )
         pending_ring[i] = i;
     
-    for ( i = 0; i < NR_CPUS; i++ )
-        completed_bhs[i] = NULL;
-        
     spin_lock_init(&io_schedule_list_lock);
     INIT_LIST_HEAD(&io_schedule_list);
-
-    if ( request_irq(bind_virq_to_irq(VIRQ_DEBUG), blkif_debug_int, 
-                     SA_SHIRQ, "blkif-backend-dbg", &blkif_debug_int) != 0 )
-        printk(KERN_WARNING "Non-fatal error -- no debug interrupt\n");
 
     buffer_head_cachep = kmem_cache_create(
         "buffer_head_cache", sizeof(struct buffer_head),
         0, SLAB_HWCACHE_ALIGN, NULL, NULL);
+
+    blkif_ctrlif_init();
 
     return 0;
 }

@@ -44,6 +44,14 @@ def daemon_loop():
     # notifications.
     notifier = xend.utils.notifier()
 
+    # The DOM0 control interface is not set up via the management interface.
+    # Note that console messages don't come our way (actually, only driver
+    # back-ends should use the DOM0 control interface). We therefore don't
+    # need to set up console structures.
+    xend.utils.port(0)
+    xend.main.notifier.bind(port.local_port)
+    xend.main.control_list[port.local_port] = (port, 0, 0, 0)
+
     ##
     ## MAIN LOOP
     ## 

@@ -36,7 +36,7 @@ static struct proc_dir_entry *privcmd_intf;
 static int privcmd_ioctl(struct inode *inode, struct file *file,
                          unsigned int cmd, unsigned long data)
 {
-    int ret = 0;
+    int ret = -ENOSYS;
 
     switch ( cmd )
     {
@@ -62,10 +62,14 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
     }
     break;
 
-    default:
-        ret = -EINVAL;
-    	break;
-	}
+    case IOCTL_PRIVCMD_INITDOMAIN_EVTCHN:
+    {
+        extern int initdom_ctrlif_domcontroller_port;
+        ret = initdom_ctrlif_domcontroller_port;
+    }
+    break;
+    }
+
     return ret;
 }
 
@@ -85,7 +89,7 @@ static int __init init_module(void)
     {
         privcmd_intf->owner      = THIS_MODULE;
         privcmd_intf->nlink      = 1;
-	privcmd_intf->proc_fops  = &privcmd_file_ops;
+        privcmd_intf->proc_fops  = &privcmd_file_ops;
     }
 
     return 0;

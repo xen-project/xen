@@ -52,7 +52,7 @@ int ctrl_if_send_message_noblock(
  *     function returns.
  *  2. If @hnd is NULL then no callback is executed.
  */
-int ctrl_if_send_message(
+int ctrl_if_send_message_block(
     ctrl_msg_t *msg, 
     ctrl_msg_handler_t hnd, 
     unsigned long id, 

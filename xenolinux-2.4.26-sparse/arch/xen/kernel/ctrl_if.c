@@ -17,6 +17,13 @@
 #include <asm/ctrl_if.h>
 #include <asm/evtchn.h>
 
+/*
+ * Only used by initial domain which must create its own control-interface
+ * event channel. This value is picked up by the user-space domain controller
+ * via an ioctl.
+ */
+int initdom_ctrlif_domcontroller_port = -1;
+
 static int        ctrl_if_evtchn;
 static int        ctrl_if_irq;
 static spinlock_t ctrl_if_lock;
@@ -276,9 +283,6 @@ void ctrl_if_unregister_receiver(u8 type, ctrl_msg_handler_t hnd)
 
 void ctrl_if_suspend(void)
 {
-    if ( start_info.flags & SIF_INITDOMAIN )
-        return;
-
     free_irq(ctrl_if_irq, NULL);
     unbind_evtchn_from_irq(ctrl_if_evtchn);
 }
@@ -286,7 +290,21 @@ void ctrl_if_suspend(void)
 void ctrl_if_resume(void)
 {
     if ( start_info.flags & SIF_INITDOMAIN )
-        return;
+    {
+        /*
+         * The initial domain must create its own domain-controller link.
+         * The controller is probably not running at this point, but will
+         * pick up its end of the event channel from 
+         */
+        evtchn_op_t op;
+        op.cmd = EVTCHNOP_bind_interdomain;
+        op.u.bind_interdomain.dom1 = DOMID_SELF;
+        op.u.bind_interdomain.dom2 = DOMID_SELF;
+        if ( HYPERVISOR_event_channel_op(&op) != 0 )
+            BUG();
+        start_info.domain_controller_evtchn = op.u.bind_interdomain.port1;
+        initdom_ctrlif_domcontroller_port   = op.u.bind_interdomain.port2;
+    }
 
     ctrl_if_tx_resp_cons = 0;
     ctrl_if_rx_req_cons  = 0;
