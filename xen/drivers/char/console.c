@@ -436,6 +436,21 @@ void console_force_lock(void)
     spin_lock(&console_lock);
 }
 
+void console_putc(char c)
+{
+    serial_putc(sercon_handle, c);
+}
+
+int console_getc(void)
+{
+    return serial_getc(sercon_handle);
+}
+
+int irq_console_getc(void)
+{
+    return irq_serial_getc(sercon_handle);
+}
+
 
 /*
  * **************************************************************

@@ -41,6 +41,7 @@ void serial_puts(int handle, const unsigned char *s);
  * will not return until a character is available. It can safely be
  * called with interrupts disabled.
  */
+unsigned char irq_serial_getc(int handle);
 unsigned char serial_getc(int handle);
 
 void serial_force_unlock(int handle);
