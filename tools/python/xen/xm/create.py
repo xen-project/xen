@@ -348,7 +348,7 @@ def preprocess_ip(opts, vals):
              or vals.gateway or vals.dhcp or vals.interface)
     if not setip: return
     ip = (vals.ip
-          + ':'
+          + ':' + '1.2.3.4'
           + ':' + vals.gateway
           + ':' + vals.netmask
           + ':' + vals.hostname
