@@ -44,6 +44,10 @@ rwlock_t tasklist_lock __cacheline_aligned = RW_LOCK_UNLOCKED;
 struct domain *task_hash[TASK_HASH_SIZE];
 struct domain *task_list;
 
+void arch_do_createdomain(struct domain *);
+void arch_final_setup_guestos(struct domain *, full_execution_context_t *c);
+void free_perdomain_pt(struct domain *);
+
 struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
 {
     char buf[100];
@@ -83,16 +87,7 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
         INIT_LIST_HEAD(&d->page_list);
         d->max_pages = d->tot_pages = 0;
 
-        d->shared_info = (void *)get_free_page();
-        memset(d->shared_info, 0, PAGE_SIZE);
-        SHARE_PFN_WITH_DOMAIN(virt_to_page(d->shared_info), d);
-        machine_to_phys_mapping[virt_to_phys(d->shared_info) >> 
-                               PAGE_SHIFT] = 0x80000000UL;  /* debug */
-
-        d->mm.perdomain_pt = (l1_pgentry_t *)get_free_page();
-        memset(d->mm.perdomain_pt, 0, PAGE_SIZE);
-        machine_to_phys_mapping[virt_to_phys(d->mm.perdomain_pt) >> 
-                               PAGE_SHIFT] = 0x0fffdeadUL;  /* debug */
+	arch_do_createdomain(d);
 
         /* Per-domain PCI-device list. */
         spin_lock_init(&d->pcidev_lock);
@@ -446,7 +441,7 @@ void domain_destruct(struct domain *d)
 
     destroy_event_channels(d);
 
-    free_page((unsigned long)d->mm.perdomain_pt);
+    free_perdomain_pt(d);
     free_page((unsigned long)d->shared_info);
 
     free_domain_struct(d);
@@ -460,8 +455,7 @@ void domain_destruct(struct domain *d)
  */
 int final_setup_guestos(struct domain *p, dom0_builddomain_t *builddomain)
 {
-    unsigned long phys_basetab;
-    int i, rc = 0;
+    int rc = 0;
     full_execution_context_t *c;
 
     if ( (c = kmalloc(sizeof(*c))) == NULL )
@@ -479,43 +473,7 @@ int final_setup_guestos(struct domain *p, dom0_builddomain_t *builddomain)
         goto out;
     }
     
-    clear_bit(DF_DONEFPUINIT, &p->flags);
-    if ( c->flags & ECF_I387_VALID )
-        set_bit(DF_DONEFPUINIT, &p->flags);
-    memcpy(&p->shared_info->execution_context,
-           &c->cpu_ctxt,
-           sizeof(p->shared_info->execution_context));
-    memcpy(&p->thread.i387,
-           &c->fpu_ctxt,
-           sizeof(p->thread.i387));
-    memcpy(p->thread.traps,
-           &c->trap_ctxt,
-           sizeof(p->thread.traps));
-#ifdef ARCH_HAS_FAST_TRAP
-    SET_DEFAULT_FAST_TRAP(&p->thread);
-    (void)set_fast_trap(p, c->fast_trap_idx);
-#endif
-    p->mm.ldt_base = c->ldt_base;
-    p->mm.ldt_ents = c->ldt_ents;
-    SET_GDT_ENTRIES(p, DEFAULT_GDT_ENTRIES);
-    SET_GDT_ADDRESS(p, DEFAULT_GDT_ADDRESS);
-    if ( c->gdt_ents != 0 )
-        (void)set_gdt(p,
-                      c->gdt_frames,
-                      c->gdt_ents);
-    p->thread.guestos_ss = c->guestos_ss;
-    p->thread.guestos_sp = c->guestos_esp;
-    for ( i = 0; i < 8; i++ )
-        (void)set_debugreg(p, i, c->debugreg[i]);
-    p->event_selector    = c->event_callback_cs;
-    p->event_address     = c->event_callback_eip;
-    p->failsafe_selector = c->failsafe_callback_cs;
-    p->failsafe_address  = c->failsafe_callback_eip;
-    
-    phys_basetab = c->pt_base;
-    p->mm.pagetable = mk_pagetable(phys_basetab);
-    get_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT], p, 
-                      PGT_base_page_table);
+    arch_final_setup_guestos(p,c);
 
     /* Set up the shared info structure. */
     update_dom_time(p->shared_info);
