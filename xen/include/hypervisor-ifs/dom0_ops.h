@@ -19,7 +19,7 @@
  * This makes sure that old versions of dom0 tools will stop working in a
  * well-defined way (rather than crashing the machine, for instance).
  */
-#define DOM0_INTERFACE_VERSION   0xAAAA0014
+#define DOM0_INTERFACE_VERSION   0xAAAA0015
 
 #define MAX_DOMAIN_NAME    16
 
@@ -216,11 +216,11 @@ typedef struct {
     s32          cpu;                 /*  4: -1 implies unpin */
 } PACKED dom0_pincpudomain_t; /* 8 bytes */
 
-/* Get trace buffers physical base pointer */
+/* Get trace buffers machine base address */
 #define DOM0_GETTBUFS         21
 typedef struct {
     /* OUT variables */
-    memory_t phys_addr;   /*  0: location of the trace buffers       */
+    memory_t mach_addr;   /*  0: location of the trace buffers       */
     MEMORY_PADDING;
     u32      size;        /*  8: size of each trace buffer, in bytes */
 } PACKED dom0_gettbufs_t; /* 12 bytes */

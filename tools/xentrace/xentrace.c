@@ -85,13 +85,13 @@ void write_rec(unsigned int cpu, struct t_rec *rec, FILE *out)
 
 /**
  * get_tbufs - get pointer to and size of the trace buffers
- * @phys_addr: location to store physical address if the trace buffers to
+ * @mach_addr: location to store machine address if the trace buffers to
  * @size:      location to store the size of a trace buffer to
  *
- * Gets the physical address of the trace pointer area and the size of the
+ * Gets the machine address of the trace pointer area and the size of the
  * per CPU buffers.
  */
-void get_tbufs(unsigned long *phys_addr, unsigned long *size)
+void get_tbufs(unsigned long *mach_addr, unsigned long *size)
 {
     int ret;
     dom0_op_t op;                        /* dom0 op we'll build             */
@@ -110,40 +110,40 @@ void get_tbufs(unsigned long *phys_addr, unsigned long *size)
         exit(EXIT_FAILURE);
     }
 
-    *phys_addr = op.u.gettbufs.phys_addr;
+    *mach_addr = op.u.gettbufs.mach_addr;
     *size      = op.u.gettbufs.size;
 }
 
 /**
  * map_tbufs - memory map Xen trace buffers into user space
- * @tbufs:     physical address of the trace buffers
+ * @tbufs:     machine address of the trace buffers
  * @num:       number of trace buffers to map
  * @size:      size of each trace buffer
  *
  * Maps the Xen trace buffers them into process address space by memory mapping
  * /dev/mem.  Returns the location the buffers have been mapped to.
  */
-struct t_buf *map_tbufs(unsigned long tbufs_phys, unsigned int num,
+struct t_buf *map_tbufs(unsigned long tbufs_mach, unsigned int num,
                         unsigned long size)
 {
-    int dm_fd;                               /* file descriptor for /dev/mem */
+    int xc_handle;                  /* file descriptor for /proc/xen/privcmd */
     struct t_buf *tbufs_mapped;
 
-    dm_fd = open("/dev/mem", O_RDONLY);
+    xc_handle = xc_interface_open();
 
-    if ( dm_fd < 0 ) 
+    if ( xc_handle < 0 ) 
     {
-        PERROR("Open /dev/mem when mapping trace buffers\n");
+        PERROR("Open /proc/xen/privcmd when mapping trace buffers\n");
         exit(EXIT_FAILURE);
     }
 
-    tbufs_mapped = (struct t_buf *)mmap(NULL, size * num,
-                                        PROT_READ, MAP_SHARED,
-                                        dm_fd, (off_t)tbufs_phys);
+    tbufs_mapped = xc_map_foreign_range(xc_handle, 0 /* Dom 0 ID */,
+					size * num, PROT_READ,
+					tbufs_mach >> PAGE_SHIFT);
 
-    close(dm_fd);
+    xc_interface_close(xc_handle);
 
-    if ( tbufs_mapped == MAP_FAILED ) 
+    if ( tbufs_mapped == 0 ) 
     {
         PERROR("Failed to mmap trace buffers");
         exit(EXIT_FAILURE);
@@ -187,16 +187,16 @@ struct t_buf **init_bufs_ptrs(void *bufs_mapped, unsigned int num,
 
 /**
  * init_rec_ptrs - initialises data area pointers to locations in user space
- * @tbufs_phys:    physical base address of the trace buffer area
+ * @tbufs_mach:    machine base address of the trace buffer area
  * @tbufs_mapped:  user virtual address of base of trace buffer area
  * @meta:          array of user-space pointers to struct t_buf's of metadata
  * @num:           number of trace buffers
  *
  * Initialises data area pointers to the locations that data areas have been
- * mapped in user space.  Note that the trace buffer metadata contains physical
+ * mapped in user space.  Note that the trace buffer metadata contains machine
  * pointers - the array returned allows more convenient access to them.
  */
-struct t_rec **init_rec_ptrs(unsigned long tbufs_phys,
+struct t_rec **init_rec_ptrs(unsigned long tbufs_mach,
                              struct t_buf *tbufs_mapped,
                              struct t_buf **meta,
                              unsigned int num)
@@ -212,8 +212,8 @@ struct t_rec **init_rec_ptrs(unsigned long tbufs_phys,
     }
 
     for ( i = 0; i<num; i++ )
-        data[i] = (struct t_rec *)((unsigned long)meta[i]->data -
-                                   tbufs_phys + (unsigned long)tbufs_mapped);
+        data[i] = (struct t_rec *)(meta[i]->data - tbufs_mach
+				   + (unsigned long)tbufs_mapped);
 
     return data;
 }
@@ -283,7 +283,7 @@ int monitor_tbufs(FILE *logfile)
     struct t_rec **data;         /* pointers to the trace buffer data areas
                                   * where they are mapped into user space.   */
     unsigned long *cons;         /* store tail indexes for the trace buffers */
-    unsigned long tbufs_phys;    /* physical address of the tbufs            */
+    unsigned long tbufs_mach;    /* machine address of the tbufs             */
     unsigned int  num;           /* number of trace buffers / logical CPUS   */
     unsigned long size;          /* size of a single trace buffer            */
 
@@ -293,36 +293,26 @@ int monitor_tbufs(FILE *logfile)
     num = get_num_cpus();
 
     /* setup access to trace buffers */
-    get_tbufs(&tbufs_phys, &size);
-    tbufs_mapped = map_tbufs(tbufs_phys, num, size);
+    get_tbufs(&tbufs_mach, &size);
+    tbufs_mapped = map_tbufs(tbufs_mach, num, size);
 
     size_in_recs = (size / sizeof(struct t_rec) )-1;
 
     /* build arrays of convenience ptrs */
     meta  = init_bufs_ptrs (tbufs_mapped, num, size);
-    data  = init_rec_ptrs  (tbufs_phys, tbufs_mapped, meta, num);
+    data  = init_rec_ptrs  (tbufs_mach, tbufs_mapped, meta, num);
     cons  = init_tail_idxs (meta, num);
 
     /* now, scan buffers for events */
     while ( !interrupted )
     {
         for ( i = 0; ( i < num ) && !interrupted; i++ )
-        {	    
-/*	    printf("XX%d: cons=%ld head=%ld  %p\n", i,
-		   cons[i], meta[i]->head, data[i] + (cons[i] % size_in_recs) );
-		   */
 	    while( cons[i] != meta[i]->head )
 	    {
-/*
-		if( (cons[i] % 6  ) == 0 )
-		    printf("%d: cons=%ld head=%ld  %p\n", i,
-		       cons[i], meta[i]->head, data[i] + (cons[i] % size_in_recs) );
-		       */
 		write_rec(i, data[i] + (cons[i] % size_in_recs), logfile);
 		cons[i]++;
 	    }
 
-        }
         nanosleep(&opts.poll_sleep, NULL);
     }
 
