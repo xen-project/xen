@@ -188,7 +188,6 @@ extern void domain_destruct(struct domain *d);
 extern void domain_kill(struct domain *d);
 extern void domain_crash(void);
 extern void domain_shutdown(u8 reason);
-extern void domain_relinquish_memory(struct domain *d);
 
 void new_thread(struct domain *d,
                 unsigned long start_pc,

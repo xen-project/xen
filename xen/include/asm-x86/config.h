@@ -220,4 +220,10 @@ extern unsigned long xenheap_phys_end; /* user-configurable */
 #define LDT_VIRT_START        (GDT_VIRT_END)
 #define LDT_VIRT_END          (LDT_VIRT_START + (64*1024))
 
+#if defined(__x86_64__)
+#define ELFSIZE 64
+#else
+#define ELFSIZE 32
+#endif
+
 #endif /* __XEN_I386_CONFIG_H__ */

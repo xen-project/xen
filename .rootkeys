@@ -323,6 +323,7 @@
 3ddb79bcBit4xJXbwtX0kb1hh2uO1Q xen/arch/x86/idle0_task.c
 3ddb79bcKIkRR0kqWaJhe5VUDkMdxg xen/arch/x86/io_apic.c
 3ddb79bdqfIcjkz_h9Hvtp8Tk_19Zw xen/arch/x86/irq.c
+40ec29ffuOa1ZvmJHzFKyZn4k_RcXg xen/arch/x86/memory.c
 3ddb79bdS4UeWWXDH-FaBKqcpMFcnw xen/arch/x86/mpparse.c
 3f12cff65EV3qOG2j37Qm0ShgvXGRw xen/arch/x86/nmi.c
 3ddb79bdHe6_Uij4-glW91vInNtBYQ xen/arch/x86/pci-irq.c
@@ -448,6 +449,7 @@
 3ddb79c2L7rTlFzazOLW1XuSZefpFw xen/include/asm-x86/irq.h
 404f1b93OjLO4bFfBXYNaJdIqlNz-Q xen/include/asm-x86/ldt.h
 3ddb79c3I98vWcQR8xEo34JMJ4Ahyw xen/include/asm-x86/mc146818rtc.h
+40ec25fd7cSvbP7Biw91zaU_g0xsEQ xen/include/asm-x86/mm.h
 3ddb79c3n_UbPuxlkNxvvLycClIkxA xen/include/asm-x86/mpspec.h
 3ddb79c2wa0dA_LGigxOelSGbJ284Q xen/include/asm-x86/msr.h
 3ddb79c3xjYnrv5t3VqYlR4tNEOl4Q xen/include/asm-x86/page.h
