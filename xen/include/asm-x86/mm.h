@@ -343,7 +343,4 @@ int update_grant_va_mapping(unsigned long va,
                             unsigned long val,
                             struct domain *d,
                             struct exec_domain *ed);
-#define GNTUPDVA_prev_ro 1
-#define GNTUPDVA_prev_rw 2
-
 #endif /* __ASM_X86_MM_H__ */

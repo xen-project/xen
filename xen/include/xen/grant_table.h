@@ -106,4 +106,8 @@ void
 gnttab_notify_transfer(
     struct domain *rd, grant_ref_t ref, unsigned long frame);
 
+/* Pre-domain destruction release of granted device mappings of other domains.*/
+void
+gnttab_release_dev_mappings(grant_table_t *gt);
+
 #endif /* __XEN_GRANT_H__ */

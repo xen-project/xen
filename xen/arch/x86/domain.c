@@ -441,6 +441,9 @@ int arch_final_setup_guest(
     memcpy(&ed->arch.user_ctxt,
            &c->cpu_ctxt,
            sizeof(ed->arch.user_ctxt));
+    /* IOPL privileges are virtualised. */
+    ed->arch.iopl = (ed->arch.user_ctxt.eflags >> 12) & 3;
+    ed->arch.user_ctxt.eflags &= ~EF_IOPL;
 
     /* Clear IOPL for unprivileged domains. */
     if (!IS_PRIV(d))
@@ -762,7 +765,7 @@ void context_switch(struct exec_domain *prev_p, struct exec_domain *next_p)
             __asm__ __volatile__ ("lgdt %0" : "=m" (*next_p->arch.gdt));
 
             __sti();
-            return;
+            goto done;
         }
 #endif
  
@@ -807,6 +810,7 @@ void context_switch(struct exec_domain *prev_p, struct exec_domain *next_p)
 
     switch_segments(stack_ec, prev_p, next_p);
 
+ done:
     /*
      * We do this late on because it doesn't need to be protected by the
      * schedule_lock, and because we want this to be the very last use of
@@ -818,15 +822,6 @@ void context_switch(struct exec_domain *prev_p, struct exec_domain *next_p)
     schedule_tail(next_p);
 
     BUG();
-}
-
-
-/* XXX Currently the 'domain' field is ignored! XXX */
-long do_iopl(domid_t domain, unsigned int new_io_pl)
-{
-    execution_context_t *ec = get_execution_context();
-    ec->eflags = (ec->eflags & 0xffffcfff) | ((new_io_pl&3) << 12);
-    return 0;
 }
 
 unsigned long __hypercall_create_continuation(
@@ -969,6 +964,10 @@ void domain_relinquish_memory(struct domain *d)
 
     /* Ensure that noone is running over the dead domain's page tables. */
     synchronise_pagetables(~0UL);
+
+    /* Release device mappings of other domains */
+    gnttab_release_dev_mappings( d->grant_table );
+
 
     /* Exit shadow mode before deconstructing final guest page table. */
     shadow_mode_disable(d);

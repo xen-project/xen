@@ -15,6 +15,10 @@
 # <http://www.tldp.org/HOWTO/HighQuality-Apps-HOWTO/>
 #
 
+if ! [ -e /proc/xen/privcmd ]; then
+	exit 0
+fi
+
 RETVAL=0
 
 INITD=/etc/init.d

@@ -214,7 +214,6 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
                 struct task_struct * p, struct pt_regs * regs)
 {
     struct pt_regs * childregs;
-    unsigned long eflags;
 
     childregs = ((struct pt_regs *) (THREAD_SIZE + (unsigned long) p)) - 1;
     struct_cpy(childregs, regs);
@@ -232,9 +231,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
     unlazy_fpu(current);
     struct_cpy(&p->thread.i387, &current->thread.i387);
 
-
-    __asm__ __volatile__ ( "pushfl; popl %0" : "=r" (eflags) : );
-    p->thread.io_pl = (eflags >> 12) & 3;
+    p->thread.io_pl = current->thread.io_pl;
 
     return 0;
 }

@@ -40,7 +40,8 @@ LIB      += libxutil.so.$(MAJOR)
 LIB      += libxutil.so.$(MAJOR).$(MINOR)
 LIB      += libxutil.a
 
-all: check-for-zlib
+all: build
+build: check-for-zlib
 	$(MAKE) $(LIB)
 
 libxutil.so: libxutil.so.$(MAJOR)
@@ -63,7 +64,7 @@ check-for-zlib:
 	false; \
 	fi
 
-install: all
+install: build
 	[ -d $(DESTDIR)/usr/lib ] || $(INSTALL_DIR) -p $(DESTDIR)/usr/lib
 	$(INSTALL_PROG) libxutil.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/lib
 	$(INSTALL_DATA) libxutil.a $(DESTDIR)/usr/lib
