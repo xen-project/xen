@@ -11,6 +11,8 @@
 #include <xen/shadow.h>
 #include <xen/elf.h>
 #include <hypervisor-ifs/dom0_ops.h>
+#include <asm/hardirq.h>
+#include <asm/domain_page.h>
 
 /* Both these structures are protected by the tasklist_lock. */
 rwlock_t tasklist_lock __cacheline_aligned = RW_LOCK_UNLOCKED;

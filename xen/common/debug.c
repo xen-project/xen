@@ -12,6 +12,7 @@
 #include <xen/event.h>
 #include <asm/page.h>
 #include <asm/pdb.h>
+#include <asm/shadow.h>
 
 #undef DEBUG_TRACE
 #ifdef DEBUG_TRACE

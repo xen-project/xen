@@ -381,7 +381,6 @@ void __enter_scheduler(void)
     rem_ac_timer(&schedule_data[cpu].s_timer);
     
     ASSERT(!in_irq());
-if(!__task_on_runqueue(prev)) printk("Domain %d not on runqueue\n",prev->domain);
     ASSERT(__task_on_runqueue(prev));
 
     if ( test_bit(DF_BLOCKED, &prev->flags) )

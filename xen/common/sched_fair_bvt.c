@@ -1,19 +1,20 @@
 /* -*-  Mode:C; c-basic-offset:4; tab-width:4 -*-
  ****************************************************************************
- * (C) 2002-2003 - Rolf Neugebauer - Intel Research Cambridge
- * (C) 2002-2003 University of Cambridge
- * (C) 2004      - Mark Williamson - Intel Research Cambridge
+ * (C) 2004      Grzegorz Milos - University of Cambridge
+ * Based on the implementation of the BVT scheduler by Rolf Neugebauer
+ * and Mark Williamson (look in sched_bvt.c)
  ****************************************************************************
  *
- *        File: common/schedule.c
- *      Author: Rolf Neugebauer & Keir Fraser
- *              Updated for generic API by Mark Williamson
+ *        File: common/sched_fair_bvt.c
+ *      Author: Grzegorz Milos
  *
  * Description: CPU scheduling
- *              implements A Borrowed Virtual Time scheduler.
- *              (see Duda & Cheriton SOSP'99)
+ *              implements Fair Borrowed Virtual Time Scheduler.
+ *              FBVT is modification of BVT (see Duda & Cheriton SOSP'99)
+ *              which tries to allocate fair shares of processor even 
+ *              when there is mix between CPU and I/O bound domains.
+ *              TODO - more information about the scheduler in TODO
  */
-
 #include <xen/config.h>
 #include <xen/init.h>
 #include <xen/lib.h>
@@ -25,6 +26,10 @@
 #include <xen/perfc.h>
 #include <xen/sched-if.h>
 #include <xen/slab.h>
+#include <xen/trace.h>
+
+/* For tracing - TODO - put all the defines in some common hearder file */
+#define TRC_SCHED_FBVT_DO_SCHED             0x00020000
 
 
 /* all per-domain BVT-specific scheduling info is stored here */
@@ -171,7 +176,7 @@ void fbvt_wake_up(struct domain *p)
 	 	 */
 	
 		io_warp = (int)(0.5 * inf->time_slept);
-		if(io_warp > 10000) io_warp = 10000;
+		if(io_warp > 1000) io_warp = 1000;
 
 		ASSERT(inf->time_slept + CPU_SVT(p->processor) > inf->avt + io_warp);
 		inf->time_slept += CPU_SVT(p->processor) - inf->avt - io_warp;
@@ -429,13 +434,16 @@ static task_slice_t fbvt_do_schedule(s_time_t now)
    
     r_time = ((next_prime_inf->evt + next_inf->vtb - next_inf->evt)/next_inf->mcu_advance)
         + ctx_allow;
-
+        
     ASSERT(r_time >= ctx_allow);
 
  sched_done:
+ 
+    TRACE_2D(TRC_SCHED_FBVT_DO_SCHED, next->domain, r_time);
     next->min_slice = ctx_allow;
     ret.task = next;
     ret.time = r_time;
+ 
     return ret;
 }
 
