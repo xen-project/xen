@@ -545,6 +545,7 @@ error_code:
         # worst that will happen is that our return code is no longer atomic.
         # This will do -- noone will ever notice. :-)
 	sti
+	movl  %esp,%edx
 	pushl %esi			# push the error code
 	pushl %edx			# push the pt_regs pointer
 	GET_CURRENT(%ebx)
