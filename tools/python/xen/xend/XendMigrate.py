@@ -41,9 +41,11 @@ class Xfrd(Protocol):
         sxp.show(req, out=self.transport)
 
     def loseConnection(self):
+        print 'Xfrd>loseConnection>'
         self.transport.loseConnection()
 
     def connectionLost(self, reason):
+        print 'Xfrd>connectionLost>', reason
         self.xinfo.connectionLost(reason)
 
     def dataReceived(self, data):
@@ -85,6 +87,8 @@ class XfrdInfo:
         from xen.xend import XendDomain
         self.xd = XendDomain.instance()
         self.deferred = defer.Deferred()
+        self.suspended = {}
+        self.paused = {}
         
     def vmconfig(self):
         print 'vmconfig>'
@@ -143,6 +147,7 @@ class XfrdInfo:
         try:
             vmid = sxp.child0(val)
             val = self.xd.domain_pause(vmid)
+            self.paused[vmid] = 1
         except:
             val = errno.EINVAL
         return ['xfr.err', val]
@@ -152,6 +157,8 @@ class XfrdInfo:
         try:
             vmid = sxp.child0(val)
             val = self.xd.domain_unpause(vmid)
+            if vmid in self.paused:
+                del self.paused[vmid]
         except:
             val = errno.EINVAL
         return ['xfr.err', val]
@@ -161,9 +168,23 @@ class XfrdInfo:
         try:
             vmid = sxp.child0(val)
             val = self.xd.domain_shutdown(vmid, reason='suspend')
+            self.suspended[vmid] = 1
         except:
             val = errno.EINVAL
         return ['xfr.err', val]
+
+    def connectionLost(self, reason=None):
+        print 'XfrdInfo>connectionLost>', reason
+        for vmid in self.suspended:
+            try:
+                self.xd.domain_destroy(vmid)
+            except:
+                pass
+        for vmid in self.paused:
+            try:
+                self.xd.domain_unpause(vmid)
+            except:
+                pass
 
 class XendMigrateInfo(XfrdInfo):
     """Representation of a migrate in-progress and its interaction with xfrd.
@@ -195,21 +216,25 @@ class XendMigrateInfo(XfrdInfo):
         if not vmconfig:
             xfrd.loseConnection()
             return
+        self.xd.domain_pause(self.src_dom)
+        self.paused[self.src_dom] = 1
         xfrd.request(['xfr.migrate',
                       self.src_dom,
                       vmconfig,
                       self.dst_host,
                       self.dst_port])
         
-    def xfr_migrate_ok(self, val):
+    def xfr_migrate_ok(self, xfrd, val):
         dom = int(sxp.child0(val))
         self.state = 'ok'
         self.dst_dom = dom
-        self.xd_domain_destroy(self.src_dom)
+        self.xd.domain_destroy(self.src_dom)
         if not self.deferred.called:
             self.deferred.callback(self)
 
     def connectionLost(self, reason=None):
+        print 'XfrdMigrateInfo>connectionLost>', reason
+        XfrdInfo.connectionLost(self, reason)
         if self.state =='ok':
             eserver.inject('xend.migrate.ok', self.sxpr())
         else:
@@ -241,9 +266,11 @@ class XendSaveInfo(XfrdInfo):
         if not vmconfig:
             xfrd.loseConnection()
             return
+        self.xd.domain_pause(self.src_dom)
+        self.paused[self.src_dom] = 1
         xfrd.request(['xfr.save', self.src_dom, vmconfig, self.file ])
         
-    def xfr_save_ok(self, val):
+    def xfr_save_ok(self, xfrd, val):
         dom = int(sxp.child0(val))
         self.state = 'ok'
         self.xd_domain_destroy(self.src_dom)
@@ -251,6 +278,8 @@ class XendSaveInfo(XfrdInfo):
             self.deferred.callback(self)
 
     def connectionLost(self, reason=None):
+        print 'XfrdSaveInfo>connectionLost>', reason
+        XfrdInfo.connectionLost(self, reason)
         if self.state =='ok':
             eserver.inject('xend.save.ok', self.sxpr())
         else:
