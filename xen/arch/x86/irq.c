@@ -17,7 +17,7 @@ irq_desc_t irq_desc[NR_IRQS] __cacheline_aligned;
 
 static void __do_IRQ_guest(int irq);
 
-void no_action(int cpl, void *dev_id, struct pt_regs *regs) { }
+void no_action(int cpl, void *dev_id, struct xen_regs *regs) { }
 
 static void enable_none(unsigned int irq) { }
 static unsigned int startup_none(unsigned int irq) { return 0; }
@@ -87,7 +87,7 @@ void enable_irq(unsigned int irq)
     spin_unlock_irqrestore(&desc->lock, flags);
 }
 
-asmlinkage void do_IRQ(struct pt_regs regs)
+asmlinkage void do_IRQ(struct xen_regs regs)
 {       
 #if defined(__i386__)
     unsigned int      irq = regs.orig_eax;

@@ -31,7 +31,7 @@ static struct {
 
 struct perfcounter_t perfcounters;
 
-void perfc_printall(u_char key, void *dev_id, struct pt_regs *regs)
+void perfc_printall(u_char key, void *dev_id, struct xen_regs *regs)
 {
     int i, j, sum;
     s_time_t now = NOW();
@@ -73,7 +73,7 @@ void perfc_printall(u_char key, void *dev_id, struct pt_regs *regs)
     }
 }
 
-void perfc_reset(u_char key, void *dev_id, struct pt_regs *regs)
+void perfc_reset(u_char key, void *dev_id, struct xen_regs *regs)
 {
     int i, j, sum;
     s_time_t now = NOW();

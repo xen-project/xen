@@ -243,7 +243,7 @@ static void switch_serial_input(void)
                input_str[xen_rx], opt_conswitch[0], input_str[!xen_rx]);
 }
 
-static void __serial_rx(unsigned char c, struct pt_regs *regs)
+static void __serial_rx(unsigned char c, struct xen_regs *regs)
 {
     key_handler *handler;
     struct domain *p;
@@ -265,7 +265,7 @@ static void __serial_rx(unsigned char c, struct pt_regs *regs)
     }
 }
 
-static void serial_rx(unsigned char c, struct pt_regs *regs)
+static void serial_rx(unsigned char c, struct xen_regs *regs)
 {
     static int switch_code_count = 0;
 

@@ -11,7 +11,7 @@
 #ifndef __XEN_SERIAL_H__
 #define __XEN_SERIAL_H__
 
-#include <asm/ptrace.h>
+#include <asm/regs.h>
 
 /* 'Serial handles' are comprise the following fields. */
 #define SERHND_IDX      (1<<0) /* COM1 or COM2?                           */
@@ -27,7 +27,7 @@ void serial_init_stage2(void);
 int parse_serial_handle(char *conf);
 
 /* Register a character-receive hook on the specified COM port. */
-typedef void (*serial_rx_fn)(unsigned char, struct pt_regs *);
+typedef void (*serial_rx_fn)(unsigned char, struct xen_regs *);
 void serial_set_rx_handler(int handle, serial_rx_fn fn);
 
 /* Transmit a single character via the specified COM port. */

@@ -1,7 +1,7 @@
-#ifndef _I386_PTRACE_H
-#define _I386_PTRACE_H
+#ifndef _I386_REGS_H
+#define _I386_REGS_H
 
-struct pt_regs {
+struct xen_regs {
 	long ebx;
 	long ecx;
 	long edx;

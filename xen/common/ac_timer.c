@@ -244,7 +244,7 @@ static void ac_timer_softirq_action(void)
 }
 
 
-static void dump_timerq(u_char key, void *dev_id, struct pt_regs *regs)
+static void dump_timerq(u_char key, void *dev_id, struct xen_regs *regs)
 {
     struct ac_timer *t;
     unsigned long    flags; 

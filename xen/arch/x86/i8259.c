@@ -7,7 +7,7 @@
 
 #include <xen/config.h>
 #include <xen/init.h>
-#include <asm/ptrace.h>
+#include <asm/regs.h>
 #include <xen/errno.h>
 #include <xen/sched.h>
 #include <xen/irq.h>

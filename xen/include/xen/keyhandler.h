@@ -7,7 +7,7 @@
 #include <xen/sched.h>
 
 typedef void key_handler(unsigned char key, void *dev_id, 
-			 struct pt_regs *regs); 
+			 struct xen_regs *regs); 
 
 extern void add_key_handler(unsigned char key, 
 			    key_handler *handler, char *desc); 

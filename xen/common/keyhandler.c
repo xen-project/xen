@@ -27,7 +27,7 @@ key_handler *get_key_handler(unsigned char key)
 }
 
 static void show_handlers(unsigned char key, void *dev_id,
-                          struct pt_regs *regs)
+                          struct xen_regs *regs)
 {
     int i; 
     printk("'%c' pressed -> showing installed handlers\n", key);
@@ -40,22 +40,22 @@ static void show_handlers(unsigned char key, void *dev_id,
 
 
 static void dump_registers(unsigned char key, void *dev_id,
-                           struct pt_regs *regs)
+                           struct xen_regs *regs)
 {
-    extern void show_registers(struct pt_regs *regs); 
+    extern void show_registers(struct xen_regs *regs); 
     printk("'%c' pressed -> dumping registers\n", key); 
     show_registers(regs); 
 }
 
 static void halt_machine(unsigned char key, void *dev_id,
-                         struct pt_regs *regs) 
+                         struct xen_regs *regs) 
 {
     printk("'%c' pressed -> rebooting machine\n", key); 
     machine_restart(NULL); 
 }
 
 void do_task_queues(unsigned char key, void *dev_id,
-                    struct pt_regs *regs) 
+                    struct xen_regs *regs) 
 {
     unsigned long  flags;
     struct domain *d;
@@ -103,21 +103,21 @@ void do_task_queues(unsigned char key, void *dev_id,
 }
 
 extern void dump_runq(unsigned char key, void *dev_id, 
-                      struct pt_regs *regs);
+                      struct xen_regs *regs);
 extern void print_sched_histo(unsigned char key, void *dev_id, 
-                              struct pt_regs *regs);
+                              struct xen_regs *regs);
 extern void reset_sched_histo(unsigned char key, void *dev_id, 
-                              struct pt_regs *regs);
+                              struct xen_regs *regs);
 #ifndef NDEBUG
 extern void audit_domains_key(unsigned char key, void *dev_id,
-                           struct pt_regs *regs);
+                           struct xen_regs *regs);
 #endif
 
 #ifdef PERF_COUNTERS
 extern void perfc_printall(unsigned char key, void *dev_id,
-                           struct pt_regs *regs);
+                           struct xen_regs *regs);
 extern void perfc_reset(unsigned char key, void *dev_id,
-                        struct pt_regs *regs);
+                        struct xen_regs *regs);
 #endif
 
 void initialize_keytable(void)

@@ -1,5 +1,5 @@
-#ifndef _X86_64_PTRACE_H
-#define _X86_64_PTRACE_H
+#ifndef _X86_64_REGS_H
+#define _X86_64_REGS_H
 
 #if defined(__ASSEMBLY__) || defined(__FRAME_OFFSETS) 
 #define R15 0
@@ -43,7 +43,7 @@
 
 #ifndef __ASSEMBLY__ 
 
-struct pt_regs {
+struct xen_regs {
 	unsigned long r15;
 	unsigned long r14;
 	unsigned long r13;
@@ -84,7 +84,7 @@ struct pt_regs {
 #if !defined(__ASSEMBLY__) 
 
 #define instruction_pointer(regs) ((regs)->rip)
-extern void show_regs(struct pt_regs *);
+extern void show_regs(struct xen_regs *);
 
 enum {
         EF_CF   = 0x00000001,
