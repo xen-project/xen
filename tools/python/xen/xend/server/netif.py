@@ -122,7 +122,7 @@ class NetDev(controller.Dev):
         self.mac = None
         self.bridge = None
         self.script = None
-        self.ipaddr = None
+        self.ipaddr = []
         
         vmac = sxp.child_value(config, 'mac')
         if not vmac: raise XendError("invalid mac")

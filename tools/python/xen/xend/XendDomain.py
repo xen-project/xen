@@ -417,7 +417,10 @@ class XendDomain:
         """
         dominfo = self.domain_lookup(id)
         eserver.inject('xend.domain.unpause', dominfo.name)
-        return xc.domain_unpause(dom=dominfo.dom)
+        try:
+            return xc.domain_unpause(dom=dominfo.dom)
+        except Exception, ex:
+            raise XendError(str(ex))
     
     def domain_pause(self, id):
         """Pause domain execution.
@@ -426,7 +429,10 @@ class XendDomain:
         """
         dominfo = self.domain_lookup(id)
         eserver.inject('xend.domain.pause', dominfo.name)
-        return xc.domain_pause(dom=dominfo.dom)
+        try:
+            return xc.domain_pause(dom=dominfo.dom)
+        except Exception, ex:
+            raise XendError(str(ex))
     
     def domain_shutdown(self, id, reason='poweroff'):
         """Shutdown domain (nicely).
@@ -581,45 +587,66 @@ class XendDomain:
         @param cpu: cpu number
         """
         dominfo = self.domain_lookup(id)
-        return xc.domain_pincpu(itn(dominfo.id), cpu)
+        try:
+            return xc.domain_pincpu(itn(dominfo.id), cpu)
+        except Exception, ex:
+            raise XendError(str(ex))
 
     def domain_cpu_bvt_set(self, id, mcuadv, warp, warpl, warpu):
         """Set BVT (Borrowed Virtual Time) scheduler parameters for a domain.
         """
         dominfo = self.domain_lookup(id)
-        return xc.bvtsched_domain_set(dom=dominfo.dom, mcuadv=mcuadv,
-                                      warp=warp, warpl=warpl, warpu=warpu)
+        try:
+            return xc.bvtsched_domain_set(dom=dominfo.dom, mcuadv=mcuadv,
+                                          warp=warp, warpl=warpl, warpu=warpu)
+        except Exception, ex:
+            raise XendError(str(ex))
 
     def domain_cpu_bvt_get(self, id):
         """Get BVT (Borrowed Virtual Time) scheduler parameters for a domain.
         """
         dominfo = self.domain_lookup(id)
-        return xc.bvtsched_domain_get(dominfo.dom)
+        try:
+            return xc.bvtsched_domain_get(dominfo.dom)
+        except Exception, ex:
+            raise XendError(str(ex))
     
     def domain_cpu_fbvt_set(self, id, mcuadv, warp, warpl, warpu):
         """Set FBVT (Fair Borrowed Virtual Time) scheduler parameters for a domain.
         """
         dominfo = self.domain_lookup(id)
-        return xc.fbvtsched_domain_set(dom=dominfo.dom, mcuadv=mcuadv,
-                                       warp=warp, warpl=warpl, warpu=warpu)
+        try:
+            return xc.fbvtsched_domain_set(dom=dominfo.dom, mcuadv=mcuadv,
+                                           warp=warp, warpl=warpl, warpu=warpu)
+        except Exception, ex:
+            raise XendError(str(ex))
 
     def domain_cpu_fbvt_get(self, id):
         """Get FBVT (Fair Borrowed Virtual Time) scheduler parameters for a domain.
         """
         dominfo = self.domain_lookup(id)
-        return xc.fbvtsched_domain_get(dominfo.dom)
+        try:
+            return xc.fbvtsched_domain_get(dominfo.dom)
+        except Exception, ex:
+            raise XendError(str(ex))
         
     def domain_cpu_atropos_set(self, id, period, slice, latency, xtratime):
         """Set Atropos scheduler parameters for a domain.
         """
         dominfo = self.domain_lookup(id)
-        return xc.atropos_domain_set(dominfo.dom, period, slice, latency, xtratime)
+        try:
+            return xc.atropos_domain_set(dominfo.dom, period, slice, latency, xtratime)
+        except Exception, ex:
+            raise XendError(str(ex))
 
     def domain_cpu_atropos_get(self, id):
         """Get Atropos scheduler parameters for a domain.
         """
         dominfo = self.domain_lookup(id)
-        return xc.atropos_domain_get(dominfo.dom)
+        try:
+            return xc.atropos_domain_get(dominfo.dom)
+        except Exception, ex:
+            raise XendError(str(ex))
 
     def domain_device_create(self, id, devconfig):
         """Create a new device for a domain.
@@ -711,7 +738,10 @@ class XendDomain:
         @param op:  operation
         """
         dominfo = self.domain_lookup(id)
-        return xc.shadow_control(dominfo.dom, op)
+        try:
+            return xc.shadow_control(dominfo.dom, op)
+        except Exception, ex:
+            raise XendError(str(ex))
 
     def domain_maxmem_set(self, id, mem):
         """Set the memory limit for a domain.
@@ -722,7 +752,10 @@ class XendDomain:
         """
         dominfo = self.domain_lookup(id)
         maxmem = int(mem) * 1024
-        return xc.domain_setmaxmem(dominfo.dom, maxmem_kb = maxmem)
+        try:
+            return xc.domain_setmaxmem(dominfo.dom, maxmem_kb = maxmem)
+        except Exception, ex:
+            raise XendError(str(ex))
 
 
 def instance():

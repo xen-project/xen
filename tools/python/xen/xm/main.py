@@ -209,6 +209,20 @@ class GroupConsole(Group):
 
 xm.group(GroupConsole)
 
+class GroupVbd(Group):
+
+    name = "vbd"
+    info = "Commands related to virtual block devices:"
+
+xm.group(GroupVbd)
+
+class GroupVif(Group):
+
+    name = "vif"
+    info = "Commands related to virtual network interfaces:"
+
+xm.group(GroupVif)
+
 class ProgHelp(Prog):
 
     name = "help"
@@ -629,6 +643,87 @@ class ProgLog(Prog):
         print server.xend_node_log()
 
 xm.prog(ProgLog)
+
+class ProgVifList(Prog):
+    group = 'vif'
+    name  = 'vif-list'
+    info  = """List virtual network interfaces for a domain."""
+
+    def help(self, args):
+        print args[0], "DOM"
+        print "\nList virtual network interfaces for domain DOM"
+
+    def main(self, args):
+        if len(args) != 2: self.err("%s: Invalid argument(s)" % args[0])
+        dom = args[1]
+        for x in server.xend_domain_vifs(dom):
+            sxp.show(x)
+            print
+
+xm.prog(ProgVifList)
+
+class ProgVbdList(Prog):
+    group = 'vbd'
+    name  = 'vbd-list'
+    info  = """List virtual block devices for a domain."""
+
+    def help(self, args):
+        print args[0], "DOM"
+        print "\nList virtual block devices for domain DOM"
+
+    def main(self, args):
+        if len(args) != 2: self.err("%s: Invalid argument(s)" % args[0])
+        dom = args[1]
+        for x in server.xend_domain_vbds(dom):
+            sxp.show(x)
+            print
+
+xm.prog(ProgVbdList)
+
+class ProgVbdCreate(Prog):
+    group = 'vbd'
+    name  = 'vbd-create'
+    info = """Create a new virtual block device for a domain"""
+
+    def help(self, args):
+        print args[0], "DOM UNAME DEV MODE"
+        print """
+Create a virtual block device for a domain.
+
+  UNAME - device to export, e.g. phys:hda2
+  DEV   - device name in the domain, e.g. xda1
+  MODE  - access mode: r for read, w for read-write
+"""
+
+    def main(self, args):
+        if len(args) != 5: self.err("%s: Invalid argument(s)" % args[0])
+        dom = args[1]
+        vbd = ['vbd',
+               ['uname', args[2]],
+               ['dev',   args[3]],
+               ['mode',  args[4]]]
+        server.xend_domain_device_create(dom, vbd)
+
+xm.prog(ProgVbdCreate)
+
+class ProgVbdDestroy(Prog):
+    group = 'vbd'
+    name = 'vbd-destroy'
+    info = """Destroy a domain's virtual block device"""
+
+    def help(self, args):
+        print args[0], "DOM DEV"
+        print """
+Destroy vbd DEV attached to domain DOM. Detaches the device
+from the domain, but does not destroy the device contents."""
+
+    def main(self, args):
+        if len(args!=3): self.err("%s: Invalid argument(s)" % args[0])
+        dom = args[1]
+        dev = args[2]
+        sever.xend_domain_device_destroy(dom, "vbd", dev)
+
+xm.prog(ProgVbdDestroy)
 
 def main(args):
     xm.main(args)

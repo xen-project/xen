@@ -622,7 +622,10 @@ class XendDomainInfo:
         if chan:
             log.debug("Closing channel to domain %d", self.dom)
             chan.close()
-        return xc.domain_destroy(dom=self.dom)
+        try:
+            return xc.domain_destroy(dom=self.dom)
+        except Exception, err:
+            log.exception("Domain destroy failed: ", self.name)
 
     def cleanup(self):
         """Cleanup vm resources: release devices.
@@ -855,6 +858,7 @@ class XendDomainInfo:
         if self.restart_time is not None:
             tdelta = tnow - self.restart_time
             if tdelta < self.MINIMUM_RESTART_TIME:
+                self.restart_cancel()
                 msg = 'VM %s restarting too fast' % self.name
                 log.error(msg)
                 raise VmError(msg)
@@ -1036,7 +1040,6 @@ def vm_dev_vbd(vm, val, index):
     """
     if vm.blkif_backend:
         raise VmError('vbd: vbd in blkif backend domain')
-    vdev = vm.next_device_index('vif')
     uname = sxp.child_value(val, 'uname')
     if not uname:
         raise VmError('vbd: Missing uname')
@@ -1047,8 +1050,9 @@ def vm_dev_vbd(vm, val, index):
     log.debug("Creating vbd dom=%d uname=%s dev=%s", vm.dom, uname, dev)
     defer = make_disk(vm.dom, uname, dev, mode, vm.recreate)
     def fn(vbd):
-        dev = xend.blkif_dev(vm.dom, vdev)
-        vm.add_device('vbd', dev)
+        vbd.dev = dev
+        vbd.uname = uname
+        vm.add_device('vbd', vbd)
         return vbd
     defer.addCallback(fn)
     return defer
