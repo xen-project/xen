@@ -123,7 +123,7 @@ struct domain *alloc_domain_struct(void)
 /*
  * Add and remove a domain
  */
-void sched_add_domain(struct domain *d, float weight) 
+void sched_add_domain(struct domain *d) 
 {
     /* Must be unpaused by control software to start execution. */
     set_bit(DF_CTRLPAUSE, &d->flags);
@@ -141,7 +141,7 @@ void sched_add_domain(struct domain *d, float weight)
         schedule_data[d->processor].idle = d;
     }
 
-    SCHED_OP(add_task, d, weight);
+    SCHED_OP(add_task, d);
 
     TRACE_2D(TRC_SCHED_DOM_ADD, d->domain, d);
 }

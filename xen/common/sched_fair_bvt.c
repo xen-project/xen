@@ -152,17 +152,14 @@ int fbvt_alloc_task(struct domain *p)
 /*
  * Add and remove a domain
  */
-void fbvt_add_task(struct domain *p, float weight) 
+void fbvt_add_task(struct domain *p) 
 {
     struct fbvt_dom_info *inf = FBVT_INFO(p);
 
     ASSERT(inf != NULL);
     ASSERT(p   != NULL);
 
-    if(weight > 0)
-        inf->mcu_advance = MCU_ADVANCE / weight;
-    else
-        inf->mcu_advance = MCU_ADVANCE;
+    inf->mcu_advance = MCU_ADVANCE;
     inf->domain = p;
     if ( p->domain == IDLE_DOMAIN_ID )
     {
@@ -190,7 +187,7 @@ int fbvt_init_idle_task(struct domain *p)
 
     if(fbvt_alloc_task(p) < 0) return -1;
 
-    fbvt_add_task(p, 0);
+    fbvt_add_task(p);
     spin_lock_irqsave(&CPU_INFO(p->processor)->run_lock, flags);
     set_bit(DF_RUNNING, &p->flags);
     if ( !__task_on_runqueue(p) )

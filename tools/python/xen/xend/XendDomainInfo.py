@@ -486,7 +486,6 @@ class XendDomainInfo:
         self.config = config
         try:
             self.name = sxp.child_value(config, 'name')
-            self.weight = float(sxp.child_value(config, 'weight'))
             self.check_name(self.name)
             self.memory = int(sxp.child_value(config, 'memory'))
             if self.memory is None:
@@ -706,10 +705,9 @@ class XendDomainInfo:
             return
         memory = self.memory
         name = self.name
-        weight = self.weight
         cpu = int(sxp.child_value(self.config, 'cpu', '-1'))
         dom = self.dom or 0
-        dom = xc.domain_create(dom= dom, mem_kb= memory * 1024, name= name, cpu= cpu, weight= weight)
+        dom = xc.domain_create(dom= dom, mem_kb= memory * 1024, name= name, cpu= cpu)
         if dom <= 0:
             raise VmError('Creating domain failed: name=%s memory=%d'
                           % (name, memory))
@@ -1139,7 +1137,6 @@ add_device_handler('pci',  vm_dev_pci)
 add_config_handler('name',    vm_field_ignore)
 add_config_handler('memory',  vm_field_ignore)
 add_config_handler('cpu',     vm_field_ignore)
-add_config_handler('weight',  vm_field_ignore)
 add_config_handler('console', vm_field_ignore)
 add_config_handler('image',   vm_field_ignore)
 add_config_handler('device',  vm_field_ignore)

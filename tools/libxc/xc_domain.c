@@ -12,7 +12,6 @@ int xc_domain_create(int xc_handle,
                      unsigned int mem_kb, 
                      const char *name,
                      int cpu,
-                     float weight,
                      u32 *pdomid)
 {
     int err;
@@ -21,8 +20,6 @@ int xc_domain_create(int xc_handle,
     op.cmd = DOM0_CREATEDOMAIN;
     op.u.createdomain.domain = (domid_t)*pdomid;
     op.u.createdomain.memory_kb = mem_kb;
-    /* The weight of a domain added to the domain creation code */
-    op.u.createdomain.weight = weight;
     strncpy(op.u.createdomain.name, name, MAX_DOMAIN_NAME);
     op.u.createdomain.name[MAX_DOMAIN_NAME-1] = '\0';
     op.u.createdomain.cpu = cpu;

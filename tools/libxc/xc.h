@@ -48,7 +48,6 @@ int xc_domain_create(int xc_handle,
                      unsigned int mem_kb, 
                      const char *name,
                      int cpu,
-                     float weight,
                      u32 *pdomid);
 int xc_domain_pause(int xc_handle, 
                     u32 domid);

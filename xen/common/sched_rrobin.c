@@ -101,9 +101,8 @@ static int rr_alloc_task(struct domain *d)
    return 0;
 }
 
-/* Setup the rr_dom_info 
-   The weight argument is ignored as RRobin does not use weights */
-static void rr_add_task(struct domain *p, float weight)
+/* Setup the rr_dom_info */
+static void rr_add_task(struct domain *p)
 {
     struct rrobin_dom_info *inf;
     RR_INFO(p)->domain = p;
@@ -122,7 +121,7 @@ static int rr_init_idle_task(struct domain *p)
 {
     unsigned long flags;
     if(rr_alloc_task(p) < 0) return -1;
-    rr_add_task(p, 0);
+    rr_add_task(p);
 
     spin_lock_irqsave(&run_locks[p->processor], flags);
     set_bit(DF_RUNNING, &p->flags);

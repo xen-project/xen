@@ -38,7 +38,7 @@ struct scheduler
     int          (*init_scheduler) ();
     int          (*init_idle_task) (struct domain *);
     int          (*alloc_task)     (struct domain *);
-    void         (*add_task)       (struct domain *, float weight);
+    void         (*add_task)       (struct domain *);
     void         (*free_task)      (struct domain *);
     void         (*rem_task)       (struct domain *);
     void         (*sleep)          (struct domain *);

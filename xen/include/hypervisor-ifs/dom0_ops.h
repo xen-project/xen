@@ -55,7 +55,7 @@ typedef struct {
     MEMORY_PADDING;
     u8           name[MAX_DOMAIN_NAME]; /*  8 */
     u32          cpu;                 /* 24 */
-    float        weight;              /* 28 */
+    u32          __pad0;              /* 28 */
     /* IN/OUT parameters. */
     /* If 0, domain is allocated. If non-zero use it unless in use. */
     domid_t      domain;              /* 32 */

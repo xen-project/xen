@@ -171,7 +171,7 @@ static inline int get_domain(struct domain *d)
 }
   
 extern struct domain *do_createdomain(
-    domid_t dom_id, unsigned int cpu, float weight);
+    domid_t dom_id, unsigned int cpu);
 extern int construct_dom0(struct domain *d, 
                           unsigned long alloc_start,
                           unsigned long alloc_end,
@@ -198,7 +198,7 @@ extern unsigned long wait_init_idle;
 #define set_current_state(_s) do { current->state = (_s); } while (0)
 void scheduler_init(void);
 void schedulers_start(void);
-void sched_add_domain(struct domain *d, float weight);
+void sched_add_domain(struct domain *d);
 void sched_rem_domain(struct domain *d);
 long sched_ctl(struct sched_ctl_cmd *);
 long sched_adjdom(struct sched_adjdom_cmd *);

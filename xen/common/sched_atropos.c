@@ -167,10 +167,8 @@ static void requeue(struct domain *sdom)
      * - they shouldn't be on any queue */
 }
 
-/* prepare a task to be added to scheduling 
-    TODO - can weight argument can be used to set up the 
-    scheduling parameters? */
-static void at_add_task(struct domain *p, float weight)
+/* prepare a task to be added to scheduling */
+static void at_add_task(struct domain *p)
 {
     s_time_t now = NOW();
 

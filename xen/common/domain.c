@@ -22,7 +22,7 @@ rwlock_t tasklist_lock __cacheline_aligned = RW_LOCK_UNLOCKED;
 struct domain *task_hash[TASK_HASH_SIZE];
 struct domain *task_list;
 
-struct domain *do_createdomain(domid_t dom_id, unsigned int cpu, float weight)
+struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
 {
     char buf[100];
     struct domain *d, **pd;
@@ -69,7 +69,7 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu, float weight)
         spin_lock_init(&d->pcidev_lock);
         INIT_LIST_HEAD(&d->pcidev_list);
 
-        sched_add_domain(d, weight);
+        sched_add_domain(d);
 
         write_lock_irqsave(&tasklist_lock, flags);
         pd = &task_list; /* NB. task_list is maintained in order of dom_id. */
@@ -85,7 +85,7 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu, float weight)
     else
     {
         sprintf(d->name, "Idle-%d", cpu);
-        sched_add_domain(d, weight);
+        sched_add_domain(d);
     }
 
     return d;
