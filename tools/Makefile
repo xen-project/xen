@@ -40,4 +40,5 @@ clean:
 	$(MAKE) -C xc clean
 	$(MAKE) -C misc clean
 	$(MAKE) -C examples clean
+	$(MAKE) -C nsplitd clean
 
