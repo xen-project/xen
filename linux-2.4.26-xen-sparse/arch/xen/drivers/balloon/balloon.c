@@ -17,6 +17,7 @@
 #include <linux/mman.h>
 #include <linux/smp_lock.h>
 #include <linux/pagemap.h>
+#include <linux/vmalloc.h>
 
 #include <asm/hypervisor.h>
 #include <asm/pgalloc.h>
@@ -33,7 +34,7 @@ typedef struct user_balloon_op {
 } user_balloon_op_t;
 /* END OF USER DEFINE */
 
-/* Dead entry written into ballon-owned entries in the PMT. */
+/* Dead entry written into balloon-owned entries in the PMT. */
 #define DEAD 0xdeadbeef
 
 static struct proc_dir_entry *balloon_pde;
@@ -54,7 +55,7 @@ static inline pte_t *get_ptep(unsigned long addr)
     return ptep;
 }
 
-/* main function for relinquishing bit of memory */
+/* Main function for relinquishing memory. */
 static unsigned long inflate_balloon(unsigned long num_pages)
 {
     unsigned long *parray;
@@ -64,14 +65,19 @@ static unsigned long inflate_balloon(unsigned long num_pages)
     unsigned long vaddr;
     unsigned long i, j;
 
-    parray = (unsigned long *)kmalloc(num_pages * sizeof(unsigned long),
-                                      GFP_KERNEL);
+    parray = (unsigned long *)vmalloc(num_pages * sizeof(unsigned long));
+    if ( parray == NULL )
+    {
+        printk("inflate_balloon: Unable to vmalloc parray\n");
+        return 0;
+    }
+
     currp = parray;
 
     for ( i = 0; i < num_pages; i++ )
     {
-        /* Try to obtain a free page (has to be done with GFP_ATOMIC). */
-        vaddr = __get_free_page(GFP_ATOMIC);
+        /* NB. Should be GFP_ATOMIC for a less aggressive inflation. */
+        vaddr = __get_free_page(GFP_KERNEL);
 
         /* If allocation fails then free all reserved pages. */
         if ( vaddr == 0 )
@@ -113,12 +119,13 @@ static unsigned long inflate_balloon(unsigned long num_pages)
     ret = num_pages;
 
  cleanup:
-    kfree(parray);
+    vfree(parray);
 
     return ret;
 }
 
-/* install new mem pages obtained by deflate_balloon. function walks 
+/*
+ * Install new mem pages obtained by deflate_balloon. function walks 
  * phys->machine mapping table looking for DEAD entries and populates
  * them.
  */
@@ -143,8 +150,7 @@ static unsigned long process_new_pages(unsigned long * parray,
         if ( phys_to_machine_mapping[i] == DEAD )
         {
             phys_to_machine_mapping[i] = *curr;
-            queue_l1_entry_update(
-                (pte_t *)((i << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE), i);
+            queue_machphys_update(*curr, i);
             queue_l1_entry_update(
                 get_ptep((unsigned long)__va(i << PAGE_SHIFT)),
                 ((*curr) << PAGE_SHIFT) | pgprot_val(PAGE_KERNEL));
@@ -155,11 +161,12 @@ static unsigned long process_new_pages(unsigned long * parray,
         }
     }
 
-    /* now, this is tricky (and will also change for machine addrs that 
-      * are mapped to not previously released addresses). we free pages
-      * that were allocated by get_free_page (the mappings are different 
-      * now, of course).
-      */
+    /*
+     * This is tricky (and will also change for machine addrs that 
+     * are mapped to not previously released addresses). We free pages
+     * that were allocated by get_free_page (the mappings are different 
+     * now, of course).
+     */
     curr = parray;
     for ( i = 0; i < num_installed; i++ )
     {
@@ -181,8 +188,14 @@ unsigned long deflate_balloon(unsigned long num_pages)
         return -EAGAIN;
     }
 
-    parray = (unsigned long *)kmalloc(num_pages * sizeof(unsigned long), 
-                                      GFP_KERNEL);
+    parray = (unsigned long *)vmalloc(num_pages * sizeof(unsigned long));
+    if ( parray == NULL )
+    {
+        printk("inflate_balloon: Unable to vmalloc parray\n");
+        return 0;
+    }
+
+    XEN_flush_page_update_queue();
 
     ret = HYPERVISOR_dom_mem_op(MEMOP_increase_reservation, 
                                 parray, num_pages);
@@ -203,7 +216,7 @@ unsigned long deflate_balloon(unsigned long num_pages)
     credit -= num_pages;
 
  cleanup:
-    kfree(parray);
+    vfree(parray);
 
     return ret;
 }
@@ -239,9 +252,6 @@ static int balloon_write(struct file *file, const char *buffer,
     return sizeof(bop);
 }
 
-/*
- * main balloon driver initialization function.
- */
 static int __init init_module(void)
 {
     printk(KERN_ALERT "Starting Xen Balloon driver\n");
@@ -270,5 +280,3 @@ static void __exit cleanup_module(void)
 
 module_init(init_module);
 module_exit(cleanup_module);
-
-
