@@ -148,6 +148,9 @@ netif_formats = {
 msg_formats.update(netif_formats)
 
 #============================================================================
+# Domain shutdown message types.
+#============================================================================
+
 CMSG_SHUTDOWN = 6
 
 CMSG_SHUTDOWN_POWEROFF  = 0
@@ -177,6 +180,14 @@ class Msg:
     pass
 
 def packMsg(ty, params):
+    """Pack a message.
+    Any 'mac' parameter is passed in as an int[6] array and converted.
+
+    ty     message type name
+    params message parameter dict
+
+    returns xu message
+    """
     if DEBUG: print '>packMsg', ty, params
     (major, minor) = msg_formats[ty]
     args = {}
@@ -194,6 +205,15 @@ def packMsg(ty, params):
     return msg
 
 def unpackMsg(ty, msg):
+    """Unpack a message.
+    Any mac addresses in the message are converted to int[6] array
+    in the return dict.
+
+    ty  message type
+    msg xu message
+
+    returns parameter dict
+    """
     args = msg.get_payload()
     mac = [0, 0, 0, 0, 0, 0]
     macs = []
@@ -212,6 +232,13 @@ def unpackMsg(ty, msg):
     return args
 
 def msgTypeName(ty, subty):
+    """Convert a message type, subtype pair (ints) to a message type name (string).
+
+    ty    integer message type
+    subty integer message subtype
+
+    returns message type name (or None)
+    """
     for (name, info) in msg_formats.items():
         if info[0] == ty and info[1] == subty:
             return name

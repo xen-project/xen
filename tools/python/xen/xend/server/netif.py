@@ -1,3 +1,5 @@
+# Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+
 import random
 
 from twisted.internet import defer
@@ -30,8 +32,12 @@ class NetifControllerFactory(controller.ControllerFactory):
 
     def createInstance(self, dom, recreate=0):
         """Create or find the network interface controller for a domain.
+
+        dom      domain
+        recreate if true this is a recreate (xend restarted)
+
+        returns netif controller
         """
-        #print 'netif>createInstance> dom=', dom
         netif = self.getInstanceByDom(dom)
         if netif is None:
             netif = NetifController(self, dom)
@@ -39,15 +45,31 @@ class NetifControllerFactory(controller.ControllerFactory):
         return netif
 
     def getDomainDevices(self, dom):
+        """Get the network device controllers for a domain.
+
+        dom  domain
+        
+        returns netif controller
+        """
         netif = self.getInstanceByDom(dom)
         return (netif and netif.getDevices()) or []
 
     def getDomainDevice(self, dom, vif):
+        """Get a virtual network interface device for a domain.
+
+        dom domain
+        vif virtual interface index
+
+        returns NetDev
+        """
         netif = self.getInstanceByDom(dom)
         return (netif and netif.getDevice(vif)) or None
         
     def setControlDomain(self, dom, recreate=0):
         """Set the 'back-end' device driver domain.
+
+        dom      domain
+        recreate if true this is a recreate (xend restarted)
         """
         if self.dom == dom: return
         self.deregisterChannel()
@@ -55,13 +77,10 @@ class NetifControllerFactory(controller.ControllerFactory):
             self.attached = 0
         self.dom = dom
         self.registerChannel()
-        #
-        #if xend.netif.be_port.remote_dom != 0:
-        #    xend.netif.recovery = True
-        #    xend.netif.be_port = xend.main.port_from_dom(dom)
-        #
 
     def getControlDomain(self):
+        """Get the domain id of the back-end control domain.
+        """
         return self.dom
 
     def recv_be_create(self, msg, req):
@@ -88,23 +107,6 @@ class NetifControllerFactory(controller.ControllerFactory):
                 netif.reattach_devices()
             self.attached = 1
 
-##         pl = msg.get_payload()
-##         status = pl['status']
-##         if status == NETIF_DRIVER_STATUS_UP:
-##             if xend.netif.recovery:
-##                 print "New netif backend now UP, notifying guests:"
-##                 for netif_key in interface.list.keys():
-##                     netif = interface.list[netif_key]
-##                     netif.create()
-##                     print "  Notifying %d" % netif.dom
-##                     msg = xu.message(
-##                         CMSG_NETIF_FE,
-##                         CMSG_NETIF_FE_INTERFACE_STATUS_CHANGED, 0,
-##                         { 'handle' : 0, 'status' : 1 })
-##                     netif.ctrlif_tx_req(xend.main.port_from_dom(netif.dom),msg)
-##                 print "Done notifying guests"
-##                 recovery = False
-                
 class NetDev(controller.Dev):
     """Info record for a network device.
     """
@@ -130,9 +132,13 @@ class NetDev(controller.Dev):
         return val
 
     def get_vifname(self):
+        """Get the virtual interface device name.
+        """
         return "vif%d.%d" % (self.controller.dom, self.vif)
 
     def get_mac(self):
+        """Get the MAC address as a string.
+        """
         return ':'.join(map(lambda x: "%x" % x, self.mac))
 
     def vifctl_params(self):
@@ -141,23 +147,30 @@ class NetDev(controller.Dev):
                  'ipaddr': self.ipaddr }
 
     def up(self, bridge=None, ipaddr=[]):
+        """Bring the device up.
+
+        bridge ethernet bridge to connect to
+        ipaddr list of ipaddrs to filter using iptables
+        """
         self.bridge = bridge
         self.ipaddr = ipaddr
         Vifctl.up(self.get_vifname(), **self.vifctl_params())
 
     def down(self):
+        """Bring the device down.
+        """
         Vifctl.down(self.get_vifname(), **self.vifctl_params())
 
     def destroy(self):
+        """Destroy the device's resources and disconnect from the back-end
+        device controller.
+        """
         def cb_destroy(val):
             self.controller.send_be_destroy(self.vif)
-        print 'NetDev>destroy>', 'vif=', self.vif
-        PrettyPrint.prettyprint(self.sxpr())
         self.down()
         d = self.controller.factory.addDeferred()
         d.addCallback(cb_destroy)
         self.controller.send_be_disconnect(self.vif)
-        #self.controller.send_be_destroy(self.vif)
         
 
 class NetifController(controller.Controller):
@@ -165,7 +178,6 @@ class NetifController(controller.Controller):
     """
     
     def __init__(self, factory, dom):
-        #print 'NetifController> dom=', dom
         controller.Controller.__init__(self, factory, dom)
         self.devices = {}
         
@@ -178,21 +190,22 @@ class NetifController(controller.Controller):
                 self.recv_fe_interface_connect,
             }
         self.registerChannel()
-        #print 'NetifController<', 'dom=', self.dom, 'idx=', self.idx
 
     def sxpr(self):
         val = ['netif', ['dom', self.dom]]
         return val
     
     def randomMAC(self):
-        # VIFs get a random MAC address with a "special" vendor id.
-        # 
-        # NB. The vendor is currently an "obsolete" one that used to belong
-        # to DEC (AA-00-00). Using it is probably a bit rude :-)
-        # 
-        # NB2. The first bit of the first random octet is set to zero for
-        # all dynamic MAC addresses. This may allow us to manually specify
-        # MAC addresses for some VIFs with no fear of clashes.
+        """Generate a random MAC address.
+
+        The OUI (Organisation Unique Identifier) used is AA:00:00, which
+        is a currently unassigned one that used to belong to DEC.
+
+        The remaining 3 fields are random, with the first bit of the first
+        random field set 0.
+
+        returns array of 6 ints
+        """
         mac = [ 0xaa, 0x00, 0x00,
                 random.randint(0x00, 0x7f),
                 random.randint(0x00, 0xff),
@@ -200,29 +213,46 @@ class NetifController(controller.Controller):
         return mac
 
     def lostChannel(self):
-        print 'NetifController>lostChannel>', 'dom=', self.dom
-        #self.destroyDevices()
+        """Method called when the channel has been lost.
+        """
         controller.Controller.lostChannel(self)
 
     def getDevices(self):
+        """Get a list of the devices.
+        """
         return self.devices.values()
 
     def getDevice(self, vif):
+        """Get a device.
+
+        vif device index
+
+        returns device (or None)
+        """
         return self.devices.get(vif)
 
     def addDevice(self, vif, vmac):
+        """Add a network interface. If vmac is None a random MAC is
+        assigned. If specified, vmac must be a string of the form
+        XX:XX:XX:XX:XX where X is hex digit.
+
+        vif device index
+        vmac device MAC 
+
+        returns device
+        """
         if vmac is None:
             mac = self.randomMAC()
         else:
             mac = [ int(x, 16) for x in vmac.split(':') ]
         if len(mac) != 6: raise ValueError("invalid mac")
-        #print "attach_device>", "vif=", vif, "mac=", mac
         dev = NetDev(self, vif, mac)
         self.devices[vif] = dev
         return dev
 
     def destroy(self):
-        print 'NetifController>destroy>', 'dom=', self.dom
+        """Destroy the controller and all devices.
+        """
         self.destroyDevices()
         
     def destroyDevices(self):
@@ -306,7 +336,6 @@ class NetifController(controller.Controller):
         self.factory.writeRequest(msg)
 
     def send_be_destroy(self, vif):
-        print 'NetifController>send_be_destroy>', 'dom=', self.dom, 'vif=', vif
         PrettyPrint.prettyprint(self.sxpr())
         dev = self.devices[vif]
         del self.devices[vif]

@@ -1,3 +1,5 @@
+# Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+
 from twisted.internet import defer
 
 import channel
@@ -5,6 +7,15 @@ from messages import msgTypeName
 
 class CtrlMsgRcvr:
     """Abstract class for things that deal with a control interface to a domain.
+
+    Instance variables:
+
+    dom       : the domain we are a control interface for
+    majorTypes: list of major message types we are interested in
+    subTypes  : mapping of message subtypes to methods
+    
+    channel   : channel to the domain
+    idx       : channel index
     """
 
 
@@ -17,6 +28,12 @@ class CtrlMsgRcvr:
         self.idx = None
 
     def requestReceived(self, msg, type, subtype):
+        """Dispatch a request to handlers.
+
+        msg     message
+        type    major message type
+        subtype minor message type
+        """
         method = self.subTypes.get(subtype)
         if method:
             method(msg, 1)
@@ -25,6 +42,12 @@ class CtrlMsgRcvr:
                    % (msgTypeName(type, subtype), type, subtype)), self
         
     def responseReceived(self, msg, type, subtype):
+        """Dispatch a response to handlers.
+
+        msg     message
+        type    major message type
+        subtype minor message type
+        """
         method = self.subTypes.get(subtype)
         if method:
             method(msg, 0)
@@ -33,9 +56,14 @@ class CtrlMsgRcvr:
                    % (msgTypeName(type, subtype), type, subtype)), self
 
     def lostChannel(self):
+        """Called when the channel to the domain is lost.
+        """
         pass
     
     def registerChannel(self):
+        """Register interest in our major message types with the
+        channel to our domain.
+        """
         #print 'CtrlMsgRcvr>registerChannel>', self
         self.channel = self.channelFactory.domChannel(self.dom)
         self.idx = self.channel.getIndex()
@@ -43,21 +71,32 @@ class CtrlMsgRcvr:
             self.channel.registerDevice(self.majorTypes, self)
         
     def deregisterChannel(self):
+        """Deregister interest in our major message types with the
+        channel to our domain.
+        """
         #print 'CtrlMsgRcvr>deregisterChannel>', self
         if self.channel:
             self.channel.deregisterDevice(self)
             del self.channel
 
     def produceRequests(self):
+        """Produce any queued requests.
+
+        return number produced
+        """
         return 0
 
     def writeRequest(self, msg):
+        """Write a request to the channel.
+        """
         if self.channel:
             self.channel.writeRequest(msg)
         else:
             print 'CtrlMsgRcvr>writeRequest>', 'no channel!', self
 
     def writeResponse(self, msg):
+        """Write a response to the channel.
+        """
         if self.channel:
             self.channel.writeResponse(msg)
         else:
@@ -66,6 +105,13 @@ class CtrlMsgRcvr:
 class ControllerFactory(CtrlMsgRcvr):
     """Abstract class for factories creating controllers.
     Maintains a table of instances.
+
+    Instance variables:
+
+    instances : mapping of index to controller instance
+    dlist     : list of deferreds
+    dom       : domain
+    timeout   : deferred timeout
     """
 
     def __init__(self):
@@ -77,34 +123,49 @@ class ControllerFactory(CtrlMsgRcvr):
         self.timeout = 10
         
     def addInstance(self, instance):
+        """Add a controller instance (under its index).
+        """
         self.instances[instance.idx] = instance
 
     def getInstance(self, idx):
+        """Get a controller instance from its index.
+        """
         return self.instances.get(idx)
 
     def getInstances(self):
+        """Get a list of all controller instances.
+        """
         return self.instances.values()
 
     def getInstanceByDom(self, dom):
+        """Get the controller instance for the given domain.
+        """
         for inst in self.instances.values():
             if inst.dom == dom:
                 return inst
         return None
 
     def delInstance(self, instance):
-        #print 'ControllerFactory>delInstance>', instance.idx
+        """Delete an instance from the table.
+        """
         if instance.idx in self.instances:
-            #print 'ControllerFactory>delInstance> remove', instance.idx
             del self.instances[instance.idx]
 
     def createInstance(self, dom, recreate=0):
+        """Create an instance. Define in a subclass.
+        """
         raise NotImplementedError()
 
     def instanceClosed(self, instance):
-        #print 'ControllerFactory>instanceClosed>', instance.idx, instance
+        """Callback called when an instance is closed (usually by the instance).
+        """
         self.delInstance(instance)
 
     def addDeferred(self):
+        """Add a deferred object.
+
+        returns deferred
+        """
         d = defer.Deferred()
         if self.timeout > 0:
             # The deferred will error if not called before timeout.
@@ -113,11 +174,19 @@ class ControllerFactory(CtrlMsgRcvr):
         return d
 
     def callDeferred(self, *args):
+        """Call the top deferred object
+
+        args arguments
+        """
         if self.dlist:
             d = self.dlist.pop(0)
             d.callback(*args)
 
     def errDeferred(self, *args):
+        """Signal an error to the top deferred object.
+
+        args arguments
+        """
         if self.dlist:
             d = self.dlist.pop(0)
             d.errback(*args)
@@ -134,15 +203,20 @@ class Controller(CtrlMsgRcvr):
         self.idx = None
 
     def close(self):
+        """Close the controller.
+        """
         self.deregisterChannel()
         self.lostChannel()
 
     def lostChannel(self):
-        #print 'Controller>lostChannel>', self, self.factory
+        """The controller channel has been lost.
+        """
         self.factory.instanceClosed(self)
 
 class Dev:
-
+    """Abstract class for a device attached to a device controller.
+    """
+    
     def __init__(self, controller):
         self.controller = controller
         self.props = {}
@@ -159,9 +233,6 @@ class Dev:
     def delprop(self, k):
         if k in self.props:
             del self.props[k]
-
-    #def __repr__(self):
-    #    return str(self.sxpr())
 
     def sxpr(self):
         raise NotImplementedError()

@@ -1,5 +1,6 @@
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
 
+import traceback
 from StringIO import StringIO
 
 from twisted.protocols import http
@@ -24,6 +25,7 @@ class SrvDomainDir(SrvDir):
         val = None
         try:
             dom = self.xd.domain_get(x)
+            if not dom: raise KeyError('No such domain')
             val = SrvDomain(dom)
         except KeyError, ex:
             print 'SrvDomainDir>', ex
@@ -38,6 +40,9 @@ class SrvDomainDir(SrvDir):
         return v
 
     def op_create(self, op, req):
+        """Create a domain.
+        Expects the domain config in request parameter 'config' in SXP format.
+        """
         ok = 0
         try:
             configstring = req.args.get('config')[0]
@@ -48,7 +53,8 @@ class SrvDomainDir(SrvDir):
             config = pin.get_val()
             ok = 1
         except Exception, ex:
-            print 'op_create>', ex
+            print 'op_create> Exception in config', ex
+            traceback.print_exc()
         if not ok:
             req.setResponseCode(http.BAD_REQUEST, "Invalid configuration")
             return "Invalid configuration"
@@ -60,10 +66,10 @@ class SrvDomainDir(SrvDir):
             deferred.addCallback(self._cb_op_create, configstring, req)
             return deferred
         except Exception, ex:
-            raise
-            #return ['err', str(ex) ]
-            #req.setResponseCode(http.BAD_REQUEST, "Error creating domain")
-            #return str(ex)
+            print 'op_create> Exception creating domain:'
+            traceback.print_exc()
+            req.setResponseCode(http.BAD_REQUEST, "Error creating domain")
+            return str(ex)
             #return error.ErrorPage(http.BAD_REQUEST,
             #                       "Error creating domain",
             #                       str(ex))
@@ -90,6 +96,8 @@ class SrvDomainDir(SrvDir):
             return val
 
     def op_restore(self, op, req):
+        """Restore a domain from file.
+        """
         fn = FormFn(self.xd.domain_restore,
                     [['file', 'str']])
         val = fn(req.args)
@@ -131,6 +139,8 @@ class SrvDomainDir(SrvDir):
             req.write('</ul>')
 
     def form(self, req):
+        """Generate the form(s) for domain dir operations.
+        """
         req.write('<form method="post" action="%s" enctype="multipart/form-data">'
                   % req.prePathURL())
         req.write('<button type="submit" name="op" value="create">Create Domain</button>')
