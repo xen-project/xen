@@ -1800,20 +1800,28 @@ int __init net_dev_init(void)
     return 0;
 }
 
-inline int init_tx_header(u8 *data, unsigned int len, struct net_device *dev)
+inline int init_tx_header(net_vif_t *vif, u8 *data, 
+                          unsigned int len, struct net_device *dev)
 {
+    int proto = ntohs(*(unsigned short *)(data + 12));
+
     memcpy(data + ETH_ALEN, dev->dev_addr, ETH_ALEN);
         
-    switch ( ntohs(*(unsigned short *)(data + 12)) )
+    switch ( proto )
     {
     case ETH_P_ARP:
         if ( len < 42 ) break;
         memcpy(data + 22, dev->dev_addr, ETH_ALEN);
-        return ETH_P_ARP;
+        break;
     case ETH_P_IP:
-        return ETH_P_IP;
+        break;
+    default:
+        /* Unsupported protocols are onyl allowed to/from VIF0/0. */
+        if ( (vif->domain->domain != 0) || (vif->idx != 0) )
+            proto = 0;
+        break;
     }
-    return 0;
+    return proto;
 }
 
 
@@ -1884,7 +1892,7 @@ static int get_tx_bufs(net_vif_t *vif)
         g_data = map_domain_mem(tx.addr);
 
         protocol = __constant_htons(
-            init_tx_header(g_data, tx.size, the_dev));
+            init_tx_header(vif, g_data, tx.size, the_dev));
         if ( protocol == 0 )
         {
             __make_tx_response(vif, tx.id, RING_STATUS_BAD_PAGE);
