@@ -249,11 +249,13 @@ static inline void invalidate_shadow_ldt(struct exec_domain *d)
 
 static int alloc_segdesc_page(struct pfn_info *page)
 {
-    unsigned long *descs = map_domain_mem((page-frame_table) << PAGE_SHIFT);
+    struct desc_struct *descs;
     int i;
 
+    descs = map_domain_mem((page-frame_table) << PAGE_SHIFT);
+
     for ( i = 0; i < 512; i++ )
-        if ( unlikely(!check_descriptor(&descs[i*2])) )
+        if ( unlikely(!check_descriptor(&descs[i])) )
             goto fail;
 
     unmap_domain_mem(descs);
@@ -1647,6 +1649,182 @@ int do_update_va_mapping_otherdomain(unsigned long page_nr,
     percpu_info[cpu].foreign = NULL;
 
     return rc;
+}
+
+
+
+/*************************
+ * Descriptor Tables
+ */
+
+void destroy_gdt(struct exec_domain *ed)
+{
+    int i;
+    unsigned long pfn;
+
+    for ( i = 0; i < 16; i++ )
+    {
+        if ( (pfn = l1_pgentry_to_pagenr(ed->arch.perdomain_ptes[i])) != 0 )
+            put_page_and_type(&frame_table[pfn]);
+        ed->arch.perdomain_ptes[i] = mk_l1_pgentry(0);
+    }
+}
+
+
+long set_gdt(struct exec_domain *ed, 
+             unsigned long *frames,
+             unsigned int entries)
+{
+    struct domain *d = ed->domain;
+    /* NB. There are 512 8-byte entries per GDT page. */
+    int i = 0, nr_pages = (entries + 511) / 512;
+    struct desc_struct *vgdt;
+    unsigned long pfn;
+
+    /* Check the first page in the new GDT. */
+    if ( (pfn = frames[0]) >= max_page )
+        goto fail;
+
+    /* The first page is special because Xen owns a range of entries in it. */
+    if ( !get_page_and_type(&frame_table[pfn], d, PGT_gdt_page) )
+    {
+        /* GDT checks failed: try zapping the Xen reserved entries. */
+        if ( !get_page_and_type(&frame_table[pfn], d, PGT_writable_page) )
+            goto fail;
+        vgdt = map_domain_mem(pfn << PAGE_SHIFT);
+        memset(vgdt + FIRST_RESERVED_GDT_ENTRY, 0,
+               NR_RESERVED_GDT_ENTRIES*8);
+        unmap_domain_mem(vgdt);
+        put_page_and_type(&frame_table[pfn]);
+
+        /* Okay, we zapped the entries. Now try the GDT checks again. */
+        if ( !get_page_and_type(&frame_table[pfn], d, PGT_gdt_page) )
+            goto fail;
+    }
+
+    /* Check the remaining pages in the new GDT. */
+    for ( i = 1; i < nr_pages; i++ )
+        if ( ((pfn = frames[i]) >= max_page) ||
+             !get_page_and_type(&frame_table[pfn], d, PGT_gdt_page) )
+            goto fail;
+
+    /* Copy reserved GDT entries to the new GDT. */
+    vgdt = map_domain_mem(frames[0] << PAGE_SHIFT);
+    memcpy(vgdt + FIRST_RESERVED_GDT_ENTRY, 
+           gdt_table + FIRST_RESERVED_GDT_ENTRY, 
+           NR_RESERVED_GDT_ENTRIES*8);
+    unmap_domain_mem(vgdt);
+
+    /* Tear down the old GDT. */
+    destroy_gdt(ed);
+
+    /* Install the new GDT. */
+    for ( i = 0; i < nr_pages; i++ )
+        ed->arch.perdomain_ptes[i] =
+            mk_l1_pgentry((frames[i] << PAGE_SHIFT) | __PAGE_HYPERVISOR);
+
+    SET_GDT_ADDRESS(ed, GDT_VIRT_START(ed));
+    SET_GDT_ENTRIES(ed, entries);
+
+    return 0;
+
+ fail:
+    while ( i-- > 0 )
+        put_page_and_type(&frame_table[frames[i]]);
+    return -EINVAL;
+}
+
+
+long do_set_gdt(unsigned long *frame_list, unsigned int entries)
+{
+    int nr_pages = (entries + 511) / 512;
+    unsigned long frames[16];
+    long ret;
+
+    if ( (entries <= LAST_RESERVED_GDT_ENTRY) || (entries > 8192) ) 
+        return -EINVAL;
+    
+    if ( copy_from_user(frames, frame_list, nr_pages * sizeof(unsigned long)) )
+        return -EFAULT;
+
+    LOCK_BIGLOCK(current->domain);
+
+    if ( (ret = set_gdt(current, frames, entries)) == 0 )
+    {
+        local_flush_tlb();
+        __asm__ __volatile__ ("lgdt %0" : "=m" (*current->arch.gdt));
+    }
+
+    UNLOCK_BIGLOCK(current->domain);
+
+    return ret;
+}
+
+
+long do_update_descriptor(
+    unsigned long pa, unsigned long word1, unsigned long word2)
+{
+    unsigned long pfn = pa >> PAGE_SHIFT;
+    struct desc_struct *gdt_pent, d;
+    struct pfn_info *page;
+    struct exec_domain *ed;
+    long ret = -EINVAL;
+
+    d.a = (u32)word1;
+    d.b = (u32)word2;
+
+    LOCK_BIGLOCK(current->domain);
+
+    if ( (pa & 7) || (pfn >= max_page) || !check_descriptor(&d) ) {
+        UNLOCK_BIGLOCK(current->domain);
+        return -EINVAL;
+    }
+
+    page = &frame_table[pfn];
+    if ( unlikely(!get_page(page, current->domain)) ) {
+        UNLOCK_BIGLOCK(current->domain);
+        return -EINVAL;
+    }
+
+    /* Check if the given frame is in use in an unsafe context. */
+    switch ( page->u.inuse.type_info & PGT_type_mask )
+    {
+    case PGT_gdt_page:
+        /* Disallow updates of Xen-reserved descriptors in the current GDT. */
+        for_each_exec_domain(current->domain, ed) {
+            if ( (l1_pgentry_to_pagenr(ed->arch.perdomain_ptes[0]) == pfn) &&
+                 (((pa&(PAGE_SIZE-1))>>3) >= FIRST_RESERVED_GDT_ENTRY) &&
+                 (((pa&(PAGE_SIZE-1))>>3) <= LAST_RESERVED_GDT_ENTRY) )
+                goto out;
+        }
+        if ( unlikely(!get_page_type(page, PGT_gdt_page)) )
+            goto out;
+        break;
+    case PGT_ldt_page:
+        if ( unlikely(!get_page_type(page, PGT_ldt_page)) )
+            goto out;
+        break;
+    default:
+        if ( unlikely(!get_page_type(page, PGT_writable_page)) )
+            goto out;
+        break;
+    }
+
+    /* All is good so make the update. */
+    gdt_pent = map_domain_mem(pa);
+    memcpy(gdt_pent, &d, 8);
+    unmap_domain_mem(gdt_pent);
+
+    put_page_type(page);
+
+    ret = 0; /* success */
+
+ out:
+    put_page(page);
+
+    UNLOCK_BIGLOCK(current->domain);
+
+    return ret;
 }
 
 

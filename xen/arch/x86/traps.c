@@ -149,6 +149,11 @@ static inline int do_trap(int trapnr, char *str,
     if ( !GUEST_FAULT(regs) )
         goto xen_fault;
 
+#ifndef NDEBUG
+    if ( (ed->arch.traps[trapnr].address == 0) && (ed->domain->id == 0) )
+        goto xen_fault;
+#endif
+
     ti = current->arch.traps + trapnr;
     tb->flags = TBF_EXCEPTION;
     tb->cs    = ti->cs;
@@ -313,6 +318,11 @@ asmlinkage int do_page_fault(struct xen_regs *regs)
 
     if ( !GUEST_FAULT(regs) )
         goto xen_fault;
+
+#ifndef NDEBUG
+    if ( (ed->arch.traps[TRAP_page_fault].address == 0) && (d->id == 0) )
+        goto xen_fault;
+#endif
 
     propagate_page_fault(addr, regs->error_code);
     return 0; 
@@ -521,6 +531,12 @@ asmlinkage int do_general_protection(struct xen_regs *regs)
          (regs->error_code == 0) && 
          gpf_emulate_4gb(regs) )
         return 0;
+#endif
+
+#ifndef NDEBUG
+    if ( (ed->arch.traps[TRAP_gp_fault].address == 0) &&
+         (ed->domain->id == 0) )
+        goto gp_in_kernel;
 #endif
 
     /* Pass on GPF as is. */
@@ -838,6 +854,13 @@ long do_fpu_taskswitch(void)
 }
 
 
+#if defined(__i386__)
+#define DB_VALID_ADDR(_a) \
+    ((_a) <= (PAGE_OFFSET - 4))
+#elif defined(__x86_64__)
+#define DB_VALID_ADDR(_a) \
+    ((_a) >= HYPERVISOR_VIRT_END) || ((_a) <= (HYPERVISOR_VIRT_START-8))
+#endif
 long set_debugreg(struct exec_domain *p, int reg, unsigned long value)
 {
     int i;
@@ -845,22 +868,22 @@ long set_debugreg(struct exec_domain *p, int reg, unsigned long value)
     switch ( reg )
     {
     case 0: 
-        if ( value > (PAGE_OFFSET-4) ) return -EPERM;
+        if ( !DB_VALID_ADDR(value) ) return -EPERM;
         if ( p == current ) 
             __asm__ ( "mov %0, %%db0" : : "r" (value) );
         break;
     case 1: 
-        if ( value > (PAGE_OFFSET-4) ) return -EPERM;
+        if ( !DB_VALID_ADDR(value) ) return -EPERM;
         if ( p == current ) 
             __asm__ ( "mov %0, %%db1" : : "r" (value) );
         break;
     case 2: 
-        if ( value > (PAGE_OFFSET-4) ) return -EPERM;
+        if ( !DB_VALID_ADDR(value) ) return -EPERM;
         if ( p == current ) 
             __asm__ ( "mov %0, %%db2" : : "r" (value) );
         break;
     case 3:
-        if ( value > (PAGE_OFFSET-4) ) return -EPERM;
+        if ( !DB_VALID_ADDR(value) ) return -EPERM;
         if ( p == current ) 
             __asm__ ( "mov %0, %%db3" : : "r" (value) );
         break;

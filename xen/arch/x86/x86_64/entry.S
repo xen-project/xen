@@ -28,8 +28,8 @@ ENTRY(hypercall)
         SAVE_ALL
         movq  %r10,%rcx
         andq  $(NR_hypercalls-1),%rax
-        leaq  SYMBOL_NAME(hypercall_table)(%rip),%rcx
-        callq *(%rcx,%rax,8)
+        leaq  SYMBOL_NAME(hypercall_table)(%rip),%rbx
+        callq *(%rbx,%rax,8)
         RESTORE_ALL
         addq  $8,%rsp
         popq  %rcx
@@ -147,7 +147,7 @@ ENTRY(nmi)
         SAVE_ALL
         inb   $0x61,%al
         movl  %eax,%esi # reason
-        movl  %esp,%edi # regs
+        movq  %rsp,%rdi # regs
         call  SYMBOL_NAME(do_nmi)
 	jmp   restore_all_xen
 

@@ -219,7 +219,7 @@ static inline int get_page_and_type(struct pfn_info *page,
     ASSERT(((_p)->count_info & PGC_count_mask) != 0);          \
     ASSERT(page_get_owner(_p) == (_d))
 
-int check_descriptor(unsigned long *d);
+int check_descriptor(struct desc_struct *d);
 
 /*
  * Use currently-executing domain's pagetables on the specified CPUs.
