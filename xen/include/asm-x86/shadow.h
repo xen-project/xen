@@ -781,13 +781,27 @@ static inline void __update_pagetables(struct exec_domain *ed)
 static inline void update_pagetables(struct exec_domain *ed)
 {
     struct domain *d = ed->domain;
+    int paging_enabled =
+#ifdef CONFIG_VMX
+        !VMX_DOMAIN(ed) ||
+        test_bit(VMX_CPU_STATE_PG_ENABLED, &ed->arch.arch_vmx.cpu_state);
+#else
+        1;
+#endif
 
-    if ( unlikely(shadow_mode_enabled(d)) )
+    /*
+     * We don't call __update_pagetables() when vmx guest paging is
+     * disabled as we want the linear_pg_table to be inaccessible so that
+     * we bail out early of shadow_fault() if the vmx guest tries illegal
+     * accesses while it thinks paging is turned off.
+     */
+    if ( unlikely(shadow_mode_enabled(d)) && paging_enabled )
     {
         shadow_lock(d);
         __update_pagetables(ed);
         shadow_unlock(d);
     }
+
     if ( !shadow_mode_external(d) )
     {
 #ifdef __x86_64__
@@ -799,6 +813,15 @@ static inline void update_pagetables(struct exec_domain *ed)
             ed->arch.monitor_table = ed->arch.shadow_table;
         else
             ed->arch.monitor_table = ed->arch.guest_table;
+    }
+    else
+    {
+        // External page tables...
+        // Allocate a monitor page table if we don't already have one.
+        //
+        if ( unlikely(!pagetable_val(ed->arch.monitor_table)) )
+            ed->arch.monitor_table =
+                mk_pagetable(alloc_monitor_pagetable(ed) << PAGE_SHIFT);
     }
 }
 

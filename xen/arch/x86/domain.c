@@ -295,7 +295,7 @@ void arch_vmx_do_launch(struct exec_domain *ed)
     reset_stack_and_jump(vmx_asm_do_launch);
 }
 
-static void alloc_monitor_pagetable(struct exec_domain *ed)
+unsigned long alloc_monitor_pagetable(struct exec_domain *ed)
 {
     unsigned long mmfn;
     l2_pgentry_t *mpl2e;
@@ -319,12 +319,13 @@ static void alloc_monitor_pagetable(struct exec_domain *ed)
         mk_l2_pgentry((__pa(d->arch.mm_perdomain_pt) & PAGE_MASK) 
                       | __PAGE_HYPERVISOR);
 
-    ed->arch.monitor_table = mk_pagetable(mmfn << PAGE_SHIFT);
     ed->arch.monitor_vtable = mpl2e;
 
     // map the phys_to_machine map into the Read-Only MPT space for this domain
     mpl2e[l2_table_offset(RO_MPT_VIRT_START)] =
         mk_l2_pgentry(pagetable_val(ed->arch.phys_table) | __PAGE_HYPERVISOR);
+
+    return mmfn;
 }
 
 /*
@@ -408,13 +409,7 @@ static int vmx_final_setup_guest(struct exec_domain *ed,
         shadow_mode_enable(ed->domain, SHM_enable|SHM_translate|SHM_external);
     }
 
-    /* We don't call update_pagetables() as we actively want fields such as 
-     * the linear_pg_table to be inaccessible so that we bail out early of 
-     * shadow_fault() in case the vmx guest tries illegal accesses with
-     * paging turned off. 
-     */
-    //update_pagetables(ed);     /* this assigns shadow_pagetable */
-    alloc_monitor_pagetable(ed); /* this assigns monitor_pagetable */
+    update_pagetables(ed);
 
     return 0;
 
