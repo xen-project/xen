@@ -6,9 +6,6 @@
  * it permits debugging of seriously-toasted machines (e.g., in situations
  * where a device driver within a guest OS would be inaccessible).
  * 
- * This file contains public definitions. The arch-specific header
- * contains only private hooks, and is not included from this file.
- * 
  * Copyright (c) 2003-2005, K A Fraser
  */
 
@@ -16,6 +13,7 @@
 #define __XEN_SERIAL_H__
 
 #include <asm/regs.h>
+#include <asm/serial.h>
 
 /* 'Serial handles' are comprise the following fields. */
 #define SERHND_IDX      (1<<0) /* COM1 or COM2?                           */

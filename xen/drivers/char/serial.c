@@ -18,6 +18,11 @@
 #include <xen/serial.h>
 #include <asm/io.h>
 
+/* Config serial port with a string <baud>,DPS,<io-base>,<irq>. */
+static unsigned char opt_com1[30] = OPT_COM1_STR, opt_com2[30] = OPT_COM2_STR;
+string_param("com1", opt_com1);
+string_param("com2", opt_com2);
+
 /* Register offsets */
 #define RBR             0x00    /* receive buffer       */
 #define THR             0x00    /* transmit holding     */
@@ -74,16 +79,16 @@
 
 #define RXBUFSZ 32
 #define MASK_RXBUF_IDX(_i) ((_i)&(RXBUFSZ-1))
-typedef struct {
+struct uart {
     int              baud, data_bits, parity, stop_bits, io_base, irq;
     serial_rx_fn     rx_lo, rx_hi, rx;
     spinlock_t       lock;
     unsigned char    rxbuf[RXBUFSZ];
     unsigned int     rxbufp, rxbufc;
     struct irqaction irqaction;
-} uart_t;
+};
 
-static uart_t com[2] = {
+static struct uart com[2] = {
     { 0, 0, 0, 0, 0x3f8, 4,
       NULL, NULL, NULL,
       SPIN_LOCK_UNLOCKED },
@@ -95,20 +100,12 @@ static uart_t com[2] = {
 #define UART_ENABLED(_u) ((_u)->baud != 0)
 #define DISABLE_UART(_u) ((_u)->baud = 0)
 
-/* Architecture-specific private definitions. */
-#include <asm/serial.h>
-
-/* opt_com[12]: Config serial port with a string <baud>,DPS,<io-base>,<irq>. */
-static unsigned char opt_com1[30] = OPT_COM1_STR, opt_com2[30] = OPT_COM2_STR;
-string_param("com1", opt_com1);
-string_param("com2", opt_com2);
-
 
 /***********************
  * PRIVATE FUNCTIONS
  */
 
-static void uart_rx(uart_t *uart, struct xen_regs *regs)
+static void uart_rx(struct uart *uart, struct xen_regs *regs)
 {
     unsigned char c;
 
@@ -134,12 +131,14 @@ static void uart_rx(uart_t *uart, struct xen_regs *regs)
     }
 }
 
-static void serial_interrupt(int irq, void *dev_id, struct xen_regs *regs)
+static void serial_interrupt(
+    int irq, void *dev_id, struct xen_regs *regs)
 {
-    uart_rx((uart_t *)dev_id, regs);
+    uart_rx((struct uart *)dev_id, regs);
 }
 
-static inline void __serial_putc(uart_t *uart, int handle, unsigned char c)
+static inline void __serial_putc(
+    struct uart *uart, int handle, unsigned char c)
 {
     unsigned long flags;
     int space;
@@ -167,7 +166,7 @@ static inline void __serial_putc(uart_t *uart, int handle, unsigned char c)
         return;                              \
 } while ( 0 )
         
-static void parse_port_config(char *conf, uart_t *uart)
+static void parse_port_config(char *conf, struct uart *uart)
 {
     if ( *conf == '\0' )
         return;
@@ -233,7 +232,7 @@ static void parse_port_config(char *conf, uart_t *uart)
     }
 }
 
-static void uart_config_stage1(uart_t *uart)
+static void uart_config_stage1(struct uart *uart)
 {
     unsigned char lcr;
 
@@ -258,7 +257,7 @@ static void uart_config_stage1(uart_t *uart)
     outb(FCR_ENABLE | FCR_CLRX | FCR_CLTX | FCR_TRG14, uart->io_base + FCR);
 }
 
-static void uart_config_stage2(uart_t *uart)
+static void uart_config_stage2(struct uart *uart)
 {
     int rc;
 
@@ -348,7 +347,7 @@ int parse_serial_handle(char *conf)
 
 void serial_set_rx_handler(int handle, serial_rx_fn fn)
 {
-    uart_t *uart = &com[handle & SERHND_IDX];
+    struct uart *uart = &com[handle & SERHND_IDX];
     unsigned long flags;
 
     if ( handle == -1 )
@@ -389,7 +388,7 @@ void serial_set_rx_handler(int handle, serial_rx_fn fn)
 
 void serial_putc(int handle, unsigned char c)
 {
-    uart_t *uart = &com[handle & SERHND_IDX];
+    struct uart *uart = &com[handle & SERHND_IDX];
 
     if ( handle == -1 )
         return;
@@ -399,7 +398,7 @@ void serial_putc(int handle, unsigned char c)
 
 void serial_puts(int handle, const unsigned char *s)
 {
-    uart_t *uart = &com[handle & SERHND_IDX];
+    struct uart *uart = &com[handle & SERHND_IDX];
 
     if ( handle == -1 )
         return;
@@ -426,7 +425,7 @@ static int byte_matches(int handle, unsigned char *pc)
 
 unsigned char irq_serial_getc(int handle)
 {
-    uart_t *uart = &com[handle & SERHND_IDX];
+    struct uart *uart = &com[handle & SERHND_IDX];
     unsigned char c;
 
 
@@ -451,7 +450,7 @@ unsigned char irq_serial_getc(int handle)
 
 unsigned char serial_getc(int handle)
 {
-    uart_t *uart = &com[handle & SERHND_IDX];
+    struct uart *uart = &com[handle & SERHND_IDX];
     unsigned char c;
     unsigned long flags;
 
@@ -476,7 +475,7 @@ unsigned char serial_getc(int handle)
 
 void serial_force_unlock(int handle)
 {
-    uart_t *uart = &com[handle & SERHND_IDX];
+    struct uart *uart = &com[handle & SERHND_IDX];
     if ( handle != -1 )
         uart->lock = SPIN_LOCK_UNLOCKED;
 }
