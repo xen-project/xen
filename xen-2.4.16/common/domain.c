@@ -409,7 +409,7 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     unsigned int ft_size = 0;
     start_info_t  *virt_startinfo_address;
     unsigned long long time;
-    l2_pgentry_t *l2tab;
+    l2_pgentry_t *l2tab, *l2start;
     l1_pgentry_t *l1tab = NULL;
     struct pfn_info *page = NULL;
     net_ring_t *net_ring;
@@ -464,7 +464,7 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
      * filled in by now !!
      */
     phys_l2tab = ALLOC_FRAME_FROM_DOMAIN();
-    l2tab = map_domain_mem(phys_l2tab);
+    l2start = l2tab = map_domain_mem(phys_l2tab);
     memcpy(l2tab, idle_pg_table[p->processor], PAGE_SIZE);
     l2tab[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] =
         mk_l2_pgentry(__pa(p->mm.perdomain_pt) | __PAGE_HYPERVISOR);
@@ -485,17 +485,16 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     if(dom == 0)
         ft_size = frame_table_size; 
 
-    phys_l2tab += l2_table_offset(virt_load_address)*sizeof(l2_pgentry_t);    
+    l2tab += l2_table_offset(virt_load_address);
     for ( cur_address  = start_address;
           cur_address != (end_address + PAGE_SIZE + ft_size);
           cur_address += PAGE_SIZE )
     {
         if ( !((unsigned long)l1tab & (PAGE_SIZE-1)) )
         {
+            if ( l1tab != NULL ) unmap_domain_mem(l1tab-1);
             phys_l1tab = ALLOC_FRAME_FROM_DOMAIN();
-            l2tab = map_domain_mem(phys_l2tab);
-            *l2tab = mk_l2_pgentry(phys_l1tab|L2_PROT);
-            phys_l2tab += sizeof(l2_pgentry_t);
+            *l2tab++ = mk_l2_pgentry(phys_l1tab|L2_PROT);
             l1tab = map_domain_mem(phys_l1tab);
             clear_page(l1tab);
             l1tab += l1_table_offset(
@@ -511,43 +510,39 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
             page->type_count = page->tot_count = 1;
         }
     }
+    unmap_domain_mem(l1tab-1);
     
     /* Pages that are part of page tables must be read-only. */
     vaddr = virt_load_address + alloc_address - start_address;
-    phys_l2tab = pagetable_val(p->mm.pagetable) +
-        (l2_table_offset(vaddr) * sizeof(l2_pgentry_t));
-    l2tab = map_domain_mem(phys_l2tab);
-    phys_l1tab = l2_pgentry_to_phys(*l2tab) +
-        (l1_table_offset(vaddr) * sizeof(l1_pgentry_t));
-    phys_l2tab += sizeof(l2_pgentry_t);
-    l1tab = map_domain_mem(phys_l1tab);
+    l2tab = l2start + l2_table_offset(vaddr);
+    l1tab = map_domain_mem(l2_pgentry_to_phys(*l2tab));
+    l1tab += l1_table_offset(vaddr);
+    l2tab++;
     for ( cur_address  = alloc_address;
           cur_address != end_address;
           cur_address += PAGE_SIZE )
     {
-        *l1tab++ = mk_l1_pgentry(l1_pgentry_val(*l1tab) & ~_PAGE_RW);
         if ( !((unsigned long)l1tab & (PAGE_SIZE-1)) )
         {
-            l2tab = map_domain_mem(phys_l2tab);
-            phys_l1tab = l2_pgentry_to_phys(*l2tab);
-            phys_l2tab += sizeof(l2_pgentry_t);
-            l1tab = map_domain_mem(phys_l1tab);
+            unmap_domain_mem(l1tab-1);
+            l1tab = map_domain_mem(l2_pgentry_to_phys(*l2tab));
+            l2tab++;
         }
+        *l1tab++ = mk_l1_pgentry(l1_pgentry_val(*l1tab) & ~_PAGE_RW);
         page = frame_table + (cur_address >> PAGE_SHIFT);
         page->flags = dom | PGT_l1_page_table;
         page->tot_count++;
     }
+    unmap_domain_mem(l1tab-1);
     page->flags = dom | PGT_l2_page_table;
 
     /* Map in the the shared info structure. */
     virt_shinfo_address = end_address - start_address + virt_load_address;
-    phys_l2tab = pagetable_val(p->mm.pagetable) +
-        (l2_table_offset(virt_shinfo_address) * sizeof(l2_pgentry_t));
-    l2tab = map_domain_mem(phys_l2tab);
-    phys_l1tab = l2_pgentry_to_phys(*l2tab) +
-        (l1_table_offset(virt_shinfo_address) * sizeof(l1_pgentry_t));
-    l1tab = map_domain_mem(phys_l1tab);
+    l2tab = l2start + l2_table_offset(virt_shinfo_address);
+    l1tab = map_domain_mem(l2_pgentry_to_phys(*l2tab));
+    l1tab += l1_table_offset(virt_shinfo_address);
     *l1tab = mk_l1_pgentry(__pa(p->shared_info)|L1_PROT);
+    unmap_domain_mem(l1tab);
 
     /* Set up shared info area. */
     rdtscll(time);
@@ -564,13 +559,11 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
             cur_address < virt_ftable_end_addr;
             cur_address += PAGE_SIZE)
         {
-            phys_l2tab = pagetable_val(p->mm.pagetable) +
-                (l2_table_offset(cur_address) * sizeof(l2_pgentry_t));
-            l2tab = map_domain_mem(phys_l2tab);
-            phys_l1tab = l2_pgentry_to_phys(*l2tab) + 
-                (l1_table_offset(cur_address) * sizeof(l1_pgentry_t)); 
-            l1tab = map_domain_mem(phys_l1tab);
+            l2tab = l2start + l2_table_offset(cur_address);
+            l1tab = map_domain_mem(l2_pgentry_to_phys(*l2tab));
+            l1tab += l1_table_offset(cur_address);
             *l1tab = mk_l1_pgentry(__pa(ft_mapping)|L1_PROT);
+            unmap_domain_mem(l1tab);
             ft_mapping += PAGE_SIZE;
         }
     }
@@ -578,6 +571,8 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     virt_startinfo_address = (start_info_t *)
         (alloc_address - start_address - PAGE_SIZE + virt_load_address);
     virt_stack_address  = (unsigned long)virt_startinfo_address;
+
+    unmap_domain_mem(l2start);
 
     /* Install the new page tables. */
     __cli();

@@ -9,6 +9,21 @@
 
 extern unsigned long *mapcache[NR_CPUS];
 #define MAPCACHE_ENTRIES        1024
+
+/*
+ * Maps a given physical address, returning corresponding virtual address.
+ * The entire page containing that VA is now accessible until a 
+ * corresponding call to unmap_domain_mem().
+ */
+extern void *map_domain_mem(unsigned long pa);
+
+/*
+ * Pass a VA within a page previously mapped with map_domain_mem().
+ * That page will then be removed from the mapping lists.
+ */
+extern void unmap_domain_mem(void *va);
+
+#if 0
 #define MAPCACHE_HASH(_pfn)     ((_pfn) & (MAPCACHE_ENTRIES-1))
 static inline void *map_domain_mem(unsigned long pa)
 {
@@ -25,3 +40,4 @@ static inline void *map_domain_mem(unsigned long pa)
     }
     return va;
 }
+#endif
