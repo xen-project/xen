@@ -592,12 +592,16 @@ static void network_connect(struct net_device *dev,
     wmb();                
     np->rx->req_prod = requeue_idx;
 
+printk(KERN_ALERT"Netfront recovered tx=%d rxfree=%d\n",
+       np->tx->req_prod,np->rx->req_prod);
+
     /* Step 3: All public and private state should now be sane.  Get
      * ready to start sending and receiving packets and give the driver
      * domain a kick because we've probably just requeued some
      * packets.
      */
     np->backend_state = BEST_CONNECTED;
+    wmb();
     notify_via_evtchn(status->evtchn);  
     network_tx_buf_gc(dev);
 

@@ -39,10 +39,9 @@ static blkif_ring_t *blk_ring;
 static BLKIF_RING_IDX resp_cons; /* Response consumer for comms ring. */
 static BLKIF_RING_IDX req_prod;  /* Private request producer.         */
 
-static blkif_ring_t *blk_ring_rec; /* Private copy of requests, used for
-                                    * recovery.  Responses not stored here. */
-static BLKIF_RING_IDX resp_cons_rec; /* Copy of response consumer, used for
-                                      * recovery */
+unsigned long rec_ring_free;
+blkif_request_t rec_ring[BLKIF_RING_SIZE];
+
 static int recovery = 0;           /* "Recovery in progress" flag.  Protected
                                     * by the blkif_io_lock */
 
@@ -70,6 +69,27 @@ static inline void flush_requests(void);
 static void kick_pending_request_queues(void);
 
 int __init xlblk_init(void);
+
+
+static inline int GET_ID_FROM_FREELIST( void )
+{
+    unsigned long free = rec_ring_free;
+
+    if(free>BLKIF_RING_SIZE) BUG();
+
+    rec_ring_free = rec_ring[free].id;
+
+    rec_ring[free].id = 0x0fffffee; // debug
+
+    return free;
+}
+
+static inline void ADD_ID_TO_FREELIST( unsigned long id )
+{
+    rec_ring[id].id = rec_ring_free;
+    rec_ring_free = id;
+}
+
 
 /**************************  KERNEL VERSION 2.6  **************************/
 
@@ -213,6 +233,7 @@ static int blkif_queue_request(struct request *req)
     struct bio *bio;
     struct bio_vec *bvec;
     int idx, s;
+    unsigned long id;
     unsigned int fsect, lsect;
 
     if (unlikely(blkif_state != BLKIF_STATE_CONNECTED))
@@ -220,7 +241,12 @@ static int blkif_queue_request(struct request *req)
 
     /* Fill out a communications ring structure. */
     ring_req = &blk_ring->ring[MASK_BLKIF_IDX(req_prod)].req;
-    ring_req->id = (unsigned long)req;
+    id = GET_ID_FROM_FREELIST();
+    rec_ring[id].id = (unsigned long) req;
+
+//printk("r: %d req %p (%ld)\n",req_prod,req,id);
+
+    ring_req->id = id;
     ring_req->operation = rq_data_dir(req) ? BLKIF_OP_WRITE :
         BLKIF_OP_READ;
     ring_req->sector_number = (blkif_sector_t)req->sector;
@@ -248,11 +274,7 @@ static int blkif_queue_request(struct request *req)
     req_prod++;
 
     /* Keep a private copy so we can reissue requests when recovering. */
-    translate_req_to_pfn(
-        &blk_ring_rec->ring[MASK_BLKIF_IDX(blk_ring_rec->req_prod)].req,
-        ring_req);
-
-    blk_ring_rec->req_prod++;
+    translate_req_to_pfn( &rec_ring[id], ring_req);
 
     return 0;
 }
@@ -319,7 +341,16 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 
     for ( i = resp_cons; i != rp; i++ )
     {
+	unsigned long id;
         bret = &blk_ring->ring[MASK_BLKIF_IDX(i)].resp;
+
+	id = bret->id;
+	req = (struct request *)rec_ring[id].id;
+
+//printk("i: %d req %p (%ld)\n",i,req,id);
+
+	ADD_ID_TO_FREELIST(id);  // overwrites req
+
         switch ( bret->operation )
         {
         case BLKIF_OP_READ:
@@ -327,13 +358,14 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
             if ( unlikely(bret->status != BLKIF_RSP_OKAY) )
                 DPRINTK("Bad return from blkdev data request: %x\n",
                         bret->status);
-            req = (struct request *)bret->id;
+	    
             if ( unlikely(end_that_request_first
                           (req, 
                            (bret->status == BLKIF_RSP_OKAY),
                            req->hard_nr_sectors)) )
                 BUG();
             end_that_request_last(req);
+
             break;
         case BLKIF_OP_PROBE:
             memcpy(&blkif_control_rsp, bret, sizeof(*bret));
@@ -345,7 +377,6 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
     }
     
     resp_cons = i;
-    resp_cons_rec = i;
 
     if ( (xlbd_blk_queue != NULL) &&
          test_bit(QUEUE_FLAG_STOPPED, &xlbd_blk_queue->queue_flags) )
@@ -618,6 +649,7 @@ static int blkif_queue_request(unsigned long   id,
                                kdev_t          device)
 {
     unsigned long       buffer_ma = phys_to_machine(virt_to_phys(buffer)); 
+    unsigned long       xid;
     struct gendisk     *gd;
     blkif_request_t    *req;
     struct buffer_head *bh;
@@ -663,10 +695,15 @@ static int blkif_queue_request(unsigned long   id,
              (sg_dev == device) &&
              (sg_next_sect == sector_number) )
         {
+
             req = &blk_ring->ring[MASK_BLKIF_IDX(req_prod-1)].req;
             bh = (struct buffer_head *)id;
-            bh->b_reqnext = (struct buffer_head *)req->id;
-            req->id = id;
+	    
+            bh->b_reqnext = (struct buffer_head *)rec_ring[req->id].id;
+	    
+
+	    rec_ring[req->id].id = id;
+
             req->frame_and_sects[req->nr_segments] = 
                 buffer_ma | (fsect<<3) | lsect;
             if ( ++req->nr_segments < BLKIF_MAX_SEGMENTS_PER_REQUEST )
@@ -675,8 +712,7 @@ static int blkif_queue_request(unsigned long   id,
                 DISABLE_SCATTERGATHER();
 
             /* Update the copy of the request in the recovery ring. */
-            translate_req_to_pfn(&blk_ring_rec->ring[
-                MASK_BLKIF_IDX(blk_ring_rec->req_prod - 1)].req, req);
+            translate_req_to_pfn(&rec_ring[req->id], req );
 
             return 0;
         }
@@ -698,18 +734,25 @@ static int blkif_queue_request(unsigned long   id,
 
     /* Fill out a communications ring structure. */
     req = &blk_ring->ring[MASK_BLKIF_IDX(req_prod)].req;
-    req->id            = id;
+
+    xid = GET_ID_FROM_FREELIST();
+    rec_ring[xid].id = id;
+
+    req->id            = xid;
     req->operation     = operation;
     req->sector_number = (blkif_sector_t)sector_number;
     req->device        = device; 
     req->nr_segments   = 1;
     req->frame_and_sects[0] = buffer_ma | (fsect<<3) | lsect;
+
+//printk("N: %d req %p (%ld)\n",req_prod,rec_ring[xid].id,xid);
+
     req_prod++;
 
     /* Keep a private copy so we can reissue requests when recovering. */    
-    translate_req_to_pfn(&blk_ring_rec->ring[
-        MASK_BLKIF_IDX(blk_ring_rec->req_prod)].req, req);
-    blk_ring_rec->req_prod++;
+    translate_req_to_pfn(&rec_ring[xid], req );
+
+
 
     return 0;
 }
@@ -816,7 +859,16 @@ static void blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 
     for ( i = resp_cons; i != rp; i++ )
     {
+	unsigned long id;
         blkif_response_t *bret = &blk_ring->ring[MASK_BLKIF_IDX(i)].resp;
+
+	id = bret->id;
+	bh = (struct buffer_head *)rec_ring[id].id; 
+
+//printk("i: %d req %p (%ld)\n",i,bh,id);
+
+	ADD_ID_TO_FREELIST(id);
+
         switch ( bret->operation )
         {
         case BLKIF_OP_READ:
@@ -824,14 +876,13 @@ static void blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
             if ( unlikely(bret->status != BLKIF_RSP_OKAY) )
                 DPRINTK("Bad return from blkdev data request: %lx\n",
                         bret->status);
-            for ( bh = (struct buffer_head *)bret->id; 
-                  bh != NULL; 
-                  bh = next_bh )
+            for ( ; bh != NULL; bh = next_bh )
             {
                 next_bh = bh->b_reqnext;
                 bh->b_reqnext = NULL;
                 bh->b_end_io(bh, bret->status == BLKIF_RSP_OKAY);
             }
+
             break;
         case BLKIF_OP_PROBE:
             memcpy(&blkif_control_rsp, bret, sizeof(*bret));
@@ -843,7 +894,6 @@ static void blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
     }
     
     resp_cons = i;
-    resp_cons_rec = i;
 
     kick_pending_request_queues();
 
@@ -859,8 +909,12 @@ static inline void translate_req_to_pfn(blkif_request_t *xreq,
                                         blkif_request_t *req)
 {
     int i;
-    
-    *xreq = *req; 
+
+    xreq->operation     = req->operation;
+    xreq->nr_segments   = req->nr_segments;
+    xreq->device        = req->device;
+    // preserve id
+    xreq->sector_number = req->sector_number;
 
     for ( i = 0; i < req->nr_segments; i++ )
     {
@@ -868,6 +922,7 @@ static inline void translate_req_to_pfn(blkif_request_t *xreq,
             (machine_to_phys_mapping[req->frame_and_sects[i] >> PAGE_SHIFT] <<
              PAGE_SHIFT);
     }
+    
 }
 
 static inline void translate_req_to_mfn(blkif_request_t *xreq,
@@ -875,7 +930,11 @@ static inline void translate_req_to_mfn(blkif_request_t *xreq,
 {
     int i;
 
-    *xreq = *req;
+    xreq->operation     = req->operation;
+    xreq->nr_segments   = req->nr_segments;
+    xreq->device        = req->device;
+    xreq->id            = req->id;   // copy id (unlike above)
+    xreq->sector_number = req->sector_number;
 
     for ( i = 0; i < req->nr_segments; i++ )
     {
@@ -884,6 +943,8 @@ static inline void translate_req_to_mfn(blkif_request_t *xreq,
              PAGE_SHIFT);
     }
 }
+
+
 
 static inline void flush_requests(void)
 {
@@ -908,7 +969,7 @@ static void kick_pending_request_queues(void)
 
 void blkif_control_send(blkif_request_t *req, blkif_response_t *rsp)
 {
-    unsigned long flags;
+    unsigned long flags, id;
 
  retry:
     while ( (req_prod - resp_cons) == BLKIF_RING_SIZE )
@@ -927,8 +988,13 @@ void blkif_control_send(blkif_request_t *req, blkif_response_t *rsp)
     DISABLE_SCATTERGATHER();
     blk_ring->ring[MASK_BLKIF_IDX(req_prod)].req = *req;    
 
-    translate_req_to_pfn(&blk_ring_rec->ring[
-	MASK_BLKIF_IDX(blk_ring_rec->req_prod++)].req,req);
+    id = GET_ID_FROM_FREELIST();
+    blk_ring->ring[MASK_BLKIF_IDX(req_prod)].req.id = id;
+    rec_ring[id].id = (unsigned long) req;
+
+//printk("c: %d req %p (%ld)\n",req_prod,req,id);
+
+    translate_req_to_pfn( &rec_ring[id], req );
 
     req_prod++;
     flush_requests();
@@ -1017,36 +1083,42 @@ static void blkif_status_change(blkif_fe_interface_status_changed_t *status)
 
         if ( recovery )
         {
-            int i,j;
+	    int i;
 
-            /*
-             * Shouldn't need the io_request_lock here - the device is plugged
-             * and the recovery flag prevents the interrupt handler changing
-             * anything.
-             */
+	    /* Hmm, requests might be re-ordered when we re-issue them.
+	       This will need to be fixed once we have barriers */
 
-            /* Reissue requests from the private block ring. */
-            for ( i = 0;
-                  resp_cons_rec < blk_ring_rec->req_prod;
-                  resp_cons_rec++, i++ )
-            {                
-                translate_req_to_mfn(
-                    &blk_ring->ring[i].req,
-                    &blk_ring_rec->ring[MASK_BLKIF_IDX(resp_cons_rec)].req);
-            }
+	    // req_prod = 0;   : already is zero
 
-            /* Reset the private block ring to match the new ring. */
-            for( j = 0; j < i; j++ )
-            {
-                translate_req_to_pfn(
-                    &blk_ring_rec->ring[j].req,
-                    &blk_ring->ring[j].req);
-            }
+	    // stage 1 : find active and move to safety
+	    for ( i=0; i <BLKIF_RING_SIZE; i++ )
+	    {
+		if ( rec_ring[i].id >= PAGE_OFFSET )
+		{
+		    translate_req_to_mfn(
+			&blk_ring->ring[req_prod].req, &rec_ring[i] );
 
-            resp_cons_rec = 0;
+		    req_prod++;
+		}
+	    }
+
+printk(KERN_ALERT"blkfront: recovered %d descriptors\n",req_prod);
+	    
+	    // stage 2 : set up shadow list
+	    for ( i=0; i<req_prod; i++ )
+	    {
+		rec_ring[i].id = blk_ring->ring[i].req.id;		
+		blk_ring->ring[i].req.id = i;
+		translate_req_to_pfn( &rec_ring[i], &blk_ring->ring[i].req );
+	    }
+
+	    // stage 3 : set up free list
+	    for ( ; i < BLKIF_RING_SIZE; i++ )
+		rec_ring[i].id = i+1;
+	    rec_ring_free = req_prod;
+	    rec_ring[BLKIF_RING_SIZE-1].id = 0x0fffffff;
 
             /* blk_ring->req_prod will be set when we flush_requests().*/
-            blk_ring_rec->req_prod = req_prod = i;
             wmb();
 
             /* Switch off recovery mode, using a memory barrier to ensure that
@@ -1057,6 +1129,9 @@ static void blkif_status_change(blkif_fe_interface_status_changed_t *status)
 
             /* Kicks things back into life. */
             flush_requests();
+
+
+
         }
         else
         {
@@ -1114,15 +1189,20 @@ int __init xlblk_init(void)
 {
     ctrl_msg_t                       cmsg;
     blkif_fe_driver_status_changed_t st;
-
+    int i;
+    
     if ( (start_info.flags & SIF_INITDOMAIN) 
          || (start_info.flags & SIF_BLK_BE_DOMAIN) )
         return 0;
 
     printk(KERN_INFO "Initialising Xen virtual block device\n");
 
-    blk_ring_rec = (blkif_ring_t *)__get_free_page(GFP_KERNEL);
-    memset(blk_ring_rec, 0, sizeof(*blk_ring_rec));
+    rec_ring_free = 0;
+    for (i=0; i<BLKIF_RING_SIZE; i++)
+    {
+	rec_ring[i].id = i+1;
+    }
+    rec_ring[BLKIF_RING_SIZE-1].id = 0x0fffffff;
 
     (void)ctrl_if_register_receiver(CMSG_BLKIF_FE, blkif_ctrlif_rx,
                                     CALLBACK_IN_BLOCKING_CONTEXT);
