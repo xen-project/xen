@@ -43,6 +43,18 @@ extern struct mm_struct init_mm;
 /* SMH: replace below when have explicit 'priv' flag or bitmask */
 #define IS_PRIV(_p) ((_p)->domain == 0) 
 
+#define DOMAIN_ID_BITS (16)
+#define MAX_DOMAIN_ID  ((1<<(DOMAIN_ID_BITS))-1)
+
+typedef struct event_channel_st
+{
+    u16 target_dom; /* Target domain (i.e. domain at remote end). */
+#define ECF_TARGET_ID ((1<<10)-1) /* Channel identifier at remote end.    */
+#define ECF_INUSE     (1<<10)     /* Is this channel descriptor in use?   */
+#define ECF_CONNECTED (1<<11)     /* Is this channel connected to remote? */
+    u16 flags;
+} event_channel_t;
+
 struct task_struct 
 {
     /*
@@ -129,6 +141,11 @@ struct task_struct
     struct thread_struct thread;
     struct task_struct *prev_task, *next_task, *next_hash;
     
+    /* Event channel information. */
+    event_channel_t *event_channel;
+    unsigned int     max_event_channel;
+    spinlock_t       event_channel_lock;
+
     unsigned long flags;
 
     atomic_t refcnt;

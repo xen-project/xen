@@ -28,7 +28,8 @@
  */
 static inline unsigned long mark_guest_event(struct task_struct *p, int event)
 {
-    set_bit(event, &p->shared_info->events);
+    if ( test_and_set_bit(event, &p->shared_info->events) )
+        return 0;
 
     /*
      * No need for the runqueue_lock! The check below does not race
@@ -46,7 +47,8 @@ static inline unsigned long mark_guest_event(struct task_struct *p, int event)
 /* As above, but hyp_events are handled within the hypervisor. */
 static inline unsigned long mark_hyp_event(struct task_struct *p, int event)
 {
-    set_bit(event, &p->hyp_events);
+    if ( test_and_set_bit(event, &p->shared_info->events) )
+        return 0;
     smp_mb();
     if ( p->state == TASK_INTERRUPTIBLE ) wake_up(p);
     reschedule(p);
@@ -64,17 +66,21 @@ static inline void guest_event_notify(unsigned long cpu_mask)
 
 static inline unsigned long mark_guest_event(struct task_struct *p, int event)
 {
-    set_bit(event, &p->shared_info->events);
-    if ( p->state == TASK_INTERRUPTIBLE ) wake_up(p);
-    reschedule(p);
+    if ( !test_and_set_bit(event, &p->shared_info->events) )
+    {
+        if ( p->state == TASK_INTERRUPTIBLE ) wake_up(p);
+        reschedule(p);
+    }
     return 0;
 }
 
 static inline unsigned long mark_hyp_event(struct task_struct *p, int event)
 {
-    set_bit(event, &p->hyp_events);
-    if ( p->state == TASK_INTERRUPTIBLE ) wake_up(p);
-    reschedule(p);
+    if ( !test_and_set_bit(event, &p->hyp_events) )
+    {
+        if ( p->state == TASK_INTERRUPTIBLE ) wake_up(p);
+        reschedule(p);
+    }
     return 0;
 }
 
