@@ -231,48 +231,66 @@ void arch_do_createdomain(struct domain *d)
                            PAGE_SHIFT] = 0x0fffdeadUL;  /* debug */
 }
 
-void arch_final_setup_guestos(struct domain *p, full_execution_context_t *c)
+int arch_final_setup_guestos(struct domain *d, full_execution_context_t *c)
 {
     unsigned long phys_basetab;
-    int i;
+    int i, rc;
 
-    clear_bit(DF_DONEFPUINIT, &p->flags);
+    clear_bit(DF_DONEFPUINIT, &d->flags);
     if ( c->flags & ECF_I387_VALID )
-        set_bit(DF_DONEFPUINIT, &p->flags);
-    memcpy(&p->shared_info->execution_context,
+        set_bit(DF_DONEFPUINIT, &d->flags);
+
+    memcpy(&d->shared_info->execution_context,
            &c->cpu_ctxt,
-           sizeof(p->shared_info->execution_context));
-    memcpy(&p->thread.i387,
+           sizeof(d->shared_info->execution_context));
+
+    memcpy(&d->thread.i387,
            &c->fpu_ctxt,
-           sizeof(p->thread.i387));
-    memcpy(p->thread.traps,
+           sizeof(d->thread.i387));
+
+    memcpy(d->thread.traps,
            &c->trap_ctxt,
-           sizeof(p->thread.traps));
+           sizeof(d->thread.traps));
+
 #ifdef ARCH_HAS_FAST_TRAP
-    SET_DEFAULT_FAST_TRAP(&p->thread);
-    (void)set_fast_trap(p, c->fast_trap_idx);
+    SET_DEFAULT_FAST_TRAP(&d->thread);
+    if ( (rc = (int)set_fast_trap(d, c->fast_trap_idx)) != 0 )
+        return rc;
 #endif
-    p->mm.ldt_base = c->ldt_base;
-    p->mm.ldt_ents = c->ldt_ents;
-    SET_GDT_ENTRIES(p, DEFAULT_GDT_ENTRIES);
-    SET_GDT_ADDRESS(p, DEFAULT_GDT_ADDRESS);
-    if ( c->gdt_ents != 0 )
-        (void)set_gdt(p,
-                      c->gdt_frames,
-                      c->gdt_ents);
-    p->thread.guestos_ss = c->guestos_ss;
-    p->thread.guestos_sp = c->guestos_esp;
+
+    d->mm.ldt_base = c->ldt_base;
+    d->mm.ldt_ents = c->ldt_ents;
+
+    d->thread.guestos_ss = c->guestos_ss;
+    d->thread.guestos_sp = c->guestos_esp;
+
     for ( i = 0; i < 8; i++ )
-        (void)set_debugreg(p, i, c->debugreg[i]);
-    p->event_selector    = c->event_callback_cs;
-    p->event_address     = c->event_callback_eip;
-    p->failsafe_selector = c->failsafe_callback_cs;
-    p->failsafe_address  = c->failsafe_callback_eip;
+        (void)set_debugreg(d, i, c->debugreg[i]);
+
+    d->event_selector    = c->event_callback_cs;
+    d->event_address     = c->event_callback_eip;
+    d->failsafe_selector = c->failsafe_callback_cs;
+    d->failsafe_address  = c->failsafe_callback_eip;
     
     phys_basetab = c->pt_base;
-    p->mm.pagetable = mk_pagetable(phys_basetab);
-    get_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT], p, 
-                      PGT_base_page_table);
+    d->mm.pagetable = mk_pagetable(phys_basetab);
+    if ( !get_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT], d, 
+                            PGT_base_page_table) )
+        return -EINVAL;
+
+    /* Failure to set GDT is harmless. */
+    SET_GDT_ENTRIES(d, DEFAULT_GDT_ENTRIES);
+    SET_GDT_ADDRESS(d, DEFAULT_GDT_ADDRESS);
+    if ( c->gdt_ents != 0 )
+    {
+        if ( (rc = (int)set_gdt(d, c->gdt_frames, c->gdt_ents)) != 0 )
+        {
+            put_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT]);
+            return rc;
+        }
+    }
+
+    return 0;
 }
 
 #if defined(__i386__)
