@@ -16,7 +16,7 @@ ifneq ($(TARGET_SUBARCH),x86_32)
 OBJS := $(subst vmx.o,,$(OBJS))
 OBJS := $(subst vmx_io.o,,$(OBJS))
 OBJS := $(subst vmx_vmcs.o,,$(OBJS))
-endif ($(TARGET_SUBARCH),x86_32)
+endif
 
 default: boot/$(TARGET_SUBARCH).o $(OBJS) boot/mkelf32
 	$(LD) $(LDFLAGS) -r -o arch.o $(OBJS)

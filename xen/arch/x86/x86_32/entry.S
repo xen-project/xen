@@ -75,14 +75,24 @@
  *
  * We also need the room, especially because orig_eax field is used 
  * by do_IRQ(). Compared the xen_regs, we skip pushing for the following:
- * (1/1)  u16 error_code;
- * (2/1)  u16 entry_vector;
- *   (2)  u32 eip;
- *   (3)  u32 cs;
+ *   (10) u32 gs;                 
+ *   (9)  u32 fs;
+ *   (8)  u32 ds;
+ *   (7)  u32 es;
+ *               <- get_stack_top() (= HOST_ESP)
+ *   (6)  u32 ss;
+ *   (5)  u32 esp;
  *   (4)  u32 eflags;
+ *   (3)  u32 cs;
+ *   (2)  u32 eip;
+ * (2/1)  u16 entry_vector;
+ * (1/1)  u16 error_code;
+ * However, get_stack_top() acturally returns 20 bytes below the real
+ * top of the stack to allow space for:
+ * domain pointer, DS, ES, FS, GS. Therefore, we effectively skip 6 registers.
  */
 #define VMX_MONITOR_EFLAGS	0x202 /* IF on */
-#define NR_SKIPPED_REGS	4	/* See the above explanation */
+#define NR_SKIPPED_REGS	6	/* See the above explanation */
 #define VMX_SAVE_ALL_NOSEGREGS \
         pushl $VMX_MONITOR_EFLAGS; \
         popf; \

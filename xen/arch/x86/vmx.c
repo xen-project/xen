@@ -75,7 +75,7 @@ int start_vmx()
 
 void stop_vmx()
 {
-    if (test_bit(X86_FEATURE_VMXE, &boot_cpu_data.x86_capability))
+    if (read_cr4() & X86_CR4_VMXE)
         __vmxoff();
 }
 

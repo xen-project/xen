@@ -93,10 +93,11 @@ EXPORT_SYMBOL(enable_hlt);
 extern int set_timeout_timer(void);
 void xen_idle(void)
 {
-	int cpu = smp_processor_id();
+	int cpu;
 
 	local_irq_disable();
 
+	cpu = smp_processor_id();
 	if (rcu_pending(cpu))
 		rcu_check_callbacks(cpu, 0);
 

@@ -217,7 +217,11 @@ static void __shutdown_handler(void *unused)
 static void __sysrq_handler(void *unused)
 {
 #ifdef CONFIG_MAGIC_SYSRQ
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
     handle_sysrq(pending_sysrq, NULL, NULL);
+#else
+    handle_sysrq(pending_sysrq, NULL, NULL, NULL);
+#endif
 #endif
     pending_sysrq = -1;
 }
