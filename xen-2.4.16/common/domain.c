@@ -137,39 +137,6 @@ long kill_other_domain(unsigned int dom)
 }
 
 
-/* Release resources belonging to task @p. */
-void release_task(struct task_struct *p)
-{
-    struct list_head *list_ent, *tmp;
-    ASSERT(p->state == TASK_DYING);
-    ASSERT(!p->has_cpu);
-    write_lock_irq(&tasklist_lock);
-    REMOVE_LINKS(p);
-    write_unlock_irq(&tasklist_lock);
-
-    /*
-     * Safe! Only queue skbuffs with tasklist_lock held.
-     * Only access shared_info with tasklist_lock held.
-     * And free_task_struct() only releases if refcnt == 0.
-     */
-    while ( p->num_net_vifs )
-    {
-        destroy_net_vif(p);
-    }
-    if ( p->mm.perdomain_pt ) free_page((unsigned long)p->mm.perdomain_pt);
-    free_page((unsigned long)p->shared_info);
-
-    list_for_each_safe(list_ent, tmp, &p->pg_head)
-    {
-        struct pfn_info *pf = list_entry(list_ent, struct pfn_info, list);
-        pf->type_count = pf->tot_count = pf->flags = 0;
-        list_del(list_ent);
-        list_add(list_ent, &free_list);
-    }
-
-    free_task_struct(p);
-}
-
 unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes)
 {
     struct list_head *temp;
@@ -206,6 +173,83 @@ unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes)
     return 0;
 }
  
+
+void free_all_dom_mem(struct task_struct *p)
+{
+    struct list_head *list_ent, *tmp;
+
+    list_for_each_safe(list_ent, tmp, &p->pg_head)
+    {
+        struct pfn_info *pf = list_entry(list_ent, struct pfn_info, list);
+        pf->type_count = pf->tot_count = pf->flags = 0;
+        list_del(list_ent);
+        list_add(list_ent, &free_list);
+    }
+
+    p->tot_pages = 0;
+}
+
+
+/* Release resources belonging to task @p. */
+void release_task(struct task_struct *p)
+{
+    ASSERT(p->state == TASK_DYING);
+    ASSERT(!p->has_cpu);
+    write_lock_irq(&tasklist_lock);
+    REMOVE_LINKS(p);
+    write_unlock_irq(&tasklist_lock);
+
+    /*
+     * Safe! Only queue skbuffs with tasklist_lock held.
+     * Only access shared_info with tasklist_lock held.
+     * And free_task_struct() only releases if refcnt == 0.
+     */
+    while ( p->num_net_vifs )
+    {
+        destroy_net_vif(p);
+    }
+    if ( p->mm.perdomain_pt ) free_page((unsigned long)p->mm.perdomain_pt);
+    free_page((unsigned long)p->shared_info);
+
+    free_all_dom_mem(p);
+
+    free_task_struct(p);
+}
+
+
+void construct_cmdline(char *dst, struct task_struct *p)
+{
+    int dom = p->domain;
+    unsigned char boot[150];
+    unsigned char ipbase[20], nfsserv[20], gateway[20], netmask[20];
+    unsigned char nfsroot[70];
+
+    if ( strcmp("",opt_nfsroot) )
+    {
+        /* NFS root for Xenolinux. */
+        snprintf(nfsroot, 70, opt_nfsroot, dom); 
+        snprintf(boot, 200,
+                " root=/dev/nfs ip=%s:%s:%s:%s::eth0:off nfsroot=%s",
+                 quad_to_str(opt_ipbase + dom, ipbase),
+                 quad_to_str(opt_nfsserv, nfsserv),
+                 quad_to_str(opt_gateway, gateway),
+                 quad_to_str(opt_netmask, netmask),
+                 nfsroot);
+    }
+    else
+    {   
+        /* Non-NFS root for Xenolinux. */
+        snprintf(boot, 200,
+                " ip=%s::%s:%s::eth0:off",
+                 quad_to_str(opt_ipbase + dom, ipbase),
+                 quad_to_str(opt_gateway, gateway),
+                 quad_to_str(opt_netmask, netmask));
+    }
+
+    strcpy(dst, boot);
+}
+
+
 /* final_setup_guestos is used for final setup and launching of domains other
  * than domain 0. ie. the domains that are being built by the userspace dom0
  * domain builder.
@@ -311,21 +355,7 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
     }
     *dst = '\0';
 
-    if ( opt_nfsroot )
-    {
-        unsigned char boot[150];
-        unsigned char ipbase[20], nfsserv[20], gateway[20], netmask[20];
-        unsigned char nfsroot[70];
-        snprintf(nfsroot, 70, opt_nfsroot, p->domain); 
-        snprintf(boot, 200,
-                " root=/dev/nfs ip=%s:%s:%s:%s::eth0:off nfsroot=%s",
-                 quad_to_str(opt_ipbase + p->domain, ipbase),
-                 quad_to_str(opt_nfsserv, nfsserv),
-                 quad_to_str(opt_gateway, gateway),
-                 quad_to_str(opt_netmask, netmask),
-                 nfsroot);
-        strcpy(dst, boot);
-    }
+    construct_cmdline(dst, p);
 
     /* Reinstate the caller's page tables. */
     __asm__ __volatile__ (
@@ -404,7 +434,7 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
                dom, (mod[nr_mods-1].mod_end-mod[0].mod_start)>>20,
                (params->memory_kb)>>11,
                (params->memory_kb)>>10);
-        /* XXX should free domain memory here XXX */
+        free_all_dom_mem(p);
         return -1;
     }
 
@@ -578,34 +608,8 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
         }
     }
     *dst = '\0';
-//printk("opt_nfsroot=%d,%s XX cmd =: %s\n",opt_nfsroot,opt_nfsroot,virt_startinfo_address->cmd_line);
 
-    if ( strcmp("",opt_nfsroot) )
-    {   // if nfsroot has been set to something
-        unsigned char boot[150];
-        unsigned char ipbase[20], nfsserv[20], gateway[20], netmask[20];
-        unsigned char nfsroot[70];
-        snprintf(nfsroot, 70, opt_nfsroot, dom); 
-        snprintf(boot, 200,
-                " root=/dev/nfs ip=%s:%s:%s:%s::eth0:off nfsroot=%s",
-                 quad_to_str(opt_ipbase + dom, ipbase),
-                 quad_to_str(opt_nfsserv, nfsserv),
-                 quad_to_str(opt_gateway, gateway),
-                 quad_to_str(opt_netmask, netmask),
-                 nfsroot);
-        strcpy(dst, boot);
-    }
-    else
-    {   
-        unsigned char boot[150];
-        unsigned char ipbase[20], nfsserv[20], gateway[20], netmask[20];
-        snprintf(boot, 200,
-                " ip=%s::%s:%s::eth0:off",
-                 quad_to_str(opt_ipbase + dom, ipbase),
-                 quad_to_str(opt_gateway, gateway),
-                 quad_to_str(opt_netmask, netmask));
-        strcpy(dst, boot);
-    }
+    construct_cmdline(dst, p);
 
 
     /* Reinstate the caller's page tables. */

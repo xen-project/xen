@@ -40,7 +40,7 @@
 #define rtnl_unlock() ((void)0)
 #define dst_init() ((void)0)
 
-#if 1
+#if 0
 #define DPRINTK(_f, _a...) printk(_f , ## _a)
 #else 
 #define DPRINTK(_f, _a...) ((void)0)

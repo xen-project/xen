@@ -182,8 +182,8 @@ mktime (unsigned int year, unsigned int mon,
 	}
 	return ((((unsigned long)(year/4 - year/100 + year/400 + 367*mon/12 + day)+
 			  year*365 - 719499
-				 )*24 + hour /* now have hours */
-				)*60 + min /* now have minutes */
+        )*24 + hour /* now have hours */
+        )*60 + min /* now have minutes */
         )*60 + sec; /* finally seconds */
 }
 
@@ -214,14 +214,14 @@ static unsigned long get_cmos_time(void)
 		year = CMOS_READ(RTC_YEAR);
 	} while (sec != CMOS_READ(RTC_SECONDS));
 	if (!(CMOS_READ(RTC_CONTROL) & RTC_DM_BINARY) || RTC_ALWAYS_BCD)
-	  {
+    {
 	    BCD_TO_BIN(sec);
 	    BCD_TO_BIN(min);
 	    BCD_TO_BIN(hour);
 	    BCD_TO_BIN(day);
 	    BCD_TO_BIN(mon);
 	    BCD_TO_BIN(year);
-	  }
+    }
 	spin_unlock(&rtc_lock);
 	if ((year += 1900) < 1970)
 		year += 100;
@@ -337,16 +337,15 @@ static void update_time(unsigned long foo)
 	new_st = NOW();
 	rdtscl(new_pcc);
 
-	/* update system time  */
+	/* Update system time. */
 	spin_lock_irqsave(&stime_lock, flags);
-
 	stime_now = new_st;
 	stime_pcc=new_pcc;
+    /* Don't reeenable IRQs until we release wctime_lock. */
+	spin_unlock(&stime_lock);
 
-	spin_unlock_irqrestore(&stime_lock, flags);
-
-	/* update wall clock time  */
-	spin_lock_irqsave(&wctime_lock, flags);
+	/* Update wall clock time. */
+	spin_lock(&wctime_lock);
 	usec = ((unsigned long)(new_st - wctime_st))/1000;
 	usec += wall_clock_time.tv_usec;
 	while (usec >= 1000000) {
@@ -360,7 +359,8 @@ static void update_time(unsigned long foo)
 	TRC(printk("TIME[%02d] update time: stime_now=%lld now=%lld,wct=%ld:%ld\n",
 			   smp_processor_id(), stime_now, new_st, wall_clock_time.tv_sec,
 			   wall_clock_time.tv_usec));
-	/* reload timer */
+
+	/* Reload the timer. */
  again:
 	update_timer.expires  = new_st + MILLISECS(200);
 	if(add_ac_timer(&update_timer) == 1) {

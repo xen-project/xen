@@ -212,11 +212,8 @@ static int cmd_write_proc(struct file *file, const char *buffer,
     }
     else if ( op.cmd == DO_PGUPDATES )
     {
-        p = op.u.pgupdate.pgt_update_arr;
-        for ( i = 0; i < op.u.pgupdate.num_pgt_updates; i++ )
-        {
-            ret = HYPERVISOR_pt_update(p + i*8, 1);
-        }
+        ret = HYPERVISOR_pt_update(op.u.pgupdate.pgt_update_arr,
+                                   op.u.pgupdate.num_pgt_updates);
     }
     else
     {

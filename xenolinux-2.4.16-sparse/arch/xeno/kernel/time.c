@@ -241,11 +241,11 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 {
 	struct timeval tv;
 	long long time, delta;
-
+	
 #ifdef XENO_TIME_DEBUG
 	static u32 foo_count = 0;
 	foo_count++;		
-	if (foo_count>= 10000) {
+	if (foo_count>= 1000) {
 		s64 n = NOW();
 		struct timeval tv;
 		do_gettimeofday(&tv);
@@ -254,7 +254,6 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 		foo_count = 0;
 	}
 #endif
-
     /*
      * The next bit really sucks:
      * Linux not only uses do_gettimeofday() to keep a notion of
