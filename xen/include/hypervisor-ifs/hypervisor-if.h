@@ -90,6 +90,7 @@
 #define EVENT_DEBUG    0x08 /* Request guest to dump debug info (gross!) */
 #define EVENT_NET      0x10 /* There are packets for transmission. */
 #define EVENT_PS2      0x20 /* PS/2 keyboard or mouse event(s) */
+#define EVENT_STOP     0x40 /* Prepare for stopping and possible pickling */
 
 /* Bit offsets, as opposed to the above masks. */
 #define _EVENT_BLKDEV   0
@@ -98,6 +99,7 @@
 #define _EVENT_DEBUG    3
 #define _EVENT_NET      4
 #define _EVENT_PS2      5
+#define _EVENT_STOP     6
 
 /*
  * Virtual addresses beyond this are not modifiable by guest OSes. The 
@@ -156,6 +158,7 @@
  */
 #define SCHEDOP_yield           0
 #define SCHEDOP_exit            1
+#define SCHEDOP_stop            2
 
  
 

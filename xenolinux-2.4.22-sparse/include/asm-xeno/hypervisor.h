@@ -263,6 +263,17 @@ static inline int HYPERVISOR_exit(void)
     return ret;
 }
 
+static inline int HYPERVISOR_stop(void)
+{
+    int ret;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret) : "0" (__HYPERVISOR_sched_op),
+        "b" (SCHEDOP_stop) );
+
+    return ret;
+}
+
 static inline int HYPERVISOR_dom0_op(dom0_op_t *dom0_op)
 {
     int ret;

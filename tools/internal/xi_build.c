@@ -147,7 +147,8 @@ static int copy_to_domain_page(unsigned long dst_pfn, void *src_page)
 static int setup_guestos(
     int dom, int kernel_fd, int initrd_fd, unsigned long tot_pages,
     unsigned long virt_load_addr, size_t ksize, 
-    dom0_builddomain_t *builddomain, int argc, char **argv, int args_start)
+    dom0_builddomain_t *builddomain, int argc, char **argv, int args_start,
+    unsigned long shared_info_frame)
 {
     l1_pgentry_t *vl1tab = NULL, *vl1e = NULL;
     l2_pgentry_t *vl2tab = NULL, *vl2e = NULL;
@@ -160,6 +161,7 @@ static int setup_guestos(
     unsigned long count, pt_start, i, j;
     unsigned long initrd_addr = 0, initrd_len = 0;
     start_info_t *start_info;
+    shared_info_t *shared_info;
     int cmd_len;
 
     memset(builddomain, 0, sizeof(*builddomain));
@@ -319,6 +321,10 @@ static int setup_guestos(
     start_info->pt_base     = virt_load_addr + ((tot_pages-1) << PAGE_SHIFT);
     start_info->mod_start   = initrd_addr;
     start_info->mod_len     = initrd_len;
+    start_info->nr_pages    = tot_pages;
+    start_info->shared_info = shared_info_frame << PAGE_SHIFT;
+    start_info->dom_id      = dom;
+    start_info->flags       = 0;
     cmd_len = 0;
     for ( i = args_start; i < argc; i++ )
     {
@@ -332,6 +338,11 @@ static int setup_guestos(
         cmd_len += strlen(argv[i] + 1);
     }
     unmap_pfn(start_info);
+
+    /* shared_info page starts its life empty. */
+    shared_info = map_pfn(shared_info_frame);
+    memset(shared_info, 0, PAGE_SIZE);
+    unmap_pfn(shared_info);
 
     /* Send the page update requests down to the hypervisor. */
     if ( send_pgupdates(pgt_update_arr, num_pgt_updates) < 0 )
@@ -356,7 +367,7 @@ int main(int argc, char **argv)
      * the 8-byte signature and 4-byte load address.
      */
     size_t ksize;
-    dom0_op_t launch_op;
+    dom0_op_t launch_op, op;
     unsigned long load_addr;
     long tot_pages;
     int kernel_fd, initrd_fd = -1;
@@ -418,9 +429,24 @@ int main(int argc, char **argv)
         }
     }
 
+    op.cmd = DOM0_GETDOMAININFO;
+    op.u.getdomaininfo.domain = domain_id;
+    if ( (do_dom0_op(&op) < 0) || (op.u.getdomaininfo.domain != domain_id) )
+    {
+        PERROR("Could not get info on domain");
+        return 1;
+    }
+    if ( (op.u.getdomaininfo.state != DOMSTATE_STOPPED) ||
+         (op.u.getdomaininfo.ctxt.pt_base != 0) )
+    {
+        ERROR("Domain is already constructed");
+        return 1;
+    }
+
     if ( setup_guestos(domain_id, kernel_fd, initrd_fd, tot_pages,
                        load_addr, ksize, &launch_op.u.builddomain,
-                       argc, argv, args_start) < 0 )
+                       argc, argv, args_start, 
+                       op.u.getdomaininfo.shared_info_frame) < 0 )
         return 1;
 
     if ( initrd_fd >= 0 )
@@ -428,6 +454,8 @@ int main(int argc, char **argv)
     close(kernel_fd);
 
     ctxt = &launch_op.u.builddomain.ctxt;
+
+    ctxt->flags = 0;
 
     /*
      * Initial register values:
@@ -473,8 +501,11 @@ int main(int argc, char **argv)
     /* No debugging. */
     memset(ctxt->debugreg, 0, sizeof(ctxt->debugreg));
 
-    /* Domain time counts from zero. */
-    ctxt->domain_time = 0;
+    /* No callback handlers. */
+    ctxt->event_callback_cs     = FLAT_RING1_CS;
+    ctxt->event_callback_eip    = 0;
+    ctxt->failsafe_callback_cs  = FLAT_RING1_CS;
+    ctxt->failsafe_callback_eip = 0;
 
     launch_op.u.builddomain.domain   = domain_id;
     launch_op.u.builddomain.num_vifs = atoi(argv[3]);

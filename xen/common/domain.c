@@ -32,12 +32,9 @@
 rwlock_t tasklist_lock __cacheline_aligned = RW_LOCK_UNLOCKED;
 struct task_struct *task_hash[TASK_HASH_SIZE];
 
-/*
- * create a new domain
- */
 struct task_struct *do_createdomain(unsigned int dom_id, unsigned int cpu)
 {
-    int retval, i;
+    int retval;
     struct task_struct *p = NULL;
     unsigned long flags;
 
@@ -68,19 +65,7 @@ struct task_struct *do_createdomain(unsigned int dom_id, unsigned int cpu)
 
     INIT_LIST_HEAD(&p->physdisk_aces);
 
-    SET_GDT_ENTRIES(p, DEFAULT_GDT_ENTRIES);
-    SET_GDT_ADDRESS(p, DEFAULT_GDT_ADDRESS);
-
     p->addr_limit = USER_DS;
-
-    /*
-     * We're basically forcing default RPLs to 1, so that our "what privilege
-     * level are we returning to?" logic works.
-     */
-    p->failsafe_selector = FLAT_RING1_CS;
-    p->event_selector    = FLAT_RING1_CS;
-    p->thread.ss1        = FLAT_RING1_DS;
-    for ( i = 0; i < 256; i++ ) p->thread.traps[i].cs = FLAT_RING1_CS;
 
     sched_add_domain(p);
 
@@ -139,9 +124,11 @@ void __kill_domain(struct task_struct *p)
         machine_restart(0);
     }
 
-    printk("Killing domain %d\n", p->domain);
+    /* Only allow the domain to be destroyed once. */
+    if ( !sched_rem_domain(p) )
+        return;
 
-    sched_rem_domain(p);
+    printk("Killing domain %d\n", p->domain);
 
     unlink_blkdev_info(p);
 
@@ -215,7 +202,6 @@ void stop_domain(void)
     unlazy_fpu(current);
     wmb(); /* All CPUs must see saved info in state TASK_STOPPED. */
     set_current_state(TASK_STOPPED);
-    clear_bit(_HYP_EVENT_STOP, &current->hyp_events);
     __enter_scheduler();
 }
 
@@ -229,8 +215,8 @@ long stop_other_domain(unsigned int dom)
     
     if ( p->state != TASK_STOPPED )
     {
-        cpu_mask = mark_hyp_event(p, _HYP_EVENT_STOP);
-        hyp_event_notify(cpu_mask);
+        cpu_mask = mark_guest_event(p, _EVENT_STOP);
+        guest_event_notify(cpu_mask);
     }
     
     put_task_struct(p);
@@ -332,13 +318,14 @@ void release_task(struct task_struct *p)
 }
 
 
-/* final_setup_guestos is used for final setup and launching of domains other
+/*
+ * final_setup_guestos is used for final setup and launching of domains other
  * than domain 0. ie. the domains that are being built by the userspace dom0
  * domain builder.
  */
 int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *builddomain)
 {
-    start_info_t * virt_startinfo_addr;
+    start_info_t *virt_startinfo_addr;
     unsigned long phys_l2tab;
     net_ring_t *shared_rings;
     net_vif_t *net_vif;
@@ -346,7 +333,10 @@ int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *builddomain)
 
     if ( (p->flags & PF_CONSTRUCTED) )
         return -EINVAL;
-
+    
+    p->flags &= ~PF_DONEFPUINIT;
+    if ( builddomain->ctxt.flags & ECF_I387_VALID )
+        p->flags |= PF_DONEFPUINIT;
     memcpy(&p->shared_info->execution_context,
            &builddomain->ctxt.i386_ctxt,
            sizeof(p->shared_info->execution_context));
@@ -371,6 +361,10 @@ int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *builddomain)
     memcpy(p->thread.debugreg,
            builddomain->ctxt.debugreg,
            sizeof(p->thread.debugreg));
+    p->event_selector    = builddomain->ctxt.event_callback_cs;
+    p->event_address     = builddomain->ctxt.event_callback_eip;
+    p->failsafe_selector = builddomain->ctxt.failsafe_callback_cs;
+    p->failsafe_address  = builddomain->ctxt.failsafe_callback_eip;
     
     /* NB. Page base must already be pinned! */
     phys_l2tab = builddomain->ctxt.pt_base;
@@ -378,24 +372,18 @@ int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *builddomain)
     get_page_type(&frame_table[phys_l2tab>>PAGE_SHIFT]);
     get_page_tot(&frame_table[phys_l2tab>>PAGE_SHIFT]);
 
-    /* set up the shared info structure */
+    /* Set up the shared info structure. */
     update_dom_time(p->shared_info);
-    p->shared_info->domain_time = builddomain->ctxt.domain_time;
 
-    /* we pass start info struct to guest os as function parameter on stack */
     virt_startinfo_addr = (start_info_t *)builddomain->virt_startinfo_addr;
 
-    /* we need to populate start_info struct within the context of the
-     * new domain. thus, temporarely install its pagetables.
+    /*
+     * We need to populate start_info struct within the context of the new
+     * domain. Thus temporarely install its pagetables.
      */
     __cli();
     __asm__ __volatile__ ( 
         "mov %%eax,%%cr3" : : "a" (pagetable_val(p->mm.pagetable)));
-
-    virt_startinfo_addr->nr_pages = p->tot_pages;
-    virt_startinfo_addr->shared_info = virt_to_phys(p->shared_info);   
-    virt_startinfo_addr->dom_id = p->domain;
-    virt_startinfo_addr->flags  = IS_PRIV(p) ? SIF_PRIVILEGED : 0;
 
     /* Add virtual network interfaces and point to them in startinfo. */
     while (builddomain->num_vifs-- > 0) {
@@ -437,7 +425,8 @@ static unsigned long alloc_page_from_domain(unsigned long * cur_addr,
     return ret;
 }
 
-/* setup_guestos is used for building dom0 solely. other domains are built in
+/*
+ * setup_guestos is used for building dom0 solely. other domains are built in
  * userspace dom0 and final setup is being done by final_setup_guestos.
  */
 int setup_guestos(struct task_struct *p, dom0_createdomain_t *params, 
@@ -513,6 +502,19 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
     printk("DOM%d: Guest OS virtual load address is %08lx\n", dom,
            virt_load_address);
     
+    SET_GDT_ENTRIES(p, DEFAULT_GDT_ENTRIES);
+    SET_GDT_ADDRESS(p, DEFAULT_GDT_ADDRESS);
+
+    /*
+     * We're basically forcing default RPLs to 1, so that our "what privilege
+     * level are we returning to?" logic works.
+     */
+    p->failsafe_selector = FLAT_RING1_CS;
+    p->event_selector    = FLAT_RING1_CS;
+    p->thread.ss1        = FLAT_RING1_DS;
+    for ( i = 0; i < 256; i++ ) 
+        p->thread.traps[i].cs = FLAT_RING1_CS;
+
     /*
      * WARNING: The new domain must have its 'processor' field
      * filled in by now !!

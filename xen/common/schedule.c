@@ -24,7 +24,6 @@
 #include <xeno/timer.h>
 #include <xeno/perfc.h>
 
-
 #undef SCHEDULER_TRACE
 #ifdef SCHEDULER_TRACE
 #define TRC(_x) _x
@@ -138,9 +137,13 @@ void sched_add_domain(struct task_struct *p)
     }
 }
 
-void sched_rem_domain(struct task_struct *p) 
+int sched_rem_domain(struct task_struct *p) 
 {
-    p->state = TASK_DYING;
+    int x, y = p->state;
+    do {
+        if ( (x = y) == TASK_DYING ) return 0;
+    } while ( (y = cmpxchg(&p->state, x, TASK_DYING)) != x );
+    return 1;
 }
 
 
@@ -224,6 +227,12 @@ long do_sched_op(unsigned long op)
     case SCHEDOP_exit:
     {
         kill_domain();
+        break;
+    }
+
+    case SCHEDOP_stop:
+    {
+        stop_domain();
         break;
     }
 

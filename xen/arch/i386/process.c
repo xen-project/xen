@@ -188,27 +188,6 @@ void machine_power_off(void)
     machine_restart(0);
 }
 
-void exit_thread(void)
-{
-    /* nothing to do ... */
-}
-
-void flush_thread(void)
-{
-    struct task_struct *tsk = current;
-
-    memset(tsk->thread.debugreg, 0, sizeof(unsigned long)*8);
-    /*
-     * Forget coprocessor state..
-     */
-    clear_fpu(tsk);
-    tsk->flags &= ~PF_DONEFPUINIT;
-}
-
-void release_thread(struct task_struct *dead_task)
-{
-}
-
 void new_thread(struct task_struct *p,
                 unsigned long start_pc,
                 unsigned long start_stack,

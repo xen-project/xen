@@ -31,7 +31,6 @@ extern struct mm_struct init_mm;
 
 #define _HYP_EVENT_NEED_RESCHED 0
 #define _HYP_EVENT_DIE          1
-#define _HYP_EVENT_STOP         2
 
 #define PF_DONEFPUINIT  0x1  /* Has the FPU been initialised for this task? */
 #define PF_USEDFPU      0x2  /* Has this task used the FPU since last save? */
@@ -148,9 +147,6 @@ struct task_struct
  *                       arbitrary event or timer.
  * TASK_STOPPED:         Domain is sopped.
  * TASK_DYING:           Domain is about to cross over to the land of the dead.
- *
- * If you update these then please update the mapping to text names in
- * xi_list.
  */
 
 #define TASK_RUNNING             0
@@ -214,8 +210,6 @@ void new_thread(struct task_struct *p,
                 unsigned long start_pc,
                 unsigned long start_stack,
                 unsigned long start_info);
-extern void flush_thread(void);
-extern void exit_thread(void);
 
 /* Linux puts these here for some reason! */
 extern int request_irq(unsigned int,
@@ -235,7 +229,7 @@ extern unsigned long wait_init_idle;
 void scheduler_init(void);
 void schedulers_start(void);
 void sched_add_domain(struct task_struct *p);
-void sched_rem_domain(struct task_struct *p);
+int sched_rem_domain(struct task_struct *p);
 long sched_bvtctl(unsigned long ctx_allow);
 long sched_adjdom(int dom, unsigned long mcu_adv, unsigned long warp, 
                   unsigned long warpl, unsigned long warpu);

@@ -18,7 +18,6 @@ static hyp_event_callback_fn_t event_call_fn[] =
 {
     __enter_scheduler,
     kill_domain,
-    stop_domain
 };
 
 /* Handle outstanding events for the currently-executing domain. */

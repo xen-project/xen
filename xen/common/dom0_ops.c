@@ -267,17 +267,24 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             strcpy (op.u.getdomaininfo.name, p->name);
             op.u.getdomaininfo.processor   = p->processor;
             op.u.getdomaininfo.has_cpu     = p->has_cpu;
-            op.u.getdomaininfo.state       = p->state;
+            op.u.getdomaininfo.state       = DOMSTATE_ACTIVE;
+            if ( (p->state == TASK_STOPPED) || (p->state == TASK_DYING) )
+                op.u.getdomaininfo.state = DOMSTATE_STOPPED;
             op.u.getdomaininfo.hyp_events  = p->hyp_events;
             op.u.getdomaininfo.mcu_advance = p->mcu_advance;
             op.u.getdomaininfo.tot_pages   = p->tot_pages;
             op.u.getdomaininfo.cpu_time    = p->cpu_time;
+            op.u.getdomaininfo.shared_info_frame = 
+                __pa(p->shared_info) >> PAGE_SHIFT;
             if ( p->state == TASK_STOPPED )
             {
                 rmb(); /* Ensure that we see saved register state. */
+                op.u.getdomaininfo.ctxt.flags = 0;
                 memcpy(&op.u.getdomaininfo.ctxt.i386_ctxt, 
                        &p->shared_info->execution_context,
                        sizeof(p->shared_info->execution_context));
+                if ( p->flags & PF_DONEFPUINIT )
+                    op.u.getdomaininfo.ctxt.flags |= ECF_I387_VALID;
                 memcpy(&op.u.getdomaininfo.ctxt.i387_ctxt,
                        &p->thread.i387,
                        sizeof(p->thread.i387));
@@ -308,8 +315,12 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
                 memcpy(op.u.getdomaininfo.ctxt.debugreg, 
                        p->thread.debugreg, 
                        sizeof(p->thread.debugreg));
-                op.u.getdomaininfo.ctxt.domain_time = 
-                    p->shared_info->domain_time;
+                op.u.getdomaininfo.ctxt.event_callback_cs  = p->event_selector;
+                op.u.getdomaininfo.ctxt.event_callback_eip = p->event_address;
+                op.u.getdomaininfo.ctxt.failsafe_callback_cs  = 
+                    p->failsafe_selector;
+                op.u.getdomaininfo.ctxt.failsafe_callback_eip = 
+                    p->failsafe_address;
             }
         }
         read_unlock_irqrestore(&tasklist_lock, flags);

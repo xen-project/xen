@@ -17,7 +17,7 @@
  * This makes sure that old versions of dom0 tools will stop working in a
  * well-defined way (rather than crashing the machine, for instance).
  */
-#define DOM0_INTERFACE_VERSION   0xAAAA0002
+#define DOM0_INTERFACE_VERSION   0xAAAA0003
 
 
 /*
@@ -26,6 +26,8 @@
  */
 typedef struct full_execution_context_st
 {
+#define ECF_I387_VALID (1<<0)
+    unsigned long flags;
     execution_context_t i386_ctxt;          /* User-level CPU registers     */
     char          i387_ctxt[256];           /* User-level FPU registers     */
     trap_info_t   trap_ctxt[256];           /* Virtual IDT                  */
@@ -35,7 +37,10 @@ typedef struct full_execution_context_st
     unsigned long ring1_ss, ring1_esp;      /* Virtual TSS (only SS1/ESP1)  */
     unsigned long pt_base;                  /* CR3 (pagetable base)         */
     unsigned long debugreg[8];              /* DB0-DB7 (debug registers)    */
-    u64           domain_time;              /* Domain virtual time          */
+    unsigned long event_callback_cs;        /* CS:EIP of event callback     */
+    unsigned long event_callback_eip;
+    unsigned long failsafe_callback_cs;     /* CS:EIP of failsafe callback  */
+    unsigned long failsafe_callback_eip;
 } full_execution_context_t;
 
 #define MAX_CMD_LEN       256
@@ -121,11 +126,14 @@ typedef struct dom0_getdomaininfo_st
     char name[MAX_DOMAIN_NAME];
     int processor;
     int has_cpu;
+#define DOMSTATE_ACTIVE              0
+#define DOMSTATE_STOPPED             1
     int state;
     int hyp_events;
     unsigned long mcu_advance;
     unsigned int tot_pages;
     long long cpu_time;
+    unsigned long shared_info_frame;  /* MFN of shared_info struct */
     full_execution_context_t ctxt;
 } dom0_getdomaininfo_t;
 

@@ -50,7 +50,7 @@
  * Point at the empty zero page to start with. We map the real shared_info
  * page as soon as fixmap is up and running.
  */
-shared_info_t *HYPERVISOR_shared_info = empty_zero_page;
+shared_info_t *HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
 
 unsigned long *phys_to_machine_mapping;
 
@@ -1048,3 +1048,22 @@ static int __init setup_death_event(void)
 }
 
 __initcall(setup_death_event);
+
+
+/******************************************************************************
+ * Stop/pickle callback handling.
+ */
+
+static void time_to_stop(int irq, void *unused, struct pt_regs *regs)
+{
+    HYPERVISOR_stop();
+}
+
+static int __init setup_stop_event(void)
+{
+    (void)request_irq(_EVENT_STOP, time_to_stop, 0, "stop", NULL);
+    return 0;
+}
+
+__initcall(setup_stop_event);
+
