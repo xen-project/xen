@@ -41,22 +41,20 @@ unsigned int opt_dom0_mem = 16000; /* default kbytes for DOM0 */
 unsigned int opt_ne_base = 0; /* NE2k NICs cannot be probed */
 unsigned char opt_ifname[10] = "eth0";
 int opt_noht=0, opt_noacpi=0, opt_nosmp=0;
-int opt_phys_bootmac=0; /* Is DOM0/VIF0 allocated the physical MAC address? */
 enum { OPT_IP, OPT_STR, OPT_UINT, OPT_BOOL };
 static struct {
     unsigned char *name;
     int type;
     void *var;
 } opts[] = {
-    { "console",      OPT_UINT, &opt_console },
-    { "ser_baud",     OPT_UINT, &opt_ser_baud },
-    { "dom0_mem",     OPT_UINT, &opt_dom0_mem }, 
-    { "ne_base",      OPT_UINT, &opt_ne_base },
-    { "ifname",       OPT_STR,  &opt_ifname },
-    { "noht",         OPT_BOOL, &opt_noht },
-    { "noacpi",       OPT_BOOL, &opt_noacpi },
-    { "nosmp",        OPT_BOOL, &opt_nosmp },
-    { "phys_bootmac", OPT_BOOL, &opt_phys_bootmac },
+    { "console",     OPT_UINT, &opt_console },
+    { "ser_baud",    OPT_UINT, &opt_ser_baud },
+    { "dom0_mem",    OPT_UINT, &opt_dom0_mem }, 
+    { "ne_base",     OPT_UINT, &opt_ne_base },
+    { "ifname",      OPT_STR,  &opt_ifname },
+    { "noht",        OPT_BOOL, &opt_noht },
+    { "noacpi",      OPT_BOOL, &opt_noacpi },
+    { "nosmp",       OPT_BOOL, &opt_nosmp },
     { NULL,       0,        NULL     }
 };
 
