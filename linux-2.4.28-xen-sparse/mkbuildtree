@@ -163,6 +163,7 @@ ln -sf ../asm-i386/mmu.h
 ln -sf ../asm-i386/mmx.h 
 ln -sf ../asm-i386/mpspec.h 
 ln -sf ../asm-i386/msgbuf.h 
+ln -sf ../asm-i386/msr.h 
 ln -sf ../asm-i386/mtrr.h 
 ln -sf ../asm-i386/namei.h 
 ln -sf ../asm-i386/param.h 
