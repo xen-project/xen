@@ -410,6 +410,9 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 		       ((s64)cur_timer->get_offset() * (s64)NSEC_PER_USEC), 
 		       processed_system_time,
 		       per_cpu(processed_system_time, cpu));
+		for (cpu = 0; cpu < num_online_cpus(); cpu++)
+			printk(" %d: %lld\n", cpu,
+			       per_cpu(processed_system_time, cpu));
 		return;
 	}
 
