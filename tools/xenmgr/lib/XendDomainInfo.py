@@ -113,7 +113,7 @@ class XendDomainInfo:
         if self.info:
             run = (self.info['running'] and 'r') or '-'
             stop = (self.info['stopped'] and 's') or '-'
-            state = run + state
+            state = run + stop
             sxpr.append(['cpu', self.info['cpu']])
             sxpr.append(['state', state])
             sxpr.append(['cpu_time', self.info['cpu_time']/1e8])

@@ -40,7 +40,8 @@ def set_var(opt, k, v):
 
 opts.opt('define', short='D', val='VAR=VAL',
          fn=set_var, default=None,
-         use="Set a variable before loading defaults,e.g. '-D vmid=3;ip=1.2.3.4'.")
+         use="""Set variables before loading defaults, e.g. '-D vmid=3;ip=1.2.3.4'
+         to set vmid and ip.""")
 
 opts.opt('dryrun', short='n',
          fn=set_true, default=0,
@@ -71,6 +72,10 @@ opts.opt('disk', short='d', val='phy:DEV,VDEV,MODE',
          is exported to the domain as VDEV. The disk is read-only if MODE is r,
          read-write if mode is 'w'.""")
 
+opts.opt('pci', val='BUS,DEV,FUNC',
+         fn=append_value, default=[],
+         use="""Add a PCI device to a domain.""")
+
 opts.opt('ipaddr', short='i', val="IPADDR",
          fn=append_value, default=[],
          use="Add an IP address to the domain.")
@@ -82,7 +87,7 @@ opts.opt('mac', short='M', val="MAC",
          are allocated a random address.""")
 
 opts.opt('nics', val="N",
-         fn=set_int, default="1",
+         fn=set_int, default=1,
          use="Set the number of network interfaces.")
 
 opts.opt('vnet', val='VNET',
@@ -101,7 +106,7 @@ opts.opt('extra', short='E', val="ARGS",
          use="Set extra arguments to append to the kernel command line.")
 
 opts.opt('ip', short='I', val='IPADDR',
-         fn=set_value, default=[],
+         fn=set_value, default='',
          use="Set the kernel IP interface address.")
 
 opts.opt('gateway', val="IPADDR",
@@ -138,7 +143,7 @@ def strip(pre, s):
     else:
         return s
 
-def make_domain_config(opts):
+def make_config(opts):
     
     config = ['config',
               ['name', opts.name ],
@@ -151,10 +156,10 @@ def make_domain_config(opts):
     if opts.ramdisk:
         config_image.append([ 'ramdisk', os.path.abspath(opts.ramdisk) ])
     if opts.cmdline_ip:
-        cmdline_ip = strip("ip=", opts.cmdline_ip)
+        cmdline_ip = strip('ip=', opts.cmdline_ip)
         config_image.append(['ip', cmdline_ip])
     if opts.root:
-        cmdline_root = strip("root=", opts.root)
+        cmdline_root = strip('root=', opts.root)
         config_image.append(['root', opts.root])
     if opts.extra:
         config_image.append(['args', opts.extra])
@@ -173,7 +178,7 @@ def make_domain_config(opts):
         config_devs.append(['device', config_pci])
 
     for idx in range(0, opts.nics):
-        config_vif = ['vif' ['@', ['id', 'vif%d' % idx]]]
+        config_vif = ['vif', ['@', ['id', 'vif%d' % idx]]]
         if idx < len(opts.mac):
             config_vif.append(['mac', opts.mac[idx]])
         config_devs.append(['device', config_vif])
@@ -203,10 +208,11 @@ def preprocess_disk(opts):
     disk = []
     for v in opts.disk:
         d = v.split(',')
+        print 'disk', v, d
         if len(d) != 3:
             opts.err('Invalid disk specifier: ' + v)
         disk.append(d)
-    opts.disk = d
+    opts.disk = disk
 
 def preprocess_pci(opts):
     if not opts.pci: return
@@ -246,7 +252,7 @@ def preprocess(opts):
     preprocess_ip(opts)
     preprocess_nfs(opts)
          
-def make_domain(config):
+def make_domain(opts, config):
     """Create, build and start a domain.
     Returns: [int] the ID of the new domain.
     """
@@ -281,7 +287,10 @@ def main(argv):
         opts.usage()
     preprocess(opts)
     config = make_config(opts)
-    make_domain(opts, config)
+    if opts.dryrun:
+        PrettyPrint.prettyprint(config)
+    else:
+        make_domain(opts, config)
         
 if __name__ == '__main__':
     main(sys.argv)

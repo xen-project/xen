@@ -2,6 +2,7 @@ from getopt import getopt
 import os
 import os.path
 import sys
+import types
 
 class Opt:
     def __init__(self, opts, name, short=None, long=None,
@@ -78,10 +79,14 @@ class Opt:
         else:
             return 0
 
+    def specified(self):
+        return self.specified_opt
+
 class Opts:
     def __init__(self, use=None):
         self._usage = use
         self._options = []
+        self._options_map = {}
         self._argv = []
         self._vals = {}
         self._globals = {}
@@ -90,7 +95,15 @@ class Opts:
     def opt(self, name, **args):
         x = Opt(self, name, **args)
         self._options.append(x)
+        self._options_map[name] = x
         return x
+
+    def getopt(self, name):
+        return self._options_map.get(name)
+
+    def specified(self, name):
+        opt = self.getopt(name)
+        return opt and opt.specified()
 
     def setvar(self, name, val):
         self._globals[name] = val
@@ -140,28 +153,31 @@ class Opts:
             opt.show()
 
     def load_defaults(self):
-        print 'load_defaults>', 'defaults=', self.defaults
-        print 'load_defaults>', 'path=', self.path
         for x in [ '' ] + self.path.split(':'):
-            print 'load_defaults>', 'x=', x, 'defaults=', self.defaults
             if x:
                 p = os.path.join(x, self.defaults)
             else:
                 p = self.defaults
-            if os.stat(p):
+            if os.path.exists(p):
                 self.load(p)
                 break
         else:
             self.err("Cannot open defaults file %s" % self.defaults)
 
     def load(self, defaults):
-        print 'load>', 'defaults=', defaults
         self._globals['sys'] = sys
         self._globals['config_file'] = defaults
         execfile(defaults, self._globals, self._locals)
-        print 'load>', 'globals=', self._globals
-        print 'load>', 'locals=', self._locals
-            
+        vtypes = [ types.StringType,
+                   types.ListType,
+                   types.IntType,
+                   types.FloatType
+                   ]
+        for (k, v) in self._locals.items():
+            if self.specified(k): continue
+            if not(type(v) in vtypes): continue
+            print 'SET ', k, v
+            setattr(self, k, v)
 
 def set_true(opt, k, v):
     opt.set(1)

@@ -1,4 +1,5 @@
 #!/usr/bin/python
+#  -*- mode: python; -*-
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
 #============================================================================
 # Move the IP address from eth0 onto the Xen bridge (nbe-br).

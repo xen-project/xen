@@ -66,11 +66,11 @@ class XendDomain:
                 print "dom=", domid, "del"
                 self._delete_domain(domid)
         print "doms:"
-        for d in self.domain.values(): print d
+        for d in self.domain.values(): print 'dom', d
         print "refresh..."
         self.refresh()
         print "doms:"
-        for d in self.domain.values(): print d
+        for d in self.domain.values(): print 'dom', d
 
     def sync(self):
         """Sync domain db to disk.
@@ -162,7 +162,7 @@ class XendDomain:
         else:
             d = self.domain.get(id)
             if d:
-                d.update(dominfo)
+                d.update(dominfo[0])
 
     def domain_ls(self):
         # List domains.

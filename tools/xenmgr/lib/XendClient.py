@@ -97,7 +97,7 @@ def xend_request(url, method, data=None):
     #hdr['Accept'] = 'text/html,text/plain'
     conn = httplib.HTTPConnection(ulocation)
     #conn.response_class = Foo
-    conn.set_debuglevel(1)
+    if DEBUG: conn.set_debuglevel(1)
     conn.request(method, upath, args, hdr)
     resp = conn.getresponse()
     if DEBUG: print resp.status, resp.reason
@@ -118,10 +118,7 @@ def xend_request(url, method, data=None):
     #    val = val[1]
     if isinstance(val, types.ListType) and sxp.name(val) == 'err':
         raise RuntimeError(val[1])
-    if DEBUG: print '**val='
-    #sxp.show(val); print
-    PrettyPrint.prettyprint(val)
-    if DEBUG: print '**'
+    if DEBUG: print '**val='; sxp.show(val); print
     return val
 
 def xend_get(url, args=None):
@@ -334,7 +331,9 @@ def main(argv):
     if not fn.startswith('xend'):
         fn = 'xend_' + fn
     args = argv[2:]
-    getattr(server, fn)(*args)
+    val = getattr(server, fn)(*args)
+    PrettyPrint.prettyprint(val)
+    print
 
 if __name__ == "__main__":
     main(sys.argv)
