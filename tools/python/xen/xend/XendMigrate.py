@@ -302,18 +302,18 @@ class XendMigrateInfo(XfrdInfo):
                       self.dst_port,
                       self.live ])
         
-    def xfr_vm_suspend(self, xfrd, val):
-        def cbok(val):
-            # Special case for localhost: destroy devices early.
-            if self.dst_host in ["localhost", "127.0.0.1"]:
-                self.dominfo.restart_cancel()
-                self.dominfo.cleanup()
-                self.dominfo.destroy_console()
-            return val
+##     def xfr_vm_suspend(self, xfrd, val):
+##         def cbok(val):
+##             # Special case for localhost: destroy devices early.
+##             if self.dst_host in ["localhost", "127.0.0.1"]:
+##                 self.dominfo.restart_cancel()
+##                 self.dominfo.cleanup()
+##                 self.dominfo.destroy_console()
+##             return val
             
-        d = XfrdInfo.xfr_vm_suspend(self, xfrd, val)
-        d.addCallback(cbok)
-        return d
+##         d = XfrdInfo.xfr_vm_suspend(self, xfrd, val)
+##         d.addCallback(cbok)
+##         return d
     
     def xfr_migrate_ok(self, xfrd, val):
         dom = int(sxp.child0(val))

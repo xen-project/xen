@@ -138,7 +138,9 @@ int xen_domain_rcv(IOStream *io,
     ioctxt->info = iostdout;
     ioctxt->err = iostderr;
     ioctxt->configure = domain_configure;
-    ioctxt->flags |= XCFLAGS_CONFIGURE;
+    if(!configured){
+        ioctxt->flags |= XCFLAGS_CONFIGURE;
+    }
 
     err = xc_linux_restore(xcinit(), ioctxt);
     *dom = ioctxt->domain;

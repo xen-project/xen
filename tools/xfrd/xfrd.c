@@ -841,7 +841,14 @@ int xfr_recv(Args *args, XfrState *state, Conn *peer){
     Sxpr sxpr;
     int configured=0;
 
-    dprintf(">\n");
+    dprintf("> peer=%s\n", inet_ntoa(peer->addr.sin_addr));
+    // If receiving from localhost set configured so that that xen_domain_rcv()
+    // does not attempt to configure the new domain. This is because the old
+    // domain still exists and will make it fail.
+    if(peer->addr.sin_addr.s_addr == htonl(INADDR_LOOPBACK)){
+        dprintf("> Peer is localhost\n");
+        configured = 1;
+    }
     err = xen_domain_rcv(peer->in,
                          &state->vmid_new,
                          &state->vmconfig, &state->vmconfig_n,
@@ -853,6 +860,7 @@ int xfr_recv(Args *args, XfrState *state, Conn *peer){
     err = Conn_sxpr(peer, &sxpr);
     if(err) goto exit;
     if(!configured){
+        dprintf("> Configuring...\n");
         err = xen_domain_configure(state->vmid_new, state->vmconfig, state->vmconfig_n);
         if(err) goto exit;
     }
@@ -1213,9 +1221,11 @@ int main(int argc, char *argv[]){
     int long_index = 0;
     static const char * LOGFILE = "/var/log/xfrd.log";
 
+#ifndef DEBUG
     freopen(LOGFILE, "w+", stdout);
     fclose(stderr);
     stderr = stdout;
+#endif
     dprintf(">\n");
     set_defaults(args);
     while(1){
