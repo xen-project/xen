@@ -104,8 +104,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         ret = -EINVAL;
         if ( p != NULL )
         {
-            if ( (ret = final_setup_guestos(p, &op.u.builddomain)) == 0 )
-                ret = p->domain;
+            ret = final_setup_guestos(p, &op.u.builddomain);
             put_task_struct(p);
         }
     }
@@ -121,7 +120,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             {
                 wake_up(p);
                 reschedule(p);
-                ret = p->domain;
+                ret = 0;
             }
             put_task_struct(p);
         }
@@ -191,40 +190,42 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         ret = -EINVAL;
         if ( p != NULL )
         {
-	    if( cpu == -1 )
-	      p->cpupinned = 0;
-	    else
-	      {
+	    if ( cpu == -1 )
+            {
+                p->cpupinned = 0;
+                ret = 0;
+	    }
+            else
+            {
 		/* For the moment, we are unable to move running
-		domains between CPUs. (We need a way of synchronously
-		stopping running domains). For now, if we discover the
-		domain is not stopped already then cowardly bail out
-		with ENOSYS */
+                   domains between CPUs. (We need a way of synchronously
+                   stopping running domains). For now, if we discover the
+                   domain is not stopped already then cowardly bail out
+                   with ENOSYS */
 
 		if( !(p->state & TASK_STOPPED) ) 
-		  ret = -ENOSYS;
-		else
-		  {
+                {
+                    ret = -ENOSYS;
+		}
+                else
+                {
 		    /* We need a task structure lock here!!! 
 		       FIX ME!! */
 		    cpu = cpu % smp_num_cpus;
 		    p->processor = cpu;
 		    p->cpupinned = 1;
-		  }
-	      }
-
-	    ret = 0;
+                    ret = 0;
+                }
+            }
             put_task_struct(p);
-        }
-     	
+        }     	
     }
     break;
 
     case DOM0_BVTCTL:
     {
         unsigned long  ctx_allow = op.u.bvtctl.ctx_allow;
-        ret = sched_bvtctl(ctx_allow);
-        
+        ret = sched_bvtctl(ctx_allow);        
     }
     break;
 
@@ -407,7 +408,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
     case DOM0_MSR:
     {
-        if (op.u.msr.write)
+        if ( op.u.msr.write )
 	{
             msr_cpu_mask = op.u.msr.cpu_mask;
             msr_addr = op.u.msr.msr;
