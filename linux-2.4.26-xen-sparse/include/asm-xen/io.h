@@ -97,13 +97,10 @@ static inline void * phys_to_virt(unsigned long address)
 }
 
 /*
- * Change "struct page" to physical address.
+ * We define page_to_phys 'incorrectly' because it is used when merging blkdev 
+ * requests, and the correct thing to do there is to use machine addresses.
  */
-#ifdef CONFIG_HIGHMEM64G
-#define page_to_phys(page)	((u64)(page - mem_map) << PAGE_SHIFT)
-#else
-#define page_to_phys(page)	((page - mem_map) << PAGE_SHIFT)
-#endif
+#define page_to_phys(_x) phys_to_machine(((_x) - mem_map) << PAGE_SHIFT)
 
 extern void * __ioremap(unsigned long offset, unsigned long size, unsigned long flags);
 
@@ -161,7 +158,7 @@ extern void bt_iounmap(void *addr, unsigned long size);
 
 #define virt_to_bus(_x) phys_to_machine(virt_to_phys(_x))
 #define bus_to_virt(_x) phys_to_virt(machine_to_phys(_x))
-#define page_to_bus(_x) phys_to_machine(page_to_phys(_x))
+#define page_to_bus(_x) phys_to_machine(((_x) - mem_map) << PAGE_SHIFT)
 #define bus_to_phys(_x) machine_to_phys(_x)
 #define bus_to_page(_x) (mem_map + (bus_to_phys(_x) >> PAGE_SHIFT))
 
