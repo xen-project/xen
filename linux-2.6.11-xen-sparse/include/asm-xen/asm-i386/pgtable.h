@@ -432,7 +432,6 @@ do {				  					\
 	}								\
 } while (0)
 
-/* NOTE: make_page* callers must call flush_page_update_queue() */
 void make_lowmem_page_readonly(void *va);
 void make_lowmem_page_writable(void *va);
 void make_page_readonly(void *va);

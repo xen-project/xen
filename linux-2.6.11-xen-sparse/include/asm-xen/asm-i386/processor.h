@@ -193,7 +193,7 @@ static inline unsigned int cpuid_edx(unsigned int op)
 }
 
 #define load_cr3(pgdir) do {				\
-	queue_pt_switch(__pa(pgdir));			\
+	xen_pt_switch(__pa(pgdir));			\
 	per_cpu(cur_pgd, smp_processor_id()) = pgdir;	\
 } while (/* CONSTCOND */0)
 

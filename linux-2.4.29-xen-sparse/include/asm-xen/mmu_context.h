@@ -28,47 +28,34 @@ static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk,
 #endif
 
 extern pgd_t *cur_pgd;
+extern int mm_state_sync;
+#define STATE_SYNC_PT  1
+#define STATE_SYNC_LDT 2
 
 static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next, struct task_struct *tsk, unsigned cpu)
 {
 	if (prev != next) {
 		/* stop flush ipis for the previous mm */
 		clear_bit(cpu, &prev->cpu_vm_mask);
-#ifdef CONFIG_SMP
-		cpu_tlbstate[cpu].state = TLBSTATE_OK;
-		cpu_tlbstate[cpu].active_mm = next;
-#endif
-
 		/* Re-load page tables */
 		cur_pgd = next->pgd;
-		queue_pt_switch(__pa(cur_pgd));
-                /* load_LDT, if either the previous or next thread
-                 * has a non-default LDT.
-                 */
-                if (next->context.size+prev->context.size)
-                        load_LDT(&next->context);
+		mm_state_sync |= STATE_SYNC_PT;
+		/* load_LDT, if either the previous or next thread
+		 * has a non-default LDT.
+		 */
+		if (next->context.size+prev->context.size)
+			mm_state_sync |= STATE_SYNC_LDT;
 	}
-#ifdef CONFIG_SMP
-	else {
-		cpu_tlbstate[cpu].state = TLBSTATE_OK;
-		if(cpu_tlbstate[cpu].active_mm != next)
-			out_of_line_bug();
-		if(!test_and_set_bit(cpu, &next->cpu_vm_mask)) {
-			/* We were in lazy tlb mode and leave_mm disabled 
-			 * tlb flush IPI delivery. We must reload %cr3.
-			 */
-		        cur_pgd = next->pgd;
-		        queue_pt_switch(__pa(cur_pgd));
-			load_LDT(next);
-		}
-	}
-#endif
 }
 
-#define activate_mm(prev, next) \
-do { \
-	switch_mm((prev),(next),NULL,smp_processor_id()); \
-	flush_page_update_queue(); \
+#define activate_mm(prev, next)                                 \
+do {                                                            \
+	switch_mm((prev),(next),NULL,smp_processor_id());       \
+	if (mm_state_sync & STATE_SYNC_PT)                      \
+		xen_pt_switch(__pa(cur_pgd));                   \
+	if (mm_state_sync & STATE_SYNC_LDT)                     \
+		load_LDT(&(next)->context);                     \
+	mm_state_sync = 0;                                      \
 } while ( 0 )
 
 #endif

@@ -337,7 +337,6 @@
 40f5623aGPlsm0u1LTO-NVZ6AGzNRQ linux-2.6.11-xen-sparse/include/asm-xen/hypervisor.h
 3f108af1ylCIm82H052FVTfXACBHrw linux-2.6.11-xen-sparse/include/asm-xen/linux-public/privcmd.h
 3fa8e3f0kBLeE4To2vpdi3cpJbIkbQ linux-2.6.11-xen-sparse/include/asm-xen/linux-public/suspend.h
-40f5623cndVUFlkxpf7Lfx7xu8madQ linux-2.6.11-xen-sparse/include/asm-xen/multicall.h
 4122466356eIBnC9ot44WSVVIFyhQA linux-2.6.11-xen-sparse/include/asm-xen/queues.h
 3f689063BoW-HWV3auUJ-OqXfcGArw linux-2.6.11-xen-sparse/include/asm-xen/xen_proc.h
 419b4e93z2S0gR17XTy8wg09JEwAhg linux-2.6.11-xen-sparse/include/linux/gfp.h

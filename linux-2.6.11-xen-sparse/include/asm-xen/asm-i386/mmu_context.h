@@ -68,7 +68,6 @@ static inline void switch_mm(struct mm_struct *prev,
 
 #define activate_mm(prev, next) do {		\
 	switch_mm((prev),(next),NULL);		\
-	flush_page_update_queue();		\
 } while (0)
 
 #endif

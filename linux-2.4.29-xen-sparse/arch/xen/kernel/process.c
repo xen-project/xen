@@ -43,7 +43,6 @@
 #include <asm/i387.h>
 #include <asm/desc.h>
 #include <asm/mmu_context.h>
-#include <asm/multicall.h>
 #include <asm-xen/xen-public/physdev.h>
 
 #include <linux/irq.h>
@@ -305,19 +304,36 @@ void fastcall __switch_to(struct task_struct *prev_p, struct task_struct *next_p
 {
     struct thread_struct *next = &next_p->thread;
     physdev_op_t op;
+    multicall_entry_t _mcl[8], *mcl = _mcl;
+    mmu_update_t _mmu[2], *mmu = _mmu;
 
-    __cli();
+    if ( mm_state_sync & STATE_SYNC_PT )
+    {
+        mmu->ptr = virt_to_machine(cur_pgd) | MMU_EXTENDED_COMMAND;
+        mmu->val = MMUEXT_NEW_BASEPTR;
+        mmu++;
+    }
 
-    /*
-     * We clobber FS and GS here so that we avoid a GPF when restoring previous
-     * task's FS/GS values in Xen when the LDT is switched. If we don't do this
-     * then we can end up erroneously re-flushing the page-update queue when
-     * we 'execute_multicall_list'.
-     */
-    __asm__ __volatile__ ( 
-        "xorl %%eax,%%eax; movl %%eax,%%fs; movl %%eax,%%gs" : : : "eax" );
+    if ( mm_state_sync & STATE_SYNC_LDT )
+    {
+        __asm__ __volatile__ ( 
+            "xorl %%eax,%%eax; movl %%eax,%%fs; movl %%eax,%%gs" : : : "eax" );
+        mmu->ptr = (unsigned long)next_p->mm->context.ldt |
+            MMU_EXTENDED_COMMAND;
+        mmu->val = (next_p->mm->context.size << MMUEXT_CMD_SHIFT) |
+            MMUEXT_SET_LDT;
+        mmu++;
+    }
 
-    MULTICALL_flush_page_update_queue();
+    if ( mm_state_sync != 0 )
+    {
+        mcl->op      = __HYPERVISOR_mmu_update;
+        mcl->args[0] = (unsigned long)_mmu;
+        mcl->args[1] = mmu - _mmu;
+        mcl->args[2] = 0;
+        mcl++;
+        mm_state_sync = 0;
+    }
 
     /*
      * This is basically 'unlazy_fpu', except that we queue a multicall to 
@@ -332,21 +348,26 @@ void fastcall __switch_to(struct task_struct *prev_p, struct task_struct *next_p
             asm volatile( "fnsave %0 ; fwait"
                           : "=m" (prev_p->thread.i387.fsave) );
 	prev_p->flags &= ~PF_USEDFPU;
-        queue_multicall1(__HYPERVISOR_fpu_taskswitch, 1);
+        mcl->op      = __HYPERVISOR_fpu_taskswitch;
+        mcl->args[0] = 1;
+        mcl++;
     }
 
-    queue_multicall2(__HYPERVISOR_stack_switch, __KERNEL_DS, next->esp0);
+    mcl->op      = __HYPERVISOR_stack_switch;
+    mcl->args[0] = __KERNEL_DS;
+    mcl->args[1] = next->esp0;
+    mcl++;
 
     if ( prev_p->thread.io_pl != next->io_pl ) 
     {
         op.cmd             = PHYSDEVOP_SET_IOPL;
 	op.u.set_iopl.iopl = next->io_pl;
-        queue_multicall1(__HYPERVISOR_physdev_op, (unsigned long)&op);
+        mcl->op      = __HYPERVISOR_physdev_op;
+        mcl->args[0] = (unsigned long)&op;
+        mcl++;
     }
 
-    /* EXECUTE ALL TASK SWITCH XEN SYSCALLS AT THIS POINT. */
-    execute_multicall_list();
-    __sti();
+    (void)HYPERVISOR_multicall(_mcl, mcl - _mcl);
 
     /*
      * Restore %fs and %gs.

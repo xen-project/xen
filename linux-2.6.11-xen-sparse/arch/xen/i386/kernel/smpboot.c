@@ -898,7 +898,6 @@ static int __init do_boot_cpu(int apicid)
 			make_page_readonly((void *)va);
 		}
 		ctxt.gdt_ents = cpu_gdt_descr[cpu].size / 8;
-		flush_page_update_queue();
 	}
 
 	/* Ring 1 stack is the initial stack. */

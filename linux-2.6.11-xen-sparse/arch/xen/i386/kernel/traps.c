@@ -963,7 +963,6 @@ void __init trap_init(void)
 	 * and a callgate to lcall27 for Solaris/x86 binaries
 	 */
 	make_lowmem_page_readonly(&default_ldt[0]);
-	flush_page_update_queue();
 
 	/*
 	 * Should be a barrier for any external CPU state.

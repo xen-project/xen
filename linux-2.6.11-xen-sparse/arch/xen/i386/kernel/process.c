@@ -46,7 +46,6 @@
 #include <asm/i387.h>
 #include <asm/irq.h>
 #include <asm/desc.h>
-#include <asm-xen/multicall.h>
 #include <asm-xen/xen-public/physdev.h>
 #ifdef CONFIG_MATH_EMULATION
 #include <asm/math_emu.h>
@@ -444,9 +443,7 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 	int cpu = smp_processor_id();
 	struct tss_struct *tss = &per_cpu(init_tss, cpu);
 	physdev_op_t iopl_op, iobmp_op;
-
-        /* NB. No need to disable interrupts as already done in sched.c */
-        /* __cli(); */
+	multicall_entry_t _mcl[8], *mcl = _mcl;
 
 	/*
 	 * Save away %fs and %gs. No need to save %es and %ds, as
@@ -463,8 +460,6 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 		"xorl %%eax,%%eax; movl %%eax,%%fs; movl %%eax,%%gs" : : :
 		"eax" );
 
-	MULTICALL_flush_page_update_queue();
-
 	/* never put a printk in __switch_to... printk() calls wake_up*() indirectly */
 
 	/*
@@ -474,7 +469,9 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 	 */
 	if (prev_p->thread_info->status & TS_USEDFPU) {
 		__save_init_fpu(prev_p); /* _not_ save_init_fpu() */
-		queue_multicall1(__HYPERVISOR_fpu_taskswitch, 1);
+		mcl->op      = __HYPERVISOR_fpu_taskswitch;
+		mcl->args[0] = 1;
+		mcl++;
 	}
 
 	/*
@@ -482,20 +479,25 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 	 * This is load_esp0(tss, next) with a multicall.
 	 */
 	tss->esp0 = next->esp0;
-	queue_multicall2(__HYPERVISOR_stack_switch, tss->ss0, tss->esp0);
+	mcl->op      = __HYPERVISOR_stack_switch;
+	mcl->args[0] = tss->ss0;
+	mcl->args[1] = tss->esp0;
+	mcl++;
 
 	/*
 	 * Load the per-thread Thread-Local Storage descriptor.
 	 * This is load_TLS(next, cpu) with multicalls.
 	 */
-#define C(i) do {							    \
-	if (unlikely(next->tls_array[i].a != prev->tls_array[i].a ||	    \
-		     next->tls_array[i].b != prev->tls_array[i].b))	    \
-		queue_multicall3(__HYPERVISOR_update_descriptor,	    \
-				 virt_to_machine(&get_cpu_gdt_table(cpu)    \
-						 [GDT_ENTRY_TLS_MIN + i]),  \
-				 ((u32 *)&next->tls_array[i])[0],	    \
-				 ((u32 *)&next->tls_array[i])[1]);	    \
+#define C(i) do {                                                       \
+	if (unlikely(next->tls_array[i].a != prev->tls_array[i].a ||    \
+		     next->tls_array[i].b != prev->tls_array[i].b)) {   \
+		mcl->op      = __HYPERVISOR_update_descriptor;          \
+		mcl->args[0] = virt_to_machine(&get_cpu_gdt_table(cpu)  \
+					 [GDT_ENTRY_TLS_MIN + i]);      \
+		mcl->args[1] = ((u32 *)&next->tls_array[i])[0];         \
+		mcl->args[2] = ((u32 *)&next->tls_array[i])[1];         \
+		mcl++;                                                  \
+	}                                                               \
 } while (0)
 	C(0); C(1); C(2);
 #undef C
@@ -503,8 +505,9 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 	if (unlikely(prev->io_pl != next->io_pl)) {
 		iopl_op.cmd             = PHYSDEVOP_SET_IOPL;
 		iopl_op.u.set_iopl.iopl = next->io_pl;
-		queue_multicall1(__HYPERVISOR_physdev_op,
-				(unsigned long)&iopl_op);
+		mcl->op      = __HYPERVISOR_physdev_op;
+		mcl->args[0] = (unsigned long)&iopl_op;
+		mcl++;
 	}
 
 	if (unlikely(prev->io_bitmap_ptr || next->io_bitmap_ptr)) {
@@ -514,13 +517,12 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 			(unsigned long)next->io_bitmap_ptr;
 		iobmp_op.u.set_iobitmap.nr_ports =
 			next->io_bitmap_ptr ? IO_BITMAP_BITS : 0;
-		queue_multicall1(__HYPERVISOR_physdev_op,
-				(unsigned long)&iobmp_op);
+		mcl->op      = __HYPERVISOR_physdev_op;
+		mcl->args[0] = (unsigned long)&iobmp_op;
+		mcl++;
 	}
 
-	/* EXECUTE ALL TASK SWITCH XEN SYSCALLS AT THIS POINT. */
-	execute_multicall_list();
-        /* __sti(); */
+	(void)HYPERVISOR_multicall(_mcl, mcl - _mcl);
 
 	/*
 	 * Restore %fs and %gs if needed.

@@ -62,9 +62,6 @@ shared_info_t *HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
 
 unsigned int *phys_to_machine_mapping, *pfn_to_mfn_frame_list;
 
-DEFINE_PER_CPU(multicall_entry_t, multicall_list[8]);
-DEFINE_PER_CPU(int, nr_multicall_ents);
-
 /*
  * Machine setup..
  */
@@ -1206,7 +1203,6 @@ void __init cpu_init (void)
     HYPERVISOR_stack_switch(__KERNEL_DS, current->thread.esp0);
 
     load_LDT(&init_mm.context);
-    flush_page_update_queue();
 
     /* Force FPU initialization. */
     current->flags &= ~PF_USEDFPU;

@@ -28,6 +28,7 @@
 extern void die(const char *,struct pt_regs *,long);
 
 pgd_t *cur_pgd;
+int mm_state_sync;
 
 extern spinlock_t timerlist_lock;
 

@@ -357,7 +357,6 @@ static void __init pagetable_init (void)
 	make_page_readonly(new_pgd);
 	xen_pgd_pin(__pa(new_pgd));
 	load_cr3(new_pgd);
-	flush_page_update_queue();
 	xen_pgd_unpin(__pa(old_pgd));
 	make_page_writable(old_pgd);
 	__flush_tlb_all();

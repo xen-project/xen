@@ -14,6 +14,7 @@
 #include <linux/vmalloc.h>
 #include <linux/slab.h>
 
+#include <asm/mmu_context.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
 #include <asm/ldt.h>
@@ -58,7 +59,6 @@ static int alloc_ldt(mm_context_t *pc, int mincount, int reload)
 			pc->ldt,
 			(pc->size*LDT_ENTRY_SIZE)/PAGE_SIZE);
 		load_LDT(pc);
-		flush_page_update_queue();
 #ifdef CONFIG_SMP
 		if (current->mm->cpu_vm_mask != (1<<smp_processor_id()))
 			smp_call_function(flush_ldt, 0, 1, 1);
@@ -66,6 +66,8 @@ static int alloc_ldt(mm_context_t *pc, int mincount, int reload)
 	}
 	wmb();
 	if (oldsize) {
+		make_pages_writable(
+			oldldt, (oldsize*LDT_ENTRY_SIZE)/PAGE_SIZE);
 		if (oldsize*LDT_ENTRY_SIZE > PAGE_SIZE)
 			vfree(oldldt);
 		else
@@ -84,7 +86,6 @@ static inline int copy_ldt(mm_context_t *new, mm_context_t *old)
 	}
 	memcpy(new->ldt, old->ldt, old->size*LDT_ENTRY_SIZE);
 	make_pages_readonly(new->ldt, (new->size*LDT_ENTRY_SIZE)/PAGE_SIZE);
-	flush_page_update_queue();
 	return 0;
 }
 
@@ -116,10 +117,11 @@ int init_new_context(struct task_struct *tsk, struct mm_struct *mm)
 void destroy_context(struct mm_struct *mm)
 {
 	if (mm->context.size) {
+		if (mm_state_sync & STATE_SYNC_LDT)
+			clear_LDT();
 		make_pages_writable(
 			mm->context.ldt, 
 			(mm->context.size*LDT_ENTRY_SIZE)/PAGE_SIZE);
-		flush_page_update_queue();
 		if (mm->context.size*LDT_ENTRY_SIZE > PAGE_SIZE)
 			vfree(mm->context.ldt);
 		else
