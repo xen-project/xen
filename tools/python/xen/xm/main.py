@@ -665,7 +665,12 @@ class ProgDmesg(Prog):
     info  = """Print Xen boot output."""
 
     def main(self, args):
-        print server.xend_node_dmesg()
+        if len(args) == 1:
+            print server.xend_node_dmesg(clear)
+        if len(args) > 1:
+            if len(args) == 2 and args[1] == '-c':
+                print server.xend_node_clear_dmesg()
+            else: self.err("%s: Invalid argument" % args[0])
 
 xm.prog(ProgDmesg)
 
@@ -726,7 +731,7 @@ class ProgVbdCreate(Prog):
 Create a virtual block device for a domain.
 
   UNAME   - device to export, e.g. phy:hda2
-  DEV     - device name in the domain, e.g. xda1
+  DEV     - device name in the domain, e.g. sda1
   MODE    - access mode: r for read, w for read-write
   BACKEND - backend driver domain
 """

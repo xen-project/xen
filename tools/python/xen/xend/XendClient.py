@@ -179,8 +179,12 @@ class Xend:
         return self.xendPost(self.nodeurl(),
                              {'op'      : 'reboot'})
 
-    def xend_node_dmesg(self):
-        return self.xendGet(self.nodeurl('dmesg'))
+    def xend_node_get_dmesg(self):
+            return self.xendGet(self.nodeurl('dmesg'))
+
+    def xend_node_clear_dmesg(self):
+        return self.xendPost(self.nodeurl('dmesg'),
+                             {'op' : 'clear' } )
 
     def xend_node_log(self):
         return self.xendGet(self.nodeurl('log'))

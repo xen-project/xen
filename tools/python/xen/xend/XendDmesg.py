@@ -12,7 +12,9 @@ class XendDmesg:
 
     def info(self):
         return self.xc.readconsolering()
-        
+
+    def clear(self):
+        self.xc.readconsolering(True)
 
 def instance():
     global inst
