@@ -423,12 +423,22 @@ out:
 
 
 /* This is called by arch_final_setup_guest and do_boot_vcpu */
-int arch_final_setup_guest(
+int arch_set_info_guest(
     struct exec_domain *ed, full_execution_context_t *c)
 {
     struct domain *d = ed->domain;
     unsigned long phys_basetab;
     int i, rc;
+
+    /*
+     * This is sufficient! If the descriptor DPL differs from CS RPL then we'll
+     * #GP. If DS, ES, FS, GS are DPL 0 then they'll be cleared automatically.
+     * If SS RPL or DPL differs from CS RPL then we'll #GP.
+     */
+    if (!(c->flags & ECF_VMX_GUEST)) 
+        if ( ((c->cpu_ctxt.cs & 3) == 0) ||
+             ((c->cpu_ctxt.ss & 3) == 0) )
+                return -EINVAL;
 
     clear_bit(EDF_DONEFPUINIT, &ed->ed_flags);
     if ( c->flags & ECF_I387_VALID )
@@ -441,6 +451,11 @@ int arch_final_setup_guest(
     memcpy(&ed->arch.user_ctxt,
            &c->cpu_ctxt,
            sizeof(ed->arch.user_ctxt));
+
+    memcpy(&ed->arch.i387,
+           &c->fpu_ctxt,
+           sizeof(ed->arch.i387));
+
     /* IOPL privileges are virtualised. */
     ed->arch.iopl = (ed->arch.user_ctxt.eflags >> 12) & 3;
     ed->arch.user_ctxt.eflags &= ~EF_IOPL;
@@ -449,19 +464,8 @@ int arch_final_setup_guest(
     if (!IS_PRIV(d))
         ed->arch.user_ctxt.eflags &= 0xffffcfff;
 
-    /*
-     * This is sufficient! If the descriptor DPL differs from CS RPL then we'll
-     * #GP. If DS, ES, FS, GS are DPL 0 then they'll be cleared automatically.
-     * If SS RPL or DPL differs from CS RPL then we'll #GP.
-     */
-    if (!(c->flags & ECF_VMX_GUEST)) 
-        if ( ((ed->arch.user_ctxt.cs & 3) == 0) ||
-             ((ed->arch.user_ctxt.ss & 3) == 0) )
-                return -EINVAL;
-
-    memcpy(&ed->arch.i387,
-           &c->fpu_ctxt,
-           sizeof(ed->arch.i387));
+    if (test_bit(EDF_DONEINIT, &ed->ed_flags))
+        return 0;
 
     memcpy(ed->arch.traps,
            &c->trap_ctxt,
@@ -509,9 +513,13 @@ int arch_final_setup_guest(
 #endif
 
     update_pagetables(ed);
+    
+    /* Don't redo final setup */
+    set_bit(EDF_DONEINIT, &ed->ed_flags);
 
     return 0;
 }
+
 
 void new_thread(struct exec_domain *d,
                 unsigned long start_pc,

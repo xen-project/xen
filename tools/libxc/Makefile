@@ -29,6 +29,7 @@ SRCS     += xc_linux_save.c
 SRCS     += xc_misc.c
 SRCS     += xc_physdev.c
 SRCS     += xc_private.c
+SRCS     += xc_ptrace.c
 SRCS     += xc_rrobin.c
 SRCS     += xc_vmx_build.c
 

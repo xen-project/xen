@@ -1,6 +1,7 @@
 
 verbose     ?= n
 debug       ?= n
+debugger    ?= n
 perfc       ?= n
 trace       ?= n
 optimize    ?= y
@@ -52,6 +53,10 @@ CFLAGS += -DVERBOSE
 endif
 else
 CFLAGS += -DVERBOSE
+endif
+
+ifeq ($(debugger),y)
+CFLAGS += -DXEN_UDB
 endif
 
 ifeq ($(crash_debug),y)

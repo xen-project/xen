@@ -533,10 +533,11 @@ xc_plan9_build(int xc_handle,
 
 	memset(&launch_op, 0, sizeof (launch_op));
 
-	launch_op.u.builddomain.domain = (domid_t) domid;
-	//  launch_op.u.builddomain.num_vifs = 1;
-	launch_op.u.builddomain.ctxt = ctxt;
-	launch_op.cmd = DOM0_BUILDDOMAIN;
+	launch_op.u.setdomaininfo.domain = (domid_t) domid;
+	launch_op.u.setdomaininfo.exec_domain = 0;
+	//  launch_op.u.setdomaininfo.num_vifs = 1;
+	launch_op.u.setdomaininfo.ctxt = ctxt;
+	launch_op.cmd = DOM0_SETDOMAININFO;
 	rc = do_dom0_op(xc_handle, &launch_op);
 
 	fprintf(stderr, "RC is %d\n", rc);

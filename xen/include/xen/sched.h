@@ -220,7 +220,7 @@ extern int construct_dom0(
     unsigned long image_start, unsigned long image_len, 
     unsigned long initrd_start, unsigned long initrd_len,
     char *cmdline);
-extern int final_setup_guest(struct domain *d, dom0_builddomain_t *);
+extern int set_info_guest(struct domain *d, dom0_setdomaininfo_t *);
 
 struct domain *find_domain_by_id(domid_t dom);
 struct domain *find_last_domain(void);
@@ -317,6 +317,7 @@ extern struct domain *domain_list;
 #define EDF_RUNNING     12 /* Currently running on a CPU.                    */
 #define EDF_CPUPINNED   13 /* Disables auto-migration.                       */
 #define EDF_MIGRATED    14 /* Domain migrated between CPUs.                  */
+#define EDF_DONEINIT    15 /* Initialization completed    .                  */
 
 static inline int domain_runnable(struct exec_domain *d)
 {

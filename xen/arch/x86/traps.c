@@ -222,8 +222,19 @@ asmlinkage int do_int3(struct xen_regs *regs)
         DEBUGGER_trap_fatal(TRAP_int3, regs);
         show_registers(regs);
         panic("CPU%d FATAL TRAP: vector = 3 (Int3)\n", smp_processor_id());
+    } 
+#ifdef XEN_UDB
+    else if ( KERNEL_MODE(ed, regs) && ed->domain->id != 0 ) 
+    {
+        if ( !test_and_set_bit(EDF_CTRLPAUSE, &ed->ed_flags) ) {
+            while (ed == current)
+                __enter_scheduler();
+            domain_pause_by_systemcontroller(ed->domain);
+        }
+        
+        return 0;
     }
-
+#endif /* XEN_UDB */
     ti = current->arch.traps + 3;
     tb->flags = TBF_EXCEPTION;
     tb->cs    = ti->cs;
@@ -886,8 +897,8 @@ asmlinkage int math_state_restore(struct xen_regs *regs)
 asmlinkage int do_debug(struct xen_regs *regs)
 {
     unsigned long condition;
-    struct exec_domain *d = current;
-    struct trap_bounce *tb = &d->arch.trap_bounce;
+    struct exec_domain *ed = current;
+    struct trap_bounce *tb = &ed->arch.trap_bounce;
 
     DEBUGGER_trap_entry(TRAP_debug, regs);
 
@@ -895,7 +906,7 @@ asmlinkage int do_debug(struct xen_regs *regs)
 
     /* Mask out spurious debug traps due to lazy DR7 setting */
     if ( (condition & (DR_TRAP0|DR_TRAP1|DR_TRAP2|DR_TRAP3)) &&
-         (d->arch.debugreg[7] == 0) )
+         (ed->arch.debugreg[7] == 0) )
     {
         __asm__("mov %0,%%db7" : : "r" (0UL));
         goto out;
@@ -912,14 +923,26 @@ asmlinkage int do_debug(struct xen_regs *regs)
          * breakpoint, which can't happen to us.
          */
         goto out;
-    }
+    } 
+#ifdef XEN_UDB
+    else if ( KERNEL_MODE(ed, regs) && ed->domain->id != 0 ) 
+    {
+        regs->eflags &= ~EF_TF;
+        if ( !test_and_set_bit(EDF_CTRLPAUSE, &ed->ed_flags) ) {
+            while (ed == current)
+                __enter_scheduler();
+            domain_pause_by_systemcontroller(ed->domain);
+        }
 
+        goto out;
+    }    
+#endif /* XEN_UDB */
     /* Save debug status register where guest OS can peek at it */
-    d->arch.debugreg[6] = condition;
+    ed->arch.debugreg[6] = condition;
 
     tb->flags = TBF_EXCEPTION;
-    tb->cs    = d->arch.traps[1].cs;
-    tb->eip   = d->arch.traps[1].address;
+    tb->cs    = ed->arch.traps[1].cs;
+    tb->eip   = ed->arch.traps[1].address;
 
  out:
     return EXCRET_not_a_fault;
