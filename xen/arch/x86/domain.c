@@ -862,7 +862,7 @@ int construct_dom0(struct domain *p,
     zap_low_mappings(); /* Do the same for the idle page tables. */
     
     /* Give up the VGA console if DOM0 is configured to grab it. */
-    console_endboot(strstr(cmdline, "tty0") != NULL);
+    console_endboot(cmdline && strstr(cmdline, "tty0"));
 
     /* DOM0 gets access to everything. */
     physdev_init_dom0(p);
