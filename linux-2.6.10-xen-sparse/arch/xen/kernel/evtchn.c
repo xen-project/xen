@@ -63,7 +63,7 @@ static int irq_to_evtchn[NR_IRQS];
 DEFINE_PER_CPU(int, virq_to_irq[NR_VIRQS]);
 
 /* evtchn <-> IPI mapping. */
-#ifndef NR_IPIS    // XXX SMH: temp fix for 2.4 
+#ifndef NR_IPIS
 #define NR_IPIS 1 
 #endif
 DEFINE_PER_CPU(int, ipi_to_evtchn[NR_IPIS]);
@@ -99,46 +99,36 @@ void force_evtchn_callback(void)
     (void)HYPERVISOR_xen_version(0);
 }
 
+/* NB. Interrupts are disabled on entry. */
 asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
 {
     unsigned long  l1, l2;
     unsigned int   l1i, l2i, port;
     int            irq;
-    unsigned long  flags;
     shared_info_t *s = HYPERVISOR_shared_info;
     vcpu_info_t   *vcpu_info = &s->vcpu_data[smp_processor_id()];
 
-    local_irq_save(flags);
+    vcpu_info->evtchn_upcall_pending = 0;
     
-    while ( vcpu_info->evtchn_upcall_pending )
+    /* NB. No need for a barrier here -- XCHG is a barrier on x86. */
+    l1 = xchg(&vcpu_info->evtchn_pending_sel, 0);
+    while ( l1 != 0 )
     {
-        vcpu_info->evtchn_upcall_pending = 0;
-        /* NB. No need for a barrier here -- XCHG is a barrier on x86. */
-        l1 = xchg(&vcpu_info->evtchn_pending_sel, 0);
-        while ( (l1i = ffs(l1)) != 0 )
-        {
-            l1i--;
-            l1 &= ~(1 << l1i);
+        l1i = __ffs(l1);
+        l1 &= ~(1 << l1i);
         
-            for ( ;; )
-            {
-                l2 = s->evtchn_pending[l1i] & ~s->evtchn_mask[l1i];
-                l2i = ffs(l2);
-                if ( l2i == 0 )
-                    break;
-                l2i--;
-                l2 &= ~(1 << l2i);
+        while ( (l2 = s->evtchn_pending[l1i] & ~s->evtchn_mask[l1i]) != 0 )
+        {
+            l2i = __ffs(l2);
+            l2 &= ~(1 << l2i);
             
-                port = (l1i << 5) + l2i;
-                if ( (irq = evtchn_to_irq[port]) != -1 )
-                    do_IRQ(irq, regs);
-                else
-                    evtchn_device_upcall(port);
-            }
+            port = (l1i << 5) + l2i;
+            if ( (irq = evtchn_to_irq[port]) != -1 )
+                do_IRQ(irq, regs);
+            else
+                evtchn_device_upcall(port);
         }
     }
-
-    local_irq_restore(flags);
 }
 
 static int find_unbound_irq(void)
