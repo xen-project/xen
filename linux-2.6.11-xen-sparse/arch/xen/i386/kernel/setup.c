@@ -41,6 +41,7 @@
 #include <linux/init.h>
 #include <linux/edd.h>
 #include <linux/percpu.h>
+#include <linux/notifier.h>
 #include <video/edid.h>
 #include <asm/e820.h>
 #include <asm/mpspec.h>
@@ -56,6 +57,15 @@
 
 /* Allows setting of maximum possible memory size  */
 static unsigned long xen_override_max_pfn;
+
+extern struct notifier_block *panic_notifier_list;
+static int xen_panic_event(struct notifier_block *, unsigned long, void *);
+static struct notifier_block xen_panic_block = {
+	xen_panic_event,
+        NULL,
+        0 /* try to go last */
+};
+
 
 int disable_pse __initdata = 0;
 
@@ -1398,6 +1408,9 @@ void __init setup_arch(char **cmdline_p)
 	if ( panic_timeout == 0 )
 		panic_timeout = 1;
 
+	/* Register a call for panic conditions. */
+	notifier_chain_register(&panic_notifier_list, &xen_panic_block);
+
 	HYPERVISOR_vm_assist(VMASST_CMD_enable,
 			     VMASST_TYPE_4gb_segments);
 
@@ -1597,6 +1610,16 @@ void __init setup_arch(char **cmdline_p)
 #endif
 	}
 }
+
+
+static int
+xen_panic_event(struct notifier_block *this, unsigned long event, void *ptr)
+{
+     HYPERVISOR_crash();    
+     /* we're never actually going to get here... */
+     return NOTIFY_DONE;
+}
+
 
 #include "setup_arch_post.h"
 /*
