@@ -80,9 +80,9 @@ rm -f mkbuildtree lndir-rel
 ## subdirectories.
 
 # This first symlink is special: it links to shared files in Xen's source tree
-rm -f ${AD}/include/asm-xeno/hypervisor-ifs
-mkdir ${AD}/include/asm-xeno/hypervisor-ifs
-cd    ${AD}/include/asm-xeno/hypervisor-ifs
+rm -rf ${AD}/include/asm-xeno/hypervisor-ifs
+mkdir  ${AD}/include/asm-xeno/hypervisor-ifs
+cd     ${AD}/include/asm-xeno/hypervisor-ifs
 ${AS}/lndir-rel -silent ../../../${RS}/../xen/include/hypervisor-ifs
 
 # The remainder are the i386 -> xeno-i386 links
