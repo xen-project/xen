@@ -6,6 +6,9 @@ import sys
 import string
 
 from xen.xend import XendRoot
+
+from xen.util.ip import _readline, _readlines
+
 xroot = XendRoot.instance()
 
 """Where network control scripts live."""
@@ -37,6 +40,6 @@ def block(op, type, dets, script=None):
     args = ' '.join(args)
     out = os.popen(script + ' ' + args)
 
-    output = out.readline()
+    output = _readline(out)
     out.close()
     return string.rstrip(output)

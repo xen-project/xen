@@ -16,6 +16,8 @@ import channel
 import controller
 from messages import *
 
+from xen.util.ip import _readline, _readlines
+
 def expand_dev_name(name):
     if re.match( '^/dev/', name ):
 	return name
@@ -25,7 +27,7 @@ def expand_dev_name(name):
 def check_mounted(self, name):
     mode = None
     name = expand_dev_name(name)
-    lines = os.popen('mount 2>/dev/null').readlines()
+    lines = _readlines(os.popen('mount 2>/dev/null'))
     exp = re.compile('^' + name + ' .*[\(,]r(?P<mode>[ow])[,\)]')
     for line in lines:
         pm = exp.match(line)
