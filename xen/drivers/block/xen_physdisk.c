@@ -149,13 +149,11 @@ static int xen_physdisk_grant_access(unsigned short dev,
 static void xen_physdisk_probe_access(physdisk_probebuf_t * buf,
 				      struct task_struct *p)
 {
-    int max_aces;
     int n_aces;
     struct list_head *cur_ace_head;
     struct physdisk_ace *cur_ace;
     int x = 0;
 
-    max_aces = buf->n_aces;
     n_aces = 0;
     list_for_each(cur_ace_head, &p->physdisk_aces) {
 	x++;
@@ -167,8 +165,6 @@ static void xen_physdisk_probe_access(physdisk_probebuf_t * buf,
 	    buf->entries[n_aces].n_sectors = cur_ace->n_sectors;
 	    buf->entries[n_aces].mode = cur_ace->mode;
 	    n_aces++;
-	    if (n_aces >= max_aces)
-		break;
 	}
     }
     buf->n_aces = n_aces;
