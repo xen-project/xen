@@ -15,10 +15,11 @@
 #include <xen/reboot.h>
 #include <xen/sched.h>
 #include <xen/serial.h>
+#include <xen/physdev.h>
 #include <asm/io.h>
 
 /* Config serial port with a string <baud>,DPS,<io-base>,<irq>. */
-static unsigned char opt_com1[30] = OPT_COM1_STR, opt_com2[30] = OPT_COM2_STR;
+static char opt_com1[30] = OPT_COM1_STR, opt_com2[30] = OPT_COM2_STR;
 string_param("com1", opt_com1);
 string_param("com2", opt_com2);
 
@@ -395,7 +396,7 @@ void serial_putc(int handle, unsigned char c)
     __serial_putc(uart, handle, c);
 }
 
-void serial_puts(int handle, const unsigned char *s)
+void serial_puts(int handle, const char *s)
 {
     struct uart *uart = &com[handle & SERHND_IDX];
 
@@ -479,6 +480,14 @@ void serial_force_unlock(int handle)
         uart->lock = SPIN_LOCK_UNLOCKED;
 }
 
+void serial_endboot(void)
+{
+    int i;
+    for ( i = 0; i < ARRAY_SIZE(com); i++ )
+        if ( UART_ENABLED(&com[i]) )
+            physdev_modify_ioport_access_range(dom0, 0, com[i].io_base, 8);
+}
+
 /*
  * Local variables:
  * mode: C
@@ -486,4 +495,5 @@ void serial_force_unlock(int handle)
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

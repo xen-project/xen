@@ -27,7 +27,7 @@ linux-%.tar.bz2:
 # Expand NetBSD release to NetBSD version
 NETBSD_RELEASE  ?= 2.0
 NETBSD_VER      ?= $(patsubst netbsd-%-xen-sparse,%,$(wildcard netbsd-$(NETBSD_RELEASE)*-xen-sparse))
-NETBSD_CVSSNAP  ?= 20041103
+NETBSD_CVSSNAP  ?= 20050309
 
 # Setup NetBSD search path
 NETBSD_SRC_PATH	?= .:..
@@ -47,6 +47,7 @@ pristine-%: %.tar.bz2
 	tar -C tmp-$(@F) -jxf $<
 	mv tmp-$(@F)/* $@
 	touch $@ # update timestamp to avoid rebuild
+	touch $@/.bk_skip
 	@rm -rf tmp-$(@F)
 	[ -d patches/$* ] && \
 	  for i in patches/$*/*.patch ; do ( cd $@ ; patch -p1 <../$$i ) ; done || \

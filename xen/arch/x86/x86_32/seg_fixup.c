@@ -28,6 +28,7 @@
 #include <xen/mm.h>
 #include <xen/perfc.h>
 #include <asm/processor.h>
+#include <asm/x86_emulate.h>
 
 /* Make the scary benign errors go away. */
 #undef  DPRINTK
@@ -258,24 +259,6 @@ int fixup_seg(u16 seg, unsigned long offset)
     return 1;
 }
 
-/* Decode Reg field of a ModRM byte: return a pointer into a register block. */
-void *decode_reg(struct xen_regs *regs, u8 b)
-{
-    switch ( b & 7 )
-    {
-    case 0: return &regs->eax;
-    case 1: return &regs->ecx;
-    case 2: return &regs->edx;
-    case 3: return &regs->ebx;
-    case 4: return &regs->esp;
-    case 5: return &regs->ebp;
-    case 6: return &regs->esi;
-    case 7: return &regs->edi;
-    }
-
-    return NULL;
-}
-
 /*
  * Called from the general-protection fault handler to attempt to decode
  * and emulate an instruction that depends on 4GB segments.
@@ -402,8 +385,8 @@ int gpf_emulate_4gb(struct xen_regs *regs)
     }
 
     /* Decode Reg and R/M fields. */
-    regreg = decode_reg(regs, reg);
-    memreg = decode_reg(regs, rm);
+    regreg = decode_register(reg, regs, 0);
+    memreg = decode_register(rm,  regs, 0);
 
     /* Decode Mod field. */
     switch ( modrm >> 6 )
@@ -499,4 +482,5 @@ int gpf_emulate_4gb(struct xen_regs *regs)
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

@@ -44,7 +44,7 @@
 #include <asm/desc.h>
 #include <asm/mmu_context.h>
 #include <asm/multicall.h>
-#include <asm-xen/xen-public/dom0_ops.h>
+#include <asm-xen/xen-public/physdev.h>
 
 #include <linux/irq.h>
 
@@ -214,7 +214,6 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
                 struct task_struct * p, struct pt_regs * regs)
 {
     struct pt_regs * childregs;
-    unsigned long eflags;
 
     childregs = ((struct pt_regs *) (THREAD_SIZE + (unsigned long) p)) - 1;
     struct_cpy(childregs, regs);
@@ -232,9 +231,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
     unlazy_fpu(current);
     struct_cpy(&p->thread.i387, &current->thread.i387);
 
-
-    __asm__ __volatile__ ( "pushfl; popl %0" : "=r" (eflags) : );
-    p->thread.io_pl = (eflags >> 12) & 3;
+    p->thread.io_pl = current->thread.io_pl;
 
     return 0;
 }
@@ -307,6 +304,7 @@ void dump_thread(struct pt_regs * regs, struct user * dump)
 void fastcall __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 {
     struct thread_struct *next = &next_p->thread;
+    physdev_op_t op;
 
     __cli();
 
@@ -338,14 +336,12 @@ void fastcall __switch_to(struct task_struct *prev_p, struct task_struct *next_p
     }
 
     queue_multicall2(__HYPERVISOR_stack_switch, __KERNEL_DS, next->esp0);
-    if ( xen_start_info.flags & SIF_PRIVILEGED ) 
+
+    if ( prev_p->thread.io_pl != next->io_pl ) 
     {
-        dom0_op_t op;
-        op.cmd           = DOM0_IOPL;
-        op.u.iopl.domain = DOMID_SELF;
-        op.u.iopl.iopl   = next->io_pl;
-        op.interface_version = DOM0_INTERFACE_VERSION;
-        queue_multicall1(__HYPERVISOR_dom0_op, (unsigned long)&op);
+        op.cmd             = PHYSDEVOP_SET_IOPL;
+	op.u.set_iopl.iopl = next->io_pl;
+        queue_multicall1(__HYPERVISOR_physdev_op, (unsigned long)&op);
     }
 
     /* EXECUTE ALL TASK SWITCH XEN SYSCALLS AT THIS POINT. */

@@ -200,7 +200,7 @@ void arch_do_boot_vcpu(struct exec_domain *p)
 	return;
 }
 
-int arch_final_setup_guest(struct exec_domain *p, full_execution_context_t *c)
+int arch_set_info_guest(struct exec_domain *p, full_execution_context_t *c)
 {
 	dummy();
 	return 1;
@@ -555,9 +555,6 @@ int construct_dom0(struct domain *d,
 #if 0
     strcpy(d->name,"Domain0");
 #endif
-    /* Set up shared-info area. */
-    update_dom_time(d);
-    d->shared_info->domain_time = 0;
 
 	// prepare domain0 pagetable (maps METAphysical to physical)
 	// following is roughly mm_init() in linux/kernel/fork.c

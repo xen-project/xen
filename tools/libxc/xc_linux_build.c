@@ -279,7 +279,7 @@ static int setup_guest(int xc_handle,
         start_info->mod_start    = vinitrd_start;
         start_info->mod_len      = initrd_len;
     }
-    strncpy(start_info->cmd_line, cmdline, MAX_CMDLINE);
+    strncpy((char *)start_info->cmd_line, cmdline, MAX_CMDLINE);
     start_info->cmd_line[MAX_CMDLINE-1] = '\0';
     munmap(start_info, PAGE_SIZE);
 
@@ -433,7 +433,10 @@ int xc_linux_build(int xc_handle,
         ctxt->trap_ctxt[i].vector = i;
         ctxt->trap_ctxt[i].cs     = FLAT_KERNEL_CS;
     }
+
+#if defined(__i386__)
     ctxt->fast_trap_idx = 0;
+#endif
 
     /* No LDT. */
     ctxt->ldt_ents = 0;
@@ -456,10 +459,11 @@ int xc_linux_build(int xc_handle,
 
     memset( &launch_op, 0, sizeof(launch_op) );
 
-    launch_op.u.builddomain.domain   = (domid_t)domid;
-    launch_op.u.builddomain.ctxt = ctxt;
+    launch_op.u.setdomaininfo.domain   = (domid_t)domid;
+    launch_op.u.setdomaininfo.exec_domain = 0;
+    launch_op.u.setdomaininfo.ctxt = ctxt;
 
-    launch_op.cmd = DOM0_BUILDDOMAIN;
+    launch_op.cmd = DOM0_SETDOMAININFO;
     rc = do_dom0_op(xc_handle, &launch_op);
     
     return rc;

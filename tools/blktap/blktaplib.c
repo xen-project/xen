@@ -3,6 +3,8 @@
  * 
  * userspace interface routines for the blktap driver.
  *
+ * (threadsafe(r) version) 
+ *
  * (c) 2004 Andrew Warfield.
  */
 
@@ -21,12 +23,13 @@
 #include <sys/ioctl.h>
 #include <string.h>
 #include <unistd.h>
-                                                                     
+#include <pthread.h>
 
+                                                                     
 #define __COMPILING_BLKTAP_LIB
 #include "blktaplib.h"
 
-#if 1
+#if 0
 #define DPRINTF(_f, _a...) printf ( _f , ## _a )
 #else
 #define DPRINTF(_f, _a...) ((void)0)
@@ -37,19 +40,13 @@
 
 #define BLKTAP_IOCTL_KICK 1
 
-// this is in the header now
-//DEFINE_RING_TYPES(blkif, blkif_request_t, blkif_response_t);
-
 void got_sig_bus();
 void got_sig_int();
-
 
 /* in kernel these are opposite, but we are a consumer now. */
 blkif_back_ring_t  fe_ring; /* slightly counterintuitive ;) */
 blkif_front_ring_t be_ring; 
 ctrl_back_ring_t   ctrl_ring;
-
-
 
 unsigned long mmap_vstart = 0;
 char *blktap_mem;
@@ -60,8 +57,6 @@ int fd = 0;
 #define BLKTAP_MMAP_PAGES \
     ((BLKIF_MAX_SEGMENTS_PER_REQUEST + 1) * BLKIF_RING_SIZE)
 #define BLKTAP_MMAP_REGION_SIZE (BLKTAP_RING_PAGES + BLKTAP_MMAP_PAGES)
-
-
     
 int bad_count = 0;
 void bad(void)
@@ -203,15 +198,19 @@ void print_hooks(void)
         
 /*-----[ Data to/from Backend (server) VM ]------------------------------*/
 
+
+
 inline int write_req_to_be_ring(blkif_request_t *req)
 {
     blkif_request_t *req_d;
+    static pthread_mutex_t be_prod_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-    //req_d = FRONT_RING_NEXT_EMPTY_REQUEST(&be_ring);
-    req_d = RING_GET_REQUEST(BLKIF_RING, &be_ring, be_ring.req_prod_pvt);
+    pthread_mutex_lock(&be_prod_mutex);
+    req_d = RING_GET_REQUEST(&be_ring, be_ring.req_prod_pvt);
     memcpy(req_d, req, sizeof(blkif_request_t));
     wmb();
     be_ring.req_prod_pvt++;
+    pthread_mutex_unlock(&be_prod_mutex);
     
     return 0;
 }
@@ -219,12 +218,14 @@ inline int write_req_to_be_ring(blkif_request_t *req)
 inline int write_rsp_to_fe_ring(blkif_response_t *rsp)
 {
     blkif_response_t *rsp_d;
+    static pthread_mutex_t fe_prod_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-    //rsp_d = BACK_RING_NEXT_EMPTY_RESPONSE(&fe_ring);
-    rsp_d = RING_GET_RESPONSE(BLKIF_RING, &fe_ring, fe_ring.rsp_prod_pvt);
+    pthread_mutex_lock(&fe_prod_mutex);
+    rsp_d = RING_GET_RESPONSE(&fe_ring, fe_ring.rsp_prod_pvt);
     memcpy(rsp_d, rsp, sizeof(blkif_response_t));
     wmb();
     fe_ring.rsp_prod_pvt++;
+    pthread_mutex_unlock(&fe_prod_mutex);
 
     return 0;
 }
@@ -251,7 +252,7 @@ void blktap_inject_response(blkif_response_t *rsp)
 {
     apply_rsp_hooks(rsp);
     write_rsp_to_fe_ring(rsp);
-    RING_PUSH_RESPONSES(BLKIF_RING, &fe_ring);
+    RING_PUSH_RESPONSES(&fe_ring);
     ioctl(fd, BLKTAP_IOCTL_KICK_FE);
 }
 
@@ -345,6 +346,10 @@ int blktap_listen(void)
     ctrl_sring_t     *csring;
     RING_IDX          rp, i, pfd_count; 
     
+    /* pending rings */
+    blkif_request_t req_pending[BLKIF_RING_SIZE];
+    blkif_response_t rsp_pending[BLKIF_RING_SIZE];
+    
     /* handler hooks: */
     request_hook_t   *req_hook;
     response_hook_t  *rsp_hook;
@@ -371,13 +376,13 @@ int blktap_listen(void)
 
     /* assign the rings to the mapped memory */
     csring = (ctrl_sring_t *)blktap_mem;
-    BACK_RING_INIT(CTRL_RING, &ctrl_ring, csring);
+    BACK_RING_INIT(&ctrl_ring, csring);
     
     sring = (blkif_sring_t *)((unsigned long)blktap_mem + PAGE_SIZE);
-    FRONT_RING_INIT(BLKIF_RING, &be_ring, sring);
+    FRONT_RING_INIT(&be_ring, sring);
     
     sring = (blkif_sring_t *)((unsigned long)blktap_mem + (2 *PAGE_SIZE));
-    BACK_RING_INIT(BLKIF_RING, &fe_ring, sring);
+    BACK_RING_INIT(&fe_ring, sring);
 
     mmap_vstart = (unsigned long)blktap_mem + (BLKTAP_RING_PAGES << PAGE_SHIFT);
     
@@ -431,7 +436,7 @@ int blktap_listen(void)
             rmb();
             for (i = ctrl_ring.req_cons; i < rp; i++)
             {
-                msg = RING_GET_REQUEST(CTRL_RING, &ctrl_ring, i);
+                msg = RING_GET_REQUEST(&ctrl_ring, i);
 
                 ctrl_hook = ctrl_hook_chain;
                 while (ctrl_hook != NULL)
@@ -444,18 +449,20 @@ int blktap_listen(void)
             }
             /* Using this as a unidirectional ring. */
             ctrl_ring.req_cons = ctrl_ring.rsp_prod_pvt = i;
-            RING_PUSH_RESPONSES(CTRL_RING, &ctrl_ring);
+            RING_PUSH_RESPONSES(&ctrl_ring);
             
             /* empty the fe_ring */
             notify_fe = 0;
-            notify_be = RING_HAS_UNCONSUMED_REQUESTS(BLKIF_RING, &fe_ring);
+            notify_be = RING_HAS_UNCONSUMED_REQUESTS(&fe_ring);
             rp = fe_ring.sring->req_prod;
             rmb();
             for (i = fe_ring.req_cons; i != rp; i++)
             {
                 int done = 0; /* stop forwarding this request */
 
-                req = RING_GET_REQUEST(BLKIF_RING, &fe_ring, i);
+                req = RING_GET_REQUEST(&fe_ring, i);
+                memcpy(&req_pending[ID_TO_IDX(req->id)], req, sizeof(*req));
+                req = &req_pending[ID_TO_IDX(req->id)];
 
                 DPRINTF("copying an fe request\n");
 
@@ -489,13 +496,15 @@ int blktap_listen(void)
             fe_ring.req_cons = i;
 
             /* empty the be_ring */
-            notify_fe |= RING_HAS_UNCONSUMED_RESPONSES(BLKIF_RING, &be_ring);
+            notify_fe |= RING_HAS_UNCONSUMED_RESPONSES(&be_ring);
             rp = be_ring.sring->rsp_prod;
             rmb();
             for (i = be_ring.rsp_cons; i != rp; i++)
             {
 
-                rsp = RING_GET_RESPONSE(BLKIF_RING, &be_ring, i);
+                rsp = RING_GET_RESPONSE(&be_ring, i);
+                memcpy(&rsp_pending[ID_TO_IDX(rsp->id)], rsp, sizeof(*rsp));
+                rsp = &rsp_pending[ID_TO_IDX(rsp->id)];
 
                 DPRINTF("copying a be request\n");
 
@@ -508,13 +517,13 @@ int blktap_listen(void)
 
             if (notify_be) {
                 DPRINTF("notifying be\n");
-                RING_PUSH_REQUESTS(BLKIF_RING, &be_ring);
+                RING_PUSH_REQUESTS(&be_ring);
                 ioctl(fd, BLKTAP_IOCTL_KICK_BE);
             }
 
             if (notify_fe) {
                 DPRINTF("notifying fe\n");
-                RING_PUSH_RESPONSES(BLKIF_RING, &fe_ring);
+                RING_PUSH_RESPONSES(&fe_ring);
                 ioctl(fd, BLKTAP_IOCTL_KICK_FE);
             }
         }        

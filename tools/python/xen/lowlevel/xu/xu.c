@@ -698,6 +698,13 @@ static PyObject *xu_message_get_payload(PyObject *self, PyObject *args)
         C2P(netif_be_destroy_t, netif_handle, Int, Long);
         C2P(netif_be_destroy_t, status,       Int, Long);
         return dict;
+    case TYPE(CMSG_NETIF_BE, CMSG_NETIF_BE_CREDITLIMIT):
+        C2P(netif_be_creditlimit_t, domid,        Int, Long);
+        C2P(netif_be_creditlimit_t, netif_handle, Int, Long);
+        C2P(netif_be_creditlimit_t, credit_bytes, Int, Long);
+        C2P(netif_be_creditlimit_t, period_usec,  Int, Long);
+        C2P(netif_be_creditlimit_t, status,       Int, Long);
+        return dict;
     case TYPE(CMSG_NETIF_BE, CMSG_NETIF_BE_CONNECT):
         C2P(netif_be_connect_t, domid,          Int, Long);
         C2P(netif_be_connect_t, netif_handle,   Int, Long);
@@ -766,7 +773,7 @@ static PyObject *xu_message_get_payload(PyObject *self, PyObject *args)
         return dict;
     }
 
-    return PyString_FromStringAndSize(xum->msg.msg, xum->msg.length);
+    return PyString_FromStringAndSize((char *)xum->msg.msg, xum->msg.length);
 }
 
 static PyObject *xu_message_get_header(PyObject *self, PyObject *args)
@@ -915,6 +922,12 @@ static PyObject *xu_message_new(PyObject *self, PyObject *args)
     case TYPE(CMSG_NETIF_BE, CMSG_NETIF_BE_DESTROY):
         P2C(netif_be_destroy_t, domid,        u32);
         P2C(netif_be_destroy_t, netif_handle, u32);
+        break;
+    case TYPE(CMSG_NETIF_BE, CMSG_NETIF_BE_CREDITLIMIT):
+        P2C(netif_be_creditlimit_t, domid,        u32);
+        P2C(netif_be_creditlimit_t, netif_handle, u32);
+        P2C(netif_be_creditlimit_t, credit_bytes, u32);
+        P2C(netif_be_creditlimit_t, period_usec,  u32);
         break;
     case TYPE(CMSG_NETIF_BE, CMSG_NETIF_BE_CONNECT):
         P2C(netif_be_connect_t, domid,          u32);

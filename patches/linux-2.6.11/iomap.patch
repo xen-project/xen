@@ -1,0 +1,120 @@
+diff -ur linux-2.6.11/drivers/char/agp/frontend.c linux-2.6.11-io/drivers/char/agp/frontend.c
+--- linux-2.6.11/drivers/char/agp/frontend.c	2005-03-02 07:37:49.000000000 +0000
++++ linux-2.6.11-io/drivers/char/agp/frontend.c	2005-03-15 17:38:30.000000000 +0000
+@@ -627,7 +627,7 @@
+ 		DBG("client vm_ops=%p", kerninfo.vm_ops);
+ 		if (kerninfo.vm_ops) {
+ 			vma->vm_ops = kerninfo.vm_ops;
+-		} else if (remap_pfn_range(vma, vma->vm_start,
++		} else if (io_remap_pfn_range(vma, vma->vm_start,
+ 				(kerninfo.aper_base + offset) >> PAGE_SHIFT,
+ 					    size, vma->vm_page_prot)) {
+ 			goto out_again;
+@@ -643,7 +643,7 @@
+ 		DBG("controller vm_ops=%p", kerninfo.vm_ops);
+ 		if (kerninfo.vm_ops) {
+ 			vma->vm_ops = kerninfo.vm_ops;
+-		} else if (remap_pfn_range(vma, vma->vm_start,
++		} else if (io_remap_pfn_range(vma, vma->vm_start,
+ 					    kerninfo.aper_base >> PAGE_SHIFT,
+ 					    size, vma->vm_page_prot)) {
+ 			goto out_again;
+diff -ur linux-2.6.11/drivers/char/drm/drm_vm.c linux-2.6.11-io/drivers/char/drm/drm_vm.c
+--- linux-2.6.11/drivers/char/drm/drm_vm.c	2005-03-02 07:38:33.000000000 +0000
++++ linux-2.6.11-io/drivers/char/drm/drm_vm.c	2005-03-15 17:43:26.000000000 +0000
+@@ -630,7 +630,7 @@
+ 					vma->vm_end - vma->vm_start,
+ 					vma->vm_page_prot, 0))
+ #else
+-		if (remap_pfn_range(DRM_RPR_ARG(vma) vma->vm_start,
++		if (io_remap_pfn_range(vma, vma->vm_start,
+ 				     (VM_OFFSET(vma) + offset) >> PAGE_SHIFT,
+ 				     vma->vm_end - vma->vm_start,
+ 				     vma->vm_page_prot))
+diff -ur linux-2.6.11/drivers/char/drm/i810_dma.c linux-2.6.11-io/drivers/char/drm/i810_dma.c
+--- linux-2.6.11/drivers/char/drm/i810_dma.c	2005-03-02 07:37:55.000000000 +0000
++++ linux-2.6.11-io/drivers/char/drm/i810_dma.c	2005-03-15 17:53:36.000000000 +0000
+@@ -139,7 +139,7 @@
+    	buf_priv->currently_mapped = I810_BUF_MAPPED;
+ 	unlock_kernel();
+ 
+-	if (remap_pfn_range(DRM_RPR_ARG(vma) vma->vm_start,
++	if (io_remap_pfn_range(vma, vma->vm_start,
+ 			     VM_OFFSET(vma) >> PAGE_SHIFT,
+ 			     vma->vm_end - vma->vm_start,
+ 			     vma->vm_page_prot)) return -EAGAIN;
+diff -ur linux-2.6.11/drivers/char/drm/i830_dma.c linux-2.6.11-io/drivers/char/drm/i830_dma.c
+--- linux-2.6.11/drivers/char/drm/i830_dma.c	2005-03-02 07:37:48.000000000 +0000
++++ linux-2.6.11-io/drivers/char/drm/i830_dma.c	2005-03-15 17:53:46.000000000 +0000
+@@ -157,7 +157,7 @@
+    	buf_priv->currently_mapped = I830_BUF_MAPPED;
+ 	unlock_kernel();
+ 
+-	if (remap_pfn_range(DRM_RPR_ARG(vma) vma->vm_start,
++	if (io_remap_pfn_range(vma, vma->vm_start,
+ 			     VM_OFFSET(vma) >> PAGE_SHIFT,
+ 			     vma->vm_end - vma->vm_start,
+ 			     vma->vm_page_prot)) return -EAGAIN;
+diff -ur linux-2.6.11/drivers/char/hpet.c linux-2.6.11-io/drivers/char/hpet.c
+--- linux-2.6.11/drivers/char/hpet.c	2005-03-02 07:38:10.000000000 +0000
++++ linux-2.6.11-io/drivers/char/hpet.c	2005-03-15 17:37:22.000000000 +0000
+@@ -76,6 +76,7 @@
+ struct hpets {
+ 	struct hpets *hp_next;
+ 	struct hpet __iomem *hp_hpet;
++	unsigned long hp_hpet_phys;
+ 	struct time_interpolator *hp_interpolator;
+ 	unsigned long hp_period;
+ 	unsigned long hp_delta;
+@@ -265,7 +266,7 @@
+ 		return -EINVAL;
+ 
+ 	devp = file->private_data;
+-	addr = (unsigned long)devp->hd_hpet;
++	addr = devp->hd_hpets->hp_hpet_phys;
+ 
+ 	if (addr & (PAGE_SIZE - 1))
+ 		return -ENOSYS;
+@@ -274,7 +275,7 @@
+ 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+ 	addr = __pa(addr);
+ 
+-	if (remap_pfn_range(vma, vma->vm_start, addr >> PAGE_SHIFT,
++	if (io_remap_pfn_range(vma, vma->vm_start, addr >> PAGE_SHIFT,
+ 					PAGE_SIZE, vma->vm_page_prot)) {
+ 		printk(KERN_ERR "remap_pfn_range failed in hpet.c\n");
+ 		return -EAGAIN;
+@@ -795,6 +796,7 @@
+ 
+ 	hpetp->hp_which = hpet_nhpet++;
+ 	hpetp->hp_hpet = hdp->hd_address;
++	hpetp->hp_hpet_phys = hdp->hd_phys_address;
+ 
+ 	hpetp->hp_ntimer = hdp->hd_nirqs;
+ 
+diff -ur linux-2.6.11/drivers/sbus/char/flash.c linux-2.6.11-io/drivers/sbus/char/flash.c
+--- linux-2.6.11/drivers/sbus/char/flash.c	2005-03-02 07:38:10.000000000 +0000
++++ linux-2.6.11-io/drivers/sbus/char/flash.c	2005-03-15 17:20:22.000000000 +0000
+@@ -75,7 +75,7 @@
+ 	pgprot_val(vma->vm_page_prot) |= _PAGE_E;
+ 	vma->vm_flags |= (VM_SHM | VM_LOCKED);
+ 
+-	if (remap_pfn_range(vma, vma->vm_start, addr, size, vma->vm_page_prot))
++	if (io_remap_pfn_range(vma, vma->vm_start, addr, size, vma->vm_page_prot))
+ 		return -EAGAIN;
+ 		
+ 	return 0;
+diff -ur linux-2.6.11/include/linux/mm.h linux-2.6.11-io/include/linux/mm.h
+--- linux-2.6.11/include/linux/mm.h	2005-03-02 07:37:47.000000000 +0000
++++ linux-2.6.11-io/include/linux/mm.h	2005-03-15 17:03:46.000000000 +0000
+@@ -815,6 +815,10 @@
+ extern int check_user_page_readable(struct mm_struct *mm, unsigned long address);
+ int remap_pfn_range(struct vm_area_struct *, unsigned long,
+ 		unsigned long, unsigned long, pgprot_t);
++/* Allow arch override for mapping of device and I/O (non-RAM) pages. */
++#ifndef io_remap_pfn_range
++#define io_remap_pfn_range remap_pfn_range
++#endif
+ 
+ #ifdef CONFIG_PROC_FS
+ void __vm_stat_account(struct mm_struct *, unsigned long, struct file *, long);

@@ -27,10 +27,12 @@
  *     (Disadvantage is potentially greater internal fragmentation).
  */
 
+#include <xen/config.h>
 #include <xen/mm.h>
 #include <xen/spinlock.h>
 #include <xen/ac_timer.h>
 #include <xen/cache.h>
+#include <xen/prefetch.h>
 
 static LIST_HEAD(freelist);
 static spinlock_t freelist_lock = SPIN_LOCK_UNLOCKED;
@@ -207,4 +209,5 @@ void xfree(const void *p)
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

@@ -271,7 +271,7 @@ void nmi_watchdog_tick (struct xen_regs * regs)
 {
     int sum, cpu = smp_processor_id();
 
-    sum = apic_timer_irqs[cpu];
+    sum = ac_timers[cpu].softirqs;
 
     if ( (last_irq_sums[cpu] == sum) && watchdog_on )
     {

@@ -45,6 +45,7 @@ PERFCOUNTER_CPU(write_fault_bail,                  "sf bailed due to write_fault
 PERFCOUNTER_CPU(read_fault_bail,                   "sf bailed due to read_fault")
 
 PERFCOUNTER_CPU( map_domain_mem_count, "map_domain_mem count" )
+PERFCOUNTER_CPU( ptwr_emulations, "writable pt emulations" )
 
 PERFCOUNTER_CPU( shadow_l2_table_count,  "shadow_l2_table count" )
 PERFCOUNTER_CPU( shadow_l1_table_count,  "shadow_l1_table count" )

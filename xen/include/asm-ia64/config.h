@@ -1,4 +1,9 @@
+// control flags for turning on/off features under test
 #undef CLONE_DOMAIN0
+//#define CLONE_DOMAIN0 1
+//#undef CLONE_DOMAIN0
+#define USER_ACCESS
+
 // manufactured from component pieces
 
 // defined in linux/arch/ia64/defconfig
@@ -159,6 +164,20 @@ struct pci_bus_region {
 	unsigned long start;
 	unsigned long end;
 };
+
+// from linux/include/linux/module.h
+
+// warning: unless search_extable is declared, the return value gets
+// truncated to 32-bits, causing a very strange error in privop handling
+struct exception_table_entry;
+
+const struct exception_table_entry *
+search_extable(const struct exception_table_entry *first,
+	       const struct exception_table_entry *last,
+	       unsigned long value);
+void sort_extable(struct exception_table_entry *start,
+		  struct exception_table_entry *finish);
+void sort_main_extable(void);
 
 // defined (why?) in include/asm-i386/processor.h
 // used in common/physdev.c

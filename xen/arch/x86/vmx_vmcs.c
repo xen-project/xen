@@ -471,4 +471,5 @@ void vm_resume_fail(unsigned long eflags)
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

@@ -15,6 +15,7 @@
 #include <asm/processor.h>
 #include <xen/serial.h>
 #include <asm/io.h>
+#include <xen/softirq.h>
 
 efi_memory_desc_t ia64_efi_io_md;
 EXPORT_SYMBOL(ia64_efi_io_md);
@@ -67,12 +68,22 @@ struct pt_regs *get_execution_context(void) { return ia64_task_regs(current); }
 
 void cleanup_writable_pagetable(struct domain *d, int what) { return; }
 
+void raise_actimer_softirq(void)
+{
+	raise_softirq(AC_TIMER_SOFTIRQ);
+}
+
 ///////////////////////////////
 // from arch/x86/apic.c
 ///////////////////////////////
 
 int reprogram_ac_timer(s_time_t timeout)
 {
+	struct exec_domain *ed = current;
+
+	local_cpu_data->itm_next = timeout;
+	if (is_idle_task(ed->domain)) vcpu_safe_set_itm(timeout);
+	else vcpu_set_next_timer(current);
 	return 1;
 }
 
@@ -215,4 +226,26 @@ int
 physdev_pci_access_modify(domid_t id, int bus, int dev, int func, int enable)
 {
 	return -EINVAL;
+}
+
+// accomodate linux extable.c
+//const struct exception_table_entry *
+void *search_module_extables(unsigned long addr)
+{
+	return NULL;
+}
+
+void *module_text_address(unsigned long addr)
+{
+	return NULL;
+}
+
+// context_switch
+void context_switch(struct exec_domain *prev, struct exec_domain *next)
+{
+	switch_to(prev,next);
+	clear_bit(EDF_RUNNING, &prev->ed_flags);
+	//if (!is_idle_task(next->domain) )
+		//send_guest_virq(next, VIRQ_TIMER);
+	schedule_tail(next);
 }

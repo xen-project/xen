@@ -614,6 +614,18 @@ class XendDomainInfo:
     def get_device_recreate(self, type, index):
         return self.get_device_savedinfo(type, index) or self.recreate
 
+    def limit_vif(self, vif, credit, period):
+        """Limit the rate of a virtual interface
+        @param vif:       vif
+        @param credit:    vif credit in bytes
+        @param period:    vif period in uSec
+        @return: 0 on success
+        """
+    
+        ctrl = xend.netif_create(self.dom, recreate=self.recreate)
+        d = ctrl.limitDevice(vif, credit, period)
+        return d
+    
     def add_config(self, val):
         """Add configuration data to a virtual machine.
 

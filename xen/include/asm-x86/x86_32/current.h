@@ -62,4 +62,5 @@ static inline unsigned long get_stack_bottom(void)
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

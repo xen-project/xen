@@ -239,10 +239,13 @@ void xen_handle_domain_access(unsigned long address, unsigned long isr, struct p
 	unsigned long psr = regs->cr_ipsr, mask, flags;
 	unsigned long iip = regs->cr_iip;
 	// FIXME should validate address here
-	unsigned long pteval, mpaddr;
+	unsigned long pteval, mpaddr, ps;
 	unsigned long lookup_domain_mpa(struct domain *,unsigned long);
+	unsigned long match_dtlb(struct exec_domain *,unsigned long, unsigned long *, unsigned long *);
 	IA64FAULT fault;
+#ifndef USER_ACCESS
 	extern void __get_domain_bundle(void);
+#endif
 
 // NEED TO HANDLE THREE CASES:
 // 1) domain is in metaphysical mode
@@ -262,23 +265,50 @@ void xen_handle_domain_access(unsigned long address, unsigned long isr, struct p
 		pteval = lookup_domain_mpa(d,address);
 		//FIXME: check return value?
 		// would be nice to have a counter here
-		vcpu_itc_no_srlz(ed,2,address,pteval,PAGE_SHIFT);
+		vcpu_itc_no_srlz(ed,2,address,pteval,-1UL,PAGE_SHIFT);
 		return;
 	}
-if (address < 0x4000) printf("WARNING: page_fault @%p, iip=%p\n",address,iip);
+#ifndef USER_ACCESS
 	if (*(unsigned long *)__get_domain_bundle != iip) {
 		printf("Bad user space access @%p ",address);
 		printf("iip=%p, ipsr=%p, b0=%p\n",iip,psr,regs->b0);
 		while(1);
 	}
+#endif
+if (address < 0x4000) printf("WARNING: page_fault @%p, iip=%p\n",address,iip);
 		
+	// if we are fortunate enough to have it in the 1-entry TLB...
+	if (pteval = match_dtlb(ed,address,&ps,NULL)) {
+		vcpu_itc_no_srlz(ed,6,address,pteval,-1UL,ps);
+		return;
+	}
+	// look in the TRs
 	fault = vcpu_tpa(ed,address,&mpaddr);
 	if (fault != IA64_NO_FAULT) {
+#ifndef USER_ACCESS
 		// this is hardcoded to handle __get_domain_bundle only
 		regs->r8 = 0; regs->r9 = 0;
 		regs->cr_iip += 0x20;
 		//regs->cr_iip |= (2UL << IA64_PSR_RI_BIT);
 		return;
+#else /* USER_ACCESS */
+		static int uacnt = 0;
+		// can't translate it, just fail (poor man's exception)
+		// which results in retrying execution
+//printk("*** xen_handle_domain_access: poor man's exception cnt=%i iip=%p, addr=%p...\n",uacnt++,iip,address);
+		if (ia64_done_with_exception(regs)) {
+//if (!(uacnt++ & 0x3ff)) printk("*** xen_handle_domain_access: successfully handled cnt=%d iip=%p, addr=%p...\n",uacnt,iip,address);
+			return;
+		}
+		else {
+			// should never happen.  If it does, region 0 addr may
+			// indicate a bad xen pointer
+			printk("*** xen_handle_domain_access: exception table"
+                               " lookup failed, iip=%p, addr=%p, spinning...\n",
+				iip,address);
+			while(1);
+		}
+#endif /* USER_ACCESS */
 	}
 	if (d == dom0) {
 		if (mpaddr < dom0_start || mpaddr >= dom0_start + dom0_size) {
@@ -286,11 +316,12 @@ if (address < 0x4000) printf("WARNING: page_fault @%p, iip=%p\n",address,iip);
 			tdpfoo();
 		}
 	}
+//printk("*** xen_handle_domain_access: tpa resolved miss @%p...\n",address);
 	pteval = lookup_domain_mpa(d,mpaddr);
 	// would be nice to have a counter here
 	//printf("Handling privop data TLB miss\n");
 	// FIXME, must be inlined or potential for nested fault here!
-	vcpu_itc_no_srlz(ed,2,address,pteval,PAGE_SHIFT);
+	vcpu_itc_no_srlz(ed,2,address,pteval,-1UL,PAGE_SHIFT);
 }
 
 void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_regs *regs, unsigned long itir)
@@ -333,13 +364,13 @@ void ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_reg
 		}
 		pteval = lookup_domain_mpa(d,address);
 		// FIXME, must be inlined or potential for nested fault here!
-		vcpu_itc_no_srlz(current,is_data?2:1,address,pteval,PAGE_SHIFT);
+		vcpu_itc_no_srlz(current,is_data?2:1,address,pteval,-1UL,PAGE_SHIFT);
 		return;
 	}
 	if (trp = match_tr(current,address)) {
 		// FIXME address had better be pre-validated on insert
 		pteval = translate_domain_pte(trp->page_flags,address,trp->itir);
-		vcpu_itc_no_srlz(current,is_data?2:1,address,pteval,(trp->itir>>2)&0x3f);
+		vcpu_itc_no_srlz(current,is_data?2:1,address,pteval,-1UL,(trp->itir>>2)&0x3f);
 		return;
 	}
 	vector = is_data ? IA64_DATA_TLB_VECTOR : IA64_INST_TLB_VECTOR;
@@ -755,6 +786,16 @@ ia64_handle_break (unsigned long ifa, struct pt_regs *regs, unsigned long isr, u
 			// FIXME: need fixes in efi.h from 2.6.9
 			regs->r8 = EFI_UNSUPPORTED;
 			break;
+		    case 0xffff: // test dummy hypercall
+			regs->r8 = dump_privop_counts_to_user(
+				vcpu_get_gr(ed,32),
+				vcpu_get_gr(ed,33));
+			break;
+		    case 0xfffe: // test dummy hypercall
+			regs->r8 = zero_privop_counts_to_user(
+				vcpu_get_gr(ed,32),
+				vcpu_get_gr(ed,33));
+			break;
 		}
 		vcpu_increment_iip(current);
 	}
@@ -809,6 +850,9 @@ ia64_handle_reflection (unsigned long ifa, struct pt_regs *regs, unsigned long i
 	    case 10:
 		check_lazy_cover = 1;
 		vector = IA64_DATA_ACCESS_BIT_VECTOR; break;
+	    case 20:
+		check_lazy_cover = 1;
+		vector = IA64_PAGE_NOT_PRESENT_VECTOR; break;
 	    case 22:
 		vector = IA64_INST_ACCESS_RIGHTS_VECTOR; break;
 	    case 23:

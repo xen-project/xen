@@ -6,7 +6,6 @@ INSTALL_DATA	= $(INSTALL) -m0644
 XEN_ROOT=../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-CC       = gcc
 CFLAGS  += -Wall -Werror -O3
 
 CFLAGS  += -I $(XEN_XC)
@@ -21,9 +20,10 @@ SCRIPTS  = xentrace_format
 MAN1     = $(wildcard *.1)
 MAN8     = $(wildcard *.8)
 
-all: $(BIN)
+all: build
+build: $(BIN)
 
-install: all
+install: build
 	[ -d $(DESTDIR)/usr/bin ] || $(INSTALL_DIR) $(DESTDIR)/usr/bin
 	[ -d $(DESTDIR)/usr/man/man1 ] || \
 		$(INSTALL_DIR) $(DESTDIR)/usr/man/man1

@@ -27,6 +27,7 @@
 #include <asm/domain_page.h>
 #include <asm/page.h>
 #include <xen/event.h>
+#include <xen/sched.h>
 #include <xen/trace.h>
 
 static void shadow_free_snapshot(struct domain *d,
@@ -2881,4 +2882,5 @@ int _check_all_pagetables(struct exec_domain *ed, char *s)
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

@@ -21,8 +21,6 @@
         ALIGN
 /* %rbx: struct exec_domain */
 restore_all_guest:
-        btr   $_TF_failsafe_return,EDOMAIN_thread_flags(%rbx)
-        jc    failsafe_callback
         RESTORE_ALL
         testw $TRAP_syscall,4(%rsp)
         jz    iret_exit_to_guest
@@ -59,39 +57,20 @@ FIX1:   popq  -15*8-8(%rsp)            # error_code/entry_vector
         jmp   error_code
 DBLFLT1:GET_CURRENT(%rbx)
         jmp   test_all_events
-DBLFIX1:GET_CURRENT(%rbx)
-        bts   $_TF_failsafe_return,EDOMAIN_thread_flags(%rbx)
-        jc    domain_crash             # cannot reenter failsafe code
-        jmp   test_all_events          # will return via failsafe code
+failsafe_callback:
+        GET_CURRENT(%rbx)
+        leaq  EDOMAIN_trap_bounce(%rbx),%rdx
+        movq  EDOMAIN_failsafe_addr(%rbx),%rax
+        movq  %rax,TRAPBOUNCE_eip(%rdx)
+        movw  $TBF_FAILSAFE,TRAPBOUNCE_flags(%rdx)
+        call  create_bounce_frame
+        jmp   test_all_events
 .previous
 .section __pre_ex_table,"a"
 	.quad FLT1,FIX1
 .previous
 .section __ex_table,"a"
-        .quad DBLFLT1,DBLFIX1
-.previous
-
-/* No special register assumptions */
-failsafe_callback:
-        GET_CURRENT(%rbx)
-        leaq EDOMAIN_trap_bounce(%rbx),%rdx
-        movq EDOMAIN_failsafe_addr(%rbx),%rax
-        movq %rax,TRAPBOUNCE_eip(%rdx)
-        movw $TBF_FAILSAFE,TRAPBOUNCE_flags(%rdx)
-        call create_bounce_frame
-        RESTORE_ALL
-        addq $8,%rsp
-FLT2:   iret 
-
-.section .fixup,"ax"
-FIX2:   pushq %rbx
-        GET_CURRENT(%rbx)
-        orb   $TF_failsafe_return,EDOMAIN_thread_flags(%rbx)
-        popq  %rbx
-        jmp   FIX1
-.previous
-.section __pre_ex_table,"a"
-	.quad FLT2,FIX2
+        .quad DBLFLT1,failsafe_callback
 .previous
 
         ALIGN
@@ -124,6 +103,7 @@ ENTRY(syscall_enter)
         pushq $0
         movl  $TRAP_syscall,4(%rsp)
         SAVE_ALL
+        sti
         GET_CURRENT(%rbx)
         testb $TF_kernel_mode,EDOMAIN_thread_flags(%rbx)
         jnz   hypercall
@@ -137,7 +117,6 @@ ENTRY(syscall_enter)
 
 /* %rbx: struct exec_domain */
 hypercall:
-        sti
         movq  %r10,%rcx
         andq  $(NR_hypercalls-1),%rax
         leaq  SYMBOL_NAME(hypercall_table)(%rip),%r10
@@ -161,6 +140,7 @@ test_all_events:
         testb $0xFF,VCPUINFO_upcall_pending(%rax)
         jz    restore_all_guest
 /*process_guest_events:*/
+        sti
         leaq  EDOMAIN_trap_bounce(%rbx),%rdx
         movq  EDOMAIN_event_addr(%rbx),%rax
         movq  %rax,TRAPBOUNCE_eip(%rdx)
@@ -168,7 +148,7 @@ test_all_events:
         call  create_bounce_frame
         movq  EDOMAIN_vcpu_info(%rbx),%rax
         movb  $1,VCPUINFO_upcall_mask(%rax) # Upcalls masked during delivery
-        jmp   restore_all_guest
+        jmp   test_all_events
 
         ALIGN
 /* %rbx: struct exec_domain */
@@ -176,19 +156,25 @@ process_softirqs:
         sti       
         call SYMBOL_NAME(do_softirq)
         jmp  test_all_events
-                
+
 /* CREATE A BASIC EXCEPTION FRAME ON GUEST OS STACK:                     */
 /*   { RCX, R11, [DS-GS,] [CR2,] [ERRCODE,] RIP, CS, RFLAGS, RSP, SS }   */
 /* %rdx: trap_bounce, %rbx: struct exec_domain                           */
 /* On return only %rbx is guaranteed non-clobbered.                      */
 create_bounce_frame:
-        /* Push new frame at existing %rsp if already in guest-OS mode. */
-        movq  XREGS_rsp+8(%rsp),%rsi
         testb $TF_kernel_mode,EDOMAIN_thread_flags(%rbx)
         jnz   1f
         /* Push new frame at registered guest-OS stack base. */
+        pushq %rdx
+        movq  %rbx,%rdi
+        call  SYMBOL_NAME(toggle_guest_mode)
+        popq  %rdx
         movq  EDOMAIN_kernel_sp(%rbx),%rsi
-1:      movq  $HYPERVISOR_VIRT_START,%rax
+        jmp   2f
+1:      /* In kernel context already: push new frame at existing %rsp. */
+        movq  XREGS_rsp+8(%rsp),%rsi
+        andb  $0xfc,XREGS_cs+8(%rsp)    # Indicate kernel context to guest.
+2:      movq  $HYPERVISOR_VIRT_START,%rax
         cmpq  %rax,%rsi
         jb    1f                        # In +ve address space? Then okay.
         movq  $HYPERVISOR_VIRT_END+60,%rax
@@ -196,77 +182,59 @@ create_bounce_frame:
         jb    domain_crash              # Above Xen private area? Then okay.
 1:      subq  $40,%rsi
         movq  XREGS_ss+8(%rsp),%rax
-FLT3:   movq  %rax,32(%rsi)             # SS
+FLT2:   movq  %rax,32(%rsi)             # SS
         movq  XREGS_rsp+8(%rsp),%rax
-FLT4:   movq  %rax,24(%rsi)             # RSP
+FLT3:   movq  %rax,24(%rsi)             # RSP
         movq  XREGS_eflags+8(%rsp),%rax
-FLT5:   movq  %rax,16(%rsi)             # RFLAGS
+FLT4:   movq  %rax,16(%rsi)             # RFLAGS
         movq  XREGS_cs+8(%rsp),%rax
-FLT6:   movq  %rax,8(%rsi)              # CS
+FLT5:   movq  %rax,8(%rsi)              # CS
         movq  XREGS_rip+8(%rsp),%rax
-FLT7:   movq  %rax,(%rsi)               # RIP
+FLT6:   movq  %rax,(%rsi)               # RIP
         movb  TRAPBOUNCE_flags(%rdx),%cl
         testb $TBF_EXCEPTION_ERRCODE,%cl
         jz    1f
         subq  $8,%rsi
-        movq  TRAPBOUNCE_error_code(%rdx),%rax
-FLT8:   movq  %rax,(%rsi)               # ERROR CODE
+        movl  TRAPBOUNCE_error_code(%rdx),%eax
+FLT7:   movq  %rax,(%rsi)               # ERROR CODE
         testb $TBF_EXCEPTION_CR2,%cl
         jz    2f
         subq  $8,%rsi
         movq  TRAPBOUNCE_cr2(%rdx),%rax
-FLT9:   movq  %rax,(%rsi)               # CR2
+FLT8:   movq  %rax,(%rsi)               # CR2
 1:      testb $TBF_FAILSAFE,%cl
         jz    2f
         subq  $32,%rsi
         movl  %gs,%eax
-FLT10:  movq  %rax,24(%rsi)             # GS
+FLT9:   movq  %rax,24(%rsi)             # GS
         movl  %fs,%eax
-FLT11:  movq  %rax,16(%rsi)             # FS
+FLT10:  movq  %rax,16(%rsi)             # FS
         movl  %es,%eax
-FLT12:  movq  %rax,8(%rsi)              # ES
+FLT11:  movq  %rax,8(%rsi)              # ES
         movl  %ds,%eax
-FLT13:  movq  %rax,(%rsi)               # DS
+FLT12:  movq  %rax,(%rsi)               # DS
 2:      subq  $16,%rsi
         movq  XREGS_r11+8(%rsp),%rax
-FLT14:  movq  %rax,(%rsi)               # R11
+FLT13:  movq  %rax,(%rsi)               # R11
         movq  XREGS_rcx+8(%rsp),%rax
-FLT15:  movq  %rax,(%rsi)               # RCX
+FLT14:  movq  %rax,(%rsi)               # RCX
         /* Rewrite our stack frame and return to guest-OS mode. */
         /* IA32 Ref. Vol. 3: TF, VM, RF and NT flags are cleared on trap. */
-        movl  $TRAP_syscall,XREGS_entry_vector+8(%rsp)
+        movq  $TRAP_syscall,XREGS_entry_vector+8(%rsp)
         andl  $0xfffcbeff,XREGS_eflags+8(%rsp)
-        movl  $__GUEST_SS,XREGS_ss+8(%rsp)
+        movq  $__GUEST_SS,XREGS_ss+8(%rsp)
         movq  %rsi,XREGS_rsp+8(%rsp)
-        movl  $__GUEST_CS,XREGS_cs+8(%rsp)
+        movq  $__GUEST_CS,XREGS_cs+8(%rsp)
         movq  TRAPBOUNCE_eip(%rdx),%rax
         movq  %rax,XREGS_rip+8(%rsp)
         movb  $0,TRAPBOUNCE_flags(%rdx)
-        testb $TF_kernel_mode,EDOMAIN_thread_flags(%rbx)
-        jz    SYMBOL_NAME(toggle_guest_mode)
         ret
-.section .fixup,"ax"
-FIX3:   sti
-        popq  %rsi
-        addq  $8,%rsp                  # Discard create_b_frame return address
-        pushq $__HYPERVISOR_DS         # SS
-        leaq  8(%rsp),%rax
-        pushq %rax                     # RSP
-        pushf                          # RFLAGS
-        pushq $__HYPERVISOR_CS         # CS
-        leaq  DBLFLT2(%rip),%rax
-        pushq %rax                     # RIP
-        pushq %rsi                     # error_code/entry_vector
-        jmp   error_code
-DBLFLT2:jmp   process_guest_exception_and_events
-.previous
-.section __pre_ex_table,"a"
-	.quad  FLT3,FIX3 ,  FLT4,FIX3 ,  FLT5,FIX3 ,  FLT6,FIX3
-	.quad  FLT7,FIX3 ,  FLT8,FIX3 ,  FLT9,FIX3 , FLT10,FIX3
-	.quad FLT11,FIX3 , FLT12,FIX3 , FLT13,FIX3 , FLT14,FIX3 , FLT15,FIX3
-.previous
 .section __ex_table,"a"
-        .quad DBLFLT2,domain_crash
+        .quad  FLT2,domain_crash ,  FLT3,domain_crash ,  FLT4,domain_crash
+        .quad  FLT5,domain_crash ,  FLT6,domain_crash ,  FLT7,domain_crash
+        .quad  FLT8,domain_crash ,  FLT9,domain_crash , FLT10,domain_crash
+        .quad FLT11,domain_crash , FLT12,domain_crash , FLT13,domain_crash
+        .quad FLT14,domain_crash
 .previous
 
         ALIGN
@@ -275,7 +243,6 @@ process_guest_exception_and_events:
         leaq  EDOMAIN_trap_bounce(%rbx),%rdx
         testb $TBF_EXCEPTION,TRAPBOUNCE_flags(%rdx)
         jz    test_all_events
-        cli   # create_bounce_frame needs CLI for pre-exceptions to work
         call  create_bounce_frame
         jmp   test_all_events
 
@@ -293,7 +260,7 @@ error_code:
         SAVE_ALL
         testb $X86_EFLAGS_IF>>8,XREGS_eflags+1(%rsp)
         jz    exception_with_ints_disabled
-1:      sti
+        sti
         movq  %rsp,%rdi
         movl  XREGS_entry_vector(%rsp),%eax
         leaq  SYMBOL_NAME(exception_table)(%rip),%rdx
@@ -307,8 +274,7 @@ error_code:
 /* No special register assumptions. */
 exception_with_ints_disabled:
         testb $3,XREGS_cs(%rsp)         # interrupts disabled outside Xen?
-        jnz   1b                        # it really does happen!
-                                        #  (e.g., DOM0 X server)
+        jnz   FATAL_exception_with_ints_disabled
         movq  %rsp,%rdi
         call  search_pre_exception_table
         testq %rax,%rax                 # no fixup code for faulting EIP?

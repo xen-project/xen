@@ -22,18 +22,32 @@ int main(int argc, char *argv[])
 {
     int              i, j, xc_handle;
     xc_perfc_desc_t *pcd;
-    unsigned int     num, sum, reset = 0;
+    unsigned int     num, sum, reset = 0, full = 0;
 
     if ( argc > 1 )
     {
         char *p = argv[1];
-        if ( (*p++ == '-')  && (*p == 'r') )
-            reset = 1;
+        if ( p[0] == '-' )
+        {
+            switch ( p[1] )
+            {
+            case 'f':
+                full = 1;
+                break;
+            case 'r':
+                reset = 1;
+                break;
+            default:
+                goto error;
+            }
+        }
         else
         {
+        error:
             printf("%s: [-r]\n", argv[0]);
-            printf("no args: print xen performance counters\n");
-            printf("    -r : reset xen performance counters\n");
+            printf("no args: print digested counters\n");
+            printf("    -f : print full arrays/histograms\n");
+            printf("    -r : reset counters\n");
             return 0;
         }
     }   
@@ -94,8 +108,9 @@ int main(int argc, char *argv[])
             sum += pcd[i].vals[j];
         printf ("T=%10u ", (unsigned int)sum);
 
-        for ( j = 0; j < pcd[i].nr_vals; j++ )
-            printf(" %10u", (unsigned int)pcd[i].vals[j]);
+        if ( full || (pcd[i].nr_vals <= 4) )
+            for ( j = 0; j < pcd[i].nr_vals; j++ )
+                printf(" %10u", (unsigned int)pcd[i].vals[j]);
 
         printf("\n");
     }

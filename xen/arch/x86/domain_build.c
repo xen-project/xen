@@ -185,7 +185,13 @@ int construct_dom0(struct domain *d,
     if ( (v_end - dsi.v_start) > (alloc_end - alloc_start) )
         panic("Insufficient contiguous RAM to build kernel image.\n");
 
-    printk("VIRTUAL MEMORY ARRANGEMENT:\n"
+    printk("PHYSICAL MEMORY ARRANGEMENT:\n"
+           " Dom0 alloc.:   %p->%p",
+           alloc_start, alloc_end);
+    if ( d->tot_pages < nr_pages )
+        printk(" (%d pages to be allocated)",
+               nr_pages - d->tot_pages);
+    printk("\nVIRTUAL MEMORY ARRANGEMENT:\n"
            " Loaded kernel: %p->%p\n"
            " Init. ramdisk: %p->%p\n"
            " Phys-Mach map: %p->%p\n"
@@ -418,9 +424,6 @@ int construct_dom0(struct domain *d,
 
 #endif /* __x86_64__ */
 
-    /* Set up shared-info area. */
-    update_dom_time(d);
-    d->shared_info->domain_time = 0;
     /* Mask all upcalls... */
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
         d->shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
@@ -505,7 +508,7 @@ int construct_dom0(struct domain *d,
                si->mod_len, si->mod_start);
     }
 
-    dst = si->cmd_line;
+    dst = (char *)si->cmd_line;
     if ( cmdline != NULL )
     {
         for ( i = 0; i < 255; i++ )
@@ -590,4 +593,5 @@ int elf_sanity_check(Elf_Ehdr *ehdr)
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

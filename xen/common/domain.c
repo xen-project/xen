@@ -129,6 +129,12 @@ struct domain *find_last_domain(void)
 }
 
 
+#ifndef CONFIG_IA64
+extern void physdev_destroy_state(struct domain *d);
+#else
+#define physdev_destroy_state(_d) ((void)0)
+#endif
+
 void domain_kill(struct domain *d)
 {
     struct exec_domain *ed;
@@ -139,6 +145,7 @@ void domain_kill(struct domain *d)
         for_each_exec_domain(d, ed)
             sched_rem_domain(ed);
         domain_relinquish_memory(d);
+        physdev_destroy_state(d);
         put_domain(d);
     }
 }
@@ -172,7 +179,7 @@ void domain_shutdown(u8 reason)
 
         debugger_trap_immediate();
 
-        if ( reason == 0 ) 
+        if ( reason == SHUTDOWN_poweroff ) 
         {
             printk("Domain 0 halted: halting machine.\n");
             machine_halt();
@@ -182,6 +189,12 @@ void domain_shutdown(u8 reason)
             printk("Domain 0 shutdown: rebooting machine.\n");
             machine_restart(0);
         }
+    }
+
+    if ( reason == SHUTDOWN_crash )
+    {
+        domain_crash();
+        BUG();
     }
 
     d->shutdown_code = reason;
@@ -206,7 +219,7 @@ unsigned int alloc_new_dom_mem(struct domain *d, unsigned int kbytes)
         if ( unlikely((page = alloc_domheap_page(d)) == NULL) )
         {
             domain_relinquish_memory(d);
-            return -ENOMEM;
+            return list_empty(&page_scrub_list) ? -ENOMEM : -EAGAIN;
         }
 
         /* Initialise the machine-to-phys mapping for this page. */
@@ -256,35 +269,35 @@ void domain_destruct(struct domain *d)
 
 
 /*
- * final_setup_guest is used for final setup and launching of domains other
- * than domain 0. ie. the domains that are being built by the userspace dom0
- * domain builder.
+ * set_info_guest is used for final setup, launching, and state modification 
+ * of domains other than domain 0. ie. the domains that are being built by 
+ * the userspace dom0 domain builder.
  */
-int final_setup_guest(struct domain *p, dom0_builddomain_t *builddomain)
+int set_info_guest(struct domain *p, dom0_setdomaininfo_t *setdomaininfo)
 {
     int rc = 0;
-    full_execution_context_t *c;
+    full_execution_context_t *c = NULL;
+    unsigned long vcpu = setdomaininfo->exec_domain;
+    struct exec_domain *ed; 
+
+    if ( (vcpu >= MAX_VIRT_CPUS) || ((ed = p->exec_domain[vcpu]) == NULL) )
+        return -EINVAL;
+    
+    if (test_bit(DF_CONSTRUCTED, &p->d_flags) && 
+        !test_bit(EDF_CTRLPAUSE, &ed->ed_flags))
+        return -EINVAL;
 
     if ( (c = xmalloc(full_execution_context_t)) == NULL )
         return -ENOMEM;
 
-    if ( test_bit(DF_CONSTRUCTED, &p->d_flags) )
-    {
-        rc = -EINVAL;
-        goto out;
-    }
-
-    if ( copy_from_user(c, builddomain->ctxt, sizeof(*c)) )
+    if ( copy_from_user(c, setdomaininfo->ctxt, sizeof(*c)) )
     {
         rc = -EFAULT;
         goto out;
     }
     
-    if ( (rc = arch_final_setup_guest(p->exec_domain[0],c)) != 0 )
+    if ( (rc = arch_set_info_guest(ed, c)) != 0 )
         goto out;
-
-    /* Set up the shared info structure. */
-    update_dom_time(p);
 
     set_bit(DF_CONSTRUCTED, &p->d_flags);
 
@@ -334,13 +347,10 @@ long do_boot_vcpu(unsigned long vcpu, full_execution_context_t *ctxt)
 
     sched_add_domain(ed);
 
-    if ( (rc = arch_final_setup_guest(ed, c)) != 0 ) {
+    if ( (rc = arch_set_info_guest(ed, c)) != 0 ) {
         sched_rem_domain(ed);
         goto out;
     }
-
-    /* Set up the shared info structure. */
-    update_dom_time(d);
 
     /* domain_unpause_by_systemcontroller */
     if ( test_and_clear_bit(EDF_CTRLPAUSE, &ed->ed_flags) )
@@ -386,4 +396,5 @@ long vm_assist(struct domain *p, unsigned int cmd, unsigned int type)
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

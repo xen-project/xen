@@ -8,6 +8,7 @@
 #include <xen/softirq.h>
 #include <xen/acpi.h>
 #include <xen/console.h>
+#include <xen/serial.h>
 #include <xen/trace.h>
 #include <xen/multiboot.h>
 #include <asm/bitops.h>
@@ -201,8 +202,8 @@ static void __init init_amd(struct cpuinfo_x86 *c)
  */
 void __init identify_cpu(struct cpuinfo_x86 *c)
 {
-    int junk, i, cpu = smp_processor_id();
-    u32 xlvl, tfms;
+    int i, cpu = smp_processor_id();
+    u32 xlvl, tfms, junk;
 
     phys_proc_id[cpu]    = cpu;
     logical_proc_id[cpu] = 0;
@@ -217,10 +218,10 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
         panic("Ancient processors not supported\n");
 
     /* Get vendor name */
-    cpuid(0x00000000, &c->cpuid_level,
-          (int *)&c->x86_vendor_id[0],
-          (int *)&c->x86_vendor_id[8],
-          (int *)&c->x86_vendor_id[4]);
+    cpuid(0x00000000, (unsigned int *)&c->cpuid_level,
+          (unsigned int *)&c->x86_vendor_id[0],
+          (unsigned int *)&c->x86_vendor_id[8],
+          (unsigned int *)&c->x86_vendor_id[4]);
 
     get_cpu_vendor(c);
 		
@@ -312,7 +313,6 @@ void __init cpu_init(void)
 
     /* Set up and load the per-CPU TSS and LDT. */
     t->bitmap = IOBMP_INVALID_OFFSET;
-    memset(t->io_bitmap, ~0, sizeof(t->io_bitmap));
 #if defined(__i386__)
     t->ss0  = __HYPERVISOR_DS;
     t->esp0 = get_stack_bottom();
@@ -455,7 +455,7 @@ static void __init start_of_day(void)
 
 void __init __start_xen(multiboot_info_t *mbi)
 {
-    unsigned char *cmdline;
+    char *cmdline;
     module_t *mod = (module_t *)__va(mbi->mods_addr);
     void *heap_start;
     unsigned long firsthole_start, nr_pages;
@@ -587,7 +587,7 @@ void __init __start_xen(multiboot_info_t *mbi)
     set_bit(DF_PRIVILEGED, &dom0->d_flags);
 
     /* Grab the DOM0 command line. Skip past the image name. */
-    cmdline = (unsigned char *)(mod[0].string ? __va(mod[0].string) : NULL);
+    cmdline = (char *)(mod[0].string ? __va(mod[0].string) : NULL);
     if ( cmdline != NULL )
     {
         while ( *cmdline == ' ' ) cmdline++;
@@ -618,6 +618,9 @@ void __init __start_xen(multiboot_info_t *mbi)
     /* Give up the VGA console if DOM0 is configured to grab it. */
     console_endboot(cmdline && strstr(cmdline, "tty0"));
 
+    /* Hide UART from DOM0 if we're using it */
+    serial_endboot();
+
     domain_unpause_by_systemcontroller(current->domain);
     domain_unpause_by_systemcontroller(dom0);
     startup_cpu_idle_loop();
@@ -630,4 +633,5 @@ void __init __start_xen(multiboot_info_t *mbi)
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

@@ -8,7 +8,7 @@
 
 #----------------------------------------------------------------------------
 # Kernel image file.
-kernel = "/boot/vmlinuz-2.6.9-xenU"
+kernel = "/boot/vmlinuz-2.6.10-xenU"
 
 # Optional ramdisk.
 #ramdisk = "/boot/initrd.gz"
@@ -45,7 +45,7 @@ name = "ExampleDomain"
 # where UNAME is the device, DEV is the device name the domain will see,
 # and MODE is r for read-only, w for read-write.
 
-disk = [ 'phy:hda1,hda1,r' ]
+disk = [ 'phy:hda1,hda1,w' ]
 
 #----------------------------------------------------------------------------
 # Set the kernel command line for the new domain.

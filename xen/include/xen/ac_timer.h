@@ -19,6 +19,7 @@
 #ifndef _AC_TIMER_H_
 #define _AC_TIMER_H_
 
+#include <xen/spinlock.h>
 #include <xen/time.h>
 
 struct ac_timer {
@@ -87,6 +88,13 @@ extern void mod_ac_timer(struct ac_timer *timer, s_time_t new_time);
 
 extern int reprogram_ac_timer(s_time_t timeout);
 
+struct ac_timers {
+    spinlock_t        lock;
+    struct ac_timer **heap;
+    unsigned int      softirqs;
+} __cacheline_aligned;
+extern struct ac_timers ac_timers[];
+
 #endif /* _AC_TIMER_H_ */
 
 /*
@@ -96,4 +104,5 @@ extern int reprogram_ac_timer(s_time_t timeout);
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

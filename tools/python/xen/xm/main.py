@@ -717,6 +717,23 @@ class ProgLog(Prog):
 
 xm.prog(ProgLog)
 
+class ProgVifCreditLimit(Prog):
+    group = 'vif'
+    name= "vif-limit"
+    info = """Limit the transmission rate of a virtual network interface."""
+
+    def help(self, args):
+        print args[0], "DOMAIN VIF CREDIT_IN_BYTES PERIOD_IN_USECS"
+        print "\nSet the credit limit of a virtual network interface."
+
+    def main(self, args):
+        if len(args) != 5: self.err("%s: Invalid argument(s)" % args[0])
+        dom = args[1]
+        v = map(int, args[2:5])
+        server.xend_domain_vif_limit(dom, *v)
+
+xm.prog(ProgVifCreditLimit)
+
 class ProgVifList(Prog):
     group = 'vif'
     name  = 'vif-list'

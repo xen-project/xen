@@ -87,4 +87,5 @@ long do_multicall(multicall_entry_t *call_list, unsigned int nr_calls)
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

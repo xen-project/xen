@@ -7,8 +7,9 @@
 #define PAGE_SHIFT              L1_PAGETABLE_SHIFT
 #define ROOT_PAGETABLE_SHIFT    L2_PAGETABLE_SHIFT
 
-#define L1_PAGETABLE_ENTRIES    1024
-#define L2_PAGETABLE_ENTRIES    1024
+#define PAGETABLE_ORDER         10
+#define L1_PAGETABLE_ENTRIES    (1<<PAGETABLE_ORDER)
+#define L2_PAGETABLE_ENTRIES    (1<<PAGETABLE_ORDER)
 #define ROOT_PAGETABLE_ENTRIES  L2_PAGETABLE_ENTRIES
 
 #define __PAGE_OFFSET           (0xFC400000)
@@ -79,4 +80,5 @@ typedef l2_pgentry_t root_pgentry_t;
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

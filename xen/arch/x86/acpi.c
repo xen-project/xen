@@ -97,7 +97,7 @@ char *__acpi_map_table(unsigned long phys, unsigned long size)
 		mapped_size += PAGE_SIZE;
 	}
 
-	return ((unsigned char *) base + offset);
+	return ((char *) base + offset);
 }
 
 

@@ -331,4 +331,5 @@ long do_set_callbacks(unsigned long event_selector,
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

@@ -34,14 +34,7 @@
 
 #define DEFAULT_HEAP_LIMIT 127
 
-/* A timer list per CPU */
-typedef struct ac_timers_st
-{
-    spinlock_t        lock;
-    struct ac_timer **heap;
-} __cacheline_aligned ac_timers_t;
-static ac_timers_t ac_timers[NR_CPUS];
-
+struct ac_timers ac_timers[NR_CPUS];
 
 /****************************************************************************
  * HEAP OPERATIONS.
@@ -214,6 +207,8 @@ static void ac_timer_softirq_action(void)
     s_time_t         now;
     void             (*fn)(unsigned long);
 
+    ac_timers[cpu].softirqs++;
+
     spin_lock_irq(&ac_timers[cpu].lock);
     
     do {
@@ -277,8 +272,10 @@ void __init ac_timer_init(void)
 
     for ( i = 0; i < smp_num_cpus; i++ )
     {
-        ac_timers[i].heap = xmalloc_array(struct ac_timer *, DEFAULT_HEAP_LIMIT+1);
-        if ( ac_timers[i].heap == NULL ) BUG();
+        ac_timers[i].heap = xmalloc_array(
+            struct ac_timer *, DEFAULT_HEAP_LIMIT+1);
+        BUG_ON(ac_timers[i].heap == NULL);
+
         SET_HEAP_SIZE(ac_timers[i].heap, 0);
         SET_HEAP_LIMIT(ac_timers[i].heap, DEFAULT_HEAP_LIMIT);
         spin_lock_init(&ac_timers[i].lock);
@@ -294,4 +291,5 @@ void __init ac_timer_init(void)
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

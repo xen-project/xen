@@ -146,6 +146,8 @@ int allocate_rid_range(struct domain *d, unsigned long ridbits)
 	d->rid_bits = ridbits;
 	d->starting_rid = i << IA64_MIN_IMPL_RID_BITS;
 	d->ending_rid = (i+n_rid_blocks) << IA64_MIN_IMPL_RID_BITS;
+printf("###allocating rid_range, domain %p: starting_rid=%lx, ending_rid=%lx\n",
+d,d->starting_rid, d->ending_rid);
 	
 	return 1;
 }
@@ -361,8 +363,7 @@ virtualize_rid(struct exec_domain *ed, unsigned long rid)
 //
 unsigned long load_region_regs(struct exec_domain *ed)
 {
-	unsigned long rr0, rr1,rr2, rr3, rr4, rr5, rr6;
-	unsigned long oldrr7, newrr7;
+	unsigned long rr0, rr1,rr2, rr3, rr4, rr5, rr6, rr7;
 	// TODO: These probably should be validated
 
 	if (ed->vcpu_info->arch.metaphysical_mode) {
@@ -372,9 +373,16 @@ unsigned long load_region_regs(struct exec_domain *ed)
 		rrv.rid = ed->domain->metaphysical_rid;
 		rrv.ps = PAGE_SHIFT;
 		rrv.ve = 1;
-		rr0 = rr1 = rr2 = rr3 = rr4 = rr5 = newrr7 = rrv.rrval;
+		rr0 = rr1 = rr2 = rr3 = rr4 = rr5 = rrv.rrval;
 		rrv.ve = 0;
 		rr6 = rrv.rrval;
+		set_rr_no_srlz(0x0000000000000000L, rr0);
+		set_rr_no_srlz(0x2000000000000000L, rr1);
+		set_rr_no_srlz(0x4000000000000000L, rr2);
+		set_rr_no_srlz(0x6000000000000000L, rr3);
+		set_rr_no_srlz(0x8000000000000000L, rr4);
+		set_rr_no_srlz(0xa000000000000000L, rr5);
+		set_rr_no_srlz(0xc000000000000000L, rr6);
 	}
 	else {
 		rr0 = physicalize_rid(ed, ed->vcpu_info->arch.rrs[0]);
@@ -384,21 +392,16 @@ unsigned long load_region_regs(struct exec_domain *ed)
 		rr4 = physicalize_rid(ed, ed->vcpu_info->arch.rrs[4]);
 		rr5 = physicalize_rid(ed, ed->vcpu_info->arch.rrs[5]);
 		rr6 = physicalize_rid(ed, ed->vcpu_info->arch.rrs[6]);
-		newrr7 = physicalize_rid(ed, ed->vcpu_info->arch.rrs[7]);
+		set_one_rr(0x0000000000000000L, rr0);
+		set_one_rr(0x2000000000000000L, rr1);
+		set_one_rr(0x4000000000000000L, rr2);
+		set_one_rr(0x6000000000000000L, rr3);
+		set_one_rr(0x8000000000000000L, rr4);
+		set_one_rr(0xa000000000000000L, rr5);
+		set_one_rr(0xc000000000000000L, rr6);
+		ia64_srlz_d();
 	}
-
-	set_rr_no_srlz(0x0000000000000000L, rr0);
-	set_rr_no_srlz(0x2000000000000000L, rr1);
-	set_rr_no_srlz(0x4000000000000000L, rr2);
-	set_rr_no_srlz(0x6000000000000000L, rr3);
-	set_rr_no_srlz(0x8000000000000000L, rr4);
-	set_rr_no_srlz(0xa000000000000000L, rr5);
-	set_rr_no_srlz(0xc000000000000000L, rr6);
+	rr7 = physicalize_rid(ed, ed->vcpu_info->arch.rrs[7]);
+	set_one_rr(0xe000000000000000L, rr7);
 	ia64_srlz_d();
-	oldrr7 = get_rr(0xe000000000000000L);
-	if (oldrr7 != newrr7) {
-		newrr7 = (newrr7 & ~0xff) | (PAGE_SHIFT << 2) | 1;
-		return vmMangleRID(newrr7);
-	}
-	else return 0;
 }

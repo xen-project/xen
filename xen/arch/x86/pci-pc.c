@@ -816,7 +816,7 @@ static int pci_bios_write (int seg, int bus, int dev, int fn, int reg, int len, 
 static int pci_bios_read_config_byte(struct pci_dev *dev, int where, u8 *value)
 {
 	int result; 
-	u32 data;
+	u32 data = 0;
 
 	if (!value) 
 		BUG();
@@ -832,7 +832,7 @@ static int pci_bios_read_config_byte(struct pci_dev *dev, int where, u8 *value)
 static int pci_bios_read_config_word(struct pci_dev *dev, int where, u16 *value)
 {
 	int result; 
-	u32 data;
+	u32 data = 0;
 
 	if (!value) 
 		BUG();
@@ -1553,4 +1553,5 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
  * c-basic-offset: 8
  * tab-width: 8
  * indent-tabs-mode: t
+ * End:
  */

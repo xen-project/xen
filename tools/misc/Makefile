@@ -5,7 +5,6 @@ INSTALL_DIR	= $(INSTALL) -d -m0755
 XEN_ROOT=../..
 include $(XEN_ROOT)/tools/Rules.mk
 
-CC        = gcc
 CFLAGS   += -Wall -Werror -O3 
 
 INCLUDES += -I $(XEN_XC)
@@ -19,11 +18,12 @@ TARGETS  = xenperf xc_shadow
 INSTALL_BIN  = $(TARGETS) xencons
 INSTALL_SBIN = netfix xm xend xensv xenperf
 
-all: $(TARGETS)
+all: build
+build: $(TARGETS)
 	$(MAKE) -C miniterm
 	$(MAKE) -C cpuperf
 
-install: all
+install: build
 	[ -d $(DESTDIR)/usr/bin ] || $(INSTALL_DIR) $(DESTDIR)/usr/bin
 	[ -d $(DESTDIR)/usr/sbin ] || $(INSTALL_DIR) $(DESTDIR)/usr/sbin
 	$(INSTALL_PROG) $(INSTALL_BIN) $(DESTDIR)/usr/bin

@@ -179,7 +179,7 @@ static void vmx_do_general_protection_fault(struct xen_regs *regs)
 
 static void vmx_vmexit_do_cpuid(unsigned long input, struct xen_regs *regs) 
 {
-    int eax, ebx, ecx, edx;
+    unsigned int eax, ebx, ecx, edx;
     unsigned long eip;
 
     __vmread(GUEST_EIP, &eip);
@@ -933,4 +933,5 @@ asmlinkage void load_cr2(void)
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

@@ -164,6 +164,15 @@ class SrvDomain(SrvDir):
         d = fn(req.args, {'dom': self.dom.id})
         return d
 
+    def op_vif_credit_limit(self, op, req):
+        fn = FormFn(self.xd.domain_vif_credit_limit,
+                    [['dom', 'str'],
+                     ['vif', 'int'],
+                     ['credit', 'int'],
+                     ['period', 'int']])
+        val = fn(req.args, {'dom': self.dom.id})
+        return val
+
     def op_vifs(self, op, req):
         devs = self.xd.domain_vif_ls(self.dom.id)
         return [ dev.sxpr() for dev in devs ]

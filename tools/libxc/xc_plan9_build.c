@@ -81,14 +81,14 @@ void
 plan9header(Exec * header)
 {
 	/* header is big-endian */
-	swabby(&header->magic, "magic");
-	swabby(&header->text, "text");
-	swabby(&header->data, "data");
-	swabby(&header->bss, "bss");
-	swabby(&header->syms, "syms");
-	swabby(&header->entry, "entry");
-	swabby(&header->spsz, "spsz");
-	swabby(&header->pcsz, "pcsz");
+	swabby((unsigned long *)&header->magic, "magic");
+	swabby((unsigned long *)&header->text, "text");
+	swabby((unsigned long *)&header->data, "data");
+	swabby((unsigned long *)&header->bss, "bss");
+	swabby((unsigned long *)&header->syms, "syms");
+	swabby((unsigned long *)&header->entry, "entry");
+	swabby((unsigned long *)&header->spsz, "spsz");
+	swabby((unsigned long *)&header->pcsz, "pcsz");
 
 }
 
@@ -98,7 +98,8 @@ static int
 	     unsigned long tot_pages, unsigned long *virt_load_addr,
 	     unsigned long *ksize, unsigned long *symtab_addr,
 	     unsigned long *symtab_len,
-	     unsigned long *first_data_page, unsigned long *pdb_page);
+	     unsigned long *first_data_page, unsigned long *pdb_page, 
+	     const char *cmdline);
 
 #define P9ROUND (P9SIZE / 8)
 
@@ -131,8 +132,8 @@ setup_guest(int xc_handle,
 	unsigned long ksize;
 	mmu_t *mmu = NULL;
 	int i;
-	unsigned long first_page_after_kernel, 
-	  first_data_page, 
+	unsigned long first_page_after_kernel = 0, 
+	  first_data_page = 0, 
 	  page_array_page;
 	unsigned long cpu0pdb, cpu0pte, cpu0ptelast;
 	unsigned long /*last_pfn, */ tot_pte_pages;
@@ -157,7 +158,7 @@ setup_guest(int xc_handle,
 
 	if (loadp9image(kernel_gfd, xc_handle, dom, cpage_array, tot_pages,
 			virt_load_addr, &ksize, &symtab_addr, &symtab_len,
-			&first_data_page, &first_page_after_kernel))
+			&first_data_page, &first_page_after_kernel, cmdline))
 		goto error_out;
 	DPRINTF(("First data page is 0x%lx\n", first_data_page));
 	DPRINTF(("First page after kernel is 0x%lx\n",
@@ -357,7 +358,7 @@ setup_guest(int xc_handle,
 	start_info->flags = 0;
 	DPRINTF((" control event channel is %d\n", control_evtchn));
 	start_info->domain_controller_evtchn = control_evtchn;
-	strncpy(start_info->cmd_line, cmdline, MAX_CMDLINE);
+	strncpy((char *)start_info->cmd_line, cmdline, MAX_CMDLINE);
 	start_info->cmd_line[MAX_CMDLINE - 1] = '\0';
 	munmap(start_info, PAGE_SIZE);
 
@@ -406,7 +407,7 @@ xc_plan9_build(int xc_handle,
 	       unsigned int control_evtchn, unsigned long flags)
 {
 	dom0_op_t launch_op, op;
-	unsigned long load_addr;
+	unsigned long load_addr = 0;
 	long tot_pages;
 	int kernel_fd = -1;
 	gzFile kernel_gfd = NULL;
@@ -505,7 +506,10 @@ xc_plan9_build(int xc_handle,
 		ctxt->trap_ctxt[i].vector = i;
 		ctxt->trap_ctxt[i].cs = FLAT_KERNEL_CS;
 	}
+
+#if defined(__i386__)
 	ctxt->fast_trap_idx = 0;
+#endif
 
 	/* No LDT. */
 	ctxt->ldt_ents = 0;
@@ -529,10 +533,11 @@ xc_plan9_build(int xc_handle,
 
 	memset(&launch_op, 0, sizeof (launch_op));
 
-	launch_op.u.builddomain.domain = (domid_t) domid;
-	//  launch_op.u.builddomain.num_vifs = 1;
-	launch_op.u.builddomain.ctxt = ctxt;
-	launch_op.cmd = DOM0_BUILDDOMAIN;
+	launch_op.u.setdomaininfo.domain = (domid_t) domid;
+	launch_op.u.setdomaininfo.exec_domain = 0;
+	//  launch_op.u.setdomaininfo.num_vifs = 1;
+	launch_op.u.setdomaininfo.ctxt = ctxt;
+	launch_op.cmd = DOM0_SETDOMAININFO;
 	rc = do_dom0_op(xc_handle, &launch_op);
 
 	fprintf(stderr, "RC is %d\n", rc);
@@ -551,7 +556,7 @@ xc_plan9_build(int xc_handle,
  * Plan 9 memory layout (initial)
  * ----------------
  * | info from xen| @0
- * ----------------
+ * ---------------|<--- boot args (start at 0x1200 + 64)
  * | stack        |
  * ----------------<--- page 2
  * | empty        |
@@ -586,7 +591,8 @@ loadp9image(gzFile kernel_gfd, int xc_handle, u32 dom,
 	    unsigned long tot_pages, unsigned long *virt_load_addr,
 	    unsigned long *ksize, unsigned long *symtab_addr,
 	    unsigned long *symtab_len,
-	    unsigned long *first_data_page, unsigned long *pdb_page)
+	    unsigned long *first_data_page, unsigned long *pdb_page, 
+	    const char *cmdline)
 {
 	unsigned long datapage;
 	Exec ehdr;
@@ -597,6 +603,7 @@ loadp9image(gzFile kernel_gfd, int xc_handle, u32 dom,
 	PAGE *image = 0;
 	unsigned long image_tot_pages = 0;
 	unsigned long textround;
+	static PAGE args;
 
 	ret = -1;
 
@@ -664,6 +671,16 @@ loadp9image(gzFile kernel_gfd, int xc_handle, u32 dom,
 			     image, image_tot_pages * 4096, page_array, 0x100);
 	DPRINTF(("done copying kernel to guest memory\n"));
 
+	/* now do the bootargs */
+	/* in plan 9, the x=y bootargs start at 0x1200 + 64 in real memory */
+	/* we'll copy to page 1, so we offset into the page struct at 
+	 * 0x200 + 64 
+	 */
+	memset(&args, 0, sizeof(args));
+	memcpy(&args.data[0x200 + 64], cmdline, strlen(cmdline));
+	printf("Copied :%s: to page for args\n", cmdline);
+	ret = memcpy_toguest(xc_handle, dom, &args, sizeof(args), page_array,1);
+	//dumpit(xc_handle, dom, 0 /*0x100000>>12*/, 4, page_array) ;
       out:
 	if (image)
 		free(image);

@@ -136,10 +136,41 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
     }
     break;
 
-    case DOM0_IOPL:
+    case DOM0_IOPORT_PERMISSION:
     {
-        extern long do_iopl(domid_t, unsigned int);
-        ret = do_iopl(op->u.iopl.domain, op->u.iopl.iopl);
+        struct domain *d;
+        unsigned int fp = op->u.ioport_permission.first_port;
+        unsigned int np = op->u.ioport_permission.nr_ports;
+        unsigned int p;
+
+        ret = -EINVAL;
+        if ( (fp + np) >= 65536 )
+            break;
+
+        ret = -ESRCH;
+        if ( unlikely((d = find_domain_by_id(
+            op->u.ioport_permission.domain)) == NULL) )
+            break;
+
+        ret = -ENOMEM;
+        if ( d->arch.iobmp_mask != NULL )
+        {
+            if ( (d->arch.iobmp_mask = xmalloc_array(
+                u8, IOBMP_BYTES)) == NULL )
+                break;
+            memset(d->arch.iobmp_mask, 0xFF, IOBMP_BYTES);
+        }
+
+        ret = 0;
+        for ( p = fp; p < (fp + np); p++ )
+        {
+            if ( op->u.ioport_permission.allow_access )
+                clear_bit(p, d->arch.iobmp_mask);
+            else
+                set_bit(p, d->arch.iobmp_mask);
+        }
+
+        put_domain(d);
     }
     break;
 
@@ -358,6 +389,9 @@ void arch_getdomaininfo_ctxt(
     memcpy(&c->cpu_ctxt, 
            &ed->arch.user_ctxt,
            sizeof(ed->arch.user_ctxt));
+    /* IOPL privileges are virtualised -- merge back into returned eflags. */
+    BUG_ON((c->cpu_ctxt.eflags & EF_IOPL) != 0);
+    c->cpu_ctxt.eflags |= ed->arch.iopl << 12;
 
 #ifdef __i386__
 #ifdef CONFIG_VMX

@@ -110,7 +110,8 @@
 #define TRAP_deferred_nmi     31
 
 /* Set for entry via SYSCALL. Informs return code to use SYSRETQ not IRETQ. */
-#define TRAP_syscall         256 /* NB. Same as ECF_IN_SYSCALL */
+/* NB. Same as ECF_IN_SYSCALL. No bits in common with any other TRAP_* defn. */
+#define TRAP_syscall         256
 
 /*
  * Non-fatal fault/trap handlers return an error code to the caller. If the
@@ -128,10 +129,8 @@
 #define TBF_INTERRUPT          8
 #define TBF_FAILSAFE          16
 
-/* arch_exec_domain' flags values */
-#define _TF_failsafe_return    0
-#define _TF_kernel_mode        1
-#define TF_failsafe_return     (1<<_TF_failsafe_return)
+/* 'arch_exec_domain' flags values */
+#define _TF_kernel_mode        0
 #define TF_kernel_mode         (1<<_TF_kernel_mode)
 
 #ifndef __ASSEMBLY__
@@ -174,7 +173,6 @@ struct cpuinfo_x86 {
  */
 
 extern struct cpuinfo_x86 boot_cpu_data;
-extern struct tss_struct init_tss[NR_CPUS];
 
 #ifdef CONFIG_SMP
 extern struct cpuinfo_x86 cpu_data[];
@@ -193,7 +191,7 @@ extern void dodgy_tsc(void);
 /*
  * Generic CPUID function
  */
-static inline void cpuid(int op, int *eax, int *ebx, int *ecx, int *edx)
+static inline void cpuid(int op, unsigned int *eax, unsigned int *ebx, unsigned int *ecx, unsigned int *edx)
 {
     __asm__("cpuid"
             : "=a" (*eax),
@@ -330,9 +328,6 @@ static inline void clear_in_cr4 (unsigned long mask)
 } while (0)
 
 #define IOBMP_BYTES             8192
-#define IOBMP_BYTES_PER_SELBIT  (IOBMP_BYTES / 64)
-#define IOBMP_BITS_PER_SELBIT   (IOBMP_BYTES_PER_SELBIT * 8)
-#define IOBMP_OFFSET            offsetof(struct tss_struct, io_bitmap)
 #define IOBMP_INVALID_OFFSET    0x8000
 
 struct i387_state {
@@ -374,14 +369,15 @@ struct tss_struct {
     u16 trace;
 #endif
     u16 bitmap;
-    u8  io_bitmap[IOBMP_BYTES+1];
-    /* Pads the TSS to be cacheline-aligned (total size is 0x2080). */
-    u8 __cacheline_filler[23];
+    /* Pads the TSS to be cacheline-aligned (total size is 0x80). */
+    u8 __cacheline_filler[24];
 } __cacheline_aligned PACKED;
 
 #define IDT_ENTRIES 256
 extern idt_entry_t idt_table[];
 extern idt_entry_t *idt_tables[];
+
+extern struct tss_struct init_tss[NR_CPUS];
 
 #ifdef ARCH_HAS_FAST_TRAP
 
@@ -518,4 +514,5 @@ asmlinkage void fatal_trap(int trapnr, struct xen_regs *regs);
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

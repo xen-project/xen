@@ -4,18 +4,7 @@
 
 #include <xen/config.h>
 #include <xen/list.h>
-#include <xen/spinlock.h>
-#include <xen/perfc.h>
-#include <xen/sched.h>
-
-#include <asm/processor.h>
-#include <asm/atomic.h>
-#include <asm/desc.h>
-#include <asm/flushtlb.h>
 #include <asm/io.h>
-#include <asm/uaccess.h>
-
-#include <public/xen.h>
 
 /*
  * Per-page-frame information.
@@ -322,6 +311,9 @@ typedef struct {
     l1_pgentry_t *pl1e;
     /* Index in L2 page table where this L1 p.t. is always hooked. */
     unsigned int l2_idx; /* NB. Only used for PTWR_PT_ACTIVE. */
+    /* Info about last ptwr update batch. */
+    struct exec_domain *prev_exec_domain; /* domain making the update */
+    unsigned int        prev_nr_updates;  /* size of update batch */
 } ptwr_ptinfo_t;
 
 typedef struct {
@@ -380,4 +372,12 @@ void audit_domains(void);
 
 #endif
 
+/*
+ * Caller must own d's BIGLOCK, is responsible for flushing the TLB, and must 
+ * hold a reference to the page.
+ */
+int update_grant_va_mapping(unsigned long va,
+                            unsigned long val,
+                            struct domain *d,
+                            struct exec_domain *ed);
 #endif /* __ASM_X86_MM_H__ */

@@ -4,11 +4,10 @@ debug       ?= n
 perfc       ?= n
 trace       ?= n
 optimize    ?= y
+domu_debug  ?= n
 crash_debug ?= n
 
-# Currently supported architectures: x86_32, x86_64
-XEN_COMPILE_ARCH    ?= $(shell uname -m | sed -e s/i.86/x86_32/)
-XEN_TARGET_ARCH     ?= $(XEN_COMPILE_ARCH)
+include $(BASEDIR)/../Config.mk
 
 # Set ARCH/SUBARCH appropriately.
 override COMPILE_SUBARCH := $(XEN_COMPILE_ARCH)
@@ -38,10 +37,8 @@ ALL_OBJS += $(BASEDIR)/drivers/acpi/driver.o
 ALL_OBJS += $(BASEDIR)/drivers/pci/driver.o
 ALL_OBJS += $(BASEDIR)/arch/$(TARGET_ARCH)/arch.o
 
-HOSTCC     = gcc
-HOSTCFLAGS = -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer 
 
-test-gcc-flag = $(shell gcc -v --help 2>&1 | grep -q " $(1) " && echo $(1))
+test-gcc-flag = $(shell $(CC) -v --help 2>&1 | grep -q " $(1) " && echo $(1))
 
 include $(BASEDIR)/arch/$(TARGET_ARCH)/Rules.mk
 
@@ -52,6 +49,10 @@ CFLAGS += -DVERBOSE
 endif
 else
 CFLAGS += -DVERBOSE
+endif
+
+ifeq ($(domu_debug),y)
+CFLAGS += -DDOMU_DEBUG
 endif
 
 ifeq ($(crash_debug),y)

@@ -25,8 +25,10 @@
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/perfc.h>
+#include <xen/sched.h>
 #include <asm/processor.h>
 #include <asm/domain_page.h>
+#include <public/dom0_ops.h>
 
 /* Shadow PT operation mode : shadow-mode variable in arch_domain. */
 
@@ -188,6 +190,13 @@ static inline void shadow_mode_disable(struct domain *d)
            phys_to_machine_mapping(gpfn); })           \
       : (gpfn) )
 
+#define __translate_gpfn_to_mfn(_d, gpfn)              \
+    ( (shadow_mode_translate(_d))                      \
+      ? translate_gpfn_to_mfn(_d, gpfn)                \
+      : (gpfn) )
+
+#define translate_gpfn_to_mfn gpfn_to_mfn_safe
+
 extern unsigned long gpfn_to_mfn_safe(
     struct domain *d, unsigned long gpfn);
 
@@ -215,7 +224,6 @@ struct out_of_sync_entry {
 #define SHADOW_SNAPSHOT_ELSEWHERE (-1L)
 
 /************************************************************************/
-
 #define SHADOW_DEBUG 0
 #define SHADOW_VERBOSE_DEBUG 0
 #define SHADOW_VVERBOSE_DEBUG 0
@@ -1495,4 +1503,5 @@ extern int _check_all_pagetables(struct exec_domain *ed, char *s);
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

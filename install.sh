@@ -32,7 +32,7 @@ do
   [ -e "$l" ] && ln -fs "$l" vmlinuz${v}-xenU
 done
 cd -
-cp -fdR $src/* $dst
+cp -fdRL $src/* $dst
 echo "All done."
 
 echo "Checking to see whether prerequisite tools are installed..."

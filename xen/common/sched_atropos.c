@@ -325,7 +325,7 @@ static void block(struct domain* sdom)
 /**
  * ATROPOS - main scheduler function
  */
-task_slice_t ksched_scheduler(s_time_t time)
+struct task_slice ksched_scheduler(s_time_t time)
 {
     struct domain *cur_sdom = current;  /* Current sdom           */
     s_time_t       newtime;
@@ -335,7 +335,7 @@ task_slice_t ksched_scheduler(s_time_t time)
     struct at_dom_info *cur_info;
     static unsigned long waitq_rrobin = 0;
     int i;
-    task_slice_t ret;
+    struct task_slice ret;
 
 
     cur_info = DOM_INFO(cur_sdom);
@@ -691,4 +691,5 @@ struct scheduler sched_atropos_def = {
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

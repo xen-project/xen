@@ -9,10 +9,11 @@
 #define PAGE_SHIFT              L1_PAGETABLE_SHIFT
 #define ROOT_PAGETABLE_SHIFT    L4_PAGETABLE_SHIFT
 
-#define L1_PAGETABLE_ENTRIES    512
-#define L2_PAGETABLE_ENTRIES    512
-#define L3_PAGETABLE_ENTRIES    512
-#define L4_PAGETABLE_ENTRIES    512
+#define PAGETABLE_ORDER         9
+#define L1_PAGETABLE_ENTRIES    (1<<PAGETABLE_ORDER)
+#define L2_PAGETABLE_ENTRIES    (1<<PAGETABLE_ORDER)
+#define L3_PAGETABLE_ENTRIES    (1<<PAGETABLE_ORDER)
+#define L4_PAGETABLE_ENTRIES    (1<<PAGETABLE_ORDER)
 #define ROOT_PAGETABLE_ENTRIES  L4_PAGETABLE_ENTRIES
 
 #define __PAGE_OFFSET           (0xFFFF830000000000)
@@ -106,4 +107,5 @@ typedef l4_pgentry_t root_pgentry_t;
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

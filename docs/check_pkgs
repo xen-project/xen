@@ -13,10 +13,8 @@ silent_which ()
 }
 
 silent_which latex      || exit 1
-silent_which latex2html || exit 1
 silent_which dvips      || exit 1
 silent_which ps2pdf     || exit 1
 silent_which fig2dev    || exit 1
-silent_which tgif       || exit 1
 
 exit 0

@@ -66,12 +66,6 @@ void perfc_printall(unsigned char key)
             for ( j = sum = 0; j < perfc_info[i].nr_elements; j++ )
                 sum += atomic_read(&counters[j]);
             printk("TOTAL[%10d]  ", sum);
-            for ( j = 0; j < perfc_info[i].nr_elements; j++ )
-            {
-                if ( (j != 0) && ((j % 4) == 0) )
-                    printk("\n                   ");
-                printk("ARR%02d[%10d]  ", j, atomic_read(&counters[j]));
-            }
             counters += j;
             break;
         }
@@ -228,4 +222,5 @@ int perfc_control(dom0_perfccontrol_t *pc)
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

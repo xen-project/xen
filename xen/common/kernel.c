@@ -16,7 +16,7 @@
 
 void cmdline_parse(char *cmdline)
 {
-    unsigned char *opt_end, *opt;
+    char *opt_end, *opt;
     struct kernel_param *param;
     
     if ( cmdline == NULL )
@@ -94,4 +94,5 @@ long do_ni_hypercall(void)
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

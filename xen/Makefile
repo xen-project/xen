@@ -16,7 +16,7 @@ export BASEDIR          := $(CURDIR)
 
 include Rules.mk
 
-default: $(TARGET).gz
+default: build
 $(TARGET).gz: $(TARGET)
 	gzip -f -9 < $< > $@.new
 	mv $@.new $@
@@ -24,9 +24,10 @@ $(TARGET).gz: $(TARGET)
 debug:	
 	objdump -D -S $(TARGET)-syms > $(TARGET).s
 
-dist:
-	$(MAKE) install
+dist: install
 
+build: $(TARGET).gz
+	
 install: $(TARGET).gz
 	[ -d $(DESTDIR)/boot ] || $(INSTALL_DIR) $(DESTDIR)/boot
 	$(INSTALL_DATA) $(TARGET).gz $(DESTDIR)/boot
@@ -46,7 +47,8 @@ clean: delete-unfresh-files
 	rm -f include/asm-*/asm-offsets.h
 	rm -f tools/figlet/*.o tools/figlet/figlet
 
-$(TARGET): delete-unfresh-files include/xen/compile.h
+$(TARGET): delete-unfresh-files
+	$(MAKE) include/xen/compile.h
 	[ -e include/asm ] || ln -sf asm-$(TARGET_ARCH) include/asm
 	$(MAKE) -C arch/$(TARGET_ARCH) asm-offsets.s
 	$(MAKE) include/asm-$(TARGET_ARCH)/asm-offsets.h
@@ -103,7 +105,7 @@ include/asm-$(TARGET_ARCH)/asm-offsets.h: arch/$(TARGET_ARCH)/asm-offsets.s
 
 .PHONY: default debug install dist clean delete-unfresh-files TAGS
 
-SUBDIRS = arch common drivers 
+SUBDIRS = arch/$(TARGET_ARCH) common drivers 
 TAGS: 
 	( find include/asm-$(TARGET_ARCH) -name '*.h'; \
 	  find include -type d \( -name "asm-*" -o -name config \) -prune -o \

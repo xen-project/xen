@@ -16,6 +16,7 @@
 #include <asm/domain_page.h>
 #include <xen/trace.h>
 #include <xen/console.h>
+#include <xen/physdev.h>
 #include <asm/shadow.h>
 #include <public/sched_ctl.h>
 
@@ -111,13 +112,13 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     switch ( op->cmd )
     {
 
-    case DOM0_BUILDDOMAIN:
+    case DOM0_SETDOMAININFO:
     {
-        struct domain *d = find_domain_by_id(op->u.builddomain.domain);
-        ret = -EINVAL;
+        struct domain *d = find_domain_by_id(op->u.setdomaininfo.domain);
+        ret = -ESRCH;
         if ( d != NULL )
         {
-            ret = final_setup_guest(d, &op->u.builddomain);
+            ret = set_info_guest(d, &op->u.setdomaininfo);
             put_domain(d);
         }
     }
@@ -147,7 +148,8 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         if ( d != NULL )
         {
             ret = -EINVAL;
-            if ( test_bit(DF_CONSTRUCTED, &d->d_flags) )
+            if ( (d != current->domain) && 
+                 test_bit(DF_CONSTRUCTED, &d->d_flags) )
             {
                 domain_unpause_by_systemcontroller(d);
                 ret = 0;
@@ -401,7 +403,6 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
     case DOM0_PCIDEV_ACCESS:
     {
-        extern int physdev_pci_access_modify(domid_t, int, int, int, int);
         ret = physdev_pci_access_modify(op->u.pcidev_access.domain, 
                                         op->u.pcidev_access.bus,
                                         op->u.pcidev_access.dev,
@@ -495,4 +496,5 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

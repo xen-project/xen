@@ -164,8 +164,6 @@ do_dom_mem_op(unsigned long  op,
     else if ( unlikely((d = find_domain_by_id(domid)) == NULL) )
         return -ESRCH;
 
-    LOCK_BIGLOCK(d);
-
     switch ( op )
     {
     case MEMOP_increase_reservation:
@@ -184,8 +182,6 @@ do_dom_mem_op(unsigned long  op,
     if ( unlikely(domid != DOMID_SELF) )
         put_domain(d);
 
-    UNLOCK_BIGLOCK(d);
-
     return rc;
 }
 
@@ -196,4 +192,5 @@ do_dom_mem_op(unsigned long  op,
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

@@ -52,6 +52,7 @@
 #include <asm/i387.h>
 #include <asm/debugger.h>
 #include <asm/msr.h>
+#include <asm/x86_emulate.h>
 
 /*
  * opt_nmi: one of 'ignore', 'dom0', or 'fatal'.
@@ -221,8 +222,19 @@ asmlinkage int do_int3(struct xen_regs *regs)
         DEBUGGER_trap_fatal(TRAP_int3, regs);
         show_registers(regs);
         panic("CPU%d FATAL TRAP: vector = 3 (Int3)\n", smp_processor_id());
+    } 
+#ifdef DOMU_DEBUG
+    else if ( KERNEL_MODE(ed, regs) && ed->domain->id != 0 ) 
+    {
+        if ( !test_and_set_bit(EDF_CTRLPAUSE, &ed->ed_flags) ) {
+            while (ed == current)
+                __enter_scheduler();
+            domain_pause_by_systemcontroller(ed->domain);
+        }
+        
+        return 0;
     }
-
+#endif /* DOMU_DEBUG */
     ti = current->arch.traps + 3;
     tb->flags = TBF_EXCEPTION;
     tb->cs    = ti->cs;
@@ -372,24 +384,272 @@ long do_fpu_taskswitch(int set)
     return 0;
 }
 
+/* Has the guest requested sufficient permission for this I/O access? */
+static inline int guest_io_okay(
+    unsigned int port, unsigned int bytes,
+    struct exec_domain *ed, struct xen_regs *regs)
+{
+    u16 x;
+#if defined(__x86_64__)
+    /* If in user mode, switch to kernel mode just to read I/O bitmap. */
+    extern void toggle_guest_mode(struct exec_domain *);
+    int user_mode = !(ed->arch.flags & TF_kernel_mode);
+#define TOGGLE_MODE() if ( user_mode ) toggle_guest_mode(ed)
+#elif defined(__i386__)
+#define TOGGLE_MODE() ((void)0)
+#endif
+
+    if ( ed->arch.iopl >= (KERNEL_MODE(ed, regs) ? 1 : 3) )
+        return 1;
+
+    if ( ed->arch.iobmp_limit > (port + bytes) )
+    {
+        TOGGLE_MODE();
+        __get_user(x, (u16 *)(ed->arch.iobmp+(port>>3)));
+        TOGGLE_MODE();
+        if ( (x & (((1<<bytes)-1) << (port&7))) == 0 )
+            return 1;
+    }
+
+    return 0;
+}
+
+/* Has the administrator granted sufficient permission for this I/O access? */
+static inline int admin_io_okay(
+    unsigned int port, unsigned int bytes,
+    struct exec_domain *ed, struct xen_regs *regs)
+{
+    struct domain *d = ed->domain;
+    u16 x;
+
+    if ( d->arch.iobmp_mask != NULL )
+    {
+        x = *(u16 *)(d->arch.iobmp_mask + (port >> 3));
+        if ( (x & (((1<<bytes)-1) << (port&7))) == 0 )
+            return 1;
+    }
+
+    return 0;
+}
+
+/* Check admin limits. Silently fail the access if it is disallowed. */
+#define inb_user(_p, _d, _r) (admin_io_okay(_p, 1, _d, _r) ? inb(_p) : ~0)
+#define inw_user(_p, _d, _r) (admin_io_okay(_p, 2, _d, _r) ? inw(_p) : ~0)
+#define inl_user(_p, _d, _r) (admin_io_okay(_p, 4, _d, _r) ? inl(_p) : ~0)
+#define outb_user(_v, _p, _d, _r) \
+    (admin_io_okay(_p, 1, _d, _r) ? outb(_v, _p) : ((void)0))
+#define outw_user(_v, _p, _d, _r) \
+    (admin_io_okay(_p, 2, _d, _r) ? outw(_v, _p) : ((void)0))
+#define outl_user(_v, _p, _d, _r) \
+    (admin_io_okay(_p, 4, _d, _r) ? outl(_v, _p) : ((void)0))
+
+#define insn_fetch(_type, _size, _ptr)          \
+({  unsigned long _x;                           \
+    if ( get_user(_x, (_type *)eip) )           \
+        goto read_fault;                        \
+    eip += _size; (_type)_x; })
+
 static int emulate_privileged_op(struct xen_regs *regs)
 {
-    extern void *decode_reg(struct xen_regs *regs, u8 b);
-
     struct exec_domain *ed = current;
     unsigned long *reg, eip = regs->eip;
-    u8 opcode;
+    u8 opcode, modrm_reg = 0, rep_prefix = 0;
+    unsigned int port, i, op_bytes = 4, data;
 
-    if ( get_user(opcode, (u8 *)eip) )
-        goto page_fault;
-    eip += 1;
-    if ( (opcode & 0xff) != 0x0f )
+    /* Legacy prefixes. */
+    for ( i = 0; i < 8; i++ )
+    {
+        switch ( opcode = insn_fetch(u8, 1, eip) )
+        {
+        case 0x66: /* operand-size override */
+            op_bytes ^= 6; /* switch between 2/4 bytes */
+            break;
+        case 0x67: /* address-size override */
+        case 0x2e: /* CS override */
+        case 0x3e: /* DS override */
+        case 0x26: /* ES override */
+        case 0x64: /* FS override */
+        case 0x65: /* GS override */
+        case 0x36: /* SS override */
+        case 0xf0: /* LOCK */
+        case 0xf2: /* REPNE/REPNZ */
+            break;
+        case 0xf3: /* REP/REPE/REPZ */
+            rep_prefix = 1;
+            break;
+        default:
+            goto done_prefixes;
+        }
+    }
+ done_prefixes:
+
+#ifdef __x86_64__
+    /* REX prefix. */
+    if ( (opcode & 0xf0) == 0x40 )
+    {
+        modrm_reg = (opcode & 4) << 1;  /* REX.R */
+        /* REX.W, REX.B and REX.X do not need to be decoded. */
+        opcode = insn_fetch(u8, 1, eip);
+    }
+#endif
+    
+    /* Input/Output String instructions. */
+    if ( (opcode >= 0x6c) && (opcode <= 0x6f) )
+    {
+        if ( rep_prefix && (regs->ecx == 0) )
+            goto done;
+
+    continue_io_string:
+        switch ( opcode )
+        {
+        case 0x6c: /* INSB */
+            op_bytes = 1;
+        case 0x6d: /* INSW/INSL */
+            if ( !guest_io_okay((u16)regs->edx, op_bytes, ed, regs) )
+                goto fail;
+            switch ( op_bytes )
+            {
+            case 1:
+                data = (u8)inb_user((u16)regs->edx, ed, regs);
+                if ( put_user((u8)data, (u8 *)regs->edi) )
+                    goto write_fault;
+                break;
+            case 2:
+                data = (u16)inw_user((u16)regs->edx, ed, regs);
+                if ( put_user((u16)data, (u16 *)regs->edi) )
+                    goto write_fault;
+                break;
+            case 4:
+                data = (u32)inl_user((u16)regs->edx, ed, regs);
+                if ( put_user((u32)data, (u32 *)regs->edi) )
+                    goto write_fault;
+                break;
+            }
+            regs->edi += (regs->eflags & EF_DF) ? -op_bytes : op_bytes;
+            break;
+
+        case 0x6e: /* OUTSB */
+            op_bytes = 1;
+        case 0x6f: /* OUTSW/OUTSL */
+            if ( !guest_io_okay((u16)regs->edx, op_bytes, ed, regs) )
+                goto fail;
+            switch ( op_bytes )
+            {
+            case 1:
+                if ( get_user(data, (u8 *)regs->esi) )
+                    goto read_fault;
+                outb_user((u8)data, (u16)regs->edx, ed, regs);
+                break;
+            case 2:
+                if ( get_user(data, (u16 *)regs->esi) )
+                    goto read_fault;
+                outw_user((u16)data, (u16)regs->edx, ed, regs);
+                break;
+            case 4:
+                if ( get_user(data, (u32 *)regs->esi) )
+                    goto read_fault;
+                outl_user((u32)data, (u16)regs->edx, ed, regs);
+                break;
+            }
+            regs->esi += (regs->eflags & EF_DF) ? -op_bytes : op_bytes;
+            break;
+        }
+
+        if ( rep_prefix && (--regs->ecx != 0) )
+        {
+            if ( !hypercall_preempt_check() )
+                goto continue_io_string;
+            eip = regs->eip;
+        }
+
+        goto done;
+    }
+
+    /* I/O Port and Interrupt Flag instructions. */
+    switch ( opcode )
+    {
+    case 0xe4: /* IN imm8,%al */
+        op_bytes = 1;
+    case 0xe5: /* IN imm8,%eax */
+        port = insn_fetch(u8, 1, eip);
+    exec_in:
+        if ( !guest_io_okay(port, op_bytes, ed, regs) )
+            goto fail;
+        switch ( op_bytes )
+        {
+        case 1:
+            regs->eax &= ~0xffUL;
+            regs->eax |= (u8)inb_user(port, ed, regs);
+            break;
+        case 2:
+            regs->eax &= ~0xffffUL;
+            regs->eax |= (u16)inw_user(port, ed, regs);
+            break;
+        case 4:
+            regs->eax = (u32)inl_user(port, ed, regs);
+            break;
+        }
+        goto done;
+
+    case 0xec: /* IN %dx,%al */
+        op_bytes = 1;
+    case 0xed: /* IN %dx,%eax */
+        port = (u16)regs->edx;
+        goto exec_in;
+
+    case 0xe6: /* OUT %al,imm8 */
+        op_bytes = 1;
+    case 0xe7: /* OUT %eax,imm8 */
+        port = insn_fetch(u8, 1, eip);
+    exec_out:
+        if ( !guest_io_okay(port, op_bytes, ed, regs) )
+            goto fail;
+        switch ( op_bytes )
+        {
+        case 1:
+            outb_user((u8)regs->eax, port, ed, regs);
+            break;
+        case 2:
+            outw_user((u16)regs->eax, port, ed, regs);
+            break;
+        case 4:
+            outl_user((u32)regs->eax, port, ed, regs);
+            break;
+        }
+        goto done;
+
+    case 0xee: /* OUT %al,%dx */
+        op_bytes = 1;
+    case 0xef: /* OUT %eax,%dx */
+        port = (u16)regs->edx;
+        goto exec_out;
+
+    case 0xfa: /* CLI */
+    case 0xfb: /* STI */
+        if ( ed->arch.iopl < (KERNEL_MODE(ed, regs) ? 1 : 3) )
+            goto fail;
+        /*
+         * This is just too dangerous to allow, in my opinion. Consider if the
+         * caller then tries to reenable interrupts using POPF: we can't trap
+         * that and we'll end up with hard-to-debug lockups. Fast & loose will
+         * do for us. :-)
+         */
+        /*ed->vcpu_info->evtchn_upcall_mask = (opcode == 0xfa);*/
+        goto done;
+
+    case 0x0f: /* Two-byte opcode */
+        break;
+
+    default:
+        goto fail;
+    }
+
+    /* Remaining instructions only emulated from guest kernel. */
+    if ( !KERNEL_MODE(ed, regs) )
         goto fail;
 
-    if ( get_user(opcode, (u8 *)eip) )
-        goto page_fault;
-    eip += 1;
-
+    /* Privileged (ring 0) instructions. */
+    opcode = insn_fetch(u8, 1, eip);
     switch ( opcode )
     {
     case 0x06: /* CLTS */
@@ -405,12 +665,11 @@ static int emulate_privileged_op(struct xen_regs *regs)
         break;
 
     case 0x20: /* MOV CR?,<reg> */
-        if ( get_user(opcode, (u8 *)eip) )
-            goto page_fault;
-        eip += 1;
+        opcode = insn_fetch(u8, 1, eip);
         if ( (opcode & 0xc0) != 0xc0 )
             goto fail;
-        reg = decode_reg(regs, opcode & 7);
+        modrm_reg |= opcode & 7;
+        reg = decode_register(modrm_reg, regs, 0);
         switch ( (opcode >> 3) & 7 )
         {
         case 0: /* Read CR0 */
@@ -433,12 +692,11 @@ static int emulate_privileged_op(struct xen_regs *regs)
         break;
 
     case 0x22: /* MOV <reg>,CR? */
-        if ( get_user(opcode, (u8 *)eip) )
-            goto page_fault;
-        eip += 1;
+        opcode = insn_fetch(u8, 1, eip);
         if ( (opcode & 0xc0) != 0xc0 )
             goto fail;
-        reg = decode_reg(regs, opcode & 7);
+        modrm_reg |= opcode & 7;
+        reg = decode_register(modrm_reg, regs, 0);
         switch ( (opcode >> 3) & 7 )
         {
         case 0: /* Write CR0 */
@@ -482,14 +740,19 @@ static int emulate_privileged_op(struct xen_regs *regs)
         goto fail;
     }
 
+ done:
     regs->eip = eip;
     return EXCRET_fault_fixed;
 
  fail:
     return 0;
 
- page_fault:
-    propagate_page_fault(eip, 0);
+ read_fault:
+    propagate_page_fault(eip, 4); /* user mode, read fault */
+    return EXCRET_fault_fixed;
+
+ write_fault:
+    propagate_page_fault(eip, 6); /* user mode, write fault */
     return EXCRET_fault_fixed;
 }
 
@@ -540,9 +803,8 @@ asmlinkage int do_general_protection(struct xen_regs *regs)
         }
     }
 
-    /* Emulate some simple privileged instructions when exec'ed in ring 1. */
+    /* Emulate some simple privileged and I/O instructions. */
     if ( (regs->error_code == 0) &&
-         KERNEL_MODE(ed, regs) &&
          emulate_privileged_op(regs) )
         return 0;
 
@@ -690,8 +952,8 @@ asmlinkage int math_state_restore(struct xen_regs *regs)
 asmlinkage int do_debug(struct xen_regs *regs)
 {
     unsigned long condition;
-    struct exec_domain *d = current;
-    struct trap_bounce *tb = &d->arch.trap_bounce;
+    struct exec_domain *ed = current;
+    struct trap_bounce *tb = &ed->arch.trap_bounce;
 
     DEBUGGER_trap_entry(TRAP_debug, regs);
 
@@ -699,7 +961,7 @@ asmlinkage int do_debug(struct xen_regs *regs)
 
     /* Mask out spurious debug traps due to lazy DR7 setting */
     if ( (condition & (DR_TRAP0|DR_TRAP1|DR_TRAP2|DR_TRAP3)) &&
-         (d->arch.debugreg[7] == 0) )
+         (ed->arch.debugreg[7] == 0) )
     {
         __asm__("mov %0,%%db7" : : "r" (0UL));
         goto out;
@@ -716,14 +978,26 @@ asmlinkage int do_debug(struct xen_regs *regs)
          * breakpoint, which can't happen to us.
          */
         goto out;
-    }
+    } 
+#ifdef DOMU_DEBUG
+    else if ( KERNEL_MODE(ed, regs) && ed->domain->id != 0 ) 
+    {
+        regs->eflags &= ~EF_TF;
+        if ( !test_and_set_bit(EDF_CTRLPAUSE, &ed->ed_flags) ) {
+            while (ed == current)
+                __enter_scheduler();
+            domain_pause_by_systemcontroller(ed->domain);
+        }
 
+        goto out;
+    }    
+#endif /* DOMU_DEBUG */
     /* Save debug status register where guest OS can peek at it */
-    d->arch.debugreg[6] = condition;
+    ed->arch.debugreg[6] = condition;
 
     tb->flags = TBF_EXCEPTION;
-    tb->cs    = d->arch.traps[1].cs;
-    tb->eip   = d->arch.traps[1].address;
+    tb->cs    = ed->arch.traps[1].cs;
+    tb->eip   = ed->arch.traps[1].address;
 
  out:
     return EXCRET_not_a_fault;
@@ -811,6 +1085,7 @@ long do_set_trap_table(trap_info_t *traps)
 {
     trap_info_t cur;
     trap_info_t *dst = current->arch.traps;
+    long rc = 0;
 
     LOCK_BIGLOCK(current->domain);
 
@@ -818,16 +1093,25 @@ long do_set_trap_table(trap_info_t *traps)
     {
         if ( hypercall_preempt_check() )
         {
-            UNLOCK_BIGLOCK(current->domain);
-            return hypercall1_create_continuation(
+            rc = hypercall1_create_continuation(
                 __HYPERVISOR_set_trap_table, traps);
+            break;
         }
 
-        if ( copy_from_user(&cur, traps, sizeof(cur)) ) return -EFAULT;
+        if ( copy_from_user(&cur, traps, sizeof(cur)) ) 
+        {
+            rc = -EFAULT;
+            break;
+        }
 
-        if ( cur.address == 0 ) break;
+        if ( cur.address == 0 )
+            break;
 
-        if ( !VALID_CODESEL(cur.cs) ) return -EPERM;
+        if ( !VALID_CODESEL(cur.cs) )
+        {
+            rc = -EPERM;
+            break;
+        }
 
         memcpy(dst+cur.vector, &cur, sizeof(cur));
         traps++;
@@ -835,7 +1119,7 @@ long do_set_trap_table(trap_info_t *traps)
 
     UNLOCK_BIGLOCK(current->domain);
 
-    return 0;
+    return rc;
 }
 
 
@@ -929,4 +1213,5 @@ unsigned long do_get_debugreg(int reg)
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

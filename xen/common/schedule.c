@@ -13,6 +13,15 @@
  *
  */
 
+/*#define WAKE_HISTO*/
+/*#define BLOCKTIME_HISTO*/
+
+#if defined(WAKE_HISTO)
+#define BUCKETS 31
+#elif defined(BLOCKTIME_HISTO)
+#define BUCKETS 200
+#endif
+
 #include <xen/config.h>
 #include <xen/init.h>
 #include <xen/lib.h>
@@ -30,15 +39,6 @@
 /* opt_sched: scheduler - default to Borrowed Virtual Time */
 static char opt_sched[10] = "bvt";
 string_param("sched", opt_sched);
-
-/*#define WAKE_HISTO*/
-/*#define BLOCKTIME_HISTO*/
-
-#if defined(WAKE_HISTO)
-#define BUCKETS 31
-#elif defined(BLOCKTIME_HISTO)
-#define BUCKETS 200
-#endif
 
 #define TIME_SLOP      (s32)MICROSECS(50)     /* allow time to slip a bit */
 
@@ -66,7 +66,7 @@ static void t_timer_fn(unsigned long unused);
 static void dom_timer_fn(unsigned long data);
 
 /* This is global for now so that private implementations can reach it */
-schedule_data_t schedule_data[NR_CPUS];
+struct schedule_data schedule_data[NR_CPUS];
 
 extern struct scheduler sched_bvt_def;
 // extern struct scheduler sched_rrobin_def;
@@ -371,7 +371,7 @@ void __enter_scheduler(void)
     struct exec_domain *prev = current, *next = NULL;
     int                 cpu = prev->processor;
     s_time_t            now;
-    task_slice_t        next_slice;
+    struct task_slice   next_slice;
     s32                 r_time;     /* time for new dom to run */
 
     perfc_incrc(sched_run);
@@ -414,10 +414,6 @@ void __enter_scheduler(void)
 
     spin_unlock_irq(&schedule_data[cpu].schedule_lock);
 
-    /* Ensure that the domain has an up-to-date time base. */
-    if ( !is_idle_task(next->domain) )
-        update_dom_time(next->domain);
-
     if ( unlikely(prev == next) )
         return;
     
@@ -453,23 +449,17 @@ void __enter_scheduler(void)
 
     TRACE_2D(TRC_SCHED_SWITCH, next->domain->id, next);
 
-    switch_to(prev, next);
+    prev->sleep_tick = schedule_data[cpu].tick;
 
-    /*
-     * We do this late on because it doesn't need to be protected by the
-     * schedule_lock, and because we want this to be the very last use of
-     * 'prev' (after this point, a dying domain's info structure may be freed
-     * without warning). 
-     */
-    clear_bit(EDF_RUNNING, &prev->ed_flags);
-
-    /* Mark a timer event for the newly-scheduled domain. */
+    /* Ensure that the domain has an up-to-date time base. */
     if ( !is_idle_task(next->domain) )
-        send_guest_virq(next, VIRQ_TIMER);
-    
-    schedule_tail(next);
+    {
+        update_dom_time(next);
+        if ( next->sleep_tick != schedule_data[cpu].tick )
+            send_guest_virq(next, VIRQ_TIMER);
+    }
 
-    BUG();
+    context_switch(prev, next);
 }
 
 /* No locking needed -- pointer comparison is safe :-) */
@@ -487,7 +477,7 @@ int idle_cpu(int cpu)
  * - dom_timer: per domain timer to specifiy timeout values
  ****************************************************************************/
 
-/* The scheduler timer: force a run through the scheduler*/
+/* The scheduler timer: force a run through the scheduler */
 static void s_timer_fn(unsigned long unused)
 {
     TRACE_0D(TRC_SCHED_S_TIMER_FN);
@@ -495,21 +485,26 @@ static void s_timer_fn(unsigned long unused)
     perfc_incrc(sched_irq);
 }
 
-/* Periodic tick timer: send timer event to current domain*/
+/* Periodic tick timer: send timer event to current domain */
 static void t_timer_fn(unsigned long unused)
 {
-    struct exec_domain *ed = current;
+    struct exec_domain *ed  = current;
+    unsigned int        cpu = ed->processor;
 
     TRACE_0D(TRC_SCHED_T_TIMER_FN);
 
+    schedule_data[cpu].tick++;
+
     if ( !is_idle_task(ed->domain) )
     {
-        update_dom_time(ed->domain);
+        update_dom_time(ed);
         send_guest_virq(ed, VIRQ_TIMER);
     }
 
-    t_timer[ed->processor].expires = NOW() + MILLISECS(10);
-    add_ac_timer(&t_timer[ed->processor]);
+    page_scrub_schedule_work();
+
+    t_timer[cpu].expires = NOW() + MILLISECS(10);
+    add_ac_timer(&t_timer[cpu]);
 }
 
 /* Domain timer function, sends a virtual timer interrupt to domain */
@@ -518,7 +513,8 @@ static void dom_timer_fn(unsigned long data)
     struct exec_domain *ed = (struct exec_domain *)data;
 
     TRACE_0D(TRC_SCHED_DOM_TIMER_FN);
-    update_dom_time(ed->domain);
+    
+    update_dom_time(ed);
     send_guest_virq(ed, VIRQ_TIMER);
 }
 
@@ -643,4 +639,5 @@ void reset_sched_histo(unsigned char key) { }
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

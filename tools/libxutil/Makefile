@@ -7,8 +7,6 @@ INSTALL_DIR	= $(INSTALL) -d -m0755
 
 include $(XEN_ROOT)/tools/Rules.mk
 
-CC = gcc
-
 LIB_SRCS :=
 LIB_SRCS += allocate.c
 LIB_SRCS += enum.c
@@ -40,7 +38,8 @@ LIB      += libxutil.so.$(MAJOR)
 LIB      += libxutil.so.$(MAJOR).$(MINOR)
 LIB      += libxutil.a
 
-all: check-for-zlib
+all: build
+build: check-for-zlib
 	$(MAKE) $(LIB)
 
 libxutil.so: libxutil.so.$(MAJOR)
@@ -50,7 +49,7 @@ libxutil.so.$(MAJOR): libxutil.so.$(MAJOR).$(MINOR)
 	ln -sf $^ $@
 
 libxutil.so.$(MAJOR).$(MINOR): $(PIC_OBJS)
-	$(CC) -Wl,-soname -Wl,libxutil.so.$(MAJOR) -shared -o $@ $^
+	$(CC) $(CFLAGS) -Wl,-soname -Wl,libxutil.so.$(MAJOR) -shared -o $@ $^
 
 libxutil.a: $(LIB_OBJS)
 	$(AR) rc $@ $^
@@ -63,7 +62,7 @@ check-for-zlib:
 	false; \
 	fi
 
-install: all
+install: build
 	[ -d $(DESTDIR)/usr/lib ] || $(INSTALL_DIR) -p $(DESTDIR)/usr/lib
 	$(INSTALL_PROG) libxutil.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/lib
 	$(INSTALL_DATA) libxutil.a $(DESTDIR)/usr/lib

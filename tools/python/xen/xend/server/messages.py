@@ -150,6 +150,7 @@ CMSG_NETIF_BE_CREATE                =  0
 CMSG_NETIF_BE_DESTROY               =  1
 CMSG_NETIF_BE_CONNECT               =  2
 CMSG_NETIF_BE_DISCONNECT            =  3
+CMSG_NETIF_BE_CREDITLIMIT           =  4
 CMSG_NETIF_BE_DRIVER_STATUS         = 32
 
 NETIF_INTERFACE_STATUS_CLOSED       =  0 #/* Interface doesn't exist.    */
@@ -172,6 +173,9 @@ netif_formats = {
 
     'netif_be_destroy_t':
     (CMSG_NETIF_BE, CMSG_NETIF_BE_DESTROY),
+
+    'netif_be_creditlimit_t':
+    (CMSG_NETIF_BE, CMSG_NETIF_BE_CREDITLIMIT),
 
     'netif_be_driver_status_t':
     (CMSG_NETIF_BE, CMSG_NETIF_BE_DRIVER_STATUS),

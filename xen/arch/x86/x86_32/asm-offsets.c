@@ -5,6 +5,7 @@
  */
 
 #include <xen/config.h>
+#include <xen/perfc.h>
 #include <xen/sched.h>
 
 #define DEFINE(_sym, _val) \
@@ -46,6 +47,8 @@ void __dummy__(void)
     OFFSET(EDOMAIN_failsafe_addr, struct exec_domain, arch.failsafe_address);
     OFFSET(EDOMAIN_trap_bounce, struct exec_domain, arch.trap_bounce);
     OFFSET(EDOMAIN_thread_flags, struct exec_domain, arch.flags);
+    OFFSET(EDOMAIN_kernel_ss, struct exec_domain, arch.kernel_ss);
+    OFFSET(EDOMAIN_kernel_sp, struct exec_domain, arch.kernel_sp);
     BLANK();
 
     OFFSET(VCPUINFO_upcall_pending, vcpu_info_t, evtchn_upcall_pending);

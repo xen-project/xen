@@ -442,11 +442,11 @@ void xlvbd_update_vbds(void)
     old_nr   = nr_vbds;
 
     new_info = kmalloc(MAX_VBDS * sizeof(vdisk_t), GFP_KERNEL);
-    if ( unlikely(new_nr = xlvbd_get_vbd_info(new_info)) < 0 )
-    {
-        kfree(new_info);
+    if (!new_info)
         return;
-    }
+
+    if ( unlikely(new_nr = xlvbd_get_vbd_info(new_info)) < 0 )
+        goto out;
 
     /*
      * Final list maximum size is old list + new list. This occurs only when
@@ -454,6 +454,8 @@ void xlvbd_update_vbds(void)
      * VBDs in the old list because the usage counts are busy.
      */
     merged_info = kmalloc((old_nr + new_nr) * sizeof(vdisk_t), GFP_KERNEL);
+    if (!merged_info)
+        goto out;
 
     /* @i tracks old list; @j tracks new list; @k tracks merged list. */
     i = j = k = 0;
@@ -500,6 +502,7 @@ void xlvbd_update_vbds(void)
     nr_vbds  = k;
 
     kfree(old_info);
+out:
     kfree(new_info);
 }
 
@@ -543,6 +546,9 @@ int xlvbd_init(void)
     }
 
     vbd_info = kmalloc(MAX_VBDS * sizeof(vdisk_t), GFP_KERNEL);
+    if (!vbd_info)
+        return -ENOMEM;
+
     nr_vbds  = xlvbd_get_vbd_info(vbd_info);
 
     if ( nr_vbds < 0 )

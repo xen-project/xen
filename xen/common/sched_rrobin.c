@@ -99,11 +99,11 @@ static int rr_init_idle_task(struct domain *d)
 }
 
 /* Main scheduling function */
-static task_slice_t rr_do_schedule(s_time_t now)
+static struct task_slice rr_do_schedule(s_time_t now)
 {
     struct domain *prev = current;
     int cpu = current->processor;
-    task_slice_t ret;
+    struct task_slice ret;
     
     if ( !is_idle_task(prev) )
     {
@@ -223,4 +223,5 @@ struct scheduler sched_rrobin_def = {
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

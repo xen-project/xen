@@ -134,7 +134,7 @@ ENTRY(vmx_asm_do_launch)
 ENTRY(vmx_asm_do_resume)
 vmx_test_all_events:
         GET_CURRENT(%ebx)
-/* test_all_events: */
+/*test_all_events:*/
         xorl %ecx,%ecx
         notl %ecx
         cli                             # tests must not race interrupts
@@ -174,8 +174,6 @@ vmx_process_softirqs:
 
         ALIGN
 restore_all_guest:
-        btr  $_TF_failsafe_return,EDOMAIN_thread_flags(%ebx)
-        jc   failsafe_callback
         testl $X86_EFLAGS_VM,XREGS_eflags(%esp)
         jnz  restore_all_vm86
 FLT1:   movl XREGS_ds(%esp),%ds
@@ -216,10 +214,20 @@ FIX1:   SET_XEN_SEGMENTS(a)
         jmp   error_code
 DBLFLT1:GET_CURRENT(%ebx)
         jmp   test_all_events
-DBLFIX1:GET_CURRENT(%ebx)
-        bts   $_TF_failsafe_return,EDOMAIN_thread_flags(%ebx)
-        jc    domain_crash             # cannot reenter failsafe code
-        jmp   test_all_events          # will return via failsafe code
+failsafe_callback:
+        GET_CURRENT(%ebx)
+        leal  EDOMAIN_trap_bounce(%ebx),%edx
+        movl  EDOMAIN_failsafe_addr(%ebx),%eax
+        movl  EDOMAIN_failsafe_sel(%ebx),%eax
+        movw  %ax,TRAPBOUNCE_cs(%edx)
+        movw  $TBF_FAILSAFE,TRAPBOUNCE_flags(%edx)
+        call  create_bounce_frame
+        xorl  %eax,%eax
+        movl  %eax,XREGS_ds(%esp)
+        movl  %eax,XREGS_es(%esp)
+        movl  %eax,XREGS_fs(%esp)
+        movl  %eax,XREGS_gs(%esp)
+        jmp   test_all_events
 .previous
 .section __pre_ex_table,"a"
 	.long FLT1,FIX1
@@ -229,37 +237,7 @@ DBLFIX1:GET_CURRENT(%ebx)
 	.long FLT5,FIX5
 .previous
 .section __ex_table,"a"
-        .long DBLFLT1,DBLFIX1
-.previous
-
-/* No special register assumptions */
-failsafe_callback:
-        GET_CURRENT(%ebx)
-        leal EDOMAIN_trap_bounce(%ebx),%edx
-        movl EDOMAIN_failsafe_addr(%ebx),%eax
-        movl %eax,TRAPBOUNCE_eip(%edx)
-        movl EDOMAIN_failsafe_sel(%ebx),%eax
-        movw %ax,TRAPBOUNCE_cs(%edx)
-        movw $TBF_FAILSAFE,TRAPBOUNCE_flags(%edx)
-        call create_bounce_frame
-        popl %ebx
-        popl %ecx
-        popl %edx
-        popl %esi
-        popl %edi
-        popl %ebp
-        popl %eax
-        addl $4,%esp
-FLT6:   iret 
-.section .fixup,"ax"
-FIX6:   pushl %ebx
-        GET_CURRENT(%ebx)
-        orb   $TF_failsafe_return,EDOMAIN_thread_flags(%ebx)
-        pop   %ebx
-        jmp   FIX5
-.previous
-.section __pre_ex_table,"a"
-	.long FLT6,FIX6
+        .long DBLFLT1,failsafe_callback
 .previous
 
         ALIGN
@@ -301,6 +279,7 @@ test_all_events:
         testb $0xFF,VCPUINFO_upcall_pending(%eax)
         jz   restore_all_guest
 /*process_guest_events:*/
+        sti
         leal EDOMAIN_trap_bounce(%ebx),%edx
         movl EDOMAIN_event_addr(%ebx),%eax
         movl %eax,TRAPBOUNCE_eip(%edx)
@@ -310,7 +289,7 @@ test_all_events:
         call create_bounce_frame
         movl EDOMAIN_vcpu_info(%ebx),%eax
         movb $1,VCPUINFO_upcall_mask(%eax) # Upcalls are masked during delivery
-        jmp  restore_all_guest
+        jmp  test_all_events
 
         ALIGN
 process_softirqs:
@@ -320,83 +299,74 @@ process_softirqs:
                 
 /* CREATE A BASIC EXCEPTION FRAME ON GUEST OS (RING-1) STACK:            */
 /*   {EIP, CS, EFLAGS, [ESP, SS]}                                        */
-/* %edx == trap_bounce, %ebx == task_struct                              */
+/* %edx == trap_bounce, %ebx == struct exec_domain                       */
 /* %eax,%ecx are clobbered. %gs:%esi contain new XREGS_ss/XREGS_esp. */
 create_bounce_frame:
         movl XREGS_eflags+4(%esp),%ecx
         movb XREGS_cs+4(%esp),%cl
         testl $(2|X86_EFLAGS_VM),%ecx
         jz   ring1 /* jump if returning to an existing ring-1 activation */
-        /* obtain ss/esp from TSS -- no current ring-1 activations */
-        movl EDOMAIN_processor(%ebx),%eax
-        /* next 4 lines multiply %eax by 8320, which is sizeof(tss_struct) */
-        movl %eax, %ecx
-        shll $7, %ecx
-        shll $13, %eax
-        addl %ecx,%eax
-        addl $init_tss + 12,%eax
-        movl (%eax),%esi /* tss->esp1 */
-FLT7:   movl 4(%eax),%gs /* tss->ss1  */
+        movl EDOMAIN_kernel_sp(%ebx),%esi
+FLT6:   movl EDOMAIN_kernel_ss(%ebx),%gs
         testl $X86_EFLAGS_VM,XREGS_eflags+4(%esp)
         jz   nvm86_1
-	subl $16,%esi       /* push ES/DS/FS/GS (VM86 stack frame) */
-	movl XREGS_es+4(%esp),%eax
-FLT8:   movl %eax,%gs:(%esi)
-	movl XREGS_ds+4(%esp),%eax
-FLT9:   movl %eax,%gs:4(%esi)
-	movl XREGS_fs+4(%esp),%eax
-FLT10:  movl %eax,%gs:8(%esi)
-	movl XREGS_gs+4(%esp),%eax
-FLT11:  movl %eax,%gs:12(%esi)
+        subl $16,%esi       /* push ES/DS/FS/GS (VM86 stack frame) */
+        movl XREGS_es+4(%esp),%eax
+FLT7:   movl %eax,%gs:(%esi)
+        movl XREGS_ds+4(%esp),%eax
+FLT8:   movl %eax,%gs:4(%esi)
+        movl XREGS_fs+4(%esp),%eax
+FLT9:   movl %eax,%gs:8(%esi)
+        movl XREGS_gs+4(%esp),%eax
+FLT10:  movl %eax,%gs:12(%esi)
 nvm86_1:subl $8,%esi        /* push SS/ESP (inter-priv iret) */
         movl XREGS_esp+4(%esp),%eax
-FLT12:  movl %eax,%gs:(%esi) 
+FLT11:  movl %eax,%gs:(%esi) 
         movl XREGS_ss+4(%esp),%eax
-FLT13:  movl %eax,%gs:4(%esi) 
+FLT12:  movl %eax,%gs:4(%esi) 
         jmp 1f
 ring1:  /* obtain ss/esp from oldss/oldesp -- a ring-1 activation exists */
         movl XREGS_esp+4(%esp),%esi
-FLT14:  movl XREGS_ss+4(%esp),%gs 
+FLT13:  movl XREGS_ss+4(%esp),%gs 
 1:      /* Construct a stack frame: EFLAGS, CS/EIP */
         subl $12,%esi
         movl XREGS_eip+4(%esp),%eax
-FLT15:  movl %eax,%gs:(%esi) 
+FLT14:  movl %eax,%gs:(%esi) 
         movl XREGS_cs+4(%esp),%eax
-FLT16:  movl %eax,%gs:4(%esi) 
+FLT15:  movl %eax,%gs:4(%esi) 
         movl XREGS_eflags+4(%esp),%eax
-FLT17:  movl %eax,%gs:8(%esi)
+FLT16:  movl %eax,%gs:8(%esi)
         movb TRAPBOUNCE_flags(%edx),%cl
         test $TBF_EXCEPTION_ERRCODE,%cl
         jz   1f
         subl $4,%esi                    # push error_code onto guest frame
         movl TRAPBOUNCE_error_code(%edx),%eax
-FLT18:  movl %eax,%gs:(%esi)
+FLT17:  movl %eax,%gs:(%esi)
         testb $TBF_EXCEPTION_CR2,%cl
         jz   2f
         subl $4,%esi                    # push %cr2 onto guest frame
         movl TRAPBOUNCE_cr2(%edx),%eax
-FLT19:  movl %eax,%gs:(%esi)
+FLT18:  movl %eax,%gs:(%esi)
 1:      testb $TBF_FAILSAFE,%cl
         jz   2f
         subl $16,%esi                # add DS/ES/FS/GS to failsafe stack frame
         testl $X86_EFLAGS_VM,XREGS_eflags+4(%esp)
         jz   nvm86_2
         xorl %eax,%eax               # VM86: we write zero selector values
-FLT20:  movl %eax,%gs:(%esi) 
-FLT21:  movl %eax,%gs:4(%esi)
-FLT22:  movl %eax,%gs:8(%esi) 
-FLT23:  movl %eax,%gs:12(%esi)
+FLT19:  movl %eax,%gs:(%esi) 
+FLT20:  movl %eax,%gs:4(%esi)
+FLT21:  movl %eax,%gs:8(%esi) 
+FLT22:  movl %eax,%gs:12(%esi)
         jmp  2f
 nvm86_2:movl XREGS_ds+4(%esp),%eax   # non-VM86: write real selector values
-FLT24:  movl %eax,%gs:(%esi) 
+FLT23:  movl %eax,%gs:(%esi) 
         movl XREGS_es+4(%esp),%eax
-FLT25:  movl %eax,%gs:4(%esi)
+FLT24:  movl %eax,%gs:4(%esi)
         movl XREGS_fs+4(%esp),%eax
-FLT26:  movl %eax,%gs:8(%esi) 
+FLT25:  movl %eax,%gs:8(%esi) 
         movl XREGS_gs+4(%esp),%eax
-FLT27:  movl %eax,%gs:12(%esi)
-2:      movb $0,TRAPBOUNCE_flags(%edx)
-        testl $X86_EFLAGS_VM,XREGS_eflags+4(%esp)
+FLT26:  movl %eax,%gs:12(%esi)
+2:      testl $X86_EFLAGS_VM,XREGS_eflags+4(%esp)
         jz   nvm86_3
         xorl %eax,%eax      /* zero DS-GS, just as a real CPU would */
         movl %eax,XREGS_ds+4(%esp)
@@ -412,29 +382,16 @@ nvm86_3:/* Rewrite our stack frame and return to ring 1. */
         movl %eax,XREGS_cs+4(%esp)
         movl TRAPBOUNCE_eip(%edx),%eax
         movl %eax,XREGS_eip+4(%esp)
+        movb $0,TRAPBOUNCE_flags(%edx)
         ret
-.section .fixup,"ax"
-FIX7:   sti
-        popl  %esi
-        addl  $4,%esp                  # Discard create_b_frame return address
-        pushfl                         # EFLAGS
-        movl  $__HYPERVISOR_CS,%eax
-        pushl %eax                     # CS
-        movl  $DBLFLT2,%eax
-        pushl %eax                     # EIP
-        pushl %esi                     # error_code/entry_vector
-        jmp   error_code
-DBLFLT2:jmp   process_guest_exception_and_events
-.previous
-.section __pre_ex_table,"a"
-	.long  FLT7,FIX7 ,  FLT8,FIX7 ,  FLT9,FIX7 , FLT10,FIX7
-	.long FLT11,FIX7 , FLT12,FIX7 , FLT13,FIX7 , FLT14,FIX7
-	.long FLT15,FIX7 , FLT16,FIX7 , FLT17,FIX7 , FLT18,FIX7
-	.long FLT19,FIX7 , FLT20,FIX7 , FLT21,FIX7 , FLT22,FIX7
-	.long FLT23,FIX7 , FLT24,FIX7 , FLT25,FIX7 , FLT26,FIX7 , FLT27,FIX7
-.previous
 .section __ex_table,"a"
-        .long DBLFLT2,domain_crash
+	.long  FLT6,domain_crash ,  FLT7,domain_crash ,  FLT8,domain_crash
+        .long  FLT9,domain_crash , FLT10,domain_crash , FLT11,domain_crash
+        .long FLT12,domain_crash , FLT13,domain_crash , FLT14,domain_crash
+        .long FLT15,domain_crash , FLT16,domain_crash , FLT17,domain_crash
+	.long FLT18,domain_crash , FLT19,domain_crash , FLT20,domain_crash
+        .long FLT21,domain_crash , FLT22,domain_crash , FLT23,domain_crash
+        .long FLT24,domain_crash , FLT25,domain_crash , FLT26,domain_crash
 .previous
 
         ALIGN
@@ -442,7 +399,6 @@ process_guest_exception_and_events:
         leal EDOMAIN_trap_bounce(%ebx),%edx
         testb $TBF_EXCEPTION,TRAPBOUNCE_flags(%edx)
         jz   test_all_events
-        cli  # create_bounce_frame needs CLI for pre-exceptions to work
         call create_bounce_frame
         jmp  test_all_events
 
@@ -463,7 +419,7 @@ error_code:
         SET_XEN_SEGMENTS(a)
         testb $X86_EFLAGS_IF>>8,XREGS_eflags+1(%esp)
         jz    exception_with_ints_disabled
-1:      sti                             # re-enable interrupts
+        sti                             # re-enable interrupts
         xorl  %eax,%eax
         movw  XREGS_entry_vector(%esp),%ax
         movl  %esp,%edx
@@ -482,8 +438,7 @@ exception_with_ints_disabled:
         movl  XREGS_eflags(%esp),%eax
         movb  XREGS_cs(%esp),%al
         testl $(3|X86_EFLAGS_VM),%eax   # interrupts disabled outside Xen?
-        jnz   1b                        # it really does happen!
-                                        #  (e.g., DOM0 X server)
+        jnz   FATAL_exception_with_ints_disabled
         pushl %esp
         call  search_pre_exception_table
         addl  $4,%esp
@@ -701,8 +656,6 @@ do_switch_vm86:
         # Discard the return address
         addl $4,%esp
 
-        movl XREGS_eflags(%esp),%edx
-
         # GS:ESI == Ring-1 stack activation
         movl XREGS_esp(%esp),%esi
 VFLT1:  movl XREGS_ss(%esp),%gs
@@ -722,13 +675,9 @@ VFLT3:  movl %gs:(%esi),%eax
         addl $4,%esi
         loop VFLT3
 
-        # Fix up EFLAGS
+        # Fix up EFLAGS: IOPL=0, IF=1, VM=1
         andl $~X86_EFLAGS_IOPL,XREGS_eflags(%esp)
-        andl $X86_EFLAGS_IOPL,%edx # Ignore attempts to change EFLAGS.IOPL
-        jnz  1f
-        orl  $X86_EFLAGS_IF,%edx   # EFLAGS.IOPL=0 => no messing with EFLAGS.IF
-1:      orl  $X86_EFLAGS_VM,%edx   # Force EFLAGS.VM
-        orl  %edx,XREGS_eflags(%esp)
+        orl  $X86_EFLAGS_IF|X86_EFLAGS_VM,XREGS_eflags(%esp)
         
         jmp test_all_events
 

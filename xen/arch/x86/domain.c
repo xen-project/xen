@@ -19,6 +19,7 @@
 #include <xen/smp.h>
 #include <xen/delay.h>
 #include <xen/softirq.h>
+#include <xen/grant_table.h>
 #include <asm/regs.h>
 #include <asm/mc146818rtc.h>
 #include <asm/system.h>
@@ -60,7 +61,10 @@ static __attribute_used__ void idle_loop(void)
     {
         irq_stat[cpu].idle_timestamp = jiffies;
         while ( !softirq_pending(cpu) )
+        {
+            page_scrub_schedule_work();
             default_idle();
+        }
         do_softirq();
     }
 }
@@ -356,12 +360,22 @@ out:
 
 
 /* This is called by arch_final_setup_guest and do_boot_vcpu */
-int arch_final_setup_guest(
+int arch_set_info_guest(
     struct exec_domain *ed, full_execution_context_t *c)
 {
     struct domain *d = ed->domain;
     unsigned long phys_basetab;
     int i, rc;
+
+    /*
+     * This is sufficient! If the descriptor DPL differs from CS RPL then we'll
+     * #GP. If DS, ES, FS, GS are DPL 0 then they'll be cleared automatically.
+     * If SS RPL or DPL differs from CS RPL then we'll #GP.
+     */
+    if (!(c->flags & ECF_VMX_GUEST)) 
+        if ( ((c->cpu_ctxt.cs & 3) == 0) ||
+             ((c->cpu_ctxt.ss & 3) == 0) )
+                return -EINVAL;
 
     clear_bit(EDF_DONEFPUINIT, &ed->ed_flags);
     if ( c->flags & ECF_I387_VALID )
@@ -375,23 +389,20 @@ int arch_final_setup_guest(
            &c->cpu_ctxt,
            sizeof(ed->arch.user_ctxt));
 
+    memcpy(&ed->arch.i387,
+           &c->fpu_ctxt,
+           sizeof(ed->arch.i387));
+
+    /* IOPL privileges are virtualised. */
+    ed->arch.iopl = (ed->arch.user_ctxt.eflags >> 12) & 3;
+    ed->arch.user_ctxt.eflags &= ~EF_IOPL;
+
     /* Clear IOPL for unprivileged domains. */
     if (!IS_PRIV(d))
         ed->arch.user_ctxt.eflags &= 0xffffcfff;
 
-    /*
-     * This is sufficient! If the descriptor DPL differs from CS RPL then we'll
-     * #GP. If DS, ES, FS, GS are DPL 0 then they'll be cleared automatically.
-     * If SS RPL or DPL differs from CS RPL then we'll #GP.
-     */
-    if (!(c->flags & ECF_VMX_GUEST)) 
-        if ( ((ed->arch.user_ctxt.cs & 3) == 0) ||
-             ((ed->arch.user_ctxt.ss & 3) == 0) )
-                return -EINVAL;
-
-    memcpy(&ed->arch.i387,
-           &c->fpu_ctxt,
-           sizeof(ed->arch.i387));
+    if (test_bit(EDF_DONEINIT, &ed->ed_flags))
+        return 0;
 
     memcpy(ed->arch.traps,
            &c->trap_ctxt,
@@ -453,9 +464,13 @@ int arch_final_setup_guest(
 #endif
 
     update_pagetables(ed);
+    
+    /* Don't redo final setup */
+    set_bit(EDF_DONEINIT, &ed->ed_flags);
 
     return 0;
 }
+
 
 void new_thread(struct exec_domain *d,
                 unsigned long start_pc,
@@ -591,6 +606,11 @@ static void switch_segments(
             (unsigned long *)regs->rsp : 
             (unsigned long *)n->arch.kernel_sp;
 
+        if ( !(n->arch.flags & TF_kernel_mode) )
+            toggle_guest_mode(n);
+        else
+            regs->cs &= ~3;
+
         if ( put_user(regs->ss,     rsp- 1) |
              put_user(regs->rsp,    rsp- 2) |
              put_user(regs->rflags, rsp- 3) |
@@ -606,9 +626,6 @@ static void switch_segments(
             DPRINTK("Error while creating failsafe callback frame.\n");
             domain_crash();
         }
-
-        if ( !(n->arch.flags & TF_kernel_mode) )
-            toggle_guest_mode(n);
 
         regs->entry_vector  = TRAP_syscall;
         regs->rflags       &= 0xFFFCBEFFUL;
@@ -632,10 +649,10 @@ long do_switch_to_user(void)
     toggle_guest_mode(ed);
 
     regs->rip    = stu.rip;
-    regs->cs     = stu.cs;
+    regs->cs     = stu.cs | 3; /* force guest privilege */
     regs->rflags = stu.rflags;
     regs->rsp    = stu.rsp;
-    regs->ss     = stu.ss;
+    regs->ss     = stu.ss | 3; /* force guest privilege */
 
     if ( !(stu.flags & ECF_IN_SYSCALL) )
     {
@@ -644,7 +661,8 @@ long do_switch_to_user(void)
         regs->rcx = stu.rcx;
     }
     
-    return regs->rax;
+    /* Saved %rax gets written back to regs->rax in entry.S. */
+    return stu.rax; 
 }
 
 #elif defined(__i386__)
@@ -661,11 +679,12 @@ long do_switch_to_user(void)
 			: /* no output */ \
 			:"r" ((_ed)->debugreg[_reg]))
 
-void switch_to(struct exec_domain *prev_p, struct exec_domain *next_p)
+void context_switch(struct exec_domain *prev_p, struct exec_domain *next_p)
 {
+#ifdef __i386__
     struct tss_struct *tss = init_tss + smp_processor_id();
+#endif
     execution_context_t *stack_ec = get_execution_context();
-    int i;
 
     __cli();
 
@@ -697,70 +716,44 @@ void switch_to(struct exec_domain *prev_p, struct exec_domain *next_p)
             loaddebug(&next_p->arch, 7);
         }
 
-#ifdef CONFIG_VMX
-        if ( VMX_DOMAIN(next_p) )
+        if ( !VMX_DOMAIN(next_p) )
         {
-            /* Switch page tables. */
-            write_ptbase(next_p);
- 
-            set_current(next_p);
-            /* Switch GDT and LDT. */
-            __asm__ __volatile__ ("lgdt %0" : "=m" (*next_p->arch.gdt));
-
-            __sti();
-            return;
-        }
-#endif
- 
-        SET_FAST_TRAP(&next_p->arch);
+            SET_FAST_TRAP(&next_p->arch);
 
 #ifdef __i386__
-        /* Switch the kernel ring-1 stack. */
-        tss->esp1 = next_p->arch.kernel_sp;
-        tss->ss1  = next_p->arch.kernel_ss;
+            /* Switch the kernel ring-1 stack. */
+            tss->esp1 = next_p->arch.kernel_sp;
+            tss->ss1  = next_p->arch.kernel_ss;
 #endif
+        }
 
         /* Switch page tables. */
         write_ptbase(next_p);
     }
 
-    if ( unlikely(prev_p->arch.io_bitmap != NULL) )
-    {
-        for ( i = 0; i < sizeof(prev_p->arch.io_bitmap_sel) * 8; i++ )
-            if ( !test_bit(i, &prev_p->arch.io_bitmap_sel) )
-                memset(&tss->io_bitmap[i * IOBMP_BYTES_PER_SELBIT],
-                       ~0U, IOBMP_BYTES_PER_SELBIT);
-        tss->bitmap = IOBMP_INVALID_OFFSET;
-    }
-
-    if ( unlikely(next_p->arch.io_bitmap != NULL) )
-    {
-        for ( i = 0; i < sizeof(next_p->arch.io_bitmap_sel) * 8; i++ )
-            if ( !test_bit(i, &next_p->arch.io_bitmap_sel) )
-                memcpy(&tss->io_bitmap[i * IOBMP_BYTES_PER_SELBIT],
-                       &next_p->arch.io_bitmap[i * IOBMP_BYTES_PER_SELBIT],
-                       IOBMP_BYTES_PER_SELBIT);
-        tss->bitmap = IOBMP_OFFSET;
-    }
-
     set_current(next_p);
 
-    /* Switch GDT and LDT. */
     __asm__ __volatile__ ("lgdt %0" : "=m" (*next_p->arch.gdt));
-    load_LDT(next_p);
 
     __sti();
 
-    switch_segments(stack_ec, prev_p, next_p);
-}
+    if ( !VMX_DOMAIN(next_p) )
+    {
+        load_LDT(next_p);
+        switch_segments(stack_ec, prev_p, next_p);
+    }
 
+    /*
+     * We do this late on because it doesn't need to be protected by the
+     * schedule_lock, and because we want this to be the very last use of
+     * 'prev' (after this point, a dying domain's info structure may be freed
+     * without warning). 
+     */
+    clear_bit(EDF_RUNNING, &prev_p->ed_flags);
 
-/* XXX Currently the 'domain' field is ignored! XXX */
-long do_iopl(domid_t domain, unsigned int new_io_pl)
-{
-    execution_context_t *ec = get_execution_context();
-    ec->eflags = (ec->eflags & 0xffffcfff) | ((new_io_pl&3) << 12);
-    return 0;
+    schedule_tail(next_p);
+
+    BUG();
 }
 
 unsigned long __hypercall_create_continuation(
@@ -904,6 +897,10 @@ void domain_relinquish_memory(struct domain *d)
     /* Ensure that noone is running over the dead domain's page tables. */
     synchronise_pagetables(~0UL);
 
+    /* Release device mappings of other domains */
+    gnttab_release_dev_mappings( d->grant_table );
+
+
     /* Exit shadow mode before deconstructing final guest page table. */
     shadow_mode_disable(d);
 
@@ -912,16 +909,15 @@ void domain_relinquish_memory(struct domain *d)
     {
         if ( pagetable_val(ed->arch.guest_table) != 0 )
         {
-            put_page_and_type(
-                &frame_table[pagetable_val(ed->arch.guest_table) >> PAGE_SHIFT]);
+            put_page_and_type(&frame_table[
+                pagetable_val(ed->arch.guest_table) >> PAGE_SHIFT]);
             ed->arch.guest_table = mk_pagetable(0);
         }
 
         if ( pagetable_val(ed->arch.guest_table_user) != 0 )
         {
-            put_page_and_type(
-                &frame_table[pagetable_val(ed->arch.guest_table_user) >>
-                            PAGE_SHIFT]);
+            put_page_and_type(&frame_table[
+                pagetable_val(ed->arch.guest_table_user) >> PAGE_SHIFT]);
             ed->arch.guest_table_user = mk_pagetable(0);
         }
     }
@@ -952,4 +948,5 @@ void domain_relinquish_memory(struct domain *d)
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

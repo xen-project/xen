@@ -278,6 +278,13 @@ class Xend:
                              { 'op'     : 'maxmem_set',
                                'memory' : memory })
 
+    def xend_domain_vif_limit(self, id, vif, credit, period):
+        return self.xendPost(self.domainurl(id),
+                            { 'op'      : 'vif_credit_limit',
+                              'vif'     : vif,
+                              'credit'  : credit,
+                              'period'  : period })
+
     def xend_domain_vifs(self, id):
         return self.xendGet(self.domainurl(id),
                             { 'op'      : 'vifs' })

@@ -18,6 +18,9 @@ struct arch_domain
     l3_pgentry_t *mm_perdomain_l3;
 #endif
 
+    /* I/O-port access bitmap mask. */
+    u8 *iobmp_mask;       /* Address of IO bitmap mask, or NULL.      */
+
     /* shadow mode status and controls */
     unsigned int shadow_mode;  /* flags to control shadow table operation */
     spinlock_t   shadow_lock;
@@ -94,9 +97,9 @@ struct arch_exec_domain
     struct trap_bounce trap_bounce;
 
     /* I/O-port access bitmap. */
-    u64 io_bitmap_sel; /* Selector to tell us which part of the IO bitmap are
-                        * "interesting" (i.e. have clear bits) */
-    u8 *io_bitmap; /* Pointer to task's IO bitmap or NULL */
+    u8 *iobmp;        /* Guest kernel virtual address of the bitmap. */
+    int iobmp_limit;  /* Number of ports represented in the bitmap.  */
+    int iopl;         /* Current IOPL for this VCPU. */
 
     /* Trap info. */
 #ifdef ARCH_HAS_FAST_TRAP
@@ -150,4 +153,5 @@ struct arch_exec_domain
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

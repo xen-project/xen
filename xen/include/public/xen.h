@@ -191,6 +191,16 @@
 #define SCHEDOP_reasonshift     8   /* 8-bit reason code. (SCHEDOP_shutdown) */
 
 /*
+ * Reason codes for SCHEDOP_shutdown. These may be interpreted by control 
+ * software to determine the appropriate action. For the most part, Xen does
+ * not care about the shutdown code (SHUTDOWN_crash excepted).
+ */
+#define SHUTDOWN_poweroff   0  /* Domain exited normally. Clean up and kill. */
+#define SHUTDOWN_reboot     1  /* Clean up, kill, and then restart.          */
+#define SHUTDOWN_suspend    2  /* Clean up, save suspend info, kill.         */
+#define SHUTDOWN_crash      3  /* Tell controller we've crashed.             */
+
+/*
  * Commands to HYPERVISOR_console_io().
  */
 #define CONSOLEIO_write         0
@@ -428,7 +438,7 @@ typedef struct {
     _MEMORY_PADDING(F);
     memory_t mod_len;         /* 56: Size (bytes) of pre-loaded module.    */
     _MEMORY_PADDING(G);
-    u8 cmd_line[MAX_CMDLINE]; /* 64 */
+    s8 cmd_line[MAX_CMDLINE]; /* 64 */
 } PACKED start_info_t; /* 320 bytes */
 
 /* These flags are passed in the 'flags' field of start_info_t. */

@@ -363,7 +363,7 @@ static int bvt_adjdom(
  *   i.e., the domain with lowest EVT.
  *   The runqueue should be ordered by EVT so that is easy.
  */
-static task_slice_t bvt_do_schedule(s_time_t now)
+static struct task_slice bvt_do_schedule(s_time_t now)
 {
     struct domain *d;
     struct exec_domain      *prev = current, *next = NULL, *next_prime, *ed; 
@@ -375,7 +375,7 @@ static task_slice_t bvt_do_schedule(s_time_t now)
     struct bvt_edom_info *p_einf          = NULL;
     struct bvt_edom_info *next_einf       = NULL;
     struct bvt_edom_info *next_prime_einf = NULL;
-    task_slice_t        ret;
+    struct task_slice     ret;
 
     ASSERT(prev->ed_sched_priv != NULL);
     ASSERT(prev_einf != NULL);
@@ -596,4 +596,5 @@ struct scheduler sched_bvt_def = {
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

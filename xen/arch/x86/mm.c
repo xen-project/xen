@@ -101,10 +101,11 @@
 #include <asm/uaccess.h>
 #include <asm/domain_page.h>
 #include <asm/ldt.h>
+#include <asm/x86_emulate.h>
 
 #ifdef VERBOSE
 #define MEM_LOG(_f, _a...)                           \
-  printk("DOM%u: MEM_LOG(line=%d) " _f "\n", \
+  printk("DOM%u: (file=mm.c, line=%d) " _f "\n", \
          current->domain->id , __LINE__ , ## _a )
 #else
 #define MEM_LOG(_f, _a...) ((void)0)
@@ -251,11 +252,22 @@ int map_ldt_shadow_page(unsigned int off)
     unsigned gva = ed->arch.ldt_base + (off << PAGE_SHIFT);
     int res;
 
-    if ( unlikely(in_irq()) )
-        BUG();
+#if defined(__x86_64__)
+    /* If in user mode, switch to kernel mode just to read LDT mapping. */
+    extern void toggle_guest_mode(struct exec_domain *);
+    int user_mode = !(ed->arch.flags & TF_kernel_mode);
+#define TOGGLE_MODE() if ( user_mode ) toggle_guest_mode(ed)
+#elif defined(__i386__)
+#define TOGGLE_MODE() ((void)0)
+#endif
+
+    BUG_ON(unlikely(in_irq()));
 
     shadow_sync_va(ed, gva);
+
+    TOGGLE_MODE();
     __get_user(l1e, (unsigned long *)&linear_pg_table[l1_linear_offset(gva)]);
+    TOGGLE_MODE();
 
     if ( unlikely(!(l1e & _PAGE_PRESENT)) )
         return 0;
@@ -265,16 +277,15 @@ int map_ldt_shadow_page(unsigned int off)
     if ( unlikely(!VALID_MFN(gmfn)) )
         return 0;
 
-    if ( unlikely(shadow_mode_enabled(d)) )
+    res = get_page_and_type(&frame_table[gmfn], d, PGT_ldt_page);
+
+    if ( !res && unlikely(shadow_mode_enabled(d)) )
     {
         shadow_lock(d);
         shadow_remove_all_write_access(d, gpfn, gmfn);
-    }
-
-    res = get_page_and_type(&frame_table[gmfn], d, PGT_ldt_page);
-
-    if ( unlikely(shadow_mode_enabled(d)) )
+        res = get_page_and_type(&frame_table[gmfn], d, PGT_ldt_page);
         shadow_unlock(d);
+    }
 
     if ( unlikely(!res) )
         return 0;
@@ -1165,15 +1176,16 @@ int get_page_type(struct pfn_info *page, u32 type)
                  * may be unnecessary (e.g., page was GDT/LDT) but those
                  * circumstances should be very rare.
                  */
-                struct domain *d = page_get_owner(page);
+                struct exec_domain *ed;
+                unsigned long mask = 0;
+                for_each_exec_domain ( page_get_owner(page), ed )
+                    mask |= 1 << ed->processor;
+                mask = tlbflush_filter_cpuset(mask, page->tlbflush_timestamp);
 
-                // XXX SMP bug?
-                if ( unlikely(NEED_FLUSH(tlbflush_time[d->exec_domain[0]->
-                                                      processor],
-                                         page->tlbflush_timestamp)) )
+                if ( unlikely(mask != 0) )
                 {
-                    perfc_incr(need_flush_tlb_flush);
-                    flush_tlb_cpu(d->exec_domain[0]->processor);
+                    perfc_incrc(need_flush_tlb_flush);
+                    flush_tlb_mask(mask);
                 }
 
                 /* We lose existing type, back pointer, and validity. */
@@ -1976,16 +1988,108 @@ int do_mmu_update(
     return rc;
 }
 
+void update_shadow_va_mapping(unsigned long va,
+                              unsigned long val,
+                              struct exec_domain *ed,
+                              struct domain *d)
+{
+    /* This function assumes the caller is holding the domain's BIGLOCK
+     * and is running in a shadow mode
+     */
+
+    unsigned long   sval = 0;
+
+    l1pte_propagate_from_guest(d, &val, &sval);
+
+    if ( unlikely(__put_user(sval, ((unsigned long *)(
+        &shadow_linear_pg_table[l1_linear_offset(va)])))) )
+    {
+        /*
+         * Since L2's are guaranteed RW, failure indicates either that the
+         * page was not shadowed, or that the L2 entry has not yet been
+         * updated to reflect the shadow.
+         */
+
+        /* Can't use linear_l2_table with external tables. */
+        BUG_ON(shadow_mode_external(current->domain));
+
+        l2_pgentry_t gpde = linear_l2_table[l2_table_offset(va)];
+        unsigned long gpfn = l2_pgentry_val(gpde) >> PAGE_SHIFT;
+
+        if (get_shadow_status(d, gpfn))
+        {
+            unsigned long gmfn = __gpfn_to_mfn(d, gpfn);
+            unsigned long *gl1e = map_domain_mem(gmfn << PAGE_SHIFT);
+            unsigned l1_idx = l1_table_offset(va);
+            gl1e[l1_idx] = sval;
+            unmap_domain_mem(gl1e);
+            put_shadow_status(d);
+
+            perfc_incrc(shadow_update_va_fail1);
+        }
+        else
+            perfc_incrc(shadow_update_va_fail2);
+    }
+
+    /*
+     * If we're in log-dirty mode then we need to note that we've updated
+     * the PTE in the PT-holding page. We need the machine frame number
+     * for this.
+     */
+    if ( shadow_mode_log_dirty(d) )
+        mark_dirty(d, va_to_l1mfn(va));
+
+    check_pagetable(d, ed->arch.guest_table, "va"); /* debug */
+}
+
+int update_grant_va_mapping(unsigned long va,
+                            unsigned long _nl1e, 
+                            struct domain *d,
+                            struct exec_domain *ed)
+{
+    /* Caller must:
+     * . own d's BIGLOCK 
+     * . already have 'get_page' correctly on the to-be-installed nl1e
+     * . be responsible for flushing the TLB
+     * . check PTE being installed isn't DISALLOWED
+     */
+
+    int             rc = 0;
+    l1_pgentry_t   *pl1e;
+    unsigned long   _ol1e;
+
+    cleanup_writable_pagetable(d);
+
+    pl1e = &linear_pg_table[l1_linear_offset(va)];
+
+    if ( unlikely(__get_user(_ol1e, (unsigned long *)pl1e) != 0) )
+        rc = -EINVAL;
+    else
+    {
+        l1_pgentry_t ol1e = mk_l1_pgentry(_ol1e);
+
+        if ( update_l1e(pl1e, ol1e, mk_l1_pgentry(_nl1e)) )
+            put_page_from_l1e(ol1e, d);
+        else
+            rc = -EINVAL;
+    }
+
+    if ( unlikely(shadow_mode_enabled(d)) )
+        update_shadow_va_mapping(va, _nl1e, ed, d);
+
+    return rc;
+}
+
 
 int do_update_va_mapping(unsigned long va,
                          unsigned long val, 
                          unsigned long flags)
 {
-    struct exec_domain *ed = current;
-    struct domain *d = ed->domain;
-    int err = 0;
-    unsigned int cpu = ed->processor;
-    unsigned long deferred_ops;
+    struct exec_domain      *ed  = current;
+    struct domain           *d   = ed->domain;
+    unsigned int             cpu = ed->processor;
+    unsigned long            deferred_ops;
+    int                      rc = 0;
 
     perfc_incrc(calls_to_update_va);
 
@@ -2000,82 +2104,11 @@ int do_update_va_mapping(unsigned long va,
      * XXX When we make this support 4MB superpages we should also deal with 
      * the case of updating L2 entries.
      */
-    if ( likely(!shadow_mode_enabled(d)) )
-    {
-        if ( unlikely(!mod_l1_entry(&linear_pg_table[l1_linear_offset(va)],
-                                    mk_l1_pgentry(val))) )
-            err = -EINVAL;
-    }
-    else
-    {
-        unsigned long l1mfn;
-
-        if ( unlikely(percpu_info[cpu].foreign &&
-                      (shadow_mode_translate(d) ||
-                       shadow_mode_translate(percpu_info[cpu].foreign))) )
-        {
-            // The foreign domain's pfn's are in a different namespace.
-            // We wouldn't be able to figure out how to (re-)shadow our
-            // gpte without additional context.
-            //
-            domain_crash();
-        }
-    
-        check_pagetable(ed, "pre-va"); /* debug */
-        shadow_lock(d);
-        
-        // This is actually overkill - we don't need to sync the L1 itself,
-        // just everything involved in getting to this L1 (i.e. we need
-        // linear_pg_table[l1_linear_offset(va)] to be in sync)...
-        //
-        __shadow_sync_va(ed, va);
-
-#if 1 /* keep check_pagetables() happy */
-        /*
-         * However, the above doesn't guarantee that there's no snapshot of
-         * the L1 table in question; it just says that the relevant L2 and L1
-         * entries for VA are in-sync.  There might still be a snapshot.
-         *
-         * The checking code in _check_pagetables() assumes that no one will
-         * mutate the shadow of a page that has a snapshot.  It's actually
-         * OK to not sync this page, but it seems simpler to:
-         * 1) keep all code paths the same, and
-         * 2) maintain the invariant for _check_pagetables(), rather than try
-         *    to teach it about this boundary case.
-         * So we flush this L1 page, if it's out of sync.
-         */
-        l1mfn = (l2_pgentry_val(linear_l2_table(ed)[l2_table_offset(va)]) >>
-                 PAGE_SHIFT);
-        if ( mfn_out_of_sync(l1mfn) )
-        {
-            perfc_incrc(extra_va_update_sync);
-            __shadow_sync_mfn(d, l1mfn);
-        }
-#endif /* keep check_pagetables() happy */
-
-        if ( unlikely(__put_user(val, &l1_pgentry_val(
-                                     linear_pg_table[l1_linear_offset(va)]))) )
-            err = -EINVAL;
-        else
-        {
-            // also need to update the shadow
-            unsigned long spte;
-
-            l1pte_propagate_from_guest(d, val, &spte);
-            shadow_set_l1e(va, spte, 0);
-
-            /*
-             * If we're in log-dirty mode then we need to note that we've updated
-             * the PTE in the PT-holding page. We need the machine frame number
-             * for this.
-             */
-            if ( shadow_mode_log_dirty(d) )
-                mark_dirty(d, va_to_l1mfn(ed, va));
-
-            shadow_unlock(d);
-            check_pagetable(ed, "post-va"); /* debug */
-        }
-    }
+    if ( unlikely(!shadow_mode_enabled(d)) )
+        rc = update_shadow_va_mapping(va, val, ed, d);
+    else if ( unlikely(!mod_l1_entry(&linear_pg_table[l1_linear_offset(va)],
+                                     mk_l1_pgentry(val))) )
+        rc = -EINVAL;
 
     deferred_ops = percpu_info[cpu].deferred_ops;
     percpu_info[cpu].deferred_ops = 0;
@@ -2099,7 +2132,7 @@ int do_update_va_mapping(unsigned long va,
     
     UNLOCK_BIGLOCK(d);
 
-    return err;
+    return rc;
 }
 
 int do_update_va_mapping_otherdomain(unsigned long va,
@@ -2354,9 +2387,7 @@ void ptwr_flush(const int which)
     int            i, cpu = smp_processor_id();
     struct exec_domain *ed = current;
     struct domain *d = ed->domain;
-#ifdef PERF_COUNTERS
     unsigned int   modified = 0;
-#endif
 
     // not supported in combination with various shadow modes!
     ASSERT( !shadow_mode_enabled(d) );
@@ -2394,11 +2425,7 @@ void ptwr_flush(const int which)
 
     /* Ensure that there are no stale writable mappings in any TLB. */
     /* NB. INVLPG is a serialising instruction: flushes pending updates. */
-#if 1
     __flush_tlb_one(l1va); /* XXX Multi-CPU guests? */
-#else
-    flush_tlb_all();
-#endif
     PTWR_PRINTK("[%c] disconnected_l1va at %p now %p\n",
                 PTWR_PRINT_WHICH, ptep, pte);
 
@@ -2415,10 +2442,8 @@ void ptwr_flush(const int which)
         if ( likely(l1_pgentry_val(ol1e) == l1_pgentry_val(nl1e)) )
             continue;
 
-#ifdef PERF_COUNTERS
         /* Update number of entries modified. */
         modified++;
-#endif
 
         /*
          * Fast path for PTEs that have merely been write-protected
@@ -2442,16 +2467,16 @@ void ptwr_flush(const int which)
                    (L1_PAGETABLE_ENTRIES - i) * sizeof(l1_pgentry_t));
             unmap_domain_mem(pl1e);
             ptwr_info[cpu].ptinfo[which].l1va = 0;
-            UNLOCK_BIGLOCK(d);
             domain_crash();
         }
         
-        if ( unlikely(l1_pgentry_val(ol1e) & _PAGE_PRESENT) )
-            put_page_from_l1e(ol1e, d);
+        put_page_from_l1e(ol1e, d);
     }
     unmap_domain_mem(pl1e);
     
     perfc_incr_histo(wpt_updates, modified, PT_UPDATES);
+    ptwr_info[cpu].ptinfo[which].prev_exec_domain = ed;
+    ptwr_info[cpu].ptinfo[which].prev_nr_updates  = modified;
 
     /*
      * STEP 3. Reattach the L1 p.t. page into the current address space.
@@ -2470,22 +2495,149 @@ void ptwr_flush(const int which)
     ptwr_info[cpu].ptinfo[which].l1va = 0;
 }
 
+static int ptwr_emulated_update(
+    unsigned long addr,
+    unsigned long old,
+    unsigned long val,
+    unsigned int bytes,
+    unsigned int do_cmpxchg)
+{
+    unsigned long sstat, pte, pfn;
+    struct pfn_info *page;
+    l1_pgentry_t ol1e, nl1e, *pl1e, *sl1e;
+    struct domain *d = current->domain;
+
+    /* Aligned access only, thank you. */
+    if ( !access_ok(VERIFY_WRITE, addr, bytes) || ((addr & (bytes-1)) != 0) )
+    {
+        MEM_LOG("ptwr_emulate: Unaligned or bad size ptwr access (%d, %p)\n",
+                bytes, addr);
+        return X86EMUL_UNHANDLEABLE;
+    }
+
+    /* Turn a sub-word access into a full-word access. */
+    if ( (addr & ((BITS_PER_LONG/8)-1)) != 0 )
+    {
+        int           rc;
+        unsigned long full;
+        unsigned int  mask = addr & ((BITS_PER_LONG/8)-1);
+        /* Align address; read full word. */
+        addr &= ~((BITS_PER_LONG/8)-1);
+        if ( (rc = x86_emulate_read_std(addr, &full, BITS_PER_LONG/8)) )
+            return rc;
+        /* Mask out bits provided by caller. */
+        full &= ~((1UL << (bytes*8)) - 1UL) << (mask*8);
+        /* Shift the caller value and OR in the missing bits. */
+        val  &= (1UL << (bytes*8)) - 1UL;
+        val <<= mask*8;
+        val  |= full;
+    }
+
+    /* Read the PTE that maps the page being updated. */
+    if ( __get_user(pte, (unsigned long *)
+                    &linear_pg_table[l1_linear_offset(addr)]) )
+    {
+        MEM_LOG("ptwr_emulate: Cannot read thru linear_pg_table\n");
+        return X86EMUL_UNHANDLEABLE;
+    }
+
+    pfn  = pte >> PAGE_SHIFT;
+    page = &frame_table[pfn];
+
+    /* We are looking only for read-only mappings of p.t. pages. */
+    if ( ((pte & (_PAGE_RW | _PAGE_PRESENT)) != _PAGE_PRESENT) ||
+         ((page->u.inuse.type_info & PGT_type_mask) != PGT_l1_page_table) ||
+         (page_get_owner(page) != d) )
+    {
+        MEM_LOG("ptwr_emulate: Page is mistyped or bad pte (%p, %x)\n",
+                pte, page->u.inuse.type_info);
+        return X86EMUL_UNHANDLEABLE;
+    }
+
+    /* Check the new PTE. */
+    nl1e = mk_l1_pgentry(val);
+    if ( unlikely(!get_page_from_l1e(nl1e, d)) )
+        return X86EMUL_UNHANDLEABLE;
+
+    /* Checked successfully: do the update (write or cmpxchg). */
+    pl1e = map_domain_mem(page_to_phys(page) + (addr & ~PAGE_MASK));
+    if ( do_cmpxchg )
+    {
+        ol1e = mk_l1_pgentry(old);
+        if ( cmpxchg((unsigned long *)pl1e, old, val) != old )
+        {
+            unmap_domain_mem(pl1e);
+            put_page_from_l1e(nl1e, d);
+            return X86EMUL_CMPXCHG_FAILED;
+        }
+    }
+    else
+    {
+        ol1e  = *pl1e;
+        *pl1e = nl1e;
+    }
+    unmap_domain_mem(pl1e);
+
+    /* Propagate update to shadow cache. */
+    if ( unlikely(shadow_mode_enabled(d)) )
+    {
+        sstat = get_shadow_status(d, page_to_pfn(page));
+        if ( sstat & PSH_shadowed )
+        {
+            sl1e = map_domain_mem(
+                ((sstat & PSH_pfn_mask) << PAGE_SHIFT) + (addr & ~PAGE_MASK));
+            l1pte_propagate_from_guest(
+                d, &l1_pgentry_val(nl1e), &l1_pgentry_val(*sl1e));
+            unmap_domain_mem(sl1e);
+        }
+    }
+
+    /* Finally, drop the old PTE. */
+    put_page_from_l1e(ol1e, d);
+
+    return X86EMUL_CONTINUE;
+}
+
+static int ptwr_emulated_write(
+    unsigned long addr,
+    unsigned long val,
+    unsigned int bytes)
+{
+    return ptwr_emulated_update(addr, 0, val, bytes, 0);
+}
+
+static int ptwr_emulated_cmpxchg(
+    unsigned long addr,
+    unsigned long old,
+    unsigned long new,
+    unsigned int bytes)
+{
+    return ptwr_emulated_update(addr, old, new, bytes, 1);
+}
+
+static struct x86_mem_emulator ptwr_mem_emulator = {
+    .read_std         = x86_emulate_read_std,
+    .write_std        = x86_emulate_write_std,
+    .read_emulated    = x86_emulate_read_std,
+    .write_emulated   = ptwr_emulated_write,
+    .cmpxchg_emulated = ptwr_emulated_cmpxchg
+};
+
 /* Write page fault handler: check if guest is trying to modify a PTE. */
 int ptwr_do_page_fault(unsigned long addr)
 {
+    unsigned long       pte, pfn, l2e;
+    struct pfn_info    *page;
+    l2_pgentry_t       *pl2e;
+    int                 which, cpu = smp_processor_id();
+    u32                 l2_idx;
     struct exec_domain *ed = current;
-    unsigned long    pte, pfn, l2e;
-    struct pfn_info *page;
-    l2_pgentry_t    *pl2e;
-    int              which, cpu = smp_processor_id();
-    u32              l2_idx;
 
     // not supported in combination with various shadow modes!
     ASSERT( !shadow_mode_enabled(ed->domain) );
-    
-#ifdef __x86_64__
-    return 0; /* Writable pagetables need fixing for x86_64. */
-#endif
+
+    /* Can't use linear_l2_table with external tables. */
+    BUG_ON(shadow_mode_external(ed->domain));
 
     /*
      * Attempt to read the PTE that maps the VA being accessed. By checking for
@@ -2504,24 +2656,29 @@ int ptwr_do_page_fault(unsigned long addr)
 
     /* We are looking only for read-only mappings of p.t. pages. */
     if ( ((pte & (_PAGE_RW | _PAGE_PRESENT)) != _PAGE_PRESENT) ||
-         ((page->u.inuse.type_info & PGT_type_mask) != PGT_l1_page_table) )
+         ((page->u.inuse.type_info & PGT_type_mask) != PGT_l1_page_table) ||
+         (page_get_owner(page) != ed->domain) )
     {
         return 0;
     }
-    
+
+    /* x86/64: Writable pagetable code needs auditing. Use emulator for now. */
+#if defined(__x86_64__)
+    goto emulate;
+#endif
+
+    /* Writable pagetables are not yet SMP safe. Use emulator for now. */
+    if ( (ed->eid != 0) || (ed->ed_next_list != NULL) )
+        goto emulate;
+
     /* Get the L2 index at which this L1 p.t. is always mapped. */
     l2_idx = page->u.inuse.type_info & PGT_va_mask;
     if ( unlikely(l2_idx >= PGT_va_unknown) )
-    {
-        domain_crash(); /* Urk! This L1 is mapped in multiple L2 slots! */
-    }
+        goto emulate; /* Urk! This L1 is mapped in multiple L2 slots! */
     l2_idx >>= PGT_va_shift;
 
-    if ( l2_idx == (addr >> L2_PAGETABLE_SHIFT) )
-    {
-        MEM_LOG("PTWR failure! Pagetable maps itself at %p", addr);
-        domain_crash();
-    }
+    if ( unlikely(l2_idx == (addr >> L2_PAGETABLE_SHIFT)) )
+        goto emulate; /* Urk! Pagetable maps itself! */
 
     /*
      * Is the L1 p.t. mapped into the current address space? If so we call it
@@ -2532,20 +2689,16 @@ int ptwr_do_page_fault(unsigned long addr)
     which = PTWR_PT_INACTIVE;
     if ( (l2e >> PAGE_SHIFT) == pfn )
     {
-        /* Check the PRESENT bit to set ACTIVE. */
-        if ( likely(l2e & _PAGE_PRESENT) )
+        /*
+         * Check the PRESENT bit to set ACTIVE mode.
+         * If the PRESENT bit is clear, we may be conflicting with the current 
+         * ACTIVE p.t. (it may be the same p.t. mapped at another virt addr).
+         * The ptwr_flush call below will restore the PRESENT bit.
+         */
+        if ( likely(l2e & _PAGE_PRESENT) ||
+             (ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l1va &&
+              (l2_idx == ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l2_idx)) )
             which = PTWR_PT_ACTIVE;
-        else {
-            /*
-             * If the PRESENT bit is clear, we may be conflicting with
-             * the current ACTIVE p.t. (it may be the same p.t. mapped
-             * at another virt addr).
-             * The ptwr_flush call below will restore the PRESENT bit.
-             */
-            if ( ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l1va &&
-                 l2_idx == ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l2_idx )
-                which = PTWR_PT_ACTIVE;
-        }
     }
     
     PTWR_PRINTK("[%c] page_fault on l1 pt at va %p, pt for %08x, "
@@ -2559,6 +2712,18 @@ int ptwr_do_page_fault(unsigned long addr)
     if ( ptwr_info[cpu].ptinfo[which].l1va )
         ptwr_flush(which);
 
+    /*
+     * If last batch made no updates then we are probably stuck. Emulate this 
+     * update to ensure we make progress.
+     */
+    if ( (ptwr_info[cpu].ptinfo[which].prev_exec_domain == ed) &&
+         (ptwr_info[cpu].ptinfo[which].prev_nr_updates  == 0) )
+    {
+        /* Force non-emul next time, or we can get stuck emulating forever. */
+        ptwr_info[cpu].ptinfo[which].prev_exec_domain = NULL;
+        goto emulate;
+    }
+
     ptwr_info[cpu].ptinfo[which].l1va   = addr | 1;
     ptwr_info[cpu].ptinfo[which].l2_idx = l2_idx;
     
@@ -2566,11 +2731,7 @@ int ptwr_do_page_fault(unsigned long addr)
     if ( which == PTWR_PT_ACTIVE )
     {
         *pl2e = mk_l2_pgentry(l2e & ~_PAGE_PRESENT);
-#if 1
         flush_tlb(); /* XXX Multi-CPU guests? */
-#else
-        flush_tlb_all();
-#endif
     }
     
     /* Temporarily map the L1 page, and make a copy of it. */
@@ -2594,6 +2755,13 @@ int ptwr_do_page_fault(unsigned long addr)
         domain_crash();
     }
     
+    return EXCRET_fault_fixed;
+
+ emulate:
+    if ( x86_emulate_memop(get_execution_context(), addr,
+                           &ptwr_mem_emulator, BITS_PER_LONG/8) )
+        return 0;
+    perfc_incrc(ptwr_emulations);
     return EXCRET_fault_fixed;
 }
 
@@ -2656,6 +2824,31 @@ void ptwr_status(void)
     page = &frame_table[pfn];
 }
 
+void audit_pagelist(struct domain *d)
+{
+    struct list_head *list_ent;
+    int xenpages, totpages;
+
+    list_ent = d->xenpage_list.next;
+    for ( xenpages = 0; (list_ent != &d->xenpage_list); xenpages++ )
+    {
+        list_ent = list_ent->next;
+    }
+    list_ent = d->page_list.next;
+    for ( totpages = 0; (list_ent != &d->page_list); totpages++ )
+    {
+        list_ent = list_ent->next;
+    }
+
+    if ( xenpages != d->xenheap_pages ||
+         totpages != d->tot_pages )
+    {
+        printk("ARGH! dom %d: xen=%d %d, pages=%d %d\n",
+               xenpages, d->xenheap_pages, 
+               totpages, d->tot_pages );
+    }
+}
+
 #endif /* NDEBUG */
 
 /*
@@ -2665,4 +2858,5 @@ void ptwr_status(void)
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
+ * End:
  */

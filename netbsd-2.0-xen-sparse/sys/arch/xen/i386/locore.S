@@ -249,6 +249,7 @@ _C_LABEL(biosextmem):	.long	REALEXTMEM
 
 #include <machine/xen.h>
 #define __HYPERVISOR_yield		   8
+#define __SCHEDOP_yield			   0
 
 	.space 512
 tmpstk:
@@ -1592,6 +1593,7 @@ idle_loop:
 	jmp	idle_start
 4:
 	movl	$__HYPERVISOR_yield,%eax
+	movl	$__SCHEDOP_yield,%ebx
 	TRAP_INSTR
 NENTRY(mpidle)
 idle_start:	

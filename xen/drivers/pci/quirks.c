@@ -18,7 +18,6 @@
 #include <xen/pci.h>
 #include <xen/init.h>
 #include <xen/delay.h>
-#include <asm/io_apic.h>
 
 #undef DEBUG
 
@@ -332,6 +331,8 @@ static void __init quirk_vt82c686_acpi(struct pci_dev *dev)
 
 
 #ifdef CONFIG_X86_IO_APIC 
+
+#include <asm/io_apic.h>
 
 /*
  * VIA 686A/B: If an IO-APIC is active, we need to route all on-chip
