@@ -243,12 +243,12 @@ class XendDomain:
             if d['shutdown']:
                 reason = XendDomainInfo.shutdown_reason(d['shutdown_reason'])
                 log.debug('XendDomain>reap> shutdown id=%s reason=%s', id, reason)
+                dominfo = self.domain_by_id.get(id)
+                name = (dominfo and dominfo.name) or '??'
                 if reason in ['suspend']:
-                    dominfo = self.domain_by_id.get(id)
                     if dominfo.is_terminated():
                         log.debug('XendDomain>reap> Suspended domain died id=%s', id)
                     else:
-                        name = (dominfo and dominfo.name) or '??'
                         eserver.inject('xend.domain.suspended', [name, id])
                         continue
                 if reason in ['poweroff', 'reboot']:
