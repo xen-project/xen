@@ -323,9 +323,11 @@ void __init start_of_day(void)
     extern int do_timer_lists_from_pit;
     unsigned long low_mem_size;
     
+#ifdef MEMORY_GUARD
     /* Unmap the first page of CPU0's stack. */
     extern unsigned long cpu0_stack[];
     memguard_guard_range(cpu0_stack, PAGE_SIZE);
+#endif
 
     if ( opt_watchdog ) 
         nmi_watchdog = NMI_LOCAL_APIC;

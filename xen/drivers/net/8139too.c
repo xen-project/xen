@@ -138,11 +138,7 @@ typedef int pid_t;
 /* define to 1 to disable lightweight runtime debugging checks */
 #undef RTL8139_NDEBUG
 
-#ifdef XEN
-#define RTL8139_DEBUG 1
-#define RTL8139_NDEBUG 1
 #undef DPRINTK
-#endif
 
 #ifdef RTL8139_DEBUG
 /* note: prints function name for you */
@@ -2701,7 +2697,7 @@ static int __init rtl8139_init_module (void)
 	/* when we're a module, we always print a version message,
 	 * even if no 8139 board is found.
 	 */
-#if defined(MODULE) || defined(XEN)
+#if defined(MODULE)
 	printk (KERN_INFO RTL8139_DRIVER_NAME "\n");
 #endif
 
