@@ -1,6 +1,11 @@
 \documentclass[11pt,twoside,final,openright]{xenstyle}
-\usepackage{a4,graphicx,parskip,setspace,times}
+\usepackage{a4,graphicx,parskip,setspace,times,xspace}
 \setstretch{1.1}
+
+
+\def\Xend{{Xend}\xspace}
+\def\xend{{xend}\xspace}
+
 
 \begin{document}
 
@@ -52,6 +57,7 @@ Contributions of material, suggestions and corrections are welcome.
 \setstretch{1.1}
 
 \newcommand{\path}[1]{{\tt #1}}
+
 
 \part{Introduction and Tutorial}
 \chapter{Introduction}
@@ -108,22 +114,23 @@ Possible usage scenarios for Xen include:
 \section{Structure of a Xen-Based System}
 
 A Xen system has multiple layers, the lowest and most privileged of
-which is Xen itself. Xen in turn may host multiple {\em guest}
-operating systems, each of which is executed within a secure virtual
-machine (in Xen terminology, a {\em domain}). Domains are scheduled by
-Xen to make effective use of the available physical CPUs.  Each guest
-OS manages its own applications, which includes responsibility for
-scheduling each application within the time allotted to the VM by Xen.
+which is Xen itself. 
+Xen in turn may host multiple {\em guest} operating systems, each of
+which is executed within a secure virtual machine (in Xen terminology,
+a {\em domain}). Domains are scheduled by Xen to make effective use of
+the available physical CPUs.  Each guest OS manages its own
+applications, which includes responsibility for scheduling each
+application within the time allotted to the VM by Xen.
 
-The first domain, {\em Domain 0}, is created automatically when the
+The first domain, {\em domain 0}, is created automatically when the
 system boots and has special management privileges. Domain 0 builds
 other domains and manages their virtual devices. It also performs
 administrative tasks such as suspending, resuming and migrating other
 virtual machines.
 
-Within domain 0, a process called `xend' runs to manage the system.
-Xend is responsible for managing virtual machines and providing access
-to their consoles.  Commands are issued to Xend over an HTTP
+Within domain 0, a process called \xend runs to manage the system.
+\Xend is responsible for managing virtual machines and providing access
+to their consoles.  Commands are issued to \xend over an HTTP
 interface, either from a command-line tool or from a web browser.
 
 \section{Hardware Support}
@@ -276,7 +283,7 @@ following:
 
 \begin{itemize}
 \item Build Xen
-\item Build the control tools, including Xend
+\item Build the control tools, including \xend
 \item Download (if necessary) and unpack the Linux 2.6 source code,
       and patch it for use with Xen
 \item Build a Linux kernel to use in domain 0 and a smaller
@@ -464,10 +471,10 @@ the tools subdirectory of the repository and typing \\
 
 To start the control daemon, type \\ \verb!# xend start! \\ If you
 wish to start the daemon automatically, see the instructions in
-Chapter~\ref{cha:xend}. Once the daemon is running, you can use the
+Section~\ref{s:xend}. Once the daemon is running, you can use the
 {\tt xm} tool to monitor and maintain the domains running on your
 system. This chapter provides only a brief tutorial: we provide full
-details of the {\tt xm} tool in Chapter~\ref{cha:xm}. 
+details of the {\tt xm} tool in Section~\ref{s:xm}. 
 
 %\section{From the web interface}
 %
@@ -518,7 +525,7 @@ receive its IP address from a DHCP server. [i.e. {\tt dhcp='dhcp'}]
 You may also want to edit the {\bf vif} variable in order to choose
 the MAC address of the virtual ethernet interface yourself.  For
 example: \\ \verb_vif = ['mac=00:06:AA:F6:BB:B3']_\\ If you do not set
-this variable, Xend will automatically generate a random MAC address
+this variable, \xend will automatically generate a random MAC address
 from an unused range.
 
 If you don't have a \path{xmdefconfig} file, simply create your own 
@@ -643,7 +650,7 @@ The output of {\tt xm list} is in rows of the following format:\\
 
 The {\tt xm list} command also supports a long output format when the
 {\tt -l} switch is used.  This outputs the fulls details of the
-running domains in Xend's SXP configuration format.
+running domains in \xend's SXP configuration format.
 
 For example, suppose the system is running the ttylinux domain as
 described earlier.  The list command should produce output somewhat
@@ -700,7 +707,7 @@ Live migration is used to transfer a domain between physical hosts
 whilst that domain continues to perform its usual activities --- from
 the user's perspective, the migration should be imperceptible.
 
-To perform a live migration, both hosts must be running Xen / Xend and
+To perform a live migration, both hosts must be running Xen / \xend and
 the destination host must have sufficient resources (e.g. memory
 capacity) to accommodate the domain after the move.
 
@@ -876,93 +883,41 @@ XXX Put some simple examples here - would be nice if an LVM user could
 contribute some, although obviously users would have to read the LVM
 docs to do advanced stuff.
 
-\part{Quick Reference}
+\part{User Reference Documentation}
 
-\chapter{Domain Configuration Files}
-\label{cha:config}
+\chapter{Control Software} 
 
-Xen configuration files contain the following standard variables.
-Unless otherwise stated, configuration items should be enclosed in
-quotes (i.e. {\tt '...'} or {\tt ``....''})):
+\section{\Xend (Node control daemon)}
+\label{s:xend}
 
-\begin{description}
-\item[kernel] Path to the kernel image (on the server).
-\item[ramdisk] Path to a ramdisk image (optional).
-% \item[builder] The name of the domain build function (e.g. {\tt'linux'} or {\tt'netbsd'}.
-\item[memory] Memory size in megabytes.
-\item[cpu] CPU to assign this domain to.
-\item[nics] Number of virtual network interfaces.
-\item[vif] List of MAC addresses (random addresses are assigned if not
-  given) and / or bridges to use for the domains network
-  interfaces. e.g.
-\begin{verbatim}
-vif = [ 'mac=aa:00:00:00:00:11, bridge=xen-br0',
-        'bridge=xen-br1' ]
-\end{verbatim}
-  to assign a MAC address and bridge to the first interface and assign
-  a different bridge to the second interface, leaving Xend to choose
-  the MAC address.
-\item[disk] List of block devices to export to the domain.  e.g. \\
-  \verb_disk = [ 'phy:hda1,sda1,r' ]_ \\
-  exports device \path{/dev/hda1} to the domain, as \path{/dev/sda1} with
-  readonly access being allowed. \\
-  \verb_disk = [ 'phy:hda7,sda2,w', 'phy:hdb2,sda,w!' ]_ \\
-  exports device \path{/dev/hda7} to the domain as \path{/dev/sda2} with
-  write access enabled and \path{/dev/hdb2} as \path{/dev/sda} with write access
-  force enabled (bypassing safety checks, as indicated by the {\tt !}).
-\item[dhcp] Set to {\tt 'dhcp'} if you want to DHCP allocate the IP
-address.
-\item[netmask] IP netmask.
-\item[gateway] IP address for the gateway (if any).
-\item[hostname] Set the hostname for the virtual machine.
-\item[root] Set the root device.
-\item[nfs\_server] IP address for the NFS server.
-\item[nfs\_root] Path of the root filesystem on the NFS server.
-\item[extra] Extra string to append to the kernel command line.
-\item[restart] Three possible options:
-  \begin{description}
-  \item[always] Always restart the domain, no matter what
-                its exit code is.
-  \item[never]  Never restart the domain.
-  \item[onreboot] (restart the domain if it requests reboot).
-  \end{description}
-\end{description}
-
-For additional flexibility, it is also possible to include Python
-scripting commands in configuration files.  An example of this is the
-\path{xmexample} file in order to handle the {\tt vmid} variable.
-
-\chapter{Xend (Node control daemon)}
-\label{cha:xend}
-
-The Xen Daemon (Xend) performs system management functions related to
+The Xen Daemon (\Xend) performs system management functions related to
 virtual machines.  It forms a central point of control for a machine
-and can be controlled using an HTTP-based protocol.  Xend must be
+and can be controlled using an HTTP-based protocol.  \Xend must be
 running in order to start and manage virtual machines.
 
-Xend must be run as root because it needs access to privileged system
+\Xend must be run as root because it needs access to privileged system
 management functions.  A small set of commands may be issued on the
-Xend command line:
+\xend command line:
 
 \begin{tabular}{ll}
-\verb!# xend start! & start Xend, if not already running \\
-\verb!# xend stop!  & stop Xend if already running       \\
-\verb!# xend restart! & restart Xend if running, otherwise start it \\
-\verb!# xend trace_start! & start Xend, with very detailed debug logging \\
-\verb!# xend status! & indicates Xend status by its return code
+\verb!# xend start! & start \xend, if not already running \\
+\verb!# xend stop!  & stop \xend if already running       \\
+\verb!# xend restart! & restart \xend if running, otherwise start it \\
+\verb!# xend trace_start! & start \xend, with very detailed debug logging \\
+\verb!# xend status! & indicates \xend status by its return code
 \end{tabular}
 
-A SysV init script called {\tt xend} is provided to start Xend at boot
+A SysV init script called {\tt xend} is provided to start \xend at boot
 time.  {\tt make install} installs this script in {\path{/etc/init.d}.
 To enable it, you have to make symbolic links in the appropriate
 runlevel directories or use the {\tt chkconfig} tool, where available.
 
-Once Xend is running, more sophisticated administration can be done
-using the xm tool (see Chapter~\ref{cha:xm}) and the experimental
-Xensv web interface (see Chapter~\ref{cha:xensv}).
+Once \xend is running, more sophisticated administration can be done
+using the xm tool (see Section~\ref{s:xm}) and the experimental
+Xensv web interface (see Section~\ref{s:xensv}).
 
-\chapter{The xm tool}
-\label{cha:xm}
+\section{The xm tool}
+\label{s:xm}
 
 The xm tool is the primary tool for managing Xen from the console.
 The general format of an xm command line is:
@@ -1001,7 +956,7 @@ The available commands are as follows:
 \item[atropos] Set the atropos parameters for a domain.
 \item[rrobin] Set the round robin time slice for the system.
 \item[info] Get information about the Xen host.
-\item[call] Call a Xend HTTP API function directly.
+\item[call] Call a \xend HTTP API function directly.
 \end{description}
 
 For a detailed overview of switches, arguments and variables to each command
@@ -1010,15 +965,16 @@ try
 # xm help command
 \end{verbatim}
 
-\chapter{Xensv (Web control interface)}
-\label{cha:xensv}
+
+\section{Xensv (Web control interface)}
+\label{s:xensv}
 
 Xensv is the experimental web control interface for managing a Xen
 machine.  It can be used to perform some (but not yet all) of the
 management tasks that can be done using the xm tool.
 
 It can be started using:\\ \verb_# xensv start_ \\ and
-stopped using: \verb_# xensv stop_ \\ It will automatically start Xend
+stopped using: \verb_# xensv stop_ \\ It will automatically start \xend
 if it is not already running.
 
 By default, Xensv will serve out the web interface on port 8080.  This
@@ -1030,108 +986,69 @@ manage running domains.
 
 
 
-\chapter{Glossary}
+
+\chapter{Domain Configuration}
+\label{cha:config}
+
+
+\section{Configuration Files}
+\label{s:cfiles}
+
+Xen configuration files contain the following standard variables.
+Unless otherwise stated, configuration items should be enclosed in
+quotes (i.e. {\tt '...'} or {\tt ``....''})):
 
 \begin{description}
-\item[Atropos]             One of the CPU schedulers provided by Xen.
-                           Atropos provides domains with absolute shares
-                           of the CPU, with timeliness guarantees and a
-                           mechanism for sharing out `slack time'.
-
-\item[BVT]                 The BVT scheduler is used to give proportional
-                           fair shares of the CPU to domains.
-
-\item[Exokernel]           A minimal piece of privileged code, similar to
-                           a {\bf microkernel} but providing a more
-                           `hardware-like' interface to the tasks it
-                           manages.  This is similar to a paravirtualising
-                           VMM like {\bf Xen} but was designed as a new
-                           operating system structure, rather than
-                           specifically to run multiple conventional OSs.
-
-\item[Domain]              A domain is the execution context that
-                           contains a running { \bf virtual machine }.
-                           The relationship between virtual machines
-                           and domains on Xen is similar to that between
-                           programs and processes in an operating
-                           system: a virtual machine is a persistent
-                           entity that resides on disk (somewhat like
-                           a program).  When it is loaded for execution,
-                           it runs in a domain.  Each domain has a
-                           { \bf domain ID }.
-
-\item[Domain 0]            The first domain to be started on a Xen
-                           machine.  Domain 0 is responsible for managing
-                           the system.
-
-\item[Domain ID]           A unique identifier for a { \bf domain },
-                           analogous to a process ID in an operating
-                           system.  Apart from domain
-
-\item[Full virtualisation] An approach to virtualisation which
-                           requires no modifications to the hosted
-                           operating system, providing the illusion of
-                           a complete system of real hardware devices.
-
-\item[Hypervisor]          An alternative term for { \bf VMM }, used
-                           because it means `beyond supervisor',
-                           since it is responsible for managing multiple
-                           `supervisor' kernels.
-
-\item[Live migration]      A technique for moving a running virtual
-                           machine to another physical host, without
-                           stopping it or the services running on it.
-
-\item[Microkernel]         A small base of code running at the highest
-                           hardware privilege level.  A microkernel is
-                           responsible for sharing CPU and memory (and
-                           sometimes other devices) between less
-                           privileged tasks running on the system.
-                           This is similar to a VMM, particularly a
-                           {\bf paravirtualising} VMM but typically
-                           addressing a different problem space and
-                           providing different kind of interface.
-
-\item[NetBSD/Xen]          A port of NetBSD to the Xen architecture.
-
-\item[Paravirtualisation]  An approach to virtualisation which requires
-                           modifications to the operating system in
-                           order to run in a virtual machine.  Xen
-                           uses paravirtualisation but preserves
-                           binary compatibility for user space
-                           applications.
-
-\item[Shadow pagetables]   A technique for hiding the layout of machine
-                           memory from a virtual machine's operating
-                           system.  Used in some {\bf VMM}s to provide
-                           the illusion of contiguous physical memory,
-                           in Xen this is used during
-                           {\bf live migration}.
-
-\item[Virtual Machine]     The environment in which a hosted operating
-                           system runs, providing the abstraction of a
-                           dedicated machine.  A virtual machine may
-                           be identical to the underlying hardware (as
-                           in { \bf full virtualisation }, or it may
-                           differ, as in { \bf paravirtualisation }.
-
-\item[VMM]                 Virtual Machine Monitor - the software that
-                           allows multiple virtual machines to be
-                           multiplexed on a single physical machine.
-
-\item[Xen]                 Xen is a paravirtualising virtual machine
-                           monitor, developed primarily by the
-                           Systems Research Group at the University
-                           of Cambridge Computer Laboratory.
-
-\item[XenLinux]            Official name for the port of the Linux kernel
-                           that runs on Xen.
-
+\item[kernel] Path to the kernel image (on the server).
+\item[ramdisk] Path to a ramdisk image (optional).
+% \item[builder] The name of the domain build function (e.g. {\tt'linux'} or {\tt'netbsd'}.
+\item[memory] Memory size in megabytes.
+\item[cpu] CPU to assign this domain to.
+\item[nics] Number of virtual network interfaces.
+\item[vif] List of MAC addresses (random addresses are assigned if not
+  given) and / or bridges to use for the domains network
+  interfaces. e.g.
+\begin{verbatim}
+vif = [ 'mac=aa:00:00:00:00:11, bridge=xen-br0',
+        'bridge=xen-br1' ]
+\end{verbatim}
+  to assign a MAC address and bridge to the first interface and assign
+  a different bridge to the second interface, leaving \xend to choose
+  the MAC address.
+\item[disk] List of block devices to export to the domain.  e.g. \\
+  \verb_disk = [ 'phy:hda1,sda1,r' ]_ \\
+  exports device \path{/dev/hda1} to the domain, as \path{/dev/sda1} with
+  readonly access being allowed. \\
+  \verb_disk = [ 'phy:hda7,sda2,w', 'phy:hdb2,sda,w!' ]_ \\
+  exports device \path{/dev/hda7} to the domain as \path{/dev/sda2} with
+  write access enabled and \path{/dev/hdb2} as \path{/dev/sda} with write access
+  force enabled (bypassing safety checks, as indicated by the {\tt !}).
+\item[dhcp] Set to {\tt 'dhcp'} if you want to DHCP allocate the IP
+address.
+\item[netmask] IP netmask.
+\item[gateway] IP address for the gateway (if any).
+\item[hostname] Set the hostname for the virtual machine.
+\item[root] Set the root device.
+\item[nfs\_server] IP address for the NFS server.
+\item[nfs\_root] Path of the root filesystem on the NFS server.
+\item[extra] Extra string to append to the kernel command line.
+\item[restart] Three possible options:
+  \begin{description}
+  \item[always] Always restart the domain, no matter what
+                its exit code is.
+  \item[never]  Never restart the domain.
+  \item[onreboot] (restart the domain if it requests reboot).
+  \end{description}
 \end{description}
 
-\part{Advanced Topics}
+For additional flexibility, it is also possible to include Python
+scripting commands in configuration files.  An example of this is the
+\path{xmexample} file in order to handle the {\tt vmid} variable.
 
-\chapter{Advanced Network Configuration}
+
+%\part{Advanced Topics}
+
+\chapter{Network Configuration}
 
 For simple systems with a single ethernet interface with a simple
 configuration, the default installation should work `out of the
@@ -1140,22 +1057,22 @@ ethernet interfaces and / or existing bridging setups will require
 some special configuration.
 
 The purpose of this chapter is to describe the mechanisms provided by
-xend to allow a flexible configuration for Xen's virtual networking.
+\xend to allow a flexible configuration for Xen's virtual networking.
 
 \section{Xen networking scripts}
 
 Xen's virtual networking is configured by 3 shell scripts.  These are
-called automatically by Xend when certain events occur, with arguments
+called automatically by \xend when certain events occur, with arguments
 to the scripts providing further contextual information.  These
 scripts are found by default in \path{/etc/xen}.  The names and
 locations of the scripts can be configured in \path{xend-config.sxp}.
 
 \subsection{\path{network}}
 
-This script is called once when Xend is started and once when Xend is
+This script is called once when \xend is started and once when \xend is
 stopped.  Its job is to do any advance preparation required for the
-Xen virtual network when Xend starts and to do any corresponding
-cleanup when Xend exits.
+Xen virtual network when \xend starts and to do any corresponding
+cleanup when \xend exits.
 
 In the default configuration, this script creates the bridge
 `xen-br0' and moves eth0 onto that bridge, modifying the routing
@@ -1164,7 +1081,7 @@ accordingly.
 In configurations where the bridge already exists, this script could
 be replaced with a link to \path{/bin/true} (for instance).
 
-When Xend exits, this script is called with the {\tt stop} argument,
+When \xend exits, this script is called with the {\tt stop} argument,
 which causes it to delete the Xen bridge and remove {\tt eth0} from
 it, restoring the normal IP and routing configuration.
 
@@ -1178,7 +1095,7 @@ By default, this adds and removes VIFs on the default Xen bridge.
 This script can be customized to properly deal with more complicated
 bridging setups.
 
-\chapter{Advanced Scheduling Configuration}
+\chapter{Scheduler Configuration}
 
 \section{Scheduler selection}
 
@@ -1288,10 +1205,10 @@ higher throughput.
 %% There are two possible types of privileges:  IO privileges and
 %% administration privileges.
 
-\section{Driver domains (IO Privileges)}
+\section{Driver domains (I/O Privileges)}
 
-IO privileges can be assigned to allow a domain to drive PCI devices
-itself.  This is used to support driver domains.
+I/O privileges can be assigned to allow a domain to directly access
+PCI devices itself.  This is used to support driver domains.
 
 Setting backend privileges is currently only supported in SXP format
 config files.  To allow a domain to function as a backend for others,
@@ -1299,7 +1216,7 @@ somewhere within the {\tt vm} element of its configuration file must
 be a {\tt backend} element of the form {\tt (backend ({\em type}))}
 where {\tt \em type} may be either {\tt netif} or {\tt blkif},
 according to the type of virtual device this domain will service.
-After this domain has been built, Xend will connect all new and
+After this domain has been built, \xend will connect all new and
 existing {\em virtual} devices (of the appropriate type) to that
 backend.
 
@@ -1509,7 +1426,7 @@ domain).  Device IDs should be given in hex format.  Bridge devices do
 not need to be hidden --- they are hidden implicitly, since guest OSes
 do not need to configure them.
 
-\section{XenLinux Options}
+\section{XenLinux Boot Options}
 
 {\bf xencons=xxx}
 Specify the device node to
@@ -1760,6 +1677,8 @@ this was to have a \path{/linuxrc} script run ahead of
  exec /sbin/init "$@" <>/dev/console 2>&1
 \end{verbatim}
 
+%$ XXX SMH: font lock fix :-)  
+
 The one slight complication with the above is that
 \path{/sbin/portmap} is dynamically linked against
 \path{/usr/lib/libwrap.so.0} Since this is in \path{/usr}, it won't
@@ -1776,6 +1695,108 @@ creates other problems for running the \path{/linuxrc} script,
 requiring bash, portmap, mount, ifconfig, and a handful of other
 shared libraries to be copied below the mount point - a little
 statically linked C program would solve this problem.
+
+
+
+
+\chapter{Glossary of Terms}
+
+\begin{description}
+\item[Atropos]             One of the CPU schedulers provided by Xen.
+                           Atropos provides domains with absolute shares
+                           of the CPU, with timeliness guarantees and a
+                           mechanism for sharing out `slack time'.
+
+\item[BVT]                 The BVT scheduler is used to give proportional
+                           fair shares of the CPU to domains.
+
+\item[Exokernel]           A minimal piece of privileged code, similar to
+                           a {\bf microkernel} but providing a more
+                           `hardware-like' interface to the tasks it
+                           manages.  This is similar to a paravirtualising
+                           VMM like {\bf Xen} but was designed as a new
+                           operating system structure, rather than
+                           specifically to run multiple conventional OSs.
+
+\item[Domain]              A domain is the execution context that
+                           contains a running { \bf virtual machine }.
+                           The relationship between virtual machines
+                           and domains on Xen is similar to that between
+                           programs and processes in an operating
+                           system: a virtual machine is a persistent
+                           entity that resides on disk (somewhat like
+                           a program).  When it is loaded for execution,
+                           it runs in a domain.  Each domain has a
+                           { \bf domain ID }.
+
+\item[Domain 0]            The first domain to be started on a Xen
+                           machine.  Domain 0 is responsible for managing
+                           the system.
+
+\item[Domain ID]           A unique identifier for a { \bf domain },
+                           analogous to a process ID in an operating
+                           system.  Apart from domain
+
+\item[Full virtualisation] An approach to virtualisation which
+                           requires no modifications to the hosted
+                           operating system, providing the illusion of
+                           a complete system of real hardware devices.
+
+\item[Hypervisor]          An alternative term for { \bf VMM }, used
+                           because it means `beyond supervisor',
+                           since it is responsible for managing multiple
+                           `supervisor' kernels.
+
+\item[Live migration]      A technique for moving a running virtual
+                           machine to another physical host, without
+                           stopping it or the services running on it.
+
+\item[Microkernel]         A small base of code running at the highest
+                           hardware privilege level.  A microkernel is
+                           responsible for sharing CPU and memory (and
+                           sometimes other devices) between less
+                           privileged tasks running on the system.
+                           This is similar to a VMM, particularly a
+                           {\bf paravirtualising} VMM but typically
+                           addressing a different problem space and
+                           providing different kind of interface.
+
+\item[NetBSD/Xen]          A port of NetBSD to the Xen architecture.
+
+\item[Paravirtualisation]  An approach to virtualisation which requires
+                           modifications to the operating system in
+                           order to run in a virtual machine.  Xen
+                           uses paravirtualisation but preserves
+                           binary compatibility for user space
+                           applications.
+
+\item[Shadow pagetables]   A technique for hiding the layout of machine
+                           memory from a virtual machine's operating
+                           system.  Used in some {\bf VMM}s to provide
+                           the illusion of contiguous physical memory,
+                           in Xen this is used during
+                           {\bf live migration}.
+
+\item[Virtual Machine]     The environment in which a hosted operating
+                           system runs, providing the abstraction of a
+                           dedicated machine.  A virtual machine may
+                           be identical to the underlying hardware (as
+                           in { \bf full virtualisation }, or it may
+                           differ, as in { \bf paravirtualisation }.
+
+\item[VMM]                 Virtual Machine Monitor - the software that
+                           allows multiple virtual machines to be
+                           multiplexed on a single physical machine.
+
+\item[Xen]                 Xen is a paravirtualising virtual machine
+                           monitor, developed primarily by the
+                           Systems Research Group at the University
+                           of Cambridge Computer Laboratory.
+
+\item[XenLinux]            Official name for the port of the Linux kernel
+                           that runs on Xen.
+
+\end{description}
 
 
 \end{document}

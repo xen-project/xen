@@ -79,10 +79,10 @@ In addition to exporting virtualized instances of CPU, memory, network
 and block devices, Xen exposes a control interface to manage how these
 resources are shared between the running domains. Access to the
 control interface is restricted: it may only be used by one
-specially-privileged VM, known as {\em domain-0}.  This domain is a
+specially-privileged VM, known as {\em domain 0}.  This domain is a
 required part of any Xen-based server and runs the application software
 that manages the control-plane aspects of the platform.  Running the
-control software in {\it domain-0}, distinct from the hypervisor
+control software in {\it domain 0}, distinct from the hypervisor
 itself, allows the Xen framework to separate the notions of 
 mechanism and policy within the system.
 
@@ -132,6 +132,7 @@ is responsible for determining the target domain that will handle
 each physical interrupt source. 
 
 
+
 \section{Time}
 
 Guest operating systems need to be aware of the passage of both real
@@ -159,7 +160,7 @@ have elapsed since system boot.
 
 This is the time of day in a Unix-style {\tt struct timeval} (seconds
 and microseconds since 1 January 1970, adjusted by leap seconds).  An
-NTP client hosted by {\it domain-0} can keep this value accurate.  
+NTP client hosted by {\it domain 0} can keep this value accurate.  
 
 
 \item[Domain virtual time.]
@@ -343,9 +344,9 @@ different to that provided by the underlying hardware. In particular,
 the processor is already executing in protected mode with paging
 enabled.
 
-{\it Domain-0} is created and booted by Xen itself. For all subsequent
+{\it Domain 0} is created and booted by Xen itself. For all subsequent
 donains, the analogue of the boot-loader is the {\it domain builder},
-user-space software running in {\it domain-0}. The domain builder 
+user-space software running in {\it domain 0}. The domain builder 
 is responsible for building the initial page tables for a domain  
 and loading its kernel image at the appropriate virtual address. 
 
@@ -615,7 +616,7 @@ to {\tt set\_trap\_table()}).
 \section{Scheduling and Timer}
 
 Domains are premptively scheduled by Xen according to the 
-parameters installed by Domain-0 (see Section~\ref{s:dom0ops}). 
+parameters installed by domain 0 (see Section~\ref{s:dom0ops}). 
 In addition, however, a domain may choose to explicitly 
 control certain behaviour with the following hypercall: 
 
@@ -900,7 +901,7 @@ XXX SMH: damn, found some more calls - needs little bit more yet.
 \label{s:dom0ops}
 
 A large number of control operations are available to a sufficiently
-privileged domain (typically domain-0). These allow the creation and
+privileged domain (typically domain 0). These allow the creation and
 management of new domains, for example. A complete list is given 
 below: for more details on any or all of these, please see 
 {\tt xen/include/public/dom0\_ops.h} 
@@ -1349,7 +1350,7 @@ buffers will be disabled.
 
 When running a trace buffer build of Xen, trace data are written continuously
 into the buffer data areas, with newer data overwriting older data.  This data
-can be captured using the {\tt xentrace} program in Domain 0.
+can be captured using the {\tt xentrace} program in domain 0.
 
 The {\tt xentrace} tool uses {\tt /dev/mem} in domain 0 to map the trace
 buffers into its address space.  It then periodically polls all the buffers for
