@@ -440,13 +440,10 @@ int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
     unsigned int cmd = sc->op;
     int rc = 0;
 
-	if (d == current)
-		printk("Attempt to control your _own_ shadow tables. I hope you know what you're doing!\n");
+    domain_pause(d);
+    synchronise_pagetables(~0UL);
 
-	domain_pause(d);
-	synchronise_pagetables(d->processor);
-
-	spin_lock(&d->mm.shadow_lock);
+    spin_lock(&d->mm.shadow_lock);
 
     if ( cmd == DOM0_SHADOW_CONTROL_OP_OFF )
     {
@@ -475,7 +472,7 @@ int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
 
     spin_unlock(&d->mm.shadow_lock);
 
-	domain_unpause(d);
+    domain_unpause(d);
 
     return rc;
 }
