@@ -77,6 +77,13 @@ static void __do_suspend(void)
 #define netif_resume()  do{}while(0)
 #endif
 
+
+#ifdef CONFIG_XEN_USB_FRONTEND
+    extern void usbif_resume();
+#else
+#define usbif_resume() do{}while(0)
+#endif
+
     extern void time_suspend(void);
     extern void time_resume(void);
     extern unsigned long max_pfn;
@@ -144,6 +151,8 @@ static void __do_suspend(void)
     blkdev_resume();
 
     netif_resume();
+
+    usbif_resume();
 
     __sti();
 

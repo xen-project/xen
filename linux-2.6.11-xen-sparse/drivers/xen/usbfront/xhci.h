@@ -20,11 +20,10 @@
 
 /* xhci_port_t - current known state of a virtual hub ports */
 typedef struct {
-        unsigned int cs     :1; /* Connection status.  do we really need this /and/ ccs? */
+        unsigned int cs     :1; /* Connection status.         */
         unsigned int cs_chg :1; /* Connection status change.  */
         unsigned int pe     :1; /* Port enable.               */
         unsigned int pe_chg :1; /* Port enable change.        */
-        unsigned int ccs    :1; /* Current connect status.    */
         unsigned int susp   :1; /* Suspended.                 */
         unsigned int lsda   :1; /* Low speed device attached. */
         unsigned int pr     :1; /* Port reset.                */
@@ -56,10 +55,13 @@ struct xhci {
 
         int evtchn;                        /* Interdom channel to backend */
         int irq;                           /* Bound to evtchn */
-        enum { USBIF_STATE_CONNECTED    = 2,
-               USBIF_STATE_DISCONNECTED = 1,
-               USBIF_STATE_CLOSED       = 0
+        enum { 
+                USBIF_STATE_CONNECTED    = 2,
+                USBIF_STATE_DISCONNECTED = 1,
+                USBIF_STATE_CLOSED       = 0
         } state; /* State of this USB interface */
+        unsigned long recovery; /* boolean recovery in progress flag */
+        
         unsigned long bandwidth;
 
 	struct usb_bus *bus;

@@ -171,6 +171,8 @@ static void xhci_show_resp(usbif_response_t *r)
  * RING REQUEST HANDLING
  */
 
+#define RING_PLUGGED(_hc) ( RING_FULL(&_hc->usb_ring) || _hc->recovery )
+
 /**
  * xhci_construct_isoc - add isochronous information to a request
  */
@@ -216,10 +218,10 @@ static int xhci_queue_req(struct urb *urb)
         
         spin_lock_irqsave(&xhci->ring_lock, flags);
 
-        if ( RING_FULL(usb_ring) )
+        if ( RING_PLUGGED(xhci) )
         {
                 printk(KERN_WARNING
-                       "xhci_queue_req(): USB ring full, not queuing request\n");
+                       "xhci_queue_req(): USB ring plugged, not queuing request\n");
                 spin_unlock_irqrestore(&xhci->ring_lock, flags);
                 return -ENOBUFS;
         }
@@ -285,7 +287,7 @@ static inline usbif_request_t *xhci_queue_probe(usbif_vdev_t port)
         /* This is always called from the timer interrupt. */
         spin_lock(&xhci->ring_lock);
        
-        if ( RING_FULL(usb_ring) )
+        if ( RING_PLUGGED(xhci) )
         {
                 printk(KERN_WARNING
                        "xhci_queue_probe(): ring full, not queuing request\n");
@@ -296,7 +298,7 @@ static inline usbif_request_t *xhci_queue_probe(usbif_vdev_t port)
         /* Stick something in the shared communications ring. */
         req = RING_GET_REQUEST(usb_ring, usb_ring->req_prod_pvt);
 
-        memset(req, sizeof(*req), 0);
+        memset(req, 0, sizeof(*req));
 
         req->operation       = USBIF_OP_PROBE;
         req->port            = port;
@@ -322,10 +324,10 @@ static int xhci_port_reset(usbif_vdev_t port)
         /* Only ever happens from process context (hub thread). */
         spin_lock_irq(&xhci->ring_lock);
 
-        if ( RING_FULL(usb_ring) )
+        if ( RING_PLUGGED(xhci) )
         {
                 printk(KERN_WARNING
-                       "xhci_port_reset(): ring full, not queuing request\n");
+                       "xhci_port_reset(): ring plugged, not queuing request\n");
                 spin_unlock_irq(&xhci->ring_lock);
                 return -ENOBUFS;
         }
@@ -337,7 +339,7 @@ static int xhci_port_reset(usbif_vdev_t port)
         /* Stick something in the shared communications ring. */
 	req = RING_GET_REQUEST(usb_ring, usb_ring->req_prod_pvt);
 
-        memset(req, sizeof(*req), 0);
+        memset(req, 0, sizeof(*req));
 
         req->operation       = USBIF_OP_RESET;
         req->port            = port;
@@ -377,7 +379,7 @@ static void receive_usb_probe(usbif_response_t *resp)
 {
     spin_lock(&xhci->rh.port_state_lock);
 
-    if ( resp->status > 0 )
+    if ( resp->status >= 0 )
     {
         if ( resp->status == 1 )
         {
@@ -386,9 +388,19 @@ static void receive_usb_probe(usbif_response_t *resp)
             if( xhci->rh.ports[resp->data].cs == 0 )
 	    {
                 xhci->rh.ports[resp->data].cs = 1;
-                xhci->rh.ports[resp->data].ccs = 1;
                 xhci->rh.ports[resp->data].cs_chg = 1;
 	    }
+        }
+        else if ( resp->status == 0 )
+        {
+            if(xhci->rh.ports[resp->data].cs == 1 )
+            {
+                xhci->rh.ports[resp->data].cs  = 0;
+                xhci->rh.ports[resp->data].cs_chg = 1;
+		xhci->rh.ports[resp->data].pe = 0;
+		/* According to USB Spec v2.0, 11.24.2.7.2.2, we don't need
+		 * to set pe_chg since an error has not occurred. */
+            }
         }
         else
             printk(KERN_WARNING "receive_usb_probe(): unexpected status %d "
@@ -1283,10 +1295,9 @@ static int rh_submit_urb(struct urb *urb)
 		cstatus = (status->cs_chg) |
 			(status->pe_chg << 1) |
 			(xhci->rh.c_p_r[wIndex - 1] << 4);
-		retstatus = (status->ccs) |
+		retstatus = (status->cs) |
 			(status->pe << 1) |
 			(status->susp << 2) |
-			(status->pr << 8) |
 			(1 << 8) |      /* power on */
 			(status->lsda << 9);
 		*(__u16 *)data = cpu_to_le16(retstatus);
@@ -1520,6 +1531,19 @@ static void usbif_status_change(usbif_fe_interface_status_changed_t *status)
             break;
             /* Not bothering to do recovery here for now.  Keep things
              * simple. */
+
+            spin_lock_irq(&xhci->ring_lock);
+            
+            /* Clean up resources. */
+            free_page((unsigned long)xhci->usb_ring.sring);
+            free_irq(xhci->irq, xhci);
+            unbind_evtchn_from_irq(xhci->evtchn);
+
+            /* Plug the ring. */
+            xhci->recovery = 1;
+            wmb();
+            
+            spin_unlock_irq(&xhci->ring_lock);
         }
 
         /* Move from CLOSED to DISCONNECTED state. */
@@ -1624,12 +1648,40 @@ static void usbif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
     ctrl_if_send_response(msg);
 }
 
+static void send_driver_up(void)
+{
+        control_msg_t cmsg;
+        usbif_fe_interface_status_changed_t st;
+
+        /* Send a driver-UP notification to the domain controller. */
+        cmsg.type      = CMSG_USBIF_FE;
+        cmsg.subtype   = CMSG_USBIF_FE_DRIVER_STATUS_CHANGED;
+        cmsg.length    = sizeof(usbif_fe_driver_status_changed_t);
+        st.status      = USBIF_DRIVER_STATUS_UP;
+        memcpy(cmsg.msg, &st, sizeof(st));
+        ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
+}
+
+void usbif_resume(void)
+{
+        int i;
+        
+        /* Fake disconnection on all virtual USB ports (suspending / migrating
+         * will destroy hard state associated will the USB devices anyhow). */
+        /* No need to lock here. */
+        for ( i = 0; i < xhci->rh.numports; i++ )
+        {
+                xhci->rh.ports[i].cs = 0;
+                xhci->rh.ports[i].cs_chg = 1;
+		xhci->rh.ports[i].pe = 0;
+        }
+        
+        send_driver_up();
+}
 
 static int __init xhci_hcd_init(void)
 {
 	int retval = -ENOMEM, i;
-        usbif_fe_interface_status_changed_t st;
-        control_msg_t cmsg;
 
 	if ( (xen_start_info.flags & SIF_INITDOMAIN)
 	     || (xen_start_info.flags & SIF_USB_BE_DOMAIN) )
@@ -1658,14 +1710,8 @@ static int __init xhci_hcd_init(void)
         
 	alloc_xhci();
 
-        /* Send a driver-UP notification to the domain controller. */
-        cmsg.type      = CMSG_USBIF_FE;
-        cmsg.subtype   = CMSG_USBIF_FE_DRIVER_STATUS_CHANGED;
-        cmsg.length    = sizeof(usbif_fe_driver_status_changed_t);
-        st.status      = USBIF_DRIVER_STATUS_UP;
-        memcpy(cmsg.msg, &st, sizeof(st));
-        ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
-        
+        send_driver_up();
+
         /*
          * We should read 'nr_interfaces' from response message and wait
          * for notifications before proceeding. For now we assume that we
