@@ -106,10 +106,6 @@ skip_multiboot_check:
 
         /* Install relocated selectors (FS/GS unused). */
         lgdt    gdt_descr(%rip)
-        mov     $(__HYPERVISOR_DS),%ecx
-        mov     %ecx,%ds
-        mov     %ecx,%es
-        mov     %ecx,%ss
 
         /* Enable full CR4 features. */
         mov     mmu_cr4_features(%rip),%rcx
@@ -164,9 +160,6 @@ int_msg:
         .asciz "Unknown interrupt\n"
 ignore_int:
         cld
-        mov     $(__HYPERVISOR_DS),%eax
-        mov     %eax,%ds
-        mov     %eax,%es
         lea     int_msg(%rip),%rdi
         call    SYMBOL_NAME(printf)
 1:      jmp     1b

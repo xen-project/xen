@@ -1,5 +1,5 @@
 /******************************************************************************
- * arch/i386/traps.c
+ * arch/x86/traps.c
  * 
  * Modifications to Linux original are copyright (c) 2002-2004, K A Fraser
  * 
@@ -66,8 +66,6 @@ char opt_nmi[10] = "fatal";
 #endif
 string_param("nmi", opt_nmi);
 
-#if defined(__i386__)
-
 #define GUEST_FAULT(_r) (likely(VM86_MODE(_r) || !RING_0(_r)))
 
 #define DOUBLEFAULT_STACK_SIZE 1024
@@ -77,9 +75,9 @@ static unsigned char doublefault_stack[DOUBLEFAULT_STACK_SIZE];
 asmlinkage int hypercall(void);
 
 /* Master table, and the one used by CPU0. */
-struct desc_struct idt_table[256] = { {0, 0}, };
+idt_entry_t idt_table[IDT_ENTRIES] = { {0, 0}, };
 /* All other CPUs have their own copy. */
-struct desc_struct *idt_tables[NR_CPUS] = { 0 };
+idt_entry_t *idt_tables[NR_CPUS] = { 0 };
 
 asmlinkage void divide_error(void);
 asmlinkage void debug(void);
@@ -112,7 +110,7 @@ static inline int kernel_text_address(unsigned long addr)
 
 }
 
-void show_guest_stack()
+void show_guest_stack(void)
 {
     int i;
     execution_context_t *ec = get_execution_context();
@@ -199,11 +197,11 @@ void show_registers(struct xen_regs *regs)
         gs  = __HYPERVISOR_DS;
     }
 
-    printk("CPU:    %d\nEIP:    %04x:[<%08x>]      \nEFLAGS: %08x\n",
+    printk("CPU:    %d\nEIP:    %04lx:[<%08lx>]      \nEFLAGS: %08lx\n",
            smp_processor_id(), 0xffff & regs->cs, regs->eip, regs->eflags);
-    printk("eax: %08x   ebx: %08x   ecx: %08x   edx: %08x\n",
+    printk("eax: %08lx   ebx: %08lx   ecx: %08lx   edx: %08lx\n",
            regs->eax, regs->ebx, regs->ecx, regs->edx);
-    printk("esi: %08x   edi: %08x   ebp: %08x   esp: %08lx\n",
+    printk("esi: %08lx   edi: %08lx   ebp: %08lx   esp: %08lx\n",
            regs->esi, regs->edi, regs->ebp, esp);
     printk("ds: %04x   es: %04x   fs: %04x   gs: %04x   ss: %04x\n",
            ds, es, fs, gs, ss);
@@ -283,7 +281,7 @@ static inline int do_trap(int trapnr, char *str,
 
     if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
     {
-        DPRINTK("Trap %d: %08x -> %08lx\n", trapnr, regs->eip, fixup);
+        DPRINTK("Trap %d: %08lx -> %08lx\n", trapnr, regs->eip, fixup);
         regs->eip = fixup;
         return 0;
     }
@@ -472,7 +470,7 @@ asmlinkage int do_page_fault(struct xen_regs *regs)
     {
         perfc_incrc(copy_user_faults);
         if ( !ed->mm.shadow_mode )
-            DPRINTK("Page fault: %08x -> %08lx\n", regs->eip, fixup);
+            DPRINTK("Page fault: %08lx -> %08lx\n", regs->eip, fixup);
         regs->eip = fixup;
         return 0;
     }
@@ -704,7 +702,7 @@ asmlinkage int do_general_protection(struct xen_regs *regs)
 
     if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
     {
-        DPRINTK("GPF (%04x): %08x -> %08lx\n",
+        DPRINTK("GPF (%04x): %08lx -> %08lx\n",
                 regs->error_code, regs->eip, fixup);
         regs->eip = fixup;
         return 0;
@@ -1151,11 +1149,3 @@ unsigned long do_get_debugreg(int reg)
     if ( (reg < 0) || (reg > 7) ) return -EINVAL;
     return current->thread.debugreg[reg];
 }
-
-#else
-
-asmlinkage void fatal_trap(int trapnr, struct xen_regs *regs)
-{
-}
-
-#endif /* __i386__ */

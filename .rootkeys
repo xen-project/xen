@@ -1042,7 +1042,6 @@
 3ddb79c3M2n1ROZH6xk3HbyN4CPDqg xen/include/asm-x86/x86_32/uaccess.h
 41bf1717bML6GxpclTWJabiaO5W5vg xen/include/asm-x86/x86_64/asm_defns.h
 404f1b9ceJeGVaPNIENm2FkK0AgEOQ xen/include/asm-x86/x86_64/current.h
-404f1b9fl6AQ_a-T1TDK3fuwTPXmHw xen/include/asm-x86/x86_64/desc.h
 41febc4b1aCGLsm0Y0b_82h7lFtrEA xen/include/asm-x86/x86_64/domain_page.h
 404f1badfXZJZ2sU8sh9PS2EZvd19Q xen/include/asm-x86/x86_64/ldt.h
 404f1bb86rAXB3aLS1vYdcqpJiEcyg xen/include/asm-x86/x86_64/regs.h

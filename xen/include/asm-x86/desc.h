@@ -40,15 +40,24 @@
 
 #ifndef __ASSEMBLY__
 struct desc_struct {
-	unsigned long a,b;
+    u32 a, b;
 };
 
+#if defined(__x86_64__)
+typedef struct {
+    u64 a, b;
+} idt_entry_t;
+#elif defined(__i386__)
+typedef struct desc_struct idt_entry_t;
+#endif
+
 extern struct desc_struct gdt_table[];
-extern struct desc_struct *idt, *gdt;
+extern struct desc_struct *gdt;
+extern idt_entry_t        *idt;
 
 struct Xgt_desc_struct {
-	unsigned short size;
-	unsigned long address __attribute__((packed));
+    unsigned short size;
+    unsigned long address __attribute__((packed));
 };
 
 #define idt_descr (*(struct Xgt_desc_struct *)((char *)&idt - 2))

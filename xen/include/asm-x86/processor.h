@@ -438,8 +438,8 @@ struct thread_struct {
 };
 
 #define IDT_ENTRIES 256
-extern struct desc_struct idt_table[];
-extern struct desc_struct *idt_tables[];
+extern idt_entry_t idt_table[];
+extern idt_entry_t *idt_tables[];
 
 #if defined(__i386__)
 
