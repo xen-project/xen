@@ -375,12 +375,11 @@ static int emulate_privileged_op(struct xen_regs *regs)
         break;
 
     case 0x09: /* WBINVD */
+        /* Ignore the instruction if unprivileged. */
         if ( !IS_CAPABLE_PHYSDEV(ed->domain) )
-        {
             DPRINTK("Non-physdev domain attempted WBINVD.\n");
-            goto fail;
-        }
-        wbinvd();
+        else
+            wbinvd();
         break;
 
     case 0x20: /* MOV CR?,<reg> */
@@ -441,21 +440,21 @@ static int emulate_privileged_op(struct xen_regs *regs)
         break;
 
     case 0x30: /* WRMSR */
+        /* Ignore the instruction if unprivileged. */
         if ( !IS_PRIV(ed->domain) )
-        {
-            DPRINTK("Non-priv domain attempted WRMSR.\n");
+            DPRINTK("Non-priv domain attempted WRMSR(%p,%08lx,%08lx).\n",
+                    regs->ecx, (long)regs->eax, (long)regs->edx);
+        else if ( wrmsr_user(regs->ecx, regs->eax, regs->edx) )
             goto fail;
-        }
-        wrmsr(regs->ecx, regs->eax, regs->edx);
         break;
 
     case 0x32: /* RDMSR */
         if ( !IS_PRIV(ed->domain) )
-        {
-            DPRINTK("Non-priv domain attempted RDMSR.\n");
+            DPRINTK("Non-priv domain attempted RDMSR(%p,%08lx,%08lx).\n",
+                    regs->ecx, (long)regs->eax, (long)regs->edx);
+        /* Everyone can read the MSR space. */
+        if ( rdmsr_user(regs->ecx, regs->eax, regs->edx) )
             goto fail;
-        }
-        rdmsr(regs->ecx, regs->eax, regs->edx);
         break;
 
     default:

@@ -1,28 +1,45 @@
 #ifndef __ASM_MSR_H
 #define __ASM_MSR_H
 
-/*
- * Access to machine-specific registers (available on 586 and better only)
- * Note: the rd* operations modify the parameters directly (without using
- * pointer indirection), this allows gcc to optimize better
- */
-
 #define rdmsr(msr,val1,val2) \
      __asm__ __volatile__("rdmsr" \
 			  : "=a" (val1), "=d" (val2) \
 			  : "c" (msr))
 
-#define rdmsrl(msr,val) do { unsigned long a__,b__; \
-       __asm__ __volatile__("rdmsr" \
-			    : "=a" (a__), "=d" (b__) \
-			    : "c" (msr)); \
-       val = a__ | (b__<<32); \
-} while(0); 
-
 #define wrmsr(msr,val1,val2) \
      __asm__ __volatile__("wrmsr" \
 			  : /* no outputs */ \
 			  : "c" (msr), "a" (val1), "d" (val2))
+
+#define rdmsr_user(msr,val1,val2) ({\
+    int _rc = 0; \
+    __asm__ __volatile__( \
+        "1: rdmsr\n2:\n" \
+        ".section .fixup,\"ax\"\n" \
+        "3: movl $1,%2\n; jmp 2b\n" \
+        ".previous\n" \
+        ".section __ex_table,\"a\"\n" \
+        "   "__FIXUP_ALIGN"\n" \
+        "   "__FIXUP_WORD" 1b,3b\n" \
+        ".previous\n" \
+        : "=a" (val1), "=d" (val2), "=r" (_rc) \
+        : "c" (msr)); \
+    _rc; })
+
+#define wrmsr_user(msr,val1,val2) ({\
+    int _rc = 0; \
+    __asm__ __volatile__( \
+        "1: wrmsr\n2:\n" \
+        ".section .fixup,\"ax\"\n" \
+        "3: movl $1,%0\n; jmp 2b\n" \
+        ".previous\n" \
+        ".section __ex_table,\"a\"\n" \
+        "   "__FIXUP_ALIGN"\n" \
+        "   "__FIXUP_WORD" 1b,3b\n" \
+        ".previous\n" \
+        : "=r" (_rc) \
+        : "c" (msr), "a" (val1), "d" (val2)); \
+    _rc; })
 
 #define rdtsc(low,high) \
      __asm__ __volatile__("rdtsc" : "=a" (low), "=d" (high))

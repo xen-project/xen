@@ -36,13 +36,13 @@ static unsigned long msr_hi;
 static void write_msr_for(void *unused)
 {
     if (((1 << current->processor) & msr_cpu_mask))
-        wrmsr(msr_addr, msr_lo, msr_hi);
+        (void)wrmsr_user(msr_addr, msr_lo, msr_hi);
 }
 
 static void read_msr_for(void *unused)
 {
     if (((1 << current->processor) & msr_cpu_mask))
-        rdmsr(msr_addr, msr_lo, msr_hi);
+        (void)rdmsr_user(msr_addr, msr_lo, msr_hi);
 }
 
 long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)

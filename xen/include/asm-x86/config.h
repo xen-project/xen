@@ -206,8 +206,10 @@ extern void __out_of_line_bug(int line) __attribute__((noreturn));
 #define __GUEST_SS        0x082b
 
 /* For generic assembly code: use macros to define operation/operand sizes. */
-#define __OS "q"  /* Operation Suffix */
-#define __OP "r"  /* Operand Prefix */
+#define __OS          "q"  /* Operation Suffix */
+#define __OP          "r"  /* Operand Prefix */
+#define __FIXUP_ALIGN ".align 8"
+#define __FIXUP_WORD  ".quad"
 
 #elif defined(__i386__)
 
@@ -264,8 +266,10 @@ extern void __out_of_line_bug(int line) __attribute__((noreturn));
 #define __HYPERVISOR_DS 0x0810
 
 /* For generic assembly code: use macros to define operation/operand sizes. */
-#define __OS "l"  /* Operation Suffix */
-#define __OP "e"  /* Operand Prefix */
+#define __OS          "l"  /* Operation Suffix */
+#define __OP          "e"  /* Operand Prefix */
+#define __FIXUP_ALIGN ".align 4"
+#define __FIXUP_WORD  ".long"
 
 #endif /* __i386__ */
 
