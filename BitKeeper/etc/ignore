@@ -543,3 +543,8 @@ tools/xc/lib/xc_netbsd_build.o
 xen/arch/i386/pdb-stub.o
 xen/common/debug-linux.o
 xen/drivers/char/serial.o
+tools/xend/xend.o
+tools/xentrace/xentrace
+tools/xc/lib/xc_evtchn.o
+tools/xc/py/XenoUtil.pyc
+tools/xend/xend

@@ -213,6 +213,7 @@
 3fcdb64fTVgpQj9UQw5aHN_eUHlzGQ xen/drivers/message/fusion/mptscsih.h
 3fcdb64fl9djvIFAYQozgMVDUNPIkQ xen/drivers/message/fusion/scsi3.h
 3ddb79bfMlOcWUwjtg6oMYhGySHDDw xen/drivers/net/3c59x.c
+404470fdR6z_nJ196-p-JE76DGEvvg xen/drivers/net/8139too.c
 3ddb79c0tWiE8xIFHszxipeVCGKTSA xen/drivers/net/Makefile
 3f0c4247730LYUgz3p5ziYqy-s_glw xen/drivers/net/SUPPORTED_CARDS
 3ddb79bfU-H1Hms4BuJEPPydjXUEaQ xen/drivers/net/Space.c
