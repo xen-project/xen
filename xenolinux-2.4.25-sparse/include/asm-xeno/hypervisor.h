@@ -451,4 +451,15 @@ static inline int HYPERVISOR_console_io(int cmd, int count, char *str)
     return ret;
 }
 
+static inline int HYPERVISOR_physdev_op(void *physdev_op)
+{
+    int ret;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret) : "0" (__HYPERVISOR_physdev_op),
+        "b" (physdev_op) : "memory" );
+
+    return ret;
+}
+
 #endif /* __HYPERVISOR_H__ */

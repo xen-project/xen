@@ -484,6 +484,7 @@
 3ddb79c25UE59iu4JJcbRalx95mvcg xen/include/hypervisor-ifs/hypervisor-if.h
 3ead095dE_VF-QA88rl_5cWYRWtRVQ xen/include/hypervisor-ifs/kbd.h
 3ddb79c2oRPrzClk3zbTkRHlpumzKA xen/include/hypervisor-ifs/network.h
+4051db79512nOCGweabrFWO2M2h5ng xen/include/hypervisor-ifs/physdev.h
 404f3d2eR2Owk-ZcGOx9ULGHg3nrww xen/include/hypervisor-ifs/trace.h
 3f0d22cbroqp_BkoDPwkfRJhaw1LiQ xen/include/hypervisor-ifs/vbd.h
 3ddb79c4qbCoOFHrv9sCGshbWzBVlQ xen/include/scsi/scsi.h
@@ -609,6 +610,12 @@
 3e5a4e65MEvZhlr070sK5JsfAQlv7Q xenolinux-2.4.25-sparse/arch/xeno/kernel/ioport.c
 3e5a4e653U6cELGv528IxOLHvCq8iA xenolinux-2.4.25-sparse/arch/xeno/kernel/irq.c
 3e5a4e65muT6SU3ck47IP87Q7Ti5hA xenolinux-2.4.25-sparse/arch/xeno/kernel/ldt.c
+4051db84bZeRX7a_Kh6VyyDuT5FOIg xenolinux-2.4.25-sparse/arch/xeno/kernel/pci-dma.c
+4051db89iiHs38tWGkoW_RukNyaBHw xenolinux-2.4.25-sparse/arch/xeno/kernel/pci-i386.c
+4051db8dJYX86ZCLA-WfTW2dAyrehw xenolinux-2.4.25-sparse/arch/xeno/kernel/pci-i386.h
+4051db91BenvDZEMZxQCGkQyJYoG5w xenolinux-2.4.25-sparse/arch/xeno/kernel/pci-irq.c
+4051db95N9N99FjsRwi49YKUNHWI8A xenolinux-2.4.25-sparse/arch/xeno/kernel/pci-pc.c
+4051db99fbdTHgCpjywPCp7vjLCe7Q xenolinux-2.4.25-sparse/arch/xeno/kernel/physirq.c
 3e5a4e65IGt3WwQDNiL4h-gYWgNTWQ xenolinux-2.4.25-sparse/arch/xeno/kernel/process.c
 3e5a4e66tR-qJMLj3MppcKqmvuI2XQ xenolinux-2.4.25-sparse/arch/xeno/kernel/setup.c
 3e5a4e66fWSTagLGU2P8BGFGRjhDiw xenolinux-2.4.25-sparse/arch/xeno/kernel/signal.c

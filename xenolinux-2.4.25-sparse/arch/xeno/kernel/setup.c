@@ -1124,7 +1124,7 @@ static void die_irq(int irq, void *unused, struct pt_regs *regs)
 
 static int __init setup_die_event(void)
 {
-    (void)request_irq(_EVENT_DIE, die_irq, 0, "die", NULL);
+    (void)request_irq(HYPEREVENT_IRQ(_EVENT_DIE), die_irq, 0, "die", NULL);
     return 0;
 }
 
@@ -1249,7 +1249,7 @@ static void stop_irq(int irq, void *unused, struct pt_regs *regs)
 
 static int __init setup_stop_event(void)
 {
-    (void)request_irq(_EVENT_STOP, stop_irq, 0, "stop", NULL);
+    (void)request_irq(HYPEREVENT_IRQ(_EVENT_STOP), stop_irq, 0, "stop", NULL);
     return 0;
 }
 

@@ -592,6 +592,7 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
     l1_pgentry_t *l1tab = NULL, *l1start = NULL;
     struct pfn_info *page = NULL;
 
+    extern void physdev_init_dom0(struct task_struct *);
     extern void ide_probe_devices(xen_disk_info_t *);
     extern void scsi_probe_devices(xen_disk_info_t *);
     extern void cciss_probe_devices(xen_disk_info_t *);

@@ -7,6 +7,8 @@
  * Copyright (c) 2004, K A Fraser (University of Cambridge)
  */
 
+#include "xc_private.h"
+
 int xc_physdev_pci_access_modify(int xc_handle,
                                  u64 domid,
                                  int bus,

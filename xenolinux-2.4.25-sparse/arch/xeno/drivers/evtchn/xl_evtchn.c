@@ -21,6 +21,7 @@
 #include <linux/devfs_fs_kernel.h>
 #include <linux/stat.h>
 #include <linux/poll.h>
+#include <linux/irq.h>
 #include <asm/evtchn.h>
 
 /* NB. This must be shared amongst drivers if more things go in /dev/xen */
@@ -454,7 +455,8 @@ static int __init init_module(void)
     /* (DEVFS) automatically destroy the symlink with its destination. */
     devfs_auto_unregister(evtchn_miscdev.devfs_handle, symlink_handle);
 
-    err = request_irq(_EVENT_EVTCHN, evtchn_interrupt, 0, "evtchn", NULL);
+    err = request_irq(HYPEREVENT_IRQ(_EVENT_EVTCHN),
+                      evtchn_interrupt, 0, "evtchn", NULL);
     if ( err != 0 )
     {
         printk(KERN_ALERT "Could not allocate evtchn receive interrupt\n");
@@ -471,7 +473,7 @@ static int __init init_module(void)
 
 static void cleanup_module(void)
 {
-    free_irq(_EVENT_EVTCHN, NULL);
+    free_irq(HYPEREVENT_IRQ(_EVENT_EVTCHN), NULL);
     misc_deregister(&evtchn_miscdev);
 }
 

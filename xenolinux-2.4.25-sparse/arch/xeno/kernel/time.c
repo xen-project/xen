@@ -623,9 +623,9 @@ void __init time_init(void)
     __get_time_values_from_xen();
     processed_system_time = shadow_system_time;
 
-    (void)setup_irq(TIMER_IRQ, &irq_timer);
+    (void)setup_irq(HYPEREVENT_IRQ(_EVENT_TIMER), &irq_timer);
 
-    (void)setup_irq(_EVENT_DEBUG, &dbg_time);
+    (void)setup_irq(HYPEREVENT_IRQ(_EVENT_DEBUG), &dbg_time);
 
     rdtscll(alarm);
 

@@ -55,6 +55,8 @@ CONFIG_NOHIGHMEM=y
 # General setup
 #
 CONFIG_NET=y
+# CONFIG_PCI is not set
+# CONFIG_PCI_NAMES is not set
 CONFIG_SYSVIPC=y
 # CONFIG_BSD_PROCESS_ACCT is not set
 CONFIG_SYSCTL=y

@@ -14,9 +14,18 @@
 #include <asm/hypervisor.h>
 #include <asm/ptrace.h>
 
-#define TIMER_IRQ _EVENT_TIMER
+#define NR_IRQS             256
 
-#define NR_IRQS (sizeof(HYPERVISOR_shared_info->events) * 8)
+#define PHYS_IRQ_BASE         0
+#define NR_PHYS_IRQS        128
+
+#define HYPEREVENT_IRQ_BASE 128
+#define NR_HYPEREVENT_IRQS  128
+
+#define HYPEREVENT_IRQ(_ev)       ((_ev)  + HYPEREVENT_IRQ_BASE)
+#define HYPEREVENT_FROM_IRQ(_irq) ((_irq) - HYPEREVENT_IRQ_BASE)
+
+extern void physirq_init(void);
 
 #define irq_cannonicalize(_irq) (_irq)
 

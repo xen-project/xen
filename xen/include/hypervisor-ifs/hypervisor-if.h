@@ -38,6 +38,7 @@
 #define __HYPERVISOR_event_channel_op     21
 #define __HYPERVISOR_xen_version          22
 #define __HYPERVISOR_console_io           23
+#define __HYPERVISOR_physdev_op           24
 
 /*
  * MULTICALLS
@@ -58,27 +59,30 @@
  */
 
 /* Events that a guest OS may receive from the hypervisor. */
-#define EVENT_BLKDEV   0x01 /* A block device response has been queued. */
-#define EVENT_TIMER    0x02 /* A timeout has been updated. */
-#define EVENT_DIE      0x04 /* OS is about to be killed. Clean up please! */
-#define EVENT_DEBUG    0x08 /* Request guest to dump debug info (gross!) */
-#define EVENT_NET      0x10 /* There are packets for transmission. */
-#define EVENT_PS2      0x20 /* PS/2 keyboard or mouse event(s) */
-#define EVENT_STOP     0x40 /* Prepare for stopping and possible pickling */
-#define EVENT_EVTCHN   0x80 /* Event pending on an event channel */
+#define EVENT_BLKDEV   0x01  /* A block device response has been queued. */
+#define EVENT_TIMER    0x02  /* A timeout has been updated. */
+#define EVENT_DIE      0x04  /* OS is about to be killed. Clean up please! */
+#define EVENT_DEBUG    0x08  /* Request guest to dump debug info (gross!) */
+#define EVENT_NET      0x10  /* There are packets for transmission. */
+#define EVENT_PS2      0x20  /* PS/2 keyboard or mouse event(s) */
+#define EVENT_STOP     0x40  /* Prepare for stopping and possible pickling */
+#define EVENT_EVTCHN   0x80  /* Event pending on an event channel */
 #define EVENT_VBD_UPD  0x100 /* Event to signal VBDs should be reprobed */
+#define EVENT_CONSOLE  0x200 /* This is only for domain-0 initial console. */
+#define EVENT_PHYSIRQ  0x400 /* Event to signal pending physical IRQs. */
 
 /* Bit offsets, as opposed to the above masks. */
-#define _EVENT_BLKDEV   0
-#define _EVENT_TIMER    1
-#define _EVENT_DIE      2
-#define _EVENT_DEBUG    3
-#define _EVENT_NET      4
-#define _EVENT_PS2      5
-#define _EVENT_STOP     6
-#define _EVENT_EVTCHN   7
-#define _EVENT_VBD_UPD  8
-#define _EVENT_CONSOLE  9 /* This is only for domain-0 initial console. */
+#define _EVENT_BLKDEV    0
+#define _EVENT_TIMER     1
+#define _EVENT_DIE       2
+#define _EVENT_DEBUG     3
+#define _EVENT_NET       4
+#define _EVENT_PS2       5
+#define _EVENT_STOP      6
+#define _EVENT_EVTCHN    7
+#define _EVENT_VBD_UPD   8
+#define _EVENT_CONSOLE   9
+#define _EVENT_PHYSIRQ  10
 
 
 /*
@@ -204,6 +208,9 @@ typedef struct shared_info_st {
     u32 event_channel_pend_sel;
     u32 event_channel_disc[32];
     u32 event_channel_disc_sel;
+
+    /* Bitmask of physical IRQ lines that are pending for this domain. */
+    unsigned long physirq_pend;
 
     /*
      * Time: The following abstractions are exposed: System Time, Clock Time,

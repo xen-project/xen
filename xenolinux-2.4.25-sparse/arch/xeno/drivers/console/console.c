@@ -446,7 +446,8 @@ int __init xeno_con_init(void)
     }
     else
     {
-        request_irq(_EVENT_CONSOLE, control_irq, 0, "console", NULL);
+        request_irq(HYPEREVENT_IRQ(_EVENT_CONSOLE), 
+                    control_irq, 0, "console", NULL);
         control_irq(0, NULL, NULL); /* kickstart the console */
     }
 

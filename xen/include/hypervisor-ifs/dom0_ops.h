@@ -208,6 +208,20 @@ typedef struct dom0_physinfo_st
     unsigned long free_pages;
 } dom0_physinfo_t;
 
+/* 
+ * Allow a domain access to a physical PCI device
+ */
+#define DOM0_PCIDEV_ACCESS    23
+typedef struct dom0_pcidev_access_st
+{
+    /* IN variables. */
+    domid_t      domain;
+    int          bus; 
+    int          dev;
+    int          func; 
+    int          enable;
+} dom0_pcidev_access_t;
+
 typedef struct dom0_op_st
 {
     unsigned long cmd;
@@ -232,6 +246,7 @@ typedef struct dom0_op_st
 	dom0_pincpudomain_t     pincpudomain;
         dom0_gettbufs_t         gettbufs;
         dom0_physinfo_t         physinfo;
+        dom0_pcidev_access_t    pcidev_access;
     } u;
 } dom0_op_t;
 

@@ -104,6 +104,12 @@ comment 'General setup'
 
 bool 'Networking support' CONFIG_NET
 
+bool 'PCI support' CONFIG_PCI
+if [ "$CONFIG_PCI" = "y" ]; then
+   tristate '    3c590/3c900 series (592/595/597) "Vortex/Boomerang" support' CONFIG_VORTEX
+fi
+source drivers/pci/Config.in
+
 bool 'System V IPC' CONFIG_SYSVIPC
 bool 'BSD Process Accounting' CONFIG_BSD_PROCESS_ACCT
 bool 'Sysctl support' CONFIG_SYSCTL

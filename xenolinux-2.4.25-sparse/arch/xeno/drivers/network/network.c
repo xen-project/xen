@@ -25,8 +25,6 @@
 #include <net/sock.h>
 #include <net/pkt_sched.h>
 
-#define NET_IRQ _EVENT_NET
-
 #define RX_BUF_SIZE ((PAGE_SIZE/2)+1) /* Fool the slab allocator :-) */
 
 static void network_interrupt(int irq, void *dev_id, struct pt_regs *ptregs);
@@ -546,7 +544,7 @@ static int __init init_module(void)
     if ( start_info.flags & SIF_INITDOMAIN )
         (void)register_inetaddr_notifier(&notifier_inetdev);
 
-    err = request_irq(NET_IRQ, network_interrupt, 
+    err = request_irq(HYPEREVENT_IRQ(_EVENT_NET), network_interrupt, 
                       SA_SAMPLE_RANDOM, "network", NULL);
     if ( err )
     {
@@ -554,8 +552,8 @@ static int __init init_module(void)
         goto fail;
     }
     
-    err = request_irq(_EVENT_DEBUG, dbg_network_int, SA_SHIRQ, "net_dbg", 
-                      &dbg_network_int);
+    err = request_irq(HYPEREVENT_IRQ(_EVENT_DEBUG), dbg_network_int, 
+                      SA_SHIRQ, "net_dbg", &dbg_network_int);
     if ( err )
         printk(KERN_WARNING "Non-fatal error -- no debug interrupt\n");
 

@@ -19,6 +19,11 @@ extern unsigned long pci_mem_start;
 #define PCIBIOS_MIN_IO		0x1000
 #define PCIBIOS_MIN_MEM		(pci_mem_start)
 
+extern int (*pci_config_read)(int seg, int bus, int dev, int fn, int reg,
+                              int len, u32 *value);
+extern int (*pci_config_write)(int seg, int bus, int dev, int fn, int reg,
+                               int len, u32 value);
+
 void pcibios_set_master(struct pci_dev *dev);
 void pcibios_penalize_isa_irq(int irq);
 struct irq_routing_table *pcibios_get_irq_routing_table(void);

@@ -13,21 +13,14 @@
 #include <xeno/sched.h>
 #include <xeno/module.h>
 #include <xeno/types.h>
-/*#include <xeno/kernel.h>*/
 #include <xeno/pci.h>
-/*#include <xeno/string.h>*/
 #include <xeno/init.h>
 #include <xeno/slab.h>
 #include <xeno/ioport.h>
 #include <xeno/spinlock.h>
-/*#include <xeno/pm.h>*/
-/*#include <xeno/kmod.h>*/		/* for hotplug_path */
-/*#include <xeno/bitops.h>*/
 #include <xeno/delay.h>
 #include <xeno/cache.h>
-
 #include <asm/page.h>
-/*#include <asm/dma.h>*/	/* isa_dma_bridge_buggy */
 
 #undef DEBUG
 
@@ -1258,6 +1251,10 @@ struct pci_bus * __devinit pci_add_new_bus(struct pci_bus *parent, struct pci_de
 		child->resource[i]->name = child->name;
 	}
 
+	DBG("pci_add_new_bus(nr=%x,devfn=%02x(%02x:%x),parent=%x)\n",
+	    busnr, dev->devfn, PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn),
+	    parent->number);
+
 	return child;
 }
 
@@ -2111,6 +2108,19 @@ void __devinit  pci_init(void)
 
 	pci_for_each_dev(dev) {
 		pci_fixup_device(PCI_FIXUP_FINAL, dev);
+#ifdef DEBUG
+		printk("PCI: %p %02x:%02x:%02x\n", dev,
+		       dev->bus ? dev->bus->number : 0xffffffff, 
+		       PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn));
+		if (dev->bus) {
+			printk(" s=%p ", dev->bus->self);
+			if ( dev->bus->self )
+				printk(" %02x:%02x)",
+				       PCI_SLOT(dev->bus->self->devfn),
+				       PCI_FUNC(dev->bus->self->devfn));
+			printk("\n");
+		}
+#endif /* DEBUG */
 	}
 
 #ifdef CONFIG_PM

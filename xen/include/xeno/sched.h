@@ -152,6 +152,10 @@ struct task_struct
     unsigned int     max_event_channel;
     spinlock_t       event_channel_lock;
 
+    /* Physical I/O */
+    spinlock_t       pcidev_lock;
+    struct list_head pcidev_list;
+
     unsigned long flags;
 
     atomic_t refcnt;

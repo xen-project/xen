@@ -18,9 +18,9 @@
 
 typedef unsigned char byte; /* from linux/ide.h */
 
-#define XLBLK_RESPONSE_IRQ _EVENT_BLKDEV
-#define XLBLK_UPDATE_IRQ   _EVENT_VBD_UPD
-#define DEBUG_IRQ          _EVENT_DEBUG 
+#define XLBLK_RESPONSE_IRQ HYPEREVENT_IRQ(_EVENT_BLKDEV)
+#define XLBLK_UPDATE_IRQ   HYPEREVENT_IRQ(_EVENT_VBD_UPD)
+#define DEBUG_IRQ          HYPEREVENT_IRQ(_EVENT_DEBUG)
 
 #define STATE_ACTIVE    0
 #define STATE_SUSPENDED 1

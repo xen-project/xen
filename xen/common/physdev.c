@@ -35,15 +35,15 @@
 #include <xeno/pci.h>
 #include <xeno/irq.h>
 #include <xeno/event.h>
-
 #include <asm/pci.h>
-
-
 #include <hypervisor-ifs/hypervisor-if.h>
-#include <hypervisor-ifs/phys_dev.h>
+#include <hypervisor-ifs/physdev.h>
 
+#if 1
 #define DBG(_x...)
-//#define DBG(_x...) printk(_x)
+#else
+#define DBG(_x...) printk(_x)
+#endif
 
 #define ACC_READ  1
 #define ACC_WRITE 2
@@ -58,7 +58,6 @@
 #define ST_BASE_ADDRESS  0   /* bits 0-5: are for base address access */
 #define ST_ROM_ADDRESS   6   /* bit 6: is for rom address access */    
 #define ST_IRQ_DELIVERED 7   /* bit 7: waiting for end irq call */    
-
 
 typedef struct _phys_dev_st
 {
@@ -84,7 +83,7 @@ static phys_dev_t *find_pdev(struct task_struct *p, struct pci_dev *dev)
     phys_dev_t *t, *res = NULL;
     struct list_head *tmp;
 
-    list_for_each(tmp, &p->dev_list)
+    list_for_each(tmp, &p->pcidev_list)
     {
         t = list_entry(tmp,  phys_dev_t, node);
         if ( dev == t->dev )
@@ -120,7 +119,7 @@ static void add_dev_to_task(struct task_struct *p,
     pdev->dev = dev;
     pdev->flags = acc;
     pdev->state = 0;
-    list_add(&pdev->node, &p->dev_list);
+    list_add(&pdev->node, &p->pcidev_list);
 
     if ( acc == ACC_WRITE )
         pdev->owner = p;
@@ -154,7 +153,7 @@ int physdev_pci_access_modify(
 
     DPRINTK("physdev_pci_access_modify: %02x:%02x:%02x\n", bus, dev, func);
 
-    if ( (p = find_domain_by_id(dom) == NULL ) 
+    if ( (p = find_domain_by_id(dom)) == NULL ) 
         return -ESRCH;
 
     /* Make the domain privileged. */
@@ -181,7 +180,7 @@ int physdev_pci_access_modify(
     DPRINTK("  add R0 %02x:%02x:%02x\n", 0, 0, 0);
 
     /* Grant read access to all devices on the path to the root. */
-    while ( tdev = pdev->bus->self; tdev != NULL; tdev = tdev->bus->self )
+    for ( tdev = pdev->bus->self; tdev != NULL; tdev = tdev->bus->self )
     {
         add_dev_to_task(p, tdev, ACC_READ);
         DPRINTK("  add RO %02x:%02x:%02x\n", tdev->bus->number,
@@ -559,13 +558,13 @@ static void phys_dev_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 
     //printk("owner %p\n", p);
 
-    if ( test_bit(irq, &p->shared_info->virt_phys_irq) )
+    if ( test_bit(irq, &p->shared_info->physirq_pend) )
     {
         printk("irq %d already delivered to guest\n", irq);
         return;
     }
     /* notify guest */
-    set_bit(irq, &p->shared_info->virt_phys_irq);
+    set_bit(irq, &p->shared_info->physirq_pend);
     set_bit(ST_IRQ_DELIVERED, &pdev->state);
     cpu_mask |= mark_guest_event(p, _EVENT_TIMER);
     guest_event_notify(cpu_mask);
@@ -587,7 +586,7 @@ static void end_virt_irq (unsigned int i)
 static long pci_request_irq(int irq)
 {
     int err;
-    phys_dev_t *pdev, *t;
+    phys_dev_t *pdev = NULL, *t;
     hw_irq_controller *new, *orig;
     struct list_head *tmp;
 
@@ -595,7 +594,7 @@ static long pci_request_irq(int irq)
 
     /* find pdev */
 
-    list_for_each(tmp, &current->dev_list)
+    list_for_each(tmp, &current->pcidev_list)
     {
         t = list_entry(tmp,  phys_dev_t, node);
         if ( t->dev->irq == irq )
@@ -605,7 +604,7 @@ static long pci_request_irq(int irq)
         }
     }
 
-    if ( !pdev )
+    if ( pdev == NULL )
     {
         printk("no device matching IRQ %d\n", irq);
         return -EINVAL;
@@ -711,7 +710,7 @@ static long pci_finished_irq(int irq)
         return -EINVAL;
     }
 
-    if ( test_bit(irq, &current->shared_info->virt_phys_irq) )
+    if ( test_bit(irq, &current->shared_info->physirq_pend) )
     {
         printk("finished_irq called for un-acknowleged irq %d\n", irq);        
         return -EINVAL;
@@ -728,54 +727,53 @@ static long pci_finished_irq(int irq)
 /*
  * demux hypervisor call.
  */
-long do_phys_dev_op(phys_dev_op_t *uop)
+long do_physdev_op(physdev_op_t *uop)
 {
-    phys_dev_op_t op;
+    physdev_op_t op;
     long ret;
-
 
     if ( unlikely(copy_from_user(&op, uop, sizeof(op)) != 0) )
         return -EFAULT;
 
     switch ( op.cmd )
     {
-    case DEVOP_CFGREG_READ:
+    case PHYSDEVOP_CFGREG_READ:
         ret = pci_cfgreg_read (op.u.cfg_read.seg, op.u.cfg_read.bus,
                                op.u.cfg_read.dev, op.u.cfg_read.func,
                                op.u.cfg_read.reg, op.u.cfg_read.len,
                                &op.u.cfg_read.value);
         break;
 
-    case DEVOP_CFGREG_WRITE:
+    case PHYSDEVOP_CFGREG_WRITE:
         ret = pci_cfgreg_write (op.u.cfg_write.seg, op.u.cfg_write.bus,
                                 op.u.cfg_write.dev, op.u.cfg_write.func,
                                 op.u.cfg_write.reg, op.u.cfg_write.len,
                                 op.u.cfg_write.value);
         break;
 
-    case DEVOP_FIND_IRQ:
+    case PHYSDEVOP_FIND_IRQ:
         ret = pci_find_irq (op.u.find_irq.seg, op.u.find_irq.bus,
                             op.u.find_irq.dev, op.u.find_irq.func,
                             &op.u.find_irq.irq);
         break;
 
-    case DEVOP_REQUEST_IRQ:
+    case PHYSDEVOP_REQUEST_IRQ:
         ret = pci_request_irq (op.u.request_irq.irq);
         break;
 
-    case DEVOP_FREE_IRQ:
+    case PHYSDEVOP_FREE_IRQ:
         ret = pci_free_irq (op.u.free_irq.irq);
         break;
 
-    case DEVOP_ENABLE_IRQ:
+    case PHYSDEVOP_ENABLE_IRQ:
         ret = pci_enable_irq (op.u.enable_irq.irq);
         break;
 
-    case DEVOP_DISABLE_IRQ:
+    case PHYSDEVOP_DISABLE_IRQ:
         ret = pci_disable_irq (op.u.disable_irq.irq);
         break;
 
-    case DEVOP_FINISHED_IRQ:
+    case PHYSDEVOP_FINISHED_IRQ:
         ret = pci_finished_irq (op.u.finished_irq.irq);
         break;
 
@@ -798,9 +796,7 @@ void physdev_init_dom0(struct task_struct *p)
     struct pci_dev *dev;
     phys_dev_t *pdev;
 
-    printk("Give Dom0 read access to all PCI devices\n");
-
-    INIT_LIST_HEAD(&p->dev_list);
+    printk("Give DOM0 read access to all PCI devices\n");
 
     pci_for_each_dev(dev)
     {
@@ -810,6 +806,6 @@ void physdev_init_dom0(struct task_struct *p)
         pdev->flags = ACC_READ;
         pdev->state = 0;
         pdev->owner = p;
-        list_add(&pdev->node, &p->dev_list);
+        list_add(&pdev->node, &p->pcidev_list);
 	}    
 }

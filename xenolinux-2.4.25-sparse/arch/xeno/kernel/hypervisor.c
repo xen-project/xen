@@ -37,13 +37,14 @@ void do_hypervisor_callback(struct pt_regs *regs)
             "   sub  $4,%%esp                      ;"
             "   jmp  2f                            ;"
             "1: btrl %%eax,%0                      ;" /* clear bit     */
+            "   add  %2,%%eax                      ;"
             "   mov  %%eax,(%%esp)                 ;"
             "   call do_IRQ                        ;" /* do_IRQ(event) */
             "2: bsfl %0,%%eax                      ;" /* %eax == bit # */
             "   jnz  1b                            ;"
             "   add  $8,%%esp                      ;"
             /* we use %ebx because it is callee-saved */
-            : : "b" (events), "r" (regs)
+            : : "b" (events), "r" (regs), "i" (HYPEREVENT_IRQ_BASE)
             /* clobbered by callback function calls */
             : "eax", "ecx", "edx", "memory" ); 
 
@@ -54,41 +55,40 @@ void do_hypervisor_callback(struct pt_regs *regs)
     while ( shared->events );
 }
 
-
-
 /*
  * Define interface to generic handling in irq.c
  */
 
 static void shutdown_hypervisor_event(unsigned int irq)
 {
-    clear_bit(irq, &event_mask);
-    clear_bit(irq, &HYPERVISOR_shared_info->events_mask);
+    clear_bit(HYPEREVENT_FROM_IRQ(irq), &event_mask);
+    clear_bit(HYPEREVENT_FROM_IRQ(irq), &HYPERVISOR_shared_info->events_mask);
 }
 
 static void enable_hypervisor_event(unsigned int irq)
 {
-    set_bit(irq, &event_mask);
-    set_bit(irq, &HYPERVISOR_shared_info->events_mask);
-    if ( test_bit(EVENTS_MASTER_ENABLE_BIT, 
+    set_bit(HYPEREVENT_FROM_IRQ(irq), &event_mask);
+    set_bit(HYPEREVENT_FROM_IRQ(irq), &HYPERVISOR_shared_info->events_mask);
+    if ( test_bit(EVENTS_MASTER_ENABLE_BIT,
                   &HYPERVISOR_shared_info->events_mask) )
         do_hypervisor_callback(NULL);
 }
 
 static void disable_hypervisor_event(unsigned int irq)
 {
-    clear_bit(irq, &event_mask);
-    clear_bit(irq, &HYPERVISOR_shared_info->events_mask);
+    clear_bit(HYPEREVENT_FROM_IRQ(irq), &event_mask);
+    clear_bit(HYPEREVENT_FROM_IRQ(irq), &HYPERVISOR_shared_info->events_mask);
 }
 
 static void ack_hypervisor_event(unsigned int irq)
 {
-    if ( !(event_mask & (1<<irq)) )
+    int ev = HYPEREVENT_FROM_IRQ(irq);
+    if ( !(event_mask & (1<<ev)) )
     {
-        printk("Unexpected hypervisor event %d\n", irq);
+        printk("Unexpected hypervisor event %d\n", ev);
         atomic_inc(&irq_err_count);
     }
-    set_bit(irq, &HYPERVISOR_shared_info->events_mask);
+    set_bit(ev, &HYPERVISOR_shared_info->events_mask);
 }
 
 static unsigned int startup_hypervisor_event(unsigned int irq)
@@ -116,11 +116,14 @@ void __init init_IRQ(void)
 {
     int i;
 
-    for ( i = 0; i < NR_IRQS; i++ )
+    for ( i = 0; i < NR_HYPEREVENT_IRQS; i++ )
     {
-        irq_desc[i].status  = IRQ_DISABLED;
-        irq_desc[i].action  = 0;
-        irq_desc[i].depth   = 1;
-        irq_desc[i].handler = &hypervisor_irq_type;
+        irq_desc[i + HYPEREVENT_IRQ_BASE].status  = IRQ_DISABLED;
+        irq_desc[i + HYPEREVENT_IRQ_BASE].action  = 0;
+        irq_desc[i + HYPEREVENT_IRQ_BASE].depth   = 1;
+        irq_desc[i + HYPEREVENT_IRQ_BASE].handler = &hypervisor_irq_type;
     }
+
+    /* Also initialise the physical IRQ handlers. */
+    physirq_init();
 }
