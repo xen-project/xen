@@ -208,6 +208,12 @@ int arch_set_info_guest(struct exec_domain *p, full_execution_context_t *c)
 	return 1;
 }
 
+int arch_final_setup_guest(struct exec_domain *p, full_execution_context_t *c)
+{
+	dummy();
+	return 1;
+}
+
 void domain_relinquish_memory(struct domain *d)
 {
 	dummy();
@@ -397,12 +403,20 @@ int elf_sanity_check(Elf_Ehdr *ehdr)
 
 static void copy_memory(void *dst, void *src, int size)
 {
+	int remain;
+
 	if (IS_XEN_ADDRESS(dom0,src)) {
 		memcpy(dst,src,size);
 	}
 	else {
-		if (__copy_from_user(dst,src,size))
-			printf("incomplete user copy\n");
+		printf("About to call __copy_from_user(%p,%p,%d)\n",
+			dst,src,size);
+		while (remain = __copy_from_user(dst,src,size)) {
+			printf("incomplete user copy, %d remain of %d\n",
+				remain,size);
+			dst += size - remain; src += size - remain;
+			size -= remain;
+		}
 	}
 }
 
