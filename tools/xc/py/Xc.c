@@ -1050,6 +1050,25 @@ static PyObject *pyxc_evtchn_bind_interdomain(PyObject *self,
                          "port2", port2);
 }
 
+static PyObject *pyxc_evtchn_bind_virq(PyObject *self,
+                                       PyObject *args,
+                                       PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+
+    int virq, port;
+
+    static char *kwd_list[] = { "virq", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i", kwd_list, &virq) )
+        return NULL;
+
+    if ( xc_evtchn_bind_virq(xc->xc_handle, virq, &port) != 0 )
+        return PyErr_SetFromErrno(xc_error);
+
+    return PyInt_FromLong(port);
+}
+
 static PyObject *pyxc_evtchn_close(PyObject *self,
                                    PyObject *args,
                                    PyObject *kwds)
@@ -1647,6 +1666,13 @@ static PyMethodDef pyxc_methods[] = {
       "Returns: [dict] dictionary is empty on failure.\n"
       " port1 [int]: Port-id for endpoint at dom1.\n"
       " port2 [int]: Port-id for endpoint at dom2.\n" },
+
+    { "evtchn_bind_virq", 
+      (PyCFunction)pyxc_evtchn_bind_virq, 
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Bind an event channel to the specified VIRQ.\n"
+      " virq [int]: VIRQ to bind.\n\n"
+      "Returns: [int] Bound event-channel port.\n" },
 
     { "evtchn_close", 
       (PyCFunction)pyxc_evtchn_close, 

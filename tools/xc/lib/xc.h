@@ -229,6 +229,9 @@ int xc_evtchn_bind_interdomain(int xc_handle,
                                u32 dom2,   /* may be DOMID_SELF */
                                int *port1,
                                int *port2);
+int xc_evtchn_bind_virq(int xc_handle,
+                        int virq,
+                        int *port);
 int xc_evtchn_close(int xc_handle,
                     u32 dom,   /* may be DOMID_SELF */
                     int port);

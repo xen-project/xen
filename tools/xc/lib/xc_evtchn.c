@@ -8,6 +8,7 @@
 
 #include "xc_private.h"
 
+
 static int do_evtchn_op(int xc_handle, evtchn_op_t *op)
 {
     int ret = -1;
@@ -29,6 +30,7 @@ static int do_evtchn_op(int xc_handle, evtchn_op_t *op)
  out1: return ret;
 }
 
+
 int xc_evtchn_bind_interdomain(int xc_handle,
                                u32 dom1,
                                u32 dom2,
@@ -48,6 +50,26 @@ int xc_evtchn_bind_interdomain(int xc_handle,
             *port1 = op.u.bind_interdomain.port1;
         if ( port2 != NULL )
             *port2 = op.u.bind_interdomain.port2;
+    }
+    
+    return rc;
+}
+
+
+int xc_evtchn_bind_virq(int xc_handle,
+                        int virq,
+                        int *port)
+{
+    evtchn_op_t op;
+    int         rc;
+
+    op.cmd = EVTCHNOP_bind_virq;
+    op.u.bind_virq.virq = (u32)virq;
+   
+    if ( (rc = do_evtchn_op(xc_handle, &op)) == 0 )
+    {
+        if ( port != NULL )
+            *port = op.u.bind_virq.port;
     }
     
     return rc;
