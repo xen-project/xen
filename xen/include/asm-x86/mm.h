@@ -129,8 +129,6 @@ static inline u32 pickle_domptr(struct domain *domain)
 #define page_get_owner(_p)    (unpickle_domptr((_p)->u.inuse._domain))
 #define page_set_owner(_p,_d) ((_p)->u.inuse._domain = pickle_domptr(_d))
 
-#define page_out_of_sync(_p)  ((_p)->count_info & PGC_out_of_sync)
-
 #define SHARE_PFN_WITH_DOMAIN(_pfn, _dom)                                   \
     do {                                                                    \
         page_set_owner((_pfn), (_dom));                                     \
@@ -233,22 +231,6 @@ static inline int get_page_and_type(struct pfn_info *page,
     }
 
     return rc;
-}
-
-static inline int mfn_is_page_table(unsigned long mfn)
-{
-    if ( !pfn_is_ram(mfn) )
-        return 0;
-
-    return frame_table[mfn].count_info & PGC_page_table;
-}
-
-static inline int page_is_page_table(struct pfn_info *page)
-{
-    if ( !pfn_is_ram(page_to_pfn(page)) )
-        return 0;
-
-    return page->count_info & PGC_page_table;
 }
 
 #define ASSERT_PAGE_IS_TYPE(_p, _t)                            \

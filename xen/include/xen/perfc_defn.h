@@ -83,3 +83,4 @@ PERFCOUNTER_CPU(validate_pte_calls,                "calls to validate_pte_change
 PERFCOUNTER_CPU(validate_pte_changes,              "validate_pte makes changes")
 PERFCOUNTER_CPU(validate_pde_calls,                "calls to validate_pde_change")
 PERFCOUNTER_CPU(validate_pde_changes,              "validate_pde makes changes")
+PERFCOUNTER_CPU(shadow_get_page_fail,   "shadow_get_page_from_l1e fails" )
