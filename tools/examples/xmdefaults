@@ -16,7 +16,7 @@ if vmid <= 0:
 
 #----------------------------------------------------------------------------
 # Kernel image file.
-kernel = "../../../install/boot/vmlinuz-2.4.26-xen"
+kernel = "../../../install/boot/vmlinuz-2.4.26-xenU"
 
 # Optional ramdisk.
 #ramdisk = "/boot/initrd.gz"
