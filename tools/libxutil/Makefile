@@ -64,7 +64,7 @@ check-for-zlib:
 
 install: all
 	[ -d $(DESTDIR)/usr/lib ] || $(INSTALL_DIR) -p $(DESTDIR)/usr/lib
-	$(INSTALL_PROG) $(LIB) $(DESTDIR)/usr/lib
+	$(INSTALL_PROG) $(LIB_NAME).so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/lib
 	ln -sf $(LIB_NAME).so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/lib/$(LIB_NAME).so.$(MAJOR)
 	ln -sf $(LIB_NAME).so.$(MAJOR) $(DESTDIR)/usr/lib/$(LIB_NAME).so
 
