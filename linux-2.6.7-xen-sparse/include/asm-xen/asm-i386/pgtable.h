@@ -457,4 +457,7 @@ static inline unsigned long arbitrary_virt_to_phys(void *va)
 #define __HAVE_ARCH_PTE_SAME
 #include <asm-generic/pgtable.h>
 
+#define HAVE_ARCH_UNMAPPED_AREA
+#define HAVE_ARCH_CHECK_FIXED_MAPPING
+
 #endif /* _I386_PGTABLE_H */
