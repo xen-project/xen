@@ -381,26 +381,32 @@ typedef struct shared_info_st
 #define MAX_CMDLINE 256
 #define BASIC_START_INFO                                                      \
     /* THE FOLLOWING ARE FILLED IN BOTH ON INITIAL BOOT AND ON RESUME.     */ \
-    unsigned long nr_pages;       /* total pages allocated to this domain. */ \
-    unsigned long shared_info;    /* MACHINE address of shared info struct.*/ \
-    unsigned long flags;          /* SIF_xxx flags.                        */ \
+    memory_t nr_pages;       /*  0: Total pages allocated to this domain. */  \
+    _MEMORY_PADDING(A);                                                       \
+    memory_t shared_info;    /*  8: MACHINE address of shared info struct.*/  \
+    _MEMORY_PADDING(B);                                                       \
+    u32      flags;          /* 16: SIF_xxx flags.                        */  \
+    u32      __pad;                                                           \
     /* THE FOLLOWING ARE ONLY FILLED IN ON INITIAL BOOT (NOT RESUME).      */ \
-    unsigned long pt_base;        /* VIRTUAL address of page directory.    */ \
-    unsigned long nr_pt_frames;   /* Number of bootstrap p.t. frames.      */ \
-    unsigned long mfn_list;       /* VIRTUAL address of page-frame list.   */ \
-    unsigned long mod_start;      /* VIRTUAL address of pre-loaded module. */ \
-    unsigned long mod_len;        /* Size (bytes) of pre-loaded module.    */ \
-    unsigned char cmd_line[MAX_CMDLINE]
+    memory_t pt_base;        /* 24: VIRTUAL address of page directory.    */  \
+    _MEMORY_PADDING(C);                                                       \
+    memory_t nr_pt_frames;   /* 32: Number of bootstrap p.t. frames.      */  \
+    _MEMORY_PADDING(D);                                                       \
+    memory_t mfn_list;       /* 40: VIRTUAL address of page-frame list.   */  \
+    _MEMORY_PADDING(E);                                                       \
+    memory_t mod_start;      /* 48: VIRTUAL address of pre-loaded module. */  \
+    _MEMORY_PADDING(F);                                                       \
+    memory_t mod_len;        /* 56: Size (bytes) of pre-loaded module.    */  \
+    _MEMORY_PADDING(G);                                                       \
+    u8 cmd_line[MAX_CMDLINE] /* 64 */
 
 typedef struct {
     BASIC_START_INFO;
-} start_info_t;
+} PACKED start_info_t; /* 320 bytes */
 
 /* These flags are passed in the 'flags' field of start_info_t. */
-#define SIF_PRIVILEGED 1          /* Is the domain privileged? */
-#define SIF_INITDOMAIN 2          /* Is this the initial control domain? */
-#define SIF_BLK_BE_DOMAIN 4       /* Is this a block backend domain? */
-#define SIF_NET_BE_DOMAIN 8       /* Is this a net backend domain? */
+#define SIF_PRIVILEGED    (1<<0)  /* Is the domain privileged? */
+#define SIF_INITDOMAIN    (1<<1)  /* Is this the initial control domain? */
 
 /* For use in guest OSes. */
 extern shared_info_t *HYPERVISOR_shared_info;

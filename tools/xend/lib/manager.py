@@ -158,6 +158,7 @@ def new_network_interface(dom, handle=-1):
 ##   for the network will only be accepted from this domain.
 ##
 def set_network_backend(dom):
-    if xend.netif.be_port: xend.netif.recovery = True
+    if xend.netif.be_port.remote_dom != 0:
+        xend.netif.recovery = True
     xend.netif.be_port = xend.main.port_from_dom(dom)
     return { 'success' : True }
