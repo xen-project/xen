@@ -536,7 +536,7 @@ starting domains and functions for managing running domains.
 
 Full details of the {\tt xm} tool are found in Chapter~\ref{cha:xm}.
 
-This example explains how to use the \path{xmdefaults} file.  If you
+This example explains how to use the \path{xmdefconfig} file.  If you
 require a more complex setup, you will want to write a custom
 configuration file --- details of the configuration file formats are
 included in Chapter~\ref{cha:config}.
@@ -549,9 +549,10 @@ to be reused for multiple virtual machines.  Setting the value of the
 {\tt vmid} variable on the {\tt xm} command line
 fills in parts of this template.
 
+Both of them can be found in \path{/etc/xen/}
 \subsection{Editing \path{xmdefconfig}}
 
-At minimum, you should edit the following variables in \path{xmdefconfig}:
+At minimum, you should edit the following variables in \path{/etc/xen/xmdefconfig}:
 
 \begin{description}
 \item[kernel] Set this to the path of the kernel you compiled for use
@@ -574,6 +575,8 @@ example: \\ \verb_vif = ['mac=00:06:AA:F6:BB:B3']_\\ If you do not set
 this variable, Xend will automatically generate a random MAC address
 from an unused range.
 
+If you don't have a \path{xmdefconfig} file, simply create your own 
+by copying one of the \path{/etc/xen/xmexample} files.
 \subsection{Starting the domain}
 
 The {\tt xm} tool provides a variety of commands for managing domains.
@@ -900,6 +903,12 @@ The available commands are as follows:
 \item[info] Get information about the Xen host.
 \item[call] Call a Xend HTTP API function directly.
 \end{description}
+
+For a detailed overview of switches, arguments and variables to each command
+try
+\begin{verbatim}
+# xm help command
+\end{verbatim}
 
 \chapter{Glossary}
 
