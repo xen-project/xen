@@ -82,8 +82,12 @@ static inline void mark_dirty( struct mm_struct *m, unsigned int mfn )
 	ASSERT(m->shadow_dirty_bitmap);
 	if( likely(pfn<m->shadow_dirty_bitmap_size) )
 	{
-		// use setbit to be smp guest safe
-		set_bit( pfn, m->shadow_dirty_bitmap );
+		/* use setbit to be smp guest safe. Since the same page is likely to 
+		   get marked dirty many times, examine the bit first before doing the
+		   expensive lock-prefixed opertion */
+
+		if (! test_bit( pfn, m->shadow_dirty_bitmap ) )
+			set_bit( pfn, m->shadow_dirty_bitmap );
 	}
 	else
 	{
@@ -327,6 +331,18 @@ static inline unsigned long get_shadow_status( struct mm_struct *m,
 										   unsigned int gpfn )
 {
 	unsigned long res;
+
+	/* If we get here, we know that this domain is running in shadow mode. 
+	   We also know that some sort of update has happened to the underlying
+	   page table page: either a PTE has been updated, or the page has
+	   changed type. If we're in log dirty mode, we should set the approrpiate
+	   bit in the dirty bitmap.
+	   NB: the VA update path doesn't use this so needs to be handled 
+	   independnetly. 
+	 */
+
+	if( m->shadow_mode == SHM_logdirty )
+		mark_dirty( m, gpfn );
 
 	spin_lock(&m->shadow_lock);
 	res = __shadow_status( m, gpfn );
