@@ -5,8 +5,13 @@
 # This file expects the variable 'vmid' to be set.
 #============================================================================
 
-import sys
-import xenctl.ip
+def config_usage ():
+    print >>sys.stderr,"""
+The config file '%s' requires the following variable to be defined:
+ vmid             -- Numeric identifier for the new domain, used to calculate
+                     the VM's IP address and root partition. E.g. -Dvmid=1
+""" % config_file
+
 
 try:
     vmid = int(vmid) # convert to integer
@@ -16,27 +21,18 @@ except:
 if vmid <= 0:
     raise ValueError, "Variable 'vmid' must be greater than 0" 
 
-
 #----------------------------------------------------------------------------
 # Kernel image file.
-kernel = "../../../install/boot/vmlinuz-2.4.26-xen"
+image = "/boot/netbsd"
 
-# Optional ramdisk.
-#ramdisk = "/boot/initrd.gz"
-
-# The domain build function. Default is 'linux'.
-#builder='linux'
-#builder='netbsd'
+# The domain build function.
+builder='netbsd'
 
 # Initial memory allocation (in megabytes) for the new domain.
-memory = 64
+memory = 16
 
 # A handy name for your new domain.
-name = "This is VM %d" % vmid
-
-# Which CPU to start domain on? 
-#cpu = -1   # leave to Xen to pick
-cpu = vmid  # set based on vmid (mod number of CPUs)
+name = "NetBSD VM %d" % vmid
 
 #----------------------------------------------------------------------------
 # Define network interfaces.
@@ -48,6 +44,15 @@ cpu = vmid  # set based on vmid (mod number of CPUs)
 # Random MACs are assigned if not given.
 #vif = [ 'mac=aa:00:00:00:00:11, bridge=nbe-br' ]
 
+# Specify IP address(es), for the new domain.  You need to
+# configure IP addrs within the domain just as you do normally.  This
+# is just to let Xen know about them so it can route packets
+# appropriately.
+
+#ipaddr = [ xenctl.utils.add_offset_to_ip(xenctl.utils.get_current_ipaddr(),vmid),
+#           xenctl.utils.add_offset_to_ip('169.254.1.0',vmid),
+#           ]
+
 #----------------------------------------------------------------------------
 # Define the disk devices you want the domain to have access to, and
 # what you want them accessible as.
@@ -55,8 +60,8 @@ cpu = vmid  # set based on vmid (mod number of CPUs)
 # where DEV is the device, VDEV is the device name the domain will see,
 # and MODE is r for read-only, w for read-write.
 
-disk = [ 'phy:sda%d,sda1,w' % (7+vmid),
-         'phy:sda6,sda6,r' ]
+#disk = [ 'phy:sda%d,sda1,w' % (7+vmid),
+#         'phy:sda6,sda6,r' ]
 
 #----------------------------------------------------------------------------
 # Set the kernel command line for the new domain.
@@ -85,7 +90,9 @@ root = "/dev/sda1 ro"
 #nfs_root   = '/full/path/to/root/directory'
 
 # Sets runlevel 4 and the device for /usr.
-extra = "4 VMID=%d usr=/dev/sda6" % vmid
+#extra = "4 VMID=%d usr=/dev/sda6" % vmid
+extra = "4 VMID=%d bootdev=xennet0" % vmid
+
 
 #----------------------------------------------------------------------------
 # Set according to whether you want the domain  restarted when it exits.
