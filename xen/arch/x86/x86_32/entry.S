@@ -96,7 +96,7 @@ do_multicall:
 multicall_loop:
         pushl %ecx
         movl  4(%esp),%ecx               # %ecx = struct domain
-        movl  DOMAIN_processor(%ecx),%eax
+        movl  EDOMAIN_processor(%ecx),%eax
         shl   $6,%eax                    # sizeof(irq_cpustat) == 64
         testl $~0,SYMBOL_NAME(irq_stat)(%eax,1)
         jnz   multicall_preempt
