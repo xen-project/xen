@@ -205,6 +205,9 @@ long stop_other_domain(unsigned int dom)
     unsigned long cpu_mask;
     struct task_struct *p;
     
+    if ( dom == 0 )
+        return -EINVAL;
+
     p = find_domain_by_id (dom);
     if ( p == NULL) return -ESRCH;
     

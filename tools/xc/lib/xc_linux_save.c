@@ -161,7 +161,12 @@ int xc_linux_save(int xc_handle,
 
         op.cmd = DOM0_STOPDOMAIN;
         op.u.stopdomain.domain = domid;
-        (void)do_dom0_op(xc_handle, &op);
+        if ( do_dom0_op(xc_handle, &op) != 0 )
+        {
+            we_stopped_it = 0;
+            PERROR("Stopping target domain failed");
+            goto out;
+        }
 
         sleep(1);
     }

@@ -354,6 +354,8 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
         if ( likely(get_page(page, p)) )
         {
+            ret = 0;
+
             op.u.getpageframeinfo.type = NONE;
 
             if ( (page->type_and_flags & PGT_count_mask) != 0 )
