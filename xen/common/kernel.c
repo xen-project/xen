@@ -33,7 +33,7 @@ void init_serial(void);
 void start_of_day(void);
 
 /* Command line options and variables. */
-int opt_console = 1;
+unsigned int opt_console = 1;
 unsigned int opt_ser_baud = 9600;  /* default baud for COM1 */
 unsigned int opt_dom0_mem = 16000; /* default kbytes for DOM0 */
 unsigned int opt_ne_base = 0; /* NE2k NICs cannot be probed */
@@ -45,7 +45,7 @@ static struct {
     int type;
     void *var;
 } opts[] = {
-    { "console",  OPT_BOOL, &opt_console },
+    { "console",  OPT_UINT, &opt_console },
     { "ser_baud", OPT_UINT, &opt_ser_baud },
     { "dom0_mem", OPT_UINT, &opt_dom0_mem }, 
     { "ne_base",  OPT_UINT, &opt_ne_base },
@@ -55,6 +55,7 @@ static struct {
     { "nosmp",    OPT_BOOL, &opt_nosmp },
     { NULL,       0,        NULL     }
 };
+
 
 void cmain (unsigned long magic, multiboot_info_t *mbi)
 {
@@ -66,17 +67,16 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
     int i;
 
     /*
-     * Clear the screen. Note that serial output cannot be done properly until 
+     * Note that serial output cannot be done properly until 
      * after command-line arguments have been parsed, and the required baud 
      * rate is known. Any messages before that will be output using the
-     * seetings of the bootloader, for example. Maybe okay for error msgs...
+     * settings of the bootloader, for example. Maybe okay for error msgs...
      */
-    init_vga();
-    cls();
+#define early_error(args...) opt_console=1; init_vga(); cls(); printk(args)
 
     if ( magic != MULTIBOOT_BOOTLOADER_MAGIC )
     {
-        printk("Invalid magic number: 0x%x\n", (unsigned)magic);
+        early_error("Invalid magic number: 0x%x\n", (unsigned)magic);
         return;
     }
 
@@ -86,13 +86,13 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
      */
     if ( (mbi->flags & 9) != 9 )
     {
-        printk("Bad flags passed by bootloader: 0x%x\n", (unsigned)mbi->flags);
+        early_error("Bad flags passed by bootloader: 0x%x\n", (unsigned)mbi->flags);
         return;
     }
 
     if ( mbi->mods_count == 0 )
     {
-        printk("Require at least one module!\n");
+        early_error("Require at least one module!\n");
         return;
     }
 
@@ -160,6 +160,11 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
             cmdline = opt_end;
         }
     }
+
+#undef early_error
+
+    init_vga();
+    cls();
 
     /* INITIALISE SERIAL LINE (printk will work okay from here on). */
     init_serial();
