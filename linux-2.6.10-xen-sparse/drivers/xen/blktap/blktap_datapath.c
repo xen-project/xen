@@ -456,13 +456,18 @@ void print_vm_ring_idxs(void)
     WPRINTK("FE Rings: \n---------\n");
     for ( i = 0; i < 50; i++) { 
         blkif = blkif_find_by_handle((domid_t)i, 0);
-        if (blkif != NULL)
-            WPRINTK("%2d: req_cons: %2d, rsp_prod_prv: %2d "
-                "| req_prod: %2d, rsp_prod: %2d\n", i, 
-                blkif->blk_ring.req_cons,
-                blkif->blk_ring.rsp_prod_pvt,
-                blkif->blk_ring.sring->req_prod,
-                blkif->blk_ring.sring->rsp_prod);
+        if (blkif != NULL) {
+            if (blkif->blk_ring.sring != NULL) {
+                WPRINTK("%2d: req_cons: %2d, rsp_prod_prv: %2d "
+                    "| req_prod: %2d, rsp_prod: %2d\n", i, 
+                    blkif->blk_ring.req_cons,
+                    blkif->blk_ring.rsp_prod_pvt,
+                    blkif->blk_ring.sring->req_prod,
+                    blkif->blk_ring.sring->rsp_prod);
+            } else {
+                WPRINTK("%2d: [no device channel yet]\n", i);
+            }
+        }
     }
     if (blktap_be_ring.sring != NULL) {
         WPRINTK("BE Ring: \n--------\n");
