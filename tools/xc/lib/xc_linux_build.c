@@ -1,8 +1,8 @@
 /******************************************************************************
- * libxc_linux_build.c
+ * xc_linux_build.c
  */
 
-#include "libxc_private.h"
+#include "xc_private.h"
 #include <zlib.h>
 
 /* This string is written to the head of every guest kernel image. */

@@ -1,10 +1,10 @@
 /******************************************************************************
- * libxc_private.c
+ * xc_private.c
  * 
  * Helper functions for the rest of the library.
  */
 
-#include "libxc_private.h"
+#include "xc_private.h"
 
 int init_pfn_mapper(void)
 {

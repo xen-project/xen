@@ -1,10 +1,10 @@
 /******************************************************************************
- * libxc_misc.c
+ * xc_misc.c
  * 
  * Miscellaneous control interface functions.
  */
 
-#include "libxc_private.h"
+#include "xc_private.h"
 
 int xc_interface_open(void)
 {

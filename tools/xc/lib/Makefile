@@ -4,12 +4,11 @@ CFLAGS   = -c -Wall -O3
 CFLAGS  += -I../../../xen/include -I../../../xenolinux-sparse/include
 
 HDRS     = $(wildcard *.h)
-OBJS     = $(patsubst %.c,%.o,$(wildcard libxc_*.c))
+OBJS     = $(patsubst %.c,%.o,$(wildcard *.c))
 
-LIBS     = libxc.a libxc.so
+LIB      = libxc.so
 
-all: check-for-zlib $(LIBS)
-	ranlib libxc.a
+all: check-for-zlib $(LIB)
 
 check-for-zlib:
 	@if [ ! -e /usr/include/zlib.h ]; then \
@@ -22,21 +21,21 @@ check-for-zlib:
 install: all
 	mkdir -p /usr/lib
 	mkdir -p /usr/include
-	cp -a $(LIBS) /usr/lib
-	for i in $(LIBS); do chmod 755 /usr/bin/$i ; done
+	cp -a $(LIB) /usr/lib
+	for i in $(LIB); do chmod 755 /usr/bin/$i ; done
 	cp -a xc.h /usr/include
 	chmod 644 /usr/include/xc.h
 
 dist: all
 	mkdir -p ../../../../install/lib
 	mkdir -p ../../../../install/include
-	cp -a $(LIBS) ../../../../install/lib
-	for i in $(LIBS); do chmod 755 ../../../../install/bin/$i ; done
+	cp -a $(LIB) ../../../../install/lib
+	for i in $(LIB); do chmod 755 ../../../../install/bin/$i ; done
 	cp -a xc.h ../../../../install/include
 	chmod 644 ../../../../install/include/xc.h
 
 clean:
-	$(RM) *.a *.so *.o *.rpm $(LIBS)
+	$(RM) *.a *.so *.o *.rpm $(LIB)
 
 rpm: all
 	rm -rf staging
@@ -49,8 +48,6 @@ rpm: all
 
 libxc.so: $(OBJS)
 	$(LD) -shared -o $@ $^ -lz
-
-libxc.a: libxc.a($(OBJS))
 
 %.o: %.c $(HDRS) Makefile
 	$(CC) $(CFLAGS) -o $@ $<

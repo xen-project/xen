@@ -1,12 +1,12 @@
 /******************************************************************************
- * libxc_domain.c
+ * xc_domain.c
  * 
  * API for manipulating and obtaining information on domains.
  * 
  * Copyright (c) 2003, K A Fraser.
  */
 
-#include "libxc_private.h"
+#include "xc_private.h"
 
 int xc_domain_create(int xc_handle,
                      unsigned int mem_kb, 
