@@ -654,8 +654,6 @@ asmlinkage int do_debug(struct xen_regs *regs)
     struct domain *d = current;
     struct trap_bounce *tb = &d->thread.trap_bounce;
 
-    DEBUGGER_trap_entry(TRAP_debug, regs);
-
     __asm__ __volatile__("movl %%db6,%0" : "=r" (condition));
 
     /* Mask out spurious debug traps due to lazy DR7 setting */
@@ -665,6 +663,8 @@ asmlinkage int do_debug(struct xen_regs *regs)
         __asm__("movl %0,%%db7" : : "r" (0));
         goto out;
     }
+
+    DEBUGGER_trap_entry(TRAP_debug, regs);
 
     if ( !GUEST_FAULT(regs) )
     {

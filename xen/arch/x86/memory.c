@@ -1686,7 +1686,7 @@ void ptwr_flush(const int which)
         MEM_LOG("ptwr: Could not read pte at %p\n", ptep);
         /*
          * Really a bug. We could read this PTE during the initial fault,
-         * and pagetables can't have changed meantime. XXX Multi-CPU guests?
+         * and pagetables can't have changed meantime.
          */
         BUG();
     }
@@ -1713,7 +1713,7 @@ void ptwr_flush(const int which)
         MEM_LOG("ptwr: Could not update pte at %p\n", ptep);
         /*
          * Really a bug. We could write this PTE during the initial fault,
-         * and pagetables can't have changed meantime. XXX Multi-CPU guests?
+         * and pagetables can't have changed meantime.
          */
         BUG();
     }
@@ -1771,6 +1771,7 @@ void ptwr_flush(const int which)
                 *pl2e = mk_l2_pgentry(l2_pgentry_val(*pl2e) | _PAGE_PRESENT); 
             }
             domain_crash();
+            return;
         }
         
         if ( unlikely(sl1e != NULL) )
@@ -1834,13 +1835,17 @@ int ptwr_do_page_fault(unsigned long addr)
     /* Get the L2 index at which this L1 p.t. is always mapped. */
     l2_idx = page->u.inuse.type_info & PGT_va_mask;
     if ( unlikely(l2_idx >= PGT_va_unknown) )
+    {
         domain_crash(); /* Urk! This L1 is mapped in multiple L2 slots! */
+        return 0;
+    }
     l2_idx >>= PGT_va_shift;
 
     if ( l2_idx == (addr >> L2_PAGETABLE_SHIFT) )
     {
         MEM_LOG("PTWR failure! Pagetable maps itself at %08lx\n", addr);
         domain_crash();
+        return 0;
     }
 
     /*
@@ -1908,6 +1913,7 @@ int ptwr_do_page_fault(unsigned long addr)
         unmap_domain_mem(ptwr_info[cpu].ptinfo[which].pl1e);
         ptwr_info[cpu].ptinfo[which].l1va = 0;
         domain_crash();
+        return 0;
     }
     
     return EXCRET_fault_fixed;
@@ -1937,40 +1943,6 @@ __initcall(ptwr_init);
 /************************************************************************/
 
 #ifndef NDEBUG
-
-void ptwr_status(void)
-{
-    unsigned long pte, *ptep, pfn;
-    struct pfn_info *page;
-    int cpu = smp_processor_id();
-
-    ptep = (unsigned long *)&linear_pg_table
-        [ptwr_info[cpu].ptinfo[PTWR_PT_INACTIVE].l1va>>PAGE_SHIFT];
-
-    if ( __get_user(pte, ptep) ) {
-        MEM_LOG("ptwr: Could not read pte at %p\n", ptep);
-        domain_crash();
-    }
-
-    pfn = pte >> PAGE_SHIFT;
-    page = &frame_table[pfn];
-    printk("need to alloc l1 page %p\n", page);
-    /* make pt page writable */
-    printk("need to make read-only l1-page at %p is %08lx\n",
-           ptep, pte);
-
-    if ( ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l1va == 0 )
-        return;
-
-    if ( __get_user(pte, (unsigned long *)
-                    ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l1va) ) {
-        MEM_LOG("ptwr: Could not read pte at %p\n", (unsigned long *)
-                ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l1va);
-        domain_crash();
-    }
-    pfn = pte >> PAGE_SHIFT;
-    page = &frame_table[pfn];
-}
 
 void audit_domain(struct domain *d)
 {

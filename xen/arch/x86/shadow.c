@@ -580,15 +580,13 @@ int shadow_fault(unsigned long va, long error_code)
                              &linear_pg_table[va >> PAGE_SHIFT])) )
     {
         SH_VVLOG("shadow_fault - EXIT: read gpte faulted" );
-        shadow_unlock(m);
-        return 0;
+        goto fail;
     }
 
     if ( unlikely(!(gpte & _PAGE_PRESENT)) )
     {
         SH_VVLOG("shadow_fault - EXIT: gpte not present (%lx)",gpte );
-        shadow_unlock(m);
-        return 0;
+        goto fail;
     }
 
     /* Write fault? */
@@ -598,8 +596,7 @@ int shadow_fault(unsigned long va, long error_code)
         {
             /* Write fault on a read-only mapping. */
             SH_VVLOG("shadow_fault - EXIT: wr fault on RO page (%lx)", gpte);
-            shadow_unlock(m);
-            return 0;
+            goto fail;
         }
 
         l1pte_write_fault(m, &gpte, &spte);
@@ -616,7 +613,10 @@ int shadow_fault(unsigned long va, long error_code)
     /* XXX Watch out for read-only L2 entries! (not used in Linux). */
     if ( unlikely(__put_user(gpte, (unsigned long *)
                              &linear_pg_table[va >> PAGE_SHIFT])) )
+    {
         domain_crash();
+        goto fail;
+    }
 
     /*
      * Update of shadow PTE can fail because the L1 p.t. is not shadowed,
@@ -637,6 +637,10 @@ int shadow_fault(unsigned long va, long error_code)
 
     check_pagetable(m, current->mm.pagetable, "post-sf");
     return EXCRET_fault_fixed;
+
+ fail:
+    shadow_unlock(m);
+    return 0;
 }
 
 
