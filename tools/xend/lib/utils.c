@@ -249,6 +249,7 @@ static PyTypeObject xu_notifier_type = {
     do {                                                                  \
         PyObject *obj = Py ## _pytype ## _From ## _ctype1                 \
                         (((_struct *)&xum->msg.msg[0])->_field);          \
+        if ( dict == NULL ) dict = PyDict_New();                          \
         PyDict_SetItemString(dict, #_field, obj);                         \
     } while ( 0 )
 
@@ -304,12 +305,10 @@ static PyObject *xu_message_set_response_fields(PyObject *self, PyObject *args)
 static PyObject *xu_message_get_payload(PyObject *self, PyObject *args)
 {
     xu_message_object *xum = (xu_message_object *)self;
-    PyObject *dict;
+    PyObject *dict = NULL;
 
     if ( !PyArg_ParseTuple(args, "") )
         return NULL;
-
-    dict = PyDict_New();
 
     switch ( TYPE(xum->msg.type, xum->msg.subtype) )
     {
@@ -428,33 +427,7 @@ static PyObject *xu_message_get_payload(PyObject *self, PyObject *args)
         return dict;
     }
 
-    PyObject_Del(dict); /* didn't use it after all */
-
     return PyString_FromStringAndSize(xum->msg.msg, xum->msg.length);
-}
-
-static PyObject *xu_message_set_header(PyObject *self, 
-                                       PyObject *args, 
-                                       PyObject *kwds)
-{
-    xu_message_object *xum = (xu_message_object *)self;
-    int type = -1, subtype = -1, id = -1;
-
-    static char *kwd_list[] = { "type", "subtype", "id", NULL };
-
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|iii", kwd_list,
-                                      &type, &subtype, &id) )
-        return NULL;
-
-    if ( type != -1 )
-        xum->msg.type = (u8)type;
-    if ( subtype != -1 )
-        xum->msg.subtype = (u8)subtype;
-    if ( id != -1 )
-        xum->msg.id = (u8)id;
-
-    Py_INCREF(Py_None);
-    return Py_None;
 }
 
 static PyObject *xu_message_get_header(PyObject *self, PyObject *args)
@@ -485,11 +458,6 @@ static PyMethodDef xu_message_methods[] = {
       (PyCFunction)xu_message_get_payload,
       METH_VARARGS,
       "Return the message payload in string form.\n" },
-
-    { "set_header",
-      (PyCFunction)xu_message_set_header,
-      METH_VARARGS | METH_KEYWORDS,
-      "Accepts keywords @type, @subtype, and @id.\n" },
 
     { "get_header",
       (PyCFunction)xu_message_get_header,
@@ -523,7 +491,8 @@ static PyObject *xu_message_new(PyObject *self, PyObject *args)
     if ( !PyDict_Check(payload) )
     {
         PyErr_SetString(PyExc_TypeError, "payload is not a dictionary");
-        goto fail;
+        PyObject_Del((PyObject *)xum);
+        return NULL;
     }
 
     switch ( TYPE(type, subtype) )
@@ -617,10 +586,6 @@ static PyObject *xu_message_new(PyObject *self, PyObject *args)
     }
 
     return (PyObject *)xum;
-
- fail:
-    PyObject_Del((PyObject *)xum);
-    return NULL;
 }
 
 static PyObject *xu_message_getattr(PyObject *obj, char *name)
