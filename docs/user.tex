@@ -295,10 +295,10 @@ download it and keep it updated with the latest features and fixes.
 Change to the directory in which you want to put the source code, then
 run:
 \begin{verbatim}
-# bk clone bk://xen.bkbits.net/xeno-2.0.bk
+# bk clone bk://xen.bkbits.net/xen-2.0.bk
 \end{verbatim}
 
-Under your current directory, a new directory named `xeno-2.0.bk'
+Under your current directory, a new directory named `xen-2.0.bk'
 has been created, which contains all the source code for the Xen
 hypervisor and the Xen tools.  The directory also contains `sparse'
 Linux source trees, containing only the files that differ between
@@ -307,7 +307,7 @@ XenLinux and standard Linux.
 Once you have cloned the repository, you can update to the newest
 changes to the repository by running:
 \begin{verbatim}
-# cd xeno-2.0.bk # to change into the local repository
+# cd xen-2.0.bk # to change into the local repository
 # bk pull        # to update the repository
 \end{verbatim}
 
@@ -509,7 +509,7 @@ At minimum, you should edit the following variables in \path{xmdefconfig}:
 \begin{description}
 \item[kernel] Set this to the path of the kernel you compiled for use
               with Xen. [e.g. {\tt kernel =
-              '/root/xeno-2.0.bk/install/boot/vmlinuz-2.4.27-xenU'}]
+              '/root/xen-2.0.bk/install/boot/vmlinuz-2.4.27-xenU'}]
 \item[memory] Set this to the size of the domain's memory in
 megabytes. [e.g. {\tt memory = 64 } ]
 \item[disk] Set the first entry in this list to calculate the offset
