@@ -18,6 +18,7 @@ SRCS     += xc_domain.c
 SRCS     += xc_evtchn.c
 SRCS     += xc_io.c
 SRCS     += xc_linux_build.c
+SRCS     += xc_plan9_build.c
 SRCS     += xc_linux_restore.c
 SRCS     += xc_linux_save.c
 SRCS     += xc_misc.c

@@ -2,6 +2,8 @@
  * arch-x86_32.h
  * 
  * Guest OS interface to x86 32-bit Xen.
+ * 
+ * Copyright (c) 2004, K A Fraser
  */
 
 #ifndef __XEN_PUBLIC_ARCH_X86_32_H__

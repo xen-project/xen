@@ -318,6 +318,7 @@
 41090ec8Pj_bkgCBpg2W7WfmNkumEA tools/examples/xmexample1
 40cf2937oKlROYOJTN8GWwWM5AmjBg tools/examples/xmexample2
 3fbba6dbDfYvJSsw9500b4SZyUhxjQ tools/libxc/Makefile
+41cc934abX-QLXJXW_clV_wRjM0zYg tools/libxc/plan9a.out.h
 3fbba6dc1uU7U3IFeF6A-XEOYF2MkQ tools/libxc/rpm.spec
 3fbba6dcrNxtygEcgJYAJJ1gCQqfsA tools/libxc/xc.h
 40589968oCfoUlXd460CjVAkBE8IBA tools/libxc/xc_atropos.c
@@ -332,6 +333,7 @@
 3fbba6db7li3FJiABYtCmuGxOJxEGw tools/libxc/xc_linux_save.c
 3fbba6db7WnnJr0KFrIFrqNlSKvFYg tools/libxc/xc_misc.c
 4051bce6CHAsYh8P5t2OHDtRWOP9og tools/libxc/xc_physdev.c
+41cc934aO1m6NxEh_8eDr9bJIMoLFA tools/libxc/xc_plan9_build.c
 3fbba6dctWRWlFJkYb6hdix2X4WMuw tools/libxc/xc_private.c
 3fbba6dcbVrG2hPzEzwdeV_UC8kydQ tools/libxc/xc_private.h
 40589968UQFnJeOMn8UIFLbXBuwXjw tools/libxc/xc_rrobin.c
@@ -519,6 +521,7 @@
 411b2c1ehdEGO_CwG0tvn85Q-Tfh5g tools/python/xen/xm/migrate.py
 40cf2937PSslwBliN1g7ofDy2H_RhA tools/python/xen/xm/opts.py
 40cf2937Z8WCNOnO2FcWdubvEAF9QQ tools/python/xen/xm/shutdown.py
+41b88ba6_C4---jeA895Efg9YFZgKA tools/python/xen/xm/sysrq.py
 40fcefb2K1xqVVT4D-p7nL2GzS4scg tools/sv/Main.rpy
 40ffbcb66Dj5F-1kCK9BcgSqCWkt1w tools/sv/Makefile
 4120b0e5L_nW-u0MWRfIdXg4ng4OjA tools/sv/images/destroy.png
@@ -690,7 +693,9 @@
 40f92331jfOlE7MfKwpdkEb1CEf23g xen/arch/x86/x86_32/seg_fixup.c
 3ddb79bc4nTpGQOe6_-MbyZzkhlhFQ xen/arch/x86/x86_32/usercopy.c
 3ddb79bcOMCu9-5mKpjIh5d0qqBDPg xen/arch/x86/x86_32/xen.lds
+41bf1717Ty3hwN3E9swdu8QfnvGqww xen/arch/x86/x86_64/asm-offsets.c
 40e96d3aLDI-nViMuYneD7VKYlZrVg xen/arch/x86/x86_64/entry.S
+41bf1717XhPz_dNT5OKSjgmbFuWBuA xen/arch/x86/x86_64/mm.c
 40e96d3ahBTZqbTViInnq0lM03vs7A xen/arch/x86/x86_64/usercopy.c
 40e96d3akN3Hu_J5Bk-WXD8OGscrYQ xen/arch/x86/x86_64/xen.lds
 3ddb79bdff-gj-jFGKjOejeHLqL8Lg xen/common/Makefile
@@ -778,6 +783,7 @@
 40715b2dWe0tDhx9LkLXzTQkvD49RA xen/include/asm-x86/acpi.h
 3ddb79c3l4IiQtf6MS2jIzcd-hJS8g xen/include/asm-x86/apic.h
 3ddb79c3QJYWr8LLGdonLbWmNb9pQQ xen/include/asm-x86/apicdef.h
+41bf17171g_hhz2k4B-fN9LQlODDjQ xen/include/asm-x86/asm_defns.h
 3ddb79c3OiG9eTsi9Dy3F_OkuRAzKA xen/include/asm-x86/atomic.h
 3ddb79c3rM-Ote0Xn6Ytg8Y6YqAG-A xen/include/asm-x86/bitops.h
 3ddb79c3KhTI0F_Iw_hRL9QEyOVK-g xen/include/asm-x86/cache.h
@@ -789,7 +795,6 @@
 3ddb79c3r9-31dIsewPV3P3i8HALsQ xen/include/asm-x86/delay.h
 3ddb79c34BFiXjBJ_cCKB0aCsV1IDw xen/include/asm-x86/desc.h
 40715b2dTokMLYGSuD58BnxOqyWVew xen/include/asm-x86/div64.h
-40f2b4a2hC3HtChu-ArD8LyojxWMjg xen/include/asm-x86/domain.h
 3e20b82fl1jmQiKdLy7fxMcutfpjWA xen/include/asm-x86/domain_page.h
 3ddb79c3NU8Zy40OTrq3D-i30Y3t4A xen/include/asm-x86/fixmap.h
 3e2d29944GI24gf7vOP_7x8EyuqxeA xen/include/asm-x86/flushtlb.h
@@ -825,6 +830,7 @@
 3ddb79c3mbqEM7QQr3zVq7NiBNhouA xen/include/asm-x86/x86_32/regs.h
 3e7f358aG11EvMI9VJ4_9hD4LUO7rQ xen/include/asm-x86/x86_32/string.h
 3ddb79c3M2n1ROZH6xk3HbyN4CPDqg xen/include/asm-x86/x86_32/uaccess.h
+41bf1717bML6GxpclTWJabiaO5W5vg xen/include/asm-x86/x86_64/asm_defns.h
 404f1b9ceJeGVaPNIENm2FkK0AgEOQ xen/include/asm-x86/x86_64/current.h
 404f1b9fl6AQ_a-T1TDK3fuwTPXmHw xen/include/asm-x86/x86_64/desc.h
 404f1badfXZJZ2sU8sh9PS2EZvd19Q xen/include/asm-x86/x86_64/ldt.h
@@ -852,6 +858,7 @@
 3eb165e0eawr3R-p2ZQtSdLWtLRN_A xen/include/xen/console.h
 3ddb79c1V44RD26YqCUm-kqIupM37A xen/include/xen/ctype.h
 3ddb79c05DdHQ0UxX_jKsXdR4QlMCA xen/include/xen/delay.h
+40f2b4a2hC3HtChu-ArD8LyojxWMjg xen/include/xen/domain.h
 3ddb79c2O729EttZTYu1c8LcsUO_GQ xen/include/xen/elf.h
 3ddb79c0HIghfBF8zFUdmXhOU8i6hA xen/include/xen/errno.h
 3ddb79c1W0lQca8gRV7sN6j3iY4Luw xen/include/xen/event.h

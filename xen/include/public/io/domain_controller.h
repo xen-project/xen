@@ -555,6 +555,7 @@ typedef struct {
 #define CMSG_SHUTDOWN_REBOOT    1   /* Clean shutdown (SHUTDOWN_reboot).     */
 #define CMSG_SHUTDOWN_SUSPEND   2   /* Create suspend info, then             */
                                     /* SHUTDOWN_suspend.                     */
+#define CMSG_SHUTDOWN_SYSRQ     3
 
 
 /******************************************************************************

@@ -45,14 +45,11 @@ static inline unsigned long get_stack_top(void)
     return p;
 }
 
-#define schedule_tail(_p)                                         \
+#define reset_stack_and_jump(__fn)                                \
     __asm__ __volatile__ (                                        \
-        "andl %%esp,%0; addl %2,%0; movl %0,%%esp; jmp *%1"       \
-        : : "r" (~(STACK_SIZE-1)),                                \
-            "r" (unlikely(is_idle_task((_p))) ?                   \
-                                continue_cpu_idle_loop :          \
-                                continue_nonidle_task),           \
-            "i" (STACK_SIZE-STACK_RESERVED) )
+        "movl %0,%%esp; jmp "STR(__fn)                            \
+        : : "r" (get_execution_context()) )
 
+#define schedule_tail(_d) ((_d)->thread.schedule_tail)(_d)
 
 #endif /* _X86_CURRENT_H */

@@ -981,4 +981,10 @@ unsigned long do_get_debugreg(int reg)
     return current->thread.debugreg[reg];
 }
 
+#else
+
+asmlinkage void fatal_trap(int trapnr, struct xen_regs *regs)
+{
+}
+
 #endif /* __i386__ */

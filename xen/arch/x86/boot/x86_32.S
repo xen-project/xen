@@ -102,15 +102,15 @@ __start:
 
         /* Initialize low and high mappings of all memory with 4MB pages */
         mov     $idle_pg_table-__PAGE_OFFSET,%edi
-        mov     $0x1e3,%eax                  /* PRESENT+RW+A+D+4MB+GLOBAL */
+        mov     $0xe3,%eax                  /* PRESENT+RW+A+D+4MB */
 1:      mov     %eax,__PAGE_OFFSET>>20(%edi) /* high mapping */
         stosl                                /* low mapping */
         add     $(1<<L2_PAGETABLE_SHIFT),%eax
-        cmp     $DIRECTMAP_PHYS_END+0x1e3,%eax
+        cmp     $DIRECTMAP_PHYS_END+0xe3,%eax
         jne     1b
 1:      stosl   /* low mappings cover as much physmem as possible */
         add     $(1<<L2_PAGETABLE_SHIFT),%eax
-        cmp     $__HYPERVISOR_VIRT_START+0x1e3,%eax
+        cmp     $__HYPERVISOR_VIRT_START+0xe3,%eax
         jne     1b
         
         /* Initialise IDT with simple error defaults. */

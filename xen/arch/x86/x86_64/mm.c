@@ -1,5 +1,5 @@
 /******************************************************************************
- * arch/x86/x86_32/mm.c
+ * arch/x86/x86_64/mm.c
  * 
  * Modifications to Linux original are copyright (c) 2004, K A Fraser
  * 
@@ -30,10 +30,14 @@
 static inline void set_pte_phys(unsigned long vaddr,
                                 l1_pgentry_t entry)
 {
+    l4_pgentry_t *l4ent;
+    l3_pgentry_t *l3ent;
     l2_pgentry_t *l2ent;
     l1_pgentry_t *l1ent;
 
-    l2ent = &idle_pg_table[l2_table_offset(vaddr)];
+    l4ent = &idle_pg_table[l4_table_offset(vaddr)];
+    l3ent = l4_pgentry_to_l3(*l4ent) + l3_table_offset(vaddr);
+    l2ent = l3_pgentry_to_l2(*l3ent) + l2_table_offset(vaddr);
     l1ent = l2_pgentry_to_l1(*l2ent) + l1_table_offset(vaddr);
     *l1ent = entry;
 
@@ -59,14 +63,6 @@ void __init paging_init(void)
     void *ioremap_pt;
     int i;
 
-    /* Xen heap mappings can be GLOBAL. */
-    if ( cpu_has_pge )
-    {
-        for ( i = 0; i < DIRECTMAP_PHYS_END; i += (1 << L2_PAGETABLE_SHIFT) )
-            ((unsigned long *)idle_pg_table)
-                [(i + PAGE_OFFSET) >> L2_PAGETABLE_SHIFT] |= _PAGE_GLOBAL;
-    }
-
     /* Create page table for ioremap(). */
     ioremap_pt = (void *)alloc_xenheap_page();
     clear_page(ioremap_pt);
@@ -88,14 +84,12 @@ void __init paging_init(void)
     /* Set up linear page table mapping. */
     idle_pg_table[LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
         mk_l2_pgentry(__pa(idle_pg_table) | __PAGE_HYPERVISOR);
+
 }
 
 void __init zap_low_mappings(void)
 {
-    int i;
-    for ( i = 0; i < DOMAIN_ENTRIES_PER_L2_PAGETABLE; i++ )
-        idle_pg_table[i] = mk_l2_pgentry(0);
-    flush_tlb_all_pge();
+    idle_pg_table[0] = 0;
 }
 
 

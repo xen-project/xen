@@ -214,9 +214,6 @@ void domain_init(void);
 int idle_cpu(int cpu); /* Is CPU 'cpu' idle right now? */
 
 void startup_cpu_idle_loop(void);
-void continue_cpu_idle_loop(void);
-
-void continue_nonidle_task(void);
 
 unsigned long hypercall_create_continuation(
     unsigned int op, unsigned int nr_args, ...);
@@ -295,6 +292,6 @@ static inline void domain_unpause_by_systemcontroller(struct domain *d)
 #define VM_ASSIST(_d,_t) (test_bit((_t), &(_d)->vm_assist))
 
 #include <xen/slab.h>
-#include <asm/domain.h>
+#include <xen/domain.h>
 
 #endif /* __SCHED_H__ */

@@ -56,7 +56,7 @@
 #include <xen/config.h>
 #include <xen/errno.h>
 #include <xen/softirq.h>
-#include <asm/x86_32/asm_defns.h>
+#include <asm/asm_defns.h>
 #include <public/xen.h>
 
 #define GET_CURRENT(reg)   \
@@ -64,10 +64,6 @@
         orl  %esp, reg;    \
         andl $~3,reg;      \
         movl (reg),reg;
-
-ENTRY(continue_nonidle_task)
-        GET_CURRENT(%ebx)
-        jmp test_all_events
 
         ALIGN
 restore_all_guest:

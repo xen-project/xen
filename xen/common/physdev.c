@@ -742,7 +742,8 @@ void physdev_init_dom0(struct domain *p)
          *
          * In Linux2.6 we set pcibios_scan_all_fns().
          */
-        if ( dev->hdr_type != PCI_HEADER_TYPE_NORMAL )
+        if ( (dev->hdr_type != PCI_HEADER_TYPE_NORMAL) &&
+             (dev->hdr_type != PCI_HEADER_TYPE_CARDBUS) )
             continue;
         pdev = xmalloc(sizeof(phys_dev_t));
         pdev->dev = dev;

@@ -47,20 +47,21 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
     /* Per-domain PCI-device list. */
     spin_lock_init(&d->pcidev_lock);
     INIT_LIST_HEAD(&d->pcidev_list);
+    
+    if ( (d->id != IDLE_DOMAIN_ID) &&
+         ((init_event_channels(d) != 0) || (grant_table_create(d) != 0)) )
+    {
+        destroy_event_channels(d);
+        free_domain_struct(d);
+        return NULL;
+    }
+    
+    arch_do_createdomain(d);
+    
+    sched_add_domain(d);
 
     if ( d->id != IDLE_DOMAIN_ID )
     {
-        if ( (init_event_channels(d) != 0) || (grant_table_create(d) != 0) )
-        {
-            destroy_event_channels(d);
-            free_domain_struct(d);
-            return NULL;
-        }
-
-        arch_do_createdomain(d);
-
-        sched_add_domain(d);
-
         write_lock(&domlist_lock);
         pd = &domain_list; /* NB. domain_list maintained in order of dom_id. */
         for ( pd = &domain_list; *pd != NULL; pd = &(*pd)->next_list )
@@ -71,10 +72,6 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
         d->next_hash = domain_hash[DOMAIN_HASH(dom_id)];
         domain_hash[DOMAIN_HASH(dom_id)] = d;
         write_unlock(&domlist_lock);
-    }
-    else
-    {
-        sched_add_domain(d);
     }
 
     return d;

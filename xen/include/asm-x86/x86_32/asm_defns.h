@@ -1,12 +1,5 @@
-#ifndef __ASM_DEFNS_H__
-#define __ASM_DEFNS_H__
-
-/* NB. Auto-generated from arch/.../asm-offsets.c */
-#include <asm/asm-offsets.h>
-#include <asm/processor.h>
-
-#define __STR(x) #x
-#define STR(x) __STR(x)
+#ifndef __X86_32_ASM_DEFNS_H__
+#define __X86_32_ASM_DEFNS_H__
 
 /* Maybe auto-generate the following two cases (quoted vs. unquoted). */
 #ifndef __ASSEMBLY__
@@ -85,4 +78,4 @@
 
 #endif
 
-#endif /* __ASM_DEFNS_H__ */
+#endif /* __X86_32_ASM_DEFNS_H__ */
