@@ -538,7 +538,8 @@ unsigned long privop_trace = 0;
 IA64FAULT
 priv_handle_op(VCPU *vcpu, REGS *regs, int privlvl)
 {
-	IA64_BUNDLE bundle, __get_domain_bundle(UINT64);
+	IA64_BUNDLE bundle;
+	IA64_BUNDLE __get_domain_bundle(UINT64);
 	int slot;
 	IA64_SLOT_TYPE slot_type;
 	INST64 inst;
@@ -550,19 +551,14 @@ priv_handle_op(VCPU *vcpu, REGS *regs, int privlvl)
 	// make a local copy of the bundle containing the privop
 #if 1
 	bundle = __get_domain_bundle(iip);
-	if (!bundle.i64[0] && !bundle.i64[1]) return IA64_RETRY;
+	if (!bundle.i64[0] && !bundle.i64[1])
 #else
-#ifdef AVOIDING_POSSIBLE_DOMAIN_TLB_MISS
-	//TODO: this needs to check for faults and behave accordingly
-	if (!vcpu_get_iip_bundle(&bundle)) return IA64_DTLB_FAULT;
-#else
-if (iip < 0x10000) {
- printf("priv_handle_op: unlikely iip=%p,b0=%p\n",iip,regs->b0);
- dummy();
-}
-        bundle = *(IA64_BUNDLE *)iip;
+	if (__copy_from_user(&bundle,iip,sizeof(bundle)))
 #endif
-#endif
+	{
+//printf("*** priv_handle_op: privop bundle @%p not mapped, retrying\n",iip);
+		return IA64_RETRY;
+	}
 #if 0
 	if (iip==0xa000000100001820) {
 		static int firstpagefault = 1;
@@ -783,10 +779,12 @@ char *cr_str[128] = {
   RS,RS,RS,RS,RS,RS,RS,RS
 };
 
-void dump_privop_counts(void)
+// FIXME: should use snprintf to ensure no buffer overflow
+int dump_privop_counts(char *buf)
 {
 	int i, j;
 	UINT64 sum = 0;
+	char *s = buf;
 
 	// this is ugly and should probably produce sorted output
 	// but it will have to do for now
@@ -795,63 +793,64 @@ void dump_privop_counts(void)
 	sum += privcnt.rfi; sum += privcnt.bsw0;
 	sum += privcnt.bsw1; sum += privcnt.cover;
 	for (i=0; i < 64; i++) sum += privcnt.Mpriv_cnt[i];
-	printf("Privop statistics: (Total privops: %ld)\r\n",sum);
+	s += sprintf(s,"Privop statistics: (Total privops: %ld)\r\n",sum);
 	if (privcnt.mov_to_ar_imm)
-		printf("%10d  %s [%d%%]\r\n", privcnt.mov_to_ar_imm,
+		s += sprintf(s,"%10d  %s [%d%%]\r\n", privcnt.mov_to_ar_imm,
 			"mov_to_ar_imm", (privcnt.mov_to_ar_imm*100L)/sum);
 	if (privcnt.mov_to_ar_reg)
-		printf("%10d  %s [%d%%]\r\n", privcnt.mov_to_ar_reg,
+		s += sprintf(s,"%10d  %s [%d%%]\r\n", privcnt.mov_to_ar_reg,
 			"mov_to_ar_reg", (privcnt.mov_to_ar_reg*100L)/sum);
 	if (privcnt.ssm)
-		printf("%10d  %s [%d%%]\r\n", privcnt.ssm,
+		s += sprintf(s,"%10d  %s [%d%%]\r\n", privcnt.ssm,
 			"ssm", (privcnt.ssm*100L)/sum);
 	if (privcnt.rsm)
-		printf("%10d  %s [%d%%]\r\n", privcnt.rsm,
+		s += sprintf(s,"%10d  %s [%d%%]\r\n", privcnt.rsm,
 			"rsm", (privcnt.rsm*100L)/sum);
 	if (privcnt.rfi)
-		printf("%10d  %s [%d%%]\r\n", privcnt.rfi,
+		s += sprintf(s,"%10d  %s [%d%%]\r\n", privcnt.rfi,
 			"rfi", (privcnt.rfi*100L)/sum);
 	if (privcnt.bsw0)
-		printf("%10d  %s [%d%%]\r\n", privcnt.bsw0,
+		s += sprintf(s,"%10d  %s [%d%%]\r\n", privcnt.bsw0,
 			"bsw0", (privcnt.bsw0*100L)/sum);
 	if (privcnt.bsw1)
-		printf("%10d  %s [%d%%]\r\n", privcnt.bsw1,
+		s += sprintf(s,"%10d  %s [%d%%]\r\n", privcnt.bsw1,
 			"bsw1", (privcnt.bsw1*100L)/sum);
 	if (privcnt.cover)
-		printf("%10d  %s [%d%%]\r\n", privcnt.cover,
+		s += sprintf(s,"%10d  %s [%d%%]\r\n", privcnt.cover,
 			"cover", (privcnt.cover*100L)/sum);
 	for (i=0; i < 64; i++) if (privcnt.Mpriv_cnt[i]) {
-		if (!Mpriv_str[i]) printf("PRIVSTRING NULL!!\r\n");
-		else printf("%10d  %s [%d%%]\r\n", privcnt.Mpriv_cnt[i],
+		if (!Mpriv_str[i]) s += sprintf(s,"PRIVSTRING NULL!!\r\n");
+		else s += sprintf(s,"%10d  %s [%d%%]\r\n", privcnt.Mpriv_cnt[i],
 			Mpriv_str[i], (privcnt.Mpriv_cnt[i]*100L)/sum);
 		if (i == 0x24) { // mov from CR
-			printf("            [");
+			s += sprintf(s,"            [");
 			for (j=0; j < 128; j++) if (from_cr_cnt[j]) {
 				if (!cr_str[j])
-					printf("PRIVSTRING NULL!!\r\n");
-				printf("%s(%d),",cr_str[j],from_cr_cnt[j]);
+					s += sprintf(s,"PRIVSTRING NULL!!\r\n");
+				s += sprintf(s,"%s(%d),",cr_str[j],from_cr_cnt[j]);
 			}
-			printf("]\r\n");
+			s += sprintf(s,"]\r\n");
 		}
 		else if (i == 0x2c) { // mov to CR
-			printf("            [");
+			s += sprintf(s,"            [");
 			for (j=0; j < 128; j++) if (to_cr_cnt[j]) {
 				if (!cr_str[j])
-					printf("PRIVSTRING NULL!!\r\n");
-				printf("%s(%d),",cr_str[j],to_cr_cnt[j]);
+					s += sprintf(s,"PRIVSTRING NULL!!\r\n");
+				s += sprintf(s,"%s(%d),",cr_str[j],to_cr_cnt[j]);
 			}
-			printf("]\r\n");
+			s += sprintf(s,"]\r\n");
 		}
 	}
+	return s - buf;
 }
 
-void zero_privop_counts(void)
+int zero_privop_counts(char *buf)
 {
 	int i, j;
+	char *s = buf;
 
 	// this is ugly and should probably produce sorted output
 	// but it will have to do for now
-	printf("Zeroing privop statistics\r\n");
 	privcnt.mov_to_ar_imm = 0; privcnt.mov_to_ar_reg = 0;
 	privcnt.ssm = 0; privcnt.rsm = 0;
 	privcnt.rfi = 0; privcnt.bsw0 = 0;
@@ -859,4 +858,27 @@ void zero_privop_counts(void)
 	for (i=0; i < 64; i++) privcnt.Mpriv_cnt[i] = 0;
 	for (j=0; j < 128; j++) from_cr_cnt[j] = 0;
 	for (j=0; j < 128; j++) to_cr_cnt[j] = 0;
+	s += sprintf(s,"All privop statistics zeroed\r\n");
+	return s - buf;
+}
+
+#define TMPBUFLEN 8*1024
+int dump_privop_counts_to_user(char __user *ubuf, int len)
+{
+	char buf[TMPBUFLEN];
+	int n = dump_privop_counts(buf);
+
+	if (len < TMPBUFLEN) return -1;
+	if (__copy_to_user(ubuf,buf,n)) return -1;
+	return n;
+}
+
+int zero_privop_counts_to_user(char __user *ubuf, int len)
+{
+	char buf[TMPBUFLEN];
+	int n = zero_privop_counts(buf);
+
+	if (len < TMPBUFLEN) return -1;
+	if (__copy_to_user(ubuf,buf,n)) return -1;
+	return n;
 }
