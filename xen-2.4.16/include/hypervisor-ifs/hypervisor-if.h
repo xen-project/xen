@@ -43,6 +43,8 @@ typedef struct
 #define PGREQ_MPT_UPDATE       1
 /* An extended command. */
 #define PGREQ_EXTENDED_COMMAND 2
+/* DOM0 can make entirely unchecked updates which do not affect refcnts. */
+#define PGREQ_UNCHECKED_UPDATE 3
     unsigned long ptr, val; /* *ptr = val */
 /* Announce a new top-level page table. */
 #define PGEXT_PIN_L1_TABLE      0
@@ -53,7 +55,6 @@ typedef struct
 #define PGEXT_NEW_BASEPTR       5
 #define PGEXT_TLB_FLUSH         6
 #define PGEXT_INVLPG            7
-#define PGEXT_
 #define PGEXT_CMD_MASK        255
 #define PGEXT_CMD_SHIFT         8
 } page_update_request_t;

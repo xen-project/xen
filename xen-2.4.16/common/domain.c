@@ -17,8 +17,6 @@
 #define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED)
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED|_PAGE_DIRTY)
 
-extern int do_process_page_updates_bh(page_update_request_t *, int);
-
 extern int nr_mods;
 extern module_t *mod;
 extern unsigned char *cmdline;
@@ -415,38 +413,16 @@ unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes)
 
 int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
 {
-    struct list_head *list_ent;
     l2_pgentry_t * l2tab;
     l1_pgentry_t * l1tab;
     start_info_t * virt_startinfo_addr;
     unsigned long virt_stack_addr;
     unsigned long long time;
     unsigned long phys_l2tab;
-    page_update_request_t * pgt_updates;
-    unsigned long curr_update_phys;
-    unsigned long count;
     net_ring_t *net_ring;
     net_vif_t *net_vif;
     char *dst;    // temporary
     int i;        // temporary
-
-    /* first of all, set up domain pagetables */
-    pgt_updates = (page_update_request_t *)
-        map_domain_mem(meminfo->pgt_update_arr);
-    curr_update_phys = meminfo->pgt_update_arr;
-    for(count = 0; count < meminfo->num_pgt_updates; count++){
-        do_process_page_updates_bh(pgt_updates, 1);
-        pgt_updates++;
-        if(!((unsigned long)pgt_updates & (PAGE_SIZE-1))){
-            unmap_domain_mem(pgt_updates-1);
-            list_ent = frame_table[curr_update_phys >> PAGE_SHIFT].list.next;
-            curr_update_phys = list_entry(list_ent, struct pfn_info, list) -
-                frame_table;
-            curr_update_phys <<= PAGE_SHIFT;
-            pgt_updates = map_domain_mem(curr_update_phys);
-        }
-    }
-    unmap_domain_mem((void *)((unsigned long)(pgt_updates-1) & PAGE_MASK));
 
     /* entries 0xe0000000 onwards in page table must contain hypervisor
      * mem mappings - set them up.

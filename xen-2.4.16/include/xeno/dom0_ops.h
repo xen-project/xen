@@ -43,8 +43,6 @@ typedef struct domain_launch
     unsigned long virt_load_addr;
     unsigned long virt_shinfo_addr;
     unsigned long virt_startinfo_addr;
-    unsigned long pgt_update_arr;
-    unsigned long num_pgt_updates;
     unsigned int num_vifs;
     char cmd_line[MAX_CMD_LEN];
 } dom_meminfo_t;

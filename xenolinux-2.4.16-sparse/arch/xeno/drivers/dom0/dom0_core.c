@@ -1,4 +1,3 @@
-
 /******************************************************************************
  * dom0_core.c
  * 
@@ -31,9 +30,19 @@
 #include <asm/tlb.h>
 
 #include "dom0_ops.h"
-#include "hypervisor_defs.h"
 
-#define XENO_BASE       "xeno"          // proc file name defs should be in separate .h
+/* Private proc-file data structures. */
+typedef struct proc_data {
+    unsigned int domain;
+    unsigned long map_size;
+} dom_procdata_t;
+
+typedef struct proc_mem_data {
+    unsigned long pfn;
+    int tot_pages;
+} proc_memdata_t;
+
+#define XENO_BASE       "xeno"
 #define DOM0_CMD_INTF   "dom0_cmd"
 #define DOM0_NEWDOM     "new_dom_data"
 
@@ -195,9 +204,18 @@ static int cmd_write_proc(struct file *file, const char *buffer,
         goto out;
     }
 
-    /* is the request intended for hypervisor? */
-    if(op.cmd != MAP_DOM_MEM){
-
+    if ( op.cmd == MAP_DOM_MEM )
+    {
+        ret = dom_map_mem(op.u.dommem.domain, op.u.dommem.start_pfn, 
+                        op.u.dommem.tot_pages); 
+    }
+    else if ( op.cmd == DO_PGUPDATES )
+    {
+        ret = HYPERVISOR_pt_update((void *)op.u.pgupdate.pgt_update_arr,
+                                   op.u.pgupdate.num_pgt_updates);
+    }
+    else
+    {
         ret = HYPERVISOR_dom0_op(&op);
 
         /* if new domain created, create proc entries */
@@ -223,10 +241,6 @@ static int cmd_write_proc(struct file *file, const char *buffer,
 
         }
 
-    } else {
-
-        ret = dom_map_mem(op.u.dommem.domain, op.u.dommem.start_pfn, 
-                        op.u.dommem.tot_pages); 
     }
     
 out:
