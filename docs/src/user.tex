@@ -1,7 +1,6 @@
 \documentclass[11pt,twoside,final,openright]{xenstyle}
 \usepackage{a4,graphicx,setspace,times}
 \setstretch{1.15}
-%\input{style.tex}
 
 \begin{document}
 
@@ -89,11 +88,6 @@ right now, Linux 2.4, Linux 2.6 and NetBSD are available for Xen 2.0.
 We expect that Xen support will ultimately be integrated into the
 official releases of Linux, NetBSD, FreeBSD and Dragonfly BSD. 
 Other OS ports, including Plan 9, are in progress.
-
-%Even running multiple copies of Linux can be very useful, providing a
-%means of containing faults to one OS image, providing performance
-%isolation between the various OS instances and trying out multiple
-%distros.
 
 Possible usage scenarios for Xen include:
 \begin{description}
@@ -194,14 +188,13 @@ scenarios on multiple sites.
 
 Xen 2.0 feature greatly enhanced hardware support, configuration
 flexibility, usability and a larger complement of supported operating
-systems. We think that Xen has the potential to become {\em the}
-definitive open source virtualisation solution and will work to
-conclusively achieve that position.
+systems. This latest release takes Xen a step closer to becoming the 
+definitive open source solution for virtualisation.
 
 \chapter{Installation}
 
 The Xen distribution includes three main components:  Xen itself,
-utilities to convert a standard Linux tree to run on Xen and the
+utilities to convert a standard Linux tree to run on Xen, and the
 userspace tools required to operate a Xen-based system.
 
 This manual describes how to install the Xen 2.0 distribution from
@@ -310,8 +303,8 @@ following:
 
 Inspect the Makefile if you want to see what goes on during a build.
 Building Xen and the tools is straightforward, but XenLinux is more
-complicated.  The makefile needs a `pristine' Linux kernel tree which
-it will then add the Xen architecture files to.  You can tell the
+complicated.  The makefile needs a `pristine' Linux kernel tree to which
+it will then add the Xen architecture files.  You can tell the
 makefile the location of the appropriate Linux compressed tar file by
 setting the LINUX\_SRC environment variable, e.g. \\
 \verb!# LINUX_SRC=/tmp/linux-2.6.8.1.tar.bz2 make world! \\ or by
@@ -475,30 +468,36 @@ The first step in creating a new domain is to prepare a root
 filesystem for it to boot off.  Typically, this might be stored in a
 normal partition, an LVM or other volume manager partition, a disk
 file or on an NFS server.
-
 A simple way to do this is simply to boot from your standard OS
 install CD and install the distribution into another partition on your
 hard drive.
 
-{\em N.b } you can boot with Xen and XenLinux without installing any
-special userspace tools but will need to have the prerequisites
-described in Section~\ref{sec:prerequisites} and the Xen control tools
-installed before you proceed.
+You can boot Xen and a single XenLinux instance without installing any
+special user-space tools. To proceed further than this you will need
+to install the prerequisites described in Section~\ref{sec:prerequisites}
+and the Xen control tools. The control tools are installed by entering
+the tools subdirectory of the repository and typing \\
+\verb!# LINUX_SRC=/path/to/linux2.4/source make linux24! \\
 
-\section{From the web interface}
+To start the control daemon, type \\ \verb!# xend start! \\ If you
+wish to start the daemon automatically, see the instructions in
+Chapter~\ref{cha:xend}. Once the daemon is running, you can use the
+{\tt xm} tool to monitor and maintain the domains running on your
+system. This chapter provides only a brief tutorial: we provide full
+details of the {\tt xm} tool in Chapter~\ref{cha:xm}. 
 
-Boot the Xen machine and start Xensv (see Chapter~\ref{cha:xensv} for
-more details) using the command: \\
-\verb_# xensv start_ \\
-This will also start Xend (see Chapter~\ref{cha:xend} for more information).
-
-The domain management interface will then be available at {\tt
-http://your\_machine:8080/}.  This provides a user friendly wizard for
-starting domains and functions for managing running domains.
-
-\section{From the command line}
-
-Full details of the {\tt xm} tool are found in Chapter~\ref{cha:xm}.
+%\section{From the web interface}
+%
+%Boot the Xen machine and start Xensv (see Chapter~\ref{cha:xensv} for
+%more details) using the command: \\
+%\verb_# xensv start_ \\
+%This will also start Xend (see Chapter~\ref{cha:xend} for more information).
+%
+%The domain management interface will then be available at {\tt
+%http://your\_machine:8080/}.  This provides a user friendly wizard for
+%starting domains and functions for managing running domains.
+%
+%\section{From the command line}
 
 This example explains how to use the \path{xmdefconfig} file.  If you
 require a more complex setup, you will want to write a custom
