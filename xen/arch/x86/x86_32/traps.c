@@ -117,6 +117,25 @@ void show_registers(struct xen_regs *regs)
     show_stack((unsigned long *)&regs->esp);
 } 
 
+void show_page_walk(unsigned long addr)
+{
+    unsigned long page;
+
+    if ( addr < PAGE_OFFSET )
+        return;
+
+    printk("Pagetable walk from %p:\n", addr);
+    
+    page = l2_pgentry_val(idle_pg_table[l2_table_offset(addr)]);
+    printk(" L2 = %p %s\n", page, (page & _PAGE_PSE) ? "(4MB)" : "");
+    if ( !(page & _PAGE_PRESENT) || (page & _PAGE_PSE) )
+        return;
+
+    page &= PAGE_MASK;
+    page = ((unsigned long *) __va(page))[l1_table_offset(addr)];
+    printk("  L1 = %p\n", page);
+}
+
 #define DOUBLEFAULT_STACK_SIZE 1024
 static struct tss_struct doublefault_tss;
 static unsigned char doublefault_stack[DOUBLEFAULT_STACK_SIZE];
@@ -173,6 +192,8 @@ void __init doublefault_init(void)
     tss->bitmap = IOBMP_INVALID_OFFSET;
     _set_tssldt_desc(gdt_table+__DOUBLEFAULT_TSS_ENTRY,
                      (unsigned long)tss, 235, 9);
+
+    set_task_gate(TRAP_double_fault, __DOUBLEFAULT_TSS_ENTRY<<3);
 }
 
 long set_fast_trap(struct exec_domain *p, int idx)

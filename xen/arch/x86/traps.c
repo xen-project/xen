@@ -329,26 +329,8 @@ asmlinkage int do_page_fault(struct xen_regs *regs)
 
     DEBUGGER_trap_fatal(TRAP_page_fault, regs);
 
-#ifdef __i386__
-    if ( addr >= PAGE_OFFSET )
-    {
-        unsigned long page;
-        page = l2_pgentry_val(idle_pg_table[addr >> L2_PAGETABLE_SHIFT]);
-        printk("*pde = %p\n", page);
-        if ( page & _PAGE_PRESENT )
-        {
-            page &= PAGE_MASK;
-            page = ((unsigned long *) __va(page))[(addr&0x3ff000)>>PAGE_SHIFT];
-            printk(" *pte = %p\n", page);
-        }
-#ifdef MEMORY_GUARD
-        if ( !(regs->error_code & 1) )
-            printk(" -- POSSIBLY AN ACCESS TO FREED MEMORY? --\n");
-#endif
-    }
-#endif /* __i386__ */
-
     show_registers(regs);
+    show_page_walk(addr);
     panic("CPU%d FATAL PAGE FAULT\n"
           "[error_code=%04x]\n"
           "Faulting linear address might be %p\n",
@@ -749,7 +731,6 @@ void __init trap_init(void)
     set_intr_gate(TRAP_deferred_nmi,&nmi);
 
 #if defined(__i386__)
-    set_task_gate(TRAP_double_fault,__DOUBLEFAULT_TSS_ENTRY<<3);
     _set_gate(idt_table+HYPERCALL_VECTOR, 14, 1, &hypercall);
 #elif defined(__x86_64__)
     _set_gate(idt_table+HYPERCALL_VECTOR, 14, 3, &hypercall);

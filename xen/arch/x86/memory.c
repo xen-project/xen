@@ -168,30 +168,9 @@ void __init init_frametable(void)
 
 void arch_init_memory(void)
 {
-#ifdef __i386__ /* XXX */
-    unsigned long i;
-
-    /*
-     * We are rather picky about the layout of 'struct pfn_info'. The
-     * count_info and domain fields must be adjacent, as we perform atomic
-     * 64-bit operations on them. Also, just for sanity, we assert the size
-     * of the structure here.
-     */
-    if ( (offsetof(struct pfn_info, u.inuse.domain) != 
-          (offsetof(struct pfn_info, count_info) + sizeof(u32))) ||
-         (sizeof(struct pfn_info) != 24) )
-    {
-        printk("Weird pfn_info layout (%ld,%ld,%d)\n",
-               offsetof(struct pfn_info, count_info),
-               offsetof(struct pfn_info, u.inuse.domain),
-               sizeof(struct pfn_info));
-        for ( ; ; ) ;
-    }
+    extern void subarch_init_memory(struct domain *);
 
     memset(percpu_info, 0, sizeof(percpu_info));
-
-    /* Initialise to a magic of 0x55555555 so easier to spot bugs later. */
-    memset(machine_to_phys_mapping, 0x55, 4<<20);
 
     /*
      * Initialise our DOMID_XEN domain.
@@ -211,16 +190,7 @@ void arch_init_memory(void)
     atomic_set(&dom_io->refcnt, 1);
     dom_io->id = DOMID_IO;
 
-    /* M2P table is mappable read-only by privileged domains. */
-    for ( i = 0; i < 1024; i++ )
-    {
-        frame_table[m2p_start_mfn+i].count_info        = PGC_allocated | 1;
-	/* gdt to make sure it's only mapped read-only by non-privileged
-	   domains. */
-        frame_table[m2p_start_mfn+i].u.inuse.type_info = PGT_gdt_page | 1;
-        frame_table[m2p_start_mfn+i].u.inuse.domain    = dom_xen;
-    }
-#endif
+    subarch_init_memory(dom_xen);
 }
 
 static void __invalidate_shadow_ldt(struct exec_domain *d)

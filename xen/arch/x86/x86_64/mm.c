@@ -27,8 +27,6 @@
 #include <asm/fixmap.h>
 #include <asm/domain_page.h>
 
-unsigned long m2p_start_mfn; /* XXX Kill this (in 32-bit code also). */
-
 void *safe_page_alloc(void)
 {
     extern int early_boot;
@@ -117,34 +115,86 @@ void __set_fixmap(
 void __init paging_init(void)
 {
     void *newpt;
+    unsigned long i, p, max;
 
-    /* Allocate and map the machine-to-phys table. */
-    /* XXX TODO XXX */
+    /* Map all of physical memory. */
+    max = (max_page + (1UL << L2_PAGETABLE_SHIFT) - 1UL) &
+        ~((1UL << L2_PAGETABLE_SHIFT) - 1UL);
+    map_pages(idle_pg_table, PAGE_OFFSET, 0, max, PAGE_HYPERVISOR);
 
-    /* Create page table for ioremap(). */
-    newpt = (void *)alloc_xenheap_page();
-    clear_page(newpt);
-    idle_pg_table[IOREMAP_VIRT_START >> L4_PAGETABLE_SHIFT] = 
-        mk_l4_pgentry(__pa(newpt) | __PAGE_HYPERVISOR);
+    /*
+     * Allocate and map the machine-to-phys table.
+     * This also ensures L3 is present for ioremap().
+     */
+    for ( i = 0; i < max_page; i += ((1UL << L2_PAGETABLE_SHIFT) / 8) )
+    {
+        p = alloc_boot_pages(1UL << L2_PAGETABLE_SHIFT,
+                             1UL << L2_PAGETABLE_SHIFT);
+        if ( p == 0 )
+            panic("Not enough memory for m2p table\n");
+        map_pages(idle_pg_table, RDWR_MPT_VIRT_START + i*8, p, 
+                  1UL << L2_PAGETABLE_SHIFT, PAGE_HYPERVISOR);
+        memset((void *)(RDWR_MPT_VIRT_START + i*8), 0x55,
+               1UL << L2_PAGETABLE_SHIFT);
+    }
 
     /* Create read-only mapping of MPT for guest-OS use. */
     newpt = (void *)alloc_xenheap_page();
     clear_page(newpt);
-    idle_pg_table[RO_MPT_VIRT_START >> L4_PAGETABLE_SHIFT] = 
+    idle_pg_table[l4_table_offset(RO_MPT_VIRT_START)] =
         mk_l4_pgentry((__pa(newpt) | __PAGE_HYPERVISOR | _PAGE_USER) &
                       ~_PAGE_RW);
-    /* XXX TODO: Copy appropriate L3 entries from RDWR_MPT_VIRT_START XXX */
+    /* Copy the L3 mappings from the RDWR_MPT area. */
+    p  = l4_pgentry_val(idle_pg_table[l4_table_offset(RDWR_MPT_VIRT_START)]);
+    p &= PAGE_MASK;
+    p += l3_table_offset(RDWR_MPT_VIRT_START) * sizeof(l3_pgentry_t);
+    newpt = (void *)((unsigned long)newpt +
+                     (l3_table_offset(RO_MPT_VIRT_START) *
+                      sizeof(l3_pgentry_t)));
+    memcpy(newpt, __va(p),
+           (RDWR_MPT_VIRT_END - RDWR_MPT_VIRT_START) >> L3_PAGETABLE_SHIFT);
 
     /* Set up linear page table mapping. */
-    idle_pg_table[LINEAR_PT_VIRT_START >> L4_PAGETABLE_SHIFT] =
+    idle_pg_table[l4_table_offset(LINEAR_PT_VIRT_START)] =
         mk_l4_pgentry(__pa(idle_pg_table) | __PAGE_HYPERVISOR);
 }
 
 void __init zap_low_mappings(void)
 {
     idle_pg_table[0] = mk_l4_pgentry(0);
+    flush_tlb_all_pge();
 }
 
+void subarch_init_memory(struct domain *dom_xen)
+{
+    unsigned long i, v, m2p_start_mfn;
+    l3_pgentry_t l3e;
+    l2_pgentry_t l2e;
+
+    /* M2P table is mappable read-only by privileged domains. */
+    for ( v  = RDWR_MPT_VIRT_START; 
+          v != RDWR_MPT_VIRT_END;
+          v += 1 << L2_PAGETABLE_SHIFT )
+    {
+        l3e = l4_pgentry_to_l3(idle_pg_table[l4_table_offset(v)])[
+            l3_table_offset(v)];
+        if ( !(l3_pgentry_val(l3e) & _PAGE_PRESENT) )
+            continue;
+        l2e = l3_pgentry_to_l2(l3e)[l2_table_offset(v)];
+        if ( !(l2_pgentry_val(l2e) & _PAGE_PRESENT) )
+            continue;
+        m2p_start_mfn = l2_pgentry_to_pagenr(l2e);
+
+        for ( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ )
+        {
+            frame_table[m2p_start_mfn+i].count_info        = PGC_allocated | 1;
+            /* gdt to make sure it's only mapped read-only by non-privileged
+               domains. */
+            frame_table[m2p_start_mfn+i].u.inuse.type_info = PGT_gdt_page | 1;
+            frame_table[m2p_start_mfn+i].u.inuse.domain    = dom_xen;
+        }
+    }
+}
 
 /*
  * Allows shooting down of borrowed page-table use on specific CPUs.
@@ -165,19 +215,10 @@ void synchronise_pagetables(unsigned long cpu_mask)
 
 long do_stack_switch(unsigned long ss, unsigned long esp)
 {
-#if 0
-    int nr = smp_processor_id();
-    struct tss_struct *t = &init_tss[nr];
-
-    /* We need to do this check as we load and use SS on guest's behalf. */
-    if ( (ss & 3) == 0 )
+    if ( (ss & 3) != 3 )
         return -EPERM;
-
     current->thread.guestos_ss = ss;
     current->thread.guestos_sp = esp;
-    t->ss1  = ss;
-    t->esp1 = esp;
-#endif
     return 0;
 }
 

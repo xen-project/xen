@@ -44,15 +44,22 @@
 
 #define FLAT_RING3_CS32 0x0823  /* GDT index 260 */
 #define FLAT_RING3_CS64 0x082b  /* GDT index 261 */
-#define FLAT_RING3_DS   0x0833  /* GDT index 262 */
+#define FLAT_RING3_DS32 0x0833  /* GDT index 262 */
+#define FLAT_RING3_DS64 0x0000
 
-#define FLAT_GUESTOS_DS   FLAT_RING3_DS
-#define FLAT_GUESTOS_CS   FLAT_RING3_CS64
+#define FLAT_GUESTOS_DS64 FLAT_RING3_DS64
+#define FLAT_GUESTOS_DS32 FLAT_RING3_DS32
+#define FLAT_GUESTOS_DS   FLAT_GUESTOS_DS64
+#define FLAT_GUESTOS_CS64 FLAT_RING3_CS64
 #define FLAT_GUESTOS_CS32 FLAT_RING3_CS32
+#define FLAT_GUESTOS_CS   FLAT_GUESTOS_CS64
 
-#define FLAT_USER_DS      FLAT_RING3_DS
-#define FLAT_USER_CS      FLAT_RING3_CS64
-#define FLAT_USER_CS32    FLAT_RING3_CS32
+#define FLAT_USER_DS64 FLAT_RING3_DS64
+#define FLAT_USER_DS32 FLAT_RING3_DS32
+#define FLAT_USER_DS   FLAT_USER_DS64
+#define FLAT_USER_CS64 FLAT_RING3_CS64
+#define FLAT_USER_CS32 FLAT_RING3_CS32
+#define FLAT_USER_CS   FLAT_USER_CS64
 
 /* And the trap vector is... */
 #define TRAP_INSTR "syscall"
@@ -89,22 +96,27 @@ typedef struct
     unsigned long r14;
     unsigned long r13;
     unsigned long r12;
-    unsigned long rbp;
-    unsigned long rbx;
+    union { unsigned long rbp, ebp; } PACKED;
+    union { unsigned long rbx, ebx; } PACKED;
     unsigned long r11;
     unsigned long r10;
     unsigned long r9;
     unsigned long r8;
-    unsigned long rax;
-    unsigned long rcx;
-    unsigned long rdx;
-    unsigned long rsi;
-    unsigned long rdi;
-    unsigned long rip;
+    union { unsigned long rax, eax; } PACKED;
+    union { unsigned long rcx, ecx; } PACKED;
+    union { unsigned long rdx, edx; } PACKED;
+    union { unsigned long rsi, esi; } PACKED;
+    union { unsigned long rdi, edi; } PACKED;
+    unsigned long _unused;
+    union { unsigned long rip, eip; } PACKED;
     unsigned long cs;
-    unsigned long eflags;
-    unsigned long rsp;
+    union { unsigned long rflags, eflags; } PACKED;
+    union { unsigned long rsp, esp; } PACKED;
     unsigned long ss;
+    unsigned long es;
+    unsigned long ds;
+    unsigned long fs;
+    unsigned long gs;
 } PACKED execution_context_t;
 
 typedef u64 tsc_timestamp_t; /* RDTSC timestamp */
@@ -132,9 +144,8 @@ typedef struct {
 } PACKED full_execution_context_t;
 
 typedef struct {
-    u64 mfn_to_pfn_start;      /* MFN of start of m2p table */
-    u64 pfn_to_mfn_frame_list; /* MFN of a table of MFNs that 
-				  make up p2m table */
+    /* MFN of a table of MFNs that make up p2m table */
+    u64 pfn_to_mfn_frame_list;
 } PACKED arch_shared_info_t;
 
 #endif /* !__ASSEMBLY__ */

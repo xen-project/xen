@@ -18,6 +18,7 @@
       (((_s)>>3) >  LAST_RESERVED_GDT_ENTRY) ||                            \
       ((_s)&4)) &&                                                         \
      (((_s)&3) == 1))
+#define VALID_CODESEL(_s) ((_s) == FLAT_GUESTOS_CS || VALID_SEL(_s))
 
 /* These are bitmasks for the high 32 bits of a descriptor table entry. */
 #define _SEGMENT_TYPE    (15<< 8)
@@ -41,8 +42,6 @@ struct desc_struct {
 
 #define __TSS(n) (((n)<<2) + __FIRST_TSS_ENTRY)
 #define __LDT(n) (((n)<<2) + __FIRST_LDT_ENTRY)
-
-#define VALID_CODESEL(_s) ((_s) == FLAT_RING3_CS64 || VALID_SEL(_s))
 
 typedef struct {
     u64 a, b;
@@ -82,8 +81,6 @@ do {                                                     \
 
 #define __TSS(n) (((n)<<1) + __FIRST_TSS_ENTRY)
 #define __LDT(n) (((n)<<1) + __FIRST_LDT_ENTRY)
-
-#define VALID_CODESEL(_s) ((_s) == FLAT_RING1_CS || VALID_SEL(_s))
 
 typedef struct desc_struct idt_entry_t;
 

@@ -428,7 +428,7 @@ struct thread_struct {
     u8 *io_bitmap; /* Pointer to task's IO bitmap or NULL */
 
     /* Trap info. */
-#ifdef __i386__
+#ifdef ARCH_HAS_FAST_TRAP
     int                fast_trap_idx;
     struct desc_struct fast_trap_desc;
 #endif
@@ -442,7 +442,7 @@ struct thread_struct {
 extern idt_entry_t idt_table[];
 extern idt_entry_t *idt_tables[];
 
-#if defined(__i386__)
+#ifdef ARCH_HAS_FAST_TRAP
 
 #define SET_DEFAULT_FAST_TRAP(_p) \
     (_p)->fast_trap_idx = 0x20;   \
@@ -465,6 +465,13 @@ extern idt_entry_t *idt_tables[];
 #endif
 
 long set_fast_trap(struct exec_domain *p, int idx);
+
+#else
+
+#define SET_DEFAULT_FAST_TRAP(_p) ((void)0)
+#define CLEAR_FAST_TRAP(_p)       ((void)0)
+#define SET_FAST_TRAP(_p)         ((void)0)
+#define set_fast_trap(_p, _i)     (0)
 
 #endif
 
@@ -636,6 +643,7 @@ void show_guest_stack();
 void show_trace(unsigned long *esp);
 void show_stack(unsigned long *esp);
 void show_registers(struct xen_regs *regs);
+void show_page_walk(unsigned long addr);
 asmlinkage void fatal_trap(int trapnr, struct xen_regs *regs);
 
 #endif /* !__ASSEMBLY__ */

@@ -261,9 +261,8 @@ static void continue_nonidle_task(struct exec_domain *ed)
 void arch_do_createdomain(struct exec_domain *ed)
 {
     struct domain *d = ed->domain;
-#ifdef ARCH_HAS_FAST_TRAP
+
     SET_DEFAULT_FAST_TRAP(&ed->thread);
-#endif
 
     if ( d->id == IDLE_DOMAIN_ID )
     {
@@ -276,7 +275,6 @@ void arch_do_createdomain(struct exec_domain *ed)
         d->shared_info = (void *)alloc_xenheap_page();
         memset(d->shared_info, 0, PAGE_SIZE);
         ed->vcpu_info = &d->shared_info->vcpu_data[ed->eid];
-        d->shared_info->arch.mfn_to_pfn_start = m2p_start_mfn;
         SHARE_PFN_WITH_DOMAIN(virt_to_page(d->shared_info), d);
         machine_to_phys_mapping[virt_to_phys(d->shared_info) >> 
                                PAGE_SHIFT] = INVALID_P2M_ENTRY;
@@ -453,10 +451,8 @@ int arch_final_setup_guestos(struct exec_domain *d, full_execution_context_t *c)
            &c->trap_ctxt,
            sizeof(d->thread.traps));
 
-#ifdef ARCH_HAS_FAST_TRAP
     if ( (rc = (int)set_fast_trap(d, c->fast_trap_idx)) != 0 )
         return rc;
-#endif
 
     d->mm.ldt_base = c->ldt_base;
     d->mm.ldt_ents = c->ldt_ents;
@@ -498,8 +494,6 @@ int arch_final_setup_guestos(struct exec_domain *d, full_execution_context_t *c)
     return 0;
 }
 
-#if defined(__i386__) /* XXX */
-
 void new_thread(struct exec_domain *d,
                 unsigned long start_pc,
                 unsigned long start_stack,
@@ -515,8 +509,8 @@ void new_thread(struct exec_domain *d,
      *          ESI = start_info
      *  [EAX,EBX,ECX,EDX,EDI,EBP are zero]
      */
-    ec->ds = ec->es = ec->fs = ec->gs = ec->ss = FLAT_RING1_DS;
-    ec->cs = FLAT_RING1_CS;
+    ec->ds = ec->es = ec->fs = ec->gs = ec->ss = FLAT_GUESTOS_DS;
+    ec->cs = FLAT_GUESTOS_CS;
     ec->eip = start_pc;
     ec->esp = start_stack;
     ec->esi = start_info;
@@ -530,10 +524,9 @@ void new_thread(struct exec_domain *d,
  * This special macro can be used to load a debugging register
  */
 #define loaddebug(thread,register) \
-		__asm__("movl %0,%%db" #register  \
+		__asm__("mov %0,%%db" #register  \
 			: /* no output */ \
 			:"r" (thread->debugreg[register]))
-
 
 void switch_to(struct exec_domain *prev_p, struct exec_domain *next_p)
 {
@@ -541,7 +534,9 @@ void switch_to(struct exec_domain *prev_p, struct exec_domain *next_p)
     struct tss_struct *tss = init_tss + smp_processor_id();
     execution_context_t *stack_ec = get_execution_context();
     int i;
+#ifdef CONFIG_VMX
     unsigned long vmx_domain = next_p->thread.arch_vmx.flags; 
+#endif
 
     __cli();
 
@@ -573,7 +568,9 @@ void switch_to(struct exec_domain *prev_p, struct exec_domain *next_p)
             loaddebug(next, 7);
         }
 
-         if (vmx_domain) {
+#ifdef CONFIG_VMX
+        if ( vmx_domain )
+        {
             /* Switch page tables. */
             write_ptbase(&next_p->mm);
  
@@ -583,13 +580,16 @@ void switch_to(struct exec_domain *prev_p, struct exec_domain *next_p)
 
             __sti();
             return;
-         }
+        }
+#endif
  
         SET_FAST_TRAP(&next_p->thread);
 
+#ifdef __i386__
         /* Switch the guest OS ring-1 stack. */
         tss->esp1 = next->guestos_sp;
         tss->ss1  = next->guestos_ss;
+#endif
 
         /* Switch page tables. */
         write_ptbase(&next_p->mm);
@@ -631,8 +631,6 @@ long do_iopl(domid_t domain, unsigned int new_io_pl)
     ec->eflags = (ec->eflags & 0xffffcfff) | ((new_io_pl&3) << 12);
     return 0;
 }
-
-#endif
 
 unsigned long hypercall_create_continuation(
     unsigned int op, unsigned int nr_args, ...)

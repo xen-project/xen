@@ -126,6 +126,10 @@ ENTRY(spurious_interrupt_bug)
         movl  $TRAP_spurious_int,4(%rsp)
 	jmp   error_code
 
+ENTRY(double_fault)
+        movl  $TRAP_double_fault,4(%rsp)
+        jmp   error_code
+
 ENTRY(nmi)
         iret
 
@@ -140,7 +144,7 @@ ENTRY(exception_table)
         .quad SYMBOL_NAME(do_bounds)
         .quad SYMBOL_NAME(do_invalid_op)
         .quad SYMBOL_NAME(math_state_restore)
-        .quad 0 # double fault
+        .quad SYMBOL_NAME(do_double_fault)
         .quad SYMBOL_NAME(do_coprocessor_segment_overrun)
         .quad SYMBOL_NAME(do_invalid_TSS)
         .quad SYMBOL_NAME(do_segment_not_present)

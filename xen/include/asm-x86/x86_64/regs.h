@@ -9,8 +9,8 @@ struct xen_regs
     u64 r14;
     u64 r13;
     u64 r12;
-    u64 rbp;
-    u64 rbx;
+    union { u64 rbp; u32 ebp; } __attribute__ ((packed));
+    union { u64 rbx; u32 ebx; } __attribute__ ((packed));
     /* NB. Above here is C callee-saves. */
     u64 r11;
     u64 r10;	
@@ -25,8 +25,8 @@ struct xen_regs
     u32 entry_vector;
     union { u64 rip; u64 eip; } __attribute__ ((packed));
     u64 cs;
-    u64 eflags;
-    u64 rsp;
+    union { u64 rflags; u64 eflags; } __attribute__ ((packed));
+    union { u64 rsp; u64 esp; } __attribute__ ((packed));
     u64 ss;
 } __attribute__ ((packed));
 

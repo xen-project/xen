@@ -459,6 +459,9 @@ static void __init start_of_day(void)
 #endif
 
     watchdog_on = 1;
+#ifdef __x86_64__ /* x86_32 uses low mappings when building DOM0. */
+    zap_low_mappings();
+#endif
 }
 
 void __init __start_xen(multiboot_info_t *mbi)

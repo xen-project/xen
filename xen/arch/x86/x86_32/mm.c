@@ -27,8 +27,6 @@
 #include <asm/fixmap.h>
 #include <asm/domain_page.h>
 
-unsigned long m2p_start_mfn;
-
 /* Map physical byte range (@p, @p+@s) at virt address @v in pagetable @pt. */
 int map_pages(
     pagetable_t *pt,
@@ -97,16 +95,16 @@ void __init paging_init(void)
     /* Allocate and map the machine-to-phys table. */
     if ( (pg = alloc_domheap_pages(NULL, 10)) == NULL )
         panic("Not enough memory to bootstrap Xen.\n");
-    m2p_start_mfn = page_to_pfn(pg);
-    idle_pg_table[RDWR_MPT_VIRT_START >> L2_PAGETABLE_SHIFT] =
+    idle_pg_table[l2_table_offset(RDWR_MPT_VIRT_START)] =
         mk_l2_pgentry(page_to_phys(pg) | __PAGE_HYPERVISOR | _PAGE_PSE);
+    memset((void *)RDWR_MPT_VIRT_START, 0x55, 4UL << 20);
 
     /* Xen 4MB mappings can all be GLOBAL. */
     if ( cpu_has_pge )
     {
         for ( v = HYPERVISOR_VIRT_START; v; v += (1 << L2_PAGETABLE_SHIFT) )
         {
-             l2e = l2_pgentry_val(idle_pg_table[v >> L2_PAGETABLE_SHIFT]);
+             l2e = l2_pgentry_val(idle_pg_table[l2_table_offset(v)]);
              if ( l2e & _PAGE_PSE )
                  l2e |= _PAGE_GLOBAL;
              idle_pg_table[v >> L2_PAGETABLE_SHIFT] = mk_l2_pgentry(l2e);
@@ -116,23 +114,22 @@ void __init paging_init(void)
     /* Create page table for ioremap(). */
     ioremap_pt = (void *)alloc_xenheap_page();
     clear_page(ioremap_pt);
-    idle_pg_table[IOREMAP_VIRT_START >> L2_PAGETABLE_SHIFT] = 
+    idle_pg_table[l2_table_offset(IOREMAP_VIRT_START)] =
         mk_l2_pgentry(__pa(ioremap_pt) | __PAGE_HYPERVISOR);
 
     /* Create read-only mapping of MPT for guest-OS use. */
-    idle_pg_table[RO_MPT_VIRT_START >> L2_PAGETABLE_SHIFT] =
+    idle_pg_table[l2_table_offset(RO_MPT_VIRT_START)] =
         mk_l2_pgentry(l2_pgentry_val(
-            idle_pg_table[RDWR_MPT_VIRT_START >> L2_PAGETABLE_SHIFT]) & 
-                      ~_PAGE_RW);
+            idle_pg_table[l2_table_offset(RDWR_MPT_VIRT_START)]) & ~_PAGE_RW);
 
     /* Set up mapping cache for domain pages. */
     mapcache = (unsigned long *)alloc_xenheap_page();
     clear_page(mapcache);
-    idle_pg_table[MAPCACHE_VIRT_START >> L2_PAGETABLE_SHIFT] =
+    idle_pg_table[l2_table_offset(MAPCACHE_VIRT_START)] =
         mk_l2_pgentry(__pa(mapcache) | __PAGE_HYPERVISOR);
 
     /* Set up linear page table mapping. */
-    idle_pg_table[LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
+    idle_pg_table[l2_table_offset(LINEAR_PT_VIRT_START)] =
         mk_l2_pgentry(__pa(idle_pg_table) | __PAGE_HYPERVISOR);
 }
 
@@ -144,6 +141,39 @@ void __init zap_low_mappings(void)
     flush_tlb_all_pge();
 }
 
+void subarch_init_memory(struct domain *dom_xen)
+{
+    unsigned long i, m2p_start_mfn;
+
+    /*
+     * We are rather picky about the layout of 'struct pfn_info'. The
+     * count_info and domain fields must be adjacent, as we perform atomic
+     * 64-bit operations on them. Also, just for sanity, we assert the size
+     * of the structure here.
+     */
+    if ( (offsetof(struct pfn_info, u.inuse.domain) != 
+          (offsetof(struct pfn_info, count_info) + sizeof(u32))) ||
+         (sizeof(struct pfn_info) != 24) )
+    {
+        printk("Weird pfn_info layout (%ld,%ld,%d)\n",
+               offsetof(struct pfn_info, count_info),
+               offsetof(struct pfn_info, u.inuse.domain),
+               sizeof(struct pfn_info));
+        for ( ; ; ) ;
+    }
+
+    /* M2P table is mappable read-only by privileged domains. */
+    m2p_start_mfn = l2_pgentry_to_pagenr(
+        idle_pg_table[l2_table_offset(RDWR_MPT_VIRT_START)]);
+    for ( i = 0; i < 1024; i++ )
+    {
+        frame_table[m2p_start_mfn+i].count_info        = PGC_allocated | 1;
+	/* gdt to make sure it's only mapped read-only by non-privileged
+	   domains. */
+        frame_table[m2p_start_mfn+i].u.inuse.type_info = PGT_gdt_page | 1;
+        frame_table[m2p_start_mfn+i].u.inuse.domain    = dom_xen;
+    }
+}
 
 /*
  * Allows shooting down of borrowed page-table use on specific CPUs.
