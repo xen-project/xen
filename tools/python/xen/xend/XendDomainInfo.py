@@ -19,6 +19,7 @@ from twisted.internet import defer
 
 import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
 import xen.util.ip
+from xen.util.ip import _readline, _readlines
 
 import sxp
 
@@ -30,24 +31,6 @@ xend = server.SrvDaemon.instance()
 
 SIF_BLK_BE_DOMAIN = (1<<4)
 SIF_NET_BE_DOMAIN = (1<<5)
-
-def readlines(fd):
-    """Version of readlines safe against EINTR.
-    """
-    import errno
-    
-    lines = []
-    while 1:
-        try:
-            line = fd.readline()
-        except IOError, ex:
-            if ex.errno == errno.EINTR:
-                continue
-            else:
-                raise
-        if line == '': break
-        lines.append(line)
-    return lines
 
 class VmError(ValueError):
     """Vm construction error."""
@@ -90,7 +73,7 @@ def lookup_raw_partn(partition):
 
     if drive == partition:
         fd = os.popen( '/sbin/sfdisk -s ' + drive + ' 2>/dev/null' )
-        line = readline(fd)
+        line = _readline(fd)
         if line:
             return [ { 'device' : blkdev_name_to_number(drive),
                        'start_sector' : long(0),
@@ -102,7 +85,7 @@ def lookup_raw_partn(partition):
     fd = os.popen( '/sbin/sfdisk -d ' + drive + ' 2>/dev/null' )
 
     #['/dev/sda3 : start= 16948575, size=16836120, Id=83, bootable\012']
-    lines = readlines(fd)
+    lines = _readlines(fd)
     for line in lines:
         m = re.search( '^' + partition + '\s*: start=\s*([0-9]+), ' +
                        'size=\s*([0-9]+), Id=\s*(\S+).*$', line)
