@@ -30,7 +30,6 @@ struct dma_coherent_mem {
 static void
 xen_contig_memory(unsigned long vstart, unsigned int order)
 {
-#ifndef CONFIG_XEN_SHADOW_MODE
 	/*
 	 * Ensure multi-page extents are contiguous in machine memory.
 	 * This code could be cleaned up some, and the number of
@@ -77,7 +76,6 @@ xen_contig_memory(unsigned long vstart, unsigned int order)
 	xen_tlb_flush();
 
         balloon_unlock(flags);
-#endif /* CONFIG_XEN_SHADOW_MODE */
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)

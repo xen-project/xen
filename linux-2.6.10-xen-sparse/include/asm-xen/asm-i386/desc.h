@@ -89,11 +89,7 @@ static inline void set_ldt_desc(unsigned int cpu, void *addr, unsigned int size)
 
 static inline void load_TLS(struct thread_struct *t, unsigned int cpu)
 {
-#ifndef CONFIG_XEN_SHADOW_MODE
 #define C(i) HYPERVISOR_update_descriptor(virt_to_machine(&get_cpu_gdt_table(cpu)[GDT_ENTRY_TLS_MIN + i]), ((u32 *)&t->tls_array[i])[0], ((u32 *)&t->tls_array[i])[1])
-#else /* CONFIG_XEN_SHADOW_MODE */
-#define C(i) HYPERVISOR_update_descriptor(__pa(&get_cpu_gdt_table(cpu)[GDT_ENTRY_TLS_MIN + i]), ((u32 *)&t->tls_array[i])[0], ((u32 *)&t->tls_array[i])[1])
-#endif /* CONFIG_XEN_SHADOW_MODE */
 	C(0); C(1); C(2);
 #undef C
 }

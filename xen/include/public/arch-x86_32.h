@@ -70,15 +70,9 @@
  * machine->physical mapping table starts at this address, read-only.
  */
 #define HYPERVISOR_VIRT_START (0xFC000000UL)
-#ifndef CONFIG_XEN_SHADOW_MODE
 #ifndef machine_to_phys_mapping
 #define machine_to_phys_mapping ((u32 *)HYPERVISOR_VIRT_START)
 #endif
-#else /* CONFIG_XEN_SHADOW_MODE */
-#ifndef __vms_machine_to_phys_mapping
-#define __vms_machine_to_phys_mapping ((u32 *)HYPERVISOR_VIRT_START)
-#endif
-#endif /* CONFIG_XEN_SHADOW_MODE */
 
 #ifndef __ASSEMBLY__
 

@@ -93,11 +93,7 @@ static void set_pte_pfn(unsigned long vaddr, unsigned long pfn, pgprot_t flags)
  * Associate a virtual page frame with a given physical page frame 
  * and protection flags for that frame.
  */ 
-#ifndef CONFIG_XEN_SHADOW_MODE
 static void set_pte_pfn_ma(unsigned long vaddr, unsigned long pfn,
-#else /* CONFIG_XEN_SHADOW_MODE */
-static void __vms_set_pte_pfn_ma(unsigned long vaddr, unsigned long pfn,
-#endif /* CONFIG_XEN_SHADOW_MODE */
 			   pgprot_t flags)
 {
 	pgd_t *pgd;
@@ -116,22 +112,7 @@ static void __vms_set_pte_pfn_ma(unsigned long vaddr, unsigned long pfn,
 	}
 	pte = pte_offset_kernel(pmd, vaddr);
 	/* <pfn,flags> stored as-is, to permit clearing entries */
-#ifndef CONFIG_XEN_SHADOW_MODE
 	set_pte(pte, pfn_pte_ma(pfn, flags));
-#else /* CONFIG_XEN_SHADOW_MODE */
-        {
-            mmu_update_t update;
-            int success = 0;
-            unsigned long ppfn;
-
-            update.ptr = (pfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
-            update.val = -1;
-            ppfn = HYPERVISOR_mmu_update(&update, 1, &success);
-            if (! success)
-                BUG();
-            set_pte(pte, pfn_pte(ppfn, flags));
-        }
-#endif /* CONFIG_XEN_SHADOW_MODE */
 
 	/*
 	 * It's enough to flush this one mapping.
@@ -184,11 +165,7 @@ void __set_fixmap (enum fixed_addresses idx, unsigned long phys, pgprot_t flags)
 	set_pte_pfn(address, phys >> PAGE_SHIFT, flags);
 }
 
-#ifndef CONFIG_XEN_SHADOW_MODE
 void __set_fixmap_ma (enum fixed_addresses idx, unsigned long phys, pgprot_t flags)
-#else /* CONFIG_XEN_SHADOW_MODE */
-void __vms___set_fixmap_ma (enum fixed_addresses idx, unsigned long phys, pgprot_t flags)
-#endif /* CONFIG_XEN_SHADOW_MODE */
 {
 	unsigned long address = __fix_to_virt(idx);
 
@@ -196,11 +173,7 @@ void __vms___set_fixmap_ma (enum fixed_addresses idx, unsigned long phys, pgprot
 		BUG();
 		return;
 	}
-#ifndef CONFIG_XEN_SHADOW_MODE
 	set_pte_pfn_ma(address, phys >> PAGE_SHIFT, flags);
-#else /* CONFIG_XEN_SHADOW_MODE */
-	__vms_set_pte_pfn_ma(address, phys >> PAGE_SHIFT, flags);
-#endif /* CONFIG_XEN_SHADOW_MODE */
 }
 
 pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
@@ -208,10 +181,8 @@ pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 	pte_t *pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT);
 	if (pte) {
 		clear_page(pte);
-#ifndef CONFIG_XEN_SHADOW_MODE
 		make_page_readonly(pte);
 		xen_flush_page_update_queue();
-#endif /* ! CONFIG_XEN_SHADOW_MODE */
 	}
 	return pte;
 }
@@ -223,11 +194,9 @@ void pte_ctor(void *pte, kmem_cache_t *cache, unsigned long unused)
 	set_page_count(page, 1);
 
 	clear_page(pte);
-#ifndef CONFIG_XEN_SHADOW_MODE
 	make_page_readonly(pte);
 	queue_pte_pin(__pa(pte));
 	flush_page_update_queue();
-#endif /* ! CONFIG_XEN_SHADOW_MODE */
 }
 
 void pte_dtor(void *pte, kmem_cache_t *cache, unsigned long unused)
@@ -235,11 +204,9 @@ void pte_dtor(void *pte, kmem_cache_t *cache, unsigned long unused)
 	struct page *page = virt_to_page(pte);
 	ClearPageForeign(page);
 
-#ifndef CONFIG_XEN_SHADOW_MODE
 	queue_pte_unpin(__pa(pte));
 	make_page_writable(pte);
 	flush_page_update_queue();
-#endif /* ! CONFIG_XEN_SHADOW_MODE */
 }
 
 struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
@@ -272,11 +239,7 @@ void pte_free(struct page *pte)
 	if (pte < highmem_start_page)
 #endif
 		kmem_cache_free(pte_cache,
-#ifndef CONFIG_XEN_SHADOW_MODE
 				phys_to_virt(page_to_pseudophys(pte)));
-#else /* CONFIG_XEN_SHADOW_MODE */
-				phys_to_virt(__vms_page_to_pseudophys(pte)));
-#endif /* CONFIG_XEN_SHADOW_MODE */
 #ifdef CONFIG_HIGHPTE
 	else
 		__free_page(pte);
@@ -341,13 +304,9 @@ void pgd_ctor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 	spin_unlock_irqrestore(&pgd_lock, flags);
 	memset(pgd, 0, USER_PTRS_PER_PGD*sizeof(pgd_t));
  out:
-#ifndef CONFIG_XEN_SHADOW_MODE
 	make_page_readonly(pgd);
 	queue_pgd_pin(__pa(pgd));
 	flush_page_update_queue();
-#else /* CONFIG_XEN_SHADOW_MODE */
-	;
-#endif /* CONFIG_XEN_SHADOW_MODE */
 }
 
 /* never called when PTRS_PER_PMD > 1 */
@@ -355,11 +314,9 @@ void pgd_dtor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 {
 	unsigned long flags; /* can be called from interrupt context */
 
-#ifndef CONFIG_XEN_SHADOW_MODE
 	queue_pgd_unpin(__pa(pgd));
 	make_page_writable(pgd);
 	flush_page_update_queue();
-#endif /* ! CONFIG_XEN_SHADOW_MODE */
 
 	if (PTRS_PER_PMD > 1)
 		return;
@@ -426,7 +383,6 @@ void make_page_readonly(void *va)
 	pmd_t *pmd = pmd_offset(pgd, (unsigned long)va);
 	pte_t *pte = pte_offset_kernel(pmd, (unsigned long)va);
 	queue_l1_entry_update(pte, (*(unsigned long *)pte)&~_PAGE_RW);
-#ifndef CONFIG_XEN_SHADOW_MODE
 	if ( (unsigned long)va >= (unsigned long)high_memory )
 	{
 		unsigned long phys;
@@ -436,7 +392,6 @@ void make_page_readonly(void *va)
 #endif
 			make_lowmem_page_readonly(phys_to_virt(phys));
 	}
-#endif /* ! CONFIG_XEN_SHADOW_MODE */
 }
 
 void make_page_writable(void *va)
@@ -448,11 +403,7 @@ void make_page_writable(void *va)
 	if ( (unsigned long)va >= (unsigned long)high_memory )
 	{
 		unsigned long phys;
-#ifndef CONFIG_XEN_SHADOW_MODE
 		phys = machine_to_phys(*(unsigned long *)pte & PAGE_MASK);
-#else /* CONFIG_XEN_SHADOW_MODE */
-		phys = __vms_machine_to_phys(*(unsigned long *)pte & PAGE_MASK);
-#endif /* CONFIG_XEN_SHADOW_MODE */
 #ifdef CONFIG_HIGHMEM
 		if ( (phys >> PAGE_SHIFT) < highstart_pfn )
 #endif

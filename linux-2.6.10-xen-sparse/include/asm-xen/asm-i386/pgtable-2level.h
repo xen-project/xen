@@ -36,33 +36,14 @@ do { \
 #endif
 #define set_pte_atomic(pteptr, pteval) set_pte(pteptr, pteval)
 #else
-#if defined(CONFIG_XEN_DEBUG_NO_MMU_BATCHING)
-#define set_pte(pteptr, pteval)\
-    set_pte_batched(pteptr, pteval)
-
-#elif defined(CONFIG_XEN_BATCH_MODE1)
-#define set_pte(pteptr, pteval)({\
-    set_pte_batched(pteptr, pteval);\
-    _flush_page_update_queue();})
-
-#elif defined(CONFIG_XEN_BATCH_MODE2)
-#define set_pte(pteptr, pteval)\
-    set_pte_batched(pteptr, pteval)
-
-#else
 #define set_pte(pteptr, pteval) (*(pteptr) = pteval)
-#endif
 #define set_pte_atomic(pteptr, pteval) set_pte(pteptr,pteval)
 #endif
 /*
  * (pmds are folded into pgds so this doesn't get actually called,
  * but the define is needed for a generic inline function.)
  */
-#ifndef CONFIG_XEN_SHADOW_MODE
 #define set_pmd(pmdptr, pmdval) xen_l2_entry_update((pmdptr), (pmdval).pmd)
-#else /* CONFIG_XEN_SHADOW_MODE */
-#define set_pmd(pmdptr, pmdval) (*(pmdptr) = pmdval)
-#endif /* CONFIG_XEN_SHADOW_MODE */
 #define set_pgd(pgdptr, pgdval) ((void)0)
 
 #define pgd_page(pgd) \
@@ -86,11 +67,7 @@ static inline pte_t ptep_get_and_clear(pte_t *xp)
 {
 	pte_t pte = *xp;
 	if (pte.pte_low)
-#ifndef CONFIG_XEN_SHADOW_MODE
 		set_pte(xp, __pte_ma(0));
-#else /* CONFIG_XEN_SHADOW_MODE */
-		set_pte(xp, __pte(0));
-#endif /* CONFIG_XEN_SHADOW_MODE */
 	return pte;
 }
 
@@ -117,7 +94,6 @@ static inline pte_t ptep_get_and_clear(pte_t *xp)
  */
 #define INVALID_P2M_ENTRY (~0U)
 #define FOREIGN_FRAME(_m) ((_m) | (1UL<<((sizeof(unsigned long)*8)-1)))
-#ifndef CONFIG_XEN_SHADOW_MODE
 #define pte_pfn(_pte)							\
 ({									\
 	unsigned long mfn = (_pte).pte_low >> PAGE_SHIFT;		\
@@ -126,17 +102,12 @@ static inline pte_t ptep_get_and_clear(pte_t *xp)
 		pfn = max_mapnr; /* special: force !pfn_valid() */	\
 	pfn;								\
 })
-#else /* CONFIG_XEN_SHADOW_MODE */
-#define pte_pfn(_pte)		((_pte).pte_low >> PAGE_SHIFT)
-#endif /* CONFIG_XEN_SHADOW_MODE */
 
 #define pte_page(_pte) pfn_to_page(pte_pfn(_pte))
 
 #define pte_none(x)		(!(x).pte_low)
 #define pfn_pte(pfn, prot)	__pte(((pfn) << PAGE_SHIFT) | pgprot_val(prot))
-#ifndef CONFIG_XEN_SHADOW_MODE
 #define pfn_pte_ma(pfn, prot)	__pte_ma(((pfn) << PAGE_SHIFT) | pgprot_val(prot))
-#endif /* ! CONFIG_XEN_SHADOW_MODE */
 #define pfn_pmd(pfn, prot)	__pmd(((pfn) << PAGE_SHIFT) | pgprot_val(prot))
 
 /*

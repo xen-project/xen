@@ -514,23 +514,17 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 	 * Load the per-thread Thread-Local Storage descriptor.
 	 * This is load_TLS(next, cpu) with multicalls.
 	 */
-#ifndef CONFIG_XEN_SHADOW_MODE
-#define C_VIRT_TO_MACH virt_to_machine
-#else /* CONFIG_XEN_SHADOW_MODE */
-#define C_VIRT_TO_MACH virt_to_phys
-#endif
 #define C(i) do {							    \
 	if (unlikely(next->tls_array[i].a != prev->tls_array[i].a ||	    \
 		     next->tls_array[i].b != prev->tls_array[i].b))	    \
 		queue_multicall3(__HYPERVISOR_update_descriptor,	    \
-				 C_VIRT_TO_MACH(&get_cpu_gdt_table(cpu)     \
+				 virt_to_machine(&get_cpu_gdt_table(cpu)    \
 						 [GDT_ENTRY_TLS_MIN + i]),  \
 				 ((u32 *)&next->tls_array[i])[0],	    \
 				 ((u32 *)&next->tls_array[i])[1]);	    \
 } while (0)
 	C(0); C(1); C(2);
 #undef C
-#undef C_VIRT_TO_MACH
 
 	if (xen_start_info.flags & SIF_PRIVILEGED) {
 		op.cmd           = DOM0_IOPL;

@@ -77,9 +77,7 @@ static pte_t * __init one_page_table_init(pmd_t *pmd)
 {
 	if (pmd_none(*pmd)) {
 		pte_t *page_table = (pte_t *) alloc_bootmem_low_pages(PAGE_SIZE);
-#ifndef CONFIG_XEN_SHADOW_MODE
 		make_page_readonly(page_table);
-#endif
 		set_pmd(pmd, __pmd(__pa(page_table) | _PAGE_TABLE));
 		if (page_table != pte_offset_kernel(pmd, 0))
 			BUG();	
@@ -351,18 +349,12 @@ static void __init pagetable_init (void)
 	 * it. We clean up by write-enabling and then freeing the old page dir.
 	 */
 	memcpy(new_pgd, old_pgd, PTRS_PER_PGD_NO_HV*sizeof(pgd_t));
-#ifndef CONFIG_XEN_SHADOW_MODE
 	make_page_readonly(new_pgd);
 	queue_pgd_pin(__pa(new_pgd));
-#endif /* ! CONFIG_XEN_SHADOW_MODE */
 	load_cr3(new_pgd);
-#ifndef CONFIG_XEN_SHADOW_MODE
 	queue_pgd_unpin(__pa(old_pgd));
-#endif /* ! CONFIG_XEN_SHADOW_MODE */
 	__flush_tlb_all(); /* implicit flush */
-#ifndef CONFIG_XEN_SHADOW_MODE
 	make_page_writable(old_pgd);
-#endif /* CONFIG_XEN_SHADOW_MODE */
 	flush_page_update_queue();
 	free_bootmem(__pa(old_pgd), PAGE_SIZE);
 
@@ -570,31 +562,18 @@ void __init paging_init(void)
 
 	/* Switch to the real shared_info page, and clear the dummy page. */
 	flush_page_update_queue();
-#ifndef CONFIG_XEN_SHADOW_MODE
 	set_fixmap_ma(FIX_SHARED_INFO, xen_start_info.shared_info);
-#else /* CONFIG_XEN_SHADOW_MODE */
-        printk("xen_start_info.shared_info=%x\n", xen_start_info.shared_info);
-	set_fixmap(FIX_SHARED_INFO, xen_start_info.shared_info);
-#endif /* CONFIG_XEN_SHADOW_MODE */
 	HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
 	memset(empty_zero_page, 0, sizeof(empty_zero_page));
 
 #ifdef CONFIG_XEN_PHYSDEV_ACCESS
 	/* Setup mapping of lower 1st MB */
 	for (i = 0; i < NR_FIX_ISAMAPS; i++)
-#ifndef CONFIG_XEN_SHADOW_MODE
 		if (xen_start_info.flags & SIF_PRIVILEGED)
 			set_fixmap_ma(FIX_ISAMAP_BEGIN - i, i * PAGE_SIZE);
 		else
 			set_fixmap_ma_ro(FIX_ISAMAP_BEGIN - i,
 					 virt_to_machine(empty_zero_page));
-#else /* CONFIG_XEN_SHADOW_MODE */
-		if (xen_start_info.flags & SIF_PRIVILEGED)
-			__vms_set_fixmap_ma(FIX_ISAMAP_BEGIN - i, i * PAGE_SIZE);
-		else
-			__vms_set_fixmap_ma_ro(FIX_ISAMAP_BEGIN - i,
-					 __vms_virt_to_machine(empty_zero_page));
-#endif /* CONFIG_XEN_SHADOW_MODE */
 #endif
 }
 

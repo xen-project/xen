@@ -101,26 +101,15 @@ enum fixed_addresses {
 
 extern void __set_fixmap (enum fixed_addresses idx,
 					unsigned long phys, pgprot_t flags);
-#ifndef CONFIG_XEN_SHADOW_MODE
 extern void __set_fixmap_ma (enum fixed_addresses idx,
-#else /* CONFIG_XEN_SHADOW_MODE */
-extern void __vms___set_fixmap_ma (enum fixed_addresses idx,
-#endif /* CONFIG_XEN_SHADOW_MODE */
 					unsigned long mach, pgprot_t flags);
 
 #define set_fixmap(idx, phys) \
 		__set_fixmap(idx, phys, PAGE_KERNEL)
-#ifndef CONFIG_XEN_SHADOW_MODE
 #define set_fixmap_ma(idx, phys) \
 		__set_fixmap_ma(idx, phys, PAGE_KERNEL)
 #define set_fixmap_ma_ro(idx, phys) \
 		__set_fixmap_ma(idx, phys, PAGE_KERNEL_RO)
-#else /* CONFIG_XEN_SHADOW_MODE */
-#define __vms_set_fixmap_ma(idx, phys) \
-		__vms___set_fixmap_ma(idx, phys, PAGE_KERNEL)
-#define __vms_set_fixmap_ma_ro(idx, phys) \
-		__vms___set_fixmap_ma(idx, phys, PAGE_KERNEL_RO)
-#endif /* CONFIG_XEN_SHADOW_MODE */
 /*
  * Some hardware wants to get fixmapped without caching.
  */
