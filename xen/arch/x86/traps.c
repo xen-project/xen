@@ -383,7 +383,7 @@ asmlinkage void do_machine_check(struct xen_regs *regs)
     fatal_trap(TRAP_machine_check, regs);
 }
 
-static inline void propagate_page_fault(unsigned long addr, u16 error_code)
+void propagate_page_fault(unsigned long addr, u16 error_code)
 {
     trap_info_t *ti;
     struct exec_domain *ed = current;
