@@ -329,13 +329,6 @@ static int setup_guest(int xc_handle,
     munmap(vl1tab, PAGE_SIZE);
     munmap(vl2tab, PAGE_SIZE);
 
-    /*
-     * Pin down l2tab addr as page dir page - causes hypervisor to provide
-     * correct protection for the page
-     */ 
-    if ( pin_table(xc_handle, MMUEXT_PIN_L2_TABLE, l2tab>>PAGE_SHIFT, dom) )
-        goto error_out;
-
     if ((boot_paramsp = xc_map_foreign_range(
 		xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
 		page_array[(vboot_params_start-dsi.v_start)>>PAGE_SHIFT])) == 0)
@@ -427,6 +420,13 @@ static int setup_guest(int xc_handle,
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
         shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
     munmap(shared_info, PAGE_SIZE);
+
+    /*
+     * Pin down l2tab addr as page dir page - causes hypervisor to provide
+     * correct protection for the page
+     */ 
+    if ( pin_table(xc_handle, MMUEXT_PIN_L2_TABLE, l2tab>>PAGE_SHIFT, dom) )
+        goto error_out;
 
     /* Send the page update requests down to the hypervisor. */
     if ( finish_mmu_updates(xc_handle, mmu) )
