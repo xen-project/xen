@@ -1,7 +1,6 @@
 
 verbose     ?= n
 debug       ?= n
-debugger    ?= n
 perfc       ?= n
 trace       ?= n
 optimize    ?= y
@@ -57,9 +56,6 @@ endif
 
 ifeq ($(crash_debug),y)
 CFLAGS += -g -DCRASH_DEBUG
-ifeq ($(debugger),y)
-error Crash debugger conflicts with PDB
-endif
 endif
 
 ifeq ($(perfc),y)
