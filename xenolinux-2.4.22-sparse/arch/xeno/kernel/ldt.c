@@ -152,8 +152,7 @@ static int write_ldt(void * ptr, unsigned long bytecount, int oldmode)
 
     /* Install the new entry ...  */
  install:
-    HYPERVISOR_update_descriptor(phys_lp, entry_1, entry_2);
-    error = 0;
+    error = HYPERVISOR_update_descriptor(phys_lp, entry_1, entry_2);
 
  out_unlock:
     up_write(&mm->mmap_sem);
