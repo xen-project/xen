@@ -125,6 +125,7 @@ int physdev_pci_access_modify(
 {
     struct task_struct *p;
     struct pci_dev *pdev, *rdev, *tdev;
+    int rc = 0;
  
     if ( !IS_PRIV(current) )
         BUG();
@@ -150,18 +151,19 @@ int physdev_pci_access_modify(
     if ( (pdev = pci_find_slot(bus, PCI_DEVFN(dev, func))) == NULL )
     {
         INFO("  dev does not exist\n");
-        return -ENODEV;
+        rc = -ENODEV;
+        goto out;
     }
     add_dev_to_task(p, pdev, ACC_WRITE);
     INFO("  add RW %02x:%02x:%02x\n", pdev->bus->number,
          PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn));
 
-
     /* Grant read access to the root device. */
     if ( (rdev = pci_find_slot(0, PCI_DEVFN(0, 0))) == NULL )
     {
         INFO("  bizarre -- no PCI root dev\n");
-        return -ENODEV;
+        rc = -ENODEV;
+        goto out;
     }
     add_dev_to_task(p, rdev, ACC_READ);
     INFO("  add R0 %02x:%02x:%02x\n", 0, 0, 0);
@@ -174,13 +176,13 @@ int physdev_pci_access_modify(
              PCI_SLOT(tdev->devfn), PCI_FUNC(tdev->devfn));
     }
 
-    if ( pdev->hdr_type == PCI_HEADER_TYPE_NORMAL )
-        return 0;
-    
-    /* The device is a bridge or cardbus. */
-    INFO("XXX can't give access to bridge devices yet\n");
+    /* Is the device a bridge or cardbus? */
+    if ( pdev->hdr_type != PCI_HEADER_TYPE_NORMAL )
+        INFO("XXX can't give access to bridge devices yet\n");
 
-    return 0;
+ out:
+    put_task_struct(p);
+    return rc;
 }
 
 /* check if a domain has general access to a device */
