@@ -151,7 +151,7 @@ NT_MASK		= 0x00004000
         movl %edx,%ds; \
         movl %edx,%es; \
         movl %edx,%fs; \
-        movl %edx,%gs;
+        movl %edx,%gs; \
         sti;
 
 #define GET_CURRENT(reg)   \
