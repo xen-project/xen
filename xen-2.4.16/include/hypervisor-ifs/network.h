@@ -26,8 +26,8 @@ typedef struct rx_entry_st {
         int           status; /* per descriptor status. */
 } rx_entry_t;
 
-#define TX_RING_SIZE 1024
-#define RX_RING_SIZE 1024
+#define TX_RING_SIZE 256
+#define RX_RING_SIZE 256
 typedef struct net_ring_st {
     /*
      * Guest OS places packets into ring at tx_prod.

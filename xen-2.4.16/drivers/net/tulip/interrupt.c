@@ -170,8 +170,9 @@ static int tulip_rx(struct net_device *dev)
 #endif
 			/* Check if the packet is long enough to accept without copying
 			   to a minimally-sized skbuff. */
-			if (pkt_len < tulip_rx_copybreak
-				&& (skb = dev_alloc_skb(pkt_len + 2)) != NULL) {
+			//if (pkt_len < tulip_rx_copybreak
+			//	&& (skb = dev_alloc_skb(pkt_len + 2)) != NULL) {
+                        if (0) {
 				skb->dev = dev;
 				skb_reserve(skb, 2);	/* 16 byte align the IP header */
 				pci_dma_sync_single(tp->pdev,
