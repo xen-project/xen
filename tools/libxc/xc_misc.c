@@ -97,3 +97,36 @@ int xc_perfc_control(int xc_handle,
 
     return (rc == 0) ? dop.u.perfccontrol.nr_counters : rc;
 }
+
+long long xc_msr_read(int xc_handle, int cpu_mask, int msr)
+{
+    int rc;    
+    dom0_op_t op;
+    
+    op.cmd = DOM0_MSR;
+    op.u.msr.write = 0;
+    op.u.msr.msr = msr;
+    op.u.msr.cpu_mask = cpu_mask;
+
+    rc = do_dom0_op(xc_handle, &op);
+
+    return (((unsigned long long)op.u.msr.out2)<<32) | op.u.msr.out1 ;
+}
+
+int xc_msr_write(int xc_handle, int cpu_mask, int msr, unsigned int low,
+                  unsigned int high)
+{
+    int rc;    
+    dom0_op_t op;
+    
+    op.cmd = DOM0_MSR;
+    op.u.msr.write = 1;
+    op.u.msr.msr = msr;
+    op.u.msr.cpu_mask = cpu_mask;
+    op.u.msr.in1 = low;
+    op.u.msr.in2 = high;
+
+    rc = do_dom0_op(xc_handle, &op);
+    
+    return rc;
+}

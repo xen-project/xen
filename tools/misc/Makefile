@@ -21,18 +21,21 @@ INSTALL_SBIN = netfix xm xend xensv xenperf
 
 all: $(TARGETS)
 	$(MAKE) -C miniterm
+	$(MAKE) -C cpuperf
 
 install: all
 	[ -d $(DESTDIR)/usr/bin ] || $(INSTALL_DIR) $(DESTDIR)/usr/bin
 	[ -d $(DESTDIR)/usr/sbin ] || $(INSTALL_DIR) $(DESTDIR)/usr/sbin
 	$(INSTALL_PROG) $(INSTALL_BIN) $(DESTDIR)/usr/bin
 	$(INSTALL_PROG) $(INSTALL_SBIN) $(DESTDIR)/usr/sbin
+	$(MAKE) -C cpuperf install
 #       No sense in installing miniterm on the Xen box.
 #	$(MAKE) -C miniterm install
 
 clean:
 	$(RM) *.o $(TARGETS) *~
 	$(MAKE) -C miniterm clean
+	$(MAKE) -C cpuperf clean
 
 %.o: %.c $(HDRS) Makefile
 	$(CC) -c $(CFLAGS) -o $@ $<

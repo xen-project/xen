@@ -586,6 +586,14 @@
 41a216cayFe2FQroFuzvNPw1AvNiqQ tools/libxutil/util.c
 41a216ca7mgVSnCBHPCLkGOIqPS1CQ tools/libxutil/util.h
 3f776bd2Xd-dUcPKlPN2vG89VGtfvQ tools/misc/Makefile
+4225f56d7sa9aEARfjNeCVTMYDAmZA tools/misc/cpuperf/Makefile
+4225f56dS5TGdKojmuBnrV3PzbE6Rg tools/misc/cpuperf/README.txt
+4225f56dcodvBSPoWYS6kvwZCQhgzg tools/misc/cpuperf/cpuperf.c
+4225f56dMjZK14EWd8K0gq4v5Diwjg tools/misc/cpuperf/cpuperf_perfcntr.h
+4225f56d_XjSY1297IiH96qeqD4sCA tools/misc/cpuperf/cpuperf_xeno.h
+4225f56dqlGC_UZ681F95mCgLbOeHQ tools/misc/cpuperf/module/Makefile
+4225f56dnmms-VFr1MiDVG_dYoM7IQ tools/misc/cpuperf/module/perfcntr.c
+4225f56dYhIGQRD_kKVJ6xQrkqO0YQ tools/misc/cpuperf/p4perf.h
 40ab2cfawIw8tsYo0dQKtp83h4qfTQ tools/misc/fakei386xen
 3f6dc136ZKOjd8PIqLbFBl_v-rnkGg tools/misc/miniterm/Makefile
 3f6dc140C8tAeBfroAF24VrmCS4v_w tools/misc/miniterm/README

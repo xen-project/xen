@@ -370,6 +370,11 @@ int xc_perfc_control(int xc_handle,
                      u32 op,
                      xc_perfc_desc_t *desc);
 
+/* read/write msr */
+long long xc_msr_read(int xc_handle, int cpu_mask, int msr);
+int xc_msr_write(int xc_handle, int cpu_mask, int msr, unsigned int low,
+                  unsigned int high);
+
 /**
  * Memory maps a range within one domain to a local address range.  Mappings
  * should be unmapped with munmap and should follow the same rules as mmap
