@@ -456,7 +456,8 @@ void xlvbd_update_vbds(void)
         }
         else
         {
-            if ( (memcmp(&old_info[i], &new_info[j], sizeof(xen_disk_t)) == 0) ||
+            if ( ((old_info[i].capacity == new_info[j].capacity) &&
+                  (old_info[i].info == new_info[j].info)) ||
                  (xlvbd_remove_device(old_info[i].device) != 0) )
                 memcpy(&merged_info[k++], &old_info[i], sizeof(xen_disk_t));
             else if ( xlvbd_init_device(&new_info[j]) == 0 )
