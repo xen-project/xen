@@ -310,8 +310,7 @@ static PyObject *pyxc_linux_restore(PyObject *self,
 
     static char *kwd_list[] = { "state_file", "progress", "debug", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "is|ii", kwd_list,
-                                      &ioctxt.domain,
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "s|ii", kwd_list,
                                       &state_file,
                                       &progress,
                                       &debug) )
