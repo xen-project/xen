@@ -86,7 +86,7 @@ struct pfn_info
 #define PageSetSlab(page)	((void)0)
 #define PageClearSlab(page)	((void)0)
 
-#define IS_XEN_HEAP_FRAME(_pfn) (page_to_phys(_pfn) < MAX_XENHEAP_ADDRESS)
+#define IS_XEN_HEAP_FRAME(_pfn) (page_to_phys(_pfn) < xenheap_phys_end)
 
 #define SHARE_PFN_WITH_DOMAIN(_pfn, _dom)                                   \
     do {                                                                    \
@@ -104,7 +104,7 @@ extern struct list_head free_list;
 extern spinlock_t free_list_lock;
 extern unsigned int free_pfns;
 extern unsigned long max_page;
-void init_frametable(unsigned long nr_pages);
+void init_frametable(void *frametable_vstart, unsigned long nr_pages);
 void add_to_domain_alloc_list(unsigned long ps, unsigned long pe);
 
 struct pfn_info *alloc_domain_page(struct domain *p);

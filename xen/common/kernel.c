@@ -27,6 +27,8 @@
 #include <asm/domain_page.h>
 #include <hypervisor-ifs/dom0_ops.h>
 
+unsigned long xenheap_phys_end;
+
 kmem_cache_t *domain_struct_cachep;
 
 struct e820entry {
@@ -69,6 +71,11 @@ char opt_physdev_dom0_hide[200] = "";
 /*                                    level- or edge-triggered.         */
 /* Example: 'leveltrigger=4,5,6,20 edgetrigger=21'. */
 char opt_leveltrigger[30] = "", opt_edgetrigger[30] = "";
+/*
+ * opt_xenheap_megabytes: Size of Xen heap in megabytes, excluding the
+ * pfn_info table and allocation bitmap.
+ */
+unsigned int opt_xenheap_megabytes = XENHEAP_DEFAULT_MB;
 
 static struct {
     unsigned char *name;
@@ -91,6 +98,7 @@ static struct {
     { "physdev_dom0_hide", OPT_STR,  &opt_physdev_dom0_hide },
     { "leveltrigger",      OPT_STR,  &opt_leveltrigger },
     { "edgetrigger",       OPT_STR,  &opt_edgetrigger },
+    { "xenheap_megabytes", OPT_UINT, &opt_xenheap_megabytes },
     { NULL,               0,        NULL     }
 };
 
@@ -180,52 +188,78 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
         for ( ; ; ) ;
     }
 
-    max_mem = max_page = (mbi->mem_upper+1024) >> (PAGE_SHIFT - 10);
-
-    /* The array of pfn_info structures must fit into the reserved area. */
-    if ( (sizeof(struct pfn_info) * max_page) >
-         (FRAMETABLE_VIRT_END - FRAMETABLE_VIRT_START) )
+    if ( opt_xenheap_megabytes < 4 )
     {
-        unsigned long new_max =
-            (FRAMETABLE_VIRT_END - FRAMETABLE_VIRT_START) /
-            sizeof(struct pfn_info);
-        printk("Truncating available memory to %lu/%luMB\n",
-               new_max >> (20 - PAGE_SHIFT), max_page >> (20 - PAGE_SHIFT));
-        max_page = new_max;
+        printk("Xen heap size is too small to safely continue!\n");
+        for ( ; ; ) ;
     }
 
     set_current(&idle0_task);
 
-    init_frametable(max_page);
-    printk("Initialised %luMB memory (%lu pages) on a %luMB machine\n",
-           max_page >> (20-PAGE_SHIFT), max_page,
-	   max_mem  >> (20-PAGE_SHIFT));
+    xenheap_phys_end = opt_xenheap_megabytes << 20;
 
-    initial_images_start = MAX_DIRECTMAP_ADDRESS;
+    max_mem = max_page = (mbi->mem_upper+1024) >> (PAGE_SHIFT - 10);
+
+#if defined(__i386__)
+
+    if ( opt_xenheap_megabytes > XENHEAP_DEFAULT_MB )
+    {
+        printk("Xen heap size is limited to %dMB - you specified %dMB.\n",
+               XENHEAP_DEFAULT_MB, opt_xenheap_megabytes);
+        for ( ; ; ) ;
+    }
+
+    ASSERT((sizeof(struct pfn_info) << 20) >
+           (FRAMETABLE_VIRT_END - FRAMETABLE_VIRT_START));
+
+    init_frametable((void *)FRAMETABLE_VIRT_START, max_page);
+
+    /* Initial images stashed away above DIRECTMAP area in boot.S. */
+    initial_images_start = DIRECTMAP_PHYS_END;
     initial_images_end   = initial_images_start + 
         (mod[mbi->mods_count-1].mod_end - mod[0].mod_start);
+
+#elif defined(__x86_64__)
+
+    init_frametable(__va(xenheap_phys_end), max_page);
+
+    initial_images_start = __pa(frame_table) + frame_table_size;
+    initial_images_end   = initial_images_start + 
+        (mod[mbi->mods_count-1].mod_end - mod[0].mod_start);
+    if ( initial_images_end > (max_page << PAGE_SHIFT) )
+    {
+        printk("Not enough memory to stash the DOM0 kernel image.\n");
+        for ( ; ; ) ;
+    }
+    memmove(__va(initial_images_start),
+            __va(mod[0].mod_start),
+            mod[mbi->mods_count-1].mod_end - mod[0].mod_start);
+
+#endif
+
     dom0_memory_start    = (initial_images_end + ((4<<20)-1)) & ~((4<<20)-1);
     dom0_memory_end      = dom0_memory_start + (opt_dom0_mem << 10);
     dom0_memory_end      = (dom0_memory_end + PAGE_SIZE - 1) & PAGE_MASK;
     
     /* Cheesy sanity check: enough memory for DOM0 allocation + some slack? */
-    if ( (dom0_memory_end + (8<<20)) > (max_page<<PAGE_SHIFT) )
-        panic("Not enough memory to craete initial domain!\n");
+    if ( (dom0_memory_end + (8<<20)) > (max_page << PAGE_SHIFT) )
+    {
+        printk("Not enough memory for DOM0 memory reservation.\n");
+        for ( ; ; ) ;
+    }
+
+    printk("Initialised %luMB memory (%lu pages) on a %luMB machine\n",
+           max_page >> (20-PAGE_SHIFT), max_page,
+	   max_mem  >> (20-PAGE_SHIFT));
 
     add_to_domain_alloc_list(dom0_memory_end, max_page << PAGE_SHIFT);
 
     heap_start = memguard_init(&_end);
 
     printk("Xen heap size is %luKB\n", 
-	   (MAX_XENHEAP_ADDRESS-__pa(heap_start))/1024 );
+	   (xenheap_phys_end-__pa(heap_start))/1024 );
 
-    if ( ((MAX_XENHEAP_ADDRESS-__pa(heap_start))/1024) <= 4096 )
-    {
-        printk("Xen heap size is too small to safely continue!\n");
-        for ( ; ; ) ;
-    }
-
-    init_page_allocator(__pa(heap_start), MAX_XENHEAP_ADDRESS);
+    init_page_allocator(__pa(heap_start), xenheap_phys_end);
  
     /* Initialise the slab allocator. */
     kmem_cache_init();
@@ -253,8 +287,7 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
 
     /*
      * We're going to setup domain0 using the module(s) that we stashed safely
-     * above our MAX_DIRECTMAP_ADDRESS in boot/boot.S. The second module, if
-     * present, is an initrd ramdisk.
+     * above our heap. The second module, if present, is an initrd ramdisk.
      */
     if ( construct_dom0(new_dom, dom0_memory_start, dom0_memory_end,
                         (char *)initial_images_start, 

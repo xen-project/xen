@@ -144,7 +144,7 @@ static struct {
 #define GPS (percpu_info[smp_processor_id()].gps ? : current)
 
 
-void __init init_frametable(unsigned long nr_pages)
+void __init init_frametable(void *frametable_vstart, unsigned long nr_pages)
 {
     unsigned long mfn;
 
@@ -153,22 +153,23 @@ void __init init_frametable(unsigned long nr_pages)
     max_page = nr_pages;
     frame_table_size = nr_pages * sizeof(struct pfn_info);
     frame_table_size = (frame_table_size + PAGE_SIZE - 1) & PAGE_MASK;
-    frame_table = (struct pfn_info *)FRAMETABLE_VIRT_START;
+    frame_table = frametable_vstart;
+
+    if ( (__pa(frame_table) + frame_table_size) > (max_page << PAGE_SHIFT) )
+        panic("Not enough memory for frame table - reduce Xen heap size?\n");
+
     memset(frame_table, 0, frame_table_size);
 
     spin_lock_init(&free_list_lock);
     INIT_LIST_HEAD(&free_list);    
     free_pfns = 0;
 
-    /* initialise to a magic of 0x55555555 so easier to spot bugs later */
-    memset( machine_to_phys_mapping, 0x55, 4*1024*1024 );
-
-    /* The array is sized for a 4GB machine regardless of actuall mem size. 
-       This costs 4MB -- may want to fix some day */
+    /* Initialise to a magic of 0x55555555 so easier to spot bugs later. */
+    memset(machine_to_phys_mapping, 0x55, 4<<20);
 
     /* Pin the ownership of the MP table so that DOM0 can map it later. */
-    for ( mfn = virt_to_phys(&machine_to_phys_mapping[0])>>PAGE_SHIFT;
-          mfn < virt_to_phys(&machine_to_phys_mapping[1024*1024])>>PAGE_SHIFT;
+    for ( mfn = virt_to_phys(&machine_to_phys_mapping[0<<20])>>PAGE_SHIFT;
+          mfn < virt_to_phys(&machine_to_phys_mapping[1<<20])>>PAGE_SHIFT;
           mfn++ )
     {
         frame_table[mfn].count_and_flags = 1 | PGC_allocated;
@@ -471,6 +472,7 @@ static int alloc_l2_table(struct pfn_info *page)
         if ( unlikely(!get_page_from_l2e(pl2e[i], page_nr)) )
             goto fail;
     
+#if defined(__i386__)
     /* Now we add our private high mappings. */
     memcpy(&pl2e[DOMAIN_ENTRIES_PER_L2_PAGETABLE], 
            &idle_pg_table[DOMAIN_ENTRIES_PER_L2_PAGETABLE],
@@ -480,6 +482,7 @@ static int alloc_l2_table(struct pfn_info *page)
     pl2e[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] =
         mk_l2_pgentry(__pa(page->u.domain->mm.perdomain_pt) | 
                       __PAGE_HYPERVISOR);
+#endif
 
     unmap_domain_mem(pl2e);
     return 1;

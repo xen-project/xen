@@ -101,7 +101,7 @@ continue_boot_cpu:
         mov     0x4(%eax),%eax               /* %eax = mod[mod_count-1]->end */
         mov     %eax,%ecx
         sub     %ebx,%ecx                    /* %ecx = byte len of all mods */
-        mov     $(MAX_DIRECTMAP_ADDRESS), %edi
+        mov     $(DIRECTMAP_PHYS_END), %edi
         add     %ecx, %edi                   /* %edi = src + length */        
         shr     $2,%ecx                      /* %ecx = length/4 */
 1:      sub     $4,%eax                      /* %eax = src, %edi = dst */
@@ -117,7 +117,7 @@ skip_dom0_copy:
 1:      mov     %eax,__PAGE_OFFSET>>20(%edi) /* high mapping */
         stosl                                /* low mapping */
         add     $(1<<L2_PAGETABLE_SHIFT),%eax
-        cmp     $MAX_DIRECTMAP_ADDRESS+0x1e3,%eax
+        cmp     $DIRECTMAP_PHYS_END+0x1e3,%eax
         jne     1b
 
         call    start_paging        
