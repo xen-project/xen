@@ -854,7 +854,7 @@ ENTRY(sys_call_table)
 	.long sys_iopl		/* 110 */
 	.long sys_vhangup
 	.long sys_ni_syscall	/* old "idle" system call */
-	.long sys_vm86old
+	.long sys_ni_syscall	/* disable sys_vm86old */
 	.long sys_wait4
 	.long sys_swapoff	/* 115 */
 	.long sys_sysinfo

@@ -381,11 +381,11 @@ static inline int direct_remap_area_pmd(struct mm_struct *mm,
     if (address >= end)
         BUG();
     do {
-        pte_t *pte = pte_alloc_kernel(mm, pmd, address);
+        pte_t *pte = pte_alloc_map(mm, pmd, address);
         if (!pte)
             return -ENOMEM;
         direct_remap_area_pte(pte, address, end - address, v);
-
+	pte_unmap(pte);
         address = (address + PMD_SIZE) & PMD_MASK;
         pmd++;
     } while (address && (address < end));
