@@ -1996,7 +1996,9 @@ long do_net_update(void)
             
             if (page->tot_count != 1) 
             {
-                DPRINTK("An rx page must be mapped exactly once\n");
+		DPRINTK("RX page mapped multple times (%d/%d/%08x)\n",
+      		page->type_count, page->tot_count, page->flags);
+                
                 goto rx_unmap_and_continue;
             }
             
