@@ -1,4 +1,4 @@
-sv_insdir	:= $(prefix)/var/xen/sv
+sv_insdir	:= $(prefix)/var/lib/xen/sv
 INSTALL		= install
 INSTALL_DIR	= $(INSTALL) -d -m0755
 INSTALL_DATA	= $(INSTALL) -m0644
