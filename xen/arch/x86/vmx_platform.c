@@ -290,7 +290,7 @@ static int vmx_decode(const unsigned char *inst, struct instruction *thread_inst
         case 0xa4:
             /* movsb */
             thread_inst->op_size = BYTE;
-            strcpy(thread_inst->i_name, "movs");
+            strcpy((char *)thread_inst->i_name, "movs");
             
             return DECODE_success;
         case 0xa5:
@@ -300,7 +300,7 @@ static int vmx_decode(const unsigned char *inst, struct instruction *thread_inst
                 thread_inst->op_size = LONG;
             }
             
-            strcpy(thread_inst->i_name, "movs");
+            strcpy((char *)thread_inst->i_name, "movs");
             
             return DECODE_success;
 
@@ -328,7 +328,7 @@ static int vmx_decode(const unsigned char *inst, struct instruction *thread_inst
             return DECODE_failure;
     }
     
-    strcpy(thread_inst->i_name, "mov");
+    strcpy((char *)thread_inst->i_name, "mov");
     if (*inst != 0x0f) {
         return DECODE_success;
     }
@@ -346,14 +346,14 @@ static int vmx_decode(const unsigned char *inst, struct instruction *thread_inst
                 
             }
             thread_inst->op_size = BYTE;
-            strcpy(thread_inst->i_name, "movzb");
+            strcpy((char *)thread_inst->i_name, "movzb");
             
             return DECODE_success;
         case 0xb7:
             thread_inst->op_size = WORD;
             index = get_index((inst + 1));
             thread_inst->operand[1] = mk_operand(LONG, index, 0, REGISTER);
-            strcpy(thread_inst->i_name, "movzw");
+            strcpy((char *)thread_inst->i_name, "movzw");
             
             return DECODE_success;
         default:
@@ -365,7 +365,7 @@ static int vmx_decode(const unsigned char *inst, struct instruction *thread_inst
     return DECODE_failure;
 }
 
-static int inst_copy_from_guest(char *buf, unsigned long guest_eip, int inst_len)
+static int inst_copy_from_guest(unsigned char *buf, unsigned long guest_eip, int inst_len)
 {
     unsigned long gpte;
     unsigned long mfn;
@@ -382,7 +382,7 @@ static int inst_copy_from_guest(char *buf, unsigned long guest_eip, int inst_len
         ma = (mfn << PAGE_SHIFT) | (guest_eip & (PAGE_SIZE - 1));
         inst_start = (unsigned char *)map_domain_mem(ma);
                 
-        memcpy(buf, inst_start, inst_len);
+        memcpy((char *)buf, inst_start, inst_len);
         unmap_domain_mem(inst_start);
     } else {
         // Todo: In two page frames
@@ -502,7 +502,7 @@ void handle_mmio(unsigned long va, unsigned long gpa)
     store_xen_regs(inst_decoder_regs);
 
     // Only handle "mov" and "movs" instructions!
-    if (!strncmp(mmio_inst.i_name, "movz", 4)) {
+    if (!strncmp((char *)mmio_inst.i_name, "movz", 4)) {
         if (read_from_mmio(&mmio_inst)) {
             // Send the request and waiting for return value.
             mpci_p->mmio_target = mmio_inst.operand[1] | WZEROEXTEND;
@@ -514,7 +514,7 @@ void handle_mmio(unsigned long va, unsigned long gpa)
         }
     }
 
-    if (!strncmp(mmio_inst.i_name, "movs", 4)) {
+    if (!strncmp((char *)mmio_inst.i_name, "movs", 4)) {
         int tmp_dir;
 
         tmp_dir = ((va == inst_decoder_regs->edi) ? IOREQ_WRITE : IOREQ_READ);
@@ -522,7 +522,7 @@ void handle_mmio(unsigned long va, unsigned long gpa)
         return;
     }
 
-    if (!strncmp(mmio_inst.i_name, "mov", 3)) {
+    if (!strncmp((char *)mmio_inst.i_name, "mov", 3)) {
         long value = 0;
         int size, index;
 

@@ -192,7 +192,7 @@ extern void dodgy_tsc(void);
 /*
  * Generic CPUID function
  */
-static inline void cpuid(int op, int *eax, int *ebx, int *ecx, int *edx)
+static inline void cpuid(int op, unsigned int *eax, unsigned int *ebx, unsigned int *ecx, unsigned int *edx)
 {
     __asm__("cpuid"
             : "=a" (*eax),

@@ -481,7 +481,7 @@ int construct_dom0(struct domain *d,
                si->mod_len, si->mod_start);
     }
 
-    dst = si->cmd_line;
+    dst = (char *)si->cmd_line;
     if ( cmdline != NULL )
     {
         for ( i = 0; i < 255; i++ )

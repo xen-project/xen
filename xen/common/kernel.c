@@ -16,7 +16,7 @@
 
 void cmdline_parse(char *cmdline)
 {
-    unsigned char *opt_end, *opt;
+    char *opt_end, *opt;
     struct kernel_param *param;
     
     if ( cmdline == NULL )

@@ -428,7 +428,7 @@ typedef struct {
     _MEMORY_PADDING(F);
     memory_t mod_len;         /* 56: Size (bytes) of pre-loaded module.    */
     _MEMORY_PADDING(G);
-    u8 cmd_line[MAX_CMDLINE]; /* 64 */
+    s8 cmd_line[MAX_CMDLINE]; /* 64 */
 } PACKED start_info_t; /* 320 bytes */
 
 /* These flags are passed in the 'flags' field of start_info_t. */

@@ -201,8 +201,8 @@ static void __init init_amd(struct cpuinfo_x86 *c)
  */
 void __init identify_cpu(struct cpuinfo_x86 *c)
 {
-    int junk, i, cpu = smp_processor_id();
-    u32 xlvl, tfms;
+    int i, cpu = smp_processor_id();
+    u32 xlvl, tfms, junk;
 
     phys_proc_id[cpu]    = cpu;
     logical_proc_id[cpu] = 0;
@@ -217,10 +217,10 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
         panic("Ancient processors not supported\n");
 
     /* Get vendor name */
-    cpuid(0x00000000, &c->cpuid_level,
-          (int *)&c->x86_vendor_id[0],
-          (int *)&c->x86_vendor_id[8],
-          (int *)&c->x86_vendor_id[4]);
+    cpuid(0x00000000, (unsigned int *)&c->cpuid_level,
+          (unsigned int *)&c->x86_vendor_id[0],
+          (unsigned int *)&c->x86_vendor_id[8],
+          (unsigned int *)&c->x86_vendor_id[4]);
 
     get_cpu_vendor(c);
 		
@@ -455,7 +455,7 @@ static void __init start_of_day(void)
 
 void __init __start_xen(multiboot_info_t *mbi)
 {
-    unsigned char *cmdline;
+    char *cmdline;
     module_t *mod = (module_t *)__va(mbi->mods_addr);
     void *heap_start;
     unsigned long firsthole_start, nr_pages;
@@ -587,7 +587,7 @@ void __init __start_xen(multiboot_info_t *mbi)
     set_bit(DF_PRIVILEGED, &dom0->d_flags);
 
     /* Grab the DOM0 command line. Skip past the image name. */
-    cmdline = (unsigned char *)(mod[0].string ? __va(mod[0].string) : NULL);
+    cmdline = (char *)(mod[0].string ? __va(mod[0].string) : NULL);
     if ( cmdline != NULL )
     {
         while ( *cmdline == ' ' ) cmdline++;

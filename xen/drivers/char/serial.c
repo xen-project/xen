@@ -18,7 +18,7 @@
 #include <asm/io.h>
 
 /* Config serial port with a string <baud>,DPS,<io-base>,<irq>. */
-static unsigned char opt_com1[30] = OPT_COM1_STR, opt_com2[30] = OPT_COM2_STR;
+static char opt_com1[30] = OPT_COM1_STR, opt_com2[30] = OPT_COM2_STR;
 string_param("com1", opt_com1);
 string_param("com2", opt_com2);
 
@@ -395,7 +395,7 @@ void serial_putc(int handle, unsigned char c)
     __serial_putc(uart, handle, c);
 }
 
-void serial_puts(int handle, const unsigned char *s)
+void serial_puts(int handle, const char *s)
 {
     struct uart *uart = &com[handle & SERHND_IDX];
 
