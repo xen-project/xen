@@ -31,12 +31,28 @@
 #include <asm/ctrl_if.h>
 
 /*
- * NB. /dev/xencons[0-9]+ are only exported by domain 0.
- * All other domains use the normal /dev/tty[0-9]+ device nodes.
- * Only /dev/tty1 is currently hooked up to real I/O -- all others are
- * dummies to suppress warnings from standard distro startip scripts.
+ * Modes:
+ *  'xencons=off'  [XC_OFF]:     Console is disabled.
+ *  'xencons=tty'  [XC_TTY]:     Console attached to '/dev/tty[0-9]+'.
+ *  'xencons=ttyS' [XC_SERIAL]:  Console attached to '/dev/ttyS[0-9]+'.
+ *                 [XC_DEFAULT]: DOM0 -> XC_SERIAL ; all others -> XC_TTY.
+ * 
+ * NB. In mode XC_TTY, we create dummy consoles for tty2-63. This suppresses
+ * warnings from standard distro startup scripts.
  */
-#define XENCONS_TTY_MINOR   123
+static enum { XC_OFF, XC_DEFAULT, XC_TTY, XC_SERIAL } xc_mode = XC_DEFAULT;
+
+static int __init xencons_setup(char *str)
+{
+    if ( !strcmp(str, "tty") )
+        xc_mode = XC_TTY;
+    else if ( !strcmp(str, "ttyS") )
+        xc_mode = XC_SERIAL;
+    else if ( !strcmp(str, "off") )
+        xc_mode = XC_OFF;
+    return 1;
+}
+__setup("xencons", xencons_setup);
 
 /* The kernel and user-land drivers share a common transmit buffer. */
 #define WBUF_SIZE     4096
@@ -99,36 +115,38 @@ static void kcons_write_dom0(
 
 static kdev_t kcons_device(struct console *c)
 {
-    return MKDEV(TTY_MAJOR, 1);
-}
-
-static kdev_t kcons_device_dom0(struct console *c)
-{
-    return MKDEV(TTY_MAJOR, XENCONS_TTY_MINOR);
+    return MKDEV(TTY_MAJOR, (xc_mode == XC_SERIAL) ? 64 : 1);
 }
 
 static struct console kcons_info = {
+    device:  kcons_device,
     flags:   CON_PRINTBUFFER,
-    index:   -1,
+    index:   -1
 };
 
 void xen_console_init(void)
 {
     if ( start_info.flags & SIF_INITDOMAIN )
     {
-        strcpy(kcons_info.name, "xencons");
-        kcons_info.device = kcons_device_dom0;
-        kcons_info.write  = kcons_write_dom0;
+        if ( xc_mode == XC_DEFAULT )
+            xc_mode = XC_SERIAL;
+        kcons_info.write = kcons_write_dom0;
     }
     else
     {
-        strcpy(kcons_info.name, "tty");
-        kcons_info.device = kcons_device;
-        kcons_info.write  = kcons_write;
+        if ( xc_mode == XC_DEFAULT )
+            xc_mode = XC_TTY;
+        kcons_info.write = kcons_write;
     }
 
-    kcons_info.write = 
-        (start_info.flags & SIF_INITDOMAIN) ? kcons_write_dom0 : kcons_write;
+    if ( xc_mode == XC_OFF )
+        return;
+
+    if ( xc_mode == XC_SERIAL )
+        strcpy(kcons_info.name, "ttyS");
+    else
+        strcpy(kcons_info.name, "tty");
+
     register_console(&kcons_info);
 }
 
@@ -527,7 +545,6 @@ static int __init xencons_init(void)
     memset(&xencons_driver, 0, sizeof(struct tty_driver));
     xencons_driver.magic           = TTY_DRIVER_MAGIC;
     xencons_driver.major           = TTY_MAJOR;
-    xencons_driver.num             = MAX_NR_CONSOLES;
     xencons_driver.type            = TTY_DRIVER_TYPE_SERIAL;
     xencons_driver.subtype         = SERIAL_TYPE_NORMAL;
     xencons_driver.init_termios    = tty_std_termios;
@@ -538,15 +555,20 @@ static int __init xencons_init(void)
     xencons_driver.termios         = xencons_termios;
     xencons_driver.termios_locked  = xencons_termios_locked;
 
-    if ( start_info.flags & SIF_INITDOMAIN )
+    if ( xc_mode == XC_OFF )
+        return 0;
+
+    if ( xc_mode == XC_SERIAL )
     {
-        xencons_driver.name        = "xencons";
-        xencons_driver.minor_start = XENCONS_TTY_MINOR;
+        xencons_driver.name        = "ttyS";
+        xencons_driver.minor_start = 64;
+        xencons_driver.num         = 1;
     }
     else
     {
         xencons_driver.name        = "tty";
         xencons_driver.minor_start = 1;
+        xencons_driver.num         = MAX_NR_CONSOLES;
     }
 
     xencons_driver.open            = xencons_open;

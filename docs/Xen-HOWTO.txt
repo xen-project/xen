@@ -282,7 +282,12 @@ starting the domain.
 Boot-time output will be directed to this console by default, because
 the console name is tty0. It is also possible to log in via the
 virtual console --- once again, your normal startup scripts will work
-as normal (e.g., by running mingetty on tty1-7).
+as normal (e.g., by running mingetty on tty1-7).  The device node to
+which the virtual console is attached can be configured by specifying
+'xencons=' on the OS command line: 
+ 'xencons=off' --> disable virtual console
+ 'xencons=tty' --> attach console to /dev/tty1 (tty0 at boot-time)
+ 'xencons=ttyS' --> attach console to /dev/ttyS0
 
 
 Manage Running Domains
