@@ -172,7 +172,6 @@
 40f562383SKvDStdtrvzr5fyCbW4rw linux-2.6.11-xen-sparse/arch/xen/i386/mm/hypervisor.c
 40f56239xcNylAxuGsQHwi1AyMLV8w linux-2.6.11-xen-sparse/arch/xen/i386/mm/init.c
 41062ab7CjxC1UBaFhOMWWdhHkIUyg linux-2.6.11-xen-sparse/arch/xen/i386/mm/ioremap.c
-413b5ab8LIowAnQrEmaOJSdmqm96jQ linux-2.6.11-xen-sparse/arch/xen/i386/mm/pageattr.c
 40f5623906UYHv1rsVUeRc0tFT0dWw linux-2.6.11-xen-sparse/arch/xen/i386/mm/pgtable.c
 4107adf12ndy94MidCaivDibJ3pPAg linux-2.6.11-xen-sparse/arch/xen/i386/pci/Makefile
 4107adf1WcCgkhsdLTRGX52cOG1vJg linux-2.6.11-xen-sparse/arch/xen/i386/pci/direct.c
