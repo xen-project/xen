@@ -288,7 +288,7 @@ static int xlvbd_init_device(vdisk_t *xd)
         /* Need to skankily setup 'partition' information */
         gd->part[minor].start_sect = 0; 
         gd->part[minor].nr_sects   = capacity; 
-        gd->sizes[minor]           = capacity; 
+        gd->sizes[minor]           = capacity >>(BLOCK_SIZE_BITS-9); 
 
         gd->flags[minor >> gd->minor_shift] |= GENHD_FL_VIRT_PARTNS;
     }
