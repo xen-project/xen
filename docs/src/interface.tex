@@ -778,140 +778,231 @@ valid.
 
 \end{quote}
 
+Guest OSes can use the above in place of context switching entire 
+LDTs (or the GDT) when the number of changing descriptors is small. 
 
 \section{Context Switching} 
 
+When a guest OS wishes to context switch between two processes, 
+it can use the page table and segmentation hypercalls described
+above to perform the the bulk of the privileged work. In addition, 
+however, it will need to invoke Xen to switch the kernel (ring 1) 
+stack pointer: 
 
-
+\begin{quote} 
 \hypercall{stack\_switch(unsigned long ss, unsigned long esp)} 
 
-Request context switch from hypervisor.
+Request kernel stack switch from hypervisor; {\tt ss} is the new 
+stack segement, which {\tt esp} is the new stack pointer. 
 
+\end{quote} 
 
+A final useful hypercall for context switching allows ``lazy'' 
+save and restore of floating point state: 
+
+\begin{quote}
 \hypercall{fpu\_taskswitch(void)} 
 
-Notify hypervisor that fpu registers needed to be save on context switch.
+This call instructs Xen to set the {\tt TS} bit in the {\tt cr0}
+control register; this means that the next attempt to use floating
+point will cause a trap which the guest OS can trap. Typically it will
+then save/restore the FP state, and clear the {\tt TS} bit. 
+\end{quote} 
+
+This is provided as an optimization only; guest OSes can also choose
+to save and restore FP state on all context switches for simplicity. 
 
 
+\section{Physical Memory Management}
+
+As mentioned previously, each domain has a maximum and current 
+memory allocation. The maximum allocation, set at domain creation 
+time, cannot be modified. However a domain can choose to reduce 
+and subsequently grow its current allocation by using the
+following call: 
+
+\begin{quote} 
+\hypercall{dom\_mem\_op(unsigned int op, unsigned long *extent\_list,
+  unsigned long nr\_extents, unsigned int extent\_order)}
+
+Increase or decrease current memory allocation (as determined by 
+the value of {\tt op}). Each invocation provides a list of 
+extents each of which is $2^s$ pages in size, 
+where $s$ is the value of {\tt extent\_order}. 
+
+\end{quote} 
+
+In addition to simply reducing or increasing the current memory
+allocation via a `balloon driver', this call is also useful for 
+obtaining contiguous regions of machine memory when required (e.g. 
+for certain PCI devices, or if using superpages).  
 
 
 \section{Inter-Domain Communication}
 \label{s:idc} 
 
+Xen provides a simple asynchronous notification mechanism via
+\emph{event channels}. Each domain has a set of end-points (or
+\emph{ports}) which may be bound to an event source (e.g. a physical
+IRQ, a virtual IRQ, or an port in another domain). When a pair of
+end-points in two different domains are bound together, then a `send'
+operation on one will cause an event to be received by the destination
+domain.
 
-\hypercall{event\_channel\_op(void *op)} 
+The control and use of event channels involves the following hypercall: 
 
-Inter-domain event-channel management.
+\begin{quote}
+\hypercall{event\_channel\_op(evtchn\_op\_t *op)} 
 
+Inter-domain event-channel management; {\tt op} is a discriminated 
+union which allows the following 7 operations: 
 
-\hypercall{grant\_table\_op(unsigned int cmd, void *uop, unsigned int count)}
+\begin{description} 
 
+\item[\it alloc\_unbound:] allocate a free (unbound) local
+  port and prepare for connection from a specified domain. 
+\item[\it bind\_virq:] bind a local port to a virtual 
+IRQ; any particular VIRQ can be bound to at most one port per domain. 
+\item[\it bind\_pirq:] bind a local port to a physical IRQ;
+once more, a given pIRQ can be bound to at most one port per
+domain. Furthermore the calling domain must be sufficiently
+privileged.
+\item[\it bind\_interdomain:] construct an interdomain event 
+channel; in general, the target domain must have previously allocated 
+an unbound port for this channel, although this can be bypassed by 
+privileged domains during domain setup. 
+\item[\it close:] close an interdomain event channel. 
+\item[\it send:] send an event to the remote end of a 
+interdomain event channel. 
+\item[\it status:] determine the current status of a local port. 
+\end{description} 
 
+For more details see
+{\tt xen/include/public/event\_channel.h}. 
 
-\section{Physical Memory Management}
+\end{quote} 
 
-\hypercall{dom\_mem\_op(unsigned int op, unsigned long *extent\_list,
-unsigned long nr\_extents, unsigned int extent\_order)}
+Event channels are the fundamental communication primitive between 
+Xen domains and seamlessly support SMP. However they provide little
+bandwidth for communication {\sl per se}, and hence are typically 
+married with a piece of shared memory to produce effective and 
+high-performance inter-domain communication. 
 
-Increase or decrease memory reservations for guest OS
+Safe sharing of memory pages between guest OSes is carried out granting
+access on a per page basis to individual domains. This is achieved 
+by using the {\tt grant\_table\_op()} hypercall. 
 
-
-
-
+%\hypercall{grant\_table\_op(unsigned int cmd, void *uop, unsigned int count)}
 
 
 \section{Administrative Operations}
 \label{s:dom0ops}
 
+A large number of control operations are available to a sufficiently
+privileged domain (typically domain-0). These allow the creation and
+management of new domains, for example. A complete list is given 
+below: for more details on any or all of these, please see 
+{\tt xen/include/public/dom0\_ops.h} 
+
+
+\begin{quote}
 \hypercall{dom0\_op(dom0\_op\_t *op)} 
 
 Administrative domain operations for domain management. The options are:
 
-{\it DOM0\_CREATEDOMAIN}: create new domain, specifying the name and memory usage
-in kilobytes.
+\begin{description} 
+\item [\it DOM0\_CREATEDOMAIN:] create a new domain
 
-{\it DOM0\_CREATEDOMAIN}: create domain
+\item [\it DOM0\_PAUSEDOMAIN:] remove a domain from the scheduler run 
+queue. 
 
-{\it DOM0\_PAUSEDOMAIN}: mark domain as unschedulable
+\item [\it DOM0\_UNPAUSEDOMAIN:] mark a paused domain as schedulable
+  once again. 
 
-{\it DOM0\_UNPAUSEDOMAIN}: mark domain as schedulable
+\item [\it DOM0\_DESTROYDOMAIN:] deallocate all resources associated
+with a domain
 
-{\it DOM0\_DESTROYDOMAIN}: deallocate resources associated with the domain
+\item [\it DOM0\_GETMEMLIST:] get list of pages used by the domain
 
-{\it DOM0\_GETMEMLIST}: get list of pages used by the domain
+\item [\it DOM0\_SCHEDCTL:]
 
-{\it DOM0\_SCHEDCTL}:
+\item [\it DOM0\_ADJUSTDOM:] adjust scheduling priorities for domain
 
-{\it DOM0\_ADJUSTDOM}: adjust scheduling priorities for domain
+\item [\it DOM0\_BUILDDOMAIN:] do final guest OS setup for domain
 
-{\it DOM0\_BUILDDOMAIN}: do final guest OS setup for domain
+\item [\it DOM0\_GETDOMAINFO:] get statistics about the domain
 
-{\it DOM0\_GETDOMAINFO}: get statistics about the domain
+\item [\it DOM0\_GETPAGEFRAMEINFO:] 
 
-{\it DOM0\_GETPAGEFRAMEINFO}:
+\item [\it DOM0\_GETPAGEFRAMEINFO2:]
 
-{\it DOM0\_IOPL}: set IO privilege level
+\item [\it DOM0\_IOPL:] set I/O privilege level
 
-{\it DOM0\_MSR}:
+\item [\it DOM0\_MSR:] read or write model specific registers
 
-{\it DOM0\_DEBUG}: interactively call pervasive debugger
+\item [\it DOM0\_DEBUG:] interactively invoke the debugger
 
-{\it DOM0\_SETTIME}: set system time
+\item [\it DOM0\_SETTIME:] set system time
 
-{\it DOM0\_READCONSOLE}: read console content from hypervisor buffer ring
+\item [\it DOM0\_READCONSOLE:] read console content from hypervisor buffer ring
 
-{\it DOM0\_PINCPUDOMAIN}: pin domain to a particular CPU
+\item [\it DOM0\_PINCPUDOMAIN:] pin domain to a particular CPU
 
-{\it DOM0\_GETTBUFS}: get information about the size and location of
+\item [\it DOM0\_GETTBUFS:] get information about the size and location of
                       the trace buffers (only on trace-buffer enabled builds)
 
-{\it DOM0\_PHYSINFO}: get information about the host machine
+\item [\it DOM0\_PHYSINFO:] get information about the host machine
 
-{\it DOM0\_PCIDEV\_ACCESS}: modify PCI device access permissions
+\item [\it DOM0\_PCIDEV\_ACCESS:] modify PCI device access permissions
 
-{\it DOM0\_SCHED\_ID}: get the ID of the current Xen scheduler
+\item [\it DOM0\_SCHED\_ID:] get the ID of the current Xen scheduler
 
-{\it DOM0\_SHADOW\_CONTROL}:
+\item [\it DOM0\_SHADOW\_CONTROL:] switch between shadow page-table modes
 
-{\it DOM0\_SETDOMAINNAME}: set the name of a domain
+\item [\it DOM0\_SETDOMAININITIALMEM:] set initial memory allocation of a domain
 
-{\it DOM0\_SETDOMAININITIALMEM}: set initial memory allocation of a domain
+\item [\it DOM0\_SETDOMAINMAXMEM:] set maximum memory allocation of a domain
 
-{\it DOM0\_SETDOMAINMAXMEM}: set maximum memory allocation of a domain
-
-{\it DOM0\_GETPAGEFRAMEINFO2}:
-
-{\it DOM0\_SETDOMAINVMASSIST}: set domain VM assist options
+\item [\it DOM0\_SETDOMAINVMASSIST:] set domain VM assist options
+\end{description} 
+\end{quote} 
 
 
 
 
-\section{Miscellaneous Hypercalls} 
 
+\section{Debugging Hypercalls} 
 
+A few additional hypercalls are maintly useful for debugging: 
+
+\begin{quote} 
 \hypercall{console\_io(int cmd, int count, char *str)}
 
-Interact with the console, operations are:
+Use Xen to interact with the console; operations are:
 
 {\it CONSOLEIO\_write}: Output count characters from buffer str.
 
 {\it CONSOLEIO\_read}: Input at most count characters into buffer str.
+\end{quote} 
 
-
-
+A pair of hypercalls allows access to the underlying debug registers: 
+\begin{quote}
 \hypercall{set\_debugreg(int reg, unsigned long value)}
 
-set debug register reg to value
-
+Set debug register {\tt reg} to {\tt value} 
 
 \hypercall{get\_debugreg(int reg)}
 
- get the debug register reg
+Return the contents of the debug register {\tt reg}
+\end{quote}
 
-
+And finally, a sometimes useful call is: 
+\begin{quote}
 \hypercall{xen\_version(int cmd)}
 
 Request Xen version number.
+\end{quote} 
+
 
 
 
