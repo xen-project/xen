@@ -1988,48 +1988,58 @@ int do_mmu_update(
     return rc;
 }
 
-void update_shadow_va_mapping(unsigned long va,
-                              unsigned long val,
-                              struct exec_domain *ed,
-                              struct domain *d)
+/* This function assumes the caller is holding the domain's BIGLOCK
+ * and is running in a shadow mode
+ */
+int update_shadow_va_mapping(unsigned long va,
+                             unsigned long val,
+                             struct exec_domain *ed,
+                             struct domain *d)
 {
-    /* This function assumes the caller is holding the domain's BIGLOCK
-     * and is running in a shadow mode
+    unsigned long l1mfn;
+    unsigned long spte;
+    int rc = 0;
+
+    check_pagetable(ed, "pre-va"); /* debug */
+    shadow_lock(d);
+        
+    // This is actually overkill - we don't need to sync the L1 itself,
+    // just everything involved in getting to this L1 (i.e. we need
+    // linear_pg_table[l1_linear_offset(va)] to be in sync)...
+    //
+    __shadow_sync_va(ed, va);
+
+#if 1 /* keep check_pagetables() happy */
+    /*
+     * However, the above doesn't guarantee that there's no snapshot of
+     * the L1 table in question; it just says that the relevant L2 and L1
+     * entries for VA are in-sync.  There might still be a snapshot.
+     *
+     * The checking code in _check_pagetables() assumes that no one will
+     * mutate the shadow of a page that has a snapshot.  It's actually
+     * OK to not sync this page, but it seems simpler to:
+     * 1) keep all code paths the same, and
+     * 2) maintain the invariant for _check_pagetables(), rather than try
+     *    to teach it about this boundary case.
+     * So we flush this L1 page, if it's out of sync.
      */
-
-    unsigned long   sval = 0;
-
-    l1pte_propagate_from_guest(d, &val, &sval);
-
-    if ( unlikely(__put_user(sval, ((unsigned long *)(
-        &shadow_linear_pg_table[l1_linear_offset(va)])))) )
+    l1mfn = (l2_pgentry_val(linear_l2_table(ed)[l2_table_offset(va)]) >>
+             PAGE_SHIFT);
+    if ( mfn_out_of_sync(l1mfn) )
     {
-        /*
-         * Since L2's are guaranteed RW, failure indicates either that the
-         * page was not shadowed, or that the L2 entry has not yet been
-         * updated to reflect the shadow.
-         */
-
-        /* Can't use linear_l2_table with external tables. */
-        BUG_ON(shadow_mode_external(current->domain));
-
-        l2_pgentry_t gpde = linear_l2_table[l2_table_offset(va)];
-        unsigned long gpfn = l2_pgentry_val(gpde) >> PAGE_SHIFT;
-
-        if (get_shadow_status(d, gpfn))
-        {
-            unsigned long gmfn = __gpfn_to_mfn(d, gpfn);
-            unsigned long *gl1e = map_domain_mem(gmfn << PAGE_SHIFT);
-            unsigned l1_idx = l1_table_offset(va);
-            gl1e[l1_idx] = sval;
-            unmap_domain_mem(gl1e);
-            put_shadow_status(d);
-
-            perfc_incrc(shadow_update_va_fail1);
-        }
-        else
-            perfc_incrc(shadow_update_va_fail2);
+        perfc_incrc(extra_va_update_sync);
+        __shadow_sync_mfn(d, l1mfn);
     }
+#endif /* keep check_pagetables() happy */
+
+    if ( unlikely(__put_user(val, &l1_pgentry_val(
+                                 linear_pg_table[l1_linear_offset(va)]))) )
+        return -EINVAL;
+
+    // also need to update the shadow
+
+    l1pte_propagate_from_guest(d, val, &spte);
+    shadow_set_l1e(va, spte, 0);
 
     /*
      * If we're in log-dirty mode then we need to note that we've updated
@@ -2037,9 +2047,12 @@ void update_shadow_va_mapping(unsigned long va,
      * for this.
      */
     if ( shadow_mode_log_dirty(d) )
-        mark_dirty(d, va_to_l1mfn(va));
+        mark_dirty(d, va_to_l1mfn(ed, va));
 
-    check_pagetable(d, ed->arch.guest_table, "va"); /* debug */
+    shadow_unlock(d);
+    check_pagetable(ed, "post-va"); /* debug */
+
+    return rc;
 }
 
 int update_grant_va_mapping(unsigned long va,
@@ -2104,8 +2117,21 @@ int do_update_va_mapping(unsigned long va,
      * XXX When we make this support 4MB superpages we should also deal with 
      * the case of updating L2 entries.
      */
-    if ( unlikely(!shadow_mode_enabled(d)) )
+    if ( unlikely(shadow_mode_enabled(d)) )
+    {
+        if ( unlikely(percpu_info[cpu].foreign &&
+                      (shadow_mode_translate(d) ||
+                       shadow_mode_translate(percpu_info[cpu].foreign))) )
+        {
+            // The foreign domain's pfn's are in a different namespace.
+            // There's not enough information in just a gpte to figure out
+            // how to (re-)shadow this entry.
+            //
+            domain_crash();
+        }
+    
         rc = update_shadow_va_mapping(va, val, ed, d);
+    }
     else if ( unlikely(!mod_l1_entry(&linear_pg_table[l1_linear_offset(va)],
                                      mk_l1_pgentry(val))) )
         rc = -EINVAL;
@@ -2484,7 +2510,7 @@ void ptwr_flush(const int which)
 
     if ( which == PTWR_PT_ACTIVE )
     {
-        pl2e = &linear_l2_table(ed)[ptwr_info[cpu].ptinfo[which].l2_idx];
+        pl2e = &__linear_l2_table[ptwr_info[cpu].ptinfo[which].l2_idx];
         *pl2e = mk_l2_pgentry(l2_pgentry_val(*pl2e) | _PAGE_PRESENT); 
     }
 
@@ -2502,9 +2528,9 @@ static int ptwr_emulated_update(
     unsigned int bytes,
     unsigned int do_cmpxchg)
 {
-    unsigned long sstat, pte, pfn;
+    unsigned long pte, pfn;
     struct pfn_info *page;
-    l1_pgentry_t ol1e, nl1e, *pl1e, *sl1e;
+    l1_pgentry_t ol1e, nl1e, *pl1e;
     struct domain *d = current->domain;
 
     /* Aligned access only, thank you. */
@@ -2581,6 +2607,8 @@ static int ptwr_emulated_update(
     /* Propagate update to shadow cache. */
     if ( unlikely(shadow_mode_enabled(d)) )
     {
+        BUG(); // XXX fix me...
+#if 0
         sstat = get_shadow_status(d, page_to_pfn(page));
         if ( sstat & PSH_shadowed )
         {
@@ -2590,6 +2618,7 @@ static int ptwr_emulated_update(
                 d, &l1_pgentry_val(nl1e), &l1_pgentry_val(*sl1e));
             unmap_domain_mem(sl1e);
         }
+#endif
     }
 
     /* Finally, drop the old PTE. */
@@ -2636,14 +2665,11 @@ int ptwr_do_page_fault(unsigned long addr)
     // not supported in combination with various shadow modes!
     ASSERT( !shadow_mode_enabled(ed->domain) );
 
-    /* Can't use linear_l2_table with external tables. */
-    BUG_ON(shadow_mode_external(ed->domain));
-
     /*
      * Attempt to read the PTE that maps the VA being accessed. By checking for
      * PDE validity in the L2 we avoid many expensive fixups in __get_user().
      */
-    if ( !(l2_pgentry_val(linear_l2_table(ed)[addr>>L2_PAGETABLE_SHIFT]) &
+    if ( !(l2_pgentry_val(__linear_l2_table[addr>>L2_PAGETABLE_SHIFT]) &
            _PAGE_PRESENT) ||
          __get_user(pte, (unsigned long *)
                     &linear_pg_table[l1_linear_offset(addr)]) )
@@ -2684,7 +2710,7 @@ int ptwr_do_page_fault(unsigned long addr)
      * Is the L1 p.t. mapped into the current address space? If so we call it
      * an ACTIVE p.t., otherwise it is INACTIVE.
      */
-    pl2e = &linear_l2_table(ed)[l2_idx];
+    pl2e = &__linear_l2_table[l2_idx];
     l2e  = l2_pgentry_val(*pl2e);
     which = PTWR_PT_INACTIVE;
     if ( (l2e >> PAGE_SHIFT) == pfn )
@@ -2822,31 +2848,6 @@ void ptwr_status(void)
     }
     pfn = pte >> PAGE_SHIFT;
     page = &frame_table[pfn];
-}
-
-void audit_pagelist(struct domain *d)
-{
-    struct list_head *list_ent;
-    int xenpages, totpages;
-
-    list_ent = d->xenpage_list.next;
-    for ( xenpages = 0; (list_ent != &d->xenpage_list); xenpages++ )
-    {
-        list_ent = list_ent->next;
-    }
-    list_ent = d->page_list.next;
-    for ( totpages = 0; (list_ent != &d->page_list); totpages++ )
-    {
-        list_ent = list_ent->next;
-    }
-
-    if ( xenpages != d->xenheap_pages ||
-         totpages != d->tot_pages )
-    {
-        printk("ARGH! dom %d: xen=%d %d, pages=%d %d\n",
-               xenpages, d->xenheap_pages, 
-               totpages, d->tot_pages );
-    }
 }
 
 #endif /* NDEBUG */

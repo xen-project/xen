@@ -431,8 +431,7 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
             mfn = page_to_pfn(page);
             page_type = page->u.inuse.type_info & PGT_type_mask;
 
-            if ( page_get_owner(page) != d )
-                BUG();
+            BUG_ON(page_get_owner(page) != d);
 
             page_count++;
 
@@ -563,6 +562,31 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
 
 #ifndef NDEBUG
 
+void audit_pagelist(struct domain *d)
+{
+    struct list_head *list_ent;
+    int xenpages, totpages;
+
+    list_ent = d->xenpage_list.next;
+    for ( xenpages = 0; (list_ent != &d->xenpage_list); xenpages++ )
+    {
+        list_ent = list_ent->next;
+    }
+    list_ent = d->page_list.next;
+    for ( totpages = 0; (list_ent != &d->page_list); totpages++ )
+    {
+        list_ent = list_ent->next;
+    }
+
+    if ( xenpages != d->xenheap_pages ||
+         totpages != d->tot_pages )
+    {
+        printk("ARGH! dom %d: xen=%d %d, pages=%d %d\n",
+               xenpages, d->xenheap_pages, 
+               totpages, d->tot_pages );
+    }
+}
+
 void _audit_domain(struct domain *d, int flags)
 {
     void scan_for_pfn_in_mfn(struct domain *d, unsigned long xmfn,
@@ -668,6 +692,8 @@ void _audit_domain(struct domain *d, int flags)
 
     spin_lock(&d->page_alloc_lock);
 
+    audit_pagelist(d);
+
     /* PHASE 0 */
 
     list_ent = d->page_list.next;
@@ -679,8 +705,7 @@ void _audit_domain(struct domain *d, int flags)
         mfn = page_to_pfn(page);
         page_type = page->u.inuse.type_info & PGT_type_mask;
 
-        if ( page_get_owner(page) != d )
-            BUG();
+        BUG_ON(page_get_owner(page) != d);
 
         if ( (page->u.inuse.type_info & PGT_count_mask) >
              (page->count_info & PGC_count_mask) )

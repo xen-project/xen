@@ -256,6 +256,9 @@ void arch_do_createdomain(struct exec_domain *ed)
         ed->arch.shadow_vtable = __shadow_linear_l2_table;
 
 #ifdef __x86_64__
+        ed->arch.guest_vl3table = __linear_l3_table;
+        ed->arch.guest_vl4table = __linear_l4_table;
+
         d->arch.mm_perdomain_l2 = (l2_pgentry_t *)alloc_xenheap_page();
         memset(d->arch.mm_perdomain_l2, 0, PAGE_SIZE);
         d->arch.mm_perdomain_l2[l2_table_offset(PERDOMAIN_VIRT_START)] = 

@@ -195,9 +195,7 @@ static inline void shadow_mode_disable(struct domain *d)
       ? translate_gpfn_to_mfn(_d, gpfn)                \
       : (gpfn) )
 
-#define translate_gpfn_to_mfn gpfn_to_mfn_safe
-
-extern unsigned long gpfn_to_mfn_safe(
+extern unsigned long translate_gpfn_to_mfn(
     struct domain *d, unsigned long gpfn);
 
 /************************************************************************/
@@ -659,12 +657,11 @@ static inline void hl2e_propagate_from_guest(
         if ( unlikely((current->domain != d) && !shadow_mode_external(d)) )
         {
             // Can't use __gpfn_to_mfn() if we don't have one of this domain's
-            // page tables currently installed.  What a pain in the neck!
-            //
+            // page tables currently installed.
             // This isn't common -- it only happens during shadow mode setup
             // and mode changes.
             //
-            mfn = gpfn_to_mfn_safe(d, pfn);
+            mfn = translate_gpfn_to_mfn(d, pfn);
         }
         else
             mfn = __gpfn_to_mfn(d, pfn);

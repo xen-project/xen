@@ -127,6 +127,11 @@ struct arch_exec_domain
     l2_pgentry_t *monitor_vtable;		/* virtual address of monitor_table */
     l1_pgentry_t *hl2_vtable;			/* virtual address of hl2_table */
 
+#ifdef __x86_64__
+    l3_pgentry_t *guest_vl3table;
+    l4_pgentry_t *guest_vl4table;
+#endif
+
     unsigned long monitor_shadow_ref;
 
     /* Virtual CR2 value. Can be read/written by guest. */

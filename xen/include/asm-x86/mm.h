@@ -4,6 +4,7 @@
 
 #include <xen/config.h>
 #include <xen/list.h>
+#include <xen/sched.h>
 #include <asm/io.h>
 
 /*
@@ -180,12 +181,13 @@ static inline int get_page(struct pfn_info *page,
              unlikely((nx & PGC_count_mask) == 0) || /* Count overflow? */
              unlikely(d != _domain) )                /* Wrong owner? */
         {
-          if ( !domain->arch.shadow_mode )
-            DPRINTK("Error pfn %p: rd=%p(%d), od=%p(%d), caf=%08x, taf=%08x\n",
-                    page_to_pfn(page), domain, (domain ? domain->id : -1),
-                    page_get_owner(page),
-                    (page_get_owner(page) ? page_get_owner(page)->id : -1),
-                    x, page->u.inuse.type_info);
+            if ( !domain->arch.shadow_mode )
+                DPRINTK("Error pfn %p: rd=%p(%d), od=%p(%d), caf=%08x, "
+                        "taf=%08x\n",
+                        page_to_pfn(page), domain, (domain ? domain->id : -1),
+                        page_get_owner(page),
+                        (page_get_owner(page) ? page_get_owner(page)->id : -1),
+                        x, page->u.inuse.type_info);
             return 0;
         }
         __asm__ __volatile__(

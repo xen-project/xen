@@ -1245,11 +1245,11 @@ void vmx_shadow_clear_state(struct domain *d)
 }
 
 unsigned long
-gpfn_to_mfn_safe(struct domain *d, unsigned long gpfn)
+translate_gpfn_to_mfn(struct domain *d, unsigned long gpfn)
 {
     ASSERT( shadow_mode_translate(d) );
 
-    perfc_incrc(gpfn_to_mfn_safe);
+    perfc_incrc(translate_gpfn_to_mfn);
 
     unsigned long va = gpfn << PAGE_SHIFT;
     unsigned long phystab = pagetable_val(d->arch.phys_table);
@@ -1258,7 +1258,7 @@ gpfn_to_mfn_safe(struct domain *d, unsigned long gpfn)
     unmap_domain_mem(l2);
     if ( !(l2_pgentry_val(l2e) & _PAGE_PRESENT) )
     {
-        printk("gpfn_to_mfn_safe(d->id=%d, gpfn=%p) => 0 l2e=%p\n",
+        printk("translate_gpfn_to_mfn(d->id=%d, gpfn=%p) => 0 l2e=%p\n",
                d->id, gpfn, l2_pgentry_val(l2e));
         return INVALID_MFN;
     }
@@ -1267,12 +1267,14 @@ gpfn_to_mfn_safe(struct domain *d, unsigned long gpfn)
     l1_pgentry_t l1e = l1[l1_table_offset(va)];
     unmap_domain_mem(l1);
 
-    printk("gpfn_to_mfn_safe(d->id=%d, gpfn=%p) => %p phystab=%p l2e=%p l1tab=%p, l1e=%p\n",
+#if 0
+    printk("translate_gpfn_to_mfn(d->id=%d, gpfn=%p) => %p phystab=%p l2e=%p l1tab=%p, l1e=%p\n",
            d->id, gpfn, l1_pgentry_val(l1e) >> PAGE_SHIFT, phystab, l2e, l1tab, l1e);
+#endif
 
     if ( !(l1_pgentry_val(l1e) & _PAGE_PRESENT) )
     {
-        printk("gpfn_to_mfn_safe(d->id=%d, gpfn=%p) => 0 l1e=%p\n",
+        printk("translate_gpfn_to_mfn(d->id=%d, gpfn=%p) => 0 l1e=%p\n",
                d->id, gpfn, l1_pgentry_val(l1e));
         return INVALID_MFN;
     }
