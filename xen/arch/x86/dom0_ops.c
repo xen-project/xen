@@ -138,8 +138,12 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
 
     case DOM0_IOPL:
     {
-        extern long do_iopl(domid_t, unsigned int);
-        ret = do_iopl(op->u.iopl.domain, op->u.iopl.iopl);
+        ret = -EINVAL;
+        if ( op->u.iopl.domain == DOMID_SELF )
+        {
+            current->arch.iopl = op->u.iopl.iopl & 3;
+            ret = 0;
+        }
     }
     break;
 
@@ -358,6 +362,9 @@ void arch_getdomaininfo_ctxt(
     memcpy(&c->cpu_ctxt, 
            &ed->arch.user_ctxt,
            sizeof(ed->arch.user_ctxt));
+    /* IOPL privileges are virtualised -- merge back into returned eflags. */
+    BUG_ON((c->cpu_ctxt.eflags & EF_IOPL) != 0);
+    c->cpu_ctxt.eflags |= ed->arch.iopl << 12;
 
 #ifdef __i386__
 #ifdef CONFIG_VMX

@@ -294,7 +294,7 @@ error_code:
         SAVE_ALL
         testb $X86_EFLAGS_IF>>8,XREGS_eflags+1(%rsp)
         jz    exception_with_ints_disabled
-1:      sti
+        sti
         movq  %rsp,%rdi
         movl  XREGS_entry_vector(%rsp),%eax
         leaq  SYMBOL_NAME(exception_table)(%rip),%rdx
@@ -308,8 +308,7 @@ error_code:
 /* No special register assumptions. */
 exception_with_ints_disabled:
         testb $3,XREGS_cs(%rsp)         # interrupts disabled outside Xen?
-        jnz   1b                        # it really does happen!
-                                        #  (e.g., DOM0 X server)
+        jnz   FATAL_exception_with_ints_disabled
         movq  %rsp,%rdi
         call  search_pre_exception_table
         testq %rax,%rax                 # no fixup code for faulting EIP?

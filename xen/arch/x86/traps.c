@@ -368,22 +368,222 @@ long do_fpu_taskswitch(int set)
     return 0;
 }
 
+static inline int user_io_okay(
+    unsigned int port, unsigned int bytes,
+    struct exec_domain *ed, struct xen_regs *regs)
+{
+    if ( ed->arch.iopl < (KERNEL_MODE(ed, regs) ? 1 : 3) )
+        return 0;
+    return 1;
+}
+
+#define insn_fetch(_type, _size, _ptr)          \
+({  unsigned long _x;                           \
+    if ( get_user(_x, (_type *)eip) )           \
+        goto read_fault;                        \
+    eip += _size; (_type)_x; })
+
 static int emulate_privileged_op(struct xen_regs *regs)
 {
     struct exec_domain *ed = current;
     unsigned long *reg, eip = regs->eip;
-    u8 opcode;
+    u8 opcode, modrm_reg = 0, rep_prefix = 0;
+    unsigned int port, i, op_bytes = 4, data;
 
-    if ( get_user(opcode, (u8 *)eip) )
-        goto page_fault;
-    eip += 1;
-    if ( (opcode & 0xff) != 0x0f )
+    /* Legacy prefixes. */
+    for ( i = 0; i < 8; i++ )
+    {
+        switch ( opcode = insn_fetch(u8, 1, eip) )
+        {
+        case 0x66: /* operand-size override */
+            op_bytes ^= 6; /* switch between 2/4 bytes */
+            break;
+        case 0x67: /* address-size override */
+        case 0x2e: /* CS override */
+        case 0x3e: /* DS override */
+        case 0x26: /* ES override */
+        case 0x64: /* FS override */
+        case 0x65: /* GS override */
+        case 0x36: /* SS override */
+        case 0xf0: /* LOCK */
+        case 0xf2: /* REPNE/REPNZ */
+            break;
+        case 0xf3: /* REP/REPE/REPZ */
+            rep_prefix = 1;
+            break;
+        default:
+            goto done_prefixes;
+        }
+    }
+ done_prefixes:
+
+#ifdef __x86_64__
+    /* REX prefix. */
+    if ( (opcode & 0xf0) == 0x40 )
+    {
+        modrm_reg = (opcode & 4) << 1;  /* REX.R */
+        /* REX.W, REX.B and REX.X do not need to be decoded. */
+        opcode = insn_fetch(u8, 1, eip);
+    }
+#endif
+    
+    /* Input/Output String instructions. */
+    if ( (opcode >= 0x6c) && (opcode <= 0x6f) )
+    {
+        if ( rep_prefix && (regs->ecx == 0) )
+            goto done;
+
+    continue_io_string:
+        switch ( opcode )
+        {
+        case 0x6c: /* INSB */
+            op_bytes = 1;
+        case 0x6d: /* INSW/INSL */
+            if ( !user_io_okay((u16)regs->edx, op_bytes, ed, regs) )
+                goto fail;
+            switch ( op_bytes )
+            {
+            case 1:
+                data = (u8)inb((u16)regs->edx);
+                if ( put_user((u8)data, (u8 *)regs->edi) )
+                    goto write_fault;
+                break;
+            case 2:
+                data = (u16)inw((u16)regs->edx);
+                if ( put_user((u16)data, (u16 *)regs->edi) )
+                    goto write_fault;
+                break;
+            case 4:
+                data = (u32)inl((u16)regs->edx);
+                if ( put_user((u32)data, (u32 *)regs->edi) )
+                    goto write_fault;
+                break;
+            }
+            regs->edi += (regs->eflags & EF_DF) ? -op_bytes : op_bytes;
+            break;
+
+        case 0x6e: /* OUTSB */
+            op_bytes = 1;
+        case 0x6f: /* OUTSW/OUTSL */
+            if ( !user_io_okay((u16)regs->edx, op_bytes, ed, regs) )
+                goto fail;
+            switch ( op_bytes )
+            {
+            case 1:
+                if ( get_user(data, (u8 *)regs->esi) )
+                    goto read_fault;
+                outb((u8)data, (u16)regs->edx);
+                break;
+            case 2:
+                if ( get_user(data, (u16 *)regs->esi) )
+                    goto read_fault;
+                outw((u16)data, (u16)regs->edx);
+                break;
+            case 4:
+                if ( get_user(data, (u32 *)regs->esi) )
+                    goto read_fault;
+                outl((u32)data, (u16)regs->edx);
+                break;
+            }
+            regs->esi += (regs->eflags & EF_DF) ? -op_bytes : op_bytes;
+            break;
+        }
+
+        if ( rep_prefix && (--regs->ecx != 0) )
+        {
+            if ( !hypercall_preempt_check() )
+                goto continue_io_string;
+            eip = regs->eip;
+        }
+
+        goto done;
+    }
+
+    /* I/O Port and Interrupt Flag instructions. */
+    switch ( opcode )
+    {
+    case 0xe4: /* IN imm8,%al */
+        op_bytes = 1;
+    case 0xe5: /* IN imm8,%eax */
+        port = insn_fetch(u8, 1, eip);
+    exec_in:
+        if ( !user_io_okay(port, op_bytes, ed, regs) )
+            goto fail;
+        switch ( op_bytes )
+        {
+        case 1:
+            regs->eax &= ~0xffUL;
+            regs->eax |= (u8)inb(port);
+            break;
+        case 2:
+            regs->eax &= ~0xffffUL;
+            regs->eax |= (u16)inw(port);
+            break;
+        case 4:
+            regs->eax = (u32)inl(port);
+            break;
+        }
+        goto done;
+
+    case 0xec: /* IN %dx,%al */
+        op_bytes = 1;
+    case 0xed: /* IN %dx,%eax */
+        port = (u16)regs->edx;
+        goto exec_in;
+
+    case 0xe6: /* OUT %al,imm8 */
+        op_bytes = 1;
+    case 0xe7: /* OUT %eax,imm8 */
+        port = insn_fetch(u8, 1, eip);
+    exec_out:
+        if ( !user_io_okay(port, op_bytes, ed, regs) )
+            goto fail;
+        switch ( op_bytes )
+        {
+        case 1:
+            outb((u8)regs->eax, port);
+            break;
+        case 2:
+            outw((u16)regs->eax, port);
+            break;
+        case 4:
+            outl((u32)regs->eax, port);
+            break;
+        }
+        goto done;
+
+    case 0xee: /* OUT %al,%dx */
+        op_bytes = 1;
+    case 0xef: /* OUT %eax,%dx */
+        port = (u16)regs->edx;
+        goto exec_out;
+
+    case 0xfa: /* CLI */
+    case 0xfb: /* STI */
+        if ( ed->arch.iopl < (KERNEL_MODE(ed, regs) ? 1 : 3) )
+            goto fail;
+        /*
+         * This is just too dangerous to allow, in my opinion. Consider if the
+         * caller then tries to reenable interrupts using POPF: we can't trap
+         * that and we'll end up with hard-to-debug lockups. Fast & loose will
+         * do for us. :-)
+         */
+        /*ed->vcpu_info->evtchn_upcall_mask = (opcode == 0xfa);*/
+        goto done;
+
+    case 0x0f: /* Two-byte opcode */
+        break;
+
+    default:
+        goto fail;
+    }
+
+    /* Remaining instructions only emulated from guest kernel. */
+    if ( !KERNEL_MODE(ed, regs) )
         goto fail;
 
-    if ( get_user(opcode, (u8 *)eip) )
-        goto page_fault;
-    eip += 1;
-
+    /* Privileged (ring 0) instructions. */
+    opcode = insn_fetch(u8, 1, eip);
     switch ( opcode )
     {
     case 0x06: /* CLTS */
@@ -399,12 +599,11 @@ static int emulate_privileged_op(struct xen_regs *regs)
         break;
 
     case 0x20: /* MOV CR?,<reg> */
-        if ( get_user(opcode, (u8 *)eip) )
-            goto page_fault;
-        eip += 1;
+        opcode = insn_fetch(u8, 1, eip);
         if ( (opcode & 0xc0) != 0xc0 )
             goto fail;
-        reg = decode_register(opcode & 7, regs, 0);
+        modrm_reg |= opcode & 7;
+        reg = decode_register(modrm_reg, regs, 0);
         switch ( (opcode >> 3) & 7 )
         {
         case 0: /* Read CR0 */
@@ -427,12 +626,11 @@ static int emulate_privileged_op(struct xen_regs *regs)
         break;
 
     case 0x22: /* MOV <reg>,CR? */
-        if ( get_user(opcode, (u8 *)eip) )
-            goto page_fault;
-        eip += 1;
+        opcode = insn_fetch(u8, 1, eip);
         if ( (opcode & 0xc0) != 0xc0 )
             goto fail;
-        reg = decode_register(opcode & 7, regs, 0);
+        modrm_reg |= opcode & 7;
+        reg = decode_register(modrm_reg, regs, 0);
         switch ( (opcode >> 3) & 7 )
         {
         case 0: /* Write CR0 */
@@ -476,14 +674,19 @@ static int emulate_privileged_op(struct xen_regs *regs)
         goto fail;
     }
 
+ done:
     regs->eip = eip;
     return EXCRET_fault_fixed;
 
  fail:
     return 0;
 
- page_fault:
-    propagate_page_fault(eip, 0);
+ read_fault:
+    propagate_page_fault(eip, 4); /* user mode, read fault */
+    return EXCRET_fault_fixed;
+
+ write_fault:
+    propagate_page_fault(eip, 6); /* user mode, write fault */
     return EXCRET_fault_fixed;
 }
 
@@ -534,9 +737,8 @@ asmlinkage int do_general_protection(struct xen_regs *regs)
         }
     }
 
-    /* Emulate some simple privileged instructions when exec'ed in ring 1. */
+    /* Emulate some simple privileged and I/O instructions. */
     if ( (regs->error_code == 0) &&
-         KERNEL_MODE(ed, regs) &&
          emulate_privileged_op(regs) )
         return 0;
 

@@ -273,7 +273,6 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 	struct pt_regs * childregs;
 	struct task_struct *tsk;
 	int err;
-	unsigned long eflags;
 
 	childregs = ((struct pt_regs *) (THREAD_SIZE + (unsigned long) p->thread_info)) - 1;
 	*childregs = *regs;
@@ -323,9 +322,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 		desc->b = LDT_entry_b(&info);
 	}
 
-
-	__asm__ __volatile__ ( "pushfl; popl %0" : "=r" (eflags) : );
-	p->thread.io_pl = (eflags >> 12) & 3;
+        p->thread.io_pl = current->thread.io_pl;
 
 	err = 0;
  out:

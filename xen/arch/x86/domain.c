@@ -441,6 +441,9 @@ int arch_final_setup_guest(
     memcpy(&ed->arch.user_ctxt,
            &c->cpu_ctxt,
            sizeof(ed->arch.user_ctxt));
+    /* IOPL privileges are virtualised. */
+    ed->arch.iopl = (ed->arch.user_ctxt.eflags >> 12) & 3;
+    ed->arch.user_ctxt.eflags &= ~EF_IOPL;
 
     /* Clear IOPL for unprivileged domains. */
     if (!IS_PRIV(d))
@@ -818,15 +821,6 @@ void context_switch(struct exec_domain *prev_p, struct exec_domain *next_p)
     schedule_tail(next_p);
 
     BUG();
-}
-
-
-/* XXX Currently the 'domain' field is ignored! XXX */
-long do_iopl(domid_t domain, unsigned int new_io_pl)
-{
-    execution_context_t *ec = get_execution_context();
-    ec->eflags = (ec->eflags & 0xffffcfff) | ((new_io_pl&3) << 12);
-    return 0;
 }
 
 unsigned long __hypercall_create_continuation(

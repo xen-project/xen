@@ -57,6 +57,7 @@ struct arch_exec_domain
 
     /* general user-visible register state */
     execution_context_t user_ctxt;
+    unsigned int iopl;
 
     void (*schedule_tail) (struct exec_domain *);
 

@@ -463,7 +463,7 @@ error_code:
         SET_XEN_SEGMENTS(a)
         testb $X86_EFLAGS_IF>>8,XREGS_eflags+1(%esp)
         jz    exception_with_ints_disabled
-1:      sti                             # re-enable interrupts
+        sti                             # re-enable interrupts
         xorl  %eax,%eax
         movw  XREGS_entry_vector(%esp),%ax
         movl  %esp,%edx
@@ -482,8 +482,7 @@ exception_with_ints_disabled:
         movl  XREGS_eflags(%esp),%eax
         movb  XREGS_cs(%esp),%al
         testl $(3|X86_EFLAGS_VM),%eax   # interrupts disabled outside Xen?
-        jnz   1b                        # it really does happen!
-                                        #  (e.g., DOM0 X server)
+        jnz   FATAL_exception_with_ints_disabled
         pushl %esp
         call  search_pre_exception_table
         addl  $4,%esp
@@ -701,8 +700,6 @@ do_switch_vm86:
         # Discard the return address
         addl $4,%esp
 
-        movl XREGS_eflags(%esp),%edx
-
         # GS:ESI == Ring-1 stack activation
         movl XREGS_esp(%esp),%esi
 VFLT1:  movl XREGS_ss(%esp),%gs
@@ -722,13 +719,9 @@ VFLT3:  movl %gs:(%esi),%eax
         addl $4,%esi
         loop VFLT3
 
-        # Fix up EFLAGS
+        # Fix up EFLAGS: IOPL=0, IF=1, VM=1
         andl $~X86_EFLAGS_IOPL,XREGS_eflags(%esp)
-        andl $X86_EFLAGS_IOPL,%edx # Ignore attempts to change EFLAGS.IOPL
-        jnz  1f
-        orl  $X86_EFLAGS_IF,%edx   # EFLAGS.IOPL=0 => no messing with EFLAGS.IF
-1:      orl  $X86_EFLAGS_VM,%edx   # Force EFLAGS.VM
-        orl  %edx,XREGS_eflags(%esp)
+        orl  $X86_EFLAGS_IF|X86_EFLAGS_VM,XREGS_eflags(%esp)
         
         jmp test_all_events
 

@@ -421,39 +421,44 @@ x86_emulate_memop(
     u8 b, d, sib, twobyte = 0, rex_prefix = 0;
     u8 modrm, modrm_mod = 0, modrm_reg = 0, modrm_rm = 0;
     unsigned int op_bytes = (mode == 8) ? 4 : mode, ad_bytes = mode;
-    unsigned int lock_prefix = 0, rep_prefix = 0;
+    unsigned int lock_prefix = 0, rep_prefix = 0, i;
     struct operand src, dst;
 
     /* Shadow copy of register state. Committed on successful emulation. */
     struct xen_regs _regs = *regs;
 
     /* Legacy prefixes. */
- next_prefix:
-    switch ( b = insn_fetch(u8, 1, _regs.eip) )
+    for ( i = 0; i < 8; i++ )
     {
-    case 0x66: /* operand-size override */
-        op_bytes ^= 6;                    /* switch between 2/4 bytes */
-        goto next_prefix;
-    case 0x67: /* address-size override */
-        ad_bytes ^= (mode == 8) ? 12 : 6; /* switch between 2/4 or 4/8 bytes */
-        goto next_prefix;
-    case 0x2e: /* CS override */
-    case 0x3e: /* DS override */
-    case 0x26: /* ES override */
-    case 0x64: /* FS override */
-    case 0x65: /* GS override */
-    case 0x36: /* SS override */
-        DPRINTF("Warning: ignoring a segment override. Probably okay. :-)\n");
-        goto next_prefix;
-    case 0xf0: /* LOCK */
-        lock_prefix = 1;
-        goto next_prefix;
-    case 0xf3: /* REP/REPE/REPZ */
-        rep_prefix = 1;
-        goto next_prefix;
-    case 0xf2: /* REPNE/REPNZ */
-        goto next_prefix;
+        switch ( b = insn_fetch(u8, 1, _regs.eip) )
+        {
+        case 0x66: /* operand-size override */
+            op_bytes ^= 6;                    /* switch between 2/4 bytes */
+            break;
+        case 0x67: /* address-size override */
+            ad_bytes ^= (mode == 8) ? 12 : 6; /* switch between 2/4/8 bytes */
+            break;
+        case 0x2e: /* CS override */
+        case 0x3e: /* DS override */
+        case 0x26: /* ES override */
+        case 0x64: /* FS override */
+        case 0x65: /* GS override */
+        case 0x36: /* SS override */
+            DPRINTF("Warning: ignoring a segment override.\n");
+            break;
+        case 0xf0: /* LOCK */
+            lock_prefix = 1;
+            break;
+        case 0xf3: /* REP/REPE/REPZ */
+            rep_prefix = 1;
+            break;
+        case 0xf2: /* REPNE/REPNZ */
+            break;
+        default:
+            goto done_prefixes;
+        }
     }
+ done_prefixes:
 
     if ( ad_bytes == 2 )
     {
