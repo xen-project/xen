@@ -12,6 +12,8 @@ Get Xen Source Code
 
 The public master BK repository for the 1.2 release lives at:
 'bk://xen.bkbits.net/xeno-1.2.bk'
+The current unstable release (1.3) is available at:
+'bk://xen.bkbits.net/xeno-unstable.bk'
 
 To fetch a local copy, first download the BitKeeper tools at:
 http://www.bitmover.com/download with username 'bitkeeper' and
@@ -27,6 +29,39 @@ Xen hypervisor and Linux guest OSes.
 To get newest changes to the repository, run
 # cd xeno-1.2.bk
 # bk pull
+
+
+Configuring Xen
+=============================
+
+Xen's build configuration is managed via a set of environment
+variables. These should be set before invoking make 
+(e.g., 'export debug=y; make', 'debug=y make').
+
+The options that can be configured are as follows (all options default
+to 'n' or off):
+
+ debug=y    -- Enable debug assertions and console output.
+               (Primarily useful for tracing bugs in Xen).
+
+ debugger=y -- Enable the in-Xen pervasive debugger (PDB).
+               This can be used to debug Xen, guest OSes, and
+               applications. For more information see the 
+               XenDebugger-HOWTO.
+
+ old_drivers=y -- Enable the old hardware-device architecture, in
+               which network and block devices are managed by
+               Xen. The new (and default) model requires such
+               devices to be managed by a suitably-privileged
+               guest OS (e.g., within domain 0).
+
+ perfc=y    -- Enable performance-counters for significant events
+               within Xen. The counts can be reset or displayed
+               on Xen's console via console control keys.
+
+ trace=y    -- Enable per-cpu trace buffers which log a range of
+               events within Xen for collection by control
+               software.
 
 
 Build Xen
@@ -64,16 +99,16 @@ kernel source tree. It contains only those files currently 'in play'
 which are either modified versions of files in the vanilla linux tree,
 or brand new files specific to the Xen port.
 
-So, first you need a vanilla linux-2.4.24 tree, which is located at:
+So, first you need a vanilla linux-2.4.26 tree, which is located at:
 http://www.kernel.org/pub/linux/kernel/v2.4
 
 Then:
-  # mv linux-2.4.24.tar.gz /xeno-1.2.bk
+  # mv linux-2.4.26.tar.gz /xeno-1.2.bk
   # cd /xeno-1.2.bk
-  # tar -zxvf linux-2.4.24.tar.gz
+  # tar -zxvf linux-2.4.26.tar.gz
 
-You'll find a new directory 'linux-2.4.24' which contains all
-the vanilla Linux 2.4.24 kernel source codes.
+You'll find a new directory 'linux-2.4.26' which contains all
+the vanilla Linux 2.4.26 kernel source codes.
 
 Hint: You should choose the vanilla linux kernel tree that has the
 same version as the "sparse" tree.
@@ -81,26 +116,26 @@ same version as the "sparse" tree.
 Next, you need to 'overlay' this sparse tree on the full vanilla Linux
 kernel tree:
 
-  # cd /xeno-1.2.bk/xenolinux-2.4.24-sparse
-  # ./mkbuildtree ../linux-2.4.24
+  # cd /xeno-1.2.bk/xenolinux-2.4.26-sparse
+  # ./mkbuildtree ../linux-2.4.26
 
 Finally, rename the buildtree since it is now a 'xenolinux' buildtree. 
 
   # cd /xeno-1.2.bk
-  # mv linux-2.4.24 xenolinux-2.4.24
+  # mv linux-2.4.26 xenolinux-2.4.26
 
 Now that the buildtree is there, you can build the xenolinux kernel.
 The default configuration should work fine for most people (use 'make
 oldconfig') but you can customise using one of the other config tools
 if you want.
 
-  # cd /xeno-1.2.bk/xenolinux-2.4.24
+  # cd /xeno-1.2.bk/xenolinux-2.4.26
   # ARCH=xen make oldconfig   { or menuconfig, or xconfig, or config }  
   # ARCH=xen make dep
   # ARCH=xen make bzImage
 
 Assuming the build works, you'll end up with
-/xeno-1.2.bk/xenolinux-2.4.24/arch/xen/boot/xenolinux.gz. This is the
+/xeno-1.2.bk/xenolinux-2.4.26/arch/xen/boot/xenolinux.gz. This is the
 gzip version of XenoLinux kernel image.
 
 
@@ -149,14 +184,14 @@ Installation
 
 First:
 # cp /xen-1.2.bk/xen/xen.gz /boot/xen.gz
-# cp /xen-1.2.bk/xenolinux-2.4.24/arch/xen/boot/xenolinux.gz /boot/xenolinux.gz
+# cp /xen-1.2.bk/xenolinux-2.4.26/arch/xen/boot/xenolinux.gz /boot/xenolinux.gz
 
 Second, you must have 'GNU Grub' installed. Then you need to edit
 the Grub configuration file '/boot/grub/menu.lst'.
 
 A typical Grub menu option might look like:
 
-title Xen 1.2 / XenoLinux 2.4.24
+title Xen 1.2 / XenoLinux 2.4.26
         kernel /boot/xen.gz dom0_mem=131072 com1=115200,8n1 noht
         module /boot/xenolinux.gz root=/dev/sda4 ro console=tty0
 
