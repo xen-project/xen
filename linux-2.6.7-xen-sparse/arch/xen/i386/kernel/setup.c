@@ -894,12 +894,12 @@ static unsigned long __init setup_memory(void)
 #endif
 
 #ifdef CONFIG_BLK_DEV_INITRD
-	if (LOADER_TYPE && INITRD_START) {
+	if (start_info.mod_start) {
 		if (INITRD_START + INITRD_SIZE <= (max_low_pfn << PAGE_SHIFT)) {
-			reserve_bootmem(INITRD_START, INITRD_SIZE);
-			initrd_start =
-				INITRD_START ? INITRD_START + PAGE_OFFSET : 0;
+			/*reserve_bootmem(INITRD_START, INITRD_SIZE);*/
+			initrd_start = INITRD_START + PAGE_OFFSET;
 			initrd_end = initrd_start+INITRD_SIZE;
+			initrd_below_start_ok = 1;
 		}
 		else {
 			printk(KERN_ERR "initrd extends beyond end of memory "

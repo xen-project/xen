@@ -53,7 +53,7 @@ extern unsigned char boot_params[PARAM_SIZE];
 #define AUX_DEVICE_INFO (*(unsigned char *) (PARAM+0x1FF))
 #define LOADER_TYPE (*(unsigned char *) (PARAM+0x210))
 #define KERNEL_START (*(unsigned long *) (PARAM+0x214))
-#define INITRD_START (start_info.mod_start)
+#define INITRD_START (__pa(start_info.mod_start))
 #define INITRD_SIZE (start_info.mod_len)
 #define EDID_INFO   (*(struct edid_info *) (PARAM+0x440))
 #define DISK80_SIGNATURE (*(unsigned int*) (PARAM+DISK80_SIG_BUFFER))

@@ -24,37 +24,11 @@
 #define X86_CAPABILITY	new_cpu_data+CPUINFO_x86_capability
 #define X86_VENDOR_ID	new_cpu_data+CPUINFO_x86_vendor_id
 
-/* Offsets in start_info structure */
-#define MOD_START	24
-#define MOD_LEN		28
-                
 ENTRY(startup_32)
 	cld
 
 	/* Set up the stack pointer */
 	lss stack_start,%esp
-
-	/* Copy initrd somewhere safe before it's clobbered by BSS. */
-	mov  MOD_LEN(%esi),%ecx
-	shr  $2,%ecx
-	jz   2f			/* bail from copy loop if no initrd */
-	mov  $_end,%edi
-	add  MOD_LEN(%esi),%edi
-	mov  MOD_START(%esi),%eax
-	add  MOD_LEN(%esi),%eax
-1:	sub  $4,%eax
-	sub  $4,%edi
-	mov  (%eax),%ebx
-	mov  %ebx,(%edi)
-	loop 1b
-	mov  %edi,MOD_START(%esi)
-
-	/* Clear BSS first so that there are no surprises... */
-2:	xorl %eax,%eax
-	movl $__bss_start,%edi
-	movl $__bss_stop,%ecx
-	subl %edi,%ecx
-	rep stosb
 
 	/* Copy the necessary stuff from start_info structure. */
 	mov  $start_info_union,%edi
