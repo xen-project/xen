@@ -96,15 +96,15 @@ static inline s64 __get_s_time(void)
 {
     s32 delta_tsc;
     u32 low;
-	u64 delta, tsc;
+    u64 delta, tsc;
 
     rdtscll(tsc);
     low = (u32)(tsc >> rdtsc_bitshift);
     delta_tsc = (s32)(low - shadow_st_pcc);
     if ( unlikely(delta_tsc < 0) ) delta_tsc = 0;
-	delta = ((u64)delta_tsc * st_scale_f);
-	delta >>= 32;
-	delta += ((u64)delta_tsc * st_scale_i);
+    delta = ((u64)delta_tsc * st_scale_f);
+    delta >>= 32;
+    delta += ((u64)delta_tsc * st_scale_i);
 
     return shadow_st + delta;
 }
@@ -121,24 +121,24 @@ static long       shadow_tv_usec;
 static long long  shadow_wc_timestamp;
 void do_gettimeofday(struct timeval *tv)
 {
-	unsigned long flags;
+    unsigned long flags;
     long          usec, sec;
-	u32	          version;
-	u64           now, cpu_freq, scale;
+    u32	          version;
+    u64           now, cpu_freq, scale;
 
-	spin_lock_irqsave(&hyp_time_lock, flags);
+    spin_lock_irqsave(&hyp_time_lock, flags);
 
-	while ( (version = HYPERVISOR_shared_info->wc_version) != 
+    while ( (version = HYPERVISOR_shared_info->wc_version) != 
             shadow_wc_version )
-	{
-		barrier();
+    {
+        barrier();
 
-		shadow_wc_version   = version;
-		shadow_tv_sec       = HYPERVISOR_shared_info->tv_sec;
-		shadow_tv_usec      = HYPERVISOR_shared_info->tv_usec;
-		shadow_wc_timestamp = HYPERVISOR_shared_info->wc_timestamp;
-		shadow_st_pcc       = HYPERVISOR_shared_info->st_timestamp;
-		shadow_st           = HYPERVISOR_shared_info->system_time;
+        shadow_wc_version   = version;
+        shadow_tv_sec       = HYPERVISOR_shared_info->tv_sec;
+        shadow_tv_usec      = HYPERVISOR_shared_info->tv_usec;
+        shadow_wc_timestamp = HYPERVISOR_shared_info->wc_timestamp;
+        shadow_st_pcc       = HYPERVISOR_shared_info->st_timestamp;
+        shadow_st           = HYPERVISOR_shared_info->system_time;
 
         rdtsc_bitshift      = HYPERVISOR_shared_info->rdtsc_bitshift;
         cpu_freq            = HYPERVISOR_shared_info->cpu_freq;
@@ -149,13 +149,13 @@ void do_gettimeofday(struct timeval *tv)
         st_scale_f = scale & 0xffffffff;
         st_scale_i = scale >> 32;
 
-		barrier();
+        barrier();
 	}
 
-	now   = __get_s_time();
-	usec  = ((unsigned long)(now-shadow_wc_timestamp))/1000;
-	sec   = shadow_tv_sec;
-	usec += shadow_tv_usec;
+    now   = __get_s_time();
+    usec  = ((unsigned long)(now-shadow_wc_timestamp))/1000;
+    sec   = shadow_tv_sec;
+    usec += shadow_tv_usec;
 
     while ( usec >= 1000000 ) 
     {
@@ -166,33 +166,32 @@ void do_gettimeofday(struct timeval *tv)
     tv->tv_sec = sec;
     tv->tv_usec = usec;
 
-	spin_unlock_irqrestore(&hyp_time_lock, flags);
+    spin_unlock_irqrestore(&hyp_time_lock, flags);
 
 #ifdef XENO_TIME_DEBUG
-	{
-		static long long old_now=0;
-		static long long wct=0, old_wct=0;
+    {
+        static long long old_now=0;
+        static long long wct=0, old_wct=0;
 
-		/* This debug code checks if time increase over two subsequent calls */
-		wct=(((long long)sec) * 1000000) + usec;
-		/* wall clock time going backwards */
-		if ((wct < old_wct) ) {	
-			printk("Urgh1: wc diff=%6ld, usec = %ld (0x%lX)\n",
-				   (long)(wct-old_wct), usec, usec);		
-			printk("       st diff=%lld cur st=0x%016llX old st=0x%016llX\n",
-				   now-old_now, now, old_now);
-		}
+        /* This debug code checks if time increase over two subsequent calls */
+        wct=(((long long)sec) * 1000000) + usec;
+        /* wall clock time going backwards */
+        if ((wct < old_wct) ) {	
+            printk("Urgh1: wc diff=%6ld, usec = %ld (0x%lX)\n",
+                   (long)(wct-old_wct), usec, usec);		
+            printk("       st diff=%lld cur st=0x%016llX old st=0x%016llX\n",
+                   now-old_now, now, old_now);
+        }
 
-		/* system time going backwards */
-		if (now<=old_now) {
-			printk("Urgh2: st diff=%lld cur st=0x%016llX old st=0x%016llX\n",
-				   now-old_now, now, old_now);
-		}
-		old_wct  = wct;
-		old_now  = now;
-	}
+        /* system time going backwards */
+        if (now<=old_now) {
+            printk("Urgh2: st diff=%lld cur st=0x%016llX old st=0x%016llX\n",
+                   now-old_now, now, old_now);
+        }
+        old_wct  = wct;
+        old_now  = now;
+    }
 #endif
-
 }
 
 void do_settimeofday(struct timeval *tv)
@@ -236,11 +235,11 @@ void do_settimeofday(struct timeval *tv)
 static long long us_per_tick=1000000/HZ;
 static long long last_irq;
 static inline void do_timer_interrupt(int irq, void *dev_id,
-									  struct pt_regs *regs)
+                                      struct pt_regs *regs)
 {
-	struct timeval tv;
-	long long time, delta;
-	
+    struct timeval tv;
+    long long time, delta;
+
     /*
      * The next bit really sucks:
      * Linux not only uses do_gettimeofday() to keep a notion of
@@ -255,19 +254,19 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
      * updates xtime accordingly. Yuck!
      */
 
-	/* Work out the number of jiffy intervals passed and update them. */
-	do_gettimeofday(&tv);
-	time = (((long long)tv.tv_sec) * 1000000) + tv.tv_usec;
-	delta = time - last_irq;
-	if (delta <= 0) {
-		printk ("Timer ISR: Time went backwards: %lld\n", delta);
-		return;
-	}
-	while (delta >= us_per_tick) {
-		do_timer(regs);
-		delta    -= us_per_tick;
-		last_irq += us_per_tick;
-	}
+    /* Work out the number of jiffy intervals passed and update them. */
+    do_gettimeofday(&tv);
+    time = (((long long)tv.tv_sec) * 1000000) + tv.tv_usec;
+    delta = time - last_irq;
+    if (delta <= 0) {
+        printk ("Timer ISR: Time went backwards: %lld\n", delta);
+        return;
+    }
+    while (delta >= us_per_tick) {
+        do_timer(regs);
+        delta    -= us_per_tick;
+        last_irq += us_per_tick;
+    }
 
 #if 0
     if (!user_mode(regs))
@@ -299,20 +298,19 @@ void __init time_init(void)
     __cpu_khz = HYPERVISOR_shared_info->cpu_freq;
     do_div(__cpu_khz, 1000);
     cpu_khz = (u32)__cpu_khz;
-	printk("Xen reported: %lu.%03lu MHz processor.\n", 
-		   cpu_khz / 1000, cpu_khz % 1000);
+    printk("Xen reported: %lu.%03lu MHz processor.\n", 
+           cpu_khz / 1000, cpu_khz % 1000);
 
-	do_gettimeofday(&xtime);
-	last_irq = (((long long)xtime.tv_sec) * 1000000) + xtime.tv_usec;
+    do_gettimeofday(&xtime);
+    last_irq = (((long long)xtime.tv_sec) * 1000000) + xtime.tv_usec;
 
     setup_irq(TIMER_IRQ, &irq_timer);
 
     /*
-     * Start ticker. Note that timing runs of wall clock, not virtual
-     * 'domain' time. This means that clock sshould run at the correct
-     * rate. For things like scheduling, it's not clear whether it
-     * matters which sort of time we use.
-	 * XXX RN: unimplemented.
+     * Start ticker. Note that timing runs of wall clock, not virtual 'domain' 
+     * time. This means that clock sshould run at the correct rate. For things 
+     * like scheduling, it's not clear whether it matters which sort of time 
+     * we use. XXX RN: unimplemented.
      */
 
     rdtscll(alarm);
