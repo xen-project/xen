@@ -361,6 +361,8 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
  */
 #define update_mmu_cache(vma,address,pte) do { } while (0)
 #define  __HAVE_ARCH_PTEP_SET_ACCESS_FLAGS
+
+#if 1
 #define ptep_set_access_flags(__vma, __address, __ptep, __entry, __dirty) \
 	do {								  \
 		if (__dirty) {						  \
@@ -368,6 +370,21 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 			flush_tlb_page(__vma, __address);		  \
 		}							  \
 	} while (0)
+#else
+#define ptep_set_access_flags(__vma, __address, __ptep, __entry, __dirty) \
+	do {								  \
+		if (__dirty) {						  \
+		        if ( likely(vma->vm_mm == current->mm) ) {        \
+			    xen_flush_page_update_queue();                \
+			    HYPERVISOR_update_va_mapping(address>>PAGE_SHIFT, entry, UVMF_INVLPG); \
+			} else {                                          \
+                            queue_l1_entry_update((__ptep), (__entry).pte_low); \
+			    xen_flush_page_update_queue();                \
+			}                                                 \
+		}							  \
+	} while (0)
+
+#endif
 
 /* Encode and de-code a swap entry */
 #define __swp_type(x)			(((x).val >> 1) & 0x1f)
