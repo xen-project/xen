@@ -93,6 +93,8 @@ typedef struct { unsigned long pt_lo; } pagetable_t;
 #define linear_pg_table ((l1_pgentry_t *)LINEAR_PT_VIRT_START)
 #define linear_l2_table ((l2_pgentry_t *)(LINEAR_PT_VIRT_START+(LINEAR_PT_VIRT_START>>(L2_PAGETABLE_SHIFT-L1_PAGETABLE_SHIFT))))
 
+#define va_to_l1mfn(_va) (l2_pgentry_val(linear_l2_table[_va>>L2_PAGETABLE_SHIFT]) >> PAGE_SHIFT)
+
 extern l2_pgentry_t idle_pg_table[ENTRIES_PER_L2_PAGETABLE];
 extern void paging_init(void);
 
