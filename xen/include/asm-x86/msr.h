@@ -71,8 +71,8 @@
 #define _EFER_NX 11  /* No execute enable */
 
 #define EFER_SCE (1<<_EFER_SCE)
-#define EFER_LME (1<<EFER_LME)
-#define EFER_LMA (1<<EFER_LMA)
+#define EFER_LME (1<<_EFER_LME)
+#define EFER_LMA (1<<_EFER_LMA)
 #define EFER_NX (1<<_EFER_NX)
 
 /* Intel MSRs. Some also available on other CPUs */
