@@ -602,7 +602,9 @@ full-featured distribution once they have mastered the
 basics.
 
 \begin{enumerate}
-\item Download the ttylinux disk image from XXX where from?
+\item Download and extract the ttylinux disk image from the Files
+section of the project's SourceForge site (see {\tt
+http://sf.net/projects/xen/}).
 \item Create a configuration file like the following:
 \begin{verbatim}
 kernel = "/boot/vmlinuz-2.6.9-xenU"
@@ -611,7 +613,7 @@ name = "ttylinux"
 cpu = -1 # leave to Xen to pick
 nics = 1
 ip = "1.2.3.4"
-disk = ['file:/path/to/ttylinux-disk,sda1,w']
+disk = ['file:/path/to/ttylinux/rootfs,sda1,w']
 root = "/dev/sda1 ro"
 \end{verbatim}
 \item Now start the domain and connect to its console:
@@ -758,12 +760,17 @@ To perform a live migration, both hosts must be running Xen / \xend and
 the destination host must have sufficient resources (e.g. memory
 capacity) to accommodate the domain after the move.
 
+Currently, there is no support for providing access to disk
+filesystems when a domain is migrated.  Administrators should choose
+an appropriate storage solution (i.e. SAN, NAS, etc.) to ensure that
+domain filesystems are also available on their destination node.
+
 A domain may be migrated using the {\tt xm migrate} command.  To
-migrate the example ttylinux domain to another machine, we would use
+live migrate a domain to another machine, we would use
 the command:
 
 \begin{verbatim}
-# xm migrate --live ttylinux destination.ournetwork.com
+# xm migrate --live mydomain destination.ournetwork.com
 \end{verbatim}
 
 There will be a delay whilst the domain is moved to the destination
@@ -779,11 +786,6 @@ For now it will be necessary to reconnect to the domain's console on
 the new machine using the {\tt xm console} command.  If a migrated
 domain has any open network connections then they will be preserved,
 so SSH connections do not have this limitation.
-
-Currently, there is no support for providing access to disk
-filesystems when a domain is migrated.  Administrators should choose
-an appropriate storage solution (i.e. SAN, NAS, etc.) to ensure that
-domain filesystems are also available on their destination node.
 
 \section{Managing domain memory (ballooning and memory limits)}
 
