@@ -16,18 +16,14 @@ all: $(TARGETS)
 
 install: all
 	mkdir -p $(prefix)/usr/bin
-	cp -a $(INSTALL) $(prefix)/usr/bin
-	chmod 755 $(prefix)/usr/bin/xen-mkdevnodes
-	chmod 755 $(prefix)/usr/bin/xen_nat_enable
-	chmod 755 $(prefix)/usr/bin/xen-clone
+	cp $(INSTALL) $(prefix)/usr/bin
+	for i in $(INSTALL); do chmod 755 $(prefix)/usr/bin/$i ; done
 	$(MAKE) -C miniterm install
 
 dist: all
 	mkdir -p ../../../install/bin
-	cp -a $(INSTALL) ../../../install/bin
-	chmod 755 ../../../install/bin/xen-mkdevnodes
-	chmod 755 ../../../install/bin/xen_nat_enable
-	chmod 755 ../../../install/bin/xen-clone
+	cp $(INSTALL) ../../../install/bin
+	for i in $(INSTALL); do chmod 755 ../../../install/bin/$i ; done
 	$(MAKE) -C miniterm dist
 
 clean:

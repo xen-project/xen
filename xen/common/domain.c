@@ -74,6 +74,10 @@ struct task_struct *do_createdomain(domid_t dom_id, unsigned int cpu)
         
         init_blkdev_info(p);
         
+        /* Per-domain PCI-device list. */
+        spin_lock_init(&p->pcidev_lock);
+        INIT_LIST_HEAD(&p->pcidev_list);
+
         write_lock_irqsave(&tasklist_lock, flags);
         pp = &task_list; /* NB. task_list is maintained in order of dom_id. */
         for ( pp = &task_list; *pp != NULL; pp = &(*pp)->next_list )
@@ -834,6 +838,9 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
             BUG();
     }
     kfree(xd);
+
+    /* DOM0 gets access to everything. */
+    physdev_init_dom0(p);
 
     set_bit(PF_CONSTRUCTED, &p->flags);
 

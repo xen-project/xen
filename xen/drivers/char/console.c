@@ -264,7 +264,7 @@ static void serial_rx(unsigned char c, struct pt_regs *regs)
     }
 }
 
-long do_serial_io(int cmd, int count, char *buffer)
+long do_console_io(int cmd, int count, char *buffer)
 {
     char *kbuf;
     long  rc;
@@ -275,7 +275,7 @@ long do_serial_io(int cmd, int count, char *buffer)
 
     switch ( cmd )
     {
-    case SERIALIO_write:
+    case CONSOLEIO_write:
         if ( count > (PAGE_SIZE-1) )
             count = PAGE_SIZE-1;
         if ( (kbuf = (char *)get_free_page(GFP_KERNEL)) == NULL )
@@ -288,7 +288,7 @@ long do_serial_io(int cmd, int count, char *buffer)
             serial_puts(sercon_handle, kbuf);
         free_page((unsigned long)kbuf);
         break;
-    case SERIALIO_read:
+    case CONSOLEIO_read:
         rc = 0;
         while ( (serial_rx_cons != serial_rx_prod) && (rc < count) )
         {

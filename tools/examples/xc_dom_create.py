@@ -85,6 +85,7 @@ image=''; ramdisk=''; builder_fn=''; restore=0; state_file=''
 mem_size=0; domain_name=''; vfr_ipaddr=[];
 vbd_expert=0; auto_restart=False;
 vbd_list = []; cmdline_ip = ''; cmdline_root=''; cmdline_extra=''
+pci_device_list = []
 
 ##### Determine location of defautls file
 #####
@@ -277,6 +278,14 @@ def make_domain():
     # setup virtual firewall rules for all aliases
     for ip in vfr_ipaddr:
 	XenoUtil.setup_vfr_rules_for_vif( id, 0, ip )
+
+    # check for physical device access
+    for (pci_bus, pci_dev, pci_func) in pci_device_list:
+        if xc.physdev_pci_access_modify(
+            dom=id, bus=pci_bus, dev=pci_dev, func=pci_func, enable=1 ) < 0:
+            print "Non-fatal error enabling PCI device access."
+        else:
+            print "Enabled PCI access (%d:%d:%d)." % (pci_bus,pci_dev,pci_func)
 
     if xc.domain_start( dom=id ) < 0:
         print "Error starting domain"

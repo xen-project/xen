@@ -473,6 +473,17 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     }
     break;
     
+    case DOM0_PCIDEV_ACCESS:
+    {
+        extern int physdev_pci_access_modify(domid_t, int, int, int, int);
+        ret = physdev_pci_access_modify(op->u.pcidev_access.domain, 
+                                        op->u.pcidev_access.bus,
+                                        op->u.pcidev_access.dev,
+                                        op->u.pcidev_access.func,
+                                        op->u.pcidev_access.enable);
+    }
+    break;
+     
     default:
         ret = -ENOSYS;
 

@@ -79,6 +79,7 @@
 3fbba6db7li3FJiABYtCmuGxOJxEGw tools/xc/lib/xc_linux_save.c
 3fbba6db7WnnJr0KFrIFrqNlSKvFYg tools/xc/lib/xc_misc.c
 40278d9ctaHVDaEuwhXI3Om2JOjx9w tools/xc/lib/xc_netbsd_build.c
+4051bce6CHAsYh8P5t2OHDtRWOP9og tools/xc/lib/xc_physdev.c
 3fbba6dctWRWlFJkYb6hdix2X4WMuw tools/xc/lib/xc_private.c
 3fbba6dcbVrG2hPzEzwdeV_UC8kydQ tools/xc/lib/xc_private.h
 3fbba6dcoGq9hQlksrBUfC2P5F6sGg tools/xc/lib/xc_vbd.c
@@ -150,6 +151,7 @@
 3ddb79bdN51qpRC-6bOH-v5hl_AK6A xen/common/network.c
 3ddb79bdD4SLmmdMD7yLW5HcUWucXw xen/common/page_alloc.c
 3e54c38dkHAev597bPr71-hGzTdocg xen/common/perfc.c
+4051bcecFeq4DE70p4zGO5setf47CA xen/common/physdev.c
 4006e659i9j-doVxY7DKOGU4XVin1Q xen/common/rbtree.c
 3ddb79bdHqdQpATqC0rmUZNbsb6L6A xen/common/resource.c
 3e397e6619PgAfBbw2XFbXkewvUWgw xen/common/schedule.c

@@ -37,7 +37,7 @@
 #define __HYPERVISOR_set_timer_op         20
 #define __HYPERVISOR_event_channel_op     21
 #define __HYPERVISOR_xen_version          22
-#define __HYPERVISOR_serial_io            23
+#define __HYPERVISOR_console_io           23
 
 /*
  * MULTICALLS
@@ -133,10 +133,10 @@
 #define SCHEDOP_stop            4   /* Stop executing this domain.       */
 
 /*
- * Commands to HYPERVISOR_serial_io().
+ * Commands to HYPERVISOR_console_io().
  */
-#define SERIALIO_write          0
-#define SERIALIO_read           1
+#define CONSOLEIO_write         0
+#define CONSOLEIO_read          1
 
 #ifndef __ASSEMBLY__
 
