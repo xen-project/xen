@@ -10,11 +10,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
 #include "blktaplib.h"
 #include "blockstore.h"
 #include "vdi.h"
+#include "parallax-threaded.h"
 
 #define PARALLAX_DEV     61440
+
 
 #if 0
 #define DPRINTF(_f, _a...) printf ( _f , ## _a )
@@ -274,6 +277,156 @@ err:
     return BLKTAP_RESPOND;  
 }
 
+typedef struct {
+    blkif_request_t *req;
+    int              count;
+    pthread_mutex_t  mutex;
+} pending_t;
+
+#define MAX_REQUESTS 64
+pending_t pending_list[MAX_REQUESTS];
+
+typedef struct  {
+    vdi_t           *vdi;
+    blkif_request_t *req;
+    int              segment;
+    pending_t       *pent;
+} readseg_params_t;
+
+#define DISPATCH_SIZE 1024UL
+#define DISPATCH_MASK (DISPATCH_SIZE-1)
+readseg_params_t dispatch_list[DISPATCH_SIZE];
+unsigned long dprod = 0, dcons = 0;
+pthread_mutex_t dispatch_mutex;
+pthread_cond_t  dispatch_cond;
+
+void *read_segment(void *param)
+{
+    readseg_params_t *p;
+    u64 vblock, gblock, sector;
+    char *dpage, *spage;
+    unsigned long size, start, offset;
+    blkif_response_t *rsp;
+    int tid;
+    
+unsigned long dc, dp;
+  
+#ifdef NOTHREADS
+#else
+    /* Set this thread's tid. */
+    tid = *(int *)param;
+    free(param);
+
+    pthread_setspecific(tid_key, (void *)tid);
+
+    printf("My tid is %d.\n", (int)pthread_getspecific(tid_key));
+start:
+    pthread_mutex_lock(&dispatch_mutex);
+    while (dprod == dcons)
+        pthread_cond_wait(&dispatch_cond, &dispatch_mutex);
+    
+    if (dprod == dcons) {
+        /* unnecessary wakeup. */
+        pthread_mutex_unlock(&dispatch_mutex);
+        goto start;
+    }
+#endif
+dc = dcons;
+dp = dprod;
+
+    p = &dispatch_list[dcons & DISPATCH_MASK];
+    dcons++;
+#ifdef NOTHREADS
+#else
+    pthread_mutex_unlock(&dispatch_mutex);
+#endif    
+    dpage  = (char *)MMAP_VADDR(ID_TO_IDX(p->req->id), p->segment);
+
+    /* Round the requested segment to a block address. */
+
+    sector  = p->req->sector_number + (8*p->segment);
+    vblock = (sector << SECTOR_SHIFT) >> BLOCK_SHIFT;
+
+    /* Get that block from the store. */
+
+    gblock = vdi_lookup_block(p->vdi, vblock, NULL);
+
+    /* Calculate read size and offset within the read block. */
+
+    offset = (sector << SECTOR_SHIFT) % BLOCK_SIZE;
+    size = ( blkif_last_sect (p->req->frame_and_sects[p->segment]) -
+             blkif_first_sect(p->req->frame_and_sects[p->segment]) + 1
+           ) << SECTOR_SHIFT;
+    start = blkif_first_sect(p->req->frame_and_sects[p->segment]) 
+            << SECTOR_SHIFT;
+
+    /* If the block does not exist in the store, return zeros. */
+    /* Otherwise, copy that region to the guest page.          */
+
+//    printf("      : (%p, %d, %d) (%d) [c:%lu,p:%lu]\n", 
+//            p->req, ID_TO_IDX(p->req->id), p->segment,
+//            p->pent->count, dc, dp);
+    
+    DPRINTF("ParallaxRead: sect: %lld (%ld,%ld),  "
+            "vblock %llx, gblock %llx, "
+            "size %lx\n", 
+            sector, blkif_first_sect(p->req->frame_and_sects[p->segment]),
+            blkif_last_sect (p->req->frame_and_sects[p->segment]),
+            vblock, gblock, size); 
+
+    if ( gblock == 0 ) {
+
+        memset(dpage + start, '\0', size);
+
+    } else {
+
+        spage = readblock(gblock);
+
+        if (spage == NULL) {
+            printf("Error reading gblock from store: %Ld\n", gblock);
+            goto err;
+        }
+
+        memcpy(dpage + start, spage + offset, size);
+
+        freeblock(spage);
+    }
+    
+    
+    /* Done the read.  Now update the pending record. */
+    
+    pthread_mutex_lock(&p->pent->mutex);
+    p->pent->count--;
+    
+    if (p->pent->count == 0) {
+        
+//    printf("FINISH: (%d, %d)\n", ID_TO_IDX(p->req->id), p->segment);
+        rsp = (blkif_response_t *)p->req;
+        rsp->id = p->req->id;
+        rsp->operation = BLKIF_OP_READ;
+        rsp->status = BLKIF_RSP_OKAY;
+
+        blktap_inject_response(rsp);       
+    }
+    
+    pthread_mutex_unlock(&p->pent->mutex);
+    
+#ifdef NOTHREADS
+    return NULL;
+#else
+    goto start;
+#endif
+                
+err:
+    printf("I am screwed!\n");
+#ifdef NOTHREADS
+    return NULL;
+#else
+    goto start;
+#endif
+}
+
+
 int parallax_read(blkif_request_t *req, blkif_t *blkif)
 {
     blkif_response_t *rsp;
@@ -283,69 +436,48 @@ int parallax_read(blkif_request_t *req, blkif_t *blkif)
     vdi_t *vdi;
     int i;
     char *dpage, *spage;
+    pending_t *pent;
+    readseg_params_t *params;
 
     vdi = blkif_get_vdi(blkif, req->device);
     
     if ( vdi == NULL )
         goto err;
+
+//    printf("START : (%p, %d, %d)\n", req, ID_TO_IDX(req->id), req->nr_segments);
+    
+    pent = &pending_list[ID_TO_IDX(req->id)];
+    pent->count = req->nr_segments;
+    pent->req = req;
+    pthread_mutex_init(&pent->mutex, NULL);
+       
     
     for (i = 0; i < req->nr_segments; i++) {
-            
-        dpage  = (char *)MMAP_VADDR(ID_TO_IDX(req->id), i);
+        pthread_t tid;
+        int ret;
+
+        params = &dispatch_list[dprod & DISPATCH_MASK];
+        params->pent = pent;
+        params->vdi  = vdi;
+        params->req  = req;         
+        params->segment = i;
+        wmb();
+        dprod++;
         
-        /* Round the requested segment to a block address. */
-        
-        sector  = req->sector_number + (8*i);
-        vblock = (sector << SECTOR_SHIFT) >> BLOCK_SHIFT;
-        
-        /* Get that block from the store. */
-        
-        gblock = vdi_lookup_block(vdi, vblock, NULL);
-        
-        /* Calculate read size and offset within the read block. */
-        
-        offset = (sector << SECTOR_SHIFT) % BLOCK_SIZE;
-        size = ( blkif_last_sect (req->frame_and_sects[i]) -
-                 blkif_first_sect(req->frame_and_sects[i]) + 1
-               ) << SECTOR_SHIFT;
-        start = blkif_first_sect(req->frame_and_sects[i]) << SECTOR_SHIFT;
-        
-        /* If the block does not exist in the store, return zeros. */
-        /* Otherwise, copy that region to the guest page.          */
-        
-        DPRINTF("ParallaxRead: sect: %lld (%ld,%ld),  "
-                "vblock %llx, gblock %llx, "
-                "size %lx\n", 
-                sector, blkif_first_sect(req->frame_and_sects[i]),
-                blkif_last_sect (req->frame_and_sects[i]),
-                vblock, gblock, size); 
-       
-        if ( gblock == 0 ) {
-           
-            memset(dpage + start, '\0', size);
-            
-        } else {
-            
-            spage = readblock(gblock);
-            
-            if (spage == NULL) {
-                printf("Error reading gblock from store: %Ld\n", gblock);
-                goto err;
-            }
-            
-            memcpy(dpage + start, spage + offset, size);
-            
-            freeblock(spage);
-        }
+        pthread_mutex_lock(&dispatch_mutex);
+        pthread_cond_signal(&dispatch_cond);
+        pthread_mutex_unlock(&dispatch_mutex);
+#ifdef NOTHREADS        
+        read_segment(NULL);
+#endif        
         
     }
+    
+    
+    
 
-    rsp = (blkif_response_t *)req;
-    rsp->id = req->id;
-    rsp->operation = BLKIF_OP_READ;
-    rsp->status = BLKIF_RSP_OKAY;
+    return BLKTAP_STOLEN;
 
-    return BLKTAP_RESPOND;
 err:
     rsp = (blkif_response_t *)req;
     rsp->id = req->id;
@@ -477,8 +609,12 @@ void __init_parallax(void)
 }
 
 
+
 int main(int argc, char *argv[])
 {
+    pthread_t read_pool[READ_POOL_SIZE];
+    int i, tid=0;
+    
     DPRINTF("parallax: starting.\n"); 
     __init_blockstore();
     DPRINTF("parallax: initialized blockstore...\n"); 
@@ -486,6 +622,28 @@ int main(int argc, char *argv[])
     DPRINTF("parallax: initialized vdi registry etc...\n"); 
     __init_parallax();
     DPRINTF("parallax: initialized local stuff..\n"); 
+
+    
+    pthread_mutex_init(&dispatch_mutex, NULL);
+    pthread_cond_init(&dispatch_cond, NULL);
+    
+    pthread_key_create(&tid_key, NULL);
+    tid = 0;
+    
+#ifdef NOTHREADS
+#else
+    for (i=0; i < READ_POOL_SIZE; i++) {
+        int ret, *t;
+        t = (int *)malloc(sizeof(int));
+        *t = tid++;
+        ret = pthread_create(&read_pool[i], NULL, read_segment, t);
+        if (ret != 0) printf("Error starting thread %d\n", i);
+    }
+#endif
+    
+    pthread_setspecific(tid_key, (void *)tid);
+    
+    printf("*My tid is %d.\n", (int)pthread_getspecific(tid_key));
     
     blktap_register_ctrl_hook("parallax_control", parallax_control);
     blktap_register_request_hook("parallax_request", parallax_request);

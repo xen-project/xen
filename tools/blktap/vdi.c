@@ -15,8 +15,8 @@
 #include "radix.h"
 #include "vdi.h"
                     
-#define VDI_REG_BLOCK   1LL
-#define VDI_RADIX_ROOT  writable(2)
+#define VDI_REG_BLOCK   2LL
+#define VDI_RADIX_ROOT  writable(3)
                                                             
 #if 1
 #define DPRINTF(_f, _a...) printf ( _f , ## _a )
@@ -158,6 +158,7 @@ void vdi_snapshot(vdi_t *vdi)
     
     rec.radix_root = vdi->radix_root;
     gettimeofday(&rec.timestamp, NULL);
+    rec.deleted = 0;
     
     vdi->radix_root = snapshot(vdi->radix_root);
     ret = snap_append(&vdi->snap, &rec, &vdi->snap);

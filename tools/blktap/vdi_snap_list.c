@@ -49,8 +49,10 @@ int main(int argc, char *argv[])
     sid = vdi->snap;
     sid.index--;
     
-    //printf("%8s%4s%21s %12s\n", "Block", "idx", "timestamp", "radix root");
-    printf("%8s%4s%37s %12s\n", "Block", "idx", "timestamp", "radix root");
+    //printf("%8s%4s%21s %12s %1s\n", "Block", "idx", "timestamp", 
+    //    "radix root", "d");
+    printf("%8s%4s%37s %12s %1s\n", "Block", "idx", "timestamp", 
+            "radix root", "d");
      
     while (sid.block != 0) {
         blk = snap_get_block(sid.block);
@@ -61,13 +63,14 @@ int main(int argc, char *argv[])
             }
             t = ctime(&blk->snaps[i].timestamp.tv_sec);
             t[strlen(t)-1] = '\0';
-            //printf("%8Ld%4u%14lu.%06lu %12Ld\n",
-            printf("%8Ld%4u%30s %06lu %12Ld\n",
+            //printf("%8Ld%4u%14lu.%06lu %12Ld %1s\n",
+            printf("%8Ld%4u%30s %06lu %12Ld %1s\n",
                     sid.block, i, 
                     //blk->snaps[i].timestamp.tv_sec,
                     t,
                     blk->snaps[i].timestamp.tv_usec,
-                    blk->snaps[i].radix_root);
+                    blk->snaps[i].radix_root,
+                    blk->snaps[i].deleted ? "*" : " ");
             if ( max_snaps != -1 ) 
                 max_snaps--;
         }

@@ -113,6 +113,11 @@ int snap_append(snap_id_t *old_id, snap_rec_t *rec, snap_id_t *new_id)
     snap_id_t id = *old_id;
     snap_block_t *blk = snap_get_block(id.block);
     
+    if ( rec->deleted == 1 ) {
+        printf("Attempt to append a deleted snapshot!\n");
+        return -1;
+    }
+    
     if ( blk->hdr.immutable != 0 ) {
         printf("Attempt to snap an immutable snap block!\n");
         return -1;
@@ -146,6 +151,65 @@ int snap_append(snap_id_t *old_id, snap_rec_t *rec, snap_id_t *new_id)
     writeblock(id.block, blk);
     freeblock(blk);
     return 0;
+}
+
+int snap_collapse(int height, snap_id_t *p_id, snap_id_t *c_id)
+{
+    snap_block_t *p_blk, *c_blk, *blk;
+    snap_rec_t   *p_rec, *c_rec;
+    int ret = -1;
+    
+    p_blk = snap_get_block(p_id->block);
+    
+    if (p_blk == NULL) return(-1);
+    
+    if (c_id->block == p_id->block)
+    {
+        c_blk = p_blk;
+    } else {
+         c_blk = snap_get_block(c_id->block);
+    }
+    
+    if (p_blk == NULL) {
+        freeblock(p_blk);
+        return(-1);
+    }
+     
+    /* parent and child must not be deleted. */
+    p_rec = &p_blk->snaps[p_id->index];
+    c_rec = &c_blk->snaps[c_id->index];
+    /*
+    if ( (p_rec->deleted == 1) || (c_rec->deleted == 1) ) {
+        printf("One of those snaps is already deleted.\n");
+        goto done;
+    }
+    */
+    /* first non-deleted thing in the log before child must be parent. */
+    
+    /* XXX todo: text the range here for delete (and eventually fork) bits) */
+    /* for now, snaps must be consecutive, on the same log page: */
+    
+    if ((p_id->block != c_id->block) || (p_id->index != c_id->index-1))
+    {
+        printf("Deleting non-consecutive snaps is not done yet.\n");
+        goto done;
+    }
+    
+    /* mark parent as deleted XXX: may need to lock parent block here.*/
+    p_rec->deleted = 1;
+    writeblock(p_id->block, p_blk);
+    
+    /* delete the parent */
+    printf("collapse(%Ld, %Ld)\n", p_rec->radix_root, c_rec->radix_root);
+    ret = collapse(height, p_rec->radix_root, c_rec->radix_root);
+    
+    /* return the number of blocks reclaimed. */
+    
+done:
+    if (c_blk != p_blk) freeblock(c_blk);
+    freeblock(p_blk);
+    
+    return(ret);
 }
 
 void snap_print_history(snap_id_t *snap_id)
