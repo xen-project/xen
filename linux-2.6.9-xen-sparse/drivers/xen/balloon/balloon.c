@@ -91,7 +91,7 @@ static struct timer_list balloon_timer;
 #define LIST_TO_PAGE(l) ( list_entry(l, struct page, list) )
 #define UNLIST_PAGE(p)  ( list_del(&p->list) )
 #define pte_offset_kernel pte_offset
-#define subsys_initcall(_fn) __initcall(fn)
+#define subsys_initcall(_fn) __initcall(_fn)
 #endif
 
 #define IPRINTK(fmt, args...) \
@@ -300,14 +300,14 @@ static void balloon_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
     switch ( msg->subtype )
     {
     case CMSG_MEM_REQUEST_SET:
+    {
+        mem_request_t *req = (mem_request_t *)&msg->msg[0];
         if ( msg->length != sizeof(mem_request_t) )
             goto parse_error;
-        {
-            mem_request_t *req = (mem_request_t *)&msg->msg[0];
-            set_new_target(req->target);
-            req->status = 0;
-        }
-        break;        
+        set_new_target(req->target);
+        req->status = 0;
+    }
+    break;        
     default:
         goto parse_error;
     }
@@ -320,92 +320,58 @@ static void balloon_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
     ctrl_if_send_response(msg);
 }
 
-static int balloon_write(struct file *file, const char *buffer,
-                         size_t count, loff_t *offp)
+static int balloon_write(struct file *file, const char __user *buffer,
+                         unsigned long count, void *data)
 {
     char memstring[64], *endchar;
-    int len, i;
     unsigned long long target_bytes;
 
     if ( !capable(CAP_SYS_ADMIN) )
         return -EPERM;
 
+    if ( count <= 1 )
+        return -EBADMSG; /* runt */
     if ( count > sizeof(memstring) )
-        return -EFBIG;
+        return -EFBIG;   /* too long */
 
-    len = strnlen_user(buffer, count);
-    if ( len == 0 )
-        return -EBADMSG;
-    if ( len == 1 )
-        goto out; /* input starts with a NUL char */
-    if ( strncpy_from_user(memstring, buffer, len) < 0 )
+    if ( copy_from_user(memstring, buffer, count) )
         return -EFAULT;
+    memstring[sizeof(memstring)-1] = '\0';
 
-    endchar = memstring;
-    for ( i = 0; i < len; ++i, ++endchar )
-        if ( (memstring[i] < '0') || (memstring[i] > '9') )
-            break;
-    if ( i == 0 )
-        return -EBADMSG;
-
-    target_bytes = memparse(memstring,&endchar);
+    target_bytes = memparse(memstring, &endchar);
     set_new_target(target_bytes >> PAGE_SHIFT);
 
- out:
-    *offp += len;
-    return len;
+    return count;
 }
 
-static int balloon_read(struct file *filp, char *buffer,
-                        size_t count, loff_t *offp)
+static int balloon_read(char *page, char **start, off_t off,
+                        int count, int *eof, void *data)
 {
-    char *priv_buf;
     int len;
-
-    priv_buf = (char *)__get_free_page(GFP_KERNEL);
-    if ( priv_buf == NULL )
-        return -ENOMEM;
 
 #define K(_p) ((_p)<<(PAGE_SHIFT-10))
     len = sprintf(
-        priv_buf,
+        page,
         "Current allocation: %8lu kB\n"
-        "Target allocation:  %8lu kB / %8lu kB (actual / requested)\n"
-        "Unused heap space:  %8lu kB / %8lu kB (low-mem / high-mem)\n"
+        "Requested target:   %8lu kB\n"
+        "Low-mem balloon:    %8lu kB\n"
+        "High-mem balloon:   %8lu kB\n"
         "Xen hard limit:     ",
-        K(current_pages),
-        K(current_target()), K(target_pages),
-        K(balloon_low), K(balloon_high));
+        K(current_pages), K(target_pages), K(balloon_low), K(balloon_high));
 
     if ( hard_limit != ~0UL )
         len += sprintf(
-            priv_buf + len, 
+            page + len, 
             "%8lu kB (inc. %8lu kB driver headroom)\n",
             K(hard_limit), K(driver_pages));
     else
         len += sprintf(
-            priv_buf + len,
+            page + len,
             "     ??? kB\n");
 
-    len -= *offp;
-    if ( len > count)
-        len = count;
-    if ( len < 0 )
-        len = 0;
-
-    if ( len != 0 )
-        (void)copy_to_user(buffer, &priv_buf[*offp], len);
-
-    free_page((unsigned long)priv_buf);
-
-    *offp += len;
+    *eof = 1;
     return len;
 }
-
-static struct file_operations balloon_fops = {
-    .read  = balloon_read,
-    .write = balloon_write
-};
 
 static int __init balloon_init(void)
 {
@@ -431,7 +397,8 @@ static int __init balloon_init(void)
         return -1;
     }
 
-    balloon_pde->proc_fops = &balloon_fops;
+    balloon_pde->read_proc  = balloon_read;
+    balloon_pde->write_proc = balloon_write;
 
     (void)ctrl_if_register_receiver(CMSG_MEM_REQUEST, balloon_ctrlif_rx, 0);
 
