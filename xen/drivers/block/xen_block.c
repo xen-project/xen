@@ -569,22 +569,16 @@ static void dump_blockq(u_char key, void *dev_id, struct pt_regs *regs)
            NR_PENDING_REQS, pending_prod, pending_cons);
 
     read_lock_irqsave(&tasklist_lock, flags);
-    p = &idle0_task;
-    do {
-        if ( !is_idle_task(p) )
-        {
-            printk("Domain: %llu\n", p->domain);
-            blk_ring = p->blk_ring_base;
-            
-            printk("  req_prod:0x%08x, req_cons:0x%08x resp_prod:0x%08x/"
-                   "0x%08x on_list=%d\n",
-                   blk_ring->req_prod, p->blk_req_cons,
-                   blk_ring->resp_prod, p->blk_resp_prod,
-                   __on_blkdev_list(p));
-        }
-        p = p->next_task;
-    } 
-    while ( (p = p->next_task) != &idle0_task );
+    for_each_domain ( p )
+    {
+        printk("Domain: %llu\n", p->domain);
+        blk_ring = p->blk_ring_base;
+        printk("  req_prod:0x%08x, req_cons:0x%08x resp_prod:0x%08x/"
+               "0x%08x on_list=%d\n",
+               blk_ring->req_prod, p->blk_req_cons,
+               blk_ring->resp_prod, p->blk_resp_prod,
+               __on_blkdev_list(p));
+    }
     read_unlock_irqrestore(&tasklist_lock, flags);
 
     for ( i = 0; i < MAX_PENDING_REQS; i++ )

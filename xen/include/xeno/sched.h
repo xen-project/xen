@@ -140,8 +140,8 @@ struct task_struct
     char name[MAX_DOMAIN_NAME];
 
     struct thread_struct thread;
-    struct task_struct *prev_task, *next_task, *next_hash;
-    
+    struct task_struct *next_list, *next_hash;
+
     /* Event channel information. */
     event_channel_t *event_channel;
     unsigned int     max_event_channel;
@@ -182,8 +182,6 @@ struct task_struct
     mm:          IDLE0_MM,       \
     addr_limit:  KERNEL_DS,      \
     thread:      INIT_THREAD,    \
-    prev_task:   &(_t),          \
-    next_task:   &(_t),          \
     flags:       1<<PF_IDLETASK  \
 }
 
@@ -284,22 +282,14 @@ void continue_cpu_idle_loop(void);
 
 void continue_nonidle_task(void);
 
-/* This hash table is protected by the tasklist_lock. */
+/* This task_hash and task_list are protected by the tasklist_lock. */
 #define TASK_HASH_SIZE 256
 #define TASK_HASH(_id) ((int)(_id)&(TASK_HASH_SIZE-1))
 extern struct task_struct *task_hash[TASK_HASH_SIZE];
+extern struct task_struct *task_list;
 
-#define REMOVE_LINKS(p) do { \
-        (p)->next_task->prev_task = (p)->prev_task; \
-        (p)->prev_task->next_task = (p)->next_task; \
-        } while (0)
-
-#define SET_LINKS(p) do { \
-        (p)->next_task = &idle0_task; \
-        (p)->prev_task = idle0_task.prev_task; \
-        idle0_task.prev_task->next_task = (p); \
-        idle0_task.prev_task = (p); \
-        } while (0)
+#define for_each_domain(_p) \
+ for ( (_p) = task_list; (_p) != NULL; (_p) = (_p)->next_list )
 
 extern void update_process_times(int user);
 
