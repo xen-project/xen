@@ -226,6 +226,7 @@ static volatile unsigned long flush_cpumask;
 asmlinkage void smp_invalidate_interrupt(void)
 {
     ack_APIC_irq();
+    perfc_incrc(ipis);
     local_flush_tlb();
     clear_bit(smp_processor_id(), &flush_cpumask);
 }
@@ -419,6 +420,7 @@ void smp_send_stop(void)
 asmlinkage void smp_event_check_interrupt(void)
 {
     ack_APIC_irq();
+    perfc_incrc(ipis);
 }
 
 asmlinkage void smp_call_function_interrupt(void)
@@ -428,6 +430,8 @@ asmlinkage void smp_call_function_interrupt(void)
     int wait = call_data->wait;
 
     ack_APIC_irq();
+    perfc_incrc(ipis);
+
     /*
      * Notify initiating CPU that I've grabbed the data and am
      * about to execute the function
