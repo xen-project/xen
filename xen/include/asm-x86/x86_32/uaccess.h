@@ -10,9 +10,7 @@
 #include <xen/string.h>
 #include <xen/sched.h>
 
-/* No user-pointer checking. */
 #define __user
-#define __chk_user_ptr(_p) ((void)0)
 
 #define VERIFY_READ 0
 #define VERIFY_WRITE 1
@@ -22,7 +20,7 @@
  */
 #ifdef CONFIG_X86_INTEL_USERCOPY
 extern struct movsl_mask {
-	int mask;
+    int mask;
 } __cacheline_aligned movsl_mask;
 #endif
 
@@ -34,40 +32,21 @@ extern struct movsl_mask {
  *
  * This is equivalent to the following test:
  * (u33)addr + (u33)size >= (u33)HYPERVISOR_VIRT_START
- *
- * This needs 33-bit arithmetic. We have a carry...
  */
-#define __range_ok(addr,size) ({ \
+#define __range_not_ok(addr,size) ({ \
 	unsigned long flag,sum; \
-	__chk_user_ptr(addr); \
 	asm("addl %3,%1 ; sbbl %0,%0; cmpl %1,%4; sbbl $0,%0" \
 		:"=&r" (flag), "=r" (sum) \
 		:"1" (addr),"g" ((int)(size)),"r" (HYPERVISOR_VIRT_START)); \
 	flag; })
 
-/**
- * access_ok: - Checks if a user space pointer is valid
- * @type: Type of access: %VERIFY_READ or %VERIFY_WRITE.  Note that
- *        %VERIFY_WRITE is a superset of %VERIFY_READ - if it is safe
- *        to write to a block, it is always safe to read from it.
- * @addr: User space pointer to start of block to check
- * @size: Size of block to check
- *
- * Context: User context only.  This function may sleep.
- *
- * Checks if a pointer to a block of memory in user space is valid.
- *
- * Returns true (nonzero) if the memory block may be valid, false (zero)
- * if it is definitely invalid.
- *
- * Note that, depending on architecture, this function probably just
- * checks that the pointer is in the user space range - after calling
- * this function, memory access functions may still return -EFAULT.
- */
-#define access_ok(type,addr,size) (likely(__range_ok(addr,size) == 0))
+#define access_ok(type,addr,size) (likely(__range_not_ok(addr,size) == 0))
 
 #define array_access_ok(type,addr,count,size) \
     (likely(count < (~0UL/size)) && access_ok(type,addr,count*size))
+
+extern long __get_user_bad(void);
+extern void __put_user_bad(void);
 
 /**
  * get_user: - Get a simple variable from user space.
@@ -88,8 +67,6 @@ extern struct movsl_mask {
  */
 #define get_user(x,ptr)	\
   __get_user_check((x),(ptr),sizeof(*(ptr)))
-
-extern void __put_user_bad(void);
 
 /**
  * put_user: - Write a simple value into user space.
@@ -195,7 +172,6 @@ extern void __put_user_bad(void);
 #define __put_user_size(x,ptr,size,retval,errret)			\
 do {									\
 	retval = 0;							\
-	__chk_user_ptr(ptr);						\
 	switch (size) {							\
 	case 1: __put_user_asm(x,ptr,retval,"b","b","iq",errret);break;	\
 	case 2: __put_user_asm(x,ptr,retval,"w","w","ir",errret);break; \
@@ -259,12 +235,9 @@ struct __large_struct { unsigned long buf[100]; };
 	__gu_err;							\
 })							
 
-extern long __get_user_bad(void);
-
 #define __get_user_size(x,ptr,size,retval,errret)			\
 do {									\
 	retval = 0;							\
-	__chk_user_ptr(ptr);						\
 	switch (size) {							\
 	case 1: __get_user_asm(x,ptr,retval,"b","b","=q",errret);break;	\
 	case 2: __get_user_asm(x,ptr,retval,"w","w","=r",errret);break;	\
@@ -317,22 +290,22 @@ unsigned long __copy_from_user_ll(void *to, const void __user *from, unsigned lo
 static always_inline unsigned long
 __copy_to_user(void __user *to, const void *from, unsigned long n)
 {
-	if (__builtin_constant_p(n)) {
-		unsigned long ret;
+    if (__builtin_constant_p(n)) {
+        unsigned long ret;
 
-		switch (n) {
-		case 1:
-			__put_user_size(*(u8 *)from, (u8 __user *)to, 1, ret, 1);
-			return ret;
-		case 2:
-			__put_user_size(*(u16 *)from, (u16 __user *)to, 2, ret, 2);
-			return ret;
-		case 4:
-			__put_user_size(*(u32 *)from, (u32 __user *)to, 4, ret, 4);
-			return ret;
-		}
-	}
-	return __copy_to_user_ll(to, from, n);
+        switch (n) {
+        case 1:
+            __put_user_size(*(u8 *)from, (u8 __user *)to, 1, ret, 1);
+            return ret;
+        case 2:
+            __put_user_size(*(u16 *)from, (u16 __user *)to, 2, ret, 2);
+            return ret;
+        case 4:
+            __put_user_size(*(u32 *)from, (u32 __user *)to, 4, ret, 4);
+            return ret;
+        }
+    }
+    return __copy_to_user_ll(to, from, n);
 }
 
 /**
@@ -355,47 +328,28 @@ __copy_to_user(void __user *to, const void *from, unsigned long n)
 static always_inline unsigned long
 __copy_from_user(void *to, const void __user *from, unsigned long n)
 {
-	if (__builtin_constant_p(n)) {
-		unsigned long ret;
+    if (__builtin_constant_p(n)) {
+        unsigned long ret;
 
-		switch (n) {
-		case 1:
-			__get_user_size(*(u8 *)to, from, 1, ret, 1);
-			return ret;
-		case 2:
-			__get_user_size(*(u16 *)to, from, 2, ret, 2);
-			return ret;
-		case 4:
-			__get_user_size(*(u32 *)to, from, 4, ret, 4);
-			return ret;
-		}
-	}
-	return __copy_from_user_ll(to, from, n);
+        switch (n) {
+        case 1:
+            __get_user_size(*(u8 *)to, from, 1, ret, 1);
+            return ret;
+        case 2:
+            __get_user_size(*(u16 *)to, from, 2, ret, 2);
+            return ret;
+        case 4:
+            __get_user_size(*(u32 *)to, from, 4, ret, 4);
+            return ret;
+        }
+    }
+    return __copy_from_user_ll(to, from, n);
 }
 
 unsigned long copy_to_user(void __user *to, const void *from, unsigned long n);
 unsigned long copy_from_user(void *to,
-			const void __user *from, unsigned long n);
-long strncpy_from_user(char *dst, const char __user *src, long count);
-long __strncpy_from_user(char *dst, const char __user *src, long count);
+                             const void __user *from, unsigned long n);
 
-/**
- * strlen_user: - Get the size of a string in user space.
- * @str: The string to measure.
- *
- * Context: User context only.  This function may sleep.
- *
- * Get the size of a NUL-terminated string in user space.
- *
- * Returns the size of the string INCLUDING the terminating NUL.
- * On exception, returns 0.
- *
- * If there is a limit on the length of a valid string, you may wish to
- * consider using strnlen_user() instead.
- */
-#define strlen_user(str) strnlen_user(str, ~0UL >> 1)
-
-long strnlen_user(const char __user *str, long n);
 unsigned long clear_user(void __user *mem, unsigned long len);
 unsigned long __clear_user(void __user *mem, unsigned long len);
 
