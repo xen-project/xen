@@ -1604,7 +1604,11 @@ void ptwr_flush(const int which)
     if ( unlikely(__get_user(pte, ptep)) )
     {
         MEM_LOG("ptwr: Could not read pte at %p\n", ptep);
-        domain_crash();
+        /*
+         * Really a bug. We could read this PTE during the initial fault,
+         * and pagetables can't have changed meantime. XXX Multi-proc guests?
+         */
+        BUG();
     }
     PTWR_PRINTK("[%c] disconnected_l1va at %p is %08lx\n",
                 PTWR_PRINT_WHICH, ptep, pte);
@@ -1627,7 +1631,11 @@ void ptwr_flush(const int which)
     if ( unlikely(__put_user(pte, ptep)) )
     {
         MEM_LOG("ptwr: Could not update pte at %p\n", ptep);
-        domain_crash();
+        /*
+         * Really a bug. We could write this PTE during the initial fault,
+         * and pagetables can't have changed meantime. XXX Multi-proc guests?
+         */
+        BUG();
     }
 
     /* Ensure that there are no stale writable mappings in any TLB. */
@@ -1668,6 +1676,12 @@ void ptwr_flush(const int which)
         if ( unlikely(!get_page_from_l1e(nl1e, d)) )
         {
             MEM_LOG("ptwr: Could not re-validate l1 page\n");
+            /*
+             * Make the remaining p.t's consistent before crashing, so the
+             * reference counts are correct.
+             */
+            memcpy(&pl1e[i], &ptwr_info[cpu].ptinfo[which].page[i],
+                   (ENTRIES_PER_L1_PAGETABLE - i) * sizeof(l1_pgentry_t));
             domain_crash();
         }
         
@@ -1781,6 +1795,9 @@ int ptwr_do_page_fault(unsigned long addr)
     {
         MEM_LOG("ptwr: Could not update pte at %p\n", (unsigned long *)
                 &linear_pg_table[addr>>PAGE_SHIFT]);
+        /* Toss the writable pagetable state and crash. */
+        unmap_domain_mem(ptwr_info[cpu].ptinfo[which].pl1e);
+        ptwr_info[cpu].ptinfo[which].l1va = 0;
         domain_crash();
     }
     
