@@ -259,23 +259,39 @@ long set_gdt(struct domain *d,
              unsigned int entries)
 {
     /* NB. There are 512 8-byte entries per GDT page. */
-    int i, nr_pages = (entries + 511) / 512;
+    int i = 0, nr_pages = (entries + 511) / 512;
     struct desc_struct *vgdt;
+    unsigned long pfn;
 
-    vgdt = map_domain_mem(frames[0] << PAGE_SHIFT);
-    memset( vgdt + FIRST_RESERVED_GDT_ENTRY, 0,	    
-           NR_RESERVED_GDT_ENTRIES*8);
+    /* Check the first page in the new GDT. */
+    if ( (pfn = frames[0]) >= max_page )
+        goto fail;
 
-    /* Check the new GDT. */
-    for ( i = 0; i < nr_pages; i++ )
+    /* The first page is special because Xen owns a range of entries in it. */
+    if ( !get_page_and_type(&frame_table[pfn], d, PGT_gdt_page) )
     {
-        if ( unlikely(frames[i] >= max_page) ||
-             unlikely(!get_page_and_type(&frame_table[frames[i]], 
-                                         d, PGT_gdt_page)) )
+        /* GDT checks failed: try zapping the Xen reserved entries. */
+        if ( !get_page_and_type(&frame_table[pfn], d, PGT_writable_page) )
+            goto fail;
+        vgdt = map_domain_mem(pfn << PAGE_SHIFT);
+        memset(vgdt + FIRST_RESERVED_GDT_ENTRY, 0,
+               NR_RESERVED_GDT_ENTRIES*8);
+        unmap_domain_mem(vgdt);
+        put_page_and_type(&frame_table[pfn]);
+
+        /* Okay, we zapped the entries. Now try the GDT checks again. */
+        if ( !get_page_and_type(&frame_table[pfn], d, PGT_gdt_page) )
             goto fail;
     }
 
+    /* Check the remaining pages in the new GDT. */
+    for ( i = 1; i < nr_pages; i++ )
+        if ( ((pfn = frames[i]) >= max_page) ||
+             !get_page_and_type(&frame_table[pfn], d, PGT_gdt_page) )
+            goto fail;
+
     /* Copy reserved GDT entries to the new GDT. */
+    vgdt = map_domain_mem(frames[0] << PAGE_SHIFT);
     memcpy(vgdt + FIRST_RESERVED_GDT_ENTRY, 
            gdt_table + FIRST_RESERVED_GDT_ENTRY, 
            NR_RESERVED_GDT_ENTRIES*8);
