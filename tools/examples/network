@@ -1,0 +1,165 @@
+#!/bin/sh
+#============================================================================
+# Example Xen network start/stop script.
+# Xend calls a network script when it starts.
+# This is the default script.
+#
+# /etc/xen/network (start|stop|status) {VAR=VAL}*
+#
+# Vars:
+#
+# bridge     The bridge to use (default xen-br0).
+# netdev     The interface to add to the bridge (default eth0).
+# antispoof  Whether to use iptables to prevent spoofing (default yes).
+#
+# start:
+# Creates the bridge and enslaves netdev to it.
+# Copies the IP addresses from netdev to the bridge.
+# Deletes the routes to netdev and adds them on bridge.
+#
+# stop:
+# Removes netdev from the bridge.
+# Deletes the routes to bridge and adds them to netdev.
+#
+# status:
+# Print ifconfig for netdev and bridge.
+# Print routes.
+#
+#============================================================================
+
+# Exit if anything goes wrong.
+set -e 
+
+# First arg is the operation.
+OP=$1
+shift
+
+# Pull variables in args in to environment.
+for arg ; do export "${arg}" ; done
+
+bridge=${bridge:-xen-br0}
+netdev=${netdev:-eth0}
+antispoof=${antispoof:-yes}
+
+echo "network $OP bridge=$bridge netdev=$netdev antispoof=$antispoof"
+
+# Usage: transfer_addrs src dst
+# Copy all IP addresses (including aliases) from device $src to device $dst.
+transfer_addrs () {
+    local src=$1
+    local dst=$2
+    # Don't bother if $dst already has IP addresses.
+    if ip addr show dev ${dst} | egrep -q '^ *inet' ; then
+        return
+    fi
+    # Address lines start with 'inet' and have the device in them.
+    # Replace 'inet' with 'ip addr add' and change the device name $src
+    # to 'dev $src'.
+    ip addr show dev ${src} | egrep '^ *inet' | sed -e "
+s/inet/ip addr add/
+s/${src}/dev ${dst}/
+" | sh -e
+}
+
+# Usage: transfer_routes src dst
+# Get all IP routes to device $src, delete them, and
+# add the same routes to device $dst.
+# The original routes have to be deleted, otherwise adding them
+# for $dst fails (duplicate routes).
+transfer_routes () {
+    local src=$1
+    local dst=$2
+    # List all routes and grep the ones with $src in.
+    # Stick 'ip route del' on the front to delete.
+    # Change $src to $dst and use 'ip route add' to add.
+    ip route list | grep ${src} | sed -e "
+h
+s/^/ip route del /
+P
+g
+s/${src}/${dst}/
+s/^/ip route add /
+P
+d
+" | sh -e
+}
+
+# Usage: create_bridge dev bridge
+# Create bridge $bridge and add device $dev to it.
+create_bridge () {
+    local dev=$1
+    local bridge=$2
+
+    # Don't create the bridge if it already exists.
+    if ! brctl show | grep -q ${bridge} ; then
+        brctl addbr ${bridge}
+        brctl stp ${bridge} off
+        brctl setfd ${bridge} 0
+        brctl sethello ${bridge} 0
+    fi
+    ifconfig ${bridge} up
+    # Don't add $dev to $bridge if it's already on a bridge.
+    if ! brctl show | grep -q ${dev} ; then
+        brctl addif ${bridge} ${dev}
+    fi
+}
+
+# Usage: antispoofing dev bridge
+# Set the default forwarding policy for $dev to drop.
+# Allow forwarding to the bridge.
+antispoofing () {
+    local dev=$1
+    local bridge=$2
+
+    iptables -P FORWARD DROP
+    iptables -A FORWARD -m physdev --physdev-in ${dev} -j ACCEPT
+}
+
+# Usage: show_status dev bridge
+# Print ifconfig and routes.
+show_status () {
+    local dev=$1
+    local bridge=$2
+    
+    echo '============================================================'
+    ifconfig ${dev}
+    ifconfig ${bridge}
+    echo ' '
+    ip route list
+    echo ' '
+    route -n
+    echo '============================================================'
+}
+
+case ${OP} in
+    start)
+        # Create the bridge and give it the interface IP addresses.
+        # Move the interface routes onto the bridge.
+        create_bridge ${netdev} ${bridge}
+        transfer_addrs ${netdev} ${bridge}
+        transfer_routes ${netdev} ${bridge}
+        
+        if [ ${antispoof} == 'yes' ] ; then
+            antispoofing ${netdev} ${bridge}
+        fi
+        
+        ;;
+    
+    stop)
+        # Remove the interface from the bridge.
+        # Move the routes back to the interface.
+        brctl delif ${bridge} ${netdev}
+        transfer_routes ${bridge} ${netdev}
+
+        # It's not our place to be enabling forwarding...
+        ;;
+
+    status)
+        show_status ${netdev} ${bridge}
+       ;;
+
+    *)
+       echo 'Unknown command: ' ${OP}
+       echo 'Valid commands are: start, stop, status'
+       exit 1
+esac
