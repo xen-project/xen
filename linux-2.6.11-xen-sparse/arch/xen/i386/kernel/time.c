@@ -77,6 +77,15 @@ u64 jiffies_64 = INITIAL_JIFFIES;
 
 EXPORT_SYMBOL(jiffies_64);
 
+#if defined(__x86_64__)
+unsigned long vxtime_hz = PIT_TICK_RATE;
+struct vxtime_data __vxtime __section_vxtime;   /* for vsyscalls */
+volatile unsigned long __jiffies __section_jiffies = INITIAL_JIFFIES;
+unsigned long __wall_jiffies __section_wall_jiffies = INITIAL_JIFFIES;
+struct timespec __xtime __section_xtime;
+struct timezone __sys_tz __section_sys_tz;
+#endif
+
 unsigned long cpu_khz;	/* Detected as we calibrate the TSC */
 
 extern unsigned long wall_jiffies;
@@ -111,8 +120,8 @@ static long last_rtc_update, last_update_to_xen;
 static long last_update_from_xen;   /* UTC seconds when last read Xen clock. */
 
 /* Keep track of last time we did processing/updating of jiffies and xtime. */
-u64 processed_system_time;   /* System time (ns) at last processing. */
-DEFINE_PER_CPU(u64, processed_system_time);
+static u64 processed_system_time;   /* System time (ns) at last processing. */
+static DEFINE_PER_CPU(u64, processed_system_time);
 
 #define NS_PER_TICK (1000000000ULL/HZ)
 
@@ -379,36 +388,48 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 					struct pt_regs *regs)
 {
 	time_t wtm_sec, sec;
-	s64 delta, nsec;
+	s64 delta, delta_cpu, nsec;
 	long sec_diff, wtm_nsec;
+	int cpu = smp_processor_id();
 
 	do {
 		__get_time_values_from_xen();
 
-		delta = (s64)(shadow_system_time +
-			      ((s64)cur_timer->get_offset() * 
-			       (s64)NSEC_PER_USEC) -
-			      processed_system_time);
+		delta = delta_cpu = (s64)shadow_system_time +
+			((s64)cur_timer->get_offset() * (s64)NSEC_PER_USEC);
+		delta     -= processed_system_time;
+		delta_cpu -= per_cpu(processed_system_time, cpu);
 	}
 	while (!TIME_VALUES_UP_TO_DATE);
 
-	if (unlikely(delta < 0)) {
-		printk("Timer ISR: Time went backwards: %lld %lld %lld %lld\n",
-		       delta, shadow_system_time,
+	if (unlikely(delta < 0) || unlikely(delta_cpu < 0)) {
+		printk("Timer ISR/%d: Time went backwards: "
+		       "delta=%lld cpu_delta=%lld shadow=%lld "
+		       "off=%lld processed=%lld cpu_processed=%lld\n",
+		       cpu, delta, delta_cpu, shadow_system_time,
 		       ((s64)cur_timer->get_offset() * (s64)NSEC_PER_USEC), 
-		       processed_system_time);
+		       processed_system_time,
+		       per_cpu(processed_system_time, cpu));
 		return;
 	}
 
-	/* Process elapsed jiffies since last call. */
+	/* System-wide jiffy work. */
 	while (delta >= NS_PER_TICK) {
 		delta -= NS_PER_TICK;
 		processed_system_time += NS_PER_TICK;
 		do_timer(regs);
-		update_process_times(user_mode(regs));
-		if (regs)
-			profile_tick(CPU_PROFILING, regs);
 	}
+
+	/* Local CPU jiffy work. */
+	while (delta_cpu >= NS_PER_TICK) {
+		delta_cpu -= NS_PER_TICK;
+		per_cpu(processed_system_time, cpu) += NS_PER_TICK;
+		update_process_times(user_mode(regs));
+		profile_tick(CPU_PROFILING, regs);
+	}
+
+	if (cpu != 0)
+		return;
 
 	/*
 	 * Take synchronised time from Xen once a minute if we're not
@@ -617,10 +638,10 @@ void __init hpet_time_init(void)
 #endif
 
 /* Dynamically-mapped IRQ. */
-static int TIMER_IRQ;
+static DEFINE_PER_CPU(int, timer_irq);
 
 static struct irqaction irq_timer = {
-	timer_interrupt, SA_INTERRUPT, CPU_MASK_NONE, "timer",
+	timer_interrupt, SA_INTERRUPT, CPU_MASK_NONE, "timer0",
 	NULL, NULL
 };
 
@@ -642,14 +663,23 @@ void __init time_init(void)
 	set_normalized_timespec(&wall_to_monotonic,
 		-xtime.tv_sec, -xtime.tv_nsec);
 	processed_system_time = shadow_system_time;
+	per_cpu(processed_system_time, 0) = processed_system_time;
 
 	if (timer_tsc_init.init(NULL) != 0)
 		BUG();
 	printk(KERN_INFO "Using %s for high-res timesource\n",cur_timer->name);
 
-	TIMER_IRQ = bind_virq_to_irq(VIRQ_TIMER);
+#if defined(__x86_64__)
+	vxtime.mode = VXTIME_TSC;
+	vxtime.quot = (1000000L << 32) / vxtime_hz;
+	vxtime.tsc_quot = (1000L << 32) / cpu_khz;
+	vxtime.hz = vxtime_hz;
+	sync_core();
+	rdtscll(vxtime.last_tsc);
+#endif
 
-	(void)setup_irq(TIMER_IRQ, &irq_timer);
+	per_cpu(timer_irq, 0) = bind_virq_to_irq(VIRQ_TIMER);
+	(void)setup_irq(per_cpu(timer_irq, 0), &irq_timer);
 }
 
 /* Convert jiffies to system time. Call with xtime_lock held for reading. */
@@ -719,6 +749,7 @@ void time_resume(void)
 
 	/* Reset our own concept of passage of system time. */
 	processed_system_time = shadow_system_time;
+	per_cpu(processed_system_time, 0) = processed_system_time;
 
 	/* Accept a warp in UTC (wall-clock) time. */
 	last_seen_tv.tv_sec = 0;
@@ -728,63 +759,20 @@ void time_resume(void)
 }
 
 #ifdef CONFIG_SMP
-
-static irqreturn_t local_timer_interrupt(int irq, void *dev_id,
-					 struct pt_regs *regs)
-{
-	s64 delta;
-	int cpu = smp_processor_id();
-
-	do {
-		__get_time_values_from_xen();
-
-		delta = (s64)(shadow_system_time +
-			      ((s64)cur_timer->get_offset() * 
-			       (s64)NSEC_PER_USEC) -
-			      per_cpu(processed_system_time, cpu));
-	}
-	while (!TIME_VALUES_UP_TO_DATE);
-
-	if (unlikely(delta < 0)) {
-		printk("Timer ISR/%d: Time went backwards: %lld %lld %lld %lld\n",
-		       cpu, delta, shadow_system_time,
-		       ((s64)cur_timer->get_offset() * (s64)NSEC_PER_USEC), 
-		       processed_system_time);
-		return IRQ_HANDLED;
-	}
-
-	/* Process elapsed jiffies since last call. */
-	while (delta >= NS_PER_TICK) {
-		delta -= NS_PER_TICK;
-		per_cpu(processed_system_time, cpu) += NS_PER_TICK;
-		if (regs)
-			update_process_times(user_mode(regs));
-#if 0
-		if (regs)
-			profile_tick(CPU_PROFILING, regs);
-#endif
-	}
-
-	return IRQ_HANDLED;
-}
-
-static struct irqaction local_irq_timer = {
-	local_timer_interrupt, SA_INTERRUPT, CPU_MASK_NONE, "ltimer",
-	NULL, NULL
-};
-
+static char timer_name[NR_IRQS][15];
 void local_setup_timer(void)
 {
-	int seq, time_irq;
-	int cpu = smp_processor_id();
+	int seq, cpu = smp_processor_id();
 
 	do {
-	    seq = read_seqbegin(&xtime_lock);
-	    per_cpu(processed_system_time, cpu) = shadow_system_time;
+		seq = read_seqbegin(&xtime_lock);
+		per_cpu(processed_system_time, cpu) = shadow_system_time;
 	} while (read_seqretry(&xtime_lock, seq));
 
-	time_irq = bind_virq_to_irq(VIRQ_TIMER);
-	(void)setup_irq(time_irq, &local_irq_timer);
+	per_cpu(timer_irq, cpu) = bind_virq_to_irq(VIRQ_TIMER);
+	sprintf(timer_name[cpu], "timer%d", cpu);
+	BUG_ON(request_irq(per_cpu(timer_irq, cpu), timer_interrupt,
+	                   SA_INTERRUPT, timer_name[cpu], NULL));
 }
 #endif
 

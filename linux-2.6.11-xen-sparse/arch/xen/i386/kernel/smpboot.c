@@ -437,21 +437,23 @@ void __init smp_callin(void)
 int cpucount;
 
 
-static irqreturn_t local_debug_interrupt(int irq, void *dev_id,
-					 struct pt_regs *regs)
+static irqreturn_t ldebug_interrupt(
+	int irq, void *dev_id, struct pt_regs *regs)
 {
-
 	return IRQ_HANDLED;
 }
 
-static struct irqaction local_irq_debug = {
-	local_debug_interrupt, SA_INTERRUPT, CPU_MASK_NONE, "ldebug",
-	NULL, NULL
-};
+static DEFINE_PER_CPU(int, ldebug_irq);
+static char ldebug_name[NR_IRQS][15];
 
-void local_setup_debug(void)
+void ldebug_setup(void)
 {
-	(void)setup_irq(bind_virq_to_irq(VIRQ_DEBUG), &local_irq_debug);
+	int cpu = smp_processor_id();
+
+	per_cpu(ldebug_irq, cpu) = bind_virq_to_irq(VIRQ_DEBUG);
+	sprintf(ldebug_name[cpu], "ldebug%d", cpu);
+	BUG_ON(request_irq(per_cpu(ldebug_irq, cpu), ldebug_interrupt,
+	                   SA_INTERRUPT, ldebug_name[cpu], NULL));
 }
 
 
@@ -472,7 +474,7 @@ static int __init start_secondary(void *unused)
 	while (!cpu_isset(smp_processor_id(), smp_commenced_mask))
 		rep_nop();
 	local_setup_timer();
-	local_setup_debug();	/* XXX */
+	ldebug_setup();
 	smp_intr_init();
 	local_irq_enable();
 	/*
@@ -1329,36 +1331,27 @@ void __init smp_cpus_done(unsigned int max_cpus)
 }
 
 extern irqreturn_t smp_reschedule_interrupt(int, void *, struct pt_regs *);
-
-static struct irqaction reschedule_irq = {
-	smp_reschedule_interrupt, SA_INTERRUPT, CPU_MASK_NONE, "reschedule",
-	NULL, NULL
-};
-
-extern irqreturn_t smp_invalidate_interrupt(int, void *, struct pt_regs *);
-
-static struct irqaction invalidate_irq = {
-	smp_invalidate_interrupt, SA_INTERRUPT, CPU_MASK_NONE, "invalidate",
-	NULL, NULL
-};
-
 extern irqreturn_t smp_call_function_interrupt(int, void *, struct pt_regs *);
 
-static struct irqaction call_function_irq = {
-	smp_call_function_interrupt, SA_INTERRUPT, CPU_MASK_NONE,
-	"call_function", NULL, NULL
-};
+static DEFINE_PER_CPU(int, resched_irq);
+static DEFINE_PER_CPU(int, callfunc_irq);
+static char resched_name[NR_IRQS][15];
+static char callfunc_name[NR_IRQS][15];
 
 void __init smp_intr_init(void)
 {
+	int cpu = smp_processor_id();
 
-	(void)setup_irq(
-	    bind_ipi_on_cpu_to_irq(smp_processor_id(), RESCHEDULE_VECTOR),
-	    &reschedule_irq);
-	(void)setup_irq(
-	    bind_ipi_on_cpu_to_irq(smp_processor_id(), INVALIDATE_TLB_VECTOR),
-	    &invalidate_irq);
-	(void)setup_irq(
-	    bind_ipi_on_cpu_to_irq(smp_processor_id(), CALL_FUNCTION_VECTOR),
-	    &call_function_irq);
+	per_cpu(resched_irq, cpu) =
+		bind_ipi_on_cpu_to_irq(cpu, RESCHEDULE_VECTOR);
+	sprintf(resched_name[cpu], "resched%d", cpu);
+	BUG_ON(request_irq(per_cpu(resched_irq, cpu), smp_reschedule_interrupt,
+	                   SA_INTERRUPT, resched_name[cpu], NULL));
+
+	per_cpu(callfunc_irq, cpu) =
+		bind_ipi_on_cpu_to_irq(cpu, CALL_FUNCTION_VECTOR);
+	sprintf(callfunc_name[cpu], "callfunc%d", cpu);
+	BUG_ON(request_irq(per_cpu(callfunc_irq, cpu),
+	                   smp_call_function_interrupt,
+	                   SA_INTERRUPT, callfunc_name[cpu], NULL));
 }

@@ -282,7 +282,6 @@
 424efaa6L1lrzwCIadTNxogSvljFwg linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/signal.c
 424efaa61XzweJyW3v5Lb9egpe3rtw linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/smp.c
 424efaa778MkpdkAIq0An1FjQENN_Q linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/smpboot.c
-424efaa7vzbNdhwhkQPhs1V7LrAH4Q linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/time.c
 424efaa7szEu90xkjpXk5TufZxxa4g linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/traps.c
 424efaa6sJsuHdGIGxm0r-ugsss3OQ linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/vsyscall.c
 424efaa6xbX9LkKyaXvgbL9s_39Trw linux-2.6.11-xen-sparse/arch/xen/x86_64/kernel/x8664_ksyms.c
