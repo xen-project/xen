@@ -179,15 +179,17 @@ void show_registers(struct pt_regs *regs)
 		esp = regs->esp;
 		ss = regs->xss & 0xffff;
 	}
-	printk("CPU:    %d\nEIP:    %04x:[<%08lx>]    %s\nEFLAGS: %08lx\n",
-		smp_processor_id(), 0xffff & regs->xcs, regs->eip, print_tainted(), regs->eflags);
-	printk("eax: %08lx   ebx: %08lx   ecx: %08lx   edx: %08lx\n",
+	printk(KERN_ALERT "CPU:    %d\n", smp_processor_id() );
+	printk(KERN_ALERT "EIP:    %04x:[<%08lx>]    %s\n",
+	       0xffff & regs->xcs, regs->eip, print_tainted());
+	printk(KERN_ALERT "EFLAGS: %08lx\n",regs->eflags);
+	printk(KERN_ALERT "eax: %08lx   ebx: %08lx   ecx: %08lx   edx: %08lx\n",
 		regs->eax, regs->ebx, regs->ecx, regs->edx);
-	printk("esi: %08lx   edi: %08lx   ebp: %08lx   esp: %08lx\n",
+	printk(KERN_ALERT "esi: %08lx   edi: %08lx   ebp: %08lx   esp: %08lx\n",
 		regs->esi, regs->edi, regs->ebp, esp);
-	printk("ds: %04x   es: %04x   ss: %04x\n",
+	printk(KERN_ALERT "ds: %04x   es: %04x   ss: %04x\n",
 		regs->xds & 0xffff, regs->xes & 0xffff, ss);
-	printk("Process %s (pid: %d, stackpage=%08lx)",
+	printk(KERN_ALERT "Process %s (pid: %d, stackpage=%08lx)",
 		current->comm, current->pid, 4096+(unsigned long)current);
 	/*
 	 * When in-kernel, we also print out the stack and code at the
@@ -195,13 +197,13 @@ void show_registers(struct pt_regs *regs)
 	 */
 	if (in_kernel) {
 
-		printk("\nStack: ");
+		printk(KERN_ALERT "\nStack: ");
 		show_stack((unsigned long*)esp);
 
 #if 0
                 {
                         int i;
-			printk("\nCode: ");
+			printk(KERN_ALERT "\nCode: ");
 			if(regs->eip < PAGE_OFFSET)
 			        goto bad;
 
@@ -210,7 +212,7 @@ void show_registers(struct pt_regs *regs)
 			        unsigned char c;
 			        if(__get_user(c, &((unsigned char*)regs->eip)[i])) {
 bad:
-				        printk(" Bad EIP value.");
+				        printk(KERN_ALERT " Bad EIP value.");
 					break;
 				}
 				printk("%02x ", c);
@@ -218,7 +220,7 @@ bad:
 		}
 #endif
 	}
-	printk("\n");
+	printk(KERN_ALERT "\n");
 }	
 
 spinlock_t die_lock = SPIN_LOCK_UNLOCKED;

@@ -98,6 +98,8 @@ static void dbg_network_int(int irq, void *dev_id, struct pt_regs *ptregs)
            " rx_req_prod = %d, rx_resp_prod = %d, rx_event = %d\n",
            np->rx_resp_cons, np->net_idx->rx_req_prod,
            np->net_idx->rx_resp_prod, np->net_idx->rx_event);
+
+    show_registers(ptregs);
 }
 
 
