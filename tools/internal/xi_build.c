@@ -3,11 +3,14 @@
 #include "dom0_defs.h"
 #include "mem_defs.h"
 
+/* This string is written to the head of every guest kernel image. */
 #define GUEST_SIG   "XenoGues"
 #define SIG_LEN    8
 
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED)
 #define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
+
+static char *argv0 = "internal_domain_build";
 
 static long get_tot_pages(int domain_id)
 {
@@ -78,6 +81,7 @@ static int read_kernel_header(int fd, long dom_size,
 	return -1;
     }
 
+    /* Double the kernel image size to account for dynamic memory usage etc. */
     if ( (stat.st_size * 2) > (dom_size << 10) )
     {
         sprintf(status, "Kernel image size %ld larger than requested "
@@ -89,11 +93,12 @@ static int read_kernel_header(int fd, long dom_size,
     read(fd, signature, SIG_LEN);
     if ( strncmp(signature, GUEST_SIG, SIG_LEN) )
     {
-        ERROR("Kernel image does not contain required signature. "
+        ERROR("Kernel image does not contain required signature.\n"
               "Terminating.\n");
 	return -1;
     }
 
+    /* Read the load address which immediately follows the Xeno signature. */
     read(fd, load_addr, sizeof(unsigned long));
 
     *ksize = stat.st_size - SIG_LEN - sizeof(unsigned long);
@@ -207,6 +212,7 @@ static int setup_guestos(
             goto error_out;
         }
 
+        /* 'i' is 'ksize' rounded up to a page boundary. */
         meminfo->virt_mod_addr = virt_load_addr + i;
         meminfo->virt_mod_len  = isize;
 
@@ -336,8 +342,12 @@ static int setup_guestos(
 
 int main(int argc, char **argv)
 {
-    dom0_op_t launch_op;
+    /*
+     * NB. 'ksize' is the size in bytes of the main kernel image. It excludes
+     * the 8-byte signature and 4-byte load address.
+     */
     size_t ksize;
+    dom0_op_t launch_op;
     unsigned long load_addr;
     long tot_pages;
     int kernel_fd, initrd_fd = -1;
@@ -348,10 +358,13 @@ int main(int argc, char **argv)
     int domain_id;
     int rc;
 
+    if ( argv[0] != NULL ) 
+        argv0 = argv[0];
+
     if ( argc < 4 )
     {
-        fprintf(stderr, "Usage: dom_builder <domain_id> <image> <num_vifs> "
-                "[<initrd=initrd_name>] <boot_params>\n");
+        fprintf(stderr, "Usage: %s <domain_id> <image> <num_vifs> "
+                "[<initrd=initrd_name>] <boot_params>\n", argv0);
         return 1;
     }
 
