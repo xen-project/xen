@@ -427,6 +427,8 @@ long do_iopl(domid_t domain, unsigned int new_io_pl)
     return 0;
 }
 
+#endif
+
 unsigned long hypercall_create_continuation(
     unsigned int op, unsigned int nr_args, ...)
 {
@@ -448,20 +450,21 @@ unsigned long hypercall_create_continuation(
     else
     {
         ec       = get_execution_context();
+#if defined(__i386__)
         ec->eax  = op;
         ec->eip -= 2;  /* re-execute 'int 0x82' */
         
         for ( i = 0, preg = &ec->ebx; i < nr_args; i++, preg++ )
             *preg = va_arg(args, unsigned long);
+#else
+        preg = NULL; /* XXX x86/64 */
+#endif
     }
 
     va_end(args);
 
     return op;
 }
-
-#endif
-
 
 static void relinquish_list(struct domain *d, struct list_head *list)
 {

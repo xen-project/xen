@@ -257,29 +257,22 @@ copy_to_user:
 set_intr_gate:
 die:
 machine_to_phys_mapping:
-.globl copy_from_user, show_registers, __set_fixmap, do_iopl, check_descriptor
+.globl copy_from_user, show_registers, do_iopl
 copy_from_user: 
 show_registers: 
-__set_fixmap: 
 do_iopl: 
-check_descriptor:
-.globl set_gdt, idt_table, copy_user_generic, memcmp, idt_tables, new_thread
-set_gdt:
+.globl idt_table, copy_user_generic, memcmp, idt_tables, new_thread
 idt_table:
 copy_user_generic:
 memcmp:
 idt_tables:
 new_thread:
-.globl switch_to, __get_user_1, paging_init, trap_init
+.globl switch_to, __get_user_1, __get_user_4, __get_user_8, trap_init
 switch_to:
 __get_user_1:
-paging_init:
-trap_init: 
-.globl __get_user_8, zap_low_mappings, set_debugreg,synchronise_pagetables
+__get_user_4:
 __get_user_8:
-zap_low_mappings:
+trap_init: 
+.globl set_debugreg
 set_debugreg:
-synchronise_pagetables:
-.globl destroy_gdt
-destroy_gdt:    
         

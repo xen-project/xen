@@ -699,7 +699,9 @@
 40f92331jfOlE7MfKwpdkEb1CEf23g xen/arch/x86/x86_32/seg_fixup.c
 3ddb79bc4nTpGQOe6_-MbyZzkhlhFQ xen/arch/x86/x86_32/usercopy.c
 3ddb79bcOMCu9-5mKpjIh5d0qqBDPg xen/arch/x86/x86_32/xen.lds
+41bf1717Ty3hwN3E9swdu8QfnvGqww xen/arch/x86/x86_64/asm-offsets.c
 40e96d3aLDI-nViMuYneD7VKYlZrVg xen/arch/x86/x86_64/entry.S
+41bf1717XhPz_dNT5OKSjgmbFuWBuA xen/arch/x86/x86_64/mm.c
 40e96d3ahBTZqbTViInnq0lM03vs7A xen/arch/x86/x86_64/usercopy.c
 40e96d3akN3Hu_J5Bk-WXD8OGscrYQ xen/arch/x86/x86_64/xen.lds
 3ddb79bdff-gj-jFGKjOejeHLqL8Lg xen/common/Makefile
@@ -787,6 +789,7 @@
 40715b2dWe0tDhx9LkLXzTQkvD49RA xen/include/asm-x86/acpi.h
 3ddb79c3l4IiQtf6MS2jIzcd-hJS8g xen/include/asm-x86/apic.h
 3ddb79c3QJYWr8LLGdonLbWmNb9pQQ xen/include/asm-x86/apicdef.h
+41bf17171g_hhz2k4B-fN9LQlODDjQ xen/include/asm-x86/asm_defns.h
 3ddb79c3OiG9eTsi9Dy3F_OkuRAzKA xen/include/asm-x86/atomic.h
 3ddb79c3rM-Ote0Xn6Ytg8Y6YqAG-A xen/include/asm-x86/bitops.h
 3ddb79c3KhTI0F_Iw_hRL9QEyOVK-g xen/include/asm-x86/cache.h
@@ -833,6 +836,7 @@
 3ddb79c3mbqEM7QQr3zVq7NiBNhouA xen/include/asm-x86/x86_32/regs.h
 3e7f358aG11EvMI9VJ4_9hD4LUO7rQ xen/include/asm-x86/x86_32/string.h
 3ddb79c3M2n1ROZH6xk3HbyN4CPDqg xen/include/asm-x86/x86_32/uaccess.h
+41bf1717bML6GxpclTWJabiaO5W5vg xen/include/asm-x86/x86_64/asm_defns.h
 404f1b9ceJeGVaPNIENm2FkK0AgEOQ xen/include/asm-x86/x86_64/current.h
 404f1b9fl6AQ_a-T1TDK3fuwTPXmHw xen/include/asm-x86/x86_64/desc.h
 404f1badfXZJZ2sU8sh9PS2EZvd19Q xen/include/asm-x86/x86_64/ldt.h

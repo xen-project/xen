@@ -56,7 +56,7 @@
 #include <xen/config.h>
 #include <xen/errno.h>
 #include <xen/softirq.h>
-#include <asm/x86_32/asm_defns.h>
+#include <asm/asm_defns.h>
 #include <public/xen.h>
 
 #define GET_CURRENT(reg)   \
