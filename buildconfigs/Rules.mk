@@ -27,7 +27,7 @@ linux-%.tar.bz2:
 # Expand NetBSD release to NetBSD version
 NETBSD_RELEASE  ?= 2.0
 NETBSD_VER      ?= $(patsubst netbsd-%-xen-sparse,%,$(wildcard netbsd-$(NETBSD_RELEASE)*-xen-sparse))
-NETBSD_CVSSNAP  ?= 20040906
+NETBSD_CVSSNAP  ?= 20041103
 
 # Setup NetBSD search patch
 NETBSD_SRC_PATH	?= .:..
@@ -59,10 +59,16 @@ pristine-%: %.tar.bz2
 	diff -Nurp pristine-$* tmp-$@ > $@ || true
 	rm -rf tmp-$@
 
-%-mrproper:
+%-mrproper: %-mrproper-extra
 	rm -rf pristine-$* $*.tar.bz2
 	rm -rf $*-xen.patch
-	rm -rf $*-tools $*-tools.tar.bz2
+
+netbsd-%-mrproper-extra:
+	rm -rf netbsd-$*-tools netbsd-$*-tools.tar.bz2
+	rm -f netbsd-$*-xen-kernel-$(NETBSD_CVSSNAP).tar.bz2
+
+%-mrproper-extra:
+	@: # do nothing
 
 # never delete any intermediate files.
 .SECONDARY:
