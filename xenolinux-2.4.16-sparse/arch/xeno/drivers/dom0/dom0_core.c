@@ -49,6 +49,7 @@ typedef struct proc_mem_data {
 #define MAX_LEN         16
 #define DOM_DIR         "dom"
 #define DOM_MEM         "mem"
+#define DOM_VIF         "vif"
 
 #define MAP_DISCONT     1
 
@@ -72,11 +73,50 @@ static int cmd_read_proc(char *page, char **start, off_t off,
     return strlen(page);
 }
 
+static ssize_t dom_vif_read(struct file * file, char * buff, size_t size, loff_t * off)
+{
+    char hyp_buf[128]; // Hypervisor is going to write its reply here.
+    network_op_t op;
+    static int finished = 0;
+
+    // This seems to be the only way to make the OS stop making read requests
+    // to the file.  When we use the fileoperations version of read, offset 
+    // seems to be ignored altogether.
+    
+    if (finished) 
+    {
+        finished = 0;
+        return 0;
+    }
+    
+    op.cmd = NETWORK_OP_VIFQUERY;
+    op.u.vif_query.domain = (unsigned int) ((struct proc_dir_entry *)file->f_dentry->d_inode->u.generic_ip)->data;
+    op.u.vif_query.buf = hyp_buf;
+
+    strcpy(hyp_buf, "Error getting domain's vif list from hypervisor.\n"); // This will be replaced if everything works.
+
+    (void)HYPERVISOR_network_op(&op);
+
+    if (*off >= (strlen(hyp_buf)+1)) return 0;
+    
+    copy_to_user(buff, hyp_buf, strlen(hyp_buf));
+    
+    finished = 1;
+    
+    return strlen(hyp_buf)+1;
+}
+
+struct file_operations dom_vif_ops = {
+    read:    dom_vif_read
+};
+
+
 static void create_proc_dom_entries(int dom)
 {
     struct proc_dir_entry * dir;
     dom_procdata_t * dom_data;
     char dir_name[MAX_LEN];
+    struct proc_dir_entry * file;
 
     snprintf(dir_name, MAX_LEN, "%s%d", DOM_DIR, dom);
 
@@ -85,6 +125,15 @@ static void create_proc_dom_entries(int dom)
 
     dir = proc_mkdir(dir_name, xeno_base);
     dir->data = dom_data;
+    
+    file = create_proc_entry(DOM_VIF, 0600, dir);
+    if (file != NULL)
+    {
+        file->owner         = THIS_MODULE;
+        file->nlink         = 1;
+        file->proc_fops     = &dom_vif_ops;
+        file->data          = (void *) dom;
+    }
 }
 
 static ssize_t dom_mem_write(struct file * file, const char * buff, 
@@ -159,6 +208,7 @@ static int dom_map_mem(unsigned int dom, unsigned long pfn, int tot_pages)
                 ret = 0;
                 break;
             }
+
             ret = -EAGAIN;
             break;
         }                    
