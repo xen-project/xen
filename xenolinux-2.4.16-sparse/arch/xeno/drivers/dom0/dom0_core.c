@@ -164,8 +164,8 @@ static int dom_mem_mmap(struct file *file, struct vm_area_struct *vma)
     return 0;
 }
 
-static ssize_t dom_mem_write(struct file * file, const char * buff, size_t size , 
-                loff_t * off)
+static ssize_t dom_mem_write(struct file * file, const char * buff, 
+	size_t size , loff_t * off)
 {
     unsigned long addr;
     proc_memdata_t * mem_data = (proc_memdata_t *)((struct proc_dir_entry *)file->f_dentry->d_inode->u.generic_ip)->data;
@@ -291,6 +291,8 @@ static int cmd_write_proc(struct file *file, const char *buffer,
         }
 
     } else {
+
+		printk("bd240 debug: mapping dom %d, %lx, %lx\n", op.u.reqdommem.domain, op.u.reqdommem.start_pfn, op.u.reqdommem.tot_pages);
 
         ret = dom_map_mem(op.u.reqdommem.domain, op.u.reqdommem.start_pfn, 
                         op.u.reqdommem.tot_pages); 
