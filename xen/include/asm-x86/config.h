@@ -161,7 +161,7 @@ extern void __out_of_line_bug(int line) __attribute__((noreturn));
 #elif defined(__i386__)
 
 #define XENHEAP_DEFAULT_MB (12)
-#define DIRECTMAP_PHYS_END (40*1024*1024)
+#define DIRECTMAP_PHYS_END (12*1024*1024)
 
 /* Hypervisor owns top 64MB of virtual address space. */
 #define __HYPERVISOR_VIRT_START  0xFC000000
@@ -173,17 +173,19 @@ extern void __out_of_line_bug(int line) __attribute__((noreturn));
  */
 #define RO_MPT_VIRT_START     (HYPERVISOR_VIRT_START)
 #define RO_MPT_VIRT_END       (RO_MPT_VIRT_START + (4*1024*1024))
-/* The virtual addresses for the 40MB direct-map region. */
+/* Xen heap extends to end of 1:1 direct-mapped memory region. */
 #define DIRECTMAP_VIRT_START  (RO_MPT_VIRT_END)
 #define DIRECTMAP_VIRT_END    (DIRECTMAP_VIRT_START + DIRECTMAP_PHYS_END)
 #define XENHEAP_VIRT_START    (DIRECTMAP_VIRT_START)
-#define XENHEAP_VIRT_END      (XENHEAP_VIRT_START + (XENHEAP_DEFAULT_MB<<20))
+#define XENHEAP_VIRT_END      (DIRECTMAP_VIRT_END)
+/* Machine-to-phys conversion table. */
 #define RDWR_MPT_VIRT_START   (XENHEAP_VIRT_END)
 #define RDWR_MPT_VIRT_END     (RDWR_MPT_VIRT_START + (4*1024*1024))
+/* Variable-length page-frame information array. */
 #define FRAMETABLE_VIRT_START (RDWR_MPT_VIRT_END)
-#define FRAMETABLE_VIRT_END   (DIRECTMAP_VIRT_END)
+#define FRAMETABLE_VIRT_END   (FRAMETABLE_VIRT_START + (24*1024*1024))
 /* Next 4MB of virtual address space is used as a linear p.t. mapping. */
-#define LINEAR_PT_VIRT_START  (DIRECTMAP_VIRT_END)
+#define LINEAR_PT_VIRT_START  (FRAMETABLE_VIRT_END)
 #define LINEAR_PT_VIRT_END    (LINEAR_PT_VIRT_START + (4*1024*1024))
 /* Next 4MB of virtual address space is used as a shadow linear p.t. map. */
 #define SH_LINEAR_PT_VIRT_START (LINEAR_PT_VIRT_END)

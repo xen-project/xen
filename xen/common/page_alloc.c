@@ -37,6 +37,9 @@
 static char opt_badpage[100] = "";
 string_param("badpage", opt_badpage);
 
+#define round_pgdown(_p)  ((_p)&PAGE_MASK)
+#define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
+
 /*********************
  * ALLOCATION BITMAP
  *  One bit per page of memory. Bit set => page is allocated.
@@ -98,7 +101,7 @@ static void map_free(unsigned long first_page, unsigned long nr_pages)
         ASSERT(allocated_in_map(first_page + i));
 #endif
 
-    curr_idx = first_page / PAGES_PER_MAPWORD;
+    curr_idx  = first_page / PAGES_PER_MAPWORD;
     start_off = first_page & (PAGES_PER_MAPWORD-1);
     end_idx   = (first_page + nr_pages) / PAGES_PER_MAPWORD;
     end_off   = (first_page + nr_pages) & (PAGES_PER_MAPWORD-1);
@@ -113,6 +116,80 @@ static void map_free(unsigned long first_page, unsigned long nr_pages)
         while ( ++curr_idx != end_idx ) alloc_bitmap[curr_idx] = 0;
         alloc_bitmap[curr_idx] &= -(1<<end_off);
     }
+}
+
+
+
+/*************************
+ * BOOT-TIME ALLOCATOR
+ */
+
+/* Initialise allocator to handle up to @max_page pages. */
+unsigned long init_boot_allocator(unsigned long bitmap_start)
+{
+    bitmap_start = round_pgup(bitmap_start);
+
+    /* Allocate space for the allocation bitmap. */
+    bitmap_size  = max_page / 8;
+    bitmap_size  = round_pgup(bitmap_size);
+    alloc_bitmap = (unsigned long *)phys_to_virt(bitmap_start);
+
+    /* All allocated by default. */
+    memset(alloc_bitmap, ~0, bitmap_size);
+
+    return bitmap_start + bitmap_size;
+}
+
+void init_boot_pages(unsigned long ps, unsigned long pe)
+{
+    unsigned long bad_pfn;
+    char *p;
+
+    ps = round_pgup(ps);
+    pe = round_pgdown(pe);
+
+    map_free(ps >> PAGE_SHIFT, (pe - ps) >> PAGE_SHIFT);
+
+    /* Check new pages against the bad-page list. */
+    p = opt_badpage;
+    while ( *p != '\0' )
+    {
+        bad_pfn = simple_strtoul(p, &p, 0);
+
+        if ( *p == ',' )
+            p++;
+        else if ( *p != '\0' )
+            break;
+
+        if ( (bad_pfn < (bitmap_size*8)) && !allocated_in_map(bad_pfn) )
+        {
+            printk("Marking page %08lx as bad\n", bad_pfn);
+            map_alloc(bad_pfn, 1);
+        }
+    }
+}
+
+unsigned long alloc_boot_pages(unsigned long size, unsigned long align)
+{
+    unsigned long pg, i;
+
+    size  = round_pgup(size) >> PAGE_SHIFT;
+    align = round_pgup(align) >> PAGE_SHIFT;
+
+    for ( pg = 0; (pg + size) < (bitmap_size*PAGES_PER_MAPWORD); pg += align )
+    {
+        for ( i = 0; i < size; i++ )
+            if ( allocated_in_map(pg + i) )
+                 break;
+
+        if ( i == size )
+        {
+            map_alloc(pg, size);
+            return pg << PAGE_SHIFT;
+        }
+    }
+
+    return 0;
 }
 
 
@@ -133,18 +210,12 @@ static struct list_head heap[NR_ZONES][NR_ORDERS];
 
 static unsigned long avail[NR_ZONES];
 
-#define round_pgdown(_p)  ((_p)&PAGE_MASK)
-#define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
-
 static spinlock_t heap_lock = SPIN_LOCK_UNLOCKED;
 
-/* Initialise allocator to handle up to @max_pages. */
-unsigned long init_heap_allocator(
-    unsigned long bitmap_start, unsigned long max_pages)
+void end_boot_allocator(void)
 {
-    int i, j;
-    unsigned long bad_pfn;
-    char *p;
+    unsigned long i, j;
+    int curr_free = 0, next_free = 0;
 
     memset(avail, 0, sizeof(avail));
 
@@ -152,53 +223,25 @@ unsigned long init_heap_allocator(
         for ( j = 0; j < NR_ORDERS; j++ )
             INIT_LIST_HEAD(&heap[i][j]);
 
-    bitmap_start = round_pgup(bitmap_start);
-
-    /* Allocate space for the allocation bitmap. */
-    bitmap_size  = max_pages / 8;
-    bitmap_size  = round_pgup(bitmap_size);
-    alloc_bitmap = (unsigned long *)phys_to_virt(bitmap_start);
-
-    /* All allocated by default. */
-    memset(alloc_bitmap, ~0, bitmap_size);
-
-    /*
-     * Process the bad-page list. Marking the page free in the bitmap will
-     * indicate to init_heap_pages() that it should not be placed on the 
-     * buddy lists.
-     */
-    p = opt_badpage;
-    while ( *p != '\0' )
+    /* Pages that are free now go to the domain sub-allocator. */
+    for ( i = 0; i < max_page; i++ )
     {
-        bad_pfn = simple_strtoul(p, &p, 0);
-
-        if ( *p == ',' )
-            p++;
-        else if ( *p != '\0' )
-            break;
-
-        if ( (bad_pfn < max_pages) && allocated_in_map(bad_pfn) )
-        {
-            printk("Marking page %08lx as bad\n", bad_pfn);
-            map_free(bad_pfn, 1);
-        }
+        curr_free = next_free;
+        next_free = !allocated_in_map(i+1);
+        if ( next_free )
+            map_alloc(i+1, 1); /* prevent merging in free_heap_pages() */
+        if ( curr_free )
+            free_heap_pages(MEMZONE_DOM, pfn_to_page(i), 0);
     }
-
-    return bitmap_start + bitmap_size;
 }
-
 
 /* Hand the specified arbitrary page range to the specified heap zone. */
 void init_heap_pages(int zone, struct pfn_info *pg, unsigned long nr_pages)
 {
-    unsigned long i, pfn = page_to_pfn(pg);
+    unsigned long i;
 
-    /* Process each page in turn, skipping bad pages. */
     for ( i = 0; i < nr_pages; i++ )
-    {
-        if ( likely(allocated_in_map(pfn+i)) ) /* bad page? */
-            free_heap_pages(zone, pg+i, 0);
-    }
+        free_heap_pages(zone, pg+i, 0);
 }
 
 

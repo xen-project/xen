@@ -286,6 +286,7 @@ void nmi_watchdog_tick (struct xen_regs * regs)
         if ( alert_counter[cpu] == 5*nmi_hz )
         {
             console_force_unlock();
+            printk("Watchdog timer detects that CPU%d is stuck!\n", cpu);
             fatal_trap(TRAP_nmi, regs);
         }
     } 

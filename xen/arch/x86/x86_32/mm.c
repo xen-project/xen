@@ -57,14 +57,25 @@ void __set_fixmap(enum fixed_addresses idx,
 void __init paging_init(void)
 {
     void *ioremap_pt;
-    int i;
+    unsigned long v, l2e;
+    struct pfn_info *pg;
 
-    /* Xen heap mappings can be GLOBAL. */
+    /* Allocate and map the machine-to-phys table. */
+    if ( (pg = alloc_domheap_pages(NULL, 10)) == NULL )
+        panic("Not enough memory to bootstrap Xen.\n");
+    idle_pg_table[RDWR_MPT_VIRT_START >> L2_PAGETABLE_SHIFT] =
+        mk_l2_pgentry(page_to_phys(pg) | __PAGE_HYPERVISOR | _PAGE_PSE);
+
+    /* Xen 4MB mappings can all be GLOBAL. */
     if ( cpu_has_pge )
     {
-        for ( i = 0; i < DIRECTMAP_PHYS_END; i += (1 << L2_PAGETABLE_SHIFT) )
-            ((unsigned long *)idle_pg_table)
-                [(i + PAGE_OFFSET) >> L2_PAGETABLE_SHIFT] |= _PAGE_GLOBAL;
+        for ( v = HYPERVISOR_VIRT_START; v; v += (1 << L2_PAGETABLE_SHIFT) )
+        {
+             l2e = l2_pgentry_val(idle_pg_table[v >> L2_PAGETABLE_SHIFT]);
+             if ( l2e & _PAGE_PSE )
+                 l2e |= _PAGE_GLOBAL;
+             idle_pg_table[v >> L2_PAGETABLE_SHIFT] = mk_l2_pgentry(l2e);
+        }
     }
 
     /* Create page table for ioremap(). */
@@ -404,7 +415,7 @@ void *memguard_init(void *heap_start)
             l1[j] = mk_l1_pgentry((i << L2_PAGETABLE_SHIFT) |
                                    (j << L1_PAGETABLE_SHIFT) | 
                                   __PAGE_HYPERVISOR);
-        idle_pg_table[i] = idle_pg_table[i + l2_table_offset(PAGE_OFFSET)] =
+        idle_pg_table[i + l2_table_offset(PAGE_OFFSET)] =
             mk_l2_pgentry(virt_to_phys(l1) | __PAGE_HYPERVISOR);
     }
 

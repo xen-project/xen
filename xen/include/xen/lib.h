@@ -14,8 +14,7 @@
 #define SWAP(_a, _b) \
    do { typeof(_a) _t = (_a); (_a) = (_b); (_b) = _t; } while ( 0 )
 
-#define reserve_bootmem(_p,_l) \
-printk("Memory Reservation 0x%lx, %lu bytes\n", (_p), (_l))
+#define reserve_bootmem(_p,_l) ((void)0)
 
 struct domain;
 

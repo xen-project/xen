@@ -86,6 +86,7 @@
 
 #include <xen/config.h>
 #include <xen/init.h>
+#include <xen/kernel.h>
 #include <xen/lib.h>
 #include <xen/mm.h>
 #include <xen/sched.h>
@@ -140,9 +141,34 @@ static struct {
 /* Private domain structs for DOMID_XEN and DOMID_IO. */
 static struct domain *dom_xen, *dom_io;
 
+/* Frame table and its size in pages. */
+struct pfn_info *frame_table;
+unsigned long frame_table_size;
+unsigned long max_page;
+
+void __init init_frametable(void)
+{
+    unsigned long i, p;
+
+    frame_table      = (struct pfn_info *)FRAMETABLE_VIRT_START;
+    frame_table_size = max_page * sizeof(struct pfn_info);
+    frame_table_size = (frame_table_size + PAGE_SIZE - 1) & PAGE_MASK;
+
+    for ( i = 0; i < frame_table_size; i += (4UL << 20) )
+    {
+        p = alloc_boot_pages(min(frame_table_size - i, 4UL << 20), 4UL << 20);
+        if ( p == 0 )
+            panic("Not enough memory for frame table\n");
+        idle_pg_table[(FRAMETABLE_VIRT_START + i) >> L2_PAGETABLE_SHIFT] =
+            mk_l2_pgentry(p | __PAGE_HYPERVISOR | _PAGE_PSE);
+    }
+
+    memset(frame_table, 0, frame_table_size);
+}
+
 void arch_init_memory(void)
 {
-    unsigned long mfn;
+    unsigned long mfn, i;
 
     /*
      * We are rather picky about the layout of 'struct pfn_info'. The
@@ -185,13 +211,13 @@ void arch_init_memory(void)
     dom_io->id = DOMID_IO;
 
     /* M2P table is mappable read-only by privileged domains. */
-    for ( mfn = virt_to_phys(&machine_to_phys_mapping[0<<20])>>PAGE_SHIFT;
-          mfn < virt_to_phys(&machine_to_phys_mapping[1<<20])>>PAGE_SHIFT;
-          mfn++ )
+    mfn = l2_pgentry_to_pagenr(
+        idle_pg_table[RDWR_MPT_VIRT_START >> L2_PAGETABLE_SHIFT]);
+    for ( i = 0; i < 1024; i++ )
     {
-        frame_table[mfn].count_info        = PGC_allocated | 1;
-        frame_table[mfn].u.inuse.type_info = PGT_gdt_page | 1; /* non-RW */
-        frame_table[mfn].u.inuse.domain    = dom_xen;
+        frame_table[mfn+i].count_info        = PGC_allocated | 1;
+        frame_table[mfn+i].u.inuse.type_info = PGT_gdt_page | 1; /* non-RW */
+        frame_table[mfn+i].u.inuse.domain    = dom_xen;
     }
 }
 
@@ -500,11 +526,10 @@ static int alloc_l2_table(struct pfn_info *page)
    
     pl2e = map_domain_mem(page_nr << PAGE_SHIFT);
 
-    for ( i = 0; i < DOMAIN_ENTRIES_PER_L2_PAGETABLE; i++ ) {
+    for ( i = 0; i < DOMAIN_ENTRIES_PER_L2_PAGETABLE; i++ )
         if ( unlikely(!get_page_from_l2e(pl2e[i], page_nr, d, i)) )
             goto fail;
-    }
-    
+
 #if defined(__i386__)
     /* Now we add our private high mappings. */
     memcpy(&pl2e[DOMAIN_ENTRIES_PER_L2_PAGETABLE], 

@@ -118,7 +118,7 @@ struct pfn_info
 extern struct pfn_info *frame_table;
 extern unsigned long frame_table_size;
 extern unsigned long max_page;
-void init_frametable(void *frametable_vstart, unsigned long nr_pages);
+void init_frametable(void);
 
 int alloc_page_type(struct pfn_info *page, unsigned int type);
 void free_page_type(struct pfn_info *page, unsigned int type);

@@ -27,7 +27,7 @@ extern struct e820map e820;
 
 #endif /*!__ASSEMBLY__*/
 
-#define PFN_DOWN(_p)  ((_p)&PAGE_MASK)
-#define PFN_UP(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
+#define PFN_DOWN(x)   ((x) >> PAGE_SHIFT)
+#define PFN_UP(x)     (((x) + PAGE_SIZE-1) >> PAGE_SHIFT)
 
 #endif /*__E820_HEADER*/
