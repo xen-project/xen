@@ -189,6 +189,70 @@ netif_formats = {
 msg_formats.update(netif_formats)
 
 #============================================================================
+# USB interface message types.
+#============================================================================
+
+CMSG_USBIF_BE = 8
+CMSG_USBIF_FE = 9
+
+CMSG_USBIF_FE_INTERFACE_STATUS_CHANGED = 0
+
+CMSG_USBIF_FE_DRIVER_STATUS_CHANGED = 32
+CMSG_USBIF_FE_INTERFACE_CONNECT     = 33
+CMSG_USBIF_FE_INTERFACE_DISCONNECT  = 34
+
+USBIF_DRIVER_STATUS_DOWN = 0
+USBIF_DRIVER_STATUS_UP   = 1
+
+USBIF_INTERFACE_STATUS_DESTROYED    = 0 #/* Interface doesn't exist.    */
+USBIF_INTERFACE_STATUS_DISCONNECTED = 1 #/* Exists but is disconnected. */
+USBIF_INTERFACE_STATUS_CONNECTED    = 2 #/* Exists and is connected.    */
+
+CMSG_USBIF_BE_CREATE = 0
+CMSG_USBIF_BE_DESTROY = 1
+CMSG_USBIF_BE_CONNECT = 2
+
+CMSG_USBIF_BE_DISCONNECT = 3
+CMSG_USBIF_BE_CLAIM_PORT = 4
+CMSG_USBIF_BE_RELEASE_PORT = 5
+
+CMSG_USBIF_BE_DRIVER_STATUS_CHANGED = 32
+
+USBIF_BE_STATUS_OKAY = 0
+USBIF_BE_STATUS_ERROR = 1
+
+USBIF_BE_STATUS_INTERFACE_EXISTS = 2
+USBIF_BE_STATUS_INTERFACE_NOT_FOUND = 3
+USBIF_BE_STATUS_INTERFACE_CONNECTED = 4
+USBIF_BE_STATUS_OUT_OF_MEMORY = 7
+USBIF_BE_STATUS_MAPPING_ERROR = 9
+
+usbif_formats = {
+    'usbif_be_create_t':
+    (CMSG_USBIF_BE, CMSG_USBIF_BE_CREATE),
+    'usbif_be_destroy_t':
+    (CMSG_USBIF_BE, CMSG_USBIF_BE_DESTROY),
+    'usbif_be_connect_t':
+    (CMSG_USBIF_BE, CMSG_USBIF_BE_CONNECT),
+    'usbif_be_disconnect_t':
+    (CMSG_USBIF_BE, CMSG_USBIF_BE_DISCONNECT),
+    'usbif_be_claim_port_t':
+    (CMSG_USBIF_BE, CMSG_USBIF_BE_CLAIM_PORT),
+    'usbif_be_release_port_t':
+    (CMSG_USBIF_BE, CMSG_USBIF_BE_RELEASE_PORT),
+    'usbif_fe_interface_status_changed_t':
+    (CMSG_USBIF_FE, CMSG_USBIF_FE_INTERFACE_STATUS_CHANGED),
+    'usbif_fe_driver_status_changed_t':
+    (CMSG_USBIF_FE, CMSG_USBIF_FE_DRIVER_STATUS_CHANGED),
+    'usbif_fe_interface_connect_t':
+    (CMSG_USBIF_FE, CMSG_USBIF_FE_INTERFACE_CONNECT),
+    'usbif_fe_interface_disconnect_t':
+    (CMSG_USBIF_FE, CMSG_USBIF_FE_INTERFACE_DISCONNECT)
+    }
+    
+msg_formats.update(usbif_formats)
+
+#============================================================================
 # Domain shutdown message types.
 #============================================================================
 

@@ -961,7 +961,7 @@ int new_guest_cr3(unsigned long pfn)
     }
     else
     {
-        MEM_LOG("Error while installing new baseptr %08lx", ptr);
+        MEM_LOG("Error while installing new baseptr %08lx", pfn);
     }
 
     return okay;
@@ -1341,7 +1341,7 @@ int do_mmu_update(
 
     LOCK_BIGLOCK(d);
 
-    cleanup_writable_pagetable(d, PTWR_CLEANUP_ACTIVE | PTWR_CLEANUP_INACTIVE);
+    cleanup_writable_pagetable(d);
 
     /*
      * If we are resuming after preemption, read how much work we have already
@@ -1572,7 +1572,7 @@ int do_update_va_mapping(unsigned long page_nr,
 
     LOCK_BIGLOCK(d);
 
-    cleanup_writable_pagetable(d, PTWR_CLEANUP_ACTIVE | PTWR_CLEANUP_INACTIVE);
+    cleanup_writable_pagetable(d);
 
     /*
      * XXX When we make this support 4MB superpages we should also deal with 

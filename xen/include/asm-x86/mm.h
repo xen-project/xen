@@ -233,6 +233,8 @@ extern unsigned long m2p_start_mfn;
 #define phys_to_machine_mapping ((unsigned long *)PERDOMAIN_VIRT_START)
 #endif
 
+#define set_machinetophys(_mfn, _pfn) machine_to_phys_mapping[(_mfn)] = (_pfn)
+
 #define DEFAULT_GDT_ENTRIES     (LAST_RESERVED_GDT_ENTRY+1)
 #define DEFAULT_GDT_ADDRESS     ((unsigned long)gdt_table)
 
@@ -294,10 +296,11 @@ do {                                                                        \
             ptwr_flush(PTWR_PT_INACTIVE);                                   \
 } while ( 0 )
 
-#define cleanup_writable_pagetable(_d, _w)                                \
+#define cleanup_writable_pagetable(_d)                                    \
     do {                                                                  \
         if ( unlikely(VM_ASSIST((_d), VMASST_TYPE_writable_pagetables)) ) \
-        __cleanup_writable_pagetable(_w);                                 \
+        __cleanup_writable_pagetable(PTWR_CLEANUP_ACTIVE |                \
+                                     PTWR_CLEANUP_INACTIVE);              \
     } while ( 0 )
 
 #ifndef NDEBUG

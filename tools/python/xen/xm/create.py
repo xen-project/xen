@@ -151,6 +151,11 @@ gopts.var('pci', val='BUS,DEV,FUNC',
          For example '-pci c0,02,1a'.
          The option may be repeated to add more than one pci device.""")
 
+gopts.var('usb', val='PATH',
+          fn=append_value, default=[],
+          use="""Add a physical USB port to a domain, as specified by the path
+          to that port.  This option may be repeated to add more than one port.""")
+
 gopts.var('ipaddr', val="IPADDR",
           fn=append_value, default=[],
           use="Add an IP address to the domain.")
@@ -273,6 +278,11 @@ def configure_pci(config_devs, vals):
         config_pci = ['pci', ['bus', bus], ['dev', dev], ['func', func]]
         config_devs.append(['device', config_pci])
 
+def configure_usb(config_devs, vals):
+    for path in vals.usb:
+        config_usb = ['usb', ['path', path]]
+        config_devs.append(['device', config_usb])
+
 def randomMAC():
     """Generate a random MAC address.
 
@@ -371,6 +381,7 @@ def make_config(vals):
     configure_disks(config_devs, vals)
     configure_pci(config_devs, vals)
     configure_vifs(config_devs, vals)
+    configure_usb(config_devs, vals)
     configure_vmx(config_devs, vals)
     config += config_devs
     return config

@@ -9,11 +9,6 @@
 #ifndef __XEN_PUBLIC_XEN_H__
 #define __XEN_PUBLIC_XEN_H__
 
-#ifndef PACKED
-/* GCC-specific way to pack structure definitions (no implicit padding). */
-#define PACKED __attribute__ ((packed))
-#endif
-
 #if defined(__i386__)
 #include "arch-x86_32.h"
 #elif defined(__x86_64__)
@@ -426,7 +421,7 @@ typedef struct {
 #define SIF_INITDOMAIN    (1<<1)  /* Is this the initial control domain? */
 #define SIF_BLK_BE_DOMAIN (1<<4)  /* Is this a block backend domain? */
 #define SIF_NET_BE_DOMAIN (1<<5)  /* Is this a net backend domain? */
-
+#define SIF_USB_BE_DOMAIN (1<<6)  /* Is this a usb backend domain? */
 /* For use in guest OSes. */
 extern shared_info_t *HYPERVISOR_shared_info;
 
