@@ -48,7 +48,6 @@
 
 #include <xeno/ac_timer.h>
 
-
 #undef APIC_TIME_TRACE
 #ifdef APIC_TIME_TRACE
 #define TRC(_x) _x
@@ -511,7 +510,7 @@ void __init init_apic_mappings(void)
 static unsigned int bus_freq;
 static u32          bus_cycle;   /* length of one bus cycle in pico-seconds */
 static u32          bus_scale;   /* scaling factor convert ns to bus cycles */
-
+u64 cpu_freq;
 
 /*
  * The timer chip is already set up at HZ interrupts per second here,
@@ -643,6 +642,8 @@ int __init calibrate_APIC_clock(void)
            result/(1000000/HZ),
            result%(1000000/HZ));
 
+	cpu_freq = (u64)(((t2-t1)/LOOPS)*HZ);
+
 	/* set up multipliers for accurate timer code */
 	bus_freq   = result*HZ;
 	bus_cycle  = (u32) (1000000000000LL/bus_freq); /* in pico seconds */
@@ -676,13 +677,12 @@ void __init setup_APIC_clocks (void)
 }
 
 #undef APIC_DIVISOR
+
 /*
  * reprogram the APIC timer. Timeoutvalue is in ns from start of boot
  * returns 1 on success
  * returns 0 if the timeout value is too small or in the past.
  */
-
-
 int reprogram_ac_timer(s_time_t timeout)
 {
 	int 		cpu = smp_processor_id();
@@ -695,8 +695,8 @@ int reprogram_ac_timer(s_time_t timeout)
 
 
 	if (expire <= 0) {
-		printk("APICT[%02d] Timeout value in the past %lld > %lld\n", 
-			   cpu, now, timeout);
+		printk("APICT[%02d] Timeout in the past 0x%08X%08X > 0x%08X%08X\n", 
+			   cpu, (u32)(now>>32), (u32)now, (u32)(timeout>>32),(u32)timeout);
 		return 0;		/* timeout value in the past */
 	}
 
@@ -728,18 +728,27 @@ int reprogram_ac_timer(s_time_t timeout)
  * the timer APIC on CPU does not go off every 10ms or so the linux 
  * timers loose accuracy, but that shouldn't be a problem.
  */
-
-static s_time_t last_cpu0_tirq = 0;
+//static s_time_t last_cpu0_tirq = 0;
 inline void smp_local_timer_interrupt(struct pt_regs * regs)
 {
 	int cpu = smp_processor_id();
-	s_time_t diff, now;
+	//s_time_t diff, now;
 
     /* if CPU 0 do old timer stuff  */
 	if (cpu == 0) {
-		update_time();
+
+		/*
+         * XXX RN: the following code should be moved here or somewhere
+         * else. It's currently done using the 8255 timer interrupt, which
+         * I'd like to disable. But, APIC initialisation relies on it,
+         * e.g., timer interrupts coming in, jiffies going up, etc. Need to
+         * clean this up. Also see ./arch/i386/time.c
+         */
+#if 0
+		//update_time();/* XXX should use a timer for this */		
 		now = NOW();
 		diff = now - last_cpu0_tirq;
+
 		/* this uses three 64bit divisions which should be avoided!! */
 		if (diff >= MILLISECS(10)) {
 			/* update jiffies */
@@ -749,8 +758,9 @@ inline void smp_local_timer_interrupt(struct pt_regs * regs)
 			do_timer(regs);
 			last_cpu0_tirq = now;
 		}
+#endif
 	}
-	/* call timer function */
+	/* call accurate timer function */
 	do_ac_timer();
 }
 

@@ -32,9 +32,16 @@
 #include <xeno/types.h>
 
 /*
+ * Init time
+ */
+extern int init_xeno_time();
+
+/*
  * Cycle Counter Time (defined in asm/time.h)
  */
 
+
+extern u64	cpu_freq;
 
 /*
  * System Time
@@ -44,6 +51,9 @@
  * The other macros are for convenience to approximate short intervals
  * of real time into system time 
  */
+
+s_time_t get_s_time(void);
+
 #define NOW()				((s_time_t)get_s_time())
 #define SECONDS(_s)			(((s_time_t)(_s))  * 1000000000UL )
 #define TENTHS(_ts)			(((s_time_t)(_ts)) * 100000000UL )
@@ -78,6 +88,9 @@ extern void (*do_get_fast_time)(struct timeval *);
  */
 /* XXX Interface for getting and setting still missing */
 
+
+/* update the per domain time information */
+extern void update_dom_time(shared_info_t *si);
 
 /* XXX move this  */
 extern void do_timer(struct pt_regs *regs);

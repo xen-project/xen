@@ -91,7 +91,9 @@ int add_ac_timer(struct ac_timer *timer)
 	TRC(printk("ACT  [%02d] add(): now=%lld timo=%lld\n",
 			   cpu, now, timer->expires));
 	if (timer->expires <= now) {	
-		printk("ACT[%02d] add_ac_timer(): timeout value in the past\n", cpu);
+		printk("ACT[%02d] add_ac_timer: now=0x%08X%08X > expire=0x%08X%08X\n",
+			   cpu, (u32)(now>>32), (u32)now,
+			   (u32)(timer->expires>>32), (u32)timer->expires);
 		return 1;
 	}
 
@@ -100,7 +102,8 @@ int add_ac_timer(struct ac_timer *timer)
 	/* check if timer would be inserted at start of list */
 	if ((list_empty(&ac_timers[cpu].timers)) ||
 		(timer->expires <
-		(list_entry(&ac_timers[cpu].timers, struct ac_timer, timer_list))->expires)) {
+		(list_entry(&ac_timers[cpu].timers,
+					struct ac_timer, timer_list))->expires)) {
 
 		TRC(printk("ACT  [%02d] add(): add at head\n", cpu));
 		/* Reprogramm and add to head of list */

@@ -1,3 +1,25 @@
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4 -*-
+ ****************************************************************************
+ * (C) 2002 - Rolf Neugebauer - Intel Research Cambridge
+ ****************************************************************************
+ *
+ *        File: arch.xeno/time.c
+ *      Author: Rolf Neugebauer
+ *     Changes: 
+ *              
+ *        Date: Nov 2002
+ * 
+ * Environment: XenoLinux
+ * Description: Interface with Hypervisor to get correct notion of time
+ *              Currently supports Systemtime and WallClock time.
+ *
+ * (This has hardly any resemblence with the Linux code but left the
+ *  copyright notice anyway. Ignore the comments in the copyright notice.)
+ ****************************************************************************
+ * $Id: c-insert.c,v 1.7 2002/11/08 16:04:34 rn Exp $
+ ****************************************************************************
+ */
+
 /*
  *  linux/arch/i386/kernel/time.c
  *
@@ -30,19 +52,6 @@
  *	serialize accesses to xtime/lost_ticks).
  */
 
-#include <linux/errno.h>
-#include <linux/sched.h>
-#include <linux/kernel.h>
-#include <linux/param.h>
-#include <linux/string.h>
-#include <linux/mm.h>
-#include <linux/interrupt.h>
-#include <linux/time.h>
-#include <linux/delay.h>
-#include <linux/init.h>
-#include <linux/smp.h>
-
-#include <asm/io.h>
 #include <asm/smp.h>
 #include <asm/irq.h>
 #include <asm/msr.h>
@@ -51,94 +60,110 @@
 #include <asm/uaccess.h>
 #include <asm/processor.h>
 
-#include <linux/mc146818rtc.h>
-#include <linux/timex.h>
-#include <linux/config.h>
-
+#include <asm/div64.h>
 #include <asm/hypervisor.h>
 
+#include <linux/kernel.h>
+#include <linux/interrupt.h>
+#include <linux/time.h>
+#include <linux/init.h>
+#include <linux/smp.h>
 #include <linux/irq.h>
 
-
-unsigned long cpu_khz;	/* Detected as we calibrate the TSC */
-
-/* Cached *multiplier* to convert TSC counts to microseconds.
- * (see the equation below).
- * Equal to 2^32 * (1 / (clocks per usec) ).
- * Initialized in time_init.
- */
-unsigned long fast_gettimeoffset_quotient;
-
-extern rwlock_t xtime_lock;
-extern unsigned long wall_jiffies;
+#undef XENO_TIME_DEBUG	/* adds sanity checks and periodic printouts */
 
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
+extern rwlock_t xtime_lock;
 
-static inline unsigned long ticks_to_secs(unsigned long long ticks)
+unsigned long cpu_khz;	/* get this from Xen, used elsewhere */
+static spinlock_t hyp_stime_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t hyp_wctime_lock = SPIN_LOCK_UNLOCKED;
+
+static u32 st_scale_f;
+static u32 st_scale_i;
+static u32 shadow_st_pcc;
+static s64 shadow_st;
+
+/*
+ * System time.
+ * Although the rest of the Linux kernel doesn't know about this, we
+ * we use it to extrapolate passage of wallclock time.
+ * We need to read the values from the shared info page "atomically" 
+ * and use the cycle counter value as the "version" number. Clashes
+ * should be very rare.
+ */
+static inline long long get_s_time(void)
 {
-    unsigned long lo, hi;
-    unsigned long little_ticks;
+	unsigned long flags;
+    u32           delta_tsc, low, pcc;
+	u64           delta;
+	s64           now;
 
-    little_ticks = ticks /* XXX URK! XXX / 1000000ULL */;
+	spin_lock_irqsave(&hyp_stime_lock, flags);
 
-    __asm__ __volatile__ (
-        "mull %2"
-        : "=a" (lo), "=d" (hi)
-        : "rm" (fast_gettimeoffset_quotient), "0" (little_ticks) );
-
-    return(hi);
-}
-
-/* NB. Only 32 bits of ticks are considered here. */
-static inline unsigned long ticks_to_us(unsigned long ticks)
-{
-    unsigned long lo, hi;
-
-    __asm__ __volatile__ (
-        "mull %2"
-        : "=a" (lo), "=d" (hi)
-        : "rm" (fast_gettimeoffset_quotient), "0" (ticks) );
-
-    return(hi);
-}
-
-static long long get_s_time(void)
-{
-    u32 	  delta, low, pcc;
-	long long now;
-	long long incr;
-
-	/* read two values (pcc, now) "atomically" */
-again:
     pcc = HYPERVISOR_shared_info->st_timestamp;
-    now = HYPERVISOR_shared_info->system_time;
-	if (HYPERVISOR_shared_info->st_timestamp != pcc) goto again;
+	mb();	
+	if (pcc != shadow_st_pcc) {
+st_again:
+		shadow_st_pcc = HYPERVISOR_shared_info->st_timestamp;
+		shadow_st     = HYPERVISOR_shared_info->system_time;
+		pcc = HYPERVISOR_shared_info->st_timestamp;
+		mb();
+		if (pcc != shadow_st_pcc)
+			goto st_again;
+	}
 
+    now = shadow_st;
     /* only use bottom 32bits of TSC. This should be sufficient */
 	rdtscl(low);
-    delta = low - pcc;
+    delta_tsc = low - pcc;
+	delta = ((u64)delta_tsc * st_scale_f);
+	delta >>= 32;
+	delta += ((u64)delta_tsc * st_scale_i);
+	spin_unlock_irqrestore(&hyp_time_lock, flags);
+    return now + delta; 
 
-	incr = ((long long)(ticks_to_us(delta)*1000));
-    return now + incr; 
 }
 #define NOW()				((long long)get_s_time())
 
 /*
- * This version of gettimeofday has microsecond resolution
- * and better than microsecond precision on fast x86 machines with TSC.
+ * Wallclock time.
+ * Based on what the hypervisor tells us, extrapolated using system time.
+ * Again need to read a number of values from the shared page "atomically".
+ * this time using a version number.
  */
+static u32        shadow_wc_version=0;
+static long       shadow_tv_sec;
+static long       shadow_tv_usec;
+static long long  shadow_wc_timestamp;
 void do_gettimeofday(struct timeval *tv)
 {
-    unsigned long flags;
-    unsigned long usec, sec;
+	unsigned long flags;
+    long          usec, sec;
+	u32	          version;
+	u64           now;
 
-    read_lock_irqsave(&xtime_lock, flags);
+	spin_lock_irqsave(&hyp_wctime_lock, flags);
 
-	usec  = ((unsigned long)(NOW()-HYPERVISOR_shared_info->wc_timestamp))/1000;
-	sec   = HYPERVISOR_shared_info->tv_sec;
-	usec += HYPERVISOR_shared_info->tv_usec;
+	version = HYPERVISOR_shared_info->wc_version;
+	mb();
+	if (version != shadow_wc_version) {
+	wc_again:
+		shadow_wc_version   = HYPERVISOR_shared_info->wc_version;
+		shadow_tv_sec       = HYPERVISOR_shared_info->tv_sec;
+		shadow_tv_usec      = HYPERVISOR_shared_info->tv_usec;
+		shadow_wc_timestamp = HYPERVISOR_shared_info->wc_timestamp;
+		shadow_wc_version   = HYPERVISOR_shared_info->wc_version;
+		version =  HYPERVISOR_shared_info->wc_version;
+		mb();
+		if (version != shadow_wc_version)
+			goto wc_again;
+	}
 
-	read_unlock_irqrestore(&xtime_lock, flags);
+	now   = NOW();
+	usec  = ((unsigned long)(now-shadow_wc_timestamp))/1000;
+	sec   = shadow_tv_sec;
+	usec += shadow_tv_usec;
 
     while ( usec >= 1000000 ) 
     {
@@ -148,11 +173,39 @@ void do_gettimeofday(struct timeval *tv)
 
     tv->tv_sec = sec;
     tv->tv_usec = usec;
+
+	spin_unlock_irqrestore(&hyp_time_lock, flags);
+
+#ifdef XENO_TIME_DEBUG
+	{
+		static long long old_now=0;
+		static long long wct=0, old_wct=0;
+
+		/* This debug code checks if time increase over two subsequent calls */
+		wct=(((long long)sec) * 1000000) + usec;
+		/* wall clock time going backwards */
+		if ((wct < old_wct) ) {	
+			printk("Urgh1: wc diff=%6ld, usec = %ld (0x%lX)\n",
+				   (long)(wct-old_wct), usec, usec);		
+			printk("       st diff=%lld cur st=0x%016llX old st=0x%016llX\n",
+				   now-old_now, now, old_now);
+		}
+
+		/* system time going backwards */
+		if (now<=old_now) {
+			printk("Urgh2: st diff=%lld cur st=0x%016llX old st=0x%016llX\n",
+				   now-old_now, now, old_now);
+		}
+		old_wct  = wct;
+		old_now  = now;
+	}
+#endif
+
 }
 
 void do_settimeofday(struct timeval *tv)
 {
-/* XXX RN: shoudl do something special here for dom0 */
+/* XXX RN: should do something special here for dom0 */
 #if 0
     write_lock_irq(&xtime_lock);
     /*
@@ -181,25 +234,68 @@ void do_settimeofday(struct timeval *tv)
 
 
 /*
- * timer_interrupt() needs to keep up the real-time clock,
- * as well as call the "do_timer()" routine every clocktick
+ * Timer ISR. 
+ * Unlike normal Linux these don't come in at a fixed rate of HZ. 
+ * In here we wrok out how often it should have been called and then call
+ * the architecture independent part (do_timer()) the appropriate number of
+ * times. A bit of a nasty hack, to keep the "other" notion of wallclock time
+ * happy.
  */
-static inline void do_timer_interrupt(
-    int irq, void *dev_id, struct pt_regs *regs)
+static long long us_per_tick=1000000/HZ;
+static long long last_irq;
+static inline void do_timer_interrupt(int irq, void *dev_id,
+									  struct pt_regs *regs)
 {
-    do_timer(regs);
+	struct timeval tv;
+	long long time, delta;
+
+#ifdef XENO_TIME_DEBUG
+	static u32 foo_count = 0;
+	foo_count++;		
+	if (foo_count>= 10000) {
+		s64 n = NOW();
+		struct timeval tv;
+		do_gettimeofday(&tv);
+		printk("0x%08X%08X %ld:%ld\n",
+			   (u32)(n>>32), (u32)n, tv.tv_sec, tv.tv_usec);
+		foo_count = 0;
+	}
+#endif
+
+    /*
+     * The next bit really sucks:
+     * Linux not only uses do_gettimeofday() to keep a notion of
+     * wallclock time, but also maintains the xtime struct and jiffies.
+     * (Even worse some userland code accesses this via the sys_time()
+     * system call)
+     * Unfortunately, xtime is maintain in the architecture independent
+     * part of the timer ISR (./kernel/timer.c sic!). So, although we have
+     * perfectly valid notion of wallclock time from the hypervisor we here
+     * fake missed timer interrupts so that the arch independent part of
+     * the Timer ISR updates jiffies for us *and* once the bh gets run
+     * updates xtime accordingly. Yuck!
+     */
+
+	/* work out the number of jiffies past and update them */
+	do_gettimeofday(&tv);
+	time = (((long long)tv.tv_sec) * 1000000) + tv.tv_usec;
+	delta = time - last_irq;
+	if (delta <= 0) {
+		printk ("Timer ISR: Time went backwards: %lld\n", delta);
+		return;
+	}
+	while (delta >= us_per_tick) {
+		do_timer(regs);
+		delta    -= us_per_tick;
+		last_irq += us_per_tick;
+	}
+
 #if 0
     if (!user_mode(regs))
         x86_do_profile(regs->eip);
 #endif
 }
 
-
-/*
- * This is the same as the above, except we _also_ save the current
- * Time Stamp Counter value at the time of the timer interrupt, so that
- * we later on can estimate the time of day more exactly.
- */
 static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
     write_lock(&xtime_lock);
@@ -216,42 +312,32 @@ static struct irqaction irq_timer = {
     NULL
 };
 
-
-
-/* Return 2^32 * (1 / (TSC clocks per usec)) for do_fast_gettimeoffset(). */
-static unsigned long __init calibrate_tsc(void)
-{
-    unsigned long quo, rem;
-
-    /* quotient == (1000 * 2^32) / ticks_per ms */
-    __asm__ __volatile__ (
-        "divl %2"
-        : "=a" (quo), "=d" (rem)
-        : "r" (HYPERVISOR_shared_info->ticks_per_ms), "0" (0), "1" (1000) );
-
-    return(quo);
-}
-
 void __init time_init(void)
 {
     unsigned long long alarm;
-	
-    fast_gettimeoffset_quotient = calibrate_tsc();
+	u64	cpu_freq = HYPERVISOR_shared_info->cpu_freq;
+	u64 scale;
 
-    /* report CPU clock rate in Hz.
-     * The formula is (10^6 * 2^32) / (2^32 * 1 / (clocks/us)) =
-     * clock/second. Our precision is about 100 ppm.
-     */
-    {	
-        unsigned long eax=0, edx=1000;
-        __asm__ __volatile__
-            ("divl %2"
-             :"=a" (cpu_khz), "=d" (edx)
-             :"r" (fast_gettimeoffset_quotient),
-             "0" (eax), "1" (edx));
-        printk("Detected %lu.%03lu MHz processor.\n", 
-               cpu_khz / 1000, cpu_khz % 1000);
-    }
+	do_get_fast_time = do_gettimeofday;
+
+	cpu_khz = (u32)cpu_freq/1000;
+	printk("Xen reported: %lu.%03lu MHz processor.\n", 
+		   cpu_khz / 1000, cpu_khz % 1000);
+
+	/*
+     * calculate systemtime scaling factor
+	 * XXX RN: have to cast cpu_freq to u32 limits it to 4.29 GHz. 
+	 *     Get a better do_div!
+	 */
+	scale = 1000000000LL << 32;
+	do_div(scale,(u32)cpu_freq);
+	st_scale_f = scale & 0xffffffff;
+	st_scale_i = scale >> 32;
+	printk("System Time scale: %X %X\n",st_scale_i, st_scale_f);
+
+	do_gettimeofday(&xtime);
+	last_irq = (((long long)xtime.tv_sec) * 1000000) + xtime.tv_usec;
+	printk("last: %lld\n", last_irq);
 
     setup_irq(TIMER_IRQ, &irq_timer);
 
@@ -260,12 +346,14 @@ void __init time_init(void)
      * 'domain' time. This means that clock sshould run at the correct
      * rate. For things like scheduling, it's not clear whether it
      * matters which sort of time we use.
+	 * XXX RN: unimplemented.
      */
+
     rdtscll(alarm);
+#if 0
     alarm += (1000/HZ)*HYPERVISOR_shared_info->ticks_per_ms;
     HYPERVISOR_shared_info->wall_timeout   = alarm;
     HYPERVISOR_shared_info->domain_timeout = ~0ULL;
+#endif
     clear_bit(_EVENT_TIMER, &HYPERVISOR_shared_info->events);
-
-	do_gettimeofday(&xtime);
 }

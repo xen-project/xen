@@ -72,7 +72,7 @@ typedef struct
 #define __HYPERVISOR_stack_and_ldt_switch  4
 #define __HYPERVISOR_net_update            5
 #define __HYPERVISOR_fpu_taskswitch        6
-#define __HYPERVISOR_yield                 7
+#define __HYPERVISOR_sched_op              7
 #define __HYPERVISOR_exit                  8
 #define __HYPERVISOR_dom0_op               9
 #define __HYPERVISOR_network_op           10
@@ -160,16 +160,20 @@ typedef struct shared_info_st {
      * The following abstractions are exposed: System Time, Wall Clock 
      * Time, Domain Virtual Time. Domains can access Cycle counter time
      * directly. 
+	 * XXX RN: Need something to pass NTP scaling to GuestOS.
      */
 
+	u64           cpu_freq;	    /* to calculate ticks -> real time */
+
 	/* System Time */
-	long long          system_time;		/* in ns */
-	unsigned long      st_timestamp;	/* cyclecounter at last update */
-	unsigned long      ticks_per_ms;    /* CPU ticks per millisecond */
+	long long          system_time;     /* in ns */
+	unsigned long      st_timestamp;    /* cyclecounter at last update */
+
 	/* Wall Clock Time */
-	long	  tv_sec;					/* essentially a struct timeval */
-	long	  tv_usec;
-	long long wc_timestamp;				/* system time at last update */
+	u32                wc_version;      /* a version number for info below */
+	long               tv_sec;          /* essentially a struct timeval */
+	long               tv_usec;
+	long long          wc_timestamp;    /* system time at last update */
 
 	/* Domain Virtual Time */
 	unsigned long long domain_time;

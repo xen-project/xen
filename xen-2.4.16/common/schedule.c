@@ -275,8 +275,7 @@ asmlinkage void schedule(void)
     if ( prev->state == TASK_DYING ) release_task(prev);
 
  same_process:
-
-	update_dom_time(next->shared_info);
+	update_dom_time(current->shared_info);
 
     if ( test_bit(_HYP_EVENT_NEED_RESCHED, &current->hyp_events) )
         goto need_resched_back;
@@ -294,20 +293,22 @@ static void sched_timer(unsigned long foo)
 	if (count[cpu] >= 5) {
 		set_bit(_HYP_EVENT_NEED_RESCHED, &curr->hyp_events);
 		count[cpu] = 0;
+		if (cpu == 0)
+			update_time(); /* XXX RN: Should be moved on its own timer */
 	}
 	count[cpu]++;
 
  again:
 	now = NOW();
 	s_timer[cpu].expires  = now + MILLISECS(10);
+	res=add_ac_timer(&s_timer[cpu]);
 
  	TRC(printk("SCHED[%02d] timer(): now=0x%08X%08X timo=0x%08X%08X\n",
  			   cpu, (u32)(now>>32), (u32)now,
  			   (u32)(s_timer[cpu].expires>>32), (u32)s_timer[cpu].expires));
-	res=add_ac_timer(&s_timer[cpu]);
-	if (res==1) {
+	if (res==1)
 		goto again;
-	}
+
 }
 /*
  * Initialise the data structures
@@ -340,6 +341,6 @@ void schedulers_start(void) {
 	printk("Start schedulers\n");
 	__cli();
 	sched_timer(0);
-	smp_call_function(sched_timer, (void*)0, 1, 1);
+	smp_call_function(sched_timer, NULL, 1, 1);
 	__sti();
 }

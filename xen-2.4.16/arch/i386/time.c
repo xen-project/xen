@@ -11,7 +11,8 @@
  * 
  * Environment: Xen Hypervisor
  * Description: modified version of Linux' time.c
- *              implement system and wall clock time.
+ *              implements system and wall clock time.
+ *				based on freebsd's implementation.
  *
  ****************************************************************************
  * $Id: c-insert.c,v 1.7 2002/11/08 16:04:34 rn Exp $
@@ -53,11 +54,6 @@ unsigned long ticks_per_usec; /* TSC ticks per microsecond. */
 
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 
-
-/*
- * timer_interrupt() needs to keep up the real-time clock,
- * as well as call the "do_timer()" routine every clocktick
- */
 int timer_ack=0;
 extern spinlock_t i8259A_lock;
 static inline void do_timer_interrupt(int irq, 
@@ -78,6 +74,8 @@ static inline void do_timer_interrupt(int irq,
         spin_unlock(&i8259A_lock);
     }
 #endif
+
+	/* XXX RN: Want to remove this but APIC-SMP code seems to rely on it */
     do_timer(regs);
 }
 
@@ -235,30 +233,59 @@ static unsigned long get_cmos_time(void)
 }
 
 /***************************************************************************
- * System time
+ * Time
+ * XXX RN: Will be able to remove some of the locking once the time is
+ * update by the APIC on only one CPU. 
  ***************************************************************************/
-u32					stime_pcc;	 /* cycle counter value at last timer irq */
-u32					stime_scale; /* scale factor for converting cc to ns */
-s_time_t			stime_now;   /* time in ns at last timer IRQ */
 
-/***************************************************************************
- * Wall Clock time 
- ***************************************************************************/
-static rwlock_t wctime_lock = RW_LOCK_UNLOCKED;
-struct timeval  wall_clock_time;	/* wall clock time at last update */
-s_time_t	    wctime_st;       /* system time at last update */
+static spinlock_t stime_lock;
+static u32	st_scale_f;
+static u32	st_scale_i;
+u32			stime_pcc;	 /* cycle counter value at last timer irq */
+s_time_t	stime_now;   /* time in ns at last timer IRQ */
+
+s_time_t get_s_time(void)
+{
+	unsigned long flags;
+    u32 	 delta_tsc, low, pcc;
+	u64      delta;
+	s_time_t now;
+
+	spin_lock_irqsave(&stime_lock, flags);
+
+    pcc = stime_pcc;		
+    now = stime_now;
+
+    /* only use bottom 32bits of TSC. This should be sufficient */
+	rdtscl(low);
+    delta_tsc = low - pcc;
+	delta = ((u64)delta_tsc * st_scale_f);
+	delta >>= 32;
+	delta += ((u64)delta_tsc * st_scale_i);
+
+	spin_unlock_irqrestore(&stime_lock, flags);
+
+    return now + delta; 
+}
+
+
+/* Wall Clock time */
+static spinlock_t wctime_lock;
+struct timeval    wall_clock_time; /* wall clock time at last update */
+s_time_t	      wctime_st;       /* system time at last update */
 
 void do_gettimeofday(struct timeval *tv)
 {
 	unsigned long flags;
 	unsigned long usec, sec;
 
-	read_lock_irqsave(&wctime_lock, flags);
+	spin_lock_irqsave(&wctime_lock, flags);
 
 	usec = ((unsigned long)(NOW() - wctime_st))/1000;
 	sec = wall_clock_time.tv_sec;
 	usec += wall_clock_time.tv_usec;
-	read_unlock_irqrestore(&wctime_lock, flags);
+
+	spin_unlock_irqrestore(&wctime_lock, flags);
 
 	while (usec >= 1000000) {
 		usec -= 1000000;
@@ -276,22 +303,26 @@ void do_settimeofday(struct timeval *tv)
 /***************************************************************************
  * Update times
  ***************************************************************************/
-
 /* update hypervisors notion of time */
 void update_time(void) {
-	u32		      new_pcc;
-	s_time_t      new_st;
-	unsigned long usec;
+	unsigned long  flags;
+	u32		       new_pcc;
+	s_time_t       new_st;
+	unsigned long  usec;
 
-	/* update system time */
+	new_st = NOW();
 	rdtscl(new_pcc);
-	stime_now = stime_now+((((s_time_t)stime_scale)*
-							(new_pcc-stime_pcc))>>10);
+
+	/* update system time  */
+	spin_lock_irqsave(&stime_lock, flags);
+
+	stime_now = new_st;
 	stime_pcc=new_pcc;
 
+	spin_unlock_irqrestore(&stime_lock, flags);
+
 	/* update wall clock time  */
-	write_lock(&wctime_lock);
-	new_st = NOW();
+	spin_lock_irqsave(&wctime_lock, flags);
 	usec = ((unsigned long)(new_st - wctime_st))/1000;
 	usec += wall_clock_time.tv_usec;
 	while (usec >= 1000000) {
@@ -300,10 +331,10 @@ void update_time(void) {
 	}
 	wall_clock_time.tv_usec = usec;
 	wctime_st = new_st;
-	write_unlock(&wctime_lock);
+	spin_unlock_irqrestore(&wctime_lock, flags);
 
-	TRC(printk("TIME[%02d] update time: stime_now=%lld now=%lld, wct=%ld:%ld\n"
-			   cpu, stime_now, new_st, wall_clock_time.tv_sec,
+	TRC(printk("TIME[%02d] update time: stime_now=%lld now=%lld,wct=%ld:%ld\n",
+			   smp_processor_id(), stime_now, new_st, wall_clock_time.tv_sec,
 			   wall_clock_time.tv_usec));
 }
 
@@ -311,13 +342,20 @@ void update_time(void) {
 void update_dom_time(shared_info_t *si)
 {
 	unsigned long flags;
-	read_lock_irqsave(&wctime_lock, flags);
+
+	spin_lock_irqsave(&stime_lock, flags);
 	si->system_time  = stime_now;
 	si->st_timestamp = stime_pcc;
+	spin_unlock_irqrestore(&stime_lock, flags);
+
+	spin_lock_irqsave(&wctime_lock, flags);
 	si->tv_sec       = wall_clock_time.tv_sec;
 	si->tv_usec      = wall_clock_time.tv_usec;
 	si->wc_timestamp = wctime_st;
-	read_unlock_irqrestore(&wctime_lock, flags);	
+	si->wc_version++;
+	spin_unlock_irqrestore(&wctime_lock, flags);	
+
+	TRC(printk(" 0x%08X%08X\n", (u32)(wctime_st>>32), (u32)wctime_st));
 }
 
 /***************************************************************************
@@ -328,17 +366,26 @@ int __init init_xeno_time()
 {
 	int cpu = smp_processor_id();
 	u32	cpu_cycle;	 /* time of one cpu cyle in pico-seconds */
+	u64 scale;
+
+	spin_lock_init(&stime_lock);
+	spin_lock_init(&wctime_lock);
 
 	/* System Time */
 	cpu_cycle   = (u32) (1000000000LL/cpu_khz); /* in pico seconds */
-	stime_scale = (cpu_cycle * 1024) / 1000;
+	scale = 1000000000LL << 32;
+	scale /= cpu_freq;
+	st_scale_f = scale & 0xffffffff;
+	st_scale_i = scale >> 32;
 
 	stime_now = (s_time_t)0;
 	rdtscl(stime_pcc);
 	
 	printk("Init Time[%02d]:\n", cpu);
 	printk(".... System Time: %lldns\n", NOW());
-	printk(".... stime_scale: %u\n",   stime_scale);
+	printk(".....cpu_cycle:   %u ps\n", cpu_cycle);
+	printk(".... st_scale_f:  %X\n",   st_scale_f);
+	printk(".... st_scale_i:  %X\n",   st_scale_i);
 	printk(".... stime_pcc:   %u\n",   stime_pcc);
 
 	/* Wall Clock time */
@@ -366,7 +413,6 @@ void __init time_init(void)
 
     ticks_per_usec = ticks_per_frac / (1000000/CALIBRATE_FRAC);
     cpu_khz = ticks_per_frac / (1000/CALIBRATE_FRAC);
-
 
     printk("Detected %lu.%03lu MHz processor.\n", 
            cpu_khz / 1000, cpu_khz % 1000);

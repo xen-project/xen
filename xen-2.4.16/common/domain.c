@@ -8,6 +8,7 @@
 #include <xeno/interrupt.h>
 #include <xeno/delay.h>
 #include <xeno/event.h>
+#include <xeno/time.h>
 #include <xeno/dom0_ops.h>
 #include <asm/io.h>
 #include <asm/domain_page.h>
@@ -160,8 +161,7 @@ void release_task(struct task_struct *p)
     free_task_struct(p);
 }
 
-
-static unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes)
+unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes)
 {
     struct list_head *temp;
     struct pfn_info *pf, *pf_head;
@@ -233,7 +233,6 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
     l1_pgentry_t * l1tab;
     start_info_t * virt_startinfo_addr;
     unsigned long virt_stack_addr;
-    unsigned long long time;
     unsigned long phys_l2tab;
     page_update_request_t * pgt_updates;
     unsigned long curr_update_phys;
@@ -285,10 +284,9 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
     unmap_domain_mem((void *)((unsigned long)l1tab & PAGE_MASK));
 
     /* set up the shared info structure */
-    rdtscll(time);
-    p->shared_info->wall_time    = time;
-    p->shared_info->domain_time  = time;
-    p->shared_info->ticks_per_ms = ticks_per_usec * 1000;
+	update_dom_time(p->shared_info);
+	p->shared_info->cpu_freq	 = cpu_freq;
+    p->shared_info->domain_time  = 0;
 
     /* we pass start info struct to guest os as function parameter on stack */
     virt_startinfo_addr = (start_info_t *)meminfo->virt_startinfo_addr;
@@ -389,7 +387,6 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     unsigned long virt_load_address, virt_stack_address, virt_shinfo_address;
     unsigned long virt_ftable_start, virt_ftable_end, ft_mapping;
     start_info_t  *virt_startinfo_address;
-    unsigned long long time;
     unsigned long count;
     unsigned long alloc_index;
     unsigned long ft_pages;
@@ -521,10 +518,10 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     unmap_domain_mem(l1start);
 
     /* Set up shared info area. */
-    rdtscll(time);
-    p->shared_info->wall_time    = time;
-    p->shared_info->domain_time  = time;
-    p->shared_info->ticks_per_ms = ticks_per_usec * 1000;
+	update_dom_time(p->shared_info);
+	p->shared_info->cpu_freq	 = cpu_freq;
+    p->shared_info->domain_time  = 0;
+
 
     virt_startinfo_address = (start_info_t *)
         (virt_load_address + ((alloc_index - 1) << PAGE_SHIFT));
@@ -640,11 +637,6 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
 void __init domain_init(void)
 {
 	printk("Initialising domains\n");
-//	scheduler_init();
 }
 
 
-
-#if 0
-    }
-}

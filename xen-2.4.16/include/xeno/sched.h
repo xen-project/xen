@@ -193,7 +193,7 @@ extern unsigned long wait_init_idle;
 #define set_current_state(_s) do { current->state = (_s); } while (0)
 #define MAX_SCHEDULE_TIMEOUT LONG_MAX
 void scheduler_init(void);
-void start_scheduler(void);
+void schedulers_start(void);
 void sched_add_domain(struct task_struct *p);
 void sched_rem_domain(struct task_struct *p);
 int  wake_up(struct task_struct *p);
