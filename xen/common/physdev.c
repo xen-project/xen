@@ -733,22 +733,6 @@ void physdev_init_dom0(struct domain *p)
             continue;
         }
 
-        /* Skip bridges and other peculiarities for now.
-         *
-         * Note that this can prevent the guest from detecting devices
-         * with fn>0 on slots where the fn=0 device is a bridge.  We
-         * can identify such slots by looking at the multifunction bit
-         * (top bit of hdr_type, masked out in dev->hdr_type).
-         *
-         * In Linux2.4 we find all devices because the detection code
-         * scans all functions if the read of the fn=0 device's header
-         * type fails.
-         *
-         * In Linux2.6 we set pcibios_scan_all_fns().
-         */
-        if ( (dev->hdr_type != PCI_HEADER_TYPE_NORMAL) &&
-             (dev->hdr_type != PCI_HEADER_TYPE_CARDBUS) )
-            continue;
         pdev = xmalloc(sizeof(phys_dev_t));
         pdev->dev = dev;
         pdev->flags = ACC_WRITE;
