@@ -205,12 +205,12 @@ class Controller(CtrlMsgRcvr):
     def close(self):
         """Close the controller.
         """
-        self.deregisterChannel()
         self.lostChannel()
 
     def lostChannel(self):
         """The controller channel has been lost.
         """
+        self.deregisterChannel()
         self.factory.instanceClosed(self)
 
 class Dev:
