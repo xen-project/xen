@@ -400,7 +400,7 @@ struct thread_struct {
     /* general user-visible register state */
     execution_context_t user_ctxt;
 
-    void (*schedule_tail) (struct domain *);
+    void (*schedule_tail) (struct exec_domain *);
 
     /*
      * Return vectors pushed to us by guest OS.

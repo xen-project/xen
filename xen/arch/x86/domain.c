@@ -197,29 +197,30 @@ void free_perdomain_pt(struct domain *d)
     free_xenheap_page((unsigned long)d->mm_perdomain_pt);
 }
 
-static void continue_idle_task(struct domain *d)
+static void continue_idle_task(struct exec_domain *ed)
 {
     reset_stack_and_jump(idle_loop);
 }
 
-static void continue_nonidle_task(struct domain *d)
+static void continue_nonidle_task(struct exec_domain *ed)
 {
     reset_stack_and_jump(ret_from_intr);
 }
 
+void arch_do_createdomain(struct exec_domain *ed)
 {
     struct domain *d = ed->domain;
 #ifdef ARCH_HAS_FAST_TRAP
-    SET_DEFAULT_FAST_TRAP(&d->thread);
+    SET_DEFAULT_FAST_TRAP(&ed->thread);
 #endif
 
     if ( d->id == IDLE_DOMAIN_ID )
     {
-        d->thread.schedule_tail = continue_idle_task;
+        ed->thread.schedule_tail = continue_idle_task;
     }
     else
     {
-        d->thread.schedule_tail = continue_nonidle_task;
+        ed->thread.schedule_tail = continue_nonidle_task;
 
         d->shared_info = (void *)alloc_xenheap_page();
         memset(d->shared_info, 0, PAGE_SIZE);
@@ -234,6 +235,7 @@ static void continue_nonidle_task(struct domain *d)
         memset(d->mm_perdomain_pt, 0, PAGE_SIZE);
         machine_to_phys_mapping[virt_to_phys(d->mm_perdomain_pt) >> 
                                PAGE_SHIFT] = INVALID_P2M_ENTRY;
+    }
 }
 
 int arch_final_setup_guestos(struct exec_domain *d, full_execution_context_t *c)
