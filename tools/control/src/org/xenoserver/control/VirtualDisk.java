@@ -169,8 +169,8 @@ public class VirtualDisk {
             Extent extent =
                 new Extent(
                     partition.getDisk(),
-                    extentSize,
-                    partition.getStartSect() + (extentSize * loop));
+                    partition.getStartSect() + (extentSize * loop),
+                    extentSize);
 
             addExtent(extent);
         }

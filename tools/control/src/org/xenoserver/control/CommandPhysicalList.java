@@ -65,12 +65,16 @@ public class CommandPhysicalList extends Command {
                 outline = in.readLine();
                 while (outline != null) {
                     int disk = -1;
+                    int partition_no = -1;
                     long offset = -1;
                     long size = -1;
 
                     StringTokenizer st = new StringTokenizer(outline);
                     if (st.hasMoreTokens()) {
-                        disk = Short.parseShort(st.nextToken(), 16);
+                        disk = Integer.parseInt(st.nextToken(), 16);
+                    }
+                    if (st.hasMoreTokens()) {
+                        partition_no = Integer.parseInt(st.nextToken(), 16);
                     }
                     if (st.hasMoreTokens()) {
                         offset = Long.parseLong(st.nextToken(), 16);
@@ -80,7 +84,7 @@ public class CommandPhysicalList extends Command {
                     }
                     if (st.hasMoreTokens()) {
                         String mode = st.nextToken();
-                        Extent extent = new Extent(disk, offset, size);
+                        Extent extent = new Extent(disk, offset, size, partition_no);
                         if (mode.equals("rw")) {
                             map.put(extent, Mode.READ_WRITE);
                         } else if (mode.equals("r")) {

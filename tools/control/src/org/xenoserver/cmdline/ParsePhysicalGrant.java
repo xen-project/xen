@@ -16,31 +16,37 @@ public class ParsePhysicalGrant extends CommandParser {
     String partition_name = getStringParameter(args, 'p', "");
     boolean write = getFlagParameter(args, 'w');
     
-    if (domain_id == 0)
+    if (domain_id == 0) {
       throw new ParseFailedException("Expected -n<domain_id>");
-    if (partition_name.equals(""))
+    }
+    if (partition_name.equals("")) {
       throw new ParseFailedException("Expected -p<partition_name>");
+    }
       
     Mode mode;
-    if (write)
+    if (write) {
       mode = Mode.READ_WRITE;
-    else
+    } else {
       mode = Mode.READ_ONLY;
+    }
       
     // Initialise the partition manager and look up the partition
     loadState();
     Partition p = PartitionManager.IT.getPartition(partition_name);
     
-    if ( p == null )
+    if ( p == null ) {
       throw new CommandFailedException("Partition " + partition_name + " does not exist.");
+    }
     
     // Check if this partition belongs to the VDM
-    if (p.isXeno() && !force)
+    if (p.isXeno() && !force) {
       throw new CommandFailedException("Refusing to grant physical access as the given partition is allocated to the virtual disk manager. Use -f if you are sure.");
-     
+    }
+         
     String output = new CommandPhysicalGrant( d, domain_id, p, mode ).execute();
-    if ( output != null )
+    if ( output != null ) {
       System.out.println( output );
+    }
   }
 
   public String getName() {
@@ -48,7 +54,7 @@ public class ParsePhysicalGrant extends CommandParser {
   }
 
   public String getUsage() {
-    return "[-f] [-w] [-n<domain_id>] [-p<partition_name>]";
+    return "-n<domain_id> -p<partition_name> [-f] [-w]";
   }
 
   public String getHelpText() {
