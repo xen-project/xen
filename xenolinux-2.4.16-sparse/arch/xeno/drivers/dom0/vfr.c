@@ -56,6 +56,9 @@ static int vfr_read_proc(char *page, char **start, off_t off,
  *
  */
 
+#define isspace(_x) ( ((_x)==' ')  || ((_x)=='\t') || ((_x)=='\v') || \
+		      ((_x)=='\f') || ((_x)=='\r') || ((_x)=='\n') )
+
 static int vfr_write_proc(struct file *file, const char *buffer,
                                            u_long count, void *data)
 {
@@ -70,12 +73,12 @@ static int vfr_write_proc(struct file *file, const char *buffer,
   memset(&op, 0, sizeof(network_op_t));
 
   // get the command:
-  while ( count && (buffer[ts] == ' ') ) { ts++; count--; } // skip spaces.
+  while ( count && isspace(buffer[ts]) ) { ts++; count--; } // skip spaces.
   te = ts;
-  while ( count && (buffer[te] != ' ') ) { te++; count--; } // command end
+  while ( count && !isspace(buffer[te]) ) { te++; count--; } // command end
   if ( te <= ts ) goto bad;
   tl = te - ts;
-
+  
   if ( strncmp(&buffer[ts], "ADD", tl) == 0 )
   {
      op.cmd = NETWORK_OP_ADDRULE;
@@ -119,18 +122,19 @@ static int vfr_write_proc(struct file *file, const char *buffer,
   while (count)
   {
     //get field
-    ts = te; while ( count && (buffer[ts] == ' ') ) { ts++; count--; }
+    ts = te; while ( count && isspace(buffer[ts]) ) { ts++; count--; }
     te = ts;
-    while ( count && (buffer[te] != ' ') && (buffer[te] != '=') ) 
+    while ( count && !isspace(buffer[te]) && (buffer[te] != '=') ) 
       { te++; count--; }
-    if ( te <= ts ) goto bad;
+    if ( te <= ts )
+	goto doneparsing;
     tl = te - ts;
     fs = ts; fe = te; fl = tl; // save the field markers.
     // skip "   =   " (ignores extra equals.)
-    while ( count && ((buffer[te] == ' ') || (buffer[te] == '=')) ) 
+    while ( count && (isspace(buffer[te]) || (buffer[te] == '=')) ) 
       { te++; count--; }
     ts = te;
-    while ( count && (buffer[te] != ' ') ) { te++; count--; }
+    while ( count && !isspace(buffer[te]) ) { te++; count--; }
     tl = te - ts;
 
     if ( (fl <= 0) || (tl <= 0) ) goto bad;
@@ -176,9 +180,9 @@ static int vfr_write_proc(struct file *file, const char *buffer,
       op.u.net_rule.dst_interface = anton(&buffer[ts], tl);
     }
     else if ( (strncmp(&buffer[fs], "proto", fl) == 0))
-    {
-      if (strncmp(&buffer[ts], "any", tl) == 0)
-          op.u.net_rule.proto = NETWORK_PROTO_ANY;
+    {	
+      if (strncmp(&buffer[ts], "any", tl) == 0) 
+	  op.u.net_rule.proto = NETWORK_PROTO_ANY; 
       if (strncmp(&buffer[ts], "ip", tl) == 0)
 	  op.u.net_rule.proto = NETWORK_PROTO_IP;
       if (strncmp(&buffer[ts], "tcp", tl) == 0) 

@@ -4,6 +4,7 @@ export BASEDIR := $(shell pwd)
 include Rules.mk
 
 default: $(TARGET)
+	gzip -f -9 < $(TARGET) > $(TARGET).gz
 
 install: $(TARGET)
 	gzip -f -9 < $(TARGET) > $(TARGET).gz
