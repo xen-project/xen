@@ -167,7 +167,6 @@ void show_registers(struct pt_regs *regs)
            regs->xfs & 0xffff, regs->xgs & 0xffff, ss);
 
     show_stack(&regs->esp);
-    show_trace(&regs->esp);
 }	
 
 

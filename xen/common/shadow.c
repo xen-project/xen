@@ -28,7 +28,19 @@ hypercall lock anyhow (at least initially).
 
 ********/
 
-static spinlock_t cpu_stall_lock; 
+
+/**
+
+FIXME:
+
+1. Flush needs to avoid blowing away the L2 page that another CPU may be using!
+
+fix using cpu_raise_softirq
+
+have a flag to count in, (after switching to init's PTs) 
+spinlock, reload cr3_shadow, unlock
+
+**/
 
 static inline void free_shadow_page( struct mm_struct *m, 
                                      struct pfn_info *pfn_info )
@@ -115,7 +127,7 @@ static inline int shadow_page_op( struct mm_struct *m, unsigned int op,
 
             for (i=0;i<ENTRIES_PER_L1_PAGETABLE;i++)
             {                    
-                if ( spl1e[i] & _PAGE_RW )
+                if ( (spl1e[i] & _PAGE_PRESENT ) && (spl1e[i] & _PAGE_RW) )
                 {
                     work++;
                     spl1e[i] &= ~_PAGE_RW;
@@ -124,6 +136,8 @@ static inline int shadow_page_op( struct mm_struct *m, unsigned int op,
             unmap_domain_mem( spl1e );
         }
     }
+	break;
+
     }
     return work;
 }
@@ -161,7 +175,6 @@ static void __scan_shadow_table( struct mm_struct *m, unsigned int op )
 
 void shadow_mode_init(void)
 {
-    spin_lock_init( &cpu_stall_lock ); 
 }
 
 int shadow_mode_enable( struct task_struct *p, unsigned int mode )
@@ -184,9 +197,9 @@ int shadow_mode_enable( struct task_struct *p, unsigned int mode )
 
     // allocate space for first lot of extra nodes
     m->shadow_ht_extras = kmalloc( sizeof(void*) + 
-				   (shadow_ht_extra_size * 
-				    sizeof(struct shadow_status)),
-				   GFP_KERNEL );
+								   (shadow_ht_extra_size * 
+									sizeof(struct shadow_status)),
+								   GFP_KERNEL );
 
     if( ! m->shadow_ht_extras )
         goto nomem;
@@ -225,7 +238,7 @@ int shadow_mode_enable( struct task_struct *p, unsigned int mode )
     __shadow_mk_pagetable( m );
     return 0;
 
- nomem:
+nomem:
     return -ENOMEM;
 }
 
@@ -263,7 +276,7 @@ void shadow_mode_disable( struct task_struct *p )
 }
 
 static int shadow_mode_table_op( struct task_struct *p, 
-				 dom0_shadow_control_t *sc )
+								 dom0_shadow_control_t *sc )
 {
     unsigned int op = sc->op;
     struct mm_struct *m = &p->mm;
@@ -272,6 +285,8 @@ static int shadow_mode_table_op( struct task_struct *p,
     // since Dom0 did the hypercall, we should be running with it's page
     // tables right now. Calling flush on yourself would be really
     // stupid.
+
+    ASSERT(spin_is_locked(&p->mm.shadow_lock));
 
     if ( m == &current->mm )
     {
@@ -291,48 +306,49 @@ static int shadow_mode_table_op( struct task_struct *p,
    
     case DOM0_SHADOW_CONTROL_OP_CLEAN:
     {
-	int i,j,zero=1;
+		int i,j,zero=1;
 		
-	__scan_shadow_table( m, op );
+		__scan_shadow_table( m, op );
+		//    __free_shadow_table( m );
 	
-	if( p->tot_pages > sc->pages || 
-	    !sc->dirty_bitmap || !p->mm.shadow_dirty_bitmap )
-	{
-	    rc = -EINVAL;
-	    goto out;
-	}
+		if( p->tot_pages > sc->pages || 
+			!sc->dirty_bitmap || !p->mm.shadow_dirty_bitmap )
+		{
+			rc = -EINVAL;
+			goto out;
+		}
 	
-	sc->pages = p->tot_pages;
+		sc->pages = p->tot_pages;
 	
 #define chunk (8*1024) // do this in 1KB chunks for L1 cache
 	
-	for(i=0;i<p->tot_pages;i+=chunk)
-	{
-	    int bytes = ((  ((p->tot_pages-i) > (chunk))?
-			    (chunk):(p->tot_pages-i) ) + 7) / 8;
+		for(i=0;i<p->tot_pages;i+=chunk)
+		{
+			int bytes = ((  ((p->tot_pages-i) > (chunk))?
+							(chunk):(p->tot_pages-i) ) + 7) / 8;
 	    
-	    copy_to_user( sc->dirty_bitmap + (i/(8*sizeof(unsigned long))),
-			  p->mm.shadow_dirty_bitmap +(i/(8*sizeof(unsigned long))),
-			  bytes );
+			copy_to_user( sc->dirty_bitmap + (i/(8*sizeof(unsigned long))),
+						  p->mm.shadow_dirty_bitmap +(i/(8*sizeof(unsigned long))),
+						  bytes );
 	    
-	    for(j=0; zero && j<bytes/sizeof(unsigned long);j++)
-	    {
-		if( p->mm.shadow_dirty_bitmap[j] != 0 )
-		    zero = 0;
-	    }
+			for(j=0; zero && j<bytes/sizeof(unsigned long);j++)
+			{
+				if( p->mm.shadow_dirty_bitmap[j] != 0 )
+					zero = 0;
+			}
 
-	    memset( p->mm.shadow_dirty_bitmap +(i/(8*sizeof(unsigned long))),
-		    0, bytes);
-	}
+			memset( p->mm.shadow_dirty_bitmap +(i/(8*sizeof(unsigned long))),
+					0, bytes);
+		}
 
-	if (zero)
-	{
-	    /* might as well stop the domain as an optimization. */
-	    if ( p->state != TASK_STOPPED )
-		send_guest_virq(p, VIRQ_STOP);
-	}
-	
-	break;
+		if (zero)
+		{
+			/* might as well stop the domain as an optimization. */
+			if ( p->state != TASK_STOPPED )
+				send_guest_virq(p, VIRQ_STOP);
+		}
+
+		break;
     }
     }
 
@@ -352,49 +368,9 @@ out:
 int shadow_mode_control( struct task_struct *p, dom0_shadow_control_t *sc )
 {
     unsigned int cmd = sc->op;
-    int rc = 0, cpu;
+    int rc = 0;
 
-    // don't call if already shadowed...
-
-    /* The following is pretty hideous because we don't have a way of
-       synchronously pausing a domain. If it's assigned to the curernt CPU,
-       we don't have to worry -- it can't possibly actually be running.
-       If its on another CPU, for the moment, we do something really gross:
-       we cause the other CPU to spin regardless of what domain it is running. 
-
-       I know this is really grim, but it only lasts a few 10's of
-       microseconds. It needs fixing as soon as the last of the Linux-isms
-       get removed from the task structure...
-
-       Oh, and let's hope someone doesn't repin the CPU while we're here.
-       Also, prey someone else doesn't do this in another domain.
-       At least there's only one dom0 at the moment...
-
-     */
-
-printk("XXX\n");
     spin_lock(&p->mm.shadow_lock);
-
-printk("SMC irq=%d\n",local_irq_is_enabled());
-    spin_lock( &cpu_stall_lock );		
-    cpu = p->processor;
-printk("got target cpu=%d this cpu=%d\n",cpu, current->processor );
-    if ( cpu != current->processor )
-    {
-	static void cpu_stall(void * data)
-	{
-	    if ( current->processor == (int) data )
-	    {
-		printk("Stall cpu=%d is locked %d irq=%d\n",(int)data,spin_is_locked(&cpu_stall_lock),local_irq_is_enabled());
-		spin_lock( &cpu_stall_lock );
-		printk("release\n");
-		spin_unlock( &cpu_stall_lock );
-	    }
-	}
-printk("before\n");
-	smp_call_function(cpu_stall, (void*)cpu, 1, 0); // don't wait!
-printk("after\n");
-    }
 
     if ( p->mm.shadow_mode && cmd == DOM0_SHADOW_CONTROL_OP_OFF )
     {
@@ -412,18 +388,15 @@ printk("after\n");
     } 
     else if ( p->mm.shadow_mode && cmd >= DOM0_SHADOW_CONTROL_OP_FLUSH && cmd<=DOM0_SHADOW_CONTROL_OP_CLEAN )
     {
-printk("+");
         rc = shadow_mode_table_op(p, sc);
-printk("=");
     }
     else
     {
         rc = -EINVAL;
     }
 
-    spin_unlock( &cpu_stall_lock );
-printk("SMC- %d\n",rc);
-
+	flush_tlb_cpu(p->processor);
+   
     spin_unlock(&p->mm.shadow_lock);
 
     return rc;
@@ -549,8 +522,6 @@ int shadow_fault( unsigned long va, long error_code )
     unsigned long gpte, spte;
     struct mm_struct *m = &current->mm;
 
-    // we know interrupts are always on entry to the page fault handler 
-
     SH_VVLOG("shadow_fault( va=%08lx, code=%ld )", va, error_code );
 
     check_pagetable( current, current->mm.pagetable, "pre-sf" );
@@ -573,9 +544,18 @@ int shadow_fault( unsigned long va, long error_code )
         return 0;
     }
 
-    spin_lock(&current->mm.shadow_lock);
     // take the lock and reread gpte
 
+    while( unlikely(!spin_trylock(&current->mm.shadow_lock)) )
+	{
+		extern volatile unsigned long flush_cpumask;
+		if ( test_and_clear_bit(smp_processor_id(), &flush_cpumask) )
+			local_flush_tlb();
+		rep_nop();
+	}
+	
+	ASSERT(spin_is_locked(&current->mm.shadow_lock));
+	
     if ( unlikely(__get_user(gpte, (unsigned long*)&linear_pg_table[va>>PAGE_SHIFT])) )
     {
         SH_VVLOG("shadow_fault - EXIT: read gpte faulted" );

@@ -366,6 +366,10 @@ static inline void _network_interrupt(struct net_device *dev)
         skb = np->rx_skbs[rx->id];
         ADD_ID_TO_FREELIST(np->rx_skbs, rx->id);
 
+/* XXXXX this is unsafe for live migrate -- if we do a scan be fore this
+point we won't transmit the right mfn! We have to fix this up in 
+xc_linux_save  */
+
         phys_to_machine_mapping[virt_to_phys(skb->head) >> PAGE_SHIFT] =
             (*(unsigned long *)get_ppte(skb->head)) >> PAGE_SHIFT;
 

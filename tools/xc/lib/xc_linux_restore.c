@@ -67,6 +67,7 @@ int xc_linux_restore(int xc_handle,
     unsigned long mfn, pfn, xpfn;
     unsigned int prev_pc, this_pc;
     int verbose = flags & XCFLAGS_VERBOSE;
+    int verify = 0; 
 
     /* Number of page frames in use by this Linux session. */
     unsigned long nr_pfns;
@@ -106,6 +107,8 @@ int xc_linux_restore(int xc_handle,
 
     int pm_handle = -1;
 
+    /* used by debug verify code */
+    unsigned long buf[PAGE_SIZE/sizeof(unsigned long)];
 
     if ( mlock(&ctxt, sizeof(ctxt) ) )
     {   
@@ -241,8 +244,17 @@ int xc_linux_restore(int xc_handle,
 
 	DPRINTF("batch %d\n",j);
 	
+	if (j == -1)
+	{
+	    verify = 1;
+	    printf("Entering page verify mode\n");
+	    continue;
+	}
+
 	if (j == 0) 
+	{
 	    break;  // our work here is done
+	}
 
 	if( j > MAX_BATCH_SIZE )
 	{
@@ -296,7 +308,10 @@ int xc_linux_restore(int xc_handle,
 
 	    mfn = pfn_to_mfn_table[pfn];
 
-            ppage = (unsigned long*) (region_base + i*PAGE_SIZE);
+	    if ( verify )
+		ppage = (unsigned long*) buf;  // debug case
+	    else
+		ppage = (unsigned long*) (region_base + i*PAGE_SIZE);
 
 	    if ( (*readerfn)(readerst, ppage, PAGE_SIZE) )
 	    {
@@ -364,6 +379,24 @@ int xc_linux_restore(int xc_handle,
 
 	    } // end of page type switch statement
 
+	    if ( verify )
+	    {
+		int res = memcmp(buf, (region_base + i*PAGE_SIZE), PAGE_SIZE );
+		if (res)
+		{
+		    int v;
+		    printf("************** pfn=%x type=%x gotcs=%08lx actualcs=%08lx\n",pfn,pfn_type[pfn],csum_page(region_base + i*PAGE_SIZE),csum_page(buf));
+		    for(v=0;v<4;v++)
+		    {
+			unsigned long * p = (unsigned long *) (region_base + i*PAGE_SIZE);
+			if ( buf[v] != p[v] )
+			    printf("    %d: %08lx %08lx\n",
+				   v, buf[v], p[v] );
+		    }
+
+		}
+	    }
+
 	    if ( add_mmu_update(xc_handle, mmu,
 				(mfn<<PAGE_SHIFT) | MMU_MACHPHYS_UPDATE, pfn) )
 		goto out;
@@ -421,7 +454,6 @@ int xc_linux_restore(int xc_handle,
         goto out;
     }
 
-
     /* Uncanonicalise the suspend-record frame number and poke resume rec. */
     pfn = ctxt.cpu_ctxt.esi;
     if ( (pfn >= nr_pfns) || (pfn_type[pfn] != NONE) )
@@ -463,6 +495,12 @@ int xc_linux_restore(int xc_handle,
         goto out;
     }
     ctxt.pt_base = pfn_to_mfn_table[pfn] << PAGE_SHIFT;
+
+
+    /* clear any pending events and the selector */
+    memset( &(((shared_info_t *)shared_info)->evtchn_pending[0]),
+	    0, sizeof (((shared_info_t *)shared_info)->evtchn_pending)+
+	    sizeof(((shared_info_t *)shared_info)->evtchn_pending_sel) );
 
     /* Copy saved contents of shared-info page. No checking needed. */
     ppage = map_pfn_writeable(pm_handle, shared_info_frame);
@@ -543,13 +581,18 @@ int xc_linux_restore(int xc_handle,
     op.u.builddomain.ctxt = &ctxt;
     rc = do_dom0_op(xc_handle, &op);
 
-    DPRINTF("Everything OK!\n");
+    /* don't start the domain as we have console etc to set up */
+  
+    if( rc == 0 )
+    {
+	/* Success: print the domain id. */
+	verbose_printf("DOM=%llu\n", dom);
+	return 0;
+    }
+
 
  out:
-    if ( mmu != NULL )
-        free(mmu);
-
-    if ( rc != 0 )
+    if ( rc != 0 )  // destroy is something went wrong
     {
         if ( dom != 0 )
         {
@@ -559,11 +602,9 @@ int xc_linux_restore(int xc_handle,
             (void)do_dom0_op(xc_handle, &op);
         }
     }
-    else
-    {
-        /* Success: print the domain id. */
-        verbose_printf("DOM=%llu\n", dom);
-    }
+
+    if ( mmu != NULL )
+        free(mmu);
 
     if ( pm_handle >= 0 )
         (void)close_pfn_mapper(pm_handle);
@@ -576,6 +617,8 @@ int xc_linux_restore(int xc_handle,
 
     if ( rc == 0 )
         *pdomid = dom;
+
+    DPRINTF("Restore exit with rc=%d\n",rc);
 
     return rc;
 }

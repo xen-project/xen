@@ -526,6 +526,16 @@ unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes)
 
 	/* initialise to machine_to_phys_mapping table to likely pfn */
 	machine_to_phys_mapping[page-frame_table] = alloc_pfns;
+
+#ifndef NDEBUG
+	{
+	    // initialise with magic marker if in DEBUG mode
+	    void * a = map_domain_mem( (page-frame_table)<<PAGE_SHIFT );
+	    memset( a, 0x80 | (char) p->domain, PAGE_SIZE );
+	    unmap_domain_mem( a );
+	}
+#endif
+
     }
 
     p->tot_pages = nr_pages;

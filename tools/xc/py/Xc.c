@@ -191,17 +191,18 @@ static PyObject *pyxc_linux_save(PyObject *self,
 
     u64   dom;
     char *state_file;
-    int   progress = 1, live = -1;
+    int   progress = 1, live = -1, debug = 0;
     unsigned int flags = 0;
 
-    static char *kwd_list[] = { "dom", "state_file", "progress", "live", NULL };
+    static char *kwd_list[] = { "dom", "state_file", "progress", "live", "debug", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "Ls|ii", kwd_list, 
-                                      &dom, &state_file, &progress, &live) )
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "Ls|iii", kwd_list, 
+                                      &dom, &state_file, &progress, &live, &debug) )
         return NULL;
 
     if (progress)  flags |= XCFLAGS_VERBOSE;
     if (live == 1) flags |= XCFLAGS_LIVE;
+    if (debug)     flags |= XCFLAGS_DEBUG;
 
     if ( strncmp(state_file,"tcp:", strlen("tcp:")) == 0 )
     {
@@ -362,6 +363,7 @@ static PyObject *pyxc_linux_restore(PyObject *self,
 	    do { 
 		rc = read( (int) fd, ((char*)buf)+tot, count-tot ); 
 		if ( rc < 0 ) { perror("READ"); return rc; }
+		if ( rc == 0 ) { printf("read: need %d, tot=%d got zero\n"); return -1; }
 		tot += rc;
 	    } 
             while ( tot < count );

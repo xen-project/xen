@@ -12,12 +12,21 @@
 #define BATCH_SIZE 1024   /* 1024 pages (4MB) at a time */
 
 #define DEBUG 0
+#define DDEBUG 0
 
 #if DEBUG
 #define DPRINTF(_f, _a...) printf ( _f , ## _a )
 #else
 #define DPRINTF(_f, _a...) ((void)0)
 #endif
+
+#if DDEBUG
+#define DDPRINTF(_f, _a...) printf ( _f , ## _a )
+#else
+#define DDPRINTF(_f, _a...) ((void)0)
+#endif
+
+
 
 /* This may allow us to create a 'quiet' command-line option, if necessary. */
 #define verbose_printf(_f, _a...) \
@@ -61,6 +70,18 @@ inline int test_bit ( int nr, volatile void * addr)
 	     (nr % (sizeof(unsigned long)*8) ) ) & 1;
 }
 
+inline void clear_bit ( int nr, volatile void * addr)
+{
+    ((unsigned long*)addr)[nr/(sizeof(unsigned long)*8)] &= 
+	~(1 << (nr % (sizeof(unsigned long)*8) ) );
+}
+
+inline void set_bit ( int nr, volatile void * addr)
+{
+    ((unsigned long*)addr)[nr/(sizeof(unsigned long)*8)] |= 
+	(1 << (nr % (sizeof(unsigned long)*8) ) );
+}
+
 
 int xc_linux_save(int xc_handle,
                   u64 domid, 
@@ -73,6 +94,7 @@ int xc_linux_save(int xc_handle,
     unsigned long mfn;
     int verbose = flags & XCFLAGS_VERBOSE;
     int live = flags & XCFLAGS_LIVE;
+    int debug = flags & XCFLAGS_DEBUG;
     int sent_last_iter, sent_this_iter, max_iters;
 
     /* Remember if we stopped the guest, so we can restart it on exit. */
@@ -89,6 +111,7 @@ int xc_linux_save(int xc_handle,
 
     /* A table containg the type of each PFN (/not/ MFN!). */
     unsigned long *pfn_type = NULL;
+    unsigned long *pfn_batch = NULL;
 
     /* A temporary mapping, and a copy, of one frame of guest memory. */
     unsigned long page[1024];
@@ -115,7 +138,9 @@ int xc_linux_save(int xc_handle,
     unsigned long nr_pfns;
 
     /* bitmap of pages left to send */
-    unsigned long *to_send;
+    unsigned long *to_send, *to_fix;
+
+//live=0;
 
     if ( mlock(&ctxt, sizeof(ctxt) ) )
     {
@@ -274,8 +299,9 @@ int xc_linux_save(int xc_handle,
 	int sz = (nr_pfns/8) + 8; // includes slop at end of array
 	
 	to_send = malloc( sz );
+	to_fix  = calloc( 1, sz );
 
-	if (!to_send)
+	if (!to_send || !to_fix)
 	{
 	    ERROR("Couldn't allocate to_send array");
 	    goto out;
@@ -292,8 +318,9 @@ int xc_linux_save(int xc_handle,
 
     /* We want zeroed memory so use calloc rather than malloc. */
     pfn_type = calloc(BATCH_SIZE, sizeof(unsigned long));
+    pfn_batch = calloc(BATCH_SIZE, sizeof(unsigned long));
 
-    if ( (pfn_type == NULL) )
+    if ( (pfn_type == NULL) || (pfn_batch == NULL) )
     {
         errno = ENOMEM;
         goto out;
@@ -370,22 +397,41 @@ int xc_linux_save(int xc_handle,
 
 	    for( batch = 0; batch < BATCH_SIZE && n < nr_pfns ; n++ )
 	    {
-		if ( !test_bit(n, to_send ) ) continue;
 
+		if(0 && debug)
+		    fprintf(stderr,"%d pfn= %08lx mfn= %08lx %d   [mfn]= %08lx\n",
+			    iter, n, live_pfn_to_mfn_table[n],
+			    test_bit(n,to_send),
+			    live_mfn_to_pfn_table[live_pfn_to_mfn_table[n]&0xFFFFF]);
+
+
+		if ( !test_bit(n, to_send ) &&
+		    !( last_iter && test_bit(n, to_fix ) ) ) continue;
+		
+		pfn_batch[batch] = n;
 		pfn_type[batch] = live_pfn_to_mfn_table[n];
 
 		if( pfn_type[batch] == 0x80000004 )
 		{
-		    DPRINTF("Skip netbuf pfn %lx. mfn %lx\n",n,pfn_type[batch]);
+		    set_bit( n, to_fix );
+		    if( iter>1 )
+			DDPRINTF("Urk! netbuf race: iter %d, pfn %lx. mfn %lx\n",
+			       iter,n,pfn_type[batch]);
 		    continue;
 		}
 
-		if(iter>1) { DPRINTF("pfn=%x mfn=%x\n",n,pfn_type[batch]); }
-		
+		if ( last_iter && test_bit(n, to_fix ) && !test_bit(n, to_send ))
+		{
+		    DPRINTF("Fix! iter %d, pfn %lx. mfn %lx\n",
+			       iter,n,pfn_type[batch]);
+		}
+
+		clear_bit( n, to_fix ); 
+
 		batch++;
 	    }
 	    
-	    DPRINTF("batch %d:%d (n=%d)\n",iter,batch,n);
+	    DDPRINTF("batch %d:%d (n=%d)\n",iter,batch,n);
 
 	    if(batch == 0) goto skip; // vanishingly unlikely...
  	    
@@ -408,15 +454,26 @@ int xc_linux_save(int xc_handle,
 	    {
 		if((pfn_type[j]>>29) == 7)
 		{
-		    DPRINTF("type fail: page %i mfn %08lx\n",j,pfn_type[j]);
+		    DDPRINTF("type fail: page %i mfn %08lx\n",j,pfn_type[j]);
 		    continue;
 		}
 		
+		if(0 && debug)
+		    fprintf(stderr,"%d pfn= %08lx mfn= %08lx [mfn]= %08lx sum= %08lx\n",
+			    iter, 
+			    (pfn_type[j] & PGT_type_mask) | pfn_batch[j],
+			    pfn_type[j],
+			    live_mfn_to_pfn_table[pfn_type[j]&(~PGT_type_mask)],
+			    csum_page(region_base + (PAGE_SIZE*j))
+			);
+
 		/* canonicalise mfn->pfn */
 		pfn_type[j] = (pfn_type[j] & PGT_type_mask) |
-		    live_mfn_to_pfn_table[pfn_type[j]&~PGT_type_mask];
+		    pfn_batch[j];
+		//live_mfn_to_pfn_table[pfn_type[j]&~PGT_type_mask];
+
 	    }
-	    
+
 	    
 	    if ( (*writerfn)(writerst, &batch, sizeof(int) ) )
 	    {
@@ -437,7 +494,7 @@ int xc_linux_save(int xc_handle,
 		
 		if((pfn_type[j]>>29) == 7)
 		{
-		    DPRINTF("SKIP BOGUS page %i mfn %08lx\n",j,pfn_type[j]);
+		    DDPRINTF("SKIP BOGUS page %i mfn %08lx\n",j,pfn_type[j]);
 		    continue;
 		}
 		
@@ -494,6 +551,7 @@ int xc_linux_save(int xc_handle,
 		}  /* end of it's a PT page */
 		else
 		{  /* normal page */
+
 		    if ( (*writerfn)(writerst, region_base + (PAGE_SIZE*j), PAGE_SIZE) )
 		    {
 			ERROR("Error when writing to state file (5)");
@@ -512,6 +570,23 @@ int xc_linux_save(int xc_handle,
 	
 	verbose_printf("\b\b\b\b100%% (%d pages)\n", sent_this_iter );
 	
+	if ( debug && last_iter )
+	{
+	    int minusone = -1;
+	    memset( to_send, 0xff, nr_pfns/8 );
+	    debug = 0;
+	    printf("Entering debug resend-all mode\n");
+    
+	    /* send "-1" to put receiver into debug mode */
+	    if ( (*writerfn)(writerst, &minusone, sizeof(int)) )
+	    {
+		ERROR("Error when writing to state file (6)");
+		goto out;
+	    }
+
+	    continue;
+	}
+
 	if ( last_iter )
 	    break;
 
@@ -520,7 +595,7 @@ int xc_linux_save(int xc_handle,
 	    if ( ( sent_this_iter > (sent_last_iter * 0.95) ) ||
 		 (iter >= max_iters) || (sent_this_iter < 10) )
 	    {
-		printf("Start last iteration\n");
+		DPRINTF("Start last iteration\n");
 		last_iter = 1;
 
 		xc_domain_stop_sync( xc_handle, domid );
@@ -536,6 +611,7 @@ int xc_linux_save(int xc_handle,
 	    }
 
 	    sent_last_iter = sent_this_iter;
+
 	}
 
 
@@ -609,6 +685,8 @@ out:
 
     if ( pfn_type != NULL )
         free(pfn_type);
+
+    DPRINTF("Save exit rc=%d\n",rc);
     
     return !!rc;
 

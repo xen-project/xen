@@ -64,6 +64,7 @@ int xc_shadow_control(int xc_handle,
 
 #define XCFLAGS_VERBOSE 1
 #define XCFLAGS_LIVE    2
+#define XCFLAGS_DEBUG   4
 
 int xc_linux_save(int xc_handle,
                   u64 domid, 

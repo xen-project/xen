@@ -410,7 +410,7 @@ int xc_domain_stop_sync( int xc_handle, domid_t domid )
 
         if ( op.u.getdomaininfo.state == DOMSTATE_STOPPED )
 	{
-	    printf("\nDomain %lld stopped\n",domid);
+	    printf("Domain %lld stopped\n",domid);
             return 0;
 	}
 	
@@ -419,4 +419,22 @@ int xc_domain_stop_sync( int xc_handle, domid_t domid )
 
 out:
     return -1;    
+}
+
+/**********************************************************************/
+
+// this is shared between save and restore, and may be useful.
+
+unsigned long csum_page ( void * page )
+{
+    int i;
+    unsigned long *p = page;
+    unsigned long long sum=0;
+
+    for (i=0;i<PAGE_SIZE/sizeof(unsigned long);i++)
+    {
+	sum += p[i];
+    }
+
+    return sum ^ (sum>>32);
 }
