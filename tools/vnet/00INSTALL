@@ -1,0 +1,31 @@
+
+To compile and install run "make install"; if it fails or you need to reinstall 
+run "make clean" first or the build will fail, at least that is what I have 
+found under 2.6.10.
+
+Other important items:
+1)	You will need to have your xen0 kernel compiled with HMAC_SUPPORT 
+	2.6.x = (MAIN MENU: Cryptographic Options -> HMAC Support)
+	BEFORE running "make install".
+
+2)	You will want at least some of the other alogorithms listed under
+	"Cryptographic Options" for the kernel compiled as modules.
+
+3)	You will want the networking IPsec/VLAN options compiled in as modules
+	2.6.x = (MAIN MENU: Device Drivers -> Networking Support -> 
+				Networking Options ->
+					IP: AH transformation
+					IP: ESP transformation
+					IP: IPComp transformation 
+					IP: tunnel transformation
+
+					IPsec user configuration interface
+	
+					802.1Q VLAN Support
+
+4)	The module (vnet_module) will not properly load from the command line
+	with a "modprobe vnet_module".  Use network-vnet to properly configure
+	your system and load the module for you.
+
+Please refer to the additional documentation found in tools/vnet/doc for
+proper syntax and config file parameters.

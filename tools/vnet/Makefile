@@ -20,10 +20,10 @@ gc: gc.tar.gz
 	tar xfz gc.tar.gz
 	ln -sf gc?.? gc
 
-gc/Makefile:
-	(cd gc && ./configure --prefix=`pwd`/install)
+gc/.configure-makefile:
+	(cd gc && ./configure --prefix=`pwd`/install && touch .configure-makefile)
 
-gc-install: gc gc/Makefile
+gc-install: gc gc/.configure-makefile
 	make -C gc
 	make -C gc install
 
