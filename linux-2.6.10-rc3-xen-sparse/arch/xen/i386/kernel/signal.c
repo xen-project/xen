@@ -292,10 +292,15 @@ setup_sigcontext(struct sigcontext __user *sc, struct _fpstate __user *fpstate,
 	err |= __put_user(current->thread.error_code, &sc->err);
 	err |= __put_user(regs->eip, &sc->eip);
 	err |= __put_user(regs->xcs, (unsigned int __user *)&sc->cs);
+
+	/*
+	 * Iff TF was set because the program is being single-stepped by a
+	 * debugger, don't save that information on the signal stack.. We
+	 * don't want debugging to change state.
+	 */
 	eflags = regs->eflags;
-	if (current->ptrace & PT_PTRACED) {
+	if (current->ptrace & PT_DTRACE)
 		eflags &= ~TF_MASK;
-	}
 	err |= __put_user(eflags, &sc->eflags);
 	err |= __put_user(regs->esp, &sc->esp_at_signal);
 	err |= __put_user(regs->xss, (unsigned int __user *)&sc->ss);
@@ -412,12 +417,17 @@ static void setup_frame(int sig, struct k_sigaction *ka,
 	regs->xes = __USER_DS;
 	regs->xss = __USER_DS;
 	regs->xcs = __USER_CS;
+
+	/*
+	 * Clear TF when entering the signal handler, but
+	 * notify any tracer that was single-stepping it.
+	 * The tracer may want to single-step inside the
+	 * handler too.
+	 */
 	if (regs->eflags & TF_MASK) {
-		if ((current->ptrace & (PT_PTRACED | PT_DTRACE)) == (PT_PTRACED | PT_DTRACE)) {
+		regs->eflags &= ~TF_MASK;
+		if (current->ptrace & PT_DTRACE)
 			ptrace_notify(SIGTRAP);
-		} else {
-			regs->eflags &= ~TF_MASK;
-		}
 	}
 
 #if DEBUG_SIG
@@ -502,12 +512,17 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	regs->xes = __USER_DS;
 	regs->xss = __USER_DS;
 	regs->xcs = __USER_CS;
+
+	/*
+	 * Clear TF when entering the signal handler, but
+	 * notify any tracer that was single-stepping it.
+	 * The tracer may want to single-step inside the
+	 * handler too.
+	 */
 	if (regs->eflags & TF_MASK) {
-		if (current->ptrace & PT_PTRACED) {
+		regs->eflags &= ~TF_MASK;
+		if (current->ptrace & PT_DTRACE)
 			ptrace_notify(SIGTRAP);
-		} else {
-			regs->eflags &= ~TF_MASK;
-		}
 	}
 
 #if DEBUG_SIG

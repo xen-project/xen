@@ -709,6 +709,7 @@ static int raw_ioctl(struct sock *sk, int cmd, unsigned long arg)
 
 struct proto raw_prot = {
 	.name =		"RAW",
+	.owner =	THIS_MODULE,
 	.close =	raw_close,
 	.connect =	ip4_datagram_connect,
 	.disconnect =	udp_disconnect,
