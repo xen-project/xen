@@ -189,7 +189,7 @@ unsigned long direct_mmap(unsigned long phys_addr, unsigned long size,
     dmmap->vm_end = addr + size;
 	entry = find_direct(&current->mm->context.direct_list, addr);
 	if(entry != &current->mm->context.direct_list){
-		list_add_tail(&dmmap->list, entry);
+		list_add(&dmmap->list, entry);
 		printk(KERN_ALERT "bd240 debug: added node %lx in the middle\n", dmmap->vm_start);
 	} else {
     	list_add(&dmmap->list, &current->mm->context.direct_list);
