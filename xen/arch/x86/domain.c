@@ -185,6 +185,70 @@ void machine_power_off(void)
     machine_restart(0);
 }
 
+/* this belongs in include/asm, but there doesn't seem to be a suitable place */
+void free_perdomain_pt(struct domain *d)
+{
+    free_page((unsigned long)d->mm.perdomain_pt);
+}
+
+void arch_do_createdomain(struct domain *d)
+{
+    d->shared_info = (void *)get_free_page();
+    memset(d->shared_info, 0, PAGE_SIZE);
+    SHARE_PFN_WITH_DOMAIN(virt_to_page(d->shared_info), d);
+    machine_to_phys_mapping[virt_to_phys(d->shared_info) >> 
+                           PAGE_SHIFT] = 0x80000000UL;  /* debug */
+
+    d->mm.perdomain_pt = (l1_pgentry_t *)get_free_page();
+    memset(d->mm.perdomain_pt, 0, PAGE_SIZE);
+    machine_to_phys_mapping[virt_to_phys(d->mm.perdomain_pt) >> 
+                           PAGE_SHIFT] = 0x0fffdeadUL;  /* debug */
+}
+
+void arch_final_setup_guestos(struct domain *p, full_execution_context_t *c)
+{
+    unsigned long phys_basetab;
+    int i;
+
+    clear_bit(DF_DONEFPUINIT, &p->flags);
+    if ( c->flags & ECF_I387_VALID )
+        set_bit(DF_DONEFPUINIT, &p->flags);
+    memcpy(&p->shared_info->execution_context,
+           &c->cpu_ctxt,
+           sizeof(p->shared_info->execution_context));
+    memcpy(&p->thread.i387,
+           &c->fpu_ctxt,
+           sizeof(p->thread.i387));
+    memcpy(p->thread.traps,
+           &c->trap_ctxt,
+           sizeof(p->thread.traps));
+#ifdef ARCH_HAS_FAST_TRAP
+    SET_DEFAULT_FAST_TRAP(&p->thread);
+    (void)set_fast_trap(p, c->fast_trap_idx);
+#endif
+    p->mm.ldt_base = c->ldt_base;
+    p->mm.ldt_ents = c->ldt_ents;
+    SET_GDT_ENTRIES(p, DEFAULT_GDT_ENTRIES);
+    SET_GDT_ADDRESS(p, DEFAULT_GDT_ADDRESS);
+    if ( c->gdt_ents != 0 )
+        (void)set_gdt(p,
+                      c->gdt_frames,
+                      c->gdt_ents);
+    p->thread.guestos_ss = c->guestos_ss;
+    p->thread.guestos_sp = c->guestos_esp;
+    for ( i = 0; i < 8; i++ )
+        (void)set_debugreg(p, i, c->debugreg[i]);
+    p->event_selector    = c->event_callback_cs;
+    p->event_address     = c->event_callback_eip;
+    p->failsafe_selector = c->failsafe_callback_cs;
+    p->failsafe_address  = c->failsafe_callback_eip;
+    
+    phys_basetab = c->pt_base;
+    p->mm.pagetable = mk_pagetable(phys_basetab);
+    get_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT], p, 
+                      PGT_base_page_table);
+}
+
 #if defined(__i386__)
 
 void new_thread(struct domain *p,
