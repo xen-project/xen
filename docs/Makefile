@@ -1,40 +1,41 @@
 
-# Generic LaTeX makefile.
-#
-# Xfig and tgif diagrams should be in the fig/ subdirectory.
-# DOCUMENTS should be a list of the target Postscript files.
-
-DOCUMENTS = interface.ps interface.pdf interface.html user.ps \
-	    user.pdf user.html xend.ps xend.pdf xend.html
+DOC_TEX  := $(wildcard src/*.tex)
+DOC_PS   := $(patsubst src/%.tex,ps/%.ps,$(DOC_TEX))
+DOC_PDF  := $(patsubst src/%.tex,pdf/%.pdf,$(DOC_TEX))
+DOC_HTML := $(patsubst src/%.tex,html/%/index.html,$(DOC_TEX))
 
 GFX  = $(patsubst %.obj, %.eps, $(wildcard figs/*.obj))
 GFX += $(patsubst %.fig, %.eps, $(wildcard figs/*.fig))
 
-all: $(DOCUMENTS)
+all: ps pdf html
+	rm -f *.aux *.dvi *.bbl *.blg *.glo *.idx *.ilg *.log *.ind *.toc
 
-pristine: clean
-	rm -f $(DOCUMENTS)
+ps: $(DOC_PS)
+
+pdf: $(DOC_PDF)
+
+html: $(DOC_HTML)
 
 clean:
-	rm -f .word_count *.aux *.dvi *.bbl *.blg *.glo *.idx *~ 
-	rm -f *.ilg *.log *.ind *.toc *.bak core
-	rm -f figs/*.eps $(DOCUMENTS)
-	rm -rf user/
-	rm -rf interface/
+	rm -rf .word_count *.aux *.dvi *.bbl *.blg *.glo *.idx *~ 
+	rm -rf *.ilg *.log *.ind *.toc *.bak core
+	rm -rf $(GFX) ps pdf html
 
-install: $(DOCUMENTS)
+install: all
 	mkdir -p $(prefix)/usr/share/doc/xen
-	cp -a $(DOCUMENTS) VBD-HOWTO.txt Xen-HOWTO.txt $(prefix)/usr/share/doc/xen
+	cp -a ps $(prefix)/usr/share/doc/xen
+	cp -a pdf $(prefix)/usr/share/doc/xen
+	cp -a html $(prefix)/usr/share/doc/xen
 
-%.pdf: %.ps
-	ps2pdf $< $@
+pdf/%.pdf: ps/%.ps
+	mkdir -p pdf ; ps2pdf $< $@
 
-%.ps: %.dvi $(GFX)
-	dvips -Ppdf -G0 -o $@ $<
+ps/%.ps: %.dvi $(GFX)
+	mkdir -p ps ; dvips -Ppdf -G0 -o $@ $<
 
-%.dvi: %.tex
-	latex $* >/dev/null
-	if [ -e $*.toc ] ; then latex $* >/dev/null ; fi
+%.dvi: src/%.tex
+	latex $< >/dev/null
+	if [ -e $*.toc ] ; then latex $< >/dev/null ; fi
 
 %.eps: %.fig
 	fig2dev -L eps $< $@
@@ -42,5 +43,7 @@ install: $(DOCUMENTS)
 %.eps: %.obj
 	tgif -print -color -eps $<
 
-%.html: %.tex
-	latex2html --split 0 --nonavigation --noinfo --math $< 1>/dev/null 2>/dev/null
+html/%/index.html: src/%.tex
+	mkdir -p html/$*
+	latex2html -split 0 -nonavigation -noinfo -math -dir html/$* $< \
+	1>/dev/null 2>/dev/null
