@@ -253,7 +253,6 @@ int aac_get_containers(struct aac_dev *dev)
 	dinfo->count = cpu_to_le32(index);
 	dinfo->type = cpu_to_le32(FT_FILESYS);
 
-	printk("aac_get_container: getting info for container %d\n", index); 
 	status = fib_send(ContainerCommand,
 			  fibptr,
 			  sizeof (struct aac_query_mount),

@@ -223,11 +223,18 @@ static void dispatch_debug_block_io(struct task_struct *p, int index)
 static void dispatch_probe_block_io(struct task_struct *p, int index)
 {
     extern void ide_probe_devices(xen_disk_info_t *xdi);
+    extern void scsi_probe_devices(xen_disk_info_t *xdi);
     blk_ring_t *blk_ring = p->blk_ring_base;
     xen_disk_info_t *xdi;
 
     xdi = phys_to_virt((unsigned long)blk_ring->ring[index].req.buffer);    
+
+    /* 
+    ** SMH: by convention we first probe IDE, then SCSI; the latter
+    ** apppends per-device info to the end of the xdi structure. 
+    */
     ide_probe_devices(xdi);
+    scsi_probe_devices(xdi); 
 
     make_response(p, blk_ring->ring[index].req.id, 0);
 }
@@ -309,6 +316,7 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
     bh->b_blocknr       = blk_ring->ring[index].req.block_number;
     bh->b_size          = size;
     bh->b_dev           = blk_ring->ring[index].req.device; 
+
     bh->b_rsector       = blk_ring->ring[index].req.sector_number;
     bh->b_data          = phys_to_virt(buffer);
     bh->b_count.counter = 1;

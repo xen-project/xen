@@ -802,6 +802,7 @@ __inline static int __init_io(Scsi_Cmnd * SCpnt,
 	int		     this_count;
 	void		   ** bbpnt;
 
+	// printk("scsi_merge.c: __init_io entered\n"); 
 	/*
 	 * FIXME(eric) - don't inline this - it doesn't depend on the
 	 * integer flags.   Come to think of it, I don't think this is even

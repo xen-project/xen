@@ -1410,7 +1410,7 @@ unsigned int aac_response_normal(struct aac_queue * q);
 unsigned int aac_command_normal(struct aac_queue * q);
 #ifdef TRY_TASKLET
 extern struct tasklet_struct aac_command_tasklet;
-int aac_command_thread(unsigned long data);
+void aac_command_thread(unsigned long data);
 #else
 int aac_command_thread(struct aac_dev * dev);
 #endif

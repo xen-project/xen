@@ -24,27 +24,26 @@
 #include <asm/io.h>
 #include <asm/uaccess.h>
 
-#define MAJOR_NR XLBLK_MAJOR   /* force defns in blk.h, must precede include */
-static int xlblk_major = XLBLK_MAJOR;
 #include <linux/blk.h>
 
 /* Copied from linux/ide.h */
 typedef unsigned char	byte; 
 
-void xlblk_ide_register_disk(int, unsigned long);
 
-#define XLBLK_MAX 32 /* Maximum minor devices we support */
-#define XLBLK_MAJOR_NAME "xhd"
-#define IDE_PARTN_BITS 6                           /* from ide.h::PARTN_BITS */
-#define IDE_PARTN_MASK ((1<<IDE_PARTN_BITS)-1)     /* from ide.h::PARTN_MASK */
-static int xlblk_blk_size[XLBLK_MAX];
-static int xlblk_blksize_size[XLBLK_MAX];
-static int xlblk_read_ahead; 
-static int xlblk_hardsect_size[XLBLK_MAX];
-static int xlblk_max_sectors[XLBLK_MAX];
+extern int  xlide_init(int xidx, int idx); 
+extern int  xlide_hwsect(int minor); 
+extern void xlide_cleanup(void); 
+extern int  xlscsi_init(int xidx, int idx);
+extern int  xlscsi_hwsect(int minor); 
+extern void xlscsi_cleanup(void); 
+
+static int nide = 0;    // number of IDE devices we have 
+static int nscsi = 0;   // number of SCSI devices we have 
+
+
+#define XLBLK_MAX 32 /* XXX SMH: this the max of XLIDE_MAX and XLSCSI_MAX */
 
 #define XLBLK_RESPONSE_IRQ _EVENT_BLK_RESP
-
 #define DEBUG_IRQ    _EVENT_DEBUG 
 
 #if 0
@@ -57,7 +56,8 @@ static int xlblk_max_sectors[XLBLK_MAX];
 
 static blk_ring_t *blk_ring;
 static unsigned int resp_cons; /* Response consumer for comms ring. */
-static xen_disk_info_t xen_disk_info;
+
+xen_disk_info_t xen_disk_info;
 
 int hypervisor_request(void *         id,
                        int            operation,
@@ -70,52 +70,136 @@ int hypervisor_request(void *         id,
 /* ------------------------------------------------------------------------
  */
 
-static int xenolinux_block_open(struct inode *inode, struct file *filep)
+/* Convert from a XenoLinux (major,minor) to the Xen-level 'physical' device */
+static kdev_t xldev_to_physdev(kdev_t xldev) 
+{
+    int xlmajor = MAJOR(xldev); 
+    int major, minor; 
+
+    switch(xlmajor) { 
+    case XLIDE_MAJOR: 
+	major = IDE0_MAJOR; 
+	minor = 0; /* we do minor offsetting manually by addition */
+	break; 
+	
+    case XLSCSI_MAJOR: 
+	major = SCSI_DISK0_MAJOR; 
+	minor = 0; /* we do minor offsetting manually by addition */
+	break; 
+
+    default: 
+	panic("xldev_to_physdev: unhandled major %d\n", xlmajor); 
+	break; 
+    } 
+
+    return MKDEV(major, minor); 
+}
+
+
+/*
+** Locate the gendisk structure associated with a particular xenolinux disk; 
+** this requires a scan of the xen_disk_info[] array currently which kind of
+** sucks. However we can clean this whole area up later (i.e. post SOSP). 
+*/
+struct gendisk *xldev_to_gendisk(kdev_t xldev, int *t) 
+{
+    int i, j, posn, type; 
+
+    switch(MAJOR(xldev)) { 
+	
+    case XLIDE_MAJOR: 
+	type = 1; 
+	posn = 1; 
+	break; 
+	
+    case XLSCSI_MAJOR: 
+	type = 2; 
+	posn = 1; 
+	break; 
+
+    default: 
+	panic("xldev_to_gendisk: unhandled major %d\n", MAJOR(xldev)); 
+	break; 
+    } 
+
+
+    for ( i = j = 0; i < xen_disk_info.count; i++ ) {
+	if(xen_disk_info.disks[i].type == type)
+	    if(++j == posn)
+		break; 
+    }
+
+    if(t) 
+	*t = type; 
+
+    return (xen_disk_info.disks[i].gendisk); 
+}
+
+int xenolinux_block_open(struct inode *inode, struct file *filep)
 {
     DPRINTK("xenolinux_block_open\n"); 
     return 0;
 }
 
-static int xenolinux_block_release(struct inode *inode, struct file *filep)
+int xenolinux_block_release(struct inode *inode, struct file *filep)
 {
     DPRINTK("xenolinux_block_release\n");
     return 0;
 }
 
-static int xenolinux_block_ioctl(struct inode *inode, struct file *filep,
+
+
+int xenolinux_block_ioctl(struct inode *inode, struct file *filep,
 			  unsigned command, unsigned long argument)
 {
-    int minor_dev;
+    int minor_dev, type;
     struct hd_geometry *geo = (struct hd_geometry *)argument;
-
+    struct gendisk *gd;     
+    struct hd_struct *part; 
+    
     DPRINTK("xenolinux_block_ioctl\n"); 
 
     /* check permissions */
     if (!capable(CAP_SYS_ADMIN)) return -EPERM;
     if (!inode)                  return -EINVAL;
+
     minor_dev = MINOR(inode->i_rdev);
     if (minor_dev >= XLBLK_MAX)  return -ENODEV;
     
     DPRINTK_IOCTL("command: 0x%x, argument: 0x%lx, minor: 0x%x\n",
                   command, (long) argument, minor_dev); 
   
+    gd = xldev_to_gendisk(inode->i_rdev, &type); 
+    part = &gd->part[minor_dev]; 
+
     switch (command)
     {
     case BLKGETSIZE:
-        DPRINTK_IOCTL("   BLKGETSIZE: %x %lx\n", BLKGETSIZE, 
-                      (long) xen_disk_info.disks[0].capacity); 
-	return put_user(xen_disk_info.disks[0].capacity, 
-			(unsigned long *) argument);
+        DPRINTK_IOCTL("   BLKGETSIZE: %x %lx\n", BLKGETSIZE, part->nr_sects); 
+	return put_user(part->nr_sects, (unsigned long *) argument);
 
     case BLKRRPART:
         DPRINTK_IOCTL("   BLKRRPART: %x\n", BLKRRPART); 
 	break;
 
     case BLKSSZGET:
-        DPRINTK_IOCTL("   BLKSSZGET: %x 0x%x\n", BLKSSZGET,
-                      xlblk_hardsect_size[minor_dev]);
-	return xlblk_hardsect_size[minor_dev]; 
+	switch(type) {
+	case 1: 
+	    DPRINTK_IOCTL("   BLKSSZGET: %x 0x%x\n", BLKSSZGET, 
+			  xlide_hwsect(minor_dev));
+	    return xlide_hwsect(minor_dev); 
+	    break; 
+	case 2: 
+	    DPRINTK_IOCTL("   BLKSSZGET: %x 0x%x\n", BLKSSZGET,
+			  xlscsi_hwsect(minor_dev));
+	    return xlscsi_hwsect(minor_dev); 
+	    break; 
 
+	default: 
+	    printk("BLKSSZGET ioctl() on bogus type %d disk!\n", type); 
+	    return 0; 
+
+	}
     case HDIO_GETGEO:
         DPRINTK_IOCTL("   HDIO_GETGEO: %x\n", HDIO_GETGEO);
 	if (!argument) return -EINVAL;
@@ -143,13 +227,13 @@ static int xenolinux_block_ioctl(struct inode *inode, struct file *filep,
     return 0;
 }
 
-static int xenolinux_block_check(kdev_t dev)
+int xenolinux_block_check(kdev_t dev)
 {
     DPRINTK("xenolinux_block_check\n");
     return 0;
 }
 
-static int xenolinux_block_revalidate(kdev_t dev)
+int xenolinux_block_revalidate(kdev_t dev)
 {
     DPRINTK("xenolinux_block_revalidate\n"); 
     return 0;
@@ -200,14 +284,13 @@ int hypervisor_request(void *         id,
 
     case XEN_BLOCK_READ:
     case XEN_BLOCK_WRITE:
-	if ( MAJOR(device) != XLBLK_MAJOR ) 
-	    panic("error: xl_block::hypervisor_request: "
-                  "unknown device [0x%x]\n", device);
-        phys_device = MKDEV(IDE0_MAJOR, 0);
+
+        phys_device =  xldev_to_physdev(device); 
+
 	/* Compute real buffer location on disk */
 	sector_number = block_number;
-	if ( (gd = (struct gendisk *)xen_disk_info.disks[0].gendisk) != NULL )
-	    sector_number += gd->part[MINOR(device)&IDE_PARTN_MASK].start_sect;
+	gd = xldev_to_gendisk(device, NULL); 
+	sector_number += gd->part[MINOR(device)].start_sect;
         break;
 
     default:
@@ -234,7 +317,7 @@ int hypervisor_request(void *         id,
  * do_xlblk_request
  *  read a block; request is in a request queue
  */
-static void do_xlblk_request (request_queue_t *rq)
+void do_xlblk_request (request_queue_t *rq)
 {
     struct request *req;
     struct buffer_head *bh;
@@ -242,9 +325,10 @@ static void do_xlblk_request (request_queue_t *rq)
     
     DPRINTK("xlblk.c::do_xlblk_request for '%s'\n", DEVICE_NAME); 
 
-    while ( !rq->plugged && !QUEUE_EMPTY )
+    while ( !rq->plugged && !list_empty(&rq->queue_head))
     {
-	if ( (req = CURRENT) == NULL ) goto out;
+	if ( (req = blkdev_entry_next_request(&rq->queue_head)) == NULL ) 
+	    goto out;
 		
         DPRINTK("do_xlblk_request %p: cmd %i, sec %lx, (%li/%li) bh:%p\n",
                 req, req->cmd, req->sector,
@@ -310,7 +394,7 @@ static struct block_device_operations xenolinux_block_fops =
 
 static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
 {
-    int i;
+    int i; 
     unsigned long flags; 
     struct buffer_head *bh;
     
@@ -327,15 +411,24 @@ static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
     resp_cons = i;
 
     /* KAF: We can push work down at this point. We have the lock. */
-    do_xlblk_request(BLK_DEFAULT_QUEUE(MAJOR_NR));
-    
+    for (i = 0; i < xen_disk_info.count; i++) {
+	/*
+	** XXX SMH: this is pretty broken ... 
+	**     a) should really only kick devs w/ outstanding work 
+	**     b) should cover /all/ devs, not just first IDE & SCSI
+	** KAF will fix this I'm sure. 
+	*/
+	do_xlblk_request(BLK_DEFAULT_QUEUE(IDE0_MAJOR));
+	do_xlblk_request(BLK_DEFAULT_QUEUE(SCSI_DISK0_MAJOR));
+    }
+
     spin_unlock_irqrestore(&io_request_lock, flags);
 }
 
 
 int __init xlblk_init(void)
 {
-    int i, error, result;
+    int i, error;
 
     /* This mapping was created early at boot time. */
     blk_ring = (blk_ring_t *)fix_to_virt(FIX_BLKRING_BASE);
@@ -356,129 +449,57 @@ int __init xlblk_init(void)
         BUG();
     HYPERVISOR_block_io_op();
     while ( blk_ring->resp_prod != 1 ) barrier();
+
     for ( i = 0; i < xen_disk_info.count; i++ )
     { 
+	/* 
+	** SMH: initialize all the disks we found; this is complicated a 
+	** bit by the fact that we have both IDE and SCSI disks underneath 
+	*/
 	printk (KERN_ALERT "  %2d: type: %d, capacity: %ld\n",
 		i, xen_disk_info.disks[i].type, 
 		xen_disk_info.disks[i].capacity);
+	
+	switch(xen_disk_info.disks[i].type) { 
+	case 1: 
+	    xlide_init(i, nide++); 
+	    break; 
+	case 2: 
+	    xlscsi_init(i, nscsi++); 
+	    break; 
+	default: 
+	    printk("Unknown Xen disk type %d\n", xen_disk_info.disks[i].type);
+	    break; 
+	}
+
     }
-    
-    SET_MODULE_OWNER(&xenolinux_block_fops);
-    result = register_blkdev(xlblk_major, "block", &xenolinux_block_fops);
-    if (result < 0) {
-	printk (KERN_ALERT "xenolinux block: can't get major %d\n",
-		xlblk_major);
-	return result;
-    }
 
-    /* initialize global arrays in drivers/block/ll_rw_block.c */
-    for (i = 0; i < XLBLK_MAX; i++) {
-	xlblk_blk_size[i]      = xen_disk_info.disks[0].capacity;
-	xlblk_blksize_size[i]  = 512;
-	xlblk_hardsect_size[i] = 512;
-	xlblk_max_sectors[i]   = 128;
-    }
-    xlblk_read_ahead  = 8; 
-
-    blk_size[xlblk_major]      = xlblk_blk_size;
-    blksize_size[xlblk_major]  = xlblk_blksize_size;
-    hardsect_size[xlblk_major] = xlblk_hardsect_size;
-    read_ahead[xlblk_major]    = xlblk_read_ahead; 
-    max_sectors[xlblk_major]   = xlblk_max_sectors;
-
-    blk_init_queue(BLK_DEFAULT_QUEUE(xlblk_major), do_xlblk_request);
-
-    /*
-     * Turn off barking 'headactive' mode. We dequeue buffer heads as
-     * soon as we pass them down to Xen.
-     */
-    blk_queue_headactive(BLK_DEFAULT_QUEUE(xlblk_major), 0);
-
-    xlblk_ide_register_disk(0, xen_disk_info.disks[0].capacity);
-
-    printk(KERN_ALERT 
-	   "XenoLinux Virtual Block Device Driver installed [device: %d]\n",
-	   xlblk_major);
     return 0;
 
  fail:
     return error;
 }
 
-void xlblk_ide_register_disk(int idx, unsigned long capacity)
-{
-    int units;
-    int minors;
-    struct gendisk *gd;
-
-    /* plagarized from ide-probe.c::init_gendisk */
-    
-    units = 2; /* from ide.h::MAX_DRIVES */
-
-    minors    = units * (1<<IDE_PARTN_BITS);
-    gd        = kmalloc (sizeof(struct gendisk), GFP_KERNEL);
-    gd->sizes = kmalloc (minors * sizeof(int), GFP_KERNEL);
-    gd->part  = kmalloc (minors * sizeof(struct hd_struct), GFP_KERNEL);
-    memset(gd->part, 0, minors * sizeof(struct hd_struct));
-    
-    gd->major        = xlblk_major;  
-    gd->major_name   = XLBLK_MAJOR_NAME;
-    gd->minor_shift  = IDE_PARTN_BITS; 
-    gd->max_p	     = 1<<IDE_PARTN_BITS;
-    gd->nr_real	     = units;           
-    gd->real_devices = NULL;          
-    gd->next	     = NULL;            
-    gd->fops         = &xenolinux_block_fops;
-    gd->de_arr       = kmalloc (sizeof *gd->de_arr * units, GFP_KERNEL);
-    gd->flags	     = kmalloc (sizeof *gd->flags * units, GFP_KERNEL);
-
-    if (gd->de_arr)  
-	memset (gd->de_arr, 0, sizeof *gd->de_arr * units);
-
-    if (gd->flags) 
-	memset (gd->flags, 0, sizeof *gd->flags * units);
-
-    add_gendisk(gd);
-
-    xen_disk_info.disks[idx].gendisk = gd;
-
-    /* default disk size is just a big number.  in the future, we
-       need a message to probe the devices to determine the actual size */
-    register_disk(gd, MKDEV(xlblk_major, 0), 1<<IDE_PARTN_BITS,
-		  &xenolinux_block_fops, capacity);
-
-    return;
-}
-
-
 
 static void __exit xlblk_cleanup(void)
 {
-    /* CHANGE FOR MULTIQUEUE */
-    blk_cleanup_queue(BLK_DEFAULT_QUEUE(xlblk_major));
+    int i; 
 
-    /* clean up global arrays */
-    read_ahead[xlblk_major] = 0;
+    for ( i = 0; i < xen_disk_info.count; i++ )
+    { 
+	switch(xen_disk_info.disks[i].type) { 
+	case 1: 
+	    xlide_cleanup(); 
+	    break; 
+	case 2: 
+	    xlscsi_cleanup(); 
+	    break; 
+	default: 
+	    printk("Unknown Xen disk type %d\n", xen_disk_info.disks[i].type);
+	    break; 
+	}
 
-    if (blk_size[xlblk_major]) 
-	kfree(blk_size[xlblk_major]);
-    blk_size[xlblk_major] = NULL;
-
-    if (blksize_size[xlblk_major]) 
-	kfree(blksize_size[xlblk_major]);
-    blksize_size[xlblk_major] = NULL;
-
-    if (hardsect_size[xlblk_major]) 
-	kfree(hardsect_size[xlblk_major]);
-    hardsect_size[xlblk_major] = NULL;
-    
-    /* XXX: free each gendisk */
-    if (unregister_blkdev(xlblk_major, "block"))
-	printk(KERN_ALERT
-	       "XenoLinux Virtual Block Device Driver uninstalled w/ errs\n");
-    else
-	printk(KERN_ALERT 
-	       "XenoLinux Virtual Block Device Driver uninstalled\n");
+    }
 
     return;
 }

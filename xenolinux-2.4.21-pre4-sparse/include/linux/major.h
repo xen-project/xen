@@ -145,7 +145,8 @@
 
 #define	UMEM_MAJOR	116	/* http://www.umem.com/ Battery Backed RAM */
 
-#define XLBLK_MAJOR	123	/* XenoLinux Block Device */
+#define XLIDE_MAJOR	123	/* XenoLinux IDE Device */
+#define XLSCSI_MAJOR	133	/* XenoLinux SCSI Device */
 
 #define RTF_MAJOR	150
 #define RAW_MAJOR	162

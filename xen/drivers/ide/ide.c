@@ -183,12 +183,6 @@ int unregister_blkdev(unsigned int major, const char * name) { return 0; }
 int invalidate_device(kdev_t dev, int do_sync) { return 0; }
 /* fs/buffer.c... */
 void invalidate_bdev(struct block_device *bdev, int destroy_dirty_buffers) { }
-/* fs/partitions/check.c... */
-void grok_partitions(struct gendisk *dev, int drive, 
-                     unsigned minors, long size) { }
-void register_disk(struct gendisk *dev, kdev_t first, 
-                   unsigned minors, struct block_device_operations *ops, 
-                   long size) { }
 /* fs/devices.c... */
 const char * kdevname(kdev_t dev) { return NULL; }
 /* End of XXXXXX region */

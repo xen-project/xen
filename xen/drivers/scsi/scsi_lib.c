@@ -73,7 +73,7 @@ static void __scsi_insert_special(request_queue_t *q, struct request *rq,
     unsigned long flags;
     
     ASSERT_LOCK(&io_request_lock, 0);
-    
+
     rq->cmd = SPECIAL;
     rq->special = data;
     rq->q = NULL;
@@ -362,92 +362,98 @@ static Scsi_Cmnd *__scsi_end_request(Scsi_Cmnd * SCpnt,
 				     int requeue,
 				     int frequeue)
 {
-	struct request *req;
-	struct buffer_head *bh;
-        Scsi_Device * SDpnt;
-	int nsect;
-
-	ASSERT_LOCK(&io_request_lock, 0);
-
-	req = &SCpnt->request;
-	req->errors = 0;
-	if (!uptodate) {
-		printk(" I/O error: dev %s, sector %lu\n",
-		       kdevname(req->rq_dev), req->sector);
-	}
-	do {
-		if ((bh = req->bh) != NULL) {
-			nsect = bh->b_size >> 9;
-			blk_finished_io(nsect);
-			req->bh = bh->b_reqnext;
-			bh->b_reqnext = NULL;
-			sectors -= nsect;
-			bh->b_end_io(bh, uptodate);
-			if ((bh = req->bh) != NULL) {
-				req->hard_sector += nsect;
-				req->hard_nr_sectors -= nsect;
-				req->sector += nsect;
-				req->nr_sectors -= nsect;
-
-				req->current_nr_sectors = bh->b_size >> 9;
-				if (req->nr_sectors < req->current_nr_sectors) {
-					req->nr_sectors = req->current_nr_sectors;
-					printk("scsi_end_request: buffer-list destroyed\n");
-				}
-			}
+    struct request *req;
+    struct buffer_head *bh;
+    Scsi_Device * SDpnt;
+    int nsect;
+    
+    ASSERT_LOCK(&io_request_lock, 0);
+    
+    req = &SCpnt->request;
+    req->errors = 0;
+    if (!uptodate) {
+	printk(" I/O error: dev %s, sector %lu\n",
+	       kdevname(req->rq_dev), req->sector);
+    }
+    do {
+	if ((bh = req->bh) != NULL) {
+	    nsect = bh->b_size >> 9;
+	    blk_finished_io(nsect);
+	    req->bh = bh->b_reqnext;
+	    bh->b_reqnext = NULL;
+	    sectors -= nsect;
+	    bh->b_end_io(bh, uptodate);
+	    if ((bh = req->bh) != NULL) {
+		req->hard_sector += nsect;
+		req->hard_nr_sectors -= nsect;
+		req->sector += nsect;
+		req->nr_sectors -= nsect;
+		
+		req->current_nr_sectors = bh->b_size >> 9;
+		if (req->nr_sectors < req->current_nr_sectors) {
+		    req->nr_sectors = req->current_nr_sectors;
+		    printk("scsi_end_request: buffer-list destroyed\n");
 		}
-	} while (sectors && bh);
-
+	    }
+	}
+    } while (sectors && bh);
+    
+    /*
+     * If there are blocks left over at the end, set up the command
+     * to queue the remainder of them.
+     */
+    if (req->bh) {
+	request_queue_t *q;
+	
+	if( !requeue )
+	{
+	    return SCpnt;
+	}
+	
+	q = &SCpnt->device->request_queue;
+	
+	req->buffer = bh->b_data;
 	/*
-	 * If there are blocks left over at the end, set up the command
-	 * to queue the remainder of them.
+	 * Bleah.  Leftovers again.  Stick the leftovers in
+	 * the front of the queue, and goose the queue again.
 	 */
-	if (req->bh) {
-                request_queue_t *q;
-
-		if( !requeue )
-		{
-			return SCpnt;
-		}
-
-                q = &SCpnt->device->request_queue;
-
-		req->buffer = bh->b_data;
-		/*
-		 * Bleah.  Leftovers again.  Stick the leftovers in
-		 * the front of the queue, and goose the queue again.
-		 */
-		scsi_queue_next_request(q, SCpnt);
-		return SCpnt;
-	}
+	scsi_queue_next_request(q, SCpnt);
+	return SCpnt;
+    }
 #if 0
-	/*
-	 * This request is done.  If there is someone blocked waiting for this
-	 * request, wake them up.  Typically used to wake up processes trying
-	 * to swap a page into memory.
-	 */
-	if (req->waiting != NULL) {
-		complete(req->waiting);
-	}
+    /*
+     * This request is done.  If there is someone blocked waiting for this
+     * request, wake them up.  Typically used to wake up processes trying
+     * to swap a page into memory.
+     */
+    if (req->waiting != NULL) {
+	complete(req->waiting);
+    }
+#else 
+    /* XXX SMH: we're done -- flip the flag for the spinner :-| */
+    if(req->waiting && (*(int *)(req->waiting) != NULL)) {
+		printk("__scsi_end_request: flipping wait status on req %p\n", req); 
+		*(int *)(req->waiting) = NULL; 
+    } // else printk("__scsi_end_request: no-one to notify!!\n"); 
 #endif
-	req_finished_io(req);
-	add_blkdev_randomness(MAJOR(req->rq_dev));
-
-        SDpnt = SCpnt->device;
-
-	/*
-	 * This will goose the queue request function at the end, so we don't
-	 * need to worry about launching another command.
-	 */
-	__scsi_release_command(SCpnt);
-
-	if( frequeue ) {
-		request_queue_t *q;
-
-		q = &SDpnt->request_queue;
-		scsi_queue_next_request(q, NULL);                
-	}
-	return NULL;
+    req_finished_io(req);
+    add_blkdev_randomness(MAJOR(req->rq_dev));
+    
+    SDpnt = SCpnt->device;
+    
+    /*
+     * This will goose the queue request function at the end, so we don't
+     * need to worry about launching another command.
+     */
+    __scsi_release_command(SCpnt);
+    
+    if( frequeue ) {
+	request_queue_t *q;
+	
+	q = &SDpnt->request_queue;
+	scsi_queue_next_request(q, NULL);                
+    }
+    return NULL;
 }
 
 /*
@@ -554,6 +560,7 @@ void scsi_io_completion(Scsi_Cmnd * SCpnt, int good_sectors,
 	int this_count = SCpnt->bufflen >> 9;
 	request_queue_t *q = &SCpnt->device->request_queue;
 
+	// printk("scsi_io_completion entered.\n"); 
 	/*
 	 * We must do one of several things here:
 	 *
@@ -1053,6 +1060,7 @@ void scsi_request_fn(request_queue_t * q)
 			 * get those allocated here.  
 			 */
 			if (!SDpnt->scsi_init_io_fn(SCpnt)) {
+				printk("scsi_request_fn: scsi_init_io_fn failed :-(\n"); 
 				SCpnt = __scsi_end_request(SCpnt, 0, 
 							   SCpnt->request.nr_sectors, 0, 0);
 				if( SCpnt != NULL )
@@ -1068,6 +1076,7 @@ void scsi_request_fn(request_queue_t * q)
 			 * Initialize the actual SCSI command for this request.
 			 */
 			if (!STpnt->init_command(SCpnt)) {
+				printk("scsi_request_fn: init_command failed :-(\n"); 
 				scsi_release_buffers(SCpnt);
 				SCpnt = __scsi_end_request(SCpnt, 0, 
 							   SCpnt->request.nr_sectors, 0, 0);

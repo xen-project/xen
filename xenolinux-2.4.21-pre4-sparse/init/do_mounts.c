@@ -232,9 +232,7 @@ static struct dev_name_struct {
 	{ "ataraid/d15p",0x72F0 },
 #if defined(CONFIG_XENOLINUX_BLOCK)
         { "xhda",    0x7B00 },
-        { "xhdb",    0x7C00 },
-        { "xhdc",    0x7D00 },
-        { "xhdd",    0x7E00 },
+        { "xsda",    0x8500 },
 #endif
 	{ "nftla", 0x5d00 },
 	{ "nftlb", 0x5d10 },

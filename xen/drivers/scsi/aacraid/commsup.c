@@ -535,12 +535,13 @@ int fib_send(u16 command, struct fib * fibptr, unsigned long size,  int priority
          * do_softirq() after scheduling the tasklet, as long as we
          * are _sure_ we hold no locks here...
          */
-	printk("about to softirq aac_command_thread...\n"); 
+//	printk("about to softirq aac_command_thread...\n"); 
 	while (!fibptr->done) { 
             tasklet_schedule(&aac_command_tasklet);
-	    mdelay(100); 
+	    do_softirq(); /* force execution */
+//	    mdelay(100); 
 	}
-	printk("back from softirq cmd thread and fibptr->done!\n"); 
+//	printk("back from softirq cmd thread and fibptr->done!\n"); 
 #else 
 	printk("about to bail at aac_command_thread...\n"); 
 	while (!fibptr->done) { 
@@ -843,11 +844,12 @@ static void aac_handle_aif(struct aac_dev * dev, struct fib * fibptr)
  */
  
 #ifndef TRY_TASKLET
-DECLARE_TASKLET_DISABLED(aac_command_tasklet, aac_command_thread, 0);
 int aac_command_thread(struct aac_dev * dev)
 {
 #else
-int aac_command_thread(unsigned long data)
+DECLARE_TASKLET_DISABLED(aac_command_tasklet, aac_command_thread, 0);
+void aac_command_thread(unsigned long data)
+#define return(_x) return 
 {   
     struct aac_dev *dev = (struct aac_dev *)data; 
 #endif
@@ -863,9 +865,8 @@ int aac_command_thread(unsigned long data)
     /*
      *	We can only have one thread per adapter for AIF's.
      */
-    printk("aac_command_'thread': entered.\n"); 
     if (dev->aif_thread)
-	return -EINVAL;
+	return(-EINVAL);
 
 #if 0
     /*
@@ -888,9 +889,7 @@ int aac_command_thread(unsigned long data)
 //    while(1) 
     {
 
-	printk("aac_command_thread: in 'loop'\n"); 
 	spin_lock_irqsave(queues->queue[HostNormCmdQueue].lock, flags);
-	printk("flags = %x\n", flags); 
 	while(!list_empty(&(queues->queue[HostNormCmdQueue].cmdq))) {
 	    struct list_head *entry;
 	    struct aac_aifcmd * aifcmd;
@@ -905,7 +904,6 @@ int aac_command_thread(unsigned long data)
 			
 	    spin_unlock_irqrestore(queues->queue[HostNormCmdQueue].lock,flags);
 	    fib = list_entry(entry, struct hw_fib, header.FibLinks);
-	    printk("aac_command_thread: got fib \n"); 
 	    /*
 	     *	We will process the FIB here or pass it to a 
 	     *	worker thread that is TBD. We Really can't 
@@ -923,7 +921,6 @@ int aac_command_thread(unsigned long data)
 	     */
 	    aifcmd = (struct aac_aifcmd *) fib->data;
 	    if (aifcmd->command == le16_to_cpu(AifCmdDriverNotify)) {
-		printk("aac_command_thread: handling aif... :-( \n"); 
 		aac_handle_aif(dev, &fibptr);
 	    } else {
 		/* The u32 here is important and intended. We are using
@@ -1024,5 +1021,5 @@ int aac_command_thread(unsigned long data)
     dev->aif_thread = 0;
 
 #endif
-    return 0;
+    return(0);
 }
