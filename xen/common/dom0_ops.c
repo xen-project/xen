@@ -16,6 +16,7 @@
 #include <asm/domain_page.h>
 #include <asm/msr.h>
 #include <asm/pdb.h>
+#include <xeno/trace.h>
 
 extern unsigned int alloc_new_dom_mem(struct task_struct *, unsigned int);
 
@@ -431,6 +432,16 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         ret = 0;
     }
     break;
+
+#ifdef TRACE_BUFFER
+    case DOM0_GETTBUFS:
+    {
+	op->u.gettbufs.phys_addr = get_tb_ptr();
+	copy_to_user(u_dom0_op, op, sizeof(*op));
+	ret = 0;
+    }
+    break;
+#endif
     
     case DOM0_READCONSOLE:
     {

@@ -86,6 +86,10 @@
 3fbd0a42l40lM0IICw2jXbQBVZSdZg tools/xc/py/Xc.c
 3fbd4bd6GtGwZGxYUJPOheYIR7bPaA tools/xc/py/XenoUtil.py
 3fbd0a40yT6G3M9hMpaz5xTUdl0E4g tools/xc/py/setup.py
+403a3edbrr8RE34gkbR40zep98SXbg tools/xentrace/Makefile
+403a3edbVpV2E_wq1zeEkJ_n4Uu2eg tools/xentrace/xentrace.c
+403a3edb0lzD0Fojc-NYNoXr3SYrnA tools/xentrace/xentrace_cpusplit.py
+403a3edblCUrzSj0mmKhO5HOPrOrSQ tools/xentrace/xentrace_format.py
 3f72f1bdJPsV3JCnBqs9ddL9tr6D2g xen/COPYING
 3ddb79bcbOVHh38VJzc97-JEGD4dJQ xen/Makefile
 3ddb79bcWnTwYsQRWl_PaneJfa6p0w xen/Rules.mk
@@ -150,6 +154,7 @@
 3ddb79bd0gVQYmL2zvuJnldvD0AGxQ xen/common/softirq.c
 3e7f358awXBC3Vw-wFRwPw18qL1khg xen/common/string.c
 3ddb79bdQqFHtHRGEO2dsxGgo6eAhw xen/common/timer.c
+403a3edbejm33XLTGMuinKEwQBrOIg xen/common/trace.c
 3ddb79bd3zgV33PHdt-cgh3sxcb1hw xen/common/vsprintf.c
 3ddb79c0ppNeJtjC4va8j41ADCnchA xen/drivers/Makefile
 3ddb79beWzgPS8ozf2BL2g3ZkiWhhQ xen/drivers/block/Makefile
@@ -491,6 +496,7 @@
 3ddb79c2HFkXuRxi1CriJtSFmY6Ybw xen/include/xeno/timer.h
 3ddb79c2_m8lT9jDKse_tePj7zcnNQ xen/include/xeno/timex.h
 3ddb79c2e2C14HkndNEJlYwXaPrF5A xen/include/xeno/tqueue.h
+403a3edbG9K5uZjuY19_LORbQGmFbA xen/include/xeno/trace.h
 3ddb79c1-kVvF8cVa0k3ZHDdBMj01Q xen/include/xeno/types.h
 3f055a3dwldYR102YcSuBaxIf9t3Jw xen/include/xeno/vbd.h
 3e8827bdaqPeZAWGVOwswgY9bWSx4g xen/include/xeno/version.h

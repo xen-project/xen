@@ -14,6 +14,7 @@
 #include <asm/desc.h>
 #include <asm/domain_page.h>
 #include <asm/pdb.h>
+#include <xeno/trace.h>
 
 struct cpuinfo_x86 boot_cpu_data = { 0 };
 /* Lots of nice things, since we only target PPro+. */
@@ -449,4 +450,8 @@ void __init start_of_day(void)
 #endif
 
     watchdog_on = 1;
+
+#ifdef TRACE_BUFFER
+    init_trace_bufs(); /* initialise trace buffers */
+#endif
 }

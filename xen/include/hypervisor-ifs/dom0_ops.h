@@ -17,7 +17,7 @@
  * This makes sure that old versions of dom0 tools will stop working in a
  * well-defined way (rather than crashing the machine, for instance).
  */
-#define DOM0_INTERFACE_VERSION   0xAAAA0005
+#define DOM0_INTERFACE_VERSION   0xAAAA0006
 
 
 /*
@@ -210,6 +210,14 @@ typedef struct dom0_pincpudomain_st
     int          cpu;  /* -1 implies unpin */
 } dom0_pincpudomain_t;
 
+/* Get trace buffers physical base pointer */
+#define DOM0_GETTBUFS         21
+typedef struct dom0_gettbufs_st
+{
+  /* OUT variable - location of the trace buffers */
+  struct t_buf *phys_addr;
+} dom0_gettbufs_t;
+
 typedef struct dom0_op_st
 {
     unsigned long cmd;
@@ -232,6 +240,7 @@ typedef struct dom0_op_st
 	dom0_settime_t          settime;
 	dom0_readconsole_t	readconsole;
 	dom0_pincpudomain_t     pincpudomain;
+        dom0_gettbufs_t         gettbufs;
     } u;
 } dom0_op_t;
 
