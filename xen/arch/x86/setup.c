@@ -602,8 +602,6 @@ void __init __start_xen(multiboot_info_t *mbi)
     xmem_cache_init();
     xmem_cache_sizes_init(max_page);
 
-    domain_startofday();
-
     start_of_day();
 
     grant_table_init();
