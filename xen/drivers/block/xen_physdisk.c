@@ -10,7 +10,7 @@
 
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
 
-#if 1
+#if 0
 #define DPRINTK printk
 #else
 #define DPRINTK(...)
@@ -40,6 +40,8 @@ static struct physdisk_ace *find_ace(const struct task_struct *p,
   struct list_head *cur_ace_head;
   struct physdisk_ace *cur_ace;
 
+  dev &= ~0x1f; /* ignore the partition part */
+
   list_for_each(cur_ace_head, &p->physdisk_aces) {
     cur_ace = list_entry(cur_ace_head, struct physdisk_ace,
 			 list);
@@ -48,7 +50,7 @@ static struct physdisk_ace *find_ace(const struct task_struct *p,
 	    sect);
     if (sect >= cur_ace->start_sect &&
 	sect < cur_ace->start_sect + cur_ace->n_sectors &&
-	dev == cur_ace->device &&
+	dev == (cur_ace->device & ~0x1f) && /* ignore partition part */
 	((operation == READ && (cur_ace->mode & PHYSDISK_MODE_R)) ||
 	 (operation == WRITE && (cur_ace->mode & PHYSDISK_MODE_W)))) {
       DPRINTK("Yes.\n");
@@ -206,7 +208,8 @@ int xen_physdisk_grant(xp_disk_t *xpd_in)
   return res;
 }
 
-int xen_physdisk_probe(physdisk_probebuf_t *buf_in)
+int xen_physdisk_probe(struct task_struct *requesting_domain,
+		       physdisk_probebuf_t *buf_in)
 {
   struct task_struct *p;
   physdisk_probebuf_t *buf = map_domain_mem(virt_to_phys(buf_in));
@@ -220,6 +223,12 @@ int xen_physdisk_probe(physdisk_probebuf_t *buf_in)
     res = 1;
     goto out;
   }
+  if (requesting_domain->domain != 0 &&
+      requesting_domain->domain != buf->domain) {
+    res = 1;
+    goto out;
+  }
+
   spin_lock(&p->physdev_lock);
   xen_physdisk_probe_access(buf, p);
   spin_unlock(&p->physdev_lock);

@@ -432,12 +432,6 @@ static void dispatch_probe_physdev(struct task_struct *p, int index)
     physdisk_probebuf_t *buf;
     int result;
 
-    if ( p->domain != 0 )
-    {
-        result = 1;
-        goto out;
-    }
-
     buffer = blk_ring->ring[index].req.buffer_and_sects[0] & ~0x1FF;
 
     spin_lock_irqsave(&p->page_lock, flags);
@@ -451,7 +445,7 @@ static void dispatch_probe_physdev(struct task_struct *p, int index)
     spin_unlock_irqrestore(&p->page_lock, flags);
 
     buf = phys_to_virt(buffer);
-    result = xen_physdisk_probe(buf);
+    result = xen_physdisk_probe(p, buf);
 
     unlock_buffer(p, buffer, sizeof(*buf), 1);
 
