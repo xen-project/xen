@@ -171,7 +171,7 @@ struct task_struct
  * TASK_UNINTERRUPTIBLE: Domain is blocked but may not be woken up by an
  *                       arbitrary event or timer.
  * TASK_WAIT:            Domains CPU allocation expired.
- * TASK_SUSPENDED:       Domain is in supsended state (eg. start of day)
+ * TASK_SUSPENDED:       Domain is suspended (startofday or pervasive debugger)
  * TASK_DYING:           Domain is about to cross over to the land of the dead.
  *
  * If you update these then please update the mapping to text names in

@@ -234,6 +234,7 @@
 3e397e66AyyD5fYraAySWuwi9uqSXg xen/common/ac_timer.c
 3ddb79bddEYJbcURvqqcx99Yl2iAhQ xen/common/block.c
 3ddb79bdrqnW93GR9gZk1OJe1qK-iQ xen/common/brlock.c
+3fa152581E5KhrAtqZef2Sr5NKTz4w xen/common/debug.c
 3ddb79bdLX_P6iB7ILiblRLWvebapg xen/common/dom0_ops.c
 3e6377e4i0c9GtKN65e99OtRbw3AZw xen/common/dom_mem_ops.c
 3ddb79bdYO5D8Av12NHqPeSviav7cg xen/common/domain.c

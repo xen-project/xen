@@ -106,16 +106,15 @@ typedef struct dom0_msr_st
     unsigned int in1, in2;
     /* OUT variables. */
     unsigned int out1, out2;
-
 } dom0_msr_t;
 
 typedef struct dom0_debug_st
 {
     /* IN variables. */
-    int in1, in2;
+    char opcode;
+    int domain, in1, in2;
     /* OUT variables. */
-    int out1, out2;
-
+    int status, out1, out2;
 } dom0_debug_t;
 
 /*
