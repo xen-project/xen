@@ -62,7 +62,7 @@ The top-level element, a virtual machine configuration.
     <li>memory: int, required. Domain memory in MB.
     <li>cpu: int, optional. Cpu to run on.
     <li>image: linux | netbsd | ..., required. Domain image (OS-specific element).
-    <li>controller: any device controller type, optional, default none.
+    <li>backend: any backend device type, optional, default none.
     <li>device: any device type, optional, repeats. Device.
     <li>restart: string, optional, default onreboot. Restart mode, one of
         <ul><li>onreboot: restart the domain when it exits with code reboot.
@@ -99,7 +99,21 @@ block devices.
 
 <h2>(backend (netif)) element</h2>
 The vm is a net device backend.
-The domain may not have virtual network interfaces (vifs) configured.
+The vm may not have virtual network interfaces (vifs) configured.
+
+<h2>(backend (vbd) element</h2>
+Defines the domain to use as the backend for virtual block devices.
+The domain must exist.
+<ul>
+    <li>domain: string, required. Domain name or id.
+</ul>
+
+<h2>(backend (vif) element</h2>
+Defines the domain to use as the backend for virtual network interfaces.
+The domain must exist.
+<ul>
+    <li>dom: string, required. Domain name or id.
+</ul>
 
 <h2>(device (vif)) element</h2>
 Defines a virtual network interface.
