@@ -68,7 +68,7 @@ char opt_nmi[10] = "fatal";
 string_param("nmi", opt_nmi);
 
 /* Master table, used by all CPUs on x86/64, and by CPU0 on x86/32.*/
-idt_entry_t idt_table[IDT_ENTRIES] = { {0, 0}, };
+idt_entry_t idt_table[IDT_ENTRIES];
 
 asmlinkage void divide_error(void);
 asmlinkage void debug(void);
@@ -714,7 +714,14 @@ asmlinkage int do_spurious_interrupt_bug(struct xen_regs *regs)
 
 void set_intr_gate(unsigned int n, void *addr)
 {
-    _set_gate(idt_table+n,14,0,addr);
+#ifdef __i386__
+    int i;
+    /* Keep secondary tables in sync with IRQ updates. */
+    for ( i = 1; i < NR_CPUS; i++ )
+        if ( idt_tables[i] != NULL )
+            _set_gate(&idt_tables[i][n], 14, 0, addr);
+#endif
+    _set_gate(&idt_table[n], 14, 0, addr);
 }
 
 void set_system_gate(unsigned int n, void *addr)

@@ -148,15 +148,22 @@ __high_start:
         rep     stosb
 
         /* Initialise IDT with simple error defaults. */
-        lea     ignore_int(%rip),%rdx
-        mov     $(__HYPERVISOR_CS64 << 16),%eax
-        mov     %dx,%ax            /* selector = 0x0010 = cs */
-        mov     $0x8E00,%dx        /* interrupt gate - dpl=0, present */
-        lea     idt_table(%rip),%rdi
-        mov     $256,%rcx
-1:      mov     %eax,(%rdi)
-        mov     %edx,4(%rdi)
-        add     $8,%rdi
+        leaq    ignore_int(%rip),%rcx
+        movl    %ecx,%eax
+        andl    $0xFFFF0000,%eax
+        orl     $0x00008E00,%eax
+        shlq    $32,%rax
+        movl    %ecx,%edx
+        andl    $0x0000FFFF,%edx
+        orl     $(__HYPERVISOR_CS64<<16),%edx
+        orq     %rdx,%rax
+        shrq    $32,%rcx
+        movl    %ecx,%edx
+        leaq    idt_table(%rip),%rdi
+        movl    $256,%ecx
+1:      movq    %rax,(%rdi)
+        movq    %rdx,8(%rdi)
+        addq    $16,%rdi
         loop    1b
 
         /* Pass off the Multiboot info structure to C land. */
@@ -166,15 +173,6 @@ __high_start:
         add     %rax,%rdi
         call    __start_xen
         ud2     /* Force a panic (invalid opcode). */
-
-/* This is the default interrupt handler. */
-int_msg:
-        .asciz "Unknown interrupt\n"
-ignore_int:
-        cld
-        lea     int_msg(%rip),%rdi
-        call    SYMBOL_NAME(printf)
-1:      jmp     1b
 
         .code32
 
@@ -250,5 +248,16 @@ ENTRY(idle_pg_table_l2)
 ENTRY(cpu0_stack)
 
         .org 0x4000 + STACK_SIZE
+        .code64
 ENTRY(stext)
 ENTRY(_stext)
+
+/* This is the default interrupt handler. */
+int_msg:
+        .asciz "Unknown interrupt\n"
+ignore_int:
+        cld
+        leaq    int_msg(%rip),%rdi
+        call    SYMBOL_NAME(printf)
+1:      jmp     1b
+
