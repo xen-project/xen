@@ -13,9 +13,16 @@
 To use these shadow page tables, guests must not rely on the ACCESSED
 and DIRTY bits on L2 pte's being accurate -- they will typically all be set.
 
-
 I doubt this will break anything. (If guests want to use the va_update
 mechanism they've signed up for this anyhow...)
+
+There's a per-domain shadow table spin lock which works fine for SMP
+hosts. We don't have to worry about interrupts as no shadow operations
+happen in an interrupt context. It's probably not quite ready for SMP
+guest operation as we have to worry about synchonisation between gpte
+and spte updates. Its possible that this might only happen in a
+hypercall context, in which case we'll probably at have a per-domain
+hypercall lock anyhow (at least initially).
 
 ********/
 
@@ -320,30 +327,48 @@ int shadow_fault( unsigned long va, long error_code )
 
 	SH_VVLOG("shadow_fault( va=%08lx, code=%ld )", va, error_code );
 
-    spin_lock(&current->mm.shadow_lock);
-
     check_pagetable( current, current->mm.pagetable, "pre-sf" );
 
 	if ( unlikely(__get_user(gpte, (unsigned long*)&linear_pg_table[va>>PAGE_SHIFT])) )
 	{
 		SH_VVLOG("shadow_fault - EXIT: read gpte faulted" );
-        spin_unlock(&current->mm.shadow_lock);
 		return 0;  // propagate to guest
 	}
 
 	if ( ! (gpte & _PAGE_PRESENT) )
 	{
 		SH_VVLOG("shadow_fault - EXIT: gpte not present (%lx)",gpte );
-        spin_unlock(&current->mm.shadow_lock);
 		return 0;  // we're not going to be able to help
     }
 
+    if ( (error_code & 2)  && ! (gpte & _PAGE_RW) )
+    {
+	    // write fault on RO page
+	    return 0;
+	}
+
+    spin_lock(&current->mm.shadow_lock);
+    // take the lock and reread gpte
+
+	if ( unlikely(__get_user(gpte, (unsigned long*)&linear_pg_table[va>>PAGE_SHIFT])) )
+	{
+		SH_VVLOG("shadow_fault - EXIT: read gpte faulted" );
+		spin_unlock(&current->mm.shadow_lock);
+		return 0;  // propagate to guest
+	}
+
+	if ( unlikely(!(gpte & _PAGE_PRESENT)) )
+	{
+		SH_VVLOG("shadow_fault - EXIT: gpte not present (%lx)",gpte );
+		spin_unlock(&current->mm.shadow_lock);
+		return 0;  // we're not going to be able to help
+    }
 
     spte = gpte;
 
 	if ( error_code & 2  )  
 	{  // write fault
-		if ( gpte & _PAGE_RW )
+		if ( likely(gpte & _PAGE_RW) )
 	    {
 			gpte |= _PAGE_DIRTY | _PAGE_ACCESSED;
 			spte |= _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED; 
@@ -385,6 +410,7 @@ int shadow_fault( unsigned long va, long error_code )
 
         gl1pfn = gpde>>PAGE_SHIFT;
 
+        
         if ( ! (sl1pfn=__shadow_status(current, gl1pfn) ) )
         {
             // this L1 is NOT already shadowed so we need to shadow it
@@ -458,8 +484,8 @@ int shadow_fault( unsigned long va, long error_code )
 
         }              
 
-    shadow_linear_pg_table[va>>PAGE_SHIFT] = mk_l1_pgentry(spte);
-    // (we need to do the above even if we've just made the shadow L1)
+        shadow_linear_pg_table[va>>PAGE_SHIFT] = mk_l1_pgentry(spte);
+        // (we need to do the above even if we've just made the shadow L1)
 
     } // end of fixup writing the shadow L1 directly failed
     	
