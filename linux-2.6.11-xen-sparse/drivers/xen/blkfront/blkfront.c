@@ -252,65 +252,6 @@ int blkif_ioctl(struct inode *inode, struct file *filep,
     return 0;
 }
 
-#if 0
-/* check media change: should probably do something here in some cases :-) */
-int blkif_check(kdev_t dev)
-{
-    DPRINTK("blkif_check\n");
-    return 0;
-}
-
-int blkif_revalidate(kdev_t dev)
-{
-    struct block_device *bd;
-    struct gendisk *gd;
-    xen_block_t *disk;
-    unsigned long capacity;
-    int i, rc = 0;
-    
-    if ( (bd = bdget(dev)) == NULL )
-        return -EINVAL;
-
-    /*
-     * Update of partition info, and check of usage count, is protected
-     * by the per-block-device semaphore.
-     */
-    down(&bd->bd_sem);
-
-    if ( ((gd = get_gendisk(dev)) == NULL) ||
-         ((disk = xldev_to_xldisk(dev)) == NULL) ||
-         ((capacity = gd->part[MINOR(dev)].nr_sects) == 0) )
-    {
-        rc = -EINVAL;
-        goto out;
-    }
-
-    if ( disk->usage > 1 )
-    {
-        rc = -EBUSY;
-        goto out;
-    }
-
-    /* Only reread partition table if VBDs aren't mapped to partitions. */
-    if ( !(gd->flags[MINOR(dev) >> gd->minor_shift] & GENHD_FL_VIRT_PARTNS) )
-    {
-        for ( i = gd->max_p - 1; i >= 0; i-- )
-        {
-            invalidate_device(dev+i, 1);
-            gd->part[MINOR(dev+i)].start_sect = 0;
-            gd->part[MINOR(dev+i)].nr_sects   = 0;
-            gd->sizes[MINOR(dev+i)]           = 0;
-        }
-
-        grok_partitions(gd, MINOR(dev)>>gd->minor_shift, gd->max_p, capacity);
-    }
-
- out:
-    up(&bd->bd_sem);
-    bdput(bd);
-    return rc;
-}
-#endif
 
 /*
  * blkif_queue_request

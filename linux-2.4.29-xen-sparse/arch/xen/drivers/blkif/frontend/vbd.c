@@ -114,12 +114,6 @@ static int xlvbd_init_device(vdisk_t *xd)
     if ( (bd = bdget(device)) == NULL )
         return -1;
 
-    /*
-     * Update of partition info, and check of usage count, is protected
-     * by the per-block-device semaphore.
-     */
-    down(&bd->bd_sem);
-
     if ( ((disk = xldev_to_xldisk(device)) != NULL) && (disk->usage != 0) )
     {
         printk(KERN_ALERT "VBD update failed - in use [dev=%x]\n", device);
@@ -331,7 +325,6 @@ static int xlvbd_init_device(vdisk_t *xd)
     }
 
  out:
-    up(&bd->bd_sem);
     bdput(bd);    
     return rc;
 }
@@ -355,12 +348,6 @@ static int xlvbd_remove_device(int device)
 
     if ( (bd = bdget(device)) == NULL )
         return -1;
-
-    /*
-     * Update of partition info, and check of usage count, is protected
-     * by the per-block-device semaphore.
-     */
-    down(&bd->bd_sem);
 
     if ( ((gd = get_gendisk(device)) == NULL) ||
          ((disk = xldev_to_xldisk(device)) == NULL) )
@@ -423,7 +410,6 @@ static int xlvbd_remove_device(int device)
     }
 
  out:
-    up(&bd->bd_sem);
     bdput(bd);
     return rc;
 }
