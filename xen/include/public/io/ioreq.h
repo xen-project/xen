@@ -41,10 +41,11 @@ typedef struct {
         u64     data;           /*  data                        */
         void    *pdata;         /*  pointer to data             */
     } u;
-    u8      state:5;
+    u8      state:4;
     u8      pdata_valid:1;	/* if 1, use pdata above        */
     u8      dir:1;		/*  1=read, 0=write             */
     u8      port_mm:1;		/*  0=portio, 1=mmio            */
+    u8      df:1;
 } ioreq_t;
 
 #define MAX_VECTOR    256

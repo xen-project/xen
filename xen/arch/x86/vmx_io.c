@@ -39,8 +39,7 @@ void vmx_io_assist(struct exec_domain *ed)
     struct domain *d = ed->domain;
     execution_context_t *ec = get_execution_context();
     unsigned long old_eax;
-    unsigned long eflags;
-    int dir;
+    int sign;
 
     /* clear the pending event */
     ed->vcpu_info->evtchn_upcall_pending = 0;
@@ -68,24 +67,27 @@ void vmx_io_assist(struct exec_domain *ed)
         return;
     }
 
-    __vmread(GUEST_EFLAGS, &eflags);
-    dir = (eflags & X86_EFLAGS_DF);
+    sign = (p->df) ? -1 : 1;
+    if (p->port_mm) {
+        if (p->pdata_valid) {
+            ec->esi += sign * p->count * p->size;
+            ec->edi += sign * p->count * p->size;
+        } else {
+            if (p->dir == IOREQ_WRITE) {
+                return;
+            }
+        }
+    }
 
     if (p->dir == IOREQ_WRITE) {
         if (p->pdata_valid) {
-            if (!dir)
-                ec->esi += p->count * p->size;
-            else
-                ec->esi -= p->count * p->size;
+            ec->esi += sign * p->count * p->size;
             ec->ecx -= p->count;
         }
         return;
     } else {
         if (p->pdata_valid) {
-            if (!dir)
-                ec->edi += p->count * p->size;
-            else
-                ec->edi -= p->count * p->size;
+            ec->edi += sign * p->count * p->size;
             ec->ecx -= p->count;
             return;
         }

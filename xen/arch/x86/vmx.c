@@ -352,6 +352,10 @@ static void vmx_io_instruction(struct xen_regs *regs,
     p->size = (exit_qualification & 7) + 1;
 
     if (test_bit(4, &exit_qualification)) {
+        unsigned long eflags;
+
+        __vmread(GUEST_EFLAGS, &eflags);
+        p->df = (eflags & X86_EFLAGS_DF) ? 1 : 0;
         p->pdata_valid = 1;
         p->u.pdata = (void *) ((p->dir == IOREQ_WRITE) ?
             regs->esi
