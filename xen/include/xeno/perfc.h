@@ -2,6 +2,8 @@
  * xen performance counters
  */
 
+#include <asm/atomic.h>
+
 /* 
  * NOTE: new counters must be defined in perfc_defn.h
  * 
@@ -25,11 +27,11 @@
  */
 
 #define PERFCOUNTER( var, name ) \
-unsigned long var[1];
+  atomic_t var[1];
 #define PERFCOUNTER_CPU( var, name ) \
-unsigned long var[NR_CPUS];
+  atomic_t var[NR_CPUS];
 #define PERFCOUNTER_ARRAY( var, name, size ) \
-unsigned long var[size];
+  atomic_t var[size];
 
 struct perfcounter_t 
 {
@@ -38,16 +40,16 @@ struct perfcounter_t
 
 extern struct perfcounter_t perfcounters;
 
-#define perfc_value(x)    perfcounters.x[0]
-#define perfc_valuec(x)   perfcounters.x[smp_processor_id()]
-#define perfc_valuea(x,y) perfcounters.x[y]
-#define perfc_set(x,v)    perfcounters.x[0] = v
-#define perfc_setc(x,v)   perfcounters.x[smp_processor_id()] = v
-#define perfc_seta(x,y,v) perfcounters.x[y] = v
-#define perfc_incr(x)     perfcounters.x[0]++
-#define perfc_incrc(x)    perfcounters.x[smp_processor_id()]++
-#define perfc_incra(x,y)  perfcounters.x[y]++
-#define perfc_add(x,y)    perfcounters.x[0]+=(y)
-#define perfc_addc(x,y)   perfcounters.x[smp_processor_id()]+=(y)
-#define perfc_adda(x,y,z) perfcounters.x[y]+=(z)
+#define perfc_value(x)    atomic_read(&perfcounters.x[0])
+#define perfc_valuec(x)   atomic_read(&perfcounters.x[smp_processor_id()])
+#define perfc_valuea(x,y) atomic_read(&perfcounters.x[y])
+#define perfc_set(x,v)    atomic_set(&perfcounters.x[0], v)
+#define perfc_setc(x,v)   atomic_set(&perfcounters.x[smp_processor_id()], v)
+#define perfc_seta(x,y,v) atomic_set(&perfcounters.x[y], v)
+#define perfc_incr(x)     atomic_inc(&perfcounters.x[0])
+#define perfc_incrc(x)    atomic_inc(&perfcounters.x[smp_processor_id()])
+#define perfc_incra(x,y)  atomic_inc(&perfcounters.x[y])
+#define perfc_add(x,y)    atomic_add((y), &perfcounters.x[0])
+#define perfc_addc(x,y)   atomic_add((y), &perfcounters.x[smp_processor_id()])
+#define perfc_adda(x,y,z) atomic_add((z), &perfcounters.x[y])
 

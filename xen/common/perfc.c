@@ -27,7 +27,7 @@ void perfc_printall(u_char key, void *dev_id, struct pt_regs *regs)
 {
     int i, j;
     s_time_t now = NOW();
-    unsigned long *counters = (unsigned long *)&perfcounters;
+    atomic_t *counters = (atomic_t *)&perfcounters;
 
     printk("Xen performance counters SHOW  (now = 0x%08X:%08X)\n",
            (u32)(now>>32), (u32)now);
@@ -37,20 +37,23 @@ void perfc_printall(u_char key, void *dev_id, struct pt_regs *regs)
         switch ( perfc_info[i].type )
         {
         case TYPE_SINGLE:
-            printk("%10ld  0x%08lx  %s\n", 
-                   counters[0], counters[0], perfc_info[i].name);
+            printk("%10d  0x%08x  %s\n", 
+                   atomic_read(&counters[0]), atomic_read(&counters[0]), 
+                   perfc_info[i].name);
             counters += 1;
             break;
         case TYPE_CPU:
             for ( j = 0; j < smp_num_cpus; j++ )
-                printk("%10ld  0x%08lx  %s[CPU %02d]\n",
-                       counters[j], counters[j], perfc_info[i].name, j);
+                printk("%10d  0x%08x  %s[CPU %02d]\n",
+                       atomic_read(&counters[j]), atomic_read(&counters[j]), 
+                       perfc_info[i].name, j);
             counters += j;
             break;
         case TYPE_ARRAY:
             for ( j = 0; j < perfc_info[i].nr_elements; j++ )
-                printk("%10ld  0x%08lx  %s[ARR %02d]\n",
-                       counters[j], counters[j], perfc_info[i].name, j);
+                printk("%10d  0x%08x  %s[ARR %02d]\n",
+                       atomic_read(&counters[j]), atomic_read(&counters[j]), 
+                       perfc_info[i].name, j);
             counters += j;
             break;
         }

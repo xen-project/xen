@@ -32,6 +32,8 @@
 #include <asm/domain_page.h>
 #include <asm/pgalloc.h>
 
+#include <xeno/perfc.h>
+
 #define BUG_TRAP ASSERT
 #define notifier_call_chain(_a,_b,_c) ((void)0)
 #define rtmsg_ifinfo(_a,_b,_c) ((void)0)
@@ -514,6 +516,7 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
     if ( (i = vif->rx_cons) == vif->rx_prod )
     {
         spin_unlock(&vif->domain->page_lock);
+        perfc_incr(net_rx_capacity_drop);
         return;
     }
     rx = vif->rx_shadow_ring + i;
@@ -570,14 +573,19 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
      */
     if ( rx->flush_count == (unsigned short)
          atomic_read(&tlb_flush_count[vif->domain->processor]) )
+    {
+        perfc_incr(net_rx_tlbflush);
         flush_tlb_cpu(vif->domain->processor);
+    }
 
- out:
-    make_rx_response(vif, rx->id, size, status, offset);
+    perfc_incr(net_rx_delivered);
 
     /* record this so they can be billed */
     vif->total_packets_received++;
     vif->total_bytes_received += size;
+
+ out:
+    make_rx_response(vif, rx->id, size, status, offset);
 }
 
 /**
