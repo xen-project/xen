@@ -288,6 +288,8 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             break;
         }
 
+        read_unlock_irqrestore(&tasklist_lock, flags);
+
         op->u.getdomaininfo.flags =
             (test_bit(DF_RUNNING, &d->flags) ? DOMFLAGS_RUNNING : 0);
 
