@@ -26,6 +26,7 @@ typedef unsigned short          ushort;
 typedef unsigned int            uint;
 typedef unsigned long           ulong;
 
+#if 0
 #ifndef __BIT_TYPES_DEFINED__
 #define __BIT_TYPES_DEFINED__
 
@@ -42,6 +43,7 @@ typedef         __u8            uint8_t;
 typedef         __u16           uint16_t;
 typedef         __u32           uint32_t;
 typedef         __u64           uint64_t;
+#endif
 
 
 struct domain;

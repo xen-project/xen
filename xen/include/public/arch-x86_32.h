@@ -94,9 +94,6 @@ typedef struct {
     memory_t address; /* 4: code address                                  */
 } PACKED trap_info_t; /* 8 bytes */
 
-/* So that we can use 'l' modifier in printf-style format strings. */
-#define u32 unsigned long
-
 typedef struct xen_regs
 {
     u32 ebx;
@@ -121,8 +118,6 @@ typedef struct xen_regs
     u32 fs;
     u32 gs;
 } PACKED execution_context_t;
-
-#undef u32
 
 typedef u64 tsc_timestamp_t; /* RDTSC timestamp */
 

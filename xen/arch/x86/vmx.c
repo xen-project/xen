@@ -193,7 +193,7 @@ static void vmx_vmexit_do_cpuid(unsigned long input, struct xen_regs *regs)
 }
 
 #define CASE_GET_REG_P(REG, reg)    \
-    case REG_ ## REG: reg_p = &(regs->reg); break
+    case REG_ ## REG: reg_p = (unsigned long *)&(regs->reg); break
 
 static void vmx_dr_access (unsigned long exit_qualification, struct xen_regs *regs)
 {
