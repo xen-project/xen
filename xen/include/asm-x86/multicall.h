@@ -5,7 +5,13 @@
 #ifndef __ASM_X86_MULTICALL_H__
 #define __ASM_X86_MULTICALL_H__
 
-#include <asm-x86/x86_32/asm_defns.h>
+#include <asm/asm_defns.h>
+
+#ifdef __x86_64__
+
+#define do_multicall_call(_call) BUG()
+
+#else
 
 #define do_multicall_call(_call)                       \
     do {                                               \
@@ -22,5 +28,7 @@
             "addl  $20,%%esp; "                        \
             : : "b" (_call) : "eax", "ecx", "edx" );   \
     } while ( 0 )
+
+#endif
 
 #endif /* __ASM_X86_MULTICALL_H__ */

@@ -254,18 +254,18 @@ static inline unsigned int cpuid_edx(unsigned int op)
 })
 
 #define write_cr0(x) \
-	__asm__("mov"__OS" %0,%%cr0": :"r" (x));
+	__asm__("mov"__OS" %0,%%cr0": :"r" ((unsigned long)x));
 
 #define read_cr4() ({ \
-	unsigned int __dummy; \
+	unsigned long __dummy; \
 	__asm__( \
-		"movl %%cr4,%0\n\t" \
+		"mov"__OS" %%cr4,%0\n\t" \
 		:"=r" (__dummy)); \
 	__dummy; \
 })
 
 #define write_cr4(x) \
-	__asm__("movl %0,%%cr4": :"r" (x));
+	__asm__("mov"__OS" %0,%%cr4": :"r" ((unsigned long)x));
 
 /*
  * Save the cr4 feature set we're using (ie
@@ -290,7 +290,7 @@ static inline void clear_in_cr4 (unsigned long mask)
     mmu_cr4_features &= ~mask;
     __asm__("mov"__OS" %%cr4,%%"__OP"ax\n\t"
             "and"__OS" %0,%%"__OP"ax\n\t"
-            "movl"__OS" %%"__OP"ax,%%cr4\n"
+            "mov"__OS" %%"__OP"ax,%%cr4\n"
             : : "irg" (~mask)
             :"ax");
 }
