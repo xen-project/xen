@@ -397,8 +397,8 @@ struct pfn_info *alloc_domheap_pages(struct domain *d, int order)
     {
         pg[i].u.inuse.domain = d;
         wmb(); /* Domain pointer must be visible before updating refcnt. */
-        pg->u.inuse.count_info = PGC_allocated | 1;
-        list_add_tail(&pg->list, &d->page_list);
+        pg[i].u.inuse.count_info = PGC_allocated | 1;
+        list_add_tail(&pg[i].list, &d->page_list);
     }
 
     spin_unlock(&d->page_alloc_lock);
