@@ -73,10 +73,7 @@ static void __refresh_mfn_list(void)
     int ret = HYPERVISOR_dom_mem_op(MEMOP_increase_reservation,
                                     mfn_list, MAX_MFN_ALLOC);
     if ( unlikely(ret != MAX_MFN_ALLOC) )
-    {
-        printk(KERN_ALERT "Unable to increase memory reservation (%d)\n", ret);
         BUG();
-    }
     alloc_index = MAX_MFN_ALLOC;
 }
 
@@ -97,8 +94,8 @@ static void dealloc_mfn(unsigned long mfn)
     spin_lock_irqsave(&mfn_lock, flags);
     if ( alloc_index != MAX_MFN_ALLOC )
         mfn_list[alloc_index++] = mfn;
-    else
-        (void)HYPERVISOR_dom_mem_op(MEMOP_decrease_reservation, &mfn, 1);
+    else if ( HYPERVISOR_dom_mem_op(MEMOP_decrease_reservation, &mfn, 1) != 1 )
+        BUG();
     spin_unlock_irqrestore(&mfn_lock, flags);
 }
 
@@ -238,7 +235,8 @@ static void net_rx_action(unsigned long unused)
         return;
 
     mcl[-2].args[2] = UVMF_FLUSH_TLB;
-    (void)HYPERVISOR_multicall(rx_mcl, mcl - rx_mcl);
+    if ( unlikely(HYPERVISOR_multicall(rx_mcl, mcl - rx_mcl) != 0) )
+        BUG();
 
     mcl = rx_mcl;
     mmu = rx_mmu;
@@ -252,30 +250,26 @@ static void net_rx_action(unsigned long unused)
         mdata   = ((mmu[2].ptr & PAGE_MASK) |
                    ((unsigned long)skb->data & ~PAGE_MASK));
         
+        phys_to_machine_mapping[__pa(skb->data) >> PAGE_SHIFT] = new_mfn;
+        
+        atomic_set(&(skb_shinfo(skb)->dataref), 1);
+        skb_shinfo(skb)->nr_frags = 0;
+        skb_shinfo(skb)->frag_list = NULL;
+
+        netif->stats.rx_bytes += size;
+        netif->stats.rx_packets++;
+
+        /* The update_va_mapping() must not fail. */
+        if ( unlikely(mcl[0].args[5] != 0) )
+            BUG();
+
         /* Check the reassignment error code. */
+        status = NETIF_RSP_OKAY;
         if ( unlikely(mcl[1].args[5] != 0) )
         {
-            DPRINTK("Failed MMU update transferring to DOM%u\n",
-                    netif->domid);
-            (void)HYPERVISOR_update_va_mapping(
-                (unsigned long)skb->head >> PAGE_SHIFT,
-                (pte_t) { (mdata & PAGE_MASK) | __PAGE_KERNEL },
-                UVMF_INVLPG);
-            dealloc_mfn(new_mfn);
+            DPRINTK("Failed MMU update transferring to DOM%u\n", netif->domid);
+            dealloc_mfn(mdata >> PAGE_SHIFT);
             status = NETIF_RSP_ERROR;
-        }
-        else
-        {
-            phys_to_machine_mapping[__pa(skb->data) >> PAGE_SHIFT] = new_mfn;
-
-            atomic_set(&(skb_shinfo(skb)->dataref), 1);
-            skb_shinfo(skb)->nr_frags = 0;
-            skb_shinfo(skb)->frag_list = NULL;
-
-            netif->stats.rx_bytes += size;
-            netif->stats.rx_packets++;
-
-            status = NETIF_RSP_OKAY;
         }
 
         evtchn = netif->evtchn;
@@ -380,14 +374,15 @@ static void net_tx_action(unsigned long unused)
     NETIF_RING_IDX i;
     struct page *page;
     multicall_entry_t *mcl;
+    PEND_RING_IDX dc, dp;
 
-    if ( (i = dealloc_cons) == dealloc_prod )
+    if ( (dc = dealloc_cons) == (dp = dealloc_prod) )
         goto skip_dealloc;
 
     mcl = tx_mcl;
-    while ( i != dealloc_prod )
+    while ( dc != dp )
     {
-        pending_idx = dealloc_ring[MASK_PEND_IDX(i++)];
+        pending_idx = dealloc_ring[MASK_PEND_IDX(dc++)];
         mcl[0].op = __HYPERVISOR_update_va_mapping;
         mcl[0].args[0] = MMAP_VADDR(pending_idx) >> PAGE_SHIFT;
         mcl[0].args[1] = 0;
@@ -396,10 +391,16 @@ static void net_tx_action(unsigned long unused)
     }
 
     mcl[-1].args[2] = UVMF_FLUSH_TLB;
-    (void)HYPERVISOR_multicall(tx_mcl, mcl - tx_mcl);
+    if ( unlikely(HYPERVISOR_multicall(tx_mcl, mcl - tx_mcl) != 0) )
+        BUG();
 
-    while ( dealloc_cons != dealloc_prod )
+    mcl = tx_mcl;
+    while ( dealloc_cons != dp )
     {
+        /* The update_va_mapping() must not fail. */
+        if ( unlikely(mcl[0].args[5] != 0) )
+            BUG();
+
         pending_idx = dealloc_ring[MASK_PEND_IDX(dealloc_cons++)];
 
         netif = pending_tx_info[pending_idx].netif;
@@ -421,6 +422,8 @@ static void net_tx_action(unsigned long unused)
             add_to_net_schedule_list_tail(netif);
         
         netif_put(netif);
+
+        mcl++;
     }
 
  skip_dealloc:
@@ -495,13 +498,16 @@ static void net_tx_action(unsigned long unused)
 
         pending_idx = pending_ring[MASK_PEND_IDX(pending_cons)];
 
-        if ( unlikely((skb = dev_alloc_skb(PKT_PROT_LEN)) == NULL) )
+        if ( unlikely((skb = alloc_skb(PKT_PROT_LEN+16, GFP_ATOMIC)) == NULL) )
         {
             DPRINTK("Can't allocate a skb in start_xmit.\n");
             make_tx_response(netif, txreq.id, NETIF_RSP_ERROR);
             netif_put(netif);
             break;
         }
+
+        /* Packets passed to netif_rx() must have some headroom. */
+        skb_reserve(skb, 16);
 
         mcl[0].op = __HYPERVISOR_update_va_mapping_otherdomain;
         mcl[0].args[0] = MMAP_VADDR(pending_idx) >> PAGE_SHIFT;
@@ -526,7 +532,8 @@ static void net_tx_action(unsigned long unused)
     if ( mcl == tx_mcl )
         return;
 
-    (void)HYPERVISOR_multicall(tx_mcl, mcl - tx_mcl);
+    if ( unlikely(HYPERVISOR_multicall(tx_mcl, mcl - tx_mcl) != 0) )
+        BUG();
 
     mcl = tx_mcl;
     while ( (skb = __skb_dequeue(&tx_queue)) != NULL )

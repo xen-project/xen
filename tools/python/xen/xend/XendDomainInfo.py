@@ -100,7 +100,7 @@ def lookup_raw_partn(name):
     if line:
 	return [ { 'device' : blkdev_name_to_number(p),
 		   'start_sector' : long(0),
-		   'nr_sectors' : long(line) * 2,
+		   'nr_sectors' : long(1L<<63),
 		   'type' : 'Disk' } ]
     else:
 	# see if this is a hex device number

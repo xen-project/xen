@@ -93,7 +93,8 @@ static void fast_flush_area(int idx, int nr_pages)
     }
 
     mcl[nr_pages-1].args[2] = UVMF_FLUSH_TLB;
-    (void)HYPERVISOR_multicall(mcl, nr_pages);
+    if ( unlikely(HYPERVISOR_multicall(mcl, nr_pages) != 0) )
+        BUG();
 }
 
 
@@ -402,7 +403,8 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
             phys_seg[i].buffer >> PAGE_SHIFT;
     }
 
-    (void)HYPERVISOR_multicall(mcl, nr_psegs);
+    if ( unlikely(HYPERVISOR_multicall(mcl, nr_psegs) != 0) )
+        BUG();
 
     for ( i = 0; i < nr_psegs; i++ )
     {

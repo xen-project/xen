@@ -16,6 +16,10 @@ config ARCH_XEN
 	default y
 
 
+config NO_IDLE_HZ
+	bool
+	default y
+
 source "init/Kconfig"
 
 #config VT
