@@ -12,6 +12,7 @@ from xen.xend import sxp
 from xen.xend.XendClient import XendError, server
 from xen.xend.XendClient import main as xend_client_main
 from xen.xm import create, destroy, migrate, shutdown
+from xen.xm.opts import *
 
 class Group:
 
@@ -662,15 +663,34 @@ xm.prog(ProgCall)
 class ProgDmesg(Prog):
     group = 'host'
     name  =  "dmesg"
-    info  = """Print Xen boot output."""
+    info  = """Read or clear Xen's message buffer."""
+
+    gopts = Opts(use="""[-c|--clear]
+
+Read Xen's message buffer (boot output, warning and error messages) or clear
+its contents if the [-c|--clear] flag is specified.
+""")
+
+    gopts.opt('clear', short='c',
+              fn=set_true, default=0,
+              use="Clear the contents of the Xen message buffer.")
+
+    short_options = ['-c']
+    long_options = ['--clear']
+
+    def help(self, args):
+        self.gopts.argv = args
+        self.gopts.usage()
 
     def main(self, args):
-        if len(args) == 1:
-            print server.xend_node_dmesg(clear)
-        if len(args) > 1:
-            if len(args) == 2 and args[1] == '-c':
-                print server.xend_node_clear_dmesg()
-            else: self.err("%s: Invalid argument" % args[0])
+        self.gopts.parse(args)
+        if not (1 <= len(args) <=2):
+            self.gopts.err('Invalid arguments: ' + str(args))
+
+        if not self.gopts.vals.clear:
+            print server.xend_node_get_dmesg()
+        else:
+            server.xend_node_clear_dmesg()
 
 xm.prog(ProgDmesg)
 

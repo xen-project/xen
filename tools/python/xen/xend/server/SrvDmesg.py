@@ -36,5 +36,6 @@ class SrvDmesg(SrvDir):
     def info(self):
         return self.xd.info()
 
-    def op_clear(self):
+    def op_clear(self, op, req):
         self.xd.clear()
+        return 0
