@@ -16,9 +16,6 @@
 
 #include "dom0_ops.h"
 
-#define MAP_CONT    0
-#define MAP_DISCONT 1
-
 extern struct list_head * find_direct(struct list_head *, unsigned long);
 
 /*
@@ -165,24 +162,20 @@ out:
  */
 
 unsigned long direct_mmap(unsigned long phys_addr, unsigned long size, 
-                pgprot_t prot, int flag, int tot_pages)
+			  pgprot_t prot, int tot_pages)
 {
     direct_mmap_node_t * dmmap;
     struct list_head * entry;
     unsigned long addr;
     int ret = 0;
     
-    if(!capable(CAP_SYS_ADMIN)){
-        ret = -EPERM;
-        goto out;
-    }
+    if(!capable(CAP_SYS_ADMIN))
+        return -EPERM;
 
     /* get unmapped area invokes xen specific arch_get_unmapped_area */
     addr = get_unmapped_area(NULL, 0, size, 0, 0);
-    if(addr & ~PAGE_MASK){
-        ret = -ENOMEM;
-        goto out;
-    }
+    if(addr & ~PAGE_MASK)
+        return -ENOMEM;
 
     /* add node on the list of directly mapped areas, make sure the
      * list remains sorted.
@@ -190,26 +183,23 @@ unsigned long direct_mmap(unsigned long phys_addr, unsigned long size,
     dmmap = (direct_mmap_node_t *)kmalloc(sizeof(direct_mmap_node_t), GFP_KERNEL);
     dmmap->vm_start = addr;
     dmmap->vm_end = addr + size;
-	entry = find_direct(&current->mm->context.direct_list, addr);
-	if(entry != &current->mm->context.direct_list){
-		list_add_tail(&dmmap->list, entry);
-	} else {
-    	list_add_tail(&dmmap->list, &current->mm->context.direct_list);
-	}
-
-    /* and perform the mapping */
-    if(flag == MAP_DISCONT){
-        ret = direct_remap_disc_page_range(addr, phys_addr >> PAGE_SHIFT, 
-            tot_pages, prot);
+    entry = find_direct(&current->mm->context.direct_list, addr);
+    if(entry != &current->mm->context.direct_list){
+      list_add_tail(&dmmap->list, entry);
     } else {
-        ret = direct_remap_page_range(addr, phys_addr, size, prot);
+      list_add_tail(&dmmap->list, &current->mm->context.direct_list);
     }
 
-    if(ret == 0)
-        ret = addr;
+    /* XXX kfree(dmmap)? */
 
-out: 
-    return ret;
+    /* and perform the mapping */
+    ret = direct_remap_disc_page_range(addr, phys_addr >> PAGE_SHIFT, 
+				       tot_pages, prot);
+
+    if(ret == 0)
+        return addr;
+    else
+        return ret;
 }
 
 /* most of the checks, refcnt updates, cache stuff have been thrown out as they are not

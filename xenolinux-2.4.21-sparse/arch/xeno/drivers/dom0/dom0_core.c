@@ -38,20 +38,14 @@ typedef struct proc_data {
     unsigned long map_size;
 } dom_procdata_t;
 
-typedef struct proc_mem_data {
-    unsigned long pfn;
-    int tot_pages;
-} proc_memdata_t;
-
-#define MAP_DISCONT     1
-
+/* XXX this certainly shouldn't be here. */
 extern struct file_operations dom0_phd_fops;
 
 struct proc_dir_entry *xeno_base;
 static struct proc_dir_entry *dom0_cmd_intf;
 static struct proc_dir_entry *dom_list_intf;
 
-unsigned long direct_mmap(unsigned long, unsigned long, pgprot_t, int, int);
+unsigned long direct_mmap(unsigned long, unsigned long, pgprot_t, int);
 int direct_unmap(unsigned long, unsigned long);
 int direct_disc_unmap(unsigned long, unsigned long, int);
 
@@ -113,7 +107,7 @@ static ssize_t dom_usage_read(struct file * file, char * buff, size_t size, loff
     return end + 1;
 }
 
-struct file_operations dom_usage_ops = {
+static struct file_operations dom_usage_ops = {
     read:    dom_usage_read
 };
 
@@ -152,113 +146,6 @@ static void create_proc_dom_entries(int dom)
     }
 }
 
-static ssize_t dom_mem_write(struct file * file, const char * buff, 
-                             size_t size , loff_t * off)
-{
-    dom_mem_t mem_data;
-    
-    printk("dom_mem_write called: Shouldn't happen.\n");
-
-    copy_from_user(&mem_data, (dom_mem_t *)buff, sizeof(dom_mem_t));
-    
-    if(direct_disc_unmap(mem_data.vaddr, mem_data.start_pfn, 
-                         mem_data.tot_pages) == 0){
-        return sizeof(sizeof(dom_mem_t));
-    } else {
-        return -1;
-    }
-}
-
-static ssize_t dom_mem_read(struct file * file, char * buff, size_t size, loff_t * off)
-{
-    unsigned long addr;
-    pgprot_t prot;
-
-    proc_memdata_t * mem_data = (proc_memdata_t *)((struct proc_dir_entry *)file->f_dentry->d_inode->u.generic_ip)->data;
-
-    prot = PAGE_SHARED; 
-
-    /* remap the range using xen specific routines */
-
-    printk("Calling direct_mmap with pfn %x, tot pages %x.\n",
-	   mem_data->pfn, mem_data->tot_pages);
-
-    addr = direct_mmap(mem_data->pfn << PAGE_SHIFT, mem_data->tot_pages << PAGE_SHIFT, prot, MAP_DISCONT, mem_data->tot_pages);
-    
-    copy_to_user((unsigned long *)buff, &addr, sizeof(addr));
-
-    return sizeof(addr);
-}
-
-struct file_operations dom_mem_ops = {
-    read:    dom_mem_read,
-    write:   dom_mem_write,
-};
-
-static int dom_map_mem(unsigned int dom, unsigned long pfn, int tot_pages)
-{
-    int ret = -ENOENT;
-    struct proc_dir_entry * pd = xeno_base->subdir;
-    struct proc_dir_entry * file;
-    proc_memdata_t * memdata;
-
-    while(pd != NULL){
-
-        if((pd->mode & S_IFDIR) && ((dom_procdata_t *)pd->data)->domain == dom){
-
-            /* check if there is already an entry for mem and if so
-             * remove it.
-             */
-	    /* XXX does this not leak the memdata? */
-            remove_proc_entry("mem", pd);
-
-            /* create new entry with parameters describing what to do
-             * when it is mmaped.
-             */
-            file = create_proc_entry("mem", 0600, pd);
-            if(file != NULL)
-            {
-                file->owner = THIS_MODULE;
-                file->nlink = 1;
-                file->proc_fops = &dom_mem_ops;
-
-                memdata = (proc_memdata_t *)kmalloc(sizeof(proc_memdata_t), GFP_KERNEL);
-                memdata->pfn = pfn;
-                memdata->tot_pages = tot_pages;
-                file->data = memdata;
-
-                ret = 0;
-                break;
-            }
-
-            ret = -EAGAIN;
-            break;
-        }                    
-        pd = pd->next;
-    }
-
-    return ret;
-}
-
-/* function used to retrieve data associated with new domain */
-static ssize_t dom_data_read(struct file * file, char * buff, size_t size, loff_t * off)
-{
-    dom0_newdomain_t * dom_data = (dom0_newdomain_t *)
-        ((struct proc_dir_entry *)file->f_dentry->d_inode->u.generic_ip)->data;
-
-    copy_to_user((dom0_newdomain_t *)buff, dom_data, sizeof(dom0_newdomain_t));
-
-    remove_proc_entry("new_dom_data", xeno_base);
-
-    kfree(dom_data);
-
-    return sizeof(dom0_newdomain_t);
-}
-
-struct file_operations newdom_data_fops = {
-    read:    dom_data_read,
-};
-
 static int dom0_cmd_write(struct file *file, const char *buffer, size_t size,
 			  loff_t *off)
 {
@@ -269,12 +156,9 @@ static int dom0_cmd_write(struct file *file, const char *buffer, size_t size,
 
     if ( op.cmd == MAP_DOM_MEM )
     {
-        ret = dom_map_mem(op.u.dommem.domain, op.u.dommem.start_pfn, 
-                          op.u.dommem.tot_pages); 
-      /* This is now an ioctl, and shouldn't be being written to
-	 the command file. */
-	//      printk("map_dom_mem dom0_cmd used!\n");
-	//      ret = -EOPNOTSUPP;
+        /* This is now an ioctl, and shouldn't be being written to the
+	   command file. */
+        ret = -EOPNOTSUPP;
     }
     else if ( op.cmd == DO_PGUPDATES )
     {
@@ -371,7 +255,7 @@ static int xeno_domains_show(struct seq_file *s, void *v)
     return 0;
 }
 
-struct seq_operations xeno_domains_op = {
+static struct seq_operations xeno_domains_op = {
     .start          = xeno_domains_start,
     .next           = xeno_domains_next,
     .stop           = xeno_domains_stop,
@@ -403,7 +287,8 @@ static int handle_dom0_cmd_createdomain(unsigned long data)
   op.cmd = DOM0_CREATEDOMAIN;
   op.u.newdomain.domain = -666;
   op.u.newdomain.memory_kb = argbuf.kb_mem;
-  op.u.newdomain.num_vifs = 0; /* Not used anymore, I hope... */
+  op.u.newdomain.num_vifs = 0; /* Not used anymore -- it's done in
+				  BUILDDOMAIN. */
   namelen = strnlen_user(argbuf.name, MAX_DOMAIN_NAME);
   if (copy_from_user(op.u.newdomain.name, argbuf.name, namelen + 1))
     return -EFAULT;
@@ -438,18 +323,12 @@ static unsigned long handle_dom0_cmd_mapdommem(unsigned long data)
     return -EFAULT;
   /* This seems to be assuming that the root of the page table is in
      the first frame of the new domain's physical memory? */
-  /* XXX do I really mean this? */
   /* XXX what happens if userspace forgets to do the unmap? */
-  printk("direct_maping w/ start pfn %x, tot_pages %x.\n",
-	 argbuf.start_pfn, argbuf.tot_pages);
 
   addr = direct_mmap(argbuf.start_pfn << PAGE_SHIFT,
 		     argbuf.tot_pages << PAGE_SHIFT,
 		     PAGE_SHARED,
-		     MAP_DISCONT,
 		     argbuf.tot_pages);
-
-  printk("Picked vaddr %x.\n", addr);
 
   return addr;
 }
