@@ -93,6 +93,8 @@ extern void __out_of_line_bug(int line) __attribute__((noreturn));
 
 #if defined(__x86_64__)
 
+#define XENHEAP_DEFAULT_MB (16)
+
 #define PML4_ENTRY_BITS  39
 #define PML4_ENTRY_BYTES (1UL<<PML4_ENTRY_BITS)
 
@@ -158,9 +160,8 @@ extern void __out_of_line_bug(int line) __attribute__((noreturn));
 
 #elif defined(__i386__)
 
-/* The following are machine addresses. */
-#define MAX_XENHEAP_ADDRESS   (12*1024*1024)
-#define MAX_DIRECTMAP_ADDRESS (40*1024*1024)
+#define XENHEAP_DEFAULT_MB (12)
+#define DIRECTMAP_PHYS_END (40*1024*1024)
 
 /* Hypervisor owns top 64MB of virtual address space. */
 #define HYPERVISOR_VIRT_START (0xFC000000UL)
@@ -173,9 +174,9 @@ extern void __out_of_line_bug(int line) __attribute__((noreturn));
 #define RO_MPT_VIRT_END       (RO_MPT_VIRT_START + (4*1024*1024))
 /* The virtual addresses for the 40MB direct-map region. */
 #define DIRECTMAP_VIRT_START  (RO_MPT_VIRT_END)
-#define DIRECTMAP_VIRT_END    (DIRECTMAP_VIRT_START + MAX_DIRECTMAP_ADDRESS)
+#define DIRECTMAP_VIRT_END    (DIRECTMAP_VIRT_START + DIRECTMAP_PHYS_END)
 #define XENHEAP_VIRT_START    (DIRECTMAP_VIRT_START)
-#define XENHEAP_VIRT_END      (XENHEAP_VIRT_START + MAX_XENHEAP_ADDRESS)
+#define XENHEAP_VIRT_END      (XENHEAP_VIRT_START + (XENHEAP_DEFAULT_MB<<20))
 #define RDWR_MPT_VIRT_START   (XENHEAP_VIRT_END)
 #define RDWR_MPT_VIRT_END     (RDWR_MPT_VIRT_START + (4*1024*1024))
 #define FRAMETABLE_VIRT_START (RDWR_MPT_VIRT_END)
@@ -206,6 +207,10 @@ extern void __out_of_line_bug(int line) __attribute__((noreturn));
 #define __OP "e"  /* Operand Prefix */
 
 #endif /* __i386__ */
+
+#ifndef __ASSEMBLY__
+extern unsigned long xenheap_phys_end; /* user-configurable */
+#endif
 
 #define GDT_VIRT_START        (PERDOMAIN_VIRT_START)
 #define GDT_VIRT_END          (GDT_VIRT_START + (64*1024))

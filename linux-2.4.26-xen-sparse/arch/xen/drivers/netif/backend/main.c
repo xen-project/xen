@@ -28,12 +28,6 @@ static DECLARE_TASKLET(net_tx_tasklet, net_tx_action, 0);
 static void net_rx_action(unsigned long unused);
 static DECLARE_TASKLET(net_rx_tasklet, net_rx_action, 0);
 
-typedef struct {
-    u16 id;
-    unsigned long old_mach_ptr;
-    unsigned long new_mach_pfn;
-    netif_t *netif;
-} rx_info_t;
 static struct sk_buff_head rx_queue;
 static multicall_entry_t rx_mcl[NETIF_RX_RING_SIZE*2];
 static mmu_update_t rx_mmu[NETIF_RX_RING_SIZE*3];
@@ -48,8 +42,10 @@ static unsigned long mmap_vstart;
 
 #define PKT_PROT_LEN (ETH_HLEN + 20)
 
-static u16 pending_id[MAX_PENDING_REQS];
-static netif_t *pending_netif[MAX_PENDING_REQS];
+static struct {
+    netif_tx_request_t req;
+    netif_t *netif;
+} pending_tx_info[MAX_PENDING_REQS];
 static u16 pending_ring[MAX_PENDING_REQS];
 typedef unsigned int PEND_RING_IDX;
 #define MASK_PEND_IDX(_i) ((_i)&(MAX_PENDING_REQS-1))
@@ -61,11 +57,6 @@ static u16 dealloc_ring[MAX_PENDING_REQS];
 static spinlock_t dealloc_lock = SPIN_LOCK_UNLOCKED;
 static PEND_RING_IDX dealloc_prod, dealloc_cons;
 
-typedef struct {
-    u16 idx;
-    netif_tx_request_t req;
-    netif_t *netif;
-} tx_info_t;
 static struct sk_buff_head tx_queue;
 static multicall_entry_t tx_mcl[MAX_PENDING_REQS];
 
@@ -127,6 +118,8 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
     netif_t *netif = (netif_t *)dev->priv;
 
+    ASSERT(skb->dev == dev);
+
     /* Drop the packet if the target domain has no receive buffers. */
     if ( (netif->rx_req_cons == netif->rx->req_prod) ||
          ((netif->rx_req_cons-netif->rx_resp_prod) == NETIF_RX_RING_SIZE) )
@@ -152,15 +145,14 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
         skb_reserve(nskb, hlen);
         __skb_put(nskb, skb->len);
         (void)skb_copy_bits(skb, -hlen, nskb->head, hlen + skb->len);
+        nskb->dev = skb->dev;
         dev_kfree_skb(skb);
         skb = nskb;
     }
 
-    ((rx_info_t *)&skb->cb[0])->id    =
-        netif->rx->ring[MASK_NETIF_RX_IDX(netif->rx_req_cons++)].req.id;
-    ((rx_info_t *)&skb->cb[0])->netif = netif;
-        
-    __skb_queue_tail(&rx_queue, skb);
+    netif->rx_req_cons++;
+
+    skb_queue_tail(&rx_queue, skb);
     tasklet_schedule(&net_rx_tasklet);
 
     return 0;
@@ -195,7 +187,7 @@ static void net_rx_action(unsigned long unused)
     netif_t *netif;
     s8 status;
     u16 size, id, evtchn;
-    mmu_update_t *mmu = rx_mmu;
+    mmu_update_t *mmu;
     multicall_entry_t *mcl;
     unsigned long vdata, mdata, new_mfn;
     struct sk_buff_head rxq;
@@ -206,9 +198,10 @@ static void net_rx_action(unsigned long unused)
     skb_queue_head_init(&rxq);
 
     mcl = rx_mcl;
-    while ( (skb = __skb_dequeue(&rx_queue)) != NULL )
+    mmu = rx_mmu;
+    while ( (skb = skb_dequeue(&rx_queue)) != NULL )
     {
-        netif   = ((rx_info_t *)&skb->cb[0])->netif;
+        netif   = (netif_t *)skb->dev->priv;
         vdata   = (unsigned long)skb->data;
         mdata   = virt_to_machine(vdata);
         new_mfn = get_new_mfn();
@@ -231,11 +224,9 @@ static void net_rx_action(unsigned long unused)
         mcl[1].args[1] = 3;
         mcl[1].args[2] = 0;
 
-        mmu += 3;
         mcl += 2;
+        mmu += 3;
 
-        ((rx_info_t *)&skb->cb[0])->old_mach_ptr = mdata;
-        ((rx_info_t *)&skb->cb[0])->new_mach_pfn = new_mfn;
         __skb_queue_tail(&rxq, skb);
 
         /* Filled the batch queue? */
@@ -250,14 +241,17 @@ static void net_rx_action(unsigned long unused)
     (void)HYPERVISOR_multicall(rx_mcl, mcl - rx_mcl);
 
     mcl = rx_mcl;
+    mmu = rx_mmu;
     while ( (skb = __skb_dequeue(&rxq)) != NULL )
     {
-        netif   = ((rx_info_t *)&skb->cb[0])->netif;
+        netif   = (netif_t *)skb->dev->priv;
         size    = skb->tail - skb->data;
-        id      = ((rx_info_t *)&skb->cb[0])->id;
-        new_mfn = ((rx_info_t *)&skb->cb[0])->new_mach_pfn;
-        mdata   = ((rx_info_t *)&skb->cb[0])->old_mach_ptr;
 
+        /* Rederive the machine addresses. */
+        new_mfn = mcl[0].args[1] >> PAGE_SHIFT;
+        mdata   = ((mmu[2].ptr & PAGE_MASK) |
+                   ((unsigned long)skb->data & ~PAGE_MASK));
+        
         /* Check the reassignment error code. */
         if ( unlikely(mcl[1].args[5] != 0) )
         {
@@ -285,6 +279,7 @@ static void net_rx_action(unsigned long unused)
         }
 
         evtchn = netif->evtchn;
+        id = netif->rx->ring[MASK_NETIF_RX_IDX(netif->rx_resp_prod)].req.id;
         if ( make_rx_response(netif, id, status, mdata, size) &&
              (rx_notify[evtchn] == 0) )
         {
@@ -295,6 +290,7 @@ static void net_rx_action(unsigned long unused)
         dev_kfree_skb(skb);
 
         mcl += 2;
+        mmu += 3;
     }
 
     while ( notify_nr != 0 )
@@ -406,10 +402,11 @@ static void net_tx_action(unsigned long unused)
     {
         pending_idx = dealloc_ring[MASK_PEND_IDX(dealloc_cons++)];
 
-        netif = pending_netif[pending_idx];
+        netif = pending_tx_info[pending_idx].netif;
 
         spin_lock(&netif->tx_lock);
-        make_tx_response(netif, pending_id[pending_idx], NETIF_RSP_OKAY);
+        make_tx_response(netif, pending_tx_info[pending_idx].req.id, 
+                         NETIF_RSP_OKAY);
         spin_unlock(&netif->tx_lock);
         
         pending_ring[MASK_PEND_IDX(pending_prod++)] = pending_idx;
@@ -512,10 +509,11 @@ static void net_tx_action(unsigned long unused)
         mcl[0].args[2] = 0;
         mcl[0].args[3] = netif->domid;
         mcl++;
-        
-        ((tx_info_t *)&skb->cb[0])->idx = pending_idx;
-        ((tx_info_t *)&skb->cb[0])->netif = netif;
-        memcpy(&((tx_info_t *)&skb->cb[0])->req, &txreq, sizeof(txreq));
+
+        memcpy(&pending_tx_info[pending_idx].req, &txreq, sizeof(txreq));
+        pending_tx_info[pending_idx].netif = netif;
+        *((u16 *)skb->data) = pending_idx;
+
         __skb_queue_tail(&tx_queue, skb);
 
         pending_cons++;
@@ -533,9 +531,9 @@ static void net_tx_action(unsigned long unused)
     mcl = tx_mcl;
     while ( (skb = __skb_dequeue(&tx_queue)) != NULL )
     {
-        pending_idx = ((tx_info_t *)&skb->cb[0])->idx;
-        netif       = ((tx_info_t *)&skb->cb[0])->netif;
-        memcpy(&txreq, &((tx_info_t *)&skb->cb[0])->req, sizeof(txreq));
+        pending_idx = *((u16 *)skb->data);
+        netif       = pending_tx_info[pending_idx].netif;
+        memcpy(&txreq, &pending_tx_info[pending_idx].req, sizeof(txreq));
 
         /* Check the remap error code. */
         if ( unlikely(mcl[0].args[5] != 0) )
@@ -581,8 +579,6 @@ static void net_tx_action(unsigned long unused)
          */
         page->mapping = (struct address_space *)netif_page_release;
         atomic_set(&page->count, 1);
-        pending_id[pending_idx] = txreq.id;
-        pending_netif[pending_idx] = netif;
 
         netif->stats.tx_bytes += txreq.size;
         netif->stats.tx_packets++;

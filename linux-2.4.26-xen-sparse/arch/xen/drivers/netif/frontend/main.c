@@ -99,8 +99,6 @@ static struct net_device *find_dev_by_handle(unsigned int handle)
     return NULL;
 }
 
-#define MULTIVIF
-
 /** Network interface info. */
 struct netif_ctrl {
     /** Number of interfaces. */
@@ -385,14 +383,8 @@ static void netif_int(int irq, void *dev_id, struct pt_regs *ptregs)
     unsigned long flags;
 
     spin_lock_irqsave(&np->tx_lock, flags);
-    
-    if( !netif_carrier_ok(dev) )
-    {
-        spin_unlock_irqrestore(&np->tx_lock, flags);
-        return;
-    }
-    
-    network_tx_buf_gc(dev);
+    if ( likely(netif_carrier_ok(dev)) )
+        network_tx_buf_gc(dev);
     spin_unlock_irqrestore(&np->tx_lock, flags);
 
     if ( np->rx_resp_cons != np->rx->resp_prod )
@@ -414,7 +406,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 
     spin_lock(&np->rx_lock);
 
-    /* if the device is undergoing recovery then don't do anything */
+    /* If the device is undergoing recovery then don't do anything. */
     if ( !netif_carrier_ok(dev) )
     {
         spin_unlock(&np->rx_lock);
@@ -721,20 +713,17 @@ static void netif_status_change(netif_fe_interface_status_changed_t *status)
 
         memcpy(dev->dev_addr, status->mac, ETH_ALEN);
 
-        if(netif_carrier_ok(dev)){
+        if ( netif_carrier_ok(dev) )
             np->state = NETIF_STATE_CONNECTED;
-        } else {
+        else
             network_reconnect(dev, status);
-        }
 
         np->evtchn = status->evtchn;
         np->irq = bind_evtchn_to_irq(np->evtchn);
         (void)request_irq(np->irq, netif_int, SA_SAMPLE_RANDOM, 
                           dev->name, dev);
         
-#ifdef MULTIVIF
         netctrl_connected_count();
-#endif
         break;
 
     default:
@@ -744,13 +733,13 @@ static void netif_status_change(netif_fe_interface_status_changed_t *status)
     }
 }
 
-/** Create a network devices.
- *
+/** Create a network device.
  * @param handle device handle
  * @param val return parameter for created device
  * @return 0 on success, error code otherwise
  */
-static int create_netdev(int handle, struct net_device **val){
+static int create_netdev(int handle, struct net_device **val)
+{
     int err = 0;
     struct net_device *dev = NULL;
     struct net_private *np = NULL;
@@ -847,11 +836,7 @@ static int __init init_module(void)
 {
     ctrl_msg_t                       cmsg;
     netif_fe_driver_status_changed_t st;
-    int err = 0;
-#ifdef MULTIVIF
-    int wait_n = 20;
-    int wait_i;
-#endif
+    int err = 0, wait_i, wait_n = 20;
 
     if ( (start_info.flags & SIF_INITDOMAIN) ||
          (start_info.flags & SIF_NET_BE_DOMAIN) )
@@ -860,9 +845,8 @@ static int __init init_module(void)
     printk("Initialising Xen virtual ethernet frontend driver");
 
     INIT_LIST_HEAD(&dev_list);
-#ifdef MULTIVIF
+
     netctrl_init();
-#endif
 
     (void)ctrl_if_register_receiver(CMSG_NETIF_FE, netif_ctrlif_rx,
                                     CALLBACK_IN_BLOCKING_CONTEXT);
@@ -876,7 +860,6 @@ static int __init init_module(void)
     memcpy(cmsg.msg, &st, sizeof(st));
     ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
 
-#ifdef MULTIVIF
     /* Wait for all interfaces to be connected. */
     for ( wait_i = 0; ; wait_i++)
     {
@@ -888,7 +871,6 @@ static int __init init_module(void)
         set_current_state(TASK_INTERRUPTIBLE);
         schedule_timeout(1);
      }
-#endif
 
     if ( err )
         ctrl_if_unregister_receiver(CMSG_NETIF_FE, netif_ctrlif_rx);

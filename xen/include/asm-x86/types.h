@@ -3,7 +3,6 @@
 
 typedef unsigned short umode_t;
 
-typedef unsigned int size_t;
 
 /*
  * __xx is ok: it doesn't pollute the POSIX namespace. Use these in the
@@ -44,10 +43,12 @@ typedef unsigned int u32;
 typedef signed long long s64;
 typedef unsigned long long u64;
 #define BITS_PER_LONG 32
+typedef unsigned int size_t;
 #elif defined(__x86_64__)
 typedef signed long s64;
 typedef unsigned long u64;
 #define BITS_PER_LONG 64
+typedef unsigned long size_t;
 #endif
 
 /* DMA addresses come in generic and 64-bit flavours.  */

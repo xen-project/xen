@@ -151,7 +151,9 @@ static inline int shadow_page_op( struct mm_struct *m, unsigned int op,
              PGT_l2_page_table )
 		{
 			unsigned long * spl1e = map_domain_mem( spfn<<PAGE_SHIFT );
-			memset( spl1e, 0, DOMAIN_ENTRIES_PER_L2_PAGETABLE * sizeof(*spl1e) );
+#ifdef __i386__
+			memset(spl1e, 0, DOMAIN_ENTRIES_PER_L2_PAGETABLE * sizeof(*spl1e));
+#endif
 			unmap_domain_mem( spl1e );
 		}
     }
@@ -574,6 +576,7 @@ unsigned long shadow_l2_table(
     // we need to do this before the linear map is set up
     spl2e = (l2_pgentry_t *) map_domain_mem(spfn << PAGE_SHIFT);
 
+#ifdef __i386__
     // get hypervisor and 2x linear PT mapings installed 
     memcpy(&spl2e[DOMAIN_ENTRIES_PER_L2_PAGETABLE], 
            &idle_pg_table[DOMAIN_ENTRIES_PER_L2_PAGETABLE],
@@ -585,6 +588,7 @@ unsigned long shadow_l2_table(
     spl2e[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] =
         mk_l2_pgentry(__pa(frame_table[gpfn].u.domain->mm.perdomain_pt) | 
                       __PAGE_HYPERVISOR);
+#endif
 
     // can't use the linear map as we may not be in the right PT
     gpl2e = (l2_pgentry_t *) map_domain_mem(gpfn << PAGE_SHIFT);

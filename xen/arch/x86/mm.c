@@ -347,7 +347,7 @@ void *memguard_init(void *heap_start)
                           PAGE_MASK);
 
     /* Memory guarding is incompatible with super pages. */
-    for ( i = 0; i < (MAX_XENHEAP_ADDRESS >> L2_PAGETABLE_SHIFT); i++ )
+    for ( i = 0; i < (xenheap_phys_end >> L2_PAGETABLE_SHIFT); i++ )
     {
         l1 = (l1_pgentry_t *)heap_start;
         heap_start = (void *)((unsigned long)heap_start + PAGE_SIZE);
