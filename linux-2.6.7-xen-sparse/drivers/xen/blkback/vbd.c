@@ -10,6 +10,11 @@
 
 static dev_t vbd_map_devnum(blkif_pdev_t);
 
+/* vbd_lock: protects updates to the rb_tree against concurrent
+ * lookups in vbd_translate.  All other lookups are implicitly
+ * protected because the only caller (the control message dispatch
+ * routine) serializes the calls. */
+
 void vbd_create(blkif_be_vbd_create_t *create) 
 {
     vbd_t       *vbd; 
@@ -25,8 +30,6 @@ void vbd_create(blkif_be_vbd_create_t *create)
         create->status = BLKIF_BE_STATUS_INTERFACE_NOT_FOUND;
         return;
     }
-
-    spin_lock(&blkif->vbd_lock);
 
     rb_p = &blkif->vbd_rb.rb_node;
     while ( *rb_p != NULL )
@@ -45,7 +48,7 @@ void vbd_create(blkif_be_vbd_create_t *create)
         {
             PRINTK("vbd_create attempted for already existing vbd\n");
             create->status = BLKIF_BE_STATUS_VBD_EXISTS;
-            goto out;
+            return;
         }
     }
 
@@ -53,7 +56,7 @@ void vbd_create(blkif_be_vbd_create_t *create)
     {
         PRINTK("vbd_create: out of memory\n");
         create->status = BLKIF_BE_STATUS_OUT_OF_MEMORY;
-        goto out;
+        return;
     }
 
     vbd->vdevice  = vdevice; 
@@ -61,15 +64,14 @@ void vbd_create(blkif_be_vbd_create_t *create)
     vbd->type     = VDISK_TYPE_DISK | VDISK_FLAG_VIRT;
     vbd->extents  = NULL; 
 
+    spin_lock(&blkif->vbd_lock);
     rb_link_node(&vbd->rb, rb_parent, rb_p);
     rb_insert_color(&vbd->rb, &blkif->vbd_rb);
+    spin_unlock(&blkif->vbd_lock);
 
     DPRINTK("Successful creation of vdev=%04x (dom=%u)\n",
             vdevice, create->domid);
     create->status = BLKIF_BE_STATUS_OKAY;
-
- out:
-    spin_unlock(&blkif->vbd_lock);
 }
 
 
@@ -93,8 +95,6 @@ void vbd_grow(blkif_be_vbd_grow_t *grow)
         return;
     }
 
-    spin_lock(&blkif->vbd_lock);
-
     rb = blkif->vbd_rb.rb_node;
     while ( rb != NULL )
     {
@@ -111,53 +111,51 @@ void vbd_grow(blkif_be_vbd_grow_t *grow)
     {
         PRINTK("vbd_grow: attempted to append extent to non-existent VBD.\n");
         grow->status = BLKIF_BE_STATUS_VBD_NOT_FOUND;
-        goto out;
+        return;
     } 
+
+    if ( grow->extent.sector_start > 0 )
+    {
+        PRINTK("vbd_grow: device %08x start not zero!\n", grow->extent.device);
+	grow->status = BLKIF_BE_STATUS_EXTENT_NOT_FOUND;
+	return;
+    }
 
     if ( unlikely((x = kmalloc(sizeof(blkif_extent_le_t), 
                                GFP_KERNEL)) == NULL) )
     {
         PRINTK("vbd_grow: out of memory\n");
         grow->status = BLKIF_BE_STATUS_OUT_OF_MEMORY;
-        goto out;
+        return;
     }
 
     x->extent.device        = grow->extent.device;
-    /* XXXcl see comments at top of open_by_devnum */
+    x->extent.sector_start  = grow->extent.sector_start;
+    x->extent.sector_length = grow->extent.sector_length;
+    x->next                 = (blkif_extent_le_t *)NULL;
+
 #if 01
-#ifdef DONT_BLKDEV_GET
-    x->bdev = bdget(vbd_map_devnum(x->extent.device));
-#else
+    /* XXXcl see comments at top of open_by_devnum */
     x->bdev = open_by_devnum(vbd_map_devnum(x->extent.device),
 			     vbd->readonly ? FMODE_READ : FMODE_WRITE);
-#endif
-    if (x->bdev == NULL) {
+    if (IS_ERR(x->bdev)) {
 	PRINTK("vbd_grow: device %08x doesn't exist.\n", x->extent.device);
 	grow->status = BLKIF_BE_STATUS_EXTENT_NOT_FOUND;
 	goto out;
     }
-#endif
     /* XXXcl maybe bd_claim? */
-    x->extent.sector_start  = grow->extent.sector_start;
-    x->extent.sector_length = grow->extent.sector_length;
-    x->next                 = (blkif_extent_le_t *)NULL;
 
     if( x->bdev->bd_disk == NULL || x->bdev->bd_part == NULL )
     {
         PRINTK("vbd_grow: device %08x doesn't exist.\n", x->extent.device);
 	grow->status = BLKIF_BE_STATUS_EXTENT_NOT_FOUND;
+	blkdev_put(x->bdev);
 	goto out;
     }
-    
+#endif
+   
     /* get size in sectors */
     sz = x->bdev->bd_part->nr_sects;
-
-    if ( x->extent.sector_start > 0 )
-    {
-        PRINTK("vbd_grow: device %08x start not zero!\n", x->extent.device);
-	grow->status = BLKIF_BE_STATUS_EXTENT_NOT_FOUND;
-	goto out;
-    }
 
     /*
      * NB. This test assumes sector_start == 0, which is always the case
@@ -179,9 +177,10 @@ void vbd_grow(blkif_be_vbd_grow_t *grow)
             vdevice, grow->domid);
     
     grow->status = BLKIF_BE_STATUS_OKAY;
+    return;
 
  out:
-    spin_unlock(&blkif->vbd_lock);
+    kfree(x);
 }
 
 
@@ -202,8 +201,6 @@ void vbd_shrink(blkif_be_vbd_shrink_t *shrink)
         return;
     }
 
-    spin_lock(&blkif->vbd_lock);
-
     rb = blkif->vbd_rb.rb_node;
     while ( rb != NULL )
     {
@@ -219,13 +216,13 @@ void vbd_shrink(blkif_be_vbd_shrink_t *shrink)
     if ( unlikely(vbd == NULL) || unlikely(vbd->vdevice != vdevice) )
     {
         shrink->status = BLKIF_BE_STATUS_VBD_NOT_FOUND;
-        goto out;
+	return;
     }
 
     if ( unlikely(vbd->extents == NULL) )
     {
         shrink->status = BLKIF_BE_STATUS_EXTENT_NOT_FOUND;
-        goto out;
+	return;
     }
 
     /* Find the last extent. We now know that there is at least one. */
@@ -235,16 +232,10 @@ void vbd_shrink(blkif_be_vbd_shrink_t *shrink)
     x   = *px;
     *px = x->next;
 
-#ifndef DONT_BLKDEV_GET
     blkdev_put(x->bdev);
-#endif
-
     kfree(x);
 
     shrink->status = BLKIF_BE_STATUS_OKAY;
-
- out:
-    spin_unlock(&blkif->vbd_lock);
 }
 
 
@@ -265,8 +256,6 @@ void vbd_destroy(blkif_be_vbd_destroy_t *destroy)
         return;
     }
 
-    spin_lock(&blkif->vbd_lock);
-
     rb = blkif->vbd_rb.rb_node;
     while ( rb != NULL )
     {
@@ -280,10 +269,13 @@ void vbd_destroy(blkif_be_vbd_destroy_t *destroy)
     }
 
     destroy->status = BLKIF_BE_STATUS_VBD_NOT_FOUND;
-    goto out;
+    return;
 
  found:
+    spin_lock(&blkif->vbd_lock);
     rb_erase(rb, &blkif->vbd_rb);
+    spin_unlock(&blkif->vbd_lock);
+
     x = vbd->extents;
     kfree(vbd);
 
@@ -293,9 +285,6 @@ void vbd_destroy(blkif_be_vbd_destroy_t *destroy)
         kfree(x);
         x = t;
     }
-    
- out:
-    spin_unlock(&blkif->vbd_lock);
 }
 
 
@@ -404,6 +393,7 @@ int vbd_translate(phys_seg_t *pseg, blkif_t *blkif, int operation)
     blkif_sector_t     sec_off;
     unsigned long      nr_secs;
 
+    /* Take the vbd_lock because another thread could be updating the tree. */
     spin_lock(&blkif->vbd_lock);
 
     rb = blkif->vbd_rb.rb_node;
