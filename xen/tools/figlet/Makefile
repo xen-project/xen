@@ -1,5 +1,5 @@
 
-include ../../Config.mk
+include $(BASEDIR)/../Config.mk
 
 figlet: figlet.c
 	$(HOSTCC) -o $@ $<
