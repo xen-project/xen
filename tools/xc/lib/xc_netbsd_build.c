@@ -3,11 +3,9 @@
  */
 
 #include "xc_private.h"
-#define ELFSIZE 32		/* XXX */
+#define ELFSIZE 32  /* XXX */
 #include "xc_elf.h"
 #include <zlib.h>
-
-/* #define DEBUG 1 */
 
 #ifdef DEBUG
 #define DPRINTF(x) printf x
@@ -16,8 +14,8 @@
 #endif
 
 static int loadelfimage(gzFile, int, unsigned long *, unsigned long,
-			unsigned long *, unsigned long *,
-			unsigned long *, unsigned long *);
+                        unsigned long *, unsigned long *,
+                        unsigned long *, unsigned long *);
 
 #define ELFROUND (ELFSIZE / 8)
 
@@ -86,12 +84,12 @@ static int setup_guestos(int xc_handle,
                          const char *cmdline,
                          unsigned long shared_info_frame)
 {
-    l1_pgentry_t *vl1tab = NULL, *vl1e = NULL;
-    l2_pgentry_t *vl2tab = NULL, *vl2e = NULL;
+    l1_pgentry_t *vl1tab;
+    l2_pgentry_t *vl2tab;
     unsigned long *page_array = NULL;
     mmu_update_t *pgt_update_arr = NULL, *pgt_updates = NULL;
     int alloc_index, num_pt_pages;
-    unsigned long l2tab;
+    unsigned long l2tab, l2e, l1e=0;
     unsigned long l1tab = 0;
     unsigned long num_pgt_updates = 0;
     unsigned long count, pt_start;
@@ -122,15 +120,16 @@ static int setup_guestos(int xc_handle,
     }
 
     if (loadelfimage(kernel_gfd, pm_handle, page_array, tot_pages,
-		     virt_load_addr, &ksize, &symtab_addr, &symtab_len))
-	goto error_out;
+                     virt_load_addr, &ksize, &symtab_addr, &symtab_len))
+        goto error_out;
 
     /* ksize is kernel-image size rounded up to a page boundary. */
 
     alloc_index = tot_pages - 1;
 
     /* Count bottom-level PTs, rounding up. */
-    num_pt_pages = (l1_table_offset(*virt_load_addr) + tot_pages + 1023) / 1024;
+    num_pt_pages = (l1_table_offset(*virt_load_addr) + tot_pages + 1023)
+        / 1024;
 
     /* We must also count the page directory. */
     num_pt_pages++;
@@ -159,44 +158,47 @@ static int setup_guestos(int xc_handle,
     if ( (vl2tab = map_pfn(pm_handle, l2tab >> PAGE_SHIFT)) == NULL )
         goto error_out;
     memset(vl2tab, 0, PAGE_SIZE);
-    vl2e = vl2tab + l2_table_offset(*virt_load_addr);
+    unmap_pfn(pm_handle, vl2tab);
+    l2e = l2tab + (l2_table_offset(*virt_load_addr)*sizeof(l2_pgentry_t));
     for ( count = 0; count < tot_pages; count++ )
-    {    
-        if ( ((unsigned long)vl1e & (PAGE_SIZE-1)) == 0 ) 
+    {
+        if ( (l1e & (PAGE_SIZE-1)) == 0 )
         {
             l1tab = page_array[alloc_index] << PAGE_SHIFT;
             if ( (vl1tab = map_pfn(pm_handle, l1tab >> PAGE_SHIFT)) == NULL )
                 goto error_out;
             memset(vl1tab, 0, PAGE_SIZE);
+            unmap_pfn(pm_handle, vl1tab);
             alloc_index--;
-		
-            vl1e = vl1tab + l1_table_offset(*virt_load_addr + 
-                                            (count << PAGE_SHIFT));
+  
+            l1e = l1tab + (l1_table_offset(*virt_load_addr + 
+                                           (count<<PAGE_SHIFT)) *
+                           sizeof(l1_pgentry_t));
 
-            /* make apropriate entry in the page directory */
-            pgt_updates->ptr = (unsigned long)vl2e;
+            /* Make appropriate entry in the page directory. */
+            pgt_updates->ptr = l2e;
             pgt_updates->val = l1tab | L2_PROT;
             pgt_updates++;
             num_pgt_updates++;
-            vl2e++;
+            l2e += sizeof(l2_pgentry_t);
         }
 
         if ( count < pt_start )
         {
-            pgt_updates->ptr = (unsigned long)vl1e;
+            pgt_updates->ptr = l1e;
             pgt_updates->val = (page_array[count] << PAGE_SHIFT) | L1_PROT;
             pgt_updates++;
             num_pgt_updates++;
-            vl1e++;
+            l1e += sizeof(l1_pgentry_t);
         }
         else
         {
-            pgt_updates->ptr = (unsigned long)vl1e;
+            pgt_updates->ptr = l1e;
             pgt_updates->val = 
                 ((page_array[count] << PAGE_SHIFT) | L1_PROT) & ~_PAGE_RW;
             pgt_updates++;
             num_pgt_updates++;
-            vl1e++;
+            l1e += sizeof(l1_pgentry_t);
         }
 
         pgt_updates->ptr = 
@@ -247,9 +249,9 @@ static int setup_guestos(int xc_handle,
 }
 
 int xc_netbsd_build(int xc_handle,
-		    unsigned int domid,
-		    const char *image_name,
-		    const char *cmdline)
+                    unsigned int domid,
+                    const char *image_name,
+                    const char *cmdline)
 {
     dom0_op_t launch_op, op;
     unsigned long load_addr;
@@ -307,7 +309,7 @@ int xc_netbsd_build(int xc_handle,
     if ( kernel_fd >= 0 )
         close(kernel_fd);
     if( kernel_gfd )
-	gzclose(kernel_gfd);
+        gzclose(kernel_gfd);
 
     ctxt = &launch_op.u.builddomain.ctxt;
 
@@ -375,7 +377,7 @@ int xc_netbsd_build(int xc_handle,
     if ( kernel_fd >= 0 )
         close(kernel_fd);
     if( kernel_gfd )
-	gzclose(kernel_gfd);
+        gzclose(kernel_gfd);
 
     return -1;
 }
@@ -388,22 +390,22 @@ myseek(gzFile gfd, off_t offset, int whence)
     int c;
 
     if (offset < 0) {
-	ERROR("seek back not supported");
-	return -1;
+        ERROR("seek back not supported");
+        return -1;
     }
 
     while (offset) {
-	c = offset;
-	if (c > MYSEEK_BUFSIZE)
-	    c = MYSEEK_BUFSIZE;
-	if (gzread(gfd, tmp, c) != c) {
-	    PERROR("Error seeking in image.");
-	    return -1;
-	}
-	offset -= c;
+        c = offset;
+        if (c > MYSEEK_BUFSIZE)
+            c = MYSEEK_BUFSIZE;
+        if (gzread(gfd, tmp, c) != c) {
+            PERROR("Error seeking in image.");
+            return -1;
+        }
+        offset -= c;
     }
 
-    return 0;			/* XXX */
+    return 0;   /* XXX */
 }
 
 /* 
@@ -434,15 +436,15 @@ myseek(gzFile gfd, off_t offset, int whence)
  * ---------------- ehdr.e_entry + *ksize << PAGE_SHIFT
  */
 
-#define IS_TEXT(p)	(p.p_flags & PF_X)
-#define IS_DATA(p)	(p.p_flags & PF_W)
-#define IS_BSS(p)	(p.p_filesz < p.p_memsz)
+#define IS_TEXT(p) (p.p_flags & PF_X)
+#define IS_DATA(p) (p.p_flags & PF_W)
+#define IS_BSS(p) (p.p_filesz < p.p_memsz)
 
 static int
 loadelfimage(gzFile kernel_gfd, int pm_handle, unsigned long *page_array,
-	     unsigned long tot_pages, unsigned long *virt_load_addr,
-	     unsigned long *ksize, unsigned long *symtab_addr,
-	     unsigned long *symtab_len)
+             unsigned long tot_pages, unsigned long *virt_load_addr,
+             unsigned long *ksize, unsigned long *symtab_addr,
+             unsigned long *symtab_len)
 {
     Elf_Ehdr ehdr;
     Elf_Phdr *phdr;
@@ -458,14 +460,14 @@ loadelfimage(gzFile kernel_gfd, int pm_handle, unsigned long *page_array,
     maxva = 0;
 
     if (gzread(kernel_gfd, &ehdr, sizeof(Elf_Ehdr)) != sizeof(Elf_Ehdr)) {
-	PERROR("Error reading kernel image ELF header.");
-	goto out;
+        PERROR("Error reading kernel image ELF header.");
+        goto out;
     }
     curpos = sizeof(Elf_Ehdr);
 
     if (!IS_ELF(ehdr)) {
-	PERROR("Image does not have an ELF header.");
-	goto out;
+        PERROR("Image does not have an ELF header.");
+        goto out;
     }
 
     *virt_load_addr = ehdr.e_entry;
@@ -476,7 +478,7 @@ loadelfimage(gzFile kernel_gfd, int pm_handle, unsigned long *page_array,
     }
 
     if ((*virt_load_addr + (tot_pages << PAGE_SHIFT)) >
-	HYPERVISOR_VIRT_START) {
+        HYPERVISOR_VIRT_START) {
         ERROR("Cannot map all domain memory without hitting Xen space");
         goto out;
     }
@@ -484,94 +486,94 @@ loadelfimage(gzFile kernel_gfd, int pm_handle, unsigned long *page_array,
 
     phdr = malloc(ehdr.e_phnum * sizeof(Elf_Phdr));
     if (phdr == NULL) {
-	ERROR("Cannot allocate memory for Elf_Phdrs");
-	goto out;
+        ERROR("Cannot allocate memory for Elf_Phdrs");
+        goto out;
     }
 
     if (myseek(kernel_gfd, ehdr.e_phoff - curpos, SEEK_SET) == -1) {
-	ERROR("Seek to program header failed");
-	goto out;
+        ERROR("Seek to program header failed");
+        goto out;
     }
     curpos = ehdr.e_phoff;
 
     if (gzread(kernel_gfd, phdr, ehdr.e_phnum * sizeof(Elf_Phdr)) !=
-	ehdr.e_phnum * sizeof(Elf_Phdr)) {
-	PERROR("Error reading kernel image ELF program header.");
-	goto out;
+        ehdr.e_phnum * sizeof(Elf_Phdr)) {
+        PERROR("Error reading kernel image ELF program header.");
+        goto out;
     }
     curpos += ehdr.e_phnum * sizeof(Elf_Phdr);
 
 
     for (h = 0; h < ehdr.e_phnum; h++) {
-	if (phdr[h].p_type != PT_LOAD ||
-	    (phdr[h].p_flags & (PF_W|PF_X)) == 0)
-	    continue;
+        if (phdr[h].p_type != PT_LOAD ||
+            (phdr[h].p_flags & (PF_W|PF_X)) == 0)
+            continue;
 
-	if (IS_TEXT(phdr[h]) || IS_DATA(phdr[h])) {
-	    if (myseek(kernel_gfd, phdr[h].p_offset - curpos, SEEK_SET) ==
-		-1) {
-		ERROR("Seek to section failed");
-		goto out;
-	    }
-	    curpos = phdr[h].p_offset;
+        if (IS_TEXT(phdr[h]) || IS_DATA(phdr[h])) {
+            if (myseek(kernel_gfd, phdr[h].p_offset - curpos, SEEK_SET) ==
+                -1) {
+                ERROR("Seek to section failed");
+                goto out;
+            }
+            curpos = phdr[h].p_offset;
 
-	    for (iva = phdr[h].p_vaddr;
-		 iva < phdr[h].p_vaddr + phdr[h].p_filesz; iva += c) {
-		c = PAGE_SIZE - (iva & (PAGE_SIZE - 1));
-		if (iva + c > phdr[h].p_vaddr + phdr[h].p_filesz)
-		    c = phdr[h].p_vaddr + phdr[h].p_filesz - iva;
-		if (gzread(kernel_gfd, page, c) != c) {
-		    PERROR("Error reading kernel image page.");
-		    goto out;
-		}
-		curpos += c;
-		vaddr = map_pfn(pm_handle, page_array[(iva - *virt_load_addr)
-						      >> PAGE_SHIFT]);
-		if (vaddr == NULL) {
-		    ERROR("Couldn't map guest memory");
-		    goto out;
-		}
-		DPRINTF(("copy page %p to %p, count 0x%x\n", (void *)iva,
-			 vaddr + (iva & (PAGE_SIZE - 1)), c));
-		memcpy(vaddr + (iva & (PAGE_SIZE - 1)), page, c);
-		unmap_pfn(pm_handle, vaddr);
-	    }
+            for (iva = phdr[h].p_vaddr;
+                 iva < phdr[h].p_vaddr + phdr[h].p_filesz; iva += c) {
+                c = PAGE_SIZE - (iva & (PAGE_SIZE - 1));
+                if (iva + c > phdr[h].p_vaddr + phdr[h].p_filesz)
+                    c = phdr[h].p_vaddr + phdr[h].p_filesz - iva;
+                if (gzread(kernel_gfd, page, c) != c) {
+                    PERROR("Error reading kernel image page.");
+                    goto out;
+                }
+                curpos += c;
+                vaddr = map_pfn(pm_handle, page_array[(iva - *virt_load_addr)
+                                                     >> PAGE_SHIFT]);
+                if (vaddr == NULL) {
+                    ERROR("Couldn't map guest memory");
+                    goto out;
+                }
+                DPRINTF(("copy page %p to %p, count 0x%x\n", (void *)iva,
+                         vaddr + (iva & (PAGE_SIZE - 1)), c));
+                memcpy(vaddr + (iva & (PAGE_SIZE - 1)), page, c);
+                unmap_pfn(pm_handle, vaddr);
+            }
 
-	    if (phdr[h].p_vaddr + phdr[h].p_filesz > maxva)
-		maxva = phdr[h].p_vaddr + phdr[h].p_filesz;
-	}
+            if (phdr[h].p_vaddr + phdr[h].p_filesz > maxva)
+                maxva = phdr[h].p_vaddr + phdr[h].p_filesz;
+        }
 
-	if (IS_BSS(phdr[h])) {
-	    /* XXX maybe clear phdr[h].p_memsz bytes from
-	       phdr[h].p_vaddr + phdr[h].p_filesz ??? */
-	    if (phdr[h].p_vaddr + phdr[h].p_memsz > maxva)
-		maxva = phdr[h].p_vaddr + phdr[h].p_memsz;
-	    DPRINTF(("bss from %p to %p, maxva %p\n",
-		     (void *)(phdr[h].p_vaddr + phdr[h].p_filesz),
-		     (void *)(phdr[h].p_vaddr + phdr[h].p_memsz),
-		     (void *)maxva));
-	}
+        if (IS_BSS(phdr[h])) {
+            /* XXX maybe clear phdr[h].p_memsz bytes from
+               phdr[h].p_vaddr + phdr[h].p_filesz ??? */
+            if (phdr[h].p_vaddr + phdr[h].p_memsz > maxva)
+                maxva = phdr[h].p_vaddr + phdr[h].p_memsz;
+            DPRINTF(("bss from %p to %p, maxva %p\n",
+                     (void *)(phdr[h].p_vaddr + phdr[h].p_filesz),
+                     (void *)(phdr[h].p_vaddr + phdr[h].p_memsz),
+                     (void *)maxva));
+        }
     }
 
     p = malloc(sizeof(int) + sizeof(Elf_Ehdr) +
-	       ehdr.e_shnum * sizeof(Elf_Shdr));
+               ehdr.e_shnum * sizeof(Elf_Shdr));
     if (p == NULL) {
-	ERROR("Cannot allocate memory for Elf_Shdrs");
-	goto out;
+        ERROR("Cannot allocate memory for Elf_Shdrs");
+        goto out;
     }
 
     shdr = (Elf_Shdr *)(p + sizeof(int) + sizeof(Elf_Ehdr));
 
     if (myseek(kernel_gfd, ehdr.e_shoff - curpos, SEEK_SET) == -1) {
-	ERROR("Seek to symbol header failed");
-	goto out;
+        ERROR("Seek to symbol header failed");
+        goto out;
     }
     curpos = ehdr.e_shoff;
 
     if (gzread(kernel_gfd, shdr, ehdr.e_shnum * sizeof(Elf_Shdr)) !=
-	ehdr.e_shnum * sizeof(Elf_Shdr)) {
-	PERROR("Error reading kernel image ELF symbol header.");
-	goto out;
+        ehdr.e_shnum * sizeof(Elf_Shdr)) {
+        PERROR("Error reading kernel image ELF symbol header.");
+        goto out;
     }
     curpos += ehdr.e_shnum * sizeof(Elf_Shdr);
 
@@ -584,68 +586,68 @@ loadelfimage(gzFile kernel_gfd, int pm_handle, unsigned long *page_array,
     maxva = (maxva + ELFROUND - 1) & ~(ELFROUND - 1);
 
     for (h = 0; h < ehdr.e_shnum; h++) {
-	if (shdr[h].sh_type == SHT_STRTAB) {
-	    for (i = 0; i < ehdr.e_shnum; i++)
-		if (shdr[i].sh_type == SHT_SYMTAB &&
-		    shdr[i].sh_link == h)
-		    break;
-	    if (i == ehdr.e_shnum) {
-		shdr[h].sh_offset = 0;
-		continue;
-	    }
-	}
+        if (shdr[h].sh_type == SHT_STRTAB) {
+            for (i = 0; i < ehdr.e_shnum; i++)
+                if (shdr[i].sh_type == SHT_SYMTAB &&
+                    shdr[i].sh_link == h)
+                    break;
+            if (i == ehdr.e_shnum) {
+                shdr[h].sh_offset = 0;
+                continue;
+            }
+        }
 
-	if (shdr[h].sh_type == SHT_STRTAB ||
-	    shdr[h].sh_type == SHT_SYMTAB) {
-	    if (myseek(kernel_gfd, shdr[h].sh_offset - curpos, SEEK_SET) ==
-		-1) {
-		ERROR("Seek to symbol section failed");
-		goto out;
-	    }
-	    curpos = shdr[h].sh_offset;
+        if (shdr[h].sh_type == SHT_STRTAB ||
+            shdr[h].sh_type == SHT_SYMTAB) {
+            if (myseek(kernel_gfd, shdr[h].sh_offset - curpos, SEEK_SET) ==
+                -1) {
+                ERROR("Seek to symbol section failed");
+                goto out;
+            }
+            curpos = shdr[h].sh_offset;
 
-	    shdr[h].sh_offset = maxva - *symtab_addr;
+            shdr[h].sh_offset = maxva - *symtab_addr;
 
-	    DPRINTF(("copy section %d, size 0x%x\n", h, shdr[h].sh_size));
-	    for (i = 0; i < shdr[h].sh_size; i += c, maxva += c) {
-		c = PAGE_SIZE - (maxva & (PAGE_SIZE - 1));
-		if (c > (shdr[h].sh_size - i))
-		    c = shdr[h].sh_size - i;
-		if (gzread(kernel_gfd, page, c) != c) {
-		    PERROR("Error reading kernel image page.");
-		    goto out;
-		}
-		curpos += c;
+            DPRINTF(("copy section %d, size 0x%x\n", h, shdr[h].sh_size));
+            for (i = 0; i < shdr[h].sh_size; i += c, maxva += c) {
+                c = PAGE_SIZE - (maxva & (PAGE_SIZE - 1));
+                if (c > (shdr[h].sh_size - i))
+                    c = shdr[h].sh_size - i;
+                if (gzread(kernel_gfd, page, c) != c) {
+                    PERROR("Error reading kernel image page.");
+                    goto out;
+                }
+                curpos += c;
 
-		vaddr = map_pfn(pm_handle, page_array[(maxva - *virt_load_addr)
-						      >> PAGE_SHIFT]);
-		if (vaddr == NULL) {
-		    ERROR("Couldn't map guest memory");
-		    goto out;
-		}
-		DPRINTF(("copy page %p to %p, count 0x%x\n", (void *)maxva,
-			 vaddr + (maxva & (PAGE_SIZE - 1)), c));
-		memcpy(vaddr + (maxva & (PAGE_SIZE - 1)), page, c);
-		unmap_pfn(pm_handle, vaddr);
-	    }
+                vaddr = map_pfn(pm_handle, page_array[(maxva - *virt_load_addr)
+                                                     >> PAGE_SHIFT]);
+                if (vaddr == NULL) {
+                    ERROR("Couldn't map guest memory");
+                    goto out;
+                }
+                DPRINTF(("copy page %p to %p, count 0x%x\n", (void *)maxva,
+                         vaddr + (maxva & (PAGE_SIZE - 1)), c));
+                memcpy(vaddr + (maxva & (PAGE_SIZE - 1)), page, c);
+                unmap_pfn(pm_handle, vaddr);
+            }
 
-	    *symtab_len += shdr[h].sh_size;
-	    maxva = (maxva + ELFROUND - 1) & ~(ELFROUND - 1);
+            *symtab_len += shdr[h].sh_size;
+            maxva = (maxva + ELFROUND - 1) & ~(ELFROUND - 1);
 
-	}
-	shdr[h].sh_name = 0;
+        }
+        shdr[h].sh_name = 0;
     }
 
     if (*symtab_len == 0) {
-	DPRINTF(("no symbol table\n"));
-	*symtab_addr = 0;
-	ret = 0;
-	goto out;
+        DPRINTF(("no symbol table\n"));
+        *symtab_addr = 0;
+        ret = 0;
+        goto out;
     }
 
     DPRINTF(("sym header va %p from %p/%p size %x/%x\n", (void *)symva,
-	     shdr, p, ehdr.e_shnum * sizeof(Elf_Shdr),
-	     ehdr.e_shnum * sizeof(Elf_Shdr) + sizeof(Elf_Ehdr)));
+             shdr, p, ehdr.e_shnum * sizeof(Elf_Shdr),
+             ehdr.e_shnum * sizeof(Elf_Shdr) + sizeof(Elf_Ehdr)));
     ehdr.e_phoff = 0;
     ehdr.e_shoff = sizeof(Elf_Ehdr);
     ehdr.e_phentsize = 0;
@@ -656,39 +658,39 @@ loadelfimage(gzFile kernel_gfd, int pm_handle, unsigned long *page_array,
 
     s = sizeof(int) + sizeof(Elf_Ehdr) + ehdr.e_shnum * sizeof(Elf_Shdr);
     for (i = 0; i < s; i += c, symva += c) {
-	c = PAGE_SIZE - (symva & (PAGE_SIZE - 1));
-	if (c > s - i)
-	    c = s - i;
-	vaddr = map_pfn(pm_handle, page_array[(symva - *virt_load_addr)
-					      >> PAGE_SHIFT]);
-	if (vaddr == NULL) {
-	    ERROR("Couldn't map guest memory");
-	    goto out;
-	}
-	DPRINTF(("copy page %p to %p, count 0x%x\n", (void *)symva,
-		 vaddr + (symva & (PAGE_SIZE - 1)), c));
-	memcpy(vaddr + (symva & (PAGE_SIZE - 1)), p + i,
-	       c);
-	unmap_pfn(pm_handle, vaddr);
+        c = PAGE_SIZE - (symva & (PAGE_SIZE - 1));
+        if (c > s - i)
+            c = s - i;
+        vaddr = map_pfn(pm_handle, page_array[(symva - *virt_load_addr)
+                                             >> PAGE_SHIFT]);
+        if (vaddr == NULL) {
+            ERROR("Couldn't map guest memory");
+            goto out;
+        }
+        DPRINTF(("copy page %p to %p, count 0x%x\n", (void *)symva,
+                 vaddr + (symva & (PAGE_SIZE - 1)), c));
+        memcpy(vaddr + (symva & (PAGE_SIZE - 1)), p + i,
+               c);
+        unmap_pfn(pm_handle, vaddr);
     }
 
     *symtab_len = maxva - *symtab_addr;
 
     ret = 0;
 
-  out:
+ out:
     if (ret == 0) {
-	maxva = (maxva + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
-	*ksize = (maxva - *virt_load_addr) >> PAGE_SHIFT;
+        maxva = (maxva + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
+        *ksize = (maxva - *virt_load_addr) >> PAGE_SHIFT;
 
-	DPRINTF(("virt_addr %p, kpages 0x%lx, symtab_addr %p, symtab_len %p\n",
-		 (void *)*virt_load_addr, *ksize, (void *)*symtab_addr,
-		 (void *)*symtab_len));
+        DPRINTF(("virt_addr %p, kpages 0x%lx, symtab_addr %p, symtab_len %p\n",
+                 (void *)*virt_load_addr, *ksize, (void *)*symtab_addr,
+                 (void *)*symtab_len));
     }
 
     if (phdr)
-	free(phdr);
+        free(phdr);
     if (p)
-	free(p);
+        free(p);
     return ret;
 }

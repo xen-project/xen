@@ -187,7 +187,7 @@ int xc_vbd_probe(int xc_handle,
 
     if ( ret >= 0 )
     {
-	for ( i = 0, j = 0; i < xdi->count; i++ )
+        for ( i = 0, j = 0; i < xdi->count; i++ )
         {
             if ( !(xdi->disks[i].info & XD_FLAG_VIRT) )
                 continue;

@@ -166,26 +166,27 @@ static int setup_guestos(int xc_handle,
     /* Load the initial ramdisk image. */
     if ( initrd_gfd )
     {
-	int size;
+        int size;
 
-	for ( j=0, i=ksize; i < ((tot_pages/2) * PAGE_SIZE); i += PAGE_SIZE )
-	{
-	    char page[PAGE_SIZE];
+        for ( j=0, i=ksize; i < ((tot_pages/2) * PAGE_SIZE); i += PAGE_SIZE )
+        {
+            char page[PAGE_SIZE];
             if ( (size = gzread(initrd_gfd, page, PAGE_SIZE)) == -1 )
             {
-		PERROR("Error reading initrd image, could not");
-		goto error_out;
-	    }
-	    j += size;
-	    if ( size > 0 )
-		copy_to_domain_page(pm_handle, page_array[i>>PAGE_SHIFT], page);
-	    if ( size < PAGE_SIZE )
-		goto initrd_copied;
-	}
-	ERROR("Kernel/initrd too big to safely fit in domain memory");
-            goto error_out;
+                PERROR("Error reading initrd image, could not");
+                goto error_out;
+            }
+            j += size;
+            if ( size > 0 )
+                copy_to_domain_page(pm_handle, 
+                                    page_array[i>>PAGE_SHIFT], page);
+            if ( size < PAGE_SIZE )
+                goto initrd_copied;
+        }
+        ERROR("Kernel/initrd too big to safely fit in domain memory");
+        goto error_out;
         
- initrd_copied:	
+    initrd_copied: 
         initrd_addr = virt_load_addr + ksize;
         initrd_len  = j;
     }
@@ -234,11 +235,11 @@ static int setup_guestos(int xc_handle,
             memset(vl1tab, 0, PAGE_SIZE);
             unmap_pfn(pm_handle, vl1tab);
             alloc_index--;
-		
+  
             l1e = l1tab + (l1_table_offset(virt_load_addr+(count<<PAGE_SHIFT))*
                            sizeof(l1_pgentry_t));
 
-            /* make apropriate entry in the page directory */
+            /* Make appropriate entry in the page directory. */
             pgt_updates->ptr = l2e;
             pgt_updates->val = l1tab | L2_PROT;
             pgt_updates++;
@@ -373,11 +374,11 @@ int xc_linux_build(int xc_handle,
             goto error_out;
         }
 
-	if ( (initrd_gfd = gzdopen(initrd_fd, "rb")) == NULL )
-	{
-	    PERROR("Could not allocate decompression state for initrd");
-	    goto error_out;
-	}
+        if ( (initrd_gfd = gzdopen(initrd_fd, "rb")) == NULL )
+        {
+            PERROR("Could not allocate decompression state for initrd");
+            goto error_out;
+        }
 
     }
 
@@ -408,11 +409,11 @@ int xc_linux_build(int xc_handle,
     if ( kernel_fd >= 0 )
         close(kernel_fd);
     if( kernel_gfd )
-	gzclose(kernel_gfd);
+        gzclose(kernel_gfd);
     if ( initrd_fd >= 0 )
         close(initrd_fd);
     if( initrd_gfd )
-	gzclose(initrd_gfd);
+        gzclose(initrd_gfd);
 
     ctxt = &launch_op.u.builddomain.ctxt;
 
@@ -480,11 +481,11 @@ int xc_linux_build(int xc_handle,
     if ( kernel_fd >= 0 )
         close(kernel_fd);
     if( kernel_gfd )
-	gzclose(kernel_gfd);
+        gzclose(kernel_gfd);
     if ( initrd_fd >= 0 )
         close(initrd_fd);
     if( initrd_gfd )
-	gzclose(initrd_gfd);
+        gzclose(initrd_gfd);
 
     return -1;
 }
