@@ -60,7 +60,7 @@ cd ${TOP}
 fi
 
 # identify this version of linux
-LINUX_VER=`/bin/ls -ld ${DEST_BK_REP}/xenolinux-sparse | sed -e 's!^.*xenolinux-\([0-9.]\+\)-sparse!\1!'`
+LINUX_VER=`( /bin/ls -ld ${DEST_BK_REP}/xenolinux-sparse || /bin/ls -ld xenolinux-*-sparse ) 2>/dev/null | sed -e 's!^.*xenolinux-\([0-9.]\+\)-sparse!\1!'`
 
 # copy in the master Linux tree for this kernel
 if [ ! -d linux-${LINUX_VER} ]
