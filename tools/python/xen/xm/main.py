@@ -302,10 +302,10 @@ class ProgMigrate(Prog):
     info = """Migrate a domain to another machine."""
 
     def help(self, args):
-        migrate.help(args)
+        migrate.help([self.name] + args)
     
     def main(self, args):
-        migrate.main(args)
+        migrate.main([self.name] + args)
 
 xm.prog(ProgMigrate)
 
