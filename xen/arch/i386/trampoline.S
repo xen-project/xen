@@ -18,6 +18,8 @@
 #include <xeno/config.h>
 #include <asm/page.h>
 
+#ifdef CONFIG_SMP
+        
 .data
 
 .code16
@@ -52,3 +54,5 @@ gdt_48:
 
 .globl SYMBOL_NAME(trampoline_end)
 SYMBOL_NAME_LABEL(trampoline_end)
+
+#endif /* CONFIG_SMP */

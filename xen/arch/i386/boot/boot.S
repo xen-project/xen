@@ -65,6 +65,7 @@ hal_entry:
         and     $0x7f,%ecx /* disable GLOBAL bit */
         mov     %ecx,%cr4
                 
+#ifdef CONFIG_SMP
         /* Is this a non-boot processor? */
         cmp     $(SECONDARY_CPU_FLAG),%ebx
         jne     continue_boot_cpu
@@ -72,6 +73,7 @@ hal_entry:
         call    start_paging
         lidt    idt_descr                        
         jmp     initialize_secondary
+#endif
         
 continue_boot_cpu:
         add     $__PAGE_OFFSET,%ebx

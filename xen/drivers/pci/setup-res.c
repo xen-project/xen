@@ -17,7 +17,7 @@
  */
 
 #include <linux/init.h>
-/*#include <linux/kernel.h>*/
+#include <linux/lib.h>
 #include <linux/pci.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>

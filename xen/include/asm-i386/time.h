@@ -46,4 +46,6 @@ extern  s_time_t stime_now;      /* time in ns at last timer IRQ */
  */
 typedef u64 dv_time_t;
 
+extern int using_apic_timer;
+
 #endif /* _ASM_TIME_H_ */

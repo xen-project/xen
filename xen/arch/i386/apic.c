@@ -45,9 +45,8 @@
 #include <asm/mpspec.h>
 #include <asm/pgalloc.h>
 #include <asm/hardirq.h>
-
+#include <asm/apic.h>
 #include <xeno/ac_timer.h>
-
 #include <xeno/perfc.h>
 
 #undef APIC_TIME_TRACE
@@ -839,7 +838,10 @@ int __init APIC_init_uniprocessor (void)
 
     connect_bsp_APIC();
 
-    cpu_online_map = phys_cpu_present_map = 1;
+#ifdef CONFIG_SMP
+    cpu_online_map = 1;
+#endif
+    phys_cpu_present_map = 1;
     apic_write_around(APIC_ID, boot_cpu_physical_apicid);
 
     apic_pm_init2();

@@ -32,6 +32,7 @@
 #include <asm/desc.h>
 #include <asm/smpboot.h>
 
+#ifdef CONFIG_X86_IO_APIC
 
 static unsigned int nmi_watchdog;  /* XXXX XEN */
 
@@ -1749,3 +1750,5 @@ void __init setup_IO_APIC(void)
 	check_timer();
 	print_IO_APIC();
 }
+
+#endif /* CONFIG_X86_IO_APIC */

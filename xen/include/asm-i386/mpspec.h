@@ -218,7 +218,6 @@ extern int mpc_default_type;
 extern int mp_current_pci_id;
 extern unsigned long mp_lapic_addr;
 extern int pic_mode;
-extern int using_apic_timer;
 
 #endif
 

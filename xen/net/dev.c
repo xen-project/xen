@@ -558,9 +558,7 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
 
 int netif_rx(struct sk_buff *skb)
 {
-#ifdef CONFIG_SMP
     unsigned long cpu_mask;
-#endif
     int this_cpu = smp_processor_id();
     unsigned long flags;
     net_vif_t *vif;

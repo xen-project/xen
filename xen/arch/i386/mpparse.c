@@ -18,6 +18,7 @@
 #include <asm/io.h>
 #include <xeno/irq.h>
 #include <xeno/smp.h>
+#include <asm/apic.h>
 #include <asm/mpspec.h>
 #include <asm/pgalloc.h>
 #include <asm/smpboot.h>

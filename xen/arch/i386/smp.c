@@ -17,6 +17,8 @@
 #include <asm/pgalloc.h>
 #include <asm/smpboot.h>
 
+#ifdef CONFIG_SMP
+
 /*
  *	Some notes on x86 processor bugs affecting SMP operation:
  *
@@ -576,3 +578,4 @@ asmlinkage void smp_call_function_interrupt(void)
     }
 }
 
+#endif /* CONFIG_SMP */

@@ -41,6 +41,8 @@
 #include <asm/page.h>
 /*#include <asm/pgtable.h>*/
 
+#ifdef CONFIG_X86_IO_APIC
+
 #include "acpitable.h"
 
 static acpi_table_handler acpi_boot_ops[ACPI_TABLE_COUNT];
@@ -547,3 +549,5 @@ config_acpi_tables(void)
 		printk("Enabling the CPU's according to the ACPI table\n");
 	}
 }
+
+#endif /* CONFIG_X86_IO_APIC */

@@ -30,6 +30,7 @@
 #include <asm/ptrace.h>  /* XXX Only used for do_timer which should be moved */
 #include <asm/time.h>    /* pull in architecture specific time definition */
 #include <xeno/types.h>
+#include <hypervisor-ifs/hypervisor-if.h>
 
 /*
  * Init time

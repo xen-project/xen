@@ -46,6 +46,8 @@
 #include <xeno/delay.h>
 #include <xeno/lib.h>
 
+#ifdef CONFIG_SMP
+
 /* Set if we find a B stepping CPU			*/
 static int smp_b_stepping;
 
@@ -960,3 +962,5 @@ void __init smp_boot_cpus(void)
  smp_done:
     ;
 }
+
+#endif /* CONFIG_SMP */

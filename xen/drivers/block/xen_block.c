@@ -13,7 +13,7 @@
 #include <hypervisor-ifs/block.h>
 #include <hypervisor-ifs/hypervisor-if.h>
 #include <asm-i386/io.h>
-#include <asm/spinlock.h>
+#include <xeno/spinlock.h>
 #include <xeno/keyhandler.h>
 #include <xeno/interrupt.h>
 #include <xeno/segment.h>

@@ -309,12 +309,16 @@ void __init start_of_day(void)
     identify_cpu(&boot_cpu_data); /* get CPU type info */
     if ( cpu_has_fxsr ) set_in_cr4(X86_CR4_OSFXSR);
     if ( cpu_has_xmm )  set_in_cr4(X86_CR4_OSXMMEXCPT);
+#ifdef CONFIG_SMP
     find_smp_config();            /* find ACPI tables */
     smp_alloc_memory();           /* trampoline which other CPUs jump at */
+#endif
     paging_init();                /* not much here now, but sets up fixmap */
+#ifdef CONFIG_SMP
     if ( smp_found_config ) get_smp_config();
+#endif
     domain_init();
-	scheduler_init();	
+    scheduler_init();	
     trap_init();
     init_IRQ();  /* installs simple interrupt wrappers. Starts HZ clock. */
     time_init(); /* installs software handler for HZ clock. */
