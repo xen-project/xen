@@ -50,7 +50,7 @@ solution.
 The structure is like this:
 
    +--------------------------+  +--------------------------+
-   | Domain 0 (privileged)    |  | Domain 1 (unprivileged) |
+   | Domain 0 (privileged)    |  | Domain 1 (unprivileged)  |
    |                          |  |                          |
    | Xend ( Application )     |  |                          |
    | Blkif Backend Driver     |  | Blkif Frontend Driver    |
@@ -107,7 +107,7 @@ front and backend domains over the control channel.  The end that is
 passed to a domain is just an integer "port" uniquely identifying the
 event channel's local connection to that domain.  An example of this
 setup code is in linux-2.6.x/drivers/xen/blkfront/blkfront.c in
-blkif_status_change, which receives several status change events as
+blkif_connect(), which receives several status change events as
 the driver starts up.  It is passed an event channel end in a
 BLKIF_INTERFACE_STATUS_CONNECTED message, and patches it in like this:
 
@@ -136,7 +136,7 @@ static inline void flush_requests(void)
 }
 }}}
 
-notify_via_evtchn issues a hypercall to set the event waiting flag on
+notify_via_evtchn() issues a hypercall to set the event waiting flag on
 the other domain's end of the channel.
 
 ===== Communication Rings =====
@@ -151,9 +151,13 @@ used, they are however worth discussing as they are used in many
 places in the current code and are a useful model for communicating
 across a shared page.
 
-A shared page is set up by a guest first allocating and passing the
-address of a page in its own address space to the backend driver.  
+A shared page is set up by a front end guest first allocating and passing 
+the address of a page in its own address space to the backend driver.  
 
+Consider the following code, also from blkfront.c.  Note:  this code
+is in blkif_disconnect().  The driver transitions from STATE_CLOSED
+to STATE_DISCONNECTED before becoming CONNECTED.  The state automata
+is in blkif_status().
 
    blk_ring = (blkif_ring_t *)__get_free_page(GFP_KERNEL);
    blk_ring->req_prod = blk_ring->resp_prod = resp_cons = req_prod = 0;
@@ -222,20 +226,20 @@ is described by four pointers into a circular buffer of fixed-size
 records.  Pointers may only advance, and may not pass one another.
 
 
-                          rsp_cons----+
+                         resp_cons----+
                                       V
            +----+----+----+----+----+----+----+
-           |    |    |    free      |RSP1|RSP2|
+           |    |    |  free(A)     |RSP1|RSP2|
            +----+----+----+----+----+----+----+
  req_prod->|    |       -------->        |RSP3|
            +----+                        +----+
-           |REQ8|                        |    |<-rsp_prod
+           |REQ8|                        |    |<-resp_prod
            +----+                        +----+
            |REQ7|                        |    |
            +----+                        +----+
            |REQ6|       <--------        |    |
            +----+----+----+----+----+----+----+
-           |REQ5|REQ4|    free      |    |    |
+           |REQ5|REQ4|    free(B)   |    |    |
            +----+----+----+----+----+----+----+
   req_cons---------^
 
@@ -298,6 +302,10 @@ ring are simple.
    consumer.  More generally, the domain may be thought of to have
    exclusive access to the messages between its consumer and producer,
    and should absolutely not read or write outside this region.
+
+   Thus the front end has exclusive access to the free(A) region 
+   in the figure above, and the back end driver has exclusive
+   access to the free(B) region.
 
 In general, drivers keep a private copy of their producer pointer and
 then set the shared version when they are ready for the other end to
