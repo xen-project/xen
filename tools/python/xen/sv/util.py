@@ -1,12 +1,9 @@
-from xen.xend.sv.XendClientDeferred import server
+from xen.xend.XendClient import server
 from xen.xend import sxp
+from xen.xend import PrettyPrint
 
 def getDomInfoHash( domain ):
-    deferred = server.xend_domain( int( domain ) )
-    deferred.addCallback( procDomInfo, domain )
-    return deferred
-    
-def procDomInfo( domInfo, domain ):
+    domInfo = server.xend_domain( int( domain ) )
     d = {}
     d['dom']    = int( domain )
     d['name']   = sxp.child_value( domInfo, 'name' )
@@ -19,7 +16,20 @@ def procDomInfo( domInfo, domain ):
     if( sxp.child_value( domInfo, 'start_time' ) ):
         d['start_time'] = float( sxp.child_value( domInfo, 'start_time' ) )
     return d
+
+def sxp2hash( sxp ):
+    pass
     
+def sxp2string( sxp ):
+    class tmp:
+        def __init__( self ):
+                self.str = ""
+        def write( self, str ):
+                self.str = self.str + str
+    temp = tmp()
+    PrettyPrint.prettyprint( sxp, out=temp )
+    return temp.str    
+
 def bigTimeFormatter( time ):
     weeks = time // 604800
     remainder = time % 604800

@@ -35,6 +35,8 @@ XFRD_PROG_OBJ += $(UTIL_LIB)
 # Define to use stubs, undefine to use the real Xen functions.
 #CPPFLAGS += -D _XEN_XFR_STUB_
 
+CC := gcc
+
 CFLAGS += -g
 CFLAGS += -Wall
 CFALGS += -Werror
@@ -67,7 +69,7 @@ XFRD_LIBS += $(CURL_LIBS)
 all: xfrd
 
 xfrd: $(XFRD_PROG_OBJ)
-	$(CC) -o $@ $^ $(XFRD_LIBS)
+	$(CC) -shared -o $@ $^ $(XFRD_LIBS)
 
 .PHONY: install
 install: xfrd

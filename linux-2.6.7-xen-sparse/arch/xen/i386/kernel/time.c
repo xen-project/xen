@@ -87,14 +87,11 @@ EXPORT_SYMBOL(i8253_lock);
 
 struct timer_opts *cur_timer = &timer_none;
 
-/* These are peridically updated in shared_info, and then copied here. */
-static u32 shadow_tsc_stamp;
-static u64 shadow_system_time;
-static u32 shadow_time_version;
-static struct timeval shadow_tv;
+extern u64 shadow_system_time;
+extern void __get_time_values_from_xen(void);
 
 /* Keep track of last time we did processing/updating of jiffies and xtime. */
-static u64 processed_system_time;   /* System time (ns) at last processing. */
+u64 processed_system_time;   /* System time (ns) at last processing. */
 
 #define NS_PER_TICK (1000000000ULL/HZ)
 
@@ -215,32 +212,12 @@ EXPORT_SYMBOL(monotonic_clock);
 
 
 /*
- * Reads a consistent set of time-base values from Xen, into a shadow data
- * area. Must be called with the xtime_lock held for writing.
- */
-static void __get_time_values_from_xen(void)
-{
-    do {
-        shadow_time_version = HYPERVISOR_shared_info->time_version2;
-        rmb();
-        shadow_tv.tv_sec    = HYPERVISOR_shared_info->wc_sec;
-        shadow_tv.tv_usec   = HYPERVISOR_shared_info->wc_usec;
-        shadow_tsc_stamp    = HYPERVISOR_shared_info->tsc_timestamp.tsc_bits;
-        shadow_system_time  = HYPERVISOR_shared_info->system_time;
-        rmb();
-    }
-    while ( shadow_time_version != HYPERVISOR_shared_info->time_version1 );
-}
-
-/*
  * timer_interrupt() needs to keep up the real-time clock,
  * as well as call the "do_timer()" routine every clocktick
  */
 static inline void do_timer_interrupt(int irq, void *dev_id,
 					struct pt_regs *regs)
 {
-	s64 delta;
-	unsigned long ticks = 0;
 
 #ifdef CONFIG_X86_IO_APIC
 	if (timer_ack) {
@@ -258,23 +235,8 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 	}
 #endif
 
-	__get_time_values_from_xen();
-
-	delta = (s64)(shadow_system_time - processed_system_time);
-	if (delta < 0) {
-		printk("Timer ISR: Time went backwards: %lld\n", delta);
-		return;
-	}
-
-	/* Process elapsed jiffies since last call. */
-	while (delta >= NS_PER_TICK) {
-		ticks++;
-		delta -= NS_PER_TICK;
-		processed_system_time += NS_PER_TICK;
-
-		if (regs)
-			do_timer_interrupt_hook(regs);
-	}
+	if (regs)
+		do_timer_interrupt_hook(regs);
 
 #if 0				/* XEN PRIV */
 	/*
@@ -325,6 +287,8 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
  */
 irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
+	s64 delta;
+
 	/*
 	 * Here we are in the timer irq handler. We just have irqs locally
 	 * disabled but we don't know if the timer_bh is running on the other
@@ -334,10 +298,22 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	 */
 	write_seqlock(&xtime_lock);
 
+	__get_time_values_from_xen();
+
+	delta = (s64)(shadow_system_time - processed_system_time);
+	if (delta < 0) {
+		printk("Timer ISR: Time went backwards: %lld\n", delta);
+		goto out;
+	}
+
+	if (delta < NS_PER_TICK)
+		goto out;
+
 	cur_timer->mark_offset();
  
 	do_timer_interrupt(irq, NULL, regs);
 
+ out:
 	write_sequnlock(&xtime_lock);
 	return IRQ_HANDLED;
 }
@@ -447,7 +423,7 @@ void __init time_init(void)
 #endif
 	xtime.tv_sec = HYPERVISOR_shared_info->wc_sec;
 	wall_to_monotonic.tv_sec = -xtime.tv_sec;
-	xtime.tv_nsec = (INITIAL_JIFFIES % HZ) * (NSEC_PER_SEC / HZ);
+	xtime.tv_nsec = HYPERVISOR_shared_info->wc_usec * 1000;
 	wall_to_monotonic.tv_nsec = -xtime.tv_nsec;
 
 	cur_timer = select_timer();

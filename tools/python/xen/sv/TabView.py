@@ -1,4 +1,4 @@
-from xen.xend.sv.HTMLBase import HTMLBase
+from xen.sv.HTMLBase import HTMLBase
 
 class TabView( HTMLBase ):
 

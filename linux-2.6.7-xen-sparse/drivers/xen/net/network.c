@@ -275,6 +275,9 @@ static void network_alloc_rx_buffers(struct net_device *dev)
     }
     while ( (++i - np->rx_resp_cons) != NETIF_RX_RING_SIZE );
 
+    if ( unlikely(nr_pfns == 0) )
+        return;
+
     /*
      * We may have allocated buffers which have entries outstanding in the page
      * update queue -- make sure we flush those first!

@@ -164,9 +164,8 @@ static void __invalidate_shadow_ldt(struct domain *d)
 }
 
 
-static inline void invalidate_shadow_ldt(void)
+static inline void invalidate_shadow_ldt(struct domain *d)
 {
-    struct domain *d = current;
     if ( d->mm.shadow_ldt_mapcnt != 0 )
         __invalidate_shadow_ldt(d);
 }
@@ -387,7 +386,7 @@ static void put_page_from_l1e(l1_pgentry_t l1e)
         if ( unlikely(((page->type_and_flags & PGT_type_mask) == 
                        PGT_ldt_page)) &&
              unlikely(((page->type_and_flags & PGT_count_mask) != 0)) )
-            invalidate_shadow_ldt();
+            invalidate_shadow_ldt(page->u.domain);
         put_page(page);
     }
 }
@@ -748,7 +747,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         okay = get_page_and_type_from_pagenr(pfn, PGT_l2_page_table, d);
         if ( likely(okay) )
         {
-            invalidate_shadow_ldt();
+            invalidate_shadow_ldt(d);
 
             percpu_info[cpu].deferred_ops &= ~DOP_FLUSH_TLB;
             old_base_pfn = pagetable_val(d->mm.pagetable) >> PAGE_SHIFT;
@@ -795,7 +794,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         else if ( (d->mm.ldt_ents != ents) || 
                   (d->mm.ldt_base != ptr) )
         {
-            invalidate_shadow_ldt();
+            invalidate_shadow_ldt(d);
             d->mm.ldt_base = ptr;
             d->mm.ldt_ents = ents;
             load_LDT(d);

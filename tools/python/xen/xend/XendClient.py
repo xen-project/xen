@@ -121,12 +121,12 @@ class XendRequest:
             data = None
         if method == "POST" and url.path.endswith('/'):
             url.path = url.path[:-1]
-            
+
         self.headers = hdr
         self.data = data
         self.url = url
         self.method = method
-            
+
 class XendClientProtocol:
     """Abstract class for xend clients.
     """
@@ -134,18 +134,18 @@ class XendClientProtocol:
     def xendRequest(self, url, method, args=None):
         """Make a request to xend.
         Implement in a subclass.
-        
+
         @param url:    xend request url
         @param method: http method: POST or GET
         @param args:   request arguments (dict)
         """
         raise NotImplementedError()
-    
+
     def xendGet(self, url, args=None):
         """Make a xend request using HTTP GET.
         Requests using GET are usually 'safe' and may be repeated without
         nasty side-effects.
-        
+
         @param url:    xend request url
         @param data:   request arguments (dict)
         """
@@ -156,7 +156,7 @@ class XendClientProtocol:
         Requests using POST potentially cause side-effects, and should
         not be repeated unless you really want to repeat the side
         effect.
-        
+
         @param url:    xend request url
         @param args:   request arguments (dict)
         """
@@ -198,7 +198,7 @@ class SynchXendClientProtocol(XendClientProtocol):
     """A synchronous xend client. This will make a request, wait for
     the reply and return the result.
     """
-    
+
     def xendRequest(self, url, method, args=None):
         """Make a request to xend.
 
@@ -244,10 +244,10 @@ class AsynchXendClient(http.HTTPClient):
 
     def handleStatus(self, version, status, message):
         return self.protocol.handleStatus(version, status, message)
-    
+
     def handleResponse(self, data):
         return self.protocol.handleResponse(data)
-        
+
 class AsynchXendClientProtocol(XendClientProtocol):
     """An asynchronous xend client. Uses twisted to connect to xend
     and make the request. It does not block waiting for the result,
@@ -255,6 +255,46 @@ class AsynchXendClientProtocol(XendClientProtocol):
 
     Uses AsynchXendClient to manage the connection.
     """
+    def __init__(self):
+        self.err = None
+
+    def xendRequest(self, url, method, args=None):
+        """Make a request to xend. The returned deferred is called when
+        the result is available.
+
+        @param url:    xend request url
+        @param method: http method: POST or GET
+        @param args:   request arguments (dict)
+        @return: deferred
+        """
+        request = XendRequest(url, method, args)
+        self.deferred = Deferred()
+        clientCreator = ClientCreator(reactor, AsynchXendClient, self, request)
+        clientCreator.connectTCP(url.host, url.port)
+        return self.deferred
+
+    def callErrback(self, err):
+        if not self.deferred.called:
+            self.err = err
+            self.deferred.errback(err)
+        return err
+
+    def callCallback(self, val):
+        if not self.deferred.called:
+            self.deferred.callback(val)
+        return val
+
+    def handleException(self, err):
+        return self.callErrback(err)
+
+    def handleResponse(self, data):
+        if self.err: return self.err
+        val = XendClientProtocol.handleResponse(self, data)
+        if isinstance(val, Exception):
+            self.callErrback(val)
+        else:
+            self.callCallback(val)
+        return val
 
     def __init__(self):
         self.err = None
@@ -365,17 +405,20 @@ class Xend:
 
     def xend_node(self):
         return self.xendGet(self.nodeurl())
+        
+    def xend_node_dmesg(self):
+        return self.xendGet(self.dmesgurl())
 
     def xend_node_cpu_rrobin_slice_set(self, slice):
         return self.xendPost(self.nodeurl(),
                              {'op'      : 'cpu_rrobin_slice_set',
                               'slice'   : slice })
-    
+
     def xend_node_cpu_bvt_slice_set(self, ctx_allow):
         return self.xendPost(self.nodeurl(),
                              {'op'      : 'cpu_bvt_slice_set',
                               'ctx_allow' : ctx_allow })
-    
+
     def xend_node_cpu_fbvt_slice_set(self, ctx_allow):
         return self.xendPost(self.nodeurl(),
                              {'op'      : 'cpu_fbvt_slice_set',
@@ -442,7 +485,7 @@ class Xend:
                               'warp'    : warp,
                               'warpl'   : warpl,
                               'warpu'   : warpu })
-    
+
     def xend_domain_cpu_fbvt_set(self, id, mcuadv, warp, warpl, warpu):
         return self.xendPost(self.domainurl(id),
                              {'op'      : 'cpu_fbvt_set',
@@ -450,7 +493,6 @@ class Xend:
                               'warp'    : warp,
                               'warpl'   : warpl,
                               'warpu'   : warpu })
-    
 
     def xend_domain_cpu_atropos_set(self, id, period, slice, latency, xtratime):
         return self.xendPost(self.domainurl(id),
@@ -459,20 +501,20 @@ class Xend:
                               'slice'   : slice,
                               'latency' : latency,
                               'xtratime': xtratime })
-    
+
     def xend_domain_vifs(self, id):
         return self.xendGet(self.domainurl(id),
                             { 'op'      : 'vifs' })
-    
+
     def xend_domain_vif(self, id, vif):
         return self.xendGet(self.domainurl(id),
                             { 'op'      : 'vif',
                               'vif'     : vif })
-    
+
     def xend_domain_vbds(self, id):
         return self.xendGet(self.domainurl(id),
                             {'op'       : 'vbds'})
-    
+
     def xend_domain_vbd(self, id, vbd):
         return self.xendGet(self.domainurl(id),
                             {'op'       : 'vbd',
@@ -488,7 +530,7 @@ class Xend:
                              {'op'      : 'device_destroy',
                               'type'    : type,
                               'index'   : idx })
-    
+
     def xend_consoles(self):
         return self.xendGet(self.consoleurl())
 
@@ -517,7 +559,6 @@ class Xend:
 
     def xend_dmesg(self):
         return self.xendGet(self.dmesgurl())
-    
 
 def xendmain(srv, asynch, fn, args):
     if asynch:
@@ -549,15 +590,15 @@ def xendmain(srv, asynch, fn, args):
 
 def main(argv):
     """Call an API function:
-    
+
     python XendClient.py fn args...
 
     The leading 'xend_' on the function can be omitted.
     Example:
 
-    > python XendClient.py domains
+python XendClient.py domains
     (0 8)
-    > python XendClient.py domain 0
+python XendClient.py domain 0
     (domain (id 0) (name Domain-0) (memory 128))
     """
     global DEBUG
@@ -588,3 +629,4 @@ if __name__ == "__main__":
     main(sys.argv)
 else:    
     server = Xend()
+    aserver = Xend( AsynchXendClientProtocol() )
