@@ -71,7 +71,7 @@ install: all
 	install -m0644 xc.h $(prefix)/usr/include
 
 clean:
-	rm -rf *.a *.so *.o *.rpm $(LIB) *~ $(DEPS) xen
+	rm -rf *.a *.so *.o *.rpm $(LIB) *~ $(DEPS) xen TAGS
 
 rpm: all
 	rm -rf staging
@@ -88,5 +88,9 @@ libxc.so.$(MAJOR):
 	ln -sf libxc.so.$(MAJOR).$(MINOR) $@
 libxc.so.$(MAJOR).$(MINOR): $(OBJS)
 	$(CC) -Wl,-soname -Wl,$(SONAME) -shared -o $@ $^ -L../libxutil -lxutil -lz
+
+.PHONY: TAGS clean install mk-symlinks rpm
+TAGS:
+	etags -t $(SRCS) *.h
 
 -include $(DEPS)
