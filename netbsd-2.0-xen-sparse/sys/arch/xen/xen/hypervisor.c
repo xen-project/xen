@@ -52,7 +52,6 @@ __KERNEL_RCSID(0, "$NetBSD: hypervisor.c,v 1.7.2.1 2004/05/22 15:58:54 he Exp $"
 #include <machine/hypervisor.h>
 #include <machine/evtchn.h>
 
-#ifdef DOM0OPS
 #include <sys/dirent.h>
 #include <sys/stat.h>
 #include <sys/tree.h>
@@ -60,7 +59,6 @@ __KERNEL_RCSID(0, "$NetBSD: hypervisor.c,v 1.7.2.1 2004/05/22 15:58:54 he Exp $"
 #include <miscfs/specfs/specdev.h>
 #include <miscfs/kernfs/kernfs.h>
 #include <machine/kernfs_machdep.h>
-#endif
 
 #if NXENNET > 0
 #include <net/if.h>
@@ -187,9 +185,9 @@ hypervisor_attach(parent, self, aux)
 	hac.hac_xennpx.xa_device = "npx";
 	config_found(self, &hac.hac_xennpx, hypervisor_print);
 #endif
+	xenkernfs_init();
 #ifdef DOM0OPS
 	if (xen_start_info.flags & SIF_PRIVILEGED) {
-		xenkernfs_init();
 		xenprivcmd_init();
 		xenmachmem_init();
 		xenvfr_init();
@@ -222,8 +220,7 @@ hypervisor_notify_via_evtchn(unsigned int port)
 	(void)HYPERVISOR_event_channel_op(&op);
 }
 
-#ifdef DOM0OPS
-
+#define	READ_MODE	(S_IRUSR|S_IRGRP|S_IROTH)
 #define DIR_MODE	(S_IRUSR|S_IXUSR|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH)
 
 kernfs_parentdir_t *kernxen_pkt;
@@ -237,5 +234,9 @@ xenkernfs_init()
 	KERNFS_INITENTRY(dkt, DT_DIR, "xen", NULL, KFSsubdir, VDIR, DIR_MODE);
 	kernfs_addentry(NULL, dkt);
 	kernxen_pkt = KERNFS_ENTOPARENTDIR(dkt);
+
+	KERNFS_ALLOCENTRY(dkt, M_TEMP, M_WAITOK);
+	KERNFS_INITENTRY(dkt, DT_REG, "cmdline", xen_start_info.cmd_line,
+	    KFSstring, VREG, READ_MODE);
+	kernfs_addentry(kernxen_pkt, dkt);
 }
-#endif
