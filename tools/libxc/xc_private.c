@@ -6,51 +6,140 @@
 
 #include "xc_private.h"
 
-int init_pfn_mapper(domid_t domid)
+#define MAX_EXTENTS 8
+typedef struct {
+    int fd;
+    struct {
+        void         *base; 
+        unsigned long length;
+    } extent[MAX_EXTENTS];
+} mapper_desc_t;
+
+void *init_pfn_mapper(domid_t domid)
 {
-    int fd = open("/dev/mem", O_RDWR);
-    if ( fd >= 0 )
-        (void)ioctl(fd, _IO('M', 1), (unsigned long)domid);
-    return fd;
+    int            fd = open("/dev/mem", O_RDWR);
+    mapper_desc_t *desc;
+
+    if ( fd < 0 )
+        return NULL;
+
+    if ( (desc = malloc(sizeof(*desc))) == NULL )
+    {
+        close(fd);
+        return NULL;
+    }
+
+    (void)ioctl(fd, _IO('M', 1), (unsigned long)domid);
+
+    memset(desc, 0, sizeof(*desc));
+    desc->fd = fd;
+
+    return desc;
 }
 
-int close_pfn_mapper(int pm_handle)
+int close_pfn_mapper(void *pm_handle)
 {
-    return close(pm_handle);
+    mapper_desc_t *desc = pm_handle;
+    int            i;
+
+    for ( i = 0; i < MAX_EXTENTS; i++ )
+    {
+        if ( desc->extent[i].base != NULL )
+            (void)munmap(desc->extent[i].base, desc->extent[i].length);
+    }
+
+    close(desc->fd);
+    free(desc);
+
+    return 0;
 }
 
-void *map_pfn_writeable(int pm_handle, unsigned long pfn)
+static int get_free_offset(mapper_desc_t *desc)
 {
-    void *vaddr = mmap(NULL, PAGE_SIZE, PROT_READ|PROT_WRITE,
-                       MAP_SHARED, pm_handle, pfn << PAGE_SHIFT);
+    int i;
+
+    for ( i = 0; i < MAX_EXTENTS; i++ )
+    {
+        if ( desc->extent[i].base == NULL )
+            break;
+    }
+
+    if ( i == MAX_EXTENTS )
+    {
+        fprintf(stderr, "Extent overflow in map_pfn_*()!\n");
+        fflush(stderr);
+        *(int*)0=0; /* XXX */
+    }
+
+    return i;
+}
+
+void *map_pfn_writeable(void *pm_handle, unsigned long pfn)
+{
+    mapper_desc_t *desc = pm_handle;
+    void          *vaddr;
+    int            off;
+
+    vaddr = mmap(NULL, PAGE_SIZE, PROT_READ|PROT_WRITE,
+                 MAP_SHARED, desc->fd, pfn << PAGE_SHIFT);
     if ( vaddr == MAP_FAILED )
         return NULL;
+
+    off = get_free_offset(desc);
+    desc->extent[off].base   = vaddr;
+    desc->extent[off].length = PAGE_SIZE;
+
     return vaddr;
 }
 
-void *map_pfn_readonly(int pm_handle, unsigned long pfn)
+void *map_pfn_readonly(void *pm_handle, unsigned long pfn)
 {
-    void *vaddr = mmap(NULL, PAGE_SIZE, PROT_READ,
-                       MAP_SHARED, pm_handle, pfn << PAGE_SHIFT);
+    mapper_desc_t *desc = pm_handle;
+    void          *vaddr;
+    int            off;
+
+    vaddr = mmap(NULL, PAGE_SIZE, PROT_READ,
+                 MAP_SHARED, desc->fd, pfn << PAGE_SHIFT);
     if ( vaddr == MAP_FAILED )
         return NULL;
+
+    off = get_free_offset(desc);
+    desc->extent[off].base   = vaddr;
+    desc->extent[off].length = PAGE_SIZE;
+
     return vaddr;
 }
 
-void unmap_pfn(int pm_handle, void *vaddr)
+void unmap_pfn(void *pm_handle, void *vaddr)
 {
-    (void)munmap(vaddr, PAGE_SIZE);
+    mapper_desc_t *desc = pm_handle;
+    int            i;
+    unsigned long  len = 0;
+
+    for ( i = 0; i < MAX_EXTENTS; i++ )
+    {
+        if ( desc->extent[i].base == vaddr )
+        {
+            desc->extent[i].base = NULL;
+            len = desc->extent[i].length;
+        }
+    }
+
+    if ( len == 0 )
+        *(int*)0 = 0; /* XXX */
+
+    (void)munmap(vaddr, len);
 }
 
 /*******************/
 
-void * mfn_mapper_map_batch(int xc_handle, domid_t dom, int prot,
-                            unsigned long *arr, int num )
+void *mfn_mapper_map_batch(int xc_handle, domid_t dom, int prot,
+                           unsigned long *arr, int num )
 {
     privcmd_mmapbatch_t ioctlx; 
     void *addr;
-    addr = mmap( NULL, num*PAGE_SIZE, prot, MAP_SHARED, xc_handle, 0 );
-    if (addr)
+    addr = mmap(NULL, num*PAGE_SIZE, prot, MAP_SHARED, xc_handle, 0);
+    if ( addr != NULL )
     {
         ioctlx.num=num;
         ioctlx.dom=dom;
@@ -69,15 +158,15 @@ void * mfn_mapper_map_batch(int xc_handle, domid_t dom, int prot,
 
 /*******************/
 
-void * mfn_mapper_map_single(int xc_handle, domid_t dom,
-                             int size, int prot,
-                             unsigned long mfn )
+void *mfn_mapper_map_single(int xc_handle, domid_t dom,
+                            int size, int prot,
+                            unsigned long mfn )
 {
     privcmd_mmap_t ioctlx; 
     privcmd_mmap_entry_t entry; 
     void *addr;
-    addr = mmap( NULL, size, prot, MAP_SHARED, xc_handle, 0 );
-    if (addr)
+    addr = mmap(NULL, size, prot, MAP_SHARED, xc_handle, 0);
+    if ( addr != NULL )
     {
         ioctlx.num=1;
         ioctlx.dom=dom;
@@ -85,7 +174,7 @@ void * mfn_mapper_map_single(int xc_handle, domid_t dom,
         entry.va=(unsigned long) addr;
         entry.mfn=mfn;
         entry.npages=(size+PAGE_SIZE-1)>>PAGE_SHIFT;
-        if ( ioctl( xc_handle, IOCTL_PRIVCMD_MMAP, &ioctlx ) <0 )
+        if ( ioctl( xc_handle, IOCTL_PRIVCMD_MMAP, &ioctlx ) < 0 )
         {
             munmap(addr, size);
             return 0;

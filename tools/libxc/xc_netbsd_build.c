@@ -13,7 +13,7 @@
 #define DPRINTF(x)
 #endif
 
-static int loadelfimage(gzFile, int, unsigned long *, unsigned long,
+static int loadelfimage(gzFile, void *, unsigned long *, unsigned long,
                         unsigned long *, unsigned long *,
                         unsigned long *, unsigned long *);
 
@@ -77,9 +77,10 @@ static int setup_guestos(int xc_handle,
     shared_info_t *shared_info;
     unsigned long ksize;
     mmu_t *mmu = NULL;
-    int pm_handle, i;
+    void  *pm_handle = NULL;
+    int i;
 
-    if ( (pm_handle = init_pfn_mapper((domid_t)dom)) < 0 )
+    if ( (pm_handle = init_pfn_mapper((domid_t)dom)) == NULL )
         goto error_out;
 
     if ( (page_array = malloc(tot_pages * sizeof(unsigned long))) == NULL )
@@ -201,7 +202,7 @@ static int setup_guestos(int xc_handle,
  error_out:
     if ( mmu != NULL )
         free(mmu);
-    if ( pm_handle >= 0 )
+    if ( pm_handle != NULL )
         (void)close_pfn_mapper(pm_handle);
     if ( page_array == NULL )
         free(page_array);
@@ -412,7 +413,7 @@ myseek(gzFile gfd, off_t offset, int whence)
 #define IS_BSS(p) (p.p_filesz < p.p_memsz)
 
 static int
-loadelfimage(gzFile kernel_gfd, int pm_handle, unsigned long *page_array,
+loadelfimage(gzFile kernel_gfd, void *pm_handle, unsigned long *page_array,
              unsigned long tot_pages, unsigned long *virt_load_addr,
              unsigned long *ksize, unsigned long *symtab_addr,
              unsigned long *symtab_len)
