@@ -89,10 +89,19 @@ ia64_hypercall (struct pt_regs *regs)
 			vcpu_get_gr(ed,32),
 			vcpu_get_gr(ed,33));
 		break;
+#ifdef DOMU_BUILD_STAGING
 	    case 0xfffd: // test dummy hypercall
-		regs->r8 = launch_domainN(
-			vcpu_get_gr(ed,32),
-			vcpu_get_gr(ed,33), 0, 0, 0);
+		regs->r8 = launch_domainU(
+			vcpu_get_gr(ed,32));
 		break;
+	    case 0xfffc: // test dummy hypercall
+		regs->r8 = domU_staging_write_32(
+			vcpu_get_gr(ed,32),
+			vcpu_get_gr(ed,33),
+			vcpu_get_gr(ed,34),
+			vcpu_get_gr(ed,35),
+			vcpu_get_gr(ed,36));
+		break;
+#endif
 	}
 }

@@ -38,6 +38,12 @@ unsigned long dom0_start = -1L;
 unsigned long dom0_size = 512*1024*1024; //FIXME: Should be configurable
 //FIXME: alignment should be 256MB, lest Linux use a 256MB page size
 unsigned long dom0_align = 64*1024*1024;
+#ifdef DOMU_BUILD_STAGING
+unsigned long domU_staging_size = 32*1024*1024; //FIXME: Should be configurable
+unsigned long domU_staging_start;
+unsigned long domU_staging_align = 64*1024;
+unsigned long *domU_staging_area;
+#endif
 
 // initialized by arch/ia64/setup.c:find_initrd()
 unsigned long initrd_start = 0, initrd_end = 0;
@@ -542,6 +548,37 @@ void alloc_dom0(void)
 
 }
 
+#ifdef DOMU_BUILD_STAGING
+void alloc_domU_staging(void)
+{
+	domU_staging_size = 32*1024*1024; //FIXME: Should be configurable
+	printf("alloc_domU_staging: starting (initializing %d MB...)\n",domU_staging_size/(1024*1024));
+	domU_staging_start= alloc_boot_pages(domU_staging_size,domU_staging_align);
+	if (!domU_staging_size) {
+		printf("alloc_domU_staging: can't allocate, spinning...\n");
+		while(1);
+	}
+	else domU_staging_area = (unsigned long *)__va(domU_staging_start);
+	printf("alloc_domU_staging: domU_staging_start=%p\n",domU_staging_start);
+
+}
+
+unsigned long
+domU_staging_write_32(unsigned long at, unsigned long a, unsigned long b,
+	unsigned long c, unsigned long d)
+{
+	if (at + 32 > domU_staging_size) return -1;
+	if (at & 0x1f) return -1;
+	at >>= 5;
+	domU_staging_area[at++] = a;
+	domU_staging_area[at++] = b;
+	domU_staging_area[at++] = c;
+	domU_staging_area[at] = d;
+	return 0;
+	
+}
+#endif
+
 int construct_dom0(struct domain *d, 
 	               unsigned long image_start, unsigned long image_len, 
 	               unsigned long initrd_start, unsigned long initrd_len,
@@ -722,7 +759,7 @@ if (d == dom0)
 }
 
 // FIXME: When dom0 can construct domains, this goes away (or is rewritten)
-int construct_domN(struct domain *d,
+int construct_domU(struct domain *d,
 		   unsigned long image_start, unsigned long image_len,
 	           unsigned long initrd_start, unsigned long initrd_len,
 	           char *cmdline)
@@ -774,20 +811,19 @@ int construct_domN(struct domain *d,
 }
 
 // FIXME: When dom0 can construct domains, this goes away (or is rewritten)
-int launch_domainN(unsigned long start, unsigned long len,
-		   unsigned long initrd_start, unsigned long initrd_len,
-		   char *cmdline)
+int launch_domainU(unsigned long size)
 {
 	static int next = 100;  // FIXME
 
 	struct domain *d = do_createdomain(next,0);
 	if (!d) {
-		printf("launch_domainN: couldn't create\n");
+		printf("launch_domainU: couldn't create\n");
 		return 1;
 	}
-	if (construct_domN(d, start, len, 0, 0, 0)) {
-		printf("launch_domainN: couldn't construct(id=%d,%lx,%lx)\n",
-			d->id,start,len);
+	else next++;
+	if (construct_domU(d, (unsigned long)domU_staging_area, size,0,0,0)) {
+		printf("launch_domainU: couldn't construct(id=%d,%lx,%lx)\n",
+			d->id,domU_staging_area,size);
 		return 2;
 	}
 	domain_unpause_by_systemcontroller(d);

@@ -224,6 +224,9 @@ void cmain(multiboot_info_t *mbi)
     init_frametable();
 
     alloc_dom0();
+#ifdef DOMU_BUILD_STAGING
+    alloc_domU_staging();
+#endif
 
     end_boot_allocator();
 

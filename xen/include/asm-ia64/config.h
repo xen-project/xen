@@ -1,6 +1,7 @@
 // control flags for turning on/off features under test
 #undef CLONE_DOMAIN0
 //#define CLONE_DOMAIN0 5
+#define DOMU_BUILD_STAGING
 
 // manufactured from component pieces
 
