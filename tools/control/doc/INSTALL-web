@@ -1,5 +1,5 @@
 
-some notes on configuring xenctl...
+some notes on configuring xenctl web interface...
 
 to build:
 
@@ -7,14 +7,16 @@ to build:
  # this next step has already been done.
  # cp $CATALINA_HOME/server/lib/catalina-ant.jar $ANT_HOME/lib
  cd xeno.bk/tools/control
- make
+ make web
+ # You only need to make/install internal if you haven't already
+ # it's also needed by the cmdline tool
  cd xeno.bk/tools/internal
  make
 
 to setup:
 
  ## expand the jakarta (aka catalina) tree somewhere accessible by dom0
- export ROOTDIR=/anfs/scratch/labyrinth/ach61
+ export ROOTDIR=/anfs/scratch/<somewhere>
  cd $ROOTDIR
  tar zxf /usr/groups/xeno/archive/tomcat-4.1.24.tar.gz 
  export CATALINA_HOME=$ROOTDIR/jakarta-tomcat-4.1.24
@@ -26,9 +28,13 @@ to setup:
 
  ## install the xenctl web archive
  cp xeno.bk/tools/control/dist/xenctl-0.1-dev.war $CATALINA_HOME/webapps/xenctl.war
- cp xeno.bk/tools/control/domctl.xml /var/lib/xen
+ # Only if you have not already copied this file for the command line tool
+ cp xeno.bk/tools/control/domctl.xml /etc
+ # If it doesn't exist:
+ mkdir /var/lib/xen
 
  ## either edit xi_tools_dir in domctl.xml or copy the binaries
+ ## unless already installed for the command line tool
  # find xeno.bk/tools/internal -perm +111 -type f -exec cp {} /usr/local/bin \;
 
 to run:

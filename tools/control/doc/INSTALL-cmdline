@@ -1,0 +1,11 @@
+To install command line interface:
+
+cd xeno.bk/tools/control
+make cmdline
+cp xenctl xenctl-cmdline.jar <dom0>/usr/local/bin
+cp domctl.xml <dom0>/etc
+mkdir <dom0>/var/lib/xen
+
+First invocation of command line interface will give a warning about not being
+able to load the disk state from /var/lib/xen/vdstate.xml. This is ok, it'll
+be created the first time you change any state in the virtual disk manager.

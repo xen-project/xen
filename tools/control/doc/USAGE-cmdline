@@ -1,0 +1,77 @@
+General
+-------
+
+Invoking xenctl with no arguments, or with 'help' gives general usage
+xenctl help command, or xenctl command -?, gives specific command help
+
+Domain control
+--------------
+
+xenctl's command line interface is based on domctl. Defaults for domain
+creation are found in /etc/domctl.xml.
+
+Creating a domain: xenctl domain new <parameters>
+All parameters may be omitted to get defaults from domctl.xml, see help
+for ful details of available parameters.
+
+Starting a domain: xenctl domain start -n<domain_no>
+Stopping a domain: xenctl domain stop -n<domain_no>
+Destroying a domain: xenctl domain destroy -n<domain_no> (add -f to force
+                     destruction of a running domain)
+
+Listing all domains: xenctl domain list
+
+Physical disk access management
+-------------------------------
+
+Grant read-only access to a disk or partition:
+  xenctl physical grant -n<domain_no> -p<partition_name> (e.g. sda10, sdc..etc)
+Grant read-write access to a disk or partition:
+  xenctl physical grant -w -n<domain_no> -p<partition_name>
+  (if you grant read-write to a domain which already has read for the same
+   partition, it will be upgraded quite happily, and vice versa)
+Revoke access to a disk or partition:
+  xenctl physical revoke -n<domain_no> -p<partition_name>
+List access a domain has:
+  xenctl physical list -n<domain_no>
+   will list all the physical disks/partitions which the given domain may access
+   and the rights assigned.
+   
+Virtual disk management
+-----------------------
+
+Add a disk partition as a XenoPartition (raw space to create VDs on):
+  xenctl partitions add -p<partition_name> -c<chunk_size>
+    adds the partition, splitting it up into chunks of the size given
+    Sizes can all be specified as k, m, g.
+Lists partitions:
+  xenctl partitions list
+    XenoPartitions are shown in [ ]
+    
+Create a virtual disk:
+  xenctl vd create -n<name> -s<size> [-e<expiry>]
+    Name is for identification only and need not be unique. Expiry may be none.
+    Size can be in k, m, g
+    You will be given a 10-digit key for the disk which is its unique identifier.
+Delete a virtual disk:
+  xenctl vd delete -k<key>
+    Virtual disks with VBDs mapped to them may not be deleted.
+Refresh the expiry on a disk:
+  xenctl vd refresh -k<key> [-e<expiry>]
+    Sets a new expiry, may be none.
+List virtual disks:
+  xenctl vd show
+  
+List space free:
+  xenctl vd free
+    Shows how much space has been added with partitions add, but not allocated
+    to a virtual disk.
+    
+Create a virtual block device:
+  xenctl vbd create -n<domain> -k<key> -v<vbd_number> [-w]
+    Maps the disk with the given key into the domain. -w allows read-write.
+    vbd number 0 = /dev/xvda, number 1 = /dev/xvdb, and so on.
+Lists virtual block devices:
+  xenctl vbd show
+  
+Virtual block devices are automatically deleted when their domain is destroyed.
