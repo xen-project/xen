@@ -84,12 +84,12 @@ asmlinkage void do_page_fault(struct pt_regs *regs,
         error_code &= 3;
         error_code |= (regs->xcs & 2) << 1;
 
-#if PT_UPDATE_DEBUG > 0
+#if MMU_UPDATE_DEBUG > 0
         if ( (error_code == 0) && (address >= TASK_SIZE) )
         {
             unsigned long paddr = __pa(address);
             int i;
-            for ( i = 0; i < pt_update_queue_idx; i++ )
+            for ( i = 0; i < mmu_update_queue_idx; i++ )
             {
                 if ( update_debug_queue[i].ptr == paddr )
                 {

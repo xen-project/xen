@@ -41,7 +41,7 @@
 
 /* EAX = vector; EBX, ECX, EDX, ESI, EDI = args 1, 2, 3, 4, 5. */
 #define __HYPERVISOR_set_trap_table	   0
-#define __HYPERVISOR_pt_update		   1
+#define __HYPERVISOR_mmu_update		   1
 #define __HYPERVISOR_console_write	   2
 #define __HYPERVISOR_set_gdt		   3
 #define __HYPERVISOR_stack_switch          4
@@ -111,37 +111,35 @@
 
 
 /*
- * PAGE UPDATE COMMANDS AND FLAGS
- * 
- * PGREQ_XXX: specified in least 2 bits of 'ptr' field. These bits are masked
+ * MMU_XXX: specified in least 2 bits of 'ptr' field. These bits are masked
  *  off to get the real 'ptr' value.
  * All requests specify relevent address in 'ptr'. This is either a
- * machine/physical address (PA), or linear/virtual address (VA).
+ * machine/physical address (MA), or linear/virtual address (VA).
  * Normal requests specify update value in 'value'.
  * Extended requests specify command in least 8 bits of 'value'. These bits
- *  are masked off to get the real 'val' value. Except for PGEXT_SET_LDT 
+ *  are masked off to get the real 'val' value. Except for MMUEXT_SET_LDT 
  *  which shifts the least bits out.
  */
 /* A normal page-table update request. */
-#define PGREQ_NORMAL_UPDATE     0 /* checked '*ptr = val'. ptr is VA.      */
+#define MMU_NORMAL_PT_UPDATE     0 /* checked '*ptr = val'. ptr is VA.      */
 /* DOM0 can make entirely unchecked updates which do not affect refcnts. */
-#define PGREQ_UNCHECKED_UPDATE  1 /* unchecked '*ptr = val'. ptr is VA.    */
+#define MMU_UNCHECKED_PT_UPDATE  1 /* unchecked '*ptr = val'. ptr is VA.    */
 /* Update an entry in the machine->physical mapping table. */
-#define PGREQ_MPT_UPDATE        2 /* ptr = PA of frame to modify entry for */
+#define MMU_MACHPHYS_UPDATE      2 /* ptr = MA of frame to modify entry for */
 /* An extended command. */
-#define PGREQ_EXTENDED_COMMAND  3 /* least 8 bits of val demux further     */
+#define MMU_EXTENDED_COMMAND     3 /* least 8 bits of val demux further     */
 /* Extended commands: */
-#define PGEXT_PIN_L1_TABLE      0 /* ptr = PA of frame to pin              */
-#define PGEXT_PIN_L2_TABLE      1 /* ptr = PA of frame to pin              */
-#define PGEXT_PIN_L3_TABLE      2 /* ptr = PA of frame to pin              */
-#define PGEXT_PIN_L4_TABLE      3 /* ptr = PA of frame to pin              */
-#define PGEXT_UNPIN_TABLE       4 /* ptr = PA of frame to unpin            */
-#define PGEXT_NEW_BASEPTR       5 /* ptr = PA of new pagetable base        */
-#define PGEXT_TLB_FLUSH         6 /* ptr = NULL                            */
-#define PGEXT_INVLPG            7 /* ptr = NULL ; val = page to invalidate */
-#define PGEXT_SET_LDT           8 /* ptr = VA of table; val = # entries    */
-#define PGEXT_CMD_MASK        255
-#define PGEXT_CMD_SHIFT         8
+#define MMUEXT_PIN_L1_TABLE      0 /* ptr = MA of frame to pin              */
+#define MMUEXT_PIN_L2_TABLE      1 /* ptr = MA of frame to pin              */
+#define MMUEXT_PIN_L3_TABLE      2 /* ptr = MA of frame to pin              */
+#define MMUEXT_PIN_L4_TABLE      3 /* ptr = MA of frame to pin              */
+#define MMUEXT_UNPIN_TABLE       4 /* ptr = MA of frame to unpin            */
+#define MMUEXT_NEW_BASEPTR       5 /* ptr = MA of new pagetable base        */
+#define MMUEXT_TLB_FLUSH         6 /* ptr = NULL                            */
+#define MMUEXT_INVLPG            7 /* ptr = NULL ; val = VA to invalidate   */
+#define MMUEXT_SET_LDT           8 /* ptr = VA of table; val = # entries    */
+#define MMUEXT_CMD_MASK        255
+#define MMUEXT_CMD_SHIFT         8
 
 /* These are passed as 'flags' to update_va_mapping. They can be ORed. */
 #define UVMF_FLUSH_TLB          1 /* Flush entire TLB. */
@@ -175,12 +173,12 @@ typedef struct trap_info_st
 } trap_info_t;
 
 /*
- * Send an array of these to HYPERVISOR_pt_update()
+ * Send an array of these to HYPERVISOR_mmu_update()
  */
 typedef struct
 {
     unsigned long ptr, val; /* *ptr = val */
-} page_update_request_t;
+} mmu_update_t;
 
 /*
  * Send an array of these to HYPERVISOR_multicall()

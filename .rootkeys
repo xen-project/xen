@@ -456,6 +456,7 @@
 3ddb79c3uPGcP_l_2xyGgBSWd5aC-Q xen/include/asm-i386/unaligned.h
 3ddb79c2YTaZwOqWin9-QNgHge5RVw xen/include/hypervisor-ifs/block.h
 3ddb79c2PMeWTK86y4C3F4MzHw4A1g xen/include/hypervisor-ifs/dom0_ops.h
+3e6377eaioRoNm0m_HSDEAd4Vqrq_w xen/include/hypervisor-ifs/dom_mem_ops.h
 3ddb79c25UE59iu4JJcbRalx95mvcg xen/include/hypervisor-ifs/hypervisor-if.h
 3ead095dE_VF-QA88rl_5cWYRWtRVQ xen/include/hypervisor-ifs/kbd.h
 3ddb79c2oRPrzClk3zbTkRHlpumzKA xen/include/hypervisor-ifs/network.h
@@ -485,7 +486,6 @@
 3f0c428eIwGr7n9fj4FkBdX2YvA_Rw xen/include/xeno/crc32.h
 3ddb79c1V44RD26YqCUm-kqIupM37A xen/include/xeno/ctype.h
 3ddb79c05DdHQ0UxX_jKsXdR4QlMCA xen/include/xeno/delay.h
-3e6377eaioRoNm0m_HSDEAd4Vqrq_w xen/include/xeno/dom_mem_ops.h
 3ddb79c1uaWQZj551j1O0B5z8AnHOg xen/include/xeno/elevator.h
 3ddb79c0HIghfBF8zFUdmXhOU8i6hA xen/include/xeno/errno.h
 3ddb79c0rMjudDKkJku_mkm0J-BZgw xen/include/xeno/etherdevice.h
@@ -563,7 +563,6 @@
 3e5a4e65TNEycLeXqPSXQJQm_xGecA xenolinux-2.4.22-sparse/arch/xeno/defconfig
 3e6377f5xwPfYZkPHPrDbEq1PRN7uQ xenolinux-2.4.22-sparse/arch/xeno/drivers/balloon/Makefile
 3e6377f8Me8IqtvEhb70XFgOvqQH7A xenolinux-2.4.22-sparse/arch/xeno/drivers/balloon/balloon.c
-3e6377fbMjXWAQd0XN0FWv4fDEo6fg xenolinux-2.4.22-sparse/arch/xeno/drivers/balloon/dom_mem_ops.h
 3e5a4e65iHEuC5sjFhj42XALYbLVRw xenolinux-2.4.22-sparse/arch/xeno/drivers/block/Makefile
 3f689056Vxx_8K8DQTRysOxx_ikmLg xenolinux-2.4.22-sparse/arch/xeno/drivers/block/info.c
 3e5a4e65pP5spJErBW69pJxSSdK9RA xenolinux-2.4.22-sparse/arch/xeno/drivers/block/xl_block.c

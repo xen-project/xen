@@ -18,7 +18,7 @@ PERFCOUNTER( net_tx_transmitted, "net tx transmitted" )
 PERFCOUNTER_CPU( domain_page_tlb_flush, "domain page tlb flushes" )
 PERFCOUNTER_CPU( need_flush_tlb_flush, "PG_need_flush tlb flushes" )
 
-PERFCOUNTER_CPU( calls_to_process_page_updates, "calls_to_process_page_updates" )
+PERFCOUNTER_CPU( calls_to_mmu_update, "calls_to_mmu_update" )
 PERFCOUNTER_CPU( num_page_updates, "num_page_updates" )
 
 

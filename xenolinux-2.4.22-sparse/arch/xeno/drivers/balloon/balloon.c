@@ -24,7 +24,7 @@
 #include <asm/uaccess.h>
 #include <asm/tlb.h>
 
-#include "dom_mem_ops.h"
+#include <asm/hypervisor-ifs/dom_mem_ops.h>
 
 /* USER DEFINES -- THESE SHOULD BE COPIED TO USER-SPACE TOOLS */
 #define USER_INFLATE_BALLOON  1   /* return mem to hypervisor */
@@ -105,9 +105,9 @@ static unsigned long inflate_balloon(unsigned long num_pages)
 
     XENO_flush_page_update_queue();
 
-    dom_mem_op.op = BALLOON_INFLATE_OP;
-    dom_mem_op.u.balloon_inflate.size  = num_pages;
-    dom_mem_op.u.balloon_inflate.pages = parray;
+    dom_mem_op.op = MEMOP_RESERVATION_DECREASE;
+    dom_mem_op.u.decrease.size  = num_pages;
+    dom_mem_op.u.decrease.pages = parray;
     if ( (ret = HYPERVISOR_dom_mem_op(&dom_mem_op)) != num_pages )
     {
         printk("Unable to inflate balloon, error %lx\n", ret);
@@ -149,10 +149,10 @@ static unsigned long process_new_pages(unsigned long * parray,
         {
             phys_to_machine_mapping[i] = *curr;
             queue_l1_entry_update(
-                (pte_t *)((i << PAGE_SHIFT) | PGREQ_MPT_UPDATE), i);
+                (pte_t *)((i << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE), i);
             queue_l1_entry_update(
                 get_ptep((unsigned long)__va(i << PAGE_SHIFT)),
-                ((*curr) << PAGE_SHIFT) | L1_PROT);
+                ((*curr) << PAGE_SHIFT) | pgprot_val(PAGE_KERNEL));
 
             *curr = (unsigned long)__va(i << PAGE_SHIFT);
             curr++;
@@ -192,9 +192,9 @@ unsigned long deflate_balloon(unsigned long num_pages)
     parray = (unsigned long *)kmalloc(num_pages * sizeof(unsigned long), 
                                       GFP_KERNEL);
 
-    dom_mem_op.op = BALLOON_DEFLATE_OP;
-    dom_mem_op.u.balloon_deflate.size = num_pages;
-    dom_mem_op.u.balloon_deflate.pages = parray;
+    dom_mem_op.op = MEMOP_RESERVATION_INCREASE;
+    dom_mem_op.u.increase.size = num_pages;
+    dom_mem_op.u.increase.pages = parray;
     if((ret = HYPERVISOR_dom_mem_op(&dom_mem_op)) != num_pages){
         printk("Unable to deflate balloon, error %lx\n", ret);
         goto cleanup;

@@ -21,7 +21,7 @@
 /*
  * A description of the page table API:
  * 
- * Domains trap to process_page_updates with a list of update requests.
+ * Domains trap to do_mmu_update with a list of update requests.
  * This is a list of (ptr, val) pairs, where the requested operation
  * is *ptr = val.
  * 
@@ -46,7 +46,7 @@
  * Pinning the page type:
  * ----------------------
  * The type of a page can be pinned/unpinned with the commands
- * PGEXT_[UN]PIN_L?_TABLE. Each page can be pinned exactly once (that is,
+ * MMUEXT_[UN]PIN_L?_TABLE. Each page can be pinned exactly once (that is,
  * pinning is not reference counted, so it can't be nested).
  * This is useful to prevent a page's type count falling to zero, at which
  * point safety checks would need to be carried out next time the count
@@ -685,20 +685,20 @@ static int mod_l1_entry(l1_pgentry_t *p_l1_entry, l1_pgentry_t new_l1_entry)
 static int do_extended_command(unsigned long ptr, unsigned long val)
 {
     int err = 0, cpu = smp_processor_id();
-    unsigned int cmd = val & PGEXT_CMD_MASK;
+    unsigned int cmd = val & MMUEXT_CMD_MASK;
     unsigned long pfn = ptr >> PAGE_SHIFT;
     struct pfn_info *page = frame_table + pfn;
 
     /* 'ptr' must be in range except where it isn't a machine address. */
-    if ( (pfn >= max_page) && (cmd != PGEXT_SET_LDT) )
+    if ( (pfn >= max_page) && (cmd != MMUEXT_SET_LDT) )
         return 1;
 
     switch ( cmd )
     {
-    case PGEXT_PIN_L1_TABLE:
+    case MMUEXT_PIN_L1_TABLE:
         err = get_l1_table(pfn);
         goto mark_as_pinned;
-    case PGEXT_PIN_L2_TABLE:
+    case MMUEXT_PIN_L2_TABLE:
         err = get_l2_table(pfn);
     mark_as_pinned:
         if ( unlikely(err) )
@@ -720,7 +720,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         }
         break;
 
-    case PGEXT_UNPIN_TABLE:
+    case MMUEXT_UNPIN_TABLE:
         if ( !DOMAIN_OKAY(page->flags) )
         {
             err = 1;
@@ -743,7 +743,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         }
         break;
 
-    case PGEXT_NEW_BASEPTR:
+    case MMUEXT_NEW_BASEPTR:
         err = get_l2_table(pfn);
         if ( !err )
         {
@@ -758,17 +758,17 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         }
         break;
         
-    case PGEXT_TLB_FLUSH:
+    case MMUEXT_TLB_FLUSH:
         deferred_op[cpu].flush_tlb = 1;
         break;
     
-    case PGEXT_INVLPG:
-        __flush_tlb_one(val & ~PGEXT_CMD_MASK);
+    case MMUEXT_INVLPG:
+        __flush_tlb_one(val & ~MMUEXT_CMD_MASK);
         break;
 
-    case PGEXT_SET_LDT:
+    case MMUEXT_SET_LDT:
     {
-        unsigned long ents = val >> PGEXT_CMD_SHIFT;
+        unsigned long ents = val >> MMUEXT_CMD_SHIFT;
         if ( ((ptr & (PAGE_SIZE-1)) != 0) || 
              (ents > 8192) ||
              ((ptr+ents*LDT_ENTRY_SIZE) < ptr) ||
@@ -791,7 +791,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
     }
 
     default:
-        MEM_LOG("Invalid extended pt command 0x%08lx", val & PGEXT_CMD_MASK);
+        MEM_LOG("Invalid extended pt command 0x%08lx", val & MMUEXT_CMD_MASK);
         err = 1;
         break;
     }
@@ -800,16 +800,16 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
 }
 
 
-int do_process_page_updates(page_update_request_t *ureqs, int count)
+int do_mmu_update(mmu_update_t *ureqs, int count)
 {
-    page_update_request_t req;
+    mmu_update_t req;
     unsigned long flags, pfn, l1e;
     struct pfn_info *page;
     int err = 0, i, cpu = smp_processor_id();
     unsigned int cmd;
     unsigned long cr0 = 0;
 
-    perfc_incrc( calls_to_process_page_updates ); 
+    perfc_incrc( calls_to_mmu_update ); 
     perfc_addc( num_page_updates, count );
 
     for ( i = 0; i < count; i++ )
@@ -829,7 +829,8 @@ int do_process_page_updates(page_update_request_t *ureqs, int count)
         spin_lock_irq(&current->page_lock);
 
         /* Get the page-frame number that a non-extended command references. */
-        if ( (cmd == PGREQ_NORMAL_UPDATE) || (cmd == PGREQ_UNCHECKED_UPDATE) )
+        if ( (cmd == MMU_NORMAL_PT_UPDATE) || 
+             (cmd == MMU_UNCHECKED_PT_UPDATE) )
         {
             if ( cr0 == 0 )
             {
@@ -852,9 +853,9 @@ int do_process_page_updates(page_update_request_t *ureqs, int count)
         switch ( cmd )
         {
             /*
-             * PGREQ_NORMAL_UPDATE: Normal update to any level of page table.
+             * MMU_NORMAL_PT_UPDATE: Normal update to any level of page table.
              */
-        case PGREQ_NORMAL_UPDATE:
+        case MMU_NORMAL_PT_UPDATE:
             page  = frame_table + pfn;
             flags = page->flags;
 
@@ -888,7 +889,7 @@ int do_process_page_updates(page_update_request_t *ureqs, int count)
             }
             break;
 
-        case PGREQ_UNCHECKED_UPDATE:
+        case MMU_UNCHECKED_PT_UPDATE:
             req.ptr &= ~(sizeof(l1_pgentry_t) - 1);
             if ( likely(IS_PRIV(current)) )
             {
@@ -901,7 +902,7 @@ int do_process_page_updates(page_update_request_t *ureqs, int count)
             }
             break;
             
-        case PGREQ_MPT_UPDATE:
+        case MMU_MACHPHYS_UPDATE:
             page = frame_table + pfn;
             if ( unlikely(pfn >= max_page) )
             {
@@ -920,10 +921,10 @@ int do_process_page_updates(page_update_request_t *ureqs, int count)
             break;
 
             /*
-             * PGREQ_EXTENDED_COMMAND: Extended command is specified
+             * MMU_EXTENDED_COMMAND: Extended command is specified
              * in the least-siginificant bits of the 'value' field.
              */
-        case PGREQ_EXTENDED_COMMAND:
+        case MMU_EXTENDED_COMMAND:
             req.ptr &= ~(sizeof(l1_pgentry_t) - 1);
             err = do_extended_command(req.ptr, req.val);
             break;

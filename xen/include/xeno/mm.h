@@ -147,7 +147,7 @@ int check_descriptor(unsigned long a, unsigned long b);
 #define machine_to_phys_mapping ((unsigned long *)RDWR_MPT_VIRT_START)
 
 /* Part of the domain API. */
-int do_process_page_updates(page_update_request_t *updates, int count);
+int do_mmu_update(mmu_update_t *updates, int count);
 
 #define DEFAULT_GDT_ENTRIES     ((LAST_RESERVED_GDT_ENTRY*8)+7)
 #define DEFAULT_GDT_ADDRESS     ((unsigned long)gdt_table)

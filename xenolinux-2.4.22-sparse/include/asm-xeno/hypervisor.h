@@ -33,7 +33,7 @@ void do_hypervisor_callback(struct pt_regs *regs);
  * be MACHINE addresses.
  */
 
-extern unsigned int pt_update_queue_idx;
+extern unsigned int mmu_update_queue_idx;
 
 void queue_l1_entry_update(pte_t *ptr, unsigned long val);
 void queue_l2_entry_update(pmd_t *ptr, unsigned long val);
@@ -45,12 +45,12 @@ void queue_pgd_unpin(unsigned long ptr);
 void queue_pte_pin(unsigned long ptr);
 void queue_pte_unpin(unsigned long ptr);
 void queue_set_ldt(unsigned long ptr, unsigned long bytes);
-#define PT_UPDATE_DEBUG 0
+#define MMU_UPDATE_DEBUG 0
 
-#define queue_unchecked_pt_update(_p,_v) queue_l1_entry_update( \
-  (pte_t *)((unsigned long)(_p)|PGREQ_UNCHECKED_UPDATE),(_v))
+#define queue_unchecked_mmu_update(_p,_v) queue_l1_entry_update( \
+  (pte_t *)((unsigned long)(_p)|MMU_UNCHECKED_PT_UPDATE),(_v))
 
-#if PT_UPDATE_DEBUG > 0
+#if MMU_UPDATE_DEBUG > 0
 typedef struct {
     void *ptr;
     unsigned long val, pteval;
@@ -59,39 +59,39 @@ typedef struct {
 } page_update_debug_t;
 extern page_update_debug_t update_debug_queue[];
 #define queue_l1_entry_update(_p,_v) ({                           \
- update_debug_queue[pt_update_queue_idx].ptr  = (_p);             \
- update_debug_queue[pt_update_queue_idx].val  = (_v);             \
- update_debug_queue[pt_update_queue_idx].line = __LINE__;         \
- update_debug_queue[pt_update_queue_idx].file = __FILE__;         \
+ update_debug_queue[mmu_update_queue_idx].ptr  = (_p);             \
+ update_debug_queue[mmu_update_queue_idx].val  = (_v);             \
+ update_debug_queue[mmu_update_queue_idx].line = __LINE__;         \
+ update_debug_queue[mmu_update_queue_idx].file = __FILE__;         \
  queue_l1_entry_update((_p),(_v));                                \
 })
 #define queue_l2_entry_update(_p,_v) ({                           \
- update_debug_queue[pt_update_queue_idx].ptr  = (_p);             \
- update_debug_queue[pt_update_queue_idx].val  = (_v);             \
- update_debug_queue[pt_update_queue_idx].line = __LINE__;         \
- update_debug_queue[pt_update_queue_idx].file = __FILE__;         \
+ update_debug_queue[mmu_update_queue_idx].ptr  = (_p);             \
+ update_debug_queue[mmu_update_queue_idx].val  = (_v);             \
+ update_debug_queue[mmu_update_queue_idx].line = __LINE__;         \
+ update_debug_queue[mmu_update_queue_idx].file = __FILE__;         \
  queue_l2_entry_update((_p),(_v));                                \
 })
 #endif
 
-#if PT_UPDATE_DEBUG > 1
+#if MMU_UPDATE_DEBUG > 1
 #undef queue_l1_entry_update
 #undef queue_l2_entry_update
 #define queue_l1_entry_update(_p,_v) ({                           \
- update_debug_queue[pt_update_queue_idx].ptr  = (_p);             \
- update_debug_queue[pt_update_queue_idx].val  = (_v);             \
- update_debug_queue[pt_update_queue_idx].line = __LINE__;         \
- update_debug_queue[pt_update_queue_idx].file = __FILE__;         \
+ update_debug_queue[mmu_update_queue_idx].ptr  = (_p);             \
+ update_debug_queue[mmu_update_queue_idx].val  = (_v);             \
+ update_debug_queue[mmu_update_queue_idx].line = __LINE__;         \
+ update_debug_queue[mmu_update_queue_idx].file = __FILE__;         \
  printk("L1 %s %d: %08lx (%08lx -> %08lx)\n", __FILE__, __LINE__, \
         (_p), pte_val(_p),                                        \
         (unsigned long)(_v));                                     \
  queue_l1_entry_update((_p),(_v));                                \
 })
 #define queue_l2_entry_update(_p,_v) ({                           \
- update_debug_queue[pt_update_queue_idx].ptr  = (_p);             \
- update_debug_queue[pt_update_queue_idx].val  = (_v);             \
- update_debug_queue[pt_update_queue_idx].line = __LINE__;         \
- update_debug_queue[pt_update_queue_idx].file = __FILE__;         \
+ update_debug_queue[mmu_update_queue_idx].ptr  = (_p);             \
+ update_debug_queue[mmu_update_queue_idx].val  = (_v);             \
+ update_debug_queue[mmu_update_queue_idx].line = __LINE__;         \
+ update_debug_queue[mmu_update_queue_idx].file = __FILE__;         \
  printk("L2 %s %d: %08lx (%08lx -> %08lx)\n", __FILE__, __LINE__, \
         (_p), pmd_val(_p),                                        \
         (unsigned long)(_v));                                     \
@@ -134,7 +134,7 @@ extern page_update_debug_t update_debug_queue[];
 void _flush_page_update_queue(void);
 static inline int flush_page_update_queue(void)
 {
-    unsigned int idx = pt_update_queue_idx;
+    unsigned int idx = mmu_update_queue_idx;
     if ( idx != 0 ) _flush_page_update_queue();
     return idx;
 }
@@ -158,12 +158,12 @@ static inline int HYPERVISOR_set_trap_table(trap_info_t *table)
 }
 
 
-static inline int HYPERVISOR_pt_update(page_update_request_t *req, int count)
+static inline int HYPERVISOR_mmu_update(mmu_update_t *req, int count)
 {
     int ret;
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret) : "0" (__HYPERVISOR_pt_update), 
+        : "=a" (ret) : "0" (__HYPERVISOR_mmu_update), 
         "b" (req), "c" (count) );
 
     return ret;

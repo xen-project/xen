@@ -43,12 +43,12 @@ static inline int HYPERVISOR_set_trap_table(trap_info_t *table)
     return ret;
 }
 
-static inline int HYPERVISOR_pt_update(page_update_request_t *req, int count)
+static inline int HYPERVISOR_mmu_update(mmu_update_t *req, int count)
 {
     int ret;
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret) : "0" (__HYPERVISOR_pt_update), 
+        : "=a" (ret) : "0" (__HYPERVISOR_mmu_update), 
         "b" (req), "c" (count) );
 
     return ret;

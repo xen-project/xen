@@ -705,7 +705,7 @@ nmi_io_err:
 .data
 ENTRY(hypervisor_call_table)
         .long SYMBOL_NAME(do_set_trap_table)
-        .long SYMBOL_NAME(do_process_page_updates)
+        .long SYMBOL_NAME(do_mmu_update)
         .long SYMBOL_NAME(do_console_write)
         .long SYMBOL_NAME(do_set_gdt)
         .long SYMBOL_NAME(do_stack_switch)

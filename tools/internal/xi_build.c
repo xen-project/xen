@@ -42,12 +42,12 @@ static int get_pfn_list(
     return (ret < 0) ? -1 : op.u.getmemlist.num_pfns;
 }
 
-static int send_pgupdates(page_update_request_t *updates, int nr_updates)
+static int send_pgupdates(mmu_update_t *updates, int nr_updates)
 {
     int ret = -1;
     privcmd_hypercall_t hypercall;
 
-    hypercall.op     = __HYPERVISOR_pt_update;
+    hypercall.op     = __HYPERVISOR_mmu_update;
     hypercall.arg[0] = (unsigned long)updates;
     hypercall.arg[1] = (unsigned long)nr_updates;
 
@@ -151,7 +151,7 @@ static int setup_guestos(
     l1_pgentry_t *vl1tab = NULL, *vl1e = NULL;
     l2_pgentry_t *vl2tab = NULL, *vl2e = NULL;
     unsigned long *page_array = NULL;
-    page_update_request_t *pgt_update_arr = NULL, *pgt_updates = NULL;
+    mmu_update_t *pgt_update_arr = NULL, *pgt_updates = NULL;
     int alloc_index, num_pt_pages;
     unsigned long l2tab;
     unsigned long l1tab = 0;
@@ -163,8 +163,7 @@ static int setup_guestos(
     if ( init_pfn_mapper() < 0 )
         goto error_out;
 
-    pgt_updates = malloc((tot_pages + 1024) * 3
-                         * sizeof(page_update_request_t));
+    pgt_updates = malloc((tot_pages + 1024) * 3 * sizeof(mmu_update_t));
     page_array = malloc(tot_pages * sizeof(unsigned long));
     pgt_update_arr = pgt_updates;
     if ( (pgt_update_arr == NULL) || (page_array == NULL) )
@@ -257,8 +256,8 @@ static int setup_guestos(
      * Pin down l2tab addr as page dir page - causes hypervisor to provide
      * correct protection for the page
      */ 
-    pgt_updates->ptr = l2tab | PGREQ_EXTENDED_COMMAND;
-    pgt_updates->val = PGEXT_PIN_L2_TABLE;
+    pgt_updates->ptr = l2tab | MMU_EXTENDED_COMMAND;
+    pgt_updates->val = MMUEXT_PIN_L2_TABLE;
     pgt_updates++;
     num_pgt_updates++;
 
@@ -314,7 +313,7 @@ static int setup_guestos(
         }
 
         pgt_updates->ptr = 
-	    (page_array[count] << PAGE_SHIFT) | PGREQ_MPT_UPDATE;
+	    (page_array[count] << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
         pgt_updates->val = count;
         pgt_updates++;
         num_pgt_updates++;
