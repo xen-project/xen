@@ -1,0 +1,209 @@
+/******************************************************************************
+ * hypervisor-if.h
+ * 
+ * Interface to Xeno hypervisor.
+ */
+
+#include "network.h"
+#include "block.h"
+
+#ifndef __HYPERVISOR_IF_H__
+#define __HYPERVISOR_IF_H__
+
+/*
+ * Virtual addresses beyond this are not modifiable by guest OSes.
+ * The machine->physical mapping table starts at this address, read-only
+ * to all domains except DOM0.
+ */
+#define HYPERVISOR_VIRT_START (0xFC000000UL)
+#ifndef machine_to_phys_mapping
+#define machine_to_phys_mapping ((unsigned long *)HYPERVISOR_VIRT_START)
+#endif
+
+typedef struct trap_info_st
+{
+    unsigned char  vector;  /* exception/interrupt vector */
+    unsigned char  dpl;     /* privilege level            */
+    unsigned short cs;      /* code selector              */
+    unsigned long  address; /* code address               */
+} trap_info_t;
+
+
+typedef struct
+{
+/*
+ * PGREQ_XXX: specified in least-significant bits of 'ptr' field.
+ * All requests specify relevent PTE or PT address in 'ptr'.
+ * Normal requests specify update value in 'value'.
+ * Extended requests specify command in least 8 bits of 'value'.
+ */
+/* A normal page-table update request. */
+#define PGREQ_NORMAL           0
+/* Update an entry in the machine->physical mapping table. */
+#define PGREQ_MPT_UPDATE       1
+/* An extended command. */
+#define PGREQ_EXTENDED_COMMAND 2
+/* DOM0 can make entirely unchecked updates which do not affect refcnts. */
+#define PGREQ_UNCHECKED_UPDATE 3
+    unsigned long ptr, val; /* *ptr = val */
+/* Announce a new top-level page table. */
+#define PGEXT_PIN_L1_TABLE      0
+#define PGEXT_PIN_L2_TABLE      1
+#define PGEXT_PIN_L3_TABLE      2
+#define PGEXT_PIN_L4_TABLE      3
+#define PGEXT_UNPIN_TABLE       4
+#define PGEXT_NEW_BASEPTR       5
+#define PGEXT_TLB_FLUSH         6
+#define PGEXT_INVLPG            7
+#define PGEXT_CMD_MASK        255
+#define PGEXT_CMD_SHIFT         8
+} page_update_request_t;
+
+
+/*
+ * Segment descriptor tables.
+ */
+/* 8 entries, plus a TSS entry for each CPU (up to 32 CPUs). */
+#define FIRST_DOMAIN_GDT_ENTRY  40
+/* These are flat segments for domain bootstrap and fallback. */
+#define FLAT_RING1_CS           0x11
+#define FLAT_RING1_DS           0x19
+#define FLAT_RING3_CS           0x23
+#define FLAT_RING3_DS           0x2b
+
+
+/* EAX = vector; EBX, ECX, EDX, ESI, EDI = args 1, 2, 3, 4, 5. */
+
+#define __HYPERVISOR_set_trap_table        0
+#define __HYPERVISOR_pt_update             1
+#define __HYPERVISOR_console_write         2
+#define __HYPERVISOR_set_gdt               3
+#define __HYPERVISOR_stack_and_ldt_switch  4
+#define __HYPERVISOR_net_update            5
+#define __HYPERVISOR_fpu_taskswitch        6
+#define __HYPERVISOR_sched_op              7
+#define __HYPERVISOR_exit                  8
+#define __HYPERVISOR_dom0_op               9
+#define __HYPERVISOR_network_op           10
+#define __HYPERVISOR_block_io_op          11
+#define __HYPERVISOR_set_debugreg         12
+#define __HYPERVISOR_get_debugreg         13
+#define __HYPERVISOR_update_descriptor    14
+#define __HYPERVISOR_set_fast_trap        15
+
+#define TRAP_INSTR "int $0x82"
+
+
+/* Event message note:
+ *
+ * Here, as in the interrupts to the guestos, additional network interfaces
+ * are defined.  These definitions server as placeholders for the event bits,
+ * however, in the code these events will allways be referred to as shifted
+ * offsets from the base NET events.
+ */
+
+/* Events that a guest OS may receive from the hypervisor. */
+#define EVENT_BLK_RESP 0x01 /* A block device response has been queued. */
+#define EVENT_TIMER    0x02 /* A timeout has been updated. */
+#define EVENT_DIE      0x04 /* OS is about to be killed. Clean up please! */
+#define EVENT_DEBUG    0x08 /* Request guest to dump debug info (gross!) */
+#define EVENT_NET_TX   0x10 /* There are packets for transmission. */
+#define EVENT_NET_RX   0x20 /* There are empty buffers for receive. */
+
+/* Bit offsets, as opposed to the above masks. */
+#define _EVENT_BLK_RESP 0
+#define _EVENT_TIMER    1
+#define _EVENT_DIE      2
+#define _EVENT_NET_TX   3
+#define _EVENT_NET_RX   4
+#define _EVENT_DEBUG    5
+
+
+/*
+ * NB. We expect that this struct is smaller than a page.
+ */
+typedef struct shared_info_st {
+
+    /* Bitmask of outstanding event notifications hypervisor -> guest OS. */
+    unsigned long events;
+    /*
+     * Hypervisor will only signal event delivery via the "callback
+     * exception" when this value is non-zero. Hypervisor clears this when
+     * notiying the guest OS -- this prevents unbounded reentrancy and
+     * stack overflow (in this way, acts as an interrupt-enable flag).
+     */
+    unsigned long events_enable;
+
+    /*
+     * Address for callbacks hypervisor -> guest OS.
+     * Stack frame looks like that of an interrupt.
+     * Code segment is the default flat selector.
+     * This handler will only be called when events_enable is non-zero.
+     */
+    unsigned long event_address;
+
+    /*
+     * Hypervisor uses this callback when it takes a fault on behalf of
+     * an application. This can happen when returning from interrupts for
+     * example: various faults can occur when reloading the segment
+     * registers, and executing 'iret'.
+     * This callback is provided with an extended stack frame, augmented
+     * with saved values for segment registers %ds and %es:
+     *  %ds, %es, %eip, %cs, %eflags [, %oldesp, %oldss]
+     * Code segment is the default flat selector.
+     * FAULTS WHEN CALLING THIS HANDLER WILL TERMINATE THE DOMAIN!!!
+     */
+    unsigned long failsafe_address;
+
+	/*
+     * Time:
+     * The following abstractions are exposed: System Time, Wall Clock 
+     * Time, Domain Virtual Time. Domains can access Cycle counter time
+     * directly. 
+	 * XXX RN: Need something to pass NTP scaling to GuestOS.
+     */
+
+	u64           cpu_freq;	    /* to calculate ticks -> real time */
+
+	/* System Time */
+	long long          system_time;     /* in ns */
+	unsigned long      st_timestamp;    /* cyclecounter at last update */
+
+	/* Wall Clock Time */
+	u32                wc_version;      /* a version number for info below */
+	long               tv_sec;          /* essentially a struct timeval */
+	long               tv_usec;
+	long long          wc_timestamp;    /* system time at last update */
+
+	/* Domain Virtual Time */
+	unsigned long long domain_time;
+	
+	/*
+     * Timeout values:
+     * Allow a domain to specify a timeout value in system time and 
+     * domain virtual time.
+     */
+    unsigned long long wall_timeout;
+    unsigned long long domain_timeout;
+
+} shared_info_t;
+
+/*
+ * NB. We expect that this struct is smaller than a page.
+ */
+typedef struct start_info_st {
+    unsigned long nr_pages;       /* total pages allocated to this domain */
+    shared_info_t *shared_info;   /* VIRTUAL address of shared info struct */
+    unsigned long  pt_base;       /* VIRTUAL address of page directory */
+    unsigned long mod_start;      /* VIRTUAL address of pre-loaded module */
+    unsigned long mod_len;        /* size (bytes) of pre-loaded module */
+    net_ring_t *net_rings;        /* network rings (VIRTUAL ADDRESS) */
+    int num_net_rings;
+    unsigned long blk_ring;       /* block io ring (MACHINE ADDRESS) */
+    unsigned char cmd_line[1];    /* variable-length */
+} start_info_t;
+
+/* For use in guest OSes. */
+extern shared_info_t *HYPERVISOR_shared_info;
+
+#endif /* __HYPERVISOR_IF_H__ */

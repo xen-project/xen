@@ -1,0 +1,2 @@
+#error "Highmem unsupported!"
+

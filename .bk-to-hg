@@ -1,6 +1,6 @@
 #!/bin/sh -x
 set -e
-test -L xenolinux-2.4.16-sparse/include/asm-xeno/hypervisor-ifs
-rm      xenolinux-2.4.16-sparse/include/asm-xeno/hypervisor-ifs
+test -L old/xenolinux-2.4.16-sparse/include/asm-xeno/hypervisor-ifs
+rm      old/xenolinux-2.4.16-sparse/include/asm-xeno/hypervisor-ifs
 (find -depth -type d -print | xargs -r rmdir 2>/dev/null) || true
 exit 0
