@@ -604,12 +604,15 @@ static struct irqaction dbg_time = {
 void __init time_init(void)
 {
     unsigned long long alarm;
-    u64 __cpu_khz, cpu_freq, scale, scale2;
+    u64 __cpu_khz, __cpu_ghz, cpu_freq, scale, scale2;
     unsigned int cpu_ghz;
 
-    __cpu_khz = HYPERVISOR_shared_info->cpu_freq;
-    do_div(__cpu_khz, 1000);
+    __cpu_khz = __cpu_ghz = cpu_freq = HYPERVISOR_shared_info->cpu_freq;
+    do_div(__cpu_khz, 1000UL);
     cpu_khz = (u32)__cpu_khz;
+    do_div(__cpu_ghz, 1000000000UL);
+    cpu_ghz = (unsigned int)__cpu_ghz;
+
     printk("Xen reported: %lu.%03lu MHz processor.\n", 
            cpu_khz / 1000, cpu_khz % 1000);
 
@@ -617,9 +620,6 @@ void __init time_init(void)
     xtime.tv_usec = HYPERVISOR_shared_info->wc_usec;
     processed_system_time = shadow_system_time;
 
-    cpu_freq = HYPERVISOR_shared_info->cpu_freq;
-
-    cpu_ghz = do_div(cpu_freq, 1000000000UL);
     for ( rdtsc_bitshift = 0; cpu_ghz != 0; rdtsc_bitshift++, cpu_ghz >>= 1 )
         continue;
 
