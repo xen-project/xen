@@ -25,6 +25,7 @@ struct physdisk_ace {
   struct list_head list;
 
   unsigned short device;
+  unsigned short partition;
   unsigned long start_sect;
   unsigned long n_sectors;
   int mode;
@@ -40,8 +41,6 @@ static struct physdisk_ace *find_ace(const struct task_struct *p,
   struct list_head *cur_ace_head;
   struct physdisk_ace *cur_ace;
 
-  dev &= ~0x1f; /* ignore the partition part */
-
   list_for_each(cur_ace_head, &p->physdisk_aces) {
     cur_ace = list_entry(cur_ace_head, struct physdisk_ace,
 			 list);
@@ -50,7 +49,7 @@ static struct physdisk_ace *find_ace(const struct task_struct *p,
 	    sect);
     if (sect >= cur_ace->start_sect &&
 	sect < cur_ace->start_sect + cur_ace->n_sectors &&
-	dev == (cur_ace->device & ~0x1f) && /* ignore partition part */
+	dev == cur_ace->device &&
 	((operation == READ && (cur_ace->mode & PHYSDISK_MODE_R)) ||
 	 (operation == WRITE && (cur_ace->mode & PHYSDISK_MODE_W)))) {
       DPRINTK("Yes.\n");
@@ -85,7 +84,7 @@ static void xen_physdisk_revoke_access(unsigned short dev,
     ace_end = cur_ace->start_sect + cur_ace->n_sectors;
     if (cur_ace->start_sect >= kill_zone_end ||
 	ace_end <= start_sect ||
-	(cur_ace->device & ~0x1f) != (dev & ~0x1f))
+	cur_ace->device != dev)
       continue;
     
     DPRINTK("Killing ace [%lx, %lx) against kill zone [%lx, %lx)\n",
@@ -111,7 +110,7 @@ static void xen_physdisk_revoke_access(unsigned short dev,
       /* Cut the current ace down to just the bit before the kzone,
 	 create a new ace for the bit just after it. */ 
       new_ace = kmalloc(sizeof(*cur_ace), GFP_KERNEL);
-      new_ace->device = dev & ~0x1f;
+      new_ace->device = dev;
       new_ace->start_sect = kill_zone_end;
       new_ace->n_sectors = ace_end - kill_zone_end;
       new_ace->mode = cur_ace->mode;
@@ -125,6 +124,7 @@ static void xen_physdisk_revoke_access(unsigned short dev,
 
 /* Hold the lock on entry, it remains held on exit. */
 static int xen_physdisk_grant_access(unsigned short dev,
+				     unsigned short partition,
 				     unsigned long start_sect,
 				     unsigned long n_sectors,
 				     int mode,
@@ -143,6 +143,7 @@ static int xen_physdisk_grant_access(unsigned short dev,
     cur_ace->start_sect = start_sect;
     cur_ace->n_sectors = n_sectors;
     cur_ace->mode = mode;
+    cur_ace->partition = partition;
 
     list_add_tail(&cur_ace->list, &p->physdisk_aces);
   }
@@ -167,6 +168,7 @@ static void xen_physdisk_probe_access(physdisk_probebuf_t *buf,
       cur_ace = list_entry(cur_ace_head, struct physdisk_ace,
 			   list);
       buf->entries[n_aces].device = cur_ace->device;
+      buf->entries[n_aces].partition = cur_ace->partition;
       buf->entries[n_aces].start_sect = cur_ace->start_sect;
       buf->entries[n_aces].n_sectors = cur_ace->n_sectors;
       buf->entries[n_aces].mode = cur_ace->mode;
@@ -188,21 +190,21 @@ int xen_physdisk_grant(xp_disk_t *xpd_in)
   DPRINTK("Have current.\n");
   DPRINTK("Target domain %x\n", xpd->domain);
 
-  do {
-    p = p->next_task;
-  } while (p != current && p->domain != xpd->domain);
-  if (p->domain != xpd->domain) {
+  p = find_domain_by_id(xpd->domain);
+  if (p == NULL) {
     DPRINTK("Bad domain!\n");
     res = 1;
     goto out;
   }
   spin_lock(&p->physdev_lock);
   res = xen_physdisk_grant_access(xpd->device,
+				  xpd->partition,
 				  xpd->start_sect,
 				  xpd->n_sectors,
 				  xpd->mode,
 				  p);
   spin_unlock(&p->physdev_lock);
+  put_task_struct(p);
 
  out:
   unmap_domain_mem(xpd);
@@ -216,16 +218,14 @@ int xen_physdisk_probe(struct task_struct *requesting_domain,
   physdisk_probebuf_t *buf = map_domain_mem(virt_to_phys(buf_in));
   int res;
 
-  p = current;
-  do {
-    p = p->next_task;
-  } while (p != current && p->domain != buf->domain);  
-  if (p->domain != buf->domain) {
+  if (requesting_domain->domain != 0 &&
+      requesting_domain->domain != buf->domain) {
     res = 1;
     goto out;
   }
-  if (requesting_domain->domain != 0 &&
-      requesting_domain->domain != buf->domain) {
+
+  p = find_domain_by_id(buf->domain);
+  if (p == NULL) {
     res = 1;
     goto out;
   }
@@ -233,6 +233,8 @@ int xen_physdisk_probe(struct task_struct *requesting_domain,
   spin_lock(&p->physdev_lock);
   xen_physdisk_probe_access(buf, p);
   spin_unlock(&p->physdev_lock);
+  put_task_struct(p);
+
   res = 0;
  out:
   unmap_domain_mem(buf);

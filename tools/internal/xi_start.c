@@ -6,8 +6,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <stdlib.h>
+#include <string.h>
 
-#include "hypervisor_defs.h"
 #include "dom0_ops.h"
 #include "dom0_defs.h"
 #include "mem_defs.h"
@@ -32,12 +32,9 @@ static void PERROR (char *message)
 
 static int start_domain(int id)
 {
-    dom0_newdomain_t * dom_data;
     char cmd_path[MAX_PATH];
-    char dom_id_path[MAX_PATH];
     dom0_op_t dop;
     int cmd_fd;
-    int id_fd;
 
     /* Set up the DOM0_STARTDOMAIN command */
     dop.cmd = DOM0_STARTDOMAIN;

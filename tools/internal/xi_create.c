@@ -16,7 +16,6 @@
 #include <errno.h>
 #include <string.h>
 
-#include "hypervisor_defs.h"
 #include "dom0_ops.h"
 #include "dom0_defs.h"
 #include "mem_defs.h"

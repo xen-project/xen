@@ -8,7 +8,35 @@
 #include <asm/uaccess.h>
 #include <linux/proc_fs.h>
 
+#include "xl_block.h"
+
 extern int xenolinux_control_msg(int operration, char *buffer, int size);
+extern unsigned short xldev_to_physdev(kdev_t xldev);
+
+static dev_t physdev_to_xldev(unsigned short physdev)
+{
+  switch (physdev & XENDEV_TYPE_MASK) {
+  case XENDEV_IDE:
+    switch (physdev & XENDEV_IDX_MASK) {
+    case 0 ... (XLIDE_DEVS_PER_MAJOR-1):
+      return MKDEV(XLIDE_MAJOR_0,
+		   (physdev & XENDEV_IDX_MASK) << XLIDE_PARTN_SHIFT);
+    case XLIDE_DEVS_PER_MAJOR ... (XLIDE_DEVS_PER_MAJOR * 2 - 1):
+      return MKDEV(XLIDE_MAJOR_1,
+		   (physdev & XENDEV_IDX_MASK) << XLIDE_PARTN_SHIFT);
+    }
+    break;
+  case XENDEV_SCSI:
+    return MKDEV(XLSCSI_MAJOR,
+		 (physdev & XENDEV_IDX_MASK) << XLSCSI_PARTN_SHIFT);
+  case XENDEV_VIRTUAL:
+    return MKDEV(XLVIRT_MAJOR,
+		 (physdev & XENDEV_IDX_MASK) << XLVIRT_PARTN_SHIFT);
+  }
+  printk(KERN_ALERT "Unrecognised xl device: %x\n", physdev);
+  BUG();
+  return -1;
+}
 
 static ssize_t proc_read_phd(struct file * file, char * buff, size_t size,
 			     loff_t * off)
@@ -16,6 +44,7 @@ static ssize_t proc_read_phd(struct file * file, char * buff, size_t size,
   physdisk_probebuf_t *buf;
   int res;
   struct proc_dir_entry *pde;
+  int x;
 
   if (size != sizeof(physdisk_probebuf_t))
     return -EINVAL;
@@ -23,11 +52,6 @@ static ssize_t proc_read_phd(struct file * file, char * buff, size_t size,
   buf = kmalloc(sizeof(physdisk_probebuf_t), GFP_KERNEL);
   if (!buf)
     return -ENOMEM;
-
-  if (copy_from_user(buf, buff, size)) {
-    kfree(buf);
-    return -EFAULT;
-  }
 
   pde = file->f_dentry->d_inode->u.generic_ip;
   buf->domain = (int)pde->data;
@@ -43,6 +67,8 @@ static ssize_t proc_read_phd(struct file * file, char * buff, size_t size,
   if (res)
     res = -EINVAL;
   else {
+    for (x = 0; x < buf->n_aces; x++)
+      buf->entries[x].device = physdev_to_xldev(buf->entries[x].device);
     res = sizeof(physdisk_probebuf_t);
     if (copy_to_user(buff, buf, sizeof(physdisk_probebuf_t))) {
       res = -EFAULT;
@@ -75,6 +101,7 @@ static int proc_write_phd(struct file *file, const char *buffer,
 
   pde = file->f_dentry->d_inode->u.generic_ip;
   xpd->domain = (int)pde->data;
+  xpd->device = xldev_to_physdev(xpd->device);
 
   res = xenolinux_control_msg(XEN_BLOCK_PHYSDEV_GRANT, local, count);
   if (res == 0)

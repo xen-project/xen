@@ -250,15 +250,11 @@ int xen_segment_create(xv_disk_t *xvd_in)
     }
 
     /* if the domain exists, assign the segment to the domain */
-    p = current;
-    do
-    {
-        p = p->next_task;
-    } while (p != current && p->domain != xvd->domain);
-
-    if (p->domain == xvd->domain)
+    p = find_domain_by_id(xvd->domain);
+    if (p != NULL)
     {
         p->segment_list[xvd->segment] = &xsegments[idx];
+        put_task_struct(p);
     }
 
     unmap_domain_mem(xvd);

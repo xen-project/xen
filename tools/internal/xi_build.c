@@ -14,7 +14,8 @@
 #include <stdlib.h>
 #include <sys/ioctl.h>
 
-#include "hypervisor_defs.h"
+#include "asm-i386/types.h"
+#include "hypervisor-ifs/hypervisor-if.h"
 #include "dom0_ops.h"
 #include "dom0_defs.h"
 #include "mem_defs.h"

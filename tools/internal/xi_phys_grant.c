@@ -1,9 +1,12 @@
+#define _GNU_SOURCE
 #include <unistd.h>
 #include <stdio.h>
 #include <errno.h>
 #include <sys/fcntl.h>
+#include <string.h>
+#include <stdlib.h>
 
-#include "physdev.h"
+#include "hypervisor-ifs/block.h"
 
 int main(int argc, char *argv[])
 {
@@ -26,9 +29,10 @@ int main(int argc, char *argv[])
   else if (argv[1][1] == 'w')
     buf.mode |= 2;
   
-  buf.device = atol(argv[3]) + atol(argv[6]);
+  buf.device = atol(argv[3]);
   buf.start_sect = atol(argv[4]);
   buf.n_sectors = atol(argv[5]);
+  buf.partition = atol(argv[6]);
 
   asprintf(&strbuf, "/proc/xeno/dom%s/phd", argv[2]);
   fd = open(strbuf, O_WRONLY);
