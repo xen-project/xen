@@ -7,7 +7,7 @@ if [ -z "$IFCONFIG" ] ; then IFCONFIG=/sbin/ifconfig ; fi
 if [ -z "$ROUTE" ] ; then ROUTE=/sbin/route ; fi
 if [ -z "$JAVA" ] ; then JAVA=java ; fi
 
-if [ "$1" = "new" ] ; then
+if [ "$1" = "domain" -a "$2" = "new" ] ; then
   if [ ! -x "$IFCONFIG" ]; then  
     echo Could not find executable $IFCONFIG
     exit 1
