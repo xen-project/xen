@@ -12,7 +12,7 @@
  * Environment: Xen Hypervisor
  * Description: modified version of Linux' time.c
  *              implements system and wall clock time.
- *				based on freebsd's implementation.
+ *              based on freebsd's implementation.
  *
  ****************************************************************************
  * $Id: c-insert.c,v 1.7 2002/11/08 16:04:34 rn Exp $
@@ -48,7 +48,7 @@
 #define TRC(_x)
 #endif
 
-unsigned long cpu_khz;	/* Detected as we calibrate the TSC */
+unsigned long cpu_khz;  /* Detected as we calibrate the TSC */
 unsigned long ticks_per_usec; /* TSC ticks per microsecond. */
 
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
@@ -86,7 +86,7 @@ static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 }
 
 static struct irqaction irq0  = { timer_interrupt, SA_INTERRUPT, 0,
-								  "timer", NULL, NULL};
+                                  "timer", NULL, NULL};
 
 /* ------ Calibrate the TSC ------- 
  * Return processor ticks per second / CALIBRATE_FRAC.
@@ -108,9 +108,9 @@ static unsigned long __init calibrate_tsc(void)
      * terminal count mode), binary count, load 5 * LATCH count, (LSB and MSB)
      * to begin countdown.
      */
-    outb(0xb0, 0x43);			/* binary, mode 0, LSB/MSB, Ch 2 */
-    outb(CALIBRATE_LATCH & 0xff, 0x42);	/* LSB of count */
-    outb(CALIBRATE_LATCH >> 8, 0x42);	/* MSB of count */
+    outb(0xb0, 0x43);           /* binary, mode 0, LSB/MSB, Ch 2 */
+    outb(CALIBRATE_LATCH & 0xff, 0x42); /* LSB of count */
+    outb(CALIBRATE_LATCH >> 8, 0x42);   /* MSB of count */
 
     {
         unsigned long startlow, starthigh;
@@ -177,7 +177,7 @@ mktime (unsigned int year, unsigned int mon,
     if (0 >= (int) (mon -= 2)) {   /* 1..12 -> 11,12,1..10 */
         mon += 12;                 /* Puts Feb last since it has leap day */
         year -= 1;
-	}
+    }
     return ((((unsigned long)(year/4 - year/100 + year/400 + 367*mon/12 + day)+
               year*365 - 719499
         )*24 + hour /* now have hours */
@@ -197,13 +197,13 @@ static unsigned long get_cmos_time(void)
      * Let's hope other operating systems interpret the RTC the same way.
      */
     /* read RTC exactly on falling edge of update flag */
-    for (i = 0 ; i < 1000000 ; i++)	/* may take up to 1 second... */
+    for (i = 0 ; i < 1000000 ; i++) /* may take up to 1 second... */
         if (CMOS_READ(RTC_FREQ_SELECT) & RTC_UIP)
             break;
-    for (i = 0 ; i < 1000000 ; i++)	/* must try at least 2.228 ms */
+    for (i = 0 ; i < 1000000 ; i++) /* must try at least 2.228 ms */
         if (!(CMOS_READ(RTC_FREQ_SELECT) & RTC_UIP))
             break;
-	do { /* Isn't this overkill ? UIP above should guarantee consistency */
+    do { /* Isn't this overkill ? UIP above should guarantee consistency */
         sec = CMOS_READ(RTC_SECONDS);
         min = CMOS_READ(RTC_MINUTES);
         hour = CMOS_READ(RTC_HOURS);
@@ -215,10 +215,10 @@ static unsigned long get_cmos_time(void)
     {
         BCD_TO_BIN(sec);
         BCD_TO_BIN(min);
-	    BCD_TO_BIN(hour);
-	    BCD_TO_BIN(day);
-	    BCD_TO_BIN(mon);
-	    BCD_TO_BIN(year);
+        BCD_TO_BIN(hour);
+        BCD_TO_BIN(day);
+        BCD_TO_BIN(mon);
+        BCD_TO_BIN(year);
     }
     spin_unlock(&rtc_lock);
     if ((year += 1900) < 1970)
@@ -235,23 +235,29 @@ static unsigned long get_cmos_time(void)
  ***************************************************************************/
 
 static spinlock_t stime_lock;
-static u32	st_scale_f;
-static u32	st_scale_i;
-u32			stime_pcc;	 /* cycle counter value at last timer irq */
-s_time_t	stime_now;   /* time in ns at last timer IRQ */
+static u32  st_scale_f;
+static u32  st_scale_i;
+u32         stime_pcc;   /* cycle counter value at last timer irq */
+s_time_t    stime_now;   /* time in ns at last timer IRQ */
 
 static inline s_time_t __get_s_time(void)
 {
-    u32 	 delta_tsc, low, pcc;
+    s32      delta_tsc;
+    u32      low, pcc;
     u64      delta;
     s_time_t now;
 
-    pcc = stime_pcc;		
+    pcc = stime_pcc;        
     now = stime_now;
 
-    /* only use bottom 32bits of TSC. This should be sufficient */
+    /*
+     * We only use the bottom 32 bits of the TSC. This should be sufficient,
+     * although we take care that TSC on thsi CPU may be lagging the master TSC
+     * slightly. In this case we clamp the TSC difference to a minimum of zero.
+     */
     rdtscl(low);
     delta_tsc = low - pcc;
+    if ( unlikely(delta_tsc < 0) ) delta_tsc = 0;
     delta = ((u64)delta_tsc * st_scale_f);
     delta >>= 32;
     delta += ((u64)delta_tsc * st_scale_i);
@@ -273,7 +279,7 @@ s_time_t get_s_time(void)
 /* Wall Clock time */
 static spinlock_t wctime_lock;
 struct timeval    wall_clock_time; /* wall clock time at last update */
-s_time_t	      wctime_st;       /* system time at last update */
+s_time_t          wctime_st;       /* system time at last update */
 
 void do_gettimeofday(struct timeval *tv)
 {
@@ -318,7 +324,7 @@ void update_dom_time(shared_info_t *si)
     si->tv_usec      = wall_clock_time.tv_usec;
     si->wc_timestamp = wctime_st;
     si->wc_version++;
-    spin_unlock_irqrestore(&wctime_lock, flags);	
+    spin_unlock_irqrestore(&wctime_lock, flags);    
 
     TRC(printk(" 0x%08X%08X\n", (u32)(wctime_st>>32), (u32)wctime_st));
 }
@@ -371,7 +377,7 @@ static void update_time(unsigned long foo)
 int __init init_xeno_time()
 {
     int      cpu = smp_processor_id();
-    u32	     cpu_cycle;  /* time of one cpu cyle in pico-seconds */
+    u32      cpu_cycle;  /* time of one cpu cyle in pico-seconds */
     u64      scale;      /* scale factor  */
 
     spin_lock_init(&stime_lock);

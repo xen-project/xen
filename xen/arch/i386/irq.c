@@ -543,8 +543,10 @@ asmlinkage unsigned int do_IRQ(struct pt_regs regs)
     if ( !action || (!(action->flags & SA_NOPROFILE)) )
     {
         perfc_adda(irq_time, cpu, cc_end - cc_start);
+#ifndef NDEBUG
         if ( (cc_end - cc_start) > (cpu_khz * 100) )
             printk("Long interrupt %08x -> %08x\n", cc_start, cc_end);
+#endif
     }
 
     return 1;
