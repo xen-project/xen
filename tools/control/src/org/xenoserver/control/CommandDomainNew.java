@@ -6,6 +6,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.lang.NumberFormatException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.zip.GZIPInputStream;
@@ -182,7 +183,14 @@ public class CommandDomainNew extends Command {
                     br =
                         new BufferedReader(
                             new InputStreamReader(create_p.getInputStream()));
-                    domain_id = Integer.parseInt(br.readLine());
+		    try
+		      {
+			domain_id = Integer.parseInt(br.readLine());
+		      }
+		    catch (NumberFormatException nfe) 
+		      {
+			domain_id = -1;
+		      }
                     create_rc = create_p.waitFor();
                 }
 		d.domainNumber = domain_id;
