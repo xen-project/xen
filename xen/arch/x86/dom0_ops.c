@@ -136,26 +136,6 @@ long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op)
     }
     break;
 
-    case DOM0_IOPL_PERMISSION:
-    {
-        struct domain *d;
-
-        ret = -EINVAL;
-        if ( op->u.iopl_permission.max_iopl > 3 )
-            break;
-
-        ret = -ESRCH;
-        if ( unlikely((d = find_domain_by_id(
-            op->u.iopl_permission.domain)) == NULL) )
-            break;
-
-        ret = 0;
-        d->arch.max_iopl = op->u.iopl_permission.max_iopl;
-
-        put_domain(d);
-    }
-    break;
-
     case DOM0_IOPORT_PERMISSION:
     {
         struct domain *d;

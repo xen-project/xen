@@ -20,7 +20,6 @@ struct arch_domain
 
     /* I/O-port access bitmap mask. */
     u8 *iobmp_mask;       /* Address of IO bitmap mask, or NULL.      */
-    int max_iopl;         /* Maximum achievable IOPL. */
 
     /* shadow mode status and controls */
     unsigned int shadow_mode;  /* flags to control shadow table operation */

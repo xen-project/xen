@@ -417,9 +417,6 @@ static inline int admin_io_okay(
     struct domain *d = ed->domain;
     u16 x;
 
-    if ( IS_PRIV(d) || (d->arch.max_iopl >= (KERNEL_MODE(ed, regs) ? 1 : 3)) )
-        return 1;
-
     if ( d->arch.iobmp_mask != NULL )
     {
         x = *(u16 *)(d->arch.iobmp_mask + (port >> 3));

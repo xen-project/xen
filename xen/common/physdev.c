@@ -744,13 +744,17 @@ static int pcidev_dom0_hidden(struct pci_dev *dev)
 
 
 /* Domain 0 has read access to all devices. */
-void physdev_init_dom0(struct domain *p)
+void physdev_init_dom0(struct domain *d)
 {
     struct pci_dev *dev;
     phys_dev_t *pdev;
 
-    INFO("Give DOM0 read access to all PCI devices\n");
+    /* Access to all I/O ports. */
+    d->arch.iobmp_mask = xmalloc_array(u8, IOBMP_BYTES);
+    BUG_ON(d->arch.iobmp_mask == NULL);
+    memset(d->arch.iobmp_mask, 0, IOBMP_BYTES);
 
+    /* Access to all PCI devices. */
     pci_for_each_dev(dev)
     {
         if ( pcidev_dom0_hidden(dev) )
@@ -759,20 +763,17 @@ void physdev_init_dom0(struct domain *p)
             continue;
         }
 
-
-        if ( (pdev = xmalloc(phys_dev_t)) == NULL ) {
-            INFO("failed to allocate physical device structure!\n");
-            break;
-        }
+        pdev = xmalloc(phys_dev_t);
+        BUG_ON(pdev == NULL);
 
         pdev->dev = dev;
         pdev->flags = ACC_WRITE;
         pdev->state = 0;
-        pdev->owner = p;
-        list_add(&pdev->node, &p->pcidev_list);
+        pdev->owner = d;
+        list_add(&pdev->node, &d->pcidev_list);
     }
 
-    set_bit(DF_PHYSDEV, &p->d_flags);
+    set_bit(DF_PHYSDEV, &d->d_flags);
 }
 
 
