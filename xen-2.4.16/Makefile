@@ -5,6 +5,7 @@ include Rules.mk
 
 default: $(TARGET)
 	gzip -f -9 < $(TARGET) > $(TARGET).gz
+	objdump -D -S image >image.s
 
 install: $(TARGET)
 	gzip -f -9 < $(TARGET) > $(TARGET).gz

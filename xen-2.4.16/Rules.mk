@@ -27,7 +27,7 @@ HOSTCFLAGS = -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer
 include $(BASEDIR)/arch/$(ARCH)/Rules.mk
 
 %.o: %.c $(HDRS) Makefile
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) -g $(CFLAGS) -c $< -o $@
 
 %.o: %.S $(HDRS) Makefile
 	$(CC) $(CFLAGS) -D__ASSEMBLY__ -c $< -o $@
