@@ -105,7 +105,7 @@ static void inline __update_guest_eip(unsigned long inst_len)
 
 #include <asm/domain_page.h>
 
-static int vmx_do_page_fault(unsigned long va, unsigned long error_code) 
+static int vmx_do_page_fault(unsigned long va, struct xen_regs *regs) 
 {
     unsigned long eip;
     unsigned long gpa;
@@ -115,8 +115,8 @@ static int vmx_do_page_fault(unsigned long va, unsigned long error_code)
     {
         __vmread(GUEST_EIP, &eip);
         VMX_DBG_LOG(DBG_LEVEL_VMMU, 
-                "vmx_do_page_fault = 0x%lx, eip = %lx, erro_code = %lx",
-                va, eip, error_code);
+                "vmx_do_page_fault = 0x%lx, eip = %lx, error_code = %lx",
+                va, eip, regs->error_code);
     }
 #endif
 
@@ -137,7 +137,7 @@ static int vmx_do_page_fault(unsigned long va, unsigned long error_code)
     if (mmio_space(gpa))
         handle_mmio(va, gpa);
 
-    if ((result = shadow_fault(va, error_code)))
+    if ((result = shadow_fault(va, regs)))
         return result;
     
     return 0;       /* failed to resolve, i.e raise #PG */
@@ -757,7 +757,6 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
         int error;
         unsigned int vector;
         unsigned long va;
-        unsigned long error_code;
 
         if ((error = __vmread(VM_EXIT_INTR_INFO, &vector))
             && !(vector & INTR_INFO_VALID_MASK))
@@ -792,14 +791,14 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
         case TRAP_page_fault:
         {
             __vmread(EXIT_QUALIFICATION, &va);
-            __vmread(VM_EXIT_INTR_ERROR_CODE, &error_code);
+            __vmread(VM_EXIT_INTR_ERROR_CODE, &regs.error_code);
             VMX_DBG_LOG(DBG_LEVEL_VMMU, 
                     "eax=%lx, ebx=%lx, ecx=%lx, edx=%lx, esi=%lx, edi=%lx",
                         regs.eax, regs.ebx, regs.ecx, regs.edx, regs.esi,
                         regs.edi);
             ed->arch.arch_vmx.vmx_platform.mpci.inst_decoder_regs = &regs;
 
-            if (!(error = vmx_do_page_fault(va, error_code))) {
+            if (!(error = vmx_do_page_fault(va, &regs))) {
                 /*
                  * Inject #PG using Interruption-Information Fields
                  */
@@ -810,7 +809,7 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
                            INTR_INFO_DELIEVER_CODE_MASK |
                            TRAP_page_fault);
                 __vmwrite(VM_ENTRY_INTR_INFO_FIELD, intr_fields);
-                __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, error_code);
+                __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, regs.error_code);
                 ed->arch.arch_vmx.cpu_cr2 = va;
             }
             break;

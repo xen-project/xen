@@ -38,7 +38,7 @@
 
 extern void shadow_mode_init(void);
 extern int shadow_mode_control(struct domain *p, dom0_shadow_control_t *sc);
-extern int shadow_fault(unsigned long va, long error_code);
+extern int shadow_fault(unsigned long va, struct xen_regs *regs);
 extern void shadow_l1_normal_pt_update(
     unsigned long pa, unsigned long gpte, 
     unsigned long *prev_spfn_ptr, l1_pgentry_t **prev_spl1e_ptr);

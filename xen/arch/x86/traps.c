@@ -289,7 +289,7 @@ asmlinkage int do_page_fault(struct xen_regs *regs)
              ptwr_do_page_fault(addr) )
         {
             if ( unlikely(shadow_mode_enabled(d)) )
-                (void)shadow_fault(addr, regs->error_code);
+                (void)shadow_fault(addr, regs);
             UNLOCK_BIGLOCK(d);
             return EXCRET_fault_fixed;
         }
@@ -297,7 +297,7 @@ asmlinkage int do_page_fault(struct xen_regs *regs)
     }
 
     if ( unlikely(shadow_mode_enabled(d)) && 
-         (addr < PAGE_OFFSET) && shadow_fault(addr, regs->error_code) )
+         (addr < PAGE_OFFSET) && shadow_fault(addr, regs) )
         return EXCRET_fault_fixed;
 
     if ( unlikely(addr >= LDT_VIRT_START(ed)) && 

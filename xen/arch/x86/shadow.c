@@ -601,13 +601,13 @@ void shadow_invlpg(struct exec_domain *ed, unsigned long va)
     }
 }
 
-int shadow_fault(unsigned long va, long error_code)
+int shadow_fault(unsigned long va, struct xen_regs *regs)
 {
     unsigned long gpte, spte = 0;
     struct exec_domain *ed = current;
     struct domain *d = ed->domain;
 
-    SH_VVLOG("shadow_fault( va=%p, code=%lu )", va, error_code );
+    SH_VVLOG("shadow_fault( va=%p, code=%lu )", va, regs->error_code );
 
     check_pagetable(d, ed->arch.guest_table, "pre-sf");
 
@@ -628,7 +628,7 @@ int shadow_fault(unsigned long va, long error_code)
         return 0;
     }
 
-    if ( (error_code & 2)  && !(gpte & _PAGE_RW) )
+    if ( (regs->error_code & 2)  && !(gpte & _PAGE_RW) )
     {
         /* Write fault on a read-only mapping. */
         return 0;
@@ -656,7 +656,7 @@ int shadow_fault(unsigned long va, long error_code)
     }
 
     /* Write fault? */
-    if ( error_code & 2 )  
+    if ( regs->error_code & 2 )  
     {
         if ( unlikely(!(gpte & _PAGE_RW)) )
         {
