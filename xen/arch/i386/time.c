@@ -185,11 +185,41 @@ mktime (unsigned int year, unsigned int mon,
         )*60 + sec; /* finally seconds */
 }
 
-static unsigned long get_cmos_time(void)
+static unsigned long __get_cmos_time(void)
 {
     unsigned int year, mon, day, hour, min, sec;
-    int i;
+    /* Linux waits here for a the Update-In-Progress (UIP) flag going
+     * from 1 to 0. This can take up to a second. This is not acceptable
+     * for the use in Xen and this code is therfor removed at the cost
+     * of reduced accuracy. */
+    sec = CMOS_READ(RTC_SECONDS);
+    min = CMOS_READ(RTC_MINUTES);
+    hour = CMOS_READ(RTC_HOURS);
+    day = CMOS_READ(RTC_DAY_OF_MONTH);
+    mon = CMOS_READ(RTC_MONTH);
+    year = CMOS_READ(RTC_YEAR);
+    
+    if (!(CMOS_READ(RTC_CONTROL) & RTC_DM_BINARY) || RTC_ALWAYS_BCD)
+    {
+        BCD_TO_BIN(sec);
+        BCD_TO_BIN(min);
+        BCD_TO_BIN(hour);
+        BCD_TO_BIN(day);
+        BCD_TO_BIN(mon);
+        BCD_TO_BIN(year);
+    }
 
+    if ((year += 1900) < 1970)
+        year += 100;
+
+    return mktime(year, mon, day, hour, min, sec);
+}
+
+/* the more accurate version waits for a change */
+static unsigned long get_cmos_time(void)
+{
+    unsigned long res;
+    int i;
     spin_lock(&rtc_lock);
     /* The Linux interpretation of the CMOS clock register contents:
      * When the Update-In-Progress (UIP) flag goes from 1 to 0, the
@@ -203,29 +233,10 @@ static unsigned long get_cmos_time(void)
     for (i = 0 ; i < 1000000 ; i++) /* must try at least 2.228 ms */
         if (!(CMOS_READ(RTC_FREQ_SELECT) & RTC_UIP))
             break;
-    do { /* Isn't this overkill ? UIP above should guarantee consistency */
-        sec = CMOS_READ(RTC_SECONDS);
-        min = CMOS_READ(RTC_MINUTES);
-        hour = CMOS_READ(RTC_HOURS);
-        day = CMOS_READ(RTC_DAY_OF_MONTH);
-        mon = CMOS_READ(RTC_MONTH);
-        year = CMOS_READ(RTC_YEAR);
-    } while (sec != CMOS_READ(RTC_SECONDS));
-    if (!(CMOS_READ(RTC_CONTROL) & RTC_DM_BINARY) || RTC_ALWAYS_BCD)
-    {
-        BCD_TO_BIN(sec);
-        BCD_TO_BIN(min);
-        BCD_TO_BIN(hour);
-        BCD_TO_BIN(day);
-        BCD_TO_BIN(mon);
-        BCD_TO_BIN(year);
-    }
+    res = __get_cmos_time();
     spin_unlock(&rtc_lock);
-    if ((year += 1900) < 1970)
-        year += 100;
-    printk(".... CMOS Clock:  %02d/%02d/%04d %02d:%02d:%02d\n",
-           day, mon, year, hour, min, sec);
-    return mktime(year, mon, day, hour, min, sec);
+    return res;
+
 }
 
 /***************************************************************************
@@ -368,6 +379,64 @@ static void update_time(unsigned long foo)
     add_ac_timer(&update_timer);
 }
 
+
+/*
+ * VERY crude way to keep system time from drfiting.
+ * Update the scaling factor using the RTC
+ * This is done periodically of it's own timer
+ * We maintain an array of cpu frequencies.
+ * - index 0 -> go slower
+ * - index 1 -> frequency as determined during calibration
+ * - index 2 -> go faster
+ */
+#define UPDATE_PERIOD   SECONDS(50)
+static struct ac_timer scale_timer;
+static unsigned long   init_cmos_time;
+static u64             cpu_freqs[3];
+static void update_scale(unsigned long foo)
+{
+    unsigned long  flags;
+    unsigned long  cmos_time;
+    s_time_t       now;
+    s32            st, ct, dt;
+    u64            scale;
+    int            freq_index;
+
+    spin_lock(&rtc_lock);
+    cmos_time = __get_cmos_time();
+    spin_unlock(&rtc_lock);
+
+    spin_lock_irqsave(&stime_lock, flags);
+    now  = __get_s_time();
+
+    ct = (cmos_time - init_cmos_time);
+    st = (s32)(now/SECONDS(1));
+    dt = ct - st;
+
+    /* work out adjustment to scaling factor. allow +/- 1s drift */
+    if (dt < -1) freq_index = 0;       /* go slower */
+    else if (dt > 1) freq_index = 2;   /* go faster */
+    else freq_index = 1;               /* correct speed */
+
+    if (dt <= -10 || dt >= 10)
+        printk("Large time drift (cmos time - system time = %ds)\n", dt);
+
+    /* set new frequency  */
+    cpu_freq = cpu_freqs[freq_index];
+
+    /* adjust scaling factor */
+    scale = 1000000000LL << 32;
+    scale /= cpu_freq;
+    st_scale_f = scale & 0xffffffff;
+    st_scale_i = scale >> 32;
+
+    spin_unlock_irqrestore(&stime_lock, flags);
+    scale_timer.expires  = now + UPDATE_PERIOD;
+    add_ac_timer(&scale_timer);
+    TRC(printk(" %ds[%d] ", dt, freq_index));
+}
+
+
 /***************************************************************************
  * Init Xeno Time
  * This has to be done after all CPUs have been booted
@@ -376,7 +445,9 @@ int __init init_xeno_time()
 {
     int      cpu = smp_processor_id();
     u32      cpu_cycle;  /* time of one cpu cyle in pico-seconds */
-    u64      scale;      /* scale factor  */
+    u64      scale;      /* scale factor */
+    s64      freq_off;
+
 
     spin_lock_init(&stime_lock);
     spin_lock_init(&wctime_lock);
@@ -385,14 +456,25 @@ int __init init_xeno_time()
 
     /* System Time */
     cpu_cycle   = (u32) (1000000000LL/cpu_khz); /* in pico seconds */
+
     scale = 1000000000LL << 32;
     scale /= cpu_freq;
     st_scale_f = scale & 0xffffffff;
     st_scale_i = scale >> 32;
 
+    
+    /* calculate adjusted frequencies */
+    freq_off  = cpu_freq/1000; /* .1%  */
+    cpu_freqs[0] = cpu_freq + freq_off;
+    cpu_freqs[1] = cpu_freq;
+    cpu_freqs[2] = cpu_freq - freq_off;
+
     /* Wall Clock time */
     wall_clock_time.tv_sec  = get_cmos_time();
     wall_clock_time.tv_usec = 0;
+
+    /* init cmos_time  for synchronising */
+    init_cmos_time = wall_clock_time.tv_sec - 3;
 
     /* set starting times */
     stime_now = (s_time_t)0;
@@ -404,12 +486,19 @@ int __init init_xeno_time()
     update_timer.data = 1;
     update_timer.function = &update_time;
     update_time(0);
+ 
+    init_ac_timer(&scale_timer, 0);
+    scale_timer.data = 4;
+    scale_timer.function = &update_scale;
+    update_scale(0);
 
-    printk(".... System Time: %lldns\n", NOW());
-    printk(".....cpu_cycle:   %u ps\n",  cpu_cycle);
-    printk(".... st_scale_f:  %X\n",     st_scale_f);
-    printk(".... st_scale_i:  %X\n",     st_scale_i);
-    printk(".... stime_pcc:   %u\n",     stime_pcc);
+    printk(".... System Time: %lldns\n",   NOW());
+    printk(".....cpu_freq:    %08X%08X\n", (u32)(cpu_freq>>32), (u32)cpu_freq);
+    printk(".....cpu_cycle:   %u ps\n",    cpu_cycle);
+    printk(".....scale:       %08X%08X\n", (u32)(scale>>32), (u32)scale);
+    printk(".... st_scale_f:  %X\n",       st_scale_f);
+    printk(".... st_scale_i:  %X\n",       st_scale_i);
+    printk(".... stime_pcc:   %u\n",       stime_pcc);
 
     printk(".... Wall Clock:  %lds %ldus\n", wall_clock_time.tv_sec,
            wall_clock_time.tv_usec);
