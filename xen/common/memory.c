@@ -829,11 +829,12 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
                                              CHECK_STRICT);
         if ( likely(okay) )
         {
+            invalidate_shadow_ldt();
+            percpu_info[cpu].deferred_ops &= ~DOP_FLUSH_TLB;
+            current->mm.pagetable = mk_pagetable(pfn << PAGE_SHIFT);
+            write_cr3_counted(pagetable_val(current->mm.pagetable));
             put_page_and_type(&frame_table[pagetable_val(current->mm.pagetable)
                                           >> PAGE_SHIFT]);
-            current->mm.pagetable = mk_pagetable(pfn << PAGE_SHIFT);
-            invalidate_shadow_ldt();
-            percpu_info[cpu].deferred_ops |= DOP_FLUSH_TLB;
         }
         else
         {
