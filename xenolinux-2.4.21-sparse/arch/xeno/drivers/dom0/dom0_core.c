@@ -149,40 +149,6 @@ static void create_proc_dom_entries(int dom)
     }
 }
 
-static int dom0_cmd_write(struct file *file, const char *buffer, size_t size,
-			  loff_t *off)
-{
-    dom0_op_t op;
-    int ret = 0;
-    
-    copy_from_user(&op, buffer, sizeof(dom0_op_t));
-
-    if ( op.cmd == MAP_DOM_MEM )
-    {
-        /* This is now an ioctl, and shouldn't be being written to the
-	   command file. */
-        ret = -EOPNOTSUPP;
-    }
-    else if ( op.cmd == DO_PGUPDATES )
-    {
-        /* Now an ioctl. */
-        ret = -EOPNOTSUPP;
-    }
-    else if (op.cmd == DOM0_CREATEDOMAIN)
-    {
-        /* This is now handled through an ioctl interface. Trying to
-	   do it this way means the /proc files for the new domain
-	   don't get created properly. */
-        ret = -EOPNOTSUPP;
-    }
-    else
-    {
-        ret = HYPERVISOR_dom0_op(&op);
-    }
-    
-    return ret;   
-}
-
 /***********************************************************************
  *
  * Implementation of /proc/xeno/domains
@@ -277,7 +243,20 @@ static struct file_operations proc_xeno_domains_operations = {
     release:        seq_release,
 };
 
-/* END OF /proc/xeno/domains */
+/***********************************************************************
+ *
+ * Implementation of /proc/xeno/dom0_cmd
+ */
+
+static int dom0_cmd_write(struct file *file, const char *buffer, size_t size,
+			  loff_t *off)
+{
+    dom0_op_t op;
+    
+    copy_from_user(&op, buffer, sizeof(dom0_op_t));
+
+    return HYPERVISOR_dom0_op(&op);
+}
 
 static int handle_dom0_cmd_createdomain(unsigned long data)
 {
@@ -307,7 +286,7 @@ static int handle_dom0_cmd_createdomain(unsigned long data)
        succeeded, because Xen doesn't appear to want to tell us... */
 
     /* The only time I've actually got this to happen was when trying
-       to crate a domain with more memory than is actually in the
+       to create a domain with more memory than is actually in the
        machine, so we guess the error code is ENOMEM. */
     return -ENOMEM;
   }
@@ -322,20 +301,15 @@ static int handle_dom0_cmd_createdomain(unsigned long data)
 static unsigned long handle_dom0_cmd_mapdommem(unsigned long data)
 {
   struct dom0_mapdommem_args argbuf;
-  unsigned long addr;
 
   if (copy_from_user(&argbuf, (void *)data, sizeof(argbuf)))
     return -EFAULT;
-  /* This seems to be assuming that the root of the page table is in
-     the first frame of the new domain's physical memory? */
 
-  addr = direct_mmap(argbuf.start_pfn << PAGE_SHIFT,
+  return direct_mmap(argbuf.start_pfn << PAGE_SHIFT,
 		     argbuf.tot_pages << PAGE_SHIFT,
 		     PAGE_SHARED,
 		     MAP_DISCONT,
 		     argbuf.tot_pages);
-
-  return addr;
 }
 
 static int handle_dom0_cmd_unmapdommem(unsigned long data)
