@@ -22,6 +22,7 @@
 #include <asm/hypervisor-ifs/block.h>
 #include <asm/hypervisor-ifs/hypervisor-if.h>
 #include <asm/io.h>
+#include <asm/atomic.h>
 #include <asm/uaccess.h>
 
 #define MAJOR_NR XLBLK_MAJOR   /* force defns in blk.h, must precede include */
@@ -58,6 +59,7 @@ static int xlblk_max_sectors[XLBLK_MAX];
 static blk_ring_t *blk_ring;
 static unsigned int resp_cons; /* Response consumer for comms ring. */
 static xen_disk_info_t xen_disk_info;
+atomic_t xlblk_control_count;
 
 int hypervisor_request(void *         id,
                        int            operation,
@@ -166,7 +168,7 @@ static int xenolinux_block_revalidate(kdev_t dev)
  *   virtual address in the guest os.
  * block_number:  block to read
  * block_size:  size of each block
- * device:  ide/hda is 768 or 0x300
+ * device:  ide/hda is 768 or 0x300           should be disk#!!!
  */
 int hypervisor_request(void *         id,
                        int            operation,
@@ -193,6 +195,8 @@ int hypervisor_request(void *         id,
 
     switch ( operation )
     {
+    case XEN_BLOCK_SEG_CREATE:
+    case XEN_BLOCK_SEG_DELETE:
     case XEN_BLOCK_PROBE:
 	phys_device = (kdev_t) 0;
 	sector_number = 0;
@@ -321,7 +325,21 @@ static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
 	  i  = BLK_RING_INC(i) )
     {
 	blk_ring_resp_entry_t *bret = &blk_ring->ring[i].resp;
-        if ( (bh = bret->id) != NULL ) bh->b_end_io(bh, 1);
+	switch (bret->operation)
+	{
+	  case XEN_BLOCK_READ :
+  	  case XEN_BLOCK_WRITE :
+	    if ( (bh = bret->id) != NULL ) bh->b_end_io(bh, 1);
+	    break;
+	    
+	  case XEN_BLOCK_SEG_CREATE :
+	  case XEN_BLOCK_SEG_DELETE :
+	    atomic_dec(&xlblk_control_count);
+	    break;
+	  
+	  default:
+	    break;
+	}
     }
     
     resp_cons = i;
@@ -336,6 +354,8 @@ static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
 int __init xlblk_init(void)
 {
     int i, error, result;
+
+    atomic_set(&xlblk_control_count, 0);
 
     /* This mapping was created early at boot time. */
     blk_ring = (blk_ring_t *)fix_to_virt(FIX_BLKRING_BASE);
@@ -356,6 +376,7 @@ int __init xlblk_init(void)
         BUG();
     HYPERVISOR_block_io_op();
     while ( blk_ring->resp_prod != 1 ) barrier();
+    printk (KERN_ALERT "block device probe:\n");
     for ( i = 0; i < xen_disk_info.count; i++ )
     { 
 	printk (KERN_ALERT "  %2d: type: %d, capacity: %ld\n",

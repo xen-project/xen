@@ -1504,6 +1504,7 @@ int __init blk_dev_init(void)
 
 #ifdef CONFIG_XENOLINUX_BLOCK
     xlblk_init();
+    xlseg_init();
 #endif
 
 	return 0;

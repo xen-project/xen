@@ -249,6 +249,7 @@
 3ddb79beNQVrdGyoI4njXhgAjD6a4A xen/drivers/block/genhd.c
 3ddb79beyWwLRP_BiM2t1JKgr_plEw xen/drivers/block/ll_rw_blk.c
 3e4a8cb7RhubVgsPwO7cK0pgAN8WCQ xen/drivers/block/xen_block.c
+3e5d129asHNyZOjBKTkqs-9AFzxemA xen/drivers/block/xen_segment.c
 3e4a8cb7alzQCDKS7MlioPoHBKYkdQ xen/drivers/char/Makefile
 3e4a8cb7WmiYdC-ASGiCSG_CL8vsqg xen/drivers/char/xen_kbd.c
 3e4a8cb7nMChlro4wvOBo76n__iCFA xen/drivers/char/xen_serial.c
@@ -438,6 +439,7 @@
 3ddb79c04nQVR3EYM5L4zxDV_MCo1g xen/include/xeno/prefetch.h
 3e4540ccU1sgCx8seIMGlahmMfv7yQ xen/include/xeno/reboot.h
 3ddb79c0LzqqS0LhAQ50ekgj4oGl7Q xen/include/xeno/sched.h
+3e5d129a2bbGTpVSZFN_mAnbm97ixw xen/include/xeno/segment.h
 3ddb79c0VDeD-Oft5eNfMneTU3D1dQ xen/include/xeno/skbuff.h
 3ddb79c14dXIhP7C2ahnoD08K90G_w xen/include/xeno/slab.h
 3ddb79c09xbS-xxfKxuV3JETIhBzmg xen/include/xeno/smp.h
@@ -466,6 +468,7 @@
 3e5a4e65iHEuC5sjFhj42XALYbLVRw xenolinux-2.4.21-pre4-sparse/arch/xeno/drivers/block/Makefile
 3e5a4e65pP5spJErBW69pJxSSdK9RA xenolinux-2.4.21-pre4-sparse/arch/xeno/drivers/block/xl_block.c
 3e5a4e65GtI9JZRAjuRdXaxt_4ohyQ xenolinux-2.4.21-pre4-sparse/arch/xeno/drivers/block/xl_block_test.c
+3e5d129aDldt6geU2-2SzBae34sQzg xenolinux-2.4.21-pre4-sparse/arch/xeno/drivers/block/xl_segment.c
 3e5a4e65G3e2s0ghPMgiJ-gBTUJ0uQ xenolinux-2.4.21-pre4-sparse/arch/xeno/drivers/console/Makefile
 3e5a4e651TH-SXHoufurnWjgl5bfOA xenolinux-2.4.21-pre4-sparse/arch/xeno/drivers/console/console.c
 3e5a4e656nfFISThfbyXQOA6HN6YHw xenolinux-2.4.21-pre4-sparse/arch/xeno/drivers/dom0/Makefile

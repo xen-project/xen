@@ -1,5 +1,5 @@
 /*
- * xen-block.c
+ * xen_block.c
  *
  * process incoming block io requests from guestos's.
  */
@@ -16,6 +16,7 @@
 #include <asm/spinlock.h>
 #include <xeno/keyhandler.h>
 #include <xeno/interrupt.h>
+#include <xeno/segment.h>
 
 #if 0
 #define DPRINTK(_f, _a...) printk( _f , ## _a )
@@ -42,7 +43,10 @@ static int do_block_io_op_domain(struct task_struct *p, int max_to_do);
 static void dispatch_rw_block_io(struct task_struct *p, int index);
 static void dispatch_probe_block_io(struct task_struct *p, int index);
 static void dispatch_debug_block_io(struct task_struct *p, int index);
-static void make_response(struct task_struct *p, void *id, unsigned long st);
+static void dispatch_create_segment(struct task_struct *p, int index);
+static void dispatch_delete_segment(struct task_struct *p, int index);
+static void make_response(struct task_struct *p, void *id, int op, 
+			  unsigned long st);
 
 
 /******************************************************************
@@ -149,7 +153,8 @@ static void end_block_io_op(struct buffer_head *bh, int uptodate)
     }
 
     atomic_dec(&nr_pending);
-    make_response(bh->b_xen_domain, bh->b_xen_id, uptodate ? 0 : 1);
+    make_response(bh->b_xen_domain, bh->b_xen_id, 
+		  XEN_BLOCK_READ, uptodate ? 0 : 1);
 
     kmem_cache_free(buffer_head_cachep, bh);
 
@@ -205,6 +210,14 @@ static int do_block_io_op_domain(struct task_struct* p, int max_to_do)
 	    dispatch_debug_block_io(p, i);
 	    break;
 
+	case XEN_BLOCK_SEG_CREATE:
+	    dispatch_create_segment(p, i);
+	    break;
+
+	case XEN_BLOCK_SEG_DELETE:
+	    dispatch_delete_segment(p, i);
+	    break;
+
 	default:
 	    panic("error: unknown block io operation [%d]\n",
                   blk_ring->ring[i].req.operation);
@@ -220,16 +233,43 @@ static void dispatch_debug_block_io(struct task_struct *p, int index)
     DPRINTK("dispatch_debug_block_io: unimplemented\n"); 
 }
 
+static void dispatch_create_segment(struct task_struct *p, int index)
+{
+  blk_ring_t *blk_ring = p->blk_ring_base;
+  xv_disk_t *xvd;
+  int result;
+
+  if (p->domain != 0)
+  {
+    printk (KERN_ALERT "dispatch_create_segment called by dom%d\n", p->domain);
+    make_response(p, blk_ring->ring[index].req.id, XEN_BLOCK_SEG_CREATE, 1); 
+    return;
+  }
+
+  xvd = phys_to_virt((unsigned long)blk_ring->ring[index].req.buffer);    
+  result = xen_segment_create(xvd);
+  make_response(p, blk_ring->ring[index].req.id, 
+		XEN_BLOCK_SEG_CREATE, result); 
+  return;
+}
+
+static void dispatch_delete_segment(struct task_struct *p, int index)
+{
+    DPRINTK("dispatch_delete_segment: unimplemented\n"); 
+}
+
 static void dispatch_probe_block_io(struct task_struct *p, int index)
 {
-    extern void ide_probe_devices(xen_disk_info_t *xdi);
+    extern void ide_probe_devices(xen_disk_info_t *xdi, int *count, 
+				  drive_t xdrives[]);
     blk_ring_t *blk_ring = p->blk_ring_base;
     xen_disk_info_t *xdi;
 
     xdi = phys_to_virt((unsigned long)blk_ring->ring[index].req.buffer);    
-    ide_probe_devices(xdi);
+    ide_probe_devices(xdi, &num_xdrives, xdrives);
+    /* scsi_probe_devices(xdi, &num_xdrives, xdrives); */          /* future */
 
-    make_response(p, blk_ring->ring[index].req.id, 0);
+    make_response(p, blk_ring->ring[index].req.id, XEN_BLOCK_PROBE, 0);
 }
 
 static void dispatch_rw_block_io(struct task_struct *p, int index)
@@ -333,9 +373,9 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
     return;
 
  bad_descriptor:
-    make_response(p, blk_ring->ring[index].req.id, 1);
+    make_response(p, blk_ring->ring[index].req.id, XEN_BLOCK_READ, 1);
     return;
-}
+} 
 
 
 
@@ -343,7 +383,8 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
  * MISCELLANEOUS SETUP / TEARDOWN / DEBUGGING
  */
 
-static void make_response(struct task_struct *p, void *id, unsigned long st)
+static void make_response(struct task_struct *p, void *id, 
+			  int op, unsigned long st)
 {
     unsigned long cpu_mask, flags;
     int position;
@@ -353,8 +394,9 @@ static void make_response(struct task_struct *p, void *id, unsigned long st)
     spin_lock_irqsave(&p->blk_ring_lock, flags);
     blk_ring = p->blk_ring_base;
     position = blk_ring->resp_prod;
-    blk_ring->ring[position].resp.id     = id;
-    blk_ring->ring[position].resp.status = st;
+    blk_ring->ring[position].resp.id        = id;
+    blk_ring->ring[position].resp.operation = op;
+    blk_ring->ring[position].resp.status    = st;
     blk_ring->resp_prod = BLK_RING_INC(position);
     spin_unlock_irqrestore(&p->blk_ring_lock, flags);
     
@@ -377,6 +419,7 @@ void init_blkdev_info(struct task_struct *p)
     clear_page(p->blk_ring_base);
     SHARE_PFN_WITH_DOMAIN(virt_to_page(p->blk_ring_base), p->domain);
     p->blkdev_list.next = NULL;
+    p->segment_count = 0;
 }
 
 /* End-of-day teardown for a domain. XXX Outstanding requests? */
@@ -397,6 +440,8 @@ void initialize_block_io ()
     buffer_head_cachep = kmem_cache_create(
         "buffer_head_cache", sizeof(struct buffer_head),
         0, SLAB_HWCACHE_ALIGN, NULL, NULL);
+
+    xen_segment_initialize();
     
     add_key_handler('b', dump_blockq, "dump xen ide blkdev stats");     
 }

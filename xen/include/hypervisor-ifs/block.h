@@ -1,10 +1,7 @@
 /******************************************************************************
  * block.h
  *
- * Block IO communication rings.
- *
- * These are the ring data structures for buffering messages between 
- * the hypervisor and guestos's.  
+ * shared structures for block IO.
  *
  */
 
@@ -13,6 +10,13 @@
 
 #include <linux/kdev_t.h>
 
+/*
+ *
+ * These are the ring data structures for buffering messages between 
+ * the hypervisor and guestos's.  
+ *
+ */
+
 /* the first four definitions match fs.h */
 #define XEN_BLOCK_READ  0
 #define XEN_BLOCK_WRITE 1
@@ -20,6 +24,8 @@
 #define XEN_BLOCK_SPECIAL 4                              /* currently unused */
 #define XEN_BLOCK_PROBE 8      /* determine io configuration from hypervisor */
 #define XEN_BLOCK_DEBUG 16                                          /* debug */
+#define XEN_BLOCK_SEG_CREATE 32                      /* create segment (vhd) */
+#define XEN_BLOCK_SEG_DELETE 64                      /* delete segment (vhd) */
 
 #define BLK_RING_SIZE        128
 #define BLK_RING_MAX_ENTRIES (BLK_RING_SIZE - 2)
@@ -29,7 +35,7 @@
 typedef struct blk_ring_req_entry 
 {
     void *          id;                /* for guest os use */
-    int             operation;         /* XEN_BLOCK_READ or XEN_BLOCK_WRITE */
+    int             operation;         /* from above */
     char *          buffer;
     unsigned long   block_number;      /* block number */
     unsigned short  block_size;        /* block size */
@@ -39,8 +45,9 @@ typedef struct blk_ring_req_entry
 
 typedef struct blk_ring_resp_entry
 {
-    void *id;
-    unsigned long status;
+    void *          id;                                  /* for guest os use */
+    int             operation;                                 /* from above */
+    unsigned long   status;
 } blk_ring_resp_entry_t;
 
 typedef struct blk_ring_st 
@@ -53,7 +60,13 @@ typedef struct blk_ring_st
     } ring[BLK_RING_SIZE];
 } blk_ring_t;
 
-#define MAX_XEN_DISK_COUNT 100
+/*
+ *
+ * physical disk (xhd) info, used by XEN_BLOCK_PROBE
+ *
+ */
+
+#define XEN_MAX_DISK_COUNT 100
 
 #define XEN_DISK_IDE  1
 #define XEN_DISK_SCSI 2
@@ -71,8 +84,33 @@ typedef struct xen_disk                                     /* physical disk */
 
 typedef struct xen_disk_info
 {
-  int         count; /* number of subsequent xen_disk_t structures to follow */
-  xen_disk_t  disks[100];
+  int         count;            /* number of xen_disk_t structures to follow */
+  xen_disk_t  disks[XEN_MAX_DISK_COUNT];
 } xen_disk_info_t;
+
+/*
+ *
+ * virtual disk (vhd) structures, used by XEN_BLOCK_SEG_{CREATE, DELETE}
+ *
+ */
+
+#define XEN_DISK_READ_WRITE  1
+#define XEN_DISK_READ_ONLY   2
+
+typedef struct xv_extent
+{
+  int disk;                                          /* physical disk number */
+  unsigned long offset;               /* offset in blocks into physical disk */
+  unsigned long size;                                      /* size in blocks */
+} xv_extent_t;
+
+typedef struct xv_disk
+{
+  int mode;                     /* XEN_DISK_READ_WRITE or XEN_DISK_READ_ONLY */
+  int domain;                                                      /* domain */
+  int segment;                                             /* segment number */
+  int ext_count;                          /* number of xv_extent_t to follow */
+  xv_extent_t extents[XEN_MAX_DISK_COUNT];    /* arbitrary reuse of constant */
+} xv_disk_t;
 
 #endif
