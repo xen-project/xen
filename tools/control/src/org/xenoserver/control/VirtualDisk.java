@@ -109,6 +109,9 @@ public class VirtualDisk {
                 + "segment:"
                 + vbd.getVbdNum()
                 + " "
+	        + "key: "
+	        + this.getKey()
+	        + " "
                 + "extents:"
                 + extents.size()
                 + " ");
