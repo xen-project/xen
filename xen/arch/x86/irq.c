@@ -280,7 +280,7 @@ int pirq_guest_bind(struct exec_domain *ed, int irq, int will_share)
         /* Attempt to bind the interrupt target to the correct CPU. */
         if ( desc->handler->set_affinity != NULL )
             desc->handler->set_affinity(
-                irq, apicid_to_phys_cpu_present(d->exec_domain[0]->processor));
+                irq, apicid_to_phys_cpu_present(ed->processor));
     }
     else if ( !will_share || !action->shareable )
     {
