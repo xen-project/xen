@@ -1956,6 +1956,9 @@ int do_update_va_mapping(unsigned long va,
              * page was not shadowed, or that the L2 entry has not yet been
              * updated to reflect the shadow.
              */
+            if ( shadow_mode_external(current->domain) )
+                BUG(); // can't use linear_l2_table with external tables.
+
             l2_pgentry_t gpde = linear_l2_table[l2_table_offset(va)];
             unsigned long gpfn = l2_pgentry_val(gpde) >> PAGE_SHIFT;
 
@@ -2380,6 +2383,9 @@ int ptwr_do_page_fault(unsigned long addr)
      * Attempt to read the PTE that maps the VA being accessed. By checking for
      * PDE validity in the L2 we avoid many expensive fixups in __get_user().
      */
+    if ( shadow_mode_external(current->domain) )
+        BUG(); // can't use linear_l2_table with external tables.
+
     if ( !(l2_pgentry_val(linear_l2_table[addr>>L2_PAGETABLE_SHIFT]) &
            _PAGE_PRESENT) ||
          __get_user(pte, (unsigned long *)
@@ -2416,6 +2422,9 @@ int ptwr_do_page_fault(unsigned long addr)
      * Is the L1 p.t. mapped into the current address space? If so we call it
      * an ACTIVE p.t., otherwise it is INACTIVE.
      */
+    if ( shadow_mode_external(current->domain) )
+        BUG(); // can't use linear_l2_table with external tables.
+
     pl2e = &linear_l2_table[l2_idx];
     l2e  = l2_pgentry_val(*pl2e);
     which = PTWR_PT_INACTIVE;
