@@ -165,11 +165,11 @@ void domain_sleep(struct domain *d)
 {
     unsigned long flags;
 
-    /* sleep and wake protected by domain's state_lock */
-    spin_lock_irqsave(&d->state_lock, flags);
+    /* sleep and wake protected by domain's sleep_lock */
+    spin_lock_irqsave(&d->sleep_lock, flags);
     if ( likely(!domain_runnable(d)) )
         SCHED_OP(sleep, d);
-    spin_unlock_irqrestore(&d->state_lock, flags);
+    spin_unlock_irqrestore(&d->sleep_lock, flags);
  
     /* Synchronous. */
     while ( test_bit(DF_RUNNING, &d->flags) && !domain_runnable(d) )
@@ -183,7 +183,7 @@ void domain_wake(struct domain *d)
 {
     unsigned long       flags;
 
-    spin_lock_irqsave(&d->state_lock, flags);
+    spin_lock_irqsave(&d->sleep_lock, flags);
     
     if ( likely(domain_runnable(d)) )
     {
@@ -196,7 +196,7 @@ void domain_wake(struct domain *d)
     
     clear_bit(DF_MIGRATED, &d->flags);
     
-    spin_unlock_irqrestore(&d->state_lock, flags);
+    spin_unlock_irqrestore(&d->sleep_lock, flags);
 }
 
 /* Block the currently-executing domain until a pertinent event occurs. */

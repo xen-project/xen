@@ -276,12 +276,12 @@ static void fbvt_wake(struct domain *d)
     /* Currently-running domain should run at least for ctx_allow. */
     min_time = curr->lastschd + ctx_allow;
     
-    spin_unlock_irqrestore(&schedule_data[cpu].schedule_lock, flags);   
-    
     if ( is_idle_task(curr) || (min_time <= now) )
         cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
     else if ( schedule_data[cpu].s_timer.expires > (min_time + TIME_SLOP) )
         mod_ac_timer(&schedule_data[cpu].s_timer, min_time);
+
+    spin_unlock_irqrestore(&schedule_data[cpu].schedule_lock, flags);   
 }
 
 

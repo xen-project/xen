@@ -218,10 +218,11 @@ void rr_wake(struct domain *d)
 
     spin_lock_irqsave(&schedule_data[cpu].schedule_lock, flags);
     curr = schedule_data[cpu].curr;
-    spin_unlock_irqrestore(&schedule_data[cpu].schedule_lock, flags);
  
     if ( is_idle_task(curr) )
         cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
+
+    spin_unlock_irqrestore(&schedule_data[cpu].schedule_lock, flags);
 }
 
 
