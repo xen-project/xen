@@ -305,6 +305,9 @@ void vbd_destroy(blkif_be_vbd_destroy_t *destroy)
     while ( x != NULL )
     {
         t = x->next;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+        blkdev_put(x->bdev);
+#endif
         kfree(x);
         x = t;
     }
@@ -330,6 +333,9 @@ void destroy_all_vbds(blkif_t *blkif)
         while ( x != NULL )
         {
             t = x->next;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+            blkdev_put(x->bdev);
+#endif
             kfree(x);
             x = t;
         }          
