@@ -1757,17 +1757,20 @@ int ptwr_do_page_fault(unsigned long addr)
     which = PTWR_PT_INACTIVE;
     if ( (l2e >> PAGE_SHIFT) == pfn )
     {
-        /*
-         * If the PRESENT bit is clear, we may be conflicting with the current 
-         * ACTIVE p.t. (it may be the same p.t. mapped at another virt addr).
-         */
-        if ( unlikely(!(l2e & _PAGE_PRESENT)) &&
-             ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l1va )
-            ptwr_flush(PTWR_PT_ACTIVE);
-        
-        /* Now do a final check of the PRESENT bit to set ACTIVE. */
+        /* Check the PRESENT bit to set ACTIVE. */
         if ( likely(l2e & _PAGE_PRESENT) )
             which = PTWR_PT_ACTIVE;
+        else {
+            /*
+             * If the PRESENT bit is clear, we may be conflicting with
+             * the current ACTIVE p.t. (it may be the same p.t. mapped
+             * at another virt addr).
+             * The ptwr_flush call below will restore the PRESENT bit.
+             */
+            if ( ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l1va &&
+                 l2_idx == ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l2_idx )
+                which = PTWR_PT_ACTIVE;
+        }
     }
     
     PTWR_PRINTK("[%c] page_fault on l1 pt at va %08lx, pt for %08x, "
