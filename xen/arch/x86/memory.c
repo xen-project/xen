@@ -905,6 +905,18 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         __flush_tlb_one(ptr);
         break;
 
+    case MMUEXT_FLUSH_CACHE:
+        if ( unlikely(!IS_CAPABLE_PHYSDEV(d)) )
+        {
+            MEM_LOG("Non-physdev domain tried to FLUSH_CACHE.\n");
+            okay = 0;
+        }
+        else
+        {
+            wbinvd();
+        }
+        break;
+
     case MMUEXT_SET_LDT:
     {
         unsigned long ents = val >> MMUEXT_CMD_SHIFT;

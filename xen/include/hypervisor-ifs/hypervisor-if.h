@@ -117,6 +117,9 @@
  *   val[7:0] == MMUEXT_INVLPG:
  *   ptr[:2]  -- Linear address to be flushed from the TLB.
  * 
+ *   val[7:0] == MMUEXT_FLUSH_CACHE:
+ *   No additional arguments. Writes back and flushes cache contents.
+ * 
  *   val[7:0] == MMUEXT_SET_LDT:
  *   ptr[:2]  -- Linear address of LDT base (NB. must be page-aligned).
  *   val[:8]  -- Number of entries in LDT.
@@ -143,15 +146,16 @@
 #define MMU_MACHPHYS_UPDATE      2 /* ptr = MA of frame to modify entry for  */
 #define MMU_EXTENDED_COMMAND     3 /* least 8 bits of val demux further      */
 #define MMUEXT_PIN_TABLE         0 /* ptr = MA of frame to pin               */
-#define MMUEXT_UNPIN_TABLE       4 /* ptr = MA of frame to unpin             */
-#define MMUEXT_NEW_BASEPTR       5 /* ptr = MA of new pagetable base         */
-#define MMUEXT_TLB_FLUSH         6 /* ptr = NULL                             */
-#define MMUEXT_INVLPG            7 /* ptr = VA to invalidate                 */
-#define MMUEXT_SET_LDT           8 /* ptr = VA of table; val = # entries     */
+#define MMUEXT_UNPIN_TABLE       1 /* ptr = MA of frame to unpin             */
+#define MMUEXT_NEW_BASEPTR       2 /* ptr = MA of new pagetable base         */
+#define MMUEXT_TLB_FLUSH         3 /* ptr = NULL                             */
+#define MMUEXT_INVLPG            4 /* ptr = VA to invalidate                 */
+#define MMUEXT_FLUSH_CACHE       5
+#define MMUEXT_SET_LDT           6 /* ptr = VA of table; val = # entries     */
+#define MMUEXT_SET_FOREIGNDOM    7 /* val[31:16] = dom                       */
+#define MMUEXT_CLEAR_FOREIGNDOM  8
 #define MMUEXT_TRANSFER_PAGE     9 /* ptr = MA of frame; val[31:16] = dom    */
-#define MMUEXT_SET_FOREIGNDOM   10 /* val[31:16] = dom                       */
-#define MMUEXT_CLEAR_FOREIGNDOM 11
-#define MMUEXT_REASSIGN_PAGE    12
+#define MMUEXT_REASSIGN_PAGE    10
 #define MMUEXT_CMD_MASK        255
 #define MMUEXT_CMD_SHIFT         8
 
