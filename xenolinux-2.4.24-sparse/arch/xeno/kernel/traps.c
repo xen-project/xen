@@ -313,12 +313,14 @@ asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
 	if ( unlikely((error_code & 6) == 4) )
 	{
 		unsigned long ldt;
-		flush_page_update_queue(); /* ensure LDTR is up to date */
 		__asm__ __volatile__ ( "sldt %0" : "=r" (ldt) );
-		if ( likely(ldt == 0) )
+		if ( ldt == 0 )
 		{
-			queue_set_ldt((unsigned long)&default_ldt[0], 5);
-			flush_page_update_queue();
+			mmu_update_t u;
+			u.ptr  = MMU_EXTENDED_COMMAND;
+			u.ptr |= (unsigned long)&default_ldt[0];
+			u.val  = MMUEXT_SET_LDT | (5 << MMUEXT_CMD_SHIFT);
+			HYPERVISOR_mmu_update(&u, 1);
 			return;
 		}
 	}
