@@ -10,7 +10,7 @@ INSTALL_DIR	:= $(INSTALL) -d -m0755
 INSTALL_DATA	:= $(INSTALL) -m0644
 INSTALL_PROG	:= $(INSTALL) -m0755
 
-KERNELS ?= linux-2.6-xen0 linux-2.6-xenU
+KERNELS ?= linux-2.6-xen0 linux-2.6-xenU  linux-2.4-xen0 linux-2.4-xenU netbsd-2.0-xenU
 # linux-2.4-xen0 linux-2.4-xenU netbsd-2.0-xenU
 # You may use wildcards in the above e.g. KERNELS=*2.4*
 
@@ -65,7 +65,7 @@ tools:
 	$(MAKE) dist=yes -C tools install
 
 kernels:
-	for i in $(XKERNELS) ; do $(MAKE) $$i-build ; done
+	for i in $(XKERNELS) ; do $(MAKE) $$i-build || exit 1; done
 
 docs:
 	sh ./docs/check_pkgs
@@ -84,7 +84,7 @@ kclean:
 
 # Make patches from kernel sparse trees
 mkpatches:
-	for i in $(ALLSPARSETREES) ; do $(MAKE) $$i-xen.patch ; done
+	for i in $(ALLSPARSETREES) ; do $(MAKE) $$i-xen.patch || exit 1; done
 
 
 # build xen, the tools, and a domain 0 plus unprivileged linux-xen images,

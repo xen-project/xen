@@ -23,7 +23,7 @@ endif
 	$(MAKE) -C sv install
 
 dist: $(TARGET)
-	$(MAKE) prefix=$(CURDIR)/../../install dist=yes install
+	$(MAKE) prefix=$(CURDIR)/../dist/install dist=yes install
 
 
 clean:
