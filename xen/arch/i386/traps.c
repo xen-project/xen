@@ -224,30 +224,6 @@ static inline void do_trap(int trapnr, char *str,
           smp_processor_id(), trapnr, str, error_code);
 }
 
-static inline void do_int3_exception(int trapnr,
-				     struct pt_regs *regs, 
-				     long error_code)
-{
-    struct task_struct *p = current;
-    struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
-    trap_info_t *ti;
-
-    if ((regs->xcs & 3) != 3)
-    {
-        pdb_handle_exception(trapnr, regs);
-	return;
-    }
-
-    ti = current->thread.traps + trapnr;
-    gtb->flags      =  GTBF_TRAP_NOCODE;
-    gtb->error_code = error_code;
-    gtb->cs         = ti->cs;
-    gtb->eip        = ti->address;
-    if ( TI_GET_IF(ti) )
-        clear_bit(EVENTS_MASTER_ENABLE_BIT, &p->shared_info->events_mask);
-    return; 
-}
-
 #define DO_ERROR_NOCODE(trapnr, str, name) \
 asmlinkage void do_##name(struct pt_regs * regs, long error_code) \
 { \
@@ -275,10 +251,34 @@ DO_ERROR(17, "alignment check", alignment_check)
 DO_ERROR_NOCODE(18, "machine check", machine_check)
 DO_ERROR_NOCODE(19, "simd error", simd_coprocessor_error)
 
-asmlinkage void do_int3(struct pt_regs * regs, long error_code)
+asmlinkage void do_int3(struct pt_regs *regs, long error_code)
 {
-    if (pdb_initialized)   do_int3_exception(3, regs, error_code);
-    else                   do_trap(3, "int3", regs, error_code, 0);
+    struct task_struct *p = current;
+    struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
+    trap_info_t *ti;
+
+    if ( (regs->xcs & 3) != 3 )
+    {
+        if ( pdb_handle_exception(3, regs) == 0 )
+             return;
+        if ( unlikely((regs->xcs & 3) == 0) )
+        {
+            show_registers(regs);
+            panic("CPU%d FATAL TRAP: vector = 3 (Int3)\n"
+                  "[error_code=%08x]\n",
+                  smp_processor_id(), error_code);
+        }
+    }
+
+    ti = current->thread.traps + 3;
+    gtb->flags      = GTBF_TRAP_NOCODE;
+    gtb->error_code = error_code;
+    gtb->cs         = ti->cs;
+    gtb->eip        = ti->address;
+    if ( TI_GET_IF(ti) )
+        clear_bit(EVENTS_MASTER_ENABLE_BIT, &p->shared_info->events_mask);
+    return;
+
 }
 
 asmlinkage void do_double_fault(void)
@@ -525,11 +525,6 @@ asmlinkage void do_debug(struct pt_regs * regs, long error_code)
     struct task_struct *tsk = current;
     struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
 
-    /*
-    printk("do_debug_exceptionn [%lx][%lx][%x]\n",
-	   error_code, regs->eip, regs->xcs);
-    */
-
     __asm__ __volatile__("movl %%db6,%0" : "=r" (condition));
 
     if ((condition & (1 << 14)) != (1 << 14))
@@ -538,7 +533,7 @@ asmlinkage void do_debug(struct pt_regs * regs, long error_code)
     }
     __asm__("movl %0,%%db6" : : "r" (0));
 
-    if (pdb_handle_exception(1, regs))                /* propagate to domain */
+    if ( pdb_handle_exception(1, regs) != 0 )
     {
         tsk->thread.debugreg[6] = condition;
 
@@ -546,8 +541,6 @@ asmlinkage void do_debug(struct pt_regs * regs, long error_code)
 	gtb->cs    = tsk->thread.traps[1].cs;
 	gtb->eip   = tsk->thread.traps[1].address;
     }
-
-    return;
 }
 
 

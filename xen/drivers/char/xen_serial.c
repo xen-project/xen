@@ -3,6 +3,7 @@
 #include <xeno/keyhandler.h> 
 #include <xeno/reboot.h>
 #include <xeno/irq.h>
+#include <asm/pdb.h>
 
 /* Register offsets */
 #define NS16550_RBR	0x00	/* receive buffer	*/
@@ -116,7 +117,8 @@ void serial_putch(u_char c)
 void serial_putchar(u_char c)
 {
     serial_putch(c);
-    if (c == '\n') serial_putch('\r');
+    if ( c == '\n' )
+        serial_putch('\r');
 }
 
 static spinlock_t serial_lock;
@@ -129,13 +131,12 @@ static void serial_rx_int(int irq, void *dev_id, struct pt_regs *regs)
 
     spin_lock_irqsave(&serial_lock, flags);
 
-    while (serial_testchar())
+    while ( serial_testchar() )
     {
         c = serial_getchar();
 
-	if (c & 0x80)
+	if ( c & 0x80 )
 	{
-	    extern int pdb_serial_input(u_char, struct pt_regs *);
 	    pdb_serial_input(c & 0x7f, regs);
 	}
 	else

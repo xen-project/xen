@@ -23,8 +23,9 @@
 
 /****************************************************************************/
 
-int pdb_change_values (int domain, u_char *buffer, unsigned long addr,
-		       int length, int rw);
+extern int pdb_change_values (int domain, u_char *buffer, unsigned long addr,
+                              int length, int rw);
+extern u_char pdb_linux_get_value (int domain, int pid, unsigned long addr);
 
 /*
  * Set memory in a domain's address space
@@ -36,22 +37,19 @@ int pdb_change_values (int domain, u_char *buffer, unsigned long addr,
 
 int pdb_set_values (int domain, u_char *buffer, unsigned long addr, int length)
 {
-    int count;
-    void *bkpt;
-    count = pdb_change_values(domain, buffer, addr, length, 2);
+    int count = pdb_change_values(domain, buffer, addr, length, 2);
 
     /* this is a bit x86 specific at the moment... */
     if (length == 1 && buffer[0] == 'c' && buffer[1] == 'c')
     {
         /* inserting a new breakpoint */
-        pdb_bkpt_add (addr);
+        pdb_bkpt_add(addr);
         TRC(printk("pdb breakpoint detected at 0x%lx\n", addr));
     }
-    else if ((bkpt = pdb_bkpt_search(addr)))
+    else if ( pdb_bkpt_remove(addr) == 0 )
     {
         /* removing a breakpoint */
         TRC(printk("pdb breakpoint cleared at 0x%lx\n", addr));
-        pdb_bkpt_remove_ptr(bkpt);
     }
 
     return count;
@@ -85,8 +83,6 @@ int pdb_change_values (int domain, u_char *buffer, unsigned long addr,
     l1_pgentry_t* l1_table = NULL;
     u_char *page;
     int bytes = 0;
-
-    extern char *hex2mem (char *, char *, int);
 
     p = find_domain_by_id(domain);
 
@@ -210,8 +206,6 @@ void pdb_do_debug (dom0_op_t *op)
 
             for (loop = 0; loop < op->u.debug.in2; loop++)         /* length */
             { 
-	        extern u_char pdb_linux_get_value (int domain, int pid, unsigned long addr);
-
                 if (loop % 8 == 0)
                 {
                     printk ("\n%08x ", op->u.debug.in1 + loop);
