@@ -58,8 +58,9 @@ XINSTALL_NAME ?= $(KERNELRELEASE)
 install: vmlinuz
 	mkdir -p $(INSTALL_PATH)/boot
 	install -m0644 vmlinuz $(INSTALL_PATH)/boot/vmlinuz-$(XINSTALL_NAME)$(INSTALL_SUFFIX)
-	install -m0644 vmlinux $(INSTALL_PATH)/boot/vmlinux-$(XINSTALL_NAME)$(INSTALL_SUFFIX)
+	install -m0644 vmlinux $(INSTALL_PATH)/boot/vmlinux-syms-$(XINSTALL_NAME)$(INSTALL_SUFFIX)
 	install -m0664 .config $(INSTALL_PATH)/boot/config-$(XINSTALL_NAME)$(INSTALL_SUFFIX)
+	install -m0664 System.map $(INSTALL_PATH)/boot/System.map-$(XINSTALL_NAME)$(INSTALL_SUFFIX)
 
 dist:
 	$(MAKE) INSTALL_PATH=../install install

@@ -114,6 +114,7 @@ install: bzImage
 	install -m0644 arch/$(ARCH)/boot/bzImage $(INSTALL_PATH)/boot/vmlinuz-$(INSTALL_NAME)$(INSTALL_SUFFIX)
 	install -m0644 vmlinux $(INSTALL_PATH)/boot/vmlinux-syms-$(INSTALL_NAME)$(INSTALL_SUFFIX)
 	install -m0664 .config $(INSTALL_PATH)/boot/config-$(INSTALL_NAME)$(INSTALL_SUFFIX)
+	install -m0664 System.map $(INSTALL_PATH)/boot/System.map-$(INSTALL_NAME)$(INSTALL_SUFFIX)
 
 dist: 
 	$(MAKE) INSTALL_PATH=../install install

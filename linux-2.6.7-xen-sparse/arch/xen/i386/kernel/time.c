@@ -474,28 +474,23 @@ static inline u64 __jiffies_to_st(unsigned long j)
  * 
  * It must be called with interrupts disabled.
  */
-extern spinlock_t timerlist_lock;
 int set_timeout_timer(void)
 {
-    u64 alarm = 0;
-    int ret = 0;
-    int cpu = smp_processor_id();
+	u64 alarm = 0;
+	int ret = 0;
 
-    spin_lock(&timerlist_lock);
+	/*
+	 * This is safe against long blocking (since calculations are
+	 * not based on TSC deltas). It is also safe against warped
+	 * system time since suspend-resume is cooperative and we
+	 * would first get locked out. It is safe against normal
+	 * updates of jiffies since interrupts are off.
+	 */
+	alarm = __jiffies_to_st(next_timer_interrupt());
 
-    /*
-     * This is safe against long blocking (since calculations are not based on 
-     * TSC deltas). It is also safe against warped system time since
-     * suspend-resume is cooperative and we would first get locked out. It is 
-     * safe against normal updates of jiffies since interrupts are off.
-     */
-    alarm = __jiffies_to_st(next_timer_interrupt());
+	/* Failure is pretty bad, but we'd best soldier on. */
+	if ( HYPERVISOR_set_timer_op(alarm) != 0 )
+		ret = -1;
 
-    /* Failure is pretty bad, but we'd best soldier on. */
-    if ( HYPERVISOR_set_timer_op(alarm) != 0 )
-        ret = -1;
-    
-    spin_unlock(&timerlist_lock);
-
-    return ret;
+	return ret;
 }
