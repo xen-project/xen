@@ -643,7 +643,11 @@ class XendDomainInfo:
         """
         self.release_vifs()
         self.release_vbds()
+        
         self.devices = {}
+        self.device_index = {}
+        self.configs = []
+        self.ipaddrs = []
 
     def release_vifs(self):
         """Release vm virtual network devices (vifs).
@@ -851,7 +855,7 @@ class XendDomainInfo:
 
     def restart_check(self):
         """Check if domain restart is OK.
-        To prevent restart loops, raise an error it is
+        To prevent restart loops, raise an error if it is
         less than MINIMUM_RESTART_TIME seconds since the last restart.
         """
         tnow = time.time()

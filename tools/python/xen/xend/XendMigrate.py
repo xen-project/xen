@@ -107,6 +107,15 @@ class XfrdInfo:
             self.deferred.errback(err)
 
     def dispatch(self, xfrd, val):
+        
+        def cbok(v):
+            if v is None: return
+            sxp.show(v, out=xfrd.transport)
+
+        def cberr(err):
+            v = ['xfr.err', errno.EINVAL]
+            sxp.show(v, out=xfrd.transport)
+
         op = sxp.name(val)
         op = op.replace('.', '_')
         if op.startswith('xfr_'):
@@ -114,8 +123,11 @@ class XfrdInfo:
         else:
             fn = self.unknown
         val = fn(xfrd, val)
-        if val is not None:
-            sxp.show(val, out=xfrd.transport)
+        if isinstance(val, defer.Deferred):
+            val.addCallback(cbok)
+            val.addErrback(cberr)
+        else:
+            cbok(val)
 
     def unknown(self, xfrd, val):
         print 'unknown>', val
@@ -164,11 +176,40 @@ class XfrdInfo:
         return ['xfr.err', val]
 
     def xfr_vm_suspend(self, xfrd, val):
+        """Suspend a domain. Suspending takes time, so we return
+        a Deferred that is called when the suspend completes.
+        """
         print 'xfr_vm_suspend>', val
         try:
             vmid = sxp.child0(val)
+            d = defer.Deferred()
+            # Subscribe to 'suspended' events so we can tell when the
+            # suspend completes. Subscribe to 'died' events so we can tell if
+            # the domain died.
+            def onSuspended(e, v):
+                print 'onSuspended>', e, v
+                if v[1] != vmid: return
+                subscribe(on=0)
+                d.callback(v)
+                
+            def onDied(e, v):
+                print 'onDied>', e, v
+                if v[1] != vmid: return
+                subscribe(on=0)
+                d.errback(XendError('Domain died'))
+                
+            def subscribe(on=1):
+                if on:
+                    action = eserver.subscribe
+                else:
+                    action = eserver.unsubscribe
+                action('xend.domain.suspended', onSuspended)
+                action('xend.domain.died', onDied)
+
+            subscribe()
             val = self.xd.domain_shutdown(vmid, reason='suspend')
             self.suspended[vmid] = 1
+            return d
         except:
             val = errno.EINVAL
         return ['xfr.err', val]
@@ -216,8 +257,6 @@ class XendMigrateInfo(XfrdInfo):
         if not vmconfig:
             xfrd.loseConnection()
             return
-        self.xd.domain_pause(self.src_dom)
-        self.paused[self.src_dom] = 1
         xfrd.request(['xfr.migrate',
                       self.src_dom,
                       vmconfig,
@@ -266,14 +305,11 @@ class XendSaveInfo(XfrdInfo):
         if not vmconfig:
             xfrd.loseConnection()
             return
-        self.xd.domain_pause(self.src_dom)
-        self.paused[self.src_dom] = 1
         xfrd.request(['xfr.save', self.src_dom, vmconfig, self.file ])
         
     def xfr_save_ok(self, xfrd, val):
-        dom = int(sxp.child0(val))
         self.state = 'ok'
-        self.xd_domain_destroy(self.src_dom)
+        self.xd.domain_destroy(self.src_dom)
         if not self.deferred.called:
             self.deferred.callback(self)
 
