@@ -834,7 +834,7 @@ int construct_dom0(struct domain *p,
     /* Mask all upcalls... */
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
         p->shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
-    p->shared_info->n_vcpu = 1;
+    p->shared_info->n_vcpu = smp_num_cpus;
 
     /* Install the new page tables. */
     __cli();
