@@ -529,7 +529,7 @@ static struct notifier_block notifier_inetdev = {
 };
 
 
-int __init init_module(void)
+static int __init init_module(void)
 {
     int i, fixmap_idx=-1, err;
     struct net_device *dev;

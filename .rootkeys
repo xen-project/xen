@@ -534,6 +534,8 @@
 3e5a4e656nfFISThfbyXQOA6HN6YHw xenolinux-2.4.25-sparse/arch/xeno/drivers/dom0/Makefile
 3e5a4e65BXtftInNHUC2PjDfPhdZZA xenolinux-2.4.25-sparse/arch/xeno/drivers/dom0/dom0_core.c
 3e5a4e65gfn_ltB8ujHMVFApnTTNRQ xenolinux-2.4.25-sparse/arch/xeno/drivers/dom0/vfr.c
+40420a6ebRqDjufoN1WSJvolEW2Wjw xenolinux-2.4.25-sparse/arch/xeno/drivers/evtchn/Makefile
+40420a73Wou6JlsZDiu6YwjYomsm7A xenolinux-2.4.25-sparse/arch/xeno/drivers/evtchn/xl_evtchn.c
 3e5a4e65gZBRBB6RsSVg1c9iahigAw xenolinux-2.4.25-sparse/arch/xeno/drivers/network/Makefile
 3e5a4e65ZxKrbFetVB84JhrTyZ1YuQ xenolinux-2.4.25-sparse/arch/xeno/drivers/network/network.c
 3e5a4e65lWzkiPXsZdzPt2RNnJGG1g xenolinux-2.4.25-sparse/arch/xeno/kernel/Makefile

@@ -18,8 +18,6 @@ int nr_multicall_ents = 0;
 
 static unsigned long event_mask = 0;
 
-void frobb(void) {}
-
 void do_hypervisor_callback(struct pt_regs *regs)
 {
     unsigned long events, flags;
