@@ -855,7 +855,6 @@ void scsi_wait_req (Scsi_Request * SRpnt, const void *cmnd ,
             *(int *)(SRpnt->sr_request.waiting) = 0; 
         } 
     }
-printk("*");
 #endif
 
 

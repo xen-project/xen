@@ -1333,7 +1333,7 @@ void scsi_probe_devices(xen_disk_info_t *xdi)
         xen_xdi->disks[xen_xdi->count].capacity = capacity; 
         xen_xdi->count++; 
                 
-        printk("Disk %d: SCSI-XENO capacity %dkB (%dMB)\n",
+        printk("Disk %d: SCSI-XENO capacity %ldkB (%ldMB)\n",
                xen_xdi->count, capacity>>1, capacity>>11);
     }
 

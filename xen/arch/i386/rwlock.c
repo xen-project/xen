@@ -3,31 +3,26 @@
 
 #if defined(CONFIG_SMP)
 asm(
-"
-.align  4
-.globl  __write_lock_failed
-__write_lock_failed:
-        " LOCK "addl    $" RW_LOCK_BIAS_STR ",(%eax)
-1:      rep; nop
-        cmpl    $" RW_LOCK_BIAS_STR ",(%eax)
-        jne     1b
+".align  4\n"
+".globl  __write_lock_failed\n"
+"__write_lock_failed:\n"
+"        " LOCK "addl    $" RW_LOCK_BIAS_STR ",(%eax)\n"
+"1:      rep; nop\n"
+"        cmpl    $" RW_LOCK_BIAS_STR ",(%eax)\n"
+"        jne     1b\n"
+"        " LOCK "subl    $" RW_LOCK_BIAS_STR ",(%eax)\n"
+"        jnz     __write_lock_failed\n"
+"        ret\n"
 
-        " LOCK "subl    $" RW_LOCK_BIAS_STR ",(%eax)
-        jnz     __write_lock_failed
-        ret
-
-
-.align  4
-.globl  __read_lock_failed
-__read_lock_failed:
-        lock ; incl     (%eax)
-1:      rep; nop
-        cmpl    $1,(%eax)
-        js      1b
-
-        lock ; decl     (%eax)
-        js      __read_lock_failed
-        ret
-"
+".align  4\n"
+".globl  __read_lock_failed\n"
+"__read_lock_failed:\n"
+"        lock ; incl     (%eax)\n"
+"1:      rep; nop\n"
+"        cmpl    $1,(%eax)\n"
+"        js      1b\n"
+"        lock ; decl     (%eax)\n"
+"        js      __read_lock_failed\n"
+"        ret\n"
 );
 #endif

@@ -593,7 +593,7 @@ static void dump_rqueue(struct list_head *queue, char *name)
             (unsigned long) queue->next, (unsigned long) queue->prev);
     list_for_each (list, queue) {
         p = list_entry(list, struct task_struct, run_list);
-        printk("%3d: %3d has=%c mcua=0x%04X ev=0x%08X av=0x%08X c=0x%X%08X\n",
+        printk("%3d: %3d has=%c mcua=0x%04lX ev=0x%08X av=0x%08X c=0x%X%08X\n",
                loop++, p->domain,
                p->has_cpu ? 'T':'F',
                p->mcu_advance, p->evt, p->avt,
