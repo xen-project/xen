@@ -246,7 +246,7 @@ def randomMAC():
             random.randint(0x00, 0x7f),
             random.randint(0x00, 0xff),
             random.randint(0x00, 0xff) ]
-    return ':'.join(map(lambda x: "%x" % x, mac))
+    return ':'.join(map(lambda x: "%02x" % x, mac))
 
 def configure_vifs(config_devs, vals):
     """Create the config for virtual network interfaces.

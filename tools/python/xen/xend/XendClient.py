@@ -316,6 +316,17 @@ class Xend:
                         {'op'       : 'vbd',
                          'vbd'      : vbd })
 
+    def xend_domain_device_create(self, id, config):
+        return xend_call(self.domainurl(id),
+                         {'op'      : 'device_create',
+                          'config'  : fileof(config) })
+
+    def xend_domain_device_destroy(self, id, type, idx):
+        return xend_call(self.domainurl(id),
+                         {'op'      : 'device_destroy',
+                          'type'    : type,
+                          'index'   : idx })
+
     def xend_consoles(self):
         return xend_get(self.consoleurl())
 

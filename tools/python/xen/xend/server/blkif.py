@@ -236,7 +236,6 @@ class BlkDev(controller.Dev):
         return val
 
     def destroy(self):
-        PrettyPrint.prettyprint(self.sxpr())
         self.controller.send_be_vbd_destroy(self.vdev)
         
 class BlkifController(controller.Controller):

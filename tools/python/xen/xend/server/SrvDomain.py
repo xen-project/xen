@@ -75,23 +75,49 @@ class SrvDomain(SrvDir):
                     [['dom', 'int'],
                      ['destination', 'str']])
         deferred = fn(req.args, {'dom': self.dom.id})
+        print 'op_migrate>', deferred
         deferred.addCallback(self._op_migrate_cb, req)
         deferred.addErrback(self._op_migrate_err, req)
         return deferred
 
     def _op_migrate_cb(self, info, req):
+        print '_op_migrate_cb>', info, req
         #req.setResponseCode(http.ACCEPTED)
         host = info.dst_host
         port = info.dst_port
         dom  = info.dst_dom
         url = "http://%s:%d/xend/domain/%d" % (host, port, dom)
         req.setHeader("Location", url)
+        print '_op_migrate_cb> url=', url
         return url
 
     def _op_migrate_err(self, err, req):
+        print '_op_migrate_err>', err, req
         req.setResponseCode(http.BAD_REQUEST, "Error: "+ str(err))
         return str(err)
-        
+
+    def op_device_create(self, op, req):
+        fn = FormFn(self.xd.domain_device_create,
+                    [['dom', 'int'],
+                     ['config', 'sxpr']])
+        try:
+            d = fn(req.args, {'dom': self.dom.id})
+            d.addErrback(self._op_device_create_err, req)
+            return d
+        except ValueError, ex:
+            return ['err', str(ex)]
+
+    def _op_device_create_err(self, err, req):
+        return ['err', str(err)]
+
+    def op_device_destroy(self, op, req):
+        fn = FormFn(self.xd.domain_device_destroy,
+                    [['dom', 'int'],
+                     ['type', 'str'],
+                     ['index', 'int']])
+        val = fn(req.args, {'dom': self.dom.id})
+        return val
+                
     def op_pincpu(self, op, req):
         fn = FormFn(self.xd.domain_pincpu,
                     [['dom', 'int'],

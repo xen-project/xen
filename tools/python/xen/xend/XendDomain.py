@@ -320,6 +320,7 @@ class XendDomain:
         @param config: configuration
         @return: deferred
         """
+        print 'domain_configure>', id, config
         dom = int(id)
         dominfo = self.domain_get(dom)
         if not dominfo:
@@ -498,9 +499,12 @@ class XendDomain:
         """
         # Need a cancel too?
         # Don't forget to cancel restart for it.
+        print 'domain_migrate>', id, dst
         dom = int(id)
         xmigrate = XendMigrate.instance()
-        return xmigrate.migrate_begin(dom, dst)
+        val = xmigrate.migrate_begin(dom, dst)
+        print 'domain_migrate<', val
+        return val
 
     def domain_save(self, id, dst, progress=0):
         """Start saving a domain to file.
@@ -560,6 +564,21 @@ class XendDomain:
         """
         dom = int(dom)
         return xc.atropos_domain_get(dom)
+
+    def domain_device_create(self, dom, devconfig):
+        dom = int(dom)
+        dominfo = self.domain_get(dom)
+        if not dominfo:
+            raise ValueError("invalid domain:" + str(dom))
+        return dominfo.device_create(devconfig)
+    
+
+    def domain_device_destroy(self, dom, type, idx):
+        dom = int(dom)
+        dominfo = self.domain_get(dom)
+        if not dominfo:
+            raise ValueError("invalid domain:" + str(dom))
+        return dominfo.device_destroy(type, idx)
 
     def domain_devtype_ls(self, dom, type):
         """Get list of device indexes for a domain.
