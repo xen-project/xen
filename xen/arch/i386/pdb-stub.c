@@ -2,6 +2,7 @@
 #include <xeno/sched.h>
 #include <asm-i386/ptrace.h>
 #include <xeno/keyhandler.h> 
+#include <asm/apic.h>
 #include <asm/pdb.h>
 #include <xeno/list.h>
 
@@ -12,9 +13,6 @@
 static const char hexchars[]="0123456789abcdef";
 
 static int remote_debug;
-
-int pdb_foobar = 0x123456;                                        /* testing */
-char *pdb_foobaz = "cambridge";                                   /* testing */
 
 #define PDB_BUFMAX 1024
 static char pdb_in_buffer[PDB_BUFMAX];
@@ -677,13 +675,16 @@ void pdb_get_packet(char *buffer)
  * Return 1 if pdb is not interested in the exception; it should
  * be propagated to the guest os.
  */
-#define DEBUG_EXCEPTION      1
-#define BREAKPT_EXCEPTION    3
-#define KEYPRESS_EXCEPTION 136
+
+#define DEBUG_EXCEPTION     0x01
+#define BREAKPT_EXCEPTION   0x03
+#define KEYPRESS_EXCEPTION  0x88
+
 int pdb_handle_exception(int exceptionVector,
 			 struct pt_regs *xen_regs)
 {
     int signal = 0;
+    int watchdog_save;
 
     /*
      * If PDB didn't set the breakpoint, is not single stepping, and the user
@@ -712,6 +713,9 @@ int pdb_handle_exception(int exceptionVector,
         xen_regs->eip--;
     }
 
+    watchdog_save = watchdog_on;
+    watchdog_on = 0;
+
     /* Generate a signal for GDB. */
     switch ( exceptionVector )
     {
@@ -722,7 +726,7 @@ int pdb_handle_exception(int exceptionVector,
     case BREAKPT_EXCEPTION: 
         signal = 5; break;                                 /* SIGTRAP */
     default:
-        printk("can't generate signal for unknown exception vector %d\n",
+        printk("pdb: can't generate signal for unknown exception vector %d\n",
                exceptionVector);
         break;
     }
@@ -738,6 +742,8 @@ int pdb_handle_exception(int exceptionVector,
 	pdb_get_packet(pdb_in_buffer);
     }
     while ( pdb_process_command(pdb_in_buffer, xen_regs) == 0 );
+
+    watchdog_on = watchdog_save;
 
     return 0;
 }
@@ -773,8 +779,8 @@ void initialize_pdb()
         return;
     }
 
-    printk("Initializing pervasive debugger (PDB) [%s] port %d, high %d\n",
-           opt_pdb, pdb_com_port, pdb_high_bit);
+    printk("Initializing pervasive debugger (PDB) on serial port %d %s\n",
+           pdb_com_port, pdb_high_bit ? "(high bit enabled)" : "");
 
     /* ack any spurrious gdb packets */
     pdb_put_char ('+');

@@ -26,10 +26,10 @@ dist: all
 	mkdir -p ../../../install/bin
 	mkdir -p ../../../install/etc
 	mkdir -p ../../../install/init.d
-	cp -a $(INSTALL) ../../../install/bin
-	cp -a $(ETC) ../../../install/etc
+	install --mode=555 $(INSTALL) ../../../install/bin
+	install --mode=444 $(ETC) ../../../install/etc
 	#chmod 755 $(INSTALL)
-	cp -a $(INITD) ../../../install/init.d
+	install --mode=555 $(INITD) ../../../install/init.d
 
 clean:
 
