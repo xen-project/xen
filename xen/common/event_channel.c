@@ -92,15 +92,10 @@ static long event_channel_open(evtchn_open_t *open)
     if ( !IS_PRIV(current) )
         return -EPERM;
 
-    /* 'dom1' may be DOMID_SELF. 'dom2' cannot be.*/
     if ( dom1 == DOMID_SELF )
         dom1 = current->domain;
     if ( dom2 == DOMID_SELF )
-        return -EINVAL;
-
-    /* Event channel must connect distinct domains. */
-    if ( dom1 == dom2 )
-        return -EINVAL;
+        dom2 = current->domain;
 
     if ( ((p1 = find_domain_by_id(dom1)) == NULL) ||
          ((p2 = find_domain_by_id(dom2)) == NULL) )
@@ -118,7 +113,8 @@ static long event_channel_open(evtchn_open_t *open)
     }
     else
     {
-        spin_lock(&p2->event_channel_lock);
+        if ( p1 != p2 )
+            spin_lock(&p2->event_channel_lock);
         spin_lock(&p1->event_channel_lock);
     }
 
@@ -148,7 +144,8 @@ static long event_channel_open(evtchn_open_t *open)
     
  out:
     spin_unlock(&p1->event_channel_lock);
-    spin_unlock(&p2->event_channel_lock);
+    if ( p1 != p2 )
+        spin_unlock(&p2->event_channel_lock);
     
     put_task_struct(p1);
     put_task_struct(p2);
@@ -191,7 +188,7 @@ static long __event_channel_close(struct task_struct *p1, int port1)
             {
                 spin_lock(&p2->event_channel_lock);
             }
-            else
+            else if ( p1 != p2 )
             {
                 spin_unlock(&p1->event_channel_lock);
                 spin_lock(&p2->event_channel_lock);
@@ -234,7 +231,8 @@ static long __event_channel_close(struct task_struct *p1, int port1)
 
     if ( p2 != NULL )
     {
-        spin_unlock(&p2->event_channel_lock);
+        if ( p1 != p2 )
+            spin_unlock(&p2->event_channel_lock);
         put_task_struct(p2);
     }
     

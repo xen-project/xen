@@ -162,7 +162,7 @@ int xc_vbd_probe(int xc_handle,
 #define EVTCHNSTAT_connected    2  /* Channel is connected to remote.     */
 int xc_evtchn_open(int xc_handle,
                    u64 dom1,   /* may be DOMID_SELF */
-                   u64 dom2,
+                   u64 dom2,   /* may be DOMID_SELF */
                    int *port1,
                    int *port2);
 int xc_evtchn_close(int xc_handle,

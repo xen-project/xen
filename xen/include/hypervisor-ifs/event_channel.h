@@ -12,7 +12,7 @@
 /*
  * EVTCHNOP_open: Open a communication channel between <dom1> and <dom2>.
  * NOTES:
- *  1. <dom1> may be specified as DOMID_SELF.
+ *  1. <dom1> and/or <dom2> may be specified as DOMID_SELF.
  *  2. Only a sufficiently-privileged domain may create an event channel.
  *  3. <port1> and <port2> are only supplied if the op succeeds.
  */

@@ -772,13 +772,13 @@ static PyObject *pyxc_evtchn_open(PyObject *self,
     XcObject *xc = (XcObject *)self;
     PyObject *dict;
 
-    u64 dom1 = DOMID_SELF, dom2;
+    u64 dom1 = DOMID_SELF, dom2 = DOMID_SELF;
     int port1, port2, ret;
 
-    static char *kwd_list[] = { "dom2", "dom1", NULL };
+    static char *kwd_list[] = { "dom1", "dom2", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "L|L", kwd_list, 
-                                      &dom2, &dom1) )
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|LL", kwd_list, 
+                                      &dom1, &dom2) )
     {
         DPRINTF("could not parse parameter list.");
         return NULL;
@@ -1163,7 +1163,7 @@ static PyMethodDef pyxc_methods[] = {
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Open an event channel between two domains.\n"
       " dom1 [long, SELF]: First domain to be connected.\n"
-      " dom2 [long]:       Second domain to be connected.\n\n"
+      " dom2 [long, SELF]: Second domain to be connected.\n\n"
       "Returns: [dict] dictionary is empty on failure.\n"
       " port1 [int]: Port-id for endpoint at dom1.\n"
       " port2 [int]: Port-id for endpoint at dom2.\n" },

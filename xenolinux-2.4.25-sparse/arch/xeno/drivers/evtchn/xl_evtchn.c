@@ -30,6 +30,10 @@ typedef void (*evtchn_receiver_t)(unsigned int);
 /* /dev/xeno/evtchn resides at device number major=10, minor=200 */
 #define EVTCHN_MINOR 200
 
+/* /dev/xeno/evtchn ioctls: */
+/* EVTCHN_RESET: Clear and reinit the event buffer. Clear error condition. */
+#define EVTCHN_RESET _IO('E', 1)
+
 /* NB. This must be shared amongst drivers if more things go in /dev/xeno */
 static devfs_handle_t xeno_dev_dir;
 
@@ -37,8 +41,10 @@ static devfs_handle_t xeno_dev_dir;
 static unsigned long evtchn_dev_inuse;
 
 /* Notification ring, accessed via /dev/xeno/evtchn. */
+#define RING_SIZE     2048  /* 2048 16-bit entries */
+#define RING_MASK(_i) ((_i)&(RING_SIZE-1))
 static u16 *ring;
-static unsigned int ring_cons, ring_prod;
+static unsigned int ring_cons, ring_prod, ring_overflow;
 
 /* Processes wait on this queue via /dev/xeno/evtchn when ring is empty. */
 static DECLARE_WAIT_QUEUE_HEAD(evtchn_wait);
@@ -146,11 +152,18 @@ static inline void process_bitmask(u32 *sel,
             }
             else if ( ring != NULL )
             {
-                ring[ring_prod] = (u16)(port | port_subtype);
-                if ( ring_cons == ring_prod++ )
+                if ( (ring_prod - ring_cons) < RING_SIZE )
                 {
-                    wake_up_interruptible(&evtchn_wait);
-                    kill_fasync(&evtchn_async_queue, SIGIO, POLL_IN);
+                    ring[RING_MASK(ring_prod)] = (u16)(port | port_subtype);
+                    if ( ring_cons == ring_prod++ )
+                    {
+                        wake_up_interruptible(&evtchn_wait);
+                        kill_fasync(&evtchn_async_queue, SIGIO, POLL_IN);
+                    }
+                }
+                else
+                {
+                    ring_overflow = 1;
                 }
             }
         }
@@ -178,116 +191,14 @@ static void evtchn_interrupt(int irq, void *dev_id, struct pt_regs *regs)
     spin_unlock_irqrestore(&lock, flags);
 }
 
-static ssize_t evtchn_read(struct file *file, char *buf,
-                           size_t count, loff_t *ppos)
+static void __evtchn_reset_buffer_ring(void)
 {
-    int rc;
-    DECLARE_WAITQUEUE(wait, current);
-
-    add_wait_queue(&evtchn_wait, &wait);
-
-    for ( ; ; )
-    {
-        set_current_state(TASK_INTERRUPTIBLE);
-
-        if ( ring_cons != ring_prod )
-            break;
-
-        if ( file->f_flags & O_NONBLOCK )
-        {
-            rc = -EAGAIN;
-            goto out;
-        }
-
-        if ( signal_pending(current) )
-        {
-            rc = -ERESTARTSYS;
-            goto out;
-        }
-
-        schedule();
-    }
-
-    rc = -EINVAL;
-    if ( count >= sizeof(ring_prod) )
-        rc = put_user(ring_prod, (unsigned int *)buf);
-    if ( rc == 0 )
-        rc = sizeof(ring_prod);
-
- out:
-    __set_current_state(TASK_RUNNING);
-    remove_wait_queue(&evtchn_wait, &wait);
-    return rc;
-}
-
-static ssize_t evtchn_write(struct file *file, const char *buf,
-                            size_t count, loff_t *ppos)
-{
-    int          rc = -EINVAL;
-    unsigned int new_cons = 0;
-
-    if ( count >= sizeof(new_cons) )
-        rc = get_user(new_cons, (unsigned int *)buf);
-
-    if ( rc != 0 )
-        return rc;
-
-    rc = sizeof(new_cons);
-
-    while ( ring_cons != new_cons )
-        evtchn_clear_port(ring[ring_cons++]);
-
-    return rc;
-}
-
-static unsigned int evtchn_poll(struct file *file, poll_table *wait)
-{
-    unsigned int mask = POLLOUT | POLLWRNORM;
-    poll_wait(file, &evtchn_wait, wait);
-    if ( ring_cons != ring_prod )
-        mask |= POLLIN | POLLRDNORM;
-    return mask;
-}
-
-static int evtchn_mmap(struct file *file, struct vm_area_struct *vma)
-{
-    /* Caller must map a single page of memory from 'file offset' zero. */
-    if ( (vma->vm_pgoff != 0) || ((vma->vm_end - vma->vm_start) != PAGE_SIZE) )
-        return -EINVAL;
-
-    /* Not a pageable area. */
-    vma->vm_flags |= VM_RESERVED;
-
-    if ( remap_page_range(vma->vm_start, 0, PAGE_SIZE, vma->vm_page_prot) )
-        return -EAGAIN;
-
-    return 0;
-}
-
-static int evtchn_fasync(int fd, struct file *filp, int on)
-{
-    return fasync_helper(fd, filp, on, &evtchn_async_queue);
-}
-
-static int evtchn_open(struct inode *inode, struct file *filp)
-{
-    u16         *_ring;
     u32          m;
     unsigned int i, j;
 
-    if ( test_and_set_bit(0, &evtchn_dev_inuse) )
-        return -EBUSY;
-
-    /* Allocate outside locked region so that we can use GFP_KERNEL. */
-    if ( (_ring = (u16 *)get_free_page(GFP_KERNEL)) == NULL )
-        return -ENOMEM;
-
-    spin_lock_irq(&lock);
-
-    ring = _ring;
-
     /* Initialise the ring with currently outstanding notifications. */
-    ring_cons = ring_prod = 0;
+    ring_cons = ring_prod = ring_overflow = 0;
+
     for ( i = 0; i < 32; i++ )
     {
         m = pend_outstanding[i];
@@ -306,7 +217,161 @@ static int evtchn_open(struct inode *inode, struct file *filp)
                 ring[ring_prod++] = (u16)(((i * 32) + j) | PORT_DISCONNECT);
         }
     }
+}
 
+static ssize_t evtchn_read(struct file *file, char *buf,
+                           size_t count, loff_t *ppos)
+{
+    int rc;
+    unsigned int c, p, bytes1 = 0, bytes2 = 0;
+    DECLARE_WAITQUEUE(wait, current);
+
+    add_wait_queue(&evtchn_wait, &wait);
+
+    if ( (count <= 0) || (count > PAGE_SIZE) || ((count&1) != 0) )
+    {
+        rc = -EINVAL;
+        goto out;
+    }
+
+    for ( ; ; )
+    {
+        set_current_state(TASK_INTERRUPTIBLE);
+
+        if ( (c = ring_cons) != (p = ring_prod) )
+            break;
+
+        if ( ring_overflow )
+        {
+            rc = -EFBIG;
+            goto out;
+        }
+
+        if ( file->f_flags & O_NONBLOCK )
+        {
+            rc = -EAGAIN;
+            goto out;
+        }
+
+        if ( signal_pending(current) )
+        {
+            rc = -ERESTARTSYS;
+            goto out;
+        }
+
+        schedule();
+    }
+
+    rc = -EFAULT;
+
+    /* Byte length of first chunk. May be truncated by ring wrap. */
+    if ( ((c ^ p) & RING_SIZE) != 0 )
+        bytes1 = (RING_SIZE - RING_MASK(c)) * sizeof(u16);
+    else
+        bytes1 = (p - c) * sizeof(u16);
+
+    /* Further truncate chunk length according to caller's maximum count. */
+    if ( bytes1 > count )
+        bytes1 = count;
+
+    /* Copy the first chunk. */
+    if ( copy_to_user(buf, &ring[c], bytes1) != 0 )
+        goto out;
+
+    /* More bytes to copy? */
+    if ( count > bytes1 )
+    {
+        bytes2 = RING_MASK(p) * sizeof(u16);
+        if ( bytes2 > count )
+            bytes2 = count;
+        if ( (bytes2 != 0) && copy_to_user(&buf[bytes1], &ring[0], bytes2) )
+            goto out;
+    }
+
+    ring_cons = (bytes1 + bytes2) / sizeof(u16);
+
+    rc = bytes1 + bytes2;
+
+ out:
+    __set_current_state(TASK_RUNNING);
+    remove_wait_queue(&evtchn_wait, &wait);
+    return rc;
+}
+
+static ssize_t evtchn_write(struct file *file, const char *buf,
+                            size_t count, loff_t *ppos)
+{
+    int  rc, i;
+    u16 *kbuf = (u16 *)get_free_page(GFP_KERNEL);
+
+    if ( kbuf == NULL )
+        return -ENOMEM;
+
+    if ( (count <= 0) || (count > PAGE_SIZE) || ((count&1) != 0) )
+    {
+        rc = -EINVAL;
+        goto out;
+    }
+
+    if ( copy_from_user(kbuf, buf, count) != 0 )
+    {
+        rc = -EFAULT;
+        goto out;
+    }
+
+    for ( i = 0; i < (count/2); i++ )
+        evtchn_clear_port(kbuf[i]);
+
+    rc = count;
+
+ out:
+    free_page((unsigned long)kbuf);
+    return rc;
+}
+
+static int evtchn_ioctl(struct inode *inode, struct file *file,
+                        unsigned int cmd, unsigned long arg)
+{
+    if ( cmd != EVTCHN_RESET )
+        return -EINVAL;
+
+    spin_lock_irq(&lock);
+    __evtchn_reset_buffer_ring();
+    spin_unlock_irq(&lock);   
+
+    return 0;
+}
+
+static unsigned int evtchn_poll(struct file *file, poll_table *wait)
+{
+    unsigned int mask = POLLOUT | POLLWRNORM;
+    poll_wait(file, &evtchn_wait, wait);
+    if ( ring_cons != ring_prod )
+        mask |= POLLIN | POLLRDNORM;
+    if ( ring_overflow )
+        mask = POLLERR;
+    return mask;
+}
+
+static int evtchn_fasync(int fd, struct file *filp, int on)
+{
+    return fasync_helper(fd, filp, on, &evtchn_async_queue);
+}
+
+static int evtchn_open(struct inode *inode, struct file *filp)
+{
+    u16 *_ring;
+
+    if ( test_and_set_bit(0, &evtchn_dev_inuse) )
+        return -EBUSY;
+
+    /* Allocate outside locked region so that we can use GFP_KERNEL. */
+    if ( (_ring = (u16 *)get_free_page(GFP_KERNEL)) == NULL )
+        return -ENOMEM;
+
+    spin_lock_irq(&lock);
+    ring = _ring;
+    __evtchn_reset_buffer_ring();
     spin_unlock_irq(&lock);
 
     MOD_INC_USE_COUNT;
@@ -335,8 +400,8 @@ static struct file_operations evtchn_fops = {
     owner:    THIS_MODULE,
     read:     evtchn_read,
     write:    evtchn_write,
+    ioctl:    evtchn_ioctl,
     poll:     evtchn_poll,
-    mmap:     evtchn_mmap,
     fasync:   evtchn_fasync,
     open:     evtchn_open,
     release:  evtchn_release
