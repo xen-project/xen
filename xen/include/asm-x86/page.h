@@ -1,123 +1,55 @@
-/******************************************************************************
- * asm-x86/page.h
- * 
- * Definitions relating to page tables.
- */
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 
 #ifndef __X86_PAGE_H__
 #define __X86_PAGE_H__
 
-#if defined(__x86_64__)
-
-#define L1_PAGETABLE_SHIFT       12
-#define L2_PAGETABLE_SHIFT       21
-#define L3_PAGETABLE_SHIFT       30
-#define L4_PAGETABLE_SHIFT       39
-
-#define ENTRIES_PER_L1_PAGETABLE 512
-#define ENTRIES_PER_L2_PAGETABLE 512
-#define ENTRIES_PER_L3_PAGETABLE 512
-#define ENTRIES_PER_L4_PAGETABLE 512
-
-#define __PAGE_OFFSET		(0xFFFF830000000000)
-
-#elif defined(__i386__)
-
-#define L1_PAGETABLE_SHIFT       12
-#define L2_PAGETABLE_SHIFT       22
-
-#define ENTRIES_PER_L1_PAGETABLE 1024
-#define ENTRIES_PER_L2_PAGETABLE 1024
-
-#define __PAGE_OFFSET		(0xFC400000)
-
+#if defined(__i386__)
+#include <asm/x86_32/page.h>
+#elif defined(__x86_64__)
+#include <asm/x86_64/page.h>
 #endif
 
-#define PAGE_SHIFT               L1_PAGETABLE_SHIFT
-#define PAGE_SIZE	         (1UL << PAGE_SHIFT)
-#define PAGE_MASK	         (~(PAGE_SIZE-1))
+/* Convert a pointer to a page-table entry into pagetable slot index. */
+#define pgentry_ptr_to_slot(_p) \
+    (((unsigned long)(_p) & ~PAGE_MASK) / sizeof(*(_p)))
 
-#define clear_page(_p)           memset((void *)(_p), 0, PAGE_SIZE)
-#define copy_page(_t,_f)         memcpy((void *)(_t), (void *)(_f), PAGE_SIZE)
+/* Page-table type. */
+#ifndef __ASSEMBLY__
+typedef struct { unsigned long pt_lo; } pagetable_t;
+#define pagetable_val(_x)   ((_x).pt_lo)
+#define mk_pagetable(_x)    ( (pagetable_t) { (_x) } )
+#endif
 
 #ifndef __ASSEMBLY__
-#include <xen/config.h>
-typedef struct { unsigned long l1_lo; } l1_pgentry_t;
-typedef struct { unsigned long l2_lo; } l2_pgentry_t;
-typedef struct { unsigned long l3_lo; } l3_pgentry_t;
-typedef struct { unsigned long l4_lo; } l4_pgentry_t;
-typedef struct { unsigned long pt_lo; } pagetable_t;
-#endif /* !__ASSEMBLY__ */
-
-/* Strip type from a table entry. */
-#define l1_pgentry_val(_x) ((_x).l1_lo)
-#define l2_pgentry_val(_x) ((_x).l2_lo)
-#define l3_pgentry_val(_x) ((_x).l3_lo)
-#define l4_pgentry_val(_x) ((_x).l4_lo)
-#define pagetable_val(_x)  ((_x).pt_lo)
-
-/* Add type to a table entry. */
-#define mk_l1_pgentry(_x)  ( (l1_pgentry_t) { (_x) } )
-#define mk_l2_pgentry(_x)  ( (l2_pgentry_t) { (_x) } )
-#define mk_l3_pgentry(_x)  ( (l3_pgentry_t) { (_x) } )
-#define mk_l4_pgentry(_x)  ( (l4_pgentry_t) { (_x) } )
-#define mk_pagetable(_x)   ( (pagetable_t) { (_x) } )
-
-/* Turn a typed table entry into a page index. */
-#define l1_pgentry_to_pagenr(_x) (l1_pgentry_val(_x) >> PAGE_SHIFT) 
-#define l2_pgentry_to_pagenr(_x) (l2_pgentry_val(_x) >> PAGE_SHIFT)
-#define l3_pgentry_to_pagenr(_x) (l3_pgentry_val(_x) >> PAGE_SHIFT)
-#define l4_pgentry_to_pagenr(_x) (l4_pgentry_val(_x) >> PAGE_SHIFT)
-
-/* Turn a typed table entry into a physical address. */
-#define l1_pgentry_to_phys(_x) (l1_pgentry_val(_x) & PAGE_MASK)
-#define l2_pgentry_to_phys(_x) (l2_pgentry_val(_x) & PAGE_MASK)
-#define l3_pgentry_to_phys(_x) (l3_pgentry_val(_x) & PAGE_MASK)
-#define l4_pgentry_to_phys(_x) (l4_pgentry_val(_x) & PAGE_MASK)
-
-/* Pagetable walking. */
-#define l2_pgentry_to_l1(_x) \
-  ((l1_pgentry_t *)__va(l2_pgentry_val(_x) & PAGE_MASK))
-#define l3_pgentry_to_l2(_x) \
-  ((l2_pgentry_t *)__va(l3_pgentry_val(_x) & PAGE_MASK))
-#define l4_pgentry_to_l3(_x) \
-  ((l3_pgentry_t *)__va(l4_pgentry_val(_x) & PAGE_MASK))
-
-/* Given a virtual address, get an entry offset into a page table. */
-#define l1_table_offset(_a) \
-  (((_a) >> L1_PAGETABLE_SHIFT) & (ENTRIES_PER_L1_PAGETABLE - 1))
-#if defined(__i386__)
-#define l2_table_offset(_a) \
-  ((_a) >> L2_PAGETABLE_SHIFT)
-#elif defined(__x86_64__)
-#define l2_table_offset(_a) \
-  (((_a) >> L2_PAGETABLE_SHIFT) & (ENTRIES_PER_L2_PAGETABLE -1))
-#define l3_table_offset(_a) \
-  (((_a) >> L3_PAGETABLE_SHIFT) & (ENTRIES_PER_L3_PAGETABLE -1))
-#define l4_table_offset(_a) \
-  ((_a) >> L4_PAGETABLE_SHIFT)
+#define PAGE_SIZE           (1UL << PAGE_SHIFT)
+#else
+#define PAGE_SIZE           (1 << PAGE_SHIFT)
 #endif
+#define PAGE_MASK           (~(PAGE_SIZE-1))
 
-#define PAGE_OFFSET		((unsigned long)__PAGE_OFFSET)
-#define __pa(x)			((unsigned long)(x)-PAGE_OFFSET)
-#define __va(x)			((void *)((unsigned long)(x)+PAGE_OFFSET))
-#define page_address(_p)        (__va(((_p) - frame_table) << PAGE_SHIFT))
-#define phys_to_page(kaddr)     (frame_table + ((kaddr) >> PAGE_SHIFT))
-#define virt_to_page(kaddr)	(frame_table + (__pa(kaddr) >> PAGE_SHIFT))
-#define VALID_PAGE(page)	((page - frame_table) < max_mapnr)
+#define clear_page(_p)      memset((void *)(_p), 0, PAGE_SIZE)
+#define copy_page(_t,_f)    memcpy((void *)(_t), (void *)(_f), PAGE_SIZE)
+
+#define PAGE_OFFSET         ((unsigned long)__PAGE_OFFSET)
+#define __pa(x)             ((unsigned long)(x)-PAGE_OFFSET)
+#define __va(x)             ((void *)((unsigned long)(x)+PAGE_OFFSET))
+#define pfn_to_page(_pfn)   (frame_table + (_pfn))
+#define phys_to_page(kaddr) (frame_table + ((kaddr) >> PAGE_SHIFT))
+#define virt_to_page(kaddr) (frame_table + (__pa(kaddr) >> PAGE_SHIFT))
+#define VALID_PAGE(page)    ((page - frame_table) < max_mapnr)
 
 /*
  * NB. We don't currently track I/O holes in the physical RAM space.
  * For now we guess that I/O devices will be mapped in the first 1MB
  * (e.g., VGA buffers) or beyond the end of physical RAM.
  */
-#define pfn_is_ram(_pfn)        (((_pfn) > 0x100) && ((_pfn) < max_page))
+#define pfn_is_ram(_pfn)    (((_pfn) > 0x100) && ((_pfn) < max_page))
 
 /* High table entries are reserved by the hypervisor. */
-#define DOMAIN_ENTRIES_PER_L2_PAGETABLE	    \
+#define DOMAIN_ENTRIES_PER_L2_PAGETABLE     \
   (HYPERVISOR_VIRT_START >> L2_PAGETABLE_SHIFT)
 #define HYPERVISOR_ENTRIES_PER_L2_PAGETABLE \
-  (ENTRIES_PER_L2_PAGETABLE - DOMAIN_ENTRIES_PER_L2_PAGETABLE)
+  (L2_PAGETABLE_ENTRIES - DOMAIN_ENTRIES_PER_L2_PAGETABLE)
 
 #ifndef __ASSEMBLY__
 #include <asm/processor.h>
@@ -130,62 +62,55 @@ typedef struct { unsigned long pt_lo; } pagetable_t;
 
 #define va_to_l1mfn(_va) (l2_pgentry_val(linear_l2_table[_va>>L2_PAGETABLE_SHIFT]) >> PAGE_SHIFT)
 
-extern l2_pgentry_t idle_pg_table[ENTRIES_PER_L2_PAGETABLE];
-extern void paging_init(void);
+extern root_pgentry_t idle_pg_table[ROOT_PAGETABLE_ENTRIES];
 
-#define __flush_tlb()                                             \
-    do {                                                          \
-        __asm__ __volatile__ (                                    \
-            "mov %%cr3, %%"__OP"ax; mov %%"__OP"ax, %%cr3"        \
-            : : : "memory", __OP"ax" );                           \
-        tlb_clocktick();                                          \
-    } while ( 0 )
+extern void paging_init(void);
 
 /* Flush global pages as well. */
 
 #define __pge_off()                                                     \
-        do {                                                            \
-                __asm__ __volatile__(                                   \
-                        "mov %0, %%cr4;  # turn off PGE     "           \
-                        :: "r" (mmu_cr4_features & ~X86_CR4_PGE));      \
-        } while (0)
+    do {                                                                \
+        __asm__ __volatile__(                                           \
+            "mov %0, %%cr4;  # turn off PGE     "                       \
+            : : "r" (mmu_cr4_features & ~X86_CR4_PGE) );                \
+        } while ( 0 )
 
 #define __pge_on()                                                      \
-        do {                                                            \
-                __asm__ __volatile__(                                   \
-                        "mov %0, %%cr4;  # turn off PGE     "           \
-                        :: "r" (mmu_cr4_features));                     \
-        } while (0)
+    do {                                                                \
+        __asm__ __volatile__(                                           \
+            "mov %0, %%cr4;  # turn off PGE     "                       \
+            : : "r" (mmu_cr4_features) );                               \
+    } while ( 0 )
 
 
-#define __flush_tlb_pge()						\
-	do {								\
-                __pge_off();                                            \
-		__flush_tlb();						\
-                __pge_on();                                             \
-	} while (0)
+#define __flush_tlb_pge()                                               \
+    do {                                                                \
+        __pge_off();                                                    \
+        __flush_tlb();                                                  \
+        __pge_on();                                                     \
+    } while ( 0 )
 
 #define __flush_tlb_one(__addr) \
-__asm__ __volatile__("invlpg %0": :"m" (*(char *) (__addr)))
+    __asm__ __volatile__("invlpg %0": :"m" (*(char *) (__addr)))
 
 #endif /* !__ASSEMBLY__ */
 
 
-#define _PAGE_PRESENT	0x001
-#define _PAGE_RW	0x002
-#define _PAGE_USER	0x004
-#define _PAGE_PWT	0x008
-#define _PAGE_PCD	0x010
-#define _PAGE_ACCESSED	0x020
-#define _PAGE_DIRTY	0x040
-#define _PAGE_PAT       0x080
-#define _PAGE_PSE	0x080
-#define _PAGE_GLOBAL	0x100
+#define _PAGE_PRESENT  0x001UL
+#define _PAGE_RW       0x002UL
+#define _PAGE_USER     0x004UL
+#define _PAGE_PWT      0x008UL
+#define _PAGE_PCD      0x010UL
+#define _PAGE_ACCESSED 0x020UL
+#define _PAGE_DIRTY    0x040UL
+#define _PAGE_PAT      0x080UL
+#define _PAGE_PSE      0x080UL
+#define _PAGE_GLOBAL   0x100UL
 
 #define __PAGE_HYPERVISOR \
-	(_PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED)
+    (_PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED)
 #define __PAGE_HYPERVISOR_NOCACHE \
-	(_PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_PCD | _PAGE_ACCESSED)
+    (_PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_PCD | _PAGE_ACCESSED)
 
 #define MAKE_GLOBAL(_x) ((_x) | _PAGE_GLOBAL)
 
@@ -193,6 +118,7 @@ __asm__ __volatile__("invlpg %0": :"m" (*(char *) (__addr)))
 #define PAGE_HYPERVISOR_NOCACHE MAKE_GLOBAL(__PAGE_HYPERVISOR_NOCACHE)
 
 #ifndef __ASSEMBLY__
+
 static __inline__ int get_order(unsigned long size)
 {
     int order;
@@ -207,6 +133,16 @@ static __inline__ int get_order(unsigned long size)
 }
 
 extern void zap_low_mappings(void);
-#endif
+
+/* Map physical byte range (@p, @p+@s) at virt address @v in pagetable @pt. */
+extern int
+map_pages(
+    root_pgentry_t *pt,
+    unsigned long v,
+    unsigned long p,
+    unsigned long s,
+    unsigned long flags);
+
+#endif /* !__ASSEMBLY__ */
 
 #endif /* __I386_PAGE_H__ */

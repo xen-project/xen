@@ -16,6 +16,7 @@
 #include <arpa/inet.h>
 #include "xc_private.h"
 #include "gzip_stream.h"
+#include "linux_boot_params.h"
 
 /* Needed for Python versions earlier than 2.3. */
 #ifndef PyMODINIT_FUNC
@@ -42,18 +43,19 @@ static PyObject *pyxc_domain_create(PyObject *self,
     XcObject *xc = (XcObject *)self;
 
     unsigned int mem_kb = 0;
-    char        *name   = "(anon)";
     int          cpu = -1;
+    float        cpu_weight = 1;
     u32          dom = 0;
     int          ret;
 
-    static char *kwd_list[] = { "dom", "mem_kb", "name", "cpu", NULL };
+    static char *kwd_list[] = { "dom", "mem_kb", "cpu", "cpu_weight", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|iisi", kwd_list, 
-                                      &dom, &mem_kb, &name, &cpu) )
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|iiif", kwd_list, 
+                                      &dom, &mem_kb, &cpu, &cpu_weight))
         return NULL;
 
-    if ( (ret = xc_domain_create(xc->xc_handle, mem_kb, name, cpu, &dom)) < 0 )
+    if ( (ret = xc_domain_create(
+                    xc->xc_handle, mem_kb, cpu, cpu_weight, &dom)) < 0 )
         return PyErr_SetFromErrno(xc_error);
 
     return PyInt_FromLong(dom);
@@ -169,7 +171,7 @@ static PyObject *pyxc_domain_getinfo(PyObject *self,
         PyList_SetItem(
             list, i, 
             Py_BuildValue("{s:i,s:i,s:i,s:i,s:i,s:i,s:i,s:i"
-                          ",s:l,s:L,s:s,s:l,s:i}",
+                          ",s:l,s:L,s:l,s:i}",
                           "dom",       info[i].domid,
                           "cpu",       info[i].cpu,
                           "dying",     info[i].dying,
@@ -180,7 +182,6 @@ static PyObject *pyxc_domain_getinfo(PyObject *self,
                           "running",   info[i].running,
                           "mem_kb",    info[i].nr_pages*4,
                           "cpu_time",  info[i].cpu_time,
-                          "name",      info[i].name,
                           "maxmem_kb", info[i].max_memkb,
                           "shutdown_reason", info[i].shutdown_reason
                 ));
@@ -347,45 +348,130 @@ static PyObject *pyxc_linux_build(PyObject *self,
 
     u32   dom;
     char *image, *ramdisk = NULL, *cmdline = "";
-    int   control_evtchn, flags = 0;
+    int   control_evtchn, flags = 0, vcpus = 1;
 
     static char *kwd_list[] = { "dom", "control_evtchn", 
-                                "image", "ramdisk", "cmdline", "flags",
+                                "image", "ramdisk", "cmdline", "flags", "vcpus",
                                 NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iis|ssi", kwd_list, 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iis|ssii", kwd_list, 
                                       &dom, &control_evtchn, 
-                                      &image, &ramdisk, &cmdline, &flags) )
+                                      &image, &ramdisk, &cmdline, &flags, &vcpus) )
         return NULL;
 
     if ( xc_linux_build(xc->xc_handle, dom, image,
-                        ramdisk, cmdline, control_evtchn, flags) != 0 )
+                        ramdisk, cmdline, control_evtchn, flags, vcpus) != 0 )
         return PyErr_SetFromErrno(xc_error);
     
     Py_INCREF(zero);
     return zero;
 }
 
-static PyObject *pyxc_netbsd_build(PyObject *self,
-                                   PyObject *args,
-                                   PyObject *kwds)
+static PyObject *pyxc_plan9_build(PyObject *self,
+                                  PyObject *args,
+                                  PyObject *kwds)
 {
     XcObject *xc = (XcObject *)self;
 
     u32   dom;
     char *image, *ramdisk = NULL, *cmdline = "";
-    int   control_evtchn;
+    int   control_evtchn, flags = 0;
 
     static char *kwd_list[] = { "dom", "control_evtchn",
-                                "image", "ramdisk", "cmdline", NULL };
+                                "image", "ramdisk", "cmdline", "flags",
+                                NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iis|ssi", kwd_list, 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iis|ssi", kwd_list,
                                       &dom, &control_evtchn,
-                                      &image, &ramdisk, &cmdline) )
+                                      &image, &ramdisk, &cmdline, &flags) )
         return NULL;
 
-    if ( xc_netbsd_build(xc->xc_handle, dom, image, 
-                         cmdline, control_evtchn) != 0 )
+    if ( xc_plan9_build(xc->xc_handle, dom, image,
+                        cmdline, control_evtchn, flags) != 0 )
+        return PyErr_SetFromErrno(xc_error);
+
+    Py_INCREF(zero);
+    return zero;
+}
+
+static PyObject *pyxc_vmx_build(PyObject *self,
+                                  PyObject *args,
+                                  PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+
+    u32   dom;
+    char *image, *ramdisk = NULL, *cmdline = "";
+    PyObject *memmap;
+    int   control_evtchn, flags = 0;
+    int numItems, i;
+    int memsize;
+    struct mem_map mem_map;
+
+    static char *kwd_list[] = { "dom", "control_evtchn",
+                                "memsize",
+                                "image", "memmap",
+				"ramdisk", "cmdline", "flags",
+                                NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiisO!|ssi", kwd_list, 
+                                      &dom, &control_evtchn, 
+                                      &memsize,
+                                      &image, &PyList_Type, &memmap,
+				      &ramdisk, &cmdline, &flags) )
+        return NULL;
+
+    memset(&mem_map, 0, sizeof(mem_map));
+    /* Parse memmap */
+
+    /* get the number of lines passed to us */
+    numItems = PyList_Size(memmap) - 1;	/* removing the line 
+					   containing "memmap" */
+    printf ("numItems: %d\n", numItems);
+    mem_map.nr_map = numItems;
+   
+
+    /* should raise an error here. */
+    if (numItems < 0) return NULL; /* Not a list */
+
+
+    /* iterate over items of the list, grabbing ranges and parsing them */
+    for (i = 1; i <= numItems; i++) {	// skip over "memmap"
+	    PyObject *item, *f1, *f2, *f3, *f4;
+	    int numFields;
+	    unsigned long lf1, lf2, lf3, lf4;
+	    char *sf1, *sf2;
+	    
+	    /* grab the string object from the next element of the list */
+	    item = PyList_GetItem(memmap, i); /* Can't fail */
+
+	    /* get the number of lines passed to us */
+	    numFields = PyList_Size(item);
+
+	    if (numFields != 4)
+		    return NULL;
+
+	    f1 = PyList_GetItem(item, 0);
+	    f2 = PyList_GetItem(item, 1);
+	    f3 = PyList_GetItem(item, 2);
+	    f4 = PyList_GetItem(item, 3);
+
+	    /* Convert objects to strings/longs */
+	    sf1 = PyString_AsString(f1);
+	    sf2 = PyString_AsString(f2);
+	    lf3 = PyLong_AsLong(f3);
+	    lf4 = PyLong_AsLong(f4);
+	    sscanf(sf1, "%lx", &lf1);
+	    sscanf(sf2, "%lx", &lf2);
+
+            mem_map.map[i-1].addr = lf1;
+            mem_map.map[i-1].size = lf2 - lf1;
+            mem_map.map[i-1].type = lf3;
+            mem_map.map[i-1].caching_attr = lf4;
+    }
+
+    if ( xc_vmx_build(xc->xc_handle, dom, memsize, image, &mem_map,
+                        ramdisk, cmdline, control_evtchn, flags) != 0 )
         return PyErr_SetFromErrno(xc_error);
     
     Py_INCREF(zero);
@@ -488,90 +574,24 @@ static PyObject *pyxc_bvtsched_domain_get(PyObject *self,
                          "warpu", warpu);
 }
 
-static PyObject *pyxc_fbvtsched_global_set(PyObject *self,
-                                          PyObject *args,
-                                          PyObject *kwds)
+static PyObject *pyxc_evtchn_alloc_unbound(PyObject *self,
+                                           PyObject *args,
+                                           PyObject *kwds)
 {
     XcObject *xc = (XcObject *)self;
 
-    unsigned long ctx_allow;
-
-    static char *kwd_list[] = { "ctx_allow", NULL };
-
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "l", kwd_list, &ctx_allow) )
-        return NULL;
-
-    if ( xc_fbvtsched_global_set(xc->xc_handle, ctx_allow) != 0 )
-        return PyErr_SetFromErrno(xc_error);
-    
-    Py_INCREF(zero);
-    return zero;
-}
-
-static PyObject *pyxc_fbvtsched_global_get(PyObject *self,
-                                          PyObject *args,
-                                          PyObject *kwds)
-{
-    XcObject *xc = (XcObject *)self;
-    
-    unsigned long ctx_allow;
-    
-    if ( !PyArg_ParseTuple(args, "") )
-        return NULL;
-    
-    if ( xc_fbvtsched_global_get(xc->xc_handle, &ctx_allow) != 0 )
-        return PyErr_SetFromErrno(xc_error);
-    
-    return Py_BuildValue("s:l", "ctx_allow", ctx_allow);
-}
-
-static PyObject *pyxc_fbvtsched_domain_set(PyObject *self,
-                                          PyObject *args,
-                                          PyObject *kwds)
-{
-    XcObject *xc = (XcObject *)self;
-
-    u32           dom;
-    unsigned long mcuadv, warp, warpl, warpu;
-
-    static char *kwd_list[] = { "dom", "mcuadv", "warp", "warpl",
-                                "warpu", NULL };
-
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "illll", kwd_list,
-                                      &dom, &mcuadv, &warp, &warpl, &warpu) )
-        return NULL;
-
-    if ( xc_fbvtsched_domain_set(xc->xc_handle, dom, mcuadv, 
-                                warp, warpl, warpu) != 0 )
-        return PyErr_SetFromErrno(xc_error);
-    
-    Py_INCREF(zero);
-    return zero;
-}
-
-static PyObject *pyxc_fbvtsched_domain_get(PyObject *self,
-                                          PyObject *args,
-                                          PyObject *kwds)
-{
-    XcObject *xc = (XcObject *)self;
     u32 dom;
-    unsigned long mcuadv, warp, warpl, warpu;
-    
+    int port;
+
     static char *kwd_list[] = { "dom", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i", kwd_list, &dom) )
         return NULL;
-    
-    if ( xc_fbvtsched_domain_get(xc->xc_handle, dom, &mcuadv, &warp,
-                                &warpl, &warpu) != 0 )
+
+    if ( xc_evtchn_alloc_unbound(xc->xc_handle, dom, &port) != 0 )
         return PyErr_SetFromErrno(xc_error);
 
-    return Py_BuildValue("{s:i,s:l,s:l,s:l,s:l}",
-                         "domain", dom,
-                         "mcuadv", mcuadv,
-                         "warp",   warp,
-                         "warpl",  warpl,
-                         "warpu",  warpu);
+    return PyInt_FromLong(port);
 }
 
 static PyObject *pyxc_evtchn_bind_interdomain(PyObject *self,
@@ -581,12 +601,12 @@ static PyObject *pyxc_evtchn_bind_interdomain(PyObject *self,
     XcObject *xc = (XcObject *)self;
 
     u32 dom1 = DOMID_SELF, dom2 = DOMID_SELF;
-    int port1, port2;
+    int port1 = 0, port2 = 0;
 
-    static char *kwd_list[] = { "dom1", "dom2", NULL };
+    static char *kwd_list[] = { "dom1", "dom2", "port1", "port2", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|ii", kwd_list, 
-                                      &dom1, &dom2) )
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|iiii", kwd_list, 
+                                      &dom1, &dom2, &port1, &port2) )
         return NULL;
 
     if ( xc_evtchn_bind_interdomain(xc->xc_handle, dom1, 
@@ -888,27 +908,6 @@ static PyObject *pyxc_rrobin_global_get(PyObject *self,
     return Py_BuildValue("{s:L}", "slice", slice);
 }
 
-static PyObject *pyxc_domain_setname(PyObject *self,
-                                     PyObject *args,
-                                     PyObject *kwds)
-{
-    XcObject *xc = (XcObject *)self;
-    u32 dom;
-    char *name;
-
-    static char *kwd_list[] = { "dom", "name", NULL };
-
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "is", kwd_list, 
-                                      &dom, &name) )
-        return NULL;
-
-    if ( xc_domain_setname(xc->xc_handle, dom, name) != 0 )
-        return PyErr_SetFromErrno(xc_error);
-    
-    Py_INCREF(zero);
-    return zero;
-}
-
 static PyObject *pyxc_domain_setmaxmem(PyObject *self,
                                        PyObject *args,
                                        PyObject *kwds)
@@ -939,7 +938,6 @@ static PyMethodDef pyxc_methods[] = {
       "Create a new domain.\n"
       " dom    [int, 0]:        Domain identifier to use (allocated if zero).\n"
       " mem_kb [int, 0]:        Memory allocation, in kilobytes.\n"
-      " name   [str, '(anon)']: Informative textual name.\n\n"
       "Returns: [int] new domain identifier; -1 on error.\n" },
 
     { "domain_pause", 
@@ -992,7 +990,6 @@ static PyMethodDef pyxc_methods[] = {
       " mem_kb   [int]:  Memory reservation, in kilobytes\n"
       " maxmem_kb [int]: Maximum memory limit, in kilobytes\n"
       " cpu_time [long]: CPU time consumed, in nanoseconds\n"
-      " name     [str]:  Identifying name\n"
       " shutdown_reason [int]: Numeric code from guest OS, explaining "
       "reason why it shut itself down.\n" },
 
@@ -1003,6 +1000,14 @@ static PyMethodDef pyxc_methods[] = {
       " dom        [int]:    Identifier of domain to be saved.\n"
       " state_file [str]:    Name of state file. Must not currently exist.\n"
       " progress   [int, 1]: Bool - display a running progress indication?\n\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+    { "plan9_build",
+      (PyCFunction)pyxc_plan9_build,
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Build a new Plan 9 guest OS.\n"
+      " dom     [long]:     Identifier of domain to build into.\n"
+      " image   [str]:      Name of kernel image file. May be gzipped.\n"
+      " cmdline [str, n/a]: Kernel parameters, if any.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "linux_restore", 
@@ -1021,14 +1026,17 @@ static PyMethodDef pyxc_methods[] = {
       " image   [str]:      Name of kernel image file. May be gzipped.\n"
       " ramdisk [str, n/a]: Name of ramdisk file, if any.\n"
       " cmdline [str, n/a]: Kernel parameters, if any.\n\n"
+      " vcpus   [int, 1]:   Number of Virtual CPUS in domain.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
-    { "netbsd_build", 
-      (PyCFunction)pyxc_netbsd_build, 
+    { "vmx_build", 
+      (PyCFunction)pyxc_vmx_build, 
       METH_VARARGS | METH_KEYWORDS, "\n"
-      "Build a new NetBSD guest OS.\n"
-      " dom     [int]:     Identifier of domain to build into.\n"
+      "Build a new Linux guest OS.\n"
+      " dom     [int]:      Identifier of domain to build into.\n"
       " image   [str]:      Name of kernel image file. May be gzipped.\n"
+      " memmap  [str]: 	    Memory map.\n\n"
+      " ramdisk [str, n/a]: Name of ramdisk file, if any.\n"
       " cmdline [str, n/a]: Kernel parameters, if any.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
@@ -1062,44 +1070,6 @@ static PyMethodDef pyxc_methods[] = {
       (PyCFunction)pyxc_bvtsched_domain_get,
       METH_KEYWORDS, "\n"
       "Get per-domain tuning parameters under the BVT scheduler.\n"
-      " dom [int]: Identifier of domain to be queried.\n"
-      "Returns [dict]:\n"
-      " domain [int]:  Domain ID.\n"
-      " mcuadv [long]: MCU Advance.\n"
-      " warp   [long]: Warp.\n"
-      " warpu  [long]: Unwarp requirement.\n"
-      " warpl  [long]: Warp limit,\n"
-    },
-
-    { "fbvtsched_global_set",
-      (PyCFunction)pyxc_fbvtsched_global_set,
-      METH_VARARGS | METH_KEYWORDS, "\n"
-      "Set global tuning parameters for Fair Borrowed Virtual Time scheduler.\n"
-      " ctx_allow [int]: Minimal guaranteed quantum.\n\n"
-      "Returns: [int] 0 on success; -1 on error.\n" },
-
-    { "fbvtsched_global_get",
-      (PyCFunction)pyxc_fbvtsched_global_get,
-      METH_KEYWORDS, "\n"
-      "Get global tuning parameters for FBVT scheduler.\n"
-      "Returns: [dict]:\n"
-      " ctx_allow [int]: context switch allowance\n" },
-
-    { "fbvtsched_domain_set",
-      (PyCFunction)pyxc_fbvtsched_domain_set,
-      METH_VARARGS | METH_KEYWORDS, "\n"
-      "Set per-domain tuning parameters for Fair Borrowed Virtual Time scheduler.\n"
-      " dom    [int]: Identifier of domain to be tuned.\n"
-      " mcuadv [int]: Proportional to the inverse of the domain's weight.\n"
-      " warp   [int]: How far to warp domain's EVT on unblock.\n"
-      " warpl  [int]: How long the domain can run warped.\n"
-      " warpu  [int]: How long before the domain can warp again.\n\n"
-      "Returns: [int] 0 on success; -1 on error.\n" },
-
-    { "fbvtsched_domain_get",
-      (PyCFunction)pyxc_fbvtsched_domain_get,
-      METH_KEYWORDS, "\n"
-      "Get per-domain tuning parameters under the FBVT scheduler.\n"
       " dom [int]: Identifier of domain to be queried.\n"
       "Returns [dict]:\n"
       " domain [int]:  Domain ID.\n"
@@ -1147,6 +1117,13 @@ static PyMethodDef pyxc_methods[] = {
       "Returns [dict]:\n"
       " slice  [long]: Scheduler time slice.\n" },    
 
+    { "evtchn_alloc_unbound", 
+      (PyCFunction)pyxc_evtchn_alloc_unbound,
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Allocate an unbound local port that will await a remote connection.\n"
+      " dom [int]: Remote domain to accept connections from.\n\n"
+      "Returns: [int] Unbound event-channel port.\n" },
+
     { "evtchn_bind_interdomain", 
       (PyCFunction)pyxc_evtchn_bind_interdomain, 
       METH_VARARGS | METH_KEYWORDS, "\n"
@@ -1167,7 +1144,7 @@ static PyMethodDef pyxc_methods[] = {
     { "evtchn_close", 
       (PyCFunction)pyxc_evtchn_close, 
       METH_VARARGS | METH_KEYWORDS, "\n"
-      "Close an event channel.\n"
+      "Close an event channel. If interdomain, sets remote end to 'unbound'.\n"
       " dom  [int, SELF]: Dom-id of one endpoint of the channel.\n"
       " port [int]:       Port-id of one endpoint of the channel.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
@@ -1225,14 +1202,6 @@ static PyMethodDef pyxc_methods[] = {
       "Set parameter for shadow pagetable interface\n"
       " dom [int]:   Identifier of domain.\n"
       " op [int, 0]: operation\n\n"
-      "Returns: [int] 0 on success; -1 on error.\n" },
-
-    { "domain_setname", 
-      (PyCFunction)pyxc_domain_setname, 
-      METH_VARARGS | METH_KEYWORDS, "\n"
-      "Set domain informative textual name\n"
-      " dom [int]:  Identifier of domain.\n"
-      " name [str]: Text string.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "domain_setmaxmem", 
@@ -1317,4 +1286,8 @@ PyMODINIT_FUNC initxc(void)
     PyDict_SetItemString(d, "error", xc_error);
 
     zero = PyInt_FromLong(0);
+
+    /* KAF: This ensures that we get debug output in a timely manner. */
+    setbuf(stdout, NULL);
+    setbuf(stderr, NULL);
 }

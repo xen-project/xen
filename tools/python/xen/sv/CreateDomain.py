@@ -16,7 +16,7 @@ class CreateDomain( Wizard ):
                    CreatePage4,
                    CreateFinish ]
     
-    	Wizard.__init__( self, urlWriter, "Create Domain Wizard", sheets )
+    	Wizard.__init__( self, urlWriter, "Create Domain", sheets )
        
 class CreatePage0( Sheet ):
 
@@ -25,13 +25,15 @@ class CreatePage0( Sheet ):
         self.addControl( InputControl( 'name', 'VM Name', 'VM Name:', "[\\w|\\S]+", "You must enter a name in this field" ) )
         self.addControl( InputControl( 'memory', '64', 'Memory (Mb):', "[\\d]+", "You must enter a number in this field" ) )
         self.addControl( InputControl( 'cpu', '0', 'CPU:', "[\\d]+", "You must enter a number in this feild" ) )
+        self.addControl( InputControl( 'cpu_weight', '1', 'CPU Weight:', "[\\d]+", "You must enter a number in this feild" ) )
                         
 class CreatePage1( Sheet ):
 
     def __init__( self, urlWriter ):
         Sheet.__init__( self, urlWriter, "Setup Kernel Image", 1 )
-        self.addControl( ListControl( 'builder', [('linux', 'Linux'), ('netbsd', 'NetBSD')], 'Kernel Type:' ) )
-        self.addControl( FileControl( 'kernel', '/boot/vmlinuz-2.4.26-xenU', 'Kernel Image:' ) )
+# For now we don't need to select a builder...
+#        self.addControl( ListControl( 'builder', [('linux', 'Linux'), ('netbsd', 'NetBSD')], 'Kernel Type:' ) )
+        self.addControl( FileControl( 'kernel', '/boot/vmlinuz-2.6.9-xenU', 'Kernel Image:' ) )
         self.addControl( InputControl( 'extra', '', 'Kernel Command Line Parameters:' ) )
 
 class CreatePage2( Sheet ):
@@ -83,9 +85,16 @@ class CreateFinish( Sheet ):
         
         xend_sxp = self.translate_sxp( string2sxp( self.passback ) )
         
-        dom_sxp = server.xend_domain_create( xend_sxp )
+        try:
+            dom_sxp = server.xend_domain_create( xend_sxp )
+            success = "Your domain was successfully created.\n"
+        except:
+            success = "There was an error creating your domain.\nThe configuration used is as follows:\n"
+            dom_sxp = xend_sxp
+            
+            
         
-        pt = PreTab( sxp2prettystring( dom_sxp ) )
+        pt = PreTab( success + sxp2prettystring( dom_sxp ) )
         pt.write_BODY( request )
 
         request.write( "<input type='hidden' name='passback' value=\"%s\"></p>" % self.passback )
@@ -105,7 +114,9 @@ class CreateFinish( Sheet ):
         
         vals.name = 	get( 'name' )
         vals.memory = 	get( 'memory' )
+        vals.maxmem =   get( 'maxmem' )
         vals.cpu =  	get( 'cpu' )
+        vals.cpu_weight = get( 'cpu_weight' )
         
         vals.builder =  get( 'builder' )       
         vals.kernel =   get( 'kernel' )
@@ -121,7 +132,7 @@ class CreateFinish( Sheet ):
         
         vals.disk = vbds    
             
-        #misc crap
+        #misc
         
         vals.pci = []
         
@@ -145,4 +156,8 @@ class CreateFinish( Sheet ):
         
         vals.cmdline_ip = "%s:%s:%s:%s:%s:eth0:%s" % (ip, nfs, gate, mask, host, dhcp)
         
-        return make_config( vals )
+        try:
+            return make_config( vals )
+        except:
+            return [["Error creating domain config."]]    
+        

@@ -8,12 +8,14 @@
 typedef struct XcIOContext {
     u32 domain;
     unsigned flags;
+    int resource;
     IOStream *io;
     IOStream *info;
     IOStream *err;
     char *vmconfig;
     int vmconfig_n;
-    int (*suspend)(u32 domain, void *data);
+    int (*suspend)(void *data, u32 domain);
+    int (*configure)(void *data, u32 domain, char *vmconfig, int vmconfig_n);
     void *data;
 } XcIOContext;
 
@@ -21,7 +23,18 @@ static inline int xcio_suspend_domain(XcIOContext *ctxt){
     int err = 0;
 
     if(ctxt->suspend){
-        err = ctxt->suspend(ctxt->domain, ctxt->data);
+        err = ctxt->suspend(ctxt->data, ctxt->domain);
+    } else {
+        err = -EINVAL;
+    }
+    return err;
+}
+
+static inline int xcio_configure_domain(XcIOContext *ctxt){
+    int err = 0;
+
+    if(ctxt->configure){
+        err = ctxt->configure(ctxt->data, ctxt->domain, ctxt->vmconfig, ctxt->vmconfig_n);
     } else {
         err = -EINVAL;
     }

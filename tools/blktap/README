@@ -1,0 +1,149 @@
+Block Tap User-level Interfaces
+Andrew Warfield
+andrew.warfield@cl.cam.ac.uk
+February 8, 2005
+
+NOTE #1: The blktap is _experimental_ code.  It works for me.  Your
+mileage may vary.  Don't use it for anything important.  Please. ;)
+
+NOTE #2: All of the interfaces here are likely to change.  This is all
+early code, and I am checking it in because others want to play with
+it.  If you use it for anything, please let me know!
+
+Overview:
+---------
+
+This directory contains a library and set of example applications for
+the block tap device.  The block tap hooks into the split block device
+interfaces above Xen allowing them to be extended.  This extension can
+be done in userspace with the help of a library.
+
+The tap can be installed either as an interposition domain in between
+a frontend and backend driver pair, or as a terminating backend, in
+which case it is responsible for serving all requests itself.
+
+There are two reasons that you might want to use the tap,
+corresponding to these configurations:
+
+ 1. To examine or modify a stream of block requests while they are
+    in-flight (e.g. to encrypt data, or add data-driven watchpoints)
+
+ 2. To prototype a new backend driver, serving requests from the tap
+    rather than passing them along to the XenLinux blkback driver.
+    (e.g. to forward block requests to a remote host)
+
+
+Interface:
+----------
+
+At the moment, the tap interface is similar in spirit to that of the
+Linux netfilter.  Requests are messages from a client (frontend)
+domain to a disk (backend) domain.  Responses are messages travelling
+back, acknowledging the completion of a request.  the library allows
+chains of functions to be attached to these events.  In addition,
+hooks may be attached to handle control messages, which signify things
+like connections from new domains.
+
+At present the control messages especially expose a lot of the
+underlying driver interfaces.  This may change in the future in order
+to simplify writing hooks.
+
+Here are the public interfaces:
+
+These allow hook functions to be chained:
+
+ void blktap_register_ctrl_hook(char *name, int (*ch)(control_msg_t *));
+ void blktap_register_request_hook(char *name, int (*rh)(blkif_request_t *));
+ void blktap_register_response_hook(char *name, int (*rh)(blkif_response_t *));
+
+This allows a response to be injected, in the case where a request has
+been removed using BLKTAP_STOLEN.
+
+ void blktap_inject_response(blkif_response_t *);
+
+These let you add file descriptors and handlers to the main poll loop:
+
+ int  blktap_attach_poll(int fd, short events, int (*func)(int));
+ void blktap_detach_poll(int fd);
+
+This starts the main poll loop:
+
+ int  blktap_listen(void);
+
+Example:
+--------
+
+blkimage.c uses an image on the local file system to serve requests to
+a domain.  Here's what it looks like:
+
+---[blkimg.c]---
+
+/* blkimg.c
+ *
+ * file-backed disk.
+ */
+
+#include "blktaplib.h"
+#include "blkimglib.h"
+
+
+int main(int argc, char *argv[])
+{
+    image_init();
+    
+    blktap_register_ctrl_hook("image_control", image_control);
+    blktap_register_request_hook("image_request", image_request);
+    blktap_listen();
+    
+    return 0;
+}
+
+----------------
+
+All of the real work is in blkimglib.c, but this illustrates the
+actual tap interface well enough.  image_control() will be called with
+all control messages.  image_request() handles requests.  As it reads
+from an on-disk image file, no requests are ever passed on to a
+backend, and so there will be no responses to process -- so there is
+nothing registered as a response hook.
+
+Other examples:
+---------------
+
+Here is a list of other examples in the directory:
+
+Things that terminate a block request stream:
+
+  blkimg    - Use a image file/device to serve requests
+  blkgnbd   - Use a remote gnbd server to serve requests
+  blkaio    - Use libaio... (DOES NOT WORK)
+  
+Things that don't:
+
+  blkdump   - Print in-flight requests.
+  blkcow    - Really inefficient copy-on-write disks using libdb to store
+              writes.
+
+There are examples of plugging these things together, for instance
+blkcowgnbd is a read-only gnbd device with copy-on-write to a local
+file.
+
+TODO:
+-----
+
+- Make session tracking work.  At the moment these generally just handle a 
+  single front-end client at a time.
+
+- Integrate with Xend.  Need to cleanly pass a image identifier in the connect
+  message.
+
+- Make an asynchronous file-io terminator.  The libaio attempt is
+  tragically stalled because mapped foreign pages make pfn_valid fail
+  (they are VM_IO), and so cannot be passed to aio as targets.  A
+  better solution may be to tear the disk interfaces out of the real
+  backend and expose them somehow.
+
+- Make CoW suck less.
+
+- Do something more along the lines of dynamic linking for the
+  plugins, so thatthey don't all need a new main().

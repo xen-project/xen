@@ -7,7 +7,7 @@
  */
 
 #include "xc_private.h"
-#include <asm-xen/suspend.h>
+#include <xen/linux/suspend.h>
 
 #define MAX_BATCH_SIZE 1024
 
@@ -18,31 +18,6 @@
 #else
 #define DPRINTF(_f, _a...) ((void)0)
 #endif
-
-static int get_pfn_list(int xc_handle,
-                        u32 domain_id, 
-                        unsigned long *pfn_buf, 
-                        unsigned long max_pfns)
-{
-    dom0_op_t op;
-    int ret;
-    op.cmd = DOM0_GETMEMLIST;
-    op.u.getmemlist.domain   = (domid_t)domain_id;
-    op.u.getmemlist.max_pfns = max_pfns;
-    op.u.getmemlist.buffer   = pfn_buf;
-
-    if ( mlock(pfn_buf, max_pfns * sizeof(unsigned long)) != 0 )
-    {
-        PERROR("Could not lock pfn list buffer");
-        return -1;
-    }    
-
-    ret = do_dom0_op(xc_handle, &op);
-
-    (void)munlock(pfn_buf, max_pfns * sizeof(unsigned long));
-
-    return (ret < 0) ? -1 : op.u.getmemlist.num_pfns;
-}
 
 /** Read the vmconfig string from the state input.
  * It is stored as a 4-byte count 'n' followed by n bytes.
@@ -86,7 +61,7 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
     int rc = 1, i, n, k;
     unsigned long mfn, pfn, xpfn;
     unsigned int prev_pc, this_pc;
-    u32 dom = ioctxt->domain;
+    u32 dom = 0;
     int verify = 0; 
 
     /* Number of page frames in use by this Linux session. */
@@ -94,7 +69,8 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
 
     /* The new domain's shared-info frame number. */
     unsigned long shared_info_frame;
-    unsigned char shared_info[PAGE_SIZE]; /* saved contents from file */
+    unsigned char shared_info_page[PAGE_SIZE]; /* saved contents from file */
+    shared_info_t *shared_info = (shared_info_t *)shared_info_page;
     
     /* A copy of the CPU context of the guest. */
     full_execution_context_t ctxt;
@@ -102,9 +78,6 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
     /* First 16 bytes of the state file must contain 'LinuxGuestRecord'. */
     char signature[16];
     
-    /* A copy of the domain's name. */
-    char name[MAX_DOMAIN_NAME];
-
     /* A table containg the type of each PFN (/not/ MFN!). */
     unsigned long *pfn_type = NULL;
 
@@ -112,7 +85,7 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
     unsigned long *region_mfn = NULL;
 
     /* A temporary mapping, and a copy, of one frame of guest memory. */
-    unsigned long *ppage;
+    unsigned long *ppage = NULL;
 
     /* A copy of the pfn-to-mfn table frame list. */
     unsigned long pfn_to_mfn_frame_list[1024];
@@ -130,10 +103,10 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
 
     mmu_t *mmu = NULL;
 
-    void *pm_handle = NULL;
-
     /* used by debug verify code */
     unsigned long buf[PAGE_SIZE/sizeof(unsigned long)];
+
+    xcio_info(ioctxt, "xc_linux_restore start\n");
 
     if ( mlock(&ctxt, sizeof(ctxt) ) )
     {
@@ -143,7 +116,7 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
         return 1;
     }
 
-    /* Start writing out the saved-domain record. */
+    /* Start reading the saved-domain record. */
     if ( xcio_read(ioctxt, signature, 16) ||
          (memcmp(signature, "LinuxGuestRecord", 16) != 0) )
     {
@@ -151,8 +124,7 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
         goto out;
     }
 
-    if ( xcio_read(ioctxt, name,                  sizeof(name)) ||
-         xcio_read(ioctxt, &nr_pfns,              sizeof(unsigned long)) ||
+    if ( xcio_read(ioctxt, &nr_pfns,              sizeof(unsigned long)) ||
          xcio_read(ioctxt, pfn_to_mfn_frame_list, PAGE_SIZE) )
     {
         xcio_error(ioctxt, "Error reading header");
@@ -164,17 +136,6 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
         xcio_error(ioctxt, "Error writing vmconfig");
         goto out;
     }
-
-    for ( i = 0; i < MAX_DOMAIN_NAME; i++ ) 
-    {
-        if ( name[i] == '\0' ) break;
-        if ( name[i] & 0x80 )
-        {
-            xcio_error(ioctxt, "Random characters in domain name");
-            goto out;
-        }
-    }
-    name[MAX_DOMAIN_NAME-1] = '\0';
 
     if ( nr_pfns > 1024*1024 )
     {
@@ -201,26 +162,22 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
         goto out;
     }
 
-    /* Set the domain's name to that from the restore file */
-    if ( xc_domain_setname( xc_handle, dom, name ) )
+    /* Create domain on CPU -1 so that it may auto load-balance in future. */
+    if ( xc_domain_create(xc_handle, nr_pfns * (PAGE_SIZE / 1024),
+                          -1, 1, &dom) )
     {
-        xcio_error(ioctxt, "Could not set domain name");
+	xcio_error(ioctxt, "Could not create domain. pfns=%d, %dKB",
+		   nr_pfns,nr_pfns * (PAGE_SIZE / 1024));
         goto out;
     }
-
-    /* Set the domain's initial memory allocation 
-       to that from the restore file */
-
-    if ( xc_domain_setinitialmem(xc_handle, dom, 
-                                 nr_pfns * (PAGE_SIZE / 1024)) )
-    {
-        xcio_error(ioctxt, "Could not set domain initial memory");
-        goto out;
-    }
+    
+    ioctxt->domain = dom;
+    xcio_info(ioctxt, "Created domain %ld\n",dom);
 
     /* Get the domain's shared-info frame. */
     op.cmd = DOM0_GETDOMAININFO;
     op.u.getdomaininfo.domain = (domid_t)dom;
+    op.u.getdomaininfo.exec_domain = 0;
     op.u.getdomaininfo.ctxt = NULL;
     if ( do_dom0_op(xc_handle, &op) < 0 )
     {
@@ -229,11 +186,17 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
     }
     shared_info_frame = op.u.getdomaininfo.shared_info_frame;
 
-    if ( (pm_handle = init_pfn_mapper((domid_t)dom)) == NULL )
-        goto out;
+    if(ioctxt->flags & XCFLAGS_CONFIGURE)
+    {
+        if(xcio_configure_domain(ioctxt))
+        {
+           xcio_error(ioctxt, "Configuring domain failed"); 
+           goto out;
+        }
+    }
 
     /* Build the pfn-to-mfn table. We choose MFN ordering returned by Xen. */
-    if ( get_pfn_list(xc_handle, dom, pfn_to_mfn_table, nr_pfns) != nr_pfns )
+    if ( xc_get_pfn_list(xc_handle, dom, pfn_to_mfn_table, nr_pfns) != nr_pfns )
     {
         xcio_error(ioctxt, "Did not read correct number of frame "
                    "numbers for new dom");
@@ -309,7 +272,7 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
             }          
         }
  
-        if ( (region_base = mfn_mapper_map_batch( xc_handle, dom, 
+        if ( (region_base = xc_map_foreign_batch( xc_handle, dom, 
                                                   PROT_WRITE,
                                                   region_mfn,
                                                   j )) == 0 )
@@ -349,7 +312,7 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
                 goto out;
             }
 
-            switch( region_pfn_type[i] )
+            switch( region_pfn_type[i] & LTABTYPE_MASK )
             {
             case 0:
                 break;
@@ -449,7 +412,7 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
         n+=j; /* crude stats */
     }
 
-    DPRINTF("Received all pages\n");
+    xcio_info(ioctxt, "Received all pages\n");
 
     /*
      * Pin page tables. Do this after writing to them as otherwise Xen
@@ -457,7 +420,7 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
      */
     for ( i = 0; i < nr_pfns; i++ )
     {
-        if ( pfn_type[i] == L1TAB )
+        if ( pfn_type[i] == (L1TAB|LPINTAB) )
         {
             if ( add_mmu_update(xc_handle, mmu,
                                 (pfn_to_mfn_table[i]<<PAGE_SHIFT) | 
@@ -468,7 +431,12 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
                 goto out;
             }
         }
-        else if ( pfn_type[i] == L2TAB )
+    }
+
+    /* must pin all L1's before L2's (need consistent va back ptr) */
+    for ( i = 0; i < nr_pfns; i++ )
+    {
+        if ( pfn_type[i] == (L2TAB|LPINTAB) )
         {
             if ( add_mmu_update(xc_handle, mmu,
                                 (pfn_to_mfn_table[i]<<PAGE_SHIFT) | 
@@ -484,11 +452,58 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
 
     if ( finish_mmu_updates(xc_handle, mmu) ) goto out;
 
-    xcio_info(ioctxt, "\b\b\b\b100%%\nMemory reloaded.\n");
+    xcio_info(ioctxt, "\b\b\b\b100%%\n");
+    xcio_info(ioctxt, "Memory reloaded.\n");
 
+    /* Get the list of PFNs that are not in the psuedo-phys map */
+    {
+	unsigned int count, *pfntab;
+	int rc;
 
-    if ( xcio_read(ioctxt, &ctxt,       sizeof(ctxt)) ||
-         xcio_read(ioctxt, shared_info, PAGE_SIZE) )
+	if ( xcio_read(ioctxt, &count, sizeof(count)) )
+	{
+	    xcio_error(ioctxt, "Error when reading from state file");
+	    goto out;
+	}
+
+	pfntab = malloc( sizeof(unsigned int) * count );
+	if ( pfntab == NULL )
+	{
+	    xcio_error(ioctxt, "Out of memory");
+	    goto out;
+	}
+
+	if ( xcio_read(ioctxt, pfntab, sizeof(unsigned int)*count) )
+	{
+	    xcio_error(ioctxt, "Error when reading pfntab from state file");
+	    goto out;
+	}
+
+	for ( i = 0; i < count; i++ )
+	{
+	    unsigned long pfn = pfntab[i];
+	    pfntab[i]=pfn_to_mfn_table[pfn];
+	    pfn_to_mfn_table[pfn] = 0x80000001;  // not in pmap
+	}
+
+	if ( count > 0 )
+	{
+	    if ( (rc = do_dom_mem_op( xc_handle,
+				       MEMOP_decrease_reservation,
+				       pfntab, count, 0, dom )) <0 )
+	    {
+		xcio_error(ioctxt, "Could not decrease reservation : %d",rc);
+		goto out;
+	    }
+	    else
+	    {
+		printf("Decreased reservation by %d pages\n", count);
+	    }
+	}	
+    }
+
+    if ( xcio_read(ioctxt, &ctxt,            sizeof(ctxt)) ||
+         xcio_read(ioctxt, shared_info_page, PAGE_SIZE) )
     {
         xcio_error(ioctxt, "Error when reading from state file");
         goto out;
@@ -502,11 +517,12 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
         goto out;
     }
     ctxt.cpu_ctxt.esi = mfn = pfn_to_mfn_table[pfn];
-    p_srec = map_pfn_writeable(pm_handle, mfn);
+    p_srec = xc_map_foreign_range(
+        xc_handle, dom, PAGE_SIZE, PROT_WRITE, mfn);
     p_srec->resume_info.nr_pages    = nr_pfns;
     p_srec->resume_info.shared_info = shared_info_frame << PAGE_SHIFT;
     p_srec->resume_info.flags       = 0;
-    unmap_pfn(pm_handle, p_srec);
+    munmap(p_srec, PAGE_SIZE);
 
     /* Uncanonicalise each GDT frame number. */
     if ( ctxt.gdt_ents > 8192 )
@@ -514,6 +530,7 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
         xcio_error(ioctxt, "GDT entry count out of range");
         goto out;
     }
+
     for ( i = 0; i < ctxt.gdt_ents; i += 512 )
     {
         pfn = ctxt.gdt_frames[i];
@@ -527,7 +544,7 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
 
     /* Uncanonicalise the page table base pointer. */
     pfn = ctxt.pt_base >> PAGE_SHIFT;
-    if ( (pfn >= nr_pfns) || (pfn_type[pfn] != L2TAB) )
+    if ( (pfn >= nr_pfns) || ((pfn_type[pfn]&LTABTYPE_MASK) != L2TAB) )
     {
         printf("PT base is bad. pfn=%lu nr=%lu type=%08lx %08lx\n",
                pfn, nr_pfns, pfn_type[pfn], (unsigned long)L2TAB);
@@ -536,17 +553,17 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
     }
     ctxt.pt_base = pfn_to_mfn_table[pfn] << PAGE_SHIFT;
 
-
     /* clear any pending events and the selector */
-    memset( &(((shared_info_t *)shared_info)->evtchn_pending[0]),
-            0, sizeof (((shared_info_t *)shared_info)->evtchn_pending)+
-            sizeof(((shared_info_t *)shared_info)->evtchn_pending_sel) );
+    memset(&(shared_info->evtchn_pending[0]), 0,
+	   sizeof (shared_info->evtchn_pending));
+    for ( i = 0; i < MAX_VIRT_CPUS; i++ )
+        shared_info->vcpu_data[i].evtchn_pending_sel = 0;
 
     /* Copy saved contents of shared-info page. No checking needed. */
-    ppage = map_pfn_writeable(pm_handle, shared_info_frame);
+    ppage = xc_map_foreign_range(
+        xc_handle, dom, PAGE_SIZE, PROT_WRITE, shared_info_frame);
     memcpy(ppage, shared_info, sizeof(shared_info_t));
-    unmap_pfn(pm_handle, ppage);
-
+    munmap(ppage, PAGE_SIZE);
 
     /* Uncanonicalise the pfn-to-mfn table frame-number list. */
     for ( i = 0; i < (nr_pfns+1023)/1024; i++ )
@@ -564,7 +581,7 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
     }
     
     if ( (live_pfn_to_mfn_table = 
-          mfn_mapper_map_batch(xc_handle, dom, 
+	  xc_map_foreign_batch(xc_handle, dom, 
                                PROT_WRITE,
                                pfn_to_mfn_frame_list,
                                (nr_pfns+1023)/1024 )) == 0 )
@@ -586,7 +603,7 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
      *  4. fast_trap_idx is checked by Xen.
      *  5. ldt base must be page-aligned, no more than 8192 ents, ...
      *  6. gdt already done, and further checking is done by Xen.
-     *  7. check that guestos_ss is safe.
+     *  7. check that kernel_ss is safe.
      *  8. pt_base is already done.
      *  9. debugregs are checked by Xen.
      *  10. callback code selectors need checking.
@@ -595,14 +612,14 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
     {
         ctxt.trap_ctxt[i].vector = i;
         if ( (ctxt.trap_ctxt[i].cs & 3) == 0 )
-            ctxt.trap_ctxt[i].cs = FLAT_GUESTOS_CS;
+            ctxt.trap_ctxt[i].cs = FLAT_KERNEL_CS;
     }
-    if ( (ctxt.guestos_ss & 3) == 0 )
-        ctxt.guestos_ss = FLAT_GUESTOS_DS;
+    if ( (ctxt.kernel_ss & 3) == 0 )
+        ctxt.kernel_ss = FLAT_KERNEL_DS;
     if ( (ctxt.event_callback_cs & 3) == 0 )
-        ctxt.event_callback_cs = FLAT_GUESTOS_CS;
+        ctxt.event_callback_cs = FLAT_KERNEL_CS;
     if ( (ctxt.failsafe_callback_cs & 3) == 0 )
-        ctxt.failsafe_callback_cs = FLAT_GUESTOS_CS;
+        ctxt.failsafe_callback_cs = FLAT_KERNEL_CS;
     if ( ((ctxt.ldt_base & (PAGE_SIZE - 1)) != 0) ||
          (ctxt.ldt_ents > 8192) ||
          (ctxt.ldt_base > HYPERVISOR_VIRT_START) ||
@@ -611,14 +628,28 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
         xcio_error(ioctxt, "Bad LDT base or size");
         goto out;
     }
-   
+
+    xcio_info(ioctxt, "Domain ready to be built.\n");
+
     op.cmd = DOM0_BUILDDOMAIN;
     op.u.builddomain.domain   = (domid_t)dom;
     op.u.builddomain.ctxt = &ctxt;
     rc = do_dom0_op(xc_handle, &op);
 
-    /* don't start the domain as we have console etc to set up */
-  
+    if ( rc != 0 )
+    {
+        xcio_error(ioctxt, "Couldn't build the domain");
+        goto out;
+    }
+
+    if ( ioctxt->flags & XCFLAGS_CONFIGURE )
+    {
+        xcio_info(ioctxt, "Domain ready to be unpaused\n");
+        op.cmd = DOM0_UNPAUSEDOMAIN;
+        op.u.unpausedomain.domain = (domid_t)dom;
+        rc = do_dom0_op(xc_handle, &op);
+    }
+
     if ( rc == 0 )
     {
         /* Success: print the domain id. */
@@ -632,8 +663,6 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
         xc_domain_destroy(xc_handle, dom);
     if ( mmu != NULL )
         free(mmu);
-    if ( pm_handle != NULL )
-        (void)close_pfn_mapper(pm_handle);
     if ( pfn_to_mfn_table != NULL )
         free(pfn_to_mfn_table);
     if ( pfn_type != NULL )

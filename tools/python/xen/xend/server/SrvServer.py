@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
 
 """Example xend HTTP and console server.
@@ -41,7 +41,7 @@ def create(port=None, interface=None, bridge=0):
         port = xroot.get_xend_port()
     if interface is None:
         interface = xroot.get_xend_address()
-    if bridge or xroot.rebooted:
+    if bridge:
         Vifctl.network('start')
     root = resource.Resource()
     xend = SrvRoot()

@@ -15,6 +15,9 @@ class SrvDmesg(SrvDir):
         SrvDir.__init__(self)
         self.xd = XendDmesg.instance()
 
+    def render_POST(self, req):
+        self.perform(req)
+
     def render_GET(self, req):
         try:
             if self.use_sxp(req):
@@ -32,3 +35,7 @@ class SrvDmesg(SrvDir):
             
     def info(self):
         return self.xd.info()
+
+    def op_clear(self, op, req):
+        self.xd.clear()
+        return 0

@@ -1,46 +1,68 @@
+#!/usr/bin/make -f
 
-# Generic LaTeX makefile.
-#
-# Xfig and tgif diagrams should be in the fig/ subdirectory.
-# DOCUMENTS should be a list of the target Postscript files.
+INSTALL		= install
+INSTALL_DIR	= $(INSTALL) -d -m0755
 
-DOCUMENTS = interface.ps interface.pdf interface.html user.ps \
-	    user.pdf user.html
+PS2PDF		:= ps2pdf
+DVIPS		:= dvips
+LATEX		:= latex
+FIG2DEV		:= fig2dev
+TGIF		:= tgif
+LATEX2HTML	:= latex2html
+
+pkgdocdir	:= /usr/share/doc/xen
+
+DOC_TEX		:= $(wildcard src/*.tex)
+DOC_PS		:= $(patsubst src/%.tex,ps/%.ps,$(DOC_TEX))
+DOC_PDF		:= $(patsubst src/%.tex,pdf/%.pdf,$(DOC_TEX))
+DOC_HTML	:= $(patsubst src/%.tex,html/%/index.html,$(DOC_TEX))
 
 GFX  = $(patsubst %.obj, %.eps, $(wildcard figs/*.obj))
 GFX += $(patsubst %.fig, %.eps, $(wildcard figs/*.fig))
 
-all: $(DOCUMENTS)
+all: ps pdf html
+	rm -f *.aux *.dvi *.bbl *.blg *.glo *.idx *.ilg *.log *.ind *.toc
 
-pristine: clean
-	rm -f $(DOCUMENTS)
+ps: $(DOC_PS)
+
+pdf: $(DOC_PDF)
+
+html: $(DOC_HTML)
 
 clean:
-	rm -f .word_count *.aux *.dvi *.bbl *.blg *.glo *.idx *~ 
-	rm -f *.ilg *.log *.ind *.toc *.bak core
-	rm -f figs/*.eps $(DOCUMENTS)
-	rm -rf user/
-	rm -rf interface/
+	rm -rf .word_count *.aux *.dvi *.bbl *.blg *.glo *.idx *~ 
+	rm -rf *.ilg *.log *.ind *.toc *.bak core
+	rm -rf $(GFX) ps pdf html
 
-install: $(DOCUMENTS)
-	mkdir -p $(prefix)/usr/share/doc/xen
-	cp -a $(DOCUMENTS) VBD-HOWTO.txt Xen-HOWTO.txt $(prefix)/usr/share/doc/xen
+install: all
+	rm -rf $(DESTDIR)$(pkgdocdir)
+	$(INSTALL_DIR) $(DESTDIR)$(pkgdocdir)
+	cp -dR ps $(DESTDIR)$(pkgdocdir)
+	cp -dR pdf $(DESTDIR)$(pkgdocdir)
+	cp -dR html $(DESTDIR)$(pkgdocdir)
 
-%.pdf: %.ps
-	ps2pdf $< $@
+pdf/%.pdf: ps/%.ps
+	$(INSTALL_DIR) $(@D)
+	$(PS2PDF) $< $@.new
+	mv $@.new $@
 
-%.ps: %.dvi $(GFX)
-	dvips -Ppdf -G0 -o $@ $<
+ps/%.ps: %.dvi
+	$(INSTALL_DIR) $(@D)
+	$(DVIPS) -Ppdf -G0 -o $@.new $<
+	mv $@.new $@
 
-%.dvi: %.tex
-	latex $* >/dev/null
-	if [ -e $*.toc ] ; then latex $* >/dev/null ; fi
+%.dvi: src/%.tex $(GFX)
+	$(LATEX) $< >/dev/null
+	if [ -e $*.toc ] ; then $(LATEX) $< >/dev/null ; fi
 
 %.eps: %.fig
-	fig2dev -L eps $< $@
+	$(FIG2DEV) -L eps $< $@
 
 %.eps: %.obj
-	tgif -print -color -eps $<
+	$(TGIF) -print -color -eps $<
 
-%.html: %.tex
-	latex2html --split 0 --nonavigation --noinfo --math $< 1>/dev/null 2>/dev/null
+html/%/index.html: src/%.tex
+	$(INSTALL_DIR) $(@D)
+	$(LATEX2HTML) -split 0 -show_section_numbers -toc_depth 3 -nonavigation \
+	-numbered_footnotes -local_icons -noinfo -math -dir $(@D) \
+	$< 1>/dev/null 2>/dev/null

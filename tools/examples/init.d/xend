@@ -4,28 +4,44 @@
 #
 # Author:       Keir Fraser <keir.fraser@cl.cam.ac.uk>
 #
-# chkconfig: 2345 99 00
+# chkconfig: 2345 98 01
 # description: Starts and stops the Xen control daemon.
+
+# Wait for Xend / Xfrd to be up
+function await_daemons_up
+{
+	i=1
+	rets=10
+	xend status
+	while [ $? -ne 0 -a $i -lt $rets ]; do
+	    sleep 1
+	    echo -n .
+	    i=$(($i + 1))
+	    xend status
+	done
+}
 
 case "$1" in
   start)
 	xend start
-	exit $?
+	await_daemons_up
 	;;
   stop)
 	xend stop
-	exit $?
 	;;
   status)
+	xend status
 	;;
-  restart|reload)
+  restart|reload|force-reload)
+	xend restart
+	await_daemons_up
 	;;
   *)
 	# do not advertise unreasonable commands that there is no reason
 	# to use with this device
-	echo $"Usage: $0 {start|stop|status|restart|reload}"
+	echo $"Usage: $0 {start|stop|status|restart|reload|force-reload}"
 	exit 1
 esac
 
-exit 0
+exit $?
 

@@ -1,3 +1,4 @@
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /*
  *	x86 SMP booting functions
  *
@@ -57,6 +58,9 @@ static int max_cpus = -1;
 /* Total count of live CPUs */
 int smp_num_cpus = 1;
 
+/* Number of hyperthreads per core */
+int ht_per_core = 1;
+
 /* Bitmask of currently online CPUs */
 unsigned long cpu_online_map;
 
@@ -64,7 +68,7 @@ static volatile unsigned long cpu_callin_map;
 static volatile unsigned long cpu_callout_map;
 
 /* Per CPU bogomips and other parameters */
-struct cpuinfo_x86 cpu_data[NR_CPUS] __cacheline_aligned;
+struct cpuinfo_x86 cpu_data[NR_CPUS];
 
 /* Set when the idlers are all forked */
 int smp_threads_ready;
@@ -384,33 +388,27 @@ static int cpucount;
 void __init start_secondary(void)
 {
     unsigned int cpu = cpucount;
-    /* 6 bytes suitable for passing to LIDT instruction. */
-    unsigned char idt_load[6];
 
+    extern void percpu_traps_init(void);
     extern void cpu_init(void);
 
     set_current(idle_task[cpu]);
 
     /*
-     * Dont put anything before smp_callin(), SMP
-     * booting is too fragile that we want to limit the
-     * things done here to the most necessary things.
+     * At this point, boot CPU has fully initialised the IDT. It is
+     * now safe to make ourselves a private copy.
      */
+    idt_tables[cpu] = xmalloc_array(idt_entry_t, IDT_ENTRIES);
+    memcpy(idt_tables[cpu], idt_table, IDT_ENTRIES*sizeof(idt_entry_t));
+
+    percpu_traps_init();
+
     cpu_init();
+
     smp_callin();
 
     while (!atomic_read(&smp_commenced))
         rep_nop();
-
-    /*
-     * At this point, boot CPU has fully initialised the IDT. It is
-     * now safe to make ourselves a private copy.
-     */
-    idt_tables[cpu] = xmalloc(IDT_ENTRIES*8);
-    memcpy(idt_tables[cpu], idt_table, IDT_ENTRIES*8);
-    *(unsigned short *)(&idt_load[0]) = (IDT_ENTRIES*8)-1;
-    *(unsigned long  *)(&idt_load[2]) = (unsigned long)idt_tables[cpu];
-    __asm__ __volatile__ ( "lidt %0" : "=m" (idt_load) );
 
     /*
      * low-memory mappings have been cleared, flush them from the local TLBs 
@@ -644,26 +642,26 @@ static void __init do_boot_cpu (int apicid)
  */
 {
     struct domain *idle;
+    struct exec_domain *ed;
     unsigned long boot_error = 0;
     int timeout, cpu;
-    unsigned long start_eip, stack;
+    unsigned long start_eip;
+    void *stack;
 
     cpu = ++cpucount;
 
     if ( (idle = do_createdomain(IDLE_DOMAIN_ID, cpu)) == NULL )
         panic("failed 'createdomain' for CPU %d", cpu);
 
-    set_bit(DF_IDLETASK, &idle->flags);
+    ed = idle->exec_domain[0];
 
-    idle->mm.pagetable = mk_pagetable(__pa(idle_pg_table));
+    set_bit(DF_IDLETASK, &idle->d_flags);
+
+    ed->arch.pagetable = mk_pagetable(__pa(idle_pg_table));
 
     map_cpu_to_boot_apicid(cpu, apicid);
 
-#if defined(__i386__)
-    SET_DEFAULT_FAST_TRAP(&idle->thread);
-#endif
-
-    idle_task[cpu] = idle;
+    idle_task[cpu] = ed;
 
     /* start_eip had better be page-aligned! */
     start_eip = setup_trampoline();
@@ -671,11 +669,15 @@ static void __init do_boot_cpu (int apicid)
     /* So we see what's up. */
     printk("Booting processor %d/%d eip %lx\n", cpu, apicid, start_eip);
 
-    stack = __pa(alloc_xenheap_pages(1));
-    stack_start.esp = stack + STACK_SIZE - STACK_RESERVED;
+    stack = (void *)alloc_xenheap_pages(STACK_ORDER);
+#if defined(__i386__)
+    stack_start.esp = __pa(stack) + STACK_SIZE - STACK_RESERVED;
+#elif defined(__x86_64__)
+    stack_start.esp = (unsigned long)stack + STACK_SIZE - STACK_RESERVED;
+#endif
 
     /* Debug build: detect stack overflow by setting up a guard page. */
-    memguard_guard_range(__va(stack), PAGE_SIZE);
+    memguard_guard_stack(stack);
 
     /*
      * This grunge runs the startup process for
@@ -737,7 +739,7 @@ static void __init do_boot_cpu (int apicid)
             printk("CPU%d has booted.\n", cpu);
         } else {
             boot_error= 1;
-            if (*((volatile unsigned long *)phys_to_virt(start_eip))
+            if (*((volatile unsigned int *)phys_to_virt(start_eip))
                 == 0xA5A5A5A5)
 				/* trampoline started but...? */
                 printk("Stuck ??\n");
@@ -866,6 +868,12 @@ void __init smp_boot_cpus(void)
          * Don't even attempt to start the boot CPU!
          */
         if (apicid == boot_cpu_apicid)
+            continue;
+
+        /* 
+         * Don't start hyperthreads if option noht requested.
+         */
+        if (opt_noht && (apicid & (ht_per_core - 1)))
             continue;
 
         if (!(phys_cpu_present_map & (1 << bit)))

@@ -23,7 +23,6 @@ from twisted.internet import reactor
 from twisted.internet import protocol
 from twisted.internet import abstract
 from twisted.internet import defer
-#defer.Deferred.debug = 1
 
 from xen.lowlevel import xu
 
@@ -36,135 +35,18 @@ from xen.xend.server import SrvServer
 from xen.xend import XendRoot
 from xen.xend.XendLogging import log
 
+from xen.util.ip import _readline, _readlines
+
 import channel
 import blkif
 import netif
+import usbif
 import console
 import domain
 from params import *
 
+DAEMONIZE = 1
 DEBUG = 1
-
-class MgmtProtocol(protocol.DatagramProtocol):
-    """Handler for the management socket (unix-domain).
-    """
-
-    def __init__(self, daemon):
-        #protocol.DatagramProtocol.__init__(self)
-        self.daemon = daemon
-    
-    def write(self, data, addr):
-        return self.transport.write(data, addr)
-
-    def datagramReceived(self, data, addr):
-        if DEBUG: print 'datagramReceived> addr=', addr, 'data=', data
-        io = StringIO.StringIO(data)
-        try:
-            vals = sxp.parse(io)
-            res = self.dispatch(vals[0])
-            self.send_result(addr, res)
-        except SystemExit:
-            raise
-        except:
-            if DEBUG:
-                raise
-            else:
-                self.send_error(addr)
-
-    def send_reply(self, addr, sxpr):
-        io = StringIO.StringIO()
-        sxp.show(sxpr, out=io)
-        io.seek(0)
-        self.write(io.getvalue(), addr)
-
-    def send_result(self, addr, res):
-        
-        def fn(res, self=self, addr=addr):
-            self.send_reply(addr, ['ok', res])
-            
-        if isinstance(res, defer.Deferred):
-            res.addCallback(fn)
-        else:
-            fn(res)
-
-    def send_error(self, addr):
-        (extype, exval) = sys.exc_info()[:2]
-        self.send_reply(addr, ['err',
-                               ['type',  str(extype) ],
-                               ['value', str(exval)  ] ] )
-
-    def opname(self, name):
-        """Get the name of the method for an operation.
-        """
-        return 'op_' + name.replace('.', '_')
-
-    def operror(self, name, v):
-        """Default operation handler - signals an error.
-        """
-        raise NotImplementedError('Invalid operation: ' +name)
-
-    def dispatch(self, req):
-        """Dispatch a request to its handler.
-        """
-        op_name = sxp.name(req)
-        op_method_name = self.opname(op_name)
-        op_method = getattr(self, op_method_name, self.operror)
-        return op_method(op_name, req)
-
-    def op_console_create(self, name, req):
-        """Create a new control interface - console for a domain.
-        """
-        print name, req
-        dom = sxp.child_value(req, 'domain')
-        if not dom: raise XendError('Missing domain')
-        dom = int(dom)
-        console_port = sxp.child_value(req, 'console_port')
-        if console_port:
-            console_port = int(console_port)
-        resp = self.daemon.console_create(dom, console_port).sxpr()
-        print name, resp
-        return resp
-
-    def op_consoles(self, name, req):
-        """Get a list of the consoles.
-        """
-        return self.daemon.consoles()
-
-    def op_console_disconnect(self, name, req):
-        id = sxp.child_value(req, 'id')
-        if not id:
-            raise XendError('Missing console id')
-        id = int(id)
-        console = self.daemon.get_console(id)
-        if not console:
-            raise XendError('Invalid console id')
-        if console.conn:
-            console.conn.loseConnection()
-        return ['ok']
-
-    def op_blkifs(self, name, req):
-        pass
-    
-    def op_blkif_devs(self, name, req):
-        pass
-
-    def op_blkif_create(self, name, req):
-        pass
-    
-    def op_blkif_dev_create(self, name, req):
-        pass
-
-    def op_netifs(self, name, req):
-        pass
-
-    def op_netif_devs(self, name, req):
-        pass
-
-    def op_netif_create(self, name, req):
-        pass
-
-    def op_netif_dev_create(self, name, req):
-        pass
 
 class NotifierProtocol(protocol.Protocol):
     """Asynchronous handler for i/o on the notifier (event channel).
@@ -237,25 +119,22 @@ class NotifierPort(abstract.FileDescriptor):
         if hasattr(self, 'protocol'):
             self.protocol.doStop()
         self.connected = 0
-        #self.notifier.close() # Not implemented.
-        os.close(self.fileno())
-        del self.notifier
+        #self.notifier.close()   # (this said:) Not implemented.
+        #os.close(self.fileno()) # But yes it is...
+        del self.notifier        # ...as _dealloc!
         if hasattr(self, 'd'):
             self.d.callback(None)
             del self.d
         
     def doRead(self):
-        #print 'NotifierPort>doRead>', self
         count = 0
         while 1:            
-            #print 'NotifierPort>doRead>', count
             notification = self.notifier.read()
             if not notification:
                 break
             self.protocol.notificationReceived(notification)
             self.notifier.unmask(notification)
             count += 1
-        #print 'NotifierPort>doRead<'
 
 class EventProtocol(protocol.Protocol):
     """Asynchronous handler for a connected event socket.
@@ -334,7 +213,7 @@ class EventProtocol(protocol.Protocol):
         self.events = events
 
     def queue_event(self, name, v):
-        # Despite the name we dont' queue the event here.
+        # Despite the name we don't queue the event here.
         # We send it because the transport will queue it.
         self.send_event([name, v])
         
@@ -374,6 +253,7 @@ class EventProtocol(protocol.Protocol):
         id = sxp.child_value(req, 'id')
         if not id:
             raise XendError('Missing console id')
+        id = int(id)
         self.daemon.console_disconnect(id)
         return ['ok']
 
@@ -382,6 +262,7 @@ class EventProtocol(protocol.Protocol):
         val += self.daemon.consoles()
         val += self.daemon.blkifs()
         val += self.daemon.netifs()
+        val += self.daemon.usbifs()
         return val
 
     def op_sys_subscribe(self, name, v):
@@ -396,11 +277,27 @@ class EventProtocol(protocol.Protocol):
         eserver.inject(sxp.name(event), event)
         return ['ok']
 
-    def op_traceon(self, name, v):
-        self.daemon.tracing(1)
+    def op_trace(self, name, v):
+        mode = (v[1] == 'on')
+        self.daemon.tracing(mode)
 
-    def op_traceoff(self, name, v):
-        self.daemon.tracing(0)
+    def op_log_stderr(self, name, v):
+        mode = v[1]
+        logging = XendRoot.instance().get_logging()
+        if mode == 'on':
+            logging.addLogStderr()
+        else:
+            logging.removeLogStderr()
+
+    def op_debug_msg(self, name, v):
+        mode = v[1]
+        import messages
+        messages.DEBUG = (mode == 'on')
+
+    def op_debug_controller(self, name, v):
+        mode = v[1]
+        import controller
+        controller.DEBUG = (mode == 'on')
 
 
 class EventFactory(protocol.Factory):
@@ -464,24 +361,80 @@ class Daemon:
             err = 1
             print "Daemon already running: ", pids
         return err
-            
+
+    def read_pid(self, pidfile):
+        """Read process id from a file.
+
+        @param pidfile: file to read
+        @return pid or 0
+        """
+        pid = 0
+        if os.path.isfile(pidfile) and os.path.getsize(pidfile):
+            try:
+                pid = open(pidfile, 'r').read()
+                pid = int(pid)
+            except:
+                pid = 0
+        return pid
+
+    def find_process(self, pid, name):
+        """Search for a process.
+
+        @param pid: process id
+        @param name: process name
+        @return: pid if found, 0 otherwise
+        """
+        running = 0
+        if pid:
+            lines = _readlines(os.popen('ps %d 2>/dev/null' % pid))
+            exp = '^ *%d.+%s' % (pid, name)
+            for line in lines:
+                if re.search(exp, line):
+                    running = pid
+                    break
+        return running
+
+    def cleanup_process(self, pidfile, name, kill):
+        """Clean up the pidfile for a process.
+        If a running process is found, kills it if 'kill' is true.
+
+        @param pidfile: pid file
+        @param name: process name
+        @param kill: whether to kill the process
+        @return running process id or 0
+        """
+        running = 0
+        pid = self.read_pid(pidfile)
+        if self.find_process(pid, name):
+            if kill:
+                os.kill(pid, 1)
+            else:
+                running = pid
+        if running == 0 and os.path.isfile(pidfile):
+            os.remove(pidfile)
+        return running
+
+    def cleanup_xend(self, kill=False):
+        return self.cleanup_process(XEND_PID_FILE, "xend", kill)
+
+    def cleanup_xfrd(self, kill=False):
+        return self.cleanup_process(XFRD_PID_FILE, "xfrd", kill)
+
     def cleanup(self, kill=False):
-        # No cleanup to do if PID_FILE is empty.
-        if not os.path.isfile(PID_FILE) or not os.path.getsize(PID_FILE):
+        self.cleanup_xend(kill=kill)
+        self.cleanup_xfrd(kill=kill)
+            
+    def status(self):
+        """Returns the status of the xend and xfrd daemons.
+        The return value is defined by the LSB:
+        0  Running
+        3  Not running
+        """
+        if (self.cleanup_process(XEND_PID_FILE, "xend", False) == 0 or
+            self.cleanup_process(XFRD_PID_FILE, "xfrd", False) == 0):
+            return 3
+        else:
             return 0
-        # Read the pid of the previous invocation and search active process list.
-        pid = open(PID_FILE, 'r').read()
-        lines = os.popen('ps ' + pid + ' 2>/dev/null').readlines()
-        for line in lines:
-            if re.search('^ *' + pid + '.+xend', line):
-                if not kill:
-                    print "Daemon is already running (pid %d)" % int(pid)
-                    return 1
-                # Old daemon is still active: terminate it.
-                os.kill(int(pid), 1)
-        # Delete the stale PID_FILE.
-        os.remove(PID_FILE)
-        return 0
 
     def install_child_reaper(self):
         #signal.signal(signal.SIGCHLD, self.onSIGCHLD)
@@ -493,42 +446,96 @@ class Daemon:
         while code > 0:
             code = os.waitpid(-1, os.WNOHANG)
 
-    def start(self, trace=0):
-        if self.cleanup(kill=False):
-            return 1
+    def fork_pid(self, pidfile):
+        """Fork and write the pid of the child to 'pidfile'.
 
-        # Detach from TTY.
-        if not DEBUG:
-            os.setsid()
-
-        if self.set_user():
-            return 1
-
-        self.install_child_reaper()
-
-        # Fork -- parent writes PID_FILE and exits.
+        @param pidfile: pid file
+        @return: pid of child in parent, 0 in child
+        """
         pid = os.fork()
         if pid:
             # Parent
-            pidfile = open(PID_FILE, 'w')
+            pidfile = open(pidfile, 'w')
             pidfile.write(str(pid))
             pidfile.close()
+        return pid
+
+    def start_xfrd(self):
+        """Fork and exec xfrd, writing its pid to XFRD_PID_FILE.
+        """
+        if self.fork_pid(XFRD_PID_FILE):
+            # Parent
+            pass
+        else:
+            # Child
+            os.execl("/usr/sbin/xfrd", "xfrd")
+
+    def daemonize(self):
+        if not DAEMONIZE: return
+        # Detach from TTY.
+        os.setsid()
+
+        # Detach from standard file descriptors.
+        # I do this at the file-descriptor level: the overlying Python file
+        # objects also use fd's 0, 1 and 2.
+        os.close(0)
+        os.close(1)
+        os.close(2)
+        if DEBUG:
+            os.open('/dev/null', os.O_RDONLY)
+            # XXX KAF: Why doesn't this capture output from C extensions that
+            # fprintf(stdout) or fprintf(stderr) ??
+            os.open('/var/log/xend-debug.log', os.O_WRONLY|os.O_CREAT)
+            os.dup(1)
+        else:
+            os.open('/dev/null', os.O_RDWR)
+            os.dup(0)
+            os.open('/var/log/xend-debug.log', os.O_WRONLY|os.O_CREAT)
+
+        
+    def start(self, trace=0):
+        """Attempts to start the daemons.
+        The return value is defined by the LSB:
+        0  Success
+        4  Insufficient privileges
+        """
+        xend_pid = self.cleanup_xend()
+        xfrd_pid = self.cleanup_xfrd()
+
+
+        self.daemonize()
+        
+        if self.set_user():
+            return 4
+        os.chdir("/")
+
+        if xfrd_pid == 0:
+            self.start_xfrd()
+        if xend_pid > 0:
+            # Trying to run an already-running service is a success.
             return 0
-        # Child
-        self.tracing(trace)
-        self.run()
+
+        self.install_child_reaper()
+
+        if self.fork_pid(XEND_PID_FILE):
+            #Parent
+            pass
+        else:
+            # Child
+            self.tracing(trace)
+            self.run()
         return 0
 
     def tracing(self, traceon):
         """Turn tracing on or off.
 
-        traceon tracing flag
+        @param traceon: tracing flag
         """
         if traceon == self.traceon:
             return
         self.traceon = traceon
         if traceon:
-            self.tracefile = open('/var/log/xend.trace', 'w+', 1)
+            self.tracefile = open(XEND_TRACE_FILE, 'w+', 1)
             self.traceindent = 0
             sys.settrace(self.trace)
             try:
@@ -603,7 +610,6 @@ class Daemon:
         xroot = XendRoot.instance()
         log.info("Xend Daemon started")
         self.createFactories()
-        self.listenMgmt()
         self.listenEvent()
         self.listenNotifier()
         self.listenVirq()
@@ -615,14 +621,8 @@ class Daemon:
         self.domainCF = domain.DomainControllerFactory()
         self.blkifCF = blkif.BlkifControllerFactory()
         self.netifCF = netif.NetifControllerFactory()
+        self.usbifCF = usbif.UsbifControllerFactory()
         self.consoleCF = console.ConsoleControllerFactory()
-
-    def listenMgmt(self):
-        protocol = MgmtProtocol(self)
-        s = os.path.join(CONTROL_DIR, MGMT_SOCK)
-        if os.path.exists(s):
-            os.unlink(s)
-        return reactor.listenUNIXDatagram(s, protocol)
 
     def listenEvent(self):
         protocol = EventFactory(self)
@@ -639,110 +639,83 @@ class Daemon:
         virqChan.registerClient(VirqClient(self))
 
     def exit(self):
-        reactor.diconnectAll()
+        reactor.disconnectAll()
         sys.exit(0)
 
     def getDomChannel(self, dom):
         """Get the channel to a domain.
 
-        dom domain
-
-        returns channel (or None)
+        @param dom: domain
+        @return: channel (or None)
         """
         return self.channelF.getDomChannel(dom)
 
-    def blkif_set_control_domain(self, dom, recreate=0):
-        """Set the block device backend control domain.
+    def createDomChannel(self, dom, local_port=0, remote_port=0):
+        """Get the channel to a domain, creating if necessary.
+
+        @param dom: domain
+        @param local_port: optional local port to re-use
+        @param remote_port: optional remote port to re-use
+        @return: channel
         """
-        return self.blkifCF.setControlDomain(dom, recreate=recreate)
-    
-    def blkif_get_control_domain(self, dom):
-        """Get the block device backend control domain.
-        """
-        return self.blkifCF.getControlDomain()
-    
+        return self.channelF.domChannel(dom, local_port=local_port,
+                                        remote_port=remote_port)
+
     def blkif_create(self, dom, recreate=0):
-        """Create a block device interface controller.
+        """Create or get a block device interface controller.
         
-        Returns Deferred
+        Returns controller
         """
-        d = self.blkifCF.createInstance(dom, recreate=recreate)
-        return d
+        blkif = self.blkifCF.getController(dom)
+        blkif.daemon = self
+        return blkif
 
     def blkifs(self):
-        return [ x.sxpr() for x in self.blkifCF.getInstances() ]
+        return [ x.sxpr() for x in self.blkifCF.getControllers() ]
 
     def blkif_get(self, dom):
-        return self.blkifCF.getInstanceByDom(dom)
+        return self.blkifCF.getControllerByDom(dom)
 
-    def blkif_dev(self, dom, vdev):
-        return self.blkifCF.getDomainDevice(dom, vdev)
-
-    def blkif_dev_create(self, dom, vdev, mode, segment, recreate=0):
-        """Create a block device.
-        
-        Returns Deferred
-        """
-        ctrl = self.blkifCF.getInstanceByDom(dom)
-        if not ctrl:
-            raise XendError('No blkif controller: %d' % dom)
-        d = ctrl.attachDevice(vdev, mode, segment, recreate=recreate)
-        return d
-
-    def netif_set_control_domain(self, dom, recreate=0):
-        """Set the network interface backend control domain.
-        """
-        return self.netifCF.setControlDomain(dom, recreate=recreate)
-
-    def netif_get_control_domain(self, dom):
-        """Get the network interface backend control domain.
-        """
-        return self.netifCF.getControlDomain()
-    
     def netif_create(self, dom, recreate=0):
-        """Create a network interface controller.
+        """Create or get a network interface controller.
         
         """
-        return self.netifCF.createInstance(dom, recreate=recreate)
+        return self.netifCF.getController(dom)
 
     def netifs(self):
-        return [ x.sxpr() for x in self.netifCF.getInstances() ]
+        return [ x.sxpr() for x in self.netifCF.getControllers() ]
 
     def netif_get(self, dom):
-        return self.netifCF.getInstanceByDom(dom)
+        return self.netifCF.getControllerByDom(dom)
 
-    def netif_dev_create(self, dom, vif, config, recreate=0):
-        """Create a network device.
+    def usbif_create(self, dom, recreate=0):
+        return self.usbifCF.getController(dom)
+    
+    def usbifs(self):
+        return [ x.sxpr() for x in self.usbifCF.getControllers() ]
 
-        """
-        ctrl = self.netifCF.getInstanceByDom(dom)
-        if not ctrl:
-            raise XendError('No netif controller: %d' % dom)
-        d = ctrl.attachDevice(vif, config, recreate=recreate)
-        return d
-
-    def netif_dev(self, dom, vif):
-        return self.netifCF.getDomainDevice(dom, vif)
+    def usbif_get(self, dom):
+        return self.usbifCF.getControllerByDom(dom)
 
     def console_create(self, dom, console_port=None):
         """Create a console for a domain.
         """
-        console = self.consoleCF.getInstanceByDom(dom)
+        console = self.consoleCF.getControllerByDom(dom)
         if console is None:
-            console = self.consoleCF.createInstance(dom, console_port)
+            console = self.consoleCF.createController(dom, console_port)
         return console
 
     def consoles(self):
-        return [ c.sxpr() for c in self.consoleCF.getInstances() ]
+        return [ c.sxpr() for c in self.consoleCF.getControllers() ]
 
     def get_consoles(self):
-        return self.consoleCF.getInstances()
+        return self.consoleCF.getControllers()
 
     def get_console(self, id):
-        return self.consoleCF.getInstance(id)
+        return self.consoleCF.getControllerByIndex(id)
 
     def get_domain_console(self, dom):
-        return self.consoleCF.getInstanceByDom(dom)
+        return self.consoleCF.getControllerByDom(dom)
 
     def console_disconnect(self, id):
         """Disconnect any connected console client.
@@ -752,13 +725,24 @@ class Daemon:
             raise XendError('Invalid console id')
         console.disconnect()
 
-    def domain_shutdown(self, dom, reason):
+    def domain_shutdown(self, dom, reason, key=0):
         """Shutdown a domain.
         """
-        ctrl = self.domainCF.getInstanceByDom(dom)
+        dom = int(dom)
+        ctrl = self.domainCF.getController(dom)
         if not ctrl:
-            raise XendError('No domain controller: %d' % dom)
-        ctrl.shutdown(reason)
+            raise XendError('No domain controller: %s' % dom)
+        ctrl.shutdown(reason, key)
+        return 0
+
+    def domain_mem_target_set(self, dom, target):
+        """Set memory target for a domain.
+        """
+        dom = int(dom)
+        ctrl = self.domainCF.getController(dom)
+        if not ctrl:
+            raise XendError('No domain controller: %s' % dom)
+        ctrl.mem_target_set(target)
         return 0
         
 def instance():

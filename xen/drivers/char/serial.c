@@ -1,3 +1,4 @@
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /******************************************************************************
  * serial.c
  * 
@@ -9,13 +10,18 @@
  */
 
 #include <xen/config.h>
+#include <xen/init.h>
 #include <xen/irq.h>
 #include <xen/keyhandler.h> 
-#include <asm/pdb.h>
 #include <xen/reboot.h>
 #include <xen/sched.h>
 #include <xen/serial.h>
 #include <asm/io.h>
+
+/* opt_com[12]: Config serial port with a string <baud>,DPS,<io-base>,<irq>. */
+static unsigned char opt_com1[30] = "", opt_com2[30] = "";
+string_param("com1", opt_com1);
+string_param("com2", opt_com2);
 
 /* Register offsets */
 #define RBR             0x00    /* receive buffer       */
@@ -27,14 +33,14 @@
 #define MCR             0x04    /* Modem control        */
 #define LSR             0x05    /* line status          */
 #define MSR             0x06    /* Modem status         */
-#define DLL             0x00    /* divisor latch (ls) ( DLAB=1)	*/
-#define DLM             0x01    /* divisor latch (ms) ( DLAB=1)	*/
+#define DLL             0x00    /* divisor latch (ls) (DLAB=1) */
+#define DLM             0x01    /* divisor latch (ms) (DLAB=1) */
 
 /* Interrupt Enable Register */
 #define IER_ERDAI       0x01    /* rx data recv'd       */
 #define IER_ETHREI      0x02    /* tx reg. empty        */
 #define IER_ELSI        0x04    /* rx line status       */
-#define IER_EMSI        0x08    /* MODEM status	        */
+#define IER_EMSI        0x08    /* MODEM status         */
 
 /* FIFO control register */
 #define FCR_ENABLE      0x01    /* enable FIFO          */
@@ -94,12 +100,22 @@ static uart_t com[2] = {
 #define UART_ENABLED(_u) ((_u)->baud != 0)
 #define DISABLE_UART(_u) ((_u)->baud = 0)
 
+#ifdef CONFIG_X86
+static inline int arch_serial_putc(uart_t *uart, unsigned char c)
+{
+    int space;
+    if ( (space = (inb(uart->io_base + LSR) & LSR_THRE)) )
+        outb(c, uart->io_base + THR);
+    return space;
+}
+#endif
+
 
 /***********************
  * PRIVATE FUNCTIONS
  */
 
-static void uart_rx(uart_t *uart, struct pt_regs *regs)
+static void uart_rx(uart_t *uart, struct xen_regs *regs)
 {
     unsigned char c;
 
@@ -125,13 +141,16 @@ static void uart_rx(uart_t *uart, struct pt_regs *regs)
     }
 }
 
-static void serial_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static void serial_interrupt(int irq, void *dev_id, struct xen_regs *regs)
 {
     uart_rx((uart_t *)dev_id, regs);
 }
 
 static inline void __serial_putc(uart_t *uart, int handle, unsigned char c)
 {
+    unsigned long flags;
+    int space;
+
     if ( (c == '\n') && (handle & SERHND_COOKED) )
         __serial_putc(uart, handle, '\r');
 
@@ -140,10 +159,12 @@ static inline void __serial_putc(uart_t *uart, int handle, unsigned char c)
     else if ( handle & SERHND_LO )
         c &= 0x7f;
 
-    while ( !(inb(uart->io_base + LSR) & LSR_THRE) )
-        barrier();
-
-    outb(c, uart->io_base + THR);
+    do { 
+        spin_lock_irqsave(&uart->lock, flags);
+        space = arch_serial_putc(uart, c);
+        spin_unlock_irqrestore(&uart->lock, flags);
+    }
+    while ( !space );
 }
 
 #define PARSE_ERR(_f, _a...)                 \
@@ -274,8 +295,6 @@ static void uart_config_stage2(uart_t *uart)
 
 void serial_init_stage1(void)
 {
-    extern unsigned char opt_com1[], opt_com2[];
-
     parse_port_config(opt_com1, &com[0]);
     parse_port_config(opt_com2, &com[1]);
 
@@ -312,11 +331,13 @@ int parse_serial_handle(char *conf)
         goto fail;
     }
 
+#ifndef NO_UART_CONFIG_OK
     if ( !UART_ENABLED(&com[handle]) )
     {
         printk("ERROR: cannot use unconfigured serial port COM%d\n", handle+1);
         return -1;
     }
+#endif
 
     if ( conf[4] == 'H' )
         handle |= SERHND_HI;
@@ -376,32 +397,22 @@ void serial_set_rx_handler(int handle, serial_rx_fn fn)
 void serial_putc(int handle, unsigned char c)
 {
     uart_t *uart = &com[handle & SERHND_IDX];
-    unsigned long flags;
 
     if ( handle == -1 )
         return;
 
-    spin_lock_irqsave(&uart->lock, flags);
-
     __serial_putc(uart, handle, c);
-
-    spin_unlock_irqrestore(&uart->lock, flags);
 }
 
 void serial_puts(int handle, const unsigned char *s)
 {
     uart_t *uart = &com[handle & SERHND_IDX];
-    unsigned long flags;
 
     if ( handle == -1 )
         return;
 
-    spin_lock_irqsave(&uart->lock, flags);
-
     while ( *s != '\0' )
         __serial_putc(uart, handle, *s++);
-
-    spin_unlock_irqrestore(&uart->lock, flags);
 }
 
 /* Returns TRUE if given character (*pc) matches the serial handle. */
@@ -420,19 +431,19 @@ static int byte_matches(int handle, unsigned char *pc)
     return 0;
 }
 
-unsigned char __serial_getc(int handle)
+unsigned char irq_serial_getc(int handle)
 {
     uart_t *uart = &com[handle & SERHND_IDX];
     unsigned char c;
 
-    /* disable_irq() may have raced execution of uart_rx(). */
+
     while ( uart->rxbufp != uart->rxbufc )
     {
         c = uart->rxbuf[MASK_RXBUF_IDX(uart->rxbufc++)];
         if ( byte_matches(handle, &c) )
-	  return c;
+            goto out;
     }
-
+    
     /* We now wait for the UART to receive a suitable character. */
     do {
         while ( (inb(uart->io_base + LSR) & LSR_DR) == 0 )
@@ -440,7 +451,8 @@ unsigned char __serial_getc(int handle)
         c = inb(uart->io_base + RBR);
     }
     while ( !byte_matches(handle, &c) );
-
+    
+ out:
     return c;
 }
 
@@ -458,11 +470,11 @@ unsigned char serial_getc(int handle)
         if ( byte_matches(handle, &c) )
             goto out;
     }
-
+    
     disable_irq(uart->irq);
 
-    c = __serial_getc(handle);
-
+    c = irq_serial_getc(handle);
+    
     enable_irq(uart->irq);
  out:
     spin_unlock_irqrestore(&uart->lock, flags);

@@ -212,19 +212,19 @@ static inline void send_IPI_allbutself(int vector)
  */
 
 static spinlock_t flush_lock = SPIN_LOCK_UNLOCKED;
-volatile unsigned long flush_cpumask;
+static unsigned long flush_cpumask;
 
 asmlinkage void smp_invalidate_interrupt(void)
 {
     ack_APIC_irq();
     perfc_incrc(ipis);
-    if ( likely(test_and_clear_bit(smp_processor_id(), &flush_cpumask)) )
-        local_flush_tlb();
+    local_flush_tlb();
+    clear_bit(smp_processor_id(), &flush_cpumask);
 }
 
 void flush_tlb_mask(unsigned long mask)
 {
-    ASSERT(!in_irq());
+    ASSERT(local_irq_is_enabled());
     
     if ( mask & (1 << smp_processor_id()) )
     {
@@ -234,20 +234,7 @@ void flush_tlb_mask(unsigned long mask)
 
     if ( mask != 0 )
     {
-        /*
-         * We are certainly not reentering a flush_lock region on this CPU
-         * because we are not in an IRQ context. We can therefore wait for the
-         * other guy to release the lock. This is harder than it sounds because
-         * local interrupts might be disabled, and he may be waiting for us to
-         * execute smp_invalidate_interrupt(). We deal with this possibility by
-         * inlining the meat of that function here.
-         */
-        while ( unlikely(!spin_trylock(&flush_lock)) )
-        {
-            if ( test_and_clear_bit(smp_processor_id(), &flush_cpumask) )
-                local_flush_tlb();
-            rep_nop();
-        }
+        spin_lock(&flush_lock);
 
         flush_cpumask = mask;
         send_IPI_mask(mask, INVALIDATE_TLB_VECTOR);
@@ -261,21 +248,15 @@ void flush_tlb_mask(unsigned long mask)
     }
 }
 
-/*
- * NB. Must be called with no locks held and interrupts enabled.
- *     (e.g., softirq context).
- */
+/* Call with no locks held and interrupts enabled (e.g., softirq context). */
 void new_tlbflush_clock_period(void)
 {
-    spin_lock(&flush_lock);
-
-    /* Someone may acquire the lock and execute the flush before us. */
-    if ( ((tlbflush_clock+1) & TLBCLOCK_EPOCH_MASK) != 0 )
-        goto out;
-
+    ASSERT(local_irq_is_enabled());
+    
+    /* Flush everyone else. We definitely flushed just before entry. */
     if ( smp_num_cpus > 1 )
     {
-        /* Flush everyone else. We definitely flushed just before entry. */
+        spin_lock(&flush_lock);
         flush_cpumask = ((1 << smp_num_cpus) - 1) & ~(1 << smp_processor_id());
         send_IPI_allbutself(INVALIDATE_TLB_VECTOR);
         while ( flush_cpumask != 0 )
@@ -283,13 +264,12 @@ void new_tlbflush_clock_period(void)
             rep_nop();
             barrier();
         }
+        spin_unlock(&flush_lock);
     }
 
     /* No need for atomicity: we are the only possible updater. */
+    ASSERT(tlbflush_clock == 0);
     tlbflush_clock++;
-
- out:
-    spin_unlock(&flush_lock);
 }
 
 static void flush_tlb_all_pge_ipi(void* info)

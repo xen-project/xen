@@ -11,7 +11,8 @@ from xen.xend import PrettyPrint
 from xen.xend import sxp
 from xen.xend.XendClient import XendError, server
 from xen.xend.XendClient import main as xend_client_main
-from xen.xm import create, destroy, shutdown
+from xen.xm import create, destroy, migrate, shutdown, sysrq
+from xen.xm.opts import *
 
 class Group:
 
@@ -282,20 +283,32 @@ class ProgRestore(Prog):
     info = """Create a domain from a saved state."""
 
     def help(self, args):
-        print args[0], "FILE [CONFIG]"
-        print "\nRestore a domain from FILE using configuration CONFIG."
+        print args[0], "FILE"
+        print "\nRestore a domain from FILE."
     
-    def main(self, help, args):
+    def main(self, args):
         if len(args) < 2: self.err("%s: Missing arguments" % args[0])
-        savefile =  os.path.abspath(args[1])
-        if len(args) >= 3:
-            configfile = os.path.abspath(args[2])
-        else:
-            configfile = None
-        info = server.xend_domain_restore(savefile, configfile)
+        savefile = os.path.abspath(args[1])
+        info = server.xend_domain_restore(savefile)
         PrettyPrint.prettyprint(info)
+        id = sxp.child_value(info, 'id')
+        if id is not None:
+            server.xend_domain_unpause(id)
 
 xm.prog(ProgRestore)
+
+class ProgMigrate(Prog):
+    group = 'domain'
+    name = "migrate"
+    info = """Migrate a domain to another machine."""
+
+    def help(self, args):
+        migrate.help([self.name] + args)
+    
+    def main(self, args):
+        migrate.main(args)
+
+xm.prog(ProgMigrate)
 
 class ProgList(Prog):
     group = 'domain'
@@ -388,6 +401,19 @@ class ProgShutdown(Prog):
 
 xm.prog(ProgShutdown)
 
+class ProgSysrq(Prog):
+    group = 'domain'
+    name = "sysrq"
+    info = """Send a sysrq to a domain."""
+
+    def help(self, args):
+        sysrq.main([args[0], '-h'])
+    
+    def main(self, args):
+        sysrq.main(args)
+
+xm.prog(ProgSysrq)
+
 class ProgPause(Prog):
     group = 'domain'
     name = "pause"
@@ -431,8 +457,9 @@ class ProgPincpu(Prog):
 
     def main(self, args):
         if len(args) != 3: self.err("%s: Invalid argument(s)" % args[0])
-        v = map(int, args[1:3])
-        server.xend_domain_pincpu(*v)
+        dom = args[1]
+        cpu = int(args[2])
+        server.xend_domain_pincpu(dom, cpu)
 
 xm.prog(ProgPincpu)
 
@@ -447,10 +474,29 @@ class ProgMaxmem(Prog):
 
     def main(self, args):
         if len(args) != 3: self.err("%s: Invalid argument(s)" % args[0])
-        v = map(int, args[1:3])
-        server.xend_domain_maxmem_set(*v)
+        dom = args[1]
+        mem = int(args[2])
+        server.xend_domain_maxmem_set(dom, mem)
 
 xm.prog(ProgMaxmem)
+
+class ProgBalloon(Prog):
+    group = 'domain'
+    name  = 'balloon'
+    info  = """Set the domain's memory footprint using the balloon driver."""
+
+    def help(self, args):
+        print args[0], "DOM MEMORY_TARGET"
+        print """\nRequest domain DOM to adjust its memory footprint to
+MEMORY_TARGET megabytes"""
+
+    def main(self, args):
+        if len(args) != 3: self.err("%s: Invalid argument(s)" % args[0])
+        dom = args[1]
+        mem_target = int(args[2])
+        server.xend_domain_mem_target_set(dom, mem_target)
+
+xm.prog(ProgBalloon)
 
 class ProgDomid(Prog):
     group = 'domain'
@@ -497,8 +543,9 @@ class ProgBvt(Prog):
 
     def main(self, args):
         if len(args) != 7: self.err("%s: Invalid argument(s)" % args[0])
-        v = map(long, args[1:7])
-        server.xend_domain_cpu_bvt_set(*v)
+        dom = args[1]
+        v = map(long, args[2:7])
+        server.xend_domain_cpu_bvt_set(dom, *v)
 
 xm.prog(ProgBvt)
 
@@ -519,39 +566,6 @@ class ProgBvtslice(Prog):
 
 xm.prog(ProgBvtslice)
 
-class ProgFbvt(Prog):
-    group = 'scheduler'
-    name = "fbvt"
-    info = """Set FBVT scheduler parameters."""
-    
-    def help(self, args):
-        print args[0], "DOM MCUADV WARP WARPL WARPU"
-        print '\nSet Fair Borrowed Virtual Time scheduler parameters.'
-
-    def main(self, args):
-        if len(args) != 6: self.err("%s: Invalid argument(s)" % args[0])
-        v = map(int, args[1:6])
-        server.xend_domain_cpu_fbvt_set(*v)
-
-xm.prog(ProgFbvt)
-
-class ProgFbvtslice(Prog):
-    group = 'scheduler'
-    name = "fbvt_ctxallow"
-    info = """Set the FBVT scheduler context switch allowance."""
-
-    def help(self, args):
-        print args[0], 'CTX_ALLOW'
-        print '\nSet Fair Borrowed Virtual Time scheduler context switch allowance.'
-
-    def main(self, args):
-        if len(args) < 2: self.err('%s: Missing context switch allowance.' 
-                                                                % args[0])
-        ctx_allow = int(args[1])
-        server.xend_node_cpu_fbvt_slice_set(ctx_allow)
-
-xm.prog(ProgFbvtslice)
-
 
 class ProgAtropos(Prog):
     group = 'scheduler'
@@ -563,9 +577,10 @@ class ProgAtropos(Prog):
         print "\nSet atropos parameters."
 
     def main(self, args):
-        if len(args) != 5: self.err("%s: Invalid argument(s)" % args[0])
-        v = map(int, args[1:5])
-        server.xend_domain_cpu_atropos_set(*v)
+        if len(args) != 6: self.err("%s: Invalid argument(s)" % args[0])
+        dom = args[1]
+        v = map(int, args[2:6])
+        server.xend_domain_cpu_atropos_set(dom, *v)
 
 xm.prog(ProgAtropos)
 
@@ -661,10 +676,34 @@ xm.prog(ProgCall)
 class ProgDmesg(Prog):
     group = 'host'
     name  =  "dmesg"
-    info  = """Print Xen boot output."""
+    info  = """Read or clear Xen's message buffer."""
+
+    gopts = Opts(use="""[-c|--clear]
+
+Read Xen's message buffer (boot output, warning and error messages) or clear
+its contents if the [-c|--clear] flag is specified.
+""")
+
+    gopts.opt('clear', short='c',
+              fn=set_true, default=0,
+              use="Clear the contents of the Xen message buffer.")
+
+    short_options = ['-c']
+    long_options = ['--clear']
+
+    def help(self, args):
+        self.gopts.argv = args
+        self.gopts.usage()
 
     def main(self, args):
-        print server.xend_node_dmesg()
+        self.gopts.parse(args)
+        if not (1 <= len(args) <=2):
+            self.gopts.err('Invalid arguments: ' + str(args))
+
+        if not self.gopts.vals.clear:
+            print server.xend_node_get_dmesg()
+        else:
+            server.xend_node_clear_dmesg()
 
 xm.prog(ProgDmesg)
 
@@ -720,22 +759,26 @@ class ProgVbdCreate(Prog):
     info = """Create a new virtual block device for a domain"""
 
     def help(self, args):
-        print args[0], "DOM UNAME DEV MODE"
+        print args[0], "DOM UNAME DEV MODE [BACKEND]"
         print """
 Create a virtual block device for a domain.
 
-  UNAME - device to export, e.g. phys:hda2
-  DEV   - device name in the domain, e.g. xda1
-  MODE  - access mode: r for read, w for read-write
+  UNAME   - device to export, e.g. phy:hda2
+  DEV     - device name in the domain, e.g. sda1
+  MODE    - access mode: r for read, w for read-write
+  BACKEND - backend driver domain
 """
 
     def main(self, args):
-        if len(args) != 5: self.err("%s: Invalid argument(s)" % args[0])
+        n = len(args)
+        if n < 5 or n > 6: self.err("%s: Invalid argument(s)" % args[0])
         dom = args[1]
         vbd = ['vbd',
                ['uname', args[2]],
                ['dev',   args[3]],
                ['mode',  args[4]]]
+        if n == 6:
+            vbd.append(['backend', args[5]])
         server.xend_domain_device_create(dom, vbd)
 
 xm.prog(ProgVbdCreate)
@@ -749,13 +792,15 @@ class ProgVbdDestroy(Prog):
         print args[0], "DOM DEV"
         print """
 Destroy vbd DEV attached to domain DOM. Detaches the device
-from the domain, but does not destroy the device contents."""
+from the domain, but does not destroy the device contents.
+The device indentifier DEV is the idx field in the device
+information. This is visible in 'xm vbd-list'."""
 
     def main(self, args):
-        if len(args!=3): self.err("%s: Invalid argument(s)" % args[0])
+        if len(args) != 3: self.err("%s: Invalid argument(s)" % args[0])
         dom = args[1]
         dev = args[2]
-        sever.xend_domain_device_destroy(dom, "vbd", dev)
+        server.xend_domain_device_destroy(dom, "vbd", dev)
 
 xm.prog(ProgVbdDestroy)
 

@@ -1,0 +1,3 @@
+# Vnet configuration for a vnet with id 97 and no security.
+# Configure using 'xm call vnet_add vnet97.sxp'.
+(vnet (id 97) (bridge vnet97) (vnetif vnetif97) (security none))

@@ -3,12 +3,12 @@
 
 #include <xen/config.h>
 #include <xen/spinlock.h>
-#include <asm/ptrace.h>
+#include <asm/regs.h>
 #include <asm/hardirq.h>
 
 struct irqaction
 {
-    void (*handler)(int, void *, struct pt_regs *);
+    void (*handler)(int, void *, struct xen_regs *);
     const char *name;
     void *dev_id;
 };
@@ -21,6 +21,7 @@ struct irqaction
 #define IRQ_PENDING	4	/* IRQ pending - replay on enable */
 #define IRQ_REPLAY	8	/* IRQ has been replayed but not acked yet */
 #define IRQ_GUEST       16      /* IRQ is handled by guest OS(es) */
+#define IRQ_PER_CPU     256     /* IRQ is per CPU */
 
 /*
  * Interrupt controller descriptor. This is all we need
@@ -54,7 +55,7 @@ typedef struct {
     struct irqaction *action;	/* IRQ action list */
     unsigned int depth;		/* nested irq disables */
     spinlock_t lock;
-} ____cacheline_aligned irq_desc_t;
+} __cacheline_aligned irq_desc_t;
 
 extern irq_desc_t irq_desc[NR_IRQS];
 
@@ -62,11 +63,12 @@ extern int setup_irq(unsigned int, struct irqaction *);
 extern void free_irq(unsigned int);
 
 extern hw_irq_controller no_irq_type;
-extern void no_action(int cpl, void *dev_id, struct pt_regs *regs);
+extern void no_action(int cpl, void *dev_id, struct xen_regs *regs);
 
 struct domain;
+struct exec_domain;
 extern int pirq_guest_unmask(struct domain *p);
-extern int pirq_guest_bind(struct domain *p, int irq, int will_share);
+extern int pirq_guest_bind(struct exec_domain *p, int irq, int will_share);
 extern int pirq_guest_unbind(struct domain *p, int irq);
 extern int pirq_guest_bindable(int irq, int will_share);
 

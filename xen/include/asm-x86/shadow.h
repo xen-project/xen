@@ -1,4 +1,4 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4 -*- */
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 
 #ifndef _XEN_SHADOW_H
 #define _XEN_SHADOW_H
@@ -8,34 +8,54 @@
 #include <xen/perfc.h>
 #include <asm/processor.h>
 
+#ifdef CONFIG_VMX
+#include <asm/domain_page.h>
+#endif
 
 /* Shadow PT flag bits in pfn_info */
 #define PSH_shadowed    (1<<31) /* page has a shadow. PFN points to shadow */
-#define PSH_pending     (1<<29) /* page is in the process of being shadowed */
 #define PSH_pfn_mask    ((1<<21)-1)
 
-/* Shadow PT operation mode : shadowmode variable in mm_struct */
+/* Shadow PT operation mode : shadow-mode variable in arch_domain. */
 #define SHM_test        (1) /* just run domain on shadow PTs */
 #define SHM_logdirty    (2) /* log pages that are dirtied */
 #define SHM_translate   (3) /* lookup machine pages in translation table */
-//#define SHM_cow       (4) /* copy on write all dirtied pages */
-
+#define SHM_cow         (4) /* copy on write all dirtied pages */
+#define SHM_full_32     (8) /* full virtualization for 32-bit */
 
 #define shadow_linear_pg_table ((l1_pgentry_t *)SH_LINEAR_PT_VIRT_START)
-#define shadow_linear_l2_table ((l2_pgentry_t *)(SH_LINEAR_PT_VIRT_START+(SH_LINEAR_PT_VIRT_START>>(L2_PAGETABLE_SHIFT-L1_PAGETABLE_SHIFT))))
+#define shadow_linear_l2_table ((l2_pgentry_t *)(SH_LINEAR_PT_VIRT_START + \
+     (SH_LINEAR_PT_VIRT_START >> (L2_PAGETABLE_SHIFT - L1_PAGETABLE_SHIFT))))
 
-#define shadow_mode(_d)      ((_d)->mm.shadow_mode)
-#define shadow_lock_init(_d) spin_lock_init(&(_d)->mm.shadow_lock)
+#define shadow_mode(_d)      ((_d)->arch.shadow_mode)
+#define shadow_lock_init(_d) spin_lock_init(&(_d)->arch.shadow_lock)
+#define shadow_lock(_d)      spin_lock(&(_d)->arch.shadow_lock)
+#define shadow_unlock(_d)    spin_unlock(&(_d)->arch.shadow_lock)
 
 extern void shadow_mode_init(void);
 extern int shadow_mode_control(struct domain *p, dom0_shadow_control_t *sc);
 extern int shadow_fault(unsigned long va, long error_code);
-extern void shadow_l1_normal_pt_update(unsigned long pa, unsigned long gpte, 
-                                       unsigned long *prev_spfn_ptr,
-                                       l1_pgentry_t **prev_spl1e_ptr);
-extern void shadow_l2_normal_pt_update(unsigned long pa, unsigned long gpte);
+extern void shadow_l1_normal_pt_update(
+    unsigned long pa, unsigned long gpte, 
+    unsigned long *prev_spfn_ptr, l1_pgentry_t **prev_spl1e_ptr);
+extern void shadow_l2_normal_pt_update(unsigned long pa, unsigned long gpde);
 extern void unshadow_table(unsigned long gpfn, unsigned int type);
 extern int shadow_mode_enable(struct domain *p, unsigned int mode);
+
+#ifdef CONFIG_VMX
+extern void vmx_shadow_clear_state(struct domain *);
+extern void vmx_shadow_invlpg(struct domain *, unsigned long);
+#endif
+
+#define __mfn_to_gpfn(_d, mfn)                         \
+    ( (shadow_mode(_d) == SHM_full_32)                 \
+      ? machine_to_phys_mapping[(mfn)]                 \
+      : (mfn) )
+
+#define __gpfn_to_mfn(_d, gpfn)                        \
+    ( (shadow_mode(_d) == SHM_full_32)                 \
+      ? phys_to_machine_mapping(gpfn)                  \
+      : (gpfn) )
 
 extern void __shadow_mode_disable(struct domain *d);
 static inline void shadow_mode_disable(struct domain *d)
@@ -45,98 +65,156 @@ static inline void shadow_mode_disable(struct domain *d)
 }
 
 extern unsigned long shadow_l2_table( 
-    struct mm_struct *m, unsigned long gpfn );
+    struct domain *d, unsigned long gpfn);
+  
+static inline void shadow_invalidate(struct exec_domain *ed) {
+    if ( shadow_mode(ed->domain) != SHM_full_32 )
+        BUG();
+    memset(ed->arch.shadow_vtable, 0, PAGE_SIZE);
+}
 
 #define SHADOW_DEBUG 0
+#define SHADOW_VERBOSE_DEBUG 0
 #define SHADOW_HASH_DEBUG 0
-#define SHADOW_OPTIMISE 1
 
 struct shadow_status {
-    unsigned long pfn;            // gpfn 
-    unsigned long spfn_and_flags; // spfn plus flags
-    struct shadow_status *next;   // use pull-to-front list.
+    unsigned long pfn;            /* Guest pfn.             */
+    unsigned long smfn_and_flags; /* Shadow mfn plus flags. */
+    struct shadow_status *next;   /* Pull-to-front list.    */
 };
 
-#define shadow_ht_extra_size         128 /*128*/
-#define shadow_ht_buckets            256 /*256*/
+#define shadow_ht_extra_size 128
+#define shadow_ht_buckets    256
 
 #ifdef VERBOSE
-#define SH_LOG(_f, _a...)                             \
-printk("DOM%u: (file=shadow.c, line=%d) " _f "\n",    \
-       current->domain , __LINE__ , ## _a )
+#define SH_LOG(_f, _a...)                                               \
+printk("DOM%uP%u: (file=shadow.c, line=%d) " _f "\n",                   \
+       current->domain->id , current->processor, __LINE__ , ## _a )
 #else
 #define SH_LOG(_f, _a...) 
 #endif
 
 #if SHADOW_DEBUG
-#define SH_VLOG(_f, _a...)                             \
-    printk("DOM%u: (file=shadow.c, line=%d) " _f "\n", \
-           current->domain , __LINE__ , ## _a )
+#define SH_VLOG(_f, _a...)                                              \
+    printk("DOM%uP%u: (file=shadow.c, line=%d) " _f "\n",               \
+           current->domain->id, current->processor, __LINE__ , ## _a )
 #else
 #define SH_VLOG(_f, _a...) 
 #endif
 
-#if 0
-#define SH_VVLOG(_f, _a...)                             \
-    printk("DOM%u: (file=shadow.c, line=%d) " _f "\n",  \
-           current->domain , __LINE__ , ## _a )
+#if SHADOW_VERBOSE_DEBUG
+#define SH_VVLOG(_f, _a...)                                             \
+    printk("DOM%uP%u: (file=shadow.c, line=%d) " _f "\n",               \
+           current->domain->id, current->processor, __LINE__ , ## _a )
 #else
-#define SH_VVLOG(_f, _a...) 
+#define SH_VVLOG(_f, _a...)
 #endif
 
-
-/************************************************************************/
-
-static inline int __mark_dirty( struct mm_struct *m, unsigned int mfn )
+// BUG: mafetter: this assumes ed == current, so why pass ed?
+static inline void __shadow_get_l2e(
+    struct exec_domain *ed, unsigned long va, unsigned long *sl2e)
 {
-    unsigned int pfn;
-    int rc = 0;
+    if ( shadow_mode(ed->domain) == SHM_full_32 ) {
+        *sl2e = l2_pgentry_val(ed->arch.shadow_vtable[l2_table_offset(va)]);
+    }
+    else if ( shadow_mode(ed->domain) ) {
+        *sl2e = l2_pgentry_val(shadow_linear_l2_table[l2_table_offset(va)]);
+    }
+    else
+        *sl2e = l2_pgentry_val(linear_l2_table[l2_table_offset(va)]);
+}
 
-    ASSERT(spin_is_locked(&m->shadow_lock));
+static inline void __shadow_set_l2e(
+    struct exec_domain *ed, unsigned long va, unsigned long value)
+{
+    if ( shadow_mode(ed->domain) == SHM_full_32 ) {
+        ed->arch.shadow_vtable[l2_table_offset(va)] = mk_l2_pgentry(value);
+    }
+    else if ( shadow_mode(ed->domain) ) {
+        shadow_linear_l2_table[l2_table_offset(va)] = mk_l2_pgentry(value);
+    }
+    else
+        linear_l2_table[l2_table_offset(va)] = mk_l2_pgentry(value);
+}
 
-    pfn = machine_to_phys_mapping[mfn];
+static inline void __guest_get_l2e(
+    struct exec_domain *ed, unsigned long va, unsigned long *l2e)
+{
+    *l2e = ( shadow_mode(ed->domain) == SHM_full_32) ?
+        l2_pgentry_val(ed->arch.vpagetable[l2_table_offset(va)]) :
+        l2_pgentry_val(linear_l2_table[l2_table_offset(va)]);
+}
 
-    /* We use values with the top bit set to mark MFNs that aren't
-       really part of the domain's psuedo-physical memory map e.g.
-       the shared info frame. Nothing to do here...
-    */
-    if ( unlikely(pfn & 0x80000000U) ) return rc; 
-
-    ASSERT(m->shadow_dirty_bitmap);
-    if( likely(pfn<m->shadow_dirty_bitmap_size) )
+static inline void __guest_set_l2e(
+    struct exec_domain *ed, unsigned long va, unsigned long value)
+{
+    if ( shadow_mode(ed->domain) == SHM_full_32 )
     {
-        /* These updates occur with mm.shadow_lock held, so use 
-           (__) version of test_and_set */
-        if ( __test_and_set_bit( pfn, m->shadow_dirty_bitmap ) == 0 )
-        {
-            // if we set it
-            m->shadow_dirty_count++;
-            rc = 1;
-        }
+        unsigned long pfn;
+
+        pfn = phys_to_machine_mapping(value >> PAGE_SHIFT);
+        ed->arch.guest_pl2e_cache[l2_table_offset(va)] =
+            mk_l2_pgentry((pfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
+
+        ed->arch.vpagetable[l2_table_offset(va)] = mk_l2_pgentry(value);
     }
     else
     {
-        extern void show_traceX(void);
-        SH_LOG("mark_dirty OOR! mfn=%x pfn=%x max=%x (mm %p)",
-               mfn, pfn, m->shadow_dirty_bitmap_size, m );
-        SH_LOG("dom=%u caf=%08x taf=%08x\n", 
-               frame_table[mfn].u.inuse.domain->domain,
-               frame_table[mfn].u.inuse.count_info, 
+        linear_l2_table[l2_table_offset(va)] = mk_l2_pgentry(value);
+    }
+}
+
+/************************************************************************/
+
+static inline int __mark_dirty(struct domain *d, unsigned int mfn)
+{
+    unsigned long pfn;
+    int           rc = 0;
+
+    ASSERT(spin_is_locked(&d->arch.shadow_lock));
+    ASSERT(d->arch.shadow_dirty_bitmap != NULL);
+
+    pfn = machine_to_phys_mapping[mfn];
+
+    /*
+     * Values with the MSB set denote MFNs that aren't really part of the 
+     * domain's pseudo-physical memory map (e.g., the shared info frame).
+     * Nothing to do here...
+     */
+    if ( unlikely(pfn & 0x80000000UL) )
+        return rc;
+
+    if ( likely(pfn < d->arch.shadow_dirty_bitmap_size) )
+    {
+        /* N.B. Can use non-atomic TAS because protected by shadow_lock. */
+        if ( !__test_and_set_bit(pfn, d->arch.shadow_dirty_bitmap) )
+        {
+            d->arch.shadow_dirty_count++;
+            rc = 1;
+        }
+    }
+#ifndef NDEBUG
+    else if ( mfn < max_page )
+    {
+        SH_LOG("mark_dirty OOR! mfn=%x pfn=%lx max=%x (dom %p)",
+               mfn, pfn, d->arch.shadow_dirty_bitmap_size, d);
+        SH_LOG("dom=%p caf=%08x taf=%08x\n", 
+               page_get_owner(&frame_table[mfn]),
+               frame_table[mfn].count_info, 
                frame_table[mfn].u.inuse.type_info );
     }
+#endif
 
     return rc;
 }
 
 
-static inline int mark_dirty( struct mm_struct *m, unsigned int mfn )
+static inline int mark_dirty(struct domain *d, unsigned int mfn)
 {
     int rc;
-    ASSERT(local_irq_is_enabled());
-    //if(spin_is_locked(&m->shadow_lock)) printk("+");
-    spin_lock(&m->shadow_lock);
-    rc = __mark_dirty( m, mfn );
-    spin_unlock(&m->shadow_lock);
+    shadow_lock(d);
+    rc = __mark_dirty(d, mfn);
+    shadow_unlock(d);
     return rc;
 }
 
@@ -144,116 +222,124 @@ static inline int mark_dirty( struct mm_struct *m, unsigned int mfn )
 /************************************************************************/
 
 static inline void l1pte_write_fault(
-    struct mm_struct *m, unsigned long *gpte_p, unsigned long *spte_p)
+    struct domain *d, unsigned long *gpte_p, unsigned long *spte_p)
 { 
     unsigned long gpte = *gpte_p;
     unsigned long spte = *spte_p;
+    unsigned long pfn = gpte >> PAGE_SHIFT;
+    unsigned long mfn = __gpfn_to_mfn(d, pfn);
 
-    switch ( m->shadow_mode )
-    {
-    case SHM_test:
-        spte = gpte;
-        gpte |= _PAGE_DIRTY | _PAGE_ACCESSED;
-        spte |= _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED;
-        break;
+    ASSERT(gpte & _PAGE_RW);
+    gpte |= _PAGE_DIRTY | _PAGE_ACCESSED;
 
-    case SHM_logdirty:
-        spte = gpte;
-        gpte |= _PAGE_DIRTY | _PAGE_ACCESSED;
-        spte |= _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED;
-        __mark_dirty( m, (gpte >> PAGE_SHIFT) );
-        break;
-    }
+    if ( shadow_mode(d) == SHM_logdirty )
+        __mark_dirty(d, pfn);
 
+    spte = (mfn << PAGE_SHIFT) | (gpte & ~PAGE_MASK);
+
+    SH_VVLOG("l1pte_write_fault: updating spte=0x%p gpte=0x%p", spte, gpte);
     *gpte_p = gpte;
     *spte_p = spte;
 }
 
 static inline void l1pte_read_fault(
-    struct mm_struct *m, unsigned long *gpte_p, unsigned long *spte_p)
+    struct domain *d, unsigned long *gpte_p, unsigned long *spte_p)
 { 
     unsigned long gpte = *gpte_p;
     unsigned long spte = *spte_p;
+    unsigned long pfn = gpte >> PAGE_SHIFT;
+    unsigned long mfn = __gpfn_to_mfn(d, pfn);
 
-    switch ( m->shadow_mode )
-    {
-    case SHM_test:
-        spte = gpte;
-        gpte |= _PAGE_ACCESSED;
-        spte |= _PAGE_ACCESSED;
-        if ( ! (gpte & _PAGE_DIRTY ) )
-            spte &= ~ _PAGE_RW;
-        break;
+    gpte |= _PAGE_ACCESSED;
+    spte = (mfn << PAGE_SHIFT) | (gpte & ~PAGE_MASK);
 
-    case SHM_logdirty:
-        spte = gpte;
-        gpte |= _PAGE_ACCESSED;
-        spte |= _PAGE_ACCESSED;
-        spte &= ~ _PAGE_RW;
-        break;
-    }
+    if ( (shadow_mode(d) == SHM_logdirty) || ! (gpte & _PAGE_DIRTY) )
+        spte &= ~_PAGE_RW;
 
+    SH_VVLOG("l1pte_read_fault: updating spte=0x%p gpte=0x%p", spte, gpte);
     *gpte_p = gpte;
     *spte_p = spte;
 }
 
-static inline void l1pte_no_fault(
-    struct mm_struct *m, unsigned long *gpte_p, unsigned long *spte_p)
+static inline void l1pte_propagate_from_guest(
+    struct domain *d, unsigned long *gpte_p, unsigned long *spte_p)
 { 
     unsigned long gpte = *gpte_p;
     unsigned long spte = *spte_p;
+    unsigned long host_pfn, host_gpte;
+#if SHADOW_VERBOSE_DEBUG
+    unsigned long old_spte = spte;
+#endif
 
-    switch ( m->shadow_mode )
+    switch ( shadow_mode(d) )
     {
     case SHM_test:
         spte = 0;
         if ( (gpte & (_PAGE_PRESENT|_PAGE_ACCESSED) ) == 
              (_PAGE_PRESENT|_PAGE_ACCESSED) )
-        {
-            spte = gpte;
-            if ( ! (gpte & _PAGE_DIRTY ) )
-                spte &= ~ _PAGE_RW;
-        }
+            spte = (gpte & _PAGE_DIRTY) ? gpte : (gpte & ~_PAGE_RW);
         break;
 
     case SHM_logdirty:
         spte = 0;
         if ( (gpte & (_PAGE_PRESENT|_PAGE_ACCESSED) ) == 
              (_PAGE_PRESENT|_PAGE_ACCESSED) )
+            spte = gpte & ~_PAGE_RW;
+        break;
+
+    case SHM_full_32:
+        spte = 0;
+
+        if ( mmio_space(gpte & 0xFFFFF000) )
         {
-            spte = gpte;
-            spte &= ~ _PAGE_RW;
+            *spte_p = spte;
+            return;
         }
+        
+        host_pfn = phys_to_machine_mapping(gpte >> PAGE_SHIFT);
+        host_gpte = (host_pfn << PAGE_SHIFT) | (gpte & ~PAGE_MASK);
+
+        if ( (host_gpte & (_PAGE_PRESENT|_PAGE_ACCESSED) ) == 
+             (_PAGE_PRESENT|_PAGE_ACCESSED) )
+            spte = (host_gpte & _PAGE_DIRTY) ? 
+                host_gpte : (host_gpte & ~_PAGE_RW);
 
         break;
     }
+
+#if SHADOW_VERBOSE_DEBUG
+    if ( old_spte || spte || gpte )
+        SH_VVLOG("l1pte_propagate_from_guest: gpte=0x%p, old spte=0x%p, new spte=0x%p ", gpte, old_spte, spte);
+#endif
 
     *gpte_p = gpte;
     *spte_p = spte;
 }
 
 static inline void l2pde_general(
-    struct mm_struct *m, 
+    struct domain *d,
     unsigned long *gpde_p,
     unsigned long *spde_p,
-    unsigned long sl1pfn)
+    unsigned long sl1mfn)
 {
     unsigned long gpde = *gpde_p;
     unsigned long spde = *spde_p;
 
     spde = 0;
 
-    if ( sl1pfn )
+    if ( sl1mfn != 0 )
     {
-        spde = (gpde & ~PAGE_MASK) | (sl1pfn<<PAGE_SHIFT) | 
+        spde = (gpde & ~PAGE_MASK) | (sl1mfn << PAGE_SHIFT) | 
             _PAGE_RW | _PAGE_ACCESSED | _PAGE_DIRTY;
-        gpde = gpde | _PAGE_ACCESSED | _PAGE_DIRTY;
+        gpde |= _PAGE_ACCESSED | _PAGE_DIRTY;
 
-        if ( unlikely( (sl1pfn<<PAGE_SHIFT) == (gpde & PAGE_MASK)  ) )
-        {   
-            // detect linear map, and keep pointing at guest
-            SH_VLOG("4c: linear mapping ( %08lx )",sl1pfn);
-            spde = gpde & ~_PAGE_RW;
+        /* Detect linear p.t. mappings and write-protect them. */
+        if ( (frame_table[sl1mfn].u.inuse.type_info & PGT_type_mask) ==
+             PGT_l2_page_table ) 
+        {
+            if ( shadow_mode(d) != SHM_full_32 )
+                spde = gpde & ~_PAGE_RW;
+
         }
     }
 
@@ -264,346 +350,420 @@ static inline void l2pde_general(
 /*********************************************************************/
 
 #if SHADOW_HASH_DEBUG
-static void shadow_audit(struct mm_struct *m, int print)
+static void shadow_audit(struct domain *d, int print)
 {
-    int live=0, free=0, j=0, abs;
+    int live = 0, free = 0, j = 0, abs;
     struct shadow_status *a;
 
-    for( j = 0; j < shadow_ht_buckets; j++ )
+    for ( j = 0; j < shadow_ht_buckets; j++ )
     {
-        a = &m->shadow_ht[j];        
-        if(a->pfn){live++; ASSERT(a->spfn_and_flags&PSH_pfn_mask);}
-        ASSERT((a->pfn&0xf0000000)==0);
-        ASSERT(a->pfn<0x00100000);
-        a=a->next;
-        while(a && live<9999)
+        a = &d->arch.shadow_ht[j];        
+        if ( a->pfn ) { live++; ASSERT(a->smfn_and_flags & PSH_pfn_mask); }
+        ASSERT(a->pfn < 0x00100000UL);
+        a = a->next;
+        while ( a && (live < 9999) )
         { 
             live++; 
-            if(a->pfn == 0 || a->spfn_and_flags == 0)
+            if ( (a->pfn == 0) || (a->smfn_and_flags == 0) )
             {
-                printk("XXX live=%d pfn=%08lx sp=%08lx next=%p\n",
-                       live, a->pfn, a->spfn_and_flags, a->next);
+                printk("XXX live=%d pfn=%p sp=%p next=%p\n",
+                       live, a->pfn, a->smfn_and_flags, a->next);
                 BUG();
             }
-            ASSERT(a->pfn);
-            ASSERT((a->pfn&0xf0000000)==0);
-            ASSERT(a->pfn<0x00100000);
-            ASSERT(a->spfn_and_flags&PSH_pfn_mask);
-            a=a->next; 
+            ASSERT(a->pfn < 0x00100000UL);
+            ASSERT(a->smfn_and_flags & PSH_pfn_mask);
+            a = a->next; 
         }
-        ASSERT(live<9999);
+        ASSERT(live < 9999);
     }
 
-    a = m->shadow_ht_free;
-    while(a) { free++; a=a->next; }
+    for ( a = d->arch.shadow_ht_free; a != NULL; a = a->next )
+        free++; 
 
-    if(print) printk("Xlive=%d free=%d\n",live,free);
+    if ( print)
+        printk("Xlive=%d free=%d\n",live,free);
 
-    abs=(perfc_value(shadow_l1_pages)+perfc_value(shadow_l2_pages))-live;
-    if( abs < -1 || abs > 1 )
+    abs = (perfc_value(shadow_l1_pages) + perfc_value(shadow_l2_pages)) - live;
+    if ( (abs < -1) || (abs > 1) )
     {
         printk("live=%d free=%d l1=%d l2=%d\n",live,free,
                perfc_value(shadow_l1_pages), perfc_value(shadow_l2_pages) );
         BUG();
     }
-
 }
-
 #else
-#define shadow_audit(p, print)
+#define shadow_audit(p, print) ((void)0)
 #endif
 
 
-
-static inline struct shadow_status* hash_bucket( struct mm_struct *m,
-                                                 unsigned int gpfn )
+static inline struct shadow_status *hash_bucket(
+    struct domain *d, unsigned int gpfn)
 {
-    return &(m->shadow_ht[gpfn % shadow_ht_buckets]);
+    return &d->arch.shadow_ht[gpfn % shadow_ht_buckets];
 }
 
 
-static inline unsigned long __shadow_status( struct mm_struct *m,
-                                             unsigned int gpfn )
+/*
+ * N.B. This takes a guest pfn (i.e. a pfn in the guest's namespace,
+ *      which, depending on full shadow mode, may or may not equal
+ *      its mfn).
+ *      The shadow status it returns is a mfn.
+ */
+static inline unsigned long __shadow_status(
+    struct domain *d, unsigned int gpfn)
 {
-    struct shadow_status **ob, *b, *B = hash_bucket( m, gpfn );
+    struct shadow_status *p, *x, *head;
 
-    b = B;
-    ob = NULL;
+    x = head = hash_bucket(d, gpfn);
+    p = NULL;
 
-    SH_VVLOG("lookup gpfn=%08x bucket=%p", gpfn, b );
-    shadow_audit(m,0);  // if in debug mode
+    //SH_VVLOG("lookup gpfn=%08x bucket=%p", gpfn, x);
+    shadow_audit(d, 0);
 
     do
     {
-        if ( b->pfn == gpfn )
+        ASSERT(x->pfn || ((x == head) && (x->next == NULL)));
+
+        if ( x->pfn == gpfn )
         {
-            unsigned long t;
-            struct shadow_status *x;
+            /* Pull-to-front if 'x' isn't already the head item. */
+            if ( unlikely(x != head) )
+            {
+                /* Delete 'x' from list and reinsert immediately after head. */
+                p->next = x->next;
+                x->next = head->next;
+                head->next = x;
 
-            // swap with head
-            t=B->pfn; B->pfn=b->pfn; b->pfn=t;
-            t=B->spfn_and_flags; B->spfn_and_flags=b->spfn_and_flags; 
-            b->spfn_and_flags=t;
-
-            if( ob )
-            {   // pull to front
-                *ob=b->next;
-                x=B->next;
-                B->next=b;
-                b->next=x;
+                /* Swap 'x' contents with head contents. */
+                SWAP(head->pfn, x->pfn);
+                SWAP(head->smfn_and_flags, x->smfn_and_flags);
             }
-            return B->spfn_and_flags;
-        }
-#if SHADOW_HASH_DEBUG
-        else
-        {
-            if(b!=B)ASSERT(b->pfn);
-        }
-#endif
-        ob=&b->next;
-        b=b->next;
-    }
-    while (b);
 
+            SH_VVLOG("lookup gpfn=%p => status=%p",
+                     gpfn, head->smfn_and_flags);
+            return head->smfn_and_flags;
+        }
+
+        p = x;
+        x = x->next;
+    }
+    while ( x != NULL );
+
+    SH_VVLOG("lookup gpfn=%p => status=0", gpfn);
     return 0;
 }
 
-/* we can make this locking more fine grained e.g. per shadow page if it 
-ever becomes a problem, but since we need a spin lock on the hash table 
-anyway its probably not worth being too clever. */
-
-static inline unsigned long get_shadow_status( struct mm_struct *m,
-                                               unsigned int gpfn )
+/*
+ * N.B. We can make this locking more fine grained (e.g., per shadow page) if
+ * it ever becomes a problem, but since we need a spin lock on the hash table 
+ * anyway it's probably not worth being too clever.
+ */
+static inline unsigned long get_shadow_status(
+    struct domain *d, unsigned int gpfn )
 {
     unsigned long res;
 
-    /* If we get here, we know that this domain is running in shadow mode. 
-       We also know that some sort of update has happened to the underlying
-       page table page: either a PTE has been updated, or the page has
-       changed type. If we're in log dirty mode, we should set the approrpiate
-       bit in the dirty bitmap.
-       NB: the VA update path doesn't use this so needs to be handled 
-       independnetly. 
-    */
+    ASSERT(shadow_mode(d));
 
-    ASSERT(local_irq_is_enabled());
-    //if(spin_is_locked(&m->shadow_lock)) printk("*");
-    spin_lock(&m->shadow_lock);
+    /*
+     * If we get here we know that some sort of update has happened to the
+     * underlying page table page: either a PTE has been updated, or the page
+     * has changed type. If we're in log dirty mode, we should set the
+     * appropriate bit in the dirty bitmap.
+     * N.B. The VA update path doesn't use this and is handled independently. 
+     */
 
-    if( m->shadow_mode == SHM_logdirty )
-        __mark_dirty( m, gpfn );
+    shadow_lock(d);
 
-    res = __shadow_status( m, gpfn );
-    if (!res) spin_unlock(&m->shadow_lock);
+    if ( shadow_mode(d) == SHM_logdirty )
+        __mark_dirty(d, gpfn);
+
+    if ( !(res = __shadow_status(d, gpfn)) )
+        shadow_unlock(d);
+
     return res;
 }
 
 
-static inline void put_shadow_status( struct mm_struct *m )
+static inline void put_shadow_status(
+    struct domain *d)
 {
-    spin_unlock(&m->shadow_lock);
+    shadow_unlock(d);
 }
 
 
-static inline void delete_shadow_status( struct mm_struct *m,
-                                         unsigned int gpfn )
+static inline void delete_shadow_status( 
+    struct domain *d, unsigned int gpfn)
 {
-    struct shadow_status *b, *B, **ob;
+    struct shadow_status *p, *x, *n, *head;
 
-    ASSERT(spin_is_locked(&m->shadow_lock));
+    ASSERT(spin_is_locked(&d->arch.shadow_lock));
+    ASSERT(gpfn != 0);
 
-    B = b = hash_bucket( m, gpfn );
+    head = hash_bucket(d, gpfn);
 
-    SH_VVLOG("delete gpfn=%08x bucket=%p", gpfn, b );
-    shadow_audit(m,0);
-    ASSERT(gpfn);
+    SH_VVLOG("delete gpfn=%08x bucket=%p", gpfn, head);
+    shadow_audit(d, 0);
 
-    if( b->pfn == gpfn )
+    /* Match on head item? */
+    if ( head->pfn == gpfn )
     {
-        if (b->next)
+        if ( (n = head->next) != NULL )
         {
-            struct shadow_status *D=b->next;
-            b->spfn_and_flags = b->next->spfn_and_flags;
-            b->pfn = b->next->pfn;
+            /* Overwrite head with contents of following node. */
+            head->pfn            = n->pfn;
+            head->smfn_and_flags = n->smfn_and_flags;
 
-            b->next = b->next->next;
-            D->next = m->shadow_ht_free;
-            D->pfn = 0;
-            D->spfn_and_flags = 0;
-            m->shadow_ht_free = D;
+            /* Delete following node. */
+            head->next           = n->next;
+
+            /* Add deleted node to the free list. */
+            n->pfn            = 0;
+            n->smfn_and_flags = 0;
+            n->next           = d->arch.shadow_ht_free;
+            d->arch.shadow_ht_free = n;
         }
         else
         {
-            b->pfn = 0;
-            b->spfn_and_flags = 0;
+            /* This bucket is now empty. Initialise the head node. */
+            head->pfn            = 0;
+            head->smfn_and_flags = 0;
         }
 
-#if SHADOW_HASH_DEBUG
-        if( __shadow_status(m,gpfn) ) BUG();  
-        shadow_audit(m,0);
-#endif
-        return;
+        goto found;
     }
 
-    ob = &b->next;
-    b=b->next;
+    p = head;
+    x = head->next;
 
     do
     {
-        if ( b->pfn == gpfn )
+        if ( x->pfn == gpfn )
         {
-            b->pfn = 0;
-            b->spfn_and_flags = 0;
+            /* Delete matching node. */
+            p->next = x->next;
 
-            // b is in the list
-            *ob=b->next;
-            b->next = m->shadow_ht_free;
-            m->shadow_ht_free = b;
+            /* Add deleted node to the free list. */
+            x->pfn            = 0;
+            x->smfn_and_flags = 0;
+            x->next           = d->arch.shadow_ht_free;
+            d->arch.shadow_ht_free = x;
 
-#if SHADOW_HASH_DEBUG
-            if( __shadow_status(m,gpfn) ) BUG();
-#endif
-            shadow_audit(m,0);
-            return;
+            goto found;
         }
 
-        ob = &b->next;
-        b=b->next;
+        p = x;
+        x = x->next;
     }
-    while (b);
+    while ( x != NULL );
 
-    // if we got here, it wasn't in the list
+    /* If we got here, it wasn't in the list! */
     BUG();
+
+ found:
+    shadow_audit(d, 0);
 }
 
 
-static inline void set_shadow_status( struct mm_struct *m,
-                                      unsigned int gpfn, unsigned long s )
+static inline void set_shadow_status(
+    struct domain *d, unsigned int gpfn, unsigned long s)
 {
-    struct shadow_status *b, *B, *extra, **fptr;
+    struct shadow_status *x, *head, *extra;
     int i;
 
-    ASSERT(spin_is_locked(&m->shadow_lock));
+    ASSERT(spin_is_locked(&d->arch.shadow_lock));
+    ASSERT(gpfn != 0);
+    ASSERT(s & PSH_shadowed);
 
-    B = b = hash_bucket( m, gpfn );
+    x = head = hash_bucket(d, gpfn);
    
-    ASSERT(gpfn);
-    SH_VVLOG("set gpfn=%08x s=%08lx bucket=%p(%p)", gpfn, s, b, b->next );
+    SH_VVLOG("set gpfn=%08x s=%p bucket=%p(%p)", gpfn, s, x, x->next);
+    shadow_audit(d, 0);
 
-    shadow_audit(m,0);
+    /*
+     * STEP 1. If page is already in the table, update it in place.
+     */
 
     do
     {
-        if ( b->pfn == gpfn )
+        if ( x->pfn == gpfn )
         {
-            b->spfn_and_flags = s;
-            shadow_audit(m,0);
-            return;
+            x->smfn_and_flags = s;
+            goto done;
         }
 
-        b=b->next;
+        x = x->next;
     }
-    while (b);
+    while ( x != NULL );
 
-    // if we got here, this is an insert rather than update
+    /*
+     * STEP 2. The page must be inserted into the table.
+     */
 
-    ASSERT( s );  // deletes must have succeeded by here
-
-    if ( B->pfn == 0 )
+    /* If the bucket is empty then insert the new page as the head item. */
+    if ( head->pfn == 0 )
     {
-        // we can use this head
-        ASSERT( B->next == 0 );
-        B->pfn = gpfn;
-        B->spfn_and_flags = s;
-        shadow_audit(m,0);
-        return;
+        head->pfn            = gpfn;
+        head->smfn_and_flags = s;
+        ASSERT(head->next == NULL);
+        goto done;
     }
 
-    if( unlikely(m->shadow_ht_free == NULL) )
+    /* We need to allocate a new node. Ensure the quicklist is non-empty. */
+    if ( unlikely(d->arch.shadow_ht_free == NULL) )
     {
-        SH_LOG("allocate more shadow hashtable blocks");
+        SH_LOG("Allocate more shadow hashtable blocks.");
 
-        // we need to allocate more space
-        extra = xmalloc(sizeof(void*) + (shadow_ht_extra_size * 
-                                         sizeof(struct shadow_status)));
+        extra = xmalloc_bytes(
+            sizeof(void *) + (shadow_ht_extra_size * sizeof(*x)));
 
-        if( ! extra ) BUG(); // should be more graceful here....
+        /* XXX Should be more graceful here. */
+        if ( extra == NULL )
+            BUG();
 
-        memset(extra, 0, sizeof(void*) + (shadow_ht_extra_size * 
-                                          sizeof(struct shadow_status)));
+        memset(extra, 0, sizeof(void *) + (shadow_ht_extra_size * sizeof(*x)));
 
-        m->shadow_extras_count++;
+        /* Record the allocation block so it can be correctly freed later. */
+        d->arch.shadow_extras_count++;
+        *((struct shadow_status **)&extra[shadow_ht_extra_size]) = 
+            d->arch.shadow_ht_extras;
+        d->arch.shadow_ht_extras = &extra[0];
 
-        // add extras to free list
-        fptr = &m->shadow_ht_free;
-        for ( i=0; i<shadow_ht_extra_size; i++ )
-        {
-            *fptr = &extra[i];
-            fptr = &(extra[i].next);
-        }
-        *fptr = NULL;
+        /* Thread a free chain through the newly-allocated nodes. */
+        for ( i = 0; i < (shadow_ht_extra_size - 1); i++ )
+            extra[i].next = &extra[i+1];
+        extra[i].next = NULL;
 
-        *((struct shadow_status ** ) &extra[shadow_ht_extra_size]) = 
-            m->shadow_ht_extras;
-        m->shadow_ht_extras = extra;
-
+        /* Add the new nodes to the free list. */
+        d->arch.shadow_ht_free = &extra[0];
     }
 
-    // should really put this in B to go right to front
-    b = m->shadow_ht_free;
-    m->shadow_ht_free = b->next;
-    b->spfn_and_flags = s;
-    b->pfn = gpfn;
-    b->next = B->next;
-    B->next = b;
+    /* Allocate a new node from the quicklist. */
+    x                      = d->arch.shadow_ht_free;
+    d->arch.shadow_ht_free = x->next;
 
-    shadow_audit(m,0);
+    /* Initialise the new node and insert directly after the head item. */
+    x->pfn            = gpfn;
+    x->smfn_and_flags = s;
+    x->next           = head->next;
+    head->next        = x;
 
-    return;
+ done:
+    shadow_audit(d, 0);
 }
+  
+#ifdef CONFIG_VMX
 
-static inline void __shadow_mk_pagetable( struct mm_struct *mm )
+static inline void vmx_update_shadow_state(
+    struct exec_domain *ed, unsigned long gpfn, unsigned long smfn)
 {
-    unsigned long gpfn, spfn=0;
 
-    gpfn =  pagetable_val(mm->pagetable) >> PAGE_SHIFT;
+    l2_pgentry_t *mpl2e = 0;
+    l2_pgentry_t *gpl2e, *spl2e;
 
-    if ( unlikely((spfn=__shadow_status(mm, gpfn)) == 0 ) )
-    {
-        spfn = shadow_l2_table(mm, gpfn );
-    }      
-    mm->shadow_table = mk_pagetable(spfn<<PAGE_SHIFT);
+    /* unmap the old mappings */
+    if ( ed->arch.shadow_vtable )
+        unmap_domain_mem(ed->arch.shadow_vtable);
+    if ( ed->arch.vpagetable )
+        unmap_domain_mem(ed->arch.vpagetable);
+
+    /* new mapping */
+    mpl2e = (l2_pgentry_t *)
+        map_domain_mem(pagetable_val(ed->arch.monitor_table));
+
+    mpl2e[l2_table_offset(SH_LINEAR_PT_VIRT_START)] =
+        mk_l2_pgentry((smfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
+    __flush_tlb_one(SH_LINEAR_PT_VIRT_START);
+
+    spl2e = (l2_pgentry_t *)map_domain_mem(smfn << PAGE_SHIFT);
+    gpl2e = (l2_pgentry_t *)map_domain_mem(gpfn << PAGE_SHIFT);
+    memset(spl2e, 0, L2_PAGETABLE_ENTRIES * sizeof(l2_pgentry_t));
+
+    ed->arch.shadow_vtable = spl2e;
+    ed->arch.vpagetable = gpl2e; /* expect the guest did clean this up */
+    unmap_domain_mem(mpl2e);
 }
 
-static inline void shadow_mk_pagetable( struct mm_struct *mm )
+static inline unsigned long gva_to_gpte(unsigned long gva)
 {
-    SH_VVLOG("shadow_mk_pagetable( gptbase=%08lx, mode=%d )",
-             pagetable_val(mm->pagetable), mm->shadow_mode );
+    unsigned long gpde, gpte, pfn, index;
+    struct exec_domain *ed = current;
 
-    if ( unlikely(mm->shadow_mode) )
-    {
-        ASSERT(local_irq_is_enabled());
-        spin_lock(&mm->shadow_lock);
+    __guest_get_l2e(ed, gva, &gpde);
+    if (!(gpde & _PAGE_PRESENT))
+        return 0;
 
-        __shadow_mk_pagetable( mm );
+    index = (gva >> L2_PAGETABLE_SHIFT);
 
-        spin_unlock(&mm->shadow_lock);
+    if (!l2_pgentry_val(ed->arch.guest_pl2e_cache[index])) {
+        pfn = phys_to_machine_mapping(gpde >> PAGE_SHIFT);
+        ed->arch.guest_pl2e_cache[index] = 
+            mk_l2_pgentry((pfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
     }
 
-    SH_VVLOG("leaving shadow_mk_pagetable( gptbase=%08lx, mode=%d ) sh=%08lx",
-             pagetable_val(mm->pagetable), mm->shadow_mode, 
-             pagetable_val(mm->shadow_table) );
+    if ( unlikely(__get_user(gpte, (unsigned long *)
+                             &linear_pg_table[gva >> PAGE_SHIFT])) )
+        return 0;
 
+    return gpte;
 }
 
+static inline unsigned long gva_to_gpa(unsigned long gva)
+{
+    unsigned long gpte;
 
-#if SHADOW_DEBUG
-extern int check_pagetable(struct mm_struct *m, pagetable_t pt, char *s);
-#else
-#define check_pagetable(m, pt, s) ((void)0)
+    gpte = gva_to_gpte(gva);
+    if ( !(gpte & _PAGE_PRESENT) )
+        return 0;
+
+    return (gpte & PAGE_MASK) + (gva & ~PAGE_MASK); 
+}
+
+#endif /* CONFIG_VMX */
+
+static inline void __shadow_mk_pagetable(struct exec_domain *ed)
+{
+    struct domain *d = ed->domain;
+    unsigned long gpfn = pagetable_val(ed->arch.pagetable) >> PAGE_SHIFT;
+    unsigned long smfn = __shadow_status(d, gpfn) & PSH_pfn_mask;
+
+    SH_VVLOG("0: __shadow_mk_pagetable(gpfn=%p, smfn=%p)", gpfn, smfn);
+
+    if ( unlikely(smfn == 0) )
+        smfn = shadow_l2_table(d, gpfn);
+#ifdef CONFIG_VMX
+    else
+        if (d->arch.shadow_mode == SHM_full_32)
+            vmx_update_shadow_state(ed, gpfn, smfn);
 #endif
 
+    ed->arch.shadow_table = mk_pagetable(smfn<<PAGE_SHIFT);
+}
+
+static inline void shadow_mk_pagetable(struct exec_domain *ed)
+{
+     if ( unlikely(shadow_mode(ed->domain)) )
+     {
+         SH_VVLOG("shadow_mk_pagetable( gptbase=%p, mode=%d )",
+             pagetable_val(ed->arch.pagetable),
+                  shadow_mode(ed->domain)); 
+
+         shadow_lock(ed->domain);
+         __shadow_mk_pagetable(ed);
+         shadow_unlock(ed->domain);
+
+     SH_VVLOG("leaving shadow_mk_pagetable:\n"
+              "( gptbase=%p, mode=%d ) sh=%p",
+              pagetable_val(ed->arch.pagetable),
+              shadow_mode(ed->domain), 
+              pagetable_val(ed->arch.shadow_table) );
+     }
+}
+
+#if SHADOW_DEBUG
+extern void check_pagetable(struct domain *d, pagetable_t pt, char *s);
+#else
+#define check_pagetable(d, pt, s) ((void)0)
+#endif
 
 #endif /* XEN_SHADOW_H */
-
-

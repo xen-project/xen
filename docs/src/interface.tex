@@ -1,0 +1,1546 @@
+\documentclass[11pt,twoside,final,openright]{report}
+\usepackage{a4,graphicx,html,setspace,times}
+\usepackage{comment,parskip}
+\setstretch{1.15}
+
+\begin{document}
+
+% TITLE PAGE
+\pagestyle{empty}
+\begin{center}
+\vspace*{\fill}
+\includegraphics{figs/xenlogo.eps}
+\vfill
+\vfill
+\vfill
+\begin{tabular}{l}
+{\Huge \bf Interface manual} \\[4mm]
+{\huge Xen v2.0 for x86} \\[80mm]
+
+{\Large Xen is Copyright (c) 2002-2004, The Xen Team} \\[3mm]
+{\Large University of Cambridge, UK} \\[20mm]
+\end{tabular}
+\end{center}
+
+{\bf
+DISCLAIMER: This documentation is currently under active development
+and as such there may be mistakes and omissions --- watch out for
+these and please report any you find to the developer's mailing list.
+Contributions of material, suggestions and corrections are welcome.
+}
+
+\vfill
+\cleardoublepage
+
+% TABLE OF CONTENTS
+\pagestyle{plain}
+\pagenumbering{roman}
+{ \parskip 0pt plus 1pt
+  \tableofcontents }
+\cleardoublepage
+
+% PREPARE FOR MAIN TEXT
+\pagenumbering{arabic}
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\parindent=0pt
+\parskip=5pt
+\renewcommand{\topfraction}{.8}
+\renewcommand{\bottomfraction}{.8}
+\renewcommand{\textfraction}{.2}
+\renewcommand{\floatpagefraction}{.8}
+\setstretch{1.1}
+
+\chapter{Introduction}
+
+Xen allows the hardware resources of a machine to be virtualized and
+dynamically partitioned, allowing multiple different {\em guest}
+operating system images to be run simultaneously.  Virtualizing the
+machine in this manner provides considerable flexibility, for example
+allowing different users to choose their preferred operating system
+(e.g., Linux, NetBSD, or a custom operating system).  Furthermore, Xen
+provides secure partitioning between virtual machines (known as
+{\em domains} in Xen terminology), and enables better resource
+accounting and QoS isolation than can be achieved with a conventional
+operating system. 
+
+Xen essentially takes a `whole machine' virtualization approach as
+pioneered by IBM VM/370.  However, unlike VM/370 or more recent
+efforts such as VMWare and Virtual PC, Xen does not attempt to
+completely virtualize the underlying hardware.  Instead parts of the
+hosted guest operating systems are modified to work with the VMM; the
+operating system is effectively ported to a new target architecture,
+typically requiring changes in just the machine-dependent code.  The
+user-level API is unchanged, and so existing binaries and operating
+system distributions work without modification.
+
+In addition to exporting virtualized instances of CPU, memory, network
+and block devices, Xen exposes a control interface to manage how these
+resources are shared between the running domains. Access to the
+control interface is restricted: it may only be used by one
+specially-privileged VM, known as {\em domain 0}.  This domain is a
+required part of any Xen-based server and runs the application software
+that manages the control-plane aspects of the platform.  Running the
+control software in {\it domain 0}, distinct from the hypervisor
+itself, allows the Xen framework to separate the notions of 
+mechanism and policy within the system.
+
+
+
+\chapter{Virtual Architecture}
+
+On a Xen-based system, the hypervisor itself runs in {\it ring 0}.  It
+has full access to the physical memory available in the system and is
+responsible for allocating portions of it to the domains.  Guest
+operating systems run in and use {\it rings 1}, {\it 2} and {\it 3} as
+they see fit. Segmentation is used to prevent the guest OS from
+accessing the portion of the address space that is reserved for
+Xen. We expect most guest operating systems will use ring 1 for their
+own operation and place applications in ring 3.
+
+In this chapter we consider the basic virtual architecture provided 
+by Xen: the basic CPU state, exception and interrupt handling, and
+time. Other aspects such as memory and device access are discussed 
+in later chapters. 
+
+\section{CPU state}
+
+All privileged state must be handled by Xen.  The guest OS has no
+direct access to CR3 and is not permitted to update privileged bits in
+EFLAGS. Guest OSes use \emph{hypercalls} to invoke operations in Xen; 
+these are analogous to system calls but occur from ring 1 to ring 0. 
+
+A list of all hypercalls is given in Appendix~\ref{a:hypercalls}. 
+
+
+
+\section{Exceptions}
+
+A virtual IDT is provided --- a domain can submit a table of trap
+handlers to Xen via the {\tt set\_trap\_table()} hypercall.  Most trap
+handlers are identical to native x86 handlers, although the page-fault
+handler is somewhat different.
+
+
+\section{Interrupts and events}
+
+Interrupts are virtualized by mapping them to \emph{events}, which are
+delivered asynchronously to the target domain using a callback
+supplied via the {\tt set\_callbacks()} hypercall.  A guest OS can map
+these events onto its standard interrupt dispatch mechanisms.  Xen is
+responsible for determining the target domain that will handle each
+physical interrupt source. For more details on the binding of event
+sources to events, see Chapter~\ref{c:devices}. 
+
+
+
+\section{Time}
+
+Guest operating systems need to be aware of the passage of both real
+(or wallclock) time and their own `virtual time' (the time for
+which they have been executing). Furthermore, Xen has a notion of 
+time which is used for scheduling. The following notions of 
+time are provided: 
+
+\begin{description}
+\item[Cycle counter time.]
+
+This provides a fine-grained time reference.  The cycle counter time is
+used to accurately extrapolate the other time references.  On SMP machines
+it is currently assumed that the cycle counter time is synchronized between
+CPUs.  The current x86-based implementation achieves this within inter-CPU
+communication latencies.
+
+\item[System time.]
+
+This is a 64-bit counter which holds the number of nanoseconds that
+have elapsed since system boot.
+
+
+\item[Wall clock time.]
+
+This is the time of day in a Unix-style {\tt struct timeval} (seconds
+and microseconds since 1 January 1970, adjusted by leap seconds).  An
+NTP client hosted by {\it domain 0} can keep this value accurate.  
+
+
+\item[Domain virtual time.]
+
+This progresses at the same pace as system time, but only while a
+domain is executing --- it stops while a domain is de-scheduled.
+Therefore the share of the CPU that a domain receives is indicated by
+the rate at which its virtual time increases.
+
+\end{description}
+
+
+Xen exports timestamps for system time and wall-clock time to guest
+operating systems through a shared page of memory.  Xen also provides
+the cycle counter time at the instant the timestamps were calculated,
+and the CPU frequency in Hertz.  This allows the guest to extrapolate
+system and wall-clock times accurately based on the current cycle
+counter time.
+
+Since all time stamps need to be updated and read \emph{atomically}
+two version numbers are also stored in the shared info page. The 
+first is incremented prior to an update, while the second is only
+incremented afterwards. Thus a guest can be sure that it read a consistent 
+state by checking the two version numbers are equal. 
+
+Xen includes a periodic ticker which sends a timer event to the
+currently executing domain every 10ms.  The Xen scheduler also sends a
+timer event whenever a domain is scheduled; this allows the guest OS
+to adjust for the time that has passed while it has been inactive.  In
+addition, Xen allows each domain to request that they receive a timer
+event sent at a specified system time by using the {\tt
+set\_timer\_op()} hypercall.  Guest OSes may use this timer to
+implement timeout values when they block.
+
+
+
+%% % akw: demoting this to a section -- not sure if there is any point
+%% % though, maybe just remove it.
+
+\section{Xen CPU Scheduling}
+
+Xen offers a uniform API for CPU schedulers.  It is possible to choose
+from a number of schedulers at boot and it should be easy to add more.
+The BVT, Atropos and Round Robin schedulers are part of the normal
+Xen distribution.  BVT provides proportional fair shares of the CPU to
+the running domains.  Atropos can be used to reserve absolute shares
+of the CPU for each domain.  Round-robin is provided as an example of
+Xen's internal scheduler API.
+
+\paragraph*{Note: SMP host support}
+Xen has always supported SMP host systems.  Domains are statically assigned to
+CPUs, either at creation time or when manually pinning to a particular CPU.
+The current schedulers then run locally on each CPU to decide which of the
+assigned domains should be run there. The user-level control software 
+can be used to perform coarse-grain load-balancing between CPUs. 
+
+
+%% More information on the characteristics and use of these schedulers is
+%% available in {\tt Sched-HOWTO.txt}.
+
+
+\section{Privileged operations}
+
+Xen exports an extended interface to privileged domains (viz.\ {\it
+  Domain 0}). This allows such domains to build and boot other domains 
+on the server, and provides control interfaces for managing 
+scheduling, memory, networking, and block devices. 
+
+
+\chapter{Memory}
+\label{c:memory} 
+
+Xen is responsible for managing the allocation of physical memory to
+domains, and for ensuring safe use of the paging and segmentation
+hardware.
+
+
+\section{Memory Allocation}
+
+
+Xen resides within a small fixed portion of physical memory; it also
+reserves the top 64MB of every virtual address space. The remaining
+physical memory is available for allocation to domains at a page
+granularity.  Xen tracks the ownership and use of each page, which
+allows it to enforce secure partitioning between domains.
+
+Each domain has a maximum and current physical memory allocation. 
+A guest OS may run a `balloon driver' to dynamically adjust its 
+current memory allocation up to its limit. 
+
+
+%% XXX SMH: I use machine and physical in the next section (which 
+%% is kinda required for consistency with code); wonder if this 
+%% section should use same terms? 
+%%
+%% Probably. 
+%%
+%% Merging this and below section at some point prob makes sense. 
+
+\section{Pseudo-Physical Memory}
+
+Since physical memory is allocated and freed on a page granularity,
+there is no guarantee that a domain will receive a contiguous stretch
+of physical memory. However most operating systems do not have good
+support for operating in a fragmented physical address space. To aid
+porting such operating systems to run on top of Xen, we make a
+distinction between \emph{machine memory} and \emph{pseudo-physical
+memory}.
+
+Put simply, machine memory refers to the entire amount of memory
+installed in the machine, including that reserved by Xen, in use by
+various domains, or currently unallocated. We consider machine memory
+to comprise a set of 4K \emph{machine page frames} numbered
+consecutively starting from 0. Machine frame numbers mean the same
+within Xen or any domain.
+
+Pseudo-physical memory, on the other hand, is a per-domain
+abstraction. It allows a guest operating system to consider its memory
+allocation to consist of a contiguous range of physical page frames
+starting at physical frame 0, despite the fact that the underlying
+machine page frames may be sparsely allocated and in any order.
+
+To achieve this, Xen maintains a globally readable {\it
+machine-to-physical} table which records the mapping from machine page
+frames to pseudo-physical ones. In addition, each domain is supplied
+with a {\it physical-to-machine} table which performs the inverse
+mapping. Clearly the machine-to-physical table has size proportional
+to the amount of RAM installed in the machine, while each
+physical-to-machine table has size proportional to the memory
+allocation of the given domain.
+
+Architecture dependent code in guest operating systems can then use
+the two tables to provide the abstraction of pseudo-physical
+memory. In general, only certain specialized parts of the operating
+system (such as page table management) needs to understand the
+difference between machine and pseudo-physical addresses.
+
+\section{Page Table Updates}
+
+In the default mode of operation, Xen enforces read-only access to
+page tables and requires guest operating systems to explicitly request
+any modifications.  Xen validates all such requests and only applies
+updates that it deems safe.  This is necessary to prevent domains from
+adding arbitrary mappings to their page tables.
+
+To aid validation, Xen associates a type and reference count with each
+memory page. A page has one of the following
+mutually-exclusive types at any point in time: page directory ({\sf
+PD}), page table ({\sf PT}), local descriptor table ({\sf LDT}),
+global descriptor table ({\sf GDT}), or writable ({\sf RW}). Note that
+a guest OS may always create readable mappings of its own memory 
+regardless of its current type. 
+%%% XXX: possibly explain more about ref count 'lifecyle' here?
+This mechanism is used to
+maintain the invariants required for safety; for example, a domain
+cannot have a writable mapping to any part of a page table as this
+would require the page concerned to simultaneously be of types {\sf
+  PT} and {\sf RW}.
+
+
+%\section{Writable Page Tables}
+
+Xen also provides an alternative mode of operation in which guests be
+have the illusion that their page tables are directly writable.  Of
+course this is not really the case, since Xen must still validate
+modifications to ensure secure partitioning. To this end, Xen traps
+any write attempt to a memory page of type {\sf PT} (i.e., that is
+currently part of a page table).  If such an access occurs, Xen
+temporarily allows write access to that page while at the same time
+{\em disconnecting} it from the page table that is currently in
+use. This allows the guest to safely make updates to the page because
+the newly-updated entries cannot be used by the MMU until Xen
+revalidates and reconnects the page.
+Reconnection occurs automatically in a number of situations: for
+example, when the guest modifies a different page-table page, when the
+domain is preempted, or whenever the guest uses Xen's explicit
+page-table update interfaces.
+
+Finally, Xen also supports a form of \emph{shadow page tables} in
+which the guest OS uses a independent copy of page tables which are
+unknown to the hardware (i.e.\ which are never pointed to by {\tt
+cr3}). Instead Xen propagates changes made to the guest's tables to the
+real ones, and vice versa. This is useful for logging page writes
+(e.g.\ for live migration or checkpoint). A full version of the shadow
+page tables also allows guest OS porting with less effort.
+
+\section{Segment Descriptor Tables}
+
+On boot a guest is supplied with a default GDT, which does not reside
+within its own memory allocation.  If the guest wishes to use other
+than the default `flat' ring-1 and ring-3 segments that this GDT
+provides, it must register a custom GDT and/or LDT with Xen,
+allocated from its own memory. Note that a number of GDT 
+entries are reserved by Xen -- any custom GDT must also include
+sufficient space for these entries. 
+
+For example, the following hypercall is used to specify a new GDT: 
+
+\begin{quote}
+int {\bf set\_gdt}(unsigned long *{\em frame\_list}, int {\em entries})
+
+{\em frame\_list}: An array of up to 16 machine page frames within
+which the GDT resides.  Any frame registered as a GDT frame may only
+be mapped read-only within the guest's address space (e.g., no
+writable mappings, no use as a page-table page, and so on).
+
+{\em entries}: The number of descriptor-entry slots in the GDT.  Note
+that the table must be large enough to contain Xen's reserved entries;
+thus we must have `{\em entries $>$ LAST\_RESERVED\_GDT\_ENTRY}\ '.
+Note also that, after registering the GDT, slots {\em FIRST\_} through
+{\em LAST\_RESERVED\_GDT\_ENTRY} are no longer usable by the guest and
+may be overwritten by Xen.
+\end{quote}
+
+The LDT is updated via the generic MMU update mechanism (i.e., via 
+the {\tt mmu\_update()} hypercall. 
+
+\section{Start of Day} 
+
+The start-of-day environment for guest operating systems is rather
+different to that provided by the underlying hardware. In particular,
+the processor is already executing in protected mode with paging
+enabled.
+
+{\it Domain 0} is created and booted by Xen itself. For all subsequent
+domains, the analogue of the boot-loader is the {\it domain builder},
+user-space software running in {\it domain 0}. The domain builder 
+is responsible for building the initial page tables for a domain  
+and loading its kernel image at the appropriate virtual address. 
+
+
+
+\chapter{Devices}
+\label{c:devices}
+
+Devices such as network and disk are exported to guests using a
+split device driver.  The device driver domain, which accesses the
+physical device directly also runs a {\em backend} driver, serving
+requests to that device from guests.  Each guest will use a simple
+{\em frontend} driver, to access the backend.  Communication between these
+domains is composed of two parts:  First, data is placed onto a shared
+memory page between the domains.  Second, an event channel between the
+two domains is used to pass notification that data is outstanding.
+This separation of notification from data transfer allows message
+batching, and results in very efficient device access.  
+
+Even channels are used extensively in device virtualization; each
+domain has a number of end-points or \emph{ports} each of which
+may be bound to one of the following \emph{event sources}:
+\begin{itemize} 
+  \item a physical interrupt from a real device, 
+  \item a virtual interrupt (callback) from Xen, or 
+  \item a signal from another domain 
+\end{itemize}
+
+Events are lightweight and do not carry much information beyond 
+the source of the notification. Hence when performing bulk data
+transfer, events are typically used as synchronization primitives
+over a shared memory transport. Event channels are managed via 
+the {\tt event\_channel\_op()} hypercall; for more details see
+Section~\ref{s:idc}. 
+
+This chapter focuses on some individual device interfaces
+available to Xen guests. 
+
+\section{Network I/O}
+
+Virtual network device services are provided by shared memory
+communication with a backend domain.  From the point of view of
+other domains, the backend may be viewed as a virtual ethernet switch
+element with each domain having one or more virtual network interfaces
+connected to it.
+
+\subsection{Backend Packet Handling}
+
+The backend driver is responsible for a variety of actions relating to
+the transmission and reception of packets from the physical device.
+With regard to transmission, the backend performs these key actions:
+
+\begin{itemize}
+\item {\bf Validation:} To ensure that domains do not attempt to
+  generate invalid (e.g. spoofed) traffic, the backend driver may
+  validate headers ensuring that source MAC and IP addresses match the
+  interface that they have been sent from.
+
+  Validation functions can be configured using standard firewall rules
+  ({\small{\tt iptables}} in the case of Linux).
+  
+\item {\bf Scheduling:} Since a number of domains can share a single
+  physical network interface, the backend must mediate access when
+  several domains each have packets queued for transmission.  This
+  general scheduling function subsumes basic shaping or rate-limiting
+  schemes.
+  
+\item {\bf Logging and Accounting:} The backend domain can be
+  configured with classifier rules that control how packets are
+  accounted or logged.  For example, log messages might be generated
+  whenever a domain attempts to send a TCP packet containing a SYN.
+\end{itemize}
+
+On receipt of incoming packets, the backend acts as a simple
+demultiplexer:  Packets are passed to the appropriate virtual
+interface after any necessary logging and accounting have been carried
+out.
+
+\subsection{Data Transfer}
+
+Each virtual interface uses two ``descriptor rings'', one for transmit,
+the other for receive.  Each descriptor identifies a block of contiguous
+physical memory allocated to the domain.  
+
+The transmit ring carries packets to transmit from the guest to the
+backend domain.  The return path of the transmit ring carries messages
+indicating that the contents have been physically transmitted and the
+backend no longer requires the associated pages of memory.
+
+To receive packets, the guest places descriptors of unused pages on
+the receive ring.  The backend will return received packets by
+exchanging these pages in the domain's memory with new pages
+containing the received data, and passing back descriptors regarding
+the new packets on the ring.  This zero-copy approach allows the
+backend to maintain a pool of free pages to receive packets into, and
+then deliver them to appropriate domains after examining their
+headers.
+
+%
+%Real physical addresses are used throughout, with the domain performing 
+%translation from pseudo-physical addresses if that is necessary.
+
+If a domain does not keep its receive ring stocked with empty buffers then 
+packets destined to it may be dropped.  This provides some defence against 
+receive livelock problems because an overload domain will cease to receive
+further data.  Similarly, on the transmit path, it provides the application
+with feedback on the rate at which packets are able to leave the system.
+
+
+Flow control on rings is achieved by including a pair of producer
+indexes on the shared ring page.  Each side will maintain a private
+consumer index indicating the next outstanding message.  In this
+manner, the domains cooperate to divide the ring into two message
+lists, one in each direction.  Notification is decoupled from the
+immediate placement of new messages on the ring; the event channel
+will be used to generate notification when {\em either} a certain
+number of outstanding messages are queued, {\em or} a specified number
+of nanoseconds have elapsed since the oldest message was placed on the
+ring.
+
+% Not sure if my version is any better -- here is what was here before:
+%% Synchronization between the backend domain and the guest is achieved using 
+%% counters held in shared memory that is accessible to both.  Each ring has
+%% associated producer and consumer indices indicating the area in the ring
+%% that holds descriptors that contain data.  After receiving {\it n} packets
+%% or {\t nanoseconds} after receiving the first packet, the hypervisor sends
+%% an event to the domain. 
+
+\section{Block I/O}
+
+All guest OS disk access goes through the virtual block device VBD
+interface.  This interface allows domains access to portions of block
+storage devices visible to the the block backend device.  The VBD
+interface is a split driver, similar to the network interface
+described above.  A single shared memory ring is used between the
+frontend and backend drivers, across which read and write messages are
+sent.
+
+Any block device accessible to the backend domain, including
+network-based block (iSCSI, *NBD, etc), loopback and LVM/MD devices,
+can be exported as a VBD.  Each VBD is mapped to a device node in the
+guest, specified in the guest's startup configuration.
+
+Old (Xen 1.2) virtual disks are not supported under Xen 2.0, since
+similar functionality can be achieved using the more complete LVM
+system, which is already in widespread use.
+
+\subsection{Data Transfer}
+
+The single ring between the guest and the block backend supports three
+messages:
+
+\begin{description}
+\item [{\small {\tt PROBE}}:] Return a list of the VBDs available to this guest
+  from the backend.  The request includes a descriptor of a free page
+  into which the reply will be written by the backend.
+
+\item [{\small {\tt READ}}:] Read data from the specified block device.  The
+  front end identifies the device and location to read from and
+  attaches pages for the data to be copied to (typically via DMA from
+  the device).  The backend acknowledges completed read requests as
+  they finish.
+
+\item [{\small {\tt WRITE}}:] Write data to the specified block device.  This
+  functions essentially as {\small {\tt READ}}, except that the data moves to
+  the device instead of from it.
+\end{description}
+
+% um... some old text
+%% In overview, the same style of descriptor-ring that is used for
+%% network packets is used here.  Each domain has one ring that carries
+%% operation requests to the hypervisor and carries the results back
+%% again.
+
+%% Rather than copying data, the backend simply maps the domain's buffers
+%% in order to enable direct DMA to them.  The act of mapping the buffers
+%% also increases the reference counts of the underlying pages, so that
+%% the unprivileged domain cannot try to return them to the hypervisor,
+%% install them as page tables, or any other unsafe behaviour.
+%% %block API here 
+
+
+\chapter{Further Information} 
+
+
+If you have questions that are not answered by this manual, the
+sources of information listed below may be of interest to you.  Note
+that bug reports, suggestions and contributions related to the
+software (or the documentation) should be sent to the Xen developers'
+mailing list (address below).
+
+\section{Other documentation}
+
+If you are mainly interested in using (rather than developing for)
+Xen, the {\em Xen Users' Manual} is distributed in the {\tt docs/}
+directory of the Xen source distribution.  
+
+% Various HOWTOs are also available in {\tt docs/HOWTOS}.
+
+\section{Online references}
+
+The official Xen web site is found at:
+\begin{quote}
+{\tt http://www.cl.cam.ac.uk/Research/SRG/netos/xen/}
+\end{quote}
+
+This contains links to the latest versions of all on-line 
+documentation. 
+
+\section{Mailing lists}
+
+There are currently three official Xen mailing lists:
+
+\begin{description}
+\item[xen-devel@lists.sourceforge.net] Used for development
+discussions and requests for help.  Subscribe at: \\
+{\small {\tt http://lists.sourceforge.net/mailman/listinfo/xen-devel}}
+\item[xen-announce@lists.sourceforge.net] Used for announcements only.
+Subscribe at: \\
+{\small {\tt http://lists.sourceforge.net/mailman/listinfo/xen-announce}}
+\item[xen-changelog@lists.sourceforge.net]  Changelog feed
+from the unstable and 2.0 trees - developer oriented.  Subscribe at: \\
+{\small {\tt http://lists.sourceforge.net/mailman/listinfo/xen-changelog}}
+\end{description}
+
+Of these, xen-devel is the most active; it is currently used for 
+both developer and user-related discussions. 
+
+
+
+
+\appendix
+
+%\newcommand{\hypercall}[1]{\vspace{5mm}{\large\sf #1}}
+
+
+
+
+
+\newcommand{\hypercall}[1]{\vspace{2mm}{\sf #1}}
+
+
+
+
+
+
+\chapter{Xen Hypercalls}
+\label{a:hypercalls}
+
+Hypercalls represent the procedural interface to Xen; this appendix 
+categorizes and describes the current set of hypercalls. 
+
+\section{Invoking Hypercalls} 
+
+Hypercalls are invoked in a manner analogous to system calls in a
+conventional operating system; a software interrupt is issued which
+vectors to an entry point within Xen. On x86\_32 machines the
+instruction required is {\tt int \$82}; the (real) IDT is setup so
+that this may only be issued from within ring 1. The particular 
+hypercall to be invoked is contained in {\tt EAX} --- a list 
+mapping these values to symbolic hypercall names can be found 
+in {\tt xen/include/public/xen.h}. 
+
+On some occasions a set of hypercalls will be required to carry
+out a higher-level function; a good example is when a guest 
+operating wishes to context switch to a new process which 
+requires updating various privileged CPU state. As an optimization
+for these cases, there is a generic mechanism to issue a set of 
+hypercalls as a batch: 
+
+\begin{quote}
+\hypercall{multicall(void *call\_list, int nr\_calls)}
+
+Execute a series of hypervisor calls; {\tt nr\_calls} is the length of
+the array of {\tt multicall\_entry\_t} structures pointed to be {\tt
+call\_list}. Each entry contains the hypercall operation code followed
+by up to 7 word-sized arguments.
+\end{quote}
+
+Note that multicalls are provided purely as an optimization; there is
+no requirement to use them when first porting a guest operating
+system.
+
+
+\section{Virtual CPU Setup} 
+
+At start of day, a guest operating system needs to setup the virtual
+CPU it is executing on. This includes installing vectors for the
+virtual IDT so that the guest OS can handle interrupts, page faults,
+etc. However the very first thing a guest OS must setup is a pair 
+of hypervisor callbacks: these are the entry points which Xen will
+use when it wishes to notify the guest OS of an occurrence. 
+
+\begin{quote}
+\hypercall{set\_callbacks(unsigned long event\_selector, unsigned long
+  event\_address, unsigned long failsafe\_selector, unsigned long
+  failsafe\_address) }
+
+Register the normal (``event'') and failsafe callbacks for 
+event processing. In each case the code segment selector and 
+address within that segment are provided. The selectors must
+have RPL 1; in XenLinux we simply use the kernel's CS for both 
+{\tt event\_selector} and {\tt failsafe\_selector}.
+
+The value {\tt event\_address} specifies the address of the guest OSes
+event handling and dispatch routine; the {\tt failsafe\_address}
+specifies a separate entry point which is used only if a fault occurs
+when Xen attempts to use the normal callback. 
+\end{quote} 
+
+
+After installing the hypervisor callbacks, the guest OS can 
+install a `virtual IDT' by using the following hypercall: 
+
+\begin{quote} 
+\hypercall{set\_trap\_table(trap\_info\_t *table)} 
+
+Install one or more entries into the per-domain 
+trap handler table (essentially a software version of the IDT). 
+Each entry in the array pointed to by {\tt table} includes the 
+exception vector number with the corresponding segment selector 
+and entry point. Most guest OSes can use the same handlers on 
+Xen as when running on the real hardware; an exception is the 
+page fault handler (exception vector 14) where a modified 
+stack-frame layout is used. 
+
+
+\end{quote} 
+
+Finally, as an optimization it is possible for each guest OS 
+to install one ``fast trap'': this is a trap gate which will 
+allow direct transfer of control from ring 3 into ring 1 without
+indirecting via Xen. In most cases this is suitable for use by 
+the guest OS system call mechanism, although it may be used for
+any purpose. 
+
+
+\begin{quote}
+\hypercall{set\_fast\_trap(int idx)}
+
+Install the handler for exception vector {\tt idx} as the ``fast
+trap'' for this domain. Note that this installs the current handler 
+(i.e. that which has been installed more recently via a call 
+to {\tt set\_trap\_table()}). 
+
+\end{quote}
+
+
+
+\section{Scheduling and Timer}
+
+Domains are preemptively scheduled by Xen according to the 
+parameters installed by domain 0 (see Section~\ref{s:dom0ops}). 
+In addition, however, a domain may choose to explicitly 
+control certain behavior with the following hypercall: 
+
+\begin{quote} 
+\hypercall{sched\_op(unsigned long op)} 
+
+Request scheduling operation from hypervisor. The options are: {\it
+yield}, {\it block}, and {\it shutdown}.  {\it yield} keeps the
+calling domain runnable but may cause a reschedule if other domains
+are runnable.  {\it block} removes the calling domain from the run
+queue and cause is to sleeps until an event is delivered to it.  {\it
+shutdown} is used to end the domain's execution; the caller can
+additionally specify whether the domain should reboot, halt or
+suspend.
+\end{quote} 
+
+To aid the implementation of a process scheduler within a guest OS,
+Xen provides a virtual programmable timer:
+
+\begin{quote}
+\hypercall{set\_timer\_op(uint64\_t timeout)} 
+
+Request a timer event to be sent at the specified system time (time 
+in nanoseconds since system boot). The hypercall actually passes the 
+64-bit timeout value as a pair of 32-bit values. 
+
+\end{quote} 
+
+Note that calling {\tt set\_timer\_op()} prior to {\tt sched\_op} 
+allows block-with-timeout semantics. 
+
+
+\section{Page Table Management} 
+
+Since guest operating systems have read-only access to their page 
+tables, Xen must be involved when making any changes. The following
+multi-purpose hypercall can be used to modify page-table entries, 
+update the machine-to-physical mapping table, flush the TLB, install 
+a new page-table base pointer, and more.
+
+\begin{quote} 
+\hypercall{mmu\_update(mmu\_update\_t *req, int count, int *success\_count)} 
+
+Update the page table for the domain; a set of {\tt count} updates are
+submitted for processing in a batch, with {\tt success\_count} being 
+updated to report the number of successful updates.  
+
+Each element of {\tt req[]} contains a pointer (address) and value; 
+the least significant 2-bits of the pointer are used to distinguish 
+the type of update requested as follows:
+\begin{description} 
+
+\item[\it MMU\_NORMAL\_PT\_UPDATE:] update a page directory entry or
+page table entry to the associated value; Xen will check that the
+update is safe, as described in Chapter~\ref{c:memory}.
+
+\item[\it MMU\_MACHPHYS\_UPDATE:] update an entry in the
+  machine-to-physical table. The calling domain must own the machine
+  page in question (or be privileged).
+
+\item[\it MMU\_EXTENDED\_COMMAND:] perform additional MMU operations.
+The set of additional MMU operations is considerable, and includes
+updating {\tt cr3} (or just re-installing it for a TLB flush),
+flushing the cache, installing a new LDT, or pinning \& unpinning
+page-table pages (to ensure their reference count doesn't drop to zero
+which would require a revalidation of all entries).
+
+Further extended commands are used to deal with granting and 
+acquiring page ownership; see Section~\ref{s:idc}. 
+
+
+\end{description}
+
+More details on the precise format of all commands can be 
+found in {\tt xen/include/public/xen.h}. 
+
+
+\end{quote}
+
+Explicitly updating batches of page table entries is extremely
+efficient, but can require a number of alterations to the guest
+OS. Using the writable page table mode (Chapter~\ref{c:memory}) is
+recommended for new OS ports.
+
+Regardless of which page table update mode is being used, however,
+there are some occasions (notably handling a demand page fault) where
+a guest OS will wish to modify exactly one PTE rather than a
+batch. This is catered for by the following:
+
+\begin{quote} 
+\hypercall{update\_va\_mapping(unsigned long page\_nr, unsigned long
+val, \\ unsigned long flags)}
+
+Update the currently installed PTE for the page {\tt page\_nr} to 
+{\tt val}. As with {\tt mmu\_update()}, Xen checks the modification 
+is safe before applying it. The {\tt flags} determine which kind
+of TLB flush, if any, should follow the update. 
+
+\end{quote} 
+
+Finally, sufficiently privileged domains may occasionally wish to manipulate 
+the pages of others: 
+\begin{quote}
+
+\hypercall{update\_va\_mapping\_otherdomain(unsigned long page\_nr,
+unsigned long val, unsigned long flags, uint16\_t domid)}
+
+Identical to {\tt update\_va\_mapping()} save that the pages being
+mapped must belong to the domain {\tt domid}. 
+
+\end{quote}
+
+This privileged operation is currently used by backend virtual device
+drivers to safely map pages containing I/O data. 
+
+
+
+\section{Segmentation Support}
+
+Xen allows guest OSes to install a custom GDT if they require it; 
+this is context switched transparently whenever a domain is 
+[de]scheduled.  The following hypercall is effectively a 
+`safe' version of {\tt lgdt}: 
+
+\begin{quote}
+\hypercall{set\_gdt(unsigned long *frame\_list, int entries)} 
+
+Install a global descriptor table for a domain; {\tt frame\_list} is
+an array of up to 16 machine page frames within which the GDT resides,
+with {\tt entries} being the actual number of descriptor-entry
+slots. All page frames must be mapped read-only within the guest's
+address space, and the table must be large enough to contain Xen's
+reserved entries (see {\tt xen/include/public/arch-x86\_32.h}).
+
+\end{quote}
+
+Many guest OSes will also wish to install LDTs; this is achieved by
+using {\tt mmu\_update()} with an extended command, passing the
+linear address of the LDT base along with the number of entries. No
+special safety checks are required; Xen needs to perform this task
+simply since {\tt lldt} requires CPL 0.
+
+
+Xen also allows guest operating systems to update just an 
+individual segment descriptor in the GDT or LDT:  
+
+\begin{quote}
+\hypercall{update\_descriptor(unsigned long ma, unsigned long word1,
+unsigned long word2)}
+
+Update the GDT/LDT entry at machine address {\tt ma}; the new
+8-byte descriptor is stored in {\tt word1} and {\tt word2}.
+Xen performs a number of checks to ensure the descriptor is 
+valid. 
+
+\end{quote}
+
+Guest OSes can use the above in place of context switching entire 
+LDTs (or the GDT) when the number of changing descriptors is small. 
+
+\section{Context Switching} 
+
+When a guest OS wishes to context switch between two processes, 
+it can use the page table and segmentation hypercalls described
+above to perform the the bulk of the privileged work. In addition, 
+however, it will need to invoke Xen to switch the kernel (ring 1) 
+stack pointer: 
+
+\begin{quote} 
+\hypercall{stack\_switch(unsigned long ss, unsigned long esp)} 
+
+Request kernel stack switch from hypervisor; {\tt ss} is the new 
+stack segment, which {\tt esp} is the new stack pointer. 
+
+\end{quote} 
+
+A final useful hypercall for context switching allows ``lazy'' 
+save and restore of floating point state: 
+
+\begin{quote}
+\hypercall{fpu\_taskswitch(void)} 
+
+This call instructs Xen to set the {\tt TS} bit in the {\tt cr0}
+control register; this means that the next attempt to use floating
+point will cause a trap which the guest OS can trap. Typically it will
+then save/restore the FP state, and clear the {\tt TS} bit. 
+\end{quote} 
+
+This is provided as an optimization only; guest OSes can also choose
+to save and restore FP state on all context switches for simplicity. 
+
+
+\section{Physical Memory Management}
+
+As mentioned previously, each domain has a maximum and current 
+memory allocation. The maximum allocation, set at domain creation 
+time, cannot be modified. However a domain can choose to reduce 
+and subsequently grow its current allocation by using the
+following call: 
+
+\begin{quote} 
+\hypercall{dom\_mem\_op(unsigned int op, unsigned long *extent\_list,
+  unsigned long nr\_extents, unsigned int extent\_order)}
+
+Increase or decrease current memory allocation (as determined by 
+the value of {\tt op}). Each invocation provides a list of 
+extents each of which is $2^s$ pages in size, 
+where $s$ is the value of {\tt extent\_order}. 
+
+\end{quote} 
+
+In addition to simply reducing or increasing the current memory
+allocation via a `balloon driver', this call is also useful for 
+obtaining contiguous regions of machine memory when required (e.g. 
+for certain PCI devices, or if using superpages).  
+
+
+\section{Inter-Domain Communication}
+\label{s:idc} 
+
+Xen provides a simple asynchronous notification mechanism via
+\emph{event channels}. Each domain has a set of end-points (or
+\emph{ports}) which may be bound to an event source (e.g. a physical
+IRQ, a virtual IRQ, or an port in another domain). When a pair of
+end-points in two different domains are bound together, then a `send'
+operation on one will cause an event to be received by the destination
+domain.
+
+The control and use of event channels involves the following hypercall: 
+
+\begin{quote}
+\hypercall{event\_channel\_op(evtchn\_op\_t *op)} 
+
+Inter-domain event-channel management; {\tt op} is a discriminated 
+union which allows the following 7 operations: 
+
+\begin{description} 
+
+\item[\it alloc\_unbound:] allocate a free (unbound) local
+  port and prepare for connection from a specified domain. 
+\item[\it bind\_virq:] bind a local port to a virtual 
+IRQ; any particular VIRQ can be bound to at most one port per domain. 
+\item[\it bind\_pirq:] bind a local port to a physical IRQ;
+once more, a given pIRQ can be bound to at most one port per
+domain. Furthermore the calling domain must be sufficiently
+privileged.
+\item[\it bind\_interdomain:] construct an interdomain event 
+channel; in general, the target domain must have previously allocated 
+an unbound port for this channel, although this can be bypassed by 
+privileged domains during domain setup. 
+\item[\it close:] close an interdomain event channel. 
+\item[\it send:] send an event to the remote end of a 
+interdomain event channel. 
+\item[\it status:] determine the current status of a local port. 
+\end{description} 
+
+For more details see
+{\tt xen/include/public/event\_channel.h}. 
+
+\end{quote} 
+
+Event channels are the fundamental communication primitive between 
+Xen domains and seamlessly support SMP. However they provide little
+bandwidth for communication {\sl per se}, and hence are typically 
+married with a piece of shared memory to produce effective and 
+high-performance inter-domain communication. 
+
+Safe sharing of memory pages between guest OSes is carried out by
+granting access on a per page basis to individual domains. This is
+achieved by using the {\tt grant\_table\_op()} hypercall.
+
+\begin{quote}
+\hypercall{grant\_table\_op(unsigned int cmd, void *uop, unsigned int count)}
+
+Grant or remove access to a particular page to a particular domain. 
+
+\end{quote} 
+
+This is not currently widely in use by guest operating systems, but 
+we intend to integrate support more fully in the near future. 
+
+\section{PCI Configuration} 
+
+Domains with physical device access (i.e.\ driver domains) receive
+limited access to certain PCI devices (bus address space and
+interrupts). However many guest operating systems attempt to 
+determine the PCI configuration by directly access the PCI BIOS, 
+which cannot be allowed for safety. 
+
+Instead, Xen provides the following hypercall: 
+
+\begin{quote}
+\hypercall{physdev\_op(void *physdev\_op)}
+
+Perform a PCI configuration option; depending on the value 
+of {\tt physdev\_op} this can be a PCI config read, a PCI config 
+write, or a small number of other queries. 
+
+\end{quote} 
+
+
+For examples of using {\tt physdev\_op()}, see the 
+Xen-specific PCI code in the linux sparse tree. 
+
+\section{Administrative Operations}
+\label{s:dom0ops}
+
+A large number of control operations are available to a sufficiently
+privileged domain (typically domain 0). These allow the creation and
+management of new domains, for example. A complete list is given 
+below: for more details on any or all of these, please see 
+{\tt xen/include/public/dom0\_ops.h} 
+
+
+\begin{quote}
+\hypercall{dom0\_op(dom0\_op\_t *op)} 
+
+Administrative domain operations for domain management. The options are:
+
+\begin{description} 
+\item [\it DOM0\_CREATEDOMAIN:] create a new domain
+
+\item [\it DOM0\_PAUSEDOMAIN:] remove a domain from the scheduler run 
+queue. 
+
+\item [\it DOM0\_UNPAUSEDOMAIN:] mark a paused domain as schedulable
+  once again. 
+
+\item [\it DOM0\_DESTROYDOMAIN:] deallocate all resources associated
+with a domain
+
+\item [\it DOM0\_GETMEMLIST:] get list of pages used by the domain
+
+\item [\it DOM0\_SCHEDCTL:]
+
+\item [\it DOM0\_ADJUSTDOM:] adjust scheduling priorities for domain
+
+\item [\it DOM0\_BUILDDOMAIN:] do final guest OS setup for domain
+
+\item [\it DOM0\_GETDOMAINFO:] get statistics about the domain
+
+\item [\it DOM0\_GETPAGEFRAMEINFO:] 
+
+\item [\it DOM0\_GETPAGEFRAMEINFO2:]
+
+\item [\it DOM0\_IOPL:] set I/O privilege level
+
+\item [\it DOM0\_MSR:] read or write model specific registers
+
+\item [\it DOM0\_DEBUG:] interactively invoke the debugger
+
+\item [\it DOM0\_SETTIME:] set system time
+
+\item [\it DOM0\_READCONSOLE:] read console content from hypervisor buffer ring
+
+\item [\it DOM0\_PINCPUDOMAIN:] pin domain to a particular CPU
+
+\item [\it DOM0\_GETTBUFS:] get information about the size and location of
+                      the trace buffers (only on trace-buffer enabled builds)
+
+\item [\it DOM0\_PHYSINFO:] get information about the host machine
+
+\item [\it DOM0\_PCIDEV\_ACCESS:] modify PCI device access permissions
+
+\item [\it DOM0\_SCHED\_ID:] get the ID of the current Xen scheduler
+
+\item [\it DOM0\_SHADOW\_CONTROL:] switch between shadow page-table modes
+
+\item [\it DOM0\_SETDOMAININITIALMEM:] set initial memory allocation of a domain
+
+\item [\it DOM0\_SETDOMAINMAXMEM:] set maximum memory allocation of a domain
+
+\item [\it DOM0\_SETDOMAINVMASSIST:] set domain VM assist options
+\end{description} 
+\end{quote} 
+
+Most of the above are best understood by looking at the code 
+implementing them (in {\tt xen/common/dom0\_ops.c}) and in 
+the user-space tools that use them (mostly in {\tt tools/libxc}). 
+
+\section{Debugging Hypercalls} 
+
+A few additional hypercalls are mainly useful for debugging: 
+
+\begin{quote} 
+\hypercall{console\_io(int cmd, int count, char *str)}
+
+Use Xen to interact with the console; operations are:
+
+{\it CONSOLEIO\_write}: Output count characters from buffer str.
+
+{\it CONSOLEIO\_read}: Input at most count characters into buffer str.
+\end{quote} 
+
+A pair of hypercalls allows access to the underlying debug registers: 
+\begin{quote}
+\hypercall{set\_debugreg(int reg, unsigned long value)}
+
+Set debug register {\tt reg} to {\tt value} 
+
+\hypercall{get\_debugreg(int reg)}
+
+Return the contents of the debug register {\tt reg}
+\end{quote}
+
+And finally: 
+\begin{quote}
+\hypercall{xen\_version(int cmd)}
+
+Request Xen version number.
+\end{quote} 
+
+This is useful to ensure that user-space tools are in sync 
+with the underlying hypervisor. 
+
+\section{Deprecated Hypercalls}
+
+Xen is under constant development and refinement; as such there 
+are plans to improve the way in which various pieces of functionality 
+are exposed to guest OSes. 
+
+\begin{quote} 
+\hypercall{vm\_assist(unsigned int cmd, unsigned int type)}
+
+Toggle various memory management modes (in particular wrritable page
+tables and superpage support). 
+
+\end{quote} 
+
+This is likely to be replaced with mode values in the shared 
+information page since this is more resilient for resumption 
+after migration or checkpoint. 
+
+
+
+
+
+
+
+
+%% 
+%% XXX SMH: not really sure how useful below is -- if it's still 
+%% actually true, might be useful for someone wanting to write a 
+%% new scheduler... not clear how many of them there are...
+%%
+
+\begin{comment}
+
+\chapter{Scheduling API}  
+
+The scheduling API is used by both the schedulers described above and should
+also be used by any new schedulers.  It provides a generic interface and also
+implements much of the ``boilerplate'' code.
+
+Schedulers conforming to this API are described by the following
+structure:
+
+\begin{verbatim}
+struct scheduler
+{
+    char *name;             /* full name for this scheduler      */
+    char *opt_name;         /* option name for this scheduler    */
+    unsigned int sched_id;  /* ID for this scheduler             */
+
+    int          (*init_scheduler) ();
+    int          (*alloc_task)     (struct task_struct *);
+    void         (*add_task)       (struct task_struct *);
+    void         (*free_task)      (struct task_struct *);
+    void         (*rem_task)       (struct task_struct *);
+    void         (*wake_up)        (struct task_struct *);
+    void         (*do_block)       (struct task_struct *);
+    task_slice_t (*do_schedule)    (s_time_t);
+    int          (*control)        (struct sched_ctl_cmd *);
+    int          (*adjdom)         (struct task_struct *,
+                                    struct sched_adjdom_cmd *);
+    s32          (*reschedule)     (struct task_struct *);
+    void         (*dump_settings)  (void);
+    void         (*dump_cpu_state) (int);
+    void         (*dump_runq_el)   (struct task_struct *);
+};
+\end{verbatim}
+
+The only method that {\em must} be implemented is
+{\tt do\_schedule()}.  However, if there is not some implementation for the
+{\tt wake\_up()} method then waking tasks will not get put on the runqueue!
+
+The fields of the above structure are described in more detail below.
+
+\subsubsection{name}
+
+The name field should point to a descriptive ASCII string.
+
+\subsubsection{opt\_name}
+
+This field is the value of the {\tt sched=} boot-time option that will select
+this scheduler.
+
+\subsubsection{sched\_id}
+
+This is an integer that uniquely identifies this scheduler.  There should be a
+macro corrsponding to this scheduler ID in {\tt <xen/sched-if.h>}.
+
+\subsubsection{init\_scheduler}
+
+\paragraph*{Purpose}
+
+This is a function for performing any scheduler-specific initialisation.  For
+instance, it might allocate memory for per-CPU scheduler data and initialise it
+appropriately.
+
+\paragraph*{Call environment}
+
+This function is called after the initialisation performed by the generic
+layer.  The function is called exactly once, for the scheduler that has been
+selected.
+
+\paragraph*{Return values}
+
+This should return negative on failure --- this will cause an
+immediate panic and the system will fail to boot.
+
+\subsubsection{alloc\_task}
+
+\paragraph*{Purpose}
+Called when a {\tt task\_struct} is allocated by the generic scheduler
+layer.  A particular scheduler implementation may use this method to
+allocate per-task data for this task.  It may use the {\tt
+sched\_priv} pointer in the {\tt task\_struct} to point to this data.
+
+\paragraph*{Call environment}
+The generic layer guarantees that the {\tt sched\_priv} field will
+remain intact from the time this method is called until the task is
+deallocated (so long as the scheduler implementation does not change
+it explicitly!).
+
+\paragraph*{Return values}
+Negative on failure.
+
+\subsubsection{add\_task}
+
+\paragraph*{Purpose}
+
+Called when a task is initially added by the generic layer.
+
+\paragraph*{Call environment}
+
+The fields in the {\tt task\_struct} are now filled out and available for use.
+Schedulers should implement appropriate initialisation of any per-task private
+information in this method.
+
+\subsubsection{free\_task}
+
+\paragraph*{Purpose}
+
+Schedulers should free the space used by any associated private data
+structures.
+
+\paragraph*{Call environment}
+
+This is called when a {\tt task\_struct} is about to be deallocated.
+The generic layer will have done generic task removal operations and
+(if implemented) called the scheduler's {\tt rem\_task} method before
+this method is called.
+
+\subsubsection{rem\_task}
+
+\paragraph*{Purpose}
+
+This is called when a task is being removed from scheduling (but is
+not yet being freed).
+
+\subsubsection{wake\_up}
+
+\paragraph*{Purpose}
+
+Called when a task is woken up, this method should put the task on the runqueue
+(or do the scheduler-specific equivalent action).
+
+\paragraph*{Call environment}
+
+The task is already set to state RUNNING.
+
+\subsubsection{do\_block}
+
+\paragraph*{Purpose}
+
+This function is called when a task is blocked.  This function should
+not remove the task from the runqueue.
+
+\paragraph*{Call environment}
+
+The EVENTS\_MASTER\_ENABLE\_BIT is already set and the task state changed to
+TASK\_INTERRUPTIBLE on entry to this method.  A call to the {\tt
+  do\_schedule} method will be made after this method returns, in
+order to select the next task to run.
+
+\subsubsection{do\_schedule}
+
+This method must be implemented.
+
+\paragraph*{Purpose}
+
+The method is called each time a new task must be chosen for scheduling on the
+current CPU.  The current time as passed as the single argument (the current
+task can be found using the {\tt current} macro).
+
+This method should select the next task to run on this CPU and set it's minimum
+time to run as well as returning the data described below.
+
+This method should also take the appropriate action if the previous
+task has blocked, e.g. removing it from the runqueue.
+
+\paragraph*{Call environment}
+
+The other fields in the {\tt task\_struct} are updated by the generic layer,
+which also performs all Xen-specific tasks and performs the actual task switch
+(unless the previous task has been chosen again).
+
+This method is called with the {\tt schedule\_lock} held for the current CPU
+and local interrupts disabled.
+
+\paragraph*{Return values}
+
+Must return a {\tt struct task\_slice} describing what task to run and how long
+for (at maximum).
+
+\subsubsection{control}
+
+\paragraph*{Purpose}
+
+This method is called for global scheduler control operations.  It takes a
+pointer to a {\tt struct sched\_ctl\_cmd}, which it should either
+source data from or populate with data, depending on the value of the
+{\tt direction} field.
+
+\paragraph*{Call environment}
+
+The generic layer guarantees that when this method is called, the
+caller selected the correct scheduler ID, hence the scheduler's
+implementation does not need to sanity-check these parts of the call.
+
+\paragraph*{Return values}
+
+This function should return the value to be passed back to user space, hence it
+should either be 0 or an appropriate errno value.
+
+\subsubsection{sched\_adjdom}
+
+\paragraph*{Purpose}
+
+This method is called to adjust the scheduling parameters of a particular
+domain, or to query their current values.  The function should check
+the {\tt direction} field of the {\tt sched\_adjdom\_cmd} it receives in
+order to determine which of these operations is being performed.
+
+\paragraph*{Call environment}
+
+The generic layer guarantees that the caller has specified the correct
+control interface version and scheduler ID and that the supplied {\tt
+task\_struct} will not be deallocated during the call (hence it is not
+necessary to {\tt get\_task\_struct}).
+
+\paragraph*{Return values}
+
+This function should return the value to be passed back to user space, hence it
+should either be 0 or an appropriate errno value.
+
+\subsubsection{reschedule}
+
+\paragraph*{Purpose}
+
+This method is called to determine if a reschedule is required as a result of a
+particular task.
+
+\paragraph*{Call environment}
+The generic layer will cause a reschedule if the current domain is the idle
+task or it has exceeded its minimum time slice before a reschedule.  The
+generic layer guarantees that the task passed is not currently running but is
+on the runqueue.
+
+\paragraph*{Return values}
+
+Should return a mask of CPUs to cause a reschedule on.
+
+\subsubsection{dump\_settings}
+
+\paragraph*{Purpose}
+
+If implemented, this should dump any private global settings for this
+scheduler to the console.
+
+\paragraph*{Call environment}
+
+This function is called with interrupts enabled.
+
+\subsubsection{dump\_cpu\_state}
+
+\paragraph*{Purpose}
+
+This method should dump any private settings for the specified CPU.
+
+\paragraph*{Call environment}
+
+This function is called with interrupts disabled and the {\tt schedule\_lock}
+for the specified CPU held.
+
+\subsubsection{dump\_runq\_el}
+
+\paragraph*{Purpose}
+
+This method should dump any private settings for the specified task.
+
+\paragraph*{Call environment}
+
+This function is called with interrupts disabled and the {\tt schedule\_lock}
+for the task's CPU held.
+
+\end{comment} 
+
+
+
+
+%%
+%% XXX SMH: we probably should have something in here on debugging 
+%% etc; this is a kinda developers manual and many devs seem to 
+%% like debugging support :^) 
+%% Possibly sanitize below, else wait until new xendbg stuff is in 
+%% (and/or kip's stuff?) and write about that instead? 
+%%
+
+\begin{comment} 
+
+\chapter{Debugging}
+
+Xen provides tools for debugging both Xen and guest OSes.  Currently, the
+Pervasive Debugger provides a GDB stub, which provides facilities for symbolic
+debugging of Xen itself and of OS kernels running on top of Xen.  The Trace
+Buffer provides a lightweight means to log data about Xen's internal state and
+behaviour at runtime, for later analysis.
+
+\section{Pervasive Debugger}
+
+Information on using the pervasive debugger is available in pdb.txt.
+
+
+\section{Trace Buffer}
+
+The trace buffer provides a means to observe Xen's operation from domain 0.
+Trace events, inserted at key points in Xen's code, record data that can be
+read by the {\tt xentrace} tool.  Recording these events has a low overhead
+and hence the trace buffer may be useful for debugging timing-sensitive
+behaviours.
+
+\subsection{Internal API}
+
+To use the trace buffer functionality from within Xen, you must {\tt \#include
+<xen/trace.h>}, which contains definitions related to the trace buffer.  Trace
+events are inserted into the buffer using the {\tt TRACE\_xD} ({\tt x} = 0, 1,
+2, 3, 4 or 5) macros.  These all take an event number, plus {\tt x} additional
+(32-bit) data as their arguments.  For trace buffer-enabled builds of Xen these
+will insert the event ID and data into the trace buffer, along with the current
+value of the CPU cycle-counter.  For builds without the trace buffer enabled,
+the macros expand to no-ops and thus can be left in place without incurring
+overheads.
+
+\subsection{Trace-enabled builds}
+
+By default, the trace buffer is enabled only in debug builds (i.e. {\tt NDEBUG}
+is not defined).  It can be enabled separately by defining {\tt TRACE\_BUFFER},
+either in {\tt <xen/config.h>} or on the gcc command line.
+
+The size (in pages) of the per-CPU trace buffers can be specified using the
+{\tt tbuf\_size=n } boot parameter to Xen.  If the size is set to 0, the trace
+buffers will be disabled.
+
+\subsection{Dumping trace data}
+
+When running a trace buffer build of Xen, trace data are written continuously
+into the buffer data areas, with newer data overwriting older data.  This data
+can be captured using the {\tt xentrace} program in domain 0.
+
+The {\tt xentrace} tool uses {\tt /dev/mem} in domain 0 to map the trace
+buffers into its address space.  It then periodically polls all the buffers for
+new data, dumping out any new records from each buffer in turn.  As a result,
+for machines with multiple (logical) CPUs, the trace buffer output will not be
+in overall chronological order.
+
+The output from {\tt xentrace} can be post-processed using {\tt
+xentrace\_cpusplit} (used to split trace data out into per-cpu log files) and
+{\tt xentrace\_format} (used to pretty-print trace data).  For the predefined
+trace points, there is an example format file in {\tt tools/xentrace/formats }.
+
+For more information, see the manual pages for {\tt xentrace}, {\tt
+xentrace\_format} and {\tt xentrace\_cpusplit}.
+
+\end{comment} 
+
+
+
+
+\end{document}

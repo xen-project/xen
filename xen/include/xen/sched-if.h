@@ -13,8 +13,8 @@ typedef struct schedule_data_st
 {
     spinlock_t          schedule_lock;  /* spinlock protecting curr pointer
                                             TODO check this */
-    struct domain       *curr;          /* current task */
-    struct domain       *idle;          /* idle task for this cpu */
+    struct exec_domain  *curr;          /* current task */
+    struct exec_domain  *idle;          /* idle task for this cpu */
     void *              sched_priv;
     struct ac_timer     s_timer;        /* scheduling timer  */
 #ifdef BUCKETS
@@ -25,7 +25,7 @@ typedef struct schedule_data_st
 
 typedef struct task_slice_st
 {
-    struct domain *task;
+    struct exec_domain *task;
     s_time_t            time;
 } task_slice_t;
 
@@ -36,14 +36,14 @@ struct scheduler
     unsigned int sched_id;  /* ID for this scheduler             */
 
     int          (*init_scheduler) ();
-    int          (*init_idle_task) (struct domain *);
-    int          (*alloc_task)     (struct domain *);
-    void         (*add_task)       (struct domain *);
+    int          (*init_idle_task) (struct exec_domain *);
+    int          (*alloc_task)     (struct exec_domain *);
+    void         (*add_task)       (struct exec_domain *);
     void         (*free_task)      (struct domain *);
-    void         (*rem_task)       (struct domain *);
-    void         (*sleep)          (struct domain *);
-    void         (*wake)           (struct domain *);
-    void         (*do_block)       (struct domain *);
+    void         (*rem_task)       (struct exec_domain *);
+    void         (*sleep)          (struct exec_domain *);
+    void         (*wake)           (struct exec_domain *);
+    void         (*do_block)       (struct exec_domain *);
     task_slice_t (*do_schedule)    (s_time_t);
     int          (*control)        (struct sched_ctl_cmd *);
     int          (*adjdom)         (struct domain *,

@@ -10,8 +10,8 @@
 
 int xc_domain_create(int xc_handle,
                      unsigned int mem_kb, 
-                     const char *name,
                      int cpu,
+                     float cpu_weight,
                      u32 *pdomid)
 {
     int err;
@@ -20,12 +20,14 @@ int xc_domain_create(int xc_handle,
     op.cmd = DOM0_CREATEDOMAIN;
     op.u.createdomain.domain = (domid_t)*pdomid;
     op.u.createdomain.memory_kb = mem_kb;
-    strncpy(op.u.createdomain.name, name, MAX_DOMAIN_NAME);
-    op.u.createdomain.name[MAX_DOMAIN_NAME-1] = '\0';
     op.u.createdomain.cpu = cpu;
 
     if ( (err = do_dom0_op(xc_handle, &op)) == 0 )
-        *pdomid = (u32)op.u.createdomain.domain;
+    {
+        *pdomid = (u16)op.u.createdomain.domain;
+        
+         err = xc_domain_setcpuweight(xc_handle, *pdomid, cpu_weight);
+    }
 
     return err;
 }    
@@ -67,6 +69,7 @@ int xc_domain_pincpu(int xc_handle,
     dom0_op_t op;
     op.cmd = DOM0_PINCPUDOMAIN;
     op.u.pincpudomain.domain = (domid_t)domid;
+    op.u.pincpudomain.exec_domain = 0;
     op.u.pincpudomain.cpu  = cpu;
     return do_dom0_op(xc_handle, &op);
 }
@@ -85,10 +88,11 @@ int xc_domain_getinfo(int xc_handle,
     {
         op.cmd = DOM0_GETDOMAININFO;
         op.u.getdomaininfo.domain = (domid_t)next_domid;
+        op.u.getdomaininfo.exec_domain = 0; // FIX ME?!?
         op.u.getdomaininfo.ctxt = NULL; /* no exec context info, thanks. */
         if ( do_dom0_op(xc_handle, &op) < 0 )
             break;
-        info->domid   = (u32)op.u.getdomaininfo.domain;
+        info->domid   = (u16)op.u.getdomaininfo.domain;
 
         info->cpu     =
             (op.u.getdomaininfo.flags>>DOMFLAGS_CPUSHIFT) & DOMFLAGS_CPUMASK;
@@ -108,10 +112,8 @@ int xc_domain_getinfo(int xc_handle,
         info->max_memkb = op.u.getdomaininfo.max_pages<<(PAGE_SHIFT);
         info->shared_info_frame = op.u.getdomaininfo.shared_info_frame;
         info->cpu_time = op.u.getdomaininfo.cpu_time;
-        strncpy(info->name, op.u.getdomaininfo.name, XC_DOMINFO_MAXNAME);
-        info->name[XC_DOMINFO_MAXNAME-1] = '\0';
 
-        next_domid = (u32)op.u.getdomaininfo.domain + 1;
+        next_domid = (u16)op.u.getdomaininfo.domain + 1;
         info++;
     }
 
@@ -120,16 +122,23 @@ int xc_domain_getinfo(int xc_handle,
 
 int xc_domain_getfullinfo(int xc_handle,
                           u32 domid,
-                          dom0_op_t *op,
-                          full_execution_context_t *ctxt )
+                          u32 vcpu,
+                          xc_domaininfo_t *info,
+                          full_execution_context_t *ctxt)
 {
     int rc;
-    op->cmd = DOM0_GETDOMAININFO;
-    op->u.getdomaininfo.domain = (domid_t)domid;
-    op->u.getdomaininfo.ctxt = ctxt;
+    dom0_op_t op;
 
-    rc = do_dom0_op(xc_handle, op);
-    if ( ((u32)op->u.getdomaininfo.domain != domid) && rc > 0 )
+    op.cmd = DOM0_GETDOMAININFO;
+    op.u.getdomaininfo.domain = (domid_t)domid;
+    op.u.getdomaininfo.exec_domain = (u16)vcpu;
+    op.u.getdomaininfo.ctxt = ctxt;
+
+    rc = do_dom0_op(xc_handle, &op);
+
+    memcpy(info, &op.u.getdomaininfo, sizeof(*info));
+
+    if ( ((u16)op.u.getdomaininfo.domain != domid) && rc > 0 )
         return -ESRCH;
     else
         return rc;
@@ -160,16 +169,58 @@ int xc_shadow_control(int xc_handle,
     return (rc == 0) ? op.u.shadow_control.pages : rc;
 }
 
-int xc_domain_setname(int xc_handle,
-                      u32 domid, 
-                      char *name)
+int xc_domain_setcpuweight(int xc_handle,
+                           u32 domid,
+                           float weight)
 {
-    dom0_op_t op;
-    op.cmd = DOM0_SETDOMAINNAME;
-    op.u.setdomainname.domain = (domid_t)domid;
-    strncpy(op.u.setdomainname.name, name, MAX_DOMAIN_NAME);
-    return do_dom0_op(xc_handle, &op);
+    int sched_id;
+    int ret;
+    
+    /* Figure out which scheduler is currently used: */
+    if((ret = xc_sched_id(xc_handle, &sched_id)))
+        return ret;
+    
+    switch(sched_id)
+    {
+        case SCHED_BVT:
+        {
+            u32 mcuadv;
+            int warpback;
+            s32 warpvalue;
+            long long warpl;
+            long long warpu;
+
+            /* Preserve all the scheduling parameters apart 
+               of MCU advance. */
+            if((ret = xc_bvtsched_domain_get(xc_handle, domid, &mcuadv, 
+                                &warpback, &warpvalue, &warpl, &warpu)))
+                return ret;
+            
+            /* The MCU advance is inverse of the weight.
+               Default value of the weight is 1, default mcuadv 10.
+               The scaling factor is therefore 10. */
+            if(weight > 0) mcuadv = 10 / weight;
+            
+            ret = xc_bvtsched_domain_set(xc_handle, domid, mcuadv, 
+                                         warpback, warpvalue, warpl, warpu);
+            break;
+        }
+        
+        case SCHED_RROBIN:
+        {
+            /* The weight cannot be set for RRobin */
+            break;
+        }
+        case SCHED_ATROPOS:
+        {
+            /* TODO - can we set weights in Atropos? */
+            break;
+        }
+    }
+
+    return ret;
 }
+
 
 int xc_domain_setinitialmem(int xc_handle,
                             u32 domid, 
@@ -193,3 +244,15 @@ int xc_domain_setmaxmem(int xc_handle,
     return do_dom0_op(xc_handle, &op);
 }
 
+int xc_domain_setvmassist(int xc_handle,
+                          u32 domid, 
+                          unsigned int cmd,
+                          unsigned int type)
+{
+    dom0_op_t op;
+    op.cmd = DOM0_SETDOMAINVMASSIST;
+    op.u.setdomainvmassist.domain = (domid_t)domid;
+    op.u.setdomainvmassist.cmd = cmd;
+    op.u.setdomainvmassist.type = type;
+    return do_dom0_op(xc_handle, &op);
+}

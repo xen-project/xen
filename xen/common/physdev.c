@@ -1,4 +1,4 @@
-/* -*-  Mode:C; c-basic-offset:4; tab-width:4 -*-
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*-
  ****************************************************************************
  * (c) 2004 - Rolf Neugebauer - Intel Research Cambridge
  * (c) 2004 - Keir Fraser - University of Cambridge
@@ -19,6 +19,7 @@
  */
 
 #include <xen/config.h>
+#include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/types.h>
 #include <xen/sched.h>
@@ -26,8 +27,8 @@
 #include <xen/irq.h>
 #include <xen/event.h>
 #include <asm/pci.h>
-#include <hypervisor-ifs/hypervisor-if.h>
-#include <hypervisor-ifs/physdev.h>
+#include <public/xen.h>
+#include <public/physdev.h>
 
 /* Called by PHYSDEV_PCI_INITIALISE_DEVICE to finalise IRQ routing. */
 extern void pcibios_enable_irq(struct pci_dev *dev);
@@ -44,6 +45,7 @@ extern void pcibios_enable_irq(struct pci_dev *dev);
 #define INFO(_f, _a...) ((void)0)
 #endif
 
+#define SLOPPY_CHECKING
 
 #define ACC_READ  1
 #define ACC_WRITE 2
@@ -71,11 +73,9 @@ typedef struct _phys_dev_st {
 static phys_dev_t *find_pdev(struct domain *p, struct pci_dev *dev)
 {
     phys_dev_t *t, *res = NULL;
-    struct list_head *tmp;
 
-    list_for_each(tmp, &p->pcidev_list)
+    list_for_each_entry ( t, &p->pcidev_list, node )
     {
-        t = list_entry(tmp,  phys_dev_t, node);
         if ( dev == t->dev )
         {
             res = t;
@@ -98,7 +98,7 @@ static void add_dev_to_task(struct domain *p,
         return;
     }
 
-    if ( (pdev = xmalloc(sizeof(phys_dev_t))) == NULL )
+    if ( (pdev = xmalloc(phys_dev_t)) == NULL )
     {
         INFO("Error allocating pdev structure.\n");
         return;
@@ -125,10 +125,11 @@ int physdev_pci_access_modify(
     domid_t dom, int bus, int dev, int func, int enable)
 {
     struct domain *p;
+    struct exec_domain *ed, *edc;
     struct pci_dev *pdev;
     int i, j, rc = 0;
- 
-    if ( !IS_PRIV(current) )
+
+    if ( !IS_PRIV(current->domain) )
         BUG();
 
     if ( (bus > PCI_BUSMAX) || (dev > PCI_DEVMAX) || (func > PCI_FUNCMAX) )
@@ -145,11 +146,13 @@ int physdev_pci_access_modify(
     if ( (p = find_domain_by_id(dom)) == NULL ) 
         return -ESRCH;
 
+    ed = p->exec_domain[0];     /* XXX */
+
     /* Make the domain privileged. */
-    set_bit(DF_PHYSDEV, &p->flags);
-	/* FIXME: MAW for now make the domain REALLY privileged so that it
-	 * can run a backend driver (hw access should work OK otherwise) */
-	set_bit(DF_PRIVILEGED, &p->flags);
+    set_bit(DF_PHYSDEV, &p->d_flags);
+    /* FIXME: MAW for now make the domain REALLY privileged so that it
+     * can run a backend driver (hw access should work OK otherwise) */
+    set_bit(DF_PRIVILEGED, &p->d_flags);
 
     /* Grant write access to the specified device. */
     if ( (pdev = pci_find_slot(bus, PCI_DEVFN(dev, func))) == NULL )
@@ -169,16 +172,22 @@ int physdev_pci_access_modify(
 
     /* Now, setup access to the IO ports and memory regions for the device. */
 
-    if ( p->io_bitmap == NULL )
+    if ( ed->arch.io_bitmap == NULL )
     {
-        if ( (p->io_bitmap = xmalloc(IO_BITMAP_BYTES)) == NULL )
+        if ( (ed->arch.io_bitmap = xmalloc_array(u8, IOBMP_BYTES)) == NULL )
         {
             rc = -ENOMEM;
             goto out;
         }
-        memset(p->io_bitmap, 0xFF, IO_BITMAP_BYTES);
+        memset(ed->arch.io_bitmap, 0xFF, IOBMP_BYTES);
 
-        p->io_bitmap_sel = ~0ULL;
+        ed->arch.io_bitmap_sel = ~0ULL;
+
+        for_each_exec_domain(p, edc) {
+            if (edc == ed)
+                continue;
+            edc->arch.io_bitmap = ed->arch.io_bitmap;
+        }
     }
 
     for ( i = 0; i < DEVICE_COUNT_RESOURCE; i++ )
@@ -195,18 +204,20 @@ int physdev_pci_access_modify(
                  "for device %s\n", dom, r->start, r->end, pdev->slot_name);
             for ( j = r->start; j < r->end + 1; j++ )
             {
-                clear_bit(j, p->io_bitmap);
-                /* Record that we cleared a bit using bit n of the selector:
-                 * n = (j / (4 bytes in a word * 8 bits in a byte))
-                 *     / number of words per selector bit
-                 */
-                clear_bit((j / (8 * 4)) / IOBMP_SELBIT_LWORDS,
-                          &p->io_bitmap_sel);
+                clear_bit(j, ed->arch.io_bitmap);
+                clear_bit(j / IOBMP_BITS_PER_SELBIT, &ed->arch.io_bitmap_sel);
             }
         }
 
         /* rights to IO memory regions are checked when the domain maps them */
     }
+
+    for_each_exec_domain(p, edc) {
+        if (edc == ed)
+            continue;
+        edc->arch.io_bitmap_sel = ed->arch.io_bitmap_sel;
+    }
+
  out:
     put_domain(p);
     return rc;
@@ -217,17 +228,16 @@ int physdev_pci_access_modify(
 int domain_iomem_in_pfn(struct domain *p, unsigned long pfn)
 {
     int ret = 0;
-    struct list_head *l;
+    phys_dev_t *phys_dev;
 
     VERBOSE_INFO("Checking if physdev-capable domain %u needs access to "
-                 "pfn %08lx\n", p->domain, pfn);
+                 "pfn %p\n", p->id, pfn);
     
     spin_lock(&p->pcidev_lock);
 
-    list_for_each(l, &p->pcidev_list)
+    list_for_each_entry ( phys_dev, &p->pcidev_list, node )
     {
         int i;
-        phys_dev_t *phys_dev = list_entry(l, phys_dev_t, node);
         struct pci_dev *pci_dev = phys_dev->dev;
 
         for ( i = 0; (i < DEVICE_COUNT_RESOURCE) && (ret == 0); i++ )
@@ -247,8 +257,8 @@ int domain_iomem_in_pfn(struct domain *p, unsigned long pfn)
     
     spin_unlock(&p->pcidev_lock);
 
-    VERBOSE_INFO("Domain %u %s mapping of pfn %08lx\n",
-                 p->domain, ret ? "allowed" : "disallowed", pfn);
+    VERBOSE_INFO("Domain %u %s mapping of pfn %p\n",
+                 p->id, ret ? "allowed" : "disallowed", pfn);
 
     return ret;
 }
@@ -293,7 +303,7 @@ inline static int check_dev_acc (struct domain *p,
     return 0;
 }
 
-
+#ifndef SLOPPY_CHECKING
 /*
  * Base address registers contain the base address for IO regions.
  * The length can be determined by writing all 1s to the register and
@@ -331,7 +341,7 @@ static int do_base_address_access(phys_dev_t *pdev, int acc, int idx,
          * anyway if this write fails.  Hopefully the printk will give us a
          * clue what went wrong. */
         INFO("Guest %u attempting sub-dword %s to BASE_ADDRESS %d\n",
-             pdev->owner->domain, (acc == ACC_READ) ? "read" : "write", idx);
+             pdev->owner->id, (acc == ACC_READ) ? "read" : "write", idx);
         
         return -EPERM;
     }
@@ -484,6 +494,7 @@ static int do_rom_address_access(phys_dev_t *pdev, int acc, int len, u32 *val)
     return ret;
 
 }
+#endif /* SLOPPY_CHECKING */
 
 /*
  * Handle a PCI config space read access if the domain has access privileges.
@@ -494,18 +505,19 @@ static long pci_cfgreg_read(int bus, int dev, int func, int reg,
     int ret;
     phys_dev_t *pdev;
 
-    if ( (ret = check_dev_acc(current, bus, dev, func, &pdev)) != 0 )
+    if ( (ret = check_dev_acc(current->domain, bus, dev, func, &pdev)) != 0 )
     {
         /* PCI spec states that reads from non-existent devices should return
          * all 1s.  In this case the domain has no read access, which should
          * also look like the device is non-existent. */
         *val = 0xFFFFFFFF;
-        return ret; /* KAF: error return seems to matter on my test machine. */
+        return ret;
     }
 
     /* Fake out read requests for some registers. */
     switch ( reg )
     {
+#ifndef SLOPPY_CHECKING
     case PCI_BASE_ADDRESS_0:
         ret = do_base_address_access(pdev, ACC_READ, 0, len, val);
         break;
@@ -533,6 +545,7 @@ static long pci_cfgreg_read(int bus, int dev, int func, int reg,
     case PCI_ROM_ADDRESS:
         ret = do_rom_address_access(pdev, ACC_READ, len, val);
         break;        
+#endif
 
     case PCI_INTERRUPT_LINE:
         *val = pdev->dev->irq;
@@ -559,12 +572,13 @@ static long pci_cfgreg_write(int bus, int dev, int func, int reg,
     int ret;
     phys_dev_t *pdev;
 
-    if ( (ret = check_dev_acc(current, bus, dev, func, &pdev)) != 0 )
+    if ( (ret = check_dev_acc(current->domain, bus, dev, func, &pdev)) != 0 )
         return ret;
 
     /* special treatment for some registers */
     switch (reg)
     {
+#ifndef SLOPPY_CHECKING
     case PCI_BASE_ADDRESS_0:
         ret = do_base_address_access(pdev, ACC_WRITE, 0, len, &val);
         break;
@@ -592,6 +606,7 @@ static long pci_cfgreg_write(int bus, int dev, int func, int reg,
     case PCI_ROM_ADDRESS:
         ret = do_rom_address_access(pdev, ACC_WRITE, len, &val);
         break;        
+#endif
 
     default:
         if ( pdev->flags != ACC_WRITE ) 
@@ -617,15 +632,11 @@ static long pci_cfgreg_write(int bus, int dev, int func, int reg,
 static long pci_probe_root_buses(u32 *busmask)
 {
     phys_dev_t *pdev;
-    struct list_head *tmp;
 
     memset(busmask, 0, 256/8);
 
-    list_for_each ( tmp, &current->pcidev_list )
-    {
-        pdev = list_entry(tmp, phys_dev_t, node);
+    list_for_each_entry ( pdev, &current->domain->pcidev_list, node )
         set_bit(pdev->dev->bus->number, busmask);
-    }
 
     return 0;
 }
@@ -665,7 +676,7 @@ long do_physdev_op(physdev_op_t *uop)
         break;
 
     case PHYSDEVOP_PCI_INITIALISE_DEVICE:
-        if ( (ret = check_dev_acc(current, 
+        if ( (ret = check_dev_acc(current->domain, 
                                   op.u.pci_initialise_device.bus, 
                                   op.u.pci_initialise_device.dev, 
                                   op.u.pci_initialise_device.func, 
@@ -678,7 +689,7 @@ long do_physdev_op(physdev_op_t *uop)
         break;
 
     case PHYSDEVOP_IRQ_UNMASK_NOTIFY:
-        ret = pirq_guest_unmask(current);
+        ret = pirq_guest_unmask(current->domain);
         break;
 
     case PHYSDEVOP_IRQ_STATUS_QUERY:
@@ -702,11 +713,15 @@ long do_physdev_op(physdev_op_t *uop)
     return ret;
 }
 
+/* opt_physdev_dom0_hide: list of PCI slots to hide from domain 0. */
+/* Format is '(%02x:%02x.%1x)(%02x:%02x.%1x)' and so on. */
+static char opt_physdev_dom0_hide[200] = "";
+string_param("physdev_dom0_hide", opt_physdev_dom0_hide);
+
 /* Test if boot params specify this device should NOT be visible to DOM0
  * (e.g. so that another domain can control it instead) */
-int pcidev_dom0_hidden(struct pci_dev *dev)
+static int pcidev_dom0_hidden(struct pci_dev *dev)
 {
-    extern char opt_physdev_dom0_hide[];
     char cmp[10] = "(.......)";
     
     strncpy(&cmp[1], dev->slot_name, 7);
@@ -734,10 +749,23 @@ void physdev_init_dom0(struct domain *p)
             continue;
         }
 
-        /* Skip bridges and other peculiarities for now. */
-        if ( dev->hdr_type != PCI_HEADER_TYPE_NORMAL )
+        /* Skip bridges and other peculiarities for now.
+         *
+         * Note that this can prevent the guest from detecting devices
+         * with fn>0 on slots where the fn=0 device is a bridge.  We
+         * can identify such slots by looking at the multifunction bit
+         * (top bit of hdr_type, masked out in dev->hdr_type).
+         *
+         * In Linux2.4 we find all devices because the detection code
+         * scans all functions if the read of the fn=0 device's header
+         * type fails.
+         *
+         * In Linux2.6 we set pcibios_scan_all_fns().
+         */
+        if ( (dev->hdr_type != PCI_HEADER_TYPE_NORMAL) &&
+             (dev->hdr_type != PCI_HEADER_TYPE_CARDBUS) )
             continue;
-        pdev = xmalloc(sizeof(phys_dev_t));
+        pdev = xmalloc(phys_dev_t);
         pdev->dev = dev;
         pdev->flags = ACC_WRITE;
         pdev->state = 0;
@@ -745,6 +773,6 @@ void physdev_init_dom0(struct domain *p)
         list_add(&pdev->node, &p->pcidev_list);
     }
 
-    set_bit(DF_PHYSDEV, &p->flags);
+    set_bit(DF_PHYSDEV, &p->d_flags);
 }
 

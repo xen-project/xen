@@ -48,14 +48,13 @@ typedef struct { int gcc_is_buggy; } spinlock_t;
 #define SPIN_LOCK_UNLOCKED (spinlock_t) { 0 }
 #endif
 
-#define spin_lock_init(lock)    do { } while(0)
-#define spin_lock(lock)         (void)(lock) /* Not "unused variable". */
-#define spin_is_locked(lock)    (0)
-#define spin_trylock(lock)      ({1; })
-#define spin_unlock_wait(lock)  do { } while(0)
-#define spin_unlock(lock)       do { } while(0)
-#define spin_lock_recursive(lock)   do { } while(0)
-#define spin_unlock_recursive(lock) do { } while(0)
+#define spin_lock_init(lock)             do { } while(0)
+#define spin_is_locked(lock)             (0)
+#define _raw_spin_lock(lock)             (void)(lock)
+#define _raw_spin_trylock(lock)          ({1; })
+#define _raw_spin_unlock(lock)           do { } while(0)
+#define _raw_spin_lock_recursive(lock)   do { } while(0)
+#define _raw_spin_unlock_recursive(lock) do { } while(0)
 
 #if (__GNUC__ > 2)
 typedef struct { } rwlock_t;
@@ -65,12 +64,22 @@ typedef struct { int gcc_is_buggy; } rwlock_t;
 #define RW_LOCK_UNLOCKED (rwlock_t) { 0 }
 #endif
 
-#define rwlock_init(lock)       do { } while(0)
-#define read_lock(lock)         (void)(lock) /* Not "unused variable". */
-#define read_unlock(lock)       do { } while(0)
-#define write_lock(lock)        (void)(lock) /* Not "unused variable". */
-#define write_unlock(lock)      do { } while(0)
+#define rwlock_init(lock)            do { } while(0)
+#define _raw_read_lock(lock)         (void)(lock) /* Not "unused variable". */
+#define _raw_read_unlock(lock)       do { } while(0)
+#define _raw_write_lock(lock)        (void)(lock) /* Not "unused variable". */
+#define _raw_write_unlock(lock)      do { } while(0)
 
 #endif
+
+#define spin_lock(_lock)             _raw_spin_lock(_lock)
+#define spin_trylock(_lock)          _raw_spin_trylock(_lock)
+#define spin_unlock(_lock)           _raw_spin_unlock(_lock)
+#define spin_lock_recursive(_lock)   _raw_spin_lock_recursive(_lock)
+#define spin_unlock_recursive(_lock) _raw_spin_unlock_recursive(_lock)
+#define read_lock(_lock)             _raw_read_lock(_lock)
+#define read_unlock(_lock)           _raw_read_unlock(_lock)
+#define write_lock(_lock)            _raw_write_lock(_lock)
+#define write_unlock(_lock)          _raw_write_unlock(_lock)
 
 #endif /* __SPINLOCK_H__ */

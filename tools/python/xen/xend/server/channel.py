@@ -45,7 +45,7 @@ class ChannelFactory:
             del self.channels[idx]
             self.notifier.unbind(idx)
 
-    def domChannel(self, dom):
+    def domChannel(self, dom, local_port=0, remote_port=0):
         """Get the channel for the given domain.
         Construct if necessary.
 
@@ -55,7 +55,8 @@ class ChannelFactory:
         """
         chan = self.getDomChannel(dom)
         if not chan:
-            chan = Channel(self, dom)
+            chan = Channel(self, dom, local_port=local_port,
+                           remote_port=remote_port)
             self.addChannel(chan)
         return chan
 
@@ -91,10 +92,25 @@ class ChannelFactory:
         """
         self.delChannel(channel.idx)
 
-    def createPort(self, dom):
+    def createPort(self, dom, local_port=0, remote_port=0):
         """Create a port for a channel to the given domain.
+        If only the domain is specified, a new channel with new port ids is
+        created.  If one port id is specified and the given port id is in use,
+        the other port id is filled.  If one port id is specified and the
+        given port id is not in use, a new channel is created with one port
+        id equal to the given id and a new id for the other end.  If both
+        port ids are specified, a port is reconnected using the given port
+        ids.
+
+        @param dom: domain
+        @param local: local port id to use
+        @type  local: int
+        @param remote: remote port id to use
+        @type  remote: int
+        @return: port object
         """
-        return xu.port(dom)
+        return xu.port(dom, local_port=int(local_port),
+                       remote_port=int(remote_port))
 
 def channelFactory():
     """Singleton constructor for the channel factory.
@@ -155,8 +171,10 @@ class VirqChannel(BaseChannel):
         """
         BaseChannel.__init__(self, factory)
         self.virq = virq
+        self.factory = factory
         # Notification port (int).
-        self.port = xc.evtchn_bind_virq(virq)
+        #self.port = xc.evtchn_bind_virq(virq)
+        self.port = factory.notifier.bind_virq(virq)
         self.idx = self.port
         # Clients to call when a virq arrives.
         self.clients = []
@@ -192,7 +210,8 @@ class VirqChannel(BaseChannel):
             c.virqReceived(self.virq)
 
     def notify(self):
-        xc.evtchn_send(self.port)
+        # xc.evtchn_send(self.port)
+        self.factory.notifier.virq_send(self.port)
 
 
 class Channel(BaseChannel):
@@ -200,7 +219,7 @@ class Channel(BaseChannel):
     are multiplexed over the channel (console, block devs, net devs).
     """
 
-    def __init__(self, factory, dom):
+    def __init__(self, factory, dom, local_port=0, remote_port=0):
         """Create a channel to the given domain using the given factory.
 
         Do not call directly, use domChannel on the factory.
@@ -209,7 +228,8 @@ class Channel(BaseChannel):
         # Domain.
         self.dom = int(dom)
         # Domain port (object).
-        self.port = self.factory.createPort(dom)
+        self.port = self.factory.createPort(dom, local_port=local_port,
+                                            remote_port=remote_port)
         # Channel port (int).
         self.idx = self.port.local_port
         # Registered devices.
@@ -262,6 +282,7 @@ class Channel(BaseChannel):
         self.devs.append(dev)
         for ty in types:
             self.devs_by_type[ty] = dev
+        self.port.register(ty)
 
     def deregisterDevice(self, dev):
         """Remove the registration for a device controller.
@@ -273,6 +294,7 @@ class Channel(BaseChannel):
         types = [ ty for (ty, d) in self.devs_by_type.items() if d == dev ]
         for ty in types:
             del self.devs_by_type[ty]
+            self.port.deregister(ty)
 
     def getDevice(self, type):
         """Get the device controller handling a message type.
@@ -333,13 +355,15 @@ class Channel(BaseChannel):
         (ty, subty) = self.getMessageType(msg)
         #todo:  Must respond before writing any more messages.
         #todo:  Should automate this (respond on write)
-        self.port.write_response(msg)
+        responded = 0
         dev = self.getDevice(ty)
         if dev:
-            dev.requestReceived(msg, ty, subty)
+            responded = dev.requestReceived(msg, ty, subty)
         else:
             print ("requestReceived> No device: Message type %s %d:%d"
                    % (msgTypeName(ty, subty), ty, subty)), self
+        if not responded:
+            self.port.write_response(msg)
 
     def handleResponses(self):
         work = 0

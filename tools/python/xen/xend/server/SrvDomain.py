@@ -21,10 +21,14 @@ class SrvDomain(SrvDir):
         self.xconsole = XendConsole.instance()
 
     def op_configure(self, op, req):
+        """Configure an existing domain.
+        Configure is unusual in that it requires a domain id,
+        not a domain name.
+        """
         fn = FormFn(self.xd.domain_configure,
-                    [['dom', 'str'],
+                    [['dom', 'int'],
                      ['config', 'sxpr']])
-        deferred = fn(req.args, {'dom': self.dom.name})
+        deferred = fn(req.args, {'dom': self.dom.dom})
         deferred.addErrback(self._op_configure_err, req)
         return deferred
 
@@ -43,8 +47,9 @@ class SrvDomain(SrvDir):
     def op_shutdown(self, op, req):
         fn = FormFn(self.xd.domain_shutdown,
                     [['dom', 'str'],
-                     ['reason', 'str']])
-        val = fn(req.args, {'dom': self.dom.name})
+                     ['reason', 'str'],
+                     ['key', 'int']])
+        val = fn(req.args, {'dom': self.dom.id})
         req.setResponseCode(http.ACCEPTED)
         req.setHeader("Location", "%s/.." % req.prePathURL())
         return val
@@ -53,7 +58,7 @@ class SrvDomain(SrvDir):
         fn = FormFn(self.xd.domain_destroy,
                     [['dom', 'str'],
                      ['reason', 'str']])
-        val = fn(req.args, {'dom': self.dom.name})
+        val = fn(req.args, {'dom': self.dom.id})
         req.setHeader("Location", "%s/.." % req.prePathURL())
         return val
 
@@ -61,7 +66,7 @@ class SrvDomain(SrvDir):
         fn = FormFn(self.xd.domain_save,
                     [['dom', 'str'],
                      ['file', 'str']])
-        deferred = fn(req.args, {'dom': self.dom.name})
+        deferred = fn(req.args, {'dom': self.dom.id})
         deferred.addCallback(self._op_save_cb, req)
         deferred.addErrback(self._op_save_err, req)
         return deferred
@@ -76,8 +81,10 @@ class SrvDomain(SrvDir):
     def op_migrate(self, op, req):
         fn = FormFn(self.xd.domain_migrate,
                     [['dom', 'str'],
-                     ['destination', 'str']])
-        deferred = fn(req.args, {'dom': self.dom.name})
+                     ['destination', 'str'],
+                     ['live', 'int'],
+                     ['resource', 'int']])
+        deferred = fn(req.args, {'dom': self.dom.id})
         print 'op_migrate>', deferred
         deferred.addCallback(self._op_migrate_cb, req)
         deferred.addErrback(self._op_migrate_err, req)
@@ -103,7 +110,7 @@ class SrvDomain(SrvDir):
         fn = FormFn(self.xd.domain_pincpu,
                     [['dom', 'str'],
                      ['cpu', 'int']])
-        val = fn(req.args, {'dom': self.dom.name})
+        val = fn(req.args, {'dom': self.dom.id})
         return val
 
     def op_cpu_bvt_set(self, op, req):
@@ -114,19 +121,9 @@ class SrvDomain(SrvDir):
                      ['warpvalue', 'int'],
                      ['warpl', 'long'],
                      ['warpu', 'long']])
-        val = fn(req.args, {'dom': self.dom.name})
+        val = fn(req.args, {'dom': self.dom.id})
         return val
     
-    def op_cpu_fbvt_set(self, op, req):
-        fn = FormFn(self.xd.domain_cpu_fbvt_set,
-                    [['dom', 'str'],
-                     ['mcuadv', 'int'],
-                     ['warp', 'int'],
-                     ['warpl', 'int'],
-                     ['warpu', 'int']])
-        val = fn(req.args, {'dom': self.dom.name})
-        return val
-
     def op_cpu_atropos_set(self, op, req):
         fn = FormFn(self.xd.domain_cpu_atropos_set,
                     [['dom', 'str'],
@@ -134,21 +131,21 @@ class SrvDomain(SrvDir):
                      ['slice', 'int'],
                      ['latency', 'int'],
                      ['xtratime', 'int']])
-        val = fn(req.args, {'dom': self.dom.name})
+        val = fn(req.args, {'dom': self.dom.id})
         return val
 
     def op_maxmem_set(self, op, req):
         fn = FormFn(self.xd.domain_maxmem_set,
                     [['dom', 'str'],
                      ['memory', 'int']])
-        val = fn(req.args, {'dom': self.dom.name})
+        val = fn(req.args, {'dom': self.dom.id})
         return val
 
     def op_device_create(self, op, req):
         fn = FormFn(self.xd.domain_device_create,
                     [['dom', 'str'],
                      ['config', 'sxpr']])
-        d = fn(req.args, {'dom': self.dom.name})
+        d = fn(req.args, {'dom': self.dom.id})
         return d
 
     def op_device_destroy(self, op, req):
@@ -156,29 +153,44 @@ class SrvDomain(SrvDir):
                     [['dom', 'str'],
                      ['type', 'str'],
                      ['idx', 'str']])
-        val = fn(req.args, {'dom': self.dom.name})
+        val = fn(req.args, {'dom': self.dom.id})
         return val
                 
+    def op_device_configure(self, op, req):
+        fn = FormFn(self.xd.domain_device_configure,
+                    [['dom', 'str'],
+                     ['config', 'sxpr'],
+                     ['idx', 'str']])
+        d = fn(req.args, {'dom': self.dom.id})
+        return d
+
     def op_vifs(self, op, req):
-        devs = self.xd.domain_vif_ls(self.dom.name)
+        devs = self.xd.domain_vif_ls(self.dom.id)
         return [ dev.sxpr() for dev in devs ]
 
     def op_vif(self, op, req):
         fn = FormFn(self.xd.domain_vif_get,
                     [['dom', 'str'],
                      ['vif', 'str']])
-        val = fn(req.args, {'dom': self.dom.name})
+        val = fn(req.args, {'dom': self.dom.id})
         return val
 
     def op_vbds(self, op, req):
-        devs = self.xd.domain_vbd_ls(self.dom.name)
+        devs = self.xd.domain_vbd_ls(self.dom.id)
         return [ dev.sxpr() for dev in devs ]
 
     def op_vbd(self, op, req):
         fn = FormFn(self.xd.domain_vbd_get,
                     [['dom', 'str'],
                      ['vbd', 'str']])
-        val = fn(req.args, {'dom': self.dom.name})
+        val = fn(req.args, {'dom': self.dom.id})
+        return val
+
+    def op_mem_target_set(self, op, req):
+        fn = FormFn(self.xd.domain_mem_target_set,
+                    [['dom', 'str'],
+                     ['target', 'int']])
+        val = fn(req.args, {'dom': self.dom.id})
         return val
 
     def render_POST(self, req):
@@ -186,7 +198,7 @@ class SrvDomain(SrvDir):
         
     def render_GET(self, req):
         op = req.args.get('op')
-        if op and op[0] in ['vifs', 'vif', 'vbds', 'vbd']:
+        if op and op[0] in ['vifs', 'vif', 'vbds', 'vbd', 'mem_target_set']:
             return self.perform(req)
         if self.use_sxp(req):
             req.setHeader("Content-Type", sxp.mime_type)
@@ -240,4 +252,5 @@ class SrvDomain(SrvDir):
         req.write('<form method="post" action="%s">' % url)
         req.write('<br><input type="submit" name="op" value="migrate">')
         req.write(' To host: <input type="text" name="destination">')
+        req.write('<input type="checkbox" name="live" value="1">Live')
         req.write('</form>')

@@ -1,3 +1,4 @@
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /******************************************************************************
  * console.c
  * 
@@ -8,6 +9,8 @@
 
 #include <stdarg.h>
 #include <xen/config.h>
+#include <xen/compile.h>
+#include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/errno.h>
 #include <xen/event.h>
@@ -16,11 +19,21 @@
 #include <xen/serial.h>
 #include <xen/keyhandler.h>
 #include <asm/uaccess.h>
+#include <asm/mm.h>
 
-extern unsigned char opt_console[], opt_conswitch[];
+/* opt_console: comma-separated list of console outputs. */
+static unsigned char opt_console[30] = OPT_CONSOLE_STR;
+string_param("console", opt_console);
+
+/* opt_conswitch: a character pair controlling console switching. */
+/* Char 1: CTRL+<char1> is used to switch console input between Xen and DOM0 */
+/* Char 2: If this character is 'x', then do not auto-switch to DOM0 when it */
+/*         boots. Any other value, or omitting the char, enables auto-switch */
+static unsigned char opt_conswitch[5] = "a";
+string_param("conswitch", opt_conswitch);
 
 static int xpos, ypos;
-static unsigned char *video = __va(0xB8000);
+static unsigned char *video;
 
 #define CONSOLE_RING_SIZE 16392
 typedef struct console_ring_st
@@ -125,6 +138,8 @@ static void init_vga(void)
         vgacon_enabled = 0;
         return;
     }
+
+    video = __va(0xB8000);
 
     tmp = inb(0x3da);
     outb(0x00, 0x3c0);
@@ -243,29 +258,21 @@ static void switch_serial_input(void)
                input_str[xen_rx], opt_conswitch[0], input_str[!xen_rx]);
 }
 
-static void __serial_rx(unsigned char c, struct pt_regs *regs)
+static void __serial_rx(unsigned char c, struct xen_regs *regs)
 {
-    key_handler *handler;
-    struct domain *p;
-
     if ( xen_rx )
     {
-        if ( (handler = get_key_handler(c)) != NULL )
-            (*handler)(c, NULL, regs);
+        handle_keypress(c, regs);
     }
     else if ( (serial_rx_prod-serial_rx_cons) != SERIAL_RX_SIZE )
     {
         serial_rx_ring[SERIAL_RX_MASK(serial_rx_prod)] = c;
         if ( serial_rx_prod++ == serial_rx_cons )
-        {
-            p = find_domain_by_id(0); /* only DOM0 reads the serial buffer */
-            send_guest_virq(p, VIRQ_CONSOLE);
-            put_domain(p);
-        }
+            send_guest_virq(dom0->exec_domain[0], VIRQ_CONSOLE);
     }
 }
 
-static void serial_rx(unsigned char c, struct pt_regs *regs)
+static void serial_rx(unsigned char c, struct xen_regs *regs)
 {
     static int switch_code_count = 0;
 
@@ -292,9 +299,9 @@ long do_console_io(int cmd, int count, char *buffer)
     char *kbuf;
     long  rc;
 
-#ifdef NDEBUG
+#ifndef VERBOSE
     /* Only domain-0 may access the emergency console. */
-    if ( current->domain != 0 )
+    if ( current->domain->id != 0 )
         return -EPERM;
 #endif
 
@@ -414,6 +421,17 @@ void init_console(void)
     init_vga();
 
     serial_set_rx_handler(sercon_handle, serial_rx);
+
+    /* HELLO WORLD --- start-of-day banner text. */
+    printk(XEN_BANNER);
+    printk(" http://www.cl.cam.ac.uk/netos/xen\n");
+    printk(" University of Cambridge Computer Laboratory\n\n");
+    printk(" Xen version %d.%d%s (%s@%s) (%s) %s\n",
+           XEN_VERSION, XEN_SUBVERSION, XEN_EXTRAVERSION,
+           XEN_COMPILE_BY, XEN_COMPILE_DOMAIN,
+           XEN_COMPILER, XEN_COMPILE_DATE);
+    printk(" Latest ChangeSet: %s\n\n", XEN_CHANGESET);
+    set_printk_prefix("(XEN) ");
 }
 
 void console_endboot(int disable_vga)
@@ -442,6 +460,21 @@ void console_force_unlock(void)
 void console_force_lock(void)
 {
     spin_lock(&console_lock);
+}
+
+void console_putc(char c)
+{
+    serial_putc(sercon_handle, c);
+}
+
+int console_getc(void)
+{
+    return serial_getc(sercon_handle);
+}
+
+int irq_console_getc(void)
+{
+    return irq_serial_getc(sercon_handle);
 }
 
 
@@ -478,6 +511,7 @@ void panic(const char *fmt, ...)
     __putstr("Reboot in five seconds...\n");
     spin_unlock_irqrestore(&console_lock, flags);
 
+    watchdog_on = 0;
     mdelay(5000);
     machine_restart(0);
 }

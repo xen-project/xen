@@ -1,23 +1,144 @@
-/*
- * include/asm-x86/processor.h
- *
- * Copyright (C) 1994 Linus Torvalds
- */
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
+
+/* Portions are: Copyright (c) 1994 Linus Torvalds */
 
 #ifndef __ASM_X86_PROCESSOR_H
 #define __ASM_X86_PROCESSOR_H
 
+#ifndef __ASSEMBLY__
 #include <asm/page.h>
 #include <asm/types.h>
 #include <asm/cpufeature.h>
 #include <asm/desc.h>
 #include <asm/flushtlb.h>
-#include <asm/pdb.h>
 #include <xen/config.h>
 #include <xen/spinlock.h>
-#include <hypervisor-ifs/hypervisor-if.h>
+#include <xen/cache.h>
+#include <asm/vmx_vmcs.h>
+#include <public/xen.h>
+#endif
+
+/*
+ * CPU vendor IDs
+ */
+#define X86_VENDOR_INTEL 0
+#define X86_VENDOR_CYRIX 1
+#define X86_VENDOR_AMD 2
+#define X86_VENDOR_UMC 3
+#define X86_VENDOR_NEXGEN 4
+#define X86_VENDOR_CENTAUR 5
+#define X86_VENDOR_RISE 6
+#define X86_VENDOR_TRANSMETA 7
+#define X86_VENDOR_NSC 8
+#define X86_VENDOR_SIS 9
+#define X86_VENDOR_NUM 10
+#define X86_VENDOR_UNKNOWN 0xff
+
+/*
+ * EFLAGS bits
+ */
+#define X86_EFLAGS_CF	0x00000001 /* Carry Flag */
+#define X86_EFLAGS_PF	0x00000004 /* Parity Flag */
+#define X86_EFLAGS_AF	0x00000010 /* Auxillary carry Flag */
+#define X86_EFLAGS_ZF	0x00000040 /* Zero Flag */
+#define X86_EFLAGS_SF	0x00000080 /* Sign Flag */
+#define X86_EFLAGS_TF	0x00000100 /* Trap Flag */
+#define X86_EFLAGS_IF	0x00000200 /* Interrupt Flag */
+#define X86_EFLAGS_DF	0x00000400 /* Direction Flag */
+#define X86_EFLAGS_OF	0x00000800 /* Overflow Flag */
+#define X86_EFLAGS_IOPL	0x00003000 /* IOPL mask */
+#define X86_EFLAGS_NT	0x00004000 /* Nested Task */
+#define X86_EFLAGS_RF	0x00010000 /* Resume Flag */
+#define X86_EFLAGS_VM	0x00020000 /* Virtual Mode */
+#define X86_EFLAGS_AC	0x00040000 /* Alignment Check */
+#define X86_EFLAGS_VIF	0x00080000 /* Virtual Interrupt Flag */
+#define X86_EFLAGS_VIP	0x00100000 /* Virtual Interrupt Pending */
+#define X86_EFLAGS_ID	0x00200000 /* CPUID detection flag */
+
+/*
+ * Intel CPU flags in CR0
+ */
+#define X86_CR0_PE              0x00000001 /* Enable Protected Mode    (RW) */
+#define X86_CR0_MP              0x00000002 /* Monitor Coprocessor      (RW) */
+#define X86_CR0_EM              0x00000004 /* Require FPU Emulation    (RO) */
+#define X86_CR0_TS              0x00000008 /* Task Switched            (RW) */
+#define X86_CR0_NE              0x00000020 /* Numeric Error Reporting  (RW) */
+#define X86_CR0_WP              0x00010000 /* Supervisor Write Protect (RW) */
+#define X86_CR0_AM              0x00040000 /* Alignment Checking       (RW) */
+#define X86_CR0_NW              0x20000000 /* Not Write-Through        (RW) */
+#define X86_CR0_CD              0x40000000 /* Cache Disable            (RW) */
+#define X86_CR0_PG              0x80000000 /* Paging                   (RW) */
+
+/*
+ * Intel CPU features in CR4
+ */
+#define X86_CR4_VME		0x0001	/* enable vm86 extensions */
+#define X86_CR4_PVI		0x0002	/* virtual interrupts flag enable */
+#define X86_CR4_TSD		0x0004	/* disable time stamp at ipl 3 */
+#define X86_CR4_DE		0x0008	/* enable debugging extensions */
+#define X86_CR4_PSE		0x0010	/* enable page size extensions */
+#define X86_CR4_PAE		0x0020	/* enable physical address extensions */
+#define X86_CR4_MCE		0x0040	/* Machine check enable */
+#define X86_CR4_PGE		0x0080	/* enable global pages */
+#define X86_CR4_PCE		0x0100	/* enable performance counters at ipl 3 */
+#define X86_CR4_OSFXSR		0x0200	/* enable fast FPU save and restore */
+#define X86_CR4_OSXMMEXCPT	0x0400	/* enable unmasked SSE exceptions */
+#define X86_CR4_VMXE		0x2000  /* enable VMX */
+
+/*
+ * Trap/fault mnemonics.
+ */
+#define TRAP_divide_error      0
+#define TRAP_debug             1
+#define TRAP_nmi               2
+#define TRAP_int3              3
+#define TRAP_overflow          4
+#define TRAP_bounds            5
+#define TRAP_invalid_op        6
+#define TRAP_no_device         7
+#define TRAP_double_fault      8
+#define TRAP_copro_seg         9
+#define TRAP_invalid_tss      10
+#define TRAP_no_segment       11
+#define TRAP_stack_error      12
+#define TRAP_gp_fault         13
+#define TRAP_page_fault       14
+#define TRAP_spurious_int     15
+#define TRAP_copro_error      16
+#define TRAP_alignment_check  17
+#define TRAP_machine_check    18
+#define TRAP_simd_error       19
+#define TRAP_deferred_nmi     31
+
+/* Set for entry via SYSCALL. Informs return code to use SYSRETQ not IRETQ. */
+#define TRAP_syscall         256 /* NB. Same as ECF_IN_SYSCALL */
+
+/*
+ * Non-fatal fault/trap handlers return an error code to the caller. If the
+ * code is non-zero, it means that either the exception was not due to a fault
+ * (i.e., it was a trap) or that the fault has been fixed up so the instruction
+ * replay ought to succeed.
+ */
+#define EXCRET_not_a_fault 1 /* It was a trap. No instruction replay needed. */
+#define EXCRET_fault_fixed 1 /* It was fault that we fixed: try a replay. */
+
+/* 'trap_bounce' flags values */
+#define TBF_EXCEPTION          1
+#define TBF_EXCEPTION_ERRCODE  2
+#define TBF_EXCEPTION_CR2      4
+#define TBF_INTERRUPT          8
+#define TBF_FAILSAFE          16
+
+/* arch_exec_domain' flags values */
+#define _TF_failsafe_return    0
+#define _TF_kernel_mode        1
+#define TF_failsafe_return     (1<<_TF_failsafe_return)
+#define TF_kernel_mode         (1<<_TF_kernel_mode)
+
+#ifndef __ASSEMBLY__
 
 struct domain;
+struct exec_domain;
 
 /*
  * Default implementation of macro that returns current
@@ -49,18 +170,6 @@ struct cpuinfo_x86 {
     int	    x86_tlbsize;     /* number of 4K pages in DTLB/ITLB combined */
 } __attribute__((__aligned__(SMP_CACHE_BYTES)));
 
-#define X86_VENDOR_INTEL 0
-#define X86_VENDOR_CYRIX 1
-#define X86_VENDOR_AMD 2
-#define X86_VENDOR_UMC 3
-#define X86_VENDOR_NEXGEN 4
-#define X86_VENDOR_CENTAUR 5
-#define X86_VENDOR_RISE 6
-#define X86_VENDOR_TRANSMETA 7
-#define X86_VENDOR_NSC 8
-#define X86_VENDOR_SIS 9
-#define X86_VENDOR_UNKNOWN 0xff
-
 /*
  * capabilities of CPUs
  */
@@ -81,27 +190,6 @@ extern char ignore_irq13;
 extern void identify_cpu(struct cpuinfo_x86 *);
 extern void print_cpu_info(struct cpuinfo_x86 *);
 extern void dodgy_tsc(void);
-
-/*
- * EFLAGS bits
- */
-#define X86_EFLAGS_CF	0x00000001 /* Carry Flag */
-#define X86_EFLAGS_PF	0x00000004 /* Parity Flag */
-#define X86_EFLAGS_AF	0x00000010 /* Auxillary carry Flag */
-#define X86_EFLAGS_ZF	0x00000040 /* Zero Flag */
-#define X86_EFLAGS_SF	0x00000080 /* Sign Flag */
-#define X86_EFLAGS_TF	0x00000100 /* Trap Flag */
-#define X86_EFLAGS_IF	0x00000200 /* Interrupt Flag */
-#define X86_EFLAGS_DF	0x00000400 /* Direction Flag */
-#define X86_EFLAGS_OF	0x00000800 /* Overflow Flag */
-#define X86_EFLAGS_IOPL	0x00003000 /* IOPL mask */
-#define X86_EFLAGS_NT	0x00004000 /* Nested Task */
-#define X86_EFLAGS_RF	0x00010000 /* Resume Flag */
-#define X86_EFLAGS_VM	0x00020000 /* Virtual Mode */
-#define X86_EFLAGS_AC	0x00040000 /* Alignment Check */
-#define X86_EFLAGS_VIF	0x00080000 /* Virtual Interrupt Flag */
-#define X86_EFLAGS_VIP	0x00100000 /* Virtual Interrupt Pending */
-#define X86_EFLAGS_ID	0x00200000 /* CPUID detection flag */
 
 /*
  * Generic CPUID function
@@ -161,20 +249,6 @@ static inline unsigned int cpuid_edx(unsigned int op)
 }
 
 
-/*
- * Intel CPU flags in CR0
- */
-#define X86_CR0_PE              0x00000001 /* Enable Protected Mode    (RW) */
-#define X86_CR0_MP              0x00000002 /* Monitor Coprocessor      (RW) */
-#define X86_CR0_EM              0x00000004 /* Require FPU Emulation    (RO) */
-#define X86_CR0_TS              0x00000008 /* Task Switched            (RW) */
-#define X86_CR0_NE              0x00000020 /* Numeric Error Reporting  (RW) */
-#define X86_CR0_WP              0x00010000 /* Supervisor Write Protect (RW) */
-#define X86_CR0_AM              0x00040000 /* Alignment Checking       (RW) */
-#define X86_CR0_NW              0x20000000 /* Not Write-Through        (RW) */
-#define X86_CR0_CD              0x40000000 /* Cache Disable            (RW) */
-#define X86_CR0_PG              0x80000000 /* Paging                   (RW) */
-
 #define read_cr0() ({ \
 	unsigned long __dummy; \
 	__asm__( \
@@ -184,23 +258,18 @@ static inline unsigned int cpuid_edx(unsigned int op)
 })
 
 #define write_cr0(x) \
-	__asm__("mov"__OS" %0,%%cr0": :"r" (x));
+	__asm__("mov"__OS" %0,%%cr0": :"r" ((unsigned long)x));
 
+#define read_cr4() ({ \
+	unsigned long __dummy; \
+	__asm__( \
+		"mov"__OS" %%cr4,%0\n\t" \
+		:"=r" (__dummy)); \
+	__dummy; \
+})
 
-/*
- * Intel CPU features in CR4
- */
-#define X86_CR4_VME		0x0001	/* enable vm86 extensions */
-#define X86_CR4_PVI		0x0002	/* virtual interrupts flag enable */
-#define X86_CR4_TSD		0x0004	/* disable time stamp at ipl 3 */
-#define X86_CR4_DE		0x0008	/* enable debugging extensions */
-#define X86_CR4_PSE		0x0010	/* enable page size extensions */
-#define X86_CR4_PAE		0x0020	/* enable physical address extensions */
-#define X86_CR4_MCE		0x0040	/* Machine check enable */
-#define X86_CR4_PGE		0x0080	/* enable global pages */
-#define X86_CR4_PCE		0x0100	/* enable performance counters at ipl 3 */
-#define X86_CR4_OSFXSR		0x0200	/* enable fast FPU save and restore */
-#define X86_CR4_OSXMMEXCPT	0x0400	/* enable unmasked SSE exceptions */
+#define write_cr4(x) \
+	__asm__("mov"__OS" %0,%%cr4": :"r" ((unsigned long)x));
 
 /*
  * Save the cr4 feature set we're using (ie
@@ -225,28 +294,51 @@ static inline void clear_in_cr4 (unsigned long mask)
     mmu_cr4_features &= ~mask;
     __asm__("mov"__OS" %%cr4,%%"__OP"ax\n\t"
             "and"__OS" %0,%%"__OP"ax\n\t"
-            "movl"__OS" %%"__OP"ax,%%cr4\n"
+            "mov"__OS" %%"__OP"ax,%%cr4\n"
             : : "irg" (~mask)
             :"ax");
 }
 
 /*
- * Size of io_bitmap in longwords:
- * For Xen we support the full 8kbyte IO bitmap but use the io_bitmap_sel field
- * to avoid a full 8kbyte copy when switching to domains with bits cleared.
+ *      NSC/Cyrix CPU configuration register indexes
  */
-#define IO_BITMAP_SIZE	2048
-#define IO_BITMAP_BYTES (IO_BITMAP_SIZE * 4)
-#define IO_BITMAP_OFFSET offsetof(struct tss_struct,io_bitmap)
-#define INVALID_IO_BITMAP_OFFSET 0x8000
+
+#define CX86_PCR0 0x20
+#define CX86_GCR  0xb8
+#define CX86_CCR0 0xc0
+#define CX86_CCR1 0xc1
+#define CX86_CCR2 0xc2
+#define CX86_CCR3 0xc3
+#define CX86_CCR4 0xe8
+#define CX86_CCR5 0xe9
+#define CX86_CCR6 0xea
+#define CX86_CCR7 0xeb
+#define CX86_PCR1 0xf0
+#define CX86_DIR0 0xfe
+#define CX86_DIR1 0xff
+#define CX86_ARR_BASE 0xc4
+#define CX86_RCR_BASE 0xdc
+
+/*
+ *      NSC/Cyrix CPU indexed register access macros
+ */
+
+#define getCx86(reg) ({ outb((reg), 0x22); inb(0x23); })
+
+#define setCx86(reg, data) do { \
+	outb((reg), 0x22); \
+	outb((data), 0x23); \
+} while (0)
+
+#define IOBMP_BYTES             8192
+#define IOBMP_BYTES_PER_SELBIT  (IOBMP_BYTES / 64)
+#define IOBMP_BITS_PER_SELBIT   (IOBMP_BYTES_PER_SELBIT * 8)
+#define IOBMP_OFFSET            offsetof(struct tss_struct, io_bitmap)
+#define IOBMP_INVALID_OFFSET    0x8000
 
 struct i387_state {
     u8 state[512]; /* big enough for FXSAVE */
 } __attribute__ ((aligned (16)));
-
-typedef struct {
-    unsigned long seg;
-} mm_segment_t;
 
 struct tss_struct {
     unsigned short	back_link,__blh;
@@ -283,31 +375,16 @@ struct tss_struct {
     u16 trace;
 #endif
     u16 bitmap;
-    u32 io_bitmap[IO_BITMAP_SIZE+1];
+    u8  io_bitmap[IOBMP_BYTES+1];
     /* Pads the TSS to be cacheline-aligned (total size is 0x2080). */
-    u32 __cacheline_filler[5];
-};
-
-struct thread_struct {
-    unsigned long      guestos_sp;
-    unsigned long      guestos_ss;
-/* Hardware debugging registers */
-    unsigned long      debugreg[8];  /* %%db0-7 debug registers */
-/* floating point info */
-    struct i387_state  i387;
-/* Trap info. */
-#ifdef __i386__
-    int                fast_trap_idx;
-    struct desc_struct fast_trap_desc;
-#endif
-    trap_info_t        traps[256];
-};
+    u8 __cacheline_filler[23];
+} __cacheline_aligned PACKED;
 
 #define IDT_ENTRIES 256
-extern struct desc_struct idt_table[];
-extern struct desc_struct *idt_tables[];
+extern idt_entry_t idt_table[];
+extern idt_entry_t *idt_tables[];
 
-#if defined(__i386__)
+#ifdef ARCH_HAS_FAST_TRAP
 
 #define SET_DEFAULT_FAST_TRAP(_p) \
     (_p)->fast_trap_idx = 0x20;   \
@@ -318,116 +395,42 @@ extern struct desc_struct *idt_tables[];
     (memset(idt_tables[smp_processor_id()] + (_p)->fast_trap_idx, \
      0, 8))
 
-#ifdef XEN_DEBUGGER
-#define SET_FAST_TRAP(_p)   \
-    (pdb_initialized ? (void *) 0 : \
-       (memcpy(idt_tables[smp_processor_id()] + (_p)->fast_trap_idx, \
-               &((_p)->fast_trap_desc), 8)))
-#else
 #define SET_FAST_TRAP(_p)   \
     (memcpy(idt_tables[smp_processor_id()] + (_p)->fast_trap_idx, \
             &((_p)->fast_trap_desc), 8))
+
+long set_fast_trap(struct exec_domain *p, int idx);
+
+#else
+
+#define SET_DEFAULT_FAST_TRAP(_p) ((void)0)
+#define CLEAR_FAST_TRAP(_p)       ((void)0)
+#define SET_FAST_TRAP(_p)         ((void)0)
+#define set_fast_trap(_p, _i)     (0)
+
 #endif
 
-long set_fast_trap(struct domain *p, int idx);
+extern int gpf_emulate_4gb(struct xen_regs *regs);
 
-#define INIT_THREAD  {						\
-	0, 0,		      		       			\
-	{ [0 ... 7] = 0 },	/* debugging registers */	\
-	{ { 0, }, },		/* 387 state */			\
-	0x20, { 0, 0 },		/* DEFAULT_FAST_TRAP */		\
-	{ {0} }			/* io permissions */		\
-}
+extern void write_ptbase(struct exec_domain *ed);
 
-#elif defined(__x86_64__)
+#define SET_GDT_ENTRIES(_p, _e) \
+    ((*(u16 *)((_p)->arch.gdt + 0)) = (((_e)<<3)-1))
+#define SET_GDT_ADDRESS(_p, _a) \
+    ((*(unsigned long *)((_p)->arch.gdt + 2)) = (_a))
+#define GET_GDT_ENTRIES(_p)     \
+    (((*(u16 *)((_p)->arch.gdt + 0))+1)>>3)
+#define GET_GDT_ADDRESS(_p)     \
+    (*(unsigned long *)((_p)->arch.gdt + 2))
 
-#define INIT_THREAD { 0 }
-
-#endif /* __x86_64__ */
-
-#define GTBF_TRAP        1
-#define GTBF_TRAP_NOCODE 2
-#define GTBF_TRAP_CR2    4
-struct guest_trap_bounce {
-    unsigned long  error_code;        /*   0 */
-    unsigned long  cr2;               /*   4 */
-    unsigned short flags;             /*   8 */
-    unsigned short cs;                /*  10 */
-    unsigned long  eip;               /*  12 */
-};
-extern struct guest_trap_bounce guest_trap_bounce[];
-
-extern int gpf_emulate_4gb(struct pt_regs *regs);
-
-struct mm_struct {
-    /*
-     * Every domain has a L1 pagetable of its own. Per-domain mappings
-     * are put in this table (eg. the current GDT is mapped here).
-     */
-    l1_pgentry_t *perdomain_pt;
-    pagetable_t  pagetable;
-
-    /* shadow mode status and controls */
-    unsigned int shadow_mode;  /* flags to control shadow table operation */
-    pagetable_t  shadow_table;
-    spinlock_t   shadow_lock;
-    unsigned int shadow_max_page_count; // currently unused
-
-    /* shadow hashtable */
-    struct shadow_status *shadow_ht;
-    struct shadow_status *shadow_ht_free;
-    struct shadow_status *shadow_ht_extras; /* extra allocation units */
-    unsigned int shadow_extras_count;
-
-    /* shadow dirty bitmap */
-    unsigned long *shadow_dirty_bitmap;
-    unsigned int shadow_dirty_bitmap_size;  /* in pages, bit per page */
-
-    /* shadow mode stats */
-    unsigned int shadow_page_count;     
-    unsigned int shadow_fault_count;     
-    unsigned int shadow_dirty_count;     
-    unsigned int shadow_dirty_net_count;     
-    unsigned int shadow_dirty_block_count;     
-
-    /* Current LDT details. */
-    unsigned long ldt_base, ldt_ents, shadow_ldt_mapcnt;
-    /* Next entry is passed to LGDT on domain switch. */
-    char gdt[10]; /* NB. 10 bytes needed for x86_64. Use 6 bytes for x86_32. */
-};
-
-static inline void write_ptbase(struct mm_struct *mm)
-{
-    unsigned long pa;
-
-    if ( unlikely(mm->shadow_mode) )
-        pa = pagetable_val(mm->shadow_table);
-    else
-        pa = pagetable_val(mm->pagetable);
-
-    __asm__ __volatile__ ( "mov"__OS" %0, %%cr3" : : "r" (pa) : "memory" );
-}
-
-#define IDLE0_MM                                                    \
-{                                                                   \
-    perdomain_pt: 0,                                                \
-    pagetable:   mk_pagetable(__pa(idle_pg_table))                  \
-}
-
-/* Convenient accessor for mm.gdt. */
-#define SET_GDT_ENTRIES(_p, _e) ((*(u16 *)((_p)->mm.gdt + 0)) = (((_e)<<3)-1))
-#define SET_GDT_ADDRESS(_p, _a) ((*(unsigned long *)((_p)->mm.gdt + 2)) = (_a))
-#define GET_GDT_ENTRIES(_p)     (((*(u16 *)((_p)->mm.gdt + 0))+1)>>3)
-#define GET_GDT_ADDRESS(_p)     (*(unsigned long *)((_p)->mm.gdt + 2))
-
-void destroy_gdt(struct domain *d);
-long set_gdt(struct domain *d, 
+void destroy_gdt(struct exec_domain *d);
+long set_gdt(struct exec_domain *d, 
              unsigned long *frames, 
              unsigned int entries);
 
-long set_debugreg(struct domain *p, int reg, unsigned long value);
+long set_debugreg(struct exec_domain *p, int reg, unsigned long value);
 
-struct microcode {
+struct microcode_header {
     unsigned int hdrver;
     unsigned int rev;
     unsigned int date;
@@ -435,12 +438,32 @@ struct microcode {
     unsigned int cksum;
     unsigned int ldrver;
     unsigned int pf;
-    unsigned int reserved[5];
-    unsigned int bits[500];
+    unsigned int datasize;
+    unsigned int totalsize;
+    unsigned int reserved[3];
 };
 
-/* '6' because it used to be for P6 only (but now covers Pentium 4 as well) */
-#define MICROCODE_IOCFREE	_IO('6',0)
+struct microcode {
+    struct microcode_header hdr;
+    unsigned int bits[0];
+};
+
+typedef struct microcode microcode_t;
+typedef struct microcode_header microcode_header_t;
+
+/* microcode format is extended from prescott processors */
+struct extended_signature {
+    unsigned int sig;
+    unsigned int pf;
+    unsigned int cksum;
+};
+
+struct extended_sigtable {
+    unsigned int count;
+    unsigned int cksum;
+    unsigned int reserved[3];
+    struct extended_signature sigs[0];
+};
 
 /* REP NOP (PAUSE) is a good thing to insert into busy-wait loops. */
 static inline void rep_nop(void)
@@ -477,5 +500,14 @@ extern inline void prefetchw(const void *x)
 #define spin_lock_prefetch(x)	prefetchw(x)
 
 #endif
+
+void show_guest_stack();
+void show_trace(unsigned long *esp);
+void show_stack(unsigned long *esp);
+void show_registers(struct xen_regs *regs);
+void show_page_walk(unsigned long addr);
+asmlinkage void fatal_trap(int trapnr, struct xen_regs *regs);
+
+#endif /* !__ASSEMBLY__ */
 
 #endif /* __ASM_X86_PROCESSOR_H */

@@ -88,19 +88,31 @@ class Opt:
         else:
             return None
 
-    def show(self):
-        sep = ''
+    def format(self, str, start='    ', out=sys.stdout):
+        """Print a string, with consistent indentation at the start of lines.
+        """
+        lines = str.split('\n')
+        for l in lines:
+            l = l.strip()
+            if start:
+                out.write(start)
+            out.write(l)
+            out.write('\n')
+
+    def show(self, out=sys.stdout):
+        sep = ' '
         for x in self.optkeys:
-            print sep, x,
-            sep = ','
+            out.write(sep)
+            out.write(x)
+            sep = ', '
         if self.val:
-            print self.val,
-        print
+            out.write(' ')
+            out.write(self.val)
+        out.write('\n')
         if self.use:
-            print '\t',
-            print self.use
+            self.format(self.use, out=out);
         if self.val:
-            print '\tDefault', self.default or 'None'
+            self.format('Default ' + str(self.default or 'None'), out=out)
 
     def specify(self, k, v):
         """Specify the option. Called when the option is set
@@ -153,14 +165,12 @@ class OptVar(Opt):
     def long_opt(self):
         return None
 
-    def show(self):
-        print '%s=%s' %(self.optkeys[0], self.val) 
-        print
+    def show(self, out=sys.stdout):
+        print >>out, ' %s=%s' % (self.optkeys[0], self.val) 
         if self.use:
-            print '\t',
-            print self.use
+            self.format(self.use, out=out);
         if self.val:
-            print '\tDefault', self.default or 'None'
+            self.format('Default ' + str(self.default or 'None'), out=out)
 
 class OptVals:
     """Class to hold option values.
@@ -194,6 +204,8 @@ class Opts:
         self.vals.quiet = 0
         # Variables for default scripts.
         self.vars = {}
+        # Option to use for bare words.
+        self.default_opt = None
 
     def __repr__(self):
         return '\n'.join(map(str, self.options))
@@ -210,6 +222,15 @@ class Opts:
         self.options.append(x)
         self.options_map[name] = x
         return x
+
+    def default(self, name):
+        self.default_opt = name
+
+    def getdefault(self, val):
+        if self.default_opt is None:
+            return 0
+        opt = self.option(self.default_opt)
+        return opt.set(val)
 
     def var(self, name, **args):
         x = OptVar(self, name, **args)
@@ -274,27 +295,30 @@ class Opts:
         """
         self.argv = argv
 
-        try:
-            (vals, args) = getopt(argv[1:], self.short_opts(), self.long_opts())
-        except GetoptError, err:
-            self.err(str(err))
-
-	# hack to work around lack of gnu getopts parsing in python 2.2
-	xargs = args
-	while xargs[1:]:
-	    (v,xargs) = getopt(xargs[1:], self.short_opts(), self.long_opts())
-	    vals = vals + v
-
-	# back to the real work
-        self.args = args
-        for (k, v) in vals:
-            for opt in self.options:
-                if opt.specify(k, v): break
-            else:
-                print >>sys.stderr, "Error: Unknown option:", k
-                self.usage()
+        # hack to work around lack of gnu getopts parsing in python 2.2
+        args = argv[1:]
         xargs = []
-        for arg in args:
+        while args:
+            # let getopt parse whatever it feels like -- if anything
+            try:
+                (xvals, args) = getopt(args[0:],
+                                       self.short_opts(), self.long_opts())
+            except GetoptError, err:
+                self.err(str(err))
+                
+            for (k, v) in xvals:
+                for opt in self.options:
+                    if opt.specify(k, v): break
+                else:
+                    print >>sys.stderr, "Error: Unknown option:", k
+                    self.usage()
+
+            if not args:
+                break
+            
+            # then process the 1st arg 
+            (arg,args) = (args[0], args[1:])
+
             isvar = 0
             if '=' in arg:
                 (k, v) = arg.split('=', 1)
@@ -302,8 +326,11 @@ class Opts:
                     if opt.specify(k, v):
                         isvar = 1
                         break
+            elif self.getdefault(arg):
+                isvar = 1
             if not isvar:
                 xargs.append(arg)
+
         return xargs
 
     def short_opts(self):
@@ -328,29 +355,48 @@ class Opts:
 
     def usage(self):
         print 'Usage: ', self.argv[0], self.use or 'OPTIONS'
+        print
         for opt in self.options:
-            print
             opt.show()
+            print
+        if self.options:
+            print
 
-    def load_defaults(self, help=0):
-        """Load a defaults script. Assumes these options set:
+    def var_usage(self):
+        if self.vars:
+            print 'The config file defines the following variables:'
+            for var in self.vars:
+                var.show()
+                print
+            print
+
+    def config_usage(self):
+        if self.imports:
+            print 'The following are automically imported:'
+            for x in self.imports:
+                print '   ', x
+            print
+        self.var_usage()
+
+    def load_defconfig(self, help=0):
+        """Load a defconfig script. Assumes these options set:
         'path'    search path
-        'default' script name
+        'defconfig' script name
         """
         for x in [ '' ] + self.vals.path.split(':'):
             if x:
-                p = os.path.join(x, self.vals.defaults)
+                p = os.path.join(x, self.vals.defconfig)
             else:
-                p = self.vals.defaults
+                p = self.vals.defconfig
             if os.path.exists(p):
-		self.info('Using config file %s' % p)
+                self.info('Using config file "%s".' % p)
                 self.load(p, help)
                 break
         else:
-            self.err("Cannot open defaults file %s" % self.vals.defaults)
+            self.err('Cannot open config file "%s"' % self.vals.defconfig)
 
-    def load(self, defaults, help):
-        """Load a defaults file. Local variables in the file
+    def load(self, defconfig, help):
+        """Load a defconfig file. Local variables in the file
         are used to set options with the same names.
         Variables are not used to set options that are already specified.
         """
@@ -363,19 +409,17 @@ class Opts:
         locals.update(self.vars)
         cmd = '\n'.join(self.imports + 
                         [ "from xen.xm.help import Vars",
-                          "xm_file = '%s'" % defaults,
+                          "xm_file = '%s'" % defconfig,
                           "xm_help = %d" % help,
                           "xm_vars = Vars(xm_file, xm_help, locals())"
                           ])
         exec cmd in globals, locals
         try:
-            execfile(defaults, globals, locals)
+            execfile(defconfig, globals, locals)
         except:
             if not help: raise
         if help:
-            print 'The following imports are done automatically:'
-            for x in self.imports:
-                print x
+            self.config_usage()
             return
         # Extract the values set by the script and set the corresponding
         # options, if not set on the command line.
@@ -409,13 +453,21 @@ def set_bool(opt, k, v):
         
 
 def set_value(opt, k, v):
-    """Set an option to a valoue."""
+    """Set an option to a value."""
     opt.set(v)
 
 def set_int(opt, k, v):
     """Set an option to an integer value."""
     try:
         v = int(v)
+    except:
+        opt.opts.err('Invalid value: ' + str(v))
+    opt.set(v)
+
+def set_float(opt, k, v):
+    """Set an option to a float value."""
+    try:
+        v = float(v)
     except:
         opt.opts.err('Invalid value: ' + str(v))
     opt.set(v)

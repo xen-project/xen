@@ -1,5 +1,6 @@
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /******************************************************************************
- * arch/i386/traps.c
+ * arch/x86/traps.c
  * 
  * Modifications to Linux original are copyright (c) 2002-2004, K A Fraser
  * 
@@ -32,7 +33,7 @@
 #include <xen/errno.h>
 #include <xen/mm.h>
 #include <xen/console.h>
-#include <asm/ptrace.h>
+#include <asm/regs.h>
 #include <xen/delay.h>
 #include <xen/event.h>
 #include <xen/spinlock.h>
@@ -50,26 +51,28 @@
 #include <asm/flushtlb.h>
 #include <asm/uaccess.h>
 #include <asm/i387.h>
-#include <asm/pdb.h>
+#include <asm/debugger.h>
+#include <asm/msr.h>
 
-extern char opt_nmi[];
-
-struct guest_trap_bounce guest_trap_bounce[NR_CPUS] = { { 0 } };
-
-#if defined(__i386__)
-
-#define DOUBLEFAULT_STACK_SIZE 1024
-static struct tss_struct doublefault_tss;
-static unsigned char doublefault_stack[DOUBLEFAULT_STACK_SIZE];
+/*
+ * opt_nmi: one of 'ignore', 'dom0', or 'fatal'.
+ *  fatal:  Xen prints diagnostic message and then hangs.
+ *  dom0:   The NMI is virtualised to DOM0.
+ *  ignore: The NMI error is cleared and ignored.
+ */
+#ifdef NDEBUG
+char opt_nmi[10] = "dom0";
+#else
+char opt_nmi[10] = "fatal";
+#endif
+string_param("nmi", opt_nmi);
 
 asmlinkage int hypercall(void);
-asmlinkage void lcall7(void);
-asmlinkage void lcall27(void);
 
 /* Master table, and the one used by CPU0. */
-struct desc_struct idt_table[256] = { {0, 0}, };
+idt_entry_t idt_table[IDT_ENTRIES] = { {0, 0}, };
 /* All other CPUs have their own copy. */
-struct desc_struct *idt_tables[NR_CPUS] = { 0 };
+idt_entry_t *idt_tables[NR_CPUS] = { 0 };
 
 asmlinkage void divide_error(void);
 asmlinkage void debug(void);
@@ -91,140 +94,107 @@ asmlinkage void alignment_check(void);
 asmlinkage void spurious_interrupt_bug(void);
 asmlinkage void machine_check(void);
 
-int kstack_depth_to_print = 8*20;
-
-static inline int kernel_text_address(unsigned long addr)
+/*
+ * This is called for faults at very unexpected times (e.g., when interrupts
+ * are disabled). In such situations we can't do much that is safe. We try to
+ * print out some tracing and then we just spin.
+ */
+asmlinkage void fatal_trap(int trapnr, struct xen_regs *regs)
 {
-    if (addr >= (unsigned long) &_stext &&
-        addr <= (unsigned long) &_etext)
-        return 1;
-    return 0;
+    int cpu = smp_processor_id();
+    unsigned long cr2;
+    static char *trapstr[] = { 
+        "divide error", "debug", "nmi", "bkpt", "overflow", "bounds", 
+        "invalid operation", "device not available", "double fault", 
+        "coprocessor segment", "invalid tss", "segment not found", 
+        "stack error", "general protection fault", "page fault", 
+        "spurious interrupt", "coprocessor error", "alignment check", 
+        "machine check", "simd error"
+    };
 
-}
-
-void show_stack(unsigned long *esp)
-{
-    unsigned long *stack, addr;
-    int i;
-
-    printk("Stack trace from ESP=%p:\n", esp);
-
-    stack = esp;
-    for ( i = 0; i < kstack_depth_to_print; i++ )
-    {
-        if ( ((long)stack & (STACK_SIZE-1)) == 0 )
-            break;
-        if ( i && ((i % 8) == 0) )
-            printk("\n       ");
-        if ( kernel_text_address(*stack) )
-            printk("[%08lx] ", *stack++);
-        else
-            printk("%08lx ", *stack++);            
-    }
-    printk("\n");
-
-    printk("Call Trace from ESP=%p: ", esp);
-    stack = esp;
-    i = 0;
-    while (((long) stack & (STACK_SIZE-1)) != 0) {
-        addr = *stack++;
-        if (kernel_text_address(addr)) {
-            if (i && ((i % 6) == 0))
-                printk("\n   ");
-            printk("[<%08lx>] ", addr);
-            i++;
-        }
-    }
-    printk("\n");
-}
-
-void show_registers(struct pt_regs *regs)
-{
-    unsigned long esp;
-    unsigned short ss;
-
-    esp = (unsigned long)(&regs->esp);
-    ss  = __HYPERVISOR_DS;
-    if ( regs->xcs & 3 )
-    {
-        esp = regs->esp;
-        ss  = regs->xss & 0xffff;
-    }
-
-    printk("CPU:    %d\nEIP:    %04x:[<%08lx>]      \nEFLAGS: %08lx\n",
-           smp_processor_id(), 0xffff & regs->xcs, regs->eip, regs->eflags);
-    printk("eax: %08lx   ebx: %08lx   ecx: %08lx   edx: %08lx\n",
-           regs->eax, regs->ebx, regs->ecx, regs->edx);
-    printk("esi: %08lx   edi: %08lx   ebp: %08lx   esp: %08lx\n",
-           regs->esi, regs->edi, regs->ebp, esp);
-    printk("ds: %04x   es: %04x   fs: %04x   gs: %04x   ss: %04x\n",
-           regs->xds & 0xffff, regs->xes & 0xffff, 
-           regs->xfs & 0xffff, regs->xgs & 0xffff, ss);
-
-    show_stack(&regs->esp);
-} 
-
-
-spinlock_t die_lock = SPIN_LOCK_UNLOCKED;
-
-void die(const char *str, struct pt_regs * regs, long err)
-{
-    unsigned long flags;
-    spin_lock_irqsave(&die_lock, flags);
-    printk("%s: %04lx,%04lx\n", str, err >> 16, err & 0xffff);
     show_registers(regs);
-    spin_unlock_irqrestore(&die_lock, flags);
-    panic("Fatal crash within Xen.\n");
+
+    if ( trapnr == TRAP_page_fault )
+    {
+        __asm__ __volatile__ ("mov %%cr2,%0" : "=r" (cr2) : );
+        printk("Faulting linear address might be %0lx %lx\n", cr2, cr2);
+    }
+
+    printk("************************************\n");
+    printk("CPU%d FATAL TRAP %d (%s), ERROR_CODE %04x%s.\n",
+           cpu, trapnr, trapstr[trapnr], regs->error_code,
+           (regs->eflags & X86_EFLAGS_IF) ? "" : ", IN INTERRUPT CONTEXT");
+    printk("System shutting down -- need manual reset.\n");
+    printk("************************************\n");
+
+    /* Lock up the console to prevent spurious output from other CPUs. */
+    console_force_lock();
+
+    /* Wait for manual reset. */
+    for ( ; ; )
+        __asm__ __volatile__ ( "hlt" );
 }
 
-
-static inline void do_trap(int trapnr, char *str,
-                           struct pt_regs *regs, 
-                           long error_code, int use_error_code)
+static inline int do_trap(int trapnr, char *str,
+                          struct xen_regs *regs, 
+                          int use_error_code)
 {
-    struct domain *p = current;
-    struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
+    struct exec_domain *ed = current;
+    struct trap_bounce *tb = &ed->arch.trap_bounce;
     trap_info_t *ti;
     unsigned long fixup;
 
-    if (!(regs->xcs & 3))
+    DEBUGGER_trap_entry(trapnr, regs);
+
+    if ( !GUEST_MODE(regs) )
         goto xen_fault;
 
-    ti = current->thread.traps + trapnr;
-    gtb->flags = use_error_code ? GTBF_TRAP : GTBF_TRAP_NOCODE;
-    gtb->error_code = error_code;
-    gtb->cs         = ti->cs;
-    gtb->eip        = ti->address;
+#ifndef NDEBUG
+    if ( (ed->arch.traps[trapnr].address == 0) && (ed->domain->id == 0) )
+        goto xen_fault;
+#endif
+
+    ti = current->arch.traps + trapnr;
+    tb->flags = TBF_EXCEPTION;
+    tb->cs    = ti->cs;
+    tb->eip   = ti->address;
+    if ( use_error_code )
+    {
+        tb->flags |= TBF_EXCEPTION_ERRCODE;
+        tb->error_code = regs->error_code;
+    }
     if ( TI_GET_IF(ti) )
-        p->shared_info->vcpu_data[0].evtchn_upcall_mask = 1;
-    return; 
+        ed->vcpu_info->evtchn_upcall_mask = 1;
+    return 0;
 
  xen_fault:
 
     if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
     {
-        DPRINTK("Trap %d: %08lx -> %08lx\n", trapnr, regs->eip, fixup);
+        DPRINTK("Trap %d: %p -> %p\n", trapnr, regs->eip, fixup);
         regs->eip = fixup;
-        regs->xds = regs->xes = regs->xfs = regs->xgs = __HYPERVISOR_DS;
-        return;
+        return 0;
     }
+
+    DEBUGGER_trap_fatal(trapnr, regs);
 
     show_registers(regs);
     panic("CPU%d FATAL TRAP: vector = %d (%s)\n"
-          "[error_code=%08x]\n",
-          smp_processor_id(), trapnr, str, error_code);
+          "[error_code=%04x]\n",
+          smp_processor_id(), trapnr, str, regs->error_code);
+    return 0;
 }
 
 #define DO_ERROR_NOCODE(trapnr, str, name) \
-asmlinkage void do_##name(struct pt_regs * regs, long error_code) \
+asmlinkage int do_##name(struct xen_regs *regs) \
 { \
-    do_trap(trapnr, str, regs, error_code, 0); \
+    return do_trap(trapnr, str, regs, 0); \
 }
 
 #define DO_ERROR(trapnr, str, name) \
-asmlinkage void do_##name(struct pt_regs * regs, long error_code) \
+asmlinkage int do_##name(struct xen_regs *regs) \
 { \
-    do_trap(trapnr, str, regs, error_code, 1); \
+    return do_trap(trapnr, str, regs, 1); \
 }
 
 DO_ERROR_NOCODE( 0, "divide error", divide_error)
@@ -237,182 +207,285 @@ DO_ERROR(11, "segment not present", segment_not_present)
 DO_ERROR(12, "stack segment", stack_segment)
 DO_ERROR_NOCODE(16, "fpu error", coprocessor_error)
 DO_ERROR(17, "alignment check", alignment_check)
-DO_ERROR_NOCODE(18, "machine check", machine_check)
 DO_ERROR_NOCODE(19, "simd error", simd_coprocessor_error)
 
-asmlinkage void do_int3(struct pt_regs *regs, long error_code)
+asmlinkage int do_int3(struct xen_regs *regs)
 {
-    struct domain *p = current;
-    struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
+    struct exec_domain *ed = current;
+    struct trap_bounce *tb = &ed->arch.trap_bounce;
     trap_info_t *ti;
 
-#ifdef XEN_DEBUGGER
-    if ( pdb_initialized && pdb_handle_exception(3, regs) == 0 )
-        return;
-#endif
+    DEBUGGER_trap_entry(TRAP_int3, regs);
 
-    if ( (regs->xcs & 3) != 3 )
+    if ( !GUEST_MODE(regs) )
     {
-        if ( unlikely((regs->xcs & 3) == 0) )
-        {
-            show_registers(regs);
-            panic("CPU%d FATAL TRAP: vector = 3 (Int3)\n"
-                  "[error_code=%08x]\n",
-                  smp_processor_id(), error_code);
-        }
+        DEBUGGER_trap_fatal(TRAP_int3, regs);
+        show_registers(regs);
+        panic("CPU%d FATAL TRAP: vector = 3 (Int3)\n", smp_processor_id());
     }
 
-    ti = current->thread.traps + 3;
-    gtb->flags      = GTBF_TRAP_NOCODE;
-    gtb->error_code = error_code;
-    gtb->cs         = ti->cs;
-    gtb->eip        = ti->address;
+    ti = current->arch.traps + 3;
+    tb->flags = TBF_EXCEPTION;
+    tb->cs    = ti->cs;
+    tb->eip   = ti->address;
     if ( TI_GET_IF(ti) )
-        p->shared_info->vcpu_data[0].evtchn_upcall_mask = 1;
+        ed->vcpu_info->evtchn_upcall_mask = 1;
+
+    return 0;
 }
 
-asmlinkage void do_double_fault(void)
+asmlinkage void do_machine_check(struct xen_regs *regs)
 {
-    struct tss_struct *tss = &doublefault_tss;
-    unsigned int cpu = ((tss->back_link>>3)-__FIRST_TSS_ENTRY)>>1;
-
-    /* Disable the NMI watchdog. It's useless now. */
-    watchdog_on = 0;
-
-    /* Find information saved during fault and dump it to the console. */
-    tss = &init_tss[cpu];
-    printk("CPU:    %d\nEIP:    %04x:[<%08x>]      \nEFLAGS: %08x\n",
-           cpu, tss->cs, tss->eip, tss->eflags);
-    printk("CR3:    %08x\n", tss->__cr3);
-    printk("eax: %08x   ebx: %08x   ecx: %08x   edx: %08x\n",
-           tss->eax, tss->ebx, tss->ecx, tss->edx);
-    printk("esi: %08x   edi: %08x   ebp: %08x   esp: %08x\n",
-           tss->esi, tss->edi, tss->ebp, tss->esp);
-    printk("ds: %04x   es: %04x   fs: %04x   gs: %04x   ss: %04x\n",
-           tss->ds, tss->es, tss->fs, tss->gs, tss->ss);
-    printk("************************************\n");
-    printk("CPU%d DOUBLE FAULT -- system shutdown\n", cpu);
-    printk("System needs manual reset.\n");
-    printk("************************************\n");
-
-    /* Lock up the console to prevent spurious output from other CPUs. */
-    console_force_lock();
-
-    /* Wait for manual reset. */
-    for ( ; ; ) ;
+    fatal_trap(TRAP_machine_check, regs);
 }
 
-asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
+void propagate_page_fault(unsigned long addr, u16 error_code)
 {
-    struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
     trap_info_t *ti;
-    unsigned long off, addr, fixup;
-    struct domain *d = current;
-    extern int map_ldt_shadow_page(unsigned int);
-    int cpu = d->processor;
+    struct exec_domain *ed = current;
+    struct trap_bounce *tb = &ed->arch.trap_bounce;
 
-    __asm__ __volatile__ ("movl %%cr2,%0" : "=r" (addr) : );
+    ti = ed->arch.traps + 14;
+    tb->flags = TBF_EXCEPTION | TBF_EXCEPTION_ERRCODE | TBF_EXCEPTION_CR2;
+    tb->cr2        = addr;
+    tb->error_code = error_code;
+    tb->cs         = ti->cs;
+    tb->eip        = ti->address;
+    if ( TI_GET_IF(ti) )
+        ed->vcpu_info->evtchn_upcall_mask = 1;
+
+    ed->arch.guest_cr2 = addr;
+}
+
+asmlinkage int do_page_fault(struct xen_regs *regs)
+{
+    unsigned long off, addr, fixup;
+    struct exec_domain *ed = current;
+    struct domain *d = ed->domain;
+    extern int map_ldt_shadow_page(unsigned int);
+    int cpu = ed->processor;
+    int ret;
+
+    __asm__ __volatile__ ("mov %%cr2,%0" : "=r" (addr) : );
+
+    DEBUGGER_trap_entry(TRAP_page_fault, regs);
 
     perfc_incrc(page_faults);
 
-    if ( unlikely(addr >= LDT_VIRT_START) && 
-         (addr < (LDT_VIRT_START + (d->mm.ldt_ents*LDT_ENTRY_SIZE))) )
+    if ( likely(VM_ASSIST(d, VMASST_TYPE_writable_pagetables)) )
+    {
+        LOCK_BIGLOCK(d);
+        if ( unlikely(ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l1va) &&
+             unlikely((addr >> L2_PAGETABLE_SHIFT) ==
+                      ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l2_idx) )
+        {
+            ptwr_flush(PTWR_PT_ACTIVE);
+            UNLOCK_BIGLOCK(d);
+            return EXCRET_fault_fixed;
+        }
+
+        if ( (addr < PAGE_OFFSET) &&
+             ((regs->error_code & 3) == 3) && /* write-protection fault */
+             ptwr_do_page_fault(addr) )
+        {
+            if ( unlikely(d->arch.shadow_mode) )
+                (void)shadow_fault(addr, regs->error_code);
+            UNLOCK_BIGLOCK(d);
+            return EXCRET_fault_fixed;
+        }
+        UNLOCK_BIGLOCK(d);
+    }
+
+    if ( unlikely(d->arch.shadow_mode) && 
+         (addr < PAGE_OFFSET) && shadow_fault(addr, regs->error_code) )
+        return EXCRET_fault_fixed;
+
+    if ( unlikely(addr >= LDT_VIRT_START(ed)) && 
+         (addr < (LDT_VIRT_START(ed) + (ed->arch.ldt_ents*LDT_ENTRY_SIZE))) )
     {
         /*
          * Copy a mapping from the guest's LDT, if it is valid. Otherwise we
          * send the fault up to the guest OS to be handled.
          */
-        off  = addr - LDT_VIRT_START;
-        addr = d->mm.ldt_base + off;
-        if ( likely(map_ldt_shadow_page(off >> PAGE_SHIFT)) )
-            return; /* successfully copied the mapping */
+        LOCK_BIGLOCK(d);
+        off  = addr - LDT_VIRT_START(ed);
+        addr = ed->arch.ldt_base + off;
+        ret = map_ldt_shadow_page(off >> PAGE_SHIFT);
+        UNLOCK_BIGLOCK(d);
+        if ( likely(ret) )
+            return EXCRET_fault_fixed; /* successfully copied the mapping */
     }
 
-    if ( (addr >> L2_PAGETABLE_SHIFT) == ptwr_info[cpu].disconnected )
-    {
-        ptwr_reconnect_disconnected(addr);
-        return;
-    }
-
-    if ( VM_ASSIST(d, VMASST_TYPE_writeable_pagetables) && 
-         (addr < PAGE_OFFSET) &&
-         ((error_code & 3) == 3) && /* write-protection fault */
-         ptwr_do_page_fault(addr) )
-        return;
-
-    if ( unlikely(d->mm.shadow_mode) && 
-         (addr < PAGE_OFFSET) && shadow_fault(addr, error_code) )
-        return; /* Returns TRUE if fault was handled. */
-
-    if ( unlikely(!(regs->xcs & 3)) )
+    if ( !GUEST_MODE(regs) )
         goto xen_fault;
 
-    ti = d->thread.traps + 14;
-    gtb->flags = GTBF_TRAP_CR2; /* page fault pushes %cr2 */
-    gtb->cr2        = addr;
-    gtb->error_code = error_code;
-    gtb->cs         = ti->cs;
-    gtb->eip        = ti->address;
-    if ( TI_GET_IF(ti) )
-        d->shared_info->vcpu_data[0].evtchn_upcall_mask = 1;
-    return; 
+#ifndef NDEBUG
+    if ( (ed->arch.traps[TRAP_page_fault].address == 0) && (d->id == 0) )
+        goto xen_fault;
+#endif
+
+    propagate_page_fault(addr, regs->error_code);
+    return 0; 
 
  xen_fault:
 
     if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
     {
         perfc_incrc(copy_user_faults);
-        if ( !d->mm.shadow_mode )
-            DPRINTK("Page fault: %08lx -> %08lx\n", regs->eip, fixup);
+        if ( !d->arch.shadow_mode )
+            DPRINTK("Page fault: %p -> %p\n", regs->eip, fixup);
         regs->eip = fixup;
-        regs->xds = regs->xes = regs->xfs = regs->xgs = __HYPERVISOR_DS;
-        return;
+        return 0;
     }
 
-    if ( addr >= PAGE_OFFSET )
-    {
-        unsigned long page;
-        page = l2_pgentry_val(idle_pg_table[addr >> L2_PAGETABLE_SHIFT]);
-        printk("*pde = %08lx\n", page);
-        if ( page & _PAGE_PRESENT )
-        {
-            page &= PAGE_MASK;
-            page = ((unsigned long *) __va(page))[(addr&0x3ff000)>>PAGE_SHIFT];
-            printk(" *pte = %08lx\n", page);
-        }
-#ifdef MEMORY_GUARD
-        if ( !(error_code & 1) )
-            printk(" -- POSSIBLY AN ACCESS TO FREED MEMORY? --\n");
-#endif
-    }
-
-#ifdef XEN_DEBUGGER
-    if ( pdb_page_fault_possible )
-    {
-        pdb_page_fault = 1;
-        /* make eax & edx valid to complete the instruction */
-        regs->eax = (long)&pdb_page_fault_scratch;
-        regs->edx = (long)&pdb_page_fault_scratch;
-        return;
-    }
-#endif
+    DEBUGGER_trap_fatal(TRAP_page_fault, regs);
 
     show_registers(regs);
+    show_page_walk(addr);
     panic("CPU%d FATAL PAGE FAULT\n"
-          "[error_code=%08x]\n"
-          "Faulting linear address might be %08lx\n",
-          smp_processor_id(), error_code, addr);
+          "[error_code=%04x]\n"
+          "Faulting linear address might be %p\n",
+          smp_processor_id(), regs->error_code, addr);
+    return 0;
 }
 
-asmlinkage void do_general_protection(struct pt_regs *regs, long error_code)
+static int emulate_privileged_op(struct xen_regs *regs)
 {
-    struct domain *d = current;
-    struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
+    extern long do_fpu_taskswitch(void);
+    extern void *decode_reg(struct xen_regs *regs, u8 b);
+
+    struct exec_domain *ed = current;
+    unsigned long *reg, eip = regs->eip;
+    u8 opcode;
+
+    if ( get_user(opcode, (u8 *)eip) )
+        goto page_fault;
+    eip += 1;
+    if ( (opcode & 0xff) != 0x0f )
+        goto fail;
+
+    if ( get_user(opcode, (u8 *)eip) )
+        goto page_fault;
+    eip += 1;
+
+    switch ( opcode )
+    {
+    case 0x06: /* CLTS */
+        (void)do_fpu_taskswitch();
+        break;
+
+    case 0x09: /* WBINVD */
+        if ( !IS_CAPABLE_PHYSDEV(ed->domain) )
+        {
+            DPRINTK("Non-physdev domain attempted WBINVD.\n");
+            goto fail;
+        }
+        wbinvd();
+        break;
+
+    case 0x20: /* MOV CR?,<reg> */
+        if ( get_user(opcode, (u8 *)eip) )
+            goto page_fault;
+        eip += 1;
+        if ( (opcode & 0xc0) != 0xc0 )
+            goto fail;
+        reg = decode_reg(regs, opcode & 7);
+        switch ( (opcode >> 3) & 7 )
+        {
+        case 0: /* Read CR0 */
+            *reg = 
+                (read_cr0() & ~X86_CR0_TS) | 
+                (test_bit(EDF_GUEST_STTS, &ed->ed_flags) ? X86_CR0_TS : 0);
+            break;
+
+        case 2: /* Read CR2 */
+            *reg = ed->arch.guest_cr2;
+            break;
+            
+        case 3: /* Read CR3 */
+            *reg = pagetable_val(ed->arch.pagetable);
+            break;
+
+        default:
+            goto fail;
+        }
+        break;
+
+    case 0x22: /* MOV <reg>,CR? */
+        if ( get_user(opcode, (u8 *)eip) )
+            goto page_fault;
+        eip += 1;
+        if ( (opcode & 0xc0) != 0xc0 )
+            goto fail;
+        reg = decode_reg(regs, opcode & 7);
+        switch ( (opcode >> 3) & 7 )
+        {
+        case 0: /* Write CR0 */
+            if ( *reg & X86_CR0_TS ) /* XXX ignore all but TS bit */
+                (void)do_fpu_taskswitch;
+            break;
+
+        case 2: /* Write CR2 */
+            ed->arch.guest_cr2 = *reg;
+            break;
+            
+        case 3: /* Write CR3 */
+            LOCK_BIGLOCK(ed->domain);
+            (void)new_guest_cr3(*reg);
+            UNLOCK_BIGLOCK(ed->domain);
+            break;
+
+        default:
+            goto fail;
+        }
+        break;
+
+    case 0x30: /* WRMSR */
+        if ( !IS_PRIV(ed->domain) )
+        {
+            DPRINTK("Non-priv domain attempted WRMSR.\n");
+            goto fail;
+        }
+        wrmsr(regs->ecx, regs->eax, regs->edx);
+        break;
+
+    case 0x32: /* RDMSR */
+        if ( !IS_PRIV(ed->domain) )
+        {
+            DPRINTK("Non-priv domain attempted RDMSR.\n");
+            goto fail;
+        }
+        rdmsr(regs->ecx, regs->eax, regs->edx);
+        break;
+
+    default:
+        goto fail;
+    }
+
+    regs->eip = eip;
+    return EXCRET_fault_fixed;
+
+ fail:
+    return 0;
+
+ page_fault:
+    propagate_page_fault(eip, 0);
+    return EXCRET_fault_fixed;
+}
+
+asmlinkage int do_general_protection(struct xen_regs *regs)
+{
+    struct exec_domain *ed = current;
+    struct trap_bounce *tb = &ed->arch.trap_bounce;
     trap_info_t *ti;
     unsigned long fixup;
 
-    /* Badness if error in ring 0, or result of an interrupt. */
-    if ( !(regs->xcs & 3) || (error_code & 1) )
+    DEBUGGER_trap_entry(TRAP_gp_fault, regs);
+
+    if ( regs->error_code & 1 )
+        goto hardware_gp;
+
+    if ( !GUEST_MODE(regs) )
         goto gp_in_kernel;
 
     /*
@@ -435,203 +508,184 @@ asmlinkage void do_general_protection(struct pt_regs *regs, long error_code)
      * instruction. The DPL specified by the guest OS for these vectors is NOT
      * CHECKED!!
      */
-    if ( (error_code & 3) == 2 )
+    if ( (regs->error_code & 3) == 2 )
     {
         /* This fault must be due to <INT n> instruction. */
-        ti = current->thread.traps + (error_code>>3);
-        if ( TI_GET_DPL(ti) >= (regs->xcs & 3) )
+        ti = current->arch.traps + (regs->error_code>>3);
+        if ( TI_GET_DPL(ti) >= (VM86_MODE(regs) ? 3 : (regs->cs & 3)) )
         {
-#ifdef XEN_DEBUGGER
-            if ( pdb_initialized && (pdb_ctx.system_call != 0) )
-            {
-                unsigned long cr3; 
-                __asm__ __volatile__ ("movl %%cr3,%0" : "=r" (cr3) : );
-                if ( cr3 == pdb_ctx.ptbr )
-                    pdb_linux_syscall_enter_bkpt(regs, error_code, ti);
-            }
-#endif
-
-            gtb->flags = GTBF_TRAP_NOCODE;
+            tb->flags = TBF_EXCEPTION;
             regs->eip += 2;
             goto finish_propagation;
         }
     }
 
+    /* Emulate some simple privileged instructions when exec'ed in ring 1. */
+    if ( (regs->error_code == 0) &&
+         KERNEL_MODE(ed, regs) &&
+         emulate_privileged_op(regs) )
+        return 0;
+
 #if defined(__i386__)
-    if ( VM_ASSIST(d, VMASST_TYPE_4gb_segments) && 
-         (error_code == 0) && 
+    if ( VM_ASSIST(ed->domain, VMASST_TYPE_4gb_segments) && 
+         (regs->error_code == 0) && 
          gpf_emulate_4gb(regs) )
-        return;
+        return 0;
 #endif
-    
+
+#ifndef NDEBUG
+    if ( (ed->arch.traps[TRAP_gp_fault].address == 0) &&
+         (ed->domain->id == 0) )
+        goto gp_in_kernel;
+#endif
+
     /* Pass on GPF as is. */
-    ti = current->thread.traps + 13;
-    gtb->flags      = GTBF_TRAP;
-    gtb->error_code = error_code;
+    ti = current->arch.traps + 13;
+    tb->flags      = TBF_EXCEPTION | TBF_EXCEPTION_ERRCODE;
+    tb->error_code = regs->error_code;
  finish_propagation:
-    gtb->cs         = ti->cs;
-    gtb->eip        = ti->address;
+    tb->cs         = ti->cs;
+    tb->eip        = ti->address;
     if ( TI_GET_IF(ti) )
-        d->shared_info->vcpu_data[0].evtchn_upcall_mask = 1;
-    return;
+        ed->vcpu_info->evtchn_upcall_mask = 1;
+    return 0;
 
  gp_in_kernel:
 
     if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
     {
-        DPRINTK("GPF (%04lx): %08lx -> %08lx\n", error_code, regs->eip, fixup);
+        DPRINTK("GPF (%04x): %p -> %p\n",
+                regs->error_code, regs->eip, fixup);
         regs->eip = fixup;
-        regs->xds = regs->xes = regs->xfs = regs->xgs = __HYPERVISOR_DS;
-        return;
+        return 0;
     }
 
-    die("general protection fault", regs, error_code);
-}
+    DEBUGGER_trap_fatal(TRAP_gp_fault, regs);
 
-asmlinkage void mem_parity_error(struct pt_regs *regs)
-{
-    console_force_unlock();
-
-    printk("\n\n");
-
+ hardware_gp:
     show_registers(regs);
-
-    printk("************************************\n");
-    printk("CPU%d MEMORY ERROR -- system shutdown\n", smp_processor_id());
-    printk("System needs manual reset.\n");
-    printk("************************************\n");
-
-    /* Lock up the console to prevent spurious output from other CPUs. */
-    console_force_lock();
-
-    /* Wait for manual reset. */
-    for ( ; ; ) ;
+    panic("CPU%d GENERAL PROTECTION FAULT\n[error_code=%04x]\n",
+          smp_processor_id(), regs->error_code);
+    return 0;
 }
 
-asmlinkage void io_check_error(struct pt_regs *regs)
+unsigned long nmi_softirq_reason;
+static void nmi_softirq(void)
 {
-    console_force_unlock();
+    if ( dom0 == NULL )
+        return;
 
-    printk("\n\n");
+    if ( test_and_clear_bit(0, &nmi_softirq_reason) )
+        send_guest_virq(dom0->exec_domain[0], VIRQ_PARITY_ERR);
 
-    show_registers(regs);
-
-    printk("************************************\n");
-    printk("CPU%d I/O ERROR -- system shutdown\n", smp_processor_id());
-    printk("System needs manual reset.\n");
-    printk("************************************\n");
-
-    /* Lock up the console to prevent spurious output from other CPUs. */
-    console_force_lock();
-
-    /* Wait for manual reset. */
-    for ( ; ; ) ;
+    if ( test_and_clear_bit(1, &nmi_softirq_reason) )
+        send_guest_virq(dom0->exec_domain[0], VIRQ_IO_ERR);
 }
 
-static void unknown_nmi_error(unsigned char reason, struct pt_regs * regs)
+asmlinkage void mem_parity_error(struct xen_regs *regs)
+{
+    /* Clear and disable the parity-error line. */
+    outb((inb(0x61)&15)|4,0x61);
+
+    switch ( opt_nmi[0] )
+    {
+    case 'd': /* 'dom0' */
+        set_bit(0, &nmi_softirq_reason);
+        raise_softirq(NMI_SOFTIRQ);
+    case 'i': /* 'ignore' */
+        break;
+    default:  /* 'fatal' */
+        console_force_unlock();
+        printk("\n\nNMI - MEMORY ERROR\n");
+        fatal_trap(TRAP_nmi, regs);
+    }
+}
+
+asmlinkage void io_check_error(struct xen_regs *regs)
+{
+    /* Clear and disable the I/O-error line. */
+    outb((inb(0x61)&15)|8,0x61);
+
+    switch ( opt_nmi[0] )
+    {
+    case 'd': /* 'dom0' */
+        set_bit(0, &nmi_softirq_reason);
+        raise_softirq(NMI_SOFTIRQ);
+    case 'i': /* 'ignore' */
+        break;
+    default:  /* 'fatal' */
+        console_force_unlock();
+        printk("\n\nNMI - I/O ERROR\n");
+        fatal_trap(TRAP_nmi, regs);
+    }
+}
+
+static void unknown_nmi_error(unsigned char reason)
 {
     printk("Uhhuh. NMI received for unknown reason %02x.\n", reason);
     printk("Dazed and confused, but trying to continue\n");
     printk("Do you have a strange power saving mode enabled?\n");
 }
 
-asmlinkage void do_nmi(struct pt_regs * regs, unsigned long reason)
+asmlinkage void do_nmi(struct xen_regs *regs, unsigned long reason)
 {
     ++nmi_count(smp_processor_id());
 
-#if CONFIG_X86_LOCAL_APIC
     if ( nmi_watchdog )
         nmi_watchdog_tick(regs);
-    else
-#endif
-        unknown_nmi_error((unsigned char)(reason&0xff), regs);
+
+    if ( reason & 0x80 )
+        mem_parity_error(regs);
+    else if ( reason & 0x40 )
+        io_check_error(regs);
+    else if ( !nmi_watchdog )
+        unknown_nmi_error((unsigned char)(reason&0xff));
 }
 
-unsigned long nmi_softirq_reason;
-static void nmi_softirq(void)
-{
-    struct domain *d = find_domain_by_id(0);
-
-    if ( d == NULL )
-        return;
-
-    if ( test_and_clear_bit(0, &nmi_softirq_reason) )
-        send_guest_virq(d, VIRQ_PARITY_ERR);
-
-    if ( test_and_clear_bit(1, &nmi_softirq_reason) )
-        send_guest_virq(d, VIRQ_IO_ERR);
-
-    put_domain(d);
-}
-
-asmlinkage void math_state_restore(struct pt_regs *regs, long error_code)
+asmlinkage int math_state_restore(struct xen_regs *regs)
 {
     /* Prevent recursion. */
     clts();
 
-    if ( !test_bit(DF_USEDFPU, &current->flags) )
+    if ( !test_bit(EDF_USEDFPU, &current->ed_flags) )
     {
-        if ( test_bit(DF_DONEFPUINIT, &current->flags) )
+        if ( test_bit(EDF_DONEFPUINIT, &current->ed_flags) )
             restore_fpu(current);
         else
             init_fpu();
-        set_bit(DF_USEDFPU, &current->flags); /* so we fnsave on switch_to() */
+        set_bit(EDF_USEDFPU, &current->ed_flags); /* so we fnsave on switch_to() */
     }
 
-    if ( test_and_clear_bit(DF_GUEST_STTS, &current->flags) )
+    if ( test_and_clear_bit(EDF_GUEST_STTS, &current->ed_flags) )
     {
-        struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
-        gtb->flags      = GTBF_TRAP_NOCODE;
-        gtb->cs         = current->thread.traps[7].cs;
-        gtb->eip        = current->thread.traps[7].address;
+        struct trap_bounce *tb = &current->arch.trap_bounce;
+        tb->flags      = TBF_EXCEPTION;
+        tb->cs         = current->arch.traps[7].cs;
+        tb->eip        = current->arch.traps[7].address;
     }
+
+    return EXCRET_fault_fixed;
 }
 
-#ifdef XEN_DEBUGGER
-asmlinkage void do_pdb_debug(struct pt_regs *regs, long error_code)
+asmlinkage int do_debug(struct xen_regs *regs)
 {
-    unsigned int condition;
-    struct domain *tsk = current;
-    struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
+    unsigned long condition;
+    struct exec_domain *d = current;
+    struct trap_bounce *tb = &d->arch.trap_bounce;
 
-    __asm__ __volatile__("movl %%db6,%0" : "=r" (condition));
-    if ( (condition & (1 << 14)) != (1 << 14) )
-        printk("\nwarning: debug trap w/o BS bit [0x%x]\n\n", condition);
-    __asm__("movl %0,%%db6" : : "r" (0));
+    DEBUGGER_trap_entry(TRAP_debug, regs);
 
-    if ( pdb_handle_exception(1, regs) != 0 )
-    {
-        tsk->thread.debugreg[6] = condition;
-
-        gtb->flags = GTBF_TRAP_NOCODE;
-        gtb->cs    = tsk->thread.traps[1].cs;
-        gtb->eip   = tsk->thread.traps[1].address;
-    }
-}
-#endif
-
-asmlinkage void do_debug(struct pt_regs *regs, long error_code)
-{
-    unsigned int condition;
-    struct domain *tsk = current;
-    struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
-
-#ifdef XEN_DEBUGGER
-    if ( pdb_initialized )
-        return do_pdb_debug(regs, error_code);
-#endif
-
-    __asm__ __volatile__("movl %%db6,%0" : "=r" (condition));
+    __asm__ __volatile__("mov %%db6,%0" : "=r" (condition));
 
     /* Mask out spurious debug traps due to lazy DR7 setting */
     if ( (condition & (DR_TRAP0|DR_TRAP1|DR_TRAP2|DR_TRAP3)) &&
-         (tsk->thread.debugreg[7] == 0) )
+         (d->arch.debugreg[7] == 0) )
     {
-        __asm__("movl %0,%%db7" : : "r" (0));
-        return;
+        __asm__("mov %0,%%db7" : : "r" (0UL));
+        goto out;
     }
 
-    if ( (regs->xcs & 3) == 0 )
+    if ( !GUEST_MODE(regs) )
     {
         /* Clear TF just for absolute sanity. */
         regs->eflags &= ~EF_TF;
@@ -641,98 +695,61 @@ asmlinkage void do_debug(struct pt_regs *regs, long error_code)
          * on it. No need to bump EIP; the only faulting trap is an instruction
          * breakpoint, which can't happen to us.
          */
-        return;
+        goto out;
     }
 
     /* Save debug status register where guest OS can peek at it */
-    tsk->thread.debugreg[6] = condition;
+    d->arch.debugreg[6] = condition;
 
-    gtb->flags = GTBF_TRAP_NOCODE;
-    gtb->cs    = tsk->thread.traps[1].cs;
-    gtb->eip   = tsk->thread.traps[1].address;
+    tb->flags = TBF_EXCEPTION;
+    tb->cs    = d->arch.traps[1].cs;
+    tb->eip   = d->arch.traps[1].address;
+
+ out:
+    return EXCRET_not_a_fault;
 }
 
+asmlinkage int do_spurious_interrupt_bug(struct xen_regs *regs)
+{
+    return EXCRET_not_a_fault;
+}
 
-asmlinkage void do_spurious_interrupt_bug(struct pt_regs * regs,
-                                          long error_code)
-{ /* nothing */ }
-
-
-#define _set_gate(gate_addr,type,dpl,addr) \
-do { \
-  int __d0, __d1; \
-  __asm__ __volatile__ ("movw %%dx,%%ax\n\t" \
- "movw %4,%%dx\n\t" \
- "movl %%eax,%0\n\t" \
- "movl %%edx,%1" \
- :"=m" (*((long *) (gate_addr))), \
-  "=m" (*(1+(long *) (gate_addr))), "=&a" (__d0), "=&d" (__d1) \
- :"i" ((short) (0x8000+(dpl<<13)+(type<<8))), \
-  "3" ((char *) (addr)),"2" (__HYPERVISOR_CS << 16)); \
-} while (0)
+BUILD_SMP_INTERRUPT(deferred_nmi, TRAP_deferred_nmi)
+asmlinkage void smp_deferred_nmi(struct xen_regs regs)
+{
+    ack_APIC_irq();
+    do_nmi(&regs, 0);
+}
 
 void set_intr_gate(unsigned int n, void *addr)
 {
     _set_gate(idt_table+n,14,0,addr);
 }
 
-static void __init set_system_gate(unsigned int n, void *addr)
+void set_system_gate(unsigned int n, void *addr)
 {
     _set_gate(idt_table+n,14,3,addr);
 }
 
-static void set_task_gate(unsigned int n, unsigned int sel)
+void set_task_gate(unsigned int n, unsigned int sel)
 {
     idt_table[n].a = sel << 16;
     idt_table[n].b = 0x8500;
 }
 
-#define _set_seg_desc(gate_addr,type,dpl,base,limit) {\
- *((gate_addr)+1) = ((base) & 0xff000000) | \
-  (((base) & 0x00ff0000)>>16) | \
-  ((limit) & 0xf0000) | \
-  ((dpl)<<13) | \
-  (0x00408000) | \
-  ((type)<<8); \
- *(gate_addr) = (((base) & 0x0000ffff)<<16) | \
-  ((limit) & 0x0ffff); }
-
-#define _set_tssldt_desc(n,addr,limit,type) \
-__asm__ __volatile__ ("movw %w3,0(%2)\n\t" \
- "movw %%ax,2(%2)\n\t" \
- "rorl $16,%%eax\n\t" \
- "movb %%al,4(%2)\n\t" \
- "movb %4,5(%2)\n\t" \
- "movb $0,6(%2)\n\t" \
- "movb %%ah,7(%2)\n\t" \
- "rorl $16,%%eax" \
- : "=m"(*(n)) : "a" (addr), "r"(n), "ir"(limit), "i"(type))
-
 void set_tss_desc(unsigned int n, void *addr)
 {
-    _set_tssldt_desc(gdt_table+__TSS(n), (int)addr, 8299, 0x89);
+    _set_tssldt_desc(
+        gdt_table + __TSS(n),
+        (unsigned long)addr,
+        offsetof(struct tss_struct, __cacheline_filler) - 1,
+        9);
 }
 
 void __init trap_init(void)
 {
-    /*
-     * Make a separate task for double faults. This will get us debug output if
-     * we blow the kernel stack.
-     */
-    struct tss_struct *tss = &doublefault_tss;
-    memset(tss, 0, sizeof(*tss));
-    tss->ds     = __HYPERVISOR_DS;
-    tss->es     = __HYPERVISOR_DS;
-    tss->ss     = __HYPERVISOR_DS;
-    tss->esp    = (unsigned long)
-        &doublefault_stack[DOUBLEFAULT_STACK_SIZE];
-    tss->__cr3  = __pa(idle_pg_table);
-    tss->cs     = __HYPERVISOR_CS;
-    tss->eip    = (unsigned long)do_double_fault;
-    tss->eflags = 2;
-    tss->bitmap = INVALID_IO_BITMAP_OFFSET;
-    _set_tssldt_desc(gdt_table+__DOUBLEFAULT_TSS_ENTRY,
-                     (int)tss, 235, 0x89);
+    extern void percpu_traps_init(void);
+    extern void cpu_init(void);
 
     /*
      * Note that interrupt gates are always used, rather than trap gates. We 
@@ -742,40 +759,37 @@ void __init trap_init(void)
      * saved. The page-fault handler also needs interrupts disabled until %cr2 
      * has been read and saved on the stack.
      */
-    set_intr_gate(0,&divide_error);
-    set_intr_gate(1,&debug);
-    set_intr_gate(2,&nmi);
-    set_system_gate(3,&int3);     /* usable from all privilege levels */
-    set_system_gate(4,&overflow); /* usable from all privilege levels */
-    set_intr_gate(5,&bounds);
-    set_intr_gate(6,&invalid_op);
-    set_intr_gate(7,&device_not_available);
-    set_task_gate(8,__DOUBLEFAULT_TSS_ENTRY<<3);
-    set_intr_gate(9,&coprocessor_segment_overrun);
-    set_intr_gate(10,&invalid_TSS);
-    set_intr_gate(11,&segment_not_present);
-    set_intr_gate(12,&stack_segment);
-    set_intr_gate(13,&general_protection);
-    set_intr_gate(14,&page_fault);
-    set_intr_gate(15,&spurious_interrupt_bug);
-    set_intr_gate(16,&coprocessor_error);
-    set_intr_gate(17,&alignment_check);
-    set_intr_gate(18,&machine_check);
-    set_intr_gate(19,&simd_coprocessor_error);
+    set_intr_gate(TRAP_divide_error,&divide_error);
+    set_intr_gate(TRAP_debug,&debug);
+    set_intr_gate(TRAP_nmi,&nmi);
+    set_system_gate(TRAP_int3,&int3);         /* usable from all privileges */
+    set_system_gate(TRAP_overflow,&overflow); /* usable from all privileges */
+    set_intr_gate(TRAP_bounds,&bounds);
+    set_intr_gate(TRAP_invalid_op,&invalid_op);
+    set_intr_gate(TRAP_no_device,&device_not_available);
+    set_intr_gate(TRAP_copro_seg,&coprocessor_segment_overrun);
+    set_intr_gate(TRAP_invalid_tss,&invalid_TSS);
+    set_intr_gate(TRAP_no_segment,&segment_not_present);
+    set_intr_gate(TRAP_stack_error,&stack_segment);
+    set_intr_gate(TRAP_gp_fault,&general_protection);
+    set_intr_gate(TRAP_page_fault,&page_fault);
+    set_intr_gate(TRAP_spurious_int,&spurious_interrupt_bug);
+    set_intr_gate(TRAP_copro_error,&coprocessor_error);
+    set_intr_gate(TRAP_alignment_check,&alignment_check);
+    set_intr_gate(TRAP_machine_check,&machine_check);
+    set_intr_gate(TRAP_simd_error,&simd_coprocessor_error);
+    set_intr_gate(TRAP_deferred_nmi,&deferred_nmi);
 
-    /* Only ring 1 can access Xen services. */
-    _set_gate(idt_table+HYPERCALL_VECTOR,14,1,&hypercall);
+#if defined(__i386__)
+    _set_gate(idt_table+HYPERCALL_VECTOR, 14, 1, &hypercall);
+#endif
 
     /* CPU0 uses the master IDT. */
     idt_tables[0] = idt_table;
 
-    /*
-     * Should be a barrier for any external CPU state.
-     */
-    {
-        extern void cpu_init(void);
-        cpu_init();
-    }
+    percpu_traps_init();
+
+    cpu_init();
 
     open_softirq(NMI_SOFTIRQ, nmi_softirq);
 }
@@ -784,10 +798,19 @@ void __init trap_init(void)
 long do_set_trap_table(trap_info_t *traps)
 {
     trap_info_t cur;
-    trap_info_t *dst = current->thread.traps;
+    trap_info_t *dst = current->arch.traps;
+
+    LOCK_BIGLOCK(current->domain);
 
     for ( ; ; )
     {
+        if ( hypercall_preempt_check() )
+        {
+            UNLOCK_BIGLOCK(current->domain);
+            return hypercall1_create_continuation(
+                __HYPERVISOR_set_trap_table, traps);
+        }
+
         if ( copy_from_user(&cur, traps, sizeof(cur)) ) return -EFAULT;
 
         if ( cur.address == 0 ) break;
@@ -798,6 +821,8 @@ long do_set_trap_table(trap_info_t *traps)
         traps++;
     }
 
+    UNLOCK_BIGLOCK(current->domain);
+
     return 0;
 }
 
@@ -807,104 +832,60 @@ long do_set_callbacks(unsigned long event_selector,
                       unsigned long failsafe_selector,
                       unsigned long failsafe_address)
 {
-    struct domain *p = current;
+    struct exec_domain *d = current;
 
     if ( !VALID_CODESEL(event_selector) || !VALID_CODESEL(failsafe_selector) )
         return -EPERM;
 
-    p->event_selector    = event_selector;
-    p->event_address     = event_address;
-    p->failsafe_selector = failsafe_selector;
-    p->failsafe_address  = failsafe_address;
+    d->arch.event_selector    = event_selector;
+    d->arch.event_address     = event_address;
+    d->arch.failsafe_selector = failsafe_selector;
+    d->arch.failsafe_address  = failsafe_address;
 
     return 0;
-}
-
-
-long set_fast_trap(struct domain *p, int idx)
-{
-    trap_info_t *ti;
-
-    /* Index 0 is special: it disables fast traps. */
-    if ( idx == 0 )
-    {
-        if ( p == current )
-            CLEAR_FAST_TRAP(&p->thread);
-        SET_DEFAULT_FAST_TRAP(&p->thread);
-        return 0;
-    }
-
-    /*
-     * We only fast-trap vectors 0x20-0x2f, and vector 0x80.
-     * The former range is used by Windows and MS-DOS.
-     * Vector 0x80 is used by Linux and the BSD variants.
-     */
-    if ( (idx != 0x80) && ((idx < 0x20) || (idx > 0x2f)) ) 
-        return -1;
-
-    ti = p->thread.traps + idx;
-
-    /*
-     * We can't virtualise interrupt gates, as there's no way to get
-     * the CPU to automatically clear the events_mask variable.
-     */
-    if ( TI_GET_IF(ti) )
-        return -1;
-
-    if ( p == current )
-        CLEAR_FAST_TRAP(&p->thread);
-
-    p->thread.fast_trap_idx    = idx;
-    p->thread.fast_trap_desc.a = (ti->cs << 16) | (ti->address & 0xffff);
-    p->thread.fast_trap_desc.b = 
-        (ti->address & 0xffff0000) | 0x8f00 | (TI_GET_DPL(ti)&3)<<13;
-
-    if ( p == current )
-        SET_FAST_TRAP(&p->thread);
-
-    return 0;
-}
-
-
-long do_set_fast_trap(int idx)
-{
-    return set_fast_trap(current, idx);
 }
 
 
 long do_fpu_taskswitch(void)
 {
-    set_bit(DF_GUEST_STTS, &current->flags);
+    set_bit(EDF_GUEST_STTS, &current->ed_flags);
     stts();
     return 0;
 }
 
 
-long set_debugreg(struct domain *p, int reg, unsigned long value)
+#if defined(__i386__)
+#define DB_VALID_ADDR(_a) \
+    ((_a) <= (PAGE_OFFSET - 4))
+#elif defined(__x86_64__)
+#define DB_VALID_ADDR(_a) \
+    ((_a) >= HYPERVISOR_VIRT_END) || ((_a) <= (HYPERVISOR_VIRT_START-8))
+#endif
+long set_debugreg(struct exec_domain *p, int reg, unsigned long value)
 {
     int i;
 
     switch ( reg )
     {
     case 0: 
-        if ( value > (PAGE_OFFSET-4) ) return -EPERM;
+        if ( !DB_VALID_ADDR(value) ) return -EPERM;
         if ( p == current ) 
-            __asm__ ( "movl %0, %%db0" : : "r" (value) );
+            __asm__ ( "mov %0, %%db0" : : "r" (value) );
         break;
     case 1: 
-        if ( value > (PAGE_OFFSET-4) ) return -EPERM;
+        if ( !DB_VALID_ADDR(value) ) return -EPERM;
         if ( p == current ) 
-            __asm__ ( "movl %0, %%db1" : : "r" (value) );
+            __asm__ ( "mov %0, %%db1" : : "r" (value) );
         break;
     case 2: 
-        if ( value > (PAGE_OFFSET-4) ) return -EPERM;
+        if ( !DB_VALID_ADDR(value) ) return -EPERM;
         if ( p == current ) 
-            __asm__ ( "movl %0, %%db2" : : "r" (value) );
+            __asm__ ( "mov %0, %%db2" : : "r" (value) );
         break;
     case 3:
-        if ( value > (PAGE_OFFSET-4) ) return -EPERM;
+        if ( !DB_VALID_ADDR(value) ) return -EPERM;
         if ( p == current ) 
-            __asm__ ( "movl %0, %%db3" : : "r" (value) );
+            __asm__ ( "mov %0, %%db3" : : "r" (value) );
         break;
     case 6:
         /*
@@ -914,7 +895,7 @@ long set_debugreg(struct domain *p, int reg, unsigned long value)
         value &= 0xffffefff; /* reserved bits => 0 */
         value |= 0xffff0ff0; /* reserved bits => 1 */
         if ( p == current ) 
-            __asm__ ( "movl %0, %%db6" : : "r" (value) );
+            __asm__ ( "mov %0, %%db6" : : "r" (value) );
         break;
     case 7:
         /*
@@ -935,13 +916,13 @@ long set_debugreg(struct domain *p, int reg, unsigned long value)
                 if ( ((value >> (i+16)) & 3) == 2 ) return -EPERM;
         }
         if ( p == current ) 
-            __asm__ ( "movl %0, %%db7" : : "r" (value) );
+            __asm__ ( "mov %0, %%db7" : : "r" (value) );
         break;
     default:
         return -EINVAL;
     }
 
-    p->thread.debugreg[reg] = value;
+    p->arch.debugreg[reg] = value;
     return 0;
 }
 
@@ -953,7 +934,5 @@ long do_set_debugreg(int reg, unsigned long value)
 unsigned long do_get_debugreg(int reg)
 {
     if ( (reg < 0) || (reg > 7) ) return -EINVAL;
-    return current->thread.debugreg[reg];
+    return current->arch.debugreg[reg];
 }
-
-#endif /* __i386__ */

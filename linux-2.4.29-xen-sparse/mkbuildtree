@@ -1,0 +1,293 @@
+#!/bin/bash
+
+# mkbuildtree <build tree>
+#
+# Creates symbolic links in <build tree> for the sparse tree
+# in the current directory.
+
+# Script to determine the relative path between two directories.
+# Copyright (c) D. J. Hawkey Jr. 2002
+# Fixed for Xen project by K. Fraser in 2003.  
+abs_to_rel ()
+{
+	local CWD SRCPATH
+                
+	if [ "$1" != "/" -a "${1##*[^/]}" = "/" ]; then
+		SRCPATH=${1%?}
+	else
+		SRCPATH=$1
+	fi
+	if [ "$2" != "/" -a "${2##*[^/]}" = "/" ]; then
+		DESTPATH=${2%?}
+	else
+		DESTPATH=$2
+	fi
+
+	CWD=$PWD
+	[ "${1%%[^/]*}" != "/" ] && cd $1 && SRCPATH=$PWD
+	[ "${2%%[^/]*}" != "/" ] && cd $2 && DESTPATH=$PWD
+	[ "$CWD" != "$PWD" ] && cd $CWD
+
+	BASEPATH=$SRCPATH
+
+	[ "$SRCPATH" = "$DESTPATH" ] && DESTPATH="." && return
+	[ "$SRCPATH" = "/" ] && DESTPATH=${DESTPATH#?} && return
+
+	while [ "$BASEPATH/" != "${DESTPATH%${DESTPATH#$BASEPATH/}}" ]; do
+          BASEPATH=${BASEPATH%/*}
+	done
+
+	SRCPATH=${SRCPATH#$BASEPATH}
+        DESTPATH=${DESTPATH#$BASEPATH}
+        DESTPATH=${DESTPATH#?}
+	while [ -n "$SRCPATH" ]; do
+		SRCPATH=${SRCPATH%/*}
+		DESTPATH="../$DESTPATH"
+	done
+
+	[ -z "$BASEPATH" ] && BASEPATH="/"
+	[ "${DESTPATH##*[^/]}" = "/" ] && DESTPATH=${DESTPATH%?}
+}
+
+# relative_lndir <target_dir>
+# Creates a tree of symlinks in the current working directory that mirror
+# real files in <target_dir>. <target_dir> should be relative to the current
+# working directory. Symlinks in <target_dir> are ignored. Source-control files
+# are ignored.
+relative_lndir ()
+{
+  local SYMLINK_DIR REAL_DIR pref i j
+  SYMLINK_DIR=$PWD
+  REAL_DIR=$1
+  (
+  cd $REAL_DIR
+  for i in `find . -type d | grep -v SCCS`; do
+    [ -d $SYMLINK_DIR/$i ] || mkdir -p $SYMLINK_DIR/$i
+    (
+    cd $i
+    pref=`echo $i | sed -e 's#/[^/]*#../#g' -e 's#^\.##'`
+    for j in `find . -type f -o -type l -maxdepth 1`; do
+      ln -sf ${pref}${REAL_DIR}/$i/$j ${SYMLINK_DIR}/$i/$j
+    done
+    )
+  done
+  )
+}
+
+[ "$1" == "" ] && { echo "Syntax: $0 <linux tree to xenify>"; exit 1; }
+
+# Get absolute path to the destination directory
+pushd . >/dev/null
+cd ${1} || { echo "cannot cd to ${1}"; exit 1; }
+AD=$PWD
+popd >/dev/null
+  
+# Get absolute path to the source directory
+AS=`pwd`
+
+# Get path to source, relative to destination
+abs_to_rel ${AD} ${AS}
+RS=$DESTPATH
+
+# Remove old copies of files and directories at the destination
+for i in `find . -type f -o -type l` ; do rm -f ${AD}/${i#./} ; done
+
+# We now work from the destination directory
+cd ${AD} || { echo "cannot cd to ${AD}"; exit 1; }
+
+# Remove old symlinks
+for i in `find . -type l`; do rm -f $i; done
+
+# Create symlinks of files and directories which exist in the sparse source
+relative_lndir ${RS}
+rm -f mkbuildtree
+
+set ${RS}/../linux-2.6.*-xen-sparse
+[ "$1" == "${RS}/../linux-2.6.*-xen-parse" ] && { echo "no Linux 2.6 sparse tree at ${RS}/../linux-2.6.*-xen-sparse"; exit 1; }
+LINUX_26="$1"
+
+
+# Create links to the shared definitions of the Xen interfaces.
+rm -rf ${AD}/include/asm-xen/xen-public
+mkdir  ${AD}/include/asm-xen/xen-public
+cd     ${AD}/include/asm-xen/xen-public
+relative_lndir ../../../${RS}/../xen/include/public
+
+# Create a link to the shared definitions for the control interface
+cd ${AD}/include/asm-xen
+
+## Symlinks for files:
+## - which are identical in the i386 and xen-i386 architecture-dependent
+##   subdirectories.
+## - which are identical in the Linux 2.6 and Linux 2.4 ports.
+
+cd ${AD}/include/asm-xen
+ln -sf ../asm-i386/a.out.h 
+ln -sf ../asm-i386/apicdef.h 
+ln -sf ../asm-i386/apic.h 
+ln -sf ../asm-i386/atomic.h 
+ln -sf ../asm-i386/bitops.h 
+ln -sf ../asm-i386/boot.h 
+ln -sf ../asm-i386/byteorder.h 
+ln -sf ../asm-i386/cache.h 
+ln -sf ../asm-i386/checksum.h 
+ln -sf ../asm-i386/cpufeature.h 
+ln -sf ../asm-i386/current.h 
+ln -sf ../asm-i386/debugreg.h 
+ln -sf ../asm-i386/delay.h 
+ln -sf ../asm-i386/div64.h 
+ln -sf ../asm-i386/dma.h 
+ln -sf ../asm-i386/elf.h 
+ln -sf ../asm-i386/errno.h 
+ln -sf ../asm-i386/fcntl.h 
+ln -sf ../asm-i386/floppy.h 
+ln -sf ../asm-i386/hardirq.h 
+ln -sf ../asm-i386/hdreg.h 
+ln -sf ../asm-i386/i387.h 
+ln -sf ../asm-i386/ide.h 
+ln -sf ../asm-i386/init.h
+ln -sf ../asm-i386/io_apic.h
+ln -sf ../asm-i386/ioctl.h
+ln -sf ../asm-i386/ioctls.h
+ln -sf ../asm-i386/ipcbuf.h
+ln -sf ../asm-i386/ipc.h
+ln -sf ../asm-i386/kmap_types.h
+ln -sf ../asm-i386/ldt.h 
+ln -sf ../asm-i386/linux_logo.h
+ln -sf ../asm-i386/locks.h 
+ln -sf ../asm-i386/math_emu.h
+ln -sf ../asm-i386/mc146818rtc.h
+ln -sf ../asm-i386/mca_dma.h 
+ln -sf ../asm-i386/mman.h 
+ln -sf ../asm-i386/mmu.h 
+ln -sf ../asm-i386/mmx.h 
+ln -sf ../asm-i386/mpspec.h 
+ln -sf ../asm-i386/msgbuf.h 
+ln -sf ../asm-i386/msr.h 
+ln -sf ../asm-i386/mtrr.h 
+ln -sf ../asm-i386/namei.h 
+ln -sf ../asm-i386/param.h 
+ln -sf ../asm-i386/parport.h 
+ln -sf ../asm-i386/pgtable-3level.h 
+ln -sf ../asm-i386/poll.h 
+ln -sf ../asm-i386/posix_types.h 
+ln -sf ../asm-i386/ptrace.h 
+ln -sf ../asm-i386/resource.h 
+ln -sf ../asm-i386/rwlock.h 
+ln -sf ../asm-i386/rwsem.h 
+ln -sf ../asm-i386/scatterlist.h
+ln -sf ../asm-i386/semaphore.h 
+ln -sf ../asm-i386/sembuf.h 
+ln -sf ../asm-i386/serial.h 
+ln -sf ../asm-i386/setup.h 
+ln -sf ../asm-i386/shmbuf.h 
+ln -sf ../asm-i386/shmparam.h 
+ln -sf ../asm-i386/sigcontext.h 
+ln -sf ../asm-i386/siginfo.h 
+ln -sf ../asm-i386/signal.h 
+ln -sf ../asm-i386/smplock.h 
+ln -sf ../asm-i386/socket.h 
+ln -sf ../asm-i386/sockios.h 
+ln -sf ../asm-i386/softirq.h 
+ln -sf ../asm-i386/spinlock.h 
+ln -sf ../asm-i386/statfs.h 
+ln -sf ../asm-i386/stat.h 
+ln -sf ../asm-i386/string-486.h 
+ln -sf ../asm-i386/string.h 
+ln -sf ../asm-i386/termbits.h 
+ln -sf ../asm-i386/termios.h 
+ln -sf ../asm-i386/timex.h 
+ln -sf ../asm-i386/tlb.h 
+ln -sf ../asm-i386/types.h 
+ln -sf ../asm-i386/uaccess.h 
+ln -sf ../asm-i386/ucontext.h 
+ln -sf ../asm-i386/unaligned.h
+ln -sf ../asm-i386/unistd.h 
+ln -sf ../asm-i386/user.h 
+ln -sf ../asm-i386/vm86.h 
+ln -sf ../../${LINUX_26}/include/asm-xen/balloon.h
+ln -sf ../../${LINUX_26}/include/asm-xen/ctrl_if.h
+ln -sf ../../${LINUX_26}/include/asm-xen/evtchn.h
+ln -sf ../../${LINUX_26}/include/asm-xen/gnttab.h
+ln -sf ../../${LINUX_26}/include/asm-xen/hypervisor.h
+ln -sf ../../${LINUX_26}/include/asm-xen/multicall.h
+ln -sf ../../${LINUX_26}/include/asm-xen/xen_proc.h
+
+mkdir -p linux-public && cd linux-public
+ln -sf ../../../${LINUX_26}/include/asm-xen/linux-public/privcmd.h
+ln -sf ../../../${LINUX_26}/include/asm-xen/linux-public/suspend.h
+
+cd ${AD}/arch/xen/kernel
+ln -sf ../../i386/kernel/i387.c
+ln -sf ../../i386/kernel/init_task.c
+ln -sf ../../i386/kernel/pci-i386.c
+ln -sf ../../i386/kernel/pci-i386.h
+ln -sf ../../i386/kernel/ptrace.c
+ln -sf ../../i386/kernel/semaphore.c 
+ln -sf ../../i386/kernel/sys_i386.c 
+ln -sf ../../../${LINUX_26}/arch/xen/kernel/ctrl_if.c
+ln -sf ../../../${LINUX_26}/arch/xen/kernel/evtchn.c
+ln -sf ../../../${LINUX_26}/arch/xen/kernel/fixup.c
+ln -sf ../../../${LINUX_26}/arch/xen/kernel/gnttab.c
+ln -sf ../../../${LINUX_26}/arch/xen/kernel/reboot.c
+ln -sf ../../../${LINUX_26}/arch/xen/kernel/skbuff.c
+ln -sf ../../../${LINUX_26}/arch/xen/i386/kernel/ioport.c
+ln -sf ../../../${LINUX_26}/arch/xen/i386/kernel/pci-dma.c
+
+cd ${AD}/arch/xen/lib
+ln -sf ../../i386/lib/checksum.S 
+ln -sf ../../i386/lib/dec_and_lock.c 
+ln -sf ../../i386/lib/getuser.S 
+ln -sf ../../i386/lib/iodebug.c 
+ln -sf ../../i386/lib/memcpy.c 
+ln -sf ../../i386/lib/mmx.c
+ln -sf ../../i386/lib/old-checksum.c 
+ln -sf ../../i386/lib/strstr.c 
+ln -sf ../../i386/lib/usercopy.c 
+ln -sf ../../../${LINUX_26}/arch/xen/kernel/xen_proc.c
+
+cd ${AD}/arch/xen/mm
+ln -sf ../../i386/mm/extable.c 
+ln -sf ../../i386/mm/pageattr.c 
+ln -sf ../../../${LINUX_26}/arch/xen/i386/mm/hypervisor.c
+
+cd ${AD}/arch/xen/drivers/balloon
+ln -sf ../../../../${LINUX_26}/drivers/xen/balloon/balloon.c
+
+cd ${AD}/arch/xen/drivers/console
+ln -sf ../../../../${LINUX_26}/drivers/xen/console/console.c 
+
+cd ${AD}/arch/xen/drivers/dom0
+ln -sf ../../../../${LINUX_26}/drivers/xen/privcmd/privcmd.c core.c
+
+cd ${AD}/arch/xen/drivers/evtchn
+ln -sf ../../../../${LINUX_26}/drivers/xen/evtchn/evtchn.c
+
+cd ${AD}/arch/xen/drivers/netif/frontend
+ln -sf ../../../../../${LINUX_26}/drivers/xen/netfront/netfront.c main.c
+
+cd ${AD}/arch/xen/drivers/netif/backend
+ln -sf ../../../../../${LINUX_26}/drivers/xen/netback/common.h
+ln -sf ../../../../../${LINUX_26}/drivers/xen/netback/control.c
+ln -sf ../../../../../${LINUX_26}/drivers/xen/netback/interface.c
+ln -sf ../../../../../${LINUX_26}/drivers/xen/netback/netback.c main.c
+
+cd ${AD}/arch/xen/drivers/blkif/backend
+ln -sf ../../../../../${LINUX_26}/drivers/xen/blkback/common.h
+ln -sf ../../../../../${LINUX_26}/drivers/xen/blkback/blkback.c main.c
+ln -sf ../../../../../${LINUX_26}/drivers/xen/blkback/control.c
+ln -sf ../../../../../${LINUX_26}/drivers/xen/blkback/interface.c
+ln -sf ../../../../../${LINUX_26}/drivers/xen/blkback/vbd.c
+
+cd ${AD}/arch/xen/drivers/blkif/frontend
+ln -sf ../../../../../${LINUX_26}/drivers/xen/blkfront/blkfront.c
+
+cd ${AD}/arch/xen/drivers/usbif/frontend
+ln -sf ../../../../../${LINUX_26}/drivers/xen/usbfront/usbfront.c main.c
+ln -sf ../../../../../${LINUX_26}/drivers/xen/usbfront/xhci.h
+
+cd ${AD}/arch/xen/drivers/usbif/backend
+ln -sf ../../../../../${LINUX_26}/drivers/xen/usbback/common.h
+ln -sf ../../../../../${LINUX_26}/drivers/xen/usbback/control.c
+ln -sf ../../../../../${LINUX_26}/drivers/xen/usbback/interface.c
+ln -sf ../../../../../${LINUX_26}/drivers/xen/usbback/usbback.c main.c

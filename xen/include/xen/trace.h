@@ -15,13 +15,13 @@
  * Access to the trace buffers is via a dom0 hypervisor op and analysis of
  * trace buffer contents can then be performed using a userland tool.
  *
- * See also common/trace.c and the dom0 op in include/hypervisor-ifs/dom0_ops.h
+ * See also common/trace.c and the dom0 op in include/public/dom0_ops.h
  */
 
 #ifndef __XEN_TRACE_H__
 #define __XEN_TRACE_H__
 
-#include <hypervisor-ifs/trace.h>
+#include <public/trace.h>
 
 #ifdef TRACE_BUFFER
 
@@ -32,7 +32,7 @@
 #include <asm/atomic.h>
 #include <asm/current.h>
 #include <asm/msr.h>
-#include <hypervisor-ifs/dom0_ops.h>
+#include <public/dom0_ops.h>
 
 /* Used to initialise trace buffer functionality */
 void init_trace_bufs(void);

@@ -1,0 +1,21 @@
+#ifndef _I386_PGTABLE_2LEVEL_DEFS_H
+#define _I386_PGTABLE_2LEVEL_DEFS_H
+
+/*
+ * traditional i386 two-level paging structure:
+ */
+
+#define PGDIR_SHIFT	22
+#define PTRS_PER_PGD	1024
+#define PTRS_PER_PGD_NO_HV	(HYPERVISOR_VIRT_START >> PGDIR_SHIFT)
+
+/*
+ * the i386 is two-level, so we don't really have any
+ * PMD directory physically.
+ */
+#define PMD_SHIFT	22
+#define PTRS_PER_PMD	1
+
+#define PTRS_PER_PTE	1024
+
+#endif /* _I386_PGTABLE_2LEVEL_DEFS_H */

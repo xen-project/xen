@@ -16,15 +16,7 @@
 
 #include "xc.h"
 
-/* from xen/include/hypervisor-ifs */
-#include <hypervisor-if.h>
-#include <dom0_ops.h>
-#include <event_channel.h>
-#include <sched_ctl.h>
-#include <io/domain_controller.h>
-
-#include <asm-xen/proc_cmd.h>
-
+#include <xen/linux/privcmd.h>
 
 #define _PAGE_PRESENT   0x001
 #define _PAGE_RW        0x002
@@ -106,35 +98,44 @@ static inline int do_dom0_op(int xc_handle, dom0_op_t *op)
  out1: return ret;
 }
 
-static inline int do_multicall_op(int xc_handle, 
-				  void *call_list, int nr_calls) 
+static inline int do_dom_mem_op(int            xc_handle,
+				unsigned int   memop, 
+				unsigned int *extent_list, 
+				unsigned int  nr_extents,
+				unsigned int   extent_order,
+				domid_t        domid)
 {
-    int ret = -1;
     privcmd_hypercall_t hypercall;
+    long ret = -EINVAL;
+	
+    hypercall.op     = __HYPERVISOR_dom_mem_op;
+    hypercall.arg[0] = (unsigned long)memop;
+    hypercall.arg[1] = (unsigned long)extent_list;
+    hypercall.arg[2] = (unsigned long)nr_extents;
+    hypercall.arg[3] = (unsigned long)extent_order;
+    hypercall.arg[4] = (unsigned long)domid;
 
-    hypercall.op     = __HYPERVISOR_multicall;
-    hypercall.arg[0] = (unsigned long)call_list;
-    hypercall.arg[1] = (unsigned long)nr_calls;
-
-    if ( (ret = do_xen_hypercall(xc_handle, &hypercall)) < 0 )
+    if ( mlock(extent_list, nr_extents*sizeof(unsigned long)) != 0 )
     {
-        if ( errno == EACCES )
-            fprintf(stderr, "Dom0 operation failed -- need to"
-                    " rebuild the user-space tool set?\n");
+        PERROR("Could not lock memory for Xen hypercall");
         goto out1;
     }
 
+    if ( (ret = do_xen_hypercall(xc_handle, &hypercall)) < 0 )
+    {
+	fprintf(stderr, "Dom_mem operation failed (rc=%ld errno=%d)-- need to"
+                    " rebuild the user-space tool set?\n",ret,errno);
+        goto out2;
+    }
+
+ out2: (void)munlock(extent_list, nr_extents*sizeof(unsigned long));
  out1: return ret;
-}
+}    
+
 
 /*
  * PFN mapping.
  */
-void *init_pfn_mapper(domid_t domid);
-int close_pfn_mapper(void *pm_handle);
-void *map_pfn_writeable(void *pm_handle, unsigned long pfn);
-void *map_pfn_readonly(void *pm_handle, unsigned long pfn);
-void unmap_pfn(void *pm_handle, void *vaddr);
 int get_pfn_type_batch(int xc_handle, u32 dom, int num, unsigned long *arr);
 unsigned long csum_page (void * page);
 
@@ -184,29 +185,21 @@ typedef struct mfn_mapper {
     
 } mfn_mapper_t;
 
-void * mfn_mapper_map_single(int xc_handle, domid_t dom, int size, int prot, 
-			     unsigned long mfn );
-
-void * mfn_mapper_map_batch(int xc_handle, domid_t dom, int prot,
-			    unsigned long *arr, int num );
-
-mfn_mapper_t * mfn_mapper_init(int xc_handle, domid_t dom, int size, int prot);
-
-void * mfn_mapper_base(mfn_mapper_t *t);
-
-void mfn_mapper_close(mfn_mapper_t *t);
-
-int mfn_mapper_flush_queue(mfn_mapper_t *t);
-
-void * mfn_mapper_queue_entry(mfn_mapper_t *t, int offset, 
-			      unsigned long mfn, int size );
-
-long long  xc_domain_get_cpu_usage( int xc_handle, domid_t domid );
-
 #include "xc_io.h"
 
-int xc_domain_getfullinfo(int xc_handle,
-                          u32 domid,
-                          dom0_op_t *op,
-                          full_execution_context_t *ctxt );
+unsigned long xc_get_m2p_start_mfn ( int xc_handle );
+
+long xc_get_tot_pages(int xc_handle, u32 domid);
+
+int xc_copy_to_domain_page(int xc_handle, u32 domid,
+                            unsigned long dst_pfn, void *src_page);
+
+unsigned long xc_get_filesz(int fd);
+
+char *xc_read_kernel_image(const char *filename, unsigned long *size);
+
+void xc_map_memcpy(unsigned long dst, char *src, unsigned long size,
+                   int xch, u32 dom, unsigned long *parray,
+                   unsigned long vstart);
+
 #endif /* __XC_PRIVATE_H__ */

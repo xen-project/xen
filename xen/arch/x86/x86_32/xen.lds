@@ -1,6 +1,6 @@
 /* ld script to make i386 Linux kernel
  * Written by Martin Mares <mj@atrey.karlin.mff.cuni.cz>
- * Modifified for i386 Xen by Keir Fraser
+ * Modified for i386 Xen by Keir Fraser
  */
 OUTPUT_FORMAT("elf32-i386", "elf32-i386", "elf32-i386")
 OUTPUT_ARCH(i386)
@@ -25,10 +25,15 @@ SECTIONS
   .rodata : { *(.rodata) *(.rodata.*) } :text
   .kstrtab : { *(.kstrtab) } :text
 
-  . = ALIGN(16);		/* Exception table */
+  . = ALIGN(32);		/* Exception table */
   __start___ex_table = .;
   __ex_table : { *(__ex_table) } :text
   __stop___ex_table = .;
+
+  . = ALIGN(32);		/* Pre-exception table */
+  __start___pre_ex_table = .;
+  __pre_ex_table : { *(__pre_ex_table) } :text
+  __stop___pre_ex_table = .;
 
   __start___ksymtab = .;	/* Kernel symbol table */
   __ksymtab : { *(__ksymtab) } :text
@@ -52,21 +57,14 @@ SECTIONS
   __init_begin = .;
   .text.init : { *(.text.init) } :text
   .data.init : { *(.data.init) } :text
-  . = ALIGN(16);
+  . = ALIGN(32);
   __setup_start = .;
   .setup.init : { *(.setup.init) } :text
   __setup_end = .;
   __initcall_start = .;
   .initcall.init : { *(.initcall.init) } :text
   __initcall_end = .;
-  . = ALIGN(4096);
   __init_end = .;
-
-  . = ALIGN(4096);
-  .data.page_aligned : { *(.data.idt) } :text
-
-  . = ALIGN(32);
-  .data.cacheline_aligned : { *(.data.cacheline_aligned) } :text
 
   __bss_start = .;		/* BSS */
   .bss : {

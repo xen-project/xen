@@ -1,5 +1,5 @@
 
-PERFCOUNTER_CPU (emulations,   "instructions emulated" )
+PERFCOUNTER_CPU (seg_fixups,   "segmentation fixups" )
 
 PERFCOUNTER_CPU( irqs,         "#interrupts" )
 PERFCOUNTER_CPU( ipis,         "#IPIs" )

@@ -1,0 +1,46 @@
+#!/usr/bin/env python
+# CHECK-INSTALL
+#  -*- mode: python; -*-
+
+import os
+import sys
+
+def hline():
+    print >>sys.stderr, "*" * 70
+
+def msg(message):
+    print >>sys.stderr, "*" * 3, message
+
+def check_twisted_version():
+    """Check twisted is installed with a supported version and print a warning if not.
+    Raises an error if twisted is not installed.
+    """
+    # Supported twisted release and major version.
+    RELEASE = 1
+    MAJOR   = 3
+    try:
+        from twisted.copyright import version
+    except ImportError:
+        hline()
+        msg("The Twisted framework is not installed.")
+        msg("Use 'make install-twisted' at the xen root to install.")
+        msg("")
+        msg("Alternatively download and install version %d.%d or higher" % (RELEASE, MAJOR))
+        msg("from http://www.twistedmatrix.com/products")
+        hline()
+        sys.exit(1)
+        
+    (release, major, minor) = version.split('.')
+    release = int(release)
+    major = int(major)
+    if release > RELEASE: return
+    if release == RELEASE and major >= MAJOR: return
+    hline()
+    msg("Warning: Twisted version not supported: %s" % version)
+    msg("Use Twisted version %d.%d.0 or higher" % (RELEASE, MAJOR))
+    hline()
+    sys.exit(1)
+
+if __name__ == '__main__':
+    check_twisted_version()
+

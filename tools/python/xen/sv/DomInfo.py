@@ -1,9 +1,12 @@
-from xen.xend.XendClient import aserver as server
+from xen.xend.XendClient import getAsynchServer
+server = getAsynchServer()
 from xen.xend import PrettyPrint
 
 from xen.sv.HTMLBase import HTMLBase
 from xen.sv.util import *
 from xen.sv.GenTabbed import *
+
+DEBUG=1
 
 class DomInfo( GenTabbed ):
 
@@ -76,8 +79,11 @@ class DomSXPTab( PreTab ):
             request.write( "<p>Please Select a Domain</p>" )
             return None
 
-        domInfo = server.xend_domain( self.dom )
-        
+        try:
+            domInfo = server.xend_domain( self.dom )
+        except:
+            domInfo = [["Error getting domain details."]]
+            
         self.source = sxp2prettystring( domInfo )
         
         PreTab.write_BODY( self, request )
@@ -88,32 +94,54 @@ class DomActionTab( ActionTab ):
     	actions = { "shutdown" : ( "Shutdown the Domain", "shutdown.png" ),
         	    "reboot" : ( "Reboot the Domain", "reboot.png" ),
                     "pause" : ( "Pause the Domain", "pause.png" ),
-                    "unpause" : ( "Unpause the Domain", "unpause.png" ) }
+                    "unpause" : ( "Unpause the Domain", "unpause.png" ),
+                    "destroy" : ( "Destroy the Domain", "destroy.png" ) }
         ActionTab.__init__( self, actions )    
         
     def op_shutdown( self, request ):
    	dom = getVar( 'dom', request )
-        if not dom is None:
-    	   print ">DomShutDown %s" % dom
-    	#server.xend_node_shutdown()
+        if not dom is None and dom != '0':
+    	   if DEBUG: print ">DomShutDown %s" % dom
+           try:
+    	   	server.xend_domain_shutdown( int( dom ), "halt" )
+           except:
+           	pass
     
     def op_reboot( self, request ):
        	dom = getVar( 'dom', request )
-        if not dom is None:
-    	    print ">DomReboot %s" % dom
-        #server.xend_node_reboot()
-        
+        if not dom is None and dom != '0':
+    	    if DEBUG: print ">DomReboot %s" % dom
+            try:
+            	server.xend_domain_shutdown( int( dom ), "reboot" )
+            except:
+            	pass
+                
     def op_pause( self, request ):
        	dom = getVar( 'dom', request )
-        if not dom is None:
-    	    print ">DomPause %s" % dom
-            server.xend_domain_pause( int( dom ) )
-        
+        if not dom is None and dom != '0':
+    	    if DEBUG: print ">DomPause %s" % dom
+            try:
+                server.xend_domain_pause( int( dom ) )
+            except:
+            	pass
+               
     def op_unpause( self, request ):
        	dom = getVar( 'dom', request )
-        if not dom is None:
-    	   print ">DomUnpause %s" % dom
-           server.xend_domain_unpause( int( dom ) )
+        if not dom is None and dom != '0':
+    	   if DEBUG: print ">DomUnpause %s" % dom
+           try:
+               server.xend_domain_unpause( int( dom ) )
+    	   except:
+               pass
+               
+    def op_destroy( self, request ):
+    	dom = getVar( 'dom', request )
+        if not dom is None and dom != '0':
+    	   if DEBUG: print ">DomDestroy %s" % dom
+           try:
+           	server.xend_domain_destroy( int( dom ), "halt" )
+           except:
+           	pass
         
     
     

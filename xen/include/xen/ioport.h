@@ -100,16 +100,12 @@ extern int allocate_resource(struct resource *root, struct resource *new,
 #define request_region(start,n,name)	__request_region(&ioport_resource, (start), (n), (name))
 #define request_mem_region(start,n,name) __request_region(&iomem_resource, (start), (n), (name))
 
-extern struct resource * __request_region(struct resource *, unsigned long start, unsigned long n, const char *name);
-
-/* Compatibility cruft */
-#define check_region(start,n)	__check_region(&ioport_resource, (start), (n))
 #define release_region(start,n)	__release_region(&ioport_resource, (start), (n))
-#define check_mem_region(start,n)	__check_region(&iomem_resource, (start), (n))
 #define release_mem_region(start,n)	__release_region(&iomem_resource, (start), (n))
 
-extern int __check_region(struct resource *, unsigned long, unsigned long);
 extern void __release_region(struct resource *, unsigned long, unsigned long);
+
+extern struct resource * __request_region(struct resource *, unsigned long start, unsigned long n, const char *name);
 
 #define get_ioport_list(buf)	get_resource_list(&ioport_resource, buf, PAGE_SIZE)
 #define get_mem_list(buf)	get_resource_list(&iomem_resource, buf, PAGE_SIZE)

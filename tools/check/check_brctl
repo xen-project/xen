@@ -1,0 +1,9 @@
+#!/bin/bash
+# CHECK-INSTALL
+
+function error {
+   echo 'Check for the bridge control utils (brctl) failed.'
+   exit 1
+}
+
+brctl show || error

@@ -1,5 +1,5 @@
 #include <xen/config.h>
-#include <hypervisor-ifs/hypervisor-if.h>
+#include <public/xen.h>
 #include <asm/page.h>
 
 #define  SECONDARY_CPU_FLAG 0xA5A5A5A5
@@ -102,15 +102,15 @@ __start:
 
         /* Initialize low and high mappings of all memory with 4MB pages */
         mov     $idle_pg_table-__PAGE_OFFSET,%edi
-        mov     $0x1e3,%eax                  /* PRESENT+RW+A+D+4MB+GLOBAL */
+        mov     $0xe3,%eax                  /* PRESENT+RW+A+D+4MB */
 1:      mov     %eax,__PAGE_OFFSET>>20(%edi) /* high mapping */
         stosl                                /* low mapping */
         add     $(1<<L2_PAGETABLE_SHIFT),%eax
-        cmp     $DIRECTMAP_PHYS_END+0x1e3,%eax
+        cmp     $DIRECTMAP_PHYS_END+0xe3,%eax
         jne     1b
 1:      stosl   /* low mappings cover as much physmem as possible */
         add     $(1<<L2_PAGETABLE_SHIFT),%eax
-        cmp     $__HYPERVISOR_VIRT_START+0x1e3,%eax
+        cmp     $__HYPERVISOR_VIRT_START+0xe3,%eax
         jne     1b
         
         /* Initialise IDT with simple error defaults. */
@@ -150,7 +150,7 @@ start_paging:
         je      start_secondary
 
         /* Call into main C routine. This should never return.*/
-       	call	cmain
+       	call	__start_xen
         ud2     /* Force a panic (invalid opcode). */
 
 /* This is the default interrupt handler. */
@@ -169,7 +169,7 @@ ignore_int:
 /*** STACK LOCATION ***/
         
 ENTRY(stack_start)
-        .long SYMBOL_NAME(cpu0_stack) + 8100 - __PAGE_OFFSET
+        .long SYMBOL_NAME(cpu0_stack) + STACK_SIZE - 200 - __PAGE_OFFSET
         .long __HYPERVISOR_DS
         
 /*** DESCRIPTOR TABLES ***/
@@ -214,7 +214,7 @@ ENTRY(gdt_table)
         .org 0x1000
 ENTRY(idle_pg_table) # Initial page directory is 4kB
         .org 0x2000
-ENTRY(cpu0_stack)    # Initial stack is 8kB
-        .org 0x4000
+ENTRY(cpu0_stack)
+        .org 0x2000 + STACK_SIZE
 ENTRY(stext)
 ENTRY(_stext)

@@ -1,3 +1,4 @@
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /*
  *  linux/lib/vsprintf.c
  *
@@ -115,13 +116,13 @@ static int skip_atoi(const char **s)
     return i;
 }
 
-#define ZEROPAD	1		/* pad with zero */
-#define SIGN	2		/* unsigned/signed long */
-#define PLUS	4		/* show plus */
-#define SPACE	8		/* space if plus */
-#define LEFT	16		/* left justified */
-#define SPECIAL	32		/* 0x */
-#define LARGE	64		/* use 'ABCDEF' instead of 'abcdef' */
+#define ZEROPAD 1               /* pad with zero */
+#define SIGN    2               /* unsigned/signed long */
+#define PLUS    4               /* show plus */
+#define SPACE   8               /* space if plus */
+#define LEFT    16              /* left justified */
+#define SPECIAL 32              /* 0x */
+#define LARGE   64              /* use 'ABCDEF' instead of 'abcdef' */
 
 static char * number(char * buf, char * end, long long num, int base, int size, int precision, int type)
 {
@@ -239,14 +240,14 @@ int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
     char *str, *end, c;
     const char *s;
 
-    int flags;		/* flags to number() */
+    int flags;          /* flags to number() */
 
-    int field_width;	/* width of output field */
-    int precision;		/* min. # of digits for integers; max
-				   number of chars for from string */
-    int qualifier;		/* 'h', 'l', or 'L' for integer fields */
-				/* 'z' support added 23/7/1999 S.H.    */
-				/* 'z' changed to 'Z' --davidm 1/25/99 */
+    int field_width;    /* width of output field */
+    int precision;              /* min. # of digits for integers; max
+                                   number of chars for from string */
+    int qualifier;              /* 'h', 'l', or 'L' for integer fields */
+                                /* 'z' support added 23/7/1999 S.H.    */
+                                /* 'z' changed to 'Z' --davidm 1/25/99 */
 
     str = buf;
     end = buf + size - 1;
@@ -267,7 +268,7 @@ int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
         /* process flags */
         flags = 0;
     repeat:
-        ++fmt;		/* this also skips first '%' */
+        ++fmt;          /* this also skips first '%' */
         switch (*fmt) {
         case '-': flags |= LEFT; goto repeat;
         case '+': flags |= PLUS; goto repeat;
@@ -293,12 +294,12 @@ int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
         /* get the precision */
         precision = -1;
         if (*fmt == '.') {
-            ++fmt;	
+            ++fmt;
             if (isdigit(*fmt))
                 precision = skip_atoi(&fmt);
             else if (*fmt == '*') {
                 ++fmt;
-				/* it's the next argument */
+                          /* it's the next argument */
                 precision = va_arg(args, int);
             }
             if (precision < 0)
@@ -314,6 +315,10 @@ int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
                 qualifier = 'L';
                 ++fmt;
             }
+        }
+        if (*fmt == 'q') {
+            qualifier = 'L';
+            ++fmt;
         }
 
         /* default base */
@@ -377,8 +382,8 @@ int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
 
 
         case 'n':
-				/* FIXME:
-                                 * What does C99 say about the overflow case here? */
+            /* FIXME:
+             * What does C99 say about the overflow case here? */
             if (qualifier == 'l') {
                 long * ip = va_arg(args, long *);
                 *ip = (str - buf);
@@ -397,7 +402,7 @@ int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
             ++str;
             continue;
 
-				/* integer number formats - set up the flags and "break" */
+                        /* integer number formats - set up the flags and "break" */
         case 'o':
             base = 8;
             break;

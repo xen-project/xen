@@ -10,9 +10,9 @@ virtual machine monitor) is copyrighted by me and others who actually
 wrote it.
 
 Further note that the guest-OS interfacing header files, which
-includes all files within the subdirectory include/hypervisor-ifs, are
+includes all files within the subdirectory include/public, are
 *not* covered by the GPL but by a much weaker license:
- include/hypervisor-ifs/COPYING
+ include/public/COPYING
 
 Also note that the only valid version of the GPL as far as Xen is
 concerned is _this_ particular version of the license (i.e., *only*

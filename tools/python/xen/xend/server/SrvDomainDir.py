@@ -5,11 +5,13 @@ from StringIO import StringIO
 
 from twisted.protocols import http
 from twisted.web import error
+from twisted.python.failure import Failure
 
 from xen.xend import sxp
 from xen.xend import XendDomain
 from xen.xend.Args import FormFn
 from xen.xend.XendError import XendError
+from xen.xend.XendLogging import log
 
 from SrvDir import SrvDir
 from SrvDomain import SrvDomain
@@ -45,7 +47,7 @@ class SrvDomainDir(SrvDir):
         errmsg = ''
         try:
             configstring = req.args.get('config')[0]
-            print 'config:', configstring
+            #print 'op_create>', 'config:', configstring
             pin = sxp.Parser()
             pin.input(configstring)
             pin.input_eof()
@@ -58,18 +60,15 @@ class SrvDomainDir(SrvDir):
         except sxp.ParseError, ex:
             errmsg = 'Invalid configuration ' + str(ex)
         if not ok:
-            req.setResponseCode(http.BAD_REQUEST, errmsg)
-            return errmsg
+            raise XendError(errmsg)
         try:
             deferred = self.xd.domain_create(config)
             deferred.addCallback(self._op_create_cb, configstring, req)
-            deferred.addErrback(self._op_create_err, req)
             return deferred
         except Exception, ex:
             print 'op_create> Exception creating domain:'
             traceback.print_exc()
-            req.setResponseCode(http.BAD_REQUEST, "Error creating domain: " + str(ex))
-            return str(ex)
+            raise XendError("Error creating domain: " + str(ex))
 
     def _op_create_cb(self, dominfo, configstring, req):
         """Callback to handle deferred domain creation.
@@ -91,24 +90,15 @@ class SrvDomainDir(SrvDir):
             out.close()
             return val
 
-    def _op_create_err(self, err, req):
-        """Callback to handle errors in deferred domain creation.
-        """
-        print 'op_create> Deferred Exception creating domain:', err
-        req.setResponseCode(http.BAD_REQUEST, "Error creating domain: " + str(err))
-        return str(err)
-
     def op_restore(self, op, req):
         """Restore a domain from file.
 
         @return: deferred
         """
-        #todo: return is deferred. May need ok and err callbacks.
         fn = FormFn(self.xd.domain_restore,
                     [['file', 'str']])
         deferred = fn(req.args)
         deferred.addCallback(self._op_restore_cb, req)
-        #deferred.addErrback(self._op_restore_err, req)
         return deferred
 
     def _op_restore_cb(self, dominfo, req):
@@ -126,11 +116,6 @@ class SrvDomainDir(SrvDir):
             out.close()
             return val
 
-    def _op_restore_err(self, err, req):
-        print 'op_create> Deferred Exception restoring domain:', err
-        req.setResponseCode(http.BAD_REQUEST, "Error restoring domain: "+ str(err))
-        return str(err)
-        
     def render_POST(self, req):
         return self.perform(req)
 

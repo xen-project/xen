@@ -1,3 +1,4 @@
+/* -*-  Mode:C; c-basic-offset:8; tab-width:8; indent-tabs-mode:t -*- */
 /*
  *	Low-Level PCI Support for PC
  *
@@ -445,8 +446,9 @@ static struct pci_ops pci_direct_conf2 = {
 static int __devinit pci_sanity_check(struct pci_ops *o)
 {
 	u16 x;
-	struct pci_bus bus;		/* Fake bus and device */
-	struct pci_dev dev;
+	/* XEN: static is important to prevent stack overflow! */
+	static struct pci_bus bus;		/* Fake bus and device */
+	static struct pci_dev dev;
 
 	if (pci_probe & PCI_NO_CHECKS)
 		return 1;
@@ -682,7 +684,9 @@ static int __devinit pci_bios_find_device (unsigned short vendor, unsigned short
 {
 	unsigned short bx;
 	unsigned short ret;
+	unsigned long flags;
 
+	__save_flags(flags); __cli();
 	__asm__("lcall *(%%edi); cld\n\t"
 		"jc 1f\n\t"
 		"xor %%ah, %%ah\n"
@@ -694,6 +698,7 @@ static int __devinit pci_bios_find_device (unsigned short vendor, unsigned short
 		  "d" (vendor),
 		  "S" ((int) index),
 		  "D" (&pci_indirect));
+	__restore_flags(flags);
 	*bus = (bx >> 8) & 0xff;
 	*device_fn = bx & 0xff;
 	return (int) (ret & 0xff00) >> 8;
@@ -1000,6 +1005,7 @@ struct irq_routing_table * __devinit pcibios_get_irq_routing_table(void)
 	struct irq_routing_table *rt = NULL;
 	int ret, map;
 	unsigned long page;
+	unsigned long flags;
 
 	if (!pci_bios_present)
 		return NULL;
@@ -1011,6 +1017,7 @@ struct irq_routing_table * __devinit pcibios_get_irq_routing_table(void)
 	opt.segment = __KERNEL_DS;
 
 	DBG("PCI: Fetching IRQ routing table... ");
+	__save_flags(flags); __cli();
 	__asm__("push %%es\n\t"
 		"push %%ds\n\t"
 		"pop  %%es\n\t"
@@ -1026,11 +1033,12 @@ struct irq_routing_table * __devinit pcibios_get_irq_routing_table(void)
 		  "D" (&opt),
 		  "S" (&pci_indirect)
                 : "memory");
+	__restore_flags(flags);
 	DBG("OK  ret=%d, size=%d, map=%x\n", ret, opt.size, map);
 	if (ret & 0xff00)
 		printk(KERN_ERR "PCI: Error %02x when fetching IRQ routing table.\n", (ret >> 8) & 0xff);
 	else if (opt.size) {
-		rt = xmalloc(sizeof(struct irq_routing_table) + opt.size);
+		rt = xmalloc_bytes(sizeof(struct irq_routing_table) + opt.size);
 		if (rt) {
 			memset(rt, 0, sizeof(struct irq_routing_table));
 			rt->size = opt.size + sizeof(struct irq_routing_table);
@@ -1047,7 +1055,9 @@ struct irq_routing_table * __devinit pcibios_get_irq_routing_table(void)
 int pcibios_set_irq_routing(struct pci_dev *dev, int pin, int irq)
 {
 	int ret;
+	unsigned long flags;
 
+	__save_flags(flags); __cli();
 	__asm__("lcall *(%%esi); cld\n\t"
 		"jc 1f\n\t"
 		"xor %%ah, %%ah\n"
@@ -1057,6 +1067,7 @@ int pcibios_set_irq_routing(struct pci_dev *dev, int pin, int irq)
 		  "b" ((dev->bus->number << 8) | dev->devfn),
 		  "c" ((irq << 8) | (pin + 10)),
 		  "S" (&pci_indirect));
+	__restore_flags(flags);
 	return !(ret & 0xff00);
 }
 
@@ -1122,8 +1133,9 @@ static void __devinit pcibios_fixup_ghosts(struct pci_bus *b)
 static void __devinit pcibios_fixup_peer_bridges(void)
 {
 	int n;
-	struct pci_bus bus;
-	struct pci_dev dev;
+	/* XEN: static is important to prevent stack overflow! */
+	static struct pci_bus bus;
+	static struct pci_dev dev;
 	u16 l;
 
 	if (pcibios_last_bus <= 0 || pcibios_last_bus >= 0xff)
@@ -1363,11 +1375,9 @@ void __devinit  pcibios_fixup_bus(struct pci_bus *b)
 
 struct pci_bus * __devinit pcibios_scan_root(int busnum)
 {
-	struct list_head *list;
 	struct pci_bus *bus;
 
-	list_for_each(list, &pci_root_buses) {
-		bus = pci_bus_b(list);
+	pci_for_each_bus(bus) {
 		if (bus->number == busnum) {
 			/* Already scanned */
 			return bus;

@@ -4,7 +4,7 @@
  * TLB flushes are timestamped using a global virtual 'clock' which ticks
  * on any TLB flush on any processor.
  * 
- * Copyright (c) 2003, K A Fraser
+ * Copyright (c) 2003-2004, K A Fraser
  */
 
 #ifndef __FLUSHTLB_H__
@@ -13,39 +13,49 @@
 #include <xen/config.h>
 #include <xen/smp.h>
 
-/*
- * Every time the TLB clock passes an "epoch", every CPU's TLB is flushed.
- * Therefore, if the current TLB time and a previously-read timestamp differ
- * in their significant bits (i.e., ~TLBCLOCK_EPOCH_MASK), then the TLB clock
- * has wrapped at least once and every CPU's TLB is guaranteed to have been
- * flushed meanwhile.
- * This allows us to deal gracefully with a bounded (a.k.a. wrapping) clock.
- */
-#define TLBCLOCK_EPOCH_MASK ((1U<<16)-1)
+/* The current time as shown by the virtual TLB clock. */
+extern u32 tlbflush_clock;
+
+/* Time at which each CPU's TLB was last flushed. */
+extern u32 tlbflush_time[NR_CPUS];
+
+#define tlbflush_current_time() tlbflush_clock
 
 /*
- * 'cpu_stamp' is the current timestamp for the CPU we are testing.
- * 'lastuse_stamp' is a timestamp taken when the PFN we are testing was last 
+ * @cpu_stamp is the timestamp at last TLB flush for the CPU we are testing.
+ * @lastuse_stamp is a timestamp taken when the PFN we are testing was last 
  * used for a purpose that may have caused the CPU's TLB to become tainted.
  */
 static inline int NEED_FLUSH(u32 cpu_stamp, u32 lastuse_stamp)
 {
+    u32 curr_time = tlbflush_current_time();
     /*
-     * Why does this work?
-     *  1. XOR sets high-order bits determines if stamps from differing epochs.
-     *  2. Subtraction sets high-order bits if 'cpu_stamp > lastuse_stamp'.
-     * In either case a flush is unnecessary: we therefore OR the results from
-     * (1) and (2), mask the high-order bits, and return the inverse.
+     * Two cases:
+     *  1. During a wrap, the clock ticks over to 0 while CPUs catch up. For
+     *     safety during this period, we force a flush if @curr_time == 0.
+     *  2. Otherwise, we look to see if @cpu_stamp <= @lastuse_stamp.
+     *     To detect false positives because @cpu_stamp has wrapped, we
+     *     also check @curr_time. If less than @lastuse_stamp we definitely
+     *     wrapped, so there's no need for a flush (one is forced every wrap).
      */
-    return !(((lastuse_stamp^cpu_stamp)|(lastuse_stamp-cpu_stamp)) & 
-             ~TLBCLOCK_EPOCH_MASK);
+    return ((curr_time == 0) ||
+            ((cpu_stamp <= lastuse_stamp) &&
+             (lastuse_stamp <= curr_time)));
 }
 
-extern u32 tlbflush_clock;
-extern u32 tlbflush_time[NR_CPUS];
-
-extern void tlb_clocktick(void);
 extern void new_tlbflush_clock_period(void);
+
+/* Read pagetable base. */
+static inline unsigned long read_cr3(void)
+{
+    unsigned long cr3;
+    __asm__ __volatile__ (
+        "mov"__OS" %%cr3, %0" : "=r" (cr3) : );
+    return cr3;
+}
+
+/* Write pagetable base and implicitly tick the tlbflush clock. */
+extern void write_cr3(unsigned long cr3);
 
 /*
  * TLB flushing:
@@ -57,6 +67,12 @@ extern void new_tlbflush_clock_period(void);
  * ..but the i386 has somewhat limited tlb flushing capabilities,
  * and page-granular flushes are available only on i486 and up.
  */
+
+#define __flush_tlb()                                             \
+    do {                                                          \
+        unsigned long cr3 = read_cr3();                           \
+        write_cr3(cr3);                                           \
+    } while ( 0 )
 
 #ifndef CONFIG_SMP
 

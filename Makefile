@@ -2,164 +2,180 @@
 # Grand Unified Makefile for Xen.
 #
 
-INSTALL_DIR ?= $(shell pwd)/install
+# Default is to install to local 'dist' directory.
+DISTDIR ?= $(CURDIR)/dist
+DESTDIR ?= $(DISTDIR)/install
 
-SOURCEFORGE_MIRROR := http://heanet.dl.sourceforge.net/sourceforge
-#http://voxel.dl.sourceforge.net/sourceforge/
-#http://easynews.dl.sourceforge.net/sourceforge
+INSTALL		:= install
+INSTALL_DIR	:= $(INSTALL) -d -m0755
+INSTALL_DATA	:= $(INSTALL) -m0644
+INSTALL_PROG	:= $(INSTALL) -m0755
 
-.PHONY: docs delete-symlinks clean
+KERNELS ?= linux-2.6-xen0 linux-2.6-xenU
+# linux-2.4-xen0 linux-2.4-xenU netbsd-2.0-xenU
+# You may use wildcards in the above e.g. KERNELS=*2.4*
 
-# a not partcularly useful but safe default target
-all: make-symlinks
-	$(MAKE) prefix=$(INSTALL_DIR) dist=yes -C xen install
-	$(MAKE) prefix=$(INSTALL_DIR) dist=yes -C tools install
+ALLKERNELS = $(patsubst buildconfigs/mk.%,%,$(wildcard buildconfigs/mk.*))
+ALLSPARSETREES = $(patsubst %-xen-sparse,%,$(wildcard *-xen-sparse))
+XKERNELS := $(foreach kernel, $(KERNELS), $(patsubst buildconfigs/mk.%,%,$(wildcard buildconfigs/mk.$(kernel))) )
 
-# install everything into the standard system directories
-install: dist
+export DESTDIR
+
+# Export target architecture overrides to Xen and Linux sub-trees.
+ifneq ($(TARGET_ARCH),)
+SUBARCH := $(subst x86_32,i386,$(TARGET_ARCH))
+export TARGET_ARCH SUBARCH
+endif
+
+include buildconfigs/Rules.mk
+
+.PHONY:	all dist install xen tools kernels docs world clean mkpatches mrproper
+.PHONY:	kbuild kdelete kclean
+
+all: dist
+
+# build and install everything into the standard system directories
+install: install-xen install-tools install-kernels install-docs
+
+# build and install everything into local dist directory
+dist: xen tools kernels docs
+	$(INSTALL_DIR) $(DISTDIR)/check
+	$(INSTALL_DATA) ./COPYING $(DISTDIR)
+	$(INSTALL_DATA) ./README $(DISTDIR)
+	$(INSTALL_PROG) ./install.sh $(DISTDIR)
+	$(INSTALL_PROG) tools/check/chk tools/check/check_* $(DISTDIR)/check
+
+xen:
 	$(MAKE) -C xen install
+
+tools:
 	$(MAKE) -C tools install
-	$(shell cp -a install/boot/*$(LINUX_VER)* /boot/)
-	$(shell cp -a install/lib/modules/* /lib/modules/)
 
-# install xen and tools into the install directory
-dist: all
-	$(MAKE) linux-xenU
-	$(MAKE) linux-xen0
+kernels:
+	for i in $(XKERNELS) ; do $(MAKE) $$i-build || exit 1; done
 
-LINUX_RELEASE    ?= 2.4
-LINUX_VER        ?= $(shell ( /bin/ls -ld linux-$(LINUX_RELEASE).*-xen-sparse ) 2>/dev/null | \
-		      sed -e 's!^.*linux-\(.\+\)-xen-sparse!\1!' )
-LINUX26_VER      ?= $(shell ( /bin/ls -ld linux-2.6.*-xen-sparse ) 2>/dev/null | \
-		      sed -e 's!^.*linux-\(.\+\)-xen-sparse!\1!' )
-LINUX_CONFIG_DIR ?= $(INSTALL_DIR)/boot
-LINUX_SRC_PATH   ?= .:..
-LINUX_SRC        ?= $(firstword $(foreach dir,$(subst :, ,$(LINUX_SRC_PATH)),\
-                    $(wildcard $(dir)/linux-$(LINUX_VER).tar.*z*)))
+docs:
+	sh ./docs/check_pkgs && $(MAKE) -C docs install || true
 
-# search for a pristine kernel tar ball, or try downloading one
-pristine-linux-src: 
-ifeq ($(LINUX_SRC),)
-	@echo "Cannot find linux-$(LINUX_VER).tar.gz in path $(LINUX_SRC_PATH)"
-	@wget http://www.kernel.org/pub/linux/kernel/v$(LINUX_RELEASE)/linux-$(LINUX_VER).tar.bz2 -O./linux-$(LINUX_VER).tar.bz2
-LINUX_SRC := ./linux-$(LINUX_VER).tar.bz2 
-endif
+# Build all the various kernels and modules
+kbuild: kernels
 
-patches/ebtables-brnf-5_vs_2.4.25.diff:
-	mkdir -p patches
-	wget $(SOURCEFORGE_MIRROR)/ebtables/ebtables-brnf-5_vs_2.4.25.diff.gz \
-	     -O- | gunzip -c > $@
+# Delete the kernel build trees entirely
+kdelete:
+	for i in $(XKERNELS) ; do $(MAKE) $$i-delete ; done
 
-LINUX_TREES := linux-$(LINUX_VER)-xen0 linux-$(LINUX_VER)-xenU
+# Clean the kernel build trees
+kclean:
+	for i in $(XKERNELS) ; do $(MAKE) $$i-clean ; done
 
-# make a linux-xen build tree from a pristine kernel plus sparse tree
-ifeq ($(LINUX_RELEASE),2.4)
-mk-linux-trees: patches/ebtables-brnf-5_vs_2.4.25.diff pristine-linux-src 
-	$(RM) -rf $(LINUX_TREES)
-	echo $(LINUX_SRC) | grep -q bz2 && \
-	    tar -jxf $(LINUX_SRC) || tar -zxf $(LINUX_SRC)
-	mv linux-$(LINUX_VER) linux-$(LINUX_VER)-xen0
-	( cd linux-$(LINUX_VER)-xen-sparse ; \
-          ./mkbuildtree ../linux-$(LINUX_VER)-xen0 )
-	cp -al linux-$(LINUX_VER)-xen0 linux-$(LINUX_VER)-xenU
-	( cd linux-$(LINUX_VER)-xen0 ; \
-          patch -p1 -F3 < ../patches/ebtables-brnf-5_vs_2.4.25.diff )
-else
-mk-linux-trees: pristine-linux-src 
-	$(RM) -rf $(LINUX_TREES)
-	echo $(LINUX_SRC) | grep -q bz2 && \
-	    tar -jxf $(LINUX_SRC) || tar -zxf $(LINUX_SRC)
-	mv linux-$(LINUX_VER) linux-$(LINUX_VER)-xen0
-	( cd linux-$(LINUX_VER)-xen-sparse ; \
-          ./mkbuildtree ../linux-$(LINUX_VER)-xen0 )
-	cp -al linux-$(LINUX_VER)-xen0 linux-$(LINUX_VER)-xenU
-endif
+# Make patches from kernel sparse trees
+mkpatches:
+	for i in $(ALLSPARSETREES) ; do $(MAKE) $$i-xen.patch || exit 1; done
 
-# configure the specified linux tree
-CDIR = $(subst config-,linux-$(LINUX_VER)-,$@)
-ifeq ($(LINUX_RELEASE),2.4)
-config-xen%:
-	$(MAKE) -C $(CDIR) ARCH=xen mrproper
-	cp $(LINUX_CONFIG_DIR)/config-$(LINUX_VER)-$(subst config-,,$@) \
-	    $(CDIR)/.config || \
-	    $(MAKE) -C $(CDIR) ARCH=xen $(subst config-,,$@)_config
-	$(MAKE) -C $(CDIR) ARCH=xen oldconfig
-	$(MAKE) -C $(CDIR) ARCH=xen dep
-else
-config-xen%:
-	$(MAKE) -C $(CDIR) ARCH=xen mrproper
-	@[ -e $(LINUX_CONFIG_DIR)/config-$(LINUX_VER)-$(subst config-,,$@) ] \
-	  && cp $(LINUX_CONFIG_DIR)/config-$(LINUX_VER)-$(subst config-,,$@) \
-		$(CDIR)/.config || \
-	$(MAKE) -C $(CDIR) ARCH=xen $(subst config-,,$@)_defconfig
-endif
-
-# build the specified linux tree
-BDIR = $(subst linux-,linux-$(LINUX_VER)-,$@)
-linux-xen%:	
-	$(MAKE) -C $(BDIR) ARCH=xen modules
-	$(MAKE) -C $(BDIR) ARCH=xen INSTALL_MOD_PATH=$(INSTALL_DIR) \
-	    modules_install
-	$(MAKE) -C $(BDIR) ARCH=xen INSTALL_PATH=$(INSTALL_DIR) install
 
 # build xen, the tools, and a domain 0 plus unprivileged linux-xen images,
 # and place them in the install directory. 'make install' should then
 # copy them to the normal system directories
-world:
+world: 
 	$(MAKE) clean
-	$(MAKE) all
-	$(MAKE) mk-linux-trees
-	$(MAKE) config-xenU
-	$(MAKE) linux-xenU
-	$(MAKE) config-xen0
-	$(MAKE) linux-xen0
-	$(MAKE) docs
+	$(MAKE) kdelete
+	$(MAKE) dist
 
-linux26:
-	$(MAKE) LINUX_RELEASE=2.6 mk-linux-trees
-	$(MAKE) LINUX_RELEASE=2.6 config-xenU
-	$(MAKE) LINUX_RELEASE=2.6 linux-xenU
-	$(MAKE) LINUX_RELEASE=2.6 config-xen0
-	$(MAKE) LINUX_RELEASE=2.6 linux-xen0
-
-
-clean: delete-symlinks
+# clean doesn't do a kclean
+clean: 
 	$(MAKE) -C xen clean
 	$(MAKE) -C tools clean
 	$(MAKE) -C docs clean
 
-# clean, but blow away linux build tree plus src tar ball
+# clean, but blow away kernel build tree plus tar balls
 mrproper: clean
-	rm -rf install/* patches $(LINUX_TREES) linux-$(LINUX_VER).tar.*
+	rm -rf dist patches/tmp
+	for i in $(ALLKERNELS) ; do $(MAKE) $$i-delete ; done
+	for i in $(ALLSPARSETREES) ; do $(MAKE) $$i-mrproper ; done
 
-make-symlinks: delete-symlinks
-	ln -sf linux-$(LINUX26_VER)-xen-sparse linux-xen-sparse
-
-delete-symlinks:
-	$(RM) linux-xen-sparse
-
-# handy target to install twisted (use rpm or apt-get in preference)
 install-twisted:
 	wget http://www.twistedmatrix.com/products/get-current.epy
 	tar -zxf Twisted-*.tar.gz
-	( cd Twisted-* ; python setup.py install )
+	cd Twisted-* && python setup.py install
 
 install-logging: LOGGING=logging-0.4.9.2
 install-logging:
 	[ -f $(LOGGING).tar.gz ] || wget http://www.red-dove.com/$(LOGGING).tar.gz
 	tar -zxf $(LOGGING).tar.gz
-	( cd $(LOGGING) && python setup.py install )
+	cd $(LOGGING) && python setup.py install
 
 # handy target to upgrade iptables (use rpm or apt-get in preference)
 install-iptables:
 	wget http://www.netfilter.org/files/iptables-1.2.11.tar.bz2
-	tar -jxf iptables-*.tar.bz2
-	( cd iptables-* ; \
-	  make PREFIX= KERNEL_DIR=../linux-$(LINUX_VER)-xen0 install)
+	tar -jxf iptables-1.2.11.tar.bz2
+	$(MAKE) -C iptables-1.2.11 PREFIX= KERNEL_DIR=../linux-$(LINUX_VER)-xen0 install
 
+install-%: DESTDIR=
+install-%: %
+	@: # do nothing
+
+help:
+	@echo 'Installation targets:'
+	@echo '  install          - build and install everything'
+	@echo '  install-xen      - build and install the Xen hypervisor'
+	@echo '  install-tools    - build and install the control tools'
+	@echo '  install-kernels  - build and install guest kernels'
+	@echo '  install-docs     - build and install documentation'
+	@echo ''
+	@echo 'Building targets:'
+	@echo '  dist             - build and install everything into local dist directory'
+	@echo '  world            - clean everything, delete guest kernel build'
+	@echo '                     trees then make dist'
+	@echo '  xen              - build and install Xen hypervisor'
+	@echo '  tools            - build and install tools'
+	@echo '  kernels          - build and install guest kernels'
+	@echo '  kbuild           - synonym for make kernels'
+	@echo '  docs             - build and install docs'
+	@echo ''
+	@echo 'Cleaning targets:'
+	@echo '  clean            - clean the Xen, tools and docs (but not'
+	@echo '                     guest kernel) trees'
+	@echo '  mrproper         - clean plus delete kernel tarballs and kernel'
+	@echo '                     build trees'
+	@echo '  kdelete          - delete guest kernel build trees'
+	@echo '  kclean           - clean guest kernel build trees'
+	@echo ''
+	@echo 'Dependency installation targets:'
+	@echo '  install-twisted  - install the Twisted Matrix Framework'
+	@echo '  install-logging  - install the Python Logging package'
+	@echo '  install-iptables - install iptables tools'
+	@echo ''
+	@echo 'Miscellaneous targets:'
+	@echo '  mkpatches        - make patches against vanilla kernels from'
+	@echo '                     sparse trees'
+	@echo '  uninstall        - attempt to remove installed Xen tools (use'
+	@echo '                     with extreme care!)'
+
+# Use this target with extreme care!
+uninstall: DESTDIR=
+uninstall: D=$(DESTDIR)
 uninstall:
-	cp -a /etc/xen /etc/xen.old && rm -rf /etc/xen 
-	rm -rf "/usr/lib/python2.2/site-packages/xen* /usr/lib/libxc* /usr/lib/python2.2/site-packages/Xc*"
+	[ ! -d $(D)/etc/xen ] || mv -f $(D)/etc/xen $(D)/etc/xen.old
+	rm -rf $(D)/etc/init.d/xend*
+	rm -rf $(D)/usr/lib/libxc* $(D)/usr/lib/libxutil*
+	rm -rf $(D)/usr/lib/python/xen $(D)/usr/include/xen
+	rm -rf $(D)/usr/include/xcs_proto.h $(D)/usr/include/xc.h
+	rm -rf $(D)/usr/sbin/xcs $(D)/usr/sbin/xcsdump $(D)/usr/sbin/xen*
+	rm -rf $(D)/usr/sbin/netfix
+	rm -rf $(D)/usr/sbin/xfrd $(D)/usr/sbin/xm $(D)/var/lib/xen
+	rm -rf $(D)/usr/share/doc/xen  $(D)/usr/man/man*/xentrace*
+	rm -rf $(D)/usr/bin/xen* $(D)/usr/bin/miniterm
+	rm -rf $(D)/boot/*xen*
 
-docs:
-	$(MAKE) -C docs all || true
+# Legacy targets for compatibility
+linux24:
+	$(MAKE) linux-2.4-xen0-build
+	$(MAKE) linux-2.4-xenU-build
+
+linux26:
+	$(MAKE) linux-2.6-xen0-build
+	$(MAKE) linux-2.6-xenU-build
+
+netbsd20:
+	$(MAKE) netbsd-2.0-xenU-build
+

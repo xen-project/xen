@@ -615,6 +615,10 @@ static inline int IO_APIC_irq_trigger(int irq)
 
 int irq_vector[NR_IRQS] = { FIRST_DEVICE_VECTOR , 0 };
 
+#ifdef CONFIG_VMX
+int vector_irq[256];
+#endif
+
 static int __init assign_irq_vector(int irq)
 {
 	static int current_vector = FIRST_DEVICE_VECTOR, offset = 0;
@@ -637,6 +641,10 @@ next:
 		panic("ran out of interrupt sources!");
 
 	IO_APIC_VECTOR(irq) = current_vector;
+#ifdef CONFIG_VMX
+        vector_irq[current_vector] = irq;
+        printk("vector_irq[%x] = %d\n", current_vector, irq);
+#endif
 	return current_vector;
 }
 
@@ -1797,7 +1805,11 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
 	entry.trigger = edge_level;
 	entry.polarity = active_high_low;
 
-	add_pin_to_irq(irq, ioapic, pin);
+	/*
+	 * IRQs < 16 are already in the irq_2_pin[] map
+	 */
+	if (irq >= 16)
+		add_pin_to_irq(irq, ioapic, pin);
 
 	entry.vector = assign_irq_vector(irq);
 
@@ -1826,7 +1838,12 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
 
 #endif /*CONFIG_ACPI_BOOT*/
 
-extern char opt_leveltrigger[], opt_edgetrigger[];
+/* opt_leveltrigger, opt_edgetrigger: Force an IO-APIC-routed IRQ to be */
+/*                                    level- or edge-triggered.         */
+/* Example: 'leveltrigger=4,5,6,20 edgetrigger=21'. */
+static char opt_leveltrigger[30] = "", opt_edgetrigger[30] = "";
+string_param("leveltrigger", opt_leveltrigger);
+string_param("edgetrigger", opt_edgetrigger);
 
 static int __init ioapic_trigger_setup(void)
 {

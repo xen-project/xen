@@ -4,8 +4,12 @@
  * A Linux-style configuration list.
  */
 
-#ifndef __XEN_I386_CONFIG_H__
-#define __XEN_I386_CONFIG_H__
+#ifndef __X86_CONFIG_H__
+#define __X86_CONFIG_H__
+
+#ifdef __i386__
+#define CONFIG_VMX 1
+#endif
 
 #define CONFIG_X86 1
 
@@ -48,6 +52,8 @@
 
 #define HZ 100
 
+#define OPT_CONSOLE_STR "com1,vga"
+
 /*
  * Just to keep compiler happy.
  * NB. DO NOT CHANGE SMP_CACHE_BYTES WITHOUT FIXING arch/i386/entry.S!!!
@@ -55,11 +61,8 @@
  */
 #define SMP_CACHE_BYTES 64
 #define NR_CPUS 16
-#define __cacheline_aligned __attribute__((__aligned__(SMP_CACHE_BYTES)))
-#define ____cacheline_aligned __cacheline_aligned
 
 /* Linkage for x86 */
-#define asmlinkage        __attribute__((regparm(0)))
 #define __ALIGN .align 16,0x90
 #define __ALIGN_STR ".align 16,0x90"
 #define SYMBOL_NAME_STR(X) #X
@@ -80,7 +83,15 @@
 
 #ifndef NDEBUG
 #define MEMORY_GUARD
+#ifdef __x86_64__
+#define STACK_ORDER 2
 #endif
+#endif
+
+#ifndef STACK_ORDER
+#define STACK_ORDER 1
+#endif
+#define STACK_SIZE  (PAGE_SIZE << STACK_ORDER)
 
 #ifndef __ASSEMBLY__
 extern unsigned long _end; /* standard ELF symbol */
@@ -95,10 +106,21 @@ extern void __out_of_line_bug(int line) __attribute__((noreturn));
 
 #if defined(__x86_64__)
 
+#define asmlinkage
+
 #define XENHEAP_DEFAULT_MB (16)
 
 #define PML4_ENTRY_BITS  39
-#define PML4_ENTRY_BYTES (1UL<<PML4_ENTRY_BITS)
+#ifndef __ASSEMBLY__
+#define PML4_ENTRY_BYTES (1UL << PML4_ENTRY_BITS)
+#define PML4_ADDR(_slot)                             \
+    ((((_slot ## UL) >> 8) * 0xffff000000000000UL) | \
+     (_slot ## UL << PML4_ENTRY_BITS))
+#else
+#define PML4_ENTRY_BYTES (1 << PML4_ENTRY_BITS)
+#define PML4_ADDR(_slot)                             \
+    (((_slot >> 8) * 0xffff000000000000) | (_slot << PML4_ENTRY_BITS))
+#endif
 
 /*
  * Memory layout:
@@ -118,7 +140,13 @@ extern void __out_of_line_bug(int line) __attribute__((noreturn));
  *    Shadow linear page table.
  *  0xffff820000000000 - 0xffff827fffffffff [512GB, 2^39 bytes, PML4:260]
  *    Per-domain mappings (e.g., GDT, LDT).
- *  0xffff828000000000 - 0xffff8287ffffffff [512GB, 2^39 bytes, PML4:261]
+ *  0xffff828000000000 - 0xffff8283ffffffff [16GB,  2^34 bytes, PML4:261]
+ *    Machine-to-phys translation table.
+ *  0xffff828400000000 - 0xffff8287ffffffff [16GB,  2^34 bytes, PML4:261]
+ *    Page-frame information array.
+ *  0xffff828800000000 - 0xffff828bffffffff [16GB,  2^34 bytes, PML4:261]
+ *    ioremap()/fixmap area.
+ *  0xffff828c00000000 - 0xffff82ffffffffff [464GB,             PML4:261]
  *    Reserved for future use.
  *  0xffff830000000000 - 0xffff83ffffffffff [1TB,   2^40 bytes, PML4:262-263]
  *    1:1 direct mapping of all physical memory. Xen and its heap live here.
@@ -128,33 +156,55 @@ extern void __out_of_line_bug(int line) __attribute__((noreturn));
  *    Guest-defined use.
  */
 
+
+#define ROOT_PAGETABLE_FIRST_XEN_SLOT 256
+#define ROOT_PAGETABLE_LAST_XEN_SLOT  271
+#define ROOT_PAGETABLE_XEN_SLOTS \
+    (ROOT_PAGETABLE_LAST_XEN_SLOT - ROOT_PAGETABLE_FIRST_XEN_SLOT + 1)
+
 /* Hypervisor reserves PML4 slots 256 to 271 inclusive. */
-#define HYPERVISOR_VIRT_START   (0xFFFF800000000000UL)
-#define HYPERVISOR_VIRT_END     (0xFFFF880000000000UL)
+#define HYPERVISOR_VIRT_START   (PML4_ADDR(256))
+#define HYPERVISOR_VIRT_END     (HYPERVISOR_VIRT_START + PML4_ENTRY_BYTES*16)
 /* Slot 256: read-only guest-accessible machine-to-phys translation table. */
-#define RO_MPT_VIRT_START       (HYPERVISOR_VIRT_START)
+#define RO_MPT_VIRT_START       (PML4_ADDR(256))
 #define RO_MPT_VIRT_END         (RO_MPT_VIRT_START + PML4_ENTRY_BYTES/2)
 /* Slot 257: read-only guest-accessible linear page table. */
-#define RO_LINEAR_PT_VIRT_START (RO_MPT_VIRT_END + PML4_ENTRY_BYTES/2)
+#define RO_LINEAR_PT_VIRT_START (PML4_ADDR(257))
 #define RO_LINEAR_PT_VIRT_END   (RO_LINEAR_PT_VIRT_START + PML4_ENTRY_BYTES)
 /* Slot 258: linear page table (guest table). */
-#define LINEAR_PT_VIRT_START    (RO_LINEAR_PT_VIRT_END)
+#define LINEAR_PT_VIRT_START    (PML4_ADDR(258))
 #define LINEAR_PT_VIRT_END      (LINEAR_PT_VIRT_START + PML4_ENTRY_BYTES)
 /* Slot 259: linear page table (shadow table). */
-#define SH_LINEAR_PT_VIRT_START (LINEAR_PT_VIRT_END)
+#define SH_LINEAR_PT_VIRT_START (PML4_ADDR(259))
 #define SH_LINEAR_PT_VIRT_END   (SH_LINEAR_PT_VIRT_START + PML4_ENTRY_BYTES)
 /* Slot 260: per-domain mappings. */
-#define PERDOMAIN_VIRT_START    (SH_LINEAR_PT_VIRT_END)
+#define PERDOMAIN_VIRT_START    (PML4_ADDR(260))
 #define PERDOMAIN_VIRT_END      (PERDOMAIN_VIRT_START + PML4_ENTRY_BYTES)
+/* Slot 261: machine-to-phys conversion table (16GB). */
+#define RDWR_MPT_VIRT_START     (PML4_ADDR(261))
+#define RDWR_MPT_VIRT_END       (RDWR_MPT_VIRT_START + (16UL<<30))
+/* Slot 261: page-frame information array (16GB). */
+#define FRAMETABLE_VIRT_START   (RDWR_MPT_VIRT_END)
+#define FRAMETABLE_VIRT_END     (FRAMETABLE_VIRT_START + (16UL<<30))
+/* Slot 261: ioremap()/fixmap area (16GB). */
+#define IOREMAP_VIRT_START      (FRAMETABLE_VIRT_END)
+#define IOREMAP_VIRT_END        (IOREMAP_VIRT_START + (16UL<<30))
 /* Slot 262-263: A direct 1:1 mapping of all of physical memory. */
-#define DIRECTMAP_VIRT_START    (PERDOMAIN_VIRT_END + PML4_ENTRY_BYTES)
+#define DIRECTMAP_VIRT_START    (PML4_ADDR(262))
 #define DIRECTMAP_VIRT_END      (DIRECTMAP_VIRT_START + PML4_ENTRY_BYTES*2)
 
 #define PGT_base_page_table PGT_l4_page_table
 
 #define __HYPERVISOR_CS64 0x0810
 #define __HYPERVISOR_CS32 0x0808
-#define __HYPERVISOR_DS 0x0818
+#define __HYPERVISOR_CS   __HYPERVISOR_CS64
+#define __HYPERVISOR_DS64 0x0000
+#define __HYPERVISOR_DS32 0x0818
+#define __HYPERVISOR_DS   __HYPERVISOR_DS64
+
+#define __GUEST_CS        0x0833
+#define __GUEST_DS        0x0000
+#define __GUEST_SS        0x082b
 
 /* For generic assembly code: use macros to define operation/operand sizes. */
 #define __OS "q"  /* Operation Suffix */
@@ -162,12 +212,21 @@ extern void __out_of_line_bug(int line) __attribute__((noreturn));
 
 #elif defined(__i386__)
 
+#define asmlinkage __attribute__((regparm(0)))
+
 #define XENHEAP_DEFAULT_MB (12)
-#define DIRECTMAP_PHYS_END (40*1024*1024)
+#define DIRECTMAP_PHYS_END (12*1024*1024)
 
 /* Hypervisor owns top 64MB of virtual address space. */
 #define __HYPERVISOR_VIRT_START  0xFC000000
 #define HYPERVISOR_VIRT_START   (0xFC000000UL)
+
+#define ROOT_PAGETABLE_FIRST_XEN_SLOT \
+    (HYPERVISOR_VIRT_START >> L2_PAGETABLE_SHIFT)
+#define ROOT_PAGETABLE_LAST_XEN_SLOT  \
+    (~0UL >> L2_PAGETABLE_SHIFT)
+#define ROOT_PAGETABLE_XEN_SLOTS \
+    (ROOT_PAGETABLE_LAST_XEN_SLOT - ROOT_PAGETABLE_FIRST_XEN_SLOT + 1)
 
 /*
  * First 4MB are mapped read-only for all. It's for the machine->physical
@@ -175,17 +234,17 @@ extern void __out_of_line_bug(int line) __attribute__((noreturn));
  */
 #define RO_MPT_VIRT_START     (HYPERVISOR_VIRT_START)
 #define RO_MPT_VIRT_END       (RO_MPT_VIRT_START + (4*1024*1024))
-/* The virtual addresses for the 40MB direct-map region. */
+/* Xen heap extends to end of 1:1 direct-mapped memory region. */
 #define DIRECTMAP_VIRT_START  (RO_MPT_VIRT_END)
 #define DIRECTMAP_VIRT_END    (DIRECTMAP_VIRT_START + DIRECTMAP_PHYS_END)
-#define XENHEAP_VIRT_START    (DIRECTMAP_VIRT_START)
-#define XENHEAP_VIRT_END      (XENHEAP_VIRT_START + (XENHEAP_DEFAULT_MB<<20))
-#define RDWR_MPT_VIRT_START   (XENHEAP_VIRT_END)
+/* Machine-to-phys conversion table. */
+#define RDWR_MPT_VIRT_START   (DIRECTMAP_VIRT_END)
 #define RDWR_MPT_VIRT_END     (RDWR_MPT_VIRT_START + (4*1024*1024))
+/* Variable-length page-frame information array. */
 #define FRAMETABLE_VIRT_START (RDWR_MPT_VIRT_END)
-#define FRAMETABLE_VIRT_END   (DIRECTMAP_VIRT_END)
+#define FRAMETABLE_VIRT_END   (FRAMETABLE_VIRT_START + (24*1024*1024))
 /* Next 4MB of virtual address space is used as a linear p.t. mapping. */
-#define LINEAR_PT_VIRT_START  (DIRECTMAP_VIRT_END)
+#define LINEAR_PT_VIRT_START  (FRAMETABLE_VIRT_END)
 #define LINEAR_PT_VIRT_END    (LINEAR_PT_VIRT_START + (4*1024*1024))
 /* Next 4MB of virtual address space is used as a shadow linear p.t. map. */
 #define SH_LINEAR_PT_VIRT_START (LINEAR_PT_VIRT_END)
@@ -215,10 +274,13 @@ extern void __out_of_line_bug(int line) __attribute__((noreturn));
 extern unsigned long xenheap_phys_end; /* user-configurable */
 #endif
 
-#define GDT_VIRT_START        (PERDOMAIN_VIRT_START)
-#define GDT_VIRT_END          (GDT_VIRT_START + (64*1024))
-#define LDT_VIRT_START        (GDT_VIRT_END)
-#define LDT_VIRT_END          (LDT_VIRT_START + (64*1024))
+#define GDT_VIRT_START(ed)    (PERDOMAIN_VIRT_START + ((ed)->eid << PDPT_VCPU_VA_SHIFT))
+#define GDT_VIRT_END(ed)      (GDT_VIRT_START(ed) + (64*1024))
+#define LDT_VIRT_START(ed)    (PERDOMAIN_VIRT_START + (64*1024) + ((ed)->eid << PDPT_VCPU_VA_SHIFT))
+#define LDT_VIRT_END(ed)      (LDT_VIRT_START(ed) + (64*1024))
+
+#define PDPT_VCPU_SHIFT       5
+#define PDPT_VCPU_VA_SHIFT    (PDPT_VCPU_SHIFT + PAGE_SHIFT)
 
 #if defined(__x86_64__)
 #define ELFSIZE 64
@@ -226,4 +288,4 @@ extern unsigned long xenheap_phys_end; /* user-configurable */
 #define ELFSIZE 32
 #endif
 
-#endif /* __XEN_I386_CONFIG_H__ */
+#endif /* __X86_CONFIG_H__ */

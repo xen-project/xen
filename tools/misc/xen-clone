@@ -17,12 +17,13 @@ UCCL)
 *)
 	BK_REP=${1:-bk://xen.bkbits.net/xeno-1.0.bk}
 	# BK_REP=${1:-ssh://xen@xen.bkbits.net/xeno-1.0.bk}
-	LINUX_DIR=${3:-..}
+	LINUX_DIR=${3:-.:..}
 ;;
 esac
 
 DEST_DIR=${2:-xeno-clone}
 DEST_BK_REP=`basename "${BK_REP}"`
+DEST_VER=`basename ${DEST_BK_REP} .bk`
 
 echo usage: xen-clone bk_repository dest_dir orig_linux_dir
 echo Source BK Repository : ${BK_REP}
@@ -65,18 +66,23 @@ if [ -d ${DEST_BK_REP}/linux-2.4.*-xen-sparse ]
 then
  # this is a new style Xen repository so building is dead easy
 
- LINUX_VER=`( /bin/ls -ld ${DEST_BK_REP}/*linux-2.4.*-xen-sparse ) 2>/dev/null | sed -e 's!^.*linux-\(.\+\)-xen-sparse!\1!'`
-
- if [ -e ${LINUX_DIR}/linux-${LINUX_VER}.tar.gz ] 
- then
-  export LINUX_SRC=${LINUX_DIR}/linux-${LINUX_VER}.tar.gz
- fi
+ export LINUX_SRC_PATH=${LINUX_DIR}
 
  cd ${DEST_BK_REP} 
- ln -sf ../install install
+
+ # Recent repositories install into 'dist/install' rather than 'install'.
+ if [ -f install.sh ]
+ then
+  mkdir -p dist
+  ln -sf ../../install dist/install
+ else
+  ln -sf ../install install
+ fi
+
  make -j4 world
+ make -j4 linux24
  cd ../install/boot
- [ -r vmlinuz-${LINUX_VER}-xen0 ] && ln -s vmlinuz-${LINUX_VER}-xen0 xenolinux.gz
+ [ -r vmlinuz-2.6.*-xen0 ] && ln -s vmlinuz-2.6.*-xen0 xenolinux.gz
   
 else
  # old style repository without 'make world'

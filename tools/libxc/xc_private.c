@@ -4,136 +4,10 @@
  * Helper functions for the rest of the library.
  */
 
+#include <zlib.h>
 #include "xc_private.h"
 
-#define MAX_EXTENTS 8
-typedef struct {
-    int fd;
-    struct {
-        void         *base; 
-        unsigned long length;
-    } extent[MAX_EXTENTS];
-} mapper_desc_t;
-
-void *init_pfn_mapper(domid_t domid)
-{
-    int            fd = open("/dev/mem", O_RDWR);
-    mapper_desc_t *desc;
-
-    if ( fd < 0 )
-        return NULL;
-
-    if ( (desc = malloc(sizeof(*desc))) == NULL )
-    {
-        close(fd);
-        return NULL;
-    }
-
-    (void)ioctl(fd, _IO('M', 1), (unsigned long)domid);
-
-    memset(desc, 0, sizeof(*desc));
-    desc->fd = fd;
-
-    return desc;
-}
-
-int close_pfn_mapper(void *pm_handle)
-{
-    mapper_desc_t *desc = pm_handle;
-    int            i;
-
-    for ( i = 0; i < MAX_EXTENTS; i++ )
-    {
-        if ( desc->extent[i].base != NULL )
-            (void)munmap(desc->extent[i].base, desc->extent[i].length);
-    }
-
-    close(desc->fd);
-    free(desc);
-
-    return 0;
-}
-
-static int get_free_offset(mapper_desc_t *desc)
-{
-    int i;
-
-    for ( i = 0; i < MAX_EXTENTS; i++ )
-    {
-        if ( desc->extent[i].base == NULL )
-            break;
-    }
-
-    if ( i == MAX_EXTENTS )
-    {
-        fprintf(stderr, "Extent overflow in map_pfn_*()!\n");
-        fflush(stderr);
-        *(int*)0=0; /* XXX */
-    }
-
-    return i;
-}
-
-void *map_pfn_writeable(void *pm_handle, unsigned long pfn)
-{
-    mapper_desc_t *desc = pm_handle;
-    void          *vaddr;
-    int            off;
-
-    vaddr = mmap(NULL, PAGE_SIZE, PROT_READ|PROT_WRITE,
-                 MAP_SHARED, desc->fd, pfn << PAGE_SHIFT);
-    if ( vaddr == MAP_FAILED )
-        return NULL;
-
-    off = get_free_offset(desc);
-    desc->extent[off].base   = vaddr;
-    desc->extent[off].length = PAGE_SIZE;
-
-    return vaddr;
-}
-
-void *map_pfn_readonly(void *pm_handle, unsigned long pfn)
-{
-    mapper_desc_t *desc = pm_handle;
-    void          *vaddr;
-    int            off;
-
-    vaddr = mmap(NULL, PAGE_SIZE, PROT_READ,
-                 MAP_SHARED, desc->fd, pfn << PAGE_SHIFT);
-    if ( vaddr == MAP_FAILED )
-        return NULL;
-
-    off = get_free_offset(desc);
-    desc->extent[off].base   = vaddr;
-    desc->extent[off].length = PAGE_SIZE;
-
-    return vaddr;
-}
-
-void unmap_pfn(void *pm_handle, void *vaddr)
-{
-    mapper_desc_t *desc = pm_handle;
-    int            i;
-    unsigned long  len = 0;
-
-    for ( i = 0; i < MAX_EXTENTS; i++ )
-    {
-        if ( desc->extent[i].base == vaddr )
-        {
-            desc->extent[i].base = NULL;
-            len = desc->extent[i].length;
-        }
-    }
-
-    if ( len == 0 )
-        *(int*)0 = 0; /* XXX */
-
-    (void)munmap(vaddr, len);
-}
-
-/*******************/
-
-void *mfn_mapper_map_batch(int xc_handle, domid_t dom, int prot,
+void *xc_map_foreign_batch(int xc_handle, u32 dom, int prot,
                            unsigned long *arr, int num )
 {
     privcmd_mmapbatch_t ioctlx; 
@@ -158,7 +32,7 @@ void *mfn_mapper_map_batch(int xc_handle, domid_t dom, int prot,
 
 /*******************/
 
-void *mfn_mapper_map_single(int xc_handle, domid_t dom,
+void *xc_map_foreign_range(int xc_handle, u32 dom,
                             int size, int prot,
                             unsigned long mfn )
 {
@@ -228,11 +102,9 @@ static int flush_mmu_updates(int xc_handle, mmu_t *mmu)
     if ( mmu->idx == FIRST_MMU_UPDATE )
         return 0;
 
-    /* The first two requests set the correct subject domain (PTS and GPS). */
-    mmu->updates[0].val  = (unsigned long)(mmu->subject<<16) & ~0xFFFFUL;
-    mmu->updates[0].ptr  = (unsigned long)(mmu->subject<< 0) & ~0xFFFFUL;
-    mmu->updates[0].ptr |= MMU_EXTENDED_COMMAND;
-    mmu->updates[0].val |= MMUEXT_SET_SUBJECTDOM | SET_PAGETABLE_SUBJECTDOM;
+    mmu->updates[0].ptr  = MMU_EXTENDED_COMMAND;
+    mmu->updates[0].val  = MMUEXT_SET_FOREIGNDOM;
+    mmu->updates[0].val |= (unsigned long)mmu->subject << 16;
 
     hypercall.op     = __HYPERVISOR_mmu_update;
     hypercall.arg[0] = (unsigned long)mmu->updates;
@@ -288,15 +160,16 @@ int finish_mmu_updates(int xc_handle, mmu_t *mmu)
 }
 
 
-long long  xc_domain_get_cpu_usage( int xc_handle, domid_t domid )
+long long xc_domain_get_cpu_usage( int xc_handle, domid_t domid, int vcpu )
 {
     dom0_op_t op;
 
     op.cmd = DOM0_GETDOMAININFO;
     op.u.getdomaininfo.domain = (domid_t)domid;
+    op.u.getdomaininfo.exec_domain = (u16)vcpu;
     op.u.getdomaininfo.ctxt = NULL;
     if ( (do_dom0_op(xc_handle, &op) < 0) || 
-         ((u32)op.u.getdomaininfo.domain != domid) )
+         ((u16)op.u.getdomaininfo.domain != domid) )
     {
         PERROR("Could not get info on domain");
         return -1;
@@ -316,4 +189,165 @@ unsigned long csum_page (void * page)
         sum += p[i];
 
     return sum ^ (sum>>32);
+}
+
+unsigned long xc_get_m2p_start_mfn ( int xc_handle )
+{
+    unsigned long mfn;
+
+    if ( ioctl( xc_handle, IOCTL_PRIVCMD_GET_MACH2PHYS_START_MFN, &mfn ) < 0 )
+    {
+	perror("xc_get_m2p_start_mfn:");
+	return 0;
+    }
+    return mfn;
+}
+
+int xc_get_pfn_list(int xc_handle,
+		 u32 domid, 
+		 unsigned long *pfn_buf, 
+		 unsigned long max_pfns)
+{
+    dom0_op_t op;
+    int ret;
+    op.cmd = DOM0_GETMEMLIST;
+    op.u.getmemlist.domain   = (domid_t)domid;
+    op.u.getmemlist.max_pfns = max_pfns;
+    op.u.getmemlist.buffer   = pfn_buf;
+
+
+    if ( mlock(pfn_buf, max_pfns * sizeof(unsigned long)) != 0 )
+    {
+        PERROR("Could not lock pfn list buffer");
+        return -1;
+    }    
+
+    ret = do_dom0_op(xc_handle, &op);
+
+    (void)munlock(pfn_buf, max_pfns * sizeof(unsigned long));
+
+#if 0
+#ifdef DEBUG
+	DPRINTF(("Ret for xc_get_pfn_list is %d\n", ret));
+	if (ret >= 0) {
+		int i, j;
+		for (i = 0; i < op.u.getmemlist.num_pfns; i += 16) {
+			fprintf(stderr, "0x%x: ", i);
+			for (j = 0; j < 16; j++)
+				fprintf(stderr, "0x%lx ", pfn_buf[i + j]);
+			fprintf(stderr, "\n");
+		}
+	}
+#endif
+#endif
+
+    return (ret < 0) ? -1 : op.u.getmemlist.num_pfns;
+}
+
+long xc_get_tot_pages(int xc_handle, u32 domid)
+{
+    dom0_op_t op;
+    op.cmd = DOM0_GETDOMAININFO;
+    op.u.getdomaininfo.domain = (domid_t)domid;
+    op.u.getdomaininfo.exec_domain = 0;
+    op.u.getdomaininfo.ctxt = NULL;
+    return (do_dom0_op(xc_handle, &op) < 0) ? 
+        -1 : op.u.getdomaininfo.tot_pages;
+}
+
+int xc_copy_to_domain_page(int xc_handle,
+                                   u32 domid,
+                                   unsigned long dst_pfn, 
+                                   void *src_page)
+{
+    void *vaddr = xc_map_foreign_range(
+        xc_handle, domid, PAGE_SIZE, PROT_WRITE, dst_pfn);
+    if ( vaddr == NULL )
+        return -1;
+    memcpy(vaddr, src_page, PAGE_SIZE);
+    munmap(vaddr, PAGE_SIZE);
+    return 0;
+}
+
+unsigned long xc_get_filesz(int fd)
+{
+    u16 sig;
+    u32 _sz = 0;
+    unsigned long sz;
+
+    lseek(fd, 0, SEEK_SET);
+    read(fd, &sig, sizeof(sig));
+    sz = lseek(fd, 0, SEEK_END);
+    if ( sig == 0x8b1f ) /* GZIP signature? */
+    {
+        lseek(fd, -4, SEEK_END);
+        read(fd, &_sz, 4);
+        sz = _sz;
+    }
+    lseek(fd, 0, SEEK_SET);
+
+    return sz;
+}
+
+char *xc_read_kernel_image(const char *filename, unsigned long *size)
+{
+    int kernel_fd = -1;
+    gzFile kernel_gfd = NULL;
+    char *image = NULL;
+    unsigned int bytes;
+
+    if ( (kernel_fd = open(filename, O_RDONLY)) < 0 )
+    {
+        PERROR("Could not open kernel image");
+        goto out;
+    }
+
+    *size = xc_get_filesz(kernel_fd);
+
+    if ( (kernel_gfd = gzdopen(kernel_fd, "rb")) == NULL )
+    {
+        PERROR("Could not allocate decompression state for state file");
+        goto out;
+    }
+
+    if ( (image = malloc(*size)) == NULL )
+    {
+        PERROR("Could not allocate memory for kernel image");
+        goto out;
+    }
+
+    if ( (bytes = gzread(kernel_gfd, image, *size)) != *size )
+    {
+        PERROR("Error reading kernel image, could not"
+               " read the whole image (%d != %ld).", bytes, *size);
+        free(image);
+        image = NULL;
+    }
+
+ out:
+    if ( kernel_gfd != NULL )
+        gzclose(kernel_gfd);
+    else if ( kernel_fd >= 0 )
+        close(kernel_fd);
+    return image;
+}
+
+void xc_map_memcpy(unsigned long dst, char *src, unsigned long size,
+                   int xch, u32 dom, unsigned long *parray,
+                   unsigned long vstart)
+{
+    char *va;
+    unsigned long chunksz, done, pa;
+
+    for ( done = 0; done < size; done += chunksz )
+    {
+        pa = dst + done - vstart;
+        va = xc_map_foreign_range(
+            xch, dom, PAGE_SIZE, PROT_WRITE, parray[pa>>PAGE_SHIFT]);
+        chunksz = size - done;
+        if ( chunksz > (PAGE_SIZE - (pa & (PAGE_SIZE-1))) )
+            chunksz = PAGE_SIZE - (pa & (PAGE_SIZE-1));
+        memcpy(va + (pa & (PAGE_SIZE-1)), src + done, chunksz);
+        munmap(va, PAGE_SIZE);
+    }
 }

@@ -1,45 +1,75 @@
+
+ifndef BUILD_PIC_LIBS
+ifeq ($(wildcard /etc/debian_version),)
+BUILD_PIC_LIBS=n
+else
+BUILD_PIC_LIBS=y
+endif
+endif
+
 XEN_ROOT = ../..
-include $(XEN_ROOT)/tools/Make.defs
+INSTALL		= install
+INSTALL_DATA	= $(INSTALL) -m0644
+INSTALL_PROG	= $(INSTALL) -m0755
+INSTALL_DIR	= $(INSTALL) -d -m0755
+
+include $(XEN_ROOT)/tools/Rules.mk
 
 CC = gcc
 
 LIB_SRCS :=
 LIB_SRCS += allocate.c
+LIB_SRCS += enum.c
 LIB_SRCS += file_stream.c
 LIB_SRCS += gzip_stream.c
+LIB_SRCS += hash_table.c
 LIB_SRCS += iostream.c
-#LIB_SRCS += sys_net.c
+LIB_SRCS += lexis.c
+LIB_SRCS += string_stream.c
+LIB_SRCS += sxpr.c
+LIB_SRCS += sxpr_parser.c
+LIB_SRCS += sys_net.c
 LIB_SRCS += sys_string.c
+LIB_SRCS += util.c
 
 LIB_OBJS := $(LIB_SRCS:.c=.o)
+PIC_OBJS := $(LIB_SRCS:.c=.opic)
 
-CFLAGS   += -Wall
-CFLAGS   += -Werror
-CFLAGS   += -g
-CFLAGS   += -O3
-CFLAGS   += -fno-strict-aliasing
+CFLAGS   += -Wall -Werror -O3 -fno-strict-aliasing
 
 # Get gcc to generate the dependencies for us.
 CFLAGS   += -Wp,-MD,.$(@F).d
 DEPS     = .*.d
 
-MAJOR    := 1.3
+MAJOR    := 3.0
 MINOR    := 0
-LIB_NAME := libxutil
-LIB      := $(LIB_NAME).so 
-LIB      += $(LIB_NAME).so.$(MAJOR)
-LIB      += $(LIB_NAME).so.$(MAJOR).$(MINOR)
+LIB      := libxutil.so 
+LIB      += libxutil.so.$(MAJOR)
+LIB      += libxutil.so.$(MAJOR).$(MINOR)
+LIB      += libxutil.a
 
-all: check-for-zlib $(LIB)
+all: check-for-zlib
+	$(MAKE) $(LIB)
 
-$(LIB_NAME).so:
-	ln -sf $(LIB_NAME).so.$(MAJOR) $@
+$(PIC_OBJS): %.opic: %.c
+	$(CC) $(CPPFLAGS) -DPIC $(CFLAGS) -fPIC -c -o $@ $<
 
-$(LIB_NAME).so.$(MAJOR):
-	ln -sf $(LIB_NAME).so.$(MAJOR).$(MINOR) $@
+libxutil.so: libxutil.so.$(MAJOR)
+	ln -sf $^ $@
 
-$(LIB_NAME).so.$(MAJOR).$(MINOR): $(LIB_OBJS)
-	$(CC) -Wl,-soname -Wl,$(LIB_NAME).so.$(MAJOR) -shared -o $@ $^
+libxutil.so.$(MAJOR): libxutil.so.$(MAJOR).$(MINOR)
+	ln -sf $^ $@
+
+ifeq ($(BUILD_PIC_LIBS),y)
+libxutil.so.$(MAJOR).$(MINOR): $(PIC_OBJS)
+	$(CC) -Wl,-soname -Wl,libxutil.so.$(MAJOR) -shared -o $@ $^
+else
+libxutil.so.$(MAJOR).$(MINOR): $(LIB_OBJS)
+	$(CC) -Wl,-soname -Wl,libxutil.so.$(MAJOR) -shared -o $@ $^
+endif
+
+libxutil.a: $(LIB_OBJS)
+	$(AR) rc $@ $^
 
 check-for-zlib:
 	@if [ ! -e /usr/include/zlib.h ]; then \
@@ -50,11 +80,14 @@ check-for-zlib:
 	fi
 
 install: all
-	mkdir -p $(prefix)/usr/lib
-	install -m0755 $(LIB) $(prefix)/usr/lib
+	[ -d $(DESTDIR)/usr/lib ] || $(INSTALL_DIR) -p $(DESTDIR)/usr/lib
+	$(INSTALL_PROG) libxutil.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/lib
+	$(INSTALL_DATA) libxutil.a $(DESTDIR)/usr/lib
+	ln -sf libxutil.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/lib/libxutil.so.$(MAJOR)
+	ln -sf libxutil.so.$(MAJOR) $(DESTDIR)/usr/lib/libxutil.so
 
 clean:
-	$(RM) *.a *.so *.o *.rpm $(LIB)
+	$(RM) *.a *.so* *.o *.opic *.rpm 
 	$(RM) *~
 	$(RM) $(DEPS)
 

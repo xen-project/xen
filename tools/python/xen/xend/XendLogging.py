@@ -18,6 +18,9 @@ class XendLogging:
     dateFormat = "%Y-%m-%d %H:%M:%S"
 
     def __init__(self, filename, level=logging.INFO, maxBytes=None, backupCount=None):
+        """Initialise logging. Logs to 'filename' by default, but does not log to
+        stderr unless addLogStderr() is called.
+        """
         self.setLevel(level)
         if maxBytes:
             self.maxBytes = maxBytes
@@ -25,7 +28,6 @@ class XendLogging:
             self.backupCount = backupCount
         self.initLogFile(filename)
         self.initLogStderr()
-        pass
 
     def setLevel(self, level):
         if isinstance(level, types.StringType):
@@ -40,6 +42,8 @@ class XendLogging:
         return logging.getLogger("xend")
 
     def initLogFile(self, filename):
+        """Create the file logger and add it.
+        """
         self.logfile = RotatingFileHandler(filename,
                                            mode='a',
                                            maxBytes=self.maxBytes,
@@ -56,9 +60,18 @@ class XendLogging:
         return self.logfilename
 
     def initLogStderr(self):
+        """Create the stderr logger, but don't add it.
+        """
         self.logstderr = StreamHandler()
         self.logstderr.setFormatter(Formatter(self.logStderrFormat, self.dateFormat))
+
+    def addLogStderr(self):
+        """Add logging to stderr."""
         self.getLogger().addHandler(self.logstderr)
+
+    def removeLogStderr(self):
+        """Remove logging to stderr."""
+        self.getLogger().removeHandler(self.logstderr)
         
     def getLogStderr(self):
         return self.logstderr

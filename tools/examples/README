@@ -1,138 +1,17 @@
-Xen Control Tools - Example Scripts
+Xen Control Tools - Examples
 ===================================
 
-This directory contains a set of example scripts for common Xen operations.
+This directory contains example scripts and configurations for Xen.
 For many operations you will either be able to use these scripts directly, or
 incorporate code from them into your own scripts.
-
-The Xc and xenctl.utils Python modules provide an API for accessing all this
-functionality - and more - from your own Python programs.  These libraries may
-contain features for which there aren't yet example scripts written for...
 
 If you write a useful script and would like to share it, please do
 send it (preferably with a little summary to go in this file) to
 <xen-devel@lists.sourceforge.net> so we can add it to this directory.
 
-xc_dom_control.py
- - general tool for controling running domains
-  Usage: xc_dom_control.py [command] <params>
+network             - default network setup script called by xend at startup.
+vif-bridge          - default virtual network interface setup script.
+xend-config.sxp     - default xend configuration file.
+xmexample1          - example configuration script for 'xm create'.
+xmexample2          - a more complex configuration script for 'xm create'.
 
-  stop      [dom]        -- pause a domain
-  start     [dom]        -- un-pause a domain
-  shutdown  [dom] [[-w]] -- request a domain to shutdown (can specify 'all')
-                            (optionally wait for complete shutdown)
-  destroy   [dom]        -- immediately terminate a domain
-  pincpu    [dom] [cpu]  -- pin a domain to the specified CPU
-  suspend   [dom] [file] -- write domain's memory to a file and terminate
-			    (resume by re-running xc_dom_create with -L option)
-  unwatch   [dom]        -- kill the auto-restart daemon for a domain
-  list                   -- print info about all domains
-  listvbds               -- print info about all virtual block devs
-  cpu_bvtset [dom] [mcuadv] [warp] [warpl] [warpu]
-                         -- set BVT scheduling parameters for domain
-  cpu_bvtslice [slice]   -- set default BVT scheduler slice
-  cpu_atropos_set [dom] [period] [slice] [latency] [xtratime]
-                         -- set Atropos scheduling parameters for domain
-  cpu_rrobin_slice [slice] -- set Round Robin scheduler slice
-  vif_stats [dom] [vif]  -- get stats for a given network vif
-  vif_addip [dom] [vif] [ip]  -- add an IP address to a given vif
-  vif_setsched [dom] [vif] [bytes] [usecs] -- rate limit vif bandwidth
-  vif_getsched [dom] [vif] -- print vif's scheduling parameters
-  vbd_add [dom] [uname] [dev] [mode] -- make disk/partition uname available to 
-                            domain as dev e.g. 'vbd_add 2 phy:sda3 hda1 w'
-  vbd_remove [dom] [dev] -- remove disk or partition attached as 'dev' 
-
-
-xc_dom_create.py
- - This tool is used to create and start new domains. It reads defaults
-from a file written in Python, having allowed variables to be set and
-passed into the file. Further command line arguments allow the
-defaults to be overridden. The defaults for each parameter are listed
-in [] brackets. Arguments are as follows:
-
-Arguments to control the parsing of the defaults file:
- -f config_file   -- Use the specified defaults script. 
-                     Default: ['/etc/xc/defaults']
- -L state_file    -- Load virtual machine memory state from state_file
- -D foo=bar       -- Set variable foo=bar before parsing config
-                     E.g. '-D vmid=3;ip=1.2.3.4'
- -h               -- Print extended help message, including all arguments
- -n               -- Dry run only, don't actually create domain
- -q               -- Quiet - write output only to the system log
-
-
-The config file 'defaults' requires the following variable to be defined:
- vmid             -- Numeric identifier for the new domain, used to calculate
-                     the VM's IP address and root partition. E.g. -Dvmid=1
-
-
-Arguments to override current config read from 'defaults':
- -k image         -- Path to kernel image ['']
- -r ramdisk       -- Path to ramdisk (or empty) ['']
- -b builder_fn    -- Function to use to build domain ['']
- -m mem_size      -- Initial memory allocation in MB [0MB]
- -N domain_name   -- Set textual name of domain ['']
- -a auto_restart  -- Restart domain on exit, yes/no ['0']
- -e vbd_expert    -- Saftey catch to avoid some disk accidents ['0'] 
- -d udisk,dev,rw  -- Add disk, partition, or virtual disk to domain. E.g. to 
-                     make partion sda4 available to the domain as hda1 with 
-                     read-write access: '-b phy:sda4,hda1,rw' To add 
-                     multiple disks use multiple -d flags or seperate with ';'
-                     Default: ['']
- -i vfr_ipaddr    -- Add IP address to the list which Xen will route to
-                     the domain. Use multiple times to add more IP addrs.
-                     Default: ['']
-
-Args to override the kernel command line, which is concatenated from these:
- -I cmdline_ip    -- Override 'ip=ipaddr:nfsserv:gateway:netmask::eth0:off'
-                     Default: ['']
- -R cmdline_root  -- Override root device parameters.
-                     Default: ['']
- -E cmdline_extra -- Override extra kernel args and rc script env vars.
-                     Default: ['']
-
-
-
-xc_vd_tool.py
- - tool for manipulating virtual disks
-   Usage: xc_vd_tool command <params>
-
-   initalise [dev] [[ext_size]]  - init. a physcial partition to store vd's
-   create [size] [[expiry]]      - allocate a vd of specified size (and expiry)
-   delete [vdid]                 - delete a vd
-   import [filename] [[expiry]]  - create a vd and populate w/ image from file
-   export [vdid] [filename]      - copy vd's contents to a file
-   setexpiry [vdid] [[expiry]]   - update the expiry time for a vd
-   list                          - list all the unexpired virtual disks  
-   undelete [vdid] [[expiry]]    - attempts to recover an expired vd
-   freespace                     - print out the amount of space in free pool
-
-   notes:
-   vdid      - the virtual disk's identity string
-   size      - measured in MB
-   expiry    - is the expiry time of the virtual disk in seconds from now
-               (0 = don't expire) 
-   device    - physical partition to 'format' to hold vd's. e.g. hda4
-   ext_size  - extent size (default 64MB)
-
-
-xendomains
-This is a Sys-V init script for RedHat systems.
-
- - Usage: xendomains {start|stop|status}
-
-   start  -- starts all the domains with config files in /etc/xc/auto/
-   stop   -- stops ALL running domains, waiting for them to shutdown cleanly
-             (if possible) before returning
-   status -- prints a list of the running domains, the same as
-             "xc_dom_control.py list"
-
-On a RedHat system it should be possible to issue commands to this
-script using the "service" command and to configure if / when it is
-run automatically, using the "chkconfig" command.
-
-xend
-This is a Sys-V init script for RedHat systems, which can be used to
-start the Xen Daemon (xend) at boot time.
-
- - Usage: xend {start|stop|status|restart|reload}

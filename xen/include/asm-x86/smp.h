@@ -1,25 +1,12 @@
 #ifndef __ASM_SMP_H
 #define __ASM_SMP_H
 
-/*
- * We need the APIC definitions automatically as part of 'smp.h'
- */
 #ifndef __ASSEMBLY__
 #include <xen/config.h>
-/*#include <xen/threads.h>*/
-#include <asm/ptrace.h>
-#endif
-
-#ifdef CONFIG_X86_LOCAL_APIC
-#ifndef __ASSEMBLY__
 #include <asm/fixmap.h>
-#include <asm/bitops.h>
 #include <asm/mpspec.h>
-#ifdef CONFIG_X86_IO_APIC
 #include <asm/io_apic.h>
-#endif
 #include <asm/apic.h>
-#endif
 #endif
 
 #ifdef CONFIG_SMP
@@ -36,12 +23,6 @@ extern volatile unsigned long smp_invalidate_needed;
 extern int pic_mode;
 extern int smp_num_siblings;
 extern int cpu_sibling_map[];
-
-extern void smp_flush_tlb(void);
-extern void smp_message_irq(int cpl, void *dev_id, struct pt_regs *regs);
-extern void smp_send_reschedule(int cpu);
-extern void smp_invalidate_rcv(void);		/* Process an NMI */
-extern void (*mtrr_hook) (void);
 
 /*
  * On x86 all CPUs are mapped 1:1 to the APIC space.
@@ -80,12 +61,7 @@ extern void smp_store_cpu_info(int id);		/* Store per CPU info (like the initial
  * so this is correct in the x86 case.
  */
 
-#if defined(__i386__)
 #define smp_processor_id() (current->processor)
-#elif defined(__x86_64__)
-#include <asm/pda.h>
-#define smp_processor_id() read_pda(cpunumber)
-#endif
 
 static __inline int hard_smp_processor_id(void)
 {

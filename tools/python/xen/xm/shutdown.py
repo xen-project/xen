@@ -46,7 +46,7 @@ def shutdown(opts, doms, mode, wait):
         server.xend_domain_shutdown(d, mode)
     if wait:
         while doms:
-            alive = domains()
+            alive = server.xend_domains()
             dead = []
             for d in doms:
                 if d in alive: continue
@@ -73,7 +73,8 @@ def shutdown_mode(opts):
     return mode
 
 def main_all(opts, args):
-    shutdown(opts, None, opts.vals.wait)
+    mode = shutdown_mode(opts)  
+    shutdown(opts, None, mode, opts.vals.wait)
 
 def main_dom(opts, args):
     if len(args) < 1: opts.err('Missing domain')

@@ -1,3 +1,4 @@
+/* -*-  Mode:C; c-basic-offset:8; tab-width:8; indent-tabs-mode:t -*- */
 
 #include <xen/ctype.h>
 #include <xen/lib.h>
@@ -394,9 +395,9 @@ __udivdi3(a, b)
  */
 u64 __umoddi3(u64 a, u64 b)
 {
-    u64 rem;
-    __qdivrem(a, b, &rem);
-    return rem;
+	u64 rem;
+	__qdivrem(a, b, &rem);
+	return rem;
 }
 
 /*
@@ -425,19 +426,18 @@ s64 __moddi3(s64 a, s64 b)
 		ub = b, neg2 = 0;
 	__qdivrem(ua, ub, &urem);
     
-    /* There 4 different cases: */
-    if(neg1)
-    {
-        if(neg2)
-            return -urem;
-        else
-            return ub - urem;
-    }   
-    else
-        if(neg2)
-            return -ub + urem;
-        else
-            return urem;
+	/* There 4 different cases: */
+	if (neg1) {
+		if (neg2)
+			return -urem;
+		else
+			return ub - urem;
+	} else {
+		if (neg2)
+			return -ub + urem;
+		else
+			return urem;
+	}
 }
 
 #endif /* BITS_PER_LONG == 32 */

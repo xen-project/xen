@@ -1,0 +1,87 @@
+#  -*- mode: python; -*-
+#============================================================================
+# Python configuration setup for 'xm create'.
+# This script sets the parameters used when a domain is created using 'xm create'.
+# You use a separate script for each domain you want to create, or 
+# you can set the parameters for the domain on the xm command line.
+#============================================================================
+
+#----------------------------------------------------------------------------
+# Kernel image file.
+kernel = "/boot/vmlinuz-2.6.9-xenU"
+
+# Optional ramdisk.
+#ramdisk = "/boot/initrd.gz"
+
+# The domain build function. Default is 'linux'.
+#builder='linux'
+
+# Initial memory allocation (in megabytes) for the new domain.
+memory = 64
+
+# A name for your domain. All domains must have different names.
+name = "ExampleDomain"
+
+# Which CPU to start domain on? 
+#cpu = -1   # leave to Xen to pick
+
+# Number of Virtual CPUS to use, default is 1
+#vcpus = 1
+
+#----------------------------------------------------------------------------
+# Define network interfaces.
+
+# Number of network interfaces. Default is 1.
+#nics=1
+
+# Optionally define mac and/or bridge for the network interfaces.
+# Random MACs are assigned if not given.
+#vif = [ 'mac=aa:00:00:00:00:11, bridge=xen-br0' ]
+
+#----------------------------------------------------------------------------
+# Define the disk devices you want the domain to have access to, and
+# what you want them accessible as.
+# Each disk entry is of the form phy:UNAME,DEV,MODE
+# where UNAME is the device, DEV is the device name the domain will see,
+# and MODE is r for read-only, w for read-write.
+
+disk = [ 'phy:hda1,hda1,r' ]
+
+#----------------------------------------------------------------------------
+# Set the kernel command line for the new domain.
+# You only need to define the IP parameters and hostname if the domain's
+# IP config doesn't, e.g. in ifcfg-eth0 or via DHCP.
+# You can use 'extra' to set the runlevel and custom environment
+# variables used by custom rc scripts (e.g. VMID=, usr= ).
+
+# Set if you want dhcp to allocate the IP address.
+#dhcp="dhcp"
+# Set netmask.
+#netmask=
+# Set default gateway.
+#gateway=
+# Set the hostname.
+#hostname= "vm%d" % vmid
+
+# Set root device.
+root = "/dev/hda1 ro"
+
+# Root device for nfs.
+#root = "/dev/nfs"
+# The nfs server.
+#nfs_server = '169.254.1.0'  
+# Root directory on the nfs server.
+#nfs_root   = '/full/path/to/root/directory'
+
+# Sets runlevel 4.
+extra = "4"
+
+#----------------------------------------------------------------------------
+# Set according to whether you want the domain restarted when it exits.
+# The default is 'onreboot', which restarts the domain when it shuts down
+# with exit code reboot.
+# Other values are 'always', and 'never'.
+
+#restart = 'onreboot'
+
+#============================================================================

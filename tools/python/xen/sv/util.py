@@ -5,8 +5,12 @@ from xen.xend import PrettyPrint
 import types
 
 def getDomInfoHash( domain ):
-    domInfoHash = sxp2hash( server.xend_domain( int( domain ) ) )
-    domInfoHash['dom'] = int( domain )
+    domInfoHash = {}
+    try:
+        domInfoHash = sxp2hash( server.xend_domain( domain ) )
+        domInfoHash['dom'] = domain
+    except:
+    	domInfoHash['name'] = "Error getting domain details"
     return domInfoHash
 
 def sxp2hash( s ):

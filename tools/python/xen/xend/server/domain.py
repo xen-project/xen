@@ -10,30 +10,14 @@ class DomainControllerFactory(controller.ControllerFactory):
     """Factory for creating domain controllers.
     """
 
-    def createInstance(self, dom):
+    def createController(self, dom):
         """Create a domain controller.
 
         dom domain
 
         returns domain controller
         """
-        d = DomainController(self, dom)
-        self.addInstance(d)
-        return d
-    
-    def getInstanceByDom(self, dom):
-        """Get a domain controller for a domain, creating if necessary.
-
-        dom domain
-
-        returns domain controller
-        """
-        for inst in self.instances.values():
-            if inst.dom == dom:
-                return inst
-        inst = self.createInstance(dom)
-        return inst
-
+        return DomainController(self, dom)
 
 class DomainController(controller.Controller):
     """Generic controller for a domain.
@@ -44,20 +28,31 @@ class DomainController(controller.Controller):
     """
     reasons = {'poweroff' : 'shutdown_poweroff_t',
                'reboot'   : 'shutdown_reboot_t',
-               'suspend'  : 'shutdown_suspend_t' }
+               'suspend'  : 'shutdown_suspend_t',
+               'sysrq'    : 'shutdown_sysrq_t' }
 
     def __init__(self, factory, dom):
         controller.Controller.__init__(self, factory, dom)
-        self.majorTypes = [ CMSG_SHUTDOWN ]
+        self.addMethod(CMSG_SHUTDOWN, 0, None)
+        self.addMethod(CMSG_MEM_REQUEST, 0, None)
         self.registerChannel()
 
-    def shutdown(self, reason):
+    def shutdown(self, reason, key=0):
         """Shutdown a domain.
 
         reason shutdown reason
+        key    sysrq key (only if reason is 'sysrq')
         """
         msgtype = self.reasons.get(reason)
         if not msgtype:
             raise XendError('invalid reason:' + reason)
-        msg = packMsg(msgtype, {})
+        extra = {}
+        if reason == 'sysrq': extra['key'] = key
+        print extra
+        self.writeRequest(packMsg(msgtype, extra))
+
+    def mem_target_set(self, target):
+        """Set domain memory target in pages.
+        """
+        msg = packMsg('mem_request_t', { 'target' : target * (1 << 8)} )
         self.writeRequest(msg)

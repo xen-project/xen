@@ -1,6 +1,6 @@
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
 
-"""Variable definition and help support for Python defaults files.
+"""Variable definition and help support for Python defconfig files.
 """
 
 import sys
@@ -12,7 +12,7 @@ class Vars:
     def __init__(self, name, help, env):
         """Create a variable set.
 
-        name name of the defaults file
+        name name of the defconfig file
         help help flag
         env  local environment
         """

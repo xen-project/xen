@@ -1,5 +1,6 @@
 
 all:	
+	$(MAKE) -C check
 	$(MAKE) -C libxutil
 	$(MAKE) -C libxc
 	$(MAKE) -C misc
@@ -7,8 +8,11 @@ all:
 	$(MAKE) -C xentrace
 	$(MAKE) -C python
 	$(MAKE) -C xfrd
+	$(MAKE) -C xcs
+	$(MAKE) -C ioemu
 
-install: all
+install: 
+	$(MAKE) -C check
 	$(MAKE) -C libxutil install
 	$(MAKE) -C libxc install
 	$(MAKE) -C misc install
@@ -17,10 +21,8 @@ install: all
 	$(MAKE) -C python install
 	$(MAKE) -C xfrd install
 	$(MAKE) -C sv install
-
-dist: $(TARGET)
-	$(MAKE) prefix=`pwd`/../../install dist=yes install
-
+	$(MAKE) -C xcs install
+	$(MAKE) -C ioemu install
 
 clean:
 	$(MAKE) -C libxutil clean
@@ -30,4 +32,5 @@ clean:
 	$(MAKE) -C xentrace clean
 	$(MAKE) -C python clean
 	$(MAKE) -C xfrd clean
-
+	$(MAKE) -C xcs clean
+	$(MAKE) -C ioemu clean

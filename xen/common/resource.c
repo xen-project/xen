@@ -1,3 +1,4 @@
+/* -*-  Mode:C; c-basic-offset:8; tab-width:8; indent-tabs-mode:t -*- */
 /*
  *	linux/kernel/resource.c
  *
@@ -220,7 +221,7 @@ int allocate_resource(struct resource *root, struct resource *new,
  */
 struct resource * __request_region(struct resource *parent, unsigned long start, unsigned long n, const char *name)
 {
-	struct resource *res = xmalloc(sizeof(*res));
+	struct resource *res = xmalloc(struct resource);
 
 	if (res) {
 		memset(res, 0, sizeof(*res));
@@ -251,19 +252,6 @@ struct resource * __request_region(struct resource *parent, unsigned long start,
 		write_unlock(&resource_lock);
 	}
 	return res;
-}
-
-int __check_region(struct resource *parent, unsigned long start, unsigned long n)
-{
-	struct resource * res;
-
-	res = __request_region(parent, start, n, "check-region");
-	if (!res)
-		return -EBUSY;
-
-	release_resource(res);
-	xfree(res);
-	return 0;
 }
 
 void __release_region(struct resource *parent, unsigned long start, unsigned long n)

@@ -14,6 +14,8 @@ import httplib
 import random
 import md5
 
+from xen.util.ip import _readline, _readlines
+
 # Extract from HTML4 spec.
 ## The following example illustrates "multipart/form-data"
 ## encoding. Suppose we have the following form:
@@ -122,7 +124,7 @@ def encode_multipart(d):
             out.write('"\r\n')
             out.write('Content-Type: application/octet-stream\r\n')
             out.write('\r\n')
-            for l in v.readlines():
+            for l in _readlines(v):
                out.write(l)  
         else:
             out.write('Content-Disposition: form-data; name="')

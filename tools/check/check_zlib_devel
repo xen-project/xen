@@ -1,0 +1,10 @@
+#!/bin/bash
+# CHECK-BUILD
+
+function error {
+    echo 'Check for zlib includes failed.'
+    exit 1
+}
+
+set -e
+[ -e /usr/include/zlib.h ] || error

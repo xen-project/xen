@@ -10,6 +10,10 @@
 #include <asm/config.h>
 
 #define EXPORT_SYMBOL(var)
+#define offsetof(_p,_f) ((unsigned long)&(((_p *)0)->_f))
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+
+#define always_inline __inline__ __attribute__ ((always_inline))
 
 /* syslog levels ==> nothing! */
 #define KERN_NOTICE  ""
@@ -20,16 +24,6 @@
 #define KERN_CRIT    ""
 #define KERN_EMERG   ""
 #define KERN_ALERT   ""
-
-#define offsetof(_p,_f) ((unsigned long)&(((_p *)0)->_f))
-#define struct_cpy(_x,_y) (memcpy((_x),(_y),sizeof(*(_x))))
-
-#define dev_probe_lock() ((void)0)
-#define dev_probe_unlock() ((void)0)
-
-#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
-
-#define capable(_c) 0
 
 #ifdef VERBOSE
 #define DPRINTK(_f, _a...) printk("(file=%s, line=%d) " _f, \

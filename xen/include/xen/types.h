@@ -44,5 +44,7 @@ typedef         __u32           uint32_t;
 typedef         __u64           uint64_t;
 
 
+struct domain;
+struct exec_domain;
 
 #endif /* __TYPES_H__ */

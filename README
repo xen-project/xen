@@ -1,219 +1,81 @@
-#############################
- __  __            _   _____ 
- \ \/ /___ _ __   / | |___ / 
-  \  // _ \ '_ \  | |   |_ \ 
-  /  \  __/ | | | | |_ ___) |
- /_/\_\___|_| |_| |_(_)____/ 
-                                              
-#############################
+###############################
+__  __            ____    ___
+\ \/ /___ _ __   |___ \  / _ \
+ \  // _ \ '_ \    __) || | | |
+ /  \  __/ | | |  / __/ | |_| |
+/_/\_\___|_| |_| |_____(_)___/
+
+###############################
 
 University of Cambridge Computer Laboratory
-15 Jun 2004
+3 November 2004
 
-http://www.cl.cam.ac.uk/netos/xen
+http://www.cl.cam.ac.uk/netos/xen/
 
-About the Xen Virtual Machine Monitor
-=====================================
+What is Xen?
+============
 
-"Xen" is a Virtual Machine Monitor (VMM) originally developed by the
+Xen is a Virtual Machine Monitor (VMM) originally developed by the
 Systems Research Group of the University of Cambridge Computer
-Laboratory, as part of the UK-EPSRC funded XenoServers project. 
+Laboratory, as part of the UK-EPSRC funded XenoServers project.
+Xen is freely-distributable Open Source software, released under the
+GNU GPL.
 
-The XenoServers project aims to provide a "public infrastructure for
-global distributed computing", and Xen plays a key part in that,
-allowing us to efficiently partition a single machine to enable
-multiple independent clients to run their operating systems and
-applications in an environment providing protection, resource
-isolation and accounting.  The project web page contains further
-information along with pointers to papers and technical reports:
-http://www.cl.cam.ac.uk/xeno
+The 2.0 release offers excellent performance, hardware support and
+enterprise-grade features such as live migration. Linux 2.6, 2.4 and
+NetBSD 2.0 are already available for Xen, with more operating system
+ports on the way.
 
-Xen has since grown into a project in its own right, enabling us to
-investigate interesting research issues regarding the best techniques
-for virtualizing resources such as the CPU, memory, disk and network.
-The project has been bolstered by support from Intel Research
-Cambridge, and HP Labs, who are now working closely with us. We're
-also in receipt of support from Microsoft Research Cambridge to port
-Windows XP to run on Xen.
+This file contains some quick-start instructions to install Xen on
+your system. For full documentation, see the Xen User Manual. If this
+is a pre-built release then you can find the manual at:
+ dist/install/usr/share/doc/xen/pdf/user.pdf
+If you have a source release, then 'make -C docs' will build the
+manual at docs/pdf/user.pdf.
 
-Xen enables multiple operating system images to execute concurrently 
-on the same hardware with very low performance overhead --- much lower
-than commercial offerings for the same x86 platform.
+Quick-Start Guide - Pre-Built Binary Release
+============================================
 
-This is achieved by requiring OSs to be specifically ported to run on
-Xen, rather than allowing unmodified OS images to be used. Crucially,
-only the OS needs to be changed -- all of the user-level application
-binaries, libraries etc can run unmodified. Hence the modified OS
-kernel can typically just be dropped into any existing OS distribution
-or installation.
+[NB. Unless noted otherwise, all the following steps should be
+performed with root privileges.]
 
-Xen currently runs on the x86 architecture, but could in principle be
-ported to others. In fact, it would have been rather easier to write
-Xen for pretty much any other architecture as x86 is particularly 
-tricky to handle. A good description of Xen's design, implementation 
-and performance is contained in our October 2003 SOSP paper, available
-at http://www.cl.cam.ac.uk/netos/papers/2003-xensosp.pdf
-[update: work to port Xen to x86_64 and IA64 is underway]
+1. Install the binary distribution onto your filesystem:
+    # sh ./install.sh
+   Amongst other things, this will install Xen and XenLinux kernel
+   files in /boot, kernel modules and Python packages in /lib, and
+   various control tools in standard 'bin' directories.
 
-Five different operating systems have been ported to run on Xen: 
-Linux 2.4/2.6, Windows XP, NetBSD, FreeBSD and Plan 9.
+2. Configure your bootloader to boot Xen and an initial Linux virtual
+   machine. Note that Xen currently only works with GRUB: less common
+   alternatives such as LILO are *not* supported. You can most likely
+   find your GRUB menu file at /boot/grub/menu.lst: edit this file to
+   include an entry like the following:
+    # title Xen 2.0 / XenLinux 2.6.9
+    #   kernel /boot/xen.gz dom0_mem=<mem-kb> console=vga
+    #   module /boot/vmlinuz-2.6.9-xen0 root=<root-dev> ro console=tty0
+   For <mem-kb> you should specify the amount of memory, in kilobytes,
+   to allocate for use by your initial XenLinux virtual machine. Note
+   that Xen itself reserves about 32MB memory for internal use, which
+   is not available for allocation to virtual machines.
+   For <root-dev>, specify your usual root partition (e.g., /dev/hda1).
 
-The Linux 2.4 port (currently Linux 2.4.26) works very well -- we
-regularly use it to host complex applications such as PostgreSQL,
-Apache, BK servers etc. It runs every user-space applications we've
-tried.  We refer to our version of Linux ported to run on Xen as
-"XenLinux", although really it's just standard Linux ported to a new
-virtual CPU architecture that we call xen-x86.
+3. Reboot your system and select the "Xen 2.0 / XenLinux 2.6.9" menu
+   option. After booting Xen, XenLinux will start and your
+   initialisation scripts should execute in the usual way.
 
-NetBSD has been ported to Xen by Christian Limpach, and will hopefully
-soon become part of the standard release. Work on a FreeBSD port has
-been started by Kip Macy, and we hope to see this complete for the 2.0
-release. Ron Minnich has been working on Plan 9.
+Quick-Start Guide - Source Release
+==================================
 
-The Windows XP port is nearly finished. It's running user space
-applications and is generally in pretty good shape thanks to some hard
-work by a team over the summer.  Of course, there are issues with
-releasing this code to others.  We should be able to release the
-source and binaries to anyone that has signed the Microsoft academic
-source license, which these days has very reasonable terms. We are in
-discussions with Microsoft about the possibility of being able to make
-binary releases to a larger user community. Obviously, there are
-issues with product activation in this environment which need to be 
-thought through.
+First, there are a number of prerequisites for building a Xen source
+release. Make sure you have all the following installed, either by
+visiting the project webpage or installing a pre-built package
+provided by your Linux distributor:
+    * GCC (preferably v3.2.x or v3.3.x; older versions are unsupported) 
+    * GNU Make
+    * GNU Binutils
+    * Development install of libcurl (e.g., libcurl-dev)
+    * Development install of zlib (e.g., zlib-dev)
+    * Development install of Python v2.2 or later (e.g., python-dev)
 
-So, for the moment, you only get to run Linux 2.4/2.6 and NetBSD on
-Xen, but we hope this will change before too long.  Even running
-multiple copies of the same OS can be very useful, as it provides a
-means of containing faults to one OS image, and also for providing
-performance isolation between the various OS, enabling you to either
-restrict, or reserve resources for, particular VM instances.
-
-It's also useful for development -- each version of Linux can have
-different patches applied, enabling different kernels to be tried
-out. For example, the "vservers" patch used by PlanetLab applies
-cleanly to our ported version of Linux.
-
-We've successfully booted over 128 copies of Linux on the same machine
-(a dual CPU hyperthreaded Xeon box) but we imagine that it would be
-more normal to use some smaller number, perhaps 10-20.
-
-A common question is "how many virtual machines can I run on hardware
-xyz?". The answer is very application dependent, but the rule of thumb
-is that you should expect to be able to run the same workload under
-multiple guest OSes that you could run under a single Linux instance,
-with an additional overhead of a few MB per OS instance.
-
-One key feature in this new release of Xen is `live migration'. This
-enables virtual machines instances to be dynamically moved between
-physical Xen machines, with typical downtimes of just a few tens of
-milliseconds. This is really useful for admins that want to take a
-node down for maintenance, or to load balance a large number of
-virtual machines across a cluster.
-
-
-
-Hardware support
-================
-
-Xen is intended to be run on server-class machines, and the current
-list of supported hardware very much reflects this, avoiding the need
-for us to write drivers for "legacy" hardware. It is likely that some
-desktop chipsets will fail to work properly with the default Xen
-configuration: specifying 'noacpi' or 'ignorebiostables' when booting
-Xen may help in these cases.
-
-Xen requires a "P6" or newer processor (e.g. Pentium Pro, Celeron,
-Pentium II, Pentium III, Pentium IV, Xeon, AMD Athlon, AMD Duron).
-Multiprocessor machines are supported, and we also have basic support
-for HyperThreading (SMT), although this remains a topic for ongoing
-research. We're also working on an AMD x86_64 port (though Xen should
-run on Opterons in 32-bit mode just fine).
-
-Xen can currently use up to 4GB of memory. It's possible for x86
-machines to address more than that (64GB), but it requires using a
-different page table format (3-level rather than 2-level) that we
-currently don't support. Adding 3-level PAE support wouldn't be
-difficult, but we'd also need to add support to all the guest
-OSs. Volunteers welcome!
-
-In contrast to previous Xen versions, in Xen 2.0 device drivers run
-within a privileged guest OS rather than within Xen itself. This means
-that we should be compatible with the full set of device hardware
-supported by Linux.  The default XenLinux build contains support for
-relatively modern server-class network and disk hardware, but you can
-add suppport for other hardware by configuring your XenLinux kernel in
-the normal way (e.g. "make xconfig").
-
-
-Building Xen and XenLinux
-=========================
-
-The public master BK repository for the 2.0 release lives at: 
-bk://xen.bkbits.net/xeno-2.0.bk
-
-To fetch a local copy, install the BitKeeper tools, then run: 
-'bk clone bk://xen.bkbits.net/xeno-2.0.bk'
-
-You can do a complete build of Xen, the control tools, and the
-XenLinux kernel images with "make world". This can take 10 minutes
-even on a fast machine. If you're on an SMP machine you may wish to
-give the '-j4' argument to make to get a parallel build.  All of the
-files that are built are placed under the ./install directory.  You
-can then install everything to the standard system directories
-(e.g. /boot, /usr/bin, /usr/lib/python/ etc) by typing "make install".
-
-Take a look in install/boot/:
- install/boot/xen.gz               The Xen 'kernel' (formerly image.gz)
- install/boot/vmlinuz-2.4.26-xen0  Domain 0 XenLinux kernel (xenolinux.gz)
- install/boot/vmlinuz-2.4.26-xenU  Unprivileged XenLinux kernel
-
-The difference between the two Linux kernels that are built is
-due to the configuration file used for each. The "U" suffixed
-unprivileged version doesn't contain any of the physical hardware
-device drivers, so is 30% smaller and hence may be preferred for
-your non-privileged domains.
-
-The install/boot directory will also contain the config files
-used for building the XenLinux kernels, and also versions of Xen
-and XenLinux kernels that contain debug symbols (xen-syms and
-vmlinux-syms-2.4.26-xen0) which are essential for interpreting crash
-dumps.
-
-Inspect the Makefile if you want to see what goes on during a
-build. Building Xen and the tools is straightforward, but XenLinux is
-more complicated. The makefile needs a 'pristine' linux kernel tree
-which it will then add the Xen architecture files to. You can tell the
-makefile the location of the appropriate linux compressed tar file by
-setting the LINUX_SRC environment variable
-(e.g. "LINUX_SRC=/tmp/linux-2.4.26.tar.gz make world") or by placing
-the tar file somewhere in the search path of LINUX_SRC_PATH which
-defaults to ".:..". If the makefile can't find a suitable kernel tar
-file it attempts to download it from kernel.org, but this won't work
-if you're behind a firewall.
-
-After untaring the pristine kernel tree, the makefile uses the
-'mkbuildtree' script to add the Xen patches the kernel. "make world"
-then build two different XenLinux images, one with a "-xen0" extension
-which contains hardware device drivers and is intended to be used in
-the first virtual machine ("domain 0"), and one with a "-xenU"
-extension that just contains virtual-device drivers. The latter can be
-used for all non hardware privileged domains, and is substantially
-smaller than the other kernel with its selection of hardware drivers.
-
-If you don't want to use bitkeeper to download the source, you can
-download prebuilt binaries and src tar balls from the project
-downloads page:  http://www.cl.cam.ac.uk/netos/xen/downloads/
-
-Using the domain control tools
-==============================
-
-Before starting domains you'll need to start the node management
-daemon: "xend start". 
-The primary tool for starting and controlling domains is "xm". 
-"xm help <cmd>" will tell you how to use it.
-
-README.CD contains some example invocations.
-
-Further documentation is in docs/ (e.g., docs/Xen-HOWTO), and also in
-
-
+[NB. Unless noted otherwise, all the following steps should be
+performed with root privileges.]

@@ -1,10 +1,22 @@
 #!/bin/sh
 #============================================================================
-# Example Xen network start/stop script.
+# Default Xen network start/stop script.
 # Xend calls a network script when it starts.
-# This is the default script.
+# The script name to use is defined in /etc/xen/xend-config.sxp
+# in the network-script field.
 #
-# /etc/xen/network (start|stop|status) {VAR=VAL}*
+# This script creates a bridge (default xen-br0), adds a device
+# (default eth0) to it, copies the IP addresses from the device
+# to the bridge and adjusts the routes accordingly.
+#
+# If all goes well, this should ensure that networking stays up.
+# However, some configurations are upset by this, especially
+# NFS roots. If the bridged setup does not meet your needs,
+# configure a different script, for example using routing instead.
+#
+# Usage:
+#
+# network (start|stop|status) {VAR=VAL}*
 #
 # Vars:
 #
@@ -49,13 +61,13 @@ transfer_addrs () {
     local src=$1
     local dst=$2
     # Don't bother if $dst already has IP addresses.
-    if ip addr show dev ${dst} | egrep -q '^ *inet' ; then
+    if ip addr show dev ${dst} | egrep -q '^ *inet ' ; then
         return
     fi
     # Address lines start with 'inet' and have the device in them.
     # Replace 'inet' with 'ip addr add' and change the device name $src
     # to 'dev $src'. Remove netmask as we'll add routes later.
-    ip addr show dev ${src} | egrep '^ *inet' | sed -e "
+    ip addr show dev ${src} | egrep '^ *inet ' | sed -e "
 s/inet/ip addr add/
 s@\([0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+\)/[0-9]\+@\1@
 s/${src}/dev ${dst}/
@@ -127,31 +139,44 @@ show_status () {
     echo '============================================================'
 }
 
+op_start () {
+    if [ "${bridge}" == "null" ] ; then
+        return
+    fi
+    # Create the bridge and give it the interface IP addresses.
+    # Move the interface routes onto the bridge.
+    create_bridge ${netdev} ${bridge}
+    transfer_addrs ${netdev} ${bridge}
+    transfer_routes ${netdev} ${bridge}
+    # Don't add $dev to $bridge if it's already on a bridge.
+    if ! brctl show | grep -q ${netdev} ; then
+        brctl addif ${bridge} ${netdev}
+    fi
+    
+    if [ ${antispoof} == 'yes' ] ; then
+        antispoofing ${netdev} ${bridge}
+    fi
+}
+
+op_stop () {
+    if [ "${bridge}" == "null" ] ; then
+        return
+    fi
+    # Remove the interface from the bridge.
+    # Move the routes back to the interface.
+    brctl delif ${bridge} ${netdev}
+    transfer_routes ${bridge} ${netdev}
+
+    # It's not our place to be enabling forwarding...
+}
+
 case ${OP} in
     start)
-        # Create the bridge and give it the interface IP addresses.
-        # Move the interface routes onto the bridge.
-        create_bridge ${netdev} ${bridge}
-        transfer_addrs ${netdev} ${bridge}
-        transfer_routes ${netdev} ${bridge}
-	# Don't add $dev to $bridge if it's already on a bridge.
-	if ! brctl show | grep -q ${netdev} ; then
-	    brctl addif ${bridge} ${netdev}
-	fi
-        
-        if [ ${antispoof} == 'yes' ] ; then
-            antispoofing ${netdev} ${bridge}
-        fi
-        
+        op_start
         ;;
     
     stop)
-        # Remove the interface from the bridge.
-        # Move the routes back to the interface.
-        brctl delif ${bridge} ${netdev}
-        transfer_routes ${bridge} ${netdev}
-
-        # It's not our place to be enabling forwarding...
+        op_stop
         ;;
 
     status)

@@ -1,3 +1,4 @@
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /******************************************************************************
  * elf.c
  * 
@@ -10,6 +11,12 @@
 #include <xen/mm.h>
 #include <xen/elf.h>
 
+#ifdef CONFIG_X86
+#define FORCE_XENELF_IMAGE 1
+#elif defined(__ia64__)
+#define FORCE_XENELF_IMAGE 0
+#endif
+
 static inline int is_loadable_phdr(Elf_Phdr *phdr)
 {
     return ((phdr->p_type == PT_LOAD) &&
@@ -18,10 +25,7 @@ static inline int is_loadable_phdr(Elf_Phdr *phdr)
 
 int parseelfimage(char *elfbase, 
                   unsigned long elfsize,
-                  unsigned long *pvirtstart,
-                  unsigned long *pkernstart,
-                  unsigned long *pkernend,
-                  unsigned long *pkernentry)
+                  struct domain_setup_info *dsi)
 {
     Elf_Ehdr *ehdr = (Elf_Ehdr *)elfbase;
     Elf_Phdr *phdr;
@@ -30,11 +34,8 @@ int parseelfimage(char *elfbase,
     char *shstrtab, *guestinfo=NULL, *p;
     int h;
 
-    if ( !IS_ELF(*ehdr) )
-    {
-        printk("Kernel image does not have an ELF header.\n");
+    if ( !elf_sanity_check(ehdr) )
         return -EINVAL;
-    }
 
     if ( (ehdr->e_phoff + (ehdr->e_phnum * ehdr->e_phentsize)) > elfsize )
     {
@@ -68,10 +69,17 @@ int parseelfimage(char *elfbase,
         guestinfo = elfbase + shdr->sh_offset;
         printk("Xen-ELF header found: '%s'\n", guestinfo);
 
-        if ( (strstr(guestinfo, "GUEST_OS=linux") == NULL) ||
-             (strstr(guestinfo, "XEN_VER=1.3") == NULL) )
+        if ( (strstr(guestinfo, "LOADER=generic") == NULL) &&
+             (strstr(guestinfo, "GUEST_OS=linux") == NULL) )
         {
-            printk("ERROR: Xen will only load Linux built for Xen v1.3\n");
+            printk("ERROR: Xen will only load images built for the generic "
+                   "loader or Linux images\n");
+            return -EINVAL;
+        }
+
+        if ( (strstr(guestinfo, "XEN_VER=2.0") == NULL) )
+        {
+            printk("ERROR: Xen will only load images built for Xen v2.0\n");
             return -EINVAL;
         }
 
@@ -80,7 +88,9 @@ int parseelfimage(char *elfbase,
     if ( guestinfo == NULL )
     {
         printk("Not a Xen-ELF image: '__xen_guest' section not found.\n");
+#if FORCE_XENELF_IMAGE
         return -EINVAL;
+#endif
     }
 
     for ( h = 0; h < ehdr->e_phnum; h++ ) 
@@ -88,10 +98,10 @@ int parseelfimage(char *elfbase,
         phdr = (Elf_Phdr *)(elfbase + ehdr->e_phoff + (h*ehdr->e_phentsize));
         if ( !is_loadable_phdr(phdr) )
             continue;
-        if ( phdr->p_vaddr < kernstart )
-            kernstart = phdr->p_vaddr;
-        if ( (phdr->p_vaddr + phdr->p_memsz) > kernend )
-            kernend = phdr->p_vaddr + phdr->p_memsz;
+        if ( phdr->p_paddr < kernstart )
+            kernstart = phdr->p_paddr;
+        if ( (phdr->p_paddr + phdr->p_memsz) > kernend )
+            kernend = phdr->p_paddr + phdr->p_memsz;
     }
 
     if ( (kernstart > kernend) || 
@@ -102,13 +112,20 @@ int parseelfimage(char *elfbase,
         return -EINVAL;
     }
 
-    *pvirtstart = kernstart;
-    if ( (p = strstr(guestinfo, "VIRT_BASE=")) != NULL )
-        *pvirtstart = simple_strtoul(p+10, &p, 0);
+    dsi->v_start = kernstart;
 
-    *pkernstart = kernstart;
-    *pkernend   = kernend;
-    *pkernentry = ehdr->e_entry;
+    if ( guestinfo != NULL )
+    {
+        if ( (p = strstr(guestinfo, "VIRT_BASE=")) != NULL )
+            dsi->v_start = simple_strtoul(p+10, &p, 0);
+        
+        if ( (p = strstr(guestinfo, "PT_MODE_WRITABLE")) != NULL )
+            dsi->use_writable_pagetables = 1;
+    }
+
+    dsi->v_kernstart = kernstart;
+    dsi->v_kernend   = kernend;
+    dsi->v_kernentry = ehdr->e_entry;
 
     return 0;
 }
@@ -125,10 +142,10 @@ int loadelfimage(char *elfbase)
         if ( !is_loadable_phdr(phdr) )
             continue;
         if ( phdr->p_filesz != 0 )
-            memcpy((char *)phdr->p_vaddr, elfbase + phdr->p_offset, 
+            memcpy((char *)phdr->p_paddr, elfbase + phdr->p_offset, 
                    phdr->p_filesz);
         if ( phdr->p_memsz > phdr->p_filesz )
-            memset((char *)phdr->p_vaddr + phdr->p_filesz, 0, 
+            memset((char *)phdr->p_paddr + phdr->p_filesz, 0, 
                    phdr->p_memsz - phdr->p_filesz);
     }
 

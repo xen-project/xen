@@ -4,16 +4,14 @@
 # Mike Wray <mike.wray@hp.com>
 #============================================================================
 
+INSTALL		= install
+INSTALL_PROG	= $(INSTALL) -m0755
+INSTALL_DIR	= $(INSTALL) -d -m0755
+
 XEN_ROOT  = ../..
-include $(XEN_ROOT)/tools/Make.defs
+include $(XEN_ROOT)/tools/Rules.mk
 
 XFRD_INSTALL_DIR = /usr/sbin
-
-vpath %.h      $(XEN_HYPERVISOR_IFS)
-INCLUDES += -I $(XEN_HYPERVISOR_IFS)
-
-vpath %h       $(XEN_LINUX_INCLUDE)
-INCLUDES += -I $(XEN_LINUX_INCLUDE)
 
 vpath %.h      $(XEN_LIBXC)
 INCLUDES += -I $(XEN_LIBXC)
@@ -32,11 +30,13 @@ XFRD_PROG_OBJ += $(UTIL_LIB)
 # Define to use stubs, undefine to use the real Xen functions.
 #CPPFLAGS += -D _XEN_XFR_STUB_
 
+ifeq ($(SXPR_DEBUG),1)
+CPPFLAGS += -D _XEN_XFR_STUB_ -D SXPR_PARSER_MAIN
+endif
+
 CC := gcc
 
-CFLAGS += -g
-CFLAGS += -Wall
-CFALGS += -Werror
+CFLAGS += -Wall -Werror -O3 -fno-strict-aliasing
 CFLAGS += $(INCLUDES)
 # Make gcc generate dependencies.
 CFLAGS += -Wp,-MD,.$(@F).d
@@ -70,8 +70,9 @@ xfrd: $(XFRD_PROG_OBJ)
 
 .PHONY: install
 install: xfrd
-	mkdir -p $(prefix)/$(XFRD_INSTALL_DIR)
-	install -m 0755 xfrd $(prefix)/$(XFRD_INSTALL_DIR)
+	[ -d $(DESTDIR)$(XFRD_INSTALL_DIR) ] || \
+		$(INSTALL_DIR) $(DESTDIR)$(XFRD_INSTALL_DIR)
+	$(INSTALL_PROG) xfrd $(DESTDIR)$(XFRD_INSTALL_DIR)
 
 .PHONY: libutil
 libutil: $(UTIL_LIB)

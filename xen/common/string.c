@@ -1,3 +1,4 @@
+/* -*-  Mode:C; c-basic-offset:8; tab-width:8; indent-tabs-mode:t -*- */
 /*
  *  linux/lib/string.c
  *
@@ -90,6 +91,32 @@ char * strncpy(char * dest,const char *src,size_t count)
 
 	return tmp;
 }
+#endif
+
+#ifndef __HAVE_ARCH_STRLCPY
+/**
+ * strlcpy - Copy a %NUL terminated string into a sized buffer
+ * @dest: Where to copy the string to
+ * @src: Where to copy the string from
+ * @size: size of destination buffer
+ *
+ * Compatible with *BSD: the result is always a valid
+ * NUL-terminated string that fits in the buffer (unless,
+ * of course, the buffer size is zero). It does not pad
+ * out the result like strncpy() does.
+ */
+size_t strlcpy(char *dest, const char *src, size_t size)
+{
+	size_t ret = strlen(src);
+
+	if (size) {
+		size_t len = (ret >= size) ? size-1 : ret;
+		memcpy(dest, src, len);
+		dest[len] = '\0';
+	}
+	return ret;
+}
+EXPORT_SYMBOL(strlcpy);
 #endif
 
 #ifndef __HAVE_ARCH_STRCAT
@@ -391,6 +418,7 @@ char * bcopy(const char * src, char * dest, int count)
 }
 #endif
 
+#ifndef __HAVE_ARCH_MEMCPY
 /**
  * memcpy - Copy one area of memory to another
  * @dest: Where to copy to
@@ -400,7 +428,6 @@ char * bcopy(const char * src, char * dest, int count)
  * You should not use this function to access IO space, use memcpy_toio()
  * or memcpy_fromio() instead.
  */
-#undef memcpy
 void * memcpy(void * dest,const void *src,size_t count)
 {
 	char *tmp = (char *) dest, *s = (char *) src;
@@ -410,6 +437,7 @@ void * memcpy(void * dest,const void *src,size_t count)
 
 	return dest;
 }
+#endif
 
 #ifndef __HAVE_ARCH_MEMMOVE
 /**
@@ -448,7 +476,6 @@ void * memmove(void * dest,const void *src,size_t count)
  * @ct: Another area of memory
  * @count: The size of the area.
  */
-/*
 int memcmp(const void * cs,const void * ct,size_t count)
 {
 	const unsigned char *su1, *su2;
@@ -459,7 +486,6 @@ int memcmp(const void * cs,const void * ct,size_t count)
 			break;
 	return res;
 }
-*/
 #endif
 
 #ifndef __HAVE_ARCH_MEMSCAN

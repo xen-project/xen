@@ -1,40 +1,41 @@
+INSTALL		= install
+INSTALL_PROG	= $(INSTALL) -m0755
+INSTALL_DIR	= $(INSTALL) -d -m0755
 
 XEN_ROOT=../..
-include $(XEN_ROOT)/tools/Make.defs
+include $(XEN_ROOT)/tools/Rules.mk
 
-CC         = gcc
-CFLAGS     = -Wall -O3 
+CC        = gcc
+CFLAGS   += -Wall -Werror -O3 
 
-INCLUDES += -I $(XEN_HYPERVISOR_IFS)
-INCLUDES += -I $(XEN_LINUX_INCLUDE)
 INCLUDES += -I $(XEN_XC)
 INCLUDES += -I $(XEN_LIBXC)
-INCLUDES += -I $(XEN_LIBXUTIL)
-
-CFLAGS += $(INCLUDES)
+CFLAGS   += $(INCLUDES)
 
 HDRS     = $(wildcard *.h)
-SRCS     = $(wildcard *.c)
-OBJS     = $(patsubst %.c,%.o,$(SRCS))
 
-TARGETS  = xen_cpuperf
+TARGETS  = xenperf
 
 INSTALL_BIN  = $(TARGETS) xencons
-INSTALL_SBIN = netfix xm xend xensv
+INSTALL_SBIN = netfix xm xend xensv xenperf
 
 all: $(TARGETS)
 	$(MAKE) -C miniterm
 
 install: all
-	mkdir -p $(prefix)/usr/bin
-	mkdir -p $(prefix)/usr/sbin
-	install -m0755 $(INSTALL_BIN) $(prefix)/usr/bin
-	install -m0755 $(INSTALL_SBIN) $(prefix)/usr/sbin
-	$(MAKE) -C miniterm install
+	[ -d $(DESTDIR)/usr/bin ] || $(INSTALL_DIR) $(DESTDIR)/usr/bin
+	[ -d $(DESTDIR)/usr/sbin ] || $(INSTALL_DIR) $(DESTDIR)/usr/sbin
+	$(INSTALL_PROG) $(INSTALL_BIN) $(DESTDIR)/usr/bin
+	$(INSTALL_PROG) $(INSTALL_SBIN) $(DESTDIR)/usr/sbin
+#       No sense in installing miniterm on the Xen box.
+#	$(MAKE) -C miniterm install
 
 clean:
 	$(RM) *.o $(TARGETS) *~
-	$(MAKE) -C miniterm clean	
+	$(MAKE) -C miniterm clean
 
-%: %.c $(HDRS) Makefile
-	$(CC) $(CFLAGS) -o $@ $<
+%.o: %.c $(HDRS) Makefile
+	$(CC) -c $(CFLAGS) -o $@ $<
+
+$(TARGETS): %: %.o Makefile
+	$(CC) $(CFLAGS) -o $@ $< -L$(XEN_LIBXC) -lxc -L$(XEN_LIBXUTIL) -lxutil

@@ -26,7 +26,6 @@ UTIL_LIB_SRC += xdr.c
 
 XFRD_PROG_SRC =
 XFRD_PROG_SRC += xfrd.c
-#XFRD_PROG_SRC += xfr_msg.c
 XFRD_PROG_SRC += xen_domain.c
 XFRD_PROG_SRC += select.c
 XFRD_PROG_SRC += connection.c

@@ -1,0 +1,443 @@
+% -*- mode: LaTeX -*-
+\def\seca{\chapter}
+\def\secb{\section}
+\def\secc{\subsection}
+\def\secd{\subsubsection}
+\def\refa{chapter}
+\def\refb{section}
+\def\refc{section}
+\def\refd{section}
+
+%\def\seca{\section}
+%\def\secb{\subsection}
+%\def\secc{\subsubsection}
+%\def\refa{section}
+%\def\refb{section}
+%\def\refc{section}
+
+\documentclass[11pt,twoside,final,openright]{report}
+\usepackage{a4,graphicx,setspace}
+\setstretch{1.15}
+
+\begin{document}
+
+% TITLE PAGE
+\pagestyle{empty}
+\begin{center}
+\vspace*{\fill}
+\includegraphics{figs/xenlogo.eps}
+\vfill
+\vfill
+\vfill
+\begin{tabular}{l}
+{\Huge \bf Xend} \\[4mm]
+{\huge Xen v2.0 for x86} \\[80mm]
+
+{\Large Xen is Copyright (c) 2004, The Xen Team} \\[3mm]
+{\Large University of Cambridge, UK} \\[20mm]
+{\large Last updated 30 August 2004}
+\end{tabular}
+\vfill
+\end{center}
+\cleardoublepage
+
+% TABLE OF CONTENTS
+\pagestyle{plain}
+\pagenumbering{roman}
+{ \parskip 0pt plus 1pt
+  \tableofcontents }
+\cleardoublepage
+% PREPARE FOR MAIN TEXT
+\pagenumbering{arabic}
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\parindent=0pt
+\renewcommand{\topfraction}{.8}
+\renewcommand{\bottomfraction}{.8}
+\renewcommand{\textfraction}{.2}
+\renewcommand{\floatpagefraction}{.8}
+
+\setstretch{1.15}
+
+\seca{Introduction}
+Xend is the control daemon used to manage a machine running the Xen hypervisor.
+Xend is responsible for creating and destroying domains and managing their
+resources, such as virtual block devices and virtual network interfaces.
+
+Xend exists because the Xen hypervisor itself only manages the memory image
+of a domain and its scheduling. Xen provides the event channels that connect
+a domain to its devices, but is intentionally not involved in setting them up.
+
+Xend runs as a daemon in the privileged domain 0 and uses a low-level api
+to communicate with Xen via the domain 0 kernel. Xend exports its control
+interface to its clients using HTTP. Most programming languages have
+HTTP client libraries, so this interface can be used from most popular 
+languages, for example Python, Perl, C, Java.
+Xend itself is written in Python, as are most of the Xen tools.
+
+The xend interface is intended to be a complete interface for the creation
+and management of domains. It supports domain creation, shutdown, reboot,
+destruction, save, restore and migration.
+
+When xend creates a domain it creates the domain memory image and communicates
+with the device driver domain(s) to configure the devices for the domain.
+This sets up connections between the domain and backend device controllers
+in the driver domain. When a domain shuts down its memory image cannot be fully released
+unless its backend devices are released and disconnected. This is done by xend.
+In order to protect against loss of this information when xend is restarted,
+xend maintains a persistent database of domain configurations. This allows
+xend to be stopped and restarted without loss of configuration information.
+For example, in order to upgrade the xend software.
+
+\seca{Domain lifecycle}
+\secb{Domain creation}
+Xend is instructed to create a domain by posting a domain\_create message to it,
+containing the domain configuration to be instantiated. The domain configuration
+is in sxp format and is as far as possible {\em fully-bound}, that is, all
+parameters are fully-specified. The domain configuration is saved in the filesystem
+so that it can be reused later if necessary.
+
+The domain configuration specifies the domain name, memory size, kernel image
+and parameters, and all the domain devices. Xend uses the Xen api to create
+the domain memory image, and then {\em builds} the memory image for the domain
+using the kernel image. At this point the domain exists, but it cannot be run because
+it has no devices. Xend then communicates with the device driver domain to create
+the configured devices. Once the devices are created it sets up event channels
+for them between the driver domain and the new domain, and notifies the new domain
+that its devices are connected. At this point the domain can be started.
+
+Xend is also responsible for managing domain consoles. When a domain is created,
+xend sets up a console event channel to the domain, and creates a TCP listening port
+for the domain console. When a connection is accepted to the port, xend
+connects input and output for the port to the domain console channel.
+
+\secb{Domain destruction}
+When a domain terminates, because it has been shutdown or it has crashed, the
+domain resources must be released so that the domain memory image can be
+finally removed from xen. Xend monitors the domains, and is also signaled by
+xen (using a VIRQ) when a domain exits. Xend examines the domain states and
+determines which domains have exited. It then communicates with the driver domain
+to release the devices for exited domains. Xend also closes any open console
+connections and removes the TCP listeners for exited domains.
+Once all devices have been released it instructs xen to destroy the memory image.
+
+\secb{Domain restart}
+Domain restart is the xen equivalent of a machine reboot. When a domain
+exits because it has been shutdown in reboot mode, its exit code is reboot.
+When examining domains to find those that have exited and destroy them,
+xend detects those that have exited for reboot and does not completely destroy
+them. It disconnects all their devices, and detaches the console listener
+from its channel to the domain, but does not close it. Instead it schedules
+a call to rebuild the domain from its configuration. This proceeds almost
+identically to creating the domain, except that the console listener is
+reused and connected to the new domain. This allows existing console
+connections to remain connected across a domain restart. The restarted
+domain keeps the same name and domain id.
+
+The determination of when to restart a domain is in fact slightly more
+complex than described above. A domain is configured with a 
+{\em restart mode}. If the restart mode is {\em onreboot}, the default,
+restart happens when the domain is shutdown normally and
+exits with code reboot. If the restart mode is {\em never} the domain is
+not restarted. If the restart mode is {\em always} the domain is always
+restarted, regardless of how it exited.
+
+In order to prevent continual domain crash causing restart loops, xend
+has a {\em minimum restart time}. Xend remembers when a domain was last
+restarted and will fail a restart that happens inside the minimum
+restart time.
+
+\seca{Devices}
+\secb{Virtual network interfaces}
+Each virtual network interface (vif) has 2 parts: the font-end device in its domain,
+and the back-end device in the driver domain. Usually the driver domain is domain 0,
+and there is a linux network device corresponding to the vif. The linux device for
+interface N on domain D is called vifD.N. When a packet is sent on the vif in the 
+domain the packet is received from the linux device. The linux devices are connected
+to network interfaces using ethernet bridging.
+
+The default setup is a bridge xen-br0, with eth0 connected to it, and the routes
+for eth0 directed at xen-br0. This is controlled by the xend network setup script,
+default {\tt /etc/xen/network}, which is run when xend starts.
+
+When the vifs for a domain are created, a vif control script, default {\tt /etc/xen/vif-bridge},
+is run to connect the vif to its bridge. The default script connects the vif
+to xen-br0 and optionally sets up iptables rules to prevent IP address spoofing.
+The bridge a vif is connected to can be defined in its configuration, and this is useful
+for setting up virtual networks using several bridges.
+
+\secb{Virtual block devices}
+Virtual block devices in a domain are interfaces onto back-end device drivers
+that export physical devices to domains. In the default configuration the back-end
+driver is in domain 0 and can export any linux block device to a domain. This includes
+physical disk partitions, LVM volumes and loopback mounts of files. In fact anything
+that linux can represent as a block device can be exported to a domain as virtual
+block device.
+
+\seca{Xend invocation}
+Xend is started (by root) using the command
+\begin{verbatim}
+xend start
+\end{verbatim}
+Xend can be stopped using
+\begin{verbatim}
+xend stop
+\end{verbatim}
+Xend must be started before any domains (apart from domain 0) can be created.
+If you try to use the {\tt xm} tool when xend is not running you will get a
+'connection refused' message.
+
+\secb{Xend configuration}
+Xend reads its own configuration from {\tt /etc/xen/xend-config.sxp}, which is
+a sequence of s-expressions. The configuration parameters are:
+\begin{itemize}
+
+\item xend-port: Port xend should use for the HTTP interface (default 8000).
+
+\item xend-address: Address xend should listen on.
+  Specifying 'localhost' prevents remote connections.
+  Specifying the empty string '' allows all connections, and is the default.
+
+\item network-script: The script used to start/stop networking for xend (default network).
+
+\item vif-bridge: The default bridge that virtual interfaces should be connected to
+  (default xen-br0).
+
+\item vif-script: The default script used to control virtual interfaces
+  (default vif-bridge).
+
+\item vif-antispoof: Whether iptables should be set up to prevent IP spoofing for
+  virtual interfaces (default yes).
+\end{itemize}
+
+Configuration scripts ({\it e.g.} for network-script) are looked for in {\tt /etc/xen}
+unless their name begins with '/'.
+
+Xend sends its log output to {\tt /var/log/xend.log}. This is a rotating logfile,
+and logs are moved onto {\tt xend.log.1} {\it etc.} as they get large. Old logs may
+be deleted.
+
+\secb{Xend database}
+Xend needs to make some data persistent, and it uses files under {\tt /var/xen/xend-db}
+for this. The persistent data is stored in files in SXP format. Domain information
+is saved when domains are created. When xend starts it reads the file {\tt /var/xen/lastboot}
+(if it exists) to determine the last time the system was rebooted. It compares this time
+with the last reboot time in {\tt wtmp} to determine if the system has been rebooted
+since xend last ran. If the system has been rebooted xend removes all its saved data
+that is not persistent across reboots (for example domain data).
+
+\seca{Xend HTTP Interface}
+ The xend interface uses HTTP 1.1 \cite{http} as its transport.
+Simple PUT and GET calls can encode parameters using the standard url-encoding 
+for parameters: MIME type {\tt application/x-www-form-urlencoded}.
+When file upload is required, the {\tt multipart/form-data} encoding is used.
+See the HTML 4.1 specification for details \cite{html}.
+
+Xend functions as a webserver and supports two interfaces: one
+for web-browsers and one for programs.
+The web-browser interface returns replies in HTML and includes forms
+for interactive operations such as stopping domains and creating domains
+from an uploaded configuration. The programmatic interface usually returns replies
+in s-expression format. Both interfaces are accessed
+in exactly the same way over HTTP - the only difference is the data returned.
+
+The webserver distinguishes browsers from programs using the {\tt User-Agent}
+and {\tt Accept} headers in the HTTP request. If there is no {\tt User-Agent} or no
+{\tt Acccept} header, or {\tt Accept} includes the type {\tt application/sxp}, the
+webserver assumes the client is a program and returns SXP. Otherwise
+it assumes the client is a webserver and returns HTML.
+In some cases the return value is essentially a string, so {\tt Content-Type}
+{\tt text/plain} is returned.
+
+The HTTP api supported is listed below. All paths in it are relative to the
+server root, for example {\tt http://localhost:8000/xend}.
+As defined in the HTTP specification, we use GET for side-effect free
+operations that may safely be repeated, and POST for operations with
+side-effects. For each request we list the HTTP method (GET or POST),
+the url relative to the server root, the operation name and arguments (if any).
+The operation name is passed as request parameter 'op', and the arguments
+are passed by name. Operation name and parameters can be encoded using either
+encoding described above. We also list the corresponding api function from the
+Python client interface in {\tt xen.xend.XendClient}.
+
+\begin{itemize}
+\item {\tt GET /},\\
+  {\tt xend()}:\\
+  Get list of urls under xend root.
+
+\item {\tt GET /node},\\
+  {\tt xend\_node()}:\\
+  Get node information.
+
+\item {\tt POST /node shutdown()},\\
+  {\tt xend\_node\_shutdown()}:\\
+  Shutdown the node
+
+\item {\tt POST /node reboot()},\\
+  {\tt xend\_node\_reboot()}:\\
+  Reboot the node
+
+\item {\tt POST /node notify()}:\\
+  Set node notification url
+  
+\item {\tt GET /node/dmesg},\\
+  {\tt xend\_node\_dmesg()}:\\
+  Get xen boot message.
+
+\item {\tt GET /node/log},\\
+  {\tt xend\_node\_log()}:\\
+  Get xend log.
+
+\item {\tt GET /domain}\\
+  {\tt xend\_domains()}:\\
+  Get list of domains.
+
+\item {\tt POST /domain create(config)},\\
+  {\tt xend\_domain\_create(config)}:\\
+  Create a domain.
+
+\item {\tt POST /domain restore(file)},\\
+  {\tt xend\_domain\_restore(filename)}:\\
+  Restore a saved domain.
+
+\item {\tt GET /domain/<dom>},\\
+  {\tt xend\_domain(dom)}:\\
+  Get domain information.
+
+\item {\tt POST /domain/[dom] configure(config)},\\
+  {\tt xend\_domain\_configure(dom, conf)}:\\
+  Configure an existing domain (for internal use by restore and migrate).
+
+\item {\tt POST /domain/[dom] unpause()},\\
+  {\tt xend\_domain\_unpause(dom)}:\\
+  Start domain running
+
+\item {\tt POST /domain/[dom] pause()},\\
+  {\tt xend\_domain\_pause(dom)}:\\
+  Stop domain running.
+
+\item {\tt POST /domain/[dom] shutdown(reason)},\\
+  {\tt xend\_domain\_shutdown(dom, reason)}:\\
+  Shutdown domain, reason can be reboot, poweroff, halt.
+
+\item {\tt POST /domain/[dom] destroy(reason)},\\
+  {\tt xend\_domain\_destroy(dom, reason)}:\\
+  Destroy domain, reason can be reboot, halt.
+
+\item {\tt POST /domain/[dom] save(file)},\\
+  {\tt xend\_domain\_save(dom, filename)}:\\
+  Save a domain to a file.
+
+\item {\tt POST /domain/[dom] migrate(dst)},\\
+  {\tt xend\_domain\_migrate(dom, dst)}:\\
+  Migrate a domain.
+
+\item {\tt POST /domain/[dom] pincpu(cpu)},\\
+  {\tt xend\_domain\_pincpu(self, id, cpu)}\\:
+  Pin a domain to a cpu.
+
+\item {\tt POST /domain/[dom] bvt\_set(mcuadv, warp, warpl, warpu)},\\
+  {\tt xend\_domain\_cpu\_bvt\_set(dom, mcuadv, warp, warpl, warpu)}:\\
+  Set BVT scheduler parameters.
+
+\item {\tt POST /domain/[dom] atropos\_set(period, slice, latency, xtratime)},\\
+  {\tt xend\_domain\_cpu\_atropos\_set(dom, period, slice, latency, xtratime)}:\\
+  Set atropos scheduler parameters.
+
+\item {\tt POST /domain/[dom] maxmem\_set(memory)},\\
+  {\tt xend\_domain\_maxmem\_set(dom, memory)}:\\
+  Set domain maximum memory limit.
+
+\item {\tt POST /domain/[dom] device\_create(config)}\\
+  {\tt xend\_domain\_device\_create(dom, config)}:\\
+  Add a device to a domain.
+
+\item {\tt POST /domain/[dom] device\_destroy(type, index)},\\
+  {\tt xend\_domain\_device\_destroy(dom, type, index)}:\\
+  Delete a device from a domain
+
+\item {\tt GET /domain/[dom] vifs()},\\
+  {\tt xend\_domain\_vifs(dom)}:\\
+  Get virtual network interfaces.
+
+\item {\tt GET /domain/[dom] vif(vif)},\\
+  {\tt xend\_domain\_vif(dom, vif)}:\\
+  Get virtual network interface.
+
+\item {\tt GET /domain/[dom] vbds()},\\
+  {\tt xend\_domain\_vbds(dom)}:\\
+  Get virtual block devices.
+
+\item {\tt GET /domain/[dom] vbd(vbd)},\\
+  {\tt xend\_domain\_vbd(dom, vbd)}:\\
+  Get virtual block device.
+
+\item {\tt GET /console},\\
+  {\tt xend\_consoles()}:\\
+  Get list of consoles.
+
+\item {\tt GET /console/[id]}\\
+  {\tt xend\_console(id)}:\\
+  Get information about a console.
+
+\item {\tt GET /console/[id] disconnect()}\\
+  {\tt xend\_console\_disconnect(self, id)}:\\
+  Disconnect any console TCP connection.
+
+\item {\tt GET /vnet}\\
+  {\tt xend\_vnets()}:\\
+  Get list of vnets (virtual networks).
+
+\item {\tt GET /vnet/[id]}\\
+  {\tt xend\_vnet(id)}:\\
+  Get information about a virtual network.
+
+\item {\tt POST /vnet create(config)}\\
+  {\tt xend\_vnet\_create(conf)}:\\
+  Create a vnet.
+
+\item {\tt POST /vnet/[id] delete()}\\
+  {\tt xend\_vnet\_delete(id)}:\\
+  Delete a vnet.
+
+\item {\tt POST /event inject(event)}\\
+  {\tt xend\_event\_inject(sxpr)}:\\
+  Inject an event.
+
+\end{itemize}
+
+\secb{Xend debugging interface}
+Xend also listens on port 8001. Connecting to this port (for example via telnet)
+allows access to some debugging functions:
+\begin{itemize}
+\item help: list functions
+\item traceon: turn xend tracing on
+\item traceoff: turn xend tracing off
+\item quit: disconnect.
+\item info: list console listeners, block and network device controllers.
+\end{itemize}
+
+When tracing is on xend logs all functions calls and exceptions to
+{\tt /var/log/xend.trace}.
+
+\begin{thebibliography}{99}
+
+\bibitem{html}
+HTML 4.01 Specification,\\
+http://www.w3.org/TR/html4/,\\
+W3C Recommendation, 24 December 1999.
+
+\bibitem{http}
+Hypertext Transfer Protocol -- HTTP/1.1,\\
+http://www.ietf.org/rfc/rfc2616.txt,\\
+RFC 2616, IETF 1999.
+
+\bibitem{ssh}
+http://www.openssh.org.
+
+\bibitem{stunnel}
+http://www.stunnel.org.
+
+\end{thebibliography}
+\end{document}

@@ -1,0 +1,72 @@
+#!/bin/bash
+
+function usage {
+    echo "Usage:"
+    echo "\t$0 [build|install|clean]"
+    echo
+    echo "Check suitability for Xen build or install."
+    echo "Exit with 0 if OK, 1 if not."
+    echo "Prints only failed tests."
+    echo
+    echo "Calling with 'clean' removes generated files."
+    exit 1
+}
+
+export PATH=${PATH}:/sbin:/usr/sbin
+
+case $1 in
+    build)
+        check="CHECK-BUILD"
+        info=".chkbuild"
+        ;;
+    install)
+        check="CHECK-INSTALL"
+        info=".chkinstall"
+        ;;
+    clean)
+        rm -f .chkbuild .chkinstall
+        exit 0
+        ;;
+    *)
+        usage
+        ;;
+esac
+
+failed=0
+
+echo "Xen ${check} " $(date) > ${info}
+for f in check_* ; do
+    case $f in
+        *~)
+            continue
+            ;;
+        *)
+            ;;
+    esac
+    if ! [ -x $f ] ; then
+        continue
+    fi
+    if ! grep -q ${check} $f ; then
+        continue
+    fi
+    echo ' ' >> ${info}
+    echo "Checking $f" >> ${info}
+    if ./$f 1>>${info} 2>&1 ; then
+        echo OK >> ${info}
+    else
+        failed=1
+        echo "FAILED $f"
+        echo FAILED >> ${info}
+    fi
+done
+
+echo >> ${info}
+
+if [ "$failed" == "1" ] ; then
+    echo "Checks failed. See `pwd`/${info} for details."
+    echo "FAILED" >> ${info}
+    exit 1
+else
+    echo "OK" >> ${info}
+    exit 0
+fi

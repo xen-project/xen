@@ -1,24 +1,29 @@
 
+verbose     ?= n
 debug       ?= n
 debugger    ?= n
 perfc       ?= n
 trace       ?= n
+optimize    ?= y
 
-# Currently supported architectures:
-#  {COMPILE,TARGET}_ARCH    := x86
-#  {COMPILE,TARGET}_SUBARCH := x86_32 | x86_64
-COMPILE_ARCH    := x86
-COMPILE_SUBARCH := $(shell uname -m | sed -e s/i.86/x86_32/)
-
+# Currently supported architectures: x86_32, x86_64
+COMPILE_ARCH    ?= $(shell uname -m | sed -e s/i.86/x86_32/)
 TARGET_ARCH     ?= $(COMPILE_ARCH)
-TARGET_SUBARCH  ?= $(COMPILE_SUBARCH)
+
+# Set ARCH/SUBARCH appropriately.
+override COMPILE_SUBARCH := $(COMPILE_ARCH)
+override TARGET_SUBARCH  := $(TARGET_ARCH)
+override COMPILE_ARCH    := $(patsubst x86%,x86,$(COMPILE_ARCH))
+override TARGET_ARCH     := $(patsubst x86%,x86,$(TARGET_ARCH))
 
 TARGET  := $(BASEDIR)/xen
 HDRS    := $(wildcard $(BASEDIR)/include/xen/*.h)
 HDRS    += $(wildcard $(BASEDIR)/include/scsi/*.h)
-HDRS    += $(wildcard $(BASEDIR)/include/hypervisor-ifs/*.h)
+HDRS    += $(wildcard $(BASEDIR)/include/public/*.h)
 HDRS    += $(wildcard $(BASEDIR)/include/asm-$(TARGET_ARCH)/*.h)
+HDRS    += $(wildcard $(BASEDIR)/include/asm-$(TARGET_ARCH)/$(TARGET_SUBARCH)/*.h)
 # compile.h is always regenerated, but other files shouldn't be rebuilt
+HDRS    := $(subst $(BASEDIR)/include/xen/banner.h,,$(HDRS))
 HDRS    := $(subst $(BASEDIR)/include/xen/compile.h,,$(HDRS))
 
 C_SRCS  := $(wildcard *.c)
@@ -36,6 +41,8 @@ ALL_OBJS += $(BASEDIR)/arch/$(TARGET_ARCH)/arch.o
 HOSTCC     = gcc
 HOSTCFLAGS = -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer 
 
+test-gcc-flag = $(shell gcc -v --help 2>&1 | grep -q " $(1) " && echo $(1))
+
 include $(BASEDIR)/arch/$(TARGET_ARCH)/Rules.mk
 
 ifneq ($(debug),y)
@@ -47,8 +54,8 @@ else
 CFLAGS += -DVERBOSE
 endif
 
-ifeq ($(debugger),y)
-CFLAGS += -DXEN_DEBUGGER -g
+ifeq ($(gdb_stub),y)
+CFLAGS += -g
 endif
 
 ifeq ($(perfc),y)
@@ -58,6 +65,8 @@ endif
 ifeq ($(trace),y)
 CFLAGS += -DTRACE_BUFFER
 endif
+
+CFLAGS := $(strip $(CFLAGS))
 
 %.o: %.c $(HDRS) Makefile
 	$(CC) $(CFLAGS) -c $< -o $@

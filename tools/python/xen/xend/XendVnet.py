@@ -53,8 +53,11 @@ class XendVnetInfo:
         return vnet_cmd(['vnet.del', self.id])
 
     def vifctl(self, op, vif, vmac):
-        fn = self.vifctl_ops[op]
-        return vnet_cmd([fn, ['vif', vif], ['vmac', vmac]])
+        try:
+            fn = self.vifctl_ops[op]
+            return vnet_cmd([fn, ['vnet', self.id], ['vif', vif], ['vmac', vmac]])
+        except XendError:
+            log.warning("vifctl failed: op=%s vif=%s mac=%s", op, vif, vmac)
 
 class XendVnet:
     """Index of all vnets. Singleton.
@@ -72,8 +75,8 @@ class XendVnet:
             self.vnet[info.id] = info
             try:
                 info.configure()
-            except:
-                log.exception("Error configuring vnet")
+            except XendError, ex:
+                log.warning("Failed to configure vnet %s: %s", str(info.id), str(ex))
 
     def vnet_of_bridge(self, bridge):
         """Get the vnet for a bridge (if any).

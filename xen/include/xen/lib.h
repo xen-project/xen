@@ -11,13 +11,19 @@
 #define ASSERT(_p) ((void)0)
 #endif
 
-#define reserve_bootmem(_p,_l) \
-printk("Memory Reservation 0x%lx, %lu bytes\n", (_p), (_l))
+#define SWAP(_a, _b) \
+   do { typeof(_a) _t = (_a); (_a) = (_b); (_b) = _t; } while ( 0 )
 
-/* kernel.c */
+#define reserve_bootmem(_p,_l) ((void)0)
+
+struct domain;
+
+void cmdline_parse(char *cmdline);
+
 #define printk printf
 void printf(const char *format, ...);
 void panic(const char *format, ...);
+long vm_assist(struct domain *, unsigned int, unsigned int);
 
 /* vsprintf.c */
 extern int sprintf(char * buf, const char * fmt, ...)

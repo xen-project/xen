@@ -27,24 +27,34 @@ def __recv_from_sock(sock):
     while not stop:
         try:
             data = sock.recv(1024)
-            os.write(1, data)
         except socket.error, error:
             if error[0] != errno.EINTR:
                 raise
+        else:
+            try:
+                os.write(1, data)
+            except os.error, error:
+                if error[0] != errno.EINTR:
+                    raise
     os.wait()
 
 def __send_to_sock(sock):
     while 1:
-        data = os.read(0,1024)
-        if ord(data[0]) == ord(']')-64:
-            break
         try:
-            sock.send(data)
-        except socket.error, error:
-            if error[0] == errno.EPIPE:
-                sys.exit(0)
+            data = os.read(0,1024)
+        except os.error, error:
             if error[0] != errno.EINTR:
                 raise
+        else:
+            if ord(data[0]) == ord(']')-64:
+                break
+            try:
+                sock.send(data)
+            except socket.error, error:
+                if error[0] == errno.EPIPE:
+                    sys.exit(0)
+                if error[0] != errno.EINTR:
+                    raise
     sys.exit(0)
 
 def connect(host,port):

@@ -1,0 +1,154 @@
+#!/bin/sh
+#
+# /etc/init.d/xendomains
+# Start / stop domains automatically when domain 0 boots / shuts down.
+#
+# chkconfig: 345 99 00
+# description: Start / stop Xen domains.
+#
+# This script offers fairly basic functionality.  It should work on Redhat
+# but also on LSB-compliant SuSE releases and on Debian with the LSB package
+# installed.  (LSB is the Linux Standard Base)
+#
+# Based on the example in the "Designing High Quality Integrated Linux
+# Applications HOWTO" by Avi Alkalay
+# <http://www.tldp.org/HOWTO/HighQuality-Apps-HOWTO/>
+#
+
+RETVAL=0
+
+INITD=/etc/init.d
+
+AUTODIR=/etc/xen/auto
+LOCKFILE=/var/lock/subsys/xendomains
+
+if [ -e /lib/lsb ]; then
+    # assume an LSB-compliant distro (Debian with LSB package,
+    # recent-enough SuSE, others...)
+
+    . /lib/lsb/init-functions # source LSB standard functions
+
+    on_fn_exit()
+    {
+	if [ $RETVAL -eq 0 ]; then
+	    log_success_msg
+	else
+	    log_failure_msg
+	fi
+    }
+elif [ -r $INITD/functions ]; then
+    # assume a Redhat-like distro
+    . $INITD/functions # source Redhat functions
+
+    on_fn_exit()
+    {
+	if [ $RETVAL -eq 0 ]; then
+	    success
+	else
+	    failure
+	fi
+	
+	echo
+    }
+else
+    # none of the above
+    LOCKFILE=/var/lock/xendomains
+
+    on_fn_exit()
+    {
+	echo
+    }
+fi
+
+
+
+start() {
+    if [ -f $LOCKFILE ]; then return; fi
+
+    echo -n $"Starting auto Xen domains:"
+
+    # We expect config scripts for auto starting domains to be in
+    # AUTODIR - they could just be symlinks to files elsewhere
+    if [ -d $AUTODIR ] && [ $(ls $AUTODIR | wc -l) -gt 0 ]; then
+	touch $LOCKFILE
+	
+       # Create all domains with config files in AUTODIR.
+	for dom in  $AUTODIR/*; do
+	    xm create --quiet --defconfig $dom
+	    if [ $? -ne 0 ]; then
+		RETVAL=$?
+	    fi
+	done
+
+    fi
+
+    on_fn_exit
+}
+
+stop()
+{
+    # NB. this shuts down ALL Xen domains (politely), not just the ones in
+    # AUTODIR/*
+    # This is because it's easier to do ;-) but arguably if this script is run
+    # on system shutdown then it's also the right thing to do.
+    
+    echo -n $"Shutting down all Xen domains:"
+
+    xm shutdown --all --wait --halt
+
+    RETVAL=$?
+
+    [ $RETVAL -eq 0 ] && rm -f $LOCKFILE
+
+    on_fn_exit
+}
+
+# This does NOT necessarily restart all running domains: instead it
+# stops all running domains and then boots all the domains specified in
+# AUTODIR.  If other domains have been started manually then they will
+# not get restarted.
+# Commented out to avoid confusion!
+#
+#restart()
+#{
+#    stop
+#    start
+#}
+
+# same as restart for now - commented out to avoid confusion
+#reload()
+#{
+#    restart
+#}
+
+
+case "$1" in
+    start)
+	start
+	;;
+
+    stop)
+	stop
+	;;
+
+# The following are commented out to disable them by default to avoid confusion
+# - see the notes above
+#
+#    restart)
+#	restart
+#	;;
+#
+#    reload)
+#	reload
+#	;;
+
+    status)
+	xm list
+	;;
+
+    *)
+	echo $"Usage: $0 {start|stop|status}"
+	;;
+esac
+
+exit $RETVAL

@@ -1,0 +1,55 @@
+# arch/xen/Kconfig.drivers
+
+menu "Device Drivers"
+
+source "drivers/base/Kconfig"
+
+if XEN_PHYSDEV_ACCESS
+source "drivers/mtd/Kconfig"
+source "drivers/parport/Kconfig"
+source "drivers/pnp/Kconfig"
+endif
+
+source "drivers/block/Kconfig"
+
+if XEN_PHYSDEV_ACCESS
+source "drivers/ide/Kconfig"
+endif
+
+source "drivers/scsi/Kconfig"
+
+if XEN_PHYSDEV_ACCESS
+source "drivers/cdrom/Kconfig"
+endif
+
+source "drivers/md/Kconfig"
+
+if XEN_PHYSDEV_ACCESS
+source "drivers/message/fusion/Kconfig"
+source "drivers/ieee1394/Kconfig"
+source "drivers/message/i2o/Kconfig"
+endif
+
+source "net/Kconfig"
+
+if XEN_PHYSDEV_ACCESS
+source "drivers/isdn/Kconfig"
+source "drivers/telephony/Kconfig"
+source "drivers/input/Kconfig"
+source "drivers/char/Kconfig"
+source "drivers/i2c/Kconfig"
+source "drivers/w1/Kconfig"
+source "drivers/misc/Kconfig"
+source "drivers/media/Kconfig"
+source "drivers/video/Kconfig"
+source "sound/Kconfig"
+source "drivers/usb/Kconfig"
+endif
+
+if !XEN_PHYSDEV_ACCESS
+config UNIX98_PTYS
+	bool
+	default y
+endif
+
+endmenu

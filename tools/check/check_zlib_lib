@@ -1,0 +1,10 @@
+#!/bin/bash
+# CHECK-BUILD CHECK-INSTALL
+
+function error {
+    echo 'Check for zlib library failed.'
+    exit 1
+}
+
+set -e
+ldconfig -p | grep libz.so || error

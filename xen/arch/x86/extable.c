@@ -3,8 +3,35 @@
 #include <xen/spinlock.h>
 #include <asm/uaccess.h>
 
-extern const struct exception_table_entry __start___ex_table[];
-extern const struct exception_table_entry __stop___ex_table[];
+extern struct exception_table_entry __start___ex_table[];
+extern struct exception_table_entry __stop___ex_table[];
+extern struct exception_table_entry __start___pre_ex_table[];
+extern struct exception_table_entry __stop___pre_ex_table[];
+
+static void sort_exception_table(struct exception_table_entry *start,
+                                 struct exception_table_entry *end)
+{
+    struct exception_table_entry *p, *q, tmp;
+
+    for ( p = start; p < end; p++ )
+    {
+        for ( q = p-1; q > start; q-- )
+            if ( p->insn > q->insn )
+                break;
+        if ( ++q != p )
+        {
+            tmp = *p;
+            memmove(q+1, q, (p-q)*sizeof(*p));
+            *q = tmp;
+        }
+    }
+}
+
+void sort_exception_tables(void)
+{
+    sort_exception_table(__start___ex_table, __stop___ex_table);
+    sort_exception_table(__start___pre_ex_table, __stop___pre_ex_table);
+}
 
 static inline unsigned long
 search_one_table(const struct exception_table_entry *first,
@@ -31,5 +58,15 @@ search_one_table(const struct exception_table_entry *first,
 unsigned long
 search_exception_table(unsigned long addr)
 {
-    return search_one_table(__start___ex_table, __stop___ex_table-1, addr);
+    return search_one_table(
+        __start___ex_table, __stop___ex_table-1, addr);
+}
+
+unsigned long
+search_pre_exception_table(unsigned long addr)
+{
+    unsigned long fixup = search_one_table(
+        __start___pre_ex_table, __stop___pre_ex_table-1, addr);
+    DPRINTK("Pre-exception: %p -> %p\n", addr, fixup);
+    return fixup;
 }

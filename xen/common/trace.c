@@ -1,3 +1,4 @@
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4; indent-tabs-mode:nil -*- */
 /******************************************************************************
  * common/trace.c
  *
@@ -13,7 +14,7 @@
  * it's possible to reconstruct a chronological record of trace events.
  *
  * See also include/xen/trace.h and the dom0 op in
- * include/hypervisor-ifs/dom0_ops.h
+ * include/public/dom0_ops.h
  */
 
 #include <xen/config.h>
@@ -25,8 +26,13 @@
 #include <xen/smp.h>
 #include <xen/trace.h>
 #include <xen/errno.h>
+#include <xen/init.h>
 #include <asm/atomic.h>
-#include <hypervisor-ifs/dom0_ops.h>
+#include <public/dom0_ops.h>
+
+/* opt_tbuf_size: trace buffer size (in pages) */
+static unsigned int opt_tbuf_size = 10;
+integer_param("tbuf_size", opt_tbuf_size);
 
 /* Pointers to the meta-data objects for all system trace buffers */
 struct t_buf *t_bufs[NR_CPUS];
@@ -43,12 +49,10 @@ int tb_init_done = 0;
  */
 void init_trace_bufs(void)
 {
-    extern int opt_tbuf_size;
     int           i, order;
     unsigned long nr_pages;
     char         *rawbuf;
     struct t_buf *buf;
-    struct domain *dom0;
     
     if ( opt_tbuf_size == 0 )
     {
@@ -67,13 +71,9 @@ void init_trace_bufs(void)
 
     /* Share pages so that xentrace can map them. */
 
-    dom0 = find_domain_by_id(0);
-
-    for( i = 0; i < nr_pages; i++)
+    for ( i = 0; i < nr_pages; i++ )
         SHARE_PFN_WITH_DOMAIN(virt_to_page(rawbuf+(i*PAGE_SIZE)), dom0);
     
-    put_domain(dom0);
-
     for ( i = 0; i < smp_num_cpus; i++ )
     {
         buf = t_bufs[i] = (struct t_buf *)&rawbuf[i*opt_tbuf_size*PAGE_SIZE];
@@ -83,7 +83,7 @@ void init_trace_bufs(void)
         buf->head_ptr = buf->vdata;
         
         /* For use in user space. */
-        buf->data = (struct t_rec *)__pa(buf->vdata);
+        buf->data = __pa(buf->vdata);
         buf->head = 0;
 
         /* For use in both. */
@@ -92,7 +92,7 @@ void init_trace_bufs(void)
     }
 
     printk("Xen trace buffers: initialised\n");
- 
+    
     wmb(); /* above must be visible before tb_init_done flag set */
 
     tb_init_done = 1;
@@ -102,23 +102,21 @@ void init_trace_bufs(void)
  * get_tb_info - get trace buffer details
  * @st: a pointer to a dom0_gettbufs_t to be filled out
  *
- * Called by the %DOM0_GETTBUFS dom0 op to fetch the physical address of the
+ * Called by the %DOM0_GETTBUFS dom0 op to fetch the machine address of the
  * trace buffers.
  */
 int get_tb_info(dom0_gettbufs_t *st)
 {
-    if(tb_init_done)
+    if ( tb_init_done )
     {
-        extern unsigned int opt_tbuf_size;
-        
-        st->phys_addr = __pa(t_bufs[0]);
+        st->mach_addr = __pa(t_bufs[0]);
         st->size      = opt_tbuf_size * PAGE_SIZE;
         
         return 0;
     }
     else
     {
-        st->phys_addr = 0;
+        st->mach_addr = 0;
         st->size      = 0;
         return -ENODATA;
     }

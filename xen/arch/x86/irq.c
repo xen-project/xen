@@ -13,11 +13,11 @@
 #include <xen/sched.h>
 #include <asm/smpboot.h>
 
-irq_desc_t irq_desc[NR_IRQS] __cacheline_aligned;
+irq_desc_t irq_desc[NR_IRQS];
 
 static void __do_IRQ_guest(int irq);
 
-void no_action(int cpl, void *dev_id, struct pt_regs *regs) { }
+void no_action(int cpl, void *dev_id, struct xen_regs *regs) { }
 
 static void enable_none(unsigned int irq) { }
 static unsigned int startup_none(unsigned int irq) { return 0; }
@@ -87,13 +87,9 @@ void enable_irq(unsigned int irq)
     spin_unlock_irqrestore(&desc->lock, flags);
 }
 
-asmlinkage void do_IRQ(struct pt_regs regs)
+asmlinkage void do_IRQ(struct xen_regs *regs)
 {       
-#if defined(__i386__)
-    unsigned int      irq = regs.orig_eax;
-#else
-    unsigned int      irq = 0; /* XXX */
-#endif
+    unsigned int      irq = regs->entry_vector;
     irq_desc_t       *desc = &irq_desc[irq];
     struct irqaction *action;
 
@@ -127,7 +123,7 @@ asmlinkage void do_IRQ(struct pt_regs regs)
         desc->status &= ~IRQ_PENDING;
         irq_enter(smp_processor_id(), irq);
         spin_unlock_irq(&desc->lock);
-        action->handler(irq, action->dev_id, &regs);
+        action->handler(irq, action->dev_id, regs);
         spin_lock_irq(&desc->lock);
         irq_exit(smp_processor_id(), irq);
     }
@@ -188,43 +184,44 @@ typedef struct {
     u8 nr_guests;
     u8 in_flight;
     u8 shareable;
-    struct domain *guest[IRQ_MAX_GUESTS];
+    struct exec_domain *guest[IRQ_MAX_GUESTS];
 } irq_guest_action_t;
 
 static void __do_IRQ_guest(int irq)
 {
     irq_desc_t         *desc = &irq_desc[irq];
     irq_guest_action_t *action = (irq_guest_action_t *)desc->action;
-    struct domain *p;
+    struct exec_domain *ed;
     int                 i;
 
     for ( i = 0; i < action->nr_guests; i++ )
     {
-        p = action->guest[i];
-        if ( !test_and_set_bit(irq, &p->pirq_mask) )
+        ed = action->guest[i];
+        if ( !test_and_set_bit(irq, &ed->domain->pirq_mask) )
             action->in_flight++;
-        send_guest_pirq(p, irq);
+        send_guest_pirq(ed, irq);
     }
 }
 
-int pirq_guest_unmask(struct domain *p)
+int pirq_guest_unmask(struct domain *d)
 {
     irq_desc_t    *desc;
-    int            i, j, pirq;
+    unsigned int   i, j, pirq;
     u32            m;
-    shared_info_t *s = p->shared_info;
+    shared_info_t *s = d->shared_info;
 
-    for ( i = 0; i < 2; i++ )
+    for ( i = 0; i < ARRAY_SIZE(d->pirq_mask); i++ )
     {
-        m = p->pirq_mask[i];
-        while ( (j = ffs(m)) != 0 )
+        m = d->pirq_mask[i];
+        while ( m != 0 )
         {
-            m &= ~(1 << --j);
+            j = find_first_set_bit(m);
+            m &= ~(1 << j);
             pirq = (i << 5) + j;
             desc = &irq_desc[pirq];
             spin_lock_irq(&desc->lock);
-            if ( !test_bit(p->pirq_to_evtchn[pirq], &s->evtchn_mask[0]) &&
-                 test_and_clear_bit(pirq, &p->pirq_mask) &&
+            if ( !test_bit(d->pirq_to_evtchn[pirq], &s->evtchn_mask[0]) &&
+                 test_and_clear_bit(pirq, &d->pirq_mask) &&
                  (--((irq_guest_action_t *)desc->action)->in_flight == 0) )
                 desc->handler->end(pirq);
             spin_unlock_irq(&desc->lock);
@@ -234,14 +231,15 @@ int pirq_guest_unmask(struct domain *p)
     return 0;
 }
 
-int pirq_guest_bind(struct domain *p, int irq, int will_share)
+int pirq_guest_bind(struct exec_domain *ed, int irq, int will_share)
 {
+    struct domain      *d = ed->domain;
     irq_desc_t         *desc = &irq_desc[irq];
     irq_guest_action_t *action;
     unsigned long       flags;
     int                 rc = 0;
 
-    if ( !IS_CAPABLE_PHYSDEV(p) )
+    if ( !IS_CAPABLE_PHYSDEV(d) )
         return -EPERM;
 
     spin_lock_irqsave(&desc->lock, flags);
@@ -258,7 +256,7 @@ int pirq_guest_bind(struct domain *p, int irq, int will_share)
             goto out;
         }
 
-        action = xmalloc(sizeof(irq_guest_action_t));
+        action = xmalloc(irq_guest_action_t);
         if ( (desc->action = (struct irqaction *)action) == NULL )
         {
             DPRINTK("Cannot bind IRQ %d to guest. Out of memory.\n", irq);
@@ -278,7 +276,7 @@ int pirq_guest_bind(struct domain *p, int irq, int will_share)
         /* Attempt to bind the interrupt target to the correct CPU. */
         if ( desc->handler->set_affinity != NULL )
             desc->handler->set_affinity(
-                irq, apicid_to_phys_cpu_present(p->processor));
+                irq, apicid_to_phys_cpu_present(ed->processor));
     }
     else if ( !will_share || !action->shareable )
     {
@@ -295,14 +293,14 @@ int pirq_guest_bind(struct domain *p, int irq, int will_share)
         goto out;
     }
 
-    action->guest[action->nr_guests++] = p;
+    action->guest[action->nr_guests++] = ed;
 
  out:
     spin_unlock_irqrestore(&desc->lock, flags);
     return rc;
 }
 
-int pirq_guest_unbind(struct domain *p, int irq)
+int pirq_guest_unbind(struct domain *d, int irq)
 {
     irq_desc_t         *desc = &irq_desc[irq];
     irq_guest_action_t *action;
@@ -313,7 +311,7 @@ int pirq_guest_unbind(struct domain *p, int irq)
 
     action = (irq_guest_action_t *)desc->action;
 
-    if ( test_and_clear_bit(irq, &p->pirq_mask) &&
+    if ( test_and_clear_bit(irq, &d->pirq_mask) &&
          (--action->in_flight == 0) )
         desc->handler->end(irq);
 
@@ -329,7 +327,7 @@ int pirq_guest_unbind(struct domain *p, int irq)
     else
     {
         i = 0;
-        while ( action->guest[i] != p )
+        while ( action->guest[i] && action->guest[i]->domain != d )
             i++;
         memmove(&action->guest[i], &action->guest[i+1], IRQ_MAX_GUESTS-i-1);
         action->nr_guests--;

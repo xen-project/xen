@@ -29,7 +29,7 @@
 
 
 /*
- * these are also defined in hypervisor-if.h but can't be pulled in as
+ * these are also defined in xen-public/xen.h but can't be pulled in as
  * they are used in start of day assembly. Need to clean up the .h files
  * a bit more...
  */
@@ -48,7 +48,7 @@
 #ifndef __ASSEMBLY__
 
 #include <types.h>
-#include <hypervisor-ifs/hypervisor-if.h>
+#include <xen-public/xen.h>
 
 
 /* this struct defines the way the registers are stored on the 

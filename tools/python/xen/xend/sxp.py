@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
 """
 Input-driven parsing for s-expression (sxp) format.
@@ -17,6 +17,7 @@ import types
 import errno
 import string
 from StringIO import StringIO
+from xen.util.ip import _readline, _readlines
 
 __all__ = [
     "mime_type", 
@@ -41,7 +42,8 @@ __all__ = [
     "has_id", 
     "with_id", 
     "child_with_id", 
-    "elements", 
+    "elements",
+    "merge",
     "to_string",
     "from_string",
     "all_from_string",
@@ -595,6 +597,77 @@ def elements(sxpr, ctxt=None):
                 yield v
         i += 1
 
+def merge(s1, s2):
+    """Merge sxprs s1 and s2.
+    Returns an sxpr containing all the fields from s1 and s2, with
+    entries in s1 overriding s2. Recursively merges fields.
+
+    @param s1 sxpr
+    @param s2 sxpr
+    @return merged sxpr
+    """
+    if s1 is None:
+        val = s2
+    elif s2 is None:
+        val = s1
+    elif elementp(s1):
+        name1 = name(s1)
+        (m1, v1) = child_map(s1)
+        (m2, v2) = child_map(s2)
+        val = [name1]
+        for (k1, f1) in m1.items():
+            merge_list(val, f1, m2.get(k1, []))
+        for (k2, f2) in m2.items():
+            if k2 in m1: continue
+            val.extend(f2)
+        val.extend(v1)
+    else:
+        val = s1
+    return val
+
+def merge_list(sxpr, l1, l2):
+    """Merge element lists l1 and l2 into sxpr.
+    The lists l1 and l2 are all element with the same name.
+    Values from l1 are merged with values in l2 and stored in sxpr.
+    If one list is longer than the other the excess values are used
+    as they are.
+
+    @param sxpr to merge into
+    @param l1 sxpr list
+    @param l2 sxpr list
+    @return modified sxpr
+    """
+    n1 = len(l1)
+    n2 = len(l2)
+    nmin = min(n1, n2)
+    for i in range(0, nmin):
+        sxpr.append(merge(l1[i], l2[i]))
+    for i in range(nmin, n1):
+        sxpr.append(l1[i])
+    for i in range(nmin, n2):
+        sxpr.append(l2[i])
+    return sxpr
+
+def child_map(sxpr):
+    """Get a dict of the elements in sxpr and a list of its values.
+    The dict maps element name to the list of elements with that name,
+    and the list is the non-element children.
+
+    @param sxpr
+    @return (dict, list)
+    """
+    m = {}
+    v = []
+    for x in children(sxpr):
+        if elementp(x):
+            n = name(x)
+            l = m.get(n, [])
+            l.append(x)
+            m[n] = l
+        else:
+            v.append(x)
+    return (m, v)
+
 def to_string(sxpr):
     """Convert an sxpr to a string.
 
@@ -641,7 +714,7 @@ def parse(io):
     """
     pin = Parser()
     while 1:
-        buf = io.readline()
+        buf = _readline(io)
         pin.input(buf)
         if len(buf) == 0:
             break
