@@ -478,7 +478,7 @@ void __init __start_xen(multiboot_info_t *mbi)
     cmdline_parse(cmdline);
 
     /* Must do this early -- e.g., spinlocks rely on get_current(). */
-    set_current(&idle0_task);
+    set_current(&idle0_exec_domain);
 
     /* We initialise the serial devices very early so we can get debugging. */
     serial_init_stage1();
@@ -594,7 +594,7 @@ void __init __start_xen(multiboot_info_t *mbi)
     if ( dom0 == NULL )
         panic("Error creating domain 0\n");
 
-    set_bit(DF_PRIVILEGED, &dom0->flags);
+    set_bit(DF_PRIVILEGED, &dom0->d_flags);
 
     /* Grab the DOM0 command line. Skip past the image name. */
     cmdline = (unsigned char *)(mod[0].string ? __va(mod[0].string) : NULL);
@@ -631,7 +631,7 @@ void __init __start_xen(multiboot_info_t *mbi)
     /* Give up the VGA console if DOM0 is configured to grab it. */
     console_endboot(cmdline && strstr(cmdline, "tty0"));
 
-    domain_unpause_by_systemcontroller(current);
+    domain_unpause_by_systemcontroller(current->domain);
     domain_unpause_by_systemcontroller(dom0);
     startup_cpu_idle_loop();
 }

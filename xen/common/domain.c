@@ -24,6 +24,7 @@ struct domain *domain_hash[DOMAIN_HASH_SIZE];
 struct domain *domain_list;
 
 xmem_cache_t *domain_struct_cachep;
+xmem_cache_t *exec_domain_struct_cachep;
 struct domain *dom0;
 
 void __init domain_startofday(void)
@@ -32,7 +33,13 @@ void __init domain_startofday(void)
         "domain_cache", sizeof(struct domain),
         0, SLAB_HWCACHE_ALIGN, NULL, NULL);
     if ( domain_struct_cachep == NULL )
-        panic("No slab cache for domain structs.");
+        BUG();
+
+    exec_domain_struct_cachep = xmem_cache_create(
+        "exec_dom_cache", sizeof(struct exec_domain),
+        0, SLAB_HWCACHE_ALIGN, NULL, NULL);
+    if ( exec_domain_struct_cachep == NULL )
+        BUG();
 }
 
 struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
@@ -302,8 +309,6 @@ int final_setup_guestos(struct domain *p, dom0_builddomain_t *builddomain)
         xfree(c);
     return rc;
 }
-
-extern xmem_cache_t *exec_domain_struct_cachep;
 
 /*
  * final_setup_guestos is used for final setup and launching of domains other
