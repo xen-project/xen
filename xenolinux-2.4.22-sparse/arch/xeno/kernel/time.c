@@ -61,6 +61,7 @@
 #include <linux/init.h>
 #include <linux/smp.h>
 #include <linux/irq.h>
+#include <linux/sysctl.h>
 
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 extern rwlock_t xtime_lock;
@@ -101,6 +102,16 @@ static u64 processed_system_time;
             (_tv).tv_sec++;                \
         }                                  \
     } while ( 0 )
+
+
+/* Does this guest OS track Xen time, or set its wall clock independently? */
+static int independent_wallclock = 0;
+static int __init __independent_wallclock(char *str)
+{
+    independent_wallclock = 1;
+    return 1;
+}
+__setup("independent_wallclock", __independent_wallclock);
 
 
 #ifdef CONFIG_XENO_PRIV
@@ -248,11 +259,9 @@ void do_gettimeofday(struct timeval *tv)
 
 void do_settimeofday(struct timeval *tv)
 {
-#ifdef CONFIG_XENO_PRIV
     struct timeval newtv;
-    dom0_op_t op;
     
-    if ( start_info.dom_id != 0 )
+    if ( !independent_wallclock && (start_info.dom_id != 0) )
         return;
     
     write_lock_irq(&xtime_lock);
@@ -283,17 +292,23 @@ void do_settimeofday(struct timeval *tv)
     time_maxerror = NTP_PHASE_LIMIT;
     time_esterror = NTP_PHASE_LIMIT;
 
-    last_rtc_update = last_xen_update = 0;
-
-    op.cmd = DOM0_SETTIME;
-    op.u.settime.secs        = newtv.tv_sec;
-    op.u.settime.usecs       = newtv.tv_usec;
-    op.u.settime.system_time = shadow_system_time;
-
-    write_unlock_irq(&xtime_lock);
-
-    HYPERVISOR_dom0_op(&op);
+#ifdef CONFIG_XENO_PRIV
+    if ( start_info.dom_id == 0 )
+    {
+        dom0_op_t op;
+        last_rtc_update = last_xen_update = 0;
+        op.cmd = DOM0_SETTIME;
+        op.u.settime.secs        = newtv.tv_sec;
+        op.u.settime.usecs       = newtv.tv_usec;
+        op.u.settime.system_time = shadow_system_time;
+        write_unlock_irq(&xtime_lock);
+        HYPERVISOR_dom0_op(&op);
+    }
+    else
 #endif
+    {
+        write_unlock_irq(&xtime_lock);
+    }
 }
 
 asmlinkage long sys_stime(int *tptr)
@@ -336,7 +351,7 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
         processed_system_time += NS_PER_TICK;
     }
     
-    if ( (time_status & STA_UNSYNC) != 0 )
+    if ( !independent_wallclock && ((time_status & STA_UNSYNC) != 0) )
     {
         /* Adjust shadow timeval for jiffies that haven't updated xtime yet. */
         shadow_tv.tv_usec -= (jiffies - wall_jiffies) * (1000000/HZ);
@@ -439,3 +454,24 @@ void __init time_init(void)
 
     clear_bit(_EVENT_TIMER, &HYPERVISOR_shared_info->events);
 }
+
+
+/*
+ * /proc/sys/xeno: This really belongs in another file. It can stay here for
+ * now however.
+ */
+static ctl_table xeno_subtable[] = {
+    {1, "independent_wallclock", &independent_wallclock,
+     sizeof(independent_wallclock), 0644, NULL, proc_dointvec},
+    {0}
+};
+static ctl_table xeno_table[] = {
+    {123, "xeno", NULL, 0, 0555, xeno_subtable},
+    {0}
+};
+static int __init xeno_sysctl_init(void)
+{
+    (void)register_sysctl_table(xeno_table, 0);
+    return 0;
+}
+__initcall(xeno_sysctl_init);

@@ -16,7 +16,6 @@
 #include <string.h>
 
 #include "p4perf.h"
-#include "hypervisor-ifs/dom0_ops.h"
 #include "dom0_defs.h"
 
 void dom0_wrmsr( int cpu_mask, int msr, unsigned int low, unsigned int high )

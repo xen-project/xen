@@ -13,7 +13,6 @@
 #include <sys/wait.h>
 #include <string.h>
 
-#include "hypervisor-ifs/dom0_ops.h"
 #include "dom0_defs.h"
 #include "mem_defs.h"
 
