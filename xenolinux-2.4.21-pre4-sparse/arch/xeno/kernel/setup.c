@@ -967,7 +967,7 @@ void __init cpu_init (void)
         BUG();
     enter_lazy_tlb(&init_mm, current, nr);
 
-    HYPERVISOR_stack_and_ldt_switch(__KERNEL_DS, current->thread.esp0, 0);
+    HYPERVISOR_stack_switch(__KERNEL_DS, current->thread.esp0);
 
     /* Force FPU initialization. */
     current->flags &= ~PF_USEDFPU;

@@ -13,6 +13,9 @@
 #include <asm/system.h>
 #include <asm/ptrace.h>
 
+multicall_entry_t multicall_list[8];
+int nr_multicall_ents = 0;
+
 static unsigned long event_mask = 0;
 
 void frobb(void) {}

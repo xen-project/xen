@@ -533,7 +533,7 @@ int console_export(char *str, int len)
 }
 
 
-long do_console_write(char *str, int count)
+long do_console_write(char *str, unsigned int count)
 {
 #define SIZEOF_BUF 256
     unsigned char safe_str[SIZEOF_BUF];

@@ -5,6 +5,7 @@
 #include <asm/desc.h>
 #include <asm/atomic.h>
 #include <asm/pgalloc.h>
+#include <asm/multicall.h>
 
 /*
  * possibly do the LDT unload here?
@@ -33,6 +34,7 @@ extern pgd_t *cur_pgd;
 
 static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next, struct task_struct *tsk, unsigned cpu)
 {
+	cli(); /* protect flush_update_queue multicall */
 	if (prev != next) {
 		/* stop flush ipis for the previous mm */
 		clear_bit(cpu, &prev->cpu_vm_mask);
@@ -50,7 +52,7 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next, str
 		/* Re-load page tables */
 		cur_pgd = next->pgd;
 		queue_pt_switch(__pa(cur_pgd));
-		XENO_flush_page_update_queue();
+		MULTICALL_flush_page_update_queue();
 	}
 #ifdef CONFIG_SMP
 	else {
@@ -70,6 +72,10 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next, str
 }
 
 #define activate_mm(prev, next) \
-	switch_mm((prev),(next),NULL,smp_processor_id())
+do { \
+	switch_mm((prev),(next),NULL,smp_processor_id()); \
+	execute_multicall_list(); \
+	sti(); /* matches 'cli' in switch_mm() */ \
+} while ( 0 )
 
 #endif

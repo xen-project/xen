@@ -4,101 +4,64 @@
  * Interface to Xeno hypervisor.
  */
 
-#include "network.h"
-#include "block.h"
-
 #ifndef __HYPERVISOR_IF_H__
 #define __HYPERVISOR_IF_H__
 
 /*
- * Virtual addresses beyond this are not modifiable by guest OSes.
- * The machine->physical mapping table starts at this address, read-only
- * to all domains except DOM0.
- */
-#define HYPERVISOR_VIRT_START (0xFC000000UL)
-#ifndef machine_to_phys_mapping
-#define machine_to_phys_mapping ((unsigned long *)HYPERVISOR_VIRT_START)
-#endif
-
-typedef struct trap_info_st
-{
-    unsigned char  vector;  /* exception/interrupt vector */
-    unsigned char  dpl;     /* privilege level            */
-    unsigned short cs;      /* code selector              */
-    unsigned long  address; /* code address               */
-} trap_info_t;
-
-
-typedef struct
-{
-/*
- * PGREQ_XXX: specified in least-significant bits of 'ptr' field.
- * All requests specify relevent PTE or PT address in 'ptr'.
- * Normal requests specify update value in 'value'.
- * Extended requests specify command in least 8 bits of 'value'.
- */
-/* A normal page-table update request. */
-#define PGREQ_NORMAL            0
-/* Update an entry in the machine->physical mapping table. */
-#define PGREQ_MPT_UPDATE        1
-/* An extended command. */
-#define PGREQ_EXTENDED_COMMAND  2
-/* DOM0 can make entirely unchecked updates which do not affect refcnts. */
-#define PGREQ_UNCHECKED_UPDATE  3
-    unsigned long ptr, val; /* *ptr = val */
-/* Announce a new top-level page table. */
-#define PGEXT_PIN_L1_TABLE      0
-#define PGEXT_PIN_L2_TABLE      1
-#define PGEXT_PIN_L3_TABLE      2
-#define PGEXT_PIN_L4_TABLE      3
-#define PGEXT_UNPIN_TABLE       4
-#define PGEXT_NEW_BASEPTR       5
-#define PGEXT_TLB_FLUSH         6
-#define PGEXT_INVLPG            7
-#define PGEXT_CMD_MASK        255
-#define PGEXT_CMD_SHIFT         8
-} page_update_request_t;
-
-
-/*
- * Segment descriptor tables.
+ * SEGMENT DESCRIPTOR TABLES
  */
 /* 8 entries, plus a TSS entry for each CPU (up to 32 CPUs). */
-#define FIRST_DOMAIN_GDT_ENTRY  40
+#define FIRST_DOMAIN_GDT_ENTRY	40
 /* These are flat segments for domain bootstrap and fallback. */
-#define FLAT_RING1_CS           0x11
-#define FLAT_RING1_DS           0x19
-#define FLAT_RING3_CS           0x23
-#define FLAT_RING3_DS           0x2b
+#define FLAT_RING1_CS		0x11
+#define FLAT_RING1_DS		0x19
+#define FLAT_RING3_CS		0x23
+#define FLAT_RING3_DS		0x2b
 
+
+/*
+ * HYPERVISOR "SYSTEM CALLS"
+ */
 
 /* EAX = vector; EBX, ECX, EDX, ESI, EDI = args 1, 2, 3, 4, 5. */
+#define __HYPERVISOR_set_trap_table	   0
+#define __HYPERVISOR_pt_update		   1
+#define __HYPERVISOR_console_write	   2
+#define __HYPERVISOR_set_gdt		   3
+#define __HYPERVISOR_stack_switch          4
+#define __HYPERVISOR_ldt_switch            5
+#define __HYPERVISOR_net_update		   6
+#define __HYPERVISOR_fpu_taskswitch	   7
+#define __HYPERVISOR_yield		   8
+#define __HYPERVISOR_exit		   9
+#define __HYPERVISOR_dom0_op		  10
+#define __HYPERVISOR_network_op		  11
+#define __HYPERVISOR_block_io_op	  12
+#define __HYPERVISOR_set_debugreg	  13
+#define __HYPERVISOR_get_debugreg	  14
+#define __HYPERVISOR_update_descriptor	  15
+#define __HYPERVISOR_set_fast_trap	  16
+#define __HYPERVISOR_dom_mem_op		  17
+#define __HYPERVISOR_multicall		  18
 
-#define __HYPERVISOR_set_trap_table        0
-#define __HYPERVISOR_pt_update             1
-#define __HYPERVISOR_console_write         2
-#define __HYPERVISOR_set_gdt               3
-#define __HYPERVISOR_stack_and_ldt_switch  4
-#define __HYPERVISOR_net_update            5
-#define __HYPERVISOR_fpu_taskswitch        6
-#define __HYPERVISOR_sched_op              7
-#define __HYPERVISOR_exit                  8
-#define __HYPERVISOR_dom0_op               9
-#define __HYPERVISOR_network_op           10
-#define __HYPERVISOR_block_io_op          11
-#define __HYPERVISOR_set_debugreg         12
-#define __HYPERVISOR_get_debugreg         13
-#define __HYPERVISOR_update_descriptor    14
-#define __HYPERVISOR_set_fast_trap        15
-#define __HYPERVISOR_dom_mem_op           16
-
+/* And the trap vector is... */
 #define TRAP_INSTR "int $0x82"
 
 
-/* Event message note:
+/*
+ * MULTICALLS
+ * 
+ * Multicalls are listed in an array, with each element being a fixed size 
+ * (BYTES_PER_MULTICALL_ENTRY). Each is of the form (op, arg1, ..., argN)
+ * where each element of the tuple is a machine word. 
+ */
+#define BYTES_PER_MULTICALL_ENTRY 32
+
+
+/* EVENT MESSAGES
  *
  * Here, as in the interrupts to the guestos, additional network interfaces
- * are defined.  These definitions server as placeholders for the event bits,
+ * are defined.	 These definitions server as placeholders for the event bits,
  * however, in the code these events will allways be referred to as shifted
  * offsets from the base NET events.
  */
@@ -113,14 +76,88 @@ typedef struct
 
 /* Bit offsets, as opposed to the above masks. */
 #define _EVENT_BLK_RESP 0
-#define _EVENT_TIMER    1
-#define _EVENT_DIE      2
-#define _EVENT_NET_TX   3
-#define _EVENT_NET_RX   4
-#define _EVENT_DEBUG    5
+#define _EVENT_TIMER	1
+#define _EVENT_DIE	2
+#define _EVENT_NET_TX	3
+#define _EVENT_NET_RX	4
+#define _EVENT_DEBUG	5
 
 
 /*
+ * Virtual addresses beyond this are not modifiable by guest OSes.
+ * The machine->physical mapping table starts at this address, read-only
+ * to all domains except DOM0.
+ */
+#define HYPERVISOR_VIRT_START (0xFC000000UL)
+#ifndef machine_to_phys_mapping
+#define machine_to_phys_mapping ((unsigned long *)HYPERVISOR_VIRT_START)
+#endif
+
+
+/*
+ * PAGE UPDATE COMMANDS AND FLAGS
+ * 
+ * PGREQ_XXX: specified in least-significant bits of 'ptr' field.
+ * All requests specify relevent PTE or PT address in 'ptr'.
+ * Normal requests specify update value in 'value'.
+ * Extended requests specify command in least 8 bits of 'value'.
+ */
+/* A normal page-table update request. */
+#define PGREQ_NORMAL		0
+/* Update an entry in the machine->physical mapping table. */
+#define PGREQ_MPT_UPDATE	1
+/* An extended command. */
+#define PGREQ_EXTENDED_COMMAND	2
+/* DOM0 can make entirely unchecked updates which do not affect refcnts. */
+#define PGREQ_UNCHECKED_UPDATE	3
+/* Announce a new top-level page table. */
+#define PGEXT_PIN_L1_TABLE	0
+#define PGEXT_PIN_L2_TABLE	1
+#define PGEXT_PIN_L3_TABLE	2
+#define PGEXT_PIN_L4_TABLE	3
+#define PGEXT_UNPIN_TABLE	4
+#define PGEXT_NEW_BASEPTR	5
+#define PGEXT_TLB_FLUSH		6
+#define PGEXT_INVLPG		7
+#define PGEXT_CMD_MASK	      255
+#define PGEXT_CMD_SHIFT		8
+
+
+#ifndef __ASSEMBLY__
+
+#include "network.h"
+#include "block.h"
+
+/*
+ * Send an array of these to HYPERVISOR_set_trap_table()
+ */
+typedef struct trap_info_st
+{
+    unsigned char  vector;  /* exception/interrupt vector */
+    unsigned char  dpl;	    /* privilege level		  */
+    unsigned short cs;	    /* code selector		  */
+    unsigned long  address; /* code address		  */
+} trap_info_t;
+
+/*
+ * Send an array of these to HYPERVISOR_pt_update()
+ */
+typedef struct
+{
+    unsigned long ptr, val; /* *ptr = val */
+} page_update_request_t;
+
+/*
+ * Send an array of these to HYPERVISOR_multicall()
+ */
+typedef struct
+{
+    unsigned long op;
+    unsigned long args[7];
+} multicall_entry_t;
+
+/*
+ * Xen/guestos shared data -- pointer provided in start_info.
  * NB. We expect that this struct is smaller than a page.
  */
 typedef struct shared_info_st {
@@ -150,36 +187,34 @@ typedef struct shared_info_st {
      * registers, and executing 'iret'.
      * This callback is provided with an extended stack frame, augmented
      * with saved values for segment registers %ds and %es:
-     *  %ds, %es, %eip, %cs, %eflags [, %oldesp, %oldss]
+     *	%ds, %es, %eip, %cs, %eflags [, %oldesp, %oldss]
      * Code segment is the default flat selector.
      * FAULTS WHEN CALLING THIS HANDLER WILL TERMINATE THE DOMAIN!!!
      */
     unsigned long failsafe_address;
 
-	/*
-     * Time:
-     * The following abstractions are exposed: System Time, Wall Clock 
-     * Time, Domain Virtual Time. Domains can access Cycle counter time
-     * directly. 
-	 * XXX RN: Need something to pass NTP scaling to GuestOS.
+    /*
+     * Time: The following abstractions are exposed: System Time, Clock Time,
+     * Domain Virtual Time. Domains can access Cycle counter time directly.
+     * XXX RN: Need something to pass NTP scaling to GuestOS.
      */
 
-	u64           cpu_freq;	    /* to calculate ticks -> real time */
+    u64		  cpu_freq;	    /* to calculate ticks -> real time */
 
-	/* System Time */
-	long long          system_time;     /* in ns */
-	unsigned long      st_timestamp;    /* cyclecounter at last update */
+    /* System Time */
+    long long	       system_time;	/* in ns */
+    unsigned long      st_timestamp;	/* cyclecounter at last update */
 
-	/* Wall Clock Time */
-	u32                wc_version;      /* a version number for info below */
-	long               tv_sec;          /* essentially a struct timeval */
-	long               tv_usec;
-	long long          wc_timestamp;    /* system time at last update */
-
-	/* Domain Virtual Time */
-	unsigned long long domain_time;
+    /* Wall Clock Time */
+    u32		       wc_version;	/* a version number for info below */
+    long	       tv_sec;		/* essentially a struct timeval */
+    long	       tv_usec;
+    long long	       wc_timestamp;	/* system time at last update */
+    
+    /* Domain Virtual Time */
+    unsigned long long domain_time;
 	
-	/*
+    /*
      * Timeout values:
      * Allow a domain to specify a timeout value in system time and 
      * domain virtual time.
@@ -193,18 +228,20 @@ typedef struct shared_info_st {
  * NB. We expect that this struct is smaller than a page.
  */
 typedef struct start_info_st {
-    unsigned long nr_pages;       /* total pages allocated to this domain */
-    shared_info_t *shared_info;   /* VIRTUAL address of shared info struct */
-    unsigned long  pt_base;       /* VIRTUAL address of page directory */
-    unsigned long mod_start;      /* VIRTUAL address of pre-loaded module */
-    unsigned long mod_len;        /* size (bytes) of pre-loaded module */
-    net_ring_t *net_rings;        /* network rings (VIRTUAL ADDRESS) */
+    unsigned long nr_pages;	  /* total pages allocated to this domain */
+    shared_info_t *shared_info;	  /* VIRTUAL address of shared info struct */
+    unsigned long  pt_base;	  /* VIRTUAL address of page directory */
+    unsigned long mod_start;	  /* VIRTUAL address of pre-loaded module */
+    unsigned long mod_len;	  /* size (bytes) of pre-loaded module */
+    net_ring_t *net_rings;	  /* network rings (VIRTUAL ADDRESS) */
     int num_net_rings;
-    unsigned long blk_ring;       /* block io ring (MACHINE ADDRESS) */
-    unsigned char cmd_line[1];    /* variable-length */
+    unsigned long blk_ring;	  /* block io ring (MACHINE ADDRESS) */
+    unsigned char cmd_line[1];	  /* variable-length */
 } start_info_t;
 
 /* For use in guest OSes. */
 extern shared_info_t *HYPERVISOR_shared_info;
+
+#endif /* !__ASSEMBLY__ */
 
 #endif /* __HYPERVISOR_IF_H__ */

@@ -79,6 +79,8 @@
  */
 
 #include <xeno/config.h>
+#include <xeno/errno.h>
+#include <hypervisor-ifs/hypervisor-if.h>
 #include <asm/smp.h>
 
 EBX		= 0x00
@@ -184,6 +186,77 @@ ENTRY(ret_from_newdomain)
 	jmp test_all_events
 
         ALIGN
+/*
+ * HYPERVISOR_multicall(call_list, nr_calls)
+ *   Execute a list of 'nr_calls' system calls, pointed at by 'call_list'.
+ *   This is fairly easy except that:
+ *   1. We may fault reading the call list, and must patch that up; and
+ *   2. We cannot recursively call HYPERVISOR_multicall, or a malicious
+ *      caller could cause our stack to blow up.
+ */
+stringstring:
+        .asciz "%08x %08x %08x %08x %08x %08x %d\n"
+do_multicall:
+        popl  %eax
+        cmpl  $SYMBOL_NAME(ret_from_hypervisor_call),%eax
+        jne   multicall_exit /* bail if called recursively */
+        pushl %ebx
+        movl  4(%esp),%ebx   /* EBX == call_list */
+        movl  8(%esp),%ecx   /* ECX == nr_calls  */
+multicall_loop:
+        pushl %ecx
+multicall_fault1: 
+        pushl 20(%ebx)
+multicall_fault2: 
+        pushl 16(%ebx)
+multicall_fault3: 
+        pushl 12(%ebx)
+multicall_fault4: 
+        pushl 8(%ebx)
+multicall_fault5: 
+        pushl 4(%ebx)
+multicall_fault6: 
+        movl  (%ebx),%eax
+        andl  $255,%eax
+        call  *SYMBOL_NAME(hypervisor_call_table)(,%eax,4)
+        addl  $20,%esp
+        popl  %ecx
+        addl  $BYTES_PER_MULTICALL_ENTRY,%ebx
+        loop  multicall_loop
+        popl  %ebx
+multicall_exit:
+        xorl  %eax,%eax
+        jmp   ret_from_hypervisor_call
+
+.section __ex_table,"a"
+        .align 4
+        .long multicall_fault1, multicall_fixup1
+        .long multicall_fault2, multicall_fixup2
+        .long multicall_fault3, multicall_fixup3
+        .long multicall_fault4, multicall_fixup4
+        .long multicall_fault5, multicall_fixup5
+        .long multicall_fault6, multicall_fixup6
+.previous
+               
+.section .fixup,"ax"
+multicall_fixup6: 
+        addl  $4,%esp
+multicall_fixup5: 
+        addl  $4,%esp
+multicall_fixup4: 
+        addl  $4,%esp
+multicall_fixup3: 
+        addl  $4,%esp
+multicall_fixup2: 
+        addl  $4,%esp
+multicall_fixup1:
+        addl  $4,%esp
+        popl  %ebx
+        movl  $-EFAULT,%eax
+        jmp   ret_from_hypervisor_call
+.previous        
+                
+        ALIGN
 restore_all:
 	RESTORE_ALL
 
@@ -194,7 +267,9 @@ ENTRY(hypervisor_call)
 	GET_CURRENT(%ebx)
 	andl $255,%eax
 	call *SYMBOL_NAME(hypervisor_call_table)(,%eax,4)
-	movl %eax,EAX(%esp)		# save the return value
+
+ret_from_hypervisor_call:
+        movl %eax,EAX(%esp)		# save the return value
 
 test_all_events:
         mov  PROCESSOR(%ebx),%eax
@@ -517,10 +592,11 @@ ENTRY(hypervisor_call_table)
         .long SYMBOL_NAME(do_process_page_updates)
         .long SYMBOL_NAME(do_console_write)
         .long SYMBOL_NAME(do_set_gdt)
-        .long SYMBOL_NAME(do_stack_and_ldt_switch)
+        .long SYMBOL_NAME(do_stack_switch)
+        .long SYMBOL_NAME(do_ldt_switch)
         .long SYMBOL_NAME(do_net_update)
         .long SYMBOL_NAME(do_fpu_taskswitch)
-        .long SYMBOL_NAME(do_sched_op)
+        .long SYMBOL_NAME(do_yield)
         .long SYMBOL_NAME(kill_domain)
         .long SYMBOL_NAME(do_dom0_op)
         .long SYMBOL_NAME(do_network_op)
@@ -530,6 +606,7 @@ ENTRY(hypervisor_call_table)
         .long SYMBOL_NAME(do_update_descriptor)
         .long SYMBOL_NAME(do_set_fast_trap)
         .long SYMBOL_NAME(do_dom_mem_op)
-        .rept NR_syscalls-(.-hypervisor_call_table)/4
+        .long SYMBOL_NAME(do_multicall)
+        .rept NR_syscalls-((.-hypervisor_call_table)/4)
         .long SYMBOL_NAME(sys_ni_syscall)
 	.endr

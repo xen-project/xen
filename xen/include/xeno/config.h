@@ -114,7 +114,7 @@
 #define __GUEST_CS      0x11
 #define __GUEST_DS      0x19
 
-#define NR_syscalls 255
+#define NR_syscalls 256
 
 #define offsetof(_p,_f) ((unsigned long)&(((_p *)0)->_f))
 #define struct_cpy(_x,_y) (memcpy((_x),(_y),sizeof(*(_x))))

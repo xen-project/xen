@@ -129,6 +129,7 @@ static inline int flush_page_update_queue(void)
     return idx;
 }
 #define XENO_flush_page_update_queue() (_flush_page_update_queue())
+void MULTICALL_flush_page_update_queue(void);
 
 
 /*
@@ -183,14 +184,24 @@ static inline int HYPERVISOR_set_gdt(unsigned long *frame_list, int entries)
     return ret;
 }
 
-static inline int HYPERVISOR_stack_and_ldt_switch(
-    unsigned long ss, unsigned long esp, unsigned long ldts)
+static inline int HYPERVISOR_stack_switch(unsigned long ss, unsigned long esp)
 {
     int ret;
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret) : "0" (__HYPERVISOR_stack_and_ldt_switch),
-        "b" (ss), "c" (esp), "d" (ldts) );
+        : "=a" (ret) : "0" (__HYPERVISOR_stack_switch),
+        "b" (ss), "c" (esp) : "memory" );
+
+    return ret;
+}
+
+static inline int HYPERVISOR_ldt_switch(unsigned long ldts)
+{
+    int ret;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret) : "0" (__HYPERVISOR_ldt_switch),
+        "b" (ldts) : "memory" );
 
     return ret;
 }
@@ -215,13 +226,12 @@ static inline int HYPERVISOR_fpu_taskswitch(void)
     return ret;
 }
 
-static inline int HYPERVISOR_do_sched_op(void *sched_op)
+static inline int HYPERVISOR_yield(void)
 {
     int ret;
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret) : "0" (__HYPERVISOR_sched_op),
-        "b" (sched_op) );
+        : "=a" (ret) : "0" (__HYPERVISOR_yield) );
 
     return ret;
 }
@@ -296,7 +306,7 @@ static inline int HYPERVISOR_update_descriptor(
     int ret;
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret) : "0" (__HYPERVISOR_set_gdt), 
+        : "=a" (ret) : "0" (__HYPERVISOR_update_descriptor), 
         "b" (pa), "c" (word1), "d" (word2) );
 
     return ret;
@@ -320,6 +330,17 @@ static inline int HYPERVISOR_dom_mem_op(void *dom_mem_op)
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_dom_mem_op),
         "b" (dom_mem_op) : "memory" );
+
+    return ret;
+}
+
+static inline int HYPERVISOR_multicall(void *call_list, int nr_calls)
+{
+    int ret;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret) : "0" (__HYPERVISOR_multicall),
+        "b" (call_list), "c" (nr_calls) : "memory" );
 
     return ret;
 }

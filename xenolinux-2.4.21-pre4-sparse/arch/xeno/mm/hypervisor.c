@@ -11,6 +11,7 @@
 #include <asm/hypervisor.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
+#include <asm/multicall.h>
 
 /*
  * This suffices to protect us if we ever move to SMP domains.
@@ -84,6 +85,28 @@ static void DEBUG_disallow_pt_read(unsigned long pa)
  * on context switch.
  */
 unsigned long pt_baseptr;
+
+/*
+ * MULTICALL_flush_page_update_queue:
+ *   This is a version of the flush which queues as part of a multicall.
+ */
+void MULTICALL_flush_page_update_queue(void)
+{
+    unsigned long flags;
+    spin_lock_irqsave(&update_lock, flags);
+    if ( idx != 0 ) 
+    {
+#if PT_UPDATE_DEBUG > 1
+        printk("Flushing %d entries from pt update queue\n", idx);
+#endif
+#if PT_UPDATE_DEBUG > 0
+        DEBUG_allow_pt_reads();
+#endif
+        queue_multicall2(__HYPERVISOR_pt_update, update_queue, idx);
+        idx = 0;
+    }
+    spin_unlock_irqrestore(&update_lock, flags);
+}
 
 static inline void __flush_page_update_queue(void)
 {

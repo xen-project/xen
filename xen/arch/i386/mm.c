@@ -97,8 +97,7 @@ void __init zap_low_mappings (void)
 }
 
 
-long do_stack_and_ldt_switch(
-    unsigned long ss, unsigned long esp, unsigned long ldts)
+long do_stack_switch(unsigned long ss, unsigned long esp)
 {
     int nr = smp_processor_id();
     struct tss_struct *t = &init_tss[nr];
@@ -106,23 +105,27 @@ long do_stack_and_ldt_switch(
     if ( (ss == __HYPERVISOR_CS) || (ss == __HYPERVISOR_DS) )
         return -1;
 
-    if ( ldts != current->mm.ldt_sel )
-    {
-        unsigned long *ptabent;
-        ptabent = (unsigned long *)GET_GDT_ADDRESS(current);
-        /* Out of range for GDT table? */
-        if ( (ldts * 8) > GET_GDT_ENTRIES(current) ) return -1;
-        ptabent += ldts * 2; /* 8 bytes per desc == 2 * unsigned long */
-        /* Not an LDT entry? (S=0b, type =0010b) */
-        if ( (*ptabent & 0x00001f00) != 0x00000200 ) return -1;
-        current->mm.ldt_sel = ldts;
-        __load_LDT(ldts);
-    }
-
     current->thread.ss1  = ss;
     current->thread.esp1 = esp;
     t->ss1  = ss;
     t->esp1 = esp;
+
+    return 0;
+}
+
+
+long do_ldt_switch(unsigned long ldts)
+{
+    unsigned long *ptabent;
+
+    ptabent = (unsigned long *)GET_GDT_ADDRESS(current);
+    /* Out of range for GDT table? */
+    if ( (ldts * 8) > GET_GDT_ENTRIES(current) ) return -1;
+    ptabent += ldts * 2; /* 8 bytes per desc == 2 * unsigned long */
+    /* Not an LDT entry? (S=0b, type =0010b) */
+    if ( ldts && ((*ptabent & 0x00001f00) != 0x00000200) ) return -1;
+    current->mm.ldt_sel = ldts;
+    __load_LDT(ldts);
 
     return 0;
 }

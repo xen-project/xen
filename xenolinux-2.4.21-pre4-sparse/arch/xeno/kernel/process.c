@@ -43,6 +43,7 @@
 #include <asm/i387.h>
 #include <asm/desc.h>
 #include <asm/mmu_context.h>
+#include <asm/multicall.h>
 
 #include <linux/irq.h>
 
@@ -85,7 +86,7 @@ void cpu_idle (void)
 
     while (1) {
         while (!current->need_resched)
-            HYPERVISOR_do_sched_op(NULL);
+            HYPERVISOR_yield();
         schedule();
         check_pgt_cache();
     }
@@ -334,9 +335,28 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
     struct thread_struct *prev = &prev_p->thread,
         *next = &next_p->thread;
 
-    unlazy_fpu(prev_p);
+    /*
+     * This is basically 'unlazy_fpu', except that we queue a multicall to 
+     * indicate FPU task switch, rather than synchronously trapping to Xen.
+     */
+    if ( prev_p->flags & PF_USEDFPU )
+    {
+	if ( cpu_has_fxsr )
+            asm volatile( "fxsave %0 ; fnclex"
+                          : "=m" (prev_p->thread.i387.fxsave) );
+	else
+            asm volatile( "fnsave %0 ; fwait"
+                          : "=m" (prev_p->thread.i387.fsave) );
+	prev_p->flags &= ~PF_USEDFPU;
+        queue_multicall0(__HYPERVISOR_fpu_taskswitch);
+    }
 
-    HYPERVISOR_stack_and_ldt_switch(__KERNEL_DS, next->esp0, 0);
+    if ( next->esp0 != 0 )
+        queue_multicall2(__HYPERVISOR_stack_switch, __KERNEL_DS, next->esp0);
+
+    /* EXECUTE ALL TASK SWITCH XEN SYSCALLS AT THIS POINT. */
+    execute_multicall_list();
+    sti(); /* matches 'cli' in switch_mm() */
 
     /*
      * Save away %fs and %gs. No need to save %es and %ds, as

@@ -148,12 +148,10 @@ int wake_up(struct task_struct *p)
 }
 
 /****************************************************************************
- * Domain requested scheduling operations
- * KAF: turn it back into do_yield()!
+ * Voluntarily yield the processor to another domain, until an event occurs.
  ****************************************************************************/
-long do_sched_op(void)
+long do_yield(void)
 {
-    /* XXX implement proper */
     current->state = TASK_INTERRUPTIBLE;
     schedule();
     return 0;
@@ -519,7 +517,7 @@ void schedulers_start(void)
  * Schedule timeout is used at a number of places and is a bit meaningless 
  * in the context of Xen, as Domains are not able to call these and all 
  * there entry points into Xen should be asynchronous. If a domain wishes
- * to block for a while it should use Xen's sched_op entry point.
+ * to block for a while it should use Xen's sched_op/yield entry point.
  ****************************************************************************/
 
 static void process_timeout(unsigned long __data)
