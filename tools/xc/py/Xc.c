@@ -26,7 +26,7 @@ static PyObject *pyxc_domain_create(PyObject *self,
     char        *name   = "(anon)";
     int          ret;
 
-    static char *kwd_list[] = { "mem_kb", "name" };
+    static char *kwd_list[] = { "mem_kb", "name", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|is", kwd_list, 
                                       &mem_kb, &name) )
@@ -46,7 +46,7 @@ static PyObject *pyxc_domain_start(PyObject *self,
     unsigned int dom;
     int          ret;
 
-    static char *kwd_list[] = { "dom" };
+    static char *kwd_list[] = { "dom", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i", kwd_list, &dom) )
         return NULL;
@@ -65,12 +65,32 @@ static PyObject *pyxc_domain_stop(PyObject *self,
     unsigned int dom;
     int          ret;
 
-    static char *kwd_list[] = { "dom" };
+    static char *kwd_list[] = { "dom", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i", kwd_list, &dom) )
         return NULL;
 
     ret = xc_domain_stop(xc->xc_handle, dom);
+    
+    return PyInt_FromLong(ret);
+}
+
+static PyObject *pyxc_domain_destroy(PyObject *self,
+                                     PyObject *args,
+                                     PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+
+    unsigned int dom;
+    int          force = 0, ret;
+
+    static char *kwd_list[] = { "dom", "force", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|i", kwd_list, 
+                                      &dom, &force) )
+        return NULL;
+
+    ret = xc_domain_destroy(xc->xc_handle, dom, force);
     
     return PyInt_FromLong(ret);
 }
@@ -86,7 +106,7 @@ static PyObject *pyxc_domain_getinfo(PyObject *self,
     int           nr_doms, i;
     xc_dominfo_t *info;
 
-    static char *kwd_list[] = { "first_dom", "max_doms" };
+    static char *kwd_list[] = { "first_dom", "max_doms", NULL };
     
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|ii", kwd_list,
                                       &first_dom, &max_doms) )
@@ -129,7 +149,7 @@ static PyObject *pyxc_linux_save(PyObject *self,
     char        *state_file;
     int          progress = 1, ret;
 
-    static char *kwd_list[] = { "dom", "state_file", "progress" };
+    static char *kwd_list[] = { "dom", "state_file", "progress", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "is|i", kwd_list, 
                                       &dom, &state_file, &progress) )
@@ -149,7 +169,7 @@ static PyObject *pyxc_linux_restore(PyObject *self,
     char        *state_file;
     int          progress = 1, ret;
 
-    static char *kwd_list[] = { "state_file", "progress" };
+    static char *kwd_list[] = { "state_file", "progress", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "s|i", kwd_list, 
                                       &state_file, &progress) )
@@ -170,7 +190,7 @@ static PyObject *pyxc_linux_build(PyObject *self,
     char        *image, *ramdisk = NULL, *cmdline = "";
     int          ret;
 
-    static char *kwd_list[] = { "dom", "image", "ramdisk", "cmdline" };
+    static char *kwd_list[] = { "dom", "image", "ramdisk", "cmdline", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "is|ss", kwd_list, 
                                       &dom, &image, &ramdisk, &cmdline) )
@@ -190,7 +210,7 @@ static PyObject *pyxc_bvtsched_global_set(PyObject *self,
     unsigned long ctx_allow;
     int           ret;
 
-    static char *kwd_list[] = { "ctx_allow" };
+    static char *kwd_list[] = { "ctx_allow", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "l", kwd_list, &ctx_allow) )
         return NULL;
@@ -210,7 +230,8 @@ static PyObject *pyxc_bvtsched_domain_set(PyObject *self,
     unsigned long mcuadv, warp, warpl, warpu;
     int           ret;
 
-    static char *kwd_list[] = { "dom", "mcuadv", "warp", "warpl", "warpu" };
+    static char *kwd_list[] = { "dom", "mcuadv", "warp", "warpl", 
+                                "warpu", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "illll", kwd_list, 
                                       &dom, &mcuadv, &warp, &warpl, &warpu) )
@@ -232,7 +253,8 @@ static PyObject *pyxc_vif_scheduler_set(PyObject *self,
     xc_vif_sched_params_t sched = { 0, 0 };
     int           ret;
 
-    static char *kwd_list[] = { "dom", "vif", "credit_bytes", "credit_usecs" };
+    static char *kwd_list[] = { "dom", "vif", "credit_bytes", 
+                                "credit_usecs", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "ii|ll", kwd_list, 
                                       &dom, &vif, 
@@ -256,7 +278,7 @@ static PyObject *pyxc_vif_scheduler_get(PyObject *self,
     xc_vif_sched_params_t sched;
     int           ret;
 
-    static char *kwd_list[] = { "dom", "vif" };
+    static char *kwd_list[] = { "dom", "vif", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "ii", kwd_list, 
                                       &dom, &vif) )
@@ -285,7 +307,7 @@ static PyObject *pyxc_vif_stats_get(PyObject *self,
     xc_vif_stats_t stats;
     int           ret;
 
-    static char *kwd_list[] = { "dom", "vif" };
+    static char *kwd_list[] = { "dom", "vif", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "ii", kwd_list, 
                                       &dom, &vif) )
@@ -314,7 +336,7 @@ static PyObject *pyxc_vbd_create(PyObject *self,
     unsigned int dom, vbd;
     int          writeable, ret;
 
-    static char *kwd_list[] = { "dom", "vbd", "writeable" };
+    static char *kwd_list[] = { "dom", "vbd", "writeable", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iii", kwd_list, 
                                       &dom, &vbd, &writeable) )
@@ -334,7 +356,7 @@ static PyObject *pyxc_vbd_destroy(PyObject *self,
     unsigned int dom, vbd;
     int          ret;
 
-    static char *kwd_list[] = { "dom", "vbd" };
+    static char *kwd_list[] = { "dom", "vbd", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "ii", kwd_list, 
                                       &dom, &vbd) )
@@ -356,7 +378,7 @@ static PyObject *pyxc_vbd_add_extent(PyObject *self,
     int           ret;
 
     static char *kwd_list[] = { "dom", "vbd", "device", 
-                                "start_sector", "nr_sectors" };
+                                "start_sector", "nr_sectors", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiill", kwd_list, 
                                       &dom, &vbd, &device, 
@@ -380,7 +402,7 @@ static PyObject *pyxc_vbd_delete_extent(PyObject *self,
     int           ret;
 
     static char *kwd_list[] = { "dom", "vbd", "device", 
-                                "start_sector", "nr_sectors" };
+                                "start_sector", "nr_sectors", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiill", kwd_list, 
                                       &dom, &vbd, &device, 
@@ -404,7 +426,7 @@ static PyObject *pyxc_vbd_probe(PyObject *self,
     xc_vbd_t    *info;
     int          nr_vbds, i;
 
-    static char *kwd_list[] = { "dom", "max_vbds" };
+    static char *kwd_list[] = { "dom", "max_vbds", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|ii", kwd_list, 
                                       &dom, &max_vbds) )
@@ -444,7 +466,7 @@ static PyObject *pyxc_readconsolering(PyObject *self,
     char         str[32768];
     int          ret;
 
-    static char *kwd_list[] = { "clear" };
+    static char *kwd_list[] = { "clear", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|i", kwd_list, &clear) )
         return NULL;
@@ -475,6 +497,14 @@ static PyMethodDef pyxc_methods[] = {
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Stop execution of a domain.\n"
       " dom [int]: Identifier of domain to be stopped.\n\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "domain_destroy", 
+      (PyCFunction)pyxc_domain_destroy, 
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Destroy a domain.\n"
+      " dom   [int]:    Identifier of domain to be destroyed.\n"
+      " force [int, 0]: Bool - force immediate destruction?\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "domain_getinfo", 

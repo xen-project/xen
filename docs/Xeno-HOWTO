@@ -99,27 +99,21 @@ This is the gzip version of XenoLinux kernel image.
 Build the Domain Control Tools
 ==============================
 
-Under '/xeno-1.1.bk/tools', there are four sub-directories:
-'balloon', 'control', 'internal' and 'misc', each containing
+Under '/xeno-1.1.bk/tools', there are three sub-directories:
+'balloon', 'xc' and 'misc', each containing
 a group of tools. You can enter any of the four sub-directories
 and type 'make' to compile the corresponding group of tools.
 Or you can type 'make' under '/xeno-1.1.bk/tools' to compile
 all the tools.
 
-Particularly, in order to compile tools under 'control', you
-must have Apache Ant installed. Latest binary can be found at
-'http://ant.apache.org/bindownload.cgi'.
+In order to compile the control-interface library in 'xc' you must
+have zlib and devlopment headers installed. Also you will need at
+least Python v2.2. 
 
-Besides, you must have Java J2SDK 1.4 installed. There seemed
-to be compilation errors with J2SDK 1.3, but fine with J2SDK 1.4
-
-To summarize:
-
-# cd /xeno-1.1.bk/tools
-# make
-# make install
-# cd /install/bin
-# cp * /usr/local/bin
+'make install' in the tools directory will place executables and
+libraries in an install directory immediately outside you local
+repository. NOTE: the installation of the Python modules may need root
+privileges if you are not using a personal installation of Python.
 
 
 Installation
@@ -181,55 +175,6 @@ The following is a list of command line arguments to pass to Xen:
  dom0_mem=xxx     Set the maximum amount of memory for domain0.
 
 
-Xenctl Configuration
-==============================
-
-# cd /xeno-1.1.bk/tools/control/examples
-# cp xenctl.xml xen-mynewdom /etc
-
-Then, you need to modify /etc/xen-mynewdom:
-
-# cat /etc/xen-mynewdom
-domain new
-physical grant -pcdrom_link
-domain start
-
-You should substitue 'cdrom_link' with the
-root partition, e.g. '/dev/hda3', '/dev/sda1'.
-Therefore, the second looks like:
-'physical grant -p/dev/hda3'
-
-Then, you need to modify /etc/xenctl.xml:
-
-# cat /etc/xenctl.xml
-<?xml version="1.0"?>
-<domctl_defaults>
-<domain_name>XenoLinux</domain_name>
-<domain_size_kb>98304</domain_size_kb>
-<domain_image>/boot/xenolinux.gz</domain_image>
-<domain_vifs>1</domain_vifs>
-<domain_init_rd>/boot/initrd.gz</domain_init_rd>
-<root_device>/dev/ram0</root_device>
-<root_args>rw</root_args>
-<args>init=/linuxrc 4 DOMID=+</args>
-<nw_ip>169.254.1.0+</nw_ip>
-<nw_gw>169.254.1.0</nw_gw>
-<nw_mask>255.255.0.0</nw_mask>
-<nw_nfs_server>169.254.1.0</nw_nfs_server>
-<max_domain_number>1000</max_domain_number>
-<xi_tools_dir>/usr/local/bin/</xi_tools_dir>
-</domctl_defaults>
-
-The meaning of every line is very straightforward
-and should be modified according to your configuration.
-
-Normally you don't need <domain_init_rd>. And you probably want
-root_args set to "ro", otherwise fsck will complain. Assuming you've
-installed a standard linux installation, you probably don't want to
-explicit set the init program, or the run level,
-e.g. <args>DOMID=+</args>
-
-
 Boot into Domain 0
 ==============================
 
@@ -259,31 +204,43 @@ UDP packets to  the local virtual network. Those  packets are received
 by xen_read_console running in Domain  0 and output are printed out to
 the standard output.
 
-# xenctl script -f/etc/xen-mynewdom
-
-This will create and start a new domain based on /etc/xen-mynewdom and
-/etc/xenctl.xml
+Now edit the installed xi_createlinuxdom.py script to your taste. This
+should then be executed as root to create a new domain.
 
 You should be able to see XenoLinux boot message on standard output
-with each line prepended [domain_id].
+with each line prepended with [domain_id].
 
 
 List and Stop Domains
 ==============================
 
 You can see a list of existing domains with:
-
-# xi_list
-or
-# xenctl domain list
+# xi_listdoms.py
 
 In order to stop a domain, you use:
+# xi_stopdom.py <domain_id>
 
-# xi_stop domain_id
-or
-# xenctl domain stop -ndomain_id
+To destroy a domain use ('force' causes an immediate destruction
+without waiting for the guest OS to shut down cleanly):
+# xi_destroydom.py <domain_id> [force]
 
-followed by
-# xi_destroy domain_id
-or
-# xenctl domain destroy -ndomain_id
+
+Other Control Tasks using Python
+================================
+
+A Python module 'Xc' is installed as part of the tools-install
+process. This can be imported, and an 'xc object' instantiated, to
+provide access to privileged command operations:
+
+# import Xc
+# xc = Xc.new()
+# dir(xc)
+# help(xc.domain_create)
+
+In this way you can see that the class 'xc' contains useful
+documentation for you to consult.
+
+A further module of useful routines (XenoUtil) is also installed:
+
+# import XenoUtil
+# help(XenoUtil)

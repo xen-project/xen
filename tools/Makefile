@@ -19,22 +19,16 @@
 
 all:	
 	$(MAKE) -C balloon
-	$(MAKE) -C control
-	$(MAKE) -C internal
 	$(MAKE) -C xc
 	$(MAKE) -C misc
 
 install: all
 	$(MAKE) -C balloon install
-	$(MAKE) -C control install
-	$(MAKE) -C internal install
 	$(MAKE) -C xc install
 	$(MAKE) -C misc install
 
 clean:
 	$(MAKE) -C balloon clean
-	$(MAKE) -C control clean
-	$(MAKE) -C internal clean
 	$(MAKE) -C xc clean
 	$(MAKE) -C misc clean
 

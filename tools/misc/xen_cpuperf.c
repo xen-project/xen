@@ -16,29 +16,35 @@
 #include <string.h>
 
 #include "p4perf.h"
-#include "dom0_defs.h"
+#include "libxc_private.h"
 
-void dom0_wrmsr( int cpu_mask, int msr, unsigned int low, unsigned int high )
+void dom0_wrmsr( int privfd,
+                 int cpu_mask, 
+                 int msr, 
+                 unsigned int low, 
+                 unsigned int high )
 {
-  dom0_op_t op;
-  op.cmd = DOM0_MSR;
-  op.u.msr.write = 1;
-  op.u.msr.msr = msr;
-  op.u.msr.cpu_mask = cpu_mask;
-  op.u.msr.in1 = low;
-  op.u.msr.in2 = high;
-  do_dom0_op(&op);
+    dom0_op_t op;
+    op.cmd = DOM0_MSR;
+    op.u.msr.write = 1;
+    op.u.msr.msr = msr;
+    op.u.msr.cpu_mask = cpu_mask;
+    op.u.msr.in1 = low;
+    op.u.msr.in2 = high;
+    do_dom0_op(privfd, &op);
 }
 
-unsigned long long dom0_rdmsr( int cpu_mask, int msr )
+unsigned long long dom0_rdmsr( int privfd,
+                               int cpu_mask,
+                               int msr )
 {
-  dom0_op_t op;
-  op.cmd = DOM0_MSR;
-  op.u.msr.write = 0;
-  op.u.msr.msr = msr;
-  op.u.msr.cpu_mask = cpu_mask;
-  do_dom0_op(&op);
-  return (((unsigned long long)op.u.msr.out2)<<32) | op.u.msr.out1 ;
+    dom0_op_t op;
+    op.cmd = DOM0_MSR;
+    op.u.msr.write = 0;
+    op.u.msr.msr = msr;
+    op.u.msr.cpu_mask = cpu_mask;
+    do_dom0_op(privfd, &op);
+    return (((unsigned long long)op.u.msr.out2)<<32) | op.u.msr.out1 ;
 } 
 
 struct macros {
@@ -157,7 +163,7 @@ int main(int argc, char **argv)
     int debug = 0;
     unsigned long pebs = 0, pebs_vert = 0;
     int pebs_x = 0, pebs_vert_x = 0;
-    int read = 0;
+    int read = 0, privfd;
  
     while ((c = getopt(argc, argv, "dc:t:e:m:T:E:C:P:V:r")) != -1) {
         switch((char)c) {
@@ -173,11 +179,11 @@ int main(int argc, char **argv)
             debug = 1;
             break;
         case 'c':
-	    {
+        {
             int cpu = atoi(optarg);
             cpu_mask  = (cpu == -1)?(~0):(1<<cpu);
             break;
-            }
+        }
         case 't': // ESCR thread bits
             t = atoi(optarg);
             break;
@@ -211,15 +217,21 @@ int main(int argc, char **argv)
         }
     }
 
+    if ( (privfd = open("/proc/xeno/privcmd", O_RDWR)) == -1 )
+    {
+        fprintf(stderr, "Could not open privileged Xen control interface.\n");
+        exit(1);
+    }
+
     if (read) {
 	while((cpu_mask&1)) {
-	int i;
-	for (i=0x300;i<0x312;i++)
-	  {
-	    printf("%010llx ",dom0_rdmsr( cpu_mask, i ) );
-	  }
-        printf("\n");
-	cpu_mask>>=1;
+            int i;
+            for (i=0x300;i<0x312;i++)
+            {
+                printf("%010llx ",dom0_rdmsr( privfd, cpu_mask, i ) );
+            }
+            printf("\n");
+            cpu_mask>>=1;
 	}
 	exit(1);
     }
@@ -250,14 +262,14 @@ int main(int argc, char **argv)
                     MSR_P4_PEBS_MATRIX_VERT, pebs_vert);
     }
 
-    dom0_wrmsr( cpu_mask, escr->msr_addr, escr_val, 0 );
-    dom0_wrmsr( cpu_mask, cccr->msr_addr, cccr_val, 0 );
+    dom0_wrmsr( privfd, cpu_mask, escr->msr_addr, escr_val, 0 );
+    dom0_wrmsr( privfd, cpu_mask, cccr->msr_addr, cccr_val, 0 );
 
     if (pebs_x)
-      dom0_wrmsr( cpu_mask, MSR_P4_PEBS_ENABLE, pebs, 0 );
+        dom0_wrmsr( privfd, cpu_mask, MSR_P4_PEBS_ENABLE, pebs, 0 );
 
     if (pebs_vert_x)
-      dom0_wrmsr( cpu_mask, MSR_P4_PEBS_MATRIX_VERT, pebs_vert, 0 );
+        dom0_wrmsr( privfd, cpu_mask, MSR_P4_PEBS_MATRIX_VERT, pebs_vert, 0 );
 
     return 0;
 }

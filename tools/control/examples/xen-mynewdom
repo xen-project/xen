@@ -1,3 +1,0 @@
-domain new
-physical grant -pcdrom_link
-domain start
