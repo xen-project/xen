@@ -332,7 +332,10 @@ typedef struct page {
 /* A foreign page uses a custom destructor rather than the buddy allocator. */
 #ifdef CONFIG_FOREIGN_PAGES
 #define PageForeign(page)	test_bit(PG_foreign, &(page)->flags)
-#define SetPageForeign(page)	set_bit(PG_foreign, &(page)->flags)
+#define SetPageForeign(page, dtor) do {		\
+	set_bit(PG_foreign, &(page)->flags);	\
+	(page)->mapping = (void *)dtor;		\
+} while (0)
 #define ClearPageForeign(page)	clear_bit(PG_foreign, &(page)->flags)
 #define PageForeignDestructor(page)	\
 	( (void (*) (struct page *)) (page)->mapping )

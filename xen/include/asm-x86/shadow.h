@@ -26,6 +26,8 @@
 
 #define shadow_mode(_d)      ((_d)->mm.shadow_mode)
 #define shadow_lock_init(_d) spin_lock_init(&(_d)->mm.shadow_lock)
+#define shadow_lock(_m)      spin_lock_nochecking(&(_m)->shadow_lock)
+#define shadow_unlock(_m)    spin_unlock_nochecking(&(_m)->shadow_lock)
 
 extern void shadow_mode_init(void);
 extern int shadow_mode_control(struct domain *p, dom0_shadow_control_t *sc);
@@ -134,9 +136,9 @@ static inline int mark_dirty( struct mm_struct *m, unsigned int mfn )
     int rc;
     ASSERT(local_irq_is_enabled());
     //if(spin_is_locked(&m->shadow_lock)) printk("+");
-    spin_lock(&m->shadow_lock);
+    shadow_lock(m);
     rc = __mark_dirty( m, mfn );
-    spin_unlock(&m->shadow_lock);
+    shadow_unlock(m);
     return rc;
 }
 
@@ -388,20 +390,21 @@ static inline unsigned long get_shadow_status( struct mm_struct *m,
 
     ASSERT(local_irq_is_enabled());
     //if(spin_is_locked(&m->shadow_lock)) printk("*");
-    spin_lock(&m->shadow_lock);
+    shadow_lock(m);
 
     if( m->shadow_mode == SHM_logdirty )
         __mark_dirty( m, gpfn );
 
     res = __shadow_status( m, gpfn );
-    if (!res) spin_unlock(&m->shadow_lock);
+    if (!res) 
+        shadow_unlock(m);
     return res;
 }
 
 
 static inline void put_shadow_status( struct mm_struct *m )
 {
-    spin_unlock(&m->shadow_lock);
+    shadow_unlock(m);
 }
 
 
@@ -583,11 +586,9 @@ static inline void shadow_mk_pagetable( struct mm_struct *mm )
     if ( unlikely(mm->shadow_mode) )
     {
         ASSERT(local_irq_is_enabled());
-        spin_lock(&mm->shadow_lock);
-
-        __shadow_mk_pagetable( mm );
-
-        spin_unlock(&mm->shadow_lock);
+        shadow_lock(mm);
+        __shadow_mk_pagetable(mm);
+        shadow_unlock(mm);
     }
 
     SH_VVLOG("leaving shadow_mk_pagetable( gptbase=%08lx, mode=%d ) sh=%08lx",

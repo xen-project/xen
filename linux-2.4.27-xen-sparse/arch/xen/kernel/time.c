@@ -214,7 +214,8 @@ static void __get_time_values_from_xen(void)
         rmb();
         shadow_tv.tv_sec    = HYPERVISOR_shared_info->wc_sec;
         shadow_tv.tv_usec   = HYPERVISOR_shared_info->wc_usec;
-        shadow_tsc_stamp    = HYPERVISOR_shared_info->tsc_timestamp.tsc_bits;
+        shadow_tsc_stamp    = 
+            (u32)(HYPERVISOR_shared_info->tsc_timestamp >> rdtsc_bitshift);
         shadow_system_time  = HYPERVISOR_shared_info->system_time;
         rmb();
     }
@@ -604,6 +605,7 @@ void __init time_init(void)
 {
     unsigned long long alarm;
     u64 __cpu_khz, cpu_freq, scale, scale2;
+    unsigned int cpu_ghz;
 
     __cpu_khz = HYPERVISOR_shared_info->cpu_freq;
     do_div(__cpu_khz, 1000);
@@ -615,8 +617,11 @@ void __init time_init(void)
     xtime.tv_usec = HYPERVISOR_shared_info->wc_usec;
     processed_system_time = shadow_system_time;
 
-    rdtsc_bitshift      = HYPERVISOR_shared_info->tsc_timestamp.tsc_bitshift;
-    cpu_freq            = HYPERVISOR_shared_info->cpu_freq;
+    cpu_freq = HYPERVISOR_shared_info->cpu_freq;
+
+    cpu_ghz = do_div(cpu_freq, 1000000000UL);
+    for ( rdtsc_bitshift = 0; cpu_ghz != 0; rdtsc_bitshift++, cpu_ghz >>= 1 )
+        continue;
 
     scale = 1000000LL << (32 + rdtsc_bitshift);
     do_div(scale, (u32)cpu_freq);

@@ -152,6 +152,9 @@ void domain_crash(void)
 {
     struct domain *d;
 
+    if (current->domain == 0)
+	BUG();
+
     set_bit(DF_CRASHED, &current->flags);
 
     d = find_domain_by_id(0);

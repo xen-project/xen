@@ -104,10 +104,7 @@ typedef struct
     unsigned long ss;
 } PACKED execution_context_t;
 
-typedef struct {
-    u32  tsc_bits;      /* 0: 32 bits read from the CPU's TSC. */
-    u32  tsc_bitshift;  /* 4: 'tsc_bits' uses N:N+31 of TSC.   */
-} PACKED tsc_timestamp_t; /* 8 bytes */
+typedef u64 tsc_timestamp_t; /* RDTSC timestamp */
 
 /*
  * The following is all CPU context. Note that the i387_ctxt block is filled 
