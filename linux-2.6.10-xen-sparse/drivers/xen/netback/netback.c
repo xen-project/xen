@@ -14,8 +14,8 @@
 #include <asm-xen/balloon.h>
 #include <asm-xen/evtchn.h>
 
+static void netif_idx_release(u16 pending_idx);
 static void netif_page_release(struct page *page);
-static void netif_skb_release(struct sk_buff *skb);
 static void make_tx_response(netif_t *netif, 
                              u16      id,
                              s8       st);
@@ -412,7 +412,7 @@ static void net_tx_action(unsigned long unused)
         mcl[0].args[0] = MMAP_VADDR(pending_idx) >> PAGE_SHIFT;
         mcl[0].args[1] = 0;
         mcl[0].args[2] = 0;
-        mcl++;        
+        mcl++;     
     }
 
     mcl[-1].args[2] = UVMF_FLUSH_TLB;
@@ -532,7 +532,7 @@ static void net_tx_action(unsigned long unused)
 
         pending_idx = pending_ring[MASK_PEND_IDX(pending_cons)];
 
-        data_len = txreq.size > PKT_PROT_LEN ? PKT_PROT_LEN : txreq.size;
+        data_len = (txreq.size > PKT_PROT_LEN) ? PKT_PROT_LEN : txreq.size;
 
         if ( unlikely((skb = alloc_skb(data_len+16, GFP_ATOMIC)) == NULL) )
         {
@@ -593,14 +593,15 @@ static void net_tx_action(unsigned long unused)
         phys_to_machine_mapping[__pa(MMAP_VADDR(pending_idx)) >> PAGE_SHIFT] =
             FOREIGN_FRAME(txreq.addr >> PAGE_SHIFT);
 
-        data_len = txreq.size > PKT_PROT_LEN ? PKT_PROT_LEN : txreq.size;
+        data_len = (txreq.size > PKT_PROT_LEN) ? PKT_PROT_LEN : txreq.size;
 
         __skb_put(skb, data_len);
         memcpy(skb->data, 
                (void *)(MMAP_VADDR(pending_idx)|(txreq.addr&~PAGE_MASK)),
                data_len);
 
-        if (data_len < txreq.size) {
+        if ( data_len < txreq.size )
+        {
             /* Append the packet payload as a fragment. */
             skb_shinfo(skb)->frags[0].page        = 
                 virt_to_page(MMAP_VADDR(pending_idx));
@@ -608,10 +609,11 @@ static void net_tx_action(unsigned long unused)
             skb_shinfo(skb)->frags[0].page_offset = 
                 (txreq.addr + data_len) & ~PAGE_MASK;
             skb_shinfo(skb)->nr_frags = 1;
-        } else {
-            skb_shinfo(skb)->frags[0].page        = 
-                virt_to_page(MMAP_VADDR(pending_idx));
-            skb->destructor = netif_skb_release;
+        }
+        else
+        {
+            /* Schedule a response immediately. */
+            netif_idx_release(pending_idx);
         }
 
         skb->data_len  = txreq.size - data_len;
@@ -648,14 +650,6 @@ static void netif_page_release(struct page *page)
 
     /* Ready for next use. */
     set_page_count(page, 1);
-
-    netif_idx_release(pending_idx);
-}
-
-static void netif_skb_release(struct sk_buff *skb)
-{
-    struct page *page = skb_shinfo(skb)->frags[0].page;
-    u16 pending_idx = page - virt_to_page(mmap_vstart);
 
     netif_idx_release(pending_idx);
 }
@@ -748,7 +742,7 @@ static int __init netback_init(void)
     struct page *page;
 
     if ( !(xen_start_info.flags & SIF_NET_BE_DOMAIN) &&
-	 !(xen_start_info.flags & SIF_INITDOMAIN) )
+         !(xen_start_info.flags & SIF_INITDOMAIN) )
         return 0;
 
     printk("Initialising Xen netif backend\n");
