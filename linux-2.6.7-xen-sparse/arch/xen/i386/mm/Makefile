@@ -11,7 +11,7 @@ c-obj-y	:= extable.o pageattr.o
 
 c-obj-$(CONFIG_DISCONTIGMEM)	+= discontig.o
 c-obj-$(CONFIG_HUGETLB_PAGE) += hugetlbpage.o
-c-obj-$(CONFIG_HIGHMEM) += highmem.o
+obj-$(CONFIG_HIGHMEM) += highmem.o
 c-obj-$(CONFIG_BOOT_IOREMAP) += boot_ioremap.o
 
 c-link	:=

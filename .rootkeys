@@ -153,6 +153,7 @@
 40f56238wi6AdNQjm0RT57bSkwb6hg linux-2.6.7-xen-sparse/arch/xen/i386/kernel/vsyscall.lds
 40f56238a3w6-byOzexIlMgni76Lcg linux-2.6.7-xen-sparse/arch/xen/i386/mm/Makefile
 40f56238ILx8xlbywNbzTdv5Zr4xXQ linux-2.6.7-xen-sparse/arch/xen/i386/mm/fault.c
+4118cc35CbY8rfGVspF5O-7EkXBEAA linux-2.6.7-xen-sparse/arch/xen/i386/mm/highmem.c
 40f562383SKvDStdtrvzr5fyCbW4rw linux-2.6.7-xen-sparse/arch/xen/i386/mm/hypervisor.c
 40f56239xcNylAxuGsQHwi1AyMLV8w linux-2.6.7-xen-sparse/arch/xen/i386/mm/init.c
 41062ab7CjxC1UBaFhOMWWdhHkIUyg linux-2.6.7-xen-sparse/arch/xen/i386/mm/ioremap.c
@@ -200,6 +201,7 @@
 4107adf1E5O4ztGHNGMzCCNhcvqNow linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/dma-mapping.h
 40f5623anSzpuEHgiNmQ56fIRfCoaQ linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/e820.h
 40f5623akIoBsQ3KxSB2kufkbgONXQ linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/fixmap.h
+4118b6a418gnL6AZsTdglC92YGqYTg linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/highmem.h
 40f5623aJVXQwpJMOLE99XgvGsfQ8Q linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/io.h
 40f5623am9BzluYFuV6EQfTd-so3dA linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/mach-xen/do_timer.h
 40f5623adZQ1IZGPxbDXONjyZGYuTA linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/mach-xen/io_ports.h

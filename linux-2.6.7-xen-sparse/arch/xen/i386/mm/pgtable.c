@@ -194,9 +194,17 @@ struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 	pte = alloc_pages(GFP_KERNEL|__GFP_REPEAT, 0);
 #endif
 	if (pte) {
+#ifdef CONFIG_HIGHPTE
+		void *kaddr = kmap_atomic(pte, KM_USER0);
+		clear_page(kaddr);
+		kunmap_atomic_force(kaddr, KM_USER0);
+#else
 		clear_highpage(pte);
+#endif
+#ifdef CONFIG_HIGHPTE
+		if (pte < highmem_start_page)
+#endif
 		__make_page_readonly(phys_to_virt(page_to_pseudophys(pte)));
-				/* XXXcl highmem */
 	}
 	return pte;
 }
