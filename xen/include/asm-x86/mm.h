@@ -81,17 +81,14 @@ struct pfn_info
  /* 17-bit count of uses of this frame as its current type. */
 #define PGT_count_mask      ((1<<17)-1)
 
- /* For safety, force a TLB flush when this page's type changes. */
-#define _PGC_tlb_flush_on_type_change 31
-#define PGC_tlb_flush_on_type_change  (1<<_PGC_tlb_flush_on_type_change)
  /* Cleared when the owning guest 'frees' this page. */
-#define _PGC_allocated                30
+#define _PGC_allocated                31
 #define PGC_allocated                 (1<<_PGC_allocated)
  /* This bit is always set, guaranteeing that the count word is never zero. */
-#define _PGC_always_set               29
+#define _PGC_always_set               30
 #define PGC_always_set                (1<<_PGC_always_set)
- /* 29-bit count of references to this frame. */
-#define PGC_count_mask                ((1<<29)-1)
+ /* 30-bit count of references to this frame. */
+#define PGC_count_mask                ((1<<30)-1)
 
 /* We trust the slab allocator in slab.c, and our use of it. */
 #define PageSlab(page)		(1)
@@ -104,7 +101,7 @@ struct pfn_info
     do {                                                                    \
         (_pfn)->u.inuse.domain = (_dom);                                    \
         /* The incremented type count is intended to pin to 'writable'. */  \
-        (_pfn)->u.inuse.type_info  = PGT_writable_page | PGT_validated | 1; \
+        (_pfn)->u.inuse.type_info = PGT_writable_page | PGT_validated | 1;  \
         wmb(); /* install valid domain ptr before updating refcnt. */       \
         spin_lock(&(_dom)->page_alloc_lock);                                \
         /* _dom holds an allocation reference */                            \
@@ -143,155 +140,34 @@ static inline int get_page(struct pfn_info *page,
                            struct domain *domain)
 {
     u32 x, nx, y = page->count_info;
-    struct domain *p, *np = page->u.inuse.domain;
+    struct domain *d, *nd = page->u.inuse.domain;
 
     do {
         x  = y;
         nx = x + 1;
-        p  = np;
+        d  = nd;
         if ( unlikely((x & PGC_count_mask) == 0) ||  /* Not allocated? */
              unlikely((nx & PGC_count_mask) == 0) || /* Count overflow? */
-             unlikely(p != domain) )                 /* Wrong owner? */
+             unlikely(d != domain) )                 /* Wrong owner? */
         {
             DPRINTK("Error pfn %08lx: ed=%p, sd=%p, caf=%08x, taf=%08x\n",
-                    page_to_pfn(page), domain, p,
+                    page_to_pfn(page), domain, d,
                     x, page->u.inuse.type_info);
             return 0;
         }
         __asm__ __volatile__(
             LOCK_PREFIX "cmpxchg8b %3"
-            : "=d" (np), "=a" (y), "=c" (p),
+            : "=d" (nd), "=a" (y), "=c" (d),
               "=m" (*(volatile u64 *)(&page->count_info))
-            : "0" (p), "1" (x), "c" (p), "b" (nx) );
+            : "0" (d), "1" (x), "c" (d), "b" (nx) );
     }
-    while ( unlikely(np != p) || unlikely(y != x) );
+    while ( unlikely(nd != d) || unlikely(y != x) );
 
     return 1;
 }
 
-
-static inline void put_page_type(struct pfn_info *page)
-{
-    u32 nx, x, y = page->u.inuse.type_info;
-
- again:
-    do {
-        x  = y;
-        nx = x - 1;
-        if ( unlikely((nx & PGT_count_mask) == 0) )
-        {
-            page->tlbflush_timestamp = tlbflush_clock;
-            if ( unlikely((nx & PGT_type_mask) <= PGT_l4_page_table) &&
-                 likely(nx & PGT_validated) )
-            {
-                /*
-                 * Page-table pages must be unvalidated when count is zero. The
-                 * 'free' is safe because the refcnt is non-zero and the
-                 * validated bit is clear => other ops will spin or fail.
-                 */
-                if ( unlikely((y = cmpxchg(&page->u.inuse.type_info, x, 
-                                           x & ~PGT_validated)) != x) )
-                    goto again;
-                /* We cleared the 'valid bit' so we must do the clear up. */
-                free_page_type(page, x & PGT_type_mask);
-                /* Carry on as we were, but with the 'valid bit' now clear. */
-                x  &= ~PGT_validated;
-                nx &= ~PGT_validated;
-            }
-        }
-	else if ( unlikely((nx & (PGT_pinned | PGT_count_mask)) == 
-                           (PGT_pinned | 1)) )
-	{
-            /* Page is now only pinned. Make the back pointer mutable again. */
-	    nx |= PGT_va_mutable;
-	}
-    }
-    while ( unlikely((y = cmpxchg(&page->u.inuse.type_info, x, nx)) != x) );
-}
-
-
-static inline int get_page_type(struct pfn_info *page, u32 type)
-{
-    u32 nx, x, y = page->u.inuse.type_info;
- again:
-    do {
-        x  = y;
-        nx = x + 1;
-        if ( unlikely((nx & PGT_count_mask) == 0) )
-        {
-            DPRINTK("Type count overflow on pfn %08lx\n", page_to_pfn(page));
-            return 0;
-        }
-        else if ( unlikely((x & PGT_count_mask) == 0) )
-        {
-            if ( (x & (PGT_type_mask|PGT_va_mask)) != type )
-            {
-                nx &= ~(PGT_type_mask | PGT_va_mask | PGT_validated);
-                nx |= type;
-                /* No extra validation needed for writable pages. */
-                if ( type == PGT_writable_page )
-                    nx |= PGT_validated;
-            }
-        }
-        else if ( unlikely((x & (PGT_type_mask|PGT_va_mask)) != type) )
-        {
-            if ( unlikely((x & PGT_type_mask) != (type & PGT_type_mask) ) )
-            {
-#ifdef VERBOSE
-                if ( ((x & PGT_type_mask) != PGT_l2_page_table) ||
-                     ((type & PGT_type_mask) != PGT_l1_page_table) )
-                    DPRINTK("Bad type (saw %08x != exp %08x) for pfn %08lx\n",
-                            x & PGT_type_mask, type, page_to_pfn(page));
-#endif
-                return 0;
-            }
-            else if ( (x & PGT_va_mask) == PGT_va_mutable )
-            {
-                /* The va backpointer is mutable, hence we update it. */
-                nx &= ~PGT_va_mask;
-                nx |= type; /* we know the actual type is correct */
-            }
-            else if ( unlikely((x & PGT_va_mask) != (type & PGT_va_mask)) )
-            {
-                /* The va backpointer wasn't mutable, and is different. */
-                DPRINTK("Unexpected va backpointer (saw %08x != exp %08x)"
-                        " for pfn %08lx\n", x, type, page_to_pfn(page));
-                return 0;
-            }
-        }
-	else if ( unlikely(!(x & PGT_validated)) )
-        {
-            /* Someone else is updating validation of this page. Wait... */
-            while ( (y = page->u.inuse.type_info) == x )
-            {
-                rep_nop();
-                barrier();
-            }
-            goto again;
-        }
-    }
-    while ( unlikely((y = cmpxchg(&page->u.inuse.type_info, x, nx)) != x) );
-
-    if ( unlikely(!(nx & PGT_validated)) )
-    {
-        /* Try to validate page type; drop the new reference on failure. */
-        if ( unlikely(!alloc_page_type(page, type & PGT_type_mask)) )
-        {
-            DPRINTK("Error while validating pfn %08lx for type %08x."
-                    " caf=%08x taf=%08x\n",
-                    page_to_pfn(page), type,
-		    page->count_info,
-		    page->u.inuse.type_info);
-            put_page_type(page);
-            return 0;
-        }
-
-        set_bit(_PGT_validated, &page->u.inuse.type_info);
-    }
-
-    return 1;
-}
-
+void put_page_type(struct pfn_info *page);
+int  get_page_type(struct pfn_info *page, u32 type);
 
 static inline void put_page_and_type(struct pfn_info *page)
 {

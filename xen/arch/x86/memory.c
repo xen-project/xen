@@ -462,7 +462,6 @@ get_page_from_l1e(
     {
         if ( unlikely(!get_page_type(page, PGT_writable_page)) )
             return 0;
-        set_bit(_PGC_tlb_flush_on_type_change, &page->count_info);
     }
 
     return 1;
@@ -774,18 +773,6 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e)
 
 int alloc_page_type(struct pfn_info *page, unsigned int type)
 {
-    if ( unlikely(test_and_clear_bit(_PGC_tlb_flush_on_type_change, 
-                                     &page->count_info)) )
-    {
-        struct domain *p = page->u.inuse.domain;
-        if ( unlikely(NEED_FLUSH(tlbflush_time[p->processor],
-                                 page->tlbflush_timestamp)) )
-        {
-            perfc_incr(need_flush_tlb_flush);
-            flush_tlb_cpu(p->processor);
-        }
-    }
-
     switch ( type )
     {
     case PGT_l1_page_table:
@@ -830,6 +817,151 @@ void free_page_type(struct pfn_info *page, unsigned int type)
         unshadow_table(page_to_pfn(page), type);
         put_shadow_status(&d->mm);
     }
+}
+
+
+void put_page_type(struct pfn_info *page)
+{
+    u32 nx, x, y = page->u.inuse.type_info;
+
+ again:
+    do {
+        x  = y;
+        nx = x - 1;
+
+        ASSERT((x & PGT_count_mask) != 0);
+        ASSERT(x & PGT_validated);
+
+        if ( unlikely((nx & PGT_count_mask) == 0) )
+        {
+            /* Record TLB information for flush later. Races are harmless. */
+            page->tlbflush_timestamp = tlbflush_clock;
+            
+            if ( unlikely((nx & PGT_type_mask) <= PGT_l4_page_table) )
+            {
+                /*
+                 * Page-table pages must be unvalidated when count is zero. The
+                 * 'free' is safe because the refcnt is non-zero and validated
+                 * bit is clear => other ops will spin or fail.
+                 */
+                if ( unlikely((y = cmpxchg(&page->u.inuse.type_info, x, 
+                                           x & ~PGT_validated)) != x) )
+                    goto again;
+                /* We cleared the 'valid bit' so we do the clear up. */
+                free_page_type(page, x & PGT_type_mask);
+                /* Carry on, but with the 'valid bit' now clear. */
+                x  &= ~PGT_validated;
+                nx &= ~PGT_validated;
+            }
+        }
+	else if ( unlikely((nx & (PGT_pinned | PGT_count_mask)) == 
+                           (PGT_pinned | 1)) )
+	{
+            /* Page is now only pinned. Make the back pointer mutable again. */
+	    nx |= PGT_va_mutable;
+	}
+    }
+    while ( unlikely((y = cmpxchg(&page->u.inuse.type_info, x, nx)) != x) );
+}
+
+
+int get_page_type(struct pfn_info *page, u32 type)
+{
+    u32 nx, x, y = page->u.inuse.type_info;
+
+ again:
+    do {
+        x  = y;
+        nx = x + 1;
+        if ( unlikely((nx & PGT_count_mask) == 0) )
+        {
+            MEM_LOG("Type count overflow on pfn %08lx\n", page_to_pfn(page));
+            return 0;
+        }
+        else if ( unlikely((x & PGT_count_mask) == 0) )
+        {
+            if ( (x & (PGT_type_mask|PGT_va_mask)) != type )
+            {
+                /*
+                 * On type change we check to flush stale TLB entries. This 
+                 * may be unnecessary (e.g., page was GDT/LDT) but those
+                 * circumstances should be very rare.
+                 */
+                struct domain *d = page->u.inuse.domain;
+                if ( unlikely(NEED_FLUSH(tlbflush_time[d->processor],
+                                         page->tlbflush_timestamp)) )
+                {
+                    perfc_incr(need_flush_tlb_flush);
+                    flush_tlb_cpu(d->processor);
+                }
+
+                /* We lose existing type, back pointer, and validity. */
+                nx &= ~(PGT_type_mask | PGT_va_mask | PGT_validated);
+                nx |= type;
+
+                /* No special validation needed for writable pages. */
+                /* Page tables and GDT/LDT need to be scanned for validity. */
+                if ( type == PGT_writable_page )
+                    nx |= PGT_validated;
+            }
+        }
+        else if ( unlikely((x & (PGT_type_mask|PGT_va_mask)) != type) )
+        {
+            if ( unlikely((x & PGT_type_mask) != (type & PGT_type_mask) ) )
+            {
+                if ( ((x & PGT_type_mask) != PGT_l2_page_table) ||
+                     ((type & PGT_type_mask) != PGT_l1_page_table) )
+                    MEM_LOG("Bad type (saw %08x != exp %08x) for pfn %08lx\n",
+                            x & PGT_type_mask, type, page_to_pfn(page));
+                return 0;
+            }
+            else if ( (x & PGT_va_mask) == PGT_va_mutable )
+            {
+                /* The va backpointer is mutable, hence we update it. */
+                nx &= ~PGT_va_mask;
+                nx |= type; /* we know the actual type is correct */
+            }
+            else if ( unlikely((x & PGT_va_mask) != (type & PGT_va_mask)) )
+            {
+                /* The va backpointer wasn't mutable, and is different. */
+                MEM_LOG("Unexpected va backpointer (saw %08x != exp %08x)"
+                        " for pfn %08lx\n", x, type, page_to_pfn(page));
+                return 0;
+            }
+        }
+	else if ( unlikely(!(x & PGT_validated)) )
+        {
+            /* Someone else is updating validation of this page. Wait... */
+            while ( (y = page->u.inuse.type_info) == x )
+            {
+                rep_nop();
+                barrier();
+            }
+            goto again;
+        }
+    }
+    while ( unlikely((y = cmpxchg(&page->u.inuse.type_info, x, nx)) != x) );
+
+    if ( unlikely(!(nx & PGT_validated)) )
+    {
+        /* Try to validate page type; drop the new reference on failure. */
+        if ( unlikely(!alloc_page_type(page, type & PGT_type_mask)) )
+        {
+            MEM_LOG("Error while validating pfn %08lx for type %08x."
+                    " caf=%08x taf=%08x\n",
+                    page_to_pfn(page), type,
+		    page->count_info,
+		    page->u.inuse.type_info);
+            /* Noone else can get a reference. We hold the only ref. */
+            page->u.inuse.type_info = 0;
+            return 0;
+        }
+
+        /* Noone else is updating simultaneously. */
+        __set_bit(_PGT_validated, &page->u.inuse.type_info);
+    }
+
+    return 1;
 }
 
 
@@ -1747,7 +1879,6 @@ int ptwr_do_page_fault(unsigned long addr)
 #ifndef NDEBUG
 void ptwr_status(void)
 {
-    int i;
     unsigned long pte, pfn;
     struct pfn_info *page;
     l2_pgentry_t *pl2e;
