@@ -45,7 +45,9 @@
 #define FLAT_RING3_CS32 0x0823  /* GDT index 260 */
 #define FLAT_RING3_CS64 0x082b  /* GDT index 261 */
 #define FLAT_RING3_DS32 0x0833  /* GDT index 262 */
-#define FLAT_RING3_DS64 0x0000
+#define FLAT_RING3_DS64 0x0000  /* NULL selector */
+#define FLAT_RING3_SS32 0x0833  /* GDT index 262 */
+#define FLAT_RING3_SS64 0x0833  /* GDT index 262 */
 
 #define FLAT_GUESTOS_DS64 FLAT_RING3_DS64
 #define FLAT_GUESTOS_DS32 FLAT_RING3_DS32
@@ -53,6 +55,9 @@
 #define FLAT_GUESTOS_CS64 FLAT_RING3_CS64
 #define FLAT_GUESTOS_CS32 FLAT_RING3_CS32
 #define FLAT_GUESTOS_CS   FLAT_GUESTOS_CS64
+#define FLAT_GUESTOS_SS64 FLAT_RING3_SS64
+#define FLAT_GUESTOS_SS32 FLAT_RING3_SS32
+#define FLAT_GUESTOS_SS   FLAT_GUESTOS_SS64
 
 #define FLAT_USER_DS64 FLAT_RING3_DS64
 #define FLAT_USER_DS32 FLAT_RING3_DS32
@@ -60,13 +65,21 @@
 #define FLAT_USER_CS64 FLAT_RING3_CS64
 #define FLAT_USER_CS32 FLAT_RING3_CS32
 #define FLAT_USER_CS   FLAT_USER_CS64
+#define FLAT_USER_SS64 FLAT_RING3_SS64
+#define FLAT_USER_SS32 FLAT_RING3_SS32
+#define FLAT_USER_SS   FLAT_USER_SS64
 
 /* And the trap vector is... */
 #define TRAP_INSTR "syscall"
 
+#ifndef HYPERVISOR_VIRT_START
+#define HYPERVISOR_VIRT_START (0xFFFF800000000000UL)
+#define HYPERVISOR_VIRT_END   (0xFFFF880000000000UL)
+#endif
+
 /* The machine->physical mapping table starts at this address, read-only. */
 #ifndef machine_to_phys_mapping
-#define machine_to_phys_mapping ((unsigned long *)0xffff810000000000ULL)
+#define machine_to_phys_mapping ((unsigned long *)HYPERVISOR_VIRT_START)
 #endif
 
 #ifndef __ASSEMBLY__

@@ -189,7 +189,7 @@ ignore_int:
 ENTRY(gdt_table)
         .fill FIRST_RESERVED_GDT_ENTRY,8,0
         .quad 0x0000000000000000     /* unused */
-        .quad 0x00cf9a000000ffff     /* 0x0808 ring 0 code, compatability */
+        .quad 0x00cf9a000000ffff     /* 0x0808 ring 0 code, compatibility */
         .quad 0x00af9a000000ffff     /* 0x0810 ring 0 code, 64-bit mode   */
         .quad 0x00cf92000000ffff     /* 0x0818 ring 0 data                */
         .quad 0x00cffa000000ffff     /* 0x0823 ring 3 code, compatibility */

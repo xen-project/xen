@@ -491,13 +491,14 @@ void new_thread(struct exec_domain *d,
 
     /*
      * Initial register values:
-     *  DS,ES,FS,GS = FLAT_RING1_DS
-     *       CS:EIP = FLAT_RING1_CS:start_pc
-     *       SS:ESP = FLAT_RING1_DS:start_stack
+     *  DS,ES,FS,GS = FLAT_GUESTOS_DS
+     *       CS:EIP = FLAT_GUESTOS_CS:start_pc
+     *       SS:ESP = FLAT_GUESTOS_SS:start_stack
      *          ESI = start_info
      *  [EAX,EBX,ECX,EDX,EDI,EBP are zero]
      */
-    ec->ds = ec->es = ec->fs = ec->gs = ec->ss = FLAT_GUESTOS_DS;
+    ec->ds = ec->es = ec->fs = ec->gs = FLAT_GUESTOS_DS;
+    ec->ss = FLAT_GUESTOS_SS;
     ec->cs = FLAT_GUESTOS_CS;
     ec->eip = start_pc;
     ec->esp = start_stack;
