@@ -49,6 +49,7 @@ net_vif_t *create_net_vif(int domain)
 {
     net_vif_t *new_vif;
     net_ring_t *new_ring;
+    net_shadow_ring_t *shadow_ring;
     struct task_struct *dom_task;
     
     if ( !(dom_task = find_domain_by_id(domain)) ) 
@@ -64,7 +65,27 @@ net_vif_t *create_net_vif(int domain)
     new_ring = dom_task->net_ring_base + dom_task->num_net_vifs;
     memset(new_ring, 0, sizeof(net_ring_t));
 
+    // allocate the shadow ring.  
+    // maybe these should be kmem_cache instead of kmalloc?
+    
+    shadow_ring = kmalloc(sizeof(net_shadow_ring_t), GFP_KERNEL);
+    if (shadow_ring == NULL) goto fail;
+    
+    shadow_ring->tx_ring = kmalloc(TX_RING_SIZE 
+                    * sizeof(tx_shadow_entry_t), GFP_KERNEL);
+    shadow_ring->rx_ring = kmalloc(RX_RING_SIZE
+                    * sizeof(rx_shadow_entry_t), GFP_KERNEL);
+    if ((shadow_ring->tx_ring == NULL) || (shadow_ring->rx_ring == NULL))
+            goto fail;
+
+    shadow_ring->rx_prod = 0;
+    
+    // fill in the new vif struct.
+    
     new_vif->net_ring = new_ring;
+    new_vif->shadow_ring = shadow_ring;
+    
+                    
     skb_queue_head_init(&new_vif->skb_list);
     new_vif->domain = domain;
     
@@ -77,6 +98,10 @@ net_vif_t *create_net_vif(int domain)
     dom_task->num_net_vifs++;
     
     return new_vif;
+    
+fail:
+    printk("VIF allocation failed!\n");
+    return NULL;
 }
 
 /* delete_net_vif - Delete the last vif in the given domain. 
@@ -101,7 +126,10 @@ void destroy_net_vif(struct task_struct *p)
     write_lock(&sys_vif_lock);
     sys_vif_list[p->net_vif_list[i]->id] = NULL; // system vif list not gc'ed
     write_unlock(&sys_vif_lock);        
-    
+   
+    kfree(p->net_vif_list[i]->shadow_ring->tx_ring);
+    kfree(p->net_vif_list[i]->shadow_ring->rx_ring);
+    kfree(p->net_vif_list[i]->shadow_ring);
     kmem_cache_free(net_vif_cache, p->net_vif_list[i]);
 }
 

@@ -879,9 +879,10 @@ void flush_rx_queue(void)
     struct sk_buff *skb;
     shared_info_t *s = current->shared_info;
     net_ring_t *net_ring;
+    net_shadow_ring_t *shadow_ring;
     unsigned int i, nvif;
-    rx_entry_t rx;
-
+    rx_shadow_entry_t *rx;
+    
     /* I have changed this to batch flush all vifs for a guest
      * at once, whenever this is called.  Since the guest is about to be
      * scheduled and issued an RX interrupt for one nic, it might as well
@@ -899,6 +900,7 @@ void flush_rx_queue(void)
     for (nvif = 0; nvif < current->num_net_vifs; nvif++)
     {
         net_ring = current->net_vif_list[nvif]->net_ring;
+        shadow_ring = current->net_vif_list[nvif]->shadow_ring;
         while ( (skb = skb_dequeue(&current->net_vif_list[nvif]->skb_list)) 
                         != NULL )
         {
@@ -923,12 +925,13 @@ void flush_rx_queue(void)
             i = net_ring->rx_cons;
             if ( i != net_ring->rx_prod )
             {
-                if ( !copy_from_user(&rx, net_ring->rx_ring+i, sizeof(rx)) )
+                if ( shadow_ring->rx_ring[i].status == RING_STATUS_OK)
                 {
-                    if ( (skb->len + ETH_HLEN) < rx.size )
-                        rx.size = skb->len + ETH_HLEN;
-                    copy_to_user((void *)rx.addr, skb->mac.raw, rx.size);
-                    copy_to_user(net_ring->rx_ring+i, &rx, sizeof(rx));
+                    rx = shadow_ring->rx_ring+i;
+                    if ( (skb->len + ETH_HLEN) < rx->size )
+                        rx->size = skb->len + ETH_HLEN;
+                    copy_to_user((void *)rx->addr, skb->mac.raw, rx->size);
+                    copy_to_user(net_ring->rx_ring+i, rx, sizeof(rx));
                 }
                 net_ring->rx_cons = (i+1) & (RX_RING_SIZE-1);
                 if ( net_ring->rx_cons == net_ring->rx_event )
@@ -1923,7 +1926,8 @@ int __init net_dev_init(void)
 long do_net_update(void)
 {
     shared_info_t *shared = current->shared_info;    
-    net_ring_t *net_ring = current->net_ring_base;
+    net_ring_t *net_ring;
+    net_shadow_ring_t *shadow_ring;
     net_vif_t *current_vif;
     unsigned int i, j;
     struct sk_buff *skb;
@@ -1933,6 +1937,10 @@ long do_net_update(void)
     {
         current_vif = current->net_vif_list[j];
         net_ring = current_vif->net_ring;
+
+        /* First, we send out pending TX descriptors if they exist on this ring.
+         */
+        
         for ( i = net_ring->tx_cons; i != net_ring->tx_prod; i = TX_RING_INC(i) )
         {
             if ( copy_from_user(&tx, net_ring->tx_ring+i, sizeof(tx)) )
@@ -1997,6 +2005,32 @@ long do_net_update(void)
             }
         }
         net_ring->tx_cons = i;
+
+        /* Next, pull any new RX descriptors across to the shadow ring.
+         * Note that in the next revision, these will reference PTEs and the
+         * code here will have to validate reference and flush counts, copy the 
+         * descriptor, change the ownership to dom0 and invalidate the client's
+         * version of the page.
+         */
+    
+        shadow_ring = current_vif->shadow_ring;
+
+        for (i = shadow_ring->rx_prod; i != net_ring->rx_prod; i = TX_RING_INC(i))
+        {
+            /* This copy assumes that rx_shadow_entry_t is an extension of rx_net_entry_t
+             * extra fields must be tacked on to the end.
+             */
+            
+            if ( copy_from_user( shadow_ring->rx_ring+i, net_ring->rx_ring+i, 
+                                 sizeof (rx_entry_t) ) )
+            {
+                shadow_ring->rx_ring[i].status = RING_STATUS_ERR_CFU;
+            } else {
+                shadow_ring->rx_ring[i].status = RING_STATUS_OK;
+            }
+        }
+
+        shadow_ring->rx_prod = net_ring->rx_prod;
     }
 
     return 0;
