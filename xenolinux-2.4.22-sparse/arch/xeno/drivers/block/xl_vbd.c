@@ -33,7 +33,7 @@ struct gendisk *xlvbd_gendisk[XLVBD_MAX_MAJORS] = { NULL };
 #define XLIDE_PARTN_SHIFT  6    /* amount to shift minor to get 'real' minor */
 #define XLIDE_MAX_MINORS  (1 << XLIDE_PARTN_SHIFT)     /* minors per ide vbd */
 
-#define XLSCSI_PARTN_SHIFT 6    /* amount to shift minor to get 'real' minor */
+#define XLSCSI_PARTN_SHIFT 4    /* amount to shift minor to get 'real' minor */
 #define XLSCSI_MAX_MINORS (1 << XLSCSI_PARTN_SHIFT)   /* minors per scsi vbd */
 
 #define XLVBD_PARTN_SHIFT  6    /* amount to shift minor to get 'real' minor */
@@ -230,11 +230,13 @@ int __init xlvbd_init(xen_disk_info_t *xdi)
 	       hence using unit number for now but in old code was 'disk' aka 
 	       sequence number assigned by xen during probe = barfle? */
 	    ((xl_disk_t *)gd->real_devices)[minor>>gd->minor_shift].capacity =
-	    xdi->disks[i].capacity;
+                xdi->disks[i].capacity;
 
 	    
 	    /* remember that we've done this major */
 	    majors[major] = 1; 
+	} else {
+	    gd = get_gendisk(device); 
 	}
 
 	if(XD_READONLY(xdi->disks[i].info)) 

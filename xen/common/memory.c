@@ -138,7 +138,7 @@
 #include <asm/uaccess.h>
 #include <asm/domain_page.h>
 
-#if 0
+#if 1
 #define MEM_LOG(_f, _a...) printk("DOM%d: (file=memory.c, line=%d) " _f "\n", current->domain, __LINE__, ## _a )
 #else
 #define MEM_LOG(_f, _a...) ((void)0)
@@ -274,7 +274,6 @@ int map_ldt_shadow_page(unsigned int off)
         for ( i = 0; i < 512; i++ )
             if ( unlikely(!check_descriptor(ldt_page[i*2], ldt_page[i*2+1])) )
                 goto out;
-
         if ( unlikely(page->flags & PG_need_flush) )
         {
             perfc_incrc(need_flush_tlb_flush);
@@ -479,7 +478,6 @@ static int get_l1_table(unsigned long page_nr)
         if ( unlikely(ret) ) goto fail;
     }
 
- out:
     /* Make sure we unmap the right page! */
     unmap_domain_mem(p_l1_entry-1);
     return ret;
