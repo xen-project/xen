@@ -257,6 +257,7 @@ void context_switch(struct exec_domain *prev, struct exec_domain *next)
 	//if (!is_idle_task(next->domain) )
 		//send_guest_virq(next, VIRQ_TIMER);
 	load_region_regs(current);
+	if (vcpu_timer_expired(current)) vcpu_pend_timer(current);
 }
 
 void panic_domain(struct pt_regs *regs, const char *fmt, ...)
@@ -276,5 +277,6 @@ void panic_domain(struct pt_regs *regs, const char *fmt, ...)
 	printf(buf);
 	if (regs) show_registers(regs);
 	domain_pause_by_systemcontroller(current->domain);
+	set_bit(DF_CRASHED, ed->domain->d_flags);
 	//while(test);
 }

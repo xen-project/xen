@@ -947,6 +947,7 @@
 421098b69pUiIJrqu_w0JMUnZ2uc2A xen/arch/ia64/smp.c
 421098b6_ToSGrf6Pk1Uwg5aMAIBxg xen/arch/ia64/smpboot.c
 421098b6AUdbxR3wyn1ATcmNuTao_Q xen/arch/ia64/tools/README.xenia64
+42376c6dfyY0eq8MS2dK3BW2rFuEGg xen/arch/ia64/tools/README.xenia64linux
 421098b6rQ2BQ103qu1n1HNofbS2Og xen/arch/ia64/tools/mkbuildtree
 41a26ebc--sjlYZQxmIxyCx3jw70qA xen/arch/ia64/vcpu.c
 421098b6M2WhsJ_ZMzFamAQcdc5gzw xen/arch/ia64/vhpt.c

@@ -248,6 +248,7 @@ void new_thread(struct exec_domain *ed,
 	regs->pr = 0;
 	sw->pr = 0;
 	regs->ar_pfs = 0;
+	sw->caller_unat = 0;
 	sw->ar_pfs = 0;
 	sw->ar_bspstore = new_rbs;
 	//regs->r13 = (unsigned long) ed;

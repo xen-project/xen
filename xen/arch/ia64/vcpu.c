@@ -572,6 +572,12 @@ UINT64 vcpu_deliverable_interrupts(VCPU *vcpu)
 		vcpu_check_pending_interrupts(vcpu) != SPURIOUS_VECTOR);
 }
 
+UINT64 vcpu_deliverable_timer(VCPU *vcpu)
+{
+	return (vcpu_get_psr_i(vcpu) &&
+		vcpu_check_pending_interrupts(vcpu) == PSCB(vcpu,itv));
+}
+
 IA64FAULT vcpu_get_lid(VCPU *vcpu, UINT64 *pval)
 {
 extern unsigned long privop_trace;
@@ -950,7 +956,26 @@ void vcpu_pend_timer(VCPU *vcpu)
 	UINT64 itv = PSCB(vcpu,itv) & 0xff;
 
 	if (vcpu_timer_disabled(vcpu)) return;
+#if 1
+	// attempt to flag "timer tick before its due" source
+	{
+	UINT64 itm = PSCB(vcpu,domain_itm);
+	UINT64 now = ia64_get_itc();
+	if (now < itm) printf("******* vcpu_pend_timer: pending before due!\n");
+	}
+#endif
 	vcpu_pend_interrupt(vcpu, itv);
+}
+
+// returns true if ready to deliver a timer interrupt too early
+UINT64 vcpu_timer_pending_early(VCPU *vcpu)
+{
+	UINT64 now = ia64_get_itc();
+	UINT64 itm = PSCB(vcpu,domain_itm);
+
+	if (vcpu_timer_disabled(vcpu)) return 0;
+	if (!itm) return 0;
+	return (vcpu_deliverable_timer(vcpu) && (now < itm));
 }
 
 //FIXME: This is a hack because everything dies if a timer tick is lost
@@ -974,7 +999,7 @@ void vcpu_poke_timer(VCPU *vcpu)
 			if (irr & (1L<<(0xef-0xc0))) return;
 if (now-itm>0x800000)
 printf("*** poking timer: now=%lx,vitm=%lx,xitm=%lx,itm=%lx\n",now,itm,local_cpu_data->itm_next,ia64_get_itm());
-			vcpu_pend_interrupt(vcpu, 0xefL);
+			vcpu_pend_timer(vcpu);
 		}
 	}
 }

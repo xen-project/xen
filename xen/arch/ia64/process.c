@@ -204,10 +204,11 @@ void deliver_pending_interrupt(struct pt_regs *regs)
 	struct exec_domain *ed = current;
 	// FIXME: Will this work properly if doing an RFI???
 	if (!is_idle_task(d) && user_mode(regs)) {
-		vcpu_poke_timer(ed);
+		//vcpu_poke_timer(ed);
 		if (vcpu_deliverable_interrupts(ed)) {
 			unsigned long isr = regs->cr_ipsr & IA64_PSR_RI;
-			foodpi();
+			if (vcpu_timer_pending_early(ed))
+printf("*#*#*#* about to deliver early timer to domain %d!!!\n",ed->domain->id);
 			reflect_interruption(0,isr,0,regs,IA64_EXTINT_VECTOR);
 		}
 	}
