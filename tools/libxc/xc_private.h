@@ -72,7 +72,7 @@ static inline int do_xen_hypercall(int xc_handle,
 
 static inline int do_dom0_op(int xc_handle, dom0_op_t *op)
 {
-    int ret = -1;
+    int ret = -1, retries = 0;
     privcmd_hypercall_t hypercall;
 
     op->interface_version = DOM0_INTERFACE_VERSION;
@@ -86,8 +86,18 @@ static inline int do_dom0_op(int xc_handle, dom0_op_t *op)
         goto out1;
     }
 
+ again:
     if ( (ret = do_xen_hypercall(xc_handle, &hypercall)) < 0 )
     {
+        if ( (errno == EAGAIN) && (retries++ < 10) )
+        {
+            /*
+             * This was added for memory allocation, where we can get EAGAIN
+             * if memory is unavailable because it is on the scrub list.
+             */
+            sleep(1);
+            goto again;
+        }
         if ( errno == EACCES )
             fprintf(stderr, "Dom0 operation failed -- need to"
                     " rebuild the user-space tool set?\n");
