@@ -99,7 +99,7 @@ int __init check_nmi_watchdog (void)
     for ( j = 0; j < smp_num_cpus; j++ ) 
     {
         cpu = cpu_logical_map(j);
-        prev_nmi_count[cpu] = irq_stat[cpu].__nmi_count;
+        prev_nmi_count[cpu] = nmi_count(cpu);
     }
     __sti();
     mdelay((10*1000)/nmi_hz); /* wait 10 ticks */

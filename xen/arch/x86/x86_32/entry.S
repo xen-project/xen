@@ -495,16 +495,10 @@ ENTRY(nmi)
         movb  XREGS_cs(%esp),%al
         testl $(3|X86_EFLAGS_VM),%eax
         jnz   do_watchdog_tick
-        movl  XREGS_ds(%esp),%eax
+        movl  %ds,%eax
         cmpw  $(__HYPERVISOR_DS),%ax
         jne   restore_all_xen
-        movl  XREGS_es(%esp),%eax
-        cmpw  $(__HYPERVISOR_DS),%ax
-        jne   restore_all_xen
-        movl  XREGS_fs(%esp),%eax
-        cmpw  $(__HYPERVISOR_DS),%ax
-        jne   restore_all_xen
-        movl  XREGS_gs(%esp),%eax
+        movl  %es,%eax
         cmpw  $(__HYPERVISOR_DS),%ax
         jne   restore_all_xen
 
