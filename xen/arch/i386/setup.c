@@ -15,7 +15,6 @@
 #include <asm/desc.h>
 #include <asm/domain_page.h>
 #include <asm/pdb.h>
-#include <xen/trace.h>
 
 char ignore_irq13;		/* set if exception 16 works */
 struct cpuinfo_x86 boot_cpu_data = { 0, 0, 0, 0, -1, 1, 0, 0, -1 };
@@ -451,6 +450,4 @@ void __init start_of_day(void)
 #endif
 
     watchdog_on = 1;
-
-    init_trace_bufs();
 }
