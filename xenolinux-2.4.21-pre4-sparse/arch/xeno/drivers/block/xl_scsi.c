@@ -13,7 +13,6 @@
 /* We support up to 16 devices of up to 16 partitions each. */
 #define XLSCSI_MAX        256
 #define XLSCSI_MAJOR_NAME "xsd"
-#define SCSI_PARTN_BITS   4
 static int xlscsi_blksize_size[XLSCSI_MAX];
 static int xlscsi_hardsect_size[XLSCSI_MAX];
 static int xlscsi_max_sectors[XLSCSI_MAX];
@@ -81,18 +80,17 @@ int xlscsi_init(xen_disk_info_t *xdi)
      */
     blk_queue_headactive(BLK_DEFAULT_QUEUE(XLSCSI_MAJOR), 0);
 
-    /* We may register up to 16 devices in a sparse identifier space. */
-    units = 16;
+    units = XLSCSI_MAX >> XLSCSI_PARTN_SHIFT;
 
     /* Construct an appropriate gendisk structure. */
-    minors    = units * (1<<SCSI_PARTN_BITS);
+    minors    = units * (1<<XLSCSI_PARTN_SHIFT);
     gd        = kmalloc(sizeof(struct gendisk), GFP_KERNEL);
     gd->sizes = kmalloc(minors * sizeof(int), GFP_KERNEL);
     gd->part  = kmalloc(minors * sizeof(struct hd_struct), GFP_KERNEL);
     gd->major        = XLSCSI_MAJOR;
     gd->major_name   = XLSCSI_MAJOR_NAME;
-    gd->minor_shift  = SCSI_PARTN_BITS; 
-    gd->max_p	     = 1<<SCSI_PARTN_BITS;
+    gd->minor_shift  = XLSCSI_PARTN_SHIFT; 
+    gd->max_p	     = 1<<XLSCSI_PARTN_SHIFT;
     gd->nr_real	     = units;           
     gd->real_devices = kmalloc(units * sizeof(xl_disk_t), GFP_KERNEL);
     gd->next	     = NULL;            
@@ -118,8 +116,8 @@ int xlscsi_init(xen_disk_info_t *xdi)
         ((xl_disk_t *)gd->real_devices)[disk].capacity =
             xdi->disks[i].capacity;
         register_disk(gd,
-                      MKDEV(XLSCSI_MAJOR, disk<<SCSI_PARTN_BITS), 
-                      1<<SCSI_PARTN_BITS, 
+                      MKDEV(XLSCSI_MAJOR, disk<<XLSCSI_PARTN_SHIFT), 
+                      1<<XLSCSI_PARTN_SHIFT, 
                       &xlscsi_block_fops, 
                       xdi->disks[i].capacity);
     }

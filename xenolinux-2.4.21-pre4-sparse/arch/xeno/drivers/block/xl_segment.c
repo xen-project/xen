@@ -16,7 +16,6 @@ typedef unsigned char byte;
 /* We support up to 16 devices of up to 16 partitions each. */
 #define XLVIRT_MAX        256
 #define XLVIRT_MAJOR_NAME "xvd"
-#define VIRT_PARTN_BITS   4
 static int xlseg_blksize_size[XLVIRT_MAX];
 static int xlseg_hardsect_size[XLVIRT_MAX];
 static int xlseg_max_sectors[XLVIRT_MAX];
@@ -90,22 +89,17 @@ int __init xlseg_init(void)
      */
     blk_queue_headactive(BLK_DEFAULT_QUEUE(XLVIRT_MAJOR), 0);
 
-    /*
-     * We may register up to 16 devices in a sparse identifier space.
-     * Unlike with IDE and SCSI, we always register a gendisk, as new
-     * virtual devices may get allocate dto us later on.
-     */
-    units = 16;
+    units = XLVIRT_MAX >> XLVIRT_PARTN_SHIFT;
 
     /* Construct an appropriate gendisk structure. */
-    minors    = units * (1<<VIRT_PARTN_BITS);
+    minors    = units * (1<<XLVIRT_PARTN_SHIFT);
     gd        = kmalloc(sizeof(struct gendisk), GFP_KERNEL);
     gd->sizes = kmalloc(minors * sizeof(int), GFP_KERNEL);
     gd->part  = kmalloc(minors * sizeof(struct hd_struct), GFP_KERNEL);
     gd->major        = XLVIRT_MAJOR;
     gd->major_name   = XLVIRT_MAJOR_NAME;
-    gd->minor_shift  = VIRT_PARTN_BITS; 
-    gd->max_p	     = 1<<VIRT_PARTN_BITS;
+    gd->minor_shift  = XLVIRT_PARTN_SHIFT; 
+    gd->max_p	     = 1<<XLVIRT_PARTN_SHIFT;
     gd->nr_real	     = units;           
     gd->real_devices = kmalloc(units * sizeof(xl_disk_t), GFP_KERNEL);
     gd->next	     = NULL;            
@@ -132,8 +126,8 @@ int __init xlseg_init(void)
         ((xl_disk_t *)gd->real_devices)[disk].capacity =
             xdi->disks[i].capacity;
         register_disk(gd, 
-                      MKDEV(XLVIRT_MAJOR, disk<<VIRT_PARTN_BITS), 
-                      1<<VIRT_PARTN_BITS, 
+                      MKDEV(XLVIRT_MAJOR, disk<<XLVIRT_PARTN_SHIFT), 
+                      1<<XLVIRT_PARTN_SHIFT, 
                       &xlsegment_block_fops, 
                       xdi->disks[i].capacity);
     }
