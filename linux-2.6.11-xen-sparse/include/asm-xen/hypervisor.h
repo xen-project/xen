@@ -311,6 +311,22 @@ HYPERVISOR_suspend(
     return ret;
 }
 
+static inline int
+HYPERVISOR_crash(
+    void)
+{
+    int ret;
+    unsigned long ign1;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret), "=b" (ign1)
+	: "0" (__HYPERVISOR_sched_op),
+	  "1" (SCHEDOP_shutdown | (SHUTDOWN_crash << SCHEDOP_reasonshift))
+        : "memory" );
+
+    return ret;
+}
+
 static inline long
 HYPERVISOR_set_timer_op(
     u64 timeout)
