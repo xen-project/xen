@@ -318,8 +318,6 @@ void __enter_scheduler(void)
     task_slice_t        next_slice;
     s32                 r_time;     /* time for new dom to run */
 
-    cleanup_writable_pagetable(prev);
-
     perfc_incrc(sched_run);
     
     spin_lock_irq(&schedule_data[cpu].schedule_lock);
@@ -368,6 +366,8 @@ void __enter_scheduler(void)
         return;
     
     perfc_incrc(sched_ctx);
+
+    cleanup_writable_pagetable(prev);
 
 #if defined(WAKE_HISTO)
     if ( !is_idle_task(next) && next->wokenup ) {
