@@ -5,14 +5,6 @@
  * based on code by Mark Williamson (C) 2004 Intel Research Cambridge
  */
 
-/*
-	TODO:
-	TESTING!
-	tracing instead of PRINTs
-*/
-
-
-
 #include <xen/sched.h>
 #include <xen/sched-if.h>
 #include <public/sched_ctl.h>
@@ -75,10 +67,9 @@ struct sedf_dom_info
 	s_time_t		period_orig;	
 	s_time_t		slice_orig;
 	s_time_t		latency;
-	//extra-time status of domain
-	short			extra;
-	//weights for "Scheduling for beginners/ lazy/ etc." ;)
-	short			weight;
+	
+	short			extra;		//extra-time status of domain
+	short			weight;		//weights for "Scheduling for beginners/ lazy/ etc." ;)
 	
 	//Bookkeeping
 	s_time_t		absdead;
@@ -197,9 +188,14 @@ static inline void extraq_check(struct domain *d) {
 	} else {
 		PRINT(2,"Dom %i is NOT on L1 extraQ\n",d->id);
 		if ((DOM_INFO(d)->extra & EXTRA_AWARE) && domain_runnable(d))  {
+			#if (EXTRA == EXTRA_ROUNDR)
+			extraq_add_tail(d, EXTRA_UTIL_Q);			//Favour domains which got short unblocked
+			#elif (EXTRA == EXTRA_SLICE_WEIGHT || EXTRA == EXTRA_BLOCK_WEIGHT)
 			extraq_add_sort_update(d, EXTRA_UTIL_Q, 0);
+			#elif
+			;
+			#endif
 			PRINT(2,"Added dom %i to L1 extraQ\n",d->id);
-			//TODO: add extraq_add_tail
 		}
 	}
 }
@@ -350,9 +346,8 @@ static inline void desched_edf_dom (s_time_t now, struct domain* d) {
 	
 	//current domain is running in real time mode
 	inf->cputime += now - inf->sched_start;				//update the domains cputime
-	//scheduling decisions, which don't remove the running domain from the runq
-	if ((inf->cputime < inf->slice) && domain_runnable(d))
-		return;						//there is nothing to do with the running task
+	if ((inf->cputime < inf->slice) && domain_runnable(d))		//scheduling decisions, which don't remove the running domain from the runq
+		return;							//there is nothing to do with the running task
 		
 	__del_from_queue(d);
 	/*if (__task_on_queue(current)) {
@@ -388,8 +383,8 @@ static inline void desched_edf_dom (s_time_t now, struct domain* d) {
 		#if (EXTRA > EXTRA_OFF)
 		#if (EXTRA == EXTRA_BLOCK_WEIGHT)
 		if (extraq_on(d,EXTRA_PEN_Q)) extraq_del(d,EXTRA_PEN_Q);
-		if (extraq_on(d,EXTRA_UTIL_Q)) extraq_del(d,EXTRA_UTIL_Q);
 		#endif
+		if (extraq_on(d,EXTRA_UTIL_Q)) extraq_del(d,EXTRA_UTIL_Q);
 		#endif
 	}
 }
@@ -496,12 +491,14 @@ static inline void desched_extra_dom(s_time_t now, struct domain* d) {
 			printf("Oops... We attempt to remove d %i from the waitq, but it is not on :(\n",d->id);*/
 		__del_from_queue(d);				//also remove this blocked domain from the waitq!
 		//make sure that we remove a blocked domain from the other extraq aswell (this caused hours of debugging!)
+		#if (EXTRA == EXTRA_BLOCK_WEIGHT)
 		if (i == EXTRA_PEN_Q) {
 			if (extraq_on(d,EXTRA_UTIL_Q)) extraq_del(d,EXTRA_UTIL_Q);
 		}
 		else {
 			if (extraq_on(d,EXTRA_PEN_Q)) extraq_del(d,EXTRA_PEN_Q);
 		}
+		#endif
 	}
 	#endif
 	/*if (!domain_runnable(d)) {
@@ -521,7 +518,7 @@ static inline void desched_extra_dom(s_time_t now, struct domain* d) {
 static inline task_slice_t sedf_do_extra_schedule(s_time_t now, s_time_t end_xt, struct list_head *extraq[], int cpu) {
 	task_slice_t 		ret;
 	struct sedf_dom_info	*runinf;
-	//TODO write this stuff as a loop and pay attention to normal stuff!
+	//TODO write this stuff as a loop
 	
 	if (end_xt - now < EXTRA_QUANTUM)
 		goto return_idle;
@@ -555,7 +552,7 @@ return_idle:
  * Reasons for calling this function are:
  * -timeslice for the current period used up
  * -domain on waitqueue has started it's period
- * -and various others ;) in general: determin which domain to run next*/
+ * -and various others ;) in general: determine which domain to run next*/
 static task_slice_t sedf_do_schedule(s_time_t now)
 {
 	int                   cpu      = current->processor;
@@ -631,8 +628,10 @@ check_waitq:
 
 sched_done:	
 	//TODO: Do something USEFUL when this happens and find out, why it still can happen!!!
-	if (ret.time<0)
+	if (ret.time<0) {
 		printk("Ouch! We are seriously BEHIND schedule! %lli\n",ret.time);
+		ret.time = EXTRA_QUANTUM;
+	}
 	DOM_INFO(ret.task)->sched_start=now;
 	return ret;
 }
@@ -840,7 +839,7 @@ static inline int get_run_type(struct domain* d) {
 /*Compares two domains in the relation of whether the one is allowed to interrupt the others execution.
   It returns true (!=0) if a switch to the other domain is good.
   Current Priority scheme is as follows:
-  	EDF > L0 (penalty based) extra-time > L1 (utilization) extra-time > blocked domain > idle-domain
+  	EDF > L0 (penalty based) extra-time > L1 (utilization) extra-time > idle-domain
   In the same class priorities are assigned as following:
   	EDF: early deadline > late deadline
   	L0 extra-time: lower score > higher score*/
@@ -933,7 +932,7 @@ void sedf_wake(struct domain *d) {
 				#if (EXTRA == EXTRA_OFF)
 				;
 				#elif (EXTRA == EXTRA_ROUNDR)
-				extraq_add_head(d);			//Favour domains which got short unblocked
+				extraq_add_head(d, EXTRA_UTIL_Q);	//Favour domains which got short unblocked
 				#elif (EXTRA == EXTRA_SLICE_WEIGHT || EXTRA == EXTRA_BLOCK_WEIGHT)
 				extraq_add_sort_update(d, EXTRA_UTIL_Q, 0);
 				#endif
@@ -960,7 +959,7 @@ void sedf_wake(struct domain *d) {
 				#if (EXTRA == EXTRA_OFF)
 				;
 				#elif (EXTRA == EXTRA_ROUNDR)
-				extraq_add_head(d);
+				extraq_add_head(d, EXTRA_UTIL_Q);
 				#elif (EXTRA == EXTRA_SLICE_WEIGHT || EXTRA == EXTRA_BLOCK_WEIGHT)
 				//PRINT(2,"now try to add domain %i to the extra_util_q\n",d->id);
 				extraq_add_sort_update(d, EXTRA_UTIL_Q, 0);
@@ -980,10 +979,10 @@ void sedf_wake(struct domain *d) {
 		inf->penalty_time_tot += PERIOD_BEGIN(inf) + inf->cputime - inf->absblock;
 	}
 	//sanity check: make sure each extra-aware domain IS on the util-q!
-	if (inf->extra & EXTRA_AWARE) {
+	/*if (inf->extra & EXTRA_AWARE) {
 		if (!extraq_on(d, EXTRA_UTIL_Q))
 			printf("sedf_wake: domain %i is extra-aware, but NOT on L1 extraq!\n",d->id);
-	}
+	}*/
 	//check whether the awakened task needs to get scheduled before the next sched. decision
 	//and check, whether we are idling and this domain is extratime aware
 	if (should_switch(schedule_data[d->processor].curr, d, now)){
@@ -994,8 +993,7 @@ void sedf_wake(struct domain *d) {
 	}
 }
 
-
-/* This could probably be a bit more specific!*/
+/*Print a lot of use-{full, less} information about a domains in the system*/
 static void sedf_dump_domain(struct domain *d) {
 	printk("%u has=%c ", d->id,
 		test_bit(DF_RUNNING, &d->flags) ? 'T':'F');
@@ -1017,6 +1015,7 @@ static void sedf_dump_domain(struct domain *d) {
 	printf("\n");
 }
 
+/*dumps all domains on hte specified cpu*/
 static void sedf_dump_cpu_state(int i)
 {
 	struct list_head *list, *queue, *tmp;
@@ -1064,7 +1063,7 @@ static void sedf_dump_cpu_state(int i)
 	loop = 0;
 	printk("\nnot on Q\n");
 	for_each_domain(d) {
-		if (!extraq_on(d,1) && !__task_on_queue(d)) {
+		if (!__task_on_queue(d) && (d->processor == i)) {
 			printk("%3d: ",loop++);
 			sedf_dump_domain(d);
 		}
@@ -1072,19 +1071,24 @@ static void sedf_dump_cpu_state(int i)
 }
 //Adjusts periods and slices of the domains accordingly to their weights
 static inline int sedf_adjust_weights(struct domain *p, struct sched_adjdom_cmd *cmd) {
-	int sumw      = 0;
-	s_time_t sumt = 0;
+	int sumw[NR_CPUS];
+	s_time_t sumt[NR_CPUS];
+	int cpu;
 	
+	for (cpu=0; cpu < NR_CPUS; cpu++) {
+		sumw[cpu] = 0;
+		sumt[cpu] = 0;
+	}
 	//sum up all weights
 	for_each_domain(p) {
 		if (DOM_INFO(p)->weight)
-			sumw += DOM_INFO(p)->weight;
+			sumw[p->processor] += DOM_INFO(p)->weight;
 		else {
 			//don't modify domains who don't have a weight, but sum up
 			//the time they need, projected to a WEIGHT_PERIOD, so that
 			//this time is not given to the weight-driven domains
 			ASSERT((WEIGHT_PERIOD < ULONG_MAX) && (DOM_INFO(p)->slice_orig < ULONG_MAX));	//this results in max. 4s slice/period length
-			sumt += (WEIGHT_PERIOD * DOM_INFO(p)->slice_orig) / DOM_INFO(p)->period_orig;
+			sumt[p->processor] += (WEIGHT_PERIOD * DOM_INFO(p)->slice_orig) / DOM_INFO(p)->period_orig;
 		}
 	}
 	//adjust all slices (and periods) to the new weight
@@ -1093,7 +1097,7 @@ static inline int sedf_adjust_weights(struct domain *p, struct sched_adjdom_cmd 
 			DOM_INFO(p)->period_orig = 
 			     DOM_INFO(p)->period = WEIGHT_PERIOD;
 			DOM_INFO(p)->slice_orig  =
-			      DOM_INFO(p)->slice = (DOM_INFO(p)->weight * (WEIGHT_PERIOD - WEIGHT_SAFETY - sumt)) / sumw;
+			      DOM_INFO(p)->slice = (DOM_INFO(p)->weight * (WEIGHT_PERIOD - WEIGHT_SAFETY - sumt[p->processor])) / sumw[p->processor];
 		}
 	}
 	return 0;
