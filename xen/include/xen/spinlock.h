@@ -78,7 +78,6 @@ extern void criticalregion_enter(void);
 extern void criticalregion_exit(void);
 extern void ASSERT_no_criticalregion(void);
 extern void disable_criticalregion_checking(void);
-extern void enable_criticalregion_checking(void);
 
 #define spin_lock(_lock) \
     do { criticalregion_enter(); _raw_spin_lock(_lock); } while (0)
@@ -112,7 +111,6 @@ static inline int spin_trylock(spinlock_t *lock)
 
 #define ASSERT_no_criticalregion()        ((void)0)
 #define disable_criticalregion_checking() ((void)0)
-#define enable_criticalregion_checking()  ((void)0)
 
 #define spin_lock(_lock)             _raw_spin_lock(_lock)
 #define spin_trylock(_lock)          _raw_spin_trylock(_lock)

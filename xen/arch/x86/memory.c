@@ -1042,7 +1042,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         if ( unlikely(e->tot_pages == e->max_pages) ||
              unlikely(!gnttab_prepare_for_transfer(e, d, gntref)) )
         {
-            MEM_LOG("Transferee has no reservation headroom (%ld,%ld), or "
+            MEM_LOG("Transferee has no reservation headroom (%d,%d), or "
                     "provided a bad grant ref.\n", e->tot_pages, e->max_pages);
             spin_unlock(&e->page_alloc_lock);
             put_domain(e);
@@ -1731,7 +1731,7 @@ static void ptwr_init_backpointers(void)
         page = &frame_table[pde >> PAGE_SHIFT];
         /* assert that page is an l1_page_table   XXXcl maybe l2? */
         if ( (page->u.inuse.type_info & PGT_type_mask) != PGT_l1_page_table ) {
-	    MEM_LOG("ptwr: Inconsistent pagetable: pde %x is not an l1 page\n",
+	    MEM_LOG("ptwr: Inconsistent pagetable: pde %lx not an l1 page\n",
 		    pde >> PAGE_SHIFT);
 	    domain_crash();
 	}
