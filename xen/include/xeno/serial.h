@@ -36,4 +36,11 @@ void serial_putc(int handle, unsigned char c);
 /* Transmit a NULL-terminated string via the specified COM port. */
 void serial_puts(int handle, const unsigned char *s);
 
+/*
+ * An alternative to registering a character-receive hook. This function
+ * will not return until a character is available. It can safely be
+ * called with interrupts disabled.
+ */
+unsigned char serial_getc(int handle);
+
 #endif /* __XEN_SERIAL_H__ */

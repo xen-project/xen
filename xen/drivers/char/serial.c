@@ -70,10 +70,14 @@
 #define PARITY_MARK     (5<<3)
 #define PARITY_SPACE    (7<<3)
 
+#define RXBUFSZ 32
+#define MASK_RXBUF_IDX(_i) ((_i)&(RXBUFSZ-1))
 typedef struct {
-    int          baud, data_bits, parity, stop_bits, io_base, irq;
-    serial_rx_fn rx_lo, rx_hi, rx;
-    spinlock_t   lock;
+    int           baud, data_bits, parity, stop_bits, io_base, irq;
+    serial_rx_fn  rx_lo, rx_hi, rx;
+    spinlock_t    lock;
+    unsigned char rxbuf[RXBUFSZ];
+    unsigned int  rxbufp, rxbufc;
 } uart_t;
 
 static uart_t com[2] = {
@@ -103,6 +107,7 @@ static void uart_rx(uart_t *uart, struct pt_regs *regs)
     /*
      * No need for the uart spinlock here. Only the uart's own interrupt
      * handler will read from the RBR and the handler isn't reentrant.
+     * Calls to serial_getc() will disable this handler before proceeding.
      */
     while ( inb(uart->io_base + LSR) & LSR_DR )
     {
@@ -113,6 +118,8 @@ static void uart_rx(uart_t *uart, struct pt_regs *regs)
             uart->rx_hi(c&0x7f, regs);
         else if ( !(c & 0x80) && (uart->rx_lo != NULL) )
             uart->rx_lo(c&0x7f, regs);
+        else if ( (uart->rxbufp - uart->rxbufc) != RXBUFSZ )
+            uart->rxbuf[MASK_RXBUF_IDX(uart->rxbufp++)] = c;            
     }
 }
 
@@ -395,4 +402,60 @@ void serial_puts(int handle, const unsigned char *s)
         __serial_putc(uart, handle, *s++);
 
     spin_unlock_irqrestore(&uart->lock, flags);
+}
+
+/* Returns TRUE if given character (*pc) matches the serial handle. */
+static int byte_matches(int handle, unsigned char *pc)
+{
+    if ( !(handle & SERHND_HI) )
+    {
+        if ( !(handle & SERHND_LO) || !(*pc & 0x80) )
+            return 1;
+    }
+    else if ( *pc & 0x80 )
+    {
+        *pc &= 0x7f;
+        return 1;
+    }
+    return 0;
+}
+
+unsigned char serial_getc(int handle)
+{
+    uart_t *uart = &com[handle & SERHND_IDX];
+    unsigned char c;
+    unsigned long flags;
+
+    spin_lock_irqsave(&uart->lock, flags);
+
+    while ( uart->rxbufp != uart->rxbufc )
+    {
+        c = uart->rxbuf[MASK_RXBUF_IDX(uart->rxbufc++)];
+        if ( byte_matches(handle, &c) )
+            goto out;
+    }
+    
+    disable_irq(uart->irq);
+    
+    /* disable_irq() may have raced execution of uart_rx(). */
+    while ( uart->rxbufp != uart->rxbufc )
+    {
+        c = uart->rxbuf[MASK_RXBUF_IDX(uart->rxbufc++)];
+        if ( byte_matches(handle, &c) )
+            goto enable_and_out;
+    }
+
+    /* We now wait for the UART to receive a suitable character. */
+    do {
+        while ( (inb(uart->io_base + LSR) & LSR_DR) == 0 )
+            barrier();
+        c = inb(uart->io_base + RBR);
+    }
+    while ( !byte_matches(handle, &c) );
+    
+ enable_and_out:
+    enable_irq(uart->irq);
+ out:
+    spin_unlock_irqrestore(&uart->lock, flags);
+    return c;
 }

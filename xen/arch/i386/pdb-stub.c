@@ -32,11 +32,6 @@ void pdb_put_packet (unsigned char *buffer, int ack);
 int pdb_initialized = 0;
 static int pdb_serhnd      = -1;
 
-#define RX_SIZE 32
-#define RX_MASK(_i) ((_i)&(RX_SIZE-1))
-static unsigned int rx_cons = 0, rx_prod = 0;
-static unsigned char rx_ring[RX_RING_SIZE];
-
 static inline void pdb_put_char(unsigned char c)
 {
     serial_putc(pdb_serhnd, c);
@@ -44,15 +39,7 @@ static inline void pdb_put_char(unsigned char c)
 
 static inline unsigned char pdb_get_char(void)
 {
-    while ( rx_cons == rx_prod )
-        barrier();
-    return rx_ring[RX_MASK(rx_cons++)];
-}
-
-static void pdb_rx_char(unsigned char c, struct pt_regs *regs)
-{
-    if ( (rx_prod - rx_cons) != RX_SIZE )
-        rx_ring[RX_MASK(rx_prod++)] = c;
+    return serial_getc(pdb_serhnd);
 }
 
 static volatile int mem_err = 0;
@@ -843,8 +830,6 @@ void initialize_pdb()
         printk("Failed to initialise PDB on port %s\n", opt_pdb);
         return;
     }
-
-    serial_set_rx_handler(pdb_serhnd, pdb_rx_char);
 
     printk("Initialised pervasive debugger (PDB) on port %s\n", opt_pdb);
 
