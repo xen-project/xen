@@ -197,6 +197,7 @@ static int file_save(XcObject *xc, XcIOContext *ctxt, char *state_file){
     int open_flags = (O_CREAT | O_EXCL | O_WRONLY);
     int open_mode = 0644;
 
+    printf("%s>\n", __FUNCTION__);
     fd = open(state_file, open_flags, open_mode);
     if(fd < 0){
         xcio_perror(ctxt, "Could not open file for writing");
@@ -205,16 +206,19 @@ static int file_save(XcObject *xc, XcIOContext *ctxt, char *state_file){
     /* Compression rate 1: we want speed over compression. 
      * We're mainly going for those zero pages, after all.
      */
+    printf("%s>gzip_stream_fdopen... \n", __FUNCTION__);
     ctxt->io = gzip_stream_fdopen(fd, "wb1");
     if(!ctxt->io){
         xcio_perror(ctxt, "Could not allocate compression state");
         goto exit;
     }
+    printf("%s> xc_linux_save...\n", __FUNCTION__);
     rc = xc_linux_save(xc->xc_handle, ctxt);
   exit:
     if(ctxt->io) IOStream_close(ctxt->io);
     if(fd >= 0) close(fd);
     unlink(state_file);
+    printf("%s> rc=%d\n", __FUNCTION__, rc);
     return rc;
 }
 
@@ -234,7 +238,7 @@ static PyObject *pyxc_linux_save(PyObject *self,
 
     static char *kwd_list[] = { "dom", "state_file", "vmconfig", "progress", "debug", NULL };
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "is|siii", kwd_list, 
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "is|sii", kwd_list, 
                                      &ioctxt.domain,
                                      &state_file,
                                      &ioctxt.vmconfig,
