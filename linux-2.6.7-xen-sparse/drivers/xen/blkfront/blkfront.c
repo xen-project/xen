@@ -82,6 +82,7 @@ static inline void translate_req_to_mfn(blkif_request_t *xreq,
 
 static inline void flush_requests(void)
 {
+    wmb(); /* Ensure that the frontend can see the requests. */
     blk_ring->req_prod = req_prod;
     notify_via_evtchn(blkif_evtchn);
 }
@@ -363,34 +364,39 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 {
     struct request *req;
     blkif_response_t *bret;
-    BLKIF_RING_IDX i; 
+    BLKIF_RING_IDX i, rp;
     unsigned long flags; 
 
     spin_lock_irqsave(&blkif_io_lock, flags);     
 
-    if (unlikely(blkif_state == BLKIF_STATE_CLOSED || recovery)) {
-        printk("Bailed out\n");
-        
+    if ( unlikely(blkif_state == BLKIF_STATE_CLOSED) || 
+         unlikely(recovery) )
+    {
         spin_unlock_irqrestore(&blkif_io_lock, flags);
         return IRQ_HANDLED;
     }
 
-    for (i = resp_cons; i != blk_ring->resp_prod; i++) {
+    rp = blk_ring->resp_prod;
+    rmb(); /* Ensure we see queued responses up to 'rp'. */
+
+    for ( i = resp_cons; i != rp; i++ )
+    {
         bret = &blk_ring->ring[MASK_BLKIF_IDX(i)].resp;
-        switch (bret->operation) {
+        switch ( bret->operation )
+        {
         case BLKIF_OP_READ:
         case BLKIF_OP_WRITE:
-            if (unlikely(bret->status != BLKIF_RSP_OKAY))
+            if ( unlikely(bret->status != BLKIF_RSP_OKAY) )
                 DPRINTK("Bad return from blkdev data request: %lx\n",
                         bret->status);
             req = (struct request *)bret->id;
-            /* XXXcl pass up status */
-            if (unlikely(end_that_request_first(req, 1,
-                                                req->hard_nr_sectors)))
+            if ( unlikely(end_that_request_first
+                          (req, 
+                           (bret->status != BLKIF_RSP_OKAY),
+                           req->hard_nr_sectors)) )
                 BUG();
-
             end_that_request_last(req);
-            blkif_completion( bret, req );
+            blkif_completion(bret, req);
             break;
         case BLKIF_OP_PROBE:
             memcpy(&blkif_control_rsp, bret, sizeof(*bret));
@@ -404,8 +410,9 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
     resp_cons = i;
     resp_cons_rec = i;
 
-    if (xlbd_blk_queue &&
-        test_bit(QUEUE_FLAG_STOPPED, &xlbd_blk_queue->queue_flags)) {
+    if ( (xlbd_blk_queue != NULL) &&
+         test_bit(QUEUE_FLAG_STOPPED, &xlbd_blk_queue->queue_flags) )
+    {
         blk_start_queue(xlbd_blk_queue);
         /* XXXcl call to request_fn should not be needed but
          * we get stuck without...  needs investigating
