@@ -35,6 +35,7 @@ struct task_struct *do_newdomain(void)
 {
     int retval;
     struct task_struct *p = NULL;
+    unsigned long flags;
 
     retval = -ENOMEM;
     p = alloc_task_struct();
@@ -56,9 +57,9 @@ struct task_struct *do_newdomain(void)
     p->blk_ring_base = (blk_ring_t *)(p->shared_info + 1);
     p->net_ring_base = (net_ring_t *)(p->blk_ring_base + 1);
     p->pg_head = p->tot_pages = 0;
-    write_lock_irq(&tasklist_lock);
+    write_lock_irqsave(&tasklist_lock, flags);
     SET_LINKS(p);
-    write_unlock_irq(&tasklist_lock);
+    write_unlock_irqrestore(&tasklist_lock, flags);
 
  newdomain_out:
     return(p);

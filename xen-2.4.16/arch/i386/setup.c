@@ -295,8 +295,6 @@ void __init start_of_day(void)
     init_bh(IMMEDIATE_BH, immediate_bh);
     init_apic_mappings(); /* make APICs addressable in our pagetables. */
 
-    sti();
-
 #ifndef CONFIG_SMP    
     APIC_init_uniprocessor();
 #else
@@ -307,6 +305,8 @@ void __init start_of_day(void)
                       * fall thru to 8259A if we have to (but slower).
                       */
 #endif
+
+    sti();
 
     zap_low_mappings();
     kmem_cache_init();
