@@ -109,7 +109,13 @@ static void __free_shadow_table( struct mm_struct *m )
     SH_LOG("Free shadow table. Freed= %d",free);
 }
 
-static inline int shadow_page_op( struct mm_struct *m, unsigned int op,
+
+#define TABLE_OP_ZERO_L2 1
+#define TABLE_OP_ZERO_L1 2
+#define TABLE_OP_FREE_L1 3
+
+static inline int shadow_page_op( struct mm_struct *m, unsigned int op, 
+								  unsigned int gpfn,
                                   struct pfn_info *spfn_info, int *work )
 {
     unsigned int spfn = spfn_info-frame_table;
@@ -117,48 +123,45 @@ static inline int shadow_page_op( struct mm_struct *m, unsigned int op,
 
     switch( op )
     {
-    case DOM0_SHADOW_CONTROL_OP_CLEAN:
-    {
-        int i;
-        if ( (spfn_info->type_and_flags & PGT_type_mask) == 
-             PGT_l1_page_table )
-        {
-            unsigned long * spl1e = map_domain_mem( spfn<<PAGE_SHIFT );
-
-            for (i=0;i<ENTRIES_PER_L1_PAGETABLE;i++)
-            {                    
-                if ( (spl1e[i] & _PAGE_PRESENT ) && (spl1e[i] & _PAGE_RW) )
-                {
-                    *work++;
-                    spl1e[i] &= ~_PAGE_RW;
-                }
-            }
-            unmap_domain_mem( spl1e );
-        }
-    }
-	break;
-
-    case DOM0_SHADOW_CONTROL_OP_CLEAN2:
-    {
-        if ( (spfn_info->type_and_flags & PGT_type_mask) == 
-             PGT_l1_page_table )
-        {
-			delete_shadow_status( m, frame_table-spfn_info );
-			restart = 1; // we need to go to start of list again
-		}
-		else if ( (spfn_info->type_and_flags & PGT_type_mask) == 
+	case TABLE_OP_ZERO_L2:
+	{
+		if ( (spfn_info->type_and_flags & PGT_type_mask) == 
              PGT_l2_page_table )
 		{
 			unsigned long * spl1e = map_domain_mem( spfn<<PAGE_SHIFT );
 			memset( spl1e, 0, DOMAIN_ENTRIES_PER_L2_PAGETABLE * sizeof(*spl1e) );
 			unmap_domain_mem( spl1e );
 		}
-		else
-			BUG();
+    }
+	break;
+	
+	case TABLE_OP_ZERO_L1:
+	{
+		if ( (spfn_info->type_and_flags & PGT_type_mask) == 
+             PGT_l1_page_table )
+		{
+			unsigned long * spl1e = map_domain_mem( spfn<<PAGE_SHIFT );
+			memset( spl1e, 0, ENTRIES_PER_L1_PAGETABLE * sizeof(*spl1e) );
+			unmap_domain_mem( spl1e );
+		}
     }
 	break;
 
+	case TABLE_OP_FREE_L1:
+	{
+		if ( (spfn_info->type_and_flags & PGT_type_mask) == 
+             PGT_l1_page_table )
+		{
+			// lock is already held
+			delete_shadow_status( m, gpfn );
+			restart = 1; // we need to go to start of list again
+		}
+    }
 
+	break;
+	
+	default:
+		BUG();
 
     }
     return restart;
@@ -183,18 +186,18 @@ static void __scan_shadow_table( struct mm_struct *m, unsigned int op )
 		next = a->next;
         if (a->pfn)
         {
-            if ( shadow_page_op( m, op, 
-							&frame_table[a->spfn_and_flags & PSH_pfn_mask], 
-							&work ) )
+            if ( shadow_page_op( m, op, a->pfn,								 
+								 &frame_table[a->spfn_and_flags & PSH_pfn_mask], 
+								 &work ) )
 				goto retry;
         }
         a=next;
         while(a)
         { 
 			next = a->next;
-            if ( shadow_page_op( m, op, 
-							&frame_table[a->spfn_and_flags & PSH_pfn_mask],
-							&work ) )
+            if ( shadow_page_op( m, op, a->pfn,
+								 &frame_table[a->spfn_and_flags & PSH_pfn_mask],
+								 &work ) )
 				goto retry;
             a=next;
         }
@@ -332,17 +335,29 @@ static int shadow_mode_table_op( struct task_struct *p,
     switch(op)
     {
     case DOM0_SHADOW_CONTROL_OP_FLUSH:
-        __free_shadow_table( m );
+        // XXX THIS IS VERY DANGEROUS : MUST ENSURE THE PTs ARE NOT IN USE ON
+		// OTHER CPU -- fix when we get sched sync pause.
+        __free_shadow_table( m );  
         break;
    
     case DOM0_SHADOW_CONTROL_OP_CLEAN:   // zero all-non hypervisor
+	{
+		__scan_shadow_table( m, TABLE_OP_ZERO_L2 );
+		__scan_shadow_table( m, TABLE_OP_ZERO_L1 );
+
+		goto send_bitmap;
+	}
+		
+
     case DOM0_SHADOW_CONTROL_OP_CLEAN2:  // zero all L2, free L1s
     {
 		int i,j,zero=1;
 		
-		__scan_shadow_table( m, op );
-		//    __free_shadow_table( m );
-	
+		__scan_shadow_table( m, TABLE_OP_ZERO_L2 );
+		__scan_shadow_table( m, TABLE_OP_FREE_L1 );
+		
+	send_bitmap:
+
 		if( p->tot_pages > sc->pages || 
 			!sc->dirty_bitmap || !p->mm.shadow_dirty_bitmap )
 		{

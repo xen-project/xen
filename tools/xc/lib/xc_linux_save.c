@@ -292,7 +292,7 @@ int xc_linux_save(int xc_handle,
 
 	last_iter = 0;
 	sent_last_iter = 1<<20; // 4GB's worth of pages
-	max_iters = 19; // limit us to 20 times round loop
+	max_iters = 29; // limit us to 30 times round loop
     }
     else
 	last_iter = 1;
@@ -645,8 +645,10 @@ int xc_linux_save(int xc_handle,
 
 	if ( live )
 	{
-	    if ( ( sent_this_iter > (sent_last_iter * 0.95) ) ||
-		 (iter >= max_iters) || (sent_this_iter < 10) || 
+	    if ( 
+		 // ( sent_this_iter > (sent_last_iter * 0.95) ) ||		 
+		 (iter >= max_iters) || 
+		 (sent_this_iter+skip_this_iter < 10) || 
 		 (total_sent > nr_pfns*2) )
 	    {
 		DPRINTF("Start last iteration\n");
@@ -657,7 +659,7 @@ int xc_linux_save(int xc_handle,
 	    } 
 
 	    if ( xc_shadow_control( xc_handle, domid, 
-				    DOM0_SHADOW_CONTROL_OP_CLEAN,
+				    DOM0_SHADOW_CONTROL_OP_CLEAN2,
 				    to_send, nr_pfns ) != nr_pfns ) 
 	    {
 		ERROR("Error flushing shadow PT");
