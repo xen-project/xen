@@ -93,7 +93,7 @@ abs_to_rel ${AD} ${AS}
 RS=$DESTPATH
 
 # Remove old copies of files and directories at the destination
-for i in `find . -type f -o -type l` ; do rm -f ${AD}/${i#./} ; done
+for i in `find sys -type f -o -type l` ; do rm -f ${AD}/${i#./} ; done
 
 # We now work from the destination directory
 cd ${AD}
