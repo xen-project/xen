@@ -188,22 +188,22 @@ typedef struct {
     u8 nr_guests;
     u8 in_flight;
     u8 shareable;
-    struct domain *guest[IRQ_MAX_GUESTS];
+    struct exec_domain *guest[IRQ_MAX_GUESTS];
 } irq_guest_action_t;
 
 static void __do_IRQ_guest(int irq)
 {
     irq_desc_t         *desc = &irq_desc[irq];
     irq_guest_action_t *action = (irq_guest_action_t *)desc->action;
-    struct domain      *d;
+    struct exec_domain *ed;
     int                 i;
 
     for ( i = 0; i < action->nr_guests; i++ )
     {
-        d = action->guest[i];
-        if ( !test_and_set_bit(irq, &d->pirq_mask) )
+        ed = action->guest[i];
+        if ( !test_and_set_bit(irq, &ed->domain->pirq_mask) )
             action->in_flight++;
-        send_guest_pirq(d, irq);
+        send_guest_pirq(ed, irq);
     }
 }
 
@@ -235,8 +235,9 @@ int pirq_guest_unmask(struct domain *d)
     return 0;
 }
 
-int pirq_guest_bind(struct domain *d, int irq, int will_share)
+int pirq_guest_bind(struct exec_domain *ed, int irq, int will_share)
 {
+    struct domain      *d = ed->domain;
     irq_desc_t         *desc = &irq_desc[irq];
     irq_guest_action_t *action;
     unsigned long       flags;
@@ -296,7 +297,7 @@ int pirq_guest_bind(struct domain *d, int irq, int will_share)
         goto out;
     }
 
-    action->guest[action->nr_guests++] = d;
+    action->guest[action->nr_guests++] = ed;
 
  out:
     spin_unlock_irqrestore(&desc->lock, flags);
@@ -330,7 +331,7 @@ int pirq_guest_unbind(struct domain *d, int irq)
     else
     {
         i = 0;
-        while ( action->guest[i] != d )
+        while ( action->guest[i] && action->guest[i]->domain != d )
             i++;
         memmove(&action->guest[i], &action->guest[i+1], IRQ_MAX_GUESTS-i-1);
         action->nr_guests--;

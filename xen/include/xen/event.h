@@ -20,9 +20,9 @@
  * may require explicit memory barriers.
  */
 
-static inline void evtchn_set_pending(struct domain *d, int port)
+static inline void evtchn_set_pending(struct exec_domain *ed, int port)
 {
-    struct exec_domain *ed = d->exec_domain[0];
+    struct domain *d = ed->domain;
     shared_info_t *s = d->shared_info;
     int            running;
 
@@ -57,8 +57,7 @@ static inline void evtchn_set_pending(struct domain *d, int port)
  */
 static inline void send_guest_virq(struct exec_domain *ed, int virq)
 {
-    struct domain *d = ed->domain;
-    evtchn_set_pending(d, d->virq_to_evtchn[virq]);
+    evtchn_set_pending(ed, ed->domain->virq_to_evtchn[virq]);
 }
 
 /*
@@ -66,9 +65,9 @@ static inline void send_guest_virq(struct exec_domain *ed, int virq)
  *  @d:        Domain to which physical IRQ should be sent
  *  @pirq:     Physical IRQ number
  */
-static inline void send_guest_pirq(struct domain *d, int pirq)
+static inline void send_guest_pirq(struct exec_domain *ed, int pirq)
 {
-    evtchn_set_pending(d, d->pirq_to_evtchn[pirq]);
+    evtchn_set_pending(ed, ed->domain->pirq_to_evtchn[pirq]);
 }
 
 #define event_pending(_d)                                     \

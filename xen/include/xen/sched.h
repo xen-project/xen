@@ -42,8 +42,8 @@ typedef struct event_channel_st
             domid_t remote_domid;
         } __attribute__ ((packed)) unbound; /* state == ECS_UNBOUND */
         struct {
-            u16            remote_port;
-            struct domain *remote_dom;
+            u16                 remote_port;
+            struct exec_domain *remote_dom;
         } __attribute__ ((packed)) interdomain; /* state == ECS_INTERDOMAIN */
         u16 pirq; /* state == ECS_PIRQ */
         u16 virq; /* state == ECS_VIRQ */
