@@ -47,18 +47,18 @@ void __perfc_print (unsigned long counter[], int offset)
       return;
   }
   if (element_size == 0) {                              /* single counter */
-      printf ("%10ld  0x%08lx  %s\n", counter[0], counter[0],
+      printf ("%10lu  0x%08lx  %s\n", counter[0], counter[0],
               perfc_name[loop] + 2 + num);
   } else if (cpus) {                                    /* counter per CPU  */
       for (loop = 0; loop < smp_num_cpus; loop++) {
-          printf ("%10ld  0x%08lx  cpu[%02d] %s\n", 
+          printf ("%10lu  0x%08lx  cpu[%02d] %s\n", 
                   counter[loop], counter[loop], 
                   loop, perfc_name[loop]);
       }
       
   } else {                                             /* show entire array */
       for (loop = 0; loop < element_size; loop++) {
-          printf ("%10ld  0x%08lx  %s:%d\n", 
+          printf ("%10lu  0x%08lx  %s:%d\n", 
                   counter[loop], counter[loop], 
                   perfc_name[loop] + 2 + num, loop);
       }
@@ -102,6 +102,8 @@ void perfc_printall (u_char key, void *dev_id, struct pt_regs *regs)
             counters++;
         }
     }
+
+    //perfc_reset( key, dev_id, regs );
 
     return;
 }
