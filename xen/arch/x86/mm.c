@@ -45,7 +45,7 @@ static inline void set_pte_phys(unsigned long vaddr,
 void __set_fixmap(enum fixed_addresses idx, 
                   l1_pgentry_t entry)
 {
-    unsigned long address = __fix_to_virt(idx);
+    unsigned long address = fix_to_virt(idx);
 
     if ( likely(idx < __end_of_fixed_addresses) )
         set_pte_phys(address, entry);

@@ -470,7 +470,7 @@ void __init init_apic_mappings(void)
                 ioapic_phys = mp_ioapics[i].mpc_apicaddr;
             set_fixmap_nocache(idx, ioapic_phys);
             Dprintk("mapped IOAPIC to %08lx (%08lx)\n",
-                    __fix_to_virt(idx), ioapic_phys);
+                    fix_to_virt(idx), ioapic_phys);
             idx++;
         }
     }
