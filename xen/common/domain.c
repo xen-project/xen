@@ -48,7 +48,7 @@ struct task_struct *do_newdomain(unsigned int dom_id, unsigned int cpu)
     p->domain    = dom_id;
     p->processor = cpu;
 
-    sprintf (p->name, "Domain-%d", dom_id);
+    sprintf(p->name, "Domain-%d", dom_id);
 
     spin_lock_init(&p->blk_ring_lock);
     spin_lock_init(&p->page_lock);
@@ -331,6 +331,9 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
     net_vif_t *net_vif;
     int i;
 
+    if ( (p->flags & PF_CONSTRUCTED) )
+        return -EINVAL;
+
     /* High entries in page table must contain hypervisor
      * mem mappings - set them up.
      */
@@ -386,11 +389,6 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
     virt_startinfo_addr->dom_id = p->domain;
     virt_startinfo_addr->flags  = IS_PRIV(p) ? SIF_PRIVILEGED : 0;
 
-    if( virt_startinfo_addr->mod_len )
-	printk("Initrd module present %08lx (%08lx)\n",
-               virt_startinfo_addr->mod_start, 
-               virt_startinfo_addr->mod_len);	
- 
     /* Add virtual network interfaces and point to them in startinfo. */
     while (meminfo->num_vifs-- > 0) {
         net_vif = create_net_vif(p->domain);
@@ -417,6 +415,8 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
     __asm__ __volatile__ (
         "mov %%eax,%%cr3" : : "a" (pagetable_val(current->mm.pagetable)));    
     __sti();
+
+    p->flags |= PF_CONSTRUCTED;
     
     new_thread(p, 
                (unsigned long)meminfo->virt_load_addr, 
@@ -461,6 +461,7 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params,
 
     /* Sanity! */
     if ( p->domain != 0 ) BUG();
+    if ( (p->flags & PF_CONSTRUCTED) ) BUG();
 
     /*
      * This is all a bit grim. We've moved the modules to the "safe" physical 
@@ -699,6 +700,8 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params,
     /* Reinstate the caller's page tables. */
     __write_cr3_counted(pagetable_val(current->mm.pagetable));
     __sti();
+
+    p->flags |= PF_CONSTRUCTED;
 
     new_thread(p, 
                (unsigned long)virt_load_address, 

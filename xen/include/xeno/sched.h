@@ -58,6 +58,7 @@ extern struct mm_struct init_mm;
 #define PF_DONEFPUINIT  0x1  /* Has the FPU been initialised for this task? */
 #define PF_USEDFPU      0x2  /* Has this task used the FPU since last save? */
 #define PF_GUEST_STTS   0x4  /* Has the guest OS requested 'stts'?          */
+#define PF_CONSTRUCTED  0x8  /* Has the guest OS been fully built yet? */
 
 #include <xeno/vif.h>
 #include <xeno/block.h>

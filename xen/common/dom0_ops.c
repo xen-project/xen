@@ -20,7 +20,9 @@ extern unsigned int alloc_new_dom_mem(struct task_struct *, unsigned int);
 static unsigned int get_domnr(void)
 {
     static unsigned int domnr = 0;
-    return ++domnr;
+    do { domnr = (domnr+1) & ((1<<20)-1); }
+    while ( find_domain_by_id(domnr) != NULL );
+    return domnr;
 }
 
 static void build_page_list(struct task_struct *p)
@@ -75,6 +77,9 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     case DOM0_STARTDOMAIN:
     {
         struct task_struct * p = find_domain_by_id(op.u.meminfo.domain);
+        ret = -EINVAL;
+        if ( (p == NULL) || !(p->flags & PF_CONSTRUCTED) )
+            break;
         wake_up(p);
         reschedule(p);
         ret = p->domain;
