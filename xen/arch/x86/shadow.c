@@ -11,12 +11,6 @@
 
 /********
 
-To use these shadow page tables, guests must not rely on the ACCESSED
-and DIRTY bits on L2 pte's being accurate -- they will typically all be set.
-
-I doubt this will break anything. (If guests want to use the va_update
-mechanism they've signed up for this anyhow...)
-
 There's a per-domain shadow table spin lock which works fine for SMP
 hosts. We don't have to worry about interrupts as no shadow operations
 happen in an interrupt context. It's probably not quite ready for SMP
@@ -484,8 +478,9 @@ unsigned long shadow_l2_table(
         spl2e = (l2_pgentry_t *)map_domain_mem(spfn << PAGE_SHIFT);
         /*
          * We could proactively fill in PDEs for pages that are already
-         * shadowed. However, we tried it and it didn't help performance.
-         * This is simpler.
+         * shadowed *and* where the guest PDE has _PAGE_ACCESSED set
+         * (restriction required for coherence of the accessed bit). However,
+         * we tried it and it didn't help performance. This is simpler. 
          */
         memset(spl2e, 0, DOMAIN_ENTRIES_PER_L2_PAGETABLE*sizeof(l2_pgentry_t));
 
@@ -498,7 +493,8 @@ unsigned long shadow_l2_table(
         spl2e[SH_LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
             mk_l2_pgentry((spfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
         spl2e[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] =
-            mk_l2_pgentry(__pa(page_get_owner(&frame_table[gpfn])->arch.mm_perdomain_pt) |
+            mk_l2_pgentry(__pa(page_get_owner(
+                &frame_table[gpfn])->arch.mm_perdomain_pt) |
                           __PAGE_HYPERVISOR);
     }
 #endif
@@ -727,7 +723,7 @@ void shadow_l1_normal_pt_update(
 
 void shadow_l2_normal_pt_update(unsigned long pa, unsigned long gpde)
 {
-    unsigned long sl2mfn, spde;
+    unsigned long sl2mfn, spde = 0;
     l2_pgentry_t *spl2e;
     unsigned long sl1mfn;
 
@@ -736,11 +732,17 @@ void shadow_l2_normal_pt_update(unsigned long pa, unsigned long gpde)
 
     sl2mfn = __shadow_status(current->domain, pa >> PAGE_SHIFT) & PSH_pfn_mask;
 
-    sl1mfn = (gpde & _PAGE_PRESENT) ?
-        __shadow_status(current->domain, gpde >> PAGE_SHIFT) : 0;
+    /*
+     * Only propagate to shadow if _PAGE_ACCESSED is set in the guest.
+     * Otherwise, to ensure coherency, we blow away the existing shadow value.
+     */
+    if ( gpde & _PAGE_ACCESSED )
+    {
+        sl1mfn = (gpde & _PAGE_PRESENT) ?
+            __shadow_status(current->domain, gpde >> PAGE_SHIFT) : 0;
+        l2pde_general(current->domain, &gpde, &spde, sl1mfn);
+    }
 
-    /* XXXX Should mark guest pte as DIRTY and ACCESSED too! */
-    l2pde_general(current->domain, &gpde, &spde, sl1mfn);
     spl2e = (l2_pgentry_t *)map_domain_mem(sl2mfn << PAGE_SHIFT);
     spl2e[(pa & ~PAGE_MASK) / sizeof(l2_pgentry_t)] = mk_l2_pgentry(spde);
     unmap_domain_mem(spl2e);

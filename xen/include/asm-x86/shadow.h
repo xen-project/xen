@@ -331,7 +331,7 @@ static inline void l2pde_general(
     {
         spde = (gpde & ~PAGE_MASK) | (sl1mfn << PAGE_SHIFT) | 
             _PAGE_RW | _PAGE_ACCESSED | _PAGE_DIRTY;
-        gpde |= _PAGE_ACCESSED | _PAGE_DIRTY;
+        gpde |= _PAGE_ACCESSED; /* N.B. PDEs do not have a dirty bit. */
 
         /* Detect linear p.t. mappings and write-protect them. */
         if ( (frame_table[sl1mfn].u.inuse.type_info & PGT_type_mask) ==
