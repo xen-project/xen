@@ -16,7 +16,7 @@ export BASEDIR          := $(CURDIR)
 
 include Rules.mk
 
-default: $(TARGET).gz
+default: build
 $(TARGET).gz: $(TARGET)
 	gzip -f -9 < $< > $@.new
 	mv $@.new $@
@@ -24,9 +24,10 @@ $(TARGET).gz: $(TARGET)
 debug:	
 	objdump -D -S $(TARGET)-syms > $(TARGET).s
 
-dist:
-	$(MAKE) install
+dist: install
 
+build: $(TARGET).gz
+	
 install: $(TARGET).gz
 	[ -d $(DESTDIR)/boot ] || $(INSTALL_DIR) $(DESTDIR)/boot
 	$(INSTALL_DATA) $(TARGET).gz $(DESTDIR)/boot
