@@ -144,8 +144,8 @@
 3f1668d4-FUY6Enc7MB3GcwUtfJ5HA tools/misc/mkdevnodes
 3f5ef5a2ir1kVAthS14Dc5QIRCEFWg tools/misc/xen-clone
 3f5ef5a2dTZP0nnsFoeq2jRf3mWDDg tools/misc/xen-clone.README
-3f13d81eQ9Vz-h-6RDGFkNR9CRP95g tools/misc/xen_enable_nat
-3f13d81e6Z6806ihYYUw8GVKNkYnuw tools/misc/xen_enable_nat.README
+3f13d81eQ9Vz-h-6RDGFkNR9CRP95g tools/misc/xen_nat_enable
+3f13d81e6Z6806ihYYUw8GVKNkYnuw tools/misc/xen_nat_enable.README
 3f1668d4F29Jsw0aC0bJEIkOBiagiQ tools/misc/xen_read_console.c
 3ddb79bcbOVHh38VJzc97-JEGD4dJQ xen/Makefile
 3f5ef5a2Qtt8AshYs-KXFFNhKALeIg xen/README
