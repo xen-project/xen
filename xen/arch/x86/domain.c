@@ -312,14 +312,14 @@ static void monitor_mk_pagetable(struct exec_domain *ed)
     ASSERT( mpfn_info ); 
 
     mpfn = (unsigned long) (mpfn_info - frame_table);
-    mpl2e = (l2_pgentry_t *) map_domain_mem(mpfn << L1_PAGETABLE_SHIFT);
+    mpl2e = (l2_pgentry_t *) map_domain_mem(mpfn << PAGE_SHIFT);
     memset(mpl2e, 0, PAGE_SIZE);
 
     memcpy(&mpl2e[DOMAIN_ENTRIES_PER_L2_PAGETABLE], 
            &idle_pg_table[DOMAIN_ENTRIES_PER_L2_PAGETABLE],
            HYPERVISOR_ENTRIES_PER_L2_PAGETABLE * sizeof(l2_pgentry_t));
 
-    ed->arch.monitor_table = mk_pagetable(mpfn << L1_PAGETABLE_SHIFT);
+    ed->arch.monitor_table = mk_pagetable(mpfn << PAGE_SHIFT);
     d->arch.shadow_mode = SHM_full_32;
 
     mpl2e[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] =
@@ -329,7 +329,7 @@ static void monitor_mk_pagetable(struct exec_domain *ed)
     phys_table = (l2_pgentry_t *) map_domain_mem(pagetable_val(
                                         ed->arch.phys_table));
     memcpy(d->arch.mm_perdomain_pt, phys_table,
-           ENTRIES_PER_L2_PAGETABLE * sizeof(l2_pgentry_t));
+           ENTRIES_PER_L1_PAGETABLE * sizeof(l1_pgentry_t));
 
     unmap_domain_mem(phys_table);
     unmap_domain_mem(mpl2e);
