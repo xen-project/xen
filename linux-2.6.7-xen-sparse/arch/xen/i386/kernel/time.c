@@ -510,7 +510,7 @@ unsigned long get_cmos_time(void)
 
 static long clock_cmos_diff;
 
-static int time_suspend(struct sys_device *dev, u32 state)
+static int __time_suspend(struct sys_device *dev, u32 state)
 {
 	/*
 	 * Estimate time zone so that set_time can update the clock
@@ -520,7 +520,7 @@ static int time_suspend(struct sys_device *dev, u32 state)
 	return 0;
 }
 
-static int time_resume(struct sys_device *dev)
+static int __time_resume(struct sys_device *dev)
 {
 	unsigned long sec = get_cmos_time() + clock_cmos_diff;
 	write_seqlock_irq(&xtime_lock);
@@ -531,8 +531,8 @@ static int time_resume(struct sys_device *dev)
 }
 
 static struct sysdev_class pit_sysclass = {
-	.resume = time_resume,
-	.suspend = time_suspend,
+	.resume = __time_resume,
+	.suspend = __time_suspend,
 	set_kset_name("pit"),
 };
 
@@ -645,6 +645,25 @@ int set_timeout_timer(void)
 		ret = -1;
 
 	return ret;
+}
+
+void time_suspend(void)
+{
+}
+
+void time_resume(void)
+{
+    unsigned long flags;
+    write_lock_irqsave(&xtime_lock, flags);
+    /* Get timebases for new environment. */ 
+    __get_time_values_from_xen();
+    /* Reset our own concept of passage of system time. */
+    processed_system_time = shadow_system_time;
+    /* Accept a warp in UTC (wall-clock) time. */
+    last_seen_tv.tv_sec = 0;
+    /* Make sure we resync UTC time with Xen on next timer interrupt. */
+    last_update_from_xen = 0;
+    write_unlock_irqrestore(&xtime_lock, flags);
 }
 
 /*
