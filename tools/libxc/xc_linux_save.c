@@ -240,6 +240,55 @@ static int analysis_phase( int xc_handle, u32 domid,
     return -1;
 }
 
+
+int suspend_and_state( int xc_handle, XcIOContext *ioctxt,		      
+		       dom0_op_t *op,
+		       full_execution_context_t *ctxt )
+{
+    int i=0;
+    
+    xcio_suspend_domain(ioctxt);
+
+retry:
+
+    if ( xc_domain_getfullinfo( xc_handle, ioctxt->domain, op, ctxt) )
+    {
+	xcio_error(ioctxt, "Could not get full domain info");
+	return -1;
+    }
+
+    if ( (op->u.getdomaininfo.flags & 
+	  ( DOMFLAGS_SHUTDOWN | (SHUTDOWN_suspend<<DOMFLAGS_SHUTDOWNSHIFT) ))
+	 == ( DOMFLAGS_SHUTDOWN | (SHUTDOWN_suspend<<DOMFLAGS_SHUTDOWNSHIFT) ))
+    {
+	return 0; // success
+    }
+
+    if ( op->u.getdomaininfo.flags & DOMFLAGS_PAUSED )
+    {
+	// try unpausing domain, wait, and retest	
+	xc_domain_unpause( xc_handle, ioctxt->domain );
+
+	xcio_error(ioctxt, "Domain was paused. Wait and re-test. (%lx)",
+		   op->u.getdomaininfo.flags);
+	usleep(10000);  // 10ms
+
+	goto retry;
+    }
+
+
+    if( ++i < 3 )
+    {
+	usleep(10000);  // 10ms	
+	goto retry;
+    }
+
+    xcio_error(ioctxt, "Unable to suspend domain. (%lx)",
+	       op->u.getdomaininfo.flags);
+
+    return -1;
+}
+
 int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 {
     dom0_op_t op;
@@ -407,22 +456,16 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 
         last_iter = 1;
 
-	xcio_suspend_domain(ioctxt);
-
-	if ( xc_domain_getfullinfo( xc_handle, domid, &op, &ctxt) )
-	{
-	    xcio_error(ioctxt, "Could not get full domain info");
-	    goto out;
-	}
-
-	if ( (op.u.getdomaininfo.flags & 
-	     ( DOMFLAGS_SHUTDOWN | (SHUTDOWN_suspend<<DOMFLAGS_SHUTDOWNSHIFT) ))
-	     != ( DOMFLAGS_SHUTDOWN | (SHUTDOWN_suspend<<DOMFLAGS_SHUTDOWNSHIFT) ))
+	if ( suspend_and_state( xc_handle, ioctxt, &op, &ctxt) )
 	{
 	    xcio_error(ioctxt, "Domain appears not to have suspended: %lx",
 		       op.u.getdomaininfo.flags);
 	    goto out;
 	}
+
+	printf("SUSPPPPPPPP flags %08lx shinfo %08lx eip %08lx esi %08lx\n", 
+	       op.u.getdomaininfo.flags, op.u.getdomaininfo.shared_info_frame,
+	       ctxt.cpu_ctxt.eip, ctxt.cpu_ctxt.esi );
 
     }
 
@@ -779,25 +822,17 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
                 DPRINTF("Start last iteration\n");
                 last_iter = 1;
 
-		xcio_suspend_domain(ioctxt);
-		
-		if ( xc_domain_getfullinfo( xc_handle, domid, &op, &ctxt) )
+		if ( suspend_and_state( xc_handle, ioctxt, &op, &ctxt) )
 		{
-		    xcio_error(ioctxt, "Could not get full domain info");
-		    goto out;
-		}
-		
-		if ( (op.u.getdomaininfo.flags & 
-		      ( DOMFLAGS_SHUTDOWN |
-			(SHUTDOWN_suspend<<DOMFLAGS_SHUTDOWNSHIFT) ))
-		     != ( DOMFLAGS_SHUTDOWN |
-			  (SHUTDOWN_suspend<<DOMFLAGS_SHUTDOWNSHIFT) ))
-		{
-		    xcio_error(ioctxt, 
-			       "Domain appears not to have suspended: %lx",
+		    xcio_error(ioctxt, "Domain appears not to have suspended: %lx",
 			       op.u.getdomaininfo.flags);
 		    goto out;
 		}
+
+		printf("SUSPPPPPPPP flags %08lx shinfo %08lx eip %08lx esi %08lx\n", 
+		       op.u.getdomaininfo.flags, op.u.getdomaininfo.shared_info_frame,
+		       ctxt.cpu_ctxt.eip, ctxt.cpu_ctxt.esi );
+
 
             } 
 
