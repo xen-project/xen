@@ -308,6 +308,15 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     }
     break;
 
+    case DOM0_DEBUG:
+    {
+      op.u.debug.out1 = op.u.debug.in2 + 1;
+      op.u.debug.out2 = op.u.debug.in1 + 1;
+      copy_to_user(u_dom0_op, &op, sizeof(op));
+      ret = 0;
+    }
+    break;
+
 
     default:
         ret = -ENOSYS;

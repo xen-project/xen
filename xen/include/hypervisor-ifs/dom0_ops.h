@@ -21,6 +21,7 @@
 #define DOM0_BUILDDOMAIN   13
 #define DOM0_IOPL          14
 #define DOM0_MSR           15
+#define DOM0_DEBUG         16                          /* pervasive debugger */
 
 #define MAX_CMD_LEN       256
 #define MAX_DOMAIN_NAME    16
@@ -108,6 +109,15 @@ typedef struct dom0_msr_st
 
 } dom0_msr_t;
 
+typedef struct dom0_debug_st
+{
+    /* IN variables. */
+    int in1, in2;
+    /* OUT variables. */
+    int out1, out2;
+
+} dom0_debug_t;
+
 typedef struct dom0_op_st
 {
     unsigned long cmd;
@@ -122,6 +132,7 @@ typedef struct dom0_op_st
         dom0_getdominfo_t getdominfo;
         dom0_iopl_t iopl;
 	dom0_msr_t msr;
+	dom0_debug_t debug;
     }
     u;
 } dom0_op_t;
