@@ -112,9 +112,18 @@ static inline void kb_wait(void)
 
 void machine_restart(char * __unused)
 {
+    extern int opt_noreboot;
 #if CONFIG_SMP
     int cpuid;
+#endif
 	
+    if ( opt_noreboot )
+    {
+        printk("Reboot disabled on cmdline: require manual reset\n");
+        for ( ; ; ) __asm__ __volatile__ ("hlt");
+    }
+
+#ifdef CONFIG_SMP
     cpuid = GET_APIC_ID(apic_read(APIC_ID));
 
     if (reboot_smp) {

@@ -275,6 +275,10 @@ that may be able to help diagnose problems:
                   by Xen. If you specify this option then ACPI tables are
                   also ignored, and SMP support is disabled.
 
+ noreboot         Don't reboot the machine automatically on errors.
+                  This is useful to catch debug output if you aren't
+                  catching console messages via the serial line.
+
  nosmp		  Disable SMP support.
                   This option is implied by 'ignorebiostables'.
 

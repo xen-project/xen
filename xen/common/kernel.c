@@ -62,6 +62,8 @@ int opt_noht=0;
 int opt_noacpi=0;
 /* opt_nosmp: If true, secondary processors are ignored. */
 int opt_nosmp=0;
+/* opt_noreboot: If true, machine will need manual reset on error. */
+int opt_noreboot=0;
 /* opt_ignorebiostables: If true, ACPI and MP tables are ignored. */
 /* NB. This flag implies 'nosmp' and 'noacpi'. */
 int opt_ignorebiostables=0;
@@ -80,6 +82,7 @@ static struct {
     { "noht",             OPT_BOOL, &opt_noht },
     { "noacpi",           OPT_BOOL, &opt_noacpi },
     { "nosmp",            OPT_BOOL, &opt_nosmp },
+    { "noreboot",         OPT_BOOL, &opt_noreboot },
     { "ignorebiostables", OPT_BOOL, &opt_ignorebiostables },
     { "watchdog",         OPT_BOOL, &opt_watchdog },
     { NULL,               0,        NULL     }
@@ -284,6 +287,44 @@ void putchar_serial(unsigned char c) {}
 #define ATTRIBUTE    7
 #define VIDEO	    __va(0xB8000)
 
+int detect_video(void *video_base)
+{
+    volatile u16 *p = (volatile u16 *)video_base;
+    u16 saved1 = p[0], saved2 = p[1];
+    int video_found = 1;
+
+    p[0] = 0xAA55;
+    p[1] = 0x55AA;
+    if ( (p[0] != 0xAA55) || (p[1] != 0x55AA) )
+        video_found = 0;
+
+    p[0] = 0x55AA;
+    p[1] = 0xAA55;
+    if ( (p[0] != 0x55AA) || (p[1] != 0xAA55) )
+        video_found = 0;
+
+    p[0] = saved1;
+    p[1] = saved2;
+
+    return video_found;
+}
+
+int detect_vga(void)
+{
+    /*
+     * Look at a number of well-known locations. Even if video is not at
+     * 0xB8000 right now, it will appear there when we set up text mode 3.
+     * 
+     * We assume if there is any sign of a video adaptor then it is at least
+     * VGA-compatible (surely noone runs CGA, EGA, .... these days?).
+     * 
+     * These checks are basically to detect headless server boxes.
+     */
+    return (detect_video(__va(0xA0000)) || 
+            detect_video(__va(0xB0000)) || 
+            detect_video(__va(0xB8000)));
+}
+
 /* This is actually code from vgaHWRestore in an old version of XFree86 :-) */
 void init_vga(void)
 {
@@ -307,6 +348,13 @@ void init_vga(void)
 
     if ( !opt_console )
         return;
+
+    if ( !detect_vga() )
+    {
+        printk("No VGA adaptor detected!\n");
+        opt_console = 0;
+        return;
+    }
 
     tmp = inb(0x3da);
     outb(0x00, 0x3c0);
