@@ -332,7 +332,6 @@ static inline void cpufreq_delayed_get(void) { return; }
 
 static int __init init_tsc(char* override)
 {
-	unsigned long long alarm;
 	u64 __cpu_khz;
 
 	__cpu_khz = HYPERVISOR_shared_info->cpu_freq;
@@ -353,9 +352,7 @@ static int __init init_tsc(char* override)
 
 	set_cyc2ns_scale(cpu_khz/1000);
 
-	rdtscll(alarm);
-
-	use_tsc=1;
+	use_tsc = 1;
 
 	return 0;
 }
