@@ -4,7 +4,10 @@
  * Process command requests from domain-0 guest OS.
  * 
  * Copyright (c) 2002, K A Fraser, B Dragovic
+ * 
+ * MUST BE KEPT IN SYNC WITH xenolinux<*>/arch/xeno/drivers/dom0/dom0_ops.h
  */
+
 
 #ifndef __DOM0_OPS_H__
 #define __DOM0_OPS_H__
@@ -13,6 +16,8 @@
 #define DOM0_KILLDOMAIN  1
 #define DOM0_GETMEMLIST  2
 #define DOM0_STARTDOM    4
+#define DOM0_BVTCTL      6
+#define DOM0_ADJUSTDOM   7
 
 #define MAX_CMD_LEN    256
 
@@ -48,6 +53,20 @@ typedef struct domain_launch
     char cmd_line[MAX_CMD_LEN];
 } dom_meminfo_t;
 
+typedef struct dom0_bvtctl_st
+{
+	unsigned long ctx_allow;	/* context switch allowance */
+} dom0_bvtctl_t;
+
+typedef struct dom0_adjustdom_st
+{
+    unsigned int  domain;	/* domain id */
+	unsigned long mcu_adv;	/* mcu advance: inverse of weight */
+	unsigned long warp;     /* time warp */
+	unsigned long warpl;    /* warp limit */
+	unsigned long warpu;    /* unwarp time requirement */
+} dom0_adjustdom_t;
+
 typedef struct dom0_op_st
 {
     unsigned long cmd;
@@ -56,6 +75,8 @@ typedef struct dom0_op_st
         dom0_newdomain_t newdomain;
         dom0_killdomain_t killdomain;
         dom0_getmemlist_t getmemlist;
+		dom0_bvtctl_t bvtctl;
+		dom0_adjustdom_t adjustdom;
         dom_meminfo_t meminfo;
     }
     u;
