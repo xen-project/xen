@@ -1977,10 +1977,19 @@ static int get_tx_bufs(net_vif_t *vif)
              * some 169.254.* (ie. link-local) packets on the wire unless we 
              * include this explicit test. :-(
              */
-            if ( (ntohs(*(unsigned short *)(g_data + 12)) == ETH_P_IP) &&
-                 ((ntohl(*(unsigned long *)(g_data + 26)) & 0xFFFF0000) == 
-                  0xA9FE0000) )
-                goto disallow_linklocal_packets;
+            switch ( ntohs(*(unsigned short *)(g_data + 12)) )
+            {
+            case ETH_P_ARP:
+                if ( ((ntohl(*(unsigned long *)(g_data + 28)) & 0xFFFF0000) == 
+                      0xA9FE0000) )
+                    goto disallow_linklocal_packets;
+                break;
+            case ETH_P_IP:
+                if ( ((ntohl(*(unsigned long *)(g_data + 26)) & 0xFFFF0000) == 
+                      0xA9FE0000) )
+                    goto disallow_linklocal_packets;
+                break;
+            }
 
             stx = &vif->tx_shadow_ring[MASK_NET_TX_IDX(j)];
             stx->id     = tx.id;
