@@ -108,6 +108,7 @@
 #define TRAP_alignment_check 17
 #define TRAP_machine_check   18
 #define TRAP_simd_error      19
+#define TRAP_deferred_nmi    31
 
 /*
  * Non-fatal fault/trap handlers return an error code to the caller. If the

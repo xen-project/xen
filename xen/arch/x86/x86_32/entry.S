@@ -57,6 +57,7 @@
 #include <xen/errno.h>
 #include <xen/softirq.h>
 #include <asm/asm_defns.h>
+#include <asm/apicdef.h>
 #include <public/xen.h>
 
 #define GET_CURRENT(reg)   \
@@ -497,10 +498,10 @@ ENTRY(nmi)
         jnz   do_watchdog_tick
         movl  %ds,%eax
         cmpw  $(__HYPERVISOR_DS),%ax
-        jne   restore_all_xen
+        jne   defer_nmi
         movl  %es,%eax
         cmpw  $(__HYPERVISOR_DS),%ax
-        jne   restore_all_xen
+        jne   defer_nmi
 
 do_watchdog_tick:
         movl  $(__HYPERVISOR_DS),%edx
@@ -517,6 +518,17 @@ do_watchdog_tick:
 	jz    restore_all_xen
         GET_CURRENT(%ebx)
         jmp   restore_all_guest
+
+defer_nmi:
+        movl  $FIXMAP_apic_base,%eax
+        # apic_wait_icr_idle()
+1:      movl  APIC_ICR(%eax),%ebx
+        testl $APIC_ICR_BUSY,%ebx
+        jnz   1b
+        # __send_IPI_shortcut(APIC_DEST_SELF, TRAP_deferred_nmi)
+        movl  $(APIC_DM_FIXED | APIC_DEST_SELF | APIC_DEST_LOGICAL | \
+                TRAP_deferred_nmi),APIC_ICR(%eax)
+        jmp   restore_all_xen
 
 nmi_parity_err:
         # Clear and disable the parity-error line
