@@ -168,6 +168,7 @@
 40c9c4684Wfg8VgMKtRFa_ULi2e_tQ tools/examples/xm_dom_control.py
 40c9c468pXANclL7slGaoD0kSrIwoQ tools/examples/xm_dom_create.py
 40c9c468QKoqBHjb5Qwrm60pNVcVng tools/examples/xm_vd_tool.py
+40cf2937oKlROYOJTN8GWwWM5AmjBg tools/examples/xmdefaults
 3f776bd2Xd-dUcPKlPN2vG89VGtfvQ tools/misc/Makefile
 40ab2cfawIw8tsYo0dQKtp83h4qfTQ tools/misc/fakei386xen
 3f6dc136ZKOjd8PIqLbFBl_v-rnkGg tools/misc/miniterm/Makefile
@@ -269,10 +270,15 @@
 40c9c46925x-Rjb0Cv2f1-l2jZrPYg tools/xenmgr/lib/server/netif.py
 40c9c469ZqILEQ8x6yWy0_51jopiCg tools/xenmgr/lib/server/params.py
 40c9c469LNxLVizOUpOjEaTKKCm8Aw tools/xenmgr/lib/sxp.py
+40cf2937gKQcATgXKGtNeWb1PDH5nA tools/xenmgr/lib/xm/create.py
+40cf2937isyS250zyd0Q2GuEDoNXfQ tools/xenmgr/lib/xm/main.py
+40cf2937PSslwBliN1g7ofDy2H_RhA tools/xenmgr/lib/xm/opts.py
+40cf2937Z8WCNOnO2FcWdubvEAF9QQ tools/xenmgr/lib/xm/shutdown.py
 40c9c469kT0H9COWzA4XzPBjWK0WsA tools/xenmgr/netfix
 40c9c469n2RRwCmjWdjdyyVRWKmgWg tools/xenmgr/setup.py
 40c9c4697z76HDfkCLdMhmaEwzFoNQ tools/xenmgr/xend
 40c9c469JkN47d1oXi-e0RjAP-C6uQ tools/xenmgr/xenmgrd
+40cf2937dqM1jWW87O5OoOYND8leuA tools/xenmgr/xm
 403a3edbrr8RE34gkbR40zep98SXbg tools/xentrace/Makefile
 40a107afN60pFdURgBv9KwEzgRl5mQ tools/xentrace/formats
 4050c413PhhLNAYk3TEwP37i_iLw9Q tools/xentrace/xentrace.8

@@ -1,6 +1,6 @@
 
 INSTALL  = $(wildcard *.py)
-ETC	 = defaults democd netbsd
+ETC	 = defaults democd netbsd xmdefaults
 INITD    = init.d/xendomains init.d/xend
 
 all: 
