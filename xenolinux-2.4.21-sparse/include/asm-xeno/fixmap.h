@@ -50,7 +50,7 @@ enum fixed_addresses {
 #define NR_FIX_BTMAPS   8  /* 32KB For the Dom0 VGA Console */
         FIX_BTMAP_END,
         FIX_BTMAP_BEGIN = FIX_BTMAP_END + NR_FIX_BTMAPS - 1,
-
+	/* our bt_ioremap is permenant unlike other architectures */
 	__end_of_permanent_fixed_addresses,
 	__end_of_fixed_addresses = __end_of_permanent_fixed_addresses
 };
