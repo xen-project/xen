@@ -111,7 +111,7 @@ static long free_dom_mem(struct task_struct *p, reservation_decrease_t op)
         pf = &frame_table[mpfn];
         if ( (pf->type_count != 0) || 
              (pf->tot_count != 0) ||
-             (pf->flags != p->domain) )
+             (pf->flags & PG_domain_mask != p->domain) )
         {
             DPRINTK("Bad page free for domain %d (%ld, %ld, %08lx)\n",
                     p->domain, pf->type_count, pf->tot_count, pf->flags);
