@@ -31,6 +31,15 @@
 #include <xeno/slab.h>
 #include <xeno/module.h>
 
+/*
+ * KAF: We can turn off noise relating to barking guest-OS requests.
+ */
+#if 0
+#define DPRINTK(_f, _a...) printk(_f , ## _a)
+#else
+#define DPRINTK(_f, _a...) ((void)0)
+#endif
+
 /* XXX SMH: temporarily we just dive at xen_block completion handler */
 extern void end_block_io_op(struct buffer_head *bh); 
 
@@ -314,12 +323,10 @@ static void generic_plug_device(request_queue_t *q, kdev_t dev)
  */
 static inline void __generic_unplug_device(request_queue_t *q)
 {
-  /*	printk(KERN_ALERT "__generic_unplug_device %p %d\n", q, q->plugged); */
 	if (q->plugged) {
 		q->plugged = 0;
 		if (!list_empty(&q->queue_head))
 		  {
-		    /*		    printk(KERN_ALERT " calling %p\n", q->request_fn); */
 			q->request_fn(q);
 		  }
 	}
@@ -329,8 +336,6 @@ void generic_unplug_device(void *data)
 {
 	request_queue_t *q = (request_queue_t *) data;
 	unsigned long flags;
-
-	/*	printk(KERN_ALERT "generic_unplug_device\n"); */
 
 	spin_lock_irqsave(&io_request_lock, flags);
 	__generic_unplug_device(q);
@@ -869,8 +874,6 @@ static int __make_request(request_queue_t * q, int rw,
 	int latency;
 	elevator_t *elevator = &q->elevator;
 
-	/* 	printk(KERN_ALERT "__make_request\n");*/
-
 	count = bh->b_size >> 9;
 	sector = bh->b_rsector;
 
@@ -1078,8 +1081,6 @@ void generic_make_request (int rw, struct buffer_head * bh)
 	int minorsize = 0;
 	request_queue_t *q;
 
-	/* 	printk(KERN_ALERT "generic_make_request\n"); */
-
 	if (!bh->b_end_io)
 		BUG();
 
@@ -1098,9 +1099,9 @@ void generic_make_request (int rw, struct buffer_head * bh)
 			/* This may well happen - the kernel calls bread()
 			   without checking the size of the device, e.g.,
 			   when mounting a device. */
-			printk(KERN_INFO
+			DPRINTK(KERN_INFO
 			       "attempt to access beyond end of device\n");
-			printk(KERN_INFO "%s: rw=%d, want=%ld, limit=%d\n",
+			DPRINTK(KERN_INFO "%s: rw=%d, want=%ld, limit=%d\n",
 			       kdevname(bh->b_rdev), rw,
 			       (sector + count)>>1, minorsize);
 
@@ -1123,7 +1124,7 @@ void generic_make_request (int rw, struct buffer_head * bh)
 	do {
 		q = blk_get_queue(bh->b_rdev);
 		if (!q || !q->make_request_fn) {
-			printk(KERN_ERR
+			DPRINTK(KERN_ERR
 			       "generic_make_request: Trying to access "
 			       "nonexistent block-device %s (%ld)\n",
 			       kdevname(bh->b_rdev), bh->b_rsector);
@@ -1202,8 +1203,6 @@ void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
 	int correct_size;
 	int i;
 
-	/* 	printk(KERN_ALERT "ll_rw_block %d %d\n", rw, nr); */
-
 	if (!nr)
 		return;
 
@@ -1216,7 +1215,7 @@ void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
 	for (i = 0; i < nr; i++) {
 		struct buffer_head *bh = bhs[i];
 		if (bh->b_size % correct_size) {
-			printk(KERN_NOTICE "ll_rw_block: device %s: "
+			DPRINTK(KERN_NOTICE "ll_rw_block: device %s: "
 			       "only %d-char blocks implemented (%u)\n",
 			       kdevname(bhs[0]->b_dev),
 			       correct_size, bh->b_size);
@@ -1225,7 +1224,7 @@ void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
 	}
 
 	if ((rw & WRITE) && is_read_only(bhs[0]->b_dev)) {
-		printk(KERN_NOTICE "Can't write to read-only device %s\n",
+		DPRINTK(KERN_NOTICE "Can't write to read-only device %s\n",
 		       kdevname(bhs[0]->b_dev));
 		goto sorry;
 	}
@@ -1269,7 +1268,6 @@ void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
 	return;
 
 sorry:
-	printk("~~~");
 	/* Make sure we don't get infinite dirty retries.. */
 	for (i = 0; i < nr; i++)
 		mark_buffer_clean(bhs[i]);
