@@ -14,6 +14,7 @@
 #include <xeno/sched.h>
 #include <xeno/event.h>
 #include <asm/domain_page.h>
+#include <asm/msr.h>
 
 extern unsigned int alloc_new_dom_mem(struct task_struct *, unsigned int);
 
@@ -61,6 +62,24 @@ static void build_page_list(struct task_struct *p)
 
     unmap_domain_mem(list);
 }
+
+static int msr_cpu_mask;
+static unsigned long msr_addr;
+static unsigned long msr_lo;
+static unsigned long msr_hi;
+
+static void write_msr_for(void *unused)
+{
+    if (((1 << current->processor) & msr_cpu_mask))
+        wrmsr(msr_addr, msr_lo, msr_hi);
+}
+
+static void read_msr_for(void *unused)
+{
+    if (((1 << current->processor) & msr_cpu_mask))
+	rdmsr(msr_addr, msr_lo, msr_hi);
+}
+
     
 long do_dom0_op(dom0_op_t *u_dom0_op)
 {
@@ -261,6 +280,33 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         ret = do_iopl(op.u.iopl.domain, op.u.iopl.iopl);
     }
     break;
+
+    case DOM0_MSR:
+    {
+      if (op.u.msr.write)
+	{
+	  msr_cpu_mask = op.u.msr.cpu_mask;
+	  msr_addr = op.u.msr.msr;
+	  msr_lo = op.u.msr.in1;
+	  msr_hi = op.u.msr.in2;
+	  smp_call_function(write_msr_for, NULL, 1, 1);
+	  write_msr_for(NULL);
+	}
+      else
+	{
+          msr_cpu_mask = op.u.msr.cpu_mask;
+          msr_addr = op.u.msr.msr;
+	  smp_call_function(read_msr_for, NULL, 1, 1);
+	  read_msr_for(NULL);
+
+          op.u.msr.out1 = msr_lo;
+          op.u.msr.out2 = msr_hi;
+	  copy_to_user(u_dom0_op, &op, sizeof(op));
+	}
+      ret = 0;
+    }
+    break;
+
 
     default:
         ret = -ENOSYS;

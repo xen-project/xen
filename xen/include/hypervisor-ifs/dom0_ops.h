@@ -20,6 +20,7 @@
 #define DOM0_GETDOMAININFO 12
 #define DOM0_BUILDDOMAIN   13
 #define DOM0_IOPL          14
+#define DOM0_MSR           15
 
 #define MAX_CMD_LEN       256
 #define MAX_DOMAIN_NAME    16
@@ -97,6 +98,16 @@ typedef struct dom0_iopl_st
     unsigned int iopl;
 } dom0_iopl_t;
 
+typedef struct dom0_msr_st
+{
+    /* IN variables. */
+    int write, cpu_mask, msr;
+    unsigned int in1, in2;
+    /* OUT variables. */
+    unsigned int out1, out2;
+
+} dom0_msr_t;
+
 typedef struct dom0_op_st
 {
     unsigned long cmd;
@@ -110,6 +121,7 @@ typedef struct dom0_op_st
         dom_meminfo_t meminfo;
         dom0_getdominfo_t getdominfo;
         dom0_iopl_t iopl;
+	dom0_msr_t msr;
     }
     u;
 } dom0_op_t;

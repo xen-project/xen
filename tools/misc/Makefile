@@ -1,13 +1,13 @@
 
 CC       = gcc
 CFLAGS   = -Wall -O3 
-CFLAGS  += -I../../xen/include -I../../xenolinux-sparse/include
+CFLAGS  += -I../../xen/include -I../../xenolinux-sparse/include -I../internal
 
 HDRS     = $(wildcard *.h)
 SRCS     = $(wildcard *.c)
 OBJS     = $(patsubst %.c,%.o,$(SRCS))
 
-TARGETS  = xen_read_console 
+TARGETS  = xen_read_console xen_cpuperf
 
 INSTALL  = $(TARGETS) xen-mkdevnodes xen-clone
 
