@@ -195,10 +195,10 @@ void vmx_do_launch(struct exec_domain *ed)
     spin_lock(&d->page_alloc_lock);
     list_ent = d->page_list.next;
 
-    mpl2e = (l2_pgentry_t *) map_domain_mem(pagetable_val(ed->mm.monitor_table));
-    ASSERT(mpl2e[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT]);
+    mpl2e = (l2_pgentry_t *)map_domain_mem(pagetable_val(ed->mm.monitor_table));
 
-    for (i = 0; list_ent != &d->page_list; i++ ) {
+    for ( i = 0; list_ent != &d->page_list; i++ )
+    {
         pfn = list_entry(list_ent, struct pfn_info, list) - frame_table;
         ed->mm.min_pfn = min(ed->mm.min_pfn, pfn);
         ed->mm.max_pfn = max(ed->mm.max_pfn, pfn);
