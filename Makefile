@@ -117,4 +117,6 @@ install-iptables:
 	( cd iptables-* ; \
 	  make PREFIX= KERNEL_DIR=../linux-$(LINUX_VER)-xen0 install)
 
-
+uninstall:
+	cp -a /etc/xen /etc/xen.old && rm -rf /etc/xen 
+	rm -rf "/usr/lib/python2.2/site-packages/xen* /usr/lib/libxc* /usr/lib/python2.2/site-packages/Xc*"
