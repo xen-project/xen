@@ -259,37 +259,43 @@ table updates and also on remapping memory regions with the guest OS.
 
 
 \chapter{Network I/O}
-Since the hypervisor must multiplex network resources, its network subsystem
-may be viewed as a virtual network switching element with each domain having
-one or more virtual network interfaces to this network.
 
-The hypervisor acts conceptually as an IP router, forwarding each domain's
-traffic according to a set of rules.
+Virtual network device services are provided by shared memory
+communications with a `backend' domain.  From the point of view of
+other domains, the backend may be viewed as a virtual ethernet switch
+element with each domain having one or more virtual network interfaces
+connected to it.
 
-\section{Hypervisor Packet Handling}
-The hypervisor is responsible primarily for {\it data-path} operations.
+\section{Backend Packet Handling}
+The backend driver is responsible primarily for {\it data-path} operations.
 In terms of networking this means packet transmission and reception.
 
-On the transmission side, the hypervisor needs to perform two key actions:
+On the transmission side, the backend needs to perform two key actions:
 \begin{itemize}
-\item {\tt Validation:} A domain is only allowed to emit packets matching a certain
-specification; for example, ones in which the source IP address matches
-one assigned to the virtual interface over which it is sent. The hypervisor
-is responsible for ensuring any such requirements are met, either by checking
-or by stamping outgoing packets with prescribed values for certain fields.
+\item {\tt Validation:} A domain is only allowed to emit packets
+matching a certain specification; for example, ones in which the
+source IP address matches one assigned to the virtual interface over
+which it is sent. The backend is responsible for ensuring any such
+requirements are met, either by checking or by stamping outgoing
+packets with prescribed values for certain fields.
 
-\item {\tt Scheduling:} Since a number of domains can share a single ``real'' network 
-interface, the hypervisor must mediate access when several domains each 
-have packets queued for transmission. Of course, this general scheduling
-function subsumes basic shaping or rate-limiting schemes.
+Validation functions can be configured using standard firewall rules
+(i.e. IP Tables, in the case of Linux).
 
-\item {\tt Logging and Accounting:} The hypervisor can be configured with classifier 
-rules that control how packets are accounted or logged. For example, 
-{\it domain0} could request that it receives a log message or copy of the
-packet whenever another domain attempts to send a TCP packet containg a 
-SYN.
+\item {\tt Scheduling:} Since a number of domains can share a single
+``real'' network interface, the hypervisor must mediate access when
+several domains each have packets queued for transmission. Of course,
+this general scheduling function subsumes basic shaping or
+rate-limiting schemes.
+
+\item {\tt Logging and Accounting:} The hypervisor can be configured
+with classifier rules that control how packets are accounted or
+logged. For example, {\it domain0} could request that it receives a
+log message or copy of the packet whenever another domain attempts to
+send a TCP packet containg a SYN.
 \end{itemize}
-On the recive side, the hypervisor's role is relatively straightforward:
+
+On the recive side, the backend's role is relatively straightforward:
 once a packet is received, it just needs to determine the virtual interface(s)
 to which it must be delivered and deliver it via page-flipping. 
 
@@ -336,42 +342,33 @@ an event to the domain.
 
 \section{Virtual Block Devices (VBDs)}
 
-All guest OS disk access goes through the VBD interface. The VBD interface
-provides the administrator with the ability to selectively grant domains 
-access to portions of block storage devices visible to the system.
+All guest OS disk access goes through the VBD interface. The VBD
+interface provides the administrator with the ability to selectively
+grant domains access to portions of block storage devices visible to
+the the block backend device (usually domain 0).
 
-A VBD can also be comprised of a set of extents from multiple storage devices.
-This provides the same functionality as a concatenated disk driver.
+VBDs can literally be backed by any block device accessible to the
+backend domain, including network-based block devices (iSCSI, *NBD,
+etc), loopback devices and LVM / MD devices.
 
-\section{Virtual Disks (VDs)}
-
-VDs are an abstraction built on top of the VBD interface. One can reserve disk
-space for use by the VD layer. This space is then managed as a pool of free extents.
-The VD tools can automatically allocate collections of extents from this pool to
-create ``virtual disks'' on demand. 
-
-\subsection{Virtual Disk Management}
-The VD management code consists of a set of python libraries. It can therefore
-be accessed by custom scripts as well as the convenience scripts provided. The
-VD database is a SQLite database in /var/db/xen\_vdisks.sqlite.
-
-The VD scripts and general VD usage are documented in the VBD-HOWTO.txt.
+Old (Xen 1.2) virtual disks are not supported under Xen 2.0, since
+similar functionality can be achieved using the (more advanced) LVM
+system, which is already in widespread use.
 
 \subsection{Data Transfer}
 Domains which have been granted access to a logical block device are permitted
-to read and write it directly through the hypervisor, rather than requiring
-{\it domain0} to mediate every data access. 
+to read and write it by shared memory communications with the backend domain. 
 
-In overview, the same style of descriptor-ring that is used for network
-packets is used here. Each domain has one ring that carries operation requests to the 
-hypervisor and carries the results back again. 
+In overview, the same style of descriptor-ring that is used for
+network packets is used here. Each domain has one ring that carries
+operation requests to the hypervisor and carries the results back
+again.
 
-Rather than copying data in and out of the hypervisor, we use page pinning to
-enable DMA transfers directly between the physical device and the domain's 
-buffers. Disk read operations are straightforward; the hypervisor just needs
-to know which pages have pending DMA transfers, and prevent the guest OS from
-giving the page back to the hypervisor, or to use them for storing page tables.
-
+Rather than copying data, the backend simply maps the domain's buffers
+in order to enable direct DMA to them.  The act of mapping the buffers
+also increases the reference counts of the underlying pages, so that
+the unprivileged domain cannot try to return them to the hypervisor,
+install them as page tables, or any other unsafe behaviour.
 %block API here 
 
 \chapter{Privileged operations}
@@ -811,9 +808,7 @@ in kilobytes.
 
 {\it DOM0\_GETPAGEFRAMEINFO}:
 
-{\it DOM0\_IOPL}:
-
-{\it DOM0\_MSR}:
+{\it DOM0\_IOPL}: set IO privilege level
 
 {\it DOM0\_DEBUG}: interactively call pervasive debugger
 
@@ -830,11 +825,13 @@ in kilobytes.
 
 {\it DOM0\_PCIDEV\_ACCESS}: modify PCI device access permissions
 
+{\it DOM0\_SCHED\_ID}: get the ID of the current Xen scheduler
 
-\section{network\_op(network\_op\_t *op)} 
-update network ruleset
+{\it DOM0\_SETDOMAINNAME}: set the name of a domain
 
-\section{ block\_io\_op(block\_io\_op\_t *op)}
+{\it DOM0\_SETDOMAININITIALMEM}: set initial memory allocation of a domain
+
+{\it DOM0\_GETPAGEFRAMEINFO2}:
 
 \section{ set\_debugreg(int reg, unsigned long value)}
 set debug register reg to value
@@ -847,7 +844,7 @@ set debug register reg to value
 \section{ set\_fast\_trap(int idx)}
  install traps to allow guest OS to bypass hypervisor
 
-\section{ dom\_mem\_op(dom\_mem\_op\_t *op)}
+\section{ dom\_mem\_op(unsigned int op, void *pages, unsigned long nr\_pages)}
  increase or decrease memory reservations for guest OS
 
 \section{ multicall(multicall\_entry\_t *call\_list, int nr\_calls)}
