@@ -40,6 +40,7 @@ struct bshdr_t_struct {
     u32            operation;
     u32            flags;
     u64            id;
+    u64            luid;
 } __attribute__ ((packed));
 typedef struct bshdr_t_struct bshdr_t;
 
@@ -52,12 +53,13 @@ typedef struct bsmsg_t_struct bsmsg_t;
 
 #define MSGBUFSIZE_OP    sizeof(u32)
 #define MSGBUFSIZE_FLAGS (sizeof(u32) + sizeof(u32))
-#define MSGBUFSIZE_ID    (sizeof(u32) + sizeof(u32) + sizeof(u64))
+#define MSGBUFSIZE_ID    (sizeof(u32) + sizeof(u32) + sizeof(u64) + sizeof(u64))
 #define MSGBUFSIZE_BLOCK sizeof(bsmsg_t)
 
 #define BSOP_READBLOCK  0x01
 #define BSOP_WRITEBLOCK 0x02
 #define BSOP_ALLOCBLOCK 0x03
+#define BSOP_FREEBLOCK  0x04
 
 #define BSOP_FLAG_ERROR 0x01
 
