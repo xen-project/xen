@@ -52,12 +52,20 @@ all: vmlinuz
 vmlinuz: vmlinux
 	$(Q)$(MAKE) $(build)=arch/xen/boot vmlinuz
 
+INSTALL_NAME ?= $(KERNELRELEASE)
+install: vmlinuz
+	mkdir -p $(INSTALL_PATH)/boot
+	install -m0644 vmlinuz $(INSTALL_PATH)/boot/vmlinuz-$(INSTALL_NAME)$(INSTALL_SUFFIX)
+	install -m0644 vmlinux $(INSTALL_PATH)/boot/vmlinux-$(INSTALL_NAME)$(INSTALL_SUFFIX)
+	install -m0664 .config $(INSTALL_PATH)/boot/config-$(INSTALL_NAME)$(INSTALL_SUFFIX)
+
 archclean:
 	@if [ -e arch/xen/arch ]; then $(MAKE) $(clean)=arch/xen/arch; fi;
 	@rm -f arch/xen/arch include/.asm-ignore include/asm-xen/asm
 
 define archhelp
   echo  '* vmlinuz	- Compressed kernel image'
+  echo  '  install	- Install kernel image and config file'
 endef
 
 ifneq ($(XENARCH),)

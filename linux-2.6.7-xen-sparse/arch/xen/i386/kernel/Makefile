@@ -8,11 +8,12 @@ CFLAGS	+= -Iarch/$(XENARCH)/kernel
 
 extra-y := head.o init_task.o vmlinux.lds.s
 
-obj-y	:= traps.o irq.o ldt.o setup.o entry.o time.o process.o signal.o
+obj-y	:= traps.o irq.o ldt.o setup.o entry.o time.o process.o signal.o \
+		i386_ksyms.o
 
 c-obj-y	:= semaphore.o vm86.o \
 		ptrace.o ioport.o sys_i386.o \
-		pci-dma.o i386_ksyms.o i387.o dmi_scan.o bootflag.o \
+		pci-dma.o i387.o dmi_scan.o bootflag.o \
 		doublefault.o
 s-obj-y	:=
 
