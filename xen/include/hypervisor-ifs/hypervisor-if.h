@@ -168,21 +168,6 @@
 #define SCHEDOP_exit            3   /* Exit and kill this domain.        */
 #define SCHEDOP_stop            4   /* Stop executing this domain.       */
 
-/*
- * EVTCHNOP_* - Event channel operations.
- */
-#define EVTCHNOP_open           0  /* Open channel to <target domain>.    */
-#define EVTCHNOP_close          1  /* Close <channel id>.                 */
-#define EVTCHNOP_send           2  /* Send event on <channel id>.         */
-#define EVTCHNOP_status         3  /* Get status of <channel id>.         */
-
-/*
- * EVTCHNSTAT_* - Non-error return values from EVTCHNOP_status.
- */
-#define EVTCHNSTAT_closed       0  /* Chennel is not in use.              */
-#define EVTCHNSTAT_disconnected 1  /* Channel is not connected to remote. */
-#define EVTCHNSTAT_connected    2  /* Channel is connected to remote.     */
-
 
 #ifndef __ASSEMBLY__
 

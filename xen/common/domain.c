@@ -127,6 +127,8 @@ void kill_domain_with_errmsg(const char *err)
 
 void __kill_domain(struct task_struct *p)
 {
+    extern void destroy_event_channels(struct task_struct *);
+
     int i;
     struct task_struct **pp;
     unsigned long flags;
@@ -148,6 +150,8 @@ void __kill_domain(struct task_struct *p)
 
     for ( i = 0; i < MAX_DOMAIN_VIFS; i++ )
         unlink_net_vif(p->net_vif_list[i]);
+
+    destroy_event_channels(p);
 
     /*
      * Note this means that find_domain_by_id may fail, even when the caller
@@ -467,8 +471,6 @@ unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes)
 /* Release resources belonging to task @p. */
 void release_task(struct task_struct *p)
 {
-    extern void destroy_event_channels(struct task_struct *);
-
     ASSERT(p->state == TASK_DYING);
     ASSERT(!p->has_cpu);
 
@@ -481,7 +483,6 @@ void release_task(struct task_struct *p)
     destroy_blkdev_info(p);
 
     /* Free all memory associated with this domain. */
-    destroy_event_channels(p);
     free_page((unsigned long)p->mm.perdomain_pt);
     UNSHARE_PFN(virt_to_page(p->shared_info));
     free_all_dom_mem(p);
