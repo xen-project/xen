@@ -218,7 +218,10 @@ void synchronise_pagetables(unsigned long cpu_mask);
 #ifdef __x86_64__
 extern unsigned long *machine_to_phys_mapping;
 #else
+/* Don't call virt_to_phys on this: it isn't direct mapped.  Using
+   m2p_start_mfn instead. */
 #define machine_to_phys_mapping ((unsigned long *)RDWR_MPT_VIRT_START)
+extern unsigned long m2p_start_mfn;
 #endif
 
 #define DEFAULT_GDT_ENTRIES     (LAST_RESERVED_GDT_ENTRY+1)

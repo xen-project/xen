@@ -27,6 +27,8 @@
 #include <asm/fixmap.h>
 #include <asm/domain_page.h>
 
+unsigned long m2p_start_mfn;
+
 static inline void set_pte_phys(unsigned long vaddr,
                                 l1_pgentry_t entry)
 {
@@ -63,6 +65,7 @@ void __init paging_init(void)
     /* Allocate and map the machine-to-phys table. */
     if ( (pg = alloc_domheap_pages(NULL, 10)) == NULL )
         panic("Not enough memory to bootstrap Xen.\n");
+    m2p_start_mfn = page_to_pfn(pg);
     idle_pg_table[RDWR_MPT_VIRT_START >> L2_PAGETABLE_SHIFT] =
         mk_l2_pgentry(page_to_phys(pg) | __PAGE_HYPERVISOR | _PAGE_PSE);
 
