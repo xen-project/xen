@@ -156,10 +156,12 @@ struct sk_buff {
     unsigned char 	*end;			/* End pointer					*/
 
     void 		(*destructor)(struct sk_buff *);	/* Destruct function		*/
-    struct pfn_info *pf;                    /* record of physical pf address for freeing    */
-    net_vif_t *src_vif;                     /* vif we came from                             */
-    net_vif_t *dst_vif;                     /* vif we are bound for                         */
-    struct skb_shared_info shinfo;          /* shared info is no longer shared in Xen.      */
+
+    unsigned short guest_id;  /* guest-OS's id for this packet (tx only!)   */
+    struct pfn_info *pf;      /* record of physical pf address for freeing  */
+    net_vif_t *src_vif;       /* vif we came from                           */
+    net_vif_t *dst_vif;       /* vif we are bound for                       */
+    struct skb_shared_info shinfo; /* shared info not shared in Xen.        */
 };
 
 extern void	       __kfree_skb(struct sk_buff *skb);

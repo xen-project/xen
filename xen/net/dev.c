@@ -504,15 +504,23 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
     if ( ntohs(skb->mac.ethernet->h_proto) == ETH_P_ARP )
         memcpy(skb->nh.raw + 18, vif->vmac, ETH_ALEN);
 
-    if ( (i = vif->rx_cons) == vif->rx_prod )
-        return;
+    /*
+     * Slightly gross: we need the page_lock so that we can do PTE checking.
+     * However, we take it slightly early so that it can protect the update
+     * of rx_cons. This saves us from grabbing two locks.
+     */
+    spin_lock(&vif->domain->page_lock);
 
+    if ( (i = vif->rx_cons) == vif->rx_prod )
+    {
+        spin_unlock(&vif->domain->page_lock);
+        return;
+    }
     rx = vif->rx_shadow_ring + i;
+    vif->rx_cons = RX_RING_INC(i);
 
     size   = (unsigned short)skb->len;
     offset = (unsigned char)((unsigned long)skb->data & ~PAGE_MASK);
-
-    spin_lock(&vif->domain->page_lock);
 
     /* Release the page-table page. */
     pte_page = frame_table + (rx->pte_ptr >> PAGE_SHIFT);
@@ -529,6 +537,8 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
         /* Bail out if the PTE has been reused under our feet. */
         list_add(&old_page->list, &vif->domain->pg_head);
         old_page->flags = vif->domain->domain;
+        unmap_domain_mem(ptep);
+        spin_unlock(&vif->domain->page_lock);
         status = RING_STATUS_BAD_PAGE;
         goto out;
     }
@@ -558,13 +568,11 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
      * NB. The remote flush here should be safe, as we hold no locks. The 
      * network driver that called us should also have no nasty locks.
      */
-    rx = vif->rx_shadow_ring + vif->rx_cons;
     if ( rx->flush_count == (unsigned short)
          atomic_read(&tlb_flush_count[vif->domain->processor]) )
         flush_tlb_cpu(vif->domain->processor);
 
  out:
-    vif->rx_cons = RX_RING_INC(vif->rx_cons);
     make_rx_response(vif, rx->id, size, status, offset);
 }
 
@@ -682,7 +690,6 @@ static void tx_skb_release(struct sk_buff *skb)
 {
     int i;
     net_vif_t *vif = skb->src_vif;
-    tx_shadow_entry_t *tx;
     unsigned long flags;
     
     spin_lock_irqsave(&vif->domain->page_lock, flags);
@@ -695,9 +702,7 @@ static void tx_skb_release(struct sk_buff *skb)
 
     skb_shinfo(skb)->nr_frags = 0; 
 
-    tx = vif->tx_shadow_ring + vif->tx_cons;
-    vif->tx_cons = TX_RING_INC(vif->tx_cons);
-    make_tx_response(vif, tx->id, RING_STATUS_OK);
+    make_tx_response(vif, skb->guest_id, RING_STATUS_OK);
 
     put_vif(vif);
 }
@@ -720,7 +725,7 @@ static void net_tx_action(unsigned long unused)
         vif = list_entry(ent, net_vif_t, list);
         get_vif(vif);
         remove_from_net_schedule_list(vif);
-        if ( vif->tx_idx == vif->tx_prod )
+        if ( vif->tx_cons == vif->tx_prod )
         {
             put_vif(vif);
             continue;
@@ -735,9 +740,9 @@ static void net_tx_action(unsigned long unused)
         }
         
         /* Pick an entry from the transmit queue. */
-        tx = &vif->tx_shadow_ring[vif->tx_idx];
-        vif->tx_idx = TX_RING_INC(vif->tx_idx);
-        if ( vif->tx_idx != vif->tx_prod )
+        tx = &vif->tx_shadow_ring[vif->tx_cons];
+        vif->tx_cons = TX_RING_INC(vif->tx_cons);
+        if ( vif->tx_cons != vif->tx_prod )
             add_to_net_schedule_list_tail(vif);
 
         skb->destructor = tx_skb_release;
@@ -749,6 +754,7 @@ static void net_tx_action(unsigned long unused)
         skb->src_vif  = vif;
         skb->dst_vif  = NULL;
         skb->mac.raw  = skb->data; 
+        skb->guest_id = tx->id;
         
         skb_shinfo(skb)->frags[0].page        = frame_table +
             (tx->payload >> PAGE_SHIFT);

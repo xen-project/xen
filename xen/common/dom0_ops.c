@@ -210,18 +210,20 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
     case DOM0_GETDOMAININFO:
     { 
-        struct task_struct *p;
+        struct task_struct *p = &idle0_task;
         u_long flags;
 
-        p = idle0_task.next_task;
         read_lock_irqsave (&tasklist_lock, flags);
-        do {
-            if ((!is_idle_task (p)) && (p -> domain >= op.u.getdominfo.domain))
-                break;
-        } while ((p = p -> next_task) != &idle0_task);
 
-        ret = -ESRCH;
-        if ( p != &idle0_task ) 
+        while ( (p = p->next_task) != &idle0_task )
+            if ( !is_idle_task(p) && (p->domain >= op.u.getdominfo.domain) )
+                break;
+
+        if ( p == &idle0_task )
+        {
+            ret = -ESRCH;
+        }
+        else
         {
             op.u.getdominfo.domain      = p->domain;
             strcpy (op.u.getdominfo.name, p->name);

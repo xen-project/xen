@@ -58,8 +58,7 @@ typedef struct net_vif_st {
     unsigned int rx_cons;  /* Next buffer to fill is here. */
     tx_shadow_entry_t tx_shadow_ring[TX_RING_SIZE];
     unsigned int tx_prod;  /* More packets for sending go here. */
-    unsigned int tx_idx;   /* Next packet to send is here. */
-    unsigned int tx_cons;  /* Next packet to create response for is here. */
+    unsigned int tx_cons;  /* Next packet to send is here. */
 
     /* Private indexes into shared ring. */
     unsigned int rx_req_cons;
