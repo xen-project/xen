@@ -13,16 +13,16 @@ struct xen_regs
     long eax;
     long orig_eax;
     long eip;
-    int  xcs;
+    int  cs;
     long eflags;
 
     /* Only saved guest activations contain the following fields. */
     long esp;
-    int  xss;
-    int  xes;
-    int  xds;
-    int  xfs;
-    int  xgs;
+    int  ss;
+    int  es;
+    int  ds;
+    int  fs;
+    int  gs;
 };
 
 enum EFLAGS {

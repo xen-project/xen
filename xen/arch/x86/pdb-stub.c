@@ -255,17 +255,17 @@ pdb_x86_to_gdb_regs (char *buffer, struct xen_regs *regs)
     idx += sizeof(regs->eip) * 2;
     mem2hex ((char *)&regs->eflags, &buffer[idx], sizeof(regs->eflags));
     idx += sizeof(regs->eflags) * 2;
-    mem2hex ((char *)&regs->xcs, &buffer[idx], sizeof(regs->xcs));
-    idx += sizeof(regs->xcs) * 2;
-    mem2hex ((char *)&regs->xss, &buffer[idx], sizeof(regs->xss));
-    idx += sizeof(regs->xss) * 2;
-    mem2hex ((char *)&regs->xds, &buffer[idx], sizeof(regs->xds));
-    idx += sizeof(regs->xds) * 2;
-    mem2hex ((char *)&regs->xes, &buffer[idx], sizeof(regs->xes));
-    idx += sizeof(regs->xes) * 2;
-    mem2hex ((char *)&regs->xfs, &buffer[idx], sizeof(regs->xfs));
-    idx += sizeof(regs->xfs) * 2;
-    mem2hex ((char *)&regs->xgs, &buffer[idx], sizeof(regs->xgs));
+    mem2hex ((char *)&regs->cs, &buffer[idx], sizeof(regs->cs));
+    idx += sizeof(regs->cs) * 2;
+    mem2hex ((char *)&regs->ss, &buffer[idx], sizeof(regs->ss));
+    idx += sizeof(regs->ss) * 2;
+    mem2hex ((char *)&regs->ds, &buffer[idx], sizeof(regs->ds));
+    idx += sizeof(regs->ds) * 2;
+    mem2hex ((char *)&regs->es, &buffer[idx], sizeof(regs->es));
+    idx += sizeof(regs->es) * 2;
+    mem2hex ((char *)&regs->fs, &buffer[idx], sizeof(regs->fs));
+    idx += sizeof(regs->fs) * 2;
+    mem2hex ((char *)&regs->gs, &buffer[idx], sizeof(regs->gs));
 }
 
 /* at this point we allow any register to be changed, caveat emptor */
@@ -292,17 +292,17 @@ pdb_gdb_to_x86_regs (struct xen_regs *regs, char *buffer)
     buffer += sizeof(regs->eip) * 2;
     hex2mem(buffer, (char *)&regs->eflags, sizeof(regs->eflags));
     buffer += sizeof(regs->eflags) * 2;
-    hex2mem(buffer, (char *)&regs->xcs, sizeof(regs->xcs));
-    buffer += sizeof(regs->xcs) * 2;
-    hex2mem(buffer, (char *)&regs->xss, sizeof(regs->xss));
-    buffer += sizeof(regs->xss) * 2;
-    hex2mem(buffer, (char *)&regs->xds, sizeof(regs->xds));
-    buffer += sizeof(regs->xds) * 2;
-    hex2mem(buffer, (char *)&regs->xes, sizeof(regs->xes));
-    buffer += sizeof(regs->xes) * 2;
-    hex2mem(buffer, (char *)&regs->xfs, sizeof(regs->xfs));
-    buffer += sizeof(regs->xfs) * 2;
-    hex2mem(buffer, (char *)&regs->xgs, sizeof(regs->xgs));
+    hex2mem(buffer, (char *)&regs->cs, sizeof(regs->cs));
+    buffer += sizeof(regs->cs) * 2;
+    hex2mem(buffer, (char *)&regs->ss, sizeof(regs->ss));
+    buffer += sizeof(regs->ss) * 2;
+    hex2mem(buffer, (char *)&regs->ds, sizeof(regs->ds));
+    buffer += sizeof(regs->ds) * 2;
+    hex2mem(buffer, (char *)&regs->es, sizeof(regs->es));
+    buffer += sizeof(regs->es) * 2;
+    hex2mem(buffer, (char *)&regs->fs, sizeof(regs->fs));
+    buffer += sizeof(regs->fs) * 2;
+    hex2mem(buffer, (char *)&regs->gs, sizeof(regs->gs));
 }
 
 int
@@ -1088,11 +1088,11 @@ int pdb_handle_exception(int exceptionVector,
        This occurs when leaving a system call from a domain.
     */
     if ( exceptionVector == 3 &&
-	 (xen_regs->xcs & 3) == 3 && 
+	 (xen_regs->cs & 3) == 3 && 
 	 xen_regs->eip != pdb_system_call_next_addr + 1)
     {
         TRC(printf("pdb: user bkpt (0x%x) at 0x%x:0x%lx:0x%lx\n", 
-		   exceptionVector, xen_regs->xcs & 3, cr3, xen_regs->eip));
+		   exceptionVector, xen_regs->cs & 3, cr3, xen_regs->eip));
 	return 1;
     }
 

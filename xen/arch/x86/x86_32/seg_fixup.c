@@ -297,15 +297,15 @@ int gpf_emulate_4gb(struct xen_regs *regs)
     unsigned int  *pseg = NULL; /* segment for memory operand (NULL=default) */
 
     /* WARNING: We only work for ring-3 segments. */
-    if ( unlikely((regs->xcs & 3) != 3) )
+    if ( unlikely((regs->cs & 3) != 3) )
     {
-        DPRINTK("Taken fault at bad CS %04x\n", regs->xcs);
+        DPRINTK("Taken fault at bad CS %04x\n", regs->cs);
         goto fail;
     }
 
-    if ( !linearise_address((u16)regs->xcs, regs->eip, (unsigned long *)&eip) )
+    if ( !linearise_address((u16)regs->cs, regs->eip, (unsigned long *)&eip) )
     {
-        DPRINTK("Cannot linearise %04x:%08lx\n", regs->xcs, regs->eip);
+        DPRINTK("Cannot linearise %04x:%08lx\n", regs->cs, regs->eip);
         goto fail;
     }
 
@@ -332,22 +332,22 @@ int gpf_emulate_4gb(struct xen_regs *regs)
         case 0x66: /* Operand-size override */
             break;
         case 0x2e: /* CS override */
-            pseg = &regs->xcs;
+            pseg = &regs->cs;
             break;
         case 0x3e: /* DS override */
-            pseg = &regs->xds;
+            pseg = &regs->ds;
             break;
         case 0x26: /* ES override */
-            pseg = &regs->xes;
+            pseg = &regs->es;
             break;
         case 0x64: /* FS override */
-            pseg = &regs->xfs;
+            pseg = &regs->fs;
             break;
         case 0x65: /* GS override */
-            pseg = &regs->xgs;
+            pseg = &regs->gs;
             break;
         case 0x36: /* SS override */
-            pseg = &regs->xss;
+            pseg = &regs->ss;
             break;
         default: /* Not a prefix byte */
             goto done_prefix;
@@ -409,7 +409,7 @@ int gpf_emulate_4gb(struct xen_regs *regs)
     {
     case 0:
         if ( pseg == NULL )
-            pseg = &regs->xds;
+            pseg = &regs->ds;
         disp32 = 0;
         if ( rm == 5 ) /* disp32 rather than (EBP) */
         {
@@ -425,7 +425,7 @@ int gpf_emulate_4gb(struct xen_regs *regs)
 
     case 1:
         if ( pseg == NULL ) /* NB. EBP defaults to SS */
-            pseg = (rm == 5) ? &regs->xss : &regs->xds;
+            pseg = (rm == 5) ? &regs->ss : &regs->ds;
         if ( get_user(disp8, pb) )
         {
             DPRINTK("Fault while extracting <disp8>.\n");
@@ -437,7 +437,7 @@ int gpf_emulate_4gb(struct xen_regs *regs)
 
     case 2:
         if ( pseg == NULL ) /* NB. EBP defaults to SS */
-            pseg = (rm == 5) ? &regs->xss : &regs->xds;
+            pseg = (rm == 5) ? &regs->ss : &regs->ds;
         if ( get_user(disp32, (u32 *)pb) )
         {
             DPRINTK("Fault while extracting <disp8>.\n");
@@ -482,7 +482,7 @@ int gpf_emulate_4gb(struct xen_regs *regs)
             "caused GPF(0) at %04x:%08lx\n",
             eip[0], eip[1], eip[2], eip[3],
             eip[4], eip[5], eip[6], eip[7],
-            regs->xcs, regs->eip);
+            regs->cs, regs->eip);
  fail:
     return 0;
 }

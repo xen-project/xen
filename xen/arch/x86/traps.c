@@ -168,14 +168,14 @@ void show_registers(struct xen_regs *regs)
     unsigned long esp;
     unsigned short ss, ds, es, fs, gs;
 
-    if ( regs->xcs & 3 )
+    if ( regs->cs & 3 )
     {
         esp = regs->esp;
-        ss  = regs->xss & 0xffff;
-        ds  = regs->xds & 0xffff;
-        es  = regs->xes & 0xffff;
-        fs  = regs->xfs & 0xffff;
-        gs  = regs->xgs & 0xffff;
+        ss  = regs->ss & 0xffff;
+        ds  = regs->ds & 0xffff;
+        es  = regs->es & 0xffff;
+        fs  = regs->fs & 0xffff;
+        gs  = regs->gs & 0xffff;
     }
     else
     {
@@ -188,7 +188,7 @@ void show_registers(struct xen_regs *regs)
     }
 
     printk("CPU:    %d\nEIP:    %04x:[<%08lx>]      \nEFLAGS: %08lx\n",
-           smp_processor_id(), 0xffff & regs->xcs, regs->eip, regs->eflags);
+           smp_processor_id(), 0xffff & regs->cs, regs->eip, regs->eflags);
     printk("eax: %08lx   ebx: %08lx   ecx: %08lx   edx: %08lx\n",
            regs->eax, regs->ebx, regs->ecx, regs->edx);
     printk("esi: %08lx   edi: %08lx   ebp: %08lx   esp: %08lx\n",
@@ -222,7 +222,7 @@ static inline void do_trap(int trapnr, char *str,
     trap_info_t *ti;
     unsigned long fixup;
 
-    if (!(regs->xcs & 3))
+    if (!(regs->cs & 3))
         goto xen_fault;
 
     ti = current->thread.traps + trapnr;
@@ -285,9 +285,9 @@ asmlinkage void do_int3(struct xen_regs *regs, long error_code)
         return;
 #endif
 
-    if ( (regs->xcs & 3) != 3 )
+    if ( (regs->cs & 3) != 3 )
     {
-        if ( unlikely((regs->xcs & 3) == 0) )
+        if ( unlikely((regs->cs & 3) == 0) )
         {
             show_registers(regs);
             panic("CPU%d FATAL TRAP: vector = 3 (Int3)\n"
@@ -382,7 +382,7 @@ asmlinkage void do_page_fault(struct xen_regs *regs, long error_code)
             return; /* successfully copied the mapping */
     }
 
-    if ( unlikely(!(regs->xcs & 3)) )
+    if ( unlikely(!(regs->cs & 3)) )
         goto xen_fault;
 
     ti = d->thread.traps + 14;
@@ -449,7 +449,7 @@ asmlinkage void do_general_protection(struct xen_regs *regs, long error_code)
     unsigned long fixup;
 
     /* Badness if error in ring 0, or result of an interrupt. */
-    if ( !(regs->xcs & 3) || (error_code & 1) )
+    if ( !(regs->cs & 3) || (error_code & 1) )
         goto gp_in_kernel;
 
     /*
@@ -476,7 +476,7 @@ asmlinkage void do_general_protection(struct xen_regs *regs, long error_code)
     {
         /* This fault must be due to <INT n> instruction. */
         ti = current->thread.traps + (error_code>>3);
-        if ( TI_GET_DPL(ti) >= (regs->xcs & 3) )
+        if ( TI_GET_DPL(ti) >= (regs->cs & 3) )
         {
 #ifdef XEN_DEBUGGER
             if ( pdb_initialized && (pdb_ctx.system_call != 0) )
@@ -662,7 +662,7 @@ asmlinkage void do_debug(struct xen_regs *regs, long error_code)
         return;
     }
 
-    if ( (regs->xcs & 3) == 0 )
+    if ( (regs->cs & 3) == 0 )
     {
         /* Clear TF just for absolute sanity. */
         regs->eflags &= ~EF_TF;
