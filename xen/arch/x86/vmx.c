@@ -114,6 +114,7 @@ static int vmx_do_page_fault(unsigned long va, unsigned long error_code)
     unsigned long eip;
     unsigned long gpa;
     int result;
+    struct exec_domain *ed = current;
 
 #if VMX_DEBUG
     {
@@ -123,6 +124,16 @@ static int vmx_do_page_fault(unsigned long va, unsigned long error_code)
                 va, eip, error_code);
     }
 #endif
+
+    /*
+     * If vpagetable is zero, then we are still emulating 1:1 page tables,
+     * and we should have never gotten here.
+     */
+    if ( !ed->arch.vpagetable )
+    {
+        printk("vmx_do_page_fault while still running on 1:1 page table\n");
+        return 0;
+    }
 
     gpa = gva_to_gpa(va);
     if (!gpa)
@@ -810,7 +821,8 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
             break;
         }
         default:
-            __vmx_bug(&regs);
+            printk("unexpected VMexit for exception vector 0x%x\n", vector);
+            //__vmx_bug(&regs);
             break;
         }
         break;

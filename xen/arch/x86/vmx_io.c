@@ -380,8 +380,13 @@ void vmx_intr_assist(struct exec_domain *d)
 
 void vmx_do_resume(struct exec_domain *d) 
 {
+    if ( d->arch.vpagetable )
+        __vmwrite(GUEST_CR3, pagetable_val(d->arch.shadow_table));
+    else
+        // we haven't switched off the 1:1 pagetable yet...
+        __vmwrite(GUEST_CR3, pagetable_val(d->arch.guest_table));
+
     __vmwrite(HOST_CR3, pagetable_val(d->arch.monitor_table));
-    __vmwrite(GUEST_CR3, pagetable_val(d->arch.shadow_table));
     __vmwrite(HOST_ESP, (unsigned long)get_stack_bottom());
 
     if (event_pending(d)) {
