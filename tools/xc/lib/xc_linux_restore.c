@@ -246,7 +246,7 @@ int xc_linux_restore(int xc_handle,
                 {
                     if ( (pfn = ppage[j] >> PAGE_SHIFT) >= nr_pfns )
                     {
-                        ERROR("Frame number in page table is out of range");
+                        ERROR("Frame number in type %d page table is out of range. i=%d j=%d pfn=%d nr_pfns=%d",pfn_type[i],i,j,pfn,nr_pfns);
                         goto out;
                     }
                     if ( (pfn_type[pfn] != NONE) && (ppage[j] & _PAGE_RW) )

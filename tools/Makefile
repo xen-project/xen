@@ -17,6 +17,10 @@ install: all
 	$(MAKE) -C xenctl install
 	$(MAKE) -C xend install
 
+dist: $(TARGET)
+	$(MAKE) prefix=`pwd`/../../install dist=yes install
+
+
 clean:
 	$(MAKE) -C balloon clean
 	$(MAKE) -C xc clean

@@ -194,6 +194,9 @@ static struct {
  */
 void __init init_frametable(unsigned long nr_pages)
 {
+    int i;
+    unsigned long mfn;
+
     memset(percpu_info, 0, sizeof(percpu_info));
 
     max_page = nr_pages;
@@ -206,7 +209,19 @@ void __init init_frametable(unsigned long nr_pages)
     INIT_LIST_HEAD(&free_list);    
     free_pfns = 0;
 
+    /* so that we can map them latter, set the ownership of pages
+       belonging to the machine_to_phys_mapping to CPU0 idle task */
+    
+    mfn = virt_to_phys((void *)RDWR_MPT_VIRT_START)>>PAGE_SHIFT;
+//    for(i=0;i<nr_pages;i+=1024,mfn++)
+    for(i=0;i<1024*1024;i+=1024,mfn++)
+    {
+	frame_table[mfn].count_and_flags = 1 | PGC_allocated;
+	frame_table[mfn].type_and_flags = 1 | PGT_gdt_page; // anything non RW
+	frame_table[mfn].u.domain = &idle0_task;
+    }
 }
+
 
 void add_to_domain_alloc_list(unsigned long ps, unsigned long pe)
 {
@@ -895,7 +910,8 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         break;
 
     case MMUEXT_SET_SUBJECTDOM_H:
-        percpu_info[cpu].subject_id |= (domid_t)((ptr&~0xFFFF)|(val>>16))<<32;
+        percpu_info[cpu].subject_id |= ((domid_t)((ptr&~0xFFFF)|(val>>16)))<<32;
+
         if ( !IS_PRIV(current) )
         {
             MEM_LOG("Dom %llu has no privilege to set subject domain",

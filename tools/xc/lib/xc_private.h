@@ -16,14 +16,16 @@
 
 #include "xc.h"
 
-#include <asm-xen/proc_cmd.h>
-
 /* from xen/include/hypervisor-ifs */
 #include <hypervisor-if.h>
 #include <dom0_ops.h>
 #include <vbd.h>
 #include <event_channel.h>
 #include <sched_ctl.h>
+
+#include <asm-xen/proc_cmd.h>
+
+
 
 /* from xend/lib */
 #include <domain_controller.h>
@@ -188,6 +190,7 @@ typedef struct privcmd_mmap_entry {
 
 typedef struct privcmd_mmap {
     int num;
+    domid_t dom;
     privcmd_mmap_entry_t *entry;
 } privcmd_mmap_t; 
 */
@@ -198,16 +201,17 @@ typedef struct mfn_mapper {
     int xc_handle;
     int size;
     int prot;
+    int error;
     int max_queue_size;
     void * addr;
     privcmd_mmap_t ioctl; 
     
 } mfn_mapper_t;
 
-void * mfn_mapper_map_single(int xc_handle, int prot, 
-			     unsigned long mfn, int size);
+void * mfn_mapper_map_single(int xc_handle, domid_t dom, int size, int prot, 
+			     unsigned long mfn );
 
-mfn_mapper_t * mfn_mapper_init(int xc_handle, int size, int prot);
+mfn_mapper_t * mfn_mapper_init(int xc_handle, domid_t dom, int size, int prot);
 
 void * mfn_mapper_base(mfn_mapper_t *t);
 

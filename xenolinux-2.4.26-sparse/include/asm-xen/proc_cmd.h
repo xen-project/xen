@@ -21,6 +21,7 @@ typedef struct privcmd_mmap_entry {
 
 typedef struct privcmd_mmap {
     int num;
+    domid_t dom; /* target domain */
     privcmd_mmap_entry_t *entry;
 } privcmd_mmap_t; 
 

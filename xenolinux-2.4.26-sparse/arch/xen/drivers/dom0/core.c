@@ -67,7 +67,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 #define PRIVCMD_MMAP_SZ 32
 	privcmd_mmap_t mmapcmd;
 	privcmd_mmap_entry_t msg[PRIVCMD_MMAP_SZ], *p;
-	int i;
+	int i, rc;
 
         if ( copy_from_user(&mmapcmd, (void *)data, sizeof(mmapcmd)) )
             return -EFAULT;
@@ -95,12 +95,13 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 		if (msg[j].va + (msg[j].npages<<PAGE_SHIFT) > vma->vm_end)
 		    return -EINVAL;
 
-		if (direct_remap_area_pages(vma->vm_mm, 
+		if (rc = direct_remap_area_pages(vma->vm_mm, 
 					    msg[j].va&PAGE_MASK, 
 					    msg[j].mfn<<PAGE_SHIFT, 
 					    msg[j].npages<<PAGE_SHIFT, 
-					    vma->vm_page_prot))
-		    return -EINVAL;
+					    vma->vm_page_prot,
+					    mmapcmd.dom))
+		    return rc;
 	    }
 	}
 	ret = 0;

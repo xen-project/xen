@@ -27,7 +27,7 @@
 #define direct_mk_pte_phys(physpage, pgprot) \
   __direct_mk_pte((physpage) >> PAGE_SHIFT, pgprot)
 
-static inline void direct_remap_area_pte(pte_t *pte, 
+static inline int direct_remap_area_pte(pte_t *pte, 
                                          unsigned long address, 
                                          unsigned long size,
                                          unsigned long machine_addr, 
@@ -38,6 +38,9 @@ static inline void direct_remap_area_pte(pte_t *pte,
 
     mmu_update_t *u, *v;
     u = v = vmalloc(3*PAGE_SIZE); /* plenty */
+
+    if (!u) 
+	return -ENOMEM;
 
     /* If not I/O mapping then specify General-Purpose Subject Domain (GPS). */
     if ( domid != 0 )
@@ -74,10 +77,15 @@ static inline void direct_remap_area_pte(pte_t *pte,
         pte++;
     } while (address && (address < end));
 
-    if ( ((v-u) != 0) && (HYPERVISOR_mmu_update(u, v-u) < 0) )
+    if ( ((v-u) > 2) && (HYPERVISOR_mmu_update(u, v-u) < 0) )
+    {
         printk(KERN_WARNING "Failed to ioremap %08lx->%08lx (%08lx)\n",
                end-size, end, machine_addr-size);
+	return -EINVAL;
+    }
+
     vfree(u);
+    return 0;
 }
 
 static inline int direct_remap_area_pmd(struct mm_struct *mm,
@@ -89,6 +97,7 @@ static inline int direct_remap_area_pmd(struct mm_struct *mm,
                                         domid_t  domid)
 {
     unsigned long end;
+    int rc;
 
     address &= ~PGDIR_MASK;
     end = address + size;
@@ -101,8 +110,11 @@ static inline int direct_remap_area_pmd(struct mm_struct *mm,
         pte_t * pte = pte_alloc(mm, pmd, address);
         if (!pte)
             return -ENOMEM;
-        direct_remap_area_pte(pte, address, end - address, 
-                              address + machine_addr, prot, domid);
+
+        if ( rc = direct_remap_area_pte(pte, address, end - address, 
+                              address + machine_addr, prot, domid) )
+	    return rc;
+
         address = (address + PMD_SIZE) & PMD_MASK;
         pmd++;
     } while (address && (address < end));
@@ -120,8 +132,8 @@ int direct_remap_area_pages(struct mm_struct *mm,
     pgd_t * dir;
     unsigned long end = address + size;
 
-printk("direct_remap_area_pages va=%08lx ma=%08lx size=%d\n",
-       address, machine_addr, size);
+/*printk("direct_remap_area_pages va=%08lx ma=%08lx size=%d\n",
+       address, machine_addr, size);*/
 
     machine_addr -= address;
     dir = pgd_offset(mm, address);

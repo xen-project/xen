@@ -209,7 +209,8 @@ struct task_struct
     mm:          IDLE0_MM,       \
     addr_limit:  KERNEL_DS,      \
     thread:      INIT_THREAD,    \
-    flags:       1<<PF_IDLETASK  \
+    flags:       1<<PF_IDLETASK, \
+    refcnt:      ATOMIC_INIT(1)  \
 }
 
 extern struct task_struct idle0_task;

@@ -2156,8 +2156,9 @@ static void get_rx_bufs(net_vif_t *vif)
                               0) != 
                       (PGC_allocated | PGC_tlb_flush_on_type_change | 2)) )
         {
-            DPRINTK("Page held more than once %08x\n", 
-                    buf_page->count_and_flags);
+            DPRINTK("Page held more than once %08x %s\n", 
+                    buf_page->count_and_flags,
+		    (buf_page->u.domain)?buf_page->u.domain->name:"None");
             if ( !get_page_type(buf_page, PGT_writeable_page) )
                 put_page(buf_page);
             else if ( cmpxchg(ptep, pte & ~_PAGE_PRESENT, pte) !=
