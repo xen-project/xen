@@ -18,6 +18,20 @@
  * $Id: c-insert.c,v 1.7 2002/11/08 16:04:34 rn Exp $
  ****************************************************************************
  */
+
+/*
+ * Note from KAF: We should probably be more careful about overflow
+ * of our timestamp cycle counter value, as we only use 31 bits of
+ * precision. This will overflow on a 3GHz processor in less than a second,
+ * and the situation is only going to get worse. 
+ * 
+ * Probably we should use bits N-N+31 of the TSC rather than 0-31, and
+ * adjust scale_f and scale_i accordingly. If we're really smart we'd
+ * calculate N dynamically, according to the measured CPU speed!
+ * 
+ * I think the current code limps along okay for now though.
+ */
+
 /*
  *  linux/arch/i386/kernel/time.c
  *
@@ -215,12 +229,31 @@ static unsigned long __get_cmos_time(void)
     return mktime(year, mon, day, hour, min, sec);
 }
 
+/*
+ * This version doesn't wait for start of a new second, but double reads
+ * to ensure we get a consistent view of all CMOS values.
+ */
+static unsigned long get_cmos_time_fast(void)
+{
+    unsigned long a, b, flags;
+
+    spin_lock_irqsave(&rtc_lock, flags);
+
+    a = __get_cmos_time();
+    while ( (b = __get_cmos_time()) != a ) a = b;
+
+    spin_unlock_irqrestore(&rtc_lock, flags);
+
+    return a;
+}
+
 /* the more accurate version waits for a change */
 static unsigned long get_cmos_time(void)
 {
-    unsigned long res;
+    unsigned long res, flags;
     int i;
-    spin_lock(&rtc_lock);
+
+    spin_lock_irqsave(&rtc_lock, flags);
     /* The Linux interpretation of the CMOS clock register contents:
      * When the Update-In-Progress (UIP) flag goes from 1 to 0, the
      * RTC registers show the second which has precisely just started.
@@ -234,9 +267,8 @@ static unsigned long get_cmos_time(void)
         if (!(CMOS_READ(RTC_FREQ_SELECT) & RTC_UIP))
             break;
     res = __get_cmos_time();
-    spin_unlock(&rtc_lock);
+    spin_unlock_irqrestore(&rtc_lock, flags);
     return res;
-
 }
 
 /***************************************************************************
@@ -263,7 +295,7 @@ static inline s_time_t __get_s_time(void)
 
     /*
      * We only use the bottom 32 bits of the TSC. This should be sufficient,
-     * although we take care that TSC on thsi CPU may be lagging the master TSC
+     * although we take care that TSC on this CPU may be lagging the master TSC
      * slightly. In this case we clamp the TSC difference to a minimum of zero.
      */
     rdtscl(low);
@@ -375,7 +407,7 @@ static void update_time(unsigned long foo)
                wall_clock_time.tv_usec));
 
     /* Reload the timer. */
-    update_timer.expires  = new_st + MILLISECS(200);
+    update_timer.expires = new_st + MILLISECS(200);
     add_ac_timer(&update_timer);
 }
 
@@ -398,27 +430,26 @@ static void update_scale(unsigned long foo)
     unsigned long  flags;
     unsigned long  cmos_time;
     s_time_t       now;
-    s32            st, ct, dt;
+    u32            st, ct;
+    s32            dt;
     u64            scale;
     int            freq_index;
 
-    spin_lock(&rtc_lock);
-    cmos_time = __get_cmos_time();
-    spin_unlock(&rtc_lock);
+    cmos_time = get_cmos_time_fast();
 
     spin_lock_irqsave(&stime_lock, flags);
     now  = __get_s_time();
 
-    ct = (cmos_time - init_cmos_time);
-    st = (s32)(now/SECONDS(1));
-    dt = ct - st;
+    ct = (u32)(cmos_time - init_cmos_time);
+    st = (u32)(now/SECONDS(1));
+    dt = (s32)(ct - st);
 
     /* work out adjustment to scaling factor. allow +/- 1s drift */
     if (dt < -1) freq_index = 0;       /* go slower */
     else if (dt > 1) freq_index = 2;   /* go faster */
     else freq_index = 1;               /* correct speed */
 
-    if (dt <= -10 || dt >= 10)
+    if ((dt <= -10) || (dt >= 10))
         printk("Large time drift (cmos time - system time = %ds)\n", dt);
 
     /* set new frequency  */
@@ -473,8 +504,8 @@ int __init init_xeno_time()
     wall_clock_time.tv_sec  = get_cmos_time();
     wall_clock_time.tv_usec = 0;
 
-    /* init cmos_time  for synchronising */
-    init_cmos_time = wall_clock_time.tv_sec - 3;
+    /* init cmos_time for synchronising */
+    init_cmos_time = wall_clock_time.tv_sec;
 
     /* set starting times */
     stime_now = (s_time_t)0;
