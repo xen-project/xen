@@ -160,11 +160,11 @@ void __kill_domain(struct task_struct *p)
     write_lock_irqsave(&tasklist_lock, flags);
     pp = &task_list;                       /* Delete from task_list. */
     while ( *pp != p ) 
-        *pp = (*pp)->next_list;
+        pp = &(*pp)->next_list;
     *pp = p->next_list;
     pp = &task_hash[TASK_HASH(p->domain)]; /* Delete from task_hash. */
     while ( *pp != p ) 
-        *pp = (*pp)->next_hash;
+        pp = &(*pp)->next_hash;
     *pp = p->next_hash;
     write_unlock_irqrestore(&tasklist_lock, flags);
 

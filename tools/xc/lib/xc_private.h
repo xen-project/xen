@@ -44,8 +44,8 @@
 #define PAGE_SIZE               (1UL << PAGE_SHIFT)
 #define PAGE_MASK               (~(PAGE_SIZE-1))
 
-typedef struct { unsigned long l1_lo; } l1_pgentry_t;
-typedef struct { unsigned long l2_lo; } l2_pgentry_t;
+typedef unsigned long l1_pgentry_t;
+typedef unsigned long l2_pgentry_t;
 
 #define l1_table_offset(_a) \
           (((_a) >> L1_PAGETABLE_SHIFT) & (ENTRIES_PER_L1_PAGETABLE - 1))
@@ -149,7 +149,8 @@ static inline int do_block_io_op(int xc_handle, block_io_op_t *op)
  */
 int init_pfn_mapper(void);
 int close_pfn_mapper(int pm_handle);
-void *map_pfn(int pm_handle, unsigned long pfn);
+void *map_pfn_writeable(int pm_handle, unsigned long pfn);
+void *map_pfn_readonly(int pm_handle, unsigned long pfn);
 void unmap_pfn(int pm_handle, void *vaddr);
 
 #endif /* __XC_PRIVATE_H__ */

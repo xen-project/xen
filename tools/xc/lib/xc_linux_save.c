@@ -189,7 +189,7 @@ int xc_linux_save(int xc_handle,
     }
 
     /* If the suspend-record MFN is okay then grab a copy of it to @srec. */
-    p_srec = map_pfn(pm_handle, ctxt.i386_ctxt.esi);
+    p_srec = map_pfn_readonly(pm_handle, ctxt.i386_ctxt.esi);
     memcpy(&srec, p_srec, sizeof(srec));
     unmap_pfn(pm_handle, p_srec);
 
@@ -206,7 +206,8 @@ int xc_linux_save(int xc_handle,
     }
 
     /* Grab a copy of the pfn-to-mfn table frame list. */
-    p_pfn_to_mfn_frame_list = map_pfn(pm_handle, srec.pfn_to_mfn_frame_list);
+    p_pfn_to_mfn_frame_list = map_pfn_readonly(
+        pm_handle, srec.pfn_to_mfn_frame_list);
     memcpy(pfn_to_mfn_frame_list, p_pfn_to_mfn_frame_list, PAGE_SIZE);
     unmap_pfn(pm_handle, p_pfn_to_mfn_frame_list);
 
@@ -243,7 +244,7 @@ int xc_linux_save(int xc_handle,
             }
             if ( pfn_to_mfn_frame != NULL )
                 unmap_pfn(pm_handle, pfn_to_mfn_frame);
-            pfn_to_mfn_frame = map_pfn(pm_handle, mfn);
+            pfn_to_mfn_frame = map_pfn_readonly(pm_handle, mfn);
         }
         
         mfn = pfn_to_mfn_frame[i & 1023];
@@ -306,7 +307,7 @@ int xc_linux_save(int xc_handle,
     }
 
     /* Start writing out the saved-domain record. */
-    ppage = map_pfn(pm_handle, shared_info_frame);
+    ppage = map_pfn_readonly(pm_handle, shared_info_frame);
     if ( !checked_write(gfd, "XenoLinuxSuspend",    16) ||
          !checked_write(gfd, name,                  sizeof(name)) ||
          !checked_write(gfd, &srec.nr_pfns,         sizeof(unsigned long)) ||
@@ -335,7 +336,7 @@ int xc_linux_save(int xc_handle,
 
         mfn = pfn_to_mfn_table[i];
 
-        ppage = map_pfn(pm_handle, mfn);
+        ppage = map_pfn_readonly(pm_handle, mfn);
         memcpy(page, ppage, PAGE_SIZE);
         unmap_pfn(pm_handle, ppage);
 

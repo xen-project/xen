@@ -132,7 +132,7 @@ int xc_linux_restore(int xc_handle,
     unsigned long *pfn_type = NULL;
 
     /* A temporary mapping, and a copy, of one frame of guest memory. */
-    unsigned long *ppage, page[1024];
+    unsigned long *ppage;
 
     /* A copy of the pfn-to-mfn table frame list. */
     unsigned long pfn_to_mfn_frame_list[1024];
@@ -241,7 +241,7 @@ int xc_linux_restore(int xc_handle,
         goto out;
 
     /* Copy saved contents of shared-info page. No checking needed. */
-    ppage = map_pfn(pm_handle, shared_info_frame);
+    ppage = map_pfn_writeable(pm_handle, shared_info_frame);
     memcpy(ppage, shared_info, PAGE_SIZE);
     unmap_pfn(pm_handle, ppage);
 
@@ -270,55 +270,42 @@ int xc_linux_restore(int xc_handle,
 
         mfn = pfn_to_mfn_table[i];
 
-        if ( !checked_read(gfd, page, PAGE_SIZE) )
+        ppage = map_pfn_writeable(pm_handle, mfn);
+
+        if ( !checked_read(gfd, ppage, PAGE_SIZE) )
         {
             ERROR("Error when reading from state file");
             goto out;
         }
 
-        ppage = map_pfn(pm_handle, mfn);
-        switch ( pfn_type[i] )
+        if ( pfn_type[i] == L1TAB )
         {
-        case L1TAB:
-            memset(ppage, 0, PAGE_SIZE);
-            if ( add_mmu_update(xc_handle, mmu_updates, &mmu_update_idx,
-                                (mfn<<PAGE_SHIFT) | MMU_EXTENDED_COMMAND,
-                                MMUEXT_PIN_L1_TABLE) )
-                goto out;
             for ( j = 0; j < 1024; j++ )
             {
-                if ( page[j] & _PAGE_PRESENT )
+                if ( ppage[j] & _PAGE_PRESENT )
                 {
-                    if ( (pfn = page[j] >> PAGE_SHIFT) >= nr_pfns )
+                    if ( (pfn = ppage[j] >> PAGE_SHIFT) >= nr_pfns )
                     {
                         ERROR("Frame number in page table is out of range");
                         goto out;
                     }
-                    if ( (pfn_type[pfn] != NONE) && (page[j] & _PAGE_RW) )
+                    if ( (pfn_type[pfn] != NONE) && (ppage[j] & _PAGE_RW) )
                     {
                         ERROR("Write access requested for a restricted frame");
                         goto out;
                     }
-                    page[j] &= (PAGE_SIZE - 1) & ~(_PAGE_GLOBAL | _PAGE_PAT);
-                    page[j] |= pfn_to_mfn_table[pfn] << PAGE_SHIFT;
+                    ppage[j] &= (PAGE_SIZE - 1) & ~(_PAGE_GLOBAL | _PAGE_PAT);
+                    ppage[j] |= pfn_to_mfn_table[pfn] << PAGE_SHIFT;
                 }
-                if ( add_mmu_update(xc_handle, mmu_updates, &mmu_update_idx,
-                                    (mfn<<PAGE_SHIFT)+(j*sizeof(l1_pgentry_t)),
-                                    page[j]) )
-                    goto out;
             }
-            break;
-        case L2TAB:
-            memset(ppage, 0, PAGE_SIZE);
-            if ( add_mmu_update(xc_handle, mmu_updates, &mmu_update_idx,
-                                (mfn<<PAGE_SHIFT) | MMU_EXTENDED_COMMAND,
-                                MMUEXT_PIN_L2_TABLE) )
-                goto out;
+        }
+        else if ( pfn_type[i] == L2TAB )
+        {
             for ( j = 0; j < (HYPERVISOR_VIRT_START>>L2_PAGETABLE_SHIFT); j++ )
             {
-                if ( page[j] & _PAGE_PRESENT )
+                if ( ppage[j] & _PAGE_PRESENT )
                 {
-                    if ( (pfn = page[j] >> PAGE_SHIFT) >= nr_pfns )
+                    if ( (pfn = ppage[j] >> PAGE_SHIFT) >= nr_pfns )
                     {
                         ERROR("Frame number in page table is out of range");
                         goto out;
@@ -328,33 +315,43 @@ int xc_linux_restore(int xc_handle,
                         ERROR("Page table mistyping");
                         goto out;
                     }
-                    /* Haven't reached the L1 table yet. Ensure it is safe! */
-                    if ( pfn > i )
-                    {
-                        unsigned long **l1 = map_pfn(pm_handle, 
-                                                     pfn_to_mfn_table[pfn]);
-                        memset(l1, 0, PAGE_SIZE);
-                        unmap_pfn(pm_handle, l1);
-                    }
-                    page[j] &= (PAGE_SIZE - 1) & ~(_PAGE_GLOBAL | _PAGE_PSE);
-                    page[j] |= pfn_to_mfn_table[pfn] << PAGE_SHIFT;
+                    ppage[j] &= (PAGE_SIZE - 1) & ~(_PAGE_GLOBAL | _PAGE_PSE);
+                    ppage[j] |= pfn_to_mfn_table[pfn] << PAGE_SHIFT;
                 }
-                if ( add_mmu_update(xc_handle, mmu_updates, &mmu_update_idx,
-                                    (mfn<<PAGE_SHIFT)+(j*sizeof(l2_pgentry_t)),
-                                    page[j]) )
-                    goto out;
             }
-            break;
-        default:
-            memcpy(ppage, page, PAGE_SIZE);
-            break;
         }
+
         unmap_pfn(pm_handle, ppage);
 
         if ( add_mmu_update(xc_handle, mmu_updates, &mmu_update_idx,
                             (mfn<<PAGE_SHIFT) | MMU_MACHPHYS_UPDATE, i) )
             goto out;
     }
+
+    /*
+     * Pin page tables. Do this after writing to them as otherwise Xen
+     * will barf when doing the type-checking.
+     */
+    for ( i = 0; i < nr_pfns; i++ )
+    {
+        if ( pfn_type[i] == L1TAB )
+        {
+            if ( add_mmu_update(xc_handle, mmu_updates, &mmu_update_idx,
+                                (pfn_to_mfn_table[i]<<PAGE_SHIFT) | 
+                                MMU_EXTENDED_COMMAND,
+                                MMUEXT_PIN_L1_TABLE) )
+                goto out;
+        }
+        else if ( pfn_type[i] == L2TAB )
+        {
+            if ( add_mmu_update(xc_handle, mmu_updates, &mmu_update_idx,
+                                (pfn_to_mfn_table[i]<<PAGE_SHIFT) | 
+                                MMU_EXTENDED_COMMAND,
+                                MMUEXT_PIN_L2_TABLE) )
+                goto out;
+        }
+    }
+
 
     if ( flush_mmu_updates(xc_handle, mmu_updates, &mmu_update_idx) )
         goto out;
@@ -369,7 +366,7 @@ int xc_linux_restore(int xc_handle,
         goto out;
     }
     ctxt.i386_ctxt.esi = mfn = pfn_to_mfn_table[pfn];
-    p_srec = map_pfn(pm_handle, mfn);
+    p_srec = map_pfn_writeable(pm_handle, mfn);
     p_srec->resume_info.nr_pages    = nr_pfns;
     p_srec->resume_info.shared_info = shared_info_frame << PAGE_SHIFT;
     p_srec->resume_info.flags       = 0;
@@ -412,7 +409,7 @@ int xc_linux_restore(int xc_handle,
             ERROR("PFN-to-MFN frame number is bad");
             goto out;
         }
-        ppage = map_pfn(pm_handle, pfn_to_mfn_table[pfn]);
+        ppage = map_pfn_writeable(pm_handle, pfn_to_mfn_table[pfn]);
         memcpy(ppage, &pfn_to_mfn_table[i], copy_size);        
         unmap_pfn(pm_handle, ppage);
     }
