@@ -32,14 +32,10 @@
 #define DEBUG 0
 
 #if DEBUG
-
 #define DPRINTK(fmt, args...) \
     printk(KERN_INFO "[XEN] %s" fmt, __FUNCTION__, ##args)
-
 #else
-
 #define DPRINTK(fmt, args...) ((void)0)
-
 #endif
 
 #define IPRINTK(fmt, args...) \
@@ -50,8 +46,6 @@
 
 #define EPRINTK(fmt, args...) \
     printk(KERN_ERROR "[XEN]" fmt, ##args)
-
-
 
 #ifndef __GFP_NOWARN
 #define __GFP_NOWARN 0
@@ -66,7 +60,7 @@
     } while ( 0 )
 
 /* Allow headroom on each rx pkt for Ethernet header, alignment padding, ... */
-#define RX_HEADROOM 100
+#define RX_HEADROOM 200
 
 /*
  * If the backend driver is pipelining transmit requests then we can be very
@@ -757,9 +751,10 @@ static void network_connect(struct net_device *dev,
     spin_unlock_irq(&np->tx_lock);
 }
 
-static void vif_show(struct net_private *np){
+static void vif_show(struct net_private *np)
+{
 #if DEBUG
-    if(np){
+    if (np) {
         IPRINTK(" <vif handle=%u %s(%s) evtchn=%u irq=%u tx=%p rx=%p>\n",
                np->handle,
                be_state_name[np->backend_state],
@@ -774,9 +769,9 @@ static void vif_show(struct net_private *np){
 #endif
 }
 
-/* Send a connect message to xend to tell it to bring up the interface.
- */
-static void send_interface_connect(struct net_private *np){
+/* Send a connect message to xend to tell it to bring up the interface. */
+static void send_interface_connect(struct net_private *np)
+{
     ctrl_msg_t cmsg = {
         .type    = CMSG_NETIF_FE,
         .subtype = CMSG_NETIF_FE_INTERFACE_CONNECT,
@@ -1034,8 +1029,8 @@ static void netif_interface_status(netif_fe_interface_status_t *status)
     switch (status->status) {
 
     case NETIF_INTERFACE_STATUS_CLOSED:
-        switch(np->backend_state){
-
+        switch ( np->backend_state )
+        {
         case BEST_CLOSED:
         case BEST_DISCONNECTED:
         case BEST_CONNECTED:
@@ -1045,12 +1040,11 @@ static void netif_interface_status(netif_fe_interface_status_t *status)
         break;
 
     case NETIF_INTERFACE_STATUS_DISCONNECTED:
-        switch(np->backend_state){
-
+        switch ( np->backend_state )
+        {
         case BEST_CLOSED:
             vif_disconnect(np);
             break;
-
         case BEST_DISCONNECTED:
         case BEST_CONNECTED:
             vif_reset(np);
@@ -1059,29 +1053,24 @@ static void netif_interface_status(netif_fe_interface_status_t *status)
         break;
 
     case NETIF_INTERFACE_STATUS_CONNECTED:
-        switch(np->backend_state){
-
+        switch ( np->backend_state )
+        {
         case BEST_CLOSED:
             unexpected(np, status);
             vif_disconnect(np);
             vif_connect(np, status);
             break;
-
         case BEST_DISCONNECTED:
             vif_connect(np, status);
-            break;
-
-        case BEST_CONNECTED:
-            //todo Do what?
-            unexpected(np, status);
             break;
         }
         break;
 
     case NETIF_INTERFACE_STATUS_CHANGED:
-        /* The domain controller is notifying us that a device has been
-        * added or removed.
-        */
+        /*
+         * The domain controller is notifying us that a device has been
+         * added or removed.
+         */
         break;
 
     default:
