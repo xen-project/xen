@@ -35,7 +35,7 @@ VirtualDiskManager
   }
 
   public void
-  add_xeno_partition (Partition partition, int size)
+  add_xeno_partition (Partition partition, long size)
   {
     free.add_new_partition (partition, size);
     return;
@@ -46,7 +46,7 @@ VirtualDiskManager
    */
 
   public VirtualDisk
-  create_virtual_disk(String name, int size, Date expiry)
+  create_virtual_disk(String name, long size, Date expiry)
   {
     VirtualDisk vd = new VirtualDisk (name, expiry);
 

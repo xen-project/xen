@@ -8,9 +8,9 @@ export PATH=${ANT_HOME}/bin:${JAVA_HOME}/bin:${PATH}
 # runtime
 export JAVA_HOME=../jre-1.4.1
 export PATH=${JAVA_HOME}/bin:${PATH}
-if [ -f /var/run/vdmanager.xml ]
+if [ -f /var/lib/xen/vdstate.xml ]
 then
-  cp /var/run/vdmanager.xml /var/run/vdmanager.old.xml
+  cp /var/lib/xen/vdstate.xml /var/lib/xen/vdstate.old.xml
 fi
 
 java -jar vdmanager.jar $*

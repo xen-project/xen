@@ -189,7 +189,7 @@ VirtualDisk
    */
 
   void
-  add_new_partition (Partition partition, int size)
+  add_new_partition (Partition partition, long size)
   {
     int loop;
 

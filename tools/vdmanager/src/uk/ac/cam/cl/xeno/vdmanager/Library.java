@@ -59,7 +59,7 @@ Library
    * convert a number (string format) into 
    * the corresponding integer value.
    */
-  static int
+  static long
   parse_size(String size)
   {
     String substring = size;
@@ -94,7 +94,7 @@ Library
       substring = size;
     }
 
-    return Integer.decode(substring).intValue() * suffix;
+    return Long.decode(substring).longValue() * suffix;
   }
 
   static String

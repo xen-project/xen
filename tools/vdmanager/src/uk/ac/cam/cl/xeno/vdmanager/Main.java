@@ -10,8 +10,8 @@ import java.util.Date;
 public class
 Main
 {
-  static String state_filename_in  = "/var/run/vdmanager.xml";
-  static String state_filename_out = "/var/run/vdmanager.xml";
+  static String state_filename_in  = "/var/lib/xen/vdstate.xml";
+  static String state_filename_out = "/var/lib/xen/vdstate.xml";
   static String partition_filename = "/proc/partitions";
 
   void
