@@ -49,8 +49,8 @@
 #include "select.h"
 
 #define MODULE_NAME "XFRD"
-#define DEBUG 0
-#undef DEBUG
+#define DEBUG 1
+//#undef DEBUG
 #include "debug.h"
 
 /*
@@ -796,7 +796,6 @@ int xfr_recv(Args *args, XfrState *state, Conn *peer){
     // before we configure the new one.
     err = Conn_sxpr(peer, &sxpr);
     if(err) goto exit;
-    //sleep(2);
     err = xen_domain_configure(state->vmid_new, state->vmconfig, state->vmconfig_n);
     if(err) goto exit;
     err = xen_domain_unpause(state->vmid_new);
@@ -916,7 +915,7 @@ int xfrd_accept(Args *args, int sock){
     pid_t pid;
     int err = 0;
     
-    dprintf(">\n");
+    dprintf("> sock=%d\n", sock);
     dprintf("> accept...\n");
     peersock = accept(sock, peer, &peer_n);
     dprintf("> accept=%d\n", peersock);
@@ -925,8 +924,8 @@ int xfrd_accept(Args *args, int sock){
         err = -errno;
         goto exit;
     }
-    iprintf("> Accepted connection from %s:%d\n",
-            inet_ntoa(peer_in.sin_addr), htons(peer_in.sin_port));
+    iprintf("> Accepted connection from %s:%d on %d\n",
+            inet_ntoa(peer_in.sin_addr), htons(peer_in.sin_port), sock);
     pid = fork();
     if(pid > 0){
         // Parent, fork succeeded.

@@ -16,11 +16,10 @@ typedef unsigned long u32;
 
 #define MODULE_NAME "XFRD"
 #define DEBUG 1
-#undef DEBUG
+//#undef DEBUG
 #include "debug.h"
 
-
-int domain_suspend(u32 dom, void *data){
+int domain_suspend(void *data, u32 dom){
     int err = 0;
     Conn *xend = data;
 
@@ -28,6 +27,10 @@ int domain_suspend(u32 dom, void *data){
     err = xfr_vm_suspend(xend, dom);
     dprintf("< err=%d\n", err);
     return err;
+}
+
+int domain_configure(void *data, u32 dom, char *vmconfig, int vmconfig_n){
+    return xen_domain_configure(dom, vmconfig, vmconfig_n);
 }
 
 #ifndef _XEN_XFR_STUB_
@@ -131,6 +134,7 @@ int xen_domain_rcv(IOStream *io, uint32_t *dom, char **vmconfig, int *vmconfig_n
     ioctxt->io = io;
     ioctxt->info = iostdout;
     ioctxt->err = iostderr;
+    ioctxt->configure = domain_configure;
 
     err = xc_linux_restore(xcinit(), ioctxt);
     *dom = ioctxt->domain;

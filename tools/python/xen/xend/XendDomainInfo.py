@@ -500,16 +500,14 @@ class XendDomainInfo:
                 raise VmError('missing memory size')
 
             self.init_domain()
+            self.construct_image()
             self.configure_console()
             self.configure_restart()
             self.configure_backends()
             deferred = self.configure()
-            def cbok(val):
-                return self.construct_image()
             def cberr(err):
                 self.destroy()
                 return err
-            deferred.addCallback(cbok)
             deferred.addErrback(cberr)
         except StandardError, ex:
             # Catch errors, cleanup and re-raise.
@@ -651,12 +649,7 @@ class XendDomainInfo:
         devices have been released.
         """
         if self.dom is None: return 0
-        if self.console:
-            if self.restart_pending():
-                self.console.deregisterChannel()
-            else:
-                log.debug('Closing console, domain %s', self.id)
-                self.console.close()
+        self.destroy_console()
         chan = xend.getDomChannel(self.dom)
         if chan:
             log.debug("Closing channel to domain %d", self.dom)
@@ -665,6 +658,14 @@ class XendDomainInfo:
             return xc.domain_destroy(dom=self.dom)
         except Exception, err:
             log.exception("Domain destroy failed: %s", self.name)
+
+    def destroy_console(self):
+        if self.console:
+            if self.restart_pending():
+                self.console.deregisterChannel()
+            else:
+                log.debug('Closing console, domain %s', self.id)
+                self.console.close()
 
     def cleanup(self):
         """Cleanup vm resources: release devices.
