@@ -733,7 +733,9 @@ long do_switch_to_user(void)
 
 void context_switch(struct exec_domain *prev_p, struct exec_domain *next_p)
 {
+#ifdef __i386__
     struct tss_struct *tss = init_tss + smp_processor_id();
+#endif
     execution_context_t *stack_ec = get_execution_context();
 
     __cli();

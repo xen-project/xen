@@ -385,12 +385,27 @@ static inline int guest_io_okay(
     struct exec_domain *ed, struct xen_regs *regs)
 {
     u16 x;
+#if defined(__x86_64__)
+    /* If in user mode, switch to kernel mode just to read I/O bitmap. */
+    extern void toggle_guest_mode(struct exec_domain *);
+    int user_mode = !(ed->arch.flags & TF_kernel_mode);
+#define TOGGLE_MODE() if ( user_mode ) toggle_guest_mode(ed)
+#elif defined(__i386__)
+#define TOGGLE_MODE() ((void)0)
+#endif
+
     if ( ed->arch.iopl >= (KERNEL_MODE(ed, regs) ? 1 : 3) )
         return 1;
-    if ( (ed->arch.iobmp_limit > (port + bytes)) &&
-         (__get_user(x, (u16 *)(ed->arch.iobmp+(port>>3))) == 0) &&
-         ((x & (((1<<bytes)-1) << (port&7))) == 0) )
-        return 1;
+
+    if ( ed->arch.iobmp_limit > (port + bytes) )
+    {
+        TOGGLE_MODE();
+        __get_user(x, (u16 *)(ed->arch.iobmp+(port>>3)));
+        TOGGLE_MODE();
+        if ( (x & (((1<<bytes)-1) << (port&7))) == 0 )
+            return 1;
+    }
+
     return 0;
 }
 
@@ -401,14 +416,17 @@ static inline int admin_io_okay(
 {
     struct domain *d = ed->domain;
     u16 x;
+
     if ( IS_PRIV(d) || (d->arch.max_iopl >= (KERNEL_MODE(ed, regs) ? 1 : 3)) )
         return 1;
+
     if ( d->arch.iobmp_mask != NULL )
     {
         x = *(u16 *)(d->arch.iobmp_mask + (port >> 3));
         if ( (x & (((1<<bytes)-1) << (port&7))) == 0 )
             return 1;
     }
+
     return 0;
 }
 
