@@ -21,14 +21,14 @@ tools/*/build/lib*/*.py
 tools/misc/miniterm/miniterm
 tools/misc/xen_cpuperf
 tools/xentrace/xentrace
+xen/arch/x86/boot/mkelf32
 xen/drivers/pci/classlist.h
 xen/drivers/pci/devlist.h
 xen/drivers/pci/gen-devlist
 xen/include/asm
 xen/include/hypervisor-ifs/arch
 xen/include/xen/compile.h
-xen/tools/elf-reloc
-xen/tools/figlet/figlet
+xen/figlet/figlet
 xen/xen
 xen/xen-syms
 xen/xen.*

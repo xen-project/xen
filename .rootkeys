@@ -315,6 +315,7 @@
 3ddb79bcBQF85CfLS4i1WGZ4oLLaCA xen/arch/x86/Rules.mk
 3e5636e5FAYZ5_vQnmgwFJfSdmO5Mw xen/arch/x86/acpi.c
 3ddb79bcsjinG9k1KcvbVBuas1R2dA xen/arch/x86/apic.c
+3ddb79c4yGZ7_22QAFFwPzqP4NSHwA xen/arch/x86/boot/mkelf32.c
 3ddb79bcSC_LvnmFlX-T5iTgaR0SKg xen/arch/x86/boot/x86_32.S
 40e42bdbNu4MjI750THP_8J1S-Sa0g xen/arch/x86/boot/x86_64.S
 3ddb79bcUrk2EIaM5VsT6wUudH1kkg xen/arch/x86/delay.c
@@ -396,6 +397,11 @@
 3ddb79bfl1H1arbB0pzAEC2uPmY_3g xen/drivers/pci/setup-irq.c
 3ddb79bfJaf0bkE1Y67bnll8-kjEPg xen/drivers/pci/setup-res.c
 3ddb79bfIcCWJsBDNcQQE3ok2Azn-Q xen/drivers/pci/syscall.c
+3eb3c87fc79FXLA6R9TvdBJNTvQDwA xen/figlet/LICENSE
+3eb3c87fPL2T_zBb0bHlbZY-ACEKRw xen/figlet/Makefile
+3eb3c87fmKYTC5GCh_rydFakZp9ayw xen/figlet/README
+3eb3c87fdQKQ5OBGbM-KjZfi9Us4ng xen/figlet/figlet.c
+3eb3c87fS7DNbg0i6yhFs28UIqAK5g xen/figlet/xen.flf
 40715b2cFpte_UNWnBZW0Du7z9AhTQ xen/include/acpi/acconfig.h
 40715b2cEQWX-PaxEH30qI48K1krnQ xen/include/acpi/acdebug.h
 40715b2c_7j-oy3ZNAuqE3IFNPzArg xen/include/acpi/acdisasm.h
@@ -530,10 +536,3 @@
 3ddb79c0BnA20PbgmuMPSGIBljNRQw xen/include/xen/time.h
 403a3edbG9K5uZjuY19_LORbQGmFbA xen/include/xen/trace.h
 3ddb79c1-kVvF8cVa0k3ZHDdBMj01Q xen/include/xen/types.h
-3ddb79c4x8dvwPtzclghWAKFWpEBFA xen/tools/Makefile
-3ddb79c4yGZ7_22QAFFwPzqP4NSHwA xen/tools/elf-reloc.c
-3eb3c87fc79FXLA6R9TvdBJNTvQDwA xen/tools/figlet/LICENSE
-3eb3c87fPL2T_zBb0bHlbZY-ACEKRw xen/tools/figlet/Makefile
-3eb3c87fmKYTC5GCh_rydFakZp9ayw xen/tools/figlet/README
-3eb3c87fdQKQ5OBGbM-KjZfi9Us4ng xen/tools/figlet/figlet.c
-3eb3c87fS7DNbg0i6yhFs28UIqAK5g xen/tools/figlet/xen.flf
