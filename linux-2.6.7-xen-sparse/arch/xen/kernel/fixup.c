@@ -205,7 +205,7 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
 {
     static unsigned int fixup_idx = 0;
     unsigned int fi;
-    int save_indirect_reg, hash, rel_idx;
+    int save_indirect_reg, hash;
     unsigned int insn_len = (unsigned int)error_code, new_insn_len;
     unsigned char b[20], modrm, mod, reg, rm, patch[PATCH_LEN], opcode, decode;
     unsigned long eip = regs->eip - insn_len;
@@ -339,8 +339,15 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
     if ( save_indirect_reg )
         fixup_buf[fi++] = 0x58 + rm;
 
-    while ( insn_len < PATCH_LEN )
+    for ( ; ; )
     {
+        if ( insn_len >= PATCH_LEN )
+        {
+            /* ret */
+            fixup_buf[fi++] = 0xc3;
+            break;
+        }
+
         /* Bail if can't decode the following instruction. */
         if ( unlikely((new_insn_len =
                        get_insn_len(&b[insn_len], &opcode, &decode)) == 0) )
@@ -349,38 +356,59 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
             return;
         }
 
-        /* We track one 8-bit relative offset for patching later. */
         if ( (decode & CODE_MASK) == JMP )
         {
-            rel_idx = insn_len;
-            while ( (fixup_buf[fi++] = b[rel_idx++]) != opcode )
-                continue;
+            return;
+
+            memcpy(&fixup_buf[fi], &b[insn_len], new_insn_len - 1);
+            fi += new_insn_len - 1;
             
             /* Patch the 8-bit relative offset. */
-            int idx = fe->fixup_idx + relbyte_idx + 6 + 4/**/;
-            if ( save_indirect_reg )
-                idx += 2;
-            fixup_buf[idx] = fi - (idx + 1);
+            fixup_buf[fi++] = 1;
+
+            insn_len += new_insn_len;
+            ASSERT(insn_len >= PATCH_LEN);
         
+            /* ret */
+            fixup_buf[fi++] = 0xc3;
+
             /* jmp <rel32> */
             fixup_buf[fi++] = 0xe9;
             fi += 4;
             *(unsigned long *)&fixup_buf[fi-4] = 
-                (eip + relbyte_idx + 1 + (long)(char)b[relbyte_idx]) - 
+                (eip + insn_len + (long)(char)b[insn_len-1]) - 
                 (FIXUP_BUF_USER + fi);
+            
+            break;
         }
         else if ( opcode == 0xe9 )
         {
-            rel_idx = insn_len;
-            while ( (fixup_buf[fi++] = b[rel_idx++]) != opcode )
-                continue;
+            return;
+
+            memcpy(&fixup_buf[fi], &b[insn_len], new_insn_len - 4);
+            fi += new_insn_len - 4;
             
+            insn_len += new_insn_len;
+            ASSERT(insn_len >= PATCH_LEN);
+        
             /* Patch the 32-bit relative offset. */
-            int idx = fe->fixup_idx + relword_idx + 6 + 4/**/;
-            if ( save_indirect_reg )
-                idx += 2;
-            *(unsigned long *)&fixup_buf[idx] +=
-                (eip + relword_idx) - (FIXUP_BUF_USER + idx);
+            fi += 4;
+            *(unsigned long *)&fixup_buf[fi-4] = 
+                (eip + insn_len + *(long *)&b[insn_len-4]) - 
+                (FIXUP_BUF_USER + fi);
+
+            /* ret */
+            fixup_buf[fi++] = 0xc3;
+
+            break;
+        }
+        else if ( (decode & CODE_MASK) == PUSH )
+        {
+            return;
+        }
+        else if ( (decode & CODE_MASK) == POP )
+        {
+            return;
         }
         else
         {
@@ -395,12 +423,8 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
             return;
         }
 
-        /* The instructions together must be no smaller than 'jmp <disp32>'. */
-        if ( insn_len >= PATCH_LEN )
-            break;
-
         /* Can't have a RET in the middle of a patch sequence. */
-        if ( opcode == 0xc4 )
+        if ( (opcode == 0xc4) && (insn_len < PATCH_LEN) )
         {
             DPRINTK("RET in middle of patch seq!\n");
             return;
@@ -423,18 +447,23 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
     fe->next = fixup_hash[hash];
     fixup_hash[hash] = fe;
 
-
-    /* jmp <rel32> */
-    fixup_buf[fi++] = 0xe9;
-    fi += 4;
-    *(unsigned long *)&fixup_buf[fi-4] = 
-        (eip + insn_len) - (FIXUP_BUF_USER + fi);
-
     /* Commit the patch. */
     fixup_idx = fi;
 
-#if 0
-    if ( fe->fixup_idx == 4122 )
+ do_the_patch:
+#if 1
+    /* Create the patching instruction in a temporary buffer. */
+    patch[0] = 0x67;
+    patch[1] = 0xff;
+    patch[2] = 0x16; /* call <r/m16> */
+    *(u16 *)&patch[3] = FIXUP_BUF_USER + fe->fixup_idx;
+#else
+    patch[0] = 0x9a;
+    *(u32 *)&patch[1] = FIXUP_BUF_USER + fe->fixup_idx + 4;
+    *(u16 *)&patch[5] = __USER_CS;
+#endif
+
+#if 1
     {
         int iii;
         printk(KERN_ALERT "EIP == %08lx; USER_EIP == %08lx\n",
@@ -442,24 +471,27 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
         printk(KERN_ALERT " .byte ");
         for ( iii = 0; iii < insn_len; iii++ )
             printk("0x%02x,", b[iii]);
-        printk("\n");
+        printk("!!\n");
         printk(KERN_ALERT " .byte ");
         for ( iii = fe->fixup_idx; iii < fi; iii++ )
-            printk("0x%02x,", fixup_buf[iii]);
-        printk("\n");
+            printk("0x%02x,", (unsigned char)fixup_buf[iii]);
+        printk("!!\n");
         printk(KERN_ALERT " .byte ");
-        for ( iii = fe->fixup_idx; iii < fi; iii++ )
-            printk("0x%02x,", ((char *)FIXUP_BUF_USER)[iii]);
-        printk("\n");
+        for ( iii = 0; iii < 7; iii++ )
+            printk("0x%02x,", (unsigned char)patch[iii]);
+        printk("!!\n");
     }
 #endif
 
- do_the_patch:
-    /* Create the patching instruction in a temporary buffer. */
-    patch[0] = 0x67;
-    patch[1] = 0xff;
-    patch[2] = 0x26; /* call <r/m16> */
-    *(u16 *)&patch[3] = FIXUP_BUF_USER + fe->fixup_idx;
+    if ( put_user(eip + insn_len, (unsigned long *)regs->esp - 1) != 0 )
+    {
+        DPRINTK("Failed to place return address on user stack.");
+        return;
+    }
+
+    /* Success! Return to user land to execute 2nd insn of the pair. */
+    regs->esp -= 4;
+    regs->eip = FIXUP_BUF_USER + fe->return_idx;
 
     /* [SMP] Need to pause other threads while patching. */
     pgd = pgd_offset(current->mm, eip);
@@ -469,8 +501,6 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
     memcpy((char *)veip + (eip & ~PAGE_MASK), patch, PATCH_LEN);
     kunmap(pte_page(*pte));
 
-    /* Success! Return to user land to execute 2nd insn of the pair. */
-    regs->eip = FIXUP_BUF_USER + fe->return_idx;
     return;
 }
 
@@ -482,7 +512,7 @@ static int __init fixup_init(void)
     struct page *_pages[1<<FIXUP_BUF_ORDER], **pages=_pages;
     int i;
 
-    if ( nosegfixup )
+    /*if ( nosegfixup )*/
         return 0;
 
     HYPERVISOR_vm_assist(VMASST_CMD_enable,
