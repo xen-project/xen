@@ -20,6 +20,9 @@ all: 	dist
 
 # build and install everything into local dist directory
 dist:	xen tools kernels docs
+	install -m0644 ./COPYING $(DIST_DIR)
+	install -m0644 ./README $(DIST_DIR)
+	install -m0755 ./install.sh $(DIST_DIR)
 
 # install everything into the standard system directories
 # NB: install explicitly does not check that everything is up to date!
@@ -65,7 +68,7 @@ mkpatches:
 world: 
 	$(MAKE) clean
 	$(MAKE) kdelete
-	$(MAKE) all
+	$(MAKE) dist
 
 # clean doesn't do a kclean
 clean: 
