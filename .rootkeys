@@ -93,6 +93,7 @@
 4055ee41IfFazrwadCH2J72nz-A9YA tools/xenctl/Makefile
 4055ee4b_4Rvns_KzE12csI14EKK6Q tools/xenctl/lib/__init__.py
 4055ee4dwy4l0MghZosxoiu6zmhc9Q tools/xenctl/lib/console_client.py
+4059c6a0pnxhG8hwSOivXybbGOwuXw tools/xenctl/lib/tempfile.py
 3fbd4bd6GtGwZGxYUJPOheYIR7bPaA tools/xenctl/lib/utils.py
 4055ee44Bu6oP7U0WxxXypbUt4dNPQ tools/xenctl/setup.py
 40431ac64Hj4ixUnKmlugZKhXPFE_Q tools/xend/Makefile

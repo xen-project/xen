@@ -867,7 +867,6 @@ static PyObject *pyxc_atropos_domain_set(PyObject *self,
                                          PyObject *kwds)
 {
     XcObject *xc = (XcObject *)self;
-    PyObject *ret_obj;
     int xtratime;
     u64 domid;
 
@@ -889,7 +888,6 @@ static PyObject *pyxc_rrobin_global_set(PyObject *self,
                                         PyObject *kwds)
 {
     XcObject *xc = (XcObject *)self;
-    PyObject *ret_obj;
     u64 slice;
     
     static char *kwd_list[] = { "slice", NULL };

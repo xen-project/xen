@@ -19,8 +19,8 @@ install: all
 	$(MAKE) -C tools install
 
 dist: all
-	$(MAKE) prefix=`pwd`/../install -C xen install
-	$(MAKE) prefix=`pwd`/../install -C tools install
+	$(MAKE) prefix=`pwd`/../install dist=yes -C xen install
+	$(MAKE) prefix=`pwd`/../install dist=yes -C tools install
 
 clean:
 	$(MAKE) -C xen clean

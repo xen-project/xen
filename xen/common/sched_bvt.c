@@ -48,9 +48,9 @@ struct bvt_cpu_info
 };
 
 
-#define DOM_INF(p) 	((struct bvt_dom_info *)(p)->sched_priv)
-#define CPU_INF(cpu)  ((struct bvt_cpu_info *)(schedule_data[cpu]).sched_priv)
-#define CPU_SVT(cpu)  (CPU_INF(cpu)->svt)
+#define BVT_INFO(p)   ((struct bvt_dom_info *)(p)->sched_priv)
+#define CPU_INFO(cpu) ((struct bvt_cpu_info *)(schedule_data[cpu]).sched_priv)
+#define CPU_SVT(cpu)  (CPU_INFO(cpu)->svt)
 
 #define MCU            (s32)MICROSECS(100)    /* Minimum unit */
 #define MCU_ADVANCE    10                     /* default weight */
@@ -98,10 +98,7 @@ static void __calc_evt(struct bvt_dom_info *inf)
  */
 int bvt_alloc_task(struct task_struct *p)
 {
-    DOM_INF(p)
-        = (struct bvt_dom_info *)kmem_cache_alloc(dom_info_cache,GFP_KERNEL);
-	
-	if ( DOM_INF(p) == NULL )
+    if ( (BVT_INFO(p) = kmem_cache_alloc(dom_info_cache,GFP_KERNEL)) == NULL )
         return -1;
     
     return 0;
@@ -112,7 +109,7 @@ int bvt_alloc_task(struct task_struct *p)
  */
 void bvt_add_task(struct task_struct *p) 
 {
-    struct bvt_dom_info *inf = DOM_INF(p);
+    struct bvt_dom_info *inf = BVT_INFO(p);
 
     ASSERT(inf != NULL);
     ASSERT(p   != NULL);
@@ -151,10 +148,9 @@ void bvt_free_task(struct task_struct *p)
 
 void bvt_wake_up(struct task_struct *p)
 {
-    struct bvt_dom_info *inf = DOM_INF(p);
+    struct bvt_dom_info *inf = BVT_INFO(p);
 
     ASSERT(inf != NULL);
-    
 
     /* set the BVT parameters */
     if (inf->avt < CPU_SVT(p->processor))
@@ -172,7 +168,7 @@ void bvt_wake_up(struct task_struct *p)
  */
 static long bvt_do_block(struct task_struct *p)
 {
-    DOM_INF(p)->warpback = 0; 
+    BVT_INFO(p)->warpback = 0; 
     return 0;
 }
 
@@ -196,7 +192,7 @@ int bvt_adjdom(struct task_struct *p,
                     warpl = params->warpl,
                     warpu = params->warpu;
     
-    struct bvt_dom_info *inf = DOM_INF(p);
+    struct bvt_dom_info *inf = BVT_INFO(p);
 
     /* Sanity -- this can avoid divide-by-zero. */
     if ( mcu_adv == 0 )
@@ -229,7 +225,7 @@ static task_slice_t bvt_do_schedule(s_time_t now)
     s32                 ranfor;     /* assume we never run longer than 2.1s! */
     s32                 mcus;
     u32                 next_evt, next_prime_evt, min_avt;
-    struct bvt_dom_info *prev_inf       = DOM_INF(prev),
+    struct bvt_dom_info *prev_inf       = BVT_INFO(prev),
                         *p_inf          = NULL,
                         *next_inf       = NULL,
                         *next_prime_inf = NULL;
@@ -271,7 +267,7 @@ static task_slice_t bvt_do_schedule(s_time_t now)
     list_for_each ( tmp, &schedule_data[cpu].runqueue )
     {
         p     = list_entry(tmp, struct task_struct, run_list);
-        p_inf = DOM_INF(p);
+        p_inf = BVT_INFO(p);
 
         if ( p_inf->evt < next_evt )
         {
@@ -331,8 +327,8 @@ static task_slice_t bvt_do_schedule(s_time_t now)
         goto sched_done;
     }
 
-    next_prime_inf = DOM_INF(next_prime);
-    next_inf       = DOM_INF(next);
+    next_prime_inf = BVT_INFO(next_prime);
+    next_inf       = BVT_INFO(next);
 
     /*
      * If we are here then we have two runnable tasks.
@@ -357,7 +353,7 @@ static task_slice_t bvt_do_schedule(s_time_t now)
 
 static void bvt_dump_runq_el(struct task_struct *p)
 {
-    struct bvt_dom_info *inf = DOM_INF(p);
+    struct bvt_dom_info *inf = BVT_INFO(p);
     
     printk("mcua=0x%04lX ev=0x%08X av=0x%08X ",
            inf->mcu_advance, inf->evt, inf->avt);
@@ -381,11 +377,11 @@ int bvt_init_scheduler()
 
     for ( i = 0; i < NR_CPUS; i++ )
     {
-        CPU_INF(i) = kmalloc(sizeof(struct bvt_cpu_info), GFP_KERNEL);
+        CPU_INFO(i) = kmalloc(sizeof(struct bvt_cpu_info), GFP_KERNEL);
 
-        if ( CPU_INF(i) == NULL )
+        if ( CPU_INFO(i) == NULL )
         {
-            printk("Failed to allocate BVT scheduler private per-CPU memory!\n");
+            printk("Failed to allocate BVT scheduler per-CPU memory!\n");
             return -1;
         }
 

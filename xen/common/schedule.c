@@ -112,9 +112,7 @@ struct task_struct *alloc_task_struct(void)
 {
     struct task_struct *p;
 
-    p=((struct task_struct *)kmem_cache_alloc(task_struct_cachep,GFP_KERNEL));
-
-    if ( p == NULL )
+    if ( (p = kmem_cache_alloc(task_struct_cachep,GFP_KERNEL)) == NULL )
         return NULL;
 
     memset(p, 0, sizeof(*p));    
@@ -135,7 +133,7 @@ void sched_add_domain(struct task_struct *p)
 {
     p->state = TASK_STOPPED;
 
-    if( p->domain != IDLE_DOMAIN_ID )
+    if ( p->domain != IDLE_DOMAIN_ID )
     {
         /* Initialise the per-domain timer. */
         init_ac_timer(&p->timer);
@@ -175,8 +173,8 @@ void init_idle_task(void)
     unsigned long flags;
     struct task_struct *p = current;
 
-    if ( SCHED_FN (alloc_task, p) < 0)
-		panic("Failed to allocate scheduler private data for idle task");
+    if ( SCHED_FN(alloc_task, p) < 0 )
+        panic("Failed to allocate scheduler private data for idle task");
     SCHED_FN(add_task, p);
 
     spin_lock_irqsave(&schedule_lock[p->processor], flags);
@@ -671,7 +669,7 @@ void dump_runq(u_char key, void *dev_id, struct pt_regs *regs)
     s_time_t now = NOW();
     int i;
 
-	printk("Scheduler: %s (%s)\n", ops.name, ops.opt_name);
+    printk("Scheduler: %s (%s)\n", ops.name, ops.opt_name);
     SCHED_FN(dump_settings);
     printk("NOW=0x%08X%08X\n",  (u32)(now>>32), (u32)now); 
     for (i = 0; i < smp_num_cpus; i++) {

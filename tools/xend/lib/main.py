@@ -4,7 +4,7 @@
 ## Copyright (c) 2004, K A Fraser (University of Cambridge)
 ###########################################################
 
-import errno, re, os, pwd, select, signal, socket, struct, sys, tempfile, time
+import errno, re, os, pwd, select, signal, socket, struct, sys, time
 import xend.console, xend.manager, xend.utils, Xc
 
 
