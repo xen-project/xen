@@ -18,7 +18,7 @@ extern void enable_irq(unsigned int);
 
 #define NR_IRQS (256 - FIRST_EXTERNAL_VECTOR)
 
-#define HYPERVISOR_CALL_VECTOR	0x82
+#define HYPERCALL_VECTOR	0x82
 
 /*
  * Vectors 0x30-0x3f are used for ISA interrupts.
@@ -44,7 +44,7 @@ extern void enable_irq(unsigned int);
 /*
  * First APIC vector available to drivers: (vectors 0x40-0xee)
  * we start at 0x41 to spread out vectors evenly between priority
- * levels. (0x82 is the syscall vector)
+ * levels. (0x82 is the hypercall vector)
  */
 #define FIRST_DEVICE_VECTOR	0x41
 #define FIRST_SYSTEM_VECTOR	0xef
@@ -108,12 +108,6 @@ extern char _stext, _etext;
 #define IRQ_NAME2(nr) nr##_interrupt(void)
 #define IRQ_NAME(nr) IRQ_NAME2(IRQ##nr)
 
-/*
- *	SMP has a few special interrupts for IPI messages
- */
-
-	/* there is a second layer of macro just to get the symbolic
-	   name for the vector evaluated. This change is for RTLinux */
 #define BUILD_SMP_INTERRUPT(x,v) XBUILD_SMP_INTERRUPT(x,v)
 #define XBUILD_SMP_INTERRUPT(x,v)\
 asmlinkage void x(void); \
@@ -121,7 +115,7 @@ asmlinkage void call_##x(void); \
 __asm__( \
 "\n"__ALIGN_STR"\n" \
 SYMBOL_NAME_STR(x) ":\n\t" \
-	"pushl $"#v"-256\n\t" \
+	"pushl $"#v"\n\t" \
 	SAVE_ALL \
 	SYMBOL_NAME_STR(call_##x)":\n\t" \
 	"call "SYMBOL_NAME_STR(smp_##x)"\n\t" \
@@ -134,7 +128,7 @@ asmlinkage void call_##x(void); \
 __asm__( \
 "\n"__ALIGN_STR"\n" \
 SYMBOL_NAME_STR(x) ":\n\t" \
-	"pushl $"#v"-256\n\t" \
+	"pushl $"#v"\n\t" \
 	SAVE_ALL \
 	"movl %esp,%eax\n\t" \
 	"pushl %eax\n\t" \
@@ -153,22 +147,12 @@ __asm__( \
 	"call " SYMBOL_NAME_STR(do_IRQ) "\n\t" \
 	"jmp ret_from_intr\n");
 
-/* 
- * subtle. orig_eax is used by the signal code to distinct between
- * system calls and interrupted 'random user-space'. Thus we have
- * to put a negative value into orig_eax here. (the problem is that
- * both system calls and IRQs want to have small integer numbers in
- * orig_eax, and the syscall code has won the optimization conflict ;)
- *
- * Subtle as a pigs ear.  VY
- */
-
 #define BUILD_IRQ(nr) \
 asmlinkage void IRQ_NAME(nr); \
 __asm__( \
 "\n"__ALIGN_STR"\n" \
 SYMBOL_NAME_STR(IRQ) #nr "_interrupt:\n\t" \
-	"pushl $"#nr"-256\n\t" \
+	"pushl $"#nr"\n\t" \
 	"jmp common_interrupt");
 
 extern unsigned long prof_cpu_mask;
@@ -178,13 +162,12 @@ extern unsigned long prof_shift;
 
 #include <xen/irq.h>
 
+static inline void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i)
+{
 #if defined(CONFIG_X86_IO_APIC)
-static inline void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i) {
         if (IO_APIC_IRQ(i))
                 send_IPI_self(IO_APIC_VECTOR(i));
-}
-#else
-static inline void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i) {}
 #endif
+}
 
 #endif /* _ASM_HW_IRQ_H */

@@ -1,37 +1,14 @@
 /*
- *  linux/arch/i386/entry.S
+ * Hypercall and fault low-level handling routines.
  *
- *  Copyright (C) 1991, 1992  Linus Torvalds
+ * Copyright (c) 2002-2004, K A Fraser
+ * Copyright (c) 1991, 1992 Linus Torvalds
  */
 
 /*
- * entry.S contains the system-call and fault low-level handling routines.
- * This also contains the timer-interrupt handler, as well as all interrupts
- * and faults that can result in a task-switch.
+ * The idea for callbacks from monitor -> guest OS
+ * ===============================================
  *
- * Stack layout in 'ret_from_system_call':
- *	 0(%esp) - %ebx
- *	 4(%esp) - %ecx
- *	 8(%esp) - %edx
- *       C(%esp) - %esi
- *	10(%esp) - %edi
- *	14(%esp) - %ebp
- *	18(%esp) - %eax
- *	1C(%esp) - %ds
- *	20(%esp) - %es
- *	24(%esp) - %fs
- *	28(%esp) - %gs
- *	2C(%esp) - orig_eax
- *	30(%esp) - %eip
- *	34(%esp) - %cs
- *	38(%esp) - %eflags
- *	3C(%esp) - %oldesp
- *	40(%esp) - %oldss
- *
- * "current" is in register %ebx during any slow entries.
- */
-/* The idea for callbacks from monitor -> guest OS.
- * 
  * First, we require that all callbacks (either via a supplied
  * interrupt-descriptor-table, or via the special event or failsafe callbacks
  * in the shared-info-structure) are to ring 1. This just makes life easier,
@@ -127,8 +104,6 @@ GTBF_TRAP_CR2    =  4
 CF_MASK		= 0x00000001
 IF_MASK		= 0x00000200
 NT_MASK		= 0x00004000
-
-
         
 #define SAVE_ALL_NOSEGREGS \
         cld; \
@@ -166,7 +141,7 @@ ENTRY(continue_nonidle_task)
         ALIGN
 /*
  * HYPERVISOR_multicall(call_list, nr_calls)
- *   Execute a list of 'nr_calls' system calls, pointed at by 'call_list'.
+ *   Execute a list of 'nr_calls' hypercalls, pointed at by 'call_list'.
  *   This is fairly easy except that:
  *   1. We may fault reading the call list, and must patch that up; and
  *   2. We cannot recursively call HYPERVISOR_multicall, or a malicious
@@ -193,8 +168,8 @@ multicall_fault5:
         pushl 4(%ebx)       # args[0]
 multicall_fault6: 
         movl  (%ebx),%eax   # op
-        andl  $255,%eax
-        call  *SYMBOL_NAME(hypervisor_call_table)(,%eax,4)
+        andl  $(NR_hypercalls-1),%eax
+        call  *SYMBOL_NAME(hypercall_table)(,%eax,4)
 multicall_return_from_call:
 multicall_fault7:
         movl  %eax,24(%ebx) # args[5] == result
@@ -204,7 +179,7 @@ multicall_fault7:
         loop  multicall_loop
         popl  %ebx
         xorl  %eax,%eax
-        jmp   ret_from_hypervisor_call
+        jmp   ret_from_hypercall
 
 .section __ex_table,"a"
         .align 4
@@ -231,7 +206,7 @@ multicall_fixup1:
         addl  $4,%esp
         popl  %ebx
         movl  $-EFAULT,%eax
-        jmp   ret_from_hypervisor_call
+        jmp   ret_from_hypercall
 .previous        
                 
         ALIGN
@@ -342,14 +317,14 @@ restore_all_xen:
         iret
 
         ALIGN
-ENTRY(hypervisor_call)
+ENTRY(hypercall)
         pushl %eax			# save orig_eax
 	SAVE_ALL
 	GET_CURRENT(%ebx)
-	andl $255,%eax
-	call *SYMBOL_NAME(hypervisor_call_table)(,%eax,4)
+	andl $(NR_hypercalls-1),%eax
+	call *SYMBOL_NAME(hypercall_table)(,%eax,4)
 
-ret_from_hypervisor_call:
+ret_from_hypercall:
         movl %eax,EAX(%esp)		# save the return value
 
 test_all_events:
@@ -694,7 +669,7 @@ nmi_io_err:
         jmp  SYMBOL_NAME(io_check_error)                        
         
 .data
-ENTRY(hypervisor_call_table)
+ENTRY(hypercall_table)
         .long SYMBOL_NAME(do_set_trap_table)     /*  0 */
         .long SYMBOL_NAME(do_mmu_update)
         .long SYMBOL_NAME(do_set_gdt)
@@ -716,6 +691,6 @@ ENTRY(hypervisor_call_table)
         .long SYMBOL_NAME(do_console_io)
         .long SYMBOL_NAME(do_physdev_op)
         .long SYMBOL_NAME(do_update_va_mapping_otherdomain) /* 20 */
-        .rept NR_syscalls-((.-hypervisor_call_table)/4)
-        .long SYMBOL_NAME(do_ni_syscall)
+        .rept NR_hypercalls-((.-hypercall_table)/4)
+        .long SYMBOL_NAME(do_ni_hypercall)
         .endr

@@ -8,7 +8,7 @@
 #define R12 24
 #define RBP 36
 #define RBX 40
-/* arguments: interrupts/non tracing syscalls only save upto here*/
+/* arguments: interrupts/hypercalls only save upto here*/
 #define R11 48
 #define R10 56	
 #define R9 64
@@ -20,7 +20,7 @@
 #define RDI 112
 #define ORIG_RAX 120       /* = ERROR */ 
 /* end of arguments */ 	
-/* cpu exception frame or undefined in case of fast syscall. */
+/* cpu exception frame or undefined in case of fast hypercall. */
 #define RIP 128
 #define CS 136
 #define EFLAGS 144
@@ -50,7 +50,7 @@ struct pt_regs {
 	unsigned long r12;
 	unsigned long rbp;
 	unsigned long rbx;
-/* arguments: non interrupts/non tracing syscalls only save upto here*/
+/* arguments: non interrupts/hypercalls only save upto here*/
  	unsigned long r11;
 	unsigned long r10;	
 	unsigned long r9;

@@ -623,9 +623,9 @@ static int __init assign_irq_vector(int irq)
 next:
 	current_vector += 8;
 
-        /* XXX Skip the guestOS -> Xen syscall vector! XXX */
-	if (current_vector == HYPERVISOR_CALL_VECTOR) goto next;
-        /* XXX Skip the Linux/BSD fast-trap vector! XXX */
+        /* Skip the hypercall vector. */
+	if (current_vector == HYPERCALL_VECTOR) goto next;
+        /* Skip the Linux/BSD fast-trap vector. */
         if (current_vector == 0x80) goto next;
 
 	if (current_vector > FIRST_SYSTEM_VECTOR) {

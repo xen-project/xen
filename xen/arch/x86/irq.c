@@ -89,7 +89,7 @@ void enable_irq(unsigned int irq)
 
 asmlinkage void do_IRQ(struct pt_regs regs)
 {       
-    unsigned int      irq = regs.orig_eax & 0xff;
+    unsigned int      irq = regs.orig_eax;
     irq_desc_t       *desc = &irq_desc[irq];
     struct irqaction *action;
 

@@ -80,7 +80,7 @@
 
 #define barrier() __asm__ __volatile__("": : :"memory")
 
-#define NR_syscalls 256
+#define NR_hypercalls 32
 
 #ifndef NDEBUG
 #define MEMORY_GUARD

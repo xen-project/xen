@@ -66,7 +66,7 @@ struct guest_trap_bounce {
 static struct tss_struct doublefault_tss;
 static unsigned char doublefault_stack[DOUBLEFAULT_STACK_SIZE];
 
-asmlinkage int hypervisor_call(void);
+asmlinkage int hypercall(void);
 asmlinkage void lcall7(void);
 asmlinkage void lcall27(void);
 
@@ -718,7 +718,7 @@ void __init trap_init(void)
     set_intr_gate(19,&simd_coprocessor_error);
 
     /* Only ring 1 can access monitor services. */
-    _set_gate(idt_table+HYPERVISOR_CALL_VECTOR,14,1,&hypervisor_call);
+    _set_gate(idt_table+HYPERCALL_VECTOR,14,1,&hypercall);
 
     /* CPU0 uses the master IDT. */
     idt_tables[0] = idt_table;

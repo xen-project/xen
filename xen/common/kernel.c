@@ -279,7 +279,7 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
 }
 
 /*
- * Simple syscalls.
+ * Simple hypercalls.
  */
 
 long do_xen_version(int cmd)
@@ -289,8 +289,8 @@ long do_xen_version(int cmd)
     return (XEN_VERSION<<16) | (XEN_SUBVERSION);
 }
 
-long do_ni_syscall(void)
+long do_ni_hypercall(void)
 {
-    /* No-op syscall. */
+    /* No-op hypercall. */
     return -ENOSYS;
 }
