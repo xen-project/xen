@@ -137,6 +137,7 @@ static inline int shadow_page_op( struct mm_struct *m, unsigned int op,
 		{
 			// lock is already held
 			delete_shadow_status( m, gpfn );
+			free_shadow_page( m, spfn_info );
 			restart = 1; // we need to go to start of list again
 		}
     }
