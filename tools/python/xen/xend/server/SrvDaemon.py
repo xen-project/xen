@@ -596,10 +596,10 @@ class Daemon:
     def set_user(self):
         # Set the UID.
         try:
-            os.setuid(pwd.getpwnam(USER)[2])
+            os.setuid(pwd.getpwnam(XEND_USER)[2])
             return 0
         except KeyError, error:
-            print "Error: no such user '%s'" % USER
+            print "Error: no such user '%s'" % XEND_USER
             return 1
 
     def stop(self):
@@ -609,7 +609,7 @@ class Daemon:
         xroot = XendRoot.instance()
         log.info("Xend Daemon started")
         self.createFactories()
-        self.listenEvent()
+        self.listenEvent(xroot)
         self.listenNotifier()
         self.listenVirq()
         SrvServer.create(bridge=1)
@@ -622,9 +622,11 @@ class Daemon:
         self.netifCF = netif.NetifControllerFactory()
         self.consoleCF = console.ConsoleControllerFactory()
 
-    def listenEvent(self):
+    def listenEvent(self, xroot):
         protocol = EventFactory(self)
-        return reactor.listenTCP(EVENT_PORT, protocol)
+        port = xroot.get_xend_event_port()
+        interface = xroot.get_xend_address()
+        return reactor.listenTCP(port, protocol, interface=interface)
 
     def listenNotifier(self):
         protocol = NotifierProtocol(self.channelF)
