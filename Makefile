@@ -14,6 +14,7 @@ install: all
 	$(MAKE) -C xen install
 	$(MAKE) -C tools install
 	$(shell cp -a install/boot/*$(LINUX_VER)* /boot/)
+	$(shell cp -a install/lib/modules/* /lib/modules/)
 
 # install xen and tools into the install directory
 dist: all
@@ -37,6 +38,9 @@ ifeq ($(LINUX_SRC_X),)
 LINUX_SRC_X = ./linux-$(LINUX_VER).tar.gz 
 endif
 endif
+
+patch-xen0-bridge-nf:
+	(cd linux-$(LINUX_VER)-xen && patch -p1 -F3 < ../patches/ebtables-brnf-5_vs_2.4.25.diff)
 
 # make a linux-xen build tree from a pristine kernel plus sparse tree
 linux-$(LINUX_VER)-xen: pristine-linux-src
