@@ -176,7 +176,7 @@ unsigned long alloc_boot_pages(unsigned long size, unsigned long align)
     size  = round_pgup(size) >> PAGE_SHIFT;
     align = round_pgup(align) >> PAGE_SHIFT;
 
-    for ( pg = 0; (pg + size) < (bitmap_size*PAGES_PER_MAPWORD); pg += align )
+    for ( pg = 0; (pg + size) < (bitmap_size*8); pg += align )
     {
         for ( i = 0; i < size; i++ )
             if ( allocated_in_map(pg + i) )
