@@ -142,12 +142,12 @@ int daemon(int nochdir, int noclose)
 
 int main(int argc, char **argv)
 {
-    logoutput = 0;
     int c;
 
+    logoutput = 0;
     opterr = 0;
 
-    while ((c = getopt (argc, argv, "dh")) != -1)
+    while ( (c = getopt (argc, argv, "dh")) != -1 )
     {
         switch(c)
         {
