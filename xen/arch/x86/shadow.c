@@ -512,8 +512,8 @@ static void shadow_map_l1_into_current_l2(unsigned long va)
 { 
     struct exec_domain *ed = current;
     struct domain *d = ed->domain;
-    unsigned long    *gpl1e, *spl1e, gl2e, sl2e, gl1pfn, sl1pfn=0, sl1ss;
-    struct pfn_info  *sl1pfn_info;
+    unsigned long    *gpl1e, *spl1e, gl2e, sl2e, gl1pfn, sl1mfn, sl1ss;
+    struct pfn_info  *sl1mfn_info;
     int               i;
 
     __guest_get_l2e(ed, va, &gl2e);
@@ -526,17 +526,17 @@ static void shadow_map_l1_into_current_l2(unsigned long va)
         /* This L1 is NOT already shadowed so we need to shadow it. */
         SH_VVLOG("4a: l1 not shadowed ( %p )", sl1pfn);
 
-        sl1pfn_info = alloc_shadow_page(d);
-        sl1pfn_info->u.inuse.type_info = PGT_l1_page_table;
+        sl1mfn_info = alloc_shadow_page(d);
+        sl1mfn_info->u.inuse.type_info = PGT_l1_page_table;
    
-        sl1pfn = sl1pfn_info - frame_table;
+        sl1mfn = sl1mfn_info - frame_table;
 
         perfc_incrc(shadow_l1_table_count);
         perfc_incr(shadow_l1_pages);
 
-        set_shadow_status(d, gl1pfn, PSH_shadowed | sl1pfn);
+        set_shadow_status(d, gl1pfn, PSH_shadowed | sl1mfn);
 
-        l2pde_general(d, &gl2e, &sl2e, sl1pfn);
+        l2pde_general(d, &gl2e, &sl2e, sl1mfn);
 
         __guest_set_l2e(ed, va, gl2e);
         __shadow_set_l2e(ed, va, sl2e);
@@ -553,10 +553,10 @@ static void shadow_map_l1_into_current_l2(unsigned long va)
     else
     {
         /* This L1 is shadowed already, but the L2 entry is missing. */
-        SH_VVLOG("4b: was shadowed, l2 missing ( %p )", sl1pfn);
+        SH_VVLOG("4b: was shadowed, l2 missing ( %p )", sl1ss);
 
-        sl1pfn = sl1ss & PSH_pfn_mask;
-        l2pde_general(d, &gl2e, &sl2e, sl1pfn);
+        sl1mfn = sl1ss & PSH_pfn_mask;
+        l2pde_general(d, &gl2e, &sl2e, sl1mfn);
         __guest_set_l2e(ed, va, gl2e);
         __shadow_set_l2e(ed, va, sl2e);
     }              
