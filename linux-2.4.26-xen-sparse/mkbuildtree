@@ -209,6 +209,7 @@ ln -sf ../../i386/kernel/pci-i386.h
 ln -sf ../../i386/kernel/ptrace.c
 ln -sf ../../i386/kernel/semaphore.c 
 ln -sf ../../i386/kernel/sys_i386.c 
+ln -sf ../../../${LINUX_26}/arch/xen/i386/kernel/ioport.c
 cd ../lib
 ln -sf ../../i386/lib/checksum.S 
 ln -sf ../../i386/lib/dec_and_lock.c 
