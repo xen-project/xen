@@ -25,7 +25,7 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
 void *ioremap_nocache (unsigned long phys_addr, unsigned long size)
 { return NULL; }
 
-void iounmap(void *addr)
+void iounmap(volatile void __iomem *addr)
 { }
 
 void __init *bt_ioremap(unsigned long phys_addr, unsigned long size)
