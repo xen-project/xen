@@ -24,13 +24,8 @@ LIB_SRCS += sys_string.c
 LIB_SRCS += util.c
 
 LIB_OBJS := $(LIB_SRCS:.c=.o)
-LIB_PIC_OBJS := $(LIB_SRCS:.c=.opic)
 
-CFLAGS   += -Wall
-CFLAGS   += -Werror
-CFLAGS   += -g
-CFLAGS   += -O3
-CFLAGS   += -fno-strict-aliasing
+CFLAGS   += -Wall -Werror -O3 -fno-strict-aliasing
 
 # Get gcc to generate the dependencies for us.
 CFLAGS   += -Wp,-MD,.$(@F).d
@@ -39,7 +34,6 @@ DEPS     = .*.d
 MAJOR    := 2.0
 MINOR    := 0
 LIB_NAME := libxutil
-SO_NAME  := $(LIB_NAME).so.$(MAJOR)
 LIB      := $(LIB_NAME).so 
 LIB      += $(LIB_NAME).so.$(MAJOR)
 LIB      += $(LIB_NAME).so.$(MAJOR).$(MINOR)
@@ -48,17 +42,14 @@ LIB      += $(LIB_NAME).a
 all: check-for-zlib
 	$(MAKE) $(LIB)
 
-$(LIB_PIC_OBJS): %.opic: %.c
-	$(CC) $(CPPFLAGS) -DPIC $(CFLAGS) -fPIC -c -o $@ $<
-
 $(LIB_NAME).so: $(LIB_NAME).so.$(MAJOR)
 	ln -sf $^ $@
 
 $(LIB_NAME).so.$(MAJOR): $(LIB_NAME).so.$(MAJOR).$(MINOR)
 	ln -sf $^ $@
 
-$(LIB_NAME).so.$(MAJOR).$(MINOR): $(LIB_PIC_OBJS)
-	$(CC) -Wl,-soname -Wl,$(SO_NAME) -shared -o $@ $^
+$(LIB_NAME).so.$(MAJOR).$(MINOR): $(LIB_OBJS)
+	$(CC) -Wl,-soname -Wl,$(LIB_NAME).so.$(MAJOR) -shared -o $@ $^
 
 $(LIB_NAME).a: $(LIB_OBJS)
 	$(AR) rc $@ $^
@@ -78,7 +69,7 @@ install: all
 	ln -sf $(LIB_NAME).so.$(MAJOR) $(DESTDIR)/usr/lib/$(LIB_NAME).so
 
 clean:
-	$(RM) *.a *.so *.so.* *.o *.opic *.rpm 
+	$(RM) *.a *.so *.so.* *.o *.rpm 
 	$(RM) *~
 	$(RM) $(DEPS)
 

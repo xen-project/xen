@@ -54,8 +54,6 @@ install: vmlinuz
 	install -m0664 System.map $(INSTALL_PATH)/boot/System.map-$(XINSTALL_NAME)$(INSTALL_SUFFIX)
 	mkdir -p $(INSTALL_PATH)/usr/include/xen/linux
 	install -m0644 include/asm-xen/linux-public/*.h $(INSTALL_PATH)/usr/include/xen/linux
-dist:
-	$(MAKE) INSTALL_PATH=../dist/install install
 
 archclean:
 	@if [ -e arch/xen/arch ]; then $(MAKE) $(clean)=arch/xen/arch; fi;

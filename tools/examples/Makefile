@@ -36,14 +36,14 @@ install-configs:
 	$(INSTALL_DIR) $(DESTDIR)$(XEN_CONFIG_DIR)
 	$(INSTALL_DIR) $(DESTDIR)$(XEN_CONFIG_DIR)/auto
 	for i in $(XEN_CONFIGS); \
-	    do [ -a $(DESTDIR)/$(XEN_CONFIG_DIR)/$$i ] || \
+	    do [ -a $(DESTDIR)$(XEN_CONFIG_DIR)/$$i ] || \
 	    $(INSTALL_DATA) $$i $(DESTDIR)$(XEN_CONFIG_DIR); \
 	done
 
 install-scripts:
 	$(INSTALL_DIR) $(DESTDIR)$(XEN_SCRIPT_DIR)
 	for i in $(XEN_SCRIPTS); \
-	    do [ -a $(DESTDIR)/$()/$$i ] || \
+	    do [ -a $(DESTDIR)$(XEN_SCRIPT_DIR)/$$i ] || \
 	    $(INSTALL_PROG) $$i $(DESTDIR)$(XEN_SCRIPT_DIR); \
 	done
 

@@ -2,9 +2,6 @@
 # Grand Unified Makefile for Xen.
 #
 
-DISTDIR		?= $(CURDIR)/dist
-DESTDIR		?= $(DISTDIR)/install
-
 INSTALL		:= install
 INSTALL_DIR	:= $(INSTALL) -d -m0755
 INSTALL_DATA	:= $(INSTALL) -m0644
@@ -18,7 +15,6 @@ ALLKERNELS = $(patsubst buildconfigs/mk.%,%,$(wildcard buildconfigs/mk.*))
 ALLSPARSETREES = $(patsubst %-xen-sparse,%,$(wildcard *-xen-sparse))
 XKERNELS := $(foreach kernel, $(KERNELS), $(patsubst buildconfigs/mk.%,%,$(wildcard buildconfigs/mk.$(kernel))) )
 
-
 export DESTDIR
 
 include buildconfigs/Rules.mk
@@ -31,26 +27,16 @@ all: dist
 
 # install everything into the standard system directories
 # NB: install explicitly does not check that everything is up to date!
-install: install-tools install-xen install-kernels install-docs
+install: xen checked-tools kernels docs
 
-install-xen:
-	$(MAKE) -C xen install
-
-install-tools:
+# Only check for install req'mts on 'make install', not on 'make dist'.
+checked-tools:
+	$(MAKE) -C tools/check install
 	$(MAKE) -C tools install
 
-install-kernels:
-	cp -a $(DESTDIR)/boot/* /boot/
-	cp -a $(DESTDIR)/lib/modules/* /lib/modules/
-	cp -dR $(DESTDIR)/boot/*$(LINUX_VER)* $(prefix)/boot/
-	cp -dR $(DESTDIR)/lib/modules/* $(prefix)/lib/modules/
-
-install-docs:
-	sh ./docs/check_pkgs && $(MAKE) -C docs install || true
-	sh ./docs/check_pkgs
-	-$(MAKE) -C docs install
-
 # build and install everything into local dist directory
+dist: DISTDIR=$(CURDIR)/dist
+dist: DESTDIR=$(DISTDIR)/install
 dist: xen tools kernels docs
 	$(INSTALL_DIR) $(DISTDIR)/check
 	$(INSTALL_DATA) ./COPYING $(DISTDIR)
@@ -59,17 +45,16 @@ dist: xen tools kernels docs
 	$(INSTALL_PROG) tools/check/chk tools/check/check_* $(DISTDIR)/check
 
 xen:
-	$(MAKE) dist=yes -C xen install
+	$(MAKE) -C xen install
 
 tools:
-	$(MAKE) dist=yes -C tools install
+	$(MAKE) -C tools install
 
 kernels:
 	for i in $(XKERNELS) ; do $(MAKE) $$i-build || exit 1; done
 
 docs:
-	sh ./docs/check_pkgs
-	-$(MAKE) dist=yes -C docs install
+	sh ./docs/check_pkgs && $(MAKE) -C docs install || true
 
 # Build all the various kernels and modules
 kbuild: kernels
@@ -126,21 +111,17 @@ install-iptables:
 
 help:
 	@echo 'Installation targets:'
-	@echo '  install          - install everything'
-	@echo '  install-xen      - install the Xen hypervisor'
-	@echo '  install-tools    - install the control tools'
-	@echo '  install-kernels  - install guest kernels'
-	@echo '  install-docs     - install documentation'
+	@echo '  install          - build and install everything'
 	@echo ''
 	@echo 'Building targets:'
-	@echo '  dist             - build everything and place in dist/'
+	@echo '  dist             - build and install everything into local dist directory'
 	@echo '  world            - clean everything, delete guest kernel build'
 	@echo '                     trees then make dist'
-	@echo '  xen              - build Xen hypervisor and place in dist/'
-	@echo '  tools            - build tools and place in dist/'
-	@echo '  kernels          - build guest kernels and place in dist/'
+	@echo '  xen              - build and install Xen hypervisor'
+	@echo '  tools            - build and install tools'
+	@echo '  kernels          - build and install guest kernels'
 	@echo '  kbuild           - synonym for make kernels'
-	@echo '  docs             - build docs and place in dist/'
+	@echo '  docs             - build and install docs'
 	@echo ''
 	@echo 'Cleaning targets:'
 	@echo '  clean            - clean the Xen, tools and docs (but not'

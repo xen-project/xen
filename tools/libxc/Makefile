@@ -3,10 +3,9 @@ INSTALL_PROG	= $(INSTALL) -m0755
 INSTALL_DATA	= $(INSTALL) -m0644
 INSTALL_DIR	= $(INSTALL) -d -m0755
 
-MAJOR		:= 2.0
-MINOR		:= 0
-LIB_NAME	:= libxc
-SONAME		:= $(LIB_NAME).so.$(MAJOR)
+MAJOR    = 2.0
+MINOR    = 0
+SONAME   = libxc.so.$(MAJOR)
 
 CC       = gcc
 
@@ -41,10 +40,9 @@ CFLAGS   += $(INCLUDES) -I.
 CFLAGS   += -Wp,-MD,.$(@F).d
 DEPS     = .*.d
 
-OBJS     := $(patsubst %.c,%.o,$(SRCS))
-PIC_OBJS := $(patsubst %.c,%.opic,$(SRCS))
+OBJS     = $(patsubst %.c,%.o,$(SRCS))
 
-LIB		:= $(LIB_NAME).a $(LIB_NAME).so $(LIB_NAME).so.$(MAJOR) $(LIB_NAME).so.$(MAJOR).$(MINOR)
+LIB      = libxc.so libxc.so.$(MAJOR) libxc.so.$(MAJOR).$(MINOR)
 
 all: check-for-zlib mk-symlinks
 	$(MAKE) $(LIB)
@@ -77,7 +75,7 @@ install: all
 	$(INSTALL_DATA) xc.h $(DESTDIR)/usr/include
 
 clean:
-	rm -rf *.a *.so *.o *.opic *.rpm $(LIB) *~ $(DEPS) xen TAGS
+	rm -rf *.a *.so *.o *.rpm $(LIB) *~ $(DEPS) xen
 
 rpm: all
 	rm -rf staging
@@ -88,21 +86,11 @@ rpm: all
 	mv staging/i386/*.rpm .
 	rm -rf staging
 
-$(PIC_OBJS): %.opic: %.c
-	$(CC) $(CPPFLAGS) -DPIC $(CFLAGS) -fPIC -c -o $@ $<
-
-$(LIB_NAME).a: $(OBJS)
-	$(AR) rc $@ $^
-
-$(LIB_NAME).so: $(LIB_NAME).so.$(MAJOR)
-	ln -sf $< $@
-$(LIB_NAME).so.$(MAJOR): $(LIB_NAME).so.$(MAJOR).$(MINOR)
-	ln -sf $< $@
-$(LIB_NAME).so.$(MAJOR).$(MINOR): $(PIC_OBJS)
+libxc.so:
+	ln -sf libxc.so.$(MAJOR) $@
+libxc.so.$(MAJOR):
+	ln -sf libxc.so.$(MAJOR).$(MINOR) $@
+libxc.so.$(MAJOR).$(MINOR): $(OBJS)
 	$(CC) -Wl,-soname -Wl,$(SONAME) -shared -o $@ $^ -L../libxutil -lxutil -lz
-
-.PHONY: TAGS clean install mk-symlinks rpm
-TAGS:
-	etags -t $(SRCS) *.h
 
 -include $(DEPS)

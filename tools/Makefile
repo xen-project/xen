@@ -12,9 +12,7 @@ all:
 	$(MAKE) -C ioemu
 
 install: 
-ifneq ($(dist),yes)
-	$(MAKE) -C check install
-endif
+	$(MAKE) -C check
 	$(MAKE) -C libxutil install
 	$(MAKE) -C libxc install
 	$(MAKE) -C misc install
@@ -25,9 +23,6 @@ endif
 	$(MAKE) -C sv install
 	$(MAKE) -C xcs install
 	$(MAKE) -C ioemu install
-
-dist: $(TARGET)
-	$(MAKE) prefix=$(CURDIR)/../dist/install dist=yes install
 
 clean:
 	$(MAKE) -C libxutil clean
