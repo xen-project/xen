@@ -314,12 +314,15 @@
 405ff55dawQyCHFEnJ067ChPRoXBBA tools/examples/init.d/xend
 40278d94cIUWl2eRgnwZtr4hTyWT1Q tools/examples/init.d/xendomains
 40ee75a9xFz6S05sDKu-JCLqyVTkDA tools/examples/network
+41fc0c18hVgK5rKJyZUsqybux9D9Dg tools/examples/network-nat
 41e661e1giIEKbJ25qfiP-ke8u8hFA tools/examples/network-route
 40ee75a967sxgcRY4Q7zXoVUaJ4flA tools/examples/vif-bridge
+41fc0c18AFAVXA1uGm1JFWHMeeznVw tools/examples/vif-nat
 41e661e1ooiRKlOfwumG6wwzc0PdhQ tools/examples/vif-route
 40ee75a93cqxHp6MiYXxxwR5j2_8QQ tools/examples/xend-config.sxp
 41090ec8Pj_bkgCBpg2W7WfmNkumEA tools/examples/xmexample1
 40cf2937oKlROYOJTN8GWwWM5AmjBg tools/examples/xmexample2
+41fc0c18_k4iL81hu4pMIWQu9dKpKA tools/examples/xmexample3
 3fbba6dbDfYvJSsw9500b4SZyUhxjQ tools/libxc/Makefile
 41cc934abX-QLXJXW_clV_wRjM0zYg tools/libxc/plan9a.out.h
 3fbba6dc1uU7U3IFeF6A-XEOYF2MkQ tools/libxc/rpm.spec

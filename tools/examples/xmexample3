@@ -1,0 +1,120 @@
+#  -*- mode: python; -*-
+#============================================================================
+# Example Python setup script for 'xm create'.
+# This script sets the parameters used when a domain is created using 'xm create'.
+#
+# This is a relatively advanced script that uses a parameter, vmid, to control
+# the settings. So this script can be used to start a set of domains by
+# setting the vmid parameter on the 'xm create' command line. For example:
+#
+# xm create vmid=1
+# xm create vmid=2
+# xm create vmid=3
+#
+# The vmid is purely a script variable, and has no effect on the the domain
+# id assigned to the new domain.
+#============================================================================
+
+# Define script variables here.
+# xm_vars is defined automatically, use xm_vars.var() to define a variable.
+
+# This function checks that 'vmid' has been given a valid value.
+# It is called automatically by 'xm create'.
+def vmid_check(var, val):
+    val = int(val)
+    if val <= 0:
+        raise ValueError
+    return val
+
+# Define the 'vmid' variable so that 'xm create' knows about it.
+xm_vars.var('vmid',
+            use="Virtual machine id. Integer greater than 0.",
+            check=vmid_check)
+
+# Check the defined variables have valid values..
+xm_vars.check()
+
+#----------------------------------------------------------------------------
+# Kernel image file.
+kernel = "/path/to/domU/kernel"
+
+# Optional ramdisk.
+#ramdisk = "/boot/initrd.gz"
+
+# The domain build function. Default is 'linux'.
+#builder='linux'
+
+# Initial memory allocation (in megabytes) for the new domain.
+memory = 64
+
+# A name for the new domain. All domains have to have different names,
+# so we use the vmid to create a name.
+name = "VM%d" % vmid
+
+# Which CPU to start domain on? 
+#cpu = -1   # leave to Xen to pick
+cpu = vmid  # set based on vmid (mod number of CPUs)
+
+#----------------------------------------------------------------------------
+# Define network interfaces.
+
+# Number of network interfaces. Default is 1.
+#nics=1
+
+# Optionally define mac and/or bridge for the network interfaces.
+# Random MACs are assigned if not given.
+
+vif = [ 'ip=192.168.%d.1/24' % (vmid)]
+
+#----------------------------------------------------------------------------
+# Define the disk devices you want the domain to have access to, and
+# what you want them accessible as.
+# Each disk entry is of the form phy:UNAME,DEV,MODE
+# where UNAME is the device, DEV is the device name the domain will see,
+# and MODE is r for read-only, w for read-write.
+
+# This makes the disk device depend on the vmid - assuming
+# tHat devices sda7, sda8 etc. exist. The device is exported
+# to all domains as sda1.
+# All domains get sda6 read-only (to use for /usr, see below).
+disk = [ 'phy:hda%d,hda1,w' % (vmid)]
+
+#----------------------------------------------------------------------------
+# Set the kernel command line for the new domain.
+# You only need to define the IP parameters and hostname if the domain's
+# IP config doesn't, e.g. in ifcfg-eth0 or via DHCP.
+# You can use 'extra' to set the runlevel and custom environment
+# variables used by custom rc scripts (e.g. VMID=, usr= ).
+
+# Set if you want dhcp to allocate the IP address.
+dhcp="off"
+ip="192.168.%d.2" % (vmid)
+# Set netmask.
+netmask="255.255.255.0"
+# Set default gateway.
+gateway="192.168.%d.1" % (vmid)
+# Set the hostname.
+hostname= "domain-%d.xeno" % vmid
+
+# Set root device.
+root = "/dev/hda1 ro"
+
+# Root device for nfs.
+#root = "/dev/nfs"
+# The nfs server.
+#nfs_server = "10.212.4.103"
+# Root directory on the nfs server.
+#nfs_root   = "/path/to/root/filesystem"
+
+# Sets runlevel 4 and the device for /usr.
+extra = "4 VMID=%d" % vmid
+
+#----------------------------------------------------------------------------
+# Set according to whether you want the domain restarted when it exits.
+# The default is 'onreboot', which restarts the domain when it shuts down
+# with exit code reboot.
+# Other values are 'always', and 'never'.
+
+#restart = 'onreboot'
+
+#============================================================================

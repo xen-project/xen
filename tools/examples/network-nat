@@ -1,0 +1,77 @@
+#!/bin/sh
+#============================================================================
+# Default Xen network start/stop script.
+# Xend calls a network script when it starts.
+# The script name to use is defined in /etc/xen/xend-config.sxp
+# in the network-script field.
+#
+# Usage:
+#
+# network-route (start|stop|status) {VAR=VAL}*
+#
+# Vars:
+#
+# netdev     The gateway interface (default eth0).
+# antispoof  Whether to use iptables to prevent spoofing (default yes).
+#
+#============================================================================
+
+
+
+# Exit if anything goes wrong.
+set -e 
+
+# First arg is the operation.
+OP=$1
+shift
+
+# Pull variables in args in to environment.
+for arg ; do export "${arg}" ; done
+
+netdev=${netdev:-eth0}
+# antispoofing not yet implemented
+antispoof=${antispoof:-yes}
+
+echo "network-nat $OP netdev=$netdev antispoof=$antispoof"
+
+
+op_start() {
+	echo 1 >/proc/sys/net/ipv4/ip_forward
+	iptables -t nat -A POSTROUTING -o ${netdev} -j MASQUERADE
+}
+
+
+op_stop() {
+	iptables -t nat -D POSTROUTING -o ${netdev} -j MASQUERADE
+}
+
+
+show_status() {
+    echo '============================================================'
+    ifconfig
+    echo ' '
+    ip route list
+    echo ' '
+    route -n
+    echo '============================================================'
+
+}
+
+case ${OP} in
+    start)
+        op_start
+        ;;
+    
+    stop)
+        op_stop
+        ;;
+
+    status)
+        show_status
+       ;;
+
+    *)
+       echo 'Unknown command: ' ${OP}
+       echo 'Valid commands are: start, stop, status'
+       exit 1
+esac
