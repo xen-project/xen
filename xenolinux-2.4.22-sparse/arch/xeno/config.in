@@ -123,32 +123,28 @@ fi
 dep_bool '  Initial RAM disk (initrd) support' CONFIG_BLK_DEV_INITRD $CONFIG_BLK_DEV_RAM
 bool 'Per partition statistics in /proc/partitions' CONFIG_BLK_STATS
 bool 'XenoLinux virtual block device support' CONFIG_XENOLINUX_BLOCK
-endmenu
+#endmenu
 define_bool CONFIG_BLK_DEV_IDE_MODES n
 define_bool CONFIG_BLK_DEV_HD n
-
-
-mainmenu_option next_comment
-comment 'Character devices'
-
-bool 'Xen console support' CONFIG_XEN_CONSOLE
-comment 'The options below are alpha-stage and will probably not work'
-bool 'Virtual terminal' CONFIG_VT
-if [ "$CONFIG_VT" = "y" ]; then
-   bool '  Support for console on virtual terminal' CONFIG_VT_CONSOLE
-   bool '  Support for VGA Video' CONFIG_VGA_CONSOLE
-   bool '  Support for Dummy Video (for testing)' CONFIG_DUMMY_CONSOLE
-   bool '  PS/2 mouse (aka "auxiliary device") support' CONFIG_PSMOUSE
-fi
-
-bool 'Unix98 PTY support' CONFIG_UNIX98_PTYS
-if [ "$CONFIG_UNIX98_PTYS" = "y" ]; then
-   int 'Maximum number of Unix98 PTYs in use (0-2048)' CONFIG_UNIX98_PTY_COUNT 256
-fi
-
 endmenu
 
+source drivers/char/Config.in
+
+
 source fs/Config.in
+
+mainmenu_option next_comment
+comment 'Console drivers'
+
+bool 'Xen console support' CONFIG_XEN_CONSOLE
+
+if [ "$CONFIG_VT" = "y" ]; then
+   bool 'VGA text console' CONFIG_VGA_CONSOLE
+   bool 'Dummy console' CONFIG_DUMMY_CONSOLE 
+#   bool 'Video mode selection support' CONFIG_VIDEO_SELECT
+fi
+endmenu
+
 
 mainmenu_option next_comment
 comment 'Kernel hacking'

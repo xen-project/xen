@@ -56,6 +56,8 @@ EXPORT_SYMBOL(boot_cpu_data);
 EXPORT_SYMBOL(dump_thread);
 EXPORT_SYMBOL(dump_fpu);
 EXPORT_SYMBOL(dump_extended_fpu);
+EXPORT_SYMBOL(__ioremap);
+EXPORT_SYMBOL(iounmap);
 EXPORT_SYMBOL(enable_irq);
 EXPORT_SYMBOL(disable_irq);
 EXPORT_SYMBOL(disable_irq_nosync);
