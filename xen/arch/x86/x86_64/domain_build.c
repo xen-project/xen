@@ -130,15 +130,13 @@ int construct_dom0(struct domain *d,
         v_end            = (vstack_end + (1UL<<22)-1) & ~((1UL<<22)-1);
         if ( (v_end - vstack_end) < (512UL << 10) )
             v_end += 1UL << 22; /* Add extra 4MB to get >= 512kB padding. */
-#define RD(_p,_s) ((_p) >> (_s))                      /* round up */
-#define RU(_p,_s) (((_p) + ((1UL<<(_s))-1)) >> (_s))  /* round down */
+#define NR(_l,_h,_s) \
+    (((((_h) + ((1UL<<(_s))-1)) & ~((1UL<<(_s))-1)) - \
+       ((_l) & ~((1UL<<(_s))-1))) >> (_s))
         if ( (1 + /* # L4 */
-              (RU(v_end, L4_PAGETABLE_SHIFT) - 
-               RD(dsi.v_start, L4_PAGETABLE_SHIFT)) + /* # L3 */
-              (RU(v_end, L3_PAGETABLE_SHIFT) - 
-               RD(dsi.v_start, L3_PAGETABLE_SHIFT)) + /* # L2 */
-              (RU(v_end, L2_PAGETABLE_SHIFT) - 
-               RD(dsi.v_start, L2_PAGETABLE_SHIFT)))  /* # L1 */
+              NR(dsi.v_start, v_end, L4_PAGETABLE_SHIFT) + /* # L3 */
+              NR(dsi.v_start, v_end, L3_PAGETABLE_SHIFT) + /* # L2 */
+              NR(dsi.v_start, v_end, L2_PAGETABLE_SHIFT))  /* # L1 */
              <= nr_pt_pages )
             break;
     }
