@@ -50,6 +50,7 @@ struct scheduler
     void         (*dump_settings)  (void);
     void         (*dump_cpu_state) (int);
     void         (*dump_runq_el)   (struct task_struct *);
+    void         (*pause)          (struct task_struct *);
 };
 
 /* per CPU scheduler information */

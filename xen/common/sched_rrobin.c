@@ -42,6 +42,12 @@ static void rr_dump_settings()
     printk("rr_slice = %llu ", rr_slice);
 }
 
+static void rr_pause(struct task_struct *p)
+{
+    if ( __task_on_runqueue(p) )
+        __del_from_runqueue(p);
+}
+
 struct scheduler sched_rrobin_def = {
     .name     = "Round-Robin Scheduler",
     .opt_name = "rrobin",
@@ -51,6 +57,7 @@ struct scheduler sched_rrobin_def = {
     .do_schedule    = rr_do_schedule,
     .control        = rr_ctl,
     .dump_settings  = rr_dump_settings,
+    .pause          = rr_pause,
 };
 
 

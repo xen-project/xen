@@ -401,6 +401,11 @@ int bvt_init_scheduler()
     return 0;
 }
 
+static void bvt_pause(struct task_struct *p)
+{
+    if( __task_on_runqueue(p) )
+        __del_from_runqueue(p);
+}
 
 struct scheduler sched_bvt_def = {
     .name     = "Borrowed Virtual Time",
@@ -419,5 +424,6 @@ struct scheduler sched_bvt_def = {
     .dump_settings  = bvt_dump_settings,
     .dump_cpu_state = bvt_dump_cpu_state,
     .dump_runq_el   = bvt_dump_runq_el,
+    .pause          = bvt_pause,
 };
 

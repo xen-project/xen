@@ -160,40 +160,48 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
     case DOM0_PINCPUDOMAIN:
     {
-        struct task_struct * p = find_domain_by_id(op->u.pincpudomain.domain);
-	int cpu = op->u.pincpudomain.cpu;
-        ret = -EINVAL;
-        if ( p != NULL )
+        domid_t dom = op->u.pincpudomain.domain;
+        
+        if ( dom == current->domain || dom == IDLE_DOMAIN_ID )
+            ret = -EINVAL;
+        else
         {
-	    if ( cpu == -1 )
+            struct task_struct * p = find_domain_by_id(dom);
+            int cpu = op->u.pincpudomain.cpu;
+            int we_paused = 0;
+            
+            ret = -ESRCH;
+            
+            if ( p != NULL )
             {
-                p->cpupinned = 0;
-                ret = 0;
-	    }
-            else
-            {
-		/* For the moment, we are unable to move running
-                   domains between CPUs. (We need a way of synchronously
-                   stopping running domains). For now, if we discover the
-                   domain is not stopped already then cowardly bail out
-                   with ENOSYS */
-
-		if( !(p->state & TASK_STOPPED) ) 
+                if ( cpu == -1 )
                 {
-                    ret = -ENOSYS;
-		}
-                else
-                {
-		    /* We need a task structure lock here!!! 
-		       FIX ME!! */
-		    cpu = cpu % smp_num_cpus;
-		    p->processor = cpu;
-		    p->cpupinned = 1;
+                    p->cpupinned = 0;
                     ret = 0;
                 }
-            }
-            put_task_struct(p);
-        }     	
+                else
+                {
+                    /* Pause domain if necessary. */
+                    if( !(p->state & TASK_STOPPED) && !(p->state & TASK_PAUSED) )
+                    {
+                        sched_pause_sync(p);
+                        we_paused = 1;
+                    }
+                    
+                    /* We need a task structure lock here!!! 
+                       FIX ME!! */
+                    cpu = cpu % smp_num_cpus;
+                    p->processor = cpu;
+                    p->cpupinned = 1;
+                    
+                    if ( we_paused )
+                        wake_up(p);
+                    
+                    ret = 0;
+                }
+                put_task_struct(p);
+            }     	
+        }
     }
     break;
 

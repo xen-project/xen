@@ -85,16 +85,8 @@ elif cmd == 'pincpu':
         sys.exit(-1)
 
     cpu = int(sys.argv[3])
-    orig_state = xc.domain_getinfo(first_dom=dom, max_doms=1)[0]['stopped']
-
-    while xc.domain_getinfo(first_dom=dom, max_doms=1)[0]['stopped'] != 1:
-	xc.domain_stop( dom=dom )
-	time.sleep(0.1)
-
+    
     rc = xc.domain_pincpu( dom, cpu )
-
-    if orig_state == 0:
-	xc.domain_start( dom=dom )
 
 elif cmd == 'list':
     print 'Dom  Name             Mem(kb)  CPU  State  Time(s)'
