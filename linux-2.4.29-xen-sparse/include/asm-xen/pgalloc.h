@@ -79,8 +79,7 @@ static inline pgd_t *get_pgd_slow(void)
 			init_mm.pgd + USER_PTRS_PER_PGD,
 			(PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
 		__make_page_readonly(pgd);
-		queue_pgd_pin(__pa(pgd));
-		flush_page_update_queue();
+		xen_pgd_pin(__pa(pgd));
 	}
 	return pgd;
 }
@@ -110,9 +109,8 @@ static inline void free_pgd_slow(pgd_t *pgd)
 		free_page((unsigned long)__va(pgd_val(pgd[i])-1));
 	kmem_cache_free(pae_pgd_cachep, pgd);
 #else
-	queue_pgd_unpin(__pa(pgd));
+	xen_pgd_unpin(__pa(pgd));
 	__make_page_writable(pgd);
-	flush_page_update_queue();
 	free_page((unsigned long)pgd);
 #endif
 }
@@ -135,8 +133,7 @@ static inline pte_t *pte_alloc_one(struct mm_struct *mm, unsigned long address)
     {
         clear_page(pte);
         __make_page_readonly(pte);
-        queue_pte_pin(__pa(pte));
-        flush_page_update_queue();
+        xen_pte_pin(__pa(pte));
     }
     return pte;
 
@@ -155,9 +152,8 @@ static inline pte_t *pte_alloc_one_fast(struct mm_struct *mm,
 
 static __inline__ void pte_free_slow(pte_t *pte)
 {
-    queue_pte_unpin(__pa(pte));
+    xen_pte_unpin(__pa(pte));
     __make_page_writable(pte);
-    flush_page_update_queue();
     free_page((unsigned long)pte);
 }
 

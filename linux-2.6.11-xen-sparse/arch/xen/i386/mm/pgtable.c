@@ -193,10 +193,8 @@ void __set_fixmap_ma (enum fixed_addresses idx, unsigned long phys, pgprot_t fla
 pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 {
 	pte_t *pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT|__GFP_ZERO);
-	if (pte) {
+	if (pte)
 		make_page_readonly(pte);
-		flush_page_update_queue();
-	}
 	return pte;
 }
 
@@ -208,8 +206,7 @@ void pte_ctor(void *pte, kmem_cache_t *cache, unsigned long unused)
 
 	clear_page(pte);
 	make_page_readonly(pte);
-	queue_pte_pin(__pa(pte));
-	flush_page_update_queue();
+	xen_pte_pin(__pa(pte));
 }
 
 void pte_dtor(void *pte, kmem_cache_t *cache, unsigned long unused)
@@ -217,9 +214,8 @@ void pte_dtor(void *pte, kmem_cache_t *cache, unsigned long unused)
 	struct page *page = virt_to_page(pte);
 	ClearPageForeign(page);
 
-	queue_pte_unpin(__pa(pte));
+	xen_pte_unpin(__pa(pte));
 	make_page_writable(pte);
-	flush_page_update_queue();
 }
 
 struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
@@ -316,8 +312,7 @@ void pgd_ctor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 	memset(pgd, 0, USER_PTRS_PER_PGD*sizeof(pgd_t));
  out:
 	make_page_readonly(pgd);
-	queue_pgd_pin(__pa(pgd));
-	flush_page_update_queue();
+	xen_pgd_pin(__pa(pgd));
 }
 
 /* never called when PTRS_PER_PMD > 1 */
@@ -325,9 +320,8 @@ void pgd_dtor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 {
 	unsigned long flags; /* can be called from interrupt context */
 
-	queue_pgd_unpin(__pa(pgd));
+	xen_pgd_unpin(__pa(pgd));
 	make_page_writable(pgd);
-	flush_page_update_queue();
 
 	if (PTRS_PER_PMD > 1)
 		return;
@@ -378,7 +372,7 @@ void make_lowmem_page_readonly(void *va)
 	pud_t *pud = pud_offset(pgd, (unsigned long)va);
 	pmd_t *pmd = pmd_offset(pud, (unsigned long)va);
 	pte_t *pte = pte_offset_kernel(pmd, (unsigned long)va);
-	queue_l1_entry_update(pte, (*(unsigned long *)pte)&~_PAGE_RW);
+	set_pte(pte, pte_wrprotect(*pte));
 }
 
 void make_lowmem_page_writable(void *va)
@@ -387,7 +381,7 @@ void make_lowmem_page_writable(void *va)
 	pud_t *pud = pud_offset(pgd, (unsigned long)va);
 	pmd_t *pmd = pmd_offset(pud, (unsigned long)va);
 	pte_t *pte = pte_offset_kernel(pmd, (unsigned long)va);
-	queue_l1_entry_update(pte, (*(unsigned long *)pte)|_PAGE_RW);
+	set_pte(pte, pte_mkwrite(*pte));
 }
 
 void make_page_readonly(void *va)
@@ -396,7 +390,7 @@ void make_page_readonly(void *va)
 	pud_t *pud = pud_offset(pgd, (unsigned long)va);
 	pmd_t *pmd = pmd_offset(pud, (unsigned long)va);
 	pte_t *pte = pte_offset_kernel(pmd, (unsigned long)va);
-	queue_l1_entry_update(pte, (*(unsigned long *)pte)&~_PAGE_RW);
+	set_pte(pte, pte_wrprotect(*pte));
 	if ( (unsigned long)va >= (unsigned long)high_memory )
 	{
 		unsigned long phys;
@@ -414,7 +408,7 @@ void make_page_writable(void *va)
 	pud_t *pud = pud_offset(pgd, (unsigned long)va);
 	pmd_t *pmd = pmd_offset(pud, (unsigned long)va);
 	pte_t *pte = pte_offset_kernel(pmd, (unsigned long)va);
-	queue_l1_entry_update(pte, (*(unsigned long *)pte)|_PAGE_RW);
+	set_pte(pte, pte_mkwrite(*pte));
 	if ( (unsigned long)va >= (unsigned long)high_memory )
 	{
 		unsigned long phys;
