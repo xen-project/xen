@@ -189,7 +189,7 @@ int deallocate_rid_range(struct domain *d)
 //  it should be unmangled
 
 //This appears to work in Xen... turn it on later so no complications yet
-//#define CONFIG_MANGLE_RIDS
+#define CONFIG_MANGLE_RIDS
 #ifdef CONFIG_MANGLE_RIDS
 static inline unsigned long
 vmMangleRID(unsigned long RIDVal)

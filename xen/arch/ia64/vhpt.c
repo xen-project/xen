@@ -20,7 +20,7 @@ unsigned long vhpt_paddr, vhpt_pend, vhpt_pte;
 void vhpt_flush(void)
 {
 	struct vhpt_lf_entry *v = (void *)VHPT_ADDR;
-	int i;
+	int i, cnt = 0;
 
 	for (i = 0; i < VHPT_NUM_ENTRIES; i++, v++) {
 		v->itir = 0;
@@ -30,6 +30,39 @@ void vhpt_flush(void)
 	}
 	// initialize cache too???
 }
+
+#ifdef VHPT_GLOBAL
+void vhpt_flush_address(unsigned long vadr, unsigned long addr_range)
+{
+	unsigned long ps;
+	struct vhpt_lf_entry *vlfe;
+
+	if ((vadr >> 61) == 7) {
+		// no vhpt for region 7 yet, see vcpu_itc_no_srlz
+		printf("vhpt_flush_address: region 7, spinning...\n");
+		while(1);
+	}
+#if 0
+	// this only seems to occur at shutdown, but it does occur
+	if ((!addr_range) || addr_range & (addr_range - 1)) {
+		printf("vhpt_flush_address: weird range, spinning...\n");
+		while(1);
+	}
+//printf("************** vhpt_flush_address(%p,%p)\n",vadr,addr_range);
+#endif
+	while ((long)addr_range > 0) {
+		vlfe = (struct vhpt_lf_entry *)ia64_thash(vadr);
+		// FIXME: for now, just blow it away even if it belongs to
+		// another domain.  Later, use ttag to check for match
+//if (!(vlfe->ti_tag & INVALID_TI_TAG)) {
+//printf("vhpt_flush_address: blowing away valid tag for vadr=%p\n",vadr);
+//}
+		vlfe->ti_tag |= INVALID_TI_TAG;
+		addr_range -= PAGE_SIZE;
+		vadr += PAGE_SIZE;
+	}
+}
+#endif
 
 void vhpt_map(void)
 {
