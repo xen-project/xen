@@ -1001,7 +1001,7 @@ int pirq_guest_bind(struct task_struct *p, int irq, int will_share)
     irq_guest_action_t *action;
     int rc = 0;
 
-    if ( !IS_PRIV(p) )
+    if ( !IS_CAPABLE_PHYSDEV(p) )
         return -EPERM;
 
     spin_lock_irqsave(&desc->lock, flags);

@@ -227,12 +227,14 @@ void new_thread(struct task_struct *p,
 			: /* no output */ \
 			:"r" (thread->debugreg[register]))
 
+
 void switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 {
     struct thread_struct *next = &next_p->thread;
     struct tss_struct *tss = init_tss + smp_processor_id();
     execution_context_t *stack_ec = get_execution_context();
-
+    int i;
+    
     __cli();
 
     /* Switch guest general-register state. */
@@ -280,6 +282,58 @@ void switch_to(struct task_struct *prev_p, struct task_struct *next_p)
         }
     }
 
+    if ( ( prev_p->io_bitmap != NULL ) || ( next_p->io_bitmap != NULL ) ) {
+        if ( next_p->io_bitmap != NULL ) {
+            /* Copy in the appropriate parts of the IO bitmap.  We use the
+             * selector to copy only the interesting parts of the bitmap. */
+
+            u64 old_sel = ~0ULL; /* IO bitmap selector for previous task. */
+
+            if ( prev_p->io_bitmap != NULL)
+            {
+                old_sel = prev_p->io_bitmap_sel;
+
+                /* Replace any areas of the IO bitmap that had bits cleared. */
+                for ( i = 0; i < sizeof(prev_p->io_bitmap_sel) * 8; i++ )
+                    if ( !test_bit(i, &prev_p->io_bitmap_sel) )
+                        memcpy(&tss->io_bitmap[i * IOBMP_SELBIT_LWORDS],
+                               &next_p->io_bitmap[i * IOBMP_SELBIT_LWORDS],
+                               IOBMP_SELBIT_LWORDS * sizeof(unsigned long));
+            }
+
+            /* Copy in any regions of the new task's bitmap that have bits
+             * clear and we haven't already dealt with. */
+            for ( i = 0; i < sizeof(prev_p->io_bitmap_sel) * 8; i++ )
+            {
+                if ( test_bit(i, &old_sel)
+                     && !test_bit(i, &next_p->io_bitmap_sel) )
+                    memcpy(&tss->io_bitmap[i * IOBMP_SELBIT_LWORDS],
+                           &next_p->io_bitmap[i * IOBMP_SELBIT_LWORDS],
+                           IOBMP_SELBIT_LWORDS * sizeof(unsigned long));
+            }
+
+            tss->bitmap = IO_BITMAP_OFFSET;
+
+	} else {
+            /* In this case, we're switching FROM a task with IO port access,
+             * to a task that doesn't use the IO bitmap.  We set any TSS bits
+             * that might have been cleared, ready for future use. */
+            for ( i = 0; i < sizeof(prev_p->io_bitmap_sel) * 8; i++ )
+                if ( !test_bit(i, &prev_p->io_bitmap_sel) )
+                    memset(&tss->io_bitmap[i * IOBMP_SELBIT_LWORDS],
+                           0xFF, IOBMP_SELBIT_LWORDS * sizeof(unsigned long));
+
+            /*
+             * a bitmap offset pointing outside of the TSS limit
+             * causes a nicely controllable SIGSEGV if a process
+             * tries to use a port IO instruction. The first
+             * sys_ioperm() call sets up the bitmap properly.
+             */
+            tss->bitmap = INVALID_IO_BITMAP_OFFSET;
+	}
+    }
+    
+    
     /* Switch page tables. */
     write_ptbase(&next_p->mm);
     tlb_clocktick();
