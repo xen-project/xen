@@ -36,10 +36,11 @@ int main(void)
                             (struct sockaddr *)&from, &fromlen)) 
             >= 0 )
     {
+#if 0
         printf("%d-byte message from %s:%d --\n", len,
                inet_ntop(AF_INET, &from.sin_addr, abuf, sizeof(abuf)),
                ntohs(from.sin_port));
-
+#endif
         /* For sanity, clean up the string's tail. */
         if ( buf[len-1] != '\n' ) { buf[len] = '\n'; len++; }
         buf[len] = '\0';
