@@ -126,10 +126,9 @@ static int mod_l1_entry(l1_pgentry_t *, l1_pgentry_t);
 static struct {
 #define DOP_FLUSH_TLB   (1<<0) /* Flush the TLB.                 */
 #define DOP_RELOAD_LDT  (1<<1) /* Reload the LDT shadow mapping. */
-    unsigned long       deferred_ops;
-    unsigned long       cr0;
+    unsigned long  deferred_ops;
     /* If non-NULL, specifies a foreign subject domain for some operations. */
-    struct domain      *foreign;
+    struct domain *foreign;
 } __cacheline_aligned percpu_info[NR_CPUS];
 
 /*
@@ -1283,18 +1282,22 @@ int do_mmu_update(
 /*
  * We steal the m.s.b. of the @count parameter to indicate whether this
  * invocation of do_mmu_update() is resuming a previously preempted call.
+ * We steal the next 15 bits to remember the current FOREIGNDOM.
  */
-#define MMU_UPDATE_PREEMPTED  (~(~0U>>1))
+#define MMU_UPDATE_PREEMPTED          (~(~0U>>1))
+#define MMU_UPDATE_PREEMPT_FDOM_SHIFT ((sizeof(int)*8)-16)
+#define MMU_UPDATE_PREEMPT_FDOM_MASK  (0x7FFFU<<MMU_UPDATE_PREEMPT_FDOM_SHIFT)
 
     mmu_update_t req;
     unsigned long va = 0, deferred_ops, pfn, prev_pfn = 0;
     struct pfn_info *page;
-    int rc = 0, okay = 1, i, cpu = smp_processor_id();
+    int rc = 0, okay = 1, i = 0, cpu = smp_processor_id();
     unsigned int cmd, done = 0;
     unsigned long prev_spfn = 0;
     l1_pgentry_t *prev_spl1e = 0;
     struct domain *d = current;
     u32 type_info;
+    domid_t domid;
 
     perfc_incrc(calls_to_mmu_update); 
     perfc_addc(num_page_updates, count);
@@ -1304,25 +1307,45 @@ int do_mmu_update(
     /*
      * If we are resuming after preemption, read how much work we have already
      * done. This allows us to set the @done output parameter correctly.
+     * We also reset FOREIGNDOM here.
      */
-    if ( unlikely(count & MMU_UPDATE_PREEMPTED) )
+    if ( unlikely(count&(MMU_UPDATE_PREEMPTED|MMU_UPDATE_PREEMPT_FDOM_MASK)) )
     {
+        if ( !(count & MMU_UPDATE_PREEMPTED) )
+        {
+            /* Count overflow into private FOREIGNDOM field. */
+            MEM_LOG("do_mmu_update count is too large");
+            rc = -EINVAL;
+            goto out;
+        }
         count &= ~MMU_UPDATE_PREEMPTED;
+        domid = count >> MMU_UPDATE_PREEMPT_FDOM_SHIFT;
+        count &= ~MMU_UPDATE_PREEMPT_FDOM_MASK;
         if ( unlikely(pdone != NULL) )
             (void)get_user(done, pdone);
+        if ( (domid != current->id) &&
+             !do_extended_command(0, MMUEXT_SET_FOREIGNDOM | (domid << 16)) )
+        {
+            rc = -EINVAL;
+            goto out;
+        }
     }
 
     if ( unlikely(!array_access_ok(VERIFY_READ, ureqs, count, sizeof(req))) )
-        return -EFAULT;
+    {
+        rc = -EFAULT;
+        goto out;
+    }
 
     for ( i = 0; i < count; i++ )
     {
         if ( hypercall_preempt_check() )
         {
-            hypercall_create_continuation(
+            rc = hypercall_create_continuation(
                 __HYPERVISOR_mmu_update, 3, ureqs, 
-                (count - i) | MMU_UPDATE_PREEMPTED, pdone);
-            rc = __HYPERVISOR_mmu_update;
+                (count - i) |
+                (FOREIGNDOM->id << MMU_UPDATE_PREEMPT_FDOM_SHIFT) | 
+                MMU_UPDATE_PREEMPTED, pdone);
             break;
         }
 
@@ -1459,6 +1482,7 @@ int do_mmu_update(
         ureqs++;
     }
 
+ out:
     if ( prev_pfn != 0 )
         unmap_domain_mem((void *)va);
 
