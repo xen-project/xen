@@ -150,6 +150,7 @@ struct task_struct
     mm_segment_t addr_limit;
 
     char name[MAX_DOMAIN_NAME];
+    s_time_t create_time;
 
     struct thread_struct thread;
     struct task_struct *next_list, *next_hash;
@@ -239,6 +240,7 @@ extern int construct_dom0(struct task_struct *p,
 extern int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *);
 
 struct task_struct *find_domain_by_id(domid_t dom);
+struct task_struct *find_last_domain(void);
 extern void release_task(struct task_struct *);
 extern void __kill_domain(struct task_struct *p);
 extern void kill_domain(void);

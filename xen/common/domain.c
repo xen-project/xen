@@ -60,6 +60,7 @@ struct task_struct *do_createdomain(domid_t dom_id, unsigned int cpu)
 
     p->domain    = dom_id;
     p->processor = cpu;
+    p->create_time = NOW();
 
     memcpy(&p->thread, &idle0_task.thread, sizeof(p->thread));
 
@@ -138,6 +139,28 @@ struct task_struct *find_domain_by_id(domid_t dom)
     read_unlock_irqrestore(&tasklist_lock, flags);
 
     return p;
+}
+
+
+/* return the most recent domain created */
+struct task_struct *find_last_domain(void)
+{
+    struct task_struct *p, *plast;
+    unsigned long flags;
+
+    read_lock_irqsave(&tasklist_lock, flags);
+    plast = task_list;
+    p = plast->next_list;
+    while ( p != NULL )
+    {
+	if ( p->create_time > plast->create_time )
+	    plast = p;
+        p = p->next_list;
+    }
+    get_task_struct(plast);
+    read_unlock_irqrestore(&tasklist_lock, flags);
+
+    return plast;
 }
 
 

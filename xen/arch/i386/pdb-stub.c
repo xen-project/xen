@@ -344,7 +344,21 @@ pdb_process_command (char *ptr, struct pt_regs *regs, unsigned long cr3,
 	{
 	    struct task_struct *p;
 
-	    p = find_domain_by_id(pdb_ctx.domain);
+	    if (pdb_ctx.domain == -2)
+	    {
+	        p = find_last_domain();
+	    }
+	    else
+	    {
+	        p = find_domain_by_id(pdb_ctx.domain);
+	    }
+	    if (p == NULL)
+	    {
+	        printk ("pdb error: unknown domain [0x%x]\n", pdb_ctx.domain);
+	        strcpy (pdb_out_buffer, "E01");
+		pdb_ctx.domain = -1;
+		goto exit;
+	    }
 	    if (p->mm.shadow_mode)
 	        pdb_ctx.ptbr = pagetable_val(p->mm.shadow_table);
 	    else
@@ -357,6 +371,14 @@ pdb_process_command (char *ptr, struct pt_regs *regs, unsigned long cr3,
 	    unsigned long domain_ptbr;
 
 	    p = find_domain_by_id(pdb_ctx.domain);
+	    if (p == NULL)
+	    {
+	        printk ("pdb error: unknown domain [0x%x][0x%x]\n", 
+			pdb_ctx.domain, pdb_ctx.process);
+	        strcpy (pdb_out_buffer, "E01");
+		pdb_ctx.domain = -1;
+		goto exit;
+	    }
 	    if (p->mm.shadow_mode)
 	        domain_ptbr = pagetable_val(p->mm.shadow_table);
 	    else
@@ -364,7 +386,7 @@ pdb_process_command (char *ptr, struct pt_regs *regs, unsigned long cr3,
 	    put_task_struct(p);
 
 	    pdb_ctx.ptbr = domain_ptbr;
-	    /* pdb_ctx.ptbr = pdb_linux_pid_ptbr(domain_ptbr, pdb_ctx.process); */
+	    /*pdb_ctx.ptbr=pdb_linux_pid_ptbr(domain_ptbr, pdb_ctx.process);*/
 	}
 
 	pdb_ctx.valid = 0;
@@ -634,6 +656,7 @@ pdb_process_command (char *ptr, struct pt_regs *regs, unsigned long cr3,
     }
     }
 
+exit:
     /* reply to the request */
     pdb_put_packet (pdb_out_buffer, ack);
 
