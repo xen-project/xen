@@ -174,7 +174,6 @@ struct cpuinfo_x86 {
  */
 
 extern struct cpuinfo_x86 boot_cpu_data;
-extern struct tss_struct init_tss[NR_CPUS];
 
 #ifdef CONFIG_SMP
 extern struct cpuinfo_x86 cpu_data[];
@@ -382,6 +381,8 @@ struct tss_struct {
 #define IDT_ENTRIES 256
 extern idt_entry_t idt_table[];
 extern idt_entry_t *idt_tables[];
+
+extern struct tss_struct init_tss[NR_CPUS];
 
 #ifdef ARCH_HAS_FAST_TRAP
 
