@@ -23,7 +23,6 @@ gopts.opt('help', short='h',
          use="Print this help.")
 
 def help(argv):
-    gopts.argv = argv
     gopts.usage()
     
 def main(argv):
