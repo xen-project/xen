@@ -1505,6 +1505,7 @@ unsigned int __devinit pci_do_scan_bus(struct pci_bus *bus)
 {
 	unsigned int devfn, max, pass;
 	struct list_head *ln;
+	/* XEN MODIFICATION: Allocate 'dev0' on heap to avoid stack overflow. */
 	struct pci_dev *dev, *dev0;
 
 	DBG("Scanning bus %02x\n", bus->number);
