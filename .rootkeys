@@ -696,6 +696,17 @@
 41a216ca7mgVSnCBHPCLkGOIqPS1CQ tools/libxutil/util.h
 3f776bd2Xd-dUcPKlPN2vG89VGtfvQ tools/misc/Makefile
 40ab2cfawIw8tsYo0dQKtp83h4qfTQ tools/misc/fakei386xen
+4249273cDOw6_uLUPvvUwWU1ZrJxnQ tools/misc/mbootpack/GPL
+4249273cSmj2h8Fj3UpTg0g-k6CLsA tools/misc/mbootpack/Makefile
+4249273c8gKIttF1QPiczvGo5AEOeA tools/misc/mbootpack/README
+4249273c4N4PAkvt3trNlto4h76k8A tools/misc/mbootpack/bin2c.c
+4249273cISg5nhW1Pt7OJ0jFu343ig tools/misc/mbootpack/bootsect.S
+4249273cUiz8CgLqnG7XYFa8x5-MoQ tools/misc/mbootpack/buildimage.c
+4249273c_gZ2yI_h-ci66E1Y5oSEPA tools/misc/mbootpack/mb_header.h
+4249273cWnlW0-lOIYua1bkKirn6vA tools/misc/mbootpack/mb_info.h
+4249273cA8LI3IMaSuhLOjykuMeQJA tools/misc/mbootpack/mbootpack.c
+4249273cVTgyv2HYd-mC29IDaz0-mg tools/misc/mbootpack/mbootpack.h
+4249273cLXQbRWFp_v-FqcyOm0sYtg tools/misc/mbootpack/setup.S
 3f6dc136ZKOjd8PIqLbFBl_v-rnkGg tools/misc/miniterm/Makefile
 3f6dc140C8tAeBfroAF24VrmCS4v_w tools/misc/miniterm/README
 3f6dc142IHaf6XIcAYGmhV9nNSIHFQ tools/misc/miniterm/miniterm.c

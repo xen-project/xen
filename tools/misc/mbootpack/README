@@ -1,0 +1,77 @@
+
+mbootpack
+---------
+
+This is a utility to take a multiboot kernel and modules and repackage
+them in a form that a standard linux bootloader will be able to load them.
+It statically allocates memory addresses based on a 'standard' PC memory 
+layout, and then saves the image of the loaded system, along with an 
+almost-standard linux bzImage header which takes care of the start-of-day 
+requirements of a multiboot kernel (setting up 32-bit protected mode, etc.)
+
+Example invocation, to package a xen VMM and xenlinux guest and initrd:
+
+   mbootpack -o bzImage -m ./xenlinux -m ./initrd.img ./xen-image
+
+You can now boot the 'bzImage' file using your favourite linux bootloader.
+
+The kernel command line will be provided at boot time by the bootloader
+(you can specify a kernel command-line using the '-c' flag, but it will
+be overridden at boot time unledd the bootloder provides an entirely
+empty command line).  If you wan to override the command line for the
+first module (i.e. domain 0 kernel in Xen) at boot time, append ' -- '
+and the module commadn line to the bootloader command line, e.g.:
+
+  boot: bzImage com1=9600,8n1 console=com1 dom0_mem=49152 -- root=/dev/sda3 ro console=ttyS0,9600n8 
+
+Everything before the '--' is passed to the kernel (xen) as its command
+line; everything after is passed to the first module (xenlinux).
+
+This is ALPHA code: there are execution paths which have *not* been
+tested, though it works for loading the Xen hypervisor using GrUB, LILO
+or SYSLINUX.  Bug reports and patches are very welcome.
+
+Possible features for future versions (all look possible, if there's any 
+demand for them):
+
+    - support for kernels that load below 1MB
+    - zImage-style compressed images
+    - sane error messgaes for insane load addresses
+    - support for the MULTIBOOT_VIDEO_MODE bit
+    - proper support for passing E820h memory-maps from bzImage
+
+
+Tim Deegan <tjd21@cl.cam.ac.uk>, March 2005
+
+
+
+License and attributions
+------------------------
+
+The bzImage header block was originally taken from the Linux kernel.
+http://www.kernel.org/
+
+Some parts of the Multiboot loader code are based on GNU GRUB.
+mb_info.h and mb_header.h are taken from GNU GRUB.
+http://www.gnu.org/software/grub/
+
+Bin2C was written by Nicolas Doualot; I tidied it a bit for a clean compile.
+http://slubman.celeonet.fr/program.php?style=Default&project=bin2c
+
+All other code is copyright (C) 2003-2005  Tim Deegan (tjd21@cl.cam.ac.uk)
+
+mbootpack is distributed under the GNU General Public License: see "GPL"
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
