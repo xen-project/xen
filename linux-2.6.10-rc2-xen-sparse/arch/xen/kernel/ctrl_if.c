@@ -462,7 +462,7 @@ ctrl_if_unregister_receiver(
 
 void ctrl_if_suspend(void)
 {
-    free_irq(ctrl_if_irq, NULL);
+    teardown_irq(ctrl_if_irq, &ctrl_if_irq_action);
     unbind_evtchn_from_irq(ctrl_if_evtchn);
 }
 
@@ -496,11 +496,9 @@ void ctrl_if_resume(void)
     ctrl_if_evtchn = xen_start_info.domain_controller_evtchn;
     ctrl_if_irq    = bind_evtchn_to_irq(ctrl_if_evtchn);
 
-#define SA_STATIC_ACTION 0x01000000 /* so that free_irq() doesn't do kfree() */
     memset(&ctrl_if_irq_action, 0, sizeof(ctrl_if_irq_action));
     ctrl_if_irq_action.handler = ctrl_if_interrupt;
     ctrl_if_irq_action.name    = "ctrl-if";
-    ctrl_if_irq_action.flags   = SA_STATIC_ACTION;
     (void)setup_irq(ctrl_if_irq, &ctrl_if_irq_action);
 }
 
