@@ -12,16 +12,9 @@
 #define usbif_vdev_t   u16
 #define usbif_sector_t u64
 
-#define USBIF_OP_IO      0
+#define USBIF_OP_IO      0 /* Request IO to a device */
 #define USBIF_OP_PROBE   1 /* Is there a device on this port? */
 #define USBIF_OP_RESET   2 /* Reset a virtual USB port.       */
-
-/* NB. Ring size must be small enough for sizeof(usbif_ring_t) <= PAGE_SIZE. */
-#define USBIF_RING_SIZE        64
-
-/* XXX this does not want to be here!  it really ought to be dynamic but it can
- * live here for now */
-#define NUM_PORTS 1
 
 typedef struct {
     unsigned long  id;           /*  0: private guest value, echoed in resp  */
@@ -44,6 +37,7 @@ typedef struct {
     unsigned long num_iso;        /* 34 : length of iso schedule */
     unsigned long timeout;        /* 38: timeout in ms */
 } PACKED usbif_request_t; /* 42 */
+
 /* Data we need to pass:
  * - Transparently handle short packets or complain at us?
  */
@@ -60,46 +54,8 @@ typedef struct {
 #define USBIF_RSP_ERROR  -1 /* non-specific 'error' */
 #define USBIF_RSP_OKAY    0 /* non-specific 'okay'  */
 
-/*
- * We use a special capitalised type name because it is _essential_ that all 
- * arithmetic on indexes is done on an integer type of the correct size.
- */
-typedef u32 USBIF_RING_IDX;
-
-/*
- * Ring indexes are 'free running'. That is, they are not stored modulo the
- * size of the ring buffer. The following macro converts a free-running counter
- * into a value that can directly index a ring-buffer array.
- */
-#define MASK_USBIF_IDX(_i) ((_i)&(USBIF_RING_SIZE-1))
-
-typedef struct {
-    USBIF_RING_IDX req_prod;  /*  0: Request producer. Updated by front-end. */
-    USBIF_RING_IDX resp_prod; /*  4: Response producer. Updated by back-end. */
-
-    union {                   /*  8 */
-        usbif_request_t  req;
-        usbif_response_t resp;
-    } PACKED ring[USBIF_RING_SIZE];
-} PACKED usbif_t;
-
-
-
-/*
- * USBIF_OP_PROBE:
- * The request format for a probe request is constrained as follows:
- *  @operation   == USBIF_OP_PROBE
- *  @nr_segments == size of probe buffer in pages
- *  @device      == unused (zero)
- *  @id          == any value (echoed in response message)
- *  @sector_num  == unused (zero)
- *  @frame_and_sects == list of page-sized buffers.
- *                       (i.e., @first_sect == 0, @last_sect == 7).
- * 
- * The response is a list of vdisk_t elements copied into the out-of-band
- * probe buffer. On success the response status field contains the number
- * of vdisk_t elements.
- */
+#define USBIF_RING RING_PARAMS(usbif_request_t, usbif_response_t, PAGE_SIZE)
+DEFINE_RING_TYPES(usbif, USBIF_RING);
 
 typedef struct {
     unsigned long length; /* IN = expected, OUT = actual */

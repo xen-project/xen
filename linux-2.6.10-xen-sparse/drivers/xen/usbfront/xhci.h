@@ -104,7 +104,7 @@ struct xhci {
 
         spinlock_t response_lock;
 
-        usbif_t *usbif;
+        usbif_front_ring_t usb_ring;
         int usb_resp_cons;
 };
 
