@@ -55,7 +55,7 @@ class XendVnetInfo:
     def vifctl(self, op, vif, vmac):
         try:
             fn = self.vifctl_ops[op]
-            return vnet_cmd([fn, ['vif', vif], ['vmac', vmac]])
+            return vnet_cmd([fn, ['vnet', self.id], ['vif', vif], ['vmac', vmac]])
         except XendError:
             log.warning("vifctl failed: op=%s vif=%s mac=%s", op, vif, vmac)
 
