@@ -68,7 +68,6 @@ static inline void direct_remappte_range(pte_t * pte, unsigned long address, uns
 		pte++;
 	} while (address && (address < end));
 
-	printk(KERN_ALERT "bd240 debug: exit from direct_remappte_range\n");
 }
 
 static inline int direct_remappmd_range(struct mm_struct *mm, pmd_t * pmd, unsigned long address, unsigned long size,
@@ -182,14 +181,10 @@ unsigned long direct_mmap(unsigned long phys_addr, unsigned long size,
     dmmap->addr = addr;
     list_add(&dmmap->list, &current->mm->context.direct_list);
 
-	printk(KERN_ALERT "bd240 debug: direct_mmap: enlisting addr %lx\n", dmmap->addr);
-
     /* and perform the mapping */
     if(flag == MAP_DISCONT){
         ret = direct_remap_disc_page_range(addr, phys_addr, tot_pages, prot);
     } else {
-		printk(KERN_ALERT "bd240 debug: addr %lx, phys_addr %lx, size %lx\n",
-			addr, phys_addr, size);
         ret = direct_remap_page_range(addr, phys_addr, size, prot);
     }
 
@@ -227,7 +222,6 @@ static inline int direct_zap_pte_range(mmu_gather_t *tlb, pmd_t * pmd, unsigned 
 		if (pte_none(pte))
 			continue;
 		freed ++;
-		printk(KERN_ALERT "bd240 debug: clearing ptr %lx\n", __pa(ptep) + start_info.phys_base); 
 		direct_pte_clear(ptep);
 	}
 
@@ -332,13 +326,9 @@ int direct_disc_unmap(unsigned long from, unsigned long first_pg, int tot_pages)
     struct list_head * curr;
     struct list_head * direct_list = &current->mm->context.direct_list;    
 
-	printk(KERN_ALERT "bd240 debug: direct_disc_unmap: from %lx\n", from);
-
     curr = direct_list->next;
     while(curr != direct_list){
         node = list_entry(curr, direct_mmap_node_t, list);
-
-		printk(KERN_ALERT "bd240 debug: direct_disc_unmap: node %lx\n", node->addr);
 
         if(node->addr == from)
             break;

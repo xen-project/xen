@@ -148,15 +148,11 @@ static void create_proc_dom_entries(int dom)
 static ssize_t dom_mem_write(struct file * file, const char * buff, 
 	size_t size , loff_t * off)
 {
-	printk(KERN_ALERT "bd240 debug: dom_mem_write invoked!\n");
-
     unsigned long addr;
     proc_memdata_t * mem_data = (proc_memdata_t *)((struct proc_dir_entry *)file->f_dentry->d_inode->u.generic_ip)->data;
     
     copy_from_user(&addr, (unsigned long *)buff, sizeof(addr));
     
-	printk(KERN_ALERT "bd240 debug: dom_mem_write addr %lx\n", addr);
-
     if(direct_disc_unmap(addr, mem_data->pfn, mem_data->tot_pages) == 0){
         return sizeof(addr);
     } else {
@@ -169,15 +165,11 @@ static ssize_t dom_mem_read(struct file * file, char * buff, size_t size, loff_t
     unsigned long addr;
     pgprot_t prot;
 
-	printk(KERN_ALERT "bd240 debug: dom_mem_read invoked!\n");
-
     proc_memdata_t * mem_data = (proc_memdata_t *)((struct proc_dir_entry *)file->f_dentry->d_inode->u.generic_ip)->data;
 
     prot = PAGE_SHARED; 
 
     /* remap the range using xen specific routines */
-	printk(KERN_ALERT "bd240 debug: mem_read: mem_data %lx\n", mem_data);
-
     addr = direct_mmap(mem_data->pfn << PAGE_SHIFT, mem_data->tot_pages << PAGE_SHIFT, prot, 0, 0);
     //addr = direct_mmap(mem_data->pfn, mem_data->tot_pages << PAGE_SHIFT, prot, 1, 
     //                mem_data->tot_pages);
@@ -194,15 +186,11 @@ struct file_operations dom_mem_ops = {
 
 static int dom_map_mem(unsigned int dom, unsigned long pfn, int tot_pages)
 {
-	printk(KERN_ALERT "bd240 debug: dom_map_mem: invoked\n");
-
     int ret = -ENOENT;
     struct proc_dir_entry * pd = xeno_base->subdir;
     struct proc_dir_entry * file;
     proc_memdata_t * memdata;
 
-	printk(KERN_ALERT "bd240 debug: dom_map_mem invoked, xeno_base %lx, subdir %lx\n", xeno_base, xeno_base->subdir);
- 
     while(pd != NULL){
 
         if((pd->mode & S_IFDIR) && ((dom_procdata_t *)pd->data)->domain == dom){
@@ -226,8 +214,6 @@ static int dom_map_mem(unsigned int dom, unsigned long pfn, int tot_pages)
                 memdata->pfn = pfn;
                 memdata->tot_pages = tot_pages;
                 file->data = memdata;
-
-				printk(KERN_ALERT "bd240 debug: associated memdata with proc, memdata %lx, pfn %lx, tot_pages %lx\n", file->data, memdata->pfn, memdata->tot_pages);
 
                 ret = 0;
                 break;
@@ -288,8 +274,6 @@ static int cmd_write_proc(struct file *file, const char *buffer,
         }
 
     } else {
-
-		printk(KERN_ALERT "bd240 debug: mapping dom %d, %lx, %lx\n", op.u.reqdommem.domain, op.u.reqdommem.start_pfn, op.u.reqdommem.tot_pages);
 
         ret = dom_map_mem(op.u.reqdommem.domain, op.u.reqdommem.start_pfn, 
                         op.u.reqdommem.tot_pages); 
@@ -366,8 +350,6 @@ static int __init init_module(void)
     /* set up /proc entries for dom 0 */
     create_proc_dom_entries(0);
 
-	printk(KERN_ALERT "bd240 debug: task 1 addr %lx\n", find_task_by_pid(1));
-    
     return 0;
 }
 
