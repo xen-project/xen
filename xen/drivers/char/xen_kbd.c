@@ -197,7 +197,7 @@ static void keyboard_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 #ifdef CONFIG_XEN_ATTENTION_KEY
         if ( !(status & (KBD_STAT_GTO | KBD_STAT_PERR | KBD_STAT_MOUSE_OBF)) )
         {
-            if ( (scancode & (~KBD_SCANCODE_KEYUP_MASK)) == XEN_ATTENTION_KEY )
+            if ( (scancode & ~KBD_SCANCODE_KEYUP_MASK) == XEN_ATTENTION_KEY )
             {
                 xen_attention_key_down = !(scancode & KBD_SCANCODE_KEYUP_MASK);
             } 
@@ -218,7 +218,7 @@ static void keyboard_interrupt(int irq, void *dev_id, struct pt_regs *regs)
         if ( p != NULL )
         {
             kbd_ring_push(status, scancode);
-            cpu_mask |= mark_guest_event(CONSOLE_OWNER, _EVENT_KBD);
+            cpu_mask |= mark_guest_event(p, _EVENT_KBD);
         }
     }
     
@@ -231,7 +231,7 @@ static void keyboard_interrupt(int irq, void *dev_id, struct pt_regs *regs)
     {
         put_task_struct(p);
         guest_event_notify(cpu_mask);
-    }    
+    }
 }
     
     
