@@ -39,7 +39,8 @@ struct scheduler
     void         (*add_task)       (struct domain *);
     void         (*free_task)      (struct domain *);
     void         (*rem_task)       (struct domain *);
-    void         (*wake_up)        (struct domain *);
+    void         (*sleep)          (struct domain *);
+    void         (*wake)           (struct domain *);
     void         (*do_block)       (struct domain *);
     task_slice_t (*do_schedule)    (s_time_t);
     int          (*control)        (struct sched_ctl_cmd *);
@@ -49,8 +50,6 @@ struct scheduler
     void         (*dump_cpu_state) (int);
     void         (*dump_runq_el)   (struct domain *);
     int          (*prn_state)      (int);
-    void         (*pause)          (struct domain *);
-	void		 (*unpause)		   (struct domain *);
 };
 
 /* per CPU scheduler information */
