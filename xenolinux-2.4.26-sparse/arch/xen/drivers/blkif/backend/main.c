@@ -176,6 +176,8 @@ static void end_block_io_op(struct buffer_head *bh, int uptodate)
         spin_unlock_irqrestore(&pend_prod_lock, flags);
         maybe_trigger_io_schedule();
     }
+
+    kmem_cache_free(buffer_head_cachep, bh);
 }
 
 
