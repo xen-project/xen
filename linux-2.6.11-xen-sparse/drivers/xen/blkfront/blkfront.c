@@ -170,8 +170,15 @@ static inline void flush_requests(void)
 module_init(xlblk_init);
 
 #if ENABLE_VBD_UPDATE
+static void update_vbds_task(void *unused)
+{ 
+    xlvbd_update_vbds();
+}
+
 static void vbd_update(void)
 {
+    static DECLARE_WORK(update_tq, update_vbds_task, NULL);
+    schedule_work(&update_tq);
 }
 #endif /* ENABLE_VBD_UPDATE */
 
