@@ -3,7 +3,7 @@
  * 
  * Simple buddy heap allocator for Xen.
  * 
- * Copyright (c) 2002 K A Fraser
+ * Copyright (c) 2002-2004 K A Fraser
  * 
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -63,6 +63,9 @@ static void map_alloc(unsigned long first_page, unsigned long nr_pages)
         ASSERT(!allocated_in_map(first_page + i));
 #endif
 
+    memguard_unguard_range(phys_to_virt(first_page << PAGE_SHIFT), 
+                           nr_pages << PAGE_SHIFT);
+
     curr_idx  = first_page / PAGES_PER_MAPWORD;
     start_off = first_page & (PAGES_PER_MAPWORD-1);
     end_idx   = (first_page + nr_pages) / PAGES_PER_MAPWORD;
@@ -92,6 +95,9 @@ static void map_free(unsigned long first_page, unsigned long nr_pages)
         ASSERT(allocated_in_map(first_page + i));
 #endif
 
+    memguard_guard_range(phys_to_virt(first_page << PAGE_SHIFT), 
+                         nr_pages << PAGE_SHIFT);
+
     curr_idx = first_page / PAGES_PER_MAPWORD;
     start_off = first_page & (PAGES_PER_MAPWORD-1);
     end_idx   = (first_page + nr_pages) / PAGES_PER_MAPWORD;
@@ -115,89 +121,12 @@ static void map_free(unsigned long first_page, unsigned long nr_pages)
  * BINARY BUDDY ALLOCATOR
  */
 
-typedef struct chunk_head_st chunk_head_t;
-
-struct chunk_head_st {
-    chunk_head_t  *next;
-    chunk_head_t **pprev;
-    int            level;
-};
-
 /* Linked lists of free chunks of different powers-of-two in size. */
-#define FREELIST_SIZE ((sizeof(void*)<<3)-PAGE_SHIFT)
-static chunk_head_t *free_head[FREELIST_SIZE];
-static chunk_head_t  free_tail[FREELIST_SIZE];
-#define FREELIST_EMPTY(_i) (free_head[_i] == &free_tail[i])
+#define NR_ORDERS 11 /* Up to 2^10 pages can be allocated at once. */
+static struct list_head free_head[NR_ORDERS];
 
 #define round_pgdown(_p)  ((_p)&PAGE_MASK)
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
-
-#ifdef MEMORY_GUARD
-
-/*
- * Debug build: free memory chunks are made inaccessible.
- */
-
-/* Make order-'o' pages inaccessible, from address 'p'. */
-static inline void GUARD(void *p, int o)
-{
-    p = (void *)((unsigned long)p&PAGE_MASK);
-    if ( p > (void *)&_end ) /* careful not to protect the 'free_tail' array */
-        memguard_guard_range(p, (1<<(o+PAGE_SHIFT)));
-}
-
-/* Make order-'o' pages accessible, from address 'p'. */
-static inline void UNGUARD(void *p, int o)
-{
-    p = (void *)((unsigned long)p&PAGE_MASK);
-    if ( p > (void *)&_end ) /* careful not to protect the 'free_tail' array */
-        memguard_unguard_range(p, (1<<(o+PAGE_SHIFT)));
-}
-
-/* Safe form of 'ch->level'. */
-static inline int HEAD_LEVEL(chunk_head_t *ch)
-{
-    int l;
-    ASSERT(memguard_is_guarded(ch));
-    UNGUARD(ch, 0);
-    l = ch->level;
-    GUARD(ch, 0);
-    return l;
-}
-
-/* Safe form of '*ch->pprev = l'. */
-static inline void UPDATE_PREV_FORWARDLINK(chunk_head_t *ch, chunk_head_t *l)
-{
-    ASSERT(((void *)ch->pprev < (void *)&_end) || 
-           memguard_is_guarded(ch->pprev));
-    UNGUARD(ch->pprev, 0);
-    *ch->pprev = l;
-    GUARD(ch->pprev, 0);
-}
-
-/* Safe form of 'ch->next->pprev = l'. */
-static inline void UPDATE_NEXT_BACKLINK(chunk_head_t *ch, chunk_head_t **l)
-{
-    ASSERT(((void *)ch->next < (void *)&_end) || 
-           memguard_is_guarded(ch->next));
-    UNGUARD(ch->next, 0);
-    ch->next->pprev = l;
-    GUARD(ch->next, 0);
-}
-
-#else
-
-/*
- * Non-debug build: free memory chunks are not made inaccessible.
- */
-
-#define GUARD(_p,_o) ((void)0)
-#define UNGUARD(_p,_o) ((void)0)
-#define HEAD_LEVEL(_ch) ((_ch)->level)
-#define UPDATE_PREV_FORWARDLINK(_ch,_link) (*(_ch)->pprev = (_link))
-#define UPDATE_NEXT_BACKLINK(_ch,_link) ((_ch)->next->pprev = (_link))
-
-#endif
 
 
 /*
@@ -207,15 +136,11 @@ static inline void UPDATE_NEXT_BACKLINK(chunk_head_t *ch, chunk_head_t **l)
 void __init init_page_allocator(unsigned long min, unsigned long max)
 {
     int i;
-    unsigned long range, bitmap_size, p, remaining;
-    chunk_head_t *ch;
+    unsigned long range, bitmap_size;
+    struct pfn_info *pg;
 
-    for ( i = 0; i < FREELIST_SIZE; i++ )
-    {
-        free_head[i]       = &free_tail[i];
-        free_tail[i].pprev = &free_head[i];
-        free_tail[i].next  = NULL;
-    }
+    for ( i = 0; i < NR_ORDERS; i++ )
+        INIT_LIST_HEAD(&free_head[i]);
 
     min = round_pgup  (min);
     max = round_pgdown(max);
@@ -232,33 +157,24 @@ void __init init_page_allocator(unsigned long min, unsigned long max)
     /* Free up the memory we've been given to play with. */
     map_free(min>>PAGE_SHIFT, range>>PAGE_SHIFT);
     
-    /* The buddy lists are addressed in high memory. */
-    min += PAGE_OFFSET;
-    max += PAGE_OFFSET;
-
-    p         = min;
-    remaining = range;
-    while ( remaining != 0 )
+    pg = &frame_table[min >> PAGE_SHIFT];
+    while ( range != 0 )
     {
         /*
-         * Next chunk is limited by alignment of p, but also must not be bigger
-         * than remaining bytes.
+         * Next chunk is limited by alignment of pg, but also must not be
+         * bigger than remaining bytes.
          */
-        for ( i = PAGE_SHIFT; (1<<(i+1)) <= remaining; i++ )
-            if ( p & (1<<i) ) break;
+        for ( i = 0; i < NR_ORDERS; i++ )
+            if ( ((page_to_pfn(pg) & (1 << i)) != 0) ||
+                 ((1 << (i + PAGE_SHIFT + 1)) > range) )
+                break;
 
-        ch = (chunk_head_t *)p;
-        p         += (1<<i);
-        remaining -= (1<<i);
-        i -= PAGE_SHIFT;
-        ch->level       = i;
-        ch->next        = free_head[i];
-        ch->pprev       = &free_head[i];
-        ch->next->pprev = &ch->next;
-        free_head[i]    = ch;
+        PFN_ORDER(pg) = i;
+        list_add_tail(&pg->list, &free_head[i]);
+
+        pg    += 1 << i;
+        range -= 1 << (i + PAGE_SHIFT);
     }
-
-    memguard_guard_range((void *)min, range);
 }
 
 
@@ -266,55 +182,36 @@ void __init init_page_allocator(unsigned long min, unsigned long max)
 unsigned long alloc_xenheap_pages(int order)
 {
     int i, attempts = 0;
-    chunk_head_t *alloc_ch, *spare_ch;
-    unsigned long           flags;
+    struct pfn_info *pg;
+    unsigned long flags;
 
 retry:
     spin_lock_irqsave(&alloc_lock, flags);
 
     /* Find smallest order which can satisfy the request. */
-    for ( i = order; i < FREELIST_SIZE; i++ )
-	if ( !FREELIST_EMPTY(i) ) 
+    for ( i = order; i < NR_ORDERS; i++ )
+	if ( !list_empty(&free_head[i]) )
 	    break;
 
-    if ( i == FREELIST_SIZE ) 
+    if ( i == NR_ORDERS ) 
         goto no_memory;
  
-    /* Unlink a chunk. */
-    alloc_ch = free_head[i];
-    UNGUARD(alloc_ch, i);
-    free_head[i] = alloc_ch->next;
-    /* alloc_ch->next->pprev = alloc_ch->pprev */
-    UPDATE_NEXT_BACKLINK(alloc_ch, alloc_ch->pprev);
+    pg = list_entry(free_head[i].next, struct pfn_info, list);
+    list_del(&pg->list);
 
-    /* We may have to break the chunk a number of times. */
+    /* We may have to halve the chunk a number of times. */
     while ( i != order )
     {
-        /* Split into two equal parts. */
-        i--;
-        spare_ch = (chunk_head_t *)((char *)alloc_ch + (1<<(i+PAGE_SHIFT)));
-
-        /* Create new header for spare chunk. */
-        spare_ch->level = i;
-        spare_ch->next  = free_head[i];
-        spare_ch->pprev = &free_head[i];
-
-        /* Link in the spare chunk. */
-        /* spare_ch->next->pprev = &spare_ch->next */
-        UPDATE_NEXT_BACKLINK(spare_ch, &spare_ch->next);
-        free_head[i] = spare_ch;
-        GUARD(spare_ch, i);
+        PFN_ORDER(pg) = --i;
+        list_add_tail(&pg->list, &free_head[i]);
+        pg += 1 << i;
     }
     
-    map_alloc(virt_to_phys(alloc_ch)>>PAGE_SHIFT, 1<<order);
+    map_alloc(page_to_pfn(pg), 1<<order);
 
     spin_unlock_irqrestore(&alloc_lock, flags);
 
-#ifdef MEMORY_GUARD
-    memset(alloc_ch, 0x55, 1 << (order + PAGE_SHIFT));
-#endif
-
-    return((unsigned long)alloc_ch);
+    return (unsigned long)page_to_virt(pg);
 
  no_memory:
     spin_unlock_irqrestore(&alloc_lock, flags);
@@ -335,63 +232,42 @@ retry:
 /* Free 2^@order pages at VIRTUAL address @p. */
 void free_xenheap_pages(unsigned long p, int order)
 {
-    unsigned long size = 1 << (order + PAGE_SHIFT);
-    chunk_head_t *ch;
+    unsigned long mask;
+    struct pfn_info *pg = virt_to_page(p);
     unsigned long flags;
-    unsigned long pfn = virt_to_phys((void *)p) >> PAGE_SHIFT;
 
     spin_lock_irqsave(&alloc_lock, flags);
 
-#ifdef MEMORY_GUARD
-    memset((void *)p, 0xaa, size);
-#endif
-
-    map_free(pfn, 1<<order);
+    map_free(page_to_pfn(pg), 1<<order);
     
     /* Merge chunks as far as possible. */
     for ( ; ; )
     {
-        if ( (p & size) )
+        mask = 1 << order;
+
+        if ( (page_to_pfn(pg) & mask) )
         {
             /* Merge with predecessor block? */
-            if ( allocated_in_map(pfn-(1<<order)) )
+            if ( allocated_in_map(page_to_pfn(pg)-mask) ||
+                 (PFN_ORDER(pg-mask) != order) )
                 break;
-            ch = (chunk_head_t *)(p - size);
-            if ( HEAD_LEVEL(ch) != order )
-                break;
-            p   -= size;
-            pfn -= 1<<order;
+            list_del(&(pg-mask)->list);
+            pg -= mask;
         }
         else
         {
             /* Merge with successor block? */
-            if ( allocated_in_map(pfn+(1<<order)) )
+            if ( allocated_in_map(page_to_pfn(pg)+mask) ||
+                 (PFN_ORDER(pg+mask) != order) )
                 break;
-            ch = (chunk_head_t *)(p + size);
-            if ( HEAD_LEVEL(ch) != order )
-                break;
+            list_del(&(pg+mask)->list);
         }
         
-        /* Okay, unlink the neighbour. */
-        UNGUARD(ch, order);
-        /* *ch->pprev = ch->next */
-        UPDATE_PREV_FORWARDLINK(ch, ch->next);
-        /* ch->next->pprev = ch->pprev */
-        UPDATE_NEXT_BACKLINK(ch, ch->pprev);
-
         order++;
-        size <<= 1;
     }
 
-    /* Okay, add the final chunk to the appropriate free list. */
-    ch = (chunk_head_t *)p;
-    ch->level = order;
-    ch->pprev = &free_head[order];
-    ch->next  = free_head[order];
-    /* ch->next->pprev = &ch->next */
-    UPDATE_NEXT_BACKLINK(ch, &ch->next);
-    free_head[order] = ch;
-    GUARD(ch, order);
+    PFN_ORDER(pg) = order;
+    list_add_tail(&pg->list, &free_head[order]);
 
     spin_unlock_irqrestore(&alloc_lock, flags);
 }
