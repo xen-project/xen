@@ -99,6 +99,10 @@ static u64 processed_system_time;   /* System time (ns) at last processing. */
 
 #define NS_PER_TICK (1000000000ULL/HZ)
 
+#ifndef NSEC_PER_SEC
+#define NSEC_PER_SEC (1000000000L)
+#endif
+
 #define HANDLE_USEC_UNDERFLOW(_tv)         \
     do {                                   \
         while ( (_tv).tv_usec < 0 )        \
@@ -115,6 +119,17 @@ static u64 processed_system_time;   /* System time (ns) at last processing. */
             (_tv).tv_sec++;                \
         }                                  \
     } while ( 0 )
+static inline void __normalize_time(time_t *sec, s64 *nsec)
+{
+	while (*nsec >= NSEC_PER_SEC) {
+		(*nsec) -= NSEC_PER_SEC;
+		(*sec)++;
+	}
+	while (*nsec < 0) {
+		(*nsec) += NSEC_PER_SEC;
+		(*sec)--;
+	}
+}
 
 /* Dynamically-mapped IRQs. */
 static int time_irq, debug_irq;
@@ -256,6 +271,7 @@ void do_gettimeofday(struct timeval *tv)
 {
     unsigned long flags, lost;
     struct timeval _tv;
+    s64 nsec;
 
  again:
     read_lock_irqsave(&xtime_lock, flags);
@@ -266,8 +282,9 @@ void do_gettimeofday(struct timeval *tv)
     _tv.tv_sec   = xtime.tv_sec;
     _tv.tv_usec += xtime.tv_usec;
 
-    _tv.tv_usec += 
-        (unsigned long)(shadow_system_time - processed_system_time) / 1000UL;
+    nsec = shadow_system_time - processed_system_time;
+    __normalize_time(&_tv.tv_sec, &nsec);
+    _tv.tv_usec += (long)nsec / 1000L;
 
     if ( unlikely(!TIME_VALUES_UP_TO_DATE) )
     {
@@ -304,7 +321,8 @@ void do_gettimeofday(struct timeval *tv)
 void do_settimeofday(struct timeval *tv)
 {
     struct timeval newtv;
-    suseconds_t usec;
+    s64            nsec;
+    suseconds_t    usec;
     
     if ( !INDEPENDENT_WALLCLOCK() )
         return;
@@ -318,8 +336,11 @@ void do_settimeofday(struct timeval *tv)
      */
  again:
     usec = tv->tv_usec - __get_time_delta_usecs();
-    usec -= 
-        (unsigned long)(shadow_system_time - processed_system_time) / 1000UL;
+
+    nsec = shadow_system_time - processed_system_time;
+    __normalize_time(&tv->tv_sec, &nsec);
+    usec -= (long)nsec / 1000L;
+
     if ( unlikely(!TIME_VALUES_UP_TO_DATE) )
     {
         __get_time_values_from_xen();
