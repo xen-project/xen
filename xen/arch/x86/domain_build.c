@@ -452,15 +452,17 @@ int construct_dom0(struct domain *d,
     si = (start_info_t *)vstartinfo_start;
     memset(si, 0, PAGE_SIZE);
     si->nr_pages     = nr_pages;
-#define NASTY_HACK
-#ifdef NASTY_HACK
-    si->shared_info  = d->next_io_page << PAGE_SHIFT;
-    set_machinetophys(virt_to_phys(d->shared_info) >> PAGE_SHIFT,
-                      d->next_io_page);
-    d->next_io_page++;
-#else
-    si->shared_info  = virt_to_phys(d->shared_info);
-#endif
+
+    if ( opt_dom0_translate )
+    {
+        si->shared_info  = d->next_io_page << PAGE_SHIFT;
+        set_machinetophys(virt_to_phys(d->shared_info) >> PAGE_SHIFT,
+                          d->next_io_page);
+        d->next_io_page++;
+    }
+    else
+        si->shared_info  = virt_to_phys(d->shared_info);
+
     si->flags        = SIF_PRIVILEGED | SIF_INITDOMAIN;
     si->pt_base      = vpt_start;
     si->nr_pt_frames = nr_pt_pages;
