@@ -266,8 +266,9 @@
 40ee75a967sxgcRY4Q7zXoVUaJ4flA tools/examples/vif-bridge
 40e15b7edWEtBf_oe3eBwGKuh1dyzQ tools/examples/vifctl
 40ee75a93cqxHp6MiYXxxwR5j2_8QQ tools/examples/xend-config.sxp
-40cf2937oKlROYOJTN8GWwWM5AmjBg tools/examples/xmdefaults
-40dfd40auJwNnb8NoiSnRkvZaaXkUg tools/examples/xmnetbsd
+41090ec8Pj_bkgCBpg2W7WfmNkumEA tools/examples/xmdefaults
+40cf2937oKlROYOJTN8GWwWM5AmjBg tools/examples/xmexample
+40dfd40auJwNnb8NoiSnRkvZaaXkUg tools/examples/xmnetbsd-example
 3fbba6dbDfYvJSsw9500b4SZyUhxjQ tools/libxc/Makefile
 3fbba6dc1uU7U3IFeF6A-XEOYF2MkQ tools/libxc/rpm.spec
 3fbba6dcrNxtygEcgJYAJJ1gCQqfsA tools/libxc/xc.h
