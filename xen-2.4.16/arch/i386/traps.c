@@ -362,7 +362,8 @@ asmlinkage void do_nmi(struct pt_regs * regs, long error_code)
 
 asmlinkage void math_state_restore(struct pt_regs *regs, long error_code)
 {
-    __asm__ __volatile__("clts");
+    /* Prevent recursion. */
+    clts();
 
     if ( !(current->flags & PF_USEDFPU) )
     {
