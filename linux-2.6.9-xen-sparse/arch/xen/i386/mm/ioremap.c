@@ -37,20 +37,17 @@ void __init bt_iounmap(void *addr, unsigned long size)
 #else
 
 /*
- * Is @address within a RAM page that is local to this virtual machine (i.e.,
- * not an I/O page; not a RAM page belonging to another VM). See the comment
- * that accompanies pte_pfn() in pgtable-2level.h to understand why this works.
+ * Does @address reside within a non-highmem page that is local to this virtual
+ * machine (i.e., not an I/O page, nor a memory page belonging to another VM).
+ * See the comment that accompanies pte_pfn() in pgtable-2level.h to understand
+ * why this works.
  */
-static inline int is_local_ram(unsigned long address)
+static inline int is_local_lowmem(unsigned long address)
 {
+	extern unsigned long max_low_pfn;
 	unsigned long mfn = address >> PAGE_SHIFT;
 	unsigned long pfn = mfn_to_pfn(mfn);
-	if (pfn < max_mapnr) {
-		if (pfn_to_mfn(pfn) == mfn)
-			return 1; /* local ram */
-		printk("is_local_ram: ioremapping foreign ram (a bad idea).\n");
-	}
-	return 0; /* i/o memory or foreign ram */
+	return ((pfn < max_low_pfn) && (pfn_to_mfn(pfn) == mfn));
 }
 
 static inline void remap_area_pte(pte_t * pte, unsigned long address, unsigned long size,
@@ -166,7 +163,7 @@ void __iomem * __ioremap(unsigned long phys_addr, unsigned long size, unsigned l
 	/*
 	 * Don't allow anybody to remap normal RAM that we're using..
 	 */
-	if (is_local_ram(phys_addr)) {
+	if (is_local_lowmem(phys_addr)) {
 		char *t_addr, *t_end;
 		struct page *page;
 
@@ -233,7 +230,7 @@ void __iomem *ioremap_nocache (unsigned long phys_addr, unsigned long size)
 	/* Guaranteed to be > phys_addr, as per __ioremap() */
 	last_addr = phys_addr + size - 1;
 
-	if (is_local_ram(last_addr)) { 
+	if (is_local_lowmem(last_addr)) { 
 		struct page *ppage = virt_to_page(bus_to_virt(phys_addr));
 		unsigned long npages;
 
@@ -270,7 +267,7 @@ void iounmap(volatile void __iomem *addr)
 		return;
 	} 
 
-	if (p->flags && is_local_ram(p->phys_addr)) { 
+	if (p->flags && is_local_lowmem(p->phys_addr)) { 
 		change_page_attr(virt_to_page(bus_to_virt(p->phys_addr)),
 				 p->size >> PAGE_SHIFT,
 				 PAGE_KERNEL); 				 
