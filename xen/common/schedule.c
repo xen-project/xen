@@ -91,11 +91,13 @@ static struct ac_timer t_timer[NR_CPUS];
 
 void free_domain_struct(struct domain *d)
 {
-    struct exec_domain *ed;
+    int i;
 
     SCHED_OP(free_task, d);
-    for_each_exec_domain(d, ed)
-        arch_free_exec_domain_struct(ed);
+    for (i = 0; i < MAX_VIRT_CPUS; i++)
+        if ( d->exec_domain[i] )
+            arch_free_exec_domain_struct(d->exec_domain[i]);
+
     arch_free_domain_struct(d);
 }
 
