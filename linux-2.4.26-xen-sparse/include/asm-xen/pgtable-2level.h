@@ -58,7 +58,19 @@ static inline pmd_t * pmd_offset(pgd_t * dir, unsigned long address)
  *     then we'll have p2m(m2p(MFN))==MFN.
  * If we detect a special mapping then it doesn't have a 'struct page'.
  * We force !VALID_PAGE() by returning an out-of-range pointer.
+ *
+ * NB. These checks require that, for any MFN that is not in our reservation,
+ * there is no PFN such that p2m(PFN) == MFN. Otherwise we can get confused if
+ * we are foreign-mapping the MFN, and the other domain as m2p(MFN) == PFN.
+ * Yikes! Various places must poke in INVALID_P2M_ENTRY for safety.
+ * 
+ * NB2. When deliberately mapping foreign pages into the p2m table, you *must*
+ *      use FOREIGN_FRAME(). This will cause pte_pfn() to choke on it, as we
+ *      require. In all the cases we care about, the high bit gets shifted out
+ *      (e.g., phys_to_machine()) so behaviour there is correct.
  */
+#define INVALID_P2M_ENTRY (~0UL)
+#define FOREIGN_FRAME(_m) ((_m) | (1UL<<((sizeof(unsigned long)*8)-1)))
 #define pte_page(_pte)                                        \
 ({                                                            \
     unsigned long mfn = (_pte).pte_low >> PAGE_SHIFT;         \

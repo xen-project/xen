@@ -29,41 +29,6 @@ hypercall lock anyhow (at least initially).
 ********/
 
 
-/**
-
-FIXME:
-
-The shadow table flush command is dangerous on SMP systems as the
-guest may be using the L2 on one CPU while the other is trying to 
-blow the table away. 
-
-The current save restore code works around this by not calling FLUSH,
-but by calling CLEAN2 which leaves all L2s in tact (this is probably
-quicker anyhow).
-
-Even so, we have to be very careful. The flush code may need to cause
-a TLB flush on another CPU. It needs to do this while holding the
-shadow table lock. The trouble is, the guest may be in the shadow page
-fault handler spinning waiting to grab the shadow lock. It may have
-intterupts disabled, hence we can't use the normal flush_tlb_cpu
-mechanism.
-
-For the moment, we have a grim race whereby the spinlock in the shadow
-fault handler is actually a try lock, in a loop with a helper for the
-tlb flush code.
-
-A better soloution would be to take a new flush lock, then raise a
-per-domain soft irq on the other CPU.  The softirq will switch to
-init's PTs, then do an atomic inc of a variable to count himself in,
-then spin on a lock.  Having noticed that the other guy has counted
-in, flush the shadow table, then release him by dropping the lock. He
-will then reload cr3 from mm.page_table on the way out of the softirq.
-
-In domian-softirq context we know that the guy holds no locks and has
-interrupts enabled. Nothing can go wrong ;-)
-
-**/
-
 static inline void free_shadow_page(struct mm_struct *m, 
                                     struct pfn_info *page)
 {
@@ -381,9 +346,9 @@ static int shadow_mode_table_op(struct domain *d,
 		d->mm.shadow_dirty_net_count   = 0;
 		d->mm.shadow_dirty_block_count = 0;
 	
-		sc->pages = d->tot_pages;
+		sc->pages = d->max_pages;
 
-		if( d->tot_pages > sc->pages || 
+		if( d->max_pages > sc->pages || 
 			!sc->dirty_bitmap || !d->mm.shadow_dirty_bitmap )
 		{
 			rc = -EINVAL;
@@ -393,10 +358,10 @@ static int shadow_mode_table_op(struct domain *d,
 	
 #define chunk (8*1024) // do this in 1KB chunks for L1 cache
 	
-		for(i=0;i<d->tot_pages;i+=chunk)
+		for(i=0;i<d->max_pages;i+=chunk)
 		{
-			int bytes = ((  ((d->tot_pages-i) > (chunk))?
-							(chunk):(d->tot_pages-i) ) + 7) / 8;
+			int bytes = ((  ((d->max_pages-i) > (chunk))?
+							(chunk):(d->max_pages-i) ) + 7) / 8;
 	    
 			copy_to_user( sc->dirty_bitmap + (i/(8*sizeof(unsigned long))),
 						  d->mm.shadow_dirty_bitmap +(i/(8*sizeof(unsigned long))),
@@ -428,21 +393,21 @@ static int shadow_mode_table_op(struct domain *d,
 		sc->stats.dirty_net_count   = d->mm.shadow_dirty_net_count;
 		sc->stats.dirty_block_count = d->mm.shadow_dirty_block_count;
 	
-		if( d->tot_pages > sc->pages || 
+		if( d->max_pages > sc->pages || 
 			!sc->dirty_bitmap || !d->mm.shadow_dirty_bitmap )
 		{
 			rc = -EINVAL;
 			goto out;
 		}
 	
-		sc->pages = d->tot_pages;
+		sc->pages = d->max_pages;
 	
 #define chunk (8*1024) // do this in 1KB chunks for L1 cache
 	
-		for(i=0;i<d->tot_pages;i+=chunk)
+		for(i=0;i<d->max_pages;i+=chunk)
 		{
-			int bytes = ((  ((d->tot_pages-i) > (chunk))?
-							(chunk):(d->tot_pages-i) ) + 7) / 8;
+			int bytes = ((  ((d->max_pages-i) > (chunk))?
+							(chunk):(d->max_pages-i) ) + 7) / 8;
 	    
 			copy_to_user( sc->dirty_bitmap + (i/(8*sizeof(unsigned long))),
 						  d->mm.shadow_dirty_bitmap +(i/(8*sizeof(unsigned long))),
@@ -475,7 +440,13 @@ int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
     unsigned int cmd = sc->op;
     int rc = 0;
 
-    spin_lock(&d->mm.shadow_lock);
+	if (d == current)
+		printk("Attempt to control your _own_ shadow tables. I hope you know what you're doing!\n");
+
+	domain_pause(d);
+	synchronise_pagetables(d->processor);
+
+	spin_lock(&d->mm.shadow_lock);
 
     if ( cmd == DOM0_SHADOW_CONTROL_OP_OFF )
     {
@@ -502,9 +473,9 @@ int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
         rc = -EINVAL;
     }
 
-	flush_tlb_cpu(d->processor);
-   
     spin_unlock(&d->mm.shadow_lock);
+
+	domain_unpause(d);
 
     return rc;
 }
@@ -518,6 +489,7 @@ static inline struct pfn_info *alloc_shadow_page(struct mm_struct *m)
 void unshadow_table( unsigned long gpfn, unsigned int type )
 {
     unsigned long spfn;
+	struct domain *d = frame_table[gpfn].u.inuse.domain;
 
     SH_VLOG("unshadow_table type=%08x gpfn=%08lx",
             type,
@@ -530,11 +502,11 @@ void unshadow_table( unsigned long gpfn, unsigned int type )
     // even in the SMP guest case, there won't be a race here as
     // this CPU was the one that cmpxchg'ed the page to invalid
 
-    spfn = __shadow_status(&current->mm, gpfn) & PSH_pfn_mask;
+    spfn = __shadow_status(&d->mm, gpfn) & PSH_pfn_mask;
 
-    delete_shadow_status(&current->mm, gpfn);
+    delete_shadow_status(&d->mm, gpfn);
 
-    free_shadow_page( &current->mm, &frame_table[spfn] );
+    free_shadow_page(&d->mm, &frame_table[spfn] );
 
 }
 
@@ -651,15 +623,7 @@ int shadow_fault( unsigned long va, long error_code )
 
     // take the lock and reread gpte
 
-    while( unlikely(!spin_trylock(&current->mm.shadow_lock)) )
-	{
-		extern volatile unsigned long flush_cpumask;
-		if ( test_and_clear_bit(smp_processor_id(), &flush_cpumask) )
-			local_flush_tlb();
-		rep_nop();
-	}
-	
-	ASSERT(spin_is_locked(&current->mm.shadow_lock));
+	spin_lock(&current->mm.shadow_lock);
 	
     if ( unlikely(__get_user(gpte, (unsigned long*)&linear_pg_table[va>>PAGE_SHIFT])) )
     {

@@ -263,9 +263,9 @@ static void network_alloc_rx_buffers(struct net_device *dev)
         
         rx_pfn_array[nr_pfns] = virt_to_machine(skb->head) >> PAGE_SHIFT;
 
-	/* remove this page from pseudo phys map (migration optimization) */
+	/* Remove this page from pseudo phys map before passing back to Xen. */
 	phys_to_machine_mapping[virt_to_phys(skb->head) >> PAGE_SHIFT] 
-	    = 0x80000001;
+	    = INVALID_P2M_ENTRY;
 
         rx_mcl[nr_pfns].op = __HYPERVISOR_update_va_mapping;
         rx_mcl[nr_pfns].args[0] = (unsigned long)skb->head >> PAGE_SHIFT;
@@ -478,15 +478,6 @@ static int netif_poll(struct net_device *dev, int *pbudget)
         mcl->args[2] = 0;
         mcl++;
         (void)HYPERVISOR_multicall(rx_mcl, mcl - rx_mcl);
-
-#if 0 
-	if (unlikely(rx_mcl[0].args[5] != 0))
-	    printk(KERN_ALERT"Hypercall0 failed %u\n",np->rx->resp_prod);
-
-	if (unlikely(rx_mcl[1].args[5] != 0))
-	    printk(KERN_ALERT"Hypercall1 failed %u\n",np->rx->resp_prod);
-#endif
-
     }
 
     while ( (skb = __skb_dequeue(&rxq)) != NULL )

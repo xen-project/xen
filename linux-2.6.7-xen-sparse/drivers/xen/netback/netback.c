@@ -204,6 +204,12 @@ static void net_rx_action(unsigned long unused)
         mdata   = virt_to_machine(vdata);
         new_mfn = get_new_mfn();
         
+        /*
+         * Set the new P2M table entry before reassigning the old data page.
+         * Heed the comment in pgtable-2level.h:pte_page(). :-)
+         */
+        phys_to_machine_mapping[__pa(skb->data) >> PAGE_SHIFT] = new_mfn;
+        
         mmu[0].ptr  = (new_mfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
         mmu[0].val  = __pa(vdata) >> PAGE_SHIFT;  
         mmu[1].ptr  = MMU_EXTENDED_COMMAND;
@@ -249,8 +255,6 @@ static void net_rx_action(unsigned long unused)
         new_mfn = mcl[0].args[1] >> PAGE_SHIFT;
         mdata   = ((mmu[2].ptr & PAGE_MASK) |
                    ((unsigned long)skb->data & ~PAGE_MASK));
-        
-        phys_to_machine_mapping[__pa(skb->data) >> PAGE_SHIFT] = new_mfn;
         
         atomic_set(&(skb_shinfo(skb)->dataref), 1);
         skb_shinfo(skb)->nr_frags = 0;
@@ -556,7 +560,7 @@ static void net_tx_action(unsigned long unused)
         }
 
         phys_to_machine_mapping[__pa(MMAP_VADDR(pending_idx)) >> PAGE_SHIFT] =
-            txreq.addr >> PAGE_SHIFT;
+            FOREIGN_FRAME(txreq.addr >> PAGE_SHIFT);
 
         __skb_put(skb, PKT_PROT_LEN);
         memcpy(skb->data, 

@@ -299,7 +299,7 @@ unsigned long allocate_empty_lowmem_region(unsigned long pages)
         pte = pte_offset_kernel(pmd, (vstart + (i*PAGE_SIZE))); 
         pfn_array[i] = pte->pte_low >> PAGE_SHIFT;
         queue_l1_entry_update(pte, 0);
-        phys_to_machine_mapping[__pa(vstart)>>PAGE_SHIFT] = 0xdeadbeef;
+        phys_to_machine_mapping[__pa(vstart)>>PAGE_SHIFT] = INVALID_P2M_ENTRY;
     }
 
     flush_page_update_queue();

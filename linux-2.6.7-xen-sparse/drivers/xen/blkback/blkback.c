@@ -415,7 +415,7 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
         mcl[i].args[3] = blkif->domid;
 
         phys_to_machine_mapping[__pa(MMAP_VADDR(pending_idx, i))>>PAGE_SHIFT] =
-            phys_seg[i].buffer >> PAGE_SHIFT;
+            FOREIGN_FRAME(phys_seg[i].buffer >> PAGE_SHIFT);
     }
 
     if ( unlikely(HYPERVISOR_multicall(mcl, nr_psegs) != 0) )

@@ -36,12 +36,15 @@ typedef struct user_balloon_op {
 } user_balloon_op_t;
 /* END OF USER DEFINE */
 
-/* Dead entry written into balloon-owned entries in the PMT. */
-#define DEAD 0xdeadbeef
-
 static struct proc_dir_entry *balloon_pde;
 unsigned long credit;
 static unsigned long current_pages, most_seen_pages;
+
+/*
+ * Dead entry written into balloon-owned entries in the PMT.
+ * It is deliberately different to INVALID_P2M_ENTRY.
+ */
+#define DEAD 0xdead1234
 
 static inline pte_t *get_ptep(unsigned long addr)
 {
@@ -79,17 +82,16 @@ static unsigned long inflate_balloon(unsigned long num_pages)
     for ( i = 0; i < num_pages; i++, currp++ )
     {
 	struct page *page = alloc_page(GFP_HIGHUSER);
-	unsigned long pfn =  page - mem_map;
+	unsigned long pfn = page - mem_map;
 
         /* If allocation fails then free all reserved pages. */
-        if ( page == 0 )
+        if ( page == NULL )
         {
-            printk(KERN_ERR "Unable to inflate balloon by %ld, only %ld pages free.",
-                   num_pages, i);
+            printk(KERN_ERR "Unable to inflate balloon by %ld, only"
+                   " %ld pages free.", num_pages, i);
             currp = parray;
-            for(j = 0; j < i; j++, ++currp){
+            for ( j = 0; j < i; j++, currp++ )
                 __free_page((struct page *) (mem_map + *currp));
-            }
 	    ret = -EFAULT;
             goto cleanup;
         }
@@ -102,9 +104,8 @@ static unsigned long inflate_balloon(unsigned long num_pages)
     {
 	unsigned long mfn = phys_to_machine_mapping[*currp];
         curraddr = (unsigned long)page_address(mem_map + *currp);
-	if (curraddr)
+	if ( curraddr != 0 )
             queue_l1_entry_update(get_ptep(curraddr), 0);
-
         phys_to_machine_mapping[*currp] = DEAD;
         *currp = mfn;
     }
@@ -313,17 +314,18 @@ claim_new_pages(unsigned long num_pages)
     XEN_flush_page_update_queue();
     new_page_cnt = HYPERVISOR_dom_mem_op(MEMOP_increase_reservation, 
                                 parray, num_pages, 0);
-    if (new_page_cnt != num_pages)
+    if ( new_page_cnt != num_pages )
     {
         printk(KERN_WARNING
             "claim_new_pages: xen granted only %lu of %lu requested pages\n",
             new_page_cnt, num_pages);
 
-	/* XXX
-	 * avoid xen lockup when user forgot to setdomainmaxmem.  xen
-	 * usually can dribble out a few pages and then hangs
+	/* 
+	 * Avoid xen lockup when user forgot to setdomainmaxmem. Xen
+	 * usually can dribble out a few pages and then hangs.
 	 */
-	if (new_page_cnt < 1000) {
+	if ( new_page_cnt < 1000 )
+        {
             printk(KERN_WARNING "Remember to use setdomainmaxmem\n");
 	    HYPERVISOR_dom_mem_op(MEMOP_decrease_reservation, 
                                 parray, new_page_cnt, 0);
@@ -331,7 +333,7 @@ claim_new_pages(unsigned long num_pages)
 	}
     }
     memcpy(phys_to_machine_mapping+most_seen_pages, parray,
-            new_page_cnt * sizeof(unsigned long));
+           new_page_cnt * sizeof(unsigned long));
 
     pagetable_extend(most_seen_pages,new_page_cnt);
 
@@ -465,12 +467,15 @@ static int __init init_module(void)
     /* 
      * make a new phys map if mem= says xen can give us memory  to grow
      */
-    if (max_pfn > start_info.nr_pages) {
+    if ( max_pfn > start_info.nr_pages )
+    {
         extern unsigned long *phys_to_machine_mapping;
         unsigned long *newmap;
         newmap = (unsigned long *)vmalloc(max_pfn * sizeof(unsigned long));
-        phys_to_machine_mapping = memcpy(newmap, phys_to_machine_mapping,
-            start_info.nr_pages * sizeof(unsigned long));
+        memset(newmap, ~0, max_pfn * sizeof(unsigned long));
+        memcpy(newmap, phys_to_machine_mapping,
+               start_info.nr_pages * sizeof(unsigned long));
+        phys_to_machine_mapping = newmap;
     }
 
     return 0;
