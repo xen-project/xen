@@ -10,13 +10,14 @@ public class ParseVdDelete extends CommandParser {
     public void parse(Defaults d, LinkedList args)
         throws ParseFailedException, CommandFailedException {
         String vd_key = getStringParameter(args, 'k', "");
+        boolean force = getFlagParameter(args,'f');
 
         if (vd_key.equals("")) {
             throw new ParseFailedException("Expected -k<key>");
         }
 
         loadState();
-        String output = new CommandVdDelete(vd_key).execute();
+        String output = new CommandVdDelete(vd_key,force).execute();
         if (output != null) {
             System.out.println(output);
         }
@@ -29,11 +30,11 @@ public class ParseVdDelete extends CommandParser {
     }
 
     public String getUsage() {
-        return "-k<key>";
+        return "-k<key> [-f]";
     }
 
     public String getHelpText() {
-        return "Deletes the virtual disk with the specified key.";
+        return "Deletes the virtual disk with the specified key. -f forces deletion even if the disk is in use.";
     }
 
 }

@@ -100,13 +100,6 @@ class XMLHelper {
                         + "]");
             }
         }
-
-        /* parse virtual block devices */
-        parseVirtualBlockDevices(
-            vdm,
-            document.getElementsByTagName("virtual_block_device"));
-
-        return;
     }
 
     /**
@@ -188,37 +181,6 @@ class XMLHelper {
                     true);
 
             pm.addXenoPartition(partition);
-        }
-    }
-
-    /**
-     * Parse a list of virtual block device nodes.
-     * @param vdm The VirtualDiskManager to configure. 
-     * @param nl The node list.
-     */
-    private static void parseVirtualBlockDevices(
-        VirtualDiskManager vdm,
-        NodeList nl) {
-        for (int loop = 0; loop < nl.getLength(); loop++) {
-            Node node = nl.item(loop);
-            Mode mode;
-
-            if (XMLHelper
-                .getText(XMLHelper.getSubNode("mode", node))
-                .equals("rw")) {
-                mode = Mode.READ_WRITE;
-            } else {
-                mode = Mode.READ_ONLY;
-            }
-
-            vdm.createVirtualBlockDevice(
-                vdm.getVirtualDisk(
-                    XMLHelper.getText(XMLHelper.getSubNode("key", node))),
-                Integer.parseInt(
-                    XMLHelper.getText(XMLHelper.getSubNode("domain", node))),
-                Integer.parseInt(
-                    XMLHelper.getText(XMLHelper.getSubNode("vbdnum", node))),
-                mode);
         }
     }
 }

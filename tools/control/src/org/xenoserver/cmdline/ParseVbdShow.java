@@ -1,29 +1,29 @@
 package org.xenoserver.cmdline;
 
-import java.util.Iterator;
 import java.util.LinkedList;
 
 import org.xenoserver.control.CommandFailedException;
+import org.xenoserver.control.CommandVbdList;
 import org.xenoserver.control.Defaults;
 import org.xenoserver.control.Library;
 import org.xenoserver.control.VirtualBlockDevice;
-import org.xenoserver.control.VirtualDiskManager;
 
 public class ParseVbdShow extends CommandParser {
     public void parse(Defaults d, LinkedList args)
         throws ParseFailedException, CommandFailedException {
         loadState();
-        Iterator i = VirtualDiskManager.IT.getVirtualBlockDevices();
+        CommandVbdList list = new CommandVbdList();
+        list.execute();
+        VirtualBlockDevice[] vbds = list.vbds();
         System.out.println("key         dom vbd mode");
-        while (i.hasNext()) {
-            VirtualBlockDevice vbd = (VirtualBlockDevice) i.next();
-            System.out.println( vbd.getVirtualDisk().getKey()
+        for (int i=0; i<vbds.length; i++) {
+            System.out.println( vbds[i].getVirtualDisk().getKey()
                     + "  "
-                    + Library.format(vbd.getDomain(), 3, false)
+                    + Library.format(vbds[i].getDomain(), 3, false)
                     + " "
-                    + Library.format(vbd.getVbdNum(), 3, false)
+                    + Library.format(vbds[i].getVbdNum(), 3, false)
                     + " "
-                    + vbd.getMode().toString());
+                    + vbds[i].getMode().toString());
         }
     }
 

@@ -45,7 +45,7 @@ public class CommandVbdCreate extends Command {
         }
 
         VirtualBlockDevice vbd =
-            VirtualDiskManager.IT.createVirtualBlockDevice(
+            new VirtualBlockDevice(
                 vd,
                 domain_id,
                 vbd_num,

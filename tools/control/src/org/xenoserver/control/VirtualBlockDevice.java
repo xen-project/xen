@@ -5,8 +5,6 @@
 
 package org.xenoserver.control;
 
-import java.io.PrintWriter;
-
 /**
  * A virtual block device; a mapping from a domain-specific number to a virtual
  * disk with associated access mode.
@@ -37,19 +35,6 @@ public class VirtualBlockDevice {
         this.domain = domain;
         this.vbdNum = vbdNum;
         this.mode = mode;
-    }
-
-    /**
-     * Dump the virtual block device as XML.
-     * @param out The writer to dump to.
-     */
-    void dumpAsXML(PrintWriter out) {
-        out.println("  <virtual_block_device>");
-        out.println("    <key>" + vd.getKey() + "</key>");
-        out.println("    <domain>" + domain + "</domain>");
-        out.println("    <vbdnum>" + vbdNum + "</vbdnum>");
-        out.println("    <mode>" + mode + "</mode>");
-        out.println("  </virtual_block_device>");
     }
 
     /**

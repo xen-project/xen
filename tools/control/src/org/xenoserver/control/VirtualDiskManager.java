@@ -21,8 +21,6 @@ public class VirtualDiskManager {
     private VirtualDisk freeDisk;
     /** The map of keys to virtual disks. */
     private LinkedHashMap virtualDisks = new LinkedHashMap(100);
-    /** The map of (domain,vbdnum) to virtual block devices. */
-    private LinkedHashMap virtualBlockDevices = new LinkedHashMap(100);
 
     /**
      * VDM constructor, private as it's a singleton.
@@ -101,60 +99,11 @@ public class VirtualDiskManager {
     }
 
     /**
-     * Create a new virtual block device.
-     * @param vd The virtual disk to expose.
-     * @param domain The domain to create the device for.
-     * @param vbdNum The block device number to use.
-     * @param mode The mode to create the device with.
-     * @return The newly created virtual block device.
-     */
-    VirtualBlockDevice createVirtualBlockDevice(
-        VirtualDisk vd,
-        int domain,
-        int vbdNum,
-        Mode mode) {
-        VirtualBlockDevice vbd =
-            new VirtualBlockDevice(vd, domain, vbdNum, mode);
-
-        insertVirtualBlockDevice(vbd);
-
-        return vbd;
-    }
-
-    /**
-     * Delete a virtual block device.
-     * @param domain Domain owning the device.
-     * @param vbdNum The vbd number within the domain.
-     * @return true if the VBD was deleted, false if it does not exist.
-     */
-    boolean deleteVirtualBlockDevice(int domain, int vbdNum) {
-        Object hash = hashVBD(domain, vbdNum);
-        return virtualBlockDevices.remove(hash) != null;
-    }
-
-    /**
-     * Flush all virtual block devices.
-     */
-    void flushVirtualBlockDevices() {
-        /* isn't automatic garbage collection wonderful? */
-        virtualBlockDevices = new LinkedHashMap(100);
-    }
-
-    /**
      * Insert a new virtual disk into the map.
      * @param vd The disk to insert.
      */
     void insertVirtualDisk(VirtualDisk vd) {
         virtualDisks.put(vd.getKey(), vd);
-    }
-
-    /**
-     * Insert a new virtual block device into the map.
-     * @param vbd The device to insert.
-     */
-    void insertVirtualBlockDevice(VirtualBlockDevice vbd) {
-        Object hash = hashVBD(vbd.getDomain(), vbd.getVbdNum());
-        virtualBlockDevices.put(hash, vbd);
     }
 
     /**
@@ -190,14 +139,6 @@ public class VirtualDiskManager {
             vd.dumpAsXML(out);
         }
         out.println("</virtual_disks>");
-        out.println("<virtual_block_devices>");
-        i = virtualBlockDevices.values().iterator();
-        while (i.hasNext()) {
-            VirtualBlockDevice vbd = (VirtualBlockDevice) i.next();
-            vbd.dumpAsXML(out);
-        }
-
-        out.println("</virtual_block_devices>");
     }
 
     /**
@@ -205,13 +146,6 @@ public class VirtualDiskManager {
      */
     public VirtualDisk getFreeDisk() {
         return freeDisk;
-    }
-
-    /**
-     * @return An iterator over the virtual block devices.
-     */
-    public Iterator getVirtualBlockDevices() {
-        return virtualBlockDevices.values().iterator();
     }
 
     /**
