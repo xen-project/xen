@@ -2,11 +2,13 @@
 default: cmdline
 
 #install: install-cmdline install-web
-install: install-cmdline
+install: install-cmdline examples
 
 clean: clean-cmdline clean-web
 
-
+examples: FORCE
+	mkdir -p ../../../install/etc
+	cp examples/xen* examples/grub.conf* ../../../install/etc/
 
 cmdline: FORCE
 	ant -buildfile build-cmdline.xml dist

@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<domctl_defaults>
+<domain_name>XenoLinux</domain_name>
+<domain_size_kb>98304</domain_size_kb>
+<domain_image>/boot/xenolinux.gz</domain_image>
+<domain_vifs>1</domain_vifs>
+<domain_init_rd>/boot/initrd.gz</domain_init_rd>
+<root_device>/dev/ram0</root_device>
+<root_args>rw</root_args>
+<args>init=/linuxrc 4 DOMID=+</args>
+<nw_ip>169.254.1.0+</nw_ip>
+<nw_gw>169.254.1.0</nw_gw>
+<nw_mask>255.255.0.0</nw_mask>
+<nw_nfs_server>169.254.1.0</nw_nfs_server>
+<max_domain_number>1000</max_domain_number>
+<xi_tools_dir>/usr/local/bin/</xi_tools_dir>
+</domctl_defaults>

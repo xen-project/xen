@@ -6,6 +6,7 @@
 3f5ef5a24IaQasQE2tyMxrfxskMmvw README
 3f5ef5a2l4kfBYSQTUaOyyD76WROZQ README.CD
 3f69d8abYB1vMyD_QVDvzxy5Zscf1A TODO
+3f776bd1Hy9rn69ntXBhPReUFw9IEA tools/Makefile
 3e6377b24eQqYMsDi9XrFkIgTzZ47A tools/balloon/Makefile
 3e6377d6eiFjF1hHIS6JEIOFk62xSA tools/balloon/README
 3e6377dbGcgnisKw16DPCaND7oGO3Q tools/balloon/balloon.c
@@ -16,6 +17,12 @@
 3f0d61da3O5gkcntbIOdUmN2-RcZbQ tools/control/doc/INSTALL-cmdline
 3eca6a96a31IwaKtkEa4jmzwTWlm8Q tools/control/doc/INSTALL-web
 3f0d61daCTHGCpQK0Brz3PAp80d_2Q tools/control/doc/USAGE-cmdline
+3f776bd12y6bW-wtcs6rD2qhdpT_Rw tools/control/examples/grub.conf-example
+3f776bd1RBu7Gnce6Bq9328QFUZBsw tools/control/examples/xen-mynewdom
+3eb781fcabCKRogwxJA3-jJKstw9Vg tools/control/examples/xenctl.xml
+3f776bd1bfwM-pP6b2qd0vih1KeV8w tools/control/examples/xenctl.xml-dom0nfs
+3f776bd1-A4vvCCsz-KOgZyAj4ux2g tools/control/examples/xenctl.xml-linklocal
+3f776bd2y1sfPGpfiaj4A-sRdUON7A tools/control/examples/xenctl.xml-publicip
 3f042c35FzVap5QW0UBPnZ2ZM0l3QA tools/control/src/org/xenoserver/cmdline/CommandParser.java
 3eb781fdNQvEJW3tNvovjqoN7GlePA tools/control/src/org/xenoserver/cmdline/Main.java
 3f042c35-TPgpCQViIaJzLts2-CnBw tools/control/src/org/xenoserver/cmdline/ParseDomainDestroy.java
@@ -123,7 +130,6 @@
 3ec41f7ek1RffqN2yRUzSTkD5m1J6w tools/control/web/tmpl/xenohead.def
 3ec41f7e1ZpfCsgQ2qRJBooBn_iRtA tools/control/web/tmpl/xenostyle.css
 3eb781fc6vgq5yhkJRGDLY9gWWRY2A tools/control/xenctl
-3eb781fcabCKRogwxJA3-jJKstw9Vg tools/control/xenctl.xml
 3eb781fdl4lXWYZzmqDDUAYhAThRqQ tools/internal/Makefile
 3eb781fdc539MQQm47rYRCCR3N5i-Q tools/internal/dom0_defs.h
 3eb781fdKiQbgozBsgs_zzJQ9ubehw tools/internal/mem_defs.h
@@ -142,12 +148,13 @@
 3eb781fd0Eo9K1jEFCSAVzO51i_ngg tools/internal/xi_stop.c
 3f108ae2to5nHRRXfvUK7oxgjcW_yA tools/internal/xi_usage.c
 3eb781fd7211MZsLxJSiuy7W4KnJXg tools/internal/xi_vifinit
+3f776bd2Xd-dUcPKlPN2vG89VGtfvQ tools/misc/Makefile
 3f6dc136ZKOjd8PIqLbFBl_v-rnkGg tools/misc/miniterm/Makefile
 3f6dc140C8tAeBfroAF24VrmCS4v_w tools/misc/miniterm/README
 3f6dc142IHaf6XIcAYGmhV9nNSIHFQ tools/misc/miniterm/miniterm.c
-3f1668d4-FUY6Enc7MB3GcwUtfJ5HA tools/misc/mkdevnodes
 3f5ef5a2ir1kVAthS14Dc5QIRCEFWg tools/misc/xen-clone
 3f5ef5a2dTZP0nnsFoeq2jRf3mWDDg tools/misc/xen-clone.README
+3f1668d4-FUY6Enc7MB3GcwUtfJ5HA tools/misc/xen-mkdevnodes
 3f13d81eQ9Vz-h-6RDGFkNR9CRP95g tools/misc/xen_nat_enable
 3f13d81e6Z6806ihYYUw8GVKNkYnuw tools/misc/xen_nat_enable.README
 3f1668d4F29Jsw0aC0bJEIkOBiagiQ tools/misc/xen_read_console.c

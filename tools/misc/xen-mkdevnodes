@@ -2,8 +2,6 @@
 
 BASE=${1:?"base directory missing (eg. /dev)"}
 
-rm -f ${BASE}/xhd[abcdefghijklmnop]*
-rm -f ${BASE}/xsd[abcdefghijklmnop]*
 rm -f ${BASE}/xvd[abcdefghijklmnop]*
 
 # XLVIRT is 16 devices of 15 partitions

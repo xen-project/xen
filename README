@@ -98,7 +98,6 @@ We've successfully booted over 128 copies of Linux on the same machine
 more normal to use some smaller number, perhaps 10-20.
 
 
-
 Hardware support
 ================
 
@@ -135,14 +134,29 @@ recommended since they require extra packet copies.
 Building Xen and XenoLinux
 ==========================
 
-Take a look at the tools/misc/xen-clone script in the BK repository,
-which will 'bk clone' the live master tree, and then set about 
-building everything. The build procedure for xenolinux is slightly 
-complicated as its done by running the 'mkbuildtree' script over
-a pristine Linux tree to turn it into a xenolinux tree by adding the
-'xeno' architecture.
+The public master BK repository lives at: bk://xen.bkbits.net/xeno.bk
 
-The public master BK repository lives at:   bk://xen.bkbits.net/xeno.bk
+To fetch a local copy, install the BitKeeper tools, then run: 
+'bk clone bk://xen.bkbits.net/xeno.bk'
+
+To see how to build Xen, Xenolinux, and all the control tools, inspect
+the tools/misc/xen-clone script in the BK repository. This script can
+be used to clone the repostitory and perform a full build.
+
+The build procedure for xenolinux is slightly complicated as its done
+by running the 'mkbuildtree' script over a pristine Linux tree to turn
+it into a xenolinux tree by adding the 'xeno' architecture.
+
+There's also a pre-built source tree on the project downloads page.
+
+
+Using the domain control tools
+==============================
+
+The README.CD file contains some examples of how to use 'xenctl' and
+the other domain control tools. Invoking the tool without any
+arguments prints some usage inforamtion. There's also some
+documentation in the the repository under tools/control/doc
 
 
 

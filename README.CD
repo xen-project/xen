@@ -89,10 +89,15 @@ via ssh::
  password: xendemo      xendemo
 
 Once logged in, it should look just like any regular linux box. All
-the usual tools and commands should work as per usual.  It's probably
-best to start by configuring networking, either with 'dhclient' or
-manually via ifconfig and route, remembering to edit /etc/resolv.conf
-if you want DNS.
+the usual tools and commands should work as per usual.  However,
+because of the poor random access performance of CD drives, the
+machine will feel rather slugish, and you may run out of memory if you
+make significant modifications to the ramfs filesystem -- for the full
+experience, install a Xen and XenoLinux image on you hard drive :-)
+
+You can configure networking, either with 'dhclient' or manually via
+'ifconfig' and 'route', remembering to edit /etc/resolv.conf if you
+want DNS.
 
 You can start an X server with 'startx'. It defaults to a conservative
 1024x768, but you can edit the script for higher resoloutions.  The CD
@@ -242,7 +247,7 @@ Alternatively, you can use 'virtual disks', which are stored as files
 within a custom file system. "xenctl partitions add" can be used to
 'format' a partition with the file system, and then virtual disks can
 be created with "xenctl vd create". Virtual disks can then be attached
-to a running domain as a 'virtual block device' using "xenctl vdb
+to a running domain as a 'virtual block device' using "xenctl vbd
 create". The virtual disk can optionally be partitioned (e.g. "fdisk
 /dev/xvda") or have a file system created on it directly (e.g. "mkfs
 -t ext3 /dev/xvda").  The virtual disk can then be accessed by a
@@ -329,7 +334,7 @@ xen-devel@lists.sourceforge.net mailing list.
 
 
 Installing from the CD
-----------------------
+======================
 
 If you're installing Xen/XenoLinux onto an existing linux file system
 distribution, just copy the Xen VMM (/boot/image.gz) and XenoLinux
@@ -373,7 +378,7 @@ require a second "module" line.
 
 
 Installing the file systems from the CD
----------------------------------------
+=======================================
 
 If you haven't an existing Linux installation onto which you can just
 drop down the Xen and XenoLinux images, then the file systems on the
@@ -411,7 +416,7 @@ version of the XenDemoCD (see below).
 
 
 Debugging
----------
+=========
 
 Xen has a set of debugging features that can be useful to try and
 figure out what's going on. Hit 'h' on the serial line (if you
@@ -432,7 +437,7 @@ connected to a serial-port server.
 
 
 Description of how the XenDemoCD boots
---------------------------------------
+======================================
 
 1. Grub is used to load Xen, a XenoLinux kernel, and an initrd (initial
 ram disk). [The source of the version of Grub used is in /usr/local/src]
@@ -456,7 +461,7 @@ normally.
 
 
 Building your own version of the XenDemoCD
-------------------------------------------
+==========================================
 
 The 'live ISO' version of RedHat is based heavily on Peter Anvin's
 SuperRescue CD version 2.1.2 and J. McDaniel's Plan-B:

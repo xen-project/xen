@@ -18,14 +18,20 @@
 # the initial system setup.
 
 all:	
-	$(MAKE) -C xen
-	$(MAKE) -C tools
+	$(MAKE) -C balloon
+	$(MAKE) -C control
+	$(MAKE) -C internal
+	$(MAKE) -C misc
 
 install: all
-	$(MAKE) -C xen install
-	$(MAKE) -C tools install
+	$(MAKE) -C balloon install
+	$(MAKE) -C control install
+	$(MAKE) -C internal install
+	$(MAKE) -C misc install
 
 clean:
-	$(MAKE) -C xen clean
-	$(MAKE) -C tools clean
+	$(MAKE) -C balloon clean
+	$(MAKE) -C control clean
+	$(MAKE) -C internal clean
+	$(MAKE) -C misc clean
 
