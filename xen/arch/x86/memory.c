@@ -1317,11 +1317,13 @@ void ptwr_reconnect_disconnected(unsigned long addr)
     unmap_domain_mem(pl1e);
     update_l2e(pl2e, *pl2e, nl2e);
 
+#if 0
     if (page->count_and_flags & PGC_guest_pinned) {
         if ((page->type_and_flags & PGT_count_mask) != 1)
             BUG();
         page->type_and_flags++;
     }
+#endif
     PTWR_PRINTK("now pl2e %p l2e %08lx              taf %08x/%08x/%u\n", pl2e,
                 l2_pgentry_val(*pl2e),
                 frame_table[pfn].type_and_flags,
@@ -1395,11 +1397,13 @@ void ptwr_flush_inactive(void)
         }
         unmap_domain_mem(pl1e);
 
+#if 0
         if (page->count_and_flags & PGC_guest_pinned) {
             if ((page->type_and_flags & PGT_count_mask) != 1)
                 BUG();
             page->type_and_flags++;
         }
+#endif
         /* make pt page writable */
         PTWR_PRINTK("writable_l1 at %p is %08lx\n", ptwr_writables[cpu][idx],
                     pte);
@@ -1446,6 +1450,7 @@ int ptwr_do_page_fault(unsigned long addr)
             PTWR_PRINTK("page_fault on l1 pt at va %08lx, pt for %08x, pfn %08lx\n",
                         addr, ((page->type_and_flags & PGT_va_mask) >>
                                PGT_va_shift) << L2_PAGETABLE_SHIFT, pfn);
+#if 0
             if (page->count_and_flags & PGC_guest_pinned) {
                 PTWR_PRINTK(" pinned l1 page %p taf %08x/%08x\n", page,
                             page->type_and_flags, page->count_and_flags);
@@ -1453,6 +1458,7 @@ int ptwr_do_page_fault(unsigned long addr)
                     BUG();
                 page->type_and_flags--;
             }
+#endif
             if (l2_pgentry_val(*pl2e) >> PAGE_SHIFT != pfn) {
                 l1_pgentry_t *pl1e;
                 PTWR_PRINTK("freeing l1 page %p taf %08x/%08x\n", page,
@@ -1461,8 +1467,10 @@ int ptwr_do_page_fault(unsigned long addr)
                     ptwr_flush_inactive();
                 ptwr_writables[cpu][ptwr_writable_idx[cpu]] = (unsigned long *)
                     &linear_pg_table[addr>>PAGE_SHIFT];
+#if 0
                 if ((page->type_and_flags & PGT_count_mask) != 1)
                     BUG();
+#endif
 
                 pl1e = map_domain_mem(pfn << PAGE_SHIFT);
                 memcpy(&ptwr_writable_page[cpu][ptwr_writable_idx[cpu]][0],
