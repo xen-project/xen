@@ -353,6 +353,69 @@ static struct irqaction misdirect_action = {
     NULL
 };
 
+void irq_suspend(void)
+{
+    evtchn_op_t op;
+    int         virq, irq, evtchn;
+
+    /* Unbind VIRQs from event channels. */
+    for ( virq = 0; virq < NR_VIRQS; virq++ )
+    {
+        if ( (irq = virq_to_irq[virq]) == -1 )
+            continue;
+        evtchn = irq_to_evtchn[irq];
+
+        /* Inform Xen that we are unbinding. */
+        op.cmd          = EVTCHNOP_close;
+        op.u.close.dom  = DOMID_SELF;
+        op.u.close.port = evtchn;
+        if ( HYPERVISOR_event_channel_op(&op) != 0 )
+            panic("Failed to unbind virtual IRQ %d\n", virq);
+
+        /* Mark the event channel as unused in our table. */
+        evtchn_to_irq[evtchn] = -1;
+        irq_to_evtchn[irq]    = -1;
+    }
+
+    /*
+     * We should now be unbound from all event channels. Stale bindings to 
+     * PIRQs and/or inter-domain event channels will cause us to barf here.
+     */
+    for ( evtchn = 0; evtchn < NR_EVENT_CHANNELS; evtchn++ )
+        if ( evtchn_to_irq[evtchn] != -1 )
+            panic("Suspend attempted while bound to evtchn %d.\n", evtchn);
+}
+
+
+void irq_resume(void)
+{
+    evtchn_op_t op;
+    int         virq, irq, evtchn;
+
+    for ( evtchn = 0; evtchn < NR_EVENT_CHANNELS; evtchn++ )
+        mask_evtchn(evtchn); /* New event-channel space is not 'live' yet. */
+
+    for ( virq = 0; virq < NR_VIRQS; virq++ )
+    {
+        if ( (irq = virq_to_irq[virq]) == -1 )
+            continue;
+
+        /* Get a new binding from Xen. */
+        op.cmd              = EVTCHNOP_bind_virq;
+        op.u.bind_virq.virq = virq;
+        if ( HYPERVISOR_event_channel_op(&op) != 0 )
+            panic("Failed to bind virtual IRQ %d\n", virq);
+        evtchn = op.u.bind_virq.port;
+        
+        /* Record the new mapping. */
+        evtchn_to_irq[evtchn] = irq;
+        irq_to_evtchn[irq]    = evtchn;
+
+        /* Ready for use. */
+        unmask_evtchn(evtchn);
+    }
+}
+
 void __init init_IRQ(void)
 {
     int i;

@@ -53,4 +53,7 @@ extern void disable_irq(unsigned int);
 extern void disable_irq_nosync(unsigned int);
 extern void enable_irq(unsigned int);
 
+extern void irq_suspend(void);
+extern void irq_resume(void);
+
 #endif /* _ASM_IRQ_H */
