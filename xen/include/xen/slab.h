@@ -1,25 +1,19 @@
 /*
- * linux/mm/slab.h
  * Written by Mark Hemment, 1996.
  * (markhe@nextd.demon.co.uk)
  */
 
-#if	!defined(_LINUX_SLAB_H)
-#define	_LINUX_SLAB_H
+#ifndef __SLAB_H__
+#define	__SLAB_H__
 
 typedef struct kmem_cache_s kmem_cache_t;
 
-#include	<xen/mm.h>
-#include	<xen/cache.h>
+#include <xen/mm.h>
+#include <xen/cache.h>
 
 /* flags for kmem_cache_alloc() */
-#define	SLAB_NOFS		GFP_NOFS
-#define	SLAB_NOIO		GFP_NOIO
-#define SLAB_NOHIGHIO		GFP_NOHIGHIO
 #define	SLAB_ATOMIC		GFP_ATOMIC
-#define	SLAB_USER		GFP_USER
 #define	SLAB_KERNEL		GFP_KERNEL
-#define	SLAB_NFS		GFP_NFS
 #define	SLAB_DMA		GFP_DMA
 
 #define SLAB_LEVEL_MASK		(__GFP_WAIT|__GFP_HIGH|__GFP_IO|__GFP_HIGHIO|__GFP_FS)
@@ -29,7 +23,6 @@ typedef struct kmem_cache_s kmem_cache_t;
  * The first 3 are only valid when the allocator as been build
  * SLAB_DEBUG_SUPPORT.
  */
-#define	SLAB_DEBUG_FREE		0x00000100UL	/* Peform (expensive) checks on free */
 #define	SLAB_DEBUG_INITIAL	0x00000200UL	/* Call constructor (as verifier) */
 #define	SLAB_RED_ZONE		0x00000400UL	/* Red zone objs in a cache */
 #define	SLAB_POISON		0x00000800UL	/* Poison objects */
@@ -62,23 +55,4 @@ extern int FASTCALL(kmem_cache_reap(int));
 
 extern void dump_slabinfo();
 
-#if 0
-extern int slabinfo_read_proc(char *page, char **start, off_t off,
-				 int count, int *eof, void *data);
-extern int slabinfo_write_proc(struct file *file, const char *buffer,
-			   unsigned long count, void *data);
-#endif
-
-/* System wide caches */
-extern kmem_cache_t	*vm_area_cachep;
-extern kmem_cache_t	*mm_cachep;
-extern kmem_cache_t	*names_cachep;
-extern kmem_cache_t	*files_cachep;
-extern kmem_cache_t	*filp_cachep;
-extern kmem_cache_t	*dquot_cachep;
-extern kmem_cache_t	*bh_cachep;
-extern kmem_cache_t	*fs_cachep;
-extern kmem_cache_t	*sigact_cachep;
-
-
-#endif	/* _LINUX_SLAB_H */
+#endif	/* __SLAB_H__ */

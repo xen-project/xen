@@ -1327,9 +1327,9 @@ void audit_page(unsigned long pfn)
 {
     unsigned long     i;
 
-    cli();
+    __cli();
     __audit_page(pfn);
-    sti();
+    __sti();
     /* add pfn to last_pages cache if is not already present */
     for ( i = 0; i < LASTPAGES_SIZE; i++ )
         if ( last_pages[i] == pfn )
@@ -1371,7 +1371,7 @@ void audit_all_pages(u_char key, void *dev_id, struct pt_regs *regs)
 
     printk("audit_all_pages\n");
 
-    cli();
+    __cli();
     
     /* walk the frame table */
     for ( i = 0; i < max_page; i++ )
@@ -1432,7 +1432,7 @@ void audit_all_pages(u_char key, void *dev_id, struct pt_regs *regs)
             }
         } /* ref count error */
     }
-    sti();
+    __sti();
     
 }
 

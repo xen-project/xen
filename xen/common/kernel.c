@@ -18,7 +18,6 @@
 #include <xen/delay.h>
 #include <xen/interrupt.h>
 #include <xen/compile.h>
-#include <xen/version.h>
 #include <xen/console.h>
 #include <xen/serial.h>
 #include <xen/shadow.h>

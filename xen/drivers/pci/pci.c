@@ -11,7 +11,6 @@
 
 #include <xen/config.h>
 #include <xen/sched.h>
-#include <xen/module.h>
 #include <xen/types.h>
 #include <xen/pci.h>
 #include <xen/init.h>

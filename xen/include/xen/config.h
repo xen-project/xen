@@ -9,6 +9,8 @@
 
 #include <asm/config.h>
 
+#define EXPORT_SYMBOL(var)
+
 /* syslog levels ==> nothing! */
 #define KERN_NOTICE  ""
 #define KERN_WARNING ""

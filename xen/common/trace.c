@@ -17,7 +17,6 @@
  */
 
 #include <xen/config.h>
-#include <asm/timex.h>
 #include <asm/types.h>
 #include <asm/io.h>
 #include <xen/lib.h>

@@ -518,7 +518,6 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     case DOM0_PHYSINFO:
     {
         extern int phys_proc_id[];
-        extern unsigned long cpu_khz;
 
         dom0_physinfo_t *pi = &op->u.physinfo;
 

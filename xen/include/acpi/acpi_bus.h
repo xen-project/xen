@@ -26,12 +26,13 @@
 #ifndef __ACPI_BUS_H__
 #define __ACPI_BUS_H__
 
+#if 0
 #include <xen/version.h>
-
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,4))
 #include <xen/device.h>
 #define CONFIG_LDM
 #endif
+#endif /* 0 */
 
 #include <acpi/acpi.h>
 

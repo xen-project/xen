@@ -7,7 +7,6 @@
 #include <xen/pci.h>
 #include <xen/serial.h>
 #include <xen/acpi.h>
-#include <xen/module.h>
 #include <asm/bitops.h>
 #include <asm/smp.h>
 #include <asm/processor.h>

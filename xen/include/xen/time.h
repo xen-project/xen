@@ -27,12 +27,12 @@
 #ifndef __XEN_TIME_H__
 #define __XEN_TIME_H__
 
-#include <asm/time.h>    /* pull in architecture specific time definition */
 #include <xen/types.h>
 #include <hypervisor-ifs/hypervisor-if.h>
 
 extern int init_xen_time();
 
+extern unsigned long cpu_khz;
 
 /*
  * System Time
@@ -42,6 +42,8 @@ extern int init_xen_time();
  * The other macros are for convenience to approximate short intervals
  * of real time into system time 
  */
+
+typedef s64 s_time_t;
 
 s_time_t get_s_time(void);
 

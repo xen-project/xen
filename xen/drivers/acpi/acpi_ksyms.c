@@ -23,7 +23,7 @@
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  */
 
-#include <xen/module.h>
+#include <xen/config.h>
 #include <xen/acpi.h>
 
 #ifdef CONFIG_ACPI_INTERPRETER

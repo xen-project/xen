@@ -30,7 +30,6 @@
 #include <asm/apic.h>
 #include <xen/mm.h>
 #include <asm/io_apic.h>
-#include <asm/timex.h>
 #include <xen/ac_timer.h>
 #include <xen/perfc.h>
 

@@ -230,26 +230,6 @@ static inline int local_irq_is_enabled(void)
     return !!(flags & (1<<9)); /* EFLAGS_IF */
 }
 
-#ifdef CONFIG_SMP
-
-extern void __global_cli(void);
-extern void __global_sti(void);
-extern unsigned long __global_save_flags(void);
-extern void __global_restore_flags(unsigned long);
-#define cli() __global_cli()
-#define sti() __global_sti()
-#define save_flags(x) ((x)=__global_save_flags())
-#define restore_flags(x) __global_restore_flags(x)
-
-#else
-
-#define cli() __cli()
-#define sti() __sti()
-#define save_flags(x) __save_flags(x)
-#define restore_flags(x) __restore_flags(x)
-
-#endif
-
 /*
  * disable hlt during certain critical i/o operations
  */

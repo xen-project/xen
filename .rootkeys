@@ -424,7 +424,6 @@
 3ddb79c3n_UbPuxlkNxvvLycClIkxA xen/include/asm-x86/mpspec.h
 3ddb79c2wa0dA_LGigxOelSGbJ284Q xen/include/asm-x86/msr.h
 3ddb79c3xjYnrv5t3VqYlR4tNEOl4Q xen/include/asm-x86/page.h
-3e450943kzme29HPCtq5HNOVQkddfw xen/include/asm-x86/param.h
 3ddb79c3ysKUbxZuwKBRK3WXU2TlEg xen/include/asm-x86/pci.h
 404f1bb41Yl-5ZjIWnG66HDCj6OIWA xen/include/asm-x86/pda.h
 4022a73diKn2Ax4-R4gzk59lm1YdDg xen/include/asm-x86/pdb.h
@@ -437,11 +436,8 @@
 3ddb79c3NiyQE2vQnyGiaBnNjBO1rA xen/include/asm-x86/spinlock.h
 3e7f358aG11EvMI9VJ4_9hD4LUO7rQ xen/include/asm-x86/string.h
 3ddb79c3ezddh34MdelJpa5tNR00Dw xen/include/asm-x86/system.h
-3e397e66xPNc8eaSqC9pPbyAtRGzHA xen/include/asm-x86/time.h
-3e450943TfE-iovQIY_tMO_VdGsPhA xen/include/asm-x86/timex.h
 3ddb79c4HugMq7IYGxcQKFBpKwKhzA xen/include/asm-x86/types.h
 40cf1596saFaHD5DC5zvrSn7CDCWGQ xen/include/asm-x86/uaccess.h
-3ddb79c3uPGcP_l_2xyGgBSWd5aC-Q xen/include/asm-x86/unaligned.h
 3ddb79c2ADvRmdexd9y3AYK9_NTx-Q xen/include/asm-x86/x86_32/current.h
 3ddb79c3mbqEM7QQr3zVq7NiBNhouA xen/include/asm-x86/x86_32/ptrace.h
 3ddb79c3M2n1ROZH6xk3HbyN4CPDqg xen/include/asm-x86/x86_32/uaccess.h
@@ -482,7 +478,6 @@
 3ddb79c1NfYlOrWNqgZkj9EwtFfJow xen/include/xen/lib.h
 3ddb79c18Ajy7micDGQQfJ0zWgEHtA xen/include/xen/list.h
 3ddb79c1gs2VbLbQlw0dcDUXYIepDA xen/include/xen/mm.h
-3ddb79c13p9iHn1XAp0IS1qvj4yDsg xen/include/xen/module.h
 3ddb79c1ieLZfGSFwfvvSQ2NK1BMSg xen/include/xen/multiboot.h
 3ddb79c2Fg44_PBPVxHSC0gTOMq4Ow xen/include/xen/pci.h
 3ddb79c0MOVXq8qZDQRGb6z64_xAwg xen/include/xen/pci_ids.h
@@ -499,10 +494,8 @@
 3ddb79c2iIcESrDAB8samy_yAh6olQ xen/include/xen/spinlock.h
 3e7f358aMtFMUVvN_Zjg5qvEJIqEBA xen/include/xen/string.h
 3ddb79c0BnA20PbgmuMPSGIBljNRQw xen/include/xen/time.h
-3ddb79c2_m8lT9jDKse_tePj7zcnNQ xen/include/xen/timex.h
 403a3edbG9K5uZjuY19_LORbQGmFbA xen/include/xen/trace.h
 3ddb79c1-kVvF8cVa0k3ZHDdBMj01Q xen/include/xen/types.h
-3e8827bdaqPeZAWGVOwswgY9bWSx4g xen/include/xen/version.h
 3ddb79c4x8dvwPtzclghWAKFWpEBFA xen/tools/Makefile
 3ddb79c4yGZ7_22QAFFwPzqP4NSHwA xen/tools/elf-reloc.c
 3eb3c87fc79FXLA6R9TvdBJNTvQDwA xen/tools/figlet/LICENSE
