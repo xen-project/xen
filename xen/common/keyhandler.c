@@ -2,6 +2,8 @@
 #include <xeno/keyhandler.h> 
 #include <xeno/reboot.h>
 #include <xeno/event.h>
+#include <xeno/console.h>
+#include <xeno/serial.h>
 
 #define KEY_MAX 256
 #define STR_MAX  64
@@ -18,21 +20,21 @@ void add_key_handler(u_char key, key_handler *handler, char *desc)
     int i; 
     char *str; 
 
-    if(key_table[key].handler != NULL) 
+    if ( key_table[key].handler != NULL ) 
 	printk("Warning: overwriting handler for key 0x%x\n", key); 
 
     key_table[key].handler = handler; 
 
     str = key_table[key].desc; 
-    for(i = 0; i < STR_MAX; i++) {
-	if(*desc) 
+    for ( i = 0; i < STR_MAX; i++ )
+    {
+	if ( *desc != '\0' ) 
 	    *str++ = *desc++; 
-	else break; 
+	else
+            break; 
     }
-    if (i == STR_MAX) 
+    if ( i == STR_MAX ) 
 	key_table[key].desc[STR_MAX-1] = '\0'; 
-
-    return; 
 }
 
 key_handler *get_key_handler(u_char key)
@@ -40,42 +42,43 @@ key_handler *get_key_handler(u_char key)
     return key_table[key].handler; 
 }
 
+static void serial_rx(unsigned char c, struct pt_regs *regs)
+{
+    key_handler *handler;
+    if ( (handler = get_key_handler(c)) != NULL )
+        (*handler)(c, NULL, regs);
+}
 
 static void show_handlers(u_char key, void *dev_id, struct pt_regs *regs) 
 {
     int i; 
 
     printk("'%c' pressed -> showing installed handlers\n", key); 
-    for(i=0; i < KEY_MAX; i++) 
-	if(key_table[i].handler) 
+    for ( i = 0; i < KEY_MAX; i++ ) 
+	if ( key_table[i].handler != NULL ) 
 	    printk(" key '%c' (ascii '%02x') => %s\n", 
 			(i<33 || i>126)?(' '):(i),i,
 			key_table[i].desc);
-    return; 
 }
 
 
 static void dump_registers(u_char key, void *dev_id, struct pt_regs *regs) 
 {
     extern void show_registers(struct pt_regs *regs); 
-
     printk("'%c' pressed -> dumping registers\n", key); 
     show_registers(regs); 
-    return; 
 }
 
 static void halt_machine(u_char key, void *dev_id, struct pt_regs *regs) 
 {
     printk("'%c' pressed -> rebooting machine\n", key); 
     machine_restart(NULL); 
-    return; 
 }
 
 static void kill_dom0(u_char key, void *dev_id, struct pt_regs *regs) 
 {
     printk("'%c' pressed -> gracefully rebooting machine\n", key); 
     kill_other_domain(0, 0);
-    return;
 }
 
 
@@ -137,12 +140,12 @@ void audit_all_pages(u_char key, void *dev_id, struct pt_regs *regs);
 #endif
 
 
-void initialize_keytable() 
+void initialize_keytable(void)
 {
     int i; 
 
     /* first initialize key handler table */
-    for(i = 0; i < KEY_MAX; i++) 
+    for ( i = 0; i < KEY_MAX; i++ ) 
 	key_table[i].handler = (key_handler *)NULL; 
 	
     /* setup own handlers */
@@ -160,4 +163,6 @@ void initialize_keytable()
     add_key_handler('m', reaudit_pages, "re-audit pages");
     add_key_handler('M', audit_all_pages, "audit all pages");
 #endif
+
+    serial_set_rx_handler(sercon_handle, serial_rx);
 }

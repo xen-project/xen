@@ -276,7 +276,6 @@ void nmi_watchdog_tick (struct pt_regs * regs)
 {
     extern spinlock_t console_lock;
     extern void die(const char * str, struct pt_regs * regs, long err);
-    extern void putchar_serial(unsigned char c);
 
     int sum, cpu = smp_processor_id();
 

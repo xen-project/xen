@@ -140,9 +140,9 @@
 #include <asm/domain_page.h>
 
 #ifndef NDEBUG
-#define MEM_LOG(_f, _a...)                           \
+#define MEM_LOG(_f, _a...)                             \
   printk("DOM%llu: (file=memory.c, line=%d) " _f "\n", \
-         current->domain, __LINE__, ## _a )
+         current->domain , __LINE__ , ## _a )
 #else
 #define MEM_LOG(_f, _a...) ((void)0)
 #endif

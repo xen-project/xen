@@ -147,7 +147,7 @@
 
 #ifndef NDEBUG
 #define DPRINTK(_f, _a...) printk("(file=%s, line=%d) " _f, \
-                           __FILE__, __LINE__, ## _a)
+                           __FILE__ , __LINE__ , ## _a )
 #define STACK_GUARD
 #else
 #define DPRINTK(_f, _a...) ((void)0)

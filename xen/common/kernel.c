@@ -29,11 +29,15 @@
 #include <asm/domain_page.h>
 #include <xeno/console.h>
 #include <xeno/net_headers.h>
+#include <xeno/serial.h>
 
 kmem_cache_t *task_struct_cachep;
 
 static int xpos, ypos;
-static volatile unsigned char *video;
+static unsigned char *video = __va(0xB8000);
+
+int sercon_handle = -1;
+int vgacon_enabled = 0;
 
 spinlock_t console_lock = SPIN_LOCK_UNLOCKED;
 
@@ -43,15 +47,17 @@ struct e820entry {
     unsigned long type;                    /* type of memory segment */
 };
 
-void init_vga(void);
-void init_serial(void);
+static void init_vga(void);
 void start_of_day(void);
 
-/* opt_console: If true, Xen sends logging to the VGA console. */
-int opt_console = 1;
+/* opt_console: comma-separated list of console outputs. */
+unsigned char opt_console[30] = "com1,vga";
 /* opt_ser_baud: Baud rate at which logging is sent to COM1. */
 /* NB. Default (0) means that serial I/O is disabled. */
+/* NB2. THIS OPTION IS DEPRECATED!! */
 unsigned int opt_ser_baud = 0;
+/* opt_com[12]: Config serial port with a string <baud>,DPS,<io-base>,<irq>. */
+unsigned char opt_com1[30] = "", opt_com2[30] = "";
 /* opt_dom0_mem: Kilobytes of memory allocated to domain 0. */
 unsigned int opt_dom0_mem = 16000;
 /* opt_ifname: Name of physical network interface to use. */
@@ -77,8 +83,10 @@ static struct {
     enum { OPT_IP, OPT_STR, OPT_UINT, OPT_BOOL } type;
     void *var;
 } opts[] = {
-    { "console",          OPT_UINT, &opt_console },
+    { "console",          OPT_STR,  &opt_console },
     { "ser_baud",         OPT_UINT, &opt_ser_baud },
+    { "com1",             OPT_STR,  &opt_com1 },
+    { "com2",             OPT_STR,  &opt_com2 },
     { "dom0_mem",         OPT_UINT, &opt_dom0_mem }, 
     { "ifname",           OPT_STR,  &opt_ifname },
     { "noht",             OPT_BOOL, &opt_noht },
@@ -92,31 +100,16 @@ static struct {
 };
 
 
-void cmain (unsigned long magic, multiboot_info_t *mbi)
+void cmain(unsigned long magic, multiboot_info_t *mbi)
 {
     struct task_struct *new_dom;
     dom0_createdomain_t dom0_params;
     unsigned long max_page;
-    unsigned char *cmdline;
+    unsigned char *cmdline, *p;
     module_t *mod;
     int i;
 
-    /*
-     * Note that serial output cannot be done properly until after 
-     * command-line arguments have been parsed, and the required baud rate is 
-     * known. Any messages before that will be output using the settings of 
-     * the bootloader, for example.
-     */
-
-    if ( magic != MULTIBOOT_BOOTLOADER_MAGIC )
-    {
-        init_vga();
-        cls();
-        printk("Invalid magic number: 0x%x\n", (unsigned)magic);
-        for ( ; ; ) ;
-    }
-
-    /* Parse the command line. */
+    /* Parse the command-line options. */
     cmdline = (unsigned char *)(mbi->cmdline ? __va(mbi->cmdline) : NULL);
     if ( cmdline != NULL )
     {
@@ -158,10 +151,28 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
         }
     }
 
-    init_serial();
-    init_vga();
-    cls();
+    /* Backward compatibility with deprecated 'ser_baud=' cmdline option. */
+    if ( opt_ser_baud != 0 )
+        sprintf(opt_com1, "%u,8n1", opt_ser_baud);
 
+    /* We initialise the serial devices very early so we can get debugging. */
+    serial_init_stage1();
+
+    /* Where should console output go? */
+    for ( p = opt_console; p != NULL; p = strchr(p, ',') )
+    {
+        if ( *p == ',' )
+            p++;
+        if ( strncmp(p, "com", 3) == 0 )
+            sercon_handle = parse_serial_handle(p);
+        else if ( strncmp(p, "vga", 3) == 0 )
+            vgacon_enabled = 1;
+    }
+
+    /* Set up VGA console output, if it was enabled. */
+    init_vga();
+
+    /* HELLO WORLD --- start-of-day banner text. */
     printk(XEN_BANNER);
     printk(" http://www.cl.cam.ac.uk/netos/xen\n");
     printk(" University of Cambridge Computer Laboratory\n\n");
@@ -169,6 +180,16 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
            XEN_VERSION, XEN_SUBVERSION, XEN_EXTRAVERSION,
            XEN_COMPILE_BY, XEN_COMPILE_DOMAIN,
            XEN_COMPILER, XEN_COMPILE_DATE);
+
+    if ( opt_ser_baud != 0 )
+        printk("**WARNING**: Xen option 'ser_baud=' is deprecated! "
+               "Use 'com1=' instead.\n");
+
+    if ( magic != MULTIBOOT_BOOTLOADER_MAGIC )
+    {
+        printk("FATAL ERROR: Invalid magic number: 0x%08lx\n", magic);
+        for ( ; ; ) ;
+    }
 
     /* We require memory and module information. */
     if ( (mbi->flags & 9) != 9 )
@@ -245,60 +266,20 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
 }
 
 
-#define SERIAL_BASE 0x3f8
-#define RX_BUF      0
-#define TX_HOLD     0
-#define INT_ENABLE  1
-#define INT_IDENT   2
-#define DATA_FORMAT 3
-#define LINE_CTL    4
-#define LINE_STATUS 5
-#define LINE_IN     6
-#define DIVISOR_LO  0
-#define DIVISOR_HI  1
-
-void init_serial(void)
-{
-    if ( !SERIAL_ENABLED )
-        return;
-
-    /* 'opt_ser_baud' baud, no parity, 1 stop bit, 8 data bits. */
-    outb(0x83, SERIAL_BASE+DATA_FORMAT);
-    outb(115200/opt_ser_baud, SERIAL_BASE+DIVISOR_LO);
-    outb(0, SERIAL_BASE+DIVISOR_HI);
-    outb(0x03, SERIAL_BASE+DATA_FORMAT);
-    
-    /* DTR and RTS should both be high, to keep other end happy. */
-    outb(0x02, SERIAL_BASE+LINE_CTL);
-
-    /* No interrupts. */
-    outb(0x00, SERIAL_BASE+INT_ENABLE);
-}
-
-
-#ifdef CONFIG_OUTPUT_SERIAL
-void putchar_serial(unsigned char c)
-{
-    if ( !SERIAL_ENABLED )
-        return;
-    if ( c == '\n' ) putchar_serial('\r');
-    while ( !(inb(SERIAL_BASE+LINE_STATUS)&(1<<5)) ) barrier();
-    outb(c, SERIAL_BASE+TX_HOLD);
-}
-#else
-void putchar_serial(unsigned char c) {}
-#endif
-
-
-#ifdef CONFIG_OUTPUT_CONSOLE
-
 /* VGA text (mode 3) definitions. */
 #define COLUMNS	    80
 #define LINES	    25
 #define ATTRIBUTE    7
-#define VIDEO	    __va(0xB8000)
 
-int detect_video(void *video_base)
+/* Clear the screen and initialize VIDEO, XPOS and YPOS.  */
+static void cls(void)
+{
+    memset(video, 0, COLUMNS * LINES * 2);
+    xpos = ypos = 0;
+    outw(10+(1<<(5+8)), 0x3d4); /* cursor off */
+}
+
+static int detect_video(void *video_base)
 {
     volatile u16 *p = (volatile u16 *)video_base;
     u16 saved1 = p[0], saved2 = p[1];
@@ -320,7 +301,7 @@ int detect_video(void *video_base)
     return video_found;
 }
 
-int detect_vga(void)
+static int detect_vga(void)
 {
     /*
      * Look at a number of well-known locations. Even if video is not at
@@ -337,7 +318,7 @@ int detect_vga(void)
 }
 
 /* This is actually code from vgaHWRestore in an old version of XFree86 :-) */
-void init_vga(void)
+static void init_vga(void)
 {
     /* The following VGA state was saved from a chip in text mode 3. */
     static unsigned char regs[] = {
@@ -357,13 +338,13 @@ void init_vga(void)
     int i, j = 0;
     volatile unsigned char tmp;
 
-    if ( !opt_console )
+    if ( !vgacon_enabled )
         return;
 
     if ( !detect_vga() )
     {
         printk("No VGA adaptor detected!\n");
-        opt_console = 0;
+        vgacon_enabled = 0;
         return;
     }
 
@@ -391,26 +372,8 @@ void init_vga(void)
     
     tmp = inb(0x3da);
     outb(0x20, 0x3c0);
-}
 
-
-/* Clear the screen and initialize VIDEO, XPOS and YPOS.  */
-void cls(void)
-{
-    int i;
-
-    if ( !opt_console )
-        return;
-
-    video = (unsigned char *) VIDEO;
-    
-    for (i = 0; i < COLUMNS * LINES * 2; i++)
-        *(video + i) = 0;
-    
-    xpos = 0;
-    ypos = 0;
-    
-    outw(10+(1<<(5+8)), 0x3d4); /* cursor off */
+    cls();
 }
 
 
@@ -431,9 +394,9 @@ static void put_newline(void)
 }
 
 
-void putchar_console(int c)
+static void putchar_console(int c)
 {
-    if ( !opt_console )
+    if ( !vgacon_enabled )
         return;
 
     if ( c == '\n' )
@@ -442,54 +405,34 @@ void putchar_console(int c)
     }
     else
     {
-        *(video + (xpos + ypos * COLUMNS) * 2) = c & 0xFF;
-        *(video + (xpos + ypos * COLUMNS) * 2 + 1) = ATTRIBUTE;
-        
-        xpos++;
-        if (xpos >= COLUMNS)
+        video[(xpos + ypos * COLUMNS) * 2]     = c & 0xFF;
+        video[(xpos + ypos * COLUMNS) * 2 + 1] = ATTRIBUTE;
+        if ( ++xpos >= COLUMNS )
             put_newline();
     }
 }
 
-#else
-
-void init_vga(void) {}
-void cls(void) {}
-void putchar_console(int c) {}
-
-#endif
-
-#ifdef CONFIG_OUTPUT_CONSOLE_RING
 
 void putchar_console_ring(int c)
 {
-    if (console_ring.len < CONSOLE_RING_SIZE)
+    if ( console_ring.len < CONSOLE_RING_SIZE )
         console_ring.buf[console_ring.len++] = (char)c;
-}
-
-#else
-
-void putchar_console_ring(int c) {}
-
-#endif
-
-
-static void putchar(int c)
-{
-    if ( (c != '\n') && ((c < 32) || (c > 126)) ) return;
-    putchar_serial(c);
-    putchar_console(c);
-    putchar_console_ring(c);
 }
 
 
 static inline void __putstr(const char *str)
 {
-    while ( *str ) putchar(*str++);
+    int c;
+    serial_puts(sercon_handle, str);
+    while ( (c = *str++) != '\0' )
+    {
+        putchar_console(c);
+        putchar_console_ring(c);
+    }
 }
 
 
-void printf (const char *fmt, ...)
+void printf(const char *fmt, ...)
 {
     va_list args;
     char buf[128];
@@ -510,7 +453,7 @@ void printf (const char *fmt, ...)
     }
 
     spin_lock_irqsave(&console_lock, flags);
-    while ( *p ) putchar(*p++);
+    __putstr(p);
     spin_unlock_irqrestore(&console_lock, flags);
 }
 
@@ -633,11 +576,12 @@ long do_console_write(char *str, unsigned int count)
 {
 #define SIZEOF_BUF 256
     unsigned char safe_str[SIZEOF_BUF+1];
-    unsigned char exported_str[SIZEOF_BUF+2];
-    unsigned char dom_id[5];
+    unsigned char single_line[SIZEOF_BUF+2];
+    unsigned char line_header[30];
     unsigned char *p;
+    unsigned char  c;
     unsigned long flags;
-    int j;
+    int            j;
     
     if ( count == 0 )
         return 0;
@@ -649,38 +593,32 @@ long do_console_write(char *str, unsigned int count)
         return -EFAULT;
     safe_str[count] = '\0';
     
+    sprintf(line_header, "DOM%llu: ", current->domain);
+    
     p = safe_str;
     while ( *p != '\0' )
     {
         j = 0;
 
-        spin_lock_irqsave(&console_lock, flags);
-        
-        __putstr("DOM"); 
-        sprintf(dom_id, "%llu", current->domain);
-        __putstr(dom_id);
-        __putstr(": ");
-        
-        while ( (*p != '\0') && (*p != '\n') )
+        while ( (c = *p++) != '\0' )
         {
-            exported_str[j++] = *p;
-            putchar(*p);
-            p++;
+            if ( c == '\n' )
+                break;
+            if ( (c < 32) || (c > 126) )
+                continue;
+            single_line[j++] = c;
         }
 
-        if ( *p == '\n' )
-            p++;
+        single_line[j++] = '\n';
+        single_line[j++] = '\0';
 
-        putchar('\n');
-        
+        spin_lock_irqsave(&console_lock, flags);
+        __putstr(line_header);
+        __putstr(single_line);
         spin_unlock_irqrestore(&console_lock, flags);
 
         if ( current->domain != 0 )
-        {
-            exported_str[j++] = '\n';
-            exported_str[j++] = '\0';
-            console_export(exported_str, j);
-        }
+            console_export(single_line, j);
     }
 
     return 0;

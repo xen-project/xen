@@ -5,6 +5,7 @@
 #include <asm/apic.h>
 #include <asm/pdb.h>
 #include <xeno/list.h>
+#include <xeno/serial.h>
 
 #define BUFMAX 400
 
@@ -27,8 +28,32 @@ static int pdb_info_thread = -1;
 static int pdb_stepping = 0;
 
 void pdb_put_packet (unsigned char *buffer, int ack);
-void pdb_put_char (u_char c);
-u_char pdb_get_char ();
+
+static int pdb_initialized = 0;
+static int pdb_serhnd      = -1;
+
+#define RX_SIZE 32
+#define RX_MASK(_i) ((_i)&(RX_SIZE-1))
+static unsigned int rx_cons = 0, rx_prod = 0;
+static unsigned char rx_ring[RX_RING_SIZE];
+
+static inline void pdb_put_char(unsigned char c)
+{
+    serial_putc(pdb_serhnd, c);
+}
+
+static inline unsigned char pdb_get_char(void)
+{
+    while ( rx_cons == rx_prod )
+        barrier();
+    return rx_ring[RX_MASK(rx_cons++)];
+}
+
+static void pdb_rx_char(unsigned char c, struct pt_regs *regs)
+{
+    if ( (rx_prod - rx_cons) != RX_SIZE )
+        rx_ring[RX_MASK(rx_prod++)] = c;
+}
 
 static volatile int mem_err = 0;
 void set_mem_err (void)                                   /* NOT USED YET... */
@@ -635,23 +660,6 @@ int pdb_bkpt_remove (unsigned long address)
 
 void breakpoint(void);
 
-int pdb_initialized = 0;
-int pdb_high_bit = 1;
-
-void pdb_put_char (u_char c)
-{
-    extern void   debug_putchar(u_char);
-    u_char cc = pdb_high_bit ? c | 0x80 : c;
-    debug_putchar(cc);
-}
-
-u_char pdb_get_char ()
-{
-    extern u_char debug_getchar();
-    u_char cc = debug_getchar();
-    return cc & 0x7f;
-}
-
 /* send the packet in buffer.  */
 void pdb_put_packet (unsigned char *buffer, int ack)
 {
@@ -821,35 +829,28 @@ void pdb_key_pressed(u_char key, void *dev_id, struct pt_regs *regs)
 void initialize_pdb()
 {
     extern char opt_pdb[];
-    int pdb_com_port;
 
     /* Certain state must be initialised even when PDB will not be used. */
     breakpoints.address = 0;
     INIT_LIST_HEAD(&breakpoints.list);
     pdb_stepping = 0;
 
-    if ( strncmp(opt_pdb, "com", 3) == 0 )
-    {
-        extern void debug_set_com_port(int port);
+    if ( strcmp(opt_pdb, "none") == 0 )
+        return;
 
-        pdb_com_port = opt_pdb[3] - '0';                 /* error checking ? */
-	debug_set_com_port(pdb_com_port);
-	pdb_high_bit = opt_pdb[4] == 'H' ? 1 : 0;
-    }
-    else
+    if ( (pdb_serhnd = parse_serial_handle(opt_pdb)) == -1 )
     {
-        if ( strcmp(opt_pdb, "none") != 0 )
-	    printk ("pdb: unknown option\n");
+        printk("Failed to initialise PDB on port %s\n", opt_pdb);
         return;
     }
 
-    printk("Initializing pervasive debugger (PDB) on serial port %d %s\n",
-           pdb_com_port, pdb_high_bit ? "(high bit enabled)" : "");
+    serial_set_rx_handler(pdb_serhnd, pdb_rx_char);
 
-    /* ack any spurrious gdb packets */
-    pdb_put_char ('+');
+    printk("Initialised pervasive debugger (PDB) on port %s\n", opt_pdb);
 
-    /* serial console */
+    /* Acknowledge any spurious GDB packets. */
+    serial_putc(pdb_serhnd, '+');
+
     add_key_handler('D', pdb_key_pressed, "enter pervasive debugger");
 
     pdb_initialized = 1;

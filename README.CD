@@ -76,7 +76,7 @@ sequentially for subsequent domains unless told otherwise.
 After selecting the kernel to boot, stand back and watch Xen boot,
 closely followed by "domain 0" running the XenoLinux kernel. The boot
 messages can also sent to the serial line by specifying the baud rate
-on the Xen cmdline (e.g., 'ser_baud=9600'); this can be very useful
+on the Xen cmdline (e.g., 'com1=9600,8n1'); this can be very useful
 for debugging should anything important scroll off the screen. Xen's
 startup messages will look quite familiar as much of the hardware
 initialisation (SMP boot, apic setup) and device drivers are derived
@@ -329,7 +329,31 @@ that may be able to help diagnose problems:
 
  ifname=dummy	  Don't use any network interface.
 
- ser_baud=xxx	  Enable serial I/O and set the baud rate (COM1)
+ com1=<baud>,DPS[,<io_base>,<irq>]
+ com2=<baud>,DPS[,<io_base>,<irq>]
+                  Xen supports up to two 16550-compatible serial ports.
+                  For example: 'com1=9600,8n1,0x408,5' maps COM1 to a
+                  9600-baud port, 8 data bits, no parity, 1 stop bit,
+                  I/O port base 0x408, IRQ 5.
+                  If the I/O base and IRQ are standard (com1:0x3f8,4;
+                  com2:0x2f8,3) then they need not be specified.
+
+ console=<specifier list>
+                  Specify the destination for Xen console I/O.
+                  This is a comma-separated list of, for example:
+                   vga:  use VGA console and allow keyboard input
+                   com1: use serial port com1
+                   com2H: use serial port com2. Transmitted chars will
+                          have the MSB set. Received chars must have
+                          MSB set.
+                   com2L: use serial port com2. Transmitted chars will
+                          have the MSB cleared. Received chars must
+                          have MSB cleared.
+                  The latter two examples allow a single port to be
+                  shared by two subsystems (eg. console and
+                  debugger). Sharing is controlled by MSB of each
+                  transmitted/received character.
+ [NB. Default for this option is 'com1,tty']
 
  dom0_mem=xxx 	  Set the initial amount of memory for domain0.
 
@@ -405,7 +429,7 @@ config file.
 A typical Grub menu option might look like:
 
 title Xen / XenoLinux 2.4.22
-        kernel /boot/image.gz dom0_mem=131072 ser_baud=115200 noht
+        kernel /boot/image.gz dom0_mem=131072 com1=115200,8n1 noht
         module /boot/xenolinux.gz root=/dev/sda4 ro console=tty0
 
 The first line specifies which Xen image to use, and what command line

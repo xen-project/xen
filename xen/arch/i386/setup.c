@@ -5,6 +5,7 @@
 #include <xeno/lib.h>
 #include <xeno/sched.h>
 #include <xeno/pci.h>
+#include <xeno/serial.h>
 #include <asm/bitops.h>
 #include <asm/smp.h>
 #include <asm/processor.h>
@@ -316,7 +317,6 @@ void __init start_of_day(void)
     extern void net_init(void);
     extern void initialize_block_io(void);
     extern void initialize_keytable(); 
-    extern void initialize_serial(void);
     extern void initialize_keyboard(void);
     extern int opt_nosmp, opt_watchdog, opt_noacpi, opt_ignorebiostables;
     extern int do_timer_lists_from_pit;
@@ -406,6 +406,10 @@ void __init start_of_day(void)
 
     initialize_keytable(); /* call back handling for key codes      */
 
+    serial_init_stage2();
+    initialize_keyboard(); /* setup keyboard (also for debugging)   */
+    initialize_pdb();      /* pervasive debugger */
+
     if ( !cpu_has_apic )
     {
         do_timer_lists_from_pit = 1;
@@ -427,10 +431,6 @@ void __init start_of_day(void)
     pci_init();
 #endif
     do_initcalls();
-    initialize_serial();   /* setup serial 'driver' (for debugging) */
-    initialize_keyboard(); /* setup keyboard (also for debugging)   */
-    initialize_pdb();      /* pervasive debugger */
-
     if ( !setup_network_devices() )
         panic("Must have a network device!\n");
     net_init();            /* initializes virtual network system. */

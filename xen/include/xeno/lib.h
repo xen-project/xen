@@ -36,7 +36,6 @@ unsigned char *quad_to_str(unsigned long q, unsigned char *s);
 /* kernel.c */
 #define printk printf
 void printf (const char *format, ...);
-void cls(void);
 void panic(const char *format, ...);
 
 /* vsprintf.c */

@@ -186,30 +186,14 @@ ignore_int:
         pushl   $int_msg
         call    SYMBOL_NAME(printf)
 1:      jmp     1b
-        pop     %eax
-        popl    %ds
-        popl    %es
-        pop     %edx
-        pop     %ecx
-        pop     %eax
-        iret
-
 
 bad_cpu_msg:
         .asciz  "Bad CPU type. Need P6+."
         ALIGN
 bad_cpu:
-/* NB. We assume the UART is set up correctly. */
-        mov     $bad_cpu_msg,%esi
-1:      lodsb
-        test    %al,%al
-        je      1f
-        push    %eax
-        call    putchar_serial
-        add     $4,%esp
-        jmp     1b
+        pushl   $bad_cpu_msg
+        call    SYMBOL_NAME(printf)
 1:      jmp     1b
-                   
         
 /*** STACK LOCATION ***/
         
