@@ -29,8 +29,34 @@ xendConsole = XendConsole.instance()
 import server.SrvDaemon
 xend = server.SrvDaemon.instance()
 
+"""Flag for a block device backend domain."""
 SIF_BLK_BE_DOMAIN = (1<<4)
+
+"""Flag for a net device backend domain."""
 SIF_NET_BE_DOMAIN = (1<<5)
+
+"""Shutdown code for poweroff."""
+DOMAIN_POWEROFF = 0
+"""Shutdown code for reboot."""
+DOMAIN_REBOOT   = 1
+"""Shutdown code for suspend."""
+DOMAIN_SUSPEND  = 2
+
+"""Map shutdown codes to strings."""
+shutdown_reasons = {
+    DOMAIN_POWEROFF: "poweroff",
+    DOMAIN_REBOOT  : "reboot",
+    DOMAIN_SUSPEND : "suspend" }
+
+def shutdown_reason(code):
+    """Get a shutdown reason from a code.
+
+    @param code: shutdown code
+    @type  code: int
+    @return: shutdown reason
+    @rtype:  string
+    """
+    return shutdown_reasons.get(code, "?")
 
 class VmError(ValueError):
     """Vm construction error."""

@@ -65,10 +65,10 @@ class XendDomain:
     def schedule_later(self, _delay, _name, _fn, *args):
         """Schedule a function to be called later (if not already scheduled).
 
-        _delay delay in seconds
-        _name  schedule name
-        _fn    function
-        args   arguments
+        @param _delay: delay in seconds
+        @param _name:  schedule name
+        @param _fn:    function
+        @param args:   arguments
         """
         if self.schedule.get(_name): return
         self.schedule[_name] = reactor.callLater(_delay, _fn, *args)
@@ -76,7 +76,7 @@ class XendDomain:
     def schedule_cancel(self, name):
         """Cancel a scheduled function call.
         
-        name schedule name to cancel
+        @param name: schedule name to cancel
         """
         callid = self.schedule.get(name)
         if not callid:
@@ -88,7 +88,7 @@ class XendDomain:
     def reap_schedule(self, delay=0):
         """Schedule reap to be called later.
 
-        delay delay in seconds
+        @param delay: delay in seconds
         """
         self.schedule_later(delay, 'reap', self.reap)
 
@@ -100,7 +100,7 @@ class XendDomain:
     def refresh_schedule(self, delay=0):
         """Schedule refresh to be called later.
         
-        delay delay in seconds
+        @param delay: delay in seconds
         """
         self.schedule_later(delay, 'refresh', self.refresh)
 
@@ -109,6 +109,18 @@ class XendDomain:
         """
         self.schedule_cancel('refresh')
 
+    def domain_restarts_schedule(self, delay=0):
+        """Schedule domain_restarts to be called later.
+        
+        @param delay: delay in seconds
+        """
+        self.schedule_later(delay, 'domain_restarts', self.domain_restarts)
+        
+    def domain_restarts_cancel(self):
+        """Cancel any scheduled call of domain_restarts.
+        """
+        self.schedule_cancel('domain_restarts')
+        
     def rm_all(self):
         """Remove all domain info. Used after reboot.
         """
@@ -118,7 +130,6 @@ class XendDomain:
     def initial_refresh(self):
         """Refresh initial domain info from domain_db.
         """
-        print "initial_refresh>"
         for d in self.domain_db.values(): print 'db dom=', d
         domlist = xc.domain_getinfo()
         for d in domlist: print 'xc dom=', d
@@ -164,10 +175,9 @@ class XendDomain:
     def _new_domain(self, savedinfo, info):
         """Create a domain entry from saved info.
 
-        savedinfo saved info from the db
-        info      domain info from xen
-
-        returns deferred
+        @param savedinfo: saved info from the db
+        @param info:      domain info from xen
+        @return: deferred
         """
         config = sxp.child_value(savedinfo, 'config')
         deferred = XendDomainInfo.vm_recreate(config, info)
@@ -179,9 +189,9 @@ class XendDomain:
     def _add_domain(self, id, info, notify=1):
         """Add a domain entry to the tables.
 
-        id     domain id
-        info   domain info object
-        notify send a domain created event if true
+        @param id:     domain id
+        @param info:   domain info object
+        @param notify: send a domain created event if true
         """
         self.domain[id] = info
         self.domain_db[id] = info.sxpr()
@@ -191,8 +201,8 @@ class XendDomain:
     def _delete_domain(self, id, notify=1):
         """Remove a domain from the tables.
 
-        id     domain id
-        notify send a domain died event if true
+        @param id:     domain id
+        @param notify: send a domain died event if true
         """
         if id in self.domain:
             if notify: eserver.inject('xend.domain.died', id)
@@ -206,7 +216,6 @@ class XendDomain:
         Tidy them up.
         """
         self.reap_cancel()
-        print 'XendDomain>reap>'
         domlist = xc.domain_getinfo()
         casualties = []
         for d in domlist:
@@ -219,8 +228,14 @@ class XendDomain:
         for d in casualties:
             id = str(d['dom'])
             print 'XendDomain>reap> died id=', id, d
+            if d['shutdown']:
+                reason = XendDomainInfo.shutdown_reason(d['shutdown_reason'])
+                print 'XendDomain>reap> shutdown id=', id, reason
+                if reason in ['poweroff', 'reboot']:
+                    self.domain_restart_schedule(id, reason)
             self.final_domain_destroy(id)
-        print 'XendDomain>reap<'
+        if len(self.restarts):
+            self.domain_restarts_schedule()
 
     def refresh(self):
         """Refresh domain list from Xen.
@@ -252,7 +267,7 @@ class XendDomain:
     def refresh_domain(self, id):
         """Refresh information for a single domain.
 
-        id domain id
+        @param id: domain id
         """
         dom = int(id)
         dominfo = xc.domain_getinfo(dom, 1)
@@ -271,7 +286,7 @@ class XendDomain:
     def domain_ls(self):
         """Get list of domain ids.
 
-        return domain ids
+        @return: domain ids
         """
         self.refresh()
         return self.domain.keys()
@@ -279,7 +294,7 @@ class XendDomain:
     def domains(self):
         """Get list of domain objects.
 
-        return domain objects
+        @return: domain objects
         """
         self.refresh()
         return self.domain.values()
@@ -287,9 +302,8 @@ class XendDomain:
     def domain_create(self, config):
         """Create a domain from a configuration.
 
-        config configuration
-
-        returns deferred
+        @param config: configuration
+        @return: deferred
         """
         deferred = XendDomainInfo.vm_create(config)
         def fn(dominfo):
@@ -301,8 +315,8 @@ class XendDomain:
     def domain_get(self, id):
         """Get up-to-date info about a domain.
 
-        id domain id
-        returns domain object (or None)
+        @param id: domain id
+        @return: domain object (or None)
         """
         id = str(id)
         self.refresh_domain(id)
@@ -311,7 +325,7 @@ class XendDomain:
     def domain_unpause(self, id):
         """Unpause domain execution.
 
-        id domain id
+        @param id: domain id
         """
         dom = int(id)
         eserver.inject('xend.domain.unpause', id)
@@ -320,7 +334,7 @@ class XendDomain:
     def domain_pause(self, id):
         """Pause domain execution.
 
-        id domain id
+        @param id: domain id
         """
         dom = int(id)
         eserver.inject('xend.domain.pause', id)
@@ -328,14 +342,20 @@ class XendDomain:
     
     def domain_shutdown(self, id, reason='poweroff'):
         """Shutdown domain (nicely).
+         - poweroff: domain will restart if has autorestart set.
+         - reboot: domain will restart.
+         - halt: domain will not restart (even if has autorestart set).
 
-        id     domain id
-        reason shutdown type: poweroff, reboot, suspend, halt
+        @param id:     domain id
+        @param reason: shutdown type: poweroff, reboot, suspend, halt
         """
         dom = int(id)
         if dom <= 0:
             return 0
-        self.domain_restart_schedule(id, reason)
+        if reason == 'halt':
+            self.domain_restart_cancel(id)
+        else:
+            self.domain_restart_schedule(id, reason)
         eserver.inject('xend.domain.shutdown', [id, reason])
         if reason == 'halt':
             reason = 'poweroff'
@@ -346,28 +366,30 @@ class XendDomain:
     def domain_restart_schedule(self, id, reason):
         """Schedule a restart for a domain if it needs one.
 
-        id     domain id
-        reason shutdown reason
+        @param id:     domain id
+        @param reason: shutdown reason
         """
-        if id in self.restarts:
-            # Don't schedule if already there.
+        print 'domain_restart_schedule>', id, reason
+        dominfo = self.domain.get(id)
+        if not dominfo or id in self.restarts:
+            # Don't schedule if unknown or already there.
+            print 'domain_restart_schedule> no domain'
             return
-        restart = 0
-        if reason in ['poweroff', 'reboot']:
-            dominfo = self.domain.get(id)
-            if dominfo and (dominfo.autorestart or reason == 'reboot'):
-                restart = 1
-                # Clear autorestart flag to avoid multiple restarts.
-                dominfo.autorestart = 0
-            
+        restart = ((reason == 'reboot') or
+                   (reason == 'poweroff' and dominfo.autorestart))
         if restart:
+            # Clear autorestart flag to avoid multiple restarts.
+            dominfo.autorestart = 0
             self.restarts[id] = dominfo.config
+            print 'Scheduling restart for domain:', id, dominfo.name
+            self.domain_restarts_schedule()
             
     def domain_restart_cancel(self, id):
         """Cancel any restart scheduled for a domain.
 
-        id domain id
+        @param id: domain id
         """
+        print 'domain_restart_cancel>', id
         dominfo = self.domain.get(id)
         if dominfo:
             dominfo.autorestart = 0
@@ -377,23 +399,36 @@ class XendDomain:
     def domain_restarts(self):
         """Execute any scheduled domain restarts for domains that have gone.
         """
+        print 'domain_restarts>'
+        self.domain_restarts_cancel()
         for id in self.restarts.keys():
             if id in self.domain:
+                print 'domain_restarts> still running:', id
                 # Don't execute restart for domains still running.
                 continue
             config = self.restarts[id]
             # Remove it from the restarts.
             del self.restarts[id]
             try:
-                self.domain_create(config)
+                print 'domain_restarts> restart:', id, config
+                def cbok(dominfo):
+                    print 'Restarted domain', id, 'as', dominfo.id
+                    self.domain_unpause(dominfo.id)
+                def cberr(err):
+                    print >>sys.stderr, "Delayed exception restarting domain: ", err
+                deferred = self.domain_create(config)
+                deferred.addCallback(cbok)
+                deferred.addCallback(cberr)
             except:
                 print >>sys.stderr, "XendDomain> Exception restarting domain"
                 traceback.print_exc(sys.stderr)
+        if len(self.restarts):
+            self.refresh_schedule(delay=5)
         
     def final_domain_destroy(self, id):
         """Final destruction of a domain..
 
-        id domain id
+        @param id: domain id
         """
         dom = int(id)
         if dom <= 0:
@@ -410,7 +445,7 @@ class XendDomain:
         """Terminate domain immediately.
         Camcels any restart for the domain.
 
-        id domain id
+        @param id: domain id
         """
         self.domain_restart_cancel(id)
         val = self.final_domain_destroy(id)
@@ -420,7 +455,7 @@ class XendDomain:
     def domain_migrate(self, id, dst):
         """Start domain migration.
 
-        id domain id
+        @param id: domain id
         """
         # Need a cancel too?
         # Don't forget to cancel restart for it.
@@ -432,9 +467,9 @@ class XendDomain:
         """Save domain state to file, destroy domain on success.
         Leave domain running on error.
 
-        id       domain id
-        dst      destination file
-        progress output progress if true
+        @param id:       domain id
+        @param dst:      destination file
+        @param progress: output progress if true
         """
         dom = int(id)
         dominfo = self.domain_get(id)
@@ -457,10 +492,9 @@ class XendDomain:
     def domain_restore(self, src, progress=0):
         """Restore domain from file.
 
-        src      source file
-        progress output progress if true
-
-        returns domain object
+        @param src :     source file
+        @param progress: output progress if true
+        @return: domain object
         """
         dominfo = XendDomainInfo.vm_restore(src, progress=progress)
         self._add_domain(dominfo.id, dominfo)
@@ -469,8 +503,8 @@ class XendDomain:
     def domain_pincpu(self, dom, cpu):
         """Pin a domain to a cpu.
 
-        dom domain
-        cpu cpu number
+        @param dom: domain
+        @param cpu: cpu number
         """
         dom = int(dom)
         return xc.domain_pincpu(dom, cpu)
@@ -493,7 +527,7 @@ class XendDomain:
         """
         dom = int(dom)
         return xc.fbvtsched_domain_set(dom=dom, mcuadv=mcuadv,
-                                      warp=warp, warpl=warpl, warpu=warpu)
+                                       warp=warp, warpl=warpl, warpu=warpu)
 
     def domain_cpu_fbvt_get(self, dom):
         """Get FBVT (Fair Borrowed Virtual Time) scheduler parameters for a domain.
@@ -516,10 +550,9 @@ class XendDomain:
     def domain_devtype_ls(self, dom, type):
         """Get list of device indexes for a domain.
 
-        dom  domain
-        type device type
-
-        returns device indexes
+        @param dom:  domain
+        @param type: device type
+        @return: device indexes
         """
         dominfo = self.domain_get(dom)
         if not dominfo: return None
@@ -529,11 +562,10 @@ class XendDomain:
     def domain_devtype_get(self, dom, type, idx):
         """Get a device from a domain.
 
-        dom  domain
-        type device type
-        idx  device index
-
-        returns device object (or None)
+        @param dom:  domain
+        @param type: device type
+        @param idx:  device index
+        @return: device object (or None)
         """
         dominfo = self.domain_get(dom)
         if not dominfo: return None
@@ -542,46 +574,42 @@ class XendDomain:
     def domain_vif_ls(self, dom):
         """Get list of virtual network interface (vif) indexes for a domain.
 
-        dom domain
-
-        returns vif indexes
+        @param dom: domain
+        @return: vif indexes
         """
         return self.domain_devtype_ls(dom, 'vif')
 
     def domain_vif_get(self, dom, vif):
         """Get a virtual network interface (vif) from a domain.
 
-        dom domain
-        vif vif index
-
-        returns vif device object (or None)
+        @param dom: domain
+        @param vif: vif index
+        @return: vif device object (or None)
         """
         return self.domain_devtype_get(dom, 'vif', vif)
 
     def domain_vbd_ls(self, dom):
         """Get list of virtual block device (vbd) indexes for a domain.
 
-        dom domain
-
-        returns vbd indexes
+        @param dom: domain
+        @return: vbd indexes
         """
         return self.domain_devtype_ls(dom, 'vbd')
 
     def domain_vbd_get(self, dom, vbd):
         """Get a virtual block device (vbd) from a domain.
 
-        dom domain
-        vbd vbd index
-
-        returns vbd device (or None)
+        @param dom: domain
+        @param vbd: vbd index
+        @return: vbd device (or None)
         """
         return self.domain_devtype_get(dom, 'vbd', vbd)
 
     def domain_shadow_control(self, dom, op):
         """Shadow page control.
 
-        dom domain
-        op  operation
+        @param dom: domain
+        @param op:  operation
         """
         dom = int(dom)
         return xc.shadow_control(dom, op)
