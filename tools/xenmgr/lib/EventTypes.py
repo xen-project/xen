@@ -8,7 +8,7 @@
 ## xend.domain.unpause: dom
 ## xend.domain.pause: dom
 ## xend.domain.shutdown: dom
-## xend.domain.halt: dom
+## xend.domain.destroy: dom
 
 ## xend.domain.migrate.begin: dom, to
 ## Begin tells: src host, src domain uri, dst host. Dst id known?

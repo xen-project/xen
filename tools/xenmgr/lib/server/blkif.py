@@ -1,3 +1,5 @@
+from twisted.internet import defer
+
 import channel
 import controller
 from messages import *
@@ -22,7 +24,7 @@ class BlkifControllerFactory(controller.ControllerFactory):
         self.attached = 1
         self.registerChannel()
 
-    def createInstance(self, dom):
+    def createInstance(self, dom, recreate=0):
         d = self.addDeferred()
         blkif = self.getInstanceByDom(dom)
         if blkif:
@@ -30,7 +32,10 @@ class BlkifControllerFactory(controller.ControllerFactory):
         else:
             blkif = BlkifController(self, dom)
             self.addInstance(blkif)
-            blkif.send_be_create()
+            if recreate:
+                self.callDeferred(blkif)
+            else:
+                blkif.send_be_create()
         return d
 
     def getDomainDevices(self, dom):
@@ -41,10 +46,11 @@ class BlkifControllerFactory(controller.ControllerFactory):
         blkif = self.getInstanceByDom(dom)
         return (blkif and blkif.getDevice(vdev)) or None
 
-    def setControlDomain(self, dom):
+    def setControlDomain(self, dom, recreate=0):
         if self.dom == dom: return
         self.deregisterChannel()
-        self.attached = 0
+        if not recreate:
+            self.attached = 0
         self.dom = dom
         self.registerChannel()
         #
@@ -54,6 +60,28 @@ class BlkifControllerFactory(controller.ControllerFactory):
 
     def getControlDomain(self):
         return self.dom
+
+    def reattachDevice(self, dom, vdev):
+        blkif = self.getInstanceByDom(dom)
+        if blkif:
+            blkif.reattachDevice(vdev)
+        self.attached = self.devicesAttached()
+        if self.attached:
+            self.reattached()
+
+    def devicesAttached(self):
+        """Check if all devices are attached.
+        """
+        attached = 1
+        for blkif in self.getInstances():
+            if not blkif.attached:
+                attached = 0
+                break
+        return attached
+                         
+    def reattached(self):
+        for blkif in self.getInstances():
+            blkif.reattached()
 
     def recv_be_create(self, msg, req):
         #print 'recv_be_create>'
@@ -86,29 +114,7 @@ class BlkifControllerFactory(controller.ControllerFactory):
         if self.attached:
             self.callDeferred(0)
         else:
-            self.reattach_device(val['domid'], val['vdevice'])
-
-    def reattach_device(self, dom, vdev):
-        blkif = self.getInstanceByDom(dom)
-        if blkif:
-            blkif.reattach_device(vdev)
-        self.attached = self.devices_attached()
-        if self.attached:
-            self.reattached()
-
-    def devices_attached(self):
-        """Check if all devices are attached.
-        """
-        attached = 1
-        for blkif in self.getInstances():
-            if not blkif.attached:
-                attached = 0
-                break
-        return attached
-                         
-    def reattached(self):
-        for blkif in self.getInstances():
-            blkif.reattached()
+            self.reattachDevice(val['domid'], val['vdevice'])
 
     def recv_be_driver_status_changed(self, msg, req):
         val = unpackMsg('blkif_be_driver_status_changed_t', msg)
@@ -117,11 +123,12 @@ class BlkifControllerFactory(controller.ControllerFactory):
             for blkif in self.getInstances():
                 blkif.detach()
 
-class BlkDev:
+class BlkDev(controller.Dev):
     """Info record for a block device.
     """
 
-    def __init__(self, vdev, mode, segment):
+    def __init__(self, ctrl, vdev, mode, segment):
+        controller.Dev.__init__(self, ctrl)
         self.vdev = vdev
         self.mode = mode
         self.device = segment['device']
@@ -131,6 +138,14 @@ class BlkDev:
 
     def readonly(self):
         return 'w' not in self.mode
+
+    def sxpr(self):
+        print 'BlkDev>sxpr>', vars(self)
+        val = ['blkif', ['vdev', self.vdev], ['mode', self.mode] ]
+        return val
+
+    def destroy(self):
+        self.controller.send_be_vbd_destroy(self.vdev)
         
 class BlkifController(controller.Controller):
     """Block device interface controller. Handles all block devices
@@ -154,21 +169,43 @@ class BlkifController(controller.Controller):
         self.registerChannel()
         #print 'BlkifController<', 'dom=', self.dom, 'idx=', self.idx
 
+    def lostChannel(self):
+        print 'BlkifController>lostChannel>', 'dom=', self.dom
+        #self.destroyDevices()
+        controller.Controller.lostChannel(self)
+
     def getDevices(self):
         return self.devices.values()
 
     def getDevice(self, vdev):
         return self.devices.get(vdev)
 
-    def attach_device(self, vdev, mode, segment):
+    def addDevice(self, vdev, mode, segment):
+        if vdev in self.devices: return None
+        dev = BlkDev(self, vdev, mode, segment)
+        self.devices[vdev] = dev
+        return dev
+
+    def attachDevice(self, vdev, mode, segment, recreate=0):
         """Attach a device to the specified interface.
         """
         #print 'BlkifController>attach_device>', self.dom, vdev, mode, segment
-        if vdev in self.devices: return -1
-        dev = BlkDev(vdev, mode, segment)
-        self.devices[vdev] = dev
-        self.send_be_vbd_create(vdev)
-        return self.factory.addDeferred()
+        dev = self.addDevice(vdev, mode, segment)
+        if not dev: return -1
+        if recreate:
+            d = defer.Deferred()
+            d.callback(self)
+        else:
+            self.send_be_vbd_create(vdev)
+            d = self.factory.addDeferred()
+        return d
+
+    def destroy(self):
+        self.destroyDevices()
+
+    def destroyDevices(self):
+        for dev in self.getDevices():
+            dev.destroy()
 
     def detach(self):
         """Detach all devices, when the back-end control domain has changed.
@@ -178,7 +215,7 @@ class BlkifController(controller.Controller):
             dev.attached = 0
             self.send_be_vbd_create(vdev)
 
-    def reattach_device(self, vdev):
+    def reattachDevice(self, vdev):
         """Reattach a device, when the back-end control domain has changed.
         """
         dev = self.devices[vdev]
@@ -253,5 +290,14 @@ class BlkifController(controller.Controller):
                         'extent.device'        : dev.device,
                         'extent.sector_start'  : dev.start_sector,
                         'extent.sector_length' : dev.nr_sectors })
+        self.factory.writeRequest(msg)
+
+    def send_be_vbd_destroy(self, vdev):
+        dev = self.devices[vdev]
+        msg = packMsg('blkif_be_vbd_destroy_t',
+                      { 'domid'                : self.dom,
+                        'blkif_handle'         : 0,
+                        'vdevice'              : dev.vdev })
+        del self.devices[vdev]
         self.factory.writeRequest(msg)
     

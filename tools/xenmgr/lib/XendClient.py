@@ -199,9 +199,9 @@ class Xend:
         return xend_call(self.domainurl(id),
                          {'op'      : 'shutdown'})
 
-    def xend_domain_halt(self, id):
+    def xend_domain_destroy(self, id):
         return xend_call(self.domainurl(id),
-                         {'op'      : 'halt'})
+                         {'op'      : 'destroy'})
 
     def xend_domain_save(self, id, filename):
         return xend_call(self.domainurl(id),
