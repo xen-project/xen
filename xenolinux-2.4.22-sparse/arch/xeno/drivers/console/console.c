@@ -26,22 +26,22 @@
 
 #define XENO_TTY_MINOR 123
 
-/*** useful function for console debugging -- goes straight to Xen ****/
-
+/*** Useful function for console debugging -- goes straight to Xen ****/
 asmlinkage int xprintk(const char *fmt, ...)
 {
-        va_list args;
-        unsigned long flags;
-        int printed_len;
-        static char printk_buf[1024];
+    va_list args;
+    int printk_len;
+    static char printk_buf[1024];
+    
+    /* Emit the output into the temporary buffer */
+    va_start(args, fmt);
+    printk_len = vsnprintf(printk_buf, sizeof(printk_buf), fmt, args);
+    va_end(args);
+    
+    /* Send the processed output directly to Xen. */
+    (void)HYPERVISOR_console_write(printk_buf, printk_len);
 
-        /* Emit the output into the temporary buffer */
-        va_start(args, fmt);
-        printed_len = vsnprintf(printk_buf, sizeof(printk_buf), fmt, args);
-        va_end(args);
-
-        // Useful Hack if things are going wrong very early in the day
-        (void)HYPERVISOR_console_write(printk_buf, sizeof(printk_buf));
+    return 0;
 }
 
 

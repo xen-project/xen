@@ -429,9 +429,10 @@ asmlinkage int printk(const char *fmt, ...)
 	va_end(args);
 
 #if 0
-// Useful Hack if things are going wrong very early in the day
-(void)HYPERVISOR_console_write(printk_buf, sizeof(printk_buf));
+	/* Useful if things are going wrong very early in the day. */
+	(void)HYPERVISOR_console_write(printk_buf, printed_len);
 #endif
+
 	/*
 	 * Copy the output into log_buf.  If the caller didn't provide
 	 * appropriate log level tags, we insert them here

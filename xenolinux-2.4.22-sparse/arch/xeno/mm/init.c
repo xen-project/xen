@@ -178,10 +178,6 @@ static void __init fixrange_init (unsigned long start,
                                       (*(unsigned long *)kpte)&~_PAGE_RW);
 
 				set_pmd(pmd, __pmd(_KERNPG_TABLE + __pa(pte)));
-
-				// XXX Xen below reqd ?
-				//if (pte != pte_offset(pmd, 0))
-				//	BUG();
 			}
 			vaddr += PMD_SIZE;
 		}
