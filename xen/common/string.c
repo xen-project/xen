@@ -391,7 +391,6 @@ char * bcopy(const char * src, char * dest, int count)
 }
 #endif
 
-#ifndef __HAVE_ARCH_MEMCPY
 /**
  * memcpy - Copy one area of memory to another
  * @dest: Where to copy to
@@ -401,6 +400,7 @@ char * bcopy(const char * src, char * dest, int count)
  * You should not use this function to access IO space, use memcpy_toio()
  * or memcpy_fromio() instead.
  */
+#undef memcpy
 void * memcpy(void * dest,const void *src,size_t count)
 {
 	char *tmp = (char *) dest, *s = (char *) src;
@@ -410,7 +410,6 @@ void * memcpy(void * dest,const void *src,size_t count)
 
 	return dest;
 }
-#endif
 
 #ifndef __HAVE_ARCH_MEMMOVE
 /**
