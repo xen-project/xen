@@ -245,7 +245,8 @@ static inline int HYPERVISOR_yield(void)
     int ret;
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret) : "0" (__HYPERVISOR_yield) );
+        : "=a" (ret) : "0" (__HYPERVISOR_sched_op),
+        "b" (SCHEDOP_yield) );
 
     return ret;
 }
@@ -255,7 +256,8 @@ static inline int HYPERVISOR_exit(void)
     int ret;
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret) : "0" (__HYPERVISOR_exit) );
+        : "=a" (ret) : "0" (__HYPERVISOR_sched_op),
+        "b" (SCHEDOP_exit) );
 
     return ret;
 }
