@@ -73,8 +73,9 @@ shadow_promote(struct domain *d, unsigned long gpfn, unsigned long gmfn,
     FSH_LOG("shadow_promote gpfn=%p gmfn=%p nt=%p min=%p max=%p",
             gpfn, gmfn, new_type, min_type, max_type);
 
-    if ( min_type <= max_type )
-        shadow_remove_all_write_access(d, min_type, max_type, gpfn, gmfn);
+    if ( (min_type <= max_type) &&
+         !shadow_remove_all_write_access(d, min_type, max_type, gpfn, gmfn) )
+        return 0;
 
     // To convert this page to use as a page table, the writable count
     // should now be zero.  Test this by grabbing the page as an page table,
@@ -90,7 +91,7 @@ shadow_promote(struct domain *d, unsigned long gpfn, unsigned long gmfn,
     // shadow_lock() and move the shadow code to BIGLOCK().
     //
     if ( unlikely(!get_page(page, d)) )
-        BUG();
+        BUG(); // XXX -- needs more thought for a graceful failure
     if ( unlikely(test_and_clear_bit(_PGT_pinned, &page->u.inuse.type_info)) )
     {
         pinned = 1;
@@ -98,8 +99,8 @@ shadow_promote(struct domain *d, unsigned long gpfn, unsigned long gmfn,
     }
     if ( get_page_type(page, PGT_base_page_table) )
     {
-        put_page_type(page);
         set_bit(_PGC_page_table, &page->count_info);
+        put_page_type(page);
     }
     else
     {
@@ -111,7 +112,7 @@ shadow_promote(struct domain *d, unsigned long gpfn, unsigned long gmfn,
 
     // Now put the type back to writable...
     if ( unlikely(!get_page_type(page, PGT_writable_page)) )
-        BUG();
+        BUG(); // XXX -- needs more thought for a graceful failure
     if ( unlikely(pinned) )
     {
         if ( unlikely(test_and_set_bit(_PGT_pinned,
@@ -215,14 +216,14 @@ alloc_shadow_page(struct domain *d,
     {
     case PGT_l1_shadow:
         if ( !shadow_promote(d, gpfn, gmfn, psh_type) )
-            goto oom;
+            goto fail;
         perfc_incr(shadow_l1_pages);
         d->arch.shadow_page_count++;
         break;
 
     case PGT_l2_shadow:
         if ( !shadow_promote(d, gpfn, gmfn, psh_type) )
-            goto oom;
+            goto fail;
         perfc_incr(shadow_l2_pages);
         d->arch.shadow_page_count++;
         if ( PGT_l2_page_table == PGT_root_page_table )
@@ -236,7 +237,7 @@ alloc_shadow_page(struct domain *d,
         // pinning.
         //
         if ( !shadow_promote(d, gpfn, gmfn, PGT_l1_shadow) )
-            goto oom;
+            goto fail;
         perfc_incr(hl2_table_pages);
         d->arch.hl2_page_count++;
         if ( shadow_mode_external(d) &&
@@ -263,7 +264,7 @@ alloc_shadow_page(struct domain *d,
 
     return smfn;
 
-  oom:
+  fail:
     FSH_LOG("promotion of pfn=%p mfn=%p failed!  external gnttab refs?\n",
             gpfn, gmfn);
     free_domheap_page(page);
@@ -1777,7 +1778,7 @@ static u32 remove_all_write_access_in_ptpage(
     return count;
 }
 
-u32 shadow_remove_all_write_access(
+int shadow_remove_all_write_access(
     struct domain *d, unsigned min_type, unsigned max_type,
     unsigned long gpfn, unsigned long gmfn)
 {
@@ -1796,10 +1797,13 @@ u32 shadow_remove_all_write_access(
          PGT_writable_page )
     {
         write_refs = (frame_table[gmfn].u.inuse.type_info & PGT_count_mask);
+        if ( write_refs &&
+             (frame_table[gmfn].u.inuse.type_info & PGT_pinned) )
+            write_refs--;
         if ( write_refs == 0 )
         {
             perfc_incrc(remove_write_access_easy);
-            return 0;
+            return 1;
         }
     }
 
@@ -1816,12 +1820,16 @@ u32 shadow_remove_all_write_access(
                 case PGT_l1_shadow:
                     count +=
                         remove_all_write_access_in_ptpage(d, a->smfn, gmfn);
+                    if ( count == write_refs )
+                        return 1;
                     break;
                 case PGT_l2_shadow:
                     if ( sl1mfn )
                         count +=
                             remove_all_write_access_in_ptpage(d, a->smfn,
                                                               sl1mfn);
+                    if ( count == write_refs )
+                        return 1;
                     break;
                 case PGT_hl2_shadow:
                     // nothing to do here...
@@ -1835,7 +1843,10 @@ u32 shadow_remove_all_write_access(
         }
     }
 
-    return count;
+    FSH_LOG("%s: looking for %d refs, found %d refs\n",
+            __func__, write_refs, count);
+
+    return 0;
 }
 
 static u32 remove_all_access_in_page(
