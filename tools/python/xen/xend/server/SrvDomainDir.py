@@ -69,7 +69,7 @@ class SrvDomainDir(SrvDir):
         except Exception, ex:
             print 'op_create> Exception creating domain:'
             traceback.print_exc()
-            req.setResponseCode(http.BAD_REQUEST, "Error creating domain")
+            req.setResponseCode(http.BAD_REQUEST, "Error creating domain: " + str(ex))
             return str(ex)
             #return error.ErrorPage(http.BAD_REQUEST,
             #                       "Error creating domain",
@@ -100,7 +100,7 @@ class SrvDomainDir(SrvDir):
         """Callback to handle errors in deferred domain creation.
         """
         print 'op_create> Deferred Exception creating domain:', err
-        req.setResponseCode(http.BAD_REQUEST, "Error creating domain")
+        req.setResponseCode(http.BAD_REQUEST, "Error creating domain: " + str(err))
         return str(err)
 
     def op_restore(self, op, req):

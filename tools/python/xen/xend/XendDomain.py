@@ -8,7 +8,7 @@ import sys
 import traceback
 
 from twisted.internet import defer
-defer.Deferred.debug = 1
+#defer.Deferred.debug = 1
 from twisted.internet import reactor
 
 import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()

@@ -4,7 +4,7 @@ for a domain.
 """
 
 from twisted.internet import defer
-defer.Deferred.debug = 1
+#defer.Deferred.debug = 1
 
 import channel
 from messages import msgTypeName, printMsg

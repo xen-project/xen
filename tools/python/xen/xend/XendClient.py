@@ -19,6 +19,9 @@ import PrettyPrint
 
 DEBUG = 0
 
+class XendError(RuntimeError):
+    pass
+
 class Foo(httplib.HTTPResponse):
 
     def begin(self):
@@ -118,7 +121,7 @@ def xend_request(url, method, data=None):
     if resp.status in [204, 404]:
         return None
     if resp.status not in [200, 201, 202, 203]:
-        raise RuntimeError(resp.reason)
+        raise XendError(resp.reason)
     pin = sxp.Parser()
     data = resp.read()
     if DEBUG: print "***data" , data

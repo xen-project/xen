@@ -6,7 +6,7 @@ import time
 
 from twisted.internet import reactor
 from twisted.internet import defer
-defer.Deferred.debug = 1
+#defer.Deferred.debug = 1
 from twisted.internet.protocol import Protocol
 from twisted.internet.protocol import ClientFactory
 

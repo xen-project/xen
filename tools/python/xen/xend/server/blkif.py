@@ -1,7 +1,7 @@
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
 
 from twisted.internet import defer
-defer.Deferred.debug = 1
+#defer.Deferred.debug = 1
 
 from xen.xend import sxp
 from xen.xend import PrettyPrint

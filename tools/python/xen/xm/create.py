@@ -7,7 +7,7 @@ import sys
 
 from xen.xend import sxp
 from xen.xend import PrettyPrint
-from xen.xend.XendClient import server
+from xen.xend.XendClient import server, XendError
 
 from xen.util import console_client
 
@@ -352,13 +352,21 @@ def preprocess(opts, vals):
          
 def make_domain(opts, config):
     """Create, build and start a domain.
-    Returns: pair: [int] the ID of the new domain, [int] console port
+
+    @param opts:   options
+    @param config: configuration
+    @return: domain id, console port
+    @rtype:  (int, int)
     """
-    if opts.vals.load:
-        filename = os.path.abspath(opts.vals.load)
-        dominfo = server.xend_domain_restore(filename, config)
-    else:
-        dominfo = server.xend_domain_create(config)
+
+    try:
+        if opts.vals.load:
+            filename = os.path.abspath(opts.vals.load)
+            dominfo = server.xend_domain_restore(filename, config)
+        else:
+            dominfo = server.xend_domain_create(config)
+    except XendError, ex:
+        opts.err(str(ex))
 
     dom = int(sxp.child_value(dominfo, 'id'))
     console_info = sxp.child(dominfo, 'console')
@@ -369,7 +377,7 @@ def make_domain(opts, config):
     
     if server.xend_domain_unpause(dom) < 0:
         server.xend_domain_destroy(dom)
-        opts.err("Failed to start domain %d" % dom)
+        opts.err("Failed to unpause domain %d" % dom)
     opts.info("Started domain %d, console on port %d"
               % (dom, console_port))
     return (dom, console_port)
@@ -397,9 +405,9 @@ def main(argv):
     if opts.vals.dryrun:
         PrettyPrint.prettyprint(config)
     else:
-        (d, c) = make_domain(opts, config)
+        (dom, console) = make_domain(opts, config)
         if opts.vals.console_autoconnect:
-            console_client.connect('localhost', c)
+            console_client.connect('localhost', console)
         
 if __name__ == '__main__':
     main(sys.argv)

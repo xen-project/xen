@@ -15,7 +15,7 @@ import sys
 import os
 
 from twisted.internet import defer
-defer.Deferred.debug = 1
+#defer.Deferred.debug = 1
 
 import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
 import xen.util.ip
