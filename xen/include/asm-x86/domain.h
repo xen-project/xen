@@ -68,11 +68,14 @@ struct arch_exec_domain
      * for segment registers %ds, %es, %fs and %gs:
      * 	%ds, %es, %fs, %gs, %eip, %cs, %eflags [, %oldesp, %oldss]
      */
-    unsigned long event_selector;    /* entry CS  */
+
+    unsigned long event_selector;    /* entry CS  (x86/32 only) */
     unsigned long event_address;     /* entry EIP */
 
-    unsigned long failsafe_selector; /* entry CS  */
+    unsigned long failsafe_selector; /* entry CS  (x86/32 only) */
     unsigned long failsafe_address;  /* entry EIP */
+
+    unsigned long syscall_address;   /* entry EIP (x86/64 only) */
 
     /* Bounce information for propagating an exception to guest OS. */
     struct trap_bounce trap_bounce;

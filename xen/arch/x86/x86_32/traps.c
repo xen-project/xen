@@ -274,3 +274,21 @@ long do_set_fast_trap(int idx)
 {
     return set_fast_trap(current, idx);
 }
+
+long do_set_callbacks(unsigned long event_selector,
+                      unsigned long event_address,
+                      unsigned long failsafe_selector,
+                      unsigned long failsafe_address)
+{
+    struct exec_domain *d = current;
+
+    if ( !VALID_CODESEL(event_selector) || !VALID_CODESEL(failsafe_selector) )
+        return -EPERM;
+
+    d->arch.event_selector    = event_selector;
+    d->arch.event_address     = event_address;
+    d->arch.failsafe_selector = failsafe_selector;
+    d->arch.failsafe_address  = failsafe_address;
+
+    return 0;
+}
