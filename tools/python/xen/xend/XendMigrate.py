@@ -289,7 +289,7 @@ class XendMigrateInfo(XfrdInfo):
             eserver.inject('xend.migrate.ok', self.sxpr())
         else:
             self.state = 'error'
-            self.error(XendError("save failed"))
+            self.error(XendError("migrate failed"))
             eserver.inject('xend.migrate.error', self.sxpr())
 
 class XendSaveInfo(XfrdInfo):

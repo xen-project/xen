@@ -11,7 +11,7 @@ from xen.xend import PrettyPrint
 from xen.xend import sxp
 from xen.xend.XendClient import XendError, server
 from xen.xend.XendClient import main as xend_client_main
-from xen.xm import create, destroy, shutdown
+from xen.xm import create, destroy, migrate, shutdown
 
 class Group:
 
@@ -295,6 +295,19 @@ class ProgRestore(Prog):
             server.xend_domain_unpause(id)
 
 xm.prog(ProgRestore)
+
+class ProgMigrate(Prog):
+    group = 'domain'
+    name = "migrate"
+    info = """Migrate a domain to another machine."""
+
+    def help(self, args):
+        migrate.help(arg)
+    
+    def main(self, args):
+        migrate.main(args)
+
+xm.prog(ProgMigrate)
 
 class ProgList(Prog):
     group = 'domain'
