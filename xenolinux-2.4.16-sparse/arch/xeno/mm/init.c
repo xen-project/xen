@@ -141,9 +141,9 @@ void __set_fixmap (enum fixed_addresses idx, unsigned long phys,
 static void __init fixrange_init (unsigned long start, 
                                   unsigned long end, pgd_t *pgd_base)
 {
-    pgd_t *pgd;
-    pmd_t *pmd;
-    pte_t *pte;
+    pgd_t *pgd, *kpgd;
+    pmd_t *pmd, *kpmd;
+    pte_t *pte, *kpte;
     int i, j;
     unsigned long vaddr;
 
@@ -157,9 +157,13 @@ static void __init fixrange_init (unsigned long start,
         for (; (j < PTRS_PER_PMD) && (vaddr != end); pmd++, j++) {
             if (pmd_none(*pmd)) {
                 pte = (pte_t *) alloc_bootmem_low_pages(PAGE_SIZE);
+                clear_page(pte);
+                kpgd = pgd_offset_k((unsigned long)pte);
+                kpmd = pmd_offset(kpgd, (unsigned long)pte);
+                kpte = pte_offset(kpmd, (unsigned long)pte);                
+                queue_l1_entry_update(__pa(kpte), 
+                                      (*(unsigned long *)kpte)&~_PAGE_RW);
                 set_pmd(pmd, __pmd(_KERNPG_TABLE + __pa(pte)));
-                if (pte != pte_offset(pmd, 0))
-                    BUG();
             }
             vaddr += PMD_SIZE;
         }
@@ -195,7 +199,7 @@ void __init paging_init(void)
      * mappings will be set by set_fixmap():
      */
     vaddr = __fix_to_virt(__end_of_fixed_addresses - 1) & PMD_MASK;
-    fixrange_init(vaddr, 0, init_mm.pgd);
+    fixrange_init(vaddr, HYPERVISOR_VIRT_START, init_mm.pgd);
 
     /*
      * XXX We do this conversion early, so that all other page tables

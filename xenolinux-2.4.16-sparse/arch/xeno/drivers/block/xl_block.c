@@ -410,7 +410,7 @@ int __init xlblk_init(void)
     int loop, error, result;
 
     /* This mapping was created early at boot time. */
-    blk_ring = (blk_ring_t *)FIX_BLKRING_BASE;
+    blk_ring = (blk_ring_t *)fix_to_virt(FIX_BLKRING_BASE);
 
     blk_ring->req_prod = blk_ring->req_cons = 0;
     blk_ring->resp_prod = blk_ring->resp_cons = 0;
