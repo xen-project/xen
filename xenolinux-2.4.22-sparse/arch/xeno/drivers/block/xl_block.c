@@ -152,11 +152,6 @@ int xenolinux_block_release(struct inode *inode, struct file *filep)
     return 0;
 }
 
-/*
- * handle ioctl calls
- *
- * individual ioctls are defined in /usr/include/linux/fs.h
- */
 
 int xenolinux_block_ioctl(struct inode *inode, struct file *filep,
 			  unsigned command, unsigned long argument)
@@ -165,13 +160,9 @@ int xenolinux_block_ioctl(struct inode *inode, struct file *filep,
     struct hd_geometry *geo = (struct hd_geometry *)argument;
     struct gendisk *gd;     
     struct hd_struct *part; 
+
+    /* NB. No need to check permissions. That is done for us. */
     
-    DPRINTK("xenolinux_block_ioctl\n"); 
-
-    /* check permissions */
-    if (!capable(CAP_SYS_ADMIN)) return -EPERM;
-    if (!inode)                  return -EINVAL;
-
     DPRINTK_IOCTL("command: 0x%x, argument: 0x%lx, dev: 0x%04x\n",
                   command, (long) argument, dev); 
   
@@ -248,7 +239,7 @@ int xenolinux_block_ioctl(struct inode *inode, struct file *filep,
 	return 0;
 
     case CDROMMULTISESSION:
-        printk("FIXME: support multisession CDs later\n");
+        DPRINTK("FIXME: support multisession CDs later\n");
         memset((struct cdrom_multisession *)argument, 0, 
                sizeof(struct cdrom_multisession));
         return 0;
