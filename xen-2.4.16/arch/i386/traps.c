@@ -69,11 +69,15 @@ asmlinkage void alignment_check(void);
 asmlinkage void spurious_interrupt_bug(void);
 asmlinkage void machine_check(void);
 
-int kstack_depth_to_print = 24;
+int kstack_depth_to_print = 8*20;
 
 static inline int kernel_text_address(unsigned long addr)
 {
-    return ( 1 );
+    if (addr >= (unsigned long) &_stext &&
+        addr <= (unsigned long) &_etext)
+        return 1;
+    return 0;
+
 }
 
 void show_trace(unsigned long * stack)
@@ -127,7 +131,10 @@ void show_stack(unsigned long * esp)
             break;
         if (i && ((i % 8) == 0))
             printk("\n       ");
-        printk("%08lx ", *stack++);
+        if ( kernel_text_address(*stack) )
+            printk("[%08lx] ", *stack++);
+        else
+            printk("%08lx ", *stack++);            
     }
     printk("\n");
     //show_trace(esp);
