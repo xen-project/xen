@@ -17,7 +17,6 @@
 3ddb79bcZbRBzT3elFWSX7u6NtMagQ xen-2.4.16/arch/i386/Makefile
 3ddb79bcBQF85CfLS4i1WGZ4oLLaCA xen-2.4.16/arch/i386/Rules.mk
 3ddb79bcsjinG9k1KcvbVBuas1R2dA xen-2.4.16/arch/i386/apic.c
-3e4d0046IHluXnd2lSLBCKqMg2QsZg xen-2.4.16/arch/i386/apic.o
 3ddb79bcSC_LvnmFlX-T5iTgaR0SKg xen-2.4.16/arch/i386/boot/boot.S
 3ddb79bcUrk2EIaM5VsT6wUudH1kkg xen-2.4.16/arch/i386/delay.c
 3ddb79bcecupHj56ZbTa3B0FxDowMg xen-2.4.16/arch/i386/entry.S
