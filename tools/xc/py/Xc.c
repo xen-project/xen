@@ -387,52 +387,159 @@ static PyObject *pyxc_vbd_destroy(PyObject *self,
     return PyInt_FromLong(ret);
 }
 
-static PyObject *pyxc_vbd_add_extent(PyObject *self,
-                                     PyObject *args,
-                                     PyObject *kwds)
+static PyObject *pyxc_vbd_grow(PyObject *self,
+                               PyObject *args,
+                               PyObject *kwds)
 {
     XcObject *xc = (XcObject *)self;
 
-    unsigned int  dom, vbd, device;
-    unsigned long start_sector, nr_sectors;
-    int           ret;
+    unsigned int   dom, vbd;
+    xc_vbdextent_t extent;
+    int            ret;
 
     static char *kwd_list[] = { "dom", "vbd", "device", 
                                 "start_sector", "nr_sectors", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiill", kwd_list, 
-                                      &dom, &vbd, &device, 
-                                      &start_sector, &nr_sectors) )
+                                      &dom, &vbd, 
+                                      &extent.real_device, 
+                                      &extent.start_sector, 
+                                      &extent.nr_sectors) )
         return NULL;
 
-    ret = xc_vbd_add_extent(xc->xc_handle, dom, vbd, device, 
-                            start_sector, nr_sectors);
+    ret = xc_vbd_grow(xc->xc_handle, dom, vbd, &extent);
     
     return PyInt_FromLong(ret);
 }
 
-static PyObject *pyxc_vbd_delete_extent(PyObject *self,
-                                        PyObject *args,
-                                        PyObject *kwds)
+static PyObject *pyxc_vbd_shrink(PyObject *self,
+                                 PyObject *args,
+                                 PyObject *kwds)
 {
     XcObject *xc = (XcObject *)self;
 
-    unsigned int  dom, vbd, device;
-    unsigned long start_sector, nr_sectors;
+    unsigned int  dom, vbd;
     int           ret;
 
-    static char *kwd_list[] = { "dom", "vbd", "device", 
-                                "start_sector", "nr_sectors", NULL };
+    static char *kwd_list[] = { "dom", "vbd", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iiill", kwd_list, 
-                                      &dom, &vbd, &device, 
-                                      &start_sector, &nr_sectors) )
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "ii", kwd_list, 
+                                      &dom, &vbd) )
         return NULL;
 
-    ret = xc_vbd_delete_extent(xc->xc_handle, dom, vbd, device, 
-                               start_sector, nr_sectors);
+    ret = xc_vbd_shrink(xc->xc_handle, dom, vbd);
     
     return PyInt_FromLong(ret);
+}
+
+static PyObject *pyxc_vbd_setextents(PyObject *self,
+                                     PyObject *args,
+                                     PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+    PyObject *list, *dict, *obj;
+
+    unsigned int    dom, vbd;
+    xc_vbdextent_t *extents = NULL;
+    int             ret, i, nr_extents;
+
+    static char *kwd_list[] = { "dom", "vbd", "extents", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "iio", kwd_list, 
+                                      &dom, &vbd, &list) )
+        goto fail;
+
+    if ( (nr_extents = PyList_Size(list)) < 0 )
+        goto fail;
+
+    if ( nr_extents != 0 )
+    {
+        extents = malloc(nr_extents * sizeof(xc_vbdextent_t));
+        if ( extents == NULL )
+            goto fail;
+
+        for ( i = 0; i < nr_extents; i++ )
+        {
+            dict = PyList_GetItem(list, i);
+            if ( !PyDict_Check(dict) )
+                goto fail;
+            if ( ((obj = PyDict_GetItemString(dict, "device")) == NULL) ||
+                 !PyInt_Check(obj) )
+                goto fail;
+            extents[i].real_device = (unsigned short)PyInt_AsLong(obj);
+            if ( ((obj = PyDict_GetItemString(dict,"start_sector")) == NULL) ||
+                 !PyInt_Check(obj) )
+                goto fail;
+            extents[i].start_sector = PyInt_AsLong(obj);
+            if ( ((obj = PyDict_GetItemString(dict, "nr_sectors")) == NULL) ||
+                 !PyInt_Check(obj) )
+                goto fail;
+            extents[i].nr_sectors = PyInt_AsLong(obj);        
+        }
+    }
+
+    ret = xc_vbd_setextents(xc->xc_handle, dom, vbd, nr_extents, extents);
+    
+    if ( extents != NULL )
+        free(extents);
+    
+    return PyInt_FromLong(ret);
+
+ fail:
+    if ( extents != NULL )
+        free(extents);
+    return NULL;
+}
+
+#define MAX_EXTENTS 1024
+static PyObject *pyxc_vbd_getextents(PyObject *self,
+                                     PyObject *args,
+                                     PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+    PyObject *list;
+
+    unsigned int    dom, vbd;
+    xc_vbdextent_t *extents;
+    int             i, nr_extents, max_extents;
+
+    static char *kwd_list[] = { "dom", "vbd", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "ii", kwd_list, 
+                                      &dom, &vbd) )
+        return NULL;
+
+    extents = malloc(MAX_EXTENTS * sizeof(xc_vbdextent_t));
+    if ( extents == NULL )
+        max_extents = 0;
+    else
+        max_extents = MAX_EXTENTS;
+
+    nr_extents = xc_vbd_getextents(xc->xc_handle, dom, vbd, max_extents,
+                                   extents, NULL);
+    
+    if ( nr_extents <= 0 )
+    {
+        list = PyList_New(0);
+    }
+    else
+    {
+        list = PyList_New(nr_extents);
+        for ( i = 0; i < nr_extents; i++ )
+        {
+            PyList_SetItem(
+                list, i, 
+                Py_BuildValue("{s:i,s:l,s:l}",
+                              "device",       extents[i].real_device,
+                              "start_sector", extents[i].start_sector,
+                              "nr_sectors",   extents[i].nr_sectors));
+        }
+    }
+
+    if ( extents != NULL )
+        free(extents);
+    
+    return list;
 }
 
 static PyObject *pyxc_vbd_probe(PyObject *self,
@@ -647,10 +754,10 @@ static PyMethodDef pyxc_methods[] = {
       " vbd       [int]: Identifier of the VBD.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
-    { "vbd_add_extent", 
-      (PyCFunction)pyxc_vbd_add_extent, 
+    { "vbd_grow", 
+      (PyCFunction)pyxc_vbd_grow, 
       METH_VARARGS | METH_KEYWORDS, "\n"
-      "Add an extent to a virtual block device.\n"
+      "Grow a virtual block device by appending a new extent.\n"
       " dom          [int]: Identifier of domain containing the VBD.\n"
       " vbd          [int]: Identifier of the VBD.\n"
       " device       [int]: Identifier of the real underlying block device.\n"
@@ -658,16 +765,36 @@ static PyMethodDef pyxc_methods[] = {
       " nr_sectors   [int]: Length, in sectors, of this extent.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
-    { "vbd_delete_extent", 
-      (PyCFunction)pyxc_vbd_delete_extent, 
+    { "vbd_shrink", 
+      (PyCFunction)pyxc_vbd_shrink, 
       METH_VARARGS | METH_KEYWORDS, "\n"
-      "Delete an extent from a virtual block device.\n"
+      "Shrink a virtual block device by deleting its final extent.\n"
+      " dom          [int]: Identifier of domain containing the VBD.\n"
+      " vbd          [int]: Identifier of the VBD.\n\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "vbd_setextents", 
+      (PyCFunction)pyxc_vbd_setextents, 
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Set all the extent information for a virtual block device.\n"
       " dom          [int]: Identifier of domain containing the VBD.\n"
       " vbd          [int]: Identifier of the VBD.\n"
-      " device       [int]: Identifier of the real underlying block device.\n"
-      " start_sector [int]: Real start sector of the extent.\n"
-      " nr_sectors   [int]: Length, in sectors, of the extent.\n\n"
+      " extents      [list of dicts]: Per-extent information.\n"
+      "  device       [int]: Identifier of the real underlying block device.\n"
+      "  start_sector [int]: Real start sector of this extent.\n"
+      "  nr_sectors   [int]: Length, in sectors, of this extent.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "vbd_getextents", 
+      (PyCFunction)pyxc_vbd_getextents, 
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Get info on all the extents in a virtual block device.\n"
+      " dom          [int]: Identifier of domain containing the VBD.\n"
+      " vbd          [int]: Identifier of the VBD.\n\n"
+      "Returns: [list of dicts] per-extent information; empty on error.\n"
+      " device       [int]: Identifier of the real underlying block device.\n"
+      " start_sector [int]: Real start sector of this extent.\n"
+      " nr_sectors   [int]: Length, in sectors, of this extent.\n" },
 
     { "vbd_probe", 
       (PyCFunction)pyxc_vbd_probe, 

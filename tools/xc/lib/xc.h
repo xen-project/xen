@@ -34,6 +34,9 @@ int xc_domain_stop(int xc_handle,
 int xc_domain_destroy(int xc_handle, 
                       unsigned int domid, 
                       int force);
+int xc_domain_pincpu(int xc_handle,
+                     unsigned int domid,
+                     int cpu);
 int xc_domain_getinfo(int xc_handle,
                       unsigned int first_domid, 
                       unsigned int max_doms,
@@ -93,6 +96,11 @@ typedef struct {
     unsigned long  nr_sectors;
 } xc_vbd_t;
 
+typedef struct {
+    unsigned short real_device;
+    unsigned long  start_sector;
+    unsigned long  nr_sectors;
+} xc_vbdextent_t;
 
 int xc_vbd_create(int xc_handle,
                   unsigned int domid, 
@@ -101,18 +109,24 @@ int xc_vbd_create(int xc_handle,
 int xc_vbd_destroy(int xc_handle,
                    unsigned int domid, 
                    unsigned short vbdid);
-int xc_vbd_add_extent(int xc_handle,
+int xc_vbd_grow(int xc_handle,
+                unsigned int domid, 
+                unsigned short vbdid,
+                xc_vbdextent_t *extent);
+int xc_vbd_shrink(int xc_handle,
+                  unsigned int domid, 
+                  unsigned short vbdid);
+int xc_vbd_setextents(int xc_handle,
                       unsigned int domid, 
                       unsigned short vbdid,
-                      unsigned short real_device,
-                      unsigned long start_sector,
-                      unsigned long nr_sectors);
-int xc_vbd_delete_extent(int xc_handle,
-                         unsigned int domid, 
-                         unsigned short vbdid,
-                         unsigned short real_device,
-                         unsigned long start_sector,
-                         unsigned long nr_sectors);
+                      unsigned int nr_extents,
+                      xc_vbdextent_t *extents);
+int xc_vbd_getextents(int xc_handle,
+                      unsigned int domid, 
+                      unsigned short vbdid,
+                      unsigned int max_extents,
+                      xc_vbdextent_t *extents,
+                      int *writeable);
 int xc_vbd_probe(int xc_handle,
                  unsigned int domid,
                  unsigned int max_vbds,

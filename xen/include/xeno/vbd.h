@@ -1,8 +1,8 @@
 /*
 ** include/xeno/vbd.h: 
 ** -- xen internal declarations + prototypes for virtual block devices
-**
 */
+
 #ifndef __VBD_H__
 #define __VBD_H__
 
@@ -11,8 +11,8 @@
 
 /* an entry in a list of xen_extent's */
 typedef struct _xen_extent_le { 
-    xen_extent_t           extent;     // an individual extent  
-    struct _xen_extent_le *next;       // and a pointer to the next 
+    xen_extent_t           extent;     /* an individual extent */
+    struct _xen_extent_le *next;       /* and a pointer to the next */ 
 } xen_extent_le_t; 
 
 
@@ -22,17 +22,18 @@ typedef struct _xen_extent_le {
 ** Each domain has a hash table to map from these to the relevant VBD. 
 */
 typedef struct _vbd { 
-    unsigned short    vdevice;   // what the domain refers to this vbd as 
-    unsigned short    mode;      // VBD_MODE_{READONLY,READWRITE}
-    xen_extent_le_t  *extents;   // list of xen_extents making up this vbd
-    struct _vbd      *next;      // for chaining in the hash table
+    unsigned short    vdevice;   /* what the domain refers to this vbd as */
+    unsigned short    mode;      /* VBD_MODE_{READONLY,READWRITE} */
+    xen_extent_le_t  *extents;   /* list of xen_extents making up this vbd */
+    struct _vbd      *next;      /* for chaining in the hash table */
 } vbd_t; 
 
-#define VBD_HTAB_SZ  16       // no. of entries in the vbd hash table. 
+#define VBD_HTAB_SZ  16       /* # entries in the vbd hash table. */
 
 long vbd_create(vbd_create_t *create_params); 
-long vbd_add(vbd_add_t *add_params); 
-long vbd_remove(vbd_remove_t *remove_params);
+long vbd_grow(vbd_grow_t *grow_params); 
+long vbd_shrink(vbd_shrink_t *shrink_params);
+long vbd_setextents(vbd_setextents_t *setextents_params);
 long vbd_delete(vbd_delete_t *delete_params); 
 long vbd_probe(vbd_probe_t *probe_params); 
 long vbd_info(vbd_info_t *info_params); 
@@ -49,6 +50,5 @@ typedef struct {
 
 
 int vbd_translate(phys_seg_t *pseg, struct task_struct *p, int operation); 
-
 
 #endif /* __VBD_H__ */

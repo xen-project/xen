@@ -35,39 +35,126 @@ int xc_vbd_destroy(int xc_handle,
 }
 
 
-int xc_vbd_add_extent(int xc_handle,
-                      unsigned int domid, 
-                      unsigned short vbdid,
-                      unsigned short real_device,
-                      unsigned long start_sector,
-                      unsigned long nr_sectors)
+int xc_vbd_grow(int xc_handle,
+                unsigned int domid, 
+                unsigned short vbdid,
+                xc_vbdextent_t *extent)
 {
     block_io_op_t op; 
-    op.cmd = BLOCK_IO_OP_VBD_ADD; 
-    op.u.add_params.domain  = domid; 
-    op.u.add_params.vdevice = vbdid;
-    op.u.add_params.extent.device       = real_device; 
-    op.u.add_params.extent.start_sector = start_sector;
-    op.u.add_params.extent.nr_sectors   = nr_sectors;
+    op.cmd = BLOCK_IO_OP_VBD_GROW; 
+    op.u.grow_params.domain  = domid; 
+    op.u.grow_params.vdevice = vbdid;
+    op.u.grow_params.extent.device       = extent->real_device; 
+    op.u.grow_params.extent.start_sector = extent->start_sector;
+    op.u.grow_params.extent.nr_sectors   = extent->nr_sectors;
     return do_block_io_op(xc_handle, &op);
 }
 
 
-int xc_vbd_delete_extent(int xc_handle,
-                         unsigned int domid, 
-                         unsigned short vbdid,
-                         unsigned short real_device,
-                         unsigned long start_sector,
-                         unsigned long nr_sectors)
+int xc_vbd_shrink(int xc_handle,
+                  unsigned int domid, 
+                  unsigned short vbdid)
 {
     block_io_op_t op; 
-    op.cmd = BLOCK_IO_OP_VBD_REMOVE; 
-    op.u.add_params.domain  = domid; 
-    op.u.add_params.vdevice = vbdid;
-    op.u.add_params.extent.device       = real_device; 
-    op.u.add_params.extent.start_sector = start_sector;
-    op.u.add_params.extent.nr_sectors   = nr_sectors;
+    op.cmd = BLOCK_IO_OP_VBD_SHRINK; 
+    op.u.shrink_params.domain  = domid; 
+    op.u.shrink_params.vdevice = vbdid;
     return do_block_io_op(xc_handle, &op);
+}
+
+
+int xc_vbd_setextents(int xc_handle,
+                      unsigned int domid, 
+                      unsigned short vbdid,
+                      unsigned int nr_extents,
+                      xc_vbdextent_t *extents)
+{
+    int           i, rc;
+    block_io_op_t op;
+    xen_extent_t *real_extents = NULL;
+
+    if ( nr_extents != 0 )
+    {
+        real_extents = malloc(nr_extents * sizeof(xc_vbdextent_t));
+        if ( (real_extents == NULL) || 
+             (mlock(real_extents, nr_extents * sizeof(xc_vbdextent_t)) != 0) )
+        {
+            if ( real_extents != NULL )
+                free(real_extents);
+            return -ENOMEM;
+        }
+
+        for ( i = 0; i < nr_extents; i++ )
+        {
+            real_extents[i].device       = extents[i].real_device;
+            real_extents[i].start_sector = extents[i].start_sector;
+            real_extents[i].nr_sectors   = extents[i].nr_sectors;
+        }
+    }
+
+    op.cmd = BLOCK_IO_OP_VBD_SET_EXTENTS;
+    op.u.setextents_params.domain     = domid;
+    op.u.setextents_params.vdevice    = vbdid;
+    op.u.setextents_params.nr_extents = nr_extents;
+    op.u.setextents_params.extents    = real_extents;
+    rc = do_block_io_op(xc_handle, &op);
+
+    if ( real_extents != NULL )
+    {
+        (void)munlock(real_extents, nr_extents * sizeof(xc_vbdextent_t));
+        free(real_extents);
+    }
+
+    return rc;
+}
+
+
+int xc_vbd_getextents(int xc_handle,
+                      unsigned int domid, 
+                      unsigned short vbdid,
+                      unsigned int max_extents,
+                      xc_vbdextent_t *extents,
+                      int *writeable)
+{
+    int           i, rc;
+    block_io_op_t op;
+    xen_extent_t *real_extents = malloc(max_extents * sizeof(xc_vbdextent_t));
+
+    if ( (real_extents == NULL) || 
+         (mlock(real_extents, max_extents * sizeof(xc_vbdextent_t)) != 0) )
+    {
+        if ( real_extents != NULL )
+            free(real_extents);
+        return -ENOMEM;
+    }
+
+    op.cmd = BLOCK_IO_OP_VBD_INFO;
+    op.u.info_params.domain     = domid;
+    op.u.info_params.vdevice    = vbdid;
+    op.u.info_params.maxextents = max_extents;
+    op.u.info_params.extents    = real_extents;
+    rc = do_block_io_op(xc_handle, &op);
+
+    (void)munlock(real_extents, max_extents * sizeof(xc_vbdextent_t));
+
+    if ( rc >= 0 )
+    {
+        for ( i = 0; i < op.u.info_params.nextents; i++ )
+        {
+            extents[i].real_device  = real_extents[i].device;
+            extents[i].start_sector = real_extents[i].start_sector;
+            extents[i].nr_sectors   = real_extents[i].nr_sectors;
+        }
+
+        if ( writeable != NULL )
+            *writeable = !!(op.u.info_params.mode & VBD_MODE_W);
+
+        rc = op.u.info_params.nextents;
+    }
+
+    free(real_extents);
+
+    return rc;
 }
 
 
