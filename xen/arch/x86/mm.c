@@ -298,13 +298,13 @@ static int get_page_from_pagenr(unsigned long page_nr, struct domain *d)
 
     if ( unlikely(!pfn_is_ram(page_nr)) )
     {
-        MEM_LOG("Pfn %08lx is not RAM", page_nr);
+        MEM_LOG("Pfn %p is not RAM", page_nr);
         return 0;
     }
 
     if ( unlikely(!get_page(page, d)) )
     {
-        MEM_LOG("Could not get page ref for pfn %08lx", page_nr);
+        MEM_LOG("Could not get page ref for pfn %p", page_nr);
         return 0;
     }
 
@@ -323,11 +323,9 @@ static int get_page_and_type_from_pagenr(unsigned long page_nr,
 
     if ( unlikely(!get_page_type(page, type)) )
     {
-#ifdef VERBOSE
         if ( (type & PGT_type_mask) != PGT_l1_page_table )
-            MEM_LOG("Bad page type for pfn %08lx (%08x)", 
+            MEM_LOG("Bad page type for pfn %p (%08x)", 
                     page_nr, page->u.inuse.type_info);
-#endif
         put_page(page);
         return 0;
     }
@@ -420,7 +418,7 @@ get_page_from_l1e(
         if ( IS_CAPABLE_PHYSDEV(d) )
             return domain_iomem_in_pfn(d, pfn);
 
-        MEM_LOG("Non-privileged attempt to map I/O space %08lx", pfn);
+        MEM_LOG("Non-privileged attempt to map I/O space %p", pfn);
         return 0;
     }
 
@@ -617,7 +615,7 @@ static inline int update_l2e(l2_pgentry_t *pl2e,
                               l2_pgentry_val(ol2e), 
                               l2_pgentry_val(nl2e));
     if ( o != l2_pgentry_val(ol2e) )
-        MEM_LOG("Failed to update %08lx -> %08lx: saw %08lx\n",
+        MEM_LOG("Failed to update %p -> %p: saw %p\n",
                 l2_pgentry_val(ol2e), l2_pgentry_val(nl2e), o);
     return (o == l2_pgentry_val(ol2e));
 }
@@ -681,7 +679,7 @@ static inline int update_l1e(l1_pgentry_t *pl1e,
     if ( unlikely(cmpxchg_user(pl1e, o, n) != 0) ||
          unlikely(o != l1_pgentry_val(ol1e)) )
     {
-        MEM_LOG("Failed to update %08lx -> %08lx: saw %08lx\n",
+        MEM_LOG("Failed to update %p -> %p: saw %p\n",
                 l1_pgentry_val(ol1e), l1_pgentry_val(nl1e), o);
         return 0;
     }
@@ -845,7 +843,7 @@ int get_page_type(struct pfn_info *page, u32 type)
         nx = x + 1;
         if ( unlikely((nx & PGT_count_mask) == 0) )
         {
-            MEM_LOG("Type count overflow on pfn %08lx\n", page_to_pfn(page));
+            MEM_LOG("Type count overflow on pfn %p\n", page_to_pfn(page));
             return 0;
         }
         else if ( unlikely((x & PGT_count_mask) == 0) )
@@ -881,7 +879,7 @@ int get_page_type(struct pfn_info *page, u32 type)
             {
                 if ( ((x & PGT_type_mask) != PGT_l2_page_table) ||
                      ((type & PGT_type_mask) != PGT_l1_page_table) )
-                    MEM_LOG("Bad type (saw %08x != exp %08x) for pfn %08lx\n",
+                    MEM_LOG("Bad type (saw %08x != exp %08x) for pfn %p\n",
                             x & PGT_type_mask, type, page_to_pfn(page));
                 return 0;
             }
@@ -916,7 +914,7 @@ int get_page_type(struct pfn_info *page, u32 type)
         /* Try to validate page type; drop the new reference on failure. */
         if ( unlikely(!alloc_page_type(page, type & PGT_type_mask)) )
         {
-            MEM_LOG("Error while validating pfn %08lx for type %08x."
+            MEM_LOG("Error while validating pfn %p for type %08x."
                     " caf=%08x taf=%08x\n",
                     page_to_pfn(page), type,
                     page->count_info,
@@ -958,7 +956,7 @@ int new_guest_cr3(unsigned long pfn)
     }
     else
     {
-        MEM_LOG("Error while installing new baseptr %08lx", pfn);
+        MEM_LOG("Error while installing new baseptr %p", pfn);
     }
 
     return okay;
@@ -993,14 +991,14 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
 
         if ( unlikely(!okay) )
         {
-            MEM_LOG("Error while pinning pfn %08lx", pfn);
+            MEM_LOG("Error while pinning pfn %p", pfn);
             break;
         }
 
         if ( unlikely(test_and_set_bit(_PGT_pinned,
                                        &page->u.inuse.type_info)) )
         {
-            MEM_LOG("Pfn %08lx already pinned", pfn);
+            MEM_LOG("Pfn %p already pinned", pfn);
             put_page_and_type(page);
             okay = 0;
             break;
@@ -1011,7 +1009,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
     case MMUEXT_UNPIN_TABLE:
         if ( unlikely(!(okay = get_page_from_pagenr(pfn, FOREIGNDOM))) )
         {
-            MEM_LOG("Page %08lx bad domain (dom=%p)",
+            MEM_LOG("Page %p bad domain (dom=%p)",
                     ptr, page_get_owner(page));
         }
         else if ( likely(test_and_clear_bit(_PGT_pinned, 
@@ -1024,7 +1022,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         {
             okay = 0;
             put_page(page);
-            MEM_LOG("Pfn %08lx not pinned", pfn);
+            MEM_LOG("Pfn %p not pinned", pfn);
         }
         break;
 
@@ -1061,7 +1059,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
              ((ptr+ents*LDT_ENTRY_SIZE) > PAGE_OFFSET) )
         {
             okay = 0;
-            MEM_LOG("Bad args to SET_LDT: ptr=%08lx, ents=%08lx", ptr, ents);
+            MEM_LOG("Bad args to SET_LDT: ptr=%p, ents=%p", ptr, ents);
         }
         else if ( (ed->arch.ldt_ents != ents) || 
                   (ed->arch.ldt_base != ptr) )
@@ -1130,7 +1128,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
              unlikely(!pfn_is_ram(pfn)) ||
              unlikely((e = find_domain_by_id(domid)) == NULL) )
         {
-            MEM_LOG("Bad frame (%08lx) or bad domid (%d).\n", pfn, domid);
+            MEM_LOG("Bad frame (%p) or bad domid (%d).\n", pfn, domid);
             okay = 0;
             break;
         }
@@ -1150,7 +1148,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
                           (1|PGC_allocated)) ||
                  unlikely(nd != d) )
             {
-                MEM_LOG("Bad page values %08lx: ed=%p(%u), sd=%p,"
+                MEM_LOG("Bad page values %p: ed=%p(%u), sd=%p,"
                         " caf=%08x, taf=%08x\n", page_to_pfn(page),
                         d, d->id, nd, x, page->u.inuse.type_info);
                 spin_unlock(&d->page_alloc_lock);
@@ -1186,7 +1184,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
              unlikely(!gnttab_prepare_for_transfer(e, d, gntref)) )
         {
             MEM_LOG("Transferee has no reservation headroom (%d,%d), or "
-                    "provided a bad grant ref, or is dying (%08lx).\n",
+                    "provided a bad grant ref, or is dying (%p).\n",
                     e->tot_pages, e->max_pages, e->d_flags);
             spin_unlock(&e->page_alloc_lock);
             put_domain(e);
@@ -1219,7 +1217,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         e = percpu_info[cpu].foreign;
         if ( unlikely(e == NULL) )
         {
-            MEM_LOG("No FOREIGNDOM to reassign pfn %08lx to", pfn);
+            MEM_LOG("No FOREIGNDOM to reassign pfn %p to", pfn);
             okay = 0;
             break;
         }
@@ -1262,7 +1260,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
                           (1|PGC_allocated)) ||
                  unlikely(nd != d) )
             {
-                MEM_LOG("Bad page values %08lx: ed=%p(%u), sd=%p,"
+                MEM_LOG("Bad page values %p: ed=%p(%u), sd=%p,"
                         " caf=%08x, taf=%08x\n", page_to_pfn(page),
                         d, d->id, nd, x, page->u.inuse.type_info);
                 okay = 0;
@@ -1304,7 +1302,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         break;
 
     default:
-        MEM_LOG("Invalid extended pt command 0x%08lx", val & MMUEXT_CMD_MASK);
+        MEM_LOG("Invalid extended pt command 0x%p", val & MMUEXT_CMD_MASK);
         okay = 0;
         break;
     }
@@ -1511,7 +1509,7 @@ int do_mmu_update(
             break;
 
         default:
-            MEM_LOG("Invalid page update command %08lx", req.ptr);
+            MEM_LOG("Invalid page update command %p", req.ptr);
             break;
         }
 
@@ -1876,7 +1874,7 @@ void ptwr_flush(const int which)
          */
         BUG();
     }
-    PTWR_PRINTK("[%c] disconnected_l1va at %p is %08lx\n",
+    PTWR_PRINTK("[%c] disconnected_l1va at %p is %p\n",
                 PTWR_PRINT_WHICH, ptep, pte);
     pte &= ~_PAGE_RW;
 
@@ -1911,7 +1909,7 @@ void ptwr_flush(const int which)
 #else
     flush_tlb_all();
 #endif
-    PTWR_PRINTK("[%c] disconnected_l1va at %p now %08lx\n",
+    PTWR_PRINTK("[%c] disconnected_l1va at %p now %p\n",
                 PTWR_PRINT_WHICH, ptep, pte);
 
     /*
@@ -2035,7 +2033,7 @@ int ptwr_do_page_fault(unsigned long addr)
 
     if ( l2_idx == (addr >> L2_PAGETABLE_SHIFT) )
     {
-        MEM_LOG("PTWR failure! Pagetable maps itself at %08lx\n", addr);
+        MEM_LOG("PTWR failure! Pagetable maps itself at %p\n", addr);
         domain_crash();
     }
 
@@ -2064,8 +2062,8 @@ int ptwr_do_page_fault(unsigned long addr)
         }
     }
     
-    PTWR_PRINTK("[%c] page_fault on l1 pt at va %08lx, pt for %08x, "
-                "pfn %08lx\n", PTWR_PRINT_WHICH,
+    PTWR_PRINTK("[%c] page_fault on l1 pt at va %p, pt for %08x, "
+                "pfn %p\n", PTWR_PRINT_WHICH,
                 addr, l2_idx << L2_PAGETABLE_SHIFT, pfn);
     
     /*
@@ -2098,7 +2096,7 @@ int ptwr_do_page_fault(unsigned long addr)
     
     /* Finally, make the p.t. page writable by the guest OS. */
     pte |= _PAGE_RW;
-    PTWR_PRINTK("[%c] update %p pte to %08lx\n", PTWR_PRINT_WHICH,
+    PTWR_PRINTK("[%c] update %p pte to %p\n", PTWR_PRINT_WHICH,
                 &linear_pg_table[addr>>PAGE_SHIFT], pte);
     if ( unlikely(__put_user(pte, (unsigned long *)
                              &linear_pg_table[addr>>PAGE_SHIFT])) )
@@ -2157,7 +2155,7 @@ void ptwr_status(void)
     page = &frame_table[pfn];
     printk("need to alloc l1 page %p\n", page);
     /* make pt page writable */
-    printk("need to make read-only l1-page at %p is %08lx\n",
+    printk("need to make read-only l1-page at %p is %p\n",
            ptep, pte);
 
     if ( ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l1va == 0 )

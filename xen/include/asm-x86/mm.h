@@ -100,16 +100,13 @@ struct pfn_info
 #define IS_XEN_HEAP_FRAME(_pfn) (page_to_phys(_pfn) < xenheap_phys_end)
 
 #if defined(__i386__)
-
 #define pickle_domptr(_d)   ((u32)(unsigned long)(_d))
 #define unpickle_domptr(_d) ((struct domain *)(unsigned long)(_d))
-
 #elif defined(__x86_64__)
 static inline struct domain *unpickle_domptr(u32 _domain)
 { return (_domain == 0) ? NULL : __va(_domain); }
 static inline u32 pickle_domptr(struct domain *domain)
 { return (domain == NULL) ? 0 : (u32)__pa(domain); }
-
 #endif
 
 #define page_get_owner(_p)    (unpickle_domptr((_p)->u.inuse._domain))
@@ -171,7 +168,7 @@ static inline int get_page(struct pfn_info *page,
              unlikely((nx & PGC_count_mask) == 0) || /* Count overflow? */
              unlikely(d != _domain) )                /* Wrong owner? */
         {
-            DPRINTK("Error pfn %08lx: ed=%p, sd=%p, caf=%08x, taf=%08x\n",
+            DPRINTK("Error pfn %p: ed=%p, sd=%p, caf=%08x, taf=%08x\n",
                     page_to_pfn(page), domain, unpickle_domptr(d),
                     x, page->u.inuse.type_info);
             return 0;

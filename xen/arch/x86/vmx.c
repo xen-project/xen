@@ -277,7 +277,7 @@ static void vmx_vmexit_do_invlpg(unsigned long va)
 
     __vmread(GUEST_EIP, &eip);
 
-    VMX_DBG_LOG(DBG_LEVEL_VMMU, "vmx_vmexit_do_invlpg:eip=%08lx, va=%08lx\n",
+    VMX_DBG_LOG(DBG_LEVEL_VMMU, "vmx_vmexit_do_invlpg:eip=%p, va=%p\n",
             eip, va);
 
     /*
@@ -339,7 +339,7 @@ static void vmx_io_instruction(struct xen_regs *regs,
     __vmread(GUEST_EIP, &eip);
 
     VMX_DBG_LOG(DBG_LEVEL_1, 
-            "vmx_io_instruction: eip=%08lx, exit_qualification = %lx\n",
+            "vmx_io_instruction: eip=%p, exit_qualification = %lx\n",
             eip, exit_qualification);
 
     if (test_bit(6, &exit_qualification))
@@ -653,7 +653,7 @@ static inline void vmx_vmexit_do_hlt()
     unsigned long eip;
     __vmread(GUEST_EIP, &eip);
 #endif
-    VMX_DBG_LOG(DBG_LEVEL_1, "vmx_vmexit_do_hlt:eip=%08lx\n", eip);
+    VMX_DBG_LOG(DBG_LEVEL_1, "vmx_vmexit_do_hlt:eip=%p\n", eip);
     __enter_scheduler();
 }
 
@@ -663,7 +663,7 @@ static inline void vmx_vmexit_do_mwait()
     unsigned long eip;
     __vmread(GUEST_EIP, &eip);
 #endif
-    VMX_DBG_LOG(DBG_LEVEL_1, "vmx_vmexit_do_mwait:eip=%08lx\n", eip);
+    VMX_DBG_LOG(DBG_LEVEL_1, "vmx_vmexit_do_mwait:eip=%p\n", eip);
     __enter_scheduler();
 }
 
@@ -915,7 +915,7 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
         break;
     case EXIT_REASON_MSR_WRITE:
         __vmread(GUEST_EIP, &eip);
-        VMX_DBG_LOG(DBG_LEVEL_1, "MSR_WRITE: eip=%08lx, eax=%08lx, edx=%08lx",
+        VMX_DBG_LOG(DBG_LEVEL_1, "MSR_WRITE: eip=%p, eax=%p, edx=%p",
                 eip, regs.eax, regs.edx);
         /* just ignore this point */
         __get_instruction_length(inst_len);
