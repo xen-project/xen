@@ -513,19 +513,19 @@ ENTRY(spurious_interrupt_bug)
 
 .data
 ENTRY(hypervisor_call_table)
-        .long SYMBOL_NAME(do_set_trap_table)
-        .long SYMBOL_NAME(do_process_page_updates)
-        .long SYMBOL_NAME(do_console_write)
-        .long SYMBOL_NAME(sys_ni_syscall)
-        .long SYMBOL_NAME(do_set_guest_stack)
-        .long SYMBOL_NAME(do_net_update)
-        .long SYMBOL_NAME(do_fpu_taskswitch)
-        .long SYMBOL_NAME(do_yield)
-        .long SYMBOL_NAME(kill_domain)
-        .long SYMBOL_NAME(do_dom0_op)
-        .long SYMBOL_NAME(do_network_op)
-        .long SYMBOL_NAME(do_set_debugreg)
-        .long SYMBOL_NAME(do_get_debugreg)
+        .long SYMBOL_NAME(do_set_trap_table)			/*  0 */ 
+        .long SYMBOL_NAME(do_process_page_updates)		/*  1 */ 
+        .long SYMBOL_NAME(do_console_write)				/*  2 */ 
+        .long SYMBOL_NAME(sys_ni_syscall)				/*  3 */ 
+        .long SYMBOL_NAME(do_set_guest_stack)			/*  4 */ 
+        .long SYMBOL_NAME(do_net_update)				/*  5 */ 
+        .long SYMBOL_NAME(do_fpu_taskswitch)			/*  6 */ 
+		.long SYMBOL_NAME(do_sched_op)					/*  7 */ 
+        .long SYMBOL_NAME(kill_domain)					/* 10 */ 
+        .long SYMBOL_NAME(do_dom0_op)					/* 11 */ 
+        .long SYMBOL_NAME(do_network_op)				/* 12 */ 
+        .long SYMBOL_NAME(do_set_debugreg)				/* 13 */ 
+        .long SYMBOL_NAME(do_get_debugreg)				/* 14 */ 
         .rept NR_syscalls-(.-hypervisor_call_table)/4
         .long SYMBOL_NAME(sys_ni_syscall)
 	.endr

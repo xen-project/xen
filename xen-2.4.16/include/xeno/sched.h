@@ -42,7 +42,8 @@ extern struct mm_struct init_mm;
 
 struct task_struct {
     int processor;
-    int state, hyp_events;
+    int state;
+	int hyp_events;
     unsigned int domain;
 
     /* An unsafe pointer into a shared data area. */
@@ -85,11 +86,24 @@ struct task_struct {
     unsigned long flags;
 };
 
+/*
+ * domain states 
+ * TASK_RUNNING:         Domain is runable and should be on a run queue
+ * TASK_INTERRUPTIBLE:   Domain is blocked by may be woken up by an event
+ *                       or expiring timer
+ * TASK_UNINTERRUPTIBLE: Domain is blocked but may not be woken up by an
+ *                       arbitrary event or timer.
+ * TASK_WAIT:            Domains CPU allocation expired.
+ * TASK_STOPPED:         not really used in Xen
+ * TASK_DYING:           Domain is about to cross over to the land of the dead.
+ */
+
 #define TASK_RUNNING            0
 #define TASK_INTERRUPTIBLE      1
 #define TASK_UNINTERRUPTIBLE    2
-#define TASK_STOPPED            4
-#define TASK_DYING              8
+#define TASK_WAIT				4
+#define TASK_DYING              16
+/* #define TASK_STOPPED            8  not really used */
 
 #define SCHED_YIELD             0x10
 
@@ -150,52 +164,23 @@ extern void free_irq(unsigned int, void *);
 extern unsigned long wait_init_idle;
 #define init_idle() clear_bit(smp_processor_id(), &wait_init_idle);
 
+
+
+/*
+ * Scheduler functions (in schedule.c)
+ */
 #define set_current_state(_s) do { current->state = (_s); } while (0)
 #define MAX_SCHEDULE_TIMEOUT LONG_MAX
+void scheduler_init(void);
+void start_scheduler(void);
+void sched_add_domain(struct task_struct *p);
+void sched_rem_domain(struct task_struct *p);
+int  wake_up(struct task_struct *p);
 long schedule_timeout(long timeout);
+long do_yield(void);
+void reschedule(struct task_struct *p);
 asmlinkage void schedule(void);
 
-void reschedule(struct task_struct *p);
-
-typedef struct schedule_data_st
-{
-    spinlock_t lock;
-    struct list_head runqueue;
-    struct task_struct *prev, *curr;
-} __cacheline_aligned schedule_data_t;
-extern schedule_data_t schedule_data[NR_CPUS];
-
-static inline void __add_to_runqueue(struct task_struct * p)
-{
-    list_add(&p->run_list, &schedule_data[p->processor].runqueue);
-}
-
-
-static inline void __move_last_runqueue(struct task_struct * p)
-{
-    list_del(&p->run_list);
-    list_add_tail(&p->run_list, &schedule_data[p->processor].runqueue);
-}
-
-
-static inline void __move_first_runqueue(struct task_struct * p)
-{
-    list_del(&p->run_list);
-    list_add(&p->run_list, &schedule_data[p->processor].runqueue);
-}
-
-static inline void __del_from_runqueue(struct task_struct * p)
-{
-    list_del(&p->run_list);
-    p->run_list.next = NULL;
-}
-
-static inline int __task_on_runqueue(struct task_struct *p)
-{
-    return (p->run_list.next != NULL);
-}
-
-int wake_up(struct task_struct *p);
 
 #define signal_pending(_p) ((_p)->hyp_events || \
                             (_p)->shared_info->events)

@@ -35,6 +35,7 @@
 3ddb79bc4nTpGQOe6_-MbyZzkhlhFQ xen-2.4.16/arch/i386/usercopy.c
 3ddb79bcOMCu9-5mKpjIh5d0qqBDPg xen-2.4.16/arch/i386/xeno.lds
 3ddb79bdff-gj-jFGKjOejeHLqL8Lg xen-2.4.16/common/Makefile
+3e397e66AyyD5fYraAySWuwi9uqSXg xen-2.4.16/common/ac_timer.c
 3ddb79bddEYJbcURvqqcx99Yl2iAhQ xen-2.4.16/common/block.c
 3ddb79bdrqnW93GR9gZk1OJe1qK-iQ xen-2.4.16/common/brlock.c
 3ddb79bdLX_P6iB7ILiblRLWvebapg xen-2.4.16/common/dom0_ops.c
@@ -46,6 +47,7 @@
 3ddb79bdN51qpRC-6bOH-v5hl_AK6A xen-2.4.16/common/network.c
 3ddb79bdD4SLmmdMD7yLW5HcUWucXw xen-2.4.16/common/page_alloc.c
 3ddb79bdHqdQpATqC0rmUZNbsb6L6A xen-2.4.16/common/resource.c
+3e397e6619PgAfBbw2XFbXkewvUWgw xen-2.4.16/common/schedule.c
 3ddb79bdB9RNMnkQnUyZ5C9hhMSQQw xen-2.4.16/common/slab.c
 3ddb79bd0gVQYmL2zvuJnldvD0AGxQ xen-2.4.16/common/softirq.c
 3ddb79bdQqFHtHRGEO2dsxGgo6eAhw xen-2.4.16/common/timer.c
@@ -157,6 +159,7 @@
 3ddb79c3e9DCEoR-WzNxcOQDzLu7BQ xen-2.4.16/include/asm-i386/softirq.h
 3ddb79c3NiyQE2vQnyGiaBnNjBO1rA xen-2.4.16/include/asm-i386/spinlock.h
 3ddb79c3ezddh34MdelJpa5tNR00Dw xen-2.4.16/include/asm-i386/system.h
+3e397e66xPNc8eaSqC9pPbyAtRGzHA xen-2.4.16/include/asm-i386/time.h
 3ddb79c4HugMq7IYGxcQKFBpKwKhzA xen-2.4.16/include/asm-i386/types.h
 3ddb79c3M2n1ROZH6xk3HbyN4CPDqg xen-2.4.16/include/asm-i386/uaccess.h
 3ddb79c3uPGcP_l_2xyGgBSWd5aC-Q xen-2.4.16/include/asm-i386/unaligned.h
@@ -167,6 +170,7 @@
 3ddb79c4R4iVwqIIeychVQYmIH4FUg xen-2.4.16/include/scsi/scsi_ioctl.h
 3ddb79c4yw_mfd4Uikn3v_IOPRpa1Q xen-2.4.16/include/scsi/scsicam.h
 3ddb79c4HKPMLvDBP9LxzPi_szVxGA xen-2.4.16/include/scsi/sg.h
+3e397e66m2tO3s-J8Jnr7Ws_tGoPTg xen-2.4.16/include/xeno/ac_timer.h
 3ddb79c0nTsjSpVK4ZVTI9WwN24xtQ xen-2.4.16/include/xeno/blk.h
 3ddb79c0dVhTHLsv6CPTf4baKix4mA xen-2.4.16/include/xeno/blkdev.h
 3ddb79c18ePBgitnOs7GiOCFilODVw xen-2.4.16/include/xeno/blkpg.h

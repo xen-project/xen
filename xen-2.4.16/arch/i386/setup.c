@@ -277,6 +277,7 @@ void __init start_of_day(void)
     extern void tqueue_bh(void);
     extern void immediate_bh(void);
     extern void init_timervecs(void);
+	extern void ac_timer_init(void);
     extern int  setup_network_devices(void);
     extern void net_init(void);
 
@@ -300,6 +301,7 @@ void __init start_of_day(void)
     paging_init();                /* not much here now, but sets up fixmap */
     if ( smp_found_config ) get_smp_config();
     domain_init();
+	scheduler_init();	
     trap_init();
     init_IRQ();  /* installs simple interrupt wrappers. Starts HZ clock. */
     time_init(); /* installs software handler for HZ clock. */
@@ -320,6 +322,9 @@ void __init start_of_day(void)
                       * fall thru to 8259A if we have to (but slower).
                       */
 #endif
+	init_xeno_time();	/* initialise the time */
+	ac_timer_init();    /* init accurate timers */
+	schedulers_start(); /* start scheduler for each CPU */
 
     sti();
 
