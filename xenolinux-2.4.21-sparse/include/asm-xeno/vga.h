@@ -24,15 +24,14 @@ static unsigned long VGA_MAP_MEM(unsigned long x)
         if( x != 0xb8000 )
             panic("Argghh! VGA Console is weird. 1:%08lx\n",x);
 
-        vgacon_mmap = (unsigned char*) bt_ioremap( 0xb8000, 32*1024 );
-        return (unsigned long) vgacon_mmap;
+        vgacon_mmap = (unsigned char*) bt_ioremap( 0xa0000, 128*1024 );
+        return (unsigned long) (vgacon_mmap+x-0xa0000);
     }
     else
     {
-        if( x != 0xc0000 )
+        if( x != 0xc0000 && x != 0xa0000 ) /* vidmem_end or charmap fonts */
             panic("Argghh! VGA Console is weird. 2:%08lx\n",x);  
-
-        return (unsigned long) vgacon_mmap + 0x8000;
+	return (unsigned long) (vgacon_mmap+x-0xa0000);
     }
     return 0;
 }

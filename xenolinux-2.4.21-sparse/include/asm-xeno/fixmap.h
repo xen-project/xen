@@ -47,10 +47,16 @@ enum fixed_addresses {
 	FIX_NETRING1_BASE,
 	FIX_NETRING2_BASE,
 	FIX_NETRING3_BASE,
-#define NR_FIX_BTMAPS   8  /* 32KB For the Dom0 VGA Console */
+
+#ifdef CONFIG_VGA_CONSOLE
+#define NR_FIX_BTMAPS   32  /* 128KB For the Dom0 VGA Console A0000-C0000 */
+#else
+#define NR_FIX_BTMAPS   1   /* have on page incase anyone wants it in future */
+#endif
         FIX_BTMAP_END,
         FIX_BTMAP_BEGIN = FIX_BTMAP_END + NR_FIX_BTMAPS - 1,
 	/* our bt_ioremap is permenant unlike other architectures */
+
 	__end_of_permanent_fixed_addresses,
 	__end_of_fixed_addresses = __end_of_permanent_fixed_addresses
 };
