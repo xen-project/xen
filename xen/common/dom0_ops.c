@@ -114,7 +114,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     case DOM0_BUILDDOMAIN:
     {
         struct domain *d = find_domain_by_id(op->u.builddomain.domain);
-        ret = -EINVAL;
+        ret = -ESRCH;
         if ( d != NULL )
         {
             ret = final_setup_guest(d, &op->u.builddomain);
@@ -147,7 +147,8 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         if ( d != NULL )
         {
             ret = -EINVAL;
-            if ( test_bit(DF_CONSTRUCTED, &d->d_flags) )
+            if ( (d != current->domain) && 
+                 test_bit(DF_CONSTRUCTED, &d->d_flags) )
             {
                 domain_unpause_by_systemcontroller(d);
                 ret = 0;

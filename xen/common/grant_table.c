@@ -345,7 +345,7 @@ gnttab_map_grant_ref(
     gnttab_map_grant_ref_t *uop, unsigned int count)
 {
     int i, flush = 0;
-    unsigned long va;
+    unsigned long va = 0;
 
     for ( i = 0; i < count; i++ )
         if ( __gnttab_map_grant_ref(&uop[i], &va) == 0)
@@ -353,8 +353,9 @@ gnttab_map_grant_ref(
 
     if ( flush == 1 )
         __flush_tlb_one(va);
-    else if ( flush )
+    else if ( flush != 0 )
         local_flush_tlb();
+
     return 0;
 }
 
