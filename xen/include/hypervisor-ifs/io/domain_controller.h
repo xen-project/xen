@@ -11,23 +11,6 @@
 #define __DOMAIN_CONTROLLER_H__
 
 
-#ifndef BASIC_START_INFO
-#error "Xen header file hypervisor-if.h must already be included here."
-#endif
-
-
-/*
- * EXTENDED BOOTSTRAP STRUCTURE FOR NEW DOMAINS.
- */
-
-typedef struct {
-    BASIC_START_INFO;
-    u16 domain_controller_evtchn; /* 320 */
-} PACKED extended_start_info_t; /* 322 bytes */
-#define SIF_BLK_BE_DOMAIN (1<<4)  /* Is this a block backend domain? */
-#define SIF_NET_BE_DOMAIN (1<<5)  /* Is this a net backend domain? */
-
-
 /*
  * Reason codes for SCHEDOP_shutdown. These are opaque to Xen but may be
  * interpreted by control software to determine the appropriate action. These 

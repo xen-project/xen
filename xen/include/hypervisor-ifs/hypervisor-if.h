@@ -2,6 +2,8 @@
  * hypervisor-if.h
  * 
  * Guest OS interface to Xen.
+ * 
+ * Copyright (c) 2004, K A Fraser
  */
 
 #ifndef __HYPERVISOR_IF_H__
@@ -360,47 +362,35 @@ typedef struct shared_info_st
  *     extended by an extra 4MB to ensure this.
  */
 
-/*
- * This is the basic bootstrap information structure as passed by Xen to the
- * initial controller domain. We want this structure to be easily extended by
- * more sophisticated domain builders and controllers, so we make the basic
- * fields of this structure available via a BASIC_START_INFO macro.
- * 
- * Extended version of start_info_t should be defined as:
- *  typedef struct {
- *      BASIC_START_INFO;
- *      <...extra fields...>
- *  } extended_start_info_t;
- */
 #define MAX_CMDLINE 256
-#define BASIC_START_INFO                                                      \
-    /* THE FOLLOWING ARE FILLED IN BOTH ON INITIAL BOOT AND ON RESUME.     */ \
-    memory_t nr_pages;       /*  0: Total pages allocated to this domain. */  \
-    _MEMORY_PADDING(A);                                                       \
-    memory_t shared_info;    /*  8: MACHINE address of shared info struct.*/  \
-    _MEMORY_PADDING(B);                                                       \
-    u32      flags;          /* 16: SIF_xxx flags.                        */  \
-    u32      __pad;                                                           \
-    /* THE FOLLOWING ARE ONLY FILLED IN ON INITIAL BOOT (NOT RESUME).      */ \
-    memory_t pt_base;        /* 24: VIRTUAL address of page directory.    */  \
-    _MEMORY_PADDING(C);                                                       \
-    memory_t nr_pt_frames;   /* 32: Number of bootstrap p.t. frames.      */  \
-    _MEMORY_PADDING(D);                                                       \
-    memory_t mfn_list;       /* 40: VIRTUAL address of page-frame list.   */  \
-    _MEMORY_PADDING(E);                                                       \
-    memory_t mod_start;      /* 48: VIRTUAL address of pre-loaded module. */  \
-    _MEMORY_PADDING(F);                                                       \
-    memory_t mod_len;        /* 56: Size (bytes) of pre-loaded module.    */  \
-    _MEMORY_PADDING(G);                                                       \
-    u8 cmd_line[MAX_CMDLINE] /* 64 */
-
 typedef struct {
-    BASIC_START_INFO;
+    /* THE FOLLOWING ARE FILLED IN BOTH ON INITIAL BOOT AND ON RESUME.     */
+    memory_t nr_pages;        /*  0: Total pages allocated to this domain. */
+    _MEMORY_PADDING(A);
+    memory_t shared_info;     /*  8: MACHINE address of shared info struct.*/
+    _MEMORY_PADDING(B);
+    u32      flags;           /* 16: SIF_xxx flags.                        */
+    u16      domain_controller_evtchn; /* 20 */
+    u16      __pad;
+    /* THE FOLLOWING ARE ONLY FILLED IN ON INITIAL BOOT (NOT RESUME).      */
+    memory_t pt_base;         /* 24: VIRTUAL address of page directory.    */
+    _MEMORY_PADDING(C);
+    memory_t nr_pt_frames;    /* 32: Number of bootstrap p.t. frames.      */
+    _MEMORY_PADDING(D);
+    memory_t mfn_list;        /* 40: VIRTUAL address of page-frame list.   */
+    _MEMORY_PADDING(E);
+    memory_t mod_start;       /* 48: VIRTUAL address of pre-loaded module. */
+    _MEMORY_PADDING(F);
+    memory_t mod_len;         /* 56: Size (bytes) of pre-loaded module.    */
+    _MEMORY_PADDING(G);
+    u8 cmd_line[MAX_CMDLINE]; /* 64 */
 } PACKED start_info_t; /* 320 bytes */
 
 /* These flags are passed in the 'flags' field of start_info_t. */
 #define SIF_PRIVILEGED    (1<<0)  /* Is the domain privileged? */
 #define SIF_INITDOMAIN    (1<<1)  /* Is this the initial control domain? */
+#define SIF_BLK_BE_DOMAIN (1<<4)  /* Is this a block backend domain? */
+#define SIF_NET_BE_DOMAIN (1<<5)  /* Is this a net backend domain? */
 
 /* For use in guest OSes. */
 extern shared_info_t *HYPERVISOR_shared_info;
