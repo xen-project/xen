@@ -215,12 +215,13 @@ static inline int HYPERVISOR_fpu_taskswitch(void)
     return ret;
 }
 
-static inline int HYPERVISOR_yield(void)
+static inline int HYPERVISOR_do_sched_op(void *sched_op)
 {
     int ret;
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret) : "0" (__HYPERVISOR_yield) );
+        : "=a" (ret) : "0" (__HYPERVISOR_sched_op),
+        "b" (sched_op) );
 
     return ret;
 }

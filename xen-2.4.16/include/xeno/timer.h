@@ -12,10 +12,17 @@
  * The "data" field enables use of a common timeout function for several
  * timeouts. You can use this field to distinguish between the different
  * invocations.
+ *
+ * RN: Unlike the Linux timers, which are executed at the periodic timer
+ *     interrupt, in Xen, the timer list is only checked "occasionally", thus
+ *     its accuracy might be somewhat worse than under Linux. However, the
+ *     hypervisor should be purely event-driven and, in fact, in the current
+ *     implementation, timers are only used for watchdog purpose at a very
+ *     coarse granularity anyway. Thus this is not a problem.
  */
 struct timer_list {
 	struct list_head list;
-	unsigned long expires;
+	unsigned long expires;		/* jiffies */
 	unsigned long data;
 	void (*function)(unsigned long);
 };

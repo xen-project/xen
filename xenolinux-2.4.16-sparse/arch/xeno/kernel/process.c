@@ -86,7 +86,7 @@ void cpu_idle (void)
 
     while (1) {
         while (!current->need_resched)
-            HYPERVISOR_yield();
+            HYPERVISOR_do_sched_op(NULL);
         schedule();
         check_pgt_cache();
     }

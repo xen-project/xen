@@ -102,47 +102,26 @@ static inline unsigned long ticks_to_us(unsigned long ticks)
     return(hi);
 }
 
-static inline unsigned long do_gettimeoffset(void)
+static long long get_s_time(void)
 {
-#if 0
-    register unsigned long eax, edx;
+    u32 	  delta, low, pcc;
+	long long now;
+	long long incr;
 
-    /* Read the Time Stamp Counter */
+	/* read two values (pcc, now) "atomically" */
+again:
+    pcc = HYPERVISOR_shared_info->st_timestamp;
+    now = HYPERVISOR_shared_info->system_time;
+	if (HYPERVISOR_shared_info->st_timestamp != pcc) goto again;
 
-    rdtsc(eax,edx);
+    /* only use bottom 32bits of TSC. This should be sufficient */
+	rdtscl(low);
+    delta = low - pcc;
 
-    /* .. relative to previous jiffy (32 bits is enough) */
-    eax -= last_tsc_low;	/* tsc_low delta */
-
-    /*
-     * Time offset = (tsc_low delta) * fast_gettimeoffset_quotient
-     *             = (tsc_low delta) * (usecs_per_clock)
-     *             = (tsc_low delta) * (usecs_per_jiffy / clocks_per_jiffy)
-     *
-     * Using a mull instead of a divl saves up to 31 clock cycles
-     * in the critical path.
-     */
-    
-    edx = ticks_to_us(eax);
-
-    /* our adjusted time offset in microseconds */
-    return delay_at_last_interrupt + edx;
-#else
-    /*
-     * We should keep a 'last_tsc_low' thing which incorporates 
-     * delay_at_last_interrupt, adjusted in timer_interrupt after
-     * do_timer_interrupt. It would look at change in xtime, and
-     * make appropriate adjustment to a last_tsc variable.
-     * 
-     * We'd be affected by rounding error in ticks_per_usec, and by
-     * processor clock drift (which should be no more than in an
-     * external interrupt source anyhow). 
-     * 
-     * Perhaps a bit rough and ready, but never mind!
-     */
-    return 0;
-#endif
+	incr = ((long long)(ticks_to_us(delta)*1000));
+    return now + incr; 
 }
+#define NOW()				((long long)get_s_time())
 
 /*
  * This version of gettimeofday has microsecond resolution
@@ -151,15 +130,15 @@ static inline unsigned long do_gettimeoffset(void)
 void do_gettimeofday(struct timeval *tv)
 {
     unsigned long flags;
-    unsigned long usec, sec, lost;
+    unsigned long usec, sec;
 
     read_lock_irqsave(&xtime_lock, flags);
-    usec = do_gettimeoffset();
-    lost = jiffies - wall_jiffies;
-    if ( lost != 0 ) usec += lost * (1000000 / HZ);
-    sec = xtime.tv_sec;
-    usec += xtime.tv_usec;
-    read_unlock_irqrestore(&xtime_lock, flags);
+
+	usec  = ((unsigned long)(NOW()-HYPERVISOR_shared_info->wc_timestamp))/1000;
+	sec   = HYPERVISOR_shared_info->tv_sec;
+	usec += HYPERVISOR_shared_info->tv_usec;
+
+	read_unlock_irqrestore(&xtime_lock, flags);
 
     while ( usec >= 1000000 ) 
     {
@@ -173,6 +152,8 @@ void do_gettimeofday(struct timeval *tv)
 
 void do_settimeofday(struct timeval *tv)
 {
+/* XXX RN: shoudl do something special here for dom0 */
+#if 0
     write_lock_irq(&xtime_lock);
     /*
      * This is revolting. We need to set "xtime" correctly. However, the
@@ -195,6 +176,7 @@ void do_settimeofday(struct timeval *tv)
     time_maxerror = NTP_PHASE_LIMIT;
     time_esterror = NTP_PHASE_LIMIT;
     write_unlock_irq(&xtime_lock);
+#endif
 }
 
 
@@ -235,19 +217,6 @@ static struct irqaction irq_timer = {
 };
 
 
-unsigned long get_cmos_time(void)
-{
-    unsigned long secs = HYPERVISOR_shared_info->rtc_time;
-    unsigned long diff;
-
-    rdtscl(diff);
-    diff -= (unsigned long)HYPERVISOR_shared_info->rtc_timestamp;
-
-    secs += ticks_to_us(diff);
-
-    return(secs + ticks_to_secs(diff));
-}
-
 
 /* Return 2^32 * (1 / (TSC clocks per usec)) for do_fast_gettimeoffset(). */
 static unsigned long __init calibrate_tsc(void)
@@ -268,7 +237,6 @@ void __init time_init(void)
     unsigned long long alarm;
 	
     fast_gettimeoffset_quotient = calibrate_tsc();
-    do_get_fast_time = do_gettimeofday;
 
     /* report CPU clock rate in Hz.
      * The formula is (10^6 * 2^32) / (2^32 * 1 / (clocks/us)) =
@@ -299,6 +267,5 @@ void __init time_init(void)
     HYPERVISOR_shared_info->domain_timeout = ~0ULL;
     clear_bit(_EVENT_TIMER, &HYPERVISOR_shared_info->events);
 
-    xtime.tv_sec = get_cmos_time();
-    xtime.tv_usec = 0;
+	do_gettimeofday(&xtime);
 }

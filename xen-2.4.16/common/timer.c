@@ -602,7 +602,6 @@ void do_timer(struct pt_regs *regs)
     p = &idle0_task;
     do {
         s = p->shared_info;
-        s->wall_time = s->domain_time = wall;
         cpu_mask |= mark_guest_event(p, _EVENT_TIMER);
     }
     while ( (p = p->next_task) != &idle0_task );

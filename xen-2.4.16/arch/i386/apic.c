@@ -1,3 +1,23 @@
+/* -*-  Mode:C; c-basic-offset:4; tab-width:4 -*-
+ ****************************************************************************
+ * (C) 2002 - Rolf Neugebauer - Intel Research Cambridge
+ ****************************************************************************
+ *
+ *        File: apic.c
+ *      Author: 
+ *     Changes: 
+ *              
+ *        Date: Nov 2002
+ * 
+ * Environment: Xen Hypervisor
+ * Description: programmable APIC timer interface for accurate timers
+ *              modified version of Linux' apic.c
+ *
+ ****************************************************************************
+ * $Id: c-insert.c,v 1.7 2002/11/08 16:04:34 rn Exp $
+ ****************************************************************************
+ */
+
 /*
  *	Local APIC handling, local APIC timers
  *
@@ -9,6 +29,7 @@
  *					and Rolf G. Tews
  *					for testing these extensively.
  */
+
 
 #include <xeno/config.h>
 #include <xeno/init.h>
@@ -25,6 +46,17 @@
 #include <asm/pgalloc.h>
 #include <asm/hardirq.h>
 
+#include <xeno/ac_timer.h>
+
+
+#undef APIC_TIME_TRACE
+#ifdef APIC_TIME_TRACE
+#define TRC(_x) _x
+#else
+#define TRC(_x)
+#endif
+
+
 /* Using APIC to generate smp_local_timer_interrupt? */
 int using_apic_timer = 0;
 
@@ -39,7 +71,7 @@ int get_maxlvt(void)
     return maxlvt;
 }
 
-void clear_local_APIC(void)
+static void clear_local_APIC(void)
 {
     int maxlvt;
     unsigned long v;
@@ -313,7 +345,6 @@ void __init setup_local_APIC (void)
      */
     value = apic_read(APIC_LVT0) & APIC_LVT_MASKED;
     if (!smp_processor_id()) { 
-/* && (pic_mode || !value)) { */
         value = APIC_DM_EXTINT;
         printk("enabled ExtINT on CPU#%d\n", smp_processor_id());
     } else {
@@ -340,11 +371,9 @@ void __init setup_local_APIC (void)
         value = apic_read(APIC_ESR);
         printk("ESR value before enabling vector: %08lx\n", value);
 
-        value = ERROR_APIC_VECTOR;      // enables sending errors
+        value = ERROR_APIC_VECTOR;      /* enables sending errors */
         apic_write_around(APIC_LVTERR, value);
-        /*
-         * spec says clear errors after enabling vector.
-         */
+        /* spec says clear errors after enabling vector. */
         if (maxlvt > 3)
             apic_write(APIC_ESR, 0);
         value = apic_read(APIC_ESR);
@@ -416,9 +445,7 @@ static int __init detect_init_APIC (void)
     boot_cpu_physical_apicid = 0;
 
     printk("Found and enabled local APIC!\n");
-
     apic_pm_init1();
-
     return 0;
 
  no_apic:
@@ -467,14 +494,24 @@ void __init init_apic_mappings(void)
 #endif
 }
 
-/*
- * This part sets up the APIC 32 bit clock in LVTT1, with HZ interrupts
- * per second. We assume that the caller has already set up the local
- * APIC.
- *
- * The APIC timer is not exactly sync with the external timer chip, it
- * closely follows bus clocks.
- */
+/*****************************************************************************
+ * APIC calibration
+ * 
+ * The APIC is programmed in bus cycles.
+ * Timeout values should specified in real time units.
+ * The "cheapest" time source is the cyclecounter.
+ * 
+ * Thus, we need a mappings from: bus cycles <- cycle counter <- system time
+ * 
+ * The calibration is currently a bit shoddy since it requires the external
+ * timer chip to generate periodic timer interupts. 
+ *****************************************************************************/
+
+/* used for system time scaling */
+static unsigned int bus_freq;
+static u32          bus_cycle;   /* length of one bus cycle in pico-seconds */
+static u32          bus_scale;   /* scaling factor convert ns to bus cycles */
+
 
 /*
  * The timer chip is already set up at HZ interrupts per second here,
@@ -485,17 +522,12 @@ static unsigned int __init get_8254_timer_count(void)
 {
     /*extern spinlock_t i8253_lock;*/
     /*unsigned long flags;*/
-
     unsigned int count;
-
     /*spin_lock_irqsave(&i8253_lock, flags);*/
-
     outb_p(0x00, 0x43);
     count = inb_p(0x40);
     count |= inb_p(0x40) << 8;
-
     /*spin_unlock_irqrestore(&i8253_lock, flags);*/
-
     return count;
 }
 
@@ -503,112 +535,67 @@ void __init wait_8254_wraparound(void)
 {
     unsigned int curr_count, prev_count=~0;
     int delta;
-
     curr_count = get_8254_timer_count();
-
     do {
         prev_count = curr_count;
         curr_count = get_8254_timer_count();
         delta = curr_count-prev_count;
-
 	/*
 	 * This limit for delta seems arbitrary, but it isn't, it's
 	 * slightly above the level of error a buggy Mercury/Neptune
 	 * chipset timer can cause.
 	 */
-
     } while (delta < 300);
 }
 
 /*
  * This function sets up the local APIC timer, with a timeout of
  * 'clocks' APIC bus clock. During calibration we actually call
- * this function twice on the boot CPU, once with a bogus timeout
- * value, second time for real. The other (noncalibrating) CPUs
- * call this function only once, with the real, calibrated value.
+ * this function with a very large value and read the current time after
+ * a well defined period of time as expired.
+ *
+ * Calibration is only performed once, for CPU0!
  *
  * We do reads before writes even if unnecessary, to get around the
  * P5 APIC double write bug.
  */
-
-#define APIC_DIVISOR 16
-
-void __setup_APIC_LVTT(unsigned int clocks)
+#define APIC_DIVISOR 1
+static void __setup_APIC_LVTT(unsigned int clocks)
 {
     unsigned int lvtt1_value, tmp_value;
-
-    lvtt1_value = SET_APIC_TIMER_BASE(APIC_TIMER_BASE_DIV) |
-        APIC_LVT_TIMER_PERIODIC | LOCAL_TIMER_VECTOR;
+    lvtt1_value = SET_APIC_TIMER_BASE(APIC_TIMER_BASE_DIV)|LOCAL_TIMER_VECTOR;
     apic_write_around(APIC_LVTT, lvtt1_value);
-
-    /*
-     * Divide PICLK by 16
-     */
     tmp_value = apic_read(APIC_TDCR);
-    apic_write_around(APIC_TDCR, (tmp_value
-                                  & ~(APIC_TDR_DIV_1 | APIC_TDR_DIV_TMBASE))
-                      | APIC_TDR_DIV_16);
-
+    apic_write_around(APIC_TDCR, (tmp_value | APIC_TDR_DIV_1));
     apic_write_around(APIC_TMICT, clocks/APIC_DIVISOR);
 }
 
+/*
+ * this is done for every CPU from setup_APIC_clocks() below.
+ * We setup each local APIC with a zero timeout value for now.
+ * Unlike Linux, we don't have to wait for slices etc.
+ */
 void setup_APIC_timer(void * data)
 {
-    unsigned int clocks = (unsigned int) data, slice, t0, t1;
     unsigned long flags;
-    int delta;
-
     __save_flags(flags);
     __sti();
-    /*
-     * ok, Intel has some smart code in their APIC that knows
-     * if a CPU was in 'hlt' lowpower mode, and this increases
-     * its APIC arbitration priority. To avoid the external timer
-     * IRQ APIC event being in synchron with the APIC clock we
-     * introduce an interrupt skew to spread out timer events.
-     *
-     * The number of slices within a 'big' timeslice is smp_num_cpus+1
-     */
-
-    slice = clocks / (smp_num_cpus+1);
-    printk("cpu: %d, clocks: %d, slice: %d\n",
-           smp_processor_id(), clocks, slice);
-
-    /*
-     * Wait for IRQ0's slice:
-     */
-    wait_8254_wraparound();
-
-    __setup_APIC_LVTT(clocks);
-
-    t0 = apic_read(APIC_TMICT)*APIC_DIVISOR;
-    /* Wait till TMCCT gets reloaded from TMICT... */
-    do {
-        t1 = apic_read(APIC_TMCCT)*APIC_DIVISOR;
-        delta = (int)(t0 - t1 - slice*(smp_processor_id()+1));
-    } while (delta >= 0);
-    /* Now wait for our slice for real. */
-    do {
-        t1 = apic_read(APIC_TMCCT)*APIC_DIVISOR;
-        delta = (int)(t0 - t1 - slice*(smp_processor_id()+1));
-    } while (delta < 0);
-
-    __setup_APIC_LVTT(clocks);
-
-    printk("CPU%d<T0:%d,T1:%d,D:%d,S:%d,C:%d>\n",
-           smp_processor_id(), t0, t1, delta, slice, clocks);
-
+    printk("cpu: %d: setup timer.", smp_processor_id());
+    __setup_APIC_LVTT(0);
+    printk("done\n");
     __restore_flags(flags);
 }
 
 /*
  * In this function we calibrate APIC bus clocks to the external timer.
  *
- * We want to do the calibration only once since we
- * want to have local timer irqs syncron. CPUs connected
- * by the same APIC bus have the very same bus frequency.
- * And we want to have irqs off anyways, no accidental
- * APIC irq that way.
+ * As a result we have the Bys Speed and CPU speed in Hz.
+ * 
+ * We want to do the calibration only once (for CPU0).  CPUs connected by the
+ * same APIC bus have the very same bus frequency.
+ *
+ * This bit is a bit shoddy since we use the very same periodic timer interrupt
+ * we try to eliminate to calibrate the APIC. 
  */
 
 int __init calibrate_APIC_clock(void)
@@ -619,95 +606,152 @@ int __init calibrate_APIC_clock(void)
     int i;
     const int LOOPS = HZ/10;
 
-    printk("calibrating APIC timer ...\n");
+    printk("calibrating APIC timer for CPU%d...\n",  smp_processor_id());
 
-    /*
-     * Put whatever arbitrary (but long enough) timeout
+    /* Put whatever arbitrary (but long enough) timeout
      * value into the APIC clock, we just want to get the
-     * counter running for calibration.
-     */
+     * counter running for calibration. */
     __setup_APIC_LVTT(1000000000);
 
-    /*
-     * The timer chip counts down to zero. Let's wait
+	/* The timer chip counts down to zero. Let's wait
      * for a wraparound to start exact measurement:
-     * (the current tick might have been already half done)
-     */
-
+     * (the current tick might have been already half done) */
     wait_8254_wraparound();
 
-    /*
-     * We wrapped around just now. Let's start:
-     */
+    /* We wrapped around just now. Let's start: */
     rdtscll(t1);
     tt1 = apic_read(APIC_TMCCT);
 
-    /*
-     * Let's wait LOOPS wraprounds:
-     */
+    /* Let's wait LOOPS wraprounds: */
     for (i = 0; i < LOOPS; i++)
         wait_8254_wraparound();
 
     tt2 = apic_read(APIC_TMCCT);
     rdtscll(t2);
 
-    /*
-     * The APIC bus clock counter is 32 bits only, it
+    /* The APIC bus clock counter is 32 bits only, it
      * might have overflown, but note that we use signed
      * longs, thus no extra care needed.
-     *
-     * underflown to be exact, as the timer counts down ;)
-     */
-
+     * underflown to be exact, as the timer counts down ;) */
     result = (tt1-tt2)*APIC_DIVISOR/LOOPS;
 
-    printk("..... CPU clock speed is %ld.%04ld MHz.\n",
+    printk("..... CPU speed is %ld.%04ld MHz.\n",
            ((long)(t2-t1)/LOOPS)/(1000000/HZ),
            ((long)(t2-t1)/LOOPS)%(1000000/HZ));
 
-    printk("..... host bus clock speed is %ld.%04ld MHz.\n",
+    printk("..... Bus speed is %ld.%04ld MHz.\n",
            result/(1000000/HZ),
            result%(1000000/HZ));
 
+	/* set up multipliers for accurate timer code */
+	bus_freq   = result*HZ;
+	bus_cycle  = (u32) (1000000000000LL/bus_freq); /* in pico seconds */
+	bus_scale  = (1000*262144)/bus_cycle;
+
+	/* print results */
+	printk("..... bus_freq  = %u Hz\n",  bus_freq);
+	printk("..... bus_cycle = %u ps\n",  bus_cycle);
+	printk("..... bus_scale = %u \n",    bus_scale);
+	/* reset APIC to zero timeout value */
+    __setup_APIC_LVTT(0);
     return result;
 }
 
-static unsigned int calibration_result;
-
+/*
+ * initialise the APIC timers for all CPUs
+ * we start with the first and find out processor frequency and bus speed
+ */
 void __init setup_APIC_clocks (void)
 {
     printk("Using local APIC timer interrupts.\n");
     using_apic_timer = 1;
-
     __cli();
-
-    calibration_result = calibrate_APIC_clock();
-    /*
-     * Now set up the timer for real.
-     */
-    setup_APIC_timer((void *)calibration_result);
-
+	/* calibrate CPU0 for CPU speed and BUS speed */
+    bus_freq = calibrate_APIC_clock();
+    /* Now set up the timer for real. */
+    setup_APIC_timer((void *)bus_freq);
     __sti();
-
     /* and update all other cpus */
-    smp_call_function(setup_APIC_timer, (void *)calibration_result, 1, 1);
+    smp_call_function(setup_APIC_timer, (void *)bus_freq, 1, 1);
 }
 
 #undef APIC_DIVISOR
-
 /*
- * Local timer interrupt handler. It does both profiling and
- * process statistics/rescheduling.
- *
- * We do profiling in every local tick, statistics/rescheduling
- * happen only every 'profiling multiplier' ticks. The default
- * multiplier is 1 and it can be changed by writing the new multiplier
- * value into /proc/profile.
+ * reprogram the APIC timer. Timeoutvalue is in ns from start of boot
+ * returns 1 on success
+ * returns 0 if the timeout value is too small or in the past.
  */
 
+
+int reprogram_ac_timer(s_time_t timeout)
+{
+	int 		cpu = smp_processor_id();
+	s_time_t	now;
+	s_time_t	expire;
+	u64			apic_tmict;
+
+	now = NOW();
+	expire = timeout - now;	/* value from now */
+
+
+	if (expire <= 0) {
+		printk("APICT[%02d] Timeout value in the past %lld > %lld\n", 
+			   cpu, now, timeout);
+		return 0;		/* timeout value in the past */
+	}
+
+	/* conversion to bus units */
+	apic_tmict = (((u64)bus_scale) * expire)>>18;
+
+	if (apic_tmict >= 0xffffffff) {
+		printk("APICT[%02d] Timeout value too large\n", cpu);
+		apic_tmict = 0xffffffff;
+	}
+	if (apic_tmict == 0) {
+		printk("APICT[%02d] timeout value too small\n", cpu);
+		return 0;
+	}
+
+	/* programm timer */
+	apic_write(APIC_TMICT, (unsigned long)apic_tmict);
+
+	TRC(printk("APICT[%02d] reprog(): expire=%lld %u\n",
+			   cpu, expire, apic_tmict));
+	return 1;
+}
+
+/*
+ * Local timer interrupt handler.
+ * here the programmable, accurate timers are executed.
+ * If we are on CPU0 and we should have updated jiffies, we do this 
+ * as well and and deal with traditional linux timers. Note, that of 
+ * the timer APIC on CPU does not go off every 10ms or so the linux 
+ * timers loose accuracy, but that shouldn't be a problem.
+ */
+
+static s_time_t last_cpu0_tirq = 0;
 inline void smp_local_timer_interrupt(struct pt_regs * regs)
 {
-    update_process_times(user_mode(regs));
+	int cpu = smp_processor_id();
+	s_time_t diff, now;
+
+    /* if CPU 0 do old timer stuff  */
+	if (cpu == 0) {
+		update_time();
+		now = NOW();
+		diff = now - last_cpu0_tirq;
+		/* this uses three 64bit divisions which should be avoided!! */
+		if (diff >= MILLISECS(10)) {
+			/* update jiffies */
+			(*(unsigned long *)&jiffies) += diff / MILLISECS(10);
+
+			/* do traditional linux timers */
+			do_timer(regs);
+			last_cpu0_tirq = now;
+		}
+	}
+	/* call timer function */
+	do_ac_timer();
 }
 
 /*
@@ -732,13 +776,11 @@ void smp_apic_timer_interrupt(struct pt_regs * regs)
     /*
      * NOTE! We'd better ACK the irq immediately,
      * because timer handling can be slow.
+	 * XXX is this save?
      */
     ack_APIC_irq();
-    /*
-     * update_process_times() expects us to have done irq_enter().
-     * Besides, if we don't timer interrupts ignore the global
-     * interrupt lock, which is the WrongThing (tm) to do.
-     */
+
+	/* call the local handler */
     irq_enter(cpu, 0);
     smp_local_timer_interrupt(regs);
     irq_exit(cpu, 0);
@@ -809,7 +851,8 @@ int __init APIC_init_uniprocessor (void)
     /*
      * Complain if the BIOS pretends there is one.
      */
-    if (!cpu_has_apic && APIC_INTEGRATED(apic_version[boot_cpu_physical_apicid])) {
+    if (!cpu_has_apic&&APIC_INTEGRATED(apic_version[boot_cpu_physical_apicid]))
+	{
         printk("BIOS bug, local APIC #%d not detected!...\n",
                boot_cpu_physical_apicid);
         return -1;
