@@ -7,6 +7,7 @@
 #ifndef __ASM_I386_PROCESSOR_H
 #define __ASM_I386_PROCESSOR_H
 
+#include <asm/vm86.h>
 #include <asm/math_emu.h>
 #include <asm/segment.h>
 #include <asm/page.h>
@@ -478,7 +479,5 @@ extern inline void prefetchw(const void *x)
 #define spin_lock_prefetch(x)	prefetchw(x)
 
 #endif
-
-#define TF_MASK 0x100
 
 #endif /* __ASM_I386_PROCESSOR_H */

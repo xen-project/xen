@@ -103,7 +103,6 @@
 3e5a4e67X7JyupgdYkgDX19Huj2sAw linux-2.4.26-xen-sparse/include/asm-xen/pgtable-2level.h
 3e5a4e67gr4NLGtQ5CvSLimMYZlkOA linux-2.4.26-xen-sparse/include/asm-xen/pgtable.h
 3e5a4e676uK4xErTBDH6XJREn9LSyg linux-2.4.26-xen-sparse/include/asm-xen/processor.h
-3e5a4e67AJPjW-zL7p-xWuA6IVeH1g linux-2.4.26-xen-sparse/include/asm-xen/ptrace.h
 3e5a4e68uJz-xI0IBVMD7xRLQKJDFg linux-2.4.26-xen-sparse/include/asm-xen/segment.h
 3e5a4e68Nfdh6QcOKUTGCaYkf2LmYA linux-2.4.26-xen-sparse/include/asm-xen/smp.h
 4062f7e2PzFOUGT0PaE7A0VprTU3JQ linux-2.4.26-xen-sparse/include/asm-xen/synch_bitops.h
@@ -222,7 +221,6 @@
 40f5623aEToIXouJgO-ao5d5pcEt1w linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/pgtable-2level.h
 40f5623aCCXRPlGpNthVXstGz9ZV3A linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/pgtable.h
 40f5623aPCkQQfPtJSooGdhcatrvnQ linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/processor.h
-40f5623bvhcUmESJrtcII6Bmd61b3w linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/ptrace.h
 40f5623bzLvxr7WoJIxVf2OH4rCBJg linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/segment.h
 40f5623bG_LzgG6-qwk292nTc5Wabw linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/setup.h
 40f5623bgzm_9vwxpzJswlAxg298Gg linux-2.6.7-xen-sparse/include/asm-xen/asm-i386/synch_bitops.h

@@ -46,6 +46,16 @@ extern asmlinkage unsigned int do_IRQ(int irq, struct pt_regs *regs);
 
 #define VALID_EVTCHN(_chn) ((_chn) != -1)
 
+/*
+ * Force a proper event-channel callback from Xen after clearing the
+ * callback mask. We do this in a very simple manner, by making a call
+ * down into Xen. The pending flag will be checked by Xen on return.
+ */
+void force_evtchn_callback(void)
+{
+    (void)HYPERVISOR_xen_version(0);
+}
+
 void evtchn_do_upcall(struct pt_regs *regs)
 {
     unsigned long  l1, l2;
