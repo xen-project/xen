@@ -315,6 +315,7 @@ static int do_block_io_op(blkif_t *blkif, int max_to_do)
          */
         ar = get_active_req();
         ar->id = req_s->id;
+        ar->nr_pages = req_s->nr_segments; 
         blkif_get(blkif);
         ar->blkif = blkif;
         req_s->id = MAKE_ID(blkif->domid, ACTIVE_IDX(ar));
