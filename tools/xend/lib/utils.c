@@ -21,7 +21,7 @@
 #include <errno.h>
 #include <signal.h>
 #include <xc.h>
-#include <asm-xeno/control_if.h>
+#include "control_if.h"
 
 /* Needed for Python versions earlier than 2.3. */
 #ifndef PyMODINIT_FUNC

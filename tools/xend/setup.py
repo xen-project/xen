@@ -2,8 +2,7 @@
 from distutils.core import setup, Extension
 
 utils = Extension("utils",
-                  include_dirs         = ["../xc/lib",
-                                          "../../xenolinux-sparse/include"],
+                  include_dirs         = ["../xc/lib"],
                   library_dirs         = ["../xc/lib"],
                   libraries            = ["xc"],
                   sources              = ["lib/utils.c"])

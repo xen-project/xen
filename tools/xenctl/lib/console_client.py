@@ -5,7 +5,17 @@
 # Copyright (c) 2004, K A Fraser
 ##############################################
 
-import errno, os, signal, socket, struct, sys, termios
+import errno, os, signal, socket, struct, sys
+
+from termios import *
+# Indexes into termios.tcgetattr() list.
+IFLAG  = 0
+OFLAG  = 1
+CFLAG  = 2
+LFLAG  = 3
+ISPEED = 4
+OSPEED = 5
+CC     = 6
 
 def __child_death(signum, frame):
     global stop
@@ -14,7 +24,6 @@ def __child_death(signum, frame):
 def __recv_from_sock(sock):
     global stop
     stop = False
-    print "************ REMOTE CONSOLE: CTRL-] TO QUIT ********"
     while not stop:
         try:
             data = sock.recv(1)
@@ -22,8 +31,6 @@ def __recv_from_sock(sock):
         except socket.error, error:
             if error[0] != errno.EINTR:
                 raise
-    print
-    print "************ REMOTE CONSOLE EXITED *****************"
     os.wait()
 
 def __send_to_sock(sock):
@@ -41,21 +48,28 @@ def connect(host,port):
                     struct.pack('ii', 0, 0))
     sock.connect((host,port))
 
-    oattrs = termios.tcgetattr(0)
-    nattrs = termios.tcgetattr(0)
-    nattrs[3] = nattrs[3] & ~(termios.ECHO | termios.ICANON)
-    nattrs[6][termios.VMIN] = 1
-    nattrs[6][termios.VTIME] = 0
-    termios.tcsetattr(0, termios.TCSAFLUSH, nattrs)
+    oattrs = tcgetattr(0)
+    nattrs = tcgetattr(0)
+    nattrs[IFLAG] = nattrs[IFLAG] & ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON)
+    nattrs[OFLAG] = nattrs[OFLAG] & ~(OPOST)
+    nattrs[CFLAG] = nattrs[CFLAG] & ~(CSIZE | PARENB)
+    nattrs[CFLAG] = nattrs[CFLAG] | CS8
+    nattrs[LFLAG] = nattrs[LFLAG] & ~(ECHO | ICANON | IEXTEN | ISIG)
+    nattrs[CC][VMIN] = 1
+    nattrs[CC][VTIME] = 0
 
-    try:
-        if os.fork():
-            signal.signal(signal.SIGCHLD, __child_death)
+    if os.fork():
+        signal.signal(signal.SIGCHLD, __child_death)
+        print "************ REMOTE CONSOLE: CTRL-] TO QUIT ********"
+        tcsetattr(0, TCSAFLUSH, nattrs)
+        try:
             __recv_from_sock(sock)
-        else:
-            __send_to_sock(sock)
-    finally:
-        termios.tcsetattr(0, termios.TCSAFLUSH, oattrs)
+        finally:
+            tcsetattr(0, TCSAFLUSH, oattrs)
+            print
+            print "************ REMOTE CONSOLE EXITED *****************"
+    else:
+        __send_to_sock(sock)
 
 if __name__ == '__main__':
     connect(str(sys.argv[1]),int(sys.argv[2]))
