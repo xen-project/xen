@@ -37,7 +37,7 @@ public class ParseVbdCreate extends CommandParser {
         loadState();
         String output;
         if (vd_key.equals("")) {
-            output = new CommandVbdCreatePhysical( partition_name, domain_id, vbd_num, mode ).execute();
+            output = new CommandVbdCreatePhysical(d,  partition_name, domain_id, vbd_num, mode ).execute();
         } else {
             output =
                 new CommandVbdCreate(vd_key, domain_id, vbd_num, mode).execute();

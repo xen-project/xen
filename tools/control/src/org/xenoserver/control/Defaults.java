@@ -215,7 +215,7 @@ public class Defaults {
      * @param command Command string to run.
      * @return Command's output.
      */
-    private String runCommand(String command) {
+    String runCommand(String command) {
         Runtime runtime = Runtime.getRuntime();
         String outline;
         StringBuffer output = new StringBuffer();

@@ -7,6 +7,8 @@ import java.io.IOException;
  * Create a virtual block device.
  */
 public class CommandVbdCreatePhysical extends Command {
+    /** Defaults instance to use. */
+    private Defaults d;
     /** Virtual disk to map to. */
     private String partition_name;
     /** Domain to create VBD for. */
@@ -24,10 +26,12 @@ public class CommandVbdCreatePhysical extends Command {
      * @param mode Access mode to grant.
      */
     public CommandVbdCreatePhysical(
-        String partition,
+        Defaults d, 
+	String partition,
         int domain_id,
         int vbd_num,
         Mode mode) {
+        this.d = d;
         this.partition_name = partition;
         this.domain_id = domain_id;
         this.vbd_num = vbd_num;
@@ -39,10 +43,11 @@ public class CommandVbdCreatePhysical extends Command {
      */
     public String execute() throws CommandFailedException {
         String resolved = StringPattern.parse(partition_name).resolve(domain_id);
-        Partition partition = PartitionManager.IT.getPartition(resolved);
+	String resolved2 = d.runCommand(d.xiToolsDir + Settings.XI_HELPER + " expand " + resolved).trim();
+        Partition partition = PartitionManager.IT.getPartition(resolved2);
         if (partition == null) {
             throw new CommandFailedException(
-                "No partition " + partition_name + " (resolved to " + resolved + ") exists");
+                "No partition " + partition_name + " (resolved to " + resolved2 + ") exists");
         }
 
         VirtualDisk vd = new VirtualDisk("vbd:" + partition.getName());

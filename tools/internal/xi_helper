@@ -13,3 +13,12 @@ fi
 if [ "$1" = "route" ] ; then
   /sbin/route -n | grep $QUERY_DEV | grep 'G' | awk '{print $2}'
 fi
+
+if [ "$1" = "expand" ] ; then
+  cd /dev/
+  CURRENT=$2
+  if [ -h "$CURRENT" ] ; then
+    CURRENT=$(basename $(stat -c%N $CURRENT | tr -d "\`\'" | awk '{print $3}'))
+  fi
+  echo $CURRENT
+fi

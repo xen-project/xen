@@ -8,6 +8,6 @@ if [ -z "$ROUTE" ] ; then ROUTE=/sbin/route ; fi
 if [ -z "$JAVA" ] ; then JAVA=java ; fi
 
 
-ARGS="-DDEFAULTS_FILE=$DEFAULTS_FILE -DDEFAULTS_PATH=$DEFAULTS_PATH"
+ARGS="$XENCTLARGS -DDEFAULTS_FILE=$DEFAULTS_FILE -DDEFAULTS_PATH=$DEFAULTS_PATH"
 
 $JAVA $ARGS -jar $(dirname $0)/xenctl-cmdline.jar $*

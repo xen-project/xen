@@ -43,10 +43,11 @@ public class CommandPhysicalGrant extends Command {
         Runtime r = Runtime.getRuntime();
         String output = null;
 	String resolved = StringPattern.parse(partition_name).resolve(domain_id);
-        Partition partition = PartitionManager.IT.getPartition(resolved);
+	String resolved2 = d.runCommand(d.xiToolsDir + Settings.XI_HELPER + " expand " + resolved).trim();
+        Partition partition = PartitionManager.IT.getPartition(resolved2);
     
         if ( partition == null ) {
-          throw new CommandFailedException("Partition " + partition_name + " (resolved to " + resolved + ") does not exist.");
+          throw new CommandFailedException("Partition " + partition_name + " (resolved to " + resolved2 + ") does not exist.");
         }
     
         // Check if this partition belongs to the VDM
