@@ -194,6 +194,7 @@ typedef struct dom0_readconsole_st
 {
     unsigned long str;
     unsigned int count;
+    unsigned int cmd;
 } dom0_readconsole_t;
 
 typedef struct dom0_op_st
