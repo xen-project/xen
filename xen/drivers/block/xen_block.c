@@ -19,7 +19,7 @@
 #include <xeno/segment.h>
 #include <asm/domain_page.h> /* TEST_READ_VALIDITY */
 
-#if 1
+#if 0
 #define TEST_READ_VALIDITY
 #define DPRINTK(_f, _a...) printk( _f , ## _a )
 #else
