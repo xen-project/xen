@@ -26,6 +26,9 @@
 #define NET_TX_IRQ _EVENT_NET_TX
 #define NET_RX_IRQ _EVENT_NET_RX
 
+#define NET_TX_IRQ_FOR_VIF(x) _EVENT_NET_TX_FOR_VIF(x)
+#define NET_RX_IRQ_FOR_VIF(x) _EVENT_NET_RX_FOR_VIF(x)
+
 #define TX_MAX_ENTRIES (TX_RING_SIZE - 2)
 #define RX_MAX_ENTRIES (RX_RING_SIZE - 2)
 
@@ -62,6 +65,7 @@ struct net_private
     unsigned int rx_idx, tx_idx, tx_full;
     net_ring_t *net_ring;
     spinlock_t tx_lock;
+    unsigned int id;
 };
 
  
@@ -69,7 +73,15 @@ static int network_open(struct net_device *dev)
 {
     struct net_private *np = dev->priv;
     int error;
+    char *rxlabel, *txlabel;
 
+    // This is inevitably not the right way to allocate a couple of static strings.
+    rxlabel = kmalloc(sizeof("net-rx- "), GFP_KERNEL);
+    txlabel = kmalloc(sizeof("net-tx- "), GFP_KERNEL);
+    if ((rxlabel == NULL) || (txlabel == NULL)) goto fail;
+    sprintf(rxlabel, "net-rx-%d", np->id);
+    sprintf(txlabel, "net-tx-%d", np->id);
+    
     np->rx_idx = np->tx_idx = np->tx_full = 0;
 
     memset(&np->stats, 0, sizeof(np->stats));
@@ -101,7 +113,8 @@ static int network_open(struct net_device *dev)
 
     network_alloc_rx_buffers(dev);
 
-    error = request_irq(NET_RX_IRQ, network_rx_int, 0, "net-rx", dev);
+    error = request_irq(NET_RX_IRQ_FOR_VIF(np->id), network_rx_int, 0, 
+                    rxlabel, dev);
     if ( error )
     {
         printk(KERN_WARNING "%s: Could not allocate receive interrupt\n",
@@ -109,12 +122,13 @@ static int network_open(struct net_device *dev)
         goto fail;
     }
 
-    error = request_irq(NET_TX_IRQ, network_tx_int, 0, "net-tx", dev);
+    error = request_irq(NET_TX_IRQ_FOR_VIF(np->id), network_tx_int, 0, 
+                    txlabel, dev);
     if ( error )
     {
         printk(KERN_WARNING "%s: Could not allocate transmit interrupt\n",
                dev->name);
-        free_irq(NET_RX_IRQ, dev);
+        free_irq(NET_RX_IRQ_FOR_VIF(np->id), dev);
         goto fail;
     }
 
@@ -127,6 +141,8 @@ static int network_open(struct net_device *dev)
     return 0;
 
  fail:
+    if ( rxlabel ) kfree(rxlabel);
+    if ( txlabel ) kfree(txlabel);
     if ( np->net_ring->rx_ring ) kfree(np->net_ring->rx_ring);
     if ( np->net_ring->tx_ring ) kfree(np->net_ring->tx_ring);
     if ( np->rx_skb_ring ) kfree(np->rx_skb_ring);
@@ -208,7 +224,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
     unsigned int i;
     struct net_private *np = (struct net_private *)dev->priv;
-
+    
     if ( np->tx_full )
     {
         printk(KERN_WARNING "%s: full queue wasn't stopped!\n", dev->name);
@@ -275,7 +291,9 @@ static void network_rx_int(int irq, void *dev_id, struct pt_regs *ptregs)
     
     /* Deal with hypervisor racing our resetting of rx_event. */
     smp_mb();
-    if ( np->net_ring->rx_cons != i ) goto again;
+    if ( np->net_ring->rx_cons != i ) { 
+                goto again;
+        }
 }
 
 
@@ -286,13 +304,13 @@ static void network_tx_int(int irq, void *dev_id, struct pt_regs *ptregs)
 }
 
 
-static int network_close(struct net_device *dev)
+int network_close(struct net_device *dev)
 {
     struct net_private *np = dev->priv;
 
     netif_stop_queue(dev);
-    free_irq(NET_RX_IRQ, dev);
-    free_irq(NET_TX_IRQ, dev);
+    free_irq(NET_RX_IRQ_FOR_VIF(np->id), dev);
+    free_irq(NET_TX_IRQ_FOR_VIF(np->id), dev);
     network_free_rx_buffers(dev);
     kfree(np->net_ring->rx_ring);
     kfree(np->net_ring->tx_ring);
@@ -310,7 +328,7 @@ static struct net_device_stats *network_get_stats(struct net_device *dev)
 }
 
 
-static int __init init_module(void)
+int __init init_module(void)
 {
     int i, err;
     struct net_device *dev;
@@ -336,6 +354,9 @@ static int __init init_module(void)
         dev->stop            = network_close;
         dev->get_stats       = network_get_stats;
 
+        memset(dev->dev_addr, 0, ETH_ALEN);
+        *(unsigned int *)(dev->dev_addr + 1) = i;
+
         if ( (err = register_netdev(dev)) != 0 )
         {
             kfree(dev);
@@ -343,6 +364,7 @@ static int __init init_module(void)
         }
 
         np->dev = dev;
+        np->id = i;
         list_add(&np->list, &dev_list);
     }
 

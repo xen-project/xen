@@ -23,6 +23,7 @@ static unsigned char readbuf[1024];
 /* Helpers, implemented at the bottom. */
 u32 getipaddr(const char *buff, unsigned int len);
 u16 antous(const char *buff, int len);
+int anton(const char *buff, int len);
 
 static int vfr_read_proc(char *page, char **start, off_t off,
                                           int count, int *eof, void *data)
@@ -55,6 +56,9 @@ static int vfr_read_proc(char *page, char **start, off_t off,
  *
  */
 
+#define isspace(_x) ( ((_x)==' ')  || ((_x)=='\t') || ((_x)=='\v') || \
+		      ((_x)=='\f') || ((_x)=='\r') || ((_x)=='\n') )
+
 static int vfr_write_proc(struct file *file, const char *buffer,
                                            u_long count, void *data)
 {
@@ -69,12 +73,12 @@ static int vfr_write_proc(struct file *file, const char *buffer,
   memset(&op, 0, sizeof(network_op_t));
 
   // get the command:
-  while ( count && (buffer[ts] == ' ') ) { ts++; count--; } // skip spaces.
+  while ( count && isspace(buffer[ts]) ) { ts++; count--; } // skip spaces.
   te = ts;
-  while ( count && (buffer[te] != ' ') ) { te++; count--; } // command end
+  while ( count && !isspace(buffer[te]) ) { te++; count--; } // command end
   if ( te <= ts ) goto bad;
   tl = te - ts;
-
+  
   if ( strncmp(&buffer[ts], "ADD", tl) == 0 )
   {
      op.cmd = NETWORK_OP_ADDRULE;
@@ -118,71 +122,74 @@ static int vfr_write_proc(struct file *file, const char *buffer,
   while (count)
   {
     //get field
-    ts = te; while ( count && (buffer[ts] == ' ') ) { ts++; count--; }
+    ts = te; while ( count && isspace(buffer[ts]) ) { ts++; count--; }
     te = ts;
-    while ( count && (buffer[te] != ' ') && (buffer[te] != '=') ) 
+    while ( count && !isspace(buffer[te]) && (buffer[te] != '=') ) 
       { te++; count--; }
-    if ( te <= ts ) goto bad;
+    if ( te <= ts )
+	goto doneparsing;
     tl = te - ts;
     fs = ts; fe = te; fl = tl; // save the field markers.
     // skip "   =   " (ignores extra equals.)
-    while ( count && ((buffer[te] == ' ') || (buffer[te] == '=')) ) 
+    while ( count && (isspace(buffer[te]) || (buffer[te] == '=')) ) 
       { te++; count--; }
     ts = te;
-    while ( count && (buffer[te] != ' ') ) { te++; count--; }
+    while ( count && !isspace(buffer[te]) ) { te++; count--; }
     tl = te - ts;
 
     if ( (fl <= 0) || (tl <= 0) ) goto bad;
 
     if (strncmp(&buffer[fs], "srcaddr", fl) == 0) 
     {  
-      op.u.net_rule.src_addr = getipaddr(&buffer[ts], tl-1);
+      op.u.net_rule.src_addr = getipaddr(&buffer[ts], tl);
     }
     else if (strncmp(&buffer[fs], "dstaddr", fl) == 0)
     {    
-      op.u.net_rule.dst_addr = getipaddr(&buffer[ts], tl-1);
+      op.u.net_rule.dst_addr = getipaddr(&buffer[ts], tl);
     }
     else if (strncmp(&buffer[fs], "srcaddrmask", fl) == 0) 
     {
-      op.u.net_rule.src_addr_mask = getipaddr(&buffer[ts], tl-1);
+      op.u.net_rule.src_addr_mask = getipaddr(&buffer[ts], tl);
     }
     else if (strncmp(&buffer[fs], "dstaddrmask", fl) == 0)
     {
-      op.u.net_rule.dst_addr_mask = getipaddr(&buffer[ts], tl-1);
+      op.u.net_rule.dst_addr_mask = getipaddr(&buffer[ts], tl);
     }
     else if (strncmp(&buffer[fs], "srcport", fl) == 0)
     {
-      op.u.net_rule.src_port = antous(&buffer[ts], tl-1);
+      op.u.net_rule.src_port = antous(&buffer[ts], tl);
     }
     else if (strncmp(&buffer[fs], "dstport", fl) == 0)
     {
-      op.u.net_rule.dst_port = antous(&buffer[ts], tl-1);
+      op.u.net_rule.dst_port = antous(&buffer[ts], tl);
     }
     else if (strncmp(&buffer[fs], "srcportmask", fl) == 0)
     {
-      op.u.net_rule.src_port_mask = antous(&buffer[ts], tl-1);
+      op.u.net_rule.src_port_mask = antous(&buffer[ts], tl);
     }
     else if (strncmp(&buffer[fs], "dstportmask", fl) == 0)
     {
-      op.u.net_rule.dst_port_mask = antous(&buffer[ts], tl-1);
+      op.u.net_rule.dst_port_mask = antous(&buffer[ts], tl);
     }
     else if (strncmp(&buffer[fs], "srcint", fl) == 0)
     {
-      op.u.net_rule.src_interface = antous(&buffer[ts], tl-1);
+      op.u.net_rule.src_interface = anton(&buffer[ts], tl);
     }
     else if (strncmp(&buffer[fs], "dstint", fl) == 0)
     {
-      op.u.net_rule.dst_interface = antous(&buffer[ts], tl-1);
+      op.u.net_rule.dst_interface = anton(&buffer[ts], tl);
     }
     else if ( (strncmp(&buffer[fs], "proto", fl) == 0))
-    {
-      if (strncmp(&buffer[ts], "ip", tl))
+    {	
+      if (strncmp(&buffer[ts], "any", tl) == 0) 
+	  op.u.net_rule.proto = NETWORK_PROTO_ANY; 
+      if (strncmp(&buffer[ts], "ip", tl) == 0)
 	  op.u.net_rule.proto = NETWORK_PROTO_IP;
-      if (strncmp(&buffer[ts], "tcp", tl))
+      if (strncmp(&buffer[ts], "tcp", tl) == 0) 
 	  op.u.net_rule.proto = NETWORK_PROTO_TCP;
-      if (strncmp(&buffer[ts], "udp", tl))
+      if (strncmp(&buffer[ts], "udp", tl) == 0)
 	  op.u.net_rule.proto = NETWORK_PROTO_UDP;
-      if (strncmp(&buffer[ts], "arp", tl))
+      if (strncmp(&buffer[ts], "arp", tl) == 0)
 	  op.u.net_rule.proto = NETWORK_PROTO_ARP;
       
     }
@@ -225,9 +232,31 @@ module_exit(cleanup_module);
 
 /* Helper functions start here: */
 
+int anton(const char *buff, int len)
+{
+    int ret;
+    char c;
+    int sign = 1;
+    
+    ret = 0;
+
+    if (len == 0) return 0;
+    if (*buff == '-') { sign = -1; buff++; len--; }
+
+    while ( (len) && ((c = *buff) >= '0') && (c <= '9') )
+    {
+        ret *= 10;
+        ret += c - '0';
+        buff++; len--;
+    }
+
+    ret *= sign;
+    return ret;
+}
+    
 u16 antous(const char *buff, int len)
 {
-  int ret;
+  u16 ret;
   char c;
 
   ret = 0;

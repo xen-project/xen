@@ -410,6 +410,8 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     l1_pgentry_t *l1tab = NULL;
     struct pfn_info *page = NULL;
     net_ring_t *net_ring;
+    blk_ring_t *blk_ring;
+    net_vif_t *net_vif;
 
     if ( strncmp(__va(mod[0].mod_start), "XenoGues", 8) )
     {
@@ -574,7 +576,8 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
 
     /* Add virtual network interfaces and point to them in startinfo. */
     while (params->num_vifs-- > 0) {
-        net_ring = create_net_vif(dom);
+        net_vif = create_net_vif(dom);
+        net_ring = net_vif->net_ring;
         if (!net_ring) panic("no network ring!\n");
     }
 

@@ -196,6 +196,7 @@
 3ddb79c1yHLp08JhgPxIMcZ8DwN9hg xen-2.4.16/include/xeno/if.h
 3ddb79c1RCWOkWPQRzbYVTX_e-E7CA xen-2.4.16/include/xeno/if_ether.h
 3ddb79c2IYah7z7hkzPyOiG8szKkyw xen-2.4.16/include/xeno/if_packet.h
+3df0af1c-QrOEqpPHq4uL3NZzCeJCg xen-2.4.16/include/xeno/in.h
 3ddb79c0GurNF9tDWqQbAwJFH8ugfA xen-2.4.16/include/xeno/init.h
 3ddb79c1Vi5VleJAOKHAlY0G2zAsgw xen-2.4.16/include/xeno/interrupt.h
 3ddb79c2J6EnruiygRhBCgftzMzTeQ xen-2.4.16/include/xeno/ioctl.h

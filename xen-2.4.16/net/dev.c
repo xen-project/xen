@@ -687,7 +687,6 @@ int netif_rx(struct sk_buff *skb)
         unsigned long cpu_mask;
 #endif
         struct task_struct *p;
-        unsigned int dest_dom;
 	int this_cpu = smp_processor_id();
 	struct softnet_data *queue;
 	unsigned long flags;
@@ -704,57 +703,43 @@ int netif_rx(struct sk_buff *skb)
         
 	netdev_rx_stat[this_cpu].total++;
 
-        skb->h.raw = skb->nh.raw = skb->data;
-        
-        if ( skb->len < 2 ) goto drop;
-        switch ( ntohs(skb->mac.ethernet->h_proto) )
-        {
-        case ETH_P_ARP:
-            if ( skb->len < 28 ) goto drop;
-            dest_dom = ntohl(*(unsigned long *)
-                             (skb->nh.raw + 24));
-            break;
-        case ETH_P_IP:
-            if ( skb->len < 20 ) goto drop;
-            dest_dom = ntohl(*(unsigned long *)
-                             (skb->nh.raw + 16));
-            break;
-        default:
-            goto drop;
-        }
-        
-        if ( (dest_dom < opt_ipbase) ||
-             (dest_dom > (opt_ipbase + 16)) )
-            goto drop;
-        
-        dest_dom -= opt_ipbase;
-        
-        read_lock(&tasklist_lock);
-        p = &idle0_task;
-        do {
-            if ( p->domain != dest_dom ) continue;
-            skb_queue_tail(&p->net_vif_list[0]->skb_list, skb); // vfr will fix.
-            cpu_mask = mark_hyp_event(p, _HYP_EVENT_NET_RX);
-            read_unlock(&tasklist_lock);
-            goto found;
-        }
-        while ( (p = p->next_task) != &idle0_task );
-        read_unlock(&tasklist_lock);
-        goto drop;
+        if (skb->src_vif == VIF_UNKNOWN_INTERFACE)
+            skb->src_vif = VIF_PHYSICAL_INTERFACE;
 
- found:
-#if 0
-        __skb_queue_tail(&queue->input_pkt_queue,skb);
-        /* Runs from irqs or BH's, no need to wake BH */
-        cpu_raise_softirq(this_cpu, NET_RX_SOFTIRQ);
-        local_irq_restore(flags);
-        get_sample_stats(this_cpu);
-        return softnet_data[this_cpu].cng_level;
-#else
-        hyp_event_notify(cpu_mask);
-        local_irq_restore(flags);
-        return 0;
-#endif
+        if (skb->dst_vif == VIF_UNKNOWN_INTERFACE)
+            net_get_target_vif(skb);
+        
+        if (sys_vif_list[skb->dst_vif] == NULL)
+        {
+            // the target vif does not exist.
+            goto drop;
+        }
+
+        /* This lock-and-walk of the task list isn't really necessary, and is an
+         * artifact of the old code.  The vif contains a pointer to the skb list 
+         * we are going to queue the packet in, so the lock and the inner loop
+         * could be removed.
+         *
+         * The argument against this is a possible race in which a domain is killed
+         * as packets are being delivered to it.  This would result in the dest vif
+         * vanishing before we can deliver to it.
+         */
+        
+        if ( skb->dst_vif >= VIF_PHYSICAL_INTERFACE )
+        {
+            read_lock(&tasklist_lock);
+            p = &idle0_task;
+            do {
+                if ( p->domain != sys_vif_list[skb->dst_vif]->domain ) continue;
+                skb_queue_tail(&sys_vif_list[skb->dst_vif]->skb_list, skb);
+                cpu_mask = mark_hyp_event(p, _HYP_EVENT_NET_RX);
+                read_unlock(&tasklist_lock);
+                goto found;
+            }
+            while ( (p = p->next_task) != &idle0_task );
+            read_unlock(&tasklist_lock); 
+            goto drop;
+        }
 
 drop:
 	netdev_rx_stat[this_cpu].dropped++;
@@ -762,6 +747,11 @@ drop:
 
 	kfree_skb(skb);
 	return NET_RX_DROP;
+
+found:
+        hyp_event_notify(cpu_mask);
+        local_irq_restore(flags);
+        return 0;
 }
 
 /* Deliver skb to an old protocol, which is not threaded well
@@ -890,6 +880,18 @@ void flush_rx_queue(void)
     unsigned int i, nvif;
     rx_entry_t rx;
 
+    /* I have changed this to batch flush all vifs for a guest
+     * at once, whenever this is called.  Since the guest is about to be
+     * scheduled and issued an RX interrupt for one nic, it might as well
+     * receive all pending traffic  although it will still only get
+     * interrupts about rings that pass the event marker.  
+     *
+     * If this doesn't make sense, _HYP_EVENT_NET_RX can be modified to
+     * represent individual interrups as _EVENT_NET_RX and the outer for
+     * loop can be replaced with a translation to the specific NET 
+     * interrupt to serve. --akw
+     */
+    
     clear_bit(_HYP_EVENT_NET_RX, &current->hyp_events);
 
     for (nvif = 0; nvif < current->num_net_vifs; nvif++)
@@ -903,10 +905,18 @@ void flush_rx_queue(void)
              * of the ethernet packet. Furthermore, do the same for ARP
              * reply packets. This is easy because the virtual MAC address
              * is always 00-00-00-00-00-00.
+             *
+             * Actually, the MAC address is now all zeros, except for the
+             * second sixteen bits, which are the per-host vif id.
+             * (so eth0 should be 00-00-..., eth1 is 00-01-...)
              */
             memset(skb->mac.ethernet->h_dest, 0, ETH_ALEN);
+            *(unsigned int *)(skb->mac.ethernet->h_dest + 1) = nvif;
             if ( ntohs(skb->mac.ethernet->h_proto) == ETH_P_ARP )
+            {
                 memset(skb->nh.raw + 18, 0, ETH_ALEN);
+                *(unsigned int *)(skb->nh.raw + 18 + 1) = nvif;
+            }
 
             i = net_ring->rx_cons;
             if ( i != net_ring->rx_prod )
@@ -920,7 +930,7 @@ void flush_rx_queue(void)
                 }
                 net_ring->rx_cons = (i+1) & (RX_RING_SIZE-1);
                 if ( net_ring->rx_cons == net_ring->rx_event )
-                    set_bit(_EVENT_NET_RX, &s->events);
+                    set_bit(_EVENT_NET_RX_FOR_VIF(nvif), &s->events);
             }
             kfree_skb(skb);
         }
@@ -1912,20 +1922,22 @@ long do_net_update(void)
 {
     shared_info_t *shared = current->shared_info;    
     net_ring_t *net_ring = current->net_ring_base;
+    net_vif_t *current_vif;
     unsigned int i, j;
     struct sk_buff *skb;
     tx_entry_t tx;
 
     for ( j = 0; j < current->num_net_vifs; j++)
     {
-        net_ring = current->net_vif_list[j]->net_ring;
+        current_vif = current->net_vif_list[j];
+        net_ring = current_vif->net_ring;
         for ( i = net_ring->tx_cons; i != net_ring->tx_prod; i = TX_RING_INC(i) )
         {
             if ( copy_from_user(&tx, net_ring->tx_ring+i, sizeof(tx)) )
                 continue;
 
             if ( TX_RING_INC(i) == net_ring->tx_event )
-                set_bit(_EVENT_NET_TX, &shared->events);
+                set_bit(_EVENT_NET_TX_FOR_VIF(j), &shared->events);
 
             skb = alloc_skb(tx.size, GFP_KERNEL);
             if ( skb == NULL ) continue;
@@ -1965,17 +1977,25 @@ long do_net_update(void)
             {
                 skb_get(skb); /* get a reference for non-local delivery */
                 skb->protocol = eth_type_trans(skb, skb->dev);
-                if ( netif_rx(skb) == 0 )
+                skb->src_vif = current_vif->id; 
+                net_get_target_vif(skb);
+                if ( skb->dst_vif > VIF_PHYSICAL_INTERFACE )
                 {
-                    /* Give up non-local reference. Packet delivered locally. */
-                    kfree_skb(skb);
+                    if (netif_rx(skb) == 0)
+                        /* Give up non-local reference. Packet delivered locally. */
+                        kfree_skb(skb);
                 }
+                else if ( skb->dst_vif == VIF_PHYSICAL_INTERFACE )
+                {
+
+                        skb_push(skb, skb->dev->hard_header_len);
+                        dev_queue_xmit(skb);
+                } 
                 else
                 {
-                    /* Pass the non-local reference to the net device. */
-                    skb_push(skb, skb->dev->hard_header_len);
-                    dev_queue_xmit(skb);
+                    kfree_skb(skb);
                 }
+
             }
         }
         net_ring->tx_cons = i;

@@ -176,6 +176,7 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
     /* Create initial domain 0. */
     dom0_params.num_vifs  = 1;
     dom0_params.memory_kb = opt_dom0_mem;
+    add_default_net_rule(0, opt_ipbase); // add vfr info for dom0
 
     new_dom = do_newdomain();
     if ( new_dom == NULL ) panic("Error creating domain 0\n");

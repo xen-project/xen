@@ -52,7 +52,7 @@ typedef struct net_ring_st {
 } net_ring_t;
 
 /* Specify base of per-domain array. Get returned free slot in the array. */
-net_ring_t *create_net_vif(int domain);
+//net_ring_t *create_net_vif(int domain);
 
 /* Packet routing/filtering code follows:
  */
@@ -60,10 +60,11 @@ net_ring_t *create_net_vif(int domain);
 #define NETWORK_ACTION_ACCEPT   0
 #define NETWORK_ACTION_COUNT    1
 
-#define NETWORK_PROTO_IP        0
-#define NETWORK_PROTO_TCP       1
-#define NETWORK_PROTO_UDP       2
-#define NETWORK_PROTO_ARP       3
+#define NETWORK_PROTO_ANY       0
+#define NETWORK_PROTO_IP        1
+#define NETWORK_PROTO_TCP       2
+#define NETWORK_PROTO_UDP       3
+#define NETWORK_PROTO_ARP       4
 
 typedef struct net_rule_st 
 {
@@ -77,8 +78,8 @@ typedef struct net_rule_st
     u16  dst_port_mask;
     u16  proto;
     
-    u16  src_interface;
-    u16 dst_interface;
+    int  src_interface;
+    int  dst_interface;
     u16  action;
 } net_rule_t;
 
