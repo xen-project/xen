@@ -40,7 +40,7 @@ rpm: all
 	mv staging/i386/*.rpm .
 	rm -rf staging
 
-xi_save_linux xi_restore_linux: %: %.c $(HDRS) Makefile
+xi_build xi_save_linux xi_restore_linux: %: %.c $(HDRS) Makefile
 	$(CC) $(CFLAGS) -lz -o $@ $<
 
 %: %.c $(HDRS) Makefile

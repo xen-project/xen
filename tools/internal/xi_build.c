@@ -2,6 +2,8 @@
 #include "dom0_defs.h"
 #include "mem_defs.h"
 
+#include <zlib.h>
+
 /* This string is written to the head of every guest kernel image. */
 #define GUEST_SIG   "XenoGues"
 #define SIG_LEN    8
@@ -69,29 +71,12 @@ static int send_pgupdates(mmu_update_t *updates, int nr_updates)
 }
 
 /* Read the kernel header, extracting the image size and load address. */
-static int read_kernel_header(int fd, long dom_size, 
-                              unsigned long * load_addr, size_t * ksize)
+static int read_kernel_header(gzFile gfd, long dom_size, 
+                              unsigned long *load_addr)
 {
-    char signature[8];
-    char status[1024];
-    struct stat stat;
-    
-    if ( fstat(fd, &stat) < 0 )
-    {
-        PERROR("Cannot stat the kernel image");
-        return -1;
-    }
+    char signature[SIG_LEN];
 
-    /* Double the kernel image size to account for dynamic memory usage etc. */
-    if ( (stat.st_size * 2) > (dom_size << 10) )
-    {
-        sprintf(status, "Kernel image size %ld larger than requested "
-                "domain size %ld\n Terminated.\n", stat.st_size, dom_size);
-        ERROR(status);
-        return -1;
-    }
-    
-    read(fd, signature, SIG_LEN);
+    gzread(gfd, signature, SIG_LEN);
     if ( strncmp(signature, GUEST_SIG, SIG_LEN) )
     {
         ERROR("Kernel image does not contain required signature.\n"
@@ -100,21 +85,7 @@ static int read_kernel_header(int fd, long dom_size,
     }
 
     /* Read the load address which immediately follows the Xeno signature. */
-    read(fd, load_addr, sizeof(unsigned long));
-
-    if ( (*load_addr & (PAGE_SIZE-1)) != 0 )
-    {
-        ERROR("We can only deal with page-aligned load addresses");
-        return -1;
-    }
-
-    if ( (*load_addr + (dom_size << 10)) > HYPERVISOR_VIRT_START )
-    {
-        ERROR("Cannot map all domain memory without hitting Xen space");
-        return -1;
-    }
-
-    *ksize = stat.st_size - SIG_LEN - sizeof(unsigned long);
+    gzread(gfd, load_addr, sizeof(unsigned long));
 
     return 0;
 }
@@ -159,8 +130,8 @@ static int copy_to_domain_page(unsigned long dst_pfn, void *src_page)
 }
 
 static int setup_guestos(
-    int dom, int kernel_fd, int initrd_fd, unsigned long tot_pages,
-    unsigned long virt_load_addr, size_t ksize, 
+    int dom, gzFile kernel_gfd, int initrd_fd, unsigned long tot_pages,
+    unsigned long virt_load_addr, 
     dom0_builddomain_t *builddomain, int argc, char **argv, int args_start,
     unsigned long shared_info_frame)
 {
@@ -177,6 +148,7 @@ static int setup_guestos(
     start_info_t *start_info;
     shared_info_t *shared_info;
     int cmd_len;
+    unsigned long ksize;
 
     memset(builddomain, 0, sizeof(*builddomain));
 
@@ -198,19 +170,27 @@ static int setup_guestos(
         goto error_out;
     }
 
-    /* Load the guest OS image. */
-    for ( i = 0; i < ksize; i += PAGE_SIZE )
+    /* Load the guest OS image. Let it take no more than 1/2 memory.*/
+    for ( i = 0; i < ((tot_pages/2)*PAGE_SIZE); i += PAGE_SIZE )
     {
         char page[PAGE_SIZE];
-        int size = ((ksize-i) < PAGE_SIZE) ? (ksize-i) : PAGE_SIZE;
-        if ( read(kernel_fd, page, size) != size )
+        int size;
+        if ( (size = gzread(kernel_gfd, page, PAGE_SIZE)) == -1 )
         {
             PERROR("Error reading kernel image, could not"
                    " read the whole image.");
             goto error_out;
-        } 
+        }
+        if ( size == 0 )
+            goto kernel_copied;
         copy_to_domain_page(page_array[i>>PAGE_SHIFT], page);
     }
+    ERROR("Kernel too big to safely fit in domain memory");
+    goto error_out;
+
+ kernel_copied:
+    /* ksize is kernel-image size rounded up to a page boundary. */
+    ksize = i;
 
     /* Load the initial ramdisk image. */
     if ( initrd_fd >= 0 )
@@ -224,17 +204,16 @@ static int setup_guestos(
             goto error_out;
         }
         isize = stat.st_size;
-        if ( ((isize + ksize) * 2) > (tot_pages << PAGE_SHIFT) )
+        if ( (isize + ksize) > ((tot_pages/2) * PAGE_SIZE) )
         {
             ERROR("Kernel + initrd too big to safely fit in domain memory");
             goto error_out;
         }
 
-        /* 'i' is 'ksize' rounded up to a page boundary. */
-        initrd_addr = virt_load_addr + i;
+        initrd_addr = virt_load_addr + ksize;
         initrd_len  = isize;
 
-        for ( j = 0; j < isize; j += PAGE_SIZE, i += PAGE_SIZE )
+        for ( j = 0, i = ksize; j < isize; j += PAGE_SIZE, i += PAGE_SIZE )
         {
             char page[PAGE_SIZE];
             int size = ((isize-j) < PAGE_SIZE) ? (isize-j) : PAGE_SIZE;
@@ -376,15 +355,11 @@ static int setup_guestos(
 
 int main(int argc, char **argv)
 {
-    /*
-     * NB. 'ksize' is the size in bytes of the main kernel image. It excludes
-     * the 8-byte signature and 4-byte load address.
-     */
-    size_t ksize;
     dom0_op_t launch_op, op;
     unsigned long load_addr;
     long tot_pages;
     int kernel_fd, initrd_fd = -1;
+    gzFile kernel_gfd;
     int args_start = 4;
     char initrd_name[1024];
     int domain_id;
@@ -421,12 +396,30 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    rc = read_kernel_header(kernel_fd,
+    if ( (kernel_gfd = gzdopen(kernel_fd, "rb")) == NULL )
+    {
+        PERROR("Could not allocate decompression state for state file");
+        return 1;
+    }
+
+    rc = read_kernel_header(kernel_gfd,
                             tot_pages << (PAGE_SHIFT - 10), 
-                            &load_addr, &ksize);
+                            &load_addr);
     if ( rc < 0 )
         return 1;
     
+    if ( (load_addr & (PAGE_SIZE-1)) != 0 )
+    {
+        ERROR("We can only deal with page-aligned load addresses");
+        return -1;
+    }
+
+    if ( (load_addr + (tot_pages << PAGE_SHIFT)) > HYPERVISOR_VIRT_START )
+    {
+        ERROR("Cannot map all domain memory without hitting Xen space");
+        return -1;
+    }
+
     if( (argc > args_start) && 
         (strncmp("initrd=", argv[args_start], 7) == 0) )
     {
@@ -457,8 +450,8 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    if ( setup_guestos(domain_id, kernel_fd, initrd_fd, tot_pages,
-                       load_addr, ksize, &launch_op.u.builddomain,
+    if ( setup_guestos(domain_id, kernel_gfd, initrd_fd, tot_pages,
+                       load_addr, &launch_op.u.builddomain,
                        argc, argv, args_start, 
                        op.u.getdomaininfo.shared_info_frame) < 0 )
     {
@@ -468,7 +461,7 @@ int main(int argc, char **argv)
 
     if ( initrd_fd >= 0 )
         close(initrd_fd);
-    close(kernel_fd);
+    gzclose(kernel_gfd);
 
     ctxt = &launch_op.u.builddomain.ctxt;
 
