@@ -30,7 +30,7 @@ struct mm_struct {
     l1_pgentry_t *perdomain_pt;
     pagetable_t  pagetable;
     /* Current LDT details. */
-    unsigned long ldt_base, ldt_ents;
+    unsigned long ldt_base, ldt_ents, shadow_ldt_mapcnt;
     /* Next entry is passed to LGDT on domain switch. */
     char gdt[6];
 };

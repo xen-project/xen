@@ -259,13 +259,13 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
 
     __asm__ __volatile__ ("movl %%cr2,%0" : "=r" (addr) : );
 
-    if ( unlikely(!(regs->xcs & 3)) )
-        goto fault_in_hypervisor;
-
     if ( unlikely(addr > PAGE_OFFSET) )
         goto fault_in_xen_space;
 
  bounce_fault:
+
+    if ( unlikely(!(regs->xcs & 3)) )
+        goto fault_in_hypervisor;
 
     ti = p->thread.traps + 14;
     gtb->flags = GTBF_TRAP_CR2; /* page fault pushes %cr2 */
@@ -275,7 +275,12 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
     gtb->eip        = ti->address;
     return; 
 
-
+    /*
+     * FAULT IN XEN ADDRESS SPACE:
+     *  We only deal with one kind -- a fault in the shadow LDT mapping.
+     *  If this occurs we pull a mapping from the guest's LDT, if it is
+     *  valid. Otherwise we send the fault up to the guest OS to be handled.
+     */
  fault_in_xen_space:
 
     if ( (addr < LDT_VIRT_START) || 
@@ -316,9 +321,11 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
         page->flags |= PGT_ldt_page;
     }
 
+    /* Success! */
     get_page_type(page);
     get_page_tot(page);
     p->mm.perdomain_pt[l1_table_offset(off)+16] = mk_l1_pgentry(l1e|_PAGE_RW);
+    p->mm.shadow_ldt_mapcnt++;
 
     spin_unlock(&p->page_lock);
     return;
