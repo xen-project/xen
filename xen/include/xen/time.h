@@ -54,9 +54,9 @@ s_time_t get_s_time(void);
 #define MILLISECS(_ms)  (((s_time_t)(_ms)) * 1000000ULL )
 #define MICROSECS(_us)  (((s_time_t)(_us)) * 1000ULL )
 
-extern int update_dom_time(struct exec_domain *ed);
-extern void do_settime(unsigned long secs, unsigned long usecs, 
-                       u64 system_time_base);
+extern void update_dom_time(struct exec_domain *ed);
+extern void do_settime(
+    unsigned long secs, unsigned long usecs, u64 system_time_base);
 
 #endif /* __XEN_TIME_H__ */
 

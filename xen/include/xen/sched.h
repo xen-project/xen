@@ -73,6 +73,7 @@ struct exec_domain
 #endif
 
     struct ac_timer  timer;         /* one-shot timer for timeout values */
+    unsigned long    sleep_tick;    /* tick at which this vcpu started sleep */
 
     s_time_t         lastschd;      /* time this domain was last scheduled */
     s_time_t         lastdeschd;    /* time this domain was last descheduled */
