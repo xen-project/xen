@@ -481,11 +481,8 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 	asm volatile("movl %%gs,%0":"=m" (*(int *)&prev->gs));
 
 	/*
-	 * We clobber FS and GS here so that we avoid a GPF when
-	 * restoring previous task's FS/GS values in Xen when the LDT
-	 * is switched. If we don't do this then we can end up
-	 * erroneously re-flushing the page-update queue when we
-	 * 'execute_multicall_list'.
+	 * We clobber FS and GS here so that we avoid a GPF when restoring
+	 * previous task's FS/GS values in Xen when the LDT is switched.
 	 */
 	__asm__ __volatile__ ( 
 		"xorl %%eax,%%eax; movl %%eax,%%fs; movl %%eax,%%gs" : : :
@@ -501,7 +498,7 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 	 * synchronously trapping to Xen.
 	 */
 	if (prev_p->thread_info->status & TS_USEDFPU) {
-		save_init_fpu(prev_p);
+		__save_init_fpu(prev_p); /* _not_ save_init_fpu() */
 		queue_multicall0(__HYPERVISOR_fpu_taskswitch);
 	}
 
@@ -510,12 +507,6 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 	 * This is load_esp0(tss, next) with a multicall.
 	 */
 	tss->esp0 = next->esp0;
-	/* This can only happen when SEP is enabled, no need to test
-	 * "SEP"arately */
-	if (unlikely(tss->ss1 != next->sysenter_cs)) {
-		tss->ss1 = next->sysenter_cs;
-		wrmsr(MSR_IA32_SYSENTER_CS, next->sysenter_cs, 0);
-	}
 	queue_multicall2(__HYPERVISOR_stack_switch, tss->ss0, tss->esp0);
 
 	/*
@@ -549,7 +540,7 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 	/*
 	 * Restore %fs and %gs if needed.
 	 */
-	if (unlikely(prev->fs | prev->gs | next->fs | next->gs)) {
+	if (unlikely(next->fs | next->gs)) {
 		loadsegment(fs, next->fs);
 		loadsegment(gs, next->gs);
 	}
