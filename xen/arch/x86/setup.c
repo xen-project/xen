@@ -598,10 +598,6 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     early_boot = 0;
 
-    /* Initialise the slab allocator. */
-    xmem_cache_init();
-    xmem_cache_sizes_init(max_page);
-
     start_of_day();
 
     grant_table_init();

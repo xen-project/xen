@@ -403,9 +403,8 @@ unsigned long alloc_xenheap_pages(unsigned int order)
 {
     unsigned long flags;
     struct pfn_info *pg;
-    int i, attempts = 0;
+    int i;
 
- retry:
     local_irq_save(flags);
     pg = alloc_heap_pages(MEMZONE_XEN, order);
     local_irq_restore(flags);
@@ -425,14 +424,7 @@ unsigned long alloc_xenheap_pages(unsigned int order)
     return (unsigned long)page_to_virt(pg);
 
  no_memory:
-    if ( attempts++ < 8 )
-    {
-        xmem_cache_reap();
-        goto retry;
-    }
-
     printk("Cannot handle page request order %d!\n", order);
-    dump_slabinfo();
     return 0;
 }
 
