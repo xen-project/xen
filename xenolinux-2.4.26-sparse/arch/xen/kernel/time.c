@@ -583,9 +583,9 @@ static void dbg_time_int(int irq, void *dev_id, struct pt_regs *ptregs)
     printk(KERN_ALERT "time: processed_system_time=0x%X:%08X\n",
            (u32)(processed_system_time>>32), (u32)processed_system_time);
 
-
+#ifdef CONFIG_MAGIC_SYSRQ
     handle_sysrq('t',NULL,NULL,NULL);
-
+#endif
 }
 
 static struct irqaction dbg_time = {
