@@ -181,7 +181,7 @@ restore_all_guest:
 	pushl %edx
 	pushl %ecx
 	pushl %ebx
-7:      SET_XEN_SEGMENTS
+7:      SET_XEN_SEGMENTS(a)
         jmp failsafe_callback
 .previous
 .section __ex_table,"a"
@@ -239,7 +239,7 @@ restore_all_xen:
         ALIGN
 ENTRY(hypercall)
         pushl %eax			# save orig_eax
-	SAVE_ALL
+	SAVE_ALL(b)
         sti
         GET_CURRENT(%ebx)
 	andl $(NR_hypercalls-1),%eax
@@ -351,7 +351,7 @@ FAULT12:movl %eax,%gs:8(%esi)
 .section .fixup,"ax"
 crash_domain_fixup1:
         subl  $4,%esp
-        SAVE_ALL
+        SAVE_ALL(a)
         sti
         jmp   domain_crash
 crash_domain_fixup2:
@@ -410,7 +410,7 @@ error_code:
         movl %es,XREGS_es(%esp)
         movl %fs,XREGS_fs(%esp)
         movl %gs,XREGS_gs(%esp)
-1:      SET_XEN_SEGMENTS
+1:      SET_XEN_SEGMENTS(b)
 	movl  XREGS_orig_eax(%esp),%esi		# get the error code
 	movl  XREGS_eax(%esp),%edi		# get the function address
 	movl  %eax,XREGS_eax(%esp)
@@ -508,7 +508,7 @@ ENTRY(nmi)
         # Save state but do not trash the segment registers!
         # We may otherwise be unable to reload them or copy them to ring 1. 
 	pushl %eax
-	SAVE_ALL_NOSEGREGS
+	SAVE_ALL_NOSEGREGS(a)
 
         # Check for hardware problems.
         inb   $0x61,%al

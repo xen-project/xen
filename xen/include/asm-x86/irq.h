@@ -92,7 +92,7 @@ __asm__( \
 "\n"__ALIGN_STR"\n" \
 SYMBOL_NAME_STR(x) ":\n\t" \
 	"push"__OS" $"#v"\n\t" \
-	SAVE_ALL \
+	SAVE_ALL(a) \
 	SYMBOL_NAME_STR(call_##x)":\n\t" \
 	"call "SYMBOL_NAME_STR(smp_##x)"\n\t" \
 	"jmp ret_from_intr\n");
@@ -105,7 +105,7 @@ __asm__( \
 "\n"__ALIGN_STR"\n" \
 SYMBOL_NAME_STR(x) ":\n\t" \
 	"push"__OS" $"#v"\n\t" \
-	SAVE_ALL \
+	SAVE_ALL(a) \
 	"mov %"__OP"sp,%"__OP"ax\n\t" \
 	"push %"__OP"ax\n\t" \
 	SYMBOL_NAME_STR(call_##x)":\n\t" \
@@ -118,7 +118,7 @@ asmlinkage void call_do_IRQ(void); \
 __asm__( \
 	"\n" __ALIGN_STR"\n" \
 	"common_interrupt:\n\t" \
-	SAVE_ALL \
+	SAVE_ALL(a) \
 	SYMBOL_NAME_STR(call_do_IRQ)":\n\t" \
 	"call " SYMBOL_NAME_STR(do_IRQ) "\n\t" \
 	"jmp ret_from_intr\n");
