@@ -28,6 +28,9 @@ integer_param("dom0_mem", opt_dom0_mem);
 static unsigned int opt_dom0_shadow = 0;
 boolean_param("dom0_shadow", opt_dom0_shadow);
 
+static unsigned int opt_dom0_translate = 0;
+boolean_param("dom0_translate", opt_dom0_translate);
+
 #if defined(__i386__)
 /* No ring-3 access in initial leaf page tables. */
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED)
@@ -83,8 +86,6 @@ int construct_dom0(struct domain *d,
 #endif
     l2_pgentry_t *l2tab = NULL, *l2start = NULL;
     l1_pgentry_t *l1tab = NULL, *l1start = NULL;
-
-    int translate_dom0 = 1; // HACK ALERT !!  Force dom0 to run in shadow translate mode
 
     /*
      * This fully describes the memory layout of the initial domain. All 
@@ -445,7 +446,7 @@ int construct_dom0(struct domain *d,
             _initrd_start, (_initrd_start+initrd_len+PAGE_SIZE-1) & PAGE_MASK);
     }
 
-    d->next_io_page = d->max_pages;
+    d->next_io_page = max_page;
 
     /* Set up start info area. */
     si = (start_info_t *)vstartinfo_start;
@@ -535,12 +536,12 @@ int construct_dom0(struct domain *d,
 
     new_thread(ed, dsi.v_kernentry, vstack_end, vstartinfo_start);
 
-    if ( opt_dom0_shadow || translate_dom0 )
+    if ( opt_dom0_shadow || opt_dom0_translate )
     {
-        shadow_mode_enable(d, (translate_dom0
+        shadow_mode_enable(d, (opt_dom0_translate
                                ? SHM_enable | SHM_translate
                                : SHM_enable));
-        if ( translate_dom0 )
+        if ( opt_dom0_translate )
         {
             // map this domain's p2m table into current page table,
             // so that we can easily access it.
