@@ -49,6 +49,7 @@ unsigned long cpu_khz;  /* Detected as we calibrate the TSC */
 unsigned long ticks_per_usec; /* TSC ticks per microsecond. */
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 int timer_ack = 0;
+int do_timer_lists_from_pit = 0;
 
 /* PRIVATE */
 
@@ -92,8 +93,11 @@ static inline void do_timer_interrupt(
         spin_unlock(&i8259A_lock);
     }
 #endif
+
     do_timer(regs);
-    do_ac_timer();
+
+    if ( do_timer_lists_from_pit )
+        do_ac_timer();
 }
 
 /*

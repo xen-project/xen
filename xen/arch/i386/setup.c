@@ -330,6 +330,7 @@ void __init start_of_day(void)
     extern void initialize_serial(void);
     extern void initialize_keyboard(void);
     extern int opt_nosmp, opt_watchdog;
+    extern int do_timer_lists_from_pit;
     unsigned long low_mem_size;
     
     if ( opt_watchdog ) 
@@ -388,6 +389,8 @@ void __init start_of_day(void)
         disable_pit();
     else if ( smp_num_cpus != 1 )
         panic("We really need local APICs on SMP machines!");
+    else
+        do_timer_lists_from_pit = 1;
 
     ac_timer_init();    /* init accurate timers */
     init_xeno_time();	/* initialise the time */

@@ -85,7 +85,9 @@ static int pcnet32vlb;	 /* check for VLB cards ? */
 static struct net_device *pcnet32_dev;
 
 static int max_interrupt_work = 80;
+#ifdef COPYBREAK
 static int rx_copybreak = 200;
+#endif
 
 #define PCNET32_PORT_AUI      0x00
 #define PCNET32_PORT_10BT     0x01
@@ -1315,7 +1317,11 @@ pcnet32_rx(struct net_device *dev)
 	    } else {
 		int rx_in_place = 0;
 
+#ifdef COPYBREAK
 		if (pkt_len > rx_copybreak) {
+#else
+		{
+#endif
 		    struct sk_buff *newskb;
 				
 		    if ((newskb = dev_alloc_skb (PKT_BUF_SZ))) {
@@ -1332,9 +1338,12 @@ pcnet32_rx(struct net_device *dev)
 			rx_in_place = 1;
 		    } else
 			skb = NULL;
-		} else {
+		} 
+#ifdef COPYBREAK
+		else {
 		    skb = dev_alloc_skb(pkt_len+2);
-                }
+		}
+#endif
 			    
 		if (skb == NULL) {
                     int i;
@@ -1351,6 +1360,7 @@ pcnet32_rx(struct net_device *dev)
 		    break;
 		}
 		skb->dev = dev;
+#ifdef COPYBREAK
 		if (!rx_in_place) {
 		    skb_reserve(skb,2); /* 16 byte align */
 		    skb_put(skb,pkt_len);	/* Make room */
@@ -1358,6 +1368,7 @@ pcnet32_rx(struct net_device *dev)
 				     (unsigned char *)(lp->rx_skbuff[entry]->tail),
 				     pkt_len,0);
 		}
+#endif
 		lp->stats.rx_bytes += skb->len;
 		skb->protocol=eth_type_trans(skb,dev);
 		netif_rx(skb);
@@ -1676,8 +1687,10 @@ MODULE_PARM(debug, "i");
 MODULE_PARM_DESC(debug, DRV_NAME " debug level (0-6)");
 MODULE_PARM(max_interrupt_work, "i");
 MODULE_PARM_DESC(max_interrupt_work, DRV_NAME " maximum events handled per interrupt");  
+#ifdef COPYBREAK
 MODULE_PARM(rx_copybreak, "i");
 MODULE_PARM_DESC(rx_copybreak, DRV_NAME " copy breakpoint for copy-only-tiny-frames"); 
+#endif
 MODULE_PARM(tx_start_pt, "i");
 MODULE_PARM_DESC(tx_start_pt, DRV_NAME " transmit start point (0-3)"); 
 MODULE_PARM(pcnet32vlb, "i");

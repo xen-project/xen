@@ -168,6 +168,7 @@ static int tulip_rx(struct net_device *dev)
                         if (drop)
                                 goto throttle;
 #endif
+#ifdef COPYBREAK
 			/* Check if the packet is long enough to accept without copying
 			   to a minimally-sized skbuff. */
 			if (pkt_len < tulip_rx_copybreak
@@ -187,6 +188,9 @@ static int tulip_rx(struct net_device *dev)
 				       pkt_len);
 #endif
 			} else { 	/* Pass up the skb already on the Rx ring. */
+#else
+			{
+#endif /* COPYBREAK */
 				char *temp = skb_put(skb = tp->rx_buffers[entry].skb,
 						     pkt_len);
 
