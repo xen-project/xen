@@ -45,9 +45,9 @@ static struct gendisk *setup_major(xen_disk_info_t *xdi, int base, int major)
     struct gendisk *gd;
 
     blk_size[major]      = NULL;
-    blksize_size[major]  = xlide_blksize_size + base*XLIDE_DEVS_PER_MAJOR;
-    hardsect_size[major] = xlide_hardsect_size + base*XLIDE_DEVS_PER_MAJOR;
-    max_sectors[major]   = xlide_max_sectors + base*XLIDE_DEVS_PER_MAJOR;
+    blksize_size[major]  = xlide_blksize_size + base*(1<<XLIDE_PARTN_SHIFT);
+    hardsect_size[major] = xlide_hardsect_size + base*(1<<XLIDE_PARTN_SHIFT);
+    max_sectors[major]   = xlide_max_sectors + base*(1<<XLIDE_PARTN_SHIFT);
     read_ahead[major]    = 8;
 
     blk_init_queue(BLK_DEFAULT_QUEUE(major), do_xlblk_request);
@@ -134,7 +134,7 @@ int xlide_init(xen_disk_info_t *xdi)
     for ( i = 0; i < xdi->count; i++ )
         if ( IS_IDE_XENDEV(xdi->disks[i].device) &&
              ((xdi->disks[i].device & XENDEV_IDX_MASK) <
-              XLIDE_DEVS_PER_MAJOR) ) 
+              (2*XLIDE_DEVS_PER_MAJOR)) ) 
             units++;
     if ( units == 0 ) return 0;
 
