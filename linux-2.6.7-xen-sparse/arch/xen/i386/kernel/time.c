@@ -199,7 +199,7 @@ void do_gettimeofday(struct timeval *tv)
 		else if (unlikely(lost))
 			usec += lost * (USEC_PER_SEC / HZ);
 
-		usec += (unsigned long)((shadow_system_time -
+		usec += ((unsigned long)(shadow_system_time -
 			processed_system_time) / NSEC_PER_USEC);
 
 		sec = xtime.tv_sec;
