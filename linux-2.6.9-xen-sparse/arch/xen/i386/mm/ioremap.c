@@ -36,6 +36,23 @@ void __init bt_iounmap(void *addr, unsigned long size)
 
 #else
 
+/*
+ * Is @address within a RAM page that is local to this virtual machine (i.e.,
+ * not an I/O page; not a RAM page belonging to another VM). See the comment
+ * that accompanies pte_pfn() in pgtable-2level.h to understand why this works.
+ */
+static inline int is_local_ram(unsigned long address)
+{
+	unsigned long mfn = address >> PAGE_SHIFT;
+	unsigned long pfn = mfn_to_pfn(mfn);
+	if (pfn < max_mapnr) {
+		if (pfn_to_mfn(pfn) == mfn)
+			return 1; /* local ram */
+		printk("is_local_ram: ioremapping foreign ram (a bad idea).\n");
+	}
+	return 0; /* i/o memory or foreign ram */
+}
+
 static inline void remap_area_pte(pte_t * pte, unsigned long address, unsigned long size,
 	unsigned long phys_addr, unsigned long flags)
 {
@@ -140,19 +157,16 @@ void __iomem * __ioremap(unsigned long phys_addr, unsigned long size, unsigned l
 	if (!size || last_addr < phys_addr)
 		return NULL;
 
-        if (phys_addr >= 0x0 && last_addr < 0x100000)
-                return isa_bus_to_virt(phys_addr);
-
 	/*
 	 * Don't remap the low PCI/ISA area, it's always mapped..
 	 */
-	if (phys_addr >= 0xA0000 && last_addr < 0x100000)
-		return (void __iomem *) phys_to_virt(phys_addr);
+	if (phys_addr >= 0x0 && last_addr < 0x100000)
+		return isa_bus_to_virt(phys_addr);
 
 	/*
 	 * Don't allow anybody to remap normal RAM that we're using..
 	 */
-	if (machine_to_phys(phys_addr) < virt_to_phys(high_memory)) {
+	if (is_local_ram(phys_addr)) {
 		char *t_addr, *t_end;
 		struct page *page;
 
@@ -219,7 +233,7 @@ void __iomem *ioremap_nocache (unsigned long phys_addr, unsigned long size)
 	/* Guaranteed to be > phys_addr, as per __ioremap() */
 	last_addr = phys_addr + size - 1;
 
-	if (machine_to_phys(last_addr) < virt_to_phys(high_memory)) { 
+	if (is_local_ram(last_addr)) { 
 		struct page *ppage = virt_to_page(bus_to_virt(phys_addr));
 		unsigned long npages;
 
@@ -256,7 +270,7 @@ void iounmap(volatile void __iomem *addr)
 		return;
 	} 
 
-	if (p->flags && machine_to_phys(p->phys_addr) < virt_to_phys(high_memory)) { 
+	if (p->flags && is_local_ram(p->phys_addr)) { 
 		change_page_attr(virt_to_page(bus_to_virt(p->phys_addr)),
 				 p->size >> PAGE_SHIFT,
 				 PAGE_KERNEL); 				 
@@ -276,14 +290,11 @@ void __init *bt_ioremap(unsigned long phys_addr, unsigned long size)
 	if (!size || last_addr < phys_addr)
 		return NULL;
 
-        if (phys_addr >= 0x0 && last_addr < 0x100000)
-                return isa_bus_to_virt(phys_addr);
-
 	/*
 	 * Don't remap the low PCI/ISA area, it's always mapped..
 	 */
-	if (phys_addr >= 0xA0000 && last_addr < 0x100000)
-		return phys_to_virt(phys_addr);
+	if (phys_addr >= 0x0 && last_addr < 0x100000)
+		return isa_bus_to_virt(phys_addr);
 
 	/*
 	 * Mappings have to be page-aligned
