@@ -16,23 +16,8 @@ eserver = EventServer.instance()
 
 import sxp
 
-def reboots():
-    """Get a list of system reboots from wtmp.
-    """
-    out = os.popen('last reboot', 'r')
-    list = [ x.strip() for x in out if x.startswith('reboot') ]
-    return list
-
-def last_reboot():
-    """Get the last known system reboot.
-    """
-    l = reboots()
-    return (l and l[-1]) or None
-
 class XendRoot:
     """Root of the management classes."""
-
-    lastboot_default = "/var/xen/lastboot"
 
     """Default path to the root of the database."""
     dbroot_default = "/var/xen/xend-db"
@@ -56,14 +41,11 @@ class XendRoot:
     components = {}
 
     def __init__(self):
-        self.rebooted = 0
-        self.last_reboot = None
         self.dbroot = None
         self.config_path = None
         self.config = None
         self.logger = None
         self.configure()
-        self.check_lastboot()
         eserver.subscribe('xend.*', self.event_handler)
         #eserver.subscribe('xend.domain.created', self.event_handler)
         #eserver.subscribe('xend.domain.died', self.event_handler)
@@ -87,7 +69,7 @@ class XendRoot:
         return self.components.get(name)
 
     def start(self):
-        eserver.inject('xend.start', self.rebooted)
+        eserver.inject('xend.start', 0)
 
     def _format(self, msg, args):
         if args:
@@ -145,58 +127,11 @@ class XendRoot:
     def event_handler(self, event, val):
         self.logInfo("EVENT> %s %s", str(event), str(val))
 
-    def read_lastboot(self):
-        """Read the lastboot file to determine the time of the last boot.
-        """
-        try:
-            val = file(self.lastboot, 'rb').readlines()[0]
-        except StandardError, ex:
-            self.logWarning('Error reading %s: %s', self.lastboot, str(ex))
-            val = None
-        return val
-
-    def write_lastboot(self, val):
-        """Write the last boot time to the lastboot file.
-        """
-        if not val: return
-        try:
-            fdir = os.path.dirname(self.lastboot)
-            if not os.path.isdir(fdir):
-                os.makedirs(fdir)
-            out = file(self.lastboot, 'wb+')
-            out.write(val)
-            out.close()
-        except IOError, ex:
-            self.logWarning('Error writing %s: %s', self.lastboot, str(ex))
-
-    def check_lastboot(self):
-        """Check if there has been a system reboot since we saved lastboot.
-        """
-        last_val = self.read_lastboot()
-        this_val = last_reboot()
-        if this_val == last_val:
-            self.rebooted = 0
-        else:
-            self.rebooted = 1
-            self.write_lastboot(this_val)
-        self.last_reboot = this_val
-
-    def get_last_reboot(self):
-        """Get the last reboot time as a string.
-        """
-        return self.last_reboot
-
-    def get_rebooted(self):
-        """Get the rebooted flag. The flag is true if the system has
-        been rebooted since xend was last run.
-        """
-        return self.rebooted
-
     def configure(self):
         self.set_config()
         self.configure_logger()
         self.dbroot = self.get_config_value("dbroot", self.dbroot_default)
-        self.lastboot = self.get_config_value("lastboot", self.lastboot_default)
+
 
     def configure_logger(self):
         logfile = self.get_config_value("logfile", self.logfile_default)

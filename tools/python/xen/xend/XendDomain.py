@@ -58,9 +58,9 @@ class XendDomain:
         # Table of domain info indexed by domain id.
         self.db = XendDB.XendDB(self.dbpath)
         self.domain_db = self.db.fetchall("")
-        if xroot.get_rebooted():
-            log.info('XendDomain> rebooted: removing all domain info')
-            self.rm_all()
+        # XXXcl maybe check if there's only dom0 if we _really_ need
+        #       to remove the db 
+        # self.rm_all()
         eserver.subscribe('xend.virq', self.onVirq)
         self.initial_refresh()
 
