@@ -184,8 +184,8 @@ unsigned long direct_mmap(unsigned long phys_addr, unsigned long size,
     /* add node on the list of directly mapped areas, make sure the
 	 * list remains sorted.
 	 */ 
-    //dmmap = (direct_mmap_node_t *)kmalloc(GFP_KERNEL, sizeof(direct_mmap_node_t));
-    dmmap = (direct_mmap_node_t *)kmalloc(GFP_KERNEL, KMALLOC_SIZE);
+    //dmmap = (direct_mmap_node_t *)kmalloc(sizeof(direct_mmap_node_t), GFP_KERNEL);
+    dmmap = (direct_mmap_node_t *)kmalloc(KMALLOC_SIZE, GFP_KERNEL);
     dmmap->vm_start = addr;
     dmmap->vm_end = addr + size;
 	entry = find_direct(&current->mm->context.direct_list, addr);

@@ -128,7 +128,7 @@ static void create_proc_dom_entries(int dom)
 
     snprintf(dir_name, MAX_LEN, "%s%d", DOM_DIR, dom);
 
-    dom_data = (dom_procdata_t *)kmalloc(GFP_KERNEL, 128);
+    dom_data = (dom_procdata_t *)kmalloc(sizeof(proc_domdata_t), GFP_KERNEL);
     dom_data->domain = dom;
 
     dir = proc_mkdir(dir_name, xeno_base);
@@ -215,7 +215,7 @@ static int dom_map_mem(unsigned int dom, unsigned long pfn, int tot_pages)
                 file->nlink = 1;
                 file->proc_fops = &dom_mem_ops;
 
-                memdata = (proc_memdata_t *)kmalloc(GFP_KERNEL, sizeof(proc_memdata_t));
+                memdata = (proc_memdata_t *)kmalloc(sizeof(proc_memdata_t), GFP_KERNEL);
                 memdata->pfn = pfn;
                 memdata->tot_pages = tot_pages;
                 file->data = memdata;
