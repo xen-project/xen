@@ -267,3 +267,8 @@ ln -sf ../../../../../${LINUX_26}/drivers/xen/blkback/blkback.c main.c
 ln -sf ../../../../../${LINUX_26}/drivers/xen/blkback/control.c
 ln -sf ../../../../../${LINUX_26}/drivers/xen/blkback/interface.c
 ln -sf ../../../../../${LINUX_26}/drivers/xen/blkback/vbd.c
+
+cd ${AD}/arch/xen/drivers/blkif/frontend
+ln -sf ../../../../../${LINUX_26}/drivers/xen/blkfront/blkfront.c
+
+

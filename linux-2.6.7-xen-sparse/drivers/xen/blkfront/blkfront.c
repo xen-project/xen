@@ -8,7 +8,16 @@
  * Copyright (c) 2004, Christian Limpach
  */
 
+#include <linux/version.h>
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 #include "block.h"
+#else
+#include "common.h"
+#include <linux/blk.h>
+#include <linux/tqueue.h>
+#endif
+
 #include <linux/cdrom.h>
 #include <linux/sched.h>
 #include <linux/interrupt.h>
@@ -50,56 +59,21 @@ static int recovery = 0;           /* "Recovery in progress" flag.  Protected
 static request_queue_t *pending_queues[MAX_PENDING];
 static int nr_pending;
 
-static inline void translate_req_to_pfn(blkif_request_t *xreq,
-                                        blkif_request_t *req)
-{
-    int i;
-    
-    *xreq = *req; 
-
-    for ( i = 0; i < req->nr_segments; i++ )
-    {
-        xreq->frame_and_sects[i] = (req->frame_and_sects[i] & ~PAGE_MASK) |
-            (machine_to_phys_mapping[req->frame_and_sects[i] >> PAGE_SHIFT] <<
-             PAGE_SHIFT);
-    }
-}
-
 static inline void translate_req_to_mfn(blkif_request_t *xreq,
-                                        blkif_request_t *req)
-{
-    int i;
+                                        blkif_request_t *req);
 
-    *xreq = *req;
+static inline void translate_req_to_pfn(blkif_request_t *xreq,
+                                        blkif_request_t *req);
 
-    for ( i = 0; i < req->nr_segments; i++ )
-    {
-        xreq->frame_and_sects[i] = (req->frame_and_sects[i] & ~PAGE_MASK) |
-            (phys_to_machine_mapping[req->frame_and_sects[i] >> PAGE_SHIFT] << 
-             PAGE_SHIFT);
-    }
-}
+static inline void flush_requests(void);
 
-static inline void flush_requests(void)
-{
-    wmb(); /* Ensure that the frontend can see the requests. */
-    blk_ring->req_prod = req_prod;
-    notify_via_evtchn(blkif_evtchn);
-}
+static void kick_pending_request_queues(void);
 
+/**************************  KERNEL VERSION 2.6  **************************/
 
-#if 0
-/*
- * blkif_update_int/update-vbds_task - handle VBD update events.
- *  Schedule a task for keventd to run, which will update the VBDs and perform 
- *  the corresponding updates to our view of VBD state.
- */
-static struct tq_struct update_tq;
-static void update_vbds_task(void *unused)
-{ 
-    xlvbd_update_vbds();
-}
-#endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+
+#define DISABLE_SCATTERGATHER() 
 
 
 int blkif_open(struct inode *inode, struct file *filep)
@@ -217,7 +191,6 @@ int blkif_revalidate(kdev_t dev)
 }
 #endif
 
-
 /*
  * blkif_queue_request
  *
@@ -281,6 +254,7 @@ static int blkif_queue_request(struct request *req)
     return 0;
 }
 
+
 /*
  * do_blkif_request
  *  read a block; request is in a request queue
@@ -321,45 +295,6 @@ void do_blkif_request(request_queue_t *rq)
 }
 
 
-static void kick_pending_request_queues(void)
-{
-    /* We kick pending request queues if the ring is reasonably empty. */
-    if ( (nr_pending != 0) && 
-         ((req_prod - resp_cons) < (BLKIF_RING_SIZE >> 1)) )
-    {
-        /* Attempt to drain the queue, but bail if the ring becomes full. */
-        while ( (nr_pending != 0) && !BLKIF_RING_FULL )
-            do_blkif_request(pending_queues[--nr_pending]);
-    }
-}
-
-
-/* Upon block read completion, issue a dummy machphys update for the
-pages in the buffer, just in case we're being migrated. 
-THIS CODE SHOULD BE REMOVED WHEN WE HAVE GRANT TABLES */
-
-static void blkif_completion(blkif_response_t *bret, struct request *req)
-{
-#if 0
-    struct bio *bio;
-    struct bio_vec *bvec;
-    int idx;
-    unsigned long mfn, pfn;
-
-    if( bret->operation == BLKIF_OP_READ )
-    {
-        rq_for_each_bio(bio, req) {
-            bio_for_each_segment(bvec, bio, idx) {
-                mfn = page_to_phys(bvec->bv_page)>>PAGE_SHIFT;
-                pfn = machine_to_phys_mapping[mfn];
-                queue_machphys_update(mfn, pfn);
-            }
-        }
-    }
-#endif
-}
-
-
 static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 {
     struct request *req;
@@ -396,7 +331,6 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
                            req->hard_nr_sectors)) )
                 BUG();
             end_that_request_last(req);
-            blkif_completion(bret, req);
             break;
         case BLKIF_OP_PROBE:
             memcpy(&blkif_control_rsp, bret, sizeof(*bret));
@@ -425,6 +359,549 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
     return IRQ_HANDLED;
 }
 
+#else
+/**************************  KERNEL VERSION 2.4  **************************/
+
+static kdev_t        sg_dev;
+static int           sg_operation = -1;
+static unsigned long sg_next_sect;
+
+#define DISABLE_SCATTERGATHER() (sg_operation = -1)
+
+#define blkif_io_lock io_request_lock
+
+/*
+ * blkif_update_int/update-vbds_task - handle VBD update events.
+ *  Schedule a task for keventd to run, which will update the VBDs and perform 
+ *  the corresponding updates to our view of VBD state.
+ */
+
+#if 0
+static struct tq_struct update_tq;
+static void update_vbds_task(void *unused)
+{ 
+    xlvbd_update_vbds();
+}
+#endif
+
+int blkif_open(struct inode *inode, struct file *filep)
+{
+    short xldev = inode->i_rdev; 
+    struct gendisk *gd = get_gendisk(xldev);
+    xl_disk_t *disk = xldev_to_xldisk(inode->i_rdev);
+    short minor = MINOR(xldev); 
+
+    if ( gd->part[minor].nr_sects == 0 )
+    { 
+        /*
+         * Device either doesn't exist, or has zero capacity; we use a few
+         * cheesy heuristics to return the relevant error code
+         */
+        if ( (gd->sizes[minor >> gd->minor_shift] != 0) ||
+             ((minor & (gd->max_p - 1)) != 0) )
+        { 
+            /*
+             * We have a real device, but no such partition, or we just have a
+             * partition number so guess this is the problem.
+             */
+            return -ENXIO;     /* no such device or address */
+        }
+        else if ( gd->flags[minor >> gd->minor_shift] & GENHD_FL_REMOVABLE )
+        {
+            /* This is a removable device => assume that media is missing. */ 
+            return -ENOMEDIUM; /* media not present (this is a guess) */
+        } 
+        else
+        { 
+            /* Just go for the general 'no such device' error. */
+            return -ENODEV;    /* no such device */
+        }
+    }
+    
+    /* Update of usage count is protected by per-device semaphore. */
+    disk->usage++;
+
+    return 0;
+}
+
+
+int blkif_release(struct inode *inode, struct file *filep)
+{
+    xl_disk_t *disk = xldev_to_xldisk(inode->i_rdev);
+
+    /*
+     * When usage drops to zero it may allow more VBD updates to occur.
+     * Update of usage count is protected by a per-device semaphore.
+     */
+    if ( --disk->usage == 0 )
+    {
+#if 0
+        update_tq.routine = update_vbds_task;
+        schedule_task(&update_tq);
+#endif
+    }
+
+    return 0;
+}
+
+
+int blkif_ioctl(struct inode *inode, struct file *filep,
+                unsigned command, unsigned long argument)
+{
+    kdev_t dev = inode->i_rdev;
+    struct hd_geometry *geo = (struct hd_geometry *)argument;
+    struct gendisk *gd;     
+    struct hd_struct *part; 
+    int i;
+
+    /* NB. No need to check permissions. That is done for us. */
+    
+    DPRINTK_IOCTL("command: 0x%x, argument: 0x%lx, dev: 0x%04x\n",
+                  command, (long) argument, dev); 
+  
+    gd = get_gendisk(dev);
+    part = &gd->part[MINOR(dev)]; 
+
+    switch ( command )
+    {
+    case BLKGETSIZE:
+        DPRINTK_IOCTL("   BLKGETSIZE: %x %lx\n", BLKGETSIZE, part->nr_sects); 
+        return put_user(part->nr_sects, (unsigned long *) argument);
+
+    case BLKGETSIZE64:
+        DPRINTK_IOCTL("   BLKGETSIZE64: %x %llx\n", BLKGETSIZE64,
+                      (u64)part->nr_sects * 512);
+        return put_user((u64)part->nr_sects * 512, (u64 *) argument);
+
+    case BLKRRPART:                               /* re-read partition table */
+        DPRINTK_IOCTL("   BLKRRPART: %x\n", BLKRRPART);
+        return blkif_revalidate(dev);
+
+    case BLKSSZGET:
+        return hardsect_size[MAJOR(dev)][MINOR(dev)]; 
+
+    case BLKBSZGET:                                        /* get block size */
+        DPRINTK_IOCTL("   BLKBSZGET: %x\n", BLKBSZGET);
+        break;
+
+    case BLKBSZSET:                                        /* set block size */
+        DPRINTK_IOCTL("   BLKBSZSET: %x\n", BLKBSZSET);
+        break;
+
+    case BLKRASET:                                         /* set read-ahead */
+        DPRINTK_IOCTL("   BLKRASET: %x\n", BLKRASET);
+        break;
+
+    case BLKRAGET:                                         /* get read-ahead */
+        DPRINTK_IOCTL("   BLKRAFET: %x\n", BLKRAGET);
+        break;
+
+    case HDIO_GETGEO:
+        /* note: these values are complete garbage */
+        DPRINTK_IOCTL("   HDIO_GETGEO: %x\n", HDIO_GETGEO);
+        if (!argument) return -EINVAL;
+        if (put_user(0x00,  (unsigned long *) &geo->start)) return -EFAULT;
+        if (put_user(0xff,  (byte *)&geo->heads)) return -EFAULT;
+        if (put_user(0x3f,  (byte *)&geo->sectors)) return -EFAULT;
+        if (put_user(0x106, (unsigned short *)&geo->cylinders)) return -EFAULT;
+        return 0;
+
+    case HDIO_GETGEO_BIG: 
+        /* note: these values are complete garbage */
+        DPRINTK_IOCTL("   HDIO_GETGEO_BIG: %x\n", HDIO_GETGEO_BIG);
+        if (!argument) return -EINVAL;
+        if (put_user(0x00,  (unsigned long *) &geo->start))  return -EFAULT;
+        if (put_user(0xff,  (byte *)&geo->heads))   return -EFAULT;
+        if (put_user(0x3f,  (byte *)&geo->sectors)) return -EFAULT;
+        if (put_user(0x106, (unsigned int *) &geo->cylinders)) return -EFAULT;
+        return 0;
+
+    case CDROMMULTISESSION:
+        DPRINTK("FIXME: support multisession CDs later\n");
+        for ( i = 0; i < sizeof(struct cdrom_multisession); i++ )
+            if ( put_user(0, (byte *)(argument + i)) ) return -EFAULT;
+        return 0;
+
+    case SCSI_IOCTL_GET_BUS_NUMBER:
+        DPRINTK("FIXME: SCSI_IOCTL_GET_BUS_NUMBER ioctl in XL blkif");
+        return -ENOSYS;
+
+    default:
+        printk(KERN_ALERT "ioctl %08x not supported by XL blkif\n", command);
+        return -ENOSYS;
+    }
+    
+    return 0;
+}
+
+
+
+/* check media change: should probably do something here in some cases :-) */
+int blkif_check(kdev_t dev)
+{
+    DPRINTK("blkif_check\n");
+    return 0;
+}
+
+int blkif_revalidate(kdev_t dev)
+{
+    struct block_device *bd;
+    struct gendisk *gd;
+    xl_disk_t *disk;
+    unsigned long capacity;
+    int i, rc = 0;
+    
+    if ( (bd = bdget(dev)) == NULL )
+        return -EINVAL;
+
+    /*
+     * Update of partition info, and check of usage count, is protected
+     * by the per-block-device semaphore.
+     */
+    down(&bd->bd_sem);
+
+    if ( ((gd = get_gendisk(dev)) == NULL) ||
+         ((disk = xldev_to_xldisk(dev)) == NULL) ||
+         ((capacity = gd->part[MINOR(dev)].nr_sects) == 0) )
+    {
+        rc = -EINVAL;
+        goto out;
+    }
+
+    if ( disk->usage > 1 )
+    {
+        rc = -EBUSY;
+        goto out;
+    }
+
+    /* Only reread partition table if VBDs aren't mapped to partitions. */
+    if ( !(gd->flags[MINOR(dev) >> gd->minor_shift] & GENHD_FL_VIRT_PARTNS) )
+    {
+        for ( i = gd->max_p - 1; i >= 0; i-- )
+        {
+            invalidate_device(dev+i, 1);
+            gd->part[MINOR(dev+i)].start_sect = 0;
+            gd->part[MINOR(dev+i)].nr_sects   = 0;
+            gd->sizes[MINOR(dev+i)]           = 0;
+        }
+
+        grok_partitions(gd, MINOR(dev)>>gd->minor_shift, gd->max_p, capacity);
+    }
+
+ out:
+    up(&bd->bd_sem);
+    bdput(bd);
+    return rc;
+}
+
+
+
+
+/*
+ * blkif_queue_request
+ *
+ * request block io 
+ * 
+ * id: for guest use only.
+ * operation: BLKIF_OP_{READ,WRITE,PROBE}
+ * buffer: buffer to read/write into. this should be a
+ *   virtual address in the guest os.
+ */
+static int blkif_queue_request(unsigned long   id,
+                               int             operation,
+                               char *          buffer,
+                               unsigned long   sector_number,
+                               unsigned short  nr_sectors,
+                               kdev_t          device)
+{
+    unsigned long       buffer_ma = phys_to_machine(virt_to_phys(buffer)); 
+    struct gendisk     *gd;
+    blkif_request_t    *req;
+    struct buffer_head *bh;
+    unsigned int        fsect, lsect;
+
+    fsect = (buffer_ma & ~PAGE_MASK) >> 9;
+    lsect = fsect + nr_sectors - 1;
+
+    /* Buffer must be sector-aligned. Extent mustn't cross a page boundary. */
+    if ( unlikely((buffer_ma & ((1<<9)-1)) != 0) )
+        BUG();
+    if ( lsect > 7 )
+        BUG();
+
+    buffer_ma &= PAGE_MASK;
+
+    if ( unlikely(blkif_state != BLKIF_STATE_CONNECTED) )
+        return 1;
+
+    switch ( operation )
+    {
+
+    case BLKIF_OP_READ:
+    case BLKIF_OP_WRITE:
+        gd = get_gendisk(device); 
+
+        /*
+         * Update the sector_number we'll pass down as appropriate; note that
+         * we could sanity check that resulting sector will be in this
+         * partition, but this will happen in driver backend anyhow.
+         */
+        sector_number += gd->part[MINOR(device)].start_sect;
+
+        /*
+         * If this unit doesn't consist of virtual partitions then we clear 
+         * the partn bits from the device number.
+         */
+        if ( !(gd->flags[MINOR(device)>>gd->minor_shift] & 
+               GENHD_FL_VIRT_PARTNS) )
+            device &= ~(gd->max_p - 1);
+
+        if ( (sg_operation == operation) &&
+             (sg_dev == device) &&
+             (sg_next_sect == sector_number) )
+        {
+            req = &blk_ring->ring[MASK_BLKIF_IDX(req_prod-1)].req;
+            bh = (struct buffer_head *)id;
+            bh->b_reqnext = (struct buffer_head *)req->id;
+            req->id = id;
+            req->frame_and_sects[req->nr_segments] = 
+                buffer_ma | (fsect<<3) | lsect;
+            if ( ++req->nr_segments < BLKIF_MAX_SEGMENTS_PER_REQUEST )
+                sg_next_sect += nr_sectors;
+            else
+                DISABLE_SCATTERGATHER();
+
+            /* Update the copy of the request in the recovery ring. */
+            translate_req_to_pfn(&blk_ring_rec->ring[
+                MASK_BLKIF_IDX(blk_ring_rec->req_prod - 1)].req, req);
+
+            return 0;
+        }
+        else if ( BLKIF_RING_FULL )
+        {
+            return 1;
+        }
+        else
+        {
+            sg_operation = operation;
+            sg_dev       = device;
+            sg_next_sect = sector_number + nr_sectors;
+        }
+        break;
+
+    default:
+        panic("unknown op %d\n", operation);
+    }
+
+    /* Fill out a communications ring structure. */
+    req = &blk_ring->ring[MASK_BLKIF_IDX(req_prod)].req;
+    req->id            = id;
+    req->operation     = operation;
+    req->sector_number = (blkif_sector_t)sector_number;
+    req->device        = device; 
+    req->nr_segments   = 1;
+    req->frame_and_sects[0] = buffer_ma | (fsect<<3) | lsect;
+    req_prod++;
+
+    /* Keep a private copy so we can reissue requests when recovering. */    
+    translate_req_to_pfn(&blk_ring_rec->ring[
+        MASK_BLKIF_IDX(blk_ring_rec->req_prod)].req, req);
+    blk_ring_rec->req_prod++;
+
+    return 0;
+}
+
+
+/*
+ * do_blkif_request
+ *  read a block; request is in a request queue
+ */
+void do_blkif_request(request_queue_t *rq)
+{
+    struct request *req;
+    struct buffer_head *bh, *next_bh;
+    int rw, nsect, full, queued = 0;
+
+    DPRINTK("Entered do_blkif_request\n"); 
+
+    while ( !rq->plugged && !list_empty(&rq->queue_head))
+    {
+        if ( (req = blkdev_entry_next_request(&rq->queue_head)) == NULL ) 
+            goto out;
+  
+        DPRINTK("do_blkif_request %p: cmd %i, sec %lx, (%li/%li) bh:%p\n",
+                req, req->cmd, req->sector,
+                req->current_nr_sectors, req->nr_sectors, req->bh);
+
+        rw = req->cmd;
+        if ( rw == READA )
+            rw = READ;
+        if ( unlikely((rw != READ) && (rw != WRITE)) )
+            panic("XenoLinux Virtual Block Device: bad cmd: %d\n", rw);
+
+        req->errors = 0;
+
+        bh = req->bh;
+        while ( bh != NULL )
+        {
+            next_bh = bh->b_reqnext;
+            bh->b_reqnext = NULL;
+
+            full = blkif_queue_request(
+                (unsigned long)bh,
+                (rw == READ) ? BLKIF_OP_READ : BLKIF_OP_WRITE, 
+                bh->b_data, bh->b_rsector, bh->b_size>>9, bh->b_rdev);
+
+            if ( full )
+            { 
+                bh->b_reqnext = next_bh;
+                pending_queues[nr_pending++] = rq;
+                if ( unlikely(nr_pending >= MAX_PENDING) )
+                    BUG();
+                goto out; 
+            }
+
+            queued++;
+
+            /* Dequeue the buffer head from the request. */
+            nsect = bh->b_size >> 9;
+            bh = req->bh = next_bh;
+            
+            if ( bh != NULL )
+            {
+                /* There's another buffer head to do. Update the request. */
+                req->hard_sector += nsect;
+                req->hard_nr_sectors -= nsect;
+                req->sector = req->hard_sector;
+                req->nr_sectors = req->hard_nr_sectors;
+                req->current_nr_sectors = bh->b_size >> 9;
+                req->buffer = bh->b_data;
+            }
+            else
+            {
+                /* That was the last buffer head. Finalise the request. */
+                if ( unlikely(end_that_request_first(req, 1, "XenBlk")) )
+                    BUG();
+                blkdev_dequeue_request(req);
+                end_that_request_last(req);
+            }
+        }
+    }
+
+ out:
+    if ( queued != 0 )
+        flush_requests();
+}
+
+
+static void blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
+{
+    BLKIF_RING_IDX i, rp; 
+    unsigned long flags; 
+    struct buffer_head *bh, *next_bh;
+    
+    spin_lock_irqsave(&io_request_lock, flags);     
+
+    if ( unlikely(blkif_state == BLKIF_STATE_CLOSED || recovery) )
+    {
+        spin_unlock_irqrestore(&io_request_lock, flags);
+        return;
+    }
+
+    rp = blk_ring->resp_prod;
+    rmb(); /* Ensure we see queued responses up to 'rp'. */
+
+    for ( i = resp_cons; i != rp; i++ )
+    {
+        blkif_response_t *bret = &blk_ring->ring[MASK_BLKIF_IDX(i)].resp;
+        switch ( bret->operation )
+        {
+        case BLKIF_OP_READ:
+        case BLKIF_OP_WRITE:
+            if ( unlikely(bret->status != BLKIF_RSP_OKAY) )
+                DPRINTK("Bad return from blkdev data request: %lx\n",
+                        bret->status);
+            for ( bh = (struct buffer_head *)bret->id; 
+                  bh != NULL; 
+                  bh = next_bh )
+            {
+                next_bh = bh->b_reqnext;
+                bh->b_reqnext = NULL;
+                bh->b_end_io(bh, bret->status == BLKIF_RSP_OKAY);
+            }
+            break;
+        case BLKIF_OP_PROBE:
+            memcpy(&blkif_control_rsp, bret, sizeof(*bret));
+            blkif_control_rsp_valid = 1;
+            break;
+        default:
+            BUG();
+        }
+    }
+    
+    resp_cons = i;
+    resp_cons_rec = i;
+
+    kick_pending_request_queues();
+
+    spin_unlock_irqrestore(&io_request_lock, flags);
+}
+
+#endif
+
+/*****************************  COMMON CODE  *******************************/
+
+
+static inline void translate_req_to_pfn(blkif_request_t *xreq,
+                                        blkif_request_t *req)
+{
+    int i;
+    
+    *xreq = *req; 
+
+    for ( i = 0; i < req->nr_segments; i++ )
+    {
+        xreq->frame_and_sects[i] = (req->frame_and_sects[i] & ~PAGE_MASK) |
+            (machine_to_phys_mapping[req->frame_and_sects[i] >> PAGE_SHIFT] <<
+             PAGE_SHIFT);
+    }
+}
+
+static inline void translate_req_to_mfn(blkif_request_t *xreq,
+                                        blkif_request_t *req)
+{
+    int i;
+
+    *xreq = *req;
+
+    for ( i = 0; i < req->nr_segments; i++ )
+    {
+        xreq->frame_and_sects[i] = (req->frame_and_sects[i] & ~PAGE_MASK) |
+            (phys_to_machine_mapping[req->frame_and_sects[i] >> PAGE_SHIFT] << 
+             PAGE_SHIFT);
+    }
+}
+
+static inline void flush_requests(void)
+{
+    DISABLE_SCATTERGATHER();
+    wmb(); /* Ensure that the frontend can see the requests. */
+    blk_ring->req_prod = req_prod;
+    notify_via_evtchn(blkif_evtchn);
+}
+
+
+static void kick_pending_request_queues(void)
+{
+    /* We kick pending request queues if the ring is reasonably empty. */
+    if ( (nr_pending != 0) && 
+         ((req_prod - resp_cons) < (BLKIF_RING_SIZE >> 1)) )
+    {
+        /* Attempt to drain the queue, but bail if the ring becomes full. */
+        while ( (nr_pending != 0) && !BLKIF_RING_FULL )
+            do_blkif_request(pending_queues[--nr_pending]);
+    }
+}
 
 void blkif_control_send(blkif_request_t *req, blkif_response_t *rsp)
 {
@@ -444,10 +921,11 @@ void blkif_control_send(blkif_request_t *req, blkif_response_t *rsp)
         goto retry;
     }
 
+    DISABLE_SCATTERGATHER();
     blk_ring->ring[MASK_BLKIF_IDX(req_prod)].req = *req;    
-    translate_req_to_pfn(
-        &blk_ring_rec->ring[MASK_BLKIF_IDX(blk_ring_rec->req_prod++)].req,
-        req);
+
+    translate_req_to_pfn(&blk_ring_rec->ring[
+	MASK_BLKIF_IDX(blk_ring_rec->req_prod++)].req,req);
 
     req_prod++;
     flush_requests();

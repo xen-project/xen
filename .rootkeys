@@ -54,7 +54,6 @@
 4083dc16KQus88a4U3uCV6qVCA6_8Q linux-2.4.26-xen-sparse/arch/xen/drivers/blkif/backend/Makefile
 4075806dI5kfeMD5RV-DA0PYoThx_w linux-2.4.26-xen-sparse/arch/xen/drivers/blkif/frontend/Makefile
 4075806d4-j7vN0Mn0bklI1cRUX1vQ linux-2.4.26-xen-sparse/arch/xen/drivers/blkif/frontend/common.h
-4075806d3fJqqDC1pYYPTZPc575iKg linux-2.4.26-xen-sparse/arch/xen/drivers/blkif/frontend/main.c
 4075806dibjCcfuXv6CINMhxWTw3jQ linux-2.4.26-xen-sparse/arch/xen/drivers/blkif/frontend/vbd.c
 3e5a4e65G3e2s0ghPMgiJ-gBTUJ0uQ linux-2.4.26-xen-sparse/arch/xen/drivers/console/Makefile
 3e5a4e656nfFISThfbyXQOA6HN6YHw linux-2.4.26-xen-sparse/arch/xen/drivers/dom0/Makefile
