@@ -240,23 +240,23 @@ static void dispatch_debug_block_io(struct task_struct *p, int index)
 
 static void dispatch_create_segment(struct task_struct *p, int index)
 {
-  blk_ring_t *blk_ring = p->blk_ring_base;
-  xv_disk_t *xvd;
-  int result;
+    blk_ring_t *blk_ring = p->blk_ring_base;
+    xv_disk_t *xvd;
+    int result;
 
-  if (p->domain != 0)
-  {
-    printk (KERN_ALERT "dispatch_create_segment called by dom%d\n", p->domain);
-    make_response(p, blk_ring->ring[index].req.id, XEN_BLOCK_SEG_CREATE, 1); 
+    if (p->domain != 0)
+    {
+        DPRINTK("dispatch_create_segment called by dom%d\n", p->domain);
+        make_response(p, blk_ring->ring[index].req.id, XEN_BLOCK_SEG_CREATE, 1); 
+        return;
+    }
+
+    xvd = phys_to_virt((unsigned long)blk_ring->ring[index].req.buffer);    
+    result = xen_segment_create(xvd);
+
+    make_response(p, blk_ring->ring[index].req.id, 
+                  XEN_BLOCK_SEG_CREATE, result); 
     return;
-  }
-
-  xvd = phys_to_virt((unsigned long)blk_ring->ring[index].req.buffer);    
-  result = xen_segment_create(xvd);
-
-  make_response(p, blk_ring->ring[index].req.id, 
-		XEN_BLOCK_SEG_CREATE, result); 
-  return;
 }
 
 static void dispatch_delete_segment(struct task_struct *p, int index)
@@ -268,12 +268,16 @@ static void dispatch_probe_blk(struct task_struct *p, int index)
 {
     extern void ide_probe_devices(xen_disk_info_t *xdi, int *count, 
 				  drive_t xdrives[]);
+    extern void scsi_probe_devices(xen_disk_info_t *xdi, int *count,
+                                   drive_t xdrives[]);
+
     blk_ring_t *blk_ring = p->blk_ring_base;
     xen_disk_info_t *xdi;
 
     xdi = phys_to_virt((unsigned long)blk_ring->ring[index].req.buffer);    
+
     ide_probe_devices(xdi, &num_xdrives, xdrives);
-    /* scsi_probe_devices(xdi, &num_xdrives, xdrives); */          /* future */
+    scsi_probe_devices(xdi, &num_xdrives, xdrives);
 
     make_response(p, blk_ring->ring[index].req.id, XEN_BLOCK_PROBE_BLK, 0);
 }
@@ -371,39 +375,38 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
     xen_device = blk_ring->ring[index].req.device;
     if (IS_XHD_MAJOR(xen_device))
     {
-      if (xen_device == XHDA_MAJOR)    	 phys_device = MKDEV(IDE0_MAJOR, 0);
-      else if (xen_device == XHDB_MAJOR) phys_device = MKDEV(IDE1_MAJOR, 0);
-      else if (xen_device == XHDC_MAJOR) phys_device = MKDEV(IDE2_MAJOR, 0);
-      else if (xen_device == XHDD_MAJOR) phys_device = MKDEV(IDE3_MAJOR, 0);
-      else
-      {
-	printk (KERN_ALERT "dispatch_rw_block_io: unknown device %d\n",
-		xen_device);
-	BUG();
-      }
+        if (xen_device == XHDA_MAJOR)    	 phys_device = MKDEV(IDE0_MAJOR, 0);
+        else if (xen_device == XHDB_MAJOR) phys_device = MKDEV(IDE1_MAJOR, 0);
+        else if (xen_device == XHDC_MAJOR) phys_device = MKDEV(IDE2_MAJOR, 0);
+        else if (xen_device == XHDD_MAJOR) phys_device = MKDEV(IDE3_MAJOR, 0);
+        else
+        {
+            printk(KERN_ALERT "dispatch_rw_block_io: unknown device %d\n",
+                   xen_device);
+            BUG();
+        }
 
-      block_number = blk_ring->ring[index].req.block_number;
-      sector_number = blk_ring->ring[index].req.sector_number;
+        block_number = blk_ring->ring[index].req.block_number;
+        sector_number = blk_ring->ring[index].req.sector_number;
     }
     else if (IS_VHD_MAJOR(xen_device))
     {
-      int s;
-      if (s = xen_segment_map_request(&phys_device, &block_number, 
-				      &sector_number,
-				      p, operation, xen_device,
-				      blk_ring->ring[index].req.block_number,
-				      blk_ring->ring[index].req.sector_number))
-      {
-	printk ("dispatch_rw_block_io: xen_segment_map_request status: %d\n",
-		s);
-	goto bad_descriptor;
-      }
+        int s;
+        if (s = xen_segment_map_request(&phys_device, &block_number, 
+                                        &sector_number,
+                                        p, operation, xen_device,
+                                        blk_ring->ring[index].req.block_number,
+                                        blk_ring->ring[index].req.sector_number))
+        {
+            DPRINTK("dispatch_rw_block_io: xen_seg_map_request status: %d\n", s);
+            goto bad_descriptor;
+        }
     }
     else
     {
-      printk (KERN_ALERT "dispatch_rw_block_io: unknown device %d\n",
-	      xen_device);
-      BUG();
+        printk (KERN_ALERT "dispatch_rw_block_io: unknown device %d\n",
+                xen_device);
+        BUG();
     }
     
     bh->b_blocknr       = block_number;
@@ -433,9 +436,8 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
     return;
 
  bad_descriptor:
-    printk (KERN_ALERT "dispatch rw blockio bad descriptor\n");
+    DPRINTK("dispatch rw blockio bad descriptor\n");
     make_response(p, blk_ring->ring[index].req.id, XEN_BLOCK_READ, 1);
-    return;
 } 
 
 
@@ -468,23 +470,23 @@ static void make_response(struct task_struct *p, void *id,
 
 static void dump_blockq(u_char key, void *dev_id, struct pt_regs *regs) 
 {
-  struct task_struct *p;
-  blk_ring_t *blk_ring ;
+    struct task_struct *p;
+    blk_ring_t *blk_ring ;
 
-  printk("Dumping block queue stats: nr_pending = %d\n",
-	 atomic_read(&nr_pending));
+    printk("Dumping block queue stats: nr_pending = %d\n",
+           atomic_read(&nr_pending));
 
-  p = current->next_task;
-  do
-  {
-    printk (KERN_ALERT "Domain: %d\n", p->domain);
-    blk_ring = p->blk_ring_base;
+    p = current->next_task;
+    do
+    {
+        printk (KERN_ALERT "Domain: %d\n", p->domain);
+        blk_ring = p->blk_ring_base;
 
-    printk("  req_prod:%d, resp_prod:%d, req_cons:%d\n",
-	   blk_ring->req_prod, blk_ring->resp_prod, p->blk_req_cons);
+        printk("  req_prod:%d, resp_prod:%d, req_cons:%d\n",
+               blk_ring->req_prod, blk_ring->resp_prod, p->blk_req_cons);
 
-    p = p->next_task;
-  } while (p != current);
+        p = p->next_task;
+    } while (p != current);
 }
 
 /* Start-of-day initialisation for a new domain. */

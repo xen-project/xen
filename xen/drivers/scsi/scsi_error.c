@@ -1914,9 +1914,9 @@ void scsi_error_handler(void *data)
 	/*
 	 * Wake up the thread that created us.
 	 */
+#if 0
 	SCSI_LOG_ERROR_RECOVERY(3, printk("Wake up parent %d\n", host->eh_notify->count.counter));
 
-#if 0
 	up(host->eh_notify);
 #endif
 

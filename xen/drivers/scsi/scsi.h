@@ -633,18 +633,18 @@ struct scsi_device {
  * with low level drivers that support multiple outstanding commands.
  */
 typedef struct scsi_pointer {
-	char *ptr;		/* data pointer */
-	int this_residual;	/* left in this buffer */
-	struct scatterlist *buffer;	/* which buffer */
-	int buffers_residual;	/* how many buffers left */
-
-        dma_addr_t dma_handle;
-
-	volatile int Status;
-	volatile int Message;
-	volatile int have_data_in;
-	volatile int sent_command;
-	volatile int phase;
+    char *ptr;		/* data pointer */
+    int this_residual;	/* left in this buffer */
+    struct scatterlist *buffer;	/* which buffer */
+    int buffers_residual;	/* how many buffers left */
+    
+    dma_addr_t dma_handle;
+    
+    volatile int Status;
+    volatile int Message;
+    volatile int have_data_in;
+    volatile int sent_command;
+    volatile int phase;
 } Scsi_Pointer;
 
 /*
@@ -685,146 +685,149 @@ struct scsi_request {
 };
 
 /*
- * FIXME(eric) - one of the great regrets that I have is that I failed to define
- * these structure elements as something like sc_foo instead of foo.  This would
- * make it so much easier to grep through sources and so forth.  I propose that
- * all new elements that get added to these structures follow this convention.
- * As time goes on and as people have the stomach for it, it should be possible to 
- * go back and retrofit at least some of the elements here with with the prefix.
- */
+ * FIXME(eric) - one of the great regrets that I have is that I failed
+ * to define these structure elements as something like sc_foo instead
+ * of foo.  This would make it so much easier to grep through sources
+ * and so forth.  I propose that all new elements that get added to
+ * these structures follow this convention.  As time goes on and as
+ * people have the stomach for it, it should be possible to go back
+ * and retrofit at least some of the elements here with with the
+ * prefix.  
+*/
+
 struct scsi_cmnd {
-	int     sc_magic;
+    int     sc_magic;
 /* private: */
-	/*
-	 * This information is private to the scsi mid-layer.  Wrapping it in a
-	 * struct private is a way of marking it in a sort of C++ type of way.
-	 */
-	struct Scsi_Host *host;
-	unsigned short state;
-	unsigned short owner;
-	Scsi_Device *device;
-	Scsi_Request *sc_request;
-	struct scsi_cmnd *next;
-	struct scsi_cmnd *reset_chain;
+    /*
+     * This information is private to the scsi mid-layer.  Wrapping it in a
+     * struct private is a way of marking it in a sort of C++ type of way.
+     */
+    struct Scsi_Host *host;
+    unsigned short state;
+    unsigned short owner;
+    Scsi_Device *device;
+    Scsi_Request *sc_request;
+    struct scsi_cmnd *next;
+    struct scsi_cmnd *reset_chain;
+    
+    int eh_state;		/* Used for state tracking in error handlr */
+    void (*done) (struct scsi_cmnd *);	/* Mid-level done function */
+    /*
+      A SCSI Command is assigned a nonzero serial_number when internal_cmnd
+      passes it to the driver's queue command function.  The serial_number
+      is cleared when scsi_done is entered indicating that the command has
+      been completed.  If a timeout occurs, the serial number at the moment
+      of timeout is copied into serial_number_at_timeout.  By subsequently
+      comparing the serial_number and serial_number_at_timeout fields
+      during abort or reset processing, we can detect whether the command
+      has already completed.  This also detects cases where the command has
+      completed and the SCSI Command structure has already being reused
+      for another command, so that we can avoid incorrectly aborting or
+      resetting the new command.
+    */
+    
+    unsigned long serial_number;
+    unsigned long serial_number_at_timeout;
 
-	int eh_state;		/* Used for state tracking in error handlr */
-	void (*done) (struct scsi_cmnd *);	/* Mid-level done function */
-	/*
-	   A SCSI Command is assigned a nonzero serial_number when internal_cmnd
-	   passes it to the driver's queue command function.  The serial_number
-	   is cleared when scsi_done is entered indicating that the command has
-	   been completed.  If a timeout occurs, the serial number at the moment
-	   of timeout is copied into serial_number_at_timeout.  By subsequently
-	   comparing the serial_number and serial_number_at_timeout fields
-	   during abort or reset processing, we can detect whether the command
-	   has already completed.  This also detects cases where the command has
-	   completed and the SCSI Command structure has already being reused
-	   for another command, so that we can avoid incorrectly aborting or
-	   resetting the new command.
-	 */
-
-	unsigned long serial_number;
-	unsigned long serial_number_at_timeout;
-
-	int retries;
-	int allowed;
-	int timeout_per_command;
-	int timeout_total;
-	int timeout;
-
-	/*
-	 * We handle the timeout differently if it happens when a reset, 
-	 * abort, etc are in process. 
-	 */
-	unsigned volatile char internal_timeout;
-	struct scsi_cmnd *bh_next;	/* To enumerate the commands waiting 
-					   to be processed. */
-
+    int retries;
+    int allowed;
+    int timeout_per_command;
+    int timeout_total;
+    int timeout;
+    
+    /*
+     * We handle the timeout differently if it happens when a reset, 
+     * abort, etc are in process. 
+     */
+    unsigned volatile char internal_timeout;
+    struct scsi_cmnd *bh_next;	/* To enumerate the commands waiting 
+                                   to be processed. */
+    
 /* public: */
-
-	unsigned int target;
-	unsigned int lun;
-	unsigned int channel;
-	unsigned char cmd_len;
-	unsigned char old_cmd_len;
-	unsigned char sc_data_direction;
-	unsigned char sc_old_data_direction;
-
-	/* These elements define the operation we are about to perform */
-	unsigned char cmnd[MAX_COMMAND_SIZE];
-	unsigned request_bufflen;	/* Actual request size */
-
-	struct timer_list eh_timeout;	/* Used to time out the command. */
-	void *request_buffer;		/* Actual requested buffer */
-        void **bounce_buffers;		/* Array of bounce buffers when using scatter-gather */
-
-	/* These elements define the operation we ultimately want to perform */
-	unsigned char data_cmnd[MAX_COMMAND_SIZE];
-	unsigned short old_use_sg;	/* We save  use_sg here when requesting
-					 * sense info */
-	unsigned short use_sg;	/* Number of pieces of scatter-gather */
-	unsigned short sglist_len;	/* size of malloc'd scatter-gather list */
-	unsigned short abort_reason;	/* If the mid-level code requests an
+    
+    unsigned int target;
+    unsigned int lun;
+    unsigned int channel;
+    unsigned char cmd_len;
+    unsigned char old_cmd_len;
+    unsigned char sc_data_direction;
+    unsigned char sc_old_data_direction;
+    
+    /* These elements define the operation we are about to perform */
+    unsigned char cmnd[MAX_COMMAND_SIZE];
+    unsigned request_bufflen;	/* Actual request size */
+    
+    struct timer_list eh_timeout; /* Used to time out the command. */
+    void *request_buffer;  /* Actual requested buffer */
+    void **bounce_buffers; /* Array of bounce buffers when 
+                              using scatter-gather */
+    
+    /* These elements define the operation we ultimately want to perform */
+    unsigned char data_cmnd[MAX_COMMAND_SIZE];
+    unsigned short old_use_sg;	/* We save  use_sg here when requesting
+                                 * sense info */
+    unsigned short use_sg;	/* Number of pieces of scatter-gather */
+    unsigned short sglist_len;	/* size of malloc'd scatter-gather list */
+    unsigned short abort_reason;	/* If the mid-level code requests an
 					 * abort, this is the reason. */
-	unsigned bufflen;	/* Size of data buffer */
-	void *buffer;		/* Data buffer */
-
-	unsigned underflow;	/* Return error if less than
-				   this amount is transferred */
-	unsigned old_underflow;	/* save underflow here when reusing the
+    unsigned bufflen;	/* Size of data buffer */
+    void *buffer;		/* Data buffer */
+    
+    unsigned underflow;	/* Return error if less than
+                           this amount is transferred */
+    unsigned old_underflow;	/* save underflow here when reusing the
 				 * command for error handling */
-
-	unsigned transfersize;	/* How much we are guaranteed to
+    
+    unsigned transfersize;	/* How much we are guaranteed to
 				   transfer with each SCSI transfer
 				   (ie, between disconnect / 
 				   reconnects.   Probably == sector
 				   size */
-
-	int resid;		/* Number of bytes requested to be
-				   transferred less actual number
-				   transferred (0 if not supported) */
-
-	struct request request;	/* A copy of the command we are
+    
+    int resid;		/* Number of bytes requested to be
+                           transferred less actual number
+                           transferred (0 if not supported) */
+    
+    struct request request;	/* A copy of the command we are
 				   working on */
+    
+    unsigned char sense_buffer[SCSI_SENSE_BUFFERSIZE];		
+    /* obtained by REQUEST SENSE when CHECK CONDITION is
+     * received on original command (auto-sense) */
 
-	unsigned char sense_buffer[SCSI_SENSE_BUFFERSIZE];		/* obtained by REQUEST SENSE
-						 * when CHECK CONDITION is
-						 * received on original command 
-						 * (auto-sense) */
+    unsigned flags;
+    
+    /*
+     * Used to indicate that a command which has timed out also
+     * completed normally.  Typically the completion function will
+     * do nothing but set this flag in this instance because the
+     * timeout handler is already running.
+     */
+    unsigned done_late:1;
+    
+    /* Low-level done function - can be used by low-level driver to point
+     *        to completion function.  Not used by mid/upper level code. */
+    void (*scsi_done) (struct scsi_cmnd *);
+    
+    /*
+     * The following fields can be written to by the host specific code. 
+     * Everything else should be left alone. 
+     */
+    
+    Scsi_Pointer SCp;	/* Scratchpad used by some host adapters */
+    
+    unsigned char *host_scribble;	
 
-	unsigned flags;
+    /* The host adapter is allowed to call scsi_malloc and get some
+     * memory and hang it here.  The host adapter is also expected to
+     * call scsi_free to release this memory.  (The memory obtained
+     * by scsi_malloc is guaranteed to be at an address < 16Mb). */
 
-	/*
-	 * Used to indicate that a command which has timed out also
-	 * completed normally.  Typically the completion function will
-	 * do nothing but set this flag in this instance because the
-	 * timeout handler is already running.
-	 */
-	unsigned done_late:1;
-
-	/* Low-level done function - can be used by low-level driver to point
-	 *        to completion function.  Not used by mid/upper level code. */
-	void (*scsi_done) (struct scsi_cmnd *);
-
-	/*
-	 * The following fields can be written to by the host specific code. 
-	 * Everything else should be left alone. 
-	 */
-
-	Scsi_Pointer SCp;	/* Scratchpad used by some host adapters */
-
-	unsigned char *host_scribble;	/* The host adapter is allowed to
-					   * call scsi_malloc and get some memory
-					   * and hang it here.     The host adapter
-					   * is also expected to call scsi_free
-					   * to release this memory.  (The memory
-					   * obtained by scsi_malloc is guaranteed
-					   * to be at an address < 16Mb). */
-
-	int result;		/* Status code from lower level driver */
-
-	unsigned char tag;	/* SCSI-II queued command tag */
-	unsigned long pid;	/* Process ID, starts at 0 */
+    
+    int result;		/* Status code from lower level driver */
+    
+    unsigned char tag;	/* SCSI-II queued command tag */
+    unsigned long pid;	/* Process ID, starts at 0 */
 };
 
 /*

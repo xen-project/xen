@@ -61,6 +61,8 @@
 
 #include <xeno/genhd.h>
 
+#include <asm/domain_page.h>    /* SMH: for [un_]map_domain_mem() */
+
 /*
  *  static const char RCSid[] = "$Header:";
  */
@@ -324,6 +326,7 @@ static int sd_init_command(Scsi_Cmnd * SCpnt)
 	!dpnt->device ||
 	!dpnt->device->online ||
 	block + SCpnt->request.nr_sectors > ppnt->nr_sects) {
+
 	SCSI_LOG_HLQUEUE(2, printk("Finishing %ld sectors\n", 
 				   SCpnt->request.nr_sectors));
 	SCSI_LOG_HLQUEUE(2, printk("Retry with 0x%p\n", SCpnt));
@@ -1132,8 +1135,8 @@ static int sd_init()
 	sd_registered++;
     }
     /* We do not support attaching loadable devices yet. */
-    if (rscsi_disks)
-	return 0;
+    if (rscsi_disks) 
+	return 0; 
 
     rscsi_disks = kmalloc(sd_template.dev_max * sizeof(Scsi_Disk), GFP_ATOMIC);
     if (!rscsi_disks)
@@ -1296,8 +1299,72 @@ static void sd_finish()
     }
 #endif
 
+#if 0
+	/* XXX SMH: turn on some logging */
+	scsi_logging_level = ~0;
+	SCSI_SET_LOGGING(SCSI_LOG_HLQUEUE_SHIFT, SCSI_LOG_HLQUEUE_BITS, 1); 
+#endif
+
     return;
 }
+
+
+/* 
+** XXX SMH: gross 'probe' function to allow xeno world to grope us; 
+** this should really not be in the disk-specific code as it should
+** report tapes, CDs, etc. But for now this looks like the easiest 
+** place to hook it in :-( 
+*/
+void scsi_probe_devices(xen_disk_info_t *xdi)
+{
+    Scsi_Disk *sd; 
+    int i, base, diskinfo[4];
+    xen_disk_info_t *xen_xdi = 
+	(xen_disk_info_t *)map_domain_mem(virt_to_phys(xdi));
+
+    /* We've already had IDE probe => we need to append our info */
+    base = xen_xdi->count; 
+
+    for (sd = rscsi_disks, i = 0; i < sd_template.dev_max; i++, sd++) {
+
+        if (sd->device !=NULL) { 
+
+	    xen_xdi->disks[xen_xdi->count].type = XEN_DISK_SCSI; 
+	    xen_xdi->disks[xen_xdi->count].capacity = sd->capacity; 
+	    xen_xdi->count++; 
+
+	    /* default bios params to most commonly used values */
+	    diskinfo[0] = 0x40;
+	    diskinfo[1] = 0x20;
+	    diskinfo[2] = (sd->capacity) >> 11;
+	    
+	    /* override with calculated, extended default,
+	       or driver values */
+	    /* XXX SMH: gross in-line literal major number. XXX FIXME. */
+	    if(sd->device->host->hostt->bios_param != NULL)
+		sd->device->host->hostt->bios_param(
+		    sd, MKDEV(SCSI_DISK0_MAJOR, 0), &diskinfo[0]);
+	    else scsicam_bios_param(sd, MKDEV(SCSI_DISK0_MAJOR, 0), 
+				    &diskinfo[0]);
+
+	    
+	    printk (KERN_ALERT "SCSI-XENO %d\n", xen_xdi->count - base);
+	    printk (KERN_ALERT "  capacity 0x%x\n", sd->capacity);
+	    printk (KERN_ALERT "  head     0x%x\n", diskinfo[0]);
+	    printk (KERN_ALERT "  sector   0x%x\n", diskinfo[1]);
+	    printk (KERN_ALERT "  cylinder 0x%x\n", diskinfo[2]);
+
+
+	}
+    }
+
+    unmap_domain_mem(xen_xdi);
+
+    return; 
+}	
+
+
+
 
 static int sd_detect(Scsi_Device * SDp)
 {
@@ -1463,6 +1530,8 @@ static void sd_detach(Scsi_Device * SDp)
 
 static int __init init_sd(void)
 {
+    extern int scsi_register_module(int, void *);
+
     sd_template.module = THIS_MODULE;
     return scsi_register_module(MODULE_SCSI_DEV, &sd_template);
 }

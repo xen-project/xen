@@ -311,7 +311,7 @@ static void aac_rx_start_adapter(struct aac_dev *dev)
     struct aac_init *init;
     
     init = dev->init;
-    printk("aac_rx_start: dev is %p, init is %p\n", dev, init); 
+
     init->HostElapsedSeconds = cpu_to_le32(jiffies/HZ);
     /*
      *	Tell the adapter we are back and up and running so it will scan

@@ -145,8 +145,8 @@
 
 #define	UMEM_MAJOR	116	/* http://www.umem.com/ Battery Backed RAM */
 
-/* note: 123, 124, 125, 126 and 234, 235, 236, 237 are defined in xeno_major */
-#include <asm/hypervisor-ifs/xeno-major.h>
+#define XLIDE_MAJOR	123	/* XenoLinux IDE Device */
+#define XLSCSI_MAJOR	133	/* XenoLinux SCSI Device */
 
 #define RTF_MAJOR	150
 #define RAW_MAJOR	162

@@ -251,6 +251,7 @@
 3ddb79be04dyXzyXqDbMRS_1funwXQ xen/drivers/block/blkpg.c
 3ddb79beME_0abStePF6fU8XLuQnWw xen/drivers/block/elevator.c
 3ddb79beNQVrdGyoI4njXhgAjD6a4A xen/drivers/block/genhd.c
+3e677183FxihZVsJDCnvV2S0-FEZyA xen/drivers/block/grok.c
 3ddb79beyWwLRP_BiM2t1JKgr_plEw xen/drivers/block/ll_rw_blk.c
 3e4a8cb7RhubVgsPwO7cK0pgAN8WCQ xen/drivers/block/xen_block.c
 3e5d129asHNyZOjBKTkqs-9AFzxemA xen/drivers/block/xen_segment.c
@@ -477,6 +478,8 @@
 3e5a4e65iHEuC5sjFhj42XALYbLVRw xenolinux-2.4.21-pre4-sparse/arch/xeno/drivers/block/Makefile
 3e5a4e65pP5spJErBW69pJxSSdK9RA xenolinux-2.4.21-pre4-sparse/arch/xeno/drivers/block/xl_block.c
 3e5a4e65GtI9JZRAjuRdXaxt_4ohyQ xenolinux-2.4.21-pre4-sparse/arch/xeno/drivers/block/xl_block_test.c
+3e677190SjkzJIvFifRVeYpIZOCtYA xenolinux-2.4.21-pre4-sparse/arch/xeno/drivers/block/xl_ide.c
+3e677193nOKKTLJzcAu4SYdbZaia8g xenolinux-2.4.21-pre4-sparse/arch/xeno/drivers/block/xl_scsi.c
 3e676eb5RXnHzSHgA1BvM0B1aIm4qg xenolinux-2.4.21-pre4-sparse/arch/xeno/drivers/block/xl_segment.c
 3e5d129aDldt6geU2-2SzBae34sQzg xenolinux-2.4.21-pre4-sparse/arch/xeno/drivers/block/xl_segment_proc.c
 3e5a4e65G3e2s0ghPMgiJ-gBTUJ0uQ xenolinux-2.4.21-pre4-sparse/arch/xeno/drivers/console/Makefile

@@ -338,7 +338,6 @@ static int aac_detect(Scsi_Host_Template *template)
 #endif
 
     template->present = aac_count; /* # of cards of this type found */
-    printk(KERN_DEBUG "aac_detect: returning %d\n", aac_count); 
     return aac_count;
 }
 
@@ -461,7 +460,7 @@ static int aac_biosparm(Scsi_Disk *disk, kdev_t dev, int *geom)
     struct buffer_head * buf;
     
     dprintk((KERN_DEBUG "aac_biosparm.\n"));
-    
+
     /*
      *	Assuming extended translation is enabled - #REVISIT#
      */
@@ -499,7 +498,6 @@ static int aac_biosparm(Scsi_Disk *disk, kdev_t dev, int *geom)
      *	table entry whose end_head matches one of the standard geometry 
      *	translations ( 64/32, 128/32, 255/63 ).
      */
-#endif
 
 	 
     if(*(unsigned short *)(buf->b_data + 0x1fe) == cpu_to_le16(0xaa55))
@@ -560,7 +558,6 @@ static int aac_biosparm(Scsi_Disk *disk, kdev_t dev, int *geom)
 		     param->heads, param->sectors));
 	}
     }
-#if 0
     brelse(buf);
 #endif
     return 0;

@@ -325,10 +325,9 @@ struct aac_dev *aac_init_adapter(struct aac_dev *dev)
 	}
 	memset(dev->queues, 0, sizeof(struct aac_queue_block));
 
-	printk("aac_init_adapater, dev is %p\n", dev); 
 	if (aac_comm_init(dev)<0)
 		return NULL;
-	printk("aac_init_adapater, dev->init is %p\n", dev->init); 
+
 	/*
 	 *	Initialize the list of fibs
 	 */
