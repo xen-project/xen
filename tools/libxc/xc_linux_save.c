@@ -632,7 +632,7 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
                 pfn_batch[batch] = n;
                 pfn_type[batch] = live_pfn_to_mfn_table[n];
 
-                if( pfn_type[batch] == 0x80000004 ){
+                if( pfn_type[batch] == 0x80000001 ){
                     /* not currently in pusedo-physical map -- set bit
                        in to_fix that we must send this page in last_iter
                        unless its sent sooner anyhow */
