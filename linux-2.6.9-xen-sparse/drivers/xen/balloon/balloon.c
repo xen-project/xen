@@ -91,7 +91,7 @@ static struct timer_list balloon_timer;
 #define LIST_TO_PAGE(l) ( list_entry(l, struct page, list) )
 #define UNLIST_PAGE(p)  ( list_del(&p->list) )
 #define pte_offset_kernel pte_offset
-#define subsys_initcall(_fn) __initcall(fn)
+#define subsys_initcall(_fn) __initcall(_fn)
 #endif
 
 #define IPRINTK(fmt, args...) \
@@ -300,14 +300,14 @@ static void balloon_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
     switch ( msg->subtype )
     {
     case CMSG_MEM_REQUEST_SET:
+    {
+        mem_request_t *req = (mem_request_t *)&msg->msg[0];
         if ( msg->length != sizeof(mem_request_t) )
             goto parse_error;
-        {
-            mem_request_t *req = (mem_request_t *)&msg->msg[0];
-            set_new_target(req->target);
-            req->status = 0;
-        }
-        break;        
+        set_new_target(req->target);
+        req->status = 0;
+    }
+    break;        
     default:
         goto parse_error;
     }
@@ -353,12 +353,11 @@ static int balloon_read(char *page, char **start, off_t off,
     len = sprintf(
         page,
         "Current allocation: %8lu kB\n"
-        "Target allocation:  %8lu kB / %8lu kB (actual / requested)\n"
-        "Unused heap space:  %8lu kB / %8lu kB (low-mem / high-mem)\n"
+        "Requested target:   %8lu kB\n"
+        "Low-mem balloon:    %8lu kB\n"
+        "High-mem balloon:   %8lu kB\n"
         "Xen hard limit:     ",
-        K(current_pages),
-        K(current_target()), K(target_pages),
-        K(balloon_low), K(balloon_high));
+        K(current_pages), K(target_pages), K(balloon_low), K(balloon_high));
 
     if ( hard_limit != ~0UL )
         len += sprintf(
