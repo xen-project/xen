@@ -7,6 +7,9 @@
 #ifndef __HYPERVISOR_IF_H__
 #define __HYPERVISOR_IF_H__
 
+/* GCC-specific way to pack structure definitions (no implicit padding). */
+#define PACKED __attribute__ ((packed))
+
 #include "arch/hypervisor-if.h"
 
 /*
@@ -197,21 +200,24 @@ typedef u64 domid_t;
 #include "block.h"
 
 /*
- * Send an array of these to HYPERVISOR_mmu_update()
+ * Send an array of these to HYPERVISOR_mmu_update().
+ * NB. The fields are natural pointer/address size for this architecture.
  */
 typedef struct
 {
-    unsigned long ptr, val; /* *ptr = val */
-} mmu_update_t;
+    memory_t ptr;    /* Machine address of PTE. */
+    memory_t val;    /* New contents of PTE.    */
+} PACKED mmu_update_t;
 
 /*
- * Send an array of these to HYPERVISOR_multicall()
+ * Send an array of these to HYPERVISOR_multicall().
+ * NB. The fields are natural register size for this architecture.
  */
 typedef struct
 {
-    unsigned long op;
-    unsigned long args[7];
-} multicall_entry_t;
+    cpureg_t op;
+    cpureg_t args[7];
+} PACKED multicall_entry_t;
 
 /* Event channel endpoints per domain. */
 #define NR_EVENT_CHANNELS 1024
@@ -258,7 +264,7 @@ typedef struct shared_info_st
         u8 evtchn_upcall_pending;
         u8 evtchn_upcall_mask;
         u8 pad0, pad1;
-    } vcpu_data[MAX_VIRT_CPUS];
+    } PACKED vcpu_data[MAX_VIRT_CPUS];  /*   0 */
 
     /*
      * A domain can have up to 1024 "event channels" on which it can send
@@ -295,16 +301,16 @@ typedef struct shared_info_st
      * 32-bit selector to be set. Each bit in the selector covers a 32-bit
      * word in the PENDING bitfield array.
      */
-    u32 evtchn_pending[32];
-    u32 evtchn_pending_sel;
-    u32 evtchn_exception[32];
-    u32 evtchn_mask[32];
+    u32 evtchn_pending[32];             /*   4 */
+    u32 evtchn_pending_sel;             /* 132 */
+    u32 evtchn_exception[32];           /* 136 */
+    u32 evtchn_mask[32];                /* 264 */
 
     /*
      * Time: The following abstractions are exposed: System Time, Clock Time,
      * Domain Virtual Time. Domains can access Cycle counter time directly.
      */
-    u64                cpu_freq;        /* CPU frequency (Hz).               */
+    u64                cpu_freq;        /* 392: CPU frequency (Hz).          */
 
     /*
      * The following values are updated periodically (and not necessarily
@@ -313,12 +319,12 @@ typedef struct shared_info_st
      * incremented immediately after. See the Xen-specific Linux code for an
      * example of how to read these values safely (arch/xen/kernel/time.c).
      */
-    unsigned long      time_version1;   /* A version number for info below.  */
-    unsigned long      time_version2;   /* A version number for info below.  */
+    u32                time_version1;   /* 400 */
+    u32                time_version2;   /* 404 */
     tsc_timestamp_t    tsc_timestamp;   /* TSC at last update of time vals.  */
     u64                system_time;     /* Time, in nanosecs, since boot.    */
-    unsigned long      wc_sec;          /* Secs  00:00:00 UTC, Jan 1, 1970.  */
-    unsigned long      wc_usec;         /* Usecs 00:00:00 UTC, Jan 1, 1970.  */
+    u32                wc_sec;          /* Secs  00:00:00 UTC, Jan 1, 1970.  */
+    u32                wc_usec;         /* Usecs 00:00:00 UTC, Jan 1, 1970.  */
     u64                domain_time;     /* Domain virtual time, in nanosecs. */
 
     /*
@@ -326,8 +332,8 @@ typedef struct shared_info_st
      * Allow a domain to specify a timeout value in system time and 
      * domain virtual time.
      */
-    u64                wall_timeout;
-    u64                domain_timeout;
+    u64                wall_timeout;    /* 440 */
+    u64                domain_timeout;  /* 448 */
 
     /*
      * The index structures are all stored here for convenience. The rings 
@@ -339,7 +345,7 @@ typedef struct shared_info_st
 
     execution_context_t execution_context;
 
-} shared_info_t;
+} PACKED shared_info_t;
 
 /*
  * Start-of-day memory layout for the initial domain (DOM0):

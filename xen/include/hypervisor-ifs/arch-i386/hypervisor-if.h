@@ -8,6 +8,16 @@
 #define __HYPERVISOR_IF_I386_H__
 
 /*
+ * Pointers and other address fields inside interface structures are padded to
+ * 64 bits. This means that field alignments aren't different between 32- and
+ * 64-bit architectures. 
+ */
+/* NB. Multi-level macro ensures __LINE__ is expanded before concatenation. */
+#define __MEMORY_PADDING(_X) u32 __pad_ ## _X
+#define _MEMORY_PADDING(_X)  __MEMORY_PADDING(_X)
+#define MEMORY_PADDING       _MEMORY_PADDING(__LINE__)
+
+/*
  * SEGMENT DESCRIPTOR TABLES
  */
 /*
@@ -55,6 +65,10 @@
 
 #ifndef __ASSEMBLY__
 
+/* NB. Both the following are 32 bits each. */
+typedef unsigned long memory_t;   /* Full-sized pointer/address/memory-size. */
+typedef unsigned long cpureg_t;   /* Full-sized register.                    */
+
 /*
  * Send an array of these to HYPERVISOR_set_trap_table()
  */
@@ -62,13 +76,12 @@
 #define TI_GET_IF(_ti)       ((_ti)->flags & 4)
 #define TI_SET_DPL(_ti,_dpl) ((_ti)->flags |= (_dpl))
 #define TI_SET_IF(_ti,_if)   ((_ti)->flags |= ((!!(_if))<<2))
-typedef struct trap_info_st
-{
-    unsigned char  vector;  /* exception vector                              */
-    unsigned char  flags;   /* 0-3: privilege level; 4: clear event enable?  */
-    unsigned short cs;      /* code selector                                 */
-    unsigned long  address; /* code address                                  */
-} trap_info_t;
+typedef struct {
+    u8       vector;  /* 0: exception vector                              */
+    u8       flags;   /* 1: 0-3: privilege level; 4: clear event enable?  */
+    u16      cs;      /* 2: code selector                                 */
+    memory_t address; /* 4: code address                                  */
+} PACKED trap_info_t; /* 8 bytes */
 
 typedef struct
 {
@@ -89,19 +102,18 @@ typedef struct
     unsigned long eflags;
     unsigned long esp;
     unsigned long ss;
-} execution_context_t;
+} PACKED execution_context_t;
 
 typedef struct {
-    unsigned long  tsc_bits;      /* 32 bits read from the CPU's TSC. */
-    unsigned int   tsc_bitshift;  /* 'tsc_bits' uses N:N+31 of TSC.   */
-} tsc_timestamp_t;
+    u32  tsc_bits;      /* 0: 32 bits read from the CPU's TSC. */
+    u32  tsc_bitshift;  /* 4: 'tsc_bits' uses N:N+31 of TSC.   */
+} PACKED tsc_timestamp_t; /* 8 bytes */
 
 /*
  * The following is all CPU context. Note that the i387_ctxt block is filled 
  * in by FXSAVE if the CPU has feature FXSR; otherwise FSAVE is used.
  */
-typedef struct full_execution_context_st
-{
+typedef struct {
 #define ECF_I387_VALID (1<<0)
     unsigned long flags;
     execution_context_t cpu_ctxt;           /* User-level CPU registers     */
@@ -117,7 +129,7 @@ typedef struct full_execution_context_st
     unsigned long event_callback_eip;
     unsigned long failsafe_callback_cs;     /* CS:EIP of failsafe callback  */
     unsigned long failsafe_callback_eip;
-} full_execution_context_t;
+} PACKED full_execution_context_t;
 
 #define ARCH_HAS_FAST_TRAP
 

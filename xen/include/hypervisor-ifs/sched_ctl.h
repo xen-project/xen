@@ -23,49 +23,45 @@
  */
 struct sched_ctl_cmd
 {
-    unsigned int sched_id;
-    int direction;          /* are we getting or putting settings? */
-    
-    union
-    {
+    u32 sched_id;                     /*  0 */
+    u32 direction;                    /*  4 */
+    union {                           /*  8 */
         struct bvt_ctl
         {
             /* IN variables. */
-            unsigned long ctx_allow;  /* context switch allowance */
-        } bvt;
+            u32 ctx_allow;            /*  8: context switch allowance */
+        } PACKED bvt;
 
         struct rrobin_ctl
         {
             /* IN variables */
-            u64 slice;                /* round robin time slice */
-        } rrobin;
-    } u;
-};
+            u64 slice;                /*  8: round robin time slice */
+        } PACKED rrobin;
+    } PACKED u;
+} PACKED; /* 16 bytes */
 
 struct sched_adjdom_cmd
 {
-    unsigned int sched_id;
-    domid_t domain;
-    int direction;          /* are we getting or putting settings? */
-    
-    union
-    {
+    u32 sched_id;                     /*  0 */
+    u32 direction;                    /*  4 */
+    domid_t domain;                   /*  8 */
+    union {                           /* 16 */
         struct bvt_adjdom
         {
-            unsigned long mcu_adv;    /* mcu advance: inverse of weight */
-            unsigned long warp;       /* time warp */
-            unsigned long warpl;      /* warp limit */
-            unsigned long warpu;      /* unwarp time requirement */
-        } bvt;
+            u32 mcu_adv;    /* 16: mcu advance: inverse of weight */
+            u32 warp;       /* 20: time warp */
+            u32 warpl;      /* 24: warp limit */
+            u32 warpu;      /* 28: unwarp time requirement */
+        } PACKED bvt;
 
         struct atropos_adjdom
         {
-            u64 nat_period;
-            u64 nat_slice;
-            u64 latency;
-            int xtratime;
-        } atropos;
-    } u;
-};
+            u64 nat_period; /* 16 */
+            u64 nat_slice;  /* 24 */
+            u64 latency;    /* 32 */
+            u32 xtratime;   /* 36 */
+        } PACKED atropos;
+    } PACKED u;
+} PACKED; /* 40 bytes */
 
 #endif /* __SCHED_CTL_H__ */

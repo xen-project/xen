@@ -16,11 +16,11 @@ static void netif_page_release(struct page *page);
 static void make_tx_response(netif_t *netif, 
                              u16      id,
                              s8       st);
-static int  make_rx_response(netif_t     *netif, 
-                             u16          id, 
-                             s8           st,
-                             netif_addr_t addr,
-                             u16          size);
+static int  make_rx_response(netif_t *netif, 
+                             u16      id, 
+                             s8       st,
+                             memory_t addr,
+                             u16      size);
 
 static void net_tx_action(unsigned long unused);
 static DECLARE_TASKLET(net_tx_tasklet, net_tx_action, 0);
@@ -682,11 +682,11 @@ static void make_tx_response(netif_t *netif,
         notify_via_evtchn(netif->evtchn);
 }
 
-static int make_rx_response(netif_t     *netif, 
-                            u16          id, 
-                            s8           st,
-                            netif_addr_t addr,
-                            u16          size)
+static int make_rx_response(netif_t *netif, 
+                            u16      id, 
+                            s8       st,
+                            memory_t addr,
+                            u16      size)
 {
     NET_RING_IDX i = netif->rx_resp_prod;
     netif_rx_response_t *resp;
