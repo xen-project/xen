@@ -19,7 +19,7 @@
 #include <asm/flushtlb.h>
 
 unsigned long *mapcache;
-static unsigned int map_idx, shadow_map_idx[NR_CPUS];
+static unsigned int map_idx, epoch, shadow_epoch[NR_CPUS];
 static spinlock_t map_lock = SPIN_LOCK_UNLOCKED;
 
 /* Use a spare PTE bit to mark entries ready for recycling. */
@@ -30,11 +30,11 @@ static void flush_all_ready_maps(void)
     unsigned long *cache = mapcache;
 
     /* A bit skanky -- depends on having an aligned PAGE_SIZE set of PTEs. */
-    do { if ( (*cache & READY_FOR_TLB_FLUSH) ) *cache = 0; }
+    do {
+        if ( (*cache & READY_FOR_TLB_FLUSH) )
+            *cache = 0;
+    }
     while ( ((unsigned long)(++cache) & ~PAGE_MASK) != 0 );
-
-    perfc_incrc(domain_page_tlb_flush);
-    local_flush_tlb();
 }
 
 
@@ -50,24 +50,28 @@ void *map_domain_mem(unsigned long pa)
     spin_lock_irqsave(&map_lock, flags);
 
     /* Has some other CPU caused a wrap? We must flush if so. */
-    if ( map_idx < shadow_map_idx[cpu] )
+    if ( epoch != shadow_epoch[cpu] )
     {
         perfc_incrc(domain_page_tlb_flush);
         local_flush_tlb();
+        shadow_epoch[cpu] = epoch;
     }
 
-    for ( ; ; )
-    {
+    do {
         idx = map_idx = (map_idx + 1) & (MAPCACHE_ENTRIES - 1);
-        if ( idx == 0 ) flush_all_ready_maps();
-        if ( cache[idx] == 0 ) break;
+        if ( unlikely(idx == 0) )
+        {
+            flush_all_ready_maps();
+            perfc_incrc(domain_page_tlb_flush);
+            local_flush_tlb();
+            shadow_epoch[cpu] = ++epoch;
+        }
     }
+    while ( cache[idx] != 0 );
 
     cache[idx] = (pa & PAGE_MASK) | __PAGE_HYPERVISOR;
 
     spin_unlock_irqrestore(&map_lock, flags);
-
-    shadow_map_idx[cpu] = idx;
 
     va = MAPCACHE_VIRT_START + (idx << PAGE_SHIFT) + (pa & ~PAGE_MASK);
     return (void *)va;
