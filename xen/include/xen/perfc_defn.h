@@ -35,7 +35,14 @@ PERFSTATUS( shadow_l1_pages, "current # shadow L1 pages" )
 PERFCOUNTER_CPU( check_pagetable, "calls to check_pagetable" )
 PERFCOUNTER_CPU( check_all_pagetables, "calls to check_all_pagetables" )
 
+/* XXX constant from dom0_ops.h */
+#define PERFC_MAX_PT_UPDATES 64
+#define PERFC_PT_UPDATES_BUCKET_SIZE 3
+PERFCOUNTER_ARRAY( wpt_updates, "writable pt updates", PERFC_MAX_PT_UPDATES )
+PERFCOUNTER_ARRAY( bpt_updates, "batched pt updates", PERFC_MAX_PT_UPDATES )
+
+
 #define VMX_PERF_EXIT_REASON_SIZE 37
 #define VMX_PERF_VECTOR_SIZE 0x20
-PERFCOUNTER_ARRAY(vmexits, "vmexits", VMX_PERF_EXIT_REASON_SIZE )
-PERFCOUNTER_ARRAY(cause_vector, "cause vector", VMX_PERF_VECTOR_SIZE )
+PERFCOUNTER_ARRAY( vmexits, "vmexits", VMX_PERF_EXIT_REASON_SIZE )
+PERFCOUNTER_ARRAY( cause_vector, "cause vector", VMX_PERF_VECTOR_SIZE )
