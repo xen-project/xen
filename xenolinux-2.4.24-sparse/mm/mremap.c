@@ -243,6 +243,13 @@ unsigned long do_mremap(unsigned long addr,
 
 		if (new_len > TASK_SIZE || new_addr > TASK_SIZE - new_len)
 			goto out;
+		/*
+		 * Allow new_len == 0 only if new_addr == addr
+		 * to preserve truncation in place (that was working
+		 * safe and some app may depend on it).
+		 */
+		if (unlikely(!new_len && new_addr != addr))
+			goto out;
 
 		/* Check if the location we're moving into overlaps the
 		 * old location at all, and fail if it does.

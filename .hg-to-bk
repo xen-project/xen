@@ -1,5 +1,5 @@
 #!/bin/sh -x
 set -e
-ln -s xenolinux-2.4.23-sparse xenolinux-sparse
+ln -s xenolinux-2.4.24-sparse xenolinux-sparse
 (find -depth -type d -print | xargs -r rmdir 2>/dev/null) || true
 exit 0
