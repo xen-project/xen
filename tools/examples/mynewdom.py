@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 
-#
-# Example script for creating and building a new Linux guest OS for Xen.
-#
+# Example script for creating and building a new Linux guest OS for
+# Xen.  THIS IS VERY SITE SPECIFIC, but shows an example configuration
+# using multiple root partitions with a common /usr.  e.g. Domain1
+# uses root /dev/sda8, usr /dev/sda6, and the next sequential IP address.
 
 import Xc, XenoUtil, sys, os, socket, re
 
@@ -19,18 +20,18 @@ memory_megabytes = 64
 # STEP 3. A handy name for your new domain.
 domain_name = "My new domain"
 
-# Allocate new domain
+# Allocate new domain ad get its domain id
 xc = Xc.new()
 id = xc.domain_create( mem_kb=memory_megabytes*1024, name=domain_name )
 if id <= 0:
     print "Error creating domain"
     sys.exit()
 
-# Set the CPU, or leave to round robin
+# Set the CPU, or leave to round robin allocation
 #xc.domain_pincpu( dom=id, cpu=1 )
 
 # STEP 4. Specify IP address, netmask and gateway for the new domain.
-ipaddr  = XenoUtil.add_to_ip(XenoUtil.addr_of_iface('eth0'),id)
+ipaddr  = XenoUtil.add_offset_to_ip(XenoUtil.get_current_ipaddr(),id)
 netmask = XenoUtil.get_current_ipmask()
 gateway = XenoUtil.get_current_ipgw()
 

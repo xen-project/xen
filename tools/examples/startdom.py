@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 #
-# Stop execution of specified domain.
+# Start execution of specified domain.
 #
 
 import Xc, sys, re
@@ -12,4 +12,4 @@ if len(sys.argv) != 2:
     print "Specify a domain identifier"
     sys.exit()
 
-xc.domain_stop( dom=int(sys.argv[1]) )
+xc.domain_start( dom=int(sys.argv[1]) )

@@ -129,16 +129,11 @@ def setup_vfr_rules_for_vif(dom,vif,addr):
     os.close( fd )
     return None
 
-def addr_of_iface( iface ):
-    fd = os.popen( '/sbin/ifconfig '+iface )
-    lines = fd.readlines()
-    for line in lines:
-	m = re.search( 'inet addr:([0-9.]+)', line )
-	if m: 
-	    return m.group(1)
-    return None
-
-def add_to_ip( ip, off ):
+def add_offset_to_ip( ip, off ):
     l = string.split(ip,'.')
-    return '%s.%s.%s.%d' % ( l[0],l[1],l[2],string.atoi(l[3])+off )
+    a = ( (string.atoi(l[0])<<24) | (string.atoi(l[1])<<16) | 
+	  (string.atoi(l[2])<<8)  | string.atoi(l[3]) ) + off
+    
+    return '%d.%d.%d.%d' % ( ((a>>24)&0xff), ((a>>16)&0xff),
+			     ((a>>8)&0xff), (a&0xff) )
 

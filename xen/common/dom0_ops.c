@@ -196,14 +196,17 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 	    else
 	      {
 		/* For the moment, we are unable to move running
-		domains between CPUs. (We need a way of cleanly stopping 
-		running domains). For now, if we discover the domain is
-		running then cowardly bail out with ENOSYS */
+		domains between CPUs. (We need a way of synchronously
+		stopping running domains). For now, if we discover the
+		domain is not stopped already then cowardly bail out
+		with ENOSYS */
 
-		if(p->flags & PF_CONSTRUCTED) 
+		if( !(p->state & TASK_STOPPED) ) 
 		  ret = -ENOSYS;
 		else
 		  {
+		    /* We need a task structure lock here!!! 
+		       FIX ME!! */
 		    cpu = cpu % smp_num_cpus;
 		    p->processor = cpu;
 		    p->cpupinned = 1;
