@@ -2,7 +2,7 @@
 #define __ASM_HARDIRQ_H
 
 #include <xen/config.h>
-#include <xen/irq.h>
+#include <xen/cache.h>
 
 /* assembly code in softirq.h is sensitive to the offsets of these fields */
 typedef struct {
