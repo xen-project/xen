@@ -21,7 +21,7 @@
 #define TG3_BDINFO_NIC_ADDR		0xcUL /* 32-bit */
 #define TG3_BDINFO_SIZE			0x10UL
 
-#define RX_COPY_THRESHOLD  		256
+#define RX_COPY_THRESHOLD  		0 //256
 
 #define RX_STD_MAX_SIZE			1536
 #define RX_JUMBO_MAX_SIZE		0xdeadbeef /* XXX */

@@ -66,7 +66,7 @@ static int tx_start = 1; /* Mapping -- 0:20, 1:64, 2:128, 3:~220 (depends on chi
 static struct net_device *pcnet32_dev;
 
 static const int max_interrupt_work = 80;
-static const int rx_copybreak = 200;
+static const int rx_copybreak = 0; /* 200; Xen doesn't do in-driver copybreak. */
 
 #define PORT_AUI      0x00
 #define PORT_10BT     0x01

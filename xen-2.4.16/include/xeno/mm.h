@@ -7,6 +7,7 @@
 #include <asm/desc.h>
 #include <xeno/list.h>
 #include <hypervisor-ifs/hypervisor-if.h>
+#include <xeno/spinlock.h>
 
 /* XXX KAF: These may die eventually, but so many refs in slab.c :((( */
 
@@ -88,7 +89,7 @@ typedef struct pfn_info {
  * references exist of teh current type. A change in type can only occur
  * when type_count == 0.
  */
-#define PG_type_mask        (7<<24) /* bits 24-26 */
+#define PG_type_mask        (15<<24) /* bits 24-27 */
 #define PGT_none            (0<<24) /* no special uses of this page */
 #define PGT_l1_page_table   (1<<24) /* using this page as an L1 page table? */
 #define PGT_l2_page_table   (2<<24) /* using this page as an L2 page table? */
@@ -97,6 +98,7 @@ typedef struct pfn_info {
 #define PGT_gdt_page        (5<<24) /* using this page in a GDT? */
 #define PGT_ldt_page        (6<<24) /* using this page in an LDT? */
 #define PGT_writeable_page  (7<<24) /* has writable mappings of this page? */
+#define PGT_net_rx_buf      (8<<24) /* this page has been pirated by the net code. */
 
 #define PageSlab(page)		test_bit(PG_slab, &(page)->flags)
 #define PageSetSlab(page)	set_bit(PG_slab, &(page)->flags)
@@ -108,6 +110,7 @@ typedef struct pfn_info {
 extern frame_table_t * frame_table;
 extern unsigned long frame_table_size;
 extern struct list_head free_list;
+extern spinlock_t free_list_lock;
 extern unsigned int free_pfns;
 extern unsigned long max_page;
 void init_frametable(unsigned long nr_pages);

@@ -171,6 +171,7 @@
 #include <xeno/sched.h>
 #include <xeno/errno.h>
 #include <asm/page.h>
+#include <asm/flushtlb.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
 #include <asm/domain_page.h>
@@ -205,6 +206,7 @@ unsigned long frame_table_size;
 unsigned long max_page;
 
 struct list_head free_list;
+spinlock_t free_list_lock = SPIN_LOCK_UNLOCKED;
 unsigned int free_pfns;
 
 static int tlb_flush[NR_CPUS];
@@ -218,6 +220,7 @@ void __init init_frametable(unsigned long nr_pages)
 {
     struct pfn_info *pf;
     unsigned long page_index;
+    unsigned long flags;
 
     memset(tlb_flush, 0, sizeof(tlb_flush));
 
@@ -230,6 +233,7 @@ void __init init_frametable(unsigned long nr_pages)
     free_pfns = 0;
 
     /* Put all domain-allocatable memory on a free list. */
+    spin_lock_irqsave(&free_list_lock, flags);
     INIT_LIST_HEAD(&free_list);
     for( page_index = (__pa(frame_table) + frame_table_size) >> PAGE_SHIFT; 
          page_index < nr_pages;
@@ -239,6 +243,7 @@ void __init init_frametable(unsigned long nr_pages)
         list_add_tail(&pf->list, &free_list);
         free_pfns++;
     }
+    spin_unlock_irqrestore(&free_list_lock, flags);
 }
 
 
@@ -697,7 +702,6 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
     return err;
 }
 
-
 int do_process_page_updates(page_update_request_t *ureqs, int count)
 {
     page_update_request_t req;
@@ -807,11 +811,10 @@ int do_process_page_updates(page_update_request_t *ureqs, int count)
     if ( tlb_flush[smp_processor_id()] )
     {
         tlb_flush[smp_processor_id()] = 0;
-        __asm__ __volatile__ (
-            "movl %%eax,%%cr3" : : 
-            "a" (pagetable_val(current->mm.pagetable)));
+        __write_cr3_counted(pagetable_val(current->mm.pagetable));
 
     }
 
     return(0);
 }
+

@@ -12,6 +12,7 @@
 #include <xeno/dom0_ops.h>
 #include <asm/io.h>
 #include <asm/domain_page.h>
+#include <asm/flushtlb.h>
 #include <asm/msr.h>
 #include <xeno/multiboot.h>
 
@@ -175,10 +176,13 @@ unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes)
     struct pfn_info *pf;
     unsigned int alloc_pfns;
     unsigned int req_pages;
+    unsigned long flags;
 
     /* how many pages do we need to alloc? */
     req_pages = kbytes >> (PAGE_SHIFT - 10);
 
+    spin_lock_irqsave(&free_list_lock, flags);
+    
     /* is there enough mem to serve the request? */   
     if ( req_pages > free_pfns ) return -1;
     
@@ -194,6 +198,8 @@ unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes)
         list_add_tail(&pf->list, &p->pg_head);
         free_pfns--;
     }
+   
+    spin_unlock_irqrestore(&free_list_lock, flags);
     
     p->tot_pages = req_pages;
 
@@ -350,6 +356,7 @@ static unsigned long alloc_page_from_domain(unsigned long * cur_addr,
  */
 int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
 {
+
     struct list_head *list_ent;
     char *src, *dst;
     int i, dom = p->domain;
@@ -517,8 +524,7 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
 
     /* Install the new page tables. */
     __cli();
-    __asm__ __volatile__ (
-        "mov %%eax,%%cr3" : : "a" (pagetable_val(p->mm.pagetable)));
+    __write_cr3_counted(pagetable_val(p->mm.pagetable));
 
     /* Copy the guest OS image. */
     src = (char *)__va(mod[0].mod_start + 12);
@@ -594,8 +600,7 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     }
 
     /* Reinstate the caller's page tables. */
-    __asm__ __volatile__ (
-        "mov %%eax,%%cr3" : : "a" (pagetable_val(current->mm.pagetable)));    
+    __write_cr3_counted(pagetable_val(current->mm.pagetable));
     __sti();
 
     new_thread(p, 

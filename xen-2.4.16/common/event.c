@@ -14,14 +14,14 @@
 typedef void (*hyp_event_callback_fn_t)(void);
 
 extern void schedule(void);
-extern void flush_rx_queue(void);
 extern void flush_blk_queue(void);
+extern void update_shared_ring(void);
 
 /* Ordering must match definitions of _HYP_EVENT_* in xeno/sched.h */
 static hyp_event_callback_fn_t event_call_fn[] = 
 {
     schedule,
-    flush_rx_queue,
+    update_shared_ring,
     kill_domain, 
     flush_blk_queue
 };

@@ -111,11 +111,6 @@ typedef struct
 #define EVENT_NET_TX   0x20 /* packets for transmission. */
 #define EVENT_NET_RX   0x40 /* empty buffers for receive. */
 
-/* should these macros and the ones below test for range violation? */
-#define EVENT_NET_TX_FOR_VIF(x)    (EVENT_NET_TX << (2 * x))
-#define EVENT_NET_RX_FOR_VIF(x)    (EVENT_NET_RX << (2 * x))
-
-
 /* Bit offsets, as opposed to the above masks. */
 #define _EVENT_BLK_TX  0
 #define _EVENT_BLK_RX  1
@@ -124,9 +119,6 @@ typedef struct
 #define _EVENT_NET_TX  4
 #define _EVENT_NET_RX  5
 #define _EVENT_DEBUG   6
-
-#define _EVENT_NET_TX_FOR_VIF(x)    (_EVENT_NET_TX + (2 * x))
-#define _EVENT_NET_RX_FOR_VIF(x)    (_EVENT_NET_RX + (2 * x))
 
 
 /*

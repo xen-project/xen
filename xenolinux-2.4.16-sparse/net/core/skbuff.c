@@ -37,38 +37,41 @@
  */
 
 #include <linux/config.h>
-#include <linux/lib.h>
-#include <linux/errno.h>
 #include <linux/types.h>
-//#include <linux/kernel.h>
+#include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/interrupt.h>
-//#include <linux/in.h>
-//#include <linux/inet.h>
+#include <linux/in.h>
+#include <linux/inet.h>
 #include <linux/slab.h>
 #include <linux/netdevice.h>
-//#include <linux/string.h>
+#include <linux/string.h>
 #include <linux/skbuff.h>
 #include <linux/cache.h>
 #include <linux/init.h>
-//#include <linux/highmem.h>
+#include <linux/highmem.h>
+#include <linux/spinlock.h>
 
-//#include <net/ip.h>
-//#include <net/protocol.h>
-//#include <net/dst.h>
-//#include <net/tcp.h>
-//#include <net/udp.h>
-//#include <net/sock.h>
-
+#include <net/ip.h>
+#include <net/protocol.h>
+#include <net/dst.h>
+#include <net/tcp.h>
+#include <net/udp.h>
+#include <net/sock.h>
+#include <asm/io.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
-#include <asm/io.h>
 
-#define BUG_TRAP ASSERT
+/* zc globals: */
+/*
+char *net_page_chunk;
+struct net_page_info *net_page_table;
+struct list_head net_page_list;
+spinlock_t net_page_list_lock = SPIN_LOCK_UNLOCKED;
+unsigned int net_pages;
+*/
 
-#define put_page(_p) ((void)0) /* XXXX KAF */
-#define get_page(_p) ((void)0)
 
 int sysctl_hot_list_len = 128;
 
@@ -150,114 +153,6 @@ static __inline__ void skb_head_to_pool(struct sk_buff *skb)
 	kmem_cache_free(skbuff_head_cache, skb);
 }
 
-//static unsigned long skbpagesout=0, skbpagesin=0;
-
-static inline u8 *alloc_skb_data_page(struct sk_buff *skb)
-{
-        struct list_head *list_ptr;
-        struct pfn_info  *pf;
-        unsigned long flags;
-        
-        spin_lock_irqsave(&free_list_lock, flags);
-
-        if (!free_pfns) return NULL;
-
-        list_ptr = free_list.next;
-        pf = list_entry(list_ptr, struct pfn_info, list);
-        pf->flags = 0; // owned by dom0
-        list_del(&pf->list);
-        //pf->next = pf->prev = (pf - frame_table);
-        free_pfns--;
-
-        spin_unlock_irqrestore(&free_list_lock, flags);
-
-        skb->pf = pf;
-//if (skbpagesout++ % 100 == 0) printk("XEN-: skb allocs: %lu\n", skbpagesout);
-        return (u8 *)((pf - frame_table) << PAGE_SHIFT);
-}
-
-static inline void dealloc_skb_data_page(struct sk_buff *skb)
-{
-        struct pfn_info  *pf;
-        unsigned long flags;
-
-        pf = skb->pf;
-
-        spin_lock_irqsave(&free_list_lock, flags);
-        
-        list_add(&pf->list, &free_list);
-        free_pfns++;
-
-        spin_unlock_irqrestore(&free_list_lock, flags);
-
-//if (skbpagesin++ % 100 == 0) printk("XEN-: skb allocs: %lu\n", skbpagesin);
-}
-
-struct sk_buff *alloc_zc_skb(unsigned int size,int gfp_mask)
-{
-        struct sk_buff *skb;
-        u8 *data;
-
-        if (in_interrupt() && (gfp_mask & __GFP_WAIT)) {
-                static int count = 0;
-                if (++count < 5) {
-                        printk(KERN_ERR "alloc_skb called nonatomically "
-                               "from interrupt %p\n", NET_CALLER(size));
-                        BUG();
-                }
-                gfp_mask &= ~__GFP_WAIT;
-        }
-
-        /* Get the HEAD */
-        skb = skb_head_from_pool();
-        if (skb == NULL) {
-                skb = kmem_cache_alloc(skbuff_head_cache, gfp_mask & ~__GFP_DMA);
-                if (skb == NULL)
-                        goto nohead;
-        }
-
-        /* Get the DATA. Size must match skb_add_mtu(). */
-        size = SKB_DATA_ALIGN(size);
-        data = alloc_skb_data_page(skb);
-
-        if (data == NULL)
-                goto nodata;
-
-        // This is so that pci_map_single does the right thing in the driver.
-        // If you want to ever use this pointer otherwise, you need to regenerate it 
-        // based on skb->pf.
-        data = phys_to_virt((unsigned long)data); 
-        
-        /* XXX: does not include slab overhead */
-        skb->truesize = size + sizeof(struct sk_buff);
-
-        /* Load the data pointers. */
-        skb->head = data;
-        skb->data = data;
-        skb->tail = data;
-        skb->end = data + size;
-
-        /* Set up other state */
-        skb->len = 0;
-        skb->cloned = 0;
-        skb->data_len = 0;
-        skb->src_vif = VIF_UNKNOWN_INTERFACE;
-        skb->dst_vif = VIF_UNKNOWN_INTERFACE;
-        skb->skb_type = SKB_ZERO_COPY;
-
-        atomic_set(&skb->users, 1);
-        atomic_set(&(skb_shinfo(skb)->dataref), 1);
-        skb_shinfo(skb)->nr_frags = 0;
-        skb_shinfo(skb)->frag_list = NULL;
-
-        return skb;
-
-nodata:
-        skb_head_to_pool(skb);
-nohead:
-        return NULL;
-}
-
 
 /* 	Allocate a new skbuff. We do this ourselves so we can fill in a few
  *	'private' fields and also do memory statistics to find all the
@@ -320,8 +215,6 @@ struct sk_buff *alloc_skb(unsigned int size,int gfp_mask)
 	skb->len = 0;
 	skb->cloned = 0;
 	skb->data_len = 0;
-        skb->src_vif = VIF_UNKNOWN_INTERFACE;
-        skb->dst_vif = VIF_UNKNOWN_INTERFACE;
         skb->skb_type = SKB_NORMAL;
 
 	atomic_set(&skb->users, 1); 
@@ -336,6 +229,148 @@ nohead:
 	return NULL;
 }
 
+/* begin zc code additions: */
+/*
+void init_net_pages(unsigned long order_pages)
+{
+        int i;
+        struct net_page_info *np;
+        pgd_t *pgd; pmd_t *pmd; pte_t *ptep;
+        unsigned long nr_pages = 1 << order_pages;
+        
+        net_page_chunk = (char *)__get_free_pages(GFP_KERNEL, order_pages);
+        net_page_table = kmalloc(nr_pages * sizeof(struct net_page_info), GFP_KERNEL);
+
+        INIT_LIST_HEAD(&net_page_list);
+
+        for (i = 0; i < nr_pages; i++) 
+        {
+                np = net_page_table + i;
+                np->virt_addr = (unsigned long)net_page_chunk + (i * PAGE_SIZE);
+
+                // now fill the pte pointer:
+                //np->ppte = 0xdeadbeef;
+                //pgd = pgd_offset_k(np->virt_addr);
+                //if (pgd_none(*pgd) || pgd_bad(*pgd)) BUG();
+
+                //if (pmd_none(*pmd)) BUG(); 
+                //if (pmd_bad(*pmd)) BUG();
+
+                //ptep = pte_offset(pmd, np->virt_addr);
+                //np->ppte = phys_to_machine(virt_to_phys(ptep));
+                
+                list_add_tail(&np->list, &net_page_list);
+        }
+        net_pages = nr_pages;
+        
+
+}
+
+struct net_page_info *get_net_page(void)
+{
+
+    struct list_head *list_ptr;
+    struct net_page_info *np;
+    unsigned long flags;
+
+    if (!net_pages) 
+    {
+            return NULL;
+    }
+    spin_lock_irqsave(&net_page_list_lock, flags);
+    
+    list_ptr = net_page_list.next;
+    np = list_entry(list_ptr, struct net_page_info, list);
+    list_del(&np->list);
+    net_pages--;
+    
+    spin_unlock_irqrestore(&net_page_list_lock, flags);
+    
+    return np;
+}
+
+void free_net_page(struct net_page_info *np)
+{
+    unsigned long flags;
+  
+    if (np == NULL) return;
+    
+    spin_lock_irqsave(&net_page_list_lock, flags);
+    
+    list_add(&np->list, &net_page_list);
+    net_pages++;
+
+    spin_unlock_irqrestore(&net_page_list_lock, flags);
+
+}
+*/
+struct sk_buff *alloc_zc_skb(unsigned int size,int gfp_mask)
+{
+	struct sk_buff *skb;
+	u8 *data;
+
+	if (in_interrupt() && (gfp_mask & __GFP_WAIT)) {
+		static int count = 0;
+		if (++count < 5) {
+			printk(KERN_ERR "alloc_skb called nonatomically "
+			       "from interrupt %p\n", NET_CALLER(size));
+ 			BUG();
+		}
+		gfp_mask &= ~__GFP_WAIT;
+	}
+
+	/* Get the HEAD */
+	skb = skb_head_from_pool();
+	if (skb == NULL) {
+		skb = kmem_cache_alloc(skbuff_head_cache, gfp_mask & ~__GFP_DMA);
+		if (skb == NULL)
+			goto nohead;
+	}
+
+	/* Get the DATA. Size must match skb_add_mtu(). */
+	size = SKB_DATA_ALIGN(size);
+        if (size > PAGE_SIZE)
+        {
+                printk("alloc_zc_skb called with unruly size.\n");
+                size = PAGE_SIZE;
+        }
+	/*skb->net_page = get_net_page();
+        if (skb->net_page == NULL)
+        {
+                goto nodata;
+        }
+        data = (u8 *)skb->net_page->virt_addr;*/
+        data = (char *)__get_free_page(gfp_mask);
+	if (data == NULL)
+		goto nodata;
+	/* XXX: does not include slab overhead */ 
+	skb->truesize = size + sizeof(struct sk_buff);
+
+	/* Load the data pointers. */
+	skb->head = data;
+	skb->data = data;
+	skb->tail = data;
+	skb->end = data + size;
+
+	/* Set up other state */
+	skb->len = 0;
+	skb->cloned = 0;
+	skb->data_len = 0;
+        skb->skb_type = SKB_ZERO_COPY;
+
+	atomic_set(&skb->users, 1); 
+	atomic_set(&(skb_shinfo(skb)->dataref), 1);
+	skb_shinfo(skb)->nr_frags = 0;
+	skb_shinfo(skb)->frag_list = NULL;
+	return skb;
+
+nodata:
+	skb_head_to_pool(skb);
+nohead:
+	return NULL;
+}
+
+/* end zc code additions: */
 
 /*
  *	Slab constructor for a skb head. 
@@ -351,7 +386,7 @@ static inline void skb_headerinit(void *p, kmem_cache_t *cache,
 	skb->sk = NULL;
 	skb->stamp.tv_sec=0;	/* No idea about time */
 	skb->dev = NULL;
-//	skb->dst = NULL;
+	skb->dst = NULL;
 	memset(skb->cb, 0, sizeof(skb->cb));
 	skb->pkt_type = PACKET_HOST;	/* Default type */
 	skb->ip_summed = 0;
@@ -394,25 +429,29 @@ static void skb_clone_fraglist(struct sk_buff *skb)
 
 static void skb_release_data(struct sk_buff *skb)
 {
-
-	if (!skb->cloned ||
+        if (!skb->cloned ||
 	    atomic_dec_and_test(&(skb_shinfo(skb)->dataref))) {
 		if (skb_shinfo(skb)->nr_frags) {
 			int i;
-			for (i = 0; i < skb_shinfo(skb)->nr_frags; i++)
+			for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) 
+{
 				put_page(skb_shinfo(skb)->frags[i].page);
+}
 		}
 
 		if (skb_shinfo(skb)->frag_list)
 			skb_drop_fraglist(skb);
 
-                if (skb->skb_type == SKB_NORMAL) {
+                if (skb->skb_type == SKB_NORMAL)
+                {
 		    kfree(skb->head);
-                } else if (skb->skb_type == SKB_ZERO_COPY) {                    dealloc_skb_data_page(skb);
-                } else {
-                    BUG(); //skb_release_data called with unknown skb type!
+                } else {// SKB_ZERO_COPY
+                    //free_net_page(skb->net_page);
+//printk(KERN_ALERT "<%p>\n", phys_to_machine(virt_to_phys(skb->head)));
+                    free_page((void *)skb->head);
                 }
 	}
+
 }
 
 /*
@@ -441,7 +480,7 @@ void __kfree_skb(struct sk_buff *skb)
 		BUG();
 	}
 
-//	dst_release(skb->dst);
+	dst_release(skb->dst);
 	if(skb->destructor) {
 		if (in_irq()) {
 			printk(KERN_WARNING "Warning: kfree_skb on hard IRQ %p\n",
@@ -449,7 +488,6 @@ void __kfree_skb(struct sk_buff *skb)
 		}
 		skb->destructor(skb);
 	}
-
 #ifdef CONFIG_NETFILTER
 	nf_conntrack_put(skb->nfct);
 #endif
@@ -492,8 +530,8 @@ struct sk_buff *skb_clone(struct sk_buff *skb, int gfp_mask)
 	C(h);
 	C(nh);
 	C(mac);
-//	C(dst);
-//	dst_clone(n->dst);
+	C(dst);
+	dst_clone(n->dst);
 	memcpy(n->cb, skb->cb, sizeof(skb->cb));
 	C(len);
 	C(data_len);
@@ -525,7 +563,8 @@ struct sk_buff *skb_clone(struct sk_buff *skb, int gfp_mask)
 #ifdef CONFIG_NET_SCHED
 	C(tc_index);
 #endif
-
+        C(skb_type);
+        //C(net_page);
 	atomic_inc(&(skb_shinfo(skb)->dataref));
 	skb->cloned = 1;
 #ifdef CONFIG_NETFILTER
@@ -546,7 +585,7 @@ static void copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 	new->dev=old->dev;
 	new->priority=old->priority;
 	new->protocol=old->protocol;
-//	new->dst=dst_clone(old->dst);
+	new->dst=dst_clone(old->dst);
 	new->h.raw=old->h.raw+offset;
 	new->nh.raw=old->nh.raw+offset;
 	new->mac.raw=old->mac.raw+offset;
@@ -1124,8 +1163,6 @@ fault:
 
 /* Checksum skb data. */
 
-#if 0
-
 unsigned int skb_checksum(const struct sk_buff *skb, int offset, int len, unsigned int csum)
 {
 	int i, copy;
@@ -1304,8 +1341,6 @@ void skb_copy_and_csum_dev(const struct sk_buff *skb, u8 *to)
 	}
 }
 
-#endif
-
 #if 0
 /* 
  * 	Tune the memory allocator for a new MTU size.
@@ -1330,6 +1365,8 @@ void __init skb_init(void)
 					      skb_headerinit, NULL);
 	if (!skbuff_head_cache)
 		panic("cannot create skbuff cache");
+
+        //init_net_pages(NUM_NET_PAGES);
 
 	for (i=0; i<NR_CPUS; i++)
 		skb_queue_head_init(&skb_head_pool[i].list);

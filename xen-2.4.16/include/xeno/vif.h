@@ -18,9 +18,37 @@
 #include <hypervisor-ifs/network.h>
 #include <xeno/skbuff.h>
 
+/* 
+ * shadow ring structures are used to protect the descriptors from
+ * tampering after they have been passed to the hypervisor.
+ *
+ * TX_RING_SIZE and RX_RING_SIZE are defined in the shared network.h.
+ */
+
+typedef struct tx_shadow_entry_st {
+    unsigned long addr;
+    unsigned long size;
+    int           status;
+    unsigned long flush_count;
+} tx_shadow_entry_t;
+
+typedef struct rx_shadow_entry_st {
+    unsigned long addr;
+    unsigned long size;
+    int           status;
+    unsigned long flush_count;
+} rx_shadow_entry_t;
+
+typedef struct net_shadow_ring_st {
+    tx_shadow_entry_t *tx_ring;
+    rx_shadow_entry_t *rx_ring;
+    unsigned int rx_prod, rx_cons, rx_idx;
+} net_shadow_ring_t;
+
 typedef struct net_vif_st {
-    net_ring_t  *net_ring;
-    int          id;
+    net_ring_t          *net_ring;
+    net_shadow_ring_t   *shadow_ring;
+    int                 id;
     struct sk_buff_head skb_list;
     unsigned int domain;
     // rules table goes here in next revision.
@@ -38,5 +66,11 @@ extern net_vif_t *sys_vif_list[];
 net_vif_t *create_net_vif(int domain);
 void destroy_net_vif(struct task_struct *p);
 void add_default_net_rule(int vif_id, u32 ipaddr);
-int net_get_target_vif(struct sk_buff *skb);
+int __net_get_target_vif(u8 *data, unsigned int len, int src_vif);
 void add_default_net_rule(int vif_id, u32 ipaddr);
+
+#define net_get_target_vif(skb) __net_get_target_vif(skb->data, skb->len, skb->src_vif)
+/* status fields per-descriptor:
+ */
+
+

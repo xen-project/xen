@@ -75,6 +75,7 @@ static inline dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr,
 	if (direction == PCI_DMA_NONE)
 		BUG();
 	flush_write_buffers();
+
 	return virt_to_bus(ptr);
 }
 

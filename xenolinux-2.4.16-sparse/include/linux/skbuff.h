@@ -15,28 +15,48 @@
 #define _LINUX_SKBUFF_H
 
 #include <linux/config.h>
-#include <linux/lib.h>
-//#include <linux/kernel.h>
-//#include <linux/sched.h>
+#include <linux/kernel.h>
+#include <linux/sched.h>
 #include <linux/time.h>
-#include <linux/timer.h>
 #include <linux/cache.h>
 
 #include <asm/atomic.h>
 #include <asm/types.h>
 #include <linux/spinlock.h>
 #include <linux/mm.h>
-//#include <linux/highmem.h>
+#include <linux/highmem.h>
 
-// vif special values.
-#define VIF_PHYSICAL_INTERFACE  -1
-#define VIF_UNKNOWN_INTERFACE   -2
-#define VIF_DROP                -3
-#define VIF_ANY_INTERFACE       -4
+/* Zero Copy additions:
+ *
+ * (1) there are now two types of skb, as indicated by the skb_type field.
+ *     this is because, at least for the time being, there are two seperate types 
+ *     of memory that may be allocated to skb->data.
+ *
+ * (2) until discontiguous memory is fully supported, there will be a free list of pages
+ *     to be used by the net RX code.  This list will be allocated in the driver init code
+ *     but is declared here because the socket free code needs to return pages to it.
+ */
 
-//skb_type values:
-#define SKB_NORMAL               0
-#define SKB_ZERO_COPY            1
+// for skb->skb_type:
+
+#define SKB_NORMAL          0
+#define SKB_ZERO_COPY       1
+
+#define NUM_NET_PAGES       9 // about 1Meg of buffers. (2^9)
+
+/*struct net_page_info {
+        struct list_head list;
+        unsigned long   virt_addr;
+        unsigned long   ppte;
+};
+
+extern char *net_page_chunk;
+extern struct net_page_info *net_page_table;
+extern struct list_head net_page_list;
+extern spinlock_t net_page_list_lock;
+extern unsigned int net_pages;
+*/
+/* End zero copy additions */
 
 #define HAVE_ALLOC_SKB		/* For the drivers to know */
 #define HAVE_ALIGNABLE_SKB	/* Ditto 8)		   */
@@ -123,7 +143,7 @@ typedef struct skb_frag_struct skb_frag_t;
 
 struct skb_frag_struct
 {
-	struct pfn_info *page;
+	struct page *page;
 	__u16 page_offset;
 	__u16 size;
 };
@@ -177,7 +197,7 @@ struct sk_buff {
 	  	unsigned char 	*raw;
 	} mac;
 
-//	struct  dst_entry *dst;
+	struct  dst_entry *dst;
 
 	/* 
 	 * This is the control buffer. It is free to use for every
@@ -191,7 +211,7 @@ struct sk_buff {
  	unsigned int 	data_len;
 	unsigned int	csum;			/* Checksum 					*/
 	unsigned char 	__unused,		/* Dead field, may be reused			*/
-			cloned, 		/* head may be cloned (check refcnt to be sure) */
+			cloned, 		/* head may be cloned (check refcnt to be sure). */
   			pkt_type,		/* Packet class					*/
   			ip_summed;		/* Driver fed us an IP checksum			*/
 	__u32		priority;		/* Packet queueing priority			*/
@@ -206,16 +226,6 @@ struct sk_buff {
 	unsigned char 	*end;			/* End pointer					*/
 
 	void 		(*destructor)(struct sk_buff *);	/* Destruct function		*/
-
-        unsigned int    skb_type;               /* SKB_NORMAL or SKB_ZERO_COPY                  */
-        struct pfn_info *pf;                    /* record of physical pf address for freeing    */
-        int src_vif;                            /* vif we came from                             */
-        int dst_vif;                            /* vif we are bound for                         */
-        struct skb_shared_info shinfo;          /* shared info is no longer shared in Xen.      */
-        
-
-                
-        
 #ifdef CONFIG_NETFILTER
 	/* Can be used for communication between hooks. */
         unsigned long	nfmark;
@@ -235,8 +245,10 @@ struct sk_buff {
 #endif
 
 #ifdef CONFIG_NET_SCHED
-       __u32           tc_index;               /* traffic control index */
+       __u32           tc_index;                /* traffic control index */
 #endif
+       unsigned int     skb_type;                /* for zero copy handling.                      */
+       struct net_page_info *net_page;
 };
 
 #define SK_WMEM_MAX	65535
@@ -268,8 +280,7 @@ extern void	skb_over_panic(struct sk_buff *skb, int len, void *here);
 extern void	skb_under_panic(struct sk_buff *skb, int len, void *here);
 
 /* Internal */
-//#define skb_shinfo(SKB)		((struct skb_shared_info *)((SKB)->end))
-#define skb_shinfo(SKB)     ((struct skb_shared_info *)(&(SKB)->shinfo))
+#define skb_shinfo(SKB)		((struct skb_shared_info *)((SKB)->end))
 
 /**
  *	skb_queue_empty - check if a queue is empty
@@ -1055,8 +1066,8 @@ static inline struct sk_buff *__dev_alloc_skb(unsigned int length,
 {
 	struct sk_buff *skb;
 
-	//skb = alloc_skb(length+16, gfp_mask);
-        skb = alloc_zc_skb(length+16, gfp_mask);
+	skb = alloc_skb(length+16, gfp_mask);
+        //skb = alloc_zc_skb(length+16, gfp_mask);
 	if (skb)
 		skb_reserve(skb,16);
 	return skb;
@@ -1117,11 +1128,21 @@ int skb_linearize(struct sk_buff *skb, int gfp);
 
 static inline void *kmap_skb_frag(const skb_frag_t *frag)
 {
-	return page_address(frag->page);
+#ifdef CONFIG_HIGHMEM
+	if (in_irq())
+		BUG();
+
+	local_bh_disable();
+#endif
+	return kmap_atomic(frag->page, KM_SKB_DATA_SOFTIRQ);
 }
 
 static inline void kunmap_skb_frag(void *vaddr)
 {
+	kunmap_atomic(vaddr, KM_SKB_DATA_SOFTIRQ);
+#ifdef CONFIG_HIGHMEM
+	local_bh_enable();
+#endif
 }
 
 #define skb_queue_walk(queue, skb) \
@@ -1131,8 +1152,11 @@ static inline void kunmap_skb_frag(void *vaddr)
 
 
 extern struct sk_buff *		skb_recv_datagram(struct sock *sk,unsigned flags,int noblock, int *err);
+extern unsigned int		datagram_poll(struct file *file, struct socket *sock, struct poll_table_struct *wait);
 extern int			skb_copy_datagram(const struct sk_buff *from, int offset, char *to,int size);
+extern int			skb_copy_datagram_iovec(const struct sk_buff *from, int offset, struct iovec *to,int size);
 extern int			skb_copy_and_csum_datagram(const struct sk_buff *skb, int offset, u8 *to, int len, unsigned int *csump);
+extern int			skb_copy_and_csum_datagram_iovec(const struct sk_buff *skb, int hlen, struct iovec *iov);
 extern void			skb_free_datagram(struct sock * sk, struct sk_buff *skb);
 
 extern unsigned int		skb_checksum(const struct sk_buff *skb, int offset, int len, unsigned int csum);

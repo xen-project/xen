@@ -49,6 +49,7 @@ net_vif_t *create_net_vif(int domain)
 {
     net_vif_t *new_vif;
     net_ring_t *new_ring;
+    net_shadow_ring_t *shadow_ring;
     struct task_struct *dom_task;
     
     if ( !(dom_task = find_domain_by_id(domain)) ) 
@@ -64,7 +65,27 @@ net_vif_t *create_net_vif(int domain)
     new_ring = dom_task->net_ring_base + dom_task->num_net_vifs;
     memset(new_ring, 0, sizeof(net_ring_t));
 
+    // allocate the shadow ring.  
+    // maybe these should be kmem_cache instead of kmalloc?
+    
+    shadow_ring = kmalloc(sizeof(net_shadow_ring_t), GFP_KERNEL);
+    if (shadow_ring == NULL) goto fail;
+    
+    shadow_ring->tx_ring = kmalloc(TX_RING_SIZE 
+                    * sizeof(tx_shadow_entry_t), GFP_KERNEL);
+    shadow_ring->rx_ring = kmalloc(RX_RING_SIZE
+                    * sizeof(rx_shadow_entry_t), GFP_KERNEL);
+    if ((shadow_ring->tx_ring == NULL) || (shadow_ring->rx_ring == NULL))
+            goto fail;
+
+    shadow_ring->rx_prod = shadow_ring->rx_cons = shadow_ring->rx_idx = 0;
+    
+    // fill in the new vif struct.
+    
     new_vif->net_ring = new_ring;
+    new_vif->shadow_ring = shadow_ring;
+    
+                    
     skb_queue_head_init(&new_vif->skb_list);
     new_vif->domain = domain;
     
@@ -77,6 +98,10 @@ net_vif_t *create_net_vif(int domain)
     dom_task->num_net_vifs++;
     
     return new_vif;
+    
+fail:
+    printk("VIF allocation failed!\n");
+    return NULL;
 }
 
 /* delete_net_vif - Delete the last vif in the given domain. 
@@ -101,7 +126,10 @@ void destroy_net_vif(struct task_struct *p)
     write_lock(&sys_vif_lock);
     sys_vif_list[p->net_vif_list[i]->id] = NULL; // system vif list not gc'ed
     write_unlock(&sys_vif_lock);        
-    
+   
+    kfree(p->net_vif_list[i]->shadow_ring->tx_ring);
+    kfree(p->net_vif_list[i]->shadow_ring->rx_ring);
+    kfree(p->net_vif_list[i]->shadow_ring);
     kmem_cache_free(net_vif_cache, p->net_vif_list[i]);
 }
 
@@ -315,47 +343,56 @@ int net_find_rule(u8 nproto, u8 tproto, u32 src_addr, u32 dst_addr, u16 src_port
  * list.
  */
 
-int net_get_target_vif(struct sk_buff *skb)
+#define net_get_target_vif(skb) __net_get_target_vif(skb->data, skb->len, skb->src_vif)
+
+int __net_get_target_vif(u8 *data, unsigned int len, int src_vif)
 {
     int target = VIF_DROP;
-    skb->h.raw = skb->nh.raw = skb->data;
-    if ( skb->len < 2 ) goto drop;
-    switch ( ntohs(skb->mac.ethernet->h_proto) )
+    u8 *h_raw, *nh_raw;
+    
+    if ( len < 2 ) goto drop;
+
+    nh_raw = data + ETH_HLEN;
+    switch ( ntohs(*(unsigned short *)(data + 12)) )
     {
     case ETH_P_ARP:
-        if ( skb->len < 28 ) goto drop;
-        target = net_find_rule((u8)ETH_P_ARP, 0, ntohl(*(u32 *)(skb->nh.raw + 14)),
-                        ntohl(*(u32 *)(skb->nh.raw + 24)), 0, 0, 
-                        skb->src_vif);
+//printk("ARP!\n");
+        if ( len < 28 ) goto drop;
+        target = net_find_rule((u8)ETH_P_ARP, 0, ntohl(*(u32 *)(nh_raw + 14)),
+                        ntohl(*(u32 *)(nh_raw + 24)), 0, 0, 
+                        src_vif);
         break;
     case ETH_P_IP:
-        if ( skb->len < 20 ) goto drop;
-        skb->h.raw += ((*(unsigned char *)(skb->nh.raw)) & 0x0f) * 4;
-        switch ( *(unsigned char *)(skb->nh.raw + 9) )
+//printk("IP\n");
+        if ( len < 20 ) goto drop;
+        h_raw =  data + ((*(unsigned char *)(nh_raw)) & 0x0f) * 4;
+        switch ( *(unsigned char *)(nh_raw + 9) )
         {
-        case IPPROTO_TCP:
         case IPPROTO_UDP:
-            target = net_find_rule((u8)ETH_P_IP,  *(u8 *)(skb->nh.raw + 9),
-                    ntohl(*(u32 *)(skb->nh.raw + 12)),
-                    ntohl(*(u32 *)(skb->nh.raw + 16)),
-                    ntohs(*(u16 *)(skb->h.raw)),
-                    ntohs(*(u16 *)(skb->h.raw + 2)), 
-                    skb->src_vif);
+//printk("UDP!\n");
+        case IPPROTO_TCP:
+            target = net_find_rule((u8)ETH_P_IP,  *(u8 *)(nh_raw + 9),
+                    ntohl(*(u32 *)(nh_raw + 12)),
+                    ntohl(*(u32 *)(nh_raw + 16)),
+                    ntohs(*(u16 *)(h_raw)),
+                    ntohs(*(u16 *)(h_raw + 2)), 
+                    src_vif);
             break;
         default: // ip-based protocol where we don't have ports.
-            target = net_find_rule((u8)ETH_P_IP,  *(u8 *)(skb->nh.raw + 9),
-                    ntohl(*(u32 *)(skb->nh.raw + 12)),
-                    ntohl(*(u32 *)(skb->nh.raw + 16)),
+//printk("Other IP!\n");
+            target = net_find_rule((u8)ETH_P_IP,  *(u8 *)(data + 9),
+                    ntohl(*(u32 *)(nh_raw + 12)),
+                    ntohl(*(u32 *)(nh_raw + 16)),
                     0,
                     0, 
-                    skb->src_vif);
+                    src_vif);
         }
         break;
     }
-    skb->dst_vif=target;
     return target;
     
     drop:
+//printk("Drop case!\n");
     return VIF_DROP;
 }
 
