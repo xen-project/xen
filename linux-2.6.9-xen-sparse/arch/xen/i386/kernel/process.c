@@ -534,6 +534,7 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 		op.cmd           = DOM0_IOPL;
 		op.u.iopl.domain = DOMID_SELF;
 		op.u.iopl.iopl   = next->io_pl;
+		op.interface_version = DOM0_INTERFACE_VERSION;
 		queue_multicall1(__HYPERVISOR_dom0_op, (unsigned long)&op);
 	}
 
