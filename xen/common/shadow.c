@@ -170,9 +170,6 @@ int shadow_mode_enable( struct task_struct *p, unsigned int mode )
     struct shadow_status **fptr;
     int i;
 
-    spin_lock_init(&m->shadow_lock);
-    spin_lock(&m->shadow_lock);
-
     m->shadow_mode = mode;
  
     // allocate hashtable
@@ -186,8 +183,10 @@ int shadow_mode_enable( struct task_struct *p, unsigned int mode )
 
 
     // allocate space for first lot of extra nodes
-    m->shadow_ht_extras = kmalloc( sizeof(void*) + (shadow_ht_extra_size * 
-                                                    sizeof(struct shadow_status)), GFP_KERNEL );
+    m->shadow_ht_extras = kmalloc( sizeof(void*) + 
+				   (shadow_ht_extra_size * 
+				    sizeof(struct shadow_status)),
+				   GFP_KERNEL );
 
     if( ! m->shadow_ht_extras )
         goto nomem;
@@ -222,14 +221,11 @@ int shadow_mode_enable( struct task_struct *p, unsigned int mode )
         memset(m->shadow_dirty_bitmap,0,m->shadow_dirty_bitmap_size/8);
     }
 
-    spin_unlock(&m->shadow_lock);
-
     // call shadow_mk_pagetable
-    shadow_mk_pagetable( m );
+    __shadow_mk_pagetable( m );
     return 0;
 
  nomem:
-    spin_unlock(&m->shadow_lock);
     return -ENOMEM;
 }
 
@@ -238,10 +234,8 @@ void shadow_mode_disable( struct task_struct *p )
     struct mm_struct *m = &p->mm;
     struct shadow_status *next;
 
-    spin_lock(&m->shadow_lock);
     __free_shadow_table( m );
     m->shadow_mode = 0;
-    spin_unlock(&m->shadow_lock);
 
     SH_LOG("freed tables count=%d l1=%d l2=%d",
            m->shadow_page_count, perfc_value(shadow_l1_pages), perfc_value(shadow_l2_pages));
@@ -285,9 +279,6 @@ static int shadow_mode_table_op( struct task_struct *p,
         return -EINVAL;
     }
    
-
-    spin_lock(&m->shadow_lock);
-
     SH_VLOG("shadow mode table op %08lx %08lx count %d",pagetable_val( m->pagetable),pagetable_val(m->shadow_table), m->shadow_page_count);
 
     shadow_audit(m,1);
@@ -348,16 +339,14 @@ static int shadow_mode_table_op( struct task_struct *p,
 
 out:
 
-    spin_unlock(&m->shadow_lock);
-
     SH_VLOG("shadow mode table op : page count %d", m->shadow_page_count);
 
     shadow_audit(m,1);
 
     // call shadow_mk_pagetable
-    shadow_mk_pagetable( m );
+    __shadow_mk_pagetable( m );
 
-	return rc;
+    return rc;
 }
 
 int shadow_mode_control( struct task_struct *p, dom0_shadow_control_t *sc )
@@ -380,25 +369,31 @@ int shadow_mode_control( struct task_struct *p, dom0_shadow_control_t *sc )
        Oh, and let's hope someone doesn't repin the CPU while we're here.
        Also, prey someone else doesn't do this in another domain.
        At least there's only one dom0 at the moment...
+
      */
-printk("SMC\n");
+
+printk("XXX\n");
+    spin_lock(&p->mm.shadow_lock);
+
+printk("SMC irq=%d\n",local_irq_is_enabled());
     spin_lock( &cpu_stall_lock );		
     cpu = p->processor;
-printk("got %d %d\n",cpu, current->processor );
+printk("got target cpu=%d this cpu=%d\n",cpu, current->processor );
     if ( cpu != current->processor )
     {
-printk("CPU %d %d\n",cpu, current->processor );
 	static void cpu_stall(void * data)
 	{
 	    if ( current->processor == (int) data )
 	    {
-		printk("Stall %d\n",(int)data);
+		printk("Stall cpu=%d is locked %d irq=%d\n",(int)data,spin_is_locked(&cpu_stall_lock),local_irq_is_enabled());
 		spin_lock( &cpu_stall_lock );
+		printk("release\n");
 		spin_unlock( &cpu_stall_lock );
 	    }
 	}
-
+printk("before\n");
 	smp_call_function(cpu_stall, (void*)cpu, 1, 0); // don't wait!
+printk("after\n");
     }
 
     if ( p->mm.shadow_mode && cmd == DOM0_SHADOW_CONTROL_OP_OFF )
@@ -417,7 +412,9 @@ printk("CPU %d %d\n",cpu, current->processor );
     } 
     else if ( p->mm.shadow_mode && cmd >= DOM0_SHADOW_CONTROL_OP_FLUSH && cmd<=DOM0_SHADOW_CONTROL_OP_CLEAN )
     {
+printk("+");
         rc = shadow_mode_table_op(p, sc);
+printk("=");
     }
     else
     {
@@ -425,7 +422,10 @@ printk("CPU %d %d\n",cpu, current->processor );
     }
 
     spin_unlock( &cpu_stall_lock );
-printk("SMC-\n");
+printk("SMC- %d\n",rc);
+
+    spin_unlock(&p->mm.shadow_lock);
+
     return rc;
 }
 
@@ -548,6 +548,8 @@ int shadow_fault( unsigned long va, long error_code )
 {
     unsigned long gpte, spte;
     struct mm_struct *m = &current->mm;
+
+    // we know interrupts are always on entry to the page fault handler 
 
     SH_VVLOG("shadow_fault( va=%08lx, code=%ld )", va, error_code );
 

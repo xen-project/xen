@@ -528,23 +528,30 @@ static inline void set_shadow_status( struct mm_struct *m,
 	return;
 }
 
-static inline void shadow_mk_pagetable( struct mm_struct *mm )
+static inline void __shadow_mk_pagetable( struct mm_struct *mm )
 {
 	unsigned long gpfn, spfn=0;
 
+	gpfn =  pagetable_val(mm->pagetable) >> PAGE_SHIFT;
+		
+	if ( unlikely((spfn=__shadow_status(mm, gpfn)) == 0 ) )
+	{
+		spfn = shadow_l2_table(mm, gpfn );
+	}      
+	mm->shadow_table = mk_pagetable(spfn<<PAGE_SHIFT);
+}
+
+static inline void shadow_mk_pagetable( struct mm_struct *mm )
+{
 	SH_VVLOG("shadow_mk_pagetable( gptbase=%08lx, mode=%d )",
 			 pagetable_val(mm->pagetable), mm->shadow_mode );
 
 	if ( unlikely(mm->shadow_mode) )
 	{
-		gpfn =  pagetable_val(mm->pagetable) >> PAGE_SHIFT;
-		
         spin_lock(&mm->shadow_lock);
-		if ( unlikely((spfn=__shadow_status(mm, gpfn)) == 0 ) )
-		{
-			spfn = shadow_l2_table(mm, gpfn );
-		}      
-		mm->shadow_table = mk_pagetable(spfn<<PAGE_SHIFT);
+
+		__shadow_mk_pagetable( mm );
+
         spin_unlock(&mm->shadow_lock);		
 	}
 
@@ -553,7 +560,6 @@ static inline void shadow_mk_pagetable( struct mm_struct *mm )
 			 pagetable_val(mm->shadow_table) );
 
 }
-
 
 
 #if SHADOW_DEBUG
