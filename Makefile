@@ -86,7 +86,7 @@ clean:
 
 # clean, but blow away kernel build tree plus tar balls
 mrproper: clean
-	rm -rf dist patches
+	rm -rf dist patches/tmp
 	for i in $(ALLKERNELS) ; do $(MAKE) -f buildconfigs/$$i delete ; done
 	for i in $(ALLSPARSETREES) ; do $(MAKE) -f buildconfigs/Rules.mk $$i-mrproper ; done
 

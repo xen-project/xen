@@ -17,11 +17,11 @@ build: $(LINUX_DIR)/include/linux/autoconf.h
 	$(MAKE) -C $(LINUX_DIR) ARCH=xen INSTALL_MOD_PATH=$(INSTALL_DIR) modules_install
 	$(MAKE) -C $(LINUX_DIR) ARCH=xen INSTALL_PATH=$(INSTALL_DIR) install
 
-patches/ebtables.diff:
-	mkdir -p patches
+patches/tmp/ebtables.diff:
+	mkdir -p patches/tmp
 	wget http://www.cl.cam.ac.uk/netos/xen/downloads/ebtables-brnf-5_vs_2.4.27.diff.gz -O- | gunzip -c > $@
 
-$(LINUX_DIR)/include/linux/autoconf.h: patches/ebtables.diff
+$(LINUX_DIR)/include/linux/autoconf.h: patches/tmp/ebtables.diff
 $(LINUX_DIR)/include/linux/autoconf.h: pristine-linux-$(LINUX_VER)
 	rm -rf $(LINUX_DIR)
 	cp -al pristine-linux-$(LINUX_VER) $(LINUX_DIR)
@@ -33,7 +33,7 @@ $(LINUX_DIR)/include/linux/autoconf.h: pristine-linux-$(LINUX_VER)
 	  sed -e 's/^EXTRAVERSION.*/&-$(EXTRAVERSION)/' Makefile >Mk.tmp ; \
 	  rm -f Makefile ; mv Mk.tmp Makefile )
 	# add ebtables patch
-	( cd $(LINUX_DIR) ; patch -p1 -F3 < ../patches/ebtables.diff )
+	( cd $(LINUX_DIR) ; patch -p1 -F3 < ../patches/tmp/ebtables.diff )
 	# Re-use config from install dir if one exits else use default config
 	[ -r $(INSTALL_DIR)/boot/config-$(FULLVERSION) ] && \
 	  cp $(INSTALL_DIR)/boot/config-$(FULLVERSION) $(LINUX_DIR)/.config \

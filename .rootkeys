@@ -128,8 +128,6 @@
 3e5a4e683HKVU-sxtagrDasRB8eBVw linux-2.4.27-xen-sparse/mm/swapfile.c
 41180721bNns9Na7w1nJ0ZVt8bhUNA linux-2.4.27-xen-sparse/mm/vmalloc.c
 41505c57WAd5l1rlfCLNSCpx9J13vA linux-2.4.27-xen-sparse/net/core/skbuff.c
-413aa1d0oNP8HXLvfPuMe6cSroUfSA linux-2.6.9-patches/agpgart.patch
-413aa1d0ewvSv-ohnNnQQNGsbPTTNA linux-2.6.9-patches/drm.patch
 40f562372u3A7_kfbYYixPHJJxYUxA linux-2.6.9-xen-sparse/arch/xen/Kconfig
 40f56237utH41NPukqHksuNf29IC9A linux-2.6.9-xen-sparse/arch/xen/Kconfig.drivers
 40f56237penAAlWVBVDpeQZNFIg8CA linux-2.6.9-xen-sparse/arch/xen/Makefile
@@ -290,6 +288,9 @@
 413cb3b5eKxnzoodEqaWn2wrPnHWnA netbsd-2.0-xen-sparse/sys/arch/xen/xen/xencons.c
 413cb3b5F56TvQWAmO5TsuzhtzLFPQ netbsd-2.0-xen-sparse/sys/arch/xen/xen/xenkbc.c
 413cb3b53nyOv1OIeDSsCXhBFDXvJA netbsd-2.0-xen-sparse/sys/nfs/files.nfs
+413aa1d0oNP8HXLvfPuMe6cSroUfSA patches/linux-2.6.9/agpgart.patch
+413aa1d0ewvSv-ohnNnQQNGsbPTTNA patches/linux-2.6.9/drm.patch
+418abc69J3F638vPO9MYoDGeYilxoQ patches/linux-2.6.9/nettel.patch
 40e1b09db5mN69Ijj0X_Eol-S7dXiw tools/Make.defs
 3f776bd1Hy9rn69ntXBhPReUFw9IEA tools/Makefile
 4124b307nRyK3dhn1hAsvrY76NuV3g tools/check/Makefile
