@@ -78,7 +78,6 @@ asmlinkage void overflow(void);
 asmlinkage void bounds(void);
 asmlinkage void invalid_op(void);
 asmlinkage void device_not_available(void);
-asmlinkage void double_fault(void);
 asmlinkage void coprocessor_segment_overrun(void);
 asmlinkage void invalid_TSS(void);
 asmlinkage void segment_not_present(void);
@@ -470,7 +469,6 @@ DO_VM86_ERROR( 4, SIGSEGV, "overflow", overflow)
 DO_VM86_ERROR( 5, SIGSEGV, "bounds", bounds)
 DO_ERROR_INFO( 6, SIGILL,  "invalid operand", invalid_op, ILL_ILLOPN, regs->eip)
 DO_VM86_ERROR( 7, SIGSEGV, "device not available", device_not_available)
-DO_ERROR( 8, SIGSEGV, "double fault", double_fault)
 DO_ERROR( 9, SIGFPE,  "coprocessor segment overrun", coprocessor_segment_overrun)
 DO_ERROR(10, SIGSEGV, "invalid TSS", invalid_TSS)
 DO_ERROR(11, SIGBUS,  "segment not present", segment_not_present)
@@ -1032,7 +1030,6 @@ static trap_info_t trap_table[] = {
 	{  5, 3, __KERNEL_CS, (unsigned long)bounds			},
 	{  6, 0, __KERNEL_CS, (unsigned long)invalid_op			},
 	{  7, 0, __KERNEL_CS, (unsigned long)device_not_available	},
-	{  8, 0, __KERNEL_CS, (unsigned long)double_fault		},
 	{  9, 0, __KERNEL_CS, (unsigned long)coprocessor_segment_overrun },
 	{ 10, 0, __KERNEL_CS, (unsigned long)invalid_TSS		},
 	{ 11, 0, __KERNEL_CS, (unsigned long)segment_not_present	},

@@ -339,7 +339,7 @@ error_code:
         SET_XEN_SEGMENTS(a)
         testb $X86_EFLAGS_IF>>8,XREGS_eflags+1(%esp)
         jz    exception_with_ints_disabled
-        sti                             # re-enable interrupts
+1:      sti                             # re-enable interrupts
         xorl  %eax,%eax
         movw  XREGS_entry_vector(%esp),%ax
         movl  %esp,%edx
@@ -354,8 +354,8 @@ error_code:
 
 exception_with_ints_disabled:
         movb  XREGS_cs(%esp),%al
-	testb $3,%al                    # interrupts disabled outside Xen?
-	jnz   FATAL_exception_with_ints_disabled
+	testb $3,%al   # interrupts disabled outside Xen?
+	jnz   1b       # it really does happen! (e.g., DOM0 X server)
         pushl XREGS_eip(%esp)
         call  search_pre_exception_table
         addl  $4,%esp
