@@ -131,7 +131,7 @@ extern void vcpu_poke_timer(VCPU *vcpu);
 extern void vcpu_set_next_timer(VCPU *vcpu);
 extern BOOLEAN vcpu_timer_expired(VCPU *vcpu);
 extern UINT64 vcpu_deliverable_interrupts(VCPU *vcpu);
-extern void vcpu_itc_no_srlz(VCPU *vcpu, UINT64, UINT64, UINT64, UINT64);
+extern void vcpu_itc_no_srlz(VCPU *vcpu, UINT64, UINT64, UINT64, UINT64, UINT64);
 
 
 #endif

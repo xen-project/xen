@@ -140,6 +140,7 @@ void cmain(multiboot_info_t *mbi)
 
     /* Must do this early -- e.g., spinlocks rely on get_current(). */
     set_current(&idle0_exec_domain);
+    idle0_exec_domain.domain = &idle0_domain;
 
     early_setup_arch();
 
@@ -286,7 +287,7 @@ printk("About to call time_init()\n");
 printk("About to call ac_timer_init()\n");
     ac_timer_init();
 // init_xen_time(); ???
-// schedulers_start(); ???
+    schedulers_start();
 // do_initcalls(); ???
 printk("About to call sort_main_extable()\n");
     sort_main_extable();

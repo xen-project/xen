@@ -1097,12 +1097,18 @@ IA64FAULT vcpu_ttag(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
 IA64FAULT vcpu_tpa(VCPU *vcpu, UINT64 vadr, UINT64 *padr)
 {
 	extern TR_ENTRY *match_tr(VCPU *,UINT64);
-	extern TR_ENTRY *match_dtlb(VCPU *,UINT64);
+	unsigned long match_dtlb(VCPU *, unsigned long, unsigned long *, unsigned long *);
 	TR_ENTRY *trp;
-	UINT64 mask;
+	UINT64 mask, pteval, mp_pte, ps;
 
 extern unsigned long privop_trace;
-	if ((trp=match_tr(current,vadr)) || (trp=match_dtlb(current,vadr))) {
+	if (pteval = match_dtlb(vcpu, vadr, &ps, &mp_pte) && (mp_pte != -1UL)) {
+		mask = (1L << ps) - 1;
+		*padr = ((mp_pte & _PAGE_PPN_MASK) & ~mask) | (vadr & mask);
+		verbose("vcpu_tpa: addr=%p @%p, successful, padr=%p\n",vadr,PSCB(vcpu,iip),*padr);
+		return (IA64_NO_FAULT);
+	}
+	if (trp=match_tr(current,vadr)) {
 		mask = (1L << trp->ps) - 1;
 		*padr = ((trp->ppn << 12) & ~mask) | (vadr & mask);
 		verbose("vcpu_tpa: addr=%p @%p, successful, padr=%p\n",vadr,PSCB(vcpu,iip),*padr);
@@ -1418,7 +1424,7 @@ void foobar(void) { /*vcpu_verbose = 1;*/ }
 
 extern struct domain *dom0;
 
-void vcpu_itc_no_srlz(VCPU *vcpu, UINT64 IorD, UINT64 vaddr, UINT64 pte, UINT64 logps)
+void vcpu_itc_no_srlz(VCPU *vcpu, UINT64 IorD, UINT64 vaddr, UINT64 pte, UINT64 mp_pte, UINT64 logps)
 {
 	unsigned long psr;
 	unsigned long ps = (vcpu->domain==dom0) ? logps : PAGE_SHIFT;
@@ -1429,13 +1435,29 @@ void vcpu_itc_no_srlz(VCPU *vcpu, UINT64 IorD, UINT64 vaddr, UINT64 pte, UINT64 
 	ia64_itc(IorD,vaddr,pte,ps); // FIXME: look for bigger mappings
 	ia64_set_psr(psr);
 	// ia64_srlz_i(); // no srls req'd, will rfi later
-	if (IorD & 0x1) vcpu_set_tr_entry(&PSCB(vcpu,itlb),pte,logps<<2,vaddr);
-	if (IorD & 0x2) vcpu_set_tr_entry(&PSCB(vcpu,dtlb),pte,logps<<2,vaddr);
+	if (IorD & 0x4) return;  // don't place in 1-entry TLB
+	if (IorD & 0x1) {
+		vcpu_set_tr_entry(&PSCB(vcpu,itlb),pte,ps<<2,vaddr);
+		PSCB(vcpu,itlb_pte) = mp_pte;
+	}
+	if (IorD & 0x2) {
+		vcpu_set_tr_entry(&PSCB(vcpu,dtlb),pte,ps<<2,vaddr);
+		PSCB(vcpu,dtlb_pte) = mp_pte;
+	}
 }
 
-TR_ENTRY *match_dtlb(VCPU *vcpu, unsigned long ifa)
+// NOTE: returns a physical pte, NOT a "metaphysical" pte, so do not check
+// the physical address contained for correctness
+unsigned long match_dtlb(VCPU *vcpu, unsigned long ifa, unsigned long *ps, unsigned long *mp_pte)
 {
-	return vcpu_match_tr_entry(vcpu,&vcpu->vcpu_info->arch.dtlb,ifa,1);
+	TR_ENTRY *trp;
+
+	if (trp = vcpu_match_tr_entry(vcpu,&vcpu->vcpu_info->arch.dtlb,ifa,1)) {
+		if (ps) *ps = trp->ps;
+		if (mp_pte) *mp_pte = vcpu->vcpu_info->arch.dtlb_pte;
+		return (trp->page_flags);
+	}
+	return 0UL;
 }
 
 IA64FAULT vcpu_itc_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
@@ -1451,7 +1473,7 @@ IA64FAULT vcpu_itc_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
 	//itir = (itir & ~0xfc) | (PAGE_SHIFT<<2); // ignore domain's pagesize
 	pteval = translate_domain_pte(pte,ifa,itir);
 	if (!pteval) return IA64_ILLOP_FAULT;
-	vcpu_itc_no_srlz(vcpu,2,ifa,pteval,logps);
+	vcpu_itc_no_srlz(vcpu,2,ifa,pteval,pte,logps);
 	return IA64_NO_FAULT;
 }
 
@@ -1470,7 +1492,7 @@ IA64FAULT vcpu_itc_i(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
 	pteval = translate_domain_pte(pte,ifa,itir);
 	// FIXME: what to do if bad physical address? (machine check?)
 	if (!pteval) return IA64_ILLOP_FAULT;
-	vcpu_itc_no_srlz(vcpu, 1,ifa,pteval,logps);
+	vcpu_itc_no_srlz(vcpu, 1,ifa,pteval,pte,logps);
 	return IA64_NO_FAULT;
 }
 
@@ -1480,13 +1502,25 @@ IA64FAULT vcpu_ptc_l(VCPU *vcpu, UINT64 vadr, UINT64 addr_range)
 	return IA64_ILLOP_FAULT;
 }
 
+// At privlvl=0, fc performs no access rights or protection key checks, while
+// at privlvl!=0, fc performs access rights checks as if it were a 1-byte
+// read but no protection key check.  Thus in order to avoid an unexpected
+// access rights fault, we have to translate the virtual address to a
+// physical address (possibly via a metaphysical address) and do the fc
+// on the physical address, which is guaranteed to flush the same cache line
 IA64FAULT vcpu_fc(VCPU *vcpu, UINT64 vadr)
 {
-	UINT64 mpaddr;
+	UINT64 mpaddr, ps;
 	IA64FAULT fault;
+	unsigned long match_dtlb(VCPU *, unsigned long, unsigned long *, unsigned long *);
 	unsigned long lookup_domain_mpa(struct domain *,unsigned long);
 	unsigned long pteval, dom_imva;
 
+	if (pteval = match_dtlb(vcpu, vadr, NULL, NULL)) {
+		dom_imva = __va(pteval & _PFN_MASK);
+		ia64_fc(dom_imva);
+		return IA64_NO_FAULT;
+	}
 	fault = vcpu_tpa(vcpu, vadr, &mpaddr);
 	if (fault == IA64_NO_FAULT) {
 		struct domain *dom0;
