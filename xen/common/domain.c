@@ -48,124 +48,123 @@ struct domain *task_list;
 struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
 {
     char buf[100];
-    struct domain *p, **pp;
+    struct domain *d, **pd;
     unsigned long flags;
 
-    if ( (p = alloc_domain_struct()) == NULL )
+    if ( (d = alloc_domain_struct()) == NULL )
         return NULL;
 
-    atomic_set(&p->refcnt, 1);
-    atomic_set(&p->pausecnt, 0);
+    atomic_set(&d->refcnt, 1);
+    atomic_set(&d->pausecnt, 0);
 
-    spin_lock_init(&p->mm.shadow_lock);
+    spin_lock_init(&d->mm.shadow_lock);
 
-    p->domain    = dom_id;
-    p->processor = cpu;
-    p->create_time = NOW();
+    d->domain    = dom_id;
+    d->processor = cpu;
+    d->create_time = NOW();
 
-    memcpy(&p->thread, &idle0_task.thread, sizeof(p->thread));
+    memcpy(&d->thread, &idle0_task.thread, sizeof(d->thread));
 
-    if ( p->domain != IDLE_DOMAIN_ID )
+    if ( d->domain != IDLE_DOMAIN_ID )
     {
-        if ( init_event_channels(p) != 0 )
+        if ( init_event_channels(d) != 0 )
         {
-            free_domain_struct(p);
+            free_domain_struct(d);
             return NULL;
         }
         
         /* We use a large intermediate to avoid overflow in sprintf. */
         sprintf(buf, "Domain-%u", dom_id);
-        strncpy(p->name, buf, MAX_DOMAIN_NAME);
-        p->name[MAX_DOMAIN_NAME-1] = '\0';
+        strncpy(d->name, buf, MAX_DOMAIN_NAME);
+        d->name[MAX_DOMAIN_NAME-1] = '\0';
 
-        p->addr_limit = USER_DS;
+        d->addr_limit = USER_DS;
         
-        spin_lock_init(&p->page_list_lock);
-        INIT_LIST_HEAD(&p->page_list);
-        p->max_pages = p->tot_pages = 0;
+        spin_lock_init(&d->page_list_lock);
+        INIT_LIST_HEAD(&d->page_list);
+        d->max_pages = d->tot_pages = 0;
 
-        p->shared_info = (void *)get_free_page();
-        memset(p->shared_info, 0, PAGE_SIZE);
-        SHARE_PFN_WITH_DOMAIN(virt_to_page(p->shared_info), p);
-        machine_to_phys_mapping[virt_to_phys(p->shared_info) >> 
+        d->shared_info = (void *)get_free_page();
+        memset(d->shared_info, 0, PAGE_SIZE);
+        SHARE_PFN_WITH_DOMAIN(virt_to_page(d->shared_info), d);
+        machine_to_phys_mapping[virt_to_phys(d->shared_info) >> 
                                PAGE_SHIFT] = 0x80000000UL;  /* debug */
 
-        p->mm.perdomain_pt = (l1_pgentry_t *)get_free_page();
-        memset(p->mm.perdomain_pt, 0, PAGE_SIZE);
-        machine_to_phys_mapping[virt_to_phys(p->mm.perdomain_pt) >> 
+        d->mm.perdomain_pt = (l1_pgentry_t *)get_free_page();
+        memset(d->mm.perdomain_pt, 0, PAGE_SIZE);
+        machine_to_phys_mapping[virt_to_phys(d->mm.perdomain_pt) >> 
                                PAGE_SHIFT] = 0x0fffdeadUL;  /* debug */
 
         /* Per-domain PCI-device list. */
-        spin_lock_init(&p->pcidev_lock);
-        INIT_LIST_HEAD(&p->pcidev_list);
+        spin_lock_init(&d->pcidev_lock);
+        INIT_LIST_HEAD(&d->pcidev_list);
 
-        sched_add_domain(p);
+        sched_add_domain(d);
 
         write_lock_irqsave(&tasklist_lock, flags);
-        pp = &task_list; /* NB. task_list is maintained in order of dom_id. */
-        for ( pp = &task_list; *pp != NULL; pp = &(*pp)->next_list )
-            if ( (*pp)->domain > p->domain )
+        pd = &task_list; /* NB. task_list is maintained in order of dom_id. */
+        for ( pd = &task_list; *pd != NULL; pd = &(*pd)->next_list )
+            if ( (*pd)->domain > d->domain )
                 break;
-        p->next_list = *pp;
-        *pp = p;
-        p->next_hash = task_hash[TASK_HASH(dom_id)];
-        task_hash[TASK_HASH(dom_id)] = p;
+        d->next_list = *pd;
+        *pd = d;
+        d->next_hash = task_hash[TASK_HASH(dom_id)];
+        task_hash[TASK_HASH(dom_id)] = d;
         write_unlock_irqrestore(&tasklist_lock, flags);
     }
     else
     {
-        sprintf(p->name, "Idle-%d", cpu);
-        sched_add_domain(p);
+        sprintf(d->name, "Idle-%d", cpu);
+        sched_add_domain(d);
     }
 
-
-    return p;
+    return d;
 }
 
 
 struct domain *find_domain_by_id(domid_t dom)
 {
-    struct domain *p;
+    struct domain *d;
     unsigned long flags;
 
     read_lock_irqsave(&tasklist_lock, flags);
-    p = task_hash[TASK_HASH(dom)];
-    while ( p != NULL )
+    d = task_hash[TASK_HASH(dom)];
+    while ( d != NULL )
     {
-        if ( p->domain == dom )
+        if ( d->domain == dom )
         {
-            if ( unlikely(!get_domain(p)) )
-                p = NULL;
+            if ( unlikely(!get_domain(d)) )
+                d = NULL;
             break;
         }
-        p = p->next_hash;
+        d = d->next_hash;
     }
     read_unlock_irqrestore(&tasklist_lock, flags);
 
-    return p;
+    return d;
 }
 
 
-/* return the most recent domain created */
+/* Return the most recently created domain. */
 struct domain *find_last_domain(void)
 {
-    struct domain *p, *plast;
+    struct domain *d, *dlast;
     unsigned long flags;
 
     read_lock_irqsave(&tasklist_lock, flags);
-    plast = task_list;
-    p = plast->next_list;
-    while ( p != NULL )
+    dlast = task_list;
+    d = dlast->next_list;
+    while ( d != NULL )
     {
-        if ( p->create_time > plast->create_time )
-            plast = p;
-        p = p->next_list;
+        if ( d->create_time > dlast->create_time )
+            dlast = d;
+        d = d->next_list;
     }
-    if ( !get_domain(plast) )
-        plast = NULL;
+    if ( !get_domain(dlast) )
+        dlast = NULL;
     read_unlock_irqrestore(&tasklist_lock, flags);
 
-    return plast;
+    return dlast;
 }
 
 
@@ -288,50 +287,31 @@ struct pfn_info *alloc_domain_page(struct domain *d)
 
 void free_domain_page(struct pfn_info *page)
 {
-    unsigned long flags;
+    unsigned long  flags;
+    int            drop_dom_ref;
     struct domain *d = page->u.domain;
 
-    ASSERT(!in_irq());
+    /* Deallocation of such pages is handled out of band. */
+    if ( unlikely(IS_XEN_HEAP_FRAME(page)) )
+        return;
 
-    if ( likely(!IS_XEN_HEAP_FRAME(page)) )
-    {
-        page->u.cpu_mask = 0;
-        page->tlbflush_timestamp = tlbflush_clock;
-        if ( likely(d != NULL) )
-        {
-            page->u.cpu_mask = 1 << d->processor;
-            /* NB. May recursively lock from domain_relinquish_memory(). */
-            spin_lock_recursive(&d->page_list_lock);
-            list_del(&page->list);
-            if ( unlikely(--d->tot_pages == 0) )
-            {
-                spin_unlock_recursive(&d->page_list_lock);
-                put_domain(d); /* Domain 'd' can disappear now. */
-            }
-            else
-            {
-                spin_unlock_recursive(&d->page_list_lock);
-            }
-        }
+    page->tlbflush_timestamp = tlbflush_clock;
+    page->u.cpu_mask = 1 << d->processor;
 
-        page->count_and_flags = 0;
+    /* NB. May recursively lock from domain_relinquish_memory(). */
+    spin_lock_recursive(&d->page_list_lock);
+    list_del(&page->list);
+    drop_dom_ref = (--d->tot_pages == 0);
+    spin_unlock_recursive(&d->page_list_lock);
+    if ( drop_dom_ref )
+        put_domain(d);
 
-        spin_lock_irqsave(&free_list_lock, flags);
-        list_add(&page->list, &free_list);
-        free_pfns++;
-        spin_unlock_irqrestore(&free_list_lock, flags);
-    }
-    else
-    {
-        /*
-         * No need for a TLB flush. Non-domain pages are always co-held by Xen,
-         * and the Xen reference is not dropped until the domain is dead.
-         * DOM0 may hold references, but it's trusted so no need to flush.
-         */
-        page->u.cpu_mask = 0;
-        page->count_and_flags = 0;
-        free_page((unsigned long)page_to_virt(page));
-    }
+    page->count_and_flags = 0;
+    
+    spin_lock_irqsave(&free_list_lock, flags);
+    list_add(&page->list, &free_list);
+    free_pfns++;
+    spin_unlock_irqrestore(&free_list_lock, flags);
 }
 
 
@@ -457,7 +437,7 @@ void domain_destruct(struct domain *d)
     destroy_event_channels(d);
 
     free_page((unsigned long)d->mm.perdomain_pt);
-    UNSHARE_PFN(virt_to_page(d->shared_info));
+    free_page((unsigned long)d->shared_info);
 
     free_domain_struct(d);
 }

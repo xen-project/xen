@@ -326,8 +326,6 @@
 #define PCIIOC_MMAP_IS_MEM	(PCIIOC_BASE | 0x02)	/* Set mmap state to MEM space. */
 #define PCIIOC_WRITE_COMBINE	(PCIIOC_BASE | 0x03)	/* Enable/disable write-combining. */
 
-#ifdef __KERNEL__
-
 #include <xen/types.h>
 #include <xen/config.h>
 #include <xen/ioport.h>
@@ -833,5 +831,4 @@ extern int pci_pci_problems;
 #define PCIPCI_VSFX		16
 #define PCIPCI_ALIMAGIK		32
 
-#endif /* __KERNEL__ */
 #endif /* LINUX_PCI_H */

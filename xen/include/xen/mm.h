@@ -86,17 +86,17 @@ struct pfn_info
 #define PageSetSlab(page)	((void)0)
 #define PageClearSlab(page)	((void)0)
 
-#define IS_XEN_HEAP_FRAME(_pfn) (page_to_phys(_pfn) < MAX_MONITOR_ADDRESS)
+#define IS_XEN_HEAP_FRAME(_pfn) (page_to_phys(_pfn) < MAX_XENHEAP_ADDRESS)
 
-#define SHARE_PFN_WITH_DOMAIN(_pfn, _dom)                                  \
-    do {                                                                   \
-        (_pfn)->u.domain = (_dom);                                         \
-        wmb(); /* install valid domain ptr before updating refcnt. */      \
-        (_pfn)->count_and_flags = 1; /* Xen holds a writeable reference */ \
-        (_pfn)->type_and_flags  = PGT_writeable_page | PGT_validated | 1;  \
+#define SHARE_PFN_WITH_DOMAIN(_pfn, _dom)                                   \
+    do {                                                                    \
+        (_pfn)->u.domain = (_dom);                                          \
+        wmb(); /* install valid domain ptr before updating refcnt. */       \
+        /* _dom holds an allocation reference */                            \
+        (_pfn)->count_and_flags = PGC_allocated | 1;                        \
+        /* The incremented type count is intended to pin to 'writeable'. */ \
+        (_pfn)->type_and_flags  = PGT_writeable_page | PGT_validated | 1;   \
     } while ( 0 )
-
-#define UNSHARE_PFN(_pfn) put_page_and_type(_pfn)
 
 extern struct pfn_info *frame_table;
 extern unsigned long frame_table_size;

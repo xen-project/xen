@@ -44,8 +44,4 @@ enum EFLAGS {
         EF_ID   = 0x00200000,   /* id */
 };
 
-#ifdef __KERNEL__
-#define user_mode(regs) ((3 & (regs)->xcs))
-#endif
-
 #endif

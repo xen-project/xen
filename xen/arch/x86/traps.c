@@ -171,14 +171,14 @@ void show_registers(struct pt_regs *regs)
 
 spinlock_t die_lock = SPIN_LOCK_UNLOCKED;
 
-void die(const char * str, struct pt_regs * regs, long err)
+void die(const char *str, struct pt_regs * regs, long err)
 {
     unsigned long flags;
     spin_lock_irqsave(&die_lock, flags);
     printk("%s: %04lx,%04lx\n", str, err >> 16, err & 0xffff);
     show_registers(regs);
     spin_unlock_irqrestore(&die_lock, flags);
-    panic("HYPERVISOR DEATH!!\n");
+    panic("Fatal crash within Xen.\n");
 }
 
 
@@ -192,7 +192,7 @@ static inline void do_trap(int trapnr, char *str,
     unsigned long fixup;
 
     if (!(regs->xcs & 3))
-        goto fault_in_hypervisor;
+        goto xen_fault;
 
     ti = current->thread.traps + trapnr;
     gtb->flags = use_error_code ? GTBF_TRAP : GTBF_TRAP_NOCODE;
@@ -203,7 +203,7 @@ static inline void do_trap(int trapnr, char *str,
         p->shared_info->vcpu_data[0].evtchn_upcall_mask = 1;
     return; 
 
- fault_in_hypervisor:
+ xen_fault:
 
     if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
     {
@@ -338,7 +338,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
         return; /* Returns TRUE if fault was handled. */
 
     if ( unlikely(!(regs->xcs & 3)) )
-        goto fault_in_hypervisor;
+        goto xen_fault;
 
     ti = p->thread.traps + 14;
     gtb->flags = GTBF_TRAP_CR2; /* page fault pushes %cr2 */
@@ -350,7 +350,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
         p->shared_info->vcpu_data[0].evtchn_upcall_mask = 1;
     return; 
 
- fault_in_hypervisor:
+ xen_fault:
 
     if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
     {
@@ -589,11 +589,10 @@ asmlinkage void do_debug(struct pt_regs *regs, long error_code)
         /* Clear TF just for absolute sanity. */
         regs->eflags &= ~EF_TF;
         /*
-         * Basically, we ignore watchpoints when they trigger in
-         * the hypervisor. This may happen when a buffer is passed
-         * to us which previously had a watchpoint set on it.
-         * No need to bump EIP; the only faulting trap is an
-         * instruction breakpoint, which can't happen to us.
+         * We ignore watchpoints when they trigger within Xen. This may happen
+         * when a buffer is passed to us which previously had a watchpoint set
+         * on it. No need to bump EIP; the only faulting trap is an instruction
+         * breakpoint, which can't happen to us.
          */
         return;
     }
@@ -717,7 +716,7 @@ void __init trap_init(void)
     set_intr_gate(18,&machine_check);
     set_intr_gate(19,&simd_coprocessor_error);
 
-    /* Only ring 1 can access monitor services. */
+    /* Only ring 1 can access Xen services. */
     _set_gate(idt_table+HYPERCALL_VECTOR,14,1,&hypercall);
 
     /* CPU0 uses the master IDT. */

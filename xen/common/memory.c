@@ -32,8 +32,8 @@
  * TOT_COUNT is the obvious reference count. It counts all uses of a
  * physical page frame by a domain, including uses as a page directory,
  * a page table, or simple mappings via a PTE. This count prevents a
- * domain from releasing a frame back to the hypervisor's free pool when
- * it still holds a reference to it.
+ * domain from releasing a frame back to the free pool when it still holds
+ * a reference to it.
  * 
  * TYPE_COUNT is more subtle. A frame can be put to one of three
  * mutually-exclusive uses: it might be used as a page directory, or a
@@ -81,48 +81,6 @@
  * OS's, which will generally use the WP bit to simplify copy-on-write
  * implementation (in that case, OS wants a fault when it writes to
  * an application-supplied buffer).
- */
-
-
-/*
- * THE FOLLOWING ARE ISSUES IF GUEST OPERATING SYSTEMS BECOME SMP-CAPABLE.
- * -----------------------------------------------------------------------
- * 
- * *********
- * UPDATE 15/7/02: Interface has changed --updates now specify physical
- * address of page-table entry, rather than specifying a virtual address,
- * so hypervisor no longer "walks" the page tables. Therefore the 
- * solution below cannot work. Another possibility is to add a new entry
- * to our "struct page" which says to which top-level page table each
- * lower-level page table or writeable mapping belongs. If it belongs to more
- * than one, we'd probably just flush on all processors running the domain.
- * *********
- * 
- * The problem involves creating new page tables which might be mapped 
- * writeable in the TLB of another processor. As an example, a domain might be 
- * running in two contexts (ie. on two processors) simultaneously, using the 
- * same top-level page table in both contexts. Now, if context 1 sends an 
- * update request [make page P read-only, add a reference to page P as a page 
- * table], that will succeed if there was only one writeable mapping of P. 
- * However, that mapping may persist in the TLB of context 2.
- * 
- * Solution: when installing a new page table, we must flush foreign TLBs as
- * necessary. Naive solution is to flush on any processor running our domain.
- * Cleverer solution is to flush on any processor running same top-level page
- * table, but this will sometimes fail (consider two different top-level page
- * tables which have a shared lower-level page table).
- * 
- * A better solution: when squashing a write reference, check how many times
- * that lowest-level table entry is referenced by ORing refcounts of tables
- * down the page-table hierarchy. If results is != 1, we require flushing all
- * instances of current domain if a new table is installed (because the
- * lowest-level entry may be referenced by many top-level page tables).
- * However, common case will be that result == 1, so we only need to flush
- * processors with the same top-level page table. Make choice at
- * table-installation time based on a `flush_level' flag, which is
- * FLUSH_NONE, FLUSH_PAGETABLE, FLUSH_DOMAIN. A flush reduces this
- * to FLUSH_NONE, while squashed write mappings can only promote up
- * to more aggressive flush types.
  */
 
 #include <xen/config.h>
@@ -186,11 +144,6 @@ static struct {
 #define GPS (percpu_info[smp_processor_id()].gps ? : current)
 
 
-/*
- * init_frametable:
- * Initialise per-frame memory information. This goes directly after
- * MAX_MONITOR_ADDRESS in physical memory.
- */
 void __init init_frametable(unsigned long nr_pages)
 {
     unsigned long mfn;
@@ -619,7 +572,7 @@ static int mod_l2_entry(l2_pgentry_t *pl2e,
     if ( unlikely((((unsigned long)pl2e & (PAGE_SIZE-1)) >> 2) >=
                   DOMAIN_ENTRIES_PER_L2_PAGETABLE) )
     {
-        MEM_LOG("Illegal L2 update attempt in hypervisor area %p", pl2e);
+        MEM_LOG("Illegal L2 update attempt in Xen-private area %p", pl2e);
         return 0;
     }
 

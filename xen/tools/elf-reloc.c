@@ -80,9 +80,6 @@ int main(int argc, char **argv)
     new_base = strtoul(argv[2], NULL, 16);
     image_name = argv[3];
 
-    printf("Relocating `%s' from 0x%08lX to 0x%08lX\n",
-           image_name, old_base, new_base);
-
     fp = fopen(image_name, "rb+");
     if ( !fp )
     {

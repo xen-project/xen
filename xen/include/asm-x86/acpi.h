@@ -26,8 +26,6 @@
 #ifndef _ASM_ACPI_H
 #define _ASM_ACPI_H
 
-#ifdef __KERNEL__
-
 #define COMPILER_DEPENDENT_INT64   long long
 #define COMPILER_DEPENDENT_UINT64  unsigned long long
 
@@ -163,8 +161,5 @@ extern void do_suspend_lowlevel_s4bios(int resume);
 extern void acpi_reserve_bootmem(void);
 
 #endif /*CONFIG_ACPI_SLEEP*/
-
-
-#endif /*__KERNEL__*/
 
 #endif /*_ASM_ACPI_H*/

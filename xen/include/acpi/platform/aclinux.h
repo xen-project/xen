@@ -49,7 +49,7 @@
 #define ACPI_USE_SYSTEM_CLIBRARY
 #define ACPI_USE_DO_WHILE_0
 
-#ifdef __KERNEL__
+#if 1 /*def __KERNEL__*/
 
 #include <xen/config.h>
 #include <xen/string.h>

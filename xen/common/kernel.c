@@ -217,15 +217,15 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
     heap_start = memguard_init(&_end);
 
     printk("Xen heap size is %luKB\n", 
-	   (MAX_MONITOR_ADDRESS-__pa(heap_start))/1024 );
+	   (MAX_XENHEAP_ADDRESS-__pa(heap_start))/1024 );
 
-    if ( ((MAX_MONITOR_ADDRESS-__pa(heap_start))/1024) <= 4096 )
+    if ( ((MAX_XENHEAP_ADDRESS-__pa(heap_start))/1024) <= 4096 )
     {
         printk("Xen heap size is too small to safely continue!\n");
         for ( ; ; ) ;
     }
 
-    init_page_allocator(__pa(heap_start), MAX_MONITOR_ADDRESS);
+    init_page_allocator(__pa(heap_start), MAX_XENHEAP_ADDRESS);
  
     /* Initialise the slab allocator. */
     kmem_cache_init();

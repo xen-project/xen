@@ -81,8 +81,8 @@ struct pt_regs {
 #define PTRACE_GETFPXREGS         18
 #define PTRACE_SETFPXREGS         19
 
-#if defined(__KERNEL__) && !defined(__ASSEMBLY__) 
-#define user_mode(regs) (!!((regs)->cs & 3))
+#if !defined(__ASSEMBLY__) 
+
 #define instruction_pointer(regs) ((regs)->rip)
 extern void show_regs(struct pt_regs *);
 

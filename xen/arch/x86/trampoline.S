@@ -43,7 +43,7 @@ r_base = .
 	lmsw	%ax		# into protected mode
 	jmp	flush_instr
 flush_instr:
-	ljmpl	$__HYPERVISOR_CS, $(MONITOR_BASE)-__PAGE_OFFSET
+	ljmpl	$__HYPERVISOR_CS, $0x100000 # 1MB
 
 idt_48:
 	.word	0			# idt limit = 0

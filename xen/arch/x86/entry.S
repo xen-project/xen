@@ -6,8 +6,8 @@
  */
 
 /*
- * The idea for callbacks from monitor -> guest OS
- * ===============================================
+ * The idea for callbacks to guest OSes
+ * ====================================
  *
  * First, we require that all callbacks (either via a supplied
  * interrupt-descriptor-table, or via the special event or failsafe callbacks
@@ -23,7 +23,7 @@
  * If not, we load incorrect SS/ESP values from the TSS (for ring 1 rather
  * than the correct ring) and bad things are bound to ensue -- IRET is
  * likely to fault, and we may end up killing the domain (no harm can
- * come to the hypervisor itself, though).
+ * come to Xen, though).
  *      
  * When doing a callback, we check if the return CS is in ring 0. If so,
  * callback is delayed until next return to ring != 0.

@@ -158,6 +158,10 @@ extern void __out_of_line_bug(int line) __attribute__((noreturn));
 
 #elif defined(__i386__)
 
+/* The following are machine addresses. */
+#define MAX_XENHEAP_ADDRESS   (12*1024*1024)
+#define MAX_DIRECTMAP_ADDRESS (40*1024*1024)
+
 /* Hypervisor owns top 64MB of virtual address space. */
 #define HYPERVISOR_VIRT_START (0xFC000000UL)
 
@@ -167,18 +171,12 @@ extern void __out_of_line_bug(int line) __attribute__((noreturn));
  */
 #define RO_MPT_VIRT_START     (HYPERVISOR_VIRT_START)
 #define RO_MPT_VIRT_END       (RO_MPT_VIRT_START + (4*1024*1024))
-/*
- * Next 12MB is fixed monitor space, which is part of a 40MB direct-mapped
- * memory region. The following are machine addresses.
- */
-#define MAX_MONITOR_ADDRESS   (12*1024*1024)
-#define MAX_DIRECTMAP_ADDRESS (40*1024*1024)
-/* And the virtual addresses for the direct-map region... */
+/* The virtual addresses for the 40MB direct-map region. */
 #define DIRECTMAP_VIRT_START  (RO_MPT_VIRT_END)
 #define DIRECTMAP_VIRT_END    (DIRECTMAP_VIRT_START + MAX_DIRECTMAP_ADDRESS)
-#define MONITOR_VIRT_START    (DIRECTMAP_VIRT_START)
-#define MONITOR_VIRT_END      (MONITOR_VIRT_START + MAX_MONITOR_ADDRESS)
-#define RDWR_MPT_VIRT_START   (MONITOR_VIRT_END)
+#define XENHEAP_VIRT_START    (DIRECTMAP_VIRT_START)
+#define XENHEAP_VIRT_END      (XENHEAP_VIRT_START + MAX_XENHEAP_ADDRESS)
+#define RDWR_MPT_VIRT_START   (XENHEAP_VIRT_END)
 #define RDWR_MPT_VIRT_END     (RDWR_MPT_VIRT_START + (4*1024*1024))
 #define FRAMETABLE_VIRT_START (RDWR_MPT_VIRT_END)
 #define FRAMETABLE_VIRT_END   (DIRECTMAP_VIRT_END)
