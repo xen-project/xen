@@ -21,10 +21,6 @@ DOM=$?
 
 echo DOM= $DOM
 
-VIF=`cat /proc/xeno/dom$DOM/vif`
-
-echo VIF= $VIF
-
-$VIFINIT $VIF $IP
+$VIFINIT $DOM 0 $IP
 
 

@@ -9,6 +9,7 @@
 #include <xeno/config.h>
 #include <xeno/types.h>
 #include <xeno/lib.h>
+#include <xeno/mm.h>
 #include <xeno/dom_mem_ops.h>
 #include <xeno/sched.h>
 #include <xeno/event.h>

@@ -21,24 +21,40 @@
 #include <asm/domain_page.h>
 #include <asm/io.h>
 
-/* vif globals 
- * sys_vif_list is a lookup table for vifs, used in packet forwarding.
- * it will be replaced later by something a little more flexible.
- */
-
-int sys_vif_count;                                  /* global vif count */
-net_vif_t *sys_vif_list[MAX_SYSTEM_VIFS];           /* global vif array */
 net_rule_ent_t *net_rule_list;                      /* global list of rules */
 kmem_cache_t *net_vif_cache;                        
 kmem_cache_t *net_rule_cache;
 static rwlock_t net_rule_lock = RW_LOCK_UNLOCKED;   /* rule mutex */
 
-rwlock_t sys_vif_lock = RW_LOCK_UNLOCKED;    /* vif mutex */
-
 void print_net_rule_list();
 
 
 /* ----[ VIF Functions ]----------------------------------------------------*/
+
+
+net_vif_t *find_vif_by_id(unsigned long id)
+{
+    struct task_struct *p;
+    net_vif_t *vif = NULL;
+    unsigned long flags, dom = id>>VIF_DOMAIN_SHIFT;
+
+    read_lock_irqsave(&tasklist_lock, flags);
+    p = task_hash[TASK_HASH(dom)];
+    while ( p != NULL )
+    {
+        if ( p->domain == dom )
+        {
+            vif = p->net_vif_list[id&VIF_INDEX_MASK];
+            if ( vif != NULL ) get_vif(vif);
+            break;
+        }
+        p = p->next_hash;
+    }
+    read_unlock_irqrestore(&tasklist_lock, flags);
+
+    return vif;
+}
+
 
 /* create_net_vif - Create a new vif and append it to the specified domain.
  * 
@@ -47,7 +63,6 @@ void print_net_rule_list();
  * global list.
  * 
  */
-
 net_vif_t *create_net_vif(int domain)
 {
     int dom_vif_idx;
@@ -59,6 +74,8 @@ net_vif_t *create_net_vif(int domain)
     if ( !(p = find_domain_by_id(domain)) )
         return NULL;
     
+    write_lock_irqsave(&tasklist_lock, flags);
+
     for ( dom_vif_idx = 0; dom_vif_idx < MAX_DOMAIN_VIFS; dom_vif_idx++ )
         if ( p->net_vif_list[dom_vif_idx] == NULL ) break;
     if ( dom_vif_idx == MAX_DOMAIN_VIFS )
@@ -82,20 +99,18 @@ net_vif_t *create_net_vif(int domain)
     new_vif->shared_rings = new_ring;
     new_vif->shared_idxs  = &p->shared_info->net_idx[dom_vif_idx];
     new_vif->domain       = p;
+    new_vif->idx          = dom_vif_idx;
     new_vif->list.next    = NULL;
     spin_lock_init(&new_vif->rx_lock);
     spin_lock_init(&new_vif->tx_lock);
 
     p->net_vif_list[dom_vif_idx] = new_vif;
-
-    write_lock_irqsave(&sys_vif_lock, flags);
-    new_vif->id = sys_vif_count;
-    sys_vif_list[sys_vif_count++] = new_vif;
-    write_unlock_irqrestore(&sys_vif_lock, flags);
     
+    write_unlock_irqrestore(&tasklist_lock, flags);
     return new_vif;
     
  fail:
+    write_unlock_irqrestore(&tasklist_lock, flags);
     if ( new_vif != NULL )
         kmem_cache_free(net_vif_cache, new_vif);
     if ( p != NULL )
@@ -146,32 +161,25 @@ void destroy_net_vif(net_vif_t *vif)
 void unlink_net_vif(net_vif_t *vif)
 {
     unsigned long flags;
-    int i;
 
     if ( vif == NULL )
         return;
 
-    for ( i = 0; i < MAX_DOMAIN_VIFS; i++ )
-        if ( vif->domain->net_vif_list[i] == vif )
-            vif->domain->net_vif_list[i] = NULL;
-    
-    write_lock_irqsave(&sys_vif_lock, flags);
-    sys_vif_list[vif->id] = NULL;
-    write_unlock_irqrestore(&sys_vif_lock, flags);
-    
+    write_lock_irqsave(&tasklist_lock, flags);
+    vif->domain->net_vif_list[vif->idx] = NULL;
+    write_unlock_irqrestore(&tasklist_lock, flags);
+
     put_vif(vif);
 }
 
 
-/* vif_query - Call from the proc file system to get a list of vifs 
- * assigned to a particular domain.
+/* vif_query - Call from the proc file system to get a list of indexes
+ * in use by a particular domain.
  */
-
 void vif_query(vif_query_t *vq)
 {
     net_vif_t *vif;
     struct task_struct *p;
-    unsigned long flags;
     char buf[128];
     int i;
 
@@ -180,14 +188,12 @@ void vif_query(vif_query_t *vq)
 
     *buf = '\0';
 
-    read_lock_irqsave(&sys_vif_lock, flags);
-    for ( i = 0; i < MAX_SYSTEM_VIFS; i++ )
+    for ( i = 0; i < MAX_DOMAIN_VIFS; i++ )
     {
-        vif = sys_vif_list[i];
-        if ( (vif == NULL) || (vif->domain != p) ) continue;
-        sprintf(buf + strlen(buf), "%d\n", vif->id);
+        vif = p->net_vif_list[i];
+        if ( vif == NULL ) continue;
+        sprintf(buf + strlen(buf), "%d\n", i);
     }
-    read_unlock_irqrestore(&sys_vif_lock, flags);
 
     copy_to_user(vq->buf, buf, strlen(buf) + 1);
     
@@ -204,9 +210,7 @@ int add_net_rule(net_rule_t *rule)
     net_rule_ent_t *new_ent;
     
     if ( (new_ent = kmem_cache_alloc(net_rule_cache, GFP_KERNEL)) == NULL )
-    {
         return -ENOMEM;
-    }
 
     memcpy(&new_ent->r, rule, sizeof(net_rule_t));
 
@@ -253,7 +257,7 @@ int delete_net_rule(net_rule_t *rule)
  * ip address to the specified vif.  It's used to set up domain zero.
  */
 
-void add_default_net_rule(int vif_id, u32 ipaddr)
+void add_default_net_rule(unsigned long vif_id, u32 ipaddr)
 {
     net_rule_t new_rule;
 
@@ -261,8 +265,8 @@ void add_default_net_rule(int vif_id, u32 ipaddr)
     memset(&new_rule, 0, sizeof(net_rule_t));
     new_rule.src_addr = ipaddr;
     new_rule.src_addr_mask = 0xffffffff;
-    new_rule.src_interface = vif_id;
-    new_rule.dst_interface = VIF_PHYSICAL_INTERFACE;
+    new_rule.src_vif = vif_id;
+    new_rule.dst_vif = VIF_PHYSICAL_INTERFACE;
     new_rule.action = NETWORK_ACTION_ACCEPT;
     new_rule.proto = NETWORK_PROTO_ANY;
     add_net_rule(&new_rule);
@@ -271,8 +275,8 @@ void add_default_net_rule(int vif_id, u32 ipaddr)
     memset(&new_rule, 0, sizeof(net_rule_t));
     new_rule.dst_addr = ipaddr;
     new_rule.dst_addr_mask = 0xffffffff;
-    new_rule.src_interface = VIF_ANY_INTERFACE;
-    new_rule.dst_interface = vif_id;
+    new_rule.src_vif = VIF_ANY_INTERFACE;
+    new_rule.dst_vif = vif_id;
     new_rule.action = NETWORK_ACTION_ACCEPT;
     new_rule.proto = NETWORK_PROTO_ANY;
     add_net_rule(&new_rule);
@@ -294,8 +298,32 @@ void print_net_rule(net_rule_t *r)
     printk("=] dst_port         : %u\n", r->dst_port);
     printk("=] dst_port_mask    : %u\n", r->dst_port_mask);
     printk("=] dst_proto        : %u\n", r->proto);
-    printk("=] src_interface    : %d\n", r->src_interface);
-    printk("=] dst_interface    : %d\n", r->dst_interface);
+    switch ( r->src_vif )
+    {
+    case VIF_PHYSICAL_INTERFACE:
+        printk("=] src_dom/idx      : PHYSICAL\n"); 
+        break;
+    case VIF_ANY_INTERFACE:
+        printk("=] src_dom/idx      : ANY\n"); 
+        break;
+    default:
+        printk("=] src_dom/idx      : %lu/%lu\n", 
+               r->src_vif>>VIF_DOMAIN_SHIFT, r->src_vif&VIF_INDEX_MASK);
+        break;
+    }
+    switch ( r->dst_vif )
+    {
+    case VIF_PHYSICAL_INTERFACE:
+        printk("=] dst_dom/idx      : PHYSICAL\n"); 
+        break;
+    case VIF_ANY_INTERFACE:
+        printk("=] dst_dom/idx      : ANY\n"); 
+        break;
+    default:
+        printk("=] dst_dom/idx      : %lu/%lu\n", 
+               r->dst_vif>>VIF_DOMAIN_SHIFT, r->dst_vif&VIF_INDEX_MASK);
+        break;
+    }
     printk("=] action           : %u\n", r->action);
 }
 
@@ -327,20 +355,21 @@ void print_net_rule_list()
  * Apply the rules to this skbuff and return the vif id that it is bound for.
  * If there is no match, VIF_DROP is returned.
  */
-int net_find_rule(u8 nproto, u8 tproto, u32 src_addr, u32 dst_addr, 
-                  u16 src_port, u16 dst_port, int src_vif)
+static net_vif_t *net_find_rule(u8 nproto, u8 tproto, u32 src_addr, 
+                                u32 dst_addr, u16 src_port, 
+                                u16 dst_port, unsigned long src_vif)
 {
     net_rule_ent_t *ent;
-    int dest = VIF_DROP;
-    
+    unsigned long dest = VIF_UNKNOWN_INTERFACE;
+
     read_lock(&net_rule_lock);
     
     ent = net_rule_list;
     
     while ( ent != NULL )
     {
-        if ( ((ent->r.src_interface == src_vif)
-              || (ent->r.src_interface == VIF_ANY_INTERFACE)) &&
+        if ( ((ent->r.src_vif == src_vif)
+              || (ent->r.src_vif == VIF_ANY_INTERFACE)) &&
 
              (!((ent->r.src_addr ^ src_addr) & ent->r.src_addr_mask )) &&
              (!((ent->r.dst_addr ^ dst_addr) & ent->r.dst_addr_mask )) &&
@@ -361,18 +390,24 @@ int net_find_rule(u8 nproto, u8 tproto, u32 src_addr, u32 dst_addr,
             /*
              * XXX FFS! We keep going to find the "best" rule. Where best 
              * corresponds to vaguely sane routing of a packet. We need a less 
-             * shafted model for aour "virtual firewall/router" methinks!
+             * shafted model for our "virtual firewall/router" methinks!
              */
-            if ( dest < 0 )
-                dest = ent->r.dst_interface;
-            if ( dest >= 0 )
+            if ( (dest & VIF_DOMAIN_MASK) == VIF_SPECIAL )
+                dest = ent->r.dst_vif;
+            if ( (dest & VIF_DOMAIN_MASK) != VIF_SPECIAL )
                 break;
         }
         ent = ent->next;
     }
 
     read_unlock(&net_rule_lock);
-    return dest;
+
+    if ( dest == VIF_PHYSICAL_INTERFACE )
+        return VIF_PHYS;
+    else if ( (dest & VIF_DOMAIN_MASK) == VIF_SPECIAL )
+        return VIF_DROP;
+    else
+        return find_vif_by_id(dest);
 }
 
 /* net_get_target_vif - Find the vif that the given sk_buff is bound for.
@@ -393,14 +428,16 @@ int net_find_rule(u8 nproto, u8 tproto, u32 src_addr, u32 dst_addr,
  * based on the packet type.  it then calls net_find_rule to scan the rule 
  * list.
  */
-
-#define net_get_target_vif(skb) __net_get_target_vif(skb->data, skb->len, skb->src_vif)
-
-int __net_get_target_vif(u8 *data, unsigned int len, int src_vif)
+net_vif_t *net_get_target_vif(u8 *data, unsigned int len, net_vif_t *src_vif)
 {
-    int target = VIF_DROP;
+    net_vif_t *target = VIF_DROP;
     u8 *h_raw, *nh_raw;
-    
+    unsigned long src_vif_val = VIF_PHYSICAL_INTERFACE;
+
+    if ( src_vif != VIF_PHYS )
+        src_vif_val = (src_vif->domain->domain<<VIF_DOMAIN_SHIFT) | 
+            src_vif->idx;
+
     if ( len < ETH_HLEN ) goto drop;
 
     nh_raw = data + ETH_HLEN;
@@ -410,34 +447,26 @@ int __net_get_target_vif(u8 *data, unsigned int len, int src_vif)
         if ( len < (ETH_HLEN + 28) ) goto drop;
         target = net_find_rule((u8)ETH_P_ARP, 0, ntohl(*(u32 *)(nh_raw + 14)),
                                ntohl(*(u32 *)(nh_raw + 24)), 0, 0, 
-                               src_vif);
+                               src_vif_val);
         break;
 
     case ETH_P_IP:
         if ( len < (ETH_HLEN + 20) ) goto drop;
         h_raw =  data + ((*(unsigned char *)(nh_raw)) & 0x0f) * 4;
-        
-        /* XXX For now, we ignore ports. */
-#if 0
-        target = net_find_rule((u8)ETH_P_IP,  *(u8 *)(nh_raw + 9),
-                               ntohl(*(u32 *)(nh_raw + 12)),
-                               ntohl(*(u32 *)(nh_raw + 16)),
-                               ntohs(*(u16 *)(h_raw)),
-                               ntohs(*(u16 *)(h_raw + 2)), 
-                               src_vif);
-#else
+        /* NB. For now we ignore ports. */
         target = net_find_rule((u8)ETH_P_IP,  *(u8 *)(data + 9),
                                ntohl(*(u32 *)(nh_raw + 12)),
                                ntohl(*(u32 *)(nh_raw + 16)),
                                0,
                                0, 
-                               src_vif);
-#endif
+                               src_vif_val);
+        break;
     }
     return target;
     
  drop:
-    printk("VIF%d: pkt to drop!\n", src_vif);
+    printk("VIF%lu/%lu: pkt to drop!\n", 
+           src_vif_val>>VIF_DOMAIN_SHIFT, src_vif_val&VIF_INDEX_MASK);
     return VIF_DROP;
 }
 
@@ -496,8 +525,6 @@ long do_network_op(network_op_t *u_network_op)
 
 void __init net_init (void)
 {
-    sys_vif_count = 0;
-    memset(sys_vif_list, 0, sizeof(sys_vif_list));
     net_rule_list = NULL;
     net_vif_cache = kmem_cache_create("net_vif_cache", sizeof(net_vif_t),
                                     0, SLAB_HWCACHE_ALIGN, NULL, NULL);

@@ -586,7 +586,6 @@ int netif_rx(struct sk_buff *skb)
 {
     int offset, this_cpu = smp_processor_id();
     unsigned long flags;
-    net_vif_t *vif;
 
     local_irq_save(flags);
 
@@ -605,17 +604,11 @@ int netif_rx(struct sk_buff *skb)
 
     netdev_rx_stat[this_cpu].total++;
 
-    if ( skb->src_vif == VIF_UNKNOWN_INTERFACE )
-        skb->src_vif = VIF_PHYSICAL_INTERFACE;
-                
-    if ( skb->dst_vif == VIF_UNKNOWN_INTERFACE )
-        skb->dst_vif = __net_get_target_vif(skb->data, skb->len, skb->src_vif);
+    if ( skb->dst_vif == NULL )
+        skb->dst_vif = net_get_target_vif(skb->data, skb->len, skb->src_vif);
         
-    read_lock(&sys_vif_lock);
-    if ( (skb->dst_vif <= VIF_PHYSICAL_INTERFACE) ||
-         ((vif = sys_vif_list[skb->dst_vif]) == NULL) )
+    if ( (skb->dst_vif == VIF_PHYS) || (skb->dst_vif == VIF_DROP) )
     {
-        read_unlock(&sys_vif_lock);
         netdev_rx_stat[this_cpu].dropped++;
         unmap_domain_mem(skb->head);
         kfree_skb(skb);
@@ -623,10 +616,8 @@ int netif_rx(struct sk_buff *skb)
         return NET_RX_DROP;
     }
 
-    get_vif(vif);
-    read_unlock(&sys_vif_lock);
-    deliver_packet(skb, vif);
-    put_vif(vif);
+    deliver_packet(skb, skb->dst_vif);
+    put_vif(skb->dst_vif);
 
     unmap_domain_mem(skb->head);
     kfree_skb(skb);
@@ -690,7 +681,7 @@ static void add_to_net_schedule_list_tail(net_vif_t *vif)
 static void tx_skb_release(struct sk_buff *skb)
 {
     int i;
-    net_vif_t *vif = sys_vif_list[skb->src_vif];
+    net_vif_t *vif = skb->src_vif;
     tx_shadow_entry_t *tx;
     unsigned long flags;
     
@@ -755,8 +746,8 @@ static void net_tx_action(unsigned long unused)
         skb->end  = skb->tail = skb->head + PKT_PROT_LEN;
         
         skb->dev      = the_dev;
-        skb->src_vif  = vif->id;
-        skb->dst_vif  = VIF_PHYSICAL_INTERFACE;
+        skb->src_vif  = vif;
+        skb->dst_vif  = NULL;
         skb->mac.raw  = skb->data; 
         
         skb_shinfo(skb)->frags[0].page        = frame_table +
@@ -1765,7 +1756,7 @@ long do_net_update(void)
     unsigned long pte_pfn, buf_pfn;
     struct pfn_info *pte_page, *buf_page;
     unsigned long *ptep;    
-    int target;
+    net_vif_t *target;
     u8 *g_data;
     unsigned short protocol;
 
@@ -1792,7 +1783,8 @@ long do_net_update(void)
                   (((vif->tx_resp_prod-i) & (TX_RING_SIZE-1)) != 1); 
               i = TX_RING_INC(i) )
         {
-            tx = shared_rings->tx_ring[i].req;
+            tx     = shared_rings->tx_ring[i].req;
+            target = VIF_DROP;
 
             if ( (tx.size < PKT_PROT_LEN) || (tx.size > ETH_FRAME_LEN) )
             {
@@ -1832,18 +1824,36 @@ long do_net_update(void)
                 goto tx_unmap_and_continue;
             }
 
-            target = __net_get_target_vif(g_data, tx.size, vif->id);
+            target = net_get_target_vif(g_data, tx.size, vif);
 
-            if ( target > VIF_PHYSICAL_INTERFACE )
+            if ( target == VIF_PHYS )
+            {
+                vif->tx_shadow_ring[j].id     = tx.id;
+                vif->tx_shadow_ring[j].size   = tx.size;
+                vif->tx_shadow_ring[j].header = 
+                    kmem_cache_alloc(net_header_cachep, GFP_KERNEL);
+                if ( vif->tx_shadow_ring[j].header == NULL )
+                { 
+                    make_tx_response(vif, tx.id, RING_STATUS_OK);
+                    goto tx_unmap_and_continue;
+                }
+
+                memcpy(vif->tx_shadow_ring[j].header, g_data, PKT_PROT_LEN);
+                vif->tx_shadow_ring[j].payload = tx.addr + PKT_PROT_LEN;
+                get_page_tot(buf_page);
+                j = TX_RING_INC(j);
+            }
+            else if ( target != VIF_DROP )
             {
                 /* Local delivery */
                 if ( (skb = dev_alloc_skb(ETH_FRAME_LEN + 32)) == NULL )
                 {
                     make_tx_response(vif, tx.id, RING_STATUS_BAD_PAGE);
+                    put_vif(target);
                     goto tx_unmap_and_continue;
                 }
 
-                skb->src_vif = vif->id;
+                skb->src_vif = vif;
                 skb->dst_vif = target;
                 skb->protocol = protocol;                
 
@@ -1864,23 +1874,6 @@ long do_net_update(void)
                 (void)netif_rx(skb);
 
                 make_tx_response(vif, tx.id, RING_STATUS_OK);
-            }
-            else if ( target == VIF_PHYSICAL_INTERFACE )
-            {
-                vif->tx_shadow_ring[j].id     = tx.id;
-                vif->tx_shadow_ring[j].size   = tx.size;
-                vif->tx_shadow_ring[j].header = 
-                    kmem_cache_alloc(net_header_cachep, GFP_KERNEL);
-                if ( vif->tx_shadow_ring[j].header == NULL )
-                { 
-                    make_tx_response(vif, tx.id, RING_STATUS_OK);
-                    goto tx_unmap_and_continue;
-                }
-
-                memcpy(vif->tx_shadow_ring[j].header, g_data, PKT_PROT_LEN);
-                vif->tx_shadow_ring[j].payload = tx.addr + PKT_PROT_LEN;
-                get_page_tot(buf_page);
-                j = TX_RING_INC(j);
             }
 
         tx_unmap_and_continue:

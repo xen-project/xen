@@ -24,11 +24,9 @@
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED)
 #define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
 
+/* Both these structures are protected by the tasklist_lock. */
 rwlock_t tasklist_lock __cacheline_aligned = RW_LOCK_UNLOCKED;
-
-#define TASK_HASH_SIZE 256
-#define TASK_HASH(_id) ((_id)&(TASK_HASH_SIZE-1))
-static struct task_struct *task_hash[TASK_HASH_SIZE];
+struct task_struct *task_hash[TASK_HASH_SIZE];
 
 /*
  * create a new domain

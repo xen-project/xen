@@ -25,12 +25,7 @@
 #include <asm/types.h>
 #include <linux/spinlock.h>
 #include <linux/mm.h>
-
-/* vif special values */
-#define VIF_PHYSICAL_INTERFACE  -1
-#define VIF_UNKNOWN_INTERFACE   -2
-#define VIF_DROP                -3
-#define VIF_ANY_INTERFACE       -4
+#include <xeno/vif.h>
 
 /* skb_type values */
 #define SKB_NORMAL               0 /* A Linux-style skbuff: no strangeness */
@@ -162,8 +157,8 @@ struct sk_buff {
 
     void 		(*destructor)(struct sk_buff *);	/* Destruct function		*/
     struct pfn_info *pf;                    /* record of physical pf address for freeing    */
-    int src_vif;                            /* vif we came from                             */
-    int dst_vif;                            /* vif we are bound for                         */
+    net_vif_t *src_vif;                     /* vif we came from                             */
+    net_vif_t *dst_vif;                     /* vif we are bound for                         */
     struct skb_shared_info shinfo;          /* shared info is no longer shared in Xen.      */
 };
 

@@ -13,7 +13,7 @@
 #include <xeno/hdsmart.h>
 #include <xeno/major.h>
 #include <xeno/blkdev.h>
-/*#include <xeno/proc_fs.h>*/
+#include <xeno/timer.h>
 /*#include <xeno/devfs_fs_kernel.h>*/
 #include <asm/hdreg.h>
 

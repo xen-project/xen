@@ -222,8 +222,6 @@ struct sk_buff *alloc_skb(unsigned int size,int gfp_mask)
     /* Set up other state */
     skb->len = 0;
     skb->data_len = 0;
-    skb->src_vif = VIF_UNKNOWN_INTERFACE;
-    skb->dst_vif = VIF_UNKNOWN_INTERFACE;
     skb->skb_type = SKB_NORMAL;
 
     skb_shinfo(skb)->nr_frags = 0;
@@ -270,8 +268,6 @@ struct sk_buff *alloc_zc_skb(unsigned int size,int gfp_mask)
     /* Set up other state */
     skb->len = 0;
     skb->data_len = 0;
-    skb->src_vif = VIF_UNKNOWN_INTERFACE;
-    skb->dst_vif = VIF_UNKNOWN_INTERFACE;
     skb->skb_type = SKB_ZERO_COPY;
 
     skb_shinfo(skb)->nr_frags = 0;
@@ -312,6 +308,8 @@ static inline void skb_headerinit(void *p, kmem_cache_t *cache,
 {
     struct sk_buff *skb = p;
 
+    skb->src_vif = NULL;
+    skb->dst_vif = NULL;
     skb->next = NULL;
     skb->prev = NULL;
     skb->list = NULL;

@@ -267,6 +267,11 @@ void domain_init(void);
 int idle_cpu(int cpu); /* Is CPU 'cpu' idle right now? */
 void cpu_idle(void);   /* Idle loop. */
 
+/* This hash table is protected by the tasklist_lock. */
+#define TASK_HASH_SIZE 256
+#define TASK_HASH(_id) ((_id)&(TASK_HASH_SIZE-1))
+struct task_struct *task_hash[TASK_HASH_SIZE];
+
 #define REMOVE_LINKS(p) do { \
         (p)->next_task->prev_task = (p)->prev_task; \
         (p)->prev_task->next_task = (p)->next_task; \

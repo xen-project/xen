@@ -75,15 +75,11 @@ static int cmd_read_proc(char *page, char **start, off_t off,
 
 static ssize_t dom_vif_read(struct file * file, char * buff, size_t size, loff_t * off)
 {
-    char hyp_buf[128]; // Hypervisor is going to write its reply here.
+    char hyp_buf[128];
     network_op_t op;
     static int finished = 0;
 
-    // This seems to be the only way to make the OS stop making read requests
-    // to the file.  When we use the fileoperations version of read, offset 
-    // seems to be ignored altogether.
-    
-    if (finished) 
+    if ( finished ) 
     {
         finished = 0;
         return 0;

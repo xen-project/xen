@@ -28,7 +28,7 @@
 #include <xeno/time.h>
 #include <xeno/ac_timer.h>
 #include <xeno/interrupt.h>
-
+#include <xeno/timer.h>
 #include <xeno/perfc.h>
 
 

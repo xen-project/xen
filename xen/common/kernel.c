@@ -527,10 +527,6 @@ int console_export(char *str, int len)
     ethh->h_proto = htons(ETH_P_IP);
     skb->mac.ethernet= (struct ethhdr *)ethh;
 
-    /* Keep the net rule tables happy. */
-    skb->src_vif = VIF_PHYSICAL_INTERFACE;
-    skb->dst_vif = 0;
-    
     unmap_domain_mem(skb_data);
     
     (void)netif_rx(skb);

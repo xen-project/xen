@@ -36,6 +36,8 @@
 #include <xeno/init.h>
 #include <xeno/interrupt.h>
 #include <xeno/irq.h>
+#include <xeno/mm.h>
+#include <xeno/slab.h>
 #include <asm/pgalloc.h>
 #include <asm/mc146818rtc.h>
 #include <asm/smpboot.h>

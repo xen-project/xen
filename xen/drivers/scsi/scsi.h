@@ -16,7 +16,7 @@
 #define _SCSI_H
 
 #include <xeno/config.h>	/* for CONFIG_SCSI_LOGGING */
-/*#include <xeno/devfs_fs_kernel.h>*/
+#include <xeno/timer.h>
 /*#include <xeno/proc_fs.h>*/
 
 /*

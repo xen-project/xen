@@ -8,7 +8,9 @@
  * (C) Copyright 1995 1996 Linus Torvalds
  */
 
-//#include <linux/vmalloc.h>
+#include <xeno/config.h>
+#include <xeno/lib.h>
+#include <xeno/mm.h>
 #include <asm/io.h>
 #include <asm/pgalloc.h>
 #include <asm/page.h>

@@ -17,6 +17,7 @@
 #include <xeno/keyhandler.h>
 #include <xeno/interrupt.h>
 #include <xeno/segment.h>
+#include <xeno/slab.h>
 
 #if 0
 #define DPRINTK(_f, _a...) printk( _f , ## _a )

@@ -46,6 +46,7 @@
 #include <asm/pgalloc.h>
 #include <asm/hardirq.h>
 #include <asm/apic.h>
+#include <xeno/mm.h>
 
 #include <asm/timex.h>
 #include <xeno/ac_timer.h>

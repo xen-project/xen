@@ -6,6 +6,9 @@
  * Copyright (c) 2002-2003, A K Warfield and K A Fraser
  */
 
+#ifndef __XENO_VIF_H__
+#define __XENO_VIF_H__
+
 /* virtual network interface struct and associated defines. */
 /* net_vif_st is the larger struct that describes a virtual network interface
  * it contains a pointer to the net_ring_t structure that needs to be on a 
@@ -16,7 +19,6 @@
  */
 
 #include <hypervisor-ifs/network.h>
-#include <xeno/skbuff.h>
 
 /* 
  * shadow ring structures are used to protect the descriptors from
@@ -62,8 +64,8 @@ typedef struct net_vif_st {
     unsigned int tx_resp_prod; /* private version of shared variable */
 
     /* Miscellaneous private stuff. */
-    int                 id;
     struct task_struct *domain;
+    unsigned int idx; /* index within domain */
     struct list_head    list;     /* scheduling list */
     atomic_t            refcnt;
     spinlock_t          rx_lock, tx_lock;
@@ -75,24 +77,22 @@ do {                                                               \
     if ( atomic_dec_and_test(&(_v)->refcnt) ) destroy_net_vif(_v); \
 } while (0)                                                        \
 
-/* VIF-related defines. */
-#define MAX_SYSTEM_VIFS 256  
-
-/* vif globals */
-extern int sys_vif_count;
-extern net_vif_t *sys_vif_list[];
-extern rwlock_t sys_vif_lock; /* protects the sys_vif_list */
-
 /* vif prototypes */
 net_vif_t *create_net_vif(int domain);
 void destroy_net_vif(net_vif_t *vif);
 void unlink_net_vif(net_vif_t *vif);
-void add_default_net_rule(int vif_id, u32 ipaddr);
-int __net_get_target_vif(u8 *data, unsigned int len, int src_vif);
-void add_default_net_rule(int vif_id, u32 ipaddr);
+void add_default_net_rule(unsigned long vif_id, u32 ipaddr);
+net_vif_t *net_get_target_vif(u8 *data, unsigned int len, net_vif_t *src_vif);
+net_vif_t *find_vif_by_id(unsigned long id);
 
-#define net_get_target_vif(skb) __net_get_target_vif(skb->data, skb->len, skb->src_vif)
-/* status fields per-descriptor:
+/*
+ * Return values from net_get_target_vif:
+ *  VIF_PHYS -- Send to physical NIC
+ *  VIF_DROP -- Drop this packet
+ *  others   -- Send to specified VIF (reference held on return)
  */
+#define VIF_PHYS ((net_vif_t *)0)
+#define VIF_DROP ((net_vif_t *)1)
 
+#endif /* __XENO_VIF_H__ */
 

@@ -13,6 +13,7 @@
 #include <xeno/sched.h>
 #include <xeno/lib.h>
 #include <xeno/errno.h>
+#include <xeno/mm.h>
 #include <asm/ptrace.h>
 #include <xeno/delay.h>
 #include <xeno/spinlock.h>

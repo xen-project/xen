@@ -104,11 +104,21 @@ typedef struct net_rule_st
     u16  src_port_mask;
     u16  dst_port_mask;
     u16  proto;
-    
-    int  src_interface;
-    int  dst_interface;
+    unsigned long src_vif;
+    unsigned long dst_vif;
     u16  action;
 } net_rule_t;
+
+#define VIF_DOMAIN_MASK  0xfffff000UL
+#define VIF_DOMAIN_SHIFT 12
+#define VIF_INDEX_MASK   0x00000fffUL
+#define VIF_INDEX_SHIFT  0
+
+/* These are specified in the index if the dom is SPECIAL. */
+#define VIF_SPECIAL      0xfffff000UL
+#define VIF_UNKNOWN_INTERFACE   (VIF_SPECIAL | 0)
+#define VIF_PHYSICAL_INTERFACE  (VIF_SPECIAL | 1)
+#define VIF_ANY_INTERFACE       (VIF_SPECIAL | 2)
 
 typedef struct vif_query_st
 {
