@@ -60,7 +60,7 @@ shadow_promote(struct domain *d, unsigned long gpfn, unsigned long gmfn,
         __shadow_sync_mfn(d, gmfn);
     }
 
-    if ( unlikely(mfn_is_page_table(gmfn)) )
+    if ( unlikely(page_is_page_table(page)) )
     {
         min_type = shadow_max_pgtable_type(d, gpfn) + PGT_l1_shadow;
         max_type = new_type;
@@ -99,7 +99,7 @@ shadow_promote(struct domain *d, unsigned long gpfn, unsigned long gmfn,
     if ( get_page_type(page, PGT_base_page_table) )
     {
         put_page_type(page);
-        set_bit(_PGC_page_table, &frame_table[gmfn].count_info);
+        set_bit(_PGC_page_table, &page->count_info);
     }
     else
     {
@@ -1197,7 +1197,7 @@ void shadow_map_l1_into_current_l2(unsigned long va)
         {
             l1pte_propagate_from_guest(d, gpl1e[i], &spl1e[i]);
             if ( spl1e[i] & _PAGE_PRESENT )
-                get_page_from_l1e(mk_l1_pgentry(spl1e[i]), d);
+                shadow_get_page_from_l1e(mk_l1_pgentry(spl1e[i]), d);
         }
     }
 }
@@ -1503,7 +1503,7 @@ static u32 remove_all_write_access_in_ptpage(
             unsigned long new = old & ~_PAGE_RW;
 
             if ( is_l1_shadow )
-                get_page_from_l1e(mk_l1_pgentry(new), d);
+                shadow_get_page_from_l1e(mk_l1_pgentry(new), d);
 
             count++;
             pt[i] = new;
@@ -1724,7 +1724,8 @@ void __shadow_sync_all(struct domain *d)
         unsigned long opte = *ppte;
         unsigned long npte = opte & ~_PAGE_RW;
 
-        get_page_from_l1e(mk_l1_pgentry(npte), d);
+        if ( npte & _PAGE_PRESENT)
+            shadow_get_page_from_l1e(mk_l1_pgentry(npte), d);
         *ppte = npte;
         put_page_from_l1e(mk_l1_pgentry(opte), d);
 

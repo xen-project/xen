@@ -68,6 +68,33 @@ static inline unsigned long __shadow_status(
 
 extern void vmx_shadow_clear_state(struct domain *);
 
+static inline int page_is_page_table(struct pfn_info *page)
+{
+    return page->count_info & PGC_page_table;
+}
+
+static inline int mfn_is_page_table(unsigned long mfn)
+{
+    if ( !pfn_is_ram(mfn) )
+        return 0;
+
+    return frame_table[mfn].count_info & PGC_page_table;
+}
+
+static inline int page_out_of_sync(struct pfn_info *page)
+{
+    return page->count_info & PGC_out_of_sync;
+}
+
+static inline int mfn_out_of_sync(unsigned long mfn)
+{
+    if ( !pfn_is_ram(mfn) )
+        return 0;
+
+    return frame_table[mfn].count_info & PGC_out_of_sync;
+}
+
+
 /************************************************************************/
 
 static void inline
@@ -215,6 +242,36 @@ extern int shadow_status_noswap;
 
 /************************************************************************/
 
+static inline int
+shadow_get_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
+{
+    int res = get_page_from_l1e(l1e, d);
+    unsigned long mfn;
+    struct domain *owner;
+
+    ASSERT( l1_pgentry_val(l1e) & _PAGE_PRESENT );
+
+    if ( unlikely(!res) && IS_PRIV(d) && !shadow_mode_translate(d) &&
+         !(l1_pgentry_val(l1e) & L1_DISALLOW_MASK) &&
+         (mfn = l1_pgentry_to_pfn(l1e)) &&
+         pfn_is_ram(mfn) &&
+         (owner = page_get_owner(pfn_to_page(l1_pgentry_to_pfn(l1e)))) &&
+         (d != owner) )
+    {
+        res = get_page_from_l1e(l1e, owner);
+        printk("tried to map page from domain %d into shadow page tables "
+               "of domain %d; %s\n",
+               owner->id, d->id, res ? "success" : "failed");
+    }
+
+    if ( unlikely(!res) )
+        perfc_incrc(shadow_get_page_fail);
+
+    return res;
+}
+
+/************************************************************************/
+
 static inline void
 __shadow_get_l2e(
     struct exec_domain *ed, unsigned long va, unsigned long *psl2e)
@@ -257,7 +314,7 @@ __guest_set_l2e(
         if ( (old_hl2e ^ new_hl2e) & (PAGE_MASK | _PAGE_PRESENT) )
         {
             if ( new_hl2e & _PAGE_PRESENT )
-                get_page_from_l1e(mk_l1_pgentry(new_hl2e), ed->domain);
+                shadow_get_page_from_l1e(mk_l1_pgentry(new_hl2e), ed->domain);
             if ( old_hl2e & _PAGE_PRESENT )
                 put_page_from_l1e(mk_l1_pgentry(old_hl2e), ed->domain);
         }
@@ -541,9 +598,10 @@ static inline void l2pde_general(
 static inline void l2pde_propagate_from_guest(
     struct domain *d, unsigned long *gpde_p, unsigned long *spde_p)
 {
-    unsigned long gpde = *gpde_p, sl1mfn;
+    unsigned long gpde = *gpde_p, sl1mfn = 0;
 
-    sl1mfn =  __shadow_status(d, gpde >> PAGE_SHIFT, PGT_l1_shadow);
+    if ( gpde & _PAGE_PRESENT )
+        sl1mfn =  __shadow_status(d, gpde >> PAGE_SHIFT, PGT_l1_shadow);
     l2pde_general(d, gpde_p, spde_p, sl1mfn);
 }
     
@@ -559,7 +617,7 @@ validate_pte_change(
 {
     unsigned long old_spte, new_spte;
 
-    perfc_incrc(validate_pte_change);
+    perfc_incrc(validate_pte_calls);
 
 #if 0
     FSH_LOG("validate_pte(old=%p new=%p)\n", old_pte, new_pte);
@@ -571,10 +629,13 @@ validate_pte_change(
 
     // only do the ref counting if something important changed.
     //
-    if ( (old_spte ^ new_spte) & (PAGE_MASK | _PAGE_RW | _PAGE_PRESENT) )
+    if ( ((old_spte | new_spte) & _PAGE_PRESENT ) &&
+         ((old_spte ^ new_spte) & (PAGE_MASK | _PAGE_RW | _PAGE_PRESENT)) )
     {
+        perfc_incrc(validate_pte_changes);
+
         if ( new_spte & _PAGE_PRESENT )
-            get_page_from_l1e(mk_l1_pgentry(new_spte), d);
+            shadow_get_page_from_l1e(mk_l1_pgentry(new_spte), d);
         if ( old_spte & _PAGE_PRESENT )
             put_page_from_l1e(mk_l1_pgentry(old_spte), d);
     }
@@ -594,15 +655,18 @@ validate_pde_change(
     unsigned long old_spde = *shadow_pde_p;
     unsigned long new_spde;
 
-    perfc_incrc(validate_pde_change);
+    perfc_incrc(validate_pde_calls);
 
     l2pde_propagate_from_guest(d, &new_pde, shadow_pde_p);
     new_spde = *shadow_pde_p;
 
     // only do the ref counting if something important changed.
     //
-    if ( (old_spde ^ new_spde) & (PAGE_MASK | _PAGE_PRESENT) )
+    if ( ((old_spde | new_spde) & _PAGE_PRESENT) &&
+         ((old_spde ^ new_spde) & (PAGE_MASK | _PAGE_PRESENT)) )
     {
+        perfc_incrc(validate_pde_changes);
+
         if ( new_spde & _PAGE_PRESENT )
             get_shadow_ref(new_spde >> PAGE_SHIFT);
         if ( old_spde & _PAGE_PRESENT )
@@ -696,15 +760,11 @@ static inline struct shadow_status *hash_bucket(
  *      It returns the shadow's mfn, or zero if it doesn't exist.
  */
 
-static inline unsigned long __shadow_status(
+static inline unsigned long ___shadow_status(
     struct domain *d, unsigned long gpfn, unsigned long stype)
 {
     struct shadow_status *p, *x, *head;
     unsigned long key = gpfn | stype;
-
-    ASSERT(spin_is_locked(&d->arch.shadow_lock));
-    ASSERT(gpfn == (gpfn & PGT_mfn_mask));
-    ASSERT(stype && !(stype & ~PGT_type_mask));
 
     perfc_incrc(shadow_status_calls);
 
@@ -753,6 +813,27 @@ static inline unsigned long __shadow_status(
     SH_VVLOG("lookup gpfn=%p => status=0", key);
     perfc_incrc(shadow_status_miss);
     return 0;
+}
+
+static inline unsigned long __shadow_status(
+    struct domain *d, unsigned long gpfn, unsigned long stype)
+{
+    unsigned long gmfn = __gpfn_to_mfn(d, gpfn);
+
+    ASSERT(spin_is_locked(&d->arch.shadow_lock));
+    ASSERT(gpfn == (gpfn & PGT_mfn_mask));
+    ASSERT(stype && !(stype & ~PGT_type_mask));
+
+    if ( gmfn && ((stype != PGT_snapshot)
+                  ? !mfn_is_page_table(gmfn)
+                  : !mfn_out_of_sync(gmfn)) )
+    {
+        perfc_incrc(shadow_status_shortcut);
+        ASSERT(___shadow_status(d, gpfn, stype) == 0);
+        return 0;
+    }
+
+    return ___shadow_status(d, gmfn, stype);
 }
 
 /*
@@ -1081,7 +1162,7 @@ shadow_set_l1e(unsigned long va, unsigned long new_spte, int create_l1_shadow)
     if ( (old_spte ^ new_spte) & (PAGE_MASK | _PAGE_RW | _PAGE_PRESENT) )
     {
         if ( new_spte & _PAGE_PRESENT )
-            get_page_from_l1e(mk_l1_pgentry(new_spte), d);
+            shadow_get_page_from_l1e(mk_l1_pgentry(new_spte), d);
         if ( old_spte & _PAGE_PRESENT )
             put_page_from_l1e(mk_l1_pgentry(old_spte), d);
     }
