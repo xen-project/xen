@@ -434,7 +434,7 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
         return IRQ_HANDLED;
     }
     
-    rp = blk_ring.sring->rsp_prod;
+    rp = blk_ring.sring->req_prod;
     rmb(); /* Ensure we see queued responses up to 'rp'. */
 
     for ( i = blk_ring.rsp_cons; i != rp; i++ )
@@ -523,13 +523,12 @@ static void vbd_update(void)
 #endif /* ENABLE_VBD_UPDATE */
 /*============================================================================*/
 
-
 static void kick_pending_request_queues(void)
 {
     /* We kick pending request queues if the ring is reasonably empty. */
     if ( (nr_pending != 0) && 
          (RING_PENDING_REQUESTS(BLKIF_RING, &blk_ring) < 
-            (RING_SIZE(&blk_ring) >> 1)) )
+            (RING_SIZE(BLKIF_RING, &blk_ring) >> 1)) )
     {
         /* Attempt to drain the queue, but bail if the ring becomes full. */
         while ( (nr_pending != 0) && !RING_FULL(BLKIF_RING, &blk_ring) )
@@ -827,7 +826,7 @@ static int blkif_queue_request(unsigned long   id,
              (sg_next_sect == sector_number) )
         {
             req = RING_GET_REQUEST(BLKIF_RING, &blk_ring, 
-                    blk_ring.rsp_prod_pvt - 1);
+                    blk_ring.req_prod_pvt - 1);
             bh = (struct buffer_head *)id;
 	    
             bh->b_reqnext = (struct buffer_head *)rec_ring[req->id].id;
@@ -981,7 +980,7 @@ static void blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
         return;
     }
 
-    rp = blk_ring.rsp_prod;
+    rp = blk_ring.sring->rsp_prod;
     rmb(); /* Ensure we see queued responses up to 'rp'. */
 
     for ( i = blk_ring.rsp_cons; i != rp; i++ )
@@ -989,7 +988,7 @@ static void blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 	unsigned long id;
         blkif_response_t *bret;
         
-        bret = RING_GET_RESPONSE(BLKIF_RING, &blkif_ring, i);
+        bret = RING_GET_RESPONSE(BLKIF_RING, &blk_ring, i);
 	id = bret->id;
 	bh = (struct buffer_head *)rec_ring[id].id; 
 
@@ -1020,6 +1019,7 @@ static void blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
             BUG();
         }
 
+	}
     blk_ring.rsp_cons = i;
     
     kick_pending_request_queues();
