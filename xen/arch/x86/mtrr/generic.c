@@ -8,7 +8,6 @@
 #include <asm/msr.h>
 #include <asm/system.h>
 #include <asm/cpufeature.h>
-//#include <asm/tlbflush.h>
 #include "mtrr.h"
 
 struct mtrr_state {
@@ -232,6 +231,13 @@ static unsigned long cr4 = 0;
 static u32 deftype_lo, deftype_hi;
 static spinlock_t set_atomicity_lock = SPIN_LOCK_UNLOCKED;
 
+/*
+ * Since we are disabling the cache don't allow any interrupts - they
+ * would run extremely slow and would only increase the pain.  The caller must
+ * ensure that local interrupts are disabled and are reenabled after post_set()
+ * has been called.
+ */
+
 static void prepare_set(void)
 {
 	unsigned long cr0;
@@ -239,18 +245,18 @@ static void prepare_set(void)
 	/*  Note that this is not ideal, since the cache is only flushed/disabled
 	   for this CPU while the MTRRs are changed, but changing this requires
 	   more invasive changes to the way the kernel boots  */
+
 	spin_lock(&set_atomicity_lock);
 
 	/*  Enter the no-fill (CD=1, NW=0) cache mode and flush caches. */
 	cr0 = read_cr0() | 0x40000000;	/* set CD flag */
-	wbinvd();
 	write_cr0(cr0);
 	wbinvd();
 
 	/*  Save value of CR4 and clear Page Global Enable (bit 7)  */
 	if ( cpu_has_pge ) {
 		cr4 = read_cr4();
-		write_cr4(cr4 & (unsigned char) ~(1 << 7));
+		write_cr4(cr4 & ~X86_CR4_PGE);
 	}
 
 	/* Flush all TLBs via a mov %cr3, %reg; mov %reg, %cr3 */
@@ -265,8 +271,7 @@ static void prepare_set(void)
 
 static void post_set(void)
 {
-	/*  Flush caches and TLBs  */
-	wbinvd();
+	/*  Flush TLBs (no need to flush caches - they are disabled)  */
 	__flush_tlb();
 
 	/* Intel (P6) standard MTRRs */
@@ -284,13 +289,16 @@ static void post_set(void)
 static void generic_set_all(void)
 {
 	unsigned long mask, count;
+	unsigned long flags;
 
+	local_irq_save(flags);
 	prepare_set();
 
 	/* Actually set the state */
 	mask = set_mtrr_state(deftype_lo,deftype_hi);
 
 	post_set();
+	local_irq_restore(flags);
 
 	/*  Use the atomic bitops to update the global mask  */
 	for (count = 0; count < sizeof mask * 8; ++count) {
@@ -313,6 +321,9 @@ static void generic_set_mtrr(unsigned int reg, unsigned long base,
     [RETURNS] Nothing.
 */
 {
+	unsigned long flags;
+
+	local_irq_save(flags);
 	prepare_set();
 
 	if (size == 0) {
@@ -327,6 +338,7 @@ static void generic_set_mtrr(unsigned int reg, unsigned long base,
 	}
 
 	post_set();
+	local_irq_restore(flags);
 }
 
 int generic_validate_add_page(unsigned long base, unsigned long size, unsigned int type)
