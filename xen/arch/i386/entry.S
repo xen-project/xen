@@ -161,7 +161,8 @@ NT_MASK		= 0x00004000
 #define GET_CURRENT(reg)   \
         movl $4096-4, reg; \
         orl  %esp, reg;    \
-        movl (reg),reg     \
+        andl $~3,reg;      \
+        movl (reg),reg;
 
 ENTRY(continue_nonidle_task)
         GET_CURRENT(%ebx)
