@@ -24,6 +24,9 @@
 
 #include "minixend.h"
 
+#define NETWORK_SCRIPT "/etc/xen/scripts/network"
+#define VIFBRIDGE_SCRIPT "/etc/xen/scripts/vif-bridge"
+
 #define MINIXEND_PORT 5123
 
 #define mb() asm volatile ("" ::: "memory")
@@ -383,7 +386,7 @@ handle_netif_fe_driver_status_changed(control_msg_t *m,
 		}
 		d->created_netif_backend = 1;
 
-		r = our_system("/etc/xen/vif-bridge up domain=%s mac=%.02x:%.02x:%.02x:%.02x:%.02x:%.02x vif=vif%d.0 bridge=xen-br0",
+		r = our_system(VIFBRIDGE_SCRIPT " up domain=%s mac=%.02x:%.02x:%.02x:%.02x:%.02x:%.02x vif=vif%d.0 bridge=xen-br0",
 			       d->name,
 			       d->netif_mac[0],
 			       d->netif_mac[1],
@@ -393,7 +396,7 @@ handle_netif_fe_driver_status_changed(control_msg_t *m,
 			       d->netif_mac[5],
 			       d->domid);
 		if (r != 0)
-			warn("error %d running vif-bridge script", r);
+			warn("error %d running " VIFBRIDGE_SCRIPT, r);
 
 		/* Tell domain how many interfaces it has to deal
 		 * with. */
@@ -969,18 +972,18 @@ main(int argc, char *argv[])
 {
 	int r;
 
-	r = our_system("/etc/xen/network start antispoof=no");
+	r = our_system(NETWORK SCRIPT " start antispoof=no");
 	if (r < 0)
-		err(1, "running /etc/xen/network");
+		err(1, "running " NETWORK_SCRIPT);
 	if (!WIFEXITED(r)) {
 		if (WIFSIGNALED(r)) {
-			errx(1, "/etc/xen/network killed by signal %d",
+			errx(1, NETWORK_SCRIPT " killed by signal %d",
 			     WTERMSIG(r));
 		}
-		errx(1, "/etc/xen/network terminated abnormally");
+		errx(1, NETWORK_SCRIPT " terminated abnormally");
 	}
 	if (WEXITSTATUS(r) != 0)
-		errx(1, "/etc/xen/network returned error status %d",
+		errx(1, NETWORK_SCRIPT " returned error status %d",
 		     WEXITSTATUS(r));
 
 	xc_handle = xc_interface_open();
