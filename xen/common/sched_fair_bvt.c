@@ -30,6 +30,7 @@
 
 /* For tracing - TODO - put all the defines in some common hearder file */
 #define TRC_SCHED_FBVT_DO_SCHED             0x00020000
+#define TRC_SCHED_FBVT_DO_SCHED_UPDATE      0x00020001
 
 
 /* all per-domain BVT-specific scheduling info is stored here */
@@ -39,7 +40,6 @@ struct fbvt_dom_info
     u32           avt;              /* actual virtual time */
     u32           evt;              /* effective virtual time */
     u32		      time_slept;	    /* records amount of time slept, used for scheduling */
-    u32		      vtb;	    	    /* virtual time bonus */
     int           warpback;         /* warp?  */
     long          warp;             /* virtual time warp */
     long          warpl;            /* warp limit */
@@ -51,17 +51,22 @@ struct fbvt_dom_info
 struct fbvt_cpu_info
 {
     unsigned long svt; /* XXX check this is unsigned long! */
+    u32		      vtb;	    	    /* virtual time bonus */
+    u32           r_time;           /* last time to run */  
 };
 
 
 #define FBVT_INFO(p)   ((struct fbvt_dom_info *)(p)->sched_priv)
 #define CPU_INFO(cpu) ((struct fbvt_cpu_info *)(schedule_data[cpu]).sched_priv)
 #define CPU_SVT(cpu)  (CPU_INFO(cpu)->svt)
+#define LAST_VTB(cpu) (CPU_INFO(cpu)->vtb)
+#define R_TIME(cpu)   (CPU_INFO(cpu)->r_time) 
 
 #define MCU            (s32)MICROSECS(100)    /* Minimum unit */
 #define MCU_ADVANCE    10                     /* default weight */
 #define TIME_SLOP      (s32)MICROSECS(50)     /* allow time to slip a bit */
 static s32 ctx_allow = (s32)MILLISECS(5);     /* context switch allowance */
+static s32 max_vtb   = (s32)MILLISECS(5);
 
 /* SLAB cache for struct fbvt_dom_info objects */
 static kmem_cache_t *dom_info_cache;
@@ -132,7 +137,6 @@ void fbvt_add_task(struct domain *p)
         inf->avt         = CPU_SVT(p->processor);
         inf->evt         = CPU_SVT(p->processor);
         /* Set some default values here. */
-		inf->vtb	     = 0;
 		inf->time_slept  = 0;
         inf->warpback    = 0;
         inf->warp        = 0;
@@ -206,6 +210,8 @@ int fbvt_ctl(struct sched_ctl_cmd *cmd)
     if ( cmd->direction == SCHED_INFO_PUT )
     { 
         ctx_allow = params->ctx_allow;
+        /* The max_vtb should be of the order o the ctx_allow */
+        max_vtb = ctx_allow;
     }
     else
     {
@@ -285,6 +291,7 @@ static task_slice_t fbvt_do_schedule(s_time_t now)
     s32                 ranfor;     /* assume we never run longer than 2.1s! */
     s32                 mcus;
     u32                 next_evt, next_prime_evt, min_avt;
+    u32                 sl_decrement;
     struct fbvt_dom_info *prev_inf       = FBVT_INFO(prev),
                         *p_inf          = NULL,
                         *next_inf       = NULL,
@@ -299,18 +306,25 @@ static task_slice_t fbvt_do_schedule(s_time_t now)
         ranfor = (s32)(now - prev->lastschd);
         /* Calculate mcu and update avt. */
         mcus = (ranfor + MCU - 1) / MCU;
-    if(mcus * prev_inf->mcu_advance < prev_inf->vtb)
-	{
-	    ASSERT(prev_inf->time_slept >= mcus * prev_inf->mcu_advance);
-    	prev_inf->time_slept -= mcus * prev_inf->mcu_advance;
-	}
-	else
-	{
-	    prev_inf->avt += mcus * prev_inf->mcu_advance - prev_inf->vtb;
+        
+        TRACE_3D(TRC_SCHED_FBVT_DO_SCHED_UPDATE, prev->domain, mcus, LAST_VTB(cpu));
+    
+        sl_decrement = mcus * LAST_VTB(cpu) / R_TIME(cpu);
+        prev_inf->time_slept -=  sl_decrement;
+        prev_inf->avt += mcus * prev_inf->mcu_advance - sl_decrement;
+  
+        /*if(mcus * prev_inf->mcu_advance < LAST_VTB(cpu))
+	    {
+	        ASSERT(prev_inf->time_slept >= mcus * prev_inf->mcu_advance);
+    	    prev_inf->time_slept -= mcus * prev_inf->mcu_advance;
+	    }
+	    else
+	    {
+	        prev_inf->avt += mcus * prev_inf->mcu_advance - LAST_VTB(cpu);
 		
-	    ASSERT(prev_inf->time_slept >= prev_inf->vtb);
-	    prev_inf->time_slept -= prev_inf->vtb;
- 	}
+	        ASSERT(prev_inf->time_slept >= LAST_VTB(cpu));
+	        prev_inf->time_slept -= LAST_VTB(cpu);
+ 	    }*/
         
         __calc_evt(prev_inf);
         
@@ -407,8 +421,9 @@ static task_slice_t fbvt_do_schedule(s_time_t now)
      * domains earlier in virtual time). Together this should give quite
      * good control both for CPU and IO-bound domains.
      */
-    next_inf->vtb = (int)(0.2 * next_inf->time_slept);
-    if(next_inf->vtb > 1000) next_inf->vtb = 1000;
+    LAST_VTB(cpu) = (int)(0.2 * next_inf->time_slept);
+    if(LAST_VTB(cpu) / next_inf->mcu_advance > max_vtb / MCU) 
+        LAST_VTB(cpu) = max_vtb * next_inf->mcu_advance / MCU;
 
 
     /* work out time for next run through scheduler */
@@ -431,15 +446,17 @@ static task_slice_t fbvt_do_schedule(s_time_t now)
      * 'next_prime's evt. Take context switch allowance into account.
      */
     ASSERT(next_prime_inf->evt >= next_inf->evt);
-   
-    r_time = ((next_prime_inf->evt + next_inf->vtb - next_inf->evt)/next_inf->mcu_advance)
+  
+    ASSERT(LAST_VTB(cpu) >= 0);
+
+    r_time = MCU * ((next_prime_inf->evt + LAST_VTB(cpu) - next_inf->evt)/next_inf->mcu_advance)
         + ctx_allow;
-        
+
     ASSERT(r_time >= ctx_allow);
 
  sched_done:
- 
-    TRACE_2D(TRC_SCHED_FBVT_DO_SCHED, next->domain, r_time);
+    R_TIME(cpu) = r_time / MCU;
+    TRACE_3D(TRC_SCHED_FBVT_DO_SCHED, next->domain, r_time, LAST_VTB(cpu));
     next->min_slice = ctx_allow;
     ret.task = next;
     ret.time = r_time;
@@ -452,8 +469,8 @@ static void fbvt_dump_runq_el(struct domain *p)
 {
     struct fbvt_dom_info *inf = FBVT_INFO(p);
     
-    printk("mcua=0x%04lX ev=0x%08X av=0x%08X sl=0x%08X vtb=0x%08X ",
-           inf->mcu_advance, inf->evt, inf->avt, inf->time_slept, inf->vtb);
+    printk("mcua=%04lu ev=%08u av=%08u sl=%08u",
+           inf->mcu_advance, inf->evt, inf->avt, inf->time_slept);
 }
 
 static void fbvt_dump_settings(void)
@@ -518,7 +535,7 @@ static void fbvt_unpause(struct domain *p)
         /* Set avt to system virtual time. */
         inf->avt         = CPU_SVT(p->processor);
         /* Set some default values here. */
-		inf->vtb	 = 0;
+		LAST_VTB(p->processor) = 0;
 		__calc_evt(inf);
     }
 }
