@@ -104,7 +104,7 @@
 
 #ifdef VERBOSE
 #define MEM_LOG(_f, _a...)                           \
-  printk("DOM%u: (file=memory.c, line=%d) " _f "\n", \
+  printk("DOM%u: (file=mm.c, line=%d) " _f "\n", \
          current->domain->id , __LINE__ , ## _a )
 #else
 #define MEM_LOG(_f, _a...) ((void)0)
@@ -2566,6 +2566,31 @@ void ptwr_status(void)
     page = &frame_table[pfn];
 }
 
+void audit_pagelist(struct domain *d)
+{
+    struct list_head *list_ent;
+    int xenpages, totpages;
+
+    list_ent = d->xenpage_list.next;
+    for ( xenpages = 0; (list_ent != &d->xenpage_list); xenpages++ )
+    {
+        list_ent = list_ent->next;
+    }
+    list_ent = d->page_list.next;
+    for ( totpages = 0; (list_ent != &d->page_list); totpages++ )
+    {
+        list_ent = list_ent->next;
+    }
+
+    if ( xenpages != d->xenheap_pages ||
+         totpages != d->tot_pages )
+    {
+        printk("ARGH! dom %d: xen=%d %d, pages=%d %d\n",
+               xenpages, d->xenheap_pages, 
+               totpages, d->tot_pages );
+    }
+}
+
 void audit_domain(struct domain *d)
 {
     int ttot=0, ctot=0, io_mappings=0, lowmem_mappings=0;
@@ -2668,6 +2693,8 @@ void audit_domain(struct domain *d)
            virt_to_page(d->shared_info)-frame_table);
            
     spin_lock(&d->page_alloc_lock);
+
+    audit_pagelist(d);
 
     /* PHASE 0 */
 
@@ -2969,13 +2996,13 @@ void audit_domain(struct domain *d)
         list_ent = frame_table[pfn].list.next;
     }
 
-    spin_unlock(&d->page_alloc_lock);
 
     if ( pagetable_val(d->exec_domain[0]->arch.guest_table) )
         adjust(&frame_table[pagetable_val(
             d->exec_domain[0]->arch.guest_table)>>PAGE_SHIFT], 1, 1);
 
-    printk("Audit %d: Done. pages=%d l1=%d l2=%d ctot=%d ttot=%d\n", d->id, i, l1, l2, ctot, ttot );
+    spin_unlock(&d->page_alloc_lock);
+    printk("Audit %d: Done. ref=%d xenpages=%d pages=%d l1=%d l2=%d ctot=%d ttot=%d\n", d->id, atomic_read(&d->refcnt), d->xenheap_pages, d->tot_pages, l1, l2, ctot, ttot );
 
     if ( d != current->domain )
         domain_unpause(d);
