@@ -89,10 +89,11 @@ struct domain
     char     name[MAX_DOMAIN_NAME];
     s_time_t create_time;
 
-    spinlock_t       page_list_lock;
-    struct list_head page_list;
-    unsigned int     tot_pages; /* number of pages currently possesed */
-    unsigned int     max_pages; /* max number of pages that can be possesed */
+    spinlock_t       page_alloc_lock; /* protects all the following fields  */
+    struct list_head page_list;       /* linked list, of size tot_pages     */
+    unsigned int     tot_pages;       /* number of pages currently possesed */
+    unsigned int     max_pages;       /* maximum value for tot_pages        */
+    unsigned int     xenheap_pages;   /* # pages allocated from Xen heap    */
 
     /* Scheduling. */
     struct list_head run_list;

@@ -169,13 +169,10 @@ class NotifierProtocol(protocol.Protocol):
     def __init__(self, channelFactory):
         self.channelFactory = channelFactory
 
-    def notificationReceived(self, idx, type):
-        #print 'NotifierProtocol>notificationReceived>', idx, type
+    def notificationReceived(self, idx):
         channel = self.channelFactory.getChannel(idx)
-        if not channel:
-            return
-        #print 'NotifierProtocol>notificationReceived> channel', channel
-        channel.notificationReceived(type)
+        if channel:
+            channel.notificationReceived()
 
     def connectionLost(self, reason=None):
         pass
@@ -251,9 +248,8 @@ class NotifierPort(abstract.FileDescriptor):
             notification = self.notifier.read()
             if not notification:
                 break
-            (idx, type) = notification
-            self.protocol.notificationReceived(idx, type)
-            self.notifier.unmask(idx)
+            self.protocol.notificationReceived(notification)
+            self.notifier.unmask(notification)
             count += 1
         #print 'NotifierPort>doRead<'
 

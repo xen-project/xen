@@ -907,17 +907,18 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
          */
         if ( d < e )
         {
-            spin_lock(&d->page_list_lock);
-            spin_lock(&e->page_list_lock);
+            spin_lock(&d->page_alloc_lock);
+            spin_lock(&e->page_alloc_lock);
         }
         else
         {
-            spin_lock(&e->page_list_lock);
-            spin_lock(&d->page_list_lock);
+            spin_lock(&e->page_alloc_lock);
+            spin_lock(&d->page_alloc_lock);
         }
 
         /* A domain shouldn't have PGC_allocated pages when it is dying. */
-        if ( unlikely(test_bit(DF_DYING, &e->flags)) )
+        if ( unlikely(test_bit(DF_DYING, &e->flags)) ||
+             unlikely(IS_XEN_HEAP_FRAME(page)) )
         {
             okay = 0;
             goto reassign_fail;
@@ -967,8 +968,8 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         list_add_tail(&page->list, &e->page_list);
 
     reassign_fail:        
-        spin_unlock(&d->page_list_lock);
-        spin_unlock(&e->page_list_lock);
+        spin_unlock(&d->page_alloc_lock);
+        spin_unlock(&e->page_alloc_lock);
         break;
 
     case MMUEXT_RESET_SUBJECTDOM:
