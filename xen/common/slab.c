@@ -1449,10 +1449,10 @@ void *xmem_cache_alloc(xmem_cache_t *cachep)
 }
 
 /**
- * xmalloc - allocate memory
+ * _xmalloc - allocate memory
  * @size: how many bytes of memory are required.
  */
-void *xmalloc(size_t size)
+void *_xmalloc(size_t size)
 {
     cache_sizes_t *csizep = cache_sizes;
 
@@ -1548,7 +1548,7 @@ static int xmem_tune_cpucache (xmem_cache_t* cachep, int limit, int batchcount)
         for (i = 0; i< smp_num_cpus; i++) {
             cpucache_t* ccnew;
 
-            ccnew = xmalloc(sizeof(void*)*limit+sizeof(cpucache_t));
+            ccnew = _xmalloc(sizeof(void*)*limit+sizeof(cpucache_t));
             if (!ccnew)
                 goto oom;
             ccnew->limit = limit;

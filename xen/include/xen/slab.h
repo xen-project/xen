@@ -46,7 +46,7 @@ extern int xmem_cache_shrink(xmem_cache_t *);
 extern void *xmem_cache_alloc(xmem_cache_t *);
 extern void xmem_cache_free(xmem_cache_t *, void *);
 
-extern void *xmalloc(size_t);
+extern void *_xmalloc(size_t);
 extern void xfree(const void *);
 
 extern int xmem_cache_reap(void);
@@ -54,15 +54,15 @@ extern int xmem_cache_reap(void);
 extern void dump_slabinfo();
 
 /* Nicely typesafe for you. */
-#define xmalloc(type) ((type *)xmalloc(sizeof(type)))
-#define xmalloc_array(type, num) ((type *)xmalloc_array(sizeof(type), (num)))
+#define xmalloc(type) ((type *)_xmalloc(sizeof(type)))
+#define xmalloc_array(type, num) ((type *)_xmalloc_array(sizeof(type), (num)))
 
-static inline void *xmalloc_array(size_t size, size_t num)
+static inline void *_xmalloc_array(size_t size, size_t num)
 {
 	/* Check for overflow. */
 	if (size && num > UINT_MAX / size)
 		return NULL;
-	return xmalloc(size * num);
+	return _xmalloc(size * num);
 }
 #endif /* __ARCH_HAS_SLAB_ALLOCATOR */
 

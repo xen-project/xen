@@ -84,7 +84,7 @@
 #define DECLARE_MUTEX(_m) spinlock_t _m = SPIN_LOCK_UNLOCKED
 #define down(_m) spin_lock(_m)
 #define up(_m) spin_unlock(_m)
-#define vmalloc(_s) xmalloc(_s)
+#define vmalloc(_s) _xmalloc(_s)
 #define vfree(_p) xfree(_p)
 #define num_online_cpus() smp_num_cpus
 static inline int on_each_cpu(

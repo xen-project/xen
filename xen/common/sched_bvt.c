@@ -171,7 +171,7 @@ int bvt_alloc_task(struct exec_domain *ed)
 {
     struct domain *d = ed->domain;
     if ( (d->sched_priv == NULL) ) {
-        if ( (d->sched_priv = new(struct bvt_dom_info)) == NULL )
+        if ( (d->sched_priv = xmalloc(struct bvt_dom_info)) == NULL )
             return -1;
         memset(d->sched_priv, 0, sizeof(struct bvt_dom_info));
     }
