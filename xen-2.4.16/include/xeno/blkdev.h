@@ -62,8 +62,8 @@ enum bh_state_bits {
                          * for private allocation by other entities
                          */
 };
+
 struct buffer_head {
-        struct buffer_head *b_next;     /* Hash queue list */
         unsigned long b_blocknr;        /* block number */
         unsigned short b_size;          /* block size */
         unsigned short b_list;          /* List that this buffer appears */
@@ -72,24 +72,18 @@ struct buffer_head {
         atomic_t b_count;               /* users using this block */
         kdev_t b_rdev;                  /* Real device */
         unsigned long b_state;          /* buffer state bitmap (see above) */
-        unsigned long b_flushtime;      /* Time when (dirty) buffer should be written */
 
-        struct buffer_head *b_next_free;/* lru/free list linkage */
-        struct buffer_head *b_prev_free;/* doubly linked list of buffers */
-        struct buffer_head *b_this_page;/* circular list of buffers in one page */
         struct buffer_head *b_reqnext;  /* request queue */
 
-        struct buffer_head **b_pprev;   /* doubly linked list of hash-queue */
         char * b_data;                  /* pointer to data block */
         struct pfn_info *b_page;            /* the page this bh is mapped to */
-        void (*b_end_io)(struct buffer_head *bh, int uptodate); /* I/O completion */
-        void *b_private;                /* reserved for b_end_io */
+        void (*b_end_io)(struct buffer_head *bh, int uptodate);
 
         unsigned long b_rsector;        /* Real buffer location on disk */
 
-        struct inode *       b_inode;
-        struct list_head     b_inode_buffers;   /* doubly linked list of inode dirty buffers */
-        void *b_xen_request;                        /* xen request structure */
+        /* Both used by b_end_io function in xen_block.c */
+        void *b_xen_domain;
+        void *b_xen_id;
 };
 
 typedef void (bh_end_io_t)(struct buffer_head *bh, int uptodate);
@@ -127,15 +121,9 @@ static inline void mark_buffer_clean(struct buffer_head * bh)
 
 static inline void buffer_IO_error(struct buffer_head * bh)
 {
-    extern void end_block_io_op(struct buffer_head *bh);
-
     mark_buffer_clean(bh);
-    /*
-     * b_end_io has to clear the BH_Uptodate bitflag in the error case!
-     */
+    /* b_end_io has to clear the BH_Uptodate bitflag in the error case! */
     bh->b_end_io(bh, 0);
-    /* XXX KAF */
-    end_block_io_op(bh);
 }
 
 /**** XXX END OF BUFFER_HEAD STUFF XXXX ****/

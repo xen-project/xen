@@ -5,7 +5,6 @@
  * Copyright (C) 1994,      Karl Keyte: Added support for disk statistics
  * Elevator latency, (C) 2000  Andrea Arcangeli <andrea@suse.de> SuSE
  * Queue request tables / lock, selectable elevator, Jens Axboe <axboe@suse.de>
- * kernel-doc documentation started by NeilBrown <neilb@cse.unsw.edu.au> -  July2000
  */
 
 /*
@@ -39,14 +38,6 @@
 #else
 #define DPRINTK(_f, _a...) ((void)0)
 #endif
-
-/* XXX SMH: temporarily we just dive at xen_block completion handler */
-extern void end_block_io_op(struct buffer_head *bh); 
-
-static void end_buffer_dummy(struct buffer_head *bh, int uptodate)
-{
-  /* do nothing */
-}
 
 /* This will die as all synchronous stuff is coming to an end */
 #define complete(_r) panic("completion.h stuff may be needed...")
@@ -1036,8 +1027,6 @@ out:
 	return 0;
 end_io:
 	bh->b_end_io(bh, test_bit(BH_Uptodate, &bh->b_state));
-	/* XXX SMH: do we need this every time? */
-	end_block_io_op(bh);
 	return 0;
 }
 
@@ -1107,8 +1096,6 @@ void generic_make_request (int rw, struct buffer_head * bh)
 
 			/* Yecch again */
 			bh->b_end_io(bh, 0);
-			/* XXX SMH */ 
-			end_block_io_op(bh);
 			return;
 		}
 	}
@@ -1238,7 +1225,6 @@ void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
 
 		/* We have the buffer lock */
 		atomic_inc(&bh->b_count);
-		bh->b_end_io = end_buffer_dummy;
 
 		switch(rw) {
 		case WRITE:
@@ -1258,8 +1244,6 @@ void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
 			BUG();
 	end_io:
 			bh->b_end_io(bh, test_bit(BH_Uptodate, &bh->b_state));
-			/* XXX SMH */
-			end_block_io_op(bh);
 			continue;
 		}
 
@@ -1313,7 +1297,6 @@ int end_that_request_first (struct request *req, int uptodate, char *name)
 		req->bh = bh->b_reqnext;
 		bh->b_reqnext = NULL;
 		bh->b_end_io(bh, uptodate);
-		end_block_io_op(bh);
 		if ((bh = req->bh) != NULL) {
 			req->hard_sector += nsect;
 			req->hard_nr_sectors -= nsect;

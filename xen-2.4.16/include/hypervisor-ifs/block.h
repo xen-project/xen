@@ -21,26 +21,14 @@
 #define XEN_BLOCK_PROBE 8      /* determine io configuration from hypervisor */
 #define XEN_BLOCK_DEBUG 16                                          /* debug */
 
-#define XEN_BLOCK_SYNC  2
-#define XEN_BLOCK_ASYNC 3
-
-#define XEN_BLOCK_MAX_DOMAINS 32  /* NOTE: FIX THIS. VALUE SHOULD COME FROM? */
-
-#define BLK_REQ_RING_SIZE  64
-#define BLK_RESP_RING_SIZE 64
-
-#define BLK_REQ_RING_MAX_ENTRIES  (BLK_REQ_RING_SIZE - 2)
-#define BLK_RESP_RING_MAX_ENTRIES (BLK_RESP_RING_SIZE - 2)
-
-#define BLK_REQ_RING_INC(_i)     (((_i)+1) & (BLK_REQ_RING_SIZE-1))
-#define BLK_RESP_RING_INC(_i)    (((_i)+1) & (BLK_RESP_RING_SIZE-1))
-#define BLK_REQ_RING_ADD(_i,_j)  (((_i)+(_j)) & (BLK_REQ_RING_SIZE-1))
-#define BLK_RESP_RING_ADD(_i,_j) (((_i)+(_j)) & (BLK_RESP_RING_SIZE-1))
+#define BLK_RING_SIZE        128
+#define BLK_RING_MAX_ENTRIES (BLK_RING_SIZE - 2)
+#define BLK_RING_INC(_i)     (((_i)+1) & (BLK_RING_SIZE-1))
+#define BLK_RING_ADD(_i,_j)  (((_i)+(_j)) & (BLK_RING_SIZE-1))
 
 typedef struct blk_ring_req_entry 
 {
     void *          id;                /* for guest os use */
-    int             priority;          /* SYNC or ASYNC for now */
     int             operation;         /* XEN_BLOCK_READ or XEN_BLOCK_WRITE */
     char *          buffer;
     unsigned long   block_number;      /* block number */
@@ -57,10 +45,12 @@ typedef struct blk_ring_resp_entry
 
 typedef struct blk_ring_st 
 {
-  unsigned int      req_prod, req_cons;
-  unsigned int      resp_prod, resp_cons;
-  blk_ring_req_entry_t  req_ring[BLK_REQ_RING_SIZE];
-  blk_ring_resp_entry_t resp_ring[BLK_RESP_RING_SIZE];
+    unsigned int req_prod;  /* Request producer. Updated by guest OS. */
+    unsigned int resp_prod; /* Response producer. Updated by Xen.     */
+    union {
+        blk_ring_req_entry_t  req;
+        blk_ring_resp_entry_t resp;
+    } ring[BLK_RING_SIZE];
 } blk_ring_t;
 
 #define MAX_XEN_DISK_COUNT 100

@@ -23,24 +23,26 @@
 #define DPRINTK(_f, _a...) ((void)0)
 #endif
 
-typedef struct blk_request
-{
-    struct buffer_head *bh;
-    void               *id;
-    struct task_struct *domain;
-} blk_request_t;
-
+/*
+ * These are rather arbitrary. They are fairly large because adjacent
+ * requests pulled from a communication ring are quite likely to end
+ * up being part of the same scatter/gather request at the disc.
+ * It might be a good idea to add scatter/gather support explicitly to
+ * the scatter/gather ring (eg. each request has an array of N pointers);
+ * then these values would better reflect real costs at the disc.
+ */
 #define MAX_PENDING_REQS 32
 #define BATCH_PER_DOMAIN 8
 
-static kmem_cache_t *blk_request_cachep;
+static kmem_cache_t *buffer_head_cachep;
 static atomic_t nr_pending;
 
 static void io_schedule(unsigned long unused);
-static int do_block_io_op_domain(struct task_struct* task, int max_to_do);
+static int do_block_io_op_domain(struct task_struct *p, int max_to_do);
 static void dispatch_rw_block_io(struct task_struct *p, int index);
 static void dispatch_probe_block_io(struct task_struct *p, int index);
 static void dispatch_debug_block_io(struct task_struct *p, int index);
+static void make_response(struct task_struct *p, void *id, unsigned long st);
 
 
 /******************************************************************
@@ -104,6 +106,7 @@ static void io_schedule(unsigned long unused)
     struct task_struct *p;
     struct list_head *ent;
 
+    /* Queue up a batch of requests. */
     while ( (atomic_read(&nr_pending) < MAX_PENDING_REQS) &&
             !list_empty(&io_schedule_list) )
     {
@@ -113,10 +116,20 @@ static void io_schedule(unsigned long unused)
         if ( do_block_io_op_domain(p, BATCH_PER_DOMAIN) )
             add_to_blkdev_list_tail(p);
     }
+
+    /* Push the batch through to disc. */
+    run_task_queue(&tq_disk);
 }
 
 static void maybe_trigger_io_schedule(void)
 {
+    /*
+     * Needed so that two processes, who together make the following predicate
+     * true, don't both read stale values and evaluate the predicate
+     * incorrectly. Incredibly unlikely to stall the scheduler on x86, but...
+     */
+    smp_mb();
+
     if ( (atomic_read(&nr_pending) < (MAX_PENDING_REQS/2)) &&
          !list_empty(&io_schedule_list) )
     {
@@ -127,51 +140,17 @@ static void maybe_trigger_io_schedule(void)
 
 
 /******************************************************************
- * COMPLETION CALLBACK -- XXX Hook properly into bh->b_end_io
+ * COMPLETION CALLBACK -- Called as bh->b_end_io()
  */
 
-void end_block_io_op(struct buffer_head * bh)
+static void end_block_io_op(struct buffer_head *bh, int uptodate)
 {
-    unsigned long cpu_mask;
-    blk_request_t *blk_request = NULL;
-    unsigned long flags;
-    struct task_struct *p;
-    int position = 0;
-    blk_ring_t *blk_ring;
-
-    DPRINTK("XEN end_block_io_op, bh: %p\n", bh);
-    
-    if ( (blk_request = (blk_request_t *)bh->b_xen_request) == NULL ) 
-        goto bad_interrupt;
-
     atomic_dec(&nr_pending);
-    
-    p = blk_request->domain;
+    make_response(bh->b_xen_domain, bh->b_xen_id, uptodate ? 0 : 1);
 
-    /* Place on the response ring for the relevant domain. */ 
-    spin_lock_irqsave(&p->blk_ring_lock, flags);
-    blk_ring = p->blk_ring_base;
-    position = blk_ring->resp_prod;
-    blk_ring->resp_ring[position].id     = blk_request->id;
-    blk_ring->resp_ring[position].status = 0;
-    blk_ring->resp_prod = BLK_RESP_RING_INC(blk_ring->resp_prod);
-    spin_unlock_irqrestore(&p->blk_ring_lock, flags);
-    
-    /* Kick the relevant domain. */
-    cpu_mask = mark_guest_event(p, _EVENT_BLK_RESP);
-    guest_event_notify(cpu_mask); 
-
-    /* Free state associated with this request. */
-    if ( blk_request->bh ) 
-        kfree(blk_request->bh);     
-    kmem_cache_free(blk_request_cachep, blk_request);
+    kmem_cache_free(buffer_head_cachep, bh);
 
     maybe_trigger_io_schedule();
-
-    return;
-
- bad_interrupt:
-    panic("Block IO interrupt received for unknown buffer [%p]\n", bh);
 }
 
 
@@ -193,55 +172,43 @@ long do_block_io_op(void)
  * DOWNWARD CALLS -- These interface with the block-device layer proper.
  */
 
-static int do_block_io_op_domain(struct task_struct* task, int max_to_do)
+static int do_block_io_op_domain(struct task_struct* p, int max_to_do)
 {
-    blk_ring_t *blk_ring = task->blk_ring_base;
-    int loop, more_to_do = 0;
-    int resp_ring_ents = 
-        (blk_ring->resp_prod - blk_ring->resp_cons) & (BLK_RESP_RING_SIZE - 1);
+    blk_ring_t *blk_ring = p->blk_ring_base;
+    int i, more_to_do = 0;
 
-    DPRINTK("XEN do_block_io_op %d %d\n",
-            blk_ring->req_cons, blk_ring->req_prod);
-
-    for ( loop = blk_ring->req_cons; 
-	  loop != blk_ring->req_prod; 
-	  loop = BLK_REQ_RING_INC(loop) ) 
+    for ( i = p->blk_req_cons; 
+	  i != blk_ring->req_prod; 
+	  i = BLK_RING_INC(i) ) 
     {
-        /*
-         * Bail if we've reached the batch allowance for thsi interface,
-         * or if we risk producing enough responses to overflow the
-         * communication ring.
-         */
-        if ( (max_to_do-- == 0) ||
-             ((atomic_read(&nr_pending) + resp_ring_ents) >
-              BLK_RESP_RING_MAX_ENTRIES) )
+        if ( max_to_do-- == 0 )
         {
             more_to_do = 1;
             break;
         }
         
-	switch ( blk_ring->req_ring[loop].operation )
+	switch ( blk_ring->ring[i].req.operation )
         {
 	case XEN_BLOCK_READ:
 	case XEN_BLOCK_WRITE:
-	    dispatch_rw_block_io(task, loop);
+	    dispatch_rw_block_io(p, i);
 	    break;
 
 	case XEN_BLOCK_PROBE:
-	    dispatch_probe_block_io(task, loop);
+	    dispatch_probe_block_io(p, i);
 	    break;
 
 	case XEN_BLOCK_DEBUG:
-	    dispatch_debug_block_io(task, loop);
+	    dispatch_debug_block_io(p, i);
 	    break;
 
 	default:
 	    panic("error: unknown block io operation [%d]\n",
-                  blk_ring->req_ring[loop].operation);
+                  blk_ring->ring[i].req.operation);
 	}
     }
 
-    blk_ring->req_cons = loop;
+    p->blk_req_cons = i;
     return more_to_do;
 }
 
@@ -255,20 +222,11 @@ static void dispatch_probe_block_io(struct task_struct *p, int index)
     extern void ide_probe_devices(xen_disk_info_t *xdi);
     blk_ring_t *blk_ring = p->blk_ring_base;
     xen_disk_info_t *xdi;
-    unsigned long flags, cpu_mask;
-    
-    xdi = phys_to_virt((unsigned long)blk_ring->req_ring[index].buffer);
-    
+
+    xdi = phys_to_virt((unsigned long)blk_ring->ring[index].req.buffer);    
     ide_probe_devices(xdi);
 
-    spin_lock_irqsave(&p->blk_ring_lock, flags);
-    blk_ring->resp_ring[blk_ring->resp_prod].id = blk_ring->req_ring[index].id;
-    blk_ring->resp_ring[blk_ring->resp_prod].status = 0;
-    blk_ring->resp_prod = BLK_RESP_RING_INC(blk_ring->resp_prod);
-    spin_unlock_irqrestore(&p->blk_ring_lock, flags);
-
-    cpu_mask = mark_guest_event(p, _EVENT_BLK_RESP);
-    guest_event_notify(cpu_mask); 
+    make_response(p, blk_ring->ring[index].req.id, 0);
 }
 
 static void dispatch_rw_block_io(struct task_struct *p, int index)
@@ -276,49 +234,45 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
     extern void ll_rw_block(int rw, int nr, struct buffer_head * bhs[]); 
     blk_ring_t *blk_ring = p->blk_ring_base;
     struct buffer_head *bh;
-    struct request_queue *rq;
     int operation;
-    blk_request_t *blk_request;
     
     /*
      * check to make sure that the block request seems at least
      * a bit legitimate
      */
-    if ( (blk_ring->req_ring[index].block_size & (0x200 - 1)) != 0 )
+    if ( (blk_ring->ring[index].req.block_size & (0x200 - 1)) != 0 )
 	panic("error: dodgy block size: %d\n", 
-              blk_ring->req_ring[index].block_size);
+              blk_ring->ring[index].req.block_size);
     
-    if ( blk_ring->req_ring[index].buffer == NULL )
+    if ( blk_ring->ring[index].req.buffer == NULL )
 	panic("xen_block: bogus buffer from guestOS\n"); 
 
-    DPRINTK("req_cons: %d  req_prod %d  index: %d, op: %s, pri: %s\n",
-            blk_ring->req_cons, blk_ring->req_prod, index, 
-            (blk_ring->req_ring[index].operation == XEN_BLOCK_READ ? 
-             "read" : "write"), 
-            (blk_ring->req_ring[index].priority == XEN_BLOCK_SYNC ? 
-             "sync" : "async"));
+    DPRINTK("req_cons: %d  req_prod %d  index: %d, op: %s\n",
+            p->blk_req_cons, blk_ring->req_prod, index, 
+            (blk_ring->ring[index].req.operation == XEN_BLOCK_READ ? 
+             "read" : "write"));
 
     atomic_inc(&nr_pending);
-    blk_request = kmem_cache_alloc(blk_request_cachep, GFP_ATOMIC);
-
-    /* we'll be doing this frequently, would a cache be appropriate? */
-    bh = (struct buffer_head *) kmalloc(sizeof(struct buffer_head), 
-					GFP_KERNEL);
+    bh = kmem_cache_alloc(buffer_head_cachep, GFP_KERNEL);
     if ( bh == NULL ) panic("bh is null\n");
 
     /* set just the important bits of the buffer header */
     memset (bh, 0, sizeof (struct buffer_head));
     
-    bh->b_blocknr       = blk_ring->req_ring[index].block_number;
-    bh->b_size          = blk_ring->req_ring[index].block_size; 
-    bh->b_dev           = blk_ring->req_ring[index].device; 
-    bh->b_rsector       = blk_ring->req_ring[index].sector_number;
+    bh->b_blocknr       = blk_ring->ring[index].req.block_number;
+    bh->b_size          = blk_ring->ring[index].req.block_size; 
+    bh->b_dev           = blk_ring->ring[index].req.device; 
+    bh->b_rsector       = blk_ring->ring[index].req.sector_number;
     bh->b_data          = phys_to_virt((unsigned long)
-				       blk_ring->req_ring[index].buffer);
+				       blk_ring->ring[index].req.buffer);
     bh->b_count.counter = 1;
-    bh->b_xen_request   = (void *)blk_request;  
-    
-    if ( blk_ring->req_ring[index].operation == XEN_BLOCK_WRITE )
+    bh->b_end_io        = end_block_io_op;
+
+    /* Save meta data about request. */
+    bh->b_xen_domain    = p;
+    bh->b_xen_id        = blk_ring->ring[index].req.id;
+
+    if ( blk_ring->ring[index].req.operation == XEN_BLOCK_WRITE )
     {
 	bh->b_state = ((1 << BH_JBD) | (1 << BH_Mapped) | (1 << BH_Req) |
 		       (1 << BH_Dirty) | (1 << BH_Uptodate));
@@ -330,15 +284,8 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
 	operation = READ;
     }
 
-    /* save meta data about request */
-    blk_request->id     = blk_ring->req_ring[index].id;
-    blk_request->bh     = bh;
-    blk_request->domain = p; 
-    
-    /* dispatch single block request */
-    ll_rw_block(operation, 1, &bh);       /* linux top half */
-    rq = blk_get_queue(bh->b_rdev);                         
-    generic_unplug_device(rq);            /* linux bottom half */
+    /* Dispatch a single request. We'll flush it to disc later. */
+    ll_rw_block(operation, 1, &bh);
 }
 
 
@@ -346,6 +293,26 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
 /******************************************************************
  * MISCELLANEOUS SETUP / TEARDOWN / DEBUGGING
  */
+
+static void make_response(struct task_struct *p, void *id, unsigned long st)
+{
+    unsigned long cpu_mask, flags;
+    int position;
+    blk_ring_t *blk_ring;
+
+    /* Place on the response ring for the relevant domain. */ 
+    spin_lock_irqsave(&p->blk_ring_lock, flags);
+    blk_ring = p->blk_ring_base;
+    position = blk_ring->resp_prod;
+    blk_ring->ring[position].resp.id     = id;
+    blk_ring->ring[position].resp.status = st;
+    blk_ring->resp_prod = BLK_RING_INC(position);
+    spin_unlock_irqrestore(&p->blk_ring_lock, flags);
+    
+    /* Kick the relevant domain. */
+    cpu_mask = mark_guest_event(p, _EVENT_BLK_RESP);
+    guest_event_notify(cpu_mask); 
+}
 
 static void dump_blockq(u_char key, void *dev_id, struct pt_regs *regs) 
 {
@@ -378,12 +345,9 @@ void initialize_block_io ()
     spin_lock_init(&io_schedule_list_lock);
     INIT_LIST_HEAD(&io_schedule_list);
 
-    blk_request_cachep = kmem_cache_create(
-        "blk_request_cache", sizeof(blk_request_t),
+    buffer_head_cachep = kmem_cache_create(
+        "buffer_head_cache", sizeof(struct buffer_head),
         0, SLAB_HWCACHE_ALIGN, NULL, NULL);
     
     add_key_handler('b', dump_blockq, "dump xen ide blkdev stats");     
 }
-
-
-

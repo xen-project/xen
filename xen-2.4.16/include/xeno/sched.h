@@ -76,6 +76,7 @@ struct task_struct {
 
     /* Block I/O */
     blk_ring_t *blk_ring_base;
+    unsigned int blk_req_cons; /* request consumer */
     struct list_head blkdev_list;
     spinlock_t blk_ring_lock;
 

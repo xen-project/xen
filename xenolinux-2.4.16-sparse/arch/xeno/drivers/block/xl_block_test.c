@@ -15,6 +15,7 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/errno.h>
+#include <linux/delay.h>
 
 #include <asm/hypervisor-ifs/block.h>
 #include <asm/hypervisor-ifs/hypervisor-if.h>
@@ -127,7 +128,6 @@ int proc_write_bdt(struct file *file, const char *buffer,
   int  block_number = 0;
   int  block_size = 0;
   int  device = 0;
-  int  mode;
 
   if (copy_from_user(local, buffer, count))
   {
@@ -158,16 +158,6 @@ int proc_write_bdt(struct file *file, const char *buffer,
     return -EINVAL;
   }
 
-  if (opcode == 'r' || opcode == 'w' ||
-      opcode == 'd' || opcode == 'D')
-  {
-    mode = XEN_BLOCK_SYNC;
-  }
-  else /* (opcode == 'R' || opcode == 'W') */
-  {
-    mode = XEN_BLOCK_ASYNC;
-  }
-
   if (data)
   {
     kfree(data);
@@ -187,7 +177,9 @@ int proc_write_bdt(struct file *file, const char *buffer,
   /* submit request */
   hypervisor_request(0, meta.operation, meta.buffer, 
 		     meta.block_number, meta.block_size,
-		     meta.device, mode);
+		     meta.device);
+  HYPERVISOR_block_io_op();
+  mdelay(1000); /* should wait for a proper acknowledgement/response. */
 
   kfree(local);
   return count;
