@@ -140,6 +140,9 @@ extern int  bind_virq_to_irq(int virq);
 extern void unbind_virq_from_irq(int virq);
 extern int  bind_evtchn_to_irq(int evtchn);
 extern void unbind_evtchn_from_irq(int evtchn);
+
+extern void irq_suspend(void);
+extern void irq_resume(void);
 #endif /* __ASSEMBLY__ */
 
 #endif /* _ASM_IRQ_VECTORS_H */
