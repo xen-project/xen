@@ -60,9 +60,9 @@ struct at_cpu_info
 };
 
 
-#define DOM_INFO(_p) ( (struct at_dom_info *)((_p)->sched_priv) )
-#define CPU_INF(_p)  ( (struct at_cpu_info *)((_p).sched_priv) )
-#define WAITQ(cpu)   (&( CPU_INF(schedule_data[cpu]) )->waitq )
+#define DOM_INFO(_p) ((struct at_dom_info *)((_p)->sched_priv))
+#define CPU_INFO(_c) ((struct at_cpu_info *)((_c).sched_priv))
+#define WAITQ(cpu)   (&CPU_INFO(schedule_data[cpu])->waitq)
 #define RUNQ(cpu)    (&schedule_data[cpu].runqueue)
 
 #define BESTEFFORT_QUANTUM MILLISECS(5)
@@ -524,10 +524,11 @@ static int at_init_scheduler()
 {
     int i;
     
-    for( i = 0; i < NR_CPUS; i++)
+    for ( i = 0; i < NR_CPUS; i++ )
     {
-        if( (CPU_INF(schedule_data[i]) = kmalloc(sizeof(struct at_cpu_info),
-                                            GFP_KERNEL)) == NULL )
+        schedule_data[i].sched_priv = kmalloc(sizeof(struct at_cpu_info),
+                                              GFP_KERNEL);
+        if ( schedule_data[i].sched_priv == NULL )
             return -1;
         WAITQ(i)->next = WAITQ(i);
         WAITQ(i)->prev = WAITQ(i);
@@ -589,10 +590,11 @@ static int at_alloc_task(struct task_struct *p)
 {
     ASSERT(p != NULL);
 
-    if( (DOM_INFO(p) = kmem_cache_alloc(dom_info_cache, GFP_KERNEL)) == NULL )
+    p->sched_priv = kmem_cache_alloc(dom_info_cache, GFP_KERNEL);
+    if( p->sched_priv == NULL )
         return -1;
 
-    memset(DOM_INFO(p), 0, sizeof(struct at_dom_info));
+    memset(p->sched_priv, 0, sizeof(struct at_dom_info));
 
     return 0;
 }
