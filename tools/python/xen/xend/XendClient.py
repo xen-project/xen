@@ -90,7 +90,7 @@ def eventurl(location, root, id=''):
     return urljoin(location, root, 'event/', id)
 
 def dmesgurl(location, root, id=''):
-    return urljoin(location, root, 'dmesg/', id)
+    return urljoin(location, root, 'node/dmesg/', id)
 
 def xend_request(url, method, data=None):
     """Make a request to xend.

@@ -1,6 +1,6 @@
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
 
-"""Get dmesg output for this node.  Very basic right now!
+"""Get dmesg output for this node.
 """
 
 import os

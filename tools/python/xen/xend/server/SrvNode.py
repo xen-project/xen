@@ -13,6 +13,7 @@ class SrvNode(SrvDir):
     def __init__(self):
         SrvDir.__init__(self)
         self.xn = XendNode.instance()
+        self.add('dmesg', 'SrvDmesg')
 
     def op_shutdown(self, op, req):
         val = self.xn.shutdown()
@@ -48,11 +49,15 @@ class SrvNode(SrvDir):
             req.setHeader("Content-Type", sxp.mime_type)
             sxp.show(['node'] + self.info(), out=req)
         else:
+            url = req.prePathURL()
+            if not url.endswith('/'):
+                url += '/'
             req.write('<html><head></head><body>')
             self.print_path(req)
             req.write('<ul>')
             for d in self.info():
                 req.write('<li> %10s: %s' % (d[0], str(d[1])))
+            req.write('<li><a href="' +url + 'dmesg">Xen dmesg output</a>')
             req.write('</ul>')
             req.write('</body></html>')
         return ''
