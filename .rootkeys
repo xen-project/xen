@@ -527,6 +527,12 @@
 40fcefb3yMSrZvApO9ToIi-iQwnchA tools/sv/images/xen.png
 41013a83z27rKvWIxAfUBMVZ1eDCDg tools/sv/inc/script.js
 40fcefb3zGC9XNBkSwTEobCoq8YClA tools/sv/inc/style.css
+4194e861IgTabTt8HOuh143QIJFD1Q tools/x2d2/Makefile
+4194e861M2gcBz4i94cQYpqzi8n6UA tools/x2d2/cntrl_con.c
+4194e861xToz-o2KH6VT_CPJqVGMCg tools/x2d2/domain_controller.h
+4194e8612TrrMvC8ZlA4h2ZYCPWz4g tools/x2d2/main.c
+4194e861x2eqNCD61RYPCUEBVdMYuw tools/x2d2/minixend.h
+4194e861A4V9VbD_FYmgXpYEj5YwVg tools/x2d2/util.c
 403a3edbrr8RE34gkbR40zep98SXbg tools/xentrace/Makefile
 40a107afN60pFdURgBv9KwEzgRl5mQ tools/xentrace/formats
 4050c413PhhLNAYk3TEwP37i_iLw9Q tools/xentrace/xentrace.8
