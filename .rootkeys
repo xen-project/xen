@@ -391,6 +391,7 @@
 3ddb79c4HugMq7IYGxcQKFBpKwKhzA xen/include/asm-i386/types.h
 3ddb79c3M2n1ROZH6xk3HbyN4CPDqg xen/include/asm-i386/uaccess.h
 3ddb79c3uPGcP_l_2xyGgBSWd5aC-Q xen/include/asm-i386/unaligned.h
+400304fcmRQmDdFYEzDh0wcBba9alg xen/include/hypervisor-ifs/COPYING
 3ddb79c2YTaZwOqWin9-QNgHge5RVw xen/include/hypervisor-ifs/block.h
 3ddb79c2PMeWTK86y4C3F4MzHw4A1g xen/include/hypervisor-ifs/dom0_ops.h
 3e6377eaioRoNm0m_HSDEAd4Vqrq_w xen/include/hypervisor-ifs/dom_mem_ops.h

@@ -1,3 +1,28 @@
+ XEN NOTICE
+ ==========
+
+This copyright does *not* cover guest operating systems that use
+Xen services via normal hypercalls - this is merely considered normal
+use of Xen, and does *not* fall under the heading of "derived work".
+Also note that the GPL below is copyrighted by the Free Software
+Foundation, but the instance of code that it refers to (the Xen
+virtual machine monitor) is copyrighted by me and others who actually
+wrote it.
+
+Further note that the guest-OS interfacing header files, which
+includes all files within the subdirectory include/hypervisor-ifs, are
+*not* covered by the GPL but by a much weaker license:
+ include/hypervisor-ifs/COPYING
+
+Also note that the only valid version of the GPL as far as Xen is
+concerned is _this_ particular version of the license (i.e., *only*
+v2, not v2.2 or v3.x or whatever), unless explicitly otherwise
+stated.
+
+ -- Keir Fraser (on behalf of the Xen team)
+
+=====================================================================
+
 		    GNU GENERAL PUBLIC LICENSE
 		       Version 2, June 1991
 
