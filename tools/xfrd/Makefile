@@ -36,9 +36,7 @@ endif
 
 CC := gcc
 
-CFLAGS += -g
-CFLAGS += -Wall
-CFLAGS += -Werror
+CFLAGS += -Wall -Werror -O3 -fno-strict-aliasing
 CFLAGS += $(INCLUDES)
 # Make gcc generate dependencies.
 CFLAGS += -Wp,-MD,.$(@F).d

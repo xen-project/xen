@@ -11,7 +11,7 @@ INSTALL_DIR	:= $(INSTALL) -d -m0755
 INSTALL_DATA	:= $(INSTALL) -m0644
 INSTALL_PROG	:= $(INSTALL) -m0755
 
-KERNELS ?= linux-2.6-xen0 linux-2.6-xenU  linux-2.4-xen0 linux-2.4-xenU netbsd-2.0-xenU
+KERNELS ?= *2.6*
 # linux-2.4-xen0 linux-2.4-xenU netbsd-2.0-xenU
 # You may use wildcards in the above e.g. KERNELS=*2.4*
 
@@ -146,9 +146,20 @@ help:
 	@echo '                     with extreme care!)'
 
 # Use this target with extreme care!
+uninstall: DESTDIR=
+uninstall: D=$(DESTDIR)
 uninstall:
-	cp -a /etc/xen /etc/xen.old && rm -rf /etc/xen 
-	rm -rf "/usr/lib/python2.?/site-packages/xen* /usr/lib/libxc* /usr/lib/python2.?/site-packages/Xc*"
+	[ ! -d $(D)/etc/xen ] || mv -f $(D)/etc/xen $(D)/etc/xen.old
+	rm -rf $(D)/etc/init.d/xend*
+	rm -rf $(D)/usr/lib/libxc* $(D)/usr/lib/libxutil*
+	rm -rf $(D)/usr/lib/python/xen $(D)/usr/include/xen
+	rm -rf $(D)/usr/include/xcs_proto.h $(D)/usr/include/xc.h
+	rm -rf $(D)/usr/sbin/xcs $(D)/usr/sbin/xcsdump $(D)/usr/sbin/xen*
+	rm -rf $(D)/usr/sbin/netfix
+	rm -rf $(D)/usr/sbin/xfrd $(D)/usr/sbin/xm $(D)/var/lib/xen
+	rm -rf $(D)/usr/share/doc/xen  $(D)/usr/man/man*/xentrace*
+	rm -rf $(D)/usr/bin/xen* $(D)/usr/bin/miniterm
+	rm -rf $(D)/boot/*xen*
 
 # Legacy targets for compatibility
 linux24:

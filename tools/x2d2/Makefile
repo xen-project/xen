@@ -2,7 +2,7 @@ XEN_ROOT=../..
 include $(XEN_ROOT)/tools/Make.defs
 
 CC       = gcc
-CFLAGS   = -Wall -Werror -g
+CFLAGS   = -Wall -Werror -O3 -fno-strict-aliasing
 
 CFLAGS  += -I $(XEN_XC)
 CFLAGS  += -I $(XEN_LIBXC)
