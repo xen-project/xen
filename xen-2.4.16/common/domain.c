@@ -263,6 +263,17 @@ void release_task(struct task_struct *p)
     }
     if ( p->mm.perdomain_pt ) free_page((unsigned long)p->mm.perdomain_pt);
     free_page((unsigned long)p->shared_info);
+    if ( p->tot_pages != 0 )
+    {
+        /* Splice domain's pages into the free list. */
+        struct list_head *first = &frame_table[p->pg_head].list;
+        struct list_head *last  = first->prev;
+        free_list.next->prev = last;
+        last->next = free_list.next;
+        free_list.next = first;
+        first->prev = &free_list;            
+        free_pfns += p->tot_pages;
+    }
     free_task_struct(p);
 }
 
