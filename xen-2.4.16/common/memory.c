@@ -364,12 +364,6 @@ static int get_l2_table(unsigned long page_nr)
               DOMAIN_ENTRIES_PER_L2_PAGETABLE] =
         mk_l2_pgentry(__pa(current->mm.perdomain_pt) | __PAGE_HYPERVISOR);
 
-    /*
-     * DOM0 has the MPT mapped as WRITABLE.
-     * 'p_l2_entry' happens to be pointing at the right place at this point :-)
-     */
-    if ( current->domain == 0 ) mk_l2_writeable(p_l2_entry);
-
  out:
     unmap_domain_mem(p_l2_entry);
     return ret;
@@ -703,9 +697,11 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
     return err;
 }
 
-/* functions to handle page table updates: upper half is invoked in case pt updates
- * are requested by a domain and it invokes copy_from_user. bottom half is invoked
- * both in case of domain downcall and domain building by hypervisor.
+/*
+ * functions to handle page table updates: upper half is invoked in case pt
+ * updates are requested by a domain and it invokes copy_from_user. bottom half
+ * is invoked both in case of domain downcall and domain building by
+ * hypervisor.
  */
 page_update_request_t * do_process_page_updates_uh(page_update_request_t *updates,
     int count)
@@ -742,7 +738,6 @@ int do_process_page_updates_bh(page_update_request_t * cur, int count)
         /* Least significant bits of 'ptr' demux the operation type. */
         switch ( cur->ptr & (sizeof(l1_pgentry_t)-1) )
         {
-
             /*
              * PGREQ_NORMAL: Normal update to any level of page table.
              */
@@ -765,7 +760,14 @@ int do_process_page_updates_bh(page_update_request_t * cur, int count)
                     break;
                 }
             }
+            break;
 
+        case PGREQ_MPT_UPDATE:
+            page = frame_table + pfn;
+            if ( DOMAIN_OKAY(page->flags) )
+            {
+                machine_to_phys_mapping[pfn] = cur->val;
+            }
             break;
 
             /*

@@ -625,9 +625,6 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     memset(l2tab, 0, DOMAIN_ENTRIES_PER_L2_PAGETABLE*sizeof(l2_pgentry_t));
     p->mm.pagetable = mk_pagetable(phys_l2tab);
 
-    /* Domain 0 gets WRITE access to the read-only machine->physical table. */
-    mk_l2_writeable(l2tab + (READONLY_MPT_VIRT_START >> L2_PAGETABLE_SHIFT));
-
     /*
      * NB. The upper limit on this loop does one extra page + pages for frame
      * table. This is to make sure a pte exists when we want to map the

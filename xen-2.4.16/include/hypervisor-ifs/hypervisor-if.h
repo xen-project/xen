@@ -36,8 +36,8 @@ typedef struct
  */
 /* A normal page-table update request. */
 #define PGREQ_NORMAL           0
-/* Make an unchecked update to a base-level pte. */
-#define PGREQ_UNCHECKED_UPDATE 1
+/* Update an entry in the machine->physical mapping table. */
+#define PGREQ_MPT_UPDATE       1
 /* An extended command. */
 #define PGREQ_EXTENDED_COMMAND 2
     unsigned long ptr, val; /* *ptr = val */
@@ -50,6 +50,7 @@ typedef struct
 #define PGEXT_NEW_BASEPTR       5
 #define PGEXT_TLB_FLUSH         6
 #define PGEXT_INVLPG            7
+#define PGEXT_
 #define PGEXT_CMD_MASK        255
 #define PGEXT_CMD_SHIFT         8
 } page_update_request_t;
