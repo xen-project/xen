@@ -14,6 +14,9 @@
  * these modifications are (C) 2004 Intel Research Cambridge
  */
 
+#include <xen/config.h>
+#include <xen/init.h>
+#include <xen/lib.h>
 #include <xen/time.h>
 #include <xen/sched.h>
 #include <xen/sched-if.h>
@@ -31,9 +34,9 @@
 struct at_dom_info
 {
     /* MAW Xen additions */
-    struct task_struct *owner; /* the struct task_struct this data belongs to */
-    struct list_head waitq;    /* wait queue                                  */
-    int reason;                /* reason domain was last scheduled            */
+    struct task_struct *owner; /* the task_struct this data belongs to */
+    struct list_head waitq;    /* wait queue                           */
+    int reason;                /* reason domain was last scheduled     */
 
     /* (what remains of) the original fields */
 
@@ -112,8 +115,9 @@ static void requeue(struct task_struct *sdom)
         prev = WAITQ(sdom->processor);
         list_for_each(next, WAITQ(sdom->processor))
         {
-            struct at_dom_info *i = list_entry(next, struct at_dom_info, waitq);
-            if( i->deadline > inf->deadline )
+            struct at_dom_info *i = 
+                list_entry(next, struct at_dom_info, waitq);
+            if ( i->deadline > inf->deadline )
             {
                 __list_add(&inf->waitq, prev, next);
                 break;
@@ -124,10 +128,10 @@ static void requeue(struct task_struct *sdom)
 
         /* put the domain on the end of the list if it hasn't been put
          * elsewhere */
-        if ( next == WAITQ(sdom->processor))
+        if ( next == WAITQ(sdom->processor) )
             list_add_tail(&inf->waitq, WAITQ(sdom->processor));
     }
-    else if(sdom->state == TASK_RUNNING)
+    else if ( sdom->state == TASK_RUNNING )
     {
         /* insert into ordered run queue */
         prev = RUNQ(sdom->processor);
@@ -471,7 +475,7 @@ task_slice_t ksched_scheduler(s_time_t time)
     cur_sdom->min_slice = newtime - time;
     DOM_INFO(cur_sdom)->reason = reason;
 
-    TRACE_2D(0, cur_sdom->domain >> 32, (u32)cur_sdom->domain);
+    TRACE_2D(0, (cur_sdom->domain >> 32), ((u32)cur_sdom->domain));
  
     return ret;
 }

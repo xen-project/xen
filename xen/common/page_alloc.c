@@ -280,12 +280,12 @@ retry:
     spin_lock_irqsave(&alloc_lock, flags);
 
     /* Find smallest order which can satisfy the request. */
-    for ( i = order; i < FREELIST_SIZE; i++ ) {
+    for ( i = order; i < FREELIST_SIZE; i++ )
 	if ( !FREELIST_EMPTY(i) ) 
 	    break;
-    }
 
-    if ( i == FREELIST_SIZE ) goto no_memory;
+    if ( i == FREELIST_SIZE ) 
+        goto no_memory;
  
     /* Unlink a chunk. */
     alloc_ch = free_head[i];
@@ -327,9 +327,10 @@ retry:
     return((unsigned long)alloc_ch);
 
  no_memory:
+    spin_unlock_irqrestore(&alloc_lock, flags);
+        
     if ( attempts++ < 8 )
     {
-        spin_unlock_irqrestore(&alloc_lock, flags);
         kmem_cache_reap(0);
         goto retry;
     }

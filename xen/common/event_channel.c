@@ -370,6 +370,7 @@ static long evtchn_status(evtchn_status_t *status)
     domid_t             dom = status->dom;
     int                 port = status->port;
     event_channel_t    *chn;
+    long                rc = 0;
 
     if ( dom == DOMID_SELF )
         dom = current->domain;
@@ -385,8 +386,8 @@ static long evtchn_status(evtchn_status_t *status)
 
     if ( (port < 0) || (port >= p->max_event_channel) )
     {
-        spin_unlock(&p->event_channel_lock);
-        return -EINVAL;
+        rc = -EINVAL;
+        goto out;
     }
 
     switch ( chn[port].state )
@@ -414,8 +415,10 @@ static long evtchn_status(evtchn_status_t *status)
         BUG();
     }
 
+ out:
     spin_unlock(&p->event_channel_lock);
-    return 0;
+    put_task_struct(p);
+    return rc;
 }
 
 

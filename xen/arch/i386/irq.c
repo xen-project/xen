@@ -1033,7 +1033,8 @@ int pirq_guest_bind(struct task_struct *p, int irq, int will_share)
     }
     else if ( !will_share || !action->shareable )
     {
-        DPRINTK("Cannot bind IRQ %d to guest. Will not share with others.\n");
+        DPRINTK("Cannot bind IRQ %d to guest. Will not share with others.\n",
+                irq);
         rc = -EBUSY;
         goto out;
     }
