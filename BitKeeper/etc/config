@@ -69,6 +69,14 @@ compression: gzip
 # If you want to manually fix them, set this to "no".
 # 
 autofix: yes
+
+# 
+# Default is not to checkout files on clone; this modifies the behaviour
+# so that a new clone or pull does 'bk get' on all files (i.e. checks them
+# out for read, but not for edit access). 
+# 
+checkout:get
+
 # 
 # Contact person for this project.  This is whoever is the person that
 # should be contacted with update information or contacted if BitKeeper
@@ -100,3 +108,4 @@ pager:
 # Business Hours when we can contact you if you left a phone number.
 # 
 hours: 
+
