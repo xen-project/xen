@@ -605,7 +605,6 @@ static int __init sercon_buffer_init(void)
     *sercon_buffer_end = 0;
 
     sercon_buffer_reset();
-    sercon_handle |= SERHND_BUFFERED;
 
     return 0;
 }
