@@ -38,6 +38,8 @@
 #define DEBUGGER_trap_fatal(_v, _r) \
     if ( debugger_trap_fatal(_v, _r) ) return EXCRET_fault_fixed;
 
+int call_with_registers(int (*f)(struct xen_regs *r));
+
 #ifdef XEN_DEBUGGER
 
 #include <asm/pdb.h>
@@ -105,11 +107,10 @@ static inline int debugger_trap_fatal(
 
 #elif defined(CRASH_DEBUG)
 
-extern void cdb_trap(void);
-extern void __trap_to_cdb(struct xen_regs *);
+extern int __trap_to_cdb(struct xen_regs *r);
 #define debugger_trap_entry(_v, _r) (0)
-#define debugger_trap_fatal(_v, _r) (__trap_to_cdb(_r), 0)
-#define debugger_trap_immediate() (cdb_trap())
+#define debugger_trap_fatal(_v, _r) __trap_to_cdb(_r)
+#define debugger_trap_immediate() call_with_registers(__trap_to_cdb)
 
 #elif 0
 
