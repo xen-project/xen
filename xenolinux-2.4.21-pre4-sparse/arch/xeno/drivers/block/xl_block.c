@@ -15,8 +15,6 @@ typedef unsigned char byte; /* from linux/ide.h */
 #define XLBLK_RESPONSE_IRQ _EVENT_BLK_RESP
 #define DEBUG_IRQ          _EVENT_DEBUG 
 
-#define PARTN_SHIFT 4
-
 static blk_ring_t *blk_ring;
 static unsigned int resp_cons; /* Response consumer for comms ring. */
 static unsigned int req_prod;  /* Private request producer.         */
@@ -54,21 +52,19 @@ static inline unsigned short xldev_to_physdev(kdev_t xldev)
     switch ( MAJOR(xldev) ) 
     { 
     case XLIDE_MAJOR: 
-        physdev = XENDEV_IDE;
+        physdev = XENDEV_IDE + (MINOR(xldev) >> XLIDE_PARTN_SHIFT);
 	break; 
 	
     case XLSCSI_MAJOR: 
-        physdev = XENDEV_SCSI;
+        physdev = XENDEV_SCSI + (MINOR(xldev) >> XLSCSI_PARTN_SHIFT);
 	break; 
 
     case XLVIRT_MAJOR:
-        physdev = XENDEV_VIRTUAL;
+        physdev = XENDEV_VIRTUAL + (MINOR(xldev) >> XLVIRT_PARTN_SHIFT);
         break;
     } 
 
     if ( physdev == 0 ) BUG();
-
-    physdev += (MINOR(xldev) >> PARTN_SHIFT);
 
     return physdev;
 }
@@ -102,7 +98,8 @@ static inline struct gendisk *xldev_to_gendisk(kdev_t xldev)
 static inline xl_disk_t *xldev_to_xldisk(kdev_t xldev)
 {
     struct gendisk *gd = xldev_to_gendisk(xldev);
-    return (xl_disk_t *)gd->real_devices + (MINOR(xldev) >> PARTN_SHIFT);
+    return (xl_disk_t *)gd->real_devices + 
+        (MINOR(xldev) >> PARTN_SHIFT(xldev));
 }
 
 
@@ -233,7 +230,7 @@ int xenolinux_block_revalidate(kdev_t dev)
     struct gendisk *gd = xldev_to_gendisk(dev);
     xl_disk_t *disk = xldev_to_xldisk(dev);
     unsigned long flags;
-    int i;
+    int i, partn_shift = PARTN_SHIFT(dev);
     
     spin_lock_irqsave(&io_request_lock, flags);
     if ( disk->usage > 1 )
@@ -243,15 +240,15 @@ int xenolinux_block_revalidate(kdev_t dev)
     }
     spin_unlock_irqrestore(&io_request_lock, flags);
 
-    for ( i = 0; i < (1 << PARTN_SHIFT); i++ )
+    for ( i = 0; i < (1 << partn_shift); i++ )
     {
         invalidate_device(dev + i, 1);
         gd->part[dev + i].start_sect = 0;
         gd->part[dev + i].nr_sects = 0;
     }
 
-    grok_partitions(gd, MINOR(dev) >> PARTN_SHIFT,
-                    1 << PARTN_SHIFT, disk->capacity);
+    grok_partitions(gd, MINOR(dev) >> partn_shift,
+                    1 << partn_shift, disk->capacity);
 
     return 0;
 }

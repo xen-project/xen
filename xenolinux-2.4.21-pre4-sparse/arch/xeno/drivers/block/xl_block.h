@@ -35,6 +35,12 @@
 #define DPRINTK_IOCTL(_f, _a...) ((void)0)
 #endif
 
+/* IDE/SCSI have <= 32 partitions per device. VIRT has <= 16. */
+#define PARTN_SHIFT(_dev) ((MAJOR(_dev)==XLVIRT_MAJOR) ? 4 : 5)
+#define XLIDE_PARTN_SHIFT  5
+#define XLSCSI_PARTN_SHIFT 5
+#define XLVIRT_PARTN_SHIFT 4
+
 /*
  * We have one of these per XL-IDE, XL-SCSI, and XL-VIRT device.
  * They hang in an array off the gendisk structure. We may end up putting
