@@ -511,7 +511,10 @@ void debugtrace_dump(void)
 
     spin_lock_irqsave(&debugtrace_lock, flags);
 
+    printk("debugtrace_dump() starting\n");
+
     /* Print oldest portion of the ring. */
+    ASSERT(debugtrace_buf[debugtrace_bytes - 1] == 0);
     serial_puts(sercon_handle, &debugtrace_buf[debugtrace_prd]);
 
     /* Print youngest portion of the ring. */
@@ -519,6 +522,8 @@ void debugtrace_dump(void)
     serial_puts(sercon_handle, &debugtrace_buf[0]);
 
     memset(debugtrace_buf, '\0', debugtrace_bytes);
+
+    printk("debugtrace_dump() finished\n");
 
     spin_unlock_irqrestore(&debugtrace_lock, flags);
 
@@ -537,6 +542,8 @@ void debugtrace_printk(const char *fmt, ...)
         return;
 
     spin_lock_irqsave(&debugtrace_lock, flags);
+
+    ASSERT(debugtrace_buf[debugtrace_bytes - 1] == 0);
 
     va_start(args, fmt);
     (void)vsnprintf(buf, sizeof(buf), fmt, args);
@@ -563,19 +570,23 @@ void debugtrace_printk(const char *fmt, ...)
 static int __init debugtrace_init(void)
 {
     int order;
-    unsigned int kbytes;
+    unsigned int kbytes, bytes;
 
     /* Round size down to next power of two. */
     while ( (kbytes = (debugtrace_kilobytes & (debugtrace_kilobytes-1))) != 0 )
         debugtrace_kilobytes = kbytes;
 
-    debugtrace_bytes = debugtrace_kilobytes << 10;
-    if ( debugtrace_bytes == 0 )
+    bytes = debugtrace_kilobytes << 10;
+    if ( bytes == 0 )
         return 0;
 
-    order = get_order(debugtrace_bytes);
+    order = get_order(bytes);
     debugtrace_buf = (unsigned char *)alloc_xenheap_pages(order);
     ASSERT(debugtrace_buf != NULL);
+
+    memset(debugtrace_buf, '\0', bytes);
+
+    debugtrace_bytes = bytes;
 
     return 0;
 }
