@@ -290,9 +290,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
 {
     struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
     trap_info_t *ti;
-    l2_pgentry_t *pl2e;
-    l1_pgentry_t *pl1e;
-    unsigned long addr, off, fixup, l2e, l1e, *ldt_page;
+    unsigned long addr, off, fixup, l1e, *ldt_page;
     struct task_struct *p = current;
     struct pfn_info *page;
     int i;
@@ -334,15 +332,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
 
     spin_lock(&p->page_lock);
 
-    pl2e  = map_domain_mem(pagetable_val(p->mm.pagetable));
-    l2e   = l2_pgentry_val(pl2e[l2_table_offset(addr)]);
-    unmap_domain_mem(pl2e);
-    if ( !(l2e & _PAGE_PRESENT) )
-        goto unlock_and_bounce_fault;
-
-    pl1e  = map_domain_mem(l2e & PAGE_MASK);
-    l1e   = l1_pgentry_val(pl1e[l1_table_offset(addr)]);
-    unmap_domain_mem(pl1e);
+    __get_user(l1e, (unsigned long *)(linear_pg_table+(addr>>PAGE_SHIFT)));
     if ( !(l1e & _PAGE_PRESENT) )
         goto unlock_and_bounce_fault;
 
@@ -353,11 +343,10 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
             goto unlock_and_bounce_fault;
 
         /* Check all potential LDT entries in the page. */
-        ldt_page = map_domain_mem(l1e & PAGE_MASK);
+        ldt_page = (unsigned long *)(addr & PAGE_MASK);
         for ( i = 0; i < 512; i++ )
             if ( !check_descriptor(ldt_page[i*2], ldt_page[i*2+1]) )
                 goto unlock_and_bounce_fault;
-        unmap_domain_mem(ldt_page);
 
         if ( page->flags & PG_need_flush )
         {
