@@ -119,10 +119,14 @@ void __init paging_init(void)
     idle_pg_table[l2_table_offset(IOREMAP_VIRT_START)] =
         mk_l2_pgentry(__pa(ioremap_pt) | __PAGE_HYPERVISOR);
 
-    /* Create read-only mapping of MPT for guest-OS use. */
+    /* Create read-only mapping of MPT for guest-OS use.
+     * NB. Remove the global bit so that shadow_mode_translate()==true domains
+     *     can reused this address space for their phys-to-machine mapping.
+     */
     idle_pg_table[l2_table_offset(RO_MPT_VIRT_START)] =
         mk_l2_pgentry(l2_pgentry_val(
-            idle_pg_table[l2_table_offset(RDWR_MPT_VIRT_START)]) & ~_PAGE_RW);
+                          idle_pg_table[l2_table_offset(RDWR_MPT_VIRT_START)]) &
+                      ~(_PAGE_RW | _PAGE_GLOBAL));
 
     /* Set up mapping cache for domain pages. */
     mapcache = (unsigned long *)alloc_xenheap_page();

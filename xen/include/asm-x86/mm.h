@@ -235,9 +235,11 @@ void synchronise_pagetables(unsigned long cpu_mask);
 
 /*
  * The phys_to_machine_mapping is the reversed mapping of MPT for full
- * virtualization.
+ * virtualization.  It is only used by shadow_mode_translate()==true
+ * guests, so we steal the address space that would have normally
+ * been used by the read-only MPT map.
  */
-#define __phys_to_machine_mapping ((unsigned long *)PERDOMAIN_VIRT_START)
+#define __phys_to_machine_mapping ((unsigned long *)RO_MPT_VIRT_START)
 
 /* Returns the machine physical */
 static inline unsigned long phys_to_machine_mapping(unsigned long pfn) 
@@ -245,11 +247,11 @@ static inline unsigned long phys_to_machine_mapping(unsigned long pfn)
     unsigned long mfn;
     l1_pgentry_t pte;
 
-   if (__get_user(l1_pgentry_val(pte), (__phys_to_machine_mapping + pfn))) {
-       return 0;
-   }
-               
-   mfn = l1_pgentry_to_phys(pte) >> PAGE_SHIFT;
+   if (__get_user(l1_pgentry_val(pte), (__phys_to_machine_mapping + pfn)))
+       mfn = 0;
+   else
+       mfn = l1_pgentry_to_phys(pte) >> PAGE_SHIFT;
+
    return mfn; 
 }
 #define set_machinetophys(_mfn, _pfn) machine_to_phys_mapping[(_mfn)] = (_pfn)

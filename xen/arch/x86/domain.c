@@ -299,7 +299,7 @@ void arch_vmx_do_launch(struct exec_domain *ed)
 static void alloc_monitor_pagetable(struct exec_domain *ed)
 {
     unsigned long mmfn;
-    l2_pgentry_t *mpl2e, *phys_table;
+    l2_pgentry_t *mpl2e;
     struct pfn_info *mmfn_info;
     struct domain *d = ed->domain;
 
@@ -323,12 +323,9 @@ static void alloc_monitor_pagetable(struct exec_domain *ed)
     ed->arch.monitor_table = mk_pagetable(mmfn << PAGE_SHIFT);
     ed->arch.monitor_vtable = mpl2e;
 
-    phys_table = (l2_pgentry_t *)
-        map_domain_mem(pagetable_val(ed->arch.phys_table));
-    memcpy(d->arch.mm_perdomain_pt, phys_table,
-           L1_PAGETABLE_ENTRIES * sizeof(l1_pgentry_t));
-
-    unmap_domain_mem(phys_table);
+    // map the phys_to_machine map into the Read-Only MPT space for this domain
+    mpl2e[l2_table_offset(RO_MPT_VIRT_START)] =
+        mk_l2_pgentry(pagetable_val(ed->arch.phys_table) | __PAGE_HYPERVISOR);
 }
 
 /*
