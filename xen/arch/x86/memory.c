@@ -1307,7 +1307,7 @@ int do_mmu_update(mmu_update_t *ureqs, int count, int *success_count)
 
     for ( i = 0; i < count; i++ )
     {
-        hypercall_may_preempt(
+        locked_hypercall_may_preempt(d,
             __HYPERVISOR_mmu_update, 3, ureqs, count-i, success_count);
 
         if ( unlikely(__copy_from_user(&req, ureqs, sizeof(req)) != 0) )

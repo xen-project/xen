@@ -263,6 +263,13 @@ void hypercall_create_continuation(unsigned int op, unsigned int nr_args, ...);
             hypercall_create_continuation(_op , _nr_args , ##_args); \
             return _op;                                              \
     } } while ( 0 )
+#define locked_hypercall_may_preempt(_d, _op, _nr_args, _args...)    \
+    do {                                                             \
+        if ( unlikely(softirq_pending(smp_processor_id())) ) {       \
+            hypercall_create_continuation(_op , _nr_args , ##_args); \
+            UNLOCK_BIGLOCK(_d);                                      \
+            return _op;                                              \
+    } } while ( 0 )
 
 /* This domain_hash and domain_list are protected by the domlist_lock. */
 #define DOMAIN_HASH_SIZE 256
