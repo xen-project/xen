@@ -32,13 +32,24 @@ struct task_struct;
  */
 
 struct cpuinfo_x86 {
-    __u8	x86;		/* CPU family */
-    __u8	x86_vendor;	/* CPU vendor */
-    __u8	x86_model;
-    __u8	x86_mask;
-    int	cpuid_level;	/* Maximum supported CPUID level, -1=no CPUID */
-    __u32	x86_capability[NCAPINTS];
+    __u8    x86;            /* CPU family */
+    __u8    x86_vendor;     /* CPU vendor */
+    __u8    x86_model;
+    __u8    x86_mask;
+    char    wp_works_ok;    /* It doesn't on 386's */
+    char    hlt_works_ok;   /* Problems on some 486Dx4's and old 386's */
+    char    hard_math;
+    char    rfu;
+    int     cpuid_level;    /* Maximum supported CPUID level, -1=no CPUID */
+    __u32   x86_capability[NCAPINTS];
     char    x86_vendor_id[16];
+    char    x86_model_id[64];
+    int     x86_cache_size;  /* in KB - valid for CPUS which support this
+                                call  */
+    int     fdiv_bug;
+    int     f00f_bug;
+    int     coma_bug;
+    unsigned long loops_per_jiffy;
     unsigned long *pgd_quick;
     unsigned long *pmd_quick;
     unsigned long *pte_quick;
@@ -53,6 +64,8 @@ struct cpuinfo_x86 {
 #define X86_VENDOR_CENTAUR 5
 #define X86_VENDOR_RISE 6
 #define X86_VENDOR_TRANSMETA 7
+#define X86_VENDOR_NSC 8
+#define X86_VENDOR_SIS 9
 #define X86_VENDOR_UNKNOWN 0xff
 
 /*
@@ -70,16 +83,7 @@ extern struct cpuinfo_x86 cpu_data[];
 #define current_cpu_data boot_cpu_data
 #endif
 
-#define cpu_has_pge	(test_bit(X86_FEATURE_PGE,  boot_cpu_data.x86_capability))
-#define cpu_has_pse	(test_bit(X86_FEATURE_PSE,  boot_cpu_data.x86_capability))
-#define cpu_has_pae	(test_bit(X86_FEATURE_PAE,  boot_cpu_data.x86_capability))
-#define cpu_has_tsc	(test_bit(X86_FEATURE_TSC,  boot_cpu_data.x86_capability))
-#define cpu_has_de	(test_bit(X86_FEATURE_DE,   boot_cpu_data.x86_capability))
-#define cpu_has_vme	(test_bit(X86_FEATURE_VME,  boot_cpu_data.x86_capability))
-#define cpu_has_fxsr	(test_bit(X86_FEATURE_FXSR, boot_cpu_data.x86_capability))
-#define cpu_has_xmm	(test_bit(X86_FEATURE_XMM,  boot_cpu_data.x86_capability))
-#define cpu_has_fpu	(test_bit(X86_FEATURE_FPU,  boot_cpu_data.x86_capability))
-#define cpu_has_apic	(test_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability))
+extern char ignore_irq13;
 
 extern void identify_cpu(struct cpuinfo_x86 *);
 extern void print_cpu_info(struct cpuinfo_x86 *);
@@ -190,7 +194,6 @@ static inline unsigned int cpuid_edx(unsigned int op)
 	__asm__("movl %0,%%cr0": :"r" (x));
 
 
-
 /*
  * Intel CPU features in CR4
  */
@@ -205,6 +208,9 @@ static inline unsigned int cpuid_edx(unsigned int op)
 #define X86_CR4_PCE		0x0100	/* enable performance counters at ipl 3 */
 #define X86_CR4_OSFXSR		0x0200	/* enable fast FPU save and restore */
 #define X86_CR4_OSXMMEXCPT	0x0400	/* enable unmasked SSE exceptions */
+
+#define load_cr3(pgdir) \
+       asm volatile("movl %0,%%cr3": :"r" (__pa(pgdir)));
 
 /*
  * Save the cr4 feature set we're using (ie
@@ -287,6 +293,7 @@ extern unsigned int mca_pentium_flag;
  * Size of io_bitmap in longwords: 32 is ports 0-0x3ff.
  */
 #define IO_BITMAP_SIZE	32
+#define IO_BITMAP_BYTES (IO_BITMAP_SIZE * 4)
 #define IO_BITMAP_OFFSET offsetof(struct tss_struct,io_bitmap)
 #define INVALID_IO_BITMAP_OFFSET 0x8000
 
@@ -299,6 +306,7 @@ struct i387_fsave_struct {
     long	foo;
     long	fos;
     long	st_space[20];	/* 8*10 bytes for each FP-reg = 80 bytes */
+    long	status;		/* software status information */
 };
 
 struct i387_fxsave_struct {
@@ -317,9 +325,24 @@ struct i387_fxsave_struct {
     long	padding[56];
 } __attribute__ ((aligned (16)));
 
+struct i387_soft_struct {
+    long    cwd;
+    long    swd;
+    long    twd;
+    long    fip;
+    long    fcs;
+    long    foo;
+    long    fos;
+    long    st_space[20];   /* 8*10 bytes for each FP-reg = 80 bytes */
+    unsigned char   ftop, changed, lookahead, no_update, rm, alimit;
+    struct info     *info;
+    unsigned long   entry_eip;
+};
+
 union i387_union {
     struct i387_fsave_struct	fsave;
     struct i387_fxsave_struct	fxsave;
+    struct i387_soft_struct soft;
 };
 
 typedef struct {

@@ -295,6 +295,17 @@ static void __init pcibios_assign_resources(void)
 	}
 }
 
+void __init pcibios_set_cacheline_size(void)
+{
+	struct cpuinfo_x86 *c = &boot_cpu_data;
+
+	pci_cache_line_size = 32 >> 2;
+	if (c->x86 >= 6 && c->x86_vendor == X86_VENDOR_AMD)
+		pci_cache_line_size = 64 >> 2;	/* K7 & K8 */
+	else if (c->x86 > 6 && c->x86_vendor == X86_VENDOR_INTEL)
+		pci_cache_line_size = 128 >> 2;	/* P4 */
+}
+
 void __init pcibios_resource_survey(void)
 {
 	DBG("PCI: Allocating resources\n");

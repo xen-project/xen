@@ -775,7 +775,7 @@ static int init_irq (ide_hwif_t *hwif)
 	restore_flags(flags);	/* all CPUs; safe now that hwif->hwgroup is set up */
 
 #if !defined(__mc68000__) && !defined(CONFIG_APUS) && !defined(__sparc__)
-	printk("%s at 0x%03x-0x%03x,0x%03x on irq %d", hwif->name,
+	printk("%s at 0x%03lx-0x%03lx,0x%03lx on irq %d", hwif->name,
 		hwif->io_ports[IDE_DATA_OFFSET],
 		hwif->io_ports[IDE_DATA_OFFSET]+7,
 		hwif->io_ports[IDE_CONTROL_OFFSET], hwif->irq);

@@ -22,9 +22,12 @@
  * The structure of the IO-APIC:
  */
 struct IO_APIC_reg_00 {
-	__u32	__reserved_2	: 24,
+	__u32	__reserved_2	: 14,
+		LTS		:  1,
+		delivery_type	:  1,
+		__reserved_1	:  8,
 		ID		:  4,
-		__reserved_1	:  4;
+		__reserved_0	:  4;
 } __attribute__ ((packed));
 
 struct IO_APIC_reg_01 {
@@ -39,6 +42,11 @@ struct IO_APIC_reg_02 {
 	__u32	__reserved_2	: 24,
 		arbitration	:  4,
 		__reserved_1	:  4;
+} __attribute__ ((packed));
+
+struct IO_APIC_reg_03 {
+	__u32	boot_DT		: 1,
+		__reserved_1	: 31;
 } __attribute__ ((packed));
 
 /*
@@ -115,15 +123,6 @@ static inline void io_apic_write(unsigned int apic, unsigned int reg, unsigned i
 }
 
 /*
- * Re-write a value: to be used for read-modify-write
- * cycles where the read already set up the index register.
- */
-static inline void io_apic_modify(unsigned int apic, unsigned int value)
-{
-	*(IO_APIC_BASE(apic)+4) = value;
-}
-
-/*
  * Synchronize the IO-APIC and the CPU by doing
  * a dummy read from the IO-APIC
  */
@@ -132,17 +131,37 @@ static inline void io_apic_sync(unsigned int apic)
 	(void) *(IO_APIC_BASE(apic)+4);
 }
 
-/* 1 if "noapic" boot option passed */
-extern int skip_ioapic_setup;
-
 /*
  * If we use the IO-APIC for IRQ routing, disable automatic
  * assignment of PCI IRQ's.
  */
 #define io_apic_assign_pci_irqs (mp_irq_entries && !skip_ioapic_setup)
 
-#else  /* !CONFIG_X86_IO_APIC */
-#define io_apic_assign_pci_irqs 0
+#ifdef CONFIG_ACPI_BOOT
+extern int io_apic_get_unique_id (int ioapic, int apic_id);
+extern int io_apic_get_version (int ioapic);
+extern int io_apic_get_redir_entries (int ioapic);
+extern int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int active_high_low);
 #endif
+
+extern int skip_ioapic_setup;	/* 1 for "noapic" */
+
+static inline void disable_ioapic_setup(void)
+{
+	skip_ioapic_setup = 1;
+}
+
+static inline int ioapic_setup_disabled(void)
+{
+	return skip_ioapic_setup;
+}
+
+#else	/* !CONFIG_X86_IO_APIC */
+#define io_apic_assign_pci_irqs 0
+
+static inline void disable_ioapic_setup(void)
+{ }
+
+#endif	/* !CONFIG_X86_IO_APIC */
 
 #endif

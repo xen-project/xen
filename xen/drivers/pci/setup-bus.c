@@ -17,13 +17,13 @@
  *	     tighter packing. Prefetchable range support.
  */
 
-#include <xen/init.h>
-#include <xen/kernel.h>
-#include <xen/pci.h>
-#include <xen/errno.h>
-#include <xen/ioport.h>
-#include <xen/cache.h>
-#include <xen/slab.h>
+#include <linux/init.h>
+#include <linux/kernel.h>
+#include <linux/pci.h>
+#include <linux/errno.h>
+#include <linux/ioport.h>
+#include <linux/cache.h>
+#include <linux/slab.h>
 
 
 #define DEBUG_CONFIG 1
@@ -299,7 +299,7 @@ pbus_size_mem(struct pci_bus *bus, unsigned long mask, unsigned long type)
 				order = 0;
 			/* Exclude ranges with size > align from
 			   calculation of the alignment. */
-			if (size == align)
+			if (r_size == align)
 				aligns[order] += align;
 			if (order > max_order)
 				max_order = order;

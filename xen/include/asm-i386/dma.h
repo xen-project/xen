@@ -72,11 +72,8 @@
 
 #define MAX_DMA_CHANNELS	8
 
-#if 0
 /* The maximum address that we can perform a DMA transfer to on this platform */
-#define MAX_DMA_ADDRESS      (PAGE_OFFSET+0x1000000)
-#endif
-
+/*#define MAX_DMA_ADDRESS      (PAGE_OFFSET+0x1000000)*/
 
 /* 8237 DMA controllers */
 #define IO_DMA1_BASE	0x00	/* 8 bit slave DMA, channels 0..3 */
@@ -242,7 +239,7 @@ static __inline__ void set_dma_addr(unsigned int dmanr, unsigned int a)
 }
 
 
-/* Set transfer size (max 64k for DMA1..3, 128k for DMA5..7) for
+/* Set transfer size (max 64k for DMA0..3, 128k for DMA5..7) for
  * a specific DMA channel.
  * You must ensure the parameters are valid.
  * NOTE: from a manual: "the number of transfers is one more
