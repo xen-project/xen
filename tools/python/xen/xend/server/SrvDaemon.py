@@ -42,7 +42,7 @@ import console
 import domain
 from params import *
 
-DEBUG = 0
+DEBUG = 1
 
 class NotifierProtocol(protocol.Protocol):
     """Asynchronous handler for i/o on the notifier (event channel).
@@ -475,14 +475,24 @@ class Daemon:
         xfrd_pid = self.cleanup_xfrd()
 
         # Detach from TTY.
-        if not DEBUG:
-            os.setsid()
-            sys.stdin.close();
-            sys.stdout.close();
-            sys.stderr.close();
-            os.close(0);
-            os.close(1);
-            os.close(2);
+        os.setsid()
+
+        # Detach from standard file descriptors.
+        # I do this at the file-descriptor level: the overlying Python file
+        # objects also use fd's 0, 1 and 2.
+        os.close(0)
+        os.close(1)
+        os.close(2)
+        if DEBUG:
+            os.open('/dev/null', os.O_RDONLY)
+            # XXX KAF: Why doesn't this capture output from C extensions that
+            # fprintf(stdout) or fprintf(stderr) ??
+            os.open('/var/log/xend-debug.log', os.O_WRONLY|os.O_CREAT)
+        else:
+            os.open('/dev/null', os.O_RDWR)
+            os.dup(0)
+        os.dup(1)
+
         if self.set_user():
             return 4
         os.chdir("/")
