@@ -276,7 +276,10 @@ void init_idle_task(void);
 int  wake_up(struct task_struct *p);
 long do_yield(void);
 void reschedule(struct task_struct *p);
-asmlinkage void schedule(void);
+
+/* NB. Limited entry in Xen. Not for arbitrary use! */
+asmlinkage void __enter_scheduler(void);
+#define schedule() __schedule_not_callable_in_xen()
 
 /* A compatibility hack for Linux drivers. */
 #define MAX_SCHEDULE_TIMEOUT 0UL

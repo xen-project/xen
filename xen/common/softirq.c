@@ -225,14 +225,9 @@ void tasklet_kill(struct tasklet_struct *t)
 {
     if (in_interrupt())
         printk("Attempt to kill tasklet from interrupt\n");
-
-    while (test_and_set_bit(TASKLET_STATE_SCHED, &t->state)) {
-        set_current_state(TASK_RUNNING);
-        do {
-            current->policy |= SCHED_YIELD;
-            schedule();
-        } while (test_bit(TASKLET_STATE_SCHED, &t->state));
-    }
+    while (test_and_set_bit(TASKLET_STATE_SCHED, &t->state))
+        while (test_bit(TASKLET_STATE_SCHED, &t->state))
+            do_softirq();
     tasklet_unlock_wait(t);
     clear_bit(TASKLET_STATE_SCHED, &t->state);
 }

@@ -201,7 +201,7 @@ long do_yield(void)
 {
     current->state = TASK_INTERRUPTIBLE;
     current->warpback = 0; /* XXX should only do this when blocking */
-    schedule();
+    __enter_scheduler();
     return 0;
 }
 
@@ -293,7 +293,7 @@ void reschedule(struct task_struct *p)
  *   i.e., the domain with lowest EVT.
  *   The runqueue should be ordered by EVT so that is easy.
  ****************************************************************************/
-asmlinkage void schedule(void)
+asmlinkage void __enter_scheduler(void)
 {
     struct task_struct *prev, *next, *next_prime, *p;
     struct list_head   *tmp;

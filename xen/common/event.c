@@ -13,12 +13,10 @@
 
 typedef void (*hyp_event_callback_fn_t)(void);
 
-extern void schedule(void);
-
 /* Ordering must match definitions of _HYP_EVENT_* in xeno/sched.h */
 static hyp_event_callback_fn_t event_call_fn[] = 
 {
-    schedule,
+    __enter_scheduler,
     kill_domain,
     stop_domain
 };

@@ -76,7 +76,7 @@ void startup_cpu_idle_loop(void)
     /* Just some sanity to ensure that the scheduler is set up okay. */
     ASSERT(current->domain == IDLE_DOMAIN_ID);
     (void)wake_up(current);
-    schedule();
+    __enter_scheduler();
 
     /*
      * Declares CPU setup done to the boot processor.

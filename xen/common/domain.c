@@ -151,7 +151,7 @@ void __kill_domain(struct task_struct *p)
 
     if ( p == current )
     {
-        schedule();
+        __enter_scheduler();
         BUG(); /* never get here */
     }
     else
@@ -196,9 +196,9 @@ long kill_other_domain(unsigned int dom, int force)
 
 void stop_domain(void)
 {
-    current -> state = TASK_SUSPENDED;
-    clear_bit(_HYP_EVENT_STOP, &(current->hyp_events));
-    schedule ();
+    set_current_state(TASK_SUSPENDED);
+    clear_bit(_HYP_EVENT_STOP, &current->hyp_events);
+    __enter_scheduler();
 }
 
 long stop_other_domain(unsigned int dom)
