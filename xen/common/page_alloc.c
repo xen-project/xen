@@ -403,6 +403,13 @@ void init_xenheap_pages(unsigned long ps, unsigned long pe)
 
     memguard_guard_range(__va(ps), pe - ps);
 
+    /*
+     * Yuk! Ensure there is a one-page buffer between Xen and Dom zones, to
+     * prevent merging of power-of-two blocks across the zone boundary.
+     */
+    if ( !IS_XEN_HEAP_FRAME(phys_to_page(pe)) )
+        pe -= PAGE_SIZE;
+
     local_irq_save(flags);
     init_heap_pages(MEMZONE_XEN, phys_to_page(ps), (pe - ps) >> PAGE_SHIFT);
     local_irq_restore(flags);
