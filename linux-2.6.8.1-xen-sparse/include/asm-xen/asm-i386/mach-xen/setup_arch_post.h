@@ -25,12 +25,8 @@ static char * __init machine_specific_memory_setup(void)
 extern void hypervisor_callback(void);
 extern void failsafe_callback(void);
 
-static void __init machine_specific_arch_setup(void)
+void __init machine_specific_modify_cpu_capabilities(void)
 {
-	HYPERVISOR_set_callbacks(
-	    __KERNEL_CS, (unsigned long)hypervisor_callback,
-	    __KERNEL_CS, (unsigned long)failsafe_callback);
-
 	clear_bit(X86_FEATURE_VME, boot_cpu_data.x86_capability);
 	clear_bit(X86_FEATURE_DE, boot_cpu_data.x86_capability);
 	clear_bit(X86_FEATURE_PSE, boot_cpu_data.x86_capability);
@@ -38,4 +34,13 @@ static void __init machine_specific_arch_setup(void)
 	clear_bit(X86_FEATURE_PGE, boot_cpu_data.x86_capability);
 	clear_bit(X86_FEATURE_MTRR, boot_cpu_data.x86_capability);
 	clear_bit(X86_FEATURE_FXSR, boot_cpu_data.x86_capability);
+}
+
+static void __init machine_specific_arch_setup(void)
+{
+	HYPERVISOR_set_callbacks(
+	    __KERNEL_CS, (unsigned long)hypervisor_callback,
+	    __KERNEL_CS, (unsigned long)failsafe_callback);
+
+	machine_specific_modify_cpu_capabilities();
 }
