@@ -25,29 +25,22 @@ class XendNode:
         return 0
     
     def cpu_bvt_slice_set(self, ctx_allow):
-        ret = 0
-        #ret = self.xc.bvtsched_global_set(ctx_allow=slice)
-        return ret
+        return self.xc.bvtsched_global_set(ctx_allow=ctx_allow)
 
-    def cpu_bvt_slice_get(self, ctx_allow):
-        ret = 0
-        #ret = self.xc.bvtsched_global_get()
-        return ret
+    def cpu_bvt_slice_get(self):
+        return self.xc.bvtsched_global_get()
     
     def cpu_fbvt_slice_set(self, ctx_allow):
-        ret = 0
-        #ret = self.xc.bvtsched_global_set(ctx_allow=slice)
-        return ret
+        return self.xc.bvtsched_global_set(ctx_allow=ctx_allow)
 
-    def cpu_fbvt_slice_get(self, ctx_allow):
-        ret = 0
-        #ret = self.xc.bvtsched_global_get()
-        return ret
+    def cpu_fbvt_slice_get(self):
+        return self.xc.bvtsched_global_get()
     
     def cpu_rrobin_slice_set(self, slice):
-        ret = 0
-        #ret = self.xc.rrobin_global_set(slice)
-        return ret
+        return self.xc.rrobin_global_set(slice=slice)
+
+    def cpu_rrobin_slice_get(self):
+        return self.xc.rrobin_global_get()
 
     def info(self):
         return self.nodeinfo() + self.physinfo()
