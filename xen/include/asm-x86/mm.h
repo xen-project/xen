@@ -226,7 +226,10 @@ void synchronise_pagetables(unsigned long cpu_mask);
 extern unsigned long *machine_to_phys_mapping;
 extern unsigned long *phys_to_machine_mapping;
 #else
+/* Don't call virt_to_phys on this: it isn't direct mapped.  Using
+   m2p_start_mfn instead. */
 #define machine_to_phys_mapping ((unsigned long *)RDWR_MPT_VIRT_START)
+extern unsigned long m2p_start_mfn;
 #define phys_to_machine_mapping ((unsigned long *)PERDOMAIN_VIRT_START)
 #endif
 
