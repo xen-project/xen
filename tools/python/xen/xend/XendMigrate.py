@@ -389,8 +389,8 @@ class XendMigrate:
 
     def session_begin(self, info):
         self._add_session(info.xid, info)
-        mcf = XfrdClientFactory(info)
-        reactor.connectTCP('localhost', XFRD_PORT, mcf)
+        xcf = XfrdClientFactory(info)
+        reactor.connectTCP('localhost', XFRD_PORT, xcf)
         return info
     
     def migrate_begin(self, dom, host, port=XFRD_PORT):
@@ -401,6 +401,8 @@ class XendMigrate:
         @param port: destination port
         @return: deferred
         """
+        if host in ['localhost', '127.0.0.1']:
+            raise XendError('cannot migrate to localhost')
         # Check dom for existence, not migrating already.
         # Subscribe to migrate notifications (for updating).
         xid = self.nextid()

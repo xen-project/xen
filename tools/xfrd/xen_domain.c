@@ -142,9 +142,17 @@ static int do_curl_global_init = 1;
 static CURL *curlinit(void){
     if(do_curl_global_init){
         do_curl_global_init = 0;
+        // Stop libcurl using the proxy. There's a curl option to
+        // set the proxy - but no option to defeat it.
+        unsetenv("http_proxy");
         curl_global_init(CURL_GLOBAL_ALL);
     }
     return curl_easy_init();
+}
+
+int curldebug(CURL *curl, curl_infotype ty, char *buf, size_t buf_n, void *data){
+    printf("%*s\n", buf_n, buf);
+    return 0;
 }
 
 /** Configure a new domain. Talk to xend using libcurl.
@@ -195,6 +203,8 @@ int xen_domain_configure(uint32_t dom, char *vmconfig, int vmconfig_n){
         eprintf("> Error adding op field.\n");
         goto exit;
     }
+    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
+    curl_easy_setopt(curl, CURLOPT_DEBUGFUNCTION, curldebug);
     // No progress meter.
     //curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1);
     // Completely quiet.
