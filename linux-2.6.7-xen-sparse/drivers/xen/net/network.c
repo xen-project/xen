@@ -371,7 +371,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 }
 
 
-static void netif_int(int irq, void *dev_id, struct pt_regs *ptregs)
+static irqreturn_t netif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 {
     struct net_device *dev = dev_id;
     struct net_private *np = dev->priv;
@@ -384,6 +384,8 @@ static void netif_int(int irq, void *dev_id, struct pt_regs *ptregs)
     if ( (np->rx_resp_cons != np->rx->resp_prod) &&
          (np->user_state == UST_OPEN) )
         netif_rx_schedule(dev);
+
+    return IRQ_HANDLED;
 }
 
 
