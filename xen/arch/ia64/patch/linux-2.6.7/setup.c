@@ -1,5 +1,5 @@
---- /home/djm/src/xen/xeno-ia64.bk/xen/linux-2.6.7/arch/ia64/kernel/setup.c	2004-06-15 23:18:58.000000000 -0600
-+++ /home/djm/src/xen/xeno-ia64.bk/xen/arch/ia64/setup.c	2004-11-11 17:08:30.000000000 -0700
+--- /home/djm/linux-2.6.7/arch/ia64/kernel/setup.c	2004-06-15 23:18:58.000000000 -0600
++++ arch/ia64/setup.c	2005-02-17 10:53:00.000000000 -0700
 @@ -21,6 +21,9 @@
  #include <linux/init.h>
  
@@ -58,7 +58,21 @@
  /*
   * Filter incoming memory segments based on the primitive map created from the boot
   * parameters. Segments contained in the map are removed from the memory ranges. A
-@@ -285,7 +298,9 @@
+@@ -280,23 +293,40 @@
+ }
+ #endif
+ 
++#ifdef XEN
++void __init
++early_setup_arch(void)
++{
++	efi_init();
++	io_port_init();
++}
++#endif
++
+ void __init
+ setup_arch (char **cmdline_p)
  {
  	unw_init();
  
@@ -68,7 +82,13 @@
  
  	*cmdline_p = __va(ia64_boot_param->command_line);
  	strlcpy(saved_command_line, *cmdline_p, sizeof(saved_command_line));
-@@ -297,6 +312,10 @@
+ 
++#ifndef XEN
+ 	efi_init();
+ 	io_port_init();
++#endif
+ 
+ #ifdef CONFIG_IA64_GENERIC
  	machvec_init(acpi_get_sysname());
  #endif
  
@@ -79,7 +99,7 @@
  #ifdef CONFIG_ACPI_BOOT
  	/* Initialize the ACPI boot-time table parser */
  	acpi_table_init();
-@@ -413,6 +432,9 @@
+@@ -413,6 +443,9 @@
  		sprintf(cp, " 0x%lx", mask);
  	}
  
@@ -89,7 +109,7 @@
  	seq_printf(m,
  		   "processor  : %d\n"
  		   "vendor     : %s\n"
-@@ -667,6 +689,8 @@
+@@ -667,6 +700,8 @@
  void
  check_bugs (void)
  {

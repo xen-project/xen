@@ -226,7 +226,6 @@ softlink include/asm-ia64/rwsem.h include/asm-ia64/rwsem.h
 softlink include/asm-ia64/scatterlist.h include/asm-ia64/scatterlist.h
 softlink include/asm-ia64/sections.h include/asm-ia64/sections.h
 softlink include/asm-ia64/semaphore.h include/asm-ia64/semaphore.h
-softlink include/asm-ia64/serial.h include/asm-ia64/serial.h
 softlink include/asm-ia64/sigcontext.h include/asm-ia64/sigcontext.h
 softlink include/asm-ia64/signal.h include/asm-ia64/signal.h
 softlink include/asm-ia64/smp.h include/asm-ia64/smp.h
@@ -240,6 +239,10 @@ softlink include/asm-ia64/unaligned.h include/asm-ia64/unaligned.h
 softlink include/asm-ia64/unistd.h include/asm-ia64/unistd.h
 softlink include/asm-ia64/unwind.h include/asm-ia64/unwind.h
 softlink include/asm-ia64/ustack.h include/asm-ia64/ustack.h
+
+#rename this one because xen/include/asm/serial.h already exists
+#there is only one use of it that must be patched -- arch/ia64/setup.c 
+#softlink include/asm-ia64/serial.h include/asm-ia64/asmserial.h
 
 # xen/include/asm-ia64/linux/*.h (== linux/include/linux/*.h)
 

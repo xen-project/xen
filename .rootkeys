@@ -1087,6 +1087,7 @@
 421098b72bPUyviWloEAIB85dGCm2Q xen/include/asm-ia64/privop.h
 421098b7Z6OwjZnrTZkh34DoDfcjrA xen/include/asm-ia64/regionreg.h
 421098b707cY5YluUcWK5Pc-71ETVw xen/include/asm-ia64/regs.h
+4214e2f3fbO_n9Z1kIcBR83d7W4OJw xen/include/asm-ia64/serial.h
 421098b7czhvyPGFa5nskL0N4vNvFw xen/include/asm-ia64/shadow.h
 421098b7GkWOnlzSmPvNAhByOSZ1Dw xen/include/asm-ia64/time.h
 421098b7FK3xgShpnH0I0Ou3O4fJ2Q xen/include/asm-ia64/tlb.h
