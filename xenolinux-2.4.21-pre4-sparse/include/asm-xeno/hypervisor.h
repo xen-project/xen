@@ -11,7 +11,7 @@
 
 #include <asm/hypervisor-ifs/hypervisor-if.h>
 #include <asm/ptrace.h>
-#include <asm/page.h>
+//#include <asm/page.h>
 
 /* arch/xeno/kernel/setup.c */
 union start_info_union
