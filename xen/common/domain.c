@@ -345,6 +345,11 @@ void free_all_dom_mem(struct task_struct *p)
 
     INIT_LIST_HEAD(&zombies);
 
+    /* STEP 1. Drop the in-use reference to the page-table base. */
+    put_page_and_type(&frame_table[pagetable_val(p->mm.pagetable) >>
+                                  PAGE_SHIFT]);
+
+    /* STEP 2. Zombify all pages on the domain's allocation list. */
     spin_lock(&p->page_list_lock);
     while ( (ent = p->page_list.next) != &p->page_list )
     {
@@ -372,7 +377,10 @@ void free_all_dom_mem(struct task_struct *p)
     }
     spin_unlock(&p->page_list_lock);
 
-    /* We do the potentially complex 'put' operations with no lock held. */
+    /*
+     * STEP 3. With the domain's list lock now released, we examine each zombie
+     * page and drop references for guest-allocated and/or type-pinned pages.
+     */
     while ( (ent = zombies.next) != &zombies )
     {
         page = list_entry(ent, struct pfn_info, list);
