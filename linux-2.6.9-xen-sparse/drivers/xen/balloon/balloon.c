@@ -77,59 +77,46 @@ unsigned long credit;
 static unsigned long current_pages, most_seen_pages;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-
-/* Head of the list of ballooned pages */
-struct page *ball_pg_hd = NULL;
-
-void add_ballooned_page(unsigned long pfn)
-{
-    struct page *p = mem_map + pfn;
-    
-    p->private = (unsigned long)ball_pg_hd;
-    ball_pg_hd = p;
-}
-
-struct page *rem_ballooned_page(void)
-{
-    if ( ball_pg_hd != NULL )
-    {
-        struct page *ret = ball_pg_hd;
-        ball_pg_hd = (struct page *)ball_pg_hd->private;
-        return ret;
-    }
-    else
-        return NULL;
-}   
-
+/* Use the private and mapping fields of struct page as a list. */
+#define PAGE_TO_LIST(p) ( (struct list_head *)&p->private )
+#define LIST_TO_PAGE(l) ( list_entry( ((unsigned long *)l),   \
+				      struct page, private ) )
+#define UNLIST_PAGE(p)  do { list_del(PAGE_TO_LIST(p));       \
+                             p->mapping = NULL;               \
+                             p->private = 0; } while(0)
 #else
+/* There's a dedicated list field in struct page we can use.    */
+#define PAGE_TO_LIST(p) ( &p->list )
+#define LIST_TO_PAGE(l) ( list_entry(l, struct page, list) )
+#define UNLIST_PAGE(p)  ( list_del(&p->list) )
+#endif
+
 /* List of ballooned pages, threaded through the mem_map array. */
 LIST_HEAD(ballooned_pages);
 
+/** add_ballooned_page - remember we've ballooned a pfn */
 void add_ballooned_page(unsigned long pfn)
 {
     struct page *p = mem_map + pfn;
 
-    list_add(&p->list, &ballooned_pages);
+    list_add(PAGE_TO_LIST(p), &ballooned_pages);
 }
 
+/* rem_ballooned_page - recall a ballooned page and remove from list. */
 struct page *rem_ballooned_page(void)
 {
     if(!list_empty(&ballooned_pages))
     {
-        struct list_head *next;
         struct page *ret;
 
-        next = ballooned_pages.next;
-        ret = list_entry(next, struct page, list);
-        list_del(next);
+        ret = LIST_TO_PAGE(ballooned_pages.next);
+	UNLIST_PAGE(ret);
 
         return ret;
     }
     else
         return NULL;
 }
-
-#endif
 
 static inline pte_t *get_ptep(unsigned long addr)
 {
