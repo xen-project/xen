@@ -320,6 +320,7 @@
 41090ec8Pj_bkgCBpg2W7WfmNkumEA tools/examples/xmexample1
 40cf2937oKlROYOJTN8GWwWM5AmjBg tools/examples/xmexample2
 3fbba6dbDfYvJSsw9500b4SZyUhxjQ tools/libxc/Makefile
+41cc934abX-QLXJXW_clV_wRjM0zYg tools/libxc/plan9a.out.h
 3fbba6dc1uU7U3IFeF6A-XEOYF2MkQ tools/libxc/rpm.spec
 3fbba6dcrNxtygEcgJYAJJ1gCQqfsA tools/libxc/xc.h
 40589968oCfoUlXd460CjVAkBE8IBA tools/libxc/xc_atropos.c
@@ -334,6 +335,7 @@
 3fbba6db7li3FJiABYtCmuGxOJxEGw tools/libxc/xc_linux_save.c
 3fbba6db7WnnJr0KFrIFrqNlSKvFYg tools/libxc/xc_misc.c
 4051bce6CHAsYh8P5t2OHDtRWOP9og tools/libxc/xc_physdev.c
+41cc934aO1m6NxEh_8eDr9bJIMoLFA tools/libxc/xc_plan9_build.c
 3fbba6dctWRWlFJkYb6hdix2X4WMuw tools/libxc/xc_private.c
 3fbba6dcbVrG2hPzEzwdeV_UC8kydQ tools/libxc/xc_private.h
 40589968UQFnJeOMn8UIFLbXBuwXjw tools/libxc/xc_rrobin.c
