@@ -51,22 +51,19 @@ typedef struct net_ring_st {
     unsigned int rx_ring_size;
 } net_ring_t;
 
-/* This is here for consideration:  Having a global lookup for vifs
- * may make the guest /proc stuff more straight forward, and could 
- * be used in the routing code.  I don't know if it warrants the 
- * overhead yet.
- */
-
-/* net_vif_t sys_vif_list[MAX_SYSTEM_VIFS]; */
-
 /* Specify base of per-domain array. Get returned free slot in the array. */
 net_ring_t *create_net_vif(int domain);
 
 /* Packet routing/filtering code follows:
  */
 
-#define NETWORK_ACTION_DROP 0
-#define NETWORK_ACTION_PASS 1
+#define NETWORK_ACTION_ACCEPT   0
+#define NETWORK_ACTION_COUNT    1
+
+#define NETWORK_PROTO_IP        0
+#define NETWORK_PROTO_TCP       1
+#define NETWORK_PROTO_UDP       2
+#define NETWORK_PROTO_ARP       3
 
 typedef struct net_rule_st 
 {
@@ -78,10 +75,11 @@ typedef struct net_rule_st
     u32  dst_addr_mask;
     u16  src_port_mask;
     u16  dst_port_mask;
-
-    int  src_interface;
-    int  dst_interface;
-    int  action;
+    u16  proto;
+    
+    u16  src_interface;
+    u16 dst_interface;
+    u16  action;
 } net_rule_t;
 
 /* Network trap operations and associated structure. 
@@ -91,6 +89,7 @@ typedef struct net_rule_st
 
 #define NETWORK_OP_ADDRULE      0
 #define NETWORK_OP_DELETERULE   1
+#define NETWORK_OP_GETRULELIST  2
 
 typedef struct network_op_st 
 {
@@ -101,7 +100,13 @@ typedef struct network_op_st
     }
     u;
 } network_op_t;
-    
+
+typedef struct net_rule_ent_st
+{
+    net_rule_t r;
+    struct net_rule_ent_st *next;
+} net_rule_ent_t;
+
 /* Drop a new rule down to the network tables. */
 int add_net_rule(net_rule_t *rule);
 

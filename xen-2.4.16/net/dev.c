@@ -1912,71 +1912,74 @@ long do_net_update(void)
 {
     shared_info_t *shared = current->shared_info;    
     net_ring_t *net_ring = current->net_ring_base;
-    unsigned int i;
+    unsigned int i, j;
     struct sk_buff *skb;
     tx_entry_t tx;
 
-    for ( i = net_ring->tx_cons; i != net_ring->tx_prod; i = TX_RING_INC(i) )
+    for ( j = 0; j < current->num_net_vifs; j++)
     {
-        if ( copy_from_user(&tx, net_ring->tx_ring+i, sizeof(tx)) )
-            continue;
-
-        if ( TX_RING_INC(i) == net_ring->tx_event )
-            set_bit(_EVENT_NET_TX, &shared->events);
-
-        skb = alloc_skb(tx.size, GFP_KERNEL);
-        if ( skb == NULL ) continue;
-        skb_put(skb, tx.size);
-        if ( copy_from_user(skb->data, (void *)tx.addr, tx.size) )
+        net_ring = current->net_vif_list[j]->net_ring;
+        for ( i = net_ring->tx_cons; i != net_ring->tx_prod; i = TX_RING_INC(i) )
         {
-            kfree_skb(skb);
-            continue;
-        }
-        skb->dev = the_dev;
+            if ( copy_from_user(&tx, net_ring->tx_ring+i, sizeof(tx)) )
+                continue;
 
-        if ( skb->len < 16 )
-        {
-            kfree_skb(skb);
-            continue;
-        }
+            if ( TX_RING_INC(i) == net_ring->tx_event )
+                set_bit(_EVENT_NET_TX, &shared->events);
 
-        memcpy(skb->data + ETH_ALEN, skb->dev->dev_addr, ETH_ALEN);
-        
-        switch ( ntohs(*(unsigned short *)(skb->data + 12)) )
-        {
-        case ETH_P_ARP:
-            skb->protocol = __constant_htons(ETH_P_ARP);
-            if ( skb->len < 42 ) break;
-            memcpy(skb->data + 22, skb->dev->dev_addr, 6);
-            break;
-        case ETH_P_IP:
-            skb->protocol = __constant_htons(ETH_P_IP);
-            break;
-        default:
-            kfree_skb(skb);
-            skb = NULL;
-            break;
-        }
-
-        if ( skb != NULL )
-        {
-            skb_get(skb); /* get a reference for non-local delivery */
-            skb->protocol = eth_type_trans(skb, skb->dev);
-            if ( netif_rx(skb) == 0 )
+            skb = alloc_skb(tx.size, GFP_KERNEL);
+            if ( skb == NULL ) continue;
+            skb_put(skb, tx.size);
+            if ( copy_from_user(skb->data, (void *)tx.addr, tx.size) )
             {
-                /* Give up non-local reference. Packet delivered locally. */
                 kfree_skb(skb);
+                continue;
             }
-            else
+            skb->dev = the_dev;
+
+            if ( skb->len < 16 )
             {
-                /* Pass the non-local reference to the net device. */
-                skb_push(skb, skb->dev->hard_header_len);
-                dev_queue_xmit(skb);
+                kfree_skb(skb);
+                continue;
+            }
+
+            memcpy(skb->data + ETH_ALEN, skb->dev->dev_addr, ETH_ALEN);
+        
+            switch ( ntohs(*(unsigned short *)(skb->data + 12)) )
+            {
+            case ETH_P_ARP:
+                skb->protocol = __constant_htons(ETH_P_ARP);
+                if ( skb->len < 42 ) break;
+                memcpy(skb->data + 22, skb->dev->dev_addr, 6);
+                break;
+            case ETH_P_IP:
+                skb->protocol = __constant_htons(ETH_P_IP);
+                break;
+            default:
+                kfree_skb(skb);
+                skb = NULL;
+                break;
+            }
+
+            if ( skb != NULL )
+            {
+                skb_get(skb); /* get a reference for non-local delivery */
+                skb->protocol = eth_type_trans(skb, skb->dev);
+                if ( netif_rx(skb) == 0 )
+                {
+                    /* Give up non-local reference. Packet delivered locally. */
+                    kfree_skb(skb);
+                }
+                else
+                {
+                    /* Pass the non-local reference to the net device. */
+                    skb_push(skb, skb->dev->hard_header_len);
+                    dev_queue_xmit(skb);
+                }
             }
         }
+        net_ring->tx_cons = i;
     }
-
-    net_ring->tx_cons = i;
 
     return 0;
 }

@@ -29,6 +29,7 @@ typedef struct net_vif_st {
 
 /* vif globals */
 extern int sys_vif_count;
+extern net_vif_t *sys_vif_list[];
 
 /* vif prototypes */
 net_ring_t *create_net_vif(int domain);

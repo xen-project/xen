@@ -248,6 +248,7 @@
 3ddb79b75eo4PRXkT6Th9popt_SJhg xenolinux-2.4.16-sparse/arch/xeno/drivers/dom0/Makefile
 3ddb79b7Xyaoep6U0kLvx6Kx7OauDw xenolinux-2.4.16-sparse/arch/xeno/drivers/dom0/dom0_core.c
 3ddb79b7PulSkF9m3c7K5MkxHRf4hA xenolinux-2.4.16-sparse/arch/xeno/drivers/dom0/dom0_ops.h
+3ddba759XOjcl_OF-52dOYq7sgMykQ xenolinux-2.4.16-sparse/arch/xeno/drivers/dom0/vfr.c
 3ddb79b7s7yYBioHidSkIoHtQxYmOw xenolinux-2.4.16-sparse/arch/xeno/drivers/network/Makefile
 3ddb79b7CpLL98ScdpbKkVBktlbCtQ xenolinux-2.4.16-sparse/arch/xeno/drivers/network/network.c
 3ddb79b7hqi9krq6h98lnpONHGzvEA xenolinux-2.4.16-sparse/arch/xeno/kernel/Makefile
