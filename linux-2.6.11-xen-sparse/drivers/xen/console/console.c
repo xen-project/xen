@@ -63,15 +63,33 @@
  * warnings from standard distro startup scripts.
  */
 static enum { XC_OFF, XC_DEFAULT, XC_TTY, XC_SERIAL } xc_mode = XC_DEFAULT;
+static int xc_num = -1;
 
 static int __init xencons_setup(char *str)
 {
-    if ( !strcmp(str, "tty") )
-        xc_mode = XC_TTY;
-    else if ( !strcmp(str, "ttyS") )
+    char *q;
+    int n;
+
+    if ( !strncmp(str, "ttyS", 4) )
         xc_mode = XC_SERIAL;
-    else if ( !strcmp(str, "off") )
+    else if ( !strncmp(str, "tty", 3) )
+        xc_mode = XC_TTY;
+    else if ( !strncmp(str, "off", 3) )
         xc_mode = XC_OFF;
+
+    switch (xc_mode)
+    {
+    case XC_SERIAL:
+	n  = simple_strtol( str+4, &q, 10 );
+	if ( q>str+4 ) xc_num = n;
+	break;
+
+    case XC_TTY:
+	n  = simple_strtol( str+3, &q, 10 );
+	if ( q>str+3 ) xc_num = n;
+	break;
+    }
+printk("xc_num = %d\n",xc_num);
     return 1;
 }
 __setup("xencons=", xencons_setup);
@@ -187,15 +205,24 @@ void xen_console_init(void)
         kcons_info.write = kcons_write;
     }
 
-    if ( xc_mode == XC_OFF )
-        return __RETCODE;
-
-    if ( xc_mode == XC_SERIAL )
+    switch ( xc_mode )
+    {
+    case XC_SERIAL:
         strcpy(kcons_info.name, "ttyS");
-    else
+	if ( xc_num == -1 ) xc_num = 0;
+	break;
+
+    case XC_TTY:
         strcpy(kcons_info.name, "tty");
+	if ( xc_num == -1 ) xc_num = 1;
+	break;
+	
+    default:
+        return __RETCODE;
+    }
 
     register_console(&kcons_info);
+
     return __RETCODE;
 }
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
@@ -705,14 +732,14 @@ static int __init xencons_init(void)
     if ( xc_mode == XC_SERIAL )
     {
         DRV(xencons_driver)->name        = "ttyS";
-        DRV(xencons_driver)->minor_start = 64;
-	DRV(xencons_driver)->name_base   = 0;
+        DRV(xencons_driver)->minor_start = 64 + xc_num;
+        DRV(xencons_driver)->name_base   = 0 + xc_num;
     }
     else
     {
         DRV(xencons_driver)->name        = "tty";
-        DRV(xencons_driver)->minor_start = 1;
-	DRV(xencons_driver)->name_base   = 1;
+        DRV(xencons_driver)->minor_start = xc_num;
+        DRV(xencons_driver)->name_base   = xc_num;
     }
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
@@ -759,8 +786,9 @@ static int __init xencons_init(void)
         (void)ctrl_if_register_receiver(CMSG_CONSOLE, xencons_rx, 0);
     }
 
-    printk("Xen virtual console successfully installed as %s\n",
-           DRV(xencons_driver)->name);
+    printk("Xen virtual console successfully installed as %s%d\n",
+           DRV(xencons_driver)->name,
+           DRV(xencons_driver)->name_base );
     
     return 0;
 }

@@ -1317,6 +1317,7 @@
 3ddb79c0MOVXq8qZDQRGb6z64_xAwg xen/include/xen/pci_ids.h
 3e54c38dlSCVdyVM4PKcrSfzLLxWUQ xen/include/xen/perfc.h
 3e54c38de9SUSYSAwxDf_DwkpAnQFA xen/include/xen/perfc_defn.h
+42422fb0FVX-TJkSvAXnbfwMf19XFA xen/include/xen/physdev.h
 3ddb79c04nQVR3EYM5L4zxDV_MCo1g xen/include/xen/prefetch.h
 3e4540ccU1sgCx8seIMGlahmMfv7yQ xen/include/xen/reboot.h
 40589969nPq3DMzv24RDb5LXE9brHw xen/include/xen/sched-if.h

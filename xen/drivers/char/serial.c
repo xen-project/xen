@@ -15,6 +15,7 @@
 #include <xen/reboot.h>
 #include <xen/sched.h>
 #include <xen/serial.h>
+#include <xen/physdev.h>
 #include <asm/io.h>
 
 /* Config serial port with a string <baud>,DPS,<io-base>,<irq>. */
@@ -477,6 +478,21 @@ void serial_force_unlock(int handle)
     struct uart *uart = &com[handle & SERHND_IDX];
     if ( handle != -1 )
         uart->lock = SPIN_LOCK_UNLOCKED;
+}
+
+void serial_endboot()
+{
+    int i;
+
+    for (i=0;i<sizeof(com)/sizeof(struct uart);i++)
+    {
+        if( UART_ENABLED(&com[i]) )
+        {
+            /* remove access */
+            physdev_modify_ioport_access_range( dom0, 0, com[i].io_base, 8 );
+        }
+    }
+    
 }
 
 /*

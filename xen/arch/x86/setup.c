@@ -8,6 +8,7 @@
 #include <xen/softirq.h>
 #include <xen/acpi.h>
 #include <xen/console.h>
+#include <xen/serial.h>
 #include <xen/trace.h>
 #include <xen/multiboot.h>
 #include <asm/bitops.h>
@@ -616,6 +617,9 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     /* Give up the VGA console if DOM0 is configured to grab it. */
     console_endboot(cmdline && strstr(cmdline, "tty0"));
+
+    /* Hide UART from DOM0 if we're using it */
+    serial_endboot();
 
     domain_unpause_by_systemcontroller(current->domain);
     domain_unpause_by_systemcontroller(dom0);
