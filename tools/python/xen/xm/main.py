@@ -737,22 +737,26 @@ class ProgVbdCreate(Prog):
     info = """Create a new virtual block device for a domain"""
 
     def help(self, args):
-        print args[0], "DOM UNAME DEV MODE"
+        print args[0], "DOM UNAME DEV MODE [BACKEND]"
         print """
 Create a virtual block device for a domain.
 
-  UNAME - device to export, e.g. phys:hda2
-  DEV   - device name in the domain, e.g. xda1
-  MODE  - access mode: r for read, w for read-write
+  UNAME   - device to export, e.g. phy:hda2
+  DEV     - device name in the domain, e.g. xda1
+  MODE    - access mode: r for read, w for read-write
+  BACKEND - backend driver domain
 """
 
     def main(self, args):
-        if len(args) != 5: self.err("%s: Invalid argument(s)" % args[0])
+        n = len(args)
+        if n < 5 or n > 6: self.err("%s: Invalid argument(s)" % args[0])
         dom = args[1]
         vbd = ['vbd',
                ['uname', args[2]],
                ['dev',   args[3]],
                ['mode',  args[4]]]
+        if n == 6:
+            vbd.append(['backend', args[5]])
         server.xend_domain_device_create(dom, vbd)
 
 xm.prog(ProgVbdCreate)
@@ -766,13 +770,15 @@ class ProgVbdDestroy(Prog):
         print args[0], "DOM DEV"
         print """
 Destroy vbd DEV attached to domain DOM. Detaches the device
-from the domain, but does not destroy the device contents."""
+from the domain, but does not destroy the device contents.
+The device indentifier DEV is the idx field in the device
+information. This is visible in 'xm vbd-list'."""
 
     def main(self, args):
-        if len(args!=3): self.err("%s: Invalid argument(s)" % args[0])
+        if len(args) != 3: self.err("%s: Invalid argument(s)" % args[0])
         dom = args[1]
         dev = args[2]
-        sever.xend_domain_device_destroy(dom, "vbd", dev)
+        server.xend_domain_device_destroy(dom, "vbd", dev)
 
 xm.prog(ProgVbdDestroy)
 
