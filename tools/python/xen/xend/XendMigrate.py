@@ -260,12 +260,13 @@ class XendMigrateInfo(XfrdInfo):
     """Representation of a migrate in-progress and its interaction with xfrd.
     """
 
-    def __init__(self, xid, dom, host, port, live):
+    def __init__(self, xid, dominfo, host, port, live):
         XfrdInfo.__init__(self)
         self.xid = xid
+        self.dominfo = dominfo
         self.state = 'begin'
         self.src_host = socket.gethostname()
-        self.src_dom = dom
+        self.src_dom = dominfo.id
         self.dst_host = host
         self.dst_port = port
         self.dst_dom = None
@@ -291,7 +292,9 @@ class XendMigrateInfo(XfrdInfo):
             xfrd.loseConnection()
             return
         log.info('Migrate BEGIN: ' + str(self.sxpr()))
-        eserver.inject('xend.migrate.begin', self.sxpr())
+        eserver.inject('xend.domain.migrate',
+                       [ self.dominfo.name, self.dominfo.id,
+                         "begin", self.sxpr() ])
         xfrd.request(['xfr.migrate',
                       self.src_dom,
                       vmconfig,
@@ -312,22 +315,24 @@ class XendMigrateInfo(XfrdInfo):
         XfrdInfo.connectionLost(self, reason)
         if self.state =='ok':
             log.info('Migrate OK: ' + str(self.sxpr()))
-            eserver.inject('xend.migrate.ok', self.sxpr())
         else:
             self.state = 'error'
             self.error(XendError("migrate failed"))
             log.info('Migrate ERROR: ' + str(self.sxpr()))
-            eserver.inject('xend.migrate.error', self.sxpr())
+        eserver.inject('xend.domain.migrate',
+                       [ self.dominfo.name, self.dominfo.id,
+                         self.state, self.sxpr() ])
 
 class XendSaveInfo(XfrdInfo):
     """Representation of a save in-progress and its interaction with xfrd.
     """
     
-    def __init__(self, xid, dom, file):
+    def __init__(self, xid, dominfo, file):
         XfrdInfo.__init__(self)
         self.xid = xid
+        self.dominfo = dominfo
         self.state = 'begin'
-        self.src_dom = dom
+        self.src_dom = dominfo.id
         self.file = file
         self.start = 0
         
@@ -347,7 +352,9 @@ class XendSaveInfo(XfrdInfo):
             return
         print '***request> begin'
         log.info('Save BEGIN: ' + str(self.sxpr()))
-        eserver.inject('xend.save.begin', self.sxpr())
+        eserver.inject('xend.domain.save',
+                       [self.dominfo.name, self.dominfo.id,
+                        "begin", self.sxpr()])
         xfrd.request(['xfr.save', self.src_dom, vmconfig, self.file ])
         
     def xfr_save_ok(self, xfrd, val):
@@ -361,12 +368,13 @@ class XendSaveInfo(XfrdInfo):
         XfrdInfo.connectionLost(self, reason)
         if self.state =='ok':
             log.info('Save OK: ' + str(self.sxpr()))
-            eserver.inject('xend.save.ok', self.sxpr())
         else:
             self.state = 'error'
             self.error(XendError("save failed"))
             log.info('Save ERROR: ' + str(self.sxpr()))
-            eserver.inject('xend.save.error', self.sxpr())
+        eserver.inject('xend.domain.save',
+                       [ self.dominfo.name, self.dominfo.id,
+                         self.state, self.sxpr() ])
     
 
 class XendMigrate:
@@ -441,27 +449,27 @@ class XendMigrate:
         reactor.connectTCP('localhost', XFRD_PORT, xcf)
         return info.deferred
     
-    def migrate_begin(self, dom, host, port=XFRD_PORT, live=0):
+    def migrate_begin(self, dominfo, host, port=XFRD_PORT, live=0):
         """Begin to migrate a domain to another host.
 
-        @param dom:  domain
+        @param dominfo:  domain info
         @param host: destination host
         @param port: destination port
         @return: deferred
         """
         xid = self.nextid()
-        info = XendMigrateInfo(xid, dom, host, port, live)
+        info = XendMigrateInfo(xid, dominfo, host, port, live)
         return self.session_begin(info)
 
-    def save_begin(self, dom, file):
+    def save_begin(self, dominfo, file):
         """Begin saving a domain to file.
 
-        @param dom:  domain
+        @param dominfo:  domain info
         @param file: destination file
         @return: deferred
         """
         xid = self.nextid()
-        info = XendSaveInfo(xid, dom, file)
+        info = XendSaveInfo(xid, dominfo, file)
         return self.session_begin(info)
 
 def instance():

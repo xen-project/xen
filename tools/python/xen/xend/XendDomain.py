@@ -203,7 +203,7 @@ class XendDomain:
         if info.name:
             self.domain_by_name[info.name] = info
         self.sync_domain(info.id)
-        if notify: eserver.inject('xend.domain.created', [info.name, info.id])
+        if notify: eserver.inject('xend.domain.create', [info.name, info.id])
 
     def _delete_domain(self, id, notify=1):
         """Remove a domain from the tables.
@@ -374,6 +374,8 @@ class XendDomain:
             self._add_domain(dominfo)
             return dominfo
         log.info("Restarting domain: id=%s name=%s", dominfo.id, dominfo.name)
+        eserver.inject("xend.domain.restart",
+                       [dominfo.name, dominfo.id, "begin"])
         deferred = dominfo.restart()
         deferred.addCallback(cbok)
         return deferred        
@@ -502,6 +504,8 @@ class XendDomain:
         self.restarts_by_name[dominfo.name] = dominfo
         self.restarts_by_id[dominfo.id] = dominfo
         log.info('Scheduling restart for domain: name=%s id=%s', dominfo.name, dominfo.id)
+        eserver.inject("xend.domain.restart",
+                       [dominfo.name, dominfo.id, "schedule"])
         self.domain_restarts_schedule()
             
     def domain_restart_cancel(self, id):
@@ -512,6 +516,8 @@ class XendDomain:
         dominfo = self.restarts_by_id.get(id) or self.restarts_by_name.get(id)
         if dominfo:
             log.info('Cancelling restart for domain: name=%s id=%s', dominfo.name, dominfo.id)
+            eserver.inject("xend.domain.restart",
+                           [dominfo.name, dominfo.id, "cancel"])
             dominfo.restart_cancel()
             del self.restarts_by_id[dominfo.id]
             del self.restarts_by_name[dominfo.name]
@@ -530,16 +536,23 @@ class XendDomain:
             try:
                 def cbok(dominfo):
                     log.info('Restarted domain name=%s id=%s', dominfo.name, dominfo.id)
+                    eserver.inject("xend.domain.restart",
+                                   [dominfo.name, dominfo.id, "success"])
                     self.domain_unpause(dominfo.id)
                 def cberr(err):
                     log.exception("Delayed exception restarting domain: name=%s id=%s",
                                   dominfo.name, dominfo.id)
+                    eserver.inject("xend.domain.restart",
+                                   [dominfo.name, dominfo.id, "fail"])
+                    
                 deferred = self.domain_restart(dominfo)
                 deferred.addCallback(cbok)
                 deferred.addErrback(cberr)
             except:
                 log.exception("Exception restarting domain: name=%s id=%s",
                               dominfo.name, dominfo.id)
+                eserver.inject("xend.domain.restart",
+                               [dominfo.name, dominfo.id, "fail"])
         if self.domain_restarts_exist():
             # Run again later if any restarts remain.
             self.refresh_schedule(delay=5)
@@ -587,7 +600,7 @@ class XendDomain:
         # Don't forget to cancel restart for it.
         dominfo = self.domain_lookup(id)
         xmigrate = XendMigrate.instance()
-        val = xmigrate.migrate_begin(dominfo.id, dst, live=live)
+        val = xmigrate.migrate_begin(dominfo, dst, live=live)
         return val
 
     def domain_save(self, id, dst, progress=0):
@@ -600,7 +613,7 @@ class XendDomain:
         """
         dominfo = self.domain_lookup(id)
         xmigrate = XendMigrate.instance()
-        return xmigrate.save_begin(dominfo.id, dst)
+        return xmigrate.save_begin(dominfo, dst)
     
     def domain_pincpu(self, id, cpu):
         """Pin a domain to a cpu.
