@@ -240,7 +240,9 @@ void __init setup_arch(char **cmdline_p)
     boot_cpu_data.pgd_quick = cpu0_pgd_quicklist;
     boot_cpu_data.pte_quick = cpu0_pte_quicklist;
 
-    ROOT_DEV = MKDEV(RAMDISK_MAJOR,0);
+    /* This must be initialized to UNNAMED_MAJOR for ipconfig to work
+       properly.  Setting ROOT_DEV to default to /dev/ram0 breaks initrd. */
+    ROOT_DEV = MKDEV(UNNAMED_MAJOR,0);
     memset(&drive_info, 0, sizeof(drive_info));
     memset(&screen_info, 0, sizeof(screen_info));
     
