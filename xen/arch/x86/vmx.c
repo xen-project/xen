@@ -405,7 +405,7 @@ static void mov_to_cr(int gp, int cr, struct xen_regs *regs)
     switch(cr) {
     case 0: 
     {
-        unsigned long old_base_pfn = 0, pfn;
+        unsigned long old_base_mfn = 0, mfn;
 
         /* 
          * CR0:
@@ -423,14 +423,14 @@ static void mov_to_cr(int gp, int cr, struct xen_regs *regs)
             /*
              * The guest CR3 must be pointing to the guest physical.
              */
-            if (!(pfn = phys_to_machine_mapping(
+            if (!(mfn = phys_to_machine_mapping(
                       d->arch.arch_vmx.cpu_cr3 >> PAGE_SHIFT))) 
             {
                 VMX_DBG_LOG(DBG_LEVEL_VMMU, "Invalid CR3 value = %lx", 
                         d->arch.arch_vmx.cpu_cr3);
                 domain_crash(); /* need to take a clean path */
             }
-            old_base_pfn = pagetable_val(d->arch.guest_table) >> PAGE_SHIFT;
+            old_base_mfn = pagetable_val(d->arch.guest_table) >> PAGE_SHIFT;
 
             /* We know that none of the previous 1:1 shadow pages are
              * going to be used again, so might as well flush them.
@@ -443,27 +443,27 @@ static void mov_to_cr(int gp, int cr, struct xen_regs *regs)
             /*
              * Now arch.guest_table points to machine physical.
              */
-            d->arch.guest_table = mk_pagetable(pfn << PAGE_SHIFT);
+            d->arch.guest_table = mk_pagetable(mfn << PAGE_SHIFT);
             update_pagetables(d);
 
             VMX_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx", 
-                    (unsigned long) (pfn << PAGE_SHIFT));
+                    (unsigned long) (mfn << PAGE_SHIFT));
 
             __vmwrite(GUEST_CR3, pagetable_val(d->arch.shadow_table));
             /* 
              * arch->shadow_table should hold the next CR3 for shadow
              */
-            VMX_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx, pfn = %lx", 
-                    d->arch.arch_vmx.cpu_cr3, pfn);
+            VMX_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx, mfn = %lx", 
+                    d->arch.arch_vmx.cpu_cr3, mfn);
             /* undo the get_page done in the para virt case */
-            put_page_and_type(&frame_table[old_base_pfn]);
+            put_page_and_type(&frame_table[old_base_mfn]);
 
         }
         break;
     }
     case 3: 
     {
-        unsigned long pfn;
+        unsigned long mfn;
 
         /*
          * If paging is not enabled yet, simply copy the value to CR3.
@@ -483,8 +483,8 @@ static void mov_to_cr(int gp, int cr, struct xen_regs *regs)
              * removed some translation or changed page attributes.
              * We simply invalidate the shadow.
              */
-            pfn = phys_to_machine_mapping(value >> PAGE_SHIFT);
-            if ((pfn << PAGE_SHIFT) != pagetable_val(d->arch.guest_table))
+            mfn = phys_to_machine_mapping(value >> PAGE_SHIFT);
+            if ((mfn << PAGE_SHIFT) != pagetable_val(d->arch.guest_table))
                 __vmx_bug(regs);
             vmx_shadow_clear_state(d->domain);
             shadow_invalidate(d);
@@ -500,9 +500,9 @@ static void mov_to_cr(int gp, int cr, struct xen_regs *regs)
                         "Invalid CR3 value=%lx", value);
                 domain_crash(); /* need to take a clean path */
             }
-            pfn = phys_to_machine_mapping(value >> PAGE_SHIFT);
+            mfn = phys_to_machine_mapping(value >> PAGE_SHIFT);
             vmx_shadow_clear_state(d->domain);
-            d->arch.guest_table  = mk_pagetable(pfn << PAGE_SHIFT);
+            d->arch.guest_table  = mk_pagetable(mfn << PAGE_SHIFT);
             update_pagetables(d); 
             /* 
              * arch.shadow_table should now hold the next CR3 for shadow

@@ -427,26 +427,27 @@ out:
 
 /* This is called by arch_final_setup_guest and do_boot_vcpu */
 int arch_final_setup_guest(
-    struct exec_domain *d, full_execution_context_t *c)
+    struct exec_domain *ed, full_execution_context_t *c)
 {
+    struct domain *d = ed->domain;
     unsigned long phys_basetab;
     int i, rc;
 
-    clear_bit(EDF_DONEFPUINIT, &d->ed_flags);
+    clear_bit(EDF_DONEFPUINIT, &ed->ed_flags);
     if ( c->flags & ECF_I387_VALID )
-        set_bit(EDF_DONEFPUINIT, &d->ed_flags);
+        set_bit(EDF_DONEFPUINIT, &ed->ed_flags);
 
-    d->arch.flags &= ~TF_kernel_mode;
+    ed->arch.flags &= ~TF_kernel_mode;
     if ( c->flags & ECF_IN_KERNEL )
-        d->arch.flags |= TF_kernel_mode;
+        ed->arch.flags |= TF_kernel_mode;
 
-    memcpy(&d->arch.user_ctxt,
+    memcpy(&ed->arch.user_ctxt,
            &c->cpu_ctxt,
-           sizeof(d->arch.user_ctxt));
+           sizeof(ed->arch.user_ctxt));
 
     /* Clear IOPL for unprivileged domains. */
-    if (!IS_PRIV(d->domain))
-        d->arch.user_ctxt.eflags &= 0xffffcfff;
+    if (!IS_PRIV(d))
+        ed->arch.user_ctxt.eflags &= 0xffffcfff;
 
     /*
      * This is sufficient! If the descriptor DPL differs from CS RPL then we'll
@@ -454,48 +455,48 @@ int arch_final_setup_guest(
      * If SS RPL or DPL differs from CS RPL then we'll #GP.
      */
     if (!(c->flags & ECF_VMX_GUEST)) 
-        if ( ((d->arch.user_ctxt.cs & 3) == 0) ||
-             ((d->arch.user_ctxt.ss & 3) == 0) )
+        if ( ((ed->arch.user_ctxt.cs & 3) == 0) ||
+             ((ed->arch.user_ctxt.ss & 3) == 0) )
                 return -EINVAL;
 
-    memcpy(&d->arch.i387,
+    memcpy(&ed->arch.i387,
            &c->fpu_ctxt,
-           sizeof(d->arch.i387));
+           sizeof(ed->arch.i387));
 
-    memcpy(d->arch.traps,
+    memcpy(ed->arch.traps,
            &c->trap_ctxt,
-           sizeof(d->arch.traps));
+           sizeof(ed->arch.traps));
 
-    if ( (rc = (int)set_fast_trap(d, c->fast_trap_idx)) != 0 )
+    if ( (rc = (int)set_fast_trap(ed, c->fast_trap_idx)) != 0 )
         return rc;
 
-    d->arch.ldt_base = c->ldt_base;
-    d->arch.ldt_ents = c->ldt_ents;
+    ed->arch.ldt_base = c->ldt_base;
+    ed->arch.ldt_ents = c->ldt_ents;
 
-    d->arch.kernel_ss = c->kernel_ss;
-    d->arch.kernel_sp = c->kernel_esp;
+    ed->arch.kernel_ss = c->kernel_ss;
+    ed->arch.kernel_sp = c->kernel_esp;
 
     for ( i = 0; i < 8; i++ )
-        (void)set_debugreg(d, i, c->debugreg[i]);
+        (void)set_debugreg(ed, i, c->debugreg[i]);
 
-    d->arch.event_selector    = c->event_callback_cs;
-    d->arch.event_address     = c->event_callback_eip;
-    d->arch.failsafe_selector = c->failsafe_callback_cs;
-    d->arch.failsafe_address  = c->failsafe_callback_eip;
-    
+    ed->arch.event_selector    = c->event_callback_cs;
+    ed->arch.event_address     = c->event_callback_eip;
+    ed->arch.failsafe_selector = c->failsafe_callback_cs;
+    ed->arch.failsafe_address  = c->failsafe_callback_eip;
+
     phys_basetab = c->pt_base;
-    d->arch.guest_table = d->arch.phys_table = mk_pagetable(phys_basetab);
+    ed->arch.guest_table = ed->arch.phys_table = mk_pagetable(phys_basetab);
 
-    if ( !get_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT], d->domain, 
+    if ( !get_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT], d, 
                             PGT_base_page_table) )
         return -EINVAL;
 
     /* Failure to set GDT is harmless. */
-    SET_GDT_ENTRIES(d, DEFAULT_GDT_ENTRIES);
-    SET_GDT_ADDRESS(d, DEFAULT_GDT_ADDRESS);
+    SET_GDT_ENTRIES(ed, DEFAULT_GDT_ENTRIES);
+    SET_GDT_ADDRESS(ed, DEFAULT_GDT_ADDRESS);
     if ( c->gdt_ents != 0 )
     {
-        if ( (rc = (int)set_gdt(d, c->gdt_frames, c->gdt_ents)) != 0 )
+        if ( (rc = (int)set_gdt(ed, c->gdt_frames, c->gdt_ents)) != 0 )
         {
             put_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT]);
             return rc;
@@ -504,10 +505,10 @@ int arch_final_setup_guest(
 
 #ifdef CONFIG_VMX
     if (c->flags & ECF_VMX_GUEST)
-        return vmx_final_setup_guest(d, c);
+        return vmx_final_setup_guest(ed, c);
 #endif
 
-    update_pagetables(d);
+    update_pagetables(ed);
 
     return 0;
 }
