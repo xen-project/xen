@@ -102,6 +102,8 @@ for i in `find . -type l`; do rm -f $i; done
 relative_lndir ${RS}
 rm -f mkbuildtree
 
+LINUX_26=${RS}/../linux-2.6.7-xen-sparse
+
 ## There are a whole bunch of special symlinks, mostly for files
 ## which are identical in the i386 and xen-i386 architecture-dependent
 ## subdirectories.
@@ -220,3 +222,7 @@ ln -sf ../../i386/lib/usercopy.c
 cd ../mm
 ln -sf ../../i386/mm/extable.c 
 ln -sf ../../i386/mm/pageattr.c 
+cd ../drivers/console
+ln -sf ../../../../${LINUX_26}/drivers/xen/console/console.c 
+#cd ../netif/frontend
+#ln -sf ../../../../../${LINUX_26}/drivers/xen/net/network.c main.c

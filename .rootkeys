@@ -61,7 +61,6 @@
 4075806d3fJqqDC1pYYPTZPc575iKg linux-2.4.26-xen-sparse/arch/xen/drivers/blkif/frontend/main.c
 4075806dibjCcfuXv6CINMhxWTw3jQ linux-2.4.26-xen-sparse/arch/xen/drivers/blkif/frontend/vbd.c
 3e5a4e65G3e2s0ghPMgiJ-gBTUJ0uQ linux-2.4.26-xen-sparse/arch/xen/drivers/console/Makefile
-3e5a4e651TH-SXHoufurnWjgl5bfOA linux-2.4.26-xen-sparse/arch/xen/drivers/console/console.c
 3e5a4e656nfFISThfbyXQOA6HN6YHw linux-2.4.26-xen-sparse/arch/xen/drivers/dom0/Makefile
 3e5a4e65BXtftInNHUC2PjDfPhdZZA linux-2.4.26-xen-sparse/arch/xen/drivers/dom0/core.c
 40420a6ebRqDjufoN1WSJvolEW2Wjw linux-2.4.26-xen-sparse/arch/xen/drivers/evtchn/Makefile
@@ -195,7 +194,7 @@
 40f56239y9naBTXe40Pi2J_z3p-d1g linux-2.6.7-xen-sparse/drivers/xen/block/block.h
 40f56239BVfPsXBiWQitXgDRtOsiqg linux-2.6.7-xen-sparse/drivers/xen/block/vbd.c
 40f56239fsLjvtD8YBRAWphps4FDjg linux-2.6.7-xen-sparse/drivers/xen/console/Makefile
-40f56239afE58Oot-9omHGqq4UJ--A linux-2.6.7-xen-sparse/drivers/xen/console/console.c
+3e5a4e651TH-SXHoufurnWjgl5bfOA linux-2.6.7-xen-sparse/drivers/xen/console/console.c
 40f56239KYxO0YabhPzCTeUuln-lnA linux-2.6.7-xen-sparse/drivers/xen/evtchn/Makefile
 40f56239DoibTX6R-ZYd3QTXAB8_TA linux-2.6.7-xen-sparse/drivers/xen/evtchn/evtchn.c
 40f56239lrg_Ob0BJ8WBFS1zeg2CYw linux-2.6.7-xen-sparse/drivers/xen/net/Kconfig
