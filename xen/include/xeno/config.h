@@ -89,7 +89,7 @@
  * Amount of slack domain memory to leave in system, in megabytes.
  * Prevents a hard out-of-memory crunch for thinsg like network receive.
  */
-#define SLACK_DOMAIN_MEM_KILOBYTES 1024
+#define SLACK_DOMAIN_MEM_KILOBYTES 2048
 
 /* Linkage for x86 */
 #define FASTCALL(x)     x __attribute__((regparm(3)))

@@ -40,7 +40,7 @@ static long alloc_dom_mem(struct task_struct *p, balloon_def_op_t bop)
 
     spin_lock_irqsave(&free_list_lock, flags);
 
-    if ( free_pfns < (bop.size + (SLACK_DOMAIN_MEM_KILOBYTES << 
+    if ( free_pfns < (bop.size + (SLACK_DOMAIN_MEM_KILOBYTES >> 
                                   (PAGE_SHIFT-10))) ) 
     {
         spin_unlock_irqrestore(&free_list_lock, flags);

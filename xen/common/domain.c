@@ -161,7 +161,7 @@ unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes)
     spin_lock_irqsave(&free_list_lock, flags);
     
     /* is there enough mem to serve the request? */   
-    if ( (req_pages + (SLACK_DOMAIN_MEM_KILOBYTES << (PAGE_SHIFT-10))) >
+    if ( (req_pages + (SLACK_DOMAIN_MEM_KILOBYTES >> (PAGE_SHIFT-10))) >
          free_pfns )
     {
         spin_unlock_irqrestore(&free_list_lock, flags);
