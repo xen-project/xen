@@ -1020,31 +1020,6 @@ def vm_image_linux(vm, image):
     vm.create_domain("linux", kernel, ramdisk, cmdline)
     return vm
 
-def vm_image_netbsd(vm, image):
-    """Create a VM for a bsd image.
-
-    @param name:     vm name
-    @param memory:    vm memory
-    @param image:     image config
-    @return: vm
-    """
-    #todo: Same as for linux. Is that right? If so can unify them.
-    kernel = sxp.child_value(image, "kernel")
-    cmdline = ""
-    ip = sxp.child_value(image, "ip", "dhcp")
-    if ip:
-        cmdline += "ip=" + ip
-    root = sxp.child_value(image, "root")
-    if root:
-        cmdline += "root=" + root
-    args = sxp.child_value(image, "args")
-    if args:
-        cmdline += " " + args
-    ramdisk = sxp.child_value(image, "ramdisk", '')
-    vm.create_domain("netbsd", kernel, ramdisk, cmdline)
-    return vm
-
-
 def vm_dev_vif(vm, val, index, change=0):
     """Create a virtual network interface (vif).
 
@@ -1168,7 +1143,6 @@ def vm_field_maxmem(vm, config, val, index):
 
 # Register image handlers.
 add_image_handler('linux',  vm_image_linux)
-add_image_handler('netbsd', vm_image_netbsd)
 
 # Register device handlers.
 add_device_handler('vif',  vm_dev_vif)
