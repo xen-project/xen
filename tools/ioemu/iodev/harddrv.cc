@@ -3666,7 +3666,7 @@ ssize_t sparse_image_t::read_page_fragment(uint32 read_virtual_page, uint32 read
    }
    else
    {
-     memset(buf, read_size, 0);
+     memset(buf, 0, read_size);
    }
  }
  else
