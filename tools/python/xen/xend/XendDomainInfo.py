@@ -408,12 +408,13 @@ class XendDomainInfo:
                 ['memory', self.memory] ]
 
         if self.info:
-            run   = (self.info['running'] and 'r') or '-'
-            block = (self.info['blocked'] and 'b') or '-'
-            stop  = (self.info['paused']  and 'p') or '-'
-            susp  = (self.info['shutdown'] and 's') or '-'
-            crash = (self.info['crashed'] and 'c') or '-'
-            state = run + block + stop + susp + crash
+            sxpr.append(['maxmem', self.info['maxmem_kb']/1024 ])
+            run   = (self.info['running']  and 'r') or '-'
+            block = (self.info['blocked']  and 'b') or '-'
+            pause = (self.info['paused']   and 'p') or '-'
+            shut  = (self.info['shutdown'] and 's') or '-'
+            crash = (self.info['crashed']  and 'c') or '-'
+            state = run + block + pause + shut + crash
             sxpr.append(['state', state])
             if self.info['shutdown']:
                 reason = shutdown_reason(self.info['shutdown_reason'])

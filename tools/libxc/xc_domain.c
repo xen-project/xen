@@ -105,7 +105,7 @@ int xc_domain_getinfo(int xc_handle,
             DOMFLAGS_SHUTDOWNMASK;
 
         info->nr_pages = op.u.getdomaininfo.tot_pages;
-        info->max_memkb = op.u.getdomaininfo.max_pages<<(PAGE_SHIFT-10);
+        info->max_memkb = op.u.getdomaininfo.max_pages<<(PAGE_SHIFT);
         info->shared_info_frame = op.u.getdomaininfo.shared_info_frame;
         info->cpu_time = op.u.getdomaininfo.cpu_time;
         strncpy(info->name, op.u.getdomaininfo.name, XC_DOMINFO_MAXNAME);
