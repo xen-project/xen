@@ -105,8 +105,6 @@ static inline int do_dom0_op(int xc_handle, dom0_op_t *op)
         goto out2;
     }
 
-    ret = 0;
-
  out2: (void)munlock(op, sizeof(*op));
  out1: return ret;
 }
@@ -127,8 +125,6 @@ static inline int do_network_op(int xc_handle, network_op_t *op)
 
     if ( (ret = do_xen_hypercall(xc_handle, &hypercall)) < 0 )
         goto out2;
-
-    ret = 0;
 
  out2: (void)munlock(op, sizeof(*op));
  out1: return ret;
