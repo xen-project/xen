@@ -140,7 +140,12 @@ xen_find_first_hole(u64 start, u64 end, void *arg)
     return 0;
 }
 
-
+static void __init do_initcalls(void)
+{
+    initcall_t *call;
+    for ( call = &__initcall_start; call < &__initcall_end; call++ )
+        (*call)();
+}
 
 void cmain(multiboot_info_t *mbi)
 {
@@ -240,7 +245,7 @@ printk("About to call ac_timer_init()\n");
     ac_timer_init();
 // init_xen_time(); ???
     schedulers_start();
-// do_initcalls(); ???
+    do_initcalls();
 printk("About to call sort_main_extable()\n");
     sort_main_extable();
 
