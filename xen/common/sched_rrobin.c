@@ -26,14 +26,37 @@ struct rrobin_dom_info
 static spinlock_t run_locks[NR_CPUS];
 
 #define RR_INFO(d)      ((struct rrobin_dom_info *)d->sched_priv)
-#define RUNLIST(d)      (struct list_head *)&(RR_INFO(d)->run_list)
+#define RUNLIST(d)      ((struct list_head *)&(RR_INFO(d)->run_list))
 #define RUNQUEUE(cpu)   RUNLIST(schedule_data[cpu].idle)
-
-// TODO remove following line
-static void rr_dump_cpu_state(int cpu);
 
 /* SLAB cache for struct rrobin_dom_info objects */
 static xmem_cache_t *dom_info_cache;
+
+/*
+ * Wrappers for run-queue management. Must be called with the run_lock
+ * held.
+ */
+static inline void __add_to_runqueue_head(struct domain *d)
+{
+    list_add(RUNLIST(d), RUNQUEUE(d->processor));
+}
+
+static inline void __add_to_runqueue_tail(struct domain *d)
+{
+    list_add_tail(RUNLIST(d), RUNQUEUE(d->processor));
+}
+
+static inline void __del_from_runqueue(struct domain *d)
+{
+    struct list_head *runlist = RUNLIST(d);
+    list_del(runlist);
+    runlist->next = NULL;
+}
+
+static inline int __task_on_runqueue(struct domain *d)
+{
+    return (RUNLIST(d))->next != NULL;
+}
 
 
 /* Ensures proper initialisation of the dom_info */
@@ -102,8 +125,8 @@ static int rr_init_idle_task(struct domain *p)
 
     spin_lock_irqsave(&run_locks[p->processor], flags);
     set_bit(DF_RUNNING, &p->flags);
-    if ( !__task_on_runqueue(RUNLIST(p)) )
-         __add_to_runqueue_head(RUNLIST(p), RUNQUEUE(p->processor));
+    if ( !__task_on_runqueue(p) )
+         __add_to_runqueue_head(p);
     spin_unlock_irqrestore(&run_locks[p->processor], flags);
     return 0;
 }
@@ -122,15 +145,15 @@ static task_slice_t rr_do_schedule(s_time_t now)
     
     if(!is_idle_task(prev))
     {
-        __del_from_runqueue(RUNLIST(prev));
+        __del_from_runqueue(prev);
     
         if ( domain_runnable(prev) )
-            __add_to_runqueue_tail(RUNLIST(prev), RUNQUEUE(cpu));
+            __add_to_runqueue_tail(prev);
     }
     
     spin_unlock_irqrestore(&run_locks[cpu], flags);
     
-    ret.task = list_entry(  RUNQUEUE(cpu).next->next, 
+    ret.task = list_entry(  RUNQUEUE(cpu)->next, 
                             struct rrobin_dom_info, 
                             run_list)->domain;
     ret.time = rr_slice;
@@ -166,8 +189,8 @@ static void rr_sleep(struct domain *d)
     else
     {
         spin_lock_irqsave(&run_locks[d->processor], flags);
-        if ( __task_on_runqueue(RUNLIST(d)) )
-            __del_from_runqueue(RUNLIST(d));
+        if ( __task_on_runqueue(d) )
+            __del_from_runqueue(d);
         spin_unlock_irqrestore(&run_locks[d->processor], flags);
     }
 }
@@ -182,13 +205,13 @@ void rr_wake(struct domain *d)
     spin_lock_irqsave(&run_locks[cpu], flags);
     
     /* If on the runqueue already then someone has done the wakeup work. */
-    if ( unlikely(__task_on_runqueue(RUNLIST(d))))
+    if ( unlikely(__task_on_runqueue(d)))
     {
         spin_unlock_irqrestore(&run_locks[cpu], flags);
         return;
     }
 
-    __add_to_runqueue_head(RUNLIST(d), RUNQUEUE(cpu));
+    __add_to_runqueue_head(d);
     spin_unlock_irqrestore(&run_locks[cpu], flags);
 
     now = NOW();
