@@ -24,7 +24,7 @@ int xeno_partition(struct gendisk *hd,
     int i, minor;
     
     /* Privileged domains can read partition info themselves. */
-    if (start_info.flags & SIF_PRIVILEGED)
+    if ( start_info.flags & SIF_PRIVILEGED )
         return 0;
 
     /* This only deals with raw/direct devices (IDE & SCSI). */
@@ -56,6 +56,13 @@ int xeno_partition(struct gendisk *hd,
         if ( (buf->entries[i].device == xldev_to_physdev(bdev->bd_dev)) &&
              (buf->entries[i].partition == 0) )
         {
+            if ( !(buf->entries[i].mode & PHYSDISK_MODE_W) )
+            {
+                if ( !(buf->entries[i].mode & PHYSDISK_MODE_R) )
+                    continue;
+                for ( i = 0; i < hd->max_p; i++ ) 
+                    set_device_ro(bdev->bd_dev + i, 1);
+            }
             kfree(buf);
             return 0;
         }
@@ -66,11 +73,11 @@ int xeno_partition(struct gendisk *hd,
     {
         if (buf->entries[i].device != xldev_to_physdev(bdev->bd_dev))
             continue;
-        if (!(buf->entries[i].mode & PHYSDISK_MODE_W))
+        if ( !(buf->entries[i].mode & PHYSDISK_MODE_W) )
         {
-            if (!(buf->entries[i].mode & PHYSDISK_MODE_R))
+            if ( !(buf->entries[i].mode & PHYSDISK_MODE_R) )
                 continue;
-            set_device_ro(bdev->bd_dev, 1);
+            set_device_ro(bdev->bd_dev + buf->entries[i].partition, 1);
         }
         minor = buf->entries[i].partition + first_part_minor - 1;
         add_gd_partition(hd,
