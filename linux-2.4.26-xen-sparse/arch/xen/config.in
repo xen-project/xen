@@ -20,6 +20,10 @@ endmenu
 # The IBM S/390 patch needs this.
 define_bool CONFIG_NO_IDLE_HZ y
 
+if [ "$CONFIG_XEN_PHYSDEV_ACCESS" != "y" ]; then
+   define_bool CONFIG_VT n
+fi
+
 mainmenu_option next_comment
 comment 'Code maturity level options'
 bool 'Prompt for development and/or incomplete code/drivers' CONFIG_EXPERIMENTAL

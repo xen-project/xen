@@ -102,6 +102,7 @@
 3f0bed43UUdQichXAiVNrjV-y2Kzcg linux-2.4.26-xen-sparse/arch/xen/mm/ioremap.c
 3e5a4e66qRlSTcjafidMB6ulECADvg linux-2.4.26-xen-sparse/arch/xen/vmlinux.lds
 3e5a4e66mrtlmV75L1tjKDg8RaM5gA linux-2.4.26-xen-sparse/drivers/block/ll_rw_blk.c
+40d70c24-Dy2HUMrwSZagfXvAPnI4w linux-2.4.26-xen-sparse/drivers/char/Makefile
 3f108aeaLcGDgQdFAANLTUEid0a05w linux-2.4.26-xen-sparse/drivers/char/mem.c
 3e5a4e66rw65CxyolW9PKz4GG42RcA linux-2.4.26-xen-sparse/drivers/char/tty_io.c
 40c9c0c1pPwYE3-4i-oI3ubUu7UgvQ linux-2.4.26-xen-sparse/drivers/scsi/aic7xxx/Makefile
@@ -116,6 +117,7 @@
 3e5a4e677VBavzM1UZIEcH1B-RlXMA linux-2.4.26-xen-sparse/include/asm-xen/hypervisor.h
 4060044fVx7-tokvNLKBf_6qBB4lqQ linux-2.4.26-xen-sparse/include/asm-xen/io.h
 3e5a4e673p7PEOyHFm3nHkYX6HQYBg linux-2.4.26-xen-sparse/include/asm-xen/irq.h
+40d70c240tW7TWArl1VUgIFH2nVO1A linux-2.4.26-xen-sparse/include/asm-xen/keyboard.h
 3e5a4e678ddsQOpbSiRdy1GRcDc9WA linux-2.4.26-xen-sparse/include/asm-xen/mmu_context.h
 40d06e5b2YWInUX1Xv9amVANwd_2Xg linux-2.4.26-xen-sparse/include/asm-xen/module.h
 3f8707e7ZmZ6TxyX0ZUEfvhA2Pb_xQ linux-2.4.26-xen-sparse/include/asm-xen/msr.h

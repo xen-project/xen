@@ -266,8 +266,7 @@ CONFIG_BLK_DEV_INITRD=y
 #
 # Character devices
 #
-CONFIG_VT=y
-CONFIG_VT_CONSOLE=y
+# CONFIG_VT is not set
 # CONFIG_SERIAL is not set
 # CONFIG_SERIAL_EXTENDED is not set
 # CONFIG_SERIAL_NONSTANDARD is not set
