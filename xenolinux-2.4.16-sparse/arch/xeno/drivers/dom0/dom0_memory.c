@@ -184,10 +184,10 @@ unsigned long direct_mmap(unsigned long phys_addr, unsigned long size,
 	entry = find_direct(&current->mm->context.direct_list, addr);
 	if(entry != &current->mm->context.direct_list){
 		list_add_tail(&dmmap->list, entry);
-		printk(KERN_ALERT "bd240 debug: added node %lx in the middle\n", dmmap->vm_start);
+		printk(KERN_ALERT "bd240 debug: added node %lx, size %lx in the middle\n", dmmap->vm_start, size);
 	} else {
     	list_add_tail(&dmmap->list, &current->mm->context.direct_list);
-		printk(KERN_ALERT "bd240 debug: added node %lx at tail\n", dmmap->vm_start);
+		printk(KERN_ALERT "bd240 debug: added node %lx, size %lx at tail\n", dmmap->vm_start, size);
 	}
 
     /* and perform the mapping */
