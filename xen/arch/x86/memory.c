@@ -1328,7 +1328,7 @@ int do_mmu_update(
         count &= ~MMU_UPDATE_PREEMPT_FDOM_MASK;
         if ( unlikely(pdone != NULL) )
             (void)get_user(done, pdone);
-        if ( (domid != current->id) &&
+        if ( (domid != current->domain->id) &&
              !do_extended_command(0, MMUEXT_SET_FOREIGNDOM | (domid << 16)) )
         {
             rc = -EINVAL;
@@ -1336,7 +1336,7 @@ int do_mmu_update(
         }
     }
 
-    if ( unlikely(!array_access_ok(VERIFY_READ, ureqs, count, sizeof(req))) ) {
+    if ( unlikely(!array_access_ok(VERIFY_READ, ureqs, count, sizeof(req))) )
     {
         rc = -EFAULT;
         goto out;
