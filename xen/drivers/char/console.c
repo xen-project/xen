@@ -506,6 +506,7 @@ void panic(const char *fmt, ...)
     __putstr("Reboot in five seconds...\n");
     spin_unlock_irqrestore(&console_lock, flags);
 
+    watchdog_on = 0;
     mdelay(5000);
     machine_restart(0);
 }
