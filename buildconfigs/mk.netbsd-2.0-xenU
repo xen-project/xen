@@ -24,7 +24,7 @@ netbsd-%-tools: netbsd-%-tools.tar.bz2
 
 $(NETBSD_DIR)/.valid: pristine-netbsd-$(NETBSD_VER)
 	$(RM) -rf $(NETBSD_DIR)
-	cp -al pristine-netbsd-$(NETBSD_VER) $(NETBSD_DIR)
+	cp -al $< $(NETBSD_DIR)
 	# Apply arch-xen patches
 	( cd netbsd-$(NETBSD_VER)-xen-sparse ; \
           ./mkbuildtree ../$(NETBSD_DIR) )

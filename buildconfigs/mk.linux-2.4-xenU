@@ -19,7 +19,7 @@ build: $(LINUX_DIR)/include/linux/autoconf.h
 
 $(LINUX_DIR)/include/linux/autoconf.h: pristine-linux-$(LINUX_VER)
 	rm -rf $(LINUX_DIR)
-	cp -al pristine-linux-$(LINUX_VER) $(LINUX_DIR)
+	cp -al $< $(LINUX_DIR)
 	# Apply arch-xen patches
 	( cd linux-$(LINUX_VER)-xen-sparse ; \
           ./mkbuildtree ../$(LINUX_DIR) )
