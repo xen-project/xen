@@ -18,9 +18,13 @@
 
 #ifndef _XEN_XFR_STUB_
 static int domain_suspend(u32 dom, void *data){
+    int err = 0;
     Conn *xend = data;
 
-    return xfr_vm_suspend(xend, dom);
+    dprintf("> dom=%lu data=%p\n", dom, data);
+    err = xfr_vm_suspend(xend, dom);
+    dprintf("< err=%d\n", err);
+    return err;
 }
 
 static int xc_handle = 0;
@@ -29,6 +33,7 @@ int xcinit(void){
     if(xc_handle <= 0){
         xc_handle = xc_interface_open();
     }
+    dprintf("< xc_handle=%d\n", xc_handle);
     return xc_handle;
 }
 
@@ -72,6 +77,7 @@ int xen_domain_snd(Conn *xend, IOStream *io, uint32_t dom, char *vmconfig, int v
 #else 
     XcIOContext _ioctxt = {}, *ioctxt = &_ioctxt;
     dprintf("> dom=%d\n", dom);
+    ioctxt->domain = dom;
     ioctxt->io = io;
     ioctxt->info = iostdout;
     ioctxt->err = iostderr;

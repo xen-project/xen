@@ -711,8 +711,10 @@ int xfr_save(Args *args, XfrState *state, Conn *xend, char *file){
     int err = 0;
     IOStream *io = NULL;
 
+    dprintf("> file=%s\n", file);
     io = file_stream_fopen(file, "wb");
     if(!io){
+        dprintf("> Failed to open %s\n", file);
         err = -EIO;
         goto exit;
     }
@@ -727,6 +729,7 @@ int xfr_save(Args *args, XfrState *state, Conn *xend, char *file){
         IOStream_close(io);
         IOStream_free(io);
     }
+    dprintf("< err=%d\n", err);
     return err;
 }
 
