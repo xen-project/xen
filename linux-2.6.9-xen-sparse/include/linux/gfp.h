@@ -79,11 +79,7 @@ struct vm_area_struct;
  * immediately bail: the arch-specific function has done all the work.
  */
 #ifndef HAVE_ARCH_FREE_PAGE
-static inline int arch_free_page(struct page *page, int order)
-{
-	/* Generic free_page must do the work. */
-	return 0;
-}
+#define arch_free_page(page, order) 0
 #endif
 
 extern struct page *
