@@ -18,6 +18,7 @@
 #include <linux/if_ether.h>
 #include <asm/domain_page.h>
 #include <xeno/console.h>
+#include <xeno/net_headers.h>
 
 static int xpos, ypos;
 static volatile unsigned char *video;
@@ -467,42 +468,6 @@ unsigned short compute_cksum(unsigned short *buf, int count)
 
 extern int netif_rx(struct sk_buff *); 
 
-typedef struct my_udphdr {
-    __u16 source;
-    __u16 dest;
-    __u16 len;
-    __u16 check;
-} my_udphdr_t; 
-
-
-typedef struct my_iphdr {
-#if defined(__LITTLE_ENDIAN_BITFIELD)
-    __u8    ihl:4,
-	version:4;
-#elif defined (__BIG_ENDIAN_BITFIELD)
-    __u8    version:4,
-	ihl:4;
-#else
-#error  "Please fix <asm/byteorder.h>"
-#endif
-    __u8    tos;
-    __u16   tot_len;
-    __u16   id;
-    __u16   frag_off;
-    __u8    ttl;
-    __u8    protocol;
-    __u16   check;
-    __u32   saddr;
-    __u32   daddr;
-} my_iphdr_t; 
-
-
-typedef struct my_ethhdr {
-    unsigned char   h_dest[6];   	
-    unsigned char   h_source[6]; 	
-    unsigned short  h_proto;        
-} my_ethhdr_t; 
-
 /*
  * Function written by ek247. Exports console output from all domains upwards 
  * to domain0, by stuffing it into a fake network packet.
@@ -510,13 +475,13 @@ typedef struct my_ethhdr {
 int console_export(char *str, int len)
 {
     struct sk_buff *skb;
-    struct my_iphdr *iph = NULL;  
-    struct my_udphdr *udph = NULL; 
-    struct my_ethhdr *ethh = NULL; 
-    int hdr_size = sizeof(struct my_iphdr) + sizeof(struct my_udphdr); 
+    struct iphdr *iph = NULL;  
+    struct udphdr *udph = NULL; 
+    struct ethhdr *ethh = NULL; 
+    int hdr_size = sizeof(struct iphdr) + sizeof(struct udphdr); 
     u8 *skb_data;
 
-    skb = dev_alloc_skb(sizeof(struct my_ethhdr) + 
+    skb = dev_alloc_skb(sizeof(struct ethhdr) + 
                                    hdr_size + len + 20);
     if ( skb == NULL ) return 0;
 
@@ -525,12 +490,12 @@ int console_export(char *str, int len)
     skb_reserve(skb, 2);
 
     /* Get a pointer to each header. */
-    ethh = (struct my_ethhdr *) 
+    ethh = (struct ethhdr *) 
         (skb_data + (skb->data - skb->head));
-    iph  = (struct my_iphdr *)(ethh + 1);
-    udph = (struct my_udphdr *)(iph + 1); 
+    iph  = (struct iphdr *)(ethh + 1);
+    udph = (struct udphdr *)(iph + 1); 
 
-    skb_reserve(skb, sizeof(struct my_ethhdr)); 
+    skb_reserve(skb, sizeof(struct ethhdr)); 
     skb_put(skb, hdr_size + len); 
 
     /* Build IP header. */
@@ -544,12 +509,12 @@ int console_export(char *str, int len)
     iph->saddr   = htonl(0xa9fefeff);  /* 169.254.254.255 */
     iph->tot_len = htons(hdr_size + len); 
     iph->check	 = 0;
-    iph->check   = compute_cksum((__u16 *)iph, sizeof(struct my_iphdr)/2); 
+    iph->check   = compute_cksum((__u16 *)iph, sizeof(struct iphdr)/2); 
 
     /* Build UDP header. */
     udph->source = htons(current->domain);
     udph->dest   = htons(666);
-    udph->len    = htons(sizeof(struct my_udphdr) + len);
+    udph->len    = htons(sizeof(struct udphdr) + len);
     udph->check  = 0;
 
     /* Build the UDP payload. */
