@@ -722,15 +722,10 @@ int reprogram_ac_timer(s_time_t timeout)
     return 1;
 }
 
-unsigned int apic_timer_irqs [NR_CPUS];
-
 void smp_apic_timer_interrupt(struct xen_regs * regs)
 {
     ack_APIC_irq();
-
-    apic_timer_irqs[smp_processor_id()]++;
     perfc_incrc(apic_timer);
-
     raise_softirq(AC_TIMER_SOFTIRQ);
 }
 
