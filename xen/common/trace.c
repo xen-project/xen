@@ -83,7 +83,7 @@ void init_trace_bufs(void)
         buf->head_ptr = buf->vdata;
         
         /* For use in user space. */
-        buf->data = (struct t_rec *)__pa(buf->vdata);
+        buf->data = __pa(buf->vdata);
         buf->head = 0;
 
         /* For use in both. */
@@ -92,7 +92,7 @@ void init_trace_bufs(void)
     }
 
     printk("Xen trace buffers: initialised\n");
- 
+    
     wmb(); /* above must be visible before tb_init_done flag set */
 
     tb_init_done = 1;
@@ -102,7 +102,7 @@ void init_trace_bufs(void)
  * get_tb_info - get trace buffer details
  * @st: a pointer to a dom0_gettbufs_t to be filled out
  *
- * Called by the %DOM0_GETTBUFS dom0 op to fetch the physical address of the
+ * Called by the %DOM0_GETTBUFS dom0 op to fetch the machine address of the
  * trace buffers.
  */
 int get_tb_info(dom0_gettbufs_t *st)
@@ -111,14 +111,14 @@ int get_tb_info(dom0_gettbufs_t *st)
     {
         extern unsigned int opt_tbuf_size;
         
-        st->phys_addr = __pa(t_bufs[0]);
+        st->mach_addr = __pa(t_bufs[0]);
         st->size      = opt_tbuf_size * PAGE_SIZE;
         
         return 0;
     }
     else
     {
-        st->phys_addr = 0;
+        st->mach_addr = 0;
         st->size      = 0;
         return -ENODATA;
     }
