@@ -600,10 +600,18 @@ static int parseelfimage(char *elfbase,
 
         guestinfo = elfbase + shdr->sh_offset;
 
-        if ( (strstr(guestinfo, "GUEST_OS=linux") == NULL) ||
-             (strstr(guestinfo, "XEN_VER=2.0") == NULL) )
+        if ( (strstr(guestinfo, "LOADER=generic") == NULL) &&
+             (strstr(guestinfo, "GUEST_OS=linux") == NULL) )
         {
-            ERROR("Will only load Linux images built for Xen v2.0");
+            ERROR("Will only load images built for the generic loader "
+                  "or Linux images");
+            ERROR("Actually saw: '%s'", guestinfo);
+            return -EINVAL;
+        }
+
+        if ( (strstr(guestinfo, "XEN_VER=2.0") == NULL) )
+        {
+            ERROR("Will only load images built for Xen v2.0");
             ERROR("Actually saw: '%s'", guestinfo);
             return -EINVAL;
         }

@@ -68,10 +68,17 @@ int parseelfimage(char *elfbase,
         guestinfo = elfbase + shdr->sh_offset;
         printk("Xen-ELF header found: '%s'\n", guestinfo);
 
-        if ( (strstr(guestinfo, "GUEST_OS=linux") == NULL) ||
-             (strstr(guestinfo, "XEN_VER=2.0") == NULL) )
+        if ( (strstr(guestinfo, "LOADER=generic") == NULL) &&
+             (strstr(guestinfo, "GUEST_OS=linux") == NULL) )
         {
-            printk("ERROR: Xen will only load Linux built for Xen v2.0\n");
+            printk("ERROR: Xen will only load images built for the generic "
+                   "loader or Linux images\n");
+            return -EINVAL;
+        }
+
+        if ( (strstr(guestinfo, "XEN_VER=2.0") == NULL) )
+        {
+            printk("ERROR: Xen will only load images built for Xen v2.0\n");
             return -EINVAL;
         }
 
