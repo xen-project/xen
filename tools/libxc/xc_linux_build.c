@@ -522,7 +522,7 @@ int xc_linux_build(int xc_handle,
     ctxt->cpu_ctxt.ss = FLAT_GUESTOS_DS;
     ctxt->cpu_ctxt.cs = FLAT_GUESTOS_CS;
     ctxt->cpu_ctxt.eip = vkern_entry;
-    ctxt->cpu_ctxt.esp = vstartinfo_start;
+    ctxt->cpu_ctxt.esp = vstartinfo_start + 2*PAGE_SIZE;
     ctxt->cpu_ctxt.esi = vstartinfo_start;
     ctxt->cpu_ctxt.eflags = (1<<9) | (1<<2);
 
@@ -545,7 +545,7 @@ int xc_linux_build(int xc_handle,
 
     /* Ring 1 stack is the initial stack. */
     ctxt->guestos_ss  = FLAT_GUESTOS_DS;
-    ctxt->guestos_esp = vstartinfo_start;
+    ctxt->guestos_esp = vstartinfo_start + 2*PAGE_SIZE;
 
     /* No debugging. */
     memset(ctxt->debugreg, 0, sizeof(ctxt->debugreg));

@@ -100,14 +100,10 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         return -EPERM;
 
     if ( copy_from_user(op, u_dom0_op, sizeof(*op)) )
-    {
         return -EFAULT;
-    }
 
     if ( op->interface_version != DOM0_INTERFACE_VERSION )
-    {
         return -EACCES;
-    }
 
     TRACE_5D(TRC_DOM0OP_ENTER_BASE + op->cmd, 
              0, op->u.dummy[0], op->u.dummy[1], 
@@ -164,9 +160,9 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
     case DOM0_CREATEDOMAIN:
     {
-        struct domain    *d;
-        unsigned int      pro;
-        domid_t           dom;
+        struct domain *d;
+        unsigned int   pro = 0;
+        domid_t        dom;
 
         dom = op->u.createdomain.domain;
         if ( (dom > 0) && (dom < DOMID_FIRST_RESERVED) )
@@ -179,29 +175,20 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             break;
 
         if ( op->u.createdomain.cpu == -1 )
-	{
-	    /* Do an initial placement. Fix me for hyperthreading! */
-	    struct domain    *d;
-	    int i, j=0, c[smp_num_cpus];
-	    
-	    pro=0; /* keep compiler happy */
+        {
+            /* Do an initial placement. Pick the least-populated CPU. */
+            struct domain *d;
+            unsigned int i, cnt[NR_CPUS] = { 0 };
 
-	    for (i=0;i<smp_num_cpus;i++) 
-		c[i]=0;
+            read_lock_irq(&tasklist_lock);
+            for_each_domain ( d )
+                cnt[d->processor]++;
+            read_unlock_irq(&tasklist_lock);
 
-	    for_each_domain ( d ) {
-		c[d->processor]++;
-		j++;
-	    }
-
-	    for (i=0;i<smp_num_cpus;i++) {
-		if( c[i]<j )
-		{
-		    j = c[i];
-		    pro = i;
-		}
-	    }
-	}
+            for ( i = 0; i < smp_num_cpus; i++ )
+                if ( cnt[i] < cnt[pro] )
+                    pro = i;
+        }
         else
             pro = op->u.createdomain.cpu % smp_num_cpus;
 
@@ -624,9 +611,9 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
                         break;
                     }
 
-		    if ( page->u.inuse.type_info & PGT_pinned )
-			type |= LPINTAB;
-		    l_arr[j] |= type;
+                    if ( page->u.inuse.type_info & PGT_pinned )
+                        type |= LPINTAB;
+                    l_arr[j] |= type;
                     put_page(page);
                 }
                 else
@@ -657,7 +644,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         d = find_domain_by_id( op->u.setdomainmaxmem.domain );
         if ( d != NULL )
         {
-	    vm_assist(d, op->u.setdomainvmassist.cmd,
+            vm_assist(d, op->u.setdomainvmassist.cmd,
                       op->u.setdomainvmassist.type);
             put_domain(d);
             ret = 0;

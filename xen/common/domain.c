@@ -168,12 +168,12 @@ void domain_shutdown(u8 reason)
 
         if ( reason == 0 ) 
         {
-            printk("Domain 0 halted: Our work here is done.\n");
+            printk("Domain 0 halted: halting machine.\n");
             machine_halt();
         }
         else
         {
-            printk("Domain 0 shutdown: rebooting machine!\n");
+            printk("Domain 0 shutdown: rebooting machine.\n");
             machine_restart(0);
         }
     }
@@ -207,15 +207,6 @@ unsigned int alloc_new_dom_mem(struct domain *d, unsigned int kbytes)
 
         /* initialise to machine_to_phys_mapping table to likely pfn */
         machine_to_phys_mapping[page-frame_table] = alloc_pfns;
-
-#ifndef NDEBUG
-        {
-            /* Initialise with magic marker if in DEBUG mode. */
-            void *a = map_domain_mem((page-frame_table)<<PAGE_SHIFT);
-            memset(a, 0x80 | (char)d->id, PAGE_SIZE);
-            unmap_domain_mem(a);
-        }
-#endif
     }
 
     return 0;
