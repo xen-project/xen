@@ -231,6 +231,7 @@ struct sk_buff {
 
 extern void			__kfree_skb(struct sk_buff *skb);
 extern struct sk_buff *		alloc_skb(unsigned int size, int priority);
+extern struct sk_buff *		alloc_skb_from_cache(kmem_cache_t *cp, unsigned int size, int priority);
 extern void			kfree_skbmem(struct sk_buff *skb);
 extern struct sk_buff *		skb_clone(struct sk_buff *skb, int priority);
 extern struct sk_buff *		skb_copy(const struct sk_buff *skb, int priority);

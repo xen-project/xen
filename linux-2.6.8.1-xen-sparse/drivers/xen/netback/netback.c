@@ -144,11 +144,12 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
      */
     if ( skb_shared(skb) || skb_cloned(skb) || !is_xen_skb(skb) )
     {
-        struct sk_buff *nskb = dev_alloc_skb(PAGE_SIZE);
         int hlen = skb->data - skb->head;
+        struct sk_buff *nskb = dev_alloc_skb(hlen + skb->len);
         if ( unlikely(nskb == NULL) )
             goto drop;
-        skb_reserve(nskb, hlen);
+        /* Account for any reservation already made by dev_alloc_skb(). */
+        skb_reserve(nskb, hlen - (nskb->data - nskb->head));
         __skb_put(nskb, skb->len);
         (void)skb_copy_bits(skb, -hlen, nskb->head, hlen + skb->len);
         nskb->dev = skb->dev;

@@ -39,7 +39,17 @@
 #ifndef __GFP_NOWARN
 #define __GFP_NOWARN 0
 #endif
-#define alloc_skb_page() __dev_alloc_skb(PAGE_SIZE, GFP_ATOMIC|__GFP_NOWARN)
+#define alloc_xen_skb(_l) __dev_alloc_skb((_l), GFP_ATOMIC|__GFP_NOWARN)
+
+#define init_skb_shinfo(_skb)                         \
+    do {                                              \
+        atomic_set(&(skb_shinfo(_skb)->dataref), 1);  \
+        skb_shinfo(_skb)->nr_frags = 0;               \
+        skb_shinfo(_skb)->frag_list = NULL;           \
+    } while ( 0 )
+
+/* Allow headroom on each rx pkt for Ethernet header, alignment padding, ... */
+#define RX_HEADROOM 100
 
 /*
  * If the backend driver is pipelining transmit requests then we can be very
@@ -249,7 +259,7 @@ static void network_tx_buf_gc(struct net_device *dev)
             id  = np->tx->ring[MASK_NETIF_TX_IDX(i)].resp.id;
             skb = np->tx_skbs[id];
             ADD_ID_TO_FREELIST(np->tx_skbs, id);
-            dev_kfree_skb_any(skb);
+            dev_kfree_skb_irq(skb);
         }
         
         np->tx_resp_cons = prod;
@@ -292,7 +302,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
         return;
 
     do {
-        if ( unlikely((skb = alloc_skb_page()) == NULL) )
+        if ( unlikely((skb = alloc_xen_skb(dev->mtu + RX_HEADROOM)) == NULL) )
             break;
 
         skb->dev = dev;
@@ -368,7 +378,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
                   PAGE_SIZE) )
     {
         struct sk_buff *new_skb;
-        if ( unlikely((new_skb = alloc_skb_page()) == NULL) )
+        if ( unlikely((new_skb = alloc_xen_skb(skb->len)) == NULL) )
             goto drop;
         skb_put(new_skb, skb->len);
         memcpy(new_skb->data, skb->data, skb->len);
@@ -446,7 +456,7 @@ static irqreturn_t netif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 static int netif_poll(struct net_device *dev, int *pbudget)
 {
     struct net_private *np = dev->priv;
-    struct sk_buff *skb;
+    struct sk_buff *skb, *nskb;
     netif_rx_response_t *rx;
     NETIF_RING_IDX i, rp;
     mmu_update_t *mmu = rx_mmu;
@@ -494,8 +504,10 @@ static int netif_poll(struct net_device *dev, int *pbudget)
         skb = np->rx_skbs[rx->id];
         ADD_ID_TO_FREELIST(np->rx_skbs, rx->id);
 
-        skb->data = skb->tail = skb->head + (rx->addr & ~PAGE_MASK);
-        skb_put(skb, rx->status);
+        /* NB. We handle skb overflow later. */
+        skb->data = skb->head + (rx->addr & ~PAGE_MASK);
+        skb->len  = rx->status;
+        skb->tail = skb->data + skb->len;
 
         np->stats.rx_packets++;
         np->stats.rx_bytes += rx->status;
@@ -529,10 +541,39 @@ static int netif_poll(struct net_device *dev, int *pbudget)
 
     while ( (skb = __skb_dequeue(&rxq)) != NULL )
     {
+        /*
+         * Enough room in skbuff for the data we were passed? Also, Linux 
+         * expects at least 16 bytes headroom in each receive buffer.
+         */
+        if ( unlikely(skb->tail > skb->end) ||
+             unlikely((skb->data - skb->head) < 16) )
+        {
+            nskb = NULL;
+
+            /* Only copy the packet if it fits in the current MTU. */
+            if ( skb->len <= (dev->mtu + ETH_HLEN) )
+            {
+                if ( (nskb = alloc_xen_skb(skb->len + 2)) != NULL )
+                {
+                    skb_reserve(nskb, 2);
+                    skb_put(nskb, skb->len);
+                    memcpy(nskb->data, skb->data, skb->len);
+                }
+            }
+
+            /* Reinitialise and then destroy the old skbuff. */
+            skb->len  = 0;
+            skb->tail = skb->data;
+            init_skb_shinfo(skb);
+            dev_kfree_skb(skb);
+
+            /* Switch old for new, if we copied the buffer. */
+            if ( (skb = nskb) == NULL )
+                continue;
+        }
+        
         /* Set the shared-info area, which is hidden behind the real data. */
-        atomic_set(&(skb_shinfo(skb)->dataref), 1);
-        skb_shinfo(skb)->nr_frags = 0;
-        skb_shinfo(skb)->frag_list = NULL;
+        init_skb_shinfo(skb);
 
         /* Ethernet-specific work. Delayed to here as it peeks the header. */
         skb->protocol = eth_type_trans(skb, dev);
@@ -596,8 +637,8 @@ static void network_connect(struct net_device *dev,
     netif_tx_request_t *tx;
 
     np = dev->priv;
-    spin_lock_irq(&np->rx_lock);
-    spin_lock(&np->tx_lock);
+    spin_lock_irq(&np->tx_lock);
+    spin_lock(&np->rx_lock);
 
     /* Recovery procedure: */
 
@@ -664,8 +705,8 @@ printk(KERN_ALERT"Netfront recovered tx=%d rxfree=%d\n",
     if ( np->user_state == UST_OPEN )
         netif_start_queue(dev);
 
-    spin_unlock(&np->tx_lock);
-    spin_unlock_irq(&np->rx_lock);
+    spin_unlock(&np->rx_lock);
+    spin_unlock_irq(&np->tx_lock);
 }
 
 static void netif_status_change(netif_fe_interface_status_changed_t *status)
