@@ -103,22 +103,20 @@ typedef struct
  */
 
 /* Events that a guest OS may receive from the hypervisor. */
-#define EVENT_BLK_TX   0x01 /* packets for transmission. */
-#define EVENT_BLK_RX   0x02 /* empty buffers for receive. */
-#define EVENT_TIMER    0x04 /* a timeout has been updated. */
-#define EVENT_DIE      0x08 /* OS is about to be killed. Clean up please! */
-#define EVENT_DEBUG    0x10 /* request guest to dump debug info (gross!) */
-#define EVENT_NET_TX   0x20 /* packets for transmission. */
-#define EVENT_NET_RX   0x40 /* empty buffers for receive. */
+#define EVENT_BLK_RESP 0x01 /* A block device response has been queued. */
+#define EVENT_TIMER    0x02 /* A timeout has been updated. */
+#define EVENT_DIE      0x04 /* OS is about to be killed. Clean up please! */
+#define EVENT_DEBUG    0x08 /* Request guest to dump debug info (gross!) */
+#define EVENT_NET_TX   0x10 /* There are packets for transmission. */
+#define EVENT_NET_RX   0x20 /* There are empty buffers for receive. */
 
 /* Bit offsets, as opposed to the above masks. */
-#define _EVENT_BLK_TX  0
-#define _EVENT_BLK_RX  1
-#define _EVENT_TIMER   2
-#define _EVENT_DIE     3
-#define _EVENT_NET_TX  4
-#define _EVENT_NET_RX  5
-#define _EVENT_DEBUG   6
+#define _EVENT_BLK_RESP 0
+#define _EVENT_TIMER    1
+#define _EVENT_DIE      2
+#define _EVENT_NET_TX   3
+#define _EVENT_NET_RX   4
+#define _EVENT_DEBUG    5
 
 
 /*
@@ -195,13 +193,13 @@ typedef struct shared_info_st {
  */
 typedef struct start_info_st {
     unsigned long nr_pages;       /* total pages allocated to this domain */
-    shared_info_t *shared_info;   /* start address of shared info struct */
+    shared_info_t *shared_info;   /* VIRTUAL address of shared info struct */
     unsigned long  pt_base;       /* VIRTUAL address of page directory */
-    unsigned long mod_start;      /* start address of pre-loaded module */
+    unsigned long mod_start;      /* VIRTUAL address of pre-loaded module */
     unsigned long mod_len;        /* size (bytes) of pre-loaded module */
-    net_ring_t *net_rings;
+    net_ring_t *net_rings;        /* network rings (VIRTUAL ADDRESS) */
     int num_net_rings;
-    blk_ring_t *blk_ring;         /* block io communication rings */
+    unsigned long blk_ring;       /* block io ring (MACHINE ADDRESS) */
     unsigned char cmd_line[1];    /* variable-length */
 } start_info_t;
 

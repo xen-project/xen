@@ -39,7 +39,7 @@ typedef struct net_ring_st {
      */
     tx_entry_t	*tx_ring;
     unsigned int tx_prod, tx_cons, tx_event;
-    unsigned int tx_ring_size;
+
     /*
      * Guest OS places empty buffers into ring at rx_prod.
      * Hypervisor fills buffers as rx_cons.
@@ -50,11 +50,10 @@ typedef struct net_ring_st {
      */
     rx_entry_t	*rx_ring;
     unsigned int rx_prod, rx_cons, rx_event;
-    unsigned int rx_ring_size;
 } net_ring_t;
 
 /* Specify base of per-domain array. Get returned free slot in the array. */
-//net_ring_t *create_net_vif(int domain);
+/*net_ring_t *create_net_vif(int domain);*/
 
 /* Packet routing/filtering code follows:
  */

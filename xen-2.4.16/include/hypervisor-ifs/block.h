@@ -26,38 +26,41 @@
 
 #define XEN_BLOCK_MAX_DOMAINS 32  /* NOTE: FIX THIS. VALUE SHOULD COME FROM? */
 
-#define BLK_TX_RING_SIZE 256
-#define BLK_RX_RING_SIZE 256
+#define BLK_REQ_RING_SIZE  64
+#define BLK_RESP_RING_SIZE 64
 
-#define BLK_TX_RING_MAX_ENTRIES (BLK_TX_RING_SIZE - 2)
-#define BLK_RX_RING_MAX_ENTRIES (BLK_RX_RING_SIZE - 2)
+#define BLK_REQ_RING_MAX_ENTRIES  (BLK_REQ_RING_SIZE - 2)
+#define BLK_RESP_RING_MAX_ENTRIES (BLK_RESP_RING_SIZE - 2)
 
-#define BLK_TX_RING_INC(_i)    (((_i)+1) & (BLK_TX_RING_SIZE-1))
-#define BLK_RX_RING_INC(_i)    (((_i)+1) & (BLK_RX_RING_SIZE-1))
-#define BLK_TX_RING_ADD(_i,_j) (((_i)+(_j)) & (BLK_TX_RING_SIZE-1))
-#define BLK_RX_RING_ADD(_i,_j) (((_i)+(_j)) & (BLK_RX_RING_SIZE-1))
+#define BLK_REQ_RING_INC(_i)     (((_i)+1) & (BLK_REQ_RING_SIZE-1))
+#define BLK_RESP_RING_INC(_i)    (((_i)+1) & (BLK_RESP_RING_SIZE-1))
+#define BLK_REQ_RING_ADD(_i,_j)  (((_i)+(_j)) & (BLK_REQ_RING_SIZE-1))
+#define BLK_RESP_RING_ADD(_i,_j) (((_i)+(_j)) & (BLK_RESP_RING_SIZE-1))
 
-typedef struct blk_ring_entry 
+typedef struct blk_ring_req_entry 
 {
-  void *          id;                   /* for guest os use; used for the bh */
-  int             priority;         /* orig sched pri, SYNC or ASYNC for now */
-  int             operation;            /* XEN_BLOCK_READ or XEN_BLOCK_WRITE */
-  char *          buffer;
-  unsigned long   block_number;                              /* block number */
-  unsigned short  block_size;                                  /* block size */
-  kdev_t          device;
-  unsigned long   sector_number;             /* real buffer location on disk */
-} blk_ring_entry_t;
+    void *          id;                /* for guest os use */
+    int             priority;          /* SYNC or ASYNC for now */
+    int             operation;         /* XEN_BLOCK_READ or XEN_BLOCK_WRITE */
+    char *          buffer;
+    unsigned long   block_number;      /* block number */
+    unsigned short  block_size;        /* block size */
+    kdev_t          device;
+    unsigned long   sector_number;     /* real buffer location on disk */
+} blk_ring_req_entry_t;
+
+typedef struct blk_ring_resp_entry
+{
+    void *id;
+    unsigned long status;
+} blk_ring_resp_entry_t;
 
 typedef struct blk_ring_st 
 {
-  blk_ring_entry_t *btx_ring;
-  unsigned int      btx_prod, btx_cons;
-  unsigned int 	    btx_ring_size;
-
-  blk_ring_entry_t *brx_ring;
-  unsigned int      brx_prod, brx_cons;
-  unsigned int	    brx_ring_size;
+  unsigned int      req_prod, req_cons;
+  unsigned int      resp_prod, resp_cons;
+  blk_ring_req_entry_t  req_ring[BLK_REQ_RING_SIZE];
+  blk_ring_resp_entry_t resp_ring[BLK_RESP_RING_SIZE];
 } blk_ring_t;
 
 #define MAX_XEN_DISK_COUNT 100

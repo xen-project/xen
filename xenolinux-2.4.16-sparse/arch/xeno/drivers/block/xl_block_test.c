@@ -22,7 +22,7 @@
 /******************************************************************/
 
 static struct proc_dir_entry *bdt;
-static blk_ring_entry_t meta;
+static blk_ring_req_entry_t meta;
 static char * data;
 
 static int proc_read_bdt(char *page, char **start, off_t off,

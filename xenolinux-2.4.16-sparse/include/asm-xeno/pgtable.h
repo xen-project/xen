@@ -18,6 +18,7 @@
 #include <asm/processor.h>
 #include <asm/hypervisor.h>
 #include <linux/threads.h>
+#include <asm/fixmap.h>
 
 #ifndef _I386_BITOPS_H
 #include <asm/bitops.h>
@@ -99,7 +100,7 @@ extern void pgtable_cache_init(void);
 #define VMALLOC_START	(((unsigned long) high_memory + 2*VMALLOC_OFFSET-1) & \
 						~(VMALLOC_OFFSET-1))
 #define VMALLOC_VMADDR(x) ((unsigned long)(x))
-#define VMALLOC_END	(HYPERVISOR_VIRT_START-PAGE_SIZE)
+#define VMALLOC_END	(FIXADDR_START - 2*PAGE_SIZE)
 
 #define _PAGE_BIT_PRESENT	0
 #define _PAGE_BIT_RW		1

@@ -115,7 +115,9 @@ static inline void set_pte_phys (unsigned long vaddr,
     if (pte_val(*pte))
         pte_ERROR(*pte);
     pgprot_val(prot) = pgprot_val(PAGE_KERNEL) | pgprot_val(flags);
-    set_pte(pte, mk_pte_phys(phys, prot));
+
+    /* We queue directly, avoiding hidden phys->machine translation. */
+    queue_l1_entry_update(__pa(pte), phys | pgprot_val(prot));
 
     /*
      * It's enough to flush this one mapping.
@@ -124,10 +126,54 @@ static inline void set_pte_phys (unsigned long vaddr,
     __flush_tlb_one(vaddr);
 }
 
+void __set_fixmap (enum fixed_addresses idx, unsigned long phys, 
+                   pgprot_t flags)
+{
+    unsigned long address = __fix_to_virt(idx);
+
+    if (idx >= __end_of_fixed_addresses) {
+        printk("Invalid __set_fixmap\n");
+        return;
+    }
+    set_pte_phys(address, phys, flags);
+}
+
+static void __init fixrange_init (unsigned long start, 
+                                  unsigned long end, pgd_t *pgd_base)
+{
+    pgd_t *pgd;
+    pmd_t *pmd;
+    pte_t *pte;
+    int i, j;
+    unsigned long vaddr;
+
+    vaddr = start;
+    i = __pgd_offset(vaddr);
+    j = __pmd_offset(vaddr);
+    pgd = pgd_base + i;
+
+    for ( ; (i < PTRS_PER_PGD) && (vaddr != end); pgd++, i++) {
+        pmd = (pmd_t *)pgd;
+        for (; (j < PTRS_PER_PMD) && (vaddr != end); pmd++, j++) {
+            if (pmd_none(*pmd)) {
+                pte = (pte_t *) alloc_bootmem_low_pages(PAGE_SIZE);
+                set_pmd(pmd, __pmd(_KERNPG_TABLE + __pa(pte)));
+                if (pte != pte_offset(pmd, 0))
+                    BUG();
+            }
+            vaddr += PMD_SIZE;
+        }
+        j = 0;
+    }
+
+    XENO_flush_page_update_queue();
+}
+
 void __init paging_init(void)
 {
     unsigned long zones_size[MAX_NR_ZONES] = {0, 0, 0};
     unsigned int max_dma, high, low;
+    unsigned long vaddr;
     
     max_dma = virt_to_phys((char *)MAX_DMA_ADDRESS) >> PAGE_SHIFT;
     low = max_low_pfn;
@@ -143,6 +189,19 @@ void __init paging_init(void)
         zones_size[ZONE_NORMAL] = low - max_dma;
     }
     free_area_init(zones_size);
+
+    /*
+     * Fixed mappings, only the page table structure has to be created - 
+     * mappings will be set by set_fixmap():
+     */
+    vaddr = __fix_to_virt(__end_of_fixed_addresses - 1) & PMD_MASK;
+    fixrange_init(vaddr, 0, init_mm.pgd);
+
+    /*
+     * XXX We do this conversion early, so that all other page tables
+     * will automatically get this mapping.
+     */
+    set_fixmap(FIX_BLKRING_BASE, start_info.blk_ring);
 }
 
 

@@ -40,8 +40,7 @@ static int xlblk_read_ahead;
 static int xlblk_hardsect_size[XLBLK_MAX];
 static int xlblk_max_sectors[XLBLK_MAX];
 
-#define XLBLK_RX_IRQ _EVENT_BLK_RX
-#define XLBLK_TX_IRQ _EVENT_BLK_TX
+#define XLBLK_RESPONSE_IRQ _EVENT_BLK_RESP
 
 #define DEBUG_IRQ    _EVENT_DEBUG 
 
@@ -55,6 +54,8 @@ xlblk_device_t xlblk_device;
 
 #define XLBLK_DEBUG       0
 #define XLBLK_DEBUG_IOCTL 0
+
+static blk_ring_t *blk_ring;
 
 /* 
  * disk management
@@ -203,7 +204,6 @@ void hypervisor_request(void *         id,
 			kdev_t         device,
 			int            mode)
 {
-    blk_ring_t *blk_ring = start_info.blk_ring;
     int position;
     void *buffer_pa, *buffer_ma; 
     kdev_t phys_device = (kdev_t) 0;
@@ -246,24 +246,24 @@ void hypervisor_request(void *         id,
     }
 
 
-    if (BLK_TX_RING_INC(blk_ring->btx_prod) == blk_ring->btx_cons) {
-	printk (KERN_ALERT "hypervisor_request: btx_cons: %d, btx_prod:%d",
-		blk_ring->btx_cons, blk_ring->btx_prod);
+    if (BLK_REQ_RING_INC(blk_ring->req_prod) == blk_ring->req_cons) {
+	printk (KERN_ALERT "hypervisor_request: req_cons: %d, req_prod:%d",
+		blk_ring->req_cons, blk_ring->req_prod);
 	BUG(); 
     }
     
     /* Fill out a communications ring structure & trap to the hypervisor */
-    position = blk_ring->btx_prod;
-    blk_ring->btx_ring[position].id            = id;
-    blk_ring->btx_ring[position].priority      = mode;
-    blk_ring->btx_ring[position].operation     = operation;
-    blk_ring->btx_ring[position].buffer        = buffer_ma;
-    blk_ring->btx_ring[position].block_number  = block_number;
-    blk_ring->btx_ring[position].block_size    = block_size;
-    blk_ring->btx_ring[position].device        = phys_device;
-    blk_ring->btx_ring[position].sector_number = sector_number;
+    position = blk_ring->req_prod;
+    blk_ring->req_ring[position].id            = id;
+    blk_ring->req_ring[position].priority      = mode;
+    blk_ring->req_ring[position].operation     = operation;
+    blk_ring->req_ring[position].buffer        = buffer_ma;
+    blk_ring->req_ring[position].block_number  = block_number;
+    blk_ring->req_ring[position].block_size    = block_size;
+    blk_ring->req_ring[position].device        = phys_device;
+    blk_ring->req_ring[position].sector_number = sector_number;
 
-    blk_ring->btx_prod = BLK_TX_RING_INC(blk_ring->btx_prod);
+    blk_ring->req_prod = BLK_REQ_RING_INC(blk_ring->req_prod);
 
     switch(mode) { 
 
@@ -325,20 +325,16 @@ static void do_xlblk_request (request_queue_t *rq)
 	/* is there space in the tx ring for this request?
 	 * if the ring is full, then leave the request in the queue
 	 *
-	 * THIS IS A BIT BOGUS SINCE XEN COULD BE UPDATING BTX_CONS
+	 * THIS IS A BIT BOGUS SINCE XEN COULD BE UPDATING REQ_CONS
 	 * AT THE SAME TIME
 	 */
-	{
-	    blk_ring_t *blk_ring = start_info.blk_ring;
-	    
-	    if (BLK_RX_RING_INC(blk_ring->btx_prod) == blk_ring->btx_cons)
-	    {
-		printk (KERN_ALERT "OOPS, TX LOOKS FULL  cons: %d  prod: %d\n",
-			blk_ring->btx_cons, blk_ring->btx_prod);
-		BUG(); 
-		break;
-	    }
-	}
+        if (BLK_RESP_RING_INC(blk_ring->req_prod) == blk_ring->req_cons)
+        {
+            printk (KERN_ALERT "OOPS, TX LOOKS FULL  cons: %d  prod: %d\n",
+                    blk_ring->req_cons, blk_ring->req_prod);
+            BUG(); 
+            break;
+        }
 	
 	req->errors = 0;
 	blkdev_dequeue_request(req);
@@ -382,24 +378,22 @@ static struct block_device_operations xenolinux_block_fops =
     revalidate:         xenolinux_block_revalidate,
 };
 
-static void xlblk_rx_int(int irq, void *dev_id, struct pt_regs *ptregs)
+static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
 {
-    blk_ring_t *blk_ring = start_info.blk_ring;
     struct request *req;
     int loop;
     u_long flags; 
     
-    for (loop = blk_ring->brx_cons;
-	 loop != blk_ring->brx_prod;
-	 loop = BLK_RX_RING_INC(loop)) {
+    for (loop = blk_ring->resp_cons;
+	 loop != blk_ring->resp_prod;
+	 loop = BLK_RESP_RING_INC(loop)) {
 
-	blk_ring_entry_t *bret = &blk_ring->brx_ring[loop];
+	blk_ring_resp_entry_t *bret = &blk_ring->resp_ring[loop];
 	
-	if(bret->operation == XEN_BLOCK_PROBE)
-	    continue; 
+	req = (struct request *)bret->id;
+        if ( req == NULL ) continue; /* probes have NULL id */
 
 	spin_lock_irqsave(&io_request_lock, flags);
-	req = (struct request *)bret->id;
 	    
 	if (!end_that_request_first(req, 1, "XenBlk"))
 	    end_that_request_last(req);
@@ -407,51 +401,24 @@ static void xlblk_rx_int(int irq, void *dev_id, struct pt_regs *ptregs)
 	
     }
     
-    blk_ring->brx_cons = loop;
+    blk_ring->resp_cons = loop;
 }
 
-static void xlblk_tx_int(int irq, void *dev_id, struct pt_regs *ptregs)
-{
-    if (XLBLK_DEBUG) 
-	printk (KERN_ALERT "--- xlblock::xlblk_tx_int\n"); 
-}
 
 int __init xlblk_init(void)
 {
-    blk_ring_t *blk_ring = start_info.blk_ring;
     int loop, error, result;
 
-    /* initialize memory rings to communicate with hypervisor */
-    if ( blk_ring == NULL ) return -ENOMEM;
+    /* This mapping was created early at boot time. */
+    blk_ring = (blk_ring_t *)FIX_BLKRING_BASE;
 
-    blk_ring->btx_prod = blk_ring->btx_cons = 0;
-    blk_ring->brx_prod = blk_ring->brx_cons = 0;
-    blk_ring->btx_ring = NULL;
-    blk_ring->brx_ring = NULL;
+    blk_ring->req_prod = blk_ring->req_cons = 0;
+    blk_ring->resp_prod = blk_ring->resp_cons = 0;
     
-    blk_ring->btx_ring = kmalloc(BLK_TX_RING_SIZE * sizeof(blk_ring_entry_t),
-				 GFP_KERNEL);
-    blk_ring->brx_ring = kmalloc(BLK_RX_RING_SIZE * sizeof(blk_ring_entry_t),
-				 GFP_KERNEL);
-
-    if ((blk_ring->btx_ring == NULL) || (blk_ring->brx_ring == NULL)) {
-	printk (KERN_ALERT "could not alloc ring memory for block device\n");
-	error = -ENOBUFS;
-	goto fail;
-    }
-    
-    error = request_irq(XLBLK_RX_IRQ, xlblk_rx_int, 0, 
-			"xlblk-rx", &xlblk_device);
+    error = request_irq(XLBLK_RESPONSE_IRQ, xlblk_response_int, 0, 
+			"xlblk-response", &xlblk_device);
     if (error) {
 	printk(KERN_ALERT "Could not allocate receive interrupt\n");
-	goto fail;
-    }
-
-    error = request_irq(XLBLK_TX_IRQ, xlblk_tx_int, 0, 
-			"xlblk-tx", &xlblk_device);
-    if (error) {
-	printk(KERN_ALERT "Could not allocate transmit interrupt\n");
-	free_irq(XLBLK_RX_IRQ, &xlblk_device);
 	goto fail;
     }
 
@@ -505,8 +472,6 @@ int __init xlblk_init(void)
     return 0;
 
  fail:
-    if (blk_ring->btx_ring) kfree(blk_ring->btx_ring);
-    if (blk_ring->brx_ring) kfree(blk_ring->brx_ring);
     return error;
 }
 

@@ -42,9 +42,16 @@ struct task_struct *do_newdomain(unsigned int dom_id, unsigned int cpu)
     p->domain    = dom_id;
     p->processor = cpu;
 
+    spin_lock_init(&p->blk_ring_lock);
+
     p->shared_info = (void *)get_free_page(GFP_KERNEL);
     memset(p->shared_info, 0, PAGE_SIZE);
     SHARE_PFN_WITH_DOMAIN(virt_to_page(p->shared_info), dom_id);
+
+    if ( sizeof(*p->blk_ring_base) > PAGE_SIZE ) BUG();
+    p->blk_ring_base = (blk_ring_t *)get_free_page(GFP_KERNEL);
+    memset(p->blk_ring_base, 0, PAGE_SIZE);
+    SHARE_PFN_WITH_DOMAIN(virt_to_page(p->blk_ring_base), dom_id);
 
     SET_GDT_ENTRIES(p, DEFAULT_GDT_ENTRIES);
     SET_GDT_ADDRESS(p, DEFAULT_GDT_ADDRESS);
@@ -54,16 +61,7 @@ struct task_struct *do_newdomain(unsigned int dom_id, unsigned int cpu)
     p->active_mm  = &p->mm;
     p->num_net_vifs = 0;
 
-    INIT_LIST_HEAD(&p->io_done_queue);
-    spin_lock_init(&p->io_done_queue_lock);
-
-    /*
-     * KAF: Passing in newdomain struct to this function is gross!
-     * Therefore, for now we just allocate the single blk_ring
-     * before the multiople net_rings :-)
-     */
-    p->blk_ring_base = (blk_ring_t *)(p->shared_info + 1);
-    p->net_ring_base = (net_ring_t *)(p->blk_ring_base + 1);
+    p->net_ring_base = (net_ring_t *)(p->shared_info + 1);
     INIT_LIST_HEAD(&p->pg_head);
     p->tot_pages = 0;
     write_lock_irqsave(&tasklist_lock, flags);
@@ -218,6 +216,9 @@ void release_task(struct task_struct *p)
     }
     if ( p->mm.perdomain_pt ) free_page((unsigned long)p->mm.perdomain_pt);
 
+    UNSHARE_PFN(virt_to_page(p->blk_ring_base));
+    free_page((unsigned long)p->blk_ring_base);
+
     UNSHARE_PFN(virt_to_page(p->shared_info));
     free_page((unsigned long)p->shared_info);
 
@@ -316,7 +317,7 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
     virt_startinfo_addr->num_net_rings = p->num_net_vifs;
 
     /* Add block io interface */
-    virt_startinfo_addr->blk_ring = (blk_ring_t *)SH2G(p->blk_ring_base);
+    virt_startinfo_addr->blk_ring = virt_to_phys(p->blk_ring_base);
 
     /* Copy the command line */
     strcpy(virt_startinfo_addr->cmd_line, meminfo->cmd_line);
@@ -548,9 +549,7 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     virt_startinfo_address->num_net_rings = p->num_net_vifs;
 
     /* Add block io interface */
-    virt_startinfo_address->blk_ring = 
-	(blk_ring_t *)SHIP2GUEST(p->blk_ring_base); 
-
+    virt_startinfo_address->blk_ring = virt_to_phys(p->blk_ring_base); 
 
     /* We tell OS about any modules we were given. */
     if ( nr_mods > 1 )
