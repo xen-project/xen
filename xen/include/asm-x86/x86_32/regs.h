@@ -49,4 +49,10 @@ enum EFLAGS {
     EF_ID   = 0x00200000,   /* id */
 };
 
+#define VM86_MODE(_r) ((_r)->eflags & EF_VM)
+#define RING_0(_r)    (((_r)->cs & 3) == 0)
+#define RING_1(_r)    (((_r)->cs & 3) == 1)
+#define RING_2(_r)    (((_r)->cs & 3) == 2)
+#define RING_3(_r)    (((_r)->cs & 3) == 3)
+
 #endif

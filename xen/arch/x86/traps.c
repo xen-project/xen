@@ -54,6 +54,8 @@
 
 #if defined(__i386__)
 
+#define GUEST_FAULT(_r) (likely(VM86_MODE(_r) || !RING_0(_r)))
+
 #define DOUBLEFAULT_STACK_SIZE 1024
 static struct tss_struct doublefault_tss;
 static unsigned char doublefault_stack[DOUBLEFAULT_STACK_SIZE];
@@ -164,7 +166,7 @@ void show_registers(struct xen_regs *regs)
     unsigned long esp;
     unsigned short ss, ds, es, fs, gs;
 
-    if ( regs->cs & 3 )
+    if ( GUEST_FAULT(regs) )
     {
         esp = regs->esp;
         ss  = regs->ss & 0xffff;
@@ -247,7 +249,7 @@ static inline int do_trap(int trapnr, char *str,
 
     DEBUGGER_trap_entry(trapnr, regs);
 
-    if ( !(regs->cs & 3) )
+    if ( !GUEST_FAULT(regs) )
         goto xen_fault;
 
     ti = current->thread.traps + trapnr;
@@ -313,7 +315,7 @@ asmlinkage int do_int3(struct xen_regs *regs)
 
     DEBUGGER_trap_entry(TRAP_int3, regs);
 
-    if ( unlikely((regs->cs & 3) == 0) )
+    if ( !GUEST_FAULT(regs) )
     {
         DEBUGGER_trap_fatal(TRAP_int3, regs);
         show_registers(regs);
@@ -428,7 +430,7 @@ asmlinkage int do_page_fault(struct xen_regs *regs)
             return EXCRET_fault_fixed; /* successfully copied the mapping */
     }
 
-    if ( unlikely(!(regs->cs & 3)) )
+    if ( !GUEST_FAULT(regs) )
         goto xen_fault;
 
     ti = ed->thread.traps + 14;
@@ -489,8 +491,10 @@ asmlinkage int do_general_protection(struct xen_regs *regs)
 
     DEBUGGER_trap_entry(TRAP_gp_fault, regs);
     
-    /* Badness if error in ring 0, or result of an interrupt. */
-    if ( !(regs->cs & 3) || (regs->error_code & 1) )
+    if ( regs->error_code & 1 )
+        goto hardware_gp;
+
+    if ( !GUEST_FAULT(regs) )
         goto gp_in_kernel;
 
     /*
@@ -517,7 +521,7 @@ asmlinkage int do_general_protection(struct xen_regs *regs)
     {
         /* This fault must be due to <INT n> instruction. */
         ti = current->thread.traps + (regs->error_code>>3);
-        if ( TI_GET_DPL(ti) >= (regs->cs & 3) )
+        if ( TI_GET_DPL(ti) >= (VM86_MODE(regs) ? 3 : (regs->cs & 3)) )
         {
             tb->flags = TBF_EXCEPTION;
             regs->eip += 2;
@@ -555,6 +559,7 @@ asmlinkage int do_general_protection(struct xen_regs *regs)
 
     DEBUGGER_trap_fatal(TRAP_gp_fault, regs);
 
+ hardware_gp:
     show_registers(regs);
     panic("CPU%d GENERAL PROTECTION FAULT\n[error_code=%04x]\n",
           smp_processor_id(), regs->error_code);
@@ -651,7 +656,7 @@ asmlinkage int do_debug(struct xen_regs *regs)
         goto out;
     }
 
-    if ( (regs->cs & 3) == 0 )
+    if ( !GUEST_FAULT(regs) )
     {
         /* Clear TF just for absolute sanity. */
         regs->eflags &= ~EF_TF;

@@ -322,12 +322,22 @@ syscall_exit:
 	testw $_TIF_ALLWORK_MASK, %cx	# current->work
 	jne syscall_exit_work
 restore_all:
+	testl $VM_MASK, EFLAGS(%esp)
+	jnz resume_vm86
 	movb EVENT_MASK(%esp), %al
 	notb %al			# %al == ~saved_mask
 	andb evtchn_upcall_mask(%esi),%al
 	andb $1,%al			# %al == mask & ~saved_mask
 	jnz restore_all_enable_events	#     != 0 => reenable event delivery
 	RESTORE_ALL
+
+resume_vm86:
+	XEN_UNBLOCK_EVENTS(%esi)
+	RESTORE_REGS
+	movl %eax,(%esp)
+	movl $__HYPERVISOR_switch_vm86,%eax
+	int $0x82
+	ud2
 
 	# perform work that needs to be done immediately before resumption
 	ALIGN
@@ -559,8 +569,10 @@ ENTRY(failsafe_callback)
 1:      popl %ds
 2:      popl %es
 3:      popl %fs
-4:      popl %gs
-5:	iret
+4:      pop  %gs
+        subl $4,%esp
+        SAVE_ALL
+        jmp  ret_from_exception
 .section .fixup,"ax";	\
 6:	movl $0,(%esp);	\
 	jmp 1b;		\
@@ -570,12 +582,6 @@ ENTRY(failsafe_callback)
 	jmp 3b;		\
 9:	movl $0,(%esp);	\
 	jmp 4b;		\
-10:	pushl %ss;	\
-	popl %ds;	\
-	pushl %ss;	\
-	popl %es;	\
-	pushl $11;	\
-	call do_exit;	\
 .previous;		\
 .section __ex_table,"a";\
 	.align 4;	\
@@ -583,7 +589,6 @@ ENTRY(failsafe_callback)
 	.long 2b,7b;	\
 	.long 3b,8b;	\
 	.long 4b,9b;	\
-	.long 5b,10b;	\
 .previous
 
 ENTRY(coprocessor_error)
@@ -901,7 +906,7 @@ ENTRY(sys_call_table)
 	.long sys_iopl		/* 110 */
 	.long sys_vhangup
 	.long sys_ni_syscall	/* old "idle" system call */
-	.long sys_ni_syscall	/* disable sys_vm86old */
+	.long sys_vm86old
 	.long sys_wait4
 	.long sys_swapoff	/* 115 */
 	.long sys_sysinfo

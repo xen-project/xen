@@ -304,7 +304,7 @@ int gpf_emulate_4gb(struct xen_regs *regs)
     unsigned int  *pseg = NULL; /* segment for memory operand (NULL=default) */
 
     /* WARNING: We only work for ring-3 segments. */
-    if ( unlikely((regs->cs & 3) != 3) )
+    if ( unlikely(VM86_MODE(regs)) || unlikely(!RING_3(regs)) )
     {
         DPRINTK("Taken fault at bad CS %04x\n", regs->cs);
         goto fail;
