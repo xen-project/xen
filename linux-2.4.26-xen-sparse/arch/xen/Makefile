@@ -16,7 +16,17 @@
 #           Added '-march' and '-mpreferred-stack-boundary' support
 #
 
-override EXTRAVERSION := -xen$(EXTRAVERSION)
+override EXTRAVERSION := $(subst linux-$(VERSION).$(PATCHLEVEL).$(SUBLEVEL),,$(shell basename $(TOPDIR)))$(EXTRAVERSION)
+
+# This following is pretty horrid, but I think the ends justify the
+# means: if no .config file exists copy the appropriate defconfig-XXX
+# file to .config so that we use it in preference to the plain
+# defconfig file. It would be much better if there was a hook in the
+# main Makefile to do this, but this works.
+ifneq (.config,$(wildcard .config))
+X=$(shell cp arch/xen/defconfig$(EXTRAVERSION) .config)
+-include .config
+endif
 
 LD=$(CROSS_COMPILE)ld -m elf_i386
 OBJCOPY=$(CROSS_COMPILE)objcopy -R .note -R .comment -S
@@ -115,6 +125,7 @@ dist:
 %_config: arch/xen/defconfig-%
 	rm -f .config arch/xen/defconfig
 	cp -f arch/xen/defconfig-$(@:_config=) arch/xen/defconfig
+	cp -f arch/xen/defconfig-$(@:_config=) .config
 
 
 archclean:

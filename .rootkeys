@@ -44,7 +44,6 @@
 3e5a4e65IEPjnWPZ5w3TxS5scV8Ewg linux-2.4.26-xen-sparse/arch/xen/Makefile
 3e5a4e65n-KhsEAs-A4ULiStBp-r6w linux-2.4.26-xen-sparse/arch/xen/boot/Makefile
 3e5a4e65OV_j_DBtjzt5vej771AJsA linux-2.4.26-xen-sparse/arch/xen/config.in
-40c9ca06qbn0-omx88JObgOYcEeiqQ linux-2.4.26-xen-sparse/arch/xen/defconfig
 40648526SxcA4lGIHB_k7ID8VlRSzw linux-2.4.26-xen-sparse/arch/xen/defconfig-xen0
 40c73c77QesbL7eIvG-fJGAtVwhGRg linux-2.4.26-xen-sparse/arch/xen/defconfig-xenU
 3e6377f5xwPfYZkPHPrDbEq1PRN7uQ linux-2.4.26-xen-sparse/arch/xen/drivers/balloon/Makefile

@@ -380,17 +380,15 @@ config file.
 
 A typical Grub menu option might look like:
 
-title Xen / Xenlinux 2.4.22
-        kernel /boot/image.gz dom0_mem=131072 com1=115200,8n1 noht
-        module /boot/xenlinux.gz root=/dev/sda4 ro console=tty0
+title Xen / Xenlinux 2.4.26
+        kernel /boot/xen.gz dom0_mem=131072 com1=115200 noht watchdog
+        module /boot/vmlinuz-2.4.26-xen0 root=/dev/sda4 ro
 
 The first line specifies which Xen image to use, and what command line
 arguments to pass to Xen. In this case we set the maximum amount of
-memory to allocate to domain0, and enable serial I/O at 9600 baud.
-We could also disable smp support (nosmp) or disable hyper-threading
-support (noht). If you have multiple network interface you can use
-ifname=ethXX to select which one to use. If your network card is
-unsupported, use ifname=dummy
+memory to allocate to domain0, and enable serial I/O on COM1 at 115200
+baud.  We could also disable smp support (nosmp) or disable
+hyper-threading support (noht). 
 
 The second line specifies which xenlinux image to use, and the
 standard linux command line arguments to pass to the kernel. In this
@@ -403,22 +401,18 @@ require a second "module" line.
 Installing the Xen tools and source
 ===================================
 
-The tools and source live in the /usr/local/src/xen-1.2 directory on
+The tools and source live in the /usr/local/src/xen-2.0 directory on
 the CD (and may also be downloaded from the project downloads
 page). You'll need to copy them to some mutable storage before using
 them.
 
 If you have the BitKeeper BK tools installed you can check the
-repository is up to date by cd'ing into the xeno-1.2.bk directory and
+repository is up to date by cd'ing into the xeno-2.0.bk directory and
 typing 'bk pull' (assuming you have an Internet connection). 
 
-You can rebuild Xen and the tools by typing 'make'. You can install
-them to the standard directories with 'make install', or into the
-../install subtree with 'make dist'.
-
-If you're using the virtual disk control tools (xc_vd_tool) you'll
-need the SQLite library and python binding pysqlite.  There's a tar
-ball containing the necessary binaries on the project downloads page.
+You can rebuild Xen, the tools and XenLinux by typing 'make
+world'. You can install them to the standard directories with 'make
+install', or into the ./install subtree with 'make dist'.
 
 
 Modifying xc_mycreatelinuxdom1.py
