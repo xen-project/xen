@@ -67,7 +67,7 @@ def vif_restrict_addr(dom, vif, addr, delete=0):
     if delete:
         d['flag'] = '-D'
     else:
-        d['flag' = '-A'
+        d['flag'] = '-A'
     cmd(CMD_IPTABLES, '-P FORWARD DROP')
     cmd(CMD_IPTABLES, '%(flag)s FORWARD -m physdev --physdev-in %(vif)s -s %(addr)s -j ACCEPT' % d)
     cmd(CMD_IPTABLES, '%(flag)s FORWARD -m physdev --physdev-out %(vif)s -d %(addr)s -j ACCEPT' % d)
