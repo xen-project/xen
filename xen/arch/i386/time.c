@@ -240,14 +240,11 @@ static u32	st_scale_i;
 u32			stime_pcc;	 /* cycle counter value at last timer irq */
 s_time_t	stime_now;   /* time in ns at last timer IRQ */
 
-s_time_t get_s_time(void)
+static inline s_time_t __get_s_time(void)
 {
-    unsigned long flags;
     u32 	 delta_tsc, low, pcc;
     u64      delta;
     s_time_t now;
-
-    spin_lock_irqsave(&stime_lock, flags);
 
     pcc = stime_pcc;		
     now = stime_now;
@@ -259,9 +256,17 @@ s_time_t get_s_time(void)
     delta >>= 32;
     delta += ((u64)delta_tsc * st_scale_i);
 
-    spin_unlock_irqrestore(&stime_lock, flags);
+    return now + delta;
+}
 
-    return now + delta; 
+s_time_t get_s_time(void)
+{
+    s_time_t now;
+    unsigned long flags;
+    spin_lock_irqsave(&stime_lock, flags);
+    now = __get_s_time();
+    spin_unlock_irqrestore(&stime_lock, flags);
+    return now; 
 }
 
 
@@ -326,17 +331,13 @@ static struct ac_timer update_timer;
 static void update_time(unsigned long foo)
 {
     unsigned long  flags;
-    u32		       new_pcc;
     s_time_t       new_st;
     unsigned long  usec;
 
-    new_st = NOW();
-    rdtscl(new_pcc);
-
     /* Update system time. */
     spin_lock_irqsave(&stime_lock, flags);
-    stime_now = new_st;
-    stime_pcc=new_pcc;
+    stime_now = new_st = __get_s_time();
+    rdtscl(stime_pcc);
     /* Don't reeenable IRQs until we release wctime_lock. */
     spin_unlock(&stime_lock);
 

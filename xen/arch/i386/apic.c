@@ -19,15 +19,15 @@
  */
 
 /*
- *	Local APIC handling, local APIC timers
+ *  Local APIC handling, local APIC timers
  *
- *	(c) 1999, 2000 Ingo Molnar <mingo@redhat.com>
+ *  (c) 1999, 2000 Ingo Molnar <mingo@redhat.com>
  *
- *	Fixes
- *	Maciej W. Rozycki	:	Bits for genuine 82489DX APICs;
- *					thanks to Eric Gilmore
- *					and Rolf G. Tews
- *					for testing these extensively.
+ *  Fixes
+ *  Maciej W. Rozycki   :   Bits for genuine 82489DX APICs;
+ *                  thanks to Eric Gilmore
+ *                  and Rolf G. Tews
+ *                  for testing these extensively.
  */
 
 
@@ -329,13 +329,13 @@ void __init setup_local_APIC (void)
         value = APIC_DM_NMI;
     else
         value = APIC_DM_NMI | APIC_LVT_MASKED;
-    if (!APIC_INTEGRATED(ver))		/* 82489DX */
+    if (!APIC_INTEGRATED(ver))      /* 82489DX */
         value |= APIC_LVT_LEVEL_TRIGGER;
     apic_write_around(APIC_LVT1, value);
 
-    if (APIC_INTEGRATED(ver)) {		/* !82489DX */
+    if (APIC_INTEGRATED(ver)) {     /* !82489DX */
         maxlvt = get_maxlvt();
-        if (maxlvt > 3)		/* Due to the Pentium erratum 3AP. */
+        if (maxlvt > 3)     /* Due to the Pentium erratum 3AP. */
             apic_write(APIC_ESR, 0);
         value = apic_read(APIC_ESR);
         printk("ESR value before enabling vector: %08lx\n", value);
@@ -653,25 +653,28 @@ void __init setup_APIC_clocks (void)
  */
 int reprogram_ac_timer(s_time_t timeout)
 {
-    int 		cpu = smp_processor_id();
-    s_time_t	now;
-    s_time_t	expire;
-    u64			apic_tmict;
+    int         cpu = smp_processor_id();
+    s_time_t    now;
+    s_time_t    expire;
+    u64         apic_tmict;
 
-    if (timeout  == 0) {
-        /* XXX RN: not sure if this disables it or cause interruptto 
-         * go off imediately */
-        apic_tmict = 0;
+    /*
+     * We use this value because we don't trust zero (we think it may just
+     * cause an immediate interrupt). At least this is guaranteed to hold it
+     * off for ages (esp. since the clock ticks on bus clock, not cpu clock!).
+     */
+    if (timeout == 0) {
+        apic_tmict = 0xffffffff;
         goto reprogram;
     }
 
     now = NOW();
-    expire = timeout - now;	/* value from now */
+    expire = timeout - now; /* value from now */
 
     if (expire <= 0) {
         printk("APICT[%02d] Timeout in the past 0x%08X%08X > 0x%08X%08X\n", 
                cpu, (u32)(now>>32), (u32)now, (u32)(timeout>>32),(u32)timeout);
-        return 0;		/* timeout value in the past */
+        return 0;       /* timeout value in the past */
     }
 
     /* conversion to bus units */
@@ -687,7 +690,7 @@ int reprogram_ac_timer(s_time_t timeout)
     }
 
  reprogram:
-    /* programm timer */
+    /* Program the timer. */
     apic_write(APIC_TMICT, (unsigned long)apic_tmict);
 
     TRC(printk("APICT[%02d] reprog(): expire=%lld %u\n",
@@ -755,9 +758,9 @@ void smp_apic_timer_interrupt(struct pt_regs * regs)
      */
     ack_APIC_irq();
 
-	/* call the local handler */
+    /* call the local handler */
     irq_enter(cpu, 0);
-	perfc_incrc(apic_timer);
+    perfc_incrc(apic_timer);
     smp_local_timer_interrupt(regs);
     irq_exit(cpu, 0);
 

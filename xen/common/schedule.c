@@ -368,9 +368,9 @@ asmlinkage void schedule(void)
 
  sched_done:
     ASSERT(r_time != 0);
-    ASSERT(r_time > ctx_allow);
+    ASSERT(r_time >= ctx_allow);
 
-#if 0
+#ifndef NDEBUG
     if ( (r_time==0) || (r_time < ctx_allow)) {
         printk("[%02d]: %lx\n", this_cpu, r_time);
         dump_rqueue(&schedule_data[this_cpu].runqueue, "foo");
@@ -389,7 +389,8 @@ asmlinkage void schedule(void)
  timer_redo:
     schedule_data[this_cpu].s_timer.expires  = now + r_time;
     if (add_ac_timer(&schedule_data[this_cpu].s_timer) == 1) {
-        printk("SCHED[%02d]: Shit this shouldn't happen\n", this_cpu);
+        printk("SCHED[%02d]: Shit this shouldn't happen %08x\n", 
+               this_cpu, r_time);
         now = NOW();
         goto timer_redo;
     }

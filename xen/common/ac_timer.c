@@ -82,7 +82,9 @@ int add_ac_timer(struct ac_timer *timer)
                    (u32)(timer->expires>>32), (u32)timer->expires));
         return 1;
     }
+
     spin_lock_irqsave(&ac_timers[cpu].lock, flags);
+
     /*
      * Add timer to the list. If it gets added to the front we have to
      * reprogramm the timer
@@ -154,8 +156,12 @@ int rem_ac_timer(struct ac_timer *timer)
             /* just removed the head */
             if (list_empty(&ac_timers[cpu].timers)) {
                 reprogram_ac_timer((s_time_t) 0);
+            } else {
+                timer = list_entry(ac_timers[cpu].timers.next,
+                                   struct ac_timer, timer_list);
+                if ( timer->expires > (NOW() + TIMER_SLOP) )
+                    reprogram_ac_timer(timer->expires);
             }
-            /* XXX should actaully reprogramm APIC to new head */
         }
     } else
         res = -1;
@@ -201,13 +207,7 @@ void do_ac_timer(void)
         
     /* Sanity: is the timer list empty? */
     if ( list_empty(&ac_timers[cpu].timers) ) {
-        /*
-         * XXX RN: This shouldn't happen, but does! Two possibilities:
-         * - Race condition between removing and reseting APIC
-         * - setting an APIC timeout value of 0 causes an immediate
-         *   timer interrupt to fire.
-         * None of these should be critical!
-         */
+        /* This does sometimes happen: race condition in resetting timeout? */
         spin_unlock_irqrestore(&ac_timers[cpu].lock, flags);
         return;
     }
