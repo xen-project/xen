@@ -103,9 +103,13 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         ret = -ESRCH;
         if ( d != NULL )
         {
-            domain_stop(d);
+            ret = -EINVAL;
+            if ( d != current )
+            {
+                domain_stop(d);
+                ret = 0;
+            }
             put_domain(d);
-            ret = 0;
         }
     }
     break;
@@ -173,9 +177,9 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             if ( d != current )
             {
                 domain_kill(d);
-                put_domain(d);
                 ret = 0;
             }
+            put_domain(d);
         }
     }
     break;
@@ -183,34 +187,35 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     case DOM0_PINCPUDOMAIN:
     {
         domid_t dom = op->u.pincpudomain.domain;
+        struct domain *d = find_domain_by_id(dom);
+        int cpu = op->u.pincpudomain.cpu;
+
+        if ( d == NULL )
+        {
+            ret = -ESRCH;            
+            break;
+        }
         
-        if ( dom == current->domain || dom == IDLE_DOMAIN_ID )
+        if ( d == current )
+        {
             ret = -EINVAL;
+            put_domain(d);
+            break;
+        }
+
+        if ( cpu == -1 )
+        {
+            clear_bit(DF_CPUPINNED, &d->flags);
+        }
         else
         {
-            struct domain *d = find_domain_by_id(dom);
-            int cpu = op->u.pincpudomain.cpu;
-            
-            ret = -ESRCH;
-            
-            if ( d != NULL )
-            {
-                if ( cpu == -1 )
-                {
-                    clear_bit(DF_CPUPINNED, &d->flags);
-                }
-                else
-                {
-                    domain_pause(d);
-                    set_bit(DF_CPUPINNED, &d->flags);
-                    cpu = cpu % smp_num_cpus;
-                    d->processor = cpu;
-                    domain_unpause(d);
-                }
-                put_domain(d);
-                ret = 0;
-            }      
+            domain_pause(d);
+            set_bit(DF_CPUPINNED, &d->flags);
+            d->processor = cpu % smp_num_cpus;
+            domain_unpause(d);
         }
+
+        put_domain(d);
     }
     break;
 
@@ -293,7 +298,8 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         op->u.getdomaininfo.flags =
             (test_bit(DF_RUNNING, &d->flags) ? DOMFLAGS_RUNNING : 0);
 
-        domain_pause(d);
+        if ( d != current )
+            domain_pause(d);
 
         op->u.getdomaininfo.domain = d->domain;
         strcpy(op->u.getdomaininfo.name, d->name);
@@ -381,7 +387,8 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             ret = -EINVAL;
 
     gdi_out:
-        domain_unpause(d);
+        if ( d != current )
+            domain_unpause(d);
         put_domain(d);
     }
     break;

@@ -178,16 +178,17 @@ void domain_sleep(struct domain *d)
     int           cpu = d->processor;
 
     spin_lock_irqsave(&schedule_lock[cpu], flags);
-
-    if ( test_bit(DF_RUNNING, &d->flags) )
-        cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
-    else if ( __task_on_runqueue(d) )
-        __del_from_runqueue(d);
-
+    if ( likely(!domain_runnable(d)) )
+    {
+        if ( test_bit(DF_RUNNING, &d->flags) )
+            cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
+        else if ( __task_on_runqueue(d) )
+            __del_from_runqueue(d);
+    }
     spin_unlock_irqrestore(&schedule_lock[cpu], flags);
 
     /* Synchronous. */
-    while ( test_bit(DF_RUNNING, &d->flags) )
+    while ( test_bit(DF_RUNNING, &d->flags) && !domain_runnable(d) )
     {
         smp_mb();
         cpu_relax();
