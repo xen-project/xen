@@ -53,9 +53,11 @@
 
 static struct sk_buff_head rx_skb_queue[NR_CPUS] __cacheline_aligned;
 
-static void make_tx_response(net_vif_t *vif, 
-                             unsigned short id, 
-                             unsigned char  st);
+static int get_tx_bufs(net_vif_t *vif);
+
+static void __make_tx_response(net_vif_t *vif, 
+                               unsigned short id, 
+                               unsigned char  st);
 static void make_rx_response(net_vif_t     *vif, 
                              unsigned short id, 
                              unsigned short size,
@@ -722,28 +724,7 @@ static void add_to_net_schedule_list_tail(net_vif_t *vif)
 }
 
 
-/* Destructor function for tx skbs. */
-static void tx_skb_release(struct sk_buff *skb)
-{
-    int i;
-    net_vif_t *vif = skb->src_vif;
-    unsigned long flags;
-    
-    spin_lock_irqsave(&vif->domain->page_lock, flags);
-    for ( i = 0; i < skb_shinfo(skb)->nr_frags; i++ )
-        put_page_tot(skb_shinfo(skb)->frags[i].page);
-    spin_unlock_irqrestore(&vif->domain->page_lock, flags);
-
-    if ( skb->skb_type == SKB_NODATA )
-        kmem_cache_free(net_header_cachep, skb->head);
-
-    skb_shinfo(skb)->nr_frags = 0; 
-
-    make_tx_response(vif, skb->guest_id, RING_STATUS_OK);
-
-    put_vif(vif);
-}
-
+static void tx_skb_release(struct sk_buff *skb);
     
 static void net_tx_action(unsigned long unused)
 {
@@ -762,11 +743,15 @@ static void net_tx_action(unsigned long unused)
         vif = list_entry(ent, net_vif_t, list);
         get_vif(vif);
         remove_from_net_schedule_list(vif);
-        if ( vif->tx_cons == vif->tx_prod )
+
+        /* Check whether there are packets to be transmitted. */
+        if ( (vif->tx_cons == vif->tx_prod) && !get_tx_bufs(vif) )
         {
             put_vif(vif);
             continue;
         }
+
+        add_to_net_schedule_list_tail(vif);
 
         if ( (skb = alloc_skb_nodata(GFP_ATOMIC)) == NULL )
         {
@@ -779,8 +764,6 @@ static void net_tx_action(unsigned long unused)
         /* Pick an entry from the transmit queue. */
         tx = &vif->tx_shadow_ring[vif->tx_cons];
         vif->tx_cons = TX_RING_INC(vif->tx_cons);
-        if ( vif->tx_cons != vif->tx_prod )
-            add_to_net_schedule_list_tail(vif);
 
         skb->destructor = tx_skb_release;
 
@@ -829,6 +812,37 @@ static inline void maybe_schedule_tx_action(void)
     if ( !netif_queue_stopped(the_dev) &&
          !list_empty(&net_schedule_list) )
         tasklet_schedule(&net_tx_tasklet);
+}
+
+
+/* Destructor function for tx skbs. */
+static void tx_skb_release(struct sk_buff *skb)
+{
+    int i;
+    net_vif_t *vif = skb->src_vif;
+    unsigned long flags;
+    
+    spin_lock_irqsave(&vif->domain->page_lock, flags);
+    for ( i = 0; i < skb_shinfo(skb)->nr_frags; i++ )
+        put_page_tot(skb_shinfo(skb)->frags[i].page);
+    spin_unlock_irqrestore(&vif->domain->page_lock, flags);
+
+    if ( skb->skb_type == SKB_NODATA )
+        kmem_cache_free(net_header_cachep, skb->head);
+
+    skb_shinfo(skb)->nr_frags = 0; 
+
+    spin_lock_irqsave(&vif->tx_lock, flags);
+    __make_tx_response(vif, skb->guest_id, RING_STATUS_OK);
+    spin_unlock_irqrestore(&vif->tx_lock, flags);
+
+    if ( (vif->tx_cons == vif->tx_prod) && get_tx_bufs(vif) )
+    {
+        add_to_net_schedule_list_tail(vif);
+        maybe_schedule_tx_action();        
+    }
+
+    put_vif(vif);
 }
 
 
@@ -1788,6 +1802,159 @@ inline int init_tx_header(u8 *data, unsigned int len, struct net_device *dev)
 }
 
 
+static int get_tx_bufs(net_vif_t *vif)
+{
+    struct task_struct *p = vif->domain;
+    net_idx_t          *shared_idxs  = vif->shared_idxs;
+    net_ring_t         *shared_rings = vif->shared_rings;
+    net_vif_t          *target;
+    unsigned long       buf_pfn;
+    struct pfn_info    *buf_page;
+    u8                 *g_data;
+    unsigned short      protocol;
+    struct sk_buff     *skb;
+    tx_req_entry_t      tx;
+    int                 i, j, ret;
+    unsigned long       flags;
+
+    if ( vif->tx_req_cons == shared_idxs->tx_req_prod )
+        return 0;
+
+    spin_lock_irqsave(&vif->tx_lock, flags);
+
+    j = vif->tx_prod;
+
+    /*
+     * Collect up new transmit buffers. We collect up to the guest OS's new 
+     * producer index, but take care not to catch up with our own consumer 
+     * index.
+     */
+ again:
+    for ( i = vif->tx_req_cons; 
+          (i != shared_idxs->tx_req_prod) && 
+              (((vif->tx_resp_prod-i) & (TX_RING_SIZE-1)) != 1); 
+          i = TX_RING_INC(i) )
+    {
+        tx     = shared_rings->tx_ring[i].req;
+        target = VIF_DROP;
+
+        if ( (tx.size < PKT_PROT_LEN) || (tx.size > ETH_FRAME_LEN) )
+        {
+            DPRINTK("Bad packet size: %d\n", tx.size);
+            __make_tx_response(vif, tx.id, RING_STATUS_BAD_PAGE);
+            continue; 
+        }
+
+        /* No crossing a page boundary as the payload mustn't fragment. */
+        if ( ((tx.addr & ~PAGE_MASK) + tx.size) >= PAGE_SIZE ) 
+        {
+            DPRINTK("tx.addr: %lx, size: %u, end: %lu\n", 
+                    tx.addr, tx.size, (tx.addr &~PAGE_MASK) + tx.size);
+            __make_tx_response(vif, tx.id, RING_STATUS_BAD_PAGE);
+            continue;
+        }
+
+        buf_pfn  = tx.addr >> PAGE_SHIFT;
+        buf_page = frame_table + buf_pfn;
+        spin_lock(&p->page_lock);
+        if ( (buf_pfn >= max_page) || 
+             ((buf_page->flags & PG_domain_mask) != p->domain) ) 
+        {
+            DPRINTK("Bad page frame\n");
+            spin_unlock(&p->page_lock);
+            __make_tx_response(vif, tx.id, RING_STATUS_BAD_PAGE);
+            continue;
+        }
+            
+        g_data = map_domain_mem(tx.addr);
+
+        protocol = __constant_htons(
+            init_tx_header(g_data, tx.size, the_dev));
+        if ( protocol == 0 )
+        {
+            __make_tx_response(vif, tx.id, RING_STATUS_BAD_PAGE);
+            goto tx_unmap_and_continue;
+        }
+
+        target = net_get_target_vif(g_data, tx.size, vif);
+
+        if ( VIF_LOCAL(target) )
+        {
+            /* Local delivery */
+            if ( (skb = dev_alloc_skb(ETH_FRAME_LEN + 32)) == NULL )
+            {
+                __make_tx_response(vif, tx.id, RING_STATUS_BAD_PAGE);
+                put_vif(target);
+                goto tx_unmap_and_continue;
+            }
+
+            skb->src_vif = vif;
+            skb->dst_vif = target;
+            skb->protocol = protocol;                
+
+            /*
+             * We don't need a well-formed skb as netif_rx will fill these
+             * fields in as necessary. All we actually need is the right
+             * page offset in skb->data, and the right length in skb->len.
+             * Note that the correct address/length *excludes* link header.
+             */
+            skb->head = (u8 *)map_domain_mem(
+                ((skb->pf - frame_table) << PAGE_SHIFT));
+            skb->data = skb->head + 18;
+            memcpy(skb->data, g_data, tx.size);
+            skb->data += ETH_HLEN;
+            skb->len = tx.size - ETH_HLEN;
+            unmap_domain_mem(skb->head);
+
+            netif_rx(skb);
+
+            __make_tx_response(vif, tx.id, RING_STATUS_OK);
+        }
+        else if ( (target == VIF_PHYS) || IS_PRIV(p) )
+        {
+            vif->tx_shadow_ring[j].id     = tx.id;
+            vif->tx_shadow_ring[j].size   = tx.size;
+            vif->tx_shadow_ring[j].header = 
+                kmem_cache_alloc(net_header_cachep, GFP_KERNEL);
+            if ( vif->tx_shadow_ring[j].header == NULL )
+            { 
+                __make_tx_response(vif, tx.id, RING_STATUS_OK);
+                goto tx_unmap_and_continue;
+            }
+
+            memcpy(vif->tx_shadow_ring[j].header, g_data, PKT_PROT_LEN);
+            vif->tx_shadow_ring[j].payload = tx.addr + PKT_PROT_LEN;
+            get_page_tot(buf_page);
+            j = TX_RING_INC(j);
+        }
+        else
+        {
+            __make_tx_response(vif, tx.id, RING_STATUS_DROPPED);
+        }
+
+    tx_unmap_and_continue:
+        unmap_domain_mem(g_data);
+        spin_unlock(&p->page_lock);
+    }
+
+    /*
+     * Needed as a final check for req_prod updates on another CPU.
+     * Also ensures that other CPUs see shadow ring updates.
+     */
+    smp_mb();
+
+    if ( (vif->tx_req_cons = i) != shared_idxs->tx_req_prod )
+        goto again;
+
+    if ( (ret = (vif->tx_prod != j)) )
+        vif->tx_prod = j;
+
+    spin_unlock_irqrestore(&vif->tx_lock, flags);
+
+    return ret;
+}
+
+
 /*
  * do_net_update:
  * 
@@ -1801,15 +1968,10 @@ long do_net_update(void)
     net_vif_t *vif;
     net_idx_t *shared_idxs;
     unsigned int i, j, idx;
-    struct sk_buff *skb;
-    tx_req_entry_t tx;
     rx_req_entry_t rx;
-    unsigned long pte_pfn, buf_pfn;
+    unsigned long  pte_pfn, buf_pfn;
     struct pfn_info *pte_page, *buf_page;
     unsigned long *ptep;    
-    net_vif_t *target;
-    u8 *g_data;
-    unsigned short protocol;
 
     perfc_incr(net_hypercalls);
 
@@ -1825,125 +1987,8 @@ long do_net_update(void)
          * PHASE 1 -- TRANSMIT RING
          */
 
-        /*
-         * Collect up new transmit buffers. We collect up to the guest OS's
-         * new producer index, but take care not to catch up with our own
-         * consumer index.
-         */
-        j = vif->tx_prod;
-        for ( i = vif->tx_req_cons; 
-              (i != shared_idxs->tx_req_prod) && 
-                  (((vif->tx_resp_prod-i) & (TX_RING_SIZE-1)) != 1); 
-              i = TX_RING_INC(i) )
+        if ( get_tx_bufs(vif) )
         {
-            tx     = shared_rings->tx_ring[i].req;
-            target = VIF_DROP;
-
-            if ( (tx.size < PKT_PROT_LEN) || (tx.size > ETH_FRAME_LEN) )
-            {
-                DPRINTK("Bad packet size: %d\n", tx.size);
-                make_tx_response(vif, tx.id, RING_STATUS_BAD_PAGE);
-                continue; 
-            }
-
-            /* No crossing a page boundary as the payload mustn't fragment. */
-            if ( ((tx.addr & ~PAGE_MASK) + tx.size) >= PAGE_SIZE ) 
-            {
-                DPRINTK("tx.addr: %lx, size: %u, end: %lu\n", 
-                        tx.addr, tx.size, (tx.addr &~PAGE_MASK) + tx.size);
-                make_tx_response(vif, tx.id, RING_STATUS_BAD_PAGE);
-                continue;
-            }
-
-            buf_pfn  = tx.addr >> PAGE_SHIFT;
-            buf_page = frame_table + buf_pfn;
-            spin_lock_irq(&current->page_lock);
-            if ( (buf_pfn >= max_page) || 
-                 ((buf_page->flags & PG_domain_mask) != current->domain) ) 
-            {
-                DPRINTK("Bad page frame\n");
-                spin_unlock_irq(&current->page_lock);
-                make_tx_response(vif, tx.id, RING_STATUS_BAD_PAGE);
-                continue;
-            }
-            
-            g_data = map_domain_mem(tx.addr);
-
-            protocol = __constant_htons(
-                init_tx_header(g_data, tx.size, the_dev));
-            if ( protocol == 0 )
-            {
-                make_tx_response(vif, tx.id, RING_STATUS_BAD_PAGE);
-                goto tx_unmap_and_continue;
-            }
-
-            target = net_get_target_vif(g_data, tx.size, vif);
-
-            if ( VIF_LOCAL(target) )
-            {
-                /* Local delivery */
-                if ( (skb = dev_alloc_skb(ETH_FRAME_LEN + 32)) == NULL )
-                {
-                    make_tx_response(vif, tx.id, RING_STATUS_BAD_PAGE);
-                    put_vif(target);
-                    goto tx_unmap_and_continue;
-                }
-
-                skb->src_vif = vif;
-                skb->dst_vif = target;
-                skb->protocol = protocol;                
-
-                /*
-                 * We don't need a well-formed skb as netif_rx will fill these
-                 * fields in as necessary. All we actually need is the right
-                 * page offset in skb->data, and the right length in skb->len.
-                 * Note that the correct address/length *excludes* link header.
-                 */
-                skb->head = (u8 *)map_domain_mem(
-                    ((skb->pf - frame_table) << PAGE_SHIFT));
-                skb->data = skb->head + 18;
-                memcpy(skb->data, g_data, tx.size);
-                skb->data += ETH_HLEN;
-                skb->len = tx.size - ETH_HLEN;
-                unmap_domain_mem(skb->head);
-
-                netif_rx(skb);
-
-                make_tx_response(vif, tx.id, RING_STATUS_OK);
-            }
-            else if ( (target == VIF_PHYS) || IS_PRIV(current) )
-            {
-                vif->tx_shadow_ring[j].id     = tx.id;
-                vif->tx_shadow_ring[j].size   = tx.size;
-                vif->tx_shadow_ring[j].header = 
-                    kmem_cache_alloc(net_header_cachep, GFP_KERNEL);
-                if ( vif->tx_shadow_ring[j].header == NULL )
-                { 
-                    make_tx_response(vif, tx.id, RING_STATUS_OK);
-                    goto tx_unmap_and_continue;
-                }
-
-                memcpy(vif->tx_shadow_ring[j].header, g_data, PKT_PROT_LEN);
-                vif->tx_shadow_ring[j].payload = tx.addr + PKT_PROT_LEN;
-                get_page_tot(buf_page);
-                j = TX_RING_INC(j);
-            }
-            else
-            {
-                make_tx_response(vif, tx.id, RING_STATUS_DROPPED);
-            }
-
-        tx_unmap_and_continue:
-            unmap_domain_mem(g_data);
-            spin_unlock_irq(&current->page_lock);
-        }
-
-        vif->tx_req_cons = i;
-
-        if ( vif->tx_prod != j )
-        {
-            smp_mb(); /* Let other CPUs see new descriptors first. */
-            vif->tx_prod = j;
             add_to_net_schedule_list_tail(vif);
             maybe_schedule_tx_action();
         }
@@ -2037,16 +2082,14 @@ long do_net_update(void)
 }
 
 
-static void make_tx_response(net_vif_t     *vif, 
-                             unsigned short id, 
-                             unsigned char  st)
+static void __make_tx_response(net_vif_t     *vif, 
+                               unsigned short id, 
+                               unsigned char  st)
 {
-    unsigned long flags;
     unsigned int pos;
     tx_resp_entry_t *resp;
 
     /* Place on the response ring for the relevant domain. */ 
-    spin_lock_irqsave(&vif->tx_lock, flags);
     pos  = vif->tx_resp_prod;
     resp = &vif->shared_rings->tx_ring[pos].resp;
     resp->id     = id;
@@ -2058,7 +2101,6 @@ static void make_tx_response(net_vif_t     *vif,
         unsigned long cpu_mask = mark_guest_event(vif->domain, _EVENT_NET);
         guest_event_notify(cpu_mask);    
     }
-    spin_unlock_irqrestore(&vif->tx_lock, flags);
 }
 
 

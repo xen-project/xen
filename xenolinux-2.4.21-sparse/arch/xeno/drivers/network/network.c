@@ -317,7 +317,10 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
     np->stats.tx_bytes += skb->len;
     np->stats.tx_packets++;
 
-    HYPERVISOR_net_update();
+    /* Only notify Xen if there are no outstanding responses. */
+    smp_wmb();
+    if ( np->net_idx->tx_resp_prod == i )
+        HYPERVISOR_net_update();
 
     return 0;
 }
