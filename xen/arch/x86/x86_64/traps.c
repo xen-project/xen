@@ -196,16 +196,24 @@ void __init percpu_traps_init(void)
     stack[9] = 0x25;
     *(u32 *)&stack[10] = (stack_bottom - &stack[14]) - 16;
 
+    /* pushq %r11 */
+    stack[14] = 0x41;
+    stack[15] = 0x53;
+
+    /* pushq $__GUEST_CS64 */
+    stack[16] = 0x68;
+    *(u32 *)&stack[17] = __GUEST_CS64;
+
     /* jmp syscall_enter */
-    stack[14] = 0xe9;
-    *(u32 *)&stack[15] = (char *)syscall_enter - &stack[19];
+    stack[21] = 0xe9;
+    *(u32 *)&stack[22] = (char *)syscall_enter - &stack[26];
 
     /*
      * Trampoline for SYSCALL entry from compatibility mode.
      */
 
     /* Skip the long-mode entry trampoline. */
-    stack = &stack[19];
+    stack = &stack[26];
     wrmsr(MSR_CSTAR, (unsigned long)stack, ((unsigned long)stack>>32)); 
 
     /* movq %rsp, saversp(%rip) */
@@ -220,9 +228,17 @@ void __init percpu_traps_init(void)
     stack[9] = 0x25;
     *(u32 *)&stack[10] = (stack_bottom - &stack[14]) - 16;
 
+    /* pushq %r11 */
+    stack[14] = 0x41;
+    stack[15] = 0x53;
+
+    /* pushq $__GUEST_CS32 */
+    stack[16] = 0x68;
+    *(u32 *)&stack[17] = __GUEST_CS32;
+
     /* jmp syscall_enter */
-    stack[14] = 0xe9;
-    *(u32 *)&stack[15] = (char *)syscall_enter - &stack[19];
+    stack[21] = 0xe9;
+    *(u32 *)&stack[22] = (char *)syscall_enter - &stack[26];
 
     /*
      * Common SYSCALL parameters.

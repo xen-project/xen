@@ -24,14 +24,21 @@ restore_all_guest:
         jc    failsafe_callback
         RESTORE_ALL
         testw $TRAP_syscall,4(%rsp)
-        jz    1f
+        jz    iret_exit_to_guest
+
         addq  $8,%rsp
-        popq  %rcx
-        addq  $8,%rsp
-        popq  %r11
-        popq  %rsp
+        popq  %rcx                    # RIP
+        popq  %r11                    # CS
+        cmpw  $__GUEST_CS32,%r11
+        popq  %r11                    # RFLAGS
+        popq  %rsp                    # RSP
+        je    1f
         sysretq
-1:      addq  $8,%rsp
+1:      sysretl
+
+        ALIGN
+iret_exit_to_guest:
+        addq  $8,%rsp
 FLT1:   iretq
 .section .fixup,"ax"
 FIX1:   popq  -15*8-8(%rsp)            # error_code/entry_vector
@@ -89,16 +96,24 @@ restore_all_xen:
         iretq
 
 /*
- * %rax                            = hypercall vector
- * %rdi, %rsi, %rdx, %r10, %r8, %9 = hypercall arguments
- * %r11, %rcx                      = SYSCALL-saved %rflags and %rip
- * NB. We must move %r10 to %rcx for C function-calling ABI.
+ * When entering SYSCALL from kernel mode:
+ *  %rax                            = hypercall vector
+ *  %rdi, %rsi, %rdx, %r10, %r8, %9 = hypercall arguments
+ *  %r11, %rcx                      = SYSCALL-saved %rflags and %rip
+ *  NB. We must move %r10 to %rcx for C function-calling ABI.
+ *
+ * When entering SYSCALL from user mode:
+ *  Vector directly to the registered arch.syscall_addr.
+ *
+ * Initial work is done by per-CPU stack trampolines. At this point %rsp
+ * has been initialised to point at the correct Xen stack, and %rsp, %rflags
+ * and %cs have been saved. All other registers are still to be saved onto
+ * the stack, starting with %rip, and an appropriate %ss must be saved into
+ * the space left by the trampoline.
  */
         ALIGN
 ENTRY(syscall_enter)
-        movl  $__GUEST_SS,8(%rsp)
-        pushq %r11
-        pushq $__GUEST_CS
+        movl  $__GUEST_SS,24(%rsp)
         pushq %rcx
         pushq $0
         movl  $TRAP_syscall,4(%rsp)
