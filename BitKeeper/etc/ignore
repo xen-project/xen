@@ -7,6 +7,7 @@
 *.tar.bz2
 *.tar.gz
 *~
+BLOG
 BitKeeper/*/*
 PENDING/*
 TAGS
@@ -75,6 +76,7 @@ tools/web-shutdown.tap
 tools/x2d2/minixend
 tools/xentrace/xentrace
 tools/xfrd/xfrd
+xen/BLOG
 xen/arch/x86/asm-offsets.s
 xen/arch/x86/boot/mkelf32
 xen/ddb/*
@@ -91,5 +93,3 @@ xen/tools/figlet/figlet
 xen/xen
 xen/xen-syms
 xen/xen.*
-xen/BLOG
-BLOG
