@@ -293,6 +293,10 @@ bx_gui_c::reset_handler(void)
       BX_CPU(i)->reset(BX_RESET_HARDWARE);
 }
 
+#ifdef BX_USE_VMX
+char xm_destroy[PATH_MAX];
+#endif
+
   void
 bx_gui_c::power_handler(void)
 {
@@ -300,9 +304,14 @@ bx_gui_c::power_handler(void)
   // to quit.  Change panics to fatal for the GUI and then do a panic.
   bx_user_quit = 1;
   LOG_THIS setonoff(LOGLEV_PANIC, ACT_FATAL);
-  BX_PANIC (("POWER button turned off."));
+  BX_INFO(("POWER button turned off."));
   // shouldn't reach this point, but if you do, QUIT!!!
   fprintf (stderr, "Bochs is exiting because you pressed the power button.\n");
+  snprintf(xm_destroy, PATH_MAX, "xm destroy %d", domid);
+  BX_INFO(("executing: %s\n", xm_destroy));
+  if (system(xm_destroy) != 0) {
+        BX_PANIC(("failed\n"));
+  }
   BX_EXIT (1);
 }
 
