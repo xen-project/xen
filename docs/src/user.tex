@@ -981,6 +981,7 @@ chapter covers some of the possibilities.
 
 
 \section{Exporting Physical Devices as VBDs} 
+\label{s:exporting-physical-devices-as-vbds}
 
 One of the simplest configurations is to directly export 
 individual partitions from domain 0 to other domains. To 
@@ -1074,8 +1075,23 @@ In the configuration file set:
 As the virtual machine writes to its `disk', the sparse file will be
 filled in and consume more space up to the original 2GB.
 
+{\bf Note that file-backed VBDs may not be appropriate for backing
+I/O-intensive domains.}  File-backed VBDs are known to experience
+substantial slowdowns under heavy I/O workloads, due to the I/O handling
+by the loopback block device used to support file-backed VBDs in dom0.
+Better I/O performance can be achieved by using either LVM-backed VBDs
+(Section~\ref{s:using-lvm-backed-vbds}) or physical devices as VBDs
+(Section~\ref{s:exporting-physical-devices-as-vbds}).
+
+Linux supports a maximum of eight file-backed VBDs across all domains by
+default.  This limit can be statically increased by using the {\em
+max\_loop} module parameter if CONFIG\_BLK\_DEV\_LOOP is compiled as a
+module in the dom0 kernel, or by using the {\em max\_loop=n} boot option
+if CONFIG\_BLK\_DEV\_LOOP is compiled directly into the dom0 kernel.
+
 
 \section{Using LVM-backed VBDs}
+\label{s:using-lvm-backed-vbds}
 
 A particularly appealing solution is to use LVM volumes 
 as backing for domain file-systems since this allows dynamic
