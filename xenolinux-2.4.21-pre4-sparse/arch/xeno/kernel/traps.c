@@ -364,7 +364,7 @@ asmlinkage void do_debug(struct pt_regs * regs, long error_code)
     /* If this is a kernel mode trap, save the user PC on entry to 
      * the kernel, that's what the debugger can make sense of.
      */
-    info.si_addr = ((regs->xcs & 3) == 0) ? (void *)tsk->thread.eip : 
+    info.si_addr = ((regs->xcs & 2) == 0) ? (void *)tsk->thread.eip : 
                                             (void *)regs->eip;
     force_sig_info(SIGTRAP, &info, tsk);
 

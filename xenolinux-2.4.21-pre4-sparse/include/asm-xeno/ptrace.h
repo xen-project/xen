@@ -55,7 +55,7 @@ struct pt_regs {
 #define PTRACE_O_TRACESYSGOOD     0x00000001
 
 #ifdef __KERNEL__
-#define user_mode(regs) ((regs) && (3 & (regs)->xcs))
+#define user_mode(regs) ((regs) && (2 & (regs)->xcs))
 #define instruction_pointer(regs) ((regs) ? (regs)->eip : NULL)
 extern void show_regs(struct pt_regs *);
 #endif
