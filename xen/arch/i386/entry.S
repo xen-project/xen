@@ -712,7 +712,11 @@ ENTRY(hypervisor_call_table)
         .long SYMBOL_NAME(do_sched_op)
         .long SYMBOL_NAME(do_dom0_op)
         .long SYMBOL_NAME(do_network_op)         /* 10 */
+#ifndef NO_DEVICES_IN_XEN
         .long SYMBOL_NAME(do_block_io_op)
+#else
+        .long SYMBOL_NAME(do_ni_syscall)
+#endif
         .long SYMBOL_NAME(do_set_debugreg)
         .long SYMBOL_NAME(do_get_debugreg)
         .long SYMBOL_NAME(do_update_descriptor)

@@ -822,6 +822,7 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
     write_cr3_counted(pagetable_val(current->mm.pagetable));
     __sti();
 
+#ifndef NO_DEVICES_IN_XEN
     /* DOM0 gets access to all real block devices. */
 #define MAX_REAL_DISKS 256
     xd = kmalloc(MAX_REAL_DISKS * sizeof(xen_disk_t), GFP_KERNEL);
@@ -843,6 +844,7 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
             BUG();
     }
     kfree(xd);
+#endif
 
     /* DOM0 gets access to everything. */
     physdev_init_dom0(p);

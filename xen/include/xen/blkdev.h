@@ -26,9 +26,15 @@ typedef struct {
 
 extern kdev_t xendev_to_physdev(unsigned short xendev);
 
+#ifndef NO_DEVICES_IN_XEN
 extern void init_blkdev_info(struct task_struct *);
 extern void unlink_blkdev_info(struct task_struct *);
 extern void destroy_blkdev_info(struct task_struct *);
+#else
+#define init_blkdev_info(_p)    ((void)0)
+#define unlink_blkdev_info(_p)  ((void)0)
+#define destroy_blkdev_info(_p) ((void)0)
+#endif
 
 extern int unregister_blkdev(unsigned int, const char *);
 extern int invalidate_device(kdev_t, int);
