@@ -233,6 +233,10 @@ void arch_free_exec_domain_struct(struct exec_domain *ed)
 void free_perdomain_pt(struct domain *d)
 {
     free_xenheap_page((unsigned long)d->arch.mm_perdomain_pt);
+#ifdef __x86_64__
+    free_xenheap_page((unsigned long)d->arch.mm_perdomain_l2);
+    free_xenheap_page((unsigned long)d->arch.mm_perdomain_l3);
+#endif
 }
 
 static void continue_idle_task(struct exec_domain *ed)
@@ -271,6 +275,17 @@ void arch_do_createdomain(struct exec_domain *ed)
         machine_to_phys_mapping[virt_to_phys(d->arch.mm_perdomain_pt) >> 
                                PAGE_SHIFT] = INVALID_P2M_ENTRY;
         ed->arch.perdomain_ptes = d->arch.mm_perdomain_pt;
+
+#ifdef __x86_64__
+        d->arch.mm_perdomain_l2 = (l2_pgentry_t *)alloc_xenheap_page();
+        memset(d->arch.mm_perdomain_l2, 0, PAGE_SIZE);
+        d->arch.mm_perdomain_l2[l2_table_offset(PERDOMAIN_VIRT_START)] = 
+            mk_l2_pgentry(__pa(d->arch.mm_perdomain_pt) | __PAGE_HYPERVISOR);
+        d->arch.mm_perdomain_l3 = (l3_pgentry_t *)alloc_xenheap_page();
+        memset(d->arch.mm_perdomain_l3, 0, PAGE_SIZE);
+        d->arch.mm_perdomain_l3[l3_table_offset(PERDOMAIN_VIRT_START)] = 
+            mk_l3_pgentry(__pa(d->arch.mm_perdomain_l2) | __PAGE_HYPERVISOR);
+#endif
     }
 }
 
@@ -322,12 +337,12 @@ static void monitor_mk_pagetable(struct exec_domain *ed)
     ed->arch.monitor_table = mk_pagetable(mpfn << PAGE_SHIFT);
     d->arch.shadow_mode = SHM_full_32;
 
-    mpl2e[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] =
+    mpl2e[l2_table_offset(PERDOMAIN_VIRT_START)] =
         mk_l2_pgentry((__pa(d->arch.mm_perdomain_pt) & PAGE_MASK) 
                       | __PAGE_HYPERVISOR);
 
-    phys_table = (l2_pgentry_t *) map_domain_mem(pagetable_val(
-                                        ed->arch.phys_table));
+    phys_table = (l2_pgentry_t *)
+        map_domain_mem(pagetable_val(ed->arch.phys_table));
     memcpy(d->arch.mm_perdomain_pt, phys_table,
            L1_PAGETABLE_ENTRIES * sizeof(l1_pgentry_t));
 
@@ -345,7 +360,8 @@ static void monitor_rm_pagetable(struct exec_domain *ed)
 
     ASSERT( pagetable_val(ed->arch.monitor_table) );
     
-    mpl2e = (l2_pgentry_t *) map_domain_mem(pagetable_val(ed->arch.monitor_table));
+    mpl2e = (l2_pgentry_t *)
+        map_domain_mem(pagetable_val(ed->arch.monitor_table));
     /*
      * First get the pfn for guest_pl2e_cache by looking at monitor_table
      */
@@ -384,8 +400,10 @@ static int vmx_final_setup_guestos(struct exec_domain *ed,
     memset(&ed->arch.arch_vmx, 0, sizeof (struct arch_vmx_struct));
 
     ed->arch.arch_vmx.vmcs = vmcs;
-    error = construct_vmcs(&ed->arch.arch_vmx, context, full_context, VMCS_USE_HOST_ENV);
-    if (error < 0) {
+    error = construct_vmcs(
+        &ed->arch.arch_vmx, context, full_context, VMCS_USE_HOST_ENV);
+    if ( error < 0 )
+    {
         printk("Failed to construct a new VMCS\n");
         goto out;
     }

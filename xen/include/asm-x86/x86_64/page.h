@@ -82,6 +82,13 @@ typedef l4_pgentry_t root_pgentry_t;
 /* Given a virtual address, get an entry offset into a linear page table. */
 #define l1_linear_offset(_a) (((_a) & VADDR_MASK) >> PAGE_SHIFT)
 
+#define is_guest_l1_slot(_s) (1)
+#define is_guest_l2_slot(_s) (1)
+#define is_guest_l3_slot(_s) (1)
+#define is_guest_l4_slot(_s)                   \
+    (((_s) < ROOT_PAGETABLE_FIRST_XEN_SLOT) || \
+     ((_s) > ROOT_PAGETABLE_LAST_XEN_SLOT))
+
 #define PGT_root_page_table PGT_l4_page_table
 
 #define _PAGE_NX         (cpu_has_nx ? (1UL<<63) : 0UL)

@@ -8,10 +8,7 @@ OBJS += $(patsubst %.c,%.o,$(wildcard mtrr/*.c))
 OBJS := $(subst $(TARGET_SUBARCH)/asm-offsets.o,,$(OBJS))
 
 ifneq ($(TARGET_SUBARCH),x86_32)
-OBJS := $(subst vmx.o,,$(OBJS))
-OBJS := $(subst vmx_io.o,,$(OBJS))
-OBJS := $(subst vmx_platform.o,,$(OBJS))
-OBJS := $(subst vmx_vmcs.o,,$(OBJS))
+OBJS := $(patsubst vmx%.o,,$(OBJS))
 endif
 
 default: $(TARGET)

@@ -14,6 +14,10 @@ struct trap_bounce {
 struct arch_domain
 {
     l1_pgentry_t *mm_perdomain_pt;
+#ifdef __x86_64__
+    l2_pgentry_t *mm_perdomain_l2;
+    l3_pgentry_t *mm_perdomain_l3;
+#endif
 
     /* shadow mode status and controls */
     unsigned int shadow_mode;  /* flags to control shadow table operation */

@@ -151,6 +151,11 @@ extern void __out_of_line_bug(int line) __attribute__((noreturn));
  */
 
 
+#define ROOT_PAGETABLE_FIRST_XEN_SLOT 256
+#define ROOT_PAGETABLE_LAST_XEN_SLOT  271
+#define ROOT_PAGETABLE_XEN_SLOTS \
+    (ROOT_PAGETABLE_LAST_XEN_SLOT - ROOT_PAGETABLE_FIRST_XEN_SLOT + 1)
+
 /* Hypervisor reserves PML4 slots 256 to 271 inclusive. */
 #define HYPERVISOR_VIRT_START   (PML4_ADDR(256))
 #define HYPERVISOR_VIRT_END     (HYPERVISOR_VIRT_START + PML4_ENTRY_BYTES*16)
@@ -209,6 +214,13 @@ extern void __out_of_line_bug(int line) __attribute__((noreturn));
 /* Hypervisor owns top 64MB of virtual address space. */
 #define __HYPERVISOR_VIRT_START  0xFC000000
 #define HYPERVISOR_VIRT_START   (0xFC000000UL)
+
+#define ROOT_PAGETABLE_FIRST_XEN_SLOT \
+    (HYPERVISOR_VIRT_START >> L2_PAGETABLE_SHIFT)
+#define ROOT_PAGETABLE_LAST_XEN_SLOT  \
+    (~0UL >> L2_PAGETABLE_SHIFT)
+#define ROOT_PAGETABLE_XEN_SLOTS \
+    (ROOT_PAGETABLE_LAST_XEN_SLOT - ROOT_PAGETABLE_FIRST_XEN_SLOT + 1)
 
 /*
  * First 4MB are mapped read-only for all. It's for the machine->physical

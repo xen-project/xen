@@ -9,6 +9,10 @@
 #include <asm/x86_64/page.h>
 #endif
 
+/* Convert a pointer to a page-table entry into pagetable slot index. */
+#define pgentry_ptr_to_slot(_p) \
+    (((unsigned long)(_p) & ~PAGE_MASK) / sizeof(*(_p)))
+
 /* Page-table type. */
 #ifndef __ASSEMBLY__
 typedef struct { unsigned long pt_lo; } pagetable_t;
