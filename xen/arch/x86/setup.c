@@ -55,6 +55,8 @@ boolean_param("ignorebiostables", opt_ignorebiostables);
 static int opt_watchdog = 0;
 boolean_param("watchdog", opt_watchdog);
 
+int early_boot = 1;
+
 unsigned long xenheap_phys_end;
 
 extern void arch_init_memory(void);
@@ -593,6 +595,8 @@ void __init __start_xen(multiboot_info_t *mbi)
     printk("Xen heap: %luMB (%lukB)\n",
 	   (xenheap_phys_end-__pa(heap_start)) >> 20,
 	   (xenheap_phys_end-__pa(heap_start)) >> 10);
+
+    early_boot = 0;
 
     /* Initialise the slab allocator. */
     xmem_cache_init();

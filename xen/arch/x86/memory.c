@@ -148,27 +148,20 @@ unsigned long max_page;
 
 void __init init_frametable(void)
 {
-#if defined(__i386__)
     unsigned long i, p;
-#endif
 
+    frame_table      = (struct pfn_info *)FRAMETABLE_VIRT_START;
     frame_table_size = max_page * sizeof(struct pfn_info);
     frame_table_size = (frame_table_size + PAGE_SIZE - 1) & PAGE_MASK;
-
-#if defined(__x86_64__)
-    frame_table = __va(alloc_boot_pages(frame_table_size, 4UL << 20));
-#elif defined(__i386__)
-    frame_table = (struct pfn_info *)FRAMETABLE_VIRT_START;
 
     for ( i = 0; i < frame_table_size; i += (4UL << 20) )
     {
         p = alloc_boot_pages(min(frame_table_size - i, 4UL << 20), 4UL << 20);
         if ( p == 0 )
             panic("Not enough memory for frame table\n");
-        idle_pg_table[(FRAMETABLE_VIRT_START + i) >> L2_PAGETABLE_SHIFT] =
-            mk_l2_pgentry(p | __PAGE_HYPERVISOR | _PAGE_PSE);
+        map_pages(idle_pg_table, FRAMETABLE_VIRT_START + i, p, 
+                  4UL << 20, PAGE_HYPERVISOR);
     }
-#endif
 
     memset(frame_table, 0, frame_table_size);
 }

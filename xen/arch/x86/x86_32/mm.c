@@ -29,30 +29,62 @@
 
 unsigned long m2p_start_mfn;
 
-static inline void set_pte_phys(unsigned long vaddr,
-                                l1_pgentry_t entry)
+/* Map physical byte range (@p, @p+@s) at virt address @v in pagetable @pt. */
+int map_pages(
+    pagetable_t *pt,
+    unsigned long v,
+    unsigned long p,
+    unsigned long s,
+    unsigned long flags)
 {
-    l2_pgentry_t *l2ent;
-    l1_pgentry_t *l1ent;
+    l2_pgentry_t *pl2e;
+    l1_pgentry_t *pl1e;
+    void         *newpg;
 
-    l2ent = &idle_pg_table[l2_table_offset(vaddr)];
-    l1ent = l2_pgentry_to_l1(*l2ent) + l1_table_offset(vaddr);
-    *l1ent = entry;
+    while ( s != 0 )
+    {
+        pl2e = &pt[l2_table_offset(v)];
 
-    /* It's enough to flush this one mapping. */
-    __flush_tlb_one(vaddr);
+        if ( ((s|v|p) & ((1<<L2_PAGETABLE_SHIFT)-1)) == 0 )
+        {
+            /* Super-page mapping. */
+            if ( (l2_pgentry_val(*pl2e) & _PAGE_PRESENT) )
+                __flush_tlb_pge();
+            *pl2e = mk_l2_pgentry(p|flags|_PAGE_PSE);
+
+            v += 1 << L2_PAGETABLE_SHIFT;
+            p += 1 << L2_PAGETABLE_SHIFT;
+            s -= 1 << L2_PAGETABLE_SHIFT;
+        }
+        else
+        {
+            /* Normal page mapping. */
+            if ( !(l2_pgentry_val(*pl2e) & _PAGE_PRESENT) )
+            {
+                newpg = (void *)alloc_xenheap_page();
+                clear_page(newpg);
+                *pl2e = mk_l2_pgentry(__pa(newpg) | __PAGE_HYPERVISOR);
+            }
+            pl1e = l2_pgentry_to_l1(*pl2e) + l1_table_offset(v);
+            if ( (l1_pgentry_val(*pl1e) & _PAGE_PRESENT) )
+                __flush_tlb_one(v);
+            *pl1e = mk_l1_pgentry(p|flags);
+
+            v += 1 << L1_PAGETABLE_SHIFT;
+            p += 1 << L1_PAGETABLE_SHIFT;
+            s -= 1 << L1_PAGETABLE_SHIFT;            
+        }
+    }
+
+    return 0;
 }
 
-
-void __set_fixmap(enum fixed_addresses idx, 
-                  l1_pgentry_t entry)
+void __set_fixmap(
+    enum fixed_addresses idx, unsigned long p, unsigned long flags)
 {
-    unsigned long address = fix_to_virt(idx);
-
-    if ( likely(idx < __end_of_fixed_addresses) )
-        set_pte_phys(address, entry);
-    else
-        printk("Invalid __set_fixmap\n");
+    if ( unlikely(idx >= __end_of_fixed_addresses) )
+        BUG();
+    map_pages(idle_pg_table, fix_to_virt(idx), p, PAGE_SIZE, flags);
 }
 
 

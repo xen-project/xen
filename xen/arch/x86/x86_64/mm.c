@@ -27,39 +27,114 @@
 #include <asm/fixmap.h>
 #include <asm/domain_page.h>
 
-static inline void set_pte_phys(unsigned long vaddr,
-                                l1_pgentry_t entry)
+unsigned long m2p_start_mfn; /* XXX Kill this (in 32-bit code also). */
+
+void *safe_page_alloc(void)
 {
-    l4_pgentry_t *l4ent;
-    l3_pgentry_t *l3ent;
-    l2_pgentry_t *l2ent;
-    l1_pgentry_t *l1ent;
-
-    l4ent = &idle_pg_table[l4_table_offset(vaddr)];
-    l3ent = l4_pgentry_to_l3(*l4ent) + l3_table_offset(vaddr);
-    l2ent = l3_pgentry_to_l2(*l3ent) + l2_table_offset(vaddr);
-    l1ent = l2_pgentry_to_l1(*l2ent) + l1_table_offset(vaddr);
-    *l1ent = entry;
-
-    /* It's enough to flush this one mapping. */
-    __flush_tlb_one(vaddr);
+    extern int early_boot;
+    if ( early_boot )
+        return __va(alloc_boot_pages(PAGE_SIZE, PAGE_SIZE));
+    return (void *)alloc_xenheap_page();
 }
 
-
-void __set_fixmap(enum fixed_addresses idx, 
-                  l1_pgentry_t entry)
+/* Map physical byte range (@p, @p+@s) at virt address @v in pagetable @pt. */
+int map_pages(
+    pagetable_t *pt,
+    unsigned long v,
+    unsigned long p,
+    unsigned long s,
+    unsigned long flags)
 {
-    unsigned long address = fix_to_virt(idx);
+    l4_pgentry_t *pl4e;
+    l3_pgentry_t *pl3e;
+    l2_pgentry_t *pl2e;
+    l1_pgentry_t *pl1e;
+    void         *newpg;
 
-    if ( likely(idx < __end_of_fixed_addresses) )
-        set_pte_phys(address, entry);
-    else
-        printk("Invalid __set_fixmap\n");
+    while ( s != 0 )
+    {
+        pl4e = &pt[l4_table_offset(v)];
+        if ( !(l4_pgentry_val(*pl4e) & _PAGE_PRESENT) )
+        {
+            newpg = safe_page_alloc();
+            clear_page(newpg);
+            *pl4e = mk_l4_pgentry(__pa(newpg) | __PAGE_HYPERVISOR);
+        }
+
+        pl3e = l4_pgentry_to_l3(*pl4e) + l3_table_offset(v);
+        if ( !(l3_pgentry_val(*pl3e) & _PAGE_PRESENT) )
+        {
+            newpg = safe_page_alloc();
+            clear_page(newpg);
+            *pl3e = mk_l3_pgentry(__pa(newpg) | __PAGE_HYPERVISOR);
+        }
+
+        pl2e = l3_pgentry_to_l2(*pl3e) + l2_table_offset(v);
+
+        if ( ((s|v|p) & ((1<<L2_PAGETABLE_SHIFT)-1)) == 0 )
+        {
+            /* Super-page mapping. */
+            if ( (l2_pgentry_val(*pl2e) & _PAGE_PRESENT) )
+                __flush_tlb_pge();
+            *pl2e = mk_l2_pgentry(p|flags|_PAGE_PSE);
+
+            v += 1 << L2_PAGETABLE_SHIFT;
+            p += 1 << L2_PAGETABLE_SHIFT;
+            s -= 1 << L2_PAGETABLE_SHIFT;
+        }
+        else
+        {
+            /* Normal page mapping. */
+            if ( !(l2_pgentry_val(*pl2e) & _PAGE_PRESENT) )
+            {
+                newpg = safe_page_alloc();
+                clear_page(newpg);
+                *pl2e = mk_l2_pgentry(__pa(newpg) | __PAGE_HYPERVISOR);
+            }
+            pl1e = l2_pgentry_to_l1(*pl2e) + l1_table_offset(v);
+            if ( (l1_pgentry_val(*pl1e) & _PAGE_PRESENT) )
+                __flush_tlb_one(v);
+            *pl1e = mk_l1_pgentry(p|flags);
+
+            v += 1 << L1_PAGETABLE_SHIFT;
+            p += 1 << L1_PAGETABLE_SHIFT;
+            s -= 1 << L1_PAGETABLE_SHIFT;
+        }
+    }
+
+    return 0;
+}
+
+void __set_fixmap(
+    enum fixed_addresses idx, unsigned long p, unsigned long flags)
+{
+    if ( unlikely(idx >= __end_of_fixed_addresses) )
+        BUG();
+    map_pages(idle_pg_table, fix_to_virt(idx), p, PAGE_SIZE, flags);
 }
 
 
 void __init paging_init(void)
 {
+    void *newpt;
+
+    /* Allocate and map the machine-to-phys table. */
+    /* XXX TODO XXX */
+
+    /* Create page table for ioremap(). */
+    newpt = (void *)alloc_xenheap_page();
+    clear_page(newpt);
+    idle_pg_table[IOREMAP_VIRT_START >> L4_PAGETABLE_SHIFT] = 
+        mk_l4_pgentry(__pa(newpt) | __PAGE_HYPERVISOR);
+
+    /* Create read-only mapping of MPT for guest-OS use. */
+    newpt = (void *)alloc_xenheap_page();
+    clear_page(newpt);
+    idle_pg_table[RO_MPT_VIRT_START >> L4_PAGETABLE_SHIFT] = 
+        mk_l4_pgentry((__pa(newpt) | __PAGE_HYPERVISOR | _PAGE_USER) &
+                      ~_PAGE_RW);
+    /* XXX TODO: Copy appropriate L3 entries from RDWR_MPT_VIRT_START XXX */
+
     /* Set up linear page table mapping. */
     idle_pg_table[LINEAR_PT_VIRT_START >> L4_PAGETABLE_SHIFT] =
         mk_l4_pgentry(__pa(idle_pg_table) | __PAGE_HYPERVISOR);
