@@ -1,3 +1,9 @@
+/******************************************************************************
+ * arch/x86/domain.c
+ * 
+ * x86-specific domain handling (e.g., register setup and context switching).
+ */
+
 /*
  *  Copyright (C) 1995  Linus Torvalds
  *
@@ -23,14 +29,9 @@
 #include <asm/ldt.h>
 #include <xen/irq.h>
 #include <xen/event.h>
-#include <xen/shadow.h>
+#include <asm/shadow.h>
 #include <xen/console.h>
-
 #include <xen/elf.h>
-
-extern int loadelfimage(char *);
-extern int readelfimage_base_and_size(char *, unsigned long,
-                  unsigned long *, unsigned long *, unsigned long *);
 
 #if !defined(CONFIG_X86_64BITMODE)
 /* No ring-3 access in initial page tables. */
@@ -45,7 +46,6 @@ extern int readelfimage_base_and_size(char *, unsigned long,
 
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
 #define round_pgdown(_p)  ((_p)&PAGE_MASK)
-
 
 int hlt_counter;
 
@@ -205,12 +205,6 @@ void machine_halt(void)
 void machine_power_off(void)
 {
     machine_restart(0);
-}
-
-/* this belongs in include/asm, but there doesn't seem to be a suitable place */
-void free_perdomain_pt(struct domain *d)
-{
-    free_page((unsigned long)d->mm.perdomain_pt);
 }
 
 void arch_do_createdomain(struct domain *d)
@@ -459,13 +453,18 @@ void domain_relinquish_memory(struct domain *d)
         write_ptbase(&current->mm);
 
     /* Exit shadow mode before deconstructing final guest page table. */
-    if ( shadow_mode(d) )
-        shadow_mode_disable(d);
+    shadow_mode_disable(d);
 
     /* Drop the in-use reference to the page-table base. */
     if ( pagetable_val(d->mm.pagetable) != 0 )
         put_page_and_type(&frame_table[pagetable_val(d->mm.pagetable) >>
                                       PAGE_SHIFT]);
+
+    /*
+     * Relinquish GDT mappings. No need for explicit unmapping of the LDT as 
+     * it automatically gets squashed when the guest's mappings go away.
+     */
+    destroy_gdt(d);
 
     /* Relinquish Xen-heap pages. Currently this can only be 'shared_info'. */
     page = virt_to_page(d->shared_info);

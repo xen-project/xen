@@ -19,8 +19,8 @@
 #include <xen/compile.h>
 #include <xen/console.h>
 #include <xen/serial.h>
-#include <xen/shadow.h>
 #include <xen/trace.h>
+#include <asm/shadow.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
 #include <asm/domain_page.h>

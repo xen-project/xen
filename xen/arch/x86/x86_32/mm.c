@@ -212,13 +212,26 @@ int check_descriptor(unsigned long a, unsigned long b)
 }
 
 
-long set_gdt(struct domain *p, 
+void destroy_gdt(struct domain *d)
+{
+    int i;
+    unsigned long pfn;
+
+    for ( i = 0; i < 16; i++ )
+    {
+        if ( (pfn = l1_pgentry_to_pagenr(d->mm.perdomain_pt[i])) != 0 )
+            put_page_and_type(&frame_table[pfn]);
+        d->mm.perdomain_pt[i] = mk_l1_pgentry(0);
+    }
+}
+
+
+long set_gdt(struct domain *d, 
              unsigned long *frames,
              unsigned int entries)
 {
     /* NB. There are 512 8-byte entries per GDT page. */
     int i, nr_pages = (entries + 511) / 512;
-    unsigned long pfn;
     struct desc_struct *vgdt;
 
     /* Check the new GDT. */
@@ -226,7 +239,7 @@ long set_gdt(struct domain *p,
     {
         if ( unlikely(frames[i] >= max_page) ||
              unlikely(!get_page_and_type(&frame_table[frames[i]], 
-                                         p, PGT_gdt_page)) )
+                                         d, PGT_gdt_page)) )
             goto fail;
     }
 
@@ -238,20 +251,15 @@ long set_gdt(struct domain *p,
     unmap_domain_mem(vgdt);
 
     /* Tear down the old GDT. */
-    for ( i = 0; i < 16; i++ )
-    {
-        if ( (pfn = l1_pgentry_to_pagenr(p->mm.perdomain_pt[i])) != 0 )
-            put_page_and_type(&frame_table[pfn]);
-        p->mm.perdomain_pt[i] = mk_l1_pgentry(0);
-    }
+    destroy_gdt(d);
 
     /* Install the new GDT. */
     for ( i = 0; i < nr_pages; i++ )
-        p->mm.perdomain_pt[i] =
+        d->mm.perdomain_pt[i] =
             mk_l1_pgentry((frames[i] << PAGE_SHIFT) | __PAGE_HYPERVISOR);
 
-    SET_GDT_ADDRESS(p, GDT_VIRT_START);
-    SET_GDT_ENTRIES(p, (entries*8)-1);
+    SET_GDT_ADDRESS(d, GDT_VIRT_START);
+    SET_GDT_ENTRIES(d, (entries*8)-1);
 
     return 0;
 

@@ -24,6 +24,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef __XEN_ELF_H__
+#define __XEN_ELF_H__
+
 typedef u8	Elf_Byte;
 
 typedef u32	Elf32_Addr;	/* Unsigned program address */
@@ -521,3 +524,8 @@ typedef struct {
 #define AuxInfo		Aux64Info
 #endif
 
+extern int loadelfimage(char *);
+extern int readelfimage_base_and_size(
+    char *, unsigned long, unsigned long *, unsigned long *, unsigned long *);
+
+#endif /* __XEN_ELF_H__ */

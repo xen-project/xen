@@ -295,4 +295,6 @@ static inline void domain_unpause_by_systemcontroller(struct domain *d)
 #define IS_PRIV(_d) (test_bit(DF_PRIVILEGED, &(_d)->flags))
 #define IS_CAPABLE_PHYSDEV(_d) (test_bit(DF_PHYSDEV, &(_d)->flags))
 
+#include <asm/domain.h>
+
 #endif /* __SCHED_H__ */

@@ -3,9 +3,6 @@
 #define __ASM_X86_MM_H__
 
 #include <xen/config.h>
-#ifdef LINUX_2_6
-#include <xen/gfp.h>
-#endif
 #include <xen/list.h>
 #include <xen/spinlock.h>
 #include <xen/perfc.h>
@@ -18,19 +15,6 @@
 #include <asm/io.h>
 
 #include <hypervisor-ifs/hypervisor-if.h>
-
-/*
- * The following is for page_alloc.c.
- */
-
-void init_page_allocator(unsigned long min, unsigned long max);
-unsigned long __get_free_pages(int order);
-void __free_pages(unsigned long p, int order);
-#define get_free_page()   (__get_free_pages(0))
-#define __get_free_page() (__get_free_pages(0))
-#define free_pages(_p,_o) (__free_pages(_p,_o))
-#define free_page(_p)     (__free_pages(_p,0))
-
 
 /*
  * Per-page-frame information.

@@ -3,7 +3,7 @@
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/mm.h>
-#include <xen/shadow.h>
+#include <asm/shadow.h>
 #include <asm/domain_page.h>
 #include <asm/page.h>
 #include <xen/event.h>
@@ -295,29 +295,30 @@ nomem:
     return -ENOMEM;
 }
 
-void shadow_mode_disable( struct domain *p )
+void __shadow_mode_disable(struct domain *d)
 {
-    struct mm_struct *m = &p->mm;
+    struct mm_struct *m = &d->mm;
     struct shadow_status *next;
 
-    __free_shadow_table( m );
+    __free_shadow_table(m);
     m->shadow_mode = 0;
 
     SH_LOG("freed tables count=%d l1=%d l2=%d",
-           m->shadow_page_count, perfc_value(shadow_l1_pages), perfc_value(shadow_l2_pages));
+           m->shadow_page_count, perfc_value(shadow_l1_pages), 
+           perfc_value(shadow_l2_pages));
 
     next = m->shadow_ht_extras;
-    while( next )
+    while ( next )
     {
         struct shadow_status * this = next;
         m->shadow_extras_count--;
         next = *((struct shadow_status **)(&next[shadow_ht_extra_size]));
-        kfree( this );
+        kfree(this);
     }
 
     SH_LOG("freed extras, now %d", m->shadow_extras_count);
 
-    if( m->shadow_dirty_bitmap  )
+    if ( m->shadow_dirty_bitmap  )
     {
         kfree( m->shadow_dirty_bitmap );
         m->shadow_dirty_bitmap = 0;
@@ -475,52 +476,50 @@ out:
     return rc;
 }
 
-int shadow_mode_control( struct domain *p, dom0_shadow_control_t *sc )
+int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
 {
     unsigned int cmd = sc->op;
     int rc = 0;
 
-    spin_lock(&p->mm.shadow_lock);
+    spin_lock(&d->mm.shadow_lock);
 
-    if ( p->mm.shadow_mode && cmd == DOM0_SHADOW_CONTROL_OP_OFF )
+    if ( cmd == DOM0_SHADOW_CONTROL_OP_OFF )
     {
-        shadow_mode_disable(p);
+        shadow_mode_disable(d);
     }
     else if ( cmd == DOM0_SHADOW_CONTROL_OP_ENABLE_TEST )
     {
-        if(p->mm.shadow_mode) shadow_mode_disable(p);
-        shadow_mode_enable(p, SHM_test);
+        shadow_mode_disable(d);
+        shadow_mode_enable(d, SHM_test);
     } 
     else if ( cmd == DOM0_SHADOW_CONTROL_OP_ENABLE_LOGDIRTY )
     {
-        if(p->mm.shadow_mode) shadow_mode_disable(p);
-        shadow_mode_enable(p, SHM_logdirty);
+        shadow_mode_disable(d);
+        shadow_mode_enable(d, SHM_logdirty);
     } 
-    else if ( p->mm.shadow_mode && cmd >= DOM0_SHADOW_CONTROL_OP_FLUSH && cmd<=DOM0_SHADOW_CONTROL_OP_CLEAN2 )
+    else if ( shadow_mode(d) && 
+              (cmd >= DOM0_SHADOW_CONTROL_OP_FLUSH) && 
+              (cmd <= DOM0_SHADOW_CONTROL_OP_CLEAN2) )
     {
-        rc = shadow_mode_table_op(p, sc);
+        rc = shadow_mode_table_op(d, sc);
     }
     else
     {
         rc = -EINVAL;
     }
 
-	flush_tlb_cpu(p->processor);
+	flush_tlb_cpu(d->processor);
    
-    spin_unlock(&p->mm.shadow_lock);
+    spin_unlock(&d->mm.shadow_lock);
 
     return rc;
 }
 
-
-
-static inline struct pfn_info *alloc_shadow_page( struct mm_struct *m )
+static inline struct pfn_info *alloc_shadow_page(struct mm_struct *m)
 {
     m->shadow_page_count++;
-
-    return alloc_domain_page( NULL );
+    return alloc_domain_page(NULL);
 }
-
 
 void unshadow_table( unsigned long gpfn, unsigned int type )
 {
