@@ -55,7 +55,7 @@ class SrvDomain(SrvDir):
         return val
 
     def op_pincpu(self, op, req):
-        fn = FormFn(self.xd.domain_migrate,
+        fn = FormFn(self.xd.domain_pincpu,
                     [['dom', 'int'],
                      ['cpu', 'int']])
         val = fn(req.args, {'dom': self.dom.id})
