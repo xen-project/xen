@@ -4,6 +4,7 @@
 *.so
 *.so.*
 *.tar.gz
+*.tar.bz2
 *~
 BitKeeper/*/*
 PENDING/*
@@ -11,7 +12,8 @@ TAGS
 extras/mini-os/h/hypervisor-ifs
 install
 install/*
-linux-2.4.26-xen/*
+patches/*
+linux-*-xen*/*
 linux-xen-sparse
 tools/*/build/lib*/*.py
 tools/balloon/balloon
