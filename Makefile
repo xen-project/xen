@@ -48,7 +48,7 @@ linux-$(LINUX_VER)-xen: pristine-linux-src
 # config linux-xen from a specified defaults file
 linux_%_config: 
 	$(MAKE) -C linux-$(LINUX_VER)-xen ARCH=xen mrproper
-	cp $(LINUX_CONFIG_DIR)/config-$(LINUX_VER)-$(subst _config,,$(subst linux_,,$(@))) .config || $(MAKE) -C linux-$(LINUX_VER)-xen ARCH=xen $(subst linux_,,$(@))
+	cp $(LINUX_CONFIG_DIR)/config-$(LINUX_VER)-$(subst _config,,$(subst linux_,,$(@))) linux-$(LINUX_VER)-xen/.config || $(MAKE) -C linux-$(LINUX_VER)-xen ARCH=xen $(subst linux_,,$(@))
 	$(MAKE) -C linux-$(LINUX_VER)-xen ARCH=xen oldconfig
 	$(MAKE) -C linux-$(LINUX_VER)-xen ARCH=xen dep
 
