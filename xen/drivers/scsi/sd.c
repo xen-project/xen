@@ -1329,11 +1329,13 @@ void scsi_probe_devices(xen_disk_info_t *xdi)
         device   = MK_SCSI_XENDEV(i);
         capacity = sd->capacity;
 
+	/* XXX SMH: if make generic, need to properly determine 'type' */
         xen_xdi->disks[xen_xdi->count].device   = device;
+	xen_xdi->disks[xen_xdi->count].type     = XD_TYPE_DISK; 
         xen_xdi->disks[xen_xdi->count].capacity = capacity; 
         xen_xdi->count++; 
                 
-        printk("Disk %d: SCSI-XENO capacity %ldkB (%ldMB)\n",
+        printk("Device %d: SCSI-XENO (disk) capacity %ldkB (%ldMB)\n",
                xen_xdi->count, capacity>>1, capacity>>11);
     }
 
