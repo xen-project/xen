@@ -23,6 +23,11 @@
 #include <xc.h>
 #include <asm-xeno/control_if.h>
 
+/* Needed for Python versions earlier than 2.3. */
+#ifndef PyMODINIT_FUNC
+#define PyMODINIT_FUNC DL_EXPORT(void)
+#endif
+
 /* NB. The following should be kept in sync with the kernel's evtchn driver. */
 #define EVTCHN_DEV_NAME  "/dev/xen/evtchn"
 #define EVTCHN_DEV_MAJOR 10

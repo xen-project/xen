@@ -7,6 +7,11 @@
 #include <Python.h>
 #include <xc.h>
 
+/* Needed for Python versions earlier than 2.3. */
+#ifndef PyMODINIT_FUNC
+#define PyMODINIT_FUNC DL_EXPORT(void)
+#endif
+
 static PyObject *xc_error, *zero;
 
 typedef struct {
