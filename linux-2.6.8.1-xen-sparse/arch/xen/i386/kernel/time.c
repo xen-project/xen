@@ -367,15 +367,16 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 	s64 delta, nsec;
 	long sec_diff, wtm_nsec;
 
- retry:
-	__get_time_values_from_xen();
+	do {
+		__get_time_values_from_xen();
 
-	delta = (s64)(shadow_system_time +
-		      (cur_timer->get_offset() * NSEC_PER_USEC) -
-		      processed_system_time);
-	if (delta < 0) {
-		if (!TIME_VALUES_UP_TO_DATE)
-			goto retry;
+		delta = (s64)(shadow_system_time +
+			      (cur_timer->get_offset() * NSEC_PER_USEC) -
+			      processed_system_time);
+	}
+	while (!TIME_VALUES_UP_TO_DATE);
+
+	if (unlikely(delta < 0)) {
 		printk("Timer ISR: Time went backwards: %lld %lld %ld %lld\n",
 		       delta, shadow_system_time,
 		       (cur_timer->get_offset() * NSEC_PER_USEC), 
