@@ -206,16 +206,17 @@ distribution.
 \begin{itemize}
 \item A working Linux distribution using the GRUB bootloader and
 running on a P6-class (or newer) CPU.
-\item An installation of Twisted v1.3 or above\footnote{{\tt
-http://www.twistedmatrix.com}}. There may be a binary package
-available for your distribution; alternatively it can be installed by
-running `{\sl make install-twisted}' in the root of the Xen source tree.
 \item The Linux bridge control tools\footnote{{\tt
 http://bridge.sourceforge.net}}.
 \item Build tools (gcc v3.2.x or v3.3.x, binutils, GNU make).
 \item Development installation of libcurl.
 \item Development installation of zlib (e.g., zlib-dev).
 \item Development installation of Python v2.2 or later (e.g., python-dev).
+\item An installation of Twisted v1.3 or above\footnote{{\tt
+http://www.twistedmatrix.com}}. There may be a binary package
+available for your distribution; alternatively it can be installed by
+running `{\sl make install-twisted}' in the root of the Xen source tree.
+\item \LaTeX, transfig and tgif are required to build the documentation.
 \end{itemize}
 
 \section{Download the Xen source code}
@@ -876,7 +877,8 @@ Make a file system in the disk file: \\
 Populate the file system e.g. by copying from the current root:
 \begin{verbatim}
 # mount -o loop vm1disk /mnt
-# cp -ax / /mnt
+# cp -ax /{root,dev,var,etc,usr,bin,sbin,lib} /mnt
+# mkdir /mnt/{proc,sys,home,tmp}
 \end{verbatim}
 Tailor the file system by editing \path{/etc/fstab},
 \path{/etc/hostname}, etc (don't forget to edit the files in the
