@@ -2392,15 +2392,8 @@ void ptwr_flush(const int which)
              */
             memcpy(&pl1e[i], &ptwr_info[cpu].ptinfo[which].page[i],
                    (L1_PAGETABLE_ENTRIES - i) * sizeof(l1_pgentry_t));
-            unmap_domain_mem(pl1e);
-            ptwr_info[cpu].ptinfo[which].l1va = 0;
-            if ( (which == PTWR_PT_ACTIVE) && likely(!d->mm.shadow_mode) )
-            {
-                pl2e = &linear_l2_table[ptwr_info[cpu].ptinfo[which].l2_idx];
-                *pl2e = mk_l2_pgentry(l2_pgentry_val(*pl2e) | _PAGE_PRESENT); 
-            }
             domain_crash();
-            return;
+            break;
         }
         
         if ( unlikely(sl1e != NULL) )
