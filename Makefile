@@ -8,6 +8,8 @@ SOURCEFORGE_MIRROR := http://heanet.dl.sourceforge.net/sourceforge
 #http://voxel.dl.sourceforge.net/sourceforge/
 #http://easynews.dl.sourceforge.net/sourceforge
 
+.PHONY: docs delete-symlinks clean
+
 # a not partcularly useful but safe default target
 all: make-symlinks
 	$(MAKE) prefix=$(INSTALL_DIR) dist=yes -C xen install
@@ -108,6 +110,7 @@ world:
 	$(MAKE) linux-xenU
 	$(MAKE) config-xen0
 	$(MAKE) linux-xen0
+	$(MAKE) docs
 
 linux26:
 	$(MAKE) LINUX_RELEASE=2.6 mk-linux-trees
@@ -118,6 +121,7 @@ linux26:
 clean: delete-symlinks
 	$(MAKE) -C xen clean
 	$(MAKE) -C tools clean
+	$(MAKE) -C docs clean
 
 # clean, but blow away linux build tree plus src tar ball
 mrproper: clean
@@ -151,3 +155,6 @@ install-iptables:
 uninstall:
 	cp -a /etc/xen /etc/xen.old && rm -rf /etc/xen 
 	rm -rf "/usr/lib/python2.2/site-packages/xen* /usr/lib/libxc* /usr/lib/python2.2/site-packages/Xc*"
+
+docs:
+	$(MAKE) -C docs all || true
