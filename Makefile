@@ -9,8 +9,8 @@ SOURCEFORGE_MIRROR := http://heanet.dl.sourceforge.net/sourceforge
 #http://voxel.dl.sourceforge.net/sourceforge/
 #http://easynews.dl.sourceforge.net/sourceforge
 
-#KERNELS = mk.linux-2.6-xen0 mk.linux-2.6-xenU mk.linux-2.4-xen0 mk.linux-2.4-xenU mk.netbsd-2.0-xenU
-KERNELS = mk.linux-2.6-xen0 mk.linux-2.6-xenU
+#KERNELS ?= mk.linux-2.6-xen0 mk.linux-2.6-xenU mk.linux-2.4-xen0 mk.linux-2.4-xenU mk.netbsd-2.0-xenU
+KERNELS ?= mk.linux-2.6-xen0 mk.linux-2.6-xenU
 
 ALLKERNELS = $(patsubst buildconfigs/%,%,$(wildcard buildconfigs/mk.*))
 ALLSPARSETREES = $(patsubst %-xen-sparse,%,$(wildcard *-xen-sparse))
