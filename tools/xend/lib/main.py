@@ -75,6 +75,8 @@ def daemon_loop():
     notifier.bind(dom0_port.local_port)
     port_list[dom0_port.local_port] = dom0_port
 
+    xend.netif.be_port = dom0_port
+
     ##
     ## MAIN LOOP
     ## 

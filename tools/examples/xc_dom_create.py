@@ -91,6 +91,7 @@ vbd_list = []; cmdline_ip = ''; cmdline_root=''; cmdline_extra=''
 pci_device_list = []; console_port = -1
 auto_console = False
 dontstart = False
+flags = 0
 
 ##### Determine location of defaults file
 #####

@@ -22,8 +22,10 @@
 
 typedef struct {
     BASIC_START_INFO;
-    unsigned int domain_controller_evtchn;
-} extended_start_info_t;
+    u16 domain_controller_evtchn; /* 320 */
+} PACKED extended_start_info_t; /* 322 bytes */
+#define SIF_BLK_BE_DOMAIN (1<<4)  /* Is this a block backend domain? */
+#define SIF_NET_BE_DOMAIN (1<<5)  /* Is this a net backend domain? */
 
 
 /*
@@ -31,23 +33,23 @@ typedef struct {
  */
 
 typedef struct {
-    u8 type;     /* echoed in response */
-    u8 subtype;  /* echoed in response */
-    u8 id;       /* echoed in response */
-    u8 length;   /* number of bytes in 'msg' */
-    unsigned char msg[60]; /* type-specific message data */
-} control_msg_t;
+    u8 type;     /*  0: echoed in response */
+    u8 subtype;  /*  1: echoed in response */
+    u8 id;       /*  2: echoed in response */
+    u8 length;   /*  3: number of bytes in 'msg' */
+    u8 msg[60];  /*  4: type-specific message data */
+} PACKED control_msg_t; /* 64 bytes */
 
 #define CONTROL_RING_SIZE 8
-typedef unsigned int CONTROL_RING_IDX;
+typedef u32 CONTROL_RING_IDX;
 #define MASK_CONTROL_IDX(_i) ((_i)&(CONTROL_RING_SIZE-1))
 
 typedef struct {
-    control_msg_t tx_ring[CONTROL_RING_SIZE]; /* guest-OS -> controller */
-    control_msg_t rx_ring[CONTROL_RING_SIZE]; /* controller -> guest-OS */
-    CONTROL_RING_IDX tx_req_prod, tx_resp_prod;
-    CONTROL_RING_IDX rx_req_prod, rx_resp_prod;
-} control_if_t;
+    control_msg_t tx_ring[CONTROL_RING_SIZE];   /*    0: guest -> controller */
+    control_msg_t rx_ring[CONTROL_RING_SIZE];   /*  512: controller -> guest */
+    CONTROL_RING_IDX tx_req_prod, tx_resp_prod; /* 1024, 1028 */
+    CONTROL_RING_IDX rx_req_prod, rx_resp_prod; /* 1032, 1036 */
+} PACKED control_if_t; /* 1040 bytes */
 
 /*
  * Top-level command types.
@@ -97,10 +99,10 @@ typedef struct {
 #define BLKIF_INTERFACE_STATUS_DISCONNECTED 1 /* Exists but is disconnected. */
 #define BLKIF_INTERFACE_STATUS_CONNECTED    2 /* Exists and is connected.    */
 typedef struct {
-    unsigned int handle;
-    unsigned int status;
-    unsigned int evtchn; /* status == BLKIF_INTERFACE_STATUS_CONNECTED */
-} blkif_fe_interface_status_changed_t;
+    u32 handle; /*  0 */
+    u32 status; /*  4 */
+    u16 evtchn; /*  8: (only if status == BLKIF_INTERFACE_STATUS_CONNECTED). */
+} PACKED blkif_fe_interface_status_changed_t; /* 10 bytes */
 
 /*
  * CMSG_BLKIF_FE_DRIVER_STATUS_CHANGED:
@@ -115,14 +117,14 @@ typedef struct {
 #define BLKIF_DRIVER_STATUS_UP     1
 typedef struct {
     /* IN */
-    unsigned int status; /* BLKIF_DRIVER_STATUS_??? */
+    u32 status;        /*  0: BLKIF_DRIVER_STATUS_??? */
     /* OUT */
     /*
      * Tells driver how many interfaces it should expect to immediately
      * receive notifications about.
      */
-    unsigned int nr_interfaces;
-} blkif_fe_driver_status_changed_t;
+    u32 nr_interfaces; /*  4 */
+} PACKED blkif_fe_driver_status_changed_t; /* 8 bytes */
 
 /*
  * CMSG_BLKIF_FE_INTERFACE_CONNECT:
@@ -130,9 +132,11 @@ typedef struct {
  *  STATUS_CONNECTED message.
  */
 typedef struct {
-    unsigned int  handle;
-    unsigned long shmem_frame;
-} blkif_fe_interface_connect_t;
+    u32      handle;      /*  0 */
+    u32      __pad;
+    memory_t shmem_frame; /*  8 */
+    MEMORY_PADDING;
+} PACKED blkif_fe_interface_connect_t; /* 16 bytes */
 
 /*
  * CMSG_BLKIF_FE_INTERFACE_DISCONNECT:
@@ -140,8 +144,8 @@ typedef struct {
  *  STATUS_DISCONNECTED message.
  */
 typedef struct {
-    unsigned int handle;
-} blkif_fe_interface_disconnect_t;
+    u32 handle; /*  0 */
+} PACKED blkif_fe_interface_disconnect_t; /* 4 bytes */
 
 
 /******************************************************************************
@@ -166,10 +170,11 @@ typedef struct {
  */
 
 typedef struct {
-    blkif_pdev_t   device;
-    blkif_sector_t sector_start;
-    blkif_sector_t sector_length;
-} blkif_extent_t;
+    blkif_sector_t sector_start;   /*  0 */
+    blkif_sector_t sector_length;  /*  8 */
+    blkif_pdev_t   device;         /* 16 */
+    u16            __pad;          /* 18 */
+} PACKED blkif_extent_t; /* 20 bytes */
 
 /* Non-specific 'okay' return. */
 #define BLKIF_BE_STATUS_OKAY                0
@@ -206,11 +211,11 @@ typedef struct {
  */
 typedef struct { 
     /* IN */
-    domid_t        domid;             /* Domain attached to new interface.   */
-    unsigned int   blkif_handle;      /* Domain-specific interface handle.   */
+    domid_t    domid;         /*  0: Domain attached to new interface.   */
+    u32        blkif_handle;  /*  4: Domain-specific interface handle.   */
     /* OUT */
-    unsigned int   status;
-} blkif_be_create_t; 
+    u32        status;        /*  8 */
+} PACKED blkif_be_create_t; /* 12 bytes */
 
 /*
  * CMSG_BLKIF_BE_DESTROY:
@@ -220,11 +225,11 @@ typedef struct {
  */
 typedef struct { 
     /* IN */
-    domid_t        domid;             /* Identify interface to be destroyed. */
-    unsigned int   blkif_handle;      /* ...ditto...                         */
+    domid_t    domid;         /*  0: Identify interface to be destroyed. */
+    u32        blkif_handle;  /*  4: ...ditto...                         */
     /* OUT */
-    unsigned int   status;
-} blkif_be_destroy_t; 
+    u32        status;        /*  8 */
+} PACKED blkif_be_destroy_t; /* 12 bytes */
 
 /*
  * CMSG_BLKIF_BE_CONNECT:
@@ -234,13 +239,14 @@ typedef struct {
  */
 typedef struct { 
     /* IN */
-    domid_t        domid;             /* Domain attached to new interface.   */
-    unsigned int   blkif_handle;      /* Domain-specific interface handle.   */
-    unsigned int   evtchn;            /* Event channel for notifications.    */
-    unsigned long  shmem_frame;       /* Page cont. shared comms window.     */
+    domid_t    domid;         /*  0: Domain attached to new interface.   */
+    u32        blkif_handle;  /*  4: Domain-specific interface handle.   */
+    memory_t   shmem_frame;   /*  8: Page cont. shared comms window.     */
+    MEMORY_PADDING;
+    u32        evtchn;        /* 16: Event channel for notifications.    */
     /* OUT */
-    unsigned int   status;
-} blkif_be_connect_t; 
+    u32        status;        /* 20 */
+} PACKED blkif_be_connect_t;  /* 24 bytes */
 
 /*
  * CMSG_BLKIF_BE_DISCONNECT:
@@ -250,70 +256,66 @@ typedef struct {
  */
 typedef struct { 
     /* IN */
-    domid_t        domid;             /* Domain attached to new interface.   */
-    unsigned int   blkif_handle;      /* Domain-specific interface handle.   */
+    domid_t    domid;         /*  0: Domain attached to new interface.   */
+    u32        blkif_handle;  /*  4: Domain-specific interface handle.   */
     /* OUT */
-    unsigned int   status;
-} blkif_be_disconnect_t; 
+    u32        status;        /*  8 */
+} PACKED blkif_be_disconnect_t; /* 12 bytes */
 
 /* CMSG_BLKIF_BE_VBD_CREATE */
 typedef struct { 
     /* IN */
-    domid_t        domid;             /* Identify blkdev interface.          */
-    unsigned int   blkif_handle;      /* ...ditto...                         */
-    blkif_vdev_t   vdevice;           /* Interface-specific id for this VBD. */
-    int            readonly;          /* Non-zero -> VBD isn't writeable.    */
+    domid_t    domid;         /*  0: Identify blkdev interface.          */
+    u32        blkif_handle;  /*  4: ...ditto...                         */
+    blkif_vdev_t vdevice;     /*  8: Interface-specific id for this VBD. */
+    u16        readonly;      /* 10: Non-zero -> VBD isn't writeable.    */
     /* OUT */
-    unsigned int   status;
-} blkif_be_vbd_create_t; 
+    u32        status;        /* 12 */
+} PACKED blkif_be_vbd_create_t; /* 16 bytes */
 
 /* CMSG_BLKIF_BE_VBD_DESTROY */
 typedef struct {
     /* IN */
-    domid_t        domid;             /* Identify blkdev interface.          */
-    unsigned int   blkif_handle;      /* ...ditto...                         */
-    blkif_vdev_t   vdevice;           /* Interface-specific id of the VBD.   */
+    domid_t    domid;         /*  0: Identify blkdev interface.          */
+    u32        blkif_handle;  /*  4: ...ditto...                         */
+    blkif_vdev_t vdevice;     /*  8: Interface-specific id of the VBD.   */
+    u16        __pad;         /* 10 */
     /* OUT */
-    unsigned int   status;
-} blkif_be_vbd_destroy_t; 
+    u32        status;        /* 12 */
+} PACKED blkif_be_vbd_destroy_t; /* 16 bytes */
 
 /* CMSG_BLKIF_BE_VBD_GROW */
 typedef struct { 
     /* IN */
-    domid_t        domid;             /* Identify blkdev interface.          */
-    unsigned int   blkif_handle;      /* ...ditto...                         */
-    blkif_vdev_t   vdevice;           /* Interface-specific id of the VBD.   */
-    blkif_extent_t extent;            /* Physical extent to append to VBD.   */
+    domid_t    domid;         /*  0: Identify blkdev interface.          */
+    u32        blkif_handle;  /*  4: ...ditto...                         */
+    blkif_extent_t extent;    /*  8: Physical extent to append to VBD.   */
+    blkif_vdev_t vdevice;     /* 28: Interface-specific id of the VBD.   */
+    u16        __pad;         /* 30 */
     /* OUT */
-    unsigned int   status;
-} blkif_be_vbd_grow_t; 
+    u32        status;        /* 32 */
+} PACKED blkif_be_vbd_grow_t; /* 36 bytes */
 
 /* CMSG_BLKIF_BE_VBD_SHRINK */
 typedef struct { 
     /* IN */
-    domid_t        domid;             /* Identify blkdev interface.          */
-    unsigned int   blkif_handle;      /* ...ditto...                         */
-    blkif_vdev_t   vdevice;           /* Interface-specific id of the VBD.   */
+    domid_t    domid;         /*  0: Identify blkdev interface.          */
+    u32        blkif_handle;  /*  4: ...ditto...                         */
+    blkif_vdev_t vdevice;     /*  8: Interface-specific id of the VBD.   */
+    u16        __pad;         /* 10 */
     /* OUT */
-    unsigned int   status;
-} blkif_be_vbd_shrink_t; 
+    u32        status;        /* 12 */
+} PACKED blkif_be_vbd_shrink_t; /* 16 bytes */
 
 /*
  * CMSG_BLKIF_BE_DRIVER_STATUS_CHANGED:
  *  Notify the domain controller that the back-end driver is DOWN or UP.
- *  If the driver goes DOWN while interfaces are still UP, the domain
+ *  If the driver goes DOWN while interfaces are still UP, the controller
  *  will automatically send DOWN notifications.
  */
 typedef struct {
-    /* IN */
-    unsigned int status; /* BLKIF_DRIVER_STATUS_??? */
-    /* OUT */
-    /*
-     * Tells driver how many interfaces it should expect to immediately
-     * receive notifications about.
-     */
-    unsigned int nr_interfaces;
-} blkif_be_driver_status_changed_t;
+    u32        status;        /*  0: BLKIF_DRIVER_STATUS_??? */
+} PACKED blkif_be_driver_status_changed_t; /* 4 bytes */
 
 
 /******************************************************************************
@@ -339,11 +341,11 @@ typedef struct {
 #define NETIF_INTERFACE_STATUS_DISCONNECTED 1 /* Exists but is disconnected. */
 #define NETIF_INTERFACE_STATUS_CONNECTED    2 /* Exists and is connected.    */
 typedef struct {
-    unsigned int handle;
-    unsigned int status;
-    unsigned int evtchn; /* status == NETIF_INTERFACE_STATUS_CONNECTED */
-    u8           mac[6]; /* status == NETIF_INTERFACE_STATUS_CONNECTED */
-} netif_fe_interface_status_changed_t;
+    u32        handle; /*  0 */
+    u32        status; /*  4 */
+    u16        evtchn; /*  8: status == NETIF_INTERFACE_STATUS_CONNECTED */
+    u8         mac[6]; /* 10: status == NETIF_INTERFACE_STATUS_CONNECTED */
+} PACKED netif_fe_interface_status_changed_t; /* 16 bytes */
 
 /*
  * CMSG_NETIF_FE_DRIVER_STATUS_CHANGED:
@@ -358,14 +360,14 @@ typedef struct {
 #define NETIF_DRIVER_STATUS_UP     1
 typedef struct {
     /* IN */
-    unsigned int status; /* NETIF_DRIVER_STATUS_??? */
+    u32        status;        /*  0: NETIF_DRIVER_STATUS_??? */
     /* OUT */
     /*
      * Tells driver how many interfaces it should expect to immediately
      * receive notifications about.
      */
-    unsigned int nr_interfaces;
-} netif_fe_driver_status_changed_t;
+    u32        nr_interfaces; /*  4 */
+} PACKED netif_fe_driver_status_changed_t; /* 8 bytes */
 
 /*
  * CMSG_NETIF_FE_INTERFACE_CONNECT:
@@ -373,10 +375,13 @@ typedef struct {
  *  STATUS_CONNECTED message.
  */
 typedef struct {
-    unsigned int  handle;
-    unsigned long tx_shmem_frame;
-    unsigned long rx_shmem_frame;
-} netif_fe_interface_connect_t;
+    u32        handle;         /*  0 */
+    u32        __pad;          /*  4 */
+    memory_t   tx_shmem_frame; /*  8 */
+    MEMORY_PADDING;
+    memory_t   rx_shmem_frame; /* 16 */
+    MEMORY_PADDING;
+} PACKED netif_fe_interface_connect_t; /* 24 bytes */
 
 /*
  * CMSG_NETIF_FE_INTERFACE_DISCONNECT:
@@ -384,8 +389,8 @@ typedef struct {
  *  STATUS_DISCONNECTED message.
  */
 typedef struct {
-    unsigned int handle;
-} netif_fe_interface_disconnect_t;
+    u32        handle;        /*  0 */
+} PACKED netif_fe_interface_disconnect_t; /* 4 bytes */
 
 
 /******************************************************************************
@@ -434,12 +439,13 @@ typedef struct {
  */
 typedef struct { 
     /* IN */
-    domid_t        domid;             /* Domain attached to new interface.   */
-    unsigned int   netif_handle;      /* Domain-specific interface handle.   */
-    u8             mac[6];
+    domid_t    domid;         /*  0: Domain attached to new interface.   */
+    u32        netif_handle;  /*  4: Domain-specific interface handle.   */
+    u8         mac[6];        /*  8 */
+    u16        __pad;         /* 14 */
     /* OUT */
-    unsigned int   status;
-} netif_be_create_t; 
+    u32        status;        /* 16 */
+} PACKED netif_be_create_t; /* 20 bytes */
 
 /*
  * CMSG_NETIF_BE_DESTROY:
@@ -449,11 +455,11 @@ typedef struct {
  */
 typedef struct { 
     /* IN */
-    domid_t        domid;             /* Identify interface to be destroyed. */
-    unsigned int   netif_handle;      /* ...ditto...                         */
+    domid_t    domid;         /*  0: Identify interface to be destroyed. */
+    u32        netif_handle;  /*  4: ...ditto...                         */
     /* OUT */
-    unsigned int   status;
-} netif_be_destroy_t; 
+    u32   status;             /*  8 */
+} PACKED netif_be_destroy_t; /* 12 bytes */
 
 /*
  * CMSG_NETIF_BE_CONNECT:
@@ -463,14 +469,17 @@ typedef struct {
  */
 typedef struct { 
     /* IN */
-    domid_t        domid;             /* Domain attached to new interface.   */
-    unsigned int   netif_handle;      /* Domain-specific interface handle.   */
-    unsigned int   evtchn;            /* Event channel for notifications.    */
-    unsigned long  tx_shmem_frame;    /* Page cont. tx shared comms window.  */
-    unsigned long  rx_shmem_frame;    /* Page cont. rx shared comms window.  */
+    domid_t    domid;          /*  0: Domain attached to new interface.   */
+    u32        netif_handle;   /*  4: Domain-specific interface handle.   */
+    memory_t   tx_shmem_frame; /*  8: Page cont. tx shared comms window.  */
+    MEMORY_PADDING;
+    memory_t   rx_shmem_frame; /* 16: Page cont. rx shared comms window.  */
+    MEMORY_PADDING;
+    u16        evtchn;         /* 24: Event channel for notifications.    */
+    u16        __pad;          /* 26 */
     /* OUT */
-    unsigned int   status;
-} netif_be_connect_t; 
+    u32        status;         /* 28 */
+} PACKED netif_be_connect_t; /* 32 bytes */
 
 /*
  * CMSG_NETIF_BE_DISCONNECT:
@@ -480,11 +489,11 @@ typedef struct {
  */
 typedef struct { 
     /* IN */
-    domid_t        domid;             /* Domain attached to new interface.   */
-    unsigned int   netif_handle;      /* Domain-specific interface handle.   */
+    domid_t    domid;         /*  0: Domain attached to new interface.   */
+    u32        netif_handle;  /*  4: Domain-specific interface handle.   */
     /* OUT */
-    unsigned int   status;
-} netif_be_disconnect_t; 
+    u32        status;        /*  8 */
+} PACKED netif_be_disconnect_t; /* 12 bytes */
 
 /*
  * CMSG_NETIF_BE_DRIVER_STATUS_CHANGED:
@@ -493,14 +502,7 @@ typedef struct {
  *  will automatically send DOWN notifications.
  */
 typedef struct {
-    /* IN */
-    unsigned int status; /* NETIF_DRIVER_STATUS_??? */
-    /* OUT */
-    /*
-     * Tells driver how many interfaces it should expect to immediately
-     * receive notifications about.
-     */
-    unsigned int nr_interfaces;
-} netif_be_driver_status_changed_t;
+    u32        status;        /*  0: NETIF_DRIVER_STATUS_??? */
+} PACKED netif_be_driver_status_changed_t; /* 4 bytes */
 
 #endif /* __DOMAIN_CONTROLLER_H__ */
