@@ -221,7 +221,7 @@ int arch_final_setup_guest(struct exec_domain *p, full_execution_context_t *c)
 	return 1;
 }
 
-void domain_relinquish_memory(struct domain *d)
+void domain_relinquish_resources(struct domain *d)
 {
 	dummy();
 }

@@ -247,7 +247,7 @@ void memguard_unguard_range(void *p, unsigned long l);
 #endif
 
 /* Writable Pagetables */
-typedef struct {
+struct ptwr_info {
     /* Linear address where the guest is updating the p.t. page. */
     unsigned long l1va;
     /* Copy of the p.t. page, taken before guest is given write access. */
@@ -257,15 +257,8 @@ typedef struct {
     /* Index in L2 page table where this L1 p.t. is always hooked. */
     unsigned int l2_idx; /* NB. Only used for PTWR_PT_ACTIVE. */
     /* Info about last ptwr update batch. */
-    struct exec_domain *prev_exec_domain; /* domain making the update */
-    unsigned int        prev_nr_updates;  /* size of update batch */
-} ptwr_ptinfo_t;
-
-typedef struct {
-    ptwr_ptinfo_t ptinfo[2];
-} __cacheline_aligned ptwr_info_t;
-
-extern ptwr_info_t ptwr_info[];
+    unsigned int prev_nr_updates;
+};
 
 #define PTWR_PT_ACTIVE 0
 #define PTWR_PT_INACTIVE 1
@@ -273,27 +266,19 @@ extern ptwr_info_t ptwr_info[];
 #define PTWR_CLEANUP_ACTIVE 1
 #define PTWR_CLEANUP_INACTIVE 2
 
-void ptwr_flush(const int);
-int ptwr_do_page_fault(unsigned long);
+int  ptwr_init(struct domain *);
+void ptwr_destroy(struct domain *);
+void ptwr_flush(struct domain *, const int);
+int  ptwr_do_page_fault(struct domain *, unsigned long);
 
-int new_guest_cr3(unsigned long pfn);
-
-#define __cleanup_writable_pagetable(_what)                                 \
-do {                                                                        \
-    int cpu = smp_processor_id();                                           \
-    if ((_what) & PTWR_CLEANUP_ACTIVE)                                      \
-        if (ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l1va)                     \
-            ptwr_flush(PTWR_PT_ACTIVE);                                     \
-    if ((_what) & PTWR_CLEANUP_INACTIVE)                                    \
-        if (ptwr_info[cpu].ptinfo[PTWR_PT_INACTIVE].l1va)                   \
-            ptwr_flush(PTWR_PT_INACTIVE);                                   \
-} while ( 0 )
-
-#define cleanup_writable_pagetable(_d)                                    \
-    do {                                                                  \
-        if ( unlikely(VM_ASSIST((_d), VMASST_TYPE_writable_pagetables)) ) \
-        __cleanup_writable_pagetable(PTWR_CLEANUP_ACTIVE |                \
-                                     PTWR_CLEANUP_INACTIVE);              \
+#define cleanup_writable_pagetable(_d)                                      \
+    do {                                                                    \
+        if ( unlikely(VM_ASSIST((_d), VMASST_TYPE_writable_pagetables)) ) { \
+            if ( (_d)->arch.ptwr[PTWR_PT_ACTIVE].l1va )                     \
+                ptwr_flush((_d), PTWR_PT_ACTIVE);                           \
+            if ( (_d)->arch.ptwr[PTWR_PT_INACTIVE].l1va )                   \
+                ptwr_flush((_d), PTWR_PT_INACTIVE);                         \
+        }                                                                   \
     } while ( 0 )
 
 #ifndef NDEBUG
@@ -303,6 +288,8 @@ void audit_domains(void);
 #define audit_domain(_d) ((void)0)
 #define audit_domains()  ((void)0)
 #endif
+
+int new_guest_cr3(unsigned long pfn);
 
 void propagate_page_fault(unsigned long addr, u16 error_code);
 

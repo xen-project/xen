@@ -68,8 +68,6 @@ void grant_table_destroy(struct domain *d)
 
 struct pt_regs *get_execution_context(void) { return ia64_task_regs(current); }
 
-void cleanup_writable_pagetable(struct domain *d, int what) { return; }
-
 void raise_actimer_softirq(void)
 {
 	raise_softirq(AC_TIMER_SOFTIRQ);

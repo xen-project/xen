@@ -262,8 +262,6 @@ asmlinkage int do_page_fault(struct xen_regs *regs)
     unsigned long off, addr, fixup;
     struct exec_domain *ed = current;
     struct domain *d = ed->domain;
-    extern int map_ldt_shadow_page(unsigned int);
-    int cpu = ed->processor;
     int ret;
 
     __asm__ __volatile__ ("mov %%cr2,%0" : "=r" (addr) : );
@@ -275,18 +273,18 @@ asmlinkage int do_page_fault(struct xen_regs *regs)
     if ( likely(VM_ASSIST(d, VMASST_TYPE_writable_pagetables)) )
     {
         LOCK_BIGLOCK(d);
-        if ( unlikely(ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l1va) &&
+        if ( unlikely(d->arch.ptwr[PTWR_PT_ACTIVE].l1va) &&
              unlikely((addr >> L2_PAGETABLE_SHIFT) ==
-                      ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l2_idx) )
+                      d->arch.ptwr[PTWR_PT_ACTIVE].l2_idx) )
         {
-            ptwr_flush(PTWR_PT_ACTIVE);
+            ptwr_flush(d, PTWR_PT_ACTIVE);
             UNLOCK_BIGLOCK(d);
             return EXCRET_fault_fixed;
         }
 
         if ( (addr < PAGE_OFFSET) &&
              ((regs->error_code & 3) == 3) && /* write-protection fault */
-             ptwr_do_page_fault(addr) )
+             ptwr_do_page_fault(d, addr) )
         {
             if ( unlikely(shadow_mode_enabled(d)) )
                 (void)shadow_fault(addr, regs);
@@ -307,6 +305,7 @@ asmlinkage int do_page_fault(struct xen_regs *regs)
          * Copy a mapping from the guest's LDT, if it is valid. Otherwise we
          * send the fault up to the guest OS to be handled.
          */
+        extern int map_ldt_shadow_page(unsigned int);
         LOCK_BIGLOCK(d);
         off  = addr - LDT_VIRT_START(ed);
         addr = ed->arch.ldt_base + off;

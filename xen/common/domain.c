@@ -122,7 +122,7 @@ void domain_kill(struct domain *d)
     {
         for_each_exec_domain(d, ed)
             sched_rem_domain(ed);
-        domain_relinquish_memory(d);
+        domain_relinquish_resources(d);
         physdev_destroy_state(d);
         put_domain(d);
     }
@@ -199,7 +199,7 @@ unsigned int alloc_new_dom_mem(struct domain *d, unsigned int kbytes)
     {
         if ( unlikely((page = alloc_domheap_page(d)) == NULL) )
         {
-            domain_relinquish_memory(d);
+            domain_relinquish_resources(d);
             return list_empty(&page_scrub_list) ? -ENOMEM : -EAGAIN;
         }
 

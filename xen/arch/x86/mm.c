@@ -2288,8 +2288,6 @@ long do_update_descriptor(unsigned long pa, u64 desc)
  * Writable Pagetables
  */
 
-ptwr_info_t ptwr_info[NR_CPUS];
-
 #ifdef VERBOSE
 int ptwr_debug = 0x0;
 #define PTWR_PRINTK(_f, _a...) \
@@ -2300,17 +2298,15 @@ int ptwr_debug = 0x0;
 #endif
 
 /* Flush the given writable p.t. page and write-protect it again. */
-void ptwr_flush(const int which)
+void ptwr_flush(struct domain *d, const int which)
 {
     unsigned long  sstat, spte, pte, *ptep, l1va;
     l1_pgentry_t  *sl1e = NULL, *pl1e, ol1e, nl1e;
     l2_pgentry_t  *pl2e;
-    int            i, cpu = smp_processor_id();
-    struct exec_domain *ed = current;
-    struct domain *d = ed->domain;
+    int            i;
     unsigned int   modified = 0;
 
-    l1va = ptwr_info[cpu].ptinfo[which].l1va;
+    l1va = d->arch.ptwr[which].l1va;
     ptep = (unsigned long *)&linear_pg_table[l1_linear_offset(l1va)];
 
     /*
@@ -2364,10 +2360,10 @@ void ptwr_flush(const int which)
      * STEP 2. Validate any modified PTEs.
      */
 
-    pl1e = ptwr_info[cpu].ptinfo[which].pl1e;
+    pl1e = d->arch.ptwr[which].pl1e;
     for ( i = 0; i < L1_PAGETABLE_ENTRIES; i++ )
     {
-        ol1e = ptwr_info[cpu].ptinfo[which].page[i];
+        ol1e = d->arch.ptwr[which].page[i];
         nl1e = pl1e[i];
 
         if ( likely(l1_pgentry_val(ol1e) == l1_pgentry_val(nl1e)) )
@@ -2400,7 +2396,7 @@ void ptwr_flush(const int which)
              * Make the remaining p.t's consistent before crashing, so the
              * reference counts are correct.
              */
-            memcpy(&pl1e[i], &ptwr_info[cpu].ptinfo[which].page[i],
+            memcpy(&pl1e[i], &d->arch.ptwr[which].page[i],
                    (L1_PAGETABLE_ENTRIES - i) * sizeof(l1_pgentry_t));
             domain_crash();
             break;
@@ -2415,8 +2411,7 @@ void ptwr_flush(const int which)
     unmap_domain_mem(pl1e);
 
     perfc_incr_histo(wpt_updates, modified, PT_UPDATES);
-    ptwr_info[cpu].ptinfo[which].prev_exec_domain = ed;
-    ptwr_info[cpu].ptinfo[which].prev_nr_updates  = modified;
+    d->arch.ptwr[which].prev_nr_updates  = modified;
 
     /*
      * STEP 3. Reattach the L1 p.t. page into the current address space.
@@ -2424,7 +2419,7 @@ void ptwr_flush(const int which)
 
     if ( (which == PTWR_PT_ACTIVE) && likely(!shadow_mode_enabled(d)) )
     {
-        pl2e = &linear_l2_table[ptwr_info[cpu].ptinfo[which].l2_idx];
+        pl2e = &linear_l2_table[d->arch.ptwr[which].l2_idx];
         *pl2e = mk_l2_pgentry(l2_pgentry_val(*pl2e) | _PAGE_PRESENT); 
     }
 
@@ -2432,7 +2427,7 @@ void ptwr_flush(const int which)
      * STEP 4. Final tidy-up.
      */
 
-    ptwr_info[cpu].ptinfo[which].l1va = 0;
+    d->arch.ptwr[which].l1va = 0;
 
     if ( unlikely(sl1e != NULL) )
     {
@@ -2570,17 +2565,16 @@ static struct x86_mem_emulator ptwr_mem_emulator = {
 };
 
 /* Write page fault handler: check if guest is trying to modify a PTE. */
-int ptwr_do_page_fault(unsigned long addr)
+int ptwr_do_page_fault(struct domain *d, unsigned long addr)
 {
-    unsigned long       pte, pfn, l2e;
-    struct pfn_info    *page;
-    l2_pgentry_t       *pl2e;
-    int                 which, cpu = smp_processor_id();
-    u32                 l2_idx;
-    struct exec_domain *ed = current;
+    unsigned long    pte, pfn, l2e;
+    struct pfn_info *page;
+    l2_pgentry_t    *pl2e;
+    int              which;
+    u32              l2_idx;
 
     /* Can't use linear_l2_table with external tables. */
-    BUG_ON(shadow_mode_external(ed->domain));
+    BUG_ON(shadow_mode_external(d));
 
     /*
      * Attempt to read the PTE that maps the VA being accessed. By checking for
@@ -2600,7 +2594,7 @@ int ptwr_do_page_fault(unsigned long addr)
     /* We are looking only for read-only mappings of p.t. pages. */
     if ( ((pte & (_PAGE_RW | _PAGE_PRESENT)) != _PAGE_PRESENT) ||
          ((page->u.inuse.type_info & PGT_type_mask) != PGT_l1_page_table) ||
-         (page_get_owner(page) != ed->domain) )
+         (page_get_owner(page) != d) )
     {
         return 0;
     }
@@ -2611,7 +2605,7 @@ int ptwr_do_page_fault(unsigned long addr)
 #endif
 
     /* Writable pagetables are not yet SMP safe. Use emulator for now. */
-    if ( (ed->eid != 0) || (ed->ed_next_list != NULL) )
+    if ( d->exec_domain[0]->ed_next_list != NULL )
         goto emulate;
 
     /* Get the L2 index at which this L1 p.t. is always mapped. */
@@ -2639,8 +2633,8 @@ int ptwr_do_page_fault(unsigned long addr)
          * The ptwr_flush call below will restore the PRESENT bit.
          */
         if ( likely(l2e & _PAGE_PRESENT) ||
-             (ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l1va &&
-              (l2_idx == ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l2_idx)) )
+             (d->arch.ptwr[PTWR_PT_ACTIVE].l1va &&
+              (l2_idx == d->arch.ptwr[PTWR_PT_ACTIVE].l2_idx)) )
             which = PTWR_PT_ACTIVE;
     }
     
@@ -2652,36 +2646,31 @@ int ptwr_do_page_fault(unsigned long addr)
      * We only allow one ACTIVE and one INACTIVE p.t. to be updated at at 
      * time. If there is already one, we must flush it out.
      */
-    if ( ptwr_info[cpu].ptinfo[which].l1va )
-        ptwr_flush(which);
+    if ( d->arch.ptwr[which].l1va )
+        ptwr_flush(d, which);
 
     /*
      * If last batch made no updates then we are probably stuck. Emulate this 
      * update to ensure we make progress.
      */
-    if ( (ptwr_info[cpu].ptinfo[which].prev_exec_domain == ed) &&
-         (ptwr_info[cpu].ptinfo[which].prev_nr_updates  == 0) )
-    {
-        /* Force non-emul next time, or we can get stuck emulating forever. */
-        ptwr_info[cpu].ptinfo[which].prev_exec_domain = NULL;
+    if ( d->arch.ptwr[which].prev_nr_updates == 0 )
         goto emulate;
-    }
 
-    ptwr_info[cpu].ptinfo[which].l1va   = addr | 1;
-    ptwr_info[cpu].ptinfo[which].l2_idx = l2_idx;
+    d->arch.ptwr[which].l1va   = addr | 1;
+    d->arch.ptwr[which].l2_idx = l2_idx;
     
     /* For safety, disconnect the L1 p.t. page from current space. */
     if ( (which == PTWR_PT_ACTIVE) && 
-         likely(!shadow_mode_enabled(ed->domain)) )
+         likely(!shadow_mode_enabled(d)) )
     {
         *pl2e = mk_l2_pgentry(l2e & ~_PAGE_PRESENT);
         local_flush_tlb(); /* XXX Multi-CPU guests? */
     }
     
     /* Temporarily map the L1 page, and make a copy of it. */
-    ptwr_info[cpu].ptinfo[which].pl1e = map_domain_mem(pfn << PAGE_SHIFT);
-    memcpy(ptwr_info[cpu].ptinfo[which].page,
-           ptwr_info[cpu].ptinfo[which].pl1e,
+    d->arch.ptwr[which].pl1e = map_domain_mem(pfn << PAGE_SHIFT);
+    memcpy(d->arch.ptwr[which].page,
+           d->arch.ptwr[which].pl1e,
            L1_PAGETABLE_ENTRIES * sizeof(l1_pgentry_t));
     
     /* Finally, make the p.t. page writable by the guest OS. */
@@ -2694,8 +2683,8 @@ int ptwr_do_page_fault(unsigned long addr)
         MEM_LOG("ptwr: Could not update pte at %p\n", (unsigned long *)
                 &linear_pg_table[addr>>PAGE_SHIFT]);
         /* Toss the writable pagetable state and crash. */
-        unmap_domain_mem(ptwr_info[cpu].ptinfo[which].pl1e);
-        ptwr_info[cpu].ptinfo[which].l1va = 0;
+        unmap_domain_mem(d->arch.ptwr[which].pl1e);
+        d->arch.ptwr[which].l1va = 0;
         domain_crash();
         return 0;
     }
@@ -2710,22 +2699,32 @@ int ptwr_do_page_fault(unsigned long addr)
     return EXCRET_fault_fixed;
 }
 
-static __init int ptwr_init(void)
+int ptwr_init(struct domain *d)
 {
-    int i;
+    void *x = (void *)alloc_xenheap_page();
+    void *y = (void *)alloc_xenheap_page();
 
-    for ( i = 0; i < smp_num_cpus; i++ )
+    if ( (x == NULL) || (y == NULL) )
     {
-        ptwr_info[i].ptinfo[PTWR_PT_ACTIVE].page =
-            (void *)alloc_xenheap_page();
-        ptwr_info[i].ptinfo[PTWR_PT_INACTIVE].page =
-            (void *)alloc_xenheap_page();
+        if ( x != NULL )
+            free_xenheap_page((unsigned long)x);
+        if ( y != NULL )
+            free_xenheap_page((unsigned long)y);
+        return -ENOMEM;
     }
+
+    d->arch.ptwr[PTWR_PT_ACTIVE].page   = x;
+    d->arch.ptwr[PTWR_PT_INACTIVE].page = y;
 
     return 0;
 }
-__initcall(ptwr_init);
 
+void ptwr_destroy(struct domain *d)
+{
+    cleanup_writable_pagetable(d);
+    free_xenheap_page((unsigned long)d->arch.ptwr[PTWR_PT_ACTIVE].page);
+    free_xenheap_page((unsigned long)d->arch.ptwr[PTWR_PT_INACTIVE].page);
+}
 
 
 

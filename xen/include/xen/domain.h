@@ -23,7 +23,7 @@ extern int  arch_set_info_guest(
 
 extern void free_perdomain_pt(struct domain *d);
 
-extern void domain_relinquish_memory(struct domain *d);
+extern void domain_relinquish_resources(struct domain *d);
 
 extern void dump_pageframe_info(struct domain *d);
 

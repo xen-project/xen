@@ -406,13 +406,6 @@ static void __enter_scheduler(void)
     
     perfc_incrc(sched_ctx);
 
-    if ( !is_idle_task(prev->domain) )
-    {
-        LOCK_BIGLOCK(prev->domain);
-        cleanup_writable_pagetable(prev->domain);
-        UNLOCK_BIGLOCK(prev->domain);
-    }
-
 #if defined(WAKE_HISTO)
     if ( !is_idle_task(next) && next->wokenup ) {
         ulong diff = (ulong)(now - next->wokenup);

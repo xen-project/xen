@@ -8,7 +8,7 @@ extern void arch_do_createdomain(struct exec_domain *);
 extern int arch_final_setup_guestos(
     struct exec_domain *, full_execution_context_t *);
 
-extern void domain_relinquish_memory(struct domain *);
+extern void domain_relinquish_resources(struct domain *);
 
 struct arch_domain {
     struct mm_struct *active_mm;
