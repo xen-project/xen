@@ -86,7 +86,7 @@ struct virutal_platform_def {
     struct mi_per_cpu_info mpci;            /* MMIO */
 };
 
-extern void handle_mmio(unsigned long, unsigned long, unsigned long);
+extern void handle_mmio(unsigned long, unsigned long);
 extern int vmx_setup_platform(struct exec_domain *, execution_context_t *);
 
 static inline int mmio_space(unsigned long gpa)
