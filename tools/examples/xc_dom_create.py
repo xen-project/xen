@@ -273,66 +273,78 @@ def make_domain():
     # set the expertise level appropriately
     xenctl.utils.VBD_EXPERT_MODE = vbd_expert
 
-    if new_io_world:
-        cmsg = 'new_block_interface(dom='+str(id)+')'
-        xend_response = xenctl.utils.xend_control_message(cmsg)
-        if not xend_response['success']:
-            print "Error creating block interface"
-            print "Error type: " + xend_response['error_type']
-            if xend_response['error_type'] == 'exception':
-                print "Exception type: " + xend_response['exception_type']
-                print "Exception val:  " + xend_response['exception_value']
-            xc.domain_destroy ( dom=id )
-            sys.exit()
-    
-    for ( uname, virt_name, rw ) in vbd_list:
-	virt_dev = xenctl.utils.blkdev_name_to_number( virt_name )
-
-	segments = xenctl.utils.lookup_disk_uname( uname )
-	if not segments:
-	    print "Error looking up %s\n" % uname
-	    xc.domain_destroy ( dom=id )
-	    sys.exit()
-
+    if not (flags & 4): # It's not a block backend (or it's old IO world)
         if new_io_world:
-            if len(segments) > 1:
-                print "New I/O world cannot deal with multi-extent vdisks"
-                xc.domain_destroy ( dom=id )
-                sys.exit()
-            seg = segments[0]
-            cmsg = 'new_block_device(dom=' + str(id) + \
-                   ',handle=0,vdev=' + str(virt_dev) + \
-                   ',pdev=' + str(seg['device']) + \
-                   ',start_sect=' + str(seg['start_sector']) + \
-                   ',nr_sect=' + str(seg['nr_sectors']) + \
-                   ',readonly=' + str(not re.match('w',rw)) + ')'
+            cmsg = 'new_block_interface(dom='+str(id)+')'
             xend_response = xenctl.utils.xend_control_message(cmsg)
             if not xend_response['success']:
-                print "Error creating virtual block device"
+                print "Error creating block interface"
                 print "Error type: " + xend_response['error_type']
                 if xend_response['error_type'] == 'exception':
                     print "Exception type: " + xend_response['exception_type']
                     print "Exception val:  " + xend_response['exception_value']
                 xc.domain_destroy ( dom=id )
                 sys.exit()
-        else:
-            # check that setting up this VBD won't violate the sharing
-            # allowed by the current VBD expertise level
-            if xenctl.utils.vd_extents_validate(segments,
-                                                rw=='w' or rw=='rw') < 0:
-                xc.domain_destroy( dom = id )
-                sys.exit()
-            
-            if xc.vbd_create( dom=id, vbd=virt_dev,
-                              writeable= rw=='w' or rw=='rw' ):
-                print "Error creating VBD %d (writeable=%d)\n" % (virt_dev,rw)
+
+        for ( uname, virt_name, rw ) in vbd_list:
+            virt_dev = xenctl.utils.blkdev_name_to_number( virt_name )
+
+            segments = xenctl.utils.lookup_disk_uname( uname )
+            if not segments:
+                print "Error looking up %s\n" % uname
                 xc.domain_destroy ( dom=id )
                 sys.exit()
+
+            if new_io_world:
+                if len(segments) > 1:
+                    print "New I/O world cannot deal with multi-extent vdisks"
+                    xc.domain_destroy ( dom=id )
+                    sys.exit()
+                seg = segments[0]
+                cmsg = 'new_block_device(dom=' + str(id) + \
+                       ',handle=0,vdev=' + str(virt_dev) + \
+                       ',pdev=' + str(seg['device']) + \
+                       ',start_sect=' + str(seg['start_sector']) + \
+                       ',nr_sect=' + str(seg['nr_sectors']) + \
+                       ',readonly=' + str(not re.match('w',rw)) + ')'
+                xend_response = xenctl.utils.xend_control_message(cmsg)
+                if not xend_response['success']:
+                    print "Error creating virtual block device"
+                    print "Error type: " + xend_response['error_type']
+                    if xend_response['error_type'] == 'exception':
+                        print "Exception type: " + xend_response['exception_type']
+                        print "Exception val:  " + xend_response['exception_value']
+                    xc.domain_destroy ( dom=id )
+                    sys.exit()
+            else:
+                # check that setting up this VBD won't violate the sharing
+                # allowed by the current VBD expertise level
+                if xenctl.utils.vd_extents_validate(segments,
+                                                    rw=='w' or rw=='rw') < 0:
+                    xc.domain_destroy( dom = id )
+                    sys.exit()
+            
+                if xc.vbd_create( dom=id, vbd=virt_dev,
+                                  writeable= rw=='w' or rw=='rw' ):
+                    print "Error creating VBD %d (writeable=%d)\n" % (virt_dev,rw)
+                    xc.domain_destroy ( dom=id )
+                    sys.exit()
 	
-            if xc.vbd_setextents( dom=id,
-                                  vbd=virt_dev,
-                                  extents=segments):
-                print "Error populating VBD vbd=%d\n" % virt_dev
+                if xc.vbd_setextents( dom=id,
+                                      vbd=virt_dev,
+                                      extents=segments):
+                    print "Error populating VBD vbd=%d\n" % virt_dev
+                    xc.domain_destroy ( dom=id )
+                    sys.exit()
+    else: # It's a block backend - notify Xend.
+        cmsg = 'set_block_backend(dom='+str(id)+')'
+        xend_response = xenctl.utils.xend_control_message(cmsg)
+        if not xend_response['success']:
+            print "Error registering network backend"
+            print "Error type: " + xend_response['error_type']
+            if xend_response['error_type'] == 'exception':
+                print "Exception type: " + xend_response['exception_type']
+                print "Exception val:  " + xend_response['exception_value']
                 xc.domain_destroy ( dom=id )
                 sys.exit()
 

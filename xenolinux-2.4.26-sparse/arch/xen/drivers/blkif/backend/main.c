@@ -487,7 +487,8 @@ static int __init init_module(void)
 {
     int i;
 
-    if ( !(start_info.flags & SIF_INITDOMAIN) )
+    if ( !(start_info.flags & SIF_INITDOMAIN)
+	 && !(start_info.flags & SIF_BLK_BE_DOMAIN) )
         return 0;
 
     blkif_interface_init();

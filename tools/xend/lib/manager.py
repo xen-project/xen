@@ -161,3 +161,13 @@ def set_network_backend(dom):
     if xend.netif.be_port: xend.netif.recovery = True
     xend.netif.be_port = xend.main.port_from_dom(dom)
     return { 'success' : True }
+
+##
+## set_block_backend
+##  Authorise a domain to act as the block backend (assumes we only have one
+##  backend driver for now).  After this call, back end "up" notifications
+##  for the network will only be accepted from this domain.
+def set_block_backend(dom):
+    if xend.blkif.be_port: xend.blkif.recovery = True
+    xend.blkif.be_port = xend.main.port_from_dom(dom)
+    return { 'success' : True }
