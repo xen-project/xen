@@ -21,19 +21,23 @@ all:
 	$(MAKE) -C balloon
 	$(MAKE) -C xc
 	$(MAKE) -C misc
+	$(MAKE) -C examples
 
 install: all
 	$(MAKE) -C balloon install
 	$(MAKE) -C xc install
 	$(MAKE) -C misc install
+	$(MAKE) -C examples install
 
 dist: all
 	$(MAKE) -C balloon dist
 	$(MAKE) -C xc dist
 	$(MAKE) -C misc dist
+	$(MAKE) -C examples dist
 
 clean:
 	$(MAKE) -C balloon clean
 	$(MAKE) -C xc clean
 	$(MAKE) -C misc clean
+	$(MAKE) -C examples clean
 

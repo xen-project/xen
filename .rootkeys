@@ -40,8 +40,12 @@
 3e6377b24eQqYMsDi9XrFkIgTzZ47A tools/balloon/Makefile
 3e6377d6eiFjF1hHIS6JEIOFk62xSA tools/balloon/README
 3e6377dbGcgnisKw16DPCaND7oGO3Q tools/balloon/balloon.c
+401d7e160vaxMBAUSLSicuZ7AQjJ3w tools/examples/Makefile
+401d7e16UgeqroJQTIhwkrDVkoWgZQ tools/examples/README
 40083bb4_j61quzxosgZ19LUgLlgYw tools/examples/add_vbd_to_dom.py
 3fbe2f12OPAkzIUtumU3wRAihnhocQ tools/examples/createlinuxdom.py
+401d7e16GS8YesM1zateRbaOoI6YLQ tools/examples/defaults
+401d7e16NoWaBGC1RXbBcqAOr5Uaag tools/examples/democd
 3fbe2f12dZbmXLlgQdMgkmnSUj23AQ tools/examples/destroydom.py
 40083bb4lxCIf5HRu6fwWUyHCYOHKA tools/examples/list_vbds.py
 3fbe2f12ltvweb13kBSsxqzZDAq4sg tools/examples/listdoms.py
@@ -59,6 +63,9 @@
 40083bb4NhDpKiYTrebI3ZjX__oI_w tools/examples/vd_refresh.py
 400c774eXs8hWKK70ZYzi1ScKiSjPQ tools/examples/vd_to_file.py
 400c33001-uDKTfHBchTKUwuMFcqTA tools/examples/vd_undelete.py
+401d7e16NpnVrFSsR7lKKKfTwCYvWA tools/examples/xc_dom_control.py
+401d7e16RJj-lbtsVEjua6HYAIiKiA tools/examples/xc_dom_create.py
+401d7e16X4iojyKopo_j63AyzYZd2A tools/examples/xc_vd_tool.py
 3f776bd2Xd-dUcPKlPN2vG89VGtfvQ tools/misc/Makefile
 3f6dc136ZKOjd8PIqLbFBl_v-rnkGg tools/misc/miniterm/Makefile
 3f6dc140C8tAeBfroAF24VrmCS4v_w tools/misc/miniterm/README
@@ -68,6 +75,7 @@
 3f5ef5a2dTZP0nnsFoeq2jRf3mWDDg tools/misc/xen-clone.README
 3f1668d4-FUY6Enc7MB3GcwUtfJ5HA tools/misc/xen-mkdevnodes
 3f870808zS6T6iFhqYPGelroZlVfGQ tools/misc/xen_cpuperf.c
+401d7e16hWEsgEnMwbPM9sKyInomWw tools/misc/xen_dmesg.py
 3f8bcf29ulZIC9rC4wM70H_q4s6VPg tools/misc/xen_log.c
 3f13d81eQ9Vz-h-6RDGFkNR9CRP95g tools/misc/xen_nat_enable
 3f13d81e6Z6806ihYYUw8GVKNkYnuw tools/misc/xen_nat_enable.README

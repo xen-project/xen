@@ -1,15 +1,15 @@
 #############################
- __  __            _   ___  
- \ \/ /___ _ __   / | / _ \ 
-  \  // _ \ '_ \  | || | | |
-  /  \  __/ | | | | || |_| |
- /_/\_\___|_| |_| |_(_)___/ 
-                                                   
+ __  __            _   ____  
+ \ \/ /___ _ __   / | |___ \ 
+  \  // _ \ '_ \  | |   __) |
+  /  \  __/ | | | | |_ / __/ 
+ /_/\_\___|_| |_| |_(_)_____|
+                                              
 #############################
 
- XenDemoCD 1.0 
+ XenDemoCD 1.2
  University of Cambridge Computer Laboratory
- 29 Sep 2003
+ 24 Jan 2004
 
  http://www.cl.cam.ac.uk/netos/xen
 
@@ -36,7 +36,7 @@ hardware:
 
 CPU:  Pentium Pro/II/III/IV/Xeon, Athlon (i.e. P6 or newer) SMP supported
 IDE:  Intel PIIX chipset, others will be PIO only (slow)
-SCSI: Adaptec / Dell PERC Raid (aacraid), megaraid, Adaptec aic7xxx
+SCSI: Adaptec / Dell PERC Raid (aacraid), fusion MPT, megaraid, Adaptec aic7xxx
 Net:  Recommended: Intel e1000, Broadcom BCM57xx (tg3), 3c905 (3c59x)
       Working, but require extra copies : pcnet32, Intel e100, tulip
 
@@ -47,9 +47,9 @@ To try out the Demo, boot from CD (you may need to change your BIOS
 configuration to do this), then select one of the four boot options 
 from the Grub menu:
 
- Xen / linux-2.4.22 
- Xen / linux-2.4.22 using cmdline IP configuration
- Xen / linux-2.4.22 in "safe mode"
+ Xen / linux-2.4.24
+ Xen / linux-2.4.24 using cmdline IP configuration
+ Xen / linux-2.4.24 in "safe mode"
  linux-2.4.22
 
 The last option is a plain linux kernel that runs on the bare machine,
@@ -91,13 +91,13 @@ via ssh::
 Once logged in, it should look just like any regular linux box. All
 the usual tools and commands should work as per usual.  However,
 because of the poor random access performance of CD drives, the
-machine will feel rather slugish, and you may run out of memory if you
+machine will feel very slugish, and you may run out of memory if you
 make significant modifications to the ramfs filesystem -- for the full
 experience, install a Xen and XenoLinux image on you hard drive :-)
 
 You can configure networking, either with 'dhclient' or manually via
 'ifconfig' and 'route', remembering to edit /etc/resolv.conf if you
-want DNS.
+want DNS to work.
 
 You can start an X server with 'startx'. It defaults to a conservative
 1024x768, but you can edit the script for higher resoloutions.  The CD
@@ -115,100 +115,189 @@ work with Xen, and you'll only be able to configure a VGA X
 server. We're working on a fix for this for the next release.
 
 If you want to browse the Xen / XenoLinux source, it's all located
-under /usr/local/src, complete with BitKeeper repository. We've also
-included source code and configuration information for the various
-benchmarks we used in the SOSP paper.
+under /usr/local/src/xeno-1.2, complete with BitKeeper
+repository. We've also included source code and configuration
+information for the various benchmarks we used in the SOSP paper.
 
 
 Starting other domains
 ======================
 
-Xen's privileged control interfaces can be accessed using a handy C
-library (libxc.so) or an even easier-to-use Python wrapper module
-(Xc). Example script templates are provided in tools/examples/.
+Xen's privileged control interfaces can be accessed using a C library
+(libxc.so) or an easier-to-use Python wrapper module (Xc). Example
+script templates are provided in tools/examples/.
 
 Abyway, the first thing to do is to set up a window in which you will
 receive console output from other domains. Console output will arrive
-as UDP packets destined for 169.254.1.0, so its necessary to setup an
-alias on eth0. The easiest way to do this is to run:
+as UDP packets destined for 169.254.1.0. The DemoCD's startup scripts
+automatically bring up 169.254.1.0 as an alias called eth0:xen (see
+/etc/sysconfig/network-scripts/ifcfg-eth0 )
 
-  xen_nat_enable
+If you're not intending to configure the new domain with an IP address
+on your LAN, then you'll probably want to use NAT. The
+'xen_nat_enable' installs a few useful iptables rules into domain0 to
+enable NAT. [ NB: The intention is that in future Xen will do NAT
+itsel (actually RSIP), but this is part of a larger work package that
+isn't ready to release.]
 
-This also inserts a few NAT rules into "domain0", in case you'll be
-starting other domains without their own IP addresses. Alternatively,
-just do "ifconfig eth0:0 169.254.1.0 up". NB: The intention is that in
-future Xen will do NAT itsel (actually RSIP), but this is part of a
-larger work package that isn't stable enough to release.
+Next, run the xen UDP console displayer:
 
-Next, run a the xen UDP console displayer:
+  xen_read_console
 
-  xen_read_console &
+[This is currently output only, but infuture we will have
+bidirectional domain console]
+
+Xen has a management interface that can be manipulated from domain0 to
+create new domains, control their CPU, network and memory resource
+allocations, allocate IP addresses, grant access to disk partitions,
+and suspend/resume domains to files, etc.  The management interface is
+implemented as a set of library functions (implemented in C) for which
+there are Python language bindings. 
+
+We have developed a simple set of example python tools for
+manipulating the interface, with the intention that more sophisticated
+high-level management tools will be developed in due course. Within
+the source repository the tools live in tools/examples/ but are
+installed in /usr/local/bin/ on the CD.
+
+Starting a new domain is achieved using xc_dom_create.py which
+allocates resources to a new domain, populates it with a kernel image
+(and optionally a ramdisk) and then starts it.
+
+It parses a configuration file written in the Python language, the
+default location of which is "/etc/xc/defaults", but this may be
+overridden with the "-f" option. For the Demo CD, the defaults file
+will cause domains to be created with ram-based root file systems, and
+mount their /usr partition from the CD, just like domain0. (If you are
+writing your own config file, the "example" script may be a better
+starting point)
+
+Variables can be initialised and passed into configuration files. Some
+of these may be compulsory, others optional.
+
+The 'defaults' file on the CD requires the 'ip' variable to be set to
+tell Xen what IP address(es) should be routed to this domain.  Xen
+will route packets to the domain if they bear one of these addresses
+as a destination address, and will also ensure that packets sent from
+the domain contain one of the addresses as a source address (to
+prevent spoofing).  If multiple IP addresses are to be assigned to a
+domain they can be listed in a comma separated list (with no
+whitespace).
+
+The 'mem' variable can be used to change the default memory allocation
+of 64MB. For example to start a domain with two IP addresses and
+72MB:
+
+  xc_dom_create.py -Dip=128.23.45.34,169.254.1.1 -Dmem=72
+
+[multiple variables may also be set with a single '-D' flag by
+separating them with ':'. Also, it's possible to use DNS hostnames
+rather than IP addresses.]
+
+When invoked with the '-n' option xc_dom_create.py will do a dry run
+and just print out what resources and configuration the domain will
+have e.g.:
+
+  [root@xendemo]# xc_dom_create.py -D ip=commando-1.xeno,169.254.2.3 -Dmem=100
+  Parsing config file 'defaults'
+
+  VM image           : "/boot/xenolinux.gz"
+  VM ramdisk         : "/boot/initrd.gz"
+  VM memory (MB)     : "100"
+  VM IP address(es)  : "128.232.38.51:169.254.2.3"
+  VM block device(s) : "phy:cdrom,hdd,r"
+  VM cmdline         : "ip=128.232.38.51:169.254.1.0:128.232.32.1:255.255.240.0::eth0:off root=/dev/ram0 rw init=/linuxrc 4 LOCALIP=169.254.2.3"
+
+If you invoke xc_dom_create.py without the '-n' option you should see
+the domain booting on your xen_read_console window.
+
+The 169.254.x.x network is special in that it is the 'link local'
+subnet, and is isolated from the external network and hence can only
+be used for communication between virtual machines. By convention, we
+usually give each domain a link local address. The startup scripts on
+the CD have been modified to accept a LINKLOCAL= parameter on the
+kernel command line and initialise an IP alias accordingly (see
+/etc/sysinit/network-scripts/ifcfg-eth0).
+
+Linux only allows one IP address to be specified on the kernel command
+line, so if you specify multiple IP addresses you'll need to configure
+the new Linux VM with the other addresses manually (using ifconfig)
+having logged in.
+
+If you inspect the 'defaults' config script you'll see that the new
+domain was started with a '4' on the kernel command line to tell
+'init' to go to runlevel 4 rather than the default of 3 used by
+domain0. This is done simply to suppress a bunch of harmless error
+messages that would otherwise occur when the new (unprivileged) domain
+tried to access physical hardware resources to try setting the
+hwclock, system font, run gpm etc.
+
+[root@commando-0 examples]# ./xc_dom_create.py -?
+Usage: ./xc_dom_create.py <args>
+
+This tool is used to create and start new domains. It reads defaults
+from a file written in Python, having allowed variables to be set and
+passed into the file. Further command line arguments allow the
+defaults to be overridden. The defaults for each parameter are listed
+in [] brackets. Arguments are as follows:
+
+Arguments to control the parsing of the defaults file:
+ -f config_file   -- Use the specified defaults script. 
+                     Default: ['/etc/xc/defaults']
+ -D foo=bar       -- Set variable foo=bar before parsing config
+                     E.g. '-D vmid=3:ip=1.2.3.4'
+ -h               -- Print extended help message, including all arguments
+ -n               -- Dry run only, don't actually create domain
+
+The config file /etc/xc/defaults requires the following vars to be defined:
+ ip               -- List of IP addr(s) for Xen to route to domain 
+                     e.g. -Dip='1.2.3.4,5.6.7.8'
+The following variables may be optionally defined:
+ mem              -- Adjust initial memory allocation (default 64MB)
+ netmask          -- Override gateway for kernel ip= command line
+ gateway          -- Override network for kernel ip= command line
 
 
-As mentioned above, a template Python script is provided:
-tools/examples/craetelinuxdom.py. This can be modified to set up a
-virtual Ethernet interface, access to local discs, and various other
-parameters.
-
-When you execute your modified screipt, you should see the domain
-booting on your xen_read_console window.
-
-The new domain may be started with a '4' on the kernel command line to
-tell 'init' to go to runlevel 4 rather than the default of 3. This is
-done simply to suppress a bunch of harmless error messages that would
-otherwise occur when the new (unprivileged) domain tried to access
-physical hardware resources to try setting the hwclock, system font,
-run gpm etc.
-
-After it's booted, you should be able to ssh into your new domain. If
-you went for a NATed address, from domain 0 you should be able to ssh
-into '169.254.1.X' where X is the domain number.  If you ran the
-xen_enable_nat script, a bunch of port redirects have been installed
-to enable you to ssh in to other domains remotely.  To access the new
-virtual machine remotely, use:
+After it's booted, you should be able to ssh into your new domain from
+domain0 using the link local 19.254.x.x address you assigned. If you
+assigned a further IP address you should be able to ssh in using that
+address too. If you ran the xen_enable_nat script, a bunch of port
+redirects have been installed to enable you to ssh in to other domains
+remotely even if you didn't assign an externally routeable address.
+To access the new virtual machine remotely, use:
 
  ssh -p2201 root@IP.address.Of.Domain0  # use 2202 for domain 2 etc.
 
-If you configured the new domain with its own IP address, you should
-be able to ssh into it directly.
+You can manipulate running domains using the xc_dom_control.py tool.
+Invoking it without arguments prints some usage information.
 
-Script 'tools/examples/listdoms.py' demonstrates how to generate a
-list of all extant domains. Prettier printing is an exercise for the
-reader!
+To see what domains are running, run 'xc_dom_control list'.  Using the
+tool you can change scheduling parameters, pause a domain, send it a
+shutdown request, or blow it away with the 'destroy' command. You can
+even suspend it to disk (but you probably won't have enough memory to
+do the latter if you're running off the demo CD).
 
-createlinuxdom.py can be used to set the new kernel's command line,
-and hence determine what it uses as a root file system, etc. Although
-the default is to boot in the same manner that domain0 did (using the
-RAM-based file system for root and the CD for /usr) it's possible to
-configure any of the following possibilities, for example:
+Usage: xc_dom_control [command] <params>
 
- * initrd=/boot/initrd init=/linuxrc
-     boot using an initial ram disk, executing /linuxrc (as per this CD)     
-
- * root=/dev/hda3 ro
-     boot using a standard hard disk partition as root
-     !!! remember to grant access in createlinuxdom.py.
-
- * root=/dev/xvda1 ro
-     boot using a pre-configured 'virtual block device' that will be
-     attached to a virtual disk that previously has had a file system
-     installed on it.
-
- * root=/dev/nfs nfsroot=/path/on/server ip=<blah_including server_IP>
-     Boot using an NFS mounted root file system. This could be from a
-     remote NFS server, or from an NFS server running in another
-     domain. The latter is rather a useful option.
-
-A typical setup might be to allocate a standard disk partition for
-each domain and populate it with files. To save space, having a shared
-read-only usr partition might make sense.
-
-Block devices should only be shared between domains in a read-only
-fashion otherwise the linux kernels will obviously get very confused
-as the file system structure may change underneath them (having the
-same partition mounted rw twice is a sure fire way to cause
-irreparable damage)!  If you want read-write sharing, export the
-directory to other domains via NFS from domain0.
+  stop      [dom]        -- pause a domain
+  start     [dom]        -- un-pause a domain
+  shutdown  [dom]        -- request a domain to shutdown
+  destroy   [dom]        -- immediately terminate a domain
+  pincpu    [dom] [cpu]  -- pin a domain to the specified CPU
+  save      [dom] [file] -- suspend a domain's memory to file
+  restore   [file]       -- resume a domain from a file
+  list                   -- print info about all domains
+  listvbds               -- print info about all virtual block devs
+  cpu_bvtset [dom] [mcuadv] [warp] [warpl] [warpu]
+                         -- set scheduling parameters for domain
+  cpu_bvtslice [slice]   -- default scheduler slice
+  vif_stats [dom] [vif]  -- get stats for a given network vif
+  vif_addip [dom] [vif] [ip]  -- add an IP address to a given vif
+  vif_setsched [dom] [vif] [bytes] [usecs] -- rate limit vif bandwidth
+  vif_getsched [dom] [vif] -- print vif's scheduling parameters
+  vbd_add [dom] [uname] [dev] [mode] -- make disk/partition uname available to 
+                            domain as dev e.g. 'vbd_add phy:sda3 hda1 rw'
+  vbd_remove [dom] [dev] -- remove disk or partition attached as 'dev' 
 
 
 Troubleshooting Problems
@@ -324,18 +413,85 @@ unsupported, use ifname=dummy
 The second line specifies which xenolinux image to use, and the
 standard linux command line arguments to pass to the kernel. In this
 case, we're configuring the root partition and stating that it should
-be mounted read-only (normal practice). 
+initially be mounted read-only (normal practice).
 
 If we were booting with an initial ram disk (initrd), then this would
 require a second "module" line.
+
+Installing the Xen tools and source
+===================================
+
+The tools and source live in the /usr/local/src/xen-1.2 directory on
+the CD (and may also be downloaded from the project downloads
+page). You'll need to copy them to some mutable storage before using
+them.
+
+If you have the BitKeeper BK tools installed you can check the
+repository is up to date by cd'ing into the xeno-1.2.bk directory and
+typing 'bk pull' (assuming you have an Internet connection). 
+
+You can rebuild Xen and the tools by typing 'make'. You can install
+them to the standard directories with 'make install', or into the
+../install subtree with 'make dist'.
+
+/usr/local/bin/xc_*   	the domain control tools
+/lib/libxc.so		the xc library
+/usr/lib/python2.2/site-packages/XenoUtil.py	python util library
+/usr/lib/python2.2/site-packages/Xc.c		python xc bindings
+
+If you're using the virtual disk control tools (xc_vd_tool) you'll
+need the SQLite library and python binding pysqlite.  There's a tar
+ball containing the necessary binaries on the project downloads page.
+
+
+Modifying xc_mycreatelinuxdom1.py
+=================================
+
+xc_mycreatelinuxdom1.py.py can be used to set the new kernel's command line,
+and hence determine what it uses as a root file system, etc. Although
+the default is to boot in the same manner that domain0 did (using the
+RAM-based file system for root and the CD for /usr) it's possible to
+configure any of the following possibilities, for example:
+
+ * initrd=/boot/initrd init=/linuxrc
+     boot using an initial ram disk, executing /linuxrc (as per this CD)     
+
+ * root=/dev/hda3 ro
+     boot using a standard hard disk partition as root
+     !!! remember to grant access in createlinuxdom.py.
+
+ * root=/dev/xvda1 ro
+     boot using a pre-configured 'virtual block device' that will be
+     attached to a virtual disk that previously has had a file system
+     installed on it.
+
+ * root=/dev/nfs nfsroot=/path/on/server ip=<blah_including server_IP>
+     Boot using an NFS mounted root file system. This could be from a
+     remote NFS server, or from an NFS server running in another
+     domain. The latter is rather a useful option.
+
+A typical setup might be to allocate a standard disk partition for
+each domain and populate it with files. To save space, having a shared
+read-only usr partition might make sense.
+
+Block devices should only be shared between domains in a read-only
+fashion otherwise the linux kernels will obviously get very confused
+as the file system structure may change underneath them (having the
+same partition mounted rw twice is a sure fire way to cause
+irreparable damage)!  If you want read-write sharing, export the
+directory to other domains via NFS from domain0.
+
+
 
 
 Installing the file systems from the CD
 =======================================
 
-If you haven't an existing Linux installation onto which you can just
-drop down the Xen and XenoLinux images, then the file systems on the
-CD provide a quick way of doing an install.
+If you haven't got an existing Linux installation onto which you can
+just drop down the Xen and XenoLinux images, then the file systems on
+the CD provide a quick way of doing an install. However, you're
+probably better off in the long run doing a proper Redhat, Fedora,
+Debian etc install rather than just doing the hack described below:
 
 Choose one or two partitions, depending on whether you want a separate
 /usr or not. Make file systems on it/them e.g.: 

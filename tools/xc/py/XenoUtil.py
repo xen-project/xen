@@ -99,6 +99,22 @@ def add_offset_to_ip( ip, off ):
     return '%d.%d.%d.%d' % ( ((a>>24)&0xff), ((a>>16)&0xff),
 			     ((a>>8)&0xff), (a&0xff) )
 
+def check_subnet( ip, network, netmask ):
+    l = string.split(ip,'.')
+    n_ip = ( (string.atoi(l[0])<<24) | (string.atoi(l[1])<<16) | 
+	   (string.atoi(l[2])<<8)  | string.atoi(l[3]) ) 
+
+    l = string.split(network,'.')
+    n_net = ( (string.atoi(l[0])<<24) | (string.atoi(l[1])<<16) | 
+	   (string.atoi(l[2])<<8)  | string.atoi(l[3]) )
+
+    l = string.split(netmask,'.')
+    n_mask = ( (string.atoi(l[0])<<24) | (string.atoi(l[1])<<16) | 
+	   (string.atoi(l[2])<<8)  | string.atoi(l[3]) )
+    
+    return (n_ip&n_mask)==(n_net&n_mask)
+
+
 ##### VBD-related Functions
 
 def blkdev_name_to_number(name):
@@ -171,6 +187,46 @@ def lookup_disk_uname( uname ):
 
 ##### VD Management-related functions
 
+##### By Mark Williamson, <mark.a.williamson@intel.com>
+##### (C) Intel Research Cambridge
+
+# TODO:
+#
+# Plenty of room for enhancement to this functionality (contributions
+# welcome - and then you get to have your name in the source ;-)...
+#
+# vd_unformat() : want facilities to unallocate virtual disk
+# partitions, possibly migrating virtual disks of them, with checks to see if
+# it's safe and options to force it anyway
+#
+# vd_create() : should have an optional argument specifying a physical
+# disk preference - useful to allocate for guest doms to do RAID
+#
+# vd_undelete() : add ability to "best effort" undelete as much of a
+# vdisk as is left in the case that some of it has already been
+# reallocated.  Some people might still be able to recover some of
+# their data this way, even if some of the disk has disappeared.
+#
+# It'd be nice if we could wipe virtual disks for security purposes -
+# should be easy to do this using dev if=/dev/{zero,random} on each
+# extent in turn.  There could be another optional flag to vd_create
+# in order to allow this.
+#
+# Error codes could be more expressive - i.e. actually tell why the
+# error occurred rather than "it broke".  Currently the code avoids
+# using exceptions to make control scripting simpler and more
+# accessible to beginners - therefore probably should just use more
+# return codes.
+#
+# Enhancements / additions to the example scripts are also welcome:
+# some people will interact with this code mostly through those
+# scripts.
+#
+# More documentation of how this stuff should be used is always nice -
+# if you have a novel configuration that you feel isn't discussed
+# enough in the HOWTO (which is currently a work in progress), feel
+# free to contribute a walkthrough, or something more substantial.
+#
 
 
 def __vd_no_database():
@@ -178,6 +234,7 @@ def __vd_no_database():
     """
     print >> sys.stderr, "ERROR: Could not locate the database file at " + VD_DB_FILE
     sys.exit(1)
+
 
 def vd_format(partition, extent_size_mb):
     """Format a partition or drive for use a virtual disk storage.
@@ -495,6 +552,9 @@ def vd_undelete(vdisk_id, expiry_time):
 
     if not os.path.isfile(VD_DB_FILE):
         __vd_no_database()
+
+    if vdisk_id == '0': #  undeleting vdisk 0 isn't sane!
+        return -1
 
     cx = sqlite.connect(VD_DB_FILE)
     cu = cx.cursor()
