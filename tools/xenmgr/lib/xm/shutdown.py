@@ -64,7 +64,7 @@ def main_dom(opts, args):
 def main(argv):
     opts = gopts
     args = opts.parse(argv)
-    if opts.help:
+    if opts.vals.help:
         opts.usage()
         return
     print 'shutdown.main>', len(args), args

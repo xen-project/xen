@@ -127,7 +127,7 @@ class ProgHelp(Prog):
             name = args[1]
             p = self.xm.getprog(name)
             if p:
-                p.help(args)
+                p.help(args[1:])
             else:
                 print '%s: Unknown command: %s' % (self.name, name)
         else:
@@ -159,22 +159,13 @@ class ProgSave(Prog):
     info = """Save domain state (and config) to file."""
 
     def help(self, args):
-        print args[0], "DOM FILE [CONFIG]"
-        print """\nSave domain with id DOM to FILE.
-        Optionally save config to CONFIG."""
+        print args[0], "DOM FILE"
+        print """\nSave domain with id DOM to FILE."""
         
     def main(self, args):
         if len(args) < 3: self.err("%s: Missing arguments" % args[0])
         dom = args[1]
         savefile = os.path.abspath(args[2])
-        configfile = None
-        if len(args) == 4:
-            configfile = os.path.abspath(args[3])
-        if configfile:
-            out = file(configfile, 'w')
-            config = server.xend_domain(dom)
-            PrettyPrint.prettyprint(config, out=out)
-            out.close()
         server.xend_domain_save(dom, savefile)
 
 xm.prog(ProgSave)
@@ -185,13 +176,16 @@ class ProgRestore(Prog):
     info = """Create a domain from a saved state."""
 
     def help(self, args):
-        print args[0], "FILE CONFIG"
+        print args[0], "FILE [CONFIG]"
         print "\nRestore a domain from FILE using configuration CONFIG."
     
     def main(self, help, args):
-        if len(args) < 3: self.err("%s: Missing arguments" % args[0])
+        if len(args) < 2: self.err("%s: Missing arguments" % args[0])
         savefile =  os.path.abspath(args[1])
-        configfile = os.path.abspath(args[2])
+        if len(args) >= 3:
+            configfile = os.path.abspath(args[2])
+        else:
+            configfile = None
         info = server.xend_domain_restore(savefile, configfile)
         PrettyPrint.prettyprint(info)
 
