@@ -10,7 +10,7 @@ SONAME   = libxc.so.$(MAJOR)
 CC       = gcc
 
 XEN_ROOT = ../..
-include $(XEN_ROOT)/tools/Make.defs
+include $(XEN_ROOT)/tools/Rules.mk
 
 vpath %c       $(XEN_LIBXUTIL)
 INCLUDES += -I $(XEN_LIBXUTIL)
@@ -70,8 +70,8 @@ install: all
 	$(INSTALL_DIR) $(DESTDIR)/usr/lib
 	$(INSTALL_DIR) $(DESTDIR)/usr/include
 	$(INSTALL_PROG) $(LIB) $(DESTDIR)/usr/lib
-	ln -sf $(LIB_NAME).so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/lib/$(LIB_NAME).so.$(MAJOR)
-	ln -sf $(LIB_NAME).so.$(MAJOR) $(DESTDIR)/usr/lib/$(LIB_NAME).so
+	ln -sf libxc.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/lib/libxc.so.$(MAJOR)
+	ln -sf libxc.so.$(MAJOR) $(DESTDIR)/usr/lib/libxc.so
 	$(INSTALL_DATA) xc.h $(DESTDIR)/usr/include
 
 clean:

@@ -4,10 +4,10 @@ INSTALL_DIR	= $(INSTALL) -d -m0755
 INSTALL_DATA	= $(INSTALL) -m0644
 
 XEN_ROOT=../..
-include $(XEN_ROOT)/tools/Make.defs
+include $(XEN_ROOT)/tools/Rules.mk
 
 CC       = gcc
-CFLAGS   = -Wall -Werror -O3
+CFLAGS  += -Wall -Werror -O3
 
 CFLAGS  += -I $(XEN_XC)
 CFLAGS  += -I $(XEN_LIBXC)
