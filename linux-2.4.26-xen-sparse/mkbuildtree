@@ -225,5 +225,5 @@ ln -sf ../../i386/mm/extable.c
 ln -sf ../../i386/mm/pageattr.c 
 cd ../drivers/console
 ln -sf ../../../../${LINUX_26}/drivers/xen/console/console.c 
-#cd ../netif/frontend
-#ln -sf ../../../../../${LINUX_26}/drivers/xen/net/network.c main.c
+cd ../netif/frontend
+ln -sf ../../../../../${LINUX_26}/drivers/xen/net/network.c main.c

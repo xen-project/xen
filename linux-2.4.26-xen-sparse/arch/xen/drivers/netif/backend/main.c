@@ -495,13 +495,16 @@ static void net_tx_action(unsigned long unused)
 
         pending_idx = pending_ring[MASK_PEND_IDX(pending_cons)];
 
-        if ( unlikely((skb = dev_alloc_skb(PKT_PROT_LEN)) == NULL) )
+        if ( unlikely((skb = alloc_skb(PKT_PROT_LEN+16, GFP_ATOMIC)) == NULL) )
         {
             DPRINTK("Can't allocate a skb in start_xmit.\n");
             make_tx_response(netif, txreq.id, NETIF_RSP_ERROR);
             netif_put(netif);
             break;
         }
+
+        /* Packets passed to netif_rx() must have some headroom. */
+        skb_reserve(skb, 16);
 
         mcl[0].op = __HYPERVISOR_update_va_mapping_otherdomain;
         mcl[0].args[0] = MMAP_VADDR(pending_idx) >> PAGE_SHIFT;
