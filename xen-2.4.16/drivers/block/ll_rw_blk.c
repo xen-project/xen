@@ -1122,7 +1122,7 @@ void generic_make_request (int rw, struct buffer_head * bh)
 	 */
 	do {
 		q = blk_get_queue(bh->b_rdev);
-		if (!q) {
+		if (!q || !q->make_request_fn) {
 			printk(KERN_ERR
 			       "generic_make_request: Trying to access "
 			       "nonexistent block-device %s (%ld)\n",

@@ -123,11 +123,15 @@ static inline void mark_buffer_clean(struct buffer_head * bh)
 
 static inline void buffer_IO_error(struct buffer_head * bh)
 {
-        mark_buffer_clean(bh);
-        /*
-         * b_end_io has to clear the BH_Uptodate bitflag in the error case!
-         */
-        bh->b_end_io(bh, 0);
+    extern void end_block_io_op(struct buffer_head *bh);
+
+    mark_buffer_clean(bh);
+    /*
+     * b_end_io has to clear the BH_Uptodate bitflag in the error case!
+     */
+    bh->b_end_io(bh, 0);
+    /* XXX KAF */
+    end_block_io_op(bh);
 }
 
 /**** XXX END OF BUFFER_HEAD STUFF XXXX ****/
