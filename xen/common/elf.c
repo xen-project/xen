@@ -78,7 +78,7 @@ int parseelfimage(char *elfbase,
 
         if ( (strstr(guestinfo, "XEN_VER=3.0") == NULL) )
         {
-            printk("ERROR: Xen will only load images built for Xen v2.0\n");
+            printk("ERROR: Xen will only load images built for Xen v3.0\n");
             return -EINVAL;
         }
 
