@@ -773,6 +773,10 @@ static void net_tx_action(unsigned long unused)
         vif->total_packets_sent++;
         vif->total_bytes_sent += tx->size;
 
+        /* Is the NIC crap? */
+        if ( !(dev->features & NETIF_F_SG) )
+            skb_linearize(skb, GFP_KERNEL);
+
         /* Transmit should always work, or the queue would be stopped. */
         if ( dev->hard_start_xmit(skb, dev) != 0 )
         {

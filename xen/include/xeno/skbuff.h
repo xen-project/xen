@@ -428,4 +428,6 @@ extern int skb_copy_bits(const struct sk_buff *skb,
                          int offset, void *to, int len);
 extern void skb_init(void);
 
+extern int skb_linearize(struct sk_buff *skn, int gfp_mask);
+
 #endif	/* _LINUX_SKBUFF_H */
