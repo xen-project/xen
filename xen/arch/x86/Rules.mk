@@ -14,9 +14,13 @@ else
 x86_32/usercopy.o: CFLAGS += -O1
 endif
 
-
 # Prevent floating-point variables from creeping into Xen.
 CFLAGS  += -msoft-float
+
+# Disable PIE/SSP if GCC supports them. They can break us.
+CFLAGS  += $(call test-gcc-flag,-nopie)
+CFLAGS  += $(call test-gcc-flag,-fno-stack-protector)
+CFLAGS  += $(call test-gcc-flag,-fno-stack-protector-all)
 
 ifeq ($(TARGET_SUBARCH),x86_32)
 CFLAGS  += -m32 -march=i686
