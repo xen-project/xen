@@ -8,6 +8,7 @@
 typedef struct XcIOContext {
     u32 domain;
     unsigned flags;
+    int resource;
     IOStream *io;
     IOStream *info;
     IOStream *err;

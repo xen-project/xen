@@ -682,9 +682,16 @@ class SplitDev(Dev):
     def __init__(self, idx, controller):
         Dev.__init__(self, idx, controller)
         self.backendDomain = 0
+        self.index = None
 
     def getBackendInterface(self):
         return self.controller.getBackendInterface(self.backendDomain)
+
+    def getIndex(self):
+        return self.index
+
+    def setIndex(self, index):
+        self.index = index
 
 
 
