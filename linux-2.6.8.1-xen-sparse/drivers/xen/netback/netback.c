@@ -132,7 +132,7 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
          (((unsigned long)skb->end ^ (unsigned long)skb->head) & PAGE_MASK) ||
          ((skb->end - skb->head) < (PAGE_SIZE/2)) )
     {
-        struct sk_buff *nskb = alloc_skb(PAGE_SIZE-1024, GFP_ATOMIC);
+        struct sk_buff *nskb = dev_alloc_skb(PAGE_SIZE);
         int hlen = skb->data - skb->head;
         if ( unlikely(nskb == NULL) )
             goto drop;

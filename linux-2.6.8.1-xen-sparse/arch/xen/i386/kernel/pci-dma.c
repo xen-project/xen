@@ -55,6 +55,7 @@ void *dma_alloc_coherent(struct device *dev, size_t size,
 		pmd_t         *pmd;
 		pte_t         *pte;
 		unsigned long  pfn, i;
+		scrub_pages(vstart, 1 << order);
 		/* 1. Zap current PTEs, giving away the underlying pages. */
 		for (i = 0; i < (1<<order); i++) {
 			pgd = pgd_offset_k(   (vstart + (i*PAGE_SIZE)));

@@ -100,16 +100,26 @@ config XEN_WRITABLE_PAGETABLES
 	help
 	  Use writable L1 pagetables
 
+config XEN_SCRUB_PAGES
+        bool "Scrub memory before freeing it to Xen"
+        default y
+        help
+          Erase memory contents before freeing it back to Xen's global
+          pool. This ensures that any secrets contained within that
+          memory (e.g., private keys) cannot be found by other guests that
+          may be running on the machine. Most people will want to say Y here.
+          If security is not a concern then you may increase performance by
+          saying N.
+
 endmenu
 
 config FOREIGN_PAGES
 	bool
 	default y
 
-config PAGESIZED_SKBS
+config HAVE_ARCH_DEV_ALLOC_SKB
 	bool
-	default y if XEN_NETDEV_BACKEND
-	default n if !XEN_NETDEV_BACKEND
+	default y
 
 #config VT
 #	bool

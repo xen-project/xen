@@ -104,8 +104,20 @@ static unsigned long inflate_balloon(unsigned long num_pages)
     {
 	unsigned long mfn = phys_to_machine_mapping[*currp];
         curraddr = (unsigned long)page_address(mem_map + *currp);
+        /* Blow away page contents for security, and also p.t. ref if any. */
 	if ( curraddr != 0 )
+        {
+            scrub_pages(curraddr, 1);
             queue_l1_entry_update(get_ptep(curraddr), 0);
+        }
+#ifdef CONFIG_XEN_SCRUB_PAGES
+        else
+        {
+            void *p = kmap(&mem_map[*currp]);
+            scrub_pages(p, 1);
+            kunmap(&mem_map[*currp]);
+        }
+#endif
         phys_to_machine_mapping[*currp] = DEAD;
         *currp = mfn;
     }
@@ -388,9 +400,9 @@ static int balloon_write(struct file *file, const char *buffer,
     }
 
     len = strnlen_user(buffer, count);
-    if (len==0) return -EBADMSG;
-    if (len==1) return 1; /* input starts with a NUL char */
-    if ( strncpy_from_user(memstring, buffer, len) < 0)
+    if ( len == 0 ) return -EBADMSG;
+    if ( len == 1 ) return 1; /* input starts with a NUL char */
+    if ( strncpy_from_user(memstring, buffer, len) < 0 )
         return -EFAULT;
 
     endchar = memstring;

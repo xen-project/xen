@@ -13,8 +13,15 @@
 #ifndef __ASSEMBLY__
 
 #include <linux/config.h>
+#include <linux/string.h>
 #include <linux/types.h>
 #include <asm/hypervisor-ifs/hypervisor-if.h>
+
+#ifdef CONFIG_XEN_SCRUB_PAGES
+#define scrub_pages(_p,_n) memset((void *)(_p), 0, (_n) << PAGE_SHIFT)
+#else
+#define scrub_pages(_p,_n) ((void)0)
+#endif
 
 #ifdef CONFIG_X86_USE_3DNOW
 

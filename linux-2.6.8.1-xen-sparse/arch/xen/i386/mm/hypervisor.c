@@ -414,6 +414,8 @@ unsigned long allocate_empty_lowmem_region(unsigned long pages)
     if ( vstart == 0 )
         return 0UL;
 
+    scrub_pages(vstart, 1 << order);
+
     pfn_array = vmalloc((1<<order) * sizeof(*pfn_array));
     if ( pfn_array == NULL )
         BUG();
