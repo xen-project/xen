@@ -1864,10 +1864,11 @@ void ptwr_status(void)
 /************************************************************************/
 
 
-void audit_domain( struct domain *d)
+void audit_domain(struct domain *d)
 {
     int ttot=0, ctot=0, io_mappings=0, lowmem_mappings=0;
-    void adjust ( struct pfn_info *page, int dir, int adjtype )
+
+    void adjust (struct pfn_info *page, int dir, int adjtype)
     {
         int count = page->count_info & PGC_count_mask;
 
@@ -1881,8 +1882,9 @@ void audit_domain( struct domain *d)
 
             if ( tcount < 0 )
             {
-		// This will only come out once
-                printk("Audit %d: type count whent below zero pfn=%x taf=%x otaf=%x\n",
+		/* This will only come out once. */
+                printk("Audit %d: type count whent below zero pfn=%x "
+                       "taf=%x otaf=%x\n",
                        d->domain, page-frame_table,
                        page->u.inuse.type_info,
                        page->tlbflush_timestamp);
@@ -1897,8 +1899,9 @@ void audit_domain( struct domain *d)
         count += dir;
         if ( count < 0 )
         {
-	    // This will only come out once
-            printk("Audit %d: general count whent below zero pfn=%x taf=%x otaf=%x\n",
+	    /* This will only come out once. */
+            printk("Audit %d: general count whent below zero pfn=%x "
+                   "taf=%x otaf=%x\n",
                    d->domain, page-frame_table,
                    page->u.inuse.type_info,
                    page->tlbflush_timestamp);
@@ -1910,41 +1913,30 @@ void audit_domain( struct domain *d)
 
     }
 
-    void scan_for_pfn( struct domain *d, unsigned long xpfn )
+    void scan_for_pfn(struct domain *d, unsigned long xpfn)
     {
-        unsigned long pfn;
+        unsigned long pfn, *pt;
         struct list_head *list_ent;
+        struct pfn_info *page;
         int i;
 
         list_ent = d->page_list.next;
         for ( i = 0; (list_ent != &d->page_list); i++ )
         {
-            unsigned long * pt;
-            struct pfn_info *page;
             pfn = list_entry(list_ent, struct pfn_info, list) - frame_table;
             page = &frame_table[pfn];
             
-            if ( (page->u.inuse.type_info & PGT_type_mask) == PGT_l1_page_table ||
-                 (page->u.inuse.type_info & PGT_type_mask) == PGT_l2_page_table )
+            switch ( page->u.inuse.type_info & PGT_type_mask )
             {
-                pt = map_domain_mem( pfn<<PAGE_SHIFT );
-
+            case PGT_l1_page_table:
+            case PGT_l2_page_table:
+                pt = map_domain_mem(pfn<<PAGE_SHIFT);
                 for ( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ )
-                {
-                    if ( pt[i] & _PAGE_PRESENT )
-                    {
-                        unsigned long l1pfn = pt[i]>>PAGE_SHIFT;
-                        
-                        if ( l1pfn == xpfn )
-                        {
-                            printk("        found dom=%d i=%x pfn=%lx t=%x c=%x\n",
-                                   d->domain,
-                                   i,pfn,page->u.inuse.type_info,
-                                   page->count_info);
-                        }
-                    }
-                }
-
+                    if ( (pt[i] & _PAGE_PRESENT) &&
+                         ((pt[i] >> PAGE_SHIFT) == xpfn) )
+                        printk("     found dom=%d i=%x pfn=%lx t=%x c=%x\n",
+                               d->domain, i, pfn, page->u.inuse.type_info,
+                               page->count_info);
                 unmap_domain_mem(pt);           
             }
 
@@ -1953,19 +1945,17 @@ void audit_domain( struct domain *d)
 
     }
 
-    void scan_for_pfn_remote( unsigned long xpfn )
+    void scan_for_pfn_remote(unsigned long xpfn)
     {
         struct domain *e;
-
         for_each_domain ( e )
-        {
             scan_for_pfn( e, xpfn );            
-        }
     }   
 
     int i;
     unsigned long pfn;
     struct list_head *list_ent;
+    struct pfn_info *page;
 
     if ( d != current )
         domain_pause(d);
@@ -1977,12 +1967,11 @@ void audit_domain( struct domain *d)
            
     spin_lock(&d->page_alloc_lock);
 
-    /* phase 0 */
+    /* PHASE 0 */
 
     list_ent = d->page_list.next;
     for ( i = 0; (list_ent != &d->page_list); i++ )
     {
-        struct pfn_info *page;
         pfn = list_entry(list_ent, struct pfn_info, list) - frame_table;       
         page = &frame_table[pfn];
 
@@ -1994,7 +1983,7 @@ void audit_domain( struct domain *d)
             printk("taf > caf %x %x pfn=%lx\n",
                    page->u.inuse.type_info, page->count_info, pfn );
  
-#if 0   // SYSV shared memory pages plus writeable files
+#if 0   /* SYSV shared memory pages plus writeable files. */
         if ( (page->u.inuse.type_info & PGT_type_mask) == PGT_writable_page && 
              (page->u.inuse.type_info & PGT_count_mask) > 1 )
         {
@@ -2014,22 +2003,21 @@ void audit_domain( struct domain *d)
                   page->count_info );
         }
 
-        // use tlbflush_timestamp to store original type_info
+        /* Use tlbflush_timestamp to store original type_info. */
         page->tlbflush_timestamp = page->u.inuse.type_info;
 
         list_ent = frame_table[pfn].list.next;
     }
 
 
-    /* phase 1 */
+    /* PHASE 1 */
 
-    adjust( &frame_table[pagetable_val(d->mm.pagetable)>>PAGE_SHIFT], -1, 1 );
+    adjust(&frame_table[pagetable_val(d->mm.pagetable)>>PAGE_SHIFT], -1, 1);
 
     list_ent = d->page_list.next;
     for ( i = 0; (list_ent != &d->page_list); i++ )
     {
-        unsigned long * pt;
-        struct pfn_info *page;
+        unsigned long *pt;
         pfn = list_entry(list_ent, struct pfn_info, list) - frame_table;       
         page = &frame_table[pfn];
 
@@ -2061,42 +2049,26 @@ void audit_domain( struct domain *d)
 
                     if ( l1page->u.inuse.domain != d )
                     {
-                        printk("L2: Skip bizare page belowing to other dom %p\n",
-                               l1page->u.inuse.domain);    
+                        printk("L2: Skip bizarre page belonging to other "
+                               "dom %p\n", l1page->u.inuse.domain);    
                         continue;
                     }
+                    
+                    if ( (l1page->u.inuse.type_info & PGT_type_mask) ==
+                         PGT_l2_page_table )
+                        printk("Audit %d: [%x] Found %s Linear PT "
+                               "t=%x pfn=%lx\n", d->domain, i, 
+                               (l1pfn==pfn) ? "Self" : "Other",
+                               l1page->u.inuse.type_info,
+                               l1pfn);
+                    else if ( (l1page->u.inuse.type_info & PGT_type_mask) !=
+                              PGT_l1_page_table )
+                        printk("Audit %d: [%x] Expected L1 t=%x pfn=%lx\n",
+                               d->domain, i,
+                               l1page->u.inuse.type_info,
+                               l1pfn);
 
-                    if ( (l1page->u.inuse.type_info & PGT_type_mask) !=
-                         PGT_l1_page_table )
-		    {
-			if( (l1page->u.inuse.type_info & PGT_type_mask) ==
-			    PGT_l2_page_table )
-			{
-			    if( l1pfn == pfn )			    
-			    {
-				printk("Audit %d: [%x] Found Self Linear PT t=%x pfn=%lx\n",
-				       d->domain, i,
-				       l1page->u.inuse.type_info,
-				       l1pfn);
-			    }
-			    else
-			    {
-				printk("Audit %d: [%x] Found Other Linear PT t=%x pfn=%lx\n",
-				       d->domain, i,
-				       l1page->u.inuse.type_info,
-				       l1pfn);
-			    }
-			}
-			else
-			{
-			    printk("Audit %d: [%x] Expected L1 t=%x pfn=%lx\n",
-				   d->domain, i,
-				   l1page->u.inuse.type_info,
-				   l1pfn);
-			}
-
-		    }
-                    adjust( l1page, -1, 1 );
+                    adjust(l1page, -1, 1);
                 }
             }
 
@@ -2108,10 +2080,7 @@ void audit_domain( struct domain *d)
         case PGT_l1_page_table:
             
             if ( (page->u.inuse.type_info & PGT_pinned) == PGT_pinned )
-            {
-                //printk("L1 is pinned\n");
                 adjust( page, -1, 1 );
-            }
 
             if ( (page->u.inuse.type_info & PGT_validated) != PGT_validated )
                 printk("Audit %d: L1 not validated %x\n",
@@ -2158,7 +2127,8 @@ void audit_domain( struct domain *d)
 
                     if ( l1page->u.inuse.domain != d )
                     {
-                        printk("Audit %d: [%lx,%x] Skip foreign page dom=%lx pfn=%lx c=%08x t=%08x m2p=%lx\n",
+                        printk("Audit %d: [%lx,%x] Skip foreign page dom=%lx "
+                               "pfn=%lx c=%08x t=%08x m2p=%lx\n",
 			       d->domain, pfn, i,
                                (unsigned long)l1page->u.inuse.domain,
 			       l1pfn,
@@ -2168,7 +2138,7 @@ void audit_domain( struct domain *d)
                         continue;
                     }
 
-                    adjust( l1page, -1, 0 );
+                    adjust(l1page, -1, 0);
                 }
             }
 
@@ -2180,21 +2150,18 @@ void audit_domain( struct domain *d)
         list_ent = frame_table[pfn].list.next;
     }
 
-    if ( io_mappings>0 || lowmem_mappings>0 )
+    if ( (io_mappings > 0) || (lowmem_mappings > 0) )
 	printk("Audit %d: Found %d lowmem mappings and %d io mappings\n",
 	       d->domain, lowmem_mappings, io_mappings);
 
-    /* phase 2 */
+    /* PHASE 2 */
 
     ctot = ttot = 0;
     list_ent = d->page_list.next;
     for ( i = 0; (list_ent != &d->page_list); i++ )
     {
-        struct pfn_info *page;
         pfn = list_entry(list_ent, struct pfn_info, list) - frame_table;
-        
         page = &frame_table[pfn];
-
 
         switch ( page->u.inuse.type_info & PGT_type_mask)
         {
@@ -2211,7 +2178,7 @@ void audit_domain( struct domain *d)
         default:
             if ( (page->count_info & PGC_count_mask) != 1 )
             {
-                printk("Audit %d: general count!=1 (c=%x) t=%x ot=%x pfn=%lx\n",
+                printk("Audit %d: gen count!=1 (c=%x) t=%x ot=%x pfn=%lx\n",
                        d->domain, 
                        page->count_info,
                        page->u.inuse.type_info, 
@@ -2224,15 +2191,13 @@ void audit_domain( struct domain *d)
         list_ent = frame_table[pfn].list.next;
     }
 
-    /* phase 3 */
+    /* PHASE 3 */
 
     list_ent = d->page_list.next;
     for ( i = 0; (list_ent != &d->page_list); i++ )
     {
-        unsigned long * pt;
-        struct pfn_info *page;
+        unsigned long *pt;
         pfn = list_entry(list_ent, struct pfn_info, list) - frame_table;
-        
         page = &frame_table[pfn];
 
         switch ( page->u.inuse.type_info & PGT_type_mask )
@@ -2251,7 +2216,7 @@ void audit_domain( struct domain *d)
                     struct pfn_info *l1page = &frame_table[l1pfn];
 
                     if ( l1page->u.inuse.domain == d)
-                        adjust( l1page, 1, 1 );
+                        adjust(l1page, 1, 1);
                 }
             }
 
@@ -2268,17 +2233,14 @@ void audit_domain( struct domain *d)
             {
                 if ( pt[i] & _PAGE_PRESENT )
                 {
-#if 1
-
                     unsigned long l1pfn = pt[i]>>PAGE_SHIFT;
                     struct pfn_info *l1page = &frame_table[l1pfn];
 
-                    if ( l1page->u.inuse.domain != d) continue;
-		    if ( l1pfn < 0x100 ) continue;
-		    if ( l1pfn > max_page ) continue;
+                    if ( (l1page->u.inuse.domain != d) ||
+                         (l1pfn < 0x100) || (l1pfn > max_page) )
+                        continue;
 
-		    adjust( l1page, 1, 0 );
-#endif
+		    adjust(l1page, 1, 0);
                 }
             }
 
@@ -2287,15 +2249,14 @@ void audit_domain( struct domain *d)
         }
 
 
-        page->tlbflush_timestamp = 0; // put back
-
+        page->tlbflush_timestamp = 0;
 
         list_ent = frame_table[pfn].list.next;
     }
 
     spin_unlock(&d->page_alloc_lock);
 
-    adjust( &frame_table[pagetable_val(d->mm.pagetable)>>PAGE_SHIFT], 1, 1 );
+    adjust(&frame_table[pagetable_val(d->mm.pagetable)>>PAGE_SHIFT], 1, 1);
 
     printk("Audit %d: Done. ctot=%d ttot=%d\n",d->domain, ctot, ttot );
 
@@ -2303,22 +2264,18 @@ void audit_domain( struct domain *d)
         domain_unpause(d);
 }
 
-
 void audit_domains(void)
 {
     struct domain *d;
-
     for_each_domain ( d )
-    {
 	audit_domain(d);
-    }
 }
 
 void audit_domains_key(unsigned char key, void *dev_id,
                        struct pt_regs *regs)
 {
-    open_softirq( MEMAUDIT_SOFTIRQ, audit_domains );
-    raise_softirq( MEMAUDIT_SOFTIRQ );
+    open_softirq(MEMAUDIT_SOFTIRQ, audit_domains);
+    raise_softirq(MEMAUDIT_SOFTIRQ);
 }
 
 

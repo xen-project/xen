@@ -290,4 +290,12 @@ do {                                                                        \
         __cleanup_writable_pagetable(_w);                                 \
     } while ( 0 )
 
+#ifndef NDEBUG
+void audit_domain(struct domain *d);
+void audit_domains(void);
+#else
+#define audit_domain(_d) ((void)0)
+#define audit_domains()  ((void)0)
+#endif
+
 #endif /* __ASM_X86_MM_H__ */
