@@ -139,7 +139,7 @@ static struct resource data_resource = { "Kernel data", 0, 0 };
 shared_info_t *HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
 EXPORT_SYMBOL(HYPERVISOR_shared_info);
 
-unsigned long *phys_to_machine_mapping;
+unsigned long *phys_to_machine_mapping, *pfn_to_mfn_frame_list;
 EXPORT_SYMBOL(phys_to_machine_mapping);
 
 multicall_entry_t multicall_list[8];
@@ -1098,7 +1098,9 @@ __setup("noreplacement", noreplacement_setup);
  */
 void __init setup_arch(char **cmdline_p)
 {
-	unsigned long max_low_pfn;
+        int i,j;
+
+        unsigned long max_low_pfn;
 
 	HYPERVISOR_vm_assist(VMASST_CMD_enable,
 			     VMASST_TYPE_4gb_segments);
@@ -1187,6 +1189,16 @@ void __init setup_arch(char **cmdline_p)
 	smp_alloc_memory(); /* AP processor realmode stacks in low memory*/
 #endif
 	paging_init();
+
+	pfn_to_mfn_frame_list = alloc_bootmem_low_pages(PAGE_SIZE);
+	for ( i=0, j=0; i < max_pfn; i+=(PAGE_SIZE/sizeof(unsigned long)), j++ )
+	{	
+	     pfn_to_mfn_frame_list[j] = 
+		  virt_to_machine(&phys_to_machine_mapping[i]) >> PAGE_SHIFT;
+	}
+	HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list =
+	     virt_to_machine(pfn_to_mfn_frame_list) >> PAGE_SHIFT;
+
 
 #ifdef CONFIG_EARLY_PRINTK
 	{

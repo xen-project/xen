@@ -377,15 +377,8 @@ void __init setup_arch(char **cmdline_p)
         pfn_to_mfn_frame_list[j] = 
             virt_to_machine(&phys_to_machine_mapping[i]) >> PAGE_SHIFT;
     }
-//pfn_to_mfn_frame_list[0] = 0xdeadbeff;
-printk("Hsi %lx %lx :: %lx\n",    pfn_to_mfn_frame_list,
-       virt_to_machine(pfn_to_mfn_frame_list),
-HYPERVISOR_shared_info->arch.mfn_to_pfn_start
-       );
     HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list =
 	virt_to_machine(pfn_to_mfn_frame_list) >> PAGE_SHIFT;
-
-
 
     /* If we are a privileged guest OS then we should request IO privileges. */
     if ( start_info.flags & SIF_PRIVILEGED ) 

@@ -304,22 +304,28 @@ static void kick_pending_request_queues(void)
 
 
 /* Upon block read completion, issue a dummy machphys update for the
-pages in the buffer, just in case we're being migrated. */
+pages in the buffer, just in case we're being migrated. 
+THIS CODE SHOULD BE REMOVED WHEN WE HAVE GRANT TABLES */
 
-static void blkif_read_completion(struct request *req)
+static void blkif_completion(blkif_response_t *bret, struct request *req)
 {
+#if 0
 	struct bio *bio;
 	struct bio_vec *bvec;
 	int idx;
-	unsigned long mfn, pfn
+	unsigned long mfn, pfn;
 
-	rq_for_each_bio(bio, req) {
+	if( bret->operation == BLKIF_OP_READ )
+	{
+	    rq_for_each_bio(bio, req) {
 		bio_for_each_segment(bvec, bio, idx) {
 		    mfn = page_to_phys(bvec->bv_page)>>PAGE_SHIFT;
 		    pfn = machine_to_phys_mapping[mfn];
 		    queue_machphys_update(mfn, pfn);
 		}
+	    }
 	}
+#endif
 }
 
 
@@ -354,9 +360,7 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 				BUG();
 
 			end_that_request_last(req);
-
-			if( bret->operation == BLKIF_OP_READ )
-			    blkif_read_completion( req );
+			blkif_completion( bret, req );
 			break;
                 case BLKIF_OP_PROBE:
                         memcpy(&blkif_control_rsp, bret, sizeof(*bret));
