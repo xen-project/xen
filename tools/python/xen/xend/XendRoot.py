@@ -17,7 +17,7 @@ import sxp
 def reboots():
     """Get a list of system reboots from wtmp.
     """
-    out = os.popen('/usr/bin/last reboot', 'r')
+    out = os.popen('last reboot', 'r')
     list = [ x.strip() for x in out if x.startswith('reboot') ]
     return list
 
