@@ -494,6 +494,9 @@ void __init time_init(void)
     st_scale_f = scale & 0xffffffff;
     st_scale_i = scale >> 32;
 
+    get_time_values_from_xen();
+    processed_system_time = shadow_system_time;
+
     setup_irq(TIMER_IRQ, &irq_timer);
 
     rdtscll(alarm);
