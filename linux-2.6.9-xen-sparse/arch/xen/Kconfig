@@ -111,10 +111,6 @@ config XEN_SCRUB_PAGES
 
 endmenu
 
-config FOREIGN_PAGES
-	bool
-	default y
-
 config HAVE_ARCH_DEV_ALLOC_SKB
 	bool
 	default y

@@ -23,6 +23,8 @@
 #include <asm/tlbflush.h>
 #include <asm/io.h>
 
+#include <asm-xen/foreign_page.h>
+
 void show_mem(void)
 {
 	int total = 0, reserved = 0;
