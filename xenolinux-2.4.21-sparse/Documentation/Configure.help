@@ -561,6 +561,14 @@ CONFIG_BLK_DEV_NBD
 
   If unsure, say N.
 
+XenoLinux virtual block device support
+CONFIG_XENOLINUX_BLOCK
+  Xen can export virtual block devices which map back to extents of
+  blocks on the physical partitions.  This option is needed for
+  xenolinux to make use of such devices when running as a Xen guest.
+
+  If unsure, say Y.
+
 Per partition statistics in /proc/partitions
 CONFIG_BLK_STATS
   If you say yes here, your kernel will keep statistical information
