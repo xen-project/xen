@@ -258,8 +258,9 @@ int Parser_pop(Parser *p){
     int err = 0;
     ParserState *s = p->state;
     p->state = s->parent;
-    if (p->start_state == s)
+    if (p->start_state == s) {
         p->start_state = NULL;
+    }
     ParserState_free(s);
     return err;
 }
