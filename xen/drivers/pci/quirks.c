@@ -18,6 +18,7 @@
 #include <xen/pci.h>
 #include <xen/init.h>
 #include <xen/delay.h>
+#include <asm/io_apic.h>
 
 #undef DEBUG
 
