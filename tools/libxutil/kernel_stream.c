@@ -50,7 +50,7 @@ typedef struct KernelData {
     char buf[BUF_N];
 } KernelData;
 
-static int kernel_write(IOStream *s, const char *msg, int n);
+static int kernel_write(IOStream *s, const void *msg, size_t n);
 static void kernel_free(IOStream *s);
 static void kernel_stream_lock(IOStream *s);
 static void kernel_stream_unlock(IOStream *s);
@@ -145,13 +145,13 @@ void kernel_stream_unlock(IOStream *s){
  * @param args print arguments
  * @return result of the print
  */
-static int kernel_write(IOStream *stream, const char *buf, int n){
+static int kernel_write(IOStream *stream, const void *buf, size_t n){
   KernelData *kdata = get_kernel_data(stream);
   int k;
   k = kdata->buf_n - 1;
   if(n < k) k = n;
   memcpy(kdata->buf, buf, k);
-  kdata->buf[k] = '\0'
+  kdata->buf[k] = '\0';
   printk(kdata->buf);
   return k;
 }
@@ -167,7 +167,7 @@ static void kernel_free(IOStream *io){
   KernelData *kdata;
   if(io == &iokernel) return;
   kdata = get_kernel_data(io);
-  zero(kdata, sizeof(*kdata));
+  memset(kdata, 0, sizeof(*kdata));
   deallocate(kdata);
 }
 #endif /* __KERNEL__ */

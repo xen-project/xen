@@ -1,0 +1,10 @@
+This directory contains the implementation of vnets:
+virtual private networks for virtual machines.
+See doc/ for more information and examples/ for example
+configurations.
+
+The kernel module is in vnet-module/ and the vnet forwarding
+daemon is in vnetd/. The vnetd daemon makes vnets work across
+subnets when multicast routing is not available.
+
+Mike Wray <mike.wray@hp.com>

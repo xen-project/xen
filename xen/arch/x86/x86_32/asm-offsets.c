@@ -7,7 +7,7 @@
 #include <xen/sched.h>
 
 #define DEFINE(_sym, _val) \
-    __asm__ __volatile__ ( "\n->" #_sym " %0 " #_val : : "i" _val )
+    __asm__ __volatile__ ( "\n->" #_sym " %0 " #_val : : "i" (_val) )
 #define BLANK() \
     __asm__ __volatile__ ( "\n->" : : )
 #define OFFSET(_sym, _str, _mem) \
@@ -31,7 +31,10 @@ void __dummy__(void)
     OFFSET(XREGS_gs, struct xen_regs, gs);
     OFFSET(XREGS_ss, struct xen_regs, ss);
     OFFSET(XREGS_eflags, struct xen_regs, eflags);
-    OFFSET(XREGS_orig_eax, struct xen_regs, orig_eax);
+    OFFSET(XREGS_error_code, struct xen_regs, error_code);
+    OFFSET(XREGS_entry_vector, struct xen_regs, entry_vector);
+    OFFSET(XREGS_kernel_sizeof, struct xen_regs, esp);
+    DEFINE(XREGS_user_sizeof, sizeof(struct xen_regs));
     BLANK();
 
     OFFSET(EDOMAIN_processor, struct exec_domain, processor);
@@ -41,6 +44,7 @@ void __dummy__(void)
     OFFSET(EDOMAIN_failsafe_sel, struct exec_domain, thread.failsafe_selector);
     OFFSET(EDOMAIN_failsafe_addr, struct exec_domain, thread.failsafe_address);
     OFFSET(EDOMAIN_trap_bounce, struct exec_domain, thread.trap_bounce);
+    OFFSET(EDOMAIN_thread_flags, struct exec_domain, thread.flags);
     BLANK();
 
     OFFSET(VCPUINFO_upcall_pending, vcpu_info_t, evtchn_upcall_pending);

@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2001 - 2004 Mike Wray <mike.wray@hp.com>
  *
  * This library is free software; you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -21,7 +22,12 @@
 #include "hash_table.h"
 #include "sxpr.h"
 
+#ifdef __KERNEL__
+#include <linux/errno.h>
+#else
 #include <errno.h>
+#endif
+
 #undef free
 
 /** @file

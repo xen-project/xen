@@ -90,7 +90,7 @@ void enable_irq(unsigned int irq)
 asmlinkage void do_IRQ(struct xen_regs regs)
 {       
 #if defined(__i386__)
-    unsigned int      irq = regs.orig_eax;
+    unsigned int      irq = regs.entry_vector;
 #else
     unsigned int      irq = 0; /* XXX */
 #endif

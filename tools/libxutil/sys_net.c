@@ -232,21 +232,17 @@ char *get_port_service(unsigned long port){
 int convert_service_to_port(const char *s, unsigned long *port){
     int err = 0;
     unsigned long value;
-    printf("%s> %s\n", __FUNCTION__, s);
     if(convert_atoul(s, &value) == 0){
         int ok = (0 <= value) && (value <= PORT_MAX);
-        printf("> value = %ld\n", value);
         if(ok){
             value = htons((unsigned short)value);
         } else {
             err = -EINVAL;
         }
     } else {
-        printf("> get_service_port...\n");
         err = get_service_port(s, &value);
     }
     *port = (err ? 0: value);
-    printf("%s< err=%d\n", __FUNCTION__, err);
     return err;
 }
 

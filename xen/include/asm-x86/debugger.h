@@ -25,17 +25,17 @@
 #include <asm/processor.h>
 
 /* The main trap handlers use these helper macros which include early bail. */
-#define DEBUGGER_trap_entry(_v, _r, _e) \
-    if ( debugger_trap_entry(_v, _r, _e) ) return EXCRET_fault_fixed;
-#define DEBUGGER_trap_fatal(_v, _r, _e) \
-    if ( debugger_trap_fatal(_v, _r, _e) ) return EXCRET_fault_fixed;
+#define DEBUGGER_trap_entry(_v, _r) \
+    if ( debugger_trap_entry(_v, _r) ) return EXCRET_fault_fixed;
+#define DEBUGGER_trap_fatal(_v, _r) \
+    if ( debugger_trap_fatal(_v, _r) ) return EXCRET_fault_fixed;
 
 #ifdef XEN_DEBUGGER
 
 #include <asm/pdb.h>
 
 static inline int debugger_trap_entry(
-    unsigned int vector, struct xen_regs *regs, unsigned int error_code)
+    unsigned int vector, struct xen_regs *regs)
 {
     int ret = 0;
 
@@ -44,7 +44,7 @@ static inline int debugger_trap_entry(
     case TRAP_debug:
         if ( pdb_initialized )
         {
-            pdb_handle_debug_trap(regs, (long)error_code);
+            pdb_handle_debug_trap(regs, regs->error_code);
             ret = 1; /* early exit */
         }
         break;
@@ -55,13 +55,14 @@ static inline int debugger_trap_entry(
         break;
 
     case TRAP_gp_fault:        
-        if ( ((regs->cs & 3) != 0) && ((error_code & 3) == 2) &&
+        if ( ((regs->cs & 3) != 0) && ((regs->error_code & 3) == 2) &&
              pdb_initialized && (pdb_ctx.system_call != 0) )
         {
             unsigned long cr3 = read_cr3();
             if ( cr3 == pdb_ctx.ptbr )
                 pdb_linux_syscall_enter_bkpt(
-                    regs, error_code, current->thread.traps + (error_code>>3));
+                    regs, regs->error_code, 
+                    current->thread.traps + (regs->error_code>>3));
         }
         break;
     }
@@ -70,7 +71,7 @@ static inline int debugger_trap_entry(
 }
 
 static inline int debugger_trap_fatal(
-    unsigned int vector, struct xen_regs *regs, unsigned int error_code)
+    unsigned int vector, struct xen_regs *regs)
 {
     int ret = 0;
 
@@ -96,21 +97,21 @@ static inline int debugger_trap_fatal(
 extern int kdb_trap(int, int, struct xen_regs *);
 
 static inline int debugger_trap_entry(
-    unsigned int vector, struct xen_regs *regs, unsigned int error_code)
+    unsigned int vector, struct xen_regs *regs)
 {
     return 0;
 }
 
 static inline int debugger_trap_fatal(
-    unsigned int vector, struct xen_regs *regs, unsigned int error_code)
+    unsigned int vector, struct xen_regs *regs)
 {
     return kdb_trap(vector, 0, regs);
 }
 
 #else
 
-#define debugger_trap_entry(_v, _r, _e) (0)
-#define debugger_trap_fatal(_v, _r, _e) (0)
+#define debugger_trap_entry(_v, _r) (0)
+#define debugger_trap_fatal(_v, _r) (0)
 
 #endif
 

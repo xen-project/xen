@@ -69,6 +69,19 @@ static PEND_RING_IDX pending_prod, pending_cons;
 static kmem_cache_t *buffer_head_cachep;
 #endif
 
+#ifdef CONFIG_XEN_BLKDEV_TAP_BE
+/*
+ * If the tap driver is used, we may get pages belonging to either the tap
+ * or (more likely) the real frontend.  The backend must specify which domain
+ * a given page belongs to in update_va_mapping though.  For the moment, 
+ * we pass in the domid of the real frontend in PROBE messages and store 
+ * this value in alt_dom.  Then on mapping, we try both.  This is a Guiness 
+ * book of records-calibre grim hack, and represents a bit of a security risk.
+ * Grant tables will soon solve the problem though!
+ */
+static domid_t alt_dom = 0;
+#endif
+
 static int do_block_io_op(blkif_t *blkif, int max_to_do);
 static void dispatch_probe(blkif_t *blkif, blkif_request_t *req);
 static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req);
@@ -324,12 +337,27 @@ static void dispatch_probe(blkif_t *blkif, blkif_request_t *req)
          (blkif_last_sect(req->frame_and_sects[0]) != 7) )
         goto out;
 
+#ifdef CONFIG_XEN_BLKDEV_TAP_BE
+    /* Grab the real frontend out of the probe message. */
+    alt_dom = (domid_t)req->frame_and_sects[1];
+#endif
+    
     if ( HYPERVISOR_update_va_mapping_otherdomain(
         MMAP_VADDR(pending_idx, 0) >> PAGE_SHIFT,
         (pte_t) { (req->frame_and_sects[0] & PAGE_MASK) | __PAGE_KERNEL },
-        0, blkif->domid) )
+        0, blkif->domid) ) {
+#ifdef CONFIG_XEN_BLKDEV_TAP_BE
+        /* That didn't work.  Try alt_dom. */
+        if ( HYPERVISOR_update_va_mapping_otherdomain(
+            MMAP_VADDR(pending_idx, 0) >> PAGE_SHIFT,
+            (pte_t) { (req->frame_and_sects[0] & PAGE_MASK) | __PAGE_KERNEL },
+            0, alt_dom) )
+            goto out;
+#else  
         goto out;
-
+#endif
+    }
+    
     rsp = vbd_probe(blkif, (vdisk_t *)MMAP_VADDR(pending_idx, 0), 
                     PAGE_SIZE / sizeof(vdisk_t));
 
@@ -412,8 +440,11 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
         mcl[i].args[0] = MMAP_VADDR(pending_idx, i) >> PAGE_SHIFT;
         mcl[i].args[1] = (phys_seg[i].buffer & PAGE_MASK) | remap_prot;
         mcl[i].args[2] = 0;
+#ifdef CONFIG_XEN_BLKDEV_TAP_BE
+        mcl[i].args[3] = (alt_dom != 0) ? alt_dom : blkif->domid;
+#else
         mcl[i].args[3] = blkif->domid;
-
+#endif
         phys_to_machine_mapping[__pa(MMAP_VADDR(pending_idx, i))>>PAGE_SHIFT] =
             FOREIGN_FRAME(phys_seg[i].buffer >> PAGE_SHIFT);
     }
@@ -580,7 +611,10 @@ static int __init blkif_init(void)
 #endif
 
     blkif_ctrlif_init();
-
+    
+#ifdef CONFIG_XEN_BLKDEV_TAP_BE
+    printk(KERN_ALERT "NOTE: Blkif backend is running with tap support on!\n");
+#endif
     return 0;
 }
 
