@@ -545,6 +545,10 @@ typedef struct {
                                     /* SHUTDOWN_suspend.                     */
 #define CMSG_SHUTDOWN_SYSRQ     3
 
+typedef struct {
+    char key;      /* 0: sysrq key */
+    char __pad[3]; /* 1: */
+} PACKED shutdown_sysrq_t; /* 4 bytes */
 
 /******************************************************************************
  * MEMORY CONTROLS
