@@ -82,11 +82,12 @@ gopts.opt('console_autoconnect', short='c',
           fn=set_true, default=0,
           use="Connect to the console after the domain is created.")
 
-gopts.opt('vnc', val='DISPLAY',
-          fn=set_int, default=None,
+gopts.var('vnc', val='no|yes',
+          fn=set_bool, default=None,
           use="""Spawn a vncviewer listening for a vnc server in the domain.
           The address of the vncviewer is passed to the domain on the kernel command
           line using 'VNC_SERVER=<host>:<port>'. The port used by vnc is 5500 + DISPLAY.
+          A display value with a free port is chosen if possible.
           """)
 
 gopts.var('name', val='NAME',
@@ -430,18 +431,49 @@ def get_host_addr():
     addr = socket.gethostbyname(host)
     return addr
 
+VNC_BASE_PORT = 5500
+
+def choose_vnc_display():
+    """Try to choose a free vnc display.
+    """
+    def netstat_local_ports():
+        """Run netstat to get a list of the local ports in use.
+        """
+        l = os.popen("netstat -nat").readlines()
+        r = []
+        # Skip 2 lines of header.
+        for x in l[2:]:
+            # Local port is field 3.
+            y = x.split()[3]
+            # Field is addr:port, split off the port.
+            y = y.split(':')[1]
+            r.append(int(y))
+        return r
+
+    ports = netstat_local_ports()
+    for d in range(1, 100):
+        port = VNC_BASE_PORT + d
+        if port in ports: continue
+        return d
+    return None
+
 def spawn_vnc(display):
     os.system("vncviewer -listen %d &" % display)
-    return 5500 + display
+    return VNC_BASE_PORT + display
     
 def preprocess_vnc(opts, vals):
     """If vnc was specified, spawn a vncviewer in listen mode
     and pass its address to the domain on the kernel command line.
     """
-    if vals.vnc is None: return
-    vnc_host = get_host_addr()
-    vnc_port = spawn_vnc(vals.vnc)
+    if not vals.vnc: return
+    vnc_display = choose_vnc_display()
+    if not vnc_display:
+        opts.warn("No free vnc display")
+        return
+    print 'VNC=', vnc_display
+    vnc_port = spawn_vnc(vnc_display)
     if vnc_port > 0:
+        vnc_host = get_host_addr()
         vnc = 'VNC_VIEWER=%s:%d' % (vnc_host, vnc_port)
         vals.extra = vnc + ' ' + vals.extra
     
