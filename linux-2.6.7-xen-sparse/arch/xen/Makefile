@@ -12,6 +12,8 @@
 # Copyright (C) 2004 by Christian Limpach
 #
 
+override EXTRAVERSION:=$(subst linux-$(VERSION).$(PATCHLEVEL).$(SUBLEVEL),,$(shell basename $(TOPDIR)))$(EXTRAVERSION)
+
 XENARCH	:= $(subst ",,$(CONFIG_XENARCH))
 
 # pick up headers from include/asm-xen/asm in preference over include/asm
@@ -52,12 +54,15 @@ all: vmlinuz
 vmlinuz: vmlinux
 	$(Q)$(MAKE) $(build)=arch/xen/boot vmlinuz
 
-INSTALL_NAME ?= $(KERNELRELEASE)
+XINSTALL_NAME ?= $(KERNELRELEASE)
 install: vmlinuz
 	mkdir -p $(INSTALL_PATH)/boot
-	install -m0644 vmlinuz $(INSTALL_PATH)/boot/vmlinuz-$(INSTALL_NAME)$(INSTALL_SUFFIX)
-	install -m0644 vmlinux $(INSTALL_PATH)/boot/vmlinux-$(INSTALL_NAME)$(INSTALL_SUFFIX)
-	install -m0664 .config $(INSTALL_PATH)/boot/config-$(INSTALL_NAME)$(INSTALL_SUFFIX)
+	install -m0644 vmlinuz $(INSTALL_PATH)/boot/vmlinuz-$(XINSTALL_NAME)$(INSTALL_SUFFIX)
+	install -m0644 vmlinux $(INSTALL_PATH)/boot/vmlinux-$(XINSTALL_NAME)$(INSTALL_SUFFIX)
+	install -m0664 .config $(INSTALL_PATH)/boot/config-$(XINSTALL_NAME)$(INSTALL_SUFFIX)
+
+dist:
+	$(MAKE) INSTALL_PATH=../install install
 
 archclean:
 	@if [ -e arch/xen/arch ]; then $(MAKE) $(clean)=arch/xen/arch; fi;

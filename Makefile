@@ -83,13 +83,7 @@ config-xen%:
 else
 config-xen%:
 	$(MAKE) -C $(CDIR) ARCH=xen mrproper
-	@[ -e $(LINUX_CONFIG_DIR)/config-$(LINUX_VER)-$(subst config-,,$@) ] \
-	  && cp $(LINUX_CONFIG_DIR)/config-$(LINUX_VER)-$(subst config-,,$@) \
-		$(CDIR)/.config || true
-	@[ -e $(CDIR)/arch/xen/defconfig ] || cp \
-		$(CDIR)/arch/xen/defconfig-$(subst config-,,$@) \
-		$(CDIR)/arch/xen/defconfig
-	$(MAKE) -C $(CDIR) ARCH=xen oldconfig
+	$(MAKE) -C $(CDIR) ARCH=xen $(subst config-,,$@)_defconfig
 endif
 
 # build the specified linux tree
