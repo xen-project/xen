@@ -206,11 +206,11 @@ static void balloon_process(void *unused)
                 BUG();
 
             pfn = page - mem_map;
-            if ( phys_to_machine_mapping[pfn] != INVALID_P2M_ENTRY )
+            if ( __vms_phys_to_machine_mapping[pfn] != INVALID_P2M_ENTRY )
                 BUG();
 
             /* Update P->M and M->P tables. */
-            phys_to_machine_mapping[pfn] = mfn_list[i];
+            __vms_phys_to_machine_mapping[pfn] = mfn_list[i];
             queue_machphys_update(mfn_list[i], pfn);
             
             /* Link back into the page tables if it's not a highmem page. */
@@ -244,8 +244,8 @@ static void balloon_process(void *unused)
             }
 
             pfn = page - mem_map;
-            mfn_list[i] = phys_to_machine_mapping[pfn];
-            phys_to_machine_mapping[pfn] = INVALID_P2M_ENTRY;
+            mfn_list[i] = __vms_phys_to_machine_mapping[pfn];
+            __vms_phys_to_machine_mapping[pfn] = INVALID_P2M_ENTRY;
 
             if ( !PageHighMem(page) )
             {

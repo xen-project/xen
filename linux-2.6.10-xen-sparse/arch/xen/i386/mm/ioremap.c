@@ -56,9 +56,8 @@ void __init bt_iounmap(void *addr, unsigned long size)
 static inline int is_local_lowmem(unsigned long address)
 {
 	extern unsigned long max_low_pfn;
-	unsigned long mfn = address >> PAGE_SHIFT;
-	unsigned long pfn = mfn_to_pfn(mfn);
-	return ((pfn < max_low_pfn) && (pfn_to_mfn(pfn) == mfn));
+	unsigned long pfn = address >> PAGE_SHIFT;
+	return (pfn < max_low_pfn);
 }
 
 /*
@@ -97,6 +96,7 @@ void __iomem * __ioremap(unsigned long phys_addr, unsigned long size, unsigned l
 	/*
 	 * Don't allow anybody to remap normal RAM that we're using..
 	 */
+#if 0
 	if (is_local_lowmem(phys_addr)) {
 		char *t_addr, *t_end;
 		struct page *page;
@@ -110,6 +110,7 @@ void __iomem * __ioremap(unsigned long phys_addr, unsigned long size, unsigned l
 
 		domid = DOMID_LOCAL;
 	}
+#endif
 
 	/*
 	 * Mappings have to be page-aligned
@@ -255,7 +256,7 @@ void __init *bt_ioremap(unsigned long phys_addr, unsigned long size)
 	 */
 	idx = FIX_BTMAP_BEGIN;
 	while (nrpages > 0) {
-		set_fixmap_ma(idx, phys_addr);
+		__vms_set_fixmap_ma(idx, phys_addr);
 		phys_addr += PAGE_SIZE;
 		--idx;
 		--nrpages;
@@ -312,7 +313,7 @@ static inline void direct_remap_area_pte(pte_t *pte,
 		BUG();
 
 	do {
-		(*v)->ptr = virt_to_machine(pte);
+		(*v)->ptr = __vms_virt_to_machine(pte);
 		(*v)++;
 		address += PAGE_SIZE;
 		pte++;
@@ -386,7 +387,7 @@ int direct_remap_area_pages(struct mm_struct *mm,
 	mmu_update_t u[MAX_DIRECTMAP_MMU_QUEUE], *w, *v;
 
 	v = w = &u[0];
-	if (domid != DOMID_LOCAL) {
+	if (0 && domid != DOMID_LOCAL) {
 		u[0].ptr  = MMU_EXTENDED_COMMAND;
 		u[0].val  = MMUEXT_SET_FOREIGNDOM;
 		u[0].val |= (unsigned long)domid << 16;
@@ -415,8 +416,19 @@ int direct_remap_area_pages(struct mm_struct *mm,
 		 * Fill in the machine address: PTE ptr is done later by
 		 * __direct_remap_area_pages(). 
 		 */
-		v->val = (machine_addr & PAGE_MASK) | pgprot_val(prot);
+        {
+            mmu_update_t update;
+            int success = 0;
+            unsigned long ppfn;
 
+            update.ptr = (machine_addr & PAGE_MASK) | MMU_MACHPHYS_UPDATE;
+            update.val = -1;
+            ppfn = HYPERVISOR_mmu_update(&update, 1, &success);
+            if (! success)
+                BUG();
+                
+		v->val = (ppfn << PAGE_SHIFT) | pgprot_val(prot);
+        }
 		machine_addr += PAGE_SIZE;
 		address += PAGE_SIZE; 
 		v++;

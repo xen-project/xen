@@ -12,6 +12,10 @@
 #ifdef __KERNEL__
 #ifndef __ASSEMBLY__
 
+#ifndef BUG
+#include <asm/bug.h>
+#endif
+
 #include <linux/config.h>
 #include <linux/string.h>
 #include <linux/types.h>
@@ -55,18 +59,18 @@
 #define copy_user_page(to, from, vaddr, pg)	copy_page(to, from)
 
 /**** MACHINE <-> PHYSICAL CONVERSION MACROS ****/
-extern unsigned int *phys_to_machine_mapping;
-#define pfn_to_mfn(_pfn) ((unsigned long)(phys_to_machine_mapping[(_pfn)]))
-#define mfn_to_pfn(_mfn) ((unsigned long)(machine_to_phys_mapping[(_mfn)]))
-static inline unsigned long phys_to_machine(unsigned long phys)
+extern unsigned int *__vms_phys_to_machine_mapping;
+#define __vms_pfn_to_mfn(_pfn) ((unsigned long)(__vms_phys_to_machine_mapping[(_pfn)]))
+#define __vms_mfn_to_pfn(_mfn) ({ BUG(); ((unsigned long)(__vms_machine_to_phys_mapping[(_mfn)])); })
+static inline unsigned long __vms_phys_to_machine(unsigned long phys)
 {
-	unsigned long machine = pfn_to_mfn(phys >> PAGE_SHIFT);
+	unsigned long machine = __vms_pfn_to_mfn(phys >> PAGE_SHIFT);
 	machine = (machine << PAGE_SHIFT) | (phys & ~PAGE_MASK);
 	return machine;
 }
-static inline unsigned long machine_to_phys(unsigned long machine)
+static inline unsigned long __vms_machine_to_phys(unsigned long machine)
 {
-	unsigned long phys = mfn_to_pfn(machine >> PAGE_SHIFT);
+	unsigned long phys = __vms_mfn_to_pfn(machine >> PAGE_SHIFT);
 	phys = (phys << PAGE_SHIFT) | (machine & ~PAGE_MASK);
 	return phys;
 }
@@ -89,9 +93,8 @@ typedef struct { unsigned long pmd; } pmd_t;
 typedef struct { unsigned long pgd; } pgd_t;
 typedef struct { unsigned long pgprot; } pgprot_t;
 #define boot_pte_t pte_t /* or would you rather have a typedef */
-#define pte_val(x)	(((x).pte_low & 1) ? machine_to_phys((x).pte_low) : \
-			 (x).pte_low)
-#define pte_val_ma(x)	((x).pte_low)
+#define pte_val(x)	((x).pte_low)
+#define __vms_pte_val_ma(x)	((x).pte_low)
 #define HPAGE_SHIFT	22
 #endif
 #define PTE_MASK	PAGE_MASK
@@ -106,22 +109,17 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 
 static inline unsigned long pmd_val(pmd_t x)
 {
-	unsigned long ret = x.pmd;
-	if (ret) ret = machine_to_phys(ret);
-	return ret;
+	return x.pmd;
 }
 #define pgd_val(x)	({ BUG(); (unsigned long)0; })
 #define pgprot_val(x)	((x).pgprot)
 
 static inline pte_t __pte(unsigned long x)
 {
-	if (x & 1) x = phys_to_machine(x);
 	return ((pte_t) { (x) });
 }
-#define __pte_ma(x)	((pte_t) { (x) } )
 static inline pmd_t __pmd(unsigned long x)
 {
-	if ((x & 1)) x = phys_to_machine(x);
 	return ((pmd_t) { (x) });
 }
 #define __pgd(x)	({ BUG(); (pgprot_t) { 0 }; })
@@ -199,8 +197,8 @@ extern int sysctl_legacy_va_layout;
 		 VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC)
 
 /* VIRT <-> MACHINE conversion */
-#define virt_to_machine(_a)	(phys_to_machine(__pa(_a)))
-#define machine_to_virt(_m)	(__va(machine_to_phys(_m)))
+#define __vms_virt_to_machine(_a)	(__vms_phys_to_machine(__pa(_a)))
+#define __vms_machine_to_virt(_m)	(__va(__vms_machine_to_phys(_m)))
 
 #endif /* __KERNEL__ */
 

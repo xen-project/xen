@@ -321,7 +321,6 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 
 #define pmd_clear(xp)	do {					\
 	set_pmd(xp, __pmd(0));					\
-	xen_flush_page_update_queue();				\
 } while (0)
 
 #ifndef CONFIG_DISCONTIGMEM
@@ -460,13 +459,22 @@ void make_page_writable(void *va);
 void make_pages_readonly(void *va, unsigned int nr);
 void make_pages_writable(void *va, unsigned int nr);
 
-#define arbitrary_virt_to_machine(__va)					\
+#define __vms_arbitrary_virt_to_machine(__va)					\
 ({									\
 	pgd_t *__pgd = pgd_offset_k((unsigned long)(__va));		\
 	pmd_t *__pmd = pmd_offset(__pgd, (unsigned long)(__va));	\
 	pte_t *__pte = pte_offset_kernel(__pmd, (unsigned long)(__va));	\
 	unsigned long __pa = (*(unsigned long *)__pte) & PAGE_MASK;	\
-	__pa | ((unsigned long)(__va) & (PAGE_SIZE-1));			\
+	__vms_phys_to_machine(__pa) | ((unsigned long)(__va) & (PAGE_SIZE-1)); \
+})
+
+#define arbitrary_virt_to_phys(__va)					\
+({									\
+	pgd_t *__pgd = pgd_offset_k((unsigned long)(__va));		\
+	pmd_t *__pmd = pmd_offset(__pgd, (unsigned long)(__va));	\
+	pte_t *__pte = pte_offset_kernel(__pmd, (unsigned long)(__va));	\
+	unsigned long __pa = (*(unsigned long *)__pte) & PAGE_MASK;	\
+	(__pa) | ((unsigned long)(__va) & (PAGE_SIZE-1));               \
 })
 
 #endif /* !__ASSEMBLY__ */

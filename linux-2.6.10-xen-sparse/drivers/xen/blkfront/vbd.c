@@ -112,7 +112,7 @@ static int xlvbd_get_vbd_info(vdisk_t *disk_info)
     memset(&req, 0, sizeof(req));
     req.operation   = BLKIF_OP_PROBE;
     req.nr_segments = 1;
-    req.frame_and_sects[0] = virt_to_machine(buf) | 7;
+    req.frame_and_sects[0] = __vms_virt_to_machine(buf) | 7;
 
     blkif_control_send(&req, &rsp);
 

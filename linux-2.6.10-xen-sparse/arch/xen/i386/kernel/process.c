@@ -518,7 +518,7 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 	if (unlikely(next->tls_array[i].a != prev->tls_array[i].a ||	    \
 		     next->tls_array[i].b != prev->tls_array[i].b))	    \
 		queue_multicall3(__HYPERVISOR_update_descriptor,	    \
-				 virt_to_machine(&get_cpu_gdt_table(cpu)    \
+				 virt_to_phys(&get_cpu_gdt_table(cpu)       \
 						 [GDT_ENTRY_TLS_MIN + i]),  \
 				 ((u32 *)&next->tls_array[i])[0],	    \
 				 ((u32 *)&next->tls_array[i])[1]);	    \

@@ -80,7 +80,7 @@ static void __do_suspend(void)
     extern void time_suspend(void);
     extern void time_resume(void);
     extern unsigned long max_pfn;
-    extern unsigned int *pfn_to_mfn_frame_list;
+    extern unsigned int *__vms_pfn_to_mfn_frame_list;
 
     suspend_record = (suspend_record_t *)__get_free_page(GFP_KERNEL);
     if ( suspend_record == NULL )
@@ -105,7 +105,7 @@ static void __do_suspend(void)
 
     memcpy(&suspend_record->resume_info, &xen_start_info, sizeof(xen_start_info));
 
-    HYPERVISOR_suspend(virt_to_machine(suspend_record) >> PAGE_SHIFT);
+    HYPERVISOR_suspend(__vms_virt_to_machine(suspend_record) >> PAGE_SHIFT);
 
     HYPERVISOR_vm_assist(VMASST_CMD_enable,
 			 VMASST_TYPE_4gb_segments);
@@ -118,11 +118,7 @@ static void __do_suspend(void)
 
     memcpy(&xen_start_info, &suspend_record->resume_info, sizeof(xen_start_info));
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-    set_fixmap_ma(FIX_SHARED_INFO, xen_start_info.shared_info);
-#else
     set_fixmap(FIX_SHARED_INFO, xen_start_info.shared_info);
-#endif
 
     HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
 
@@ -130,11 +126,11 @@ static void __do_suspend(void)
 
     for ( i=0, j=0; i < max_pfn; i+=(PAGE_SIZE/sizeof(unsigned long)), j++ )
     {
-        pfn_to_mfn_frame_list[j] = 
-            virt_to_machine(&phys_to_machine_mapping[i]) >> PAGE_SHIFT;
+        __vms_pfn_to_mfn_frame_list[j] = 
+            __vms_virt_to_machine(&__vms_phys_to_machine_mapping[i]) >> PAGE_SHIFT;
     }
     HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list =
-        virt_to_machine(pfn_to_mfn_frame_list) >> PAGE_SHIFT;
+        __vms_virt_to_machine(__vms_pfn_to_mfn_frame_list) >> PAGE_SHIFT;
 
 
     irq_resume();

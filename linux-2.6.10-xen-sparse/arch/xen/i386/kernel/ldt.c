@@ -61,8 +61,10 @@ static int alloc_ldt(mm_context_t *pc, int mincount, int reload)
 		cpumask_t mask;
 		preempt_disable();
 #endif
+#if 0
 		make_pages_readonly(pc->ldt, (pc->size * LDT_ENTRY_SIZE) /
 				    PAGE_SIZE);
+#endif
 		load_LDT(pc);
 		flush_page_update_queue();
 #ifdef CONFIG_SMP
@@ -73,8 +75,10 @@ static int alloc_ldt(mm_context_t *pc, int mincount, int reload)
 #endif
 	}
 	if (oldsize) {
+#if 0
 		make_pages_writable(oldldt, (oldsize * LDT_ENTRY_SIZE) /
 			PAGE_SIZE);
+#endif
 		flush_page_update_queue();
 		if (oldsize*LDT_ENTRY_SIZE > PAGE_SIZE)
 			vfree(oldldt);
@@ -90,8 +94,10 @@ static inline int copy_ldt(mm_context_t *new, mm_context_t *old)
 	if (err < 0)
 		return err;
 	memcpy(new->ldt, old->ldt, old->size*LDT_ENTRY_SIZE);
+#if 0
 	make_pages_readonly(new->ldt, (new->size * LDT_ENTRY_SIZE) /
 			    PAGE_SIZE);
+#endif
 	flush_page_update_queue();
 	return 0;
 }
@@ -124,9 +130,11 @@ void destroy_context(struct mm_struct *mm)
 	if (mm->context.size) {
 		if (mm == current->active_mm)
 			clear_LDT();
+#if 0
 		make_pages_writable(mm->context.ldt, 
 				    (mm->context.size * LDT_ENTRY_SIZE) /
 				    PAGE_SIZE);
+#endif
 		flush_page_update_queue();
 		if (mm->context.size*LDT_ENTRY_SIZE > PAGE_SIZE)
 			vfree(mm->context.ldt);
@@ -222,7 +230,7 @@ static int write_ldt(void __user * ptr, unsigned long bytecount, int oldmode)
 	}
 
 	lp = (__u32 *) ((ldt_info.entry_number << 3) + (char *) mm->context.ldt);
-	mach_lp = arbitrary_virt_to_machine(lp);
+	mach_lp = arbitrary_virt_to_phys(lp);
 
    	/* Allow LDTs to be cleared by the user. */
    	if (ldt_info.base_addr == 0 && ldt_info.limit == 0) {

@@ -129,7 +129,7 @@ static inline void translate_req_to_pfn(blkif_request_t *xreq,
     xreq->sector_number = req->sector_number;
 
     for ( i = 0; i < req->nr_segments; i++ )
-        xreq->frame_and_sects[i] = machine_to_phys(req->frame_and_sects[i]);
+        xreq->frame_and_sects[i] = __vms_machine_to_phys(req->frame_and_sects[i]);
 }
 
 static inline void translate_req_to_mfn(blkif_request_t *xreq,
@@ -144,7 +144,7 @@ static inline void translate_req_to_mfn(blkif_request_t *xreq,
     xreq->sector_number = req->sector_number;
 
     for ( i = 0; i < req->nr_segments; i++ )
-        xreq->frame_and_sects[i] = phys_to_machine(req->frame_and_sects[i]);
+        xreq->frame_and_sects[i] = __vms_phys_to_machine(req->frame_and_sects[i]);
 }
 
 
@@ -1091,7 +1091,7 @@ static void blkif_send_interface_connect(void)
     blkif_fe_interface_connect_t *msg = (void*)cmsg.msg;
     
     msg->handle      = 0;
-    msg->shmem_frame = (virt_to_machine(blk_ring.sring) >> PAGE_SHIFT);
+    msg->shmem_frame = (__vms_virt_to_machine(blk_ring.sring) >> PAGE_SHIFT);
     
     ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
 }
@@ -1401,7 +1401,7 @@ void blkif_completion(blkif_request_t *req)
         for ( i = 0; i < req->nr_segments; i++ )
         {
             unsigned long pfn = req->frame_and_sects[i] >> PAGE_SHIFT;
-            unsigned long mfn = phys_to_machine_mapping[pfn];
+            unsigned long mfn = __vms_phys_to_machine_mapping[pfn];
             xen_machphys_update(mfn, pfn);
         }
         break;

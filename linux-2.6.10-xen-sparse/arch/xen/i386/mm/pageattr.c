@@ -119,7 +119,7 @@ __change_page_attr(struct page *page, pgprot_t prot)
 		if ((pte_val(*kpte) & _PAGE_PSE) == 0) { 
 			pte_t old = *kpte;
 			pte_t standard = mk_pte(page, PAGE_KERNEL); 
-			set_pte_batched(kpte, mk_pte(page, prot)); 
+			set_pte_atomic(kpte, mk_pte(page, prot)); 
 			if (pte_same(old,standard))
 				get_page(kpte_page);
 		} else {
@@ -130,7 +130,7 @@ __change_page_attr(struct page *page, pgprot_t prot)
 			set_pmd_pte(kpte,address,mk_pte(split, PAGE_KERNEL));
 		}	
 	} else if ((pte_val(*kpte) & _PAGE_PSE) == 0) { 
-		set_pte_batched(kpte, mk_pte(page, PAGE_KERNEL));
+		set_pte_atomic(kpte, mk_pte(page, PAGE_KERNEL));
 		__put_page(kpte_page);
 	}
 
@@ -171,7 +171,6 @@ int change_page_attr(struct page *page, int numpages, pgprot_t prot)
 		if (err) 
 			break; 
 	} 	
-	flush_page_update_queue();
 	spin_unlock_irqrestore(&cpa_lock, flags);
 	return err;
 }

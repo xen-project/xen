@@ -458,8 +458,8 @@ no_context:
 	printk("%08lx\n", regs->eip);
 	page = ((unsigned long *) per_cpu(cur_pgd, smp_processor_id()))
 	    [address >> 22];
-	printk(KERN_ALERT "*pde = ma %08lx pa %08lx\n", page,
-	       machine_to_phys(page));
+	printk(KERN_ALERT "*pde = ma %08lx pa %08lx\n",
+	       __vms_phys_to_machine(page), page);
 	/*
 	 * We must not directly access the pte in the highpte
 	 * case, the page table might be allocated in highmem.
@@ -470,10 +470,9 @@ no_context:
 	if (page & 1) {
 		page &= PAGE_MASK;
 		address &= 0x003ff000;
-		page = machine_to_phys(page);
 		page = ((unsigned long *) __va(page))[address >> PAGE_SHIFT];
-		printk(KERN_ALERT "*pte = ma %08lx pa %08lx\n", page,
-		       machine_to_phys(page));
+		printk(KERN_ALERT "*pte = ma %08lx pa %08lx\n",
+		       __vms_phys_to_machine(page), page);
 	}
 #endif
 	show_trace(NULL, (unsigned long *)&regs[1]);

@@ -174,7 +174,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 
     case IOCTL_PRIVCMD_GET_MACH2PHYS_START_MFN:
     {
-        unsigned long m2pv = (unsigned long)machine_to_phys_mapping;
+        unsigned long m2pv = (unsigned long)__vms_machine_to_phys_mapping;
         pgd_t *pgd = pgd_offset_k(m2pv);
         pmd_t *pmd = pmd_offset(pgd, m2pv);
         unsigned long m2p_start_mfn = pmd_val(*pmd) >> PAGE_SHIFT;

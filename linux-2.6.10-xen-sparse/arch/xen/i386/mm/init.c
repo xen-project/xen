@@ -349,12 +349,9 @@ static void __init pagetable_init (void)
 	 * it. We clean up by write-enabling and then freeing the old page dir.
 	 */
 	memcpy(new_pgd, old_pgd, PTRS_PER_PGD_NO_HV*sizeof(pgd_t));
-	//make_page_readonly(new_pgd);
-	queue_pgd_pin(__pa(new_pgd));
 	load_cr3(new_pgd);
-	queue_pgd_unpin(__pa(old_pgd));
 	__flush_tlb_all(); /* implicit flush */
-	make_page_writable(old_pgd);
+	//make_page_writable(old_pgd);
 	flush_page_update_queue();
 	free_bootmem(__pa(old_pgd), PAGE_SIZE);
 
@@ -562,7 +559,8 @@ void __init paging_init(void)
 
 	/* Switch to the real shared_info page, and clear the dummy page. */
 	flush_page_update_queue();
-	set_fixmap_ma(FIX_SHARED_INFO, xen_start_info.shared_info);
+        printk("xen_start_info.shared_info=%x\n", xen_start_info.shared_info);
+	set_fixmap(FIX_SHARED_INFO, xen_start_info.shared_info);
 	HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
 	memset(empty_zero_page, 0, sizeof(empty_zero_page));
 
@@ -570,10 +568,10 @@ void __init paging_init(void)
 	/* Setup mapping of lower 1st MB */
 	for (i = 0; i < NR_FIX_ISAMAPS; i++)
 		if (xen_start_info.flags & SIF_PRIVILEGED)
-			set_fixmap_ma(FIX_ISAMAP_BEGIN - i, i * PAGE_SIZE);
+			__vms_set_fixmap_ma(FIX_ISAMAP_BEGIN - i, i * PAGE_SIZE);
 		else
-			set_fixmap_ma_ro(FIX_ISAMAP_BEGIN - i,
-					 virt_to_machine(empty_zero_page));
+			__vms_set_fixmap_ma_ro(FIX_ISAMAP_BEGIN - i,
+					 __vms_virt_to_machine(empty_zero_page));
 #endif
 }
 

@@ -43,7 +43,7 @@ do { \
  * (pmds are folded into pgds so this doesn't get actually called,
  * but the define is needed for a generic inline function.)
  */
-#define set_pmd(pmdptr, pmdval) xen_l2_entry_update((pmdptr), (pmdval).pmd)
+#define set_pmd(pmdptr, pmdval) (*(pmdptr) = pmdval)
 #define set_pgd(pgdptr, pgdval) ((void)0)
 
 #define pgd_page(pgd) \
@@ -67,7 +67,7 @@ static inline pte_t ptep_get_and_clear(pte_t *xp)
 {
 	pte_t pte = *xp;
 	if (pte.pte_low)
-		set_pte(xp, __pte_ma(0));
+		set_pte(xp, __pte(0));
 	return pte;
 }
 
@@ -94,20 +94,12 @@ static inline pte_t ptep_get_and_clear(pte_t *xp)
  */
 #define INVALID_P2M_ENTRY (~0U)
 #define FOREIGN_FRAME(_m) ((_m) | (1UL<<((sizeof(unsigned long)*8)-1)))
-#define pte_pfn(_pte)							\
-({									\
-	unsigned long mfn = (_pte).pte_low >> PAGE_SHIFT;		\
-	unsigned long pfn = mfn_to_pfn(mfn);				\
-	if ((pfn >= max_mapnr) || (pfn_to_mfn(pfn) != mfn))		\
-		pfn = max_mapnr; /* special: force !pfn_valid() */	\
-	pfn;								\
-})
+#define pte_pfn(_pte)		((_pte).pte_low >> PAGE_SHIFT)
 
 #define pte_page(_pte) pfn_to_page(pte_pfn(_pte))
 
 #define pte_none(x)		(!(x).pte_low)
 #define pfn_pte(pfn, prot)	__pte(((pfn) << PAGE_SHIFT) | pgprot_val(prot))
-#define pfn_pte_ma(pfn, prot)	__pte_ma(((pfn) << PAGE_SHIFT) | pgprot_val(prot))
 #define pfn_pmd(pfn, prot)	__pmd(((pfn) << PAGE_SHIFT) | pgprot_val(prot))
 
 /*
