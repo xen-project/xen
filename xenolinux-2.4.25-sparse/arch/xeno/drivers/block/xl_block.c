@@ -164,6 +164,11 @@ int xenolinux_block_ioctl(struct inode *inode, struct file *filep,
         DPRINTK_IOCTL("   BLKGETSIZE: %x %lx\n", BLKGETSIZE, part->nr_sects); 
         return put_user(part->nr_sects, (unsigned long *) argument);
 
+    case BLKGETSIZE64:
+        DPRINTK_IOCTL("   BLKGETSIZE64: %x %llx\n", BLKGETSIZE64,
+                      (u64)part->nr_sects * 512);
+        return put_user((u64)part->nr_sects * 512, (u64 *) argument);
+
     case BLKRRPART:                               /* re-read partition table */
         DPRINTK_IOCTL("   BLKRRPART: %x\n", BLKRRPART);
         return xenolinux_block_revalidate(dev);
