@@ -10,10 +10,7 @@
 #ifndef __ASM_XEN_FOREIGN_PAGE_H__
 #define __ASM_XEN_FOREIGN_PAGE_H__
 
-/*
- * NOTE: PG_foreign must not conflict with any PG_ definition in page-flags.h!!
- */
-#define PG_foreign		25
+#define PG_foreign		PG_arch_1
 
 #define PageForeign(page)	test_bit(PG_foreign, &(page)->flags)
 
