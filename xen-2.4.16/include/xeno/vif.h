@@ -25,13 +25,6 @@
  * TX_RING_SIZE and RX_RING_SIZE are defined in the shared network.h.
  */
 
-typedef struct tx_shadow_entry_st {
-    unsigned long addr;
-    unsigned long size;
-    int           status;
-    unsigned long flush_count;
-} tx_shadow_entry_t;
-
 typedef struct rx_shadow_entry_st {
     unsigned long addr;
     unsigned long size;
@@ -40,9 +33,9 @@ typedef struct rx_shadow_entry_st {
 } rx_shadow_entry_t;
 
 typedef struct net_shadow_ring_st {
-    tx_shadow_entry_t *tx_ring;
     rx_shadow_entry_t *rx_ring;
     unsigned int rx_prod, rx_cons, rx_idx;
+    unsigned int tx_cons; /* ahead of shared tx_cons */
 } net_shadow_ring_t;
 
 typedef struct net_vif_st {

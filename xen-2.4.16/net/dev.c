@@ -2003,6 +2003,7 @@ inline int init_tx_header(u8 *data, unsigned int len, struct net_device *dev)
         return 0;
 }
 
+
 /* 
  * tx_skb_release
  *
@@ -2017,11 +2018,21 @@ void tx_skb_release(struct sk_buff *skb)
 {
     int i;
     
-    for (i= 0; i < skb_shinfo(skb)->nr_frags; i++)
+    for ( i = 0; i < skb_shinfo(skb)->nr_frags; i++ )
         skb_shinfo(skb)->frags[i].page->tot_count--;
     
     skb_shinfo(skb)->nr_frags = 0; 
+
+    /*
+     * XXX This assumes that, per vif, SKBs are processed in-order!
+     * Also, like lots of code in here -- we assume direct access to the
+     * consumer and producer indexes. This is likely safe for the
+     * forseeable future.
+     */
+    sys_vif_list[skb->src_vif]->net_ring->tx_cons = 
+        TX_RING_INC(sys_vif_list[skb->src_vif]->net_ring->tx_cons);
 }
+
     
 /*
  * do_net_update:
@@ -2045,8 +2056,7 @@ long do_net_update(void)
     rx_shadow_entry_t *rx;
     unsigned long pfn;
     struct pfn_info *page;
-    unsigned long *g_pte;
-    
+    unsigned long *g_pte;    
     
     for ( j = 0; j < current->num_net_vifs; j++)
     {
@@ -2056,12 +2066,13 @@ long do_net_update(void)
 
         current_vif = current->net_vif_list[j];
         net_ring = current_vif->net_ring;
+        shadow_ring = current_vif->shadow_ring;
         
         /*
          * PHASE 1 -- TRANSMIT RING
          */
 
-        for ( i = net_ring->tx_cons; 
+        for ( i = shadow_ring->tx_cons; 
               i != net_ring->tx_prod; 
               i = TX_RING_INC(i) )
         {
@@ -2176,13 +2187,11 @@ long do_net_update(void)
                 unmap_domain_mem(g_data);
             }
         }
-        net_ring->tx_cons = i;
+        shadow_ring->tx_cons = i;
 
         /*
          * PHASE 2 -- RECEIVE RING
          */
-
-        shadow_ring = current_vif->shadow_ring;
 
         for ( i = shadow_ring->rx_prod; 
               i != net_ring->rx_prod; 

@@ -65,22 +65,18 @@ net_vif_t *create_net_vif(int domain)
     new_ring = dom_task->net_ring_base + dom_task->num_net_vifs;
     memset(new_ring, 0, sizeof(net_ring_t));
 
-    // allocate the shadow ring.  
-    // maybe these should be kmem_cache instead of kmalloc?
-    
     shadow_ring = kmalloc(sizeof(net_shadow_ring_t), GFP_KERNEL);
     if (shadow_ring == NULL) goto fail;
     
-    shadow_ring->tx_ring = kmalloc(TX_RING_SIZE 
-                    * sizeof(tx_shadow_entry_t), GFP_KERNEL);
     shadow_ring->rx_ring = kmalloc(RX_RING_SIZE
                     * sizeof(rx_shadow_entry_t), GFP_KERNEL);
-    if ((shadow_ring->tx_ring == NULL) || (shadow_ring->rx_ring == NULL))
+    if ( shadow_ring->rx_ring == NULL )
             goto fail;
 
     shadow_ring->rx_prod = shadow_ring->rx_cons = shadow_ring->rx_idx = 0;
+    shadow_ring->tx_cons = 0;
     
-    // fill in the new vif struct.
+    /* Fill in the new vif struct. */
     
     new_vif->net_ring = new_ring;
     new_vif->shadow_ring = shadow_ring;
@@ -127,7 +123,6 @@ void destroy_net_vif(struct task_struct *p)
     sys_vif_list[p->net_vif_list[i]->id] = NULL; // system vif list not gc'ed
     write_unlock(&sys_vif_lock);        
    
-    kfree(p->net_vif_list[i]->shadow_ring->tx_ring);
     kfree(p->net_vif_list[i]->shadow_ring->rx_ring);
     kfree(p->net_vif_list[i]->shadow_ring);
     kmem_cache_free(net_vif_cache, p->net_vif_list[i]);
@@ -297,21 +292,23 @@ int net_find_rule(u8 nproto, u8 tproto, u32 src_addr, u32 dst_addr, u16 src_port
     
     while (ent)
     {
-        if (    (    (ent->r.src_interface == src_vif) 
-                  || (ent->r.src_interface == VIF_ANY_INTERFACE) )
+        if ( ((ent->r.src_interface == src_vif)
+              || (ent->r.src_interface == VIF_ANY_INTERFACE)) &&
 
-             && (!((ent->r.src_addr ^ src_addr) & ent->r.src_addr_mask ))
-             && (!((ent->r.dst_addr ^ dst_addr) & ent->r.dst_addr_mask ))
-             && (!((ent->r.src_port ^ src_port) & ent->r.src_port_mask ))
-             && (!((ent->r.dst_port ^ dst_port) & ent->r.dst_port_mask ))
-
-             && (
-                     (ent->r.proto == NETWORK_PROTO_ANY)
-                  || ((ent->r.proto == NETWORK_PROTO_IP)  && (nproto == (u8)ETH_P_IP))
-                  || ((ent->r.proto == NETWORK_PROTO_ARP) && (nproto == (u8)ETH_P_ARP))
-                  || ((ent->r.proto == NETWORK_PROTO_TCP) && (tproto == IPPROTO_TCP))
-                  || ((ent->r.proto == NETWORK_PROTO_UDP) && (tproto == IPPROTO_UDP))
-                )
+             (!((ent->r.src_addr ^ src_addr) & ent->r.src_addr_mask )) &&
+             (!((ent->r.dst_addr ^ dst_addr) & ent->r.dst_addr_mask )) &&
+             (!((ent->r.src_port ^ src_port) & ent->r.src_port_mask )) &&
+             (!((ent->r.dst_port ^ dst_port) & ent->r.dst_port_mask )) &&
+             
+             ((ent->r.proto == NETWORK_PROTO_ANY) ||
+              ((ent->r.proto == NETWORK_PROTO_IP)  &&
+               (nproto == (u8)ETH_P_IP)) ||
+              ((ent->r.proto == NETWORK_PROTO_ARP) &&
+               (nproto == (u8)ETH_P_ARP)) ||
+              ((ent->r.proto == NETWORK_PROTO_TCP) &&
+               (tproto == IPPROTO_TCP)) ||
+              ((ent->r.proto == NETWORK_PROTO_UDP) &&
+               (tproto == IPPROTO_UDP)))
            )
         {
             break;
@@ -358,40 +355,34 @@ int __net_get_target_vif(u8 *data, unsigned int len, int src_vif)
     case ETH_P_ARP:
         if ( len < 28 ) goto drop;
         target = net_find_rule((u8)ETH_P_ARP, 0, ntohl(*(u32 *)(nh_raw + 14)),
-                        ntohl(*(u32 *)(nh_raw + 24)), 0, 0, 
-                        src_vif);
+                               ntohl(*(u32 *)(nh_raw + 24)), 0, 0, 
+                               src_vif);
         break;
 
     case ETH_P_IP:
         if ( len < 20 ) goto drop;
         h_raw =  data + ((*(unsigned char *)(nh_raw)) & 0x0f) * 4;
-        switch ( *(unsigned char *)(nh_raw + 9) )
-        {
-        case IPPROTO_UDP:
-        case IPPROTO_TCP:
-            target = net_find_rule((u8)ETH_P_IP,  *(u8 *)(nh_raw + 9),
-                    ntohl(*(u32 *)(nh_raw + 12)),
-                    ntohl(*(u32 *)(nh_raw + 16)),
-                    ntohs(*(u16 *)(h_raw)),
-                    ntohs(*(u16 *)(h_raw + 2)), 
-                    src_vif);
-            break;
-
-        default: // ip-based protocol where we don't have ports.
-            target = net_find_rule((u8)ETH_P_IP,  *(u8 *)(data + 9),
-                    ntohl(*(u32 *)(nh_raw + 12)),
-                    ntohl(*(u32 *)(nh_raw + 16)),
-                    0,
-                    0, 
-                    src_vif);
-        }
-        break;
-
+        
+        /* XXX For now, we ignore ports. */
+#if 0
+        target = net_find_rule((u8)ETH_P_IP,  *(u8 *)(nh_raw + 9),
+                               ntohl(*(u32 *)(nh_raw + 12)),
+                               ntohl(*(u32 *)(nh_raw + 16)),
+                               ntohs(*(u16 *)(h_raw)),
+                               ntohs(*(u16 *)(h_raw + 2)), 
+                               src_vif);
+#else
+        target = net_find_rule((u8)ETH_P_IP,  *(u8 *)(data + 9),
+                               ntohl(*(u32 *)(nh_raw + 12)),
+                               ntohl(*(u32 *)(nh_raw + 16)),
+                               0,
+                               0, 
+                               src_vif);
+#endif
     }
     return target;
     
-    drop:
-//printk("Drop case!\n");
+ drop:
     return VIF_DROP;
 }
 
