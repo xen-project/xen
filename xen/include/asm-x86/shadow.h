@@ -46,10 +46,10 @@ extern void shadow_l2_normal_pt_update(unsigned long pa, unsigned long gpde);
 extern void unshadow_table(unsigned long gpfn, unsigned int type);
 extern int shadow_mode_enable(struct domain *p, unsigned int mode);
 extern void free_shadow_state(struct domain *d);
+extern void shadow_invlpg(struct exec_domain *, unsigned long);
 
 #ifdef CONFIG_VMX
 extern void vmx_shadow_clear_state(struct domain *);
-extern void vmx_shadow_invlpg(struct domain *, unsigned long);
 #endif
 
 #define __mfn_to_gpfn(_d, mfn)                         \
@@ -70,7 +70,7 @@ static inline void shadow_mode_disable(struct domain *d)
 }
 
 extern unsigned long shadow_l2_table( 
-    struct domain *d, unsigned long gpfn);
+    struct domain *d, unsigned long gmfn);
   
 static inline void shadow_invalidate(struct exec_domain *ed) {
     if ( !shadow_mode_translate(ed->domain))
@@ -131,10 +131,8 @@ static inline void __shadow_get_l2e(
             *sl2e = l2_pgentry_val(
                 shadow_linear_l2_table[l2_table_offset(va)]);
     }
-    else {
-        BUG(); /* why do we need this case? */
-        *sl2e = l2_pgentry_val(linear_l2_table[l2_table_offset(va)]);
-    }
+    else
+        BUG();
 }
 
 static inline void __shadow_set_l2e(
@@ -147,17 +145,14 @@ static inline void __shadow_set_l2e(
             shadow_linear_l2_table[l2_table_offset(va)] = mk_l2_pgentry(value);
     }
     else
-    {
-        BUG(); /* why do we need this case? */
-        linear_l2_table[l2_table_offset(va)] = mk_l2_pgentry(value);
-    }
+        BUG();
 }
 
 static inline void __guest_get_l2e(
     struct exec_domain *ed, unsigned long va, unsigned long *l2e)
 {
     *l2e = ( shadow_mode_translate(ed->domain) ) ?
-        l2_pgentry_val(ed->arch.vpagetable[l2_table_offset(va)]) :
+        l2_pgentry_val(ed->arch.guest_vtable[l2_table_offset(va)]) :
         l2_pgentry_val(linear_l2_table[l2_table_offset(va)]);
 }
 
@@ -169,10 +164,10 @@ static inline void __guest_set_l2e(
         unsigned long pfn;
 
         pfn = phys_to_machine_mapping(value >> PAGE_SHIFT);
-        ed->arch.guest_pl2e_cache[l2_table_offset(va)] =
+        ed->arch.hl2_vtable[l2_table_offset(va)] =
             mk_l2_pgentry((pfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
 
-        ed->arch.vpagetable[l2_table_offset(va)] = mk_l2_pgentry(value);
+        ed->arch.guest_vtable[l2_table_offset(va)] = mk_l2_pgentry(value);
     }
     else
     {
@@ -661,36 +656,6 @@ static inline void set_shadow_status(
   
 #ifdef CONFIG_VMX
 
-static inline void vmx_update_shadow_state(
-    struct exec_domain *ed, unsigned long gpfn, unsigned long smfn)
-{
-
-    l2_pgentry_t *mpl2e = 0;
-    l2_pgentry_t *gpl2e, *spl2e;
-
-    /* unmap the old mappings */
-    if ( ed->arch.shadow_vtable )
-        unmap_domain_mem(ed->arch.shadow_vtable);
-    if ( ed->arch.vpagetable )
-        unmap_domain_mem(ed->arch.vpagetable);
-
-    /* new mapping */
-    mpl2e = (l2_pgentry_t *)
-        map_domain_mem(pagetable_val(ed->arch.monitor_table));
-
-    mpl2e[l2_table_offset(SH_LINEAR_PT_VIRT_START)] =
-        mk_l2_pgentry((smfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
-    __flush_tlb_one(SH_LINEAR_PT_VIRT_START);
-
-    spl2e = (l2_pgentry_t *)map_domain_mem(smfn << PAGE_SHIFT);
-    gpl2e = (l2_pgentry_t *)map_domain_mem(gpfn << PAGE_SHIFT);
-    memset(spl2e, 0, L2_PAGETABLE_ENTRIES * sizeof(l2_pgentry_t));
-
-    ed->arch.shadow_vtable = spl2e;
-    ed->arch.vpagetable = gpl2e; /* expect the guest did clean this up */
-    unmap_domain_mem(mpl2e);
-}
-
 static inline unsigned long gva_to_gpte(unsigned long gva)
 {
     unsigned long gpde, gpte, pfn, index;
@@ -702,9 +667,9 @@ static inline unsigned long gva_to_gpte(unsigned long gva)
 
     index = (gva >> L2_PAGETABLE_SHIFT);
 
-    if (!l2_pgentry_val(ed->arch.guest_pl2e_cache[index])) {
+    if (!l2_pgentry_val(ed->arch.hl2_vtable[index])) {
         pfn = phys_to_machine_mapping(gpde >> PAGE_SHIFT);
-        ed->arch.guest_pl2e_cache[index] = 
+        ed->arch.hl2_vtable[index] = 
             mk_l2_pgentry((pfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
     }
 
@@ -731,22 +696,52 @@ static inline unsigned long gva_to_gpa(unsigned long gva)
 static inline void __update_pagetables(struct exec_domain *ed)
 {
     struct domain *d = ed->domain;
-    unsigned long gpfn = pagetable_val(ed->arch.guest_table) >> PAGE_SHIFT;
+    unsigned long gmfn = pagetable_val(ed->arch.guest_table) >> PAGE_SHIFT;
+    unsigned long gpfn = __mfn_to_gpfn(d, gmfn);
     unsigned long smfn = __shadow_status(d, gpfn) & PSH_pfn_mask;
 
-    SH_VVLOG("0: __update_pagetables(gpfn=%p, smfn=%p)", gpfn, smfn);
+    SH_VVLOG("0: __update_pagetables(gmfn=%p, smfn=%p)", gmfn, smfn);
 
     if ( unlikely(smfn == 0) )
-        smfn = shadow_l2_table(d, gpfn);
-#ifdef CONFIG_VMX
-    else if ( shadow_mode_translate(ed->domain) )
-        vmx_update_shadow_state(ed, gpfn, smfn);
-#endif
+        smfn = shadow_l2_table(d, gmfn);
 
     ed->arch.shadow_table = mk_pagetable(smfn<<PAGE_SHIFT);
 
-    if ( !shadow_mode_external(ed->domain) )
-        ed->arch.monitor_table = ed->arch.shadow_table;
+    if  ( shadow_mode_translate(ed->domain) )
+    {
+        l2_pgentry_t *gpl2e, *spl2e;
+
+        if ( ed->arch.guest_vtable )
+            unmap_domain_mem(ed->arch.guest_vtable);
+        if ( ed->arch.shadow_vtable )
+            unmap_domain_mem(ed->arch.shadow_vtable);
+
+        gpl2e = ed->arch.guest_vtable =
+            map_domain_mem(pagetable_val(ed->arch.guest_table));
+        spl2e = ed->arch.shadow_vtable =
+            map_domain_mem(pagetable_val(ed->arch.shadow_table));
+
+        if ( shadow_mode_external(ed->domain ) )
+        {
+            l2_pgentry_t *mpl2e = ed->arch.monitor_vtable;
+            unsigned long old_smfn;
+            unsigned sh_l2offset = l2_table_offset(SH_LINEAR_PT_VIRT_START);
+            
+            old_smfn = l2_pgentry_val(mpl2e[sh_l2offset]) >> PAGE_SHIFT;
+            if ( old_smfn != smfn )
+            {
+                mpl2e[sh_l2offset] =
+                    mk_l2_pgentry((smfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
+                local_flush_tlb();
+            }
+        }
+
+        if ( ed->arch.arch_vmx.flags )
+        {
+            // Why is VMX mode doing this?
+            memset(spl2e, 0, L2_PAGETABLE_ENTRIES * sizeof(l2_pgentry_t));
+        }
+    }
 }
 
 static inline void update_pagetables(struct exec_domain *ed)
@@ -757,12 +752,18 @@ static inline void update_pagetables(struct exec_domain *ed)
          __update_pagetables(ed);
          shadow_unlock(ed->domain);
      }
+     if ( !shadow_mode_external(ed->domain) )
+     {
 #ifdef __x86_64__
-     else if ( !(ed->arch.flags & TF_kernel_mode) )
-         ed->arch.monitor_table = ed->arch.guest_table_user;
+         if ( !(ed->arch.flags & TF_kernel_mode) )
+             ed->arch.monitor_table = ed->arch.guest_table_user;
+         else
 #endif
-     else
-         ed->arch.monitor_table = ed->arch.guest_table;
+         if ( shadow_mode_enabled(ed->domain) )
+             ed->arch.monitor_table = ed->arch.shadow_table;
+         else
+             ed->arch.monitor_table = ed->arch.guest_table;
+     }
 }
 
 #if SHADOW_DEBUG

@@ -260,7 +260,7 @@ static int shadow_mode_table_op(
     ASSERT(spin_is_locked(&d->arch.shadow_lock));
 
     SH_VLOG("shadow mode table op %p %p count %d",
-            pagetable_val(d->exec_domain[0]->arch.pagetable),    /* XXX SMP */
+            pagetable_val(d->exec_domain[0]->arch.guest_table),  /* XXX SMP */
             pagetable_val(d->exec_domain[0]->arch.shadow_table), /* XXX SMP */
             d->arch.shadow_page_count);
 
@@ -465,15 +465,15 @@ void vmx_shadow_clear_state(struct domain *d)
 
 
 unsigned long shadow_l2_table( 
-    struct domain *d, unsigned long gpfn)
+    struct domain *d, unsigned long gmfn)
 {
     struct pfn_info *spfn_info;
     unsigned long    spfn;
-    unsigned long guest_gpfn;
+    unsigned long    gpfn;
 
-    guest_gpfn = __mfn_to_gpfn(d, gpfn);
+    gpfn = __mfn_to_gpfn(d, gmfn);
 
-    SH_VVLOG("shadow_l2_table( %p )", gpfn);
+    SH_VVLOG("shadow_l2_table( %p )", gmfn);
 
     perfc_incrc(shadow_l2_table_count);
 
@@ -485,19 +485,11 @@ unsigned long shadow_l2_table(
 
     spfn = spfn_info - frame_table;
   /* Mark pfn as being shadowed; update field to point at shadow. */
-    set_shadow_status(d, guest_gpfn, spfn | PSH_shadowed);
+    set_shadow_status(d, gpfn, spfn | PSH_shadowed);
  
 #ifdef __i386__
     /* Install hypervisor and 2x linear p.t. mapings. */
-    if ( shadow_mode_translate(d) )
-    {
-#ifdef CONFIG_VMX
-        vmx_update_shadow_state(d->exec_domain[0], gpfn, spfn);
-#else
-        panic("Shadow Full 32 not yet implemented without VMX\n");
-#endif
-    }
-    else
+    if ( !shadow_mode_translate(d) )
     {
         l2_pgentry_t *spl2e;
         spl2e = (l2_pgentry_t *)map_domain_mem(spfn << PAGE_SHIFT);
@@ -514,19 +506,19 @@ unsigned long shadow_l2_table(
                &idle_pg_table[DOMAIN_ENTRIES_PER_L2_PAGETABLE],
                HYPERVISOR_ENTRIES_PER_L2_PAGETABLE * sizeof(l2_pgentry_t));
         spl2e[LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
-            mk_l2_pgentry((gpfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
+            mk_l2_pgentry((gmfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
         spl2e[SH_LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
             mk_l2_pgentry((spfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
         spl2e[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] =
             mk_l2_pgentry(__pa(page_get_owner(
-                &frame_table[gpfn])->arch.mm_perdomain_pt) |
+                &frame_table[gmfn])->arch.mm_perdomain_pt) |
                           __PAGE_HYPERVISOR);
 
         unmap_domain_mem(spl2e);
     }
 #endif
 
-    SH_VLOG("shadow_l2_table( %p -> %p)", gpfn, spfn);
+    SH_VLOG("shadow_l2_table( %p -> %p)", gmfn, spfn);
     return spfn;
 }
 
@@ -546,7 +538,7 @@ static void shadow_map_l1_into_current_l2(unsigned long va)
     if ( !(sl1ss & PSH_shadowed) )
     {
         /* This L1 is NOT already shadowed so we need to shadow it. */
-        SH_VVLOG("4a: l1 not shadowed ( %p )", sl1pfn);
+        SH_VVLOG("4a: l1 not shadowed ( %p )", sl1ss);
 
         sl1mfn_info = alloc_shadow_page(d);
         sl1mfn_info->u.inuse.type_info = PGT_l1_page_table;
@@ -584,14 +576,15 @@ static void shadow_map_l1_into_current_l2(unsigned long va)
     }              
 }
 
-#ifdef CONFIG_VMX
-void vmx_shadow_invlpg(struct domain *d, unsigned long va)
+void shadow_invlpg(struct exec_domain *ed, unsigned long va)
 {
-    unsigned long gpte, spte, host_pfn;
+    unsigned long gpte, spte;
+
+    ASSERT(shadow_mode_enabled(ed->domain));
 
     if (__put_user(0L, (unsigned long *)
                    &shadow_linear_pg_table[va >> PAGE_SHIFT])) {
-        vmx_shadow_clear_state(d);
+        vmx_shadow_clear_state(ed->domain);
         return;
     }
 
@@ -600,15 +593,13 @@ void vmx_shadow_invlpg(struct domain *d, unsigned long va)
         return;
     }
 
-    host_pfn = phys_to_machine_mapping(gpte >> PAGE_SHIFT);
-    spte = (host_pfn << PAGE_SHIFT) | (gpte & ~PAGE_MASK);
+    l1pte_propagate_from_guest(ed->domain, &gpte, &spte);
 
     if (__put_user(spte, (unsigned long *)
                    &shadow_linear_pg_table[va >> PAGE_SHIFT])) {
         return;
     }
 }
-#endif
 
 int shadow_fault(unsigned long va, long error_code)
 {
@@ -616,9 +607,9 @@ int shadow_fault(unsigned long va, long error_code)
     struct exec_domain *ed = current;
     struct domain *d = ed->domain;
 
-    SH_VVLOG("shadow_fault( va=%p, code=%ld )", va, error_code );
+    SH_VVLOG("shadow_fault( va=%p, code=%lu )", va, error_code );
 
-    check_pagetable(d, ed->arch.pagetable, "pre-sf");
+    check_pagetable(d, ed->arch.guest_table, "pre-sf");
 
     /*
      * STEP 1. A fast-reject set of checks with no locking.
@@ -708,7 +699,7 @@ int shadow_fault(unsigned long va, long error_code)
 
     shadow_unlock(d);
 
-    check_pagetable(d, ed->arch.pagetable, "post-sf");
+    check_pagetable(d, ed->arch.guest_table, "post-sf");
     return EXCRET_fault_fixed;
 }
 

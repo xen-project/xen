@@ -194,7 +194,7 @@ void vmx_io_assist(struct exec_domain *ed)
     vio = (vcpu_iodata_t *) ed->arch.arch_vmx.vmx_platform.shared_page_va;
     if (vio == 0) {
         VMX_DBG_LOG(DBG_LEVEL_1, 
-                    "bad shared page: %lx\n", (unsigned long) vio);
+                    "bad shared page: %lx", (unsigned long) vio);
         domain_crash();
     }
     p = &vio->vp_ioreq;
@@ -313,7 +313,7 @@ static inline int find_highest_pending_irq(struct exec_domain *d)
     vio = (vcpu_iodata_t *) d->arch.arch_vmx.vmx_platform.shared_page_va;
     if (vio == 0) {
         VMX_DBG_LOG(DBG_LEVEL_1, 
-                    "bad shared page: %lx\n", (unsigned long) vio);
+                    "bad shared page: %lx", (unsigned long) vio);
         domain_crash();
     }
         
@@ -327,7 +327,7 @@ static inline void clear_highest_bit(struct exec_domain *d, int vector)
     vio = (vcpu_iodata_t *) d->arch.arch_vmx.vmx_platform.shared_page_va;
     if (vio == 0) {
         VMX_DBG_LOG(DBG_LEVEL_1, 
-                    "bad shared page: %lx\n", (unsigned long) vio);
+                    "bad shared page: %lx", (unsigned long) vio);
         domain_crash();
     }
         
@@ -350,14 +350,14 @@ void vmx_intr_assist(struct exec_domain *d)
 
     __vmread(VM_ENTRY_INTR_INFO_FIELD, &intr_fields);
     if (intr_fields & INTR_INFO_VALID_MASK) {
-        VMX_DBG_LOG(DBG_LEVEL_1, "vmx_intr_assist: intr_fields: %lx\n", 
+        VMX_DBG_LOG(DBG_LEVEL_1, "vmx_intr_assist: intr_fields: %lx",
                     intr_fields);
         return;
     }
 
     __vmread(GUEST_EFLAGS, &eflags);
     if (irq_masked(eflags)) {
-        VMX_DBG_LOG(DBG_LEVEL_1, "guesting pending: %x, eflags: %lx\n", 
+        VMX_DBG_LOG(DBG_LEVEL_1, "guesting pending: %x, eflags: %lx",
                     highest_vector, eflags);
         return;
     }
@@ -380,8 +380,13 @@ void vmx_intr_assist(struct exec_domain *d)
 
 void vmx_do_resume(struct exec_domain *d) 
 {
+    if ( d->arch.guest_vtable )
+        __vmwrite(GUEST_CR3, pagetable_val(d->arch.shadow_table));
+    else
+        // we haven't switched off the 1:1 pagetable yet...
+        __vmwrite(GUEST_CR3, pagetable_val(d->arch.guest_table));
+
     __vmwrite(HOST_CR3, pagetable_val(d->arch.monitor_table));
-    __vmwrite(GUEST_CR3, pagetable_val(d->arch.shadow_table));
     __vmwrite(HOST_ESP, (unsigned long)get_stack_bottom());
 
     if (event_pending(d)) {

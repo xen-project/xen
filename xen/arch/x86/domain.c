@@ -248,6 +248,10 @@ void arch_do_createdomain(struct exec_domain *ed)
         machine_to_phys_mapping[virt_to_phys(d->arch.mm_perdomain_pt) >> 
                                PAGE_SHIFT] = INVALID_M2P_ENTRY;
         ed->arch.perdomain_ptes = d->arch.mm_perdomain_pt;
+#if 0 /* don't need this yet, but maybe soon! */
+        ed->arch.guest_vtable = linear_l2_table;
+        ed->arch.shadow_vtable = shadow_linear_l2_table;
+#endif
 
 #ifdef __x86_64__
         d->arch.mm_perdomain_l2 = (l2_pgentry_t *)alloc_xenheap_page();
@@ -312,11 +316,12 @@ static void alloc_monitor_pagetable(struct exec_domain *ed)
            &idle_pg_table[DOMAIN_ENTRIES_PER_L2_PAGETABLE],
            HYPERVISOR_ENTRIES_PER_L2_PAGETABLE * sizeof(l2_pgentry_t));
 
-    ed->arch.monitor_table = mk_pagetable(mpfn << PAGE_SHIFT);
-
     mpl2e[l2_table_offset(PERDOMAIN_VIRT_START)] =
         mk_l2_pgentry((__pa(d->arch.mm_perdomain_pt) & PAGE_MASK) 
                       | __PAGE_HYPERVISOR);
+
+    ed->arch.monitor_table = mk_pagetable(mpfn << PAGE_SHIFT);
+    ed->arch.monitor_vtable = mpl2e;
 
     phys_table = (l2_pgentry_t *)
         map_domain_mem(pagetable_val(ed->arch.phys_table));
@@ -324,11 +329,10 @@ static void alloc_monitor_pagetable(struct exec_domain *ed)
            L1_PAGETABLE_ENTRIES * sizeof(l1_pgentry_t));
 
     unmap_domain_mem(phys_table);
-    unmap_domain_mem(mpl2e);
 }
 
 /*
- * Free the pages for monitor_table and guest_pl2e_cache
+ * Free the pages for monitor_table and hl2_table
  */
 static void free_monitor_pagetable(struct exec_domain *ed)
 {
@@ -337,10 +341,10 @@ static void free_monitor_pagetable(struct exec_domain *ed)
 
     ASSERT( pagetable_val(ed->arch.monitor_table) );
     
-    mpl2e = (l2_pgentry_t *)
-        map_domain_mem(pagetable_val(ed->arch.monitor_table));
+    mpl2e = ed->arch.monitor_vtable;
+
     /*
-     * First get the pfn for guest_pl2e_cache by looking at monitor_table
+     * First get the pfn for hl2_table by looking at monitor_table
      */
     mpfn = l2_pgentry_val(mpl2e[LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT])
         >> PAGE_SHIFT;
@@ -355,6 +359,7 @@ static void free_monitor_pagetable(struct exec_domain *ed)
     free_domheap_page(&frame_table[mpfn]);
 
     ed->arch.monitor_table = mk_pagetable(0);
+    ed->arch.monitor_vtable = 0;
 }
 
 static int vmx_final_setup_guest(struct exec_domain *ed,
@@ -410,7 +415,7 @@ static int vmx_final_setup_guest(struct exec_domain *ed,
     /* We don't call update_pagetables() as we actively want fields such as 
      * the linear_pg_table to be null so that we bail out early of 
      * shadow_fault in case the vmx guest tries illegal accesses with
-     * paging turned of. 
+     * paging turned off. 
      */
     //update_pagetables(ed);     /* this assigns shadow_pagetable */
     alloc_monitor_pagetable(ed); /* this assigns monitor_pagetable */
@@ -427,26 +432,27 @@ out:
 
 /* This is called by arch_final_setup_guest and do_boot_vcpu */
 int arch_final_setup_guest(
-    struct exec_domain *d, full_execution_context_t *c)
+    struct exec_domain *ed, full_execution_context_t *c)
 {
+    struct domain *d = ed->domain;
     unsigned long phys_basetab;
     int i, rc;
 
-    clear_bit(EDF_DONEFPUINIT, &d->ed_flags);
+    clear_bit(EDF_DONEFPUINIT, &ed->ed_flags);
     if ( c->flags & ECF_I387_VALID )
-        set_bit(EDF_DONEFPUINIT, &d->ed_flags);
+        set_bit(EDF_DONEFPUINIT, &ed->ed_flags);
 
-    d->arch.flags &= ~TF_kernel_mode;
+    ed->arch.flags &= ~TF_kernel_mode;
     if ( c->flags & ECF_IN_KERNEL )
-        d->arch.flags |= TF_kernel_mode;
+        ed->arch.flags |= TF_kernel_mode;
 
-    memcpy(&d->arch.user_ctxt,
+    memcpy(&ed->arch.user_ctxt,
            &c->cpu_ctxt,
-           sizeof(d->arch.user_ctxt));
+           sizeof(ed->arch.user_ctxt));
 
     /* Clear IOPL for unprivileged domains. */
-    if (!IS_PRIV(d->domain))
-        d->arch.user_ctxt.eflags &= 0xffffcfff;
+    if (!IS_PRIV(d))
+        ed->arch.user_ctxt.eflags &= 0xffffcfff;
 
     /*
      * This is sufficient! If the descriptor DPL differs from CS RPL then we'll
@@ -454,48 +460,48 @@ int arch_final_setup_guest(
      * If SS RPL or DPL differs from CS RPL then we'll #GP.
      */
     if (!(c->flags & ECF_VMX_GUEST)) 
-        if ( ((d->arch.user_ctxt.cs & 3) == 0) ||
-             ((d->arch.user_ctxt.ss & 3) == 0) )
+        if ( ((ed->arch.user_ctxt.cs & 3) == 0) ||
+             ((ed->arch.user_ctxt.ss & 3) == 0) )
                 return -EINVAL;
 
-    memcpy(&d->arch.i387,
+    memcpy(&ed->arch.i387,
            &c->fpu_ctxt,
-           sizeof(d->arch.i387));
+           sizeof(ed->arch.i387));
 
-    memcpy(d->arch.traps,
+    memcpy(ed->arch.traps,
            &c->trap_ctxt,
-           sizeof(d->arch.traps));
+           sizeof(ed->arch.traps));
 
-    if ( (rc = (int)set_fast_trap(d, c->fast_trap_idx)) != 0 )
+    if ( (rc = (int)set_fast_trap(ed, c->fast_trap_idx)) != 0 )
         return rc;
 
-    d->arch.ldt_base = c->ldt_base;
-    d->arch.ldt_ents = c->ldt_ents;
+    ed->arch.ldt_base = c->ldt_base;
+    ed->arch.ldt_ents = c->ldt_ents;
 
-    d->arch.kernel_ss = c->kernel_ss;
-    d->arch.kernel_sp = c->kernel_esp;
+    ed->arch.kernel_ss = c->kernel_ss;
+    ed->arch.kernel_sp = c->kernel_esp;
 
     for ( i = 0; i < 8; i++ )
-        (void)set_debugreg(d, i, c->debugreg[i]);
+        (void)set_debugreg(ed, i, c->debugreg[i]);
 
-    d->arch.event_selector    = c->event_callback_cs;
-    d->arch.event_address     = c->event_callback_eip;
-    d->arch.failsafe_selector = c->failsafe_callback_cs;
-    d->arch.failsafe_address  = c->failsafe_callback_eip;
-    
+    ed->arch.event_selector    = c->event_callback_cs;
+    ed->arch.event_address     = c->event_callback_eip;
+    ed->arch.failsafe_selector = c->failsafe_callback_cs;
+    ed->arch.failsafe_address  = c->failsafe_callback_eip;
+
     phys_basetab = c->pt_base;
-    d->arch.guest_table = d->arch.phys_table = mk_pagetable(phys_basetab);
+    ed->arch.guest_table = ed->arch.phys_table = mk_pagetable(phys_basetab);
 
-    if ( !get_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT], d->domain, 
+    if ( !get_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT], d, 
                             PGT_base_page_table) )
         return -EINVAL;
 
     /* Failure to set GDT is harmless. */
-    SET_GDT_ENTRIES(d, DEFAULT_GDT_ENTRIES);
-    SET_GDT_ADDRESS(d, DEFAULT_GDT_ADDRESS);
+    SET_GDT_ENTRIES(ed, DEFAULT_GDT_ENTRIES);
+    SET_GDT_ADDRESS(ed, DEFAULT_GDT_ADDRESS);
     if ( c->gdt_ents != 0 )
     {
-        if ( (rc = (int)set_gdt(d, c->gdt_frames, c->gdt_ents)) != 0 )
+        if ( (rc = (int)set_gdt(ed, c->gdt_frames, c->gdt_ents)) != 0 )
         {
             put_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT]);
             return rc;
@@ -504,10 +510,10 @@ int arch_final_setup_guest(
 
 #ifdef CONFIG_VMX
     if (c->flags & ECF_VMX_GUEST)
-        return vmx_final_setup_guest(d, c);
+        return vmx_final_setup_guest(ed, c);
 #endif
 
-    update_pagetables(d);
+    update_pagetables(ed);
 
     return 0;
 }
