@@ -363,6 +363,20 @@ class BlkDev(controller.SplitDev):
         Blkctl.block('unbind', self.type, self.node)
 
     def setNode(self, node):
+    
+        # NOTE: 
+        # This clause is testing code for storage system experiments.
+        # Add a new disk type that will just pass an opaque id in the
+        # start_sector and use an experimental device type.
+        # Please contact andrew.warfield@cl.cam.ac.uk with any concerns.
+        if self.type == 'amorfs':
+            self.node   = node
+            self.device =  61440 # (240,0)
+            self.start_sector = long(self.params)
+            self.nr_sectors = long(0)
+            return
+        # done.
+            
         mounted_mode = check_mounted(self, node)
         if not '!' in self.mode and mounted_mode:
             if mounted_mode is "w":

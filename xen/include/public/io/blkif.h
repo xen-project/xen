@@ -9,7 +9,7 @@
 #ifndef __XEN_PUBLIC_IO_BLKIF_H__
 #define __XEN_PUBLIC_IO_BLKIF_H__
 
-#include <asm-xen/xen-public/io/ring.h>
+#include "ring.h"
 
 #define blkif_vdev_t   u16
 #define blkif_sector_t u64
