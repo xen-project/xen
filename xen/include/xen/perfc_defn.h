@@ -30,3 +30,8 @@ PERFCOUNTER_CPU( shadow_update_va_fail, "shadow_update_va_fail" )
 /* STATUS counters do not reset when 'P' is hit */
 PERFSTATUS( shadow_l2_pages, "current # shadow L2 pages" )
 PERFSTATUS( shadow_l1_pages, "current # shadow L1 pages" )
+
+#define VMX_PERF_EXIT_REASON_SIZE 37
+#define VMX_PERF_VECTOR_SIZE 0x20
+PERFCOUNTER_ARRAY(vmexits, "vmexits", VMX_PERF_EXIT_REASON_SIZE )
+PERFCOUNTER_ARRAY(cause_vector, "cause vector", VMX_PERF_VECTOR_SIZE )
