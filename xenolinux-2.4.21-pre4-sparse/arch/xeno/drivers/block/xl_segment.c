@@ -21,7 +21,7 @@ static int xlseg_blksize_size[XLVIRT_MAX];
 static int xlseg_hardsect_size[XLVIRT_MAX];
 static int xlseg_max_sectors[XLVIRT_MAX];
 
-struct gendisk *xlsegment_gendisk;
+struct gendisk *xlsegment_gendisk = NULL;
 
 static xen_disk_info_t xlseg_disk_info;
 
@@ -148,6 +148,8 @@ int __init xlseg_init(void)
 
 static void __exit xlseg_cleanup(void)
 {
+    if ( xlsegment_gendisk == NULL ) return;
+
     blk_cleanup_queue(BLK_DEFAULT_QUEUE(XLVIRT_MAJOR));
 
     xlsegment_gendisk = NULL;

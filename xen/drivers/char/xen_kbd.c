@@ -1,4 +1,5 @@
 #include <asm-i386/io.h>
+#include <asm-i386/irq.h>
 #include <xeno/sched.h>    /* this has request_irq() proto for some reason */
 #include <xeno/keyhandler.h>  
 
@@ -183,7 +184,7 @@ static void keyboard_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 void initialize_keyboard()
 {
-    if(request_irq(KEYBOARD_IRQ, keyboard_interrupt, 0, "keyboard", NULL))
+    if(request_irq(KEYBOARD_IRQ, keyboard_interrupt, SA_NOPROFILE, "keyboard", NULL))
 	printk("initialize_keyboard: failed to alloc IRQ %d\n", KEYBOARD_IRQ); 
 
     return; 

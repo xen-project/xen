@@ -42,6 +42,13 @@ int xlscsi_init(xen_disk_info_t *xdi)
     int i, result, units, minors, disk;
     struct gendisk *gd;
 
+    /* If we don't have any usable SCSI devices we may as well bail now. */
+    units = 0;
+    for ( i = 0; i < xdi->count; i++ )
+        if ( IS_SCSI_XENDEV(xdi->disks[i].device) &&
+             ((xdi->disks[i].device & XENDEV_IDX_MASK) < 16) ) units++;
+    if ( units == 0 ) return 0;
+
     SET_MODULE_OWNER(&xlscsi_block_fops);
 
     result = register_blkdev(XLSCSI_MAJOR, XLSCSI_MAJOR_NAME, 
@@ -55,16 +62,16 @@ int xlscsi_init(xen_disk_info_t *xdi)
     /* Initialize global arrays. */
     for ( i = 0; i < XLSCSI_MAX; i++ )
     {
-	xlscsi_blksize_size[i]  = 512;
+	xlscsi_blksize_size[i]  = 1024; //XXX 512;
 	xlscsi_hardsect_size[i] = 512;
-	xlscsi_max_sectors[i]   = 128;
+	xlscsi_max_sectors[i]   = 128*8; //XXX 128
     }
 
     blk_size[XLSCSI_MAJOR]      = NULL;
     blksize_size[XLSCSI_MAJOR]  = xlscsi_blksize_size;
     hardsect_size[XLSCSI_MAJOR] = xlscsi_hardsect_size;
     max_sectors[XLSCSI_MAJOR]   = xlscsi_max_sectors;
-    read_ahead[XLSCSI_MAJOR]    = 8;
+    read_ahead[XLSCSI_MAJOR]    = NULL; //XXX8;
 
     blk_init_queue(BLK_DEFAULT_QUEUE(XLSCSI_MAJOR), do_xlblk_request);
 
@@ -73,13 +80,6 @@ int xlscsi_init(xen_disk_info_t *xdi)
      * soon as we pass them down to Xen.
      */
     blk_queue_headactive(BLK_DEFAULT_QUEUE(XLSCSI_MAJOR), 0);
-
-    /* If we don't have any usable SCSI devices we may as well bail now. */
-    units = 0;
-    for ( i = 0; i < xdi->count; i++ )
-        if ( IS_SCSI_XENDEV(xdi->disks[i].device) &&
-             ((xdi->disks[i].device & XENDEV_IDX_MASK) < 16) ) units++;
-    if ( units == 0 ) return 0;
 
     /* We may register up to 16 devices in a sparse identifier space. */
     units = 16;
@@ -134,6 +134,8 @@ int xlscsi_init(xen_disk_info_t *xdi)
 
 void xlscsi_cleanup(void)
 {
+    if ( xlscsi_gendisk == NULL ) return;
+
     blk_cleanup_queue(BLK_DEFAULT_QUEUE(XLSCSI_MAJOR));
 
     xlscsi_gendisk = NULL;

@@ -292,7 +292,7 @@ void __init start_of_day(void)
     extern void initialize_keytable(); 
     extern void initialize_serial(void);
     extern void initialize_keyboard(void);
-
+    extern int opt_nosmp;
     unsigned long low_mem_size;
     
     /*
@@ -327,7 +327,11 @@ void __init start_of_day(void)
 #ifndef CONFIG_SMP    
     APIC_init_uniprocessor();
 #else
-    smp_boot_cpus(); /*
+    if( opt_nosmp )
+	APIC_init_uniprocessor();
+    else
+    	smp_boot_cpus(); 
+		     /*
                       * Does loads of stuff, including kicking the local
                       * APIC, and the IO APIC after other CPUs are booted.
                       * Each IRQ is preferably handled by IO-APIC, but

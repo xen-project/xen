@@ -151,17 +151,17 @@ static inline int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
  	for (i = 0; i < nents; i++ ) {
  		if (sg[i].address && sg[i].page)
  			out_of_line_bug();
-
-		/* not worth checking since NULL is ok says SMH */
 #if 0
- 		else if (!sg[i].address && !sg[i].page)
+		/* Invalid check, since address==0 is valid. */
+		else if (!sg[i].address && !sg[i].page)
  			out_of_line_bug();
 #endif
  
- 		if (sg[i].address)
- 			sg[i].dma_address = virt_to_bus(sg[i].address);
- 		else
+		/* XXX Switched round, since address==0 is valid. */
+ 		if (sg[i].page)
  			sg[i].dma_address = page_to_bus(sg[i].page) + sg[i].offset;
+ 		else
+ 			sg[i].dma_address = virt_to_bus(sg[i].address);
  	}
  
 	flush_write_buffers();

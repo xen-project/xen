@@ -116,8 +116,8 @@ static int network_open(struct net_device *dev)
 
     network_alloc_rx_buffers(dev);
 
-    error = request_irq(NET_RX_IRQ, network_rx_int, 0, 
-                        "net-rx", dev);
+    error = request_irq(NET_RX_IRQ, network_rx_int, 
+                        SA_SAMPLE_RANDOM, "net-rx", dev);
     if ( error )
     {
         printk(KERN_WARNING "%s: Could not allocate receive interrupt\n",
@@ -126,8 +126,8 @@ static int network_open(struct net_device *dev)
         goto fail;
     }
 
-    error = request_irq(NET_TX_IRQ, network_tx_int, 0, 
-                        "net-tx", dev);
+    error = request_irq(NET_TX_IRQ, network_tx_int, 
+                        SA_SAMPLE_RANDOM, "net-tx", dev);
     if ( error )
     {
         printk(KERN_WARNING "%s: Could not allocate transmit interrupt\n",

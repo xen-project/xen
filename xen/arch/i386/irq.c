@@ -537,7 +537,9 @@ asmlinkage unsigned int do_IRQ(struct pt_regs regs)
         do_softirq();
 
     rdtscl(cc_end);
-    perfc_adda(irq_time, cpu, cc_end - cc_start);
+
+    if(!action || (!(action->flags & SA_NOPROFILE)) )
+        perfc_adda(irq_time, cpu, cc_end - cc_start);
 
     return 1;
 }

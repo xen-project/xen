@@ -116,6 +116,15 @@ static inline int target_cpus(void)
 	return cpu_online_map;
 }
 #else
-#define target_cpus() (0x01)
+/* KAF Xen: Round-robin allocate IRQs to CPUs. */
+static inline int target_cpus(void)
+{
+    static unsigned int cpu_field = 1;
+    do { 
+        cpu_field <<= 1; 
+        if ( cpu_field == 0x100 ) cpu_field = 1; /* logical field == 8 bits */ 
+    } while ( (cpu_field & cpu_online_map) == 0 );
+    return cpu_field;
+}
 #endif
 #endif

@@ -85,6 +85,6 @@ void initialize_serial()
     outb(NS16550_MCR_OUT2, SERIAL_BASE + NS16550_MCR);   /* Modem control */
     outb(NS16550_IER_ERDAI, SERIAL_BASE + NS16550_IER ); /* Setup interrupts */
 
-    if((rc = request_irq(4, serial_rx_int, 0, "serial", 0)))
+    if((rc = request_irq(4, serial_rx_int, SA_NOPROFILE, "serial", 0)))
 	printk("initialize_serial: failed to get IRQ4, rc=%d\n", rc); 
 }
