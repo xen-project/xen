@@ -72,7 +72,7 @@ then
  make -j4 world
  make -j4 linux26
  cd ../install/boot
- [ -r vmlinuz-${LINUX_VER}-xen0 ] && ln -s vmlinuz-${LINUX_VER}-xen0 xenolinux.gz
+ [ -r vmlinuz-2.4.*-xen0 ] && ln -s vmlinuz-2.4.*-xen0 xenolinux.gz
   
 else
  # old style repository without 'make world'

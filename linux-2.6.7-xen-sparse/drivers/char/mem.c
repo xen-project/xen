@@ -252,7 +252,7 @@ static int mmap_mem(struct file * file, struct vm_area_struct * vma)
 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 	if (direct_remap_area_pages(vma->vm_mm, vma->vm_start, offset, 
 				vma->vm_end-vma->vm_start, vma->vm_page_prot,
-				(domid_t)file->private_data))
+				(domid_t)(unsigned long)file->private_data))
 		return -EAGAIN;
 	return 0;
 }

@@ -50,6 +50,32 @@ static int recovery = 0;           /* "Recovery in progress" flag.  Protected
 static request_queue_t *pending_queues[MAX_PENDING];
 static int nr_pending;
 
+inline void translate_req_to_pfn( blkif_request_t * xreq, blkif_request_t * req)
+{
+    int i;
+    
+    *xreq=*req; 
+    for ( i=0; i<req->nr_segments; i++ )
+    {	
+	xreq->frame_and_sects[i] = (req->frame_and_sects[i] & ~PAGE_MASK) |
+	    (machine_to_phys_mapping[req->frame_and_sects[i]>>PAGE_SHIFT]<<PAGE_SHIFT);	
+    }
+    return xreq;
+}
+
+inline void translate_req_to_mfn( blkif_request_t * xreq, blkif_request_t * req)
+{
+    int i;
+
+    *xreq=*req; 
+    for ( i=0; i<req->nr_segments; i++ )
+    {	
+	xreq->frame_and_sects[i] = (req->frame_and_sects[i] & ~PAGE_MASK) |
+	    (phys_to_machine_mapping[req->frame_and_sects[i]>>PAGE_SHIFT]<<PAGE_SHIFT);
+    }
+    return xreq;
+}
+
 static inline void flush_requests(void)
 {
 
@@ -243,8 +269,10 @@ static int blkif_queue_request(struct request *req)
 	req_prod++;
 
         /* Keep a private copy so we can reissue requests when recovering. */
-        blk_ring_rec->ring[MASK_BLKIF_IDX(blk_ring_rec->req_prod)].req =
-                *ring_req;
+        translate_req_to_pfn(
+	    &blk_ring_rec->ring[MASK_BLKIF_IDX(blk_ring_rec->req_prod)].req,
+            ring_req);
+
         blk_ring_rec->req_prod++;
 
         return 0;
@@ -407,9 +435,10 @@ void blkif_control_send(blkif_request_t *req, blkif_response_t *rsp)
         goto retry;
     }
 
-    memcpy(&blk_ring->ring[MASK_BLKIF_IDX(req_prod)].req, req, sizeof(*req));
-    memcpy(&blk_ring_rec->ring[MASK_BLKIF_IDX(blk_ring_rec->req_prod++)].req,
-           req, sizeof(*req));
+    blk_ring->ring[MASK_BLKIF_IDX(req_prod)].req = *req;    
+    translate_req_to_pfn(&blk_ring_rec->ring[
+	MASK_BLKIF_IDX(blk_ring_rec->req_prod++)].req,req);
+
     req_prod++;
     flush_requests();
 
@@ -497,9 +526,9 @@ static void blkif_status_change(blkif_fe_interface_status_changed_t *status)
 
         if ( recovery )
         {
-            int i;
+            int i,j;
 
-	    /* Shouldn't need the blkif_io_lock here - the device is
+	    /* Shouldn't need the io_request_lock here - the device is
 	     * plugged and the recovery flag prevents the interrupt handler
 	     * changing anything. */
 
@@ -507,18 +536,24 @@ static void blkif_status_change(blkif_fe_interface_status_changed_t *status)
             for ( i = 0;
 		  resp_cons_rec < blk_ring_rec->req_prod;
                   resp_cons_rec++, i++ )
-            {
-                blk_ring->ring[i].req
-                    = blk_ring_rec->ring[MASK_BLKIF_IDX(resp_cons_rec)].req;
+            {                
+                translate_req_to_mfn(&blk_ring->ring[i].req,
+				     &blk_ring_rec->ring[
+					 MASK_BLKIF_IDX(resp_cons_rec)].req);
             }
 
-            /* Reset the private block ring to match the new ring. */
-            memcpy(blk_ring_rec, blk_ring, sizeof(*blk_ring));
+            /* Reset the private block ring to match the new ring. */	    
+	    for( j=0; j<i; j++ )
+	    {		
+		translate_req_to_pfn(
+		    &blk_ring_rec->ring[j].req,
+		    &blk_ring->ring[j].req);
+	    }
+
             resp_cons_rec = 0;
 
             /* blk_ring->req_prod will be set when we flush_requests().*/
             blk_ring_rec->req_prod = req_prod = i;
-
             wmb();
 
             /* Switch off recovery mode, using a memory barrier to ensure that
@@ -677,4 +712,14 @@ void blkdev_suspend(void)
 
 void blkdev_resume(void)
 {
+    ctrl_msg_t                       cmsg;
+    blkif_fe_driver_status_changed_t st;    
+
+    /* Send a driver-UP notification to the domain controller. */
+    cmsg.type      = CMSG_BLKIF_FE;
+    cmsg.subtype   = CMSG_BLKIF_FE_DRIVER_STATUS_CHANGED;
+    cmsg.length    = sizeof(blkif_fe_driver_status_changed_t);
+    st.status      = BLKIF_DRIVER_STATUS_UP;
+    memcpy(cmsg.msg, &st, sizeof(st));
+    ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
 }
