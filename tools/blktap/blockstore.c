@@ -14,6 +14,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include "blockstore.h"
+#include "parallax-threaded.h"
+
 #define BLOCKSTORE_REMOTE
 
 #ifdef BLOCKSTORE_REMOTE
@@ -156,10 +158,13 @@ void *readblock_indiv(int server, u64 id) {
         fprintf(stderr, "readblock recv short (%u)\n", len);
         goto err;
     }
+    /* akw: memory leak here? */
+    /*
     if ((block = malloc(BLOCK_SIZE)) == NULL) {
         perror("readblock malloc");
         goto err;
     }
+    */
     //memcpy(block, qe->message.block, BLOCK_SIZE);
     block = qe->block;
 
@@ -416,7 +421,6 @@ u64 allocblock_hint(void *block, u64 hint) {
 
 #else /* /BLOCKSTORE_REMOTE */
 
-#include "parallax-threaded.h"
  
 /**
  * readblock: read a block from disk
@@ -688,8 +692,7 @@ int __init_blockstore(void)
     
 #ifdef BLOCKSTORE_REMOTE
     struct hostent *addr;
-    int i;
-
+/* james's list
     bsservers[0].hostname = "firebug.cl.cam.ac.uk";
     bsservers[1].hostname = "tetris.cl.cam.ac.uk";
     bsservers[2].hostname = "donkeykong.cl.cam.ac.uk";
@@ -698,6 +701,15 @@ int __init_blockstore(void)
     bsservers[5].hostname = "firetrack.cl.cam.ac.uk";
     bsservers[6].hostname = "funfair.cl.cam.ac.uk";
     bsservers[7].hostname = "felix.cl.cam.ac.uk";
+*/
+    bsservers[0].hostname = "arcadians.cl.cam.ac.uk";
+    bsservers[1].hostname = "uridium.cl.cam.ac.uk";
+    bsservers[2].hostname = "shep.cl.cam.ac.uk";
+    bsservers[3].hostname = "centipede.cl.cam.ac.uk";
+    bsservers[4].hostname = "ghouls.cl.cam.ac.uk";
+    bsservers[5].hostname = "phoenix.cl.cam.ac.uk";
+    bsservers[6].hostname = "swarm.cl.cam.ac.uk";
+    bsservers[7].hostname = "freefall.cl.cam.ac.uk";
     bsservers[8].hostname = NULL;
     bsservers[9].hostname = NULL;
     bsservers[10].hostname = NULL;
