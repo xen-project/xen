@@ -23,3 +23,6 @@ endif
 
 %.o: %.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
+
+%.o: %.cc
+	$(CC) $(CPPFLAGS) $(CXXFLAGS) -c -o $@ $<

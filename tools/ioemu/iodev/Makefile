@@ -10,7 +10,7 @@ LDLIBS= $(BXLIBS) $(X11_LDPATH) -lX11 -lXpm -lstdc++ -L../../../tools/libxc -L..
 all: device-model
 
 device-model: $(OBJS) $(BXLIBS)
-	$(LINK.o) $(OBJS) $(LOADLIBES) $(LDLIBS) -o $@
+	$(CC) $(LDFLAGS) $(OBJS) $(LOADLIBES) $(LDLIBS) -o $@
 
 include $(TOPDIR)/mk/helix.mk
 
