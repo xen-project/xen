@@ -14,7 +14,14 @@
 #include <errno.h>
 #include <string.h>
 
-#include <asm/types.h>
+typedef unsigned char      u8;
+typedef unsigned short     u16;
+typedef unsigned long      u32;
+typedef unsigned long long u64;
+typedef signed char        s8;
+typedef signed short       s16;
+typedef signed long        s32;
+typedef signed long long   s64;
 
 #include "mem_defs.h"
 #include <asm-xeno/proc_cmd.h>
@@ -29,7 +36,7 @@
 
 static inline int do_privcmd(unsigned int cmd, unsigned long data)
 {
-    int fd;
+    int fd, ret;
 
     if ( (fd = open("/proc/xeno/privcmd", O_RDWR)) < 0 )
     {
@@ -37,7 +44,7 @@ static inline int do_privcmd(unsigned int cmd, unsigned long data)
         return -1;
     }
 
-    if ( ioctl(fd, cmd, data) < 0 )
+    if ( (ret = ioctl(fd, cmd, data)) < 0 )
     {
 #ifndef SILENT_ERRORS_FROM_XEN
         PERROR("Error when executing privileged control ioctl");
@@ -47,7 +54,7 @@ static inline int do_privcmd(unsigned int cmd, unsigned long data)
     }
 
     close(fd);
-    return 0;
+    return ret;
 }
 
 static inline int xldev_to_physdev(int xldev)

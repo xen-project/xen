@@ -470,7 +470,15 @@ asmlinkage void do_nmi(struct pt_regs * regs, long error_code)
 {
     unsigned char reason = inb(0x61);
 
+    ++nmi_count(smp_processor_id());
+
     if (!(reason & 0xc0)) {
+#if CONFIG_X86_LOCAL_APIC
+        if (nmi_watchdog) {
+            nmi_watchdog_tick(regs);
+            return;
+        }
+#endif
         unknown_nmi_error(reason, regs);
         return;
     }

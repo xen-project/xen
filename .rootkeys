@@ -159,6 +159,7 @@
 3ddb79bdqfIcjkz_h9Hvtp8Tk_19Zw xen/arch/i386/irq.c
 3ddb79bcHwuCQDjBICDTSis52hWguw xen/arch/i386/mm.c
 3ddb79bdS4UeWWXDH-FaBKqcpMFcnw xen/arch/i386/mpparse.c
+3f12cff65EV3qOG2j37Qm0ShgvXGRw xen/arch/i386/nmi.c
 3ddb79bcnL-_Dtsbtjgxl7vJU3vBiQ xen/arch/i386/pci-dma.c
 3ddb79bdeJ7_86z03yTAPIeeywOg3Q xen/arch/i386/pci-i386.c
 3ddb79bdIKgipvGoqExEQ7jawfVowA xen/arch/i386/pci-i386.h

@@ -148,7 +148,8 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
             c->x86_capability[2] = cpuid_edx(0x80860001);
     }
 
-    printk("CPU: Before vendor init, caps: %08x %08x %08x, vendor = %d\n",
+    printk("CPU%d: Before vendor init, caps: %08x %08x %08x, vendor = %d\n",
+           smp_processor_id(),
            c->x86_capability[0],
            c->x86_capability[1],
            c->x86_capability[2],
@@ -345,12 +346,14 @@ void __init start_of_day(void)
 #endif
     initialize_keytable(); /* call back handling for key codes      */
 
-	disable_pit();		/* not needed anymore */
-	ac_timer_init();    /* init accurate timers */
-	init_xeno_time();	/* initialise the time */
-	schedulers_start(); /* start scheduler for each CPU */
+    disable_pit();		/* not needed anymore */
+    ac_timer_init();    /* init accurate timers */
+    init_xeno_time();	/* initialise the time */
+    schedulers_start(); /* start scheduler for each CPU */
 
     sti();
+
+    check_nmi_watchdog();
 
     zap_low_mappings();
     kmem_cache_init();
@@ -368,7 +371,6 @@ void __init start_of_day(void)
         panic("Must have a network device!\n");
     net_init();            /* initializes virtual network system. */
     initialize_block_io(); /* setup block devices */
-
 
 #ifdef CONFIG_SMP
     wait_init_idle = cpu_online_map;

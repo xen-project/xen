@@ -10,6 +10,7 @@ typedef struct {
 	unsigned int __local_irq_count;
 	unsigned int __local_bh_count;
 	unsigned int __syscall_count;
+	unsigned int __nmi_count;
 	unsigned long idle_timestamp;
 } ____cacheline_aligned irq_cpustat_t;
 
