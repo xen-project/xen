@@ -40,6 +40,12 @@
 #define rtnl_unlock() ((void)0)
 #define dst_init() ((void)0)
 
+#if 1
+#define DPRINTK(_f, _a...) printk(_f , ## _a)
+#else 
+#define DPRINTK(_f, _a...) ((void)0)
+#endif
+
 // Ring defines:
 #define TX_RING_INC(_i)    (((_i)+1) & (TX_RING_SIZE-1))
 #define RX_RING_INC(_i)    (((_i)+1) & (RX_RING_SIZE-1))
@@ -1005,7 +1011,7 @@ void update_shared_ring(void)
                 __flush_tlb();
 
             if ( net_ring->rx_cons == net_ring->rx_event )
-                set_bit(_EVENT_NET_RX_FOR_VIF(nvif), &s->events);
+                set_bit(_EVENT_NET_RX, &s->events);
             
         }
     }
@@ -1153,7 +1159,7 @@ void flush_rx_queue(void)
                 }
                 net_ring->rx_cons = (i+1) & (RX_RING_SIZE-1);
                 if ( net_ring->rx_cons == net_ring->rx_event )
-                    set_bit(_EVENT_NET_RX_FOR_VIF(nvif), &s->events);
+                    set_bit(_EVENT_NET_RX, &s->events);
             }
             kfree_skb(skb);
         }
@@ -2222,14 +2228,14 @@ long do_net_update(void)
             
             if ( ((tx.addr & ~PAGE_MASK) + tx.size) >= PAGE_SIZE ) 
             {
-                printk("tx.addr: %lx, size: %lu, end: %lu\n", tx.addr, tx.size,
+                DPRINTK("tx.addr: %lx, size: %lu, end: %lu\n", tx.addr, tx.size,
                     (tx.addr &~PAGE_MASK) + tx.size);
                 continue;
                 //BUG();
             }
             
             if ( TX_RING_INC(i) == net_ring->tx_event )
-                set_bit(_EVENT_NET_TX_FOR_VIF(j), &shared->events);
+                set_bit(_EVENT_NET_TX, &shared->events);
 
             /* Map the skb in from the guest, and get it's delivery target.
              * We need this to know whether the packet is to be sent locally
