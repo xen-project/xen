@@ -54,3 +54,4 @@ xen/tools/figlet/figlet
 xen/xen
 xen/xen-syms
 xen/xen.*
+xen/common/sched_atropos.c.smh
