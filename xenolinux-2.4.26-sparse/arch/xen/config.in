@@ -235,6 +235,16 @@ if [ "$CONFIG_XEN_PHYSDEV_ACCESS" = "y" ]; then
 else
    define_bool CONFIG_NETDEVICES y
 
+   mainmenu_option next_comment
+   comment 'SCSI support'
+
+   tristate 'SCSI support' CONFIG_SCSI
+
+   if [ "$CONFIG_SCSI" != "n" ]; then
+      source drivers/scsi/Config.in
+   fi
+   endmenu
+
    #
    # Block device driver configuration
    #
