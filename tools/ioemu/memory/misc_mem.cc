@@ -189,9 +189,6 @@ BX_MEM_C::init_memory(int memsize)
     shared_page = xc_map_foreign_range(xc_handle, domid, PAGE_SIZE, 
                                        PROT_READ|PROT_WRITE, 
                                        page_array[nr_pages - 1]);
-
-    /* Initialize shared page */
-    memset(shared_page, 0, PAGE_SIZE);
 }
 #endif // #if BX_PROVIDE_CPU_MEMORY
 

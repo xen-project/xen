@@ -142,6 +142,10 @@ int vmx_setup_platform(struct exec_domain *d, execution_context_t *context)
     mpfn = phys_to_machine_mapping(gpfn);
     p = map_domain_mem(mpfn << PAGE_SHIFT);
     ASSERT(p != NULL);
+
+    /* Initialise shared page */
+    memset(p, 0, PAGE_SIZE);
+
     d->arch.arch_vmx.vmx_platform.shared_page_va = (unsigned long) p;
 
     return 0;

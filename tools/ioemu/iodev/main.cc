@@ -1781,6 +1781,7 @@ int bxmain () {
 // wxWindows under win32.
 int main (int argc, char *argv[])
 {
+  daemon(0, 0);
   bx_startup_flags.argc = argc;
   bx_startup_flags.argv = argv;
 #if BX_WITH_SDL && defined(WIN32)
