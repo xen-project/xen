@@ -19,8 +19,8 @@ debug:
 
 install: $(TARGET)
 	gzip -f -9 < $(TARGET) > $(TARGET).gz
-	mkdir -p /boot
-	cp -a $(TARGET).gz /boot
+	mkdir -p $(prefix)/boot
+	cp -a $(TARGET).gz $(prefix)/boot
 
 dist: $(TARGET)
 	gzip -f -9 < $(TARGET) > $(TARGET).gz

@@ -16,6 +16,8 @@
 #           Added '-march' and '-mpreferred-stack-boundary' support
 #
 
+override EXTRAVERSION := -xeno$(EXTRAVERSION)
+
 LD=$(CROSS_COMPILE)ld -m elf_i386
 OBJCOPY=$(CROSS_COMPILE)objcopy -O binary -R .note -R .comment -S
 LDFLAGS=-e stext

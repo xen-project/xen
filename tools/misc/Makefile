@@ -15,11 +15,11 @@ all: $(TARGETS)
 	$(MAKE) -C miniterm	
 
 install: all
-	mkdir -p /usr/bin
-	cp -a $(INSTALL) /usr/bin
-	chmod 755 /usr/bin/xen-mkdevnodes
-	chmod 755 /usr/bin/xen_nat_enable
-	chmod 755 /usr/bin/xen-clone
+	mkdir -p $(prefix)/usr/bin
+	cp -a $(INSTALL) $(prefix)/usr/bin
+	chmod 755 $(prefix)/usr/bin/xen-mkdevnodes
+	chmod 755 $(prefix)/usr/bin/xen_nat_enable
+	chmod 755 $(prefix)/usr/bin/xen-clone
 	$(MAKE) -C miniterm install
 
 dist: all

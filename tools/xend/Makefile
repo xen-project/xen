@@ -11,9 +11,9 @@ BIN      = xend
 all: $(BIN)
 
 install: all
-	mkdir -p /usr/sbin
-	cp $(BIN) /usr/sbin
-	chmod 755 /usr/sbin/$(BIN)
+	mkdir -p $(prefix)/usr/sbin
+	cp $(BIN) $(prefix)/usr/sbin
+	chmod 755 $(prefix)/usr/sbin/$(BIN)
 
 dist: all
 	mkdir -p ../../../install/sbin

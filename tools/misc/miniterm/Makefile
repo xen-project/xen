@@ -4,7 +4,7 @@ CFLAGS  = -O3 -march=i686 -Wall
 all: miniterm
 
 install: all
-	cp -a miniterm /usr/bin/	
+	cp -a miniterm $(prefix)/usr/bin/	
 
 dist: all
 	cp -a miniterm ../../../../install/bin/	

@@ -1,15 +1,15 @@
 VERSION = 2
 PATCHLEVEL = 4
 SUBLEVEL = 25
-EXTRAVERSION = -xeno
+EXTRAVERSION =
 
 KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)
 
-ARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ -e s/arm.*/arm/ -e s/sa110/arm/)
-
-# Xeno hack XXX
-ARCH    := xeno
-SUBARCH := i386
+# SUBARCH always tells us the underlying machine architecture.
+# Unless overridden, by default ARCH is equivalent to SUBARCH.
+# This will be overriden for Xen and UML builds.
+SUBARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ -e s/arm.*/arm/ -e s/sa110/arm/)
+ARCH := $(SUBARCH)
 
 KERNELPATH=kernel-$(shell echo $(KERNELRELEASE) | sed -e "s/-//g")
 
@@ -87,7 +87,7 @@ endif
 # makefile but the arguement can be passed to make if needed.
 #
 
-MODLIB	:= $(INSTALL_MOD_PATH)/lib/modules/$(KERNELRELEASE)
+MODLIB = $(INSTALL_MOD_PATH)/lib/modules/$(KERNELRELEASE)
 export MODLIB
 
 #
@@ -425,7 +425,7 @@ depmod_opts	:= -b $(INSTALL_MOD_PATH) -r
 endif
 .PHONY: _modinst_post
 _modinst_post: _modinst_post_pcmcia
-#	if [ -r System.map ]; then $(DEPMOD) -ae -F System.map $(depmod_opts) $(KERNELRELEASE); fi
+	if [ -r System.map ]; then $(DEPMOD) -ae -F System.map $(depmod_opts) $(KERNELRELEASE); fi
 
 # Backwards compatibilty symlinks for people still using old versions
 # of pcmcia-cs with hard coded pathnames on insmod.  Remove

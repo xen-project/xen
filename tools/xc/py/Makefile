@@ -1,9 +1,10 @@
 
-all: ../lib/libxc.so ../lib/xc.h
+all: ../lib/libxc.so.1.3.0 ../lib/xc.h
 	python setup.py build
 
 install: all
-	python setup.py install
+	if [ "$(prefix)" = "" ]; then python setup.py install; \
+	else python setup.py install --root "$(prefix)"; fi
 
 dist: all
 	mkdir -p ../../../../install/lib/python

@@ -4,7 +4,7 @@
 # Xfig and tgif diagrams should be in the fig/ subdirectory.
 # DOCUMENTS should be a list of the target Postscript files.
 
-DOCUMENTS = interface.ps
+DOCUMENTS = interface.ps interface.pdf
 
 GFX  = $(patsubst %.obj, %.eps, $(wildcard figs/*.obj))
 GFX += $(patsubst %.fig, %.eps, $(wildcard figs/*.fig))
@@ -17,10 +17,17 @@ pristine: clean
 clean:
 	rm -f .word_count *.aux *.dvi *.bbl *.blg *.glo *.idx *~ 
 	rm -f *.ilg *.log *.ind *.toc *.bak core
-	rm -f figs/*.eps
+	rm -f figs/*.eps $(DOCUMENTS)
+
+install: $(DOCUMENTS)
+	mkdir -p $(prefix)/usr/share/doc/xen
+	cp -a $(DOCUMENTS) VBD-HOWTO.txt Xeno-1.2-HOWTO.txt $(prefix)/usr/share/doc/xen
+
+%.pdf: %.ps
+	ps2pdf $< $@
 
 %.ps: %.dvi $(GFX)
-	dvips -o $@ $<
+	dvips -Ppdf -G0 -o $@ $<
 
 %.dvi: %.tex
 	latex $*
