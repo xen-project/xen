@@ -800,6 +800,8 @@ static void net_tx_action(unsigned long unused)
             kfree_skb(skb);
             break;
         }
+
+        perfc_incr(net_tx_transmitted);
     }
     spin_unlock(&dev->xmit_lock);
 }
