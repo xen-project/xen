@@ -9,13 +9,12 @@ class HTMLBase( Resource ):
 
     def render_POST( self, request ):
         self.perform( request )
-        self.render_GET( request ) 
+        return self.render_GET( request )
         
     def render_GET( self, request ):
         self.write_TOP( request )
         self.write_BODY( request )
         self.write_BOTTOM( request )
-        request.finish()
         return ''
                 
     def write_BODY( self, request ):

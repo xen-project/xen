@@ -2,7 +2,7 @@ from xen.sv.Wizard import *
 from xen.sv.util import *
 from xen.sv.GenTabbed import PreTab
 
-from xen.xm.create import make_config
+from xen.xm.create import make_config, OptVals
 
 from xen.xend.XendClient import server
 
@@ -22,94 +22,108 @@ class CreatePage0( Sheet ):
 
     def __init__( self, urlWriter ):
         Sheet.__init__( self, urlWriter, "General", 0 )
-        self.addControl( InputControl( 'name', 'VM Name', 'VM Name:' ) )
-        self.addControl( InputControl( 'memory', '64', 'Memory (Mb):' ) )
-        self.addControl( InputControl( 'cpu', '0', 'CPU:' ) )
+        self.addControl( InputControl( 'name', 'VM Name', 'VM Name:', "[\\w|\\S]+", "You must enter a name in this field" ) )
+        self.addControl( InputControl( 'memory', '64', 'Memory (Mb):', "[\\d]+", "You must enter a number in this field" ) )
+        self.addControl( InputControl( 'cpu', '0', 'CPU:', "[\\d]+", "You must enter a number in this feild" ) )
                         
 class CreatePage1( Sheet ):
 
     def __init__( self, urlWriter ):
         Sheet.__init__( self, urlWriter, "Setup Kernel Image", 1 )
-        self.addControl( InputControl( 'builder', 'linux', 'Kernel Type:' ) )
-        self.addControl( InputControl( 'kernel', '/boot/vmlinuz-2.4.26-xenU', 'Kernel Image:' ) )
-        self.addControl( InputControl( 'extra', '', 'Kernel Command Line Parame:' ) )
+        self.addControl( ListControl( 'builder', [('linux', 'Linux'), ('netbsd', 'NetBSD')], 'Kernel Type:' ) )
+        self.addControl( FileControl( 'kernel', '/boot/vmlinuz-2.4.26-xenU', 'Kernel Image:' ) )
+        self.addControl( InputControl( 'extra', '', 'Kernel Command Line Parameters:' ) )
 
 class CreatePage2( Sheet ):
 
     def __init__( self, urlWriter ):
     	Sheet.__init__( self, urlWriter, "Setup Virtual Block Device", 2 )
-        self.addControl( InputControl( 'num_vbds', '1', 'Number of VBDs:' ) )
+        self.addControl( InputControl( 'num_vbds', '1', 'Number of VBDs:', '[\\d]+', "You must enter a number in this field" ) )
 
 class CreatePage3( Sheet ):
 
     def __init__( self, urlWriter ):
         Sheet.__init__( self, urlWriter, "Setup Virtual Block Device", 3 )
         
-    def write_BODY( self, request ):
+    def write_BODY( self, request, err ):
+        if not self.passback: self.parseForm( request )
+    
     	previous_values = sxp2hash( string2sxp( self.passback ) ) #get the hash for quick reference
+        
         num_vbds = previous_values.get( 'num_vbds' )
         
         for i in range( int( num_vbds ) ):
-            self.addControl( InputControl( 'vbd%s_dom0' % i, '/dev/sda%i' % i, 'Device %s name:' % i  ) )
-            self.addControl( InputControl( 'vbd%s_domU' % i, '/dev/sda%i' % i, 'Virtualized device %s:' % i ) )
-            self.addControl( InputControl( 'vbd%s_mode' % i, 'w', 'Device %s mode:' % i ) )
+            self.addControl( InputControl( 'vbd%s_dom0' % i, 'phy:sda%s' % str(i + 1), 'Device %s name:' % i  ) )
+            self.addControl( InputControl( 'vbd%s_domU' % i, 'sda%s' % str(i + 1), 'Virtualized device %s:' % i ) )
+            self.addControl( ListControl( 'vbd%s_mode' % i, [('w', 'Read + Write'), ('r', 'Read Only')], 'Device %s mode:' % i ) )
             
         self.addControl( InputControl( 'root', '/dev/sda1', 'Root device (in VM):' ) )
         
-        Sheet.write_BODY( self, request )
+        Sheet.write_BODY( self, request, err )
                 
 class CreatePage4( Sheet ):
 
     def __init__( self, urlWriter ):        
-        Sheet.__init__( self, urlWriter, "Network settings", 4 )  
+        Sheet.__init__( self, urlWriter, "Network settings", 4 )
+        self.addControl( ListControl( 'dhcp', [('off', 'No'), ('dhcp', 'Yes')], 'Use DHCP:' ) )
         self.addControl( InputControl( 'hostname', 'hostname', 'VM Hostname:' ) )
         self.addControl( InputControl( 'ip_addr', '1.2.3.4', 'VM IP Address:' ) )
         self.addControl( InputControl( 'ip_subnet', '255.255.255.0', 'VM Subnet Mask:' ) ) 
         self.addControl( InputControl( 'ip_gateway', '1.2.3.4', 'VM Gateway:' ) )           
-         
+        self.addControl( InputControl( 'ip_nfs', '1.2.3.4', 'NFS Server:' ) )  
+                 
 class CreateFinish( Sheet ):
 
     def __init__( self, urlWriter ):
         Sheet.__init__( self, urlWriter, "All Done", 5 )
         
-    def write_BODY( self, request ):
-    	fin_sxp = string2sxp( self.passback )
+    def write_BODY( self, request, err ):
     
-        xend_sxp = self.translate_sxp( fin_sxp )
+        if not self.passback: self.parseForm( request )
         
-        pt = PreTab( sxp2prettystring( xend_sxp ) )
+        xend_sxp = self.translate_sxp( string2sxp( self.passback ) )
+        
+        dom_sxp = server.xend_domain_create( xend_sxp )
+        
+        pt = PreTab( sxp2prettystring( dom_sxp ) )
         pt.write_BODY( request )
-        
-        server.xend_domain_create( xend_sxp )
-       
+
         request.write( "<input type='hidden' name='passback' value=\"%s\"></p>" % self.passback )
         request.write( "<input type='hidden' name='sheet' value='%s'></p>" % self.location )
     
     def translate_sxp( self, fin_sxp ):
    	fin_hash = ssxp2hash( fin_sxp )
     
+        def get( key ):
+            ret = fin_hash.get( key )
+            if ret:
+                return ret
+            else:
+                return ""
+        
     	vals = OptVals()
         
-        setattr(vals, "name", 	fin_hash.get( 'name' ) )
-        setattr(vals, "memory", fin_hash.get( 'memory' ) )
-        setattr(vals, "cpu", 	fin_hash.get( 'cpu' ) )
+        vals.name = 	get( 'name' )
+        vals.memory = 	get( 'memory' )
+        vals.cpu =  	get( 'cpu' )
         
-        setattr(vals, "builder", 	fin_hash.get( 'builder' ) )        
-        setattr(vals, "kernel", 	fin_hash.get( 'kernel' ) )
-	setattr(vals, "root", 		fin_hash.get( 'root' ) )
-        setattr(vals, "extra", 		fin_hash.get( 'extra' ) ) 
+        vals.builder =  get( 'builder' )       
+        vals.kernel =   get( 'kernel' )
+	vals.root = 	get( 'root' )
+        vals.extra = 	get( 'extra' )
+        
+        #setup vbds
         
         vbds = []
         
-        for i in range( int( fin_hash.get( 'num_vbds' ) ) ):
-            vbds.append( ( fin_hash.get('vbd%s_domU' % i ), fin_hash.get( 'vbd%s_dom0' % i ), fin_hash.get( 'vbd%s_mode' % i ) ) )
+        for i in range( int( get( 'num_vbds' ) ) ):
+            vbds.append( ( get( 'vbd%s_dom0' % i ), get('vbd%s_domU' % i ), get( 'vbd%s_mode' % i ) ) )
         
         vals.disk = vbds    
             
-        vals.pci = []
+        #misc crap
         
-        vals.vif = []
-        vals.nics = 1
+        vals.pci = []
         
         vals.blkif = None
         vals.netif = None
@@ -117,14 +131,18 @@ class CreateFinish( Sheet ):
         vals.console = None
         vals.ramdisk = None
         
-        #todo: setup ip addr stuff
+        #setup vifs
         
-        vals.cmdline_ip = None
+        vals.vif = []
+        vals.nics = 1
+                
+        ip =   get( 'ip_addr' )
+        nfs =  get( 'ip_nfs' )
+        gate = get( 'ip_gateway' )
+        mask = get( 'ip_subnet' )
+        host = get( 'hostname' )
+        dhcp = get( 'dhcp' )
+        
+        vals.cmdline_ip = "%s:%s:%s:%s:%s:eth0:%s" % (ip, nfs, gate, mask, host, dhcp)
         
         return make_config( vals )
-
-        
-class OptVals:
-    """Class to hold option values.
-    """
-    pass
