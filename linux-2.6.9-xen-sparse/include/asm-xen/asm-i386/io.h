@@ -146,8 +146,8 @@ extern void bt_iounmap(void *addr, unsigned long size);
  *
  * Allow them on x86 for legacy drivers, though.
  */
-#define virt_to_bus(_x) phys_to_machine(virt_to_phys(_x))
-#define bus_to_virt(_x) phys_to_virt(machine_to_phys(_x))
+#define virt_to_bus(_x) phys_to_machine(__pa(_x))
+#define bus_to_virt(_x) __va(machine_to_phys(_x))
 
 /*
  * readX/writeX() are used to access memory mapped devices. On some
