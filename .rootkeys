@@ -64,8 +64,6 @@
 3ec41f7dKX9YpwrfH7BZ7BogyWqqLA tools/control/src/org/xenoserver/control/VirtualDiskManager.java
 3ec41f7dUPpYTwYL5QVpRBv6PLKPrg tools/control/src/org/xenoserver/control/XML.java
 3ec41f7d7Try-2zmfnpaALwJjY0GCA tools/control/src/org/xenoserver/control/XMLHelper.java
-3ec41f7civcv4mQiYK0DeX9Zvsxhrw tools/control/src/uk/ac/cam/cl/xeno/xenctl/Main.java.orig
-3ec41f7d3-xTeoVJBJqWqxVfU-ANoQ tools/control/src/uk/ac/cam/cl/xeno/xenctl/Parser.java
 3ec41f7dOVZgjP4sQS6vjuBnExdlMQ tools/control/src/uk/ac/cam/cl/xeno/xenctl/RootBean.java
 3ec41f7dvPdszb0frNEkMnEdJUBVjA tools/control/src/uk/ac/cam/cl/xeno/xenctl/SystemConfigurationBean.java
 3ec41f7dO6IuKGGLG4VRUhMDmkTn5g tools/control/web/WEB-INF/web.xml
