@@ -73,12 +73,6 @@ static char * blkif_status_name[] = {
     [BLKIF_INTERFACE_STATUS_CHANGED]      = "changed",
 };
 
-#if 1
-#define dprintf(fmt, args...) \
-printk(KERN_ALERT "[XEN:%s:%s:%d] " fmt, \
-__FUNCTION__, __FILE__, __LINE__, ##args)
-#endif
-
 #define WPRINTK(fmt, args...) printk(KERN_WARNING "xen_blk: " fmt, ##args)
 
 static int blkif_handle = 0;
@@ -189,10 +183,8 @@ static inline void flush_requests(void)
 __initcall(xlblk_init);
 
 #if ENABLE_VBD_UPDATE
-static void vbd_update()
+static void vbd_update(void)
 {
-    dprintf(">\n");
-    dprintf("<\n");
 }
 #endif /* ENABLE_VBD_UPDATE */
 
@@ -412,7 +404,7 @@ void do_blkif_request(request_queue_t *rq)
             blk_stop_queue(rq);
             break;
         }
-        DPRINTK("do_blkif_request %p: cmd %p, sec %lx, (%u/%li) buffer:%p [%s]\n",
+        DPRINTK("do_blk_req %p: cmd %p, sec %lx, (%u/%li) buffer:%p [%s]\n",
                 req, req->cmd, req->sector, req->current_nr_sectors,
                 req->nr_sectors, req->buffer,
                 rq_data_dir(req) ? "write" : "read");
@@ -528,10 +520,8 @@ static void update_vbds_task(void *unused)
 static void vbd_update(void)
 {
     static struct tq_struct update_tq;
-    dprintf(">\n");
     update_tq.routine = update_vbds_task;
     schedule_task(&update_tq);
-    dprintf("<\n");
 }
 
 #endif /* ENABLE_VBD_UPDATE */
@@ -775,8 +765,6 @@ int blkif_revalidate(kdev_t dev)
 }
 
 
-
-
 /*
  * blkif_queue_request
  *
@@ -895,8 +883,6 @@ static int blkif_queue_request(unsigned long   id,
 
     /* Keep a private copy so we can reissue requests when recovering. */    
     translate_req_to_pfn(&rec_ring[xid], req );
-
-
 
     return 0;
 }
@@ -1125,8 +1111,6 @@ static void blkif_send_interface_connect(void)
 
 static void blkif_free(void)
 {
-    printk(KERN_INFO "xen_blk: Recovering virtual block device driver\n");
-
     /* Prevent new requests being issued until we fix things up. */
     spin_lock_irq(&blkif_io_lock);
     recovery = 1;
@@ -1153,7 +1137,8 @@ static void blkif_close(void)
 /* Move from CLOSED to DISCONNECTED state. */
 static void blkif_disconnect(void)
 {
-    if(blk_ring) free_page((unsigned long)blk_ring);
+    if ( blk_ring != NULL )
+        free_page((unsigned long)blk_ring);
     blk_ring = (blkif_ring_t *)__get_free_page(GFP_KERNEL);
     blk_ring->req_prod = blk_ring->resp_prod = resp_cons = req_prod = 0;
     blkif_state  = BLKIF_STATE_DISCONNECTED;
@@ -1162,7 +1147,6 @@ static void blkif_disconnect(void)
 
 static void blkif_reset(void)
 {
-    printk(KERN_INFO "xen_blk: Recovering virtual block device driver\n");
     blkif_free();
     blkif_disconnect();
 }
@@ -1185,8 +1169,6 @@ static void blkif_recover(void)
         }
     }
 
-    printk(KERN_ALERT"blkfront: recovered %d descriptors\n",req_prod);
-	    
     /* Stage 2 : Set up shadow list. */
     for ( i = 0; i < req_prod; i++ ) 
     {
@@ -1253,9 +1235,9 @@ static void blkif_connect(blkif_fe_interface_status_t *status)
 
 static void unexpected(blkif_fe_interface_status_t *status)
 {
-    WPRINTK(" Unexpected blkif status %s in state %s\n", 
-           blkif_status_name[status->status],
-           blkif_state_name[blkif_state]);
+    DPRINTK(" Unexpected blkif status %s in state %s\n", 
+            blkif_status_name[status->status],
+            blkif_state_name[blkif_state]);
 }
 
 static void blkif_status(blkif_fe_interface_status_t *status)
@@ -1291,7 +1273,7 @@ static void blkif_status(blkif_fe_interface_status_t *status)
             break;
         case BLKIF_STATE_DISCONNECTED:
         case BLKIF_STATE_CONNECTED:
-            unexpected(status);
+            /* unexpected(status); */ /* occurs during suspend/resume */
             blkif_reset();
             break;
         }

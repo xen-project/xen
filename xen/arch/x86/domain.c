@@ -524,8 +524,6 @@ static void relinquish_list(struct domain *d, struct list_head *list)
 
 void domain_relinquish_memory(struct domain *d)
 {
-    audit_domain(d);
-
     /* Ensure that noone is running over the dead domain's page tables. */
     synchronise_pagetables(~0UL);
 
