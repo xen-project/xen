@@ -113,11 +113,11 @@ int construct_dom0(struct domain *d,
     printk("*** LOADING DOMAIN 0 ***\n");
 
     /* By default DOM0 is allocated all available memory. */
+    d->max_pages = ~0U;
     if ( (nr_pages = opt_dom0_mem >> (PAGE_SHIFT - 10)) == 0 )
         nr_pages = avail_domheap_pages() +
             ((initrd_len + PAGE_SIZE - 1) >> PAGE_SHIFT) +
             ((image_len  + PAGE_SIZE - 1) >> PAGE_SHIFT);
-    d->max_pages = nr_pages;
     if ( (page = alloc_largest(d, nr_pages)) == NULL )
         panic("Not enough RAM for DOM0 reservation.\n");
     alloc_start = page_to_phys(page);
