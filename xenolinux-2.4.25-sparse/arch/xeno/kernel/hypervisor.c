@@ -7,8 +7,9 @@
  */
 
 #include <linux/config.h>
-#include <asm/atomic.h>
 #include <linux/irq.h>
+#include <linux/kernel_stat.h>
+#include <asm/atomic.h>
 #include <asm/hypervisor.h>
 #include <asm/system.h>
 #include <asm/ptrace.h>
@@ -17,6 +18,40 @@ multicall_entry_t multicall_list[8];
 int nr_multicall_ents = 0;
 
 static unsigned long event_mask = 0;
+
+asmlinkage unsigned int do_physirq(int irq, struct pt_regs *regs)
+{
+    int cpu = smp_processor_id();
+    unsigned long irqs;
+    shared_info_t *shared = HYPERVISOR_shared_info;
+
+    /* do this manually */
+    kstat.irqs[cpu][irq]++;
+    ack_hypervisor_event(irq);
+
+    barrier();
+    irqs  = xchg(&shared->physirq_pend, 0);
+
+    __asm__ __volatile__ (
+        "   push %1                            ;"
+        "   sub  $4,%%esp                      ;"
+        "   jmp  3f                            ;"
+        "1: btrl %%eax,%0                      ;" /* clear bit     */
+        "   mov  %%eax,(%%esp)                 ;"
+        "   call do_IRQ                        ;" /* do_IRQ(event) */
+        "3: bsfl %0,%%eax                      ;" /* %eax == bit # */
+        "   jnz  1b                            ;"
+        "   add  $8,%%esp                      ;"
+        /* we use %ebx because it is callee-saved */
+        : : "b" (irqs), "r" (regs)
+        /* clobbered by callback function calls */
+        : "eax", "ecx", "edx", "memory" ); 
+
+    /* do this manually */
+    end_hypervisor_event(irq);
+
+    return 0;
+}
 
 void do_hypervisor_callback(struct pt_regs *regs)
 {
@@ -31,6 +66,12 @@ void do_hypervisor_callback(struct pt_regs *regs)
 
         events  = xchg(&shared->events, 0);
         events &= event_mask;
+
+        if ( (events & EVENT_PHYSIRQ) != 0 )
+        {
+            do_physirq(_EVENT_PHYSIRQ, regs);
+            events &= ~EVENT_PHYSIRQ;
+        }
 
         __asm__ __volatile__ (
             "   push %1                            ;"

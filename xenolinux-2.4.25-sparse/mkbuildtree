@@ -137,8 +137,7 @@ ln -sf ../asm-i386/hardirq.h
 ln -sf ../asm-i386/hdreg.h 
 ln -sf ../asm-i386/i387.h 
 ln -sf ../asm-i386/ide.h 
-ln -sf ../asm-i386/init.h 
-ln -sf ../asm-i386/io.h
+ln -sf ../asm-i386/init.h
 ln -sf ../asm-i386/io_apic.h
 ln -sf ../asm-i386/ioctl.h
 ln -sf ../asm-i386/ioctls.h

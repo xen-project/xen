@@ -73,16 +73,16 @@ typedef union rx_entry_st
 } rx_entry_t;
 
 
-#define TX_RING_SIZE 256
-#define RX_RING_SIZE 256
+#define XENNET_TX_RING_SIZE 256
+#define XENNET_RX_RING_SIZE 256
 
 #define MAX_DOMAIN_VIFS 8
 
 /* This structure must fit in a memory page. */
 typedef struct net_ring_st
 {
-    tx_entry_t tx_ring[TX_RING_SIZE];
-    rx_entry_t rx_ring[RX_RING_SIZE];
+    tx_entry_t tx_ring[XENNET_TX_RING_SIZE];
+    rx_entry_t rx_ring[XENNET_RX_RING_SIZE];
 } net_ring_t;
 
 /*
@@ -96,8 +96,8 @@ typedef unsigned int NET_RING_IDX;
  * size of the ring buffer. The following macros convert a free-running counter
  * into a value that can directly index a ring-buffer array.
  */
-#define MASK_NET_RX_IDX(_i) ((_i)&(RX_RING_SIZE-1))
-#define MASK_NET_TX_IDX(_i) ((_i)&(TX_RING_SIZE-1))
+#define MASK_NET_RX_IDX(_i) ((_i)&(XENNET_RX_RING_SIZE-1))
+#define MASK_NET_TX_IDX(_i) ((_i)&(XENNET_TX_RING_SIZE-1))
 
 typedef struct net_idx_st
 {

@@ -1869,7 +1869,7 @@ static int get_tx_bufs(net_vif_t *vif)
  again:
     for ( i = vif->tx_req_cons; 
           (i != shared_idxs->tx_req_prod) && 
-              ((i-vif->tx_resp_prod) != TX_RING_SIZE);
+              ((i-vif->tx_resp_prod) != XENNET_TX_RING_SIZE);
           i++ )
     {
         tx     = shared_rings->tx_ring[MASK_NET_TX_IDX(i)].req;
@@ -2061,7 +2061,7 @@ static void get_rx_bufs(net_vif_t *vif)
     j = vif->rx_prod;
     for ( i = vif->rx_req_cons; 
           (i != shared_idxs->rx_req_prod) && 
-              ((i-vif->rx_resp_prod) != RX_RING_SIZE);
+              ((i-vif->rx_resp_prod) != XENNET_RX_RING_SIZE);
           i++ )
     {
         rx = shared_rings->rx_ring[MASK_NET_RX_IDX(i)].req;
@@ -2193,7 +2193,7 @@ long flush_bufs_for_vif(net_vif_t *vif)
     spin_lock(&vif->rx_lock);
     for ( i = vif->rx_req_cons; 
           (i != shared_idxs->rx_req_prod) &&
-              ((i-vif->rx_resp_prod) != RX_RING_SIZE);
+              ((i-vif->rx_resp_prod) != XENNET_RX_RING_SIZE);
           i++ )
     {
         make_rx_response(vif, shared_rings->rx_ring[MASK_NET_RX_IDX(i)].req.id,
@@ -2242,7 +2242,7 @@ long flush_bufs_for_vif(net_vif_t *vif)
     spin_lock(&vif->tx_lock);
     for ( i = vif->tx_req_cons; 
           (i != shared_idxs->tx_req_prod) &&
-              ((i-vif->tx_resp_prod) != TX_RING_SIZE);
+              ((i-vif->tx_resp_prod) != XENNET_TX_RING_SIZE);
           i++ )
     {
         make_tx_response(vif, shared_rings->tx_ring[MASK_NET_TX_IDX(i)].req.id,

@@ -150,7 +150,7 @@ void __kill_domain(struct task_struct *p)
     if ( !sched_rem_domain(p) )
         return;
 
-    printk("Killing domain %llu\n", p->domain);
+    DPRINTK("Killing domain %llu\n", p->domain);
 
     unlink_blkdev_info(p);
 
@@ -482,7 +482,7 @@ void release_task(struct task_struct *p)
     ASSERT(p->state == TASK_DYING);
     ASSERT(!p->has_cpu);
 
-    printk("Releasing task %llu\n", p->domain);
+    DPRINTK("Releasing task %llu\n", p->domain);
 
     /*
      * This frees up blkdev rings and vbd-access lists. Totally safe since

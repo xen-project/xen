@@ -38,7 +38,9 @@ static unsigned int startup_physirq_event(unsigned int irq)
     printk("startup_physirq_event %d\n", irq);
 
     /*
-     * install a interrupt handler for physirq event when called thefirst tim
+     * install a interrupt handler for physirq event when called first time
+     * we actually are never executing the handler as _EVENT_PHYSIRQ is 
+     * handled specially in hypervisor.c But we need to enable the event etc.
      */
     if ( !setup_event_handler )
     {
@@ -66,23 +68,51 @@ static unsigned int startup_physirq_event(unsigned int irq)
     }
     return 0;
 }
+/*
+ * This is a dummy interrupt handler.
+ * It should never be called. events for physical interrupts are handled
+ * differently in hypervisor.c
+ */
+static void physirq_interrupt(int irq, void *unused, struct pt_regs *ptregs)
+{
+    printk("XXX This should never be called!");
+}
 
+
+/*
+ * IRQ is not needed anymore.
+ */
 static void shutdown_physirq_event(unsigned int irq)
 {
+    physdev_op_t op;
+    int err;
 
-    /* call xen to free IRQ */
+    printk("shutdown_phys_irq called.");
 
+    /*
+     * tell hypervisor
+     */
+    op.cmd = PHYSDEVOP_FREE_IRQ;
+    op.u.free_irq.irq   = irq;
+    if ( (err = HYPERVISOR_physdev_op(&op)) != 0 )
+    {
+        printk(KERN_ALERT "could not free IRQ %d\n", irq);
+        return;
+    }
+    return;
 }
 
 
 static void enable_physirq_event(unsigned int irq)
 {
-    /* XXX just enable all interrupts for now */
+    /* XXX just enable all phys interrupts for now */
+    enable_irq(HYPEREVENT_IRQ(_EVENT_PHYSIRQ));
 }
 
 static void disable_physirq_event(unsigned int irq)
 {
-    /* XXX just disable all interrupts for now */
+    /* XXX just disable all phys interrupts for now */
+    disable_irq(HYPEREVENT_IRQ(_EVENT_PHYSIRQ));
 }
 
 static void ack_physirq_event(unsigned int irq)
@@ -100,6 +130,7 @@ static void end_physirq_event(unsigned int irq)
 {
     int err;
     physdev_op_t op;
+
     /* call hypervisor */
     op.cmd = PHYSDEVOP_FINISHED_IRQ;
     op.u.finished_irq.irq   = irq;
@@ -122,21 +153,6 @@ static struct hw_interrupt_type physirq_irq_type = {
     NULL
 };
 
-
-/*
- * this interrupt handler demuxes the virt phys event and the virt phys 
- * bitmask and calls the interrupt handlers for virtualised physical interrupts
- */
-static void physirq_interrupt(int irq, void *unused, struct pt_regs *ptregs)
-{
-#if 0
-    unsigned long flags;
-    int virq;
-    local_irq_save(flags);
-    do_IRQ(virq);
-    local_irq_restore(flags);
-#endif
-}
 
 
 void __init physirq_init(void)

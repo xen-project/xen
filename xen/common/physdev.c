@@ -24,7 +24,15 @@
  * size of teh region, is faked out by a very simple state machine, 
  * preventing direct writes to the PCI config registers by a guest.
  *
- * XXX Some comment on IRQ handling
+ * Interrupt handling is currently done in a very cheese fashion.
+ * We take the default irq controller code and replace it with our own.
+ * If an interrupt comes in it is acked using the PICs normal routine. Then
+ * an event is send to the receiving domain which has to explicitly call
+ * once it is finished dealing with the interrupt. Only then the PICs end
+ * handler is called. very cheesy with all sorts of problems but it seems 
+ * to work in normal cases. No shared interrupts are allowed.
+ *
+ * XXX this code is not SMP safe at the moment!
  */
 
 
@@ -76,6 +84,12 @@ typedef struct _phys_dev_st
 #define MAX_IRQS 32
 /* an array of device descriptors index by IRQ number */
 static phys_dev_t *irqs[MAX_IRQS];
+
+/*
+ * 
+ * General functions
+ * 
+ */
 
 /* find a device on the device list */
 static phys_dev_t *find_pdev(struct task_struct *p, struct pci_dev *dev)
@@ -237,6 +251,11 @@ inline static int check_dev_acc (struct task_struct *p,
     return 0;
 }
 
+/*
+ * 
+ * PCI config space access
+ * 
+ */
 
 /*
  * Base address registers contain the base address for IO regions.
@@ -313,6 +332,7 @@ static int do_base_address_access(phys_dev_t *pdev, int acc,
 
             if ( res->flags & IORESOURCE_MEM )
             {
+                /* this is written out explicitly for clarity */
                 *val = 0xffffffff;
                 /* bit    0 = 0 */
                 /* bit  21  = memory type */
@@ -501,6 +521,13 @@ static long pci_cfgreg_write(int seg, int bus, int dev, int func, int reg,
                                       func, reg, len, &val);
         return ret;
         break;        
+#if 0
+    case 0xe0: /* XXX some device drivers seem to write to this.... */
+        printk("pci write hack allowed %02x:%02x:%02x: "
+                   "reg=0x%02x len=0x%02x val=0x%08x\n",
+                   bus, dev, func, reg, len, val);
+        break;        
+#endif
     default:
         //if ( pdev->flags != ACC_WRITE ) 
         /* XXX for debug we disallow all write access */
@@ -519,6 +546,12 @@ static long pci_cfgreg_write(int seg, int bus, int dev, int func, int reg,
         bus, dev, func, reg, len, val);
     return ret;
 }
+
+/*
+ * 
+ * Interrupt handling
+ * 
+ */
 
 
 /*
@@ -552,26 +585,23 @@ static void phys_dev_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
         return;
     }
     
-    //printk("irq %d pdev=%p\n", irq, pdev);
-
     p = pdev->owner;
-
-    //printk("owner %p\n", p);
 
     if ( test_bit(irq, &p->shared_info->physirq_pend) )
     {
-        printk("irq %d already delivered to guest\n", irq);
+        /* Some interrupt already delivered to guest */
         return;
     }
+
     /* notify guest */
     set_bit(irq, &p->shared_info->physirq_pend);
     set_bit(ST_IRQ_DELIVERED, &pdev->state);
-    cpu_mask |= mark_guest_event(p, _EVENT_TIMER);
+    cpu_mask |= mark_guest_event(p, _EVENT_PHYSIRQ);
     guest_event_notify(cpu_mask);
 }
 
 /* this is called instead of the PICs original end handler. 
- * the real end handler is only called once the guest ack'ed the handling
+ * the real end handler is only called once the guest signalled the handling
  * of the event. */
 static void end_virt_irq (unsigned int i)
 {
@@ -609,8 +639,6 @@ static long pci_request_irq(int irq)
         printk("no device matching IRQ %d\n", irq);
         return -EINVAL;
     }
-
-    printk("pdev= %p\n", pdev);
 
     if ( irq >= MAX_IRQS )
     {
@@ -651,8 +679,9 @@ static long pci_request_irq(int irq)
     
     printk ("setup handler %d\n", irq);
 
-    /* request the IRQ. this is not shared! */
-    err = request_irq(irq, phys_dev_interrupt, 0, "network", (void *)pdev);
+    /* request the IRQ. this is not shared and we use a slow handler! */
+    err = request_irq(irq, phys_dev_interrupt, SA_INTERRUPT,
+                      "foo", (void *)pdev);
     if ( err )
     {
         printk("error requesting irq\n");
@@ -670,7 +699,35 @@ static long pci_request_irq(int irq)
 
 static long pci_free_irq(int irq)
 {
-    /* XXX restore original handler and free_irq() */
+    phys_dev_t *pdev;
+
+    if ( irq >= MAX_IRQS )
+    {
+        printk("requested IRQ to big %d\n", irq);
+        return -EINVAL;
+    }
+
+    if ( irqs[irq] == NULL )
+    {
+        printk ("irq not used %d\n", irq);
+        return -EINVAL;
+    }
+
+    pdev = irqs[irq];
+
+    /* shutdown IRQ */
+    free_irq(irq, (void *)pdev);
+
+    /* restore irq controller  */
+    irq_desc[irq].handler = pdev->orig_handler;
+
+    /* clean up */
+    pdev->orig_handler = NULL;
+    irqs[irq] = NULL;
+    kfree(pdev->new_handler);
+    pdev->new_handler = NULL;
+
+    printk("freed irq %d", irq);
     return 0;
 }
 
@@ -723,6 +780,7 @@ static long pci_finished_irq(int irq)
 
     return 0;
 }
+
 
 /*
  * demux hypervisor call.

@@ -24,11 +24,12 @@
 
 extern struct net_device *the_dev;
 
-/* 
- * shadow ring structures are used to protect the descriptors from
- * tampering after they have been passed to the hypervisor.
- *
- * TX_RING_SIZE and RX_RING_SIZE are defined in the shared network.h.
+/*
+ * shadow ring structures are used to protect the descriptors from tampering 
+ * after they have been passed to the hypervisor.
+ * 
+ * XENNET_TX_RING_SIZE and XENNET_RX_RING_SIZE are defined in the shared
+ * network.h. 
  */
 
 typedef struct rx_shadow_entry_st 
@@ -53,10 +54,10 @@ typedef struct net_vif_st {
     net_idx_t          *shared_idxs;
 
     /* The private rings and indexes. */
-    rx_shadow_entry_t rx_shadow_ring[RX_RING_SIZE];
+    rx_shadow_entry_t rx_shadow_ring[XENNET_RX_RING_SIZE];
     NET_RING_IDX rx_prod;  /* More buffers for filling go here. */
     NET_RING_IDX rx_cons;  /* Next buffer to fill is here. */
-    tx_shadow_entry_t tx_shadow_ring[TX_RING_SIZE];
+    tx_shadow_entry_t tx_shadow_ring[XENNET_TX_RING_SIZE];
     NET_RING_IDX tx_prod;  /* More packets for sending go here. */
     NET_RING_IDX tx_cons;  /* Next packet to send is here. */
 

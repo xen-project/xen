@@ -58,8 +58,8 @@ struct net_private
      * {tx,rx}_skbs store outstanding skbuffs. The first entry in each
      * array is an index into a chain of free entries.
      */
-    struct sk_buff *tx_skbs[TX_RING_SIZE+1];
-    struct sk_buff *rx_skbs[RX_RING_SIZE+1];
+    struct sk_buff *tx_skbs[XENNET_TX_RING_SIZE+1];
+    struct sk_buff *rx_skbs[XENNET_RX_RING_SIZE+1];
 };
 
 /* Access macros for acquiring freeing slots in {tx,rx}_skbs[]. */
@@ -143,9 +143,9 @@ static int network_open(struct net_device *dev)
     memset(np->net_idx, 0, sizeof(*np->net_idx));
 
     /* Initialise {tx,rx}_skbs to be a free chain containing every entry. */
-    for ( i = 0; i <= TX_RING_SIZE; i++ )
+    for ( i = 0; i <= XENNET_TX_RING_SIZE; i++ )
         np->tx_skbs[i] = (void *)(i+1);
-    for ( i = 0; i <= RX_RING_SIZE; i++ )
+    for ( i = 0; i <= XENNET_RX_RING_SIZE; i++ )
         np->rx_skbs[i] = (void *)(i+1);
 
     wmb();
@@ -196,7 +196,8 @@ static void network_tx_buf_gc(struct net_device *dev)
     }
     while ( prod != np->net_idx->tx_resp_prod );
 
-    if ( np->tx_full && ((np->net_idx->tx_req_prod - prod) < TX_RING_SIZE) )
+    if ( np->tx_full && 
+         ((np->net_idx->tx_req_prod - prod) < XENNET_TX_RING_SIZE) )
     {
         np->tx_full = 0;
         if ( np->state == STATE_ACTIVE )
@@ -223,7 +224,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
     netop_t netop;
     NET_RING_IDX i = np->net_idx->rx_req_prod;
 
-    if ( unlikely((i - np->rx_resp_cons) == RX_RING_SIZE) || 
+    if ( unlikely((i - np->rx_resp_cons) == XENNET_RX_RING_SIZE) || 
          unlikely(np->state != STATE_ACTIVE) )
         return;
 
@@ -246,7 +247,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 
         np->rx_bufs_to_notify++;
     }
-    while ( (++i - np->rx_resp_cons) != RX_RING_SIZE );
+    while ( (++i - np->rx_resp_cons) != XENNET_RX_RING_SIZE );
 
     /*
      * We may have allocated buffers which have entries outstanding in the page
@@ -258,7 +259,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
     np->net_idx->rx_event    = np->rx_resp_cons + 1;
         
     /* Batch Xen notifications. */
-    if ( np->rx_bufs_to_notify > (RX_RING_SIZE/4) )
+    if ( np->rx_bufs_to_notify > (XENNET_RX_RING_SIZE/4) )
     {
         netop.cmd = NETOP_PUSH_BUFFERS;
         netop.vif = np->idx;
@@ -313,7 +314,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
     network_tx_buf_gc(dev);
 
-    if ( (i - np->tx_resp_cons) == (TX_RING_SIZE - 1) )
+    if ( (i - np->tx_resp_cons) == (XENNET_TX_RING_SIZE - 1) )
     {
         np->tx_full = 1;
         netif_stop_queue(dev);

@@ -9,7 +9,7 @@
 #include <linux/interrupt.h>
 #include <linux/smp_lock.h>
 #include <linux/pm.h>
-//XXX ??? #include <linux/pci.h>
+#include <linux/pci.h>
 #include <linux/apm_bios.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
@@ -68,6 +68,8 @@ EXPORT_SYMBOL(pm_power_off);
 EXPORT_SYMBOL(apm_info);
 //EXPORT_SYMBOL(gdt);
 EXPORT_SYMBOL(empty_zero_page);
+EXPORT_SYMBOL(phys_to_machine_mapping);
+
 
 #ifdef CONFIG_DEBUG_IOVIRT
 EXPORT_SYMBOL(__io_virt_debug);
@@ -100,6 +102,16 @@ EXPORT_SYMBOL(__clear_user);
 EXPORT_SYMBOL(__generic_copy_from_user);
 EXPORT_SYMBOL(__generic_copy_to_user);
 EXPORT_SYMBOL(strnlen_user);
+
+
+EXPORT_SYMBOL(pci_alloc_consistent);
+EXPORT_SYMBOL(pci_free_consistent);
+
+#ifdef CONFIG_PCI
+EXPORT_SYMBOL(pcibios_penalize_isa_irq);
+EXPORT_SYMBOL(pci_mem_start);
+#endif
+
 
 #ifdef CONFIG_X86_USE_3DNOW
 EXPORT_SYMBOL(_mmx_memcpy);
