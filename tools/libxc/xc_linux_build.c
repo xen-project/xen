@@ -29,13 +29,17 @@ struct domain_setup_info
     unsigned long symtab_len;
 };
 
-static int parseelfimage(char *elfbase, 
-                         unsigned long elfsize,
-                         struct domain_setup_info *dsi);
-static int loadelfimage(char *elfbase, void *pmh, unsigned long *parray,
-                        unsigned long vstart);
-static int loadelfsymtab(char *elfbase, void *pmh, unsigned long *parray,
-                         struct domain_setup_info *dsi);
+static int
+parseelfimage(
+    char *elfbase, unsigned long elfsize, struct domain_setup_info *dsi);
+static int
+loadelfimage(
+    char *elfbase, int xch, u32 dom, unsigned long *parray,
+    unsigned long vstart);
+static int
+loadelfsymtab(
+    char *elfbase, int xch, u32 dom, unsigned long *parray,
+    struct domain_setup_info *dsi);
 
 static long get_tot_pages(int xc_handle, u32 domid)
 {
@@ -69,15 +73,17 @@ static int get_pfn_list(int xc_handle,
     return (ret < 0) ? -1 : op.u.getmemlist.num_pfns;
 }
 
-static int copy_to_domain_page(void *pm_handle,
+static int copy_to_domain_page(int xc_handle,
+                               u32 domid,
                                unsigned long dst_pfn, 
                                void *src_page)
 {
-    void *vaddr = map_pfn_writeable(pm_handle, dst_pfn);
+    void *vaddr = xc_map_foreign_range(
+        xc_handle, domid, PAGE_SIZE, PROT_WRITE, dst_pfn);
     if ( vaddr == NULL )
         return -1;
     memcpy(vaddr, src_page, PAGE_SIZE);
-    unmap_pfn(pm_handle, vaddr);
+    munmap(vaddr, PAGE_SIZE);
     return 0;
 }
 
@@ -102,7 +108,6 @@ static int setup_guestos(int xc_handle,
     start_info_t *start_info;
     shared_info_t *shared_info;
     mmu_t *mmu = NULL;
-    void  *pm_handle=NULL;
     int rc;
 
     unsigned long nr_pt_pages;
@@ -133,7 +138,7 @@ static int setup_guestos(int xc_handle,
                               VMASST_TYPE_writable_pagetables);
 
     if (dsi.load_bsd_symtab)
-        loadelfsymtab(image, NULL, NULL, &dsi);
+        loadelfsymtab(image, xc_handle, dom, NULL, &dsi);
 
     if ( (dsi.v_start & (PAGE_SIZE-1)) != 0 )
     {
@@ -193,9 +198,6 @@ static int setup_guestos(int xc_handle,
         goto error_out;
     }
 
-    if ( (pm_handle = init_pfn_mapper((domid_t)dom)) == NULL )
-        goto error_out;
-
     if ( (page_array = malloc(nr_pages * sizeof(unsigned long))) == NULL )
     {
         PERROR("Could not allocate memory");
@@ -208,10 +210,10 @@ static int setup_guestos(int xc_handle,
         goto error_out;
     }
 
-    loadelfimage(image, pm_handle, page_array, dsi.v_start);
+    loadelfimage(image, xc_handle, dom, page_array, dsi.v_start);
 
     if (dsi.load_bsd_symtab)
-        loadelfsymtab(image, pm_handle, page_array, &dsi);
+        loadelfsymtab(image, xc_handle, dom, page_array, &dsi);
 
     /* Load the initial ramdisk image. */
     if ( initrd_len != 0 )
@@ -225,7 +227,7 @@ static int setup_guestos(int xc_handle,
                 PERROR("Error reading initrd image, could not");
                 goto error_out;
             }
-            copy_to_domain_page(pm_handle, 
+            copy_to_domain_page(xc_handle, dom,
                                 page_array[i>>PAGE_SHIFT], page);
         }
     }
@@ -239,7 +241,9 @@ static int setup_guestos(int xc_handle,
     ctxt->pt_base = l2tab;
 
     /* Initialise the page tables. */
-    if ( (vl2tab = map_pfn_writeable(pm_handle, l2tab >> PAGE_SHIFT)) == NULL )
+    if ( (vl2tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE, 
+                                        PROT_READ|PROT_WRITE, 
+                                        l2tab >> PAGE_SHIFT)) == NULL )
         goto error_out;
     memset(vl2tab, 0, PAGE_SIZE);
     vl2e = &vl2tab[l2_table_offset(dsi.v_start)];
@@ -249,10 +253,14 @@ static int setup_guestos(int xc_handle,
         {
             l1tab = page_array[ppt_alloc++] << PAGE_SHIFT;
             if ( vl1tab != NULL )
-                unmap_pfn(pm_handle, vl1tab);
-            if ( (vl1tab = map_pfn_writeable(pm_handle, 
-                                             l1tab >> PAGE_SHIFT)) == NULL )
+                munmap(vl1tab, PAGE_SIZE);
+            if ( (vl1tab = xc_map_foreign_range(xc_handle, dom, PAGE_SIZE,
+                                                PROT_READ|PROT_WRITE,
+                                                l1tab >> PAGE_SHIFT)) == NULL )
+            {
+                munmap(vl2tab, PAGE_SIZE);
                 goto error_out;
+            }
             memset(vl1tab, 0, PAGE_SIZE);
             vl1e = &vl1tab[l1_table_offset(dsi.v_start + (count<<PAGE_SHIFT))];
             *vl2e++ = l1tab | L2_PROT;
@@ -264,28 +272,33 @@ static int setup_guestos(int xc_handle,
             *vl1e &= ~_PAGE_RW;
         vl1e++;
     }
-    unmap_pfn(pm_handle, vl1tab);
-    unmap_pfn(pm_handle, vl2tab);
+    munmap(vl1tab, PAGE_SIZE);
+    munmap(vl2tab, PAGE_SIZE);
 
     /* Write the phys->machine and machine->phys table entries. */
     physmap_pfn = (vphysmap_start - dsi.v_start) >> PAGE_SHIFT;
-    physmap = physmap_e = 
-        map_pfn_writeable(pm_handle, page_array[physmap_pfn++]);
+    physmap = physmap_e = xc_map_foreign_range(
+        xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
+        page_array[physmap_pfn++]);
     for ( count = 0; count < nr_pages; count++ )
     {
         if ( add_mmu_update(xc_handle, mmu,
                             (page_array[count] << PAGE_SHIFT) | 
                             MMU_MACHPHYS_UPDATE, count) )
+        {
+            munmap(physmap, PAGE_SIZE);
             goto error_out;
+        }
         *physmap_e++ = page_array[count];
         if ( ((unsigned long)physmap_e & (PAGE_SIZE-1)) == 0 )
         {
-            unmap_pfn(pm_handle, physmap);
-            physmap = physmap_e = 
-                map_pfn_writeable(pm_handle, page_array[physmap_pfn++]);
+            munmap(physmap, PAGE_SIZE);
+            physmap = physmap_e = xc_map_foreign_range(
+                xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
+                page_array[physmap_pfn++]);
         }
     }
-    unmap_pfn(pm_handle, physmap);
+    munmap(physmap, PAGE_SIZE);
     
     /*
      * Pin down l2tab addr as page dir page - causes hypervisor to provide
@@ -295,8 +308,9 @@ static int setup_guestos(int xc_handle,
                         l2tab | MMU_EXTENDED_COMMAND, MMUEXT_PIN_L2_TABLE) )
         goto error_out;
 
-    start_info = map_pfn_writeable(
-        pm_handle, page_array[(vstartinfo_start-dsi.v_start)>>PAGE_SHIFT]);
+    start_info = xc_map_foreign_range(
+        xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE,
+        page_array[(vstartinfo_start-dsi.v_start)>>PAGE_SHIFT]);
     memset(start_info, 0, sizeof(*start_info));
     start_info->nr_pages     = nr_pages;
     start_info->shared_info  = shared_info_frame << PAGE_SHIFT;
@@ -312,22 +326,22 @@ static int setup_guestos(int xc_handle,
     }
     strncpy(start_info->cmd_line, cmdline, MAX_CMDLINE);
     start_info->cmd_line[MAX_CMDLINE-1] = '\0';
-    unmap_pfn(pm_handle, start_info);
+    munmap(start_info, PAGE_SIZE);
 
     /* shared_info page starts its life empty. */
-    shared_info = map_pfn_writeable(pm_handle, shared_info_frame);
+    shared_info = xc_map_foreign_range(
+        xc_handle, dom, PAGE_SIZE, PROT_READ|PROT_WRITE, shared_info_frame);
     memset(shared_info, 0, sizeof(shared_info_t));
     /* Mask all upcalls... */
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
         shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
-    unmap_pfn(pm_handle, shared_info);
+    munmap(shared_info, PAGE_SIZE);
 
     /* Send the page update requests down to the hypervisor. */
     if ( finish_mmu_updates(xc_handle, mmu) )
         goto error_out;
 
     free(mmu);
-    (void)close_pfn_mapper(pm_handle);
     free(page_array);
 
     *pvsi = vstartinfo_start;
@@ -338,8 +352,6 @@ static int setup_guestos(int xc_handle,
  error_out:
     if ( mmu != NULL )
         free(mmu);
-    if ( pm_handle != NULL )
-        (void)close_pfn_mapper(pm_handle);
     if ( page_array != NULL )
         free(page_array);
     return -1;
@@ -681,8 +693,10 @@ static int parseelfimage(char *elfbase,
     return 0;
 }
 
-static int loadelfimage(char *elfbase, void *pmh, unsigned long *parray,
-                        unsigned long vstart)
+static int
+loadelfimage(
+    char *elfbase, int xch, u32 dom, unsigned long *parray,
+    unsigned long vstart)
 {
     Elf_Ehdr *ehdr = (Elf_Ehdr *)elfbase;
     Elf_Phdr *phdr;
@@ -700,32 +714,36 @@ static int loadelfimage(char *elfbase, void *pmh, unsigned long *parray,
         for ( done = 0; done < phdr->p_filesz; done += chunksz )
         {
             pa = (phdr->p_vaddr + done) - vstart;
-            va = map_pfn_writeable(pmh, parray[pa>>PAGE_SHIFT]);
+            va = xc_map_foreign_range(
+                xch, dom, PAGE_SIZE, PROT_WRITE, parray[pa>>PAGE_SHIFT]);
             chunksz = phdr->p_filesz - done;
             if ( chunksz > (PAGE_SIZE - (pa & (PAGE_SIZE-1))) )
                 chunksz = PAGE_SIZE - (pa & (PAGE_SIZE-1));
             memcpy(va + (pa & (PAGE_SIZE-1)),
                    elfbase + phdr->p_offset + done, chunksz);
-            unmap_pfn(pmh, va);
+            munmap(va, PAGE_SIZE);
         }
 
         for ( ; done < phdr->p_memsz; done += chunksz )
         {
             pa = (phdr->p_vaddr + done) - vstart;
-            va = map_pfn_writeable(pmh, parray[pa>>PAGE_SHIFT]);
+            va = xc_map_foreign_range(
+                xch, dom, PAGE_SIZE, PROT_WRITE, parray[pa>>PAGE_SHIFT]);
             chunksz = phdr->p_memsz - done;
             if ( chunksz > (PAGE_SIZE - (pa & (PAGE_SIZE-1))) )
                 chunksz = PAGE_SIZE - (pa & (PAGE_SIZE-1));
             memset(va + (pa & (PAGE_SIZE-1)), 0, chunksz);
-            unmap_pfn(pmh, va);            
+            munmap(va, PAGE_SIZE);
         }
     }
 
     return 0;
 }
 
-static void map_memcpy(unsigned long dst, char *src, unsigned long size,
-                       void *pmh, unsigned long *parray, unsigned long vstart)
+static void
+map_memcpy(
+    unsigned long dst, char *src, unsigned long size,
+    int xch, u32 dom, unsigned long *parray, unsigned long vstart)
 {
     char *va;
     unsigned long chunksz, done, pa;
@@ -733,19 +751,22 @@ static void map_memcpy(unsigned long dst, char *src, unsigned long size,
     for ( done = 0; done < size; done += chunksz )
     {
         pa = dst + done - vstart;
-        va = map_pfn_writeable(pmh, parray[pa>>PAGE_SHIFT]);
+        va = xc_map_foreign_range(
+            xch, dom, PAGE_SIZE, PROT_WRITE, parray[pa>>PAGE_SHIFT]);
         chunksz = size - done;
         if ( chunksz > (PAGE_SIZE - (pa & (PAGE_SIZE-1))) )
             chunksz = PAGE_SIZE - (pa & (PAGE_SIZE-1));
         memcpy(va + (pa & (PAGE_SIZE-1)), src + done, chunksz);
-        unmap_pfn(pmh, va);
+        munmap(va, PAGE_SIZE);
     }
 }
 
 #define ELFROUND (ELFSIZE / 8)
 
-static int loadelfsymtab(char *elfbase, void *pmh, unsigned long *parray,
-                         struct domain_setup_info *dsi)
+static int
+loadelfsymtab(
+    char *elfbase, int xch, u32 dom, unsigned long *parray,
+    struct domain_setup_info *dsi)
 {
     Elf_Ehdr *ehdr = (Elf_Ehdr *)elfbase, *sym_ehdr;
     Elf_Shdr *shdr;
@@ -789,9 +810,9 @@ static int loadelfsymtab(char *elfbase, void *pmh, unsigned long *parray,
         if ( (shdr[h].sh_type == SHT_STRTAB) ||
              (shdr[h].sh_type == SHT_SYMTAB) )
         {
-            if ( pmh != NULL )
+            if ( parray != NULL )
                 map_memcpy(maxva, elfbase + shdr[h].sh_offset, shdr[h].sh_size,
-                           pmh, parray, dsi->v_start);
+                           xch, dom, parray, dsi->v_start);
 
             /* Mangled to be based on ELF header location. */
             shdr[h].sh_offset = maxva - dsi->symtab_addr;
@@ -810,7 +831,8 @@ static int loadelfsymtab(char *elfbase, void *pmh, unsigned long *parray,
         goto out;
     }
 
-    if ( pmh != NULL ) {
+    if ( parray != NULL )
+    {
         *(int *)p = maxva - dsi->symtab_addr;
         sym_ehdr = (Elf_Ehdr *)(p + sizeof(int));
         memcpy(sym_ehdr, ehdr, sizeof(Elf_Ehdr));
@@ -822,7 +844,7 @@ static int loadelfsymtab(char *elfbase, void *pmh, unsigned long *parray,
 
         /* Copy total length, crafted ELF header and section header table */
         map_memcpy(symva, p, sizeof(int) + sizeof(Elf_Ehdr) +
-                   ehdr->e_shnum * sizeof(Elf_Shdr), pmh, parray,
+                   ehdr->e_shnum * sizeof(Elf_Shdr), xch, dom, parray,
                    dsi->v_start);
     }
 

@@ -120,8 +120,7 @@ void get_tbufs(unsigned long *mach_addr, unsigned long *size)
  * @num:       number of trace buffers to map
  * @size:      size of each trace buffer
  *
- * Maps the Xen trace buffers them into process address space by memory mapping
- * /dev/mem.  Returns the location the buffers have been mapped to.
+ * Maps the Xen trace buffers them into process address space.
  */
 struct t_buf *map_tbufs(unsigned long tbufs_mach, unsigned int num,
                         unsigned long size)

@@ -247,25 +247,13 @@ static int mmap_mem(struct file * file, struct vm_area_struct * vma)
 	if (!(start_info.flags & SIF_PRIVILEGED))
 		return -ENXIO;
 
-	if (file->private_data == NULL)
-		file->private_data = (void *)(unsigned long)DOMID_IO;
-
 	/* DONTCOPY is essential for Xen as copy_page_range is broken. */
 	vma->vm_flags |= VM_RESERVED | VM_IO | VM_DONTCOPY;
 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 	if (direct_remap_area_pages(vma->vm_mm, vma->vm_start, offset, 
 				vma->vm_end-vma->vm_start, vma->vm_page_prot,
-				(domid_t)(unsigned long)file->private_data))
+				DOMID_IO))
 		return -EAGAIN;
-	return 0;
-}
-
-static int ioctl_mem(struct inode * inode, struct file * file, unsigned int cmd, unsigned long arg)
-{
-	switch (cmd) {
-	case _IO('M', 1): file->private_data = (void *)arg; break;
-	default: return -ENOSYS;
-	}
 	return 0;
 }
 #endif /* CONFIG_XEN */
@@ -640,9 +628,6 @@ static struct file_operations mem_fops = {
 	.write		= write_mem,
 	.mmap		= mmap_mem,
 	.open		= open_mem,
-#if defined(CONFIG_XEN_PRIVILEGED_GUEST)
-	.ioctl		= ioctl_mem,
-#endif
 };
 
 static struct file_operations kmem_fops = {
