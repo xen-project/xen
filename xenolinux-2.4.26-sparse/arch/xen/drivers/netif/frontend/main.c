@@ -523,7 +523,7 @@ static void netif_status_change(netif_fe_interface_status_changed_t *status)
 	    printk(KERN_INFO "Attempting to reconnect network interface\n");
 
             /* Begin interface recovery.
-             * TODO: Change the Xend<->Guest protocol so that a recovery
+             * TODO: (MAW) Change the Xend<->Guest protocol so that a recovery
              * is initiated by a special "RESET" message - disconnect could
              * just mean we're not allowed to use this interface any more.
              */
@@ -591,7 +591,7 @@ static void netif_status_change(netif_fe_interface_status_changed_t *status)
             np->rx_resp_cons = np->tx_resp_cons = np->tx_full = 0;
             np->rx->event = 1;
 
-            /* Step 1: Rebuild the RX and TX ring contents.
+            /* Step 2: Rebuild the RX and TX ring contents.
              * NB. We could just throw away the queued TX packets but we hope
              * that sending them out might do some good.  We have to rebuild
              * the RX ring because some of our pages are currently flipped out
@@ -632,15 +632,17 @@ static void netif_status_change(netif_fe_interface_status_changed_t *status)
             wmb();                
             np->rx->req_prod = requeue_idx;
 
-            /* Step 4: All public and private state should now be sane.  Start
+            /* Step 3: All public and private state should now be sane.  Start
              * sending and receiving packets again and give the driver domain a
-	     * kick because we've probably just queued some packets. */
+	     * kick because we've probably just requeued some packets. */
 
             netif_carrier_on(dev);
             netif_start_queue(dev);
             np->state = NETIF_STATE_ACTIVE;
 
             notify_via_evtchn(status->evtchn);  
+
+	    network_tx_buf_gc();
 
             printk(KERN_INFO "Recovery completed\n");
 
