@@ -1,8 +1,21 @@
+#!/usr/bin/make -f
 
-DOC_TEX  := $(wildcard src/*.tex)
-DOC_PS   := $(patsubst src/%.tex,ps/%.ps,$(DOC_TEX))
-DOC_PDF  := $(patsubst src/%.tex,pdf/%.pdf,$(DOC_TEX))
-DOC_HTML := $(patsubst src/%.tex,html/%/index.html,$(DOC_TEX))
+
+PS2PDF		:= ps2pdf
+DVIPS		:= dvips
+LATEX		:= latex
+FIG2DEV		:= fig2dev
+TGIF		:= tgif
+LATEX2HTML	:= latex2html
+
+package		= xen
+docdir		= /usr/share/doc
+pkgdocdir	= $(docdir)/$(package)
+
+DOC_TEX		:= $(wildcard src/*.tex)
+DOC_PS		:= $(patsubst src/%.tex,ps/%.ps,$(DOC_TEX))
+DOC_PDF		:= $(patsubst src/%.tex,pdf/%.pdf,$(DOC_TEX))
+DOC_HTML	:= $(patsubst src/%.tex,html/%/index.html,$(DOC_TEX))
 
 GFX  = $(patsubst %.obj, %.eps, $(wildcard figs/*.obj))
 GFX += $(patsubst %.fig, %.eps, $(wildcard figs/*.fig))
@@ -22,30 +35,34 @@ clean:
 	rm -rf $(GFX) ps pdf html
 
 install: all
-	rm -rf $(prefix)/usr/share/doc/xen
-	mkdir -p $(prefix)/usr/share/doc/xen
-	cp -dR ps $(prefix)/usr/share/doc/xen
-	cp -dR pdf $(prefix)/usr/share/doc/xen
-	cp -dR html $(prefix)/usr/share/doc/xen
+	rm -rf $(prefix)$(pkgdocdir)
+	mkdir -p $(prefix)$(pkgdocdir)
+	cp -dR ps $(prefix)$(pkgdocdir)
+	cp -dR pdf $(prefix)$(pkgdocdir)
+	cp -dR html $(prefix)$(pkgdocdir)
 
 pdf/%.pdf: ps/%.ps
-	mkdir -p pdf ; ps2pdf $< $@
+	mkdir -p $(@D)
+	$(PS2PDF) $< $@.new
+	mv $@.new $@
 
 ps/%.ps: %.dvi
-	mkdir -p ps ; dvips -Ppdf -G0 -o $@ $<
+	mkdir -p $(@D)
+	$(DVIPS) -Ppdf -G0 -o $@.new $<
+	mv $@.new $@
 
 %.dvi: src/%.tex $(GFX)
-	latex $< >/dev/null
-	if [ -e $*.toc ] ; then latex $< >/dev/null ; fi
+	$(LATEX) $< >/dev/null
+	if [ -e $*.toc ] ; then $(LATEX) $< >/dev/null ; fi
 
 %.eps: %.fig
-	fig2dev -L eps $< $@
+	$(FIG2DEV) -L eps $< $@
 
 %.eps: %.obj
-	tgif -print -color -eps $<
+	$(TGIF) -print -color -eps $<
 
 html/%/index.html: src/%.tex
-	mkdir -p html/$*
-	latex2html -split 0 -show_section_numbers -toc_depth 3 -nonavigation \
-	-numbered_footnotes -local_icons -noinfo -math -dir html/$* \
+	mkdir -p $(@D)
+	$(LATEX2HTML) -split 0 -show_section_numbers -toc_depth 3 -nonavigation \
+	-numbered_footnotes -local_icons -noinfo -math -dir $(@D) \
 	$< 1>/dev/null 2>/dev/null
