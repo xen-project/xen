@@ -163,6 +163,7 @@ struct task_struct
      */
     u16 pirq_to_evtchn[64];
     u16 virq_to_evtchn[NR_VIRQS];
+    u32 pirq_mask[2];
 
     /* Physical I/O */
     spinlock_t       pcidev_lock;

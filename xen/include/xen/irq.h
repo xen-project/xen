@@ -58,6 +58,7 @@ extern hw_irq_controller no_irq_type;
 extern void no_action(int cpl, void *dev_id, struct pt_regs *regs);
 
 struct task_struct;
+extern int pirq_guest_unmask(struct task_struct *p);
 extern int pirq_guest_bind(struct task_struct *p, int irq);
 extern int pirq_guest_unbind(struct task_struct *p, int irq);
 
