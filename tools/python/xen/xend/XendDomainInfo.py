@@ -553,8 +553,11 @@ class XendDomainInfo:
         devices have been released.
         """
         if self.dom is None: return 0
-        if self.restart_state == STATE_RESTART_PENDING and self.console:
-            self.console.deregisterChannel()
+        if self.console:
+            if self.restart_pending():
+                self.console.deregisterChannel()
+            else:
+                self.console.close()
         chan = xend.getDomChannel(self.dom)
         if chan:
             log.debug("Closing channel to domain %d", self.dom)
