@@ -385,9 +385,12 @@ static int shadow_mode_table_op(struct domain *d,
 					0, bytes);
 		}
 
+#if 0   /* This optimisation is dangerous for some uses of this function.
+		 disable for the moment */
         /* Might as well stop the domain as an optimization. */
 		if ( zero )
             domain_pause_by_systemcontroller(d);
+#endif
 
 		break;
     }
@@ -487,8 +490,21 @@ int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
 
 static inline struct pfn_info *alloc_shadow_page(struct mm_struct *m)
 {
+	struct pfn_info *page;
     m->shadow_page_count++;
-    return alloc_domheap_page(NULL);
+    page = alloc_domheap_page(NULL);
+
+	if( unlikely(page == NULL) )
+	{
+		printk("Couldn't alloc shadow page! count=%d\n",
+			   m->shadow_page_count);
+		SH_VLOG("Shadow tables l1=%d l2=%d",
+				perfc_value(shadow_l1_pages), 
+				perfc_value(shadow_l2_pages));
+		BUG();  // FIXME: try a shadow flush to free up some memory
+	}
+
+	return page;
 }
 
 void unshadow_table( unsigned long gpfn, unsigned int type )

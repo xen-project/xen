@@ -118,17 +118,20 @@ static inline int __mark_dirty( struct mm_struct *m, unsigned int mfn )
     }
     else
     {
-        SH_LOG("mark_dirty OOR! mfn=%x pfn=%x max=%x (mm %p)",
-               mfn, pfn, m->shadow_dirty_bitmap_size, m );
-        SH_LOG("dom=%p caf=%08x taf=%08x\n", 
-               frame_table[mfn].u.inuse.domain,
-               frame_table[mfn].count_info, 
-               frame_table[mfn].u.inuse.type_info );
+		if ( mfn < max_page )
 		{
-			extern void show_trace(unsigned long *esp);		
-			unsigned long *esp;
-			__asm__ __volatile__ ("movl %%esp,%0" : "=r" (esp) : );
-			show_trace(esp);
+			SH_LOG("mark_dirty OOR! mfn=%x pfn=%x max=%x (mm %p)",
+				   mfn, pfn, m->shadow_dirty_bitmap_size, m );
+			SH_LOG("dom=%p caf=%08x taf=%08x\n", 
+				   frame_table[mfn].u.inuse.domain,
+				   frame_table[mfn].count_info, 
+				   frame_table[mfn].u.inuse.type_info );
+			{
+				extern void show_trace(unsigned long *esp);		
+				unsigned long *esp;
+				__asm__ __volatile__ ("movl %%esp,%0" : "=r" (esp) : );
+				show_trace(esp);
+			}
 		}
     }
 
