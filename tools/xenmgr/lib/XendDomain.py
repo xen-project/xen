@@ -8,7 +8,6 @@ import sys
 
 import Xc; xc = Xc.new()
 import xenctl.ip
-import xenctl.vdisk
 
 import sxp
 import XendRoot
@@ -125,6 +124,7 @@ class XendDomain:
 
     def _delete_domain(self, id, notify=1):
         if id in self.domain:
+            self.domain[id].died()
             if notify: eserver.inject('xend.domain.died', id)
             del self.domain[id]
         if id in self.domain_db:

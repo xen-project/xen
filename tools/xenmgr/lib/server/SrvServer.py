@@ -32,17 +32,24 @@ from twisted.internet import reactor
 from xenmgr import XendRoot
 xroot = XendRoot.instance()
 
+from xenmgr import XendBridge
+
 from SrvRoot import SrvRoot
 
-def create(port=None, interface=None):
+def create(port=None, interface=None, bridge=0):
     if port is None: port = 8000
     if interface is None: interface = ''
+    if bridge or xroot.rebooted:
+        init_bridge()
     root = resource.Resource()
     xend = SrvRoot()
     root.putChild('xend', xend)
     site = server.Site(root)
     reactor.listenTCP(port, site, interface=interface)
-    
+
+def init_bridge():
+    XendBridge.bridge_create()
+    XendBridge.reconfigure()
 
 def main(port=None, interface=None):
     create(port, interface)

@@ -549,7 +549,7 @@ class Daemon:
         self.listenEvent()
         self.listenNotifier()
         self.listenVirq()
-        SrvServer.create()
+        SrvServer.create(bridge=1)
         reactor.run()
 
     def createFactories(self):
@@ -602,6 +602,9 @@ class Daemon:
         d = self.blkifCF.createInstance(dom)
         return d
 
+    def blkif_dev(self, dom, vdev):
+        return self.blkifCF.getDomainDevice(dom, vdev)
+
     def blkif_dev_create(self, dom, vdev, mode, segment):
         """Create a block device.
         
@@ -640,6 +643,9 @@ class Daemon:
             raise ValueError('No netif controller: %d' % dom)
         d = ctrl.attach_device(vif, vmac)
         return d
+
+    def netif_dev(self, dom, vif):
+        return self.netifCF.getDomainDevice(dom, vif)
 
     def console_create(self, dom, console_port=None):
         """Create a console for a domain.
