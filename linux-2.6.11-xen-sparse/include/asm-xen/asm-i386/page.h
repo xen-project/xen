@@ -114,7 +114,6 @@ static inline unsigned long pgd_val(pgd_t x)
 	if (ret) ret = machine_to_phys(ret);
 	return ret;
 }
-#define pgd_val_ma(x)   ((x).pgd)
 #define pgprot_val(x)	((x).pgprot)
 
 static inline pte_t __pte(unsigned long x)

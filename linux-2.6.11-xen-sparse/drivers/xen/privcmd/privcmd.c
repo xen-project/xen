@@ -176,8 +176,9 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
     {
         unsigned long m2pv = (unsigned long)machine_to_phys_mapping;
         pgd_t *pgd = pgd_offset_k(m2pv);
-        pmd_t *pmd = pmd_offset(pgd, m2pv);
-        unsigned long m2p_start_mfn = pmd_val_ma(*pmd) >> PAGE_SHIFT;
+        pud_t *pud = pud_offset(pgd, m2pv);
+        pmd_t *pmd = pmd_offset(pud, m2pv);
+        unsigned long m2p_start_mfn = pfn_to_mfn(pmd_val(*pmd) >> PAGE_SHIFT);
         ret = put_user(m2p_start_mfn, (unsigned long *)data) ? -EFAULT: 0;
     }
     break;

@@ -65,11 +65,12 @@ static int __initdata smp_b_stepping;
 /* Number of siblings per CPU package */
 int smp_num_siblings = 1;
 int phys_proc_id[NR_CPUS]; /* Package ID of each logical CPU */
+EXPORT_SYMBOL(phys_proc_id);
 
 /* bitmap of online cpus */
 cpumask_t cpu_online_map;
 
-static cpumask_t cpu_callin_map;
+cpumask_t cpu_callin_map;
 cpumask_t cpu_callout_map;
 static cpumask_t smp_commenced_mask;
 
@@ -404,8 +405,6 @@ void __init smp_callin(void)
 #endif
 	map_cpu_to_logical_apicid();
 
-	local_irq_enable();
-
 	/*
 	 * Get our bogomips.
 	 */
@@ -420,7 +419,7 @@ void __init smp_callin(void)
 #if 0
 	disable_APIC_timer();
 #endif
-	local_irq_disable();
+
 	/*
 	 * Allow the master to continue.
 	 */
@@ -436,8 +435,6 @@ void __init smp_callin(void)
 }
 
 int cpucount;
-
-extern int cpu_idle(void);
 
 
 static irqreturn_t local_debug_interrupt(int irq, void *dev_id,
@@ -463,7 +460,7 @@ extern void local_setup_timer(void);
 /*
  * Activate a secondary processor.
  */
-int __init start_secondary(void *unused)
+static int __init start_secondary(void *unused)
 {
 	/*
 	 * Dont put anything before smp_callin(), SMP
@@ -484,6 +481,10 @@ int __init start_secondary(void *unused)
 	 */
 	local_flush_tlb();
 	cpu_set(smp_processor_id(), cpu_online_map);
+
+	/* We can take interrupts now: we're officially "up". */
+	local_irq_enable();
+
 	wmb();
 	if (0) {
 		char *msg2 = "delay2\n";
@@ -496,7 +497,7 @@ int __init start_secondary(void *unused)
 			}
 		}
 	}
-	return cpu_idle();
+	cpu_idle();
 }
 
 /*
