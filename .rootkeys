@@ -999,12 +999,14 @@
 3ddb79c3r9-31dIsewPV3P3i8HALsQ xen/include/asm-x86/delay.h
 3ddb79c34BFiXjBJ_cCKB0aCsV1IDw xen/include/asm-x86/desc.h
 40715b2dTokMLYGSuD58BnxOqyWVew xen/include/asm-x86/div64.h
+4204e7acwzqgXyTAPKa1nM-L7Ec0Qw xen/include/asm-x86/domain.h
 41febc4bBKTKHhnAu_KPYwgNkHjFlg xen/include/asm-x86/domain_page.h
 41d3eaaeIBzW621S1oa0c2yk7X43qQ xen/include/asm-x86/e820.h
 3ddb79c3NU8Zy40OTrq3D-i30Y3t4A xen/include/asm-x86/fixmap.h
 3e2d29944GI24gf7vOP_7x8EyuqxeA xen/include/asm-x86/flushtlb.h
 3ddb79c39o75zPP0T1aQQ4mNrCAN2w xen/include/asm-x86/hardirq.h
 3ddb79c3TMDjkxVndKFKnGiwY0HzDg xen/include/asm-x86/i387.h
+4204e7acwXDo-5iAAiO2eQbtDeYZXA xen/include/asm-x86/init.h
 3ddb79c3fQ_O3o5NHK2N8AJdk0Ea4Q xen/include/asm-x86/io.h
 3ddb79c2TKeScYHQZreTdHqYNLbehQ xen/include/asm-x86/io_apic.h
 3ddb79c2L7rTlFzazOLW1XuSZefpFw xen/include/asm-x86/irq.h

@@ -21,7 +21,8 @@
 #include <asm/current.h>
 #include <xen/spinlock.h>
 #include <xen/grant_table.h>
-#include <xen/irq_cpustat.h>
+#include <asm/hardirq.h>
+#include <asm/domain.h>
 
 extern unsigned long volatile jiffies;
 extern rwlock_t domlist_lock;
@@ -67,7 +68,11 @@ struct exec_domain
     struct exec_domain *ed_next_list;
     int eid;
 
+#ifdef ARCH_HAS_EXEC_DOMAIN_MM_PTR
+    struct mm_struct *mm;
+#else
     struct mm_struct mm;
+#endif
 
     struct thread_struct thread;
 
@@ -84,6 +89,7 @@ struct exec_domain
     u16 virq_to_evtchn[NR_VIRQS];
 
     atomic_t pausecnt;
+    arch_exec_domain_t arch;
 
 };
 
@@ -151,6 +157,7 @@ struct domain {
     atomic_t refcnt;
 
     struct exec_domain *exec_domain[MAX_VIRT_CPUS];
+    arch_domain_t arch;
 };
 
 struct domain_setup_info
@@ -372,5 +379,6 @@ static inline void domain_unpause_by_systemcontroller(struct domain *d)
 
 #include <xen/slab.h>
 #include <xen/domain.h>
+
 
 #endif /* __SCHED_H__ */
