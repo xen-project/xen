@@ -48,6 +48,7 @@
 #include <linux/netdevice.h>
 #include <linux/rtnetlink.h>
 #include <linux/tqueue.h>
+#include <net/pkt_sched.h> /* dev_(de)activate */
 
 /*
  * Point at the empty zero page to start with. We map the real shared_info
@@ -444,6 +445,39 @@ static void __init display_cacheinfo(struct cpuinfo_x86 *c)
            l2size, ecx & 0xFF);
 }
 
+static void __init init_c3(struct cpuinfo_x86 *c)
+{
+    /* Test for Centaur Extended Feature Flags presence */
+    if (cpuid_eax(0xC0000000) >= 0xC0000001) {
+        /* store Centaur Extended Feature Flags as
+         * word 5 of the CPU capability bit array
+         */
+        c->x86_capability[5] = cpuid_edx(0xC0000001);
+    }
+   
+    switch (c->x86_model) {
+    case 9:	/* Nehemiah */
+    default:
+        get_model_name(c);
+        display_cacheinfo(c);
+        break;
+    }
+}
+
+static void __init init_centaur(struct cpuinfo_x86 *c)
+{
+    /* Bit 31 in normal CPUID used for nonstandard 3DNow ID;
+       3DNow is IDd by bit 31 in extended CPUID (1*3231) anyway */
+    clear_bit(0*32+31, &c->x86_capability);
+  
+    switch (c->x86) {
+    case 6:
+        init_c3(c);
+        break;
+    default:
+        panic("Unsupported Centaur CPU (%i)\n", c->x86);
+    }
+}
 
 static int __init init_amd(struct cpuinfo_x86 *c)
 {
@@ -630,6 +664,8 @@ void __init get_cpu_vendor(struct cpuinfo_x86 *c)
         c->x86_vendor = X86_VENDOR_INTEL;
     else if (!strcmp(v, "AuthenticAMD"))
         c->x86_vendor = X86_VENDOR_AMD;
+    else if (!strcmp(v, "CentaurHauls"))
+        c->x86_vendor = X86_VENDOR_CENTAUR;
     else
         c->x86_vendor = X86_VENDOR_UNKNOWN;
 }
@@ -819,8 +855,12 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
         init_intel(c);
         break;
 
+    case X86_VENDOR_CENTAUR:
+        init_centaur(c);
+        break;
+        
     default:
-        panic("Unsupported CPU vendor\n");
+        printk("Unsupported CPU vendor (%d) -- please report!\n");
     }
 	
     printk(KERN_DEBUG "CPU: After vendor init, caps: %08x %08x %08x %08x\n",

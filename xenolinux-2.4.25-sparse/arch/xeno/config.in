@@ -39,7 +39,9 @@ choice 'Processor family' \
 	"Pentium-Pro/Celeron/Pentium-II		CONFIG_M686 \
 	 Pentium-III/Celeron(Coppermine)	CONFIG_MPENTIUMIII \
 	 Pentium-4				CONFIG_MPENTIUM4 \
-	 Athlon/Duron/K7			CONFIG_MK7" Pentium-Pro
+	 Athlon/Duron/K7			CONFIG_MK7 \
+	 Opteron/Athlon64/Hammer/K8             CONFIG_MK8 \
+	 VIA-C3-2                               CONFIG_MVIAC3_2" Pentium-Pro
 
    define_bool CONFIG_X86_WP_WORKS_OK y
    define_bool CONFIG_X86_INVLPG y
@@ -64,9 +66,15 @@ fi
 if [ "$CONFIG_MPENTIUM4" = "y" ]; then
    define_int  CONFIG_X86_L1_CACHE_SHIFT 7
 fi
+if [ "$CONFIG_MK8" = "y" ]; then
+   define_bool CONFIG_MK7 y
+fi
 if [ "$CONFIG_MK7" = "y" ]; then
    define_int  CONFIG_X86_L1_CACHE_SHIFT 6
    define_bool CONFIG_X86_USE_3DNOW y
+fi
+if [ "$CONFIG_MVIAC3_2" = "y" ]; then
+   define_int  CONFIG_X86_L1_CACHE_SHIFT 5
 fi
 
 if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then

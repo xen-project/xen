@@ -203,8 +203,11 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
         break;
     case X86_VENDOR_UNKNOWN:  /* Connectix Virtual PC reports this */
 	break;
+    case X86_VENDOR_CENTAUR:
+        break;
     default:
-        panic("Only support Intel processors (P6+)\n");
+        printk("Unknown CPU identifier (%d): continuing anyway, "
+               "but might fail.\n", c->x86_vendor);
     }
 	
     printk("CPU caps: %08x %08x %08x %08x\n",
