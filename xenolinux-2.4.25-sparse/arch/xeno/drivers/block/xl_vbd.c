@@ -122,20 +122,30 @@ static int xlvbd_init_device(xen_disk_t *xd)
         goto out;
     }
 
-    if ( is_ide )
-    { 
+    if ( is_ide ) {
+
 	major_name = XLIDE_MAJOR_NAME; 
 	max_part   = XLIDE_MAX_PART;
-    }
-    else if ( is_scsi )
-    { 
+
+    } else if ( is_scsi ) {
+
 	major_name = XLSCSI_MAJOR_NAME;
 	max_part   = XLSCSI_MAX_PART;
-    }
-    else
-    { 
+
+    } else if (XD_VIRTUAL(xd->info)) {
+
 	major_name = XLVBD_MAJOR_NAME;
 	max_part   = XLVBD_MAX_PART;
+
+    } else { 
+
+        /* SMH: hmm - probably a CCISS driver or sim; assume CCISS for now */
+	printk(KERN_ALERT "Assuming device %02x:%02x is CCISS/SCSI\n", 
+	       major, minor);
+	is_scsi    = 1; 
+	major_name = "cciss"; 
+	max_part   = XLSCSI_MAX_PART;
+
     }
     
     partno = minor & (max_part - 1); 
