@@ -81,9 +81,7 @@ void vbd_grow(blkif_be_vbd_grow_t *grow)
     vbd_t              *vbd = NULL;
     struct rb_node     *rb;
     blkif_vdev_t        vdevice = grow->vdevice;
-#if 0
     unsigned long       sz;
-#endif
 
 
     blkif = blkif_find_by_handle(grow->domid, grow->blkif_handle);
@@ -127,11 +125,11 @@ void vbd_grow(blkif_be_vbd_grow_t *grow)
     x->extent.device        = grow->extent.device;
     /* XXXcl see comments at top of open_by_devnum */
 #if 01
+#ifdef DONT_BLKDEV_GET
     x->bdev = bdget(vbd_map_devnum(x->extent.device));
-#ifndef DONT_BLKDEV_GET
-    if (x->bdev)
-	x->bdev = open_by_devnum(vbd_map_devnum(x->extent.device),
-				 vbd->readonly ? FMODE_READ : FMODE_WRITE);
+#else
+    x->bdev = open_by_devnum(vbd_map_devnum(x->extent.device),
+			     vbd->readonly ? FMODE_READ : FMODE_WRITE);
 #endif
     if (x->bdev == NULL) {
 	PRINTK("vbd_grow: device %08x doesn't exist.\n", x->extent.device);
@@ -144,17 +142,15 @@ void vbd_grow(blkif_be_vbd_grow_t *grow)
     x->extent.sector_length = grow->extent.sector_length;
     x->next                 = (blkif_extent_le_t *)NULL;
 
-#if 0
-    if( !blk_size[MAJOR(x->extent.device)] )
+    if( x->bdev->bd_disk == NULL || x->bdev->bd_part == NULL )
     {
         PRINTK("vbd_grow: device %08x doesn't exist.\n", x->extent.device);
 	grow->status = BLKIF_BE_STATUS_EXTENT_NOT_FOUND;
 	goto out;
     }
     
-    /* convert blocks (1KB) to sectors */
-    sz = blk_size[MAJOR(x->extent.device)][MINOR(x->extent.device)] * 2;    
-#endif
+    /* get size in sectors */
+    sz = x->bdev->bd_part->nr_sects;
 
     if ( x->extent.sector_start > 0 )
     {
@@ -163,7 +159,6 @@ void vbd_grow(blkif_be_vbd_grow_t *grow)
 	goto out;
     }
 
-#if 0
     /*
      * NB. This test assumes sector_start == 0, which is always the case
      * in Xen 1.3. In fact the whole grow/shrink interface could do with
@@ -174,7 +169,6 @@ void vbd_grow(blkif_be_vbd_grow_t *grow)
     
     DPRINTK("vbd_grow: requested_len %llu actual_len %lu\n", 
             x->extent.sector_length, sz);
-#endif
 
     for ( px = &vbd->extents; *px != NULL; px = &(*px)->next ) 
         continue;
