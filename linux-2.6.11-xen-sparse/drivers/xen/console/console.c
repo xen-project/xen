@@ -87,6 +87,8 @@ static int __init xencons_setup(char *str)
         n = simple_strtol( str+3, &q, 10 );
         if ( q > (str + 3) ) xc_num = n;
         break;
+    default:
+        break;
     }
 
     return 1;
