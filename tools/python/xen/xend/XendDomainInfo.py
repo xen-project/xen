@@ -718,7 +718,7 @@ class XendDomainInfo:
     def build_domain(self, ostype, kernel, ramdisk, cmdline, vifs_n):
         """Build the domain boot image.
         """
-        if self.recreate: return
+        if self.recreate or self.restore: return
         if len(cmdline) >= 256:
             log.warning('kernel cmdline too long, domain %d', self.dom)
         dom = self.dom
