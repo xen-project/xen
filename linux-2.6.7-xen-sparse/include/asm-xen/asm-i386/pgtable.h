@@ -64,17 +64,16 @@ void paging_init(void);
 #define PGDIR_SIZE	(1UL << PGDIR_SHIFT)
 #define PGDIR_MASK	(~(PGDIR_SIZE-1))
 
-#define FIRST_USER_PGD_NR	1
-#define USER_PTRS_PER_PGD	((TASK_SIZE/PGDIR_SIZE) - FIRST_USER_PGD_NR)
+#define USER_PTRS_PER_PGD	(TASK_SIZE/PGDIR_SIZE)
+#define FIRST_USER_PGD_NR	0
 
-#if 0 /* XEN */
 #define USER_PGD_PTRS (PAGE_OFFSET >> PGDIR_SHIFT)
 #define KERNEL_PGD_PTRS (PTRS_PER_PGD-USER_PGD_PTRS)
 
 #define TWOLEVEL_PGDIR_SHIFT	22
 #define BOOT_USER_PGD_PTRS (__PAGE_OFFSET >> TWOLEVEL_PGDIR_SHIFT)
 #define BOOT_KERNEL_PGD_PTRS (1024-BOOT_USER_PGD_PTRS)
-#endif
+
 
 #ifndef __ASSEMBLY__
 /* Just any arbitrary offset to the start of the vmalloc VM area: the
@@ -461,8 +460,5 @@ static inline unsigned long arbitrary_virt_to_phys(void *va)
 #define __HAVE_ARCH_PTEP_MKDIRTY
 #define __HAVE_ARCH_PTE_SAME
 #include <asm-generic/pgtable.h>
-
-#define HAVE_ARCH_UNMAPPED_AREA
-#define HAVE_ARCH_CHECK_FIXED_MAPPING
 
 #endif /* _I386_PGTABLE_H */

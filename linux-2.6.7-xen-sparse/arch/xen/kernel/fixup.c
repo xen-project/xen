@@ -30,11 +30,12 @@
 #include <linux/pagemap.h>
 #include <linux/vmalloc.h>
 #include <linux/highmem.h>
+#include <linux/mman.h>
 #include <asm/fixmap.h>
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
 
-#if 0
+#if 1
 #define ASSERT(_p) \
     if ( !(_p) ) { printk("Assertion '%s' failed, line %d, file %s", #_p , \
     __LINE__, __FILE__); *(int*)0=0; }
@@ -50,23 +51,13 @@
 #define TestSetPageLocked(_p) TryLockPage(_p)
 #define PageAnon(_p)          0 /* no equivalent in 2.4 */
 #define pte_offset_kernel     pte_offset
-extern int __vmalloc_area_pages(unsigned long address,
-                                unsigned long size,
-                                int gfp_mask,
-                                pgprot_t prot,
-                                struct page ***pages);
-#else
-static inline int __vmalloc_area_pages(unsigned long address,
-                                unsigned long size,
-                                int gfp_mask,
-                                pgprot_t prot,
-                                struct page ***pages)
-{
-    struct vm_struct vma;
-    vma.addr = (void *)address;
-    vma.size = size + PAGE_SIZE; /* retarded interface */
-    return map_vm_area(&vma, prot, pages);
-}
+#define remap_page_range(_a,_b,_c,_d,_e) remap_page_range(_b,_c,_d,_e)
+#define daemonize(_n)                   \
+    do {                                \
+        daemonize();                    \
+        strcpy(current->comm, _n);      \
+        sigfillset(&current->blocked);  \
+    } while ( 0 )
 #endif
 
 static unsigned char *fixup_buf;
@@ -235,6 +226,64 @@ static unsigned int parse_insn(unsigned char *insn,
     return ((pb - insn) + 1 + (d & INSN_SUFFIX_BYTES));
 }
 
+#define SUCCESS 1
+#define FAIL    0
+static int map_fixup_buf(struct mm_struct *mm)
+{
+    struct vm_area_struct *vma;
+
+    /* Already mapped? This is a pretty safe check. */
+    if ( ((vma = find_vma(current->mm, FIXUP_BUF_USER)) != NULL) &&
+         (vma->vm_start <= FIXUP_BUF_USER) &&
+         (vma->vm_flags == (VM_READ | VM_MAYREAD | VM_RESERVED)) &&
+         (vma->vm_file == NULL) )
+        return SUCCESS;
+
+    if ( (vma = kmem_cache_alloc(vm_area_cachep, SLAB_KERNEL)) == NULL )
+    {
+        DPRINTK("Cannot allocate VMA.");
+        return FAIL;
+    }
+
+    memset(vma, 0, sizeof(*vma));
+
+    vma->vm_mm        = mm;
+    vma->vm_flags     = VM_READ | VM_MAYREAD | VM_RESERVED;
+    vma->vm_page_prot = PAGE_READONLY;
+
+    down_write(&mm->mmap_sem);
+
+    vma->vm_start = get_unmapped_area(
+        NULL, FIXUP_BUF_USER, FIXUP_BUF_SIZE,
+        0, MAP_PRIVATE|MAP_ANONYMOUS|MAP_FIXED);
+    if ( vma->vm_start != FIXUP_BUF_USER )
+    {
+        DPRINTK("Cannot allocate low-memory-region VMA.");
+        up_write(&mm->mmap_sem);
+        kmem_cache_free(vm_area_cachep, vma);
+        return FAIL;
+    }
+
+    vma->vm_end = vma->vm_start + FIXUP_BUF_SIZE;
+
+    if ( remap_page_range(vma, vma->vm_start, __pa(fixup_buf), 
+                          vma->vm_end - vma->vm_start, vma->vm_page_prot) )
+    {
+        DPRINTK("Cannot map low-memory-region VMA.");
+        up_write(&mm->mmap_sem);
+        kmem_cache_free(vm_area_cachep, vma);
+        return FAIL;
+    }
+
+    insert_vm_struct(mm, vma);
+    
+    mm->total_vm += FIXUP_BUF_SIZE >> PAGE_SHIFT;
+
+    up_write(&mm->mmap_sem);
+
+    return SUCCESS;
+}
+
 /*
  * Mainly this function checks that our patches can't erroneously get flushed
  * to a file on disc, which would screw us after reboot!
@@ -251,7 +300,8 @@ static int safe_to_patch(struct mm_struct *mm, unsigned long addr)
     if ( addr <= (FIXUP_BUF_USER + FIXUP_BUF_SIZE) )
         return SUCCESS;
 
-    if ( (vma = find_vma(current->mm, addr)) == NULL )
+    if ( ((vma = find_vma(current->mm, addr)) == NULL) ||
+         (vma->vm_start > addr) )
     {
         DPRINTK("No VMA contains fault address.");
         return FAIL;
@@ -313,6 +363,9 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
         DPRINTK("Unexpected CS value.");
         return;
     }
+
+    if ( unlikely(!map_fixup_buf(mm)) )
+        goto out;
 
     /* Hold the mmap_sem to prevent the mapping from disappearing under us. */
     down_read(&mm->mmap_sem);
@@ -669,8 +722,14 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
 
     /* Find the physical page that is to be patched. */
     pgd = pgd_offset(current->mm, eip);
+    if ( unlikely(!pgd_present(*pgd)) )
+        goto unlock_and_out;
     pmd = pmd_offset(pgd, eip);
+    if ( unlikely(!pmd_present(*pmd)) )
+        goto unlock_and_out;
     pte = pte_offset_kernel(pmd, eip);
+    if ( unlikely(!pte_present(*pte)) )
+        goto unlock_and_out;
     page = pte_page(*pte);
 
     /*
@@ -680,8 +739,7 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
     if ( unlikely(TestSetPageLocked(page)) )
     {
         DPRINTK("Page is locked.");
-        spin_unlock(&mm->page_table_lock);
-        goto out;
+        goto unlock_and_out;
     }
 
     /*
@@ -692,8 +750,7 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
     {
         DPRINTK("Page is dirty or anonymous.");
         unlock_page(page);
-        spin_unlock(&mm->page_table_lock);
-        goto out;
+        goto unlock_and_out;
     }
 
     veip = kmap(page);
@@ -709,30 +766,43 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
 
  out:
     up_read(&mm->mmap_sem);
+    return;
+
+ unlock_and_out:
+    spin_unlock(&mm->page_table_lock);
+    up_read(&mm->mmap_sem);
+    return;
+}
+
+static int fixup_thread(void *unused)
+{
+    daemonize("segfixup");
+    
+    for ( ; ; )
+    {
+        set_current_state(TASK_INTERRUPTIBLE);
+        schedule();
+    }
 }
 
 static int nosegfixup = 0;
 
 static int __init fixup_init(void)
 {
-    struct page *_pages[1<<FIXUP_BUF_ORDER], **pages=_pages;
     int i;
 
-    if ( nosegfixup )
-        return 0;
+    nosegfixup = 1; /* XXX */
 
-    HYPERVISOR_vm_assist(VMASST_CMD_enable,
-                         VMASST_TYPE_4gb_segments_notify);
-
-    fixup_buf = (char *)__get_free_pages(GFP_ATOMIC, FIXUP_BUF_ORDER);
-    for ( i = 0; i < (1<<FIXUP_BUF_ORDER); i++ )
-        _pages[i] = virt_to_page(fixup_buf) + i;
-
-    if ( __vmalloc_area_pages(FIXUP_BUF_USER, FIXUP_BUF_SIZE, 
-                              0, PAGE_READONLY, &pages) != 0 )
-        BUG();
-
-    memset(fixup_hash, 0, sizeof(fixup_hash));
+    if ( !nosegfixup )
+    {
+        HYPERVISOR_vm_assist(VMASST_CMD_enable,
+                             VMASST_TYPE_4gb_segments_notify);
+        fixup_buf = (char *)__get_free_pages(GFP_ATOMIC, FIXUP_BUF_ORDER);
+        for ( i = 0; i < (1 << FIXUP_BUF_ORDER); i++ )
+            SetPageReserved(virt_to_page(fixup_buf) + i);
+        memset(fixup_hash, 0, sizeof(fixup_hash));
+        (void)kernel_thread(fixup_thread, NULL, CLONE_FS | CLONE_FILES);
+    }
 
     return 0;
 }
