@@ -1,8 +1,6 @@
 #ifndef _I386_REGS_H
 #define _I386_REGS_H
 
-#include <xen/types.h>
-
 struct xen_regs
 {
     /* All saved activations contain the following fields. */
