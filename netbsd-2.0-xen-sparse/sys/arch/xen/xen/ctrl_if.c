@@ -20,8 +20,9 @@ __KERNEL_RCSID(0, "$NetBSD$");
 #include <machine/ctrl_if.h>
 #include <machine/evtchn.h>
 
+void printk(char *, ...);
 #if 0
-#define DPRINTK(_f, _a...) printf("(file=%s, line=%d) " _f, \
+#define DPRINTK(_f, _a...) printk("(file=%s, line=%d) " _f, \
                            __FILE__ , __LINE__ , ## _a )
 #else
 #define DPRINTK(_f, _a...) ((void)0)
@@ -34,7 +35,7 @@ __KERNEL_RCSID(0, "$NetBSD$");
  */
 int initdom_ctrlif_domcontroller_port = -1;
 
-static int ctrl_if_evtchn;
+/* static */ int ctrl_if_evtchn = -1;
 static int ctrl_if_irq;
 static struct simplelock ctrl_if_lock;
 
@@ -148,9 +149,10 @@ static void __ctrl_if_rxmsg_deferred(void *unused)
 
 	while ( ctrl_if_rxmsg_deferred_cons != dp )
 	{
-		msg = &ctrl_if_rxmsg_deferred[MASK_CONTROL_IDX(
-						      ctrl_if_rxmsg_deferred_cons++)];
+		msg = &ctrl_if_rxmsg_deferred[
+		    MASK_CONTROL_IDX(ctrl_if_rxmsg_deferred_cons)];
 		(*ctrl_if_rxmsg_handler[msg->type])(msg, 0);
+		ctrl_if_rxmsg_deferred_cons++;
 	}
 }
 
@@ -166,7 +168,7 @@ static void __ctrl_if_rx_tasklet(unsigned long data)
 
     while ( ctrl_if_rx_req_cons != rp )
     {
-        pmsg = &ctrl_if->rx_ring[MASK_CONTROL_IDX(ctrl_if_rx_req_cons++)];
+        pmsg = &ctrl_if->rx_ring[MASK_CONTROL_IDX(ctrl_if_rx_req_cons)];
         memcpy(&msg, pmsg, offsetof(ctrl_msg_t, msg));
 
         DPRINTK("Rx-Req %u/%u :: %d/%d\n", 
@@ -184,6 +186,8 @@ static void __ctrl_if_rx_tasklet(unsigned long data)
                    &msg, offsetof(ctrl_msg_t, msg) + msg.length);
         else
             (*ctrl_if_rxmsg_handler[msg.type])(&msg, 0);
+
+	ctrl_if_rx_req_cons++;
     }
 
     if ( dp != ctrl_if_rxmsg_deferred_prod )
@@ -206,10 +210,14 @@ static int ctrl_if_interrupt(void *arg)
     if ( ctrl_if_tx_resp_cons != ctrl_if->tx_resp_prod ||
 	ctrl_if_rx_req_cons != ctrl_if->rx_req_prod ) {
 #if 0
+#if 0
 	    wakeup(&ctrl_if_kthread);
 #else
 	    if (ctrl_if_softintr)
 		    softintr_schedule(ctrl_if_softintr);
+#endif
+#else
+	    ctrl_if_kthread((void *)1);
 #endif
     }
 
@@ -225,6 +233,7 @@ ctrl_if_send_message_noblock(
     control_if_t *ctrl_if = get_ctrl_if();
     unsigned long flags;
     int           i;
+    int s;
 
     save_and_cli(flags);
     simple_lock(&ctrl_if_lock);
@@ -233,7 +242,11 @@ ctrl_if_send_message_noblock(
     {
         simple_unlock(&ctrl_if_lock);
 	restore_flags(flags);
-        return -EAGAIN;
+	s = splhigh();
+	if ( ctrl_if_tx_resp_cons != ctrl_if->tx_resp_prod )
+		__ctrl_if_tx_tasklet(0);
+	splx(s);
+        return EAGAIN;
     }
 
     msg->id = 0xFF;
@@ -275,10 +288,13 @@ ctrl_if_send_message_block(
 
 	while ((rc = ctrl_if_send_message_noblock(msg, hnd, id)) == EAGAIN) {
 		/* XXXcl possible race -> add a lock and ltsleep */
+#if 1
+#else
 		rc = tsleep((caddr_t) &ctrl_if_tx_wait, PUSER | PCATCH,
 		    "ctrl_if", 0);
 		if (rc)
 			break;
+#endif
 	}
 
 	return rc;
@@ -456,17 +472,12 @@ ctrl_if_kthread(void *arg)
 {
 	control_if_t *ctrl_if = get_ctrl_if();
 
-	// printf("ctrl_if_kthread starting\n");
 	for (;;) {
 		if ( ctrl_if_tx_resp_cons != ctrl_if->tx_resp_prod )
 			__ctrl_if_tx_tasklet(0);
 
 		if ( ctrl_if_rx_req_cons != ctrl_if->rx_req_prod )
 			__ctrl_if_rx_tasklet(0);
-
-		if ( ctrl_if_rxmsg_deferred_cons !=
-		    ctrl_if_rxmsg_deferred_prod )
-			__ctrl_if_rxmsg_deferred(NULL);
 
 		if (arg) {
 			// printf("ctrl_if_kthread one-shot done\n");
@@ -479,13 +490,19 @@ ctrl_if_kthread(void *arg)
 }
 
 static void
-ctrl_if_create_kthread(void *arg)
+ctrl_if_softintr_handler(void *arg)
 {
+	static int in_handler = 0;
 
-	printf("ctrl_if_kthread creating\n");
-	if (kthread_create1(ctrl_if_kthread, arg, NULL, "ctrl_if"))
-		printf("ctrl_if_kthread create failed\n");
-	softintr_schedule(ctrl_if_softintr);
+	if (in_handler++ != 0) {
+		ctrl_if_evtchn = -1;
+		panic("recurse");
+	}
+
+	if ( ctrl_if_rxmsg_deferred_cons != ctrl_if_rxmsg_deferred_prod )
+		__ctrl_if_rxmsg_deferred(NULL);
+
+	in_handler--;
 }
 
 #ifdef notyet
@@ -528,20 +545,29 @@ void ctrl_if_resume(void)
     hypervisor_enable_irq(ctrl_if_irq);
 }
 
+void ctrl_if_early_init(void);
+void ctrl_if_early_init(void)
+{
+
+	simple_lock_init(&ctrl_if_lock);
+
+	ctrl_if_evtchn = xen_start_info.domain_controller_evtchn;
+}
+
 void ctrl_if_init(void)
 {
-        int i;
+	int i;
 
-    for ( i = 0; i < 256; i++ )
-        ctrl_if_rxmsg_handler[i] = ctrl_if_rxmsg_default_handler;
+	for ( i = 0; i < 256; i++ )
+		ctrl_if_rxmsg_handler[i] = ctrl_if_rxmsg_default_handler;
 
-    simple_lock_init(&ctrl_if_lock);
+	if (ctrl_if_evtchn == -1)
+		ctrl_if_early_init();
 
-    if (0) kthread_create(ctrl_if_create_kthread, NULL);
-    ctrl_if_softintr =
-	    softintr_establish(IPL_SOFTNET, ctrl_if_kthread, (void *)1);
+	ctrl_if_softintr = softintr_establish(IPL_SOFTNET,
+	    ctrl_if_softintr_handler, NULL);
 
-    ctrl_if_resume();
+	ctrl_if_resume();
 }
 
 
