@@ -102,6 +102,7 @@ typedef struct { unsigned long pt_lo; } pagetable_t;
 #define __pa(x)			((unsigned long)(x)-PAGE_OFFSET)
 #define __va(x)			((void *)((unsigned long)(x)+PAGE_OFFSET))
 #define page_address(_p)        (__va(((_p) - frame_table) << PAGE_SHIFT))
+#define pfn_to_page(_pfn)       (frame_table + (_pfn))
 #define phys_to_page(kaddr)     (frame_table + ((kaddr) >> PAGE_SHIFT))
 #define virt_to_page(kaddr)	(frame_table + (__pa(kaddr) >> PAGE_SHIFT))
 #define VALID_PAGE(page)	((page - frame_table) < max_mapnr)

@@ -5,9 +5,13 @@
 struct domain;
 struct pfn_info;
 
+/* Boot-time allocator. Turns into generic allocator after bootstrap. */
+unsigned long init_boot_allocator(unsigned long bitmap_start);
+void init_boot_pages(unsigned long ps, unsigned long pe);
+unsigned long alloc_boot_pages(unsigned long size, unsigned long align);
+void end_boot_allocator(void);
+
 /* Generic allocator. These functions are *not* interrupt-safe. */
-unsigned long init_heap_allocator(
-    unsigned long bitmap_start, unsigned long max_pages);
 void init_heap_pages(int zone, struct pfn_info *pg, unsigned long nr_pages);
 struct pfn_info *alloc_heap_pages(int zone, int order);
 void free_heap_pages(int zone, struct pfn_info *pg, int order);

@@ -27,12 +27,12 @@ static void __init add_memory_region(unsigned long long start,
 
 #define E820_DEBUG	1
 
-static void __init print_memory_map(char *who)
+static void __init print_memory_map(void)
 {
     int i;
 
     for (i = 0; i < e820.nr_map; i++) {
-        printk(" %s: %016Lx - %016Lx ", who,
+        printk(" %016Lx - %016Lx ",
                e820.map[i].addr,
                e820.map[i].addr + e820.map[i].size);
         switch (e820.map[i].type) {
@@ -305,19 +305,18 @@ static unsigned long __init find_max_pfn(void)
     return max_pfn;
 }
 
-static char * __init machine_specific_memory_setup(
+static void __init machine_specific_memory_setup(
     struct e820entry *raw, int raw_nr)
 {
     char nr = (char)raw_nr;
-    char *who = "Pseudo-e820";
     sanitize_e820_map(raw, &nr);
     (void)copy_e820_map(raw, nr);
-    return who;
 }
 
 unsigned long init_e820(struct e820entry *raw, int raw_nr)
 {
+    machine_specific_memory_setup(raw, raw_nr);
     printk(KERN_INFO "Physical RAM map:\n");
-    print_memory_map(machine_specific_memory_setup(raw, raw_nr));
+    print_memory_map();
     return find_max_pfn();
 }

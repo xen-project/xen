@@ -30,7 +30,9 @@ integer_param("dom0_mem", opt_dom0_mem);
  * pfn_info table and allocation bitmap.
  */
 static unsigned int opt_xenheap_megabytes = XENHEAP_DEFAULT_MB;
+#if defined(__x86_64__)
 integer_param("xenheap_megabytes", opt_xenheap_megabytes);
+#endif
 
 /* opt_noht: If true, Hyperthreading is ignored. */
 int opt_noht = 0;
@@ -466,15 +468,14 @@ static void __init start_of_day(void)
 
 void __init __start_xen(multiboot_info_t *mbi)
 {
-    unsigned long max_page;
     unsigned char *cmdline;
     module_t *mod = (module_t *)__va(mbi->mods_addr);
     void *heap_start;
-    unsigned long max_mem;
+    unsigned long firsthole_start, nr_pages;
     unsigned long dom0_memory_start, dom0_memory_end;
     unsigned long initial_images_start, initial_images_end;
     struct e820entry e820_raw[E820MAX];
-    int e820_raw_nr = 0, bytes = 0;
+    int i, e820_raw_nr = 0, bytes = 0;
 
     /* Parse the command-line options. */
     if ( (mbi->flags & MBI_CMDLINE) && (mbi->cmdline != 0) )
@@ -492,12 +493,6 @@ void __init __start_xen(multiboot_info_t *mbi)
     if ( !(mbi->flags & MBI_MODULES) || (mbi->mods_count == 0) )
     {
         printk("FATAL ERROR: Require at least one Multiboot module.\n");
-        for ( ; ; ) ;
-    }
-
-    if ( opt_xenheap_megabytes < 4 )
-    {
-        printk("FATAL ERROR: Xen heap is too small to safely continue!\n");
         for ( ; ; ) ;
     }
 
@@ -523,9 +518,9 @@ void __init __start_xen(multiboot_info_t *mbi)
         e820_raw[0].addr = 0;
         e820_raw[0].size = mbi->mem_lower << 10;
         e820_raw[0].type = E820_RAM;
-        e820_raw[0].addr = 0x100000;
-        e820_raw[0].size = mbi->mem_upper << 10;
-        e820_raw[0].type = E820_RAM;
+        e820_raw[1].addr = 0x100000;
+        e820_raw[1].size = mbi->mem_upper << 10;
+        e820_raw[1].type = E820_RAM;
         e820_raw_nr = 2;
     }
     else
@@ -534,76 +529,70 @@ void __init __start_xen(multiboot_info_t *mbi)
         for ( ; ; ) ;
     }
 
-    max_mem = max_page = init_e820(e820_raw, e820_raw_nr);
-    max_mem = max_page = (mbi->mem_upper+1024) >> (PAGE_SHIFT - 10);
+    max_page = init_e820(e820_raw, e820_raw_nr);
 
-#if defined(__i386__)
+    /* Find the first high-memory RAM hole. */
+    for ( i = 0; i < e820.nr_map; i++ )
+        if ( (e820.map[i].type == E820_RAM) &&
+             (e820.map[i].addr >= 0x100000) )
+            break;
+    firsthole_start = e820.map[i].addr + e820.map[i].size;
 
-    initial_images_start = DIRECTMAP_PHYS_END;
+    /* Relocate the Multiboot modules. */
+    initial_images_start = xenheap_phys_end;
     initial_images_end   = initial_images_start + 
         (mod[mbi->mods_count-1].mod_end - mod[0].mod_start);
-    if ( initial_images_end > (max_page << PAGE_SHIFT) )
+    if ( initial_images_end > firsthole_start )
     {
         printk("Not enough memory to stash the DOM0 kernel image.\n");
         for ( ; ; ) ;
     }
+#if defined(__i386__)
     memmove((void *)initial_images_start,  /* use low mapping */
             (void *)mod[0].mod_start,      /* use low mapping */
             mod[mbi->mods_count-1].mod_end - mod[0].mod_start);
-
-    if ( opt_xenheap_megabytes > XENHEAP_DEFAULT_MB )
-    {
-        printk("Xen heap size is limited to %dMB - you specified %dMB.\n",
-               XENHEAP_DEFAULT_MB, opt_xenheap_megabytes);
-        for ( ; ; ) ;
-    }
-
-    ASSERT((sizeof(struct pfn_info) << 20) <=
-           (FRAMETABLE_VIRT_END - FRAMETABLE_VIRT_START));
-
-    init_frametable((void *)FRAMETABLE_VIRT_START, max_page);
-
 #elif defined(__x86_64__)
-
-    init_frametable(__va(xenheap_phys_end), max_page);
-
-    initial_images_start = __pa(frame_table) + frame_table_size;
-    initial_images_end   = initial_images_start + 
-        (mod[mbi->mods_count-1].mod_end - mod[0].mod_start);
-    if ( initial_images_end > (max_page << PAGE_SHIFT) )
-    {
-        printk("Not enough memory to stash the DOM0 kernel image.\n");
-        for ( ; ; ) ;
-    }
     memmove(__va(initial_images_start),
             __va(mod[0].mod_start),
             mod[mbi->mods_count-1].mod_end - mod[0].mod_start);
-
 #endif
 
-    dom0_memory_start    = (initial_images_end + ((4<<20)-1)) & ~((4<<20)-1);
-    dom0_memory_end      = dom0_memory_start + (opt_dom0_mem << 10);
-    dom0_memory_end      = (dom0_memory_end + PAGE_SIZE - 1) & PAGE_MASK;
-    
-    /* Cheesy sanity check: enough memory for DOM0 allocation + some slack? */
-    if ( (dom0_memory_end + (8<<20)) > (max_page << PAGE_SHIFT) )
+    /* Initialise boot-time allocator with all RAM situated after modules. */
+    heap_start = memguard_init(&_end);
+    heap_start = __va(init_boot_allocator(__pa(heap_start)));
+    nr_pages   = 0;
+    for ( i = 0; i < e820.nr_map; i++ )
+    {
+        if ( e820.map[i].type != E820_RAM )
+            continue;
+        nr_pages += e820.map[i].size >> PAGE_SHIFT;
+        if ( (e820.map[i].addr + e820.map[i].size) >= initial_images_end )
+            init_boot_pages((e820.map[i].addr < initial_images_end) ?
+                            initial_images_end : e820.map[i].addr,
+                            e820.map[i].addr + e820.map[i].size);
+    }
+
+    printk("System RAM: %luMB (%lukB)\n", 
+           nr_pages >> (20 - PAGE_SHIFT),
+           nr_pages << (PAGE_SHIFT - 10));
+
+    /* Allocate an aligned chunk of RAM for DOM0. */
+    dom0_memory_start = alloc_boot_pages(opt_dom0_mem << 10, 4UL << 20);
+    dom0_memory_end   = dom0_memory_start + (opt_dom0_mem << 10);
+    if ( dom0_memory_start == 0 )
     {
         printk("Not enough memory for DOM0 memory reservation.\n");
         for ( ; ; ) ;
     }
 
-    printk("Initialised %luMB memory (%lu pages) on a %luMB machine\n",
-           max_page >> (20-PAGE_SHIFT), max_page,
-	   max_mem  >> (20-PAGE_SHIFT));
+    init_frametable();
 
-    heap_start = memguard_init(&_end);
-    heap_start = __va(init_heap_allocator(__pa(heap_start), max_page));
- 
+    end_boot_allocator();
+
     init_xenheap_pages(__pa(heap_start), xenheap_phys_end);
-    printk("Xen heap size is %luKB\n", 
-	   (xenheap_phys_end-__pa(heap_start))/1024 );
-
-    init_domheap_pages(dom0_memory_end, max_page << PAGE_SHIFT);
+    printk("Xen heap: %luMB (%lukB)\n",
+	   (xenheap_phys_end-__pa(heap_start)) >> 20,
+	   (xenheap_phys_end-__pa(heap_start)) >> 10);
 
     /* Initialise the slab allocator. */
     xmem_cache_init();
@@ -649,8 +638,7 @@ void __init __start_xen(multiboot_info_t *mbi)
         panic("Could not set up DOM0 guest OS\n");
 
     /* The stash space for the initial kernel image can now be freed up. */
-    init_domheap_pages(__pa(frame_table) + frame_table_size,
-                       dom0_memory_start);
+    init_domheap_pages(initial_images_start, initial_images_end);
 
     scrub_heap_pages();
 
