@@ -122,10 +122,9 @@ static void __ctrl_if_tx_tasklet(unsigned long data)
 
     if ( was_full && !TX_FULL(ctrl_if) )
     {
+        wake_up(&ctrl_if_tx_wait);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
         run_task_queue(&ctrl_if_tx_tq);
-#else
-        wake_up(&ctrl_if_tx_wait);
 #endif
     }
 }
