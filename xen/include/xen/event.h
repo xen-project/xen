@@ -71,11 +71,8 @@ static inline void evtchn_set_pending(struct task_struct *p, int port)
 
 static inline void evtchn_set_exception(struct task_struct *p, int port)
 {
-    shared_info_t *s = p->shared_info;
-    if ( !test_and_set_bit(port,    &s->evtchn_exception[0]) &&
-         !test_bit        (port,    &s->evtchn_mask[0])      &&
-         !test_and_set_bit(port>>5, &s->evtchn_exception_sel) )
-        guest_notify(p);
+    if ( !test_and_set_bit(port, &p->shared_info->evtchn_exception[0]) )
+        evtchn_set_pending(p, port);
 }
 
 /*

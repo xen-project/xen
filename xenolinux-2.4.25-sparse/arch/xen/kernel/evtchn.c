@@ -38,76 +38,37 @@ static int irq_bindcount[NR_IRQS];
 /* Upcall to generic IRQ layer. */
 extern asmlinkage unsigned int do_IRQ(int irq, struct pt_regs *regs);
 
-static void evtchn_handle_normal(shared_info_t *s, struct pt_regs *regs)
-{
-    unsigned long l1, l2;
-    unsigned int  l1i, l2i, port;
-    int           irq;
-
-    l1 = xchg(&s->evtchn_pending_sel, 0);
-    while ( (l1i = ffs(l1)) != 0 )
-    {
-        l1i--;
-        l1 &= ~(1 << l1i);
-        
-        l2 = s->evtchn_pending[l1i] & ~s->evtchn_mask[l1i];
-        while ( (l2i = ffs(l2)) != 0 )
-        {
-            l2i--;
-            l2 &= ~(1 << l2i);
-            
-            port = (l1i << 5) + l2i;
-            if ( (irq = evtchn_to_irq[port]) != -1 )
-                do_IRQ(irq, regs);
-            else
-                evtchn_device_upcall(port, 0);
-        }
-    }
-}
-
-static void evtchn_handle_exceptions(shared_info_t *s, struct pt_regs *regs)
-{
-    unsigned long l1, l2;
-    unsigned int  l1i, l2i, port;
-    int           irq;
-
-    l1 = xchg(&s->evtchn_exception_sel, 0);
-    while ( (l1i = ffs(l1)) != 0 )
-    {
-        l1i--;
-        l1 &= ~(1 << l1i);
-        
-        l2 = s->evtchn_exception[l1i] & ~s->evtchn_mask[l1i];
-        while ( (l2i = ffs(l2)) != 0 )
-        {
-            l2i--;
-            l2 &= ~(1 << l2i);
-            
-            port = (l1i << 5) + l2i;
-            if ( (irq = evtchn_to_irq[port]) != -1 )
-            {
-                printk(KERN_ALERT "Error on IRQ line %d!\n", irq);
-                synch_clear_bit(port, &s->evtchn_exception[0]);
-            }
-            else
-                evtchn_device_upcall(port, 1);
-        }
-    }
-}
-
 void evtchn_do_upcall(struct pt_regs *regs)
 {
-    unsigned long flags;
+    unsigned long  l1, l2;
+    unsigned int   l1i, l2i, port;
+    int            irq;
+    unsigned long  flags;
     shared_info_t *s = HYPERVISOR_shared_info;
 
     local_irq_save(flags);
     
     while ( synch_test_and_clear_bit(0, &s->evtchn_upcall_pending) )
     {
-        if ( s->evtchn_pending_sel != 0 )
-            evtchn_handle_normal(s, regs);
-        if ( s->evtchn_exception_sel != 0 )
-            evtchn_handle_exceptions(s, regs);
+        l1 = xchg(&s->evtchn_pending_sel, 0);
+        while ( (l1i = ffs(l1)) != 0 )
+        {
+            l1i--;
+            l1 &= ~(1 << l1i);
+        
+            l2 = s->evtchn_pending[l1i] & ~s->evtchn_mask[l1i];
+            while ( (l2i = ffs(l2)) != 0 )
+            {
+                l2i--;
+                l2 &= ~(1 << l2i);
+            
+                port = (l1i << 5) + l2i;
+                if ( (irq = evtchn_to_irq[port]) != -1 )
+                    do_IRQ(irq, regs);
+                else
+                    evtchn_device_upcall(port);
+            }
+        }
     }
 
     local_irq_restore(flags);
@@ -346,16 +307,16 @@ static struct hw_interrupt_type pirq_type = {
     NULL
 };
 
-static void error_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static void misdirect_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-    printk(KERN_ALERT "unexpected VIRQ_ERROR trap to vector %d\n", irq);
+    /* nothing */
 }
 
-static struct irqaction error_action = {
-    error_interrupt, 
+static struct irqaction misdirect_action = {
+    misdirect_interrupt, 
     SA_INTERRUPT, 
     0, 
-    "error", 
+    "misdirect", 
     NULL, 
     NULL
 };
@@ -372,7 +333,10 @@ void __init init_IRQ(void)
 
     /* No event-channel -> IRQ mappings. */
     for ( i = 0; i < NR_EVENT_CHANNELS; i++ )
+    {
         evtchn_to_irq[i] = -1;
+        mask_evtchn(i); /* No event channels are 'live' right now. */
+    }
 
     /* No IRQ -> event-channel mappings. */
     for ( i = 0; i < NR_IRQS; i++ )
@@ -400,5 +364,5 @@ void __init init_IRQ(void)
         irq_desc[pirq_to_irq(i)].handler = &pirq_type;
     }
 
-    (void)setup_irq(bind_virq_to_irq(VIRQ_ERROR), &error_action);
+    (void)setup_irq(bind_virq_to_irq(VIRQ_MISDIRECT), &misdirect_action);
 }

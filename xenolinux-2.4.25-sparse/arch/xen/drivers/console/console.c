@@ -143,8 +143,6 @@ void xen_console_init(void)
     }
 
     register_console(&kcons_info);
-
-    evtchn_clear_error_virq();
 }
 
 

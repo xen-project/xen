@@ -56,19 +56,19 @@
  * Virtual interrupts that a guest OS may receive from the hypervisor.
  */
 
-#define VIRQ_BLKDEV    0  /* A block device response has been queued. */
-#define VIRQ_TIMER     1  /* A timeout has been updated. */
-#define VIRQ_DIE       2  /* OS is about to be killed. Clean up please! */
-#define VIRQ_DEBUG     3  /* Request guest to dump debug info (gross!) */
-#define VIRQ_NET       4  /* There are packets for transmission. */
-#define VIRQ_PS2       5  /* PS/2 keyboard or mouse event(s) */
-#define VIRQ_STOP      6  /* Prepare for stopping and possible pickling */
-#define VIRQ_EVTCHN    7  /* Event pending on an event channel */
-#define VIRQ_VBD_UPD   8  /* Event to signal VBDs should be reprobed */
-#define VIRQ_CONSOLE   9  /* This is only for domain-0 initial console. */
-#define VIRQ_PHYSIRQ  10  /* Event to signal pending physical IRQs. */
-#define VIRQ_ERROR    11  /* Catch-all virtual interrupt. */
-#define NR_VIRQS      12
+#define VIRQ_BLKDEV     0  /* A block device response has been queued. */
+#define VIRQ_TIMER      1  /* A timeout has been updated. */
+#define VIRQ_DIE        2  /* OS is about to be killed. Clean up please! */
+#define VIRQ_DEBUG      3  /* Request guest to dump debug info (gross!) */
+#define VIRQ_NET        4  /* There are packets for transmission. */
+#define VIRQ_PS2        5  /* PS/2 keyboard or mouse event(s) */
+#define VIRQ_STOP       6  /* Prepare for stopping and possible pickling */
+#define VIRQ_EVTCHN     7  /* Event pending on an event channel */
+#define VIRQ_VBD_UPD    8  /* Event to signal VBDs should be reprobed */
+#define VIRQ_CONSOLE    9  /* This is only for domain-0 initial console. */
+#define VIRQ_PHYSIRQ   10  /* Event to signal pending physical IRQs. */
+#define VIRQ_MISDIRECT 11  /* Catch-all virtual interrupt. */
+#define NR_VIRQS       12
 
 /*
  * MMU_XXX: specified in least 2 bits of 'ptr' field. These bits are masked
@@ -187,23 +187,22 @@ typedef struct shared_info_st
      *  2. EXCEPTION -- notifies the domain that there has been some
      *     exceptional event associated with this channel (e.g. remote
      *     disconnect, physical IRQ error). This bit is cleared by the guest.
+     *     A 0->1 transition of this bit will cause the PENDING bit to be set.
      *  3. MASK -- if this bit is clear then a 0->1 transition of PENDING
-     *     or EXCEPTION will cause an asynchronous upcall to be scheduled.
-     *     This bit is only updated by the guest. It is read-only within Xen.
-     *     If a channel becomes pending or an exceptional event occurs while
-     *     the channel is masked then the 'edge' is lost (i.e., when the
-     *     channel is unmasked, the guest must manually handle pending
-     *     notifications as no upcall will be scheduled by Xen).
+     *     will cause an asynchronous upcall to be scheduled. This bit is only
+     *     updated by the guest. It is read-only within Xen. If a channel
+     *     becomes pending while the channel is masked then the 'edge' is lost
+     *     (i.e., when the channel is unmasked, the guest must manually handle
+     *     pending notifications as no upcall will be scheduled by Xen).
      * 
-     * To expedite scanning of pending notifications and exceptions, any 
-     * 0->1 transition on an unmasked channel causes a corresponding bit in
-     * a 32-bit selector to be set. Each bit in the selector covers a 32-bit
-     * word in the PENDING or EXCEPTION bitfield array.
+     * To expedite scanning of pending notifications, any 0->1 pending
+     * transition on an unmasked channel causes a corresponding bit in a
+     * 32-bit selector to be set. Each bit in the selector covers a 32-bit
+     * word in the PENDING bitfield array.
      */
     u32 evtchn_pending[32];
     u32 evtchn_pending_sel;
     u32 evtchn_exception[32];
-    u32 evtchn_exception_sel;
     u32 evtchn_mask[32];
 
     /*

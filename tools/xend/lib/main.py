@@ -41,8 +41,7 @@ def daemon_loop():
 
     # Interface via which we receive event notifications from other guest
     # OSes. This interface also allows us to clear/acknowledge outstanding
-    # notifications --- successive notifications for the same channel are
-    # dropped until the first notification is cleared.
+    # notifications.
     notifier = xend.utils.notifier()
 
     ##
@@ -169,56 +168,48 @@ def daemon_loop():
                 break
             (idx, type) = notification
 
+            if not control_list.has_key(idx):
+                continue
+
+            (port, rbuf, wbuf, con_if) = control_list[idx]
+            work_done = False
+
             # If we pick up a disconnect notification then we do any necessary
-            # cleanup, even if the event channel doesn't belong to us.
-            # This is intended to prevent the event-channel port space from
-            # getting clogged with stale connections.
-            if type == notifier.DISCONNECT:
+            # cleanup.
+            if type == notifier.EXCEPTION:
                 ret = xc.evtchn_status(idx)
-                if ret['status'] == 'interdomain':
-                    notifier.clear(idx, notifier.NORMAL)
-                    notifier.clear(idx, notifier.DISCONNECT)
-                    if control_list.has_key(idx):
-                        (port, rbuf, wbuf, con_if) =  control_list[idx]
-                        con_if.close()
-                        del control_list[idx], port, rbuf, wbuf, con_if
-                elif ret['status'] == 'unbound':
-                    # There's noone to do the closure for us...
-                    xc.evtchn_close(idx)
+                if ret['status'] == 'unbound':
+                    notifier.unbind(idx)
+                    con_if.close()
+                    del control_list[idx], port, rbuf, wbuf, con_if
+                    continue
 
-            # A standard notification: probably means there are messages to
-            # read or that there is space to write messages.
-            elif type == notifier.NORMAL and control_list.has_key(idx):
-                (port, rbuf, wbuf, con_if) = control_list[idx]
-                work_done = False
+            # Read incoming requests. Currently assume that request
+            # message always containb console data.
+            while port.request_to_read():
+                msg = port.read_request()
+                rbuf.write(msg.get_payload())
+                port.write_response(msg)
+                work_done = True
 
-                # We clear the notification before doing any work, to avoid
-                # races.
-                notifier.clear(idx, notifier.NORMAL)
+            # Incoming responses are currently thrown on the floor.
+            while port.response_to_read():
+                msg = port.read_response()
+                work_done = True
 
-                # Read incoming requests. Currently assume that request
-                # message always containb console data.
-                while port.request_to_read():
-                    msg = port.read_request()
-                    rbuf.write(msg.get_payload())
-                    port.write_response(msg)
-                    work_done = True
+            # Send as much pending console data as there is room for.
+            while not wbuf.empty() and port.space_to_write_request():
+                msg = xend.utils.message(0, 0, 0)
+                msg.append_payload(wbuf.read(msg.MAX_PAYLOAD))
+                port.write_request(msg)
+                work_done = True
 
-                # Incoming responses are currently thrown on the floor.
-                while port.response_to_read():
-                    msg = port.read_response()
-                    work_done = True
+            # Finally, notify the remote end of any work that we did.
+            if work_done:
+                port.notify()
 
-                # Send as much pending console data as there is room for.
-                while not wbuf.empty() and port.space_to_write_request():
-                    msg = xend.utils.message(0, 0, 0)
-                    msg.append_payload(wbuf.read(msg.MAX_PAYLOAD))
-                    port.write_request(msg)
-                    work_done = True
-
-                # Finally, notify the remote end of any work that we did.
-                if work_done:
-                    port.notify()
+            # Unmask notifications for this port.
+            notifier.unmask(idx)
 
 
 
