@@ -1593,7 +1593,7 @@ void ptwr_flush(const int which)
         MEM_LOG("ptwr: Could not read pte at %p\n", ptep);
         /*
          * Really a bug. We could read this PTE during the initial fault,
-         * and pagetables can't have changed meantime. XXX Multi-proc guests?
+         * and pagetables can't have changed meantime. XXX Multi-CPU guests?
          */
         BUG();
     }
@@ -1620,13 +1620,14 @@ void ptwr_flush(const int which)
         MEM_LOG("ptwr: Could not update pte at %p\n", ptep);
         /*
          * Really a bug. We could write this PTE during the initial fault,
-         * and pagetables can't have changed meantime. XXX Multi-proc guests?
+         * and pagetables can't have changed meantime. XXX Multi-CPU guests?
          */
         BUG();
     }
 
     /* Ensure that there are no stale writable mappings in any TLB. */
-    __flush_tlb_one(l1va);
+    /* NB. INVLPG is a serialising instruction: flushes pending updates. */
+    __flush_tlb_one(l1va); /* XXX Multi-CPU guests? */
     PTWR_PRINTK("[%c] disconnected_l1va at %p now %08lx\n",
                 PTWR_PRINT_WHICH, ptep, pte);
 
@@ -1766,7 +1767,7 @@ int ptwr_do_page_fault(unsigned long addr)
     {
         nl2e = mk_l2_pgentry(l2_pgentry_val(*pl2e) & ~_PAGE_PRESENT);
         update_l2e(pl2e, *pl2e, nl2e);
-        flush_tlb();
+        flush_tlb(); /* XXX Multi-CPU guests? */
     }
     
     /* Temporarily map the L1 page, and make a copy of it. */

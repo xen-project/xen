@@ -41,7 +41,7 @@ void write_cr3(unsigned long cr3)
     t = tlbflush_clock;
     do {
         t1 = t2 = t;
-        /* Clock wrapped: someone else is leading a global TLB shootodiown. */
+        /* Clock wrapped: someone else is leading a global TLB shootdown. */
         if ( unlikely(t1 == 0) )
             goto skip_clocktick;
         t2 = (t + 1) & WRAP_MASK;
@@ -60,7 +60,15 @@ void write_cr3(unsigned long cr3)
     __asm__ __volatile__ ( "mov"__OS" %0, %%cr3" : : "r" (cr3) : "memory" );
 
     /*
-     * STEP 3. Update this CPU's timestamp.
+     * STEP 3. Update this CPU's timestamp. Note that this happens *after*
+     *         flushing the TLB, as otherwise we can race a NEED_FLUSH() test
+     *         on another CPU. (e.g., other CPU sees the updated CPU stamp and
+     *         so does not force a synchronous TLB flush, but the flush in this
+     *         function hasn't yet occurred and so the TLB might be stale).
+     *         The ordering would only actually matter if this function were
+     *         interruptible, and something that abuses the stale mapping could
+     *         exist in an interrupt handler. In fact neither of these is the
+     *         case, so really we are being ultra paranoid.
      */
 
     tlbflush_time[smp_processor_id()] = t2;
