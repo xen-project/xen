@@ -1,4 +1,5 @@
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+
 """Domain creation.
 """
 import string
@@ -15,11 +16,21 @@ from xen.xm.opts import *
 gopts = Opts(use="""[options]
 
 Create a domain.
+
+Domain creation parameters can be set by command-line switches, from
+a python configuration script or an SXP config file. See documentation
+for --defaults, --config. Configuration variables can be set using
+VAR=VAL on the command line. For example vmid=3 sets vmid to 3.
+
 """)
 
 gopts.opt('help', short='h',
          fn=set_true, default=0,
          use="Print this help.")
+
+gopts.opt('help_config',
+          fn=set_true, default=0,
+          use="Print help for configuration file.")
 
 gopts.opt('quiet', short='q',
          fn=set_true, default=0,
@@ -31,24 +42,40 @@ gopts.opt('path', val='PATH',
 
 gopts.opt('defaults', short='f', val='FILE',
          fn=set_value, default='xmdefaults',
-         use="Use the given default script.")
+         use="""Use the given Python defaults script.
+The defaults script is loaded after arguments have been processed.
+Each command-line option sets a configuration variable named after
+its long option name, and these variables are placed in the
+environment of the script before it is loaded.
+Variables for options that may be repeated have list values.
+Other variables can be set using VAR=VAL on the command line.
+
+After the script is loaded, option values that were not set on the
+command line are replaced by the values set in the script.
+""")
 
 gopts.opt('config', short='F', val='FILE',
          fn=set_value, default=None,
-         use='Domain configuration to use (SXP).')
+         use="""Domain configuration to use (SXP).
+SXP is the underlying configuration format used by Xen.
+SXP configs can be hand-written or generated from Python defaults
+scripts, using the -n (dryrun) option to print the config.
+""")
 
 gopts.opt('load', short='L', val='FILE',
           fn=set_value, default=None,
           use='Domain saved state to load.')
 
-gopts.opt('define', short='D', val='VAR=VAL',
-         fn=set_var, default=None,
-         use="""Set a variable before loading defaults, e.g. '-D vmid=3'
-         to set vmid. May be repeated to set more thanone variable.""")
+#gopts.opt('define', short='D', val='VAR=VAL',
+#         fn=set_var, default=None,
+#         use="""Set a variable before loading defaults, e.g. '-D vmid=3'
+#         to set vmid. May be repeated to set more than one variable.""")
 
 gopts.opt('dryrun', short='n',
          fn=set_true, default=0,
-         use="Dry run - print the config but don't create the domain.")
+         use="""Dry run - print the config but don't create the domain.
+The defaults file is loaded and the SXP configuration is created and printed.         
+""")
 
 gopts.opt('name', short='N', val='NAME',
           fn=set_value, default=None,
@@ -352,7 +379,15 @@ def main(argv):
     args = opts.parse(argv)
     if opts.vals.help:
         opts.usage()
+    if opts.vals.help or opts.vals.help_config:
+        opts.load_defaults(help=1)
+    if opts.vals.help or opts.vals.help_config:
         return
+    # Process remaining args as config variables.
+    for arg in args:
+        if '=' in arg:
+            (var, val) = arg.strip().split('=')
+            gopts.setvar(var.strip(), val.strip())
     if opts.vals.config:
         pass
     else:

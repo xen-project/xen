@@ -257,7 +257,6 @@
 40c9c469N2-b3GqpLHHHPZykJPLVvA tools/python/xen/xend/server/channel.py
 40c9c469hJ_IlatRne-9QEa0-wlquw tools/python/xen/xend/server/console.py
 40c9c469UcNJh_NuLU0ytorM0Lk5Ow tools/python/xen/xend/server/controller.py
-40c9c469vHh-qLiiubdbKEQbJf18Zw tools/python/xen/xend/server/cstruct.py
 40d83983OXjt-y3HjSCcuoPp9rzvmw tools/python/xen/xend/server/domain.py
 40c9c469yrm31i60pGKslTi2Zgpotg tools/python/xen/xend/server/messages.py
 40c9c46925x-Rjb0Cv2f1-l2jZrPYg tools/python/xen/xend/server/netif.py
@@ -265,6 +264,7 @@
 40c9c469LNxLVizOUpOjEaTKKCm8Aw tools/python/xen/xend/sxp.py
 40d05079aFRp6NQdo5wIh5Ly31c0cg tools/python/xen/xm/__init__.py
 40cf2937gKQcATgXKGtNeWb1PDH5nA tools/python/xen/xm/create.py
+40e41cd2w0I4En6qrJn4em8HkK_oxQ tools/python/xen/xm/help.py
 40cf2937isyS250zyd0Q2GuEDoNXfQ tools/python/xen/xm/main.py
 40cf2937PSslwBliN1g7ofDy2H_RhA tools/python/xen/xm/opts.py
 40cf2937Z8WCNOnO2FcWdubvEAF9QQ tools/python/xen/xm/shutdown.py

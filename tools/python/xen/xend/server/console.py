@@ -1,3 +1,4 @@
+# Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
 
 from twisted.internet import reactor
 from twisted.internet import protocol
@@ -11,11 +12,6 @@ eserver = EventServer.instance()
 import controller
 from messages import *
 from params import *
-
-"""Telnet binary option."""
-TRANSMIT_BINARY = '0'
-WILL = chr(251)
-IAC = chr(255)
 
 class ConsoleProtocol(protocol.Protocol):
     """Asynchronous handler for a console TCP socket.
@@ -36,18 +32,11 @@ class ConsoleProtocol(protocol.Protocol):
             self.loseConnection()
             return
         else:
-            # KAF: A nice quiet successful connect. Don't bother with telnet
-            # control sequence -- telnet is not the appropriate protocol here. 
+            # KAF: A nice quiet successful connect.
             #self.transport.write("Connected to console %d on domain %d\n"
             #                     % (self.idx, self.controller.dom))
-            #self.setTelnetTransmitBinary()
             eserver.inject('xend.console.connect',
                            [self.idx, self.addr[0], self.addr[1]])
-
-    def setTelnetTransmitBinary(self):
-        """Send the sequence to set the telnet TRANSMIT-BINARY option.
-        """
-        self.write(IAC + WILL + TRANSMIT_BINARY)
 
     def dataReceived(self, data):
         if self.controller.handleInput(self, data):
@@ -105,7 +94,6 @@ class ConsoleController(controller.Controller):
     """
 
     def __init__(self, factory, dom, console_port):
-        #print 'ConsoleController> dom=', dom, type(dom)
         controller.Controller.__init__(self, factory, dom)
         self.majorTypes = [ CMSG_CONSOLE ]
         self.status = "new"
@@ -118,7 +106,6 @@ class ConsoleController(controller.Controller):
         self.registerChannel()
         self.listener = None
         self.listen()
-        #print 'ConsoleController<', 'dom=', self.dom, 'idx=', self.idx
 
     def sxpr(self):
         val =['console',
@@ -143,7 +130,6 @@ class ConsoleController(controller.Controller):
 
     def close(self):
         try:
-            #print 'ConsoleController> close dom=', self.dom
             self.status = "closed"
             if self.conn:
                 self.conn.loseConnection()
@@ -183,11 +169,11 @@ class ConsoleController(controller.Controller):
         self.listen()
 
     def requestReceived(self, msg, type, subtype):
-        #print '***Console', self.dom, msg.get_payload()
         self.rbuf.write(msg.get_payload())
         self.handleOutput()
         
     def responseReceived(self, msg, type, subtype):
+        # Just ignore responses.
         pass
 
     def produceRequests(self):
@@ -215,18 +201,14 @@ class ConsoleController(controller.Controller):
         Sends it to the connected console (if any).
         """
         if self.closed():
-            #print 'Console>handleOutput> closed'
             return -1
         if not self.conn:
-            #print 'Console>handleOutput> not connected'
             return 0
         while not self.rbuf.empty():
             try:
-                #print 'Console>handleOutput> writing...'
                 bytes = self.conn.write(self.rbuf.peek())
                 if bytes > 0:
                     self.rbuf.discard(bytes)
             except socket.error, error:
                 pass
-        #print 'Console>handleOutput<'
         return 0

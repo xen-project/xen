@@ -1,3 +1,5 @@
+# Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+
 import xen.lowlevel.xc; xc = xen.lowlevel.xc.new()
 from xen.lowlevel import xu
 from messages import msgTypeName
@@ -24,14 +26,11 @@ class ChannelFactory:
         self.notifier = xu.notifier()
     
     def addChannel(self, channel):
-        """Add a channel.
+        """Add a channel. Registers with the notifier.
         """
         idx = channel.idx
         self.channels[idx] = channel
         self.notifier.bind(idx)
-        # Try to wake it up
-        #self.notifier.unmask(idx)
-        #channel.notify()
 
     def getChannel(self, idx):
         """Get the channel with the given index (if any).
@@ -40,6 +39,7 @@ class ChannelFactory:
 
     def delChannel(self, idx):
         """Remove the channel with the given index (if any).
+        Deregisters with the notifier.
         """
         if idx in self.channels:
             del self.channels[idx]
@@ -288,6 +288,8 @@ class Channel(BaseChannel):
                    self.getRemotePort()))
 
     def handleNotification(self):
+        """Process outstanding messages in repsonse to notification on the port.
+        """
         if self.closed:
             print 'handleNotification> Notification on closed channel', self
             return
@@ -299,6 +301,8 @@ class Channel(BaseChannel):
             self.notify()
 
     def notify(self):
+        """Notify the other end of the port that messages have been processed.
+        """
         if self.closed: return
         self.port.notify()
 

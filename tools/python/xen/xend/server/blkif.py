@@ -1,3 +1,5 @@
+# Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+
 from twisted.internet import defer
 
 from xen.xend import sxp
@@ -28,6 +30,11 @@ class BlkifControllerFactory(controller.ControllerFactory):
         self.registerChannel()
 
     def createInstance(self, dom, recreate=0):
+        """Create a block device controller for a domain.
+
+        dom      domain
+        recreate if true it's a recreate (after xend restart)
+        """
         d = self.addDeferred()
         blkif = self.getInstanceByDom(dom)
         if blkif:
@@ -42,29 +49,50 @@ class BlkifControllerFactory(controller.ControllerFactory):
         return d
 
     def getDomainDevices(self, dom):
+        """Get the block devices for a domain.
+
+        dom domain
+
+        returns devices
+        """
         blkif = self.getInstanceByDom(dom)
         return (blkif and blkif.getDevices()) or []
 
     def getDomainDevice(self, dom, vdev):
+        """Get a block device from a domain.
+
+        dom  domain
+        vdev device index
+
+        returns device
+        """
         blkif = self.getInstanceByDom(dom)
         return (blkif and blkif.getDevice(vdev)) or None
 
     def setControlDomain(self, dom, recreate=0):
+        """Set the back-end block device controller domain.
+
+        dom      domain
+        recreate if true it's a recreate (after xend restart)
+        """
         if self.dom == dom: return
         self.deregisterChannel()
         if not recreate:
             self.attached = 0
         self.dom = dom
         self.registerChannel()
-        #
-        #if xend.blkif.be_port:
-        #    xend.blkif.recovery = True
-        #xend.blkif.be_port = xend.main.port_from_dom(dom)
 
     def getControlDomain(self):
+        """Get the back-end block device controller domain.
+        """
         return self.dom
 
     def reattachDevice(self, dom, vdev):
+        """Reattach a device (on changing control domain).
+
+        dom  domain
+        vdev device index
+        """
         blkif = self.getInstanceByDom(dom)
         if blkif:
             blkif.reattachDevice(vdev)
@@ -83,6 +111,9 @@ class BlkifControllerFactory(controller.ControllerFactory):
         return attached
                          
     def reattached(self):
+        """Notify all block interface we have been reattached
+        (after changing control domain).
+        """
         for blkif in self.getInstances():
             blkif.reattached()
 
@@ -147,7 +178,6 @@ class BlkDev(controller.Dev):
         return val
 
     def destroy(self):
-        print 'BlkDev>destroy>', self.vdev
         PrettyPrint.prettyprint(self.sxpr())
         self.controller.send_be_vbd_destroy(self.vdev)
         
@@ -157,7 +187,6 @@ class BlkifController(controller.Controller):
     """
     
     def __init__(self, factory, dom):
-        #print 'BlkifController> dom=', dom
         controller.Controller.__init__(self, factory, dom)
         self.devices = {}
 
@@ -172,7 +201,6 @@ class BlkifController(controller.Controller):
         self.attached = 1
         self.evtchn = None
         self.registerChannel()
-        #print 'BlkifController<', 'dom=', self.dom, 'idx=', self.idx
 
     def sxpr(self):
         val = ['blkif', ['dom', self.dom]]
@@ -183,8 +211,6 @@ class BlkifController(controller.Controller):
         return val
 
     def lostChannel(self):
-        print 'BlkifController>lostChannel>', 'dom=', self.dom
-        #self.destroyDevices()
         controller.Controller.lostChannel(self)
 
     def getDevices(self):
@@ -201,8 +227,14 @@ class BlkifController(controller.Controller):
 
     def attachDevice(self, vdev, mode, segment, recreate=0):
         """Attach a device to the specified interface.
+
+        vdev     device index
+        mode     read/write mode
+        segment  segment
+        recreate if true it's being recreated (after xend restart)
+
+        returns deferred
         """
-        #print 'BlkifController>attach_device>', self.dom, vdev, mode, segment
         dev = self.addDevice(vdev, mode, segment)
         if not dev: return -1
         if recreate:
@@ -214,13 +246,11 @@ class BlkifController(controller.Controller):
         return d
 
     def destroy(self):
-        print 'BlkifController>destroy> dom=', self.dom
         def cb_destroy(val):
             self.send_be_destroy()
         d = self.factory.addDeferred()
         d.addCallback(cb_destroy)
         self.send_be_disconnect()
-        #self.destroyDevices()
 
     def destroyDevices(self):
         for dev in self.getDevices():
@@ -275,11 +305,6 @@ class BlkifController(controller.Controller):
                         'shmem_frame'  : val['shmem_frame'] })
         self.factory.writeRequest(msg)
         pass
-
-    #def recv_fe_interface_status_changed(self, msg, req):
-    #    (hnd, status, chan) = unpackMsg('blkif_fe_interface_status_changed_t', msg)
-    #    print 'recv_fe_interface_status_changed>', hnd, status, chan
-    #   pass
 
     def send_fe_interface_status_changed(self):
         msg = packMsg('blkif_fe_interface_status_changed_t',
