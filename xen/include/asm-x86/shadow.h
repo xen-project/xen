@@ -730,10 +730,8 @@ static inline void __update_pagetables(struct exec_domain *ed)
 {
     struct domain *d = ed->domain;
     unsigned long gmfn = pagetable_val(ed->arch.guest_table) >> PAGE_SHIFT;
-
-    // mafetter: BUG: __shadow_status() should take a gpfn, not a gmfn...
-    // WHY DOES THIS WORK?
-    unsigned long smfn = __shadow_status(d, gmfn) & PSH_pfn_mask;
+    unsigned long gpfn = __mfn_to_gpfn(d, gmfn);
+    unsigned long smfn = __shadow_status(d, gpfn) & PSH_pfn_mask;
 
     SH_VVLOG("0: __update_pagetables(gmfn=%p, smfn=%p)", gmfn, smfn);
 
