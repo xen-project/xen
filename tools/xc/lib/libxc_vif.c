@@ -8,7 +8,8 @@
 
 #include "libxc_private.h"
 
-int xc_vif_scheduler_set(unsigned int domid, 
+int xc_vif_scheduler_set(int xc_handle,
+                         unsigned int domid, 
                          unsigned int vifid, 
                          xc_vif_sched_params_t *params)
 {
@@ -18,11 +19,12 @@ int xc_vif_scheduler_set(unsigned int domid,
     netop.u.vif_setparams.vif          = vifid;
     netop.u.vif_setparams.credit_bytes = params->credit_bytes;
     netop.u.vif_setparams.credit_usec  = params->credit_usec;
-    return do_network_op(&netop);
+    return do_network_op(xc_handle, &netop);
 }
 
 
-int xc_vif_scheduler_get(unsigned int domid, 
+int xc_vif_scheduler_get(int xc_handle,
+                         unsigned int domid, 
                          unsigned int vifid, 
                          xc_vif_sched_params_t *params)
 {
@@ -33,7 +35,7 @@ int xc_vif_scheduler_get(unsigned int domid,
     netop.u.vif_getinfo.domain = domid;
     netop.u.vif_getinfo.vif    = vifid;
 
-    if ( (rc = do_network_op(&netop)) >= 0 )
+    if ( (rc = do_network_op(xc_handle, &netop)) >= 0 )
     {
         params->credit_bytes = netop.u.vif_getinfo.credit_bytes;
         params->credit_usec  = netop.u.vif_getinfo.credit_usec;
@@ -43,7 +45,8 @@ int xc_vif_scheduler_get(unsigned int domid,
 }
 
 
-int xc_vif_stats_get(unsigned int domid, 
+int xc_vif_stats_get(int xc_handle,
+                     unsigned int domid, 
                      unsigned int vifid, 
                      xc_vif_stats_t *stats)
 {
@@ -54,7 +57,7 @@ int xc_vif_stats_get(unsigned int domid,
     netop.u.vif_getinfo.domain = domid;
     netop.u.vif_getinfo.vif    = vifid;
 
-    if ( (rc = do_network_op(&netop)) >= 0 )
+    if ( (rc = do_network_op(xc_handle, &netop)) >= 0 )
     {
         stats->tx_bytes = netop.u.vif_getinfo.total_bytes_sent;
         stats->tx_pkts  = netop.u.vif_getinfo.total_packets_sent;

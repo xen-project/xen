@@ -1,7 +1,7 @@
 
 CC       = gcc
 CFLAGS   = -c -Wall -O3 
-CFLAGS  += -I../../xen/include -I../../xenolinux-sparse/include
+CFLAGS  += -I../../../xen/include -I../../../xenolinux-sparse/include
 
 HDRS     = $(wildcard *.h)
 OBJS     = $(patsubst %.c,%.o,$(wildcard libxc_*.c))
@@ -20,12 +20,12 @@ check-for-zlib:
 	fi
 
 install: all
-	mkdir -p ../../../install/lib
-	mkdir -p ../../../install/include
-	cp -a $(LIBS) ../../../install/lib
-	for i in $(LIBS) do ; chmod 755 ../../../install/bin/$i ; done
-	cp -a xc.h ../../../install/include
-	chmod 644 ../../../install/include/xc.h
+	mkdir -p ../../../../install/lib
+	mkdir -p ../../../../install/include
+	cp -a $(LIBS) ../../../../install/lib
+	for i in $(LIBS) do ; chmod 755 ../../../../install/bin/$i ; done
+	cp -a xc.h ../../../../install/include
+	chmod 644 ../../../../install/include/xc.h
 
 clean:
 	$(RM) *.a *.so *.o *.rpm $(LIBS)

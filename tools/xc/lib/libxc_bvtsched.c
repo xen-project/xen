@@ -8,15 +8,17 @@
 
 #include "libxc_private.h"
 
-int xc_bvtsched_global_set(unsigned long ctx_allow)
+int xc_bvtsched_global_set(int xc_handle,
+                           unsigned long ctx_allow)
 {
     dom0_op_t op;
     op.cmd = DOM0_BVTCTL;
     op.u.bvtctl.ctx_allow = ctx_allow;
-    return do_dom0_op(&op);
+    return do_dom0_op(xc_handle, &op);
 }
 
-int xc_bvtsched_domain_set(unsigned int domid,
+int xc_bvtsched_domain_set(int xc_handle,
+                           unsigned int domid,
                            unsigned long mcuadv,
                            unsigned long warp,
                            unsigned long warpl,
@@ -29,5 +31,5 @@ int xc_bvtsched_domain_set(unsigned int domid,
     op.u.adjustdom.warp    = warp;
     op.u.adjustdom.warpl   = warpl;
     op.u.adjustdom.warpu   = warpu;
-    return do_dom0_op(&op);
+    return do_dom0_op(xc_handle, &op);
 }

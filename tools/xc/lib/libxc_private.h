@@ -66,18 +66,22 @@ typedef struct { unsigned long l2_lo; } l2_pgentry_t;
 #define PERROR(_m) \
     fprintf(stderr, "ERROR: %s (%d = %s)\n", (_m), errno, strerror(errno))
 
-extern int privcmd_fd;
-static inline int do_privcmd(unsigned int cmd, unsigned long data)
+static inline int do_privcmd(int xc_handle,
+                             unsigned int cmd, 
+                             unsigned long data)
 {
-    return ioctl(privcmd_fd, cmd, data);
+    return ioctl(xc_handle, cmd, data);
 }
 
-static inline int do_xen_hypercall(privcmd_hypercall_t *hypercall)
+static inline int do_xen_hypercall(int xc_handle,
+                                   privcmd_hypercall_t *hypercall)
 {
-    return do_privcmd(IOCTL_PRIVCMD_HYPERCALL, (unsigned long)hypercall);
+    return do_privcmd(xc_handle,
+                      IOCTL_PRIVCMD_HYPERCALL, 
+                      (unsigned long)hypercall);
 }
 
-static inline int do_dom0_op(dom0_op_t *op)
+static inline int do_dom0_op(int xc_handle, dom0_op_t *op)
 {
     int ret = -1;
     privcmd_hypercall_t hypercall;
@@ -88,9 +92,12 @@ static inline int do_dom0_op(dom0_op_t *op)
     hypercall.arg[0] = (unsigned long)op;
 
     if ( mlock(op, sizeof(*op)) != 0 )
+    {
+        PERROR("Could not lock memory for Xen hypercall");
         goto out1;
+    }
 
-    if ( (ret = do_xen_hypercall(&hypercall)) < 0 )
+    if ( (ret = do_xen_hypercall(xc_handle, &hypercall)) < 0 )
     {
         if ( errno == EACCES )
             fprintf(stderr, "Dom0 operation failed -- need to"
@@ -104,7 +111,7 @@ static inline int do_dom0_op(dom0_op_t *op)
  out1: return ret;
 }
 
-static inline int do_network_op(network_op_t *op)
+static inline int do_network_op(int xc_handle, network_op_t *op)
 {
     int ret = -1;
     privcmd_hypercall_t hypercall;
@@ -113,9 +120,12 @@ static inline int do_network_op(network_op_t *op)
     hypercall.arg[0] = (unsigned long)op;
 
     if ( mlock(op, sizeof(*op)) != 0 )
+    {
+        PERROR("Could not lock memory for Xen hypercall");
         goto out1;
+    }
 
-    if ( (ret = do_xen_hypercall(&hypercall)) < 0 )
+    if ( (ret = do_xen_hypercall(xc_handle, &hypercall)) < 0 )
         goto out2;
 
     ret = 0;
@@ -125,7 +135,7 @@ static inline int do_network_op(network_op_t *op)
 }
 
 
-static inline int do_block_io_op(block_io_op_t *op)
+static inline int do_block_io_op(int xc_handle, block_io_op_t *op)
 {
     int ret = -1;
     privcmd_hypercall_t hypercall;
@@ -134,9 +144,12 @@ static inline int do_block_io_op(block_io_op_t *op)
     hypercall.arg[0] = (unsigned long)op;
 
     if ( mlock(op, sizeof(*op)) != 0 )
+    {
+        PERROR("Could not lock memory for Xen hypercall");
         goto out1;
+    }
 
-    if ( do_xen_hypercall(&hypercall) < 0 )
+    if ( do_xen_hypercall(xc_handle, &hypercall) < 0 )
         goto out2;
 
     ret = 0;
@@ -149,7 +162,8 @@ static inline int do_block_io_op(block_io_op_t *op)
  * PFN mapping.
  */
 int init_pfn_mapper(void);
-void *map_pfn(unsigned long pfn);
-void unmap_pfn(void *vaddr);
+int close_pfn_mapper(int pm_handle);
+void *map_pfn(int pm_handle, unsigned long pfn);
+void unmap_pfn(int pm_handle, void *vaddr);
 
 #endif /* __LIBXC_PRIVATE_H__ */

@@ -8,7 +8,9 @@
 
 #include "libxc_private.h"
 
-int xc_domain_create(unsigned int mem_kb, const char *name)
+int xc_domain_create(int xc_handle,
+                     unsigned int mem_kb, 
+                     const char *name)
 {
     int err;
     dom0_op_t op;
@@ -18,40 +20,45 @@ int xc_domain_create(unsigned int mem_kb, const char *name)
     strncpy(op.u.createdomain.name, name, MAX_DOMAIN_NAME);
     op.u.createdomain.name[MAX_DOMAIN_NAME-1] = '\0';
 
-    err = do_dom0_op(&op);
+    err = do_dom0_op(xc_handle, &op);
 
     return (err < 0) ? err : op.u.createdomain.domain;
 }    
 
 
-int xc_domain_start(unsigned int domid)
+int xc_domain_start(int xc_handle,
+                    unsigned int domid)
 {
     dom0_op_t op;
     op.cmd = DOM0_STARTDOMAIN;
     op.u.startdomain.domain = domid;
-    return do_dom0_op(&op);
+    return do_dom0_op(xc_handle, &op);
 }    
 
 
-int xc_domain_stop(unsigned int domid)
+int xc_domain_stop(int xc_handle, 
+                   unsigned int domid)
 {
     dom0_op_t op;
     op.cmd = DOM0_STOPDOMAIN;
     op.u.stopdomain.domain = domid;
-    return do_dom0_op(&op);
+    return do_dom0_op(xc_handle, &op);
 }    
 
 
-int xc_domain_destroy(unsigned int domid, int force)
+int xc_domain_destroy(int xc_handle,
+                      unsigned int domid, 
+                      int force)
 {
     dom0_op_t op;
     op.cmd = DOM0_DESTROYDOMAIN;
     op.u.destroydomain.domain = domid;
     op.u.destroydomain.force  = !!force;
-    return do_dom0_op(&op);
+    return do_dom0_op(xc_handle, &op);
 }
 
-int xc_domain_getinfo(unsigned int first_domid,
+int xc_domain_getinfo(int xc_handle,
+                      unsigned int first_domid,
                       unsigned int max_doms,
                       xc_dominfo_t *info)
 {
@@ -62,7 +69,7 @@ int xc_domain_getinfo(unsigned int first_domid,
     {
         op.cmd = DOM0_GETDOMAININFO;
         op.u.getdomaininfo.domain = next_domid;
-        if ( do_dom0_op(&op) < 0 )
+        if ( do_dom0_op(xc_handle, &op) < 0 )
             break;
         info->domid   = op.u.getdomaininfo.domain;
         info->cpu     = op.u.getdomaininfo.processor;

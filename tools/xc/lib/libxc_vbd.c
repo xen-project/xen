@@ -9,28 +9,34 @@
 #define _GNU_SOURCE
 #include "libxc_private.h"
 
-int xc_vbd_create(unsigned int domid, unsigned short vbdid, int writeable)
+int xc_vbd_create(int xc_handle,
+                  unsigned int domid, 
+                  unsigned short vbdid, 
+                  int writeable)
 {
     block_io_op_t op; 
     op.cmd = BLOCK_IO_OP_VBD_CREATE; 
     op.u.create_params.domain  = domid;
     op.u.create_params.vdevice = vbdid;
     op.u.create_params.mode    = VBD_MODE_R | (writeable ? VBD_MODE_W : 0);
-    return do_block_io_op(&op);
+    return do_block_io_op(xc_handle, &op);
 }
 
 
-int xc_vbd_destroy(unsigned int domid, unsigned short vbdid)
+int xc_vbd_destroy(int xc_handle,
+                   unsigned int domid, 
+                   unsigned short vbdid)
 {
     block_io_op_t op; 
     op.cmd = BLOCK_IO_OP_VBD_DELETE; 
     op.u.delete_params.domain  = domid;
     op.u.delete_params.vdevice = vbdid;
-    return do_block_io_op(&op);
+    return do_block_io_op(xc_handle, &op);
 }
 
 
-int xc_vbd_add_extent(unsigned int domid, 
+int xc_vbd_add_extent(int xc_handle,
+                      unsigned int domid, 
                       unsigned short vbdid,
                       unsigned short real_device,
                       unsigned long start_sector,
@@ -43,11 +49,12 @@ int xc_vbd_add_extent(unsigned int domid,
     op.u.add_params.extent.device       = real_device; 
     op.u.add_params.extent.start_sector = start_sector;
     op.u.add_params.extent.nr_sectors   = nr_sectors;
-    return do_block_io_op(&op);
+    return do_block_io_op(xc_handle, &op);
 }
 
 
-int xc_vbd_delete_extent(unsigned int domid, 
+int xc_vbd_delete_extent(int xc_handle,
+                         unsigned int domid, 
                          unsigned short vbdid,
                          unsigned short real_device,
                          unsigned long start_sector,
@@ -60,11 +67,12 @@ int xc_vbd_delete_extent(unsigned int domid,
     op.u.add_params.extent.device       = real_device; 
     op.u.add_params.extent.start_sector = start_sector;
     op.u.add_params.extent.nr_sectors   = nr_sectors;
-    return do_block_io_op(&op);
+    return do_block_io_op(xc_handle, &op);
 }
 
 
-int xc_vbd_probe(unsigned int domid,
+int xc_vbd_probe(int xc_handle,
+                 unsigned int domid,
                  unsigned short vbdid,
                  unsigned int max_vbds,
                  xc_vbd_t *vbds)
@@ -87,7 +95,7 @@ int xc_vbd_probe(unsigned int domid,
         return -ENOMEM;
     }
 
-    ret = do_block_io_op(&op);
+    ret = do_block_io_op(xc_handle, &op);
 
     (void)munlock(xdi->disks, allocsz);
 

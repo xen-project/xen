@@ -38,23 +38,26 @@
     _res;                                   \
 })
 
-static int check_pfn_ownership(unsigned long mfn, unsigned int dom)
+static int check_pfn_ownership(int xc_handle, 
+                               unsigned long mfn, 
+                               unsigned int dom)
 {
     dom0_op_t op;
     op.cmd = DOM0_GETPAGEFRAMEINFO;
     op.u.getpageframeinfo.pfn = mfn;
-    if ( (do_dom0_op(&op) < 0) || (op.u.getpageframeinfo.domain != dom) )
+    if ( (do_dom0_op(xc_handle, &op) < 0) || 
+         (op.u.getpageframeinfo.domain != dom) )
         return 0;
     return 1;
 }
 
 #define GETPFN_ERR (~0U)
-static unsigned int get_pfn_type(unsigned long mfn)
+static unsigned int get_pfn_type(int xc_handle, unsigned long mfn)
 {
     dom0_op_t op;
     op.cmd = DOM0_GETPAGEFRAMEINFO;
     op.u.getpageframeinfo.pfn = mfn;
-    if ( do_dom0_op(&op) < 0 )
+    if ( do_dom0_op(xc_handle, &op) < 0 )
     {
         PERROR("Unexpected failure when getting page frame info!");
         return GETPFN_ERR;
@@ -70,7 +73,10 @@ static int checked_write(gzFile fd, void *buf, size_t count)
     return rc == count;
 }
 
-int xc_linux_save(unsigned int domid, const char *state_file, int verbose)
+int xc_linux_save(int xc_handle,
+                  unsigned int domid, 
+                  const char *state_file, 
+                  int verbose)
 {
     dom0_op_t op;
     int rc = 1, i, j;
@@ -112,6 +118,8 @@ int xc_linux_save(unsigned int domid, const char *state_file, int verbose)
     int    fd;
     gzFile gfd;
 
+    int pm_handle = -1;
+
     if ( (fd = open(state_file, O_CREAT|O_EXCL|O_WRONLY, 0644)) == -1 )
     {
         PERROR("Could not open file for writing");
@@ -134,7 +142,8 @@ int xc_linux_save(unsigned int domid, const char *state_file, int verbose)
     {
         op.cmd = DOM0_GETDOMAININFO;
         op.u.getdomaininfo.domain = domid;
-        if ( (do_dom0_op(&op) < 0) || (op.u.getdomaininfo.domain != domid) )
+        if ( (do_dom0_op(xc_handle, &op) < 0) || 
+             (op.u.getdomaininfo.domain != domid) )
         {
             PERROR("Could not get info on domain");
             goto out;
@@ -151,7 +160,7 @@ int xc_linux_save(unsigned int domid, const char *state_file, int verbose)
 
         op.cmd = DOM0_STOPDOMAIN;
         op.u.stopdomain.domain = domid;
-        (void)do_dom0_op(&op);
+        (void)do_dom0_op(xc_handle, &op);
 
         sleep(1);
     }
@@ -163,20 +172,20 @@ int xc_linux_save(unsigned int domid, const char *state_file, int verbose)
         goto out;
     }
 
-    if ( init_pfn_mapper() < 0 )
+    if ( (pm_handle = init_pfn_mapper()) < 0 )
         goto out;
 
     /* Is the suspend-record MFN actually valid for this domain? */
-    if ( !check_pfn_ownership(ctxt.i386_ctxt.esi, domid) )
+    if ( !check_pfn_ownership(xc_handle, ctxt.i386_ctxt.esi, domid) )
     {
         ERROR("Invalid state record pointer");
         goto out;
     }
 
     /* If the suspend-record MFN is okay then grab a copy of it to @srec. */
-    p_srec = map_pfn(ctxt.i386_ctxt.esi);
+    p_srec = map_pfn(pm_handle, ctxt.i386_ctxt.esi);
     memcpy(&srec, p_srec, sizeof(srec));
-    unmap_pfn(p_srec);
+    unmap_pfn(pm_handle, p_srec);
 
     if ( srec.nr_pfns > 1024*1024 )
     {
@@ -184,16 +193,16 @@ int xc_linux_save(unsigned int domid, const char *state_file, int verbose)
         goto out;
     }
 
-    if ( !check_pfn_ownership(srec.pfn_to_mfn_frame_list, domid) )
+    if ( !check_pfn_ownership(xc_handle, srec.pfn_to_mfn_frame_list, domid) )
     {
         ERROR("Invalid pfn-to-mfn frame list pointer");
         goto out;
     }
 
     /* Grab a copy of the pfn-to-mfn table frame list. */
-    p_pfn_to_mfn_frame_list = map_pfn(srec.pfn_to_mfn_frame_list);
+    p_pfn_to_mfn_frame_list = map_pfn(pm_handle, srec.pfn_to_mfn_frame_list);
     memcpy(pfn_to_mfn_frame_list, p_pfn_to_mfn_frame_list, PAGE_SIZE);
-    unmap_pfn(p_pfn_to_mfn_frame_list);
+    unmap_pfn(pm_handle, p_pfn_to_mfn_frame_list);
 
     /* We want zeroed memory so use calloc rather than malloc. */
     mfn_to_pfn_table = calloc(1, 4 * 1024 * 1024);
@@ -221,19 +230,19 @@ int xc_linux_save(unsigned int domid, const char *state_file, int verbose)
         if ( (i & 1023) == 0 )
         {
             mfn = pfn_to_mfn_frame_list[i/1024];
-            if ( !check_pfn_ownership(mfn, domid) )
+            if ( !check_pfn_ownership(xc_handle, mfn, domid) )
             {
                 ERROR("Invalid frame number if pfn-to-mfn frame list");
                 goto out;
             }
             if ( pfn_to_mfn_frame != NULL )
-                unmap_pfn(pfn_to_mfn_frame);
-            pfn_to_mfn_frame = map_pfn(mfn);
+                unmap_pfn(pm_handle, pfn_to_mfn_frame);
+            pfn_to_mfn_frame = map_pfn(pm_handle, mfn);
         }
         
         mfn = pfn_to_mfn_frame[i & 1023];
 
-        if ( !check_pfn_ownership(mfn, domid) )
+        if ( !check_pfn_ownership(xc_handle, mfn, domid) )
         {
             ERROR("Invalid frame specified with pfn-to-mfn table");
             goto out;
@@ -250,7 +259,7 @@ int xc_linux_save(unsigned int domid, const char *state_file, int verbose)
         mfn_to_pfn_table[mfn] = i;
 
         /* Query page type by MFN, but store it by PFN. */
-        if ( (pfn_type[i] = get_pfn_type(mfn)) == GETPFN_ERR )
+        if ( (pfn_type[i] = get_pfn_type(xc_handle, mfn)) == GETPFN_ERR )
             goto out;
     }
 
@@ -290,7 +299,7 @@ int xc_linux_save(unsigned int domid, const char *state_file, int verbose)
     }
 
     /* Start writing out the saved-domain record. */
-    ppage = map_pfn(shared_info_frame);
+    ppage = map_pfn(pm_handle, shared_info_frame);
     if ( !checked_write(gfd, "XenoLinuxSuspend",    16) ||
          !checked_write(gfd, name,                  sizeof(name)) ||
          !checked_write(gfd, &srec.nr_pfns,         sizeof(unsigned long)) ||
@@ -302,7 +311,7 @@ int xc_linux_save(unsigned int domid, const char *state_file, int verbose)
         ERROR("Error when writing to state file");
         goto out;
     }
-    unmap_pfn(ppage);
+    unmap_pfn(pm_handle, ppage);
 
     verbose_printf("Saving memory pages:   0%%");
 
@@ -319,9 +328,9 @@ int xc_linux_save(unsigned int domid, const char *state_file, int verbose)
 
         mfn = pfn_to_mfn_table[i];
 
-        ppage = map_pfn(mfn);
+        ppage = map_pfn(pm_handle, mfn);
         memcpy(page, ppage, PAGE_SIZE);
-        unmap_pfn(ppage);
+        unmap_pfn(pm_handle, ppage);
 
         if ( (pfn_type[i] == L1TAB) || (pfn_type[i] == L2TAB) )
         {
@@ -360,10 +369,13 @@ int xc_linux_save(unsigned int domid, const char *state_file, int verbose)
     {
         op.cmd = DOM0_STARTDOMAIN;
         op.u.startdomain.domain = domid;
-        (void)do_dom0_op(&op);
+        (void)do_dom0_op(xc_handle, &op);
     }
 
     gzclose(gfd);
+
+    if ( pm_handle >= 0 )
+        (void)close_pfn_mapper(pm_handle);
 
     if ( pfn_to_mfn_table != NULL )
         free(pfn_to_mfn_table);
