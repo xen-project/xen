@@ -75,7 +75,7 @@ static unsigned char insn_decode[256] = {
     X, X, X, X, X, X, X, X,
     X, X, X, X, X, X, X, X,
     /* 0xA0 - 0xAF */
-    O|1, O|4, O|1, O|4, X, X, X, X,
+    O|4, O|4, O|4, O|4, X, X, X, X,
     X, X, X, X, X, X, X, X,
     /* 0xB0 - 0xBF */
     X, X, X, X, X, X, X, X,
@@ -182,7 +182,7 @@ int fixup_seg(u16 seg, unsigned long offset)
         table = (unsigned long *)LDT_VIRT_START(d);
         if ( idx >= d->mm.ldt_ents )
         {
-            DPRINTK("Segment %04x out of LDT range (%d)\n",
+            DPRINTK("Segment %04x out of LDT range (%ld)\n",
                     seg, d->mm.ldt_ents);
             goto fail;
         }
@@ -231,16 +231,9 @@ int fixup_seg(u16 seg, unsigned long offset)
     }
     else
     {
-        /*
-         * Expands-up: All the way to Xen space? Assume 4GB if so.
-         * NB: we compare offset with limit-15, instead of the "real"
-         * comparison of offset+15 (worst case) with limit,
-         * to avoid possible unsigned int overflow of offset+15.
-         * limit-15 will not underflow here because we don't allow expand-up
-         * segments with maxlimit.
-         */
+        /* Expands-up: All the way to Xen space? Assume 4GB if so. */
         if ( ((PAGE_OFFSET - (base + limit)) < PAGE_SIZE) &&
-             ((offset) > (limit-15)) )
+             (offset > limit) )
         {
             /* Flip to expands-down. */
             limit = -(base & PAGE_MASK);
@@ -248,8 +241,8 @@ int fixup_seg(u16 seg, unsigned long offset)
         }
     }
 
-    DPRINTK("None of the above! (%08lx:%08lx, %d, %08lx, %08lx, %08lx)\n", 
-            a, b, positive_access, base, limit, base+limit);
+    DPRINTK("None of the above! (%08lx:%08lx, %08lx, %08lx, %08lx)\n", 
+            a, b, base, limit, base+limit);
 
  fail:
     return 0;
@@ -285,9 +278,7 @@ void *decode_reg(struct xen_regs *regs, u8 b)
 
 /*
  * Called from the general-protection fault handler to attempt to decode
- * and emulate an instruction that depends on 4GB segments. At this point
- * we assume that the instruction itself is paged into memory (the CPU
- * must have triggered this in order to decode the instruction itself).
+ * and emulate an instruction that depends on 4GB segments.
  */
 int gpf_emulate_4gb(struct xen_regs *regs)
 {
@@ -312,7 +303,7 @@ int gpf_emulate_4gb(struct xen_regs *regs)
 
     if ( !linearise_address((u16)regs->cs, regs->eip, (unsigned long *)&eip) )
     {
-        DPRINTK("Cannot linearise %04x:%08lx\n", regs->cs, regs->eip);
+        DPRINTK("Cannot linearise %04x:%08x\n", regs->cs, regs->eip);
         goto fail;
     }
 
@@ -322,7 +313,7 @@ int gpf_emulate_4gb(struct xen_regs *regs)
         if ( get_user(b, pb) )
         {
             DPRINTK("Fault while accessing byte %d of instruction\n", pb-eip);
-            goto fail;
+            goto page_fault;
         }
 
         if ( (pb - eip) >= 15 )
@@ -340,25 +331,25 @@ int gpf_emulate_4gb(struct xen_regs *regs)
         case 0xf0: /* LOCK */
         case 0xf2: /* REPNE/REPNZ */
         case 0xf3: /* REP/REPE/REPZ */
-            continue;
+            break;
         case 0x2e: /* CS override */
             pseg = &regs->cs;
-            continue;
+            break;
         case 0x3e: /* DS override */
             pseg = &regs->ds;
-            continue;
+            break;
         case 0x26: /* ES override */
             pseg = &regs->es;
-            continue;
+            break;
         case 0x64: /* FS override */
             pseg = &regs->fs;
-            continue;
+            break;
         case 0x65: /* GS override */
             pseg = &regs->gs;
-            continue;
+            break;
         case 0x36: /* SS override */
             pseg = &regs->ss;
-            continue;
+            break;
         default: /* Not a prefix byte */
             goto done_prefix;
         }
@@ -375,17 +366,17 @@ int gpf_emulate_4gb(struct xen_regs *regs)
     
     if ( !(decode & HAS_MODRM) )
     {
-        switch ( decode & 7 )
-        {
-        case 1:
-            offset = (long)(*(char *)pb);
-            goto skip_modrm;
-        case 4:
-            offset = *(long *)pb;
-            goto skip_modrm;
-        default:
+        if ( (decode & 7) != 4 )
             goto fail;
+
+        if ( get_user(offset, (u32 *)pb) )
+        {
+            DPRINTK("Fault while extracting <disp8>.\n");
+            goto page_fault;
         }
+        pb += 4;
+
+        goto skip_modrm;
     }
 
     /*
@@ -395,7 +386,7 @@ int gpf_emulate_4gb(struct xen_regs *regs)
     if ( get_user(modrm, pb) )
     {
         DPRINTK("Fault while extracting modrm byte\n");
-        goto fail;
+        goto page_fault;
     }
 
     pb++;
@@ -427,7 +418,7 @@ int gpf_emulate_4gb(struct xen_regs *regs)
             if ( get_user(disp32, (u32 *)pb) )
             {
                 DPRINTK("Fault while extracting <disp8>.\n");
-                goto fail;
+                goto page_fault;
             }
             pb += 4;
         }
@@ -439,7 +430,7 @@ int gpf_emulate_4gb(struct xen_regs *regs)
         if ( get_user(disp8, pb) )
         {
             DPRINTK("Fault while extracting <disp8>.\n");
-            goto fail;
+            goto page_fault;
         }
         pb++;
         disp32 = (disp8 & 0x80) ? (disp8 | ~0xff) : disp8;;
@@ -451,7 +442,7 @@ int gpf_emulate_4gb(struct xen_regs *regs)
         if ( get_user(disp32, (u32 *)pb) )
         {
             DPRINTK("Fault while extracting <disp8>.\n");
-            goto fail;
+            goto page_fault;
         }
         pb += 4;
         break;
@@ -485,14 +476,18 @@ int gpf_emulate_4gb(struct xen_regs *regs)
             d->vcpu_info->evtchn_upcall_mask = 1;
     }
 
-    return 1;
+    return EXCRET_fault_fixed;
 
  fixme:
     DPRINTK("Undecodable instruction %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x "
-            "caused GPF(0) at %04x:%08lx\n",
+            "caused GPF(0) at %04x:%08x\n",
             eip[0], eip[1], eip[2], eip[3],
             eip[4], eip[5], eip[6], eip[7],
             regs->cs, regs->eip);
  fail:
     return 0;
+
+ page_fault:
+    propagate_page_fault((unsigned long)pb, 4);
+    return EXCRET_fault_fixed;
 }

@@ -189,4 +189,17 @@ typedef struct mfn_mapper {
 
 unsigned long xc_get_m2p_start_mfn ( int xc_handle );
 
+long xc_get_tot_pages(int xc_handle, u32 domid);
+
+int xc_copy_to_domain_page(int xc_handle, u32 domid,
+                            unsigned long dst_pfn, void *src_page);
+
+unsigned long xc_get_filesz(int fd);
+
+char *xc_read_kernel_image(const char *filename, unsigned long *size);
+
+void xc_map_memcpy(unsigned long dst, char *src, unsigned long size,
+                   int xch, u32 dom, unsigned long *parray,
+                   unsigned long vstart);
+
 #endif /* __XC_PRIVATE_H__ */

@@ -168,7 +168,7 @@ void __init init_frametable(void)
 
 void arch_init_memory(void)
 {
-    unsigned long mfn, i;
+    unsigned long i;
 
     /*
      * We are rather picky about the layout of 'struct pfn_info'. The
@@ -211,13 +211,13 @@ void arch_init_memory(void)
     dom_io->id = DOMID_IO;
 
     /* M2P table is mappable read-only by privileged domains. */
-    mfn = l2_pgentry_to_pagenr(
-        idle_pg_table[RDWR_MPT_VIRT_START >> L2_PAGETABLE_SHIFT]);
     for ( i = 0; i < 1024; i++ )
     {
-        frame_table[mfn+i].count_info        = PGC_allocated | 1;
-        frame_table[mfn+i].u.inuse.type_info = PGT_gdt_page | 1; /* non-RW */
-        frame_table[mfn+i].u.inuse.domain    = dom_xen;
+        frame_table[m2p_start_mfn+i].count_info        = PGC_allocated | 1;
+	/* gdt to make sure it's only mapped read-only by non-privileged
+	   domains. */
+        frame_table[m2p_start_mfn+i].u.inuse.type_info = PGT_gdt_page | 1;
+        frame_table[m2p_start_mfn+i].u.inuse.domain    = dom_xen;
     }
 }
 
@@ -937,12 +937,41 @@ int get_page_type(struct pfn_info *page, u32 type)
 }
 
 
+int new_guest_cr3(unsigned long pfn)
+{
+    struct exec_domain *ed = current;
+    struct domain *d = ed->domain;
+    int okay, cpu = smp_processor_id();
+    unsigned long old_base_pfn;
+    
+    okay = get_page_and_type_from_pagenr(pfn, PGT_l2_page_table, d);
+    if ( likely(okay) )
+    {
+        invalidate_shadow_ldt(ed);
+
+        percpu_info[cpu].deferred_ops &= ~DOP_FLUSH_TLB;
+        old_base_pfn = pagetable_val(ed->mm.pagetable) >> PAGE_SHIFT;
+        ed->mm.pagetable = mk_pagetable(pfn << PAGE_SHIFT);
+
+        shadow_mk_pagetable(&ed->mm);
+
+        write_ptbase(&ed->mm);
+
+        put_page_and_type(&frame_table[old_base_pfn]);
+    }
+    else
+    {
+        MEM_LOG("Error while installing new baseptr %08lx", ptr);
+    }
+
+    return okay;
+}
+
 static int do_extended_command(unsigned long ptr, unsigned long val)
 {
     int okay = 1, cpu = smp_processor_id();
     unsigned int cmd = val & MMUEXT_CMD_MASK;
     unsigned long pfn = ptr >> PAGE_SHIFT;
-    unsigned long old_base_pfn;
     struct pfn_info *page = &frame_table[pfn];
     struct exec_domain *ed = current;
     struct domain *d = ed->domain, *nd, *e;
@@ -1003,25 +1032,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         break;
 
     case MMUEXT_NEW_BASEPTR:
-        okay = get_page_and_type_from_pagenr(pfn, PGT_l2_page_table, d);
-        if ( likely(okay) )
-        {
-            invalidate_shadow_ldt(ed);
-
-            percpu_info[cpu].deferred_ops &= ~DOP_FLUSH_TLB;
-            old_base_pfn = pagetable_val(ed->mm.pagetable) >> PAGE_SHIFT;
-            ed->mm.pagetable = mk_pagetable(pfn << PAGE_SHIFT);
-
-            shadow_mk_pagetable(&ed->mm);
-
-            write_ptbase(&ed->mm);
-
-            put_page_and_type(&frame_table[old_base_pfn]);
-        }
-        else
-        {
-            MEM_LOG("Error while installing new baseptr %08lx", ptr);
-        }
+        okay = new_guest_cr3(pfn);
         break;
         
     case MMUEXT_TLB_FLUSH:

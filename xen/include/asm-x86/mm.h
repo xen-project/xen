@@ -226,7 +226,10 @@ void synchronise_pagetables(unsigned long cpu_mask);
 extern unsigned long *machine_to_phys_mapping;
 extern unsigned long *phys_to_machine_mapping;
 #else
+/* Don't call virt_to_phys on this: it isn't direct mapped.  Using
+   m2p_start_mfn instead. */
 #define machine_to_phys_mapping ((unsigned long *)RDWR_MPT_VIRT_START)
+extern unsigned long m2p_start_mfn;
 #define phys_to_machine_mapping ((unsigned long *)PERDOMAIN_VIRT_START)
 #endif
 
@@ -278,6 +281,8 @@ extern ptwr_info_t ptwr_info[];
 void ptwr_flush(const int);
 int ptwr_do_page_fault(unsigned long);
 
+int new_guest_cr3(unsigned long pfn);
+
 #define __cleanup_writable_pagetable(_what)                                 \
 do {                                                                        \
     int cpu = smp_processor_id();                                           \
@@ -302,5 +307,7 @@ void audit_domains(void);
 #define audit_domain(_d) ((void)0)
 #define audit_domains()  ((void)0)
 #endif
+
+void propagate_page_fault(unsigned long addr, u16 error_code);
 
 #endif /* __ASM_X86_MM_H__ */

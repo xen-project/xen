@@ -11,12 +11,14 @@ include buildconfigs/Rules.mk
 
 .PHONY: build clean delete
 
+# The real action starts here!
 build: $(LINUX_DIR)/include/linux/autoconf.h
-	$(MAKE) -C $(LINUX_DIR) ARCH=xen modules
-	$(MAKE) -C $(LINUX_DIR) ARCH=xen INSTALL_MOD_PATH=$(INSTALL_DIR) modules_install
+	if grep "^CONFIG_MODULES=" $(LINUX_DIR)/.config ; then \
+	    $(MAKE) -C $(LINUX_DIR) ARCH=xen modules ; \
+	    $(MAKE) -C $(LINUX_DIR) ARCH=xen INSTALL_MOD_PATH=$(INSTALL_DIR) modules_install ; \
+	fi
 	$(MAKE) -C $(LINUX_DIR) ARCH=xen INSTALL_PATH=$(INSTALL_DIR) install
 
-# The real action starts here!
 $(LINUX_DIR)/include/linux/autoconf.h: pristine-linux-$(LINUX_VER)
 	rm -rf $(LINUX_DIR)
 	cp -al $< $(LINUX_DIR)

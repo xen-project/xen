@@ -354,7 +354,14 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
         op->u.getdomaininfo.domain = d->id;
 
-        ed = d->exec_domain[0]; // op->u.getdomaininfo.exec_domain];
+        if ( (op->u.getdomaininfo.exec_domain >= MAX_VIRT_CPUS) ||
+             !d->exec_domain[op->u.getdomaininfo.exec_domain] )
+        {
+            ret = -EINVAL;
+            break;
+        }
+        
+        ed = d->exec_domain[op->u.getdomaininfo.exec_domain];
 
         op->u.getdomaininfo.flags =
             (test_bit( DF_DYING,      &d->d_flags)  ? DOMFLAGS_DYING    : 0) |

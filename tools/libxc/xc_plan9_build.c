@@ -132,52 +132,6 @@ static int
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED)
 #define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
 
-static long
-get_tot_pages(int xc_handle, u32 domid)
-{
-	dom0_op_t op;
-	op.cmd = DOM0_GETDOMAININFO;
-	op.u.getdomaininfo.domain = (domid_t) domid;
-	op.u.getdomaininfo.ctxt = NULL;
-	return (do_dom0_op(xc_handle, &op) < 0) ?
-	    -1 : op.u.getdomaininfo.tot_pages;
-}
-
-static int
-get_pfn_list(int xc_handle,
-	     u32 domid, unsigned long *pfn_buf, unsigned long max_pfns)
-{
-	dom0_op_t op;
-	int ret;
-	op.cmd = DOM0_GETMEMLIST;
-	op.u.getmemlist.domain = (domid_t) domid;
-	op.u.getmemlist.max_pfns = max_pfns;
-	op.u.getmemlist.buffer = pfn_buf;
-
-	if (mlock(pfn_buf, max_pfns * sizeof (unsigned long)) != 0)
-		return -1;
-
-	ret = do_dom0_op(xc_handle, &op);
-
-	(void) munlock(pfn_buf, max_pfns * sizeof (unsigned long));
-
-#if 0
-#ifdef DEBUG
-	DPRINTF(("Ret for get_pfn_list is %d\n", ret));
-	if (ret >= 0) {
-		int i, j;
-		for (i = 0; i < op.u.getmemlist.num_pfns; i += 16) {
-			fprintf(stderr, "0x%x: ", i);
-			for (j = 0; j < 16; j++)
-				fprintf(stderr, "0x%lx ", pfn_buf[i + j]);
-			fprintf(stderr, "\n");
-		}
-	}
-#endif
-#endif
-	return (ret < 0) ? -1 : op.u.getmemlist.num_pfns;
-}
-
 static int
 setup_guestos(int xc_handle,
 	      u32 dom,
@@ -216,7 +170,7 @@ setup_guestos(int xc_handle,
 		goto error_out;
 	}
 
-	if (get_pfn_list(xc_handle, dom, cpage_array, tot_pages) != tot_pages) {
+	if (xc_get_pfn_list(xc_handle, dom, cpage_array, tot_pages) != tot_pages) {
 		PERROR("Could not get the page frame list");
 		goto error_out;
 	}
@@ -487,11 +441,11 @@ xc_plan9_build(int xc_handle,
 	full_execution_context_t st_ctxt, *ctxt = &st_ctxt;
 	unsigned long virt_startinfo_addr;
 
-	if ((tot_pages = get_tot_pages(xc_handle, domid)) < 0) {
+	if ((tot_pages = xc_get_tot_pages(xc_handle, domid)) < 0) {
 		PERROR("Could not find total pages for domain");
 		return 1;
 	}
-	DPRINTF(("get_tot_pages returns %ld pages\n", tot_pages));
+	DPRINTF(("xc_get_tot_pages returns %ld pages\n", tot_pages));
 
 	kernel_fd = open(image_name, O_RDONLY);
 	if (kernel_fd < 0) {
@@ -505,7 +459,7 @@ xc_plan9_build(int xc_handle,
 		return 1;
 	}
 
-	DPRINTF(("get_tot_pages returns %ld pages\n", tot_pages));
+	DPRINTF(("xc_get_tot_pages returns %ld pages\n", tot_pages));
 	if (mlock(&st_ctxt, sizeof (st_ctxt))) {
 		PERROR("Unable to mlock ctxt");
 		return 1;
@@ -513,13 +467,14 @@ xc_plan9_build(int xc_handle,
 
 	op.cmd = DOM0_GETDOMAININFO;
 	op.u.getdomaininfo.domain = (domid_t) domid;
+        op.u.getdomaininfo.exec_domain = 0;
 	op.u.getdomaininfo.ctxt = ctxt;
 	if ((do_dom0_op(xc_handle, &op) < 0) ||
 	    ((u32) op.u.getdomaininfo.domain != domid)) {
 		PERROR("Could not get info on domain");
 		goto error_out;
 	}
-	DPRINTF(("get_tot_pages returns %ld pages\n", tot_pages));
+	DPRINTF(("xc_get_tot_pages returns %ld pages\n", tot_pages));
 
 	if (!(op.u.getdomaininfo.flags & DOMFLAGS_PAUSED)
 	    || (op.u.getdomaininfo.ctxt->pt_base != 0)) {
@@ -527,7 +482,7 @@ xc_plan9_build(int xc_handle,
 		goto error_out;
 	}
 
-	DPRINTF(("get_tot_pages returns %ld pages\n", tot_pages));
+	DPRINTF(("xc_get_tot_pages returns %ld pages\n", tot_pages));
 	if (setup_guestos(xc_handle, domid, kernel_gfd, tot_pages,
 			  &virt_startinfo_addr,
 			  &load_addr, &st_ctxt, cmdline,

@@ -23,7 +23,7 @@ import sys
 import re
 
 # Default install path for Xen binary packages.
-sys.path.append('/lib/python')
+sys.path = [ '/usr/lib/python' ] + sys.path
 from xen.xend.server.params import XEND_PID_FILE
 
 class CheckError(ValueError):
