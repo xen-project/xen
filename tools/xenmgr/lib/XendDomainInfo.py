@@ -113,7 +113,6 @@ class XendDomainInfo:
                 ['name', self.name],
                 ['memory', self.memory] ]
         if self.info:
-            print 'info:', self.info
             run   = (self.info['running'] and 'r') or '-'
             block = (self.info['blocked'] and 'b') or '-'
             stop  = (self.info['stopped'] and 's') or '-'
