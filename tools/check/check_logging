@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# CHECK-INSTALL
 #  -*- mode: python; -*-
 
 import os
