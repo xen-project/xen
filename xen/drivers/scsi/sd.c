@@ -1336,32 +1336,39 @@ static kdev_t scsi_devs[NR_SCSI_DEVS] = {
 };
 
 
-void scsi_probe_devices(xen_disk_info_t *xdi)
+int scsi_probe_devices(xen_disk_info_t *xdi)
 {
     Scsi_Disk *sd; 
-    int i;
-    unsigned short device;
-    unsigned long capacity;
+    xen_disk_t cur_disk; 
+    int i, ret;
 
     for ( sd = rscsi_disks, i = 0; i < sd_template.dev_max; i++, sd++ )
     {
         if ( sd->device == NULL ) continue;
 
-	/* SMH: we export 'raw' linux device numbers to domain 0 */
-	device   = scsi_devs[i]; 
-        capacity = sd->capacity;
+	/* SMH: don't ever expect this to happen, hence verbose printk */
+	if ( xdi->count == xdi->max ) { 
+	    printk("scsi_probe_devices: out of space for probe.\n"); 
+	    return -ENOMEM; 
+	}
 
-	/* XXX SMH: if make generic, need to properly determine 'type' */
-        xdi->disks[xdi->count].device   = device;
-	xdi->disks[xdi->count].info     = XD_TYPE_DISK; 
-        xdi->disks[xdi->count].capacity = capacity; 
-        xdi->count++; 
-                
-        printk("Device %d: SCSI-XENO (disk) capacity %ldkB (%ldMB)\n",
-               xdi->count, capacity>>1, capacity>>11);
+	/* SMH: we export 'raw' linux device numbers to domain 0 */
+	cur_disk.device   = scsi_devs[i]; 
+	cur_disk.info     = XD_TYPE_DISK; // XXX SMH: should determine properly
+        cur_disk.capacity = sd->capacity;
+	cur_disk.domain   = 0;            // 'physical' disks belong to dom0 
+
+	/* Now copy into relevant part of user-space buffer */
+	if((ret = copy_to_user(xdi->disks + xdi->count, &cur_disk, 
+			       sizeof(xen_disk_t))) < 0) {  
+	    printk("scsi_probe_devices: copy_to_user failed [rc=%d]\n", ret); 
+	    return ret; 
+	} 
+	
+	xdi->count++;
     }
 
-    return; 
+    return 0;
 }	
 
 

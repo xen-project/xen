@@ -30,10 +30,12 @@ typedef struct _vbd {
 
 #define VBD_HTAB_SZ  16       // no. of entries in the vbd hash table. 
 
-long vbd_create(vbd_create_t *create_info); 
-long vbd_add(vbd_add_t *add_info); 
-long vbd_remove(vbd_remove_t *remove_info);
-long vbd_delete(vbd_delete_t *delete_info); 
+long vbd_create(vbd_create_t *create_params); 
+long vbd_add(vbd_add_t *add_params); 
+long vbd_remove(vbd_remove_t *remove_params);
+long vbd_delete(vbd_delete_t *delete_params); 
+long vbd_probe(vbd_probe_t *probe_params); 
+long vbd_info(vbd_info_t *info_params); 
 
 
 /* Describes a [partial] disk extent (part of a block io request) */

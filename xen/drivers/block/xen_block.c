@@ -73,7 +73,6 @@ static void unlock_buffer(struct task_struct *p,
 static void io_schedule(unsigned long unused);
 static int do_block_io_op_domain(struct task_struct *p, int max_to_do);
 static void dispatch_rw_block_io(struct task_struct *p, int index);
-static void dispatch_probe(struct task_struct *p, int index);
 static void dispatch_debug_block_io(struct task_struct *p, int index);
 static void make_response(struct task_struct *p, unsigned long id, 
                           unsigned short op, unsigned long st);
@@ -241,31 +240,35 @@ long do_block_io_op(block_io_op_t *u_block_io_op)
         break;
 
     case BLOCK_IO_OP_VBD_CREATE:  
-	/* create a new VBD for a given domain; caller must be privileged  */
-	if(!IS_PRIV(p))
-	    return -EPERM; 
-	ret = vbd_create(&op.u.create_info); 
+	/* create a new VBD */
+	ret = vbd_create(&op.u.create_params); 
 	break; 
 
     case BLOCK_IO_OP_VBD_ADD:  
-	/* add an extent to a VBD; caller must be privileged  */
-	if(!IS_PRIV(p))
-	    return -EPERM; 
-	ret = vbd_add(&op.u.add_info); 
+	/* add an extent to a VBD */
+	ret = vbd_add(&op.u.add_params); 
 	break; 
 
     case BLOCK_IO_OP_VBD_REMOVE:  
-	/* remove an extent from a VBD; caller must be privileged  */
-	if(!IS_PRIV(p))
-	    return -EPERM; 
-	ret = vbd_remove(&op.u.remove_info); 
+	/* remove an extent from a VBD */
+	ret = vbd_remove(&op.u.remove_params); 
 	break; 
 
     case BLOCK_IO_OP_VBD_DELETE:  
-	/* delete a VBD; caller must be privileged */
-	if(!IS_PRIV(p))
-	    return -EPERM; 
-	ret = vbd_delete(&op.u.delete_info); 
+	/* delete a VBD */
+	ret = vbd_delete(&op.u.delete_params); 
+	break; 
+
+    case BLOCK_IO_OP_VBD_PROBE: 
+	/* query VBD information for self or others (or all) */
+	ret = vbd_probe(&op.u.probe_params); 
+	if(ret == 0)
+	    copy_to_user(u_block_io_op, &op, sizeof(op)); 
+	break; 
+
+    case BLOCK_IO_OP_VBD_INFO: 
+	/* query information about a particular VBD */
+	ret = vbd_info(&op.u.info_params); 
 	break; 
 
     default: 
@@ -403,10 +406,6 @@ static int do_block_io_op_domain(struct task_struct *p, int max_to_do)
 	    dispatch_rw_block_io(p, i);
 	    break;
 
-	case XEN_BLOCK_PROBE:
-	    dispatch_probe(p, i);
-	    break;
-
 	case XEN_BLOCK_DEBUG:
 	    dispatch_debug_block_io(p, i);
 	    break;
@@ -427,55 +426,6 @@ static int do_block_io_op_domain(struct task_struct *p, int max_to_do)
 static void dispatch_debug_block_io(struct task_struct *p, int index)
 {
     DPRINTK("dispatch_debug_block_io: unimplemented\n"); 
-}
-
-
-static void dispatch_probe(struct task_struct *p, int index)
-{
-    extern void ide_probe_devices(xen_disk_info_t *xdi);
-    extern void scsi_probe_devices(xen_disk_info_t *xdi);
-    extern void vbd_probe_devices(xen_disk_info_t *xdi, struct task_struct *p);
-
-    blk_ring_t *blk_ring = p->blk_ring_base;
-    xen_disk_info_t *xdi;
-    unsigned long flags, buffer;
-    int rc = 0;
-    
-    buffer = blk_ring->ring[index].req.buffer_and_sects[0] & ~0x1FF;
-
-    spin_lock_irqsave(&p->page_lock, flags);
-    if ( !__buffer_is_valid(p, buffer, sizeof(xen_disk_info_t), 1) )
-    {
-        DPRINTK("Bad buffer in dispatch_probe_blk\n");
-        spin_unlock_irqrestore(&p->page_lock, flags);
-        rc = 1;
-        goto out;
-    }
-
-    __lock_buffer(buffer, sizeof(xen_disk_info_t), 1);
-    spin_unlock_irqrestore(&p->page_lock, flags);
-
-    /* 
-    ** XXX SMH: all three of the below probe functions /append/ their 
-    ** info to the xdi array; i.e.  they assume that all earlier slots 
-    ** are correctly filled, and that xdi->count points to the first 
-    ** free entry in the array. All kinda gross but it'll do for now.  
-    */
-    xdi = map_domain_mem(buffer);
-    xdi->count = 0; 
-
-    if(IS_PRIV(p)) { 
-	/* privileged domains always get access to the 'real' devices */
-	ide_probe_devices(xdi);
-	scsi_probe_devices(xdi);
-    } 
-    vbd_probe_devices(xdi, p); 
-    unmap_domain_mem(xdi);
-
-    unlock_buffer(p, buffer, sizeof(xen_disk_info_t), 1);
-
- out:
-    make_response(p, blk_ring->ring[index].req.id, XEN_BLOCK_PROBE, rc);
 }
 
 static void dispatch_rw_block_io(struct task_struct *p, int index)

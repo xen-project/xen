@@ -24,14 +24,14 @@ static kdev_t ide_devs[NR_IDE_DEVS] = {
 
 
 
-void ide_probe_devices(xen_disk_info_t* xdi)
+int ide_probe_devices(xen_disk_info_t* xdi)
 {
-    int loop;
+    int loop, ret = 0;
     unsigned int unit;
-    unsigned long capacity; 
-    unsigned short device, type; 
+    unsigned short type; 
     ide_drive_t *drive;
-    
+    xen_disk_t cur_disk; 
+
     for ( loop = 0; loop < MAX_HWIFS; loop++ )
     {
 	ide_hwif_t *hwif = &ide_hwifs[loop];
@@ -42,33 +42,42 @@ void ide_probe_devices(xen_disk_info_t* xdi)
             drive = &hwif->drives[unit];
 
             if ( !drive->present ) continue;
+
+
+	    /* SMH: don't ever expect this to happen, hence verbose printk */
+	    if ( xdi->count == xdi->max ) { 
+		printk("ide_probe_devices: out of space for probe.\n"); 
+		return -ENOMEM;  
+	    }
+
             
+	    
+	    /* SMH: we export 'raw' linux device numbers to domain 0 */
+	    cur_disk.device = ide_devs[(loop * MAX_DRIVES) + unit]; 
+
 	    /* 
 	    ** NB: we use the ide 'media' field (ide_disk, ide_cdrom, etc) 
 	    ** as our 'type' field (XD_TYPE_DISK, XD_TYPE_CDROM, etc). 
 	    ** Hence must ensure these are kept in sync. 
 	    */
-
-	    /* SMH: we export 'raw' linux device numbers to domain 0 */
-            device   = ide_devs[(loop * MAX_DRIVES) + unit]; 
-	    type     = drive->media; 
-            capacity = current_capacity(drive);
-
-            xdi->disks[xdi->count].device   = device; 
-            xdi->disks[xdi->count].info     = type; 
-
+	    cur_disk.info   = (type = drive->media); 
 	    if(type == XD_TYPE_CDROM) 
-		xdi->disks[xdi->count].info |= XD_FLAG_RO; 
+		cur_disk.info |= XD_FLAG_RO; 
 
-            xdi->disks[xdi->count].capacity = capacity;
+	    cur_disk.capacity = current_capacity(drive);
+	    cur_disk.domain   = 0; /* 'physical' disks belong to domain 0 
+
+	    /* Now copy into relevant part of user-space buffer */
+	    if((ret = copy_to_user(xdi->disks + xdi->count, &cur_disk, 
+				   sizeof(xen_disk_t))) < 0) { 
+		printk("ide_probe_devices: copy_to_user failed [rc=%d]\n", 
+		       ret); 
+		return ret; 
+	    } 
+		
             xdi->count++;
-
-            printk("Device %d: IDE-XENO (%s) capacity %ldkB (%ldMB)\n",
-                   xdi->count, (type == XD_TYPE_DISK) ? "disk" : 
-		   ((type == XD_TYPE_CDROM) ? "cdrom" : "unknown"), 
-		   capacity>>1, capacity>>11);
         }
     }
     
-    return;
+    return ret; 
 }

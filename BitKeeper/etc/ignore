@@ -483,3 +483,8 @@ xen/common/debug.c~
 xen/common/debug.o
 tools/internal/xi_restore_linux
 tools/internal/xi_save_linux
+tools/internal/xi_vbd_add
+tools/internal/xi_vbd_create
+tools/internal/xi_vbd_info
+tools/internal/xi_vbd_list
+xen/drivers/scsi/BusLogic.o
