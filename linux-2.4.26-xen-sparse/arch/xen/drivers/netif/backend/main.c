@@ -252,30 +252,22 @@ static void net_rx_action(unsigned long unused)
         mdata   = ((mmu[2].ptr & PAGE_MASK) |
                    ((unsigned long)skb->data & ~PAGE_MASK));
         
+        phys_to_machine_mapping[__pa(skb->data) >> PAGE_SHIFT] = new_mfn;
+        
+        atomic_set(&(skb_shinfo(skb)->dataref), 1);
+        skb_shinfo(skb)->nr_frags = 0;
+        skb_shinfo(skb)->frag_list = NULL;
+
+        netif->stats.rx_bytes += size;
+        netif->stats.rx_packets++;
+
         /* Check the reassignment error code. */
+        status = NETIF_RSP_OKAY;
         if ( unlikely(mcl[1].args[5] != 0) )
         {
-            DPRINTK("Failed MMU update transferring to DOM%u\n",
-                    netif->domid);
-            (void)HYPERVISOR_update_va_mapping(
-                (unsigned long)skb->head >> PAGE_SHIFT,
-                (pte_t) { (mdata & PAGE_MASK) | __PAGE_KERNEL },
-                UVMF_INVLPG);
-            dealloc_mfn(new_mfn);
+            DPRINTK("Failed MMU update transferring to DOM%u\n", netif->domid);
+            dealloc_mfn(mdata >> PAGE_SHIFT);
             status = NETIF_RSP_ERROR;
-        }
-        else
-        {
-            phys_to_machine_mapping[__pa(skb->data) >> PAGE_SHIFT] = new_mfn;
-
-            atomic_set(&(skb_shinfo(skb)->dataref), 1);
-            skb_shinfo(skb)->nr_frags = 0;
-            skb_shinfo(skb)->frag_list = NULL;
-
-            netif->stats.rx_bytes += size;
-            netif->stats.rx_packets++;
-
-            status = NETIF_RSP_OKAY;
         }
 
         evtchn = netif->evtchn;

@@ -840,7 +840,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
 
         if ( unlikely((e = percpu_info[cpu].gps) == NULL) )
         {
-            MEM_LOG("No GPS to reassign pfn %08lx to\n", pfn);
+            MEM_LOG("No GPS to reassign pfn %08lx to", pfn);
             okay = 0;
             break;
         }
@@ -865,6 +865,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         if ( unlikely(test_bit(DF_DYING, &e->flags)) ||
              unlikely(IS_XEN_HEAP_FRAME(page)) )
         {
+            MEM_LOG("Reassignment page is Xen heap, or dest dom is dying.");
             okay = 0;
             goto reassign_fail;
         }
@@ -1051,8 +1052,8 @@ int do_mmu_update(mmu_update_t *ureqs, int count, int *success_count)
              * If in log-dirty mode, mark the corresponding pseudo-physical
              * page as dirty.
              */
-            if( unlikely(current->mm.shadow_mode == SHM_logdirty) )
-                mark_dirty( &current->mm, pfn );
+            if ( unlikely(current->mm.shadow_mode == SHM_logdirty) )
+                mark_dirty(&current->mm, pfn);
 
             put_page(&frame_table[pfn]);
             break;
