@@ -91,7 +91,7 @@ asmlinkage void call_##x(void); \
 __asm__( \
 "\n"__ALIGN_STR"\n" \
 SYMBOL_NAME_STR(x) ":\n\t" \
-	"push"__OS" $"#v"\n\t" \
+	"push"__OS" $"#v"<<16\n\t" \
 	SAVE_ALL(a) \
 	SYMBOL_NAME_STR(call_##x)":\n\t" \
 	"call "SYMBOL_NAME_STR(smp_##x)"\n\t" \
@@ -104,7 +104,7 @@ asmlinkage void call_##x(void); \
 __asm__( \
 "\n"__ALIGN_STR"\n" \
 SYMBOL_NAME_STR(x) ":\n\t" \
-	"push"__OS" $"#v"\n\t" \
+	"push"__OS" $"#v"<<16\n\t" \
 	SAVE_ALL(a) \
 	"mov %"__OP"sp,%"__OP"ax\n\t" \
 	"push %"__OP"ax\n\t" \
@@ -131,7 +131,7 @@ asmlinkage void IRQ_NAME(nr); \
 __asm__( \
 "\n"__ALIGN_STR"\n" \
 SYMBOL_NAME_STR(IRQ) #nr "_interrupt:\n\t" \
-	"push"__OS" $"#nr"\n\t" \
+	"push"__OS" $"#nr"<<16\n\t" \
 	"jmp common_interrupt");
 
 extern unsigned long prof_cpu_mask;
