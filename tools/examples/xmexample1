@@ -15,7 +15,6 @@ kernel = "/boot/vmlinuz-2.6.8.1-xenU"
 
 # The domain build function. Default is 'linux'.
 #builder='linux'
-#builder='netbsd'
 
 # Initial memory allocation (in megabytes) for the new domain.
 memory = 64
