@@ -285,7 +285,8 @@ static void network_alloc_rx_buffers(struct net_device *dev)
     rx_mcl[nr_pfns].args[0] = MEMOP_decrease_reservation;
     rx_mcl[nr_pfns].args[1] = (unsigned long)rx_pfn_array;
     rx_mcl[nr_pfns].args[2] = (unsigned long)nr_pfns;
-    rx_mcl[nr_pfns].args[3] = DOMID_SELF;
+    rx_mcl[nr_pfns].args[3] = 0;
+    rx_mcl[nr_pfns].args[4] = DOMID_SELF;
 
     /* Zap PTEs and give away pages in one big multicall. */
     (void)HYPERVISOR_multicall(rx_mcl, nr_pfns+1);
