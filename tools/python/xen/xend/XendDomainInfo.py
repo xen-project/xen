@@ -26,6 +26,7 @@ import sxp
 
 import XendConsole
 xendConsole = XendConsole.instance()
+from XendLogging import log
 
 import server.SrvDaemon
 xend = server.SrvDaemon.instance()
@@ -537,6 +538,7 @@ class XendDomainInfo:
         if self.dom is None: return 0
         chan = xend.getDomChannel(self.dom)
         if chan:
+            log.debug("Closing channel to domain %d", self.dom)
             chan.close()
         return xc.domain_destroy(dom=self.dom)
 
@@ -564,6 +566,7 @@ class XendDomainInfo:
         if self.dom is None: return
         ctrl = xend.netif_get(self.dom)
         if ctrl:
+            log.debug("Destroying vifs for domain %d", self.dom)
             ctrl.destroy()
 
     def release_vbds(self):
@@ -572,6 +575,7 @@ class XendDomainInfo:
         if self.dom is None: return
         ctrl = xend.blkif_get(self.dom)
         if ctrl:
+            log.debug("Destroying vbds for domain %d", self.dom)
             ctrl.destroy()
 
     def show(self):
@@ -599,11 +603,11 @@ class XendDomainInfo:
         memory = self.memory
         name = self.name
         cpu = int(sxp.child_value(self.config, 'cpu', '-1'))
-        #print 'init_domain>', memory, name, cpu
         dom = xc.domain_create(mem_kb= memory * 1024, name= name, cpu= cpu)
         if dom <= 0:
             raise VmError('Creating domain failed: name=%s memory=%d'
                           % (name, memory))
+        log.debug('init_domain> Created domain=%d name=%s memory=%d', dom, name, memory)
         self.setdom(dom)
 
         if self.startTime is None:
@@ -614,7 +618,7 @@ class XendDomainInfo:
         """
         if self.recreate: return
         if len(cmdline) >= 256:
-            print 'Warning: kernel cmdline too long'
+            log.warning('kernel cmdline too long, domain %d', self.dom)
         dom = self.dom
         buildfn = getattr(xc, '%s_build' % ostype)
         #print 'build_domain>', ostype, dom, kernel, cmdline, ramdisk
@@ -803,6 +807,8 @@ class XendDomainInfo:
             if field_handler:
                 v = field_handler(self, self.config, field, field_index)
                 append_deferred(dlist, v)
+            else:
+                log.warning("Unknown config field %s", field_name)
             index[field_name] = field_index + 1
         d = defer.DeferredList(dlist, fireOnOneErrback=1)
         return d
@@ -872,6 +878,7 @@ def vm_dev_vif(vm, val, index):
     vif = index #todo
     vmac = sxp.child_value(val, "mac")
     xend.netif_create(vm.dom, recreate=vm.recreate)
+    log.debug("Creating vif dom=%d vif=%d mac=%s", vm.dom, vif, str(vmac))
     defer = xend.netif_dev_create(vm.dom, vif, val, recreate=vm.recreate)
     def fn(id):
         dev = xend.netif_dev(vm.dom, vif)
@@ -898,6 +905,7 @@ def vm_dev_vbd(vm, val, index):
     if not dev:
         raise VmError('vbd: Missing dev')
     mode = sxp.child_value(val, 'mode', 'r')
+    log.debug("Creating vbd dom=%d uname=%s dev=%s", vm.dom, uname, dev)
     defer = make_disk(vm.dom, uname, dev, mode, vm.recreate)
     def fn(vbd):
         dev = xend.blkif_dev(vm.dom, vdev)
@@ -932,6 +940,7 @@ def vm_dev_pci(vm, val, index):
         func = parse_pci(func)
     except:
         raise VmError('pci: invalid parameter')
+    log.debug("Creating pci device dom=%d bus=%x dev=%x func=%x", vm.dom, bus, dev, func)
     rc = xc.physdev_pci_access_modify(dom=vm.dom, bus=bus, dev=dev,
                                       func=func, enable=1)
     if rc < 0:
@@ -974,13 +983,13 @@ def vnet_bridge(vnet, vmac, dom, idx):
     vif = "vif%d.%d" % (dom, idx)
     try:
         cmd = "(vif.conn (vif %s) (vnet %s) (vmac %s))" % (vif, vnet, vmac)
-        print "*** vnet_bridge>", cmd
+        log.debug("vnet_bridge> %s", cmd)
         out = file("/proc/vnet/policy", "wb")
         out.write(cmd)
         err = out.close()
-        print "vnet_bridge>", "err=", err
+        log.debug("vnet_bridge> err=%d", err)
     except IOError, ex:
-        print "vnet_bridge>", ex
+        log.exception("vnet_bridge>")
     
 def vm_field_vnet(vm, config, val, index):
     """Handle a vnet field in a config.
@@ -1005,6 +1014,9 @@ def vm_field_vnet(vm, config, val, index):
         #vnet_bridge(vnet, mac, vm.dom, 0)
         #vm.add_config([ 'vif.vnet', ['id', id], ['vnet', vnet], ['mac', mac]])
 
+def vm_field_ignore(vm, config, val, index):
+    pass
+
 # Register image handlers for linux and bsd.
 add_image_handler('linux',  vm_image_linux)
 add_image_handler('netbsd', vm_image_netbsd)
@@ -1013,6 +1025,15 @@ add_image_handler('netbsd', vm_image_netbsd)
 add_device_handler('vif',  vm_dev_vif)
 add_device_handler('vbd',  vm_dev_vbd)
 add_device_handler('pci',  vm_dev_pci)
+
+# Ignore the fields we already handle.
+add_config_handler('name',    vm_field_ignore)
+add_config_handler('memory',  vm_field_ignore)
+add_config_handler('cpu',     vm_field_ignore)
+add_config_handler('console', vm_field_ignore)
+add_config_handler('image',   vm_field_ignore)
+add_config_handler('device',  vm_field_ignore)
+add_config_handler('backend', vm_field_ignore)
 
 # Register config handlers for vfr and vnet.
 add_config_handler('vfr',  vm_field_vfr)

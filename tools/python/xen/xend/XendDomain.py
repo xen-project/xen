@@ -22,6 +22,8 @@ import XendConsole
 import XendMigrate
 import EventServer
 from XendError import XendError
+from XendLogging import log
+
 
 from xen.xend.server import SrvDaemon
 xend = SrvDaemon.instance()
@@ -52,7 +54,7 @@ class XendDomain:
         self.db = XendDB.XendDB(self.dbpath)
         self.domain_db = self.db.fetchall("")
         if xroot.get_rebooted():
-            print 'XendDomain> rebooted: removing all domain info'
+            log.info('XendDomain> rebooted: removing all domain info')
             self.rm_all()
         eserver.subscribe('xend.virq', self.onVirq)
         self.initial_refresh()
@@ -226,10 +228,10 @@ class XendDomain:
                 casualties.append(d)
         for d in casualties:
             id = str(d['dom'])
-            print 'XendDomain>reap> died id=', id, d
+            log.debug('XendDomain>reap> domain died id=%s', id)
             if d['shutdown']:
                 reason = XendDomainInfo.shutdown_reason(d['shutdown_reason'])
-                print 'XendDomain>reap> shutdown id=', id, reason
+                log.debug('XendDomain>reap> shutdown id=%s reason=%s', id, reason)
                 if reason in ['poweroff', 'reboot']:
                     self.domain_restart_schedule(id, reason)
             self.final_domain_destroy(id)
@@ -283,7 +285,7 @@ class XendDomain:
             try:
                 self._delete_domain(id)
             except:
-                print 'refresh_domain: error'
+                log.exception('refresh_domain> error')
                 raise
                 pass
         else:
@@ -328,7 +330,7 @@ class XendDomain:
         @param config: configuration
         @return: deferred
         """
-        print 'domain_configure>', id, config
+        log.debug('domain_configure> id=%s config=%s', id, str(config))
         dom = int(id)
         dominfo = self.domain_get(dom)
         if not dominfo:
@@ -417,7 +419,7 @@ class XendDomain:
         @param id:     domain id
         @param reason: shutdown reason
         """
-        print 'domain_restart_schedule>', id, reason, set
+        log.debug('domain_restart_schedule> %s %s %d', id, reason, set)
         dominfo = self.domain.get(id)
         if not dominfo:
             return
@@ -430,7 +432,7 @@ class XendDomain:
             # Avoid multiple restarts.
             dominfo.restart_mode = XendDomainInfo.RESTART_NEVER
             self.restarts[id] = dominfo.config
-            print 'Scheduling restart for domain:', id, dominfo.name
+            log.info('Scheduling restart for domain: id=%s name=%s', id, dominfo.name)
             self.domain_restarts_schedule()
             
     def domain_restart_cancel(self, id):
@@ -456,18 +458,17 @@ class XendDomain:
             # Remove it from the restarts.
             del self.restarts[id]
             try:
-                print 'domain_restarts> restart:', id, config
+                log.info('domain_restarts> restart: id=%s config=%s', id, str(config))
                 def cbok(dominfo):
-                    print 'Restarted domain', id, 'as', dominfo.id
+                    log.info('Restarted domain %s as %s', id, dominfo.id)
                     self.domain_unpause(dominfo.id)
                 def cberr(err):
-                    print >>sys.stderr, "Delayed exception restarting domain: ", err
+                    log.exception("Delayed exception restarting domain")
                 deferred = self.domain_create(config)
                 deferred.addCallback(cbok)
                 deferred.addErrback(cberr)
             except:
-                print >>sys.stderr, "XendDomain> Exception restarting domain"
-                traceback.print_exc(sys.stderr)
+                log.exception("Exception restarting domain")
         if len(self.restarts):
             self.refresh_schedule(delay=5)
         
@@ -479,6 +480,7 @@ class XendDomain:
         dom = int(id)
         if dom <= 0:
             return 0
+        log.info('Destroying domain %s', str(id))
         eserver.inject('xend.domain.destroy', id)
         dominfo = self.domain.get(id)
         if dominfo:

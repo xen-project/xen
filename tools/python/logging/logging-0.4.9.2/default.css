@@ -1,0 +1,32 @@
+BODY, P, UL, OL {font-family: Verdana, Arial, Helvetica, Geneva, sans-serif ; background: white; color: black; font-size: 10pt; }
+CODE {font-family: "Courier New", Courier, Monaco, monospace ; }
+PRE {font-family: "Courier New", Courier, Monaco, monospace ; }
+.program { color: navy; font-family: "Courier New", Courier, Monaco, monospace }
+.output { color: maroon }
+HR {color: gray ; }
+.navbar { font-family: Verdana, Arial, Helvetica, Geneva, sans-serif; background: #FFFF66 ; border-style: none none solid none; border-width: thin; padding: 2px;}
+.navarea { background: #FFFF66 ; }
+TR { font-size: 10pt }
+.red { color: #FF0000 }
+.maroon { color: #800000 }
+.comment { color: green }
+.optional { color: silver }
+.strong { font-weight: bold }
+TR.tblheading { background: silver ; }
+.notrecommended {color: #666666 ; }
+.deemphasized {color: #666666 ; }
+TABLE.densetable {font-size: 80% ; }
+TH { text-align: left; background: silver }
+TR.summaryrow { font-size: 90%; background: #00FFFF ; }
+CAPTION {font-size: 100% ; }
+.embeddedfloat {float: right; margin-left: 3em}
+.bigtd { font-size: 18pt }
+TD, .normaltd { vertical-align: top; background: #EEEEEE; font-family: Verdana, Arial, Helvetica, Geneva, sans-serif; font-size: 10pt }
+H1, H2, H3, H4, H5, H6 {font-family: Verdana, Arial, Helvetica, Geneva, sans-serif ; }
+H4 {margin-bottom: 0.5em }
+H5, H6 {margin-bottom: 0.1em }
+A:link {color: blue ; }
+A:visited {color: purple ; }
+A:active {color: red ; }
+A { font-family: Verdana, Arial, Helvetica, Geneva, sans-serif; font-size: 10pt }
+.warning { color: red }

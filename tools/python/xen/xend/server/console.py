@@ -2,13 +2,13 @@
 
 from twisted.internet import reactor
 from twisted.internet import protocol
-from twisted.protocols import telnet
 
 from xen.lowlevel import xu
 
 from xen.xend.XendError import XendError
 from xen.xend import EventServer
 eserver = EventServer.instance()
+from xen.xend.XendLogging import log
 
 import controller
 from messages import *
@@ -36,6 +36,8 @@ class ConsoleProtocol(protocol.Protocol):
             # KAF: A nice quiet successful connect.
             #self.transport.write("Connected to console %d on domain %d\n"
             #                     % (self.idx, self.controller.dom))
+            log.info("Console connected %s %s %s",
+                     self.idx, str(self.addr[0]), str(self.addr[1]))
             eserver.inject('xend.console.connect',
                            [self.idx, self.addr[0], self.addr[1]])
 
@@ -49,6 +51,8 @@ class ConsoleProtocol(protocol.Protocol):
         return len(data)
 
     def connectionLost(self, reason=None):
+        log.info("Console disconnected %s %s %s",
+                 self.idx, str(self.addr[0]), str(self.addr[1]))
         eserver.inject('xend.console.disconnect',
                        [self.idx, self.addr[0], self.addr[1]])
         self.controller.disconnect()
@@ -83,11 +87,14 @@ class ConsoleControllerFactory(controller.ControllerFactory):
                 raise XendError('console port in use: ' + str(console_port))
         console = ConsoleController(self, dom, console_port)
         self.addInstance(console)
+        log.info("Created console id=%s domain=%d port=%d",
+                 console.idx, console.dom, console.console_port)
         eserver.inject('xend.console.create',
                        [console.idx, console.dom, console.console_port])
         return console
         
     def consoleClosed(self, console):
+        log.info("Closed console id=%s", console.idx)
         eserver.inject('xend.console.close', console.idx)
         self.delInstance(console)
 

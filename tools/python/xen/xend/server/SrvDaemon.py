@@ -32,8 +32,9 @@ from xen.xend import PrettyPrint
 from xen.xend import EventServer
 eserver = EventServer.instance()
 from xen.xend.XendError import XendError
-
 from xen.xend.server import SrvServer
+from xen.xend import XendRoot
+from xen.xend.XendLogging import log
 
 import channel
 import blkif
@@ -514,11 +515,7 @@ class Daemon:
             pidfile.close()
             return 0
         # Child
-        logfile = self.open_logfile()
-        self.redirect_output(logfile)
-        
         self.tracing(trace)
-
         self.run()
         return 0
 
@@ -590,16 +587,6 @@ class Daemon:
             #del tb
         return self.trace
 
-    def open_logfile(self):
-        if not os.path.exists(CONTROL_DIR):
-            os.makedirs(CONTROL_DIR)
-
-        # Open log file. Truncate it if non-empty, and request line buffering.
-        if os.path.isfile(LOG_FILE):
-            os.rename(LOG_FILE, LOG_FILE+'.old')
-        logfile = open(LOG_FILE, 'w+', 1)
-        return logfile
-
     def set_user(self):
         # Set the UID.
         try:
@@ -609,22 +596,12 @@ class Daemon:
             print "Error: no such user '%s'" % USER
             return 1
 
-    def redirect_output(self, logfile):
-        if DEBUG: return
-        # Close down standard file handles
-        try:
-            os.close(0) # stdin
-            os.close(1) # stdout
-            os.close(2) # stderr
-        except:
-            pass
-        # Redirect output to log file.
-        sys.stdout = sys.stderr = logfile
-
     def stop(self):
         return self.cleanup(kill=True)
 
     def run(self):
+        xroot = XendRoot.instance()
+        log.info("Xend Daemon started")
         self.createFactories()
         self.listenMgmt()
         self.listenEvent()
@@ -709,7 +686,6 @@ class Daemon:
         ctrl = self.blkifCF.getInstanceByDom(dom)
         if not ctrl:
             raise XendError('No blkif controller: %d' % dom)
-        print 'blkif_dev_create>', dom, vdev, mode, segment
         d = ctrl.attachDevice(vdev, mode, segment, recreate=recreate)
         return d
 
