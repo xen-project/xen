@@ -116,17 +116,11 @@ static inline unsigned long pgd_val(pgd_t x)
 }
 #define pgprot_val(x)	((x).pgprot)
 
-static inline pte_t __pte(unsigned long x)
-{
-	if (x & 1) x = phys_to_machine(x);
-	return ((pte_t) { (x) });
-}
+#define __pte(x) ({ unsigned long _x = (x); \
+    (((_x)&1) ? ((pte_t) {phys_to_machine(_x)}) : ((pte_t) {(_x)})); })
 #define __pte_ma(x)	((pte_t) { (x) } )
-static inline pgd_t __pgd(unsigned long x)
-{
-	if ((x & 1)) x = phys_to_machine(x);
-	return ((pgd_t) { (x) });
-}
+#define __pgd(x) ({ unsigned long _x = (x); \
+    (((_x)&1) ? ((pgd_t) {phys_to_machine(_x)}) : ((pgd_t) {(_x)})); })
 #define __pgprot(x)	((pgprot_t) { (x) } )
 
 #endif /* !__ASSEMBLY__ */

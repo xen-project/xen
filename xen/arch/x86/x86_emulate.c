@@ -18,12 +18,14 @@ typedef int16_t            s16;
 typedef int32_t            s32;
 typedef int64_t            s64;
 #include <public/xen.h>
+#define DPRINTF(_f, _a...) printf( _f , ## _a )
 #else
 #include <xen/config.h>
 #include <xen/types.h>
 #include <xen/lib.h>
 #include <xen/mm.h>
 #include <asm/regs.h>
+#define DPRINTF DPRINTK
 #endif
 #include <asm-x86/x86_emulate.h>
 
@@ -226,22 +228,25 @@ struct operand {
 #define EFLAGS_MASK (EFLG_OF|EFLG_SF|EFLG_ZF|EFLG_AF|EFLG_PF|EFLG_CF)
 
 /* Before executing instruction: restore necessary bits in EFLAGS. */
-/* EFLAGS = (_sav & _msk) | (EFLAGS & ~_msk); _sav &= ~msk; */
 #define _PRE_EFLAGS(_sav, _msk, _tmp)           \
+/* EFLAGS = (_sav & _msk) | (EFLAGS & ~_msk); */\
 "push %"_sav"; "                                \
 "movl %"_msk",%"_LO32 _tmp"; "                  \
 "andl %"_LO32 _tmp",("_STK"); "                 \
-"notl %"_LO32 _tmp"; "                          \
-"andl %"_LO32 _tmp",%"_sav"; "                  \
 "pushf; "                                       \
+"notl %"_LO32 _tmp"; "                          \
 "andl %"_LO32 _tmp",("_STK"); "                 \
 "pop  %"_tmp"; "                                \
 "orl  %"_LO32 _tmp",("_STK"); "                 \
-"popf; "
+"popf; "                                        \
+/* _sav &= ~msk; */                             \
+"movl %"_msk",%"_LO32 _tmp"; "                  \
+"notl %"_LO32 _tmp"; "                          \
+"andl %"_LO32 _tmp",%"_sav"; "
 
 /* After executing instruction: write-back necessary bits in EFLAGS. */
-/* _sav |= EFLAGS & _msk; */
 #define _POST_EFLAGS(_sav, _msk, _tmp)          \
+/* _sav |= EFLAGS & _msk; */                    \
 "pushf; "                                       \
 "pop  %"_tmp"; "                                \
 "andl %"_msk",%"_LO32 _tmp"; "                  \
@@ -369,8 +374,6 @@ do{ __asm__ __volatile__ (                                              \
    (_eip) += (_size); \
    (_type)_x; \
 })
-
-#define DPRINTF(_f, _a...) printf( _f , ## _a )
 
 void *
 decode_register(
@@ -932,23 +935,23 @@ x86_emulate_memop(
         }
         break;
     case 0xa3: bt: /* bt */
-        src.val &= (1UL << (1 << dst.bytes)) - 1; /* only subword offset */
+        src.val &= (dst.bytes << 3) - 1; /* only subword offset */
         emulate_2op_SrcV_nobyte("bt", src, dst, _regs.eflags);
         break;
     case 0xb3: btr: /* btr */
-        src.val &= (1UL << (1 << dst.bytes)) - 1; /* only subword offset */
+        src.val &= (dst.bytes << 3) - 1; /* only subword offset */
         emulate_2op_SrcV_nobyte("btr", src, dst, _regs.eflags);
         break;
     case 0xab: bts: /* bts */
-        src.val &= (1UL << (1 << dst.bytes)) - 1; /* only subword offset */
+        src.val &= (dst.bytes << 3) - 1; /* only subword offset */
         emulate_2op_SrcV_nobyte("bts", src, dst, _regs.eflags);
         break;
     case 0xbb: btc: /* btc */
-        src.val &= (1UL << (1 << dst.bytes)) - 1; /* only subword offset */
+        src.val &= (dst.bytes << 3) - 1; /* only subword offset */
         emulate_2op_SrcV_nobyte("btc", src, dst, _regs.eflags);
         break;
     case 0xba: /* Grp8 */
-        switch ( modrm_reg >> 1 )
+        switch ( modrm_reg & 3 )
         {
         case 0: goto bt;
         case 1: goto bts;

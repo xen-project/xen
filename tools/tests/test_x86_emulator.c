@@ -158,6 +158,21 @@ int main(int argc, char **argv)
         goto fail;
     printf("okay\n");
 
+    printf("%-40s", "Testing btrl $0x1,(%edi)...");
+    instr[0] = 0x0f; instr[1] = 0xba; instr[2] = 0x37; instr[3] = 0x01;
+    res         = 0x2233445F;
+    regs.eflags = 0x200;
+    regs.eip    = (unsigned long)&instr[0];
+    regs.edi    = (unsigned long)&res;
+    cr2         = regs.edi;
+    rc = x86_emulate_memop(&regs, cr2, &emulops, 4);    
+    if ( (rc != 0) || 
+         (res != 0x2233445D) ||
+         ((regs.eflags&0x201) != 0x201) ||
+         (regs.eip != (unsigned long)&instr[4]) )
+        goto fail;
+    printf("okay\n");
+
     return 0;
 
  fail:

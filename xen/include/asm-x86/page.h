@@ -56,10 +56,23 @@ typedef struct { unsigned long pt_lo; } pagetable_t;
 #include <asm/bitops.h>
 #include <asm/flushtlb.h>
 
-#define linear_pg_table ((l1_pgentry_t *)LINEAR_PT_VIRT_START)
-#define linear_l2_table ((l2_pgentry_t *)(LINEAR_PT_VIRT_START+(LINEAR_PT_VIRT_START>>(L2_PAGETABLE_SHIFT-L1_PAGETABLE_SHIFT))))
-
-#define va_to_l1mfn(_va) (l2_pgentry_val(linear_l2_table[_va>>L2_PAGETABLE_SHIFT]) >> PAGE_SHIFT)
+#define linear_l1_table                                                 \
+    ((l1_pgentry_t *)(LINEAR_PT_VIRT_START))
+#define linear_l2_table                                                 \
+    ((l2_pgentry_t *)(LINEAR_PT_VIRT_START +                            \
+                     (LINEAR_PT_VIRT_START >> (PAGETABLE_ORDER<<0))))
+#define linear_l3_table                                                 \
+    ((l3_pgentry_t *)(LINEAR_PT_VIRT_START +                            \
+                     (LINEAR_PT_VIRT_START >> (PAGETABLE_ORDER<<0)) +   \
+                     (LINEAR_PT_VIRT_START >> (PAGETABLE_ORDER<<1))))
+#define linear_l4_table                                                 \
+    ((l4_pgentry_t *)(LINEAR_PT_VIRT_START +                            \
+                     (LINEAR_PT_VIRT_START >> (PAGETABLE_ORDER<<0)) +   \
+                     (LINEAR_PT_VIRT_START >> (PAGETABLE_ORDER<<1)) +   \
+                     (LINEAR_PT_VIRT_START >> (PAGETABLE_ORDER<<2))))
+#define linear_pg_table linear_l1_table
+#define va_to_l1mfn(_va) \
+    (l2_pgentry_val(linear_l2_table[_va>>L2_PAGETABLE_SHIFT]) >> PAGE_SHIFT)
 
 extern root_pgentry_t idle_pg_table[ROOT_PAGETABLE_ENTRIES];
 

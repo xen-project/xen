@@ -2560,18 +2560,15 @@ static struct x86_mem_emulator ptwr_mem_emulator = {
 /* Write page fault handler: check if guest is trying to modify a PTE. */
 int ptwr_do_page_fault(unsigned long addr)
 {
-    unsigned long    pte, pfn, l2e;
-    struct pfn_info *page;
-    l2_pgentry_t    *pl2e;
-    int              which, cpu = smp_processor_id();
-    u32              l2_idx;
-
-#ifdef __x86_64__
-    return 0; /* Writable pagetables need fixing for x86_64. */
-#endif
+    unsigned long       pte, pfn, l2e;
+    struct pfn_info    *page;
+    l2_pgentry_t       *pl2e;
+    int                 which, cpu = smp_processor_id();
+    u32                 l2_idx;
+    struct exec_domain *ed = current;
 
     /* Can't use linear_l2_table with external tables. */
-    BUG_ON(shadow_mode_external(current->domain));
+    BUG_ON(shadow_mode_external(ed->domain));
 
     /*
      * Attempt to read the PTE that maps the VA being accessed. By checking for
@@ -2594,6 +2591,15 @@ int ptwr_do_page_fault(unsigned long addr)
     {
         return 0;
     }
+
+    /* x86/64: Writable pagetable code needs auditing. Use emulator for now. */
+#if defined(__x86_64__)
+    goto emulate;
+#endif
+
+    /* Writable pagetables are not yet SMP safe. Use emulator for now. */
+    if ( (ed->eid != 0) || (ed->ed_next_list != NULL) )
+        goto emulate;
 
     /* Get the L2 index at which this L1 p.t. is always mapped. */
     l2_idx = page->u.inuse.type_info & PGT_va_mask;
@@ -2640,7 +2646,7 @@ int ptwr_do_page_fault(unsigned long addr)
      * If last batch made no updates then we are probably stuck. Emulate this 
      * update to ensure we make progress.
      */
-    if ( (ptwr_info[cpu].ptinfo[which].prev_exec_domain == current) &&
+    if ( (ptwr_info[cpu].ptinfo[which].prev_exec_domain == ed) &&
          (ptwr_info[cpu].ptinfo[which].prev_nr_updates  == 0) )
     {
         /* Force non-emul next time, or we can get stuck emulating forever. */
@@ -2653,7 +2659,7 @@ int ptwr_do_page_fault(unsigned long addr)
     
     /* For safety, disconnect the L1 p.t. page from current space. */
     if ( (which == PTWR_PT_ACTIVE) && 
-         likely(!shadow_mode_enabled(current->domain)) )
+         likely(!shadow_mode_enabled(ed->domain)) )
     {
         *pl2e = mk_l2_pgentry(l2e & ~_PAGE_PRESENT);
         flush_tlb(); /* XXX Multi-CPU guests? */

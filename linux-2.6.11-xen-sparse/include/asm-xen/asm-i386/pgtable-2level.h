@@ -13,41 +13,13 @@
  * within a page table are directly modified.  Thus, the following
  * hook is made available.
  */
+#define set_pte(pteptr, pteval) (*(pteptr) = pteval)
+#define set_pte_atomic(pteptr, pteval) set_pte(pteptr,pteval)
+#define set_pmd(pmdptr, pmdval) xen_l2_entry_update((pmdptr), (pmdval))
 #define set_pte_batched(pteptr, pteval) \
 	queue_l1_entry_update(pteptr, (pteval).pte_low)
 
-#ifdef CONFIG_SMP
-#define set_pte(pteptr, pteval) xen_l1_entry_update(pteptr, (pteval).pte_low)
-#if 0
-do { \
-  (*(pteptr) = pteval); \
-  HYPERVISOR_xen_version(0); \
-} while (0)
-#endif
-#define set_pte_atomic(pteptr, pteval) set_pte(pteptr, pteval)
-#else
-#define set_pte(pteptr, pteval) (*(pteptr) = pteval)
-#define set_pte_atomic(pteptr, pteval) set_pte(pteptr,pteval)
-#endif
-#define set_pmd(pmdptr, pmdval) xen_l2_entry_update((pmdptr), (pmdval))
-
-/*
- * A note on implementation of this atomic 'get-and-clear' operation.
- * This is actually very simple because Xen Linux can only run on a single
- * processor. Therefore, we cannot race other processors setting the 'accessed'
- * or 'dirty' bits on a page-table entry.
- * Even if pages are shared between domains, that is not a problem because
- * each domain will have separate page tables, with their own versions of
- * accessed & dirty state.
- */
-static inline pte_t ptep_get_and_clear(pte_t *xp)
-{
-	pte_t pte = *xp;
-	if (pte.pte_low)
-		set_pte(xp, __pte_ma(0));
-	return pte;
-}
-
+#define ptep_get_and_clear(xp)	__pte_ma(xchg(&(xp)->pte_low, 0))
 #define pte_same(a, b)		((a).pte_low == (b).pte_low)
 /*
  * We detect special mappings in one of two ways:
