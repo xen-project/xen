@@ -229,22 +229,24 @@ static unsigned long __get_cmos_time(void)
     return mktime(year, mon, day, hour, min, sec);
 }
 
-/*
- * This version doesn't wait for start of a new second, but double reads
- * to ensure we get a consistent view of all CMOS values.
- */
-static unsigned long get_cmos_time_fast(void)
+/* This version is fast: it bails if there's an update in progress. */
+static unsigned long maybe_get_cmos_time(void)
 {
-    unsigned long a, b, flags;
+    unsigned long ct, retval = 0, flags;
 
     spin_lock_irqsave(&rtc_lock, flags);
 
-    a = __get_cmos_time();
-    while ( (b = __get_cmos_time()) != a ) a = b;
+    if ( (CMOS_READ(RTC_FREQ_SELECT) & RTC_UIP) )
+        goto out;
 
+    ct = __get_cmos_time();
+
+    if ( !(CMOS_READ(RTC_FREQ_SELECT) & RTC_UIP) )
+        retval = ct;
+    
+ out:
     spin_unlock_irqrestore(&rtc_lock, flags);
-
-    return a;
+    return retval;
 }
 
 /* the more accurate version waits for a change */
@@ -421,7 +423,12 @@ static void update_time(unsigned long foo)
  * - index 1 -> frequency as determined during calibration
  * - index 2 -> go faster
  */
-#define UPDATE_PERIOD   SECONDS(50)
+/*
+ * NB. The period is not a whole number of seconds since we want to avoid
+ * being in sync with the CMOS update-in-progress flag, which causes this
+ * routine to bail.
+ */
+#define UPDATE_PERIOD   MILLISECS(50200)
 static struct ac_timer scale_timer;
 static unsigned long   init_cmos_time;
 static u64             cpu_freqs[3];
@@ -435,7 +442,8 @@ static void update_scale(unsigned long foo)
     u64            scale;
     int            freq_index;
 
-    cmos_time = get_cmos_time_fast();
+    if ( (cmos_time = maybe_get_cmos_time()) == 0 )
+        return;
 
     spin_lock_irqsave(&stime_lock, flags);
     now  = __get_s_time();
@@ -467,7 +475,6 @@ static void update_scale(unsigned long foo)
     TRC(printk(" %ds[%d] ", dt, freq_index));
 }
 
-
 /***************************************************************************
  * Init Xeno Time
  * This has to be done after all CPUs have been booted
@@ -478,7 +485,6 @@ int __init init_xeno_time()
     u32      cpu_cycle;  /* time of one cpu cyle in pico-seconds */
     u64      scale;      /* scale factor */
     s64      freq_off;
-
 
     spin_lock_init(&stime_lock);
     spin_lock_init(&wctime_lock);
@@ -493,7 +499,6 @@ int __init init_xeno_time()
     st_scale_f = scale & 0xffffffff;
     st_scale_i = scale >> 32;
 
-    
     /* calculate adjusted frequencies */
     freq_off  = cpu_freq/1000; /* .1%  */
     cpu_freqs[0] = cpu_freq + freq_off;
