@@ -59,4 +59,7 @@ extern void irq_resume(void);
 
 #define CPU_MASK_NONE 0
 
+/* XXX SMH: no-op for compat w/ 2.6 shared files */ 
+#define irq_ctx_init(cpu) do { ; } while (0)
+
 #endif /* _ASM_IRQ_H */

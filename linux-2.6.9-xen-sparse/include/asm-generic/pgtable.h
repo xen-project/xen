@@ -43,6 +43,9 @@ do {				  					  \
 #endif
 
 #ifndef __HAVE_ARCH_PTEP_ESTABLISH_NEW
+/*
+ * Establish a mapping where none previously existed
+ */
 #define ptep_establish_new(__vma, __address, __ptep, __entry)		\
 do {									\
 	set_pte(__ptep, __entry);					\

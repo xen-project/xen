@@ -553,6 +553,8 @@ void __init init_IRQ(void)
     int i;
     int cpu;
 
+    irq_ctx_init(0);
+
     spin_lock_init(&irq_mapping_update_lock);
 
     for ( cpu = 0; cpu < NR_CPUS; cpu++ ) {

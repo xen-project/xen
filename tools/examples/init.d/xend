@@ -7,9 +7,24 @@
 # chkconfig: 2345 98 01
 # description: Starts and stops the Xen control daemon.
 
+# Wait for Xend / Xfrd to be up
+function await_daemons_up
+{
+	i=1
+	rets=10
+	xend status
+	while [ $? -ne 0 -a $i -lt $rets ]; do
+	    sleep 1
+	    echo -n .
+	    i=$(($i + 1))
+	    xend status
+	done
+}
+
 case "$1" in
   start)
 	xend start
+	await_daemons_up
 	;;
   stop)
 	xend stop
@@ -19,6 +34,7 @@ case "$1" in
 	;;
   restart|reload)
 	xend restart
+	await_daemons_up
 	;;
   *)
 	# do not advertise unreasonable commands that there is no reason

@@ -534,10 +534,13 @@ static void balloon_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
     ctrl_if_send_response(msg);
 }
 
-
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-static int balloon_write(struct file *file, const char *buffer,
-                         size_t count, loff_t *offp)
+typedef size_t count_t;
+#else
+typedef u_long count_t;
+#endif
+
+static int do_balloon_write(const char *buffer, count_t count)
 {
     char memstring[64], *endchar;
     int len, i;
@@ -570,6 +573,17 @@ static int balloon_write(struct file *file, const char *buffer,
     i = balloon_try_target(target);
 
     if ( i <= 0 ) return i;
+
+    return len;
+}
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+static int balloon_write(struct file *file, const char *buffer,
+                         size_t count, loff_t *offp)
+{
+    int len = do_balloon_write(buffer, count);
+    
+    if ( len <= 0 ) return len;
 
     *offp += len;
     return len;
@@ -605,71 +619,7 @@ static struct file_operations balloon_fops = {
 static int balloon_write(struct file *file, const char *buffer,
                          u_long count, void *data)
 {
-    char memstring[64], *endchar;
-    int len, i;
-    unsigned long target;
-    unsigned long long targetbytes;
-
-    /* Only admin can play with the balloon :) */
-    if ( !capable(CAP_SYS_ADMIN) )
-        return -EPERM;
-
-    if ( count > sizeof(memstring) )
-        return -EFBIG;
-
-    len = strnlen_user(buffer, count);
-    if ( len == 0 ) return -EBADMSG;
-    if ( len == 1 ) return 1; /* input starts with a NUL char */
-    if ( strncpy_from_user(memstring, buffer, len) < 0 )
-        return -EFAULT;
-
-    endchar = memstring;
-    for ( i = 0; i < len; ++i, ++endchar )
-        if ( (memstring[i] < '0') || (memstring[i] > '9') )
-            break;
-    if ( i == 0 )
-        return -EBADMSG;
-
-    targetbytes = memparse(memstring,&endchar);
-    target = targetbytes >> PAGE_SHIFT;
-
-    if ( target < current_pages )
-    {
-        int change = inflate_balloon(current_pages-target);
-        if ( change <= 0 )
-            return change;
-
-        current_pages -= change;
-        printk(KERN_INFO "Relinquish %dMB to xen. Domain now has %luMB\n",
-            change>>PAGE_TO_MB_SHIFT, current_pages>>PAGE_TO_MB_SHIFT);
-    }
-    else if ( target > current_pages )
-    {
-        int change, reclaim = min(target,most_seen_pages) - current_pages;
-
-        if ( reclaim )
-        {
-            change = deflate_balloon( reclaim);
-            if ( change <= 0 )
-                return change;
-            current_pages += change;
-            printk(KERN_INFO "Reclaim %dMB from xen. Domain now has %luMB\n",
-                change>>PAGE_TO_MB_SHIFT, current_pages>>PAGE_TO_MB_SHIFT);
-        }
-
-        if ( most_seen_pages < target )
-        {
-            int growth = claim_new_pages(target-most_seen_pages);
-            if ( growth <= 0 )
-                return growth;
-            most_seen_pages += growth;
-            current_pages += growth;
-            printk(KERN_INFO "Granted %dMB new mem. Dom now has %luMB\n",
-                growth>>PAGE_TO_MB_SHIFT, current_pages>>PAGE_TO_MB_SHIFT);
-        }
-    }
-
-    return len;
+    return do_balloon_write(buffer, count);
 }
 
 static int balloon_read(char *page, char **start, off_t off,

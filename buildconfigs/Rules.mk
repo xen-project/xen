@@ -1,16 +1,9 @@
 
-# We expect these two to already be set if people 
-# are using the top-level Makefile
-DIST_DIR	?= $(shell pwd)/dist
-INSTALL_DIR	?= $(DIST_DIR)/install
-
 .PHONY:	mkpatches mrproper
-
 
 # Setup pristine search path
 PRISTINE_SRC_PATH	?= .:..
 vpath pristine-% $(PRISTINE_SRC_PATH)
-
 
 # Expand Linux series to Linux version
 LINUX_SERIES	?= 2.6
@@ -25,8 +18,6 @@ linux-%.tar.bz2: override _LINUX_VDIR = $(word 1,$(subst ., ,$*)).$(word 2,$(sub
 linux-%.tar.bz2:
 	@echo "Cannot find $@ in path $(LINUX_SRC_PATH)"
 	wget http://www.kernel.org/pub/linux/kernel/v$(_LINUX_VDIR)/$@ -O./$@
-
-
 
 # Expand NetBSD release to NetBSD version
 NETBSD_RELEASE  ?= 2.0
@@ -45,9 +36,6 @@ netbsd-%-xen-kernel-$(NETBSD_CVSSNAP).tar.bz2:
 netbsd-%.tar.bz2: netbsd-%-xen-kernel-$(NETBSD_CVSSNAP).tar.bz2
 	ln -fs $< $@
 
-
-
-
 pristine-%: %.tar.bz2
 	rm -rf tmp-$(@F) $@
 	mkdir -p tmp-$(@F)
@@ -55,6 +43,15 @@ pristine-%: %.tar.bz2
 	mv tmp-$(@F)/* $@
 	touch $@ # update timestamp to avoid rebuild
 	@rm -rf tmp-$(@F)
+
+%-build:
+	$(MAKE) -f buildconfigs/mk.$* build
+
+%-delete:
+	$(MAKE) -f buildconfigs/mk.$* delete
+
+%-clean:
+	$(MAKE) -f buildconfigs/mk.$* clean
 
 %-xen.patch: pristine-%
 	rm -rf tmp-$@

@@ -971,8 +971,8 @@ class XendDomainInfo:
 
         @return: deferred - calls callback with vm
         """
-        d = self.create_blkif()
-        d.addCallback(lambda x: self.create_devices())
+        d = self.create_devices()
+        d.addCallback(lambda x: self.create_blkif())
         d.addCallback(self._configure)
         return d
 
@@ -994,9 +994,12 @@ class XendDomainInfo:
 
         @return: deferred
         """
-        ctrl = xend.blkif_create(self.dom, recreate=self.recreate)
-        back = ctrl.getBackendInterface(0)
-        return back.connect(recreate=self.recreate)
+        if (self.get_devices("vbd") == None):
+            ctrl = xend.blkif_create(self.dom, recreate=self.recreate)
+            back = ctrl.getBackendInterface(0)
+            return back.connect(recreate=self.recreate)
+        else:
+            return None
     
     def dom_construct(self, dom, config):
         """Construct a vm for an existing domain.

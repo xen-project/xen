@@ -32,7 +32,7 @@ extern struct page *pte_alloc_one(struct mm_struct *, unsigned long);
 static inline void pte_free_kernel(pte_t *pte)
 {
 	free_page((unsigned long)pte);
-	__make_page_writable(pte);
+	make_page_writable(pte);
 	flush_page_update_queue();
 }
 
