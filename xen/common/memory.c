@@ -346,11 +346,22 @@ static int get_page_and_type_from_pagenr(unsigned long page_nr,
 
 
 /*
- * We allow an L2 table to map itself, to achieve a linear p.t. Note that this
- * does not raise any reference counts.
+ * We allow an L2 tables to map each other (a.k.a. linear page tables). It
+ * needs some special care with reference counst and access permissions:
+ *  1. The mapping entry must be read-only, or the guest may get write access
+ *     to its own PTEs.
+ *  2. We must only bump the reference counts for an *already validated*
+ *     L2 table, or we can end up in a deadlock in get_page_type() by waiting
+ *     on a validation that is required to complete that validation.
+ *  3. We only need to increment the reference counts for the mapped page
+ *     frame if it is mapped by a different L2 table. This is sufficient and
+ *     also necessary to allow validation of an L2 table mapping itself.
  */
-static int check_linear_pagetable(l2_pgentry_t l2e, unsigned long pfn)
+static int get_linear_pagetable(l2_pgentry_t l2e, unsigned long pfn)
 {
+    unsigned long x, y;
+    struct pfn_info *page;
+
     if ( (l2_pgentry_val(l2e) & _PAGE_RW) )
     {
         MEM_LOG("Attempt to create linear p.t. with write perms");
@@ -359,8 +370,27 @@ static int check_linear_pagetable(l2_pgentry_t l2e, unsigned long pfn)
 
     if ( (l2_pgentry_val(l2e) >> PAGE_SHIFT) != pfn )
     {
-        MEM_LOG("L2 tables may not map _other_ L2 tables!\n");
-        return 0;
+        /* Make sure the mapped frame belongs to the correct domain. */
+        if ( unlikely(!get_page_from_pagenr(l2_pgentry_to_pagenr(l2e))) )
+            return 0;
+
+        /*
+         * Make sure that the mapped frame is an already-validated L2 table. 
+         * If so, atomically increment the count (checking for overflow).
+         */
+        page = &frame_table[l2_pgentry_to_pagenr(l2e)];
+        y = page->type_and_flags;
+        do {
+            x = y;
+            if ( unlikely((x & PGT_count_mask) == PGT_count_mask) ||
+                 unlikely((x & (PGT_type_mask|PGT_validated)) != 
+                          (PGT_l2_page_table|PGT_validated)) )
+            {
+                put_page(page);
+                return 0;
+            }
+        }
+        while ( (y = cmpxchg(&page->type_and_flags, x, x + 1)) != x );
     }
 
     return 1;
@@ -406,7 +436,7 @@ static int get_page_from_l2e(l2_pgentry_t l2e, unsigned long pfn)
 
     if ( unlikely(!get_page_and_type_from_pagenr(
         l2_pgentry_to_pagenr(l2e), PGT_l1_page_table)) )
-        return check_linear_pagetable(l2e, pfn);
+        return get_linear_pagetable(l2e, pfn);
 
     return 1;
 }
@@ -434,7 +464,10 @@ static void put_page_from_l1e(l1_pgentry_t l1e)
 }
 
 
-/* NB. Virtual address 'l2e' maps to a machine address within frame 'pfn'. */
+/*
+ * NB. Virtual address 'l2e' maps to a machine address within frame 'pfn'.
+ * Note also that this automatically deals correctly with linear p.t.'s.
+ */
 static void put_page_from_l2e(l2_pgentry_t l2e, unsigned long pfn)
 {
     ASSERT(l2_pgentry_val(l2e) & _PAGE_PRESENT);

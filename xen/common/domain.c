@@ -343,6 +343,7 @@ void free_all_dom_mem(struct task_struct *p)
 {
     struct list_head *ent, zombies;
     struct pfn_info *page;
+    unsigned long x, y;
 
     INIT_LIST_HEAD(&zombies);
 
@@ -393,6 +394,24 @@ void free_all_dom_mem(struct task_struct *p)
 
         if ( test_and_clear_bit(_PGC_allocated, &page->count_and_flags) )
             put_page(page);
+
+        /*
+         * Forcibly invalidate L2 tables at this point to break circular
+         * 'linear page table' references. This is okay because MMU structures
+         * are not shared across domains and this domain is now dead. Thus L2
+         * tables are not in use so a non-zero count means circular reference.
+         */
+        y = page->type_and_flags;
+        do {
+            x = y;
+            if ( likely((x & (PGT_type_mask|PGT_validated)) != 
+                        (PGT_l2_page_table|PGT_validated)) )
+                break;
+            y = cmpxchg(&page->type_and_flags, x, x & ~PGT_validated);
+            if ( likely(y == x) )
+                free_page_type(page, PGT_l2_page_table);
+        }
+        while ( unlikely(y != x) );
 
         put_page(page);
     }
