@@ -1289,6 +1289,11 @@ void ptwr_reconnect_disconnected(unsigned long addr)
 
         BUG();
     }
+    if (page->count_and_flags & PGC_guest_pinned) {
+        if ((page->type_and_flags & PGT_count_mask) != 1)
+            BUG();
+        page->type_and_flags++;
+    }
     PTWR_PRINTK("now pl2e %p l2e %08lx              taf %08x/%08x/%u\n", pl2e,
                 l2_pgentry_val(*pl2e),
                 frame_table[pfn].type_and_flags,
@@ -1326,6 +1331,11 @@ void ptwr_flush_inactive(void)
         PTWR_PRINTK("alloc l1 page %p\n", page);
         if (!get_page_type(page, PGT_l1_page_table))
             BUG();
+        if (page->count_and_flags & PGC_guest_pinned) {
+            if ((page->type_and_flags & PGT_count_mask) != 1)
+                BUG();
+            page->type_and_flags++;
+        }
         /* make pt page writable */
         PTWR_PRINTK("writable_l1 at %p is %08lx\n", ptwr_writables[cpu][i], pte);
         pte &= ~_PAGE_RW;
@@ -1370,8 +1380,16 @@ int ptwr_do_page_fault(unsigned long addr)
             PTWR_PRINTK("page_fault on l1 pt at va %08lx, pt for %08x, pfn %08lx\n",
                         addr, ((page->type_and_flags & PGT_va_mask) >>
                                PGT_va_shift) << L2_PAGETABLE_SHIFT, pfn);
+            if (page->count_and_flags & PGC_guest_pinned) {
+                PTWR_PRINTK(" pinned l1 page %p taf %08x/%08x\n", page,
+                            page->type_and_flags, page->count_and_flags);
+                if ((page->type_and_flags & PGT_count_mask) != 2)
+                    BUG();
+                page->type_and_flags--;
+            }
             if (l2_pgentry_val(*pl2e) >> PAGE_SHIFT != pfn) {
-                PTWR_PRINTK("freeing l1 page %p\n", page);
+                PTWR_PRINTK("freeing l1 page %p taf %08x/%08x\n", page,
+                            page->type_and_flags, page->count_and_flags);
                 if (ptwr_writable_idx[cpu] == PTWR_NR_WRITABLES)
                     ptwr_flush_inactive();
                 ptwr_writables[cpu][ptwr_writable_idx[cpu]++] = (unsigned long *)
