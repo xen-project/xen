@@ -146,24 +146,6 @@ static void create_proc_dom_entries(int dom)
     }
 }
 
-static int dom_mem_mmap(struct file *file, struct vm_area_struct *vma)
-{
-    proc_memdata_t * mem_data = (proc_memdata_t *)((struct proc_dir_entry *)file->f_dentry->d_inode->u.generic_ip)->data;
-
-    /*
-     * do not dump contents to core file,
-     * do not swap out.
-     */
-    vma->vm_flags |= VM_IO;
-    vma->vm_flags |= VM_RESERVED;
-
-    if(direct_remap_disc_page_range(vma->vm_start, mem_data->pfn, mem_data->tot_pages, 
-                            vma->vm_page_prot))
-        return -EAGAIN;
-    
-    return 0;
-}
-
 static ssize_t dom_mem_write(struct file * file, const char * buff, 
 	size_t size , loff_t * off)
 {
@@ -188,6 +170,8 @@ static ssize_t dom_mem_read(struct file * file, char * buff, size_t size, loff_t
     prot = PAGE_SHARED; 
 
     /* remap the range using xen specific routines */
+	printk(KERN_ALERT "bd240 debug: mem_read: mem_data %lx\n", mem_data);
+
     addr = direct_mmap(mem_data->pfn << PAGE_SHIFT, mem_data->tot_pages << PAGE_SHIFT, prot, 0, 0);
     //addr = direct_mmap(mem_data->pfn, mem_data->tot_pages << PAGE_SHIFT, prot, 1, 
     //                mem_data->tot_pages);
@@ -231,6 +215,8 @@ static int dom_map_mem(unsigned int dom, unsigned long pfn, int tot_pages)
                 memdata->pfn = pfn;
                 memdata->tot_pages = tot_pages;
                 file->data = memdata;
+
+				printk(KERN_ALERT "bd240 debug: associated memdata with proc, memdata %lx, pfn %lx, tot_pages %lx\n", file->data, memdata->pfn, memdata->tot_pages);
 
                 ret = 0;
                 break;
