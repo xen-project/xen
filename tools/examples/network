@@ -1,4 +1,4 @@
-#!/bin/sh 
+#!/bin/sh
 #============================================================================
 # Example Xen network start/stop script.
 # Xend calls a network script when it starts.
@@ -99,10 +99,6 @@ create_bridge () {
         brctl sethello ${bridge} 0
     fi
     ifconfig ${bridge} up
-    # Don't add $dev to $bridge if it's already on a bridge.
-    if ! brctl show | grep -q ${dev} ; then
-        brctl addif ${bridge} ${dev}
-    fi
 }
 
 # Usage: antispoofing dev bridge
@@ -139,6 +135,10 @@ case ${OP} in
         create_bridge ${netdev} ${bridge}
         transfer_addrs ${netdev} ${bridge}
         transfer_routes ${netdev} ${bridge}
+	# Don't add $dev to $bridge if it's already on a bridge.
+	if ! brctl show | grep -q ${netdev} ; then
+	    brctl addif ${bridge} ${netdev}
+	fi
         
         if [ ${antispoof} == 'yes' ] ; then
             antispoofing ${netdev} ${bridge}
