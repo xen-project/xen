@@ -686,6 +686,17 @@ class XendDomain:
         dom = int(dom)
         return xc.shadow_control(dom, op)
 
+    def domain_maxmem_set(self, dom, mem):
+        """Set the memory limit for a domain.
+
+        @param dom: domain
+        @param mem: memory limit (in MB)
+        @return: 0 on success, -1 on error
+        """
+        dom = int(dom)
+        maxmem = int(mem) * 1024
+        return xc.domain_setmaxmem(dom, maxmem_kb = maxmem)
+
 
 def instance():
     """Singleton constructor. Use this instead of the class constructor.

@@ -510,6 +510,11 @@ class Xend:
                               'latency' : latency,
                               'xtratime': xtratime })
 
+    def xend_domain_maxmem_set(self, id, memory):
+        return self.xendPost(self.domainurl(id),
+                             { 'op'     : 'maxmem_set',
+                               'memory' : memory })
+
     def xend_domain_vifs(self, id):
         return self.xendGet(self.domainurl(id),
                             { 'op'      : 'vifs' })
@@ -564,9 +569,6 @@ class Xend:
         val = self.xendPost(self.eventurl(),
                              {'op'      : 'inject',
                               'event'   : fileof(sxpr) })
-
-    def xend_dmesg(self):
-        return self.xendGet(self.dmesgurl())
 
 def xendmain(srv, asynch, fn, args):
     if asynch:

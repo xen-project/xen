@@ -151,6 +151,13 @@ class SrvDomain(SrvDir):
         val = fn(req.args, {'dom': self.dom.id})
         return val
 
+    def op_maxmem_set(self, op, req):
+        fn = FormFn(self.xd.domain_maxmem_set,
+                    [['dom', 'int'],
+                     ['memory', 'int']])
+        val = fn(req.args, {'dom': self.dom.id})
+        return val
+
     def op_vifs(self, op, req):
         return self.xd.domain_vif_ls(self.dom.id)
 
