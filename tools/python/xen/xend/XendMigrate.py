@@ -134,11 +134,11 @@ class XfrdInfo:
         #    print >>sys.stdout, "Error unpausing domain:", self.src_dom
         return None
 
-    def xfr_progress(self, val):
+    def xfr_progress(self, xfrd, val):
         print 'xfr_progress>', val
         return None
 
-    def xfr_vm_pause(self, val):
+    def xfr_vm_pause(self, xfrd, val):
         print 'xfr_vm_pause>', val
         try:
             vmid = sxp.child0(val)
@@ -147,7 +147,7 @@ class XfrdInfo:
             val = errno.EINVAL
         return ['xfr.err', val]
 
-    def xfr_vm_unpause(self, val):
+    def xfr_vm_unpause(self, xfrd, val):
         print 'xfr_vm_unpause>', val
         try:
             vmid = sxp.child0(val)
@@ -156,7 +156,7 @@ class XfrdInfo:
             val = errno.EINVAL
         return ['xfr.err', val]
 
-    def xfr_vm_suspend(self, val):
+    def xfr_vm_suspend(self, xfrd, val):
         print 'xfr_vm_suspend>', val
         try:
             vmid = sxp.child0(val)
