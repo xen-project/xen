@@ -2,6 +2,10 @@
 #ifndef __XEN_MM_H__
 #define __XEN_MM_H__
 
+#include <xen/config.h>
+#include <xen/list.h>
+#include <xen/spinlock.h>
+
 struct domain;
 struct pfn_info;
 
@@ -33,6 +37,15 @@ void free_domheap_pages(struct pfn_info *pg, unsigned int order);
 unsigned long avail_domheap_pages(void);
 #define alloc_domheap_page(_d) (alloc_domheap_pages(_d,0))
 #define free_domheap_page(_p) (free_domheap_pages(_p,0))
+
+/* Automatic page scrubbing for dead domains. */
+extern spinlock_t page_scrub_lock;
+extern struct list_head page_scrub_list;
+#define page_scrub_schedule_work()              \
+    do {                                        \
+        if ( !list_empty(&page_scrub_list) )    \
+            raise_softirq(PAGE_SCRUB_SOFTIRQ);  \
+    } while ( 0 )
 
 #include <asm/mm.h>
 
