@@ -46,6 +46,8 @@
 #include <asm/pgalloc.h>
 #include <asm/hardirq.h>
 #include <asm/apic.h>
+
+#include <asm/timex.h>
 #include <xeno/ac_timer.h>
 #include <xeno/perfc.h>
 
@@ -746,6 +748,8 @@ unsigned int apic_timer_irqs [NR_CPUS];
 void smp_apic_timer_interrupt(struct pt_regs * regs)
 {
     int cpu = smp_processor_id();
+    u32 cc_start, cc_end;
+    rdtscl(cc_start);
 
     /*
      * the NMI deadlock-detector uses this.
@@ -766,6 +770,10 @@ void smp_apic_timer_interrupt(struct pt_regs * regs)
 
     if (softirq_pending(cpu))
         do_softirq();
+
+    rdtscl(cc_end);
+    if ( (cc_end - cc_start) > (cpu_khz * 100) )
+        printk("APIC Long ISR on CPU=%02d %08X -> %08X\n",cpu,cc_start,cc_end);
 }
 
 /*
