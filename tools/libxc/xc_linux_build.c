@@ -270,7 +270,7 @@ static int setup_guestos(int xc_handle,
      * correct protection for the page
      */ 
     if ( add_mmu_update(xc_handle, mmu,
-                        l2tab | MMU_EXTENDED_COMMAND, MMUEXT_PIN_TABLE) )
+                        l2tab | MMU_EXTENDED_COMMAND, MMUEXT_PIN_L2_TABLE) )
         goto error_out;
 
     start_info = map_pfn_writeable(

@@ -54,6 +54,8 @@ void queue_tlb_flush(void);
 void queue_invlpg(unsigned long ptr);
 void queue_pgd_pin(unsigned long ptr);
 void queue_pgd_unpin(unsigned long ptr);
+void queue_pte_pin(unsigned long ptr);
+void queue_pte_unpin(unsigned long ptr);
 void queue_set_ldt(unsigned long ptr, unsigned long bytes);
 void queue_machphys_update(unsigned long mfn, unsigned long pfn);
 void xen_l1_entry_update(pte_t *ptr, unsigned long val);
@@ -63,6 +65,8 @@ void xen_tlb_flush(void);
 void xen_invlpg(unsigned long ptr);
 void xen_pgd_pin(unsigned long ptr);
 void xen_pgd_unpin(unsigned long ptr);
+void xen_pte_pin(unsigned long ptr);
+void xen_pte_unpin(unsigned long ptr);
 void xen_set_ldt(unsigned long ptr, unsigned long bytes);
 void xen_machphys_update(unsigned long mfn, unsigned long pfn);
 #define MMU_UPDATE_DEBUG 0
@@ -136,6 +140,14 @@ extern page_update_debug_t update_debug_queue[];
 #define queue_pgd_unpin(_p) ({                                    \
  printk("PGD UNPIN %s %d: %08lx\n", __FILE__, __LINE__, (_p));    \
  queue_pgd_unpin(_p);                                             \
+})   
+#define queue_pte_pin(_p) ({                                      \
+ printk("PTE PIN %s %d: %08lx\n", __FILE__, __LINE__, (_p));      \
+ queue_pte_pin(_p);                                               \
+})   
+#define queue_pte_unpin(_p) ({                                    \
+ printk("PTE UNPIN %s %d: %08lx\n", __FILE__, __LINE__, (_p));    \
+ queue_pte_unpin(_p);                                             \
 })   
 #define queue_set_ldt(_p,_l) ({                                        \
  printk("SETL LDT %s %d: %08lx %d\n", __FILE__, __LINE__, (_p), (_l)); \

@@ -85,6 +85,8 @@ static void DEBUG_disallow_pt_read(unsigned long va)
 #undef queue_invlpg
 #undef queue_pgd_pin
 #undef queue_pgd_unpin
+#undef queue_pte_pin
+#undef queue_pte_unpin
 #undef queue_set_ldt
 #endif
 
@@ -217,12 +219,34 @@ void queue_pgd_pin(unsigned long ptr)
     spin_lock_irqsave(&update_lock, flags);
     update_queue[idx].ptr  = phys_to_machine(ptr);
     update_queue[idx].ptr |= MMU_EXTENDED_COMMAND;
-    update_queue[idx].val  = MMUEXT_PIN_TABLE;
+    update_queue[idx].val  = MMUEXT_PIN_L2_TABLE;
     increment_index();
     spin_unlock_irqrestore(&update_lock, flags);
 }
 
 void queue_pgd_unpin(unsigned long ptr)
+{
+    unsigned long flags;
+    spin_lock_irqsave(&update_lock, flags);
+    update_queue[idx].ptr  = phys_to_machine(ptr);
+    update_queue[idx].ptr |= MMU_EXTENDED_COMMAND;
+    update_queue[idx].val  = MMUEXT_UNPIN_TABLE;
+    increment_index();
+    spin_unlock_irqrestore(&update_lock, flags);
+}
+
+void queue_pte_pin(unsigned long ptr)
+{
+    unsigned long flags;
+    spin_lock_irqsave(&update_lock, flags);
+    update_queue[idx].ptr  = phys_to_machine(ptr);
+    update_queue[idx].ptr |= MMU_EXTENDED_COMMAND;
+    update_queue[idx].val  = MMUEXT_PIN_L1_TABLE;
+    increment_index();
+    spin_unlock_irqrestore(&update_lock, flags);
+}
+
+void queue_pte_unpin(unsigned long ptr)
 {
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
@@ -315,12 +339,34 @@ void xen_pgd_pin(unsigned long ptr)
     spin_lock_irqsave(&update_lock, flags);
     update_queue[idx].ptr  = phys_to_machine(ptr);
     update_queue[idx].ptr |= MMU_EXTENDED_COMMAND;
-    update_queue[idx].val  = MMUEXT_PIN_TABLE;
+    update_queue[idx].val  = MMUEXT_PIN_L2_TABLE;
     increment_index_and_flush();
     spin_unlock_irqrestore(&update_lock, flags);
 }
 
 void xen_pgd_unpin(unsigned long ptr)
+{
+    unsigned long flags;
+    spin_lock_irqsave(&update_lock, flags);
+    update_queue[idx].ptr  = phys_to_machine(ptr);
+    update_queue[idx].ptr |= MMU_EXTENDED_COMMAND;
+    update_queue[idx].val  = MMUEXT_UNPIN_TABLE;
+    increment_index_and_flush();
+    spin_unlock_irqrestore(&update_lock, flags);
+}
+
+void xen_pte_pin(unsigned long ptr)
+{
+    unsigned long flags;
+    spin_lock_irqsave(&update_lock, flags);
+    update_queue[idx].ptr  = phys_to_machine(ptr);
+    update_queue[idx].ptr |= MMU_EXTENDED_COMMAND;
+    update_queue[idx].val  = MMUEXT_PIN_L1_TABLE;
+    increment_index_and_flush();
+    spin_unlock_irqrestore(&update_lock, flags);
+}
+
+void xen_pte_unpin(unsigned long ptr)
 {
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
