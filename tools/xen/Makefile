@@ -12,7 +12,6 @@ install: all
 	fi
 	mkdir -p $(prefix)/usr/sbin
 	install -m0755 xend $(prefix)/usr/sbin
-	install -m0755 netfix $(prefix)/usr/sbin
 	install -m0755 xm $(prefix)/usr/sbin
 
 clean:
