@@ -261,17 +261,11 @@ static volatile unsigned long flush_cpumask;
 static spinlock_t tlbstate_lock = SPIN_LOCK_UNLOCKED;
 #define FLUSH_ALL	0xffffffff
 
-asmlinkage void smp_invalidate_interrupt (void)
+asmlinkage void smp_invalidate_interrupt(void)
 {
-    unsigned long cpu = smp_processor_id();
-
-    if (!test_bit(cpu, &flush_cpumask))
-        return;
-
-    local_flush_tlb();
-
     ack_APIC_irq();
-    clear_bit(cpu, &flush_cpumask);
+    if (test_and_clear_bit(smp_processor_id(), &flush_cpumask))
+        local_flush_tlb();
 }
 
 void flush_tlb_others(unsigned long cpumask)

@@ -67,6 +67,5 @@ static __inline__ int active_ac_timer(struct ac_timer *timer)
 
 /* interface used by programmable timer, implemented hardware dependent */
 extern int  reprogram_ac_timer(s_time_t timeout);
-extern void do_ac_timer(void);
 
 #endif /* _AC_TIMER_H_ */

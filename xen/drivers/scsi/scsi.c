@@ -840,6 +840,7 @@ void scsi_wait_req (Scsi_Request * SRpnt, const void *cmnd ,
        if it hasn't been done already. This is not the correct behaviour 
        in xen ... hmm .. how to fix? */
     while(wait) { 
+        do_softirq(); /* XXX KAF: this is safe, and necessary!! */
         udelay(500); 
         usecs += 500; 
         if(usecs > 1000000) {

@@ -12,9 +12,7 @@
 #include <linux/config.h>
 #include <linux/mm.h>
 #include <linux/sched.h>
-//#include <linux/kernel_stat.h>
 #include <linux/interrupt.h>
-//#include <linux/smp_lock.h>
 #include <linux/init.h>
 #include <linux/tqueue.h>
 
@@ -51,48 +49,30 @@ asmlinkage void do_softirq()
     int cpu = smp_processor_id();
     struct softirq_action *h;
     __u32 pending;
-    long flags;
 
-    if (in_interrupt())
-        return;
-
-    local_irq_save(flags);
-
-    pending = xchg(&softirq_pending(cpu), 0);
-    if ( !pending ) goto out;
+    if ( in_interrupt() )
+        BUG();
 
     local_bh_disable();
 
-    do {
-        local_irq_enable();
-        
+    while ( (pending = xchg(&softirq_pending(cpu), 0)) != 0 )
+    {
         h = softirq_vec;
-        
-        do {
+        while ( pending )
+        {
             if (pending & 1)
                 h->action(h);
             h++;
             pending >>= 1;
-        } while (pending);
-        
-        local_irq_disable();
-        
-        pending = xchg(&softirq_pending(cpu), 0);
-    } while ( pending );
+        }
+    }
 
     __local_bh_enable();
-
-out:
-    local_irq_restore(flags);
 }
 
-/*
- * This function must run with irq disabled!
- */
 inline void cpu_raise_softirq(unsigned int cpu, unsigned int nr)
 {
     __cpu_raise_softirq(cpu, nr);
-
 #ifdef CONFIG_SMP
     if ( cpu != smp_processor_id() )
         smp_send_event_check_cpu(cpu);
@@ -101,11 +81,7 @@ inline void cpu_raise_softirq(unsigned int cpu, unsigned int nr)
 
 void raise_softirq(unsigned int nr)
 {
-    long flags;
-
-    local_irq_save(flags);
     cpu_raise_softirq(smp_processor_id(), nr);
-    local_irq_restore(flags);
 }
 
 void open_softirq(int nr, void (*action)(struct softirq_action*), void *data)
@@ -224,7 +200,7 @@ void tasklet_init(struct tasklet_struct *t,
 void tasklet_kill(struct tasklet_struct *t)
 {
     if (in_interrupt())
-        printk("Attempt to kill tasklet from interrupt\n");
+        BUG();
     while (test_and_set_bit(TASKLET_STATE_SCHED, &t->state))
         while (test_bit(TASKLET_STATE_SCHED, &t->state))
             do_softirq();

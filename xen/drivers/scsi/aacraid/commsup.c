@@ -523,24 +523,8 @@ int fib_send(u16 command, struct fib * fibptr, unsigned long size,  int priority
     
 	if (wait) {
 		spin_unlock_irqrestore(&fibptr->event_lock, flags);
-#if 0
-		down(&fibptr->event_wait);
-		if(fibptr->done == 0)
-			BUG();
-#endif
-#ifdef TRY_TASKLET
-	while (!fibptr->done) { 
-		tasklet_schedule(&aac_command_tasklet);
-		do_softirq(); /* force execution */
-	}
-#else 
-	while (!fibptr->done) { 
-		mdelay(100); 
-		aac_command_thread(dev); 
-	}
-#endif
-
-			
+		while (!fibptr->done)
+			aac_command_thread(dev); 
 		if((fibptr->flags & FIB_CONTEXT_FLAG_TIMED_OUT))
 			return -ETIMEDOUT;
 		else
@@ -924,62 +908,27 @@ static void aac_handle_aif(struct aac_dev * dev, struct fib * fibptr)
  *	until the queue is empty. When the queue is empty it will wait for
  *	more FIBs.
  */
-#ifndef TRY_TASKLET
-int aac_command_thread(struct aac_dev * dev)
+void aac_command_thread(struct aac_dev * dev)
 {
-#else
-DECLARE_TASKLET_DISABLED(aac_command_tasklet, aac_command_thread, 0);
-void aac_command_thread(unsigned long data)
-#define return(_x) return 
-{
-	struct aac_dev *dev = (struct aac_dev *)data; 
-#endif
 	struct hw_fib *hw_fib, *hw_newfib;
 	struct fib *fib, *newfib;
 	struct aac_queue_block *queues = dev->queues;
 	struct aac_fib_context *fibctx;
 	unsigned long flags;
-#if 0
-	DECLARE_WAITQUEUE(wait, current);
-#endif
+	static spinlock_t lock = SPIN_LOCK_UNLOCKED;
 
-	/*
-	 *	We can only have one thread per adapter for AIF's.
-	 */
-	if (dev->aif_thread)
-		return(-EINVAL);
-#if 0
-	/*
-	 *	Set up the name that will appear in 'ps'
-	 *	stored in  task_struct.comm[16].
-	 */
-	sprintf(current->comm, "aacraid");
-	daemonize();
-#endif
-	/*
-	 *	Let the DPC know it has a place to send the AIF's to.
-	 */
-	dev->aif_thread = 1;
-#if 0
-	add_wait_queue(&queues->queue[HostNormCmdQueue].cmdready, &wait);
-	set_current_state(TASK_INTERRUPTIBLE);
-	dprintk ((KERN_INFO "aac_command_thread start\n"));
-	while(1) 
-#endif
+	spin_lock_irqsave(&lock, flags);
+
 	{
-		spin_lock_irqsave(queues->queue[HostNormCmdQueue].lock, flags);
+		spin_lock(queues->queue[HostNormCmdQueue].lock);
 		while(!list_empty(&(queues->queue[HostNormCmdQueue].cmdq))) {
 			struct list_head *entry;
 			struct aac_aifcmd * aifcmd;
 
-#if 0
-			set_current_state(TASK_RUNNING);
-#endif
-
 			entry = queues->queue[HostNormCmdQueue].cmdq.next;
 			list_del(entry);
 	
-			spin_unlock_irqrestore(queues->queue[HostNormCmdQueue].lock, flags);
+			spin_unlock(queues->queue[HostNormCmdQueue].lock);
 			fib = list_entry(entry, struct fib, fiblink);
 			/*
 			 *	We will process the FIB here or pass it to a 
@@ -1074,13 +1023,6 @@ void aac_command_thread(unsigned long data)
 						 */
 						list_add_tail(&newfib->fiblink, &fibctx->fib_list);
 						fibctx->count++;
-#if 0
-						/* 
-						 * Set the event to wake up the
-						 * thread that will waiting.
-						 */
-						up(&fibctx->wait_sem);
-#endif
 					} else {
 						printk(KERN_WARNING "aifd: didn't allocate NewFib.\n");
 						if(newfib)
@@ -1097,27 +1039,14 @@ void aac_command_thread(unsigned long data)
 				fib_adapter_complete(fib, sizeof(u32));
 				spin_unlock_irqrestore(&dev->fib_lock, flagv);
 			}
-			spin_lock_irqsave(queues->queue[HostNormCmdQueue].lock, flags);
+			spin_lock(queues->queue[HostNormCmdQueue].lock);
 			kfree(fib);
 		}
 		/*
 		 *	There are no more AIF's
 		 */
-		spin_unlock_irqrestore(queues->queue[HostNormCmdQueue].lock, flags);
-#if 0
-		schedule();
-
-		if(signal_pending(current))
-			break;
-		set_current_state(TASK_INTERRUPTIBLE);
-#endif
+		spin_unlock(queues->queue[HostNormCmdQueue].lock);
 	}
-#if 0
-	remove_wait_queue(&queues->queue[HostNormCmdQueue].cmdready, &wait);
-	dev->aif_thread = 0;
-	complete_and_exit(&dev->aif_completion, 0);
-#else
-	mdelay(50); 
-	dev->aif_thread = 0;
-#endif
+
+	spin_unlock_irqrestore(&lock, flags);
 }

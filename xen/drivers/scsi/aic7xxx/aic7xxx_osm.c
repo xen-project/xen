@@ -1903,7 +1903,6 @@ ahc_linux_isr(int irq, void *dev_id, struct pt_regs * regs)
 	if (next_dev) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 		tasklet_schedule(&ahc->platform_data->runq_tasklet);
-		do_softirq();
 #else
 		ahc_runq_tasklet((unsigned long)ahc);
 #endif
@@ -2535,7 +2534,6 @@ ahc_linux_release_sim_queue(u_long arg)
 		scsi_unblock_requests(ahc->platform_data->host);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 		tasklet_schedule(&ahc->platform_data->runq_tasklet);
-		do_softirq();
 #else
 		ahc_runq_tasklet((unsigned long)ahc);
 #endif
