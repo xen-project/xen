@@ -28,7 +28,7 @@ $(TARGET): make-links
 	$(MAKE) -C drivers
 	$(MAKE) -C arch/$(ARCH)
 
-make-links:
+make-links: delete-links
 	ln -sf xeno include/linux
 	ln -sf asm-$(ARCH) include/asm
 
