@@ -108,7 +108,8 @@ extern frame_table_t * frame_table;
 extern unsigned long frame_table_size;
 extern struct list_head free_list;
 extern unsigned int free_pfns;
-unsigned long init_frametable(unsigned long nr_pages);
+extern unsigned long max_page;
+void init_frametable(unsigned long nr_pages);
 
 /* Part of the domain API. */
 int do_process_page_updates(page_update_request_t *updates, int count);

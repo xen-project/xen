@@ -62,7 +62,7 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
 {
     struct task_struct *new_dom;
     dom0_newdomain_t dom0_params;
-    unsigned long max_page, remaining_hypervisor_memory;
+    unsigned long max_page;
     unsigned char *cmdline;
     int i;
 
@@ -155,15 +155,11 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
     memcpy(&idle0_task_union, &first_task_struct, sizeof(first_task_struct));
 
     max_page = (mbi->mem_upper+1024) >> (PAGE_SHIFT - 10);
-    if ( max_page > (MAX_USABLE_ADDRESS >> PAGE_SHIFT) )
-        max_page = MAX_USABLE_ADDRESS >> PAGE_SHIFT;
-    /* mem_upper is address of first memory hole in high memory, minus 1MB. */
-    /* PS. mem_upper is in kB. */
-    remaining_hypervisor_memory = init_frametable(max_page);
-    printk("Initialised %luMB of memory on a %luMB machine\n",
-           max_page >> (20-PAGE_SHIFT), (mbi->mem_upper>>10)+1);
+    init_frametable(max_page);
+    printk("Initialised all memory on a %luMB machine\n",
+           max_page >> (20-PAGE_SHIFT));
 
-    init_page_allocator(mod[nr_mods-1].mod_end, remaining_hypervisor_memory);
+    init_page_allocator(mod[nr_mods-1].mod_end, MAX_MONITOR_ADDRESS);
  
     /* These things will get done by do_newdomain() for all other tasks. */
     current->shared_info = (void *)get_free_page(GFP_KERNEL);

@@ -131,6 +131,7 @@
 3ddb79c2jFkPAZTDmU35L6IUssYMgQ xen-2.4.16/include/asm-i386/debugreg.h
 3ddb79c3r9-31dIsewPV3P3i8HALsQ xen-2.4.16/include/asm-i386/delay.h
 3ddb79c34BFiXjBJ_cCKB0aCsV1IDw xen-2.4.16/include/asm-i386/desc.h
+3e20b82fl1jmQiKdLy7fxMcutfpjWA xen-2.4.16/include/asm-i386/domain_page.h
 3ddb79c2O729EttZTYu1c8LcsUO_GQ xen-2.4.16/include/asm-i386/elf.h
 3ddb79c3NU8Zy40OTrq3D-i30Y3t4A xen-2.4.16/include/asm-i386/fixmap.h
 3ddb79c39o75zPP0T1aQQ4mNrCAN2w xen-2.4.16/include/asm-i386/hardirq.h
@@ -170,7 +171,6 @@
 3ddb79c0dVhTHLsv6CPTf4baKix4mA xen-2.4.16/include/xeno/blkdev.h
 3ddb79c18ePBgitnOs7GiOCFilODVw xen-2.4.16/include/xeno/blkpg.h
 3ddb79c2SisDOHDyTeK5-MV3m7pNbA xen-2.4.16/include/xeno/block.h
-3ddb79c2JOriBs0mWh-Tlolq78tg3w xen-2.4.16/include/xeno/bootmem.h
 3ddb79c1oOjpQbp68MW7yiUpoi-S-w xen-2.4.16/include/xeno/brlock.h
 3ddb79c1x7Ie3kifu7dQRx8y7HVyvA xen-2.4.16/include/xeno/byteorder/big_endian.h
 3ddb79c1qFXOEX1eD0yXJ_gsGkUt8w xen-2.4.16/include/xeno/byteorder/generic.h
@@ -312,7 +312,6 @@
 3ddb79bac26NkKcPIEsfxETc5Snyag xenolinux-2.4.16-sparse/include/asm-xeno/elf.h
 3ddb79ba722pCJ_g_xI8ebsE31IK-Q xenolinux-2.4.16-sparse/include/asm-xeno/errno.h
 3ddb79b8vIpUpgaSNEneFkg5hYSvNg xenolinux-2.4.16-sparse/include/asm-xeno/fcntl.h
-3ddb79b8c_oKu2_BGNJctM4DBET31Q xenolinux-2.4.16-sparse/include/asm-xeno/fixmap.h
 3ddb79b8780YvqvK1g5KPIWzQ6P15w xenolinux-2.4.16-sparse/include/asm-xeno/floppy.h
 3ddb79bas-nFywnmilbUeT34PEAA0g xenolinux-2.4.16-sparse/include/asm-xeno/hardirq.h
 3ddb79batzR40ZFY9dvgs5f1aM9I6g xenolinux-2.4.16-sparse/include/asm-xeno/hdreg.h

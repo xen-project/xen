@@ -10,6 +10,9 @@
 #ifndef __HYPERVISOR_IF_H__
 #define __HYPERVISOR_IF_H__
 
+/* Virtual addresses beyond this are inaccessible by guest OSes. */
+#define HYPERVISOR_VIRT_START (0xFC000000UL)
+
 typedef struct trap_info_st
 {
     unsigned char  vector;  /* exception/interrupt vector */

@@ -26,7 +26,7 @@ extern struct mm_struct init_mm;
 #define IDLE0_MM                                                    \
 {                                                                   \
     cpu_vm_mask: 0,                                                 \
-    pagetable:   mk_pagetable((unsigned long)idle0_pg_table)        \
+    pagetable:   mk_pagetable(__pa(idle0_pg_table))                 \
 }
 
 #define _HYP_EVENT_NEED_RESCHED 0

@@ -28,6 +28,7 @@ static void new_l2e(l2_pgentry_t *pl2e)
     *pl2e = mk_l2_pgentry(__pa(pl1e)|L2_PROT);
 }
 
+
 void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flags)
 {
     unsigned long vaddr;
@@ -35,9 +36,8 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
     l2_pgentry_t *pl2e;
     l1_pgentry_t *pl1e;
 
-    /* First time through, start allocating from end of real memory. */
-    if ( !remap_base ) 
-        remap_base = (unsigned long)phys_to_virt(MAX_USABLE_ADDRESS);
+    /* First time through, start allocating from far end of virtual memory. */
+    if ( !remap_base ) remap_base = IOREMAP_VIRT_START;
 
     /* Don't allow wraparound or zero size */
     last_addr = phys_addr + size - 1;

@@ -4,7 +4,6 @@
 #include <xeno/interrupt.h>
 #include <xeno/lib.h>
 #include <xeno/sched.h>
-#include <xeno/bootmem.h>
 #include <xeno/pci.h>
 #include <asm/bitops.h>
 #include <asm/smp.h>
@@ -12,11 +11,18 @@
 #include <asm/mpspec.h>
 #include <asm/apic.h>
 #include <asm/desc.h>
+#include <asm/domain_page.h>
 
 struct cpuinfo_x86 boot_cpu_data = { 0 };
 /* Lots of nice things, since we only target PPro+. */
 unsigned long mmu_cr4_features = X86_CR4_PSE | X86_CR4_PGE;
 unsigned long wait_init_idle;
+
+/* Basic page table for each CPU in the system. */
+l2_pgentry_t *idle_pg_table[NR_CPUS] = { idle0_pg_table };
+
+/* for asm/domain_page.h, map_domain_page() */
+unsigned long *mapcache[NR_CPUS];
 
 /* Standard macro to see if a specific flag is changeable */
 static inline int flag_is_changeable_p(u32 flag)
@@ -182,7 +188,8 @@ void __init cpu_init(void)
 {
     int nr = smp_processor_id();
     struct tss_struct * t = &init_tss[nr];
-    
+    l2_pgentry_t *pl2e;
+
     if ( test_and_set_bit(nr, &cpu_initialized) )
         panic("CPU#%d already initialized!!!\n", nr);
     printk("Initializing CPU#%d\n", nr);
@@ -207,6 +214,16 @@ void __init cpu_init(void)
 #define CD(register) __asm__("movl %0,%%db" #register ::"r"(0) );
     CD(0); CD(1); CD(2); CD(3); /* no db4 and db5 */; CD(6); CD(7);
 #undef CD
+
+    /* Install correct page table. */
+    __asm__ __volatile__ ("movl %%eax,%%cr3"
+                          : : "a" (pagetable_val(current->mm.pagetable)));
+
+    /* Set up mapping cache for domain pages. */
+    pl2e = idle_pg_table[nr] + (MAPCACHE_VIRT_START >> L2_PAGETABLE_SHIFT);
+    mapcache[nr] = (unsigned long *)get_free_page(GFP_KERNEL);
+    clear_page(mapcache[nr]);
+    *pl2e = mk_l2_pgentry(__pa(mapcache[nr]) | PAGE_HYPERVISOR);
 
     /* Stick the idle task on the run queue. */
     (void)wake_up(current);
@@ -283,12 +300,7 @@ void __init start_of_day(void)
     paging_init();                /* not much here now, but sets up fixmap */
     if ( smp_found_config ) get_smp_config();
     domain_init();
-    trap_init(); /*
-                  * installs trap (s/w exception) wrappers.
-                  * Most route via entry.S and thence back into traps.c
-                  * where a really simple handler does a panic.
-                  * Instead, we'll want to pass most back to a domain.
-                  */
+    trap_init();
     init_IRQ();  /* installs simple interrupt wrappers. Starts HZ clock. */
     time_init(); /* installs software handler for HZ clock. */
     softirq_init();

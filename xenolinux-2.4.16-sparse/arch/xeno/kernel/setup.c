@@ -143,7 +143,6 @@ void __init setup_arch(char **cmdline_p)
 {
     unsigned long start_pfn, max_pfn, max_low_pfn;
     unsigned long bootmap_size;
-    char str[256]; int strcnt;
 
     extern void hypervisor_callback(void);
     extern void failsafe_callback(void);
@@ -187,7 +186,7 @@ void __init setup_arch(char **cmdline_p)
  * 128MB for vmalloc and initrd
  */
 #define VMALLOC_RESERVE	(unsigned long)(128 << 20)
-#define MAXMEM		(unsigned long)(-PAGE_OFFSET-VMALLOC_RESERVE)
+#define MAXMEM		(unsigned long)(HYPERVISOR_VIRT_START-PAGE_OFFSET-VMALLOC_RESERVE)
 #define MAXMEM_PFN	PFN_DOWN(MAXMEM)
 #define MAX_NONPAE_PFN	(1 << 20)
 
@@ -242,7 +241,7 @@ void __init setup_arch(char **cmdline_p)
      * Then reserve space for OS image, and the bootmem bitmap.
      */
     bootmap_size = init_bootmem(start_pfn, max_low_pfn);
-    free_bootmem(0, PFN_PHYS(max_pfn));
+    free_bootmem(0, PFN_PHYS(max_low_pfn));
     reserve_bootmem(0, PFN_PHYS(start_pfn) + bootmap_size + PAGE_SIZE-1);
 
     /* Now reserve space for the hypervisor-provided page tables. */
@@ -251,7 +250,7 @@ void __init setup_arch(char **cmdline_p)
         unsigned long  pte;
         int i;
         reserve_bootmem(__pa(pgd), PAGE_SIZE);
-        for ( i = 0; i < (0xE0000000UL>>22); i++ )
+        for ( i = 0; i < (HYPERVISOR_VIRT_START>>22); i++ )
         {
             unsigned long pgde = *pgd++;
             if ( !(pgde & 1) ) continue;
@@ -260,6 +259,7 @@ void __init setup_arch(char **cmdline_p)
         }
     }
     cur_pgd = init_mm.pgd = (pgd_t *)start_info.pt_base;
+    queue_pgd_pin(__pa(init_mm.pgd));
 
 #ifdef CONFIG_BLK_DEV_INITRD
     if (start_info.mod_start) {
@@ -976,6 +976,7 @@ static void time_to_die(int irq, void *unused, struct pt_regs *regs)
 static int __init setup_death_event(void)
 {
     (void)request_irq(_EVENT_DIE, time_to_die, 0, "die", NULL);
+    return 0;
 }
 
 __initcall(setup_death_event);

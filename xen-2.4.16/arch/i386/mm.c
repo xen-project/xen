@@ -56,6 +56,7 @@ static void __init fixrange_init (unsigned long start,
 void __init paging_init(void)
 {
     unsigned long addr;
+    void *ioremap_pt;
 
     /* XXX initialised in boot.S */
     /*if ( cpu_has_pge ) set_in_cr4(X86_CR4_PGE);*/
@@ -68,13 +69,24 @@ void __init paging_init(void)
      */
     addr = FIXADDR_START & ~((1<<L2_PAGETABLE_SHIFT)-1);
     fixrange_init(addr, 0, idle0_pg_table);
+
+    /* Create page table for ioremap(). */
+    ioremap_pt = (void *)get_free_page(GFP_KERNEL);
+    clear_page(ioremap_pt);
+    idle0_pg_table[MAPCACHE_VIRT_START >> L2_PAGETABLE_SHIFT] = 
+        mk_l2_pgentry(__pa(ioremap_pt) | PAGE_HYPERVISOR);
 }
 
 void __init zap_low_mappings (void)
 {
-    int i;
-    for (i = 0; i < DOMAIN_ENTRIES_PER_L2_PAGETABLE; i++ )
-        idle0_pg_table[i] = mk_l2_pgentry(0);
+    int i, j;
+    for ( i = 0; i < smp_num_cpus; i++ )
+    {
+        for ( j = 0; j < DOMAIN_ENTRIES_PER_L2_PAGETABLE; j++ )
+        {
+            idle_pg_table[i][j] = mk_l2_pgentry(0);
+        }
+    }
     flush_tlb_all();
 }
 

@@ -55,7 +55,6 @@
 #include <linux/timex.h>
 #include <linux/config.h>
 
-#include <asm/fixmap.h>
 #include <asm/hypervisor.h>
 
 #include <linux/irq.h>

@@ -15,7 +15,6 @@
 #ifndef __ASSEMBLY__
 #include <asm/processor.h>
 #include <asm/hypervisor.h>
-#include <asm/fixmap.h>
 #include <linux/threads.h>
 
 #ifndef _I386_BITOPS_H
@@ -93,22 +92,12 @@ extern void pgtable_cache_init(void);
 
 
 #ifndef __ASSEMBLY__
-/* Just any arbitrary offset to the start of the vmalloc VM area: the
- * current 8MB value just means that there will be a 8MB "hole" after the
- * physical memory until the kernel virtual memory starts.  That means that
- * any out-of-bounds memory accesses will hopefully be caught.
- * The vmalloc() routines leaves a hole of 4kB between each vmalloced
- * area for the same reason. ;)
- */
-#define VMALLOC_OFFSET	(8*1024*1024)
+/* 4MB is just a nice "safety zone". Also, we align to a fresh pde. */
+#define VMALLOC_OFFSET	(4*1024*1024)
 #define VMALLOC_START	(((unsigned long) high_memory + 2*VMALLOC_OFFSET-1) & \
 						~(VMALLOC_OFFSET-1))
 #define VMALLOC_VMADDR(x) ((unsigned long)(x))
-#if CONFIG_HIGHMEM
-# define VMALLOC_END	(PKMAP_BASE-2*PAGE_SIZE)
-#else
-# define VMALLOC_END	(FIXADDR_START-2*PAGE_SIZE)
-#endif
+#define VMALLOC_END	(HYPERVISOR_VIRT_START-PAGE_SIZE)
 
 #define _PAGE_BIT_PRESENT	0
 #define _PAGE_BIT_RW		1

@@ -173,6 +173,7 @@
 #include <asm/page.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
+#include <asm/domain_page.h>
 
 #if 0
 #define MEM_LOG(_f, _a...) printk("DOM%d: (file=memory.c, line=%d) " _f "\n", current->domain, __LINE__, ## _a )
@@ -191,8 +192,8 @@ static void put_l1_table(unsigned long page_nr);
 static void put_page(unsigned long page_nr, int writeable);
 static int dec_page_refcnt(unsigned long page_nr, unsigned int type);
 
-static int mod_l2_entry(l2_pgentry_t *, l2_pgentry_t);
-static int mod_l1_entry(l1_pgentry_t *, l1_pgentry_t);
+static int mod_l2_entry(unsigned long, l2_pgentry_t);
+static int mod_l1_entry(unsigned long, l1_pgentry_t);
 
 /* frame table size and its size in pages */
 frame_table_t * frame_table;
@@ -206,13 +207,10 @@ static int tlb_flush[NR_CPUS];
 
 /*
  * init_frametable:
- * Initialise per-frame memory information. The return value
- * is the amount of memory available for use by the rest of Xen.
- * The very highest frames are reserved for the per-frame info.
- * This function should be called before initialising the
- * page allocator!
+ * Initialise per-frame memory information. This goes directly after
+ * MAX_MONITOR_ADDRESS in physical memory.
  */
-unsigned long __init init_frametable(unsigned long nr_pages)
+void __init init_frametable(unsigned long nr_pages)
 {
     struct pfn_info *pf;
     unsigned long page_index;
@@ -222,23 +220,21 @@ unsigned long __init init_frametable(unsigned long nr_pages)
     max_page = nr_pages;
     frame_table_size = nr_pages * sizeof(struct pfn_info);
     frame_table_size = (frame_table_size + PAGE_SIZE - 1) & PAGE_MASK;
-    free_pfns = nr_pages - (MAX_MONITOR_ADDRESS >> PAGE_SHIFT);
+    free_pfns = nr_pages - 
+        ((MAX_MONITOR_ADDRESS + frame_table_size) >> PAGE_SHIFT);
 
-    frame_table = phys_to_virt(MAX_MONITOR_ADDRESS - frame_table_size);
+    frame_table = phys_to_virt(MAX_MONITOR_ADDRESS);
     memset(frame_table, 0, frame_table_size);
 
     /* Put all domain-allocatable memory on a free list. */
     INIT_LIST_HEAD(&free_list);
-    for( page_index = MAX_MONITOR_ADDRESS >> PAGE_SHIFT; 
+    for( page_index = (MAX_MONITOR_ADDRESS + frame_table_size) >> PAGE_SHIFT; 
          page_index < nr_pages; 
          page_index++ )      
     {
         pf = list_entry(&frame_table[page_index].list, struct pfn_info, list);
         list_add_tail(&pf->list, &free_list);
     }
-
-    /* Return the remaing Xen-allocatable memory. */
-    return(MAX_MONITOR_ADDRESS - frame_table_size);
 }
 
 
@@ -312,7 +308,7 @@ static int get_l2_table(unsigned long page_nr)
     if ( ret != 0 ) return((ret < 0) ? ret : 0);
     
     /* NEW level-2 page table! Deal with every PDE in the table. */
-    p_l2_entry = (l2_pgentry_t *)__va(page_nr << PAGE_SHIFT);
+    p_l2_entry = map_domain_mem(page_nr << PAGE_SHIFT);
     for ( i = 0; i < DOMAIN_ENTRIES_PER_L2_PAGETABLE; i++ )
     {
         l2_entry = *p_l2_entry++;
@@ -325,10 +321,13 @@ static int get_l2_table(unsigned long page_nr)
         }
         ret = get_l1_table(l2_pgentry_to_pagenr(l2_entry));
         if ( ret ) return(ret);
+        p_l2_entry = map_domain_mem((page_nr << PAGE_SHIFT) + 
+                                    ((i+1) * sizeof(l2_pgentry_t)));
     }
 
     /* Now we simply slap in our high mapping. */
-    memcpy(p_l2_entry, idle0_pg_table + DOMAIN_ENTRIES_PER_L2_PAGETABLE,
+    memcpy(p_l2_entry, 
+           idle_pg_table[smp_processor_id()] + DOMAIN_ENTRIES_PER_L2_PAGETABLE,
            HYPERVISOR_ENTRIES_PER_L2_PAGETABLE * sizeof(l2_pgentry_t));
 
     return(ret);
@@ -344,7 +343,7 @@ static int get_l1_table(unsigned long page_nr)
     if ( ret != 0 ) return((ret < 0) ? ret : 0);
 
     /* NEW level-1 page table! Deal with every PTE in the table. */
-    p_l1_entry = (l1_pgentry_t *)__va(page_nr << PAGE_SHIFT);
+    p_l1_entry = map_domain_mem(page_nr << PAGE_SHIFT);
     for ( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ )
     {
         l1_entry = *p_l1_entry++;
@@ -414,12 +413,16 @@ static int put_l2_table(unsigned long page_nr)
     if ( ret != 0 ) return((ret < 0) ? ret : 0);
 
     /* We had last reference to level-2 page table. Free the PDEs. */
-    p_l2_entry = (l2_pgentry_t *)__va(page_nr << PAGE_SHIFT);
+    p_l2_entry = map_domain_mem(page_nr << PAGE_SHIFT);
     for ( i = 0; i < HYPERVISOR_ENTRIES_PER_L2_PAGETABLE; i++ )
     {
         l2_entry = *p_l2_entry++;
-        if ( (l2_pgentry_val(l2_entry) & _PAGE_PRESENT) ) 
+        if ( (l2_pgentry_val(l2_entry) & _PAGE_PRESENT) )
+        { 
             put_l1_table(l2_pgentry_to_pagenr(l2_entry));
+            p_l2_entry = map_domain_mem((page_nr << PAGE_SHIFT) + 
+                                        ((i+1) * sizeof(l2_pgentry_t)));
+        }
     }
 
     return(0);
@@ -433,7 +436,7 @@ static void put_l1_table(unsigned long page_nr)
     if ( dec_page_refcnt(page_nr, PGT_l1_page_table) != 0 ) return;
 
     /* We had last reference to level-1 page table. Free the PTEs. */
-    p_l1_entry = (l1_pgentry_t *)__va(page_nr << PAGE_SHIFT);
+    p_l1_entry = map_domain_mem(page_nr << PAGE_SHIFT);
     for ( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ )
     {
         l1_entry = *p_l1_entry++;
@@ -463,9 +466,12 @@ static void put_page(unsigned long page_nr, int writeable)
 }
 
 
-static int mod_l2_entry(l2_pgentry_t *p_l2_entry, l2_pgentry_t new_l2_entry)
+static int mod_l2_entry(unsigned long pa, l2_pgentry_t new_l2_entry)
 {
-    l2_pgentry_t old_l2_entry = *p_l2_entry;
+    l2_pgentry_t *p_l2_entry, old_l2_entry;
+
+    p_l2_entry = map_domain_mem(pa);
+    old_l2_entry = *p_l2_entry;
 
     if ( (((unsigned long)p_l2_entry & (PAGE_SIZE-1)) >> 2) >=
          DOMAIN_ENTRIES_PER_L2_PAGETABLE )
@@ -474,6 +480,12 @@ static int mod_l2_entry(l2_pgentry_t *p_l2_entry, l2_pgentry_t new_l2_entry)
                 p_l2_entry);
         goto fail;
     }
+
+    /*
+     * Write the new value while pointer is still valid. The mapping cache 
+     * entry for p_l2_entry may get clobbered by {put,get}_l1_table.
+     */
+    *p_l2_entry = new_l2_entry;
 
     if ( (l2_pgentry_val(new_l2_entry) & _PAGE_PRESENT) )
     {
@@ -502,17 +514,25 @@ static int mod_l2_entry(l2_pgentry_t *p_l2_entry, l2_pgentry_t new_l2_entry)
         put_l1_table(l2_pgentry_to_pagenr(old_l2_entry));
     }
     
-    *p_l2_entry++ = new_l2_entry;
-    
     return(0);
+
  fail:
+    /*
+     * On failure we put the old value back. We need to regrab the
+     * mapping of the physical page frame.
+     */
+    p_l2_entry = map_domain_mem(pa);
+    *p_l2_entry = old_l2_entry;
     return(-1);
 }
 
 
-static int mod_l1_entry(l1_pgentry_t *p_l1_entry, l1_pgentry_t new_l1_entry)
+static int mod_l1_entry(unsigned long pa, l1_pgentry_t new_l1_entry)
 {
-    l1_pgentry_t old_l1_entry = *p_l1_entry;
+    l1_pgentry_t *p_l1_entry, old_l1_entry;
+
+    p_l1_entry = map_domain_mem(pa);
+    old_l1_entry = *p_l1_entry;
 
     if ( (l1_pgentry_val(new_l1_entry) & _PAGE_PRESENT) )
     {
@@ -548,7 +568,8 @@ static int mod_l1_entry(l1_pgentry_t *p_l1_entry, l1_pgentry_t new_l1_entry)
                  l1_pgentry_val(old_l1_entry) & _PAGE_RW);
     }
 
-    *p_l1_entry++ = new_l1_entry;
+    /* p_l1_entry is still valid here */
+    *p_l1_entry = new_l1_entry;
 
     return(0);
  fail:
@@ -616,10 +637,8 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         err = get_l2_table(pfn);
         if ( !err )
         {
-            put_l2_table(__pa(pagetable_ptr(current->mm.pagetable)) 
-                         >> PAGE_SHIFT);
-            current->mm.pagetable = 
-                mk_pagetable((unsigned long)__va(pfn<<PAGE_SHIFT));
+            put_l2_table(pagetable_val(current->mm.pagetable) >> PAGE_SHIFT);
+            current->mm.pagetable = mk_pagetable(pfn << PAGE_SHIFT);
         }
         else
         {
@@ -632,8 +651,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         break;
     
     case PGEXT_INVLPG:
-        __asm__ __volatile__ ("invlpg %0" : : 
-                              "m" (*(char*)(val & ~PGEXT_CMD_MASK)));
+        __flush_tlb_one(val & ~PGEXT_CMD_MASK);
         break;
 
     default:
@@ -684,12 +702,10 @@ int do_process_page_updates(page_update_request_t *updates, int count)
                 switch ( (flags & PG_type_mask) )
                 {
                 case PGT_l1_page_table: 
-                    err = mod_l1_entry((l1_pgentry_t *)__va(cur.ptr), 
-                                       mk_l1_pgentry(cur.val)); 
+                    err = mod_l1_entry(cur.ptr, mk_l1_pgentry(cur.val)); 
                     break;
                 case PGT_l2_page_table: 
-                    err = mod_l2_entry((l2_pgentry_t *)__va(cur.ptr),
-                                       mk_l2_pgentry(cur.val)); 
+                    err = mod_l2_entry(cur.ptr, mk_l2_pgentry(cur.val)); 
                     break;
                 default:
                     MEM_LOG("Update to non-pt page %08lx", cur.ptr);
@@ -711,7 +727,8 @@ int do_process_page_updates(page_update_request_t *updates, int count)
             flags = page->flags;
             if ( (flags | current->domain) == PGT_l1_page_table )
             {
-                *(unsigned long *)__va(cur.ptr) = cur.val;
+                
+                *(unsigned long *)map_domain_mem(cur.ptr) = cur.val;
                 err = 0;
             }
             else
@@ -748,7 +765,7 @@ int do_process_page_updates(page_update_request_t *updates, int count)
         tlb_flush[smp_processor_id()] = 0;
         __asm__ __volatile__ (
             "movl %%eax,%%cr3" : : 
-            "a" (__pa(pagetable_ptr(current->mm.pagetable))));
+            "a" (pagetable_val(current->mm.pagetable)));
     }
 
     return(0);

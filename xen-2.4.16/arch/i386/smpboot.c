@@ -664,6 +664,7 @@ static void __init do_boot_cpu (int apicid)
     unsigned long boot_error = 0;
     int timeout, cpu;
     unsigned long start_eip;
+    l2_pgentry_t *pagetable;
 
     cpu = ++cpucount;
     /*
@@ -674,7 +675,10 @@ static void __init do_boot_cpu (int apicid)
  
     idle->processor    = cpu;
     idle->domain       = IDLE_DOMAIN_ID;
-    idle->mm.pagetable = mk_pagetable((unsigned long)idle0_pg_table);
+    pagetable = (void *)get_free_page(GFP_KERNEL);
+    memcpy(pagetable, idle0_pg_table, PAGE_SIZE);
+    idle_pg_table[cpu] = pagetable;
+    idle->mm.pagetable = mk_pagetable(__pa(pagetable));
 
     map_cpu_to_boot_apicid(cpu, apicid);
 

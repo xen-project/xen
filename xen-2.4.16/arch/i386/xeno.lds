@@ -6,7 +6,7 @@ OUTPUT_ARCH(i386)
 ENTRY(start)
 SECTIONS
 {
-  . = 0xE0000000 + 0x100000;
+  . = 0xFC000000 + 0x100000;
   _text = .;			/* Text and read-only data */
   .text : {
 	*(.text)

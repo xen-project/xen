@@ -91,7 +91,7 @@ continue_boot_cpu:
 1:      mov     %eax,__PAGE_OFFSET>>20(%edi) /* high mapping */
         stosl                                /* low mapping */
         add     $(1<<L2_PAGETABLE_SHIFT),%eax
-        cmp     $MAX_USABLE_ADDRESS+0x1e3,%eax
+        cmp     $MAX_DIRECTMAP_ADDRESS+0x1e3,%eax
         jne     1b
 
         call    start_paging        
@@ -219,12 +219,12 @@ nopaging_gdt_descr:
 ENTRY(gdt_table)
         .quad 0x0000000000000000     /* NULL descriptor */
         .quad 0x0000000000000000     /* not used */
-        .quad 0x00cdba000000ffff     /* 0x11 ring 1 3.5GB code at 0x00000000 */
-        .quad 0x00cdb2000000ffff     /* 0x19 ring 1 3.5GB data at 0x00000000 */
-        .quad 0x00cdfa000000ffff     /* 0x23 ring 3 3.5GB code at 0x00000000 */
-        .quad 0x00cdf2000000ffff     /* 0x2b ring 3 3.5GB data at 0x00000000 */
-        .quad 0x00cf9a000000ffff     /* 0x30 ring 0 4.0GB code at 0x00000000 */
-        .quad 0x00cf92000000ffff     /* 0x38 ring 0 4.0GB data at 0x00000000 */
+        .quad 0x00cfba000000bfff     /* 0x11 ring 1 3.95GB code at 0x0 */
+        .quad 0x00cfb2000000bfff     /* 0x19 ring 1 3.95GB data at 0x0 */
+        .quad 0x00cffa000000bfff     /* 0x23 ring 3 3.95GB code at 0x0 */
+        .quad 0x00cff2000000bfff     /* 0x2b ring 3 3.95GB data at 0x0 */
+        .quad 0x00cf9a000000ffff     /* 0x30 ring 0 4.00GB code at 0x0 */
+        .quad 0x00cf92000000ffff     /* 0x38 ring 0 4.00GB data at 0x0 */
         .quad 0x0000000000000000
         .quad 0x0000000000000000
         .quad 0x0000000000000000

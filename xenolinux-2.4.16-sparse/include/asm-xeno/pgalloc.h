@@ -4,7 +4,6 @@
 #include <linux/config.h>
 #include <asm/processor.h>
 #include <asm/hypervisor.h>
-#include <asm/fixmap.h>
 #include <linux/threads.h>
 
 /*

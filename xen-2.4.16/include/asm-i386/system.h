@@ -29,7 +29,7 @@ extern void FASTCALL(__switch_to(struct task_struct *prev, struct task_struct *n
 		     :"=m" (prev->thread.esp),"=m" (prev->thread.eip)	\
 		     :"m" (next->thread.esp),"m" (next->thread.eip),	\
 		      "a" (prev), "d" (next),				\
-                      "c" (__pa(pagetable_ptr(next->mm.pagetable)))     \
+                      "c" (pagetable_val(next->mm.pagetable))		\
                      :"memory");                                        \
 } while (0)
 

@@ -41,22 +41,23 @@ typedef struct { unsigned long pt_lo; } pagetable_t;
 /* Strip type from a table entry. */
 #define l1_pgentry_val(_x) ((_x).l1_lo)
 #define l2_pgentry_val(_x) ((_x).l2_lo)
+#define pagetable_val(_x)  ((_x).pt_lo)
 
 #define alloc_l1_pagetable()  ((l1_pgentry_t *)get_free_page(GFP_KERNEL))
 #define alloc_l2_pagetable()  ((l2_pgentry_t *)get_free_page(GFP_KERNEL))
 
-#define pagetable_ptr(_x)  ((l2_pagetable_t)((_x).pt_lo))
-#define pagetable_type(_x) (((_x).pt_lo) & ~PAGE_MASK)
-#define mk_pagetable(_x)   ( (pagetable_t) { (_x) } )
-#define pagetable_none(_x) ((_x).pt_lo == 0)
-
 /* Add type to a table entry. */
 #define mk_l1_pgentry(_x)  ( (l1_pgentry_t) { (_x) } )
 #define mk_l2_pgentry(_x)  ( (l2_pgentry_t) { (_x) } )
+#define mk_pagetable(_x)   ( (pagetable_t) { (_x) } )
 
 /* Turn a typed table entry into a page index. */
 #define l1_pgentry_to_pagenr(_x) (l1_pgentry_val(_x) >> PAGE_SHIFT) 
 #define l2_pgentry_to_pagenr(_x) (l2_pgentry_val(_x) >> PAGE_SHIFT)
+
+/* Turn a typed table entry into a physical address. */
+#define l1_pgentry_to_phys(_x) (l1_pgentry_val(_x) & PAGE_MASK)
+#define l2_pgentry_to_phys(_x) (l2_pgentry_val(_x) & PAGE_MASK)
 
 /* Dereference a typed level-2 entry to yield a typed level-1 table. */
 #define l2_pgentry_to_l1(_x)     \
@@ -72,7 +73,7 @@ typedef struct { unsigned long pt_lo; } pagetable_t;
 #define l1_pgentry_empty(_x) (!l1_pgentry_val(_x))
 #define l2_pgentry_empty(_x) (!l2_pgentry_val(_x))
 
-#define __PAGE_OFFSET		(0xE0000000)
+#define __PAGE_OFFSET		(0xFC000000)
 #define PAGE_OFFSET		((unsigned long)__PAGE_OFFSET)
 #define __pa(x)			((unsigned long)(x)-PAGE_OFFSET)
 #define __va(x)			((void *)((unsigned long)(x)+PAGE_OFFSET))
@@ -92,6 +93,7 @@ typedef struct { unsigned long pt_lo; } pagetable_t;
 #include <asm/bitops.h>
 
 extern l2_pgentry_t idle0_pg_table[ENTRIES_PER_L2_PAGETABLE];
+extern l2_pgentry_t *idle_pg_table[NR_CPUS];
 extern void paging_init(void);
 
 #define __flush_tlb()							\

@@ -32,7 +32,6 @@
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
 #include <asm/dma.h>
-#include <asm/fixmap.h>
 #include <asm/apic.h>
 #include <asm/tlb.h>
 
@@ -58,31 +57,6 @@ int do_check_pgt_cache(int low, int high)
     }
     return freed;
 }
-
-/*
- * NOTE: pagetable_init alloc all the fixmap pagetables contiguous on the
- * physical space so we can cache the place of the first one and move
- * around without checking the pgd every time.
- */
-
-#if CONFIG_HIGHMEM
-pte_t *kmap_pte;
-pgprot_t kmap_prot;
-
-#define kmap_get_fixmap_pte(vaddr)					\
-	pte_offset(pmd_offset(pgd_offset_k(vaddr), (vaddr)), (vaddr))
-
-void __init kmap_init(void)
-{
-    unsigned long kmap_vstart;
-
-    /* cache the first kmap pte */
-    kmap_vstart = __fix_to_virt(FIX_KMAP_BEGIN);
-    kmap_pte = kmap_get_fixmap_pte(kmap_vstart);
-
-    kmap_prot = PAGE_KERNEL;
-}
-#endif /* CONFIG_HIGHMEM */
 
 void show_mem(void)
 {
@@ -150,92 +124,8 @@ static inline void set_pte_phys (unsigned long vaddr,
     __flush_tlb_one(vaddr);
 }
 
-void __set_fixmap (enum fixed_addresses idx, unsigned long phys, pgprot_t flags)
-{
-    unsigned long address = __fix_to_virt(idx);
-
-    if (idx >= __end_of_fixed_addresses) {
-        printk("Invalid __set_fixmap\n");
-        return;
-    }
-    set_pte_phys(address, phys, flags);
-}
-
-#if 0
-static void __init fixrange_init (unsigned long start, unsigned long end, pgd_t *pgd_base)
-{
-    pgd_t *pgd;
-    pmd_t *pmd;
-    pte_t *pte;
-    int i, j;
-    unsigned long vaddr;
-
-    vaddr = start;
-    i = __pgd_offset(vaddr);
-    j = __pmd_offset(vaddr);
-    pgd = pgd_base + i;
-
-    for ( ; (i < PTRS_PER_PGD) && (vaddr != end); pgd++, i++) {
-#if CONFIG_X86_PAE
-        if (pgd_none(*pgd)) {
-            pmd = (pmd_t *) alloc_bootmem_low_pages(PAGE_SIZE);
-            set_pgd(pgd, __pgd(__pa(pmd) + 0x1));
-            if (pmd != pmd_offset(pgd, 0))
-                printk("PAE BUG #02!\n");
-        }
-        pmd = pmd_offset(pgd, vaddr);
-#else
-        pmd = (pmd_t *)pgd;
-#endif
-        for (; (j < PTRS_PER_PMD) && (vaddr != end); pmd++, j++) {
-            if (pmd_none(*pmd)) {
-                pte = (pte_t *) alloc_bootmem_low_pages(PAGE_SIZE);
-                set_pmd(pmd, __pmd(_KERNPG_TABLE + __pa(pte)));
-                if (pte != pte_offset(pmd, 0))
-                    BUG();
-            }
-            vaddr += PMD_SIZE;
-        }
-        j = 0;
-    }
-}
-#endif
-
-static void __init pagetable_init (void)
-{
-#if 0
-    vaddr = __fix_to_virt(__end_of_fixed_addresses - 1) & PMD_MASK;
-    fixrange_init(vaddr, 0, pgd_base);
-#endif
-
-#if CONFIG_HIGHMEM
-    /*
-     * Permanent kmaps:
-     */
-    vaddr = PKMAP_BASE;
-    fixrange_init(vaddr, vaddr + PAGE_SIZE*LAST_PKMAP, pgd_base);
-
-    pgd = init_mm.pgd + __pgd_offset(vaddr);
-    pmd = pmd_offset(pgd, vaddr);
-    pte = pte_offset(pmd, vaddr);
-    pkmap_page_table = pte;
-#endif
-}
-
-/*
- * paging_init() sets up the page tables - note that the first 8MB are
- * already mapped by head.S.
- *
- * This routines also unmaps the page at virtual kernel address 0, so
- * that we can trap those pesky NULL-reference errors in the kernel.
- */
 void __init paging_init(void)
 {
-    pagetable_init();
-
-#ifdef CONFIG_HIGHMEM
-    kmap_init();
-#endif
     {
         unsigned long zones_size[MAX_NR_ZONES] = {0, 0, 0};
         unsigned int max_dma, high, low;
@@ -249,9 +139,6 @@ void __init paging_init(void)
         else {
             zones_size[ZONE_DMA] = max_dma;
             zones_size[ZONE_NORMAL] = low - max_dma;
-#ifdef CONFIG_HIGHMEM
-            zones_size[ZONE_HIGHMEM] = high - low;
-#endif
         }
         free_area_init(zones_size);
     }
@@ -269,12 +156,7 @@ void __init mem_init(void)
     int codesize, reservedpages, datasize, initsize;
     int tmp;
 
-#ifdef CONFIG_HIGHMEM
-    highmem_start_page = mem_map + highstart_pfn;
-    max_mapnr = num_physpages = highend_pfn;
-#else
     max_mapnr = num_physpages = max_low_pfn;
-#endif
     high_memory = (void *) __va(max_low_pfn * PAGE_SIZE);
 
     /* clear the zero-page */
@@ -290,22 +172,6 @@ void __init mem_init(void)
          */
         if (page_is_ram(tmp) && PageReserved(mem_map+tmp))
             reservedpages++;
-#ifdef CONFIG_HIGHMEM
-    for (tmp = highstart_pfn; tmp < highend_pfn; tmp++) {
-        struct page *page = mem_map + tmp;
-
-        if (!page_is_ram(tmp)) {
-            SetPageReserved(page);
-            continue;
-        }
-        ClearPageReserved(page);
-        set_bit(PG_highmem, &page->flags);
-        atomic_set(&page->count, 1);
-        __free_page(page);
-        totalhigh_pages++;
-    }
-    totalram_pages += totalhigh_pages;
-#endif
     codesize =  (unsigned long) &_etext - (unsigned long) &_text;
     datasize =  (unsigned long) &_edata - (unsigned long) &_etext;
     initsize =  (unsigned long) &__init_end - (unsigned long) &__init_begin;

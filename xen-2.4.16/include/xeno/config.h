@@ -41,12 +41,16 @@
 #define __cacheline_aligned __attribute__((__aligned__(SMP_CACHE_BYTES)))
 #define ____cacheline_aligned __cacheline_aligned
 
-/* 0-8MB is fixed monitor space for now. */
-#define MAX_MONITOR_ADDRESS ( 16*1024*1024)
-#define MAX_DMA_ADDRESS     ( 16*1024*1024)
-#define MAX_USABLE_ADDRESS  ((0xfc000000-__PAGE_OFFSET) & ~((1<<22)-1))
-                             /*^^^^^^^^^*/
-                             /*arbitrary*/
+/* 0-16MB is fixed monitor space. 0-56MB is direct-mapped at top of memory.*/
+#define MAX_MONITOR_ADDRESS   (16*1024*1024)
+#define MAX_DMA_ADDRESS       (16*1024*1024)
+#define MAX_DIRECTMAP_ADDRESS (56*1024*1024)
+/* Penultimate 4MB of virtual address space used for domain page mappings. */
+#define MAPCACHE_VIRT_START   (PAGE_OFFSET + MAX_DIRECTMAP_ADDRESS)
+#define MAPCACHE_VIRT_END     (MAPCACHE_VIRT_START + (4*1024*1024))
+/* Final 4MB of virtual address space used for ioremap(). */
+#define IOREMAP_VIRT_START    (MAPCACHE_VIRT_END)
+#define IOREMAP_VIRT_END      (IOREMAP_VIRT_START + (4*1024*1024))
 
 /* Linkage for x86 */
 #define FASTCALL(x)     x __attribute__((regparm(3)))
