@@ -39,6 +39,9 @@
 #define DPRINTK_IOCTL(_f, _a...) ((void)0)
 #endif
 
+/* Private gendisk->flags[] values. */
+#define GENHD_FL_XENO        2 /* Is unit a Xen block device?  */
+#define GENHD_FL_VIRT_PARTNS 4 /* Are unit partitions virtual? */
 
 /*
  * We have one of these per vbd, whether ide, scsi or 'other'.

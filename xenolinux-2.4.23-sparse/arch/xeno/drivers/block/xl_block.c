@@ -223,16 +223,17 @@ int xenolinux_block_revalidate(kdev_t dev)
     }
     spin_unlock_irqrestore(&io_request_lock, flags);
 
-    for ( i = gd->nr_real - 1; i >= 0; i-- )
+    for ( i = gd->max_p - 1; i >= 0; i-- )
     {
         invalidate_device(dev+i, 1);
         gd->part[MINOR(dev+i)].start_sect = 0;
-        gd->part[MINOR(dev+i)].nr_sects = 0;
+        gd->part[MINOR(dev+i)].nr_sects   = 0;
+        gd->sizes[MINOR(dev+i)]           = 0;
     }
 
     /* XXX Should perhaps revalidate VBDs here */
 
-    grok_partitions(gd, disk_nr, gd->nr_real, capacity);
+    grok_partitions(gd, disk_nr, gd->max_p, capacity);
 
     return 0;
 }
@@ -281,6 +282,14 @@ static int hypervisor_request(unsigned long   id,
          * partition, but this will happen in xen anyhow.
          */
         sector_number += gd->part[MINOR(device)].start_sect;
+
+        /*
+         * If this unit doesn't consist of virtual (i.e., Xen-specified)
+         * partitions then we clear the partn bits from the device number.
+         */
+        if ( !(gd->flags[MINOR(device)>>gd->minor_shift] & 
+               GENHD_FL_VIRT_PARTNS) )
+            device &= ~(gd->max_p - 1);
 
         if ( (sg_operation == operation) &&
              (sg_dev == device) &&

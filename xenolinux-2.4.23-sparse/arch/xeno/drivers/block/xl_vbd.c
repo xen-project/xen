@@ -8,12 +8,11 @@
 #include "xl_block.h"
 #include <linux/blk.h>
 
-#define GENHD_FL_XENO     2
-
-/* For convenience we distinguish between ide, scsi and 'other' (i.e. 
-** potentially combinations of the two) in the naming scheme and in a 
-** few other places (like default readahead, etc). 
-*/
+/*
+ * For convenience we distinguish between ide, scsi and 'other' (i.e.
+ * potentially combinations of the two) in the naming scheme and in a few 
+ * other places (like default readahead, etc).
+ */
 #define XLIDE_MAJOR_NAME  "hd"
 #define XLSCSI_MAJOR_NAME "sd"
 #define XLVBD_MAJOR_NAME "xvd"
@@ -31,7 +30,7 @@
 #define XLVBD_PARTN_SHIFT  6    /* amount to shift minor to get 'real' minor */
 #define XLVBD_MAX_PART    (1 << XLVBD_PARTN_SHIFT) /* minors per 'other' vbd */
 
-/* the below are for the use of the generic drivers/block/ll_rw_block.c code */
+/* The below are for the generic drivers/block/ll_rw_block.c code. */
 static int xlide_blksize_size[256];
 static int xlide_hardsect_size[256];
 static int xlide_max_sectors[256];
@@ -61,7 +60,7 @@ static struct block_device_operations xlvbd_block_fops =
  */
 int __init xlvbd_init(xen_disk_info_t *xdi)
 {
-    int i, result, max_part; 
+    int i, j, result, max_part; 
     struct gendisk *gd = NULL;
     kdev_t device; 
     unsigned short major, minor, partno; 
@@ -134,7 +133,7 @@ int __init xlvbd_init(xen_disk_info_t *xdi)
                 continue; 
             }
 
-            if( is_ide )
+            if ( is_ide )
             { 
                 blksize_size[major]  = xlide_blksize_size;
                 hardsect_size[major] = xlide_hardsect_size;
@@ -224,14 +223,37 @@ int __init xlvbd_init(xen_disk_info_t *xdi)
         gd->flags[minor >> gd->minor_shift] |= GENHD_FL_XENO;
         
         if ( partno != 0 )
-        { 
+        {
+            /*
+             * If this was previously set up as a real disc we will have set 
+             * up partition-table information. Virtual partitions override 
+             * 'real' partitions, and the two cannot coexist on a device.
+             */
+            if ( gd->sizes[minor & ~(max_part-1)] != 0 )
+            {
+                kdev_t dev = device & ~(max_part-1);
+                for ( j = max_part - 1; j >= 0; j-- )
+                {
+                    invalidate_device(dev+j, 1);
+                    gd->part[MINOR(dev+j)].start_sect = 0;
+                    gd->part[MINOR(dev+j)].nr_sects   = 0;
+                    gd->sizes[MINOR(dev+j)]           = 0;
+                }
+                printk(KERN_ALERT
+                       "Virtual partitions found for /dev/%s - ignoring any "
+                       "real partition information we may have found.\n",
+                       disk_name(gd, MINOR(device), buf));
+            }
+
             /* Need to skankily setup 'partition' information */
-            gd->part[partno].start_sect = 0; 
-            gd->part[partno].nr_sects   = xdi->disks[i].capacity; 
-            gd->sizes[partno]           = xdi->disks[i].capacity; 
+            gd->part[minor].start_sect = 0; 
+            gd->part[minor].nr_sects   = xdi->disks[i].capacity; 
+            gd->sizes[minor]           = xdi->disks[i].capacity; 
+
+            gd->flags[minor >> gd->minor_shift] |= GENHD_FL_VIRT_PARTNS;
         }
         else
-        { 
+        {
             /* Some final fix-ups depending on the device type */
             switch ( XD_TYPE(xdi->disks[i].info) )
             { 
@@ -248,8 +270,16 @@ int __init xlvbd_init(xen_disk_info_t *xdi)
                         "floppy"), disk_name(gd, MINOR(device), buf)); 
                 break; 
 
-            case XD_TYPE_DISK: 
-                register_disk(gd, device, gd->nr_real, &xlvbd_block_fops, 
+            case XD_TYPE_DISK:
+                /* Only check partitions on real discs (not virtual!). */
+                if ( gd->flags[minor>>gd->minor_shift] & GENHD_FL_VIRT_PARTNS )
+                {
+                    printk(KERN_ALERT
+                           "Skipping partition check on virtual /dev/%s\n",
+                           disk_name(gd, MINOR(device), buf));
+                    break;
+                }
+                register_disk(gd, device, gd->max_p, &xlvbd_block_fops, 
                               xdi->disks[i].capacity);
                 break; 
 

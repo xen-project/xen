@@ -463,13 +463,6 @@ static void dispatch_rw_block_io(struct task_struct *p,
                         req->device); 
                 goto bad_descriptor;
             }
-
-	    /*
-             * Clear any 'partition' bits in the device id. This works because
-             * IDE ignores the partition bits anyway. Only SCSI needs this
-             * hack, and we know that always requires the four LSBs cleared.
-             */
-	    phys_seg[nr_psegs].dev = req->device & 0xFFF0;
             new_segs = 1;
         }
 	 
