@@ -196,7 +196,7 @@ public class CommandDomainNew extends Command {
                 if (vifs > 0) {
                     domain_ip =
                         InetAddressPattern.parse(nw_ip).resolve(domain_id);
-                    if (nw_host == null) {
+                 /*   if (nw_host == null) {
                         try {
                             nw_host =
                                 InetAddress.getByName(domain_ip).getHostName();
@@ -204,7 +204,7 @@ public class CommandDomainNew extends Command {
                             nw_host = "" + nw_ip;
                         }
 
-                    }
+                    }*/
                     bargs =
                         ("ip="
                             + domain_ip
