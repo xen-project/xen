@@ -20,7 +20,7 @@
 #include <xeno/vbd.h>
 #include <xeno/slab.h>
 
-#if 1
+#if 0
 #define DPRINTK(_f, _a...) printk( _f , ## _a )
 #else
 #define DPRINTK(_f, _a...) ((void)0)
@@ -624,15 +624,17 @@ static void make_response(struct task_struct *p, unsigned long id,
 
 static void dump_blockq(u_char key, void *dev_id, struct pt_regs *regs) 
 {
+    unsigned long flags;
     struct task_struct *p;
     blk_ring_t *blk_ring ;
+    int i;
 
     printk("Dumping block queue stats: nr_pending = %d (prod=%d,cons=%d)\n",
            atomic_read(&nr_pending), pending_prod, pending_cons);
 
-    p = current->next_task;
-    do
-    {
+    read_lock_irqsave(&tasklist_lock, flags);
+    p = &idle0_task;
+    do {
         if ( !is_idle_task(p) )
         {
             printk("Domain: %d\n", p->domain);
@@ -644,7 +646,17 @@ static void dump_blockq(u_char key, void *dev_id, struct pt_regs *regs)
                    __on_blkdev_list(p));
         }
         p = p->next_task;
-    } while (p != current);
+    } 
+    while ( (p = p->next_task) != &idle0_task );
+    read_unlock_irqrestore(&tasklist_lock, flags);
+
+    for ( i = 0; i < MAX_PENDING_REQS; i++ )
+    {
+        printk("Pend%d: dom=%p, id=%08lx, cnt=%d, op=%d, status=%d\n",
+               i, pending_reqs[i].domain, pending_reqs[i].id,
+               atomic_read(&pending_reqs[i].pendcnt), 
+               pending_reqs[i].operation, pending_reqs[i].status);
+    }
 }
 
 /* Start-of-day initialisation for a new domain. */

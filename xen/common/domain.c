@@ -440,7 +440,12 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
         return -1;
     }
 
-    if ( alloc_new_dom_mem(p, params->memory_kb) ) return -ENOMEM;
+    if ( alloc_new_dom_mem(p, params->memory_kb) )
+    {
+        printk("DOM%d: Not enough memory --- reduce dom0_mem ??\n", dom);
+        return -ENOMEM;
+    }
+
     alloc_address = list_entry(p->pg_head.prev, struct pfn_info, list) -
         frame_table;
     alloc_address <<= PAGE_SHIFT;

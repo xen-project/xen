@@ -65,7 +65,7 @@ int ide_probe_devices(xen_disk_info_t* xdi)
 		cur_disk.info |= XD_FLAG_RO; 
 
 	    cur_disk.capacity = current_capacity(drive);
-	    cur_disk.domain   = 0; /* 'physical' disks belong to domain 0 
+	    cur_disk.domain   = 0; /* 'physical' disks belong to domain 0 */
 
 	    /* Now copy into relevant part of user-space buffer */
 	    if((ret = copy_to_user(xdi->disks + xdi->count, &cur_disk, 

@@ -16,7 +16,7 @@
 #include <string.h>
 
 #include "p4perf.h"
-#include "libxc_private.h"
+#include "xc_private.h"
 
 void dom0_wrmsr( int privfd,
                  int cpu_mask, 
