@@ -554,6 +554,10 @@ class Xend:
     def xend_console(self, id):
         return self.xendGet(self.consoleurl(id))
 
+    def xend_console_disconnect(self, id):
+        return self.xendPost(self.consoleurl(id),
+                             {'op'      : 'disconnect'})
+
     def xend_vnets(self):
         return self.xendGet(self.vneturl())
 
