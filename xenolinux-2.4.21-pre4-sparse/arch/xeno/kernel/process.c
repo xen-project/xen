@@ -140,6 +140,8 @@ void release_segments(struct mm_struct *mm)
     if (ldt) {
         mm->context.segments = NULL;
         clear_LDT();
+        make_pages_writeable(ldt, (LDT_ENTRIES*LDT_ENTRY_SIZE)/PAGE_SIZE);
+        flush_page_update_queue();
         vfree(ldt);
     }
 }
@@ -225,10 +227,15 @@ void copy_segments(struct task_struct *p, struct mm_struct *new_mm)
          * Completely new LDT, we initialize it from the parent:
          */
         ldt = vmalloc(LDT_ENTRIES*LDT_ENTRY_SIZE);
-        if (!ldt)
+        if ( ldt == NULL )
+        {
             printk(KERN_WARNING "ldt allocation failed\n");
+        }
         else
+        {
             memcpy(ldt, old_ldt, LDT_ENTRIES*LDT_ENTRY_SIZE);
+            make_pages_readonly(ldt, (LDT_ENTRIES*LDT_ENTRY_SIZE)/PAGE_SIZE);
+        }
     }
     new_mm->context.segments = ldt;
     new_mm->context.cpuvalid = ~0UL;	/* valid on all CPU's - they can't have stale data */
@@ -335,6 +342,10 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
     struct thread_struct *prev = &prev_p->thread,
         *next = &next_p->thread;
 
+    __cli();
+
+    MULTICALL_flush_page_update_queue();
+
     /*
      * This is basically 'unlazy_fpu', except that we queue a multicall to 
      * indicate FPU task switch, rather than synchronously trapping to Xen.
@@ -356,7 +367,7 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 
     /* EXECUTE ALL TASK SWITCH XEN SYSCALLS AT THIS POINT. */
     execute_multicall_list();
-    sti(); /* matches 'cli' in switch_mm() */
+    __sti();
 
     /*
      * Save away %fs and %gs. No need to save %es and %ds, as

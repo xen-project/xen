@@ -116,12 +116,12 @@ long do_stack_switch(unsigned long ss, unsigned long esp)
 
 
 /* Returns TRUE if given descriptor is valid for GDT or LDT. */
-static int check_descriptor(unsigned long a, unsigned long b)
+int check_descriptor(unsigned long a, unsigned long b)
 {
     unsigned long base, limit;
 
     /* A not-present descriptor will always fault, so is safe. */
-    if ( !(a & _SEGMENT_P) ) 
+    if ( !(b & _SEGMENT_P) ) 
         goto good;
 
     /*
@@ -130,10 +130,10 @@ static int check_descriptor(unsigned long a, unsigned long b)
      * gates (consider a call gate pointing at another guestos descriptor with 
      * DPL 0 -- this would get the OS ring-0 privileges).
      */
-    if ( (a & _SEGMENT_DPL) == 0 )
+    if ( (b & _SEGMENT_DPL) == 0 )
         goto bad;
 
-    if ( !(a & _SEGMENT_S) )
+    if ( !(b & _SEGMENT_S) )
     {
         /*
          * System segment:
@@ -148,15 +148,15 @@ static int check_descriptor(unsigned long a, unsigned long b)
          */
 
         /* Disallow everything but call gates. */
-        if ( (a & _SEGMENT_TYPE) != 0xc00 )
+        if ( (b & _SEGMENT_TYPE) != 0xc00 )
             goto bad;
 
         /* Can't allow far jump to a Xen-private segment. */
-        if ( !VALID_CODESEL(b>>16) )
+        if ( !VALID_CODESEL(a>>16) )
             goto bad;
 
         /* Reserved bits must be zero. */
-        if ( (a & 0xe0) != 0 )
+        if ( (b & 0xe0) != 0 )
             goto bad;
         
         /* No base/limit check is needed for a call gate. */
@@ -164,10 +164,10 @@ static int check_descriptor(unsigned long a, unsigned long b)
     }
     
     /* Check that base/limit do not overlap Xen-private space. */
-    base  = (a&(0xff<<24)) | ((a&0xff)<<16) | (b>>16);
-    limit = (a&0xf0000) | (b&0xffff);
+    base  = (b&(0xff<<24)) | ((b&0xff)<<16) | (a>>16);
+    limit = (b&0xf0000) | (a&0xffff);
     limit++; /* We add one because limit is inclusive. */
-    if ( (a & _SEGMENT_G) )
+    if ( (b & _SEGMENT_G) )
         limit <<= 12;
     if ( ((base + limit) <= base) || 
          ((base + limit) >= PAGE_OFFSET) )
@@ -214,7 +214,7 @@ long do_set_gdt(unsigned long *frame_list, unsigned int entries)
             /* Check all potential GDT entries in the page. */
             gdt_page = map_domain_mem(frames[0] << PAGE_SHIFT);
             for ( i = 0; i < 512; i++ )
-                if ( !check_descriptor(gdt_page[i*2], gdt_page[i*2]+1) )
+                if ( !check_descriptor(gdt_page[i*2], gdt_page[i*2+1]) )
                     goto out;
             unmap_domain_mem(gdt_page);
         }
@@ -247,9 +247,9 @@ long do_set_gdt(unsigned long *frame_list, unsigned int entries)
     flush_tlb();
 
     /* Copy over first entries of the new GDT. */
-    memcpy((void *)PERDOMAIN_VIRT_START, gdt_table, FIRST_DOMAIN_GDT_ENTRY*8);
+    memcpy((void *)GDT_VIRT_START, gdt_table, FIRST_DOMAIN_GDT_ENTRY*8);
     
-    SET_GDT_ADDRESS(current, PERDOMAIN_VIRT_START);
+    SET_GDT_ADDRESS(current, GDT_VIRT_START);
     SET_GDT_ENTRIES(current, (entries*8)-1);
     __asm__ __volatile__ ("lgdt %0" : "=m" (*current->mm.gdt));
 

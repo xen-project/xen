@@ -57,11 +57,14 @@ ENTRY(stack_start)
 ENTRY(empty_zero_page)
 
 .org 0x2000
+ENTRY(default_ldt)
+
+.org 0x3000
 ENTRY(cpu0_pte_quicklist)
 
-.org 0x2400
+.org 0x3400
 ENTRY(cpu0_pgd_quicklist)
         
-.org 0x2800
+.org 0x3800
 ENTRY(stext)
 ENTRY(_stext)

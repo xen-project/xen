@@ -17,7 +17,7 @@
 #include <xeno/delay.h>
 #include <xeno/spinlock.h>
 #include <xeno/irq.h>
-
+#include <asm/domain_page.h>
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/atomic.h>
@@ -188,22 +188,13 @@ static void inline do_trap(int trapnr, char *str,
 {
     struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
     trap_info_t *ti;
-    unsigned long addr, fixup;
+    unsigned long fixup;
 
     if (!(regs->xcs & 3))
         goto fault_in_hypervisor;
 
     ti = current->thread.traps + trapnr;
-    if ( trapnr == 14 )
-    {
-        /* page fault pushes %cr2 */
-        gtb->flags = GTBF_TRAP_CR2;
-        __asm__ __volatile__ ("movl %%cr2,%0" : "=r" (gtb->cr2) : );
-    }
-    else
-    {
-        gtb->flags = use_error_code ? GTBF_TRAP : GTBF_TRAP_NOCODE;
-    }
+    gtb->flags = use_error_code ? GTBF_TRAP : GTBF_TRAP_NOCODE;
     gtb->error_code = error_code;
     gtb->cs         = ti->cs;
     gtb->eip        = ti->address;
@@ -217,29 +208,10 @@ static void inline do_trap(int trapnr, char *str,
         return;
     }
 
-    __asm__ __volatile__ ("movl %%cr2,%0" : "=r" (addr) : );
-
-    if ( (trapnr == 14) && (addr >= PAGE_OFFSET) )
-    {
-        unsigned long page;
-        unsigned long *pde;
-        pde = (unsigned long *)idle_pg_table[smp_processor_id()];
-        page = pde[addr >> L2_PAGETABLE_SHIFT];
-        printk("*pde = %08lx\n", page);
-        if ( page & _PAGE_PRESENT )
-        {
-            page &= PAGE_MASK;
-            page = ((unsigned long *) __va(page))[(addr&0x3ff000)>>PAGE_SHIFT];
-            printk(" *pte = %08lx\n", page);
-        }
-    }
-
     show_registers(regs);
     panic("CPU%d FATAL TRAP: vector = %d (%s)\n"
-          "[error_code=%08x]\n"
-          "Faulting linear address might be %08lx\n",
-          smp_processor_id(), trapnr, str,
-          error_code, addr);
+          "[error_code=%08x]\n",
+          smp_processor_id(), trapnr, str, error_code);
 }
 
 #define DO_ERROR_NOCODE(trapnr, str, name) \
@@ -265,14 +237,134 @@ DO_ERROR_NOCODE( 9, "coprocessor segment overrun", coprocessor_segment_overrun)
 DO_ERROR(10, "invalid TSS", invalid_TSS)
 DO_ERROR(11, "segment not present", segment_not_present)
 DO_ERROR(12, "stack segment", stack_segment)
-DO_ERROR(14, "page fault", page_fault)
 /* Vector 15 reserved by Intel */
 DO_ERROR_NOCODE(16, "fpu error", coprocessor_error)
 DO_ERROR(17, "alignment check", alignment_check)
 DO_ERROR_NOCODE(18, "machine check", machine_check)
 DO_ERROR_NOCODE(19, "simd error", simd_coprocessor_error)
 
-asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
+asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
+{
+    struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
+    trap_info_t *ti;
+    l2_pgentry_t *pl2e;
+    l1_pgentry_t *pl1e;
+    unsigned long addr, off, fixup, l2e, l1e, *ldt_page;
+    struct task_struct *p = current;
+    struct pfn_info *page;
+    int i;
+
+    __asm__ __volatile__ ("movl %%cr2,%0" : "=r" (addr) : );
+
+    if ( unlikely(!(regs->xcs & 3)) )
+        goto fault_in_hypervisor;
+
+    if ( unlikely(addr > PAGE_OFFSET) )
+        goto fault_in_xen_space;
+
+ bounce_fault:
+
+    if ( (regs->xcs &3) == 1 )
+        printk("Fault at %08x (%08x)\n", addr, regs->eip); /* XXX */
+
+    ti = p->thread.traps + 14;
+    gtb->flags = GTBF_TRAP_CR2; /* page fault pushes %cr2 */
+    gtb->cr2        = addr;
+    gtb->error_code = error_code;
+    gtb->cs         = ti->cs;
+    gtb->eip        = ti->address;
+    return; 
+
+
+ fault_in_xen_space:
+
+    if ( (addr < LDT_VIRT_START) || 
+         (addr >= (LDT_VIRT_START + (p->mm.ldt_ents*LDT_ENTRY_SIZE))) )
+        goto bounce_fault;
+
+    off  = addr - LDT_VIRT_START;
+    addr = p->mm.ldt_base + off;
+
+    spin_lock_irq(&p->page_lock);
+
+    pl2e  = map_domain_mem(pagetable_val(p->mm.pagetable));
+    l2e   = l2_pgentry_val(pl2e[l2_table_offset(addr)]);
+    unmap_domain_mem(pl2e);
+    if ( !(l2e & _PAGE_PRESENT) )
+        goto unlock_and_bounce_fault;
+
+    pl1e  = map_domain_mem(l2e & PAGE_MASK);
+    l1e   = l1_pgentry_val(pl1e[l1_table_offset(addr)]);
+    unmap_domain_mem(pl1e);
+    if ( !(l1e & _PAGE_PRESENT) )
+        goto unlock_and_bounce_fault;
+
+    page = frame_table + (l1e >> PAGE_SHIFT);
+    if ( (page->flags & PG_type_mask) != PGT_ldt_page )
+    {
+        if ( page->type_count != 0 )
+        { /* XXX */
+            printk("BOGO TYPE %08lx %ld\n", page->flags, page->type_count);
+            goto unlock_and_bounce_fault;
+        }
+        /* Check all potential LDT entries in the page. */
+        ldt_page = map_domain_mem(l1e & PAGE_MASK);
+        for ( i = 0; i < 512; i++ )
+            if ( !check_descriptor(ldt_page[i*2], ldt_page[i*2+1]) )
+            { /* XXX */
+                printk("Bad desc!!!!!\n");
+                goto unlock_and_bounce_fault;
+            }
+        unmap_domain_mem(ldt_page);
+        page->flags &= ~PG_type_mask;
+        page->flags |= PGT_ldt_page;
+        get_page_type(page);
+        get_page_tot(page);
+    }
+
+    p->mm.perdomain_pt[l1_table_offset(off)+16] = mk_l1_pgentry(l1e);
+
+    spin_unlock_irq(&p->page_lock);
+    return;
+
+
+ unlock_and_bounce_fault:
+
+    spin_unlock_irq(&p->page_lock);
+    goto bounce_fault;
+
+
+ fault_in_hypervisor:
+
+    if ( (fixup = search_exception_table(regs->eip)) != 0 )
+    {
+        regs->eip = fixup;
+        return;
+    }
+
+    if ( addr >= PAGE_OFFSET )
+    {
+        unsigned long page;
+        unsigned long *pde;
+        pde = (unsigned long *)idle_pg_table[smp_processor_id()];
+        page = pde[addr >> L2_PAGETABLE_SHIFT];
+        printk("*pde = %08lx\n", page);
+        if ( page & _PAGE_PRESENT )
+        {
+            page &= PAGE_MASK;
+            page = ((unsigned long *) __va(page))[(addr&0x3ff000)>>PAGE_SHIFT];
+            printk(" *pte = %08lx\n", page);
+        }
+    }
+
+    show_registers(regs);
+    panic("CPU%d FATAL PAGE FAULT\n"
+          "[error_code=%08x]\n"
+          "Faulting linear address might be %08lx\n",
+          smp_processor_id(), error_code, addr);
+}
+
+asmlinkage void do_general_protection(struct pt_regs *regs, long error_code)
 {
     struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
     trap_info_t *ti;
@@ -315,7 +407,7 @@ asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
             return;
         }
     }
-
+    
     /* Pass on GPF as is. */
     ti = current->thread.traps + 13;
     gtb->flags      = GTBF_TRAP;
@@ -328,6 +420,7 @@ asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
 
     if ( (fixup = search_exception_table(regs->eip)) != 0 )
     {
+        printk("Hmmmm %08lx -> %08lx (%04lx)\n", regs->eip, fixup, error_code);
         regs->eip = fixup;
         return;
     }

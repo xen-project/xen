@@ -1,14 +1,15 @@
 #ifndef __ARCH_DESC_H
 #define __ARCH_DESC_H
 
+#define LDT_ENTRY_SIZE 8
+
 #define __FIRST_TSS_ENTRY 8
 #define __FIRST_LDT_ENTRY (__FIRST_TSS_ENTRY+1)
 
 #define __TSS(n) (((n)<<1) + __FIRST_TSS_ENTRY)
 #define __LDT(n) (((n)<<1) + __FIRST_LDT_ENTRY)
 
-#define load_TR(n)  __asm__ __volatile__ ( "ltr  %%ax" : : "a" (__TSS(n)<<3) )
-#define __load_LDT(n) __asm__ __volatile__ ( "lldt %%ax" : : "a" (n) )
+#define load_TR(n)  __asm__ __volatile__ ("ltr  %%ax" : : "a" (__TSS(n)<<3) )
 
 /* Guest OS must provide its own code selectors, or use the one we provide. */
 #define VALID_CODESEL(_s) \

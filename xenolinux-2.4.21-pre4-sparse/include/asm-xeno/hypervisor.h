@@ -11,6 +11,7 @@
 
 #include <asm/hypervisor-ifs/hypervisor-if.h>
 #include <asm/ptrace.h>
+#include <asm/page.h>
 
 /* arch/xeno/kernel/setup.c */
 union start_info_union
@@ -42,7 +43,7 @@ void queue_pgd_pin(unsigned long ptr);
 void queue_pgd_unpin(unsigned long ptr);
 void queue_pte_pin(unsigned long ptr);
 void queue_pte_unpin(unsigned long ptr);
-
+void queue_set_ldt(unsigned long ptr, unsigned long bytes);
 #define PT_UPDATE_DEBUG 0
 
 #if PT_UPDATE_DEBUG > 0
@@ -118,6 +119,10 @@ extern page_update_debug_t update_debug_queue[];
 #define queue_pte_unpin(_p) ({                                    \
  printk("PTE UNPIN %s %d: %08lx\n", __FILE__, __LINE__, (_p));    \
  queue_pte_unpin(_p);                                             \
+})   
+#define queue_set_ldt(_p,_l) ({                                        \
+ printk("SETL LDT %s %d: %08lx %d\n", __FILE__, __LINE__, (_p), (_l)); \
+ queue_set_ldt((_p), (_l));                                            \
 })   
 #endif
 

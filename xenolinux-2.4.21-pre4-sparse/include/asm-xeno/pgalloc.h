@@ -73,19 +73,13 @@ out_oom:
 static inline pgd_t *get_pgd_slow(void)
 {
 	pgd_t *pgd = (pgd_t *)__get_free_page(GFP_KERNEL);
-	pgd_t *kpgd;
-	pmd_t *kpmd;
-	pte_t *kpte;
 
 	if (pgd) {
 		memset(pgd, 0, USER_PTRS_PER_PGD * sizeof(pgd_t));
 		memcpy(pgd + USER_PTRS_PER_PGD,
 			init_mm.pgd + USER_PTRS_PER_PGD,
 			(PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
-		kpgd = pgd_offset_k((unsigned long)pgd);
-		kpmd = pmd_offset(kpgd, (unsigned long)pgd);
-		kpte = pte_offset(kpmd, (unsigned long)pgd);
-		queue_l1_entry_update(__pa(kpte), (*(unsigned long *)kpte)&~_PAGE_RW);
+                __make_page_readonly(pgd);
 		queue_pgd_pin(__pa(pgd));
 
 	}
@@ -117,14 +111,8 @@ static inline void free_pgd_slow(pgd_t *pgd)
 		free_page((unsigned long)__va(pgd_val(pgd[i])-1));
 	kmem_cache_free(pae_pgd_cachep, pgd);
 #else
-	pgd_t *kpgd;
-	pmd_t *kpmd;
-	pte_t *kpte;
 	queue_pgd_unpin(__pa(pgd));
-	kpgd = pgd_offset_k((unsigned long)pgd);
-	kpmd = pmd_offset(kpgd, (unsigned long)pgd);
-	kpte = pte_offset(kpmd, (unsigned long)pgd);
-	queue_l1_entry_update(__pa(kpte), (*(unsigned long *)kpte)|_PAGE_RW);
+        __make_page_writeable(pgd);
 	free_page((unsigned long)pgd);
 #endif
 }
@@ -141,18 +129,12 @@ static inline void free_pgd_fast(pgd_t *pgd)
 static inline pte_t *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 {
     pte_t *pte;
-    pgd_t *kpgd;
-    pmd_t *kpmd;
-    pte_t *kpte;
 
     pte = (pte_t *) __get_free_page(GFP_KERNEL);
     if (pte)
     {
         clear_page(pte);
-        kpgd = pgd_offset_k((unsigned long)pte);
-        kpmd = pmd_offset(kpgd, (unsigned long)pte);
-        kpte = pte_offset(kpmd, (unsigned long)pte);
-        queue_l1_entry_update(__pa(kpte), (*(unsigned long *)kpte)&~_PAGE_RW);
+        __make_page_readonly(pte);
         queue_pte_pin(__pa(pte));
     }
     return pte;
@@ -172,14 +154,8 @@ static inline pte_t *pte_alloc_one_fast(struct mm_struct *mm,
 
 static __inline__ void pte_free_slow(pte_t *pte)
 {
-    pgd_t *kpgd;
-    pmd_t *kpmd;
-    pte_t *kpte;
     queue_pte_unpin(__pa(pte));
-    kpgd = pgd_offset_k((unsigned long)pte);
-    kpmd = pmd_offset(kpgd, (unsigned long)pte);
-    kpte = pte_offset(kpmd, (unsigned long)pte);
-    queue_l1_entry_update(__pa(kpte), (*(unsigned long *)kpte)|_PAGE_RW);
+    __make_page_writeable(pte);
     free_page((unsigned long)pte);
 }
 
