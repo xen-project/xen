@@ -16,7 +16,7 @@ typedef unsigned long u32;
 
 #define MODULE_NAME "XFRD"
 #define DEBUG 1
-//#undef DEBUG
+#undef DEBUG
 #include "debug.h"
 
 int domain_suspend(void *data, u32 dom){

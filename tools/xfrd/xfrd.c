@@ -50,7 +50,7 @@
 
 #define MODULE_NAME "XFRD"
 #define DEBUG 1
-//#undef DEBUG
+#undef DEBUG
 #include "debug.h"
 
 /*

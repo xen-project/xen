@@ -48,17 +48,17 @@
 
 #ifdef DEBUG
 
-#define dprintf(fmt, args...) fprintf(stdout, "[DBG] " MODULE_NAME ">%s" fmt, __FUNCTION__, ##args)
-#define wprintf(fmt, args...) fprintf(stderr, "[WRN] " MODULE_NAME ">%s" fmt, __FUNCTION__, ##args)
-#define iprintf(fmt, args...) fprintf(stderr, "[INF] " MODULE_NAME ">%s" fmt, __FUNCTION__, ##args)
-#define eprintf(fmt, args...) fprintf(stderr, "[ERR] " MODULE_NAME ">%s" fmt, __FUNCTION__, ##args)
+#define dprintf(fmt, args...) fprintf(stdout, "%d [DBG] " MODULE_NAME ">%s" fmt, getpid(), __FUNCTION__, ##args)
+#define wprintf(fmt, args...) fprintf(stderr, "%d [WRN] " MODULE_NAME ">%s" fmt, getpid(),__FUNCTION__, ##args)
+#define iprintf(fmt, args...) fprintf(stderr, "%d [INF] " MODULE_NAME ">%s" fmt, getpid(),__FUNCTION__, ##args)
+#define eprintf(fmt, args...) fprintf(stderr, "%d [ERR] " MODULE_NAME ">%s" fmt, getpid(),__FUNCTION__, ##args)
 
 #else
 
 #define dprintf(fmt, args...) do {} while(0)
-#define wprintf(fmt, args...) fprintf(stderr, "[WRN] " MODULE_NAME fmt, ##args)
-#define iprintf(fmt, args...) fprintf(stderr, "[INF] " MODULE_NAME fmt, ##args)
-#define eprintf(fmt, args...) fprintf(stderr, "[ERR] " MODULE_NAME fmt, ##args)
+#define wprintf(fmt, args...) fprintf(stderr, "%d [WRN] " MODULE_NAME fmt, getpid(), ##args)
+#define iprintf(fmt, args...) fprintf(stderr, "%d [INF] " MODULE_NAME fmt, getpid(), ##args)
+#define eprintf(fmt, args...) fprintf(stderr, "%d [ERR] " MODULE_NAME fmt, getpid(), ##args)
 
 #endif
 
