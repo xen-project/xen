@@ -379,7 +379,7 @@ exception_with_ints_disabled:
         testl $(3|X86_EFLAGS_VM),%eax   # interrupts disabled outside Xen?
         jnz   1b                        # it really does happen!
                                         #  (e.g., DOM0 X server)
-        pushl XREGS_eip(%esp)
+        pushl %esp
         call  search_pre_exception_table
         addl  $4,%esp
         testl %eax,%eax                 # no fixup code for faulting EIP?
