@@ -54,12 +54,10 @@ struct pfn_info
     struct list_head list;
     /* The following possible uses are context-dependent. */
     union {
-        /* Page is in use and not a zombie: we keep a pointer to its owner. */
+        /* Page is in use: we keep a pointer to its owner. */
         struct domain *domain;
         /* Page is not currently allocated: mask of possibly-tainted TLBs. */
         unsigned long cpu_mask;
-        /* Page is a zombie: this word currently has no use. */
-        unsigned long _unused;
     } u;
     /* Reference count and various PGC_xxx flags and fields. */
     u32 count_and_flags;
@@ -85,20 +83,17 @@ struct pfn_info
  /* 28-bit count of uses of this frame as its current type. */
 #define PGT_count_mask      ((1<<28)-1)
 
- /* The owner of this page is dead: 'u.domain' is no longer valid. */
-#define _PGC_zombie                   31
-#define PGC_zombie                    (1<<_PGC_zombie)
  /* For safety, force a TLB flush when this page's type changes. */
-#define _PGC_tlb_flush_on_type_change 30
+#define _PGC_tlb_flush_on_type_change 31
 #define PGC_tlb_flush_on_type_change  (1<<_PGC_tlb_flush_on_type_change)
  /* Owning guest has pinned this page to its current type? */
-#define _PGC_guest_pinned             29
+#define _PGC_guest_pinned             30
 #define PGC_guest_pinned              (1<<_PGC_guest_pinned)
  /* Cleared when the owning guest 'frees' this page. */
-#define _PGC_allocated                28
+#define _PGC_allocated                29
 #define PGC_allocated                 (1<<_PGC_allocated)
  /* 28-bit count of references to this frame. */
-#define PGC_count_mask                ((1<<28)-1)
+#define PGC_count_mask                ((1<<29)-1)
 
 
 /* We trust the slab allocator in slab.c, and our use of it. */
@@ -160,12 +155,11 @@ static inline int get_page(struct pfn_info *page,
         p  = np;
         if ( unlikely((x & PGC_count_mask) == 0) ||  /* Not allocated? */
              unlikely((nx & PGC_count_mask) == 0) || /* Count overflow? */
-             unlikely(x & PGC_zombie) ||             /* Zombie? */
              unlikely(p != domain) )                 /* Wrong owner? */
         {
             DPRINTK("Error pfn %08lx: ed=%p(%u), sd=%p(%u),"
                     " caf=%08x, taf=%08x\n",
-                    page_to_pfn(page), domain, (domain)?domain->domain:999, 
+                    page_to_pfn(page), domain, domain->domain,
                     p, (p && !((x & PGC_count_mask) == 0))?p->domain:999, 
                     x, page->type_and_flags);
             return 0;
@@ -173,7 +167,7 @@ static inline int get_page(struct pfn_info *page,
         __asm__ __volatile__(
             LOCK_PREFIX "cmpxchg8b %3"
             : "=a" (np), "=d" (y), "=b" (p),
-              "=m" (*(volatile unsigned long long *)(&page->u.domain))
+              "=m" (*(volatile u64 *)(&page->u.domain))
             : "0" (p), "1" (x), "b" (p), "c" (nx) );
     }
     while ( unlikely(np != p) || unlikely(y != x) );

@@ -175,6 +175,7 @@ void domain_kill(struct domain *d)
     if ( !test_and_set_bit(DF_DYING, &d->flags) )
     {
         sched_rem_domain(d);
+        domain_relinquish_memory(d);
         put_domain(d);
     }
 }
@@ -215,7 +216,7 @@ void domain_shutdown(u8 reason)
     __enter_scheduler();
 }
 
-struct pfn_info *alloc_domain_page(struct domain *p)
+struct pfn_info *alloc_domain_page(struct domain *d)
 {
     struct pfn_info *page = NULL;
     unsigned long flags, mask, pfn_stamp, cpu_stamp;
@@ -255,23 +256,24 @@ struct pfn_info *alloc_domain_page(struct domain *p)
         }
     }
 
-    page->u.domain = p;
+    page->u.domain = d;
     page->type_and_flags = 0;
-    if ( p != NULL )
+    if ( d != NULL )
     {
         wmb(); /* Domain pointer must be visible before updating refcnt. */
-        spin_lock(&p->page_list_lock);
-        if ( unlikely(p->tot_pages >= p->max_pages) )
+        spin_lock(&d->page_list_lock);
+        if ( unlikely(d->tot_pages >= d->max_pages) )
         {
             DPRINTK("Over-allocation for domain %u: %u >= %u\n",
-                    p->domain, p->tot_pages, p->max_pages);
-            spin_unlock(&p->page_list_lock);
+                    d->domain, d->tot_pages, d->max_pages);
+            spin_unlock(&d->page_list_lock);
             goto free_and_exit;
         }
-        list_add_tail(&page->list, &p->page_list);
-        p->tot_pages++;
+        list_add_tail(&page->list, &d->page_list);
         page->count_and_flags = PGC_allocated | 1;
-        spin_unlock(&p->page_list_lock);
+        if ( unlikely(d->tot_pages++ == 0) )
+            get_domain(d);
+        spin_unlock(&d->page_list_lock);
     }
 
     return page;
@@ -287,27 +289,28 @@ struct pfn_info *alloc_domain_page(struct domain *p)
 void free_domain_page(struct pfn_info *page)
 {
     unsigned long flags;
-    struct domain *p = page->u.domain;
+    struct domain *d = page->u.domain;
 
     ASSERT(!in_irq());
 
     if ( likely(!IS_XEN_HEAP_FRAME(page)) )
     {
-        /*
-         * No race with setting of zombie bit. If it wasn't set before the
-         * last reference was dropped, then it can't be set now.
-         */
         page->u.cpu_mask = 0;
-        if ( !(page->count_and_flags & PGC_zombie) )
+        page->tlbflush_timestamp = tlbflush_clock;
+        if ( likely(d != NULL) )
         {
-            page->tlbflush_timestamp = tlbflush_clock;
-            if ( likely(p != NULL) )
+            page->u.cpu_mask = 1 << d->processor;
+            /* NB. May recursively lock from domain_relinquish_memory(). */
+            spin_lock_recursive(&d->page_list_lock);
+            list_del(&page->list);
+            if ( unlikely(--d->tot_pages == 0) )
             {
-                page->u.cpu_mask = 1 << p->processor;
-                spin_lock(&p->page_list_lock);
-                list_del(&page->list);
-                p->tot_pages--;
-                spin_unlock(&p->page_list_lock);
+                spin_unlock_recursive(&d->page_list_lock);
+                put_domain(d); /* Domain 'd' can disappear now. */
+            }
+            else
+            {
+                spin_unlock_recursive(&d->page_list_lock);
             }
         }
 
@@ -332,13 +335,11 @@ void free_domain_page(struct pfn_info *page)
 }
 
 
-void free_all_dom_mem(struct domain *p)
+void domain_relinquish_memory(struct domain *d)
 {
-    struct list_head *ent, zombies;
-    struct pfn_info *page;
-    unsigned long x, y;
-
-    INIT_LIST_HEAD(&zombies);
+    struct list_head *ent, *tmp;
+    struct pfn_info  *page;
+    unsigned long     x, y;
 
     /*
      * If we're executing the idle task then we may still be running over the 
@@ -348,51 +349,20 @@ void free_all_dom_mem(struct domain *p)
         write_ptbase(&current->mm);
 
     /* Exit shadow mode before deconstructing final guest page table. */
-    if ( p->mm.shadow_mode )
-        shadow_mode_disable(p);
+    if ( d->mm.shadow_mode )
+        shadow_mode_disable(d);
 
-    /* STEP 1. Drop the in-use reference to the page-table base. */
-    put_page_and_type(&frame_table[pagetable_val(p->mm.pagetable) >>
-                                  PAGE_SHIFT]);
+    /* Drop the in-use reference to the page-table base. */
+    if ( pagetable_val(d->mm.pagetable) != 0 )
+        put_page_and_type(&frame_table[pagetable_val(d->mm.pagetable) >>
+                                      PAGE_SHIFT]);
 
-    /* STEP 2. Zombify all pages on the domain's allocation list. */
-    spin_lock(&p->page_list_lock);
-    while ( (ent = p->page_list.next) != &p->page_list )
+    /* Relinquish all pages on the domain's allocation list. */
+    spin_lock_recursive(&d->page_list_lock); /* may enter free_domain_page() */
+    list_for_each_safe ( ent, tmp, &d->page_list )
     {
         page = list_entry(ent, struct pfn_info, list);
 
-        if ( unlikely(!get_page(page, p)) )
-        {
-            /*
-             * Another CPU has dropped the last reference and is responsible 
-             * for removing the page from this list. Wait for them to do so.
-             */
-            spin_unlock(&p->page_list_lock);
-            while ( p->page_list.next == ent )
-                barrier();
-            spin_lock(&p->page_list_lock);
-            continue;
-        }
-
-        set_bit(_PGC_zombie, &page->count_and_flags);
-
-        list_del(&page->list);
-        p->tot_pages--;
-
-        list_add(&page->list, &zombies);
-    }
-    spin_unlock(&p->page_list_lock);
-
-    /*
-     * STEP 3. With the domain's list lock now released, we examine each zombie
-     * page and drop references for guest-allocated and/or type-pinned pages.
-     */
-    while ( (ent = zombies.next) != &zombies )
-    {
-        page = list_entry(ent, struct pfn_info, list);
-
-        list_del(&page->list);
-        
         if ( test_and_clear_bit(_PGC_guest_pinned, &page->count_and_flags) )
             put_page_and_type(page);
 
@@ -416,28 +386,27 @@ void free_all_dom_mem(struct domain *p)
                 free_page_type(page, PGT_base_page_table);
         }
         while ( unlikely(y != x) );
-
-        put_page(page);
     }
+    spin_unlock_recursive(&d->page_list_lock);
 }
 
 
-unsigned int alloc_new_dom_mem(struct domain *p, unsigned int kbytes)
+unsigned int alloc_new_dom_mem(struct domain *d, unsigned int kbytes)
 {
     unsigned int alloc_pfns, nr_pages;
     struct pfn_info *page;
 
     nr_pages = (kbytes + ((PAGE_SIZE-1)>>10)) >> (PAGE_SHIFT - 10);
-    p->max_pages = nr_pages; /* this can now be controlled independently */
+    d->max_pages = nr_pages; /* this can now be controlled independently */
 
-    /* grow the allocation if necessary */
-    for ( alloc_pfns = p->tot_pages; alloc_pfns < nr_pages; alloc_pfns++ )
+    /* Grow the allocation if necessary. */
+    for ( alloc_pfns = d->tot_pages; alloc_pfns < nr_pages; alloc_pfns++ )
     {
-        if ( unlikely((page=alloc_domain_page(p)) == NULL) ||
+        if ( unlikely((page=alloc_domain_page(d)) == NULL) ||
              unlikely(free_pfns < (SLACK_DOMAIN_MEM_KILOBYTES >> 
                                    (PAGE_SHIFT-10))) )
         {
-            free_all_dom_mem(p);
+            domain_relinquish_memory(d);
             return -ENOMEM;
         }
 
@@ -447,55 +416,50 @@ unsigned int alloc_new_dom_mem(struct domain *p, unsigned int kbytes)
 #ifndef NDEBUG
         {
             /* Initialise with magic marker if in DEBUG mode. */
-            void * a = map_domain_mem( (page-frame_table)<<PAGE_SHIFT );
-            memset( a, 0x80 | (char) p->domain, PAGE_SIZE );
-            unmap_domain_mem( a );
+            void *a = map_domain_mem((page-frame_table)<<PAGE_SHIFT);
+            memset(a, 0x80 | (char)d->domain, PAGE_SIZE);
+            unmap_domain_mem(a);
         }
 #endif
-
     }
-
-    p->tot_pages = nr_pages;
 
     return 0;
 }
  
 
 /* Release resources belonging to task @p. */
-void domain_destruct(struct domain *p)
+void domain_destruct(struct domain *d)
 {
-    struct domain **pp;
+    struct domain **pd;
     unsigned long flags;
 
-    if ( !test_bit(DF_DYING, &p->flags) )
+    if ( !test_bit(DF_DYING, &d->flags) )
         BUG();
 
     /* May be already destructed, or get_domain() can race us. */
-    if ( cmpxchg(&p->refcnt.counter, 0, DOMAIN_DESTRUCTED) != 0 )
+    if ( cmpxchg(&d->refcnt.counter, 0, DOMAIN_DESTRUCTED) != 0 )
         return;
 
-    DPRINTK("Releasing task %u\n", p->domain);
+    DPRINTK("Releasing task %u\n", d->domain);
 
     /* Delete from task list and task hashtable. */
     write_lock_irqsave(&tasklist_lock, flags);
-    pp = &task_list;
-    while ( *pp != p ) 
-        pp = &(*pp)->next_list;
-    *pp = p->next_list;
-    pp = &task_hash[TASK_HASH(p->domain)];
-    while ( *pp != p ) 
-        pp = &(*pp)->next_hash;
-    *pp = p->next_hash;
+    pd = &task_list;
+    while ( *pd != d ) 
+        pd = &(*pd)->next_list;
+    *pd = d->next_list;
+    pd = &task_hash[TASK_HASH(d->domain)];
+    while ( *pd != d ) 
+        pd = &(*pd)->next_hash;
+    *pd = d->next_hash;
     write_unlock_irqrestore(&tasklist_lock, flags);
 
-    destroy_event_channels(p);
+    destroy_event_channels(d);
 
-    /* Free all memory associated with this domain. */
-    free_page((unsigned long)p->mm.perdomain_pt);
-    UNSHARE_PFN(virt_to_page(p->shared_info));
-    free_all_dom_mem(p);
+    free_page((unsigned long)d->mm.perdomain_pt);
+    UNSHARE_PFN(virt_to_page(d->shared_info));
 
-    free_domain_struct(p);
+    free_domain_struct(d);
 }
 
 

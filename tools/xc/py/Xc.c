@@ -1011,7 +1011,7 @@ static PyMethodDef pyxc_methods[] = {
       (PyCFunction)pyxc_domain_create, 
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Create a new domain.\n"
-      " mem_kb [int, 65536]:    Memory allocation, in kilobytes.\n"
+      " mem_kb [int, 0]:        Memory allocation, in kilobytes.\n"
       " name   [str, '(anon)']: Informative textual name.\n\n"
       "Returns: [int] new domain identifier; -1 on error.\n" },
 

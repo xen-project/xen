@@ -194,8 +194,8 @@ extern void domain_destruct(struct domain *d);
 extern void domain_kill(struct domain *d);
 extern void domain_crash(void);
 extern void domain_shutdown(u8 reason);
+extern void domain_relinquish_memory(struct domain *d);
 
-/* arch/process.c */
 void new_thread(struct domain *d,
                 unsigned long start_pc,
                 unsigned long start_stack,
@@ -206,9 +206,6 @@ extern unsigned long wait_init_idle;
 
 extern spinlock_t schedule_lock[NR_CPUS] __cacheline_aligned;
 
-/*
- * Scheduler functions (in schedule.c)
- */
 #define set_current_state(_s) do { current->state = (_s); } while (0)
 void scheduler_init(void);
 void schedulers_start(void);
@@ -225,7 +222,6 @@ void __enter_scheduler(void);
 
 extern void switch_to(struct domain *prev, 
                       struct domain *next);
-
 
 void domain_init(void);
 
@@ -251,7 +247,7 @@ extern struct domain *task_list;
 #define DF_CONSTRUCTED  3 /* Has the guest OS been fully built yet?         */
 #define DF_IDLETASK     4 /* Is this one of the per-CPU idle domains?       */
 #define DF_PRIVILEGED   5 /* Is this domain privileged?                     */
-#define DF_CONSOLEWRITEBUG 6 /* Has this domain used the obsolete console?  */
+#define DF_CONWRITEBUG  6 /* Has this domain used the obsolete console?     */
 #define DF_PHYSDEV      7 /* May this domain do IO to physical devices?     */
 #define DF_BLOCKED      8 /* Domain is blocked waiting for an event.        */
 #define DF_CTRLPAUSE    9 /* Domain is paused by controller software.       */

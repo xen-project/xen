@@ -92,12 +92,12 @@ int xc_domain_getinfo(int xc_handle,
         info->cpu     =
             (op.u.getdomaininfo.flags>>DOMFLAGS_CPUSHIFT) & DOMFLAGS_CPUMASK;
 
-        info->dying    = (op.u.getdomaininfo.flags & DOMFLAGS_DYING);
-        info->crashed  = (op.u.getdomaininfo.flags & DOMFLAGS_CRASHED);
-        info->shutdown = (op.u.getdomaininfo.flags & DOMFLAGS_SHUTDOWN);
-        info->paused   = (op.u.getdomaininfo.flags & DOMFLAGS_PAUSED);
-        info->blocked  = (op.u.getdomaininfo.flags & DOMFLAGS_BLOCKED);
-        info->running  = (op.u.getdomaininfo.flags & DOMFLAGS_RUNNING);
+        info->dying    = !!(op.u.getdomaininfo.flags & DOMFLAGS_DYING);
+        info->crashed  = !!(op.u.getdomaininfo.flags & DOMFLAGS_CRASHED);
+        info->shutdown = !!(op.u.getdomaininfo.flags & DOMFLAGS_SHUTDOWN);
+        info->paused   = !!(op.u.getdomaininfo.flags & DOMFLAGS_PAUSED);
+        info->blocked  = !!(op.u.getdomaininfo.flags & DOMFLAGS_BLOCKED);
+        info->running  = !!(op.u.getdomaininfo.flags & DOMFLAGS_RUNNING);
 
         info->shutdown_reason = 
             (op.u.getdomaininfo.flags>>DOMFLAGS_SHUTDOWNSHIFT) & 

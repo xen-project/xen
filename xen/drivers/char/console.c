@@ -290,7 +290,7 @@ long do_console_io(int cmd, int count, char *buffer)
     long  rc;
 
 #ifdef NDEBUG
-    /* Only domain-0 may access the emrgency console. */
+    /* Only domain-0 may access the emergency console. */
     if ( current->domain != 0 )
         return -EPERM;
 #endif
@@ -445,7 +445,7 @@ long do_console_write(char *str, unsigned int count)
 
     return 0;
 #else
-    if ( !test_and_set_bit(DF_CONSOLEWRITEBUG, &current->flags) )
+    if ( !test_and_set_bit(DF_CONWRITEBUG, &current->flags) )
     {
         printk("DOM%u is attempting to use the deprecated "
                "HYPERVISOR_console_write() interface.\n", current->domain);

@@ -15,9 +15,9 @@
 #include <xen/event.h>
 #include <asm/domain_page.h>
 
-static long alloc_dom_mem(struct domain *p, 
-                          unsigned long      *pages, 
-                          unsigned long       nr_pages)
+static long alloc_dom_mem(struct domain *d, 
+                          unsigned long *pages, 
+                          unsigned long  nr_pages)
 {
     struct pfn_info *page;
     unsigned long    i;
@@ -35,7 +35,7 @@ static long alloc_dom_mem(struct domain *p,
     for ( i = 0; i < nr_pages; i++ )
     {
         /* NB. 'alloc_domain_page' does limit-checking on pages per domain. */
-        if ( unlikely((page = alloc_domain_page(p)) == NULL) )
+        if ( unlikely((page = alloc_domain_page(d)) == NULL) )
         {
             DPRINTK("Could not allocate a frame\n");
             break;
@@ -49,9 +49,9 @@ static long alloc_dom_mem(struct domain *p,
     return i;
 }
     
-static long free_dom_mem(struct domain *p, 
-                         unsigned long      *pages, 
-                         unsigned long       nr_pages)
+static long free_dom_mem(struct domain *d, 
+                         unsigned long *pages, 
+                         unsigned long  nr_pages)
 {
     struct pfn_info *page;
     unsigned long    i, mpfn;
@@ -65,15 +65,15 @@ static long free_dom_mem(struct domain *p,
         if ( unlikely(mpfn >= max_page) )
         {
             DPRINTK("Domain %u page number out of range (%08lx>=%08lx)\n", 
-                    p->domain, mpfn, max_page);
+                    d->domain, mpfn, max_page);
             rc = -EINVAL;
             break;
         }
 
         page = &frame_table[mpfn];
-        if ( unlikely(!get_page(page, p)) )
+        if ( unlikely(!get_page(page, d)) )
         {
-            DPRINTK("Bad page free for domain %u\n", p->domain);
+            DPRINTK("Bad page free for domain %u\n", d->domain);
             rc = -EINVAL;
             break;
         }
