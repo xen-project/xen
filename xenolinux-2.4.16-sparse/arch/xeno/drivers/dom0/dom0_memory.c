@@ -178,9 +178,14 @@ unsigned long direct_mmap(unsigned long phys_addr, unsigned long size,
         goto out;
     }
 
+	printk(KERN_ALERT "bd240 debug: before kmalloc\n");
+
     /* add node on the list of directly mapped areas */ 
     //dmmap = (direct_mmap_node_t *)kmalloc(GFP_KERNEL, sizeof(direct_mmap_node_t));
     dmmap = (direct_mmap_node_t *)kmalloc(GFP_KERNEL, 128);
+
+	printk(KERN_ALERT "bd240 debug: after kmalloc\n");
+
     dmmap->addr = addr;
     list_add(&dmmap->list, &current->mm->context.direct_list);
 
