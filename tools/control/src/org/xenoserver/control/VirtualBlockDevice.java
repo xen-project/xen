@@ -39,28 +39,6 @@ public class VirtualBlockDevice {
         this.mode = mode;
     }
 
-    // TODO: get rid of this method
-    String dump(boolean title) {
-        StringBuffer sb = new StringBuffer();
-
-        if (title) {
-            sb.append("  key         dom vbd mode\n");
-        } else {
-            sb.append(
-                "  "
-                    + vd.getKey()
-                    + "  "
-                    + Library.format(domain, 3, false)
-                    + " "
-                    + Library.format(vbdNum, 3, false)
-                    + " "
-                    + mode.toString()
-                    + "\n");
-        }
-
-        return sb.toString();
-    }
-
     /**
      * Dump the virtual block device as XML.
      * @param out The writer to dump to.

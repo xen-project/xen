@@ -9,9 +9,11 @@ public class CommandPhysicalGrant extends Command {
     /** Domain ID to grant access for */ 
     private int domain_id;
     /** Partition to grant access to */
-    private Partition partition;
+    private String partition_name;
     /** Access mode to grant */
     private Mode mode;
+    /** True to force grant */
+    private boolean force;
 
     /**
      * Constructor for CommandPhysicalGrant.
@@ -19,16 +21,19 @@ public class CommandPhysicalGrant extends Command {
      * @param domain_id Domain to grant access for.
      * @param partition Partition to grant access to.
      * @param mode Access mode to grant.
+     * @param force True to force grant
      */
     public CommandPhysicalGrant(
         Defaults d,
         int domain_id,
-        Partition partition,
-        Mode mode) {
+        String partition,
+        Mode mode,
+        boolean force) {
         this.d = d;
         this.domain_id = domain_id;
-        this.partition = partition;
+        this.partition_name = partition;
         this.mode = mode;
+        this.force = force;
     }
 
     /**
@@ -38,6 +43,17 @@ public class CommandPhysicalGrant extends Command {
         Runtime r = Runtime.getRuntime();
         String output = null;
 
+        Partition partition = PartitionManager.IT.getPartition(partition_name);
+    
+        if ( partition == null ) {
+          throw new CommandFailedException("Partition " + partition_name + " does not exist.");
+        }
+    
+        // Check if this partition belongs to the VDM
+        if (partition.isXeno() && !force) {
+          throw new CommandFailedException("Refusing to grant physical access as the given partition is allocated to the virtual disk manager. Use -f if you are sure.");
+        }
+         
         try {
             Process start_p;
             String start_cmdarray[] = new String[7];

@@ -45,7 +45,7 @@ public class VirtualDiskManager {
      * @param partition The partition to add.
      * @param chunkSize The chunk size to split the partition into, in sectors. 
      */
-    public void addPartition(Partition partition, long chunkSize) {
+    void addPartition(Partition partition, long chunkSize) {
         freeDisk.addPartition(partition, chunkSize);
     }
 
@@ -56,7 +56,7 @@ public class VirtualDiskManager {
      * @param expiry The expiry time, or null for never.
      * @return null if not enough space is available
      */
-    public VirtualDisk createVirtualDisk(String name, long size, Date expiry) {
+    VirtualDisk createVirtualDisk(String name, long size, Date expiry) {
         if (freeDisk.getSize() < size) {
             return null;
         }
@@ -83,7 +83,7 @@ public class VirtualDiskManager {
      * Delete a virtual disk, and put its extents back into the free pool.
      * @param key The key of the disk to delete.
      */
-    public void deleteVirtualDisk(String key) {
+    void deleteVirtualDisk(String key) {
         VirtualDisk vd;
 
         vd = (VirtualDisk) virtualDisks.get(key);
@@ -108,7 +108,7 @@ public class VirtualDiskManager {
      * @param mode The mode to create the device with.
      * @return The newly created virtual block device.
      */
-    public VirtualBlockDevice createVirtualBlockDevice(
+    VirtualBlockDevice createVirtualBlockDevice(
         VirtualDisk vd,
         int domain,
         int vbdNum,
@@ -126,7 +126,7 @@ public class VirtualDiskManager {
      * @param domain Domain owning the device.
      * @param vbdNum The vbd number within the domain.
      */
-    public void deleteVirtualBlockDevice(int domain, int vbdNum) {
+    void deleteVirtualBlockDevice(int domain, int vbdNum) {
         Object hash = hashVBD(domain, vbdNum);
         virtualBlockDevices.remove(hash);
     }
@@ -134,7 +134,7 @@ public class VirtualDiskManager {
     /**
      * Flush all virtual block devices.
      */
-    public void flushVirtualBlockDevices() {
+    void flushVirtualBlockDevices() {
         /* isn't automatic garbage collection wonderful? */
         virtualBlockDevices = new LinkedHashMap(100);
     }

@@ -9,7 +9,7 @@ public class CommandPhysicalRevoke extends Command {
     /** Domain to revoke access from */
     private int domain_id;
     /** Partition to revoke access to */
-    private Partition partition;
+    private String partition_name;
 
     /**
      * Constructor for CommandPhysicalRevoke.
@@ -17,10 +17,10 @@ public class CommandPhysicalRevoke extends Command {
      * @param domain_id Domain to revoke access from.
      * @param partition Partition to revoke access to.
      */
-    public CommandPhysicalRevoke(Defaults d, int domain_id, Partition partition) {
+    public CommandPhysicalRevoke(Defaults d, int domain_id, String partition) {
         this.d = d;
         this.domain_id = domain_id;
-        this.partition = partition;
+        this.partition_name = partition;
     }
 
     /**
@@ -29,6 +29,13 @@ public class CommandPhysicalRevoke extends Command {
     public String execute() throws CommandFailedException {
         Runtime r = Runtime.getRuntime();
         String output = null;
+
+        Partition partition = PartitionManager.IT.getPartition(partition_name);
+
+        if (partition == null) {
+            throw new CommandFailedException(
+                "Partition " + partition_name + " does not exist.");
+        }
 
         try {
             Process start_p;

@@ -19,6 +19,11 @@ public class CommandVdDelete extends Command {
      * @see org.xenoserver.control.Command#execute()
      */
     public String execute() throws CommandFailedException {
+        if (VirtualDiskManager.IT.getVirtualDisk(key) == null) {
+            throw new CommandFailedException(
+                "Virtual disk " + key + " does not exist");
+        }
+
         VirtualDiskManager.IT.deleteVirtualDisk(key);
         return "Deleted virtual disk " + key;
     }

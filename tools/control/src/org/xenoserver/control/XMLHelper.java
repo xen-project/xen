@@ -146,10 +146,11 @@ class XMLHelper {
                                 XMLHelper.getSubNode("disk", enode))),
                         Long.parseLong(
                             XMLHelper.getText(
-                                XMLHelper.getSubNode("size", enode))),
-                        Long.parseLong(
-                            XMLHelper.getText(
-                                XMLHelper.getSubNode("offset", enode))));
+                                XMLHelper.getSubNode("offset", enode))),
+                    Long.parseLong(
+                        XMLHelper.getText(
+                            XMLHelper.getSubNode("size", enode))));
+
                 vd.addExtent(extent);
             }
         }

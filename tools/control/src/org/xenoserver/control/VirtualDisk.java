@@ -169,8 +169,8 @@ public class VirtualDisk {
             Extent extent =
                 new Extent(
                     partition.getDisk(),
-                    extentSize,
-                    partition.getStartSect() + (extentSize * loop));
+                    partition.getStartSect() + (extentSize * loop),
+                    extentSize);
 
             addExtent(extent);
         }
@@ -227,7 +227,7 @@ public class VirtualDisk {
      * Reset the expiry time for this virtual disk.
      * @param expiry The new expiry time, or null for never.
      */
-    public void refreshExpiry(Date expiry) {
+    void refreshExpiry(Date expiry) {
         this.expiry = expiry;
     }
 }
