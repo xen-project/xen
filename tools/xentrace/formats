@@ -1,0 +1,14 @@
+0x00010000	CPU%(cpu)d 0x%(tsc)x sched_add_domain(0x%(3)08x)            [ dom id = 0x%(1)08x%(2)08x   ]
+0x00010001	CPU%(cpu)d 0x%(tsc)x sched_rem_domain(0x%08(3)x)            [ dom id = 0x%(1)08x%(2)08x   ]
+0x00010002	CPU%(cpu)d 0x%(tsc)x __wake_up(0x%(3)08x)                   [ dom id = 0x%(1)08x%(2)08x   ]
+0x00010003	CPU%(cpu)d 0x%(tsc)x do_block()                             [ current = 0x%(2)08x         ]
+0x00010004	CPU%(cpu)d 0x%(tsc)x do_yield()		                    [ current = %(2)08x         ]
+0x00010005	CPU%(cpu)d 0x%(tsc)x do_set_timer_op(0x%(4)08x, 0x%(5)08x)  [ current = 0x%(3)08x ]
+0x00010006	CPU%(cpu)d 0x%(tsc)x sched_ctl(0x%(1)08x)
+0x00010007	CPU%(cpu)d 0x%(tsc)x sched_adjdom(params)                   [ dom id = 0x%(1)08x%(2)08x   ]
+0x00010008	CPU%(cpu)d 0x%(tsc)x __reschedule(0x%(3)08x)                [ dom id = 0x%(1)08x%(2)08x   ]
+0x00010009	CPU%(cpu)d 0x%(tsc)x switching to task_struct 0x%(1)08x     [ dom id = 0x%(1)08x     ]
+0x0001000A	CPU%(cpu)d 0x%(tsc)x s_timer_fn(unused)
+0x0001000B	CPU%(cpu)d 0x%(tsc)x t_timer_fn(unused)
+0x0001000C	CPU%(cpu)d 0x%(tsc)x dom_timer_fn(data)
+0x0001000D	CPU%(cpu)d 0x%(tsc)x fallback_timer_fn(unused)

@@ -31,6 +31,7 @@
 #include <xen/console.h>
 #include <xen/net_headers.h>
 #include <xen/serial.h>
+#include <xen/trace.h>
 
 kmem_cache_t *task_struct_cachep;
 
@@ -287,6 +288,8 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
     /* The stash space for the initial kernel image can now be freed up. */
     add_to_domain_alloc_list(__pa(frame_table) + frame_table_size,
                              dom0_memory_start);
+
+    init_trace_bufs();
 
     wake_up(new_dom);
 

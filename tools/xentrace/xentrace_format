@@ -15,8 +15,10 @@ def usage():
 
           {event_id}{whitespace}{text format string}
 
-          The textual format string may include the format specifiers:
-            %(cpu)s, %(tsc), %(event)s, %(1)s, %(2)s, %(3)s, %(4)s, %(5)s
+          The textual format string may include format specifiers, such as:
+            %(cpu)d, %(tsc)d, %(event)d, %(1)d, %(2)d, %(3)d, %(4)d, %(5)d
+          [ the 'd' format specifier outputs in decimal, alternatively 'x'
+            will output in hexadecimal and 'o' will output in octal ]
 
           Which correspond to the CPU number, event ID, timestamp counter and
           the 5 data fields from the trace record.  There should be one such
@@ -34,7 +36,7 @@ def read_defs(defs_file):
     
     fd = open(defs_file)
 
-    reg = re.compile('(\d+)\s+(\S.*)')
+    reg = re.compile('(\S+)\s+(\S.*)')
 
     while True:
         line = fd.readline()
@@ -45,7 +47,7 @@ def read_defs(defs_file):
 
         if not m: print >> sys.stderr, "Bad format file" ; sys.exit(1)
         
-        defs[m.group(1)] = m.group(2)
+        defs[str(eval(m.group(1)))] = m.group(2)
 
     return defs
 
@@ -73,20 +75,20 @@ while not interrupted:
         line = sys.stdin.readline()
         if not line:
             break
-
+        
         m = reg.match(line)
 
         if not m: print >> sys.stderr, "Invalid input line."
 
         s = string.split(m.group(4))
 
-        args = {'cpu'   : m.group(1),
-                'tsc'   : m.group(2),
-                'event' : m.group(3) }
+        args = {'cpu'   : eval(m.group(1)),
+                'tsc'   : eval(m.group(2)),
+                'event' : eval(m.group(3)) }
 
-        i = 0
+        i = 1
         for item in s:
-            args[str(i)] = item
+            args[str(i)] = eval(item)
             i += 1
 
         if defs.has_key(m.group(3)): print defs[m.group(3)] % args
