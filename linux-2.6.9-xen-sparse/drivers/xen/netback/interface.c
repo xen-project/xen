@@ -124,13 +124,17 @@ void netif_create(netif_be_create_t *create)
 
     dev->hard_start_xmit = netif_be_start_xmit;
     dev->get_stats       = netif_be_get_stats;
-    memcpy(dev->dev_addr, create->mac, ETH_ALEN);
 
     /* Disable queuing. */
     dev->tx_queue_len = 0;
 
-    /* Force a different MAC from remote end. */
-    dev->dev_addr[2] ^= 1;
+    /*
+     * Initialise a dummy MAC address. We choose the numerically largest
+     * non-broadcast address to prevent the address getting stolen by an 
+     * Ethernet bridge for STP purposes. (FE:FF:FF:FF:FF:FF)
+     */
+    memset(dev->dev_addr, 0xFF, ETH_ALEN);
+    dev->dev_addr[0] &= ~0x01;
 
     if ( (err = register_netdev(dev)) != 0 )
     {
