@@ -98,6 +98,8 @@ extern void __set_fixmap_ma (enum fixed_addresses idx,
 		__set_fixmap(idx, phys, PAGE_KERNEL)
 #define set_fixmap_ma(idx, phys) \
 		__set_fixmap_ma(idx, phys, PAGE_KERNEL)
+#define set_fixmap_ma_ro(idx, phys) \
+		__set_fixmap_ma(idx, phys, PAGE_KERNEL_RO)
 /*
  * Some hardware wants to get fixmapped without caching.
  */
