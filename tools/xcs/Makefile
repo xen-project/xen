@@ -33,9 +33,9 @@ all: $(BIN) xcsdump
 clean:
 	$(RM) *.a *.so *.o *.rpm $(BIN) xcsdump
 
-xcsdump: xcsdump.c
+xcsdump: xcsdump.c dump.c
 	$(CC) $(CFLAGS) -o xcsdump xcsdump.c -L$(XEN_LIBXC) -L$(XEN_LIBXUTIL) \
-              ctrl_interface.c evtchn.c  -lxc -lxutil
+              ctrl_interface.c evtchn.c dump.c -lxc -lxutil
 
 $(BIN): $(OBJS)
 	$(CC) $(CFLAGS) $^ -o $@ -L$(XEN_LIBXC) -L$(XEN_LIBXUTIL) -lxc -lxutil 

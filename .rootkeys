@@ -865,6 +865,8 @@
 41d58ba6NxgkfzD_rmsGjgd_zJ3H_w tools/xcs/bindings.c
 41d58ba6I2umi60mShq4Pl0RDg7lzQ tools/xcs/connection.c
 41d58ba6YyYu53bFuoIAw9hNNmneEg tools/xcs/ctrl_interface.c
+423d82c7ZKf2bDOxRcR4Nc1kN5StNQ tools/xcs/dump.c
+423d82c7U__LHy9dvkUNUvSIhOqnBQ tools/xcs/dump.h
 41d58ba6Ru9ZbhTjgYX_oiszSIwCww tools/xcs/evtchn.c
 41d58ba6x9KO1CQBT7kKOKq_pJYC3g tools/xcs/xcs.c
 41d58ba6R6foSMtSFEcu-yxWFrT8VQ tools/xcs/xcs.h

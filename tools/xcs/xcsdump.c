@@ -3,6 +3,9 @@
  * little tool to sniff control messages.
  *
  * Copyright (c) 2004, Andrew Warfield
+ *
+ * Modifications by Anthony Liguori <aliguori@us.ibm.com> are:
+ *   Copyright (C) 2005, International Business Machines, Corp.
  */
 
 #include <stdio.h>
@@ -16,8 +19,11 @@
 #include <xc.h>
 #include <xen/xen.h>
 #include <xen/io/domain_controller.h>
+#include <getopt.h>
 #include "xcs_proto.h"
 #include "xcs.h"
+
+#include "dump.h"
 
 static int xcs_ctrl_fd = -1; /* connection to the xcs server. */
 static int xcs_data_fd = -1; /* connection to the xcs server. */
@@ -80,14 +86,32 @@ void xcs_send(int fd, xcs_msg_t *msg)
 
 int main(int argc, char* argv[])
 {
-    int ret, i;
+    int ret;
     xcs_msg_t msg;
     control_msg_t *cmsg;
     int verbose = 0;
-    
-    if (argc > 1) 
-        if ((strlen(argv[1]) >=2) && (strncmp(argv[1], "-v", 2) == 0))
-            verbose = 1;
+    int ch;
+
+    while ((ch = getopt(argc, argv, "hv:")) != -1)
+    {
+        switch (ch)
+        {
+        case 'v':
+            verbose = atoi(optarg);
+            break;
+        case 'h':
+  	    printf("Usage: %s [-v FLAGS]\n"
+"Displays XCS control message traffic.\n"
+"\n"
+"FLAGS is a bitmask where each bit (numbering starts from LSB) represents\n"
+"whether to display a particular message type.\n"
+"\n"
+"For example, -v 1022 will display all messages except for console messages.\n"
+		   , argv[0]);
+	    exit(0);
+	    break;
+        }
+    }
     
     ret = sock_connect(XCS_SUN_PATH);
     if (ret < 0) 
@@ -142,33 +166,34 @@ int main(int argc, char* argv[])
         xcs_read(xcs_data_fd, &msg);
         cmsg = &msg.u.control.msg;
         
-        for (i=0; i<60; i++)
-            if ((!isprint(cmsg->msg[i])) && (cmsg->msg[i] != '\0'))
-                cmsg->msg[i] = '.';
-        cmsg->msg[59] = '\0';
-        
         switch (msg.type)
         {
         case XCS_REQUEST:
-            printf("[REQUEST ] : (dom:%u port:%d) (type:(%d,%d) len %d) \n",
-                    msg.u.control.remote_dom,
-                    msg.u.control.local_port,
-                    msg.u.control.msg.type, 
-                    msg.u.control.msg.subtype, 
-                    msg.u.control.msg.length);
-            if (verbose)
-                printf("           : %s\n", msg.u.control.msg.msg);
-            break; 
+  	    if (!verbose || verbose & (1 << msg.u.control.msg.type))
+            {
+	        printf("[REQUEST ] : (dom:%u port:%d) (type:(%d,%d) len %d)\n",
+		       msg.u.control.remote_dom,
+		       msg.u.control.local_port,
+		       msg.u.control.msg.type, 
+		       msg.u.control.msg.subtype, 
+		       msg.u.control.msg.length);
+
+		dump_msg(cmsg, verbose);
+	    }
+	    break; 
         case XCS_RESPONSE:
-            printf("[RESPONSE] : (dom:%u port:%d) (type:(%d,%d) len %d) \n",
-                    msg.u.control.remote_dom,
-                    msg.u.control.local_port,
-                    msg.u.control.msg.type, 
-                    msg.u.control.msg.subtype, 
-                    msg.u.control.msg.length);
-            if (verbose)
-                printf("           : %s\n", msg.u.control.msg.msg);
-            break;
+  	    if (!verbose || verbose & (1 << msg.u.control.msg.type))
+            {
+	        printf("[RESPONSE] : (dom:%u port:%d) (type:(%d,%d) len %d)\n",
+		       msg.u.control.remote_dom,
+		       msg.u.control.local_port,
+		       msg.u.control.msg.type, 
+		       msg.u.control.msg.subtype, 
+		       msg.u.control.msg.length);
+
+		dump_msg(cmsg, verbose);
+	    }
+	    break;
         case XCS_VIRQ:
             printf("[VIRQ    ] : %d\n", msg.u.control.local_port);
         default:
