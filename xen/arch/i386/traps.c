@@ -107,28 +107,9 @@ static inline int kernel_text_address(unsigned long addr)
 
 }
 
-void show_trace(unsigned long * stack)
-{
-    int i;
-    unsigned long addr;
-
-    printk("Call Trace: ");
-    i = 1;
-    while (((long) stack & (STACK_SIZE-1)) != 0) {
-        addr = *stack++;
-        if (kernel_text_address(addr)) {
-            if (i && ((i % 6) == 0))
-                printk("\n   ");
-            printk("[<%08lx>] ", addr);
-            i++;
-        }
-    }
-    printk("\n");
-}
-
 void show_stack(unsigned long *esp)
 {
-    unsigned long *stack;
+    unsigned long *stack, addr;
     int i;
 
     printk("Stack trace from ESP=%p:\n", esp);
@@ -144,6 +125,20 @@ void show_stack(unsigned long *esp)
             printk("[%08lx] ", *stack++);
         else
             printk("%08lx ", *stack++);            
+    }
+    printk("\n");
+
+    printk("Call Trace from ESP=%p: ", esp);
+    stack = esp;
+    i = 0;
+    while (((long) stack & (STACK_SIZE-1)) != 0) {
+        addr = *stack++;
+        if (kernel_text_address(addr)) {
+            if (i && ((i % 6) == 0))
+                printk("\n   ");
+            printk("[<%08lx>] ", addr);
+            i++;
+        }
     }
     printk("\n");
 }
@@ -241,7 +236,6 @@ DO_ERROR_NOCODE( 0, "divide error", divide_error)
 DO_ERROR_NOCODE( 4, "overflow", overflow)
 DO_ERROR_NOCODE( 5, "bounds", bounds)
 DO_ERROR_NOCODE( 6, "invalid operand", invalid_op)
-DO_ERROR_NOCODE( 7, "device not available", device_not_available)
 DO_ERROR_NOCODE( 9, "coprocessor segment overrun", coprocessor_segment_overrun)
 DO_ERROR(10, "invalid TSS", invalid_TSS)
 DO_ERROR(11, "segment not present", segment_not_present)

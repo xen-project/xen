@@ -284,6 +284,12 @@ struct pfn_info *alloc_domain_page(struct task_struct *p)
     unsigned long flags, mask, pfn_stamp, cpu_stamp;
     int i;
 
+#ifdef NO_DEVICES_IN_XEN
+    ASSERT(!in_irq());
+#else
+    ASSERT((p != NULL) || !in_irq());
+#endif
+
     spin_lock_irqsave(&free_list_lock, flags);
     if ( likely(!list_empty(&free_list)) )
     {
@@ -311,11 +317,15 @@ struct pfn_info *alloc_domain_page(struct task_struct *p)
 
         if ( unlikely(mask != 0) )
         {
+#ifdef NO_DEVICES_IN_XEN
+            flush_tlb_mask(mask);
+#else
             /* In IRQ ctxt, flushing is best-effort only, to avoid deadlock. */
             if ( likely(!in_irq()) )
                 flush_tlb_mask(mask);
             else if ( unlikely(!try_flush_tlb_mask(mask)) )
                 goto free_and_exit;
+#endif
             perfc_incrc(need_flush_tlb_flush);
         }
     }
@@ -324,7 +334,6 @@ struct pfn_info *alloc_domain_page(struct task_struct *p)
     page->type_and_flags = 0;
     if ( p != NULL )
     {
-        ASSERT(!in_irq());
         wmb(); /* Domain pointer must be visible before updating refcnt. */
         spin_lock(&p->page_list_lock);
         if ( unlikely(p->tot_pages >= p->max_pages) )
@@ -355,8 +364,7 @@ void free_domain_page(struct pfn_info *page)
     unsigned long flags;
     struct task_struct *p = page->u.domain;
 
-    if ( unlikely(in_irq()) )
-        BUG();
+    ASSERT(!in_irq());
 
     if ( likely(!IS_XEN_HEAP_FRAME(page)) )
     {
