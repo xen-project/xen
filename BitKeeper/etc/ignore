@@ -416,3 +416,5 @@ xen/tools/figlet/figlet
 tools/control/.classpath
 tools/control/.project
 tools/control/eclipsebin/**
+tools/control/build-cmdline/**
+tools/control/xenctl-cmdline.jar
