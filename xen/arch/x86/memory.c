@@ -1776,12 +1776,15 @@ int ptwr_do_page_fault(unsigned long addr)
                 ptwr_flush(which);
             ptwr_info[cpu].ptinfo[which].l1va = addr | 1;
 
-            if (which == PTWR_PT_ACTIVE && likely(!current->mm.shadow_mode)) {
+            if (which == PTWR_PT_ACTIVE) {
                 ptwr_info[cpu].active_pteidx = va_mask;
-		/* disconnect l1 page (unnecessary in shadow mode) */
-		nl2e = mk_l2_pgentry((l2_pgentry_val(*pl2e) & ~_PAGE_PRESENT));
-		update_l2e(pl2e, *pl2e, nl2e);
-		flush_tlb();
+		if ( likely(!current->mm.shadow_mode) ) {
+		    /* disconnect l1 page (unnecessary in shadow mode) */
+		    nl2e = mk_l2_pgentry((l2_pgentry_val(*pl2e) &
+					  ~_PAGE_PRESENT));
+		    update_l2e(pl2e, *pl2e, nl2e);
+		    flush_tlb();
+		}
 	    }
 
             ptwr_info[cpu].ptinfo[which].pl1e =
