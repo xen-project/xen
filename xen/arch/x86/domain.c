@@ -273,6 +273,13 @@ void arch_do_createdomain(struct exec_domain *ed)
     }
 }
 
+void arch_do_boot_vcpu(struct exec_domain *ed)
+{
+    struct domain *d = ed->domain;
+    ed->thread.schedule_tail = d->exec_domain[0]->thread.schedule_tail;
+    ed->mm.perdomain_ptes = d->mm_perdomain_pt + (ed->eid << PDPT_VCPU_SHIFT);
+}
+
 #ifdef CONFIG_VMX
 void arch_vmx_do_resume(struct exec_domain *ed) 
 {
