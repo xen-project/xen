@@ -576,6 +576,9 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     net_ring_t *net_ring;
     net_vif_t *net_vif;
 
+    /* Sanity! */
+    if ( p->domain != 0 ) BUG();
+
     if ( strncmp(__va(mod[0].mod_start), "XenoGues", 8) )
     {
         printk("DOM%d: Invalid guest OS image\n", dom);
@@ -622,10 +625,13 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     memset(l2tab, 0, DOMAIN_ENTRIES_PER_L2_PAGETABLE*sizeof(l2_pgentry_t));
     p->mm.pagetable = mk_pagetable(phys_l2tab);
 
+    /* Domain 0 gets WRITE access to the read-only machine->physical table. */
+    mk_l2_writeable(l2tab + (READONLY_MPT_VIRT_START >> L2_PAGETABLE_SHIFT));
+
     /*
-     * NB. The upper limit on this loop does one extra page + pages for frame table. 
-     * This is to make sure a pte exists when we want to map the shared_info struct
-     * and frame table struct.
+     * NB. The upper limit on this loop does one extra page + pages for frame
+     * table. This is to make sure a pte exists when we want to map the
+     * shared_info struct and frame table struct.
      */
 
     ft_pages = frame_table_size >> PAGE_SHIFT;

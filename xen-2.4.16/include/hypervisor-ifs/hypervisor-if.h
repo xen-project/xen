@@ -10,7 +10,11 @@
 #ifndef __HYPERVISOR_IF_H__
 #define __HYPERVISOR_IF_H__
 
-/* Virtual addresses beyond this are inaccessible by guest OSes. */
+/*
+ * Virtual addresses beyond this are not modifiable by guest OSes.
+ * The machine->physical mapping table starts at this address, read-only
+ * to all domains except DOM0.
+ */
 #define HYPERVISOR_VIRT_START (0xFC000000UL)
 
 typedef struct trap_info_st

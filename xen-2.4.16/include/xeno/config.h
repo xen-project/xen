@@ -41,12 +41,33 @@
 #define __cacheline_aligned __attribute__((__aligned__(SMP_CACHE_BYTES)))
 #define ____cacheline_aligned __cacheline_aligned
 
-/* 0-16MB is fixed monitor space. 0-52MB is direct-mapped at top of memory.*/
+/*** Hypervisor owns top 64MB of virtual address space. ***/
+#define HYPERVISOR_VIRT_START (0xFC000000UL)
+
+/*
+ * First 4MB are mapped read-only for all. It's for the machine->physical
+ * mapping table (MPT table). The following are virtual addresses.
+ */
+#define READONLY_MPT_VIRT_START (HYPERVISOR_VIRT_START)
+#define READONLY_MPT_VIRT_END   (READONLY_MPT_VIRT_START + (4*1024*1024))
+/*
+ * Next 16MB is fixed monitor space, which is part of a 48MB direct-mapped
+ * memory region. The following are machine addresses.
+ */
 #define MAX_MONITOR_ADDRESS   (16*1024*1024)
 #define MAX_DMA_ADDRESS       (16*1024*1024)
-#define MAX_DIRECTMAP_ADDRESS (52*1024*1024)
+#define MAX_DIRECTMAP_ADDRESS (48*1024*1024)
+/* And the virtual addresses for the direct-map region... */
+#define DIRECTMAP_VIRT_START  (READONLY_MPT_VIRT_END)
+#define DIRECTMAP_VIRT_END    (DIRECTMAP_VIRT_START + MAX_DIRECTMAP_ADDRESS)
+#define MONITOR_VIRT_START    (DIRECTMAP_VIRT_START)
+#define MONITOR_VIRT_END      (MONITOR_VIRT_START + MAX_MONITOR_ADDRESS)
+#define RDWR_MPT_VIRT_START   (MONITOR_VIRT_END)
+#define RDWR_MPT_VIRT_END     (RDWR_MPT_VIRT_START + (4*1024*1024))
+#define FRAMETABLE_VIRT_START (RDWR_MPT_VIRT_END)
+#define FRAMETABLE_VIRT_END   (DIRECTMAP_VIRT_END)
 /* Next 4MB of virtual address space used for per-domain mappings (eg. GDT). */
-#define PERDOMAIN_VIRT_START  (PAGE_OFFSET + MAX_DIRECTMAP_ADDRESS)
+#define PERDOMAIN_VIRT_START  (DIRECTMAP_VIRT_END)
 #define PERDOMAIN_VIRT_END    (PERDOMAIN_VIRT_START + (4*1024*1024))
 /* Penultimate 4MB of virtual address space used for domain page mappings. */
 #define MAPCACHE_VIRT_START   (PERDOMAIN_VIRT_END)

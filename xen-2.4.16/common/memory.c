@@ -224,15 +224,15 @@ void __init init_frametable(unsigned long nr_pages)
     max_page = nr_pages;
     frame_table_size = nr_pages * sizeof(struct pfn_info);
     frame_table_size = (frame_table_size + PAGE_SIZE - 1) & PAGE_MASK;
-    free_pfns = nr_pages - 
-        ((MAX_MONITOR_ADDRESS + frame_table_size) >> PAGE_SHIFT);
-
-    frame_table = phys_to_virt(MAX_MONITOR_ADDRESS);
+    frame_table = (frame_table_t *)FRAMETABLE_VIRT_START;
     memset(frame_table, 0, frame_table_size);
+
+    free_pfns = nr_pages - 
+        ((__pa(frame_table) + frame_table_size) >> PAGE_SHIFT);
 
     /* Put all domain-allocatable memory on a free list. */
     INIT_LIST_HEAD(&free_list);
-    for( page_index = (MAX_MONITOR_ADDRESS + frame_table_size) >> PAGE_SHIFT; 
+    for( page_index = (__pa(frame_table) + frame_table_size) >> PAGE_SHIFT; 
          page_index < nr_pages; 
          page_index++ )      
     {
@@ -363,6 +363,12 @@ static int get_l2_table(unsigned long page_nr)
     p_l2_entry[(PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT) -
               DOMAIN_ENTRIES_PER_L2_PAGETABLE] =
         mk_l2_pgentry(__pa(current->mm.perdomain_pt) | __PAGE_HYPERVISOR);
+
+    /*
+     * DOM0 has the MPT mapped as WRITABLE.
+     * 'p_l2_entry' happens to be pointing at the right place at this point :-)
+     */
+    if ( current->domain == 0 ) mk_l2_writeable(p_l2_entry);
 
  out:
     unmap_domain_mem(p_l2_entry);

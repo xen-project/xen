@@ -73,7 +73,7 @@ typedef struct { unsigned long pt_lo; } pagetable_t;
 #define l1_pgentry_empty(_x) (!l1_pgentry_val(_x))
 #define l2_pgentry_empty(_x) (!l2_pgentry_val(_x))
 
-#define __PAGE_OFFSET		(0xFC000000)
+#define __PAGE_OFFSET		(0xFC400000)
 #define PAGE_OFFSET		((unsigned long)__PAGE_OFFSET)
 #define __pa(x)			((unsigned long)(x)-PAGE_OFFSET)
 #define __va(x)			((void *)((unsigned long)(x)+PAGE_OFFSET))
@@ -83,7 +83,7 @@ typedef struct { unsigned long pt_lo; } pagetable_t;
 
 /* High table entries are reserved by the hypervisor. */
 #define DOMAIN_ENTRIES_PER_L2_PAGETABLE	    \
-  (PAGE_OFFSET >> L2_PAGETABLE_SHIFT)
+  (HYPERVISOR_VIRT_START >> L2_PAGETABLE_SHIFT)
 #define HYPERVISOR_ENTRIES_PER_L2_PAGETABLE \
   (ENTRIES_PER_L2_PAGETABLE - DOMAIN_ENTRIES_PER_L2_PAGETABLE)
 
@@ -152,6 +152,16 @@ __asm__ __volatile__("invlpg %0": :"m" (*(char *) (__addr)))
 #define PAGE_HYPERVISOR MAKE_GLOBAL(__PAGE_HYPERVISOR)
 #define PAGE_HYPERVISOR_RO MAKE_GLOBAL(__PAGE_HYPERVISOR_RO)
 #define PAGE_HYPERVISOR_NOCACHE MAKE_GLOBAL(__PAGE_HYPERVISOR_NOCACHE)
+
+#define mk_l2_writeable(_p) \
+    (*(_p) = mk_l2_pgentry(l2_pgentry_val(*(_p)) |  _PAGE_RW))
+#define mk_l2_readonly(_p) \
+    (*(_p) = mk_l2_pgentry(l2_pgentry_val(*(_p)) & ~_PAGE_RW))
+#define mk_l1_writeable(_p) \
+    (*(_p) = mk_l1_pgentry(l1_pgentry_val(*(_p)) |  _PAGE_RW))
+#define mk_l1_readonly(_p) \
+    (*(_p) = mk_l1_pgentry(l1_pgentry_val(*(_p)) & ~_PAGE_RW))
+
 
 #ifndef __ASSEMBLY__
 static __inline__ int get_order(unsigned long size)

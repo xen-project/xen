@@ -216,13 +216,15 @@ nopaging_gdt_descr:
         .long   SYMBOL_NAME(gdt_table)-__PAGE_OFFSET
         
         ALIGN
+/* NB. Rings != 0 get access up to 0xFC400000. This allows access to the */
+/*     machine->physical mapping table. Ring 0 can access all memory.    */
 ENTRY(gdt_table)
         .quad 0x0000000000000000     /* NULL descriptor */
         .quad 0x0000000000000000     /* not used */
-        .quad 0x00cfba000000bfff     /* 0x11 ring 1 3.95GB code at 0x0 */
-        .quad 0x00cfb2000000bfff     /* 0x19 ring 1 3.95GB data at 0x0 */
-        .quad 0x00cffa000000bfff     /* 0x23 ring 3 3.95GB code at 0x0 */
-        .quad 0x00cff2000000bfff     /* 0x2b ring 3 3.95GB data at 0x0 */
+        .quad 0x00cfba000000c3ff     /* 0x11 ring 1 3.95GB code at 0x0 */
+        .quad 0x00cfb2000000c3ff     /* 0x19 ring 1 3.95GB data at 0x0 */
+        .quad 0x00cffa000000c3ff     /* 0x23 ring 3 3.95GB code at 0x0 */
+        .quad 0x00cff2000000c3ff     /* 0x2b ring 3 3.95GB data at 0x0 */
         .quad 0x00cf9a000000ffff     /* 0x30 ring 0 4.00GB code at 0x0 */
         .quad 0x00cf92000000ffff     /* 0x38 ring 0 4.00GB data at 0x0 */
         .fill NR_CPUS,8,0             /* space for TSS's */

@@ -73,8 +73,14 @@ void __init paging_init(void)
     /* Create page table for ioremap(). */
     ioremap_pt = (void *)get_free_page(GFP_KERNEL);
     clear_page(ioremap_pt);
-    idle0_pg_table[MAPCACHE_VIRT_START >> L2_PAGETABLE_SHIFT] = 
+    idle0_pg_table[IOREMAP_VIRT_START >> L2_PAGETABLE_SHIFT] = 
         mk_l2_pgentry(__pa(ioremap_pt) | PAGE_HYPERVISOR);
+
+    /* Create read-only mapping of MPT for guest-OS use. */
+    idle0_pg_table[READONLY_MPT_VIRT_START >> L2_PAGETABLE_SHIFT] =
+        idle0_pg_table[RDWR_MPT_VIRT_START >> L2_PAGETABLE_SHIFT];
+    mk_l2_readonly(idle0_pg_table + 
+                   (READONLY_MPT_VIRT_START >> L2_PAGETABLE_SHIFT));
 }
 
 void __init zap_low_mappings (void)
