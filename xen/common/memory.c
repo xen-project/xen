@@ -809,8 +809,12 @@ int do_process_page_updates(page_update_request_t *ureqs, int count)
     unsigned int cmd;
     unsigned long cr0 = 0;
 
+    perfc_incrc( calls_to_process_page_updates ); 
+    perfc_addc( num_page_updates, count );
+
     for ( i = 0; i < count; i++ )
     {
+
         if ( unlikely(copy_from_user(&req, ureqs, sizeof(req)) != 0) )
         {
             if ( cr0 != 0 ) write_cr0(cr0);
