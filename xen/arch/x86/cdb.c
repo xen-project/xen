@@ -10,10 +10,11 @@
 #include <asm/irq.h>
 #include <xen/spinlock.h>
 #include <asm/debugger.h>
+#include <asm/init.h>
 
 /* Printk isn't particularly safe just after we've trapped to the
    debugger. so avoid it. */
-#define dbg_printk(...)
+#define dbg_printk
 
 static unsigned char opt_cdb[30] = "none";
 string_param("cdb", opt_cdb);
@@ -23,6 +24,33 @@ struct xendbg_context {
 	u8 reply_csum;
 	int currently_attached:1;
 };
+
+/* Like copy_from_user, but safe to call with interrupts disabled.
+
+   Trust me, and don't look behind the curtain. */
+static unsigned
+dbg_copy_from_user(void *dest, const void *src, unsigned len)
+{
+	int __d0, __d1, __d2;
+	ASSERT(!local_irq_is_enabled());
+	__asm__ __volatile__(
+		"1:	rep; movsb\n"
+		"2:\n"
+		".section __pre_ex_table,\"a\"\n"
+		"	.align 4\n"
+		"	.long 1b,2b\n"
+		".previous\n"
+		".section __ex_table,\"a\"\n"
+		"	.align 4\n"
+		"	.long 1b,2b\n"
+		".previous\n"
+		: "=c"(__d2), "=D" (__d0), "=S" (__d1)
+		: "0"(len), "1"(dest), "2"(src)
+		: "memory");
+	ASSERT(!local_irq_is_enabled());
+	printf("dbg_copy_from_user returning %d.\n", __d2);
+	return __d2;
+}
 
 static void
 xendbg_put_char(u8 data, struct xendbg_context *ctx)
@@ -158,7 +186,7 @@ handle_memory_read_command(unsigned long addr, unsigned long length,
 		   length);
 	xendbg_start_reply(ctx);
 	for (x = 0; x < length; x++) {
-		r = __copy_from_user(&val, (void *)(addr + x), 1);
+		r = dbg_copy_from_user(&val, (void *)(addr + x), 1);
 		if (r != 0) {
 			dbg_printk("Error reading from %lx.\n", addr + x);
 			break;
@@ -221,6 +249,7 @@ process_command(char *received_packet, struct xen_regs *regs,
 		switch (received_packet[0]) {
 		case 'g': /* Read registers */
 			retry = handle_register_read_command(regs, ctx);
+			ASSERT(!local_irq_is_enabled());
 			break;
 		case 'm': /* Read memory */
 			addr = simple_strtoul(received_packet + 1, &ptr, 16);
@@ -238,6 +267,7 @@ process_command(char *received_packet, struct xen_regs *regs,
 				handle_memory_read_command(addr,
 							   length,
 							   ctx);
+			ASSERT(!local_irq_is_enabled());
 			break;
 		case 'G': /* Write registers */
 		case 'M': /* Write memory */
@@ -318,6 +348,8 @@ __trap_to_cdb(struct xen_regs *regs)
 		return;
 	}
 
+	smp_send_stop();
+
 	/* Shouldn't really do this, but otherwise we stop for no
 	   obvious reason, which is Bad */
 	printk("Waiting for GDB to attach to XenDBG\n");
@@ -330,22 +362,27 @@ __trap_to_cdb(struct xen_regs *regs)
 	}
 
 	while (resume == 0) {
+		ASSERT(!local_irq_is_enabled());
 		r = receive_command(recv_buf, &xdb_ctx);
+		ASSERT(!local_irq_is_enabled());
 		if (r < 0) {
 			dbg_printk("GDB disappeared, trying to resume Xen...\n");
 			resume = 1;
-		} else
+		} else {
+			ASSERT(!local_irq_is_enabled());
 			resume = process_command(recv_buf, regs, &xdb_ctx);
+			ASSERT(!local_irq_is_enabled());
+		}
 	}
 	atomic_inc(&xendbg_running);
 	local_irq_restore(flags);
 }
 
-void
+static int
 initialize_xendbg(void)
 {
 	if (!strcmp(opt_cdb, "none"))
-		return;
+		return 0;
 	xdb_ctx.serhnd = parse_serial_handle(opt_cdb);
 	if (xdb_ctx.serhnd == -1)
 		panic("Can't parse %s as CDB serial info.\n", opt_cdb);
@@ -354,4 +391,7 @@ initialize_xendbg(void)
 	xendbg_put_char('+', &xdb_ctx);
 
 	printk("Xendbg initialised.\n");
+	return 0;
 }
+
+__initcall(initialize_xendbg);
