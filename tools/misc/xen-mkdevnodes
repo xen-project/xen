@@ -12,8 +12,10 @@ PARTITIONS="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15"
 j=0
 for l in ${LETTERS}; do
     mknod ${BASE}/xvd${l} b 125 ${j}
+    chmod 600 ${BASE}/xvd${l}
     for i in ${PARTITIONS}; do
         mknod ${BASE}/xvd${l}${i} b 125 $(($i+$j))
+        chmod 600 ${BASE}/xvd${l}${i}
     done
     j=$(($j+16))
 done
