@@ -1224,6 +1224,18 @@ int do_update_va_mapping_otherdomain(unsigned long page_nr,
 }
 
 
+static inline int readonly_page_from_l1e(l1_pgentry_t l1e)
+{
+    struct pfn_info *page = &frame_table[l1_pgentry_to_pagenr(l1e)];
+    unsigned long    l1v  = l1_pgentry_val(l1e);
+
+    if ( (l1v & _PAGE_RW) || !(l1v & _PAGE_PRESENT) ||
+         !pfn_is_ram(l1v >> PAGE_SHIFT) )
+        return 0;
+    put_page_type(page);
+    return 1;
+}
+
 /*  */
 unsigned long ptwr_disconnected[NR_CPUS] __cacheline_aligned =
 	{ [ 0 ... NR_CPUS-1 ] = ENTRIES_PER_L2_PAGETABLE };
@@ -1277,12 +1289,26 @@ void ptwr_reconnect_disconnected(unsigned long addr)
                          _PAGE_PRESENT);
     pl1e = map_domain_mem(l2_pgentry_to_pagenr(nl2e) << PAGE_SHIFT);
     for ( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ ) {
+        if ((l1_pgentry_val(pl1e[i]) ^
+             l1_pgentry_val(ptwr_disconnected_page[cpu][i])) == _PAGE_RW) {
+#if 0
+            struct pfn_info *page = &frame_table[l1_pgentry_to_pagenr(pl1e[i])];
+            printk("%03x: %08lx != %08lx %08x/%08x\n", i,
+                   l1_pgentry_val(ptwr_disconnected_page[cpu][i]),
+                   l1_pgentry_val(pl1e[i]), page->type_and_flags,
+                   page->count_and_flags);
+#endif
+            if (readonly_page_from_l1e(pl1e[i]))
+                continue;
+        }
         if (l1_pgentry_val(pl1e[i]) != l1_pgentry_val(ptwr_disconnected_page[cpu][i])) {
 #if 0
-            printk("%03x: %08lx != %08lx\n", i, l1_pgentry_val(pl1e[i]),
-                   l1_pgentry_val(ptwr_disconnected_page[cpu][i]));
+            printk("%03x: %08lx != %08lx\n", i,
+                   l1_pgentry_val(ptwr_disconnected_page[cpu][i]),
+                   l1_pgentry_val(pl1e[i]));
 #endif
-            put_page_from_l1e(ptwr_disconnected_page[cpu][i]);
+            if (l1_pgentry_val(ptwr_disconnected_page[cpu][i]) & _PAGE_PRESENT)
+                put_page_from_l1e(ptwr_disconnected_page[cpu][i]);
             if (unlikely(!get_page_from_l1e(pl1e[i])))
                 BUG();
         }
@@ -1320,12 +1346,17 @@ void ptwr_flush_inactive(void)
     l1_pgentry_t *pl1e;
     int cpu = smp_processor_id();
     int i, idx;
+    static int maxidx = 0;
 
 #ifdef TRACK_PTWR_DOMAIN
     if (ptwr_domain[cpu] != get_current()->domain)
         printk("ptwr_flush_inactive domain mismatch %d != %d\n",
                ptwr_domain[cpu], get_current()->domain);
 #endif
+    if (ptwr_writable_idx[cpu] > maxidx) {
+        maxidx = ptwr_writable_idx[cpu];
+        printk("maxidx on cpu %d now %d\n", cpu, maxidx);
+    }
     for (idx = 0; idx < ptwr_writable_idx[cpu]; idx++) {
         if (__get_user(pte, ptwr_writables[cpu][idx]))
             BUG();
@@ -1335,13 +1366,29 @@ void ptwr_flush_inactive(void)
 
         pl1e = map_domain_mem(pfn << PAGE_SHIFT);
         for ( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ ) {
+#if 0
+            if ((l1_pgentry_val(pl1e[i]) ^
+                 l1_pgentry_val(ptwr_writable_page[cpu][idx][i])) == _PAGE_RW) {
+#if 01
+                struct pfn_info *page = &frame_table[l1_pgentry_to_pagenr(pl1e[i])];
+                printk("%03x: %08lx != %08lx %08x/%08x\n", i,
+                       l1_pgentry_val(ptwr_writable_page[cpu][idx][i]),
+                       l1_pgentry_val(pl1e[i]), page->type_and_flags,
+                       page->count_and_flags);
+#endif
+                if (readonly_page_from_l1e(pl1e[i]))
+                    continue;
+            }
+#endif
             if (l1_pgentry_val(pl1e[i]) !=
                 l1_pgentry_val(ptwr_writable_page[cpu][idx][i])) {
 #if 0
-                printk("%03x: %08lx != %08lx\n", i, l1_pgentry_val(pl1e[i]),
-                       l1_pgentry_val(ptwr_writable_page[cpu][idx][i]));
+                printk("%03x: %08lx != %08lx\n", i,
+                       l1_pgentry_val(ptwr_writable_page[cpu][idx][i]),
+                       l1_pgentry_val(pl1e[i]));
 #endif
-                put_page_from_l1e(ptwr_writable_page[cpu][idx][i]);
+                if (l1_pgentry_val(ptwr_writable_page[cpu][idx][i]) & _PAGE_PRESENT)
+                    put_page_from_l1e(ptwr_writable_page[cpu][idx][i]);
                 if (unlikely(!get_page_from_l1e(pl1e[i])))
                     BUG();
             }
