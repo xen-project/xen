@@ -90,8 +90,8 @@ applications and libraries {\em do not} require modification.
 Xen support is available for increasingly many operating systems:
 right now, Linux 2.4, Linux 2.6 and NetBSD are available for Xen 2.0.
 We expect that Xen support will ultimately be integrated into the
-official releases of Linux, NetBSD, FreeBSD and Dragonfly BSD. 
-Other OS ports, including Plan 9, are in progress.
+official releases of Linux, NetBSD and FreeBSD.  Other OS ports,
+including Plan 9, are in progress.
 
 Possible usage scenarios for Xen include:
 \begin{description}
@@ -106,8 +106,8 @@ Possible usage scenarios for Xen include:
 \item [Cluster computing.] Management at VM granularity provides more
       flexibility than separately managing each physical host, but
       better control and isolation than single-system image solutions.
-\item [Hardware support for custom OSes.] Allow devlopment of new OSes
-      while benefitting from the wide-ranging hardware support of
+\item [Hardware support for custom OSes.] Allow development of new OSes
+      while benefiting from the wide-ranging hardware support of
       existing OSes such as Linux.
 \end{description}
 
@@ -173,7 +173,7 @@ isolation and accounting.  The project web page contains further
 information along with pointers to papers and technical reports:
 {\small {\tt http://www.cl.cam.ac.uk/xeno}}
 
-Xen has since grown into a fully-fledgd project in its own right,
+Xen has since grown into a fully-fledged project in its own right,
 enabling us to investigate interesting research issues regarding the
 best techniques for virtualising resources such as the CPU, memory,
 disk and network.  The project has been bolstered by support from
@@ -228,7 +228,7 @@ Xen download page (pre-built tarballs are also available from this page):
 {\tt http://xen.sf.net}
 \end{quote} 
 
-\subsection{Using Bitkeeper}
+\subsection{Using BitKeeper}
 
 If you wish to install Xen from a clone of our latest BitKeeper
 repository then you will need to install the BitKeeper tools.
@@ -242,7 +242,7 @@ The public master BK repository for the 2.0 release lives at:
 \begin{quote}
 {\tt bk://xen.bkbits.net/xen-2.0.bk}  
 \end{quote} 
-You can use Bitkeeper to
+You can use BitKeeper to
 download it and keep it updated with the latest features and fixes.
 
 Change to the directory in which you want to put the source code, then
@@ -333,10 +333,9 @@ necessary to build the NetBSD kernel under Linux.
 If you have an existing Linux kernel configuration that you would like
 to use for domain 0, you should copy it to
 \path{dist/install/boot/config-2.6.9-xen0}; for example, certain
-distributions require a kernel with either {\tt udev} or {\tt devfs}
-support at boot time.  During the first build, you may be prompted with
-some Xen-specific options.  We advise accepting the defaults for
-these options.
+distributions require a kernel with {\tt devfs} support at boot time.
+During the first build, you may be prompted with some Xen-specific
+options.  We advise accepting the defaults for these options.
 
 %% \framebox{\parbox{5in}{
 %% {\bf Distro specific:} \\
@@ -405,7 +404,7 @@ XenLinux kernel that Xen should start and the parameters that should
 be passed to it (these are standard Linux parameters, identifying the
 root device and specifying it be initially mounted read only and
 instructing that console output be sent both to the screen and to the
-serial port). Some distributions such as SUSE do not require the 
+serial port). Some distributions such as SuSE do not require the 
 {\small {\tt ro}} parameter. 
 
 %% \framebox{\parbox{5in}{
@@ -475,7 +474,7 @@ by restoring the directory to its original location (i.e. {\small
 {\tt mv /lib/tls.disabled /lib/tls}}).
 
 The reason for this is that the current TLS implementation uses
-segmentation in a way that is not permissable under Xen.  If TLS is
+segmentation in a way that is not permissible under Xen.  If TLS is
 not disabled, an emulation mode is used within Xen which reduces
 performance substantially and is not guaranteed to work perfectly.
 
@@ -487,7 +486,7 @@ as usual but choose the new Xen option when the Grub screen appears.
 What follows should look much like a conventional Linux boot.  The
 first portion of the output comes from Xen itself, supplying low level
 information about itself and the machine it is running on.  The
-following portion of the output comes from XenLinux itself.
+following portion of the output comes from XenLinux.
 
 You may see some errors during the XenLinux boot.  These are not
 necessarily anything to worry about --- they may result from kernel
@@ -514,10 +513,10 @@ special user-space tools. To proceed further than this you will need
 to install the prerequisites described in Section~\ref{sec:prerequisites}
 and the Xen control tools. The control tools are installed by entering
 the tools subdirectory of the repository and typing \\
-\verb!# LINUX_SRC=/path/to/linux2.4/source make linux24! \\
+\verb!# make install! \\
 
-To start the control daemon, type \\ \verb!# xend start! \\ If you
-wish to start the daemon automatically, see the instructions in
+To start the \xend control daemon, type \\ \verb!# xend start! \\ If you
+wish the daemon to start automatically, see the instructions in
 Section~\ref{s:xend}. Once the daemon is running, you can use the
 {\tt xm} tool to monitor and maintain the domains running on your
 system. This chapter provides only a brief tutorial: we provide full
@@ -550,6 +549,7 @@ to be reused for multiple virtual machines.  Setting the value of the
 fills in parts of this template.
 
 Both of them can be found in \path{/etc/xen/}
+
 \section{Editing \path{xmdefconfig}}
 
 At minimum, you should edit the following 
@@ -557,8 +557,7 @@ variables in \path{/etc/xen/xmdefconfig}:
 
 \begin{description}
 \item[kernel] Set this to the path of the kernel you compiled for use
-              with Xen. [e.g. {\tt kernel =
-              '/root/xen-2.0.bk/install/boot/vmlinuz-2.4.27-xenU'}]
+              with Xen. [e.g. {\tt kernel = '/boot/vmlinuz-2.6.9-xenU'}]
 \item[memory] Set this to the size of the domain's memory in
 megabytes. [e.g. {\tt memory = 64} ]
 \item[disk] Set the first entry in this list to calculate the offset
@@ -599,7 +598,7 @@ was specified on the command line.
 Ttylinux is a very small Linux distribution, designed to
 require very few resources.  We will use it as a concrete example of
 how to start a Xen domain.  Most users will probably want to install a
-more complex mainstream distribution once they have mastered the
+full-featured distribution once they have mastered the
 basics.
 
 \begin{enumerate}
@@ -671,7 +670,7 @@ tool.  For online help for the commands available, type:\\
 The most important {\tt xm} commands are: \\
 \verb_# xm list_ : Lists all domains running. \\
 \verb_# xm consoles_ : Gives information about the domain consoles. \\
-\verb_# xm console_: open a console to a domain.
+\verb_# xm console_: Opens a console to a domain.
 e.g. \verb_# xm console 1_ (open console to domain 1)
 
 \subsection{\tt xm list}
@@ -711,7 +710,7 @@ ttylinux           5       63    0  -b---      3.0    9605
 \end{verbatim}
 
 Here we can see the details for the ttylinux domain, as well as for
-domain 0 (which of course is always running).  Note that the console
+domain 0 (which, of course, is always running).  Note that the console
 port for the ttylinux domain is 9605.  This can be connected to by TCP
 using a terminal program (e.g. {\tt telnet} or, better, {\tt
 xencons}).  The simplest way to connect is to use the {\tt xm console}
@@ -770,7 +769,7 @@ the command:
 There will be a delay whilst the domain is moved to the destination
 machine.  During this time, the Xen migration daemon copies as much
 information as possible about the domain (configuration, memory
-contents, etc.) to the destination host as possible.  The domain is
+contents, etc.) to the destination host.  The domain is
 then stopped for a fraction of a second in order to update the state
 on the destination machine with any changes in memory contents, etc.
 The domain will then continue on the new machine having been halted
@@ -793,7 +792,7 @@ memory at the request of the administrator or the user of the domain.
 
 \subsection{Setting memory footprints from dom0}
 
-The machine administator can request that a domain alter its memory
+The machine administrator can request that a domain alter its memory
 footprint using the {\tt xm balloon} command.  For instance, we can
 request that our example ttylinux domain reduce its memory footprint
 to 32 megabytes.
@@ -833,12 +832,13 @@ Xen associates a memory size limit with each domain.  By default, this
 is the amount of memory the domain is originally started with,
 preventing the domain from ever growing beyond this size.  To permit a
 domain to grow beyond its original allocation or to prevent a domain
-you've shrunk from reclaiming the memory it reliquished, use the {\tt
+you've shrunk from reclaiming the memory it relinquished, use the {\tt
 xm maxmem} command.
 
 \chapter{Domain filesystem storage}
 
-It is possible to directly export any Linux block device to a virtual,
+It is possible to directly export any Linux block device in dom0 to
+another domain,
 or to export filesystems / devices to virtual machines using standard
 network protocols (e.g. NBD, iSCSI, NFS, etc).  This chapter covers
 some of the possibilities.
@@ -917,7 +917,7 @@ the domain's configuration file:
 \begin{verbatim}
 root       = '/dev/nfs'
 nfs_server = 'a.b.c.d'       # Substitute the IP for the server here
-nfs_root   = '/path/to/root' # Path to root FS on the server machine
+nfs_root   = '/path/to/root' # Path to root FS on the server
 \end{verbatim}
 
 The domain will need network access at boot-time, so either statically
@@ -925,11 +925,11 @@ configure an IP address (Using the config variables {\tt ip}, {\tt
 netmask}, {\tt gateway}, {\tt hostname}) or enable DHCP ({\tt
 dhcp='dhcp'}).
 
-\section{LVM-backed virtual block devices}
+%% \section{LVM-backed virtual block devices}
 
-XXX Put some simple examples here - would be nice if an LVM user could
-contribute some, although obviously users would have to read the LVM
-docs to do advanced stuff.
+%% XXX Put some simple examples here - would be nice if an LVM user could
+%% contribute some, although obviously users would have to read the LVM
+%% docs to do advanced stuff.
 
 \part{User Reference Documentation}
 
@@ -1027,8 +1027,7 @@ machine.  It can be used to perform some (but not yet all) of the
 management tasks that can be done using the xm tool.
 
 It can be started using:\\ \verb_# xensv start_ \\ and
-stopped using: \verb_# xensv stop_ \\ It will automatically start \xend
-if it is not already running.
+stopped using: \verb_# xensv stop_ \\
 
 By default, Xensv will serve out the web interface on port 8080.  This
 can be changed by editing {\tt
@@ -1097,7 +1096,8 @@ vif = [ 'mac=aa:00:00:00:00:11, bridge=xen-br0',
 
 For additional flexibility, it is also possible to include Python
 scripting commands in configuration files.  An example of this is the
-\path{xmexample} file in order to handle the {\tt vmid} variable.
+\path{xmexample2} file, which uses Python code to handle the {\tt
+vmid} variable.
 
 
 %\part{Advanced Topics}
@@ -1125,8 +1125,8 @@ names and locations of the scripts can be configured in
 \begin{description} 
 
 \item[network:] This script is called whenever \xend is started or
-stopped to respectively initialize or tear down the Xen virtual
-network. In the default configuration initialization creates the
+stopped to respectively initialise or tear down the Xen virtual
+network. In the default configuration initialisation creates the
 bridge `xen-br0' and moves eth0 onto that bridge, modifying the
 routing accordingly. When \xend exits, it deletes the Xen bridge and
 removes eth0, restoring the normal IP and routing configuration.
@@ -1229,7 +1229,7 @@ domains), but this can be compensated for by using warping.
 
 \begin{description}
 \item[ctx\_allow]
-  the context switch allowance is similar to the "quantum"
+  the context switch allowance is similar to the `quantum'
   in traditional schedulers.  It is the minimum time that
   a scheduled domain will be allowed to run before being
   pre-empted. 
@@ -1243,7 +1243,7 @@ domains), but this can be compensated for by using warping.
   proportional share of the CPU that a domain receives.  It
   is set inversely proportionally to a domain's sharing weight.
 \item[warp]
-  the amount of ``virtual time'' the domain is allowed to warp
+  the amount of `virtual time' the domain is allowed to warp
   backwards
 \item[warpl]
   the warp limit is the maximum time a domain can run warped for
@@ -1456,7 +1456,7 @@ do not need to configure them.
 
 \section{XenLinux Boot Options}
 
-In addition to the standard linux kernel boot options, we support: 
+In addition to the standard Linux kernel boot options, we support: 
 \begin{description} 
 \item[xencons=xxx ] Specify the device node to which the Xen virtual
 console driver is attached. The following options are supported:
@@ -1565,8 +1565,8 @@ Xen domain:
 dd if=/dev/zero of=/path/diskimage bs=1024k count=size_in_mbytes
 dd if=/dev/zero of=/path/swapimage bs=1024k count=size_in_mbytes
 \end{verbatim}\end{small}
-      If you're going to use this filesystem / diskimage only as a
-      `template' for other vm diskimages, something like 300 MB should
+      If you're going to use this filesystem / disk image only as a
+      `template' for other vm disk images, something like 300 MB should
       be enough.. (of course it depends what kind of packages you are
       planning to install to the template)
 
@@ -1576,7 +1576,7 @@ mkfs.ext3 /path/diskimage
 mkswap /path/swapimage
 \end{verbatim}\end{small}
 
-\item Mount the diskimage for installation
+\item Mount the disk image for installation
 \begin{small}\begin{verbatim}
 mount -o loop /path/diskimage /mnt/disk
 \end{verbatim}\end{small}
@@ -1588,7 +1588,7 @@ running Debian sarge (3.1 / testing) or unstable you can install it by
 running {\small {\tt apt-get install debootstrap}}.  Otherwise, it can be
 downloaded from the Debian project website.
 
-\item Install debian base to the diskimage:
+\item Install Debian base to the disk image:
 \begin{small}\begin{verbatim}
 debootstrap --arch i386 sarge /mnt/disk  \
             http://ftp.<countrycode>.debian.org/debian
@@ -1631,13 +1631,13 @@ proc            /proc   proc    defaults                0       0
 
 Logout
 
-\item      Umount the diskimage
+\item      Unmount the disk image
 \begin{small}\begin{verbatim}
 umount /mnt/disk
 \end{verbatim}\end{small}
 
 \item Create Xen 2.0 configuration file for the new domain. You can
-        use the example-configurations coming with xen as a template.
+        use the example-configurations coming with Xen as a template.
 
         Make sure you have the following set up:
 \begin{small}\begin{verbatim}
@@ -1664,7 +1664,7 @@ Started domain testdomain2, console on port 9626
         
         There you can see the ID of the console: 26. You can also list
         the consoles with {\small {\tt xm consoles}} (ID is the last two
-        digits of the portnumber.)
+        digits of the port number.)
 
         Attach to the console:
 
@@ -1673,7 +1673,7 @@ xm console 26
 \end{verbatim}\end{small}
 
         or by telnetting to the port 9626 of localhost (the xm console
-        progam works better).
+        program works better).
 
 \item   Log in and run base-config
 
@@ -1700,7 +1700,7 @@ image-specific settings (hostname, network settings, etc).
 
 \chapter{Installing Xen / XenLinux on Redhat or Fedora Core}
 
-When using Xen / Xenlinux on a standard Linux distribution there are
+When using Xen / XenLinux on a standard Linux distribution there are
 a couple of things to watch out for:
 
 Note that, because domains>0 don't have any privileged access at all,
@@ -1715,7 +1715,7 @@ startup scripts.  Deleting the following links are a good start:
 
 If you want to use a single root file system that works cleanly for
 both domain 0 and unprivileged domains, a useful trick is to use
-different 'init' run levels. For example, on the Xen Demo CD we use
+different 'init' run levels. For example, use
 run level 3 for domain 0, and run level 4 for other domains. This
 enables different startup scripts to be run in depending on the run
 level number passed on the kernel command line.
@@ -1800,7 +1800,7 @@ statically-linked C program would solve this problem.
 
 \item[Domain ID]           A unique identifier for a {\bf domain},
                            analogous to a process ID in an operating
-                           system.  Apart from domain
+                           system.
 
 \item[Full virtualisation] An approach to virtualisation which
                            requires no modifications to the hosted
