@@ -73,9 +73,13 @@ static inline void shadow_invalidate(struct exec_domain *ed) {
     memset(ed->arch.shadow_vtable, 0, PAGE_SIZE);
 }
 
-#define SHADOW_DEBUG 1
+#define SHADOW_DEBUG 0
 #define SHADOW_VERBOSE_DEBUG 0
-#define SHADOW_HASH_DEBUG 1
+#define SHADOW_HASH_DEBUG 0
+
+#if SHADOW_DEBUG
+extern int shadow_status_noswap;
+#endif
 
 struct shadow_status {
     unsigned long pfn;            /* Guest pfn.             */
@@ -88,7 +92,7 @@ struct shadow_status {
 
 #ifdef VERBOSE
 #define SH_LOG(_f, _a...)                                               \
-printk("DOM%uP%u: (file=shadow.c, line=%d) " _f "\n",                   \
+    printk("DOM%uP%u: SH_LOG(%d): " _f "\n",                            \
        current->domain->id , current->processor, __LINE__ , ## _a )
 #else
 #define SH_LOG(_f, _a...) 
@@ -96,7 +100,7 @@ printk("DOM%uP%u: (file=shadow.c, line=%d) " _f "\n",                   \
 
 #if SHADOW_DEBUG
 #define SH_VLOG(_f, _a...)                                              \
-    printk("DOM%uP%u: (file=shadow.c, line=%d) " _f "\n",               \
+    printk("DOM%uP%u: SH_VLOG(%d): " _f "\n",                           \
            current->domain->id, current->processor, __LINE__ , ## _a )
 #else
 #define SH_VLOG(_f, _a...) 
@@ -104,7 +108,7 @@ printk("DOM%uP%u: (file=shadow.c, line=%d) " _f "\n",                   \
 
 #if SHADOW_VERBOSE_DEBUG
 #define SH_VVLOG(_f, _a...)                                             \
-    printk("DOM%uP%u: (file=shadow.c, line=%d) " _f "\n",               \
+    printk("DOM%uP%u: SH_VVLOG(%d): " _f "\n",                          \
            current->domain->id, current->processor, __LINE__ , ## _a )
 #else
 #define SH_VVLOG(_f, _a...)
@@ -426,6 +430,10 @@ static inline unsigned long __shadow_status(
 
         if ( x->pfn == gpfn )
         {
+#if SHADOW_DEBUG
+            if ( unlikely(shadow_status_noswap) )
+                return x->smfn_and_flags;
+#endif
             /* Pull-to-front if 'x' isn't already the head item. */
             if ( unlikely(x != head) )
             {
@@ -726,9 +734,14 @@ static inline void shadow_mk_pagetable(struct exec_domain *ed)
 }
 
 #if SHADOW_DEBUG
-extern void check_pagetable(struct domain *d, pagetable_t pt, char *s);
+extern int _check_pagetable(struct domain *d, pagetable_t pt, char *s);
+extern int _check_all_pagetables(struct domain *d, char *s);
+
+#define check_pagetable(_d, _pt, _s) _check_pagetable(_d, _pt, _s)
+//#define check_pagetable(_d, _pt, _s) _check_all_pagetables(_d, _s)
+
 #else
-#define check_pagetable(d, pt, s) ((void)0)
+#define check_pagetable(_d, _pt, _s) ((void)0)
 #endif
 
 #endif /* XEN_SHADOW_H */

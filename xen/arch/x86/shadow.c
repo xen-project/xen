@@ -758,10 +758,10 @@ void shadow_l2_normal_pt_update(unsigned long pa, unsigned long gpde)
 // BUG: these are not SMP safe...
 static int sh_l2_present;
 static int sh_l1_present;
-static int errors;
 char * sh_check_name;
+int shadow_status_noswap;
 
-#define virt_to_phys2(adr) ({                                            \
+#define v2m(adr) ({                                                      \
     unsigned long _a = (unsigned long)(adr);                             \
     unsigned long _pte = l1_pgentry_val(                                 \
                             shadow_linear_pg_table[_a >> PAGE_SHIFT]);   \
@@ -771,23 +771,28 @@ char * sh_check_name;
 
 #define FAIL(_f, _a...)                                                      \
     do {                                                                     \
-        printk("XXX %s-FAIL (%d,%d)" _f " g=%p s=%p &g=%p &s=%p" \
-               " pa(&g)=%p pa(&s)=%p\n",                               \
-               sh_check_name, level, i, ## _a , gpte, spte, pgpte, pspte,    \
-               virt_to_phys2(pgpte), virt_to_phys2(pspte));                  \
+        printk("XXX %s-FAIL (%d,%d)" _f "\n"                                 \
+               "g=%08lx s=%08lx &g=%08lx &s=%08lx"                           \
+               " v2m(&g)=%08lx v2m(&s)=%08lx ea=%08lx\n",                    \
+               sh_check_name, level, l1_idx, ## _a ,                         \
+               gpte, spte, pgpte, pspte,                                     \
+               v2m(pgpte), v2m(pspte),                                       \
+               (l2_idx << L2_PAGETABLE_SHIFT) |                              \
+               (l1_idx << L1_PAGETABLE_SHIFT));                              \
         errors++;                                                            \
     } while ( 0 )
 
 static int check_pte(
     struct domain *d, unsigned long *pgpte, unsigned long *pspte, 
-    int level, int i)
+    int level, int l2_idx, int l1_idx)
 {
     unsigned gpte = *pgpte;
     unsigned spte = *pspte;
     unsigned long mask, gpfn, smfn;
+    int errors = 0;
 
     if ( (spte == 0) || (spte == 0xdeadface) || (spte == 0x00000E00) )
-        return 1;  /* always safe */
+        return errors;  /* always safe */
 
     if ( !(spte & _PAGE_PRESENT) )
         FAIL("Non zero not present spte");
@@ -833,72 +838,71 @@ static int check_pte(
                  __shadow_status(d, gpfn) );
     }
 
-    return 1;
+    return errors;
 }
 
 
 static int check_l1_table(
     struct domain *d,
-    unsigned long g2mfn, unsigned long s2mfn)
+    unsigned long gmfn, unsigned long smfn, unsigned l2_idx)
 {
     int i;
     unsigned long *gpl1e, *spl1e;
+    int cpu = current->processor;
+    int errors = 0;
 
-    gpl1e = map_domain_mem(g2mfn << PAGE_SHIFT);
-    spl1e = map_domain_mem(s2mfn << PAGE_SHIFT);
+    // First check to see if this guest page is currently the active
+    // PTWR page.  If so, then we compare the (old) cached copy of the
+    // guest page to the shadow, and not the currently writable (and
+    // thus potentially out-of-sync) guest page.
+    //
+    if ( VM_ASSIST(d, VMASST_TYPE_writable_pagetables) )
+    {
+        for ( i = 0; i < ARRAY_SIZE(ptwr_info->ptinfo); i++)
+        {
+            if ( ptwr_info[cpu].ptinfo[i].l1va &&
+                 ((v2m(ptwr_info[cpu].ptinfo[i].pl1e) >> PAGE_SHIFT) == gmfn) )
+            {
+                unsigned long old = gmfn;
+                gmfn = (v2m(ptwr_info[cpu].ptinfo[i].page) >> PAGE_SHIFT);
+                printk("hit1 ptwr_info[%d].ptinfo[%d].l1va, mfn=0x%08x, snapshot=0x%08x\n",
+                       cpu, i, old, gmfn);
+            }
+        }
+    }
+
+    gpl1e = map_domain_mem(gmfn << PAGE_SHIFT);
+    spl1e = map_domain_mem(smfn << PAGE_SHIFT);
 
     for ( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ )
-        check_pte(d, &gpl1e[i], &spl1e[i], 1, i);
+        errors += check_pte(d, &gpl1e[i], &spl1e[i], 1, l2_idx, i);
  
     unmap_domain_mem(spl1e);
     unmap_domain_mem(gpl1e);
 
-    return 1;
+    return errors;
 }
 
-#define FAILPT(_f, _a...)                                      \
-    do {                                                       \
-        printk("XXX FAIL %s-PT" _f "\n", s, ## _a );           \
-        errors++;                                              \
+#define FAILPT(_f, _a...)                                         \
+    do {                                                          \
+        printk("XXX FAIL %s-PT " _f "\n", sh_check_name, ## _a ); \
+        errors++;                                                 \
     } while ( 0 )
 
-void check_pagetable(struct domain *d, pagetable_t pt, char *s)
+int check_l2_table(
+    struct domain *d, unsigned long gpfn, unsigned long smfn)
 {
-    unsigned long gptbase = pagetable_val(pt);
-    unsigned long ptbase_pfn, smfn, ss;
-    unsigned long i;
-    l2_pgentry_t *gpl2e, *spl2e;
-    unsigned long ptbase_mfn = 0;
-    int cpu = current->processor;
+    unsigned long gmfn = __gpfn_to_mfn(d, gpfn);
+    l2_pgentry_t *gpl2e = (l2_pgentry_t *) map_domain_mem( gmfn << PAGE_SHIFT );
+    l2_pgentry_t *spl2e = (l2_pgentry_t *) map_domain_mem( smfn << PAGE_SHIFT );
+    int i;
+    int errors = 0;
 
-    errors = 0;
-    sh_check_name = s;
-
-    SH_VVLOG("%s-PT Audit", s);
-
-    sh_l2_present = sh_l1_present = 0;
-
-    ptbase_pfn = gptbase >> PAGE_SHIFT;
-    ptbase_mfn = __gpfn_to_mfn(d, ptbase_pfn);
-
-    ss = __shadow_status(d, ptbase_pfn);
-  
-    if ( ! (ss & PSH_shadowed) )
-    {
-        printk("%s-PT %p not shadowed\n", s, gptbase);
-
-        if ( ss != 0 )
-            BUG();
-        return;
-    }   
- 
-    smfn = ss & PSH_pfn_mask;
-
-    if ( ss != (PSH_shadowed | smfn) )
-        FAILPT("ptbase shadow inconsistent1");
-
-    gpl2e = (l2_pgentry_t *) map_domain_mem( ptbase_mfn << PAGE_SHIFT );
-    spl2e = (l2_pgentry_t *) map_domain_mem( smfn << PAGE_SHIFT );
+    if ( page_get_owner(pfn_to_page(gmfn)) != d )
+        FAILPT("domain doesn't own page");
+    if ( page_get_owner(pfn_to_page(smfn)) != NULL )
+        FAILPT("shadow page mfn=0x%08x is owned by someone, domid=%d",
+               smfn, page_get_owner(pfn_to_page(smfn))->id);
 
     if ( memcmp(&spl2e[DOMAIN_ENTRIES_PER_L2_PAGETABLE],
                 &gpl2e[DOMAIN_ENTRIES_PER_L2_PAGETABLE], 
@@ -918,24 +922,68 @@ void check_pagetable(struct domain *d, pagetable_t pt, char *s)
         FAILPT("hypervisor linear map inconsistent");
 
     if ( (l2_pgentry_val(spl2e[SH_LINEAR_PT_VIRT_START >> 
-                              L2_PAGETABLE_SHIFT]) != 
+                               L2_PAGETABLE_SHIFT]) != 
           ((smfn << PAGE_SHIFT) | __PAGE_HYPERVISOR)) )
         FAILPT("hypervisor shadow linear map inconsistent %p %p",
                l2_pgentry_val(spl2e[SH_LINEAR_PT_VIRT_START >>
-                                   L2_PAGETABLE_SHIFT]),
+                                    L2_PAGETABLE_SHIFT]),
                (smfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
 
     if ( shadow_mode(d) != SHM_full_32 ) {
-        // BUG: this shouldn't be using exec_domain[0] here...
         if ( (l2_pgentry_val(spl2e[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT]) !=
-              ((__pa(page_get_owner(&frame_table[ptbase_pfn])->arch.mm_perdomain_pt) | 
-            __PAGE_HYPERVISOR))) )
+              ((v2m(page_get_owner(&frame_table[gmfn])->arch.mm_perdomain_pt) |
+                __PAGE_HYPERVISOR))) )
             FAILPT("hypervisor per-domain map inconsistent");
     }
 
     /* Check the whole L2. */
     for ( i = 0; i < DOMAIN_ENTRIES_PER_L2_PAGETABLE; i++ )
-        check_pte(d, &l2_pgentry_val(gpl2e[i]), &l2_pgentry_val(spl2e[i]), 2, i);
+        errors += check_pte(d, &l2_pgentry_val(gpl2e[i]), &l2_pgentry_val(spl2e[i]), 2, i, 0);
+
+    unmap_domain_mem(spl2e);
+    unmap_domain_mem(gpl2e);
+
+    return errors;
+}
+
+int _check_pagetable(struct domain *d, pagetable_t pt, char *s)
+{
+    unsigned long gptbase = pagetable_val(pt);
+    unsigned long ptbase_pfn, smfn, ss;
+    unsigned long i;
+    l2_pgentry_t *gpl2e, *spl2e;
+    unsigned long ptbase_mfn = 0;
+    int errors = 0;
+
+    sh_check_name = s;
+    SH_VVLOG("%s-PT Audit", s);
+    sh_l2_present = sh_l1_present = 0;
+    perfc_incrc(check_pagetable);
+
+    ptbase_pfn = gptbase >> PAGE_SHIFT;
+    ptbase_mfn = __gpfn_to_mfn(d, ptbase_pfn);
+
+    ss = __shadow_status(d, ptbase_pfn);
+  
+    if ( ! (ss & PSH_shadowed) )
+    {
+        printk("%s-PT %p not shadowed\n", s, gptbase);
+        errors++;
+
+        if ( ss != 0 )
+            BUG();
+        return errors;
+    }   
+ 
+    smfn = ss & PSH_pfn_mask;
+
+    if ( ss != (PSH_shadowed | smfn) )
+        FAILPT("ptbase shadow inconsistent1");
+
+    errors += check_l2_table(d, ptbase_pfn, smfn);
+
+    gpl2e = (l2_pgentry_t *) map_domain_mem( ptbase_mfn << PAGE_SHIFT );
+    spl2e = (l2_pgentry_t *) map_domain_mem( smfn << PAGE_SHIFT );
 
     /* Go back and recurse. */
     for ( i = 0; i < DOMAIN_ENTRIES_PER_L2_PAGETABLE; i++ )
@@ -946,20 +994,7 @@ void check_pagetable(struct domain *d, pagetable_t pt, char *s)
 
         if ( l2_pgentry_val(spl2e[i]) != 0 )
         {
-            // First check to see if this guest page is currently the active
-            // PTWR page.  If so, then we compare the (old) cached copy of the
-            // guest page to the shadow, and not the currently writable (and
-            // thus potentially out-of-sync) guest page.
-            //
-            if ( ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l1va &&
-                 (i == ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l2_idx) &&
-                 likely(VM_ASSIST(d, VMASST_TYPE_writable_pagetables)) )
-            {
-                gl1mfn = (__pa(ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].page) >>
-                          PAGE_SHIFT);
-            }
-
-            check_l1_table(d, gl1mfn, sl1mfn);
+            errors += check_l1_table(d, gl1mfn, sl1mfn, i);
         }
     }
 
@@ -969,10 +1004,104 @@ void check_pagetable(struct domain *d, pagetable_t pt, char *s)
     SH_VVLOG("PT verified : l2_present = %d, l1_present = %d",
              sh_l2_present, sh_l1_present);
  
+#if 1
     if ( errors )
         BUG();
+#endif
 
-    return;
+    return errors;
+}
+
+int _check_all_pagetables(struct domain *d, char *s)
+{
+    int i, j;
+    struct shadow_status *a;
+    unsigned long gmfn;
+    int errors = 0;
+    int cpu;
+
+    shadow_status_noswap = 1;
+
+    sh_check_name = s;
+    SH_VVLOG("%s-PT Audit domid=%d", s, d->id);
+    sh_l2_present = sh_l1_present = 0;
+    perfc_incrc(check_all_pagetables);
+
+    for (i = 0; i < shadow_ht_buckets; i++)
+    {
+        a = &d->arch.shadow_ht[i];
+        while ( a && a->pfn )
+        {
+            gmfn = __gpfn_to_mfn(d, a->pfn);
+            switch ( frame_table[a->pfn].u.inuse.type_info & PGT_type_mask )
+            {
+            case PGT_l1_page_table:
+                errors += check_l1_table(d, gmfn, a->smfn_and_flags & PSH_pfn_mask, 0);
+                break;
+            case PGT_l2_page_table:
+                errors += check_l2_table(d, gmfn, a->smfn_and_flags & PSH_pfn_mask);
+                break;
+            default:
+                errors++;
+                printk("unexpected page type 0x%08x, pfn=0x%08x, gmfn=0x%08x\n",
+                       frame_table[gmfn].u.inuse.type_info,
+                       a->pfn, gmfn);
+                BUG();
+            }
+            a = a->next;
+        }
+    }
+
+    shadow_status_noswap = 0;
+
+    for (i = 0; i < 1024; i++)
+    {
+        if ( l2_pgentry_val(shadow_linear_l2_table[i]) & _PAGE_PRESENT )
+        {
+            unsigned base = i << 10;
+            for (j = 0; j < 1024; j++)
+            {
+                if ( (l1_pgentry_val(shadow_linear_pg_table[base + j]) & PAGE_MASK) == 0x0143d000 )
+                {
+                    printk("sh_ln_pg_tb[0x%08x] => 0x%08lx ",
+                           base + j,
+                           l1_pgentry_val(shadow_linear_pg_table[base + j]));
+                    if ( l1_pgentry_val(shadow_linear_pg_table[base + j]) & _PAGE_PRESENT )
+                        printk(" first entry => 0x%08lx\n",
+                               *(unsigned long *)((base + j) << PAGE_SHIFT));
+                    else
+                        printk(" page not present\n");
+                }
+            }
+        }
+    }
+
+    if ( errors )
+    {
+        printk("VM_ASSIST(d, VMASST_TYPE_writable_pagetables) => %d\n",
+               VM_ASSIST(d, VMASST_TYPE_writable_pagetables));
+        for ( cpu = 0; cpu < smp_num_cpus; cpu++ )
+        {
+            for ( j = 0; j < ARRAY_SIZE(ptwr_info->ptinfo); j++)
+            {
+                printk("ptwr_info[%d].ptinfo[%d].l1va => 0x%08x\n",
+                       cpu, j, ptwr_info[cpu].ptinfo[j].l1va);
+                printk("ptwr_info[%d].ptinfo[%d].pl1e => 0x%08x\n",
+                       cpu, j, ptwr_info[cpu].ptinfo[j].pl1e);
+                if (cpu == smp_processor_id())
+                    printk("v2m(ptwr_info[%d].ptinfo[%d].pl1e) => 0x%08x\n",
+                           cpu, j, v2m(ptwr_info[cpu].ptinfo[j].pl1e));
+                printk("ptwr_info[%d].ptinfo[%d].page => 0x%08x\n",
+                       cpu, j, ptwr_info[cpu].ptinfo[j].page);
+                if (cpu == smp_processor_id())
+                    printk("v2m(ptwr_info[%d].ptinfo[%d].page) => 0x%08x\n",
+                           cpu, j, v2m(ptwr_info[cpu].ptinfo[j].page));
+            }
+        }
+        BUG();
+    }
+
+    return errors;
 }
 
 #endif // SHADOW_DEBUG
