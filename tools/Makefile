@@ -1,6 +1,5 @@
 
 all:	
-	$(MAKE) -C balloon
 	$(MAKE) -C xc
 	$(MAKE) -C misc
 	$(MAKE) -C examples
@@ -10,7 +9,6 @@ all:
 	$(MAKE) -C xenmgr
 
 install: all
-	$(MAKE) -C balloon install
 	$(MAKE) -C xc install
 	$(MAKE) -C misc install
 	$(MAKE) -C examples install
@@ -24,11 +22,9 @@ dist: $(TARGET)
 
 
 clean:
-	$(MAKE) -C balloon clean
 	$(MAKE) -C xc clean
 	$(MAKE) -C misc clean
 	$(MAKE) -C examples clean
-	$(MAKE) -C nsplitd clean
 	$(MAKE) -C xentrace clean
 	$(MAKE) -C xenctl clean
 	$(MAKE) -C xend clean

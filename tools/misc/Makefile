@@ -11,8 +11,7 @@ OBJS     = $(patsubst %.c,%.o,$(SRCS))
 
 TARGETS  = xen_cpuperf
 
-INSTALL  = $(TARGETS) xen-mkdevnodes xen_nat_enable xen-clone
-INSTALL += xen_dmesg.py xencons
+INSTALL  = $(TARGETS) xencons
 
 all: $(TARGETS)
 	$(MAKE) -C miniterm
