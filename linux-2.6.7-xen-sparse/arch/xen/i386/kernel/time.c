@@ -479,6 +479,7 @@ int set_timeout_timer(void)
 {
     u64 alarm = 0;
     int ret = 0;
+    int cpu = smp_processor_id();
 
     spin_lock(&timerlist_lock);
 
@@ -489,12 +490,6 @@ int set_timeout_timer(void)
      * safe against normal updates of jiffies since interrupts are off.
      */
     alarm = __jiffies_to_st(next_timer_interrupt());
-
-#if 0
-    /* Tasks on the timer task queue expect to be executed on the next tick. */
-    if ( TQ_ACTIVE(tq_timer) )
-        alarm = __jiffies_to_st(jiffies + 1);
-#endif
 
     /* Failure is pretty bad, but we'd best soldier on. */
     if ( HYPERVISOR_set_timer_op(alarm) != 0 )
