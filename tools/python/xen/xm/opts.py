@@ -331,6 +331,7 @@ class Opts:
             else:
                 p = self.vals.defaults
             if os.path.exists(p):
+		print 'Using config file %s\n' % (p)
                 self.load(p, help)
                 break
         else:
