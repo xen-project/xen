@@ -594,7 +594,7 @@ class XendDomain:
         self.refresh_schedule()
         return val
 
-    def domain_migrate(self, id, dst, live):
+    def domain_migrate(self, id, dst, live=0, resource=0):
         """Start domain migration.
 
         @param id: domain id
@@ -604,7 +604,7 @@ class XendDomain:
         # Don't forget to cancel restart for it.
         dominfo = self.domain_lookup(id)
         xmigrate = XendMigrate.instance()
-        val = xmigrate.migrate_begin(dominfo, dst, live=live)
+        val = xmigrate.migrate_begin(dominfo, dst, live=live, resource=resource)
         return val
 
     def domain_save(self, id, dst, progress=0):
