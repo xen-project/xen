@@ -191,8 +191,6 @@
 3f8bcf29ulZIC9rC4wM70H_q4s6VPg tools/misc/xen_log.c
 3f13d81eQ9Vz-h-6RDGFkNR9CRP95g tools/misc/xen_nat_enable
 3f13d81e6Z6806ihYYUw8GVKNkYnuw tools/misc/xen_nat_enable.README
-3fafbef1fJFKCcJLq-ffpauvpM10jQ tools/misc/xen_netwatch.c
-3fafd0abTbQjsCr5W3DDyNdqdJezrA tools/misc/xen_netwatch_redhatscript
 3f1668d4F29Jsw0aC0bJEIkOBiagiQ tools/misc/xen_read_console.c
 3f87ba90EUVPQLVOlFG0sW89BCwouQ tools/misc/xen_refresh_dev.c
 3f72f1bdJPsV3JCnBqs9ddL9tr6D2g xen/COPYING
