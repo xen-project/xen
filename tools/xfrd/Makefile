@@ -70,7 +70,8 @@ xfrd: $(XFRD_PROG_OBJ)
 
 .PHONY: install
 install: xfrd
-	$(INSTALL_DIR) $(DESTDIR)$(XFRD_INSTALL_DIR)
+	[ -d $(DESTDIR)$(XFRD_INSTALL_DIR) ] || \
+		$(INSTALL_DIR) $(DESTDIR)$(XFRD_INSTALL_DIR)
 	$(INSTALL_PROG) xfrd $(DESTDIR)$(XFRD_INSTALL_DIR)
 
 .PHONY: libutil
