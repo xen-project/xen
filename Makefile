@@ -22,8 +22,8 @@ install: dist
 	$(MAKE) -C xen install
 	$(MAKE) -C tools install
 	sh ./docs/check_pkgs && $(MAKE) -C docs install
-	$(shell cp -a install/boot/*$(LINUX_VER)* /boot/)
-	$(shell cp -a install/lib/modules/* /lib/modules/)
+	$(shell cp -dR install/boot/*$(LINUX_VER)* /boot/)
+	$(shell cp -dR install/lib/modules/* /lib/modules/)
 
 # install xen and tools into the install directory
 dist: all

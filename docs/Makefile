@@ -23,9 +23,9 @@ clean:
 
 install: all
 	mkdir -p $(prefix)/usr/share/doc/xen
-	cp -a ps $(prefix)/usr/share/doc/xen
-	cp -a pdf $(prefix)/usr/share/doc/xen
-	cp -a html $(prefix)/usr/share/doc/xen
+	cp -dR ps $(prefix)/usr/share/doc/xen
+	cp -dR pdf $(prefix)/usr/share/doc/xen
+	cp -dR html $(prefix)/usr/share/doc/xen
 
 pdf/%.pdf: ps/%.ps
 	mkdir -p pdf ; ps2pdf $< $@

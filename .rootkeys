@@ -37,6 +37,7 @@
 3f815145CB8XdPUqsmhAjSDFuwOoqA extras/mini-os/mm.c
 3f815145vGYx1WY79voKkZB9yKwJKQ extras/mini-os/time.c
 3f815145xlKBAQmal9oces3G_Mvxqw extras/mini-os/traps.c
+4187ca95_eQN62ugV1zliQcfzXrHnw install.sh
 3e5a4e6589G-U42lFKs43plskXoFxQ linux-2.4.27-xen-sparse/Makefile
 3e5a4e65IEPjnWPZ5w3TxS5scV8Ewg linux-2.4.27-xen-sparse/arch/xen/Makefile
 3e5a4e65n-KhsEAs-A4ULiStBp-r6w linux-2.4.27-xen-sparse/arch/xen/boot/Makefile
