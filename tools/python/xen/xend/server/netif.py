@@ -134,7 +134,7 @@ class NetDev(controller.SplitDev):
 
         self.vifname = sxp.child_value(config, 'vifname')
         if self.vifname is None:
-            self.vifname = "vif%d.%d" % (self.controller.dom, self.vif)
+            self.vifname = self.default_vifname()
         if len(self.vifname) > 15:
             raise XendError('invalid vifname: too long: ' + self.vifname)
         mac = self._get_config_mac(config)
@@ -217,6 +217,9 @@ class NetDev(controller.SplitDev):
         """
         return self.vifname
 
+    def default_vifname(self):
+        return "vif%d.%d" % (self.controller.dom, self.vif)
+    
     def get_mac(self):
         """Get the MAC address as a string.
         """
@@ -248,6 +251,8 @@ class NetDev(controller.SplitDev):
         @param op: operation name (up, down)
         @param vmname: vmname
         """
+        if op == 'up':
+            Vifctl.set_vif_name(self.default_vifname(), self.vifname)
         Vifctl.vifctl(op, **self.vifctl_params(vmname=vmname))
         vnet = XendVnet.instance().vnet_of_bridge(self.bridge)
         if vnet:
@@ -276,7 +281,7 @@ class NetDev(controller.SplitDev):
                       { 'domid'        : self.controller.dom,
                         'netif_handle' : self.vif,
                         'mac'          : self.mac,
-                        'vifname'      : self.vifname
+                        #'vifname'      : self.vifname
                         })
         self.getBackendInterface().writeRequest(msg, response=d)
         return d

@@ -480,7 +480,6 @@ static PyObject *xu_message_get_payload(PyObject *self, PyObject *args)
         C2P(netif_be_create_t, domid,        Int, Long);
         C2P(netif_be_create_t, netif_handle, Int, Long);
         C2P(netif_be_create_t, status,       Int, Long);
-        C2P(netif_be_create_t, vifname,      String, String);
         return dict;
     case TYPE(CMSG_NETIF_BE, CMSG_NETIF_BE_DESTROY):
         C2P(netif_be_destroy_t, domid,        Int, Long);
@@ -648,7 +647,6 @@ static PyObject *xu_message_new(PyObject *self, PyObject *args)
         P2C(netif_be_create_t, mac[3],       u8);
         P2C(netif_be_create_t, mac[4],       u8);
         P2C(netif_be_create_t, mac[5],       u8);
-        P2CSTRING(netif_be_create_t, vifname);
         break;
     case TYPE(CMSG_NETIF_BE, CMSG_NETIF_BE_DESTROY):
         P2C(netif_be_destroy_t, domid,        u32);

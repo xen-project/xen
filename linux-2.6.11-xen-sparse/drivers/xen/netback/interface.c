@@ -121,11 +121,7 @@ void netif_create(netif_be_create_t *create)
     netif_t          **pnetif, *netif;
     char               name[IFNAMSIZ] = {};
 
-    if(create->vifname[0] == '\0'){
-        snprintf(name, IFNAMSIZ - 1, "vif%u.%u", domid, handle);
-    } else {
-        snprintf(name, IFNAMSIZ - 1, "%s", create->vifname);
-    }
+    snprintf(name, IFNAMSIZ - 1, "vif%u.%u", domid, handle);
     dev = alloc_netdev(sizeof(netif_t), name, ether_setup);
     if ( dev == NULL )
     {
