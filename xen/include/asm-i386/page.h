@@ -91,6 +91,7 @@ typedef struct { unsigned long pt_lo; } pagetable_t;
 #include <asm/flushtlb.h>
 
 #define linear_pg_table ((l1_pgentry_t *)LINEAR_PT_VIRT_START)
+#define linear_l2_table ((l2_pgentry_t *)(LINEAR_PT_VIRT_START+(LINEAR_PT_VIRT_START>>(L2_PAGETABLE_SHIFT-L1_PAGETABLE_SHIFT))))
 
 extern l2_pgentry_t idle_pg_table[ENTRIES_PER_L2_PAGETABLE];
 extern void paging_init(void);

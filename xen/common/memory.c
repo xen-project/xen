@@ -133,6 +133,7 @@
 #include <xen/errno.h>
 #include <xen/perfc.h>
 #include <xen/interrupt.h>
+#include <xen/shadow.h>
 #include <asm/page.h>
 #include <asm/flushtlb.h>
 #include <asm/io.h>
@@ -181,6 +182,7 @@ static struct {
     domid_t             subject_id;
     struct task_struct *subject_p;
 } percpu_info[NR_CPUS] __cacheline_aligned;
+
 
 /*
  * init_frametable:
@@ -762,9 +764,25 @@ void free_page_type(struct pfn_info *page, unsigned int type)
     switch ( type )
     {
     case PGT_l1_page_table:
-        return free_l1_table(page);
+        free_l1_table(page);
+	if ( unlikely(current->mm.shadow_mode) && 
+	     (get_shadow_status(current, page-frame_table) & PSH_shadowed) )
+	{
+	    unshadow_table( page-frame_table, type );
+	    put_shadow_status(current);
+        }
+	return;
+
     case PGT_l2_page_table:
-        return free_l2_table(page);
+        free_l2_table(page);
+	if ( unlikely(current->mm.shadow_mode) && 
+	     (get_shadow_status(current, page-frame_table) & PSH_shadowed) )
+	{
+	    unshadow_table( page-frame_table, type );
+	    put_shadow_status(current);
+        }
+	return;
+
     default:
         BUG();
     }
@@ -831,11 +849,22 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         if ( likely(okay) )
         {
             invalidate_shadow_ldt();
+
             percpu_info[cpu].deferred_ops &= ~DOP_FLUSH_TLB;
             old_base_pfn = pagetable_val(current->mm.pagetable) >> PAGE_SHIFT;
             current->mm.pagetable = mk_pagetable(pfn << PAGE_SHIFT);
-            write_cr3_counted(pfn << PAGE_SHIFT);
-            put_page_and_type(&frame_table[old_base_pfn]);
+
+            if( unlikely(current->mm.shadow_mode))
+            {
+                current->mm.shadow_table = 
+                    shadow_mk_pagetable(current, pfn<<PAGE_SHIFT);
+                write_cr3_counted(pagetable_val(current->mm.shadow_table));
+            }
+            else
+            {
+                write_cr3_counted(pfn << PAGE_SHIFT);
+            }
+            put_page_and_type(&frame_table[old_base_pfn]);    
         }
         else
         {
@@ -919,6 +948,8 @@ int do_mmu_update(mmu_update_t *ureqs, int count)
     struct pfn_info *page;
     int rc = 0, okay = 1, i, cpu = smp_processor_id();
     unsigned int cmd;
+    unsigned long prev_spfn = 0;
+    l1_pgentry_t *prev_spl1e = 0;
 
     perfc_incrc(calls_to_mmu_update); 
     perfc_addc(num_page_updates, count);
@@ -969,6 +1000,16 @@ int do_mmu_update(mmu_update_t *ureqs, int count)
                 {
                     okay = mod_l1_entry((l1_pgentry_t *)va, 
                                         mk_l1_pgentry(req.val)); 
+
+		    if ( okay && unlikely(current->mm.shadow_mode) &&
+			 (get_shadow_status(current, page-frame_table) &
+			  PSH_shadowed) )
+		    {
+		        shadow_l1_normal_pt_update( req.ptr, req.val, 
+						    &prev_spfn, &prev_spl1e );
+			put_shadow_status(current);
+		    }
+
                     put_page_type(page);
                 }
                 break;
@@ -978,6 +1019,15 @@ int do_mmu_update(mmu_update_t *ureqs, int count)
                     okay = mod_l2_entry((l2_pgentry_t *)va, 
                                         mk_l2_pgentry(req.val),
                                         pfn); 
+
+		    if ( okay && unlikely(current->mm.shadow_mode) &&
+			 (get_shadow_status(current, page-frame_table) & 
+			  PSH_shadowed) )
+		    {
+		        shadow_l2_normal_pt_update( req.ptr, req.val );
+			put_shadow_status(current);
+		    }
+
                     put_page_type(page);
                 }
                 break;
@@ -987,10 +1037,12 @@ int do_mmu_update(mmu_update_t *ureqs, int count)
                     *(unsigned long *)va = req.val;
                     okay = 1;
                     put_page_type(page);
+
+                    // at present, we don't shadowing such pages
                 }
                 break;
             }
-            
+
             put_page(page);
 
             break;
@@ -1033,11 +1085,23 @@ int do_mmu_update(mmu_update_t *ureqs, int count)
     if ( prev_pfn != 0 )
         unmap_domain_mem((void *)va);
 
+    if( prev_spl1e != 0 ) 
+        unmap_domain_mem((void *)prev_spl1e);
+
     deferred_ops = percpu_info[cpu].deferred_ops;
     percpu_info[cpu].deferred_ops = 0;
 
     if ( deferred_ops & DOP_FLUSH_TLB )
-        write_cr3_counted(pagetable_val(current->mm.pagetable));
+    {
+        if ( unlikely(current->mm.shadow_mode) )
+	{
+            check_pagetable( current, 
+			     current->mm.pagetable, "pre-stlb-flush" );
+	    write_cr3_counted(pagetable_val(current->mm.shadow_table));
+        }
+        else
+  	    write_cr3_counted(pagetable_val(current->mm.pagetable));
+    }
 
     if ( deferred_ops & DOP_RELOAD_LDT )
         (void)map_ldt_shadow_page(0);
@@ -1061,19 +1125,58 @@ int do_update_va_mapping(unsigned long page_nr,
     unsigned int cpu = p->processor;
     unsigned long deferred_ops;
 
+    perfc_incrc(calls_to_update_va);
+
     if ( unlikely(page_nr >= (HYPERVISOR_VIRT_START >> PAGE_SHIFT)) )
         return -EINVAL;
+
+    // XXX when we make this support 4MB pages we should also
+    // deal with the case of updating L2s
 
     if ( unlikely(!mod_l1_entry(&linear_pg_table[page_nr], 
                                 mk_l1_pgentry(val))) )
         err = -EINVAL;
+
+    if ( unlikely(p->mm.shadow_mode) )
+    {
+        unsigned long sval = 0;
+
+	// XXX this only works for l1 entries, with no translation
+
+        if ( (val & _PAGE_PRESENT) && (val & _PAGE_ACCESSED) )
+        {
+	    sval = val;
+            if ( !(val & _PAGE_DIRTY) ) 
+	        sval &= ~_PAGE_RW;
+	}
+
+	/*	printk("update_va_map: page_nr=%08lx val =%08lx sval =%08lx\n", 
+	       page_nr, val, sval);*/
+
+	if ( __put_user( sval, ((unsigned long *) (&shadow_linear_pg_table[page_nr])) ) )
+	{
+	    // Since L2's are guranteed RW, failure indicates the page
+	    // was not shadowed, so ignore.
+            perfc_incrc(shadow_update_va_fail);
+	    //MEM_LOG("update_va_map: couldn't write update\n");	
+	}
+
+	check_pagetable( p, p->mm.pagetable, "va" ); // debug
+    
+    }
+
 
     deferred_ops = percpu_info[cpu].deferred_ops;
     percpu_info[cpu].deferred_ops = 0;
 
     if ( unlikely(deferred_ops & DOP_FLUSH_TLB) || 
          unlikely(flags & UVMF_FLUSH_TLB) )
-        write_cr3_counted(pagetable_val(p->mm.pagetable));
+    {
+        if ( unlikely(p->mm.shadow_mode) )
+            write_cr3_counted(pagetable_val(p->mm.shadow_table));
+        else
+            write_cr3_counted(pagetable_val(p->mm.pagetable));
+    }
     else if ( unlikely(flags & UVMF_INVLPG) )
         __flush_tlb_one(page_nr << PAGE_SHIFT);
 
