@@ -34,3 +34,17 @@ and I'm not terribly interested in putting it back.
 As soon as you reach the debugger, we disable interrupts, the
 watchdog, and every other CPU, so the state of the world shouldn't
 change too much behind your back.
+
+
+Reasons why we might fail to reach the debugger:
+-----------------------------------------------
+
+-- In order to stop the other processors, we need to acquire the SMP
+   call lock.  If you happen to have crashed in the middle of that,
+   you're screwed.
+-- If the page tables are wrong, you're screwed
+-- If the serial port setup is wrong, badness happens
+-- We acquire the console lock at one stage XXX this is unnecessary and
+   stupid
+-- Obviously, the low level processor state can be screwed in any
+   number of wonderful ways
