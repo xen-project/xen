@@ -1879,7 +1879,7 @@ e1000_read_phy_reg(struct e1000_hw *hw,
     uint32_t mdic = 0;
     const uint32_t phy_addr = 1;
 
-    DEBUGFUNC("e1000_read_phy_reg");
+    DEBUGFUNC("XXXXe1000_read_phy_reg");
 
     if(reg_addr > MAX_PHY_REG_ADDRESS) {
         DEBUGOUT1("PHY Address %d is out of range\n", reg_addr);

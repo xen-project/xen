@@ -45,7 +45,7 @@
 #define msec_delay(x) {\
  	int s=jiffies+1+((x*HZ)/1000); \
 	printk("mdelay(%d) called -- spin\n",x); \
-	while(jiffies<s); printk("mdelay over\n");}
+	while(jiffies<s); }
 
 #if 0
 /********************  NOT in XEN ! *******/
@@ -73,7 +73,7 @@ typedef enum {
 #define ASSERT(x)	if(!(x)) BUG()
 #define MSGOUT(S, A, B)	printk(KERN_DEBUG S "\n", A, B)
 
-#define DBG 1
+//#define DBG 1
 
 #if DBG
 #define DEBUGOUT(S)		printk(KERN_DEBUG S "\n")

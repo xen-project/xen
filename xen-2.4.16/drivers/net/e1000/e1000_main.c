@@ -301,11 +301,9 @@ e1000_reset(struct e1000_adapter *adapter)
 
 	adapter->hw.fc = adapter->hw.original_fc;
 	e1000_reset_hw(&adapter->hw);
-printk("RESET_H/W\n");
 	if(adapter->hw.mac_type >= e1000_82544)
 		E1000_WRITE_REG(&adapter->hw, WUC, 0);
 	e1000_init_hw(&adapter->hw);
-printk("INIT H/W\n");
 	e1000_reset_adaptive(&adapter->hw);
 	e1000_phy_get_info(&adapter->hw, &adapter->phy_info);
 }
@@ -470,14 +468,12 @@ e1000_probe(struct pci_dev *pdev,
 
 	printk(KERN_INFO "%s: %s\n", netdev->name, adapter->id_string);
 	e1000_check_options(adapter);
-printk("OPTIONS OVER\n");
 	/* Initial Wake on LAN setting
 	 * If APM wake is enabled in the EEPROM,
 	 * enable the ACPI Magic Packet filter
 	 */
 
 	e1000_read_eeprom(&adapter->hw, EEPROM_INIT_CONTROL2_REG, &eeprom_data);
-printk("EPROM OVER\n");
 	if((adapter->hw.mac_type >= e1000_82544) &&
 	   (eeprom_data & E1000_EEPROM_APME))
 		adapter->wol |= E1000_WUFC_MAG;
@@ -485,7 +481,6 @@ printk("EPROM OVER\n");
 	/* reset the hardware with the new settings */
 
 	e1000_reset(adapter);
-printk("PROBE OVER\n");
 	cards_found++;
 	return 0;
 

@@ -77,14 +77,13 @@
 struct e1000_adapter;
 
 // XEN XXX
-#define DBG 1
+// #define DBG 1
 
 #include "e1000_hw.h"
 
 #if DBG
 #define E1000_DBG(args...) printk(KERN_DEBUG "e1000: " args)
 #else
-XXX
 #define E1000_DBG(args...)
 #endif
 

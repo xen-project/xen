@@ -32,6 +32,8 @@
 #define			SET_APIC_LOGICAL_ID(x)	(((x)<<24))
 #define			APIC_ALL_CPUS		0xFF
 #define		APIC_DFR	0xE0
+#define			APIC_DFR_CLUSTER	0x0FFFFFFFul	/* Clustered */
+#define			APIC_DFR_FLAT		0xFFFFFFFFul	/* Flat mode */
 #define		APIC_SPIV	0xF0
 #define			APIC_SPIV_FOCUS_DISABLED	(1<<9)
 #define			APIC_SPIV_APIC_ENABLED		(1<<8)
@@ -57,6 +59,7 @@
 #define			APIC_INT_LEVELTRIG	0x08000
 #define			APIC_INT_ASSERT		0x04000
 #define			APIC_ICR_BUSY		0x01000
+#define			APIC_DEST_PHYSICAL	0x00000
 #define			APIC_DEST_LOGICAL	0x00800
 #define			APIC_DM_FIXED		0x00000
 #define			APIC_DM_LOWEST		0x00100
@@ -107,7 +110,19 @@
 
 #define APIC_BASE (fix_to_virt(FIX_APIC_BASE))
 
+#ifdef CONFIG_X86_CLUSTERED_APIC
+#define MAX_IO_APICS 32
+#else
 #define MAX_IO_APICS 8
+#endif
+
+
+/*
+ * The broadcast ID is 0xF for old APICs and 0xFF for xAPICs.  SAPICs
+ * don't broadcast (yet?), but if they did, they might use 0xFFFF.
+ */
+#define APIC_BROADCAST_ID_XAPIC (0xFF)
+#define APIC_BROADCAST_ID_APIC  (0x0F)
 
 /*
  * the local APIC register structure, memory mapped. Not terribly well
