@@ -641,6 +641,9 @@ int do_process_page_updates(page_update_request_t *updates, int count)
             flags = page->flags;
             if ( (flags | current->domain) == PGT_l1_page_table )
             {
+				printk("bd240 debug: xen: doing unchecked update phy %lx\n",
+					cur.val);
+
                 *(unsigned long *)__va(cur.ptr) = cur.val;
                 err = 0;
             }
