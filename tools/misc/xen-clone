@@ -60,41 +60,66 @@ bk pull
 cd ${TOP}
 fi
 
-# identify this version of linux
-LINUX_VER=`( /bin/ls -ld ${DEST_BK_REP}/xenolinux-sparse || /bin/ls -ld ${DEST_BK_REP}/xenolinux-*-sparse ) 2>/dev/null | sed -e 's!^.*xenolinux-\(.\+\)-sparse!\1!'`
 
-if [ -z "${LINUX_VER}" ]
+if [ -d ${DEST_BK_REP}/linux-*-xen-sparse ]
 then
-echo Unable to identify Linux version. Bailing.
-exit -1
+ # this is a new style Xen repository so building is dead easy
+
+ LINUX_VER=`( /bin/ls -ld ${DEST_BK_REP}/*linux-*-xen-sparse ) 2>/dev/null | sed -e 's!^.*linux-\(.\+\)-xen-sparse!\1!'`
+
+ if [ -e ${LINUX_DIR}/linux-${LINUX_VER}.tar.gz ]  
+  LINUX_SRC=${LINUX_DIR}/linux-${LINUX_VER}.tar.gz
+ elif
+  wget ftp://ftp.kernel.org/pub/linux/kernel/v2.4/linux-${LINUX_VER}.tar.gz -O- > linux-${LINUX_VER}.tar.gz
+  LINUX_SRC=''
+ fi
+
+ cd ${DEST_BK_REP} 
+ make world
+ cd ../install/boot
+ ln -s vmlinux-${LINUX_VER}-xen0 xenolinux.gz
+  
+elif
+ # old style repository without 'make world'
+
+
+ # identify this version of linux
+ LINUX_VER=`( /bin/ls -ld ${DEST_BK_REP}/*xenolinux-sparse || /bin/ls -ld ${DEST_BK_REP}/*xenolinux-*-sparse ) 2>/dev/null | sed -e 's!^.*xenolinux-\(.\+\)-sparse!\1!'`
+
+ if [ -z "${LINUX_VER}" ]
+ then
+ echo Unable to identify Linux version. Bailing.
+ exit -1
+ fi
+
+ # copy in the master Linux tree for this kernel
+ if [ ! -d linux-${LINUX_VER} ]
+ then
+ tar -jxf ${LINUX_DIR}/linux-${LINUX_VER}.tar.bz2 || tar -zxf ${LINUX_DIR}/linux-${LINUX_VER}.tar.gz || tar -zxf ${LINUX_DIR}/linux-${LINUX_VER}.tgz || cp -a ${LINUX_DIR}/linux-${LINUX_VER} . ||  wget ftp://ftp.kernel.org/pub/linux/kernel/v2.4/linux-${LINUX_VER}.tar.gz -O- | tar -zxf - || exit -1
+ fi
+
+ # build and install Xen and tools
+ cd ${DEST_BK_REP}
+ make dist || make install
+
+ # Turn linux into xenolinux then build it
+ cd xenolinux-${LINUX_VER}-sparse
+ ./mkbuildtree ../../linux-${LINUX_VER}
+ cd ../..
+ mv linux-${LINUX_VER} xenolinux-${LINUX_VER}
+ cd xenolinux-${LINUX_VER}
+
+ # cope with the change from ARCH=xeno to ARCH=xen
+ cd arch; XEN=`/bin/ls -d xen*`; cd ..
+
+ # built it all
+ ARCH=$XEN make oldconfig
+ ARCH=$XEN make dep
+ ARCH=$XEN make bzImage
+ ARCH=$XEN make dist || ARCH=xen make install
+ ARCH=$XEN make modules
+ ARCH=$XEN make INSTALL_MOD_PATH=${TOP}/install modules_install
+ cd ..
+
 fi
-
-# copy in the master Linux tree for this kernel
-if [ ! -d linux-${LINUX_VER} ]
-then
-tar -jxf ${LINUX_DIR}/linux-${LINUX_VER}.tar.bz2 || tar -zxf ${LINUX_DIR}/linux-${LINUX_VER}.tar.gz || tar -zxf ${LINUX_DIR}/linux-${LINUX_VER}.tgz || cp -a ${LINUX_DIR}/linux-${LINUX_VER} . ||  wget ftp://ftp.kernel.org/pub/linux/kernel/v2.4/linux-${LINUX_VER}.tar.gz -O- | tar -zxf - || exit -1
-fi
-
-# build and install Xen and tools
-cd ${DEST_BK_REP}
-make dist || make install
-
-# Turn linux into xenolinux then build it
-cd xenolinux-${LINUX_VER}-sparse
-./mkbuildtree ../../linux-${LINUX_VER}
-cd ../..
-mv linux-${LINUX_VER} xenolinux-${LINUX_VER}
-cd xenolinux-${LINUX_VER}
-
-# cope with the change from ARCH=xeno to ARCH=xen
-cd arch; XEN=`/bin/ls -d xen*`; cd ..
-
-# built it all
-ARCH=$XEN make oldconfig
-ARCH=$XEN make dep
-ARCH=$XEN make bzImage
-ARCH=$XEN make dist || ARCH=xen make install
-ARCH=$XEN make modules
-ARCH=$XEN make INSTALL_MOD_PATH=${TOP}/install modules_install
-cd ..
 
