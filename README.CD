@@ -256,10 +256,10 @@ Troubleshooting Problems
 If you have problems booting Xen, there are a number of boot parameters 
 that may be able to help diagnose problems:
 
- ignorebiostables Disable parsing of BIOS-supplied tables. This is needed
-                  for some very unsupported chipsets (eg. nforce2). If you
-                  specify this option then ACPI tables are also ignored, and
-                  SMP suppirt is disabled.
+ ignorebiostables Disable parsing of BIOS-supplied tables. This may
+                  help with some chipsets that aren't fully supported
+                  by Xen. If you specify this option then ACPI tables are
+                  also ignored, and SMP support is disabled.
 
  nosmp		  Disable SMP support.
                   This option is implied by 'ignorebiostables'.

@@ -104,9 +104,10 @@ Hardware support
 
 Xen is intended to be run on server-class machines, and the current
 list of supported hardware very much reflects this, avoiding the need
-for us to write drivers for "legacy" hardware. Certain desktop chipsets
-such as nvidia nforce2 are not fully supported. Some can be made
-to work by specifying 'noacpi' or 'ignorebiostables' when booting Xen.
+for us to write drivers for "legacy" hardware. It is likely that some
+desktop chipsets will fail to work properly with the default Xen
+configuration: specifying 'noacpi' or 'ignorebiostables' when booting
+Xen may help in these cases.
 
 Xen requires a "P6" or newer processor (e.g. Pentium Pro, Celeron,
 Pentium II, Pentium III, Pentium IV, Xeon, AMD Athlon, AMD Duron).
