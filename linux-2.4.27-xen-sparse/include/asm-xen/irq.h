@@ -56,4 +56,7 @@ extern void enable_irq(unsigned int);
 extern void irq_suspend(void);
 extern void irq_resume(void);
 
+
+#define CPU_MASK_NONE 0
+
 #endif /* _ASM_IRQ_H */
