@@ -5,6 +5,7 @@ from twisted.internet import defer
 
 from xen.xend import sxp
 from xen.xend.XendLogging import log
+from xen.xend.XendError import XendError
 
 import channel
 import controller
@@ -193,13 +194,11 @@ class BlkifControllerFactory(controller.ControllerFactory):
         @type  d: Deferred or None
         """
         val = unpackMsg('blkif_be_vbd_grow_t', msg)
-        # Check status?
 	status = val['status']
 	if status != BLKIF_BE_STATUS_OKAY:
-            log.debug("Error: Adding extent to vbd failed! (device %x)",
-		      val['extent.device'])
-            # what to do here to abort????
-
+            raise XendError("Adding extent to vbd failed: device %x, error %d",
+                            val['extent.device'],
+                            status)
         if self.attached:
             if d:
                 d.callback(dev)
