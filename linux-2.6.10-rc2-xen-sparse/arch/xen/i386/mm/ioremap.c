@@ -22,7 +22,7 @@
 #ifndef CONFIG_XEN_PHYSDEV_ACCESS
 
 void * __ioremap(unsigned long phys_addr, unsigned long size,
-		unsigned long flags)
+		 unsigned long flags)
 {
 	return NULL;
 }
@@ -123,7 +123,10 @@ void __iomem * __ioremap(unsigned long phys_addr, unsigned long size, unsigned l
 		return NULL;
 	area->phys_addr = phys_addr;
 	addr = (void __iomem *) area->addr;
-	if (direct_remap_area_pages(&init_mm, (unsigned long) addr, phys_addr, size, __pgprot(_PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED | flags), DOMID_IO)) {
+	if (direct_remap_area_pages(&init_mm, (unsigned long) addr, phys_addr,
+				    size, __pgprot(_PAGE_PRESENT | _PAGE_RW |
+						   _PAGE_DIRTY | _PAGE_ACCESSED
+						   | flags), DOMID_IO)) {
 		vunmap((void __force *) addr);
 		return NULL;
 	}
@@ -395,7 +398,7 @@ int direct_remap_area_pages(struct mm_struct *mm,
 						  start_address, 
 						  address-start_address, 
 						  w);
-	
+ 
 			if (HYPERVISOR_mmu_update(u, v - u, NULL) < 0)
 				return -EFAULT;
 			v = w;
@@ -420,7 +423,7 @@ int direct_remap_area_pages(struct mm_struct *mm,
 					  address-start_address, 
 					  w);
 		if (unlikely(HYPERVISOR_mmu_update(u, v - u, NULL) < 0))
-			return -EFAULT;	
+			return -EFAULT;
 	}
 
 	flush_tlb_all();
