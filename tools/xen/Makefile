@@ -13,6 +13,8 @@ install: all
 	mkdir -p $(prefix)/usr/sbin
 	install -m0755 xend $(prefix)/usr/sbin
 	install -m0755 xm $(prefix)/usr/sbin
+	mkdir -p $(prefix)/etc/xen/xend
+	install -m0755 vifctl $(prefix)/etc/xen/xend
 
 clean:
 	rm -rf build *.pyc *.pyo *.o *.a *~

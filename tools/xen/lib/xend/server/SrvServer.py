@@ -32,7 +32,7 @@ from twisted.internet import reactor
 from xen.xend import XendRoot
 xroot = XendRoot.instance()
 
-from xen.xend import XendBridge
+from xen.xend import Vifctl
 
 from SrvRoot import SrvRoot
 
@@ -48,8 +48,7 @@ def create(port=None, interface=None, bridge=0):
     reactor.listenTCP(port, site, interface=interface)
 
 def init_bridge():
-    XendBridge.bridge_create()
-    XendBridge.reconfigure()
+    Vifctl.init()
 
 def main(port=None, interface=None):
     create(port, interface)
