@@ -406,6 +406,14 @@ class Xend:
     def xend_node(self):
         return self.xendGet(self.nodeurl())
         
+    def xend_node_shutdown(self):
+        return self.xendPost(self.nodeurl(),
+                {'op'      : 'shutdown'})
+                
+    def xend_node_restart(self):
+        return self.xendPost(self.nodeurl(),
+                {'op'      : 'reboot'})
+
     def xend_node_dmesg(self):
         return self.xendGet(self.dmesgurl())
 

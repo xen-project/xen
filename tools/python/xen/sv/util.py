@@ -17,8 +17,13 @@ def getDomInfoHash( domain ):
         d['start_time'] = float( sxp.child_value( domInfo, 'start_time' ) )
     return d
 
-def sxp2hash( sxp ):
-    pass
+def sxp2hash( s ):
+    sxphash = {}
+        
+    for child in sxp.children( s ):
+        sxphash[ child[0] ] = child[1]
+        
+    return sxphash
     
 def sxp2string( sxp ):
     class tmp:
@@ -58,7 +63,12 @@ def stateFormatter( state ):
     return state
     
 def memoryFormatter( mem ):
-    return "%7dMb" % mem
+    mem = int( mem )
+    if mem >= 1024:
+        mem = float( mem ) / 1024
+        return "%3.2fGb" % mem
+    else:    
+        return "%7dMb" % mem
 
 def cpuFormatter( mhz ):
     if mhz > 1000:

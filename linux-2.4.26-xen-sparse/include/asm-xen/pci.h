@@ -145,7 +145,8 @@ static inline void pci_unmap_page(struct pci_dev *hwdev, dma_addr_t dma_address,
 static inline int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
 			     int nents, int direction)
 {
-	int i;
+	int i, j, nr_pfns;
+	unsigned long first_pfn;
 
 	if (direction == PCI_DMA_NONE)
 		out_of_line_bug();
@@ -159,10 +160,28 @@ static inline int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
  		else if (!sg[i].address && !sg[i].page)
  			out_of_line_bug();
  
- 		if (sg[i].address)
+ 		if (sg[i].address) {
  			sg[i].dma_address = virt_to_bus(sg[i].address);
- 		else
+ 			first_pfn = virt_to_phys(sg[i].address) >> PAGE_SHIFT;
+ 			nr_pfns = (((unsigned long)sg[i].address & 
+ 			    (PAGE_SIZE-1)) + sg[i].length + PAGE_SIZE - 1) >>
+ 			    PAGE_SHIFT;
+ 		} else {
  			sg[i].dma_address = page_to_bus(sg[i].page) + sg[i].offset;
+ 			first_pfn = page_to_phys(sg[i].page) >> PAGE_SHIFT;
+ 			nr_pfns = (sg[i].offset + sg[i].length + PAGE_SIZE - 
+ 			    1) >> PAGE_SHIFT;
+ 		}
+
+                /*
+                 * Check that we merged physical buffers are also contiguous
+                 * in machine-address space. We try to fail by returning 0.
+                 */
+                for (j = 1; j < nr_pfns; j++) {
+                    if ( unlikely(pfn_to_mfn(first_pfn+j) != 
+                                  (pfn_to_mfn(first_pfn)+j)) )
+                        return 0;
+                }
  	}
  
 	flush_write_buffers();

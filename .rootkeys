@@ -442,12 +442,15 @@
 40fcefb38OTgsUKHBpwshLLIsiIaCA tools/sv/images/middle-no-highlight.jpg
 40fcefb32SPtrw36c4S6YGFlLvkKuw tools/sv/images/orb_01.jpg
 40fcefb3Ok5qkX3iM7ZEPVkRInrUpg tools/sv/images/orb_02.jpg
+41013a82ILk71xLqWFH5ZO5VmOIvBw tools/sv/images/reboot.png
 40fcefb3JnT5XeKTuVF4yUMGOtuNZg tools/sv/images/right-end-highlight.jpg
 40fcefb3-DuYOS7noo2W7b_0p7TOUg tools/sv/images/right-end-no-highlight.jpg
 40fcefb3qNbAZR5FYGPAZ9sFPVMTDA tools/sv/images/seperator-left-highlight.jpg
 40fcefb3dgsa24WLk_BJeYQHrDLuOg tools/sv/images/seperator-right-highlight.jpg
 40fcefb3FtiX4Pd2kT8wDlp8u8xRhQ tools/sv/images/seperator.jpg
+41013a82sUdUqBv8EoAUJii3gsZ-4g tools/sv/images/shutdown.png
 40fcefb3yMSrZvApO9ToIi-iQwnchA tools/sv/images/xen.png
+41013a83z27rKvWIxAfUBMVZ1eDCDg tools/sv/inc/script.js
 40fcefb3zGC9XNBkSwTEobCoq8YClA tools/sv/inc/style.css
 403a3edbrr8RE34gkbR40zep98SXbg tools/xentrace/Makefile
 40a107afN60pFdURgBv9KwEzgRl5mQ tools/xentrace/formats
