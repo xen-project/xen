@@ -375,7 +375,7 @@ class XendDomain:
         def cbok(dominfo):
             self._add_domain(dominfo)
             return dominfo
-        deferred = dominfo.construct(config)
+        deferred = dominfo.dom_construct(dominfo.dom, config)
         deferred.addCallback(cbok)
         return deferred
     
