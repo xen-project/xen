@@ -114,7 +114,7 @@ relative_lndir ../../../${RS}/../xen/include/hypervisor-ifs
 
 # Another special symlink: to the shared definitions for the control interface
 cd ..
-ln -sf ../../${RS}/../tools/python/xen/ext/xu/domain_controller.h
+ln -sf ../../${RS}/../tools/python/xen/lowlevel/xu/domain_controller.h
 
 # The remainder are the i386 -> xen-i386 links
 ln -sf ../asm-i386/a.out.h 
