@@ -1,5 +1,6 @@
 
 #include <linux/slab.h>
+#include <linux/version.h>
 #include <linux/mman.h>
 #include <linux/init.h>
 #include <asm/pgalloc.h>
@@ -23,7 +24,11 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
 		    (!vma || ((addr + len) <= vma->vm_start)))
 			return addr;
 	}
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 	start_addr = addr = mm->free_area_cache;
+#else
+	addr = PAGE_ALIGN(TASK_UNMAPPED_BASE);
+#endif
 
 full_search:
 	for (vma = find_vma(mm, addr); ; vma = vma->vm_next) {
@@ -43,7 +48,9 @@ full_search:
 			/*
 			 * Remember the place where we stopped the search:
 			 */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 			mm->free_area_cache = addr + len;
+#endif
 			return addr;
 		}
 		addr = vma->vm_end;

@@ -9,7 +9,7 @@
 
 O_TARGET := mm.o
 
-obj-y	 := init.o fault.o extable.o pageattr.o hypervisor.o ioremap.o
+obj-y	 := init.o fault.o extable.o pageattr.o hypervisor.o ioremap.o mmap.o
 
 export-objs := pageattr.o
 

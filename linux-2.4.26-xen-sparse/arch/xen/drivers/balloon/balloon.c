@@ -65,7 +65,6 @@ static unsigned long inflate_balloon(unsigned long num_pages)
     unsigned long *currp;
     unsigned long curraddr;
     unsigned long ret = 0;
-    unsigned long vaddr;
     unsigned long i, j;
 
     parray = (unsigned long *)vmalloc(num_pages * sizeof(unsigned long));
@@ -102,7 +101,7 @@ static unsigned long inflate_balloon(unsigned long num_pages)
     for ( i = 0, currp = parray; i < num_pages; i++, currp++ )
     {
 	unsigned long mfn = phys_to_machine_mapping[*currp];
-        curraddr = page_address(mem_map + *currp);
+        curraddr = (unsigned long)page_address(mem_map + *currp);
 	if (curraddr)
             queue_l1_entry_update(get_ptep(curraddr), 0);
 
@@ -178,7 +177,7 @@ unsigned long deflate_balloon(unsigned long num_pages)
 
     if ( num_pages > credit )
     {
-        printk(KERN_ERR "deflate_balloon: %d pages > %d credit.\n",
+        printk(KERN_ERR "deflate_balloon: %lu pages > %lu credit.\n",
 			num_pages, credit);
         return -EAGAIN;
     }

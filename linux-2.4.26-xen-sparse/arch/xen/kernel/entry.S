@@ -518,9 +518,8 @@ ENTRY(machine_check)
 	pushl $ SYMBOL_NAME(do_machine_check)
 	jmp error_code
 
-ENTRY(spurious_interrupt_bug)
-	pushl $0
-	pushl $ SYMBOL_NAME(do_spurious_interrupt_bug)
+ENTRY(fixup_4gb_segment)
+	pushl $ SYMBOL_NAME(do_fixup_4gb_segment)
 	jmp error_code
 
 .data

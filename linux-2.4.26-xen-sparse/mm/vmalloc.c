@@ -152,7 +152,7 @@ static inline int alloc_area_pmd(pmd_t * pmd, unsigned long address,
 	return 0;
 }
 
-static inline int __vmalloc_area_pages (unsigned long address,
+/*static inline*/ int __vmalloc_area_pages (unsigned long address,
 					unsigned long size,
 					int gfp_mask,
 					pgprot_t prot,
