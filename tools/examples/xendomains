@@ -6,7 +6,9 @@
 # chkconfig: 345 99 00
 # description: Start / stop Xen domains.
 #
-# This script offers fairly basic functionality.
+# This script offers fairly basic functionality.  It should work on Redhat
+# but also on LSB-compliant SuSE releases and on Debian with the LSB package
+# installed.  (LSB is the Linux Standard Base)
 #
 # Based on the example in the "Designing High Quality Integrated Linux
 # Applications HOWTO" by Avi Alkalay
@@ -16,18 +18,38 @@
 RETVAL=0
 
 INITD=/etc/init.d/
-. $INITD/functions
 
-on_fn_exit()
-{
-    if [ $RETVAL -eq 0 ]; then
-	success
-    else
-	failure
-    fi
-    
-    echo
-}
+if [ -e /lib/lsb ]; then
+    # assume an LSB-compliant distro (Debian with LSB package,
+    # recent-enough SuSE, others...)
+
+    . /lib/lsb/init-functions # source LSB standard functions
+
+    on_fn_exit()
+    {
+	if [ $RETVAL -eq 0 ]; then
+	    log_success_msg
+	else
+	    log_failure_msg
+	fi
+    }
+else
+    # assume a Redhat-like distro
+    . $INITD/functions # source Redhat functions
+
+    on_fn_exit()
+    {
+	if [ $RETVAL -eq 0 ]; then
+	    success
+	else
+	    failure
+	fi
+	
+	echo
+    }
+fi
+
+
 
 start() {
     if [ -f /var/lock/subsys/xendomains ]; then return; fi
@@ -36,7 +58,8 @@ start() {
 
     # we expect config scripts for auto starting domains to be in
     # /etc/xc/auto/ - they could just be symlinks to files elsewhere
-    if [ $(ls /etc/xc/auto/ | wc -l) -gt 0 ]; then
+    if [ -d /etc/xc/auto ] &&
+	    [ $(ls /etc/xc/auto/ | wc -l) -gt 0 ]; then
 	
        # create all domains with config files in /etc/xc/auto
 	for dom in /etc/xc/auto/*; do
@@ -45,9 +68,9 @@ start() {
 		RETVAL=$?
 	    fi
 	done
-    fi
 
-    [ $RETVAL -eq 0 ] && touch /var/lock/subsys/xendomains
+	touch /var/lock/subsys/xendomains
+    fi
 
     on_fn_exit
 }
@@ -61,7 +84,8 @@ stop()
     
     echo -n $"Shutting down all Xen domains:"
 
-    if [ $(ls /var/run/xendomains/ | wc -l) -gt 0 ]; then
+    if [ -d /var/run/xendomains ] &&
+	    [ $(ls /var/run/xendomains/ | wc -l) -gt 0 ]; then
 	
 	cd /var/run/xendomains/
 
