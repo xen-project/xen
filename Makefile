@@ -19,28 +19,28 @@ export INSTALL_DIR
 include buildconfigs/Rules.mk
 
 .PHONY:	all dist install xen tools kernels docs world clean mkpatches mrproper
-.PHONY:	kbuild kdelete kclean install_tools install_xen install_docs
-.PHONY: install_kernel
+.PHONY:	kbuild kdelete kclean install-tools install-xen install-docs
+.PHONY: install-kernels
 
 all: dist
 
 # install everything into the standard system directories
 # NB: install explicitly does not check that everything is up to date!
-install: install_tools install_xen install_kernels install_docs
+install: install-tools install-xen install-kernels install-docs
 
-install_xen:
+install-xen:
 	$(MAKE) -C xen install
 
-install_tools:
+install-tools:
 	$(MAKE) -C tools install
 
-install_kernels:
+install-kernels:
 	$(shell cp -a $(INSTALL_DIR)/boot/* /boot/)
 	$(shell cp -a $(INSTALL_DIR)/lib/modules/* /lib/modules/)
 	$(shell cp -dR $(INSTALL_DIR)/boot/*$(LINUX_VER)* $(prefix)/boot/)
 	$(shell cp -dR $(INSTALL_DIR)/lib/modules/* $(prefix)/lib/modules/)
 
-install_docs:
+install-docs:
 	sh ./docs/check_pkgs && $(MAKE) -C docs install || true
 
 # build and install everything into local dist directory

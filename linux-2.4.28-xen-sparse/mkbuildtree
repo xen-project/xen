@@ -204,6 +204,7 @@ ln -sf ../asm-i386/unaligned.h
 ln -sf ../asm-i386/unistd.h 
 ln -sf ../asm-i386/user.h 
 ln -sf ../asm-i386/vm86.h 
+ln -sf ../../${LINUX_26}/include/asm-xen/balloon.h
 ln -sf ../../${LINUX_26}/include/asm-xen/ctrl_if.h
 ln -sf ../../${LINUX_26}/include/asm-xen/evtchn.h
 ln -sf ../../${LINUX_26}/include/asm-xen/gnttab.h
