@@ -60,10 +60,10 @@ void failsafe_callback(void);
 static void exit_handler(int ev, struct pt_regs *regs);
 static void debug_handler(int ev, struct pt_regs *regs);
 
+extern char shared_info[PAGE_SIZE];
 
 static shared_info_t *map_shared_info(unsigned long pa)
 {
-    extern char shared_info[PAGE_SIZE];
     if ( HYPERVISOR_update_va_mapping((unsigned long)shared_info >> PAGE_SHIFT,
                                       pa | 3, UVMF_INVLPG) )
     {

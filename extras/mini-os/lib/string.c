@@ -35,7 +35,8 @@ int memcmp(const void * cs,const void * ct,size_t count)
 
 void * memcpy(void * dest,const void *src,size_t count)
 {
-	char *tmp = (char *) dest, *s = (char *) src;
+	char *tmp = (char *) dest;
+    const char *s = src;
 
 	while (count--)
 		*tmp++ = *s++;
@@ -120,7 +121,7 @@ char * strchr(const char * s, int c)
         for(; *s != (char) c; ++s)
                 if (*s == '\0')
                         return NULL;
-        return (char *) s;
+        return (char *)s;
 }
 
 char * strstr(const char * s1,const char * s2)
@@ -139,4 +140,3 @@ char * strstr(const char * s1,const char * s2)
         }
         return NULL;
 }
-

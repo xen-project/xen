@@ -1,17 +1,24 @@
 
 CC := gcc
 LD := ld
+
 # Linker should relocate monitor to this address
 MONITOR_BASE := 0xE0100000
-CFLAGS  := -fno-builtin -O3 -Wall -Ih/
+
+# NB. '-Wstrict-prototypes -Wredundant-decls -Wpointer-arith -Winline -ansi'
+#     might all be okay to add to Xen. '-Wnested-externs' is a maybe.
+#     '-Wcast-qual' is evil.
+CFLAGS := -fno-builtin -O3 -Wall -Ih/ -Wredundant-decls
+CFLAGS += -Wstrict-prototypes -Wnested-externs -Wpointer-arith -Winline -ansi
 
 TARGET := mini-os
 
-LOBJS:= lib/malloc.o lib/math.o lib/printf.o lib/string.o 
-OBJS := entry.o kernel.o traps.o hypervisor.o mm.o events.o time.o ${LOBJS}
+LOBJS := lib/malloc.o lib/math.o lib/printf.o lib/string.o 
+OBJS  := entry.o kernel.o traps.o hypervisor.o mm.o events.o time.o ${LOBJS}
 
 HINTF := h/hypervisor-ifs/hypervisor-if.h
-HDRS :=  h/os.h h/types.h h/hypervisor.h h/mm.h h/events.h h/time.h h/lib.h $(HINTF)
+HDRS  :=  h/os.h h/types.h h/hypervisor.h h/mm.h h/events.h h/time.h h/lib.h
+HDRS  += $(HINTF)
 
 default: $(TARGET)
 

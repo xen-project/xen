@@ -88,7 +88,7 @@ static void get_time_values_from_xen(void)
     (shadow_time_version == HYPERVISOR_shared_info->time_version2)
 
 
-static inline unsigned long get_time_delta_usecs(void)
+static __inline__ unsigned long get_time_delta_usecs(void)
 {
     s32      delta_tsc;
     u32      low;

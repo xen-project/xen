@@ -57,7 +57,7 @@ void dump_regs(struct pt_regs *regs)
 }	
 
 
-static inline void dump_code(unsigned eip)
+static __inline__ void dump_code(unsigned eip)
 {
   unsigned *ptr = (unsigned *)eip;
   int x;
@@ -80,7 +80,7 @@ static inline void dump_code(unsigned eip)
  * register CR2, but that is not accessible in a virtualised OS.
  */
 
-static void inline do_trap(int trapnr, char *str,
+static void __inline__ do_trap(int trapnr, char *str,
 			   struct pt_regs * regs, long error_code)
 {
   printk("FATAL:  Unhandled Trap (see mini-os:traps.c)");

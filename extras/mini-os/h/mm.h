@@ -51,13 +51,13 @@
 extern unsigned long *phys_to_machine_mapping;
 #define pfn_to_mfn(_pfn) (phys_to_machine_mapping[(_pfn)])
 #define mfn_to_pfn(_mfn) (machine_to_phys_mapping[(_mfn)])
-static inline unsigned long phys_to_machine(unsigned long phys)
+static __inline__ unsigned long phys_to_machine(unsigned long phys)
 {
     unsigned long machine = pfn_to_mfn(phys >> PAGE_SHIFT);
     machine = (machine << PAGE_SHIFT) | (phys & ~PAGE_MASK);
     return machine;
 }
-static inline unsigned long machine_to_phys(unsigned long machine)
+static __inline__ unsigned long machine_to_phys(unsigned long machine)
 {
     unsigned long phys = mfn_to_pfn(machine >> PAGE_SHIFT);
     phys = (phys << PAGE_SHIFT) | (machine & ~PAGE_MASK);
@@ -69,7 +69,7 @@ static inline unsigned long machine_to_phys(unsigned long machine)
 #define to_phys(x)                 ((unsigned long)(x)-VIRT_START)
 #define to_virt(x)                 ((void *)((unsigned long)(x)+VIRT_START))
 
-void init_mm();
+void init_mm(void);
 unsigned long alloc_pages(int order);
 
 #endif /* _MM_H_ */

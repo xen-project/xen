@@ -130,10 +130,7 @@ vsprintf(char *buf, const char *cfmt, va_list ap)
  * The buffer pointed to by `nbuf' must have length >= MAXNBUF.
  */
 static char *
-ksprintn(nbuf, ul, base, lenp)
-	char *nbuf;
-	u_long ul;
-	int base, *lenp;
+ksprintn(char *nbuf, u_long ul, int base, int *lenp)
 {
 	char *p;
 
@@ -148,10 +145,7 @@ ksprintn(nbuf, ul, base, lenp)
 }
 /* ksprintn, but for a quad_t. */
 static char *
-ksprintqn(nbuf, uq, base, lenp)
-	char *nbuf;
-	u_quad_t uq;
-	int base, *lenp;
+ksprintqn(char *nbuf, u_quad_t uq, int base, int *lenp)
 {
 	char *p;
 

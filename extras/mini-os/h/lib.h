@@ -114,7 +114,7 @@ void  free(void* p);
 void *realloc(void* p, size_t n);
 void *memalign(size_t alignment, size_t n);
 void *valloc(size_t n);
-struct mallinfo mallinfo();
+struct mallinfo mallinfo(void);
 int  mallopt(int parameter_number, int parameter_value);
 
 void **independent_calloc(size_t n_elements, size_t size, void* chunks[]);
@@ -123,7 +123,7 @@ void *pvalloc(size_t n);
 void cfree(void* p);
 int malloc_trim(size_t pad);
 size_t malloc_usable_size(void* p);
-void malloc_stats();
+void malloc_stats(void);
 
 
 #endif /* _LIB_H_ */

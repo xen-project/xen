@@ -104,10 +104,10 @@ typedef struct xen_disk
 typedef struct xen_disk_info
 {
     /* IN variables  */
-    int         max;             // maximumum number of disks to report
-    xen_disk_t *disks;           // pointer to array of disk info 
+    int         max;             /* maximumum number of disks to report */
+    xen_disk_t *disks;           /* pointer to array of disk info       */
     /* OUT variables */
-    int         count;           // how many disks we have info about 
+    int         count;           /* how many disks we have info about   */
 } xen_disk_info_t;
 
 #endif

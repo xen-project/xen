@@ -60,7 +60,7 @@ static void *more_core(size_t n)
     if ( ret )
     {
         num_pages = 1 << order;
-        last = ret + (num_pages * PAGE_SIZE);
+        last = (char *)ret + (num_pages * PAGE_SIZE);
     }
 
     return ret;      
