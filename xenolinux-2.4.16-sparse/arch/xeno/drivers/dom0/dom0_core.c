@@ -175,6 +175,8 @@ static ssize_t dom_mem_read(struct file * file, char * buff, size_t size, loff_t
     //                mem_data->tot_pages);
     copy_to_user((unsigned long *)buff, &addr, sizeof(addr));
 
+	printk(KERN_ALERT "bd240 debug: exiting dom_mem_read\n");
+
     return sizeof(addr);
      
 }
