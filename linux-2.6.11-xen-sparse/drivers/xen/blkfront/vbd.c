@@ -496,21 +496,16 @@ int xlvbd_init(void)
 {
     int i;
 
-    /*
-     * If compiled as a module, we don't support unloading yet. We
-     * therefore permanently increment the reference count to
-     * disallow it.
-     */
-    /* MOD_INC_USE_COUNT; */
-
     memset(major_info, 0, sizeof(major_info));
 
-    for (i = 0; i < sizeof(major_info) / sizeof(major_info[0]); i++) {
+    vbd_info = kmalloc(MAX_VBDS * sizeof(vdisk_t), GFP_KERNEL);
+    if (vbd_info == NULL) {
+        printk(KERN_ALERT "Failed to allocate memory for disk info.\n");
+        nr_vbds = 0;
+        return 0;
     }
 
-    vbd_info = kmalloc(MAX_VBDS * sizeof(vdisk_t), GFP_KERNEL);
     nr_vbds  = xlvbd_get_vbd_info(vbd_info);
-
     if (nr_vbds < 0) {
         kfree(vbd_info);
         vbd_info = NULL;
