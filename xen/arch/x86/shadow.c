@@ -256,7 +256,6 @@ static int shadow_mode_table_op(
 
     switch ( op )
     {
-        /* XXX KAF: Do we really need this function? Is it any use? */
     case DOM0_SHADOW_CONTROL_OP_FLUSH:
         free_shadow_state(m);
 
@@ -268,11 +267,6 @@ static int shadow_mode_table_op(
         break;
    
     case DOM0_SHADOW_CONTROL_OP_CLEAN:
-        /*
-         * XXX KAF: Why not just free_shadow_state()? Is zeroing L2's faster?
-         * If so, why wouldn't zeroing L1's be better than freeing them, as we
-         * do now?
-         */
         clear_shadow_state(m);
 
         sc->stats.fault_count       = m->shadow_fault_count;
