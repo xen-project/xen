@@ -89,7 +89,7 @@ int map_pages(
         {
             /* Super-page mapping. */
             if ( (l2_pgentry_val(*pl2e) & _PAGE_PRESENT) )
-                __flush_tlb_pge();
+                local_flush_tlb_pge();
             *pl2e = mk_l2_pgentry(p|flags|_PAGE_PSE);
 
             v += 1 << L2_PAGETABLE_SHIFT;
@@ -107,7 +107,7 @@ int map_pages(
             }
             pl1e = l2_pgentry_to_l1(*pl2e) + l1_table_offset(v);
             if ( (l1_pgentry_val(*pl1e) & _PAGE_PRESENT) )
-                __flush_tlb_one(v);
+                local_flush_tlb_one(v);
             *pl1e = mk_l1_pgentry(p|flags);
 
             v += 1 << L1_PAGETABLE_SHIFT;

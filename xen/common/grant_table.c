@@ -102,7 +102,8 @@ __gnttab_map_grant_ref(
     if ( ((host_virt_addr != 0) || (flags & GNTMAP_host_map) ) &&
          unlikely(!__addr_ok(host_virt_addr)))
     {
-        DPRINTK("Bad virtual address (%x) or flags (%x).\n", host_virt_addr, flags);
+        DPRINTK("Bad virtual address (%x) or flags (%x).\n",
+                host_virt_addr, flags);
         (void)__put_user(GNTST_bad_virt_addr, &uop->handle);
         return GNTST_bad_gntref;
     }
@@ -332,8 +333,10 @@ __gnttab_map_grant_ref(
          */
     }
 
-    /* Only make the maptrack live _after_ writing the pte, in case
-     * we overwrite the same frame number, causing a maptrack walk to find it */
+    /*
+     * Only make the maptrack live _after_ writing the pte, in case we 
+     * overwrite the same frame number, causing a maptrack walk to find it.
+     */
     ld->grant_table->maptrack[handle].domid         = dom;
     ld->grant_table->maptrack[handle].ref_and_flags =
         (ref << MAPTRACK_REF_SHIFT) | (flags & MAPTRACK_GNTMAP_MASK);
@@ -364,13 +367,14 @@ gnttab_map_grant_ref(
     unsigned long va = 0;
 
     for ( i = 0; i < count; i++ )
-        if ( __gnttab_map_grant_ref(&uop[i], &va) == 0)
+        if ( __gnttab_map_grant_ref(&uop[i], &va) == 0 )
             flush++;
 
+    /* XXX KAF: I think we are probably flushing too much here. */
     if ( flush == 1 )
-        __flush_tlb_one(va);
+        flush_tlb_one_mask(current->domain->cpuset, va);
     else if ( flush != 0 )
-        local_flush_tlb();
+        flush_tlb_mask(current->domain->cpuset);
 
     return 0;
 }
@@ -457,7 +461,7 @@ __gnttab_unmap_grant_ref(
         unsigned long   _ol1e;
 
         pl1e = &linear_pg_table[l1_linear_offset(virt)];
-                                                                                            
+
         if ( unlikely(__get_user(_ol1e, (unsigned long *)pl1e) != 0) )
         {
             DPRINTK("Could not find PTE entry for address %x\n", virt);
@@ -526,14 +530,13 @@ gnttab_unmap_grant_ref(
     unsigned long va = 0;
 
     for ( i = 0; i < count; i++ )
-        if ( __gnttab_unmap_grant_ref(&uop[i], &va) == 0)
+        if ( __gnttab_unmap_grant_ref(&uop[i], &va) == 0 )
             flush++;
 
     if ( flush == 1 )
-        __flush_tlb_one(va);
-
+        flush_tlb_one_mask(current->domain->cpuset, va);
     else if ( flush != 0 )
-        local_flush_tlb();
+        flush_tlb_mask(current->domain->cpuset);
 
     return 0;
 }

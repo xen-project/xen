@@ -1476,23 +1476,34 @@ int do_mmuext_op(
             break;
     
         case MMUEXT_INVLPG_LOCAL:
-            __flush_tlb_one(op.linear_addr);
+            local_flush_tlb_one(op.linear_addr);
             break;
 
         case MMUEXT_TLB_FLUSH_MULTI:
-            flush_tlb_mask(d->cpuset); /* XXX KAF XXX */
-            break;
-    
         case MMUEXT_INVLPG_MULTI:
-            flush_tlb_mask(d->cpuset); /* XXX KAF XXX */
+        {
+            unsigned long inset = op.cpuset, outset = 0;
+            while ( inset != 0 )
+            {
+                unsigned int vcpu = find_first_set_bit(inset);
+                inset &= ~(1UL<<vcpu);
+                if ( (vcpu < MAX_VIRT_CPUS) &&
+                     ((ed = d->exec_domain[vcpu]) != NULL) )
+                    outset |= 1UL << ed->processor;
+            }
+            if ( op.cmd == MMUEXT_TLB_FLUSH_MULTI )
+                flush_tlb_mask(outset & d->cpuset);
+            else
+                flush_tlb_one_mask(outset & d->cpuset, op.linear_addr);
             break;
+        }
 
         case MMUEXT_TLB_FLUSH_ALL:
             flush_tlb_mask(d->cpuset);
             break;
     
         case MMUEXT_INVLPG_ALL:
-            flush_tlb_mask(d->cpuset); /* XXX KAF XXX */
+            flush_tlb_one_mask(d->cpuset, op.linear_addr);
             break;
 
         case MMUEXT_FLUSH_CACHE:
@@ -2029,10 +2040,10 @@ int do_update_va_mapping(unsigned long va,
         percpu_info[cpu].deferred_ops &= ~DOP_FLUSH_TLB;
         break;
     case UVMF_INVLPG_LOCAL:
-        __flush_tlb_one(va);
+        local_flush_tlb_one(va);
         break;
     case UVMF_INVLPG_ALL:
-        flush_tlb_mask(d->cpuset); /* XXX KAF XXX */
+        flush_tlb_one_mask(d->cpuset, va);
         break;
     }
 
@@ -2317,7 +2328,7 @@ void ptwr_flush(const int which)
 
     /* Ensure that there are no stale writable mappings in any TLB. */
     /* NB. INVLPG is a serialising instruction: flushes pending updates. */
-    __flush_tlb_one(l1va); /* XXX Multi-CPU guests? */
+    local_flush_tlb_one(l1va); /* XXX Multi-CPU guests? */
     PTWR_PRINTK("[%c] disconnected_l1va at %p now %p\n",
                 PTWR_PRINT_WHICH, ptep, pte);
 
@@ -2636,7 +2647,7 @@ int ptwr_do_page_fault(unsigned long addr)
          likely(!shadow_mode_enabled(ed->domain)) )
     {
         *pl2e = mk_l2_pgentry(l2e & ~_PAGE_PRESENT);
-        flush_tlb(); /* XXX Multi-CPU guests? */
+        local_flush_tlb(); /* XXX Multi-CPU guests? */
     }
     
     /* Temporarily map the L1 page, and make a copy of it. */

@@ -78,8 +78,6 @@ extern root_pgentry_t idle_pg_table[ROOT_PAGETABLE_ENTRIES];
 
 extern void paging_init(void);
 
-/* Flush global pages as well. */
-
 #define __pge_off()                                                     \
     do {                                                                \
         __asm__ __volatile__(                                           \
@@ -93,17 +91,6 @@ extern void paging_init(void);
             "mov %0, %%cr4;  # turn off PGE     "                       \
             : : "r" (mmu_cr4_features) );                               \
     } while ( 0 )
-
-
-#define __flush_tlb_pge()                                               \
-    do {                                                                \
-        __pge_off();                                                    \
-        __flush_tlb();                                                  \
-        __pge_on();                                                     \
-    } while ( 0 )
-
-#define __flush_tlb_one(__addr) \
-    __asm__ __volatile__("invlpg %0": :"m" (*(char *) (__addr)))
 
 #endif /* !__ASSEMBLY__ */
 

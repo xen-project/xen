@@ -148,17 +148,20 @@ static inline void send_IPI_allbutself(int vector)
 }
 
 static spinlock_t flush_lock = SPIN_LOCK_UNLOCKED;
-static unsigned long flush_cpumask;
+static unsigned long flush_cpumask, flush_va;
 
 asmlinkage void smp_invalidate_interrupt(void)
 {
     ack_APIC_irq();
     perfc_incrc(ipis);
-    local_flush_tlb();
+    if ( flush_va == FLUSHVA_ALL )
+        local_flush_tlb();
+    else
+        local_flush_tlb_one(flush_va);
     clear_bit(smp_processor_id(), &flush_cpumask);
 }
 
-void flush_tlb_mask(unsigned long mask)
+void __flush_tlb_mask(unsigned long mask, unsigned long va)
 {
     ASSERT(local_irq_is_enabled());
     
@@ -172,6 +175,7 @@ void flush_tlb_mask(unsigned long mask)
     {
         spin_lock(&flush_lock);
         flush_cpumask = mask;
+        flush_va      = va;
         send_IPI_mask(mask, INVALIDATE_TLB_VECTOR);
         while ( flush_cpumask != 0 )
             cpu_relax();
@@ -190,6 +194,7 @@ void new_tlbflush_clock_period(void)
         spin_lock(&flush_lock);
         flush_cpumask  = (1UL << smp_num_cpus) - 1;
         flush_cpumask &= ~(1UL << smp_processor_id());
+        flush_va       = FLUSHVA_ALL;
         send_IPI_allbutself(INVALIDATE_TLB_VECTOR);
         while ( flush_cpumask != 0 )
             cpu_relax();
@@ -203,13 +208,13 @@ void new_tlbflush_clock_period(void)
 
 static void flush_tlb_all_pge_ipi(void *info)
 {
-    __flush_tlb_pge();
+    local_flush_tlb_pge();
 }
 
 void flush_tlb_all_pge(void)
 {
     smp_call_function(flush_tlb_all_pge_ipi, 0, 1, 1);
-    __flush_tlb_pge();
+    local_flush_tlb_pge();
 }
 
 void smp_send_event_check_mask(unsigned long cpu_mask)

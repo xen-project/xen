@@ -77,46 +77,35 @@ static inline unsigned long read_cr3(void)
 /* Write pagetable base and implicitly tick the tlbflush clock. */
 extern void write_cr3(unsigned long cr3);
 
-/*
- * TLB flushing:
- *
- *  - flush_tlb() flushes the current mm struct TLBs
- *  - flush_tlb_all() flushes all processes TLBs
- *  - flush_tlb_pgtables(mm, start, end) flushes a range of page tables
- *
- * ..but the i386 has somewhat limited tlb flushing capabilities,
- * and page-granular flushes are available only on i486 and up.
- */
-
-#define __flush_tlb()                                             \
+#define local_flush_tlb()                                         \
     do {                                                          \
         unsigned long cr3 = read_cr3();                           \
         write_cr3(cr3);                                           \
     } while ( 0 )
 
-#ifndef CONFIG_SMP
+#define local_flush_tlb_pge()                                     \
+    do {                                                          \
+        __pge_off();                                              \
+        local_flush_tlb();                                        \
+        __pge_on();                                               \
+    } while ( 0 )
 
-#define flush_tlb()               __flush_tlb()
-#define flush_tlb_all()           __flush_tlb()
-#define flush_tlb_all_pge()       __flush_tlb_pge()
-#define local_flush_tlb()         __flush_tlb()
-#define flush_tlb_cpu(_cpu)       __flush_tlb()
-#define flush_tlb_mask(_mask)     __flush_tlb()
-#define try_flush_tlb_mask(_mask) __flush_tlb()
+#define local_flush_tlb_one(__addr) \
+    __asm__ __volatile__("invlpg %0": :"m" (*(char *) (__addr)))
 
-#else
-
-#include <xen/smp.h>
-
-extern int try_flush_tlb_mask(unsigned long mask);
-extern void flush_tlb_mask(unsigned long mask);
-extern void flush_tlb_all_pge(void);
-
-#define flush_tlb()	    __flush_tlb()
 #define flush_tlb_all()     flush_tlb_mask((1 << smp_num_cpus) - 1)
-#define local_flush_tlb()   __flush_tlb()
-#define flush_tlb_cpu(_cpu) flush_tlb_mask(1 << (_cpu))
 
+#ifndef CONFIG_SMP
+#define flush_tlb_all_pge()          local_flush_tlb_pge()
+#define flush_tlb_mask(_mask)        local_flush_tlb()
+#define flush_tlb_one_mask(_mask,_v) local_flush_tlb_one(_v)
+#else
+#include <xen/smp.h>
+#define FLUSHVA_ALL (~0UL)
+extern void flush_tlb_all_pge(void);
+extern void __flush_tlb_mask(unsigned long mask, unsigned long va);
+#define flush_tlb_mask(_mask)        __flush_tlb_mask(_mask,FLUSHVA_ALL)
+#define flush_tlb_one_mask(_mask,_v) __flush_tlb_mask(_mask,_v)
 #endif
 
 #endif /* __FLUSHTLB_H__ */
