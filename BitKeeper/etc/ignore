@@ -539,3 +539,6 @@ xen/common/rbtree.o
 xen/drivers/block/cciss.o
 xen/drivers/block/cciss_scsi.o
 TAGS
+tools/xc/lib/xc_netbsd_build.o
+xen/arch/i386/pdb-stub.o
+xen/common/debug-linux.o

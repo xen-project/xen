@@ -1624,11 +1624,13 @@ static int register_new_disk(int ctlr, int opened_vol, __u64 requested_lun)
 	}
 	if (hba[ctlr]->drv[logvol].raid_level > 5)
 		hba[ctlr]->drv[logvol].raid_level = RAID_UNKNOWN;
+
 	printk(KERN_INFO "      heads= %d, sectors= %d, cylinders= %d RAID %s\n\n",
-		hba[ctlr]->drv[logvol].heads,
-		hba[ctlr]->drv[logvol].sectors,
-		hba[ctlr]->drv[logvol].cylinders, 
-		raid_label[hba[ctlr]->drv[logvol].raid_level]);
+	       hba[ctlr]->drv[logvol].heads,
+	       hba[ctlr]->drv[logvol].sectors,
+	       hba[ctlr]->drv[logvol].cylinders, 
+	       raid_label[hba[ctlr]->drv[logvol].raid_level]);
+
 
 	/* special case for c?d0, which may be opened even when
 	   it does not "exist".  In that case, don't mess with usage count.
@@ -1644,6 +1646,7 @@ static int register_new_disk(int ctlr, int opened_vol, __u64 requested_lun)
 
 	for(i=max_p-1; i>=0; i--) {
 		int minor = start+i;
+
 		invalidate_device(MKDEV(hba[ctlr]->major, minor), 1);
 		gdev->part[minor].start_sect = 0;
 		gdev->part[minor].nr_sects = 0;
@@ -1653,8 +1656,12 @@ static int register_new_disk(int ctlr, int opened_vol, __u64 requested_lun)
 		hba[ctlr]->hardsizes[minor] = block_size;
 	}
 
+
+
 	++hba[ctlr]->num_luns;
 	gdev->nr_real = hba[ctlr]->highest_lun + 1;
+
+
 	/* setup partitions per disk */
 	grok_partitions(gdev, logvol, MAX_PART,
 			hba[ctlr]->drv[logvol].nr_blocks);
@@ -2422,7 +2429,7 @@ next:
 		h->maxSG = seg; 
 
 #ifdef CCISS_DEBUG
-	printk(KERN_DEBUG "cciss: Submitting %d sectors in %d segments\n", sect, seg);
+	printk(KERN_DEBUG "cciss: Submitting %d sectors in %d segments\n", creq->nr_sectors, seg);
 #endif /* CCISS_DEBUG */
 
 	c->Header.SGList = c->Header.SGTotal = seg;
@@ -2929,7 +2936,7 @@ static void cciss_getgeometry(int cntl_num)
 	kfree(ld_buff);
 	kfree(size_buff);
 	kfree(inq_buff);
-}	
+}
 
 /* Function to find the first free pointer into our hba[] array */
 /* Returns -1 if no free entries are left.  */
