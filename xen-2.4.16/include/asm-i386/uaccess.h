@@ -103,12 +103,16 @@ extern void __get_user_4(void);
 
 /* Careful: we have to cast the result to the type of the pointer for sign reasons */
 #define get_user(x,ptr)							\
-({	int __ret_gu,__val_gu;						\
+({	int __ret_gu=1,__val_gu;						\
 	switch(sizeof (*(ptr))) {					\
-	case 1:  __get_user_x(1,__ret_gu,__val_gu,ptr); break;		\
-	case 2:  __get_user_x(2,__ret_gu,__val_gu,ptr); break;		\
-	case 4:  __get_user_x(4,__ret_gu,__val_gu,ptr); break;		\
-	default: __get_user_x(X,__ret_gu,__val_gu,ptr); break;		\
+	case 1: __ret_gu=copy_from_user(&__val_gu,ptr,1); break;			\
+	case 2: __ret_gu=copy_from_user(&__val_gu,ptr,2); break;                 \
+	case 4: __ret_gu=copy_from_user(&__val_gu,ptr,4); break;                 \
+	default: __ret_gu=copy_from_user(&__val_gu,ptr,8); break;                 \
+	/*case 1:  __get_user_x(1,__ret_gu,__val_gu,ptr); break;*/		\
+	/*case 2:  __get_user_x(2,__ret_gu,__val_gu,ptr); break;*/		\
+	/*case 4:  __get_user_x(4,__ret_gu,__val_gu,ptr); break;*/		\
+	/*default: __get_user_x(X,__ret_gu,__val_gu,ptr); break;*/		\
 	}								\
 	(x) = (__typeof__(*(ptr)))__val_gu;				\
 	__ret_gu;							\

@@ -10,8 +10,8 @@
 
 /* Offsets in start_info structure */
 #define SHARED_INFO  4
-#define MOD_START   16
-#define MOD_LEN     20
+#define MOD_START   12
+#define MOD_LEN     16
                 
 startup_32:
         cld

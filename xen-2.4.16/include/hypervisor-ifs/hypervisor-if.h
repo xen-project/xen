@@ -10,8 +10,15 @@
 #ifndef __HYPERVISOR_IF_H__
 #define __HYPERVISOR_IF_H__
 
-/* Virtual addresses beyond this are inaccessible by guest OSes. */
+/*
+ * Virtual addresses beyond this are not modifiable by guest OSes.
+ * The machine->physical mapping table starts at this address, read-only
+ * to all domains except DOM0.
+ */
 #define HYPERVISOR_VIRT_START (0xFC000000UL)
+#ifndef machine_to_phys_mapping
+#define machine_to_phys_mapping ((unsigned long *)HYPERVISOR_VIRT_START)
+#endif
 
 typedef struct trap_info_st
 {
@@ -32,10 +39,12 @@ typedef struct
  */
 /* A normal page-table update request. */
 #define PGREQ_NORMAL           0
-/* Make an unchecked update to a base-level pte. */
-#define PGREQ_UNCHECKED_UPDATE 1
+/* Update an entry in the machine->physical mapping table. */
+#define PGREQ_MPT_UPDATE       1
 /* An extended command. */
 #define PGREQ_EXTENDED_COMMAND 2
+/* DOM0 can make entirely unchecked updates which do not affect refcnts. */
+#define PGREQ_UNCHECKED_UPDATE 3
     unsigned long ptr, val; /* *ptr = val */
 /* Announce a new top-level page table. */
 #define PGEXT_PIN_L1_TABLE      0
@@ -79,6 +88,7 @@ typedef struct
 #define __HYPERVISOR_set_debugreg         11
 #define __HYPERVISOR_get_debugreg         12
 #define __HYPERVISOR_update_descriptor    13
+#define __HYPERVISOR_set_fast_trap        14
 
 #define TRAP_INSTR "int $0x82"
 
@@ -194,14 +204,12 @@ typedef struct shared_info_st {
 typedef struct start_info_st {
     unsigned long nr_pages;       /* total pages allocated to this domain */
     shared_info_t *shared_info;   /* start address of shared info struct */
-    unsigned long  pt_base;       /* address of page directory */
-    unsigned long phys_base;
+    unsigned long  pt_base;       /* VIRTUAL address of page directory */
     unsigned long mod_start;      /* start address of pre-loaded module */
     unsigned long mod_len;        /* size (bytes) of pre-loaded module */
     net_ring_t *net_rings;
     int num_net_rings;
     blk_ring_t *blk_ring;         /* block io communication rings */
-    unsigned long frame_table;
     unsigned char cmd_line[1];    /* variable-length */
 } start_info_t;
 

@@ -12,8 +12,6 @@
  */
 
 #define __KERNEL_SYSCALLS__
-#include <stdarg.h>
-
 #include <xeno/config.h>
 #include <xeno/lib.h>
 #include <xeno/errno.h>
@@ -326,6 +324,9 @@ void new_thread(struct task_struct *p,
 
     __save_flags(regs->eflags);
     regs->eflags |= X86_EFLAGS_IF;
+
+    /* No fast trap at start of day. */
+    SET_DEFAULT_FAST_TRAP(&p->thread);
 }
 
 
@@ -363,11 +364,16 @@ void new_thread(struct task_struct *p,
 /* NB. prev_p passed in %eax, next_p passed in %edx */
 void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 {
+    extern struct desc_struct idt_table[];
     struct thread_struct *prev = &prev_p->thread,
         *next = &next_p->thread;
     struct tss_struct *tss = init_tss + smp_processor_id();
 
     unlazy_fpu(prev_p);
+
+    /* Switch the fast-trap handler. */
+    CLEAR_FAST_TRAP(&prev_p->thread);
+    SET_FAST_TRAP(&next_p->thread);
 
     tss->esp0 = next->esp0;
     tss->esp1 = next->esp1;

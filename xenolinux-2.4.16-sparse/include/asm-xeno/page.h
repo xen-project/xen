@@ -34,6 +34,23 @@
 #define clear_user_page(page, vaddr)	clear_page(page)
 #define copy_user_page(to, from, vaddr)	copy_page(to, from)
 
+/**** MACHINE <-> PHYSICAL CONVERSION MACROS ****/
+extern unsigned long *phys_to_machine_mapping;
+#define pfn_to_mfn(_pfn) (phys_to_machine_mapping[(_pfn)])
+#define mfn_to_pfn(_mfn) (machine_to_phys_mapping[(_mfn)])
+static inline unsigned long phys_to_machine(unsigned long phys)
+{
+    unsigned long machine = pfn_to_mfn(phys >> PAGE_SHIFT);
+    machine = (machine << PAGE_SHIFT) | (phys & ~PAGE_MASK);
+    return machine;
+}
+static inline unsigned long machine_to_phys(unsigned long machine)
+{
+    unsigned long phys = mfn_to_pfn(machine >> PAGE_SHIFT);
+    phys = (phys << PAGE_SHIFT) | (machine & ~PAGE_MASK);
+    return phys;
+}
+
 /*
  * These are used to make use of C type-checking..
  */
@@ -49,7 +66,7 @@ typedef struct { unsigned long pgd; } pgd_t;
 static inline unsigned long pte_val(pte_t x)
 {
     unsigned long ret = x.pte_low;
-    if ( (ret & 1) ) ret -= start_info.phys_base;
+    if ( (ret & 1) ) ret = machine_to_phys(ret);
     return ret;
 }
 #endif
@@ -60,7 +77,7 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 static inline unsigned long pmd_val(pmd_t x)
 {
     unsigned long ret = x.pmd;
-    if ( (ret & 1) ) ret -= start_info.phys_base;
+    if ( (ret & 1) ) ret = machine_to_phys(ret);
     return ret;
 }
 #define pgd_val(x)	({ BUG(); (unsigned long)0; })
@@ -68,12 +85,12 @@ static inline unsigned long pmd_val(pmd_t x)
 
 static inline pte_t __pte(unsigned long x)
 {
-    if ( (x & 1) ) x += start_info.phys_base;
+    if ( (x & 1) ) x = phys_to_machine(x);
     return ((pte_t) { (x) });
 }
 static inline pmd_t __pmd(unsigned long x)
 {
-    if ( (x & 1) ) x += start_info.phys_base;
+    if ( (x & 1) ) x = phys_to_machine(x);
     return ((pmd_t) { (x) });
 }
 #define __pgd(x) ({ BUG(); (pgprot_t) { 0 }; })

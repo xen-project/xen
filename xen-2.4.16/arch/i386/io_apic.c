@@ -495,8 +495,10 @@ static int __init assign_irq_vector(int irq)
 		return IO_APIC_VECTOR(irq);
 next:
 	current_vector += 8;
-	if (current_vector == HYPERVISOR_CALL_VECTOR)
-		goto next;
+        /* XXX Skip the guestOS -> Xen syscall vector! XXX */
+	if (current_vector == HYPERVISOR_CALL_VECTOR) goto next;
+        /* XXX Skip the Linux/BSD fast-trap vector! XXX */
+        if (current_vector == 0x80) goto next;
 
 	if (current_vector > FIRST_SYSTEM_VECTOR) {
 		offset++;

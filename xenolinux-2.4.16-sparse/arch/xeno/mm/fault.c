@@ -314,14 +314,14 @@ no_context:
 	printk(" printing eip:\n");
 	printk("%08lx\n", regs->eip);
         page = ((unsigned long *) cur_pgd)[address >> 22];
-        printk(KERN_ALERT "*pde = %08lx(%08lx)\n", page, page - start_info.phys_base);
+        printk(KERN_ALERT "*pde=%08lx(%08lx)\n", page, machine_to_phys(page));
         if (page & 1) {
                 page &= PAGE_MASK;
                 address &= 0x003ff000;
-                page -= start_info.phys_base;
+                page = machine_to_phys(page);
                 page = ((unsigned long *) __va(page))[address >> PAGE_SHIFT];
-                printk(KERN_ALERT "*pte = %08lx(%08lx)\n", page, 
-                       page - start_info.phys_base);
+                printk(KERN_ALERT "*pte=%08lx(%08lx)\n", page, 
+                       machine_to_phys(page));
         }
  	die("Oops", regs, error_code);
 	bust_spinlocks(0);

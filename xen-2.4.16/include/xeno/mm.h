@@ -56,8 +56,6 @@ void __free_pages(unsigned long p, int order);
  */
 typedef struct pfn_info {
     struct list_head list;      /* ->mapping has some page lists. */
-    unsigned long next;         /* used for threading pages belonging */
-    unsigned long prev;         /* to same domain */
     unsigned long flags;        /* atomic flags. */
     unsigned long tot_count;    /* Total domain usage count. */
     unsigned long type_count;   /* pagetable/dir, or domain-writeable refs. */
@@ -113,6 +111,15 @@ extern struct list_head free_list;
 extern unsigned int free_pfns;
 extern unsigned long max_page;
 void init_frametable(unsigned long nr_pages);
+
+/*
+ * The MPT (machine->physical mapping table) is an array of word-sized
+ * values, indexed on machine frame number. It is expected that guest OSes
+ * will use it to store a "physical" frame number to give the appearance of
+ * contiguous (or near contiguous) physical memory.
+ */
+#undef  machine_to_phys_mapping
+#define machine_to_phys_mapping ((unsigned long *)RDWR_MPT_VIRT_START)
 
 /* Part of the domain API. */
 int do_process_page_updates(page_update_request_t *updates, int count);

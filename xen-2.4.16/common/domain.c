@@ -15,10 +15,8 @@
 #include <asm/msr.h>
 #include <xeno/multiboot.h>
 
-#define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED)
-#define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED|_PAGE_DIRTY)
-
-extern int do_process_page_updates_bh(page_update_request_t *, int);
+#define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED)
+#define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_USER|_PAGE_ACCESSED|_PAGE_DIRTY)
 
 extern int nr_mods;
 extern module_t *mod;
@@ -57,7 +55,8 @@ struct task_struct *do_newdomain(void)
      */
     p->blk_ring_base = (blk_ring_t *)(p->shared_info + 1);
     p->net_ring_base = (net_ring_t *)(p->blk_ring_base + 1);
-    p->pg_head = p->tot_pages = 0;
+    INIT_LIST_HEAD(&p->pg_head);
+    p->tot_pages = 0;
     write_lock_irqsave(&tasklist_lock, flags);
     SET_LINKS(p);
     write_unlock_irqrestore(&tasklist_lock, flags);
@@ -140,7 +139,7 @@ long kill_other_domain(unsigned int dom)
 /* Release resources belonging to task @p. */
 void release_task(struct task_struct *p)
 {
-    //ASSERT(!__task_on_runqueue(p));
+    struct list_head *list_ent, *tmp;
     ASSERT(p->state == TASK_DYING);
     ASSERT(!p->has_cpu);
     write_lock_irq(&tasklist_lock);
@@ -158,13 +157,22 @@ void release_task(struct task_struct *p)
     }
     if ( p->mm.perdomain_pt ) free_page((unsigned long)p->mm.perdomain_pt);
     free_page((unsigned long)p->shared_info);
+
+    list_for_each_safe(list_ent, tmp, &p->pg_head)
+    {
+        struct pfn_info *pf = list_entry(list_ent, struct pfn_info, list);
+        pf->type_count = pf->tot_count = pf->flags = 0;
+        list_del(list_ent);
+        list_add(list_ent, &free_list);
+    }
+
     free_task_struct(p);
 }
 
 unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes)
 {
     struct list_head *temp;
-    struct pfn_info *pf, *pf_head;
+    struct pfn_info *pf;
     unsigned int alloc_pfns;
     unsigned int req_pages;
 
@@ -172,35 +180,18 @@ unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes)
     req_pages = kbytes >> (PAGE_SHIFT - 10);
 
     /* is there enough mem to serve the request? */   
-    if(req_pages > free_pfns)
-        return -1;
+    if ( req_pages > free_pfns ) return -1;
     
     /* allocate pages and build a thread through frame_table */
     temp = free_list.next;
-
-    /* allocate first page */
-    pf = list_entry(temp, struct pfn_info, list);
-    pf->flags |= p->domain;
-    temp = temp->next;
-    list_del(&pf->list);
-    pf->next = pf->prev = p->pg_head = (pf - frame_table);
-    pf->type_count = pf->tot_count = 0;
-    free_pfns--;
-    pf_head = pf;
-
-    /* allocate the rest */
-    for(alloc_pfns = req_pages - 1; alloc_pfns; alloc_pfns--){
+    for ( alloc_pfns = 0; alloc_pfns < req_pages; alloc_pfns++ )
+    {
         pf = list_entry(temp, struct pfn_info, list);
         pf->flags |= p->domain;
+        pf->type_count = pf->tot_count = 0;
         temp = temp->next;
         list_del(&pf->list);
-
-        pf->next = p->pg_head;
-        pf->prev = pf_head->prev;
-        (frame_table + pf_head->prev)->next = (pf - frame_table);
-        pf_head->prev = (pf - frame_table);
-        pf->type_count = pf->tot_count = 0;
-
+        list_add_tail(&pf->list, &p->pg_head);
         free_pfns--;
     }
     
@@ -233,30 +224,12 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
     l1_pgentry_t * l1tab;
     start_info_t * virt_startinfo_addr;
     unsigned long virt_stack_addr;
+    unsigned long long time;
     unsigned long phys_l2tab;
-    page_update_request_t * pgt_updates;
-    unsigned long curr_update_phys;
-    unsigned long count;
     net_ring_t *net_ring;
     net_vif_t *net_vif;
     char *dst;    // temporary
     int i;        // temporary
-
-    /* first of all, set up domain pagetables */
-    pgt_updates = (page_update_request_t *)
-        map_domain_mem(meminfo->pgt_update_arr);
-    curr_update_phys = meminfo->pgt_update_arr;
-    for(count = 0; count < meminfo->num_pgt_updates; count++){
-        do_process_page_updates_bh(pgt_updates, 1);
-        pgt_updates++;
-        if(!((unsigned long)pgt_updates & (PAGE_SIZE-1))){
-            unmap_domain_mem((void *)((unsigned long)(pgt_updates-1) & PAGE_MASK));
-            curr_update_phys = (frame_table + (curr_update_phys >> PAGE_SHIFT))->next 
-                << PAGE_SHIFT;
-            pgt_updates = (page_update_request_t *)map_domain_mem(curr_update_phys);
-        }
-    }
-    unmap_domain_mem((void *)((unsigned long)(pgt_updates-1) & PAGE_MASK));
 
     /* entries 0xe0000000 onwards in page table must contain hypervisor
      * mem mappings - set them up.
@@ -304,11 +277,6 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
     virt_startinfo_addr->shared_info = (shared_info_t *)meminfo->virt_shinfo_addr;
     virt_startinfo_addr->pt_base = meminfo->virt_load_addr + 
                     ((p->tot_pages - 1) << PAGE_SHIFT);
-
-    /* now, this is just temprorary before we switch to pseudo phys
-     * addressing. this works only for contiguous chunks of memory!!!
-     */
-    virt_startinfo_addr->phys_base = p->pg_head << PAGE_SHIFT;
     
     /* Add virtual network interfaces and point to them in startinfo. */
     while (meminfo->num_vifs-- > 0) {
@@ -370,9 +338,12 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
 static unsigned long alloc_page_from_domain(unsigned long * cur_addr, 
     unsigned long * index)
 {
-    *cur_addr = (frame_table + (*cur_addr >> PAGE_SHIFT))->prev << PAGE_SHIFT;
+    unsigned long ret = *cur_addr;
+    struct list_head *ent = frame_table[ret >> PAGE_SHIFT].list.prev;
+    *cur_addr = list_entry(ent, struct pfn_info, list) - frame_table;
+    *cur_addr <<= PAGE_SHIFT;
     (*index)--;    
-    return *cur_addr;
+    return ret;
 }
 
 /* setup_guestos is used for building dom0 solely. other domains are built in
@@ -380,6 +351,7 @@ static unsigned long alloc_page_from_domain(unsigned long * cur_addr,
  */
 int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
 {
+    struct list_head *list_ent;
     char *src, *dst;
     int i, dom = p->domain;
     unsigned long phys_l1tab, phys_l2tab;
@@ -387,14 +359,17 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     unsigned long virt_load_address, virt_stack_address, virt_shinfo_address;
     unsigned long virt_ftable_start, virt_ftable_end, ft_mapping;
     start_info_t  *virt_startinfo_address;
+    unsigned long long time;
     unsigned long count;
     unsigned long alloc_index;
-    unsigned long ft_pages;
     l2_pgentry_t *l2tab, *l2start;
     l1_pgentry_t *l1tab = NULL, *l1start = NULL;
     struct pfn_info *page = NULL;
     net_ring_t *net_ring;
     net_vif_t *net_vif;
+
+    /* Sanity! */
+    if ( p->domain != 0 ) BUG();
 
     if ( strncmp(__va(mod[0].mod_start), "XenoGues", 8) )
     {
@@ -411,7 +386,9 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     }
 
     if ( alloc_new_dom_mem(p, params->memory_kb) ) return -ENOMEM;
-    alloc_address = p->pg_head << PAGE_SHIFT;
+    alloc_address = list_entry(p->pg_head.prev, struct pfn_info, list) -
+        frame_table;
+    alloc_address <<= PAGE_SHIFT;
     alloc_index = p->tot_pages;
 
     if ( (mod[nr_mods-1].mod_end-mod[0].mod_start) > 
@@ -443,17 +420,15 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     p->mm.pagetable = mk_pagetable(phys_l2tab);
 
     /*
-     * NB. The upper limit on this loop does one extra page + pages for frame table. 
-     * This is to make sure a pte exists when we want to map the shared_info struct
-     * and frame table struct.
+     * NB. The upper limit on this loop does one extra page. This is to make 
+     * sure a pte exists when we want to map the shared_info struct.
      */
 
-    ft_pages = frame_table_size >> PAGE_SHIFT;
     l2tab += l2_table_offset(virt_load_address);
-    cur_address = p->pg_head << PAGE_SHIFT;
-    for ( count  = 0;
-          count < p->tot_pages + 1 + ft_pages;
-          count++)
+    cur_address = list_entry(p->pg_head.next, struct pfn_info, list) -
+        frame_table;
+    cur_address <<= PAGE_SHIFT;
+    for ( count = 0; count < p->tot_pages + 1; count++ )
     {
         if ( !((unsigned long)l1tab & (PAGE_SIZE-1)) )
         {
@@ -467,23 +442,32 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
         }
         *l1tab++ = mk_l1_pgentry(cur_address|L1_PROT);
         
-        if(count < p->tot_pages)
+        if ( count < p->tot_pages )
         {
             page = frame_table + (cur_address >> PAGE_SHIFT);
             page->flags = dom | PGT_writeable_page;
             page->type_count = page->tot_count = 1;
+            /* Set up the MPT entry. */
+            machine_to_phys_mapping[cur_address >> PAGE_SHIFT] = count;
         }
 
-        cur_address = ((frame_table + (cur_address >> PAGE_SHIFT))->next) << PAGE_SHIFT;
+        list_ent = frame_table[cur_address >> PAGE_SHIFT].list.next;
+        cur_address = list_entry(list_ent, struct pfn_info, list) -
+            frame_table;
+        cur_address <<= PAGE_SHIFT;
     }
     unmap_domain_mem(l1start);
 
     /* pages that are part of page tables must be read only */
-    cur_address = p->pg_head << PAGE_SHIFT;
-    for(count = 0;
-        count < alloc_index;
-        count++){
-        cur_address = ((frame_table + (cur_address >> PAGE_SHIFT))->next) << PAGE_SHIFT;
+    cur_address = list_entry(p->pg_head.next, struct pfn_info, list) -
+        frame_table;
+    cur_address <<= PAGE_SHIFT;
+    for ( count = 0; count < alloc_index; count++ ) 
+    {
+        list_ent = frame_table[cur_address >> PAGE_SHIFT].list.next;
+        cur_address = list_entry(list_ent, struct pfn_info, list) -
+            frame_table;
+        cur_address <<= PAGE_SHIFT;
     }
 
     l2tab = l2start + l2_table_offset(virt_load_address + 
@@ -491,11 +475,11 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     l1start = l1tab = map_domain_mem(l2_pgentry_to_phys(*l2tab));
     l1tab += l1_table_offset(virt_load_address + (alloc_index << PAGE_SHIFT));
     l2tab++;
-    for(count = alloc_index;
-        count < p->tot_pages;
-        count++){
+    for ( count = alloc_index; count < p->tot_pages; count++ ) 
+    {
         *l1tab++ = mk_l1_pgentry(l1_pgentry_val(*l1tab) & ~_PAGE_RW);
-        if(!((unsigned long)l1tab & (PAGE_SIZE - 1))){
+        if( !((unsigned long)l1tab & (PAGE_SIZE - 1)) )
+        {
             unmap_domain_mem(l1start);
             l1start = l1tab = map_domain_mem(l2_pgentry_to_phys(*l2tab));
             l2tab++;
@@ -504,7 +488,10 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
         page->flags = dom | PGT_l1_page_table;
         page->tot_count++;
         
-        cur_address = ((frame_table + (cur_address >> PAGE_SHIFT))->next) << PAGE_SHIFT;
+        list_ent = frame_table[cur_address >> PAGE_SHIFT].list.next;
+        cur_address = list_entry(list_ent, struct pfn_info, list) -
+            frame_table;
+        cur_address <<= PAGE_SHIFT;
     }
     page->flags = dom | PGT_l2_page_table;
     unmap_domain_mem(l1start);
@@ -526,21 +513,6 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     virt_startinfo_address = (start_info_t *)
         (virt_load_address + ((alloc_index - 1) << PAGE_SHIFT));
     virt_stack_address  = (unsigned long)virt_startinfo_address;
-
-    /* set up frame_table mapping */
-    ft_mapping = (unsigned long)frame_table;
-    virt_ftable_start = virt_shinfo_address + PAGE_SIZE; 
-    virt_ftable_end = virt_ftable_start + frame_table_size;
-    for(cur_address = virt_ftable_start;
-        cur_address < virt_ftable_end;
-        cur_address += PAGE_SIZE){
-        l2tab = l2start + l2_table_offset(cur_address);
-        l1start = l1tab = map_domain_mem(l2_pgentry_to_phys(*l2tab));
-        l1tab += l1_table_offset(cur_address);
-        *l1tab = mk_l1_pgentry(__pa(ft_mapping)|L1_PROT);
-        unmap_domain_mem(l1start);
-        ft_mapping += PAGE_SIZE;
-    }
     
     unmap_domain_mem(l2start);
 
@@ -561,8 +533,6 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
         (shared_info_t *)virt_shinfo_address;
     virt_startinfo_address->pt_base = virt_load_address + 
         ((p->tot_pages - 1) << PAGE_SHIFT); 
-    virt_startinfo_address->phys_base = p->pg_head << PAGE_SHIFT;
-    virt_startinfo_address->frame_table = virt_ftable_start;
 
     /* Add virtual network interfaces and point to them in startinfo. */
     while (params->num_vifs-- > 0) {

@@ -1,4 +1,3 @@
-
 /******************************************************************************
  * dom0_ops.c
  * 
@@ -33,24 +32,27 @@ static unsigned int get_domnr(void)
 
 static void build_page_list(struct task_struct *p)
 {
-    unsigned long * list;
+    unsigned long *list;
     unsigned long curr;
-    unsigned long page;
+    struct list_head *list_ent;
 
-    list = (unsigned long *)map_domain_mem(p->pg_head << PAGE_SHIFT);
-    curr = p->pg_head;
-    *list++ = p->pg_head;
-    page = (frame_table + p->pg_head)->next;
-    while(page != p->pg_head){
-        if(!((unsigned long)list & (PAGE_SIZE-1))){
-            curr = (frame_table + curr)->next;
-            unmap_domain_mem((unsigned long)(list-1) & PAGE_MASK);
+    curr = list_entry(p->pg_head.next, struct pfn_info, list) - frame_table;
+    list = (unsigned long *)map_domain_mem(curr << PAGE_SHIFT);
+
+    list_for_each(list_ent, &p->pg_head)
+    {
+        *list++ = list_entry(list_ent, struct pfn_info, list) - frame_table;
+
+        if( ((unsigned long)list & ~PAGE_MASK) == 0 )
+        {
+            struct list_head *ent = frame_table[curr].list.next;
+            curr = list_entry(ent, struct pfn_info, list) - frame_table;
+            unmap_domain_mem(list-1);
             list = (unsigned long *)map_domain_mem(curr << PAGE_SHIFT);
         }
-        *list++ = page;
-        page = (frame_table + page)->next;
     }
-    unmap_domain_mem((unsigned long)(list-1) & PAGE_MASK);
+
+    unmap_domain_mem(list);
 }
     
 long do_dom0_op(dom0_op_t *u_dom0_op)
@@ -95,37 +97,20 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         pro = (pro+1) % smp_num_cpus;
         p->processor = pro;
 
-        /* if we are not booting dom 0 than only mem 
-         * needs to be allocated
-         */
-        if(dom != 0){
+        if ( dom == 0 ) BUG();
 
-            if(alloc_new_dom_mem(p, op.u.newdomain.memory_kb) != 0){
-                ret = -1;
-                break;
-            }
-            build_page_list(p);
-            
-            ret = p->domain;
+        ret = alloc_new_dom_mem(p, op.u.newdomain.memory_kb);
+        if ( ret != 0 ) break;
 
-            op.u.newdomain.domain = ret;
-            op.u.newdomain.pg_head = p->pg_head;
-            copy_to_user(u_dom0_op, &op, sizeof(op));
-
-            break;
-        }
-
-        /* executed only in case of domain 0 */
-        ret = setup_guestos(p, &op.u.newdomain);    /* Load guest OS into @p */
-        if ( ret != 0 ) 
-        {
-            p->state = TASK_DYING;
-            release_task(p);
-            break;
-        }
-        wake_up(p);          /* Put @p on runqueue */
-        reschedule(p);       /* Force a scheduling decision on @p's CPU */
+        build_page_list(p);
+        
         ret = p->domain;
+        
+        op.u.newdomain.domain = ret;
+        op.u.newdomain.pg_head = 
+            list_entry(p->pg_head.next, struct pfn_info, list) -
+            frame_table;
+        copy_to_user(u_dom0_op, &op, sizeof(op));
     }
     break;
 
@@ -143,13 +128,20 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     }
     break;
 
-    case DOM0_MAPTASK:
+    case DOM0_GETMEMLIST:
     {
-        unsigned int dom = op.u.mapdomts.domain;
-        
-        op.u.mapdomts.ts_phy_addr = __pa(find_domain_by_id(dom));
-        copy_to_user(u_dom0_op, &op, sizeof(op));
+        int i;
+        unsigned long pfn = op.u.getmemlist.start_pfn;
+        unsigned long *buffer = op.u.getmemlist.buffer;
+        struct list_head *list_ent;
 
+        for ( i = 0; i < op.u.getmemlist.num_pfns; i++ )
+        {
+            /* XXX We trust DOM0 to give us a safe buffer. XXX */
+            *buffer++ = pfn;
+            list_ent = frame_table[pfn].list.next;
+            pfn = list_entry(list_ent, struct pfn_info, list) - frame_table;
+        }
     }
     break;
 

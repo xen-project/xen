@@ -224,20 +224,20 @@ void __init init_frametable(unsigned long nr_pages)
     max_page = nr_pages;
     frame_table_size = nr_pages * sizeof(struct pfn_info);
     frame_table_size = (frame_table_size + PAGE_SIZE - 1) & PAGE_MASK;
-    free_pfns = nr_pages - 
-        ((MAX_MONITOR_ADDRESS + frame_table_size) >> PAGE_SHIFT);
-
-    frame_table = phys_to_virt(MAX_MONITOR_ADDRESS);
+    frame_table = (frame_table_t *)FRAMETABLE_VIRT_START;
     memset(frame_table, 0, frame_table_size);
+
+    free_pfns = 0;
 
     /* Put all domain-allocatable memory on a free list. */
     INIT_LIST_HEAD(&free_list);
-    for( page_index = (MAX_MONITOR_ADDRESS + frame_table_size) >> PAGE_SHIFT; 
-         page_index < nr_pages; 
+    for( page_index = (__pa(frame_table) + frame_table_size) >> PAGE_SHIFT; 
+         page_index < nr_pages;
          page_index++ )      
     {
         pf = list_entry(&frame_table[page_index].list, struct pfn_info, list);
         list_add_tail(&pf->list, &free_list);
+        free_pfns++;
     }
 }
 
@@ -697,34 +697,22 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
     return err;
 }
 
-/* functions to handle page table updates: upper half is invoked in case pt updates
- * are requested by a domain and it invokes copy_from_user. bottom half is invoked
- * both in case of domain downcall and domain building by hypervisor.
- */
-page_update_request_t * do_process_page_updates_uh(page_update_request_t *updates,
-    int count)
-{
-    page_update_request_t * ret = kmalloc(sizeof(page_update_request_t) * count, 
-        GFP_KERNEL);
 
-    if ( copy_from_user(ret, updates, sizeof(page_update_request_t) * count) )
-    {
-        kill_domain_with_errmsg("Cannot read page update request");
-    }
-    
-    return ret;
-}
-
-/* Apply updates to page table @pagetable_id within the current domain. */
-int do_process_page_updates_bh(page_update_request_t * cur, int count)
+int do_process_page_updates(page_update_request_t *ureqs, int count)
 {
+    page_update_request_t req;
     unsigned long flags, pfn;
     struct pfn_info *page;
     int err = 0, i;
 
     for ( i = 0; i < count; i++ )
     {
-        pfn = cur->ptr >> PAGE_SHIFT;
+        if ( copy_from_user(&req, ureqs, sizeof(req)) )
+        {
+            kill_domain_with_errmsg("Cannot read page update request");
+        } 
+
+        pfn = req.ptr >> PAGE_SHIFT;
         if ( pfn >= max_page )
         {
             MEM_LOG("Page out of range (%08lx > %08lx)", pfn, max_page);
@@ -734,9 +722,8 @@ int do_process_page_updates_bh(page_update_request_t * cur, int count)
         err = 1;
 
         /* Least significant bits of 'ptr' demux the operation type. */
-        switch ( cur->ptr & (sizeof(l1_pgentry_t)-1) )
+        switch ( req.ptr & (sizeof(l1_pgentry_t)-1) )
         {
-
             /*
              * PGREQ_NORMAL: Normal update to any level of page table.
              */
@@ -749,17 +736,35 @@ int do_process_page_updates_bh(page_update_request_t * cur, int count)
                 switch ( (flags & PG_type_mask) )
                 {
                 case PGT_l1_page_table: 
-                    err = mod_l1_entry(cur->ptr, mk_l1_pgentry(cur->val)); 
+                    err = mod_l1_entry(req.ptr, mk_l1_pgentry(req.val)); 
                     break;
                 case PGT_l2_page_table: 
-                    err = mod_l2_entry(cur->ptr, mk_l2_pgentry(cur->val)); 
+                    err = mod_l2_entry(req.ptr, mk_l2_pgentry(req.val)); 
                     break;
                 default:
-                    MEM_LOG("Update to non-pt page %08lx", cur->ptr);
+                    MEM_LOG("Update to non-pt page %08lx", req.ptr);
                     break;
                 }
             }
+            else
+            {
+                MEM_LOG("Bad domain normal update (dom %d, pfn %ld)",
+                        current->domain, pfn);
+            }
+            break;
 
+        case PGREQ_MPT_UPDATE:
+            page = frame_table + pfn;
+            if ( DOMAIN_OKAY(page->flags) )
+            {
+                machine_to_phys_mapping[pfn] = req.val;
+                err = 0;
+            }
+            else
+            {
+                MEM_LOG("Bad domain MPT update (dom %d, pfn %ld)",
+                        current->domain, pfn);
+            }
             break;
 
             /*
@@ -767,12 +772,27 @@ int do_process_page_updates_bh(page_update_request_t * cur, int count)
              * in the least-siginificant bits of the 'value' field.
              */
         case PGREQ_EXTENDED_COMMAND:
-            cur->ptr &= ~(sizeof(l1_pgentry_t) - 1);
-            err = do_extended_command(cur->ptr, cur->val);
+            req.ptr &= ~(sizeof(l1_pgentry_t) - 1);
+            err = do_extended_command(req.ptr, req.val);
             break;
 
+        case PGREQ_UNCHECKED_UPDATE:
+            req.ptr &= ~(sizeof(l1_pgentry_t) - 1);
+            if ( current->domain == 0 )
+            {
+                unsigned long *ptr = map_domain_mem(req.ptr);
+                *ptr = req.val;
+                unmap_domain_mem(ptr);
+                err = 0;
+            }
+            else
+            {
+                MEM_LOG("Bad unchecked update attempt");
+            }
+            break;
+            
         default:
-            MEM_LOG("Invalid page update command %08lx", cur->ptr);
+            MEM_LOG("Invalid page update command %08lx", req.ptr);
             break;
         }
 
@@ -781,7 +801,7 @@ int do_process_page_updates_bh(page_update_request_t * cur, int count)
             kill_domain_with_errmsg("Illegal page update request");
         }
 
-        cur++;
+        ureqs++;
     }
 
     if ( tlb_flush[smp_processor_id()] )
@@ -790,20 +810,8 @@ int do_process_page_updates_bh(page_update_request_t * cur, int count)
         __asm__ __volatile__ (
             "movl %%eax,%%cr3" : : 
             "a" (pagetable_val(current->mm.pagetable)));
+
     }
 
     return(0);
-}
-
-/* Apply updates to page table @pagetable_id within the current domain. */
-int do_process_page_updates(page_update_request_t *updates, int count)
-{
-    page_update_request_t * pg_updates;
-    int ret;
-
-    pg_updates = do_process_page_updates_uh(updates, count);
-    ret = do_process_page_updates_bh(pg_updates, count);
-    kfree(pg_updates);
-
-    return ret;
 }
