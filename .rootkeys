@@ -323,6 +323,8 @@
 40ee75a967sxgcRY4Q7zXoVUaJ4flA tools/examples/vif-bridge
 41fc0c18AFAVXA1uGm1JFWHMeeznVw tools/examples/vif-nat
 41e661e1ooiRKlOfwumG6wwzc0PdhQ tools/examples/vif-route
+423ab2eaNCzxk3c-9yU1BwzxWvsDCQ tools/examples/vnc/Xservers
+423ab2ea7ajZLdZOI-8Z-bpNdNhhAQ tools/examples/vnc/Xvnc-xen
 40ee75a93cqxHp6MiYXxxwR5j2_8QQ tools/examples/xend-config.sxp
 41090ec8Pj_bkgCBpg2W7WfmNkumEA tools/examples/xmexample1
 40cf2937oKlROYOJTN8GWwWM5AmjBg tools/examples/xmexample2
