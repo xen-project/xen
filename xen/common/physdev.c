@@ -45,6 +45,7 @@ extern void pcibios_enable_irq(struct pci_dev *dev);
 #define INFO(_f, _a...) ((void)0)
 #endif
 
+#define SLOPPY_CHECKING
 
 #define ACC_READ  1
 #define ACC_WRITE 2
@@ -305,7 +306,7 @@ inline static int check_dev_acc (struct domain *p,
     return 0;
 }
 
-
+#ifndef SLOPPY_CHECKING
 /*
  * Base address registers contain the base address for IO regions.
  * The length can be determined by writing all 1s to the register and
@@ -496,6 +497,7 @@ static int do_rom_address_access(phys_dev_t *pdev, int acc, int len, u32 *val)
     return ret;
 
 }
+#endif /* SLOPPY_CHECKING */
 
 /*
  * Handle a PCI config space read access if the domain has access privileges.
@@ -512,12 +514,13 @@ static long pci_cfgreg_read(int bus, int dev, int func, int reg,
          * all 1s.  In this case the domain has no read access, which should
          * also look like the device is non-existent. */
         *val = 0xFFFFFFFF;
-        return ret; /* KAF: error return seems to matter on my test machine. */
+        return ret;
     }
 
     /* Fake out read requests for some registers. */
     switch ( reg )
     {
+#ifndef SLOPPY_CHECKING
     case PCI_BASE_ADDRESS_0:
         ret = do_base_address_access(pdev, ACC_READ, 0, len, val);
         break;
@@ -545,6 +548,7 @@ static long pci_cfgreg_read(int bus, int dev, int func, int reg,
     case PCI_ROM_ADDRESS:
         ret = do_rom_address_access(pdev, ACC_READ, len, val);
         break;        
+#endif
 
     case PCI_INTERRUPT_LINE:
         *val = pdev->dev->irq;
@@ -577,6 +581,7 @@ static long pci_cfgreg_write(int bus, int dev, int func, int reg,
     /* special treatment for some registers */
     switch (reg)
     {
+#ifndef SLOPPY_CHECKING
     case PCI_BASE_ADDRESS_0:
         ret = do_base_address_access(pdev, ACC_WRITE, 0, len, &val);
         break;
@@ -604,6 +609,7 @@ static long pci_cfgreg_write(int bus, int dev, int func, int reg,
     case PCI_ROM_ADDRESS:
         ret = do_rom_address_access(pdev, ACC_WRITE, len, &val);
         break;        
+#endif
 
     default:
         if ( pdev->flags != ACC_WRITE ) 
