@@ -128,7 +128,7 @@ typedef int pid_t;
 
 
 /* enable PIO instead of MMIO, if CONFIG_8139TOO_PIO is selected */
-#ifdef CONFIG_8139TOO_PIO
+#if defined(CONFIG_8139TOO_PIO) || defined(XEN) /* XXX MMIO fails on Xen :-( */
 #define USE_IO_OPS 1
 #endif
 
@@ -2250,6 +2250,7 @@ static int rtl8139_close (struct net_device *dev)
 	return 0;
 }
 
+#ifndef XEN
 
 /* Get the ethtool Wake-on-LAN settings.  Assumes that wol points to
    kernel memory, *wol has been initialized as {ETHTOOL_GWOL}, and
@@ -2325,7 +2326,6 @@ static int netdev_set_wol (struct net_device *dev,
 	return 0;
 }
 
-#ifndef XEN
 static int netdev_ethtool_ioctl (struct net_device *dev, void *useraddr)
 {
 	struct rtl8139_private *np = dev->priv;

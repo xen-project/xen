@@ -25,6 +25,7 @@
 #define _LINUX_ETHERDEVICE_H
 
 #include <xeno/if_ether.h>
+#include <asm/domain_page.h>
 
 #ifdef __KERNEL__
 extern int		eth_header(struct sk_buff *skb, struct net_device *dev,
@@ -43,7 +44,9 @@ extern struct net_device *alloc_etherdev(int sizeof_priv);
 
 static inline void eth_copy_and_sum (struct sk_buff *dest, unsigned char *src, int len, int base)
 {
-	memcpy (dest->data, src, len);
+	char *vdata = map_domain_mem(__pa(dest->data));
+	memcpy(vdata, src, len);
+	unmap_domain_mem(vdata);
 }
 
 /**
