@@ -10,6 +10,6 @@
 <nw_mask>=</nw_mask>
 <nw_nfs_server>128.232.32.20</nw_nfs_server>
 <nw_nfs_root>/usr/groups/srgboot/moonraider/roots/root+</nw_nfs_root>
-<max_domain_number>2</max_domain_number>
+<max_domain_number>10</max_domain_number>
 <xi_tools_dir>/tools/internal/</xi_tools_dir>
 </domctl_defaults>
