@@ -666,11 +666,13 @@ static int __init xencons_init(void)
     {
         DRV(xencons_driver)->name        = "ttyS";
         DRV(xencons_driver)->minor_start = 64;
+	DRV(xencons_driver)->name_base   = 0;
     }
     else
     {
         DRV(xencons_driver)->name        = "tty";
         DRV(xencons_driver)->minor_start = 1;
+	DRV(xencons_driver)->name_base   = 1;
     }
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
@@ -694,6 +696,10 @@ static int __init xencons_init(void)
         panic("Couldn't register Xen virtual console driver as %s\n",
               DRV(xencons_driver)->name);
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+    tty_register_device(xencons_driver, 0, NULL);
+#endif
+
     if ( start_info.flags & SIF_INITDOMAIN )
     {
         xencons_priv_irq = bind_virq_to_irq(VIRQ_CONSOLE);
@@ -714,6 +720,10 @@ static int __init xencons_init(void)
 static void __exit xencons_fini(void)
 {
     int ret;
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+    tty_unregister_device(xencons_driver, 0);
+#endif
 
     if ( (ret = tty_unregister_driver(DRV(xencons_driver))) != 0 )
         printk(KERN_ERR "Unable to unregister Xen console driver: %d\n", ret);
