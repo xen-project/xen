@@ -146,7 +146,7 @@ static inline int do_trap(int trapnr, char *str,
 
     DEBUGGER_trap_entry(trapnr, regs);
 
-    if ( !GUEST_FAULT(regs) )
+    if ( !GUEST_MODE(regs) )
         goto xen_fault;
 
 #ifndef NDEBUG
@@ -217,7 +217,7 @@ asmlinkage int do_int3(struct xen_regs *regs)
 
     DEBUGGER_trap_entry(TRAP_int3, regs);
 
-    if ( !GUEST_FAULT(regs) )
+    if ( !GUEST_MODE(regs) )
     {
         DEBUGGER_trap_fatal(TRAP_int3, regs);
         show_registers(regs);
@@ -316,7 +316,7 @@ asmlinkage int do_page_fault(struct xen_regs *regs)
             return EXCRET_fault_fixed; /* successfully copied the mapping */
     }
 
-    if ( !GUEST_FAULT(regs) )
+    if ( !GUEST_MODE(regs) )
         goto xen_fault;
 
 #ifndef NDEBUG
@@ -485,7 +485,7 @@ asmlinkage int do_general_protection(struct xen_regs *regs)
     if ( regs->error_code & 1 )
         goto hardware_gp;
 
-    if ( !GUEST_FAULT(regs) )
+    if ( !GUEST_MODE(regs) )
         goto gp_in_kernel;
 
     /*
@@ -522,7 +522,7 @@ asmlinkage int do_general_protection(struct xen_regs *regs)
 
     /* Emulate some simple privileged instructions when exec'ed in ring 1. */
     if ( (regs->error_code == 0) &&
-         GUESTOS_FAULT(regs) &&
+         GUESTOS_MODE(ed, regs) &&
          emulate_privileged_op(regs) )
         return 0;
 
@@ -685,7 +685,7 @@ asmlinkage int do_debug(struct xen_regs *regs)
         goto out;
     }
 
-    if ( !GUEST_FAULT(regs) )
+    if ( !GUEST_MODE(regs) )
     {
         /* Clear TF just for absolute sanity. */
         regs->eflags &= ~EF_TF;

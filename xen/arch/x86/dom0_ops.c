@@ -355,6 +355,8 @@ void arch_getdomaininfo_ctxt(
            sizeof(ed->arch.user_ctxt));
     if ( test_bit(EDF_DONEFPUINIT, &ed->ed_flags) )
         c->flags |= ECF_I387_VALID;
+    if ( GUESTOS_MODE(ed, &ed->arch.user_ctxt) )
+        c->flags |= ECF_IN_GUESTOS;
     memcpy(&c->fpu_ctxt,
            &ed->arch.i387,
            sizeof(ed->arch.i387));

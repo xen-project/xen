@@ -33,11 +33,16 @@ static inline execution_context_t *get_execution_context(void)
     return execution_context;
 }
 
+/*
+ * Get the top-of-stack, as stored in the per-CPU TSS. This is actually
+ * 64 bytes below the real top of the stack to allow space for:
+ *  domain pointer, DS, ES, FS, GS, FS_BASE, GS_BASE_OS, GS_BASE_APP
+ */
 static inline unsigned long get_stack_top(void)
 {
     unsigned long p;
     __asm__ ( "orq %%rsp,%0; andq $~7,%0" 
-              : "=r" (p) : "0" (STACK_SIZE-8) );
+              : "=r" (p) : "0" (STACK_SIZE-64) );
     return p;
 }
 

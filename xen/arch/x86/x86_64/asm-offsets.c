@@ -37,6 +37,8 @@ void __dummy__(void)
     OFFSET(XREGS_eflags, struct xen_regs, eflags);
     OFFSET(XREGS_rsp, struct xen_regs, rsp);
     OFFSET(XREGS_ss, struct xen_regs, ss);
+    OFFSET(XREGS_kernel_sizeof, struct xen_regs, es);
+    DEFINE(XREGS_user_sizeof, sizeof(struct xen_regs));
     BLANK();
 
     OFFSET(EDOMAIN_processor, struct exec_domain, processor);
@@ -47,12 +49,11 @@ void __dummy__(void)
     OFFSET(EDOMAIN_failsafe_addr, struct exec_domain, arch.failsafe_address);
     OFFSET(EDOMAIN_trap_bounce, struct exec_domain, arch.trap_bounce);
     OFFSET(EDOMAIN_thread_flags, struct exec_domain, arch.flags);
+    OFFSET(EDOMAIN_guestos_sp, struct exec_domain, arch.guestos_sp);
     BLANK();
 
-    OFFSET(SHINFO_upcall_pending, shared_info_t, 
-           vcpu_data[0].evtchn_upcall_pending);
-    OFFSET(SHINFO_upcall_mask, shared_info_t, 
-           vcpu_data[0].evtchn_upcall_mask);
+    OFFSET(VCPUINFO_upcall_pending, vcpu_info_t, evtchn_upcall_pending);
+    OFFSET(VCPUINFO_upcall_mask, vcpu_info_t, evtchn_upcall_mask);
     BLANK();
 
     OFFSET(TRAPBOUNCE_error_code, struct trap_bounce, error_code);

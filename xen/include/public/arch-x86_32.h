@@ -94,26 +94,35 @@ typedef struct {
     memory_t address; /* 4: code address                                  */
 } PACKED trap_info_t; /* 8 bytes */
 
-typedef struct
+/* So that we can use 'l' modifier in printf-style format strings. */
+#define u32 unsigned long
+
+typedef struct xen_regs
 {
-    unsigned long ebx;
-    unsigned long ecx;
-    unsigned long edx;
-    unsigned long esi;
-    unsigned long edi;
-    unsigned long ebp;
-    unsigned long eax;
-    unsigned long _unused;
-    unsigned long eip;
-    unsigned long cs;
-    unsigned long eflags;
-    unsigned long esp;
-    unsigned long ss;
-    unsigned long es;
-    unsigned long ds;
-    unsigned long fs;
-    unsigned long gs;
+    u32 ebx;
+    u32 ecx;
+    u32 edx;
+    u32 esi;
+    u32 edi;
+    u32 ebp;
+    u32 eax;
+    u16 error_code;        /* private */
+    union { 
+        u16 entry_vector;  /* private */
+        u16 flags;
+    } PACKED;
+    u32 eip;
+    u32 cs;
+    u32 eflags;
+    u32 esp;
+    u32 ss;
+    u32 es;
+    u32 ds;
+    u32 fs;
+    u32 gs;
 } PACKED execution_context_t;
+
+#undef u32
 
 typedef u64 tsc_timestamp_t; /* RDTSC timestamp */
 
@@ -123,7 +132,8 @@ typedef u64 tsc_timestamp_t; /* RDTSC timestamp */
  */
 typedef struct {
 #define ECF_I387_VALID (1<<0)
-#define ECF_VMX_GUEST  (2<<0)
+#define ECF_VMX_GUEST  (1<<1)
+#define ECF_IN_GUESTOS (1<<2)
     unsigned long flags;
     execution_context_t cpu_ctxt;           /* User-level CPU registers     */
     char          fpu_ctxt[256];            /* User-level FPU registers     */

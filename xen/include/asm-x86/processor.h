@@ -88,27 +88,30 @@
 /*
  * Trap/fault mnemonics.
  */
-#define TRAP_divide_error     0
-#define TRAP_debug            1
-#define TRAP_nmi              2
-#define TRAP_int3             3
-#define TRAP_overflow         4
-#define TRAP_bounds           5
-#define TRAP_invalid_op       6
-#define TRAP_no_device        7
-#define TRAP_double_fault     8
-#define TRAP_copro_seg        9
-#define TRAP_invalid_tss     10
-#define TRAP_no_segment      11
-#define TRAP_stack_error     12
-#define TRAP_gp_fault        13
-#define TRAP_page_fault      14
-#define TRAP_spurious_int    15
-#define TRAP_copro_error     16
-#define TRAP_alignment_check 17
-#define TRAP_machine_check   18
-#define TRAP_simd_error      19
-#define TRAP_deferred_nmi    31
+#define TRAP_divide_error      0
+#define TRAP_debug             1
+#define TRAP_nmi               2
+#define TRAP_int3              3
+#define TRAP_overflow          4
+#define TRAP_bounds            5
+#define TRAP_invalid_op        6
+#define TRAP_no_device         7
+#define TRAP_double_fault      8
+#define TRAP_copro_seg         9
+#define TRAP_invalid_tss      10
+#define TRAP_no_segment       11
+#define TRAP_stack_error      12
+#define TRAP_gp_fault         13
+#define TRAP_page_fault       14
+#define TRAP_spurious_int     15
+#define TRAP_copro_error      16
+#define TRAP_alignment_check  17
+#define TRAP_machine_check    18
+#define TRAP_simd_error       19
+#define TRAP_deferred_nmi     31
+
+/* Set for entry via SYSCALL. Informs return code to use SYSRETQ not IRETQ. */
+#define TRAP_syscall         256 /* NB. Same as ECF_IN_SYSCALL */
 
 /*
  * Non-fatal fault/trap handlers return an error code to the caller. If the
@@ -119,19 +122,16 @@
 #define EXCRET_not_a_fault 1 /* It was a trap. No instruction replay needed. */
 #define EXCRET_fault_fixed 1 /* It was fault that we fixed: try a replay. */
 
-/*
- * 'trap_bounce' flags values.
- */
+/* 'trap_bounce' flags values */
 #define TBF_EXCEPTION          1
 #define TBF_EXCEPTION_ERRCODE  2
 #define TBF_EXCEPTION_CR2      4
 #define TBF_INTERRUPT          8
 #define TBF_FAILSAFE          16
 
-/*
- * thread.flags values.
- */
-#define TF_failsafe_return 1
+/* arch_exec_domain' flags values */
+#define TF_failsafe_return     1
+#define TF_guestos_mode        2
 
 #ifndef __ASSEMBLY__
 

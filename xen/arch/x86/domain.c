@@ -36,6 +36,7 @@
 #include <xen/elf.h>
 #include <asm/vmx.h>
 #include <asm/vmx_vmcs.h>
+#include <asm/msr.h>
 #include <xen/kernel.h>
 #include <public/io/ioreq.h>
 #include <xen/multicall.h>
@@ -286,6 +287,8 @@ void arch_do_createdomain(struct exec_domain *ed)
         d->arch.mm_perdomain_l3[l3_table_offset(PERDOMAIN_VIRT_START)] = 
             mk_l3_pgentry(__pa(d->arch.mm_perdomain_l2) | __PAGE_HYPERVISOR);
 #endif
+
+        ed->arch.flags = TF_guestos_mode;
     }
 }
 
@@ -295,6 +298,7 @@ void arch_do_boot_vcpu(struct exec_domain *ed)
     ed->arch.schedule_tail = d->exec_domain[0]->arch.schedule_tail;
     ed->arch.perdomain_ptes = 
         d->arch.mm_perdomain_pt + (ed->eid << PDPT_VCPU_SHIFT);
+    ed->arch.flags = TF_guestos_mode;
 }
 
 #ifdef CONFIG_VMX
@@ -445,6 +449,10 @@ int arch_final_setup_guestos(
     if ( c->flags & ECF_I387_VALID )
         set_bit(EDF_DONEFPUINIT, &d->ed_flags);
 
+    d->arch.flags &= ~TF_guestos_mode;
+    if ( c->flags & ECF_IN_GUESTOS )
+        d->arch.flags |= TF_guestos_mode;
+
     memcpy(&d->arch.user_ctxt,
            &c->cpu_ctxt,
            sizeof(d->arch.user_ctxt));
@@ -558,12 +566,21 @@ void switch_to(struct exec_domain *prev_p, struct exec_domain *next_p)
 #ifdef CONFIG_VMX
     unsigned long vmx_domain = next_p->arch.arch_vmx.flags; 
 #endif
+#ifdef __x86_64__
+    int all_segs_okay = 1;
+#endif
 
     __cli();
 
     /* Switch guest general-register state. */
     if ( !is_idle_task(prev_p->domain) )
     {
+#ifdef __x86_64__
+        __asm__ __volatile__ ( "movl %%ds,%0" : "=m" (stack_ec->ds) );
+        __asm__ __volatile__ ( "movl %%es,%0" : "=m" (stack_ec->es) );
+        __asm__ __volatile__ ( "movl %%fs,%0" : "=m" (stack_ec->fs) );
+        __asm__ __volatile__ ( "movl %%gs,%0" : "=m" (stack_ec->gs) );
+#endif
         memcpy(&prev_p->arch.user_ctxt,
                stack_ec, 
                sizeof(*stack_ec));
@@ -642,6 +659,127 @@ void switch_to(struct exec_domain *prev_p, struct exec_domain *next_p)
     load_LDT(next_p);
 
     __sti();
+
+#ifdef __x86_64__
+
+#define loadsegment(seg,value) ({               \
+    int __r = 1;                                \
+    __asm__ __volatile__ (                      \
+        "1: movl %k1,%%" #seg "\n2:\n"          \
+        ".section .fixup,\"ax\"\n"              \
+        "3: xorl %k0,%k0\n"                     \
+        "   movl %k0,%%" #seg "\n"              \
+        "   jmp 2b\n"                           \
+        ".previous\n"                           \
+        ".section __ex_table,\"a\"\n"           \
+        "   .align 8\n"                         \
+        "   .quad 1b,3b\n"                      \
+        ".previous"                             \
+        : "=r" (__r) : "r" (value), "0" (__r) );\
+    __r; })
+
+    /* Either selector != 0 ==> reload. */
+    if ( unlikely(prev_p->arch.user_ctxt.ds) ||
+         unlikely(next_p->arch.user_ctxt.ds) )
+        all_segs_okay &= loadsegment(ds, next_p->arch.user_ctxt.ds);
+
+    /* Either selector != 0 ==> reload. */
+    if ( unlikely(prev_p->arch.user_ctxt.es) ||
+         unlikely(next_p->arch.user_ctxt.es) )
+        all_segs_okay &= loadsegment(es, next_p->arch.user_ctxt.es);
+
+    /*
+     * Either selector != 0 ==> reload.
+     * Also reload to reset FS_BASE if it was non-zero.
+     */
+    if ( unlikely(prev_p->arch.user_ctxt.fs) ||
+         unlikely(prev_p->arch.user_ctxt.fs_base) ||
+         unlikely(next_p->arch.user_ctxt.fs) )
+    {
+        all_segs_okay &= loadsegment(fs, next_p->arch.user_ctxt.fs);
+        if ( prev_p->arch.user_ctxt.fs ) /* != 0 selector kills fs_base */
+            prev_p->arch.user_ctxt.fs_base = 0;
+    }
+
+    /*
+     * Either selector != 0 ==> reload.
+     * Also reload to reset GS_BASE if it was non-zero.
+     */
+    if ( unlikely(prev_p->arch.user_ctxt.gs) ||
+         unlikely(prev_p->arch.user_ctxt.gs_base_os) ||
+         unlikely(prev_p->arch.user_ctxt.gs_base_app) ||
+         unlikely(next_p->arch.user_ctxt.gs) )
+    {
+        /* Reset GS_BASE with user %gs. */
+        all_segs_okay &= loadsegment(gs, next_p->arch.user_ctxt.gs);
+        /* Reset KERNEL_GS_BASE if we won't be doing it later. */
+        if ( !next_p->arch.user_ctxt.gs_base_os )
+            wrmsr(MSR_KERNEL_GS_BASE, 0, 0);
+        if ( prev_p->arch.user_ctxt.gs ) /* != 0 selector kills app gs_base */
+            prev_p->arch.user_ctxt.gs_base_app = 0;
+    }
+
+    /* This can only be non-zero if selector is NULL. */
+    if ( next_p->arch.user_ctxt.fs_base )
+        wrmsr(MSR_FS_BASE,
+              next_p->arch.user_ctxt.fs_base,
+              next_p->arch.user_ctxt.fs_base>>32);
+
+    /* This can only be non-zero if selector is NULL. */
+    if ( next_p->arch.user_ctxt.gs_base_os )
+        wrmsr(MSR_KERNEL_GS_BASE,
+              next_p->arch.user_ctxt.gs_base_os,
+              next_p->arch.user_ctxt.gs_base_os>>32);
+
+    /* This can only be non-zero if selector is NULL. */
+    if ( next_p->arch.user_ctxt.gs_base_app )
+        wrmsr(MSR_GS_BASE,
+              next_p->arch.user_ctxt.gs_base_app,
+              next_p->arch.user_ctxt.gs_base_app>>32);
+
+    /* If in guest-OS mode, switch the GS bases around. */
+    if ( next_p->arch.flags & TF_guestos_mode )
+        __asm__ __volatile__ ( "swapgs" );
+
+    if ( unlikely(!all_segs_okay) )
+    {
+        unsigned long *rsp =
+            (next_p->arch.flags & TF_guestos_mode) ?
+            (unsigned long *)stack_ec->rsp : 
+            (unsigned long *)next_p->arch.guestos_sp;
+
+        if ( put_user(stack_ec->ss,     rsp- 1) |
+             put_user(stack_ec->rsp,    rsp- 2) |
+             put_user(stack_ec->rflags, rsp- 3) |
+             put_user(stack_ec->cs,     rsp- 4) |
+             put_user(stack_ec->rip,    rsp- 5) |
+             put_user(stack_ec->gs,     rsp- 6) |
+             put_user(stack_ec->fs,     rsp- 7) |
+             put_user(stack_ec->es,     rsp- 8) |
+             put_user(stack_ec->ds,     rsp- 9) |
+             put_user(stack_ec->r11,    rsp-10) |
+             put_user(stack_ec->rcx,    rsp-11) )
+        {
+            DPRINTK("Error while creating failsafe callback frame.\n");
+            domain_crash();
+        }
+
+        if ( !(next_p->arch.flags & TF_guestos_mode) )
+        {
+            next_p->arch.flags |= TF_guestos_mode;
+            __asm__ __volatile__ ( "swapgs" );
+            /* XXX switch page tables XXX */
+        }
+
+        stack_ec->entry_vector  = TRAP_syscall;
+        stack_ec->rflags       &= 0xFFFCBEFFUL;
+        stack_ec->ss            = __GUEST_SS;
+        stack_ec->rsp           = (unsigned long)(rsp-11);
+        stack_ec->cs            = __GUEST_CS;
+        stack_ec->rip           = next_p->arch.failsafe_address;
+    }
+
+#endif /* __x86_64__ */
 }
 
 

@@ -111,10 +111,16 @@ extern void __out_of_line_bug(int line) __attribute__((noreturn));
 #define XENHEAP_DEFAULT_MB (16)
 
 #define PML4_ENTRY_BITS  39
+#ifndef __ASSEMBLY__
 #define PML4_ENTRY_BYTES (1UL << PML4_ENTRY_BITS)
 #define PML4_ADDR(_slot)                             \
     ((((_slot ## UL) >> 8) * 0xffff000000000000UL) | \
      (_slot ## UL << PML4_ENTRY_BITS))
+#else
+#define PML4_ENTRY_BYTES (1 << PML4_ENTRY_BITS)
+#define PML4_ADDR(_slot)                             \
+    (((_slot >> 8) * 0xffff000000000000) | (_slot << PML4_ENTRY_BITS))
+#endif
 
 /*
  * Memory layout:

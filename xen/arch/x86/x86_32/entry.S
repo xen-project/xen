@@ -58,12 +58,13 @@
 #include <xen/softirq.h>
 #include <asm/asm_defns.h>
 #include <asm/apicdef.h>
+#include <asm/page.h>
 #include <public/xen.h>
 
-#define GET_CURRENT(reg)   \
-        movl $8192-4, reg; \
-        orl  %esp, reg;    \
-        andl $~3,reg;      \
+#define GET_CURRENT(reg)         \
+        movl $STACK_SIZE-4, reg; \
+        orl  %esp, reg;          \
+        andl $~3,reg;            \
         movl (reg),reg;
 
 #ifdef CONFIG_VMX
@@ -169,10 +170,6 @@ vmx_process_softirqs:
         call SYMBOL_NAME(do_softirq)
         jmp  vmx_test_all_events
 #endif
-        
-ENTRY(continue_nonidle_task)
-        GET_CURRENT(%ebx)
-        jmp test_all_events
 
         ALIGN
 restore_all_guest:

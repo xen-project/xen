@@ -88,7 +88,7 @@ void show_registers(struct xen_regs *regs)
     unsigned long esp;
     unsigned short ss, ds, es, fs, gs;
 
-    if ( GUEST_FAULT(regs) )
+    if ( GUEST_MODE(regs) )
     {
         esp = regs->esp;
         ss  = regs->ss & 0xffff;

@@ -103,33 +103,41 @@ typedef struct {
     memory_t address; /* 8: code address                                  */
 } PACKED trap_info_t; /* 16 bytes */
 
-typedef struct
+typedef struct xen_regs
 {
-    unsigned long r15;
-    unsigned long r14;
-    unsigned long r13;
-    unsigned long r12;
-    union { unsigned long rbp, ebp; } PACKED;
-    union { unsigned long rbx, ebx; } PACKED;
-    unsigned long r11;
-    unsigned long r10;
-    unsigned long r9;
-    unsigned long r8;
-    union { unsigned long rax, eax; } PACKED;
-    union { unsigned long rcx, ecx; } PACKED;
-    union { unsigned long rdx, edx; } PACKED;
-    union { unsigned long rsi, esi; } PACKED;
-    union { unsigned long rdi, edi; } PACKED;
-    unsigned long _unused;
-    union { unsigned long rip, eip; } PACKED;
-    unsigned long cs;
-    union { unsigned long rflags, eflags; } PACKED;
-    union { unsigned long rsp, esp; } PACKED;
-    unsigned long ss;
-    unsigned long es;
-    unsigned long ds;
-    unsigned long fs;
-    unsigned long gs;
+    u64 r15;
+    u64 r14;
+    u64 r13;
+    u64 r12;
+    union { u64 rbp, ebp; } PACKED;
+    union { u64 rbx, ebx; } PACKED;
+    u64 r11;
+    u64 r10;
+    u64 r9;
+    u64 r8;
+    union { u64 rax, eax; } PACKED;
+    union { u64 rcx, ecx; } PACKED;
+    union { u64 rdx, edx; } PACKED;
+    union { u64 rsi, esi; } PACKED;
+    union { u64 rdi, edi; } PACKED;
+    u32 error_code;        /* private */
+    union { 
+        u32 entry_vector;  /* private */
+#define ECF_IN_SYSCALL (1<<8) /* Guest synchronously interrupted by SYSCALL? */
+        u32 flags;
+    } PACKED;
+    union { u64 rip, eip; } PACKED;
+    u64 cs;
+    union { u64 rflags, eflags; } PACKED;
+    union { u64 rsp, esp; } PACKED;
+    u64 ss;
+    u64 es;
+    u64 ds;
+    u64 fs;      /* Non-zero => takes precedence over fs_base.     */
+    u64 gs;      /* Non-zero => takes precedence over gs_base_app. */
+    u64 fs_base;
+    u64 gs_base_os;
+    u64 gs_base_app;
 } PACKED execution_context_t;
 
 typedef u64 tsc_timestamp_t; /* RDTSC timestamp */
@@ -140,7 +148,8 @@ typedef u64 tsc_timestamp_t; /* RDTSC timestamp */
  */
 typedef struct {
 #define ECF_I387_VALID (1<<0)
-#define ECF_VMX_GUEST  (2<<0)
+#define ECF_VMX_GUEST  (1<<1)
+#define ECF_IN_GUESTOS (1<<2)
     unsigned long flags;
     execution_context_t cpu_ctxt;           /* User-level CPU registers     */
     char          fpu_ctxt[512];            /* User-level FPU registers     */

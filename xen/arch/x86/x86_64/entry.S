@@ -9,8 +9,86 @@
 #include <xen/softirq.h>
 #include <asm/asm_defns.h>
 #include <asm/apicdef.h>
+#include <asm/page.h>
 #include <public/xen.h>
 
+#define GET_CURRENT(reg)         \
+        movq $STACK_SIZE-8, reg; \
+        orq  %rsp, reg;          \
+        andq $~7,reg;            \
+        movq (reg),reg;
+
+        ALIGN
+restore_all_guest:
+        testb $TF_failsafe_return,EDOMAIN_thread_flags(%rbx)
+        jnz   failsafe_callback
+        RESTORE_ALL
+        testw $TRAP_syscall,4(%rsp)
+        jz    1f
+        addq  $8,%rsp
+        popq  %rcx
+        addq  $8,%rsp
+        popq  %r11
+        popq  %rsp
+        sysretq
+1:      addq  $8,%rsp
+FLT1:   iretq
+.section .fixup,"ax"
+FIX1:   popq  -15*8-8(%rsp)            # error_code/entry_vector
+        SAVE_ALL                       # 15*8 bytes pushed
+        movq  -8(%rsp),%rsi            # error_code/entry_vector
+        sti                            # after stack abuse (-1024(%rsp))
+        pushq $__HYPERVISOR_DS         # SS
+        leaq  8(%rsp),%rax
+        pushq %rax                     # RSP
+        pushf                          # RFLAGS
+        pushq $__HYPERVISOR_CS         # CS
+        leaq  DBLFLT1(%rip),%rax
+        pushq %rax                     # RIP
+        pushq %rsi                     # error_code/entry_vector
+        jmp   error_code
+DBLFLT1:GET_CURRENT(%rbx)
+        jmp   test_all_events
+DBLFIX1:GET_CURRENT(%rbx)
+        testb $TF_failsafe_return,EDOMAIN_thread_flags(%rbx)
+        jnz   domain_crash             # cannot reenter failsafe code
+        orb   $TF_failsafe_return,EDOMAIN_thread_flags(%rbx)
+        jmp   test_all_events          # will return via failsafe code
+.previous
+.section __pre_ex_table,"a"
+	.quad FLT1,FIX1
+.previous
+.section __ex_table,"a"
+        .quad DBLFLT1,DBLFIX1
+.previous
+
+/* No special register assumptions */
+failsafe_callback:
+        GET_CURRENT(%rbx)
+        andb $~TF_failsafe_return,EDOMAIN_thread_flags(%rbx)
+        leaq EDOMAIN_trap_bounce(%rbx),%rdx
+        movq EDOMAIN_failsafe_addr(%rbx),%rax
+        movq %rax,TRAPBOUNCE_eip(%rdx)
+        movw $TBF_FAILSAFE,TRAPBOUNCE_flags(%rdx)
+        call create_bounce_frame
+        RESTORE_ALL
+        addq $8,%rsp
+FLT2:   iret 
+.section .fixup,"ax"
+FIX2:   pushq %rbx
+        GET_CURRENT(%rbx)
+        orb   $TF_failsafe_return,EDOMAIN_thread_flags(%rbx)
+        popq  %rbx
+        jmp   FIX1
+.section __pre_ex_table,"a"
+	.quad FLT2,FIX2
+.previous
+
+        ALIGN
+restore_all_xen:
+        RESTORE_ALL
+        addq  $8,%rsp
+        iretq
 
 /*
  * %rax                            = hypercall vector
@@ -18,6 +96,7 @@
  * %r11, %rcx                      = SYSCALL-saved %rflags and %rip
  * NB. We must move %r10 to %rcx for C function-calling ABI.
  */
+        ALIGN
 ENTRY(hypercall)
         sti
         movl  $__GUEST_SS,8(%rsp)
@@ -25,34 +104,193 @@ ENTRY(hypercall)
         pushq $__GUEST_CS
         pushq %rcx
         pushq $0
+        movl  $TRAP_syscall,4(%rsp)
         SAVE_ALL
         movq  %r10,%rcx
         andq  $(NR_hypercalls-1),%rax
         leaq  SYMBOL_NAME(hypercall_table)(%rip),%rbx
         callq *(%rbx,%rax,8)
-        RESTORE_ALL
-        addq  $8,%rsp
-        popq  %rcx
-        addq  $8,%rsp
-        popq  %r11
-        cli
-        popq  %rsp
-        sysretq
-        
-ENTRY(ret_from_intr)
-restore_all_xen:
-        RESTORE_ALL
-        addq  $8,%rsp
-        iretq
+        GET_CURRENT(%rbx)
 
+ret_from_hypercall:
+        movq %rax,XREGS_rax(%rsp)       # save the return value
+
+test_all_events:
+        cli                             # tests must not race interrupts
+/*test_softirqs:*/  
+        movl  EDOMAIN_processor(%rbx),%eax
+        shl   $6,%rax                    # sizeof(irq_cpustat) == 64
+        leaq  SYMBOL_NAME(irq_stat)(%rip),%rcx
+        testl $~0,(%rcx,%rax,1)
+        jnz   process_softirqs
+/*test_guest_events:*/
+        movq  EDOMAIN_vcpu_info(%rbx),%rax
+        testb $0xFF,VCPUINFO_upcall_mask(%rax)
+        jnz   restore_all_guest
+        testb $0xFF,VCPUINFO_upcall_pending(%rax)
+        jz    restore_all_guest
+/*process_guest_events:*/
+        leaq  EDOMAIN_trap_bounce(%rbx),%rdx
+        movq  EDOMAIN_event_addr(%rbx),%rax
+        movq  %rax,TRAPBOUNCE_eip(%rdx)
+        movw  $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
+        call  create_bounce_frame
+        movq  EDOMAIN_vcpu_info(%rbx),%rax
+        movb  $1,VCPUINFO_upcall_mask(%rax) # Upcalls masked during delivery
+        jmp   restore_all_guest
+
+        ALIGN
+process_softirqs:
+        sti       
+        call SYMBOL_NAME(do_softirq)
+        jmp  test_all_events
+                
+/* CREATE A BASIC EXCEPTION FRAME ON GUEST OS STACK:                     */
+/*   { RCX, R11, [DS-GS,] [CR2,] [ERRCODE,] RIP, CS, RFLAGS, RSP, SS }   */
+/* %rdx == trap_bounce, %rbx == task_struct                              */
+/* %rax,%rcx are clobbered. %rsi contains new XREGS_rsp.                 */
+create_bounce_frame:
+        /* Push new frame at existing %rsp if already in guest-OS mode. */
+        movq  XREGS_rsp+8(%rsp),%rsi
+        testb $TF_guestos_mode,EDOMAIN_thread_flags(%rbx)
+        jnz   1f
+        /* Push new frame at registered guest-OS stack top. */
+        movq  EDOMAIN_guestos_sp(%rbx),%rsi
+1:      movq  $HYPERVISOR_VIRT_START,%rax
+        cmpq  %rax,%rsi
+        jb    1f                        # In +ve address space? Then okay.
+        movq  $HYPERVISOR_VIRT_END+60,%rax
+        cmpq  %rax,%rsi
+        jb    domain_crash              # Above Xen private area? Then okay.
+1:      subq  $40,%rsi
+        movq  XREGS_ss+8(%rsp),%rax
+FLT3:   movq  %rax,32(%rsi)             # SS
+        movq  XREGS_rsp+8(%rsp),%rax
+FLT4:   movq  %rax,24(%rsi)             # RSP
+        movq  XREGS_eflags+8(%rsp),%rax
+FLT5:   movq  %rax,16(%rsi)             # RFLAGS
+        movq  XREGS_cs+8(%rsp),%rax
+FLT6:   movq  %rax,8(%rsi)              # CS
+        movq  XREGS_rip+8(%rsp),%rax
+FLT7:   movq  %rax,(%rsi)               # RIP
+        movb  TRAPBOUNCE_flags(%rdx),%cl
+        testb $TBF_EXCEPTION_ERRCODE,%cl
+        jz    1f
+        subq  $8,%rsi
+        movq  TRAPBOUNCE_error_code(%rdx),%rax
+FLT8:   movq  %rax,(%rsi)               # ERROR CODE
+        testb $TBF_EXCEPTION_CR2,%cl
+        jz    2f
+        subq  $8,%rsi
+        movq  TRAPBOUNCE_cr2(%rdx),%rax
+FLT9:   movq  %rax,(%rsi)               # CR2
+1:      testb $TBF_FAILSAFE,%cl
+        jz    2f
+        subq  $32,%rsi
+        movl  %gs,%eax
+FLT10:  movq  %rax,24(%rsi)             # GS
+        movl  %fs,%eax
+FLT11:  movq  %rax,16(%rsi)             # FS
+        movl  %es,%eax
+FLT12:  movq  %rax,8(%rsi)              # ES
+        movl  %ds,%eax
+FLT13:  movq  %rax,(%rsi)               # DS
+2:      subq  $16,%rsi
+        movq  XREGS_r11+8(%rsp),%rax
+FLT14:  movq  %rax,(%rsi)               # R11
+        movq  XREGS_rcx+8(%rsp),%rax
+FLT15:  movq  %rax,(%rsi)               # RCX
+        /* Rewrite our stack frame and return to guest-OS mode. */
+        /* IA32 Ref. Vol. 3: TF, VM, RF and NT flags are cleared on trap. */
+        movb  $0,TRAPBOUNCE_flags(%rdx)
+        testb $TF_guestos_mode,EDOMAIN_thread_flags(%rbx)
+        jnz   1f
+        orb   $TF_guestos_mode,EDOMAIN_thread_flags(%rbx)
+        swapgs
+        /* XXX switch page tables XXX */
+1:      movl  $TRAP_syscall,XREGS_entry_vector+8(%rsp)
+        andl  $0xfffcbeff,XREGS_eflags+8(%rsp)
+        movl  $__GUEST_SS,XREGS_ss+8(%rsp)
+        movq  %rsi,XREGS_rsp+8(%rsp)
+        movl  $__GUEST_CS,XREGS_cs+8(%rsp)
+        movq  TRAPBOUNCE_eip(%rdx),%rax
+        movq  %rax,XREGS_rip+8(%rsp)
+        ret
+.section .fixup,"ax"
+FIX3:   sti
+        popq  %rsi
+        addq  $8,%rsp                  # Discard create_b_frame return address
+        pushq $__HYPERVISOR_DS         # SS
+        leaq  8(%rsp),%rax
+        pushq %rax                     # RSP
+        pushf                          # RFLAGS
+        pushq $__HYPERVISOR_CS         # CS
+        leaq  DBLFLT2(%rip),%rax
+        pushq %rax                     # RIP
+        pushq %rsi                     # error_code/entry_vector
+        jmp   error_code
+DBLFLT2:jmp   process_guest_exception_and_events
+.previous
+.section __pre_ex_table,"a"
+	.quad  FLT3,FIX3 ,  FLT4,FIX3 ,  FLT5,FIX3 ,  FLT6,FIX3
+	.quad  FLT7,FIX3 ,  FLT8,FIX3 ,  FLT9,FIX3 , FLT10,FIX3
+	.quad FLT11,FIX3 , FLT12,FIX3 , FLT13,FIX3 , FLT14,FIX3 , FLT15,FIX3
+.previous
+.section __ex_table,"a"
+        .quad DBLFLT2,domain_crash
+.previous
+
+        ALIGN
+process_guest_exception_and_events:
+        leaq  EDOMAIN_trap_bounce(%rbx),%rdx
+        testb $TBF_EXCEPTION,TRAPBOUNCE_flags(%rdx)
+        jz    test_all_events
+        cli   # create_bounce_frame needs CLI for pre-exceptions to work
+        call  create_bounce_frame
+        jmp   test_all_events
+
+        ALIGN
+ENTRY(ret_from_intr)
+        GET_CURRENT(%rbx)
+        testb $3,XREGS_cs(%rsp)
+        jnz   test_all_events
+        jmp   restore_all_xen
+
+        ALIGN
 error_code:
         SAVE_ALL
-        sti
+        testb $X86_EFLAGS_IF>>8,XREGS_eflags+1(%rsp)
+        jz    exception_with_ints_disabled
+1:      sti
         movq  %rsp,%rdi
         movl  XREGS_entry_vector(%rsp),%eax
         leaq  SYMBOL_NAME(exception_table)(%rip),%rdx
         callq *(%rdx,%rax,8)
         jmp   restore_all_xen
+
+exception_with_ints_disabled:
+        testb $3,XREGS_cs(%rsp)         # interrupts disabled outside Xen?
+        jnz   1b                        # it really does happen!
+                                        #  (e.g., DOM0 X server)
+        movq  XREGS_rip(%rsp),%rdi
+        call  search_pre_exception_table
+        testq %rax,%rax                 # no fixup code for faulting EIP?
+        jz    FATAL_exception_with_ints_disabled
+        movq  %rax,XREGS_rip(%rsp)
+        movq  %rsp,%rsi
+        subq  $8,%rsp
+        movq  %rsp,%rdi
+        movq  $XREGS_kernel_sizeof/8,%rcx
+        rep;  movsq                     # make room for error_code/entry_vector
+        movq  XREGS_error_code(%rsp),%rax # error_code/entry_vector
+        movq  %rax,XREGS_kernel_sizeof(%rsp)
+        jmp   restore_all_xen           # return to fixup code
+
+FATAL_exception_with_ints_disabled:
+        movl  XREGS_entry_vector(%rsp),%edi
+        movq  %rsp,%rsi
+        call  SYMBOL_NAME(fatal_trap)
+        ud2
 
 ENTRY(divide_error)
         pushq $0
