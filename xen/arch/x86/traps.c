@@ -288,12 +288,12 @@ asmlinkage void do_double_fault(void)
 
     /* Find information saved during fault and dump it to the console. */
     tss = &init_tss[cpu];
-    printk("CPU:    %d\nEIP:    %04x:[<%08lx>]      \nEFLAGS: %08lx\n",
+    printk("CPU:    %d\nEIP:    %04x:[<%08x>]      \nEFLAGS: %08x\n",
            cpu, tss->cs, tss->eip, tss->eflags);
-    printk("CR3:    %08lx\n", tss->__cr3);
-    printk("eax: %08lx   ebx: %08lx   ecx: %08lx   edx: %08lx\n",
+    printk("CR3:    %08x\n", tss->__cr3);
+    printk("eax: %08x   ebx: %08x   ecx: %08x   edx: %08x\n",
            tss->eax, tss->ebx, tss->ecx, tss->edx);
-    printk("esi: %08lx   edi: %08lx   ebp: %08lx   esp: %08lx\n",
+    printk("esi: %08x   edi: %08x   ebp: %08x   esp: %08x\n",
            tss->esi, tss->edi, tss->ebp, tss->esp);
     printk("ds: %04x   es: %04x   fs: %04x   gs: %04x   ss: %04x\n",
            tss->ds, tss->es, tss->fs, tss->gs, tss->ss);

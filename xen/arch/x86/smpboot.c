@@ -52,9 +52,6 @@
 
 #ifdef CONFIG_SMP
 
-/* Set if we find a B stepping CPU			*/
-static int smp_b_stepping;
-
 /* Setup configured maximum number of CPUs to activate */
 static int max_cpus = -1;
 
@@ -113,25 +110,8 @@ void __init smp_alloc_memory(void)
 
 void __init smp_store_cpu_info(int id)
 {
-    struct cpuinfo_x86 *c = cpu_data + id;
-
-    *c = boot_cpu_data;
-    c->pte_quick = 0;
-    c->pmd_quick = 0;
-    c->pgd_quick = 0;
-    c->pgtable_cache_sz = 0;
-    identify_cpu(c);
-    /*
-     * Mask B, Pentium, but not Pentium MMX
-     */
-    if (c->x86_vendor == X86_VENDOR_INTEL &&
-        c->x86 == 5 &&
-        c->x86_mask >= 1 && c->x86_mask <= 4 &&
-        c->x86_model <= 3)
-        /*
-         * Remember we have B step Pentia with bugs
-         */
-        smp_b_stepping = 1;
+    cpu_data[id] = boot_cpu_data;
+    identify_cpu(&cpu_data[id]);
 }
 
 /*
@@ -926,9 +906,6 @@ void __init smp_boot_cpus(void)
     }
     smp_num_cpus = cpucount + 1;
 
-    if (smp_b_stepping)
-        printk("WARNING: SMP operation may"
-               " be unreliable with B stepping processors.\n");
     Dprintk("Boot done.\n");
 
     /*

@@ -95,7 +95,7 @@ extern void __out_of_line_bug(int line) __attribute__((noreturn));
 #if defined(__x86_64__)
 
 #define PML4_ENTRY_BITS  39
-#define PML4_ENTRY_BYTES (1<<PML4_ENTRY_BITS)
+#define PML4_ENTRY_BYTES (1UL<<PML4_ENTRY_BITS)
 
 /*
  * Memory layout:
@@ -192,10 +192,6 @@ extern void __out_of_line_bug(int line) __attribute__((noreturn));
 /* Next 4MB of virtual address space used for per-domain mappings (eg. GDT). */
 #define PERDOMAIN_VIRT_START  (SH_LINEAR_PT_VIRT_END)
 #define PERDOMAIN_VIRT_END    (PERDOMAIN_VIRT_START + (4*1024*1024))
-#define GDT_VIRT_START        (PERDOMAIN_VIRT_START)
-#define GDT_VIRT_END          (GDT_VIRT_START + (64*1024))
-#define LDT_VIRT_START        (GDT_VIRT_END)
-#define LDT_VIRT_END          (LDT_VIRT_START + (64*1024))
 /* Penultimate 4MB of virtual address space used for domain page mappings. */
 #define MAPCACHE_VIRT_START   (PERDOMAIN_VIRT_END)
 #define MAPCACHE_VIRT_END     (MAPCACHE_VIRT_START + (4*1024*1024))
@@ -213,5 +209,10 @@ extern void __out_of_line_bug(int line) __attribute__((noreturn));
 #define __OP "e"  /* Operand Prefix */
 
 #endif /* __i386__ */
+
+#define GDT_VIRT_START        (PERDOMAIN_VIRT_START)
+#define GDT_VIRT_END          (GDT_VIRT_START + (64*1024))
+#define LDT_VIRT_START        (GDT_VIRT_END)
+#define LDT_VIRT_END          (LDT_VIRT_START + (64*1024))
 
 #endif /* __XEN_I386_CONFIG_H__ */

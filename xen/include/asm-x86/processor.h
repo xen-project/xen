@@ -1,11 +1,11 @@
 /*
- * include/asm-i386/processor.h
+ * include/asm-x86/processor.h
  *
  * Copyright (C) 1994 Linus Torvalds
  */
 
-#ifndef __ASM_I386_PROCESSOR_H
-#define __ASM_I386_PROCESSOR_H
+#ifndef __ASM_X86_PROCESSOR_H
+#define __ASM_X86_PROCESSOR_H
 
 #include <asm/page.h>
 #include <asm/types.h>
@@ -23,8 +23,12 @@ struct task_struct;
  * Default implementation of macro that returns current
  * instruction pointer ("program counter").
  */
+#ifdef __x86_64__
+#define current_text_addr() ({ void *pc; asm volatile("leaq 1f(%%rip),%0\n1:":"=r"(pc)); pc; })
+#else
 #define current_text_addr() \
   ({ void *pc; __asm__("movl $1f,%0\n1:":"=g" (pc)); pc; })
+#endif
 
 /*
  *  CPU type and hardware bug flags. Kept separately for each CPU.
@@ -37,24 +41,12 @@ struct cpuinfo_x86 {
     __u8    x86_vendor;     /* CPU vendor */
     __u8    x86_model;
     __u8    x86_mask;
-    char    wp_works_ok;    /* It doesn't on 386's */
-    char    hlt_works_ok;   /* Problems on some 486Dx4's and old 386's */
-    char    hard_math;
-    char    rfu;
     int     cpuid_level;    /* Maximum supported CPUID level, -1=no CPUID */
     __u32   x86_capability[NCAPINTS];
     char    x86_vendor_id[16];
-    char    x86_model_id[64];
-    int     x86_cache_size;  /* in KB - valid for CPUS which support this
-                                call  */
-    int     fdiv_bug;
-    int     f00f_bug;
-    int     coma_bug;
-    unsigned long loops_per_jiffy;
-    unsigned long *pgd_quick;
-    unsigned long *pmd_quick;
-    unsigned long *pte_quick;
-    unsigned long pgtable_cache_sz;
+    int     x86_cache_size;  /* in KB - for CPUS that support this call  */
+    int	    x86_clflush_size;
+    int	    x86_tlbsize;     /* number of 4K pages in DTLB/ITLB combined */
 } __attribute__((__aligned__(SMP_CACHE_BYTES)));
 
 #define X86_VENDOR_INTEL 0
@@ -184,15 +176,15 @@ static inline unsigned int cpuid_edx(unsigned int op)
 #define X86_CR0_PG              0x80000000 /* Paging                   (RW) */
 
 #define read_cr0() ({ \
-	unsigned int __dummy; \
+	unsigned long __dummy; \
 	__asm__( \
-		"movl %%cr0,%0\n\t" \
+		"mov"__OS" %%cr0,%0\n\t" \
 		:"=r" (__dummy)); \
 	__dummy; \
 })
 
 #define write_cr0(x) \
-	__asm__("movl %0,%%cr0": :"r" (x));
+	__asm__("mov"__OS" %0,%%cr0": :"r" (x));
 
 
 /*
@@ -221,9 +213,9 @@ extern unsigned long mmu_cr4_features;
 static inline void set_in_cr4 (unsigned long mask)
 {
     mmu_cr4_features |= mask;
-    __asm__("movl %%cr4,%%eax\n\t"
-            "orl %0,%%eax\n\t"
-            "movl %%eax,%%cr4\n"
+    __asm__("mov"__OS" %%cr4,%%"__OP"ax\n\t"
+            "or"__OS" %0,%%"__OP"ax\n\t"
+            "mov"__OS" %%"__OP"ax,%%cr4\n"
             : : "irg" (mask)
             :"ax");
 }
@@ -231,61 +223,12 @@ static inline void set_in_cr4 (unsigned long mask)
 static inline void clear_in_cr4 (unsigned long mask)
 {
     mmu_cr4_features &= ~mask;
-    __asm__("movl %%cr4,%%eax\n\t"
-            "andl %0,%%eax\n\t"
-            "movl %%eax,%%cr4\n"
+    __asm__("mov"__OS" %%cr4,%%"__OP"ax\n\t"
+            "and"__OS" %0,%%"__OP"ax\n\t"
+            "movl"__OS" %%"__OP"ax,%%cr4\n"
             : : "irg" (~mask)
             :"ax");
 }
-
-
-
-/*
- *      Cyrix CPU configuration register indexes
- */
-#define CX86_CCR0 0xc0
-#define CX86_CCR1 0xc1
-#define CX86_CCR2 0xc2
-#define CX86_CCR3 0xc3
-#define CX86_CCR4 0xe8
-#define CX86_CCR5 0xe9
-#define CX86_CCR6 0xea
-#define CX86_CCR7 0xeb
-#define CX86_DIR0 0xfe
-#define CX86_DIR1 0xff
-#define CX86_ARR_BASE 0xc4
-#define CX86_RCR_BASE 0xdc
-
-/*
- *      Cyrix CPU indexed register access macros
- */
-
-#define getCx86(reg) ({ outb((reg), 0x22); inb(0x23); })
-
-#define setCx86(reg, data) do { \
-	outb((reg), 0x22); \
-	outb((data), 0x23); \
-} while (0)
-
-#define EISA_bus (0)
-#define MCA_bus  (0)
-
-/* from system description table in BIOS.  Mostly for MCA use, but
-others may find it useful. */
-extern unsigned int machine_id;
-extern unsigned int machine_submodel_id;
-extern unsigned int BIOS_revision;
-extern unsigned int mca_pentium_flag;
-
-/*
- * User space process size: 3GB (default).
- */
-#define TASK_SIZE	(PAGE_OFFSET)
-
-/* This decides where the kernel will search for a free chunk of vm
- * space during mmap's.
- */
-#define TASK_UNMAPPED_BASE	(TASK_SIZE / 3)
 
 /*
  * Size of io_bitmap in longwords:
@@ -298,53 +241,9 @@ extern unsigned int mca_pentium_flag;
 #define IO_BITMAP_OFFSET offsetof(struct tss_struct,io_bitmap)
 #define INVALID_IO_BITMAP_OFFSET 0x8000
 
-struct i387_fsave_struct {
-    long	cwd;
-    long	swd;
-    long	twd;
-    long	fip;
-    long	fcs;
-    long	foo;
-    long	fos;
-    long	st_space[20];	/* 8*10 bytes for each FP-reg = 80 bytes */
-    long	status;		/* software status information */
-};
-
-struct i387_fxsave_struct {
-    unsigned short	cwd;
-    unsigned short	swd;
-    unsigned short	twd;
-    unsigned short	fop;
-    long	fip;
-    long	fcs;
-    long	foo;
-    long	fos;
-    long	mxcsr;
-    long	reserved;
-    long	st_space[32];	/* 8*16 bytes for each FP-reg = 128 bytes */
-    long	xmm_space[32];	/* 8*16 bytes for each XMM-reg = 128 bytes */
-    long	padding[56];
+struct i387_state {
+    u8 state[512]; /* big enough for FXSAVE */
 } __attribute__ ((aligned (16)));
-
-struct i387_soft_struct {
-    long    cwd;
-    long    swd;
-    long    twd;
-    long    fip;
-    long    fcs;
-    long    foo;
-    long    fos;
-    long    st_space[20];   /* 8*10 bytes for each FP-reg = 80 bytes */
-    unsigned char   ftop, changed, lookahead, no_update, rm, alimit;
-    struct info     *info;
-    unsigned long   entry_eip;
-};
-
-union i387_union {
-    struct i387_fsave_struct	fsave;
-    struct i387_fxsave_struct	fxsave;
-    struct i387_soft_struct soft;
-};
 
 typedef struct {
     unsigned long seg;
@@ -352,50 +251,64 @@ typedef struct {
 
 struct tss_struct {
     unsigned short	back_link,__blh;
-    unsigned long	esp0;
-    unsigned short	ss0,__ss0h;
-    unsigned long	esp1;
-    unsigned short	ss1,__ss1h;
-    unsigned long	esp2;
-    unsigned short	ss2,__ss2h;
-    unsigned long	__cr3;
-    unsigned long	eip;
-    unsigned long	eflags;
-    unsigned long	eax,ecx,edx,ebx;
-    unsigned long	esp;
-    unsigned long	ebp;
-    unsigned long	esi;
-    unsigned long	edi;
-    unsigned short	es, __esh;
-    unsigned short	cs, __csh;
-    unsigned short	ss, __ssh;
-    unsigned short	ds, __dsh;
-    unsigned short	fs, __fsh;
-    unsigned short	gs, __gsh;
-    unsigned short	ldt, __ldth;
-    unsigned short	trace, bitmap;
-    unsigned long	io_bitmap[IO_BITMAP_SIZE+1];
-    /*
-     * pads the TSS to be cacheline-aligned (total size is 0x2080)
-     */
-    unsigned long __cacheline_filler[5];
+#ifdef __x86_64__
+    u64 rsp0;
+    u64 rsp1;
+    u64 rsp2;
+    u64 reserved1;
+    u64 ist[7];
+    u64 reserved2;
+    u16 reserved3;
+#else
+    u32 esp0;
+    u16 ss0,__ss0h;
+    u32 esp1;
+    u16 ss1,__ss1h;
+    u32 esp2;
+    u16 ss2,__ss2h;
+    u32 __cr3;
+    u32 eip;
+    u32 eflags;
+    u32 eax,ecx,edx,ebx;
+    u32 esp;
+    u32 ebp;
+    u32 esi;
+    u32 edi;
+    u16 es, __esh;
+    u16 cs, __csh;
+    u16 ss, __ssh;
+    u16 ds, __dsh;
+    u16 fs, __fsh;
+    u16 gs, __gsh;
+    u16 ldt, __ldth;
+    u16 trace;
+#endif
+    u16 bitmap;
+    u32 io_bitmap[IO_BITMAP_SIZE+1];
+    /* Pads the TSS to be cacheline-aligned (total size is 0x2080). */
+    u32 __cacheline_filler[5];
 };
 
 struct thread_struct {
-    unsigned long guestos_sp, guestos_ss;
+    unsigned long      guestos_sp;
+    unsigned long      guestos_ss;
 /* Hardware debugging registers */
-    unsigned long	debugreg[8];  /* %%db0-7 debug registers */
+    unsigned long      debugreg[8];  /* %%db0-7 debug registers */
 /* floating point info */
-    union i387_union	i387;
+    struct i387_state  i387;
 /* Trap info. */
-    int                 fast_trap_idx;
-    struct desc_struct  fast_trap_desc;
-    trap_info_t         traps[256];
+#ifdef __i386__
+    int                fast_trap_idx;
+    struct desc_struct fast_trap_desc;
+#endif
+    trap_info_t        traps[256];
 };
 
 #define IDT_ENTRIES 256
 extern struct desc_struct idt_table[];
 extern struct desc_struct *idt_tables[];
+
+#if defined(__i386__)
 
 #define SET_DEFAULT_FAST_TRAP(_p) \
     (_p)->fast_trap_idx = 0x20;   \
@@ -443,6 +356,19 @@ long set_fast_trap(struct task_struct *p, int idx);
 	{ [0 ... IO_BITMAP_SIZE] = ~0UL }, /* ioperm */         \
 }
 
+#elif defined(__x86_64__)
+
+#define INIT_THREAD { 0 }
+
+#define INIT_TSS {                                              \
+	0,0,                                                    \
+	0,0,0,0,{0},0,0,                                        \
+	0, INVALID_IO_BITMAP_OFFSET,                            \
+	{ [0 ... IO_BITMAP_SIZE] = ~0UL }                       \
+}
+
+#endif /* __x86_64__ */
+
 struct mm_struct {
     /*
      * Every domain has a L1 pagetable of its own. Per-domain mappings
@@ -454,7 +380,7 @@ struct mm_struct {
     /* shadow mode status and controls */
     unsigned int shadow_mode;  /* flags to control shadow table operation */
     pagetable_t  shadow_table;
-    spinlock_t shadow_lock;
+    spinlock_t   shadow_lock;
     unsigned int shadow_max_page_count; // currently unused
 
     /* shadow hashtable */
@@ -472,11 +398,10 @@ struct mm_struct {
     unsigned int shadow_fault_count;     
     unsigned int shadow_dirty_count;     
 
-
     /* Current LDT details. */
     unsigned long ldt_base, ldt_ents, shadow_ldt_mapcnt;
     /* Next entry is passed to LGDT on domain switch. */
-    char gdt[6];
+    char gdt[10]; /* NB. 10 bytes needed for x86_64. Use 6 bytes for x86_32. */
 };
 
 static inline void write_ptbase(struct mm_struct *mm)
@@ -488,7 +413,7 @@ static inline void write_ptbase(struct mm_struct *mm)
     else
         pa = pagetable_val(mm->pagetable);
 
-    __asm__ __volatile__ ( "movl %0, %%cr3" : : "r" (pa) : "memory" );
+    __asm__ __volatile__ ( "mov"__OS" %0, %%cr3" : : "r" (pa) : "memory" );
 }
 
 #define IDLE0_MM                                                    \
@@ -499,9 +424,9 @@ static inline void write_ptbase(struct mm_struct *mm)
 
 /* Convenient accessor for mm.gdt. */
 #define SET_GDT_ENTRIES(_p, _e) ((*(u16 *)((_p)->mm.gdt + 0)) = (_e))
-#define SET_GDT_ADDRESS(_p, _a) ((*(u32 *)((_p)->mm.gdt + 2)) = (_a))
+#define SET_GDT_ADDRESS(_p, _a) ((*(unsigned long *)((_p)->mm.gdt + 2)) = (_a))
 #define GET_GDT_ENTRIES(_p)     ((*(u16 *)((_p)->mm.gdt + 0)))
-#define GET_GDT_ADDRESS(_p)     ((*(u32 *)((_p)->mm.gdt + 2)))
+#define GET_GDT_ADDRESS(_p)     ((*(unsigned long *)((_p)->mm.gdt + 2)))
 
 long set_gdt(struct task_struct *p, 
              unsigned long *frames, 
@@ -560,4 +485,4 @@ extern inline void prefetchw(const void *x)
 
 #endif
 
-#endif /* __ASM_I386_PROCESSOR_H */
+#endif /* __ASM_X86_PROCESSOR_H */

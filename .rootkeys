@@ -406,7 +406,7 @@
 3ddb79c3KhTI0F_Iw_hRL9QEyOVK-g xen/include/asm-x86/cache.h
 404f1b920OQVnrbnXnySS-WxrH9Wzw xen/include/asm-x86/config.h
 3ddb79c2LLt11EQHjrd6sB7FUqvFfA xen/include/asm-x86/cpufeature.h
-3ddb79c2ADvRmdexd9y3AYK9_NTx-Q xen/include/asm-x86/current.h
+40cf1596ajIU1KJfF22XD-tSLfH6XA xen/include/asm-x86/current.h
 3ddb79c2jFkPAZTDmU35L6IUssYMgQ xen/include/asm-x86/debugreg.h
 3ddb79c3r9-31dIsewPV3P3i8HALsQ xen/include/asm-x86/delay.h
 3ddb79c34BFiXjBJ_cCKB0aCsV1IDw xen/include/asm-x86/desc.h
@@ -429,7 +429,7 @@
 404f1bb41Yl-5ZjIWnG66HDCj6OIWA xen/include/asm-x86/pda.h
 4022a73diKn2Ax4-R4gzk59lm1YdDg xen/include/asm-x86/pdb.h
 3ddb79c2QF5-pZGzuX4QukPCDAl59A xen/include/asm-x86/processor.h
-3ddb79c3mbqEM7QQr3zVq7NiBNhouA xen/include/asm-x86/ptrace.h
+40cf1596bim9F9DNdV75klgRSZ6Y2A xen/include/asm-x86/ptrace.h
 3ddb79c2plf7ciNgoNjU-RsbUzawsw xen/include/asm-x86/rwlock.h
 3ddb79c3Hgbb2g8CyWLMCK-6_ZVQSQ xen/include/asm-x86/smp.h
 3ddb79c3jn8ALV_S9W5aeTYUQRKBpg xen/include/asm-x86/smpboot.h
@@ -440,13 +440,15 @@
 3e397e66xPNc8eaSqC9pPbyAtRGzHA xen/include/asm-x86/time.h
 3e450943TfE-iovQIY_tMO_VdGsPhA xen/include/asm-x86/timex.h
 3ddb79c4HugMq7IYGxcQKFBpKwKhzA xen/include/asm-x86/types.h
-3ddb79c3M2n1ROZH6xk3HbyN4CPDqg xen/include/asm-x86/uaccess.h
+40cf1596saFaHD5DC5zvrSn7CDCWGQ xen/include/asm-x86/uaccess.h
 3ddb79c3uPGcP_l_2xyGgBSWd5aC-Q xen/include/asm-x86/unaligned.h
+3ddb79c2ADvRmdexd9y3AYK9_NTx-Q xen/include/asm-x86/x86_32/current.h
+3ddb79c3mbqEM7QQr3zVq7NiBNhouA xen/include/asm-x86/x86_32/ptrace.h
+3ddb79c3M2n1ROZH6xk3HbyN4CPDqg xen/include/asm-x86/x86_32/uaccess.h
 404f1b9ceJeGVaPNIENm2FkK0AgEOQ xen/include/asm-x86/x86_64/current.h
 404f1b9fl6AQ_a-T1TDK3fuwTPXmHw xen/include/asm-x86/x86_64/desc.h
 404f1badfXZJZ2sU8sh9PS2EZvd19Q xen/include/asm-x86/x86_64/ldt.h
 404f1bb1LSCqrMDSfRAti5NdMQPJBQ xen/include/asm-x86/x86_64/page.h
-404f1bb756fZfxk5HDx7J7BW3R-1jQ xen/include/asm-x86/x86_64/processor.h
 404f1bb86rAXB3aLS1vYdcqpJiEcyg xen/include/asm-x86/x86_64/ptrace.h
 404f1bc4tWkB9Qr8RkKtZGW5eMQzhw xen/include/asm-x86/x86_64/uaccess.h
 400304fcmRQmDdFYEzDh0wcBba9alg xen/include/hypervisor-ifs/COPYING

@@ -24,10 +24,10 @@ static inline void __save_init_fpu( struct task_struct *tsk )
 {
     if ( cpu_has_fxsr ) {
         asm volatile( "fxsave %0 ; fnclex"
-                      : "=m" (tsk->thread.i387.fxsave) );
+                      : "=m" (tsk->thread.i387) );
     } else {
         asm volatile( "fnsave %0 ; fwait"
-                      : "=m" (tsk->thread.i387.fsave) );
+                      : "=m" (tsk->thread.i387) );
     }
     clear_bit(PF_USEDFPU, &tsk->flags);
 }
@@ -48,9 +48,9 @@ void restore_fpu( struct task_struct *tsk )
 {
     if ( cpu_has_fxsr ) {
         asm volatile( "fxrstor %0"
-                      : : "m" (tsk->thread.i387.fxsave) );
+                      : : "m" (tsk->thread.i387) );
     } else {
         asm volatile( "frstor %0"
-                      : : "m" (tsk->thread.i387.fsave) );
+                      : : "m" (tsk->thread.i387) );
     }
 }

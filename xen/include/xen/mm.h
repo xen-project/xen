@@ -313,7 +313,11 @@ int check_descriptor(unsigned long a, unsigned long b);
  * contiguous (or near contiguous) physical memory.
  */
 #undef  machine_to_phys_mapping
+#ifdef __x86_64__
+extern unsigned long *machine_to_phys_mapping;
+#else
 #define machine_to_phys_mapping ((unsigned long *)RDWR_MPT_VIRT_START)
+#endif
 
 /* Part of the domain API. */
 int do_mmu_update(mmu_update_t *updates, int count, int *success_count);

@@ -12,11 +12,6 @@ struct x8664_pda {
 	struct task_struct *pcurrent;	/* Current process */
         int irqcount;		    /* Irq nesting counter. Starts with -1 */  	
 	int cpunumber;		    /* Logical CPU number */
-	/* XXX: could be a single list */
-	unsigned long *pgd_quick;
-	unsigned long *pmd_quick;
-	unsigned long *pte_quick;
-	unsigned long pgtable_cache_sz;
 	char *irqstackptr;	/* top of irqstack */
 	unsigned long volatile *level4_pgt; 
 } ____cacheline_aligned;

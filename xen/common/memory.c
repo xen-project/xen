@@ -214,8 +214,8 @@ void __init init_frametable(unsigned long nr_pages)
        This costs 4MB -- may want to fix some day */
 
     /* Pin the ownership of the MP table so that DOM0 can map it later. */
-    for ( mfn = virt_to_phys((void *)RDWR_MPT_VIRT_START)>>PAGE_SHIFT;
-          mfn < virt_to_phys((void *)RDWR_MPT_VIRT_END)>>PAGE_SHIFT;
+    for ( mfn = virt_to_phys(&machine_to_phys_mapping[0])>>PAGE_SHIFT;
+          mfn < virt_to_phys(&machine_to_phys_mapping[1024*1024])>>PAGE_SHIFT;
           mfn++ )
     {
         frame_table[mfn].count_and_flags = 1 | PGC_allocated;

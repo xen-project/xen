@@ -21,10 +21,8 @@
 #include <xen/shadow.h>
 #include <hypervisor-ifs/sched_ctl.h>
 
-
 #define TRC_DOM0OP_ENTER_BASE  0x00020000
 #define TRC_DOM0OP_LEAVE_BASE  0x00030000
-
 
 extern unsigned int alloc_new_dom_mem(struct task_struct *, unsigned int);
 
@@ -45,7 +43,6 @@ static void read_msr_for(void *unused)
         rdmsr(msr_addr, msr_lo, msr_hi);
 }
 
-    
 long do_dom0_op(dom0_op_t *u_dom0_op)
 {
     long ret = 0;

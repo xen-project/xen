@@ -103,16 +103,11 @@ extern void __get_user_8(void);
 ({	long __val_gu;							\
 	int __ret_gu=1;							\
 	switch(sizeof (*(ptr))) {					\
-+	case 1:  __ret_gu=copy_from_user(&__val_gu,ptr,1);break;		\
-+	case 2:  __ret_gu=copy_from_user(&__val_gu,ptr,2);break;		\
-+	case 4:  __ret_gu=copy_from_user(&__val_gu,ptr,4);break;		\
-+	case 8:  __ret_gu=copy_from_user(&__val_gu,ptr,8);break;		\
-+	default: __ret_gu=copy_from_user(&__val_gu,ptr,sizeof(*(ptr)));break;\
-	/*case 1:  __get_user_x(1,__ret_gu,__val_gu,ptr); break;*/	\
-	/*case 2:  __get_user_x(2,__ret_gu,__val_gu,ptr); break;*/	\
-	/*case 4:  __get_user_x(4,__ret_gu,__val_gu,ptr); break;*/	\
-	/*case 8:  __get_user_x(8,__ret_gu,__val_gu,ptr); break;*/	\
-	/*default: __get_user_bad(); break;*/				\
+	case 1:  __get_user_x(1,__ret_gu,__val_gu,ptr); break;	\
+	case 2:  __get_user_x(2,__ret_gu,__val_gu,ptr); break;	\
+	case 4:  __get_user_x(4,__ret_gu,__val_gu,ptr); break;	\
+	case 8:  __get_user_x(8,__ret_gu,__val_gu,ptr); break;	\
+	default: __get_user_bad(); break;				\
 	}								\
 	(x) = (__typeof__(*(ptr)))__val_gu;				\
 	__ret_gu;							\

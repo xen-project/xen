@@ -168,13 +168,21 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
  * Some non intel clones support out of order store. wmb() ceases to be a
  * nop for these.
  */
- 
+#if defined(__i386__)
 #define mb() 	__asm__ __volatile__ ("lock; addl $0,0(%%esp)": : :"memory")
-#define rmb()	mb()
-
+#define rmb()	__asm__ __volatile__ ("lock; addl $0,0(%%esp)": : :"memory")
 #ifdef CONFIG_X86_OOSTORE
 #define wmb() 	__asm__ __volatile__ ("lock; addl $0,0(%%esp)": : :"memory")
-#else
+#endif
+#elif defined(__x86_64__)
+#define mb()    __asm__ __volatile__ ("mfence":::"memory")
+#define rmb()   __asm__ __volatile__ ("lfence":::"memory")
+#ifdef CONFIG_X86_OOSTORE
+#define wmb()   __asm__ __volatile__ ("sfence":::"memory")
+#endif
+#endif
+
+#ifndef CONFIG_X86_OOSTORE
 #define wmb()	__asm__ __volatile__ ("": : :"memory")
 #endif
 

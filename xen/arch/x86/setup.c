@@ -18,7 +18,7 @@
 #include <asm/pdb.h>
 
 char ignore_irq13;		/* set if exception 16 works */
-struct cpuinfo_x86 boot_cpu_data = { 0, 0, 0, 0, -1, 1, 0, 0, -1 };
+struct cpuinfo_x86 boot_cpu_data = { 0, 0, 0, 0, -1 };
 
 /* Lots of nice things, since we only target PPro+. */
 unsigned long mmu_cr4_features = X86_CR4_PSE | X86_CR4_PGE;
