@@ -326,6 +326,9 @@ void __enter_scheduler(void)
     task_slice_t        next_slice;
     s32                 r_time;     /* time for new dom to run */
 
+    cleanup_writable_pagetable(
+        prev, PTWR_CLEANUP_ACTIVE | PTWR_CLEANUP_INACTIVE);
+
     perfc_incrc(sched_run);
     
     spin_lock_irq(&schedule_data[cpu].schedule_lock);
@@ -373,9 +376,6 @@ void __enter_scheduler(void)
     if ( unlikely(prev == next) )
         return;
     
-    cleanup_writable_pagetable(
-        prev, PTWR_CLEANUP_ACTIVE | PTWR_CLEANUP_INACTIVE);
-
     perfc_incrc(sched_ctx);
 
 #if defined(WAKE_HISTO)
