@@ -328,6 +328,7 @@ static task_slice_t bvt_do_schedule(s_time_t now)
         {
             if ( p->processor == cpu )
             {
+                p_inf = BVT_INFO(p);
                 p_inf->evt -= 0xe0000000;
                 p_inf->avt -= 0xe0000000;
             }
