@@ -948,7 +948,7 @@ class XendDomainInfo:
         @return: deferred
         """
         ctrl = xend.blkif_create(self.dom, recreate=self.recreate)
-        back = ctrl.getBackend(0)
+        back = ctrl.getBackendInterface(0)
         return back.connect(recreate=self.recreate)
     
     def dom_construct(self, dom, config):
@@ -1049,8 +1049,6 @@ def vm_dev_vif(vm, val, index):
     @param index:     vif index
     @return: deferred
     """
-    #if vm.netif_backend:
-    #    raise VmError('vif: vif in netif backend domain')
     vif = vm.next_device_index('vif')
     vmac = sxp.child_value(val, "mac")
     ctrl = xend.netif_create(vm.dom, recreate=vm.recreate)
@@ -1071,8 +1069,6 @@ def vm_dev_vbd(vm, val, index):
     @param index:     vbd index
     @return: deferred
     """
-    #if vm.blkif_backend:
-    #    raise VmError('vbd: vbd in blkif backend domain')
     uname = sxp.child_value(val, 'uname')
     if not uname:
         raise VmError('vbd: Missing uname')
