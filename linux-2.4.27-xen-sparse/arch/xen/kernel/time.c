@@ -127,7 +127,8 @@ static int __init __independent_wallclock(char *str)
     return 1;
 }
 __setup("independent_wallclock", __independent_wallclock);
-
+#define INDEPENDENT_WALLCLOCK() \
+    (independent_wallclock || (start_info.flags & SIF_INITDOMAIN))
 
 #ifdef CONFIG_XEN_PRIVILEGED_GUEST
 /*
@@ -302,7 +303,7 @@ void do_settimeofday(struct timeval *tv)
     struct timeval newtv;
     suseconds_t usec;
     
-    if ( !independent_wallclock && !(start_info.flags & SIF_INITDOMAIN) )
+    if ( !INDEPENDENT_WALLCLOCK() )
         return;
     
     write_lock_irq(&xtime_lock);
@@ -424,7 +425,7 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
      * synchronised ourselves, and we haven't chosen to keep an independent
      * time base.
      */
-    if ( !independent_wallclock && 
+    if ( !INDEPENDENT_WALLCLOCK() &&
          ((time_status & STA_UNSYNC) != 0) &&
          (xtime.tv_sec > (last_update_from_xen + 60)) )
     {

@@ -146,6 +146,8 @@ static int __init __independent_wallclock(char *str)
 	return 1;
 }
 __setup("independent_wallclock", __independent_wallclock);
+#define INDEPENDENT_WALLCLOCK() \
+    (independent_wallclock || (start_info.flags & SIF_INITDOMAIN))
 
 /*
  * Reads a consistent set of time-base values from Xen, into a shadow data
@@ -260,7 +262,7 @@ int do_settimeofday(struct timespec *tv)
 	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
 		return -EINVAL;
 
-	if (!independent_wallclock && !(start_info.flags & SIF_INITDOMAIN))
+	if (!INDEPENDENT_WALLCLOCK())
 		return 0; /* Silent failure? */
 
 	write_seqlock_irq(&xtime_lock);
@@ -392,7 +394,7 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 	 * synchronised ourselves, and we haven't chosen to keep an independent
 	 * time base.
 	 */
-	if (!independent_wallclock && 
+	if (!INDEPENDENT_WALLCLOCK() &&
 	    ((time_status & STA_UNSYNC) != 0) &&
 	    (xtime.tv_sec > (last_update_from_xen + 60))) {
 		/* Adjust shadow for jiffies that haven't updated xtime yet. */
