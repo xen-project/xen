@@ -19,31 +19,6 @@
 #define DPRINTF(_f, _a...) ((void)0)
 #endif
 
-static int get_pfn_list(int xc_handle,
-                        u32 domain_id, 
-                        unsigned long *pfn_buf, 
-                        unsigned long max_pfns)
-{
-    dom0_op_t op;
-    int ret;
-    op.cmd = DOM0_GETMEMLIST;
-    op.u.getmemlist.domain   = (domid_t)domain_id;
-    op.u.getmemlist.max_pfns = max_pfns;
-    op.u.getmemlist.buffer   = pfn_buf;
-
-    if ( mlock(pfn_buf, max_pfns * sizeof(unsigned long)) != 0 )
-    {
-        PERROR("Could not lock pfn list buffer");
-        return -1;
-    }    
-
-    ret = do_dom0_op(xc_handle, &op);
-
-    (void)munlock(pfn_buf, max_pfns * sizeof(unsigned long));
-
-    return (ret < 0) ? -1 : op.u.getmemlist.num_pfns;
-}
-
 /** Read the vmconfig string from the state input.
  * It is stored as a 4-byte count 'n' followed by n bytes.
  * The config data is stored in a new string in 'ioctxt->vmconfig',
@@ -202,6 +177,7 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
     /* Get the domain's shared-info frame. */
     op.cmd = DOM0_GETDOMAININFO;
     op.u.getdomaininfo.domain = (domid_t)dom;
+    op.u.getdomaininfo.exec_domain = 0;
     op.u.getdomaininfo.ctxt = NULL;
     if ( do_dom0_op(xc_handle, &op) < 0 )
     {
@@ -220,7 +196,7 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
     }
 
     /* Build the pfn-to-mfn table. We choose MFN ordering returned by Xen. */
-    if ( get_pfn_list(xc_handle, dom, pfn_to_mfn_table, nr_pfns) != nr_pfns )
+    if ( xc_get_pfn_list(xc_handle, dom, pfn_to_mfn_table, nr_pfns) != nr_pfns )
     {
         xcio_error(ioctxt, "Did not read correct number of frame "
                    "numbers for new dom");

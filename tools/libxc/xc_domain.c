@@ -88,6 +88,7 @@ int xc_domain_getinfo(int xc_handle,
     {
         op.cmd = DOM0_GETDOMAININFO;
         op.u.getdomaininfo.domain = (domid_t)next_domid;
+        op.u.getdomaininfo.exec_domain = 0; // FIX ME?!?
         op.u.getdomaininfo.ctxt = NULL; /* no exec context info, thanks. */
         if ( do_dom0_op(xc_handle, &op) < 0 )
             break;
@@ -121,6 +122,7 @@ int xc_domain_getinfo(int xc_handle,
 
 int xc_domain_getfullinfo(int xc_handle,
                           u32 domid,
+                          u32 vcpu,
                           xc_domaininfo_t *info,
                           full_execution_context_t *ctxt)
 {
@@ -129,6 +131,7 @@ int xc_domain_getfullinfo(int xc_handle,
 
     op.cmd = DOM0_GETDOMAININFO;
     op.u.getdomaininfo.domain = (domid_t)domid;
+    op.u.getdomaininfo.exec_domain = (u16)vcpu;
     op.u.getdomaininfo.ctxt = ctxt;
 
     rc = do_dom0_op(xc_handle, &op);
