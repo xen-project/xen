@@ -555,8 +555,11 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
 
         // avoid the fault later
 	*sptr = new_pte;
-
 	unmap_domain_mem(sptr);
+
+	if( p->mm.shadow_mode == SHM_logdirty )
+		mark_dirty( &p->mm, new_page-frame_table );
+
 	put_shadow_status(&p->mm);
     }
 

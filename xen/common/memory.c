@@ -1060,6 +1060,12 @@ int do_mmu_update(mmu_update_t *ureqs, int count)
 
             machine_to_phys_mapping[pfn] = req.val;
             okay = 1;
+
+	    /*  if in log dirty shadow mode, mark the corresponding 
+		psuedo-physical page as dirty */
+	    if( unlikely(current->mm.shadow_mode == SHM_logdirty) )
+		mark_dirty( &current->mm, pfn );
+
             put_page(&frame_table[pfn]);
             break;
 
