@@ -481,6 +481,8 @@ void ctrl_if_suspend(void)
 
 void ctrl_if_resume(void)
 {
+    control_if_t *ctrl_if = get_ctrl_if();
+
     if ( xen_start_info.flags & SIF_INITDOMAIN )
     {
         /*
@@ -501,8 +503,8 @@ void ctrl_if_resume(void)
     }
 
     /* Sync up with shared indexes. */
-    RING_DROP_PENDING_RESPONSES(&ctrl_if_tx_ring);
-    RING_DROP_PENDING_REQUESTS(&ctrl_if_rx_ring);
+    FRONT_RING_ATTACH(&ctrl_if_tx_ring, &ctrl_if->tx_ring);
+    BACK_RING_ATTACH(&ctrl_if_rx_ring, &ctrl_if->rx_ring);
 
     ctrl_if_evtchn = xen_start_info.domain_controller_evtchn;
     ctrl_if_irq    = bind_evtchn_to_irq(ctrl_if_evtchn);
