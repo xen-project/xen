@@ -145,11 +145,11 @@ mk-netbsd-trees: netbsd-tools pristine-netbsd-src
           ./mkbuildtree ../netbsd-$(NETBSD_VER)-xenU )
 
 # build the specified netbsd tree
-BDIR = $(subst netbsd-,netbsd-$(NETBSD_VER)-,$@)
+NBDIR = $(subst netbsd-,netbsd-$(NETBSD_VER)-,$@)
 netbsd-xen%:	
-	$(MAKE) -C $(BDIR) config
-	$(MAKE) -C $(BDIR) netbsd
-	$(MAKE) -C $(BDIR) INSTALL_PATH=$(INSTALL_DIR) INSTALL_NAME=boot/netbsd-$(NETBSD_VER)-$(subst netbsd-,,$@) install
+	$(MAKE) -C $(NBDIR) config
+	$(MAKE) -C $(NBDIR) netbsd
+	$(MAKE) -C $(NBDIR) INSTALL_PATH=$(INSTALL_DIR) INSTALL_NAME=boot/netbsd-$(NETBSD_VER)-$(subst netbsd-,,$@) install
 
 # build xen, the tools, and a domain 0 plus unprivileged linux-xen images,
 # and place them in the install directory. 'make install' should then
