@@ -36,7 +36,7 @@
 #include "sys_net.h"
 #include "sys_string.h"
 
-#include "xdr.h"
+//#include "xdr.h"
 #include "enum.h"
 #include "xfrd.h"
 
@@ -362,10 +362,10 @@ int addrof(Sxpr exp, uint32_t *v){
     err = stringof(exp, &h);
     if(err) goto exit;
     if(get_host_address(h, &a)){
-        *v = a;
-    } else {
         err = -EINVAL;
+        goto exit;
     }
+    *v = a;
   exit:
     dprintf("< err=%d v=%x\n", err, *v);
     return err;
@@ -383,11 +383,12 @@ int portof(Sxpr exp, uint16_t *v){
         unsigned long p;
         err = stringof(exp, &s);
         if(err) goto exit;
-        if(get_service_port(s, &p)){
-            *v = p;
-        } else {
+        err = convert_service_to_port(s, &p);
+        if(err){
             err = -EINVAL;
+            goto exit;
         }
+        *v = p;
     }
   exit:
     dprintf("< err=%d v=%u\n", err, *v);
@@ -414,20 +415,12 @@ time_t stats(time_t t0, uint64_t offset, uint64_t memory, float *percent, float 
  */
 int xfr_error(Conn *conn, int errcode){
     int err = 0;
+
     if(!conn->out) return -ENOTCONN;
-    err = pack_type(conn->out, T_CONS);
-    if(err) goto exit;
-    err = pack_bool(conn->out, 1);
-    if(err) goto exit;
-    err = pack_sxpr(conn->out, oxfr_err);
-    if(err) goto exit;
-    err = pack_bool(conn->out, 1);
-    if(err) goto exit;
-    err = pack_sxpr(conn->out, mkint(errcode));
-    if(err) goto exit;
-    err = pack_bool(conn->out, 0);
-  exit:
-    return err;
+    if(errcode <0) errcode = -errcode;
+    err = IOStream_print(conn->out, "(%s %d)",
+                         atom_name(oxfr_err), errcode);
+    return (err < 0 ? err : 0);
 }
 
 /** Read a response message - error or ok.
@@ -441,7 +434,7 @@ int xfr_response(Conn *conn){
 
     dprintf(">\n");
     if(!conn->out) return -ENOTCONN;
-    err = unpack_sxpr(conn->in, &sxpr);
+    err = Conn_sxpr(conn, &sxpr);
     if(err) goto exit;
     if(sxpr_elementp(sxpr, oxfr_err)){
         int errcode;
@@ -468,7 +461,7 @@ int xfr_hello(Conn *conn){
     Sxpr sxpr;
     if(!conn->in) return -ENOTCONN;
     dprintf(">\n");
-    err = unpack_sxpr(conn->in, &sxpr);
+    err = Conn_sxpr(conn, &sxpr);
     if(err) goto exit;
     if(!sxpr_elementp(sxpr, oxfr_hello)){
         dprintf("> sxpr_elementp test failed\n");
@@ -503,21 +496,12 @@ int xfr_hello(Conn *conn){
 int xfr_send_hello(Conn *conn){
     int err = 0;
     dprintf(">\n");
-    err = pack_type(conn->out, T_CONS);
-    if(err) goto exit;
-    err = pack_bool(conn->out, 1);
-    if(err) goto exit;
-    err = pack_sxpr(conn->out, oxfr_hello);
-    if(err) goto exit;
-    err = pack_bool(conn->out, 1);
-    if(err) goto exit;
-    err = pack_sxpr(conn->out, mkint(XFR_PROTO_MAJOR));
-    if(err) goto exit;
-    err = pack_bool(conn->out, 1);
-    if(err) goto exit;
-    err = pack_sxpr(conn->out, mkint(XFR_PROTO_MINOR));
-    if(err) goto exit;
-    err = pack_bool(conn->out, 0);
+
+    err = IOStream_print(conn->out, "(%s %d %d)",
+                         atom_name(oxfr_hello),
+                         XFR_PROTO_MAJOR,
+                         XFR_PROTO_MINOR);
+    if(err < 0) goto exit;
     IOStream_flush(conn->out);
     dprintf("> xfr_response...\n");
     err = xfr_response(conn);
@@ -528,55 +512,26 @@ int xfr_send_hello(Conn *conn){
 
 int xfr_send_xfr(Conn *conn, uint32_t vmid){
     int err;
-    err = pack_type(conn->out, T_CONS);
-    if(err) goto exit;
-    err = pack_bool(conn->out, 1);
-    if(err) goto exit;
-    err = pack_sxpr(conn->out, oxfr_xfr);
-    if(err) goto exit;
-    err = pack_bool(conn->out, 1);
-    if(err) goto exit;
-    err = pack_sxpr(conn->out, mkint(vmid));
-    if(err) goto exit;
-    err = pack_bool(conn->out, 0);
-    if(err) goto exit;
-  exit:
-    return err;
+
+    err = IOStream_print(conn->out, "(%s %d)",
+                         atom_name(oxfr_xfr), vmid);
+    return (err < 0 ? err : 0);
 }
 
 int xfr_send_ok(Conn *conn, uint32_t vmid){
     int err = 0;
-    err = pack_type(conn->out, T_CONS);
-    if(err) goto exit;
-    err = pack_bool(conn->out, 1);
-    if(err) goto exit;
-    err = pack_sxpr(conn->out, oxfr_ok);
-    if(err) goto exit;
-    err = pack_bool(conn->out, 1);
-    if(err) goto exit;
-    err = pack_sxpr(conn->out, mkint(vmid));
-    if(err) goto exit;
-    err = pack_bool(conn->out, 0);
-  exit:
-    return err;
+
+    err = IOStream_print(conn->out, "(%s %d)",
+                         atom_name(oxfr_ok), vmid);
+    return (err < 0 ? err : 0);
 }
 
 int xfr_send_suspend(Conn *conn, uint32_t vmid){
     int err = 0;
 
-    err = pack_type(conn->out, T_CONS);
-    if(err) goto exit;
-    err = pack_bool(conn->out, 1);
-    if(err) goto exit;
-    err = pack_sxpr(conn->out, oxfr_suspend);
-    if(err) goto exit;
-    err = pack_bool(conn->out, 1);
-    if(err) goto exit;
-    err = pack_sxpr(conn->out, mkint(vmid));
-    if(err) goto exit;
-    err = pack_bool(conn->out, 0);
-  exit:
-    return err;
+    err = IOStream_print(conn->out, "(%s %d)",
+                         atom_name(oxfr_suspend), vmid);
+    return (err < 0 ? err : 0);
 }
 
 /** Get vm state. Send transfer message.
@@ -594,11 +549,12 @@ int xfr_send_state(XfrState *state, Conn *xend, Conn *peer){
     // Send xfr message and the domain state.
     err = xfr_send_xfr(peer, state->vmid);
     if(err) goto exit;
-    err = xen_domain_snd(xend, peer->out, state->vmid, state->vmconfig, state->vmconfig_n);
+    err = xen_domain_snd(xend, peer->out,
+                         state->vmid, state->vmconfig, state->vmconfig_n);
     if(err) goto exit;
     IOStream_flush(peer->out);
     // Read the response from the peer.
-    err = unpack_sxpr(peer->in, &sxpr);
+    err = Conn_sxpr(peer, &sxpr);
     if(err) goto exit;
     if(sxpr_elementp(sxpr, oxfr_err)){
         // Error.
@@ -785,10 +741,14 @@ int xfrd_service(Args *args, int peersock, struct sockaddr_in peer_in){
     dprintf(">\n");
     err = Conn_init(conn, flags, peersock, peer_in);
     if(err) goto exit;
+    dprintf(">xfr_hello... \n");
     err = xfr_hello(conn);
     if(err) goto exit;
-    err = unpack_sxpr(conn->in, &sxpr);
+    dprintf("> sxpr...\n");
+    err = Conn_sxpr(conn, &sxpr);
     if(err) goto exit;
+    dprintf("> sxpr=\n");
+    objprint(iostdout, sxpr, PRINT_TYPE); IOStream_print(iostdout, "\n");
     if(sxpr_elementp(sxpr, oxfr_migrate)){
         // Migrate message from xend.
         uint32_t addr;

@@ -193,45 +193,45 @@ def strip(pre, s):
     else:
         return s
 
-def configure_image(config, opts):
+def configure_image(config, vals):
     """Create the image config.
     """
-    config_image = [ opts.builder ]
-    config_image.append([ 'kernel', os.path.abspath(opts.kernel) ])
-    if opts.ramdisk:
-        config_image.append([ 'ramdisk', os.path.abspath(opts.ramdisk) ])
-    if opts.cmdline_ip:
-        cmdline_ip = strip('ip=', opts.cmdline_ip)
+    config_image = [ vals.builder ]
+    config_image.append([ 'kernel', os.path.abspath(vals.kernel) ])
+    if vals.ramdisk:
+        config_image.append([ 'ramdisk', os.path.abspath(vals.ramdisk) ])
+    if vals.cmdline_ip:
+        cmdline_ip = strip('ip=', vals.cmdline_ip)
         config_image.append(['ip', cmdline_ip])
-    if opts.root:
-        cmdline_root = strip('root=', opts.root)
+    if vals.root:
+        cmdline_root = strip('root=', vals.root)
         config_image.append(['root', cmdline_root])
-    if opts.extra:
-        config_image.append(['args', opts.extra])
+    if vals.extra:
+        config_image.append(['args', vals.extra])
     config.append(['image', config_image ])
     
-def configure_disks(config_devs, opts):
+def configure_disks(config_devs, vals):
     """Create the config for disks (virtual block devices).
     """
-    for (uname, dev, mode) in opts.disk:
+    for (uname, dev, mode) in vals.disk:
         config_vbd = ['vbd',
                       ['uname', uname],
                       ['dev', dev ],
                       ['mode', mode ] ]
         config_devs.append(['device', config_vbd])
 
-def configure_pci(config_devs, opts):
+def configure_pci(config_devs, vals):
     """Create the config for pci devices.
     """
-    for (bus, dev, func) in opts.pci:
+    for (bus, dev, func) in vals.pci:
         config_pci = ['pci', ['bus', bus], ['dev', dev], ['func', func]]
         config_devs.append(['device', config_pci])
 
-def configure_vifs(config_devs, opts):
+def configure_vifs(config_devs, vals):
     """Create the config for virtual network interfaces.
     """
-    vifs = opts.vif
-    vifs_n = max(opts.nics, len(vifs))
+    vifs = vals.vif
+    vifs_n = max(vals.nics, len(vifs))
 
     for idx in range(0, vifs_n):
         if idx < len(vifs):
@@ -248,65 +248,65 @@ def configure_vifs(config_devs, opts):
             config_vif.append(['bridge', bridge])
         config_devs.append(['device', config_vif])
 
-def configure_vfr(config, opts):
-     if not opts.ipaddr: return
+def configure_vfr(config, vals):
+     if not vals.ipaddr: return
      config_vfr = ['vfr']
      idx = 0 # No way of saying which IP is for which vif?
-     for ip in opts.ipaddr:
+     for ip in vals.ipaddr:
          config_vfr.append(['vif', ['id', idx], ['ip', ip]])
      config.append(config_vfr)
 
 
-def make_config(opts):
+def make_config(vals):
     """Create the domain configuration.
     """
     
     config = ['vm',
-              ['name', opts.name ],
-              ['memory', opts.memory ] ]
-    if opts.cpu:
-        config.append(['cpu', opts.cpu])
-    if opts.blkif:
+              ['name', vals.name ],
+              ['memory', vals.memory ] ]
+    if vals.cpu:
+        config.append(['cpu', vals.cpu])
+    if vals.blkif:
         config.append(['backend', ['blkif']])
-    if opts.netif:
+    if vals.netif:
         config.append(['backend', ['netif']])
-    if opts.autorestart:
+    if vals.autorestart:
         config.append(['autorestart'])
     
-    configure_image(config, opts)
+    configure_image(config, vals)
     config_devs = []
-    configure_disks(config_devs, opts)
-    configure_pci(config_devs, opts)
-    configure_vifs(config_devs, opts)
+    configure_disks(config_devs, vals)
+    configure_pci(config_devs, vals)
+    configure_vifs(config_devs, vals)
     config += config_devs
     return config
 
-def preprocess_disk(opts):
-    if not opts.disk: return
+def preprocess_disk(opts, vals):
+    if not vals.disk: return
     disk = []
-    for v in opts.disk:
+    for v in vals.disk:
         d = v.split(',')
         if len(d) != 3:
             opts.err('Invalid disk specifier: ' + v)
         disk.append(d)
-    opts.disk = disk
+    vals.disk = disk
 
-def preprocess_pci(opts):
-    if not opts.pci: return
+def preprocess_pci(opts, vals):
+    if not vals.pci: return
     pci = []
-    for v in opts.pci:
+    for v in vals.pci:
         d = v.split(',')
         if len(d) != 3:
             opts.err('Invalid pci specifier: ' + v)
         # Components are in hex: add hex specifier.
         hexd = map(lambda v: '0x'+v, d)
         pci.append(hexd)
-    opts.pci = pci
+    vals.pci = pci
 
-def preprocess_vifs(opts):
-    if not opts.vif: return
+def preprocess_vifs(opts, vals):
+    if not vals.vif: return
     vifs = []
-    for vif in opts.vif:
+    for vif in vals.vif:
         d = {}
         a = vif.split(',')
         for b in a:
@@ -317,43 +317,42 @@ def preprocess_vifs(opts):
                 opts.err('Invalid vif specifier: ' + vif)
             d[k] = v
         vifs.append(d)
-    opts.vif = vifs
+    vals.vif = vifs
 
-def preprocess_ip(opts):
-    setip = (opts.hostname or opts.netmask
-             or opts.gateway or opts.dhcp or opts.interface)
+def preprocess_ip(opts, vals):
+    setip = (vals.hostname or vals.netmask
+             or vals.gateway or vals.dhcp or vals.interface)
     if not setip: return
-    #if not opts
-    ip = (opts.ip
+    ip = (vals.ip
           + ':'
-          + ':' + opts.gateway
-          + ':' + opts.netmask
-          + ':' + opts.hostname
-          + ':' + opts.interface
-          + ':' + opts.dhcp)
-    opts.cmdline_ip = ip
+          + ':' + vals.gateway
+          + ':' + vals.netmask
+          + ':' + vals.hostname
+          + ':' + vals.interface
+          + ':' + vals.dhcp)
+    vals.cmdline_ip = ip
 
-def preprocess_nfs(opts):
-    if (opts.nfs_root or opts.nfs_server):
-        if (not opts.nfs_root) or (not opts.nfs_server):
+def preprocess_nfs(opts, vals):
+    if (vals.nfs_root or vals.nfs_server):
+        if (not vals.nfs_root) or (not vals.nfs_server):
             opts.err('Must set nfs root and nfs server')
     else:
         return
-    nfs = 'nfsroot=' + opts.nfs_server + ':' + opts.nfs_root
-    opts.extra = nfs + ' ' + opts.extra
+    nfs = 'nfsroot=' + vals.nfs_server + ':' + vals.nfs_root
+    vals.extra = nfs + ' ' + vals.extra
     
-def preprocess(opts):
-    if not opts.kernel:
+def preprocess(opts, vals):
+    if not vals.kernel:
         opts.err("No kernel specified")
-    preprocess_disk(opts)
-    preprocess_pci(opts)
-    preprocess_vifs(opts)
-    preprocess_ip(opts)
-    preprocess_nfs(opts)
+    preprocess_disk(opts, vals)
+    preprocess_pci(opts, vals)
+    preprocess_vifs(opts, vals)
+    preprocess_ip(opts, vals)
+    preprocess_nfs(opts, vals)
          
 def make_domain(opts, config):
     """Create, build and start a domain.
-    Returns: [int] the ID of the new domain.
+    Returns: pair: [int] the ID of the new domain, [int] console port
     """
     if opts.vals.load:
         filename = os.path.abspath(opts.vals.load)
@@ -393,7 +392,7 @@ def main(argv):
         pass
     else:
         opts.load_defaults()
-    preprocess(opts.vals)
+    preprocess(opts, opts.vals)
     config = make_config(opts.vals)
     if opts.vals.dryrun:
         PrettyPrint.prettyprint(config)

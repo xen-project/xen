@@ -8,6 +8,7 @@
 #include "connection.h"
 #include "file_stream.h"
 #include "lzi_stream.h"
+#include "sxpr_parser.h"
 
 #define dprintf(fmt, args...) fprintf(stdout, "[DEBUG] %s" fmt, __FUNCTION__, ##args)
 #define wprintf(fmt, args...) fprintf(stderr, "[WARN]  %s" fmt, __FUNCTION__, ##args)
@@ -160,4 +161,35 @@ void Conn_close(Conn *conn){
     if(conn->in) IOStream_close(conn->in);
     if(conn->out) IOStream_close(conn->out);
     shutdown(conn->sock, 2);
+}
+
+int Conn_sxpr(Conn *conn, Sxpr *sxpr){
+    int err = 0;
+    Sxpr val = ONONE;
+    int c = 0;
+
+    dprintf(">\n");
+    if(!conn->parser){
+        conn->parser = Parser_new();
+        set_error_stream(conn->parser, iostdout);
+    }
+    while(!err && c >= 0 && !Parser_ready(conn->parser)){
+        c = IOStream_getc(conn->in);
+        printf("%c", (char)c);
+        if(c < 0){
+            err = Parser_input_eof(conn->parser);
+        } else {
+            err = Parser_input_char(conn->parser, c);
+        }
+    }
+    if(Parser_ready(conn->parser)){
+        val = Parser_get_val(conn->parser);
+    }
+    if(err){
+        objfree(val);
+        val = ONONE;
+    }
+    *sxpr = val;
+    dprintf("< err=%d\n", err);
+    return err;
 }

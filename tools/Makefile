@@ -6,6 +6,7 @@ all:
 	$(MAKE) -C examples
 	$(MAKE) -C xentrace
 	$(MAKE) -C python
+	$(MAKE) -C xfrd
 
 install: all
 	$(MAKE) -C libxutil install
@@ -14,6 +15,7 @@ install: all
 	$(MAKE) -C examples install
 	$(MAKE) -C xentrace install
 	$(MAKE) -C python install
+	$(MAKE) -C xfrd install
 
 dist: $(TARGET)
 	$(MAKE) prefix=`pwd`/../../install dist=yes install
@@ -26,4 +28,5 @@ clean:
 	$(MAKE) -C examples clean
 	$(MAKE) -C xentrace clean
 	$(MAKE) -C python clean
+	$(MAKE) -C xfrd clean
 
