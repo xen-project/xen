@@ -7,7 +7,9 @@
  * Portions by Mark Williamson are (C) 2004 Intel Research Cambridge
  */
 
-#define BUCKETS 10
+//#define ADV_SCHED_HISTO
+#define BUCKETS  10
+/*300*/
 
 typedef struct schedule_data_st
 {
@@ -17,6 +19,11 @@ typedef struct schedule_data_st
     struct domain       *idle;          /* idle task for this cpu */
     void *              sched_priv;
     struct ac_timer     s_timer;        /* scheduling timer  */
+#ifdef ADV_SCHED_HISTO
+    u32			to_hist[BUCKETS];
+    u32			from_hist[BUCKETS];
+    u64			save_tsc;
+#endif
 #ifdef BUCKETS
     u32                 hist[BUCKETS];  /* for scheduler latency histogram */
 #endif
@@ -55,5 +62,3 @@ struct scheduler
 
 /* per CPU scheduler information */
 extern schedule_data_t schedule_data[];
-
-

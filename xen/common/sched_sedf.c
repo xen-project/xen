@@ -13,14 +13,33 @@
 #include <xen/time.h>
 #include <xen/slab.h>
 
+//#include <xen/adv_sched_hist.h>
+
 #define SEDFLEVEL 2
 #define PRINT(_f, _a...)  \
 if ((_f)<=SEDFLEVEL) printk(_a );
 
+//various ways of unblocking domains
+#define UNBLOCK_ISOCHRONOUS_EDF 1
+#define UNBLOCK_EDF 2
+#define UNBLOCK_ATROPOS 3
+#define UNBLOCK_SHORT_RESUME 4
+#define UNBLOCK_BURST 5
+
+#define UNBLOCK UNBLOCK_BURST
+
+//various ways of treating extra-time
+#define EXTRA_OFF 1
+#define EXTRA_ROUNDR 2
+#define EXTRA_SLICE_WEIGHT 3
+#define EXTRA_BLOCK_WEIGHT 4
+
+#define EXTRA EXTRA_OFF
+
+
 /*
 	TODO:
 	TESTING!
-	implement stylish features!
 	tracing instead of PRINTs
 */
 
@@ -29,15 +48,16 @@ if ((_f)<=SEDFLEVEL) printk(_a );
 #define EXTRA_NONE (0)
 #define EXTRA_AWARE (1)
 #define EXTRA_RUNNING (2)
-#define EXTRA_QUANTUM (MICROSECS(1000)) 
+#define EXTRA_QUANTUM (MICROSECS(500)) 
 #define WEIGHT_PERIOD (MILLISECS(100))
 #define WEIGHT_SAFETY (MILLISECS(5))
+
 
 struct sedf_dom_info
 {
 	struct domain		*owner;
 	struct list_head	list;
-	struct list_head	extralist;
+	struct list_head	extralist[2];
 	
 	//Parameters for EDF
 	s_time_t		period;		//=(relative deadline)
@@ -50,14 +70,17 @@ struct sedf_dom_info
 	s_time_t		latency;
 	//extra-time status of domain
 	short			extra;
-	//weights for "Scheduling for Beginners/ Lazy/ etc."
+	//weights for "Scheduling for beginners/ lazy/ etc."
 	short			weight;
 	
 	//Bookkeeping
 	s_time_t		absdead;
 	s_time_t		sched_start;
 	s_time_t		cputime;
-	s_time_t		absblock;
+	s_time_t		absblock;	
+	s_time_t		absunblock;	//time the domain unblocked, used by burst mode to determine unblocking intervals
+	int			score[2];	//scores for {util, block penalty}-weighted extratime distribution
+	s_time_t		short_block_lost_tot;
 	
 	//Statistics
 	s_time_t		block_time_tot;
@@ -109,6 +132,37 @@ static inline int extraq_on(struct domain *d) {
 	return (((EXTRALIST(d))->next != NULL) && (EXTRALIST(d)->next != EXTRALIST(d)));
 }
 
+/* adds a domain to the queue of processes which are aware of extra time. List is sorted by score,
+   where a lower score means higher priority for an extra slice. It also updates the score, by simply subtracting
+   a fixed value from each entry, in order to avoid overflow. The algorithm works by simply charging each domain
+   that recieved extratime with an inverse of its weight.
+ */ 
+static inline void extraq_add_sort_update(struct domain *d, unsigned long sub) {
+	struct list_head     *cur;
+	struct sedf_dom_info *curinf;
+	
+	PRINT(3,"Adding domain %i (score= %llu) to extraq\n",d->id,DOM_INFO(d)->score);	
+	//iterate through all elements to find our "hole" and on our way update all the other scores
+	list_for_each(cur,EXTRAQ(d->processor)){
+		curinf         = list_entry(cur,struct sedf_dom_info,extralist);
+		curinf->score -= sub;
+		if (DOM_INFO(d)->score < curinf->score)
+	 		break;
+		else
+			PRINT(4,"\tbehind domain %i (score= %llu)\n",curinf->owner->id,curinf->score);
+	}
+	//cur now contains the element, before which we'll enqueue
+	PRINT(3,"\tlist_add to %x\n",cur->prev);
+	list_add(EXTRALIST(d),cur->prev);
+	
+	//continue updating the extraq
+	if ((cur != EXTRAQ(d->processor)) && sub) 
+		for (cur = cur->next; cur != EXTRAQ(d->processor); cur = cur-> next) {
+			curinf         = list_entry(cur,struct sedf_dom_info,extralist);
+			curinf->score -= sub;
+			PRINT(4,"\tupdating domain %i (score= %llu)\n",curinf->owner->id,curinf->score);
+		}
+}
 static inline void extraq_check(struct domain *d) {
 	if (extraq_on(d)) {
 		PRINT(2,"Dom %i is on extraQ\n",d->id);
@@ -120,11 +174,10 @@ static inline void extraq_check(struct domain *d) {
 		PRINT(2,"Dom %i is NOT on extraQ\n",d->id);
 		if (DOM_INFO(d)->extra != EXTRA_NONE) {
 			PRINT(2,"Added dom %i to extraQ\n",d->id);
-			extraq_add_tail(d);
+			extraq_add_sort_update(d, 0);
 		}
 	}
 }
-
 static inline void __del_from_queue(struct domain *d)
 {
     struct list_head *list = LIST(d);
@@ -277,29 +330,45 @@ static task_slice_t sedf_do_schedule(s_time_t now)
 	int                   cpu   = current->processor;
 	struct list_head     *runq  = RUNQ(cpu);
 	struct list_head     *waitq = WAITQ(cpu);
+	#if (EXTRA > EXTRA_OFF)
 	struct list_head     *extraq = EXTRAQ(cpu);
+	#endif
 	struct list_head     *cur,*tmp;
 	struct sedf_dom_info *curinf;
 	task_slice_t          ret;
-
+	#if (EXTRA == EXTRA_SLICE_WEIGHT)
+	unsigned long         oldscore;
+	#endif
 	
 	//idle tasks don't need any of the following stuf
 	if (is_idle_task(inf->owner))
 		goto check_waitq;				//idle task doesn't get scheduled on the runq
-	
+
+	#if (EXTRA > EXTRA_OFF)
 	if (unlikely(inf->extra == EXTRA_RUNNING)) {
 		//special treatment of domains running in extra time
 		inf->extra = EXTRA_AWARE;
 		inf->cputime=0;
 		inf->extra_time_tot += now - inf->sched_start;
 		
-		extraq_del(current);				//remove extradomain from head of the queue
-		if (domain_runnable(inf->owner))
-			extraq_add_tail(current);		//and add to the tail if it is runnable => round-robin
+		extraq_del(current);					//remove extradomain from head of the queue
+		
+		#if (EXTRA == EXTRA_ROUNDR)
+		if (domain_runnable(current))
+			extraq_add_tail(current);			//and add to the tail if it is runnable => round-robin
+		#elif (EXTRA == EXTRA_SLICE_WEIGHT)
+		oldscore   = inf->score;				//update the score
+		inf->score = (inf->period << 10) / inf->slice;		//use fixed point arithmetic with 10 bits
+		
+		if (domain_runnable(current))
+			extraq_add_sort_update(current, oldscore);	//add according to score: weighted round robin
+		#endif
 		else
-			__del_from_queue(inf->owner);		//if domain blocked in extratime remove it from waitq(/runq) as well
+			__del_from_queue(inf->owner);			//if domain blocked in extratime remove it from waitq(/runq) as well
 	}
-	else {
+	else
+	#endif
+	{
 		//current domain is running in real time mode
 		//update the domains cputime
 		inf->cputime += now - inf->sched_start;
@@ -315,13 +384,18 @@ static task_slice_t sedf_do_schedule(s_time_t now)
 			inf->cputime -= inf->slice;
 			
 			if (inf->period < inf->period_orig) {
-				//this domain runs in latency scaling mode
-				inf->period *= 2;
-				inf->slice *= 2;
-				if ((inf->period > inf->period_orig) || (inf->slice > inf->slice_orig)) {
-					//now switch back to standard timing
-					inf->period = inf->period_orig;
-					inf->slice = inf->slice_orig;
+				//this domain runs in latency scaling or burst mode
+				#if (UNBLOCK == UNBLOCK_BURST)
+				if (now - inf->absunblock >= 2 * inf->period)
+				#endif
+				{
+					inf->period *= 2;
+					inf->slice *= 2;
+					if ((inf->period > inf->period_orig) || (inf->slice > inf->slice_orig)) {
+						//now switch back to standard timing
+						inf->period = inf->period_orig;
+						inf->slice = inf->slice_orig;
+					}
 				}
 			}
 			inf->absdead += inf->period;		//set next deadline
@@ -333,9 +407,11 @@ static task_slice_t sedf_do_schedule(s_time_t now)
 			__add_to_waitqueue_sort(inf->owner);
 		else {
 			//we have a blocked realtime task
-			inf->absblock=now;
+			inf->absblock = now;
+			#if (EXTRA > EXTRA_OFF)
 			if (inf->extra == EXTRA_AWARE)
 				extraq_del(inf->owner);		//remove a blocked domain from the extraq aswell
+			#endif
 		}
 	}
 check_waitq:
@@ -393,13 +469,16 @@ check_waitq:
 		if (!list_empty(waitq)) {
 			waitinf  = list_entry(waitq->next,struct sedf_dom_info,list);
 			//we could not find any suitable domain => look for domains that are aware of extratime
+			#if (EXTRA > EXTRA_OFF)
 			if (!list_empty(extraq) && (PERIOD_BEGIN(waitinf) - now >= EXTRA_QUANTUM)) {
 				runinf   = list_entry(extraq->next,struct sedf_dom_info,extralist);
 				runinf->extra = EXTRA_RUNNING;
 				ret.task = runinf->owner;
 				ret.time = EXTRA_QUANTUM;
 			}
-			else {
+			else
+			#endif
+			{
 				//we have an empty run- and extraqueue or too less time => idle task!
 				ret.task = IDLETASK(cpu);
 				ret.time = PERIOD_BEGIN(waitinf) - now;
@@ -420,13 +499,19 @@ check_waitq:
 
 static void sedf_sleep(struct domain *d) {
 	PRINT(2,"sedf_sleep was called, domain-id %i\n",d->id);
-	if ( test_bit(DF_RUNNING, &d->flags) )
+	if ( test_bit(DF_RUNNING, &d->flags) ) {
+#ifdef ADV_SCHED_HISTO
+		adv_sched_hist_start(d->processor);
+#endif
 		cpu_raise_softirq(d->processor, SCHEDULE_SOFTIRQ);
+	}
 	else  {
 		if ( __task_on_queue(d) )
 			__del_from_queue(d);
+		#if (EXTRA > EXTRA_OFF)
 		if (extraq_on(d))
 			extraq_del(d);
+		#endif
 	}
 }
 
@@ -490,9 +575,8 @@ static void sedf_sleep(struct domain *d) {
  *      (or even worse: allocate a new full slice for the domain) 
  *     -either behaviour can lead to missed deadlines in other domains as opposed to approaches 1,2a,2b
  */
-static inline void unblock_short_vcons(struct sedf_dom_info* inf, s_time_t now) { inf->absdead += inf->period;}
-static inline void unblock_long_vcons(struct sedf_dom_info* inf, s_time_t now) {
-	inf->absdead += ((now - inf->absdead) / inf->period + 1) * inf->period;		//very conservative
+static inline void unblock_short_vcons(struct sedf_dom_info* inf, s_time_t now) { 
+	inf->absdead += inf->period;
 	inf->cputime = 0;
 }
 
@@ -500,19 +584,23 @@ static inline void unblock_short_cons(struct sedf_dom_info* inf, s_time_t now) {
 	inf->cputime += now - inf->absblock;						//treat blocked time as consumed by the domain
 	if (inf->cputime + EXTRA_QUANTUM > inf->slice) {
 		//we don't have a reasonable amount of time in our slice left :(
-		inf->cputime=0;
-		inf->absdead += inf->period;						//start in next period!
+		unblock_short_vcons(inf, now);						//start in next period!
 	}
 	else
-		inf->short_cont++;
+		inf->short_cont++;							//we let the domain run in the current period
 }
+
+static inline void unblock_long_vcons(struct sedf_dom_info* inf, s_time_t now) {
+	inf->absdead += ((now - inf->absdead) / inf->period + 1) * inf->period;		//very conservative
+	inf->cputime = 0;
+}
+
 static inline void unblock_long_cons_a(struct sedf_dom_info* inf, s_time_t now) {
 	inf->cputime = (now - inf->absdead) % inf->period;				//treat the time the domain was blocked in the CURRENT
 											//period as consumed by the domain
 	if (inf->cputime + EXTRA_QUANTUM > inf->slice) {
 		//we don't have a reasonable amount of time in our slice left :(
-		inf->cputime=0;
-		inf->absdead += inf->period;						//start in next period!
+		unblock_long_vcons(inf, now);						//start in next period!
 	}
 }
 static inline void unblock_long_cons_b(struct sedf_dom_info* inf,s_time_t now) {
@@ -521,20 +609,52 @@ static inline void unblock_long_cons_b(struct sedf_dom_info* inf,s_time_t now) {
 }
 static inline void unblock_long_cons_c(struct sedf_dom_info* inf,s_time_t now) {
 	if (likely(inf->latency)) {
-		//sclae the slice and period accordingly to the latency hint
+		//scale the slice and period accordingly to the latency hint
 		inf->period = inf->latency;						//reduce period temporarily to the latency hint
-		ASSERT((inf->latency < ULONG_MAX) && (inf->slice_orig < ULONG_MAX));	//this results in max. 4s slice/period length
-		inf->slice = (inf->latency * inf->slice_orig) / inf->period_orig;	//scale slice accordingly, so that utilisation stays the same
+		ASSERT((inf->period < ULONG_MAX) && (inf->slice_orig < ULONG_MAX));	//this results in max. 4s slice/period length
+		inf->slice = (inf->period * inf->slice_orig) / inf->period_orig;	//scale slice accordingly, so that utilisation stays the same
 	}	
 	else {
 		//we don't have a latency hint.. use some other technique
-		inf->absdead = now + inf->period;					//Conservative 2b...
-		inf->cputime = 0;
+		unblock_long_cons_b(inf, now);
 	}
 }
+//a new idea of dealing with short blocks: burst period scaling
+static inline void unblock_short_burst(struct sedf_dom_info* inf, s_time_t now) {
+	inf->cputime += now - inf->absblock;						//treat blocked time as consumed by the domain
+	
+	if (inf->cputime + EXTRA_QUANTUM <= inf->slice) {
+		inf->short_cont++;							//we let the domain run in the current period
+	}
+	else {
+		//we don't have a reasonable amount of time in our slice left => switch to burst mode
+		if (likely(inf->absunblock)) {
+			inf->period = now - inf->absunblock;				//set the period-length to the current blocking interval
+			ASSERT((inf->period < ULONG_MAX) && (inf->slice_orig < ULONG_MAX));//this results in max. 4s slice/period length
+			inf->slice = (inf->period * inf->slice_orig) / inf->period_orig;//scale slice accordingly, so that utilisation stays the same
+		}
+		else {
+			inf->cputime=0;							//in Case we haven't unblocked before
+			inf->absdead += inf->period;					//start in next period!
+		}
+	}
+	inf->absunblock = now;
+}
+static inline void unblock_long_burst(struct sedf_dom_info* inf,s_time_t now) {
+	if (unlikely(inf->latency && (inf->period > inf->latency))) {
+		//sclae the slice and period accordingly to the latency hint
+		inf->period = inf->latency;						//reduce period temporarily to the latency hint
+		ASSERT((inf->period < ULONG_MAX) && (inf->slice_orig < ULONG_MAX));	//this results in max. 4s slice/period length
+		inf->slice = (inf->period * inf->slice_orig) / inf->period_orig;	//scale slice accordingly, so that utilisation stays the same
+	}
+	else {
+		//we don't have a latency hint.. or we are currently in "burst mode": use some other technique
+		//this should be in fact the normal way of operation, when we are in sync with the device!
+		unblock_long_cons_b(inf, now);
+	}
+	inf->absunblock = now;
+}
 
-/*static inline void unblock_short_vcons
-static inline void unblock_short_vcons*/
 void sedf_wake(struct domain *d) {
 	//for the first try just implement the "very conservative" way of waking domains up
 	s_time_t              now = NOW();
@@ -555,16 +675,19 @@ void sedf_wake(struct domain *d) {
 	if (unlikely(inf->absdead == 0))
 		inf->absdead = now + inf->slice;			//initial setup of the deadline
 		
-	//very conservative way of unblocking
-	//make sure that the start of the period for this
-	//domain is happening in the future
 	PRINT(3,"waking up domain %i (deadl= %llu period= %llu now= %llu)\n",d->id,inf->absdead,inf->period,now);
 	
 	inf->block_tot++;
 	if (unlikely(now< PERIOD_BEGIN(inf))) {
 		//this might happen, imagine unblocking in extra-time!
 		if (likely(inf->extra == EXTRA_AWARE)) 
+		#if (EXTRA == EXTRA_ROUNDR)
 			extraq_add_tail(d);				//SD: Could extraq_add_head be better?
+		#elif (EXTRA == EXTRA_SLICE_WEIGHT)
+			extraq_add_sort_update(d, 0);
+		#else
+			;
+		#endif
 		//else
 		//This is very very unlikely, ie. might even be an error?!
 	}		
@@ -572,19 +695,48 @@ void sedf_wake(struct domain *d) {
 		if (now < inf->absdead) {
 			//short blocking
 			inf->short_block_tot++;
-			//unblock_short_vcons(inf, now);
+			#if (UNBLOCK <= UNBLOCK_ATROPOS)
+			unblock_short_vcons(inf, now);
+			#elif (UNBLOCK == UNBLOCK_SHORT_RESUME)
 			unblock_short_cons(inf, now);
-			if (inf->extra == EXTRA_AWARE) 
+			#elif (UNBLOCK == UNBLOCK_BURST)
+			unblock_short_burst(inf, now);
+			#endif
+			
+			if (inf->extra == EXTRA_AWARE)
+				#if (EXTRA == EXTRA_OFF)
+				;
+				#elif (EXTRA == EXTRA_ROUNDR)
 				extraq_add_head(d);
+				#elif (EXTRA == EXTRA_SLICE_WEIGHT)
+				extraq_add_sort_update(d, 0);
+				#endif
 		}
 		else {
 			//long blocking
 			inf->long_block_tot++;
 			//PRINT(3,"old=%llu ",inf->absdead);
-			//unblock_long_vcons(inf, now);
-			unblock_long_cons_c(inf,now);
+			#if (UNBLOCK == UNBLOCK_ISOCHRONOUS_EDF)
+			unblock_long_vcons(inf, now);
+			#elif (UNBLOCK == UNBLOCK_EDF)
+			unblock_long_cons_b(inf, now);
+			#elif (UNBLOCK == UNBLOCK_ATROPOS)
+			unblock_long_cons_c(inf, now);
+			#elif (UNBLOCK == UNBLOCK_SHORT_RESUME)
+			unblock_long_cons_b(inf, now);
+			//unblock_short_cons_c(inf, now);
+			#elif (UNBLOCK == UNBLOCK_BURST)
+			unblock_long_burst(inf, now);
+			#endif
+			
 			if (inf->extra == EXTRA_AWARE) 
-				extraq_add_tail(d);
+				#if (EXTRA == EXTRA_OFF)
+				;
+				#elif (EXTRA == EXTRA_ROUNDR)
+				extraq_add_head(d);
+				#elif (EXTRA == EXTRA_SLICE_WEIGHT)
+				extraq_add_sort_update(d,0);
+				#endif
 		}
 	}
 	PRINT(3,"waking up domain %i (deadl= %llu period= %llu now= %llu)\n",d->id,inf->absdead,inf->period,now);
@@ -592,7 +744,7 @@ void sedf_wake(struct domain *d) {
 	PRINT(3,"added to waitq\n");	
 	
 	//do some statistics here...
-	if (inf->absblock!=0) {
+	if (inf->absblock != 0) {
 		inf->block_time_tot += now - inf->absblock;
 		inf->penalty_time_tot += PERIOD_BEGIN(inf) + inf->cputime - inf->absblock;
 		/*if (DOM_INFO(d)->block_time_tot)
@@ -607,8 +759,12 @@ void sedf_wake(struct domain *d) {
 	//and check, whether we are idling and this domain is extratime aware
 	if ((PERIOD_BEGIN(inf) < schedule_data[d->processor].s_timer.expires) ||
 	    (is_idle_task(schedule_data[d->processor].curr) && (now + EXTRA_QUANTUM < schedule_data[d->processor].s_timer.expires) &&
-	     (inf->extra == EXTRA_AWARE)))
+	     (inf->extra == EXTRA_AWARE))) {
+#ifdef ADV_SCHED_HISTO
+		adv_sched_hist_start(d->processor);
+#endif
 		cpu_raise_softirq(d->processor, SCHEDULE_SOFTIRQ);
+	}
 }
 
 
@@ -616,9 +772,9 @@ void sedf_wake(struct domain *d) {
 static void sedf_dump_domain(struct domain *d) {
 	printk("%u has=%c ", d->id,
 		test_bit(DF_RUNNING, &d->flags) ? 'T':'F');
-	printk("p=%llu sl=%llu ddl=%llu w=%u c=%llu xtr(%s)=%llu",
+	printk("p=%llu sl=%llu ddl=%llu w=%u c=%llu sc=%i xtr(%s)=%llu",
 	 	DOM_INFO(d)->period, DOM_INFO(d)->slice, DOM_INFO(d)->absdead, DOM_INFO(d)->weight, d->cpu_time,
-		DOM_INFO(d)->extra ? "yes" : "no", DOM_INFO(d)->extra_time_tot);
+		DOM_INFO(d)->score, DOM_INFO(d)->extra ? "yes" : "no", DOM_INFO(d)->extra_time_tot);
 	if (d->cpu_time !=0)
 		printf(" (%lu%)", (DOM_INFO(d)->extra_time_tot * 100) / d->cpu_time);
 	if (DOM_INFO(d)->block_time_tot!=0)
