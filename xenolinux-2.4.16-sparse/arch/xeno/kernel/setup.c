@@ -259,7 +259,6 @@ void __init setup_arch(char **cmdline_p)
         }
     }
     cur_pgd = init_mm.pgd = (pgd_t *)start_info.pt_base;
-    queue_pgd_pin(__pa(init_mm.pgd));
 
 #ifdef CONFIG_BLK_DEV_INITRD
     if (start_info.mod_start) {

@@ -34,12 +34,10 @@
 
 #define XENO_BASE       "xeno"          // proc file name defs should be in separate .h
 #define DOM0_CMD_INTF   "dom0_cmd"
-#define DOM0_FT         "frame_table"
 #define DOM0_NEWDOM     "new_dom_data"
 
 #define MAX_LEN         16
 #define DOM_DIR         "dom"
-#define DOM_TS          "task_data"
 #define DOM_MEM         "mem"
 
 static struct proc_dir_entry *xeno_base;
@@ -49,11 +47,6 @@ static struct proc_dir_entry *proc_ft;
 unsigned long direct_mmap(unsigned long, unsigned long, pgprot_t, int, int);
 int direct_unmap(unsigned long, unsigned long);
 int direct_disc_unmap(unsigned long, unsigned long, int);
-
-/* frame_table mapped from dom0 */
-frame_table_t * frame_table;
-unsigned long frame_table_len;
-unsigned long frame_table_pa;
 
 static unsigned char readbuf[1204];
 
@@ -66,58 +59,6 @@ static int cmd_read_proc(char *page, char **start, off_t off,
     *start = page;
     return strlen(page);
 }
-
-static ssize_t ts_read(struct file * file, char * buff, size_t size, loff_t * off)
-{
-    dom0_op_t op;
-    unsigned long addr;
-    pgprot_t prot;
-    int ret = 0;
-
-    /* retrieve domain specific data from proc_dir_entry */
-    dom_procdata_t * dom_data = (dom_procdata_t *)((struct proc_dir_entry *)file->f_dentry->d_inode->u.generic_ip)->data;
-    
-    /* 
-     * get the phys addr of the task struct for the requested
-     * domain
-     */
-    op.cmd = DOM0_MAPTASK;
-    op.u.mapdomts.domain = dom_data->domain;
-    op.u.mapdomts.ts_phy_addr = -1;
-
-    ret = HYPERVISOR_dom0_op(&op);
-    if(ret != 0)
-       return -EAGAIN;
-
-    prot = PAGE_SHARED; 
-
-    /* remap the range using xen specific routines */
-    addr = direct_mmap(op.u.mapdomts.ts_phy_addr, PAGE_SIZE, prot, 0, 0);
-    copy_to_user((unsigned long *)buff, &addr, sizeof(addr));
-    dom_data->map_size = PAGE_SIZE;
-
-    return sizeof(addr);
-     
-}
-
-static ssize_t ts_write(struct file * file, const char * buff, size_t size , loff_t * off)
-{
-    unsigned long addr;
-    dom_procdata_t * dom_data = (dom_procdata_t *)((struct proc_dir_entry *)file->f_dentry->d_inode->u.generic_ip)->data;
-    
-    copy_from_user(&addr, (unsigned long *)buff, sizeof(addr));
-    
-    if(direct_unmap(addr, dom_data->map_size) == 0){
-        return sizeof(addr);
-    } else {
-        return -1;
-    }
-}
- 
-struct file_operations ts_ops = {
-    read:   ts_read,
-    write:  ts_write,
-};
 
 static void create_proc_dom_entries(int dom)
 {
@@ -133,16 +74,6 @@ static void create_proc_dom_entries(int dom)
 
     dir = proc_mkdir(dir_name, xeno_base);
     dir->data = dom_data;
-
-    file = create_proc_entry(DOM_TS, 0600, dir);
-    if(file != NULL)
-    {   
-        file->owner = THIS_MODULE;
-        file->nlink = 1;
-        file->proc_fops = &ts_ops;
-    
-        file->data = dom_data;
-    }
 }
 
 static ssize_t dom_mem_write(struct file * file, const char * buff, 
@@ -303,45 +234,8 @@ out:
     
 }
 
-static ssize_t ft_write(struct file * file, const char * buff, size_t size , loff_t * off)
-{
-    unsigned long addr;
-    
-    copy_from_user(&addr, (unsigned long *)buff, sizeof(addr));
-    
-    if(direct_unmap(addr, frame_table_len) == 0){
-        return sizeof(addr);
-    } else {
-        return -1;
-    }
-}
-
-static ssize_t ft_read(struct file * file, char * buff, size_t size, loff_t * off)
-{
-    unsigned long addr;
-    pgprot_t prot;
-
-    prot = PAGE_SHARED; 
-
-    /* remap the range using xen specific routines */
-    addr = direct_mmap(frame_table_pa, frame_table_len, prot, 0, 0);
-    copy_to_user((unsigned long *)buff, &addr, sizeof(addr));
-
-    return sizeof(addr);
-     
-}
-
-struct file_operations ft_ops = {
-    read:   ft_read,
-    write: ft_write,
-};
-
 static int __init init_module(void)
 {
-    frame_table = (frame_table_t *)start_info.frame_table;
-    frame_table_len = start_info.frame_table_len;
-    frame_table_pa = start_info.frame_table_pa;
-
     /* xeno proc root setup */
     xeno_base = proc_mkdir(XENO_BASE, &proc_root); 
 
@@ -354,15 +248,6 @@ static int __init init_module(void)
         dom0_cmd_intf->nlink      = 1;
         dom0_cmd_intf->read_proc  = cmd_read_proc;
         dom0_cmd_intf->write_proc = cmd_write_proc;
-    }
-
-    /* frame table mapping, to be mmaped */
-    proc_ft = create_proc_entry(DOM0_FT, 0600, xeno_base);
-    if(proc_ft != NULL)
-    {   
-        proc_ft->owner = THIS_MODULE;
-        proc_ft->nlink = 1;
-        proc_ft->proc_fops = &ft_ops;
     }
 
     /* set up /proc entries for dom 0 */

@@ -569,6 +569,9 @@ static int mod_l1_entry(unsigned long pa, l1_pgentry_t new_l1_entry)
         if ( (l1_pgentry_val(new_l1_entry) &
               (_PAGE_GLOBAL|_PAGE_PAT)) ) 
         {
+
+            printk(KERN_ALERT "bd240 debug: bad l1 entry val %lx\n", l1_pgentry_val(new_l1_entry) & (_PAGE_GLOBAL | _PAGE_PAT));
+
             MEM_LOG("Bad L1 entry val %04lx",
                     l1_pgentry_val(new_l1_entry) & 
                     (_PAGE_GLOBAL|_PAGE_PAT));
@@ -588,8 +591,10 @@ static int mod_l1_entry(unsigned long pa, l1_pgentry_t new_l1_entry)
             }
             
             if ( get_page(l1_pgentry_to_pagenr(new_l1_entry),
-                          l1_pgentry_val(new_l1_entry) & _PAGE_RW) )
+                          l1_pgentry_val(new_l1_entry) & _PAGE_RW) ){
+                printk(KERN_ALERT "bd240 debug: get_page err\n");
                 goto fail;
+            }
         } 
     }
     else if ( (l1_pgentry_val(old_l1_entry) & _PAGE_PRESENT) )
@@ -694,122 +699,26 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
     return err;
 }
 
-/* Apply updates to page table @pagetable_id within the current domain. */
-int do_process_page_updates(page_update_request_t *updates, int count)
+/* functions to handle page table updates: upper half is invoked in case pt updates
+ * are requested by a domain and it invokes copy_from_user. bottom half is invoked
+ * both in case of domain downcall and domain building by hypervisor.
+ */
+page_update_request_t * do_process_page_updates_uh(page_update_request_t *updates,
+    int count)
 {
-    page_update_request_t cur;
-    unsigned long flags, pfn;
-    struct pfn_info *page;
-    int err = 0, i;
+    page_update_request_t * ret = kmalloc(sizeof(page_update_request_t) * count, 
+        GFP_KERNEL);
 
-    for ( i = 0; i < count; i++ )
+    if ( copy_from_user(ret, updates, sizeof(page_update_request_t) * count) )
     {
-        if ( copy_from_user(&cur, updates, sizeof(cur)) )
-        {
-            kill_domain_with_errmsg("Cannot read page update request");
-        }
-
-        pfn = cur.ptr >> PAGE_SHIFT;
-        if ( pfn >= max_page )
-        {
-            MEM_LOG("Page out of range (%08lx > %08lx)", pfn, max_page);
-            kill_domain_with_errmsg("Page update request out of range");
-        }
-
-        err = 1;
-
-        /* Least significant bits of 'ptr' demux the operation type. */
-        switch ( cur.ptr & (sizeof(l1_pgentry_t)-1) )
-        {
-
-            /*
-             * PGREQ_NORMAL: Normal update to any level of page table.
-             */
-        case PGREQ_NORMAL:
-            page = frame_table + pfn;
-            flags = page->flags;
-            if ( DOMAIN_OKAY(flags) )
-            {
-                switch ( (flags & PG_type_mask) )
-                {
-                case PGT_l1_page_table: 
-                    err = mod_l1_entry(cur.ptr, mk_l1_pgentry(cur.val)); 
-                    break;
-                case PGT_l2_page_table: 
-                    err = mod_l2_entry(cur.ptr, mk_l2_pgentry(cur.val)); 
-                    break;
-                default:
-                    MEM_LOG("Update to non-pt page %08lx", cur.ptr);
-                    break;
-                }
-            }
-            break;
-
-            /*
-             * PGREQ_UNCHECKED_UPDATE: Make an unchecked update to a
-             * bottom-level page-table entry.
-             * Restrictions apply:
-             *  1. Update only allowed by domain 0.
-             *  2. Update must be to a level-1 pte belonging to dom0.
-             */
-        case PGREQ_UNCHECKED_UPDATE:
-            cur.ptr &= ~(sizeof(l1_pgentry_t) - 1);
-            page = frame_table + pfn;
-            flags = page->flags;
-            if ( (flags | current->domain) == PGT_l1_page_table )
-            {
-                unsigned long *va = map_domain_mem(cur.ptr);
-                *va = cur.val;
-                unmap_domain_mem(va);
-                err = 0;
-            }
-            else
-            {
-                MEM_LOG("UNCHECKED_UPDATE: Bad domain %d, or"
-                        " bad pte type %08lx", current->domain, flags);
-            }
-            break;
-
-            /*
-             * PGREQ_EXTENDED_COMMAND: Extended command is specified
-             * in the least-siginificant bits of the 'value' field.
-             */
-        case PGREQ_EXTENDED_COMMAND:
-            cur.ptr &= ~(sizeof(l1_pgentry_t) - 1);
-            err = do_extended_command(cur.ptr, cur.val);
-            break;
-
-        default:
-            MEM_LOG("Invalid page update command %08lx", cur.ptr);
-            break;
-        }
-
-        if ( err )
-        {
-            page = frame_table + (cur.ptr >> PAGE_SHIFT);
-            printk(KERN_ALERT "bd240 debug: Update request %d\n", cur.ptr & (sizeof(l1_pgentry_t) - 1)); 
-            printk(KERN_ALERT "bd240 debug: Update request %lx, %lx\n", cur.ptr, cur.val);
-            printk(KERN_ALERT "bd240 debug: Page flags %lx\n", page->flags);
-
-            kill_domain_with_errmsg("Illegal page update request");
-        }
-
-        updates++;
+        kill_domain_with_errmsg("Cannot read page update request");
     }
-
-    if ( tlb_flush[smp_processor_id()] )
-    {
-        tlb_flush[smp_processor_id()] = 0;
-        __asm__ __volatile__ (
-            "movl %%eax,%%cr3" : : 
-            "a" (pagetable_val(current->mm.pagetable)));
-    }
-
-    return(0);
+    
+    return ret;
 }
 
 /* Apply updates to page table @pagetable_id within the current domain. */
-int new_do_process_page_updates(page_update_request_t * cur, int count)
+int do_process_page_updates_bh(page_update_request_t * cur, int count)
 {
     unsigned long flags, pfn;
     struct pfn_info *page;
@@ -837,11 +746,8 @@ int new_do_process_page_updates(page_update_request_t * cur, int count)
             page = frame_table + pfn;
             flags = page->flags;
             
-            printk(KERN_ALERT "bd240 debug: normal update\n");
-            
-            if ( (flags & PG_domain_mask) == current->domain )
+            if ( DOMAIN_OKAY(flags) )
             {
-                printk(KERN_ALERT "bd240 debug: normal update inside\n");
                 switch ( (flags & PG_type_mask) )
                 {
                 case PGT_l1_page_table: 
@@ -855,8 +761,6 @@ int new_do_process_page_updates(page_update_request_t * cur, int count)
                     break;
                 }
             }
-
-            printk(KERN_ALERT "bd240 debug: normal update finish\n");
 
             break;
 
@@ -901,10 +805,6 @@ int new_do_process_page_updates(page_update_request_t * cur, int count)
         if ( err )
         {
             page = frame_table + (cur->ptr >> PAGE_SHIFT);
-            printk(KERN_ALERT "bd240 debug: Update request %lx\n", cur->ptr & (sizeof(l1_pgentry_t) - 1)); 
-            printk(KERN_ALERT "bd240 debug: Update request %lx, %lx\n", cur->ptr, cur->val);
-            printk(KERN_ALERT "bd240 debug: Page flags %lx\n", page->flags);
-
             kill_domain_with_errmsg("Illegal page update request");
         }
 
@@ -920,4 +820,13 @@ int new_do_process_page_updates(page_update_request_t * cur, int count)
     }
 
     return(0);
+}
+
+/* Apply updates to page table @pagetable_id within the current domain. */
+int do_process_page_updates(page_update_request_t *updates, int count)
+{
+    page_update_request_t * pg_updates;
+
+    pg_updates = do_process_page_updates_uh(updates, count);
+    return do_process_page_updates_bh(pg_updates, count);
 }
