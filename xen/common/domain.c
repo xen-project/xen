@@ -41,7 +41,6 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
 
     d->id          = dom_id;
     ed->processor  = cpu;
-    d->create_time = NOW();
  
     spin_lock_init(&d->time_lock);
 
@@ -104,28 +103,6 @@ struct domain *find_domain_by_id(domid_t dom)
     read_unlock(&domlist_lock);
 
     return d;
-}
-
-
-/* Return the most recently created domain. */
-struct domain *find_last_domain(void)
-{
-    struct domain *d, *dlast;
-
-    read_lock(&domlist_lock);
-    dlast = domain_list;
-    d = dlast->next_list;
-    while ( d != NULL )
-    {
-        if ( d->create_time > dlast->create_time )
-            dlast = d;
-        d = d->next_list;
-    }
-    if ( !get_domain(dlast) )
-        dlast = NULL;
-    read_unlock(&domlist_lock);
-
-    return dlast;
 }
 
 
@@ -206,6 +183,7 @@ void domain_shutdown(u8 reason)
 
     raise_softirq(SCHEDULE_SOFTIRQ);
 }
+
 
 unsigned int alloc_new_dom_mem(struct domain *d, unsigned int kbytes)
 {
@@ -349,7 +327,8 @@ long do_boot_vcpu(unsigned long vcpu, full_execution_context_t *ctxt)
 
     sched_add_domain(ed);
 
-    if ( (rc = arch_set_info_guest(ed, c)) != 0 ) {
+    if ( (rc = arch_set_info_guest(ed, c)) != 0 )
+    {
         sched_rem_domain(ed);
         goto out;
     }
