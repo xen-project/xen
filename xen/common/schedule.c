@@ -94,7 +94,7 @@ void free_domain_struct(struct domain *d)
         if ( d->exec_domain[i] )
             arch_free_exec_domain_struct(d->exec_domain[i]);
 
-    arch_free_domain_struct(d);
+    xfree(d);
 }
 
 struct exec_domain *alloc_exec_domain_struct(struct domain *d,
@@ -147,7 +147,7 @@ struct domain *alloc_domain_struct(void)
 {
     struct domain *d;
 
-    if ( (d = arch_alloc_domain_struct()) == NULL )
+    if ( (d = xmalloc(struct domain)) == NULL )
         return NULL;
     
     memset(d, 0, sizeof(*d));
@@ -158,7 +158,7 @@ struct domain *alloc_domain_struct(void)
     return d;
 
  out:
-    arch_free_domain_struct(d);
+    xfree(d);
     return NULL;
 }
 

@@ -192,16 +192,6 @@ void dump_pageframe_info(struct domain *d)
            page->u.inuse.type_info);
 }
 
-struct domain *arch_alloc_domain_struct(void)
-{
-    return xmalloc(struct domain);
-}
-
-void arch_free_domain_struct(struct domain *d)
-{
-    xfree(d);
-}
-
 struct exec_domain *arch_alloc_exec_domain_struct(void)
 {
     return xmalloc(struct exec_domain);

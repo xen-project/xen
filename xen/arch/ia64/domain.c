@@ -139,16 +139,6 @@ void startup_cpu_idle_loop(void)
 	continue_cpu_idle_loop();
 }
 
-struct domain *arch_alloc_domain_struct(void)
-{
-	return xmalloc(struct domain);
-}
-
-void arch_free_domain_struct(struct domain *d)
-{
-	xfree(d);
-}
-
 struct exec_domain *arch_alloc_exec_domain_struct(void)
 {
 	/* Per-vp stack is used here. So we need keep exec_domain

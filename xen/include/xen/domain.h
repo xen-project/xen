@@ -6,10 +6,6 @@
  * Arch-specifics.
  */
 
-extern struct domain *arch_alloc_domain_struct(void);
-
-extern void arch_free_domain_struct(struct domain *d);
-
 struct exec_domain *arch_alloc_exec_domain_struct(void);
 
 extern void arch_free_exec_domain_struct(struct exec_domain *ed);
