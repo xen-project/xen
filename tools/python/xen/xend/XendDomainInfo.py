@@ -504,6 +504,9 @@ class XendDomainInfo:
         devices have been released.
         """
         if self.dom is None: return 0
+        chan = xend.getDomChannel(self.dom)
+        if chan:
+            chan.close()
         return xc.domain_destroy(dom=self.dom)
 
     def cleanup(self):

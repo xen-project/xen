@@ -48,15 +48,31 @@ class ChannelFactory:
     def domChannel(self, dom):
         """Get the channel for the given domain.
         Construct if necessary.
+
+        dom domain
+
+        returns channel
+        """
+        chan = self.getDomChannel(dom)
+        if not chan:
+            chan = Channel(self, dom)
+            self.addChannel(chan)
+        return chan
+
+    def getDomChannel(self, dom):
+        """Get the channel for the given domain.
+
+        dom domain
+
+        returns channel (or None)
         """
         dom = int(dom)
         for chan in self.channels.values():
             if not isinstance(chan, Channel): continue
             if chan.dom == dom:
                 return chan
-        chan = Channel(self, dom)
-        self.addChannel(chan)
-        return chan
+        return None
+        
 
     def virqChannel(self, virq):
         """Get the channel for the given virq.
@@ -109,12 +125,11 @@ class BaseChannel:
 
     def notificationReceived(self):
         """Called when a notification is received.
-        Closes the channel on error, otherwise calls
-        handleNotification(type), which should be defined
+        Calls handleNotification(), which should be defined
         in a subclass.
         """
-        if not self.closed:
-            self.handleNotification(type)
+        if self.closed: return
+        self.handleNotification()
 
     def close(self):
         """Close the channel. Calls channelClosed() on the factory.
@@ -122,7 +137,7 @@ class BaseChannel:
         """
         self.factory.channelClosed(self)
 
-    def handleNotification(self, type):
+    def handleNotification(self):
         """Handle notification.
         Define in subclass.
         """
@@ -172,7 +187,7 @@ class VirqChannel(BaseChannel):
         """
         self.clients.append(client)
 
-    def handleNotification(self, type):
+    def handleNotification(self):
         for c in self.clients:
             c.virqReceived(self.virq)
 
@@ -221,13 +236,14 @@ class Channel(BaseChannel):
         """Close the channel. Calls lostChannel() on all its devices and
         channelClosed() on the factory.
         """
+        if self.closed: return
         self.closed = 1
         for d in self.devs:
             d.lostChannel()
         self.factory.channelClosed(self)
         self.devs = []
         self.devs_by_type = {}
-        del self.port
+        self.port.disconnect()
 
     def registerDevice(self, types, dev):
         """Register a device controller.
@@ -271,7 +287,10 @@ class Channel(BaseChannel):
                    self.getLocalPort(),
                    self.getRemotePort()))
 
-    def handleNotification(self, type):
+    def handleNotification(self):
+        if self.closed:
+            print 'handleNotification> Notification on closed channel', self
+            return
         work = 0
         work += self.handleRequests()
         work += self.handleResponses()

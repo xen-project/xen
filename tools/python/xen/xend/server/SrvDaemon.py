@@ -663,6 +663,15 @@ class Daemon:
         reactor.diconnectAll()
         sys.exit(0)
 
+    def getDomChannel(self, dom):
+        """Get the channel to a domain.
+
+        dom domain
+
+        returns channel (or None)
+        """
+        return self.channelF.getDomChannel(dom)
+
     def blkif_set_control_domain(self, dom, recreate=0):
         """Set the block device backend control domain.
         """
