@@ -211,7 +211,7 @@ static void __get_time_values_from_xen(void)
         rmb();
         shadow_tv.tv_sec    = HYPERVISOR_shared_info->wc_sec;
         shadow_tv.tv_usec   = HYPERVISOR_shared_info->wc_usec;
-        shadow_tsc_stamp    = HYPERVISOR_shared_info->tsc_timestamp;
+        shadow_tsc_stamp    = HYPERVISOR_shared_info->tsc_timestamp.tsc_bits;
         shadow_system_time  = HYPERVISOR_shared_info->system_time;
         rmb();
     }
@@ -604,7 +604,7 @@ void __init time_init(void)
     xtime.tv_usec = HYPERVISOR_shared_info->wc_usec;
     processed_system_time = shadow_system_time;
 
-    rdtsc_bitshift      = HYPERVISOR_shared_info->rdtsc_bitshift;
+    rdtsc_bitshift      = HYPERVISOR_shared_info->tsc_timestamp.tsc_bitshift;
     cpu_freq            = HYPERVISOR_shared_info->cpu_freq;
 
     scale = 1000000LL << (32 + rdtsc_bitshift);

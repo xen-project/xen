@@ -109,8 +109,8 @@ void start_kernel(start_info_t *si)
         printk(" %lx", si->net_rings[i]);
     }; printk("\n");
     printk("  blk_ring:   0x%lx\n", si->blk_ring);
-#endif
     printk("  dom_id:     %ld\n",  si->dom_id);
+#endif
     printk("  flags:      0x%lx\n", si->flags);
     printk("  cmd_line:   %s\n",  si->cmd_line ? (const char *)si->cmd_line : "NULL");
 

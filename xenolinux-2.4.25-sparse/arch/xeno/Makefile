@@ -111,6 +111,9 @@ archclean:
 	@$(MAKEBOOT) clean
 
 archmrproper:
+	rm -f include/asm-xeno/hypervisor-ifs/arch
 
 archdep:
+	rm -f include/asm-xeno/hypervisor-ifs/arch
+	( cd include/asm-xeno/hypervisor-ifs ; ln -sf arch-$(SUBARCH) arch)
 	@$(MAKEBOOT) dep

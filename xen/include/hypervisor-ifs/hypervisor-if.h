@@ -209,7 +209,6 @@ typedef struct shared_info_st {
      * Time: The following abstractions are exposed: System Time, Clock Time,
      * Domain Virtual Time. Domains can access Cycle counter time directly.
      */
-
     u64                cpu_freq;        /* CPU frequency (Hz).               */
 
     /*
@@ -221,20 +220,17 @@ typedef struct shared_info_st {
      */
     unsigned long      time_version1;   /* A version number for info below.  */
     unsigned long      time_version2;   /* A version number for info below.  */
-    unsigned long      tsc_timestamp;   /* TSC at last update of time vals.  */
+    tsc_timestamp_t    tsc_timestamp;   /* TSC at last update of time vals.  */
     u64                system_time;     /* Time, in nanosecs, since boot.    */
     unsigned long      wc_sec;          /* Secs  00:00:00 UTC, Jan 1, 1970.  */
     unsigned long      wc_usec;         /* Usecs 00:00:00 UTC, Jan 1, 1970.  */
-    
-    /* Domain Virtual Time */
-    u64                domain_time;
-	
+    u64                domain_time;     /* Domain virtual time, in nanosecs. */
+
     /*
      * Timeout values:
      * Allow a domain to specify a timeout value in system time and 
      * domain virtual time.
      */
-
     u64                wall_timeout;
     u64                domain_timeout;
 
@@ -247,7 +243,6 @@ typedef struct shared_info_st {
     net_idx_t net_idx[MAX_DOMAIN_VIFS];
 
     execution_context_t execution_context;
-    arch_shared_info_t arch;
 
 } shared_info_t;
 

@@ -280,12 +280,10 @@ void update_dom_time(shared_info_t *si)
     si->time_version1++;
     wmb();
 
-    /* NB. These two values don't actually ever change. */
     si->cpu_freq       = cpu_freq;
-    si->arch.rdtsc_bitshift = rdtsc_bitshift;
-
+    si->tsc_timestamp.tsc_bitshift = rdtsc_bitshift;
+    si->tsc_timestamp.tsc_bits     = tsc_irq;
     si->system_time    = stime_irq;
-    si->tsc_timestamp  = tsc_irq;
     si->wc_sec         = xtime.tv_sec;
     si->wc_usec        = xtime.tv_usec;
     si->wc_usec       += (jiffies - wall_jiffies) * (1000000 / HZ);

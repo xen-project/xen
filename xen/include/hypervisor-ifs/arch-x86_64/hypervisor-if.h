@@ -85,14 +85,10 @@ typedef struct
     unsigned long ss;
 } execution_context_t;
 
-/*
- * Xen/guestos shared data -- pointer provided in start_info.
- * NB. We expect that this struct is smaller than a page.
- */
-typedef struct arch_shared_info_st {
-    unsigned int       rdtsc_bitshift;  /* tsc_timestamp uses N:N+31 of TSC. */
-} arch_shared_info_t;
-
+typedef struct {
+    unsigned long  tsc_bits;      /* 32 bits read from the CPU's TSC. */
+    unsigned int   tsc_bitshift;  /* 'tsc_bits' uses N:N+31 of TSC.   */
+} tsc_timestamp_t;
 
 /*
  * The following is all CPU context. Note that the i387_ctxt block is filled 
