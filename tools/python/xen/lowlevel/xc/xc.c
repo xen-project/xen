@@ -1320,4 +1320,8 @@ PyMODINIT_FUNC initxc(void)
     PyDict_SetItemString(d, "error", xc_error);
 
     zero = PyInt_FromLong(0);
+
+    /* KAF: This ensures that we get debug output in a timely manner. */
+    setbuf(stdout, NULL);
+    setbuf(stderr, NULL);
 }
