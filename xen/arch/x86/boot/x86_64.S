@@ -52,16 +52,16 @@ __start:
 
         /* Set up a few descriptors: on entry only CS is guaranteed good. */
         lgdt    %cs:0x1001f0
-        mov     $(__HYPERVISOR_DS),%ecx
+        mov     $(__HYPERVISOR_DS32),%ecx
         mov     %ecx,%ds
         mov     %ecx,%es
 
-        /* Check for Multiboot bootloader */
         cmp     $(SECONDARY_CPU_FLAG),%ebx
-        je      skip_multiboot_check
+        je      skip_boot_checks
+
+        /* Check for Multiboot bootloader */
         cmp     $0x2BADB002,%eax
         jne     not_multiboot
-skip_multiboot_check:
         
         /* Save the Multiboot info structure for later use. */
         mov     %ebx,0x1001e0
@@ -75,7 +75,8 @@ skip_multiboot_check:
         cpuid
         bt      $29,%edx            # Long mode feature?
         jnc     bad_cpu
-        
+skip_boot_checks:
+
         /* Set up FPU. */
         fninit
         
@@ -123,6 +124,13 @@ skip_multiboot_check:
         ret
 __high_start:
         
+        mov     $(__HYPERVISOR_DS64),%ecx
+        mov     %ecx,%ds
+        mov     %ecx,%es
+        mov     %ecx,%fs
+        mov     %ecx,%gs
+        mov     %ecx,%ss
+
         lidt    idt_descr(%rip)
                 
         cmp     $(SECONDARY_CPU_FLAG),%ebx
@@ -203,7 +211,7 @@ SYMBOL_NAME(idt):
         .quad   SYMBOL_NAME(idt_table)
 
 ENTRY(stack_start)
-        .quad   SYMBOL_NAME(cpu0_stack) + 8100
+        .quad   SYMBOL_NAME(cpu0_stack) + 8000
 
 high_start:
         .quad   __high_start
@@ -241,9 +249,8 @@ ENTRY(cpu0_stack)    # Initial stack is 8kB
 ENTRY(stext)
 ENTRY(_stext)
 
-.globl switch_to, ret_from_intr, do_iopl
+.globl switch_to, do_iopl
 switch_to:
-ret_from_intr:
 do_iopl: 
 .globl copy_from_user, copy_to_user, copy_user_generic, new_thread
 copy_from_user: 

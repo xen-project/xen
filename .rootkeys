@@ -1020,7 +1020,6 @@
 41a61536MFhNalgbVmYGXAhQsPTZNw xen/include/asm-x86/multicall.h
 3ddb79c3xjYnrv5t3VqYlR4tNEOl4Q xen/include/asm-x86/page.h
 3ddb79c3ysKUbxZuwKBRK3WXU2TlEg xen/include/asm-x86/pci.h
-404f1bb41Yl-5ZjIWnG66HDCj6OIWA xen/include/asm-x86/pda.h
 4022a73diKn2Ax4-R4gzk59lm1YdDg xen/include/asm-x86/pdb.h
 3ddb79c2QF5-pZGzuX4QukPCDAl59A xen/include/asm-x86/processor.h
 40cf1596bim9F9DNdV75klgRSZ6Y2A xen/include/asm-x86/regs.h

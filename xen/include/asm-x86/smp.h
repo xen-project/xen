@@ -61,12 +61,7 @@ extern void smp_store_cpu_info(int id);		/* Store per CPU info (like the initial
  * so this is correct in the x86 case.
  */
 
-#if defined(__i386__)
 #define smp_processor_id() (current->processor)
-#elif defined(__x86_64__)
-#include <asm/pda.h>
-#define smp_processor_id() read_pda(cpunumber)
-#endif
 
 static __inline int hard_smp_processor_id(void)
 {

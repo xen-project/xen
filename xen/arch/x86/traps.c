@@ -116,7 +116,7 @@ asmlinkage void fatal_trap(int trapnr, struct xen_regs *regs)
     if ( trapnr == TRAP_page_fault )
     {
         __asm__ __volatile__ ("mov %%cr2,%0" : "=r" (cr2) : );
-        printk("Faulting linear address might be %08lx\n", cr2);
+        printk("Faulting linear address might be %0lx %lx\n", cr2, cr2);
     }
 
     printk("************************************\n");
@@ -165,7 +165,7 @@ static inline int do_trap(int trapnr, char *str,
 
     if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
     {
-        DPRINTK("Trap %d: %08lx -> %08lx\n", trapnr, regs->eip, fixup);
+        DPRINTK("Trap %d: %p -> %p\n", trapnr, regs->eip, fixup);
         regs->eip = fixup;
         return 0;
     }
@@ -322,7 +322,7 @@ asmlinkage int do_page_fault(struct xen_regs *regs)
     {
         perfc_incrc(copy_user_faults);
         if ( !ed->mm.shadow_mode )
-            DPRINTK("Page fault: %08lx -> %08lx\n", regs->eip, fixup);
+            DPRINTK("Page fault: %p -> %p\n", regs->eip, fixup);
         regs->eip = fixup;
         return 0;
     }
@@ -334,12 +334,12 @@ asmlinkage int do_page_fault(struct xen_regs *regs)
     {
         unsigned long page;
         page = l2_pgentry_val(idle_pg_table[addr >> L2_PAGETABLE_SHIFT]);
-        printk("*pde = %08lx\n", page);
+        printk("*pde = %p\n", page);
         if ( page & _PAGE_PRESENT )
         {
             page &= PAGE_MASK;
             page = ((unsigned long *) __va(page))[(addr&0x3ff000)>>PAGE_SHIFT];
-            printk(" *pte = %08lx\n", page);
+            printk(" *pte = %p\n", page);
         }
 #ifdef MEMORY_GUARD
         if ( !(regs->error_code & 1) )
@@ -351,7 +351,7 @@ asmlinkage int do_page_fault(struct xen_regs *regs)
     show_registers(regs);
     panic("CPU%d FATAL PAGE FAULT\n"
           "[error_code=%04x]\n"
-          "Faulting linear address might be %08lx\n",
+          "Faulting linear address might be %p\n",
           smp_processor_id(), regs->error_code, addr);
     return 0;
 }
@@ -555,7 +555,7 @@ asmlinkage int do_general_protection(struct xen_regs *regs)
 
     if ( likely((fixup = search_exception_table(regs->eip)) != 0) )
     {
-        DPRINTK("GPF (%04x): %08lx -> %08lx\n",
+        DPRINTK("GPF (%04x): %p -> %p\n",
                 regs->error_code, regs->eip, fixup);
         regs->eip = fixup;
         return 0;
@@ -705,16 +705,6 @@ void set_task_gate(unsigned int n, unsigned int sel)
     idt_table[n].b = 0x8500;
 }
 
-#define _set_seg_desc(gate_addr,type,dpl,base,limit) {\
- *((gate_addr)+1) = ((base) & 0xff000000) | \
-  (((base) & 0x00ff0000)>>16) | \
-  ((limit) & 0xf0000) | \
-  ((dpl)<<13) | \
-  (0x00408000) | \
-  ((type)<<8); \
- *(gate_addr) = (((base) & 0x0000ffff)<<16) | \
-  ((limit) & 0x0ffff); }
-
 void set_tss_desc(unsigned int n, void *addr)
 {
     _set_tssldt_desc(
@@ -729,7 +719,6 @@ void __init trap_init(void)
     extern void doublefault_init(void);
     doublefault_init();
 
-#ifdef __i386__
     /*
      * Note that interrupt gates are always used, rather than trap gates. We 
      * must have interrupts disabled until DS/ES/FS/GS are saved because the 
@@ -760,8 +749,10 @@ void __init trap_init(void)
     set_intr_gate(TRAP_simd_error,&simd_coprocessor_error);
     set_intr_gate(TRAP_deferred_nmi,&nmi);
 
-    /* Only ring 1 can access Xen services. */
-    _set_gate(idt_table+HYPERCALL_VECTOR,14,1,&hypercall);
+#if defined(__i386__)
+    _set_gate(idt_table+HYPERCALL_VECTOR, 14, 1, &hypercall);
+#elif defined(__x86_64__)
+    _set_gate(idt_table+HYPERCALL_VECTOR, 14, 3, &hypercall);
 #endif
 
     /* CPU0 uses the master IDT. */

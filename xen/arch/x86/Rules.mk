@@ -5,7 +5,7 @@ CC := gcc
 LD := ld
 
 CFLAGS  := -nostdinc -fno-builtin -fno-common -fno-strict-aliasing
-CFLAGS  += -iwithprefix include -Wall -Werror -pipe
+CFLAGS  += -iwithprefix include -Wall -Werror -Wno-format -pipe
 CFLAGS  += -I$(BASEDIR)/include -Wno-pointer-arith -Wredundant-decls
 
 ifeq ($(optimize),y)

@@ -50,7 +50,19 @@ typedef struct {
     u64 a, b;
 } idt_entry_t;
 
-#define _set_gate(gate_addr,type,dpl,addr) ((void)0)
+#define _set_gate(gate_addr,type,dpl,addr)               \
+do {                                                     \
+    (gate_addr)->a =                                     \
+        (((unsigned long)(addr) & 0xFFFF0000UL) << 32) | \
+        ((unsigned long)(dpl) << 45) |                   \
+        ((unsigned long)(type) << 40) |                  \
+        ((unsigned long)(addr) & 0xFFFFUL) |             \
+        ((unsigned long)__HYPERVISOR_CS64 << 16) |       \
+        (1UL << 47);                                     \
+    (gate_addr)->b =                                     \
+        ((unsigned long)(addr) >> 32);                   \
+} while (0)
+
 #define _set_tssldt_desc(n,addr,limit,type) ((void)0)
 
 #elif defined(__i386__)

@@ -23,15 +23,15 @@ void show_guest_stack(void)
     int i;
     execution_context_t *ec = get_execution_context();
     unsigned long *stack = (unsigned long *)ec->rsp;
-    printk("Guest RIP is %lx\n", ec->rip);
+    printk("Guest RIP is %lx\n   ", ec->rip);
 
     for ( i = 0; i < kstack_depth_to_print; i++ )
     {
         if ( ((long)stack & (STACK_SIZE-1)) == 0 )
             break;
         if ( i && ((i % 8) == 0) )
-            printk("\n       ");
-            printk("%08lx ", *stack++);            
+            printk("\n    ");
+            printk("%p ", *stack++);
     }
     printk("\n");
     
@@ -42,7 +42,7 @@ void show_trace(unsigned long *rsp)
     unsigned long *stack, addr;
     int i;
 
-    printk("Call Trace from RSP=%p: ", rsp);
+    printk("Call Trace from RSP=%p:\n   ", rsp);
     stack = rsp;
     i = 0;
     while (((long) stack & (STACK_SIZE-1)) != 0) {
@@ -50,7 +50,7 @@ void show_trace(unsigned long *rsp)
         if (kernel_text_address(addr)) {
             if (i && ((i % 6) == 0))
                 printk("\n   ");
-            printk("[<%08lx>] ", addr);
+            printk("[<%p>] ", addr);
             i++;
         }
     }
@@ -62,7 +62,7 @@ void show_stack(unsigned long *rsp)
     unsigned long *stack;
     int i;
 
-    printk("Stack trace from RSP=%p:\n", rsp);
+    printk("Stack trace from RSP=%p:\n    ", rsp);
 
     stack = rsp;
     for ( i = 0; i < kstack_depth_to_print; i++ )
@@ -70,11 +70,11 @@ void show_stack(unsigned long *rsp)
         if ( ((long)stack & (STACK_SIZE-1)) == 0 )
             break;
         if ( i && ((i % 8) == 0) )
-            printk("\n       ");
+            printk("\n    ");
         if ( kernel_text_address(*stack) )
-            printk("[%08lx] ", *stack++);
+            printk("[%p] ", *stack++);
         else
-            printk("%08lx ", *stack++);            
+            printk("%p ", *stack++);            
     }
     printk("\n");
 
@@ -83,15 +83,15 @@ void show_stack(unsigned long *rsp)
 
 void show_registers(struct xen_regs *regs)
 {
-    printk("CPU:    %d\nEIP:    %04lx:[<%08lx>]      \nEFLAGS: %08lx\n",
+    printk("CPU:    %d\nEIP:    %04lx:[<%p>]      \nEFLAGS: %p\n",
            smp_processor_id(), 0xffff & regs->cs, regs->rip, regs->eflags);
-    printk("rax: %08lx   rbx: %08lx   rcx: %08lx   rdx: %08lx\n",
+    printk("rax: %p   rbx: %p   rcx: %p   rdx: %p\n",
            regs->rax, regs->rbx, regs->rcx, regs->rdx);
-    printk("rsi: %08lx   rdi: %08lx   rbp: %08lx   rsp: %08lx   ss: %04x\n",
-           regs->rsi, regs->rdi, regs->rbp, regs->rsp, regs->ss);
-    printk("r8:  %08lx   r9:  %08lx   r10: %08lx   r11: %08lx\n",
+    printk("rsi: %p   rdi: %p   rbp: %p   rsp: %p\n",
+           regs->rsi, regs->rdi, regs->rbp, regs->rsp);
+    printk("r8:  %p   r9:  %p   r10: %p   r11: %p\n",
            regs->r8,  regs->r9,  regs->r10, regs->r11);
-    printk("r12: %08lx   r13: %08lx   r14: %08lx   r15: %08lx\n",
+    printk("r12: %p   r13: %p   r14: %p   r15: %p\n",
            regs->r12, regs->r13, regs->r14, regs->r15);
 
     show_stack((unsigned long *)regs->rsp);

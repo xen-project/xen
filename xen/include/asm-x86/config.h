@@ -61,7 +61,6 @@
 #define NR_CPUS 16
 
 /* Linkage for x86 */
-#define asmlinkage        __attribute__((regparm(0)))
 #define __ALIGN .align 16,0x90
 #define __ALIGN_STR ".align 16,0x90"
 #define SYMBOL_NAME_STR(X) #X
@@ -96,6 +95,8 @@ extern void __out_of_line_bug(int line) __attribute__((noreturn));
 } while (0)
 
 #if defined(__x86_64__)
+
+#define asmlinkage
 
 #define XENHEAP_DEFAULT_MB (16)
 
@@ -175,13 +176,18 @@ extern void __out_of_line_bug(int line) __attribute__((noreturn));
 
 #define __HYPERVISOR_CS64 0x0810
 #define __HYPERVISOR_CS32 0x0808
-#define __HYPERVISOR_DS 0x0818
+#define __HYPERVISOR_CS   __HYPERVISOR_CS64
+#define __HYPERVISOR_DS64 0x0000
+#define __HYPERVISOR_DS32 0x0818
+#define __HYPERVISOR_DS   __HYPERVISOR_DS64
 
 /* For generic assembly code: use macros to define operation/operand sizes. */
 #define __OS "q"  /* Operation Suffix */
 #define __OP "r"  /* Operand Prefix */
 
 #elif defined(__i386__)
+
+#define asmlinkage __attribute__((regparm(0)))
 
 #define XENHEAP_DEFAULT_MB (12)
 #define DIRECTMAP_PHYS_END (12*1024*1024)

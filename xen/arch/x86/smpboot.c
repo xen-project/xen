@@ -409,7 +409,7 @@ void __init start_secondary(void)
      * At this point, boot CPU has fully initialised the IDT. It is
      * now safe to make ourselves a private copy.
      */
-    idt_tables[cpu] = xmalloc_array(struct desc_struct, IDT_ENTRIES);
+    idt_tables[cpu] = xmalloc_array(idt_entry_t, IDT_ENTRIES);
     memcpy(idt_tables[cpu], idt_table, IDT_ENTRIES*8);
     *(unsigned short *)(&idt_load[0]) = (IDT_ENTRIES*8)-1;
     *(unsigned long  *)(&idt_load[2]) = (unsigned long)idt_tables[cpu];
@@ -650,7 +650,8 @@ static void __init do_boot_cpu (int apicid)
     struct exec_domain *ed;
     unsigned long boot_error = 0;
     int timeout, cpu;
-    unsigned long start_eip, stack;
+    unsigned long start_eip;
+    void *stack;
 
     cpu = ++cpucount;
 
@@ -673,11 +674,15 @@ static void __init do_boot_cpu (int apicid)
     /* So we see what's up. */
     printk("Booting processor %d/%d eip %lx\n", cpu, apicid, start_eip);
 
-    stack = __pa(alloc_xenheap_pages(1));
-    stack_start.esp = stack + STACK_SIZE - STACK_RESERVED;
+    stack = (void *)alloc_xenheap_pages(1);
+#if defined(__i386__)
+    stack_start.esp = __pa(stack) + STACK_SIZE - STACK_RESERVED;
+#elif defined(__x86_64__)
+    stack_start.esp = (unsigned long)stack + STACK_SIZE - STACK_RESERVED;
+#endif
 
     /* Debug build: detect stack overflow by setting up a guard page. */
-    memguard_guard_range(__va(stack), PAGE_SIZE);
+    memguard_guard_range(stack, PAGE_SIZE);
 
     /*
      * This grunge runs the startup process for
@@ -739,7 +744,7 @@ static void __init do_boot_cpu (int apicid)
             printk("CPU%d has booted.\n", cpu);
         } else {
             boot_error= 1;
-            if (*((volatile unsigned long *)phys_to_virt(start_eip))
+            if (*((volatile unsigned int *)phys_to_virt(start_eip))
                 == 0xA5A5A5A5)
 				/* trampoline started but...? */
                 printk("Stuck ??\n");
