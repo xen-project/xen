@@ -12,7 +12,7 @@ make this release: We have plans for a "universal buffer cache" that
 enables otherwise unused system memory to be used by domains in a
 read-only fashion.
 
-Disk Scheduling
+Disk scheduling
 ---------------
 The current disk scheduler is rather simplistic (batch round robin),
 and could be replaced by e.g. Cello if we have QoS isolation
@@ -27,7 +27,7 @@ assigned to a CPU when they are created (in a round robin fashion).
 We'd like to see a user-space load-balancing daemon that can shift
 domains between CPUs as their activity changes.
 
-Multiprocessor Guest VMs
+Multiprocessor guest VMs
 ------------------------
 Xen currently only supports uniprocessor guest OSes. We have designed
 the Xen interface with MP guests in mind, and plan to build an MP
@@ -40,7 +40,7 @@ still has the page in its TLB to ensure memory system integrity.  One
 other issue for supporting MP guests is that we'll need some sort of
 CPU gang scheduler, which will require some research.
 
-Cluster Management
+Cluster management
 ------------------
 There have been discussions regarding a unified cluster controller
 for Xen deployments.  This would leverage the existing features of
@@ -48,12 +48,13 @@ Xen to present a uniform control interface for managing a cluster
 as a pool of resources, rather than a set of completely distinct
 machines.
 
-PAE Support on 32-bit x86
--------------------------
-Xen can currently use up to 4GB of memory. It's possible for x86
-machines to address more than that (64GB), but it requires using a
-different page table format (3-level rather than 2-level) that we
-currently don't support. Adding 3-level PAE support wouldn't be
-difficult, but we'd also need to add support to all the guest
-OSs. We do not plan to add this support ourselves but volunteers
-are welcome!
+64-bit x86
+----------
+Xen can currently use up to 4GB of memory. It's possible for 32-bit
+x86 machines to address up to 64GB, but it requires using a different
+page table format that would be rather tedious to support. Our
+preferred approach is to virtualize 64-bit x86 (x86/64), as supported
+by modern AMD and Intel processors. The large address space provided
+by a 64-bit execution model greatly simplifies support for large-memory
+configurations. Our implementation for x86/64 is in progress and should
+feature in our next major release.

@@ -8,7 +8,7 @@ __  __            ____    ___
 ###############################
 
 University of Cambridge Computer Laboratory
-28 October 2004
+29 October 2004
 
 http://www.cl.cam.ac.uk/netos/xen/
 http://www.cl.cam.ac.uk/netos/xen/
@@ -16,17 +16,18 @@ http://www.cl.cam.ac.uk/netos/xen/
 About the Xen Virtual Machine Monitor
 =====================================
 
-"Xen" is a Virtual Machine Monitor (VMM) originally developed by the
+Xen is a Virtual Machine Monitor (VMM) originally developed by the
 Systems Research Group of the University of Cambridge Computer
-Laboratory, as part of the UK-EPSRC funded XenoServers project. 
+Laboratory, as part of the UK-EPSRC funded XenoServers project.
 
-Xen 2.0 offers excellent performance, hardware support and enterprise
-grade features such as live migration.  Linux 2.6, 2.4 and NetBSD 2.0
-are already available for Xen, with more operating system ports on the
-way.
+The 2.0 release offers excellent performance, hardware support and
+enterprise-grade features such as live migration. Linux 2.6, 2.4 and
+NetBSD 2.0 are already available for Xen, with more operating system
+ports on the way.
 
-Xen is Free Open Source Software, released under the GNU GPL.
+Xen is freely-distributable Open Source software, released under the
+GNU GPL.
 
-For full documentation, see the Xen User Manual in docs/user.pdf
+For full documentation, see the Xen User Manual in docs/pdf/user.pdf
 (after running make -C docs) or the Documentation page on the Xen
 website.
