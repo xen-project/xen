@@ -281,6 +281,8 @@ void update_dom_time(struct domain *d)
 
     read_lock_irqsave(&time_lock, flags);
 
+    spin_lock(&d->time_lock);
+
     si->time_version1++;
     wmb();
 
@@ -292,6 +294,8 @@ void update_dom_time(struct domain *d)
 
     wmb();
     si->time_version2++;
+
+    spin_unlock(&d->time_lock);
 
     read_unlock_irqrestore(&time_lock, flags);
 }

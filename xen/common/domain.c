@@ -44,6 +44,8 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
  
     memcpy(&ed->thread, &idle0_exec_domain.thread, sizeof(ed->thread));
 
+    spin_lock_init(&d->time_lock);
+
     spin_lock_init(&d->page_alloc_lock);
     INIT_LIST_HEAD(&d->page_list);
     INIT_LIST_HEAD(&d->xenpage_list);

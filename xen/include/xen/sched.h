@@ -109,10 +109,11 @@ struct exec_domain
 };
 
 struct domain {
-    domid_t  id;
-    s_time_t create_time;
+    domid_t          id;
+    s_time_t         create_time;
 
-    shared_info_t *shared_info;       /* shared data area */
+    shared_info_t   *shared_info;     /* shared data area */
+    spinlock_t       time_lock;
 
     spinlock_t       page_alloc_lock; /* protects all the following fields  */
     struct list_head page_list;       /* linked list, of size tot_pages     */
