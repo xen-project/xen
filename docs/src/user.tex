@@ -89,9 +89,11 @@ applications and libraries {\em do not} require modification.
 
 Xen support is available for increasingly many operating systems:
 right now, Linux 2.4, Linux 2.6 and NetBSD are available for Xen 2.0.
-We expect that Xen support will ultimately be integrated into the
-releases of Linux, NetBSD and FreeBSD.  Other OS ports,
-including Plan 9, are in progress.
+A FreeBSD port is undergoing testing and will be incorporated into the
+release soon. Other OS ports, including Plan 9, are in progress.  We
+hope that that arch-xen patches will be incorporated into the
+mainstream releases of these operating systems in due course (as has
+already happened for NetBSD).
 
 Possible usage scenarios for Xen include:
 \begin{description}
@@ -136,19 +138,20 @@ interface, either from a command-line tool or from a web browser.
 
 \section{Hardware Support}
 
-Xen currently runs only on the x86 architecture,
-requiring a `P6' or newer processor (e.g. Pentium Pro, Celeron,
-Pentium II, Pentium III, Pentium IV, Xeon, AMD Athlon, AMD Duron).
-Multiprocessor machines are supported, and we also have basic support
-for HyperThreading (SMT), although this remains a topic for ongoing
-research. A port specifically for x86/64 is in
-progress, although Xen already runs on such systems in 32-bit legacy
-mode. In addition a port to the IA64 architecture is approaching 
-completion. 
+Xen currently runs only on the x86 architecture, requiring a `P6' or
+newer processor (e.g. Pentium Pro, Celeron, Pentium II, Pentium III,
+Pentium IV, Xeon, AMD Athlon, AMD Duron).  Multiprocessor machines are
+supported, and we also have basic support for HyperThreading (SMT),
+although this remains a topic for ongoing research. A port
+specifically for x86/64 is in progress, although Xen already runs on
+such systems in 32-bit legacy mode. In addition a port to the IA64
+architecture is approaching completion. We hope to add other
+architectures such as PPC and ARM in due course.
+
 
 Xen can currently use up to 4GB of memory.  It is possible for x86
 machines to address up to 64GB of physical memory but there are no
-current plans to support these systems.  The x86/64 port is the
+current plans to support these systems: The x86/64 port is the
 planned route to supporting larger memory sizes.
 
 Xen offloads most of the hardware support issues to the guest OS
@@ -187,7 +190,7 @@ Xen was first described in a paper presented at SOSP in
 http://www.cl.cam.ac.uk/netos/papers/2003-xensosp.pdf}, and the first
 public release (1.0) was made that October.  Since then, Xen has
 significantly matured and is now used in production scenarios on
-multiple sites.
+many sites.
 
 Xen 2.0 features greatly enhanced hardware support, configuration
 flexibility, usability and a larger complement of supported operating
@@ -206,18 +209,13 @@ system distribution.
 \section{Prerequisites}
 \label{sec:prerequisites}
 
-The following is a full list of prerequisites. Items marked `$*$' are
-only required if you wish to build from source; items marked `$\dag$'
-are only required if you wish to run more than one virtual machine.
-
+The following is a full list of prerequisites.  Items marked `$\dag$'
+are required by the \xend control tools, and hence required if you
+want to run more than one virtual machine; items marked `$*$' are only
+required if you wish to build from source.
 \begin{itemize}
 \item A working Linux distribution using the GRUB bootloader and
 running on a P6-class (or newer) CPU.
-\item [$*$] Build tools (gcc v3.2.x or v3.3.x, binutils, GNU make).
-\item [$*$] Development installation of libcurl (e.g., libcurl-devel) 
-\item [$*$] Development installation of zlib (e.g., zlib-dev).
-\item [$*$] Development installation of Python v2.2 or later (e.g., python-dev).
-\item [$*$] \LaTeX, transfig and tgif are required to build the documentation.
 \item [$\dag$] The \path{iproute2} package. 
 \item [$\dag$] The Linux bridge-utils\footnote{Available from 
 {\tt http://bridge.sourceforge.net}} (e.g., \path{/sbin/brctl})
@@ -227,6 +225,11 @@ http://www.twistedmatrix.com}}. There may be a binary package
 available for your distribution; alternatively it can be installed by
 running `{\sl make install-twisted}' in the root of the Xen source
 tree.
+\item [$*$] Build tools (gcc v3.2.x or v3.3.x, binutils, GNU make).
+\item [$*$] Development installation of libcurl (e.g., libcurl-devel) 
+\item [$*$] Development installation of zlib (e.g., zlib-dev).
+\item [$*$] Development installation of Python v2.2 or later (e.g., python-dev).
+\item [$*$] \LaTeX, transfig and tgif are required to build the documentation.
 \end{itemize}
 
 Once you have satisfied the relevant prerequisites, you can 
@@ -362,9 +365,10 @@ KERNELS ?= mk.linux-2.6-xen0 mk.linux-2.6-xenU
 \end{verbatim} 
 \end{quote} 
 
-You can edit this line to include any set of operating system 
-kernels which have configurations in the top-level 
-\path{buildconfigs/} directory. 
+You can edit this line to include any set of operating system kernels
+which have configurations in the top-level \path{buildconfigs/}
+directory, for example {\tt mk.linux-2.4-xenU} to build a Linux 2.4
+kernel containing only virtual device drivers.
 
 %% Inspect the Makefile if you want to see what goes on during a build.
 %% Building Xen and the tools is straightforward, but XenLinux is more
@@ -405,6 +409,8 @@ architecture being built for is \path{xen}, e.g:
 \begin{verbatim} 
 # cd linux-2.6.9-xen0 
 # make ARCH=xen xconfig 
+# cd ..
+# make
 \end{verbatim} 
 \end{quote} 
 
@@ -412,7 +418,7 @@ You can also copy an existing Linux configuration (\path{.config})
 into \path{linux-2.6.9-xen0} and execute:  
 \begin{quote}
 \begin{verbatim} 
-# make oldconfig 
+# make ARCH=xen oldconfig 
 \end{verbatim} 
 \end{quote} 
 
@@ -564,10 +570,11 @@ by restoring the directory to its original location (i.e.
 The reason for this is that the current TLS implementation uses
 segmentation in a way that is not permissible under Xen.  If TLS is
 not disabled, an emulation mode is used within Xen which reduces
-performance substantially and is not guaranteed to work perfectly.
+performance substantially.
 
-We hope that this issue can be resolved by working 
-with Linux distribution vendors. 
+We hope that this issue can be resolved by working with Linux
+distribution vendors to implement a minor backward-compatible change
+to the TLS library.
 
 \section{Booting Xen} 
 
@@ -677,7 +684,7 @@ machine ID~1 you should type:
 
 \begin{quote}
 \begin{verbatim}
-# xm create -c -f myvmconfig vmid=1
+# xm create -c myvmconfig vmid=1
 \end{verbatim}
 \end{quote}
 
@@ -708,7 +715,6 @@ section of the project's SourceForge site (see
 kernel = "/boot/vmlinuz-2.6.9-xenU"
 memory = 64
 name = "ttylinux"
-cpu = -1 # leave to Xen to pick
 nics = 1
 ip = "1.2.3.4"
 disk = ['file:/path/to/ttylinux/rootfs,sda1,w']
@@ -716,7 +722,7 @@ root = "/dev/sda1 ro"
 \end{verbatim}
 \item Now start the domain and connect to its console:
 \begin{verbatim}
-xm create -f configfile -c
+xm create configfile -c
 \end{verbatim}
 \item Login as root, password root.
 \end{enumerate}
@@ -842,6 +848,10 @@ or:
 \begin{verbatim}
 # xm console 5
 \end{verbatim}
+or:
+\begin{verbatim}
+# xencons localhost 9605
+\end{verbatim}
 
 \section{Domain Save and Restore}
 
@@ -879,10 +889,12 @@ capacity) to accommodate the domain after the move. Furthermore we
 currently require both source and destination machines to be on the 
 same L2 subnet. 
 
-Currently, there is no support for providing access to disk
-filesystems when a domain is migrated.  Administrators should choose
-an appropriate storage solution (i.e. SAN, NAS, etc.) to ensure that
-domain filesystems are also available on their destination node.
+Currently, there is no support for providing automatic remote access
+to filesystems stored on local disk when a domain is migrated.
+Administrators should choose an appropriate storage solution
+(i.e. SAN, NAS, etc.) to ensure that domain filesystems are also
+available on their destination node. GNBD is a good method for
+exporting a volume from one machine to another, as is iSCSI.
 
 A domain may be migrated using the \path{xm migrate} command.  To
 live migrate a domain to another machine, we would use
@@ -892,14 +904,12 @@ the command:
 # xm migrate --live mydomain destination.ournetwork.com
 \end{verbatim}
 
-There will be a delay whilst the domain is moved to the destination
-machine.  During this time, the Xen migration daemon copies as much
-information as possible about the domain (configuration, memory
-contents, etc.) to the destination host.  The domain is
-then stopped for a fraction of a second in order to update the state
-on the destination machine with any changes in memory contents, etc.
-The domain will then continue on the new machine having been halted
-for a fraction of a second (usually between about 60 -- 300ms).
+Without the {\tt --live} flag, \xend simply stops the domain and
+copies the memory image over to the new node and restarts it. Since
+domains can have large allocations this can be quite time consuming,
+even on a Gigabit network. With the {\tt --live} flag \xend attempts
+to keep the domain running while the migration is in progress,
+resulting in typical 'downtimes' of just 60 -- 300ms.
 
 For now it will be necessary to reconnect to the domain's console on
 the new machine using the \path{xm console} command.  If a migrated
@@ -974,27 +984,38 @@ configuration file. For example a line like
 \verb_disk = ['phy:hda3,sda1,w']_
 \end{quote}
 specifies that the partition \path{/dev/hda3} in domain 0 
-should be exported to the new domain as \path{/dev/sda1}; 
-one could equally well export it as \path{/dev/hda3} or 
+should be exported read-write to the new domain as \path{/dev/sda1}; 
+one could equally well export it as \path{/dev/hda} or 
 \path{/dev/sdb5} should one wish. 
 
 In addition to local disks and partitions, it is possible to export
 any device that Linux considers to be ``a disk'' in the same manner.
 For example, if you have iSCSI disks or GNBD volumes imported into
 domain 0 you can export these to other domains using the \path{phy:}
-disk syntax.
+disk syntax. E.g.:
+\begin{quote}
+\verb_disk = ['phy:vg/lvm1,sda2,w']_
+\end{quote}
+
 
 
 \begin{center}
 \framebox{\bf Warning: Block device sharing}
 \end{center}
 \begin{quote}
-Block devices should only be shared between domains in a read-only
-fashion otherwise the Linux kernels will obviously get very confused
-as the file system structure may change underneath them (having the
-same partition mounted rw twice is a sure fire way to cause
-irreparable damage)!  If you want read-write sharing, export the
-directory to other domains via NFS from domain0. 
+Block devices should typically only be shared between domains in a
+read-only fashion otherwise the Linux kernel's file systems will get
+very confused as the file system structure may change underneath them
+(having the same ext3 partition mounted rw twice is a sure fire way to
+cause irreparable damage)!  \xend will attempt to prevent you from
+doing this by checking that the device is not mounted read-write in
+domain 0, and hasn't already been exported read-write to another
+domain.
+
+If you want read-write sharing, export the directory to other domains
+via NFS from domain0 (or use a cluster file system such as GFS or
+ocfs2).
+
 \end{quote}
 
 
@@ -1132,11 +1153,11 @@ rather confused. It may be possible to automate the growing
 process by using \path{dmsetup wait} to spot the volume getting full
 and then issue an \path{lvextend}.
 
-%% In principle, it is possible to continue writing to the volume
-%% that has been cloned (the changes will not be visible to the
-%% clones), but we wouldn't recommend this: have the cloned volume
-%% as a 'pristine' file system install that isn't mounted directly
-%% by any of the virtual machines.
+In principle, it is possible to continue writing to the volume
+that has been cloned (the changes will not be visible to the
+clones), but we wouldn't recommend this: have the cloned volume
+as a 'pristine' file system install that isn't mounted directly
+by any of the virtual machines.
 
 
 \section{Using NFS Root}
@@ -1150,7 +1171,7 @@ network by adding a line to \path{/etc/exports}, for instance:
 
 \begin{quote}
 \begin{verbatim}
-/export/vm1root      w.x.y.z/m (rw,sync,no_root_squash)
+/export/vm1root      1.2.3.4/24 (rw,sync,no_root_squash)
 \end{verbatim}
 \end{quote}
 
@@ -1162,7 +1183,7 @@ the domain's configuration file:
 \begin{small}
 \begin{verbatim}
 root       = '/dev/nfs'
-nfs_server = 'a.b.c.d'       # substitute IP address of server 
+nfs_server = '2.3.4.5'       # substitute IP address of server 
 nfs_root   = '/path/to/root' # path to root FS on the server
 \end{verbatim}
 \end{small}
@@ -1214,6 +1235,10 @@ runlevel directories or use the {\tt chkconfig} tool, where available.
 Once \xend is running, more sophisticated administration can be done
 using the xm tool (see Section~\ref{s:xm}) and the experimental
 Xensv web interface (see Section~\ref{s:xensv}).
+
+As \xend runs, events will be logged to {\tt /var/log/xend.log} and
+{\tt /var/log/xfrd.log}, and these may be useful for troubleshooting
+problems.
 
 \section{Xm (command line interface)}
 \label{s:xm}
@@ -1765,7 +1790,7 @@ directory of the Xen source distribution.
 
 The official Xen web site is found at:
 \begin{quote}
-{\tt http://www.cl.cam.ac.uk/Research/SRG/netos/xen/}
+{\tt http://www.cl.cam.ac.uk/netos/xen/}
 \end{quote}
 
 This contains links to the latest versions of all on-line 
