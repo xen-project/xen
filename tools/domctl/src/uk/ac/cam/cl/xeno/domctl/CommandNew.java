@@ -13,7 +13,7 @@ public class CommandNew extends Command
     String image = getStringParameter(args, 'i', d.domainImage);
     String initrd = getStringParameter (args, 'r', d.domainInitRD);
     int vifs = getIntParameter(args, 'v', d.domainVIFs);
-    String bargs = getStringParameter (args, 'a', "");
+    String bargs = getStringParameter (args, 'a', d.args);
     String root_dev = getStringParameter (args, 'd', d.rootDevice);
     String nfs_root_path = getStringParameter (args, 'f', d.NWNFSRoot);
     String nw_ip = getStringParameter (args, '4', d.NWIP);
@@ -62,8 +62,7 @@ public class CommandNew extends Command
 	}
 	
 	/* Set up boot parameters to pass to xi_build. */
-	bargs = "";
-
+        bargs += " ";
 	if (root_dev.equals ("/dev/nfs")) {
 	  if (vifs == 0) {
 	    return reportError ("Cannot use NFS root without VIFs configured");

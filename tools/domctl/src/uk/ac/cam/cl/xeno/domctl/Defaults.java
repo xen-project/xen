@@ -26,6 +26,8 @@ public class Defaults
 
   int MaxDomainNumber;
 
+  String args = "";
+
   String XIToolsDir;
 
   /***********************************************************************/
@@ -65,6 +67,7 @@ public class Defaults
     System.out.println ("   NWNFSServer " + NWNFSServer);
     System.out.println ("   NWNFSRoot " + NWNFSRoot);
     System.out.println ("   XIToolsDir " + XIToolsDir);
+    System.out.println ("   args " + args);
   }
 
   /***********************************************************************/
@@ -129,6 +132,8 @@ public class Defaults
 	    NWNFSServer = s;
 	  } else if (lastName.equals ("nw_nfs_root")) {
 	    NWNFSRoot = s;
+	  } else if (lastName.equals ("args")) {
+	    args = s;
 	  } else if (lastName.equals ("max_domain_number")) {
 	    MaxDomainNumber = Integer.parseInt(s);
 	  } else if (lastName.equals ("xi_tools_dir")) {
