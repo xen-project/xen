@@ -29,9 +29,13 @@
 
 #if 0
 #define DPRINTK(_f, _a...) printk ( KERN_ALERT _f , ## _a )
-#define DPRINTK_IOCTL(_f, _a...) printk ( KERN_ALERT _f , ## _a )
 #else
 #define DPRINTK(_f, _a...) ((void)0)
+#endif
+
+#if 0
+#define DPRINTK_IOCTL(_f, _a...) printk ( KERN_ALERT _f , ## _a )
+#else
 #define DPRINTK_IOCTL(_f, _a...) ((void)0)
 #endif
 

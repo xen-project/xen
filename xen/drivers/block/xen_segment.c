@@ -17,6 +17,12 @@
 
 segment_t xsegments[XEN_MAX_SEGMENTS];
 
+#if 0
+#define DPRINTK(_f, _a...) printk( _f , ## _a )
+#else
+#define DPRINTK(_f, _a...) ((void)0)
+#endif
+
 /*
  * xen_segment_map_request
  *
@@ -37,18 +43,36 @@ int xen_segment_map_request(
     int sum, i;
 
     segment_number &= XENDEV_IDX_MASK;
-    if ( segment_number >= XEN_MAX_SEGMENTS ) goto fail;
+    if ( segment_number >= XEN_MAX_SEGMENTS )
+    {
+      DPRINTK("invalid segment number. %d %d\n",
+	      segment_number, XEN_MAX_SEGMENTS);
+      goto fail;
+    }
 
     seg = p->segment_list[segment_number];
-    if ( seg == NULL ) goto fail;
+    if ( seg == NULL ) 
+    {
+      DPRINTK("segment is null. %d\n", segment_number);
+      goto fail;
+    }
 
     /* check domain permissions */
-    if ( seg->domain != p->domain ) goto fail;
+    if ( seg->domain != p->domain )
+    {
+      DPRINTK("segment is for another domain. %d %d\n",
+	      seg->domain, p->domain);
+      goto fail;
+    }
 
     /* check rw access */
     if ((operation == WRITE && seg->mode != XEN_SEGMENT_RW) ||
         (operation == READ  && seg->mode == XEN_SEGMENT_UNUSED))
+    {
+        DPRINTK("illegal operation: %d %d\n",
+		operation, seg->mode);
         goto fail;
+    }
 
     /* find extent, check size */
     sum = 0; 
@@ -60,36 +84,88 @@ int xen_segment_map_request(
         ext++; i++;
     }
 
-    if ( (sum + ext->size) <= sect_nr ) goto fail;
+    if ( (sum + ext->size) <= sect_nr ) 
+    {
+      DPRINTK("extent size mismatch: %d %d : %d %ld %ld\n",
+	      i, seg->num_extents, sum, ext->size, sect_nr);
+      goto fail;
+    }
 
-    pseg->sector_number = sect_nr + ext->offset - sum;
+    pseg->sector_number = (sect_nr - sum) + ext->offset;
     pseg->buffer        = buffer;
     pseg->nr_sects      = nr_sects;
     pseg->dev           = xendev_to_physdev(ext->disk);
-    if ( pseg->dev == 0 ) goto fail;
+    if ( pseg->dev == 0 ) 
+    {
+        DPRINTK ("invalid device 0x%x 0x%lx 0x%lx\n", 
+		 ext->disk, ext->offset, ext->size);
+	goto fail;
+    }
 
     /* We're finished if the virtual extent didn't overrun the phys extent. */
     if ( (sum + ext->size) >= (sect_nr + nr_sects) )
-        return 1; /* Just one more physical extent. */
+        return 1;                         /* entire read fits in this extent */
 
     /* Hmmm... make sure there's another extent to overrun onto! */
-    if ( (i+1) == seg->num_extents ) goto fail;
+    if ( (i+1) == seg->num_extents ) 
+    {
+        DPRINTK ("not enough extents %d %d\n",
+		 i, seg->num_extents);
+	goto fail;
+    }
 
     pseg[1].nr_sects = (sect_nr + nr_sects) - (sum + ext->size);
     pseg[0].nr_sects = sum + ext->size - sect_nr;
     pseg[1].buffer = buffer + (pseg->nr_sects << 9);
     pseg[1].sector_number = ext[1].offset;
     pseg[1].dev = xendev_to_physdev(ext[1].disk);
-    if ( pseg[1].dev == 0 ) goto fail;
+    if ( pseg[1].dev == 0 ) 
+    {
+        DPRINTK ("bogus device for pseg[1] \n");
+	goto fail;
+    }
 
     /* We don't allow overrun onto a third physical extent. */
     if ( (sum + ext[0].size + ext[1].size) < 
          (pseg[1].sector_number + pseg[1].nr_sects) )
+    {
+        DPRINTK ("third extent\n");
+        DPRINTK (" sum:%d, e0:%ld, e1:%ld   p1.sect:%ld p1.nr:%d\n",
+		 sum, ext[0].size, ext[1].size, 
+		 pseg[1].sector_number, pseg[1].nr_sects);
         goto fail;    
+    }
 
-    return 2; /* We overran onto a second physical es\xtent. */
+    return 2;                   /* We overran onto a second physical extent. */
 
  fail:
+
+    DPRINTK ("xen_segment_map_request failure\n");
+    DPRINTK ("operation: %d\n", operation);
+    DPRINTK ("segment number: %d\n", segment_number);
+    DPRINTK ("sect_nr: %ld 0x%lx\n", sect_nr, sect_nr);
+    DPRINTK ("nr_sects: %d 0x%x\n", nr_sects, nr_sects);
+
+    if (0)
+    {
+      segment_t *xseg;
+      extent_t  *xext;
+      int xsum, xi;
+
+      xseg = p->segment_list[segment_number];
+
+      xsum = 0; xi = 0;
+      xext = xseg->extents;
+
+      while ( (xi < xseg->num_extents) && ((xsum + xext->size) <= sect_nr) )
+      {
+	DPRINTK (" xi:%d, num_ext:%d, xsum:%d, size:%lx, sect_nr:%lx\n",
+		 xi, xseg->num_extents, xsum, xext->size, sect_nr);
+	xsum += xext->size;
+        xext++; xi++;
+      }
+    }
+
     return -1;
 }
 

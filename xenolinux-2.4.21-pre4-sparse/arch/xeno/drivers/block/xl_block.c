@@ -120,6 +120,11 @@ int xenolinux_block_release(struct inode *inode, struct file *filep)
     return 0;
 }
 
+/*
+ * handle ioctl calls
+ *
+ * individual ioctls are defined in /usr/include/linux/fs.h
+ */
 
 int xenolinux_block_ioctl(struct inode *inode, struct file *filep,
 			  unsigned command, unsigned long argument)
@@ -299,6 +304,7 @@ static int hypervisor_request(unsigned long   id,
     case XEN_BLOCK_WRITE:
         phys_device = xldev_to_physdev(device);
 	gd = xldev_to_gendisk(device); 
+
 	sector_number += gd->part[MINOR(device)].start_sect;
         if ( (sg_operation == operation) &&
              (sg_dev == phys_device) &&

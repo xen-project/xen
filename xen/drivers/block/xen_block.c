@@ -210,11 +210,6 @@ static void end_block_io_op(struct buffer_head *bh, int uptodate)
         pending_req->status = 2;
     }
 
-    if (pending_req->status)
-    {
-      printk ("Hey! status is %d\n", pending_req->status);
-    }
-
     unlock_buffer(pending_req->domain, 
                   virt_to_phys(bh->b_data), 
                   bh->b_size, 
@@ -568,7 +563,10 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
         }
 
         if ( !__buffer_is_valid(p, buffer, nr_sects<<9, (operation==READ)) )
+	{
+            DPRINTK("invalid buffer\n");
             goto bad_descriptor;
+	}
 
         /* Get the physical device and block index. */
         if ( (req->device & XENDEV_TYPE_MASK) == XENDEV_VIRTUAL )
@@ -578,7 +576,11 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
                 req->device, 
                 req->sector_number + tot_sects,
                 buffer, nr_sects);
-            if ( new_segs <= 0 ) goto bad_descriptor;
+            if ( new_segs <= 0 ) 
+	    {
+	        DPRINTK("bogus xen_segment_map_request\n");
+		goto bad_descriptor;
+	    }
         }
         else
         {
@@ -586,7 +588,11 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
             phys_seg[nr_psegs].sector_number = req->sector_number + tot_sects;
             phys_seg[nr_psegs].buffer        = buffer;
             phys_seg[nr_psegs].nr_sects      = nr_sects;
-            if ( phys_seg[nr_psegs].dev == 0 ) goto bad_descriptor;
+            if ( phys_seg[nr_psegs].dev == 0 ) 
+	    {
+	        DPRINTK("bad device\n");
+	        goto bad_descriptor;
+	    }
             new_segs = 1;
         }
         
@@ -689,11 +695,6 @@ static void make_response(struct task_struct *p, unsigned long id,
     unsigned long cpu_mask, flags;
     int position;
     blk_ring_t *blk_ring;
-
-    if (st != 0)
-    {
-      printk("status is %ld\n", st);
-    }
 
     /* Place on the response ring for the relevant domain. */ 
     spin_lock_irqsave(&p->blk_ring_lock, flags);
