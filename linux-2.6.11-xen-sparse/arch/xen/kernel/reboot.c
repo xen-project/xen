@@ -77,6 +77,13 @@ static void __do_suspend(void)
 #define netif_resume()  do{}while(0)
 #endif
 
+
+#ifdef CONFIG_XEN_USB_FRONTEND
+    extern void usbif_resume();
+#else
+#define usbif_resume() do{}while(0)
+#endif
+
     extern void time_suspend(void);
     extern void time_resume(void);
     extern unsigned long max_pfn;
@@ -103,20 +110,15 @@ static void __do_suspend(void)
     HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
     clear_fixmap(FIX_SHARED_INFO);
 
-    memcpy(&suspend_record->resume_info, &xen_start_info, sizeof(xen_start_info));
+    memcpy(&suspend_record->resume_info, &xen_start_info,
+           sizeof(xen_start_info));
 
     HYPERVISOR_suspend(virt_to_machine(suspend_record) >> PAGE_SHIFT);
 
-    HYPERVISOR_vm_assist(VMASST_CMD_enable,
-			 VMASST_TYPE_4gb_segments);
-#ifdef CONFIG_XEN_WRITABLE_PAGETABLES
-    HYPERVISOR_vm_assist(VMASST_CMD_enable,
-			 VMASST_TYPE_writable_pagetables);
-#endif
-
     shutting_down = -1; 
 
-    memcpy(&xen_start_info, &suspend_record->resume_info, sizeof(xen_start_info));
+    memcpy(&xen_start_info, &suspend_record->resume_info,
+           sizeof(xen_start_info));
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
     set_fixmap_ma(FIX_SHARED_INFO, xen_start_info.shared_info);
@@ -146,6 +148,8 @@ static void __do_suspend(void)
     blkdev_resume();
 
     netif_resume();
+
+    usbif_resume();
 
     __sti();
 
@@ -242,7 +246,7 @@ static void shutdown_handler(ctrl_msg_t *msg, unsigned long id)
     else if ( (pending_sysrq == -1) && 
               (msg->subtype == CMSG_SHUTDOWN_SYSRQ) )
     {
-        pending_sysrq = msg->msg[0];
+        pending_sysrq = ((shutdown_sysrq_t *)&msg->msg[0])->key;
         schedule_work(&sysrq_work);
     }
     else

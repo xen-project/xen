@@ -52,7 +52,7 @@ ln -s $XEN/include/xen $XEN/include/linux
 ln -s $XEN/include/asm-ia64/linux $XEN/include/asm-ia64/xen 
 
 # prepare for building asm-offsets (circular dependency)
-touch include/asm-ia64/asm-offsets.h
+echo '#define IA64_TASK_SIZE 0' > include/asm-ia64/asm-offsets.h
 sleep 2
 touch arch/ia64/asm-offsets.c
 
@@ -94,9 +94,9 @@ cp_patch arch/ia64/kernel/time.c arch/ia64/time.c time.c
 cp_patch arch/ia64/kernel/unaligned.c arch/ia64/unaligned.c unaligned.c
 cp_patch arch/ia64/kernel/vmlinux.lds.S arch/ia64/xen.lds.S lds.S
 
-cp_patch mm/bootmem.c arch/ia64/mm_bootmem.c mm_bootmem.c
-cp_patch mm/page_alloc.c arch/ia64/page_alloc.c page_alloc.c
-cp_patch mm/slab.c arch/ia64/slab.c slab.c
+#cp_patch mm/bootmem.c arch/ia64/mm_bootmem.c mm_bootmem.c
+#cp_patch mm/page_alloc.c arch/ia64/page_alloc.c page_alloc.c
+#cp_patch mm/slab.c arch/ia64/slab.c slab.c
 
 # following renamed to avoid conflict
 softlink kernel/extable.c arch/ia64/linuxextable.c
@@ -112,7 +112,8 @@ softlink arch/ia64/kernel/ia64_ksyms.c arch/ia64/ia64_ksyms.c
 softlink arch/ia64/kernel/irq_lsapic.c arch/ia64/irq_lsapic.c
 softlink arch/ia64/kernel/machvec.c arch/ia64/machvec.c
 softlink arch/ia64/mm/extable.c arch/ia64/extable.c
-softlink arch/ia64/kernel/pal.S arch/ia64/pal.S
+#softlink arch/ia64/kernel/pal.S arch/ia64/pal.S
+cp_patch arch/ia64/kernel/pal.S arch/ia64/pal.S pal.S
 softlink arch/ia64/kernel/patch.c arch/ia64/patch.c
 softlink arch/ia64/kernel/sal.c arch/ia64/sal.c
 softlink arch/ia64/kernel/minstate.h arch/ia64/minstate.h
@@ -140,7 +141,8 @@ softlink arch/ia64/lib/strlen.S arch/ia64/lib/strlen.S
 softlink arch/ia64/lib/strlen_user.S arch/ia64/lib/strlen_user.S
 softlink arch/ia64/lib/strncpy_from_user.S arch/ia64/lib/strncpy_from_user.S
 softlink arch/ia64/lib/strnlen_user.S arch/ia64/lib/strnlen_user.S
-softlink arch/ia64/lib/swiotlb.c arch/ia64/lib/swiotlb.c
+#softlink arch/ia64/lib/swiotlb.c arch/ia64/lib/swiotlb.c
+cp_patch arch/ia64/lib/swiotlb.c arch/ia64/lib/swiotlb.c swiotlb.c
 softlink arch/ia64/lib/xor.S arch/ia64/lib/xor.S
 
 softlink lib/cmdline.c arch/ia64/cmdline.c
@@ -182,8 +184,8 @@ cp_patch include/asm-ia64/system.h include/asm-ia64/system.h system.h
 cp_patch include/asm-ia64/types.h include/asm-ia64/types.h types.h
 
 null include/asm-ia64/desc.h 
-null include/asm-ia64/domain_page.h
-null include/asm-ia64/flushtlb.h
+#null include/asm-ia64/domain_page.h
+#null include/asm-ia64/flushtlb.h
 null include/asm-ia64/io_apic.h
 null include/asm-ia64/pdb.h
 null include/asm-ia64/module.h
@@ -212,7 +214,8 @@ softlink include/asm-ia64/ioctl.h include/asm-ia64/ioctl.h
 softlink include/asm-ia64/linkage.h include/asm-ia64/linkage.h
 softlink include/asm-ia64/machvec.h include/asm-ia64/machvec.h
 softlink include/asm-ia64/machvec_hpsim.h include/asm-ia64/machvec_hpsim.h
-softlink include/asm-ia64/mca_asm.h include/asm-ia64/mca_asm.h
+#softlink include/asm-ia64/mca_asm.h include/asm-ia64/mca_asm.h
+cp_patch include/asm-ia64/mca_asm.h include/asm-ia64/mca_asm.h mca_asm.h
 softlink include/asm-ia64/mca.h include/asm-ia64/mca.h
 softlink include/asm-ia64/meminit.h include/asm-ia64/meminit.h
 softlink include/asm-ia64/mman.h include/asm-ia64/mman.h
@@ -222,7 +225,8 @@ softlink include/asm-ia64/param.h include/asm-ia64/param.h
 softlink include/asm-ia64/patch.h include/asm-ia64/patch.h
 softlink include/asm-ia64/pci.h include/asm-ia64/pci.h
 softlink include/asm-ia64/percpu.h include/asm-ia64/percpu.h
-softlink include/asm-ia64/pgalloc.h include/asm-ia64/pgalloc.h
+#softlink include/asm-ia64/pgalloc.h include/asm-ia64/pgalloc.h
+cp_patch include/asm-ia64/pgalloc.h include/asm-ia64/pgalloc.h pgalloc.h
 softlink include/asm-ia64/pgtable.h include/asm-ia64/pgtable.h
 softlink include/asm-ia64/ptrace.h include/asm-ia64/ptrace.h
 softlink include/asm-ia64/ptrace_offsets.h include/asm-ia64/ptrace_offsets.h

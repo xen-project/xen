@@ -1,8 +1,8 @@
 // control flags for turning on/off features under test
 #undef CLONE_DOMAIN0
-//#define CLONE_DOMAIN0 1
-//#undef CLONE_DOMAIN0
-#define USER_ACCESS
+//#define CLONE_DOMAIN0 5
+#define DOMU_BUILD_STAGING
+#define VHPT_GLOBAL
 
 // manufactured from component pieces
 
@@ -27,13 +27,10 @@ typedef int pid_t;
 
 //////////////////////////////////////
 
-// FIXME: generated automatically into offsets.h??
-#define IA64_TASK_SIZE 0 // this probably needs to be fixed
-//#define IA64_TASK_SIZE sizeof(struct task_struct)
-
 #define FASTCALL(x) x	// see linux/include/linux/linkage.h
 #define fastcall	// " "
 
+#define touch_nmi_watchdog()
 // from linux/include/linux/types.h
 #define BITS_TO_LONGS(bits) \
 	(((bits)+BITS_PER_LONG-1)/BITS_PER_LONG)
@@ -48,15 +45,12 @@ typedef int pid_t;
 // FIXME?: x86-ism used in xen/mm.h
 #define LOCK_PREFIX
 
+extern unsigned long xenheap_phys_end;
+extern unsigned long xen_pstart;
+extern unsigned long xenheap_size;
+
 // from linux/include/linux/mm.h
 extern struct page *mem_map;
-
-// defined in include/asm-x86/mm.h, not really used for ia64
-typedef struct {
-    void	(*enable)(struct domain *p);
-    void	(*disable)(struct domain *p);
-} vm_assist_info_t;
-extern vm_assist_info_t vm_assist_info[];
 
 // xen/include/asm/config.h
 extern char _end[]; /* standard ELF symbol */
@@ -74,7 +68,9 @@ extern char _end[]; /* standard ELF symbol */
 
 ///////////////////////////////////////////////////////////////
 // xen/include/asm/config.h
-#define XENHEAP_DEFAULT_MB (16)
+// Natural boundary upon TR size to define xenheap space
+#define XENHEAP_DEFAULT_MB (1 << (KERNEL_TR_PAGE_SHIFT - 20))
+#define XENHEAP_DEFAULT_SIZE	(1 << KERNEL_TR_PAGE_SHIFT)
 #define	ELFSIZE	64
 
 ///////////////////////////////////////////////////////////////
@@ -186,15 +182,6 @@ void sort_main_extable(void);
 
 #define printk printf
 
-#define __ARCH_HAS_SLAB_ALLOCATOR  // see include/xen/slab.h
-#define xmem_cache_t kmem_cache_t
-#define	xmem_cache_alloc(a)	kmem_cache_alloc(a,GFP_KERNEL)
-#define	xmem_cache_free(a,b)	kmem_cache_free(a,b)
-#define	xmem_cache_create	kmem_cache_create
-#define	xmalloc(_type)		kmalloc(sizeof(_type),GFP_KERNEL)
-#define	xmalloc_array(_type,_num)	kmalloc(sizeof(_type)*_num,GFP_KERNEL)
-#define	xfree(a)		kfree(a)
-
 #undef  __ARCH_IRQ_STAT
 
 #define find_first_set_bit(x)	(ffs(x)-1)	// FIXME: Is this right???
@@ -230,6 +217,10 @@ void sort_main_extable(void);
 #define ARCH_HAS_EXEC_DOMAIN_MM_PTR
 
 // see arch/x86/nmi.c !?!?
+
+// these declarations got moved at some point, find a better place for them
+extern int opt_noht;
+extern int ht_per_core;
 extern unsigned int watchdog_on;
 
 // xen/include/asm/config.h

@@ -69,16 +69,13 @@ static void dom_timer_fn(unsigned long data);
 struct schedule_data schedule_data[NR_CPUS];
 
 extern struct scheduler sched_bvt_def;
-// extern struct scheduler sched_rrobin_def;
-// extern struct scheduler sched_atropos_def;
 static struct scheduler *schedulers[] = { 
     &sched_bvt_def,
-//     &sched_rrobin_def,
-//     &sched_atropos_def,
     NULL
 };
 
-/* Operations for the current scheduler. */
+static void __enter_scheduler(void);
+
 static struct scheduler ops;
 
 #define SCHED_OP(fn, ...)                                 \
@@ -195,7 +192,6 @@ void sched_add_domain(struct exec_domain *ed)
 
 void sched_rem_domain(struct exec_domain *ed) 
 {
-
     rem_ac_timer(&ed->timer);
     SCHED_OP(rem_task, ed);
     TRACE_3D(TRC_SCHED_DOM_REM, ed->domain->id, ed->eid, ed);
@@ -220,10 +216,7 @@ void domain_sleep(struct exec_domain *d)
  
     /* Synchronous. */
     while ( test_bit(EDF_RUNNING, &d->ed_flags) && !domain_runnable(d) )
-    {
-        smp_mb();
         cpu_relax();
-    }
 }
 
 void domain_wake(struct exec_domain *ed)
@@ -301,20 +294,14 @@ long do_sched_op(unsigned long op)
 }
 
 /* Per-domain one-shot-timer hypercall. */
-long do_set_timer_op(unsigned long timeout_hi, unsigned long timeout_lo)
+long do_set_timer_op(s_time_t timeout)
 {
-    struct exec_domain *p = current;
+    struct exec_domain *ed = current;
 
-    rem_ac_timer(&p->timer);
+    rem_ac_timer(&ed->timer);
     
-    if ( (timeout_hi != 0) || (timeout_lo != 0) )
-    {
-        p->timer.expires = ((s_time_t)timeout_hi<<32) | ((s_time_t)timeout_lo);
-        add_ac_timer(&p->timer);
-    }
-
-    TRACE_5D(TRC_SCHED_SET_TIMER, p->domain->id, p->eid, p, timeout_hi,
-             timeout_lo);
+    if ( (ed->timer.expires = timeout) != 0 )
+        add_ac_timer(&ed->timer);
 
     return 0;
 }
@@ -366,7 +353,7 @@ long sched_adjdom(struct sched_adjdom_cmd *cmd)
  * - deschedule the current domain (scheduler independent).
  * - pick a new domain (scheduler dependent).
  */
-void __enter_scheduler(void)
+static void __enter_scheduler(void)
 {
     struct exec_domain *prev = current, *next = NULL;
     int                 cpu = prev->processor;

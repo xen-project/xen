@@ -16,7 +16,7 @@
 #define __initsetup  \
     __attribute_used__ __attribute__ ((__section__ (".setup.init")))
 #define __init_call  \
-    __attribute_used__ __attribute__ ((__section__ (".initcall.init")))
+    __attribute_used__ __attribute__ ((__section__ (".initcall1.init")))
 #define __exit_call  \
     __attribute_used__ __attribute__ ((__section__ (".exitcall.exit")))
 

@@ -1,13 +1,16 @@
+XEN_ROOT= ../../../
+include $(XEN_ROOT)/tools/Rules.mk
+ 
 TOPDIR= ..
 CXXFLAGS=-I. -I../include -I..
 OBJS=$(patsubst %.cc,%.o,$(wildcard *.cc))
 BXLIBS = ../gui/libgui.a ../memory/libmemory.a  
-LDLIBS= $(BXLIBS) -L/usr/X11R6/lib -lX11 -lXpm -lstdc++ -L ../../../tools/libxc -L ../../../tools/libxutil -lxc -lxutil -lpthread -lncurses
+LDLIBS= $(BXLIBS) $(X11_LDPATH) -lX11 -lXpm -lstdc++ -L../../../tools/libxc -L../../../tools/libxutil -lxc -lxutil -lpthread -lncurses 
 
 all: device-model
 
 device-model: $(OBJS) $(BXLIBS)
-	$(LINK.o) $(OBJS) $(LOADLIBES) $(LDLIBS) -o $@
+	$(CC) $(LDFLAGS) $(OBJS) $(LOADLIBES) $(LDLIBS) -o $@
 
 include $(TOPDIR)/mk/helix.mk
 

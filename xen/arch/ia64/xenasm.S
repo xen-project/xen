@@ -132,7 +132,7 @@ GLOBAL_ENTRY(ia64_new_rr7)
 (p7)	br.cond.sptk	.stack_overlaps
 	;;
 	movl r25=PAGE_KERNEL
-	dep r20=0,r13,50,14		// physical address of "current"
+	dep r20=0,r13,60,4		// physical address of "current"
 	;;
 	or r23=r25,r20			// construct PA | page properties
 	mov r25=IA64_GRANULE_SHIFT<<2
@@ -261,24 +261,6 @@ GLOBAL_ENTRY(ia64_prepare_handle_reflection)
 	br.cond.sptk.many rp			// goes to ia64_leave_kernel
 END(ia64_prepare_handle_reflection)
 
-#ifndef USER_ACCESS
-// REMOVE: replaced with get_user
-// NOTE: instruction spacing must be explicit for recovery on miss
-GLOBAL_ENTRY(__get_domain_bundle)
-	ld8 r8=[r32],8
-	nop 0
-	nop 0
-	;;
-	ld8 r9=[r32]
-	nop 0
-	nop 0
-	;;
-	br.ret.sptk.many rp
-	nop 0
-	nop 0
-	;;
-END(__get_domain_bundle)
-#else
 GLOBAL_ENTRY(__get_domain_bundle)
 	EX(.failure_in_get_bundle,ld8 r8=[r32],8)
 	;;
@@ -294,7 +276,6 @@ GLOBAL_ENTRY(__get_domain_bundle)
 	br.ret.sptk.many rp
 	;;
 END(__get_domain_bundle)
-#endif
 
 GLOBAL_ENTRY(dorfirfi)
 #define SI_CR_IIP_OFFSET 0x10
@@ -484,3 +465,16 @@ static:	cmp.eq p7,p8=6,r32		/* PAL_PTCE_INFO */
 stacked:
 	br.ret.sptk.few rp
 END(pal_emulator_static)
+
+GLOBAL_ENTRY(vhpt_insert)
+//	alloc loc0 = ar.pfs, 3, 1, 0, 0
+	mov r16=r32
+	mov r26=r33
+	mov r27=r34
+	;;
+	VHPT_INSERT()
+//	VHPT_INSERT1()	... add collision chains later
+//	mov ar.pfs = loc0
+	br.ret.sptk.few rp
+	;;
+END(vhpt_insert)

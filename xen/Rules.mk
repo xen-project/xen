@@ -9,12 +9,6 @@ crash_debug ?= n
 
 include $(BASEDIR)/../Config.mk
 
-# Set ARCH/SUBARCH appropriately.
-override COMPILE_SUBARCH := $(XEN_COMPILE_ARCH)
-override TARGET_SUBARCH  := $(XEN_TARGET_ARCH)
-override COMPILE_ARCH    := $(patsubst x86%,x86,$(XEN_COMPILE_ARCH))
-override TARGET_ARCH     := $(patsubst x86%,x86,$(XEN_TARGET_ARCH))
-
 TARGET  := $(BASEDIR)/xen
 HDRS    := $(wildcard $(BASEDIR)/include/xen/*.h)
 HDRS    += $(wildcard $(BASEDIR)/include/public/*.h)

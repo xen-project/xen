@@ -387,14 +387,8 @@ static void network_alloc_rx_buffers(struct net_device *dev)
         rx_mcl[i].args[2] = 0;
     }
 
-    /*
-     * We may have allocated buffers which have entries outstanding in the page
-     * update queue -- make sure we flush those first!
-     */
-    flush_page_update_queue();
-
     /* After all PTEs have been zapped we blow away stale TLB entries. */
-    rx_mcl[i-1].args[2] = UVMF_FLUSH_TLB;
+    rx_mcl[i-1].args[2] = UVMF_TLB_FLUSH|UVMF_ALL;
 
     /* Give away a batch of pages. */
     rx_mcl[i].op = __HYPERVISOR_dom_mem_op;
@@ -594,6 +588,7 @@ static int netif_poll(struct net_device *dev, int *pbudget)
         mcl->args[0] = (unsigned long)rx_mmu;
         mcl->args[1] = mmu - rx_mmu;
         mcl->args[2] = 0;
+        mcl->args[3] = DOMID_SELF;
         mcl++;
         (void)HYPERVISOR_multicall(rx_mcl, mcl - rx_mcl);
     }
@@ -1102,18 +1097,13 @@ static void netif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
 
     switch (msg->subtype) {
     case CMSG_NETIF_FE_INTERFACE_STATUS:
-        if (msg->length != sizeof(netif_fe_interface_status_t))
-            goto error;
         netif_interface_status((netif_fe_interface_status_t *) &msg->msg[0]);
         break;
 
     case CMSG_NETIF_FE_DRIVER_STATUS:
-        if (msg->length != sizeof(netif_fe_driver_status_t))
-            goto error;
         netif_driver_status((netif_fe_driver_status_t *) &msg->msg[0]);
         break;
 
-    error:
     default:
         msg->length = 0;
         break;

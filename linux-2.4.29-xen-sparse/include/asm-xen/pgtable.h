@@ -38,11 +38,11 @@ extern void paging_init(void);
 
 extern unsigned long pgkern_mask;
 
-#define __flush_tlb() ({ queue_tlb_flush(); XEN_flush_page_update_queue(); })
+#define __flush_tlb() xen_tlb_flush()
 #define __flush_tlb_global() __flush_tlb()
 #define __flush_tlb_all() __flush_tlb_global()
-#define __flush_tlb_one(addr) ({ queue_invlpg(addr); XEN_flush_page_update_queue(); })
-#define __flush_tlb_single(addr) ({ queue_invlpg(addr); XEN_flush_page_update_queue(); })
+#define __flush_tlb_one(addr) xen_invlpg(addr)
+#define __flush_tlb_single(addr) xen_invlpg(addr)
 
 /*
  * ZERO_PAGE is a global shared page that is always zero: used
@@ -179,12 +179,14 @@ extern void * high_memory;
 #define __S111	PAGE_SHARED
 
 #define pte_present(x)	((x).pte_low & (_PAGE_PRESENT | _PAGE_PROTNONE))
-#define pte_clear(xp)	queue_l1_entry_update(xp, 0)
+#define pte_clear(xp)	do { set_pte(xp, __pte(0)); } while (0)
 
-#define pmd_none(x)	(!(x).pmd)
-#define pmd_present(x)	((x).pmd & _PAGE_PRESENT)
+#define pmd_none(x)	(!pmd_val(x))
+/* pmd_present doesn't just test the _PAGE_PRESENT bit since wr.p.t.
+   can temporarily clear it. */
+#define pmd_present(x)	(pmd_val(x))
 #define pmd_clear(xp)	do { set_pmd(xp, __pmd(0)); } while (0)
-#define	pmd_bad(x)	(((x).pmd & (~PAGE_MASK & ~_PAGE_USER)) != _KERNPG_TABLE)
+#define pmd_bad(x)	((pmd_val(x) & (~PAGE_MASK & ~_PAGE_USER & ~_PAGE_PRESENT)) != (_KERNPG_TABLE & ~_PAGE_PRESENT))
 
 
 #define pages_to_mb(x) ((x) >> (20-PAGE_SHIFT))
@@ -212,29 +214,28 @@ static inline pte_t pte_mkwrite(pte_t pte)	{ (pte).pte_low |= _PAGE_RW; return p
 
 static inline int ptep_test_and_clear_dirty(pte_t *ptep)
 {
-    unsigned long pteval = *(unsigned long *)ptep;
-    int ret = pteval & _PAGE_DIRTY;
-    if ( ret ) queue_l1_entry_update(ptep, pteval & ~_PAGE_DIRTY);
-    return ret;
+    if (!pte_dirty(*ptep))
+        return 0;
+    return test_and_clear_bit(_PAGE_BIT_DIRTY, &ptep->pte_low);
 }
-static inline  int ptep_test_and_clear_young(pte_t *ptep)
+
+static inline int ptep_test_and_clear_young(pte_t *ptep)
 {
-    unsigned long pteval = *(unsigned long *)ptep;
-    int ret = pteval & _PAGE_ACCESSED;
-    if ( ret ) queue_l1_entry_update(ptep, pteval & ~_PAGE_ACCESSED);
-    return ret;
+    if (!pte_young(*ptep))
+        return 0;
+    return test_and_clear_bit(_PAGE_BIT_ACCESSED, &ptep->pte_low);
 }
+
 static inline void ptep_set_wrprotect(pte_t *ptep)
 {
-    unsigned long pteval = *(unsigned long *)ptep;
-    if ( (pteval & _PAGE_RW) )
-        queue_l1_entry_update(ptep, pteval & ~_PAGE_RW);
+    if (pte_write(*ptep))
+        clear_bit(_PAGE_BIT_RW, &ptep->pte_low);
 }
+
 static inline void ptep_mkdirty(pte_t *ptep)
 {
-    unsigned long pteval = *(unsigned long *)ptep;
-    if ( !(pteval & _PAGE_DIRTY) )
-        queue_l1_entry_update(ptep, pteval | _PAGE_DIRTY);
+    if (!pte_dirty(*ptep))
+        set_bit(_PAGE_BIT_DIRTY, &ptep->pte_low);
 }
 
 /*
@@ -299,7 +300,7 @@ static inline void __make_page_readonly(void *va)
     pgd_t *pgd = pgd_offset_k((unsigned long)va);
     pmd_t *pmd = pmd_offset(pgd, (unsigned long)va);
     pte_t *pte = pte_offset(pmd, (unsigned long)va);
-    queue_l1_entry_update(pte, (*(unsigned long *)pte)&~_PAGE_RW);
+    set_pte(pte, pte_wrprotect(*pte));
 }
 
 static inline void __make_page_writable(void *va)
@@ -307,7 +308,7 @@ static inline void __make_page_writable(void *va)
     pgd_t *pgd = pgd_offset_k((unsigned long)va);
     pmd_t *pmd = pmd_offset(pgd, (unsigned long)va);
     pte_t *pte = pte_offset(pmd, (unsigned long)va);
-    queue_l1_entry_update(pte, (*(unsigned long *)pte)|_PAGE_RW);
+    set_pte(pte, pte_mkwrite(*pte));
 }
 
 static inline void make_page_readonly(void *va)
@@ -315,7 +316,7 @@ static inline void make_page_readonly(void *va)
     pgd_t *pgd = pgd_offset_k((unsigned long)va);
     pmd_t *pmd = pmd_offset(pgd, (unsigned long)va);
     pte_t *pte = pte_offset(pmd, (unsigned long)va);
-    queue_l1_entry_update(pte, (*(unsigned long *)pte)&~_PAGE_RW);
+    set_pte(pte, pte_wrprotect(*pte));
     if ( (unsigned long)va >= VMALLOC_START )
         __make_page_readonly(machine_to_virt(
             *(unsigned long *)pte&PAGE_MASK));
@@ -326,7 +327,7 @@ static inline void make_page_writable(void *va)
     pgd_t *pgd = pgd_offset_k((unsigned long)va);
     pmd_t *pmd = pmd_offset(pgd, (unsigned long)va);
     pte_t *pte = pte_offset(pmd, (unsigned long)va);
-    queue_l1_entry_update(pte, (*(unsigned long *)pte)|_PAGE_RW);
+    set_pte(pte, pte_mkwrite(*pte));
     if ( (unsigned long)va >= VMALLOC_START )
         __make_page_writable(machine_to_virt(
             *(unsigned long *)pte&PAGE_MASK));

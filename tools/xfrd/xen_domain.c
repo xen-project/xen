@@ -177,7 +177,9 @@ static CURL *curlinit(void){
 /** Curl debug function.
  */
 int curldebug(CURL *curl, curl_infotype ty, char *buf, size_t buf_n, void *data){
-    printf("%*s\n", buf_n, buf);
+    // printf("%*s\n", buf_n, buf); /* Does not compile correctly on non 32bit platforms */
+    fwrite(data, buf_n, 1, stdout);
+    printf("\n");
     return 0;
 }
 

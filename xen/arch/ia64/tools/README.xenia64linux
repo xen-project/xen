@@ -1,0 +1,50 @@
+INSTRUCTIONS FOR BUILDING XENLINUX/IA64
+
+1) In linux-2.6.9: (also tested with 2.6.10, 2.6.11.2)
+	cp arch/ia64/configs/zx1_defconfig .config
+2) vi .config
+	unset CONFIG_IA32_SUPPORT
+	unset CONFIG_IDE [for now, need to fix later]
+	unset CONFIG_VIRTUAL_MEM_MAP [for now, need to fix later]
+	set CONFIG_DISABLE_VHPT
+3) if running on ski, it is useful to make the following change:
+   a) at the beginning of drivers/acpi/motherboard.c:acpi_reserve_resources()
+      add the line:
+	if (!acpi_gbl_FADT) return;
+4) Build linux.
+   a) yes "" | make oldconfig
+   b) check the resulting .config to ensure there are no modules used (because
+      Xen/ia64 doesn't support them yet).  Change '=m' to '=n' and remake
+   c) yes "" | make oldconfig
+   d) make
+5) Linux must be "privified" to run on Xen/ia64.  This process converts all
+   privilege-sensitive instructions into privileged instructions.
+	Usage: privify infile outfile
+   Privify is very dumb... it will not overwrite outfile.  It also prints
+   out a bunch of useless info that can be safely ignored (except for "panic").
+   The privify program can be obtained from:
+	ftp://ftp.hpl.hp.com/pub/xen-ia64/privify
+6) debug fixes:
+   a) periodically xenlinux/ia64 goes into a fit of printing
+      "Oops: timer tick before it is due..."  This can be changed
+      in arch/ia64/kernel/time.c to either ignore it or print something
+      shorter
+   b) The hp simulator (ski) console drivers can be turned on to allow
+      output of early boot information from xenlinux.  This results
+      in some duplication of later output (which can be ignored).
+      i) in linux/arch/ia64/Makefile, force the sim drivers by changing
+		drivers-$(CONFIG_IA64_HP_SIM) += arch/ia64/hp/sim to
+		drivers-y += arch/ia64/hp/sim
+      ii) in linux/arch/ia64/hp/sim/Makefile, force the sim drivers
+	  by changing obj-$(CONFIG_HP_SIMSERIAL) to obj-y and
+          obj-$(CONFIG_HP_SIM_SERIAL_CONSOLE) to obj-y
+      iii) in arch/ia64/kernel/setup.c:early_console_setup(), replace
+           the contents of the routine with:
+		extern struct console hpsim_cons;
+		register_console(&hpsim_cons);
+		return 0;
+           (It may be necessary also to un-inline the routine, not sure.)
+   c) It can be useful to modify linux/init/main.c to add a printf before
+      or after a lot of the init calls
+6) NOTE: mca currently has a problem with binary translation,
+   must run with "nomca" as a kernel argument

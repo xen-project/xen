@@ -16,8 +16,6 @@
 #define set_pte(pteptr, pteval) (*(pteptr) = pteval)
 #define set_pte_atomic(pteptr, pteval) set_pte(pteptr,pteval)
 #define set_pmd(pmdptr, pmdval) xen_l2_entry_update((pmdptr), (pmdval))
-#define set_pte_batched(pteptr, pteval) \
-	queue_l1_entry_update(pteptr, (pteval).pte_low)
 
 #define ptep_get_and_clear(xp)	__pte_ma(xchg(&(xp)->pte_low, 0))
 #define pte_same(a, b)		((a).pte_low == (b).pte_low)

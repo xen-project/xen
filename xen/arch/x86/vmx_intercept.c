@@ -56,7 +56,7 @@ int register_io_handler(unsigned long addr, unsigned long offset, intercept_acti
 
     if (num >= MAX_IO_HANDLER) {
         printk("no extra space, register io interceptor failed!\n");
-        domain_crash();
+        domain_crash_synchronous();
     }
 
     handler->hdl_list[num].addr = addr;

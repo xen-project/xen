@@ -14,6 +14,7 @@
 #include <xen/event.h>
 #include <xen/time.h>
 #include <xen/console.h>
+#include <xen/softirq.h>
 #include <asm/shadow.h>
 #include <public/dom0_ops.h>
 #include <asm/domain_page.h>
@@ -41,7 +42,6 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
 
     d->id          = dom_id;
     ed->processor  = cpu;
-    d->create_time = NOW();
  
     spin_lock_init(&d->time_lock);
 
@@ -107,28 +107,6 @@ struct domain *find_domain_by_id(domid_t dom)
 }
 
 
-/* Return the most recently created domain. */
-struct domain *find_last_domain(void)
-{
-    struct domain *d, *dlast;
-
-    read_lock(&domlist_lock);
-    dlast = domain_list;
-    d = dlast->next_list;
-    while ( d != NULL )
-    {
-        if ( d->create_time > dlast->create_time )
-            dlast = d;
-        d = d->next_list;
-    }
-    if ( !get_domain(dlast) )
-        dlast = NULL;
-    read_unlock(&domlist_lock);
-
-    return dlast;
-}
-
-
 #ifndef CONFIG_IA64
 extern void physdev_destroy_state(struct domain *d);
 #else
@@ -161,12 +139,18 @@ void domain_crash(void)
     set_bit(DF_CRASHED, &d->d_flags);
 
     send_guest_virq(dom0->exec_domain[0], VIRQ_DOM_EXC);
-    
-    __enter_scheduler();
-    BUG();
+
+    raise_softirq(SCHEDULE_SOFTIRQ);
 }
 
-extern void trap_to_xendbg(void);
+
+void domain_crash_synchronous(void)
+{
+    domain_crash();
+    for ( ; ; )
+        do_softirq();
+}
+
 
 void domain_shutdown(u8 reason)
 {
@@ -191,19 +175,16 @@ void domain_shutdown(u8 reason)
         }
     }
 
-    if ( reason == SHUTDOWN_crash )
-    {
-        domain_crash();
-        BUG();
-    }
-
-    d->shutdown_code = reason;
-    set_bit(DF_SHUTDOWN, &d->d_flags);
+    if ( (d->shutdown_code = reason) == SHUTDOWN_crash )
+        set_bit(DF_CRASHED, &d->d_flags);
+    else
+        set_bit(DF_SHUTDOWN, &d->d_flags);
 
     send_guest_virq(dom0->exec_domain[0], VIRQ_DOM_EXC);
 
-    __enter_scheduler();
+    raise_softirq(SCHEDULE_SOFTIRQ);
 }
+
 
 unsigned int alloc_new_dom_mem(struct domain *d, unsigned int kbytes)
 {
@@ -347,7 +328,8 @@ long do_boot_vcpu(unsigned long vcpu, full_execution_context_t *ctxt)
 
     sched_add_domain(ed);
 
-    if ( (rc = arch_set_info_guest(ed, c)) != 0 ) {
+    if ( (rc = arch_set_info_guest(ed, c)) != 0 )
+    {
         sched_rem_domain(ed);
         goto out;
     }
@@ -376,13 +358,9 @@ long vm_assist(struct domain *p, unsigned int cmd, unsigned int type)
     {
     case VMASST_CMD_enable:
         set_bit(type, &p->vm_assist);
-        if (vm_assist_info[type].enable)
-            (*vm_assist_info[type].enable)(p);
         return 0;
     case VMASST_CMD_disable:
         clear_bit(type, &p->vm_assist);
-        if (vm_assist_info[type].disable)
-            (*vm_assist_info[type].disable)(p);
         return 0;
     }
 

@@ -106,6 +106,10 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
     /* used by debug verify code */
     unsigned long buf[PAGE_SIZE/sizeof(unsigned long)];
 
+#define MAX_PIN_BATCH 1024
+    struct mmuext_op pin[MAX_PIN_BATCH];
+    unsigned int nr_pins = 0;
+
     xcio_info(ioctxt, "xc_linux_restore start\n");
 
     if ( mlock(&ctxt, sizeof(ctxt) ) )
@@ -414,43 +418,33 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
 
     xcio_info(ioctxt, "Received all pages\n");
 
+    if ( finish_mmu_updates(xc_handle, mmu) )
+        goto out;
+
     /*
      * Pin page tables. Do this after writing to them as otherwise Xen
      * will barf when doing the type-checking.
      */
     for ( i = 0; i < nr_pfns; i++ )
     {
+        if ( (pfn_type[i] & LPINTAB) == 0 )
+            continue;
         if ( pfn_type[i] == (L1TAB|LPINTAB) )
+            pin[nr_pins].cmd = MMUEXT_PIN_L1_TABLE;
+        else /* pfn_type[i] == (L2TAB|LPINTAB) */
+            pin[nr_pins].cmd = MMUEXT_PIN_L2_TABLE;
+        pin[nr_pins].mfn = pfn_to_mfn_table[i];
+        if ( ++nr_pins == MAX_PIN_BATCH )
         {
-            if ( add_mmu_update(xc_handle, mmu,
-                                (pfn_to_mfn_table[i]<<PAGE_SHIFT) | 
-                                MMU_EXTENDED_COMMAND,
-                                MMUEXT_PIN_L1_TABLE) ) {
-                printf("ERR pin L1 pfn=%lx mfn=%lx\n",
-                       (unsigned long)i, pfn_to_mfn_table[i]);
+            if ( do_mmuext_op(xc_handle, pin, nr_pins, dom) < 0 )
                 goto out;
-            }
+            nr_pins = 0;
         }
     }
 
-    /* must pin all L1's before L2's (need consistent va back ptr) */
-    for ( i = 0; i < nr_pfns; i++ )
-    {
-        if ( pfn_type[i] == (L2TAB|LPINTAB) )
-        {
-            if ( add_mmu_update(xc_handle, mmu,
-                                (pfn_to_mfn_table[i]<<PAGE_SHIFT) | 
-                                MMU_EXTENDED_COMMAND,
-                                MMUEXT_PIN_L2_TABLE) )
-            {
-                printf("ERR pin L2 pfn=%lx mfn=%lx\n",
-                       (unsigned long)i, pfn_to_mfn_table[i]);
-                goto out;
-            }
-        }
-    }
-
-    if ( finish_mmu_updates(xc_handle, mmu) ) goto out;
+    if ( (nr_pins != 0) &&
+         (do_mmuext_op(xc_handle, pin, nr_pins, dom) < 0) )
+        goto out;
 
     xcio_info(ioctxt, "\b\b\b\b100%%\n");
     xcio_info(ioctxt, "Memory reloaded.\n");
@@ -623,10 +617,12 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
     }
     if ( (ctxt.kernel_ss & 3) == 0 )
         ctxt.kernel_ss = FLAT_KERNEL_DS;
+#if defined(__i386__)
     if ( (ctxt.event_callback_cs & 3) == 0 )
         ctxt.event_callback_cs = FLAT_KERNEL_CS;
     if ( (ctxt.failsafe_callback_cs & 3) == 0 )
         ctxt.failsafe_callback_cs = FLAT_KERNEL_CS;
+#endif
     if ( ((ctxt.ldt_base & (PAGE_SIZE - 1)) != 0) ||
          (ctxt.ldt_ents > 8192) ||
          (ctxt.ldt_base > HYPERVISOR_VIRT_START) ||

@@ -31,44 +31,29 @@ extern pgd_t *cur_pgd;
 
 static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next, struct task_struct *tsk, unsigned cpu)
 {
+	struct mmuext_op _op[2], *op = _op;
 	if (prev != next) {
 		/* stop flush ipis for the previous mm */
 		clear_bit(cpu, &prev->cpu_vm_mask);
-#ifdef CONFIG_SMP
-		cpu_tlbstate[cpu].state = TLBSTATE_OK;
-		cpu_tlbstate[cpu].active_mm = next;
-#endif
-
 		/* Re-load page tables */
 		cur_pgd = next->pgd;
-		queue_pt_switch(__pa(cur_pgd));
-                /* load_LDT, if either the previous or next thread
-                 * has a non-default LDT.
-                 */
-                if (next->context.size+prev->context.size)
-                        load_LDT(&next->context);
-	}
-#ifdef CONFIG_SMP
-	else {
-		cpu_tlbstate[cpu].state = TLBSTATE_OK;
-		if(cpu_tlbstate[cpu].active_mm != next)
-			out_of_line_bug();
-		if(!test_and_set_bit(cpu, &next->cpu_vm_mask)) {
-			/* We were in lazy tlb mode and leave_mm disabled 
-			 * tlb flush IPI delivery. We must reload %cr3.
-			 */
-		        cur_pgd = next->pgd;
-		        queue_pt_switch(__pa(cur_pgd));
-			load_LDT(next);
+		op->cmd = MMUEXT_NEW_BASEPTR;
+		op->mfn = pfn_to_mfn(__pa(next->pgd) >> PAGE_SHIFT);
+		op++;
+		/* load_LDT, if either the previous or next thread
+		 * has a non-default LDT.
+		 */
+		if (next->context.size+prev->context.size) {
+			op->cmd = MMUEXT_SET_LDT;
+			op->linear_addr = (unsigned long)next->context.ldt;
+			op->nr_ents     = next->context.size;
+			op++;
 		}
+		BUG_ON(HYPERVISOR_mmuext_op(_op, op-_op, NULL, DOMID_SELF));
 	}
-#endif
 }
 
-#define activate_mm(prev, next) \
-do { \
-	switch_mm((prev),(next),NULL,smp_processor_id()); \
-	flush_page_update_queue(); \
-} while ( 0 )
+#define activate_mm(prev, next)	\
+	switch_mm((prev),(next),NULL,smp_processor_id())
 
 #endif

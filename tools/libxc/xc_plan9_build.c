@@ -314,8 +314,7 @@ setup_guest(int xc_handle,
 	 * Pin down l2tab addr as page dir page - causes hypervisor to provide
 	 * correct protection for the page
 	 */
-	if (add_mmu_update(xc_handle, mmu,
-			   l2tab | MMU_EXTENDED_COMMAND, MMUEXT_PIN_L2_TABLE))
+	if (pin_table(xc_handle, MMUEXT_PIN_L2_TABLE, l2tab>>PAGE_SHIFT, dom))
 		goto error_out;
 
 	for (count = 0; count < tot_pages; count++) {
@@ -526,10 +525,16 @@ xc_plan9_build(int xc_handle,
 	memset(ctxt->debugreg, 0, sizeof (ctxt->debugreg));
 
 	/* No callback handlers. */
-	ctxt->event_callback_cs = FLAT_KERNEL_CS;
-	ctxt->event_callback_eip = 0;
-	ctxt->failsafe_callback_cs = FLAT_KERNEL_CS;
+#if defined(__i386__)
+	ctxt->event_callback_cs     = FLAT_KERNEL_CS;
+	ctxt->event_callback_eip    = 0;
+	ctxt->failsafe_callback_cs  = FLAT_KERNEL_CS;
 	ctxt->failsafe_callback_eip = 0;
+#elif defined(__x86_64__)
+	ctxt->event_callback_eip    = 0;
+	ctxt->failsafe_callback_eip = 0;
+	ctxt->syscall_callback_eip  = 0;
+#endif
 
 	memset(&launch_op, 0, sizeof (launch_op));
 

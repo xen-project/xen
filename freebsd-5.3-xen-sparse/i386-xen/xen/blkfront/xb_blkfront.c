@@ -102,8 +102,10 @@ static blkif_response_t blkif_control_rsp;
 
 static blkif_front_ring_t   blk_ring;
 
+#define BLK_RING_SIZE __RING_SIZE((blkif_sring_t *)0, PAGE_SIZE)
+
 static unsigned long rec_ring_free;		
-blkif_request_t rec_ring[RING_SIZE(&blk_ring)];	/* shadow recovery ring */
+blkif_request_t rec_ring[BLK_RING_SIZE];
 
 /* XXX move to xb_vbd.c when VBD update support is added */
 #define MAX_VBDS 64
@@ -133,7 +135,7 @@ GET_ID_FROM_FREELIST( void )
 {
     unsigned long free = rec_ring_free;
 
-    KASSERT(free <= RING_SIZE(&blk_ring), ("free %lu > RING_SIZE", free));
+    KASSERT(free <= BLK_RING_SIZE, ("free %lu > RING_SIZE", free));
 
     rec_ring_free = rec_ring[free].id;
 
@@ -638,7 +640,7 @@ blkif_disconnect(void)
     if (blk_ring.sring) free(blk_ring.sring, M_DEVBUF);
     blk_ring.sring = (blkif_sring_t *)malloc(PAGE_SIZE, M_DEVBUF, M_WAITOK);
     SHARED_RING_INIT(blk_ring.sring);
-    FRONT_RING_INIT(&blk_ring, blk_ring.sring);
+    FRONT_RING_INIT(&blk_ring, blk_ring.sring, PAGE_SIZE);
     blkif_state  = BLKIF_STATE_DISCONNECTED;
     blkif_send_interface_connect();
 }
@@ -662,7 +664,7 @@ blkif_recover(void)
      * This will need to be fixed once we have barriers */
 
     /* Stage 1 : Find active and move to safety. */
-    for ( i = 0; i < RING_SIZE(&blk_ring); i++ ) {
+    for ( i = 0; i < BLK_RING_SIZE; i++ ) {
         if ( rec_ring[i].id >= KERNBASE ) {
 	    req = RING_GET_REQUEST(&blk_ring, 
                                    blk_ring.req_prod_pvt);
@@ -682,11 +684,11 @@ blkif_recover(void)
     }
 
     /* Stage 3 : Set up free list. */
-    for ( ; i < RING_SIZE(&blk_ring); i++ ){
+    for ( ; i < BLK_RING_SIZE; i++ ){
         rec_ring[i].id = i+1;
     }
     rec_ring_free = blk_ring.req_prod_pvt;
-    rec_ring[RING_SIZE(&blk_ring)-1].id = 0x0fffffff;
+    rec_ring[BLK_RING_SIZE-1].id = 0x0fffffff;
 
     /* blk_ring.req_prod will be set when we flush_requests().*/
     wmb();
@@ -874,10 +876,10 @@ xb_init(void *unused)
     printk("[XEN] Initialising virtual block device driver\n");
 
     rec_ring_free = 0;
-    for (i = 0; i < RING_SIZE(&blk_ring); i++) {
+    for (i = 0; i < BLK_RING_SIZE; i++) {
 	rec_ring[i].id = i+1;
     }
-    rec_ring[RING_SIZE(&blk_ring)-1].id = 0x0fffffff;
+    rec_ring[BLK_RING_SIZE-1].id = 0x0fffffff;
 
     (void)ctrl_if_register_receiver(CMSG_BLKIF_FE, blkif_ctrlif_rx, 0);
 

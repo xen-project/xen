@@ -58,7 +58,7 @@ OBJS     = $(patsubst %.c,%.o,$(SRCS))
 
 LIB      = libblktap.so libblktap.so.$(MAJOR) libblktap.so.$(MAJOR).$(MINOR)
 
-all: mk-symlinks blkdump blkcow blkimg blkcowimg blkgnbd blkcowgnbd $(VDI_TOOLS) parallax 
+all: mk-symlinks blkdump blkcow blkimg blkcowimg blkgnbd blkcowgnbd $(VDI_TOOLS) parallax parallax-threaded blockstored
 	$(MAKE) $(LIB)
 
 LINUX_ROOT := $(wildcard $(XEN_ROOT)/linux-2.6.*-xen-sparse)
@@ -120,42 +120,42 @@ blkaio: $(LIB) blkaio.c blkaiolib.c
 	$(CC) $(CFLAGS) -o blkaio -L$(XEN_LIBXC) -L$(XEN_LIBXUTIL) -L. -lblktap blkaio.c blkaiolib.c -laio -lpthread
 
 parallax: $(LIB) $(PLX_SRCS)
-	$(CC) $(CFLAGS) -o parallax -L$(XEN_LIBXC) -L$(XEN_LIBXUTIL) -L. -lblktap $(PLX_SRCS) libgnbd/libgnbd.a
+	$(CC) $(CFLAGS) -o parallax -L$(XEN_LIBXC) -L$(XEN_LIBXUTIL) -L. -lblktap -lpthread $(PLX_SRCS) libgnbd/libgnbd.a
 
 parallax-threaded: $(LIB) $(PLXT_SRCS)
 	$(CC) $(CFLAGS) -o parallax-threaded -L$(XEN_LIBXC) -L$(XEN_LIBXUTIL) -L. -lpthread -lblktap $(PLXT_SRCS) libgnbd/libgnbd.a
 
 vdi_test: $(LIB) $(VDI_SRCS)
-	$(CC) $(CFLAGS) -g3 -o vdi_test -DVDI_STANDALONE $(VDI_SRCS)
+	$(CC) $(CFLAGS) -g3 -o vdi_test -DVDI_STANDALONE -lpthread $(VDI_SRCS)
 
 vdi_list: $(LIB) vdi_list.c $(VDI_SRCS)
-	$(CC) $(CFLAGS) -g3 -o vdi_list vdi_list.c $(VDI_SRCS)
+	$(CC) $(CFLAGS) -g3 -o vdi_list vdi_list.c -lpthread $(VDI_SRCS)
 
 vdi_create: $(LIB) vdi_create.c $(VDI_SRCS)
-	$(CC) $(CFLAGS) -g3 -o vdi_create vdi_create.c $(VDI_SRCS)
+	$(CC) $(CFLAGS) -g3 -o vdi_create vdi_create.c -lpthread $(VDI_SRCS)
 
 vdi_snap: $(LIB) vdi_snap.c $(VDI_SRCS)
-	$(CC) $(CFLAGS) -g3 -o vdi_snap vdi_snap.c $(VDI_SRCS)
+	$(CC) $(CFLAGS) -g3 -o vdi_snap vdi_snap.c -lpthread $(VDI_SRCS)
 
 vdi_snap_list: $(LIB) vdi_snap_list.c $(VDI_SRCS)
-	$(CC) $(CFLAGS) -g3 -o vdi_snap_list vdi_snap_list.c $(VDI_SRCS)
+	$(CC) $(CFLAGS) -g3 -o vdi_snap_list vdi_snap_list.c -lpthread $(VDI_SRCS)
 
 vdi_snap_delete: $(LIB) vdi_snap_delete.c $(VDI_SRCS)
-	$(CC) $(CFLAGS) -g3 -o vdi_snap_delete vdi_snap_delete.c $(VDI_SRCS)
+	$(CC) $(CFLAGS) -g3 -o vdi_snap_delete vdi_snap_delete.c -lpthread $(VDI_SRCS)
 
 vdi_tree: $(LIB) vdi_tree.c $(VDI_SRCS)
-	$(CC) $(CFLAGS) -g3 -o vdi_tree vdi_tree.c $(VDI_SRCS)
+	$(CC) $(CFLAGS) -g3 -o vdi_tree vdi_tree.c -lpthread $(VDI_SRCS)
 
 vdi_fill: $(LIB) vdi_fill.c $(VDI_SRCS)
-	$(CC) $(CFLAGS) -g3 -o vdi_fill vdi_fill.c $(VDI_SRCS)
+	$(CC) $(CFLAGS) -g3 -o vdi_fill vdi_fill.c -lpthread $(VDI_SRCS)
 
 vdi_validate: $(LIB) vdi_validate.c $(VDI_SRCS)
-	$(CC) $(CFLAGS) -g3 -o vdi_validate vdi_validate.c $(VDI_SRCS)
+	$(CC) $(CFLAGS) -g3 -o vdi_validate vdi_validate.c -lpthread $(VDI_SRCS)
 
 blockstored: blockstored.c
-	$(CC) $(CFLAGS) -g3 -o blockstored blockstored.c
+	$(CC) $(CFLAGS) -g3 -o blockstored -lpthread blockstored.c
 bstest: bstest.c blockstore.c
-	$(CC) $(CFLAGS) -g3 -o bstest bstest.c blockstore.c
+	$(CC) $(CFLAGS) -g3 -o bstest bstest.c -lpthread blockstore.c
 
 .PHONY: TAGS clean install mk-symlinks rpm
 TAGS:

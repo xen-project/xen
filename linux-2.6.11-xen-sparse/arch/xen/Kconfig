@@ -114,10 +114,6 @@ config XEN_BLKDEV_TAP
 	  to a character device, allowing device prototyping in application
 	  space.  Odds are that you want to say N here.
 
-config XEN_WRITABLE_PAGETABLES
-	bool
-	default y
-
 config XEN_SCRUB_PAGES
 	bool "Scrub memory before freeing it to Xen"
 	default y

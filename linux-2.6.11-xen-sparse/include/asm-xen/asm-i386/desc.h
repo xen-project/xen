@@ -103,7 +103,7 @@ static inline void clear_LDT(void)
 	 * it slows down context switching. Noone uses it anyway.
 	 */
 	cpu = cpu;		/* XXX avoid compiler warning */
-	queue_set_ldt(0UL, 0);
+	xen_set_ldt(0UL, 0);
 	put_cpu();
 }
 
@@ -118,7 +118,7 @@ static inline void load_LDT_nolock(mm_context_t *pc, int cpu)
 	if (likely(!count))
 		segments = NULL;
 
-	queue_set_ldt((unsigned long)segments, count);
+	xen_set_ldt((unsigned long)segments, count);
 }
 
 static inline void load_LDT(mm_context_t *pc)

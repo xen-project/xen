@@ -44,6 +44,9 @@ string_param("badpage", opt_badpage);
 #define round_pgdown(_p)  ((_p)&PAGE_MASK)
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
 
+static spinlock_t page_scrub_lock;
+struct list_head page_scrub_list;
+
 /*********************
  * ALLOCATION BITMAP
  *  One bit per page of memory. Bit set => page is allocated.
@@ -535,8 +538,6 @@ void free_domheap_pages(struct pfn_info *pg, unsigned int order)
 {
     int            i, drop_dom_ref;
     struct domain *d = page_get_owner(pg);
-    struct exec_domain *ed;
-    int cpu_mask = 0;
 
     ASSERT(!in_irq());
 
@@ -558,9 +559,6 @@ void free_domheap_pages(struct pfn_info *pg, unsigned int order)
         /* NB. May recursively lock from domain_relinquish_memory(). */
         spin_lock_recursive(&d->page_alloc_lock);
 
-        for_each_exec_domain ( d, ed )
-            cpu_mask |= 1 << ed->processor;
-
         for ( i = 0; i < (1 << order); i++ )
         {
             if ( ((pg[i].u.inuse.type_info & PGT_count_mask) != 0) &&
@@ -581,7 +579,7 @@ void free_domheap_pages(struct pfn_info *pg, unsigned int order)
 
             ASSERT((pg[i].u.inuse.type_info & PGT_count_mask) == 0);
             pg[i].tlbflush_timestamp  = tlbflush_current_time();
-            pg[i].u.free.cpu_mask     = cpu_mask;
+            pg[i].u.free.cpu_mask     = d->cpuset;
             list_del(&pg[i].list);
         }
 
@@ -632,9 +630,6 @@ unsigned long avail_domheap_pages(void)
  * PAGE SCRUBBING
  */
 
-static spinlock_t page_scrub_lock;
-struct list_head page_scrub_list;
-
 static void page_scrub_softirq(void)
 {
     struct list_head *ent;
@@ -655,8 +650,11 @@ static void page_scrub_softirq(void)
         
         /* Peel up to 16 pages from the list. */
         for ( i = 0; i < 16; i++ )
-            if ( (ent = ent->next) == &page_scrub_list )
+        {
+            if ( ent->next == &page_scrub_list )
                 break;
+            ent = ent->next;
+        }
         
         /* Remove peeled pages from the list. */
         ent->next->prev = &page_scrub_list;

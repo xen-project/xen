@@ -1,5 +1,5 @@
 --- ../../linux-2.6.7/arch/ia64/kernel/time.c	2004-06-15 23:19:01.000000000 -0600
-+++ arch/ia64/time.c	2005-03-09 13:22:52.000000000 -0700
++++ arch/ia64/time.c	2005-03-14 17:27:11.000000000 -0700
 @@ -10,16 +10,22 @@
   */
  #include <linux/config.h>
@@ -208,7 +208,7 @@
 +	}
 +	if (domain0_ready && vcpu_timer_expired(dom0->exec_domain[0])) {
 +		vcpu_pend_timer(dom0->exec_domain[0]);
-+		vcpu_set_next_timer(dom0->exec_domain[0]);
++		//vcpu_set_next_timer(dom0->exec_domain[0]);
 +		domain_wake(dom0->exec_domain[0]);
 +	}
 +	if (!is_idle_task(current->domain) && current->domain != dom0) {

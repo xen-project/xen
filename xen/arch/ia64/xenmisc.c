@@ -53,7 +53,9 @@ platform_is_hp_ski(void)
 }
 
 /* calls in xen/common code that are unused on ia64 */
-void synchronise_pagetables(unsigned long cpu_mask) { return; }
+
+void sync_lazy_execstate_cpuset(unsigned long cpuset) {}
+void sync_lazy_execstate_all(void) {}
 
 int grant_table_create(struct domain *d) { return 0; }
 void grant_table_destroy(struct domain *d)
@@ -88,25 +90,10 @@ int reprogram_ac_timer(s_time_t timeout)
 }
 
 ///////////////////////////////
-// from arch/x86/dompage.c
+// from arch/ia64/page_alloc.c
 ///////////////////////////////
-
-struct pfn_info *alloc_domheap_pages(struct domain *d, unsigned int order)
-{
-	printf("alloc_domheap_pages: called, not implemented\n");
-}
-
-void free_domheap_pages(struct pfn_info *pg, unsigned int order)
-{
-	printf("free_domheap_pages: called, not implemented\n");
-}
-
-
-unsigned long avail_domheap_pages(void)
-{
-	printf("avail_domheap_pages: called, not implemented\n");
-	return 0;
-}
+DEFINE_PER_CPU(struct page_state, page_states) = {0};
+unsigned long totalram_pages;
 
 ///////////////////////////////
 // from arch/x86/flushtlb.c
@@ -203,7 +190,7 @@ char * __devinit  pcibios_setup(char *str)
 
 void show_registers(struct pt_regs *regs)
 {
-	dummy();
+	printf("*** ADD REGISTER DUMP HERE FOR DEBUGGING\n");
 }	
 
 ///////////////////////////////
@@ -228,6 +215,19 @@ physdev_pci_access_modify(domid_t id, int bus, int dev, int func, int enable)
 	return -EINVAL;
 }
 
+void physdev_modify_ioport_access_range(struct domain *d, int enable,
+	int port, int num)
+{
+	printk("physdev_modify_ioport_access_range not implemented\n");
+	dummy();
+}
+
+void physdev_destroy_state(struct domain *d)
+{
+	printk("physdev_destroy_state not implemented\n");
+	dummy();
+}
+
 // accomodate linux extable.c
 //const struct exception_table_entry *
 void *search_module_extables(unsigned long addr)
@@ -240,12 +240,52 @@ void *module_text_address(unsigned long addr)
 	return NULL;
 }
 
+void cs10foo(void) {}
+void cs01foo(void) {}
+
 // context_switch
 void context_switch(struct exec_domain *prev, struct exec_domain *next)
 {
-	switch_to(prev,next);
+//printk("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
+//printk("@@@@@@ context switch from domain %d (%x) to domain %d (%x)\n",
+//prev->domain->id,(long)prev&0xffffff,next->domain->id,(long)next&0xffffff);
+//if (prev->domain->id == 1 && next->domain->id == 0) cs10foo();
+//if (prev->domain->id == 0 && next->domain->id == 1) cs01foo();
+//printk("@@sw %d->%d\n",prev->domain->id,next->domain->id);
+	switch_to(prev,next,prev);
+// leave this debug for now: it acts as a heartbeat when more than
+// one domain is active
+{
+static long cnt[16] = { 50,50,50,50,50,50,50,50,50,50,50,50,50,50,50,50};
+static int i = 100;
+int id = ((struct exec_domain *)current)->domain->id & 0xf;
+if (!cnt[id]--) { printk("%x",id); cnt[id] = 50; }
+if (!i--) { printk("+",id); cnt[id] = 100; }
+}
 	clear_bit(EDF_RUNNING, &prev->ed_flags);
 	//if (!is_idle_task(next->domain) )
 		//send_guest_virq(next, VIRQ_TIMER);
-	schedule_tail(next);
+	load_region_regs(current);
+	if (vcpu_timer_expired(current)) vcpu_pend_timer(current);
+}
+
+void panic_domain(struct pt_regs *regs, const char *fmt, ...)
+{
+	va_list args;
+	char buf[128];
+	struct exec_domain *ed = current;
+	static volatile int test = 1;	// so can continue easily in debug
+	extern spinlock_t console_lock;
+	unsigned long flags;
+    
+	printf("$$$$$ PANIC in domain %d (k6=%p): ",
+		ed->domain->id, ia64_get_kr(IA64_KR_CURRENT));
+	va_start(args, fmt);
+	(void)vsnprintf(buf, sizeof(buf), fmt, args);
+	va_end(args);
+	printf(buf);
+	if (regs) show_registers(regs);
+	domain_pause_by_systemcontroller(current->domain);
+	set_bit(DF_CRASHED, ed->domain->d_flags);
+	//while(test);
 }

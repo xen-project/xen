@@ -465,14 +465,7 @@ fastcall void do_general_protection(struct pt_regs * regs, long error_code)
 		unsigned long ldt;
 		__asm__ __volatile__ ("sldt %0" : "=r" (ldt));
 		if (ldt == 0) {
-			mmu_update_t u;
-			u.ptr = MMU_EXTENDED_COMMAND;
-			u.ptr |= (unsigned long)&default_ldt[0];
-			u.val = MMUEXT_SET_LDT | (5 << MMUEXT_CMD_SHIFT);
-			if (unlikely(HYPERVISOR_mmu_update(&u, 1, NULL) < 0)) {
-				show_trace(NULL, (unsigned long *)&u);
-				panic("Failed to install default LDT");
-			}
+			xen_set_ldt((unsigned long)&default_ldt[0], 5);
 			return;
 		}
 	}
@@ -963,7 +956,6 @@ void __init trap_init(void)
 	 * and a callgate to lcall27 for Solaris/x86 binaries
 	 */
 	make_lowmem_page_readonly(&default_ldt[0]);
-	xen_flush_page_update_queue();
 
 	/*
 	 * Should be a barrier for any external CPU state.

@@ -62,9 +62,6 @@ shared_info_t *HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
 
 unsigned int *phys_to_machine_mapping, *pfn_to_mfn_frame_list;
 
-DEFINE_PER_CPU(multicall_entry_t, multicall_list[8]);
-DEFINE_PER_CPU(int, nr_multicall_ents);
-
 /*
  * Machine setup..
  */
@@ -231,8 +228,10 @@ void __init setup_arch(char **cmdline_p)
     blk_nohighio = 1;
 #endif
 
-    HYPERVISOR_vm_assist(VMASST_CMD_enable,
-                         VMASST_TYPE_4gb_segments);
+    HYPERVISOR_vm_assist(
+        VMASST_CMD_enable, VMASST_TYPE_4gb_segments);
+    HYPERVISOR_vm_assist(
+        VMASST_CMD_enable, VMASST_TYPE_writable_pagetables);
         
     HYPERVISOR_set_callbacks(
         __KERNEL_CS, (unsigned long)hypervisor_callback,
@@ -1206,7 +1205,6 @@ void __init cpu_init (void)
     HYPERVISOR_stack_switch(__KERNEL_DS, current->thread.esp0);
 
     load_LDT(&init_mm.context);
-    flush_page_update_queue();
 
     /* Force FPU initialization. */
     current->flags &= ~PF_USEDFPU;

@@ -97,7 +97,6 @@ struct exec_domain
 struct domain
 {
     domid_t          id;
-    s_time_t         create_time;
 
     shared_info_t   *shared_info;     /* shared data area */
     spinlock_t       time_lock;
@@ -145,17 +144,27 @@ struct domain
 
     struct exec_domain *exec_domain[MAX_VIRT_CPUS];
 
+    /* Bitmask of CPUs on which this domain is running. */
+    unsigned long cpuset;
+
     struct arch_domain arch;
 };
 
 struct domain_setup_info
 {
+    /* Initialised by caller. */
+    unsigned long image_addr;
+    unsigned long image_len;
+    /* Initialised by loader: Public. */
     unsigned long v_start;
+    unsigned long v_end;
     unsigned long v_kernstart;
     unsigned long v_kernend;
     unsigned long v_kernentry;
-
-    unsigned int use_writable_pagetables;
+    /* Initialised by loader: Private. */
+    unsigned int  load_symtab;
+    unsigned long symtab_addr;
+    unsigned long symtab_len;
 };
 
 #include <asm/uaccess.h> /* for KERNEL_DS */
@@ -216,11 +225,21 @@ extern int construct_dom0(
 extern int set_info_guest(struct domain *d, dom0_setdomaininfo_t *);
 
 struct domain *find_domain_by_id(domid_t dom);
-struct domain *find_last_domain(void);
 extern void domain_destruct(struct domain *d);
 extern void domain_kill(struct domain *d);
-extern void domain_crash(void);
 extern void domain_shutdown(u8 reason);
+
+/*
+ * Mark current domain as crashed. This function returns: the domain is not
+ * synchronously descheduled from any processor.
+ */
+extern void domain_crash(void);
+
+/*
+ * Mark current domain as crashed and synchronously deschedule from the local
+ * processor. This function never returns.
+ */
+extern void domain_crash_synchronous(void) __attribute__((noreturn));
 
 void new_thread(struct exec_domain *d,
                 unsigned long start_pc,
@@ -242,7 +261,13 @@ void init_idle_task(void);
 void domain_wake(struct exec_domain *d);
 void domain_sleep(struct exec_domain *d);
 
-void __enter_scheduler(void);
+/*
+ * Force loading of currently-executing domain state on the specified set
+ * of CPUs. This is used to counteract lazy state switching where required.
+ */
+extern void sync_lazy_execstate_cpuset(unsigned long cpuset);
+extern void sync_lazy_execstate_all(void);
+extern int __sync_lazy_execstate(void);
 
 extern void context_switch(
     struct exec_domain *prev, 
@@ -324,14 +349,21 @@ static inline void exec_domain_pause(struct exec_domain *ed)
     ASSERT(ed != current);
     atomic_inc(&ed->pausecnt);
     domain_sleep(ed);
+    sync_lazy_execstate_cpuset(ed->domain->cpuset & (1UL << ed->processor));
 }
 
 static inline void domain_pause(struct domain *d)
 {
     struct exec_domain *ed;
 
-    for_each_exec_domain(d, ed)
-        exec_domain_pause(ed);
+    for_each_exec_domain( d, ed )
+    {
+        ASSERT(ed != current);
+        atomic_inc(&ed->pausecnt);
+        domain_sleep(ed);
+    }
+
+    sync_lazy_execstate_cpuset(d->cpuset);
 }
 
 static inline void exec_domain_unpause(struct exec_domain *ed)
@@ -345,7 +377,7 @@ static inline void domain_unpause(struct domain *d)
 {
     struct exec_domain *ed;
 
-    for_each_exec_domain(d, ed)
+    for_each_exec_domain( d, ed )
         exec_domain_unpause(ed);
 }
 
@@ -355,30 +387,26 @@ static inline void exec_domain_unblock(struct exec_domain *ed)
         domain_wake(ed);
 }
 
-static inline void domain_unblock(struct domain *d)
-{
-    struct exec_domain *ed;
-
-    for_each_exec_domain(d, ed)
-        exec_domain_unblock(ed);
-}
-
 static inline void domain_pause_by_systemcontroller(struct domain *d)
 {
     struct exec_domain *ed;
 
-    for_each_exec_domain(d, ed) {
+    for_each_exec_domain ( d, ed )
+    {
         ASSERT(ed != current);
         if ( !test_and_set_bit(EDF_CTRLPAUSE, &ed->ed_flags) )
             domain_sleep(ed);
     }
+
+    sync_lazy_execstate_cpuset(d->cpuset);
 }
 
 static inline void domain_unpause_by_systemcontroller(struct domain *d)
 {
     struct exec_domain *ed;
 
-    for_each_exec_domain(d, ed) {
+    for_each_exec_domain ( d, ed )
+    {
         if ( test_and_clear_bit(EDF_CTRLPAUSE, &ed->ed_flags) )
             domain_wake(ed);
     }
@@ -392,7 +420,6 @@ static inline void domain_unpause_by_systemcontroller(struct domain *d)
 
 #include <xen/slab.h>
 #include <xen/domain.h>
-
 
 #endif /* __SCHED_H__ */
 

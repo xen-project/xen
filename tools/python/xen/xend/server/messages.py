@@ -41,8 +41,6 @@ CMSG_BLKIF_BE_CONNECT               =  2
 CMSG_BLKIF_BE_DISCONNECT            =  3
 CMSG_BLKIF_BE_VBD_CREATE            =  4
 CMSG_BLKIF_BE_VBD_DESTROY           =  5
-CMSG_BLKIF_BE_VBD_GROW              =  6
-CMSG_BLKIF_BE_VBD_SHRINK            =  7
 CMSG_BLKIF_BE_DRIVER_STATUS         = 32
 
 BLKIF_DRIVER_STATUS_DOWN            =  0
@@ -61,7 +59,7 @@ BLKIF_BE_STATUS_INTERFACE_CONNECTED =  4
 BLKIF_BE_STATUS_VBD_EXISTS          =  5
 BLKIF_BE_STATUS_VBD_NOT_FOUND       =  6
 BLKIF_BE_STATUS_OUT_OF_MEMORY       =  7
-BLKIF_BE_STATUS_EXTENT_NOT_FOUND    =  8
+BLKIF_BE_STATUS_PHYSDEV_NOT_FOUND   =  8
 BLKIF_BE_STATUS_MAPPING_ERROR       =  9
 
 blkif_formats = {
@@ -85,11 +83,6 @@ blkif_formats = {
     'blkif_be_vbd_create_t':
     (CMSG_BLKIF_BE, CMSG_BLKIF_BE_VBD_CREATE),
     # Create a vbd device.
-
-    'blkif_be_vbd_grow_t':
-    (CMSG_BLKIF_BE, CMSG_BLKIF_BE_VBD_GROW),
-    # Change the size of a vbd device. Remove?
-    # Do in one go in blkif_be_vbd_create_t.
 
     'blkif_be_vbd_destroy_t':
     (CMSG_BLKIF_BE, CMSG_BLKIF_BE_VBD_DESTROY),

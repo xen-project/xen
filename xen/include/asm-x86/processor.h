@@ -463,10 +463,10 @@ struct extended_sigtable {
 /* REP NOP (PAUSE) is a good thing to insert into busy-wait loops. */
 static inline void rep_nop(void)
 {
-    __asm__ __volatile__("rep;nop");
+    __asm__ __volatile__ ( "rep;nop" : : : "memory" );
 }
 
-#define cpu_relax()	rep_nop()
+#define cpu_relax() rep_nop()
 
 /* Prefetch instructions for Pentium III and AMD Athlon */
 #ifdef 	CONFIG_MPENTIUMIII

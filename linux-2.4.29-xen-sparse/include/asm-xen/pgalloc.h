@@ -22,7 +22,6 @@
 #define pmd_populate(mm, pmd, pte) 		  \
  do {                                             \
   set_pmd(pmd, __pmd(_PAGE_TABLE + __pa(pte)));   \
-  XEN_flush_page_update_queue();                 \
  } while ( 0 )
 
 /*
@@ -79,8 +78,8 @@ static inline pgd_t *get_pgd_slow(void)
 		memcpy(pgd + USER_PTRS_PER_PGD,
 			init_mm.pgd + USER_PTRS_PER_PGD,
 			(PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
-                __make_page_readonly(pgd);
-		queue_pgd_pin(__pa(pgd));
+		__make_page_readonly(pgd);
+		xen_pgd_pin(__pa(pgd));
 	}
 	return pgd;
 }
@@ -110,8 +109,8 @@ static inline void free_pgd_slow(pgd_t *pgd)
 		free_page((unsigned long)__va(pgd_val(pgd[i])-1));
 	kmem_cache_free(pae_pgd_cachep, pgd);
 #else
-	queue_pgd_unpin(__pa(pgd));
-        __make_page_writable(pgd);
+	xen_pgd_unpin(__pa(pgd));
+	__make_page_writable(pgd);
 	free_page((unsigned long)pgd);
 #endif
 }
@@ -134,7 +133,7 @@ static inline pte_t *pte_alloc_one(struct mm_struct *mm, unsigned long address)
     {
         clear_page(pte);
         __make_page_readonly(pte);
-        queue_pte_pin(__pa(pte));
+        xen_pte_pin(__pa(pte));
     }
     return pte;
 
@@ -153,7 +152,7 @@ static inline pte_t *pte_alloc_one_fast(struct mm_struct *mm,
 
 static __inline__ void pte_free_slow(pte_t *pte)
 {
-    queue_pte_unpin(__pa(pte));
+    xen_pte_unpin(__pa(pte));
     __make_page_writable(pte);
     free_page((unsigned long)pte);
 }
@@ -208,22 +207,19 @@ extern int do_check_pgt_cache(int, int);
 
 static inline void flush_tlb_mm(struct mm_struct *mm)
 {
-	if (mm == current->active_mm) queue_tlb_flush();
-	XEN_flush_page_update_queue();
+	if (mm == current->active_mm) xen_tlb_flush();
 }
 
 static inline void flush_tlb_page(struct vm_area_struct *vma,
 	unsigned long addr)
 {
-	if (vma->vm_mm == current->active_mm) queue_invlpg(addr);
-	XEN_flush_page_update_queue();
+	if (vma->vm_mm == current->active_mm) xen_invlpg(addr);
 }
 
 static inline void flush_tlb_range(struct mm_struct *mm,
 	unsigned long start, unsigned long end)
 {
-	if (mm == current->active_mm) queue_tlb_flush();
-	XEN_flush_page_update_queue();
+	if (mm == current->active_mm) xen_tlb_flush();
 }
 
 #else
@@ -261,7 +257,6 @@ static inline void flush_tlb_pgtables(struct mm_struct *mm,
 				      unsigned long start, unsigned long end)
 {
     /* i386 does not keep any page table caches in TLB */
-    XEN_flush_page_update_queue();
 }
 
 /*

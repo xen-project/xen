@@ -470,8 +470,8 @@ ctrl_if_resume(void)
     
 
     /* Sync up with shared indexes. */
-    FRONT_RING_ATTACH(&ctrl_if_tx_ring, &ctrl_if->tx_ring);
-    BACK_RING_ATTACH(&ctrl_if_rx_ring, &ctrl_if->rx_ring);
+    FRONT_RING_ATTACH(&ctrl_if_tx_ring, &ctrl_if->tx_ring, CONTROL_RING_MEM);
+    BACK_RING_ATTACH(&ctrl_if_rx_ring, &ctrl_if->rx_ring, CONTROL_RING_MEM);
 
     ctrl_if_evtchn = xen_start_info->domain_controller_evtchn;
     ctrl_if_irq    = bind_evtchn_to_irq(ctrl_if_evtchn);
@@ -498,8 +498,8 @@ ctrl_if_init(void *dummy __unused)
     for ( i = 0; i < 256; i++ )
         ctrl_if_rxmsg_handler[i] = ctrl_if_rxmsg_default_handler;
     
-    FRONT_RING_ATTACH(&ctrl_if_tx_ring, &ctrl_if->tx_ring);
-    BACK_RING_ATTACH(&ctrl_if_rx_ring, &ctrl_if->rx_ring);
+    FRONT_RING_ATTACH(&ctrl_if_tx_ring, &ctrl_if->tx_ring, CONTROL_RING_MEM);
+    BACK_RING_ATTACH(&ctrl_if_rx_ring, &ctrl_if->rx_ring, CONTROL_RING_MEM);
 
     mtx_init(&ctrl_if_lock, "ctrlif", NULL, MTX_SPIN | MTX_NOWITNESS);
     

@@ -308,6 +308,12 @@ class Xend:
                              {'op'      : 'device_create',
                               'config'  : fileof(config) })
 
+    def xend_domain_device_refresh(self, id, type, idx):
+        return self.xendPost(self.domainurl(id),
+                             {'op'      : 'device_refresh',
+                              'type'    : type,
+                              'idx'     : idx })
+
     def xend_domain_device_destroy(self, id, type, idx):
         return self.xendPost(self.domainurl(id),
                              {'op'      : 'device_destroy',

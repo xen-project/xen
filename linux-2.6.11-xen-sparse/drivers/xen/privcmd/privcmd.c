@@ -88,6 +88,8 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
         {
             int j, n = ((mmapcmd.num-i)>PRIVCMD_MMAP_SZ)?
                 PRIVCMD_MMAP_SZ:(mmapcmd.num-i);
+
+
             if ( copy_from_user(&msg, p, n*sizeof(privcmd_mmap_entry_t)) )
                 return -EFAULT;
      
@@ -120,8 +122,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
 
     case IOCTL_PRIVCMD_MMAPBATCH:
     {
-#define MAX_DIRECTMAP_MMU_QUEUE 130
-        mmu_update_t u[MAX_DIRECTMAP_MMU_QUEUE], *w, *v;
+        mmu_update_t u;
         privcmd_mmapbatch_t m;
         struct vm_area_struct *vma = NULL;
         unsigned long *p, addr;
@@ -142,11 +143,6 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
         if ( (m.addr + (m.num<<PAGE_SHIFT)) > vma->vm_end )
         { ret = -EFAULT; goto batch_err; }
 
-        u[0].ptr  = MMU_EXTENDED_COMMAND;
-        u[0].val  = MMUEXT_SET_FOREIGNDOM;
-        u[0].val |= (unsigned long)m.dom << 16;
-        v = w = &u[1];
-
         p = m.arr;
         addr = m.addr;
         for ( i = 0; i < m.num; i++, addr += PAGE_SIZE, p++ )
@@ -154,24 +150,24 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
             if ( get_user(mfn, p) )
                 return -EFAULT;
 
-            v->val = (mfn << PAGE_SHIFT) | pgprot_val(vma->vm_page_prot);
+            u.val = (mfn << PAGE_SHIFT) | pgprot_val(vma->vm_page_prot);
 
             __direct_remap_area_pages(vma->vm_mm,
                                       addr, 
                                       PAGE_SIZE, 
-                                      v);
+                                      &u);
 
-            if ( unlikely(HYPERVISOR_mmu_update(u, v - u + 1, NULL) < 0) )
-                put_user( 0xF0000000 | mfn, p );
-
-            v = w;
+            if ( unlikely(HYPERVISOR_mmu_update(&u, 1, NULL, m.dom) < 0) )
+                put_user(0xF0000000 | mfn, p);
         }
+
         ret = 0;
         break;
 
     batch_err:
         printk("batch_err ret=%d vma=%p addr=%lx num=%d arr=%p %lx-%lx\n", 
-               ret, vma, m.addr, m.num, m.arr, vma->vm_start, vma->vm_end);
+               ret, vma, m.addr, m.num, m.arr,
+               vma ? vma->vm_start : 0, vma ? vma->vm_end : 0);
         break;
     }
     break;
@@ -183,7 +179,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
         pgd_t *pgd = pgd_offset_k(m2pv);
         pud_t *pud = pud_offset(pgd, m2pv);
         pmd_t *pmd = pmd_offset(pud, m2pv);
-        unsigned long m2p_start_mfn = pfn_to_mfn(pmd_val(*pmd) >> PAGE_SHIFT);
+        unsigned long m2p_start_mfn = (*(unsigned long *)pmd) >> PAGE_SHIFT; 
         ret = put_user(m2p_start_mfn, (unsigned long *)data) ? -EFAULT: 0;
     }
     break;

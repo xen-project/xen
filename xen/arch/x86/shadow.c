@@ -1198,7 +1198,6 @@ int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
     }   
 
     domain_pause(d);
-    synchronise_pagetables(~0UL);
 
     shadow_lock(d);
 
@@ -2293,8 +2292,7 @@ int shadow_fault(unsigned long va, struct xen_regs *regs)
     {
         SH_VVLOG("shadow_fault - EXIT: L1 not present" );
         perfc_incrc(shadow_fault_bail_pde_not_present);
-        shadow_unlock(d);
-        return 0;
+        goto fail;
     }
 
     // This can't fault because we hold the shadow lock and we've ensured that
@@ -2306,8 +2304,7 @@ int shadow_fault(unsigned long va, struct xen_regs *regs)
     {
         SH_VVLOG("shadow_fault - EXIT: gpte not present (%lx)",gpte );
         perfc_incrc(shadow_fault_bail_pte_not_present);
-        shadow_unlock(d);
-        return 0;
+        goto fail;
     }
 
     /* Write fault? */
@@ -2318,8 +2315,7 @@ int shadow_fault(unsigned long va, struct xen_regs *regs)
             /* Write fault on a read-only mapping. */
             SH_VVLOG("shadow_fault - EXIT: wr fault on RO page (%lx)", gpte);
             perfc_incrc(shadow_fault_bail_ro_mapping);
-            shadow_unlock(d);
-            return 0;
+            goto fail;
         }
 
         if ( !l1pte_write_fault(ed, &gpte, &spte, va) )
@@ -2349,10 +2345,10 @@ int shadow_fault(unsigned long va, struct xen_regs *regs)
     if ( unlikely(__put_user(gpte, (unsigned long *)
                              &linear_pg_table[l1_linear_offset(va)])) )
     {
-        printk("shadow_fault(): crashing domain %d "
+        printk("shadow_fault() failed, crashing domain %d "
                "due to a read-only L2 page table (gpde=%p), va=%p\n",
                d->id, gpde, va);
-        domain_crash();
+        domain_crash_synchronous();
     }
 
     // if necessary, record the page table page as dirty
@@ -2368,6 +2364,10 @@ int shadow_fault(unsigned long va, struct xen_regs *regs)
 
     check_pagetable(ed, "post-sf");
     return EXCRET_fault_fixed;
+
+ fail:
+    shadow_unlock(d);
+    return 0;
 }
 
 /*

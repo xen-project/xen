@@ -19,6 +19,7 @@
 //#define	VHPT_NUM_ENTRIES		131072
 //#define	VHPT_CACHE_MASK			131071
 //#define	VHPT_SIZE_LOG2			22	//????
+#define	VHPT_CACHE_ENTRY_SIZE		64
 #define	VHPT_CACHE_NUM_ENTRIES		8192
 #define	VHPT_NUM_ENTRIES		524288
 #define	VHPT_CACHE_MASK			524287
@@ -353,7 +354,7 @@ FindOne:;\
 		and r23 = r23, r24;\
 \
 \
-		movl r17 = G_VHPT_Cache;\
+		movl r17 = VHPT_ADDR;\
 		;;\
 \
 \

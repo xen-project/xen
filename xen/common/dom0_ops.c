@@ -162,7 +162,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     case DOM0_CREATEDOMAIN:
     {
         struct domain *d;
-        unsigned int   pro = 0;
+        unsigned int   pro;
         domid_t        dom;
 
         dom = op->u.createdomain.domain;
@@ -180,7 +180,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             /* Do an initial placement. Pick the least-populated CPU. */
             struct domain *d;
             struct exec_domain *ed;
-            unsigned int i, cnt[NR_CPUS] = { 0 };
+            unsigned int i, ht, cnt[NR_CPUS] = { 0 };
 
             read_lock(&domlist_lock);
             for_each_domain ( d ) {
@@ -189,9 +189,15 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             }
             read_unlock(&domlist_lock);
 
-            for ( i = 0; i < smp_num_cpus; i++ )
-                if ( cnt[i] < cnt[pro] )
-                    pro = i;
+            /* If we're on a HT system, we only use the first HT for dom0,
+               other domains will all share the second HT of each CPU.
+	       Since dom0 is on CPU 0, we favour high numbered CPUs in
+	       the event of a tie */
+            ht = opt_noht ? 1 : ht_per_core;
+            pro = ht-1;
+            for ( i = pro; i < smp_num_cpus; i += ht )
+		if ( cnt[i] <= cnt[pro] )
+		    pro = i;
         }
         else
             pro = op->u.createdomain.cpu % smp_num_cpus;
@@ -266,7 +272,6 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         else
         {
             exec_domain_pause(ed);
-            synchronise_pagetables(~0UL);
             if ( ed->processor != (cpu % smp_num_cpus) )
                 set_bit(EDF_MIGRATED, &ed->ed_flags);
             set_bit(EDF_CPUPINNED, &ed->ed_flags);
@@ -446,21 +451,6 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         {
             d->max_pages = 
                 (op->u.setdomainmaxmem.max_memkb+PAGE_SIZE-1)>> PAGE_SHIFT;
-            put_domain(d);
-            ret = 0;
-        }
-    }
-    break;
-
-    case DOM0_SETDOMAINVMASSIST:
-    {
-        struct domain *d; 
-        ret = -ESRCH;
-        d = find_domain_by_id( op->u.setdomainvmassist.domain );
-        if ( d != NULL )
-        {
-            vm_assist(d, op->u.setdomainvmassist.cmd,
-                      op->u.setdomainvmassist.type);
             put_domain(d);
             ret = 0;
         }

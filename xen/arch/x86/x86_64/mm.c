@@ -89,7 +89,7 @@ int map_pages(
         {
             /* Super-page mapping. */
             if ( (l2_pgentry_val(*pl2e) & _PAGE_PRESENT) )
-                __flush_tlb_pge();
+                local_flush_tlb_pge();
             *pl2e = mk_l2_pgentry(p|flags|_PAGE_PSE);
 
             v += 1 << L2_PAGETABLE_SHIFT;
@@ -107,7 +107,7 @@ int map_pages(
             }
             pl1e = l2_pgentry_to_l1(*pl2e) + l1_table_offset(v);
             if ( (l1_pgentry_val(*pl1e) & _PAGE_PRESENT) )
-                __flush_tlb_one(v);
+                local_flush_tlb_one(v);
             *pl1e = mk_l1_pgentry(p|flags);
 
             v += 1 << L1_PAGETABLE_SHIFT;
@@ -236,23 +236,6 @@ void subarch_init_memory(struct domain *dom_xen)
     }
 }
 
-/*
- * Allows shooting down of borrowed page-table use on specific CPUs.
- * Specifically, we borrow page tables when running the idle domain.
- */
-static void __synchronise_pagetables(void *mask)
-{
-    struct exec_domain *ed = current;
-    if ( ((unsigned long)mask & (1 << ed->processor)) &&
-         is_idle_task(ed->domain) )
-        write_ptbase(ed);
-}
-void synchronise_pagetables(unsigned long cpu_mask)
-{
-    __synchronise_pagetables((void *)cpu_mask);
-    smp_call_function(__synchronise_pagetables, (void *)cpu_mask, 1, 1);
-}
-
 long do_stack_switch(unsigned long ss, unsigned long esp)
 {
     if ( (ss & 3) != 3 )
@@ -265,6 +248,9 @@ long do_stack_switch(unsigned long ss, unsigned long esp)
 long do_set_segment_base(unsigned int which, unsigned long base)
 {
     struct exec_domain *ed = current;
+
+    /* Canonicalise the base address. */
+    base &= VADDR_MASK;
 
     switch ( which )
     {
@@ -281,6 +267,22 @@ long do_set_segment_base(unsigned int which, unsigned long base)
     case SEGBASE_GS_KERNEL:
         ed->arch.user_ctxt.gs_base_kernel = base;
         wrmsr(MSR_GS_BASE, base, base>>32);
+        break;
+
+    case SEGBASE_GS_USER_SEL:
+        __asm__ __volatile__ (
+            "     swapgs              \n"
+            "1:   movl %k0,%%gs       \n"
+            "     mfence; swapgs      \n" /* AMD erratum #88 */
+            ".section .fixup,\"ax\"   \n"
+            "2:   xorl %k0,%k0        \n"
+            "     jmp  1b             \n"
+            ".previous                \n"
+            ".section __ex_table,\"a\"\n"
+            "    .align 8             \n"
+            "    .quad 1b,2b          \n"
+            ".previous                  "
+            : : "r" (base&0xffff) );
         break;
 
     default:
@@ -301,7 +303,7 @@ int check_descriptor(struct desc_struct *d)
         goto good;
 
     /* The guest can only safely be executed in ring 3. */
-    if ( (b & _SEGMENT_DPL) != 3 )
+    if ( (b & _SEGMENT_DPL) != _SEGMENT_DPL )
         goto bad;
 
     /* All code and data segments are okay. No base/limit checking. */

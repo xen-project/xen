@@ -122,7 +122,6 @@ start:
 	}
 	vaddr = PKMAP_ADDR(last_pkmap_nr);
 	set_pte(&(pkmap_page_table[last_pkmap_nr]), mk_pte(page, kmap_prot));
-	XEN_flush_page_update_queue();
 
 	pkmap_count[last_pkmap_nr] = 1;
 	page->virtual = (void *) vaddr;

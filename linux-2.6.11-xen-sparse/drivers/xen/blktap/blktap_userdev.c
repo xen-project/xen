@@ -87,8 +87,7 @@ static int blktap_open(struct inode *inode, struct file *filp)
     SetPageReserved(virt_to_page(csring));
     
     SHARED_RING_INIT(csring);
-    FRONT_RING_INIT(&blktap_uctrl_ring, csring);
-
+    FRONT_RING_INIT(&blktap_uctrl_ring, csring, PAGE_SIZE);
 
     /* Allocate the fe ring. */
     sring = (blkif_sring_t *)get_zeroed_page(GFP_KERNEL);
@@ -98,7 +97,7 @@ static int blktap_open(struct inode *inode, struct file *filp)
     SetPageReserved(virt_to_page(sring));
     
     SHARED_RING_INIT(sring);
-    FRONT_RING_INIT(&blktap_ufe_ring, sring);
+    FRONT_RING_INIT(&blktap_ufe_ring, sring, PAGE_SIZE);
 
     /* Allocate the be ring. */
     sring = (blkif_sring_t *)get_zeroed_page(GFP_KERNEL);
@@ -108,7 +107,7 @@ static int blktap_open(struct inode *inode, struct file *filp)
     SetPageReserved(virt_to_page(sring));
     
     SHARED_RING_INIT(sring);
-    BACK_RING_INIT(&blktap_ube_ring, sring);
+    BACK_RING_INIT(&blktap_ube_ring, sring, PAGE_SIZE);
 
     DPRINTK(KERN_ALERT "blktap open.\n");
 
@@ -299,7 +298,7 @@ int blktap_write_fe_ring(blkif_request_t *req)
     }
 
     if ( RING_FULL(&blktap_ufe_ring) ) {
-        DPRINTK("blktap: fe_ring is full, can't add.\n");
+        PRINTK("blktap: fe_ring is full, can't add.\n");
         return 0;
     }
 
@@ -383,10 +382,9 @@ static int blktap_read_fe_ring(void)
             zap_page_range(blktap_vma, MMAP_VADDR(ID_TO_IDX(resp_s->id), 0), 
                     ar->nr_pages << PAGE_SHIFT, NULL);
             write_resp_to_fe_ring(blkif, resp_s);
+            blktap_ufe_ring.rsp_cons = i + 1;
             kick_fe_domain(blkif);
         }
-        
-        blktap_ufe_ring.rsp_cons = i;
     }
     return 0;
 }

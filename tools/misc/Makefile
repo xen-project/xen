@@ -22,6 +22,7 @@ all: build
 build: $(TARGETS)
 	$(MAKE) -C miniterm
 	$(MAKE) -C cpuperf
+	$(MAKE) -C mbootpack
 
 install: build
 	[ -d $(DESTDIR)/usr/bin ] || $(INSTALL_DIR) $(DESTDIR)/usr/bin
@@ -31,11 +32,14 @@ install: build
 	$(MAKE) -C cpuperf install
 #       No sense in installing miniterm on the Xen box.
 #	$(MAKE) -C miniterm install
+#       Likewise mbootpack
+#	$(MAKE) -C mbootpack install
 
 clean:
 	$(RM) *.o $(TARGETS) *~
 	$(MAKE) -C miniterm clean
 	$(MAKE) -C cpuperf clean
+	$(MAKE) -C mbootpack clean
 
 %.o: %.c $(HDRS) Makefile
 	$(CC) -c $(CFLAGS) -o $@ $<

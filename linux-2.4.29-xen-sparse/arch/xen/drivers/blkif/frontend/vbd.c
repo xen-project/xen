@@ -114,12 +114,6 @@ static int xlvbd_init_device(vdisk_t *xd)
     if ( (bd = bdget(device)) == NULL )
         return -1;
 
-    /*
-     * Update of partition info, and check of usage count, is protected
-     * by the per-block-device semaphore.
-     */
-    down(&bd->bd_sem);
-
     if ( ((disk = xldev_to_xldisk(device)) != NULL) && (disk->usage != 0) )
     {
         printk(KERN_ALERT "VBD update failed - in use [dev=%x]\n", device);
@@ -169,14 +163,14 @@ static int xlvbd_init_device(vdisk_t *xd)
             blksize_size[major]  = xlide_blksize_size;
             hardsect_size[major] = xlide_hardsect_size;
             max_sectors[major]   = xlide_max_sectors;
-            read_ahead[major]    = 8; /* from drivers/ide/ide-probe.c */
+            read_ahead[major]    = 8;
         } 
         else if ( is_scsi )
         { 
             blksize_size[major]  = xlscsi_blksize_size;
             hardsect_size[major] = xlscsi_hardsect_size;
             max_sectors[major]   = xlscsi_max_sectors;
-            read_ahead[major]    = 0; /* XXX 8; -- guessing */
+            read_ahead[major]    = 8;
         }
         else
         { 
@@ -331,7 +325,6 @@ static int xlvbd_init_device(vdisk_t *xd)
     }
 
  out:
-    up(&bd->bd_sem);
     bdput(bd);    
     return rc;
 }
@@ -355,12 +348,6 @@ static int xlvbd_remove_device(int device)
 
     if ( (bd = bdget(device)) == NULL )
         return -1;
-
-    /*
-     * Update of partition info, and check of usage count, is protected
-     * by the per-block-device semaphore.
-     */
-    down(&bd->bd_sem);
 
     if ( ((gd = get_gendisk(device)) == NULL) ||
          ((disk = xldev_to_xldisk(device)) == NULL) )
@@ -423,7 +410,6 @@ static int xlvbd_remove_device(int device)
     }
 
  out:
-    up(&bd->bd_sem);
     bdput(bd);
     return rc;
 }
@@ -529,20 +515,17 @@ int xlvbd_init(void)
     /* Initialize the global arrays. */
     for ( i = 0; i < 256; i++ ) 
     {
-        /* from the generic ide code (drivers/ide/ide-probe.c, etc) */
         xlide_blksize_size[i]  = 1024;
         xlide_hardsect_size[i] = 512;
-        xlide_max_sectors[i]   = 128;  /* 'hwif->rqsize' if we knew it */
+        xlide_max_sectors[i]   = 512;
 
-        /* from the generic scsi disk code (drivers/scsi/sd.c) */
-        xlscsi_blksize_size[i]  = 1024; /* XXX 512; */
+        xlscsi_blksize_size[i]  = 1024;
         xlscsi_hardsect_size[i] = 512;
-        xlscsi_max_sectors[i]   = 128*8; /* XXX 128; */
+        xlscsi_max_sectors[i]   = 512;
 
-        /* we don't really know what to set these too since it depends */
         xlvbd_blksize_size[i]  = 512;
         xlvbd_hardsect_size[i] = 512;
-        xlvbd_max_sectors[i]   = 128;
+        xlvbd_max_sectors[i]   = 512;
     }
 
     vbd_info = kmalloc(MAX_VBDS * sizeof(vdisk_t), GFP_KERNEL);

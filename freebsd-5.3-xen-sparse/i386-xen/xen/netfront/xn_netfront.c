@@ -440,7 +440,7 @@ xn_alloc_rx_buffers(struct xn_softc *sc)
     PT_UPDATES_FLUSH();
 
     /* After all PTEs have been zapped we blow away stale TLB entries. */
-    xn_rx_mcl[i-1].args[2] = UVMF_FLUSH_TLB;
+    xn_rx_mcl[i-1].args[2] = UVMF_TLB_FLUSH|UVMF_LOCAL;
 
     /* Give away a batch of pages. */
     xn_rx_mcl[i].op = __HYPERVISOR_dom_mem_op;

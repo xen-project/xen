@@ -43,8 +43,8 @@ extern void smp_commence(void);
 /*
  * Call a function on all other processors
  */
-extern int smp_call_function (void (*func) (void *info), void *info,
-			      int retry, int wait);
+extern int smp_call_function(
+    void (*func) (void *info), void *info, int retry, int wait);
 
 /*
  * True once the per process idle is forked
@@ -84,7 +84,7 @@ extern volatile int smp_msg_id;
 #define kernel_lock()
 #define cpu_logical_map(cpu)			0
 #define cpu_number_map(cpu)			0
-#define smp_call_function(func,info,retry,wait)	({ 0; })
+#define smp_call_function(func,info,retry,wait)	0
 #define cpu_online_map				1
 
 #endif

@@ -67,8 +67,6 @@ struct xlbd_type_info {
     int partn_shift;
     int partn_per_major;
     int devs_per_major;
-    int hardsect_size;
-    int max_sectors;
     char *devname;
     char *diskname;
 };

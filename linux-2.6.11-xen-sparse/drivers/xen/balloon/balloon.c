@@ -139,24 +139,6 @@ static struct page *balloon_retrieve(void)
     return page;
 }
 
-static inline pte_t *get_ptep(unsigned long addr)
-{
-    pgd_t *pgd;
-    pud_t *pud;
-    pmd_t *pmd;
-
-    pgd = pgd_offset_k(addr);
-    if ( pgd_none(*pgd) || pgd_bad(*pgd) ) BUG();
-
-    pud = pud_offset(pgd, addr);
-    if ( pud_none(*pud) || pud_bad(*pud) ) BUG();
-
-    pmd = pmd_offset(pud, addr);
-    if ( pmd_none(*pmd) || pmd_bad(*pmd) ) BUG();
-
-    return pte_offset_kernel(pmd, addr);
-}
-
 static void balloon_alarm(unsigned long unused)
 {
     schedule_work(&balloon_worker);
@@ -220,14 +202,18 @@ static void balloon_process(void *unused)
 
             /* Update P->M and M->P tables. */
             phys_to_machine_mapping[pfn] = mfn_list[i];
-            queue_machphys_update(mfn_list[i], pfn);
+            xen_machphys_update(mfn_list[i], pfn);
             
             /* Link back into the page tables if it's not a highmem page. */
             if ( pfn < max_low_pfn )
-                queue_l1_entry_update(
-                    get_ptep((unsigned long)__va(pfn << PAGE_SHIFT)),
-                    (mfn_list[i] << PAGE_SHIFT) | pgprot_val(PAGE_KERNEL));
-            
+            {
+                HYPERVISOR_update_va_mapping(
+                    (unsigned long)__va(pfn << PAGE_SHIFT),
+                    __pte_ma((mfn_list[i] << PAGE_SHIFT) |
+                             pgprot_val(PAGE_KERNEL)),
+                    0);
+            }
+
             /* Finally, relinquish the memory back to the system allocator. */
             ClearPageReserved(page);
             set_page_count(page, 1);
@@ -259,7 +245,8 @@ static void balloon_process(void *unused)
             {
                 v = phys_to_virt(pfn << PAGE_SHIFT);
                 scrub_pages(v, 1);
-                queue_l1_entry_update(get_ptep((unsigned long)v), 0);
+                HYPERVISOR_update_va_mapping(
+                    (unsigned long)v, __pte_ma(0), 0);
             }
 #ifdef CONFIG_XEN_SCRUB_PAGES
             else
@@ -273,9 +260,7 @@ static void balloon_process(void *unused)
 
         /* Ensure that ballooned highmem pages don't have cached mappings. */
         kmap_flush_unused();
-
-        /* Flush updates through and flush the TLB. */
-        xen_tlb_flush();
+        flush_tlb_all();
 
         /* No more mappings: invalidate pages in P2M and add to balloon. */
         for ( i = 0; i < debt; i++ )
@@ -319,21 +304,16 @@ static void balloon_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
     case CMSG_MEM_REQUEST_SET:
     {
         mem_request_t *req = (mem_request_t *)&msg->msg[0];
-        if ( msg->length != sizeof(mem_request_t) )
-            goto parse_error;
         set_new_target(req->target);
         req->status = 0;
     }
     break;        
+
     default:
-        goto parse_error;
+        msg->length = 0;
+        break;
     }
 
-    ctrl_if_send_response(msg);
-    return;
-
- parse_error:
-    msg->length = 0;
     ctrl_if_send_response(msg);
 }
 

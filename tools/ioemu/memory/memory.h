@@ -37,6 +37,12 @@
 #  define BX_MEM_THIS this->
 #endif
 
+#if defined(__i386__)
+typedef Bit32u dma_addr_t;
+#elif defined(__x86_64__)
+typedef Bit64u dma_addr_t;
+#endif
+
 // alignment of memory vector, must be a power of 2
 #define BX_MEM_VECTOR_ALIGN 4096
 
@@ -64,9 +70,9 @@ public:
   ~BX_MEM_C(void);
   BX_MEM_SMF void    alloc_vector_aligned (size_t bytes, size_t alignment) BX_CPP_AttrRegparmN(2);
   BX_MEM_SMF void    init_memory(int memsize);
-  BX_MEM_SMF void    readPhysicalPage(BX_CPU_C *cpu, Bit32u addr,
+  BX_MEM_SMF void    readPhysicalPage(BX_CPU_C *cpu, dma_addr_t addr,
                                       unsigned len, void *data) BX_CPP_AttrRegparmN(3);
-  BX_MEM_SMF void    writePhysicalPage(BX_CPU_C *cpu, Bit32u addr,
+  BX_MEM_SMF void    writePhysicalPage(BX_CPU_C *cpu, dma_addr_t addr,
                                        unsigned len, void *data) BX_CPP_AttrRegparmN(3);
   BX_MEM_SMF void    load_ROM(const char *path, Bit32u romaddress, Bit8u type);
   BX_MEM_SMF Bit32u  get_memory_in_k(void);

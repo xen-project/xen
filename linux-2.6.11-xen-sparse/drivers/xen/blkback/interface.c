@@ -198,7 +198,7 @@ void blkif_connect(blkif_be_connect_t *connect)
     }
     sring = (blkif_sring_t *)vma->addr;
     SHARED_RING_INIT(sring);
-    BACK_RING_INIT(&blkif->blk_ring, sring);
+    BACK_RING_INIT(&blkif->blk_ring, sring, PAGE_SIZE);
     
     blkif->evtchn        = evtchn;
     blkif->irq           = bind_evtchn_to_irq(evtchn);

@@ -351,13 +351,6 @@ void __init smp_callin(void)
 
     __sti();
 
-#ifdef CONFIG_MTRR
-    /*
-     * Must be done before calibration delay is computed
-     */
-    mtrr_init_secondary_cpu ();
-#endif
-
     Dprintk("Stack at about %p\n",&cpuid);
 
     /*
@@ -414,7 +407,7 @@ void __init start_secondary(void)
     smp_callin();
 
     while (!atomic_read(&smp_commenced))
-        rep_nop();
+        cpu_relax();
 
 #ifdef __i386__
     /*
@@ -784,10 +777,6 @@ void __init smp_boot_cpus(void)
 {
     int apicid, bit;
 
-#ifdef CONFIG_MTRR
-    /*  Must be done before other processors booted  */
-    mtrr_init_boot_cpu ();
-#endif
     /* Initialize the logical to physical CPU number mapping */
     init_cpu_to_apicid();
 

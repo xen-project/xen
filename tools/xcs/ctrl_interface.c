@@ -186,8 +186,8 @@ int ctrl_chan_connect(control_channel_t *cc)
     }
 
     /* Synchronise ring indexes. */
-    BACK_RING_ATTACH(&cc->tx_ring, &cc->interface->tx_ring);
-    FRONT_RING_ATTACH(&cc->rx_ring, &cc->interface->rx_ring);
+    BACK_RING_ATTACH(&cc->tx_ring, &cc->interface->tx_ring, CONTROL_RING_MEM);
+    FRONT_RING_ATTACH(&cc->rx_ring, &cc->interface->rx_ring, CONTROL_RING_MEM);
 
     cc->connected = 1;
 

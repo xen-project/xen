@@ -407,8 +407,7 @@ extern void noexec_setup(const char *str);
 	do {								  \
 		if (__dirty) {						  \
 		        if ( likely((__vma)->vm_mm == current->mm) ) {    \
-			    xen_flush_page_update_queue();                \
-			    HYPERVISOR_update_va_mapping((__address), (__entry), UVMF_INVLPG); \
+			    HYPERVISOR_update_va_mapping((__address), (__entry), UVMF_INVLPG|UVMF_MULTI|(unsigned long)((__vma)->vm_mm->cpu_vm_mask.bits)); \
 			} else {                                          \
                             xen_l1_entry_update((__ptep), (__entry).pte_low); \
 			    flush_tlb_page((__vma), (__address));         \
@@ -426,7 +425,6 @@ do {				  					\
 #define ptep_establish_new(__vma, __address, __ptep, __entry)		\
 do {				  					\
 	if (likely((__vma)->vm_mm == current->mm)) {			\
-		xen_flush_page_update_queue();				\
 		HYPERVISOR_update_va_mapping((__address),		\
 					     __entry, 0);		\
 	} else {							\
@@ -434,7 +432,6 @@ do {				  					\
 	}								\
 } while (0)
 
-/* NOTE: make_page* callers must call flush_page_update_queue() */
 void make_lowmem_page_readonly(void *va);
 void make_lowmem_page_writable(void *va);
 void make_page_readonly(void *va);
@@ -458,7 +455,6 @@ void make_pages_writable(void *va, unsigned int nr);
 #define kern_addr_valid(addr)	(1)
 #endif /* !CONFIG_DISCONTIGMEM */
 
-#define DOMID_LOCAL (0xFFFFU)
 int direct_remap_area_pages(struct mm_struct *mm,
                             unsigned long address, 
                             unsigned long machine_addr,

@@ -74,8 +74,10 @@ static blkif_response_t blkif_control_rsp;
 
 static blkif_front_ring_t blk_ring;
 
+#define BLK_RING_SIZE __RING_SIZE((blkif_sring_t *)0, PAGE_SIZE)
+
 unsigned long rec_ring_free;
-blkif_request_t rec_ring[RING_SIZE(&blk_ring)];
+blkif_request_t rec_ring[BLK_RING_SIZE];
 
 static int recovery = 0;           /* "Recovery in progress" flag.  Protected
                                     * by the blkif_io_lock */
@@ -90,8 +92,7 @@ static inline int GET_ID_FROM_FREELIST( void )
 {
     unsigned long free = rec_ring_free;
 
-    if ( free > RING_SIZE(&blk_ring) )
-        BUG();
+    BUG_ON(free > BLK_RING_SIZE);
 
     rec_ring_free = rec_ring[free].id;
 
@@ -225,8 +226,7 @@ int blkif_release(struct inode *inode, struct file *filep)
 int blkif_ioctl(struct inode *inode, struct file *filep,
                 unsigned command, unsigned long argument)
 {
-	int i;
-    /*  struct gendisk *gd = inode->i_bdev->bd_disk; */
+    int i;
 
     DPRINTK_IOCTL("command: 0x%x, argument: 0x%lx, dev: 0x%04x\n",
                   command, (long)argument, inode->i_rdev); 
@@ -252,65 +252,6 @@ int blkif_ioctl(struct inode *inode, struct file *filep,
     return 0;
 }
 
-#if 0
-/* check media change: should probably do something here in some cases :-) */
-int blkif_check(kdev_t dev)
-{
-    DPRINTK("blkif_check\n");
-    return 0;
-}
-
-int blkif_revalidate(kdev_t dev)
-{
-    struct block_device *bd;
-    struct gendisk *gd;
-    xen_block_t *disk;
-    unsigned long capacity;
-    int i, rc = 0;
-    
-    if ( (bd = bdget(dev)) == NULL )
-        return -EINVAL;
-
-    /*
-     * Update of partition info, and check of usage count, is protected
-     * by the per-block-device semaphore.
-     */
-    down(&bd->bd_sem);
-
-    if ( ((gd = get_gendisk(dev)) == NULL) ||
-         ((disk = xldev_to_xldisk(dev)) == NULL) ||
-         ((capacity = gd->part[MINOR(dev)].nr_sects) == 0) )
-    {
-        rc = -EINVAL;
-        goto out;
-    }
-
-    if ( disk->usage > 1 )
-    {
-        rc = -EBUSY;
-        goto out;
-    }
-
-    /* Only reread partition table if VBDs aren't mapped to partitions. */
-    if ( !(gd->flags[MINOR(dev) >> gd->minor_shift] & GENHD_FL_VIRT_PARTNS) )
-    {
-        for ( i = gd->max_p - 1; i >= 0; i-- )
-        {
-            invalidate_device(dev+i, 1);
-            gd->part[MINOR(dev+i)].start_sect = 0;
-            gd->part[MINOR(dev+i)].nr_sects   = 0;
-            gd->sizes[MINOR(dev+i)]           = 0;
-        }
-
-        grok_partitions(gd, MINOR(dev)>>gd->minor_shift, gd->max_p, capacity);
-    }
-
- out:
-    up(&bd->bd_sem);
-    bdput(bd);
-    return rc;
-}
-#endif
 
 /*
  * blkif_queue_request
@@ -522,8 +463,7 @@ static void kick_pending_request_queues(void)
 {
     /* We kick pending request queues if the ring is reasonably empty. */
     if ( (nr_pending != 0) && 
-         (RING_PENDING_REQUESTS(&blk_ring) < 
-          (RING_SIZE(&blk_ring) >> 1)) )
+         (RING_PENDING_REQUESTS(&blk_ring) < (BLK_RING_SIZE >> 1)) )
     {
         /* Attempt to drain the queue, but bail if the ring becomes full. */
         while ( (nr_pending != 0) && !RING_FULL(&blk_ring) )
@@ -1138,7 +1078,7 @@ static void blkif_disconnect(void)
     
     sring = (blkif_sring_t *)__get_free_page(GFP_KERNEL);
     SHARED_RING_INIT(sring);
-    FRONT_RING_INIT(&blk_ring, sring);
+    FRONT_RING_INIT(&blk_ring, sring, PAGE_SIZE);
     blkif_state  = BLKIF_STATE_DISCONNECTED;
     blkif_send_interface_connect();
 }
@@ -1158,7 +1098,7 @@ static void blkif_recover(void)
      * This will need to be fixed once we have barriers */
 
     /* Stage 1 : Find active and move to safety. */
-    for ( i = 0; i < RING_SIZE(&blk_ring); i++ )
+    for ( i = 0; i < BLK_RING_SIZE; i++ )
     {
         if ( rec_ring[i].id >= PAGE_OFFSET )
         {
@@ -1179,10 +1119,10 @@ static void blkif_recover(void)
     }
 
     /* Stage 3 : Set up free list. */
-    for ( ; i < RING_SIZE(&blk_ring); i++ )
+    for ( ; i < BLK_RING_SIZE; i++ )
         rec_ring[i].id = i+1;
     rec_ring_free = blk_ring.req_prod_pvt;
-    rec_ring[RING_SIZE(&blk_ring)-1].id = 0x0fffffff;
+    rec_ring[BLK_RING_SIZE-1].id = 0x0fffffff;
 
     /* blk_ring->req_prod will be set when we flush_requests().*/
     wmb();
@@ -1322,20 +1262,14 @@ static void blkif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
     switch ( msg->subtype )
     {
     case CMSG_BLKIF_FE_INTERFACE_STATUS:
-        if ( msg->length != sizeof(blkif_fe_interface_status_t) )
-            goto parse_error;
         blkif_status((blkif_fe_interface_status_t *)
                      &msg->msg[0]);
-        break;        
+        break;
     default:
-        goto parse_error;
+        msg->length = 0;
+        break;
     }
 
-    ctrl_if_send_response(msg);
-    return;
-
- parse_error:
-    msg->length = 0;
     ctrl_if_send_response(msg);
 }
 
@@ -1375,9 +1309,9 @@ int __init xlblk_init(void)
     printk(KERN_INFO "xen_blk: Initialising virtual block device driver\n");
 
     rec_ring_free = 0;
-    for ( i = 0; i < RING_SIZE(&blk_ring); i++ )
+    for ( i = 0; i < BLK_RING_SIZE; i++ )
         rec_ring[i].id = i+1;
-    rec_ring[RING_SIZE(&blk_ring)-1].id = 0x0fffffff;
+    rec_ring[BLK_RING_SIZE-1].id = 0x0fffffff;
 
     (void)ctrl_if_register_receiver(CMSG_BLKIF_FE, blkif_ctrlif_rx,
                                     CALLBACK_IN_BLOCKING_CONTEXT);

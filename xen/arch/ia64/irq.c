@@ -649,8 +649,7 @@ int request_irq(unsigned int irq,
 	if (!handler)
 		return -EINVAL;
 
-	action = (struct irqaction *)
-			kmalloc(sizeof(struct irqaction), GFP_ATOMIC);
+	action = xmalloc(struct irqaction);
 	if (!action)
 		return -ENOMEM;
 
@@ -667,7 +666,7 @@ int request_irq(unsigned int irq,
 
 	retval = setup_irq(irq, action);
 	if (retval)
-		kfree(action);
+		xfree(action);
 	return retval;
 }
 
@@ -730,7 +729,7 @@ void free_irq(unsigned int irq, void *dev_id)
 
 			/* Wait to make sure it's not being used on another CPU */
 			synchronize_irq(irq);
-			kfree(action);
+			xfree(action);
 			return;
 		}
 		printk(KERN_ERR "Trying to free free IRQ%d\n",irq);
@@ -1389,7 +1388,7 @@ int pirq_guest_bind(struct exec_domain *d, int irq, int will_share)
             goto out;
         }
 
-        action = xmalloc(sizeof(irq_guest_action_t));
+        action = xmalloc(irq_guest_action_t);
         if ( (desc->action = (struct irqaction *)action) == NULL )
         {
             DPRINTK("Cannot bind IRQ %d to guest. Out of memory.\n", irq);

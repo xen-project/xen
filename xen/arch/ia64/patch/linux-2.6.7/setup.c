@@ -1,5 +1,5 @@
---- /home/djm/linux-2.6.7/arch/ia64/kernel/setup.c	2004-06-15 23:18:58.000000000 -0600
-+++ arch/ia64/setup.c	2005-02-17 10:53:00.000000000 -0700
+--- ../../linux-2.6.7/arch/ia64/kernel/setup.c	2004-06-15 23:18:58.000000000 -0600
++++ arch/ia64/setup.c	2005-03-23 14:54:06.000000000 -0700
 @@ -21,6 +21,9 @@
  #include <linux/init.h>
  
@@ -58,36 +58,83 @@
  /*
   * Filter incoming memory segments based on the primitive map created from the boot
   * parameters. Segments contained in the map are removed from the memory ranges. A
-@@ -280,23 +293,40 @@
+@@ -128,9 +141,12 @@
+ 	for (i = 0; i < num_rsvd_regions; ++i) {
+ 		range_start = max(start, prev_start);
+ 		range_end   = min(end, rsvd_region[i].start);
+-
+-		if (range_start < range_end)
+-			call_pernode_memory(__pa(range_start), range_end - range_start, func);
++		/* init_boot_pages requires "ps, pe" */
++		if (range_start < range_end) {
++			printk("Init boot pages: 0x%lx -> 0x%lx.\n",
++				__pa(range_start), __pa(range_end));
++			(*func)(__pa(range_start), __pa(range_end), 0);
++		}
+ 
+ 		/* nothing more available in this segment */
+ 		if (range_end == end) return 0;
+@@ -187,17 +203,17 @@
+ 				+ strlen(__va(ia64_boot_param->command_line)) + 1);
+ 	n++;
+ 
++	/* Reserve xen image/bitmap/xen-heap */
+ 	rsvd_region[n].start = (unsigned long) ia64_imva((void *)KERNEL_START);
+-	rsvd_region[n].end   = (unsigned long) ia64_imva(_end);
++	rsvd_region[n].end   = rsvd_region[n].start + xenheap_size;
+ 	n++;
+ 
+-#ifdef CONFIG_BLK_DEV_INITRD
++	/* This is actually dom0 image */
+ 	if (ia64_boot_param->initrd_start) {
+ 		rsvd_region[n].start = (unsigned long)__va(ia64_boot_param->initrd_start);
+ 		rsvd_region[n].end   = rsvd_region[n].start + ia64_boot_param->initrd_size;
+ 		n++;
+ 	}
+-#endif
+ 
+ 	/* end of memory marker */
+ 	rsvd_region[n].start = ~0UL;
+@@ -207,6 +223,16 @@
+ 	num_rsvd_regions = n;
+ 
+ 	sort_regions(rsvd_region, num_rsvd_regions);
++
++	{
++		int i;
++		printk("Reserved regions: \n");
++		for (i = 0; i < num_rsvd_regions; i++)
++			printk("  [%d] -> [0x%lx, 0x%lx]\n",
++				i,
++				rsvd_region[i].start,
++				rsvd_region[i].end);
++	}
+ }
+ 
+ /**
+@@ -280,23 +306,26 @@
  }
  #endif
  
 +#ifdef XEN
-+void __init
-+early_setup_arch(void)
-+{
-+	efi_init();
-+	io_port_init();
-+}
-+#endif
-+
  void __init
- setup_arch (char **cmdline_p)
+-setup_arch (char **cmdline_p)
++early_setup_arch(char **cmdline_p)
  {
  	unw_init();
- 
-+#ifndef XEN
- 	ia64_patch_vtop((u64) __start___vtop_patchlist, (u64) __end___vtop_patchlist);
-+#endif
- 
+-
+-	ia64_patch_vtop((u64) __start___vtop_patchlist, (u64) __end___vtop_patchlist);
+-
++	
  	*cmdline_p = __va(ia64_boot_param->command_line);
  	strlcpy(saved_command_line, *cmdline_p, sizeof(saved_command_line));
- 
-+#ifndef XEN
+-
++	cmdline_parse(*cmdline_p);
++	
  	efi_init();
- 	io_port_init();
-+#endif
- 
+-	io_port_init();
+-
++	
  #ifdef CONFIG_IA64_GENERIC
  	machvec_init(acpi_get_sysname());
  #endif
@@ -99,7 +146,31 @@
  #ifdef CONFIG_ACPI_BOOT
  	/* Initialize the ACPI boot-time table parser */
  	acpi_table_init();
-@@ -413,6 +443,9 @@
+@@ -308,9 +337,13 @@
+ 	smp_build_cpu_map();	/* happens, e.g., with the Ski simulator */
+ # endif
+ #endif /* CONFIG_APCI_BOOT */
++	io_port_init();
++}
++#endif
+ 
+-	find_memory();
+-
++void __init
++setup_arch (void)
++{
+ 	/* process SAL system table: */
+ 	ia64_sal_init(efi.sal_systab);
+ 
+@@ -353,7 +386,6 @@
+ 	/* enable IA-64 Machine Check Abort Handling */
+ 	ia64_mca_init();
+ 
+-	platform_setup(cmdline_p);
+ 	paging_init();
+ }
+ 
+@@ -413,6 +445,9 @@
  		sprintf(cp, " 0x%lx", mask);
  	}
  
@@ -109,7 +180,7 @@
  	seq_printf(m,
  		   "processor  : %d\n"
  		   "vendor     : %s\n"
-@@ -667,6 +700,8 @@
+@@ -667,6 +702,8 @@
  void
  check_bugs (void)
  {

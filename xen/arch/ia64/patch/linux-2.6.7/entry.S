@@ -1,5 +1,5 @@
---- /home/djm/src/xen/xeno-ia64.bk/xen/linux-2.6.7/arch/ia64/kernel/entry.S	2005-01-23 13:23:36.000000000 -0700
-+++ /home/djm/src/xen/xeno-ia64.bk/xen/arch/ia64/entry.S	2004-12-17 13:47:03.000000000 -0700
+--- ../../linux-2.6.7/arch/ia64/kernel/entry.S	2005-03-24 19:39:56.000000000 -0700
++++ arch/ia64/entry.S	2005-04-01 12:56:01.000000000 -0700
 @@ -35,7 +35,9 @@
  
  #include <asm/asmmacro.h>
@@ -46,7 +46,7 @@
  	mov r27=IA64_KR(CURRENT_STACK)
  	adds r21=IA64_TASK_THREAD_KSP_OFFSET,in0
 -	dep r20=0,in0,61,3		// physical address of "current"
-+	dep r20=0,in0,50,14		// physical address of "current"
++	dep r20=0,in0,60,4		// physical address of "current"
  	;;
  	st8 [r22]=sp			// save kernel stack pointer of old task
  	shr.u r26=r20,IA64_GRANULE_SHIFT

@@ -362,9 +362,6 @@ EXPORT_SYMBOL(HYPERVISOR_shared_info);
 unsigned int *phys_to_machine_mapping, *pfn_to_mfn_frame_list;
 EXPORT_SYMBOL(phys_to_machine_mapping);
 
-DEFINE_PER_CPU(multicall_entry_t, multicall_list[8]);
-DEFINE_PER_CPU(int, nr_multicall_ents);
-
 /* Raw start-of-day parameters from the hypervisor. */
 union xen_start_info_union xen_start_info_union;
 
@@ -1412,8 +1409,10 @@ void __init setup_arch(char **cmdline_p)
 	/* Register a call for panic conditions. */
 	notifier_chain_register(&panic_notifier_list, &xen_panic_block);
 
-	HYPERVISOR_vm_assist(VMASST_CMD_enable,
-			     VMASST_TYPE_4gb_segments);
+	HYPERVISOR_vm_assist(
+		VMASST_CMD_enable, VMASST_TYPE_4gb_segments);
+	HYPERVISOR_vm_assist(
+		VMASST_CMD_enable, VMASST_TYPE_writable_pagetables);
 
 	memcpy(&boot_cpu_data, &new_cpu_data, sizeof(new_cpu_data));
 	early_cpu_init();

@@ -203,6 +203,7 @@ inline void send_IPI_mask_sequence(cpumask_t mask, int vector)
 
 #include <mach_ipi.h> /* must come after the send_IPI functions above for inlining */
 
+#if 0 /* XEN */
 /*
  *	Smarter SMP flushing macros. 
  *		c/o Linus Torvalds.
@@ -440,6 +441,22 @@ void flush_tlb_all(void)
 {
 	on_each_cpu(do_flush_tlb_all, NULL, 1, 1);
 }
+
+#else
+
+irqreturn_t smp_invalidate_interrupt(int irq, void *dev_id,
+				     struct pt_regs *regs)
+{ return 0; }
+void flush_tlb_current_task(void)
+{ xen_tlb_flush_mask(current->mm->cpu_vm_mask); }
+void flush_tlb_mm(struct mm_struct * mm)
+{ xen_tlb_flush_mask(mm->cpu_vm_mask); }
+void flush_tlb_page(struct vm_area_struct *vma, unsigned long va)
+{ xen_invlpg_mask(vma->vm_mm->cpu_vm_mask, va); }
+void flush_tlb_all(void)
+{ xen_tlb_flush_all(); }
+
+#endif /* XEN */
 
 /*
  * this function sends a 'reschedule' IPI to another CPU.

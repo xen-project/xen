@@ -57,7 +57,7 @@ typedef struct {
  * Generate blkif ring structures and types.
  */
 
-DEFINE_RING_TYPES(blkif, blkif_request_t, blkif_response_t, PAGE_SIZE);
+DEFINE_RING_TYPES(blkif, blkif_request_t, blkif_response_t);
 
 /*
  * BLKIF_OP_PROBE:

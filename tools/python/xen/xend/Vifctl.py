@@ -37,6 +37,20 @@ def network(op, script=None, bridge=None, antispoof=None):
     args = ' '.join(args)
     os.system(script + ' ' + args)
 
+def set_vif_name(vif_old, vif_new):
+    if vif_old == vif_new:
+        vif = vif_new
+        return vif
+    if os.system("ip link show %s" % vif_old) == 0:
+        os.system("ip link set %s down" % vif_old)
+        os.system("ip link set %s name %s" % (vif_old, vif_new))
+        os.system("ip link set %s up" % vif_new)
+    if os.system("ip link show %s" % vif_new) == 0:
+        vif = vif_new
+    else:
+        vif = vif_old
+    return vif
+
 def vifctl(op, vif=None, script=None, domain=None, mac=None, bridge=None, ipaddr=[]):
     """Call a vif control script.
     Xend calls this when bringing vifs up or down.

@@ -50,8 +50,8 @@ __LINKAGE void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
 
     if ( !test_and_set_bit(0, &printed) )
     {
-        HYPERVISOR_vm_assist(VMASST_CMD_disable,
-                             VMASST_TYPE_4gb_segments_notify);
+        HYPERVISOR_vm_assist(
+            VMASST_CMD_disable, VMASST_TYPE_4gb_segments_notify);
 
         DP("");
         DP("***************************************************************");
@@ -79,8 +79,8 @@ __LINKAGE void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
 
 static int __init fixup_init(void)
 {
-    HYPERVISOR_vm_assist(VMASST_CMD_enable,
-                         VMASST_TYPE_4gb_segments_notify);
+    HYPERVISOR_vm_assist(
+        VMASST_CMD_enable, VMASST_TYPE_4gb_segments_notify);
     return 0;
 }
 __initcall(fixup_init);

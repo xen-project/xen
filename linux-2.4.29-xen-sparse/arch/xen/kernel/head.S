@@ -1,6 +1,8 @@
 
 .section __xen_guest
-    .asciz "GUEST_OS=linux,GUEST_VER=2.4,XEN_VER=3.0,VIRT_BASE=0xC0000000"
+    .ascii "GUEST_OS=linux,GUEST_VER=2.4,XEN_VER=3.0,VIRT_BASE=0xC0000000"
+    .ascii ",LOADER=generic"
+    .byte  0
 
 .text
 #include <linux/config.h>

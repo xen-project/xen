@@ -195,7 +195,7 @@ static void fast_flush_area(int idx, int nr_pages)
         mcl[i].args[2] = 0;
     }
 
-    mcl[nr_pages-1].args[2] = UVMF_FLUSH_TLB;
+    mcl[nr_pages-1].args[2] = UVMF_TLB_FLUSH|UVMF_ALL;
     if ( unlikely(HYPERVISOR_multicall(mcl, nr_pages) != 0) )
         BUG();
 }

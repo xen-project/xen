@@ -80,38 +80,19 @@ blkif_t *blkif_find_by_handle(domid_t domid, unsigned int handle);
             blkif_disconnect_complete(_b);        \
     } while (0)
 
-/* An entry in a list of xen_extents. */
-typedef struct _blkif_extent_le { 
-    blkif_extent_t extent;               /* an individual extent */
-    struct _blkif_extent_le *next;       /* and a pointer to the next */ 
-    struct block_device *bdev;
-} blkif_extent_le_t; 
-
-typedef struct _vbd { 
-    blkif_vdev_t       vdevice;   /* what the domain refers to this vbd as */
-    unsigned char      readonly;  /* Non-zero -> read-only */
-    unsigned char      type;      /* VDISK_TYPE_xxx */
-    blkif_extent_le_t *extents;   /* list of xen_extents making up this vbd */
-    rb_node_t          rb;        /* for linking into R-B tree lookup struct */
-} vbd_t; 
-
 void vbd_create(blkif_be_vbd_create_t *create); 
-void vbd_grow(blkif_be_vbd_grow_t *grow); 
-void vbd_shrink(blkif_be_vbd_shrink_t *shrink);
 void vbd_destroy(blkif_be_vbd_destroy_t *delete); 
 int vbd_probe(blkif_t *blkif, vdisk_t *vbd_info, int max_vbds);
 void destroy_all_vbds(blkif_t *blkif);
 
-/* Describes a [partial] disk extent (part of a block io request) */
-typedef struct {
+struct phys_req {
     unsigned short       dev;
     unsigned short       nr_sects;
     struct block_device *bdev;
-    unsigned long        buffer;
     blkif_sector_t       sector_number;
-} phys_seg_t;
+};
 
-int vbd_translate(phys_seg_t *pseg, blkif_t *blkif, int operation); 
+int vbd_translate(struct phys_req *req, blkif_t *blkif, int operation); 
 
 void blkif_interface_init(void);
 void blkif_ctrlif_init(void);

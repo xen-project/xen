@@ -551,6 +551,16 @@ class XendDomainInfo:
         dl.append(dev)
         self.devices[type] = dl
 
+    def refresh_device(self, type, dev):
+        """Refresh a device to a virtual machine.
+
+        @param type: device type
+        @param dev:  device
+        """
+        dl = self.devices.get(type, [])
+        if dev in dl:
+            dl.refresh(dev)
+
     def remove_device(self, type, dev):
         """Remove a device from a virtual machine.
 
@@ -912,6 +922,19 @@ class XendDomainInfo:
         old_index = self.config.index(old_full_config)
         self.config[old_index] = new_full_config
         return new_config
+
+    def device_refresh(self, type, idx):
+        """Refresh a device.
+
+        @param type: device type
+        @param idx:  device index
+        """
+        dev = self.get_device_by_index(type, idx)
+        if not dev:
+            raise VmError('invalid device: %s %s' % (type, idx))
+        devs = self.devices.get(type)
+        dev.refresh()
+        #self.refresh_device(type, dev)
         
     def device_destroy(self, type, idx):
         """Destroy a device.

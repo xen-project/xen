@@ -22,6 +22,8 @@
 #ifndef __ASM_DEBUGGER_H__
 #define __ASM_DEBUGGER_H__
 
+#include <xen/softirq.h>
+
 /* The main trap handlers use these helper macros which include early bail. */
 static inline int debugger_trap_entry(
     unsigned int vector, struct xen_regs *regs)

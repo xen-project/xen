@@ -30,6 +30,7 @@ restore_all_guest:
         popq  %r11                    # CS
         cmpw  $__GUEST_CS32,%r11
         popq  %r11                    # RFLAGS
+        cli                           # No interrupts after stack switch
         popq  %rsp                    # RSP
         je    1f
         sysretq
@@ -112,8 +113,8 @@ ENTRY(syscall_enter)
         movq  EDOMAIN_syscall_addr(%rbx),%rax
         movq  %rax,TRAPBOUNCE_eip(%rdx)
         movw  $0,TRAPBOUNCE_flags(%rdx)
-        pushq restore_all_guest(%rip)
-        jmp   create_bounce_frame
+        call  create_bounce_frame
+        jmp   restore_all_guest
 
 /* %rbx: struct exec_domain */
 hypercall:
@@ -179,7 +180,7 @@ create_bounce_frame:
         jb    1f                        # In +ve address space? Then okay.
         movq  $HYPERVISOR_VIRT_END+60,%rax
         cmpq  %rax,%rsi
-        jb    domain_crash              # Above Xen private area? Then okay.
+        jb    domain_crash_synchronous  # Above Xen private area? Then okay.
 1:      subq  $40,%rsi
         movq  XREGS_ss+8(%rsp),%rax
 FLT2:   movq  %rax,32(%rsi)             # SS
@@ -215,7 +216,7 @@ FLT11:  movq  %rax,8(%rsi)              # ES
 FLT12:  movq  %rax,(%rsi)               # DS
 2:      subq  $16,%rsi
         movq  XREGS_r11+8(%rsp),%rax
-FLT13:  movq  %rax,(%rsi)               # R11
+FLT13:  movq  %rax,8(%rsi)              # R11
         movq  XREGS_rcx+8(%rsp),%rax
 FLT14:  movq  %rax,(%rsi)               # RCX
         /* Rewrite our stack frame and return to guest-OS mode. */
@@ -230,11 +231,13 @@ FLT14:  movq  %rax,(%rsi)               # RCX
         movb  $0,TRAPBOUNCE_flags(%rdx)
         ret
 .section __ex_table,"a"
-        .quad  FLT2,domain_crash ,  FLT3,domain_crash ,  FLT4,domain_crash
-        .quad  FLT5,domain_crash ,  FLT6,domain_crash ,  FLT7,domain_crash
-        .quad  FLT8,domain_crash ,  FLT9,domain_crash , FLT10,domain_crash
-        .quad FLT11,domain_crash , FLT12,domain_crash , FLT13,domain_crash
-        .quad FLT14,domain_crash
+        .quad  FLT2,domain_crash_synchronous ,  FLT3,domain_crash_synchronous
+        .quad  FLT4,domain_crash_synchronous ,  FLT5,domain_crash_synchronous
+        .quad  FLT6,domain_crash_synchronous ,  FLT7,domain_crash_synchronous
+        .quad  FLT8,domain_crash_synchronous ,  FLT9,domain_crash_synchronous
+        .quad FLT10,domain_crash_synchronous , FLT11,domain_crash_synchronous
+        .quad FLT12,domain_crash_synchronous , FLT13,domain_crash_synchronous
+        .quad FLT14,domain_crash_synchronous
 .previous
 
         ALIGN
@@ -447,6 +450,7 @@ ENTRY(hypercall_table)
         .quad SYMBOL_NAME(do_switch_to_user)
         .quad SYMBOL_NAME(do_boot_vcpu)
         .quad SYMBOL_NAME(do_set_segment_base)   /* 25 */
+        .quad SYMBOL_NAME(do_mmuext_op)
         .rept NR_hypercalls-((.-hypercall_table)/4)
         .quad SYMBOL_NAME(do_ni_hypercall)
         .endr
