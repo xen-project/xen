@@ -127,8 +127,17 @@ void vbd_grow(blkif_be_vbd_grow_t *grow)
     x->extent.device        = grow->extent.device;
     /* XXXcl see comments at top of open_by_devnum */
 #if 01
-    x->bdev = open_by_devnum(vbd_map_devnum(x->extent.device),
-			     vbd->readonly ? FMODE_READ : FMODE_WRITE);
+    x->bdev = bdget(vbd_map_devnum(x->extent.device));
+#ifndef DONT_BLKDEV_GET
+    if (x->bdev)
+	x->bdev = open_by_devnum(vbd_map_devnum(x->extent.device),
+				 vbd->readonly ? FMODE_READ : FMODE_WRITE);
+#endif
+    if (x->bdev == NULL) {
+	PRINTK("vbd_grow: device %08x doesn't exist.\n", x->extent.device);
+	grow->status = BLKIF_BE_STATUS_EXTENT_NOT_FOUND;
+	goto out;
+    }
 #endif
     /* XXXcl maybe bd_claim? */
     x->extent.sector_start  = grow->extent.sector_start;
@@ -231,6 +240,11 @@ void vbd_shrink(blkif_be_vbd_shrink_t *shrink)
 
     x   = *px;
     *px = x->next;
+
+#ifndef DONT_BLKDEV_GET
+    blkdev_put(x->bdev);
+#endif
+
     kfree(x);
 
     shrink->status = BLKIF_BE_STATUS_OKAY;
@@ -491,6 +505,15 @@ int vbd_translate(phys_seg_t *pseg, blkif_t *blkif, int operation)
 #define MAJOR_XEN(dev)	((dev)>>8)
 #define MINOR_XEN(dev)	((dev) & 0xff)
 
+#ifndef FANCY_REMAPPING
+static dev_t vbd_map_devnum(blkif_pdev_t cookie)
+{
+    int major = MAJOR_XEN(cookie);
+    int minor = MINOR_XEN(cookie);
+
+    return MKDEV(major, minor);
+}
+#else
 #define	XEN_IDE0_MAJOR IDE0_MAJOR
 #define	XEN_IDE1_MAJOR IDE1_MAJOR
 #define	XEN_IDE2_MAJOR IDE2_MAJOR
@@ -538,3 +561,4 @@ static dev_t vbd_map_devnum(blkif_pdev_t cookie)
 
     return MKDEV(new_major, minor);
 }
+#endif
