@@ -420,13 +420,13 @@ static ide_startstop_t chs_rw_disk (ide_drive_t *drive, struct request *rq, unsi
 	taskfile.device_head	|= drive->select.all;
 	taskfile.command	= command;
 
-	/* #ifdef DEBUG */
+#ifdef DEBUG
 	printk("%s: %sing: ", drive->name, (rq->cmd==READ) ? "read" : "writ");
 	if (lba)	printk("LBAsect=%lld, ", block);
 	else		printk("CHS=%d/%d/%d, ", cyl, head, sect);
 	printk("sectors=%ld, ", rq->nr_sectors);
 	printk("buffer=0x%08lx\n", (unsigned long) rq->buffer);
-	/* #endif*/
+#endif
 
 	memcpy(args.tfRegister, &taskfile, sizeof(struct hd_drive_task_hdr));
 	memcpy(args.hobRegister, &hobfile, sizeof(struct hd_drive_hob_hdr));
@@ -578,7 +578,7 @@ static ide_startstop_t do_rw_disk (ide_drive_t *drive, struct request *rq, unsig
 			tasklets[9] = (task_ioreg_t) 0;
 //			tasklets[8] = (task_ioreg_t) (block>>32);
 //			tasklets[9] = (task_ioreg_t) (block>>40);
-			/*#ifdef DEBUG */
+#ifdef DEBUG
 			printk("[A]\n");
 			printk("%s: %sing: LBAsect=%lu, sectors=%ld, buffer=0x%08lx, LBAsect=0x%012lx\n",
 				drive->name,
@@ -591,7 +591,7 @@ static ide_startstop_t do_rw_disk (ide_drive_t *drive, struct request *rq, unsig
 				drive->name, tasklets[3], tasklets[2],
 				tasklets[9], tasklets[8], tasklets[7],
 				tasklets[6], tasklets[5], tasklets[4]);
-			/* #endif */
+#endif
 			OUT_BYTE(tasklets[1], IDE_FEATURE_REG);
 			OUT_BYTE(tasklets[3], IDE_NSECTOR_REG);
 			OUT_BYTE(tasklets[7], IDE_SECTOR_REG);
