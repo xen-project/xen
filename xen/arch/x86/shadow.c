@@ -636,7 +636,7 @@ int shadow_fault(unsigned long va, long error_code)
     shadow_unlock(m);
 
     check_pagetable(m, current->mm.pagetable, "post-sf");
-    return 1;
+    return EXCRET_fault_fixed;
 }
 
 
