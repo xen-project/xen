@@ -195,10 +195,11 @@ void cmain(multiboot_info_t *mbi)
     printk(XEN_BANNER);
     printk(" http://www.cl.cam.ac.uk/netos/xen\n");
     printk(" University of Cambridge Computer Laboratory\n\n");
-    printk(" Xen version %d.%d%s (%s@%s) (%s) %s\n\n",
+    printk(" Xen version %d.%d%s (%s@%s) (%s) %s\n",
            XEN_VERSION, XEN_SUBVERSION, XEN_EXTRAVERSION,
            XEN_COMPILE_BY, XEN_COMPILE_DOMAIN,
            XEN_COMPILER, XEN_COMPILE_DATE);
+    printk(" Latest ChangeSet: %s\n\n", XEN_CHANGESET);
     set_printk_prefix("(XEN) ");
 
     /* We require memory and module information. */

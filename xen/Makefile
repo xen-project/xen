@@ -61,6 +61,8 @@ include/xen/compile.h:
 	@LANG=C echo \#define XEN_SUBVERSION\ \ \ $(XEN_SUBVERSION) >> $@
 	@LANG=C echo \#define XEN_EXTRAVERSION \"$(XEN_EXTRAVERSION)\" >> $@
 	@LANG=C echo >> $@
+	@LANG=C echo \#define XEN_CHANGESET \"`bk changes -nd':D: :T: :REV: :MD5KEY:' -r+ 2>/dev/null || echo "information unavailable"`\" >> $@
+	@LANG=C echo >> $@
 	@LANG=C echo \#define XEN_BANNER \\ >> $@
 	cd ./figlet && make && ./figlet Xen $(XEN_VERSION).$(XEN_SUBVERSION)$(XEN_EXTRAVERSION) 1>>../$@ && cd ..
 	@LANG=C echo >> $@
