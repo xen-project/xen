@@ -50,7 +50,7 @@ def shutdown(opts, doms, wait):
         opts.info("All domains terminated")
 
 def main_all(opts, args):
-    shutdown(opts, None, opts.wait)
+    shutdown(opts, None, opts.vals.wait)
 
 def main_dom(opts, args):
     if len(args) < 1: opts.err('Missing domain')
@@ -59,7 +59,7 @@ def main_dom(opts, args):
         domid = int(dom)
     except:
         opts.err('Invalid domain: ' + dom)
-    shutdown(opts, [ domid ], opts.wait)
+    shutdown(opts, [ domid ], opts.vals.wait)
     
 def main(argv):
     opts = gopts
@@ -68,7 +68,7 @@ def main(argv):
         opts.usage()
         return
     print 'shutdown.main>', len(args), args
-    if opts.all:
+    if opts.vals.all:
         main_all(opts, args)
     else:
         main_dom(opts, args)

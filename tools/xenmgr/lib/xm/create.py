@@ -28,7 +28,7 @@ gopts.opt('path', val='PATH',
          use="Search path for default scripts.")
 
 gopts.opt('defaults', short='f', val='FILE',
-         fn=set_value, default='defaults',
+         fn=set_value, default='xmdefaults',
          use="Use the given default script.")
 
 gopts.opt('config', short='F', val='FILE',

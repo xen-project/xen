@@ -4,6 +4,7 @@
 import os
 import os.path
 import sys
+from getopt import getopt
 
 from xenmgr import PrettyPrint
 from xenmgr import sxp
@@ -196,20 +197,41 @@ class ProgList(Prog):
     name = "list"
     info = """List info about domains."""
 
+    short_options = 'l'
+    long_options = ['long']
+
     def help(self, args):
         if help:
-            print args[0], '[DOM...]'
+            print args[0], '[options] [DOM...]'
             print """\nGet information about domains.
-            Either all domains or the domains given."""
+            Either all domains or the domains given.
+
+            -l, --long   Get more detailed information.
+            """
             return
         
     def main(self, args):
-        n = len(args)
-        if n == 1:
-            doms = server.xend_domains()
+        use_long = 0
+        (options, params) = getopt(args[1:],
+                                   self.short_options,
+                                   self.long_options)
+        n = len(params)
+        for (k, v) in options:
+            if k in ['-l', '--long']:
+                use_long = 1
+                
+        if n == 0:
+            doms = map(int, server.xend_domains())
+            doms.sort()
         else:
-            doms = map(int, args[1:])
-        doms.sort()
+            doms = map(int, params)
+            
+        if use_long:
+            self.long_list(doms)
+        else:
+            self.brief_list(doms)
+
+    def brief_list(self, doms):
         print 'Dom  Name             Mem(MB)  CPU  State  Time(s)'
         for dom in doms:
             info = server.xend_domain(dom)
@@ -221,6 +243,12 @@ class ProgList(Prog):
             d['state'] = sxp.child_value(info, 'state', '??')
             d['cpu_time'] = float(sxp.child_value(info, 'cpu_time', '0'))
             print ("%(dom)-4d %(name)-16s %(mem)7d  %(cpu)3d  %(state)5s  %(cpu_time)7.1f" % d)
+
+    def long_list(self, doms):
+        for dom in doms:
+            info = server.xend_domain(dom)
+            print '\nDomain %d' % dom
+            PrettyPrint.prettyprint(info)
 
 xm.prog(ProgList)
 
@@ -246,8 +274,7 @@ class ProgShutdown(Prog):
     info = """Shutdown a domain."""
 
     def help(self, args):
-        print args[0], 'DOM'
-        print '\nSignal domain DOM to shutdown.'
+        shutdown.main([args[0], '-h'])
     
     def main(self, args):
         shutdown.main(args)

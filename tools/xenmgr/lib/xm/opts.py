@@ -273,7 +273,7 @@ class Opts:
                 self.load(p)
                 break
         else:
-            self.err("Cannot open defaults file %s" % self.defaults)
+            self.err("Cannot open defaults file %s" % self.vals.defaults)
 
     def load(self, defaults, help=0):
         """Load a defaults file. Local variables in the file
