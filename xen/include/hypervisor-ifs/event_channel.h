@@ -10,36 +10,35 @@
 #define __HYPERVISOR_IFS__EVENT_CHANNEL_H__
 
 /*
- * EVTCHNOP_open: Open a communication channel between <local_dom> and
- * <remote_dom>.
+ * EVTCHNOP_open: Open a communication channel between <dom1> and <dom2>.
  * NOTES:
- *  1. <local_dom> may be specified as DOMID_SELF.
+ *  1. <dom1> may be specified as DOMID_SELF.
  *  2. Only a sufficiently-privileged domain may create an event channel.
- *  3. <local_port> and <remote_port> are only supplied if the op succeeds.
+ *  3. <port1> and <port2> are only supplied if the op succeeds.
  */
 #define EVTCHNOP_open           0
 typedef struct evtchn_open
 {
     /* IN parameters. */
-    domid_t local_dom, remote_dom;
+    domid_t dom1, dom2;
     /* OUT parameters. */
-    int     local_port, remote_port;
+    int     port1, port2;
 } evtchn_open_t;
 
 /*
  * EVTCHNOP_close: Close the communication channel which has an endpoint at
- * <local_dom, local_port>.
+ * <dom, port>.
  * NOTES:
- *  1. <local_dom> may be specified as DOMID_SELF.
+ *  1. <dom> may be specified as DOMID_SELF.
  *  2. Only a sufficiently-privileged domain may close an event channel
- *     for which <local_dom> is not DOMID_SELF.
+ *     for which <dom> is not DOMID_SELF.
  */
 #define EVTCHNOP_close          1
 typedef struct evtchn_close
 {
     /* IN parameters. */
-    domid_t local_dom;
-    int     local_port;
+    domid_t dom;
+    int     port;
     /* No OUT parameters. */
 } evtchn_close_t;
 
@@ -57,22 +56,22 @@ typedef struct evtchn_send
 
 /*
  * EVTCHNOP_status: Get the current status of the communication channel which
- * has an endpoint at <local_dom, local_port>.
+ * has an endpoint at <dom1, port1>.
  * NOTES:
- *  1. <local_dom> may be specified as DOMID_SELF.
+ *  1. <dom1> may be specified as DOMID_SELF.
  *  2. Only a sufficiently-privileged domain may obtain the status of an event
- *     channel for which <local_dom> is not DOMID_SELF.
- *  3. <remote_dom, remote_port> is only supplied if status is 'connected'.
+ *     channel for which <dom1> is not DOMID_SELF.
+ *  3. <dom2, port2> is only supplied if status is 'connected'.
  */
 #define EVTCHNOP_status         3  /* Get status of <channel id>.         */
 typedef struct evtchn_status
 {
     /* IN parameters */
-    domid_t local_dom;
-    int     local_port;
+    domid_t dom1;
+    int     port1;
     /* OUT parameters */
-    domid_t remote_dom;
-    int     remote_port;
+    domid_t dom2;
+    int     port2;
 #define EVTCHNSTAT_closed       0  /* Chennel is not in use.              */
 #define EVTCHNSTAT_disconnected 1  /* Channel is not connected to remote. */
 #define EVTCHNSTAT_connected    2  /* Channel is connected to remote.     */

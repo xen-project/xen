@@ -20,6 +20,7 @@
 #include <hypervisor-ifs/hypervisor-if.h>
 #include <hypervisor-ifs/dom0_ops.h>
 #include <hypervisor-ifs/vbd.h>
+#include <hypervisor-ifs/event_channel.h>
 
 #define _PAGE_PRESENT   0x001
 #define _PAGE_RW        0x002
