@@ -369,7 +369,7 @@ class BlkDev(controller.SplitDev):
         # Add a new disk type that will just pass an opaque id in the
         # start_sector and use an experimental device type.
         # Please contact andrew.warfield@cl.cam.ac.uk with any concerns.
-        if self.type == 'amorfs':
+        if self.type == 'parallax':
             self.node   = node
             self.device =  61440 # (240,0)
             self.start_sector = long(self.params)

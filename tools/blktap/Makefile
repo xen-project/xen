@@ -7,10 +7,33 @@ CC       = gcc
 XEN_ROOT = ../..
 include $(XEN_ROOT)/tools/Rules.mk
 
+BLKTAP_INSTALL_DIR	= /usr/sbin
+
+INSTALL         = install
+INSTALL_PROG    = $(INSTALL) -m0755
+INSTALL_DIR     = $(INSTALL) -d -m0755
+
 INCLUDES += 
 
 SRCS     :=
 SRCS     += blktaplib.c
+
+PLX_SRCS := 
+PLX_SRCS += vdi.c 
+PLX_SRCS += radix.c 
+PLX_SRCS += blockstore.c 
+PLX_SRCS += snaplog.c
+VDI_SRCS := $(PLX_SRCS)
+PLX_SRCS += parallax.c
+
+VDI_TOOLS :=
+VDI_TOOLS += vdi_create
+VDI_TOOLS += vdi_list
+VDI_TOOLS += vdi_snap
+VDI_TOOLS += vdi_snap_list
+VDI_TOOLS += vdi_fill
+VDI_TOOLS += vdi_tree
+VDI_TOOLS += vdi_validate
 
 CFLAGS   += -Wall
 CFLAGS   += -Werror
@@ -30,7 +53,7 @@ OBJS     = $(patsubst %.c,%.o,$(SRCS))
 
 LIB      = libblktap.so libblktap.so.$(MAJOR) libblktap.so.$(MAJOR).$(MINOR)
 
-all: mk-symlinks blkdump blkcow blkimg blkcowimg blkgnbd blkcowgnbd blkaio
+all: mk-symlinks blkdump blkcow blkimg blkcowimg blkgnbd blkcowgnbd $(VDI_TOOLS) parallax 
 	$(MAKE) $(LIB)
 
 LINUX_ROOT := $(wildcard $(XEN_ROOT)/linux-2.6.*-xen-sparse)
@@ -45,16 +68,14 @@ mk-symlinks:
 	  ln -sf ../../$(LINUX_ROOT)/include/asm-xen/linux-public/*.h . )
 
 install: all
-	mkdir -p $(prefix)/usr/lib
-	mkdir -p $(prefix)/usr/include
-	install -m0755 $(LIB) $(prefix)/usr/lib
-	ln -sf libblktap.so.$(MAJOR).$(MINOR) \
-                $(prefix)/usr/lib/libblktap.so.$(MAJOR)
-	ln -sf libblktap.so.$(MAJOR) $(prefix)/usr/lib/libblktap.so
-	install -m0644 blktaplib.h $(prefix)/usr/include
+	$(INSTALL_DIR) -p $(DESTDIR)/usr/lib
+	$(INSTALL_DIR) -p $(DESTDIR)/usr/include
+	$(INSTALL_PROG) $(LIB) $(DESTDIR)/usr/lib
+	$(INSTALL_PROG) blktaplib.h $(DESTDIR)/usr/include
+	$(INSTALL_PROG) blkdump blkcow blkimg blkcowimg blkgnbd blkcowgnbd $(DESTDIR)/$(BLKTAP_INSTALL_DIR)
 
 clean:
-	rm -rf *.a *.so *.o *.rpm $(LIB) *~ $(DEPS) xen TAGS blkdump blkcow blkimg blkcowimg blkgnbd blkcowgnbd blkaio
+	rm -rf *.a *.so *.o *.rpm $(LIB) *~ $(DEPS) xen TAGS blkdump blkcow blkimg blkcowimg blkgnbd blkcowgnbd blkaio $(VDI_TOOLS) parallax
 
 rpm: all
 	rm -rf staging
@@ -92,6 +113,38 @@ blkcowgnbd: $(LIB) blkgnbd.c blkcowlib.c blkgnbdlib.c
 
 blkaio: $(LIB) blkaio.c blkaiolib.c
 	$(CC) $(CFLAGS) -o blkaio -L$(XEN_LIBXC) -L$(XEN_LIBXUTIL) -L. -lblktap blkaio.c blkaiolib.c -laio -lpthread
+
+parallax: $(LIB) $(PLX_SRCS)
+	$(CC) $(CFLAGS) -o parallax -L$(XEN_LIBXC) -L$(XEN_LIBXUTIL) -L. -lblktap $(PLX_SRCS) libgnbd/libgnbd.a
+
+vdi_test: $(LIB) $(VDI_SRCS)
+	$(CC) $(CFLAGS) -g3 -o vdi_test -DVDI_STANDALONE $(VDI_SRCS)
+
+vdi_list: $(LIB) vdi_list.c $(VDI_SRCS)
+	$(CC) $(CFLAGS) -g3 -o vdi_list vdi_list.c $(VDI_SRCS)
+
+vdi_create: $(LIB) vdi_create.c $(VDI_SRCS)
+	$(CC) $(CFLAGS) -g3 -o vdi_create vdi_create.c $(VDI_SRCS)
+
+vdi_snap: $(LIB) vdi_snap.c $(VDI_SRCS)
+	$(CC) $(CFLAGS) -g3 -o vdi_snap vdi_snap.c $(VDI_SRCS)
+
+vdi_snap_list: $(LIB) vdi_snap_list.c $(VDI_SRCS)
+	$(CC) $(CFLAGS) -g3 -o vdi_snap_list vdi_snap_list.c $(VDI_SRCS)
+
+vdi_tree: $(LIB) vdi_tree.c $(VDI_SRCS)
+	$(CC) $(CFLAGS) -g3 -o vdi_tree vdi_tree.c $(VDI_SRCS)
+
+vdi_fill: $(LIB) vdi_fill.c $(VDI_SRCS)
+	$(CC) $(CFLAGS) -g3 -o vdi_fill vdi_fill.c $(VDI_SRCS)
+
+vdi_validate: $(LIB) vdi_validate.c $(VDI_SRCS)
+	$(CC) $(CFLAGS) -g3 -o vdi_validate vdi_validate.c $(VDI_SRCS)
+
+
+rdx_cmp: $(LIB) rdx_cmp.c $(VDI_SRCS)
+	$(CC) $(CFLAGS) -g3 -o rdx_cmp rdx_cmp.c $(VDI_SRCS)
+
 
 .PHONY: TAGS clean install mk-symlinks rpm
 TAGS:
