@@ -50,8 +50,10 @@ void evtchn_do_upcall(struct pt_regs *regs)
 
     local_irq_save(flags);
     
-    while ( synch_test_and_clear_bit(0, &s->evtchn_upcall_pending) )
+    while ( s->vcpu_data[0].evtchn_upcall_pending )
     {
+        s->vcpu_data[0].evtchn_upcall_pending = 0;
+        /* NB. No need for a barrier here -- XCHG is a barrier on x86. */
         l1 = xchg(&s->evtchn_pending_sel, 0);
         while ( (l1i = ffs(l1)) != 0 )
         {

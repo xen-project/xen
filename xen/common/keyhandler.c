@@ -94,8 +94,9 @@ void do_task_queues(u_char key, void *dev_id, struct pt_regs *regs)
         sched_prn_state(p ->state);
 	printk(", hyp_events = %08x\n", p->hyp_events);
         s = p->shared_info; 
-        printk("Guest: upcall_pend = %08lx, upcall_mask = %08lx\n", 
-               s->evtchn_upcall_pending, s->evtchn_upcall_mask);
+        printk("Guest: upcall_pend = %02x, upcall_mask = %02x\n", 
+               s->vcpu_data[0].evtchn_upcall_pending, 
+               s->vcpu_data[0].evtchn_upcall_mask);
         printk("Notifying guest...\n"); 
         send_guest_virq(p, VIRQ_DEBUG);
     }

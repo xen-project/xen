@@ -918,7 +918,9 @@ int construct_dom0(struct task_struct *p,
     /* Set up shared-info area. */
     update_dom_time(p->shared_info);
     p->shared_info->domain_time = 0;
-    p->shared_info->evtchn_upcall_mask = ~0UL; /* mask all upcalls */
+    /* Mask all upcalls... */
+    for ( i = 0; i < MAX_VIRT_CPUS; i++ )
+        p->shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
 
     /* Install the new page tables. */
     __cli();

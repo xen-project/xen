@@ -18,7 +18,7 @@
  */
 
 /* Schedule an asynchronous callback for the specified domain. */
-static inline void __guest_notify(struct task_struct *p)
+static inline void guest_schedule_to_run(struct task_struct *p)
 {
 #ifdef CONFIG_SMP
     unsigned long flags, cpu_mask;
@@ -41,23 +41,11 @@ static inline void __guest_notify(struct task_struct *p)
 #endif
 }
 
-static inline void guest_notify(struct task_struct *p)
-{
-    /*
-     * Upcall already pending or upcalls masked?
-     * NB. Suitably synchronised on x86:
-     *  We must set the pending bit before checking the mask, but this is
-     *  guaranteed to occur because test_and_set_bit() is an ordering barrier.
-     */
-    if ( !test_and_set_bit(0, &p->shared_info->evtchn_upcall_pending) &&
-         !test_bit(0, &p->shared_info->evtchn_upcall_mask) )
-        __guest_notify(p);
-}
-
-
 /*
  * EVENT-CHANNEL NOTIFICATIONS
- * NB. As in guest_notify, evtchn_set_* is suitably synchronised on x86.
+ * NB. On x86, the atomic bit operations also act as memory barriers. There
+ * is therefore sufficiently strict ordering for this architecture -- others
+ * may require explicit memory barriers.
  */
 
 static inline void evtchn_set_pending(struct task_struct *p, int port)
@@ -66,7 +54,11 @@ static inline void evtchn_set_pending(struct task_struct *p, int port)
     if ( !test_and_set_bit(port,    &s->evtchn_pending[0]) &&
          !test_bit        (port,    &s->evtchn_mask[0])    &&
          !test_and_set_bit(port>>5, &s->evtchn_pending_sel) )
-        guest_notify(p);
+    {
+        /* The VCPU pending flag must be set /after/ update to evtchn-pend. */
+        p->shared_info->vcpu_data[0].evtchn_upcall_pending = 1;
+        guest_schedule_to_run(p);
+    }
 }
 
 static inline void evtchn_set_exception(struct task_struct *p, int port)
@@ -103,7 +95,7 @@ static inline void send_guest_pirq(struct task_struct *p, int pirq)
 static inline void send_hyp_event(struct task_struct *p, int event)
 {
     if ( !test_and_set_bit(event, &p->hyp_events) )
-        __guest_notify(p);
+        guest_schedule_to_run(p);
 }
 
 /* Called on return from (architecture-dependent) entry.S. */

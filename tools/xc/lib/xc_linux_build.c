@@ -284,7 +284,9 @@ static int setup_guestos(int xc_handle,
     /* shared_info page starts its life empty. */
     shared_info = map_pfn_writeable(pm_handle, shared_info_frame);
     memset(shared_info, 0, PAGE_SIZE);
-    shared_info->evtchn_upcall_mask = ~0UL; /* mask all upcalls */
+    /* Mask all upcalls... */
+    for ( i = 0; i < MAX_VIRT_CPUS; i++ )
+        shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
     unmap_pfn(pm_handle, shared_info);
 
     /* Send the page update requests down to the hypervisor. */

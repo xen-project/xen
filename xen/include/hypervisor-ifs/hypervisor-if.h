@@ -150,6 +150,9 @@ typedef struct
 /* Event channel endpoints per domain. */
 #define NR_EVENT_CHANNELS 1024
 
+/* No support for multi-processor guests. */
+#define MAX_VIRT_CPUS 1
+
 /*
  * Xen/guestos shared data -- pointer provided in start_info.
  * NB. We expect that this struct is smaller than a page.
@@ -157,13 +160,39 @@ typedef struct
 typedef struct shared_info_st
 {
     /*
-     * If bit 0 in evtchn_upcall_pending is transitioned 0->1, and bit 0 in 
-     * evtchn_upcall_mask is clear, then an asynchronous upcall is scheduled. 
-     * The upcall mask can be used to prevent unbounded reentrancy and stack 
-     * overflow (in this way, acts as a kind of interrupt-enable flag).
+     * Per-VCPU information goes here. This will be cleaned up more when Xen 
+     * actually supports multi-VCPU guests.
      */
-    unsigned long evtchn_upcall_pending;
-    unsigned long evtchn_upcall_mask;
+    struct {
+        /*
+         * 'evtchn_upcall_pending' is written non-zero by Xen to indicate
+         * a pending notification for a particular VCPU. It is then cleared 
+         * by the guest OS /before/ checking for pending work, thus avoiding
+         * a set-and-check race. Note that the mask is only accessed by Xen
+         * on the CPU that is currently hosting the VCPU. This means that the
+         * pending and mask flags can be updated by the guest without special
+         * synchronisation (i.e., no need for the x86 LOCK prefix).
+         * This may seem suboptimal because if the pending flag is set by
+         * a different CPU then an IPI may be scheduled even when the mask
+         * is set. However, note:
+         *  1. The task of 'interrupt holdoff' is covered by the per-event-
+         *     channel mask bits. A 'noisy' event that is continually being
+         *     triggered can be masked at source at this very precise
+         *     granularity.
+         *  2. The main purpose of the per-VCPU mask is therefore to restrict
+         *     reentrant execution: whether for concurrency control, or to
+         *     prevent unbounded stack usage. Whatever the purpose, we expect
+         *     that the mask will be asserted only for short periods at a time,
+         *     and so the likelihood of a 'spurious' IPI is suitably small.
+         * The mask is read before making an event upcall to the guest: a
+         * non-zero mask therefore guarantees that the VCPU will not receive
+         * an upcall activation. The mask is cleared when the VCPU requests
+         * to block: this avoids wakeup-waiting races.
+         */
+        u8 evtchn_upcall_pending;
+        u8 evtchn_upcall_mask;
+        u8 pad0, pad1;
+    } vcpu_data[MAX_VIRT_CPUS];
 
     /*
      * A domain can have up to 1024 "event channels" on which it can send

@@ -220,7 +220,7 @@ void wake_up(struct task_struct *p)
 static long do_block(void)
 {
     ASSERT(current->domain != IDLE_DOMAIN_ID);
-    clear_bit(0, &current->shared_info->evtchn_upcall_mask);
+    current->shared_info->vcpu_data[0].evtchn_upcall_mask = 0;
     current->state = TASK_INTERRUPTIBLE;
     TRACE_2D(TRC_SCHED_BLOCK, current->domain, current);
     __enter_scheduler();
