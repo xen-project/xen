@@ -72,12 +72,12 @@ def blkdev_name_to_number(name):
     """Take the given textual block-device name (e.g., '/dev/sda1',
     'hda') and return the device number used by the OS. """
 
-    if not re.match( '/dev/', name ):
+    if not re.match( '^/dev/', name ):
         name = '/dev/' + name
         
     return os.stat(name).st_rdev
 
-def lookup_raw_partn(partition):
+def lookup_raw_partn(name):
     """Take the given block-device name (e.g., '/dev/sda1', 'hda')
     and return a dictionary { device, start_sector,
     nr_sectors, type }
@@ -87,40 +87,26 @@ def lookup_raw_partn(partition):
         type:         'Disk' or identifying name for partition type
     """
 
-    if not re.match( '/dev/', partition ):
-        partition = '/dev/' + partition
-        
-    """Try and match non-standard scsi raid arraysa
-    """
-    if re.match( '/dev/cciss/c[0-9]+d[0-9]+p[0-9]+', partition ):
-        drive = re.split( 'p[0-9]+', partition )[0]
+    p = name
+
+    if not re.match( '^/dev/', name ):
+        p = '/dev/' + name
+	        
+    fd = os.popen( '/sbin/sfdisk -s ' + p + ' 2>/dev/null' )
+    line = _readline(fd)
+    if line:
+	return [ { 'device' : blkdev_name_to_number(p),
+		   'start_sector' : long(0),
+		   'nr_sectors' : long(line) * 2,
+		   'type' : 'Disk' } ]
     else:
-        drive = re.split( '[0-9]', partition )[0]
-
-    if drive == partition:
-        fd = os.popen( '/sbin/sfdisk -s ' + drive + ' 2>/dev/null' )
-        line = _readline(fd)
-        if line:
-            return [ { 'device' : blkdev_name_to_number(drive),
-                       'start_sector' : long(0),
-                       'nr_sectors' : long(line) * 2,
-                       'type' : 'Disk' } ]
-        return None
-
-    # determine position on disk
-    fd = os.popen( '/sbin/sfdisk -d ' + drive + ' 2>/dev/null' )
-
-    #['/dev/sda3 : start= 16948575, size=16836120, Id=83, bootable\012']
-    lines = _readlines(fd)
-    for line in lines:
-        m = re.search( '^' + partition + '\s*: start=\s*([0-9]+), ' +
-                       'size=\s*([0-9]+), Id=\s*(\S+).*$', line)
-        if m:
-            return [ { 'device' : blkdev_name_to_number(drive),
-                       'start_sector' : long(m.group(1)),
-                       'nr_sectors' : long(m.group(2)),
-                       'type' : m.group(3) } ]
-    
+	# see if this is a hex device number
+	if re.match( '^(0x)?[0-9a-fA-F]+$', name ):
+	    return [ { 'device' : string.atoi(name,16),
+		   'start_sector' : long(0),
+		   'nr_sectors' : long(1L<<63),
+		   'type' : 'Disk' } ]
+	
     return None
 
 def lookup_disk_uname(uname):
@@ -143,7 +129,7 @@ def make_disk(dom, uname, dev, mode, recreate=0):
     """
     segments = lookup_disk_uname(uname)
     if not segments:
-        raise VmError("vbd: Segments not found: uname=%s" % uname)
+        raise VmError("vbd: Segments not foundXXXXXX: uname=%s" % uname)
     if len(segments) > 1:
         raise VmError("vbd: Multi-segment vdisk: uname=%s" % uname)
     segment = segments[0]
