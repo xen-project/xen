@@ -22,6 +22,18 @@ rwlock_t domlist_lock = RW_LOCK_UNLOCKED;
 struct domain *domain_hash[DOMAIN_HASH_SIZE];
 struct domain *domain_list;
 
+xmem_cache_t *domain_struct_cachep;
+struct domain *dom0;
+
+void __init domain_startofday(void)
+{
+    domain_struct_cachep = xmem_cache_create(
+        "domain_cache", sizeof(struct domain),
+        0, SLAB_HWCACHE_ALIGN, NULL, NULL);
+    if ( domain_struct_cachep == NULL )
+        panic("No slab cache for domain structs.");
+}
+
 struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
 {
     struct domain *d, **pd;

@@ -8,6 +8,7 @@
 
 #include <stdarg.h>
 #include <xen/config.h>
+#include <xen/compile.h>
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/errno.h>
@@ -416,6 +417,17 @@ void init_console(void)
     init_vga();
 
     serial_set_rx_handler(sercon_handle, serial_rx);
+
+    /* HELLO WORLD --- start-of-day banner text. */
+    printk(XEN_BANNER);
+    printk(" http://www.cl.cam.ac.uk/netos/xen\n");
+    printk(" University of Cambridge Computer Laboratory\n\n");
+    printk(" Xen version %d.%d%s (%s@%s) (%s) %s\n",
+           XEN_VERSION, XEN_SUBVERSION, XEN_EXTRAVERSION,
+           XEN_COMPILE_BY, XEN_COMPILE_DOMAIN,
+           XEN_COMPILER, XEN_COMPILE_DATE);
+    printk(" Latest ChangeSet: %s\n\n", XEN_CHANGESET);
+    set_printk_prefix("(XEN) ");
 }
 
 void console_endboot(int disable_vga)
