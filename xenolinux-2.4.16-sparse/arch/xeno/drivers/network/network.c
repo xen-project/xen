@@ -63,7 +63,6 @@ struct net_private
     unsigned int rx_idx, tx_idx, tx_full;
     net_ring_t *net_ring;
     spinlock_t tx_lock;
-    unsigned int id;
 };
 
  
@@ -109,6 +108,7 @@ static int network_open(struct net_device *dev)
     {
         printk(KERN_WARNING "%s: Could not allocate receive interrupt\n",
                dev->name);
+        network_free_rx_buffers(dev);
         goto fail;
     }
 
@@ -119,6 +119,7 @@ static int network_open(struct net_device *dev)
         printk(KERN_WARNING "%s: Could not allocate transmit interrupt\n",
                dev->name);
         free_irq(NET_RX_IRQ, dev);
+        network_free_rx_buffers(dev);
         goto fail;
     }
 
@@ -189,8 +190,7 @@ static void network_alloc_rx_buffers(struct net_device *dev)
     unsigned int i;
     struct net_private *np = dev->priv;
     struct sk_buff *skb;
-    unsigned int end = RX_RING_ADD(np->rx_idx, RX_MAX_ENTRIES);
-    
+    unsigned int end = RX_RING_ADD(np->rx_idx, RX_MAX_ENTRIES);    
 
     for ( i = np->net_ring->rx_prod; i != end; i = RX_RING_INC(i) )
     {
@@ -213,6 +213,13 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 
 static void network_free_rx_buffers(struct net_device *dev)
 {
+    /*
+     * XXXX This cannot be done safely until be have a proper interface
+     * for setting up and tearing down virtual interfaces on the fly.
+     * Currently the receive buffers are locked down by Xen and we have
+     * no sensible way of retrieving them.
+     */
+#if 0
     unsigned int i;
     struct net_private *np = dev->priv;
     struct sk_buff *skb;    
@@ -222,6 +229,7 @@ static void network_free_rx_buffers(struct net_device *dev)
         skb = np->rx_skb_ring[i];
         dev_kfree_skb(skb);
     }
+#endif
 }
 
 static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
@@ -399,7 +407,6 @@ int __init init_module(void)
         }
 
         np->dev = dev;
-        np->id = i;
         list_add(&np->list, &dev_list);
     }
 
