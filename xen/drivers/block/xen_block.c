@@ -661,20 +661,21 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
         }
         else
         {
-            phys_seg[nr_psegs].dev           = xendev_to_physdev(req->device);
+	    phys_seg[nr_psegs].dev           = req->device;
             phys_seg[nr_psegs].sector_number = req->sector_number + tot_sects;
             phys_seg[nr_psegs].buffer        = buffer;
             phys_seg[nr_psegs].nr_sects      = nr_sects;
-            if ( phys_seg[nr_psegs].dev == 0 ) 
-	    {
-	        DPRINTK("bad device\n");
-	        goto bad_descriptor;
-	    }
 	    if (p->domain != 0 &&
 		!xen_physdisk_access_okay(&phys_seg[nr_psegs], p, operation)) {
 	      DPRINTK("access denied\n");
 	      /* XXX not quite right, but close enough. */
 	      goto bad_descriptor;
+	    }
+	    phys_seg[nr_psegs].dev           = xendev_to_physdev(req->device);
+            if ( phys_seg[nr_psegs].dev == 0 ) 
+	    {
+	        DPRINTK("bad device\n");
+	        goto bad_descriptor;
 	    }
             new_segs = 1;
         }
