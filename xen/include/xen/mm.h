@@ -11,6 +11,7 @@ unsigned long init_heap_allocator(
 void init_heap_pages(int zone, struct pfn_info *pg, unsigned long nr_pages);
 struct pfn_info *alloc_heap_pages(int zone, int order);
 void free_heap_pages(int zone, struct pfn_info *pg, int order);
+void scrub_heap_pages(void);
 
 /* Xen suballocator */
 void init_xenheap_pages(unsigned long ps, unsigned long pe);

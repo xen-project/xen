@@ -344,6 +344,8 @@ void cmain(multiboot_info_t *mbi)
     init_domheap_pages(__pa(frame_table) + frame_table_size,
                        dom0_memory_start);
 
+    scrub_heap_pages();
+
     init_trace_bufs();
 
     domain_unpause_by_systemcontroller(current);

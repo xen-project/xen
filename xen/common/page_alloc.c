@@ -37,6 +37,7 @@ extern char opt_badpage[];
  *  One bit per page of memory. Bit set => page is allocated.
  */
 
+static unsigned long  bitmap_size; /* in bytes */
 static unsigned long *alloc_bitmap;
 #define PAGES_PER_MAPWORD (sizeof(unsigned long) * 8)
 
@@ -139,7 +140,7 @@ unsigned long init_heap_allocator(
     unsigned long bitmap_start, unsigned long max_pages)
 {
     int i, j;
-    unsigned long bitmap_size, bad_pfn;
+    unsigned long bad_pfn;
     char *p;
 
     memset(avail, 0, sizeof(avail));
@@ -282,6 +283,37 @@ void free_heap_pages(int zone, struct pfn_info *pg, int order)
     list_add_tail(&pg->list, &heap[zone][order]);
 
     spin_unlock_irqrestore(&heap_lock, flags);
+}
+
+
+/*
+ * Scrub all unallocated pages in all heap zones. This function is more
+ * convoluted than appears necessary because we do not want to continuously
+ * hold the lock or disable interrupts while scrubbing very large memory areas.
+ */
+void scrub_heap_pages(void)
+{
+    void *p;
+    unsigned long pfn, flags;
+
+    for ( pfn = 0; pfn < (bitmap_size * 8); pfn++ )
+    {
+        /* Quick lock-free check. */
+        if ( allocated_in_map(pfn) )
+            continue;
+        
+        spin_lock_irqsave(&heap_lock, flags);
+        
+        /* Re-check page status with lock held. */
+        if ( !allocated_in_map(pfn) )
+        {
+            p = map_domain_mem(pfn << PAGE_SHIFT);
+            clear_page(p);
+            unmap_domain_mem(p);
+        }
+        
+        spin_unlock_irqrestore(&heap_lock, flags);
+    }
 }
 
 

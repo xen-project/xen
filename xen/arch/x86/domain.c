@@ -698,6 +698,9 @@ int construct_dom0(struct domain *p,
         return -EINVAL;
     }
 
+    /* Paranoia: scrub DOM0's memory allocation. */
+    memset((void *)alloc_start, 0, alloc_end - alloc_start);
+
     /* Construct a frame-allocation list for the initial domain. */
     for ( mfn = (alloc_start>>PAGE_SHIFT); 
           mfn < (alloc_end>>PAGE_SHIFT); 
