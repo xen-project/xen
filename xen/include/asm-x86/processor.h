@@ -120,9 +120,16 @@
 /*
  * 'trap_bounce' flags values.
  */
-#define TBF_TRAP        1
-#define TBF_TRAP_NOCODE 2
-#define TBF_TRAP_CR2    4
+#define TBF_EXCEPTION          1
+#define TBF_EXCEPTION_ERRCODE  2
+#define TBF_EXCEPTION_CR2      4
+#define TBF_INTERRUPT          8
+#define TBF_FAILSAFE          16
+
+/*
+ * thread.flags values.
+ */
+#define TF_failsafe_return 1
 
 #ifndef __ASSEMBLY__
 
@@ -340,6 +347,8 @@ struct thread_struct {
     unsigned long      guestos_sp;
     unsigned long      guestos_ss;
 
+    unsigned long      flags; /* TF_ */
+
     /* Hardware debugging registers */
     unsigned long      debugreg[8];  /* %%db0-7 debug registers */
 
@@ -539,7 +548,7 @@ void show_guest_stack();
 void show_trace(unsigned long *esp);
 void show_stack(unsigned long *esp);
 void show_registers(struct xen_regs *regs);
-asmlinkage void fatal_trap(int trapnr, struct xen_regs *regs, long error_code);
+asmlinkage void fatal_trap(int trapnr, struct xen_regs *regs);
 
 #endif /* !__ASSEMBLY__ */
 
