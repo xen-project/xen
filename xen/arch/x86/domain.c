@@ -238,7 +238,7 @@ void arch_do_createdomain(struct exec_domain *ed)
         d->shared_info = (void *)alloc_xenheap_page();
         memset(d->shared_info, 0, PAGE_SIZE);
         ed->vcpu_info = &d->shared_info->vcpu_data[ed->eid];
-        SHARE_PFN_WITH_DOMAIN(virt_to_page(d->shared_info), d);
+        SHARE_PFN_WITH_DOMAIN2(virt_to_page(d->shared_info), d);
         machine_to_phys_mapping[virt_to_phys(d->shared_info) >> 
                                PAGE_SHIFT] = INVALID_M2P_ENTRY;
 

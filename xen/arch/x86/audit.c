@@ -36,7 +36,7 @@ static int ttot=0, ctot=0, io_mappings=0, lowmem_mappings=0;
 static int l1, l2, oos_count, page_count;
 
 #define FILE_AND_LINE 0
-//#define MFN_TO_WATCH 0x4700
+//#define MFN2_TO_WATCH 0x1d8
 
 #if FILE_AND_LINE
 #define adjust(_p, _a) _adjust((_p), (_a), __FILE__, __LINE__)
@@ -56,10 +56,10 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
 
     void _adjust(struct pfn_info *page, int adjtype ADJUST_EXTRA_ARGS)
     {
-#ifdef MFN_TO_WATCH
-        if (page_to_pfn(page) == MFN_TO_WATCH)
+#ifdef MFN2_TO_WATCH
+        if (page_to_pfn(page) == MFN2_TO_WATCH)
         {
-            APRINTK("adjust(mfn=%p, dir=%d, adjtype=%d) MFN_TO_WATCH",
+            APRINTK("adjust(mfn=%p, dir=%d, adjtype=%d)",
                     page_to_pfn(page), dir, adjtype);
         }
 #endif
@@ -547,6 +547,9 @@ int audit_adjust_pgtables(struct domain *d, int dir, int noisy)
         adjust_oos_list();
         adjust_shadow_tables();
     }
+
+    //printk("d->shared_info=%p __pa()=%p\n", d->shared_info, __pa(d->shared_info));
+    adjust(virt_to_page(d->shared_info), 1);
 
     return errors;
 }

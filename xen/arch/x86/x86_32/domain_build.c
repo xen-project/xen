@@ -329,12 +329,22 @@ int construct_dom0(struct domain *d,
     /* Copy the initial ramdisk. */
     if ( initrd_len != 0 )
         memcpy((void *)vinitrd_start, initrd_start, initrd_len);
-    
+
+    d->next_io_page = d->max_pages;
+
     /* Set up start info area. */
     si = (start_info_t *)vstartinfo_start;
     memset(si, 0, PAGE_SIZE);
     si->nr_pages     = d->tot_pages;
+#define NASTY_HACK
+#ifdef NASTY_HACK
+    si->shared_info  = d->next_io_page << PAGE_SHIFT;
+    set_machinetophys(virt_to_phys(d->shared_info) >> PAGE_SHIFT,
+                      d->next_io_page);
+    d->next_io_page++;
+#else
     si->shared_info  = virt_to_phys(d->shared_info);
+#endif
     si->flags        = SIF_PRIVILEGED | SIF_INITDOMAIN;
     si->pt_base      = vpt_start;
     si->nr_pt_frames = nr_pt_pages;
@@ -344,10 +354,12 @@ int construct_dom0(struct domain *d,
     for ( pfn = 0; pfn < d->tot_pages; pfn++ )
     {
         mfn = pfn + (alloc_start>>PAGE_SHIFT);
+#if 0
 #ifndef NDEBUG
 #define REVERSE_START ((v_end - dsi.v_start) >> PAGE_SHIFT)
         if ( pfn > REVERSE_START )
             mfn = (alloc_end>>PAGE_SHIFT) - (pfn - REVERSE_START);
+#endif
 #endif
         ((u32 *)vphysmap_start)[pfn] = mfn;
         machine_to_phys_mapping[mfn] = pfn;

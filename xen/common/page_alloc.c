@@ -350,6 +350,11 @@ void scrub_heap_pages(void)
 
     printk("Scrubbing Free RAM: ");
 
+#ifdef WATCH_MAP_DOMAIN_CALLERS
+    int old_map_domain_mem_noisy = map_domain_mem_noisy;
+    map_domain_mem_noisy = 0;
+#endif
+
     for ( pfn = 0; pfn < (bitmap_size * 8); pfn++ )
     {
         /* Every 100MB, print a progress dot and appease the watchdog. */
@@ -375,6 +380,10 @@ void scrub_heap_pages(void)
         
         spin_unlock_irqrestore(&heap_lock, flags);
     }
+
+#ifdef WATCH_MAP_DOMAIN_CALLERS
+    map_domain_mem_noisy = old_map_domain_mem_noisy;
+#endif
 
     printk("done.\n");
 }

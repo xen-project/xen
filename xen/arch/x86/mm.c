@@ -262,7 +262,7 @@ int map_ldt_shadow_page(unsigned int off)
 
     gpfn = l1_pgentry_to_pfn(mk_l1_pgentry(l1e));
     gmfn = __gpfn_to_mfn(d, gpfn);
-    if ( unlikely(!gmfn) )
+    if ( unlikely(!VALID_MFN(gmfn)) )
         return 0;
 
     if ( unlikely(shadow_mode_enabled(d)) )
@@ -1088,7 +1088,7 @@ void free_page_type(struct pfn_info *page, unsigned int type)
 }
 
 
-void put_page_type(struct pfn_info *page)
+void _put_page_type(struct pfn_info *page)
 {
     u32 nx, x, y = page->u.inuse.type_info;
 
@@ -1143,7 +1143,7 @@ void put_page_type(struct pfn_info *page)
 }
 
 
-int get_page_type(struct pfn_info *page, u32 type)
+int _get_page_type(struct pfn_info *page, u32 type)
 {
     u32 nx, x, y = page->u.inuse.type_info;
 
@@ -1286,8 +1286,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
     unsigned int cmd = val & MMUEXT_CMD_MASK, type;
     struct exec_domain *ed = current;
     struct domain *d = ed->domain, *e;
-    unsigned long gpfn = ptr >> PAGE_SHIFT;
-    unsigned long mfn = __gpfn_to_mfn(d, gpfn);
+    unsigned long mfn = ptr >> PAGE_SHIFT;
     struct pfn_info *page = &frame_table[mfn];
     u32 x, y, _d, _nd;
     domid_t domid;
@@ -1304,15 +1303,6 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         type = PGT_l1_page_table | PGT_va_mutable;
 
     pin_page:
-        if ( unlikely(percpu_info[cpu].foreign &&
-                      (shadow_mode_translate(d) ||
-                       shadow_mode_translate(percpu_info[cpu].foreign))) )
-        {
-            // oops -- we should be using the foreign domain's P2M
-            mfn = __gpfn_to_mfn(FOREIGNDOM, gpfn);
-            page = &frame_table[mfn];
-        }
-
         if ( shadow_mode_enabled(FOREIGNDOM) )
             type = PGT_writable_page;
 
@@ -1349,15 +1339,6 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
 #endif /* __x86_64__ */
 
     case MMUEXT_UNPIN_TABLE:
-        if ( unlikely(percpu_info[cpu].foreign &&
-                      (shadow_mode_translate(d) ||
-                       shadow_mode_translate(percpu_info[cpu].foreign))) )
-        {
-            // oops -- we should be using the foreign domain's P2M
-            mfn = __gpfn_to_mfn(FOREIGNDOM, gpfn);
-            page = &frame_table[mfn];
-        }
-
         if ( unlikely(!(okay = get_page_from_pagenr(mfn, FOREIGNDOM))) )
         {
             MEM_LOG("mfn %p bad domain (dom=%p)",
@@ -1723,9 +1704,7 @@ int do_mmu_update(
     cleanup_writable_pagetable(d);
 
     if ( unlikely(shadow_mode_enabled(d)) )
-    {
         check_pagetable(ed, "pre-mmu"); /* debug */
-    }
 
     /*
      * If we are resuming after preemption, read how much work we have already
@@ -1783,8 +1762,7 @@ int do_mmu_update(
         }
 
         cmd = req.ptr & (sizeof(l1_pgentry_t)-1);
-        gpfn = req.ptr >> PAGE_SHIFT;
-        mfn = __gpfn_to_mfn(d, gpfn);
+        mfn = req.ptr >> PAGE_SHIFT;
 
         okay = 0;
 
@@ -1867,6 +1845,8 @@ int do_mmu_update(
                         if ( shadow_mode_log_dirty(d) )
                             __mark_dirty(d, mfn);
 
+                        gpfn = __mfn_to_gpfn(d, mfn);
+                        ASSERT(gpfn);
                         if ( page_is_page_table(page) )
                             shadow_mark_mfn_out_of_sync(ed, gpfn, mfn);
                     }
@@ -1886,6 +1866,21 @@ int do_mmu_update(
             break;
 
         case MMU_MACHPHYS_UPDATE:
+
+            // HACK ALERT...  This about this later...
+            //
+            if ( unlikely(shadow_mode_translate(FOREIGNDOM) && IS_PRIV(d)) )
+            {
+                rc = FOREIGNDOM->next_io_page++;
+                printk("privileged guest dom%d requests mfn=%p for dom%d, gets pfn=%p\n",
+                       d->id, mfn, FOREIGNDOM->id, rc);
+                set_machinetophys(mfn, rc);
+                set_p2m_entry(FOREIGNDOM, rc, mfn);
+                okay = 1;
+                break;
+            }
+            BUG();
+            
             if ( unlikely(!get_page_from_pagenr(mfn, FOREIGNDOM)) )
             {
                 MEM_LOG("Could not get page for mach->phys update");
@@ -2250,7 +2245,7 @@ long do_update_descriptor(
 
     LOCK_BIGLOCK(dom);
 
-    if ( !(mfn = __gpfn_to_mfn(dom, gpfn)) ) {
+    if ( !VALID_MFN(mfn = __gpfn_to_mfn(dom, gpfn)) ) {
         UNLOCK_BIGLOCK(dom);
         return -EINVAL;
     }
