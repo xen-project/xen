@@ -10,6 +10,8 @@
 #include "mem_defs.h"
 #include <asm-xeno/suspend.h>
 
+#include <zlib.h>
+
 static char *argv0 = "internal_restore_linux";
 
 /* A table mapping each PFN to its new MFN. */
@@ -120,10 +122,10 @@ static void unmap_pfn(void *vaddr)
     (void)munmap(vaddr, PAGE_SIZE);
 }
 
-static int checked_read(int fd, void *buf, size_t count)
+static int checked_read(gzFile fd, void *buf, size_t count)
 {
     int rc;
-    while ( ((rc = read(fd, buf, count)) == -1) && (errno == EINTR) )
+    while ( ((rc = gzread(fd, buf, count)) == -1) && (errno == EINTR) )
         continue;
     return rc == count;
 }
@@ -164,8 +166,9 @@ int main(int argc, char **argv)
     suspend_record_t *p_srec;
 
     /* The name and descriptor of the file that we are reading from. */
-    char *filename;
-    int fd;
+    char  *filename;
+    int    fd;
+    gzFile gfd;
 
     if ( argv[0] != NULL ) 
         argv0 = argv[0];
@@ -183,19 +186,26 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    if ( (gfd = gzdopen(fd, "rb")) == NULL )
+    {
+        ERROR("Could not allocate decompression state for state file");
+        close(fd);
+        return 1;
+    }
+
     /* Start writing out the saved-domain record. */
-    if ( !checked_read(fd, signature, 16) ||
+    if ( !checked_read(gfd, signature, 16) ||
          (memcmp(signature, "XenoLinuxSuspend", 16) != 0) )
     {
         ERROR("Unrecognised state format -- no signature found");
         goto out;
     }
 
-    if ( !checked_read(fd, name,                  sizeof(name)) ||
-         !checked_read(fd, &nr_pfns,              sizeof(unsigned long)) ||
-         !checked_read(fd, &ctxt,                 sizeof(ctxt)) ||
-         !checked_read(fd, shared_info,           PAGE_SIZE) ||
-         !checked_read(fd, pfn_to_mfn_frame_list, PAGE_SIZE) )
+    if ( !checked_read(gfd, name,                  sizeof(name)) ||
+         !checked_read(gfd, &nr_pfns,              sizeof(unsigned long)) ||
+         !checked_read(gfd, &ctxt,                 sizeof(ctxt)) ||
+         !checked_read(gfd, shared_info,           PAGE_SIZE) ||
+         !checked_read(gfd, pfn_to_mfn_frame_list, PAGE_SIZE) )
     {
         ERROR("Error when reading from state file");
         goto out;
@@ -222,7 +232,7 @@ int main(int argc, char **argv)
     pfn_to_mfn_table = calloc(1, 4 * nr_pfns);
     pfn_type         = calloc(1, 4 * nr_pfns);    
 
-    if ( !checked_read(fd, pfn_type, 4 * nr_pfns) )
+    if ( !checked_read(gfd, pfn_type, 4 * nr_pfns) )
     {
         ERROR("Error when reading from state file");
         goto out;
@@ -282,7 +292,7 @@ int main(int argc, char **argv)
 
         mfn = pfn_to_mfn_table[i];
 
-        if ( !checked_read(fd, page, PAGE_SIZE) )
+        if ( !checked_read(gfd, page, PAGE_SIZE) )
         {
             ERROR("Error when reading from state file");
             goto out;
@@ -481,6 +491,8 @@ int main(int argc, char **argv)
         /* Success: print the domain id. */
         printf("DOM=%ld\n", dom);
     }
+
+    gzclose(gfd);
 
     return !!rc;
 }

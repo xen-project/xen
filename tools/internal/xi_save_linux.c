@@ -10,6 +10,8 @@
 #include "mem_defs.h"
 #include <asm-xeno/suspend.h>
 
+#include <zlib.h>
+
 static char *argv0 = "internal_save_linux";
 
 /* A table mapping each PFN to its current MFN. */
@@ -94,10 +96,10 @@ static unsigned int get_pfn_type(unsigned long mfn)
     return op.u.getpageframeinfo.type;
 }
 
-static int checked_write(int fd, const void *buf, size_t count)
+static int checked_write(gzFile fd, void *buf, size_t count)
 {
     int rc;
-    while ( ((rc = write(fd, buf, count)) == -1) && (errno = EINTR) )
+    while ( ((rc = gzwrite(fd, buf, count)) == -1) && (errno = EINTR) )
         continue;
     return rc == count;
 }
@@ -136,8 +138,9 @@ int main(int argc, char **argv)
     suspend_record_t *p_srec, srec;
 
     /* The name and descriptor of the file that we are writing to. */
-    char *filename;
-    int fd;
+    char  *filename;
+    int    fd;
+    gzFile gfd;
 
     if ( argv[0] != NULL ) 
         argv0 = argv[0];
@@ -159,6 +162,17 @@ int main(int argc, char **argv)
     if ( (fd = open(filename, O_CREAT|O_EXCL|O_WRONLY, 0644)) == -1 )
     {
         PERROR("Could not open file for writing");
+        return 1;
+    }
+
+    /*
+     * Compression rate 1: we want speed over compression. We're mainly going
+     * for those zero pages, after all.
+     */
+    if ( (gfd = gzdopen(fd, "wb1")) == NULL )
+    {
+        ERROR("Could not allocate compression state for state file");
+        close(fd);
         return 1;
     }
 
@@ -314,13 +328,13 @@ int main(int argc, char **argv)
 
     /* Start writing out the saved-domain record. */
     ppage = map_pfn(shared_info_frame);
-    if ( !checked_write(fd, "XenoLinuxSuspend",    16) ||
-         !checked_write(fd, name,                  sizeof(name)) ||
-         !checked_write(fd, &srec.nr_pfns,         sizeof(unsigned long)) ||
-         !checked_write(fd, &ctxt,                 sizeof(ctxt)) ||
-         !checked_write(fd, ppage,                 PAGE_SIZE) ||
-         !checked_write(fd, pfn_to_mfn_frame_list, PAGE_SIZE) ||
-         !checked_write(fd, pfn_type,              4 * srec.nr_pfns) )
+    if ( !checked_write(gfd, "XenoLinuxSuspend",    16) ||
+         !checked_write(gfd, name,                  sizeof(name)) ||
+         !checked_write(gfd, &srec.nr_pfns,         sizeof(unsigned long)) ||
+         !checked_write(gfd, &ctxt,                 sizeof(ctxt)) ||
+         !checked_write(gfd, ppage,                 PAGE_SIZE) ||
+         !checked_write(gfd, pfn_to_mfn_frame_list, PAGE_SIZE) ||
+         !checked_write(gfd, pfn_type,              4 * srec.nr_pfns) )
     {
         ERROR("Error when writing to state file");
         goto out;
@@ -365,7 +379,7 @@ int main(int argc, char **argv)
             }
         }
 
-        if ( !checked_write(fd, page, PAGE_SIZE) )
+        if ( !checked_write(gfd, page, PAGE_SIZE) )
         {
             ERROR("Error when writing to state file");
             goto out;
@@ -386,6 +400,8 @@ int main(int argc, char **argv)
         (void)do_dom0_op(&op);
     }
 
+    gzclose(gfd);
+    
     /* On error, make sure the file is deleted. */
     if ( rc != 0 )
         unlink(filename);
