@@ -67,11 +67,11 @@ CORE_FILES += arch/xen/kernel/kernel.o arch/xen/mm/mm.o
 CORE_FILES += arch/xen/drivers/evtchn/drv.o
 CORE_FILES += arch/xen/drivers/console/drv.o
 ifdef CONFIG_XEN_NEWIO
-CORE_FILES += arch/xen/drivers/blkif/drv.o
-CORE_FILES += arch/xen/drivers/netif/drv.o
+DRIVERS += arch/xen/drivers/blkif/drv.o
+DRIVERS += arch/xen/drivers/netif/drv.o
 else
-CORE_FILES += arch/xen/drivers/block/drv.o
-CORE_FILES += arch/xen/drivers/network/drv.o
+DRIVERS += arch/xen/drivers/block/drv.o
+DRIVERS += arch/xen/drivers/network/drv.o
 endif
 ifdef CONFIG_XEN_PRIVILEGED_GUEST
 CORE_FILES += arch/xen/drivers/dom0/drv.o
