@@ -380,7 +380,7 @@ static PyObject *pyxc_linux_restore(PyObject *self,
 	    do { 
 		rc = read( (int) fd, ((char*)buf)+tot, count-tot ); 
 		if ( rc < 0 ) { perror("READ"); return rc; }
-		if ( rc == 0 ) { printf("read: need %d, tot=%d got zero\n"); return -1; }
+		if ( rc == 0 ) { printf("read: need %d, tot=%d got zero\n",count-tot,tot); return -1; }
 		tot += rc;
 	    } 
             while ( tot < count );
@@ -1296,7 +1296,7 @@ static PyObject *pyxc_shadow_control(PyObject *self,
                                       &dom, &op) )
         return NULL;
 
-    if ( xc_shadow_control(xc->xc_handle, dom, op, NULL, 0) < 0 )
+    if ( xc_shadow_control(xc->xc_handle, dom, op, NULL, 0, NULL, NULL) < 0 )
         return PyErr_SetFromErrno(xc_error);
     
     Py_INCREF(zero);

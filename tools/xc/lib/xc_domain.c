@@ -112,7 +112,9 @@ int xc_shadow_control(int xc_handle,
                       u64 domid, 
                       unsigned int sop,
 		      unsigned long *dirty_bitmap,
-		      unsigned long pages)
+		      unsigned long pages,
+		      unsigned long *fault_count,
+		      unsigned long *dirty_count)
 {
     int rc;
     dom0_op_t op;
@@ -123,6 +125,9 @@ int xc_shadow_control(int xc_handle,
     op.u.shadow_control.pages  = pages;
 
     rc = do_dom0_op(xc_handle, &op);
+
+    if(fault_count) *fault_count = op.u.shadow_control.fault_count;
+    if(dirty_count) *dirty_count = op.u.shadow_control.dirty_count;
 
     if ( rc == 0 )
 	return op.u.shadow_control.pages;

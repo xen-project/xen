@@ -95,8 +95,12 @@ printk("DOM%lld: (file=shadow.c, line=%d) " _f "\n", \
     ASSERT(m->shadow_dirty_bitmap);
     if( likely(pfn<m->shadow_dirty_bitmap_size) )
     {
-	/* These updates occur with mm.shadow_lock held */
-	__set_bit( pfn, m->shadow_dirty_bitmap );
+		/* These updates occur with mm.shadow_lock held, so use 
+		   (__) version of test_and_set */
+		if( ! __test_and_set_bit( pfn, m->shadow_dirty_bitmap ) )
+		{
+			m->shadow_dirty_count++;
+		}
     }
     else
     {

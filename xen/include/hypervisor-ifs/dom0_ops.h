@@ -150,6 +150,13 @@ typedef struct dom0_settime_st
 } dom0_settime_t;
 
 #define DOM0_GETPAGEFRAMEINFO 18
+#define NOTAB 0         /* normal page */
+#define L1TAB (1<<28)
+#define L2TAB (2<<28)
+#define L3TAB (3<<28)
+#define L4TAB (4<<28)
+#define XTAB  (0xf<<28) /* invalid page */
+#define LTAB_MASK XTAB
 typedef struct dom0_getpageframeinfo_st
 {
     /* IN variables. */
@@ -157,8 +164,7 @@ typedef struct dom0_getpageframeinfo_st
     domid_t domain;        /* To which domain does the frame belong?    */
     /* OUT variables. */
     /* Is the page PINNED to a type? */
-    enum { NONE, L1TAB=(1<<29), L2TAB=(2<<29), L3TAB=(3<<29), L4TAB=(4<<29) } type;
-#define PGT_type_mask (7<<29)
+    unsigned long type;    /* see above type defs */
 } dom0_getpageframeinfo_t;
 
 
@@ -251,6 +257,9 @@ typedef struct dom0_shadow_control_st
     unsigned long  *dirty_bitmap; // pointe to mlocked buffer
     /* IN/OUT variables */
     unsigned long  pages;  // size of buffer, updated with actual size
+    /* OUT varaibles */
+    unsigned long fault_count;
+    unsigned long dirty_count;
 } dom0_shadow_control_t;
 
 #define DOM0_SETDOMAINNAME     26

@@ -59,7 +59,9 @@ int xc_shadow_control(int xc_handle,
                       u64 domid, 
                       unsigned int sop,
 		      unsigned long *dirty_bitmap,
-		      unsigned long pages);
+		      unsigned long pages,
+		      unsigned long *fault_count,
+		      unsigned long *dirty_count);
 
 
 #define XCFLAGS_VERBOSE 1

@@ -88,6 +88,9 @@ int xc_linux_restore(int xc_handle,
     /* A table containg the type of each PFN (/not/ MFN!). */
     unsigned long *pfn_type = NULL;
 
+    /* A table of MFNs to map in the current region */
+    unsigned long *region_mfn = NULL;
+
     /* A temporary mapping, and a copy, of one frame of guest memory. */
     unsigned long *ppage;
 
@@ -97,10 +100,12 @@ int xc_linux_restore(int xc_handle,
     /* A table mapping each PFN to its new MFN. */
     unsigned long *pfn_to_mfn_table = NULL;
 
+    /* used by mapper for updating the domain's copy of the table */
+    unsigned long *live_pfn_to_mfn_table = NULL;
+
     /* A temporary mapping of the guest's suspend record. */
     suspend_record_t *p_srec;
 
-    mfn_mapper_t *region_mapper, *mapper_handle1;
     char *region_base;
 
     mmu_t *mmu = NULL;
@@ -154,10 +159,18 @@ int xc_linux_restore(int xc_handle,
     /* We want zeroed memory so use calloc rather than malloc. */
     pfn_to_mfn_table = calloc(1, 4 * nr_pfns);
     pfn_type         = calloc(1, 4 * nr_pfns);    
+    region_mfn       = calloc(1, 4 * MAX_BATCH_SIZE);    
 
-    if ( (pfn_to_mfn_table == NULL) || (pfn_type == NULL) )
+    if ( (pfn_to_mfn_table == NULL) || (pfn_type == NULL) || 
+	 (region_mfn == NULL) )
     {
         errno = ENOMEM;
+        goto out;
+    }
+    
+    if ( mlock(region_mfn, 4 * MAX_BATCH_SIZE ) )
+    {
+        ERROR("Could not mlock region_mfn");
         goto out;
     }
 
@@ -206,15 +219,6 @@ int xc_linux_restore(int xc_handle,
         goto out;
     }
 
-
-    if ( (region_mapper = mfn_mapper_init(xc_handle, dom,
-					  MAX_BATCH_SIZE*PAGE_SIZE, 
-					  PROT_WRITE )) 
-	 == NULL )
-        goto out;
-
-    region_base = mfn_mapper_base( region_mapper );
-
     verbose_printf("Reloading memory pages:   0%%");
 
     /*
@@ -227,7 +231,7 @@ int xc_linux_restore(int xc_handle,
     while(1)
     {
 	int j;
-	unsigned long region_pfn_type[1024];
+	unsigned long region_pfn_type[MAX_BATCH_SIZE];
 
         this_pc = (n * 100) / nr_pfns;
         if ( (this_pc - prev_pc) >= 5 )
@@ -270,30 +274,31 @@ int xc_linux_restore(int xc_handle,
 
 	for(i=0;i<j;i++)
 	{
-            if ((region_pfn_type[i]>>29) == 7)
-		continue;
-
-	    pfn = region_pfn_type[i] & ~PGT_type_mask;
-	    mfn = pfn_to_mfn_table[pfn];
-	    
-	    mfn_mapper_queue_entry( region_mapper, i<<PAGE_SHIFT, 
-				    mfn, PAGE_SIZE );
+            if ( (region_pfn_type[i] & LTAB_MASK) == XTAB)
+		region_mfn[i] = 0; // we know map will fail, but don't care
+	    else
+	    {		
+		pfn = region_pfn_type[i] & ~LTAB_MASK;
+		region_mfn[i] = pfn_to_mfn_table[pfn];
+	    }	    	    
 	}
-
-	if( mfn_mapper_flush_queue(region_mapper) )
+	
+	if ( (region_base = mfn_mapper_map_batch( xc_handle, dom, 
+						  PROT_WRITE,
+						  region_mfn,
+						  j )) == 0)
 	{
-	    ERROR("Couldn't map page region");
+	    PERROR("map batch failed");
 	    goto out;
 	}
-
 
 	for(i=0;i<j;i++)
 	{
 	    unsigned long *ppage;
 
-	    pfn = region_pfn_type[i] & ~PGT_type_mask;
+	    pfn = region_pfn_type[i] & ~LTAB_MASK;
 
-            if ((region_pfn_type[i]>>29) == 7)
+            if ( (region_pfn_type[i] & LTAB_MASK) == XTAB)
 		continue;
 
             if (pfn>nr_pfns)
@@ -302,7 +307,7 @@ int xc_linux_restore(int xc_handle,
 		goto out;
 	    }
 
-	    region_pfn_type[i] &= PGT_type_mask;
+	    region_pfn_type[i] &= LTAB_MASK;
 
 	    pfn_type[pfn] = region_pfn_type[i];
 
@@ -334,7 +339,7 @@ int xc_linux_restore(int xc_handle,
 
 			if ( xpfn >= nr_pfns )
 			{
-			    ERROR("Frame number in type %d page table is out of range. i=%d k=%d pfn=0x%x nr_pfns=%d",region_pfn_type[i]>>29,i,k,xpfn,nr_pfns);
+			    ERROR("Frame number in type %d page table is out of range. i=%d k=%d pfn=0x%x nr_pfns=%d",region_pfn_type[i]>>28,i,k,xpfn,nr_pfns);
 			    goto out;
 			}
 
@@ -355,17 +360,11 @@ int xc_linux_restore(int xc_handle,
 
 			if ( xpfn >= nr_pfns )
 			{
-			    ERROR("Frame number in type %d page table is out of range. i=%d k=%d pfn=%d nr_pfns=%d",region_pfn_type[i]>>29,i,k,xpfn,nr_pfns);
+			    ERROR("Frame number in type %d page table is out of range. i=%d k=%d pfn=%d nr_pfns=%d",region_pfn_type[i]>>28,i,k,xpfn,nr_pfns);
 
 			    goto out;
 			}
-#if 0
-			if ( region_pfn_type[pfn] != L1TAB )
-			{
-			    ERROR("Page table mistyping");
-			    goto out;
-			}
-#endif
+
 			ppage[k] &= (PAGE_SIZE - 1) & ~(_PAGE_GLOBAL | _PAGE_PSE);
 			ppage[k] |= pfn_to_mfn_table[xpfn] << PAGE_SHIFT;
 		    }
@@ -399,17 +398,21 @@ int xc_linux_restore(int xc_handle,
 
 	    if ( add_mmu_update(xc_handle, mmu,
 				(mfn<<PAGE_SHIFT) | MMU_MACHPHYS_UPDATE, pfn) )
+	    {
+		printf("machpys mfn=%ld pfn=%ld\n",mfn,pfn);
 		goto out;
+	    }
 
 	} // end of 'batch' for loop
 
+	munmap( region_base, j*PAGE_SIZE );
 	n+=j; // crude stats
 
     }
 
-    DPRINTF("Received all pages\n");
+    printf("Received all pages\n");
 
-    mfn_mapper_close( region_mapper );
+    DPRINTF("Received all pages\n");
 
     /*
      * Pin page tables. Do this after writing to them as otherwise Xen
@@ -424,7 +427,8 @@ int xc_linux_restore(int xc_handle,
                                 MMU_EXTENDED_COMMAND,
                                 MMUEXT_PIN_L1_TABLE) )
 	    {
-		printf("ERR pin L1 pfn=%lx mfn=%lx\n");
+		printf("ERR pin L1 pfn=%lx mfn=%lx\n",
+		       i, pfn_to_mfn_table[i]);
                 goto out;
 	    }
         }
@@ -435,7 +439,8 @@ int xc_linux_restore(int xc_handle,
                                 MMU_EXTENDED_COMMAND,
                                 MMUEXT_PIN_L2_TABLE) )
 	    {
-		printf("ERR pin L2 pfn=%lx mfn=%lx\n");
+		printf("ERR pin L2 pfn=%lx mfn=%lx\n",
+		       i, pfn_to_mfn_table[i]);
                 goto out;
 	    }
         }
@@ -456,7 +461,7 @@ int xc_linux_restore(int xc_handle,
 
     /* Uncanonicalise the suspend-record frame number and poke resume rec. */
     pfn = ctxt.cpu_ctxt.esi;
-    if ( (pfn >= nr_pfns) || (pfn_type[pfn] != NONE) )
+    if ( (pfn >= nr_pfns) || (pfn_type[pfn] != NOTAB) )
     {
         ERROR("Suspend record frame number is bad");
         goto out;
@@ -477,7 +482,7 @@ int xc_linux_restore(int xc_handle,
     for ( i = 0; i < ctxt.gdt_ents; i += 512 )
     {
         pfn = ctxt.gdt_frames[i];
-        if ( (pfn >= nr_pfns) || (pfn_type[pfn] != NONE) )
+        if ( (pfn >= nr_pfns) || (pfn_type[pfn] != NOTAB) )
         {
             ERROR("GDT frame number is bad");
             goto out;
@@ -509,37 +514,33 @@ int xc_linux_restore(int xc_handle,
 
 
     /* Uncanonicalise the pfn-to-mfn table frame-number list. */
-    if ( (mapper_handle1 = mfn_mapper_init(xc_handle, dom,
-					   1024*1024, PROT_WRITE )) 
-	 == NULL )
-        goto out;
-	
     for ( i = 0; i < (nr_pfns+1023)/1024; i++ )
     {
 	unsigned long pfn, mfn;
 
         pfn = pfn_to_mfn_frame_list[i];
-        if ( (pfn >= nr_pfns) || (pfn_type[pfn] != NONE) )
+        if ( (pfn >= nr_pfns) || (pfn_type[pfn] != NOTAB) )
         {
             ERROR("PFN-to-MFN frame number is bad");
             goto out;
         }
 	mfn = pfn_to_mfn_table[pfn];
-
-	mfn_mapper_queue_entry( mapper_handle1, i<<PAGE_SHIFT, 
-				mfn, PAGE_SIZE );
+	pfn_to_mfn_frame_list[i] = mfn;
     }
     
-    if ( mfn_mapper_flush_queue(mapper_handle1) )
+    if ( (live_pfn_to_mfn_table = mfn_mapper_map_batch( xc_handle, dom, 
+				  PROT_WRITE,
+				  pfn_to_mfn_frame_list,
+				  (nr_pfns+1023)/1024 )) == 0 )
     {
         ERROR("Couldn't map pfn_to_mfn table");
         goto out;
     }
 
-    memcpy( mfn_mapper_base( mapper_handle1 ), pfn_to_mfn_table, 
+    memcpy( live_pfn_to_mfn_table, pfn_to_mfn_table, 
 	    nr_pfns*sizeof(unsigned long) );
 
-    mfn_mapper_close( mapper_handle1 );
+    munmap( live_pfn_to_mfn_table, ((nr_pfns+1023)/1024)*PAGE_SIZE );
 
     /*
      * Safety checking of saved context:

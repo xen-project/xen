@@ -172,7 +172,7 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
                                       v);
 
 	    if ( unlikely(HYPERVISOR_mmu_update(u, v - u + 1, NULL) < 0) )
-		put_user( 0xe0000000 | mfn, p );
+		put_user( 0xF0000000 | mfn, p );
 
 	    v = w;
 	}

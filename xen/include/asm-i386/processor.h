@@ -445,17 +445,27 @@ struct mm_struct {
     l1_pgentry_t *perdomain_pt;
     pagetable_t  pagetable;
 
+    /* shadow mode status and controls */
     unsigned int shadow_mode;  /* flags to control shadow table operation */
     pagetable_t  shadow_table;
     spinlock_t shadow_lock;
+    unsigned int shadow_max_page_count; // currently unused
+
+    /* shadow hashtable */
     struct shadow_status *shadow_ht;
     struct shadow_status *shadow_ht_free;
     struct shadow_status *shadow_ht_extras; /* extra allocation units */
+    unsigned int shadow_extras_count;
+
+    /* shadow dirty bitmap */
     unsigned long *shadow_dirty_bitmap;
     unsigned int shadow_dirty_bitmap_size;  /* in pages, bit per page */
-    unsigned int shadow_page_count;
-    unsigned int shadow_max_page_count;
-    unsigned int shadow_extras_count;
+
+    /* shadow mode stats */
+    unsigned int shadow_page_count;     
+    unsigned int shadow_fault_count;     
+    unsigned int shadow_dirty_count;     
+
 
     /* Current LDT details. */
     unsigned long ldt_base, ldt_ents, shadow_ldt_mapcnt;

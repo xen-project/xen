@@ -397,7 +397,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         {
             ret = 0;
 
-            op->u.getpageframeinfo.type = NONE;
+            op->u.getpageframeinfo.type = NOTAB;
 
             if ( (page->type_and_flags & PGT_count_mask) != 0 )
             {
@@ -645,11 +645,17 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 		    switch( page->type_and_flags & PGT_type_mask )
 		    {
 		    case PGT_l1_page_table:
+			type = L1TAB;
+			break;
 		    case PGT_l2_page_table:
+			type = L2TAB;
+			break;
 		    case PGT_l3_page_table:
+			type = L3TAB;
+			break;
 		    case PGT_l4_page_table:
-			type = page->type_and_flags & PGT_type_mask;
-
+			type = L4TAB;
+			break;
 		    }
 		    l_arr[j] |= type;
 		    put_page(page);
@@ -657,7 +663,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 		else
 		{
 		e2_err:
-		    l_arr[j] |= PGT_type_mask; /* error */
+		    l_arr[j] |= XTAB;
 		}
 
 	    }

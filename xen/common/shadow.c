@@ -33,12 +33,34 @@ hypercall lock anyhow (at least initially).
 
 FIXME:
 
-1. Flush needs to avoid blowing away the L2 page that another CPU may be using!
+The shadow table flush command is dangerous on SMP systems as the
+guest may be using the L2 on one CPU while the other is trying to 
+blow the table away. 
 
-fix using cpu_raise_softirq
+The current save restore code works around this by not calling FLUSH,
+but by calling CLEAN2 which leaves all L2s in tact (this is probably
+quicker anyhow).
 
-have a flag to count in, (after switching to init's PTs) 
-spinlock, reload cr3_shadow, unlock
+Even so, we have to be very careful. The flush code may need to cause
+a TLB flush on another CPU. It needs to do this while holding the
+shadow table lock. The trouble is, the guest may be in the shadow page
+fault handler spinning waiting to grab the shadow lock. It may have
+intterupts disabled, hence we can't use the normal flush_tlb_cpu
+mechanism.
+
+For the moment, we have a grim hace whereby the spinlock in the shadow
+fault handler is actually a try lock, in a loop with a helper for the
+tlb flush code.
+
+A better soloution would be to take a new flush lock, then raise a
+per-domain soft irq on the other CPU.  The softirq will switch to
+init's PTs, then do an atomic inc of a variable to count himself in,
+then spin on a lock.  Having noticed that the other guy has counted
+in, flush the shadow table, then release him by dropping the lock. He
+will then reload cr3 from mm.page_table on the way out of the softirq.
+
+In domian-softirq context we know that the guy holds no locks and has
+interrupts enabled. Nothing can go wrong ;-)
 
 **/
 
@@ -364,6 +386,11 @@ static int shadow_mode_table_op( struct task_struct *p,
 			rc = -EINVAL;
 			goto out;
 		}
+
+		sc->fault_count = p->mm.shadow_fault_count;
+		sc->dirty_count = p->mm.shadow_dirty_count;
+		p->mm.shadow_fault_count = 0;
+		p->mm.shadow_dirty_count = 0;
 	
 		sc->pages = p->tot_pages;
 	
@@ -745,6 +772,8 @@ int shadow_fault( unsigned long va, long error_code )
     } // end of fixup writing the shadow L1 directly failed
      
     perfc_incrc(shadow_fixup_count);
+
+	m->shadow_fault_count++;
 
     check_pagetable( current, current->mm.pagetable, "post-sf" );
 
