@@ -75,6 +75,7 @@ __start:
         cpuid
         bt      $29,%edx            # Long mode feature?
         jnc     bad_cpu
+        mov     %edx,%edi
 skip_boot_checks:
 
         /* Set up FPU. */
@@ -91,9 +92,12 @@ skip_boot_checks:
         /* Set up EFER (Extended Feature Enable Register). */
         movl    $MSR_EFER, %ecx
         rdmsr
-        /* Long Mode, SYSCALL/SYSRET, No-Execute */
-        movl    $(EFER_LME|EFER_SCE|EFER_NX),%eax
-        wrmsr
+        btsl    $_EFER_LME,%eax /* Long Mode      */
+        btsl    $_EFER_SCE,%eax /* SYSCALL/SYSRET */
+        btl     $20,%edi        /* CPUID 0x80000001, EDX[20] */
+        jnc     1f
+        btsl    $_EFER_NX,%eax  /* No-Execute     */
+1:      wrmsr
 
         mov     $0x80050033,%eax /* hi-to-lo: PG,AM,WP,NE,ET,MP,PE */
         mov     %eax,%cr0
