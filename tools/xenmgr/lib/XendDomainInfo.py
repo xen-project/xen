@@ -17,13 +17,14 @@ import os
 from twisted.internet import defer
 
 import Xc; xc = Xc.new()
-
 import xenctl.ip
 
 import sxp
 
 import XendConsole
 xendConsole = XendConsole.instance()
+
+import XendBridge
 
 import server.SrvConsoleServer
 xend = server.SrvConsoleServer.instance()
@@ -125,7 +126,7 @@ class XendDomainInfo:
             sxpr.append(['state', state])
             if self.info['shutdown']:
                 reasons = ["poweroff", "reboot", "suspend"]
-                reason = reasons[info['shutdown_reason']]
+                reason = reasons[self.info['shutdown_reason']]
                 sxpr.append(['shutdown_reason', reason])
             sxpr.append(['cpu', self.info['cpu']])
             sxpr.append(['cpu_time', self.info['cpu_time']/1e9])
@@ -182,6 +183,18 @@ class XendDomainInfo:
         if self.dom <= 0:
             return 0
         return xc.domain_destroy(dom=self.dom)
+
+    def died(self):
+        print 'died>', self.dom
+        self.release_vifs()
+
+    def release_vifs(self):
+        print 'release_vifs>', self.dom
+        vifs = self.get_devices('vif')
+        for v in vifs:
+            vif = sxp.child_value(v, 'vif')
+            bridge = sxp.child_value(v, 'bridge')
+            XendBridge.vif_bridge_rem(self.dom, vif, bridge)
 
     def show(self):
         """Print virtual machine info.
@@ -264,7 +277,7 @@ def lookup_disk_uname( uname ):
         segments = None
     return segments
 
-def make_disk(dom, uname, dev, mode, sharing):
+def make_disk(dom, uname, dev, mode):
     """Create a virtual disk device for a domain.
 
     @returns Deferred
@@ -689,10 +702,14 @@ def vm_dev_vif(vm, val, index):
         raise VmError('vif: vif in control domain')
     vif = index #todo
     vmac = sxp.child_value(val, "mac")
-    bridge = sxp.child_value(val, "bridge") # todo
     defer = make_vif(vm.dom, vif, vmac)
     def fn(id):
-        dev = val + ['vif', vif]
+        bridge = sxp.child_value(val, "bridge")
+        bridge = XendBridge.vif_bridge_add(vm.dom, vif, bridge)
+        dev = ['vif', ['vif', vif], ['bridge', bridge] ]
+        netdev = xend.netif_dev(vm.dom, vif)
+        if netdev and netdev.mac:
+            dev += [ 'mac', netdev.mac ]
         vm.add_device('vif', dev)
         print 'vm_dev_vif> created', dev
         return id
@@ -715,8 +732,7 @@ def vm_dev_vbd(vm, val, index):
     if not dev:
         raise VMError('vbd: Missing dev')
     mode = sxp.child_value(val, 'mode', 'r')
-    sharing = sxp.child_value(val, 'sharing', 'rr')
-    defer = make_disk(vm.dom, uname, dev, mode, sharing)
+    defer = make_disk(vm.dom, uname, dev, mode)
     def fn(vbd):
         vm.add_device('vbd', val)
         return vbd

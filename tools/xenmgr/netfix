@@ -3,102 +3,15 @@
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
 #============================================================================
 # Move the IP address from eth0 onto the Xen bridge (nbe-br).
-# Works best if the bridge control utils (brctl) have been installed.
+# Only works if the bridge control utils (brctl) have been installed.
 #============================================================================
-import os
-import os.path
-import re
-import sys
 
 from getopt import getopt
+from xenmgr.XendBridge import *
 
-os.defpath = os.defpath+':/sbin:/usr/sbin:/usr/local/sbin'
-CMD_IFCONFIG = 'ifconfig'
-CMD_ROUTE    = 'route'
-CMD_BRCTL    = 'brctl'
-
-def routes():
-    """Return a list of the routes.
-    """
-    fin = os.popen(CMD_ROUTE + ' -n', 'r')
-    routes = []
-    for x in fin:
-        if x.startswith('Kernel'): continue
-        if x.startswith('Destination'): continue
-        x = x.strip()
-        y = x.split()
-        z = { 'destination': y[0],
-              'gateway'    : y[1],
-              'mask'       : y[2],
-              'flags'      : y[3],
-              'metric'     : y[4],
-              'ref'        : y[5],
-              'use'        : y[6],
-              'interface'  : y[7] }
-        routes.append(z)
-    return routes
-
-def cmd(p, s):
-    """Print and execute command 'p' with args 's'.
-    """
-    global opts
-    c = p + ' ' + s
-    if opts.verbose: print c
-    if not opts.dryrun:
-        os.system(c)
-
-def ifconfig(interface):
-    """Return the ip config for an interface,
-    """
-    fin = os.popen(CMD_IFCONFIG + ' %s' % interface, 'r')
-    inetre = re.compile('\s*inet\s*addr:(?P<address>\S*)\s*Bcast:(?P<broadcast>\S*)\s*Mask:(?P<mask>\S*)')
-    info = None
-    for x in fin:
-        m = inetre.match(x)
-        if not m: continue
-        info = m.groupdict()
-        info['interface'] = interface
-        break
-    return info
-
-def reconfigure(interface, bridge):
-    """Reconfigure an interface to be attached to a bridge, and give the bridge
-    the IP address etc. from interface. Move the default route to the interface
-    to the bridge.
-    """
-    intf_info = ifconfig(interface)
-    if not intf_info:
-        print 'Interface not found:', interface
-        return
-    #bridge_info = ifconfig(bridge)
-    #if not bridge_info:
-    #    print 'Bridge not found:', bridge
-    #    return
-    route_info = routes()
-    intf_info['bridge'] = bridge
-    intf_info['gateway'] = None
-    for r in route_info:
-        if (r['destination'] == '0.0.0.0' and
-            'G' in r['flags'] and
-            r['interface'] == interface):
-            intf_info['gateway'] = r['gateway']
-    if not intf_info['gateway']:
-        print 'Gateway not found: ', interface
-        return
-    cmd(CMD_IFCONFIG, '%(bridge)s %(address)s netmask %(mask)s broadcast %(broadcast)s up' % intf_info)
-    cmd(CMD_ROUTE, 'add default gateway %(gateway)s dev %(bridge)s' % intf_info)
-    cmd(CMD_BRCTL, 'addif %(bridge)s %(interface)s' % intf_info)
-    cmd(CMD_IFCONFIG, '%(interface)s 0.0.0.0' % intf_info)
-
-defaults = {
-    'interface': 'eth0',
-    'bridge'   : 'nbe-br',
-    'verbose'  : 1,
-    'dryrun'   : 0,
-    }
-
-short_options = 'hvqni:b:'
-long_options  = ['help', 'verbose', 'quiet', 'interface=', 'bridge=']
+short_options = 'hvqni:b:c'
+long_options  = ['help', 'verbose', 'quiet',
+                 'interface=', 'bridge=', 'create']
 
 def usage():
     print """Usage:
@@ -107,12 +20,13 @@ def usage():
     Reconfigure routing so that <bridge> has the IP address from
     <interface>. This lets IP carry on working when <interface>
     is attached to <bridge> for virtual networking.
-    If brctl is available, <interface> is added to <bridge>,
+    Uses brctl to add <interface> to <bridge>,
     so this can be run before any domains have been created.
     """ % sys.argv[0]
     print """
     -i, --interface <interface>    interface, default %(interface)s.
     -b, --bridge <bridge>          bridge, default %(bridge)s.
+    -c, --create                   create the bridge.
     -v, --verbose                  Print commands.
     -q, --quiet                    Don't print commands.
     -n, --dry-run                  Don't execute commands.
@@ -120,32 +34,28 @@ def usage():
     """ % defaults
     sys.exit(1)
 
-class Opts:
-
-    def __init__(self, defaults):
-        for (k, v) in defaults.items():
-            setattr(self, k, v)
-        pass
 
 def main():
-    global opts
-    opts = Opts(defaults)
+    lopts = set_opts(Opts(defaults))
+    lopts.dryrun = 0
     (options, args) = getopt(sys.argv[1:], short_options, long_options)
     if args: usage()
     for k, v in options:
         if k in ['-h', '--help']:
             usage()
+        elif k in ['-c', '--create']:
+            lopts.create = 1
         elif k in ['-i', '--interface']:
-            opts.interface = v
+            lopts.interface = v
         elif k in ['-b', '--bridge']:
-            opts.bridge = v
+            lopts.bridge = v
         elif k in ['-q', '--quiet']:
-            opts.verbose = 0
+            lopts.verbose = 0
         elif k in ['-v', '--verbose']:
-            opts.verbose = 1
+            lopts.verbose = 1
         elif k in ['-n', '--dry-run']:
-            opts.dryrun = 1
-    reconfigure(opts.interface, opts.bridge)
+            lopts.dryrun = 1
+    reconfigure(lopts.interface, lopts.bridge)
 
 if __name__ == '__main__':
     main()
