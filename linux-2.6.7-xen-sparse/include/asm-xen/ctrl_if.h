@@ -10,11 +10,7 @@
 #define __ASM_XEN__CTRL_IF_H__
 
 #include <asm-xen/hypervisor.h>
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-#include <linux/tqueue.h>
-#define work_struct tq_struct
-#endif
+#include <asm-xen/queues.h>
 
 typedef control_msg_t ctrl_msg_t;
 
@@ -69,7 +65,7 @@ int ctrl_if_send_message_block(
  * still be executed. If this function returns 1 then the callback /will/ be
  * executed when space becomes available.
  */
-int ctrl_if_enqueue_space_callback(struct work_struct *task);
+int ctrl_if_enqueue_space_callback(struct tq_struct *task);
 
 /*
  * Send a response (@msg) to a message from the domain controller. This will 

@@ -103,6 +103,7 @@
 3e5a4e67X7JyupgdYkgDX19Huj2sAw linux-2.4.26-xen-sparse/include/asm-xen/pgtable-2level.h
 3e5a4e67gr4NLGtQ5CvSLimMYZlkOA linux-2.4.26-xen-sparse/include/asm-xen/pgtable.h
 3e5a4e676uK4xErTBDH6XJREn9LSyg linux-2.4.26-xen-sparse/include/asm-xen/processor.h
+41224663YBCUMX1kVo_HRUtgaHTi7w linux-2.4.26-xen-sparse/include/asm-xen/queues.h
 3e5a4e68uJz-xI0IBVMD7xRLQKJDFg linux-2.4.26-xen-sparse/include/asm-xen/segment.h
 3e5a4e68Nfdh6QcOKUTGCaYkf2LmYA linux-2.4.26-xen-sparse/include/asm-xen/smp.h
 4062f7e2PzFOUGT0PaE7A0VprTU3JQ linux-2.4.26-xen-sparse/include/asm-xen/synch_bitops.h
@@ -118,7 +119,6 @@
 3e6e7c1efbQe93xCvOpOVCnXTMmQ5w linux-2.4.26-xen-sparse/mkbuildtree
 406aeeafkrnCuIVWLFv3kfn4uAD5Eg linux-2.4.26-xen-sparse/mm/highmem.c
 3e5a4e68GxCIaFH4sy01v1wjapetaA linux-2.4.26-xen-sparse/mm/memory.c
-411ce99d_uOUTK61pkqbdIAi1CIaSA linux-2.4.26-xen-sparse/mm/mmap.c
 3f108af5VxPkLv13tXpXgoRKALQtXQ linux-2.4.26-xen-sparse/mm/mprotect.c
 3e5a4e681xMPdF9xCMwpyfuYMySU5g linux-2.4.26-xen-sparse/mm/mremap.c
 409ba2e7akOFqQUg6Qyg2s28xcXiMg linux-2.4.26-xen-sparse/mm/page_alloc.c
@@ -159,7 +159,6 @@
 40f562383SKvDStdtrvzr5fyCbW4rw linux-2.6.7-xen-sparse/arch/xen/i386/mm/hypervisor.c
 40f56239xcNylAxuGsQHwi1AyMLV8w linux-2.6.7-xen-sparse/arch/xen/i386/mm/init.c
 41062ab7CjxC1UBaFhOMWWdhHkIUyg linux-2.6.7-xen-sparse/arch/xen/i386/mm/ioremap.c
-411b9db3oFpYQc4C-_mO2lRTcSz8UQ linux-2.6.7-xen-sparse/arch/xen/i386/mm/mmap.c
 40f5623906UYHv1rsVUeRc0tFT0dWw linux-2.6.7-xen-sparse/arch/xen/i386/mm/pgtable.c
 4107adf12ndy94MidCaivDibJ3pPAg linux-2.6.7-xen-sparse/arch/xen/i386/pci/Makefile
 4107adf1WcCgkhsdLTRGX52cOG1vJg linux-2.6.7-xen-sparse/arch/xen/i386/pci/direct.c
@@ -240,10 +239,10 @@
 40f5623aGPlsm0u1LTO-NVZ6AGzNRQ linux-2.6.7-xen-sparse/include/asm-xen/hypervisor.h
 40f5623cndVUFlkxpf7Lfx7xu8madQ linux-2.6.7-xen-sparse/include/asm-xen/multicall.h
 3f108af1ylCIm82H052FVTfXACBHrw linux-2.6.7-xen-sparse/include/asm-xen/proc_cmd.h
+4122466356eIBnC9ot44WSVVIFyhQA linux-2.6.7-xen-sparse/include/asm-xen/queues.h
 3fa8e3f0kBLeE4To2vpdi3cpJbIkbQ linux-2.6.7-xen-sparse/include/asm-xen/suspend.h
 3f689063BoW-HWV3auUJ-OqXfcGArw linux-2.6.7-xen-sparse/include/asm-xen/xen_proc.h
 40f56a0ddHCSs3501MY4hRf22tctOw linux-2.6.7-xen-sparse/mkbuildtree
-411b9db3dpQAK-pcP8WwcRHZGn2eKg linux-2.6.7-xen-sparse/mm/mmap.c
 410a94a4KT6I6X0LVc7djB39tRDp4g linux-2.6.7-xen-sparse/mm/page_alloc.c
 40e1b09db5mN69Ijj0X_Eol-S7dXiw tools/Make.defs
 3f776bd1Hy9rn69ntXBhPReUFw9IEA tools/Makefile

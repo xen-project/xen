@@ -258,21 +258,16 @@ void pgd_ctor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 	if (PTRS_PER_PMD == 1)
 		spin_lock_irqsave(&pgd_lock, flags);
 
-	memcpy((pgd_t *)pgd,
-			swapper_pg_dir,
-			FIRST_USER_PGD_NR * sizeof(pgd_t));
-	memcpy((pgd_t *)pgd + FIRST_USER_PGD_NR + USER_PTRS_PER_PGD,
-			swapper_pg_dir + FIRST_USER_PGD_NR + USER_PTRS_PER_PGD,
-			(PTRS_PER_PGD - USER_PTRS_PER_PGD -
-			 FIRST_USER_PGD_NR) * sizeof(pgd_t));
+	memcpy((pgd_t *)pgd + USER_PTRS_PER_PGD,
+			swapper_pg_dir + USER_PTRS_PER_PGD,
+			(PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
 
 	if (PTRS_PER_PMD > 1)
 		goto out;
 
 	pgd_list_add(pgd);
 	spin_unlock_irqrestore(&pgd_lock, flags);
-	memset((pgd_t *)pgd + FIRST_USER_PGD_NR,
-			0, USER_PTRS_PER_PGD*sizeof(pgd_t));
+	memset(pgd, 0, USER_PTRS_PER_PGD*sizeof(pgd_t));
  out:
 	__make_page_readonly(pgd);
 	queue_pgd_pin(__pa(pgd));
