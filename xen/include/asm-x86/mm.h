@@ -148,21 +148,6 @@ static inline u32 pickle_domptr(struct domain *domain)
         list_add_tail(&(_pfn)->list, &(_dom)->xenpage_list);                \
         spin_unlock(&(_dom)->page_alloc_lock);                              \
     } while ( 0 )
-#define SHARE_PFN_WITH_DOMAIN2(_pfn, _dom)                                  \
-    do {                                                                    \
-        page_set_owner((_pfn), (_dom));                                     \
-        /* The incremented type count is intended to pin to 'writable'. */  \
-        (_pfn)->u.inuse.type_info = PGT_writable_page | PGT_validated | 1;  \
-        wmb(); /* install valid domain ptr before updating refcnt. */       \
-        spin_lock(&(_dom)->page_alloc_lock);                                \
-        /* _dom holds an allocation reference + writable ref */             \
-        ASSERT((_pfn)->count_info == 0);                                    \
-        (_pfn)->count_info |= PGC_allocated | 2;                            \
-        if ( unlikely((_dom)->xenheap_pages++ == 0) )                       \
-            get_knownalive_domain(_dom);                                    \
-        list_add_tail(&(_pfn)->list, &(_dom)->page_list);                   \
-        spin_unlock(&(_dom)->page_alloc_lock);                              \
-    } while ( 0 )
 
 extern struct pfn_info *frame_table;
 extern unsigned long frame_table_size;
@@ -225,36 +210,8 @@ static inline int get_page(struct pfn_info *page,
     return 1;
 }
 
-//#define MFN1_TO_WATCH 0x1d8
-#ifdef MFN1_TO_WATCH
-#define get_page_type(__p, __t) (                                             \
-{                                                                             \
-    struct pfn_info *_p = (__p);                                              \
-    u32 _t = (__t);                                                           \
-    if ( page_to_pfn(_p) == MFN1_TO_WATCH )                                   \
-        printk("get_page_type(%x) c=%p ot=%p @ %s:%d in %s\n",                \
-               MFN1_TO_WATCH, frame_table[MFN1_TO_WATCH].count_info,          \
-               frame_table[MFN1_TO_WATCH].u.inuse.type_info,                  \
-               __FILE__, __LINE__, __func__);                                 \
-    _get_page_type(_p, _t);                                                   \
-})
-#define put_page_type(__p) (                                                  \
-{                                                                             \
-    struct pfn_info *_p = (__p);                                              \
-    if ( page_to_pfn(_p) == MFN1_TO_WATCH )                                   \
-        printk("put_page_type(%x) c=%p ot=%p @ %s:%d in %s\n",                \
-               MFN1_TO_WATCH, frame_table[MFN1_TO_WATCH].count_info,          \
-               frame_table[MFN1_TO_WATCH].u.inuse.type_info,                  \
-               __FILE__, __LINE__, __func__);                                 \
-    _put_page_type(_p);                                                       \
-})
-#else
-#define _get_page_type get_page_type
-#define _put_page_type put_page_type
-#endif
-
-void _put_page_type(struct pfn_info *page);
-int  _get_page_type(struct pfn_info *page, u32 type);
+void put_page_type(struct pfn_info *page);
+int  get_page_type(struct pfn_info *page, u32 type);
 int  get_page_from_l1e(l1_pgentry_t l1e, struct domain *d);
 void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d);
 

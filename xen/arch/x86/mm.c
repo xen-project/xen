@@ -1088,7 +1088,7 @@ void free_page_type(struct pfn_info *page, unsigned int type)
 }
 
 
-void _put_page_type(struct pfn_info *page)
+void put_page_type(struct pfn_info *page)
 {
     u32 nx, x, y = page->u.inuse.type_info;
 
@@ -1143,7 +1143,7 @@ void _put_page_type(struct pfn_info *page)
 }
 
 
-int _get_page_type(struct pfn_info *page, u32 type)
+int get_page_type(struct pfn_info *page, u32 type)
 {
     u32 nx, x, y = page->u.inuse.type_info;
 
@@ -1880,7 +1880,7 @@ int do_mmu_update(
 
         case MMU_MACHPHYS_UPDATE:
 
-            // HACK ALERT...  This about this later...
+            // HACK ALERT...  Need to think about this some more...
             //
             if ( unlikely(shadow_mode_translate(FOREIGNDOM) && IS_PRIV(d)) )
             {

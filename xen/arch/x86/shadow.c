@@ -2,6 +2,7 @@
  * arch/x86/shadow.c
  * 
  * Copyright (c) 2005 Michael A Fetterman
+ * Based on an earlier implementation by Ian Pratt et al
  * 
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -658,11 +659,6 @@ set_p2m_entry(struct domain *d, unsigned long pfn, unsigned long mfn)
 
     ASSERT( phystab );
 
-#ifdef WATCH_MAP_DOMAIN_CALLERS
-    int old_map_domain_mem_noisy = map_domain_mem_noisy;
-    map_domain_mem_noisy = 0;
-#endif
-
     l2 = map_domain_mem(phystab);
     if ( !l2_pgentry_val(l2e = l2[l2_table_offset(va)]) )
     {
@@ -684,10 +680,6 @@ set_p2m_entry(struct domain *d, unsigned long pfn, unsigned long mfn)
     l1[l1_table_offset(va)] = mk_l1_pgentry((mfn << PAGE_SHIFT) |
                                             __PAGE_HYPERVISOR);
     unmap_domain_mem(l1);
-
-#ifdef WATCH_MAP_DOMAIN_CALLERS
-    map_domain_mem_noisy = old_map_domain_mem_noisy;
-#endif
 
     return 1;
 }
@@ -718,6 +710,21 @@ alloc_p2m_table(struct domain *d)
         ASSERT(pfn < (1u<<20));
 
         set_p2m_entry(d, pfn, mfn);
+
+        list_ent = page->list.next;
+    }
+
+    list_ent = d->xenpage_list.next;
+    while ( list_ent != &d->xenpage_list )
+    {
+        page = list_entry(list_ent, struct pfn_info, list);
+        mfn = page_to_pfn(page);
+        pfn = machine_to_phys_mapping[mfn];
+        if ( (pfn != INVALID_M2P_ENTRY) &&
+             (pfn < (1u<<20)) )
+        {
+            set_p2m_entry(d, pfn, mfn);
+        }
 
         list_ent = page->list.next;
     }
