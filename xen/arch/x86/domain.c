@@ -235,6 +235,7 @@ void arch_do_createdomain(struct exec_domain *ed)
         memset(d->mm_perdomain_pt, 0, PAGE_SIZE);
         machine_to_phys_mapping[virt_to_phys(d->mm_perdomain_pt) >> 
                                PAGE_SHIFT] = INVALID_P2M_ENTRY;
+        ed->mm.perdomain_ptes = d->mm_perdomain_pt;
     }
 }
 

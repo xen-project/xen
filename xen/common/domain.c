@@ -336,6 +336,7 @@ long do_boot_vcpu(unsigned long vcpu, full_execution_context_t *ctxt)
     memcpy(&ed->thread, &idle0_exec_domain.thread, sizeof(ed->thread));
 
     /* arch_do_createdomain */
+    ed->thread.schedule_tail = d->exec_domain[0]->thread.schedule_tail;
     ed->mm.perdomain_ptes = d->mm_perdomain_pt + (ed->eid << PDPT_VCPU_SHIFT);
 
     sched_add_domain(ed);
