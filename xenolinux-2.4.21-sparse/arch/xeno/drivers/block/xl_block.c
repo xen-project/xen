@@ -488,8 +488,8 @@ static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
         case XEN_BLOCK_READ:
         case XEN_BLOCK_WRITE:
             if ( bret->status )
-                printk(KERN_ALERT "Bad return from blkdev data request: %lx\n",
-		       bret->status);
+                DPRINTK("Bad return from blkdev data request: %lx\n",
+                        bret->status);
             for ( bh = (struct buffer_head *)bret->id; 
                   bh != NULL; 
                   bh = next_bh )
