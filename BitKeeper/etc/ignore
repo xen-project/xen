@@ -32,6 +32,9 @@ linux-2.4.26.tar.gz
 linux-2.6.7-xenU
 linux-2.6.7.tar.bz2
 linux-xen-sparse
+netbsd-*-xen0
+netbsd-*-xenU
+netbsd-*-tools
 patches/*
 tools/*/build/lib*/*.py
 tools/balloon/balloon

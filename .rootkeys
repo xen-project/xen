@@ -259,6 +259,10 @@
 40f56a0ddHCSs3501MY4hRf22tctOw linux-2.6.8.1-xen-sparse/mkbuildtree
 412f46c0LJuKAgSPGoC0Z1DEkLfuLA linux-2.6.8.1-xen-sparse/mm/memory.c
 410a94a4KT6I6X0LVc7djB39tRDp4g linux-2.6.8.1-xen-sparse/mm/page_alloc.c
+413cb1e4zst25MDYjg63Y-NGC5_pLg netbsd-2.0-xen-sparse/Makefile
+413cb1e5c_Mkxf_X0zimEhTKI_l4DA netbsd-2.0-xen-sparse/mkbuildtree
+413cb1e5kY_Zil7-b0kI6hvCIxBEYg netbsd-2.0-xen-sparse/nbconfig-xen
+413cb1e5-58q5doPifcE1Q8ZAgm-JQ netbsd-2.0-xen-sparse/nbmake-xen
 40e1b09db5mN69Ijj0X_Eol-S7dXiw tools/Make.defs
 3f776bd1Hy9rn69ntXBhPReUFw9IEA tools/Makefile
 4124b307nRyK3dhn1hAsvrY76NuV3g tools/check/Makefile

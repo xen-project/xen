@@ -103,6 +103,54 @@ linux-xen%:
 	    modules_install
 	$(MAKE) -C $(BDIR) ARCH=xen INSTALL_PATH=$(INSTALL_DIR) install
 
+
+NETBSD_RELEASE   ?= 2.0
+NETBSD_VER       ?= $(shell ( /bin/ls -ld netbsd-$(NETBSD_RELEASE)*-xen-sparse ) 2>/dev/null | \
+		      sed -e 's!^.*netbsd-\(.\+\)-xen-sparse!\1!' )
+NETBSD_CVSSNAP   ?= 20040906
+NETBSD_SRC_PATH  ?= .:..
+NETBSD_SRC       ?= $(firstword $(foreach dir,$(subst :, ,$(NETBSD_SRC_PATH)),\
+                    $(wildcard $(dir)/netbsd-$(NETBSD_VER)-xen-kernel-$(NETBSD_CVSSNAP).tar.*z*)))
+NETBSD_TOOLS_SRC ?= $(firstword $(foreach dir,$(subst :, ,$(NETBSD_SRC_PATH)),\
+                    $(wildcard $(dir)/netbsd-$(NETBSD_VER)-tools.tar.*z*)))
+
+NETBSD_TREES := netbsd-$(NETBSD_VER)-xenU
+
+pristine-netbsd-src: 
+ifeq ($(NETBSD_SRC),)
+	@echo "Cannot find netbsd-$(NETBSD_VER)-xen-kernel-$(NETBSD_CVSSNAP).tar.gz in path $(NETBSD_SRC_PATH)"
+	@wget http://www.cl.cam.ac.uk/Research/SRG/netos/xen/downloads/netbsd-$(NETBSD_VER)-xen-kernel-$(NETBSD_CVSSNAP).tar.bz2 -O./netbsd-$(NETBSD_VER)-xen-kernel-$(NETBSD_CVSSNAP).tar.bz2
+NETBSD_SRC := ./netbsd-$(NETBSD_VER)-xen-kernel-$(NETBSD_CVSSNAP).tar.bz2 
+endif
+
+pristine-netbsd-tools-src: 
+ifeq ($(NETBSD_TOOLS_SRC),)
+	@echo "Cannot find netbsd-$(NETBSD_VER)-tools.tar.gz in path $(NETBSD_SRC_PATH)"
+	@wget http://www.cl.cam.ac.uk/Research/SRG/netos/xen/downloads/netbsd-$(NETBSD_VER)-tools.tar.bz2 -O./netbsd-$(NETBSD_VER)-tools.tar.bz2
+NETBSD_TOOLS_SRC := ./netbsd-$(NETBSD_VER)-tools.tar.bz2 
+endif
+
+netbsd-tools: pristine-netbsd-tools-src
+	@[ -d netbsd-$(NETBSD_RELEASE)-tools ] || { \
+		echo extract $(NETBSD_TOOLS_SRC); \
+		tar -jxf $(NETBSD_TOOLS_SRC); }
+
+mk-netbsd-trees: netbsd-tools pristine-netbsd-src 
+	$(RM) -rf $(NETBSD_TREES)
+	echo $(NETBSD_SRC) | grep -q bz2 && \
+	    tar -jxf $(NETBSD_SRC) || tar -zxf $(NETBSD_SRC)
+	mv netbsd-$(NETBSD_VER)-xen-kernel-$(NETBSD_CVSSNAP) \
+	    netbsd-$(NETBSD_VER)-xenU
+	( cd netbsd-$(NETBSD_VER)-xen-sparse ; \
+          ./mkbuildtree ../netbsd-$(NETBSD_VER)-xenU )
+
+# build the specified netbsd tree
+BDIR = $(subst netbsd-,netbsd-$(NETBSD_VER)-,$@)
+netbsd-xen%:	
+	$(MAKE) -C $(BDIR) config
+	$(MAKE) -C $(BDIR) netbsd
+	$(MAKE) -C $(BDIR) INSTALL_PATH=$(INSTALL_DIR) INSTALL_NAME=boot/netbsd-$(NETBSD_VER)-$(subst netbsd-,,$@) install
+
 # build xen, the tools, and a domain 0 plus unprivileged linux-xen images,
 # and place them in the install directory. 'make install' should then
 # copy them to the normal system directories
@@ -129,6 +177,10 @@ linux24:
 	$(MAKE) LINUX_RELEASE=2.4 linux-xenU
 	$(MAKE) LINUX_RELEASE=2.4 config-xen0
 	$(MAKE) LINUX_RELEASE=2.4 linux-xen0
+
+netbsd:
+	$(MAKE) mk-netbsd-trees
+	$(MAKE) netbsd-xenU
 
 clean: delete-symlinks
 	$(MAKE) -C xen clean
