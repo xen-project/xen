@@ -350,22 +350,3 @@ diff -rup pristine-linux-2.6.11/drivers/char/agp/uninorth-agp.c linux-2.6.11/dri
  
  	for (i = 0; i < num_entries; i++) {
  		agp_bridge->gatt_table[i] =
-diff -rup pristine-linux-2.6.11/include/asm-i386/agp.h linux-2.6.11/include/asm-i386/agp.h
---- pristine-linux-2.6.11/include/asm-i386/agp.h	2005-03-02 07:37:31.000000000 +0000
-+++ linux-2.6.11/include/asm-i386/agp.h	2005-03-11 00:35:21.331193069 +0000
-@@ -3,6 +3,7 @@
- 
- #include <asm/pgtable.h>
- #include <asm/cacheflush.h>
-+#include <asm/system.h>
- 
- /* 
-  * Functions to keep the agpgart mappings coherent with the MMU.
-@@ -19,6 +20,6 @@ int unmap_page_from_agp(struct page *pag
- /* Could use CLFLUSH here if the cpu supports it. But then it would
-    need to be called for each cacheline of the whole page so it may not be 
-    worth it. Would need a page for it. */
--#define flush_agp_cache() asm volatile("wbinvd":::"memory")
-+#define flush_agp_cache() wbinvd()
- 
- #endif
