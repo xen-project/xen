@@ -32,14 +32,14 @@ case "$1" in
   status)
 	xend status
 	;;
-  restart|reload)
+  restart|reload|force-reload)
 	xend restart
 	await_daemons_up
 	;;
   *)
 	# do not advertise unreasonable commands that there is no reason
 	# to use with this device
-	echo $"Usage: $0 {start|stop|status|restart|reload}"
+	echo $"Usage: $0 {start|stop|status|restart|reload|force-reload}"
 	exit 1
 esac
 
