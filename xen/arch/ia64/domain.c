@@ -882,3 +882,24 @@ void domain_pend_keyboard_interrupt(int irq)
 {
 	vcpu_pend_interrupt(dom0->exec_domain[0],irq);
 }
+
+/////////////////////////////////
+// added 01Apr2005, to accomodate change in xen/sched.h, not clear
+//  yet if this functionality is needed on ia64
+#if 0
+static void __synchronise_lazy_execstate(void *unused)
+{
+    if ( percpu_ctxt[smp_processor_id()].curr_ed != current )
+    {
+        __context_switch();
+        load_LDT(current);
+        clear_segments();
+    }
+}
+#endif
+
+void synchronise_lazy_execstate(unsigned long cpuset)
+{
+    //smp_subset_call_function(__synchronise_lazy_execstate, NULL, 1, cpuset);
+}
+/////////////////////////////////
