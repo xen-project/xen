@@ -453,7 +453,12 @@ void unshadow_table(unsigned long gpfn, unsigned int type)
     free_shadow_page(d, &frame_table[smfn]);
 }
 
-#ifdef CONFIG_VMX
+/*
+ * XXX KAF:
+ *  1. Why is this VMX specific?
+ *  2. Why is VMX using clear_state() rather than free_state()?
+ *     (could we get rid of clear_state and fold into free_state?)
+ */
 void vmx_shadow_clear_state(struct domain *d)
 {
     SH_VVLOG("vmx_clear_shadow_state:");
@@ -461,8 +466,6 @@ void vmx_shadow_clear_state(struct domain *d)
     clear_shadow_state(d);
     shadow_unlock(d);
 }
-#endif
-
 
 unsigned long shadow_l2_table( 
     struct domain *d, unsigned long gmfn)
@@ -582,6 +585,10 @@ void shadow_invlpg(struct exec_domain *ed, unsigned long va)
 
     ASSERT(shadow_mode_enabled(ed->domain));
 
+    /*
+     * XXX KAF: Why is this set-to-zero required?
+     *          Why, on failure, must we bin all our shadow state?
+     */
     if (__put_user(0L, (unsigned long *)
                    &shadow_linear_pg_table[va >> PAGE_SHIFT])) {
         vmx_shadow_clear_state(ed->domain);

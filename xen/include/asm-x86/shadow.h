@@ -7,10 +7,7 @@
 #include <xen/types.h>
 #include <xen/perfc.h>
 #include <asm/processor.h>
-
-#ifdef CONFIG_VMX
 #include <asm/domain_page.h>
-#endif
 
 /* Shadow PT flag bits in pfn_info */
 #define PSH_shadowed    (1<<31) /* page has a shadow. PFN points to shadow */
@@ -48,9 +45,7 @@ extern int shadow_mode_enable(struct domain *p, unsigned int mode);
 extern void free_shadow_state(struct domain *d);
 extern void shadow_invlpg(struct exec_domain *, unsigned long);
 
-#ifdef CONFIG_VMX
 extern void vmx_shadow_clear_state(struct domain *);
-#endif
 
 #define __mfn_to_gpfn(_d, mfn)                         \
     ( (shadow_mode_translate(_d))                      \
@@ -654,8 +649,6 @@ static inline void set_shadow_status(
     shadow_audit(d, 0);
 }
   
-#ifdef CONFIG_VMX
-
 static inline unsigned long gva_to_gpte(unsigned long gva)
 {
     unsigned long gpde, gpte, pfn, index;
@@ -690,8 +683,6 @@ static inline unsigned long gva_to_gpa(unsigned long gva)
 
     return (gpte & PAGE_MASK) + (gva & ~PAGE_MASK); 
 }
-
-#endif /* CONFIG_VMX */
 
 static inline void __update_pagetables(struct exec_domain *ed)
 {

@@ -91,9 +91,9 @@ struct arch_exec_domain
     struct desc_struct fast_trap_desc;
 #endif
     trap_info_t        traps[256];
-#ifdef CONFIG_VMX
-    struct arch_vmx_struct arch_vmx; /* Virtual Machine Extensions */
-#endif
+
+    /* Virtual Machine Extensions */
+    struct arch_vmx_struct arch_vmx;
 
     /*
      * Every domain has a L1 pagetable of its own. Per-domain mappings
