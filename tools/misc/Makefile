@@ -17,7 +17,7 @@ HDRS     = $(wildcard *.h)
 SRCS     = $(wildcard *.c)
 OBJS     = $(patsubst %.c,%.o,$(SRCS))
 
-TARGETS  = xen_cpuperf
+TARGETS  = 
 
 INSTALL_BIN  = $(TARGETS) xencons
 INSTALL_SBIN = netfix xm xend xensv
