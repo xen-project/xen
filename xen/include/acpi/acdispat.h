@@ -300,7 +300,7 @@ acpi_ds_parse_method (
 
 acpi_status
 acpi_ds_call_control_method (
-	struct acpi_thread_state        *thread,
+	struct acpi_thread_state        *acpi_thread,
 	struct acpi_walk_state          *walk_state,
 	union acpi_parse_object         *op);
 
@@ -428,7 +428,7 @@ acpi_ds_create_walk_state (
 	acpi_owner_id                   owner_id,
 	union acpi_parse_object         *origin,
 	union acpi_operand_object       *mth_desc,
-	struct acpi_thread_state        *thread);
+	struct acpi_thread_state        *acpi_thread);
 
 acpi_status
 acpi_ds_init_aml_walk (
@@ -456,12 +456,12 @@ acpi_ds_delete_walk_state (
 
 struct acpi_walk_state *
 acpi_ds_pop_walk_state (
-	struct acpi_thread_state        *thread);
+	struct acpi_thread_state        *acpi_thread);
 
 void
 acpi_ds_push_walk_state (
 	struct acpi_walk_state          *walk_state,
-	struct acpi_thread_state        *thread);
+	struct acpi_thread_state        *acpi_thread);
 
 acpi_status
 acpi_ds_result_stack_pop (
@@ -477,7 +477,7 @@ acpi_ds_result_stack_clear (
 
 struct acpi_walk_state *
 acpi_ds_get_current_walk_state (
-	struct acpi_thread_state        *thread);
+	struct acpi_thread_state        *acpi_thread);
 
 void
 acpi_ds_delete_walk_state_cache (

@@ -544,7 +544,7 @@ union acpi_generic_state
 	struct acpi_scope_state             scope;
 	struct acpi_pscope_state            parse_scope;
 	struct acpi_pkg_state               pkg;
-	struct acpi_thread_state            thread;
+	struct acpi_thread_state            acpi_thread;
 	struct acpi_result_values           results;
 	struct acpi_notify_info             notify;
 };

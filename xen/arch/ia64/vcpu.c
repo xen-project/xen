@@ -7,6 +7,7 @@
  */
 
 #include <linux/sched.h>
+#include <public/arch-ia64.h>
 #include <asm/ia64_int.h>
 #include <asm/vcpu.h>
 #include <asm/regionreg.h>
@@ -15,7 +16,7 @@
 #include <asm/delay.h>
 
 typedef	union {
-	struct ia64_psr;
+	struct ia64_psr ia64_psr;
 	unsigned long i64;
 } PSR;
 
@@ -23,8 +24,8 @@ typedef	union {
 //typedef struct domain VCPU;
 
 // this def for vcpu_regs won't work if kernel stack is present
-#define	vcpu_regs(vcpu) ((struct pt_regs *) vcpu->regs)
-#define	PSCB(x)	x->shared_info->arch
+#define	vcpu_regs(vcpu) ((struct pt_regs *) vcpu->arch.regs)
+#define	PSCB(x,y)	x->vcpu_info->arch.y
 
 #define	TRUE	1
 #define	FALSE	0
@@ -78,7 +79,7 @@ IA64FAULT vcpu_set_ar(VCPU *vcpu, UINT64 reg, UINT64 val)
 	if (reg == 44) return (vcpu_set_itc(vcpu,val));
 	if (reg == 27) return (IA64_ILLOP_FAULT);
 	if (reg > 7) return (IA64_ILLOP_FAULT);
-	PSCB(vcpu).krs[reg] = val;
+	PSCB(vcpu,krs[reg]) = val;
 #if 0
 // for now, privify kr read's so all kr accesses are privileged
 	switch (reg) {
@@ -99,7 +100,7 @@ IA64FAULT vcpu_set_ar(VCPU *vcpu, UINT64 reg, UINT64 val)
 IA64FAULT vcpu_get_ar(VCPU *vcpu, UINT64 reg, UINT64 *val)
 {
 	if (reg > 7) return (IA64_ILLOP_FAULT);
-	*val = PSCB(vcpu).krs[reg];
+	*val = PSCB(vcpu,krs[reg]);
 	return IA64_NO_FAULT;
 }
 
@@ -110,11 +111,11 @@ IA64FAULT vcpu_get_ar(VCPU *vcpu, UINT64 reg, UINT64 *val)
 void vcpu_set_metaphysical_mode(VCPU *vcpu, BOOLEAN newmode)
 {
 	/* only do something if mode changes */
-	if (!!newmode ^ !!vcpu->metaphysical_mode) {
-		if (newmode) set_metaphysical_rr(0,vcpu->metaphysical_rid);
-		else if (PSCB(vcpu).rrs[0] != -1)
-			set_one_rr(0, PSCB(vcpu).rrs[0]);
-		vcpu->metaphysical_mode = newmode;
+	if (!!newmode ^ !!PSCB(vcpu,metaphysical_mode)) {
+		if (newmode) set_metaphysical_rr(0,vcpu->domain->metaphysical_rid);
+		else if (PSCB(vcpu,rrs[0]) != -1)
+			set_one_rr(0, PSCB(vcpu,rrs[0]));
+		PSCB(vcpu,metaphysical_mode) = newmode;
 	}
 }
 
@@ -129,10 +130,10 @@ IA64FAULT vcpu_reset_psr_sm(VCPU *vcpu, UINT64 imm24)
 	ipsr = (struct ia64_psr *)&regs->cr_ipsr;
 	imm = *(struct ia64_psr *)&imm24;
 	// interrupt flag
-	if (imm.i) PSCB(vcpu).interrupt_delivery_enabled = 0;
-	if (imm.ic)  PSCB(vcpu).interrupt_collection_enabled = 0;
+	if (imm.i) PSCB(vcpu,interrupt_delivery_enabled) = 0;
+	if (imm.ic)  PSCB(vcpu,interrupt_collection_enabled) = 0;
 	// interrupt collection flag
-	//if (imm.ic) PSCB(vcpu).interrupt_delivery_enabled = 0;
+	//if (imm.ic) PSCB(vcpu,interrupt_delivery_enabled) = 0;
 	// just handle psr.up and psr.pp for now
 	if (imm24 & ~(IA64_PSR_PP | IA64_PSR_UP | IA64_PSR_SP
 		| IA64_PSR_I | IA64_PSR_IC | IA64_PSR_DT
@@ -170,13 +171,13 @@ IA64FAULT vcpu_set_psr_sm(VCPU *vcpu, UINT64 imm24)
 	if (imm.pp) { ipsr->pp = 1; psr.pp = 1; }
 	if (imm.sp) { ipsr->sp = 1; psr.sp = 1; }
 	if (imm.i) {
-		if (!PSCB(vcpu).interrupt_delivery_enabled) {
+		if (!PSCB(vcpu,interrupt_delivery_enabled)) {
 //printf("vcpu_set_psr_sm: psr.ic 0->1 ");
 			enabling_interrupts = 1;
 		}
-		PSCB(vcpu).interrupt_delivery_enabled = 1;
+		PSCB(vcpu,interrupt_delivery_enabled) = 1;
 	}
-	if (imm.ic)  PSCB(vcpu).interrupt_collection_enabled = 1;
+	if (imm.ic)  PSCB(vcpu,interrupt_collection_enabled) = 1;
 	// TODO: do this faster
 	if (imm.mfl) { ipsr->mfl = 1; psr.mfl = 1; }
 	if (imm.ac) { ipsr->ac = 1; psr.ac = 1; }
@@ -218,11 +219,11 @@ IA64FAULT vcpu_set_psr_l(VCPU *vcpu, UINT64 val)
 	if (newpsr.up) { ipsr->up = 1; psr.up = 1; }
 	if (newpsr.sp) { ipsr->sp = 1; psr.sp = 1; }
 	if (newpsr.i) {
-		if (!PSCB(vcpu).interrupt_delivery_enabled)
+		if (!PSCB(vcpu,interrupt_delivery_enabled))
 			enabling_interrupts = 1;
-		PSCB(vcpu).interrupt_delivery_enabled = 1;
+		PSCB(vcpu,interrupt_delivery_enabled) = 1;
 	}
-	if (newpsr.ic)  PSCB(vcpu).interrupt_collection_enabled = 1;
+	if (newpsr.ic)  PSCB(vcpu,interrupt_collection_enabled) = 1;
 	if (newpsr.mfl) { ipsr->mfl = 1; psr.mfl = 1; }
 	if (newpsr.ac) { ipsr->ac = 1; psr.ac = 1; }
 	if (newpsr.up) { ipsr->up = 1; psr.up = 1; }
@@ -253,9 +254,9 @@ IA64FAULT vcpu_get_psr(VCPU *vcpu, UINT64 *pval)
 	__asm__ __volatile ("mov %0=psr;;" : "=r"(psr) :: "memory");
 	newpsr = *(struct ia64_psr *)&psr;
 	if (newpsr.cpl == 2) newpsr.cpl = 0;
-	if (PSCB(vcpu).interrupt_delivery_enabled) newpsr.i = 1;
+	if (PSCB(vcpu,interrupt_delivery_enabled)) newpsr.i = 1;
 	else newpsr.i = 0;
-	if (PSCB(vcpu).interrupt_collection_enabled) newpsr.ic = 1;
+	if (PSCB(vcpu,interrupt_collection_enabled)) newpsr.ic = 1;
 	else newpsr.ic = 0;
 	*pval = *(unsigned long *)&newpsr;
 	return IA64_NO_FAULT;
@@ -263,28 +264,28 @@ IA64FAULT vcpu_get_psr(VCPU *vcpu, UINT64 *pval)
 
 BOOLEAN vcpu_get_psr_ic(VCPU *vcpu)
 {
-	return !!PSCB(vcpu).interrupt_collection_enabled;
+	return !!PSCB(vcpu,interrupt_collection_enabled);
 }
 
 BOOLEAN vcpu_get_psr_i(VCPU *vcpu)
 {
-	return !!PSCB(vcpu).interrupt_delivery_enabled;
+	return !!PSCB(vcpu,interrupt_delivery_enabled);
 }
 
 UINT64 vcpu_get_ipsr_int_state(VCPU *vcpu,UINT64 prevpsr)
 {
-	UINT64 dcr = PSCB(vcpu).dcr;
+	UINT64 dcr = PSCB(vcpu,dcr);
 	PSR psr = {0};
 	
 	//printf("*** vcpu_get_ipsr_int_state (0x%016lx)...",prevpsr);
 	psr.i64 = prevpsr;
-	psr.be = 0; if (dcr & IA64_DCR_BE) psr.be = 1;
-	psr.pp = 0; if (dcr & IA64_DCR_PP) psr.pp = 1;
-	psr.ic = PSCB(vcpu).interrupt_collection_enabled;
-	psr.i = PSCB(vcpu).interrupt_delivery_enabled;
-	psr.bn = PSCB(vcpu).banknum;
-	psr.dt = 1; psr.it = 1; psr.rt = 1;
-	if (psr.cpl == 2) psr.cpl = 0; // !!!! fool domain
+	psr.ia64_psr.be = 0; if (dcr & IA64_DCR_BE) psr.ia64_psr.be = 1;
+	psr.ia64_psr.pp = 0; if (dcr & IA64_DCR_PP) psr.ia64_psr.pp = 1;
+	psr.ia64_psr.ic = PSCB(vcpu,interrupt_collection_enabled);
+	psr.ia64_psr.i = PSCB(vcpu,interrupt_delivery_enabled);
+	psr.ia64_psr.bn = PSCB(vcpu,banknum);
+	psr.ia64_psr.dt = 1; psr.ia64_psr.it = 1; psr.ia64_psr.rt = 1;
+	if (psr.ia64_psr.cpl == 2) psr.ia64_psr.cpl = 0; // !!!! fool domain
 	// psr.pk = 1;
 	//printf("returns 0x%016lx...",psr.i64);
 	return psr.i64;
@@ -298,22 +299,22 @@ IA64FAULT vcpu_get_dcr(VCPU *vcpu, UINT64 *pval)
 {
 extern unsigned long privop_trace;
 //privop_trace=0;
-//verbose("vcpu_get_dcr: called @%p\n",PSCB(vcpu).iip);
+//verbose("vcpu_get_dcr: called @%p\n",PSCB(vcpu,iip));
 	// Reads of cr.dcr on Xen always have the sign bit set, so
 	// a domain can differentiate whether it is running on SP or not
-	*pval = PSCB(vcpu).dcr | 0x8000000000000000L;
+	*pval = PSCB(vcpu,dcr) | 0x8000000000000000L;
 	return (IA64_NO_FAULT);
 }
 
 IA64FAULT vcpu_get_iva(VCPU *vcpu, UINT64 *pval)
 {
-	*pval = PSCB(vcpu).iva & ~0x7fffL;
+	*pval = PSCB(vcpu,iva) & ~0x7fffL;
 	return (IA64_NO_FAULT);
 }
 
 IA64FAULT vcpu_get_pta(VCPU *vcpu, UINT64 *pval)
 {
-	*pval = PSCB(vcpu).pta;
+	*pval = PSCB(vcpu,pta);
 	return (IA64_NO_FAULT);
 }
 
@@ -321,13 +322,13 @@ IA64FAULT vcpu_get_ipsr(VCPU *vcpu, UINT64 *pval)
 {
 	//REGS *regs = vcpu_regs(vcpu);
 	//*pval = regs->cr_ipsr;
-	*pval = PSCB(vcpu).ipsr;
+	*pval = PSCB(vcpu,ipsr);
 	return (IA64_NO_FAULT);
 }
 
 IA64FAULT vcpu_get_isr(VCPU *vcpu, UINT64 *pval)
 {
-	*pval = PSCB(vcpu).isr;
+	*pval = PSCB(vcpu,isr);
 	return (IA64_NO_FAULT);
 }
 
@@ -335,13 +336,13 @@ IA64FAULT vcpu_get_iip(VCPU *vcpu, UINT64 *pval)
 {
 	//REGS *regs = vcpu_regs(vcpu);
 	//*pval = regs->cr_iip;
-	*pval = PSCB(vcpu).iip;
+	*pval = PSCB(vcpu,iip);
 	return (IA64_NO_FAULT);
 }
 
 IA64FAULT vcpu_get_ifa(VCPU *vcpu, UINT64 *pval)
 {
-	UINT64 val = PSCB(vcpu).ifa;
+	UINT64 val = PSCB(vcpu,ifa);
 	*pval = val;
 	return (IA64_NO_FAULT);
 }
@@ -360,14 +361,14 @@ unsigned long vcpu_get_itir_on_fault(VCPU *vcpu, UINT64 ifa)
 
 IA64FAULT vcpu_get_itir(VCPU *vcpu, UINT64 *pval)
 {
-	UINT64 val = PSCB(vcpu).itir;
+	UINT64 val = PSCB(vcpu,itir);
 	*pval = val;
 	return (IA64_NO_FAULT);
 }
 
 IA64FAULT vcpu_get_iipa(VCPU *vcpu, UINT64 *pval)
 {
-	UINT64 val = PSCB(vcpu).iipa;
+	UINT64 val = PSCB(vcpu,iipa);
 	// SP entry code does not save iipa yet nor does it get
 	//  properly delivered in the pscb
 	printf("*** vcpu_get_iipa: cr.iipa not fully implemented yet!!\n");
@@ -377,23 +378,23 @@ IA64FAULT vcpu_get_iipa(VCPU *vcpu, UINT64 *pval)
 
 IA64FAULT vcpu_get_ifs(VCPU *vcpu, UINT64 *pval)
 {
-	//PSCB(vcpu).ifs = PSCB(vcpu)->regs.cr_ifs;
-	//*pval = PSCB(vcpu).regs.cr_ifs;
-	*pval = PSCB(vcpu).ifs;
-	PSCB(vcpu).incomplete_regframe = 0;
+	//PSCB(vcpu,ifs) = PSCB(vcpu)->regs.cr_ifs;
+	//*pval = PSCB(vcpu,regs).cr_ifs;
+	*pval = PSCB(vcpu,ifs);
+	PSCB(vcpu,incomplete_regframe) = 0;
 	return (IA64_NO_FAULT);
 }
 
 IA64FAULT vcpu_get_iim(VCPU *vcpu, UINT64 *pval)
 {
-	UINT64 val = PSCB(vcpu).iim;
+	UINT64 val = PSCB(vcpu,iim);
 	*pval = val;
 	return (IA64_NO_FAULT);
 }
 
 IA64FAULT vcpu_get_iha(VCPU *vcpu, UINT64 *pval)
 {
-	return vcpu_thash(vcpu,PSCB(vcpu).ifa,pval);
+	return vcpu_thash(vcpu,PSCB(vcpu,ifa),pval);
 }
 
 IA64FAULT vcpu_set_dcr(VCPU *vcpu, UINT64 val)
@@ -404,13 +405,13 @@ extern unsigned long privop_trace;
 	// a domain can differentiate whether it is running on SP or not
 	// Thus, writes of DCR should ignore the sign bit
 //verbose("vcpu_set_dcr: called\n");
-	PSCB(vcpu).dcr = val & ~0x8000000000000000L;
+	PSCB(vcpu,dcr) = val & ~0x8000000000000000L;
 	return (IA64_NO_FAULT);
 }
 
 IA64FAULT vcpu_set_iva(VCPU *vcpu, UINT64 val)
 {
-	PSCB(vcpu).iva = val & ~0x7fffL;
+	PSCB(vcpu,iva) = val & ~0x7fffL;
 	return (IA64_NO_FAULT);
 }
 
@@ -422,25 +423,25 @@ IA64FAULT vcpu_set_pta(VCPU *vcpu, UINT64 val)
 	}
 	if (val & (0x3f<<9)) /* reserved fields */ return IA64_RSVDREG_FAULT;
 	if (val & 2) /* reserved fields */ return IA64_RSVDREG_FAULT;
-	PSCB(vcpu).pta = val;
+	PSCB(vcpu,pta) = val;
 	return IA64_NO_FAULT;
 }
 
 IA64FAULT vcpu_set_ipsr(VCPU *vcpu, UINT64 val)
 {
-	PSCB(vcpu).ipsr = val;
+	PSCB(vcpu,ipsr) = val;
 	return IA64_NO_FAULT;
 }
 
 IA64FAULT vcpu_set_isr(VCPU *vcpu, UINT64 val)
 {
-	PSCB(vcpu).isr = val;
+	PSCB(vcpu,isr) = val;
 	return IA64_NO_FAULT;
 }
 
 IA64FAULT vcpu_set_iip(VCPU *vcpu, UINT64 val)
 {
-	PSCB(vcpu).iip = val;
+	PSCB(vcpu,iip) = val;
 	return IA64_NO_FAULT;
 }
 
@@ -455,13 +456,13 @@ IA64FAULT vcpu_increment_iip(VCPU *vcpu)
 
 IA64FAULT vcpu_set_ifa(VCPU *vcpu, UINT64 val)
 {
-	PSCB(vcpu).ifa = val;
+	PSCB(vcpu,ifa) = val;
 	return IA64_NO_FAULT;
 }
 
 IA64FAULT vcpu_set_itir(VCPU *vcpu, UINT64 val)
 {
-	PSCB(vcpu).itir = val;
+	PSCB(vcpu,itir) = val;
 	return IA64_NO_FAULT;
 }
 
@@ -470,26 +471,26 @@ IA64FAULT vcpu_set_iipa(VCPU *vcpu, UINT64 val)
 	// SP entry code does not save iipa yet nor does it get
 	//  properly delivered in the pscb
 	printf("*** vcpu_set_iipa: cr.iipa not fully implemented yet!!\n");
-	PSCB(vcpu).iipa = val;
+	PSCB(vcpu,iipa) = val;
 	return IA64_NO_FAULT;
 }
 
 IA64FAULT vcpu_set_ifs(VCPU *vcpu, UINT64 val)
 {
 	//REGS *regs = vcpu_regs(vcpu);
-	PSCB(vcpu).ifs = val;
+	PSCB(vcpu,ifs) = val;
 	return IA64_NO_FAULT;
 }
 
 IA64FAULT vcpu_set_iim(VCPU *vcpu, UINT64 val)
 {
-	PSCB(vcpu).iim = val;
+	PSCB(vcpu,iim) = val;
 	return IA64_NO_FAULT;
 }
 
 IA64FAULT vcpu_set_iha(VCPU *vcpu, UINT64 val)
 {
-	PSCB(vcpu).iha = val;
+	PSCB(vcpu,iha) = val;
 	return IA64_NO_FAULT;
 }
 
@@ -503,11 +504,11 @@ void vcpu_pend_interrupt(VCPU *vcpu, UINT64 vector)
 		printf("vcpu_pend_interrupt: bad vector\n");
 		return;
 	}
-	if (!test_bit(vector,PSCB(vcpu).delivery_mask)) return;
-	if (test_bit(vector,PSCB(vcpu).irr)) {
+	if (!test_bit(vector,PSCB(vcpu,delivery_mask))) return;
+	if (test_bit(vector,PSCB(vcpu,irr))) {
 //printf("vcpu_pend_interrupt: overrun\n");
 	}
-	set_bit(vector,PSCB(vcpu).irr);
+	set_bit(vector,PSCB(vcpu,irr));
 }
 
 #define	IA64_TPR_MMI	0x10000
@@ -523,9 +524,9 @@ UINT64 vcpu_check_pending_interrupts(VCPU *vcpu)
 {
 	UINT64 *p, *q, *r, bits, bitnum, mask, i, vector;
 
-	p = &PSCB(vcpu).irr[3];
-	q = &PSCB(vcpu).delivery_mask[3];
-	r = &PSCB(vcpu).insvc[3];
+	p = &PSCB(vcpu,irr[3]);
+	q = &PSCB(vcpu,delivery_mask[3]);
+	r = &PSCB(vcpu,insvc[3]);
 	for (i = 3; ; p--, q--, r--, i--) {
 		bits = *p & *q;
 		if (bits) break; // got a potential interrupt
@@ -550,12 +551,12 @@ UINT64 vcpu_check_pending_interrupts(VCPU *vcpu)
 //printf("but masked by equal inservice\n");
 		return SPURIOUS_VECTOR;
 	}
-	if (PSCB(vcpu).tpr & IA64_TPR_MMI) {
+	if (PSCB(vcpu,tpr) & IA64_TPR_MMI) {
 		// tpr.mmi is set
 //printf("but masked by tpr.mmi\n");
 		return SPURIOUS_VECTOR;
 	}
-	if (((PSCB(vcpu).tpr & IA64_TPR_MIC) + 15) >= vector) {
+	if (((PSCB(vcpu,tpr) & IA64_TPR_MIC) + 15) >= vector) {
 		//tpr.mic masks class
 //printf("but masked by tpr.mic\n");
 		return SPURIOUS_VECTOR;
@@ -597,7 +598,7 @@ IA64FAULT vcpu_get_ivr(VCPU *vcpu, UINT64 *pval)
 
 	vector = vcpu_check_pending_interrupts(vcpu);
 	if (vector == SPURIOUS_VECTOR) {
-		PSCB(vcpu).pending_interruption = 0;
+		PSCB(vcpu,pending_interruption) = 0;
 		*pval = vector;
 		return IA64_NO_FAULT;
 	}
@@ -613,16 +614,16 @@ IA64FAULT vcpu_get_ivr(VCPU *vcpu, UINT64 *pval)
 	i = vector >> 6;
 	mask = 1L << (vector & 0x3f);
 //printf("ZZZZZZ vcpu_get_ivr: setting insvc mask for vector %ld\n",vector);
-	PSCB(vcpu).insvc[i] |= mask;
-	PSCB(vcpu).irr[i] &= ~mask;
-	PSCB(vcpu).pending_interruption--;
+	PSCB(vcpu,insvc[i]) |= mask;
+	PSCB(vcpu,irr[i]) &= ~mask;
+	PSCB(vcpu,pending_interruption)--;
 	*pval = vector;
 	return IA64_NO_FAULT;
 }
 
 IA64FAULT vcpu_get_tpr(VCPU *vcpu, UINT64 *pval)
 {
-	*pval = PSCB(vcpu).tpr;
+	*pval = PSCB(vcpu,tpr);
 	return (IA64_NO_FAULT);
 }
 
@@ -678,19 +679,19 @@ IA64FAULT vcpu_get_irr3(VCPU *vcpu, UINT64 *pval)
 
 IA64FAULT vcpu_get_itv(VCPU *vcpu, UINT64 *pval)
 {
-	*pval = PSCB(vcpu).itv;
+	*pval = PSCB(vcpu,itv);
 	return (IA64_NO_FAULT);
 }
 
 IA64FAULT vcpu_get_pmv(VCPU *vcpu, UINT64 *pval)
 {
-	*pval = PSCB(vcpu).pmv;
+	*pval = PSCB(vcpu,pmv);
 	return (IA64_NO_FAULT);
 }
 
 IA64FAULT vcpu_get_cmcv(VCPU *vcpu, UINT64 *pval)
 {
-	*pval = PSCB(vcpu).cmcv;
+	*pval = PSCB(vcpu,cmcv);
 	return (IA64_NO_FAULT);
 }
 
@@ -719,7 +720,7 @@ IA64FAULT vcpu_set_lid(VCPU *vcpu, UINT64 val)
 IA64FAULT vcpu_set_tpr(VCPU *vcpu, UINT64 val)
 {
 	if (val & 0xff00) return IA64_RSVDREG_FAULT;
-	PSCB(vcpu).tpr = val;
+	PSCB(vcpu,tpr) = val;
 	return (IA64_NO_FAULT);
 }
 
@@ -728,7 +729,7 @@ IA64FAULT vcpu_set_eoi(VCPU *vcpu, UINT64 val)
 	UINT64 *p, bits, vec, bitnum;
 	int i;
 
-	p = &PSCB(vcpu).insvc[3];
+	p = &PSCB(vcpu,insvc[3]);
 	for (i = 3; (i >= 0) && !(bits = *p); i--, p--);
 	if (i < 0) {
 		printf("Trying to EOI interrupt when none are in-service.\r\n");
@@ -740,7 +741,7 @@ IA64FAULT vcpu_set_eoi(VCPU *vcpu, UINT64 val)
 	bits &= ~(1L << bitnum);
 	*p = bits;
 	/* clearing an eoi bit may unmask another pending interrupt... */
-	if (PSCB(vcpu).interrupt_delivery_enabled) { // but only if enabled...
+	if (PSCB(vcpu,interrupt_delivery_enabled)) { // but only if enabled...
 		// worry about this later... Linux only calls eoi
 		// with interrupts disabled
 		printf("Trying to EOI interrupt with interrupts enabled\r\n");
@@ -775,10 +776,10 @@ IA64FAULT vcpu_set_itv(VCPU *vcpu, UINT64 val)
 extern unsigned long privop_trace;
 //privop_trace=1;
 	if (val & 0xef00) return (IA64_ILLOP_FAULT);
-	PSCB(vcpu).itv = val;
+	PSCB(vcpu,itv) = val;
 	if (val & 0x10000) {
-printf("**** vcpu_set_itv(%d): vitm=%lx, setting to 0\n",val,PSCB(vcpu).domain_itm);
-		PSCB(vcpu).domain_itm = 0;
+printf("**** vcpu_set_itv(%d): vitm=%lx, setting to 0\n",val,PSCB(vcpu,domain_itm));
+		PSCB(vcpu,domain_itm) = 0;
 	}
 	else vcpu_enable_timer(vcpu,1000000L);
 	return (IA64_NO_FAULT);
@@ -787,14 +788,14 @@ printf("**** vcpu_set_itv(%d): vitm=%lx, setting to 0\n",val,PSCB(vcpu).domain_i
 IA64FAULT vcpu_set_pmv(VCPU *vcpu, UINT64 val)
 {
 	if (val & 0xef00) /* reserved fields */ return IA64_RSVDREG_FAULT;
-	PSCB(vcpu).pmv = val;
+	PSCB(vcpu,pmv) = val;
 	return (IA64_NO_FAULT);
 }
 
 IA64FAULT vcpu_set_cmcv(VCPU *vcpu, UINT64 val)
 {
 	if (val & 0xef00) /* reserved fields */ return IA64_RSVDREG_FAULT;
-	PSCB(vcpu).cmcv = val;
+	PSCB(vcpu,cmcv) = val;
 	return (IA64_NO_FAULT);
 }
 
@@ -804,13 +805,13 @@ Interval timer routines
 
 BOOLEAN vcpu_timer_disabled(VCPU *vcpu)
 {
-	UINT64 itv = PSCB(vcpu).itv;
+	UINT64 itv = PSCB(vcpu,itv);
 	return(!itv || !!(itv & 0x10000));
 }
 
 BOOLEAN vcpu_timer_expired(VCPU *vcpu)
 {
-	unsigned long domain_itm = PSCB(vcpu).domain_itm;
+	unsigned long domain_itm = PSCB(vcpu,domain_itm);
 	unsigned long now = ia64_get_itc();
  
 	if (domain_itm && (now > domain_itm) &&
@@ -836,18 +837,18 @@ void vcpu_safe_set_itm(unsigned long val)
 
 void vcpu_set_next_timer(VCPU *vcpu)
 {
-	UINT64 d = PSCB(vcpu).domain_itm;
-	//UINT64 s = PSCB(vcpu).xen_itm;
+	UINT64 d = PSCB(vcpu,domain_itm);
+	//UINT64 s = PSCB(vcpu,xen_itm);
 	UINT64 s = local_cpu_data->itm_next;
 	UINT64 now = ia64_get_itc();
-	//UINT64 interval = PSCB(vcpu).xen_timer_interval;
+	//UINT64 interval = PSCB(vcpu,xen_timer_interval);
 
 	/* gloss over the wraparound problem for now... we know it exists
 	 * but it doesn't matter right now */
 
 #if 0
 	/* ensure at least next SP tick is in the future */
-	if (!interval) PSCB(vcpu).xen_itm = now +
+	if (!interval) PSCB(vcpu,xen_itm) = now +
 #if 0
 		(running_on_sim() ? SIM_DEFAULT_CLOCK_RATE :
 		 			DEFAULT_CLOCK_RATE);
@@ -856,16 +857,16 @@ void vcpu_set_next_timer(VCPU *vcpu)
 //printf("vcpu_set_next_timer: HACK!\n");
 #endif
 #if 0
-	if (PSCB(vcpu).xen_itm < now)
-		while (PSCB(vcpu).xen_itm < now + (interval>>1))
-			PSCB(vcpu).xen_itm += interval;
+	if (PSCB(vcpu,xen_itm) < now)
+		while (PSCB(vcpu,xen_itm) < now + (interval>>1))
+			PSCB(vcpu,xen_itm) += interval;
 #endif
 #endif
 
-	if (is_idle_task(vcpu)) {
+	if (is_idle_task(vcpu->domain)) {
 		printf("****** vcpu_set_next_timer called during idle!!\n");
 	}
-	//s = PSCB(vcpu).xen_itm;
+	//s = PSCB(vcpu,xen_itm);
 	if (d && (d > now) && (d < s)) {
 		vcpu_safe_set_itm(d);
 		//using_domain_as_itm++;
@@ -879,11 +880,11 @@ void vcpu_set_next_timer(VCPU *vcpu)
 // parameter is a time interval specified in cycles
 void vcpu_enable_timer(VCPU *vcpu,UINT64 cycles)
 {
-    PSCB(vcpu).xen_timer_interval = cycles;
+    PSCB(vcpu,xen_timer_interval) = cycles;
     vcpu_set_next_timer(vcpu);
     printf("vcpu_enable_timer(%d): interval set to %d cycles\n",
-             PSCB(vcpu).xen_timer_interval);
-    __set_bit(PSCB(vcpu).itv, PSCB(vcpu).delivery_mask);
+             PSCB(vcpu,xen_timer_interval));
+    __set_bit(PSCB(vcpu,itv), PSCB(vcpu,delivery_mask));
 }
 
 IA64FAULT vcpu_set_itm(VCPU *vcpu, UINT64 val)
@@ -892,7 +893,7 @@ IA64FAULT vcpu_set_itm(VCPU *vcpu, UINT64 val)
 
 	//if (val < now) val = now + 1000;
 //printf("*** vcpu_set_itm: called with %lx\n",val);
-	PSCB(vcpu).domain_itm = val;
+	PSCB(vcpu,domain_itm) = val;
 	vcpu_set_next_timer(vcpu);
 	return (IA64_NO_FAULT);
 }
@@ -901,7 +902,7 @@ IA64FAULT vcpu_set_itc(VCPU *vcpu, UINT64 val)
 {
 	
 	UINT64 oldnow = ia64_get_itc();
-	UINT64 olditm = PSCB(vcpu).domain_itm;
+	UINT64 olditm = PSCB(vcpu,domain_itm);
 	unsigned long d = olditm - oldnow;
 	unsigned long x = local_cpu_data->itm_next - oldnow;
 	
@@ -910,10 +911,10 @@ IA64FAULT vcpu_set_itc(VCPU *vcpu, UINT64 val)
 	local_irq_disable();
 	if (olditm) {
 printf("**** vcpu_set_itc(%lx): vitm changed to %lx\n",val,newnow+d);
-		PSCB(vcpu).domain_itm = newnow + d;
+		PSCB(vcpu,domain_itm) = newnow + d;
 	}
 	local_cpu_data->itm_next = newnow + x;
-	d = PSCB(vcpu).domain_itm;
+	d = PSCB(vcpu,domain_itm);
 	x = local_cpu_data->itm_next;
 	
 	ia64_set_itc(newnow);
@@ -946,7 +947,7 @@ IA64FAULT vcpu_get_itc(VCPU *vcpu, UINT64 *pval)
 
 void vcpu_pend_timer(VCPU *vcpu)
 {
-	UINT64 itv = PSCB(vcpu).itv & 0xff;
+	UINT64 itv = PSCB(vcpu,itv) & 0xff;
 
 	if (vcpu_timer_disabled(vcpu)) return;
 	vcpu_pend_interrupt(vcpu, itv);
@@ -955,9 +956,9 @@ void vcpu_pend_timer(VCPU *vcpu)
 //FIXME: This is a hack because everything dies if a timer tick is lost
 void vcpu_poke_timer(VCPU *vcpu)
 {
-	UINT64 itv = PSCB(vcpu).itv & 0xff;
+	UINT64 itv = PSCB(vcpu,itv) & 0xff;
 	UINT64 now = ia64_get_itc();
-	UINT64 itm = PSCB(vcpu).domain_itm;
+	UINT64 itm = PSCB(vcpu,domain_itm);
 	UINT64 irr;
 
 	if (vcpu_timer_disabled(vcpu)) return;
@@ -967,8 +968,8 @@ void vcpu_poke_timer(VCPU *vcpu)
 		while(1);
 	}
 	// using 0xef instead of itv so can get real irr
-	if (now > itm && !test_bit(0xefL, PSCB(vcpu).insvc)) {
-		if (!test_bit(0xefL,PSCB(vcpu).irr)) {
+	if (now > itm && !test_bit(0xefL, PSCB(vcpu,insvc))) {
+		if (!test_bit(0xefL,PSCB(vcpu,irr))) {
 			irr = ia64_getreg(_IA64_REG_CR_IRR3);
 			if (irr & (1L<<(0xef-0xc0))) return;
 if (now-itm>0x800000)
@@ -985,7 +986,7 @@ Privileged operation emulation routines
 
 IA64FAULT vcpu_force_data_miss(VCPU *vcpu, UINT64 ifa)
 {
-	PSCB(vcpu).ifa = ifa;	// privop traps don't set ifa so do it here
+	PSCB(vcpu,ifa) = ifa;	// privop traps don't set ifa so do it here
 	return (IA64_DATA_TLB_VECTOR | IA64_FORCED_IFA);
 }
 
@@ -999,34 +1000,35 @@ IA64FAULT vcpu_rfi(VCPU *vcpu)
 	REGS *regs = vcpu_regs(vcpu);
 	extern void dorfirfi(void);
 
-	psr.i64 = PSCB(vcpu).ipsr;
-	if (psr.cpl < 3) psr.cpl = 2;
-	if (psr.i) PSCB(vcpu).interrupt_delivery_enabled = 1;
-	int_enable = psr.i;
-	if (psr.ic)  PSCB(vcpu).interrupt_collection_enabled = 1;
-	if (psr.dt && psr.rt && psr.it) vcpu_set_metaphysical_mode(vcpu,FALSE);
+	psr.i64 = PSCB(vcpu,ipsr);
+	if (psr.ia64_psr.cpl < 3) psr.ia64_psr.cpl = 2;
+	if (psr.ia64_psr.i) PSCB(vcpu,interrupt_delivery_enabled) = 1;
+	int_enable = psr.ia64_psr.i;
+	if (psr.ia64_psr.ic)  PSCB(vcpu,interrupt_collection_enabled) = 1;
+	if (psr.ia64_psr.dt && psr.ia64_psr.rt && psr.ia64_psr.it) vcpu_set_metaphysical_mode(vcpu,FALSE);
 	else vcpu_set_metaphysical_mode(vcpu,TRUE);
-	psr.ic = 1; psr.i = 1;
-	psr.dt = 1; psr.rt = 1; psr.it = 1;
-	psr.bn = 1;
+	psr.ia64_psr.ic = 1; psr.ia64_psr.i = 1;
+	psr.ia64_psr.dt = 1; psr.ia64_psr.rt = 1; psr.ia64_psr.it = 1;
+	psr.ia64_psr.bn = 1;
 	//psr.pk = 1;  // checking pkeys shouldn't be a problem but seems broken
-	if (psr.be) {
+	if (psr.ia64_psr.be) {
 		printf("*** DOMAIN TRYING TO TURN ON BIG-ENDIAN!!!\n");
 		return (IA64_ILLOP_FAULT);
 	}
-	PSCB(vcpu).incomplete_regframe = 0; // is this necessary?
-	ifs = PSCB(vcpu).ifs;
+	PSCB(vcpu,incomplete_regframe) = 0; // is this necessary?
+	ifs = PSCB(vcpu,ifs);
 	//if ((ifs & regs->cr_ifs & 0x8000000000000000L) && ifs != regs->cr_ifs) {
 	//if ((ifs & 0x8000000000000000L) && ifs != regs->cr_ifs) {
 	if (ifs & regs->cr_ifs & 0x8000000000000000L) {
-#define SI_OFS(x)	((char *)(&PSCB(vcpu).x) - (char *)(vcpu->shared_info))
-if (SI_OFS(iip)!=0x150 || SI_OFS(ipsr)!=0x148 || SI_OFS(ifs)!=0x158) {
+#define SI_OFS(x)	((char *)(&PSCB(vcpu,x)) - (char *)(vcpu->vcpu_info))
+if (SI_OFS(iip)!=0x10 || SI_OFS(ipsr)!=0x08 || SI_OFS(ifs)!=0x18) {
 printf("SI_CR_IIP/IPSR/IFS_OFFSET CHANGED, SEE dorfirfi\n");
+printf("SI_CR_IIP=0x%x,IPSR=0x%x,IFS_OFFSET=0x%x\n",SI_OFS(iip),SI_OFS(ipsr),SI_OFS(ifs));
 while(1);
 }
-		// TODO: validate PSCB(vcpu).iip 
-		// TODO: PSCB(vcpu).ipsr = psr;
-		PSCB(vcpu).ipsr = psr.i64;
+		// TODO: validate PSCB(vcpu,iip) 
+		// TODO: PSCB(vcpu,ipsr) = psr;
+		PSCB(vcpu,ipsr) = psr.i64;
 		// now set up the trampoline
 		regs->cr_iip = *(unsigned long *)dorfirfi; // function pointer!!
 		__asm__ __volatile ("mov %0=psr;;":"=r"(regspsr)::"memory");
@@ -1034,11 +1036,11 @@ while(1);
 	}
 	else {
 		regs->cr_ipsr = psr.i64;
-		regs->cr_iip = PSCB(vcpu).iip;
+		regs->cr_iip = PSCB(vcpu,iip);
 	}
-	PSCB(vcpu).interrupt_collection_enabled = 1;
+	PSCB(vcpu,interrupt_collection_enabled) = 1;
 	vcpu_bsw1(vcpu);
-	PSCB(vcpu).interrupt_delivery_enabled = int_enable;
+	PSCB(vcpu,interrupt_delivery_enabled) = int_enable;
 	return (IA64_NO_FAULT);
 }
 
@@ -1046,10 +1048,10 @@ IA64FAULT vcpu_cover(VCPU *vcpu)
 {
 	REGS *regs = vcpu_regs(vcpu);
 
-	if (!PSCB(vcpu).interrupt_collection_enabled) {
-		if (!PSCB(vcpu).incomplete_regframe)
-			PSCB(vcpu).ifs = regs->cr_ifs;
-		else PSCB(vcpu).incomplete_regframe = 0;
+	if (!PSCB(vcpu,interrupt_collection_enabled)) {
+		if (!PSCB(vcpu,incomplete_regframe))
+			PSCB(vcpu,ifs) = regs->cr_ifs;
+		else PSCB(vcpu,incomplete_regframe) = 0;
 	}
 	regs->cr_ifs = 0;
 	return (IA64_NO_FAULT);
@@ -1058,7 +1060,7 @@ IA64FAULT vcpu_cover(VCPU *vcpu)
 IA64FAULT vcpu_thash(VCPU *vcpu, UINT64 vadr, UINT64 *pval)
 {
 	extern unsigned long vcpu_get_rr_ps(VCPU *vcpu,UINT64 vadr);
-	UINT64 pta = PSCB(vcpu).pta;
+	UINT64 pta = PSCB(vcpu,pta);
 	UINT64 pta_sz = (pta & IA64_PTA_SZ(0x3f)) >> IA64_PTA_SZ_BIT;
 	UINT64 pta_base = pta & ~((1UL << IA64_PTA_BASE_BIT)-1);
 	UINT64 Mask = (1L << pta_sz) - 1;
@@ -1078,7 +1080,7 @@ IA64FAULT vcpu_thash(VCPU *vcpu, UINT64 vadr, UINT64 *pval)
 
 	if (VHPT_addr1 == 0xe000000000000000L) {
 	    printf("vcpu_thash: thash unsupported with rr7 @%lx\n",
-		PSCB(vcpu).iip);
+		PSCB(vcpu,iip));
 	    return (IA64_ILLOP_FAULT);
 	}
 //verbose("vcpu_thash: vadr=%p, VHPT_addr=%p\n",vadr,VHPT_addr);
@@ -1103,10 +1105,10 @@ extern unsigned long privop_trace;
 	if ((trp=match_tr(current,vadr)) || (trp=match_dtlb(current,vadr))) {
 		mask = (1L << trp->ps) - 1;
 		*padr = ((trp->ppn << 12) & ~mask) | (vadr & mask);
-		verbose("vcpu_tpa: addr=%p @%p, successful, padr=%p\n",vadr,PSCB(vcpu).iip,*padr);
+		verbose("vcpu_tpa: addr=%p @%p, successful, padr=%p\n",vadr,PSCB(vcpu,iip),*padr);
 		return (IA64_NO_FAULT);
 	}
-	verbose("vcpu_tpa addr=%p, @%p, forcing data miss\n",vadr,PSCB(vcpu).iip);
+	verbose("vcpu_tpa addr=%p, @%p, forcing data miss\n",vadr,PSCB(vcpu,iip));
 	return vcpu_force_data_miss(vcpu, vadr);
 }
 
@@ -1198,13 +1200,13 @@ IA64FAULT vcpu_bsw0(VCPU *vcpu)
 {
 	REGS *regs = vcpu_regs(vcpu);
 	unsigned long *r = &regs->r16;
-	unsigned long *b0 = &PSCB(vcpu).bank0_regs[0];
-	unsigned long *b1 = &PSCB(vcpu).bank1_regs[0];
+	unsigned long *b0 = &PSCB(vcpu,bank0_regs[0]);
+	unsigned long *b1 = &PSCB(vcpu,bank1_regs[0]);
 	int i;
 
-	if (PSCB(vcpu).banknum) {
+	if (PSCB(vcpu,banknum)) {
 		for (i = 0; i < 16; i++) { *b1++ = *r; *r++ = *b0++; }
-		PSCB(vcpu).banknum = 0;
+		PSCB(vcpu,banknum) = 0;
 	}
 	return (IA64_NO_FAULT);
 }
@@ -1213,13 +1215,13 @@ IA64FAULT vcpu_bsw1(VCPU *vcpu)
 {
 	REGS *regs = vcpu_regs(vcpu);
 	unsigned long *r = &regs->r16;
-	unsigned long *b0 = &PSCB(vcpu).bank0_regs[0];
-	unsigned long *b1 = &PSCB(vcpu).bank1_regs[0];
+	unsigned long *b0 = &PSCB(vcpu,bank0_regs[0]);
+	unsigned long *b1 = &PSCB(vcpu,bank1_regs[0]);
 	int i;
 
-	if (!PSCB(vcpu).banknum) {
+	if (!PSCB(vcpu,banknum)) {
 		for (i = 0; i < 16; i++) { *b0++ = *r; *r++ = *b1++; }
-		PSCB(vcpu).banknum = 1;
+		PSCB(vcpu,banknum) = 1;
 	}
 	return (IA64_NO_FAULT);
 }
@@ -1263,7 +1265,7 @@ unsigned long vcpu_get_rr_ve(VCPU *vcpu,UINT64 vadr)
 	
 	ia64_rr rr;
 
-	rr.rrval = PSCB(vcpu).rrs[vadr>>61];
+	rr.rrval = PSCB(vcpu,rrs[vadr)>>61];
 	return(rr.ve);
 }
 
@@ -1273,7 +1275,7 @@ unsigned long vcpu_get_rr_ps(VCPU *vcpu,UINT64 vadr)
 	
 	ia64_rr rr;
 
-	rr.rrval = PSCB(vcpu).rrs[vadr>>61];
+	rr.rrval = PSCB(vcpu,rrs[vadr)>>61];
 	return(rr.ps);
 }
 
@@ -1283,7 +1285,7 @@ unsigned long vcpu_get_rr_rid(VCPU *vcpu,UINT64 vadr)
 	
 	ia64_rr rr;
 
-	rr.rrval = PSCB(vcpu).rrs[vadr>>61];
+	rr.rrval = PSCB(vcpu,rrs[vadr)>>61];
 	return(rr.rid);
 }
 
@@ -1291,7 +1293,7 @@ unsigned long vcpu_get_rr_rid(VCPU *vcpu,UINT64 vadr)
 IA64FAULT vcpu_set_rr(VCPU *vcpu, UINT64 reg, UINT64 val)
 {
 	extern void set_one_rr(UINT64, UINT64);
-	PSCB(vcpu).rrs[reg>>61] = val;
+	PSCB(vcpu,rrs[reg)>>61] = val;
 	// warning: set_one_rr() does it "live"
 	set_one_rr(reg,val);
 	return (IA64_NO_FAULT);
@@ -1299,7 +1301,7 @@ IA64FAULT vcpu_set_rr(VCPU *vcpu, UINT64 reg, UINT64 val)
 
 IA64FAULT vcpu_get_rr(VCPU *vcpu, UINT64 reg, UINT64 *pval)
 {
-	UINT val = PSCB(vcpu).rrs[reg>>61];
+	UINT val = PSCB(vcpu,rrs[reg)>>61];
 	*pval = val;
 	return (IA64_NO_FAULT);
 }
@@ -1379,9 +1381,9 @@ TR_ENTRY *match_tr(VCPU *vcpu, unsigned long ifa)
 {
 	TR_ENTRY *trp;
 
-	trp = vcpu_match_tr_entry(vcpu,vcpu->shared_info->arch.dtrs,ifa,NDTRS);
+	trp = vcpu_match_tr_entry(vcpu,vcpu->vcpu_info->arch.dtrs,ifa,NDTRS);
 	if (trp) return trp;
-	trp = vcpu_match_tr_entry(vcpu,vcpu->shared_info->arch.itrs,ifa,NITRS);
+	trp = vcpu_match_tr_entry(vcpu,vcpu->vcpu_info->arch.itrs,ifa,NITRS);
 	if (trp) return trp;
 	return 0;
 }
@@ -1392,7 +1394,7 @@ IA64FAULT vcpu_itr_d(VCPU *vcpu, UINT64 slot, UINT64 pte,
 	TR_ENTRY *trp;
 
 	if (slot >= NDTRS) return IA64_RSVDREG_FAULT;
-	trp = &PSCB(vcpu).dtrs[slot];
+	trp = &PSCB(vcpu,dtrs[slot]);
 	vcpu_set_tr_entry(trp,pte,itir,ifa);
 	return IA64_NO_FAULT;
 }
@@ -1403,7 +1405,7 @@ IA64FAULT vcpu_itr_i(VCPU *vcpu, UINT64 slot, UINT64 pte,
 	TR_ENTRY *trp;
 
 	if (slot >= NITRS) return IA64_RSVDREG_FAULT;
-	trp = &PSCB(vcpu).itrs[slot];
+	trp = &PSCB(vcpu,itrs[slot]);
 	vcpu_set_tr_entry(trp,pte,itir,ifa);
 	return IA64_NO_FAULT;
 }
@@ -1414,7 +1416,7 @@ IA64FAULT vcpu_itr_i(VCPU *vcpu, UINT64 slot, UINT64 pte,
 
 void foobar(void) { /*vcpu_verbose = 1;*/ }
 
-extern VCPU *dom0;
+extern struct domain *dom0;
 
 void vcpu_itc_no_srlz(VCPU *vcpu, UINT64 IorD, UINT64 vaddr, UINT64 pte, UINT64 logps)
 {
@@ -1427,13 +1429,13 @@ void vcpu_itc_no_srlz(VCPU *vcpu, UINT64 IorD, UINT64 vaddr, UINT64 pte, UINT64 
 	ia64_itc(IorD,vaddr,pte,ps); // FIXME: look for bigger mappings
 	ia64_set_psr(psr);
 	// ia64_srlz_i(); // no srls req'd, will rfi later
-	if (IorD & 0x1) vcpu_set_tr_entry(&PSCB(vcpu).itlb,pte,logps<<2,vaddr);
-	if (IorD & 0x2) vcpu_set_tr_entry(&PSCB(vcpu).dtlb,pte,logps<<2,vaddr);
+	if (IorD & 0x1) vcpu_set_tr_entry(&PSCB(vcpu,itlb),pte,logps<<2,vaddr);
+	if (IorD & 0x2) vcpu_set_tr_entry(&PSCB(vcpu,dtlb),pte,logps<<2,vaddr);
 }
 
 TR_ENTRY *match_dtlb(VCPU *vcpu, unsigned long ifa)
 {
-	return vcpu_match_tr_entry(vcpu,&vcpu->shared_info->arch.dtlb,ifa,1);
+	return vcpu_match_tr_entry(vcpu,&vcpu->vcpu_info->arch.dtlb,ifa,1);
 }
 
 IA64FAULT vcpu_itc_d(VCPU *vcpu, UINT64 pte, UINT64 itir, UINT64 ifa)
@@ -1482,7 +1484,7 @@ IA64FAULT vcpu_fc(VCPU *vcpu, UINT64 vadr)
 {
 	UINT64 mpaddr;
 	IA64FAULT fault;
-	unsigned long lookup_domain_mpa(VCPU *,unsigned long);
+	unsigned long lookup_domain_mpa(struct domain *,unsigned long);
 	unsigned long pteval, dom_imva;
 
 	fault = vcpu_tpa(vcpu, vadr, &mpaddr);
@@ -1494,7 +1496,7 @@ IA64FAULT vcpu_fc(VCPU *vcpu, UINT64 vadr)
 				printk("vcpu_fc: bad dom0 mpaddr %p!\n",mpaddr);
 			}
 		}
-		pteval = lookup_domain_mpa(vcpu,mpaddr);
+		pteval = lookup_domain_mpa(vcpu->domain,mpaddr);
 		if (pteval) {
 			dom_imva = __va(pteval & _PFN_MASK);
 			ia64_fc(dom_imva);
@@ -1518,8 +1520,8 @@ IA64FAULT vcpu_ptc_e(VCPU *vcpu, UINT64 vadr)
 	// FIXME: When VHPT is in place, flush that too!
 	local_flush_tlb_all();
 	// just invalidate the "whole" tlb
-	vcpu_purge_tr_entry(&PSCB(vcpu).dtlb);
-	vcpu_purge_tr_entry(&PSCB(vcpu).itlb);
+	vcpu_purge_tr_entry(&PSCB(vcpu,dtlb));
+	vcpu_purge_tr_entry(&PSCB(vcpu,itlb));
 	return IA64_NO_FAULT;
 }
 
@@ -1536,8 +1538,8 @@ IA64FAULT vcpu_ptc_ga(VCPU *vcpu,UINT64 vadr,UINT64 addr_range)
 	// if (Xen address) return(IA64_ILLOP_FAULT);
 	// FIXME: ??breaks if domain PAGE_SIZE < Xen PAGE_SIZE
 	ia64_global_tlb_purge(vadr,vadr+addr_range,PAGE_SHIFT);
-	vcpu_purge_tr_entry(&PSCB(vcpu).dtlb);
-	vcpu_purge_tr_entry(&PSCB(vcpu).itlb);
+	vcpu_purge_tr_entry(&PSCB(vcpu,dtlb));
+	vcpu_purge_tr_entry(&PSCB(vcpu,itlb));
 	return IA64_NO_FAULT;
 }
 
@@ -1555,5 +1557,5 @@ IA64FAULT vcpu_ptr_i(VCPU *vcpu,UINT64 vadr,UINT64 addr_range)
 
 void vcpu_set_regs(VCPU *vcpu, REGS *regs)
 {
-	vcpu->regs = regs;
+	vcpu->arch.regs = regs;
 }

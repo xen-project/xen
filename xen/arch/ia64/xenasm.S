@@ -11,6 +11,9 @@
 #include <asm/pgtable.h>
 #include <asm/vhpt.h>
 
+#if 0
+// FIXME: there's gotta be a better way...
+// ski and spaski are different... moved to xenmisc.c
 #define RunningOnHpSki(rx,ry,pn) 			\
 	addl rx = 2, r0; 				\
 	addl ry = 3, r0; 				\
@@ -22,7 +25,7 @@
 	;; 						\
 	(pn) movl rx = 0x7000004 ; 			\
 	;; 						\
-	(pn) cmp.eq pn,p0 = ry, rx; 			\
+	(pn) cmp.ge pn,p0 = ry, rx; 			\
 	;;
 
 //int platform_is_hp_ski(void)
@@ -32,9 +35,12 @@ GLOBAL_ENTRY(platform_is_hp_ski)
 (p8)	mov r8 = 1
 	br.ret.sptk.many b0
 END(platform_is_hp_ski)
+#endif
 
 // Change rr7 to the passed value while ensuring
-// Xen is mapped into the new region
+// Xen is mapped into the new region.
+//   in0: new rr7 value
+//   in1: Xen virtual address of shared info (to be pinned)
 #define PSR_BITS_TO_CLEAR						\
 	(IA64_PSR_I | IA64_PSR_IT | IA64_PSR_DT | IA64_PSR_RT |		\
 	 IA64_PSR_DD | IA64_PSR_SS | IA64_PSR_RI | IA64_PSR_ED |	\
@@ -45,7 +51,7 @@ END(platform_is_hp_ski)
 GLOBAL_ENTRY(ia64_new_rr7)
 	// not sure this unwind statement is correct...
 	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(1)
-	alloc loc1 = ar.pfs, 1, 7, 0, 0
+	alloc loc1 = ar.pfs, 2, 7, 0, 0
 1:	{
 	  mov r28  = in0		// copy procedure index
 	  mov r8   = ip			// save ip to compute branch
@@ -62,7 +68,7 @@ GLOBAL_ENTRY(ia64_new_rr7)
 	tpa loc6=loc6			// grab this BEFORE changing rr7
 	;;
 #endif
-	movl loc5=SHAREDINFO_ADDR
+	mov loc5=in1
 	;;
 	tpa loc5=loc5			// grab this BEFORE changing rr7
 	;;
@@ -272,9 +278,9 @@ GLOBAL_ENTRY(__get_domain_bundle)
 END(__get_domain_bundle)
 
 GLOBAL_ENTRY(dorfirfi)
-#define SI_CR_IIP_OFFSET 0x150
-#define SI_CR_IPSR_OFFSET 0x148
-#define SI_CR_IFS_OFFSET 0x158
+#define SI_CR_IIP_OFFSET 0x10
+#define SI_CR_IPSR_OFFSET 0x08
+#define SI_CR_IFS_OFFSET 0x18
         movl r16 = SHAREDINFO_ADDR+SI_CR_IIP_OFFSET
         movl r17 = SHAREDINFO_ADDR+SI_CR_IPSR_OFFSET
         movl r18 = SHAREDINFO_ADDR+SI_CR_IFS_OFFSET
