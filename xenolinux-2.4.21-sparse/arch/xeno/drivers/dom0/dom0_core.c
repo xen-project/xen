@@ -52,7 +52,6 @@ static struct proc_dir_entry *dom_list_intf;
 
 unsigned long direct_mmap(unsigned long, unsigned long, pgprot_t, int, int);
 int direct_unmap(unsigned long, unsigned long);
-int direct_disc_unmap(unsigned long, unsigned long, int);
 
 static unsigned char readbuf[1204];
 
@@ -161,8 +160,8 @@ static ssize_t dom_mem_write(struct file * file, const char * buff,
     
     copy_from_user(&mem_data, (dom_mem_t *)buff, sizeof(dom_mem_t));
     
-    if(direct_disc_unmap(mem_data.vaddr, mem_data.start_pfn, 
-                         mem_data.tot_pages) == 0){
+    if ( direct_unmap(mem_data.vaddr, 
+                      mem_data.tot_pages << PAGE_SHIFT) == 0 ) {
         return sizeof(sizeof(dom_mem_t));
     } else {
         return -1;

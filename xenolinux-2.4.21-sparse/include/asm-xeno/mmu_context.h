@@ -7,15 +7,13 @@
 #include <asm/pgalloc.h>
 #include <asm/multicall.h>
 
-/*
- * possibly do the LDT unload here?
- */
+/* Hooked directly from 'init_new_context'. */
+extern int init_direct_list(struct mm_struct *);
+/* Called from 'release_segments'. */
+extern void destroy_direct_list(struct mm_struct *);
 
-extern int init_new_context(struct task_struct *tsk, struct mm_struct *);
-extern void destroy_context(struct mm_struct *);
-
-//#define destroy_context(mm)		do { } while(0)
-//#define init_new_context(tsk,mm)	0
+#define destroy_context(mm)		do { } while(0)
+#define init_new_context(tsk,mm)	init_direct_list(mm)
 
 #ifdef CONFIG_SMP
 
