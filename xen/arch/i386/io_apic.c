@@ -189,6 +189,86 @@ static void clear_IO_APIC (void)
 			clear_IO_APIC_pin(apic, pin);
 }
 
+static void set_ioapic_affinity (unsigned int irq, unsigned long mask)
+{
+	unsigned long flags;
+
+	/*
+	 * Only the first 8 bits are valid.
+	 */
+	mask = mask << 24;
+	spin_lock_irqsave(&ioapic_lock, flags);
+	__DO_ACTION(1, = mask, )
+	spin_unlock_irqrestore(&ioapic_lock, flags);
+}
+
+#if CONFIG_SMP
+
+typedef struct {
+	unsigned int cpu;
+	unsigned long timestamp;
+} ____cacheline_aligned irq_balance_t;
+
+static irq_balance_t irq_balance[NR_IRQS] __cacheline_aligned
+			= { [ 0 ... NR_IRQS-1 ] = { 0, 0 } };
+
+extern unsigned long irq_affinity [NR_IRQS];
+
+#endif
+
+#define IDLE_ENOUGH(cpu,now) \
+		(idle_cpu(cpu) && ((now) - irq_stat[(cpu)].idle_timestamp > 1))
+
+#define IRQ_ALLOWED(cpu,allowed_mask) \
+		((1 << cpu) & (allowed_mask))
+
+static unsigned long move(int curr_cpu, unsigned long allowed_mask, unsigned long now, int direction)
+{
+	int search_idle = 1;
+	int cpu = curr_cpu;
+
+	goto inside;
+
+	do {
+		if (unlikely(cpu == curr_cpu))
+			search_idle = 0;
+inside:
+		if (direction == 1) {
+			cpu++;
+			if (cpu >= smp_num_cpus)
+				cpu = 0;
+		} else {
+			cpu--;
+			if (cpu == -1)
+				cpu = smp_num_cpus-1;
+		}
+	} while (!IRQ_ALLOWED(cpu,allowed_mask) ||
+			(search_idle && !IDLE_ENOUGH(cpu,now)));
+
+	return cpu;
+}
+
+static inline void balance_irq(int irq)
+{
+#if CONFIG_SMP
+	irq_balance_t *entry = irq_balance + irq;
+	unsigned long now = jiffies;
+
+	if (unlikely(entry->timestamp != now)) {
+		unsigned long allowed_mask;
+		int random_number;
+
+		rdtscl(random_number);
+		random_number &= 1;
+
+		allowed_mask = cpu_online_map & irq_affinity[irq];
+		entry->timestamp = now;
+		entry->cpu = move(entry->cpu, allowed_mask, now, random_number);
+		set_ioapic_affinity(irq, apicid_to_phys_cpu_present(entry->cpu));
+	}
+#endif
+}
+
 /*
  * support for broken MP BIOSs, enables hand-redirection of PIRQ0-7 to
  * specific CPU-side IRQs.
@@ -1233,6 +1313,7 @@ static unsigned int startup_edge_ioapic_irq(unsigned int irq)
  */
 static void ack_edge_ioapic_irq(unsigned int irq)
 {
+	balance_irq(irq);
 	if ((irq_desc[irq].status & (IRQ_PENDING | IRQ_DISABLED))
 					== (IRQ_PENDING | IRQ_DISABLED))
 		mask_IO_APIC_irq(irq);
@@ -1271,6 +1352,8 @@ static void end_level_ioapic_irq (unsigned int irq)
 {
 	unsigned long v;
 	int i;
+
+	balance_irq(irq);
 
 /*
  * It appears there is an erratum which affects at least version 0x11
@@ -1327,19 +1410,6 @@ static void end_level_ioapic_irq (unsigned int irq)
 }
 
 static void mask_and_ack_level_ioapic_irq (unsigned int irq) { /* nothing */ }
-
-static void set_ioapic_affinity (unsigned int irq, unsigned long mask)
-{
-	unsigned long flags;
-	/*
-	 * Only the first 8 bits are valid.
-	 */
-	mask = mask << 24;
-
-	spin_lock_irqsave(&ioapic_lock, flags);
-	__DO_ACTION(1, = mask, )
-	spin_unlock_irqrestore(&ioapic_lock, flags);
-}
 
 /*
  * Level and edge triggered IO-APIC interrupts need different handling,

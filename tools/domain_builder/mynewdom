@@ -1,0 +1,52 @@
+#!/bin/sh
+
+# mynewdom <size> <extra args>
+
+SIZE=${1:?"size missing"}
+
+shift;
+
+ARGS="$*"
+
+IMAGE=../../../xenolinux-2.4.21-pre4/arch/xeno/boot/image
+
+
+LASTDOM=`/bin/ls /proc/xeno/ | grep -v cmd | cut -c4- | sort -rn | head -1`
+DOM=$[LASTDOM+1]
+
+echo Domain ${DOM} looks free
+
+ADDR=`/sbin/ifconfig eth0 | grep inet.addr | sed -e 's/.*inet addr:\([0-9.]*\) .*/\1/'`
+LO=`echo $ADDR | sed -e 's/[0-9]\+\.[0-9]\+\.[0-9]\+\.\([0-9]\+\)/\1/'`
+HI=`echo $ADDR | sed -e 's/\([0-9]\+\.[0-9]\+\.[0-9]\+\)\.[0-9]\+/\1/'`
+NEWADDR=$HI.$[LO+DOM]
+
+echo New IP address : ${NEWADDR}
+
+CMDLINE=`cat /proc/cmdline`
+case $CMDLINE in
+*root=/dev/nfs*)
+ROOT_DIR=`echo $CMDLINE | sed -e 's,.*nfsroot=\([^ ]*\).*,\1,'`
+ROOT_PATH=`echo $ROOT_DIR | sed -e 's!^\(.*\)[0-9]\+$!\1!'`
+ROOT_NUM=`echo $ROOT_DIR | sed -e 's!^.*\([0-9]\+\)$!\1!'`
+NEWROOT_DEV="root=/dev/nfs nfsroot=${ROOT_PATH}$[ROOT_NUM+DOM]"
+;;
+*root=/dev/[hs]d[abcd][0-9]*|*root=/dev/x[hs]d[abcd][0-9]*)
+ROOT_DEV=`echo $CMDLINE | sed -e 's!^.*root=\(/dev/[x]*[hs]da[0-9]\+\).*$!\1!'`
+ROOT_DISK=`echo $ROOT_DEV | sed -e 's!\(/dev/[x]\?[hs]d[a-z]\)[0-9]\+!\1!'`
+ROOT_PART=`echo $ROOT_DEV | sed -e 's!/dev/[x]\?[hs]d[a-z]\([0-9]\+\)!\1!'`
+NEWROOT_DEV="root=${ROOT_DISK}$[ROOT_PART+DOM] ro"
+;;
+*)
+echo Could not determine root from /proc/cmdline
+exit
+;;
+esac
+
+echo New root arguments : ${NEWROOT_DEV}
+
+echo ./newdom ${SIZE} ${IMAGE} ${NEWADDR} ${NEWROOT_DEV} ${ARGS}
+
+./newdom ${SIZE} ${IMAGE} ${NEWADDR} ${NEWROOT_DEV} ${ARGS}
+
+

@@ -85,6 +85,7 @@ void cpu_idle (void)
 
     for ( ; ; )
     {
+        irq_stat[cpu].idle_timestamp = jiffies;
         while (!current->hyp_events && !softirq_pending(cpu))
             default_idle();
         do_hyp_events();
