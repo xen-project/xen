@@ -114,29 +114,36 @@ u64 processed_system_time;   /* System time (ns) at last processing. */
 
 #define NS_PER_TICK (1000000000ULL/HZ)
 
-#define HANDLE_USEC_UNDERFLOW(_tv)         \
-    do {                                   \
-        while ( (_tv).tv_usec < 0 )        \
-        {                                  \
-            (_tv).tv_usec += 1000000;      \
-            (_tv).tv_sec--;                \
-        }                                  \
-    } while ( 0 )
-#define HANDLE_USEC_OVERFLOW(_tv)          \
-    do {                                   \
-        while ( (_tv).tv_usec >= 1000000 ) \
-        {                                  \
-            (_tv).tv_usec -= 1000000;      \
-            (_tv).tv_sec++;                \
-        }                                  \
-    } while ( 0 )
+#define HANDLE_USEC_UNDERFLOW(_tv) do {		\
+	while ((_tv).tv_usec < 0) {		\
+		(_tv).tv_usec += USEC_PER_SEC;	\
+		(_tv).tv_sec--;			\
+	}					\
+} while (0)
+#define HANDLE_USEC_OVERFLOW(_tv) do {		\
+	while ((_tv).tv_usec >= USEC_PER_SEC) {	\
+		(_tv).tv_usec -= USEC_PER_SEC;	\
+		(_tv).tv_sec++;			\
+	}					\
+} while (0)
+static inline void __normalize_time(time_t *sec, s64 *usec)
+{
+	while (*usec >= NSEC_PER_SEC) {
+		(*usec) -= NSEC_PER_SEC;
+		(*sec)++;
+	}
+	while (*usec < NSEC_PER_SEC) {
+		(*usec) += NSEC_PER_SEC;
+		(*sec)--;
+	}
+}
 
 /* Does this guest OS track Xen time, or set its wall clock independently? */
 static int independent_wallclock = 0;
 static int __init __independent_wallclock(char *str)
 {
-    independent_wallclock = 1;
-    return 1;
+	independent_wallclock = 1;
+	return 1;
 }
 __setup("independent_wallclock", __independent_wallclock);
 
@@ -175,6 +182,7 @@ void do_gettimeofday(struct timeval *tv)
 	unsigned long usec, sec;
 	unsigned long max_ntp_tick;
 	unsigned long flags;
+	s64 nsec;
 
 	do {
 		unsigned long lost;
@@ -199,11 +207,12 @@ void do_gettimeofday(struct timeval *tv)
 		else if (unlikely(lost))
 			usec += lost * (USEC_PER_SEC / HZ);
 
-		usec += ((unsigned long)(shadow_system_time -
-			processed_system_time) / NSEC_PER_USEC);
-
 		sec = xtime.tv_sec;
 		usec += (xtime.tv_nsec / NSEC_PER_USEC);
+
+		nsec = shadow_system_time - processed_system_time;
+		__normalize_time(&sec, &nsec);
+		usec += (long)nsec / NSEC_PER_USEC;
 
 		if (unlikely(!TIME_VALUES_UP_TO_DATE)) {
 			/*
@@ -220,8 +229,8 @@ void do_gettimeofday(struct timeval *tv)
 		}
 	} while (read_seqretry(&xtime_lock, seq));
 
-	while (usec >= 1000000) {
-		usec -= 1000000;
+	while (usec >= USEC_PER_SEC) {
+		usec -= USEC_PER_SEC;
 		sec++;
 	}
 
@@ -244,7 +253,8 @@ EXPORT_SYMBOL(do_gettimeofday);
 int do_settimeofday(struct timespec *tv)
 {
 	time_t wtm_sec, sec = tv->tv_sec;
-	long wtm_nsec, nsec = tv->tv_nsec;
+	long wtm_nsec;
+	s64 nsec;
 	struct timespec xentime;
 
 	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
@@ -261,12 +271,13 @@ int do_settimeofday(struct timespec *tv)
 	 * be stale, so we can retry with fresh ones.
 	 */
  again:
-	nsec -= cur_timer->get_offset() * NSEC_PER_USEC;
+	nsec = tv->tv_nsec - cur_timer->get_offset() * NSEC_PER_USEC;
 	if (unlikely(!TIME_VALUES_UP_TO_DATE)) {
 		__get_time_values_from_xen();
 		goto again;
 	}
 
+	__normalize_time(&sec, &nsec);
 	set_normalized_timespec(&xentime, sec, nsec);
 
 	/*
@@ -277,8 +288,9 @@ int do_settimeofday(struct timespec *tv)
 	 */
 	nsec -= (jiffies - wall_jiffies) * TICK_NSEC;
 
-	nsec -= (unsigned long)(shadow_system_time - processed_system_time);
+	nsec -= (shadow_system_time - processed_system_time);
 
+	__normalize_time(&sec, &nsec);
 	wtm_sec  = wall_to_monotonic.tv_sec + (xtime.tv_sec - sec);
 	wtm_nsec = wall_to_monotonic.tv_nsec + (xtime.tv_nsec - nsec);
 
@@ -300,7 +312,7 @@ int do_settimeofday(struct timespec *tv)
 		last_rtc_update = last_update_to_xen = 0;
 		op.cmd = DOM0_SETTIME;
 		op.u.settime.secs        = xentime.tv_sec;
-		op.u.settime.usecs       = xentime.tv_nsec / 1000;
+		op.u.settime.usecs       = xentime.tv_nsec / NSEC_PER_USEC;
 		op.u.settime.system_time = shadow_system_time;
 		write_sequnlock_irq(&xtime_lock);
 		HYPERVISOR_dom0_op(&op);
@@ -385,7 +397,7 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 	    (xtime.tv_sec > (last_update_from_xen + 60))) {
 		/* Adjust shadow for jiffies that haven't updated xtime yet. */
 		shadow_tv.tv_usec -= 
-			(jiffies - wall_jiffies) * (1000000/HZ);
+			(jiffies - wall_jiffies) * (USEC_PER_SEC / HZ);
 		HANDLE_USEC_UNDERFLOW(shadow_tv);
 
 		/*
@@ -394,9 +406,9 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 		 */
 		sec_diff = xtime.tv_sec - shadow_tv.tv_sec;
 		if (unlikely(abs(sec_diff) > 1) ||
-		    unlikely(((sec_diff * 1000000) + 
-		              (xtime.tv_nsec/1000) - shadow_tv.tv_usec) >
-		             500000)) {
+		    unlikely(((sec_diff * USEC_PER_SEC) +
+			      (xtime.tv_nsec / NSEC_PER_USEC) -
+			      shadow_tv.tv_usec) > 500000)) {
 #ifdef CONFIG_XEN_PRIVILEGED_GUEST
 			last_rtc_update = last_update_to_xen = 0;
 #endif
@@ -405,7 +417,7 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 
 		/* Update our unsynchronised xtime appropriately. */
 		xtime.tv_sec  = shadow_tv.tv_sec;
-		xtime.tv_nsec = shadow_tv.tv_usec * 1000;
+		xtime.tv_nsec = shadow_tv.tv_usec * NSEC_PER_USEC;
 
 		last_update_from_xen = xtime.tv_sec;
 	}
@@ -421,8 +433,8 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 		struct timeval tv;
 
 		tv.tv_sec   = xtime.tv_sec;
-		tv.tv_usec  = xtime.tv_nsec / 1000;
-		tv.tv_usec += (jiffies - wall_jiffies) * (1000000/HZ);
+		tv.tv_usec  = xtime.tv_nsec / NSEC_PER_USEC;
+		tv.tv_usec += (jiffies - wall_jiffies) * (USEC_PER_SEC/HZ);
 		HANDLE_USEC_OVERFLOW(tv);
 
 		op.cmd = DOM0_SETTIME;
@@ -640,17 +652,17 @@ int set_timeout_timer(void)
  * now however.
  */
 static ctl_table xen_subtable[] = {
-    {1, "independent_wallclock", &independent_wallclock,
-     sizeof(independent_wallclock), 0644, NULL, proc_dointvec},
-    {0}
+	{1, "independent_wallclock", &independent_wallclock,
+	 sizeof(independent_wallclock), 0644, NULL, proc_dointvec},
+	{0}
 };
 static ctl_table xen_table[] = {
-    {123, "xen", NULL, 0, 0555, xen_subtable},
-    {0}
+	{123, "xen", NULL, 0, 0555, xen_subtable},
+	{0}
 };
 static int __init xen_sysctl_init(void)
 {
-    (void)register_sysctl_table(xen_table, 0);
-    return 0;
+	(void)register_sysctl_table(xen_table, 0);
+	return 0;
 }
 __initcall(xen_sysctl_init);
