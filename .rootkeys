@@ -585,10 +585,7 @@
 3ddb79bfyX7-pD6XdxY_mdNrJR20iw xen/drivers/pci/pci.c
 3ddb79bf2AS7YBGwooE_Kbv7XgUqNQ xen/drivers/pci/pci.ids
 3ddb79bf7sTn85WtP_8Nc2YEmmVExQ xen/drivers/pci/quirks.c
-3ddb79bfkVLMq5CWjZLACPDivqxq_w xen/drivers/pci/setup-bus.c
-3ddb79bfl1H1arbB0pzAEC2uPmY_3g xen/drivers/pci/setup-irq.c
 3ddb79bfJaf0bkE1Y67bnll8-kjEPg xen/drivers/pci/setup-res.c
-3ddb79bfIcCWJsBDNcQQE3ok2Azn-Q xen/drivers/pci/syscall.c
 3eb3c87fc79FXLA6R9TvdBJNTvQDwA xen/figlet/LICENSE
 3eb3c87fPL2T_zBb0bHlbZY-ACEKRw xen/figlet/Makefile
 3eb3c87fmKYTC5GCh_rydFakZp9ayw xen/figlet/README

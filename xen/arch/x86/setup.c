@@ -46,11 +46,6 @@ int acpi_disabled = 1;
 #endif
 EXPORT_SYMBOL(acpi_disabled);
 
-#ifdef	CONFIG_ACPI_BOOT
-extern	int __initdata acpi_ht;
-int acpi_force __initdata = 0;
-#endif
-
 int phys_proc_id[NR_CPUS];
 int logical_proc_id[NR_CPUS];
 
