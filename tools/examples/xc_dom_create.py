@@ -90,7 +90,7 @@ vbd_list = []; cmdline_ip = ''; cmdline_root=''; cmdline_extra=''
 pci_device_list = []; console_port = -1
 auto_console = False
 
-##### Determine location of defautls file
+##### Determine location of defaults file
 #####
 
 try:
@@ -181,7 +181,7 @@ cmdline = cmdline_ip +' '+ cmdline_root +' '+ cmdline_extra
 
 syslog.openlog('xc_dom_create.py %s' % config_file, 0, syslog.LOG_DAEMON)
 
-##### Print some debug info just incase things don't work out...
+##### Print some debug info just in case things don't work out...
 ##### 
 
 output('VM image           : "%s"' % image)
