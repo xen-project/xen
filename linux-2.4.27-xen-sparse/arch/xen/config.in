@@ -25,14 +25,10 @@ define_bool CONFIG_NO_IDLE_HZ y
 
 if [ "$CONFIG_XEN_PHYSDEV_ACCESS" == "y" ]; then
    define_bool CONFIG_FOREIGN_PAGES y
-   define_bool CONFIG_XEN_BLKDEV_FRONTEND n
-   define_bool CONFIG_XEN_NETDEV_FRONTEND n
 else
    define_bool CONFIG_FOREIGN_PAGES n
    define_bool CONFIG_NETDEVICES y
    define_bool CONFIG_VT n
-   define_bool CONFIG_XEN_BLKDEV_FRONTEND y
-   define_bool CONFIG_XEN_NETDEV_FRONTEND y
 fi
 
 mainmenu_option next_comment

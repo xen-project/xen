@@ -219,7 +219,7 @@ CONFIG_IP_NF_TARGET_ULOG=y
 #
 # CONFIG_IP_SCTP is not set
 # CONFIG_ATM is not set
-# CONFIG_VLAN_8021Q is not set
+CONFIG_VLAN_8021Q=y
 # CONFIG_IPX is not set
 # CONFIG_ATALK is not set
 
