@@ -276,12 +276,14 @@ def vd_format(partition, extent_size_mb):
         else:
             new_id = 0
 
-        for i in range(part_info['nr_sectors'] / extent_size):
+        num_extents = part_info['nr_sectors'] / extent_size
+
+        for i in range(num_extents):
             sql ="""INSERT INTO vdisk_extents(vdisk_extent_no, vdisk_id,
                                               part_id, part_extent_no)
                     VALUES ("""+ str(new_id + i) + ", 0, "\
                                + str(blkdev_name_to_number(partition))\
-                               + ", " + str(i) + ")"
+                               + ", " + str(num_extents - (i + 1)) + ")"
             cu.execute(sql)
 
     cx.commit()
