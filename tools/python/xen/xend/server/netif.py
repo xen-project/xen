@@ -104,6 +104,7 @@ class NetDev(controller.SplitDev):
         self.evtchn = None
         self.configure(config)
         self.status = NETIF_INTERFACE_STATUS_DISCONNECTED
+        self.dom = ctrl.dom
 
     def _get_config_mac(self, config):
         vmac = sxp.child_value(config, 'mac')
