@@ -14,14 +14,14 @@ import java.io.PrintWriter;
 public class
 VirtualDiskManager
 {
-  VirtualDisk free;
+  VirtualDisk free_disk;
   Vector virtual_disks;
   Hashtable virtual_block_devices;
   Hashtable key_hash;
 
   VirtualDiskManager ()
   {
-    free = new VirtualDisk("free");
+    free_disk = new VirtualDisk("free");
 
     virtual_disks = new Vector(10,5);
     flush_virtual_block_devices();
@@ -37,7 +37,7 @@ VirtualDiskManager
   public void
   add_xeno_partition (Partition partition, long size)
   {
-    free.add_new_partition (partition, size);
+    free_disk.add_new_partition (partition, size);
     return;
   }
 
@@ -54,7 +54,7 @@ VirtualDiskManager
     {
       Extent e;
 
-      e = free.remove_extent();
+      e = free_disk.remove_extent();
       if (e == null)
       {
 	return null;
@@ -88,7 +88,7 @@ VirtualDiskManager
       e = vd.remove_extent();
       while (e != null)
       {
-	free.add_extent(e);
+	free_disk.add_extent(e);
 	e = vd.remove_extent();
       }
     }
@@ -198,7 +198,7 @@ VirtualDiskManager
   public void
   add_free (VirtualDisk vd)
   {
-    free = vd;
+    free_disk = vd;
   }
 
   public String
@@ -218,7 +218,7 @@ VirtualDiskManager
   public String
   dump_free()
   {
-    return(free.dump(true, false));
+    return(free_disk.dump(true, false));
   }
 
   public String
@@ -265,7 +265,7 @@ VirtualDiskManager
   dump_xml(PrintWriter out)
   {
     out.println("<free>");
-    free.dump_xml(out);
+    free_disk.dump_xml(out);
     out.println("</free>");
     out.println("<virtual_disks>");
     for (int i = 0; i < virtual_disks.size(); i++)

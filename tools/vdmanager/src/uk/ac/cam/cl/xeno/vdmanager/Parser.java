@@ -252,6 +252,45 @@ Parser
       return;
     }
 
+    if (commands[1].startsWith("sd") ||
+	commands[1].startsWith("hd"))
+    {
+      /*
+       * this is a gross hack to allow you to create a virtual block
+       * device that maps directly to a physical partition
+       */
+
+      /* find the appropriate partition */
+      Partition partition = pm.get_partition(commands[1]);
+      if (partition == null)
+      {
+	System.out.println ("vbdcreate error: couldn't find partition \"" +
+			    commands[1] + "\"");
+	return;
+      }
+
+      /* create a virtual disk */
+      vd = new VirtualDisk("vbd:" + commands[1]);
+      vd.add_new_partition(partition, partition.nr_sects);
+
+
+      /* display result */
+      System.out.print("domain:" + commands[2] + " ");
+      if (commands.length == 4)
+      {
+	System.out.print ("rw ");
+      }
+      else
+      {
+	System.out.print(commands[4] + " ");
+      }
+      System.out.print("segment:" + commands[3] + " ");
+      System.out.print(vd.dump_xen());
+      System.out.println("");
+
+      return;
+    } 
+
     if (commands.length == 4)
     {
       vbd =
@@ -269,6 +308,7 @@ Parser
 				      commands[4]);
     }
 
+    /* display commandline to user */
     {
       vd = vdm.get_virtual_disk_key(commands[1]);
       System.out.println ("\n" + vd.dump_xen(vbd) + "\n");
@@ -280,7 +320,7 @@ Parser
   {
     if (commands.length < 3)
     {
-      System.out.println ("vbdcreate <domain number> <vbd number>");
+      System.out.println ("vbddelete <domain number> <vbd number>");
       return;
     }
 

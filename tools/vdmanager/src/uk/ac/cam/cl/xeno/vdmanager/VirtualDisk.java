@@ -134,6 +134,22 @@ VirtualDisk
   }
 
   String
+  dump_xen ()
+  {
+    StringBuffer sb = new StringBuffer();
+
+    sb.append("extents:" + extents.size() + " ");
+    for (int loop = 0; loop < extents.size(); loop++)
+    {
+      Extent e = (Extent) extents.get(loop);
+      sb.append("(disk:" + e.disk + " " +
+		"offset:" + e.offset + " " +
+		"size:" + e.size + ")");
+    }
+    return sb.toString();
+  }
+
+  String
   dump_xen (VirtualBlockDevice vbd)
   {
     StringBuffer sb = new StringBuffer();

@@ -7,12 +7,16 @@ package uk.ac.cam.cl.xeno.vdmanager;
 
 import java.io.*;
 import java.util.Vector;
+import java.util.Enumeration;
 
 public class
 PartitionManager
 {
   Vector partition_map;
   Vector xeno_partition_list;
+
+  static String proc_template =
+    "major minor  #blocks  start_sect   nr_sects name";
 
   /*
    * Initialize partition manager with source file.
@@ -32,6 +36,14 @@ PartitionManager
       in = new BufferedReader(new FileReader(filename));
 
       str = in.readLine();                                  /* skip headings */
+      if (str.length() < proc_template.length() ||
+	  !str.substring(0, proc_template.length()).equals(proc_template))
+      {
+	System.err.println ("Error: Incorrect /proc/partitions.");
+	System.err.println ("       Is this Xeno?");
+	System.exit (1);
+      }
+
       str = in.readLine();                                /* skip blank line */
 
       str = in.readLine();
@@ -56,6 +68,21 @@ PartitionManager
 			  + filename + "]");
       System.err.println (io);
     }
+  }
+
+  Partition
+  get_partition (String name)
+  {
+    Partition partition = null;
+    for (Enumeration e = partition_map.elements() ; e.hasMoreElements() ;) 
+    {
+      partition = (Partition) e.nextElement();
+      if (partition.name.equals(name))
+      {
+	return partition;
+      }
+    }
+    return null;
   }
 
   Partition
