@@ -52,6 +52,19 @@ extern unsigned char pckbd_sysrq_xlate[128];
 #include <asm/hypervisor-ifs/kbd.h>
 #include <asm/hypervisor-ifs/hypervisor-if.h>
 
+#define kbd_controller_present xen_kbd_controller_present
+
+static inline int xen_kbd_controller_present ()
+{
+	if( start_info.flags & SIF_CONSOLE )
+		{
+		printk("Enable keyboard\n");
+		return 1;
+		}
+	else
+		return 0;
+}
+
 /* resource allocation */
 #define kbd_request_region() do { } while (0)
 #define kbd_request_irq(handler) request_irq(_EVENT_KBD, handler, 0, "PS/2 kbd", NULL)
@@ -68,7 +81,7 @@ static unsigned char kbd_current_scancode = 0;
 
 static unsigned char kbd_read_input(void) 
 {
-  //printk("kbd_read_input: returning scancode 0x%2x\n", kbd_current_scancode);
+  //xprintk("kbd_read_input: returning scancode 0x%2x\n", kbd_current_scancode);
   return kbd_current_scancode;
 }
 

@@ -711,7 +711,7 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
 	    phys_seg[nr_psegs].dev           = xendev_to_physdev(req->device);
             if ( phys_seg[nr_psegs].dev == 0 ) 
 	    {
-	        DPRINTK("bad device: %04x\n", req_device);
+	        DPRINTK("bad device: %04x\n", req->device);
 	        goto bad_descriptor;
 	    }
             new_segs = 1;
