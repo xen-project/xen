@@ -2,7 +2,7 @@ from xen.sv.util import *
 from xen.sv.HTMLBase import HTMLBase
 from xen.xend import sxp
 
-class Wizzard( HTMLBase ):
+class Wizard( HTMLBase ):
 
     def __init__( self, urlWriter, title, sheets ):
         HTMLBase.__init__( self )

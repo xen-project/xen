@@ -379,7 +379,7 @@
 40fcefb2vnfDbl4w_yCTedROPuqs0g tools/python/xen/sv/Main.py
 40fcefb24h-04WaHag-Tg4nxWPhTig tools/python/xen/sv/NodeInfo.py
 40fcefb2Sif__6AqrANeBQZZfvP-6w tools/python/xen/sv/TabView.py
-41052eb8UrgtUkuJPg7oY1tutVQHsg tools/python/xen/sv/Wizzard.py
+41052eb8UrgtUkuJPg7oY1tutVQHsg tools/python/xen/sv/Wizard.py
 40fcefb2DqteqCCZYDCvvh4Q5jBd0w tools/python/xen/sv/__init__.py
 40fcefb4rnaZNjqsBu7A5V2rlLyqRw tools/python/xen/sv/util.py
 40d8915cyoVA0hJxiBFNymL7YvDaRg tools/python/xen/util/Brctl.py

@@ -1,6 +1,6 @@
-from xen.sv.Wizzard import Wizzard, Sheet
+from xen.sv.Wizard import Wizard, Sheet
 
-class CreateDomain( Wizzard ):
+class CreateDomain( Wizard ):
     def __init__( self, urlWriter ):
     	
     	sheets = { 0: CreatePage0,
@@ -8,7 +8,7 @@ class CreateDomain( Wizzard ):
           	   2: CreatePage2,
                    3: CreatePage3 }
     
-    	Wizzard.__init__( self, urlWriter, "Create Domain Wizzard", sheets )
+    	Wizard.__init__( self, urlWriter, "Create Domain Wizard", sheets )
        
 class CreatePage0( Sheet ):
 
