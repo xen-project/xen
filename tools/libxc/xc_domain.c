@@ -18,6 +18,7 @@ int xc_domain_create(int xc_handle,
     dom0_op_t op;
 
     op.cmd = DOM0_CREATEDOMAIN;
+    op.u.createdomain.domain = (domid_t)*pdomid;
     op.u.createdomain.memory_kb = mem_kb;
     strncpy(op.u.createdomain.name, name, MAX_DOMAIN_NAME);
     op.u.createdomain.name[MAX_DOMAIN_NAME-1] = '\0';

@@ -27,6 +27,98 @@ extern unsigned int alloc_new_dom_mem(struct domain *, unsigned int);
 extern long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op);
 extern void arch_getdomaininfo_ctxt(struct domain *, full_execution_context_t *);
 
+static inline int is_free_domid(domid_t dom)
+{
+    struct domain  *d;
+
+    if (dom >= DOMID_SELF) return 0;
+    d = find_domain_by_id(dom);
+    if (d == NULL) {
+        return 1;
+    } else {
+        put_domain(d);
+        return 0;
+    }
+}
+
+/** Allocate a free domain id. We try to reuse domain ids in a fairly low range,
+ * only expanding the range when there are no free domain ids. This is to
+ * keep domain ids in a range depending on the number that exist simultaneously,
+ * rather than incrementing domain ids in the full 32-bit range.
+ */
+static int allocate_domid(domid_t *pdom)
+{
+    static spinlock_t domid_lock = SPIN_LOCK_UNLOCKED;
+    static domid_t curdom = 0;
+    static domid_t topdom = 101;
+    int err = 0;
+    domid_t cur, dom, top;
+
+    /* Try to use a domain id in the range 0..topdom, starting at curdom. */
+    spin_lock(&domid_lock);
+    cur = curdom;
+    dom = curdom;
+    top = topdom;
+    spin_unlock(&domid_lock);
+    do {
+        ++dom;
+        if (dom == top) {
+            dom = 1;
+        }
+        if (is_free_domid(dom)) goto exit;
+    } while (dom != cur);
+    /* Couldn't find a free domain id in 0..topdom, try higher. */
+    for (dom = top; dom < DOMID_SELF; dom++) {
+        if(is_free_domid(dom)) goto exit;
+    }
+    /* No free domain ids. */
+    err = -ENOMEM;
+  exit:
+    if (err == 0) {
+        spin_lock(&domid_lock);
+        curdom = dom;
+        if (dom >= topdom) {
+            topdom = dom + 1;
+        }
+        spin_unlock(&domid_lock);
+        *pdom = dom;
+    }
+    return err;
+}
+
+#if 0
+        struct domain    *d;
+        static domid_t    domnr = 0;
+        static spinlock_t domnr_lock = SPIN_LOCK_UNLOCKED;
+        unsigned int      pro;
+        domid_t           dom;
+
+        ret = -ENOMEM;
+
+        if(op->u.createdomain.domain > 0){
+            d = find_domain_by_id(dom);
+            if(d){
+                put_domain(d);
+                ret = -EINVAL;
+                break;
+            }
+        } else {
+            /* Search for an unused domain identifier. */
+            for ( ; ; )
+            {
+                spin_lock(&domnr_lock);
+                /* Wrap the roving counter when we reach first special value. */
+                if ( (dom = ++domnr) == DOMID_SELF )
+                    dom = domnr = 1;
+                spin_unlock(&domnr_lock);
+                
+                if ( (d = find_domain_by_id(dom)) == NULL )
+                    break;
+                put_domain(d);
+             }
+        }
+#endif
+
 long do_dom0_op(dom0_op_t *u_dom0_op)
 {
     long ret = 0;
@@ -101,25 +193,24 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     case DOM0_CREATEDOMAIN:
     {
         struct domain    *d;
-        static domid_t    domnr = 0;
-        static spinlock_t domnr_lock = SPIN_LOCK_UNLOCKED;
         unsigned int      pro;
         domid_t           dom;
 
         ret = -ENOMEM;
 
-        /* Search for an unused domain identifier. */
-        for ( ; ; )
+        dom = op->u.createdomain.domain;
+        if ( 0 < dom && dom < DOMID_SELF )
         {
-            spin_lock(&domnr_lock);
-            /* Wrap the roving counter when we reach first special value. */
-            if ( (dom = ++domnr) == DOMID_SELF )
-                dom = domnr = 1;
-            spin_unlock(&domnr_lock);
-
-            if ( (d = find_domain_by_id(dom)) == NULL )
+            if ( !is_free_domid(dom) )
+            {
+                ret = -EINVAL;
                 break;
-            put_domain(d);
+            }
+        }
+        else
+        {
+            ret = allocate_domid(&dom);
+            if ( ret ) break;
         }
 
         if ( op->u.createdomain.cpu == -1 )
