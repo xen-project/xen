@@ -291,6 +291,8 @@ struct thread_struct {
     unsigned long      debugreg[8];  /* %%db0-7 debug registers */
 /* floating point info */
     struct i387_state  i387;
+/* general user-visible register state */
+    execution_context_t user_ctxt;
 /* Trap info. */
 #ifdef __i386__
     int                fast_trap_idx;
@@ -331,6 +333,7 @@ long set_fast_trap(struct domain *p, int idx);
 	0, 0,		      		       			\
 	{ [0 ... 7] = 0 },	/* debugging registers */	\
 	{ { 0, }, },		/* 387 state */			\
+	{ 0 },							\
 	0x20, { 0, 0 },		/* DEFAULT_FAST_TRAP */		\
 	{ {0} }			/* io permissions */		\
 }

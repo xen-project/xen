@@ -240,9 +240,18 @@ int arch_final_setup_guestos(struct domain *d, full_execution_context_t *c)
     if ( c->flags & ECF_I387_VALID )
         set_bit(DF_DONEFPUINIT, &d->flags);
 
-    memcpy(&d->shared_info->execution_context,
+    memcpy(&d->thread.user_ctxt,
            &c->cpu_ctxt,
-           sizeof(d->shared_info->execution_context));
+           sizeof(d->thread.user_ctxt));
+
+    /*
+     * This is sufficient! If the descriptor DPL differs from CS RPL then we'll
+     * #GP. If DS, ES, FS, GS are DPL 0 then they'll be cleared automatically.
+     * If SS RPL or DPL differs from CS RPL then we'll #GP.
+     */
+    if ( ((d->thread.user_ctxt.cs & 3) == 0) ||
+         ((d->thread.user_ctxt.ss & 3) == 0) )
+        return -EINVAL;
 
     memcpy(&d->thread.i387,
            &c->fpu_ctxt,
@@ -295,12 +304,12 @@ int arch_final_setup_guestos(struct domain *d, full_execution_context_t *c)
 
 #if defined(__i386__)
 
-void new_thread(struct domain *p,
+void new_thread(struct domain *d,
                 unsigned long start_pc,
                 unsigned long start_stack,
                 unsigned long start_info)
 {
-    execution_context_t *ec = &p->shared_info->execution_context;
+    execution_context_t *ec = &d->thread.user_ctxt;
 
     /*
      * Initial register values:
@@ -320,7 +329,7 @@ void new_thread(struct domain *p,
     ec->eflags |= X86_EFLAGS_IF;
 
     /* No fast trap at start of day. */
-    SET_DEFAULT_FAST_TRAP(&p->thread);
+    SET_DEFAULT_FAST_TRAP(&d->thread);
 }
 
 
@@ -345,7 +354,7 @@ void switch_to(struct domain *prev_p, struct domain *next_p)
     /* Switch guest general-register state. */
     if ( !is_idle_task(prev_p) )
     {
-        memcpy(&prev_p->shared_info->execution_context, 
+        memcpy(&prev_p->thread.user_ctxt,
                stack_ec, 
                sizeof(*stack_ec));
         unlazy_fpu(prev_p);
@@ -355,18 +364,8 @@ void switch_to(struct domain *prev_p, struct domain *next_p)
     if ( !is_idle_task(next_p) )
     {
         memcpy(stack_ec,
-               &next_p->shared_info->execution_context,
+               &next_p->thread.user_ctxt,
                sizeof(*stack_ec));
-
-        /*
-         * This is sufficient! If the descriptor DPL differs from CS RPL then 
-         * we'll #GP. If DS, ES, FS, GS are DPL 0 then they'll be cleared 
-         * automatically. If SS RPL or DPL differs from CS RPL then we'll #GP.
-         */
-        if ( (stack_ec->cs & 3) == 0 )
-            stack_ec->cs = FLAT_RING1_CS;
-        if ( (stack_ec->ss & 3) == 0 )
-            stack_ec->ss = FLAT_RING1_DS;
 
         SET_FAST_TRAP(&next_p->thread);
 
