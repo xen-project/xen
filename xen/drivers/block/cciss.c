@@ -443,6 +443,10 @@ void cciss_probe_devices(xen_disk_info_t *xdi)
 
     ctlr = 0;  /* XXX SMH: only deal with 1 controller for now */
 
+    /* Bail if there is no controller. */
+    if ( hba[ctlr] == NULL )
+        return;
+
     /* Loop through each real device */ 
     for(i=0; i < NWD; i++) {
 	
@@ -450,11 +454,10 @@ void cciss_probe_devices(xen_disk_info_t *xdi)
 	
 	if (!(drv->nr_blocks))
             continue;
-	
+
 	if ( xdi->count == xdi->max )
 	    BUG();
-	
-	
+
 	hba[ctlr]->hd[i << NWD_SHIFT].nr_sects = 
 	    hba[ctlr]->sizes[i << NWD_SHIFT] = drv->nr_blocks;
 	
@@ -3409,7 +3412,7 @@ static struct pci_driver cciss_pci_driver = {
 int __init cciss_init(void)
 {
 
-	printk(KERN_INFO DRIVER_NAME "\n");
+/*	printk(KERN_INFO DRIVER_NAME "\n");*/
 	/* Register for out PCI devices */
 	return pci_module_init(&cciss_pci_driver);
 }
