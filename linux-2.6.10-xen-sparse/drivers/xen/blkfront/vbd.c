@@ -5,7 +5,7 @@
  * 
  * Copyright (c) 2003-2004, Keir Fraser & Steve Hand
  * Modifications by Mark A. Williamson are (c) Intel Research Cambridge
- * Copyright (c) 2004, Christian Limpach
+ * Copyright (c) 2004-2005, Christian Limpach
  * 
  * This file may be distributed separately from the Linux kernel, or
  * incorporated into other software packages, subject to the following license:
@@ -49,7 +49,8 @@ static struct xlbd_type_info xlbd_ide_type = {
     .hardsect_size = 512,
     .max_sectors = 128,  /* 'hwif->rqsize' if we knew it */
     // XXXcl todo read_ahead[major]    = 8; /* from drivers/ide/ide-probe.c */
-    .name = "hd",
+    .devname = "ide",
+    .diskname = "hd",
 };
 
 static struct xlbd_type_info xlbd_scsi_type = {
@@ -59,7 +60,8 @@ static struct xlbd_type_info xlbd_scsi_type = {
     .hardsect_size = 512,
     .max_sectors = 128*8, /* XXX 128; */
     // XXXcl todo read_ahead[major]    = 0; /* XXX 8; -- guessing */
-    .name = "sd",
+    .devname = "sd",
+    .diskname = "sd",
 };
 
 static struct xlbd_type_info xlbd_vbd_type = {
@@ -69,7 +71,8 @@ static struct xlbd_type_info xlbd_vbd_type = {
     .hardsect_size = 512,
     .max_sectors = 128,
     // XXXcl todo read_ahead[major]    = 8;
-    .name = "xvd",
+    .devname = "xvd",
+    .diskname = "xvd",
 };
 
 static struct xlbd_major_info *major_info[NUM_IDE_MAJORS + NUM_SCSI_MAJORS +
@@ -183,13 +186,13 @@ static struct xlbd_major_info *xlbd_get_major_info(int xd_device, int *minor)
     }
     major_info[mi_idx]->major = new_major;
 
-    if (register_blkdev(major_info[mi_idx]->major, major_info[mi_idx]->type->name)) {
+    if (register_blkdev(major_info[mi_idx]->major, major_info[mi_idx]->type->devname)) {
         printk(KERN_ALERT "XL VBD: can't get major %d with name %s\n",
-               major_info[mi_idx]->major, major_info[mi_idx]->type->name);
+               major_info[mi_idx]->major, major_info[mi_idx]->type->devname);
         goto out;
     }
 
-    devfs_mk_dir(major_info[mi_idx]->type->name);
+    devfs_mk_dir(major_info[mi_idx]->type->devname);
 
     return major_info[mi_idx];
 
@@ -226,7 +229,7 @@ static struct gendisk *xlvbd_get_gendisk(struct xlbd_major_info *mi,
     gd->first_minor = xd_minor;
     gd->fops = &xlvbd_block_fops;
     gd->private_data = di;
-    sprintf(gd->disk_name, "%s%c%d", mi->type->name,
+    sprintf(gd->disk_name, "%s%c%d", mi->type->diskname,
             'a' + mi->index * mi->type->partn_per_major +
             (xd_minor >> mi->type->partn_shift),
             xd_minor & ((1 << mi->type->partn_shift) - 1));
