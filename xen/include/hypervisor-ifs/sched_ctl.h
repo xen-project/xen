@@ -60,8 +60,8 @@ struct sched_adjdom_cmd
 
         struct atropos_adjdom
         {
-            u64 period;
-            u64 slice;
+            u64 nat_period;
+            u64 nat_slice;
             u64 latency;
             int xtratime;
         } atropos;

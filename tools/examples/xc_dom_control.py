@@ -21,8 +21,11 @@ Usage: %s [command] <params>
   list                   -- print info about all domains
   listvbds               -- print info about all virtual block devs
   cpu_bvtset [dom] [mcuadv] [warp] [warpl] [warpu]
-                         -- set scheduling parameters for domain
-  cpu_bvtslice [slice]   -- default scheduler slice
+                         -- set BVT scheduling parameters for domain
+  cpu_bvtslice [slice]   -- set default BVT scheduler slice
+  cpu_atropos_set [dom] [period] [slice] [latency] [xtratime]
+                         -- set Atropos scheduling parameters for domain
+  cpu_rrobin_slice [slice] -- set Round Robin scheduler slice
   vif_stats [dom] [vif]  -- get stats for a given network vif
   vif_addip [dom] [vif] [ip]  -- add an IP address to a given vif
   vif_setsched [dom] [vif] [bytes] [usecs] -- rate limit vif bandwidth
@@ -263,6 +266,17 @@ elif cmd == 'vbd_remove':
 	print "Failed"
 	sys.exit(1)
 
+elif cmd == 'cpu_atropos_set': # args: dom period slice latency xtratime
+    if len(sys.argv) < 6:
+        usage()
+        sys.exit(1)
+
+    (period, slice, latency, xtratime) = map(lambda x: int(x), sys.argv[3:7])
+    
+    rc = xc.atropos_domain_set(dom, period, slice, latency, xtratime)
+
+elif cmd == 'cpu_rrobin_slice':
+    rc = xc.rrobin_global_set(slice=int(sys.argv[2]))
 
 else:
     usage()

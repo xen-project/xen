@@ -231,6 +231,11 @@ The following is a list of command line arguments to pass to Xen:
                   enabled in debug builds.  Most users can ignore
                   this feature completely.
 
+ sched=xxx        Select the CPU scheduler Xen should use.  The current
+                  possibilities are 'bvt', 'atropos' and 'rrobin'.  The
+                  default is 'bvt'.  For more information see
+                  Sched-HOWTO.txt.
+
 Boot into Domain 0
 ==============================
 

@@ -999,7 +999,7 @@ static PyObject *pyxc_rrobin_global_get(PyObject *self,
     if ( xc_rrobin_global_get(xc->xc_handle, &slice) != 0 )
         return PyErr_SetFromErrno(xc_error);
     
-    return Py_BuildValue("s:L", "slice", slice);
+    return Py_BuildValue("{s:L}", "slice", slice);
 }
 
 
@@ -1130,7 +1130,7 @@ static PyMethodDef pyxc_methods[] = {
       " domain [long]: Domain ID.\n"
       " mcuadv [long]: MCU Advance.\n"
       " warp   [long]: Warp.\n"
-      " warpu  [long]:\n"
+      " warpu  [long]: Unwarp requirement.\n"
       " warpl  [long]: Warp limit,\n"
     },
 
@@ -1363,7 +1363,7 @@ static PyObject *PyXc_new(PyObject *self, PyObject *args)
     if ( (xc->xc_handle = xc_interface_open()) == -1 )
     {
         PyObject_Del((PyObject *)xc);
-        return NULL;
+	return PyErr_SetFromErrno(xc_error);
     }
 
     return (PyObject *)xc;
