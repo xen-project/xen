@@ -704,7 +704,7 @@ string_param("physdev_dom0_hide", opt_physdev_dom0_hide);
 
 /* Test if boot params specify this device should NOT be visible to DOM0
  * (e.g. so that another domain can control it instead) */
-int pcidev_dom0_hidden(struct pci_dev *dev)
+static int pcidev_dom0_hidden(struct pci_dev *dev)
 {
     char cmp[10] = "(.......)";
     

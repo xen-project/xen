@@ -159,7 +159,7 @@ static inline u32 calc_evt(struct domain *d, u32 avt)
  *
  * Returns non-zero on failure.
  */
-int bvt_alloc_task(struct domain *d)
+static int bvt_alloc_task(struct domain *d)
 {
     if ( (d->sched_priv = xmem_cache_alloc(dom_info_cache)) == NULL )
         return -1;
@@ -170,7 +170,7 @@ int bvt_alloc_task(struct domain *d)
 /*
  * Add and remove a domain
  */
-void bvt_add_task(struct domain *d) 
+static void bvt_add_task(struct domain *d) 
 {
     struct bvt_dom_info *inf = BVT_INFO(d);
     ASSERT(inf != NULL);
@@ -206,7 +206,7 @@ void bvt_add_task(struct domain *d)
     }
 }
 
-int bvt_init_idle_task(struct domain *p)
+static int bvt_init_idle_task(struct domain *p)
 {
     if ( bvt_alloc_task(p) < 0 )
         return -1;
@@ -220,7 +220,7 @@ int bvt_init_idle_task(struct domain *p)
     return 0;
 }
 
-void bvt_wake(struct domain *d)
+static void bvt_wake(struct domain *d)
 {
     struct bvt_dom_info *inf = BVT_INFO(d);
     struct domain       *curr;
@@ -271,14 +271,14 @@ static void bvt_sleep(struct domain *d)
  * bvt_free_task - free BVT private structures for a task
  * @d:             task
  */
-void bvt_free_task(struct domain *d)
+static void bvt_free_task(struct domain *d)
 {
     ASSERT(d->sched_priv != NULL);
     xmem_cache_free(dom_info_cache, d->sched_priv);
 }
 
 /* Control the scheduler. */
-int bvt_ctl(struct sched_ctl_cmd *cmd)
+static int bvt_ctl(struct sched_ctl_cmd *cmd)
 {
     struct bvt_ctl *params = &cmd->u.bvt;
 
@@ -291,7 +291,7 @@ int bvt_ctl(struct sched_ctl_cmd *cmd)
 }
 
 /* Adjust scheduling parameter for a given domain. */
-int bvt_adjdom(
+static int bvt_adjdom(
     struct domain *d, struct sched_adjdom_cmd *cmd)
 {
     struct bvt_adjdom *params = &cmd->u.bvt;
@@ -526,7 +526,7 @@ static void bvt_dump_cpu_state(int i)
 }
 
 /* Initialise the data structures. */
-int bvt_init_scheduler()
+static int bvt_init_scheduler(void)
 {
     int i;
 

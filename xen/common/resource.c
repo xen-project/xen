@@ -253,19 +253,6 @@ struct resource * __request_region(struct resource *parent, unsigned long start,
 	return res;
 }
 
-int __check_region(struct resource *parent, unsigned long start, unsigned long n)
-{
-	struct resource * res;
-
-	res = __request_region(parent, start, n, "check-region");
-	if (!res)
-		return -EBUSY;
-
-	release_resource(res);
-	xfree(res);
-	return 0;
-}
-
 void __release_region(struct resource *parent, unsigned long start, unsigned long n)
 {
 	struct resource **p;

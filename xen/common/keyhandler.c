@@ -26,7 +26,7 @@ static struct {
 
 static unsigned char keypress_key;
 
-void keypress_softirq(void)
+static void keypress_softirq(void)
 {
     keyhandler_t *h;
     unsigned char key = keypress_key;
@@ -93,7 +93,7 @@ static void halt_machine(unsigned char key, struct xen_regs *regs)
     machine_restart(NULL); 
 }
 
-void do_task_queues(unsigned char key)
+static void do_task_queues(unsigned char key)
 {
     struct domain *d;
     s_time_t       now = NOW();
