@@ -218,7 +218,7 @@ int construct_dom0(struct domain *d,
      */
     ed->thread.failsafe_selector = FLAT_GUESTOS_CS;
     ed->thread.event_selector    = FLAT_GUESTOS_CS;
-    ed->thread.guestos_ss = FLAT_GUESTOS_DS;
+    ed->thread.guestos_ss = FLAT_GUESTOS_SS;
     for ( i = 0; i < 256; i++ ) 
         ed->thread.traps[i].cs = FLAT_GUESTOS_CS;
 
@@ -257,7 +257,6 @@ int construct_dom0(struct domain *d,
     l2tab = l2start + l2_table_offset(vpt_start);
     l1start = l1tab = (l1_pgentry_t *)l2_pgentry_to_phys(*l2tab);
     l1tab += l1_table_offset(vpt_start);
-    l2tab++;
     for ( count = 0; count < nr_pt_pages; count++ ) 
     {
         *l1tab = mk_l1_pgentry(l1_pgentry_val(*l1tab) & ~_PAGE_RW);
@@ -294,9 +293,8 @@ int construct_dom0(struct domain *d,
              */
             get_page(page, d); /* an extra ref because of readable mapping */
         }
-        l1tab++;
-        if( !((unsigned long)l1tab & (PAGE_SIZE - 1)) )
-            l1start = l1tab = (l1_pgentry_t *)l2_pgentry_to_phys(*l2tab);
+        if ( !((unsigned long)++l1tab & (PAGE_SIZE - 1)) )
+            l1start = l1tab = (l1_pgentry_t *)l2_pgentry_to_phys(*++l2tab);
     }
 
     /* Set up shared-info area. */

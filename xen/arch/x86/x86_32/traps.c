@@ -196,6 +196,10 @@ void __init doublefault_init(void)
     set_task_gate(TRAP_double_fault, __DOUBLEFAULT_TSS_ENTRY<<3);
 }
 
+void __init percpu_traps_init(void)
+{
+}
+
 long set_fast_trap(struct exec_domain *p, int idx)
 {
     trap_info_t *ti;

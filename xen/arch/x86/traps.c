@@ -470,7 +470,7 @@ asmlinkage int do_general_protection(struct xen_regs *regs)
     unsigned long fixup;
 
     DEBUGGER_trap_entry(TRAP_gp_fault, regs);
-    
+
     if ( regs->error_code & 1 )
         goto hardware_gp;
 
@@ -732,8 +732,6 @@ void __init trap_init(void)
 
 #if defined(__i386__)
     _set_gate(idt_table+HYPERCALL_VECTOR, 14, 1, &hypercall);
-#elif defined(__x86_64__)
-    _set_gate(idt_table+HYPERCALL_VECTOR, 14, 3, &hypercall);
 #endif
 
     /* CPU0 uses the master IDT. */

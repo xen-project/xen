@@ -298,6 +298,7 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 unsigned long cpu_initialized;
 void __init cpu_init(void)
 {
+    extern void percpu_traps_init(void);
     int nr = smp_processor_id();
     struct tss_struct *t = &init_tss[nr];
 
@@ -334,6 +335,8 @@ void __init cpu_init(void)
 #define CD(register) __asm__ ( "mov %0,%%db" #register : : "r" (0UL) );
     CD(0); CD(1); CD(2); CD(3); /* no db4 and db5 */; CD(6); CD(7);
 #undef CD
+
+    percpu_traps_init();
 
     /* Install correct page table. */
     write_ptbase(&current->mm);

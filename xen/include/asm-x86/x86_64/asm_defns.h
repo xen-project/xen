@@ -22,6 +22,23 @@
         "pushq %r14;" \
         "pushq %r15;"
 
+#define RESTORE_ALL \
+        "popq  %r15;" \
+        "popq  %r14;" \
+        "popq  %r13;" \
+        "popq  %r12;" \
+        "popq  %rbp;" \
+        "popq  %rbx;" \
+        "popq  %r11;" \
+        "popq  %r10;" \
+        "popq  %r9;" \
+        "popq  %r8;" \
+        "popq  %rax;" \
+        "popq  %rcx;" \
+        "popq  %rdx;" \
+        "popq  %rsi;" \
+        "popq  %rdi;"
+
 #else
 
 #define SAVE_ALL \
@@ -41,6 +58,23 @@
         pushq %r13; \
         pushq %r14; \
         pushq %r15;
+
+#define RESTORE_ALL \
+        popq  %r15; \
+        popq  %r14; \
+        popq  %r13; \
+        popq  %r12; \
+        popq  %rbp; \
+        popq  %rbx; \
+        popq  %r11; \
+        popq  %r10; \
+        popq  %r9; \
+        popq  %r8; \
+        popq  %rax; \
+        popq  %rcx; \
+        popq  %rdx; \
+        popq  %rsi; \
+        popq  %rdi;
 
 #endif
 

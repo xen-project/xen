@@ -118,8 +118,8 @@ void __init paging_init(void)
     unsigned long i, p, max;
 
     /* Map all of physical memory. */
-    max = (max_page + (1UL << L2_PAGETABLE_SHIFT) - 1UL) &
-        ~((1UL << L2_PAGETABLE_SHIFT) - 1UL);
+    max = ((max_page + ENTRIES_PER_L1_PAGETABLE - 1) & 
+           ~(ENTRIES_PER_L1_PAGETABLE - 1)) << PAGE_SHIFT;
     map_pages(idle_pg_table, PAGE_OFFSET, 0, max, PAGE_HYPERVISOR);
 
     /*

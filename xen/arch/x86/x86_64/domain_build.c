@@ -42,7 +42,9 @@ int construct_dom0(struct domain *d,
     unsigned long nr_pages = (alloc_end - alloc_start) >> PAGE_SHIFT;
     unsigned long nr_pt_pages;
     unsigned long count;
-    l2_pgentry_t *l2tab, *l2start;
+    l4_pgentry_t *l4tab = NULL, *l4start = NULL;
+    l3_pgentry_t *l3tab = NULL, *l3start = NULL;
+    l2_pgentry_t *l2tab = NULL, *l2start = NULL;
     l1_pgentry_t *l1tab = NULL, *l1start = NULL;
     struct pfn_info *page = NULL;
     start_info_t *si;
@@ -128,8 +130,14 @@ int construct_dom0(struct domain *d,
         v_end            = (vstack_end + (1UL<<22)-1) & ~((1UL<<22)-1);
         if ( (v_end - vstack_end) < (512UL << 10) )
             v_end += 1UL << 22; /* Add extra 4MB to get >= 512kB padding. */
-        if ( (((v_end - dsi.v_start + ((1UL<<L2_PAGETABLE_SHIFT)-1)) >> 
-               L2_PAGETABLE_SHIFT) + 1) <= nr_pt_pages )
+#define NR(_l,_h,_s) \
+    (((((_h) + ((1UL<<(_s))-1)) & ~((1UL<<(_s))-1)) - \
+       ((_l) & ~((1UL<<(_s))-1))) >> (_s))
+        if ( (1 + /* # L4 */
+              NR(dsi.v_start, v_end, L4_PAGETABLE_SHIFT) + /* # L3 */
+              NR(dsi.v_start, v_end, L3_PAGETABLE_SHIFT) + /* # L2 */
+              NR(dsi.v_start, v_end, L2_PAGETABLE_SHIFT))  /* # L1 */
+             <= nr_pt_pages )
             break;
     }
 
@@ -195,8 +203,8 @@ int construct_dom0(struct domain *d,
     printk("done.\n");
 
     /* Construct a frame-allocation list for the initial domain. */
-    for ( mfn = (alloc_start>>PAGE_SHIFT); 
-          mfn < (alloc_end>>PAGE_SHIFT); 
+    for ( mfn = (alloc_start>>PAGE_SHIFT);
+          mfn < (alloc_end>>PAGE_SHIFT);
           mfn++ )
     {
         page = &frame_table[mfn];
@@ -218,85 +226,97 @@ int construct_dom0(struct domain *d,
      */
     ed->thread.failsafe_selector = FLAT_GUESTOS_CS;
     ed->thread.event_selector    = FLAT_GUESTOS_CS;
-    ed->thread.guestos_ss = FLAT_GUESTOS_DS;
+    ed->thread.guestos_ss = FLAT_GUESTOS_SS;
     for ( i = 0; i < 256; i++ ) 
         ed->thread.traps[i].cs = FLAT_GUESTOS_CS;
 
     /* WARNING: The new domain must have its 'processor' field filled in! */
-    l2start = l2tab = (l2_pgentry_t *)mpt_alloc; mpt_alloc += PAGE_SIZE;
-    memcpy(l2tab, &idle_pg_table[0], PAGE_SIZE);
-    l2tab[LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
-        mk_l2_pgentry((unsigned long)l2start | __PAGE_HYPERVISOR);
-    l2tab[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] =
-        mk_l2_pgentry(__pa(d->mm_perdomain_pt) | __PAGE_HYPERVISOR);
-    ed->mm.pagetable = mk_pagetable((unsigned long)l2start);
+    phys_to_page(mpt_alloc)->u.inuse.type_info = PGT_l4_page_table;
+    l4start = l4tab = __va(mpt_alloc); mpt_alloc += PAGE_SIZE;
+    memcpy(l4tab, &idle_pg_table[0], PAGE_SIZE);
+    l4tab[l4_table_offset(LINEAR_PT_VIRT_START)] =
+        mk_l4_pgentry(__pa(l4start) | __PAGE_HYPERVISOR);
+    l4tab[l4_table_offset(PERDOMAIN_VIRT_START)] =
+        mk_l4_pgentry(__pa(d->mm_perdomain_pt) | __PAGE_HYPERVISOR);
+    ed->mm.pagetable = mk_pagetable(__pa(l4start));
 
-    l2tab += l2_table_offset(dsi.v_start);
+    l4tab += l4_table_offset(dsi.v_start);
     mfn = alloc_start >> PAGE_SHIFT;
     for ( count = 0; count < ((v_end-dsi.v_start)>>PAGE_SHIFT); count++ )
     {
         if ( !((unsigned long)l1tab & (PAGE_SIZE-1)) )
         {
-            l1start = l1tab = (l1_pgentry_t *)mpt_alloc; 
-            mpt_alloc += PAGE_SIZE;
-            *l2tab++ = mk_l2_pgentry((unsigned long)l1start | L2_PROT);
+            phys_to_page(mpt_alloc)->u.inuse.type_info = PGT_l1_page_table;
+            l1start = l1tab = __va(mpt_alloc); mpt_alloc += PAGE_SIZE;
             clear_page(l1tab);
             if ( count == 0 )
                 l1tab += l1_table_offset(dsi.v_start);
+            if ( !((unsigned long)l2tab & (PAGE_SIZE-1)) )
+            {
+                phys_to_page(mpt_alloc)->u.inuse.type_info = PGT_l2_page_table;
+                l2start = l2tab = __va(mpt_alloc); mpt_alloc += PAGE_SIZE;
+                clear_page(l2tab);
+                if ( count == 0 )
+                    l2tab += l2_table_offset(dsi.v_start);
+                if ( !((unsigned long)l3tab & (PAGE_SIZE-1)) )
+                {
+                    phys_to_page(mpt_alloc)->u.inuse.type_info =
+                        PGT_l3_page_table;
+                    l3start = l3tab = __va(mpt_alloc); mpt_alloc += PAGE_SIZE;
+                    clear_page(l3tab);
+                    if ( count == 0 )
+                        l3tab += l3_table_offset(dsi.v_start);
+                    *l4tab++ = mk_l4_pgentry(__pa(l3start) | L4_PROT);
+                }
+                *l3tab++ = mk_l3_pgentry(__pa(l2start) | L3_PROT);
+            }
+            *l2tab++ = mk_l2_pgentry(__pa(l1start) | L2_PROT);
         }
         *l1tab++ = mk_l1_pgentry((mfn << PAGE_SHIFT) | L1_PROT);
-        
+
         page = &frame_table[mfn];
-        if ( !get_page_and_type(page, d, PGT_writable_page) )
+        if ( (page->u.inuse.type_info == 0) &&
+             !get_page_and_type(page, d, PGT_writable_page) )
             BUG();
 
         mfn++;
     }
 
     /* Pages that are part of page tables must be read only. */
-    l2tab = l2start + l2_table_offset(vpt_start);
-    l1start = l1tab = (l1_pgentry_t *)l2_pgentry_to_phys(*l2tab);
+    l4tab = l4start + l4_table_offset(vpt_start);
+    l3start = l3tab = l4_pgentry_to_l3(*l4tab);
+    l3tab += l3_table_offset(vpt_start);
+    l2start = l2tab = l3_pgentry_to_l2(*l3tab);
+    l2tab += l2_table_offset(vpt_start);
+    l1start = l1tab = l2_pgentry_to_l1(*l2tab);
     l1tab += l1_table_offset(vpt_start);
-    l2tab++;
     for ( count = 0; count < nr_pt_pages; count++ ) 
     {
         *l1tab = mk_l1_pgentry(l1_pgentry_val(*l1tab) & ~_PAGE_RW);
         page = &frame_table[l1_pgentry_to_pagenr(*l1tab)];
-        if ( count == 0 )
+
+        /* Read-only mapping + PGC_allocated + page-table page. */
+        page->count_info         = PGC_allocated | 3;
+        page->u.inuse.type_info |= PGT_validated | 1;
+
+        /* Top-level p.t. is pinned. */
+        if ( (page->u.inuse.type_info & PGT_type_mask) == PGT_l4_page_table )
         {
-            page->u.inuse.type_info &= ~PGT_type_mask;
-            page->u.inuse.type_info |= PGT_l2_page_table;
-
-            /*
-             * No longer writable: decrement the type_count.
-             * Installed as CR3: increment both the ref_count and type_count.
-             * Net: just increment the ref_count.
-             */
-            get_page(page, d); /* an extra ref because of readable mapping */
-
-            /* Get another ref to L2 page so that it can be pinned. */
-            if ( !get_page_and_type(page, d, PGT_l2_page_table) )
-                BUG();
-            set_bit(_PGT_pinned, &page->u.inuse.type_info);
+            page->count_info        += 1;
+            page->u.inuse.type_info += 1 | PGT_pinned;
         }
-        else
+
+        /* Iterate. */
+        if ( !((unsigned long)++l1tab & (PAGE_SIZE - 1)) )
         {
-            page->u.inuse.type_info &= ~PGT_type_mask;
-            page->u.inuse.type_info |= PGT_l1_page_table;
-	    page->u.inuse.type_info |= 
-		((dsi.v_start>>L2_PAGETABLE_SHIFT)+(count-1))<<PGT_va_shift;
-
-            /*
-             * No longer writable: decrement the type_count.
-             * This is an L1 page, installed in a validated L2 page:
-             * increment both the ref_count and type_count.
-             * Net: just increment the ref_count.
-             */
-            get_page(page, d); /* an extra ref because of readable mapping */
+            if ( !((unsigned long)++l2tab & (PAGE_SIZE - 1)) )
+            {
+                if ( !((unsigned long)++l3tab & (PAGE_SIZE - 1)) )
+                    l3start = l3tab = l4_pgentry_to_l3(*++l4tab); 
+                l2start = l2tab = l3_pgentry_to_l2(*l3tab);
+            }
+            l1start = l1tab = l2_pgentry_to_l1(*l2tab);
         }
-        l1tab++;
-        if( !((unsigned long)l1tab & (PAGE_SIZE - 1)) )
-            l1start = l1tab = (l1_pgentry_t *)l2_pgentry_to_phys(*l2tab);
     }
 
     /* Set up shared-info area. */
@@ -365,24 +385,12 @@ int construct_dom0(struct domain *d,
     write_ptbase(&current->mm);
     __sti();
 
-    /* Destroy low mappings - they were only for our convenience. */
-    for ( i = 0; i < DOMAIN_ENTRIES_PER_L2_PAGETABLE; i++ )
-        if ( l2_pgentry_val(l2start[i]) & _PAGE_PSE )
-            l2start[i] = mk_l2_pgentry(0);
-    zap_low_mappings(); /* Do the same for the idle page tables. */
-    
     /* DOM0 gets access to everything. */
     physdev_init_dom0(d);
 
     set_bit(DF_CONSTRUCTED, &d->d_flags);
 
     new_thread(ed, dsi.v_kernentry, vstack_end, vstartinfo_start);
-
-#if 0 /* XXXXX DO NOT CHECK IN ENABLED !!! (but useful for testing so leave) */
-    shadow_lock(&d->mm);
-    shadow_mode_enable(p, SHM_test); 
-    shadow_unlock(&d->mm);
-#endif
 
     return 0;
 }

@@ -7,6 +7,8 @@
 #include <xen/mm.h>
 #include <xen/irq.h>
 #include <xen/console.h>
+#include <xen/sched.h>
+#include <asm/msr.h>
 
 static int kstack_depth_to_print = 8*20;
 
@@ -174,6 +176,33 @@ void __init doublefault_init(void)
     /* Set interrupt gate for double faults, specifying IST1. */
     set_intr_gate(TRAP_double_fault, &double_fault);
     idt_table[TRAP_double_fault].a |= 1UL << 32; /* IST1 */
+}
+
+asmlinkage void hypercall(void);
+void __init percpu_traps_init(void)
+{
+    char *stack_top = (char *)get_stack_top();
+    char *stack     = (char *)((unsigned long)stack_top & ~(STACK_SIZE - 1));
+
+    /* movq %rsp, saversp(%rip) */
+    stack[0] = 0x48;
+    stack[1] = 0x89;
+    stack[2] = 0x25;
+    *(u32 *)&stack[3] = (stack_top - &stack[7]) - 16;
+
+    /* leaq saversp(%rip), %rsp */
+    stack[7] = 0x48;
+    stack[8] = 0x8d;
+    stack[9] = 0x25;
+    *(u32 *)&stack[10] = (stack_top - &stack[14]) - 16;
+
+    /* jmp hypercall */
+    stack[14] = 0xe9;
+    *(u32 *)&stack[15] = (char *)hypercall - &stack[19];
+
+    wrmsr(MSR_STAR,  0, (FLAT_RING3_CS64<<16) | __HYPERVISOR_CS); 
+    wrmsr(MSR_LSTAR, (unsigned long)stack, ((unsigned long)stack>>32)); 
+    wrmsr(MSR_SYSCALL_MASK, 0xFFFFFFFFU, 0U);
 }
 
 void *decode_reg(struct xen_regs *regs, u8 b)
