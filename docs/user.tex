@@ -312,7 +312,7 @@ Once you have cloned the repository, you can update to the newest
 changes to the repository by running:
 \begin{verbatim}
 # cd xen-2.0.bk # to change into the local repository
-# bk pull        # to update the repository
+# bk pull       # to update the repository
 \end{verbatim}
 
 \subsection{Without Bitkeeper}
@@ -320,7 +320,7 @@ changes to the repository by running:
 The Xen source tree is also available in gzipped tarball form from the
 Xen downloads page:\\
 {\tt http://www.cl.cam.ac.uk/Research/SRG/netos/xen/downloads.html}.
-Prebuilt tarballs are also available but are very large.
+Prebuilt tarballs are also available from this page but are very large.
 
 \section{The distribution}
 
@@ -469,6 +469,19 @@ serial console.  Add the line:
 
 XXX insert distro specific stuff in here (maybe)
 Suse 9.1: different boot scheme (/etc/init.d/)
+
+\subsection{TLS Libraries}
+
+Users of the XenLinux 2.6 kernel should disable Thread Local Storage
+(e.g. by doing a {\tt mv /lib/tls /lib/tls.disabled}) before
+attempting to run with a XenLinux kernel.  You can always reenable it
+my restoring the directory to its original location (i.e. {\tt mv
+  /lib/tls.disabled /lib/tls}).
+
+The TLS implementation uses segmentation in a way that is not
+permissable under Xen.  If TLS is not disabled, an emulation mode is
+used within Xen which reduces performance substantially and is not
+guaranteed to work perfectly.
 
 \section{Test the new install}
 
