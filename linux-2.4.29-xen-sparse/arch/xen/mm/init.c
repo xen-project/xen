@@ -223,10 +223,9 @@ static void __init pagetable_init (void)
     pmd_t *kpmd, *pmd;
     pte_t *kpte, *pte, *pte_base;
 
-    end     = (unsigned long)__va(max_low_pfn * PAGE_SIZE);
-    ram_end = (unsigned long)__va(xen_start_info.nr_pages * PAGE_SIZE);
-    if ( ram_end > end )
-        ram_end = end;
+    ram_end = end = (unsigned long)__va(max_low_pfn * PAGE_SIZE);
+    if ( xen_start_info.nr_pages < max_low_pfn )
+        ram_end = (unsigned long)__va(xen_start_info.nr_pages * PAGE_SIZE);
 
     pgd_base = init_mm.pgd;
     i = __pgd_offset(PAGE_OFFSET);
