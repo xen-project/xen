@@ -16,6 +16,7 @@
 #include <asm/mc146818rtc.h>
 #include <asm/pgalloc.h>
 #include <asm/smpboot.h>
+#include <asm/hardirq.h>
 
 #ifdef CONFIG_SMP
 
@@ -264,34 +265,67 @@ static spinlock_t tlbstate_lock = SPIN_LOCK_UNLOCKED;
 asmlinkage void smp_invalidate_interrupt(void)
 {
     ack_APIC_irq();
-    if (test_and_clear_bit(smp_processor_id(), &flush_cpumask))
-        local_flush_tlb();
+    clear_bit(smp_processor_id(), &flush_cpumask);
+    local_flush_tlb();
 }
 
-void flush_tlb_others(unsigned long cpumask)
+void flush_tlb_mask(unsigned long mask)
 {
-    spin_lock(&tlbstate_lock);
-    atomic_set_mask(cpumask, &flush_cpumask);
-    send_IPI_mask(cpumask, INVALIDATE_TLB_VECTOR);
-    while (flush_cpumask) continue;
+    if ( unlikely(in_irq()) )
+        BUG();
+    
+    if ( mask & (1 << smp_processor_id()) )
+    {
+        local_flush_tlb();
+        mask &= ~(1 << smp_processor_id());
+    }
+
+    if ( mask != 0 )
+    {
+        spin_lock(&tlbstate_lock);
+        flush_cpumask = mask;
+        send_IPI_mask(mask, INVALIDATE_TLB_VECTOR);
+        while ( flush_cpumask != 0 )
+        {
+            rep_nop();
+            barrier();
+        }
+        spin_unlock(&tlbstate_lock);
+    }
+}
+
+void new_tlbflush_clock_period(void)
+{
+    if ( unlikely(!spin_trylock(&tlbstate_lock)) )
+        return;
+
+    if ( unlikely((flush_cpumask = tlbflush_mask) != 0) )
+    {
+        send_IPI_mask(flush_cpumask, INVALIDATE_TLB_VECTOR);
+        while ( flush_cpumask != 0 )
+        {
+            rep_nop();
+            barrier();
+        }
+    }
+
+    /* No need for cmpxchg updates here: we are protected by tlbstate lock. */
+    tlbflush_mask = (1 << smp_num_cpus) - 1;
+    wmb(); /* Reset the mask before allowing the clock to continue ticking. */
+    tlbflush_clock++;
+
     spin_unlock(&tlbstate_lock);
 }
-	
-static inline void do_flush_tlb_all_local(void)
+
+static void flush_tlb_all_pge_ipi(void* info)
 {
-    __flush_tlb_all();
+    __flush_tlb_pge();
 }
 
-static void flush_tlb_all_ipi(void* info)
+void flush_tlb_all_pge(void)
 {
-    do_flush_tlb_all_local();
-}
-
-void flush_tlb_all(void)
-{
-    smp_call_function (flush_tlb_all_ipi,0,1,1);
-
-    do_flush_tlb_all_local();
+    smp_call_function (flush_tlb_all_pge_ipi,0,1,1);
+    __flush_tlb_pge();
 }
 
 void smp_send_event_check_mask(unsigned long cpu_mask)

@@ -1,40 +1,39 @@
 /******************************************************************************
  * flushtlb.h
  * 
- * TLB flush macros that count flushes.  Counting is used to enforce 
- * zero-copy safety, particularily for the network code.
- *
- * akw - Jan 21, 2003
+ * TLB flushes are timestamped using a global virtual 'clock' which ticks
+ * on any TLB flush on any processor.
+ * 
+ * Copyright (c) 2003, K A Fraser
  */
 
-#ifndef __FLUSHTLB_H
-#define __FLUSHTLB_H
+#ifndef __FLUSHTLB_H__
+#define __FLUSHTLB_H__
 
 #include <xeno/smp.h>
-#include <asm/atomic.h>
 
-atomic_t tlb_flush_count[NR_CPUS];
+/*
+ * Every GLOBAL_FLUSH_PERIOD ticks of the tlbflush clock, every TLB in the
+ * system is guaranteed to have been flushed.
+ */
+#define GLOBAL_FLUSH_PERIOD (1<<16)
 
-#define __write_cr3_counted(__pa)                                       \
-    do {                                                                \
-                __asm__ __volatile__ (                                  \
-                        "movl %0, %%cr3;"                               \
-                        :: "r" (__pa)                                   \
-                        : "memory");                                    \
-                atomic_inc(&tlb_flush_count[smp_processor_id()]);       \
-    } while (0)
+/*
+ * '_cpu_stamp' is the current timestamp for the CPU we are testing.
+ * '_lastuse_stamp' is a timestamp taken when the PFN we are testing was last 
+ * used for a purpose that may have caused the CPU's TLB to become tainted.
+ */
+#define NEED_FLUSH(_cpu_stamp, _lastuse_stamp) \
+ (((_cpu_stamp) > (_lastuse_stamp)) ||         \
+  (((_lastuse_stamp) - (_cpu_stamp)) > (2*GLOBAL_FLUSH_PERIOD)))
 
-#define __flush_tlb_counted()                                           \
-        do {                                                            \
-                unsigned int tmpreg;                                    \
-                                                                        \
-                __asm__ __volatile__(                                   \
-                        "movl %%cr3, %0;  # flush TLB \n"               \
-                        "movl %0, %%cr3;                "               \
-                        : "=r" (tmpreg)                                 \
-                        :: "memory");                                   \
-                atomic_inc(&tlb_flush_count[smp_processor_id()]);       \
-        } while (0)
+extern unsigned long tlbflush_mask;
+extern unsigned long tlbflush_clock;
+extern unsigned long tlbflush_time[NR_CPUS];
 
-#endif
-                           
+extern void new_tlbflush_clock_period(void);
+
+extern void write_cr3_counted(unsigned long pa);
+extern void flush_tlb_counted(void);
+
+#endif /* __FLUSHTLB_H__ */

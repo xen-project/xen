@@ -47,7 +47,7 @@
 #include <asm/hardirq.h>
 #include <asm/apic.h>
 #include <xeno/mm.h>
-
+#include <asm/io_apic.h>
 #include <asm/timex.h>
 #include <xeno/ac_timer.h>
 #include <xeno/perfc.h>

@@ -141,8 +141,8 @@ typedef struct dom0_getpageframeinfo_st
 {
     /* IN variables. */
     unsigned long pfn;          /* Machine page frame number to query.       */
-    /* OUT variables. */
     unsigned int domain;        /* To which domain does the frame belong?    */
+    /* OUT variables. */
     enum { NONE, L1TAB, L2TAB } type; /* Is the page PINNED to a type?       */
 } dom0_getpageframeinfo_t;
 

@@ -12,7 +12,6 @@ PERFCOUNTER( net_hypercalls, "network hypercalls" )
 PERFCOUNTER( net_rx_congestion_drop, "net rx congestion drops" )
 PERFCOUNTER( net_rx_capacity_drop, "net rx capacity drops" )
 PERFCOUNTER( net_rx_delivered, "net rx delivered" )
-PERFCOUNTER( net_rx_tlbflush, "net rx tlb flushes" )
 PERFCOUNTER( net_tx_transmitted, "net tx transmitted" )
 
 PERFCOUNTER_CPU( domain_page_tlb_flush, "domain page tlb flushes" )

@@ -36,10 +36,9 @@ static inline void * phys_to_virt(unsigned long address)
 	return __va(address);
 }
 
-/*
- * Change "struct page" to physical address.
- */
-#define page_to_phys(page)	((page - frame_table) << PAGE_SHIFT)
+#define page_to_pfn(_page)  ((unsigned long)((_page) - frame_table))
+#define page_to_phys(_page) (page_to_pfn(_page) << PAGE_SHIFT)
+#define page_to_virt(_page) phys_to_virt(page_to_phys(_page))
 
 extern void * __ioremap(unsigned long offset, unsigned long size, unsigned long flags);
 

@@ -34,7 +34,7 @@ extern struct net_device *the_dev;
 typedef struct rx_shadow_entry_st 
 {
     unsigned short id;
-    unsigned short flush_count; /* 16 bits should be enough */
+    unsigned short _pad;
     unsigned long  pte_ptr;
     unsigned long  buf_pfn;
 } rx_shadow_entry_t;

@@ -93,7 +93,34 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 #define cmpxchg(ptr,o,n)\
 	((__typeof__(*(ptr)))__cmpxchg((ptr),(unsigned long)(o),\
 					(unsigned long)(n),sizeof(*(ptr))))
-    
+
+
+/*
+ * This function causes longword _o to be changed to _n at location _p.
+ * If this access causes a fault then we return 1, otherwise we return 0.
+ * If no fault occurs then _o is updated to teh value we saw at _p. If this
+ * is the same as the initial value of _o then _n is written to location _p.
+ */
+#define cmpxchg_user(_p,_o,_n)                                          \
+({                                                                      \
+    int _rc;                                                            \
+    __asm__ __volatile__ (                                              \
+        "1: " LOCK_PREFIX "cmpxchgl %2,%3\n"                            \
+        "2:\n"                                                          \
+        ".section .fixup,\"ax\"\n"                                      \
+        "3:     movl $1,%1\n"                                           \
+        "       jmp 2b\n"                                               \
+        ".previous\n"                                                   \
+        ".section __ex_table,\"a\"\n"                                   \
+        "       .align 4\n"                                             \
+        "       .long 1b,3b\n"                                          \
+        ".previous"                                                     \
+        : "=a" (_o), "=r" (_rc)                                         \
+        : "q" (_n), "m" (*__xg((volatile void *)_p)), "0" (_o), "1" (0) \
+        : "memory");                                                    \
+    _rc;                                                                \
+})
+
 /*
  * Force strict CPU ordering.
  * And yes, this is required on UP too when we're talking

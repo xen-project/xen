@@ -202,14 +202,15 @@ void __init *bt_ioremap(unsigned long machine_addr, unsigned long size)
          */
         nrpages = size >> PAGE_SHIFT;
         if (nrpages > NR_FIX_BTMAPS)
-                return NULL;
+            return NULL;
 
         /*
          * Ok, go for it..
          */
         idx = FIX_BTMAP_BEGIN;
         while (nrpages > 0) {
-                set_fixmap(idx, machine_addr);
+                __set_fixmap(idx, machine_addr, 
+                             __pgprot(__PAGE_KERNEL|_PAGE_IO));
                 machine_addr += PAGE_SIZE;
                 --idx;
                 --nrpages;

@@ -24,7 +24,8 @@
 #include <xeno/interrupt.h>
 #include <xeno/irq.h>
 #include <xeno/slab.h>
-
+#include <asm/mpspec.h>
+#include <asm/io_apic.h>
 #include <asm/msr.h>
 #include <asm/hardirq.h>
 #include <asm/ptrace.h>

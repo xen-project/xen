@@ -27,6 +27,7 @@
 #include <asm/processor.h>
 #include <asm/desc.h>
 #include <asm/i387.h>
+#include <asm/mpspec.h>
 
 #include <xeno/irq.h>
 #include <xeno/event.h>
@@ -263,7 +264,7 @@ void switch_to(struct task_struct *prev_p, struct task_struct *next_p)
     tss->ss1  = next->ss1;
 
     /* Switch page tables.  */
-    __write_cr3_counted(pagetable_val(next_p->mm.pagetable));
+    write_cr3_counted(pagetable_val(next_p->mm.pagetable));
 
     set_current(next_p);
 

@@ -20,12 +20,6 @@
 #include <xeno/vbd.h>
 #include <xeno/slab.h>
 
-#if 0
-#define DPRINTK(_f, _a...) printk( _f , ## _a )
-#else
-#define DPRINTK(_f, _a...) ((void)0)
-#endif
-
 /*
  * These are rather arbitrary. They are fairly large because adjacent
  * requests pulled from a communication ring are quite likely to end
@@ -60,15 +54,11 @@ static atomic_t nr_pending;
 
 static struct buffer_head *completed_bhs[NR_CPUS] __cacheline_aligned;
 
-static int __buffer_is_valid(struct task_struct *p, 
-                             unsigned long buffer, 
-                             unsigned short size,
-                             int writeable_buffer);
-static void __lock_buffer(unsigned long buffer,
-                          unsigned short size,
-                          int writeable_buffer);
-static void unlock_buffer(struct task_struct *p,
-                          unsigned long buffer,
+static int lock_buffer(struct task_struct *p,
+                       unsigned long buffer,
+                       unsigned short size,
+                       int writeable_buffer);
+static void unlock_buffer(unsigned long buffer,
                           unsigned short size,
                           int writeable_buffer);
 
@@ -185,8 +175,7 @@ static void end_block_io_op_softirq(struct softirq_action *h)
     {
         pending_req = bh->pending_req;
         
-        unlock_buffer(pending_req->domain, 
-                      virt_to_phys(bh->b_data), 
+        unlock_buffer(virt_to_phys(bh->b_data), 
                       bh->b_size, 
                       (pending_req->operation==READ));
         
@@ -321,97 +310,60 @@ long do_block_io_op(block_io_op_t *u_block_io_op)
  * DOWNWARD CALLS -- These interface with the block-device layer proper.
  */
 
-static int __buffer_is_valid(struct task_struct *p, 
-                             unsigned long buffer, 
-                             unsigned short size,
-                             int writeable_buffer)
+static int lock_buffer(struct task_struct *p,
+                       unsigned long buffer,
+                       unsigned short size,
+                       int writeable_buffer)
 {
     unsigned long    pfn;
     struct pfn_info *page;
-    int rc = 0;
 
-    /* A request may span multiple page frames. Each must be checked. */
     for ( pfn = buffer >> PAGE_SHIFT; 
           pfn < ((buffer + size + PAGE_SIZE - 1) >> PAGE_SHIFT);
           pfn++ )
     {
-        /* Each frame must be within bounds of machine memory. */
-        if ( pfn >= max_page )
+        if ( unlikely(pfn >= max_page) )
+            goto fail;
+
+        page = &frame_table[pfn];
+
+        if ( unlikely(!get_page(page, p)) )
+            goto fail;
+
+        if ( writeable_buffer && 
+             unlikely(!get_page_type(page, PGT_writeable_page)) )
         {
-            DPRINTK("pfn out of range: %08lx\n", pfn);
-            goto out;
+            put_page(page);
+            goto fail;
         }
+    }
 
-        page = frame_table + pfn;
+    return 1;
 
-        /* Each frame must belong to the requesting domain. */
-        if ( (page->flags & PG_domain_mask) != p->domain )
-        {
-            DPRINTK("bad domain: expected %d, got %ld\n", 
-                    p->domain, page->flags & PG_domain_mask);
-            goto out;
-        }
-
-        /* If reading into the frame, the frame must be writeable. */
-        if ( writeable_buffer &&
-             ((page->flags & PG_type_mask) != PGT_writeable_page) &&
-             (page_type_count(page) != 0) )
-        {
-            DPRINTK("non-writeable page passed for block read\n");
-            goto out;
-        }
-    }    
-
-    rc = 1;
- out:
-    return rc;
+ fail:
+    while ( pfn-- > (buffer >> PAGE_SHIFT) )
+    {        
+        if ( writeable_buffer )
+            put_page_type(&frame_table[pfn]);
+        put_page(&frame_table[pfn]);
+    }
+    return 0;
 }
 
-static void __lock_buffer(unsigned long buffer,
+static void unlock_buffer(unsigned long buffer,
                           unsigned short size,
                           int writeable_buffer)
 {
-    unsigned long    pfn;
-    struct pfn_info *page;
+    unsigned long pfn;
 
     for ( pfn = buffer >> PAGE_SHIFT; 
           pfn < ((buffer + size + PAGE_SIZE - 1) >> PAGE_SHIFT);
           pfn++ )
     {
-        page = frame_table + pfn;
         if ( writeable_buffer )
-        {
-            if ( page_type_count(page) == 0 )
-            {
-                page->flags &= ~PG_type_mask;
-                /* No need for PG_need_flush here. */
-                page->flags |= PGT_writeable_page;
-            }
-            get_page_type(page);
-        }
-        get_page_tot(page);
+            put_page_type(&frame_table[pfn]);
+        put_page(&frame_table[pfn]);
     }
-}
-
-static void unlock_buffer(struct task_struct *p,
-                          unsigned long buffer,
-                          unsigned short size,
-                          int writeable_buffer)
-{
-    unsigned long    pfn;
-    struct pfn_info *page;
-
-    spin_lock(&p->page_lock);
-    for ( pfn = buffer >> PAGE_SHIFT; 
-          pfn < ((buffer + size + PAGE_SIZE - 1) >> PAGE_SHIFT);
-          pfn++ )
-    {
-        page = frame_table + pfn;
-        if ( writeable_buffer )
-            put_page_type(page);
-        put_page_tot(page);
-    }
-    spin_unlock(&p->page_lock);
 }
 
 static int do_block_io_op_domain(struct task_struct *p, int max_to_do)
@@ -480,8 +432,6 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
     int new_segs, nr_psegs = 0;
     phys_seg_t phys_seg[MAX_BLK_SEGS * 2];
 
-    spin_lock(&p->page_lock);
-
     /* Check that number of segments is sane. */
     if ( (req->nr_segments == 0) || (req->nr_segments > MAX_BLK_SEGS) )
     {
@@ -506,7 +456,7 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
             goto bad_descriptor;
         }
 
-        if ( !__buffer_is_valid(p, buffer, nr_sects<<9, (operation==READ)) )
+        if ( !lock_buffer(p, buffer, nr_sects<<9, (operation==READ)) )
 	{
             DPRINTK("invalid buffer\n");
             goto bad_descriptor;
@@ -530,6 +480,7 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
                         req->sector_number + tot_sects, 
                         req->sector_number + tot_sects + nr_sects, 
                         req->device); 
+                unlock_buffer(buffer, nr_sects<<9, (operation==READ));
                 goto bad_descriptor;
             }
 
@@ -545,12 +496,6 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
         nr_psegs += new_segs;
         if ( nr_psegs >= (MAX_BLK_SEGS*2) ) BUG();
     }
-
-    /* Lock pages associated with each buffer head. */
-    for ( i = 0; i < nr_psegs; i++ )
-        __lock_buffer(phys_seg[i].buffer, phys_seg[i].nr_sects<<9, 
-                      (operation==READ));
-    spin_unlock(&p->page_lock);
 
     atomic_inc(&nr_pending);
     pending_req = pending_reqs + pending_ring[pending_cons];
@@ -594,7 +539,6 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
     return;
 
  bad_descriptor:
-    spin_unlock(&p->page_lock);
     make_response(p, req->id, req->operation, 1);
 } 
 
@@ -670,7 +614,7 @@ void init_blkdev_info(struct task_struct *p)
     if ( sizeof(*p->blk_ring_base) > PAGE_SIZE ) BUG();
     p->blk_ring_base = (blk_ring_t *)get_free_page(GFP_KERNEL);
     clear_page(p->blk_ring_base);
-    SHARE_PFN_WITH_DOMAIN(virt_to_page(p->blk_ring_base), p->domain);
+    SHARE_PFN_WITH_DOMAIN(virt_to_page(p->blk_ring_base), p);
     p->blkdev_list.next = NULL;
     spin_lock_init(&p->vbd_lock);
 }
@@ -680,7 +624,6 @@ void destroy_blkdev_info(struct task_struct *p)
 {
     ASSERT(!__on_blkdev_list(p));
     UNSHARE_PFN(virt_to_page(p->blk_ring_base));
-    free_page((unsigned long)p->blk_ring_base);
     destroy_all_vbds(p);
 }
 

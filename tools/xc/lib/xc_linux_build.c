@@ -106,12 +106,12 @@ static int setup_guestos(int xc_handle,
                          const char *cmdline,
                          unsigned long shared_info_frame)
 {
-    l1_pgentry_t *vl1tab = NULL, *vl1e = NULL;
-    l2_pgentry_t *vl2tab = NULL, *vl2e = NULL;
+    l1_pgentry_t *vl1tab;
+    l2_pgentry_t *vl2tab;
     unsigned long *page_array = NULL;
     mmu_update_t *pgt_update_arr = NULL, *pgt_updates = NULL;
     int alloc_index, num_pt_pages;
-    unsigned long l2tab;
+    unsigned long l2tab, l2e, l1e=0;
     unsigned long l1tab = 0;
     unsigned long num_pgt_updates = 0;
     unsigned long count, pt_start, i, j;
@@ -230,44 +230,46 @@ static int setup_guestos(int xc_handle,
     if ( (vl2tab = map_pfn(pm_handle, l2tab >> PAGE_SHIFT)) == NULL )
         goto error_out;
     memset(vl2tab, 0, PAGE_SIZE);
-    vl2e = vl2tab + l2_table_offset(virt_load_addr);
+    unmap_pfn(pm_handle, vl2tab);
+    l2e = l2tab + (l2_table_offset(virt_load_addr)*sizeof(l2_pgentry_t));
     for ( count = 0; count < tot_pages; count++ )
     {    
-        if ( ((unsigned long)vl1e & (PAGE_SIZE-1)) == 0 ) 
+        if ( (l1e & (PAGE_SIZE-1)) == 0 )
         {
             l1tab = page_array[alloc_index] << PAGE_SHIFT;
             if ( (vl1tab = map_pfn(pm_handle, l1tab >> PAGE_SHIFT)) == NULL )
                 goto error_out;
             memset(vl1tab, 0, PAGE_SIZE);
+            unmap_pfn(pm_handle, vl1tab);
             alloc_index--;
 		
-            vl1e = vl1tab + l1_table_offset(virt_load_addr + 
-                                            (count << PAGE_SHIFT));
+            l1e = l1tab + (l1_table_offset(virt_load_addr+(count<<PAGE_SHIFT))*
+                           sizeof(l1_pgentry_t));
 
             /* make apropriate entry in the page directory */
-            pgt_updates->ptr = (unsigned long)vl2e;
+            pgt_updates->ptr = l2e;
             pgt_updates->val = l1tab | L2_PROT;
             pgt_updates++;
             num_pgt_updates++;
-            vl2e++;
+            l2e += sizeof(l2_pgentry_t);
         }
 
         if ( count < pt_start )
         {
-            pgt_updates->ptr = (unsigned long)vl1e;
+            pgt_updates->ptr = l1e;
             pgt_updates->val = (page_array[count] << PAGE_SHIFT) | L1_PROT;
             pgt_updates++;
             num_pgt_updates++;
-            vl1e++;
+            l1e += sizeof(l1_pgentry_t);
         }
         else
         {
-            pgt_updates->ptr = (unsigned long)vl1e;
+            pgt_updates->ptr = l1e;
             pgt_updates->val = 
                 ((page_array[count] << PAGE_SHIFT) | L1_PROT) & ~_PAGE_RW;
             pgt_updates++;
             num_pgt_updates++;
-            vl1e++;
+            l1e += sizeof(l1_pgentry_t);
         }
 
         pgt_updates->ptr = 
