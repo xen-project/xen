@@ -397,7 +397,7 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
         __get_time_values_from_xen();
         
         delta = (s64)(shadow_system_time + 
-                      (__get_time_delta_usecs() * 1000) -
+                      ((s64)__get_time_delta_usecs() * 1000LL) -
                       processed_system_time);
     }
     while ( !TIME_VALUES_UP_TO_DATE );

@@ -273,7 +273,8 @@ int do_settimeofday(struct timespec *tv)
 	 * be stale, so we can retry with fresh ones.
 	 */
  again:
-	nsec = tv->tv_nsec - cur_timer->get_offset() * NSEC_PER_USEC;
+	nsec = (s64)tv->tv_nsec -
+	    ((s64)cur_timer->get_offset() * (s64)NSEC_PER_USEC);
 	if (unlikely(!TIME_VALUES_UP_TO_DATE)) {
 		__get_time_values_from_xen();
 		goto again;
@@ -383,15 +384,16 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 		__get_time_values_from_xen();
 
 		delta = (s64)(shadow_system_time +
-			      (cur_timer->get_offset() * NSEC_PER_USEC) -
+			      ((s64)cur_timer->get_offset() * 
+			       (s64)NSEC_PER_USEC) -
 			      processed_system_time);
 	}
 	while (!TIME_VALUES_UP_TO_DATE);
 
 	if (unlikely(delta < 0)) {
-		printk("Timer ISR: Time went backwards: %lld %lld %ld %lld\n",
+		printk("Timer ISR: Time went backwards: %lld %lld %lld %lld\n",
 		       delta, shadow_system_time,
-		       (cur_timer->get_offset() * NSEC_PER_USEC), 
+		       ((s64)cur_timer->get_offset() * (s64)NSEC_PER_USEC), 
 		       processed_system_time);
 		return;
 	}
