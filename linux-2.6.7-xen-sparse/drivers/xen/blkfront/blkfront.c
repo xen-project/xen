@@ -61,6 +61,7 @@ static void kick_pending_request_queues(void);
 
 int __init xlblk_init(void);
 
+void blkif_completion( blkif_request_t *req );
 
 static inline int GET_ID_FROM_FREELIST( void )
 {
@@ -358,6 +359,8 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 	req = (struct request *)rec_ring[id].id;
 
 //printk(KERN_ALERT"i: %d req %p (%ld)\n",i,req,id);
+
+	blkif_completion( &rec_ring[id] );
 
 	ADD_ID_TO_FREELIST(id);  // overwrites req
 
@@ -891,6 +894,8 @@ static void blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 
 //printk("i: %d req %p (%ld)\n",i,bh,id);
 
+	blkif_completion( &rec_ring[id] );
+
 	ADD_ID_TO_FREELIST(id);
 
         switch ( bret->operation )
@@ -1262,3 +1267,27 @@ void blkdev_resume(void)
     memcpy(cmsg.msg, &st, sizeof(st));
     ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
 }
+
+/* XXXXX THIS IS A TEMPORARY FUNCTION UNTIL WE GET GRANT TABLES */
+
+void blkif_completion( blkif_request_t *req )
+{
+    int i;
+
+    switch ( req->operation )
+    {
+    case BLKIF_OP_READ:
+	for ( i = 0; i < req->nr_segments; i++ )
+	{
+	    unsigned long pfn = req->frame_and_sects[i] >> PAGE_SHIFT;
+	    unsigned long mfn = phys_to_machine_mapping[pfn];
+
+	    queue_machphys_update(mfn, pfn);
+	}
+
+	break;
+    }
+    
+}
+
+
