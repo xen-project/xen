@@ -50,6 +50,8 @@ unsigned char irq_serial_getc(int handle);
 
 void serial_force_unlock(int handle);
 
+void serial_endboot(void);
+
 #endif /* __XEN_SERIAL_H__ */
 
 /*

@@ -16,6 +16,7 @@
 #include <asm/domain_page.h>
 #include <xen/trace.h>
 #include <xen/console.h>
+#include <xen/physdev.h>
 #include <asm/shadow.h>
 #include <public/sched_ctl.h>
 
@@ -402,7 +403,6 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
     case DOM0_PCIDEV_ACCESS:
     {
-        extern int physdev_pci_access_modify(domid_t, int, int, int, int);
         ret = physdev_pci_access_modify(op->u.pcidev_access.domain, 
                                         op->u.pcidev_access.bus,
                                         op->u.pcidev_access.dev,

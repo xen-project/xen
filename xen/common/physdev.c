@@ -105,6 +105,14 @@ static int setup_ioport_memory_access(struct domain *d, struct pci_dev *pdev)
     return 0;
 }
 
+void physdev_modify_ioport_access_range(
+    struct domain *d, int enable, int port, int num)
+{
+    int i;
+    for ( i = port; i < (port + num); i++ )
+        (enable ? clear_bit : set_bit)(i, d->arch.iobmp_mask);
+}
+
 /* Add a device to a per-domain device-access list. */
 static int add_dev_to_task(struct domain *d, struct pci_dev *dev, int acc)
 {
