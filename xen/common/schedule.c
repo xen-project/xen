@@ -148,6 +148,7 @@ int wake_up(struct task_struct *p)
 
 /****************************************************************************
  * Domain requested scheduling operations
+ * KAF: No, turn it back into do_yield()!
  ****************************************************************************/
 long do_sched_op(void)
 {
@@ -418,6 +419,14 @@ asmlinkage void schedule(void)
     }
     return;
 }
+
+/* No locking needed -- pointer comparison is safe :-) */
+int idle_cpu(int cpu)
+{
+    struct task_struct *p = schedule_data[cpu].curr;
+    return p == idle_task[cpu];
+}
+
 
 /*
  * The scheduler timer.
