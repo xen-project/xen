@@ -44,7 +44,8 @@ docs/user/internals.pl
 docs/user/labels.pl
 docs/user/user.css
 docs/user/user.html
-extras/mini-os/h/hypervisor-ifs
+extras/mini-os/h/xen-public
+extras/mini-os/mini-os.*
 install/*
 linux-*-xen0/*
 linux-*-xenU/*
@@ -91,7 +92,7 @@ xen/drivers/pci/gen-devlist
 xen/figlet/figlet
 xen/include/asm
 xen/include/asm-*/asm-offsets.h
-xen/include/hypervisor-ifs/arch
+xen/include/public/public
 xen/include/xen/*.new
 xen/include/xen/banner.h
 xen/include/xen/compile.h
