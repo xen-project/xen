@@ -25,7 +25,7 @@
 #include <xen/ac_timer.h>
 #include <xen/cache.h>
 
-#define BUG_ON(x) do { if (x) BUG(); }while(0)
+#define BUG_ON(x) do { if (x) BUG(); } while(0)
 
 static LIST_HEAD(freelist);
 static spinlock_t freelist_lock = SPIN_LOCK_UNLOCKED;
@@ -48,8 +48,9 @@ static void maybe_split(struct xmalloc_hdr *hdr, size_t size, size_t block)
 		extra = (void *)hdr + size;
 		extra->size = leftover;
 		list_add(&extra->freelist, &freelist);
-	} else
+	} else {
 		size = block;
+	}
 
 	hdr->size = size;
 	/* Debugging aid. */
@@ -62,7 +63,7 @@ static void *xmalloc_new_page(size_t size)
 	unsigned long flags;
 
 	hdr = (void *)alloc_xenheap_pages(0);
-	if (!hdr)
+	if (hdr == NULL)
 		return NULL;
 
 	spin_lock_irqsave(&freelist_lock, flags);
@@ -78,7 +79,7 @@ static void *xmalloc_whole_pages(size_t size)
 	unsigned int pageorder = get_order(size);
 
 	hdr = (void *)alloc_xenheap_pages(pageorder);
-	if (!hdr)
+	if (hdr == NULL)
 		return NULL;
 
 	hdr->size = (1 << (pageorder + PAGE_SHIFT));
@@ -130,7 +131,7 @@ void xfree(const void *p)
 	unsigned long flags;
 	struct xmalloc_hdr *i, *tmp, *hdr;
 
-	if (!p)
+	if (p == NULL)
 		return;
 
 	hdr = (struct xmalloc_hdr *)p - 1;
@@ -150,14 +151,19 @@ void xfree(const void *p)
 	/* Merge with other free block, or put in list. */
 	spin_lock_irqsave(&freelist_lock, flags);
 	list_for_each_entry_safe(i, tmp, &freelist, freelist) {
+		unsigned long _i   = (unsigned long)i;
+		unsigned long _hdr = (unsigned long)hdr;
+		/* Do not merge across page boundaries. */
+		if (((_i ^ _hdr) & PAGE_MASK) != 0)
+			continue;
 		/* We follow this block?  Swallow it. */
-		if ((void *)i + i->size == (void *)hdr) {
+		if ((_i + i->size) == _hdr) {
 			list_del(&i->freelist);
 			i->size += hdr->size;
 			hdr = i;
 		}
-		/* It follows us?  Delete it and add it to us. */
-		if ((void *)hdr + hdr->size == (void *)i) {
+		/* We precede this block? Swallow it. */
+		if ((_hdr + hdr->size) == _i) {
 			list_del(&i->freelist);
 			hdr->size += i->size;
 		}
@@ -167,7 +173,9 @@ void xfree(const void *p)
 	if (hdr->size == PAGE_SIZE) {
 		BUG_ON((((unsigned long)hdr) & (PAGE_SIZE-1)) != 0);
 		free_xenheap_pages((unsigned long)hdr, 0);
-	} else
+	} else {
 		list_add(&hdr->freelist, &freelist);
+	}
+
 	spin_unlock_irqrestore(&freelist_lock, flags);
 }
