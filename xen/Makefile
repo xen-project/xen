@@ -77,7 +77,7 @@ include/xen/banner.h: tools/figlet/figlet tools/figlet/xen.flf
 	tools/figlet/figlet -d tools/figlet Xen $(XEN_VERSION).$(XEN_SUBVERSION)$(XEN_EXTRAVERSION) > $@.new
 	@mv -f $@.new $@
 
-include/asm-$(TARGET_ARCH)/asm-offsets.h: arch/$(TARGET_ARCH)/asm-offsets.s
+include/asm-$(TARGET_ARCH)/asm-offsets.h: arch/$(TARGET_ARCH)/asm-offsets.s $(HDRS)
 	@(set -e; \
 	  echo "/*"; \
 	  echo " * DO NOT MODIFY."; \

@@ -69,8 +69,6 @@ struct at_cpu_info
 
 static void at_dump_cpu_state(int cpu);
 
-static xmem_cache_t *dom_info_cache;
-
 static inline void __add_to_runqueue_head(struct domain *d)
 {
     list_add(RUNLIST(d), RUNQ(d->processor));
@@ -173,7 +171,7 @@ static int at_alloc_task(struct domain *p)
 {
     ASSERT(p != NULL);
     
-    p->sched_priv = xmem_cache_alloc(dom_info_cache);
+    p->sched_priv = xmalloc(struct at_dom_info);
     if ( p->sched_priv == NULL )
         return -1;
     
@@ -558,10 +556,6 @@ static int at_init_scheduler()
         INIT_LIST_HEAD(RUNQ(i));
     }
 
-    dom_info_cache = xmem_cache_create("Atropos dom info",
-                                       sizeof(struct at_dom_info),
-                                       0, 0, NULL, NULL);
-
     return 0;
 }
 
@@ -649,7 +643,7 @@ static int at_adjdom(struct domain *p, struct sched_adjdom_cmd *cmd)
 /* free memory associated with a task */
 static void at_free_task(struct domain *p)
 {
-    xmem_cache_free( dom_info_cache, DOM_INFO(p) );
+    xfree( DOM_INFO(p) );
 }
 
 

@@ -565,7 +565,7 @@ grant_table_create(
     grant_table_t *t;
     int            i;
 
-    if ( (t = xmalloc(sizeof(*t))) == NULL )
+    if ( (t = xmalloc(grant_table_t)) == NULL )
         goto no_mem;
 
     /* Simple stuff. */
@@ -573,8 +573,8 @@ grant_table_create(
     spin_lock_init(&t->lock);
 
     /* Active grant table. */
-    if ( (t->active = xmalloc(sizeof(active_grant_entry_t) * 
-                              NR_GRANT_ENTRIES)) == NULL )
+    if ( (t->active = xmalloc_array(active_grant_entry_t, NR_GRANT_ENTRIES))
+	 == NULL )
         goto no_mem;
     memset(t->active, 0, sizeof(active_grant_entry_t) * NR_GRANT_ENTRIES);
 

@@ -16,6 +16,7 @@
 #include <asm/pdb.h>
 #include <xen/config.h>
 #include <xen/spinlock.h>
+#include <xen/cache.h>
 #include <asm/vmx_vmcs.h>
 #include <public/xen.h>
 #endif
@@ -412,11 +413,11 @@ struct thread_struct {
      * for segment registers %ds, %es, %fs and %gs:
      * 	%ds, %es, %fs, %gs, %eip, %cs, %eflags [, %oldesp, %oldss]
      */
-    unsigned long event_selector;    /* 08: entry CS  */
-    unsigned long event_address;     /* 12: entry EIP */
+    unsigned long event_selector;    /* entry CS  */
+    unsigned long event_address;     /* entry EIP */
 
-    unsigned long failsafe_selector; /* 16: entry CS  */
-    unsigned long failsafe_address;  /* 20: entry EIP */
+    unsigned long failsafe_selector; /* entry CS  */
+    unsigned long failsafe_address;  /* entry EIP */
 
     /* Bounce information for propagating an exception to guest OS. */
     struct trap_bounce trap_bounce;
@@ -435,7 +436,7 @@ struct thread_struct {
 #ifdef CONFIG_VMX
     struct arch_vmx_struct arch_vmx; /* Virtual Machine Extensions */
 #endif
-};
+} __cacheline_aligned;
 
 #define IDT_ENTRIES 256
 extern idt_entry_t idt_table[];

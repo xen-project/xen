@@ -616,7 +616,7 @@ static inline void set_shadow_status(
     {
         SH_LOG("Allocate more shadow hashtable blocks.");
 
-        extra = xmalloc(
+        extra = _xmalloc(
             sizeof(void *) + (shadow_ht_extra_size * sizeof(*x)));
 
         /* XXX Should be more graceful here. */

@@ -176,8 +176,7 @@ int shadow_mode_enable(struct domain *p, unsigned int mode)
 {
     struct mm_struct *m = &p->exec_domain[0]->mm;
 
-    m->shadow_ht = xmalloc(
-        shadow_ht_buckets * sizeof(struct shadow_status));
+    m->shadow_ht = xmalloc_array(struct shadow_status, shadow_ht_buckets);
     if ( m->shadow_ht == NULL )
         goto nomem;
     memset(m->shadow_ht, 0, shadow_ht_buckets * sizeof(struct shadow_status));
@@ -186,7 +185,7 @@ int shadow_mode_enable(struct domain *p, unsigned int mode)
     {
         m->shadow_dirty_bitmap_size = (p->max_pages + 63) & ~63;
         m->shadow_dirty_bitmap = 
-            xmalloc(m->shadow_dirty_bitmap_size/8);
+            _xmalloc(m->shadow_dirty_bitmap_size/8);
         if ( m->shadow_dirty_bitmap == NULL )
         {
             m->shadow_dirty_bitmap_size = 0;

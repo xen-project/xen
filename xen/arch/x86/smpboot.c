@@ -409,7 +409,7 @@ void __init start_secondary(void)
      * At this point, boot CPU has fully initialised the IDT. It is
      * now safe to make ourselves a private copy.
      */
-    idt_tables[cpu] = xmalloc(IDT_ENTRIES*8);
+    idt_tables[cpu] = xmalloc_array(struct desc_struct, IDT_ENTRIES);
     memcpy(idt_tables[cpu], idt_table, IDT_ENTRIES*8);
     *(unsigned short *)(&idt_load[0]) = (IDT_ENTRIES*8)-1;
     *(unsigned long  *)(&idt_load[2]) = (unsigned long)idt_tables[cpu];

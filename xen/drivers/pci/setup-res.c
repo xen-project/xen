@@ -171,10 +171,10 @@ pdev_sort_resources(struct pci_dev *dev, struct resource_list *head)
 					ln->res->start;
 			}
 			if (r_align > align) {
-				tmp = xmalloc(sizeof(*tmp));
+				tmp = xmalloc(struct resource_list);
 				if (!tmp)
 					panic("pdev_sort_resources(): "
-					      "xmalloc() failed!\n");
+					      "malloc() failed!\n");
 				tmp->next = ln;
 				tmp->res = r;
 				tmp->dev = dev;
