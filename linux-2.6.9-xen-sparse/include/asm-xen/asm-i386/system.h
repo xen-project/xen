@@ -450,63 +450,60 @@ struct alt_instr {
 
 #define __cli()								\
 do {									\
-	vcpu_info_t *_vcpu =						\
-		&HYPERVISOR_shared_info->vcpu_data[smp_processor_id()];	\
+	vcpu_info_t *_vcpu;						\
+	preempt_disable();						\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_data[smp_processor_id()];	\
 	_vcpu->evtchn_upcall_mask = 1;					\
+	preempt_enable_no_resched();					\
 	barrier();							\
 } while (0)
 
 #define __sti()								\
 do {									\
-	vcpu_info_t *_vcpu =						\
-		&HYPERVISOR_shared_info->vcpu_data[smp_processor_id()];	\
+	vcpu_info_t *_vcpu;						\
 	barrier();							\
+	preempt_disable();						\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_data[smp_processor_id()];	\
 	_vcpu->evtchn_upcall_mask = 0;					\
 	barrier(); /* unmask then check (avoid races) */		\
 	if ( unlikely(_vcpu->evtchn_upcall_pending) )			\
 		force_evtchn_callback();				\
+	preempt_enable();						\
 } while (0)
 
 #define __save_flags(x)							\
 do {									\
-	vcpu_info_t *_vcpu =						\
-		&HYPERVISOR_shared_info->vcpu_data[smp_processor_id()];	\
+	vcpu_info_t *_vcpu;						\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_data[smp_processor_id()];	\
 	(x) = _vcpu->evtchn_upcall_mask;				\
 } while (0)
 
 #define __restore_flags(x)						\
 do {									\
-	vcpu_info_t *_vcpu =						\
-		&HYPERVISOR_shared_info->vcpu_data[smp_processor_id()];	\
+	vcpu_info_t *_vcpu;						\
 	barrier();							\
-	if ( (_vcpu->evtchn_upcall_mask = (x)) == 0 ) {			\
+	preempt_disable();						\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_data[smp_processor_id()];	\
+	if ((_vcpu->evtchn_upcall_mask = (x)) == 0) {			\
 		barrier(); /* unmask then check (avoid races) */	\
 		if ( unlikely(_vcpu->evtchn_upcall_pending) )		\
 			force_evtchn_callback();			\
-	}								\
+		preempt_enable();					\
+	} else								\
+		preempt_enable_no_resched();				\
 } while (0)
 
 #define safe_halt()		((void)0)
 
 #define __save_and_cli(x)						\
 do {									\
-	vcpu_info_t *_vcpu =						\
-		&HYPERVISOR_shared_info->vcpu_data[smp_processor_id()];	\
+	vcpu_info_t *_vcpu;						\
+	preempt_disable();						\
+	_vcpu = &HYPERVISOR_shared_info->vcpu_data[smp_processor_id()];	\
 	(x) = _vcpu->evtchn_upcall_mask;				\
 	_vcpu->evtchn_upcall_mask = 1;					\
+	preempt_enable_no_resched();					\
 	barrier();							\
-} while (0)
-
-#define __save_and_sti(x)						\
-do {									\
-	vcpu_info_t *_vcpu =						\
-		&HYPERVISOR_shared_info->vcpu_data[smp_processor_id()];	\
-	barrier();							\
-	(x) = _vcpu->evtchn_upcall_mask;				\
-	_vcpu->evtchn_upcall_mask = 0;					\
-	barrier(); /* unmask then check (avoid races) */		\
-	if ( unlikely(_vcpu->evtchn_upcall_pending) )			\
-		force_evtchn_callback();				\
 } while (0)
 
 #define local_irq_save(x)	__save_and_cli(x)
