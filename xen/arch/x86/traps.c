@@ -51,16 +51,7 @@
 #include <asm/i387.h>
 #include <asm/pdb.h>
 
-#define GTBF_TRAP        1
-#define GTBF_TRAP_NOCODE 2
-#define GTBF_TRAP_CR2    4
-struct guest_trap_bounce {
-    unsigned long  error_code;        /*   0 */
-    unsigned long  cr2;               /*   4 */
-    unsigned short flags;             /*   8 */
-    unsigned short cs;                /*  10 */
-    unsigned long  eip;               /*  12 */
-} guest_trap_bounce[NR_CPUS] = { { 0 } };
+struct guest_trap_bounce guest_trap_bounce[NR_CPUS] = { { 0 } };
 
 #if defined(__i386__)
 
@@ -451,6 +442,11 @@ asmlinkage void do_general_protection(struct pt_regs *regs, long error_code)
             goto finish_propagation;
         }
     }
+
+#if defined(__i386__)
+    if ( (error_code == 0) && gpf_emulate_4gb(regs) )
+        return;
+#endif
     
     /* Pass on GPF as is. */
     ti = current->thread.traps + 13;

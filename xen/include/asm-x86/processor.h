@@ -345,6 +345,20 @@ long set_fast_trap(struct domain *p, int idx);
 
 #endif /* __x86_64__ */
 
+#define GTBF_TRAP        1
+#define GTBF_TRAP_NOCODE 2
+#define GTBF_TRAP_CR2    4
+struct guest_trap_bounce {
+    unsigned long  error_code;        /*   0 */
+    unsigned long  cr2;               /*   4 */
+    unsigned short flags;             /*   8 */
+    unsigned short cs;                /*  10 */
+    unsigned long  eip;               /*  12 */
+};
+extern struct guest_trap_bounce guest_trap_bounce[];
+
+extern int gpf_emulate_4gb(struct pt_regs *regs);
+
 struct mm_struct {
     /*
      * Every domain has a L1 pagetable of its own. Per-domain mappings
@@ -401,10 +415,10 @@ static inline void write_ptbase(struct mm_struct *mm)
 }
 
 /* Convenient accessor for mm.gdt. */
-#define SET_GDT_ENTRIES(_p, _e) ((*(u16 *)((_p)->mm.gdt + 0)) = (_e))
+#define SET_GDT_ENTRIES(_p, _e) ((*(u16 *)((_p)->mm.gdt + 0)) = (((_e)<<3)-1))
 #define SET_GDT_ADDRESS(_p, _a) ((*(unsigned long *)((_p)->mm.gdt + 2)) = (_a))
-#define GET_GDT_ENTRIES(_p)     ((*(u16 *)((_p)->mm.gdt + 0)))
-#define GET_GDT_ADDRESS(_p)     ((*(unsigned long *)((_p)->mm.gdt + 2)))
+#define GET_GDT_ENTRIES(_p)     (((*(u16 *)((_p)->mm.gdt + 0))+1)>>3)
+#define GET_GDT_ADDRESS(_p)     (*(unsigned long *)((_p)->mm.gdt + 2))
 
 void destroy_gdt(struct domain *d);
 long set_gdt(struct domain *d, 

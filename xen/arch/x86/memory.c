@@ -178,7 +178,7 @@ int alloc_segdesc_page(struct pfn_info *page)
     int i;
 
     for ( i = 0; i < 512; i++ )
-        if ( unlikely(!check_descriptor(descs[i*2], descs[i*2+1])) )
+        if ( unlikely(!check_descriptor(&descs[i*2])) )
             goto fail;
 
     unmap_domain_mem(descs);
