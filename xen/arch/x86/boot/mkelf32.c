@@ -245,6 +245,12 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    /*
+     * End the image on a page boundary. This gets round alignment bugs
+     * in the boot- or chain-loader (e.g., kexec on the XenoBoot CD).
+     */
+    mem_siz += -(loadbase + mem_siz) & 0xfff;
+
     out_ehdr.e_entry = loadbase;
     out_ehdr.e_shoff = RAW_OFFSET + dat_siz;
 
