@@ -21,6 +21,7 @@
 #include <linux/vt_kern.h>		/* For unblank_screen() */
 #include <linux/highmem.h>
 #include <linux/module.h>
+#include <linux/percpu.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -29,7 +30,7 @@
 
 extern void die(const char *,struct pt_regs *,long);
 
-pgd_t *cur_pgd;			/* XXXsmp */
+DEFINE_PER_CPU(pgd_t *, cur_pgd);
 
 /*
  * Unlock any spinlocks which will prevent us from getting the
@@ -453,7 +454,8 @@ no_context:
 	printk(" at virtual address %08lx\n",address);
 	printk(KERN_ALERT " printing eip:\n");
 	printk("%08lx\n", regs->eip);
-	page = ((unsigned long *) cur_pgd)[address >> 22];
+	page = ((unsigned long *) per_cpu(cur_pgd, smp_processor_id()))
+	    [address >> 22];
 	printk(KERN_ALERT "*pde = ma %08lx pa %08lx\n", page, machine_to_phys(page));
 	/*
 	 * We must not directly access the pte in the highpte
@@ -526,7 +528,7 @@ vmalloc_fault:
 		pmd_t *pmd, *pmd_k;
 		pte_t *pte_k;
 
-		pgd = index + cur_pgd;
+		pgd = index + per_cpu(cur_pgd, smp_processor_id());
 		pgd_k = init_mm.pgd + index;
 
 		if (!pgd_present(*pgd_k))

@@ -87,7 +87,7 @@ extern struct cpuinfo_x86 boot_cpu_data;
 extern struct cpuinfo_x86 new_cpu_data;
 extern struct tss_struct doublefault_tss;
 DECLARE_PER_CPU(struct tss_struct, init_tss);
-extern pgd_t *cur_pgd;		/* XXXsmp */
+DECLARE_PER_CPU(pgd_t *, cur_pgd);
 
 #ifdef CONFIG_SMP
 extern struct cpuinfo_x86 cpu_data[];
@@ -183,7 +183,7 @@ static inline unsigned int cpuid_edx(unsigned int op)
 
 #define load_cr3(pgdir) do {				\
 	queue_pt_switch(__pa(pgdir));			\
-	cur_pgd = pgdir;	/* XXXsmp */		\
+	per_cpu(cur_pgd, smp_processor_id()) = pgdir;	\
 } while (/* CONSTCOND */0)
 
 
