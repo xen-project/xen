@@ -103,8 +103,8 @@ def blkdev_name_to_number(name):
 # lookup_blkdev_partn_info( '/dev/sda3' )
 def lookup_raw_partn(partition):
     """Take the given block-device name (e.g., '/dev/sda1', 'hda')
-    and return a dictionary { partn-dev, start-sect,
-    nr-sects, type }
+    and return a dictionary { device, start_sector,
+    nr_sectors, type }
         device:       Device number of the given partition
         start_sector: Index of first sector of the partition
         nr_sectsors:  Number of sectors comprising this partition
@@ -194,7 +194,8 @@ def vd_format(partition, extent_size_mb):
         part_info = lookup_raw_partn(partition)[0]
         
         cu.execute("INSERT INTO vdisk_part(partition, part_id, extent_size) " +
-                   "VALUES ( \'" + partition + "\', " + str(part_info['device'])
+                   "VALUES ( \'" + partition + "\', "
+                   + str(blkdev_name_to_number(partition))
                    + ", " + str(extent_size) + ")")
 
 
@@ -212,7 +213,8 @@ def vd_format(partition, extent_size_mb):
             sql ="""INSERT INTO vdisk_extents(vdisk_extent_no, vdisk_id,
                                               part_id, part_extent_no)
                     VALUES ("""+ str(new_id + i) + ", 0, "\
-                               + str(part_info['device']) + ", " + str(i) + ")"
+                               + str(blkdev_name_to_number(partition))\
+                               + ", " + str(i) + ")"
             cu.execute(sql)
 
     cx.commit()
@@ -242,9 +244,9 @@ def vd_create(size_mb, expiry):
     # about their size
     cu.execute("""SELECT vdisks.vdisk_id, vdisk_extent_no, part_extent_no,
                          vdisk_extents.part_id, extent_size
-                  FROM vdisk_extents NATURAL JOIN vdisks
+                  FROM vdisks NATURAL JOIN vdisk_extents
                                                   NATURAL JOIN vdisk_part
-                  WHERE expires AND expiry_time < datetime('now')
+                  WHERE expires AND expiry_time <= datetime('now')
                   ORDER BY expiry_time asc, vdisk_extent_no desc
                """)  # aims to reuse the last extents
                      # from the longest-expired disks first
@@ -268,6 +270,7 @@ def vd_create(size_mb, expiry):
     while allocated < size:
         row = cu.fetchone()
         if not row:
+            print "ran out of space, having allocated %d meg of %d" % (allocated, size)
             cx.close()
             return -1
         
@@ -291,19 +294,17 @@ def vd_create(size_mb, expiry):
     return str(new_id)
 
 
-# Future work: Disk sizes aren't modified when vd_create scavenges extents from
-# expired disks.  As a result it is possible to check if a disk is expired but
-# intact (assuming VD IDs are not reused) - could allow recovery when people
-# mess up.
-
 def vd_lookup(id):
     """Lookup a Virtual Disk by ID.
     id [string]: a virtual disk identifier
-    Returns [list of dicts]: a list of extents as dicts, contain fields:
-                             device : Linux device number
+    Returns [list of dicts]: a list of extents as dicts, containing fields:
+                             device : Linux device number of host disk
                              start_sector : within the device
                              nr_sectors : size of this extent
                              type : set to \'VD Extent\'
+                             
+                             part_device : Linux device no of host partition
+                             part_start_sector : within the partition
     """
 
     if not os.path.isfile(VD_DB_FILE):
@@ -330,16 +331,16 @@ def vd_lookup(id):
     # following query - the use of the multiplication confuses it otherwise ;-)
     # This row is significant to PySQLite but is syntactically an SQL comment.
 
-    cu.execute("-- types int, int, int")
+    cu.execute("-- types str, int, int, int")
 
     # This SQL statement is designed so that when the results are fetched they
     # will be in the right format to return immediately.
-    cu.execute("""SELECT vdisk_extents.part_id,
+    cu.execute("""SELECT partition, vdisk_part.part_id,
                          round(part_extent_no * extent_size) as start,
                          extent_size
                          
-                  FROM vdisk_extents NATURAL JOIN vdisks
-                                                NATURAL JOIN vdisk_part
+                  FROM vdisks NATURAL JOIN vdisk_extents
+                                             NATURAL JOIN vdisk_part
                                                 
                   WHERE vdisk_extents.vdisk_id = """ + id
                )
@@ -348,9 +349,20 @@ def vd_lookup(id):
 
     # use this function to map the results from the database into a dict
     # list of extents, for consistency with the rest of the code
-    def transform ((device, start_sector, nr_sectors)):
-        return {'device' : device, 'start_sector' : int(start_sector),
-                'nr_sectors' : nr_sectors, 'type' : 'VD Extent' }
+    def transform ((partition, part_device, part_offset, nr_sectors)):
+        return {
+                 # the disk device this extent is on - for passing to Xen
+                 'device' : lookup_raw_partn(partition)[0]['device'],
+                 # the offset of this extent within the disk - for passing to Xen
+                 'start_sector' : int(part_offset + lookup_raw_partn(partition)[0]['start_sector']),
+                 # extent size, in sectors
+                 'nr_sectors' : nr_sectors,
+                 # partition device this extent is on (useful to know for XenoUtil fns)
+                 'part_device' : part_device,
+                 # start sector within this partition (useful to know for XenoUtil fns)
+                 'part_start_sector' : part_offset,
+                 # type of this extent - handy to know
+                 'type' : 'VD Extent' }
 
     cx.commit()
     cx.close()
@@ -427,9 +439,9 @@ def vd_enlarge(vdisk_id, extra_size_mb):
     # about their size
     cu.execute("""SELECT vdisks.vdisk_id, vdisk_extent_no, part_extent_no,
                          vdisk_extents.part_id, extent_size
-                  FROM vdisk_extents NATURAL JOIN vdisks
+                  FROM vdisks NATURAL JOIN vdisk_extents
                                                   NATURAL JOIN vdisk_part
-                  WHERE expires AND expiry_time < datetime('now')
+                  WHERE expires AND expiry_time <= datetime('now')
                   ORDER BY expiry_time asc, vdisk_extent_no desc
                """)  # aims to reuse the last extents
                      # from the longest-expired disks first
@@ -639,6 +651,8 @@ def vd_freespace():
 
     sum, = cu.fetchone()
 
+    cx.close()
+
     return sum / 2048
 
 
@@ -683,6 +697,104 @@ def vd_init_db(path):
     cx.close()
 
     VD_DB_FILE = path
+
+
+
+def vd_cp_to_file(vdisk_id,filename):
+    """Writes the contents of a specified vdisk out into a disk file, leaving
+    the original copy in the virtual disk pool."""
+
+    cx = sqlite.connect(VD_DB_FILE)
+    cu = cx.cursor()
+
+    extents = vd_lookup(vdisk_id)
+
+    if extents < 0:
+        return -1
+    
+    file_idx = 0 # index into source file, in sectors
+
+    for i in extents:
+        cu.execute("""SELECT partition, extent_size FROM vdisk_part
+                      WHERE part_id =  """ + str(i['part_device']))
+
+        (partition, extent_size) = cu.fetchone()
+
+        os.system("dd bs=1b if=" + partition + " of=" + filename
+                  + " skip=" + str(i['part_start_sector'])
+                  + " seek=" + str(file_idx)
+                  + " count=" + str(i['nr_sectors'])
+                  + " > /dev/null")
+
+        file_idx += i['nr_sectors']
+
+    cx.close()
+
+    return 0 # should return -1 if something breaks
+    
+
+def vd_mv_to_file(vdisk_id,filename):
+    """Writes a vdisk out into a disk file and frees the space originally
+    taken within the virtual disk pool.
+    vdisk_id [string]: ID of the vdisk to write out
+    filename [string]: file to write vdisk contents out to
+    returns [int]: zero on success, nonzero on failure
+    """
+
+    if vd_cp_to_file(vdisk_id,filename):
+        return -1
+
+    if vd_delete(vdisk_id):
+        return -1
+
+    return 0
+
+
+def vd_read_from_file(filename,expiry):
+    """Reads the contents of a file directly into a vdisk, which is
+    automatically allocated to fit.
+    filename [string]: file to read disk contents from
+    returns [string] : vdisk ID for the destination vdisk
+    """
+
+    size_sectors = os.stat(filename).st_size / 512
+
+    vdisk_id = vd_create(size_sectors / ( 2 * 1024 ),expiry)
+
+    if vdisk_id < 0:
+        return -1
+
+    cx = sqlite.connect(VD_DB_FILE)
+    cu = cx.cursor()
+
+    cu.execute("""SELECT partition, extent_size, part_extent_no
+                  FROM vdisk_part NATURAL JOIN vdisk_extents
+                  WHERE vdisk_id =  """ + vdisk_id + """
+                  ORDER BY vdisk_extent_no""")
+
+    extents = cu.fetchall()
+
+    file_idx = 0 # index into source file, in sectors
+
+    def write_extent_to_vd((partition, extent_size, part_extent_no),
+                           file_idx, filename):
+        """Write an extent out to disk and update file_idx"""
+
+        os.system("dd bs=512 if=" + filename + " of=" + partition
+                  + " skip=" + str(file_idx)
+                  + " seek=" + str(part_extent_no * extent_size)
+                  + " count=" + str(min(extent_size, size_sectors - file_idx))
+                  + " > /dev/null")
+
+        return file_idx + extent_size
+
+    for i in extents:
+        file_idx += write_extent_to_vd(i, file_idx, filename)
+
+    cx.close()
+
+    return vdisk_id
+    
 
 
 
