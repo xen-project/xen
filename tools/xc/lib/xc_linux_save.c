@@ -84,6 +84,9 @@ int xc_linux_save(int xc_handle,
     unsigned long mfn;
     unsigned int prev_pc, this_pc;
 
+    /* state of the new MFN mapper */
+    mfn_mapper_t *mapper_handle1, *mapper_handle2;
+
     /* Remember if we stopped the guest, so we can restart it on exit. */
     int we_stopped_it = 0;
 
@@ -102,18 +105,23 @@ int xc_linux_save(int xc_handle,
     /* A temporary mapping, and a copy, of one frame of guest memory. */
     unsigned long *ppage, page[1024];
 
-    /* A temporary mapping, and a copy, of the pfn-to-mfn table frame list. */
-    unsigned long *p_pfn_to_mfn_frame_list, pfn_to_mfn_frame_list[1024];
-    /* A temporary mapping of one frame in the above list. */
-    unsigned long *pfn_to_mfn_frame;
+    /* A copy of the pfn-to-mfn table frame list. */
+    unsigned long *pfn_to_mfn_frame_list;
+    /* A live mapping of the pfn-to-mfn table frame list. */
+    unsigned long *live_pfn_to_mfn_frame_list;
 
-    /* A table mapping each PFN to its current MFN. */
+    /* A table translating each PFN to its current MFN. */
     unsigned long *pfn_to_mfn_table = NULL;
-    /* A table mapping each current MFN to its canonical PFN. */
+    /* Live mapping of the table mapping each PFN to its current MFN. */
+    unsigned long *live_pfn_to_mfn_table = NULL;
+    /* A table translating each current MFN to its canonical PFN. */
     unsigned long *mfn_to_pfn_table = NULL;
     
+    /* Live mapping of shared info structure */
+    unsigned long *live_shinfo;
+
     /* A temporary mapping, and a copy, of the guest's suspend record. */
-    suspend_record_t *p_srec, srec;
+    suspend_record_t *srec;
 
     /* The name and descriptor of the file that we are writing to. */
     int    fd;
@@ -178,8 +186,10 @@ int xc_linux_save(int xc_handle,
         goto out;
     }
 
-    if ( (pm_handle = init_pfn_mapper()) < 0 )
-        goto out;
+
+    /* Map the suspend-record MFN to pin it */
+    srec = mfn_mapper_map_single(xc_handle, PROT_READ, 
+				 ctxt.cpu_ctxt.esi, sizeof(*srec));
 
     /* Is the suspend-record MFN actually valid for this domain? */
     if ( !check_pfn_ownership(xc_handle, ctxt.cpu_ctxt.esi, domid) )
@@ -188,33 +198,65 @@ int xc_linux_save(int xc_handle,
         goto out;
     }
 
-    /* If the suspend-record MFN is okay then grab a copy of it to @srec. */
-    p_srec = map_pfn_readonly(pm_handle, ctxt.cpu_ctxt.esi);
-    memcpy(&srec, p_srec, sizeof(srec));
-    unmap_pfn(pm_handle, p_srec);
-
-    if ( srec.nr_pfns > 1024*1024 )
+    /* cheesy sanity check */
+    if ( srec->nr_pfns > 1024*1024 )
     {
         ERROR("Invalid state record -- pfn count out of range");
         goto out;
     }
 
-    if ( !check_pfn_ownership(xc_handle, srec.pfn_to_mfn_frame_list, domid) )
+    
+    /* the pfn_to_mfn_frame_list fits in a single page */
+    live_pfn_to_mfn_frame_list = 
+	mfn_mapper_map_single(xc_handle, PROT_WRITE, 
+			      srec->pfn_to_mfn_frame_list, 
+			      PAGE_SIZE);
+
+    if ( !check_pfn_ownership(xc_handle, 
+			      srec->pfn_to_mfn_frame_list, domid) )
     {
-        ERROR("Invalid pfn-to-mfn frame list pointer");
-        goto out;
+	ERROR("Invalid pfn-to-mfn frame list pointer");
+	goto out;
     }
 
-    /* Grab a copy of the pfn-to-mfn table frame list. */
-    p_pfn_to_mfn_frame_list = map_pfn_readonly(
-        pm_handle, srec.pfn_to_mfn_frame_list);
-    memcpy(pfn_to_mfn_frame_list, p_pfn_to_mfn_frame_list, PAGE_SIZE);
-    unmap_pfn(pm_handle, p_pfn_to_mfn_frame_list);
+    memcpy( pfn_to_mfn_frame_list, live_pfn_to_mfn_frame_list, PAGE_SIZE );
+
+    if ( (mapper_handle1 = mfn_mapper_init(xc_handle, 1024*1024, PROT_READ )) 
+	 == NULL )
+        goto out;
+	
+    for ( i = 0; i < (srec->nr_pfns+1023)/1024; i++ )
+    {
+	/* Grab a copy of the pfn-to-mfn table frame list. 
+	 This has the effect of preventing the page from being freed and
+	 given to another domain. (though the domain is stopped anyway...) */
+	mfn_mapper_queue_entry( mapper_handle1, i<<PAGE_SHIFT, 
+				pfn_to_mfn_frame_list[i],
+				PAGE_SIZE );
+    }
+    
+    mfn_mapper_flush_queue(mapper_handle1);
+
+    /* Now they're pined, check they're the right dom. We assume
+       they're not going to change, otherwise the suspend is going to fail, 
+       with only itself to blame. */
+
+    for ( i = 0; i < (srec->nr_pfns+1023)/1024; i++ )
+    {
+	if ( !check_pfn_ownership(xc_handle, 
+				  pfn_to_mfn_frame_list[i], domid) )
+	{
+	    ERROR("Invalid pfn-to-mfn frame list pointer");
+	    goto out;
+	}
+    }
+
+    live_pfn_to_mfn_table = mfn_mapper_base( mapper_handle1 );
 
     /* We want zeroed memory so use calloc rather than malloc. */
     mfn_to_pfn_table = calloc(1, 4 * 1024 * 1024);
-    pfn_to_mfn_table = calloc(1, 4 * srec.nr_pfns);
-    pfn_type         = calloc(1, 4 * srec.nr_pfns);
+    pfn_to_mfn_table = calloc(1, 4 * srec->nr_pfns);
+    pfn_type         = calloc(1, 4 * srec->nr_pfns);
 
     if ( (mfn_to_pfn_table == NULL) ||
          (pfn_to_mfn_table == NULL) ||
@@ -230,24 +272,10 @@ int xc_linux_save(int xc_handle,
      * loop we have each MFN mapped at most once. Note that there may be MFNs
      * that aren't mapped at all: we detect these by MFN_IS_IN_PSEUDOPHYS_MAP.
      */
-    pfn_to_mfn_frame = NULL;
-    for ( i = 0; i < srec.nr_pfns; i++ )
+
+    for ( i = 0; i < srec->nr_pfns; i++ )
     {
-        /* Each frameful of table frames must be checked & mapped on demand. */
-        if ( (i & 1023) == 0 )
-        {
-            mfn = pfn_to_mfn_frame_list[i/1024];
-            if ( !check_pfn_ownership(xc_handle, mfn, domid) )
-            {
-                ERROR("Invalid frame number if pfn-to-mfn frame list");
-                goto out;
-            }
-            if ( pfn_to_mfn_frame != NULL )
-                unmap_pfn(pm_handle, pfn_to_mfn_frame);
-            pfn_to_mfn_frame = map_pfn_readonly(pm_handle, mfn);
-        }
-        
-        mfn = pfn_to_mfn_frame[i & 1023];
+        mfn = live_pfn_to_mfn_table[i];
 
         if ( !check_pfn_ownership(xc_handle, mfn, domid) )
         {
@@ -256,14 +284,14 @@ int xc_linux_save(int xc_handle,
         }
 
         /* Did we map this MFN already? That would be invalid! */
-        if ( MFN_IS_IN_PSEUDOPHYS_MAP(mfn) )
+        if ( mfn_to_pfn_table[mfn] )
         {
             ERROR("A machine frame appears twice in pseudophys space");
             goto out;
         }
 
-        pfn_to_mfn_table[i] = mfn;
         mfn_to_pfn_table[mfn] = i;
+	pfn_to_mfn_table[i] = live_pfn_to_mfn_table[i];
 
         /* Query page type by MFN, but store it by PFN. */
         if ( (pfn_type[i] = get_pfn_type(xc_handle, mfn, domid)) == 
@@ -307,63 +335,110 @@ int xc_linux_save(int xc_handle,
     }
 
     /* Start writing out the saved-domain record. */
-    ppage = map_pfn_readonly(pm_handle, shared_info_frame);
+    live_shinfo = mfn_mapper_map_single(xc_handle, PROT_READ,
+				  shared_info_frame, PAGE_SIZE);
+
+    /* Belts and braces safety check on the shared info record */
+    if ( !check_pfn_ownership(xc_handle, shared_info_frame, domid) )
+    {
+        ERROR("Invalid shared_info_frame");
+        goto out;
+    }
+
     if ( !checked_write(gfd, "LinuxGuestRecord",    16) ||
          !checked_write(gfd, name,                  sizeof(name)) ||
          !checked_write(gfd, &srec.nr_pfns,         sizeof(unsigned long)) ||
          !checked_write(gfd, &ctxt,                 sizeof(ctxt)) ||
-         !checked_write(gfd, ppage,                 PAGE_SIZE) ||
+         !checked_write(gfd, live_shinfo,           PAGE_SIZE) ||
          !checked_write(gfd, pfn_to_mfn_frame_list, PAGE_SIZE) ||
          !checked_write(gfd, pfn_type,              4 * srec.nr_pfns) )
     {
         ERROR("Error when writing to state file");
         goto out;
     }
-    unmap_pfn(pm_handle, ppage);
+    munmap(live_shinfo, PAGE_SIZE);
 
     verbose_printf("Saving memory pages:   0%%");
 
+    if ( (mapper_handle2 = mfn_mapper_init(xc_handle, 
+					   BATCH_SIZE*4096, PROT_READ )) 
+	 == NULL )
+        goto out;
+
+    region_base = mfn_mapper_base( mapper_handle2 );
+
     /* Now write out each data page, canonicalising page tables as we go... */
     prev_pc = 0;
-    for ( i = 0; i < srec.nr_pfns; i++ )
+    for ( n = 0; n < srec.nr_pfns; )
     {
-        this_pc = (i * 100) / srec.nr_pfns;
+        this_pc = (n * 100) / srec.nr_pfns;
         if ( (this_pc - prev_pc) >= 5 )
         {
             verbose_printf("\b\b\b\b%3d%%", this_pc);
             prev_pc = this_pc;
         }
 
-        mfn = pfn_to_mfn_table[i];
 
-        ppage = map_pfn_readonly(pm_handle, mfn);
-        memcpy(page, ppage, PAGE_SIZE);
-        unmap_pfn(pm_handle, ppage);
+	for( j = 0, i = n; j < BATCH_SIZE && i < srec.nr_pfns ; j++, i++ )
+	{
+	    /* queue up mappings for all of the pages in this batch */
 
-        if ( (pfn_type[i] == L1TAB) || (pfn_type[i] == L2TAB) )
-        {
-            for ( j = 0; 
-                  j < ((pfn_type[i] == L2TAB) ? 
-                       (HYPERVISOR_VIRT_START >> L2_PAGETABLE_SHIFT) : 1024); 
-                  j++ )
-            {
-                if ( !(page[j] & _PAGE_PRESENT) ) continue;
-                mfn = page[j] >> PAGE_SHIFT;
-                if ( !MFN_IS_IN_PSEUDOPHYS_MAP(mfn) )
-                {
-                    ERROR("Frame number in pagetable page is invalid");
-                    goto out;
-                }
-                page[j] &= PAGE_SIZE - 1;
-                page[j] |= mfn_to_pfn_table[mfn] << PAGE_SHIFT;
-            }
-        }
+	    mfn_mapper_queue_entry( mapper_handle2, j<<PAGE_SHIFT, 
+				    pfn_to_mfn_frame_list[i],
+				    PAGE_SIZE );
+	}
+	mfn_mapper_flush_queue(mapper_handle2);
+	   
+	typer_handle = get_type_init( xc_handle, BATCH_SIZE )
 
-        if ( !checked_write(gfd, page, PAGE_SIZE) )
-        {
-            ERROR("Error when writing to state file");
-            goto out;
-        }
+	for( j = 0, i = n; j < BATCH_SIZE && i < srec.nr_pfns ; j++, i++ )
+	{
+	    /* queue up ownership and type checks for all pages in batch */
+
+	    get_type_queue_entry( typer_handle, domain, 
+				  pfn_to_mfn_frame_list[i] );
+	}
+
+
+	region_type = get_type;
+
+	for( j = 0, i = n; j < BATCH_SIZE && i < srec.nr_pfns ; j++, i++ )
+	{
+	    /* write out pages in batch */
+
+	    mfn = pfn_to_mfn_table[i];
+
+	    ppage = map_pfn_readonly(pm_handle, mfn);
+	    memcpy(page, ppage, PAGE_SIZE);
+	    unmap_pfn(pm_handle, ppage);
+
+	    if ( (pfn_type[i] == L1TAB) || (pfn_type[i] == L2TAB) )
+	    {
+		for ( j = 0; 
+		      j < ((pfn_type[i] == L2TAB) ? 
+			   (HYPERVISOR_VIRT_START >> L2_PAGETABLE_SHIFT) : 1024); 
+		      j++ )
+		{
+		    if ( !(page[j] & _PAGE_PRESENT) ) continue;
+		    mfn = page[j] >> PAGE_SHIFT;
+		    if ( !MFN_IS_IN_PSEUDOPHYS_MAP(mfn) )
+		    {
+			ERROR("Frame number in pagetable page is invalid");
+			goto out;
+		    }
+		    page[j] &= PAGE_SIZE - 1;
+		    page[j] |= mfn_to_pfn_table[mfn] << PAGE_SHIFT;
+		}
+	    }
+
+	    if ( !checked_write(gfd, page, PAGE_SIZE) )
+	    {
+		ERROR("Error when writing to state file");
+		goto out;
+	    }
+	}
+	
+	n+=j; /* i is the master loop counter */
     }
 
     verbose_printf("\b\b\b\b100%%\nMemory saved.\n");
@@ -371,7 +446,7 @@ int xc_linux_save(int xc_handle,
     /* Success! */
     rc = 0;
 
- out:
+out:
     /* Restart the domain if we had to stop it to save its state. */
     if ( we_stopped_it )
     {
@@ -397,4 +472,6 @@ int xc_linux_save(int xc_handle,
         unlink(state_file);
     
     return !!rc;
+
+
 }

@@ -39,6 +39,112 @@ void unmap_pfn(int pm_handle, void *vaddr)
     (void)munmap(vaddr, PAGE_SIZE);
 }
 
+/*******************/
+
+void * mfn_mapper_map_single(int xc_handle, int prot, 
+			     unsigned long mfn, int size)
+{
+    privcmd_mmap_t ioctlx; 
+    privcmd_mmap_entry_t entry; 
+    void *addr;
+    addr = mmap( NULL, size, prot, MAP_SHARED, xc_handle, 0 );
+    if (addr)
+    {
+	ioctlx.num=1;
+	ioctlx.entry=&entry;
+	entry.va=(unsigned long) addr;
+	entry.mfn=mfn;
+	entry.npages=(size+PAGE_SIZE-1)>>PAGE_SHIFT;
+	if ( ioctl( xc_handle, IOCTL_PRIVCMD_MMAP, &ioctlx ) <0 )
+	    return 0;
+    }
+    return addr;
+}
+
+mfn_mapper_t * mfn_mapper_init(int xc_handle, int size, int prot)
+{
+    mfn_mapper_t * t;
+    t = calloc( 1, sizeof(mfn_mapper_t)+
+		mfn_mapper_queue_size*sizeof(privcmd_mmap_entry_t) );
+    if (!t) return NULL;
+    t->xc_handle = xc_handle;
+    t->size = size;
+    t->prot = prot;
+    t->max_queue_size = mfn_mapper_queue_size;
+    t->addr = mmap( NULL, size, prot, MAP_SHARED, xc_handle, 0 );
+    if (!t->addr)
+    {
+	free(t);
+	return NULL;
+    }
+    t->ioctl.num = 0;
+    t->ioctl.entry = (privcmd_mmap_entry_t *) &t[1];
+    return t;
+}
+
+void * mfn_mapper_base(mfn_mapper_t *t)
+{
+    return t->addr;
+}
+
+void mfn_mapper_close(mfn_mapper_t *t)
+{
+    if(t->addr) munmap( t->addr, t->size );
+    free(t);    
+}
+
+int mfn_mapper_flush_queue(mfn_mapper_t *t)
+{
+    int rc;
+
+    rc = ioctl( t->xc_handle, IOCTL_PRIVCMD_MMAP, &t->ioctl );
+    if (rc<0) return rc;
+    t->ioctl.num = 0;
+    return 0;
+}
+
+void * mfn_mapper_queue_entry(mfn_mapper_t *t, int offset, 
+			      unsigned long mfn, int size)
+{
+    privcmd_mmap_entry_t *entry, *prev;
+    int pages;
+
+    offset &= PAGE_MASK;
+    pages =(size+PAGE_SIZE-1)>>PAGE_SHIFT;
+    entry = &t->ioctl.entry[t->ioctl.num];       
+
+    if ( t->ioctl.num > 0 )
+    {
+	prev = &t->ioctl.entry[t->ioctl.num-1];       
+
+	if ( (prev->va+(prev->npages*PAGE_SIZE)) == (t->addr+offset) &&
+	     (prev->mfn+prev->npages) == mfn )
+	{
+	    prev->npages += pages;
+printf("merge\n");
+	    return t->addr+offset;
+	}
+    }
+     
+    entry->va = t->addr+offset;
+    entry->mfn = mfn;
+    entry->npages = pages;
+    t->ioctl.num++;       
+
+    if(t->ioctl.num == t->max_queue_size)
+    {
+	if ( mfn_mapper_flush_queue(t) )
+	return 0;
+    }
+
+    return t->addr+offset;
+}
+
+
+
+
+/*******************/
+
 #define FIRST_MMU_UPDATE 2
 
 static int flush_mmu_updates(int xc_handle, mmu_t *mmu)

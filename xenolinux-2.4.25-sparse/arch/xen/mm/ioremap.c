@@ -42,10 +42,12 @@ static inline void direct_remap_area_pte(pte_t *pte,
     if (address >= end)
         BUG();
     do {
+#if 0  /* thanks to new ioctl mmaping interface this is no longer a bug */
         if (!pte_none(*pte)) {
             printk("direct_remap_area_pte: page already exists\n");
             BUG();
         }
+#endif
         set_pte(pte, pte_mkio(direct_mk_pte_phys(machine_addr, prot))); 
         address += PAGE_SIZE;
         machine_addr += PAGE_SIZE;
@@ -90,6 +92,9 @@ int direct_remap_area_pages(struct mm_struct *mm,
     int error = 0;
     pgd_t * dir;
     unsigned long end = address + size;
+
+printk("direct_remap_area_pages va=%08lx ma=%08lx size=%d\n",
+       address, machine_addr, size);
 
     machine_addr -= address;
     dir = pgd_offset(mm, address);

@@ -171,4 +171,49 @@ int add_mmu_update(int xc_handle, mmu_t *mmu,
                    unsigned long ptr, unsigned long val);
 int finish_mmu_updates(int xc_handle, mmu_t *mmu);
 
+
+/*
+ * ioctl-based mfn mapping interface
+ */
+
+/*
+typedef struct privcmd_mmap_entry {
+    unsigned long va;
+    unsigned long mfn;
+    unsigned long npages;
+} privcmd_mmap_entry_t; 
+
+typedef struct privcmd_mmap {
+    int num;
+    privcmd_mmap_entry_t *entry;
+} privcmd_mmap_t; 
+*/
+
+#define mfn_mapper_queue_size 128
+
+typedef struct mfn_mapper {
+    int xc_handle;
+    int size;
+    int prot;
+    int max_queue_size;
+    void * addr;
+    privcmd_mmap_t ioctl; 
+    
+} mfn_mapper_t;
+
+void * mfn_mapper_map_single(int xc_handle, int prot, 
+			     unsigned long mfn, int size);
+
+mfn_mapper_t * mfn_mapper_init(int xc_handle, int size, int prot);
+
+void * mfn_mapper_base(mfn_mapper_t *t);
+
+void mfn_mapper_close(mfn_mapper_t *t);
+
+int mfn_mapper_flush_queue(mfn_mapper_t *t);
+
+void * mfn_mapper_queue_entry(mfn_mapper_t *t, int offset, 
+			      unsigned long mfn, int size );
+
+
 #endif /* __XC_PRIVATE_H__ */
