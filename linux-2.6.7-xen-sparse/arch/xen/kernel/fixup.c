@@ -110,7 +110,7 @@ static unsigned char insn_decode[256] = {
     X, X, X, X, X, X, X, X,
     /* 0xE0 - 0xEF */
     X, X, X, X, X, X, X, X,
-    X, X, X, O|1, X, X, X, X,
+    X, O|4, X, O|1, X, X, X, X,
     /* 0xF0 - 0xFF */
     P, X, P, P, O, O, O|M|1, O|M|4, 
     O, O, O, O, O, O, O|M, O|M
@@ -133,10 +133,7 @@ static unsigned int get_insn_len(unsigned char *insn, unsigned char *p_opcode)
 
     /* 2. Ensure we have a valid opcode byte. */
     if ( !(d & OPCODE_BYTE) )
-    {
-        printk(KERN_ALERT " !!! 0x%02x 0x%02x\n", b, *(pb+1));
         return 0;
-    }
 
     /* 3. Process Mod/RM if there is one. */
     if ( d & HAS_MODRM )
@@ -166,20 +163,31 @@ static unsigned int get_insn_len(unsigned char *insn, unsigned char *p_opcode)
     return ((pb - insn) + 1 + (d & INSN_SUFFIX_BYTES));
 }
 
+static unsigned char handleable_code[32] = {
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    /* 0x80-0x83, 0x89, 0x8B */
+    0x0F, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    /* 0xC7 */
+    0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+};
+
 asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
 {
     static unsigned int fixup_idx = 0;
-    int relbyte_idx = -1;
+    int relbyte_idx = -1, relword_idx = -1, save_indirect_reg;
     unsigned int insn_len = (unsigned int)error_code, new_insn_len;
-    unsigned char b[20], modrm, mod, reg, rm, *fixup_buf, patch[5], opcode;
-    unsigned long fixup_buf_user, eip = regs->eip - insn_len;
+    unsigned char b[20], modrm, mod, reg, rm, patch[5], opcode;
+    unsigned char *fixup_buf = 
+        (unsigned char *)fix_to_virt(FIX_4GB_SEGMENT_FIXUP_RW);
+    unsigned long fixup_buf_user = 
+        fix_to_virt(FIX_4GB_SEGMENT_FIXUP_RO);
+    unsigned long eip = regs->eip - insn_len;
     struct fixup_entry *fe;
     pte_t *pte;
     pmd_t *pmd;
     pgd_t *pgd;
     void *veip;
-
-    return; /* XXX */
 
     /* Easy check that code segment has base 0, max limit. */
     if ( unlikely(regs->xcs != __USER_CS) )
@@ -190,7 +198,17 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
 
     if ( unlikely(eip >= (PAGE_OFFSET-32)) )
     {
-        DPRINTK("User executing out of kernel space?!");
+        if ( (eip < fixup_buf_user) || (eip >= (fixup_buf_user+PAGE_SIZE-32)) )
+        {
+            DPRINTK("User executing out of kernel space?!");
+            return;
+        }
+        /* We know it's safe to directly copy teh bytes into our buffer. */
+        memcpy(b, (void *)eip, sizeof(b));
+    }
+    else if ( unlikely(copy_from_user(b, (void *)eip, sizeof(b)) != 0) )
+    {
+        DPRINTK("Could not read instruction bytes from user space.");
         return;
     }
 
@@ -203,18 +221,16 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
     /* Guaranteed enough room to patch? */
     if ( unlikely(fixup_idx > (PAGE_SIZE-32)) )
     {
-        DPRINTK("Out of room in fixup page.");
+        static int printed = 0;
+        if ( !printed )
+            printk(KERN_ALERT "WARNING: Out of room in segment-fixup page.\n");
+        printed = 1;
         return;
     }
 
-    if ( unlikely(copy_from_user(b, (void *)eip, sizeof(b)) != 0) )
-    {
-        DPRINTK("Could not read instruction bytes from user space.");
-        return;
-    }
-
-    /* Must be 'mov %gs:m32,r32' or 'mov r32,%gs:m32'. */
-    if ( (b[0] != 0x65) || ((b[1] != 0x89) && (b[1] != 0x8b)) )
+    /* Must be a handleable opcode with GS override. */
+    if ( (b[0] != 0x65) || 
+         !test_bit((unsigned int)b[1], (unsigned long *)handleable_code) )
     {
         DPRINTK("No GS override, or not a MOV (%02x %02x).", b[0], b[1]);
         return;
@@ -224,6 +240,9 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
     mod   = (modrm >> 6) & 3;
     reg   = (modrm >> 3) & 7;
     rm    = (modrm >> 0) & 7;
+
+    /* If indirect register isn't clobbered then we must push/pop it. */
+    save_indirect_reg = !((b[1] == 0x8b) && (reg == rm));
 
     /* We don't grok SIB bytes. */
     if ( rm == 4 )
@@ -236,26 +255,20 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
     switch ( mod )
     {
     case 0:
-        if ( (rm == 5) || unlikely(insn_len != 3) )
+        if ( rm == 5 )
         {
-            DPRINTK("Unhandleable disp32 EA, or bad insn_len (%d, %d).",
-                    rm, insn_len);
+            DPRINTK("Unhandleable disp32 EA %d.", rm);
             return;
         }
         break;            /* m32 == (r32) */
     case 1:
-        if ( unlikely(insn_len != 4) )
-        {
-            DPRINTK("Bad insn_len (%d).", insn_len);
-            return;
-        }
         break;            /* m32 == disp8(r32) */
     default:
         DPRINTK("Unhandleable Mod value %d.", mod);
         return;
     }
 
-    for ( ; ; )
+    while ( insn_len < 5 )
     {
         /* Bail if can't decode the following instruction. */
         if ( unlikely((new_insn_len =
@@ -270,13 +283,25 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
         {
             if ( relbyte_idx != -1 )
             {
-                printk(KERN_ALERT "Multiple relative offsets in patch seq!");
+                DPRINTK("Multiple relative offsets in patch seq!");
                 return;
             }
             relbyte_idx = insn_len;
             while ( b[relbyte_idx] != opcode )
                 relbyte_idx++;
             relbyte_idx++;
+        }
+        else if ( opcode == 0xe9 )
+        {
+            if ( relword_idx != -1 )
+            {
+                DPRINTK("Multiple relative offsets in patch seq!");
+                return;
+            }
+            relword_idx = insn_len;
+            while ( b[relword_idx] != opcode )
+                relword_idx++;
+            relword_idx++;
         }
 
         if ( (insn_len += new_insn_len) > 20 )
@@ -290,15 +315,12 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
             break;
 
         /* Can't have a RET in the middle of a patch sequence. */
-        if ( (opcode == 0xc4) || (relbyte_idx != -1) )
+        if ( opcode == 0xc4 )
         {
-            printk(KERN_ALERT "RET or rel. off. in middle of patch seq!\n");
+            DPRINTK("RET in middle of patch seq!\n");
             return;
         }
     }
-
-    fixup_buf = (unsigned char *)fix_to_virt(FIX_4GB_SEGMENT_FIXUP_RW);
-    fixup_buf_user = fix_to_virt(FIX_4GB_SEGMENT_FIXUP_RO);
 
     /* Already created a fixup for this address and code sequence? */
     for ( fe = fixup_hash[FIXUP_HASH(eip)];
@@ -307,13 +329,7 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
         if ( (fe->patch_addr == eip) &&
              (fe->patched_code_len == insn_len) &&
              (memcmp(fe->patched_code, b, insn_len) == 0) )
-        {
-#if 0
-            if ( fe->fixup_idx == 10000 )
-                return;
-#endif
             goto do_the_patch;
-        }
     }
 
     /* No existing patch -- create an entry for one. */
@@ -330,22 +346,8 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
     fe->next = fixup_hash[FIXUP_HASH(eip)];
     fixup_hash[FIXUP_HASH(eip)] = fe;
     
-#if 0
-    if ( (eip & 0x3f) == 0x38 )
-    {
-        int i;
-        static int ii = 0;
-        printk(KERN_ALERT " !!!!!!! %d'th reject\n"KERN_ALERT" .byte ", ++ii);
-        for ( i = 0; i < insn_len; i++ )
-            printk("0x%02x,", b[i]);
-        printk("\n");
-        fe->fixup_idx = 10000;
-        return;
-    }
-#endif
-
     /* push <r32> */
-    if ( reg != rm )
+    if ( save_indirect_reg )
         fixup_buf[fixup_idx++] = 0x50 + rm;
 
     /* add %gs:0,<r32> */
@@ -360,12 +362,15 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
     fixup_idx += error_code - 1;
 
     /* pop <r32> */
-    if ( reg != rm )
+    if ( save_indirect_reg )
         fixup_buf[fixup_idx++] = 0x58 + rm;
 
-    /* Relocated instructions, minus the initial GS override. */
-    memcpy(&fixup_buf[fixup_idx], &b[error_code], insn_len - error_code);
-    fixup_idx += insn_len - error_code;
+    if ( insn_len != error_code )
+    {
+        /* Relocated instructions. */
+        memcpy(&fixup_buf[fixup_idx], &b[error_code], insn_len - error_code);
+        fixup_idx += insn_len - error_code;
+    }
 
     /* jmp <rel32> */
     fixup_buf[fixup_idx++] = 0xe9;
@@ -376,8 +381,8 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
     if ( relbyte_idx != -1 )
     {
         /* Patch the 8-bit relative offset. */
-        int idx = relbyte_idx + 6;
-        if ( reg != rm )
+        int idx = fe->fixup_idx + relbyte_idx + 6;
+        if ( save_indirect_reg )
             idx += 2;
         fixup_buf[idx] = fixup_idx - (idx + 1);
         
@@ -385,9 +390,17 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
         fixup_buf[fixup_idx++] = 0xe9;
         fixup_idx += 4;
         *(unsigned long *)&fixup_buf[fixup_idx-4] = 
-            (eip + relbyte_idx + 1 + b[relbyte_idx]) - 
+            (eip + relbyte_idx + 1 + (long)(char)b[relbyte_idx]) - 
             (fixup_buf_user + fixup_idx);
-
+    }
+    else if ( relword_idx != -1 )
+    {
+        /* Patch the 32-bit relative offset by subtracting the code disp. */
+        int idx = fe->fixup_idx + relword_idx + 6;
+        if ( save_indirect_reg )
+            idx += 2;
+        *(unsigned long *)&fixup_buf[idx] +=
+            (eip + relword_idx) - (fixup_buf_user + idx);
     }
 
  do_the_patch:
@@ -405,18 +418,36 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
 
     /* Success! Return to user land to execute 2nd insn of the pair. */
     regs->eip = fixup_buf_user + fe->fixup_idx + error_code + 6;
-    if ( reg != rm )
-        regs->eip += 2; /* account for push/pop pair */
+    if ( save_indirect_reg )
+        regs->eip += 2;
     return;
 }
 
+static int nosegfixup = 0;
+
 static int __init fixup_init(void)
 {
-    unsigned long page = get_zeroed_page(GFP_ATOMIC);
+    unsigned long page;
+
+    if ( nosegfixup )
+        return 0;
+
+    HYPERVISOR_vm_assist(VMASST_CMD_enable,
+                         VMASST_TYPE_4gb_segments_notify);
+
+    page = get_zeroed_page(GFP_ATOMIC);
     __set_fixmap(FIX_4GB_SEGMENT_FIXUP_RO, __pa(page), PAGE_READONLY);
     __set_fixmap(FIX_4GB_SEGMENT_FIXUP_RW, __pa(page), PAGE_KERNEL);
+
     memset(fixup_hash, 0, sizeof(fixup_hash));
+
     return 0;
 }
-
 __initcall(fixup_init);
+
+static int __init fixup_setup(char *str)
+{
+    nosegfixup = 1;
+    return 0;
+}
+__setup("nosegfixup", fixup_setup);

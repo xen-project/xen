@@ -1100,8 +1100,6 @@ void __init setup_arch(char **cmdline_p)
 
 	HYPERVISOR_vm_assist(VMASST_CMD_enable,
 			     VMASST_TYPE_4gb_segments);
-	HYPERVISOR_vm_assist(VMASST_CMD_enable,
-			     VMASST_TYPE_4gb_segments_notify);
 #if 0
 	HYPERVISOR_vm_assist(VMASST_CMD_enable,
 			     VMASST_TYPE_writeable_pagetables);
