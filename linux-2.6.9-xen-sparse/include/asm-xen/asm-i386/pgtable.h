@@ -421,30 +421,18 @@ extern pte_t *lookup_address(unsigned long address);
 #define update_mmu_cache(vma,address,pte) do { } while (0)
 #define  __HAVE_ARCH_PTEP_SET_ACCESS_FLAGS
 
-#if 0
 #define ptep_set_access_flags(__vma, __address, __ptep, __entry, __dirty) \
 	do {								  \
 		if (__dirty) {						  \
-			queue_l1_entry_update((__ptep), (__entry).pte_low); \
-			flush_tlb_page(__vma, __address);                 \
-			xen_flush_page_update_queue();                    \
-		}							  \
-	} while (0)
-#else
-#define ptep_set_access_flags(__vma, __address, __ptep, __entry, __dirty) \
-	do {								  \
-		if (__dirty) {						  \
-		        if ( likely(vma->vm_mm == current->mm) ) {        \
+		        if ( likely((__vma)->vm_mm == current->mm) ) {    \
 			    xen_flush_page_update_queue();                \
-			    HYPERVISOR_update_va_mapping(address>>PAGE_SHIFT, entry, UVMF_INVLPG); \
+			    HYPERVISOR_update_va_mapping((__address)>>PAGE_SHIFT, (__entry), UVMF_INVLPG); \
 			} else {                                          \
                             xen_l1_entry_update((__ptep), (__entry).pte_low); \
-			    flush_tlb_page(__vma, __address);             \
+			    flush_tlb_page((__vma), (__address));         \
 			}                                                 \
 		}							  \
 	} while (0)
-
-#endif
 
 #define __HAVE_ARCH_PTEP_ESTABLISH
 #define ptep_establish(__vma, __address, __ptep, __entry)		\
