@@ -151,8 +151,8 @@
 3f13d81eQ9Vz-h-6RDGFkNR9CRP95g tools/misc/xen_nat_enable
 3f13d81e6Z6806ihYYUw8GVKNkYnuw tools/misc/xen_nat_enable.README
 3f1668d4F29Jsw0aC0bJEIkOBiagiQ tools/misc/xen_read_console.c
+3f72f1bdJPsV3JCnBqs9ddL9tr6D2g xen/COPYING
 3ddb79bcbOVHh38VJzc97-JEGD4dJQ xen/Makefile
-3f5ef5a2Qtt8AshYs-KXFFNhKALeIg xen/README
 3ddb79bcWnTwYsQRWl_PaneJfa6p0w xen/Rules.mk
 3e74d2be6ELqhaY1sW0yyHRKhpOvDQ xen/TODO
 3ddb79bcZbRBzT3elFWSX7u6NtMagQ xen/arch/i386/Makefile
