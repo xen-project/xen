@@ -49,7 +49,7 @@ EXPORT_SYMBOL(machine_power_off);
  * Stop/pickle callback handling.
  */
 
-#include <asm/suspend.h>
+//#include <asm/suspend.h>
 
 /* Ignore multiple shutdown requests. */
 static int shutting_down = -1;
