@@ -15,6 +15,7 @@
 #include <sys/stat.h>
 #include <stdarg.h>
 #include "blockstore.h"
+#include "parallax-threaded.h"
 
 #define BLOCKSTORE_REMOTE
 //#define BSDEBUG
@@ -790,7 +791,6 @@ u64 allocblock_hint(void *block, u64 hint) {
 
 #else /* /BLOCKSTORE_REMOTE */
 
-static int block_fp = -1;
  
 /**
  * readblock: read a block from disk
@@ -801,21 +801,36 @@ static int block_fp = -1;
 
 void *readblock(u64 id) {
     void *block;
+    int block_fp;
+    
+    block_fp = open("blockstore.dat", O_RDONLY | O_CREAT | O_LARGEFILE, 0644);
+
+    if (block_fp < 0) {
+        perror("open");
+        return NULL;
+    }
+    
     if (lseek64(block_fp, ((off64_t) id - 1LL) * BLOCK_SIZE, SEEK_SET) < 0) {
+        printf ("%Ld ", id);
         printf ("%Ld\n", (id - 1) * BLOCK_SIZE);
         perror("readblock lseek");
-        return NULL;
+        goto err;
     }
     if ((block = malloc(BLOCK_SIZE)) == NULL) {
         perror("readblock malloc");
-        return NULL;
+        goto err;
     }
     if (read(block_fp, block, BLOCK_SIZE) != BLOCK_SIZE) {
         perror("readblock read");
         free(block);
-        return NULL;
+        goto err;
     }
+    close(block_fp);
     return block;
+    
+err:
+    close(block_fp);
+    return NULL;
 }
 
 /**
@@ -826,15 +841,30 @@ void *readblock(u64 id) {
  *   @return: zero on success, -1 on failure
  */
 int writeblock(u64 id, void *block) {
+    
+    int block_fp;
+    
+    block_fp = open("blockstore.dat", O_RDWR | O_CREAT | O_LARGEFILE, 0644);
+
+    if (block_fp < 0) {
+        perror("open");
+        return -1;
+    }
+
     if (lseek64(block_fp, ((off64_t) id - 1LL) * BLOCK_SIZE, SEEK_SET) < 0) {
         perror("writeblock lseek");
-        return -1;
+        goto err;
     }
     if (write(block_fp, block, BLOCK_SIZE) < 0) {
         perror("writeblock write");
-        return -1;
+        goto err;
     }
+    close(block_fp);
     return 0;
+
+err:
+    close(block_fp);
+    return -1;
 }
 
 /**
@@ -843,30 +873,41 @@ int writeblock(u64 id, void *block) {
  *
  *   @return: new id of block on disk
  */
-static u64 lastblock = 0;
 
 u64 allocblock(void *block) {
     u64 lb;
-    off64_t pos = lseek64(block_fp, 0, SEEK_END);
+    off64_t pos;
+    int block_fp;
+    
+    block_fp = open("blockstore.dat", O_RDWR | O_CREAT | O_LARGEFILE, 0644);
+
+    if (block_fp < 0) {
+        perror("open");
+        return 0;
+    }
+
+    pos = lseek64(block_fp, 0, SEEK_END);
     if (pos == (off64_t)-1) {
         perror("allocblock lseek");
-        return 0;
+        goto err;
     }
     if (pos % BLOCK_SIZE != 0) {
         fprintf(stderr, "file size not multiple of %d\n", BLOCK_SIZE);
-        return 0;
+        goto err;
     }
     if (write(block_fp, block, BLOCK_SIZE) != BLOCK_SIZE) {
         perror("allocblock write");
-        return 0;
+        goto err;
     }
     lb = pos / BLOCK_SIZE + 1;
-    
-    if (lb <= lastblock)
-        printf("[*** %Ld alredy allocated! ***]\n", lb);
-    
-    lastblock = lb;
+//printf("alloc(%Ld)\n", lb);
+    close(block_fp);
     return lb;
+    
+err:
+    close(block_fp);
+    return 0;
+    
 }
 
 /**
@@ -908,13 +949,119 @@ void freeblock(void *block) {
         free(block);
 }
 
+static freeblock_t *new_freeblock(void)
+{
+    freeblock_t *fb;
+    
+    fb = newblock();
+    
+    if (fb == NULL) return NULL;
+    
+    fb->magic = FREEBLOCK_MAGIC;
+    fb->next  = 0ULL;
+    fb->count = 0ULL;
+    memset(fb->list, 0, sizeof fb->list);
+    
+    return fb;
+}
+
+void releaseblock(u64 id)
+{
+    blockstore_super_t *bs_super;
+    freeblock_t *fl_current;
+    
+    /* get superblock */
+    bs_super = (blockstore_super_t *) readblock(BLOCKSTORE_SUPER);
+    
+    /* get freeblock_current */
+    if (bs_super->freelist_current == 0ULL) 
+    {
+        fl_current = new_freeblock();
+        bs_super->freelist_current = allocblock(fl_current);
+        writeblock(BLOCKSTORE_SUPER, bs_super);
+    } else {
+        fl_current = readblock(bs_super->freelist_current);
+    }
+    
+    /* if full, chain to superblock and allocate new current */
+    
+    if (fl_current->count == FREEBLOCK_SIZE) {
+        fl_current->next = bs_super->freelist_full;
+        writeblock(bs_super->freelist_current, fl_current);
+        bs_super->freelist_full = bs_super->freelist_current;
+        freeblock(fl_current);
+        fl_current = new_freeblock();
+        bs_super->freelist_current = allocblock(fl_current);
+        writeblock(BLOCKSTORE_SUPER, bs_super);
+    }
+    
+    /* append id to current */
+    fl_current->list[fl_current->count++] = id;
+    writeblock(bs_super->freelist_current, fl_current);
+    
+    freeblock(fl_current);
+    freeblock(bs_super);
+    
+    
+}
+
+/* freelist debug functions: */
+void freelist_count(int print_each)
+{
+    blockstore_super_t *bs_super;
+    freeblock_t *fb;
+    u64 total = 0, next;
+    
+    bs_super = (blockstore_super_t *) readblock(BLOCKSTORE_SUPER);
+    
+    if (bs_super->freelist_current == 0ULL) {
+        printf("freelist is empty!\n");
+        return;
+    }
+    
+    fb = readblock(bs_super->freelist_current);
+    printf("%Ld entires on current.\n", fb->count);
+    total += fb->count;
+    if (print_each == 1)
+    {
+        int i;
+        for (i=0; i< fb->count; i++)
+            printf("  %Ld\n", fb->list[i]);
+    }
+    
+    freeblock(fb);
+    
+    if (bs_super->freelist_full == 0ULL) {
+        printf("freelist_full is empty!\n");
+        return;
+    }
+    
+    next = bs_super->freelist_full;
+    for (;;) {
+        fb = readblock(next);
+        total += fb->count;
+        if (print_each == 1)
+        {
+            int i;
+            for (i=0; i< fb->count; i++)
+                printf("  %Ld\n", fb->list[i]);
+        }
+        next = fb->next;
+        freeblock(fb);
+        if (next == 0ULL) break;
+    }
+    printf("Total of %Ld ids on freelist.\n", total);
+}
 
 int __init_blockstore(void)
 {
+    int i;
+    blockstore_super_t *bs_super;
+    u64 ret;
+    int block_fp;
+    
 #ifdef BLOCKSTORE_REMOTE
     struct hostent *addr;
-    int i;
-
     bsservers[0].hostname = "firebug.cl.cam.ac.uk";
     bsservers[1].hostname = "planb.cl.cam.ac.uk";
     bsservers[2].hostname = "simcity.cl.cam.ac.uk";
@@ -996,7 +1143,30 @@ int __init_blockstore(void)
     if (block_fp < 0) {
         perror("open");
         return -1;
+        exit(-1);
     }
+    
+    if (lseek(block_fp, 0, SEEK_END) == 0) {
+        bs_super = newblock();
+        bs_super->magic            = BLOCKSTORE_MAGIC;
+        bs_super->freelist_full    = 0LL;
+        bs_super->freelist_current = 0LL;
+        
+        ret = allocblock(bs_super);
+        
+        freeblock(bs_super);
+    } else {
+        bs_super = (blockstore_super_t *) readblock(BLOCKSTORE_SUPER);
+        if (bs_super->magic != BLOCKSTORE_MAGIC)
+        {
+            printf("BLOCKSTORE IS CORRUPT! (no magic in superblock!)\n");
+            exit(-1);
+        }
+        freeblock(bs_super);
+    }
+        
+    close(block_fp);
+        
 #endif /*  BLOCKSTORE_REMOTE */   
     return 0;
 }
