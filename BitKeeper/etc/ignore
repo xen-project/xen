@@ -413,3 +413,6 @@ tools/vdmanager/vdmanager.jar
 xen/image.dis
 xen/include/xeno/compile.h
 xen/tools/figlet/figlet
+tools/control/.classpath
+tools/control/.project
+tools/control/eclipsebin/**
