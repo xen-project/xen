@@ -74,10 +74,26 @@ int xc_sched_id(int xc_handle,
     op.cmd = DOM0_SCHED_ID;
     op.interface_version = DOM0_INTERFACE_VERSION;
     
-    if((ret = do_dom0_op(xc_handle, &op))) return ret;
+    if ( (ret = do_dom0_op(xc_handle, &op)) != 0 )
+        return ret;
     
     *sched_id = op.u.sched_id.sched_id;
     
     return 0;
 }
 
+int xc_perfc_control(int xc_handle,
+                     u32 op,
+                     xc_perfc_desc_t *desc)
+{
+    int rc;
+    dom0_op_t dop;
+
+    dop.cmd = DOM0_PERFCCONTROL;
+    dop.u.perfccontrol.op   = op;
+    dop.u.perfccontrol.desc = desc;
+
+    rc = do_dom0_op(xc_handle, &dop);
+
+    return (rc == 0) ? dop.u.perfccontrol.nr_counters : rc;
+}

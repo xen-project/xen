@@ -651,6 +651,16 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     }
     break;
 
+#ifdef PERF_COUNTERS
+    case DOM0_PERFCCONTROL:
+    {
+        extern int perfc_control(dom0_perfccontrol_t *);
+        ret = perfc_control(&op->u.perfccontrol);
+        copy_to_user(u_dom0_op, op, sizeof(*op));
+    }
+    break;
+#endif
+
     default:
         ret = arch_do_dom0_op(op,u_dom0_op);
 

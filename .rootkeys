@@ -380,6 +380,7 @@
 3f5ef5a2dTZP0nnsFoeq2jRf3mWDDg tools/misc/xen-clone.README
 405eedf6_nnNhFQ1I85lhCkLK6jFGA tools/misc/xencons
 40c9c4697z76HDfkCLdMhmaEwzFoNQ tools/misc/xend
+41adc641dV-0cDLSyzMs5BT8nL7v3Q tools/misc/xenperf.c
 4107986eMWVdBoz4tXYoOscpN_BCYg tools/misc/xensv
 4056f5155QYZdsk-1fLdjsZPFTnlhg tools/misc/xensymoops
 40cf2937dqM1jWW87O5OoOYND8leuA tools/misc/xm
