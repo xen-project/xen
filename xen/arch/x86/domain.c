@@ -697,7 +697,8 @@ long do_switch_to_user(void)
         regs->rcx = stu.rcx;
     }
     
-    return regs->rax;
+    /* Saved %rax gets written back to regs->rax in entry.S. */
+    return stu.rax; 
 }
 
 #elif defined(__i386__)

@@ -95,18 +95,18 @@
 
 /*
  * int HYPERVISOR_switch_to_user(void)
- *  All arguments are on the kernel stack, in the following format.
+ * All arguments are on the kernel stack, in the following format.
  * Never returns if successful. Current kernel context is lost.
  * If flags contains ECF_IN_SYSCALL:
- *   Restore RIP, RFLAGS, RSP. 
+ *   Restore RAX, RIP, RFLAGS, RSP. 
  *   Discard R11, RCX, CS, SS.
  * Otherwise:
- *   Restore R11, RCX, CS:RIP, RFLAGS, SS:RSP.
+ *   Restore RAX, R11, RCX, CS:RIP, RFLAGS, SS:RSP.
  * All other registers are saved on hypercall entry and restored to user.
  */
 struct switch_to_user {
     /* Top of stack (%rsp at point of hypercall). */
-    u64 r11, rcx, flags, rip, cs, rflags, rsp, ss;
+    u64 rax, r11, rcx, flags, rip, cs, rflags, rsp, ss;
     /* Bottom of switch_to_user stack frame. */
 } PACKED;
 

@@ -243,6 +243,7 @@ FLT15:  movq  %rax,(%rsi)               # RCX
         movq  %rax,XREGS_rip+8(%rsp)
         movb  $0,TRAPBOUNCE_flags(%rdx)
         testb $TF_kernel_mode,EDOMAIN_thread_flags(%rbx)
+        movq  %rbx,%rdi # toggle_guest_mode(current)
         jz    SYMBOL_NAME(toggle_guest_mode)
         ret
 .section .fixup,"ax"
