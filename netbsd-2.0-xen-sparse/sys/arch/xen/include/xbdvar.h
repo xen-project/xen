@@ -42,6 +42,9 @@ struct xbd_softc {
 	struct dk_intf		*sc_di;		/* pseudo-disk interface */
 	struct simplelock	sc_slock;	/* our lock */
 	int			sc_shutdown;	/* about to be removed */
+#if NRND > 0
+	rndsource_element_t	sc_rnd_source;
+#endif
 };
 
 struct xbd_attach_args {

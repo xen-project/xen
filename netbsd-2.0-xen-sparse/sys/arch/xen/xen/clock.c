@@ -184,7 +184,7 @@ startrtclock()
 void
 xen_delay(int n)
 {
-	u_int64_t when;
+	uint64_t when;
 
 	get_time_values_from_xen();
 	when = shadow_system_time + n * 1000;

@@ -94,6 +94,10 @@ struct xennet_softc {
 	union xennet_bufarray	sc_rx_bufa[NETIF_TX_RING_SIZE];
 
 	SLIST_HEAD(, xennet_txbuf)	sc_tx_bufs;
+
+#if NRND > 0
+	rndsource_element_t	sc_rnd_source;
+#endif
 };
 
 struct xennet_attach_args {
