@@ -14,7 +14,7 @@ endif
 
 source "net/Kconfig"
 
-if XEN_PHYSDEV_ACCESS
+if XEN_PRIVILEGED_GUEST
 source "drivers/input/Kconfig"
 endif
 
@@ -36,7 +36,7 @@ config INPUT
 	  To compile this driver as a module, choose M here: the
 	  module will be called input.
 
-if XEN_PHYSDEV_ACCESS
+if XEN_PRIVILEGED_GUEST
 source "drivers/char/Kconfig"
 endif
 
