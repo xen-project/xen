@@ -1,7 +1,7 @@
 
 CC       = gcc
 CFLAGS   = -Wall -O3 
-CFLAGS  += -I../xc/lib
+CFLAGS  += -I../xc/lib -I../../xenolinux-sparse/include
 
 HDRS     = $(wildcard *.h)
 OBJS     = $(patsubst %.c,%.o,$(wildcard *.c))

@@ -148,7 +148,7 @@
 #ifndef NDEBUG
 #define DPRINTK(_f, _a...) printk("(file=%s, line=%d) " _f, \
                            __FILE__ , __LINE__ , ## _a )
-#define STACK_GUARD
+#define MEMORY_GUARD
 #define TRACE_BUFFER
 #else
 #define DPRINTK(_f, _a...) ((void)0)

@@ -165,6 +165,7 @@ int sched_rem_domain(struct task_struct *p)
     do {
         if ( (x = y) == TASK_DYING ) return 0;
     } while ( (y = cmpxchg(&p->state, x, TASK_DYING)) != x );
+    rem_ac_timer(&p->timer);
     return 1;
 }
 

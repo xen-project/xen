@@ -36,7 +36,6 @@
  */
 
 void init_page_allocator(unsigned long min, unsigned long max);
-void release_bytes_to_allocator(unsigned long min, unsigned long max);
 unsigned long __get_free_pages(int mask, int order);
 void __free_pages(unsigned long p, int order);
 #define get_free_page(_m) (__get_free_pages((_m),0))
@@ -316,5 +315,17 @@ int do_mmu_update(mmu_update_t *updates, int count);
 
 #define DEFAULT_GDT_ENTRIES     ((LAST_RESERVED_GDT_ENTRY*8)+7)
 #define DEFAULT_GDT_ADDRESS     ((unsigned long)gdt_table)
+
+#ifdef MEMORY_GUARD
+void *memguard_init(void *heap_start);
+void memguard_guard_range(void *p, unsigned long l);
+void memguard_unguard_range(void *p, unsigned long l);
+int memguard_is_guarded(void *p);
+#else
+#define memguard_init(_s)              (_s)
+#define memguard_guard_range(_p,_l)    ((void)0)
+#define memguard_unguard_range(_p,_l)  ((void)0)
+#define memguard_is_guarded(_p)        (0)
+#endif
 
 #endif /* __XENO_MM_H__ */

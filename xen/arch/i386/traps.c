@@ -370,6 +370,10 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
             page = ((unsigned long *) __va(page))[(addr&0x3ff000)>>PAGE_SHIFT];
             printk(" *pte = %08lx\n", page);
         }
+#ifdef MEMORY_GUARD
+        if ( !(error_code & 1) )
+            printk(" -- POSSIBLY AN ACCESS TO FREED MEMORY? --\n");
+#endif
     }
 
     show_registers(regs);

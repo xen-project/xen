@@ -64,7 +64,6 @@
 3f8bcf29ulZIC9rC4wM70H_q4s6VPg tools/misc/xen_log.c
 3f13d81eQ9Vz-h-6RDGFkNR9CRP95g tools/misc/xen_nat_enable
 3f13d81e6Z6806ihYYUw8GVKNkYnuw tools/misc/xen_nat_enable.README
-3f1668d4F29Jsw0aC0bJEIkOBiagiQ tools/misc/xen_read_console.c
 4022a73cEKvrYe_DVZW2JlAxobg9wg tools/nsplitd/Makefile
 4022a73cKms4Oq030x2JBzUB426lAQ tools/nsplitd/nsplitd.c
 3fbca441SjQr8vJwTQIgH1laysaWog tools/xc/Makefile
@@ -568,7 +567,9 @@
 3e5a4e66rw65CxyolW9PKz4GG42RcA xenolinux-2.4.25-sparse/drivers/char/tty_io.c
 3e5a4e669uzIE54VwucPYtGwXLAbzA xenolinux-2.4.25-sparse/fs/exec.c
 3e5a4e66wbeCpsJgVf_U8Jde-CNcsA xenolinux-2.4.25-sparse/include/asm-xeno/bugs.h
+4048c0ddxnIa2GpBAVR-mY6mNSdeJg xenolinux-2.4.25-sparse/include/asm-xeno/control_if.h
 3e5a4e66HdSkvIV6SJ1evG_xmTmXHA xenolinux-2.4.25-sparse/include/asm-xeno/desc.h
+4048c0e0_P2wUTiT6UqgPhn0s7yFcA xenolinux-2.4.25-sparse/include/asm-xeno/evtchn.h
 3e5a4e66SYp_UpAVcF8Lc1wa3Qtgzw xenolinux-2.4.25-sparse/include/asm-xeno/fixmap.h
 3e5a4e67w_DWgjIJ17Tlossu1LGujQ xenolinux-2.4.25-sparse/include/asm-xeno/highmem.h
 3e5a4e67YtcyDLQsShhCfQwPSELfvA xenolinux-2.4.25-sparse/include/asm-xeno/hw_irq.h

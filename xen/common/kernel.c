@@ -110,6 +110,7 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
     unsigned long max_page;
     unsigned char *cmdline, *p;
     module_t *mod;
+    void *heap_start;
     int i;
 
     /* Parse the command-line options. */
@@ -222,7 +223,9 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
     printk("Initialised all memory on a %luMB machine\n",
            max_page >> (20-PAGE_SHIFT));
 
-    init_page_allocator(__pa(&_end), MAX_MONITOR_ADDRESS);
+    heap_start = memguard_init(&_end);
+
+    init_page_allocator(__pa(heap_start), MAX_MONITOR_ADDRESS);
  
     /* Initialise the slab allocator. */
     kmem_cache_init();
@@ -460,85 +463,6 @@ void printf(const char *fmt, ...)
 }
 
 
-unsigned short compute_cksum(unsigned short *buf, int count)
-{
-    unsigned long sum = 0;
-    while ( count-- )
-        sum += *buf++;
-    while ( sum >> 16 )
-	sum = (sum & 0xffff) + (sum >> 16);
-    return (unsigned short) ~sum;
-}
-
-
-/*
- * Function written by ek247. Exports console output from all domains upwards 
- * to domain0, by stuffing it into a fake network packet.
- */
-int console_export(char *str, int len)
-{
-    struct sk_buff *skb;
-    struct iphdr *iph = NULL;  
-    struct udphdr *udph = NULL; 
-    struct ethhdr *ethh = NULL; 
-    int hdr_size = sizeof(struct iphdr) + sizeof(struct udphdr); 
-    u8 *skb_data;
-
-    skb = dev_alloc_skb(sizeof(struct ethhdr) + 
-                                   hdr_size + len + 20);
-    if ( skb == NULL ) return 0;
-
-    skb->dev = the_dev;
-    skb_data = (u8 *)map_domain_mem((skb->pf - frame_table) << PAGE_SHIFT);
-    skb_reserve(skb, 2);
-
-    /* Get a pointer to each header. */
-    ethh = (struct ethhdr *) 
-        (skb_data + (skb->data - skb->head));
-    iph  = (struct iphdr *)(ethh + 1);
-    udph = (struct udphdr *)(iph + 1); 
-
-    skb_reserve(skb, sizeof(struct ethhdr)); 
-    skb_put(skb, hdr_size +  len); 
-
-    /* Build IP header. */
-    iph->version = 4;
-    iph->ihl     = 5;
-    iph->tos	 = 0;
-    iph->tot_len = htons(hdr_size + len);
-    iph->id      = 0xdead;
-    iph->frag_off= 0;
-    iph->ttl     = 255;
-    iph->protocol= 17;
-    iph->daddr   = htonl(0xa9fe0100);  /* 169.254.1.0 */
-    iph->saddr   = htonl(0xa9fefeff);  /* 169.254.254.255 */
-    iph->check	 = 0;
-    iph->check   = compute_cksum((__u16 *)iph, sizeof(struct iphdr)/2); 
-
-    /* Build UDP header. */
-    udph->source = htons(current->domain);
-    udph->dest   = htons(666);
-    udph->len    = htons(sizeof(struct udphdr) + len);
-    udph->check  = 0;
-
-    /* Build the UDP payload. */
-    memcpy((char *)(udph + 1), str, len); 
-
-    /* Fix Ethernet header. */
-    memset(ethh->h_source, 0, ETH_ALEN);
-    memset(ethh->h_dest,   0, ETH_ALEN);
-    ethh->h_proto = htons(ETH_P_IP);
-    skb->mac.ethernet= (struct ethhdr *)ethh;
-
-    unmap_domain_mem(skb_data);
-    
-    skb->dst_vif = find_net_vif(0, 0);
-    (void)netif_rx(skb);
-
-    return 1;
-}
-
-
 long do_console_write(char *str, unsigned int count)
 {
 #define SIZEOF_BUF 256
@@ -583,9 +507,6 @@ long do_console_write(char *str, unsigned int count)
         __putstr(line_header);
         __putstr(single_line);
         spin_unlock_irqrestore(&console_lock, flags);
-
-        if ( current->domain != 0 )
-            console_export(single_line, j);
     }
 
     return 0;
@@ -648,28 +569,3 @@ long do_ni_syscall(void)
     /* No-op syscall. */
     return -ENOSYS;
 }
-
-
-/*
- * GRAVEYARD
- */
-#if 0
-    if ( (mbi->flags & (1<<6)) )
-    {
-        memory_map_t *mmap = (memory_map_t *)mbi->mmap_addr;
-        struct e820entry *e820 = E820_MAP;
-
-        while ( (unsigned long)mmap < (mbi->mmap_addr + mbi->mmap_length) )
-        {
-            e820->addr_lo = mmap->base_addr_low;
-            e820->addr_hi = mmap->base_addr_high;
-            e820->size_lo = mmap->length_low;
-            e820->size_hi = mmap->length_high;
-            e820->type    = mmap->type;
-            e820++;
-            mmap = (memory_map_t *) 
-                ((unsigned long)mmap + mmap->size + sizeof (mmap->size));
-        }
-    }
-#endif
-

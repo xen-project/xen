@@ -691,15 +691,10 @@ static void __init do_boot_cpu (int apicid)
     printk("Booting processor %d/%d eip %lx\n", cpu, apicid, start_eip);
 
     stack = __pa(__get_free_pages(GFP_KERNEL, 1));
-#ifdef STACK_GUARD
-    {
-        /* Unmap the first page of the new CPU0's stack. */
-        l2_pgentry_t *l2  = &idle_pg_table[l2_table_offset(stack)];
-        l1_pgentry_t *l1  = l2_pgentry_to_l1(*l2) + l1_table_offset(stack);
-        *l1 = mk_l1_pgentry(0);
-    }
-#endif
     stack_start.esp = stack + STACK_SIZE - STACK_RESERVED;
+
+    /* Debug build: detect stack overflow by setting up a guard page. */
+    memguard_guard_range(__va(stack), PAGE_SIZE);
 
     /*
      * This grunge runs the startup process for
