@@ -659,7 +659,6 @@ void __init setup_APIC_clocks (void)
  */
 int reprogram_ac_timer(s_time_t timeout)
 {
-    int         cpu = smp_processor_id();
     s_time_t    now;
     s_time_t    expire;
     u64         apic_tmict;
@@ -669,7 +668,8 @@ int reprogram_ac_timer(s_time_t timeout)
      * cause an immediate interrupt). At least this is guaranteed to hold it
      * off for ages (esp. since the clock ticks on bus clock, not cpu clock!).
      */
-    if (timeout == 0) {
+    if ( timeout == 0 )
+    {
         apic_tmict = 0xffffffff;
         goto reprogram;
     }
@@ -677,10 +677,12 @@ int reprogram_ac_timer(s_time_t timeout)
     now = NOW();
     expire = timeout - now; /* value from now */
 
-    if (expire <= 0) {
+    if ( expire <= 0 )
+    {
         Dprintk("APICT[%02d] Timeout in the past 0x%08X%08X > 0x%08X%08X\n", 
-                cpu, (u32)(now>>32), (u32)now, (u32)(timeout>>32),(u32)timeout);
-        return 0;       /* timeout value in the past */
+                smp_processor_id(), (u32)(now>>32), 
+                (u32)now, (u32)(timeout>>32),(u32)timeout);
+        return 0;
     }
 
     /*
@@ -693,12 +695,15 @@ int reprogram_ac_timer(s_time_t timeout)
     /* conversion to bus units */
     apic_tmict = (((u64)bus_scale) * expire)>>18;
 
-    if (apic_tmict >= 0xffffffff) {
-        Dprintk("APICT[%02d] Timeout value too large\n", cpu);
+    if ( apic_tmict >= 0xffffffff )
+    {
+        Dprintk("APICT[%02d] Timeout value too large\n", smp_processor_id());
         apic_tmict = 0xffffffff;
     }
-    if (apic_tmict == 0) {
-        Dprintk("APICT[%02d] timeout value too small\n", cpu);
+
+    if ( apic_tmict == 0 )
+    {
+        Dprintk("APICT[%02d] timeout value too small\n", smp_processor_id());
         return 0;
     }
 

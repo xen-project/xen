@@ -45,13 +45,16 @@ extern struct mm_struct init_mm;
 
 #define IS_PRIV(_p) (test_bit(PF_PRIVILEGED, &(_p)->flags))
 
+struct task_struct;
+
 typedef struct event_channel_st
 {
-    u16 target_dom; /* Target domain (i.e. domain at remote end). */
-#define ECF_TARGET_ID ((1<<10)-1) /* Channel identifier at remote end.    */
-#define ECF_INUSE     (1<<10)     /* Is this channel descriptor in use?   */
-#define ECF_CONNECTED (1<<11)     /* Is this channel connected to remote? */
-    u16 flags;
+    struct task_struct *remote_dom;
+    u16                 remote_port;
+#define ECS_FREE      0 /* Available for use.                            */
+#define ECS_ZOMBIE    1 /* Connection is closed. Remote is disconnected. */
+#define ECS_CONNECTED 2 /* Connected to remote end.                      */
+    u16                 state;
 } event_channel_t;
 
 struct task_struct 
