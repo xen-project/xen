@@ -50,6 +50,10 @@ ifdef CONFIG_MK7
 CFLAGS += $(call check_gcc,-march=athlon,-march=i686 -malign-functions=4)
 endif
 
+# Disable unit-at-a-time mode, it makes gcc use a lot more stack
+# due to the lack of sharing of stacklots.
+CFLAGS += $(call check_gcc,-fno-unit-at-a-time,)
+
 HEAD := arch/xen/kernel/head.o arch/xen/kernel/init_task.o
 
 SUBDIRS += arch/xen/kernel arch/xen/mm arch/xen/lib

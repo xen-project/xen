@@ -20,9 +20,9 @@
 
 #============================================================================
 ifeq ($(src),)
-LINUX_RELEASE ?=2.6
+LINUX_SERIES ?=2.6
 
-include Makefile-$(LINUX_RELEASE)
+include Makefile-$(LINUX_SERIES)
 
 #============================================================================
 else
