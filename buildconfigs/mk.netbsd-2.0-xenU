@@ -19,7 +19,7 @@ netbsd-%-tools.tar.bz2:
 	wget http://www.cl.cam.ac.uk/Research/SRG/netos/xen/downloads/netbsd-$*-tools.tar.bz2 -O./$@
 
 netbsd-%-tools: netbsd-%-tools.tar.bz2
-	tar -jxf netbsd-$*-tools.tar.bz2
+	tar -jxf $<
 	touch $@ # update timestamp to avoid rebuild
 
 $(NETBSD_DIR)/.valid: pristine-netbsd-$(NETBSD_VER)
