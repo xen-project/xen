@@ -76,6 +76,7 @@ radix_tree_node cloneblock(radix_tree_node block) {
  */
 u64 lookup(int height, u64 root, u64 key) {
     radix_tree_node node;
+    u64 mask = ONE;
     
     assert(key >> height == 0);
 
@@ -101,10 +102,11 @@ u64 lookup(int height, u64 root, u64 key) {
             return ZERO;
 
         root = node[(key >> height) & RADIX_TREE_MAP_MASK];
+        mask &= root;
         freeblock(node);
 
         if (height == 0)
-            return root;
+            return ( root & ONEMASK ) | mask;
 
         height -= RADIX_TREE_MAP_SHIFT;
     }

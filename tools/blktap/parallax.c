@@ -390,9 +390,7 @@ int parallax_write(blkif_request_t *req, blkif_t *blkif)
                  blkif_first_sect(req->frame_and_sects[i]) + 1
                ) << SECTOR_SHIFT;
         start = blkif_first_sect(req->frame_and_sects[i]) << SECTOR_SHIFT;
-/*       
-if (( gblock != 0 ) && ( writable == 0 )) printf("*");
-*/
+
         DPRINTF("ParallaxWrite: sect: %lld (%ld,%ld),  "
                 "vblock %llx, gblock %llx, "
                 "size %lx\n", 
@@ -407,19 +405,19 @@ if (( gblock != 0 ) && ( writable == 0 )) printf("*");
             printf("]\n] STRANGE WRITE!\n]\n");
             goto err;
         }
-/* Disable write-in-place till radix is sorted out.
+
         if (( gblock == 0 ) || ( writable == 0 )) {
-*/          
+         
             gblock = allocblock(spage);
             vdi_update_block(vdi, vblock, gblock);
-#if 0            
+            
         } else {
             
             /* write-in-place, no need to change mappings. */
             writeblock(gblock, spage);
             
         }
-#endif
+
     }
 
     rsp = (blkif_response_t *)req;

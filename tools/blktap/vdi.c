@@ -136,8 +136,6 @@ u64 vdi_lookup_block(vdi_t *vdi, u64 vdi_block, int *writable)
     gblock = lookup(VDI_HEIGHT, vdi->radix_root, vdi_block);
     
     if (writable != NULL) *writable = iswritable(gblock);
-printf("lu: root: %11Ld, gblock: %11Ld, id: %11Ld, wr: %Ld\n",
-        vdi->radix_root, gblock, getid(gblock), iswritable(gblock));
 
     return getid(gblock);
 }
