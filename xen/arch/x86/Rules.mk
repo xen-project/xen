@@ -24,13 +24,13 @@ CFLAGS  += $(call test-gcc-flag,-fno-stack-protector-all)
 
 ifeq ($(TARGET_SUBARCH),x86_32)
 CFLAGS  += -m32 -march=i686
-LDFLAGS := --oformat elf32-i386 
+LDFLAGS := -m elf_i386 
 endif
 
 ifeq ($(TARGET_SUBARCH),x86_64)
 CFLAGS  += -m64 -mno-red-zone -fpic -fno-reorder-blocks
 CFLAGS  += -fno-asynchronous-unwind-tables
-LDFLAGS := --oformat elf64-x86-64
+LDFLAGS := -m elf_x86_64
 endif
 
 # Test for at least GCC v3.2.x.
