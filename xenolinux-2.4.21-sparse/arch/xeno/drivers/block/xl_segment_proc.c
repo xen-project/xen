@@ -78,33 +78,39 @@ static int proc_write_vhd(struct file *file, const char *buffer,
     char *string;
     int loop;
     xv_disk_t xvd;
+    int res;
+
+    if (!local)
+      return -ENOMEM;
 
     memset (&xvd, 0, sizeof(xvd));
 
     if (copy_from_user(local, buffer, count))
     {
-        return -EFAULT;
+	res = -EFAULT;
+	goto out;
     }
     local[count] = '\0';
 
+    res = count;
     string = get_string(local); /* domain specifier */
     if (string == NULL)
     {
-        return count;
+	goto out;
     }
     if (*string != 'd' && *string != 'D')
     {
         printk (KERN_ALERT 
                 "error: domain specifier missing [%s]. should be \"domain\".\n",
                 string);
-        return count;
+	goto out;
     }
 
     string = get_string(NULL); /* domain number */
     if (string == NULL)
     {
         printk (KERN_ALERT "error: domain number missing\n");
-        return count;
+	goto out;
     }
     xvd.domain = (int) to_number(string);
 
@@ -122,7 +128,7 @@ static int proc_write_vhd(struct file *file, const char *buffer,
         printk (KERN_ALERT 
                 "error: bad mode [%s]. should be \"rw\" or \"ro\".\n",
                 string);
-        return count;
+	goto out;
     }
 
     string = get_string(NULL);                           /* look for Segment */
@@ -131,14 +137,14 @@ static int proc_write_vhd(struct file *file, const char *buffer,
         printk (KERN_ALERT 
                 "error: segment specifier missing [%s]. should be \"segment\".\n",
                 string);
-        return count;
+	goto out;
     }
 
     string = get_string(NULL);                             /* segment number */
     if (string == NULL)
     {
         printk (KERN_ALERT "error: segment number missing\n");
-        return count;
+	goto out;
     }
     xvd.segment = (int) to_number(string);
 
@@ -148,14 +154,14 @@ static int proc_write_vhd(struct file *file, const char *buffer,
         printk (KERN_ALERT 
                 "error: extents specifier missing [%s]. should be \"extents\".\n",
                 string);
-        return count;
+	goto out;
     }
 
     string = get_string(NULL);                          /* number of extents */
     if (string == NULL)
     {
         printk (KERN_ALERT "error: number of extents missing\n");
-        return count;
+	goto out;
     }
     xvd.ext_count = (int) to_number(string);
 
@@ -169,13 +175,13 @@ static int proc_write_vhd(struct file *file, const char *buffer,
             printk (KERN_ALERT 
                     "hmm, extent disk specifier missing [%s]. should be \"disk\".\n",
                     string);
-            return count;
+	    goto out;
         }
         string = get_string(NULL);                            /* disk number */
         if (string == NULL)
         {
             printk (KERN_ALERT "error: disk number missing\n");
-            return count;
+	    goto out;
         }
         xvd.extents[loop].disk = xldev_to_physdev((int) to_number(string));
 
@@ -185,13 +191,13 @@ static int proc_write_vhd(struct file *file, const char *buffer,
             printk (KERN_ALERT 
                     "error: disk offset missing [%s]. should be \"offset\".\n",
                     string);
-            return count;
+	    goto out;
         }
         string = get_string(NULL);                                 /* offset */
         if (string == NULL)
         {
             printk (KERN_ALERT "error: offset missing\n");
-            return count;
+	    goto out;
         }
         xvd.extents[loop].offset =  to_number(string);
 
@@ -201,20 +207,23 @@ static int proc_write_vhd(struct file *file, const char *buffer,
             printk (KERN_ALERT 
                     "error: extent size missing [%s]. should be \"size\".\n",
                     string);
-            return count;
+	    goto out;
         }
         string = get_string(NULL);                                   /* size */
         if (string == NULL)
         {
             printk (KERN_ALERT "error: extent size missing\n");
-            return count;
+	    goto out;
         }
         xvd.extents[loop].size =  to_number(string);
     }
 
     xenolinux_control_msg(XEN_BLOCK_SEG_CREATE, (char *)&xvd, sizeof(xvd));
 
-    return count;
+ out:
+    kfree(local);
+
+    return res;
 }
 
 /******************************************************************/
