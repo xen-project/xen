@@ -733,7 +733,7 @@ static void net_tx_action(unsigned long unused)
 {
     struct net_device *dev = the_dev;
     struct list_head *ent;
-    struct sk_buff *skb;
+    struct sk_buff *skb, *nskb;
     net_vif_t *vif;
     tx_shadow_entry_t *tx;
 
@@ -794,7 +794,11 @@ static void net_tx_action(unsigned long unused)
 
         /* Is the NIC crap? */
         if ( !(dev->features & NETIF_F_SG) )
-            skb_linearize(skb, GFP_KERNEL);
+        {
+            nskb = skb_copy(skb, GFP_KERNEL);
+            kfree_skb(skb);
+            skb = nskb;
+        }
 
         /* Transmit should always work, or the queue would be stopped. */
         if ( dev->hard_start_xmit(skb, dev) != 0 )

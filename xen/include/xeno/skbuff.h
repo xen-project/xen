@@ -440,19 +440,20 @@ static inline struct sk_buff *dev_alloc_skb(unsigned int length)
     return __dev_alloc_skb(length, GFP_ATOMIC);
 }
 
+#include <asm/domain_page.h>
+
 static inline void *kmap_skb_frag(const skb_frag_t *frag)
 {
-    return page_address(frag->page);
+    return map_domain_mem(__pa(page_address(frag->page)));
 }
 
 static inline void kunmap_skb_frag(void *vaddr)
 {
+    unmap_domain_mem(vaddr);
 }
 
 extern int skb_copy_bits(const struct sk_buff *skb, 
                          int offset, void *to, int len);
 extern void skb_init(void);
-
-extern int skb_linearize(struct sk_buff *skn, int gfp_mask);
 
 #endif	/* _LINUX_SKBUFF_H */
