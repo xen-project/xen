@@ -380,6 +380,7 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
     pending_req->operation = operation;
     pending_req->status    = BLKIF_RSP_OKAY;
     atomic_set(&pending_req->pendcnt, nr_psegs);
+    pending_cons++;
 
     blkif_get(blkif);
 
@@ -412,7 +413,6 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
         generic_make_request(operation, bh);
     }
 
-    pending_cons++;
     return;
 
  bad_descriptor:

@@ -36,7 +36,7 @@ static inline int direct_remap_area_pte(pte_t *pte,
 {
     unsigned long end;
 #define MAX_DIRECTMAP_MMU_QUEUE 130
-    mmu_update_t u[MAX_DIRECTMAP_MMU_QUEUE], *v;
+    mmu_update_t u[MAX_DIRECTMAP_MMU_QUEUE], *v, *w;
 
     address &= ~PMD_MASK;
     end = address + size;
@@ -45,23 +45,31 @@ static inline int direct_remap_area_pte(pte_t *pte,
     if (address >= end)
         BUG();
 
- reset_buffer:
     /* If not I/O mapping then specify General-Purpose Subject Domain (GPS). */
-    v = &u[0];
     if ( domid != 0 )
     {
-        v[0].val  = (unsigned long)(domid<<16) & ~0xFFFFUL;
-        v[0].ptr  = (unsigned long)(domid<< 0) & ~0xFFFFUL;
-        v[1].val  = (unsigned long)(domid>>16) & ~0xFFFFUL;
-        v[1].ptr  = (unsigned long)(domid>>32) & ~0xFFFFUL;
-        v[0].ptr |= MMU_EXTENDED_COMMAND;
-        v[0].val |= MMUEXT_SET_SUBJECTDOM_L;
-        v[1].ptr |= MMU_EXTENDED_COMMAND;
-        v[1].val |= MMUEXT_SET_SUBJECTDOM_H;
-        v += 2;
+        u[0].val  = (unsigned long)(domid<<16) & ~0xFFFFUL;
+        u[0].ptr  = (unsigned long)(domid<< 0) & ~0xFFFFUL;
+        u[1].val  = (unsigned long)(domid>>16) & ~0xFFFFUL;
+        u[1].ptr  = (unsigned long)(domid>>32) & ~0xFFFFUL;
+        u[0].ptr |= MMU_EXTENDED_COMMAND;
+        u[0].val |= MMUEXT_SET_SUBJECTDOM_L;
+        u[1].ptr |= MMU_EXTENDED_COMMAND;
+        u[1].val |= MMUEXT_SET_SUBJECTDOM_H;
+        v = w = &u[2];
+    }
+    else
+    {
+        v = w = &u[0];
     }
 
     do {
+        if ( (v-u) == MAX_DIRECTMAP_MMU_QUEUE )
+        {
+            if ( HYPERVISOR_mmu_update(u, MAX_DIRECTMAP_MMU_QUEUE) < 0 )
+                return -EFAULT;
+            v = w;
+        }
 #if 0  /* thanks to new ioctl mmaping interface this is no longer a bug */
         if (!pte_none(*pte)) {
             printk("direct_remap_area_pte: page already exists\n");
@@ -70,23 +78,14 @@ static inline int direct_remap_area_pte(pte_t *pte,
 #endif
         v->ptr = virt_to_machine(pte);
         v->val = (machine_addr & PAGE_MASK) | pgprot_val(prot) | _PAGE_IO;
-        if ( ( ++v - u )== MAX_DIRECTMAP_MMU_QUEUE ) 
-        {
-            if ( HYPERVISOR_mmu_update(u, MAX_DIRECTMAP_MMU_QUEUE) < 0 )
-                return -EFAULT;
-            goto reset_buffer;
-        }
+        v++;
         address += PAGE_SIZE;
         machine_addr += PAGE_SIZE;
         pte++;
     } while (address && (address < end));
 
-    if ( ((v-u) > 2) && (HYPERVISOR_mmu_update(u, v-u) < 0) )
-    {
-        printk(KERN_WARNING "Failed to ioremap %08lx->%08lx (%08lx)\n",
-               end-size, end, machine_addr-size);
-	return -EINVAL;
-    }
+    if ( ((v-w) != 0) && (HYPERVISOR_mmu_update(u, v-u) < 0) )
+        return -EFAULT;
 
     return 0;
 }
@@ -113,7 +112,6 @@ static inline int direct_remap_area_pmd(struct mm_struct *mm,
         pte_t * pte = pte_alloc(mm, pmd, address);
         if (!pte)
             return -ENOMEM;
-
         error = direct_remap_area_pte(pte, address, end - address, 
                                       address + machine_addr, prot, domid);
         if ( error )
@@ -134,9 +132,6 @@ int direct_remap_area_pages(struct mm_struct *mm,
     int error = 0;
     pgd_t * dir;
     unsigned long end = address + size;
-
-/*printk("direct_remap_area_pages va=%08lx ma=%08lx size=%d\n",
-       address, machine_addr, size);*/
 
     machine_addr -= address;
     dir = pgd_offset(mm, address);

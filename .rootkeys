@@ -682,9 +682,13 @@
 40420a73Wou6JlsZDiu6YwjYomsm7A xenolinux-2.4.26-sparse/arch/xen/drivers/evtchn/evtchn.c
 4083dc16-Kd5y9psK_yk161sme5j5Q xenolinux-2.4.26-sparse/arch/xen/drivers/netif/Makefile
 4083dc16UmHXxS9g_UFVnkUpN-oP2Q xenolinux-2.4.26-sparse/arch/xen/drivers/netif/backend/Makefile
+4097ba83pPKYqMS3Gl-PVKIgYU1FZw xenolinux-2.4.26-sparse/arch/xen/drivers/netif/backend/common.h
+4097ba83glWYwQTkbPqgLIlYDOPVLg xenolinux-2.4.26-sparse/arch/xen/drivers/netif/backend/control.c
+4097ba837h2tuiweIWp-voNVzCRI6g xenolinux-2.4.26-sparse/arch/xen/drivers/netif/backend/interface.c
 4087cf0d5dudKw_DecIJgOhLlBF_0Q xenolinux-2.4.26-sparse/arch/xen/drivers/netif/backend/main.c
 405853f2wg7JXZJNltspMwOZJklxgw xenolinux-2.4.26-sparse/arch/xen/drivers/netif/frontend/Makefile
 405853f6nbeazrNyEWNHBuoSg2PiPA xenolinux-2.4.26-sparse/arch/xen/drivers/netif/frontend/main.c
+4097ba83Qy2eafeFUhGhm6_4iMIIDw xenolinux-2.4.26-sparse/arch/xen/drivers/netif/netif.h
 3e5a4e65gZBRBB6RsSVg1c9iahigAw xenolinux-2.4.26-sparse/arch/xen/drivers/network/Makefile
 3e5a4e65ZxKrbFetVB84JhrTyZ1YuQ xenolinux-2.4.26-sparse/arch/xen/drivers/network/network.c
 3e5a4e65lWzkiPXsZdzPt2RNnJGG1g xenolinux-2.4.26-sparse/arch/xen/kernel/Makefile

@@ -29,8 +29,8 @@
 #define BLKIF_MAX_SECTORS_PER_SEGMENT  16
 
 typedef struct {
-    unsigned char  operation;        /* BLKIF_OP_???                         */
-    unsigned char  nr_segments;      /* number of segments                   */
+    u8             operation;        /* BLKIF_OP_???                         */
+    u8             nr_segments;      /* number of segments                   */
     blkif_vdev_t   device;           /* only for read/write requests         */
     unsigned long  id;               /* private guest value, echoed in resp  */
     blkif_sector_t sector_number;    /* start sector idx on disk (r/w only)  */
@@ -41,8 +41,8 @@ typedef struct {
 
 typedef struct {
     unsigned long   id;              /* copied from request */
-    unsigned char   operation;       /* copied from request */
-    int             status;          /* BLKIF_RSP_???       */
+    u8              operation;       /* copied from request */
+    s16             status;          /* BLKIF_RSP_???       */
 } blkif_response_t;
 
 #define BLKIF_RSP_ERROR  -1 /* non-specific 'error' */
@@ -104,9 +104,9 @@ typedef struct {
 #define VDISK_VIRTUAL(_x)  ((_x) & VDISK_FLAG_VIRT) 
 
 typedef struct {
-    blkif_vdev_t   device;       /* Device number (opaque 16 bit value). */
-    unsigned short info;         /* Device type and flags (VDISK_*).     */
     blkif_sector_t capacity;     /* Size in terms of 512-byte sectors.   */
+    blkif_vdev_t   device;       /* Device number (opaque 16 bit value). */
+    u16            info;         /* Device type and flags (VDISK_*).     */
 } vdisk_t;
 
 #endif /* __SHARED_BLKIF_H__ */

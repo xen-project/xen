@@ -52,9 +52,11 @@ typedef struct {
 /*
  * Top-level command types.
  */
-#define CMSG_CONSOLE            0  /* Console               */
-#define CMSG_BLKIF_BE           1  /* Block-device backend  */
-#define CMSG_BLKIF_FE           2  /* Block-device frontend */
+#define CMSG_CONSOLE        0  /* Console                 */
+#define CMSG_BLKIF_BE       1  /* Block-device backend    */
+#define CMSG_BLKIF_FE       2  /* Block-device frontend   */
+#define CMSG_NETIF_BE       3  /* Network-device backend  */
+#define CMSG_NETIF_FE       4  /* Network-device frontend */
 
 
 /******************************************************************************
@@ -112,7 +114,14 @@ typedef struct {
 #define BLKIF_DRIVER_STATUS_DOWN   0
 #define BLKIF_DRIVER_STATUS_UP     1
 typedef struct {
+    /* IN */
     unsigned int status; /* BLKIF_DRIVER_STATUS_??? */
+    /* OUT */
+    /*
+     * Tells driver how many interfaces it should expect to immediately
+     * receive notifications about.
+     */
+    unsigned int nr_interfaces;
 } blkif_fe_driver_status_changed_t;
 
 /*
@@ -131,14 +140,7 @@ typedef struct {
  *  STATUS_DISCONNECTED message.
  */
 typedef struct {
-    /* IN */
     unsigned int handle;
-    /* OUT */
-    /*
-     * Tells driver how many interfaces it should expect to immediately
-     * receive notifications about.
-     */
-    unsigned int nr_interfaces;
 } blkif_fe_interface_disconnect_t;
 
 
@@ -312,5 +314,189 @@ typedef struct {
      */
     unsigned int nr_interfaces;
 } blkif_be_driver_status_changed_t;
+
+
+/******************************************************************************
+ * NETWORK-INTERFACE FRONTEND DEFINITIONS
+ */
+
+/* Messages from domain controller to guest. */
+#define CMSG_NETIF_FE_INTERFACE_STATUS_CHANGED   0
+
+/* Messages from guest to domain controller. */
+#define CMSG_NETIF_FE_DRIVER_STATUS_CHANGED     32
+#define CMSG_NETIF_FE_INTERFACE_CONNECT         33
+#define CMSG_NETIF_FE_INTERFACE_DISCONNECT      34
+
+/*
+ * CMSG_NETIF_FE_INTERFACE_STATUS_CHANGED:
+ *  Notify a guest about a status change on one of its network interfaces.
+ *  If the interface is DESTROYED or DOWN then the interface is disconnected:
+ *   1. The shared-memory frame is available for reuse.
+ *   2. Any unacknowledged messgaes pending on the interface were dropped.
+ */
+#define NETIF_INTERFACE_STATUS_DESTROYED    0 /* Interface doesn't exist.    */
+#define NETIF_INTERFACE_STATUS_DISCONNECTED 1 /* Exists but is disconnected. */
+#define NETIF_INTERFACE_STATUS_CONNECTED    2 /* Exists and is connected.    */
+typedef struct {
+    unsigned int handle;
+    unsigned int status;
+    unsigned int evtchn; /* status == NETIF_INTERFACE_STATUS_CONNECTED */
+} netif_fe_interface_status_changed_t;
+
+/*
+ * CMSG_NETIF_FE_DRIVER_STATUS_CHANGED:
+ *  Notify the domain controller that the front-end driver is DOWN or UP.
+ *  When the driver goes DOWN then the controller will send no more
+ *  status-change notifications. When the driver comes UP then the controller
+ *  will send a notification for each interface that currently exists.
+ *  If the driver goes DOWN while interfaces are still UP, the domain
+ *  will automatically take the interfaces DOWN.
+ */
+#define NETIF_DRIVER_STATUS_DOWN   0
+#define NETIF_DRIVER_STATUS_UP     1
+typedef struct {
+    /* IN */
+    unsigned int status; /* NETIF_DRIVER_STATUS_??? */
+    /* OUT */
+    /*
+     * Tells driver how many interfaces it should expect to immediately
+     * receive notifications about.
+     */
+    unsigned int nr_interfaces;
+} netif_fe_driver_status_changed_t;
+
+/*
+ * CMSG_NETIF_FE_INTERFACE_CONNECT:
+ *  If successful, the domain controller will acknowledge with a
+ *  STATUS_CONNECTED message.
+ */
+typedef struct {
+    unsigned int  handle;
+    unsigned long shmem_frame;
+} netif_fe_interface_connect_t;
+
+/*
+ * CMSG_NETIF_FE_INTERFACE_DISCONNECT:
+ *  If successful, the domain controller will acknowledge with a
+ *  STATUS_DISCONNECTED message.
+ */
+typedef struct {
+    unsigned int handle;
+} netif_fe_interface_disconnect_t;
+
+
+/******************************************************************************
+ * NETWORK-INTERFACE BACKEND DEFINITIONS
+ */
+
+/* Messages from domain controller. */
+#define CMSG_NETIF_BE_CREATE      0  /* Create a new net-device interface. */
+#define CMSG_NETIF_BE_DESTROY     1  /* Destroy a net-device interface.    */
+#define CMSG_NETIF_BE_CONNECT     2  /* Connect i/f to remote driver.        */
+#define CMSG_NETIF_BE_DISCONNECT  3  /* Disconnect i/f from remote driver.   */
+
+/* Messages to domain controller. */
+#define CMSG_NETIF_BE_DRIVER_STATUS_CHANGED 32
+
+/*
+ * Message request/response definitions for net-device messages.
+ */
+
+/* Non-specific 'okay' return. */
+#define NETIF_BE_STATUS_OKAY                0
+/* Non-specific 'error' return. */
+#define NETIF_BE_STATUS_ERROR               1
+/* The following are specific error returns. */
+#define NETIF_BE_STATUS_INTERFACE_EXISTS    2
+#define NETIF_BE_STATUS_INTERFACE_NOT_FOUND 3
+#define NETIF_BE_STATUS_INTERFACE_CONNECTED 4
+#define NETIF_BE_STATUS_OUT_OF_MEMORY       5
+#define NETIF_BE_STATUS_MAPPING_ERROR       6
+
+/* This macro can be used to create an array of descriptive error strings. */
+#define NETIF_BE_STATUS_ERRORS {    \
+    "Okay",                         \
+    "Non-specific error",           \
+    "Interface already exists",     \
+    "Interface not found",          \
+    "Interface is still connected", \
+    "Out of memory",                \
+    "Could not map domain memory" }
+
+/*
+ * CMSG_NETIF_BE_CREATE:
+ *  When the driver sends a successful response then the interface is fully
+ *  created. The controller will send a DOWN notification to the front-end
+ *  driver.
+ */
+typedef struct { 
+    /* IN */
+    domid_t        domid;             /* Domain attached to new interface.   */
+    unsigned int   netif_handle;      /* Domain-specific interface handle.   */
+    /* OUT */
+    unsigned int   status;
+} netif_be_create_t; 
+
+/*
+ * CMSG_NETIF_BE_DESTROY:
+ *  When the driver sends a successful response then the interface is fully
+ *  torn down. The controller will send a DESTROYED notification to the
+ *  front-end driver.
+ */
+typedef struct { 
+    /* IN */
+    domid_t        domid;             /* Identify interface to be destroyed. */
+    unsigned int   netif_handle;      /* ...ditto...                         */
+    /* OUT */
+    unsigned int   status;
+} netif_be_destroy_t; 
+
+/*
+ * CMSG_NETIF_BE_CONNECT:
+ *  When the driver sends a successful response then the interface is fully
+ *  connected. The controller will send a CONNECTED notification to the
+ *  front-end driver.
+ */
+typedef struct { 
+    /* IN */
+    domid_t        domid;             /* Domain attached to new interface.   */
+    unsigned int   netif_handle;      /* Domain-specific interface handle.   */
+    unsigned int   evtchn;            /* Event channel for notifications.    */
+    unsigned long  shmem_frame;       /* Page cont. shared comms window.     */
+    /* OUT */
+    unsigned int   status;
+} netif_be_connect_t; 
+
+/*
+ * CMSG_NETIF_BE_DISCONNECT:
+ *  When the driver sends a successful response then the interface is fully
+ *  disconnected. The controller will send a DOWN notification to the front-end
+ *  driver.
+ */
+typedef struct { 
+    /* IN */
+    domid_t        domid;             /* Domain attached to new interface.   */
+    unsigned int   netif_handle;      /* Domain-specific interface handle.   */
+    /* OUT */
+    unsigned int   status;
+} netif_be_disconnect_t; 
+
+/*
+ * CMSG_NETIF_BE_DRIVER_STATUS_CHANGED:
+ *  Notify the domain controller that the back-end driver is DOWN or UP.
+ *  If the driver goes DOWN while interfaces are still UP, the domain
+ *  will automatically send DOWN notifications.
+ */
+typedef struct {
+    /* IN */
+    unsigned int status; /* NETIF_DRIVER_STATUS_??? */
+    /* OUT */
+    /*
+     * Tells driver how many interfaces it should expect to immediately
+     * receive notifications about.
+     */
+    unsigned int nr_interfaces;
+} netif_be_driver_status_changed_t;
 
 #endif /* __DOMAIN_CONTROLLER_H__ */
