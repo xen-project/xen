@@ -3,4 +3,4 @@ default:
 
 clean:
 	ant clean
-	rm -f domctl.jar
+	rm -f vdmanager.jar
