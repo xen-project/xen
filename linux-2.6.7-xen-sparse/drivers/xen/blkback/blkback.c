@@ -24,22 +24,15 @@
 #define MAX_PENDING_REQS 64
 #define BATCH_PER_DOMAIN 16
 
-/*
- * NB. We place a page of padding between each buffer page to avoid incorrect
- * merging of requests by the IDE and SCSI merging routines. Otherwise, two
- * adjacent buffers in a scatter-gather request would have adjacent page
- * numbers: since the merge routines don't realise that this is in *pseudophys*
- * space, not real space, they may collapse the s-g elements!
- */
 static unsigned long mmap_vstart;
 #define MMAP_PAGES_PER_REQUEST \
-    (2 * (BLKIF_MAX_SEGMENTS_PER_REQUEST + 1))
+    (BLKIF_MAX_SEGMENTS_PER_REQUEST + 1)
 #define MMAP_PAGES             \
     (MAX_PENDING_REQS * MMAP_PAGES_PER_REQUEST)
 #define MMAP_VADDR(_req,_seg)                        \
     (mmap_vstart +                                   \
      ((_req) * MMAP_PAGES_PER_REQUEST * PAGE_SIZE) + \
-     ((_seg) * 2 * PAGE_SIZE))
+     ((_seg) * PAGE_SIZE))
 
 /*
  * Each outstanding request that we've passed to the lower device layers has a 
