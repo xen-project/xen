@@ -784,7 +784,9 @@ void free_irq(unsigned int irq, void *dev_id)
 				cpu_relax();
 			}
 #endif
-			kfree(action);
+#define SA_STATIC_ACTION 0x01000000 /* Is it our duty to free the action? */
+			if (!(action->flags & SA_STATIC_ACTION))
+				kfree(action);
 			return;
 		}
 		printk("Trying to free free IRQ%d\n",irq);
