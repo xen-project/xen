@@ -142,6 +142,9 @@
 3eb781fd0Eo9K1jEFCSAVzO51i_ngg tools/internal/xi_stop.c
 3f108ae2to5nHRRXfvUK7oxgjcW_yA tools/internal/xi_usage.c
 3eb781fd7211MZsLxJSiuy7W4KnJXg tools/internal/xi_vifinit
+3f6dc136ZKOjd8PIqLbFBl_v-rnkGg tools/misc/miniterm/Makefile
+3f6dc140C8tAeBfroAF24VrmCS4v_w tools/misc/miniterm/README
+3f6dc142IHaf6XIcAYGmhV9nNSIHFQ tools/misc/miniterm/miniterm.c
 3f1668d4-FUY6Enc7MB3GcwUtfJ5HA tools/misc/mkdevnodes
 3f5ef5a2ir1kVAthS14Dc5QIRCEFWg tools/misc/xen-clone
 3f5ef5a2dTZP0nnsFoeq2jRf3mWDDg tools/misc/xen-clone.README
