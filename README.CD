@@ -240,10 +240,16 @@ that may be able to help diagnose problems:
 
  ifname=dummy	  Don't use any network interface.
 
- ser_baud=xxx	  Enable serial I/O and set the baud rate.
+ ser_baud=xxx	  Enable serial I/O and set the baud rate (COM1)
 
  dom0_mem=xxx 	  Set the initial amount of memory for domain0.
-		  
+
+ pdb=xxx          Enable the pervasive debugger.  See docs/pdb.txt
+                  xxx defines how the gdb stub will communicate:
+                     com1    use com1
+                     com1H   use com1 (with high bit set)
+                     com2    use on com2
+                     com2H   use com2 (with high bit set)
 
 It's probably a good idea to join the Xen developer's mailing list on
 Sourceforge:    http://lists.sourceforge.net/lists/listinfo/xen-devel   

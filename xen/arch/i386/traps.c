@@ -49,6 +49,7 @@
 #include <asm/pgalloc.h>
 #include <asm/uaccess.h>
 #include <asm/i387.h>
+#include <asm/pdb.h>
 
 #define GTBF_TRAP        1
 #define GTBF_TRAP_NOCODE 2
@@ -223,6 +224,30 @@ static inline void do_trap(int trapnr, char *str,
           smp_processor_id(), trapnr, str, error_code);
 }
 
+static inline void do_int3_exception(int trapnr,
+				     struct pt_regs *regs, 
+				     long error_code)
+{
+    struct task_struct *p = current;
+    struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
+    trap_info_t *ti;
+
+    if ((regs->xcs & 3) != 3)
+    {
+        pdb_handle_exception(trapnr, regs);
+	return;
+    }
+
+    ti = current->thread.traps + trapnr;
+    gtb->flags      =  GTBF_TRAP_NOCODE;
+    gtb->error_code = error_code;
+    gtb->cs         = ti->cs;
+    gtb->eip        = ti->address;
+    if ( TI_GET_IF(ti) )
+        clear_bit(EVENTS_MASTER_ENABLE_BIT, &p->shared_info->events_mask);
+    return; 
+}
+
 #define DO_ERROR_NOCODE(trapnr, str, name) \
 asmlinkage void do_##name(struct pt_regs * regs, long error_code) \
 { \
@@ -236,7 +261,6 @@ do_trap(trapnr, str, regs, error_code, 1); \
 }
 
 DO_ERROR_NOCODE( 0, "divide error", divide_error)
-DO_ERROR_NOCODE( 3, "int3", int3)
 DO_ERROR_NOCODE( 4, "overflow", overflow)
 DO_ERROR_NOCODE( 5, "bounds", bounds)
 DO_ERROR_NOCODE( 6, "invalid operand", invalid_op)
@@ -250,6 +274,12 @@ DO_ERROR_NOCODE(16, "fpu error", coprocessor_error)
 DO_ERROR(17, "alignment check", alignment_check)
 DO_ERROR_NOCODE(18, "machine check", machine_check)
 DO_ERROR_NOCODE(19, "simd error", simd_coprocessor_error)
+
+asmlinkage void do_int3(struct pt_regs * regs, long error_code)
+{
+    if (pdb_initialized)   do_int3_exception(3, regs, error_code);
+    else                   do_trap(3, "int3", regs, error_code, 0);
+}
 
 asmlinkage void do_double_fault(void)
 {
@@ -489,8 +519,39 @@ asmlinkage void math_state_restore(struct pt_regs *regs, long error_code)
     }
 }
 
-
 asmlinkage void do_debug(struct pt_regs * regs, long error_code)
+{
+    unsigned int condition;
+    struct task_struct *tsk = current;
+    struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
+
+    /*
+    printk("do_debug_exceptionn [%lx][%lx][%x]\n",
+	   error_code, regs->eip, regs->xcs);
+    */
+
+    __asm__ __volatile__("movl %%db6,%0" : "=r" (condition));
+
+    if ((condition & (1 << 14)) != (1 << 14))
+    {
+        printk ("\nwarning: debug trap w/o BS bit [0x%x]\n\n", condition);
+    }
+    __asm__("movl %0,%%db6" : : "r" (0));
+
+    if (pdb_handle_exception(1, regs))                /* propagate to domain */
+    {
+        tsk->thread.debugreg[6] = condition;
+
+	gtb->flags = GTBF_TRAP_NOCODE;
+	gtb->cs    = tsk->thread.traps[1].cs;
+	gtb->eip   = tsk->thread.traps[1].address;
+    }
+
+    return;
+}
+
+
+asmlinkage void do_debug_orig(struct pt_regs * regs, long error_code)
 {
     unsigned int condition;
     struct task_struct *tsk = current;

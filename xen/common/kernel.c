@@ -69,6 +69,8 @@ int opt_noreboot=0;
 int opt_ignorebiostables=0;
 /* opt_watchdog: If true, run a watchdog NMI on each processor. */
 int opt_watchdog=0;
+/* opt_pdb: Name of serial port for Xen pervasive debugger (and enable pdb) */
+unsigned char opt_pdb[10] = "none";
 
 static struct {
     unsigned char *name;
@@ -85,6 +87,7 @@ static struct {
     { "noreboot",         OPT_BOOL, &opt_noreboot },
     { "ignorebiostables", OPT_BOOL, &opt_ignorebiostables },
     { "watchdog",         OPT_BOOL, &opt_watchdog },
+    { "pdb",              OPT_STR,  &opt_pdb },
     { NULL,               0,        NULL     }
 };
 

@@ -159,7 +159,7 @@ struct task_struct
  *                       or expiring timer
  * TASK_UNINTERRUPTIBLE: Domain is blocked but may not be woken up by an
  *                       arbitrary event or timer.
- * TASK_STOPPED:         Domain is sopped.
+ * TASK_STOPPED:         Domain is stopped.
  * TASK_DYING:           Domain is about to cross over to the land of the dead.
  */
 

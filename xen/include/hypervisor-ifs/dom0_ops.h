@@ -17,7 +17,7 @@
  * This makes sure that old versions of dom0 tools will stop working in a
  * well-defined way (rather than crashing the machine, for instance).
  */
-#define DOM0_INTERFACE_VERSION   0xAAAA0003
+#define DOM0_INTERFACE_VERSION   0xAAAA0004
 
 
 /*
@@ -168,9 +168,11 @@ typedef struct dom0_debug_st
 {
     /* IN variables. */
     char opcode;
-    int domain, in1, in2;
+    unsigned int domain;
+    int in1, in2, in3, in4;
     /* OUT variables. */
-    int status, out1, out2;
+    unsigned int status;
+    int out1, out2;
 } dom0_debug_t;
 
 /*

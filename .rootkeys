@@ -12,6 +12,7 @@
 3f9e7d60PWZJeVh5xdnk0nLUdxlqEA docs/eps/xenlogo.eps
 3f9e7d63lTwQbp2fnx7yY93epWS-eQ docs/figs/dummy
 3f9e7d564bWFB-Czjv1qdmE6o0GqNg docs/interface.tex
+4022a73cgxX1ryj1HgS-IwwB6NUi2A docs/pdb.txt
 3f9e7d58t7N6hjjBMxSn-NMxBphchA docs/style.tex
 3f9e7d5bz8BwYkNuwyiPVu7JJG441A docs/xenstyle.cls
 3f815144d1vI2777JI-dO4wk49Iw7g extras/mini-os/Makefile
@@ -73,6 +74,8 @@
 3f13d81e6Z6806ihYYUw8GVKNkYnuw tools/misc/xen_nat_enable.README
 3f1668d4F29Jsw0aC0bJEIkOBiagiQ tools/misc/xen_read_console.c
 3f87ba90EUVPQLVOlFG0sW89BCwouQ tools/misc/xen_refresh_dev.c
+4022a73cEKvrYe_DVZW2JlAxobg9wg tools/nsplitd/Makefile
+4022a73cKms4Oq030x2JBzUB426lAQ tools/nsplitd/nsplitd.c
 3fbca441SjQr8vJwTQIgH1laysaWog tools/xc/Makefile
 3fbba6dbDfYvJSsw9500b4SZyUhxjQ tools/xc/lib/Makefile
 3fbba6dc1uU7U3IFeF6A-XEOYF2MkQ tools/xc/lib/rpm.spec
@@ -118,6 +121,7 @@
 3ddb79bdIKgipvGoqExEQ7jawfVowA xen/arch/i386/pci-i386.h
 3ddb79bdHe6_Uij4-glW91vInNtBYQ xen/arch/i386/pci-irq.c
 3ddb79bcZ_2FxINljqNSkqa17ISyJw xen/arch/i386/pci-pc.c
+4022a73czgX7d-2zfF_cb33oVemApQ xen/arch/i386/pdb-stub.c
 3ddb79bc1_2bAt67x9MFCP4AZrQnvQ xen/arch/i386/process.c
 3ddb79bc7KxGCEJsgBnkDX7XjD_ZEQ xen/arch/i386/rwlock.c
 3ddb79bcrD6Z_rUvSDgrvjyb4846Eg xen/arch/i386/setup.c
@@ -133,6 +137,8 @@
 3ddb79bddEYJbcURvqqcx99Yl2iAhQ xen/common/block.c
 3ddb79bdrqnW93GR9gZk1OJe1qK-iQ xen/common/brlock.c
 3fb10d07GscSWPKxBqpvNfU-dYfa0g xen/common/console.c
+4022a73c_BbDFd2YJ_NQYVvKX5Oz7w xen/common/debug-linux.c
+4022a73c_KPZ1VEbYOrpAhQffd01kA xen/common/debug-linux.h
 3fa152581E5KhrAtqZef2Sr5NKTz4w xen/common/debug.c
 3ddb79bdLX_P6iB7ILiblRLWvebapg xen/common/dom0_ops.c
 3e6377e4i0c9GtKN65e99OtRbw3AZw xen/common/dom_mem_ops.c
@@ -394,6 +400,7 @@
 3ddb79c3xjYnrv5t3VqYlR4tNEOl4Q xen/include/asm-i386/page.h
 3e450943kzme29HPCtq5HNOVQkddfw xen/include/asm-i386/param.h
 3ddb79c3ysKUbxZuwKBRK3WXU2TlEg xen/include/asm-i386/pci.h
+4022a73diKn2Ax4-R4gzk59lm1YdDg xen/include/asm-i386/pdb.h
 3ddb79c3nm2zdzeO6Mj8g7ex3txgGw xen/include/asm-i386/pgalloc.h
 3ddb79c2QF5-pZGzuX4QukPCDAl59A xen/include/asm-i386/processor.h
 3ddb79c3mbqEM7QQr3zVq7NiBNhouA xen/include/asm-i386/ptrace.h

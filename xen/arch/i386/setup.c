@@ -12,6 +12,7 @@
 #include <asm/apic.h>
 #include <asm/desc.h>
 #include <asm/domain_page.h>
+#include <asm/pdb.h>
 
 struct cpuinfo_x86 boot_cpu_data = { 0 };
 /* Lots of nice things, since we only target PPro+. */
@@ -428,6 +429,7 @@ void __init start_of_day(void)
     do_initcalls();
     initialize_serial();   /* setup serial 'driver' (for debugging) */
     initialize_keyboard(); /* setup keyboard (also for debugging)   */
+    initialize_pdb();      /* pervasive debugger */
 
     if ( !setup_network_devices() )
         panic("Must have a network device!\n");
