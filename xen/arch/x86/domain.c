@@ -328,7 +328,7 @@ static void alloc_monitor_pagetable(struct exec_domain *ed)
 }
 
 /*
- * Free the pages for monitor_table and guest_pl2e_cache
+ * Free the pages for monitor_table and hl2_table
  */
 static void free_monitor_pagetable(struct exec_domain *ed)
 {
@@ -340,7 +340,7 @@ static void free_monitor_pagetable(struct exec_domain *ed)
     mpl2e = (l2_pgentry_t *)
         map_domain_mem(pagetable_val(ed->arch.monitor_table));
     /*
-     * First get the pfn for guest_pl2e_cache by looking at monitor_table
+     * First get the pfn for hl2_table by looking at monitor_table
      */
     mpfn = l2_pgentry_val(mpl2e[LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT])
         >> PAGE_SHIFT;
@@ -410,7 +410,7 @@ static int vmx_final_setup_guest(struct exec_domain *ed,
     /* We don't call update_pagetables() as we actively want fields such as 
      * the linear_pg_table to be null so that we bail out early of 
      * shadow_fault in case the vmx guest tries illegal accesses with
-     * paging turned of. 
+     * paging turned off. 
      */
     //update_pagetables(ed);     /* this assigns shadow_pagetable */
     alloc_monitor_pagetable(ed); /* this assigns monitor_pagetable */

@@ -584,14 +584,15 @@ static void shadow_map_l1_into_current_l2(unsigned long va)
     }              
 }
 
-#ifdef CONFIG_VMX
-void vmx_shadow_invlpg(struct domain *d, unsigned long va)
+void shadow_invlpg(struct exec_domain *ed, unsigned long va)
 {
-    unsigned long gpte, spte, host_pfn;
+    unsigned long gpte, spte;
+
+    ASSERT(shadow_mode_enabled(ed->domain));
 
     if (__put_user(0L, (unsigned long *)
                    &shadow_linear_pg_table[va >> PAGE_SHIFT])) {
-        vmx_shadow_clear_state(d);
+        vmx_shadow_clear_state(ed->domain);
         return;
     }
 
@@ -600,15 +601,13 @@ void vmx_shadow_invlpg(struct domain *d, unsigned long va)
         return;
     }
 
-    host_pfn = phys_to_machine_mapping(gpte >> PAGE_SHIFT);
-    spte = (host_pfn << PAGE_SHIFT) | (gpte & ~PAGE_MASK);
+    l1pte_propagate_from_guest(ed->domain, &gpte, &spte);
 
     if (__put_user(spte, (unsigned long *)
                    &shadow_linear_pg_table[va >> PAGE_SHIFT])) {
         return;
     }
 }
-#endif
 
 int shadow_fault(unsigned long va, long error_code)
 {
@@ -616,7 +615,7 @@ int shadow_fault(unsigned long va, long error_code)
     struct exec_domain *ed = current;
     struct domain *d = ed->domain;
 
-    SH_VVLOG("shadow_fault( va=%p, code=%ld )", va, error_code );
+    SH_VVLOG("shadow_fault( va=%p, code=%lu )", va, error_code );
 
     check_pagetable(d, ed->arch.guest_table, "pre-sf");
 

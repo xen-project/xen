@@ -380,7 +380,7 @@ void vmx_intr_assist(struct exec_domain *d)
 
 void vmx_do_resume(struct exec_domain *d) 
 {
-    if ( d->arch.vpagetable )
+    if ( d->arch.guest_vtable )
         __vmwrite(GUEST_CR3, pagetable_val(d->arch.shadow_table));
     else
         // we haven't switched off the 1:1 pagetable yet...

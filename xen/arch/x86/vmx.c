@@ -114,7 +114,6 @@ static int vmx_do_page_fault(unsigned long va, unsigned long error_code)
     unsigned long eip;
     unsigned long gpa;
     int result;
-    struct exec_domain *ed = current;
 
 #if VMX_DEBUG
     {
@@ -129,7 +128,7 @@ static int vmx_do_page_fault(unsigned long va, unsigned long error_code)
      * If vpagetable is zero, then we are still emulating 1:1 page tables,
      * and we should have never gotten here.
      */
-    if ( !ed->arch.vpagetable )
+    if ( !current->arch.guest_vtable )
     {
         printk("vmx_do_page_fault while still running on 1:1 page table\n");
         return 0;
@@ -277,18 +276,18 @@ static void vmx_vmexit_do_invlpg(unsigned long va)
      * We do the safest things first, then try to update the shadow
      * copying from guest
      */
-    vmx_shadow_invlpg(ed->domain, va);
+    shadow_invlpg(ed, va);
     index = (va >> L2_PAGETABLE_SHIFT);
-    ed->arch.guest_pl2e_cache[index] = 
+    ed->arch.hl2_vtable[index] = 
         mk_l2_pgentry(0); /* invalidate pgd cache */
 }
 
-static inline void guest_pl2e_cache_invalidate(struct exec_domain *ed)
+static inline void hl2_table_invalidate(struct exec_domain *ed)
 {
     /*
      * Need to optimize this
      */
-    memset(ed->arch.guest_pl2e_cache, 0, PAGE_SIZE);
+    memset(ed->arch.hl2_vtable, 0, PAGE_SIZE);
 }
 
 static void vmx_io_instruction(struct xen_regs *regs, 
@@ -474,7 +473,7 @@ static void mov_to_cr(int gp, int cr, struct xen_regs *regs)
             break;
         }
         
-        guest_pl2e_cache_invalidate(d);
+        hl2_table_invalidate(d);
         /*
          * We make a new one if the shadow does not exist.
          */
@@ -531,7 +530,7 @@ static void mov_to_cr(int gp, int cr, struct xen_regs *regs)
         if ((old_cr ^ value) & (X86_CR4_PSE | X86_CR4_PGE | X86_CR4_PAE)) {
             vmx_shadow_clear_state(d->domain);
             shadow_invalidate(d);
-            guest_pl2e_cache_invalidate(d);
+            hl2_table_invalidate(d);
         }
         break;
     default:

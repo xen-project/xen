@@ -158,7 +158,7 @@ void vmx_do_launch(struct exec_domain *ed)
     struct host_execution_env host_env;
     struct Xgt_desc_struct desc;
     struct list_head *list_ent;
-    l2_pgentry_t *mpl2e, *guest_pl2e_cache;
+    l2_pgentry_t *mpl2e, *hl2_vtable;
     unsigned long i, pfn = 0;
     struct pfn_info *page;
     execution_context_t *ec = get_execution_context();
@@ -191,9 +191,9 @@ void vmx_do_launch(struct exec_domain *ed)
     mpl2e[LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
         mk_l2_pgentry((pfn << PAGE_SHIFT)| __PAGE_HYPERVISOR);
 
-    guest_pl2e_cache = map_domain_mem(pfn << PAGE_SHIFT);
-    memset(guest_pl2e_cache, 0, PAGE_SIZE); /* clean it up */
-    ed->arch.guest_pl2e_cache = guest_pl2e_cache; 
+    hl2_vtable = map_domain_mem(pfn << PAGE_SHIFT);
+    memset(hl2_vtable, 0, PAGE_SIZE); /* clean it up */
+    ed->arch.hl2_vtable = hl2_vtable; 
         
     unmap_domain_mem(mpl2e);
 

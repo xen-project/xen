@@ -66,7 +66,7 @@ struct arch_exec_domain
      * The stack frame for events is exactly that of an x86 hardware interrupt.
      * The stack frame for a failsafe callback is augmented with saved values
      * for segment registers %ds, %es, %fs and %gs:
-     * 	%ds, %es, %fs, %gs, %eip, %cs, %eflags [, %oldesp, %oldss]
+     *  %ds, %es, %fs, %gs, %eip, %cs, %eflags [, %oldesp, %oldss]
      */
 
     unsigned long event_selector;    /* entry CS  (x86/32 only) */
@@ -104,13 +104,15 @@ struct arch_exec_domain
     pagetable_t  guest_table_user;      /* x86/64: user-space pagetable. */
     pagetable_t  guest_table;           /* guest notion of cr3 */
     pagetable_t  shadow_table;          /* shadow of guest */
+    pagetable_t  hl2_table;             /* shortcut to guest's L1 PTEs */
     pagetable_t  monitor_table;         /* used in hypervisor */
 
     pagetable_t  phys_table;            /* guest 1:1 pagetable */
 
-    l2_pgentry_t *vpagetable;	        /* virtual address of pagetable */
-    l2_pgentry_t *shadow_vtable;	/* virtual address of shadow_table */
-    l2_pgentry_t *guest_pl2e_cache;	/* guest page directory cache */
+    l2_pgentry_t *guest_vtable;         /* virtual address of pagetable */
+    l2_pgentry_t *shadow_vtable;        /* virtual address of shadow_table */
+    l2_pgentry_t *hl2_vtable;			/* virtual address of hl2_table */
+    l2_pgentry_t *monitor_vtable;		/* virtual address of monitor_table */
 
     /* Virtual CR2 value. Can be read/written by guest. */
     unsigned long guest_cr2;

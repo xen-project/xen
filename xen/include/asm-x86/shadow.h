@@ -46,10 +46,10 @@ extern void shadow_l2_normal_pt_update(unsigned long pa, unsigned long gpde);
 extern void unshadow_table(unsigned long gpfn, unsigned int type);
 extern int shadow_mode_enable(struct domain *p, unsigned int mode);
 extern void free_shadow_state(struct domain *d);
+extern void shadow_invlpg(struct exec_domain *, unsigned long);
 
 #ifdef CONFIG_VMX
 extern void vmx_shadow_clear_state(struct domain *);
-extern void vmx_shadow_invlpg(struct domain *, unsigned long);
 #endif
 
 #define __mfn_to_gpfn(_d, mfn)                         \
@@ -131,10 +131,8 @@ static inline void __shadow_get_l2e(
             *sl2e = l2_pgentry_val(
                 shadow_linear_l2_table[l2_table_offset(va)]);
     }
-    else {
-        BUG(); /* why do we need this case? */
-        *sl2e = l2_pgentry_val(linear_l2_table[l2_table_offset(va)]);
-    }
+    else
+        BUG();
 }
 
 static inline void __shadow_set_l2e(
@@ -147,17 +145,14 @@ static inline void __shadow_set_l2e(
             shadow_linear_l2_table[l2_table_offset(va)] = mk_l2_pgentry(value);
     }
     else
-    {
-        BUG(); /* why do we need this case? */
-        linear_l2_table[l2_table_offset(va)] = mk_l2_pgentry(value);
-    }
+        BUG();
 }
 
 static inline void __guest_get_l2e(
     struct exec_domain *ed, unsigned long va, unsigned long *l2e)
 {
     *l2e = ( shadow_mode_translate(ed->domain) ) ?
-        l2_pgentry_val(ed->arch.vpagetable[l2_table_offset(va)]) :
+        l2_pgentry_val(ed->arch.guest_vtable[l2_table_offset(va)]) :
         l2_pgentry_val(linear_l2_table[l2_table_offset(va)]);
 }
 
@@ -169,10 +164,10 @@ static inline void __guest_set_l2e(
         unsigned long pfn;
 
         pfn = phys_to_machine_mapping(value >> PAGE_SHIFT);
-        ed->arch.guest_pl2e_cache[l2_table_offset(va)] =
+        ed->arch.hl2_vtable[l2_table_offset(va)] =
             mk_l2_pgentry((pfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
 
-        ed->arch.vpagetable[l2_table_offset(va)] = mk_l2_pgentry(value);
+        ed->arch.guest_vtable[l2_table_offset(va)] = mk_l2_pgentry(value);
     }
     else
     {
@@ -671,13 +666,16 @@ static inline void vmx_update_shadow_state(
     /* unmap the old mappings */
     if ( ed->arch.shadow_vtable )
         unmap_domain_mem(ed->arch.shadow_vtable);
-    if ( ed->arch.vpagetable )
-        unmap_domain_mem(ed->arch.vpagetable);
+    if ( ed->arch.guest_vtable )
+        unmap_domain_mem(ed->arch.guest_vtable);
 
     /* new mapping */
     mpl2e = (l2_pgentry_t *)
         map_domain_mem(pagetable_val(ed->arch.monitor_table));
 
+    // mafetter: why do we need to keep setting up shadow_linear_pg_table for
+    // this monitor page table?  Seems unnecessary...
+    //
     mpl2e[l2_table_offset(SH_LINEAR_PT_VIRT_START)] =
         mk_l2_pgentry((smfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
     __flush_tlb_one(SH_LINEAR_PT_VIRT_START);
@@ -687,7 +685,7 @@ static inline void vmx_update_shadow_state(
     memset(spl2e, 0, L2_PAGETABLE_ENTRIES * sizeof(l2_pgentry_t));
 
     ed->arch.shadow_vtable = spl2e;
-    ed->arch.vpagetable = gpl2e; /* expect the guest did clean this up */
+    ed->arch.guest_vtable = gpl2e; /* expect the guest did clean this up */
     unmap_domain_mem(mpl2e);
 }
 
@@ -702,9 +700,9 @@ static inline unsigned long gva_to_gpte(unsigned long gva)
 
     index = (gva >> L2_PAGETABLE_SHIFT);
 
-    if (!l2_pgentry_val(ed->arch.guest_pl2e_cache[index])) {
+    if (!l2_pgentry_val(ed->arch.hl2_vtable[index])) {
         pfn = phys_to_machine_mapping(gpde >> PAGE_SHIFT);
-        ed->arch.guest_pl2e_cache[index] = 
+        ed->arch.hl2_vtable[index] = 
             mk_l2_pgentry((pfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
     }
 
@@ -746,6 +744,9 @@ static inline void __update_pagetables(struct exec_domain *ed)
     ed->arch.shadow_table = mk_pagetable(smfn<<PAGE_SHIFT);
 
     if ( !shadow_mode_external(ed->domain) )
+        // mafetter: why do we need to keep overwriting
+        // ed->arch.monitor_table?  Seems unnecessary...
+        //
         ed->arch.monitor_table = ed->arch.shadow_table;
 }
 
@@ -759,9 +760,15 @@ static inline void update_pagetables(struct exec_domain *ed)
      }
 #ifdef __x86_64__
      else if ( !(ed->arch.flags & TF_kernel_mode) )
+         // mafetter: why do we need to keep overwriting
+         // ed->arch.monitor_table?  Seems unnecessary...
+         //
          ed->arch.monitor_table = ed->arch.guest_table_user;
 #endif
      else
+         // mafetter: why do we need to keep overwriting
+         // ed->arch.monitor_table?  Seems unnecessary...
+         //
          ed->arch.monitor_table = ed->arch.guest_table;
 }
 
