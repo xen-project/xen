@@ -43,12 +43,10 @@ asmlinkage int hypervisor_call(void);
 asmlinkage void lcall7(void);
 asmlinkage void lcall27(void);
 
-/*
- * The IDT has to be page-aligned to simplify the Pentium
- * F0 0F bug workaround.. We have a special link segment
- * for this.
- */
-struct desc_struct idt_table[256] __attribute__((__section__(".data.idt"))) = { {0, 0}, };
+/* Master table, and the one used by CPU0. */
+struct desc_struct idt_table[256] = { {0, 0}, };
+/* All other CPUs have their own copy. */
+struct desc_struct *idt_tables[NR_CPUS] = { 0 };
 
 asmlinkage void divide_error(void);
 asmlinkage void debug(void);
@@ -299,7 +297,12 @@ asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
         ti = current->thread.traps + (error_code>>3);
         if ( ti->dpl >= (regs->xcs & 3) )
         {
-            if ( (error_code>>3)==0x80 ) { printk("!!!\n"); BUG(); }
+            /* XXX Kill next conditional soon :-) XXX */
+            if ( (error_code>>3)==0x80 ) 
+            { 
+                printk("DIDN'T USE FAST-TRAP HANDLER FOR 0x80!!! :-(\n");
+                BUG(); 
+            }
             gtb->flags = GTBF_TRAP_NOCODE;
             gtb->cs    = ti->cs;
             gtb->eip   = ti->address;
@@ -541,6 +544,9 @@ void __init trap_init(void)
 
     /* Only ring 1 can access monitor services. */
     _set_gate(idt_table+HYPERVISOR_CALL_VECTOR,15,1,&hypervisor_call);
+
+    /* CPU0 uses the master IDT. */
+    idt_tables[0] = idt_table;
 
     /*
      * Should be a barrier for any external CPU state.
