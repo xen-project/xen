@@ -29,7 +29,7 @@ static int pdb_stepping = 0;
 
 void pdb_put_packet (unsigned char *buffer, int ack);
 
-static int pdb_initialized = 0;
+int pdb_initialized = 0;
 static int pdb_serhnd      = -1;
 
 #define RX_SIZE 32

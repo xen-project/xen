@@ -196,6 +196,8 @@ static inline void do_trap(int trapnr, char *str,
     trap_info_t *ti;
     unsigned long fixup;
 
+    __sti();
+
     if (!(regs->xcs & 3))
         goto fault_in_hypervisor;
 
@@ -256,6 +258,8 @@ asmlinkage void do_int3(struct pt_regs *regs, long error_code)
     struct task_struct *p = current;
     struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
     trap_info_t *ti;
+
+    __sti();
 
     if ( (regs->xcs & 3) != 3 )
     {
@@ -323,6 +327,8 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
 
     __asm__ __volatile__ ("movl %%cr2,%0" : "=r" (addr) : );
 
+    __sti();
+
     if ( unlikely(addr >= LDT_VIRT_START) && 
          (addr < (LDT_VIRT_START + (p->mm.ldt_ents*LDT_ENTRY_SIZE))) )
     {
@@ -389,6 +395,8 @@ asmlinkage void do_general_protection(struct pt_regs *regs, long error_code)
     struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
     trap_info_t *ti;
     unsigned long fixup;
+
+    __sti();
 
     /* Badness if error in ring 0, or result of an interrupt. */
     if ( !(regs->xcs & 3) || (error_code & 1) )
@@ -498,6 +506,8 @@ asmlinkage void math_state_restore(struct pt_regs *regs, long error_code)
     /* Prevent recursion. */
     clts();
 
+    __sti();
+
     if ( !test_bit(PF_USEDFPU, &current->flags) )
     {
         if ( test_bit(PF_DONEFPUINIT, &current->flags) )
@@ -516,36 +526,13 @@ asmlinkage void math_state_restore(struct pt_regs *regs, long error_code)
     }
 }
 
-asmlinkage void do_debug(struct pt_regs * regs, long error_code)
+asmlinkage void do_debug_orig(struct pt_regs *regs, long error_code)
 {
     unsigned int condition;
     struct task_struct *tsk = current;
     struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
 
-    __asm__ __volatile__("movl %%db6,%0" : "=r" (condition));
-
-    if ((condition & (1 << 14)) != (1 << 14))
-    {
-        printk ("\nwarning: debug trap w/o BS bit [0x%x]\n\n", condition);
-    }
-    __asm__("movl %0,%%db6" : : "r" (0));
-
-    if ( pdb_handle_exception(1, regs) != 0 )
-    {
-        tsk->thread.debugreg[6] = condition;
-
-	gtb->flags = GTBF_TRAP_NOCODE;
-	gtb->cs    = tsk->thread.traps[1].cs;
-	gtb->eip   = tsk->thread.traps[1].address;
-    }
-}
-
-
-asmlinkage void do_debug_orig(struct pt_regs * regs, long error_code)
-{
-    unsigned int condition;
-    struct task_struct *tsk = current;
-    struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
+    __sti();
 
     __asm__ __volatile__("movl %%db6,%0" : "=r" (condition));
 
@@ -577,6 +564,37 @@ asmlinkage void do_debug_orig(struct pt_regs * regs, long error_code)
     gtb->flags = GTBF_TRAP_NOCODE;
     gtb->cs    = tsk->thread.traps[1].cs;
     gtb->eip   = tsk->thread.traps[1].address;
+}
+
+
+asmlinkage void do_debug(struct pt_regs *regs, long error_code)
+{
+    unsigned int condition;
+    struct task_struct *tsk = current;
+    struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
+
+    /* This handler is broken! Only use it if PDB is enabled. */
+    if ( !pdb_initialized )
+    {
+        do_debug_orig(regs, error_code);
+        return;
+    }
+
+    __sti();
+
+    __asm__ __volatile__("movl %%db6,%0" : "=r" (condition));
+    if ( (condition & (1 << 14)) != (1 << 14) )
+        printk("\nwarning: debug trap w/o BS bit [0x%x]\n\n", condition);
+    __asm__("movl %0,%%db6" : : "r" (0));
+
+    if ( pdb_handle_exception(1, regs) != 0 )
+    {
+        tsk->thread.debugreg[6] = condition;
+
+	gtb->flags = GTBF_TRAP_NOCODE;
+	gtb->cs    = tsk->thread.traps[1].cs;
+	gtb->eip   = tsk->thread.traps[1].address;
+    }
 }
 
 
