@@ -188,10 +188,8 @@ int xen_physdisk_grant(xp_disk_t *xpd_in)
   DPRINTK("Have current.\n");
   DPRINTK("Target domain %x\n", xpd->domain);
 
-  do {
-    p = p->next_task;
-  } while (p != current && p->domain != xpd->domain);
-  if (p->domain != xpd->domain) {
+  p = find_domain_by_id(xpd->domain);
+  if (p == NULL) {
     DPRINTK("Bad domain!\n");
     res = 1;
     goto out;
@@ -203,6 +201,7 @@ int xen_physdisk_grant(xp_disk_t *xpd_in)
 				  xpd->mode,
 				  p);
   spin_unlock(&p->physdev_lock);
+  put_task_struct(p);
 
  out:
   unmap_domain_mem(xpd);
@@ -216,16 +215,14 @@ int xen_physdisk_probe(struct task_struct *requesting_domain,
   physdisk_probebuf_t *buf = map_domain_mem(virt_to_phys(buf_in));
   int res;
 
-  p = current;
-  do {
-    p = p->next_task;
-  } while (p != current && p->domain != buf->domain);  
-  if (p->domain != buf->domain) {
+  if (requesting_domain->domain != 0 &&
+      requesting_domain->domain != buf->domain) {
     res = 1;
     goto out;
   }
-  if (requesting_domain->domain != 0 &&
-      requesting_domain->domain != buf->domain) {
+
+  p = find_domain_by_id(buf->domain);
+  if (p == NULL) {
     res = 1;
     goto out;
   }
@@ -233,6 +230,8 @@ int xen_physdisk_probe(struct task_struct *requesting_domain,
   spin_lock(&p->physdev_lock);
   xen_physdisk_probe_access(buf, p);
   spin_unlock(&p->physdev_lock);
+  put_task_struct(p);
+
   res = 0;
  out:
   unmap_domain_mem(buf);
