@@ -55,6 +55,10 @@ name = "VM%d" % vmid
 #cpu = -1   # leave to Xen to pick
 cpu = vmid  # set based on vmid (mod number of CPUs)
 
+# Number of Virtual CPUS to use, default is 1
+#vcpus = 1
+vcpus = 4 # make your domain a 4-way
+
 #----------------------------------------------------------------------------
 # Define network interfaces.
 
