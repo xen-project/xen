@@ -689,8 +689,19 @@ int xc_linux_restore(int xc_handle, XcIOContext *ioctxt)
     op.u.builddomain.ctxt = &ctxt;
     rc = do_dom0_op(xc_handle, &op);
 
-    /* don't start the domain as we have console etc to set up */
-  
+    if ( rc != 0 )
+    {
+        xcio_error(ioctxt, "Couldn't build the domain");
+        goto out;
+    }
+
+    if ( ioctxt->flags & XCFLAGS_CONFIGURE )
+    {
+        op.cmd = DOM0_UNPAUSEDOMAIN;
+        op.u.unpausedomain.domain = (domid_t)dom;
+        rc = do_dom0_op(xc_handle, &op);
+    }
+
     if ( rc == 0 )
     {
         /* Success: print the domain id. */

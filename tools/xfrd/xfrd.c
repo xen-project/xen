@@ -863,9 +863,9 @@ int xfr_recv(Args *args, XfrState *state, Conn *peer){
         dprintf("> Configuring...\n");
         err = xen_domain_configure(state->vmid_new, state->vmconfig, state->vmconfig_n);
         if(err) goto exit;
+        err = xen_domain_unpause(state->vmid_new);
+        if(err) goto exit;
     }
-    err = xen_domain_unpause(state->vmid_new);
-    if(err) goto exit;
     // Report new domain id to peer.
     err = xfr_send_xfr_ok(peer, state->vmid_new);
     if(err) goto exit;
