@@ -89,10 +89,10 @@ public abstract class CommandParser {
   }
 
   protected void loadState() {
-    XML.load_state( PartitionManager.it, VirtualDiskManager.it, Settings.STATE_INPUT_FILE );
+    XML.loadState( PartitionManager.IT, VirtualDiskManager.IT, Settings.STATE_INPUT_FILE );
   }
   
   protected void saveState() {
-    XML.dump_state( PartitionManager.it, VirtualDiskManager.it, Settings.STATE_OUTPUT_FILE );
+    XML.saveState( PartitionManager.IT, VirtualDiskManager.IT, Settings.STATE_OUTPUT_FILE );
   }
 }

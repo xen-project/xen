@@ -19,19 +19,19 @@ public class ParsePartitionsAdd extends CommandParser {
     if (partition_name.equals(""))
       throw new ParseFailedException("Expected -p<partition_name>");
       
-    long chunksize = Library.parse_size( size ) / Settings.SECTOR_SIZE;
+    long chunksize = Library.parseSize( size ) / Settings.SECTOR_SIZE;
     if ( chunksize <= 0 )
       throw new CommandFailedException("Chunk size " + size + " is smaller than sector size.");
     
     // Initialise the partition manager and look up the partition
     loadState();
-    Partition p = PartitionManager.it.get_partition(partition_name);
+    Partition p = PartitionManager.IT.getPartition(partition_name);
     
     if ( p == null )
       throw new CommandFailedException("Partition " + partition_name + " does not exist.");
     
     // Check if this partition belongs to the VDM
-    if (p.getIsXeno() && !force)
+    if (p.isXeno() && !force)
       throw new CommandFailedException("Refusing to add partition as it is already allocated to the virtual disk manager. Use -f if you are sure.");
     
     String output = new CommandPartitionAdd( p, chunksize ).execute();

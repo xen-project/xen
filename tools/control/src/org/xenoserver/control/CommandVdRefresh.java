@@ -9,7 +9,7 @@ public class CommandVdRefresh extends Command {
   /**
    * Constructor for CommandVdRefresh.
    * @param key Key to refresh.
-   * @param expiry New expiry.
+   * @param expiry New expiry (null for no expiry).
    */
   public CommandVdRefresh(String key, Date expiry) {
     this.key = key;
@@ -17,7 +17,10 @@ public class CommandVdRefresh extends Command {
   }
 
   public String execute() throws CommandFailedException {
-    VirtualDiskManager.it.refresh_virtual_disk(key,expiry);
+    VirtualDisk vd = VirtualDiskManager.IT.getVirtualDisk(key);
+    if ( vd == null )
+      throw new CommandFailedException( "No such virtual disk " + key );
+    vd.refreshExpiry(expiry);
     return "Refreshed virtual disk " + key;
   }
 }

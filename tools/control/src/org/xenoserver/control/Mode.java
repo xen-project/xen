@@ -7,16 +7,30 @@
 
 package org.xenoserver.control;
 
-public class 
-Mode 
-{
-  private final String name;
+/**
+ * Enumeration to represent an access mode.
+ */
+public class Mode {
+    /** name of this mode */
+    private final String name;
 
-  private Mode(String name) { this.name = name; }
+    /**
+     * Construct a mode
+     * @param name Name to use.
+     */
+    private Mode(String name) {
+        this.name = name;
+    }
 
-  public String toString()  { return name; }
+    /**
+     * @see java.lang.Object#toString()
+     */
+    public String toString() {
+        return name;
+    }
 
-  public static final Mode READ_ONLY  = new Mode("ro");
-  public static final Mode READ_WRITE = new Mode("rw");
+    /** Single read-only mode instance. */
+    public static final Mode READ_ONLY = new Mode("ro");
+    /** Single read-write mode instance. */
+    public static final Mode READ_WRITE = new Mode("rw");
 }
-

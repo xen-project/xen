@@ -25,7 +25,7 @@ public class ParseVdCreate extends CommandParser {
     else
       expiry = new Date(Date.parse(expiry_s));
       
-    long size = Library.parse_size(size_s);
+    long size = Library.parseSize(size_s);
     
     loadState();
     String output = new CommandVdCreate(name,size/Settings.SECTOR_SIZE,expiry).execute();

@@ -20,7 +20,7 @@ public class CommandVdCreate extends Command {
   }
 
   public String execute() throws CommandFailedException {
-    VirtualDisk vd = VirtualDiskManager.it.create_virtual_disk(name,size,expiry);
+    VirtualDisk vd = VirtualDiskManager.IT.createVirtualDisk(name,size,expiry);
     if ( vd == null )
       throw new CommandFailedException( "Not enough free space to create disk" );
     return "Virtual Disk created with key: " + vd.getKey();

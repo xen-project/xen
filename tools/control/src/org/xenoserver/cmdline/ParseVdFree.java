@@ -16,17 +16,17 @@ public class ParseVdFree extends CommandParser {
     boolean verbose = getFlagParameter(args, 'v');
     
     loadState();
-    VirtualDisk free = VirtualDiskManager.it.getFreeVirtualDisk();
+    VirtualDisk free = VirtualDiskManager.IT.getFreeDisk();
     System.out.println( "Free disk has " + free.getExtentCount() + " extents totalling "
-                      + Library.format_size(free.getSize()*Settings.SECTOR_SIZE,8,1) );
+                      + Library.formatSize(free.getSize()*Settings.SECTOR_SIZE,8,true) );
     if ( verbose ) {
-      Iterator i = free.iterator();
+      Iterator i = free.extents();
       System.out.println("  disk       offset         size");
       while (i.hasNext()) {
         Extent e = (Extent) i.next();
-        System.out.println( Library.format(e.getDisk(), 6, 0) + " "
-                          + Library.format(e.getOffset(), 12, 0) + " "
-                          + Library.format(e.getSize(), 12, 0) );
+        System.out.println( Library.format(e.getDisk(), 6, false) + " "
+                          + Library.format(e.getOffset(), 12, false) + " "
+                          + Library.format(e.getSize(), 12, false) );
       }
     }
   }

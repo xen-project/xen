@@ -15,7 +15,7 @@ public class ParseVdDelete extends CommandParser {
       throw new ParseFailedException("Expected -k<key>");
     
     loadState();
-    if ( VirtualDiskManager.it.get_virtual_disk_key(vd_key) == null )
+    if ( VirtualDiskManager.IT.getVirtualDisk(vd_key) == null )
       throw new CommandFailedException("Virtual disk " + vd_key + " does not exist");
       
     String output = new CommandVdDelete(vd_key).execute();

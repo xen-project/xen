@@ -12,7 +12,7 @@ public class CommandVdDelete extends Command {
   }
 
   public String execute() throws CommandFailedException {
-    VirtualDiskManager.it.delete_virtual_disk(key);
+    VirtualDiskManager.IT.deleteVirtualDisk(key);
     return "Deleted virtual disk " + key;
   }
 }

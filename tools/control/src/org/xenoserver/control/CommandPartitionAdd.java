@@ -15,8 +15,8 @@ public class CommandPartitionAdd extends Command {
   }
 
   public String execute() throws CommandFailedException {
-    VirtualDiskManager.it.add_xeno_partition(partition,chunksize);
-    PartitionManager.it.add_xeno_partition(partition);
+    VirtualDiskManager.IT.addPartition(partition,chunksize);
+    PartitionManager.IT.addXenoPartition(partition);
     return "Added partition " + partition.getName();
   }
 }

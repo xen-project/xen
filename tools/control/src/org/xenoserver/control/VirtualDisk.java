@@ -10,172 +10,224 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.Vector;
 
+/**
+ * A single virtual disk. This may be used by multiple virtual block devices.
+ */
 public class VirtualDisk {
-  String name;
-  String key;
-  Date expiry;
-  Vector extents;
+    /** The name of this virtual disk. */
+    private String name;
+    /** The key of this virtual disk (unique). */
+    private String key;
+    /** The expiry time of this virtual disk, or null for never. */
+    private Date expiry;
+    /** The extent list for this virtual disk. */
+    private Vector extents;
 
-  VirtualDisk(String name, Date expiry, String key) {
-    this.name = name;
-    if ( key == null )
-      this.key = generate_key();
-    else
-      this.key = key;
-    this.expiry = expiry;
-    extents = new Vector();
-  }
-
-  VirtualDisk(String name) {
-    this(name, null, null);
-  }
-
-  VirtualDisk(String name, Date expiry) {
-    this(name, expiry, null);
-  }
-
-  /*
-   * generate a unique key for this virtual disk.
-   * for now, just generate a 10 digit number
-   */
-  String generate_key() {
-    return Long.toString(1000000000l + (long) (Math.random() * 8999999999l));
-  }
-
-  void set_expiry(Date expiry) {
-    this.expiry = expiry;
-  }
-
-  public void add_extent(Extent extent) {
-    extents.add(extent);
-  }
-
-  public Extent remove_extent() {
-    Extent e;
-
-    if (extents.size() > 0) {
-      e = (Extent) extents.remove(0);
-    } else {
-      e = null;
+    /**
+     * Construct a new virtual disk, specifying all parameters.
+     * @param name Name of the new disk.
+     * @param expiry Expiry time, or null for never.
+     * @param key Key for the new disk, or null to autogenerate.
+     */
+    VirtualDisk(String name, Date expiry, String key) {
+        this.name = name;
+        if (key == null) {
+            this.key = generateKey();
+        } else {
+            this.key = key;
+        }
+        this.expiry = expiry;
+        extents = new Vector();
     }
 
-    return e;
-  }
-
-  String dump_xen(VirtualBlockDevice vbd) {
-    StringBuffer sb = new StringBuffer();
-
-    sb.append(
-      "domain:"
-        + vbd.domain
-        + " "
-        + vbd.mode.toString()
-        + " "
-        + "segment:"
-        + vbd.vbdnum
-        + " "
-        + "extents:"
-        + extents.size()
-        + " ");
-    for (int loop = 0; loop < extents.size(); loop++) {
-      Extent e = (Extent) extents.get(loop);
-      sb.append(
-        "(disk:"
-          + e.disk
-          + " "
-          + "offset:"
-          + e.offset
-          + " "
-          + "size:"
-          + e.size
-          + ")");
-    }
-    return sb.toString();
-  }
-
-  void dump_xml(PrintWriter out) {
-    out.println("  <virtual_disk>");
-    out.println("    <name>" + name + "</name>");
-    out.println("    <key>" + key + "</key>");
-    if (expiry == null) {
-      out.println("    <expiry>0</expiry>");
-    } else {
-      out.println("    <expiry>" + expiry.getTime() + "</expiry>");
-    }
-    out.println("    <extents>");
-    for (int loop = 0; loop < extents.size(); loop++) {
-      Extent e = (Extent) extents.get(loop);
-      out.println("      <extent>");
-      out.println("        <disk>" + e.disk + "</disk>");
-      out.println("        <size>" + e.size + "</size>");
-      out.println("        <offset>" + e.offset + "</offset>");
-      out.println("      </extent>");
-    }
-    out.println("    </extents>");
-    out.println("  </virtual_disk>");
-
-    return;
-  }
-
-  /*
-   * Add a partition as a XenoPartition.
-   * Chop the partition in to extents and of size "size" sectors
-   * and add them to the virtual disk.
-   */
-
-  void add_new_partition(Partition partition, long size) {
-    int loop;
-
-    for (loop = 0; loop < partition.nr_sects / size; loop++) {
-      Extent extent = new Extent();
-
-      extent.disk = partition.major << 8;
-      extent.disk = extent.disk | (partition.minor >> 5) << 5;
-      extent.size = size;
-      extent.offset = partition.start_sect + (size * loop);
-
-      add_extent(extent);
+    /**
+     * Construct a new virtual disk, with automatically generated key and no expiry.
+     * @param name Name of the new disk.
+     */
+    VirtualDisk(String name) {
+        this(name, null, null);
     }
 
-    return;
-  }
-
-  public String getName() {
-    return name;
-  }
-
-  public String getKey() {
-    return key;
-  }
-
-  public Date getExpiry() {
-    return expiry;
-  }
-
-  public int getExtentCount() {
-    return extents.size();
-  }
-
-  public Extent getExtent(int index) {
-    return (Extent) extents.get(index);
-  }
-
-  /**
-   * @return Total size of this virtual disk in sectors.
-   */
-  public long getSize() {
-    long size = 0;
-    Iterator i = extents.iterator();
-    while ( i.hasNext() ) {
-      size += ((Extent) i.next()).getSize();
+    /**
+     * Construct a new virtual disk, with automatically generated key.
+     * @param name Name of the new disk.
+     * @param expiry Expiry time, or null for never.
+     */
+    VirtualDisk(String name, Date expiry) {
+        this(name, expiry, null);
     }
-    return size;
-  }
-  
-  /**
-   * @return An iterator over all extents in the disk.
-   */
-  public Iterator iterator() {
-    return extents.iterator();
-  }
+
+    /**
+     * Generate a unique key for this virtual disk.
+     * For now, just generate a 10 digit number.
+     * @return A unique key.
+     */
+    private static String generateKey() {
+        return Long.toString(
+            1000000000L + (long) (Math.random() * 8999999999L));
+    }
+
+    /**
+     * Add an extent to this disk.
+     * @param extent The extent to add.
+     */
+    void addExtent(Extent extent) {
+        extents.add(extent);
+    }
+
+    /**
+     * Remove the first extent from this disk.
+     * @return The extent removed, or null if there are no extents.
+     */
+    Extent removeExtent() {
+        Extent e;
+
+        if (extents.size() > 0) {
+            e = (Extent) extents.remove(0);
+        } else {
+            e = null;
+        }
+
+        return e;
+    }
+
+    /**
+     * Form a string suitable for passing into the XenoLinux proc interface mapping
+     * the given VBD to this virtual disk.
+     * @param vbd The virtual block device to map.
+     * @return A XenoLinux /proc string.
+     */
+    String dumpForXen(VirtualBlockDevice vbd) {
+        StringBuffer sb = new StringBuffer();
+
+        sb.append(
+            "domain:"
+                + vbd.getDomain()
+                + " "
+                + vbd.getMode().toString()
+                + " "
+                + "segment:"
+                + vbd.getVbdNum()
+                + " "
+                + "extents:"
+                + extents.size()
+                + " ");
+        for (int loop = 0; loop < extents.size(); loop++) {
+            Extent e = (Extent) extents.get(loop);
+            sb.append(
+                "(disk:"
+                    + e.getDisk()
+                    + " "
+                    + "offset:"
+                    + e.getOffset()
+                    + " "
+                    + "size:"
+                    + e.getSize()
+                    + ")");
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Dump the virtual disk as XML.
+     * @param out The writer to dump to.
+     */
+    void dumpAsXML(PrintWriter out) {
+        out.println("  <virtual_disk>");
+        out.println("    <name>" + name + "</name>");
+        out.println("    <key>" + key + "</key>");
+        if (expiry == null) {
+            out.println("    <expiry>0</expiry>");
+        } else {
+            out.println("    <expiry>" + expiry.getTime() + "</expiry>");
+        }
+        out.println("    <extents>");
+        for (int loop = 0; loop < extents.size(); loop++) {
+            Extent e = (Extent) extents.get(loop);
+            out.println("      <extent>");
+            out.println("        <disk>" + e.getDisk() + "</disk>");
+            out.println("        <size>" + e.getSize() + "</size>");
+            out.println("        <offset>" + e.getOffset() + "</offset>");
+            out.println("      </extent>");
+        }
+        out.println("    </extents>");
+        out.println("  </virtual_disk>");
+
+        return;
+    }
+
+    /**
+     * Add a partition as a XenoPartition.
+     * Chop the partition in to extents and add them to this virtual disk.
+     * @param partition The partition to add.
+     * @param extentSize The number of sectors to use for each extent. 
+     */
+    void addPartition(Partition partition, long extentSize) {
+        int loop;
+
+        for (loop = 0; loop < partition.getNumSects() / extentSize; loop++) {
+            Extent extent =
+                new Extent(
+                    partition.getDisk(),
+                    extentSize,
+                    partition.getStartSect() + (extentSize * loop));
+
+            addExtent(extent);
+        }
+    }
+
+    /**
+     * @return The name of this virtual disk.
+     */
+    public String getName() {
+        return name;
+    }
+
+    /**
+     * @return The key of this virtual disk.
+     */
+    public String getKey() {
+        return key;
+    }
+
+    /**
+     * @return The expiry time of this virtual disk.
+     */
+    public Date getExpiry() {
+        return expiry;
+    }
+
+    /**
+     * @return The number of extents in this virtual disk.
+     */
+    public int getExtentCount() {
+        return extents.size();
+    }
+
+    /**
+     * @return Total size of this virtual disk in sectors.
+     */
+    public long getSize() {
+        long size = 0;
+        Iterator i = extents.iterator();
+        while (i.hasNext()) {
+            size += ((Extent) i.next()).getSize();
+        }
+        return size;
+    }
+
+    /**
+     * @return An iterator over all extents in the disk.
+     */
+    public Iterator extents() {
+        return extents.iterator();
+    }
+
+    /**
+     * Reset the expiry time for this virtual disk.
+     * @param expiry The new expiry time, or null for never.
+     */
+    public void refreshExpiry(Date expiry) {
+        this.expiry = expiry;
+    }
 }

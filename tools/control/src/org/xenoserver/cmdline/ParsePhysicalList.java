@@ -35,23 +35,23 @@ public class ParsePhysicalList extends CommandParser {
       Entry entry = (Entry) i.next(); 
       Extent e = (Extent) entry.getKey();
       String mode = entry.getValue().toString();
-      Partition p = PartitionManager.it.get_partition( e );
+      Partition p = PartitionManager.IT.getPartition( e );
       if ( p != null ) {
-        System.out.println(Library.format(p.getMajor(),3,0) + ":" + 
-          Library.format(p.getMinor(),3,1) + " " +
-          Library.format(p.getBlocks(),10,0) + " " +
-          Library.format(p.getStartSect(),10,0) + " " +
-          Library.format(p.getNumSects(),10,0) + " " +
-          Library.format(p.getName(),7,1) + " " +
-          Library.format(mode,2,1));   
+        System.out.println(Library.format(p.getMajor(),3,false) + ":" + 
+          Library.format(p.getMinor(),3,true) + " " +
+          Library.format(p.getBlocks(),10,false) + " " +
+          Library.format(p.getStartSect(),10,false) + " " +
+          Library.format(p.getNumSects(),10,false) + " " +
+          Library.format(p.getName(),7,true) + " " +
+          Library.format(mode,2,true));   
       } else {
-        System.out.println(Library.format(e.getMajor(),3,0) + ":" +
-          Library.format(e.getMinor(),3,1) + " " +
+        System.out.println(Library.format(e.getMajor(),3,false) + ":" +
+          Library.format(e.getMinor(),3,true) + " " +
           "          " + " " +
-          Library.format(e.getOffset(),10,0) + " " +
-          Library.format(e.getSize(),10,0) + " " +
+          Library.format(e.getOffset(),10,false) + " " +
+          Library.format(e.getSize(),10,false) + " " +
           "       " + " " +
-          Library.format(mode,2,1));
+          Library.format(mode,2,true));
       }
     }
   }

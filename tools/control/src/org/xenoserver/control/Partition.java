@@ -7,184 +7,179 @@ package org.xenoserver.control;
 
 import java.io.PrintWriter;
 
-public class
-Partition
-{
-  int major;
-  int minor;
-  long blocks;
-  long start_sect;
-  long nr_sects;
-  String name;
-  boolean xeno;
+/**
+ * Represents a single real partition.
+ */
+public class Partition {
+    /** Major device number as seen by Linux. */
+    private int major;
+    /** Minor device number as seen by Linux. */
+    private int minor;
+    /** Number of blocks in the partition. */
+    private long blocks;
+    /** Start sector of the partition. */
+    private long start_sect;
+    /** Number of sectors in the partition. */
+    private long nr_sects;
+    /** Name of the partition. */
+    private String name;
+    /** True if this partition is a XenoPartition. */
+    private boolean xeno;
 
-  Partition
-  duplicate ()
-  {
-    Partition p = new Partition();
-
-    p.major = major;
-    p.minor = minor;
-    p.blocks = blocks;
-    p.start_sect = start_sect;
-    p.nr_sects = nr_sects;
-    p.name = name;
-    p.xeno = xeno;
-
-    return p;
-  }
-
-  void
-  dump_xml(PrintWriter out)
-  {
-    out.println ("  <partition>\n" +
-		 "    <major>" + major + "</major>\n" +
-		 "    <minor>" + minor + "</minor>\n" +
-		 "    <blocks>" + blocks + "</blocks>\n" +
-		 "    <start_sect>" + start_sect + "</start_sect>\n" +
-		 "    <nr_sects>" + nr_sects + "</nr_sects>\n" +
-		 "    <name>" + name + "</name>\n" +
-		 "  </partition>");
-  }
-
-  public int
-  getMajor()
-  {
-    return major;
-  }
-
-  public int
-  getMinor()
-  {
-    return minor;
-  }
-
-  public long
-  getBlocks()
-  {
-    return blocks;
-  }
-  
-  public long
-  getStartSect()
-  {
-    return start_sect;
-  }
-
-  public long
-  getNumSects()
-  {
-    return nr_sects;
-  }
-  
-  public String
-  getName()
-  {
-    return name;
-  }
-
-  public boolean
-  getIsXeno()
-  {
-    return xeno;
-  }
-
-  public int hashCode() {
-    final int PRIME = 1000003;
-    int result = 0;
-    result = PRIME * result + major;
-    result = PRIME * result + minor;
-    result = PRIME * result + (int) (blocks >>> 32);
-    result = PRIME * result + (int) (blocks & 0xFFFFFFFF);
-    result = PRIME * result + (int) (start_sect >>> 32);
-    result = PRIME * result + (int) (start_sect & 0xFFFFFFFF);
-    result = PRIME * result + (int) (nr_sects >>> 32);
-    result = PRIME * result + (int) (nr_sects & 0xFFFFFFFF);
-    if (name != null) {
-      result = PRIME * result + name.hashCode();
+    /**
+     * Mark this partition as a XenoPartition.
+     */
+    void makeXeno() {
+        xeno = true;
     }
 
-    return result;
-  }
-
-  public boolean equals(Object oth) {
-    if (this == oth) {
-      return true;
+    /**
+     * Constructor for Partition.
+     * @param major Major number
+     * @param minor Minor number
+     * @param blocks Size in blocks
+     * @param start_sect Start sector
+     * @param nr_sects Number of sectors
+     * @param name Name of partition
+     * @param xeno True if XenoPartition
+     */
+    Partition(
+        int major,
+        int minor,
+        long blocks,
+        long start_sect,
+        long nr_sects,
+        String name,
+        boolean xeno) {
+        this.major = major;
+        this.minor = minor;
+        this.blocks = blocks;
+        this.start_sect = start_sect;
+        this.nr_sects = nr_sects;
+        this.name = name;
+        this.xeno = xeno;
     }
 
-    if (oth == null) {
-      return false;
+    /**
+     * Dump this partition as XML.
+     * @param out The writer to dump to.
+     */
+    void dumpAsXML(PrintWriter out) {
+        out.println(
+            "  <partition>\n"
+                + "    <major>"
+                + major
+                + "</major>\n"
+                + "    <minor>"
+                + minor
+                + "</minor>\n"
+                + "    <blocks>"
+                + blocks
+                + "</blocks>\n"
+                + "    <start_sect>"
+                + start_sect
+                + "</start_sect>\n"
+                + "    <nr_sects>"
+                + nr_sects
+                + "</nr_sects>\n"
+                + "    <name>"
+                + name
+                + "</name>\n"
+                + "  </partition>");
     }
 
-    if (oth.getClass() != getClass()) {
-      return false;
+    /**
+     * @return Major device number.
+     */
+    public int getMajor() {
+        return major;
     }
 
-    Partition other = (Partition) oth;
-
-    if (this.major != other.major) {
-      return false;
+    /**
+     * @return Minor device number.
+     */
+    public int getMinor() {
+        return minor;
     }
 
-    if (this.minor != other.minor) {
-      return false;
+    /**
+     * @return Number of blocks.
+     */
+    public long getBlocks() {
+        return blocks;
     }
 
-    if (this.blocks != other.blocks) {
-      return false;
+    /**
+     * @return Starting sector.
+     */
+    public long getStartSect() {
+        return start_sect;
     }
 
-    if (this.start_sect != other.start_sect) {
-      return false;
+    /**
+     * @return Number of sectors.
+     */
+    public long getNumSects() {
+        return nr_sects;
     }
 
-    if (this.nr_sects != other.nr_sects) {
-      return false;
-    }
-    if (this.name == null) {
-      if (other.name != null) {
-        return false;
-      }
-    } else {
-      if (!this.name.equals(other.name)) {
-        return false;
-      }
+    /**
+     * @return Name of partition.
+     */
+    public String getName() {
+        return name;
     }
 
-    return true;
-  }
+    /**
+     * @return True if this is a XenoPartition.
+     */
+    public boolean isXeno() {
+        return xeno;
+    }
 
-  /**
-   * @return An Extent covering this partiton.
-   */
-  public Extent toExtent()
-  {
-    Extent e = new Extent();
-    // Build 16-bit disk number.. high 8 bits are the major
-    e.disk = major << 8;
-    // Low 8 bits are the minor, but bottom 5 need to be cleared
-    // as they are the partition number, not the disk number
-    e.disk |= ( minor & 0xE0 );
-    e.offset = start_sect;
-    e.size = nr_sects;
-    return e;
-  }
-  
-  /**
-   * @param e Extent to compare this partition to.
-   * @return True if this partition covers the same disk area as the given extent.
-   */
-  public boolean matchesExtent( Extent e )
-  {
-    if ( e.getMajor() != major )
-      return false;
-    if ( e.getMinor() != minor )
-      return false;
-    if ( e.offset != start_sect )
-      return false;
-    if ( e.size != nr_sects )
-      return false;
-      
-    return true;
-  }
+    /**
+     * Is this partition identical to the other?
+     * @param other Other partition to compare to.
+     * @return True if they are identical.
+     */
+    public boolean identical(Partition other) {
+        return this.major == other.major
+            && this.minor == other.minor
+            && this.blocks == other.blocks
+            && this.start_sect == other.start_sect
+            && this.nr_sects == other.nr_sects
+            && this.name.equals(other.name);
+    }
+
+    /**
+     * @return An Extent covering this partiton.
+     */
+    public Extent toExtent() {
+        return new Extent(getDisk(),start_sect,nr_sects);
+    }
+
+    /**
+     * @param e Extent to compare this partition to.
+     * @return True if this partition covers the same disk area as the given extent.
+     */
+    public boolean matchesExtent(Extent e) {
+        return e.getDisk() == getDisk()
+            && e.getOffset() == start_sect
+            && e.getSize() == nr_sects;
+    }
+    
+    /**
+     * @return Disk number for this partition.
+     */
+    public int getDisk() {
+        if ( name.startsWith("hd") ) {
+            // High 8 bits are major, low 8 bits are minor, with bottom 6 clear
+            return (major << 8) | (minor & 0xC0); 
+        } else if ( name.startsWith("sd") ) {
+            // High 8 bits are major, low 8 bits are minor, with bottom 4 clear
+            return (major << 8) | (minor & 0xF0);
+        } else {
+            throw new IllegalArgumentException("Don't know how to convert " + name + "into a disk number");
+        }
+    }
 }

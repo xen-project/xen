@@ -17,170 +17,155 @@ import java.util.Vector;
  * PartitionManager manages the partitions on the machine. It is a Singleton
  * which automatically initialises itself on first class reference.
  */
-public class
-PartitionManager
-{
-  static final String proc_template =
-    "major minor  #blocks  start_sect   nr_sects name";
+public class PartitionManager {
+    /** The proc header string, used to check that this is a suitable proc file. */
+    private static final String PROC_TEMPLATE =
+        "major minor  #blocks  start_sect   nr_sects name";
+
+    /** The single PartitionManager reference. */
+    public static final PartitionManager IT =
+        new PartitionManager(Settings.PARTITIONS_FILE);
+
+    /** The list of partitions. */
+    private Vector partition_map;
+
+    /**
+     * Initialize partition manager with source file.
+     * Normally we read from /proc/partitions, but we can
+     * specify an alternative file for debugging.
+     * @param filename The file to read partition data from.
+     */
+    private PartitionManager(String filename) {
+        String str;
+        BufferedReader in;
+
+        partition_map = new Vector(100, 10);
+
+        try {
+            in = new BufferedReader(new FileReader(filename));
+
+            str = in.readLine(); /* skip headings */
+            if (str.length() < PROC_TEMPLATE.length()
+                || !str.substring(0, PROC_TEMPLATE.length()).equals(
+                    PROC_TEMPLATE)) {
+                System.err.println("Error: Incorrect /proc/partitions.");
+                System.err.println("       Is this Xeno?");
+                System.exit(1);
+            }
+
+            str = in.readLine(); /* skip blank line */
+
+            str = in.readLine();
+            while (str != null) {
+                Partition partition =
+                    new Partition(
+                        Integer.parseInt(str.substring(0, 5).trim()),
+                        Integer.parseInt(str.substring(5, 10).trim()),
+                        Integer.parseInt(str.substring(10, 21).trim()),
+                        Integer.parseInt(str.substring(21, 32).trim()),
+                        Integer.parseInt(str.substring(32, 43).trim()),
+                        str.substring(43).trim(),
+                        false);
+
+                partition_map.add(partition);
+                str = in.readLine();
+            }
+        } catch (IOException io) {
+            System.err.println(
+                "PartitionManager: error reading partition file ["
+                    + filename
+                    + "]");
+            System.err.println(io);
+        }
+    }
+
+    /**
+     * Find a partition with the specified name.
+     * @param name The name to search for.
+     * @return The partition found, or null if no such partition.
+     */
+    public Partition getPartition(String name) {
+        Partition partition = null;
+        for (Enumeration e = partition_map.elements(); e.hasMoreElements();) {
+            partition = (Partition) e.nextElement();
+            if (partition.getName().equals(name)) {
+                return partition;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Finds the partition that matches the given extent, if any.
+     * @param extent The extent to compare to.
+     * @return The first matching partition, or null if none.
+     */
+    public Partition getPartition(Extent extent) {
+        Partition partition = null;
+        for (Enumeration e = partition_map.elements(); e.hasMoreElements();) {
+            partition = (Partition) e.nextElement();
+            if (partition.matchesExtent(extent)) {
+                return partition;
+            }
+        }
+        return null;
+    }
     
-  public static final PartitionManager it = new PartitionManager(Settings.PARTITIONS_FILE);
-    
-  Vector partition_map;
-
-  /*
-   * Initialize partition manager with source file.
-   * Normally we read from /proc/partitions, but we can
-   * specify an alternative file for debugging
-   */
-  private PartitionManager (String filename)
-  {
-    String str;
-    BufferedReader in;
-
-    partition_map = new Vector(100,10);
-
-    try
-    {
-      in = new BufferedReader(new FileReader(filename));
-
-      str = in.readLine();                                  /* skip headings */
-      if (str.length() < proc_template.length() ||
-	  !str.substring(0, proc_template.length()).equals(proc_template))
-      {
-	System.err.println ("Error: Incorrect /proc/partitions.");
-	System.err.println ("       Is this Xeno?");
-	System.exit (1);
-      }
-
-      str = in.readLine();                                /* skip blank line */
-
-      str = in.readLine();
-      while (str != null)
-      {
-	Partition partition = new Partition();
-
-	partition.major = Integer.parseInt(str.substring(0,5).trim());
-	partition.minor = Integer.parseInt(str.substring(5,10).trim());
-	partition.blocks = Integer.parseInt(str.substring(10,21).trim());
-	partition.start_sect = Integer.parseInt(str.substring(21,32).trim());
-	partition.nr_sects = Integer.parseInt(str.substring(32,43).trim());
-	partition.name = str.substring(43).trim();
-	partition.xeno = false;
-
-	partition_map.add(partition);
-	str = in.readLine();
-      }
-    }
-    catch (IOException io)
-    {
-      System.err.println ("PartitionManager: error reading partition file [" 
-			  + filename + "]");
-      System.err.println (io);
-    }
-  }
-
-  public Partition
-  get_partition (String name)
-  {
-    Partition partition = null;
-    for (Enumeration e = partition_map.elements() ; e.hasMoreElements() ;) 
-    {
-      partition = (Partition) e.nextElement();
-      if (partition.name.equals(name))
-      {
-  return partition;
-      }
-    }
-    return null;
-  }
-
-  /**
-   * Finds the partition that matches the given extent, if any.
-   * @param extent The extent to compare to.
-   * @return The first matching partition, or null if none.
-   */
-  public Partition
-  get_partition (Extent extent)
-  {
-    Partition partition = null;
-    for (Enumeration e = partition_map.elements() ; e.hasMoreElements() ;) 
-    {
-      partition = (Partition) e.nextElement();
-      if (partition.matchesExtent(extent))
-      {
-  return partition;
-      }
-    }
-    return null;
-  }
-
-  Partition
-  get_partition (int index)
-  {
-    return (Partition) partition_map.get(index);
-  }
-
-  void
-  add_xeno_partition (Partition p)
-  {
-    for (Enumeration e = partition_map.elements() ; e.hasMoreElements() ;) 
-    {
-      Partition partition = (Partition) e.nextElement();
-      if (partition.equals(p))
-      {
-	partition.xeno = true;
-      }
-    }
-  }
-
-  /*
-   * dump the xeno partition list as xml
-   */
-  void
-  dump_xml (PrintWriter out)
-  {
-    out.println("<partitions>");
-    for (Enumeration e = partition_map.elements() ; e.hasMoreElements() ;) 
-    {
-      Partition partition = (Partition) e.nextElement();
-      if (partition.xeno == true)
-      {
-	partition.dump_xml(out);
-      }
+    /**
+     * Find the ith partition in the partition list.
+     * @param i Index number.
+     * @return The partition, or null if out of range.
+     */
+    public Partition getPartition(int i) {
+        if ( i >= partition_map.size() ) {
+          return null;
+        }
+        return (Partition) partition_map.elementAt( i );
     }
 
-    out.println("</partitions>");
+    /**
+     * Adds the given partition as a XenoPartition.
+     * @param p The partition to add.
+     */
+    void addXenoPartition(Partition p) {
+        for (Enumeration e = partition_map.elements(); e.hasMoreElements();) {
+            Partition partition = (Partition) e.nextElement();
+            if (partition.identical(p)) {
+                partition.makeXeno();
+            }
+        }
+    }
 
-    return;
-  }
+    /**
+     * Dump the XenoPartition list as XML.
+     * @param out Writer to dump to.
+     */
+    void dumpAsXML(PrintWriter out) {
+        out.println("<partitions>");
+        for (Enumeration e = partition_map.elements(); e.hasMoreElements();) {
+            Partition partition = (Partition) e.nextElement();
+            if (partition.isXeno()) {
+                partition.dumpAsXML(out);
+            }
+        }
 
-  /**
-   * get the number of partitions 
-   */
+        out.println("</partitions>");
 
-  int
-  getPartitionCount ()
-  {
-    return partition_map.size();
-  }
+        return;
+    }
 
-  /**
-   * get the details about a particular partition
-   *
-   */
-  Partition
-  getPartition (int index)
-  {
-    Partition partition = (Partition) partition_map.get(index);
-    return partition;
-  }
- 
-  /**
-   * Get an iterator over all the partitions.
-   * @return An iterator over Partition objects.
-   */
-  public Iterator iterator()
-  {
-    return partition_map.iterator();
-  }
+    /**
+     * @return The number of partitions. 
+     */
+    public int getPartitionCount() {
+        return partition_map.size();
+    }
+
+    /**
+     * Get an iterator over all the partitions.
+     * @return An iterator over Partition objects.
+     */
+    public Iterator iterator() {
+        return partition_map.iterator();
+    }
 }
