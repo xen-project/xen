@@ -144,6 +144,7 @@
 3ddb79bdIKgipvGoqExEQ7jawfVowA xen/arch/i386/pci-i386.h
 3ddb79bdHe6_Uij4-glW91vInNtBYQ xen/arch/i386/pci-irq.c
 3ddb79bcZ_2FxINljqNSkqa17ISyJw xen/arch/i386/pci-pc.c
+40a4dfced2dnSzbKgJFlD3chKHexjQ xen/arch/i386/pdb-linux.c
 4022a73czgX7d-2zfF_cb33oVemApQ xen/arch/i386/pdb-stub.c
 3ddb79bc1_2bAt67x9MFCP4AZrQnvQ xen/arch/i386/process.c
 3ddb79bc7KxGCEJsgBnkDX7XjD_ZEQ xen/arch/i386/rwlock.c

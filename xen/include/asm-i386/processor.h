@@ -12,6 +12,7 @@
 #include <asm/cpufeature.h>
 #include <asm/desc.h>
 #include <asm/flushtlb.h>
+#include <asm/pdb.h>
 #include <xen/config.h>
 #include <xen/spinlock.h>
 #include <hypervisor-ifs/hypervisor-if.h>
@@ -406,8 +407,9 @@ extern struct desc_struct *idt_tables[];
      0, 8))
 
 #define SET_FAST_TRAP(_p)   \
-    (memcpy(idt_tables[smp_processor_id()] + (_p)->fast_trap_idx, \
-     &((_p)->fast_trap_desc), 8))
+    (pdb_initialized ? (void *) 0 : \
+       (memcpy(idt_tables[smp_processor_id()] + (_p)->fast_trap_idx, \
+	       &((_p)->fast_trap_desc), 8)))
 
 long set_fast_trap(struct task_struct *p, int idx);
 

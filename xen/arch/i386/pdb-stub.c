@@ -47,26 +47,13 @@ static int  pdb_in_buffer_ptr;
 static unsigned char  pdb_in_checksum;
 static unsigned char  pdb_xmit_checksum;
 
-/* function pointers in the near future... */
-unsigned long pdb_linux_pid_ptbr (unsigned long cr3, int pid);
-void pdb_linux_get_values(char *buffer, int length, unsigned long address,
-			  int pid, unsigned long cr3);
-void pdb_linux_set_values(char *buffer, int length, unsigned long address,
-			  int pid, unsigned long cr3);
-
-struct pdb_context
-{
-    int valid;
-    int domain;
-    int process;
-    unsigned long ptbr;                   /* cached page table base register */
-};
 struct pdb_context pdb_ctx;
-
 int pdb_continue_thread = 0;
 int pdb_general_thread = 0;
 
 void pdb_put_packet (unsigned char *buffer, int ack);
+void pdb_bkpt_check (u_char *buffer, int length,
+		     unsigned long cr3, unsigned long addr);
 
 int pdb_initialized = 0;
 int pdb_page_fault_possible = 0;
@@ -74,6 +61,12 @@ int pdb_page_fault_scratch = 0;                     /* just a handy variable */
 int pdb_page_fault = 0;
 static int pdb_serhnd = -1;
 static int pdb_stepping = 0;
+
+int pdb_system_call = 0;
+unsigned char pdb_system_call_enter_instr = 0;       /* original enter instr */
+unsigned char pdb_system_call_leave_instr = 0;        /* original next instr */
+unsigned long pdb_system_call_next_addr = 0;         /* instr after int 0x80 */
+unsigned long pdb_system_call_eflags_addr = 0;      /* saved eflags on stack */
 
 static inline void pdb_put_char(unsigned char c)
 {
@@ -406,15 +399,49 @@ pdb_process_command (char *ptr, struct pt_regs *regs, unsigned long cr3,
         break;
     case 'S':                                            /* step with signal */
     case 's':                                                        /* step */
+    {
+        if ( pdb_system_call_eflags_addr != 0 )
+	{
+	    unsigned long eflags;
+	    char eflags_buf[sizeof(eflags)*2];       /* STUPID STUPID STUPID */
+
+	    pdb_linux_get_values((u_char*)&eflags, sizeof(eflags), 
+				 pdb_system_call_eflags_addr, 
+				 pdb_ctx.process, pdb_ctx.ptbr);
+	    eflags |= X86_EFLAGS_TF;
+	    mem2hex ((u_char *)&eflags, eflags_buf, sizeof(eflags)); 
+	    pdb_linux_set_values(eflags_buf, sizeof(eflags),
+				 pdb_system_call_eflags_addr,
+				 pdb_ctx.process, pdb_ctx.ptbr);
+	}
+
         regs->eflags |= X86_EFLAGS_TF;
         pdb_stepping = 1;
         return 1;                                        
         /* not reached */
+    }
     case 'C':                                        /* continue with signal */
     case 'c':                                                    /* continue */
+    {
+        if ( pdb_system_call_eflags_addr != 0 )
+	{
+	    unsigned long eflags;
+	    char eflags_buf[sizeof(eflags)*2];       /* STUPID STUPID STUPID */
+
+	    pdb_linux_get_values((u_char*)&eflags, sizeof(eflags), 
+				 pdb_system_call_eflags_addr, 
+				 pdb_ctx.process, pdb_ctx.ptbr);
+	    eflags &= ~X86_EFLAGS_TF;
+	    mem2hex ((u_char *)&eflags, eflags_buf, sizeof(eflags)); 
+	    pdb_linux_set_values(eflags_buf, sizeof(eflags),
+				 pdb_system_call_eflags_addr,
+				 pdb_ctx.process, pdb_ctx.ptbr);
+	}
+
         regs->eflags &= ~X86_EFLAGS_TF;
         return 1;                         /* jump out before replying to gdb */
         /* not reached */
+    }
     case 'd':
         remote_debug = !(remote_debug);                 /* toggle debug flag */
         break;
@@ -424,54 +451,11 @@ pdb_process_command (char *ptr, struct pt_regs *regs, unsigned long cr3,
     case 'g':                       /* return the value of the CPU registers */
     {
         pdb_x86_to_gdb_regs (pdb_out_buffer, regs);
-
-	/*
-	printk ("  reg: %s",   pdb_out_buffer);
-	printk ("\n");
-	printk ("  eax: 0x%08lx\n", regs->eax);
-	printk ("  ecx: 0x%08lx\n", regs->ecx);
-	printk ("  edx: 0x%08lx\n", regs->edx);
-	printk ("  ebx: 0x%08lx\n", regs->ebx);
-	printk ("  esp: 0x%08lx\n", regs->esp);
-	printk ("  ebp: 0x%08lx\n", regs->ebp);
-	printk ("  esi: 0x%08lx\n", regs->esi);
-	printk ("  edi: 0x%08lx\n", regs->edi);
-	printk ("  eip: 0x%08lx\n", regs->eip);
-	printk ("  efl: 0x%08lx\n", regs->eflags);
-	printk ("  xcs: 0x%08x\n",  regs->xcs);
-	printk ("  xss: 0x%08x\n",  regs->xss);
-	printk ("  xds: 0x%08x\n",  regs->xds);
-	printk ("  xes: 0x%08x\n",  regs->xes);
-	printk ("  xfs: 0x%08x\n",  regs->xfs);
-	printk ("  xgs: 0x%08x\n",  regs->xgs);
-	*/
-
         break;
     }
     case 'G':              /* set the value of the CPU registers - return OK */
     {
         pdb_gdb_to_x86_regs (regs, ptr);
-
-	/*
-	printk ("  ptr: %s \n\n",   ptr);
-	printk ("  eax: 0x%08lx\n", regs->eax);
-	printk ("  ecx: 0x%08lx\n", regs->ecx);
-	printk ("  edx: 0x%08lx\n", regs->edx);
-	printk ("  ebx: 0x%08lx\n", regs->ebx);
-	printk ("  esp: 0x%08lx\n", regs->esp);
-	printk ("  ebp: 0x%08lx\n", regs->ebp);
-	printk ("  esi: 0x%08lx\n", regs->esi);
-	printk ("  edi: 0x%08lx\n", regs->edi);
-	printk ("  eip: 0x%08lx\n", regs->eip);
-	printk ("  efl: 0x%08lx\n", regs->eflags);
-	printk ("  xcs: 0x%08x\n",  regs->xcs);
-	printk ("  xss: 0x%08x\n",  regs->xss);
-	printk ("  xds: 0x%08x\n",  regs->xds);
-	printk ("  xes: 0x%08x\n",  regs->xes);
-	printk ("  xfs: 0x%08x\n",  regs->xfs);
-	printk ("  xgs: 0x%08x\n",  regs->xgs);
-	*/
-
         break;
     }
     case 'H':
@@ -572,17 +556,20 @@ pdb_process_command (char *ptr, struct pt_regs *regs, unsigned long cr3,
 			if (addr >= PAGE_OFFSET)
 			{
 			    hex2mem (ptr, (char *)addr, length);
+			    pdb_bkpt_check(ptr, length, pdb_ctx.ptbr, addr);
 			}
 			else if (pdb_ctx.process != -1)
 			{
 			    pdb_linux_set_values(ptr, length, addr,
 						 pdb_ctx.process, 
 						 pdb_ctx.ptbr);
+			    pdb_bkpt_check(ptr, length, pdb_ctx.ptbr, addr);
 			}
 			else
 			{
 			    pdb_set_values (ptr, length,
 					    pdb_ctx.ptbr, addr);
+			    pdb_bkpt_check(ptr, length, pdb_ctx.ptbr, addr);
 			}
 			pdb_page_fault_possible = 0;
                         if (pdb_page_fault)
@@ -936,7 +923,6 @@ int pdb_set_values(u_char *buffer, int length,
 		   unsigned long cr3, unsigned long addr)
 {
     int count = pdb_change_values(buffer, length, cr3, addr, __PDB_SET_VAL);
-    pdb_bkpt_check(buffer, length, cr3, addr);
     return count;
 }
 
@@ -1176,16 +1162,35 @@ int pdb_handle_exception(int exceptionVector,
 
     __asm__ __volatile__ ("movl %%cr3,%0" : "=r" (cr3) : );
 
+    /* If the exception is an int3 from user space then pdb is only
+       interested if it re-wrote an instruction set the breakpoint.
+       This occurs when leaving a system call from a domain.
+    */
+    if ( exceptionVector == 3 &&
+	 (xen_regs->xcs & 3) == 3 && 
+	 xen_regs->eip != pdb_system_call_next_addr + 1)
+    {
+        TRC(printf("pdb: user bkpt (0x%x) at 0x%x:0x%lx:0x%lx\n", 
+		   exceptionVector, xen_regs->xcs & 3, cr3, xen_regs->eip));
+	return 1;
+    }
+
     /*
-     * If PDB didn't set the breakpoint, is not single stepping, and the user
-     * didn't press the magic debug key, then we don't handle the exception.
+     * If PDB didn't set the breakpoint, is not single stepping, 
+     * is not entering a system call in a domain,
+     * the user didn't press the magic debug key, 
+     * then we don't handle the exception.
      */
     bkpt = pdb_bkpt_search(cr3, xen_regs->eip - 1);
     if ( (bkpt == NULL) &&
-         !pdb_stepping && (exceptionVector != KEYPRESS_EXCEPTION) &&
+         !pdb_stepping && 
+	 !pdb_system_call &&
+	 xen_regs->eip != pdb_system_call_next_addr + 1 &&
+	 (exceptionVector != KEYPRESS_EXCEPTION) &&
 	 xen_regs->eip < 0xc0000000)                   /* xenolinux for now! */
     {
-        TRC(printf("pdb: user bkpt at 0x%lx:0x%lx\n", cr3, xen_regs->eip));
+        TRC(printf("pdb: user bkpt (0x%x) at 0x%lx:0x%lx\n", 
+		   exceptionVector, cr3, xen_regs->eip));
 	return 1;
     }
 
@@ -1199,10 +1204,52 @@ int pdb_handle_exception(int exceptionVector,
         pdb_stepping = 0;
     }
 
+    if ( pdb_system_call )
+    {
+	pdb_system_call = 0;
+
+	pdb_linux_syscall_exit_bkpt (xen_regs, &pdb_ctx);
+
+	/* we don't have a saved breakpoint so we need to rewind eip */
+	xen_regs->eip--;
+	
+	/* if ther user doesn't care about breaking when entering a
+	   system call then we'll just ignore the exception */
+	if ( (pdb_ctx.system_call & 0x01) == 0 )
+	{
+	    return 0;
+	}
+    }
+
     if ( exceptionVector == BREAKPT_EXCEPTION && bkpt != NULL)
     {
         /* Executed Int3: replace breakpoint byte with real program byte. */
         xen_regs->eip--;
+    }
+
+    /* returning to user space after a system call */
+    if ( xen_regs->eip == pdb_system_call_next_addr + 1)
+    {
+        u_char instr[2];                      /* REALLY REALLY REALLY STUPID */
+
+	mem2hex (&pdb_system_call_leave_instr, instr, sizeof(instr)); 
+
+	pdb_linux_set_values (instr, 1, pdb_system_call_next_addr,
+			      pdb_ctx.process, pdb_ctx.ptbr);
+
+	pdb_system_call_next_addr = 0;
+	pdb_system_call_leave_instr = 0;
+
+	/* manually rewind eip */
+	xen_regs->eip--;
+
+	/* if the user doesn't care about breaking when returning 
+	   to user space after a system call then we'll just ignore 
+	   the exception */
+	if ( (pdb_ctx.system_call & 0x02) == 0 )
+	{
+	    return 0;
+	}
     }
 
     /* Generate a signal for GDB. */
@@ -1267,6 +1314,7 @@ void initialize_pdb()
     pdb_ctx.valid = 1;
     pdb_ctx.domain = -1;
     pdb_ctx.process = -1;
+    pdb_ctx.system_call = 0;
     pdb_ctx.ptbr = 0;
 
     printk("pdb: pervasive debugger (%s)   www.cl.cam.ac.uk/netos/pdb\n", 

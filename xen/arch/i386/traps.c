@@ -258,10 +258,10 @@ asmlinkage void do_int3(struct pt_regs *regs, long error_code)
     struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
     trap_info_t *ti;
 
+    if ( pdb_handle_exception(3, regs) == 0 )
+        return;
     if ( (regs->xcs & 3) != 3 )
     {
-        if ( pdb_handle_exception(3, regs) == 0 )
-             return;
         if ( unlikely((regs->xcs & 3) == 0) )
         {
             show_registers(regs);
@@ -436,6 +436,15 @@ asmlinkage void do_general_protection(struct pt_regs *regs, long error_code)
         ti = current->thread.traps + (error_code>>3);
         if ( TI_GET_DPL(ti) >= (regs->xcs & 3) )
         {
+	    unsigned long cr3;
+	
+	    __asm__ __volatile__ ("movl %%cr3,%0" : "=r" (cr3) : );
+	    if (pdb_initialized && pdb_ctx.system_call != 0 &&
+		cr3 == pdb_ctx.ptbr)
+	    {
+	        pdb_linux_syscall_enter_bkpt(regs, error_code, ti);
+	    }
+
             gtb->flags = GTBF_TRAP_NOCODE;
             regs->eip += 2;
             goto finish_propagation;
