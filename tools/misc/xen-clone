@@ -80,6 +80,7 @@ then
 
  make -j4 world
  make -j4 linux24
+ make -j4 dist
  cd ../install/boot
  [ -r vmlinuz-2.6.*-xen0 ] && ln -s vmlinuz-2.6.*-xen0 xenolinux.gz
   
