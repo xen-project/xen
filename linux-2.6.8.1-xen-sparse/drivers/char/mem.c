@@ -6,20 +6,6 @@
  *  Added devfs support. 
  *    Jan-11-1998, C. Scott Ananian <cananian@alumni.princeton.edu>
  *  Shared /dev/zero mmaping support, Feb 2000, Kanoj Sarcar <kanoj@sgi.com>
- *
- *  MODIFIED FOR XEN by Keir Fraser, 10th July 2003.
- *  Linux running on Xen has strange semantics for /dev/mem and /dev/kmem!!
- *   1. mmap will not work on /dev/kmem
- *   2. mmap on /dev/mem interprets the 'file offset' as a machine address
- *      rather than a physical address.
- *  I don't believe anyone sane mmaps /dev/kmem, but /dev/mem is mmapped
- *  to get at memory-mapped I/O spaces (eg. the VESA X server does this).
- *  For this to work at all we need to expect machine addresses.
- *  Reading/writing of /dev/kmem expects kernel virtual addresses, as usual.
- *  Reading/writing of /dev/mem expects 'physical addresses' as usual -- this
- *  is because /dev/mem can only read/write existing kernel mappings, which
- *  will be normal RAM, and we should present pseudo-physical layout for all
- *  except I/O (which is the sticky case that mmap is hacked to deal with).
  */
 
 #include <linux/config.h>
@@ -208,9 +194,9 @@ static ssize_t write_mem(struct file * file, const char __user * buf,
 	return do_write_mem(__va(p), p, buf, count, ppos);
 }
 
-#if !defined(CONFIG_XEN)
 static int mmap_mem(struct file * file, struct vm_area_struct * vma)
 {
+#if !defined(CONFIG_XEN)
 	unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
 	int uncached;
 
@@ -233,30 +219,25 @@ static int mmap_mem(struct file * file, struct vm_area_struct * vma)
 			     vma->vm_page_prot))
 		return -EAGAIN;
 	return 0;
-}
 #elif !defined(CONFIG_XEN_PRIVILEGED_GUEST)
-static int mmap_mem(struct file * file, struct vm_area_struct * vma)
-{
 	return -ENXIO;
-}
 #else
-static int mmap_mem(struct file * file, struct vm_area_struct * vma)
-{
 	unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
 
 	if (!(start_info.flags & SIF_PRIVILEGED))
 		return -ENXIO;
 
-	/* DONTCOPY is essential for Xen as copy_page_range is broken. */
-	vma->vm_flags |= VM_RESERVED | VM_IO | VM_DONTCOPY;
+	/* Currently we're not smart about setting PTE cacheability. */
+	vma->vm_flags |= VM_RESERVED | VM_IO;
 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+
 	if (direct_remap_area_pages(vma->vm_mm, vma->vm_start, offset, 
 				vma->vm_end-vma->vm_start, vma->vm_page_prot,
 				DOMID_IO))
 		return -EAGAIN;
 	return 0;
+#endif
 }
-#endif /* CONFIG_XEN */
 
 extern long vread(char *buf, char *addr, unsigned long count);
 extern long vwrite(char *buf, char *addr, unsigned long count);
@@ -634,9 +615,7 @@ static struct file_operations kmem_fops = {
 	.llseek		= memory_lseek,
 	.read		= read_kmem,
 	.write		= write_kmem,
-#if !defined(CONFIG_XEN)
 	.mmap		= mmap_kmem,
-#endif
 	.open		= open_kmem,
 };
 
