@@ -38,9 +38,6 @@
 #define EVTCHN_DEV_NAME  "/dev/xen/evtchn"
 #define EVTCHN_DEV_MAJOR 10
 #define EVTCHN_DEV_MINOR 200
-#define PORT_NORMAL     0x0000   /* A standard event notification.      */ 
-#define PORT_EXCEPTION  0x8000   /* An exceptional notification.        */
-#define PORTIDX_MASK    0x7fff   /* Strip subtype to obtain port index. */
 /* /dev/xen/evtchn ioctls: */
 /* EVTCHN_RESET: Clear and reinit the event buffer. Clear error condition. */
 #define EVTCHN_RESET  _IO('E', 1)
@@ -81,7 +78,7 @@ static PyObject *xu_notifier_read(PyObject *self, PyObject *args)
     }
     
     if ( bytes == sizeof(v) )
-        return Py_BuildValue("(i,i)", v&PORTIDX_MASK, v&~PORTIDX_MASK);
+        return PyInt_FromLong(v);
 
  none:
     Py_INCREF(Py_None);
@@ -145,7 +142,7 @@ static PyMethodDef xu_notifier_methods[] = {
     { "read",
       (PyCFunction)xu_notifier_read,
       METH_VARARGS,
-      "Read a (@port, @type) pair.\n" },
+      "Read a @port with pending notifications.\n" },
 
     { "unmask", 
       (PyCFunction)xu_notifier_unmask,
@@ -199,10 +196,6 @@ static PyObject *xu_notifier_new(PyObject *self, PyObject *args)
 
 static PyObject *xu_notifier_getattr(PyObject *obj, char *name)
 {
-    if ( strcmp(name, "EXCEPTION") == 0 )
-        return PyInt_FromLong(PORT_EXCEPTION);
-    if ( strcmp(name, "NORMAL") == 0 )
-        return PyInt_FromLong(PORT_NORMAL);
     return Py_FindMethod(xu_notifier_methods, obj, name);
 }
 
@@ -686,43 +679,6 @@ typedef struct xu_port_object {
 
 static PyObject *port_error;
 
-static int xup_connect(xu_port_object *xup, domid_t dom,
-                       int local_port, int remote_port){
-    // From our prespective rx = producer, tx = consumer.
-    int err = 0;
-    printf("%s> dom=%u %d:%d\n", __FUNCTION__, (unsigned int)dom, 
-           local_port, remote_port);
-
-    // Consumer = tx.
-    //xup->interface->tx_resp_prod = 0;
-    //xup->interface->tx_req_prod = 0;
-    xup->tx_resp_prod = xup->interface->tx_resp_prod;
-    xup->tx_req_cons = xup->interface->tx_resp_prod;
-    printf("%s> tx: %u %u : %u %u\n", __FUNCTION__,
-           (unsigned int)xup->interface->tx_resp_prod,
-           (unsigned int)xup->tx_resp_prod,
-           (unsigned int)xup->tx_req_cons,
-           (unsigned int)xup->interface->tx_req_prod);
-
-    // Producer = rx.
-    //xup->interface->rx_req_prod  = 0;
-    //xup->interface->rx_resp_prod = 0;
-    xup->rx_req_prod  = xup->interface->rx_req_prod;
-    xup->rx_resp_cons = xup->interface->rx_resp_prod;
-    printf("%s> rx: %u %u : %u %u\n", __FUNCTION__,
-           (unsigned int)xup->rx_resp_cons,
-           (unsigned int)xup->interface->rx_resp_prod,
-           (unsigned int)xup->interface->rx_req_prod,
-           (unsigned int)xup->rx_req_prod);
-
-    xup->remote_dom   = dom;
-    xup->local_port   = local_port;
-    xup->remote_port  = remote_port;
-
-    printf("%s< err=%d\n", __FUNCTION__, err);
-    return err;
-}
-
 static PyObject *xu_port_notify(PyObject *self, PyObject *args)
 {
     xu_port_object *xup = (xu_port_object *)self;
@@ -913,6 +869,86 @@ static PyObject *xu_port_space_to_write_response(
     return PyInt_FromLong(1);
 }
 
+static int __xu_port_connect(xu_port_object *xup)
+{
+    xc_dominfo_t info;
+
+    if ( xup->mem_fd != -1 )
+        return 0;
+
+    if ( (xup->mem_fd = open("/dev/mem", O_RDWR)) == -1 )
+    {
+        PyErr_SetString(port_error, "Could not open '/dev/mem'");
+        return -1;
+    }
+
+    /* Set the General-Purpose Subject whose page frame will be mapped. */
+    (void)ioctl(xup->mem_fd, _IO('M', 1), (unsigned long)xup->remote_dom);
+
+    if ( (xc_domain_getinfo(xup->xc_handle, xup->remote_dom, 1, &info) != 1) ||
+         (info.domid != xup->remote_dom) )
+    {
+        PyErr_SetString(port_error, "Failed to obtain domain status");
+        (void)close(xup->mem_fd);
+        xup->mem_fd = -1;
+        return -1;
+    }
+
+    xup->interface = 
+        map_control_interface(xup->mem_fd, info.shared_info_frame);
+    if ( xup->interface == NULL )
+    {
+        PyErr_SetString(port_error, "Failed to map domain control interface");
+        (void)close(xup->mem_fd);
+        xup->mem_fd = -1;
+        return -1;
+    }
+
+    /* Synchronise ring indexes. */
+    xup->tx_resp_prod = xup->interface->tx_resp_prod;
+    xup->tx_req_cons  = xup->interface->tx_resp_prod;
+    xup->rx_req_prod  = xup->interface->rx_req_prod;
+    xup->rx_resp_cons = xup->interface->rx_resp_prod;
+
+    return 0;
+}
+
+static void __xu_port_disconnect(xu_port_object *xup)
+{
+    if ( xup->mem_fd == -1 )
+        return;
+    unmap_control_interface(xup->mem_fd, xup->interface);
+    (void)close(xup->mem_fd);
+    xup->mem_fd = -1;
+}
+
+static PyObject *xu_port_connect(PyObject *self, PyObject *args)
+{
+    xu_port_object *xup = (xu_port_object *)self;
+
+    if ( !PyArg_ParseTuple(args, "") )
+        return NULL;
+
+    if ( __xu_port_connect(xup) != 0 )
+        return NULL;
+
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static PyObject *xu_port_disconnect(PyObject *self, PyObject *args)
+{
+    xu_port_object *xup = (xu_port_object *)self;
+
+    if ( !PyArg_ParseTuple(args, "") )
+        return NULL;
+
+    __xu_port_disconnect(xup);
+
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
 static PyMethodDef xu_port_methods[] = {
     { "notify",
       (PyCFunction)xu_port_notify,
@@ -959,6 +995,16 @@ static PyMethodDef xu_port_methods[] = {
       METH_VARARGS,
       "Returns TRUE if there is space to write a response message.\n" },
 
+    { "connect",
+      (PyCFunction)xu_port_connect,
+      METH_VARARGS,
+      "Synchronously connect to remote domain.\n" },
+
+    { "disconnect",
+      (PyCFunction)xu_port_disconnect,
+      METH_VARARGS,
+      "Synchronously disconnect from remote domain.\n" },
+
     { NULL, NULL, 0, NULL }
 };
 
@@ -969,26 +1015,19 @@ static PyObject *xu_port_new(PyObject *self, PyObject *args)
     xu_port_object *xup;
     u32 dom;
     int port1, port2;
-    xc_dominfo_t info;
 
     if ( !PyArg_ParseTuple(args, "i", &dom) )
         return NULL;
 
     xup = PyObject_New(xu_port_object, &xu_port_type);
 
-    if ( (xup->mem_fd = open("/dev/mem", O_RDWR)) == -1 )
-    {
-        PyErr_SetString(port_error, "Could not open '/dev/mem'");
-        goto fail1;
-    }
-
-    /* Set the General-Purpose Subject whose page frame will be mapped. */
-    (void)ioctl(xup->mem_fd, _IO('M', 1), (unsigned long)dom);
+    xup->remote_dom = dom;
+    xup->mem_fd     = -1; /* currently disconnected */
 
     if ( (xup->xc_handle = xc_interface_open()) == -1 )
     {
         PyErr_SetString(port_error, "Could not open Xen control interface");
-        goto fail2;
+        goto fail1;
     }
 
     if ( dom == 0 )
@@ -1002,7 +1041,7 @@ static PyObject *xu_port_new(PyObject *self, PyObject *args)
         if ( port1 < 0 )
         {
             PyErr_SetString(port_error, "Could not open channel to DOM0");
-            goto fail3;
+            goto fail2;
         }
     }
     else if ( xc_evtchn_bind_interdomain(xup->xc_handle, 
@@ -1010,34 +1049,22 @@ static PyObject *xu_port_new(PyObject *self, PyObject *args)
                                          &port1, &port2) != 0 )
     {
         PyErr_SetString(port_error, "Could not open channel to domain");
+        goto fail2;
+    }
+
+    xup->local_port  = port1;
+    xup->remote_port = port2;
+
+    if ( __xu_port_connect(xup) != 0 )
         goto fail3;
-    }
 
-    if ( (xc_domain_getinfo(xup->xc_handle, dom, 1, &info) != 1) ||
-         (info.domid != dom) )
-    {
-        PyErr_SetString(port_error, "Failed to obtain domain status");
-        goto fail4;
-    }
-
-    xup->interface = 
-        map_control_interface(xup->mem_fd, info.shared_info_frame);
-    if ( xup->interface == NULL )
-    {
-        PyErr_SetString(port_error, "Failed to map domain control interface");
-        goto fail4;
-    }
-
-    xup_connect(xup, dom, port1, port2);
     return (PyObject *)xup;
-
     
- fail4:
-    (void)xc_evtchn_close(xup->xc_handle, DOMID_SELF, port1);
  fail3:
-    (void)xc_interface_close(xup->xc_handle);
+    if ( dom != 0 )
+        (void)xc_evtchn_close(xup->xc_handle, DOMID_SELF, port1);
  fail2:
-    (void)close(xup->mem_fd);
+    (void)xc_interface_close(xup->xc_handle);
  fail1:
     PyObject_Del((PyObject *)xup);
     return NULL;        
@@ -1058,11 +1085,10 @@ static PyObject *xu_port_getattr(PyObject *obj, char *name)
 static void xu_port_dealloc(PyObject *self)
 {
     xu_port_object *xup = (xu_port_object *)self;
-    unmap_control_interface(xup->mem_fd, xup->interface);
+    __xu_port_disconnect(xup);
     if ( xup->remote_dom != 0 )
         (void)xc_evtchn_close(xup->xc_handle, DOMID_SELF, xup->local_port);
     (void)xc_interface_close(xup->xc_handle);
-    (void)close(xup->mem_fd);
     PyObject_Del(self);
 }
 

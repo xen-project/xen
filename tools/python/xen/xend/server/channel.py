@@ -107,22 +107,14 @@ class BaseChannel:
         """
         return self.idx
 
-    def notificationReceived(self, type):
+    def notificationReceived(self):
         """Called when a notification is received.
         Closes the channel on error, otherwise calls
         handleNotification(type), which should be defined
         in a subclass.
         """
-        #print 'notificationReceived> type=', type, self
-        if self.closed: return
-        if type == self.factory.notifier.EXCEPTION:
-            print 'notificationReceived> EXCEPTION'
-            info = xc.evtchn_status(self.idx)
-            if info['status'] == 'unbound':
-                print 'notificationReceived> EXCEPTION closing...'
-                self.close()
-                return
-        self.handleNotification(type)
+        if not self.closed:
+            self.handleNotification(type)
 
     def close(self):
         """Close the channel. Calls channelClosed() on the factory.
