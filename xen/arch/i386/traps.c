@@ -1,5 +1,5 @@
 /*
- *  linux/arch/i386/traps.c
+ *  xen/arch/i386/traps.c
  *
  *  Copyright (C) 1991, 1992  Linus Torvalds
  *
@@ -189,6 +189,7 @@ static void inline do_trap(int trapnr, char *str,
 			   struct pt_regs * regs, 
                            long error_code, int use_error_code)
 {
+    struct task_struct *p = current;
     struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
     trap_info_t *ti;
     unsigned long fixup;
@@ -201,6 +202,8 @@ static void inline do_trap(int trapnr, char *str,
     gtb->error_code = error_code;
     gtb->cs         = ti->cs;
     gtb->eip        = ti->address;
+    if ( TI_GET_IF(ti) )
+        clear_bit(EVENTS_MASTER_ENABLE_BIT, &p->shared_info->events_mask);
     return; 
 
  fault_in_hypervisor:
@@ -274,6 +277,8 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
     gtb->error_code = error_code;
     gtb->cs         = ti->cs;
     gtb->eip        = ti->address;
+    if ( TI_GET_IF(ti) )
+        clear_bit(EVENTS_MASTER_ENABLE_BIT, &p->shared_info->events_mask);
     return; 
 
     /*
@@ -371,6 +376,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
 
 asmlinkage void do_general_protection(struct pt_regs *regs, long error_code)
 {
+    struct task_struct *p = current;
     struct guest_trap_bounce *gtb = guest_trap_bounce+smp_processor_id();
     trap_info_t *ti;
     unsigned long fixup;
@@ -403,13 +409,11 @@ asmlinkage void do_general_protection(struct pt_regs *regs, long error_code)
     {
         /* This fault must be due to <INT n> instruction. */
         ti = current->thread.traps + (error_code>>3);
-        if ( ti->dpl >= (regs->xcs & 3) )
+        if ( TI_GET_DPL(ti) >= (regs->xcs & 3) )
         {
             gtb->flags = GTBF_TRAP_NOCODE;
-            gtb->cs    = ti->cs;
-            gtb->eip   = ti->address;
             regs->eip += 2;
-            return;
+            goto finish_propagation;
         }
     }
     
@@ -417,8 +421,11 @@ asmlinkage void do_general_protection(struct pt_regs *regs, long error_code)
     ti = current->thread.traps + 13;
     gtb->flags      = GTBF_TRAP;
     gtb->error_code = error_code;
+ finish_propagation:
     gtb->cs         = ti->cs;
     gtb->eip        = ti->address;
+    if ( TI_GET_IF(ti) )
+        clear_bit(EVENTS_MASTER_ENABLE_BIT, &p->shared_info->events_mask);
     return;
 
  gp_in_kernel:
@@ -718,16 +725,24 @@ long do_set_fast_trap(int idx)
      * The former range is used by Windows and MS-DOS.
      * Vector 0x80 is used by Linux and the BSD variants.
      */
-    if ( (idx != 0x80) && ((idx < 0x20) || (idx > 0x2f)) ) return -1;
+    if ( (idx != 0x80) && ((idx < 0x20) || (idx > 0x2f)) ) 
+        return -1;
 
     ti = current->thread.traps + idx;
+
+    /*
+     * We can't virtualise interrupt gates, as there's no way to get
+     * the CPU to automatically clear the events_mask variable.
+     */
+    if ( TI_GET_IF(ti) )
+        return -1;
 
     CLEAR_FAST_TRAP(&current->thread);
 
     current->thread.fast_trap_idx    = idx;
     current->thread.fast_trap_desc.a = (ti->cs << 16) | (ti->address & 0xffff);
     current->thread.fast_trap_desc.b = 
-        (ti->address & 0xffff0000) | 0x8f00 | (ti->dpl&3)<<13;
+        (ti->address & 0xffff0000) | 0x8f00 | (TI_GET_DPL(ti)&3)<<13;
 
     SET_FAST_TRAP(&current->thread);
 

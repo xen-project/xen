@@ -146,12 +146,16 @@
 /*
  * Send an array of these to HYPERVISOR_set_trap_table()
  */
+#define TI_GET_DPL(_ti)      ((_ti)->flags & 3)
+#define TI_GET_IF(_ti)       ((_ti)->flags & 4)
+#define TI_SET_DPL(_ti,_dpl) ((_ti)->flags |= (_dpl))
+#define TI_SET_IF(_ti,_if)   ((_ti)->flags |= (_if))
 typedef struct trap_info_st
 {
-    unsigned char  vector;  /* exception/interrupt vector */
-    unsigned char  dpl;	    /* privilege level		  */
-    unsigned short cs;	    /* code selector		  */
-    unsigned long  address; /* code address		  */
+    unsigned char  vector;  /* exception vector                              */
+    unsigned char  flags;   /* 0-3: privilege level; 4: clear event enable?  */
+    unsigned short cs;	    /* code selector                                 */
+    unsigned long  address; /* code address                                  */
 } trap_info_t;
 
 /*

@@ -554,6 +554,7 @@ static void __init set_call_gate(void *a, void *addr)
 }
 
 
+/* NB. All these are "trap gates" (i.e. events_mask isn't cleared). */
 static trap_info_t trap_table[] = {
     {  0, 0, __KERNEL_CS, (unsigned long)divide_error                },
     {  1, 0, __KERNEL_CS, (unsigned long)debug                       },
