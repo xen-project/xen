@@ -111,6 +111,7 @@
 3f1056a9L_kqHcFheV00KbKBzv9j5w linux-2.4.26-xen-sparse/include/asm-xen/vga.h
 40659defgWA92arexpMGn8X3QMDj3w linux-2.4.26-xen-sparse/include/asm-xen/xor.h
 3f056927gMHl7mWB89rb73JahbhQIA linux-2.4.26-xen-sparse/include/linux/blk.h
+4124f66fPHG6yvB_vXmesjvzrJ3yMg linux-2.4.26-xen-sparse/include/linux/mm.h
 401c0590D_kwJDU59X8NyvqSv_Cl2A linux-2.4.26-xen-sparse/include/linux/sched.h
 40a248afgI0_JKthdYAe8beVfXSTpQ linux-2.4.26-xen-sparse/include/linux/skbuff.h
 401c0592pLrp_aCbQRo9GXiYQQaVVA linux-2.4.26-xen-sparse/include/linux/timer.h
@@ -242,6 +243,9 @@
 4122466356eIBnC9ot44WSVVIFyhQA linux-2.6.7-xen-sparse/include/asm-xen/queues.h
 3fa8e3f0kBLeE4To2vpdi3cpJbIkbQ linux-2.6.7-xen-sparse/include/asm-xen/suspend.h
 3f689063BoW-HWV3auUJ-OqXfcGArw linux-2.6.7-xen-sparse/include/asm-xen/xen_proc.h
+4124d8c4aocX7A-jIbuGraWN84pxGQ linux-2.6.7-xen-sparse/include/linux/bio.h
+4124f66fp5QwbDHEfoUIa7pqO5Xhag linux-2.6.7-xen-sparse/include/linux/page-flags.h
+4124f66f4NaKNa0xPiGGykn9QaZk3w linux-2.6.7-xen-sparse/include/linux/skbuff.h
 40f56a0ddHCSs3501MY4hRf22tctOw linux-2.6.7-xen-sparse/mkbuildtree
 410a94a4KT6I6X0LVc7djB39tRDp4g linux-2.6.7-xen-sparse/mm/page_alloc.c
 40e1b09db5mN69Ijj0X_Eol-S7dXiw tools/Make.defs
@@ -264,9 +268,8 @@
 40ee75a9xFz6S05sDKu-JCLqyVTkDA tools/examples/network
 40ee75a967sxgcRY4Q7zXoVUaJ4flA tools/examples/vif-bridge
 40ee75a93cqxHp6MiYXxxwR5j2_8QQ tools/examples/xend-config.sxp
-41090ec8Pj_bkgCBpg2W7WfmNkumEA tools/examples/xmdefconfig
-40cf2937oKlROYOJTN8GWwWM5AmjBg tools/examples/xmdefconfig-example
-40dfd40auJwNnb8NoiSnRkvZaaXkUg tools/examples/xmdefconfig-netbsd
+41090ec8Pj_bkgCBpg2W7WfmNkumEA tools/examples/xmexample1
+40cf2937oKlROYOJTN8GWwWM5AmjBg tools/examples/xmexample2
 3fbba6dbDfYvJSsw9500b4SZyUhxjQ tools/libxc/Makefile
 3fbba6dc1uU7U3IFeF6A-XEOYF2MkQ tools/libxc/rpm.spec
 3fbba6dcrNxtygEcgJYAJJ1gCQqfsA tools/libxc/xc.h

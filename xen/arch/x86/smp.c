@@ -212,7 +212,7 @@ static inline void send_IPI_allbutself(int vector)
  */
 
 static spinlock_t flush_lock = SPIN_LOCK_UNLOCKED;
-volatile unsigned long flush_cpumask;
+static unsigned long flush_cpumask;
 
 asmlinkage void smp_invalidate_interrupt(void)
 {

@@ -497,9 +497,8 @@ static void fastcall free_hot_cold_page(struct page *page, int cold)
 	struct per_cpu_pages *pcp;
 	unsigned long flags;
 
-	/* XXX Xen: use mapping pointer as skb/data-page destructor */
-	if (page->mapping)
-		return (*(void(*)(struct page *))page->mapping)(page);
+	if (PageForeign(page))
+		return (PageForeignDestructor(page))(page);
 
 	kernel_map_pages(page, 1, 0);
 	inc_page_state(pgfree);

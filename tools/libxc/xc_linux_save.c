@@ -295,7 +295,7 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
     int rc = 1, i, j, k, last_iter, iter = 0;
     unsigned long mfn;
     u32 domid = ioctxt->domain;
-    int live = 0; // (ioctxt->flags & XCFLAGS_LIVE);
+    int live =  (ioctxt->flags & XCFLAGS_LIVE);
     int debug = (ioctxt->flags & XCFLAGS_DEBUG);
     int sent_last_iter, skip_this_iter;
 
@@ -423,7 +423,7 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
     mfn_to_pfn_table_start_mfn = xc_get_m2p_start_mfn( xc_handle );
 
     live_mfn_to_pfn_table = 
-	mfn_mapper_map_single(xc_handle, 0x7FFFU, 
+	mfn_mapper_map_single(xc_handle, DOMID_XEN, 
 			      PAGE_SIZE*1024, PROT_READ, 
 			      mfn_to_pfn_table_start_mfn );
 
@@ -440,7 +440,8 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
 
     /* Domain is still running at this point */
 
-    if( live ){ 
+    if( live ){
+printf("GO LIVE!!\n");
         if ( xc_shadow_control( xc_handle, domid, 
                                 DOM0_SHADOW_CONTROL_OP_ENABLE_LOGDIRTY,
                                 NULL, 0, NULL ) < 0 ) {

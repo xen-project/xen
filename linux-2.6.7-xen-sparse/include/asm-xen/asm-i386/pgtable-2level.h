@@ -88,29 +88,32 @@ static inline pte_t ptep_get_and_clear(pte_t *xp)
  *     not have MFN in our p2m table. Conversely, if the page is ours,
  *     then we'll have p2m(m2p(MFN))==MFN.
  * If we detect a special mapping then it doesn't have a 'struct page'.
- * We force !VALID_PAGE() by returning an out-of-range pointer.
+ * We force !pfn_valid() by returning an out-of-range pointer.
+ *
+ * NB. These checks require that, for any MFN that is not in our reservation,
+ * there is no PFN such that p2m(PFN) == MFN. Otherwise we can get confused if
+ * we are foreign-mapping the MFN, and the other domain as m2p(MFN) == PFN.
+ * Yikes! Various places must poke in INVALID_P2M_ENTRY for safety.
+ * 
+ * NB2. When deliberately mapping foreign pages into the p2m table, you *must*
+ *      use FOREIGN_FRAME(). This will cause pte_pfn() to choke on it, as we
+ *      require. In all the cases we care about, the high bit gets shifted out
+ *      (e.g., phys_to_machine()) so behaviour there is correct.
  */
-#define pte_page(_pte)                                        \
-({                                                            \
-    unsigned long mfn = (_pte).pte_low >> PAGE_SHIFT;         \
-    unsigned long pfn = mfn_to_pfn(mfn);                      \
-    if ( (pfn >= max_mapnr) || (pfn_to_mfn(pfn) != mfn) )     \
-        pfn = max_mapnr; /* special: force !VALID_PAGE() */   \
-    pfn_to_page(pfn);                                         \
-})
-
-#define pte_none(x)		(!(x).pte_low)
-/* See comments above pte_page */
-/* XXXcl check pte_present because msync.c:filemap_sync_pte calls
- * without pte_present check */
+#define INVALID_P2M_ENTRY (~0UL)
+#define FOREIGN_FRAME(_m) ((_m) | (1UL<<((sizeof(unsigned long)*8)-1)))
 #define pte_pfn(_pte)                                                   \
 ({                                                                      \
     unsigned long mfn = (_pte).pte_low >> PAGE_SHIFT;                   \
-    unsigned long pfn = pte_present(_pte) ? mfn_to_pfn(mfn) : mfn;      \
+    unsigned long pfn = mfn_to_pfn(mfn);                                \
     if ( (pfn >= max_mapnr) || (pfn_to_mfn(pfn) != mfn) )               \
         pfn = max_mapnr; /* special: force !pfn_valid() */              \
     pfn;                                                                \
 })
+
+#define pte_page(_pte) pfn_to_page(pte_pfn(_pte))
+
+#define pte_none(x)		(!(x).pte_low)
 
 #define pfn_pte(pfn, prot)	__pte(((pfn) << PAGE_SHIFT) | pgprot_val(prot))
 #define pfn_pte_ma(pfn, prot)	__pte_ma(((pfn) << PAGE_SHIFT) | pgprot_val(prot))

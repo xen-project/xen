@@ -115,17 +115,10 @@ int direct_remap_area_pages(struct mm_struct *mm,
 #define MAX_DIRECTMAP_MMU_QUEUE 130
     mmu_update_t u[MAX_DIRECTMAP_MMU_QUEUE], *w, *v;
 
-    if ( domid != 0 )
-    {
-        u[0].ptr  = MMU_EXTENDED_COMMAND;
-        u[0].val  = MMUEXT_SET_FOREIGNDOM;
-        u[0].val |= (unsigned long)domid << 16;
-        v = w = &u[1];
-    }
-    else
-    {
-        v = w = &u[0];
-    }
+    u[0].ptr  = MMU_EXTENDED_COMMAND;
+    u[0].val  = MMUEXT_SET_FOREIGNDOM;
+    u[0].val |= (unsigned long)domid << 16;
+    v = w = &u[1];
 
     start_address = address;
 

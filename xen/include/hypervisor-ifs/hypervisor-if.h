@@ -87,8 +87,10 @@
  * ptr[1:0] == MMU_NORMAL_PT_UPDATE:
  * Updates an entry in a page table. If updating an L1 table, and the new
  * table entry is valid/present, the mapped frame must belong to the FD, if
- * an FD has been specified. If attempting to map an I/O page, then the FD
- * is ignored, but the calling domain must have sufficient privilege.
+ * an FD has been specified. If attempting to map an I/O page then the
+ * caller assumes the privilege of the FD.
+ * FD == DOMID_IO: Permit /only/ I/O mappings, at the priv level of the caller.
+ * FD == DOMID_XEN: Map restricted areas of Xen's heap space.
  * ptr[:2]  -- Machine address of the page-table entry to modify.
  * val      -- Value to write.
  * 
@@ -121,6 +123,7 @@
  *   val[7:0] == MMUEXT_SET_FOREIGNDOM:
  *   val[31:15] -- Domain to set as the Foreign Domain (FD).
  *                 (NB. DOMID_SELF is not recognised)
+ *                 If FD != DOMID_IO then the caller must be privileged.
  * 
  *   val[7:0] == MMUEXT_REASSIGN_PAGE:
  *   ptr[:2]  -- A machine address within the page to be reassigned to the FD.
@@ -186,9 +189,31 @@
 #ifndef __ASSEMBLY__
 
 typedef u16 domid_t;
+
+/* Domain ids >= DOMID_FIRST_RESERVED cannot be used for ordinary domains. */
+#define DOMID_FIRST_RESERVED (0x7FF0U)
+
 /* DOMID_SELF is used in certain contexts to refer to oneself. */
-#define DOMID_SELF  (0x7FF0U)
-/* NB. IDs >= 0x7FF1 are reserved for future use. */
+#define DOMID_SELF (0x7FF0U)
+
+/*
+ * DOMID_IO is used to restrict page-table updates to mapping I/O memory.
+ * Although no Foreign Domain need be specified to map I/O pages, DOMID_IO
+ * is useful to ensure that no mappings to the OS's own heap are accidentally
+ * installed. (e.g., in Linux this could cause havoc as reference counts
+ * aren't adjusted on the I/O-mapping code path).
+ * This only makes sense in MMUEXT_SET_FOREIGNDOM, but in that context can
+ * be specified by any calling domain.
+ */
+#define DOMID_IO   (0x7FF1U)
+
+/*
+ * DOMID_XEN is used to allow privileged domains to map restricted parts of
+ * Xen's heap space (e.g., the machine_to_phys table).
+ * This only makes sense in MMUEXT_SET_FOREIGNDOM, and is only permitted if
+ * the caller is privileged.
+ */
+#define DOMID_XEN  (0x7FF2U)
 
 /*
  * Send an array of these to HYPERVISOR_mmu_update().

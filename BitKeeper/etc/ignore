@@ -35,6 +35,7 @@ linux-xen-sparse
 patches/*
 tools/*/build/lib*/*.py
 tools/balloon/balloon
+tools/check/.*
 tools/misc/miniterm/miniterm
 tools/misc/xen_cpuperf
 tools/web-shutdown.tap
