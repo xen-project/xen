@@ -94,6 +94,7 @@ struct task_struct {
 
     s_time_t lastschd;              /* time this domain was last scheduled */
     s_time_t cpu_time;              /* total CPU time received till now */
+    s_time_t wokenup;               /* time domain got woken up */
 
     unsigned long mcu_advance;      /* inverse of weight */
     s32  avt;                       /* actual virtual time */

@@ -39,9 +39,15 @@
 #define TRC(_x)
 #endif
 
+#define SCHED_HISTO
+#ifdef SCHED_HISTO
+#define BUCKETS 31
+#endif
 
-#define MCU         (s32)MICROSECS(100)     /* Minimum unit */
-static s32 ctx_allow=(s32)MILLISECS(10);    /* context switch allowance */
+
+#define MCU          (s32)MICROSECS(100)    /* Minimum unit */
+#define TIME_SLOP    (s32)MICROSECS(50)     /* allow time to slip a bit */
+static s32 ctx_allow=(s32)MILLISECS(5);     /* context switch allowance */
 
 /*****************************************************************************
  * per CPU data for the scheduler.
@@ -54,6 +60,9 @@ typedef struct schedule_data_st
     struct task_struct *idle;           /* idle task for this cpu */
     u32                 svt;            /* system virtual time. per CPU??? */
     struct ac_timer     s_timer;        /* scheduling timer  */
+#ifdef SCHED_HISTO
+    u32                 hist[BUCKETS];  /* for scheduler latency histogram */
+#endif
 
 } __cacheline_aligned schedule_data_t;
 schedule_data_t schedule_data[NR_CPUS];
@@ -140,8 +149,11 @@ int wake_up(struct task_struct *p)
 
     p->evt = p->avt; /* RN: XXX BVT deal with warping here */
 
-    ret = 1;
+#ifdef SCHED_HISTO
+    p->wokenup = NOW();
+#endif
 
+    ret = 1;
  out:
     spin_unlock_irqrestore(&schedule_data[p->processor].lock, flags);
     return ret;
@@ -194,36 +206,46 @@ long sched_adjdom(int dom, unsigned long mcu_adv, unsigned long warp,
  * cause a run through the scheduler when appropriate
  * Appropriate is:
  * - current task is idle task
- * - new processes evt is lower than current one
  * - the current task already ran for it's context switch allowance
- * XXX RN: not quite sure about the last two. Strictly, if p->evt < curr->evt
- * should still let curr run for at least ctx_allow. But that gets quite messy.
+ * Otherwise we do a run through the scheduler after the current tasks 
+ * context switch allowance is over.
  ****************************************************************************/
 void reschedule(struct task_struct *p)
 {
-    int cpu = p->processor;
+    int cpu = p->processor;;
     struct task_struct *curr;
     unsigned long flags;
+    s_time_t now, min_time;
 
     if (p->has_cpu)
         return;
 
     spin_lock_irqsave(&schedule_data[cpu].lock, flags);
+    
+    now = NOW();
     curr = schedule_data[cpu].curr;
+    /* domain should run at least for ctx_allow */
+    min_time = curr->lastschd + ctx_allow;
 
-    if ( is_idle_task(curr) ||
-         (p->evt < curr->evt) ||
-         (curr->lastschd + ctx_allow >= NOW()) ) {
+    if ( is_idle_task(curr) || (min_time <= now) ) {
         /* reschedule */
         set_bit(_HYP_EVENT_NEED_RESCHED, &curr->hyp_events);
+
         spin_unlock_irqrestore(&schedule_data[cpu].lock, flags);
-#ifdef CONFIG_SMP
+
         if (cpu != smp_processor_id())
             smp_send_event_check_cpu(cpu);
-#endif
-    } else {
-        spin_unlock_irqrestore(&schedule_data[cpu].lock, flags);
+        return;
     }
+
+    /* current hasn't been running for long enough -> reprogram timer.
+     * but don't bother if timer would go off soon anyway */
+    if (schedule_data[cpu].s_timer.expires > min_time + TIME_SLOP) {
+        mod_ac_timer(&schedule_data[cpu].s_timer, min_time);
+    }
+    
+    spin_unlock_irqrestore(&schedule_data[cpu].lock, flags);
+    return;
 }
 
 
@@ -258,7 +280,8 @@ asmlinkage void schedule(void)
 
     now = NOW();
 
-    /* remove timer  */
+    /* remove timer, if till on list  */
+    //if (active_ac_timer(&schedule_data[this_cpu].s_timer))
     rem_ac_timer(&schedule_data[this_cpu].s_timer);
 
     /* deschedule the current domain */
@@ -369,6 +392,13 @@ asmlinkage void schedule(void)
  sched_done:
     ASSERT(r_time >= ctx_allow);
 
+#ifndef NDEBUG
+    if (r_time < ctx_allow) {
+        printk("[%02d]: %lx\n", this_cpu, r_time);
+        dump_rqueue(&schedule_data[this_cpu].runqueue, "foo");
+    }
+#endif
+
     prev->has_cpu = 0;
     next->has_cpu = 1;
 
@@ -391,6 +421,19 @@ asmlinkage void schedule(void)
     }
 
     perfc_incrc(sched_ctx);
+#ifdef SCHED_HISTO
+    {
+        ulong diff; /* should fit in 32bits */
+        if (!is_idle_task(next) && next->wokenup) {
+            diff = (ulong)(now - next->wokenup);
+            diff /= (ulong)MILLISECS(1);
+            if (diff <= BUCKETS-2)  schedule_data[this_cpu].hist[diff]++;
+            else                    schedule_data[this_cpu].hist[BUCKETS-1]++;
+        }
+        next->wokenup = (s_time_t)0;
+    }
+#endif
+
 
     prepare_to_switch();
     switch_to(prev, next);
@@ -450,7 +493,7 @@ static void virt_timer(unsigned long foo)
     guest_event_notify(cpu_mask);
 
     now = NOW();
-    v_timer.expires  = now + MILLISECS(10);
+    v_timer.expires  = now + MILLISECS(20);
     add_ac_timer(&v_timer);
 }
 
@@ -472,11 +515,13 @@ void __init scheduler_init(void)
         
         /* a timer for each CPU  */
         init_ac_timer(&schedule_data[i].s_timer, i);
+        schedule_data[i].s_timer.data = 2;
         schedule_data[i].s_timer.function = &sched_timer;
 
     }
     schedule_data[0].idle = &idle0_task; /* idle on CPU 0 is special */
     init_ac_timer(&v_timer, 0);
+    v_timer.data = 3;
     v_timer.function = &virt_timer;
 }
 
@@ -603,3 +648,39 @@ void dump_runq(u_char key, void *dev_id, struct pt_regs *regs)
     return; 
 }
 
+#ifdef SCHED_HISTO
+void print_sched_histo(u_char key, void *dev_id, struct pt_regs *regs)
+{
+    int loop, i, j;
+    for (loop = 0; loop < smp_num_cpus; loop++) {
+        j = 0;
+        printf ("CPU[%02d]: scheduler latency histogram (ms:[count])\n", loop);
+        for (i=0; i<BUCKETS; i++) {
+            if (schedule_data[loop].hist[i]) {
+                if (i < BUCKETS-1)
+                    printk("%2d:[%7u]    ", i, schedule_data[loop].hist[i]);
+                else
+                    printk(" >:[%7u]    ", schedule_data[loop].hist[i]);
+                j++;
+                if (!(j % 5)) printk("\n");
+            }
+        }
+        printk("\n");
+    }
+      
+}
+void reset_sched_histo(u_char key, void *dev_id, struct pt_regs *regs)
+{
+    int loop, i;
+    for (loop = 0; loop < smp_num_cpus; loop++)
+        for (i=0; i<BUCKETS; i++) 
+            schedule_data[loop].hist[i]=0;
+}
+#else
+void print_sched_histo(u_char key, void *dev_id, struct pt_regs *regs)
+{
+}
+void reset_sched_histo(u_char key, void *dev_id, struct pt_regs *regs)
+{
+}
+#endif

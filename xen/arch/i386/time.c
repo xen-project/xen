@@ -401,6 +401,7 @@ int __init init_xeno_time()
 
     /* start timer to update time periodically */
     init_ac_timer(&update_timer, 0);
+    update_timer.data = 1;
     update_timer.function = &update_time;
     update_time(0);
 

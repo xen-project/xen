@@ -256,30 +256,6 @@ void do_ac_timer(void)
 }
 
 
-/*****************************************************************************
- * debug dump_queue
- * arguments: queue head, name of queue
- *****************************************************************************/
-static void dump_tqueue(struct list_head *queue, char *name)
-{
-    struct list_head *list;
-    int loop = 0;
-    struct ac_timer  *t;
-
-    printk ("QUEUE %s %lx   n: %lx, p: %lx\n", name,  (unsigned long)queue,
-            (unsigned long) queue->next, (unsigned long) queue->prev);
-    list_for_each (list, queue) {
-        t = list_entry(list, struct ac_timer, timer_list);
-        printk ("  %s %d : %lx ex=0x%08X%08X %lu  n: %lx, p: %lx\n",
-                name, loop++, 
-                (unsigned long)list,
-                (u32)(t->expires>>32), (u32)t->expires, t->data,
-                (unsigned long)list->next, (unsigned long)list->prev);
-    }
-    return; 
-}
-
-
 static void ac_timer_softirq_action(struct softirq_action *a)
 {
     int           cpu = smp_processor_id();
@@ -312,6 +288,28 @@ static void ac_timer_softirq_action(struct softirq_action *a)
     }
 }
 
+/*****************************************************************************
+ * debug dump_queue
+ * arguments: queue head, name of queue
+ *****************************************************************************/
+static void dump_tqueue(struct list_head *queue, char *name)
+{
+    struct list_head *list;
+    int loop = 0;
+    struct ac_timer  *t;
+
+    printk ("QUEUE %s %lx   n: %lx, p: %lx\n", name,  (unsigned long)queue,
+            (unsigned long) queue->next, (unsigned long) queue->prev);
+    list_for_each (list, queue) {
+        t = list_entry(list, struct ac_timer, timer_list);
+        printk ("  %s %d : %lx ex=0x%08X%08X %lu  n: %lx, p: %lx\n",
+                name, loop++, 
+                (unsigned long)list,
+                (u32)(t->expires>>32), (u32)t->expires, t->data,
+                (unsigned long)list->next, (unsigned long)list->prev);
+    }
+    return; 
+}
 
 void dump_timerq(u_char key, void *dev_id, struct pt_regs *regs)
 {
