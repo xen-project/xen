@@ -354,22 +354,25 @@ int __direct_remap_area_pages(struct mm_struct *mm,
 {
 	pgd_t * dir;
 	unsigned long end = address + size;
+	int error;
 
 	dir = pgd_offset(mm, address);
 	if (address >= end)
 		BUG();
 	spin_lock(&mm->page_table_lock);
 	do {
+		error = -ENOMEM;
 		pmd_t *pmd = pmd_alloc(mm, dir, address);
 		if (!pmd)
-			return -ENOMEM;
+			break;
+		error = 0;
 		direct_remap_area_pmd(mm, pmd, address, end - address, &v);
 		address = (address + PGDIR_SIZE) & PGDIR_MASK;
 		dir++;
 
 	} while (address && (address < end));
 	spin_unlock(&mm->page_table_lock);
-	return 0;
+	return error;
 }
 
 
