@@ -20,6 +20,7 @@
 #include <asm/uaccess.h>
 #include <asm/mm.h>
 #include <asm/debugger.h>
+#include <asm/io.h>
 
 /* opt_console: comma-separated list of console outputs. */
 static char opt_console[30] = OPT_CONSOLE_STR;
