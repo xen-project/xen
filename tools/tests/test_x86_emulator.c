@@ -26,7 +26,7 @@ static int read_any(
     case 4: *val = *(u32 *)addr; break;
     case 8: *val = *(unsigned long *)addr; break;
     }
-    return 0;
+    return X86EMUL_CONTINUE;
 }
 
 static int write_any(
@@ -41,17 +41,15 @@ static int write_any(
     case 4: *(u32 *)addr = (u32)val; break;
     case 8: *(unsigned long *)addr = val; break;
     }
-    return 0;
+    return X86EMUL_CONTINUE;
 }
 
 static int cmpxchg_any(
     unsigned long addr,
     unsigned long old,
     unsigned long new,
-    unsigned long *seen,
     unsigned int bytes)
 {
-    *seen = old;
     switch ( bytes )
     {
     case 1: *(u8 *)addr = (u8)new; break;
@@ -59,7 +57,7 @@ static int cmpxchg_any(
     case 4: *(u32 *)addr = (u32)new; break;
     case 8: *(unsigned long *)addr = new; break;
     }
-    return 0;
+    return X86EMUL_CONTINUE;
 }
 
 static struct x86_mem_emulator emulops = {
