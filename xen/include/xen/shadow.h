@@ -31,6 +31,7 @@ extern void shadow_l1_normal_pt_update( unsigned long pa, unsigned long gpte,
 extern void shadow_l2_normal_pt_update( unsigned long pa, unsigned long gpte );
 extern void unshadow_table( unsigned long gpfn, unsigned int type );
 extern int shadow_mode_enable( struct task_struct *p, unsigned int mode );
+extern void shadow_mode_disable( struct task_struct *p );
 extern unsigned long shadow_l2_table( 
                      struct mm_struct *m, unsigned long gpfn );
 
@@ -70,6 +71,146 @@ struct shadow_status {
 #else
 #define SH_VVLOG(_f, _a...) 
 #endif
+
+
+
+/************************************************************************/
+
+static inline void mark_dirty( struct mm_struct *m, unsigned int mfn )
+{
+	unsigned int pfn = machine_to_phys_mapping[mfn];
+	ASSERT(m->shadow_dirty_bitmap);
+	if( likely(pfn<m->shadow_dirty_bitmap_size) )
+	{
+		// use setbit to be smp guest safe
+		set_bit( pfn, m->shadow_dirty_bitmap );
+	}
+	else
+	{
+		SH_LOG("mark_dirty pfn out of range attempt!");
+	}
+
+}
+
+/************************************************************************/
+
+static inline void l1pte_write_fault( struct mm_struct *m, 
+									  unsigned long *gpte_p, unsigned long *spte_p )
+{ 
+    unsigned long gpte = *gpte_p;
+    unsigned long spte = *spte_p;
+
+    switch( m->shadow_mode )
+    {
+    case SHM_test:
+		spte = gpte;
+		gpte |= _PAGE_DIRTY | _PAGE_ACCESSED;
+		spte |= _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED; 			
+		break;
+
+    case SHM_logdirty:
+		spte = gpte;
+		gpte |= _PAGE_DIRTY | _PAGE_ACCESSED;
+		spte |= _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED; 			
+		mark_dirty( m, gpte >> PAGE_SHIFT );
+		break;
+    }
+
+    *gpte_p = gpte;
+    *spte_p = spte;
+}
+
+static inline void l1pte_read_fault( struct mm_struct *m, 
+									 unsigned long *gpte_p, unsigned long *spte_p )
+{ 
+    unsigned long gpte = *gpte_p;
+    unsigned long spte = *spte_p;
+
+    switch( m->shadow_mode )
+    {
+    case SHM_test:
+		spte = gpte;
+		gpte |= _PAGE_ACCESSED;
+		spte |= _PAGE_ACCESSED; 			
+		if ( ! (gpte & _PAGE_DIRTY ) )
+			spte &= ~ _PAGE_RW;
+		break;
+
+    case SHM_logdirty:
+		spte = gpte;
+		gpte |= _PAGE_ACCESSED;
+		spte |= _PAGE_ACCESSED; 			
+		spte &= ~ _PAGE_RW;
+		break;
+    }
+
+    *gpte_p = gpte;
+    *spte_p = spte;
+}
+
+static inline void l1pte_no_fault( struct mm_struct *m, 
+								   unsigned long *gpte_p, unsigned long *spte_p )
+{ 
+    unsigned long gpte = *gpte_p;
+    unsigned long spte = *spte_p;
+
+    switch( m->shadow_mode )
+    {
+    case SHM_test:
+		spte = 0;
+		if ( (gpte & (_PAGE_PRESENT|_PAGE_ACCESSED) ) == 
+			 (_PAGE_PRESENT|_PAGE_ACCESSED) )
+		{
+			spte = gpte;
+			if ( ! (gpte & _PAGE_DIRTY ) )
+				spte &= ~ _PAGE_RW;
+		}
+		break;
+
+    case SHM_logdirty:
+		spte = 0;
+		if ( (gpte & (_PAGE_PRESENT|_PAGE_ACCESSED) ) == 
+			 (_PAGE_PRESENT|_PAGE_ACCESSED) )
+		{
+			spte = gpte;
+			spte &= ~ _PAGE_RW;
+		}
+
+		break;
+    }
+
+    *gpte_p = gpte;
+    *spte_p = spte;
+}
+
+static inline void l2pde_general( struct mm_struct *m, 
+			   unsigned long *gpde_p, unsigned long *spde_p,
+			   unsigned long sl1pfn)
+{
+    unsigned long gpde = *gpde_p;
+    unsigned long spde = *spde_p;
+
+	spde = 0;
+
+	if ( sl1pfn )
+	{
+		spde = (gpde & ~PAGE_MASK) | (sl1pfn<<PAGE_SHIFT) | 
+			_PAGE_RW | _PAGE_ACCESSED | _PAGE_DIRTY;
+		gpde = gpde | _PAGE_ACCESSED | _PAGE_DIRTY;
+
+		if ( unlikely( (sl1pfn<<PAGE_SHIFT) == (gpde & PAGE_MASK)  ) )
+		{   
+			// detect linear map, and keep pointing at guest
+			SH_VLOG("4c: linear mapping ( %08lx )",sl1pfn);
+			spde = gpde & ~_PAGE_RW;
+		}
+	}
+
+    *gpde_p = gpde;
+    *spde_p = spde;
+}
+
+/*********************************************************************/
 
 
 

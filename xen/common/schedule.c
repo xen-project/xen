@@ -283,7 +283,13 @@ long do_sched_op(unsigned long op)
 }
 
 
-/* sched_pause_sync - synchronously pause a domain's execution */
+/* sched_pause_sync - synchronously pause a domain's execution 
+
+XXXX This is horibly broken -- here just as a place holder at present,
+                               do not use.
+
+*/
+
 void sched_pause_sync(struct task_struct *p)
 {
     unsigned long flags;
@@ -293,7 +299,7 @@ void sched_pause_sync(struct task_struct *p)
 
     if ( schedule_data[cpu].curr != p )
         /* if not the current task, we can remove it from scheduling now */
-        SCHED_FN(pause, p);
+        SCHED_OP(pause, p);
 
     p->state = TASK_PAUSED;
     

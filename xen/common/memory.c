@@ -770,7 +770,14 @@ void free_page_type(struct pfn_info *page, unsigned int type)
 	     (get_shadow_status(&current->mm, 
 				page-frame_table) & PSH_shadowed) )
 	{
-	    unshadow_table( page-frame_table, type );
+	    /* using 'current-mm' is safe because page type changes only
+	       occur within the context of the currently running domain as 
+	       pagetable pages can not be shared across domains. The one
+	       exception is when destroying a domain. However, we get away 
+	       with this as there's no way the current domain can have this
+	       mfn shadowed, so we won't get here... Phew! */
+
+ 	    unshadow_table( page-frame_table, type );
 	    put_shadow_status(&current->mm);
         }
 	return;
