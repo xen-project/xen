@@ -731,15 +731,20 @@ static void net_tx_action(unsigned long unused)
         if ( vif->shadow_ring->tx_idx == vif->shadow_ring->tx_prod )
             continue;
 
-        /* Check the chosen entry is good. */
+        /* Pick an entry from the transmit queue. */
         tx = &vif->shadow_ring->tx_ring[vif->shadow_ring->tx_idx];
-        if ( tx->status != RING_STATUS_OK ) goto skip_desc;
+        vif->shadow_ring->tx_idx = TX_RING_INC(vif->shadow_ring->tx_idx);
+        if ( vif->shadow_ring->tx_idx != vif->shadow_ring->tx_prod )
+            add_to_net_schedule_list_tail(vif);
+
+        /* Check the chosen entry is good. */
+        if ( tx->status != RING_STATUS_OK ) continue;
 
         if ( (skb = alloc_skb_nodata(GFP_ATOMIC)) == NULL )
         {
             add_to_net_schedule_list_tail(vif);
             printk("Out of memory in net_tx_action()!\n");
-            goto out;
+            break;
         }
         
         skb->destructor = tx_skb_release;
@@ -766,15 +771,9 @@ static void net_tx_action(unsigned long unused)
         {
             add_to_net_schedule_list_tail(vif);
             printk("Weird failure in hard_start_xmit!\n");
-            goto out;
+            break;
         }
-
-    skip_desc:
-        vif->shadow_ring->tx_idx = TX_RING_INC(vif->shadow_ring->tx_idx);
-        if ( vif->shadow_ring->tx_idx != vif->shadow_ring->tx_prod )
-            add_to_net_schedule_list_tail(vif);
     }
- out:
     spin_unlock(&dev->xmit_lock);
 }
 
