@@ -555,9 +555,7 @@ void setup_APIC_timer(void * data)
     unsigned long flags;
     __save_flags(flags);
     __sti();
-    printk("cpu: %d: setup timer.", smp_processor_id());
     __setup_APIC_LVTT(0);
-    printk("done\n");
     __restore_flags(flags);
 }
 
