@@ -74,6 +74,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <errno.h>
+#include <malloc.h>
+#include <fcntl.h>
 #include "xcs.h"
 
 #undef fd_max
@@ -82,14 +84,36 @@
 /* ------[ Control channel interfaces ]------------------------------------*/
 
 static control_channel_t *cc_list[NR_EVENT_CHANNELS];
-static int dom_to_port[MAX_DOMS]; /* This should not be a fixed-size array.*/
+static int *dom_port_map = 0;
+static int dom_port_map_size = 0;
+
+static void map_dom_to_port(u32 dom, int port)
+{
+	if (dom >= dom_port_map_size) {
+		dom_port_map = (int *)realloc(dom_port_map,
+					      (dom + 10) * sizeof(dom_port_map[0]));
+
+		if (dom_port_map == NULL) {
+			perror("realloc(dom_port_map)");
+			exit(1);
+		}
+
+		for (; dom_port_map_size < dom + 10; dom_port_map_size++) {
+			dom_port_map[dom_port_map_size] = -1;
+		}
+	}
+
+	dom_port_map[dom] = port;
+}
+
+static int dom_to_port(u32 dom) {
+	if (dom >= dom_port_map_size) return -1;
+
+	return dom_port_map[dom];
+}
 
 static void init_interfaces(void)
 {
-    int i;
-    
-    for (i = 0; i < MAX_DOMS; i++)
-        dom_to_port[i] = -1;
     memset(cc_list, 0, sizeof cc_list);
 }
 
@@ -99,9 +123,9 @@ static control_channel_t *add_interface(u32 dom, int local_port,
     control_channel_t *cc=NULL, *oldcc;
     int ret;
     
-    if (cc_list[dom_to_port[dom]] != NULL)
+    if (cc_list[dom_to_port(dom)] != NULL)
     {
-        return(cc_list[dom_to_port[dom]]);
+        return(cc_list[dom_to_port(dom)]);
     }
     
     if (cc_list[local_port] == NULL) 
@@ -133,13 +157,13 @@ static control_channel_t *add_interface(u32 dom, int local_port,
         {
             DPRINTF("CC conflict! (port: %d, old dom: %u, new dom: %u)\n",
                     cc->local_port, oldcc->remote_dom, cc->remote_dom);
-            dom_to_port[oldcc->remote_dom] = -1;
+            map_dom_to_port(oldcc->remote_dom, -1);
             ctrl_chan_free(cc_list[cc->local_port]);
         }
     }
      
     cc_list[cc->local_port] = cc;
-    dom_to_port[cc->remote_dom] = cc->local_port;
+    map_dom_to_port(cc->remote_dom, cc->local_port);
     cc->type = CC_TYPE_INTERDOMAIN;
     cc->ref_count = 0;
     return cc;
@@ -436,7 +460,7 @@ void handle_data_message( connection_t *con, xcs_msg_t *msg )
         if ( cmsg->remote_dom > MAX_DOMS )
             break;
         
-        port = dom_to_port[cmsg->remote_dom];
+        port = dom_to_port(cmsg->remote_dom);
         if (port == -1) break;
         cc = cc_list[port];
         if ((cc != NULL) && ( cc->type == CC_TYPE_INTERDOMAIN ))
@@ -455,7 +479,7 @@ void handle_data_message( connection_t *con, xcs_msg_t *msg )
         if ( cmsg->remote_dom > MAX_DOMS )
             break;
         
-        port = dom_to_port[cmsg->remote_dom];
+        port = dom_to_port(cmsg->remote_dom);
         if (port == -1) break;
         cc = cc_list[port];
         if ((cc != NULL) && ( cc->type == CC_TYPE_INTERDOMAIN ))
@@ -627,7 +651,30 @@ int main (int argc, char*argv[])
     init_bindings();
     
     listen_fd = listen_socket(XCS_TCP_PORT);
-    
+   
+    /* detach from our controlling tty so that a shell does hang waiting for
+       stopped jobs. */
+    /* we should use getopt() here */
+
+    if (!(argc == 2 && !strcmp(argv[1], "-i"))) {
+	pid_t pid = fork();
+	int fd;
+
+	if (pid == -1) {
+		perror("fork()");
+	} else if (pid) {
+		exit(0);
+	}
+
+    	setsid();
+	close(2);
+	close(1);
+	close(0);
+	fd = open("/dev/null", O_RDWR);
+	dup(fd);
+	dup(fd);
+    }
+ 
     for (;;)
     {
         int n, ret;
