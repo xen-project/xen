@@ -22,7 +22,7 @@
 #include <xen/serial.h>
 #include <xen/softirq.h>
 
-#undef PDB_DEBUG_TRACE
+#define PDB_DEBUG_TRACE
 #ifdef PDB_DEBUG_TRACE
 #define TRC(_x) _x
 #else
@@ -971,9 +971,9 @@ int pdb_change_values(u_char *buffer, int length,
 int pdb_change_values_one_page(u_char *buffer, int length,
 			       unsigned long cr3, unsigned long addr, int rw)
 {
-    l2_pgentry_t* l2_table = NULL;
-    l1_pgentry_t* l1_table = NULL;
-    u_char *page;
+    l2_pgentry_t* l2_table = NULL;                         /* page directory */
+    l1_pgentry_t* l1_table = NULL;                             /* page table */
+    u_char *page;                                                 /* 4k page */
     int bytes = 0;
 
     l2_table = map_domain_mem(cr3); 

@@ -264,10 +264,41 @@ processes, pdb currently supports just Linux 2.4.
    $4 = 27
 
 
+Some Helpful .gdbinit Commands
+------------------------------
+
+define setup
+  file    .../install/boot/xen-syms
+  add-sym .../install/boot/vmlinux-syms-2.4.26-xen0
+  add-sym /homes/aho/a.out
+end
+document setup
+  load symbols for xen, xenolinux (dom 0), and "a.out"
+end
+
+define setup-linux
+  set pdb_pidhash_addr = &pidhash
+  set pdb_init_task_union_addr = &init_task_union
+
+  set task_struct_mm_offset           = (void *)&(init_task_union.task.mm) - (void *)&(init_task_union.task)
+  set task_struct_next_task_offset    = (void *)&(init_task_union.task.next_task) - (void *)&(init_task_union.task)
+  set task_struct_pid_offset          = (void *)&(init_task_union.task.pid) - (void *)&(init_task_union.task)
+  set task_struct_pidhash_next_offset = (void *)&(init_task_union.task.pidhash_next) - (void *)&(init_task_union.task)
+  set task_struct_comm_offset         = (void *)&(init_task_union.task.comm) - (void *)&(init_task_union.task)
+  set task_struct_comm_length         = sizeof (init_task_union.task.comm)
+
+  set mm_struct_pgd_offset            = sizeof (struct vm_area_struct *) * 2 + sizeof (rb_root_t)
+end
+document setup-linux
+  define various xenolinux specific offsets and sizes in pdb
+end
+
+
 
 
 Changes
 -------
 
+04.07.15 aho .gdbinit
 04.02.05 aho creation
 04.03.31 aho add description on debugging multiple domains

@@ -55,14 +55,15 @@ static inline unsigned long machine_to_phys(unsigned long cr3,
 unsigned long pdb_pidhash_addr         = 0xc01971e0UL;
 unsigned long pdb_init_task_union_addr = 0xc0182000UL;
 
-#define task_struct_mm_offset        0x2c
-#define task_struct_next_task_offset 0x48
-#define task_struct_pid_offset       0x7c
-#define task_struct_pidhash_next_offset 0xb0
-#define task_struct_comm_offset      0x23e
-#define task_struct_comm_length      0x10
 
-#define mm_struct_pgd_offset         0x0c
+unsigned int task_struct_mm_offset           = 0x2c;
+unsigned int task_struct_next_task_offset    = 0x48;
+unsigned int task_struct_pid_offset          = 0x7c;
+unsigned int task_struct_pidhash_next_offset = 0xb0;
+unsigned int task_struct_comm_offset         = 0x23e;
+unsigned int task_struct_comm_length         = 0x10;
+
+unsigned int mm_struct_pgd_offset            = 0x0c;
 
 /*
  * find the task structure of a process (pid)
