@@ -103,9 +103,25 @@ if [ "$CONFIG_NET" = "y" ]; then
    source net/Config.in
 fi
 
-source drivers/block/Config.in
+
+#
+# Block device driver configuration
+#
+mainmenu_option next_comment
+comment 'Block devices'
+tristate 'Loopback device support' CONFIG_BLK_DEV_LOOP
+dep_tristate 'Network block device support' CONFIG_BLK_DEV_NBD $CONFIG_NET
+tristate 'RAM disk support' CONFIG_BLK_DEV_RAM
+if [ "$CONFIG_BLK_DEV_RAM" = "y" -o "$CONFIG_BLK_DEV_RAM" = "m" ]; then
+   int '  Default RAM disk size' CONFIG_BLK_DEV_RAM_SIZE 4096
+fi
+dep_bool '  Initial RAM disk (initrd) support' CONFIG_BLK_DEV_INITRD $CONFIG_BLK_DEV_RAM
+bool 'Per partition statistics in /proc/partitions' CONFIG_BLK_STATS
+bool 'XenoLinux virtual block device support' CONFIG_XENOLINUX_BLOCK
+endmenu
 define_bool CONFIG_BLK_DEV_IDE_MODES n
 define_bool CONFIG_BLK_DEV_HD n
+
 
 mainmenu_option next_comment
 comment 'Character devices'
