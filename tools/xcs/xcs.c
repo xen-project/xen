@@ -241,7 +241,7 @@ static int listen_socket (char *listen_path)
 
     if (bind(s, (struct sockaddr *) &a, sizeof (a)) < 0) 
     {
-        perror ("bind");
+        fprintf (stderr, "bind('%s'): %s\n", listen_path, strerror(errno));
         close (s);
         return -1;
     }

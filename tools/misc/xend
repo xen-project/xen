@@ -24,7 +24,7 @@ import sys
 import socket
 import time
 
-XCS_PATH = "/var/xen/xcs_socket"
+XCS_PATH = "/var/lib/xen/xcs_socket"
 XCS_EXEC = "/usr/sbin/xcs"
 XCS_LOGFILE = "/var/log/xcs.log"
 
