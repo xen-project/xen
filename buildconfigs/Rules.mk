@@ -1,4 +1,9 @@
 
+# We expect these two to already be set if people 
+# are using the top-level Makefile
+DIST_DIR	?= $(shell pwd)/dist
+INSTALL_DIR	?= $(DIST_DIR)/install
+
 .PHONY:	mkpatches mrproper
 
 # Setup pristine search path
