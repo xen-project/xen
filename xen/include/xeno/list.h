@@ -1,6 +1,8 @@
 #ifndef _LINUX_LIST_H
 #define _LINUX_LIST_H
 
+#include <xeno/lib.h>
+
 /*
  * Simple doubly linked list implementation.
  *
@@ -87,6 +89,8 @@ static __inline__ void __list_del(struct list_head * prev,
  */
 static __inline__ void list_del(struct list_head *entry)
 {
+	ASSERT(entry->next->prev == entry);
+	ASSERT(entry->prev->next == entry);
 	__list_del(entry->prev, entry->next);
 }
 

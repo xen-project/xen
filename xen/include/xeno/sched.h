@@ -117,10 +117,9 @@ struct task_struct {
     long warped;                    /* time it ran warped last time */
     long uwarped;                   /* time it ran unwarped last time */
 
-
     /* Network I/O */
     net_ring_t *net_ring_base;
-    net_vif_t *net_vif_list[MAX_GUEST_VIFS];
+    struct list_head net_vifs;
     int num_net_vifs;
 
     /* Block I/O */

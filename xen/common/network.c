@@ -32,7 +32,8 @@ net_rule_ent_t *net_rule_list;                      /* global list of rules */
 kmem_cache_t *net_vif_cache;                        
 kmem_cache_t *net_rule_cache;
 static rwlock_t net_rule_lock = RW_LOCK_UNLOCKED;   /* rule mutex */
-static rwlock_t sys_vif_lock = RW_LOCK_UNLOCKED;    /* vif mutex */
+
+rwlock_t sys_vif_lock = RW_LOCK_UNLOCKED;    /* vif mutex */
 
 void print_net_rule_list();
 
@@ -53,7 +54,8 @@ net_vif_t *create_net_vif(int domain)
     net_ring_t *new_ring;
     net_shadow_ring_t *shadow_ring;
     struct task_struct *dom_task;
-    
+    unsigned long flags;
+
     if ( !(dom_task = find_domain_by_id(domain)) )
         return NULL;
     
@@ -76,24 +78,24 @@ net_vif_t *create_net_vif(int domain)
     shadow_ring->rx_prod = shadow_ring->rx_cons = shadow_ring->rx_idx = 0;
     shadow_ring->tx_prod = shadow_ring->tx_cons = shadow_ring->tx_idx = 0;
     
-    /* Fill in the new vif struct. */
-    
-    new_vif->net_ring = new_ring;
+    /*
+     * Fill in the new vif struct. Note that, while the vif's refcnt is
+     * non-zero, we hold a reference to the task structure.
+     */
+    atomic_set(&new_vif->refcnt, 1);
+    new_vif->net_ring    = new_ring;
     new_vif->shadow_ring = shadow_ring;
-    
-    new_vif->domain = dom_task;
+    new_vif->domain      = dom_task;
+    new_vif->list.next   = NULL;
 
-    new_vif->list.next = NULL;
-    
-    write_lock(&sys_vif_lock);
+    list_add(&new_vif->dom_list, &dom_task->net_vifs);
+    dom_task->num_net_vifs++;
+
+    write_lock_irqsave(&sys_vif_lock, flags);
     new_vif->id = sys_vif_count;
     sys_vif_list[sys_vif_count++] = new_vif;
-    write_unlock(&sys_vif_lock);
-
-    dom_task->net_vif_list[dom_task->num_net_vifs] = new_vif;
-    dom_task->num_net_vifs++;
+    write_unlock_irqrestore(&sys_vif_lock, flags);
     
-    free_task_struct(dom_task);
     return new_vif;
     
 fail:
@@ -109,29 +111,49 @@ fail:
     return NULL;
 }
 
-/* delete_net_vif - Delete the last vif in the given domain. 
- *
- * There doesn't seem to be any reason (yet) to be able to axe an arbitrary 
- * vif, by vif id. 
- */
-
-void destroy_net_vif(struct task_struct *p)
+void destroy_net_vif(net_vif_t *vif)
 {
     int i;
+    unsigned long *pte, flags;
+    struct pfn_info *page;
+    struct task_struct *p = vif->domain;
 
-    if ( p->num_net_vifs <= 0 ) return; // nothing to do.
-    
-    i = --p->num_net_vifs;
-    
-    write_lock(&sys_vif_lock);
-    sys_vif_list[p->net_vif_list[i]->id] = NULL; // system vif list not gc'ed
-    write_unlock(&sys_vif_lock);        
-   
-    kfree(p->net_vif_list[i]->shadow_ring->tx_ring);
-    kfree(p->net_vif_list[i]->shadow_ring->rx_ring);
-    kfree(p->net_vif_list[i]->shadow_ring);
-    kmem_cache_free(net_vif_cache, p->net_vif_list[i]);
+    /* Return any outstanding receive buffers to the guest OS. */
+    spin_lock_irqsave(&p->page_lock, flags);
+    for ( i  = vif->shadow_ring->rx_idx; 
+          i != vif->shadow_ring->rx_prod; 
+          i  = ((i+1) & (RX_RING_SIZE-1)) )
+    {
+        rx_shadow_entry_t *rx = vif->shadow_ring->rx_ring + i;
+        if ( rx->status != RING_STATUS_OK ) continue;
+        pte  = map_domain_mem(rx->addr);
+        *pte |= _PAGE_PRESENT;
+        page = frame_table + (*pte >> PAGE_SHIFT);
+        page->flags &= ~PG_type_mask;
+        if ( (*pte & _PAGE_RW) ) 
+            page->flags |= PGT_writeable_page | PG_need_flush;
+        unmap_domain_mem(pte);
+    }
+    spin_unlock_irqrestore(&p->page_lock, flags);
+
+    kfree(vif->shadow_ring->tx_ring);
+    kfree(vif->shadow_ring->rx_ring);
+    kfree(vif->shadow_ring);
+    kmem_cache_free(net_vif_cache, vif);
+    free_task_struct(p);
 }
+
+void unlink_net_vif(net_vif_t *vif)
+{
+    unsigned long flags;
+    list_del(&vif->dom_list);
+    vif->domain->num_net_vifs--;
+    write_lock_irqsave(&sys_vif_lock, flags);
+    sys_vif_list[vif->id] = NULL;
+    write_unlock_irqrestore(&sys_vif_lock, flags);
+    put_vif(vif);
+}
+
 
 /* vif_query - Call from the proc file system to get a list of vifs 
  * assigned to a particular domain.
@@ -139,41 +161,31 @@ void destroy_net_vif(struct task_struct *p)
 
 void vif_query(vif_query_t *vq)
 {
-    struct task_struct *dom_task;
+    net_vif_t *vif;
+    struct task_struct *p;
+    unsigned long flags;
     char buf[128];
     int i;
 
-    if ( !(dom_task = find_domain_by_id(vq->domain)) ) return;
+    if ( !(p = find_domain_by_id(vq->domain)) ) 
+        return;
 
     *buf = '\0';
 
-    for ( i = 0; i < dom_task->num_net_vifs; i++ )
-        sprintf(buf + strlen(buf), "%d\n", dom_task->net_vif_list[i]->id);
+    read_lock_irqsave(&sys_vif_lock, flags);
+    for ( i = 0; i < MAX_SYSTEM_VIFS; i++ )
+    {
+        vif = sys_vif_list[i];
+        if ( (vif == NULL) || (vif->domain != p) ) continue;
+        sprintf(buf + strlen(buf), "%d\n", vif->id);
+    }
+    read_unlock_irqrestore(&sys_vif_lock, flags);
 
     copy_to_user(vq->buf, buf, strlen(buf) + 1);
     
-    free_task_struct(dom_task);
+    free_task_struct(p);
 }
         
-
-/* print_vif_list - Print the contents of the global vif table.
- */
-
-void print_vif_list()
-{
-    int i;
-    net_vif_t *v;
-
-    printk("Currently, there are %d VIFs.\n", sys_vif_count);
-    for ( i = 0; i<sys_vif_count; i++ )
-    {
-        v = sys_vif_list[i];
-        printk("] VIF Entry %d(%d):\n", i, v->id);
-        printk("   > net_ring*:  %p\n", v->net_ring);
-        printk("   > domain   :  %u\n", v->domain->domain);
-    }
-}
-
 /* ----[ Net Rule Functions ]-----------------------------------------------*/
 
 /* add_net_rule - Add a new network filter rule.

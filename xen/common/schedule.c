@@ -440,7 +440,8 @@ asmlinkage void schedule(void)
     prev = schedule_data[this_cpu].prev;
     
     prev->policy &= ~SCHED_YIELD;
-    if ( prev->state == TASK_DYING ) release_task(prev);
+    if ( prev->state == TASK_DYING ) 
+        free_task_struct(prev);
 
  same_process:
     /* update the domains notion of time  */
