@@ -12,6 +12,7 @@
 #include "xeno.h"
 
 extern int xenolinux_control_msg(int operration, char *buffer, int size);
+extern unsigned short xldev_to_physdev(kdev_t xldev);
 
 /* Grab the physdisk partitions list from the hypervisor. */
 int xeno_partition(struct gendisk *hd,
@@ -39,7 +40,6 @@ int xeno_partition(struct gendisk *hd,
   }
 
   if (buf->n_aces == PHYSDISK_MAX_ACES_PER_REQUEST) {
-    printk("Error getting Xen partition table, trying ordinary one...\n");
     kfree(buf);
     return 0;
   }
@@ -47,13 +47,15 @@ int xeno_partition(struct gendisk *hd,
   count = 0;
 
   for (i = 0; i < buf->n_aces; i++) {
-    if (buf->entries[i].partition == 0)
+    if (buf->entries[i].partition == 0) {
       continue;
+    }
     /* Make sure the partition is actually supposed to be on this
        disk.  This assumes that Xen and XenoLinux block device
        numbers match up. */
-    if (buf->entries[i].device != bdev->bd_dev)
+    if (buf->entries[i].device != xldev_to_physdev(bdev->bd_dev)) {
       continue;
+    }
     /* This is a bit of a hack - the partition numbers are specified
        by the hypervisor, and if we want them to match up, this is
        what we need to do. */
