@@ -31,7 +31,7 @@ LINUX_26SRC := ./linux-$(LINUX_26VER).tar.bz2
 endif
 
 pristine-linux-$(LINUX_26VER): $(LINUX_26SRC)
-	rm -rf tmp-linux-$(LINUX_26VER) $@ && mkdir -p tmp-linux-$(LINUX_26VER) && tar -C tmp-linux-$(LINUX_26VER) -jxf $(LINUX_26SRC) && mv tmp-linux-$(LINUX_26VER)/* $@
+	rm -rf tmp-linux-$(LINUX_26VER) $@ && mkdir -p tmp-linux-$(LINUX_26VER) && tar -C tmp-linux-$(LINUX_26VER) -jxf $(LINUX_26SRC) && mv tmp-linux-$(LINUX_26VER)/* $@ ; rm -rf tmp-linux-$(LINUX_26VER)
 	touch $@ # update timestamp to avoid rebuild
 
 
@@ -44,7 +44,7 @@ LINUX_24SRC := ./linux-$(LINUX_24VER).tar.bz2
 endif
 
 pristine-linux-$(LINUX_24VER): $(LINUX_24SRC)
-	rm -rf tmp-linux-$(LINUX_24VER) $@ && mkdir -p tmp-linux-$(LINUX_24VER) && tar -C tmp-linux-$(LINUX_24VER) -jxf $(LINUX_24SRC) && mv tmp-linux-$(LINUX_24VER)/* $@
+	rm -rf tmp-linux-$(LINUX_24VER) $@ && mkdir -p tmp-linux-$(LINUX_24VER) && tar -C tmp-linux-$(LINUX_24VER) -jxf $(LINUX_24SRC) && mv tmp-linux-$(LINUX_24VER)/* $@ ; rm -rf tmp-linux-$(LINUX_24VER)
 	touch $@ # update timestamp to avoid rebuild
 
 linux-$(LINUX_24VER)-xen.patch: pristine-linux-$(LINUX_24VER)	

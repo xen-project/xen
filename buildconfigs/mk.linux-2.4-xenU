@@ -5,18 +5,20 @@ FULLVERSION  = $(LINUX_24VER)-$(EXTRAVERSION)
 
 LINUX_DIR    = linux-$(FULLVERSION)
 
-.PHONY: build clean mrproper mkpatch
-
 include buildconfigs/Rules.mk
 
-.PHONY: build clean mrproper mkpatch
+.PHONY: build clean delete
 
+# The real action starts here!
+build: $(LINUX_DIR)
+	$(MAKE) -C $(LINUX_DIR) ARCH=xen modules	
+	$(MAKE) -C $(LINUX_DIR) ARCH=xen INSTALL_MOD_PATH=$(INSTALL_DIR) modules_install
+	$(MAKE) -C $(LINUX_DIR) ARCH=xen INSTALL_PATH=$(INSTALL_DIR) install
 
 patches/ebtables.diff:
 	mkdir -p patches
 	wget http://www.cl.cam.ac.uk/netos/xen/downloads/ebtables-brnf-5_vs_2.4.27.diff.gz -O- | gunzip -c > $@
 
-# The real action starts here!
 $(LINUX_DIR):  pristine-linux-$(LINUX_24VER) patches/ebtables.diff
 	rm -rf $(LINUX_DIR)
 	cp -al pristine-linux-$(LINUX_24VER) $(LINUX_DIR)
@@ -31,11 +33,6 @@ $(LINUX_DIR):  pristine-linux-$(LINUX_24VER) patches/ebtables.diff
 	cp $(INSTALL_DIR)/boot/config-$(FULLVERSION) $(LINUX_DIR)/.config || cp $(LINUX_DIR)/arch/xen/defconfig-$(EXTRAVERSION) $(LINUX_DIR)/.config
 	make -C $(LINUX_DIR) ARCH=xen oldconfig
 	make -C $(LINUX_DIR) ARCH=xen dep
-
-build: $(LINUX_DIR)
-	$(MAKE) -C $(LINUX_DIR) ARCH=xen modules	
-	$(MAKE) -C $(LINUX_DIR) ARCH=xen INSTALL_MOD_PATH=$(INSTALL_DIR) modules_install
-	$(MAKE) -C $(LINUX_DIR) ARCH=xen INSTALL_PATH=$(INSTALL_DIR) install
 
 clean:
 	$(MAKE) -C $(LINUX_DIR) ARCH=xen clean

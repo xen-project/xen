@@ -5,11 +5,14 @@ FULLVERSION  = $(LINUX_26VER)-$(EXTRAVERSION)
 
 LINUX_DIR    = linux-$(FULLVERSION)
 
-.PHONY: build clean mrproper mkpatch
-
 include buildconfigs/Rules.mk
 
-.PHONY: build clean mrproper mkpatch
+.PHONY: build clean delete
+
+build: $(LINUX_DIR)
+	$(MAKE) -C $(LINUX_DIR) ARCH=xen modules
+	$(MAKE) -C $(LINUX_DIR) ARCH=xen INSTALL_MOD_PATH=$(INSTALL_DIR) modules_install
+	$(MAKE) -C $(LINUX_DIR) ARCH=xen INSTALL_PATH=$(INSTALL_DIR) install
 
 # The real action starts here!
 $(LINUX_DIR):  pristine-linux-$(LINUX_26VER)
@@ -25,11 +28,6 @@ $(LINUX_DIR):  pristine-linux-$(LINUX_26VER)
 	# Re-use config from install dir if one exits else use make defconfig
 	cp $(INSTALL_DIR)/boot/config-$(FULLVERSION) $(LINUX_DIR)/.config || cp $(LINUX_DIR)/arch/xen/configs/$(EXTRAVERSION)_defconfig $(LINUX_DIR)/.config
 	make -C $(LINUX_DIR) ARCH=xen oldconfig
-
-build: $(LINUX_DIR)
-	$(MAKE) -C $(LINUX_DIR) ARCH=xen modules
-	$(MAKE) -C $(LINUX_DIR) ARCH=xen INSTALL_MOD_PATH=$(INSTALL_DIR) modules_install
-	$(MAKE) -C $(LINUX_DIR) ARCH=xen INSTALL_PATH=$(INSTALL_DIR) install
 
 clean:
 	$(MAKE) -C $(LINUX_DIR) ARCH=xen clean
