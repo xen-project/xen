@@ -1,6 +1,12 @@
 
-#ifndef __ASM_X86_DOMAIN_H__
-#define __ASM_X86_DOMAIN_H__
+#ifndef __XEN_DOMAIN_H__
+#define __XEN_DOMAIN_H__
+
+
+
+/*
+ * Arch-specifics.
+ */
 
 extern void arch_do_createdomain(struct domain *d);
 
@@ -11,4 +17,4 @@ extern void free_perdomain_pt(struct domain *d);
 
 extern void domain_relinquish_memory(struct domain *d);
 
-#endif /* __ASM_X86_DOMAIN_H__ */
+#endif /* __XEN_DOMAIN_H__ */

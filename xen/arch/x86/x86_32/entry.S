@@ -65,10 +65,6 @@
         andl $~3,reg;      \
         movl (reg),reg;
 
-ENTRY(continue_nonidle_task)
-        GET_CURRENT(%ebx)
-        jmp test_all_events
-
         ALIGN
 restore_all_guest:
         testb $TF_failsafe_return,DOMAIN_thread_flags(%ebx)

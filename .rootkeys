@@ -792,7 +792,6 @@
 3ddb79c3r9-31dIsewPV3P3i8HALsQ xen/include/asm-x86/delay.h
 3ddb79c34BFiXjBJ_cCKB0aCsV1IDw xen/include/asm-x86/desc.h
 40715b2dTokMLYGSuD58BnxOqyWVew xen/include/asm-x86/div64.h
-40f2b4a2hC3HtChu-ArD8LyojxWMjg xen/include/asm-x86/domain.h
 3e20b82fl1jmQiKdLy7fxMcutfpjWA xen/include/asm-x86/domain_page.h
 3ddb79c3NU8Zy40OTrq3D-i30Y3t4A xen/include/asm-x86/fixmap.h
 3e2d29944GI24gf7vOP_7x8EyuqxeA xen/include/asm-x86/flushtlb.h
@@ -855,6 +854,7 @@
 3eb165e0eawr3R-p2ZQtSdLWtLRN_A xen/include/xen/console.h
 3ddb79c1V44RD26YqCUm-kqIupM37A xen/include/xen/ctype.h
 3ddb79c05DdHQ0UxX_jKsXdR4QlMCA xen/include/xen/delay.h
+40f2b4a2hC3HtChu-ArD8LyojxWMjg xen/include/xen/domain.h
 3ddb79c2O729EttZTYu1c8LcsUO_GQ xen/include/xen/elf.h
 3ddb79c0HIghfBF8zFUdmXhOU8i6hA xen/include/xen/errno.h
 3ddb79c1W0lQca8gRV7sN6j3iY4Luw xen/include/xen/event.h

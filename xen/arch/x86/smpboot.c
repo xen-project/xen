@@ -662,10 +662,6 @@ static void __init do_boot_cpu (int apicid)
 
     map_cpu_to_boot_apicid(cpu, apicid);
 
-#if defined(__i386__)
-    SET_DEFAULT_FAST_TRAP(&idle->thread);
-#endif
-
     idle_task[cpu] = idle;
 
     /* start_eip had better be page-aligned! */

@@ -399,6 +399,8 @@ struct thread_struct {
     /* general user-visible register state */
     execution_context_t user_ctxt;
 
+    void (*schedule_tail) (struct domain *);
+
     /*
      * Return vectors pushed to us by guest OS.
      * The stack frame for events is exactly that of an x86 hardware interrupt.
@@ -456,13 +458,9 @@ extern struct desc_struct *idt_tables[];
 
 long set_fast_trap(struct domain *p, int idx);
 
-#define INIT_THREAD  { fast_trap_idx: 0x20 }
-
-#elif defined(__x86_64__)
+#endif
 
 #define INIT_THREAD { 0 }
-
-#endif /* __x86_64__ */
 
 extern int gpf_emulate_4gb(struct xen_regs *regs);
 
