@@ -213,6 +213,19 @@ physdev_pci_access_modify(domid_t id, int bus, int dev, int func, int enable)
 	return -EINVAL;
 }
 
+void physdev_modify_ioport_access_range(struct domain *d, int enable,
+	int port, int num)
+{
+	printk("physdev_modify_ioport_access_range not implemented\n");
+	dummy();
+}
+
+void physdev_destroy_state(struct domain *d)
+{
+	printk("physdev_destroy_state not implemented\n");
+	dummy();
+}
+
 // accomodate linux extable.c
 //const struct exception_table_entry *
 void *search_module_extables(unsigned long addr)
