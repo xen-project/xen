@@ -102,6 +102,25 @@ static inline int kernel_text_address(unsigned long addr)
 
 }
 
+void show_guest_stack()
+{
+    int i;
+    execution_context_t *ec = get_execution_context();
+    unsigned long *stack = (unsigned long *)ec->esp;
+    printk("Guest EIP is %lx\n",ec->eip);
+
+    for ( i = 0; i < kstack_depth_to_print; i++ )
+    {
+        if ( ((long)stack & (STACK_SIZE-1)) == 0 )
+            break;
+        if ( i && ((i % 8) == 0) )
+            printk("\n       ");
+            printk("%08lx ", *stack++);            
+    }
+    printk("\n");
+    
+}
+
 void show_stack(unsigned long *esp)
 {
     unsigned long *stack, addr;

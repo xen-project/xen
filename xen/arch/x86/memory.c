@@ -92,6 +92,7 @@
 #include <xen/errno.h>
 #include <xen/perfc.h>
 #include <xen/irq.h>
+#include <xen/softirq.h>
 #include <asm/shadow.h>
 #include <asm/page.h>
 #include <asm/flushtlb.h>
@@ -779,6 +780,9 @@ int alloc_page_type(struct pfn_info *page, unsigned int type)
     case PGT_ldt_page:
         return alloc_segdesc_page(page);
     default:
+	printk("Bad type in alloc_page_type %x t=%x c=%x\n", 
+	       type, page->u.inuse.type_info,
+	       page->count_info);
         BUG();
     }
 
@@ -1789,4 +1793,420 @@ void ptwr_status(void)
                  frame_table[pfn].u.inuse.type_info,
                  frame_table[pfn].u.inuse.domain->domain));
 }
+
+
+/************************************************************************/
+
+
+void audit_domain( struct domain *d)
+{
+    int ttot=0, ctot=0;
+    void adjust ( struct pfn_info *page, int dir, int adjtype )
+    {
+	int count = page->count_info & PGC_count_mask;
+
+	if (adjtype)
+	{
+	    int tcount = page->u.inuse.type_info & PGT_count_mask;
+	    
+	    ttot++;
+
+	    tcount += dir;
+
+	    if (tcount <0 )
+	    {
+		printk("Audit %d: type count whent below zero pfn=%x taf=%x otaf=%x\n",
+		       d->domain, page-frame_table,
+		       page->u.inuse.type_info,
+		       page->tlbflush_timestamp);
+		return;
+	    }
+	    
+	    page->u.inuse.type_info =
+		(page->u.inuse.type_info & ~PGT_count_mask) | tcount;	    
+	}
+
+	ctot++;
+	count += dir;
+	if (count <0 )
+	{
+	    printk("Audit %d: general count whent below zero pfn=%x taf=%x otaf=%x\n",
+		   d->domain, page-frame_table,
+		   page->u.inuse.type_info,
+		   page->tlbflush_timestamp);
+	    return;
+	}
+	    
+	page->count_info =
+	    (page->count_info & ~PGC_count_mask) | count;	    
+
+    }
+
+    void scan_for_pfn( struct domain *d, unsigned long xpfn )
+    {
+	unsigned long pfn;
+	struct list_head *list_ent;
+	int i;
+
+        list_ent = d->page_list.next;
+	for ( i = 0; (list_ent != &d->page_list); i++ )
+	{
+	    unsigned long * pt;
+	    struct pfn_info *page;
+	    pfn = list_entry(list_ent, struct pfn_info, list) - frame_table;
+	    page = &frame_table[pfn];
+	    
+	    if ( (page->u.inuse.type_info & PGT_type_mask) == PGT_l1_page_table ||
+		 (page->u.inuse.type_info & PGT_type_mask) == PGT_l2_page_table )
+	    {
+		pt = map_domain_mem( pfn<<PAGE_SHIFT );
+
+		for ( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ )
+		{
+		    if ( pt[i] & _PAGE_PRESENT )
+		    {
+			unsigned long l1pfn = pt[i]>>PAGE_SHIFT;
+			
+			if( l1pfn == xpfn )
+			{
+			    printk("        found dom=%d i=%x pfn=%lx t=%x c=%x\n",
+				   d->domain,
+				   i,pfn,page->u.inuse.type_info,
+				   page->count_info);
+			}
+		    }
+		}
+
+		unmap_domain_mem(pt);	   
+	    }
+
+	    list_ent = frame_table[pfn].list.next;
+	}
+
+    }
+
+    void scan_for_pfn_remote( unsigned long xpfn )
+    {
+	struct domain *e;
+
+	for_each_domain ( e )
+	{
+	    scan_for_pfn( e, xpfn );	    
+	}
+    }   
+
+    int i;
+    unsigned long pfn;
+    struct list_head *list_ent;
+
+    if(d!=current)domain_pause(d);
+    synchronise_pagetables(~0UL);
+
+    printk("pt base=%lx sh_info=%x\n",
+	   pagetable_val(d->mm.pagetable)>>PAGE_SHIFT,
+	   virt_to_page(d->shared_info)-frame_table);
+	   
+    spin_lock(&d->page_alloc_lock);
+
+    /* phase 0 */
+
+    list_ent = d->page_list.next;
+    for ( i = 0; (list_ent != &d->page_list); i++ )
+    {
+	struct pfn_info *page;
+	pfn = list_entry(list_ent, struct pfn_info, list) - frame_table;       
+	page = &frame_table[pfn];
+
+	if ( page->u.inuse.domain != d )
+	    BUG();
+
+	if ( (page->u.inuse.type_info & PGT_count_mask) >
+	     (page->count_info & PGC_count_mask) )
+	    printk("taf > caf %x %x pfn=%lx\n",
+		   page->u.inuse.type_info, page->count_info, pfn );
+ 
+#if 0   // SYSV shared memory pages plus writeable files
+	if ( (page->u.inuse.type_info & PGT_type_mask) == PGT_writable_page && 
+	     (page->u.inuse.type_info & PGT_count_mask) > 1 )
+	{
+	    printk("writeable page with type count >1: pfn=%lx t=%x c=%x\n",
+		  pfn,
+		  page->u.inuse.type_info,
+		  page->count_info );
+	    scan_for_pfn_remote(pfn);
+	}
+#endif
+	if ( (page->u.inuse.type_info & PGT_type_mask) == PGT_none && 
+	     (page->u.inuse.type_info & PGT_count_mask) > 1 )
+	{
+	    printk("normal page with type count >1: pfn=%lx t=%x c=%x\n",
+		  pfn,
+		  page->u.inuse.type_info,
+		  page->count_info );
+	}
+
+	// use tlbflush_timestamp to store original type_info
+	page->tlbflush_timestamp = page->u.inuse.type_info;
+
+	list_ent = frame_table[pfn].list.next;
+    }
+
+
+    /* phase 1 */
+
+    adjust( &frame_table[pagetable_val(d->mm.pagetable)>>PAGE_SHIFT], -1, 1 );
+
+    list_ent = d->page_list.next;
+    for ( i = 0; (list_ent != &d->page_list); i++ )
+    {
+	unsigned long * pt;
+	struct pfn_info *page;
+	pfn = list_entry(list_ent, struct pfn_info, list) - frame_table;       
+	page = &frame_table[pfn];
+
+	if ( page->u.inuse.domain != d )
+	    BUG();
+
+	switch ( page->u.inuse.type_info & PGT_type_mask )
+	{
+	case PGT_l2_page_table:
+
+	    if ((page->u.inuse.type_info & PGT_validated) != PGT_validated )
+		printk("Audit %d: L2 not validated %x\n",
+		       d->domain, page->u.inuse.type_info);
+
+	    if ((page->u.inuse.type_info & PGT_pinned) != PGT_pinned )
+		printk("Audit %d: L2 not pinned %x\n",
+		       d->domain, page->u.inuse.type_info);
+	    else
+		adjust( page, -1, 1 );
+	   
+	    pt = map_domain_mem( pfn<<PAGE_SHIFT );
+
+	    for ( i = 0; i < DOMAIN_ENTRIES_PER_L2_PAGETABLE; i++ )
+	    {
+		if ( pt[i] & _PAGE_PRESENT )
+		{
+		    unsigned long l1pfn = pt[i]>>PAGE_SHIFT;
+		    struct pfn_info *l1page = &frame_table[l1pfn];
+
+		    if (l1page->u.inuse.domain != d)
+		    {
+			printk("Skip page belowing to other dom %p\n",
+			       l1page->u.inuse.domain);    
+			continue;
+		    }
+
+		    if ((l1page->u.inuse.type_info & PGT_type_mask) !=
+			PGT_l1_page_table )
+			printk("Audit %d: [%x] Expected L1 t=%x pfn=%lx\n",
+			       d->domain, i,
+			       l1page->u.inuse.type_info,
+			       l1pfn);
+
+		    adjust( l1page, -1, 1 );
+		}
+	    }
+
+	    unmap_domain_mem(pt);
+
+	    break;
+
+
+	case PGT_l1_page_table:
+	    
+	    if ((page->u.inuse.type_info & PGT_pinned) == PGT_pinned )
+	    {
+		//printk("L1 is pinned\n");
+		adjust( page, -1, 1 );
+	    }
+
+	    if ((page->u.inuse.type_info & PGT_validated) != PGT_validated )
+		printk("Audit %d: L1 not validated %x\n",
+		       d->domain, page->u.inuse.type_info);
+#if 0
+	    if ((page->u.inuse.type_info & PGT_pinned) != PGT_pinned )
+		printk("Audit %d: L1 not pinned %x\n",
+		       d->domain, page->u.inuse.type_info);
+#endif
+	    pt = map_domain_mem( pfn<<PAGE_SHIFT );
+
+	    for ( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ )
+	    {
+		if ( pt[i] & _PAGE_PRESENT )
+		{
+		    unsigned long l1pfn = pt[i]>>PAGE_SHIFT;
+		    struct pfn_info *l1page = &frame_table[l1pfn];
+
+		    if ( pt[i] & _PAGE_RW )
+		    {
+
+			if ((l1page->u.inuse.type_info & PGT_type_mask) ==
+			    PGT_l1_page_table ||
+			    (l1page->u.inuse.type_info & PGT_type_mask) ==
+			    PGT_l2_page_table )
+			    printk("Audit %d: [%x] Ilegal RW t=%x pfn=%lx\n",
+				   d->domain, i,
+				   l1page->u.inuse.type_info,
+				   l1pfn);
+
+		    }
+
+		    if (l1page->u.inuse.domain != d)
+		    {
+			printk("Skip page belowing to other dom %p\n",
+			       l1page->u.inuse.domain);    
+			continue;
+		    }
+
+		    adjust( l1page, -1, 0 );
+		}
+	    }
+
+	    unmap_domain_mem(pt);
+
+	    break;
+	}
+	
+
+
+	list_ent = frame_table[pfn].list.next;
+    }
+
+    /* phase 2 */
+
+    ctot = ttot = 0;
+    list_ent = d->page_list.next;
+    for ( i = 0; (list_ent != &d->page_list); i++ )
+    {
+	struct pfn_info *page;
+	pfn = list_entry(list_ent, struct pfn_info, list) - frame_table;
+	
+	page = &frame_table[pfn];
+
+
+	switch ( page->u.inuse.type_info & PGT_type_mask)
+	{
+	case PGT_l1_page_table:
+	case PGT_l2_page_table:
+	    if ( (page->u.inuse.type_info & PGT_count_mask) != 0 )
+	    {
+		printk("Audit %d: type count!=0 t=%x ot=%x c=%x pfn=%lx\n",
+		       d->domain, page->u.inuse.type_info, 
+		       page->tlbflush_timestamp,
+		       page->count_info, pfn );
+		scan_for_pfn_remote(pfn);
+	    }
+	default:
+	    if ( (page->count_info & PGC_count_mask) != 1 )
+	    {
+		printk("Audit %d: general count!=1 (c=%x) t=%x ot=%x pfn=%lx\n",
+		       d->domain, 
+		       page->count_info,
+		       page->u.inuse.type_info, 
+		       page->tlbflush_timestamp, pfn );
+		scan_for_pfn_remote(pfn);
+	    }
+	    break;
+	}
+
+	list_ent = frame_table[pfn].list.next;
+    }
+
+    /* phase 3 */
+
+    list_ent = d->page_list.next;
+    for ( i = 0; (list_ent != &d->page_list); i++ )
+    {
+	unsigned long * pt;
+	struct pfn_info *page;
+	pfn = list_entry(list_ent, struct pfn_info, list) - frame_table;
+	
+	page = &frame_table[pfn];
+
+	switch ( page->u.inuse.type_info & PGT_type_mask )
+	{
+	case PGT_l2_page_table:
+	    if ((page->u.inuse.type_info & PGT_pinned) == PGT_pinned )
+		adjust( page, 1, 1 );	  
+
+	    pt = map_domain_mem( pfn<<PAGE_SHIFT );
+
+	    for ( i = 0; i < DOMAIN_ENTRIES_PER_L2_PAGETABLE; i++ )
+	    {
+		if ( pt[i] & _PAGE_PRESENT )
+		{
+		    unsigned long l1pfn = pt[i]>>PAGE_SHIFT;
+		    struct pfn_info *l1page = &frame_table[l1pfn];
+
+		    if ( l1page->u.inuse.domain == d)
+			adjust( l1page, 1, 1 );
+		}
+	    }
+
+	    unmap_domain_mem(pt);
+	    break;
+
+	case PGT_l1_page_table:
+	    if ((page->u.inuse.type_info & PGT_pinned) == PGT_pinned )
+		adjust( page, 1, 1 );
+
+	    pt = map_domain_mem( pfn<<PAGE_SHIFT );
+
+	    for ( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ )
+	    {
+		if ( pt[i] & _PAGE_PRESENT )
+		{
+#if 1
+
+		    unsigned long l1pfn = pt[i]>>PAGE_SHIFT;
+		    struct pfn_info *l1page = &frame_table[l1pfn];
+
+		    if ( l1page->u.inuse.domain == d)
+			adjust( l1page, 1, 0 );
+#endif
+		}
+	    }
+
+	    unmap_domain_mem(pt);
+	    break;
+	}
+
+
+	page->tlbflush_timestamp = 0; // put back
+
+
+	list_ent = frame_table[pfn].list.next;
+    }
+
+    spin_unlock(&d->page_alloc_lock);
+
+    adjust( &frame_table[pagetable_val(d->mm.pagetable)>>PAGE_SHIFT], 1, 1 );
+
+    printk("Audit %d: Done. ctot=%d ttot=%d\n",d->domain, ctot, ttot );
+
+    if(d!=current)domain_unpause(d);
+
+}
+
+
+void audit_domains( void )
+{
+    struct domain *d;
+
+    for_each_domain ( d )
+    {
+	if ( d->domain > 0 )
+	    audit_domain(d);
+    }
+}
+
+void audit_domains_key (unsigned char key, void *dev_id,
+                           struct pt_regs *regs)
+{
+    open_softirq( MEMAUDIT_SOFTIRQ, audit_domains );
+    raise_softirq( MEMAUDIT_SOFTIRQ );
+}
+
+
 #endif

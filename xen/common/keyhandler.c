@@ -108,6 +108,11 @@ extern void print_sched_histo(unsigned char key, void *dev_id,
                               struct pt_regs *regs);
 extern void reset_sched_histo(unsigned char key, void *dev_id, 
                               struct pt_regs *regs);
+#ifndef NDEBUG
+extern void audit_domains_key(unsigned char key, void *dev_id,
+                           struct pt_regs *regs);
+#endif
+
 #ifdef PERF_COUNTERS
 extern void perfc_printall(unsigned char key, void *dev_id,
                            struct pt_regs *regs);
@@ -124,6 +129,11 @@ void initialize_keytable(void)
     add_key_handler('q', do_task_queues, "dump task queues + guest state");
     add_key_handler('r', dump_runq,      "dump run queues");
     add_key_handler('R', halt_machine,   "reboot machine"); 
+
+#ifndef NDEBUG
+    add_key_handler('o', audit_domains_key,  "audit domains >0 EXPERIMENTAL"); 
+#endif
+
 #ifdef PERF_COUNTERS
     add_key_handler('p', perfc_printall, "print performance counters"); 
     add_key_handler('P', perfc_reset,    "reset performance counters"); 

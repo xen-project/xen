@@ -448,6 +448,11 @@ void free_domheap_pages(struct pfn_info *pg, int order)
 
         for ( i = 0; i < (1 << order); i++ )
         {
+#ifndef NDEBUG
+	    if ( pg[i].u.inuse.type_info & PGT_count_mask )
+		printk("ERROR: type count not zero on free %x\n",
+		       pg[i].u.inuse.type_info );
+#endif
             pg[i].tlbflush_timestamp  = tlbflush_clock;
             pg[i].u.free.cpu_mask     = 1 << d->processor;
             list_del(&pg[i].list);

@@ -6,7 +6,8 @@
 #define DEBUGGER_SOFTIRQ                  2
 #define NMI_SOFTIRQ                       3
 #define SCHEDULE_SOFTIRQ                  4
-#define NR_SOFTIRQS                       5
+#define MEMAUDIT_SOFTIRQ                  5
+#define NR_SOFTIRQS                       6
 
 #ifndef __ASSEMBLY__
 
