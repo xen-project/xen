@@ -79,13 +79,29 @@ VM_MASK		= 0x00020000
 #define evtchn_upcall_pending		/* 0 */
 #define evtchn_upcall_mask		1
 
+#define sizeof_vcpu_shift		3
+
+#ifdef CONFIG_SMP
+#define XEN_GET_VCPU_INFO(reg)	movl TI_cpu(%ebp),reg			; \
+				shl  $sizeof_vcpu_shift,reg		; \
+    				addl HYPERVISOR_shared_info,reg
+#else
+#define XEN_GET_VCPU_INFO(reg)	movl HYPERVISOR_shared_info,reg
+#endif
+
 #define XEN_BLOCK_EVENTS(reg)	movb $1,evtchn_upcall_mask(reg)
 #define XEN_UNBLOCK_EVENTS(reg)	movb $0,evtchn_upcall_mask(reg)
-#define XEN_TEST_PENDING(reg)	testb $0xFF,evtchn_upcall_pending(%reg)
+#define XEN_TEST_PENDING(reg)	testb $0x1,evtchn_upcall_pending(reg)
 
 #ifdef CONFIG_PREEMPT
-#define preempt_stop		movl HYPERVISOR_shared_info,%esi	; \
+#ifdef CONFIG_SMP
+#define preempt_stop		GET_THREAD_INFO(%ebp)			; \
+				XEN_GET_VCPU_INFO(%esi)			; \
 				XEN_BLOCK_EVENTS(%esi)
+#else
+#define preempt_stop		XEN_GET_VCPU_INFO(%esi)			; \
+				XEN_BLOCK_EVENTS(%esi)
+#endif
 #else
 #define preempt_stop
 #define resume_kernel		restore_all
@@ -209,7 +225,7 @@ ret_from_intr:
 	testl $(VM_MASK | 2), %eax
 	jz resume_kernel		# returning to kernel or vm86-space
 ENTRY(resume_userspace)
-	movl HYPERVISOR_shared_info,%esi
+	XEN_GET_VCPU_INFO(%esi)
 	XEN_BLOCK_EVENTS(%esi)		# make tests atomic
 					# make sure we don't miss an interrupt
 					# setting need_resched or sigpending
@@ -223,7 +239,7 @@ ret_syscall_tests:
 
 #ifdef CONFIG_PREEMPT
 ENTRY(resume_kernel)
-	movl HYPERVISOR_shared_info,%esi
+	XEN_GET_VCPU_INFO(%esi)
 	cmpl $0,TI_preempt_count(%ebp)	# non-zero preempt_count ?
 	jnz restore_all_enable_events
 need_resched:
@@ -236,7 +252,7 @@ need_resched:
 	XEN_UNBLOCK_EVENTS(%esi)	# reenable event callbacks
 	call schedule
 	movl $0,TI_preempt_count(%ebp)
-	movl HYPERVISOR_shared_info,%esi
+	XEN_GET_VCPU_INFO(%esi)
 	XEN_BLOCK_EVENTS(%esi)		# make tests atomic
 	jmp need_resched
 #endif
@@ -302,7 +318,7 @@ syscall_call:
 	call *sys_call_table(,%eax,4)
 	movl %eax,EAX(%esp)		# store the return value
 syscall_exit:
-	movl HYPERVISOR_shared_info,%esi
+	XEN_GET_VCPU_INFO(%esi)
 	XEN_BLOCK_EVENTS(%esi)		# make tests atomic
 					# make sure we don't miss an interrupt
 					# setting need_resched or sigpending
@@ -324,7 +340,7 @@ work_pending:
 	jz work_notifysig
 work_resched:
 	call schedule
-	movl HYPERVISOR_shared_info,%esi
+	XEN_GET_VCPU_INFO(%esi)
 	XEN_BLOCK_EVENTS(%esi)		# make tests atomic
 					# make sure we don't miss an interrupt
 					# setting need_resched or sigpending
@@ -346,7 +362,7 @@ work_notifysig:				# deal with pending signals and
 					# vm86-space
 	xorl %edx, %edx
 	call do_notify_resume
-	movl HYPERVISOR_shared_info,%esi
+	XEN_GET_VCPU_INFO(%esi)
 	jmp restore_all_enable_events
 
 	ALIGN
@@ -357,7 +373,7 @@ work_notifysig_v86:
 	movl %eax, %esp
 	xorl %edx, %edx
 	call do_notify_resume
-	movl HYPERVISOR_shared_info,%esi
+	XEN_GET_VCPU_INFO(%esi)
 	jmp restore_all_enable_events
 
 	# perform syscall exit tracing
@@ -375,7 +391,7 @@ syscall_trace_entry:
 	# perform syscall exit tracing
 	ALIGN
 syscall_exit_work:
-	movl HYPERVISOR_shared_info,%esi
+	XEN_GET_VCPU_INFO(%esi)
 	testb $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT), %cl
 	jz work_pending
 	XEN_UNBLOCK_EVENTS(%esi)	# reenable event callbacks
@@ -453,14 +469,14 @@ ENTRY(hypervisor_callback)
 11:	push %esp
 	call evtchn_do_upcall
 	add  $4,%esp
-	movl HYPERVISOR_shared_info,%esi
+	XEN_GET_VCPU_INFO(%esi)
 	movb CS(%esp),%cl
 	test $2,%cl			# slow return to ring 2 or 3
 	jne  ret_syscall_tests
 restore_all_enable_events:  
 safesti:XEN_UNBLOCK_EVENTS(%esi)	# reenable event callbacks
 scrit:	/**** START OF CRITICAL REGION ****/
-	testb $1,evtchn_upcall_pending(%esi)
+	XEN_TEST_PENDING(%esi)
 	jnz  14f			# process more events if necessary...
 	RESTORE_ALL
 14:	XEN_BLOCK_EVENTS(%esi)
@@ -492,7 +508,7 @@ critical_region_fixup:
 	jmp  11b
 
 critical_fixup_table:
-	.byte 0x00,0x00,0x00		# testb $0xff,(%esi)
+	.byte 0x00,0x00,0x00		# testb $0x1,(%esi) = XEN_TEST_PENDING
 	.byte 0x00,0x00			# jnz  14f
 	.byte 0x00			# pop  %ebx
 	.byte 0x04			# pop  %ecx
