@@ -32,7 +32,7 @@ class CreatePage1( Sheet ):
     def __init__( self, urlWriter ):
         Sheet.__init__( self, urlWriter, "Setup Kernel Image", 1 )
         self.addControl( ListControl( 'builder', [('linux', 'Linux'), ('netbsd', 'NetBSD')], 'Kernel Type:' ) )
-        self.addControl( FileControl( 'kernel', '/boot/vmlinuz-2.4.26-xenU', 'Kernel Image:' ) )
+        self.addControl( FileControl( 'kernel', '/boot/vmlinuz-2.6.9-xenU', 'Kernel Image:' ) )
         self.addControl( InputControl( 'extra', '', 'Kernel Command Line Parameters:' ) )
 
 class CreatePage2( Sheet ):
