@@ -46,11 +46,7 @@ unsigned int opt_vmx_debug_level;
 
 extern long evtchn_send(int lport);
 extern long do_block(void);
-
-#define VECTOR_DB   1
-#define VECTOR_BP   3
-#define VECTOR_GP   13
-#define VECTOR_PG   14
+void do_nmi(struct xen_regs *, unsigned long);
 
 int start_vmx()
 {
@@ -157,7 +153,7 @@ static void vmx_do_general_protection_fault(struct xen_regs *regs)
     intr_fields = (INTR_INFO_VALID_MASK | 
 		   INTR_TYPE_EXCEPTION |
 		   INTR_INFO_DELIEVER_CODE_MASK |
-		   VECTOR_GP);
+		   TRAP_gp_fault);
     __vmwrite(VM_ENTRY_INTR_INFO_FIELD, intr_fields);
     __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, error_code);
 }
@@ -763,14 +759,14 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
         TRACE_3D(TRC_VMX_VECTOR, ed->domain->id, eip, vector);
         switch (vector) {
 #ifdef XEN_DEBUGGER
-        case VECTOR_DB:
+        case TRAP_debug:
         {
             save_xen_regs(&regs);
             pdb_handle_exception(1, &regs, 1);
             restore_xen_regs(&regs);
             break;
         }
-        case VECTOR_BP:
+        case TRAP_int3:
         {
             save_xen_regs(&regs);
             pdb_handle_exception(3, &regs, 1);
@@ -778,12 +774,12 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
             break;
         }
 #endif
-        case VECTOR_GP:
+        case TRAP_gp_fault:
         {
             vmx_do_general_protection_fault(&regs);
             break;  
         }
-        case VECTOR_PG:
+        case TRAP_page_fault:
         {
             __vmread(EXIT_QUALIFICATION, &va);
             __vmread(VM_EXIT_INTR_ERROR_CODE, &error_code);
@@ -802,13 +798,16 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
                 intr_fields = (INTR_INFO_VALID_MASK | 
                            INTR_TYPE_EXCEPTION |
                            INTR_INFO_DELIEVER_CODE_MASK |
-                           VECTOR_PG);
+                           TRAP_page_fault);
                 __vmwrite(VM_ENTRY_INTR_INFO_FIELD, intr_fields);
                 __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, error_code);
                 ed->arch.arch_vmx.cpu_cr2 = va;
             }
             break;
         }
+        case TRAP_nmi:
+            do_nmi(&regs, 0);
+            break;
         default:
             __vmx_bug(&regs);
             break;
