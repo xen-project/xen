@@ -385,7 +385,8 @@ static inline void __putstr(const char *str)
 void printf (const char *fmt, ...)
 {
     va_list args;
-    char buf[128], *p = fmt;
+    char buf[128];
+    const char *p = fmt;
     unsigned long flags;
 
     /*

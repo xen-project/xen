@@ -52,7 +52,7 @@ static void dom_mem_cleanup(dom_mem_t * dom_mem)
 
     /* open the domain's /proc mem interface */
     sprintf(mem_path, "%s%s%s%s%d%s%s", "/proc/", PROC_XENO_ROOT, "/", 
-        PROC_DOM_PREFIX, dom_mem->domain, "/", PROC_DOM_MEM);
+            PROC_DOM_PREFIX, dom_mem->domain, "/", PROC_DOM_MEM);
 
     mem_fd = open(mem_path, O_WRONLY);
     if(mem_fd < 0){
@@ -81,7 +81,8 @@ static int setup_dom_memmap(unsigned long pfn, int pages, int dom)
     /* open the /proc command interface */
     sprintf(cmd_path, "%s%s%s%s", "/proc/", PROC_XENO_ROOT, "/", PROC_CMD);
     cmd_fd = open(cmd_path, O_WRONLY);
-    if(cmd_fd < 0){
+    if ( cmd_fd < 0 )
+    {
         perror(PERR_STRING);
         return -1;
     }
@@ -96,12 +97,12 @@ static int setup_dom_memmap(unsigned long pfn, int pages, int dom)
 static unsigned long get_vaddr(unsigned int dom)
 {
     char mem_path[MAX_PATH];
-	unsigned long addr;
+    unsigned long addr;
     int mem_fd;
 
     /* open the domain's /proc mem interface */
     sprintf(mem_path, "%s%s%s%s%d%s%s", "/proc/", PROC_XENO_ROOT, "/", 
-                    PROC_DOM_PREFIX, dom, "/", PROC_DOM_MEM);
+            PROC_DOM_PREFIX, dom, "/", PROC_DOM_MEM);
 
     mem_fd = open(mem_path, O_RDONLY);
     if(mem_fd < 0){
@@ -110,7 +111,7 @@ static unsigned long get_vaddr(unsigned int dom)
     }
 
     /* get virtual address of mapped region */
-	read(mem_fd, &addr, sizeof(addr));
+    read(mem_fd, &addr, sizeof(addr));
 	
     close(mem_fd);
 
@@ -118,7 +119,7 @@ static unsigned long get_vaddr(unsigned int dom)
 }
 
 static int map_dom_mem(unsigned long pfn, int pages, int dom, 
-    dom_mem_t * dom_mem)
+                       dom_mem_t * dom_mem)
 {
 
     if(setup_dom_memmap(pfn, pages, dom)){
@@ -139,7 +140,7 @@ static int map_dom_mem(unsigned long pfn, int pages, int dom,
 
 /* open kernel image and do some sanity checks */
 static int do_kernel_chcks(char *image, long dom_size, 
-    unsigned long * load_addr, size_t * ksize)
+                           unsigned long * load_addr, size_t * ksize)
 {
     char signature[8];
     char status[MAX_PATH];
@@ -157,25 +158,25 @@ static int do_kernel_chcks(char *image, long dom_size,
     if(fstat(fd, &stat) < 0){
         perror(PERR_STRING);
         ret = -1;
-		close(fd);
+        close(fd);
         goto out;
     }
 
     if(stat.st_size > (dom_size << 10)){
         sprintf(status, "Kernel image size %ld larger than requested "
-            "domain size %ld\n Terminated.\n", stat.st_size, dom_size);
+                "domain size %ld\n Terminated.\n", stat.st_size, dom_size);
         dberr(status);
         ret = -1;
-		close(fd);
+        close(fd);
         goto out;
     }
     
     read(fd, signature, SIG_LEN);
     if(strncmp(signature, GUEST_SIG, SIG_LEN)){
         dberr("Kernel image does not contain required signature. "
-		"Terminating.\n");
+              "Terminating.\n");
         ret = -1;
-		close(fd);
+        close(fd);
         goto out;
     }
 
@@ -185,7 +186,7 @@ static int do_kernel_chcks(char *image, long dom_size,
 
     ret = fd;
 
-out:    
+ out:    
     return ret;
 }
 
@@ -198,7 +199,7 @@ out:
  */ 
 #define PAGE_TO_VADDR(_pfn) ((void *)(dom_mem->vaddr + ((_pfn) * PAGE_SIZE)))
 static dom_meminfo_t *setup_guestos(int dom, int kernel_fd, int initrd_fd,
-    unsigned long virt_load_addr, size_t ksize, dom_mem_t *dom_mem)
+                                    unsigned long virt_load_addr, size_t ksize, dom_mem_t *dom_mem)
 {
     dom_meminfo_t *meminfo;
     unsigned long *page_array;
@@ -327,32 +328,32 @@ static dom_meminfo_t *setup_guestos(int dom, int kernel_fd, int initrd_fd,
     }
 
     if( initrd_fd )
-      {
+    {
 	struct stat stat;
 	unsigned long isize;
 
 	if(fstat(initrd_fd, &stat) < 0){
-	  perror(PERR_STRING);
-	  close(initrd_fd);
-	  goto out;
+            perror(PERR_STRING);
+            close(initrd_fd);
+            goto out;
 	}
 	isize = stat.st_size;
 
 	if( read(initrd_fd, ((char *)dom_mem->vaddr)+ksize, isize) != isize )
-	  {
+        {
 	    dberr("Error reading initrd image, could not"
 		  " read the whole image. Terminating.\n");
 	    goto out;
-	  }
+        }
 
 	meminfo->virt_mod_addr = virt_load_addr + ksize;
 	meminfo->virt_mod_len  = isize;
 
-      }
+    }
 
 
     ret = meminfo;
-out:
+ out:
 
     return ret;
 }
@@ -382,40 +383,40 @@ static int get_domain_info (int domain_id,
                             int *pg_head,
                             int *tot_pages)
 {
-  FILE *f; 
-  char domains_path[MAX_PATH];
-  char domains_line[256];
-  int rc = -1;
-  int read_id;
+    FILE *f; 
+    char domains_path[MAX_PATH];
+    char domains_line[256];
+    int rc = -1;
+    int read_id;
 
-  sprintf (domains_path, "%s%s%s%s", "/proc/", PROC_XENO_ROOT, "/", PROC_DOMAINS
-);
+    sprintf (domains_path, "%s%s%s%s", "/proc/", PROC_XENO_ROOT, "/", PROC_DOMAINS
+        );
 
-  f = fopen (domains_path, "r");
-  if (f == NULL) goto out;
+    f = fopen (domains_path, "r");
+    if (f == NULL) goto out;
 
-  read_id = -1;
-  while (fgets (domains_line, 256, f) != 0)
+    read_id = -1;
+    while (fgets (domains_line, 256, f) != 0)
     { 
-      int trans;
-      trans = sscanf (domains_line, "%d %*d %*d %*d %*d %*d %x %d %*s", &read_id
-, pg_head, tot_pages);
-      if (trans == 3) {
-        if (read_id == domain_id) {
-          rc = 0;
-          break;
+        int trans;
+        trans = sscanf (domains_line, "%d %*d %*d %*d %*d %*d %x %d %*s", &read_id
+                        , pg_head, tot_pages);
+        if (trans == 3) {
+            if (read_id == domain_id) {
+                rc = 0;
+                break;
+            }
         }
-      }
     }
 
-  if (read_id == -1) {
-    errno = ESRCH;
-  }
+    if (read_id == -1) {
+        errno = ESRCH;
+    }
 
-  fclose (f);
+    fclose (f);
 
  out:
-  return rc;
+    return rc;
 }
 
 
@@ -450,35 +451,39 @@ int main(int argc, char **argv)
 
     /* Look up information about the domain */
     domain_id = atol(argv[1]);
-    if (get_domain_info (domain_id, &pg_head, &tot_pages) != 0) {
-      perror ("Could not find domain information");
-      rc = -1;
-      goto out;
+    if ( get_domain_info (domain_id, &pg_head, &tot_pages) != 0 ) 
+    {
+        perror ("Could not find domain information");
+        rc = -1;
+        goto out;
     }
 	     
-    kernel_fd = do_kernel_chcks(argv[2], tot_pages << (PAGE_SHIFT - 10), &load_addr, &ksize);
-    if(kernel_fd < 0)
+    kernel_fd = do_kernel_chcks(argv[2], 
+                                tot_pages << (PAGE_SHIFT - 10), 
+                                &load_addr, &ksize);
+    if ( kernel_fd < 0 )
 	return -1;
     
 
     /* map domain's memory */
-    if(map_dom_mem(pg_head, tot_pages,
-		   domain_id, &dom_os_image))
+    if ( map_dom_mem(pg_head, tot_pages,
+                     domain_id, &dom_os_image) )
         goto out;
 
-    if( strncmp("initrd=", argv[args_start], 7) == 0 )
-      {
+    if( (argc > args_start) && 
+        (strncmp("initrd=", argv[args_start], 7) == 0) )
+    {
 	strncpy( initrd_name, argv[args_start]+7, sizeof(initrd_name) );
 	initrd_name[sizeof(initrd_name)-1] = 0;
 	printf("initrd present, name = %s\n", initrd_name );
 	args_start++;
-
+        
 	initrd_fd = open(initrd_name, O_RDONLY);
 	if(initrd_fd < 0){
-	  perror(PERR_STRING);
-	  goto out;
+            perror(PERR_STRING);
+            goto out;
 	}
-      }
+    }
 
     /* the following code does the actual domain building */
     meminfo = setup_guestos(domain_id, kernel_fd, initrd_fd, load_addr, 
@@ -507,18 +512,18 @@ int main(int argc, char **argv)
     }
 
     /*    sprintf(status, 
-	    "About to launch new domain %d with folowing parameters:\n"
-	    " * page table base: %lx \n * load address: %lx \n"
-	    " * shared info address: %lx \n * start info address: %lx \n"
-	    " * number of vifs: %d \n * cmd line: %s \n", meminfo->domain, 
-	    meminfo->l2_pgt_addr, meminfo->virt_load_addr, 
-	    meminfo->virt_shinfo_addr, meminfo->virt_startinfo_addr, 
-	    meminfo->num_vifs, meminfo->cmd_line);
-	    dbstatus(status);*/
+          "About to launch new domain %d with folowing parameters:\n"
+          " * page table base: %lx \n * load address: %lx \n"
+          " * shared info address: %lx \n * start info address: %lx \n"
+          " * number of vifs: %d \n * cmd line: %s \n", meminfo->domain, 
+          meminfo->l2_pgt_addr, meminfo->virt_load_addr, 
+          meminfo->virt_shinfo_addr, meminfo->virt_startinfo_addr, 
+          meminfo->num_vifs, meminfo->cmd_line);
+          dbstatus(status);*/
     
     /* and launch the domain */
     rc = launch_domain(meminfo); 
     
-out:
+ out:
     return rc;
 }

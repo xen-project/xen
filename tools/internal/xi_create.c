@@ -30,7 +30,7 @@ static void ERROR (char *message)
 
 static void PERROR (char *message)
 {
-  fprintf (stderr, "%s: %s (%s)\n", argv0, message, sys_errlist[errno]);
+  fprintf (stderr, "%s: %s (%s)\n", argv0, message, strerror(errno));
   exit (-1);
 }
 
