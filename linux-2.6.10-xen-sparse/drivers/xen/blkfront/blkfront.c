@@ -223,6 +223,7 @@ int blkif_release(struct inode *inode, struct file *filep)
 int blkif_ioctl(struct inode *inode, struct file *filep,
                 unsigned command, unsigned long argument)
 {
+	int i;
     /*  struct gendisk *gd = inode->i_bdev->bd_disk; */
 
     DPRINTK_IOCTL("command: 0x%x, argument: 0x%lx, dev: 0x%04x\n",
@@ -233,6 +234,12 @@ int blkif_ioctl(struct inode *inode, struct file *filep,
     case HDIO_GETGEO:
         /* return ENOSYS to use defaults */
         return -ENOSYS;
+
+    case CDROMMULTISESSION:
+        DPRINTK("FIXME: support multisession CDs later\n");
+        for ( i = 0; i < sizeof(struct cdrom_multisession); i++ )
+            if ( put_user(0, (byte *)(argument + i)) ) return -EFAULT;
+        return 0;
 
     default:
         printk(KERN_ALERT "ioctl %08x not supported by Xen blkdev\n",
