@@ -216,7 +216,20 @@ shutdown_formats = {
 msg_formats.update(shutdown_formats)
 
 #============================================================================
+# Domain memory reservation message.
+#============================================================================
 
+CMSG_MEM_REQUEST = 7
+CMSG_MEM_REQUEST_SET = 0
+
+mem_request_formats = {
+    'mem_request_t':
+    (CMSG_MEM_REQUEST, CMSG_MEM_REQUEST_SET)
+    }
+
+msg_formats.update(mem_request_formats)
+
+#============================================================================
 class Msg:
     pass
 

@@ -33,6 +33,7 @@ class DomainController(controller.Controller):
     def __init__(self, factory, dom):
         controller.Controller.__init__(self, factory, dom)
         self.addMethod(CMSG_SHUTDOWN, 0, None)
+        self.addMethod(CMSG_MEM_REQUEST, 0, None)
         self.registerChannel()
 
     def shutdown(self, reason):
@@ -44,4 +45,10 @@ class DomainController(controller.Controller):
         if not msgtype:
             raise XendError('invalid reason:' + reason)
         msg = packMsg(msgtype, {})
+        self.writeRequest(msg)
+
+    def mem_target_set(self, target):
+        """Set domain memory target in pages.
+        """
+        msg = packMsg('mem_request_t', { 'target' : target * (1 << 8)} )
         self.writeRequest(msg)

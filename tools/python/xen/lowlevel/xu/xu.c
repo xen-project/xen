@@ -479,6 +479,10 @@ static PyObject *xu_message_get_payload(PyObject *self, PyObject *args)
     case TYPE(CMSG_NETIF_BE, CMSG_NETIF_BE_DRIVER_STATUS):
         C2P(netif_be_driver_status_t, status, Int, Long);
         return dict;
+    case TYPE(CMSG_MEM_REQUEST, CMSG_MEM_REQUEST_SET):
+        C2P(mem_request_t, target, Int, Long);
+        C2P(mem_request_t, status, Int, Long);
+        return dict;
     }
 
     return PyString_FromStringAndSize(xum->msg.msg, xum->msg.length);
@@ -639,6 +643,10 @@ static PyObject *xu_message_new(PyObject *self, PyObject *args)
     case TYPE(CMSG_NETIF_FE, CMSG_NETIF_FE_DRIVER_STATUS):
         P2C(netif_fe_driver_status_t, status,        u32);
         P2C(netif_fe_driver_status_t, max_handle,    u32);
+        break;
+    case TYPE(CMSG_MEM_REQUEST, CMSG_MEM_REQUEST_SET):
+        P2C(mem_request_t, target, u32);
+        P2C(mem_request_t, status, u32);
         break;
     }
 

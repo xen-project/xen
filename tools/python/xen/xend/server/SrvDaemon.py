@@ -706,6 +706,16 @@ class Daemon:
             raise XendError('No domain controller: %s' % dom)
         ctrl.shutdown(reason)
         return 0
+
+    def domain_mem_target_set(self, dom, target):
+        """Set memory target for a domain.
+        """
+        dom = int(dom)
+        ctrl = self.domainCF.getController(dom)
+        if not ctrl:
+            raise XendError('No domain controller: %s' % dom)
+        ctrl.mem_target_set(target)
+        return 0
         
 def instance():
     global inst

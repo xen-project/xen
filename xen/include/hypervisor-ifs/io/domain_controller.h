@@ -53,6 +53,7 @@ typedef struct {
 #define CMSG_NETIF_BE       3  /* Network-device backend  */
 #define CMSG_NETIF_FE       4  /* Network-device frontend */
 #define CMSG_SHUTDOWN       6  /* Shutdown messages       */
+#define CMSG_MEM_REQUEST    7  /* Memory reservation reqs */
 
 
 /******************************************************************************
@@ -554,5 +555,24 @@ typedef struct {
 #define CMSG_SHUTDOWN_REBOOT    1   /* Clean shutdown (SHUTDOWN_reboot).     */
 #define CMSG_SHUTDOWN_SUSPEND   2   /* Create suspend info, then             */
                                     /* SHUTDOWN_suspend.                     */
+
+
+/******************************************************************************
+ * MEMORY CONTROLS
+ */
+
+#define CMSG_MEM_REQUEST_SET 0 /* Request a domain to set its mem footprint. */
+
+/*
+ * CMSG_MEM_REQUEST:
+ *  Request that the domain change its memory reservation.
+ */
+typedef struct {
+    /* OUT */
+    u32 target;       /* 0: Target memory reservation in pages.       */
+    /* IN  */
+    u32 status;       /* 4: Return code indicates success or failure. */
+} PACKED mem_request_t; /* 8 bytes */
+
 
 #endif /* __DOMAIN_CONTROLLER_H__ */

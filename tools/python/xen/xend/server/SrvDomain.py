@@ -194,12 +194,19 @@ class SrvDomain(SrvDir):
         val = fn(req.args, {'dom': self.dom.id})
         return val
 
+    def op_mem_target_set(self, op, req):
+        fn = FormFn(self.xd.domain_mem_target_set,
+                    [['dom', 'str'],
+                     ['target', 'int']])
+        val = fn(req.args, {'dom': self.dom.id})
+        return val
+
     def render_POST(self, req):
         return self.perform(req)
         
     def render_GET(self, req):
         op = req.args.get('op')
-        if op and op[0] in ['vifs', 'vif', 'vbds', 'vbd']:
+        if op and op[0] in ['vifs', 'vif', 'vbds', 'vbd', 'mem_target_set']:
             return self.perform(req)
         if self.use_sxp(req):
             req.setHeader("Content-Type", sxp.mime_type)

@@ -811,6 +811,10 @@ class XendDomain:
         except Exception, ex:
             raise XendError(str(ex))
 
+    def domain_mem_target_set(self, id, target):
+        return xend.domain_mem_target_set(id, target)
+        
+
 
 def instance():
     """Singleton constructor. Use this instead of the class constructor.

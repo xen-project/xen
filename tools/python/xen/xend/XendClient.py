@@ -350,6 +350,12 @@ class Xend:
                              {'op'      : 'inject',
                               'event'   : fileof(sxpr) })
 
+    def xend_domain_mem_target_set(self, id, mem_target):
+        val = self.xendPost(self.domainurl(id),
+                            {'op'         : 'mem_target_set',
+                             'target'     : mem_target })
+        return val
+
 def getAsynchXendClientProtocol():
     """Load AsynchXendClientProtocol on demand to avoid the cost.
     """

@@ -466,6 +466,24 @@ class ProgMaxmem(Prog):
 
 xm.prog(ProgMaxmem)
 
+class ProgBalloon(Prog):
+    group = 'domain'
+    name  = 'balloon'
+    info  = """Set the domain's memory footprint using the balloon driver."""
+
+    def help(self, args):
+        print args[0], "DOM MEMORY_TARGET"
+        print """\nRequest domain DOM to adjust its memory footprint to
+MEMORY_TARGET megabytes"""
+
+    def main(self, args):
+        if len(args) != 3: self.err("%s: Invalid argument(s)" % args[0])
+        dom = args[1]
+        mem_target = int(args[2])
+        server.xend_domain_mem_target_set(dom, mem_target)
+
+xm.prog(ProgBalloon)
+
 class ProgDomid(Prog):
     group = 'domain'
     name = 'domid'
