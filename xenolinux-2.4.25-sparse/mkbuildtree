@@ -49,15 +49,39 @@ abs_to_rel ()
 	[ "${DESTPATH##*[^/]}" = "/" ] && DESTPATH=${DESTPATH%?}
 }
 
+# relative_lndir <target_dir>
+# Creates a tree of symlinks in the current working directory that mirror
+# real files in <target_dir>. <target_dir> should be relative to the current
+# working directory. Symlinks in <target_dir> are ignored. Source-control files
+# are ignored.
+relative_lndir ()
+{
+  local SYMLINK_DIR REAL_DIR pref i j
+  SYMLINK_DIR=$PWD
+  REAL_DIR=$1
+  (
+  cd $REAL_DIR
+  for i in `find . -type d | grep -v SCCS`; do
+    [ -d $SYMLINK_DIR/$i ] || mkdir -p $SYMLINK_DIR/$i
+    (
+    cd $i
+    pref=`echo $i | sed -e 's#/[^/]*#../#g' -e 's#^\.##'`
+    for j in `find . -type f -maxdepth 1`; do
+      ln -sf ${pref}${REAL_DIR}/$i/$j ${SYMLINK_DIR}/$i/$j
+    done
+    )
+  done
+  )
+}
 
 [ "$1" == "" ] && { echo "Syntax: $0 <linux tree to xenify>"; exit 1; }
 
 # Get absolute path to the destination directory
 pushd . >/dev/null
 cd ${1}
-AD=`pwd`
+AD=$PWD
 popd >/dev/null
-
+  
 # Get absolute path to the source directory
 AS=`pwd`
 
@@ -71,9 +95,12 @@ for i in `find . -type f -o -type l` ; do rm -f ${AD}/${i#./} ; done
 # We now work from the destination directory
 cd ${AD}
 
+# Remove old symlinks
+for i in `find . -type l`; do rm -f $i; done
+
 # Create symlinks of files and directories which exist in the sparse source
-${AS}/lndir-rel -silent ${RS}
-rm -f mkbuildtree lndir-rel
+relative_lndir ${RS}
+rm -f mkbuildtree
 
 ## There are a whole bunch of special symlinks, mostly for files
 ## which are identical in the i386 and xeno-i386 architecture-dependent
@@ -83,7 +110,7 @@ rm -f mkbuildtree lndir-rel
 rm -rf ${AD}/include/asm-xeno/hypervisor-ifs
 mkdir  ${AD}/include/asm-xeno/hypervisor-ifs
 cd     ${AD}/include/asm-xeno/hypervisor-ifs
-${AS}/lndir-rel -silent ../../../${RS}/../xen/include/hypervisor-ifs
+relative_lndir ../../../${RS}/../xen/include/hypervisor-ifs
 
 # The remainder are the i386 -> xeno-i386 links
 cd ..
