@@ -656,39 +656,6 @@ static inline void set_shadow_status(
   
 #ifdef CONFIG_VMX
 
-static inline void vmx_update_shadow_state(
-    struct exec_domain *ed, unsigned long gmfn, unsigned long smfn)
-{
-
-    l2_pgentry_t *mpl2e = 0;
-    l2_pgentry_t *gpl2e, *spl2e;
-
-    /* unmap the old mappings */
-    if ( ed->arch.shadow_vtable )
-        unmap_domain_mem(ed->arch.shadow_vtable);
-    if ( ed->arch.guest_vtable )
-        unmap_domain_mem(ed->arch.guest_vtable);
-
-    /* new mapping */
-    mpl2e = (l2_pgentry_t *)
-        map_domain_mem(pagetable_val(ed->arch.monitor_table));
-
-    // mafetter: why do we need to keep setting up shadow_linear_pg_table for
-    // this monitor page table?  Seems unnecessary...
-    //
-    mpl2e[l2_table_offset(SH_LINEAR_PT_VIRT_START)] =
-        mk_l2_pgentry((smfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
-    __flush_tlb_one(SH_LINEAR_PT_VIRT_START);
-
-    spl2e = (l2_pgentry_t *)map_domain_mem(smfn << PAGE_SHIFT);
-    gpl2e = (l2_pgentry_t *)map_domain_mem(gmfn << PAGE_SHIFT);
-    memset(spl2e, 0, L2_PAGETABLE_ENTRIES * sizeof(l2_pgentry_t));
-
-    ed->arch.shadow_vtable = spl2e;
-    ed->arch.guest_vtable = gpl2e; /* expect the guest did clean this up */
-    unmap_domain_mem(mpl2e);
-}
-
 static inline unsigned long gva_to_gpte(unsigned long gva)
 {
     unsigned long gpde, gpte, pfn, index;
@@ -737,18 +704,44 @@ static inline void __update_pagetables(struct exec_domain *ed)
 
     if ( unlikely(smfn == 0) )
         smfn = shadow_l2_table(d, gmfn);
-#ifdef CONFIG_VMX
-    else if ( shadow_mode_translate(ed->domain) )
-        vmx_update_shadow_state(ed, gmfn, smfn);
-#endif
 
     ed->arch.shadow_table = mk_pagetable(smfn<<PAGE_SHIFT);
 
-    if ( !shadow_mode_external(ed->domain) )
-        // mafetter: why do we need to keep overwriting
-        // ed->arch.monitor_table?  Seems unnecessary...
-        //
-        ed->arch.monitor_table = ed->arch.shadow_table;
+    if  ( shadow_mode_translate(ed->domain) )
+    {
+        l2_pgentry_t *gpl2e, *spl2e;
+
+        if ( ed->arch.guest_vtable )
+            unmap_domain_mem(ed->arch.guest_vtable);
+        if ( ed->arch.shadow_vtable )
+            unmap_domain_mem(ed->arch.shadow_vtable);
+
+        gpl2e = ed->arch.guest_vtable =
+            map_domain_mem(pagetable_val(ed->arch.guest_table));
+        spl2e = ed->arch.shadow_vtable =
+            map_domain_mem(pagetable_val(ed->arch.shadow_table));
+
+        if ( shadow_mode_external(ed->domain ) )
+        {
+            l2_pgentry_t *mpl2e = ed->arch.monitor_vtable;
+            unsigned long old_smfn;
+            unsigned sh_l2offset = l2_table_offset(SH_LINEAR_PT_VIRT_START);
+            
+            old_smfn = l2_pgentry_val(mpl2e[sh_l2offset]) >> PAGE_SHIFT;
+            if ( old_smfn != smfn )
+            {
+                mpl2e[sh_l2offset] =
+                    mk_l2_pgentry((smfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
+                local_flush_tlb();
+            }
+        }
+
+        if ( ed->arch.arch_vmx.flags )
+        {
+            // Why is VMX mode doing this?
+            memset(spl2e, 0, L2_PAGETABLE_ENTRIES * sizeof(l2_pgentry_t));
+        }
+    }
 }
 
 static inline void update_pagetables(struct exec_domain *ed)
@@ -759,18 +752,18 @@ static inline void update_pagetables(struct exec_domain *ed)
          __update_pagetables(ed);
          shadow_unlock(ed->domain);
      }
+     if ( !shadow_mode_external(ed->domain) )
+     {
 #ifdef __x86_64__
-     else if ( !(ed->arch.flags & TF_kernel_mode) )
-         // mafetter: why do we need to keep overwriting
-         // ed->arch.monitor_table?  Seems unnecessary...
-         //
-         ed->arch.monitor_table = ed->arch.guest_table_user;
+         if ( !(ed->arch.flags & TF_kernel_mode) )
+             ed->arch.monitor_table = ed->arch.guest_table_user;
+         else
 #endif
-     else
-         // mafetter: why do we need to keep overwriting
-         // ed->arch.monitor_table?  Seems unnecessary...
-         //
-         ed->arch.monitor_table = ed->arch.guest_table;
+         if ( shadow_mode_enabled(ed->domain) )
+             ed->arch.monitor_table = ed->arch.shadow_table;
+         else
+             ed->arch.monitor_table = ed->arch.guest_table;
+     }
 }
 
 #if SHADOW_DEBUG

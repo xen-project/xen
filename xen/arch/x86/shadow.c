@@ -489,15 +489,7 @@ unsigned long shadow_l2_table(
  
 #ifdef __i386__
     /* Install hypervisor and 2x linear p.t. mapings. */
-    if ( shadow_mode_translate(d) )
-    {
-#ifdef CONFIG_VMX
-        vmx_update_shadow_state(d->exec_domain[0], gmfn, spfn);
-#else
-        panic("Shadow Full 32 not yet implemented without VMX\n");
-#endif
-    }
-    else
+    if ( !shadow_mode_translate(d) )
     {
         l2_pgentry_t *spl2e;
         spl2e = (l2_pgentry_t *)map_domain_mem(spfn << PAGE_SHIFT);

@@ -248,6 +248,10 @@ void arch_do_createdomain(struct exec_domain *ed)
         machine_to_phys_mapping[virt_to_phys(d->arch.mm_perdomain_pt) >> 
                                PAGE_SHIFT] = INVALID_M2P_ENTRY;
         ed->arch.perdomain_ptes = d->arch.mm_perdomain_pt;
+#if 0 /* don't need this yet, but maybe soon! */
+        ed->arch.guest_vtable = linear_l2_table;
+        ed->arch.shadow_vtable = shadow_linear_l2_table;
+#endif
 
 #ifdef __x86_64__
         d->arch.mm_perdomain_l2 = (l2_pgentry_t *)alloc_xenheap_page();
@@ -312,11 +316,12 @@ static void alloc_monitor_pagetable(struct exec_domain *ed)
            &idle_pg_table[DOMAIN_ENTRIES_PER_L2_PAGETABLE],
            HYPERVISOR_ENTRIES_PER_L2_PAGETABLE * sizeof(l2_pgentry_t));
 
-    ed->arch.monitor_table = mk_pagetable(mpfn << PAGE_SHIFT);
-
     mpl2e[l2_table_offset(PERDOMAIN_VIRT_START)] =
         mk_l2_pgentry((__pa(d->arch.mm_perdomain_pt) & PAGE_MASK) 
                       | __PAGE_HYPERVISOR);
+
+    ed->arch.monitor_table = mk_pagetable(mpfn << PAGE_SHIFT);
+    ed->arch.monitor_vtable = mpl2e;
 
     phys_table = (l2_pgentry_t *)
         map_domain_mem(pagetable_val(ed->arch.phys_table));
@@ -324,7 +329,6 @@ static void alloc_monitor_pagetable(struct exec_domain *ed)
            L1_PAGETABLE_ENTRIES * sizeof(l1_pgentry_t));
 
     unmap_domain_mem(phys_table);
-    unmap_domain_mem(mpl2e);
 }
 
 /*
@@ -337,8 +341,8 @@ static void free_monitor_pagetable(struct exec_domain *ed)
 
     ASSERT( pagetable_val(ed->arch.monitor_table) );
     
-    mpl2e = (l2_pgentry_t *)
-        map_domain_mem(pagetable_val(ed->arch.monitor_table));
+    mpl2e = ed->arch.monitor_vtable;
+
     /*
      * First get the pfn for hl2_table by looking at monitor_table
      */
@@ -355,6 +359,7 @@ static void free_monitor_pagetable(struct exec_domain *ed)
     free_domheap_page(&frame_table[mpfn]);
 
     ed->arch.monitor_table = mk_pagetable(0);
+    ed->arch.monitor_vtable = 0;
 }
 
 static int vmx_final_setup_guest(struct exec_domain *ed,
