@@ -5,7 +5,6 @@ import java.util.LinkedList;
 import org.xenoserver.control.CommandFailedException;
 import org.xenoserver.control.CommandVdDelete;
 import org.xenoserver.control.Defaults;
-import org.xenoserver.control.VirtualDiskManager;
 
 public class ParseVdDelete extends CommandParser {
     public void parse(Defaults d, LinkedList args)
@@ -17,11 +16,6 @@ public class ParseVdDelete extends CommandParser {
         }
 
         loadState();
-        if (VirtualDiskManager.IT.getVirtualDisk(vd_key) == null) {
-            throw new CommandFailedException(
-                "Virtual disk " + vd_key + " does not exist");
-        }
-
         String output = new CommandVdDelete(vd_key).execute();
         if (output != null) {
             System.out.println(output);

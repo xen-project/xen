@@ -142,7 +142,7 @@ public class Partition {
      * @param other Other partition to compare to.
      * @return True if they are identical.
      */
-    public boolean identical(Partition other) {
+    boolean identical(Partition other) {
         return this.major == other.major
             && this.minor == other.minor
             && this.blocks == other.blocks
@@ -154,7 +154,7 @@ public class Partition {
     /**
      * @return An Extent covering this partiton.
      */
-    public Extent toExtent() {
+    Extent toExtent() {
         return new Extent(getDisk(),start_sect,nr_sects);
     }
 
@@ -162,7 +162,7 @@ public class Partition {
      * @param e Extent to compare this partition to.
      * @return True if this partition covers the same disk area as the given extent.
      */
-    public boolean matchesExtent(Extent e) {
+    boolean matchesExtent(Extent e) {
         return e.getDisk() == getDisk()
             && e.getOffset() == start_sect
             && e.getSize() == nr_sects;

@@ -8,7 +8,7 @@ import java.io.IOException;
  */
 public class CommandVbdCreatePhysical extends Command {
     /** Virtual disk to map to. */
-    private Partition partition;
+    private String partition_name;
     /** Domain to create VBD for. */
     private int domain_id;
     /** VBD number to use. */
@@ -24,11 +24,11 @@ public class CommandVbdCreatePhysical extends Command {
      * @param mode Access mode to grant.
      */
     public CommandVbdCreatePhysical(
-        Partition partition,
+        String partition,
         int domain_id,
         int vbd_num,
         Mode mode) {
-        this.partition = partition;
+        this.partition_name = partition;
         this.domain_id = domain_id;
         this.vbd_num = vbd_num;
         this.mode = mode;
@@ -38,14 +38,17 @@ public class CommandVbdCreatePhysical extends Command {
      * @see org.xenoserver.control.Command#execute()
      */
     public String execute() throws CommandFailedException {
-        VirtualDisk vd = new VirtualDisk("vbd:"+partition.getName());
-        vd.addPartition(partition,partition.getNumSects());
+        Partition partition = PartitionManager.IT.getPartition(partition_name);
+        if (partition == null) {
+            throw new CommandFailedException(
+                "No partition " + partition_name + " exists");
+        }
 
-        VirtualBlockDevice vbd = new VirtualBlockDevice(
-                vd,
-                domain_id,
-                vbd_num,
-                mode);
+        VirtualDisk vd = new VirtualDisk("vbd:" + partition.getName());
+        vd.addPartition(partition, partition.getNumSects());
+
+        VirtualBlockDevice vbd =
+            new VirtualBlockDevice(vd, domain_id, vbd_num, mode);
 
         String command = vd.dumpForXen(vbd);
 
@@ -55,7 +58,9 @@ public class CommandVbdCreatePhysical extends Command {
             fw.flush();
             fw.close();
         } catch (IOException e) {
-            throw new CommandFailedException("Could not write VBD details to /proc/xeno/dom0/vhd", e);
+            throw new CommandFailedException(
+                "Could not write VBD details to /proc/xeno/dom0/vhd",
+                e);
         }
 
         return "Created virtual block device "

@@ -8,7 +8,7 @@ import java.io.IOException;
  */
 public class CommandVbdCreate extends Command {
     /** Virtual disk to map to. */
-    private VirtualDisk vd;
+    private String vd_key;
     /** Domain to create VBD for. */
     private int domain_id;
     /** VBD number to use. */
@@ -24,11 +24,11 @@ public class CommandVbdCreate extends Command {
      * @param mode Access mode to grant.
      */
     public CommandVbdCreate(
-        VirtualDisk vd,
+        String vd,
         int domain_id,
         int vbd_num,
         Mode mode) {
-        this.vd = vd;
+        this.vd_key = vd;
         this.domain_id = domain_id;
         this.vbd_num = vbd_num;
         this.mode = mode;
@@ -38,9 +38,13 @@ public class CommandVbdCreate extends Command {
      * @see org.xenoserver.control.Command#execute()
      */
     public String execute() throws CommandFailedException {
-        VirtualBlockDevice vbd;
+        VirtualDisk vd = VirtualDiskManager.IT.getVirtualDisk(vd_key);
+        if (vd == null) {
+            throw new CommandFailedException(
+                "No virtual disk with key " + vd_key);
+        }
 
-        vbd =
+        VirtualBlockDevice vbd =
             VirtualDiskManager.IT.createVirtualBlockDevice(
                 vd,
                 domain_id,

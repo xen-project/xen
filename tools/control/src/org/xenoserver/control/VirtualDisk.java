@@ -227,7 +227,7 @@ public class VirtualDisk {
      * Reset the expiry time for this virtual disk.
      * @param expiry The new expiry time, or null for never.
      */
-    public void refreshExpiry(Date expiry) {
+    void refreshExpiry(Date expiry) {
         this.expiry = expiry;
     }
 }

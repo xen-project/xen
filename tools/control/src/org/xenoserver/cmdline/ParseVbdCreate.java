@@ -7,10 +7,6 @@ import org.xenoserver.control.CommandVbdCreate;
 import org.xenoserver.control.CommandVbdCreatePhysical;
 import org.xenoserver.control.Defaults;
 import org.xenoserver.control.Mode;
-import org.xenoserver.control.Partition;
-import org.xenoserver.control.PartitionManager;
-import org.xenoserver.control.VirtualDisk;
-import org.xenoserver.control.VirtualDiskManager;
 
 public class ParseVbdCreate extends CommandParser {
     public void parse(Defaults d, LinkedList args)
@@ -41,21 +37,10 @@ public class ParseVbdCreate extends CommandParser {
         loadState();
         String output;
         if (vd_key.equals("")) {
-            Partition p = PartitionManager.IT.getPartition(partition_name);
-            if ( p == null ) {
-                throw new CommandFailedException("No partition " + partition_name + " exists" );
-            }
-            
-            output = new CommandVbdCreatePhysical( p, domain_id, vbd_num, mode ).execute();
+            output = new CommandVbdCreatePhysical( partition_name, domain_id, vbd_num, mode ).execute();
         } else {
-            VirtualDisk vd = VirtualDiskManager.IT.getVirtualDisk(vd_key);
-            if (vd == null) {
-                throw new CommandFailedException(
-                    "No virtual disk with key " + vd_key);
-            }
-
             output =
-                new CommandVbdCreate(vd, domain_id, vbd_num, mode).execute();
+                new CommandVbdCreate(vd_key, domain_id, vbd_num, mode).execute();
         }
         if (output != null) {
             System.out.println(output);
