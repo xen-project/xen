@@ -678,8 +678,8 @@ int reprogram_ac_timer(s_time_t timeout)
     expire = timeout - now; /* value from now */
 
     if (expire <= 0) {
-        printk("APICT[%02d] Timeout in the past 0x%08X%08X > 0x%08X%08X\n", 
-               cpu, (u32)(now>>32), (u32)now, (u32)(timeout>>32),(u32)timeout);
+        Dprintk("APICT[%02d] Timeout in the past 0x%08X%08X > 0x%08X%08X\n", 
+                cpu, (u32)(now>>32), (u32)now, (u32)(timeout>>32),(u32)timeout);
         return 0;       /* timeout value in the past */
     }
 
@@ -694,11 +694,11 @@ int reprogram_ac_timer(s_time_t timeout)
     apic_tmict = (((u64)bus_scale) * expire)>>18;
 
     if (apic_tmict >= 0xffffffff) {
-        printk("APICT[%02d] Timeout value too large\n", cpu);
+        Dprintk("APICT[%02d] Timeout value too large\n", cpu);
         apic_tmict = 0xffffffff;
     }
     if (apic_tmict == 0) {
-        printk("APICT[%02d] timeout value too small\n", cpu);
+        Dprintk("APICT[%02d] timeout value too small\n", cpu);
         return 0;
     }
 
@@ -706,8 +706,6 @@ int reprogram_ac_timer(s_time_t timeout)
     /* Program the timer. */
     apic_write(APIC_TMICT, (unsigned long)apic_tmict);
 
-    TRC(printk("APICT[%02d] reprog(): expire=%lld %u\n",
-               cpu, expire, apic_tmict));
     return 1;
 }
 

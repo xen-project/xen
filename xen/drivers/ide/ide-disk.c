@@ -1399,7 +1399,9 @@ static void idedisk_setup (ide_drive_t *drive)
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (drive->using_dma)
 		(void) HWIF(drive)->dmaproc(ide_dma_verbose, drive);
+	else
 #endif /* CONFIG_BLK_DEV_IDEDMA */
+		printk(" PIO (slow!)");
 	printk("\n");
 
 	drive->mult_count = 0;
