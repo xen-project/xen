@@ -563,7 +563,12 @@ long do_set_trap_table(trap_info_t *traps)
     trap_info_t cur;
     trap_info_t *dst = current->thread.traps;
 
-    memset(dst, 0, sizeof(*dst) * 256);
+    /*
+     * I'm removing the next line, since it seems more intuitive to use this 
+     * as an interface to incrementally update a domain's trap table. Clearing 
+     * out old entries automatically is rather antisocial!
+     */
+    /*memset(dst, 0, sizeof(*dst) * 256);*/
 
     for ( ; ; )
     {
