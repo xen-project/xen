@@ -36,6 +36,10 @@
 #include <asm/apic.h>
 #include <asm/tlb.h>
 
+/* XEN: We *cannot* use mmx_clear_page() this early. Force dumb memset(). */
+#undef clear_page
+#define clear_page(page) memset((void *)(page), 0, PAGE_SIZE)
+
 mmu_gather_t mmu_gathers[NR_CPUS];
 unsigned long highstart_pfn, highend_pfn;
 static unsigned long totalram_pages;
