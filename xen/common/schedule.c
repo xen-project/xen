@@ -217,10 +217,7 @@ void domain_sleep(struct exec_domain *d)
  
     /* Synchronous. */
     while ( test_bit(EDF_RUNNING, &d->ed_flags) && !domain_runnable(d) )
-    {
-        smp_mb();
         cpu_relax();
-    }
 }
 
 void domain_wake(struct exec_domain *ed)

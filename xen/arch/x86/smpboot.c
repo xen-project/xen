@@ -407,7 +407,7 @@ void __init start_secondary(void)
     smp_callin();
 
     while (!atomic_read(&smp_commenced))
-        rep_nop();
+        cpu_relax();
 
 #ifdef __i386__
     /*
