@@ -45,5 +45,5 @@ ps/%.ps: %.dvi $(GFX)
 
 html/%/index.html: src/%.tex
 	mkdir -p html/$*
-	latex2html -split 0 -nonavigation -noinfo -math -dir html/$* $< \
-	1>/dev/null 2>/dev/null
+	latex2html -split 0 -show_section_numbers -toc_depth 3 -nonavigation \
+	-noinfo -math -dir html/$* $< 1>/dev/null 2>/dev/null
