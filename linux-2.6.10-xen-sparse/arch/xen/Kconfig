@@ -50,7 +50,7 @@ config XEN_BLKDEV_BACKEND
 
 config XEN_BLKDEV_TAP_BE
         bool "Block Tap support for backend driver (DANGEROUS)"
-      depends on XEN_BLDEV_BACKEND
+        depends on XEN_BLKDEV_BACKEND
         default n
         help
           If you intend to use the block tap driver, the backend domain will
