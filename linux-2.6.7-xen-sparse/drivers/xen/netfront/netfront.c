@@ -721,7 +721,6 @@ static void netif_status_change(netif_fe_interface_status_changed_t *status)
         np->irq = bind_evtchn_to_irq(np->evtchn);
         (void)request_irq(np->irq, netif_int, SA_SAMPLE_RANDOM, 
                           dev->name, dev);
-        
         netctrl_connected_count();
         break;
 
@@ -906,10 +905,9 @@ void netif_suspend(void)
 	sprintf(name,"eth%d",i);
 	dev = __dev_get_by_name(name);
 
-	if ( dev && (dev->flags & IFF_UP) )
+	if ( dev )
 	{
 	    np  = dev->priv;
-
 	    free_irq(np->irq, dev);
             unbind_evtchn_from_irq(np->evtchn);
 	}    
@@ -924,8 +922,6 @@ void netif_resume(void)
     struct net_device *dev = NULL;
     struct net_private *np = NULL;
     int i;
-
-
 
 #if 1
     /* XXX THIS IS TEMPORARY */

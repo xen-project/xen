@@ -49,15 +49,6 @@ static int recovery = 0;           /* "Recovery in progress" flag.  Protected
 #define BLKIF_RING_FULL (((req_prod - resp_cons) == BLKIF_RING_SIZE) || \
                          (blkif_state != BLKIF_STATE_CONNECTED))
 
-/*
- * Request queues with outstanding work, but ring is currently full.
- * We need no special lock here, as we always access this with the
- * blkif_io_lock held. We only need a small maximum list.
- */
-#define MAX_PENDING 8
-static request_queue_t *pending_queues[MAX_PENDING];
-static int nr_pending;
-
 static inline void translate_req_to_mfn(blkif_request_t *xreq,
                                         blkif_request_t *req);
 
@@ -98,6 +89,23 @@ static inline void ADD_ID_TO_FREELIST( unsigned long id )
 #define DISABLE_SCATTERGATHER() 
 
 __initcall(xlblk_init);
+
+
+static void kick_pending_request_queues(void)
+{
+
+    if ( (xlbd_blk_queue != NULL) &&
+         test_bit(QUEUE_FLAG_STOPPED, &xlbd_blk_queue->queue_flags) )
+    {
+        blk_start_queue(xlbd_blk_queue);
+        /* XXXcl call to request_fn should not be needed but
+         * we get stuck without...  needs investigating
+         */
+        xlbd_blk_queue->request_fn(xlbd_blk_queue);
+    }
+
+}
+
 
 int blkif_open(struct inode *inode, struct file *filep)
 {
@@ -244,7 +252,7 @@ static int blkif_queue_request(struct request *req)
     id = GET_ID_FROM_FREELIST();
     rec_ring[id].id = (unsigned long) req;
 
-//printk("r: %d req %p (%ld)\n",req_prod,req,id);
+//printk(KERN_ALERT"r: %d req %p (%ld)\n",req_prod,req,id);
 
     ring_req->id = id;
     ring_req->operation = rq_data_dir(req) ? BLKIF_OP_WRITE :
@@ -290,6 +298,8 @@ void do_blkif_request(request_queue_t *rq)
     int queued;
 
     DPRINTK("Entered do_blkif_request\n"); 
+
+//printk(KERN_ALERT"r: %d req\n",req_prod);
 
     queued = 0;
 
@@ -347,7 +357,7 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 	id = bret->id;
 	req = (struct request *)rec_ring[id].id;
 
-//printk("i: %d req %p (%ld)\n",i,req,id);
+//printk(KERN_ALERT"i: %d req %p (%ld)\n",i,req,id);
 
 	ADD_ID_TO_FREELIST(id);  // overwrites req
 
@@ -378,15 +388,7 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
     
     resp_cons = i;
 
-    if ( (xlbd_blk_queue != NULL) &&
-         test_bit(QUEUE_FLAG_STOPPED, &xlbd_blk_queue->queue_flags) )
-    {
-        blk_start_queue(xlbd_blk_queue);
-        /* XXXcl call to request_fn should not be needed but
-         * we get stuck without...  needs investigating
-         */
-        xlbd_blk_queue->request_fn(xlbd_blk_queue);
-    }
+    kick_pending_request_queues();
 
     spin_unlock_irqrestore(&blkif_io_lock, flags);
 
@@ -399,6 +401,16 @@ static irqreturn_t blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 static kdev_t        sg_dev;
 static int           sg_operation = -1;
 static unsigned long sg_next_sect;
+
+/*
+ * Request queues with outstanding work, but ring is currently full.
+ * We need no special lock here, as we always access this with the
+ * blkif_io_lock held. We only need a small maximum list.
+ */
+#define MAX_PENDING 8
+static request_queue_t *pending_queues[MAX_PENDING];
+static int nr_pending;
+
 
 #define DISABLE_SCATTERGATHER() (sg_operation = -1)
 
@@ -417,6 +429,18 @@ static void update_vbds_task(void *unused)
     xlvbd_update_vbds();
 }
 #endif
+
+static void kick_pending_request_queues(void)
+{
+    /* We kick pending request queues if the ring is reasonably empty. */
+    if ( (nr_pending != 0) && 
+         ((req_prod - resp_cons) < (BLKIF_RING_SIZE >> 1)) )
+    {
+        /* Attempt to drain the queue, but bail if the ring becomes full. */
+        while ( (nr_pending != 0) && !BLKIF_RING_FULL )
+            do_blkif_request(pending_queues[--nr_pending]);
+    }
+}
 
 int blkif_open(struct inode *inode, struct file *filep)
 {
@@ -949,23 +973,12 @@ static inline void translate_req_to_mfn(blkif_request_t *xreq,
 static inline void flush_requests(void)
 {
     DISABLE_SCATTERGATHER();
+//printk(KERN_ALERT"flush %d\n",req_prod);
     wmb(); /* Ensure that the frontend can see the requests. */
     blk_ring->req_prod = req_prod;
     notify_via_evtchn(blkif_evtchn);
 }
 
-
-static void kick_pending_request_queues(void)
-{
-    /* We kick pending request queues if the ring is reasonably empty. */
-    if ( (nr_pending != 0) && 
-         ((req_prod - resp_cons) < (BLKIF_RING_SIZE >> 1)) )
-    {
-        /* Attempt to drain the queue, but bail if the ring becomes full. */
-        while ( (nr_pending != 0) && !BLKIF_RING_FULL )
-            do_blkif_request(pending_queues[--nr_pending]);
-    }
-}
 
 void blkif_control_send(blkif_request_t *req, blkif_response_t *rsp)
 {
@@ -1016,6 +1029,7 @@ static void blkif_status_change(blkif_fe_interface_status_changed_t *status)
 {
     ctrl_msg_t                   cmsg;
     blkif_fe_interface_connect_t up;
+    long rc;
 
     if ( status->handle != 0 )
     {
@@ -1075,11 +1089,13 @@ static void blkif_status_change(blkif_fe_interface_status_changed_t *status)
                    " in state %d\n", blkif_state);
             break;
         }
-
         blkif_evtchn = status->evtchn;
         blkif_irq = bind_evtchn_to_irq(blkif_evtchn);
-        (void)request_irq(blkif_irq, blkif_int, 
-                          SA_SAMPLE_RANDOM, "blkif", NULL);
+        if ( (rc=request_irq(blkif_irq, blkif_int, 
+                          SA_SAMPLE_RANDOM, "blkif", NULL)) )
+	{
+	    printk(KERN_ALERT"blkfront request_irq failed (%ld)\n",rc);
+	}
 
         if ( recovery )
         {
