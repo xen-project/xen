@@ -1,5 +1,4 @@
 /******************************************************************************
- *
  * common/trace.c
  *
  * Xen Trace Buffer
@@ -15,12 +14,11 @@
  *
  * See also include/xeno/trace.h and the dom0 op in
  * include/hypervisor-ifs/dom0_ops.h
- *
- *****************************************************************************/
+ */
 
 #include <xeno/config.h>
 
-#ifdef TRACE_BUFFER /* don't compile this stuff in unless explicitly enabled */
+#ifdef TRACE_BUFFER
 
 #include <asm/timex.h>
 #include <asm/types.h>
@@ -33,14 +31,11 @@
 #include <xeno/trace.h>
 #include <asm/atomic.h>
 
-
-
 /* Pointers to the meta-data objects for all system trace buffers */
 struct t_buf *t_bufs[NR_CPUS];
 
 /* a flag recording whether initialisation has been done */
-atomic_t tb_init_done = ATOMIC_INIT(0);
-
+int tb_init_done = 0;
 
 /**
  * init_trace_bufs - performs initialisation of the per-cpu trace buffers.
@@ -49,44 +44,41 @@ atomic_t tb_init_done = ATOMIC_INIT(0);
  * trace buffers.  The trace buffers are then available for debugging use, via
  * the %TRACE_xD macros exported in <xeno/trace.h>.
  */
-void init_trace_bufs()
+void init_trace_bufs(void)
 {
-    int i;
-    void *d;     /* trace buffer area pointer */
+    int           i;
+    char         *rawbuf;
+    struct t_buf *buf;
 
-    d = kmalloc(smp_num_cpus * TB_SIZE, GFP_KERNEL);
-    
-    if( d == NULL ) {
+    if ( (rawbuf = kmalloc(smp_num_cpus * TB_SIZE, GFP_KERNEL)) == NULL )
+    {
         printk("Xen trace buffers: memory allocation failed\n");
         return;
     }
     
-    for(i = 0; i < smp_num_cpus; i++) {
-        struct t_buf *buf = t_bufs[i]
-	  = (struct t_buf *)( (unsigned int)d + TB_SIZE * i );
+    for ( i = 0; i < smp_num_cpus; i++ )
+    {
+        buf = t_bufs[i] = (struct t_buf *)&rawbuf[i*TB_SIZE];
         
-        /* for use in Xen */
-        buf->vdata = (struct t_rec *)
-            ( (unsigned int)buf + sizeof(struct t_buf) );
+        /* For use in Xen. */
+        buf->vdata    = (struct t_rec *)(buf+1);
         buf->head_ptr = buf->vdata;
-	spin_lock_init(&buf->lock);
+        spin_lock_init(&buf->lock);
         
-        /* for use in user space */
+        /* For use in user space. */
         buf->data = (struct t_rec *)__pa(buf->vdata);
-	buf->head = 0;
+        buf->head = 0;
 
-        /* for use in both */
-	buf->size = (TB_SIZE - sizeof(struct t_buf)) / sizeof(struct t_rec);
+        /* For use in both. */
+        buf->size = (TB_SIZE - sizeof(struct t_buf)) / sizeof(struct t_rec);
     }
 
     printk("Xen trace buffers: initialised\n");
  
     wmb(); /* above must be visible before tb_init_done flag set */
 
-    atomic_set(&tb_init_done, 1);
+    tb_init_done = 1;
 }
-
-    
 
 /**
  * get_tb_ptr - return physical address of the trace buffers.
@@ -94,10 +86,10 @@ void init_trace_bufs()
  * Called by the %DOM0_GETTBUFS dom0 op to fetch the physical address of the
  * trace buffers.
  */
-struct t_buf *get_tb_ptr()
+unsigned long get_tb_ptr(void)
 {
-    /* a physical address (user space maps this using /dev/mem) */
-  return (struct t_buf *)__pa(t_bufs[0]);
+    /* Return the physical address. */
+    return __pa(t_bufs[0]);
 }
 
-#endif /* #ifdef TRACE_BUFFER */
+#endif /* TRACE_BUFFER */

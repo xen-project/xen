@@ -1,5 +1,4 @@
 /******************************************************************************
- *
  * include/xeno/trace.h
  *
  * Xen Trace Buffer
@@ -17,15 +16,45 @@
  * trace buffer contents can then be performed using a userland tool.
  *
  * See also common/trace.c and the dom0 op in include/hypervisor-ifs/dom0_ops.h
- *
- *****************************************************************************/
-
-#ifdef TRACE_BUFFER
+ */
 
 #ifndef __XENO_TRACE_H__
 #define __XENO_TRACE_H__
 
+/*
+ * How much space is allowed for a single trace buffer, including data and
+ * metadata (and maybe some waste).
+ */
+#define TB_SIZE PAGE_SIZE
+
+/* This structure represents a single trace buffer record. */
+struct t_rec {
+    u64 cycles;               /* 64 bit cycle counter timestamp */
+    u32 event;                /* 32 bit event ID                */
+    u32 d1, d2, d3, d4, d5;   /* event data items               */
+};
+
+/*
+ * This structure contains the metadata for a single trace buffer.  The head
+ * field, indexes into an array of struct t_rec's.
+ */
+struct t_buf {
+    struct t_rec *data;     /* pointer to data area.  physical address
+                             * for convenience in user space code            */
+
+    unsigned int size;      /* size of the data area, in t_recs              */
+    unsigned int head;      /* array index of the most recent record         */
+
 #ifdef __KERNEL__
+    struct t_rec *head_ptr; /* pointer to the head record                    */
+    struct t_rec *vdata;    /* virtual address pointer to data               */
+    spinlock_t lock;        /* ensure mutually exlusive access (for inserts) */
+#endif
+
+    /* never add anything here - the kernel stuff must be the last elements */
+};
+
+#ifdef TRACE_BUFFER
 
 #include <xeno/spinlock.h>
 #include <asm/page.h>
@@ -35,50 +64,11 @@
 #include <asm/current.h>
 #include <asm/msr.h>
 
-#endif /* #ifdef __KERNEL__ */
-
-/******************************************************************************
- * Data structure declarations
- *****************************************************************************/
-
-/* This structure represents a single trace buffer record. */
-struct t_rec {
-    u64 cycles;               /* 64 bit cycle counter timestamp */
-    u32 event;                /* 32 bit event ID                */
-    u32 d1, d2, d3, d4, d5;   /* event data items               */
-};
-
-/* This structure contains the metadata for a single trace buffer.  The head
- * field, indexes into an array of struct t_rec's.
- */
-struct t_buf {
-    struct t_rec *data;     /* pointer to data area.  physical address
-			     * for convenience in user space code            */
-
-    unsigned int size;      /* size of the data area, in t_recs              */
-    unsigned int head;      /* array index of the most recent record         */
-
-#ifdef __KERNEL__
-    struct t_rec *head_ptr; /* pointer to the head record                    */
-    struct t_rec *vdata;    /* virtual address pointer to data,
-                             * for use in Xen */
-    spinlock_t lock;        /* ensure mutually exlusive access (for inserts) */
-#endif /* #ifdef __KERNEL__ */
-
-    /* never add anything here - the kernel stuff must be the last elements */
-};
-
-/******************************************************************************
- * Functions
- *****************************************************************************/
-
-#ifdef __KERNEL__
-
 /* Used to initialise trace buffer functionality */
-void init_trace_bufs();
+void init_trace_bufs(void);
 
 /* used to retrieve the physical address of the trace buffers */
-struct t_buf *get_tb_ptr();
+struct t_buf *get_tb_ptr(void);
 
 /**
  * trace - Enters a trace tuple into the trace buffer for the current CPU.
@@ -92,19 +82,19 @@ struct t_buf *get_tb_ptr();
 static inline int trace(u32 event, u32 d1, u32 d2, u32 d3, u32 d4, u32 d5)
 {
     extern struct t_buf *t_bufs[];      /* global array of pointers to bufs */
-    extern atomic_t tb_init_done;       /* set when buffers are initialised */
+    extern int tb_init_done;            /* set when buffers are initialised */
     unsigned long flags;                /* for saving interrupt flags       */
     struct t_buf *buf;                  /* the buffer we're working on      */
     struct t_rec *rec;                  /* next record to fill out          */
 
 
-    if(!atomic_read(&tb_init_done)) return -1;
+    if ( !tb_init_done )
+        return -1;
 
     buf = t_bufs[smp_processor_id()];
     rec = buf->head_ptr;
 
     spin_lock_irqsave(&buf->lock, flags);
-    /* interrupts _disabled locally_ during the following code */
 
     rdtscll(rec->cycles);
     rec->event = event;
@@ -116,45 +106,32 @@ static inline int trace(u32 event, u32 d1, u32 d2, u32 d3, u32 d4, u32 d5)
 
     wmb(); /* above must be visible before reader sees index updated */
 
-    if( likely( buf->head_ptr < ( buf->vdata + buf->size - 1) ) ) {
+    if ( likely(buf->head_ptr < (buf->vdata + buf->size - 1)) )
+    {
         buf->head_ptr++;
         buf->head++;
-    } else {
-	buf->head = 0;
+    }
+    else
+    {
+        buf->head = 0;
         buf->head_ptr = buf->vdata;
     }
 
     spin_unlock_irqrestore(&buf->lock, flags);
-    /* Interrupts now _re-enabled locally_ */
     
     return 0;
 }
 
-
-#endif /* #ifdef __KERNEL__ */
-
-
-/******************************************************************************
- * Macros
- *****************************************************************************/
-
-/* How much space is allowed for a single trace buffer, including data and
- * metadata (and maybe some waste).
- */
-#define TB_SIZE PAGE_SIZE
-
-#ifdef __KERNEL__
-
-/* avoids troubling the caller with casting their arguments to a trace macro */
+/* Avoids troubling the caller with casting their arguments to a trace macro */
 #define trace_do_casts(e,d1,d2,d3,d4,d5)  \
                  trace(e,                 \
-		       (unsigned long)d1, \
-		       (unsigned long)d2, \
-		       (unsigned long)d3, \
-		       (unsigned long)d4, \
-		       (unsigned long)d5)
+                       (unsigned long)d1, \
+                       (unsigned long)d2, \
+                       (unsigned long)d3, \
+                       (unsigned long)d4, \
+                       (unsigned long)d5)
 
-/* convenience macros for calling the trace function */
+/* Convenience macros for calling the trace function. */
 #define TRACE_0D(event)                trace_do_casts(event,0, 0, 0, 0, 0 )
 #define TRACE_1D(event,d)              trace_do_casts(event,d, 0, 0, 0, 0 )
 #define TRACE_2D(event,d1,d2)          trace_do_casts(event,d1,d2,0, 0, 0 )
@@ -162,13 +139,10 @@ static inline int trace(u32 event, u32 d1, u32 d2, u32 d3, u32 d4, u32 d5)
 #define TRACE_4D(event,d1,d2,d3,d4)    trace_do_casts(event,d1,d2,d3,d4,0 )
 #define TRACE_5D(event,d1,d2,d3,d4,d5) trace_do_casts(event,d1,d2,d3,d4,d5)
 
-#endif /* #ifdef __KERNEL__        */
+#else
 
-#endif /* #ifndef __XENO_TRACE_H__ */
+#define init_trace_bufs() ((void)0)
 
-#else  /* #ifdef TRACE_BUFFER      */
-
-/* define out macros so that they can be left in code when tracing is disabled */
 #define TRACE_0D(event)                ((void)0)
 #define TRACE_1D(event,d)              ((void)0)
 #define TRACE_2D(event,d1,d2)          ((void)0)
@@ -176,4 +150,6 @@ static inline int trace(u32 event, u32 d1, u32 d2, u32 d3, u32 d4, u32 d5)
 #define TRACE_4D(event,d1,d2,d3,d4)    ((void)0)
 #define TRACE_5D(event,d1,d2,d3,d4,d5) ((void)0)
 
-#endif /* #ifdef TRACE_BUFFER      */
+#endif /* TRACE_BUFFER */
+
+#endif /* __XENO_TRACE_H__ */

@@ -29,4 +29,4 @@ clean:
 	$(RM) *.a *.so *.o *.rpm $(BIN)
 
 %: %.c $(HDRS) Makefile
-	$(CC) $(CFLAGS) -o $@ $< -lxc
+	$(CC) $(CFLAGS) -o $@ $< -L../xc/lib -lxc

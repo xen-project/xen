@@ -215,7 +215,7 @@ typedef struct dom0_pincpudomain_st
 typedef struct dom0_gettbufs_st
 {
   /* OUT variable - location of the trace buffers */
-  struct t_buf *phys_addr;
+  unsigned long phys_addr;
 } dom0_gettbufs_t;
 
 typedef struct dom0_op_st
@@ -244,8 +244,4 @@ typedef struct dom0_op_st
     } u;
 } dom0_op_t;
 
-
-
-
-
-#endif
+#endif /* __DOM0_OPS_H__ */

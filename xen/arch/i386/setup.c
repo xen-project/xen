@@ -451,7 +451,5 @@ void __init start_of_day(void)
 
     watchdog_on = 1;
 
-#ifdef TRACE_BUFFER
-    init_trace_bufs(); /* initialise trace buffers */
-#endif
+    init_trace_bufs();
 }

@@ -1,5 +1,4 @@
 /******************************************************************************
- *
  * tools/xentrace/xentrace.c
  *
  * Tool for collecting trace buffer data from Xen.
@@ -8,8 +7,7 @@
  *
  * Author: Mark Williamson, mark.a.williamson@intel.com
  * Date:   February 2004
- *
- *****************************************************************************/
+ */
 
 #include <time.h>
 #include <stdlib.h>
@@ -25,7 +23,6 @@
 
 #include "../xc/lib/xc_private.h"
 
-#define TRACE_BUFFER    /* need to define this for trace.h */
 #include <xeno/trace.h>
 
 extern FILE *stdout;
@@ -99,7 +96,7 @@ void print_rec(unsigned int cpu, struct t_rec *rec, FILE *out)
  * be dereferenced immediately, since it is a physical address of memory in Xen
  * space - they are used in this program to mmap the right area from /dev/mem.
  */
-struct t_buf *get_tbuf_ptrs()
+unsigned long get_tbuf_ptrs(void)
 {
     int ret;
     dom0_op_t op;                        /* dom0 op we'll build             */
@@ -112,7 +109,8 @@ struct t_buf *get_tbuf_ptrs()
 
     xc_interface_close(xc_handle);
 
-    if(ret) {
+    if ( ret != 0 )
+    {
         PERROR("Failure to get trace buffer pointer from Xen");
         exit(EXIT_FAILURE);
     }
@@ -128,14 +126,14 @@ struct t_buf *get_tbuf_ptrs()
  * address space by memory mapping /dev/mem.  Returns a pointer to the location
  * the buffers have been mapped to.
  */
-struct t_buf *map_tbufs(struct t_buf *tbufs_phys)
+struct t_buf *map_tbufs(unsigned long tbufs_phys)
 {
     int dm_fd;                    /* file descriptor for /dev/mem */
     struct t_buf *tbufs_mapped;
 
     dm_fd = open("/dev/mem", O_RDONLY);
-
-    if(dm_fd < 0) {
+    if ( dm_fd < 0 ) 
+    {
         PERROR("Open /dev/mem when mapping trace buffers\n");
         exit(EXIT_FAILURE);
     }
@@ -146,7 +144,8 @@ struct t_buf *map_tbufs(struct t_buf *tbufs_phys)
 
     close(dm_fd);
 
-    if(tbufs_mapped == MAP_FAILED) {
+    if ( tbufs_mapped == MAP_FAILED ) 
+    {
         PERROR("Failed to mmap trace buffers");
         exit(EXIT_FAILURE);
     }
@@ -168,15 +167,15 @@ struct t_buf **init_bufs_ptrs(void *bufs_mapped)
     struct t_buf **user_ptrs;
 
     user_ptrs = (struct t_buf **)calloc(opts.num_cpus, sizeof(struct t_buf *));
-
-    if(!user_ptrs) {
+    if ( user_ptrs == NULL )
+    {
         PERROR( "Failed to allocate memory for buffer pointers\n");
         exit(EXIT_FAILURE);
     }
     
     /* initialise pointers to the trace buffers - given the size of a trace
      * buffer and the value of bufs_maped, we can easily calculate these */
-    for(i = 0; i<opts.num_cpus; i++)
+    for ( i = 0; i<opts.num_cpus; i++ )
         user_ptrs[i] = (struct t_buf *)(
             (unsigned long)bufs_mapped + TB_SIZE * i);
 
@@ -194,7 +193,7 @@ struct t_buf **init_bufs_ptrs(void *bufs_mapped)
  * mapped in user space.  Note that the trace buffer metadata contains physical
  * pointers - the array returned allows more convenient access to them.
  */
-struct t_rec **init_rec_ptrs(struct t_buf *tbufs_phys,
+struct t_rec **init_rec_ptrs(unsigned long tbufs_phys,
                              struct t_buf *tbufs_mapped,
                              struct t_buf **meta)
 {
@@ -202,19 +201,15 @@ struct t_rec **init_rec_ptrs(struct t_buf *tbufs_phys,
     struct t_rec **data;
     
     data = calloc(opts.num_cpus, sizeof(struct t_rec *));
-    
-    if(!data) {
-        PERROR( "Failed to allocate memory for data pointers\n");
+    if ( data == NULL )
+    {
+        PERROR("Failed to allocate memory for data pointers\n");
         exit(EXIT_FAILURE);
     }
 
-    for(i = 0; i<opts.num_cpus; i++) {
-        data[i] = (struct t_rec *)(
-            (unsigned long)meta[i]->data
-            - (unsigned long)tbufs_phys
-            + (unsigned long)tbufs_mapped
-            );
-    }
+    for ( i = 0; i<opts.num_cpus; i++ )
+        data[i] = (struct t_rec *)((unsigned long)meta[i]->data -
+                                   tbufs_phys + (unsigned long)tbufs_mapped);
 
     return data;
 }
@@ -232,12 +227,13 @@ int *init_tail_idxs(struct t_buf **bufs)
     int i;
     int *tails = calloc(opts.num_cpus, sizeof(unsigned int));
  
-    if(!tails) {
+    if ( tails == NULL )
+    {
         PERROR("Failed to allocate memory for tail pointers\n");
         exit(EXIT_FAILURE);
     }
     
-    for(i = 0; i<opts.num_cpus; i++)
+    for ( i = 0; i<opts.num_cpus; i++ )
         tails[i] = bufs[i]->head;
 
     return tails;
@@ -256,7 +252,7 @@ int monitor_tbufs(FILE *logfile)
     struct t_rec **data;         /* pointers to the trace buffer data areas
                                   * where they are mapped into user space.   */
     int *tails;                  /* store tail indexes for the trace buffers */
-    struct t_buf *tbufs_phys;    /* physical address of the tbufs             */
+    unsigned long tbufs_phys;    /* physical address of the tbufs            */
     
     /* setup access to trace buffers */
     tbufs_phys   = get_tbuf_ptrs();
@@ -268,18 +264,22 @@ int monitor_tbufs(FILE *logfile)
     tails = init_tail_idxs (meta);
 
     /* now, scan buffers for events */
-    while(!interrupted) {
-        for(i = 0; i < opts.num_cpus; i++) {
+    while ( !interrupted )
+    {
+        for ( i = 0; i < opts.num_cpus; i++ )
+        {
             signed long newdata = meta[i]->head - tails[i];
             signed long prewrap = newdata;
 
 	    /* correct newdata and prewrap in case of a pointer wrap */
-            if(newdata < 0) {
+            if ( newdata < 0 )
+            {
                 newdata += meta[i]->size;
                 prewrap  = meta[i]->size - tails[i];
             }
 
-            if(newdata >= opts.new_data_thresh) {
+            if ( newdata >= opts.new_data_thresh )
+            {
                 /* output pre-wrap data */
                 for(j = 0; j < prewrap; j++)
                     print_rec(i, data[i] + tails[i] + j, logfile);
@@ -316,22 +316,23 @@ error_t cmd_parser(int key, char *arg, struct argp_state *state)
 {
     settings_t *setup = (settings_t *)state->input;
 
-    switch(key)
+    switch ( key )
     {
     case 't': /* set new records threshold for logging */
     {
         char *inval;
         setup->new_data_thresh = strtol(arg, &inval, 0);
-        if(inval == arg) argp_usage(state);
+        if ( inval == arg )
+            argp_usage(state);
     }
-    
     break;
 
     case 's': /* set sleep time (given in milliseconds) */
     {
         char *inval;
         setup->poll_sleep = millis_to_timespec(strtol(arg, &inval, 0));
-        if(inval == arg) argp_usage(state);
+        if ( inval == arg )
+            argp_usage(state);
     }
     break;
 
@@ -339,16 +340,19 @@ error_t cmd_parser(int key, char *arg, struct argp_state *state)
     {
         char *inval;
         setup->num_cpus = strtol(arg, &inval, 0);
-        if(inval == arg) argp_usage(state);
+        if (inval == arg )
+            argp_usage(state);
     }
     break;
     
     case ARGP_KEY_ARG:
-        if(state->arg_num == 0)
+    {
+        if ( state->arg_num == 0 )
             setup->outfile = arg;
         else
             argp_usage(state);
-        break;
+    }
+    break;
         
     default:
         return ARGP_ERR_UNKNOWN;
@@ -413,9 +417,8 @@ int main(int argc, char **argv)
 
     argp_parse(&parser_def, argc, argv, 0, 0, &opts);
 
-    if(opts.outfile) {
+    if ( opts.outfile )
         logfile = fopen(opts.outfile, "w");
-    }
     
     /* ensure that if we get a signal, we'll do cleanup, then exit */
     sigaction(SIGHUP,  &act, 0);
