@@ -1391,6 +1391,8 @@ static ide_startstop_t start_request (ide_drive_t *drive, struct request *rq)
 	block    = rq->sector;
 	blockend = block + rq->nr_sectors;
 
+
+#ifdef NEVER
 	if ((rq->cmd == READ || rq->cmd == WRITE) &&
 	    (drive->media == ide_disk || drive->media == ide_floppy)) {
 		if ((blockend < block) || (blockend > drive->part[minor&PARTN_MASK].nr_sects)) {
@@ -1404,6 +1406,15 @@ static ide_startstop_t start_request (ide_drive_t *drive, struct request *rq)
 	   possibly killing some innocent following sector */
 	if (block == 0 && drive->remap_0_to_1 == 1)
 		block = 1;  /* redirect MBR access to EZ-Drive partn table */
+#endif
+
+#ifdef NEVER_DEBUG
+	{
+	  printk("    ide::start_request  %lx %lx  %lx  %lx %lx\n", 
+		 rq->sector, rq->nr_sectors, block,
+		 drive->part[minor&PARTN_MASK].start_sect, drive->sect0);
+	}
+#endif
 
 #if (DISK_RECOVERY_TIME > 0)
 	while ((read_timer() - hwif->last_time) < DISK_RECOVERY_TIME);
@@ -1414,6 +1425,7 @@ static ide_startstop_t start_request (ide_drive_t *drive, struct request *rq)
 		printk("%s: drive not ready for command\n", drive->name);
 		return startstop;
 	}
+	drive->special.all = 0;
 	if (!drive->special.all) {
 		switch(rq->cmd) {
 			case IDE_DRIVE_CMD:

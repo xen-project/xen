@@ -15,6 +15,7 @@ OBJS    += $(patsubst %.c,%.o,$(C_SRCS))
 # Note that link order matters!
 ALL_OBJS := $(BASEDIR)/common/common.o
 ALL_OBJS += $(BASEDIR)/net/network.o
+ALL_OBJS += $(BASEDIR)/drivers/char/driver.o
 ALL_OBJS += $(BASEDIR)/drivers/pci/driver.o
 ALL_OBJS += $(BASEDIR)/drivers/net/driver.o
 ALL_OBJS += $(BASEDIR)/drivers/block/driver.o

@@ -1227,6 +1227,11 @@ int __init blk_dev_init(void)
 #ifdef CONFIG_SUN_JSFLASH
 	jsfd_init();
 #endif
+
+#ifdef CONFIG_XENOLINUX_BLOCK
+    xlblk_init();
+#endif
+
 	return 0;
 };
 

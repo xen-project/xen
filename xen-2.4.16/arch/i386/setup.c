@@ -282,6 +282,9 @@ void __init start_of_day(void)
     extern void init_timervecs(void);
     extern int  setup_network_devices(void);
     extern void net_init(void);
+    extern void initialize_block_io(void);
+    extern void initialize_serial(void);
+    extern void initialize_keyboard(void);
 
     unsigned long low_mem_size;
     
@@ -333,9 +336,15 @@ void __init start_of_day(void)
     pci_init();
 #endif
     do_initcalls();
+
+    initialize_serial();   /* setup serial 'driver' (for debugging) */
+    initialize_keyboard(); /* setup keyboard (also for debugging) */
+
     if ( !setup_network_devices() )
         panic("Must have a network device!\n");
-    net_init(); /* initializes virtual network system. */
+    net_init();            /* initializes virtual network system. */
+    initialize_block_io(); /* setup block devices */
+
 
 #ifdef CONFIG_SMP
     wait_init_idle = cpu_online_map;

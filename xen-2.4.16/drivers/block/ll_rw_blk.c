@@ -31,8 +31,12 @@
 #include <xeno/slab.h>
 #include <xeno/module.h>
 
+static void end_buffer_dummy(struct buffer_head *bh, int uptodate)
+{
+  /* do nothing */
+}
+
 /* This will die as all synchronous stuff is coming to an end */
-#define end_buffer_io_sync NULL
 #define complete(_r) panic("completion.h stuff may be needed...")
 
 /*
@@ -307,10 +311,14 @@ static void generic_plug_device(request_queue_t *q, kdev_t dev)
  */
 static inline void __generic_unplug_device(request_queue_t *q)
 {
+  /*	printk(KERN_ALERT "__generic_unplug_device %p %d\n", q, q->plugged); */
 	if (q->plugged) {
 		q->plugged = 0;
 		if (!list_empty(&q->queue_head))
+		  {
+		    /*		    printk(KERN_ALERT " calling %p\n", q->request_fn); */
 			q->request_fn(q);
+		  }
 	}
 }
 
@@ -318,6 +326,8 @@ void generic_unplug_device(void *data)
 {
 	request_queue_t *q = (request_queue_t *) data;
 	unsigned long flags;
+
+	/*	printk(KERN_ALERT "generic_unplug_device\n"); */
 
 	spin_lock_irqsave(&io_request_lock, flags);
 	__generic_unplug_device(q);
@@ -856,6 +866,8 @@ static int __make_request(request_queue_t * q, int rw,
 	int latency;
 	elevator_t *elevator = &q->elevator;
 
+	/* 	printk(KERN_ALERT "__make_request\n");*/
+
 	count = bh->b_size >> 9;
 	sector = bh->b_rsector;
 
@@ -1061,6 +1073,8 @@ void generic_make_request (int rw, struct buffer_head * bh)
 	int minorsize = 0;
 	request_queue_t *q;
 
+	/* 	printk(KERN_ALERT "generic_make_request\n"); */
+
 	if (!bh->b_end_io)
 		BUG();
 
@@ -1130,6 +1144,8 @@ void submit_bh(int rw, struct buffer_head * bh)
 {
 	int count = bh->b_size >> 9;
 
+	/* 	printk(KERN_ALERT "submit_bh\n"); */
+
 	if (!test_bit(BH_Lock, &bh->b_state))
 		BUG();
 
@@ -1141,7 +1157,7 @@ void submit_bh(int rw, struct buffer_head * bh)
 	 * further remap this.
 	 */
 	bh->b_rdev = bh->b_dev;
-	bh->b_rsector = bh->b_blocknr * count;
+	/*	bh->b_rsector = bh->b_blocknr * count; */
 
 	generic_make_request(rw, bh);
 
@@ -1194,6 +1210,8 @@ void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
 	int correct_size;
 	int i;
 
+	/* 	printk(KERN_ALERT "ll_rw_block %d %d\n", rw, nr); */
+
 	if (!nr)
 		return;
 
@@ -1229,14 +1247,14 @@ void ll_rw_block(int rw, int nr, struct buffer_head * bhs[])
 
 		/* We have the buffer lock */
 		atomic_inc(&bh->b_count);
-		bh->b_end_io = end_buffer_io_sync;
+		bh->b_end_io = end_buffer_dummy;
 
 		switch(rw) {
 		case WRITE:
 			if (!atomic_set_buffer_clean(bh))
 				/* Hmmph! Nothing to write */
 				goto end_io;
-			__mark_buffer_clean(bh);
+			/* __mark_buffer_clean(bh); */
 			break;
 
 		case READA:
@@ -1302,6 +1320,7 @@ int end_that_request_first (struct request *req, int uptodate, char *name)
 		req->bh = bh->b_reqnext;
 		bh->b_reqnext = NULL;
 		bh->b_end_io(bh, uptodate);
+		end_block_io_op(bh);
 		if ((bh = req->bh) != NULL) {
 			req->hard_sector += nsect;
 			req->hard_nr_sectors -= nsect;

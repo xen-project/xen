@@ -85,6 +85,7 @@ struct buffer_head {
 
         struct inode *       b_inode;
         struct list_head     b_inode_buffers;   /* doubly linked list of inode dirty buffers */
+        void *b_xen_request;                        /* xen request structure */
 };
 
 typedef void (bh_end_io_t)(struct buffer_head *bh, int uptodate);

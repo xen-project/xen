@@ -15,13 +15,15 @@ typedef void (*hyp_event_callback_fn_t)(void);
 
 extern void schedule(void);
 extern void flush_rx_queue(void);
+extern void flush_blk_queue(void);
 
 /* Ordering must match definitions of _HYP_EVENT_* in xeno/sched.h */
 static hyp_event_callback_fn_t event_call_fn[] = 
 {
     schedule,
     flush_rx_queue,
-    kill_domain
+    kill_domain, 
+    flush_blk_queue
 };
 
 /* Handle outstanding events for the currently-executing domain. */

@@ -1,4 +1,3 @@
-
 #ifndef _LINUX_SCHED_H
 #define _LINUX_SCHED_H
 
@@ -49,6 +48,7 @@ extern struct mm_struct init_mm;
 #define _HYP_EVENT_NEED_RESCHED 0
 #define _HYP_EVENT_NET_RX       1
 #define _HYP_EVENT_DIE          2
+#define _HYP_EVENT_BLK_RX       3
 
 #define PF_DONEFPUINIT  0x1  /* Has the FPU been initialised for this task? */
 #define PF_USEDFPU      0x2  /* Has this task used the FPU since last save? */
