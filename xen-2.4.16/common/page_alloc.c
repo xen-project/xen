@@ -171,11 +171,12 @@ void __init init_page_allocator(unsigned long min, unsigned long max)
 /* Allocate 2^@order contiguous pages. */
 unsigned long __get_free_pages(int mask, int order)
 {
-    int i;
+    int i, attempts = 0;
     chunk_head_t *alloc_ch, *spare_ch;
     chunk_tail_t            *spare_ct;
     unsigned long           flags;
 
+retry:
     spin_lock_irqsave(&alloc_lock, flags);
 
 
@@ -185,11 +186,7 @@ unsigned long __get_free_pages(int mask, int order)
 	    break;
     }
 
-    if ( i == FREELIST_SIZE )
-    {
-        printk("Cannot handle page request order %d!\n", order);
-	return 0;
-    }
+    if ( i == FREELIST_SIZE ) goto no_memory;
  
     /* Unlink a chunk. */
     alloc_ch = free_list[i];
@@ -220,6 +217,19 @@ unsigned long __get_free_pages(int mask, int order)
     spin_unlock_irqrestore(&alloc_lock, flags);
 
     return((unsigned long)alloc_ch);
+
+ no_memory:
+    if ( attempts++ < 8 )
+    {
+        spin_unlock_irqrestore(&alloc_lock, flags);
+        kmem_cache_reap(0);
+        goto retry;
+    }
+
+    printk("Cannot handle page request order %d!\n", order);
+    dump_slabinfo();
+
+    return 0;
 }
 
 
