@@ -65,9 +65,10 @@ mk-linux-trees: pristine-linux-src
 	$(RM) -rf $(LINUX_TREES)
 	echo $(LINUX_SRC) | grep -q bz2 && \
 	    tar -jxf $(LINUX_SRC) || tar -zxf $(LINUX_SRC)
-	mv linux-$(LINUX_VER) linux-$(LINUX_VER)-xenU
+	mv linux-$(LINUX_VER) linux-$(LINUX_VER)-xen0
 	( cd linux-$(LINUX_VER)-xen-sparse ; \
-          ./mkbuildtree ../linux-$(LINUX_VER)-xenU )
+          ./mkbuildtree ../linux-$(LINUX_VER)-xen0 )
+	cp -al linux-$(LINUX_VER)-xen0 linux-$(LINUX_VER)-xenU
 endif
 
 # configure the specified linux tree
