@@ -7,6 +7,7 @@
 #include <asm/desc.h>
 #include <xeno/list.h>
 #include <hypervisor-ifs/hypervisor-if.h>
+#include <xeno/spinlock.h>
 
 /* XXX KAF: These may die eventually, but so many refs in slab.c :((( */
 
@@ -110,6 +111,7 @@ typedef struct pfn_info {
 extern frame_table_t * frame_table;
 extern unsigned long frame_table_size;
 extern struct list_head free_list;
+extern spinlock_t free_list_lock;
 extern unsigned int free_pfns;
 extern unsigned long max_page;
 void init_frametable(unsigned long nr_pages);

@@ -334,10 +334,13 @@ static unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes
     struct pfn_info *pf, *pf_head;
     unsigned int alloc_pfns;
     unsigned int req_pages;
+    unsigned long flags;
 
     /* how many pages do we need to alloc? */
     req_pages = kbytes >> (PAGE_SHIFT - 10);
 
+    spin_lock_irqsave(&free_list_lock, flags);
+    
     /* is there enough mem to serve the request? */   
     if(req_pages > free_pfns)
         return -1;
@@ -369,6 +372,8 @@ static unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes
 
         free_pfns--;
     }
+   
+    spin_unlock_irqrestore(&free_list_lock, flags);
     
     p->tot_pages = req_pages;
 

@@ -206,6 +206,7 @@ unsigned long frame_table_size;
 unsigned long max_page;
 
 struct list_head free_list;
+spinlock_t free_list_lock = SPIN_LOCK_UNLOCKED;
 unsigned int free_pfns;
 
 static int tlb_flush[NR_CPUS];
@@ -219,6 +220,7 @@ void __init init_frametable(unsigned long nr_pages)
 {
     struct pfn_info *pf;
     unsigned long page_index;
+    unsigned long flags;
 
     memset(tlb_flush, 0, sizeof(tlb_flush));
 
@@ -232,6 +234,7 @@ void __init init_frametable(unsigned long nr_pages)
     memset(frame_table, 0, frame_table_size);
 
     /* Put all domain-allocatable memory on a free list. */
+    spin_lock_irqsave(&free_list_lock, flags);
     INIT_LIST_HEAD(&free_list);
     for( page_index = (MAX_MONITOR_ADDRESS + frame_table_size) >> PAGE_SHIFT; 
          page_index < nr_pages; 
@@ -240,6 +243,7 @@ void __init init_frametable(unsigned long nr_pages)
         pf = list_entry(&frame_table[page_index].list, struct pfn_info, list);
         list_add_tail(&pf->list, &free_list);
     }
+    spin_unlock_irqrestore(&free_list_lock, flags);
 }
 
 
