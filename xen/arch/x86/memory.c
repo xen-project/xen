@@ -144,7 +144,6 @@ static struct domain *dom_xen, *dom_io;
 void arch_init_memory(void)
 {
     unsigned long mfn;
-    int i;
 
     /*
      * We are rather picky about the layout of 'struct pfn_info'. The
@@ -197,15 +196,6 @@ void arch_init_memory(void)
         frame_table[mfn].count_info        |= PGC_allocated | 1;
         frame_table[mfn].u.inuse.type_info  = PGT_gdt_page | 1; /* non-RW */
         frame_table[mfn].u.inuse.domain     = dom_xen;
-    }
-
-    vm_assist_info[VMASST_TYPE_writable_pagetables].enable = NULL;
-    vm_assist_info[VMASST_TYPE_writable_pagetables].disable = NULL;
-
-    for ( i = 0; i < smp_num_cpus; i++ )
-    {
-        ptwr_info[i].disconnected_page = (void *)alloc_xenheap_page();
-        ptwr_info[i].writable_page = (void *)alloc_xenheap_page();
     }
 }
 
@@ -1875,6 +1865,20 @@ int ptwr_do_page_fault(unsigned long addr)
     }
     return 0;
 }
+
+static __init int ptwr_init(void)
+{
+    int i;
+
+    for ( i = 0; i < smp_num_cpus; i++ )
+    {
+        ptwr_info[i].disconnected_page = (void *)alloc_xenheap_page();
+        ptwr_info[i].writable_page = (void *)alloc_xenheap_page();
+    }
+
+    return 0;
+}
+__initcall(ptwr_init);
 
 #ifndef NDEBUG
 void ptwr_status(void)
