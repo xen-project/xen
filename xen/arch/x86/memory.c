@@ -168,6 +168,7 @@ void __init init_frametable(void)
 
 void arch_init_memory(void)
 {
+#ifdef __i386__
     unsigned long i;
 
     /*
@@ -219,6 +220,7 @@ void arch_init_memory(void)
         frame_table[m2p_start_mfn+i].u.inuse.type_info = PGT_gdt_page | 1;
         frame_table[m2p_start_mfn+i].u.inuse.domain    = dom_xen;
     }
+#endif
 }
 
 static void __invalidate_shadow_ldt(struct exec_domain *d)
