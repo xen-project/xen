@@ -30,13 +30,13 @@ int main(int argc, char *argv[])
     vdevice = device + atoi(argv[6]);
     
     op.cmd = BLOCK_IO_OP_VBD_CREATE; 
-    op.u.create_info.domain  = domain; 
-    op.u.create_info.vdevice = vdevice; 
-    op.u.create_info.mode    = 0; 
+    op.u.create_params.domain  = domain; 
+    op.u.create_params.vdevice = vdevice; 
+    op.u.create_params.mode    = 0; 
     if ( strchr(argv[1], 'r') )
-	op.u.create_info.mode |= VBD_MODE_R;
+	op.u.create_params.mode |= VBD_MODE_R;
     if ( strchr(argv[1], 'w') )
-        op.u.create_info.mode |= VBD_MODE_W;
+        op.u.create_params.mode |= VBD_MODE_W;
 
     ret = do_block_io_op(&op);
 
@@ -48,12 +48,12 @@ int main(int argc, char *argv[])
 
 
     op.cmd = BLOCK_IO_OP_VBD_ADD; 
-    op.u.add_info.domain  = domain; 
-    op.u.add_info.vdevice = vdevice;
+    op.u.add_params.domain  = domain; 
+    op.u.add_params.vdevice = vdevice;
 
-    op.u.add_info.extent.device       = device; 
-    op.u.add_info.extent.start_sector = atol(argv[4]);
-    op.u.add_info.extent.nr_sectors   = atol(argv[5]);
+    op.u.add_params.extent.device       = device; 
+    op.u.add_params.extent.start_sector = atol(argv[4]);
+    op.u.add_params.extent.nr_sectors   = atol(argv[5]);
 
     ret = do_block_io_op(&op);
 

@@ -20,8 +20,7 @@
 #define XEN_BLOCK_WRITE        1
 #define XEN_BLOCK_READA        2
 #define XEN_BLOCK_SPECIAL      4
-#define XEN_BLOCK_PROBE        5   /* get config from hypervisor */
-#define XEN_BLOCK_DEBUG        6   /* debug */
+#define XEN_BLOCK_DEBUG        5   /* debug */
 
 /* NB. Ring size must be small enough for sizeof(blk_ring_t) <= PAGE_SIZE. */
 #define BLK_RING_SIZE        64
@@ -65,7 +64,6 @@ typedef struct blk_ring_st
  * Information about the real and virtual disks we have; used during 
  * guest device probing. 
  */ 
-#define XEN_MAX_DISK_COUNT 64
 
 /* XXX SMH: below types chosen to align with ide_xxx types in ide.h */
 #define XD_TYPE_FLOPPY  0x00
@@ -81,19 +79,23 @@ typedef struct blk_ring_st
 #define XD_FLAG_RO      0x40
 #define XD_FLAG_VIRT    0x80
 #define XD_READONLY(_x) ((_x) & XD_FLAG_RO)
-#define XD_VIRTUAL(_x)  ((_x) & XF_FLAG_VIRT) 
+#define XD_VIRTUAL(_x)  ((_x) & XD_FLAG_VIRT) 
 
 typedef struct xen_disk
 {
     unsigned short device;       /* device number (opaque 16 bit val)  */
     unsigned short info;         /* device type and flags              */
     unsigned long  capacity;     /* size in terms of #512 byte sectors */
+    unsigned int   domain;       /* if a VBD, domain this 'belongs to' */
 } xen_disk_t;
 
 typedef struct xen_disk_info
 {
-  int         count;
-  xen_disk_t  disks[XEN_MAX_DISK_COUNT];
+    /* IN variables  */
+    int         max;             // maximumum number of disks to report
+    xen_disk_t *disks;           // pointer to array of disk info 
+    /* OUT variables */
+    int         count;           // how many disks we have info about 
 } xen_disk_info_t;
 
 #endif

@@ -13,7 +13,8 @@
 #define BLOCK_IO_OP_VBD_ADD      4    /* add an extent to a given VBD */
 #define BLOCK_IO_OP_VBD_REMOVE   5    /* remove an extent from a given VBD */
 #define BLOCK_IO_OP_VBD_DELETE   6    /* delete a VBD */
-
+#define BLOCK_IO_OP_VBD_PROBE    7    /* query VBD information for a domain */
+#define BLOCK_IO_OP_VBD_INFO     8    /* query info about a particular VBD */
 
 typedef struct _xen_extent { 
     u16       device; 
@@ -32,29 +33,41 @@ typedef struct _xen_extent {
 
   
 typedef struct _vbd_create { 
-    unsigned  domain; 
-    u16       vdevice; 
-    u16       mode; 
+    unsigned     domain;              // create VBD for this domain 
+    u16          vdevice;             // 16 bit id domain will refer to VBD as 
+    u16          mode;                // OR of { VBD_MODE_R , VBD_MODE_W } 
 } vbd_create_t; 
 
 typedef struct _vbd_add { 
-    unsigned     domain; 
-    u16          vdevice; 
-    xen_extent_t extent; 
+    unsigned     domain;              // domain in question 
+    u16          vdevice;             // 16 bit id domain refers to VBD as 
+    xen_extent_t extent;              // the extent to add to this VBD
 } vbd_add_t; 
 
 typedef struct _vbd_remove { 
-    unsigned     domain; 
-    u16          vdevice; 
-    xen_extent_t extent; 
+    unsigned     domain;              // domain in question 
+    u16          vdevice;             // 16 bit id domain refers to VBD as 
+    xen_extent_t extent;              // the extent to remove from this VBD
 } vbd_remove_t; 
 
 
-typedef struct _vbd_delete { 
-    unsigned  domain; 
-    u16       vdevice; 
+typedef struct _vbd_delete {          
+    unsigned     domain;              // domain in question 
+    u16          vdevice;             // 16 bit id domain refers to VBD as 
 } vbd_delete_t; 
 
+#define VBD_PROBE_ALL 0xFFFFFFFF
+typedef struct _vbd_probe { 
+    unsigned         domain;          // domain in question or VBD_PROBE_ALL
+    xen_disk_info_t  xdi;             // where's our space for VBD/disk info
+} vbd_probe_t; 
+
+typedef struct _vbd_info { 
+    unsigned      domain;             // domain in question 
+    u16           vdevice;            // 16 bit id domain refers to VBD as 
+    u16           nextents;           // max no. of extents to return info for
+    xen_extent_t *extents;            // pointer to space for list of extents
+} vbd_info_t; 
 
 
 typedef struct block_io_op_st
@@ -65,10 +78,12 @@ typedef struct block_io_op_st
         /* no entry for BLOCK_IO_OP_SIGNAL */
         /* no entry for BLOCK_IO_OP_RESET  */
 	unsigned long ring_mfn; 
-	vbd_create_t  create_info; 
-	vbd_add_t     add_info; 
-	vbd_remove_t  remove_info; 
-	vbd_delete_t  delete_info; 
+	vbd_create_t  create_params; 
+	vbd_add_t     add_params; 
+	vbd_remove_t  remove_params; 
+	vbd_delete_t  delete_params; 
+	vbd_probe_t   probe_params; 
+	vbd_info_t    info_params; 
     }
     u;
 } block_io_op_t;

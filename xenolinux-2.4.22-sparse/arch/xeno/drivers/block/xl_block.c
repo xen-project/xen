@@ -22,8 +22,14 @@ static unsigned int state = STATE_SUSPENDED;
 static blk_ring_t *blk_ring;
 static unsigned int resp_cons; /* Response consumer for comms ring. */
 static unsigned int req_prod;  /* Private request producer.         */
-static xen_disk_info_t xlblk_disk_info;
+
+#define XDI_MAX 64 
+static xen_disk_info_t xlblk_disk_info; /* information about our disks/VBDs */
+
+#if 0
 static int xlblk_control_msg_pending;
+#endif
+
 
 /* We plug the I/O ring if the driver is suspended or if the ring is full. */
 #define RING_PLUGGED ((BLK_RING_INC(req_prod) == resp_cons) || \
@@ -247,11 +253,13 @@ static int hypervisor_request(unsigned long   id,
 
     switch ( operation )
     {
+#if 0
     case XEN_BLOCK_PROBE:
         if ( RING_PLUGGED ) return 1;
 	sector_number = 0;
         DISABLE_SCATTERGATHER();
         break;
+#endif
 
     case XEN_BLOCK_READ:
     case XEN_BLOCK_WRITE:
@@ -430,9 +438,11 @@ static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
             }
 	    break;
 	    
+#if 0
         case XEN_BLOCK_PROBE:
             xlblk_control_msg_pending = bret->status;
             break;
+#endif
 	  
         default:
             BUG();
@@ -447,6 +457,7 @@ static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
 }
 
 
+#if 0
 /* Send a synchronous message to Xen. */
 int xenolinux_control_msg(int operation, char *buffer, int size)
 {
@@ -472,13 +483,14 @@ int xenolinux_control_msg(int operation, char *buffer, int size)
     
     return xlblk_control_msg_pending ? -EINVAL : 0;
 }
+#endif
 
 
 static void reset_xlblk_interface(void)
 {
     block_io_op_t op; 
 
-    xlblk_control_msg_pending = 0;
+//    xlblk_control_msg_pending = 0;
     nr_pending = 0;
 
     op.cmd = BLOCK_IO_OP_RESET;
@@ -500,6 +512,7 @@ static void reset_xlblk_interface(void)
 int __init xlblk_init(void)
 {
     int error; 
+    block_io_op_t op; 
 
     reset_xlblk_interface();
 
@@ -511,17 +524,28 @@ int __init xlblk_init(void)
 	goto fail;
     }
 
+    /* Setup our [empty] disk information structure */
+    xlblk_disk_info.max   = XDI_MAX; 
+    xlblk_disk_info.disks = kmalloc(XDI_MAX * sizeof(xen_disk_t), GFP_KERNEL);
+    xlblk_disk_info.count = 0; 
+
     /* Probe for disk information. */
-    memset(&xlblk_disk_info, 0, sizeof(xlblk_disk_info));
-    error = xenolinux_control_msg(XEN_BLOCK_PROBE, 
-                                  (char *)&xlblk_disk_info,
-                                  sizeof(xen_disk_info_t));
+    memset(&op, 0, sizeof(op)); 
+    op.cmd = BLOCK_IO_OP_VBD_PROBE; 
+    op.u.probe_params.domain = 0; 
+    memcpy(&op.u.probe_params.xdi, &xlblk_disk_info, sizeof(xlblk_disk_info)); 
+
+    error = HYPERVISOR_block_io_op(&op); 
+
     if ( error )
     {
         printk(KERN_ALERT "Could not probe disks (%d)\n", error);
         free_irq(XLBLK_RESPONSE_IRQ, NULL);
         goto fail;
     }
+
+    /* copy back the [updated] count parameter */
+    xlblk_disk_info.count = op.u.probe_params.xdi.count; 
 
     /* Pass the information to our virtual block device susbystem. */
     xlvbd_init(&xlblk_disk_info);
