@@ -24,6 +24,10 @@
 #define GUEST_SIG   "XenoGues"
 #define SIG_LEN    8
 
+/* Watch for precedence when using thses ones... */
+#define PROC_XENO_DOM0_CMD "/proc/" PROC_XENO_ROOT "/" PROC_CMD
+#define PROC_XENO_DOMAINS "/proc" PROC_XENO_ROOT "/" PROC_DOMAINS
+
 /*
  * NB. No ring-3 access in initial guestOS pagetables. Note that we allow
  * ring-3 privileges in the page directories, so that the guestOS may later
@@ -153,7 +157,6 @@ static dom_meminfo_t *setup_guestos(int dom, int kernel_fd, int initrd_fd,
     unsigned long num_pgt_updates = 0;
     unsigned long count, pt_start;
     struct dom0_dopgupdates_args pgupdate_req;
-    char cmd_path[MAX_PATH];
     int cmd_fd;
     int result;
 
@@ -259,10 +262,9 @@ static dom_meminfo_t *setup_guestos(int dom, int kernel_fd, int initrd_fd,
      * Send the page update requests down to the hypervisor.
      * NB. We must do this before loading the guest OS image!
      */
-    sprintf(cmd_path, "%s%s%s%s", "/proc/", PROC_XENO_ROOT, "/", PROC_CMD);
-    if ( (cmd_fd = open(cmd_path, O_WRONLY)) < 0 )
+    if ( (cmd_fd = open(PROC_XENO_DOM0_CMD, O_WRONLY)) < 0 )
     {
-	dberr ("Could not open /proc/" PROC_XENO_ROOT "/" PROC_CMD ".");
+	dberr ("Could not open " PROC_XENO_DOM0_CMD);
 	goto error_out;
     }
 
@@ -320,12 +322,10 @@ static dom_meminfo_t *setup_guestos(int dom, int kernel_fd, int initrd_fd,
 
 static int launch_domain(dom_meminfo_t  * meminfo)
 {
-    char cmd_path[MAX_PATH];
     dom0_op_t dop;
     int cmd_fd;
 
-    sprintf(cmd_path, "%s%s%s%s", "/proc/", PROC_XENO_ROOT, "/", PROC_CMD);
-    cmd_fd = open(cmd_path, O_WRONLY);
+    cmd_fd = open(PROC_XENO_DOM0_CMD, O_WRONLY);
     if(cmd_fd < 0){
         perror(PERR_STRING);
         return -1;
@@ -344,14 +344,10 @@ static int get_domain_info (int domain_id,
                             int *tot_pages)
 {
     FILE *f; 
-    char domains_path[MAX_PATH];
     char domains_line[256];
     int read_id;
 
-    sprintf (domains_path, "%s%s%s%s", "/proc/", PROC_XENO_ROOT, "/",
-	     PROC_DOMAINS);
-
-    f = fopen (domains_path, "r");
+    f = fopen (PROC_XENO_DOMAINS, "r");
     if (f == NULL) return -1;
 
     read_id = -1;
@@ -362,7 +358,7 @@ static int get_domain_info (int domain_id,
         trans = sscanf (domains_line, "%d %*d %*d %*d %*d %*d %x %d %*s", &read_id
                         , pg_head, tot_pages);
 	if (trans != 3) {
-	    dberr ("format of /proc/" PROC_XENO_ROOT "/" PROC_DOMAINS " changed -- wrong kernel version?");
+	    dberr ("format of " PROC_XENO_DOMAINS " changed -- wrong kernel version?");
 	    read_id = -1;
 	    break;
 	}
