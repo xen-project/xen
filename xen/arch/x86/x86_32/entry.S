@@ -218,6 +218,7 @@ failsafe_callback:
         GET_CURRENT(%ebx)
         leal  EDOMAIN_trap_bounce(%ebx),%edx
         movl  EDOMAIN_failsafe_addr(%ebx),%eax
+        movl  %eax,TRAPBOUNCE_eip(%edx)
         movl  EDOMAIN_failsafe_sel(%ebx),%eax
         movw  %ax,TRAPBOUNCE_cs(%edx)
         movw  $TBF_FAILSAFE,TRAPBOUNCE_flags(%edx)
