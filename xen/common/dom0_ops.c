@@ -184,6 +184,39 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     }
     break;
 
+    case DOM0_PINCPUDOMAIN:
+    {
+        struct task_struct * p = find_domain_by_id(op.u.pincpudomain.domain);
+	int cpu = op.u.pincpudomain.cpu;
+        ret = -EINVAL;
+        if ( p != NULL )
+        {
+	    if( cpu == -1 )
+	      p->cpupinned = 0;
+	    else
+	      {
+		/* For the moment, we are unable to move running
+		domains between CPUs. (We need a way of cleanly stopping 
+		running domains). For now, if we discover the domain is
+		running then cowardly bail out with ENOSYS */
+
+		if(p->flags & PF_CONSTRUCTED) 
+		  ret = -ENOSYS;
+		else
+		  {
+		    cpu = cpu % smp_num_cpus;
+		    p->processor = cpu;
+		    p->cpupinned = 1;
+		  }
+	      }
+
+	    ret = 0;
+            put_task_struct(p);
+        }
+     	
+    }
+    break;
+
     case DOM0_BVTCTL:
     {
         unsigned long  ctx_allow = op.u.bvtctl.ctx_allow;

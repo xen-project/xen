@@ -102,7 +102,8 @@ struct task_struct
     struct list_head run_list;
     int              has_cpu;
     int state;                  /* current run state */
-    
+    int cpupinned;              /* true if pinned to curent CPU */
+
     s_time_t lastschd;              /* time this domain was last scheduled */
     s_time_t cpu_time;              /* total CPU time received till now */
     s_time_t wokenup;               /* time domain got woken up */

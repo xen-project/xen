@@ -513,3 +513,13 @@ xen/drivers/scsi/aic7xxx/aic79xx_osm.o
 xen/drivers/scsi/aic7xxx/aic79xx_osm_pci.o
 xen/drivers/scsi/aic7xxx/aic79xx_pci.o
 xen/drivers/scsi/aic7xxx/aic79xx_proc.o
+tools/xc/lib/xc_bvtsched.o
+tools/xc/lib/xc_domain.o
+tools/xc/lib/xc_linux_build.o
+tools/xc/lib/xc_linux_restore.o
+tools/xc/lib/xc_linux_save.o
+tools/xc/lib/xc_misc.o
+tools/xc/lib/xc_private.o
+tools/xc/lib/xc_vbd.o
+tools/xc/lib/xc_vif.o
+xen/xen.s

@@ -57,6 +57,18 @@ int xc_domain_destroy(int xc_handle,
     return do_dom0_op(xc_handle, &op);
 }
 
+int xc_domain_pincpu(int xc_handle,
+                      unsigned int domid, 
+                      int cpu)
+{
+    dom0_op_t op;
+    op.cmd = DOM0_PINCPUDOMAIN;
+    op.u.pincpudomain.domain = domid;
+    op.u.pincpudomain.cpu  = cpu;
+    return do_dom0_op(xc_handle, &op);
+}
+
+
 int xc_domain_getinfo(int xc_handle,
                       unsigned int first_domid,
                       unsigned int max_doms,

@@ -95,6 +95,26 @@ static PyObject *pyxc_domain_destroy(PyObject *self,
     return PyInt_FromLong(ret);
 }
 
+static PyObject *pyxc_domain_pincpu(PyObject *self,
+                                     PyObject *args,
+                                     PyObject *kwds)
+{
+    XcObject *xc = (XcObject *)self;
+
+    unsigned int dom;
+    int cpu, ret;
+
+    static char *kwd_list[] = { "dom", "cpu", NULL };
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "i|i", kwd_list, 
+                                      &dom, &cpu) )
+        return NULL;
+
+    ret = xc_domain_pincpu(xc->xc_handle, dom, cpu);
+    
+    return PyInt_FromLong(ret);
+}
+
 static PyObject *pyxc_domain_getinfo(PyObject *self,
                                      PyObject *args,
                                      PyObject *kwds)
@@ -505,6 +525,14 @@ static PyMethodDef pyxc_methods[] = {
       "Destroy a domain.\n"
       " dom   [int]:    Identifier of domain to be destroyed.\n"
       " force [int, 0]: Bool - force immediate destruction?\n\n"
+      "Returns: [int] 0 on success; -1 on error.\n" },
+
+    { "domain_pincpu", 
+      (PyCFunction)pyxc_domain_pincpu, 
+      METH_VARARGS | METH_KEYWORDS, "\n"
+      "Pin a domain to a specified CPU.\n"
+      " dom   [int]:    Identifier of domain to be destroyed.\n"
+      " force [int, -1]: CPU to pin to, or -1 to unpin\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "domain_getinfo", 
