@@ -50,6 +50,7 @@
 
 #define MODULE_NAME "XFRD"
 #define DEBUG 0
+#undef DEBUG
 #include "debug.h"
 
 /*
@@ -1142,7 +1143,11 @@ int main(int argc, char *argv[]){
     int err = 0;
     int key = 0;
     int long_index = 0;
+    static const char * LOGFILE = "/var/log/xfrd.log";
 
+    freopen(LOGFILE, "w+", stdout);
+    fclose(stderr);
+    stderr = stdout;
     dprintf(">\n");
     set_defaults(args);
     while(1){
