@@ -702,6 +702,35 @@ void time_resume(void)
 	last_update_from_xen = 0;
 }
 
+#ifdef CONFIG_SMP
+static irqreturn_t local_timer_interrupt(int irq, void *dev_id,
+					 struct pt_regs *regs)
+{
+	static int xxx = 0;
+	if ((xxx++ % 100) == 0)
+		xxprint("local_timer_interrupt\n");
+
+	/* XXX add processed_system_time loop thingy */
+	if (regs)
+		update_process_times(user_mode(regs));
+
+	return IRQ_HANDLED;
+}
+
+static struct irqaction local_irq_timer = {
+	local_timer_interrupt, SA_INTERRUPT, CPU_MASK_NONE, "ltimer",
+	NULL, NULL
+};
+
+void local_setup_timer(void)
+{
+	int time_irq;
+
+	time_irq = bind_virq_to_irq(VIRQ_TIMER);
+	(void)setup_irq(time_irq, &local_irq_timer);
+}
+#endif
+
 /*
  * /proc/sys/xen: This really belongs in another file. It can stay here for
  * now however.

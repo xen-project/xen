@@ -441,6 +441,32 @@ int cpucount;
 
 extern int cpu_idle(void);
 
+
+static irqreturn_t local_debug_interrupt(int irq, void *dev_id,
+					 struct pt_regs *regs)
+{
+	xxprint("local_debug_interrupt\n");
+
+	return IRQ_HANDLED;
+}
+
+static struct irqaction local_irq_debug = {
+	local_debug_interrupt, SA_INTERRUPT, CPU_MASK_NONE, "ldebug",
+	NULL, NULL
+};
+
+void local_setup_debug(void)
+{
+	int time_irq;
+
+	time_irq = bind_virq_to_irq(VIRQ_DEBUG);
+	(void)setup_irq(time_irq, &local_irq_debug);
+}
+
+
+extern void setup_misdirect_virq(void);
+extern void local_setup_timer(void);
+
 /*
  * Activate a secondary processor.
  */
@@ -455,29 +481,18 @@ int __init start_secondary(void *unused)
 	smp_callin();
 	while (!cpu_isset(smp_processor_id(), smp_commenced_mask))
 		rep_nop();
-#if 1
-	if (0) {
-		char *msg = "start_secondary\n";
-		char *msg2 = "delay2\n";
-		int timeout;
-		(void)HYPERVISOR_console_io(CONSOLEIO_write, strlen(msg), msg);
-		for (timeout = 0; timeout < 50000; timeout++) {
-			udelay(100);
-			if (timeout == 20000) {
-				(void)HYPERVISOR_console_io(CONSOLEIO_write, strlen(msg2), msg2);
-				timeout = 0;
-			}
-		}
-	}
-	// enable_APIC_timer();
+	setup_misdirect_virq();
+	local_setup_timer();
+	local_setup_debug();	/* XXX */
+	local_irq_enable();
 	/*
 	 * low-memory mappings have been cleared, flush them from
 	 * the local TLBs too.
 	 */
-	// local_flush_tlb();
+	local_flush_tlb();
 	cpu_set(smp_processor_id(), cpu_online_map);
 	wmb();
-	if (10) {
+	if (01) {
 		char *msg2 = "delay2\n";
 		int timeout;
 		for (timeout = 0; timeout < 50000; timeout++) {
@@ -489,32 +504,6 @@ int __init start_secondary(void *unused)
 		}
 	}
 	return cpu_idle();
-#else
-	/*
-	 * Dont put anything before smp_callin(), SMP
-	 * booting is too fragile that we want to limit the
-	 * things done here to the most necessary things.
-	 */
-	cpu_init();
-	smp_callin();
-	while (!cpu_isset(smp_processor_id(), smp_commenced_mask))
-		rep_nop();
-	setup_secondary_APIC_clock();
-	if (nmi_watchdog == NMI_IO_APIC) {
-		disable_8259A_irq(0);
-		enable_NMI_through_LVT0(NULL);
-		enable_8259A_irq(0);
-	}
-	enable_APIC_timer();
-	/*
-	 * low-memory mappings have been cleared, flush them from
-	 * the local TLBs too.
-	 */
-	local_flush_tlb();
-	cpu_set(smp_processor_id(), cpu_online_map);
-	wmb();
-	return cpu_idle();
-#endif
 }
 
 /*

@@ -128,6 +128,7 @@ typedef struct {
 #define EVTCHNSTAT_interdomain  2  /* Channel is connected to remote domain. */
 #define EVTCHNSTAT_pirq         3  /* Channel is bound to a phys IRQ line.   */
 #define EVTCHNSTAT_virq         4  /* Channel is bound to a virtual IRQ line */
+#define EVTCHNSTAT_ipi          5  /* Channel is bound to a virtual IPI line */
     u32     status;                   /*  8 */
     union {                           /* 12 */
         struct {
@@ -140,8 +141,21 @@ typedef struct {
         } PACKED interdomain; /* EVTCHNSTAT_interdomain */
         u32 pirq;      /* EVTCHNSTAT_pirq        */   /* 12 */
         u32 virq;      /* EVTCHNSTAT_virq        */   /* 12 */
+        u32 ipi_edom;  /* EVTCHNSTAT_ipi         */   /* 12 */
     } PACKED u;
 } PACKED evtchn_status_t; /* 20 bytes */
+
+/*
+ * EVTCHNOP_bind_ipi: Bind a local event channel to receive events.
+ */
+#define EVTCHNOP_bind_ipi         7
+typedef struct {
+    /* IN parameters. */
+    u32 ipi_edom;                     /*  0 */
+    /* OUT parameters. */
+    u32 port;                         /*  4 */
+} PACKED evtchn_bind_ipi_t; /* 8 bytes */
+
 
 typedef struct {
     u32 cmd; /* EVTCHNOP_* */         /*  0 */
@@ -154,6 +168,7 @@ typedef struct {
         evtchn_close_t            close;
         evtchn_send_t             send;
         evtchn_status_t           status;
+        evtchn_bind_ipi_t         bind_ipi;
         u8                        __dummy[24];
     } PACKED u;
 } PACKED evtchn_op_t; /* 32 bytes */

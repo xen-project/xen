@@ -270,6 +270,33 @@ static long evtchn_bind_virq(evtchn_bind_virq_t *bind)
         return port;
 
     bind->port = port;
+    printk("evtchn_bind_virq %d/%d virq %d -> %d\n",
+           d->id, ed->eid, virq, port);
+    return 0;
+}
+
+static long evtchn_bind_ipi(evtchn_bind_ipi_t *bind)
+{
+    struct exec_domain *ed = current;
+    struct domain *d = ed->domain;
+    int            port, ipi_edom = bind->ipi_edom;
+
+    spin_lock(&d->event_channel_lock);
+
+    if ( (port = get_free_port(d)) >= 0 )
+    {
+        d->event_channel[port].state      = ECS_IPI;
+        d->event_channel[port].u.ipi_edom = ipi_edom;
+    }
+
+    spin_unlock(&d->event_channel_lock);
+
+    if ( port < 0 )
+        return port;
+
+    bind->port = port;
+    printk("evtchn_bind_ipi %d/%d ipi_edom %d -> %d\n",
+           d->id, current->eid, ipi_edom, port);
     return 0;
 }
 
@@ -307,6 +334,8 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
         return rc;
 
     bind->port = port;
+    printk("evtchn_bind_pirq %d/%d pirq %d -> port %d\n",
+           d->id, current->eid, pirq, port);
     return 0;
 }
 
@@ -350,6 +379,9 @@ static long __evtchn_close(struct domain *d1, int port1)
         for_each_exec_domain(d1, ed)
             if (ed->virq_to_evtchn[chn1[port1].u.virq] == port1)
                 ed->virq_to_evtchn[chn1[port1].u.virq] = 0;
+        break;
+
+    case ECS_IPI:
         break;
 
     case ECS_INTERDOMAIN:
@@ -516,6 +548,10 @@ static long evtchn_status(evtchn_status_t *status)
         status->status = EVTCHNSTAT_virq;
         status->u.virq = chn[port].u.virq;
         break;
+    case ECS_IPI:
+        status->status     = EVTCHNSTAT_ipi;
+        status->u.ipi_edom = chn[port].u.ipi_edom;
+        break;
     default:
         BUG();
     }
@@ -551,6 +587,12 @@ long do_event_channel_op(evtchn_op_t *uop)
 
     case EVTCHNOP_bind_virq:
         rc = evtchn_bind_virq(&op.u.bind_virq);
+        if ( (rc == 0) && (copy_to_user(uop, &op, sizeof(op)) != 0) )
+            rc = -EFAULT; /* Cleaning up here would be a mess! */
+        break;
+
+    case EVTCHNOP_bind_ipi:
+        rc = evtchn_bind_ipi(&op.u.bind_ipi);
         if ( (rc == 0) && (copy_to_user(uop, &op, sizeof(op)) != 0) )
             rc = -EFAULT; /* Cleaning up here would be a mess! */
         break;

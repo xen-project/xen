@@ -36,6 +36,7 @@ typedef struct event_channel_st
 #define ECS_INTERDOMAIN  2 /* Channel is bound to another domain.            */
 #define ECS_PIRQ         3 /* Channel is bound to a physical IRQ line.       */
 #define ECS_VIRQ         4 /* Channel is bound to a virtual IRQ line.        */
+#define ECS_IPI          5 /* Channel is bound to a virtual IPI line.        */
     u16 state;
     union {
         struct {
@@ -47,6 +48,7 @@ typedef struct event_channel_st
         } __attribute__ ((packed)) interdomain; /* state == ECS_INTERDOMAIN */
         u16 pirq; /* state == ECS_PIRQ */
         u16 virq; /* state == ECS_VIRQ */
+        u32 ipi_edom; /* state == ECS_IPI */
     } u;
 } event_channel_t;
 

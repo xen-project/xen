@@ -107,15 +107,14 @@ void do_task_queues(unsigned char key)
                    ed->ed_flags,
                    ed->vcpu_info->evtchn_upcall_pending, 
                    ed->vcpu_info->evtchn_upcall_mask);
+            printk("Notifying guest... %d/%d\n", d->id, ed->eid); 
+            printk("port %d/%d stat %d %d %d\n",
+                   VIRQ_DEBUG, ed->virq_to_evtchn[VIRQ_DEBUG],
+                   test_bit(ed->virq_to_evtchn[VIRQ_DEBUG], &d->shared_info->evtchn_pending[0]),
+                   test_bit(ed->virq_to_evtchn[VIRQ_DEBUG], &d->shared_info->evtchn_mask[0]),
+                   test_bit(ed->virq_to_evtchn[VIRQ_DEBUG]>>5, &ed->vcpu_info->evtchn_pending_sel));
+            send_guest_virq(ed, VIRQ_DEBUG);
         }
-        ed = d->exec_domain[0];
-        printk("Notifying guest... %d/%d\n", d->id, ed->eid); 
-        printk("port %d/%d stat %d %d %d\n",
-               VIRQ_DEBUG, ed->virq_to_evtchn[VIRQ_DEBUG],
-               test_bit(ed->virq_to_evtchn[VIRQ_DEBUG], &d->shared_info->evtchn_pending[0]),
-               test_bit(ed->virq_to_evtchn[VIRQ_DEBUG], &d->shared_info->evtchn_mask[0]),
-               test_bit(ed->virq_to_evtchn[VIRQ_DEBUG]>>5, &ed->vcpu_info->evtchn_pending_sel));
-        send_guest_virq(d->exec_domain[0], VIRQ_DEBUG);
     }
 
     read_unlock(&domlist_lock);
