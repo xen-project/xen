@@ -6,6 +6,13 @@
 
 #include <Python.h>
 #include <xc.h>
+#include <zlib.h>
+#include <fcntl.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
 
 /* Needed for Python versions earlier than 2.3. */
 #ifndef PyMODINIT_FUNC
@@ -183,6 +190,7 @@ static PyObject *pyxc_linux_save(PyObject *self,
     u64   dom;
     char *state_file;
     int   progress = 1;
+    unsigned int flags = 0;
 
     static char *kwd_list[] = { "dom", "state_file", "progress", NULL };
 
@@ -190,11 +198,124 @@ static PyObject *pyxc_linux_save(PyObject *self,
                                       &dom, &state_file, &progress) )
         return NULL;
 
-    if ( xc_linux_save(xc->xc_handle, dom, state_file, progress) != 0 )
-        return PyErr_SetFromErrno(xc_error);
-    
-    Py_INCREF(zero);
-    return zero;
+    if (progress) flags |= XCFLAGS_VERBOSE;
+
+    if (strncmp(state_file,"tcp:", strlen("tcp:")) == 0)
+    {
+#define max_namelen 64
+	char server[max_namelen];
+	char *port_s;
+	int port=777;
+	int sd = 0;
+	struct hostent *h;
+	struct sockaddr_in s;
+	int sockbufsize;
+
+	int writerfn(void *fd, const void *buf, size_t count)
+	{
+	    int tot = 0, rc;
+	    do 
+	    {
+		rc = write( (int) fd, ((char*)buf)+tot, count-tot );
+		if (rc<0) { perror("WRITE"); return rc; };
+		tot += rc;
+	    }
+	    while(tot<count);
+	    return 0;
+	}
+
+	strncpy( server, state_file+strlen("tcp://"), max_namelen);
+	server[max_namelen-1]='\0';
+	if( port_s = strchr(server,':') )
+	{
+	    *port_s = '\0';
+	    port = atoi(port_s+1);
+	}
+
+	printf("X server=%s port=%d\n",server,port);
+	
+	h = gethostbyname(server);
+	sd = socket (AF_INET,SOCK_STREAM,0);
+	if(sd<0) goto serr;
+	s.sin_family = AF_INET;
+	bcopy ( h->h_addr, &(s.sin_addr.s_addr), h->h_length);
+	s.sin_port = htons(port);
+	if( connect(sd, (struct sockaddr *) &s, sizeof(s)) ) 
+	    goto serr;
+
+	sockbufsize=128*1024;
+	if (setsockopt(sd, SOL_SOCKET, SO_SNDBUF, &sockbufsize, sizeof sockbufsize) < 0) 
+	{
+	    goto serr;
+	}
+
+	if ( xc_linux_save(xc->xc_handle, dom, flags, writerfn, (void*)sd) == 0 )
+	{
+	    close(sd);
+	    Py_INCREF(zero);
+	    return zero;
+	}
+
+	serr:
+
+	PyErr_SetFromErrno(xc_error);
+	if(sd)close(sd);
+	return NULL;
+    }    
+    else
+    {
+	int fd;
+	gzFile gfd;
+
+	int writerfn(void *fd, const void *buf, size_t count)
+	{
+	    int rc;
+	    while ( ((rc = gzwrite( (gzFile*)fd, (void*)buf, count)) == -1) && 
+		    (errno = EINTR) )
+		continue;
+	    return ! (rc == count);
+	}
+
+	if (strncmp(state_file,"file:",strlen("file:")) == 0)
+	    state_file += strlen("file:");
+
+	if ( (fd = open(state_file, O_CREAT|O_EXCL|O_WRONLY, 0644)) == -1 )
+	{
+	    perror("Could not open file for writing");
+	    goto err;
+	}
+
+	/*
+	 * Compression rate 1: we want speed over compression. 
+	 * We're mainly going for those zero pages, after all.
+	 */
+
+	if ( (gfd = gzdopen(fd, "wb1")) == NULL )
+	{
+	    perror("Could not allocate compression state for state file");
+	    close(fd);
+	    goto err;
+	}
+
+
+	if ( xc_linux_save(xc->xc_handle, dom, flags, writerfn, gfd) == 0 )
+	{
+	    gzclose(gfd);
+	    close(fd);
+
+	    Py_INCREF(zero);
+	    return zero;
+	}
+
+    err:
+	PyErr_SetFromErrno(xc_error);
+	if(gfd)gzclose(gfd);
+	if(fd)close(fd);
+	unlink(state_file);
+
+	return NULL;
+    }
+
 }
 
 static PyObject *pyxc_linux_restore(PyObject *self,
@@ -206,6 +327,7 @@ static PyObject *pyxc_linux_restore(PyObject *self,
     char        *state_file;
     int          progress = 1;
     u64          dom;
+    unsigned int flags = 0;
 
     static char *kwd_list[] = { "dom", "state_file", "progress", NULL };
 
@@ -213,11 +335,149 @@ static PyObject *pyxc_linux_restore(PyObject *self,
                                       &dom, &state_file, &progress) )
         return NULL;
 
-    if ( xc_linux_restore(xc->xc_handle, dom, state_file, progress, &dom) != 0 )
-        return PyErr_SetFromErrno(xc_error);
+    if (progress) flags |= XCFLAGS_VERBOSE;
 
-    Py_INCREF(zero);
-    return zero;
+    if (strncmp(state_file,"tcp:", strlen("tcp:")) == 0)
+    {
+#define max_namelen 64
+	char server[max_namelen];
+	char *port_s;
+	int port=777;
+	int ld = 0, sd = 0;
+	struct hostent *h;
+	struct sockaddr_in s, d, p;
+	socklen_t dlen, plen;
+	int sockbufsize;
+	int on = 1;
+
+	int readerfn(void *fd, void *buf, size_t count)
+	{
+	    int rc, tot = 0;
+	    do { 
+		rc = read( (int) fd, ((char*)buf)+tot, count-tot ); 
+		if (rc<0)
+		    {
+			perror("READ");
+			return rc;
+		    }
+		tot += rc;
+	    } while( tot<count );
+
+	    return 0;
+	}
+
+	strncpy( server, state_file+strlen("tcp://"), max_namelen);
+	server[max_namelen-1]='\0';
+	if( port_s = strchr(server,':') )
+	{
+	    *port_s = '\0';
+	    port = atoi(port_s+1);
+	}
+
+	printf("X server=%s port=%d\n",server,port);
+	
+	h = gethostbyname(server);
+	ld = socket (AF_INET,SOCK_STREAM,0);
+	if(ld<0) goto serr;
+	s.sin_family = AF_INET;
+	//bcopy ( h->h_addr, &(s.sin_addr.s_addr), h->h_length);
+	s.sin_addr.s_addr = htonl(INADDR_ANY);
+	s.sin_port = htons(port);
+
+	if (setsockopt(ld, SOL_SOCKET, SO_REUSEADDR, &on, sizeof (on)) < 0)
+	    goto serr;
+
+	if( bind(ld, (struct sockaddr *) &s, sizeof(s)) ) 
+	    goto serr;
+
+	if( listen(ld, 1) )
+	    goto serr;
+
+	dlen=sizeof(struct sockaddr);
+	if( (sd = accept(ld, (struct sockaddr *) &d, &dlen )) < 0 )
+	    goto serr;
+
+        plen = sizeof(p);
+	if (getpeername(sd, (struct sockaddr_in *) &p, 
+			&plen) < 0) {
+	    goto serr;
+	}
+
+	printf("Accepted connection from %s\n",
+			inet_ntoa(p.sin_addr));
+	
+	sockbufsize=128*1024;
+	if (setsockopt(sd, SOL_SOCKET, SO_SNDBUF, &sockbufsize, sizeof sockbufsize) < 0) 
+	{
+	    goto serr;
+	}
+
+	if ( xc_linux_restore(xc->xc_handle, dom, flags, readerfn, (void*)sd, &dom) == 0 )
+	{
+	    close(sd);
+	    Py_INCREF(zero);
+	    return zero;
+	}
+
+	serr:
+
+	PyErr_SetFromErrno(xc_error);
+	if(ld)close(ld);
+	if(sd)close(sd);
+	return NULL;
+    }    
+    else
+    {
+	int fd;
+	gzFile gfd;
+
+	int readerfn(void *fd, void *buf, size_t count)
+	{
+	    int rc;
+	    while ( ((rc = gzread( (gzFile*)fd, (void*)buf, count)) == -1) && 
+		    (errno = EINTR) )
+		continue;
+	    return ! (rc == count);
+	}
+
+	if (strncmp(state_file,"file:",strlen("file:")) == 0)
+	    state_file += strlen("file:");
+
+	if ( (fd = open(state_file, O_RDONLY)) == -1 )
+	{
+	    perror("Could not open file for writing");
+	    goto err;
+	}
+
+	/*
+	 * Compression rate 1: we want speed over compression. 
+	 * We're mainly going for those zero pages, after all.
+	 */
+
+	if ( (gfd = gzdopen(fd, "rb")) == NULL )
+	{
+	    perror("Could not allocate compression state for state file");
+	    close(fd);
+	    goto err;
+	}
+
+
+	if ( xc_linux_restore(xc->xc_handle, dom, flags, readerfn, gfd, &dom) == 0 )
+	{
+	    gzclose(gfd);
+	    close(fd);
+
+	    Py_INCREF(zero);
+	    return zero;
+	}
+
+    err:
+	PyErr_SetFromErrno(xc_error);
+	if(gfd)gzclose(gfd);
+	if(fd)close(fd);
+	return NULL;
+    }
+
 }
 
 static PyObject *pyxc_linux_build(PyObject *self,

@@ -347,6 +347,18 @@ def make_domain():
             else:
                 print "Enabled PCI access (%d:%d:%d)." % \
                       (pci_bus,pci_dev,pci_func)
+		
+    if restore:
+	# send an unsolicited ARP reply for all non link-local IPs
+	gw=xenctl.utils.get_current_ipgw()
+	if gw == '': gw='255.255.255.255'
+	nlb=open('/proc/sys/net/ipv4/ip_nonlocal_bind','r').read()[0]=='1'
+	if not nlb: print >>open('/proc/sys/net/ipv4/ip_nonlocal_bind','w'), '1'
+	for ip in vfr_ipaddr:
+	    if not xenctl.utils.check_subnet(ip,'169.254.0.0','255.255.0.0'):
+		print     '/usr/sbin/arping -A -b -I eth0 -c 1 -s %s %s' % (ip,gw)
+		os.system('/usr/sbin/arping -A -b -I eth0 -c 1 -s %s %s' % (ip,gw))
+	if not nlb: print >>open('/proc/sys/net/ipv4/ip_nonlocal_bind','w'), '0'
 
     if xc.domain_start( dom=id ) < 0:
         print "Error starting domain"
