@@ -1,3 +1,3 @@
 O_TARGET := drv.o
-obj-y := vnetif.o
+obj-y := main.o
 include $(TOPDIR)/Rules.make

@@ -1,13 +1,13 @@
 /******************************************************************************
- * vblkif.h
+ * blkif.h
  * 
  * Unified block-device I/O interface for Xen guest OSes.
  * 
  * Copyright (c) 2003-2004, Keir Fraser
  */
 
-#ifndef __SHARED_VBLKIF_H__
-#define __SHARED_VBLKIF_H__
+#ifndef __SHARED_BLKIF_H__
+#define __SHARED_BLKIF_H__
 
 #define blkif_vdev_t   u16
 #define blkif_sector_t u64
@@ -106,4 +106,4 @@ typedef struct {
     xen_sector_t   capacity;     /* Size in terms of 512-byte sectors.   */
 } vdisk_t;
 
-#endif /* __SHARED_VBLKIF_H__ */
+#endif /* __SHARED_BLKIF_H__ */

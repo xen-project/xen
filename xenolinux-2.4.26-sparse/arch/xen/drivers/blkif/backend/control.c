@@ -1,5 +1,5 @@
 /******************************************************************************
- * arch/xen/drivers/vblkif/backend/control.c
+ * arch/xen/drivers/blkif/backend/control.c
  * 
  * Routines for interfacing with the control plane.
  * 

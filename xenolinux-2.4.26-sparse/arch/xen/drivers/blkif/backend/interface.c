@@ -1,5 +1,5 @@
 /******************************************************************************
- * arch/xen/drivers/vblkif/backend/interface.c
+ * arch/xen/drivers/blkif/backend/interface.c
  * 
  * Block-device interface management.
  * 
@@ -51,7 +51,7 @@ void blkif_create(blkif_create_t *create)
     spin_lock_init(&blkif->vbd_lock);
     spin_lock_init(&blkif->blk_ring_lock);
 
-    request_irq(irq, vblkif_be_int, 0, "vblkif-backend", blkif);
+    request_irq(irq, blkif_be_int, 0, "blkif-backend", blkif);
 
     blkif->hash_next = *pblkif;
     *pblkif = blkif;

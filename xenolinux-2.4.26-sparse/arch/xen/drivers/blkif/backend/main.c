@@ -1,11 +1,11 @@
 /******************************************************************************
- * arch/xen/drivers/vblkif/backend/main.c
+ * arch/xen/drivers/blkif/backend/main.c
  * 
  * Back-end of the driver for virtual block devices. This portion of the
  * driver exports a 'unified' block-device interface that can be accessed
  * by any operating system that implements a compatible front end. A 
  * reference front-end implementation can be found in:
- *  arch/xen/drivers/vblkif/frontend
+ *  arch/xen/drivers/blkif/frontend
  * 
  * Copyright (c) 2003-2004, Keir Fraser & Steve Hand
  */
@@ -187,7 +187,7 @@ static void end_block_io_op(struct buffer_head *bh, int uptodate)
  * NOTIFICATION FROM GUEST OS.
  */
 
-void vblkif_be_int(int irq, void *dev_id, struct pt_regs *regs)
+void blkif_be_int(int irq, void *dev_id, struct pt_regs *regs)
 {
     blkif_t *blkif = dev_id;
     add_to_blkdev_list_tail(blkif);
@@ -490,7 +490,7 @@ static int __init init_module(void)
     INIT_LIST_HEAD(&io_schedule_list);
 
     if ( request_irq(bind_virq_to_irq(VIRQ_DEBUG), blkif_debug_int, 
-                     SA_SHIRQ, "vblkif-backend-dbg", &blkif_debug_int) != 0 )
+                     SA_SHIRQ, "blkif-backend-dbg", &blkif_debug_int) != 0 )
         printk(KERN_WARNING "Non-fatal error -- no debug interrupt\n");
 
     buffer_head_cachep = kmem_cache_create(

@@ -1,5 +1,5 @@
 /******************************************************************************
- * vnetif.c
+ * arch/xen/drivers/netif/frontend/main.c
  * 
  * Virtual network driver for XenoLinux.
  * 

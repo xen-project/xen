@@ -52,8 +52,8 @@ SUBDIRS += arch/xen/kernel arch/xen/mm arch/xen/lib
 SUBDIRS += arch/xen/drivers/console 
 SUBDIRS += arch/xen/drivers/evtchn
 ifdef CONFIG_XEN_NEWIO
-SUBDIRS += arch/xen/drivers/vblkif
-SUBDIRS += arch/xen/drivers/vnetif
+SUBDIRS += arch/xen/drivers/blkif
+SUBDIRS += arch/xen/drivers/netif
 else
 SUBDIRS += arch/xen/drivers/block
 SUBDIRS += arch/xen/drivers/network
@@ -67,8 +67,8 @@ CORE_FILES += arch/xen/kernel/kernel.o arch/xen/mm/mm.o
 CORE_FILES += arch/xen/drivers/evtchn/drv.o
 CORE_FILES += arch/xen/drivers/console/drv.o
 ifdef CONFIG_XEN_NEWIO
-CORE_FILES += arch/xen/drivers/vblkif/drv.o
-CORE_FILES += arch/xen/drivers/vnetif/drv.o
+CORE_FILES += arch/xen/drivers/blkif/drv.o
+CORE_FILES += arch/xen/drivers/netif/drv.o
 else
 CORE_FILES += arch/xen/drivers/block/drv.o
 CORE_FILES += arch/xen/drivers/network/drv.o

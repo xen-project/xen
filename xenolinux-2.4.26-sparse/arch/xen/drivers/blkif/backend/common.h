@@ -1,9 +1,9 @@
 /******************************************************************************
- * arch/xen/drivers/vblkif/backend/common.h
+ * arch/xen/drivers/blkif/backend/common.h
  */
 
-#ifndef __VBLKIF__BACKEND__COMMON_H__
-#define __VBLKIF__BACKEND__COMMON_H__
+#ifndef __BLKIF__BACKEND__COMMON_H__
+#define __BLKIF__BACKEND__COMMON_H__
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -12,7 +12,7 @@
 #include <linux/slab.h>
 #include <asm/ctrl_if.h>
 #include <asm/io.h>
-#include "../vblkif.h"
+#include "../blkif.h"
 
 #ifndef NDEBUG
 #define ASSERT(_p) \
@@ -91,8 +91,8 @@ typedef struct {
 
 int vbd_translate(phys_seg_t *pseg, blkif_t *blkif, int operation); 
 
-int vblkif_be_controller_init(void);
+int blkif_be_controller_init(void);
 
-void vblkif_be_int(int irq, void *dev_id, struct pt_regs *regs);
+void blkif_be_int(int irq, void *dev_id, struct pt_regs *regs);
 
-#endif /* __VBLKIF__BACKEND__COMMON_H__ */
+#endif /* __BLKIF__BACKEND__COMMON_H__ */

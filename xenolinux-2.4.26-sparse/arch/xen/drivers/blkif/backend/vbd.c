@@ -1,5 +1,5 @@
 /******************************************************************************
- * arch/xen/drivers/vblkif/backend/vbd.c
+ * arch/xen/drivers/blkif/backend/vbd.c
  * 
  * Routines for managing virtual block devices (VBDs).
  * 
