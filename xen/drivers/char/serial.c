@@ -99,7 +99,7 @@ static uart_t com[2] = {
  * PRIVATE FUNCTIONS
  */
 
-static void uart_rx(uart_t *uart, struct pt_regs *regs)
+static void uart_rx(uart_t *uart, struct xen_regs *regs)
 {
     unsigned char c;
 
@@ -125,7 +125,7 @@ static void uart_rx(uart_t *uart, struct pt_regs *regs)
     }
 }
 
-static void serial_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static void serial_interrupt(int irq, void *dev_id, struct xen_regs *regs)
 {
     uart_rx((uart_t *)dev_id, regs);
 }

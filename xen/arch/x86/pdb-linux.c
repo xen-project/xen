@@ -37,7 +37,7 @@ pdb_linux_clr_bkpt (unsigned long addr, unsigned char value)
 }
 
 void
-pdb_linux_syscall_enter_bkpt (struct pt_regs *regs, long error_code,
+pdb_linux_syscall_enter_bkpt (struct xen_regs *regs, long error_code,
 			      trap_info_t *ti)
 {
     /* set at breakpoint at the beginning of the 
@@ -49,7 +49,7 @@ pdb_linux_syscall_enter_bkpt (struct pt_regs *regs, long error_code,
 }
 
 void
-pdb_linux_syscall_exit_bkpt (struct pt_regs *regs, struct pdb_context *pdb_ctx)
+pdb_linux_syscall_exit_bkpt (struct xen_regs *regs, struct pdb_context *pdb_ctx)
 {
     /*
       we've hit an int 0x80 in a user's program, jumped into xen

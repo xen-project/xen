@@ -711,7 +711,7 @@
 404f1bb41Yl-5ZjIWnG66HDCj6OIWA xen/include/asm-x86/pda.h
 4022a73diKn2Ax4-R4gzk59lm1YdDg xen/include/asm-x86/pdb.h
 3ddb79c2QF5-pZGzuX4QukPCDAl59A xen/include/asm-x86/processor.h
-40cf1596bim9F9DNdV75klgRSZ6Y2A xen/include/asm-x86/ptrace.h
+40cf1596bim9F9DNdV75klgRSZ6Y2A xen/include/asm-x86/regs.h
 3ddb79c2plf7ciNgoNjU-RsbUzawsw xen/include/asm-x86/rwlock.h
 405b8599BsDsDwKEJLS0XipaiQW3TA xen/include/asm-x86/shadow.h
 3ddb79c3Hgbb2g8CyWLMCK-6_ZVQSQ xen/include/asm-x86/smp.h
@@ -722,13 +722,13 @@
 3ddb79c4HugMq7IYGxcQKFBpKwKhzA xen/include/asm-x86/types.h
 40cf1596saFaHD5DC5zvrSn7CDCWGQ xen/include/asm-x86/uaccess.h
 3ddb79c2ADvRmdexd9y3AYK9_NTx-Q xen/include/asm-x86/x86_32/current.h
-3ddb79c3mbqEM7QQr3zVq7NiBNhouA xen/include/asm-x86/x86_32/ptrace.h
+3ddb79c3mbqEM7QQr3zVq7NiBNhouA xen/include/asm-x86/x86_32/regs.h
 3e7f358aG11EvMI9VJ4_9hD4LUO7rQ xen/include/asm-x86/x86_32/string.h
 3ddb79c3M2n1ROZH6xk3HbyN4CPDqg xen/include/asm-x86/x86_32/uaccess.h
 404f1b9ceJeGVaPNIENm2FkK0AgEOQ xen/include/asm-x86/x86_64/current.h
 404f1b9fl6AQ_a-T1TDK3fuwTPXmHw xen/include/asm-x86/x86_64/desc.h
 404f1badfXZJZ2sU8sh9PS2EZvd19Q xen/include/asm-x86/x86_64/ldt.h
-404f1bb86rAXB3aLS1vYdcqpJiEcyg xen/include/asm-x86/x86_64/ptrace.h
+404f1bb86rAXB3aLS1vYdcqpJiEcyg xen/include/asm-x86/x86_64/regs.h
 40e1966azOJZfNI6Ilthe6Q-T3Hewg xen/include/asm-x86/x86_64/string.h
 404f1bc4tWkB9Qr8RkKtZGW5eMQzhw xen/include/asm-x86/x86_64/uaccess.h
 400304fcmRQmDdFYEzDh0wcBba9alg xen/include/public/COPYING

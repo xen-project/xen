@@ -12,7 +12,7 @@
 #ifndef __PDB_H__
 #define __PDB_H__
 
-#include <asm/ptrace.h>
+#include <asm/regs.h>
 #include <xen/list.h>
 #include <public/dom0_ops.h>
 #include <public/xen.h>                   /* for domain id */
@@ -34,7 +34,7 @@ extern int pdb_get_values(u_char *buffer, int length,
 
 /* External entry points. */
 extern int pdb_handle_exception(int exceptionVector,
-				struct pt_regs *xen_regs);
+				struct xen_regs *xen_regs);
 extern void pdb_do_debug(dom0_op_t *op);
 
 /* PDB Context. */
@@ -79,9 +79,9 @@ void pdb_linux_get_values(char *buffer, int length, unsigned long address,
 			  int pid, unsigned long cr3);
 void pdb_linux_set_values(char *buffer, int length, unsigned long address,
 			  int pid, unsigned long cr3);
-void pdb_linux_syscall_enter_bkpt (struct pt_regs *regs, long error_code,
+void pdb_linux_syscall_enter_bkpt (struct xen_regs *regs, long error_code,
 				   trap_info_t *ti);
-void pdb_linux_syscall_exit_bkpt (struct pt_regs *regs, 
+void pdb_linux_syscall_exit_bkpt (struct xen_regs *regs, 
 				  struct pdb_context *pdb_ctx);
 
 #endif  /* __PDB_H__ */

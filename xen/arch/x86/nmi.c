@@ -30,7 +30,7 @@ unsigned int nmi_watchdog = NMI_NONE;
 unsigned int watchdog_on = 0;
 static unsigned int nmi_hz = HZ;
 unsigned int nmi_perfctr_msr;	/* the MSR to reset in NMI handler */
-extern void show_registers(struct pt_regs *regs);
+extern void show_registers(struct xen_regs *regs);
 
 extern int logical_proc_id[];
 
@@ -270,9 +270,9 @@ void touch_nmi_watchdog (void)
         alert_counter[i] = 0;
 }
 
-void nmi_watchdog_tick (struct pt_regs * regs)
+void nmi_watchdog_tick (struct xen_regs * regs)
 {
-    extern void die(const char * str, struct pt_regs * regs, long err);
+    extern void die(const char * str, struct xen_regs * regs, long err);
 
     int sum, cpu = smp_processor_id();
 

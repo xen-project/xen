@@ -52,8 +52,8 @@ static void show_handlers(unsigned char key)
 
 static void dump_registers(unsigned char key)
 {
-    struct pt_regs *regs = (struct pt_regs *)get_execution_context();
-    extern void show_registers(struct pt_regs *regs); 
+    struct xen_regs *regs = (struct xen_regs *)get_execution_context();
+    extern void show_registers(struct xen_regs *regs); 
     printk("'%c' pressed -> dumping registers\n", key); 
     show_registers(regs); 
 }
