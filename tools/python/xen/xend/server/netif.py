@@ -346,7 +346,21 @@ class NetDev(controller.SplitDev):
         vif = val['netif_handle']
         self.status = NETIF_INTERFACE_STATUS_CONNECTED
         self.reportStatus()
-
+        
+    def send_be_creditlimit(self, credit, period):
+        msg = packMsg('netif_be_creditlimit_t',
+                      { 'domid'          : self.controller.dom,
+                        'netif_handle'   : self.vif,
+                        'credit_bytes'   : credit,
+                        'period_usec'    : period })
+        d = defer.Deferred()
+        d.addCallback(self.respond_be_creditlimit)
+        self.getBackendInterface().writeRequest(msg, response=d)
+        
+    def respond_be_creditlimit(self, msg):
+        val = unpackMsg('netif_be_creditlimit_t', msg)
+        return self
+        
     def reportStatus(self, resp=0):
         msg = packMsg('netif_fe_interface_status_t',
                       { 'handle' : self.vif,
@@ -430,6 +444,15 @@ class NetifController(controller.SplitController):
             d = dev.attach()
         return d
 
+    def limitDevice(self, vif, credit, period):        
+        if vif not in self.devices:
+            raise XendError('device does not exist for credit limit: vif'
+                            + str(self.dom) + '.' + str(vif))
+        
+        dev = self.devices[vif]
+        d = dev.send_be_creditlimit(credit, period)
+        return d
+    
     def recv_fe_driver_status(self, msg, req):
         if not req: return
         print

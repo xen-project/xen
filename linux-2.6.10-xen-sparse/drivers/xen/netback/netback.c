@@ -7,7 +7,7 @@
  * reference front-end implementation can be found in:
  *  drivers/xen/netfront/netfront.c
  * 
- * Copyright (c) 2002-2004, K A Fraser
+ * Copyright (c) 2002-2005, K A Fraser
  */
 
 #include "common.h"
@@ -380,14 +380,13 @@ void netif_deschedule_work(netif_t *netif)
     remove_from_net_schedule_list(netif);
 }
 
-#if 0
+
 static void tx_credit_callback(unsigned long data)
 {
     netif_t *netif = (netif_t *)data;
     netif->remaining_credit = netif->credit_bytes;
     netif_schedule_work(netif);
 }
-#endif
 
 static void net_tx_action(unsigned long unused)
 {
@@ -471,42 +470,48 @@ static void net_tx_action(unsigned long unused)
             continue;
         }
 
-        netif->tx->req_cons = ++netif->tx_req_cons;
-
-        /*
-         * 1. Ensure that we see the request when we copy it.
-         * 2. Ensure that frontend sees updated req_cons before we check
-         *    for more work to schedule.
-         */
-        mb();
-
+        rmb(); /* Ensure that we see the request before we copy it. */
         memcpy(&txreq, &netif->tx->ring[MASK_NETIF_TX_IDX(i)].req, 
                sizeof(txreq));
 
-#if 0
         /* Credit-based scheduling. */
-        if ( tx.size > netif->remaining_credit )
+        if ( txreq.size > netif->remaining_credit )
         {
-            s_time_t now = NOW(), next_credit = 
-                netif->credit_timeout.expires + MICROSECS(netif->credit_usec);
-            if ( next_credit <= now )
+            unsigned long now = jiffies;
+            unsigned long next_credit = 
+                netif->credit_timeout.expires +
+                msecs_to_jiffies(netif->credit_usec / 1000);
+
+            /* Timer could already be pending in some rare cases. */
+            if ( timer_pending(&netif->credit_timeout) )
+                break;
+
+            /* Already passed the point at which we can replenish credit? */
+            if ( time_after_eq(now, next_credit) )
             {
                 netif->credit_timeout.expires = now;
                 netif->remaining_credit = netif->credit_bytes;
             }
-            else
+
+            /* Still too big to send right now? Then set a timer callback. */
+            if ( txreq.size > netif->remaining_credit )
             {
                 netif->remaining_credit = 0;
                 netif->credit_timeout.expires  = next_credit;
                 netif->credit_timeout.data     = (unsigned long)netif;
                 netif->credit_timeout.function = tx_credit_callback;
-                netif->credit_timeout.cpu      = smp_processor_id();
-                add_ac_timer(&netif->credit_timeout);
+                add_timer_on(&netif->credit_timeout, smp_processor_id());
                 break;
             }
         }
-        netif->remaining_credit -= tx.size;
-#endif
+        netif->remaining_credit -= txreq.size;
+
+        /*
+         * Why the barrier? It ensures that the frontend sees updated req_cons
+         * before we check for more work to schedule.
+         */
+        netif->tx->req_cons = ++netif->tx_req_cons;
+        mb();
 
         netif_schedule_work(netif);
 
