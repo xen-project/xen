@@ -13,6 +13,8 @@ CONFIG_UID16=y
 # CONFIG_XEN_PRIVILEGED_GUEST is not set
 # CONFIG_XEN_PHYSDEV_ACCESS is not set
 CONFIG_NO_IDLE_HZ=y
+CONFIG_NETDEVICES=y
+# CONFIG_VT is not set
 
 #
 # Code maturity level options
@@ -179,7 +181,6 @@ CONFIG_IP_NF_TARGET_ULOG=y
 # Network testing
 #
 # CONFIG_NET_PKTGEN is not set
-CONFIG_NETDEVICES=y
 
 #
 # SCSI support
@@ -519,8 +520,6 @@ CONFIG_NLS_ISO8859_1=y
 # Console drivers
 #
 CONFIG_XEN_CONSOLE=y
-# CONFIG_VGA_CONSOLE is not set
-CONFIG_DUMMY_CONSOLE=y
 
 #
 # Kernel hacking

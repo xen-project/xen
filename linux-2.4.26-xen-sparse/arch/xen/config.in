@@ -21,6 +21,7 @@ endmenu
 define_bool CONFIG_NO_IDLE_HZ y
 
 if [ "$CONFIG_XEN_PHYSDEV_ACCESS" != "y" ]; then
+   define_bool CONFIG_NETDEVICES y
    define_bool CONFIG_VT n
 fi
 
@@ -173,17 +174,19 @@ if [ "$CONFIG_XEN_PHYSDEV_ACCESS" = "y" ]; then
       define_bool CONFIG_BLK_DEV_HD n
    fi
    endmenu
+fi
 
-   mainmenu_option next_comment
-   comment 'SCSI support'
+mainmenu_option next_comment
+comment 'SCSI support'
 
-   tristate 'SCSI support' CONFIG_SCSI
+tristate 'SCSI support' CONFIG_SCSI
 
-   if [ "$CONFIG_SCSI" != "n" ]; then
-      source drivers/scsi/Config.in
-   fi
-   endmenu
+if [ "$CONFIG_SCSI" != "n" ]; then
+   source drivers/scsi/Config.in
+fi
+endmenu
 
+if [ "$CONFIG_XEN_PHYSDEV_ACCESS" = "y" ]; then
    source drivers/message/fusion/Config.in
 
    source drivers/ieee1394/Config.in
@@ -234,18 +237,6 @@ if [ "$CONFIG_XEN_PHYSDEV_ACCESS" = "y" ]; then
    #
    source drivers/input/Config.in
 else
-   define_bool CONFIG_NETDEVICES y
-
-   mainmenu_option next_comment
-   comment 'SCSI support'
-
-   tristate 'SCSI support' CONFIG_SCSI
-
-   if [ "$CONFIG_SCSI" != "n" ]; then
-      source drivers/scsi/Config.in
-   fi
-   endmenu
-
    #
    # Block device driver configuration
    #
