@@ -121,6 +121,14 @@ gopts.var('netif', val='no|yes',
           fn=set_bool, default=0,
           use="Make the domain a network interface backend.")
 
+gopts.var('vbd_backend', val='DOM',
+          fn=set_value, default=None,
+          use='Set the domain to use for the vbd backend.')
+
+gopts.var('vif_backend', val='DOM',
+          fn=set_value, default=None,
+          use='Set the domain to use for the vif backend.')
+
 gopts.var('disk', val='phy:DEV,VDEV,MODE',
           fn=append_value, default=[],
           use="""Add a disk device to a domain. The physical device is DEV,
@@ -306,6 +314,10 @@ def make_config(vals):
         config.append(['backend', ['blkif']])
     if vals.netif:
         config.append(['backend', ['netif']])
+    if vals.vbd_backend:
+        config.append(['backend', ['vbd', ['dom', vals.vbd_backend]]])
+    if vals.vif_backend:
+        config.append(['backend', ['vif', ['dom', vals.vif_backend]]])
     if vals.restart:
         config.append(['restart', vals.restart])
     if vals.console:

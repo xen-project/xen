@@ -69,6 +69,12 @@ STATE_RESTART_BOOTING = 'booting'
 STATE_VM_OK         = "ok"
 STATE_VM_TERMINATED = "terminated"
 
+
+def domain_exists(name):
+    # See comment in XendDomain constructor.
+    xd = get_component('xen.xend.XendDomain')
+    return xd.domain_exists(name)
+
 def shutdown_reason(code):
     """Get a shutdown reason from a code.
 
@@ -131,10 +137,10 @@ def lookup_disk_uname(uname):
         segments = None
     return segments
 
-def make_disk(dom, uname, dev, mode, recreate=0):
+def make_disk(vm, uname, dev, mode, recreate=0):
     """Create a virtual disk device for a domain.
 
-    @param dom:      domain id
+    @param vm:       vm
     @param uname:    device to export
     @param dev:      device name in domain
     @param mode:     read/write mode
@@ -148,10 +154,11 @@ def make_disk(dom, uname, dev, mode, recreate=0):
         raise VmError("vbd: Multi-segment vdisk: uname=%s" % uname)
     segment = segments[0]
     vdev = blkdev_name_to_number(dev)
-    ctrl = xend.blkif_create(dom, recreate=recreate)
+    backend = vm.get_device_backend('vbd')
+    ctrl = xend.blkif_create(vm.dom, recreate=recreate, backend=backend)
     
     def fn(ctrl):
-        return xend.blkif_dev_create(dom, vdev, mode, segment, recreate=recreate)
+        return xend.blkif_dev_create(vm.dom, vdev, mode, segment, recreate=recreate)
     ctrl.addCallback(fn)
     return ctrl
         
@@ -371,6 +378,7 @@ class XendDomainInfo:
         self.console = None
         self.devices = {}
         self.device_index = {}
+        self.device_backends = {}
         self.configs = []
         self.info = None
         self.ipaddrs = []
@@ -466,9 +474,7 @@ class XendDomainInfo:
             if c in '_-.': continue
             if c in string.ascii_letters: continue
             raise VmError('invalid vm name')
-        # See comment in XendDomain constructor.
-        xd = get_component('xen.xend.XendDomain')
-        dominfo = xd.domain_exists(name)
+        dominfo = domain_exists(name)
         # When creating or rebooting, a domain with my name should not exist.
         # When restoring, a domain with my name will exist, but it should have
         # my domain id.
@@ -663,6 +669,7 @@ class XendDomainInfo:
         
         self.devices = {}
         self.device_index = {}
+        self.device_backends = {}
         self.configs = []
         self.ipaddrs = []
 
@@ -901,15 +908,40 @@ class XendDomainInfo:
             self.restart_state = None
         return d
 
+    def configure_device_backend(self, type, sxpr):
+        """Configure the backend domain to use for devices of a given type.
+
+        @param type: device type
+        @param sxpr: config
+        @raise: VmError if the domain id is missing
+        @raise: VmError if the domain does not exist
+        """
+        dom = sxp.child_value(sxpr, 'domain')
+        if dom is None:
+            raise VmError('missing backend domain')
+        dominfo = domain_exists(dom)
+        if dominfo is None:
+            raise VmError('invalid backend domain:' + dom)
+        self.device_backends[type] = dominfo.dom
+
+    def get_device_backend(self, type):
+        return self.device_backends.get(type, 0)
+
     def configure_backends(self):
-        """Set configuration flags if the vm is a backend for netif of blkif.
+        """Set configuration flags if the vm is a backend for netif or blkif.
+        Configure the backends to use for vbd and vif if specified.
         """
         for c in sxp.children(self.config, 'backend'):
-            name = sxp.name(sxp.child0(c))
+            v = sxp.child0(c)
+            name = sxp.name(v)
             if name == 'blkif':
                 self.blkif_backend = 1
             elif name == 'netif':
                 self.netif_backend = 1
+            elif name == 'vbd':
+                self.configure_device_backend('vbd', v)
+            elif name == 'vif':
+                self.configure_device_backend('vif', v)
             else:
                 raise VmError('invalid backend type:' + str(name))
 
@@ -1039,7 +1071,8 @@ def vm_dev_vif(vm, val, index):
         raise VmError('vif: vif in netif backend domain')
     vif = vm.next_device_index('vif')
     vmac = sxp.child_value(val, "mac")
-    xend.netif_create(vm.dom, recreate=vm.recreate)
+    backend = vm.get_device_backend('vif')
+    xend.netif_create(vm.dom, recreate=vm.recreate, backend=backend)
     log.debug("Creating vif dom=%d vif=%d mac=%s", vm.dom, vif, str(vmac))
     defer = xend.netif_dev_create(vm.dom, vif, val, recreate=vm.recreate)
     def fn(id):
@@ -1068,7 +1101,7 @@ def vm_dev_vbd(vm, val, index):
         raise VmError('vbd: Missing dev')
     mode = sxp.child_value(val, 'mode', 'r')
     log.debug("Creating vbd dom=%d uname=%s dev=%s", vm.dom, uname, dev)
-    defer = make_disk(vm.dom, uname, dev, mode, vm.recreate)
+    defer = make_disk(vm, uname, dev, mode, vm.recreate)
     def fn(vbd):
         vbd.dev = dev
         vbd.uname = uname

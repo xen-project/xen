@@ -661,12 +661,12 @@ class Daemon:
         """
         return self.blkifCF.getControlDomain()
     
-    def blkif_create(self, dom, recreate=0):
+    def blkif_create(self, dom, recreate=0, backend=0):
         """Create a block device interface controller.
         
         Returns Deferred
         """
-        d = self.blkifCF.createInstance(dom, recreate=recreate)
+        d = self.blkifCF.createInstance(dom, recreate=recreate, backend=backend)
         return d
 
     def blkifs(self):
@@ -699,11 +699,11 @@ class Daemon:
         """
         return self.netifCF.getControlDomain()
     
-    def netif_create(self, dom, recreate=0):
+    def netif_create(self, dom, recreate=0, backend=0):
         """Create a network interface controller.
         
         """
-        return self.netifCF.createInstance(dom, recreate=recreate)
+        return self.netifCF.createInstance(dom, recreate=recreate, backend=backend)
 
     def netifs(self):
         return [ x.sxpr() for x in self.netifCF.getInstances() ]
