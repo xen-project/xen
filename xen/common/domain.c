@@ -850,7 +850,7 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
     set_bit(PF_CONSTRUCTED, &p->flags);
 
 #if 0 // XXXXX DO NOT CHECK IN ENBALED !!! (but useful for testing so leave) 
-    shadow_mode_enable(p, SHM_test); 
+    shadow_mode_enable(&p->mm, SHM_test); 
 #endif
 
     new_thread(p, 

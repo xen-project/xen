@@ -1,12 +1,13 @@
 /* -*-  Mode:C; c-basic-offset:4; tab-width:4 -*- */
 
-#ifndef _XENO_SHADOW_H
-#define _XENO_SHADOW_H
+#ifndef _XEN_SHADOW_H
+#define _XEN_SHADOW_H
 
 #include <xen/config.h>
 #include <xen/types.h>
-#include <xen/mm.h>
 #include <xen/perfc.h>
+#include <asm/processor.h>
+
 
 /* Shadow PT flag bits in pfn_info */
 #define PSH_shadowed	(1<<31) /* page has a shadow. PFN points to shadow */
@@ -23,15 +24,15 @@
 #define shadow_linear_l2_table ((l2_pgentry_t *)(SH_LINEAR_PT_VIRT_START+(SH_LINEAR_PT_VIRT_START>>(L2_PAGETABLE_SHIFT-L1_PAGETABLE_SHIFT))))
 
 extern int shadow_mode_control( struct task_struct *p, unsigned int op );
-extern pagetable_t shadow_mk_pagetable( struct task_struct *p, 
-										unsigned long gptbase);
 extern int shadow_fault( unsigned long va, long error_code );
 extern void shadow_l1_normal_pt_update( unsigned long pa, unsigned long gpte, 
 										unsigned long *prev_spfn_ptr,
 										l1_pgentry_t **prev_spl1e_ptr  );
 extern void shadow_l2_normal_pt_update( unsigned long pa, unsigned long gpte );
 extern void unshadow_table( unsigned long gpfn, unsigned int type );
-extern int shadow_mode_enable( struct task_struct *p, unsigned int mode );
+extern int shadow_mode_enable( struct mm_struct *m, unsigned int mode );
+extern unsigned long shadow_l2_table( 
+                     struct mm_struct *m, unsigned long gpfn );
 
 #define SHADOW_DEBUG 0
 #define SHADOW_HASH_DEBUG 0
@@ -73,7 +74,7 @@ struct shadow_status {
 
 
 #if SHADOW_HASH_DEBUG
-static void shadow_audit(struct task_struct *p, int print)
+static void shadow_audit(struct mm_struct *m, int print)
 {
 	int live=0, free=0, j=0, abs;
 	struct shadow_status *a;
@@ -115,23 +116,25 @@ static void shadow_audit(struct task_struct *p, int print)
 #define shadow_audit(p, print)
 #endif
 
-static inline struct shadow_status* hash_bucket( struct task_struct *p,
+
+
+static inline struct shadow_status* hash_bucket( struct mm_struct *m,
 												 unsigned int gpfn )
 {
-    return &(p->mm.shadow_ht[gpfn % shadow_ht_buckets]);
+    return &(m->shadow_ht[gpfn % shadow_ht_buckets]);
 }
 
 
-static inline unsigned long __shadow_status( struct task_struct *p,
+static inline unsigned long __shadow_status( struct mm_struct *m,
 										   unsigned int gpfn )
 {
-	struct shadow_status **ob, *b, *B = hash_bucket( p, gpfn );
+	struct shadow_status **ob, *b, *B = hash_bucket( m, gpfn );
 
     b = B;
     ob = NULL;
 
-	SH_VVLOG("lookup gpfn=%08lx bucket=%08lx", gpfn, b );
-	shadow_audit(p,0);  // if in debug mode
+	SH_VVLOG("lookup gpfn=%08x bucket=%p", gpfn, b );
+	shadow_audit(m,0);  // if in debug mode
 
 	do
 	{
@@ -172,33 +175,33 @@ static inline unsigned long __shadow_status( struct task_struct *p,
 ever becomes a problem, but since we need a spin lock on the hash table 
 anyway its probably not worth being too clever. */
 
-static inline unsigned long get_shadow_status( struct task_struct *p,
+static inline unsigned long get_shadow_status( struct mm_struct *m,
 										   unsigned int gpfn )
 {
 	unsigned long res;
 
-	spin_lock(&p->mm.shadow_lock);
-	res = __shadow_status( p, gpfn );
-	if (!res) spin_unlock(&p->mm.shadow_lock);
+	spin_lock(&m->shadow_lock);
+	res = __shadow_status( m, gpfn );
+	if (!res) spin_unlock(&m->shadow_lock);
 	return res;
 }
 
 
-static inline void put_shadow_status( struct task_struct *p )
+static inline void put_shadow_status( struct mm_struct *m )
 {
-	spin_unlock(&p->mm.shadow_lock);
+	spin_unlock(&m->shadow_lock);
 }
 
 
-static inline void delete_shadow_status( struct task_struct *p,
+static inline void delete_shadow_status( struct mm_struct *m,
 									  unsigned int gpfn )
 {
 	struct shadow_status *b, *B, **ob;
 
-	B = b = hash_bucket( p, gpfn );
+	B = b = hash_bucket( m, gpfn );
 
 	SH_VVLOG("delete gpfn=%08x bucket=%p", gpfn, b );
-	shadow_audit(p,0);
+	shadow_audit(m,0);
 	ASSERT(gpfn);
 
 	if( b->pfn == gpfn )
@@ -210,8 +213,8 @@ static inline void delete_shadow_status( struct task_struct *p,
 			b->pfn = b->next->pfn;
 
 			b->next = b->next->next;
-			D->next = p->mm.shadow_ht_free;
-			p->mm.shadow_ht_free = D;
+			D->next = m->shadow_ht_free;
+			m->shadow_ht_free = D;
 		}
 		else
 		{
@@ -220,7 +223,7 @@ static inline void delete_shadow_status( struct task_struct *p,
 		}
 
 #if SHADOW_HASH_DEBUG
-		if( __shadow_status(p,gpfn) ) BUG();  
+		if( __shadow_status(m,gpfn) ) BUG();  
 #endif
 		return;
     }
@@ -237,11 +240,11 @@ static inline void delete_shadow_status( struct task_struct *p,
 
 			// b is in the list
             *ob=b->next;
-			b->next = p->mm.shadow_ht_free;
-			p->mm.shadow_ht_free = b;
+			b->next = m->shadow_ht_free;
+			m->shadow_ht_free = b;
 
 #if SHADOW_HASH_DEBUG
-			if( __shadow_status(p,gpfn) ) BUG();
+			if( __shadow_status(m,gpfn) ) BUG();
 #endif
 			return;
 		}
@@ -256,18 +259,18 @@ static inline void delete_shadow_status( struct task_struct *p,
 }
 
 
-static inline void set_shadow_status( struct task_struct *p,
+static inline void set_shadow_status( struct mm_struct *m,
 									  unsigned int gpfn, unsigned long s )
 {
 	struct shadow_status *b, *B, *extra, **fptr;
     int i;
 
-	B = b = hash_bucket( p, gpfn );
+	B = b = hash_bucket( m, gpfn );
    
     ASSERT(gpfn);
     ASSERT(s);
     SH_VVLOG("set gpfn=%08x s=%08lx bucket=%p(%p)", gpfn, s, b, b->next );
-    shadow_audit(p,0);
+    shadow_audit(m,0);
 
 	do
 	{
@@ -294,7 +297,7 @@ static inline void set_shadow_status( struct task_struct *p,
 		return;
 	}
 
-    if( unlikely(p->mm.shadow_ht_free == NULL) )
+    if( unlikely(m->shadow_ht_free == NULL) )
     {
         SH_LOG("allocate more shadow hashtable blocks");
 
@@ -308,7 +311,7 @@ static inline void set_shadow_status( struct task_struct *p,
 							   sizeof(struct shadow_status)) );
 	
         // add extras to free list
-	    fptr = &p->mm.shadow_ht_free;
+	    fptr = &m->shadow_ht_free;
 	    for ( i=0; i<shadow_ht_extra_size; i++ )
  	    {
 		    *fptr = &extra[i];
@@ -316,15 +319,15 @@ static inline void set_shadow_status( struct task_struct *p,
 	    }
 	    *fptr = NULL;
 
-	    *((struct shadow_status ** ) &p->mm.shadow_ht[shadow_ht_extra_size]) = 
-                                            p->mm.shadow_ht_extras;
-        p->mm.shadow_ht_extras = extra;
+	    *((struct shadow_status ** ) &m->shadow_ht[shadow_ht_extra_size]) = 
+                                            m->shadow_ht_extras;
+        m->shadow_ht_extras = extra;
 
     }
 
 	// should really put this in B to go right to front
-	b = p->mm.shadow_ht_free;
-    p->mm.shadow_ht_free = b->next;
+	b = m->shadow_ht_free;
+    m->shadow_ht_free = b->next;
     b->spfn_and_flags = s;
 	b->pfn = gpfn;
 	b->next = B->next;
@@ -333,13 +336,39 @@ static inline void set_shadow_status( struct task_struct *p,
 	return;
 }
 
+static inline void shadow_mk_pagetable( struct mm_struct *mm )
+{
+	unsigned long gpfn, spfn=0;
+
+	SH_VVLOG("shadow_mk_pagetable( gptbase=%08lx, mode=%d )",
+			 pagetable_val(mm->pagetable), mm->shadow_mode );
+
+	if ( unlikely(mm->shadow_mode) )
+	{
+		gpfn =  pagetable_val(mm->pagetable) >> PAGE_SHIFT;
+		
+        spin_lock(&mm->shadow_lock);
+		if ( unlikely((spfn=__shadow_status(mm, gpfn)) == 0 ) )
+		{
+			spfn = shadow_l2_table(mm, gpfn );
+		}      
+		mm->shadow_table = mk_pagetable(spfn<<PAGE_SHIFT);
+        spin_unlock(&mm->shadow_lock);		
+	}
+
+	SH_VVLOG("leaving shadow_mk_pagetable( gptbase=%08lx, mode=%d ) sh=%08lx",
+			 pagetable_val(mm->pagetable), mm->shadow_mode, 
+			 pagetable_val(mm->shadow_table) );
+
+}
+
 
 
 #if SHADOW_DEBUG
-extern int check_pagetable( struct task_struct *p, pagetable_t pt, char *s );
+extern int check_pagetable( struct mm_struct *m, pagetable_t pt, char *s );
 #else
-#define check_pagetable( p, pt, s )
+#define check_pagetable( m, pt, s )
 #endif
 
 
-#endif
+#endif /* XEN_SHADOW_H */

@@ -26,99 +26,11 @@ hypercall lock anyhow (at least initially).
 
 ********/
 
-int shadow_mode_control( struct task_struct *p, unsigned int op )
-{
-	if (p->mm.shadow_mode && op == DOM0_SHADOW_CONTROL_OP_OFF )
-    {
-		shadow_mode_disable(p);
-	}
-	else if (p->mm.shadow_mode && op == DOM0_SHADOW_CONTROL_OP_ENABLE_TEST )
-	{
-        shadow_mode_disable(p);
-        shadow_mode_enable(p, SHM_test);
-	}	
-	else if (p->mm.shadow_mode && op == DOM0_SHADOW_CONTROL_OP_FLUSH )
-    {
-		//shadow_mode_flush(p);
-    }
-	else
-    {
-		return -EINVAL;
-    }
-
-	return 0;
-}
-
-int shadow_mode_enable( struct task_struct *p, unsigned int mode )
-{
-	struct shadow_status **fptr;
-	int i;
-
-	// sychronously stop domain
-    // XXX for the moment, only use on already stopped domains!!!
-
-	spin_lock_init(&p->mm.shadow_lock);
-	spin_lock(&p->mm.shadow_lock);
-
-    p->mm.shadow_mode = mode;
-	
-	// allocate hashtable
-    p->mm.shadow_ht = kmalloc( shadow_ht_buckets * 
-							   sizeof(struct shadow_status), GFP_KERNEL );
-	if( ! p->mm.shadow_ht )
-		goto nomem;
-
-	memset( p->mm.shadow_ht, 0, shadow_ht_buckets * 
-							   sizeof(struct shadow_status) );
-
-
-	// allocate space for first lot of extra nodes
-    p->mm.shadow_ht_extras = kmalloc( sizeof(void*) + (shadow_ht_extra_size * 
-							   sizeof(struct shadow_status)), GFP_KERNEL );
-
-	if( ! p->mm.shadow_ht_extras )
-		goto nomem;
-
-	memset( p->mm.shadow_ht_extras, 0, sizeof(void*) + (shadow_ht_extra_size * 
-							   sizeof(struct shadow_status)) );
-	
-    // add extras to free list
-	fptr = &p->mm.shadow_ht_free;
-	for ( i=0; i<shadow_ht_extra_size; i++ )
-	{
-		*fptr = &p->mm.shadow_ht_extras[i];
-		fptr = &(p->mm.shadow_ht_extras[i].next);
-	}
-	*fptr = NULL;
-	*((struct shadow_status ** ) &p->mm.shadow_ht_extras[shadow_ht_extra_size]) = NULL;
-
-	spin_unlock(&p->mm.shadow_lock);
-
-    // call shadow_mk_pagetable
-	p->mm.shadow_table = shadow_mk_pagetable( p, 
-											  pagetable_val(p->mm.pagetable) );
-
-	return 0;
-
-nomem:
-	spin_unlock(&p->mm.shadow_lock);
-	return -ENOMEM;
-}
-
-void shadow_mode_disable( )
-{
-
-    // free the hash buckets as you go
-
-    // free the hashtable itself
-}
-
-
-static inline void free_shadow_page( struct task_struct *p, unsigned int pfn )
+static inline void free_shadow_page( struct mm_struct *m, unsigned int pfn )
 {
     unsigned long flags;
 
-	p->mm.shadow_page_count--;
+	m->shadow_page_count--;
 
     spin_lock_irqsave(&free_list_lock, flags);
     list_add(&frame_table[pfn].list, &free_list);
@@ -126,15 +38,7 @@ static inline void free_shadow_page( struct task_struct *p, unsigned int pfn )
     spin_unlock_irqrestore(&free_list_lock, flags);
 }
 
-static inline struct pfn_info *alloc_shadow_page( struct task_struct *p )
-{
-	p->mm.shadow_page_count++;
-
-	return alloc_domain_page( NULL );
-}
-
-
-static void __free_shadow_table( struct task_struct *p )
+static void __free_shadow_table( struct mm_struct *m )
 {
 	int j;
 	struct shadow_status *a;
@@ -146,10 +50,10 @@ static void __free_shadow_table( struct task_struct *p )
 
     for(j=0;j<shadow_ht_buckets;j++)
     {
-        a = &p->mm.shadow_ht[j];        
+        a = &m->shadow_ht[j];        
         if (a->pfn)
         {
-            free_shadow_page( p, a->spfn_and_flags & PSH_pfn_mask );
+            free_shadow_page( m, a->spfn_and_flags & PSH_pfn_mask );
             a->pfn = 0;
             a->spfn_and_flags = 0;
         }
@@ -157,29 +61,145 @@ static void __free_shadow_table( struct task_struct *p )
         while(a)
 		{ 
             struct shadow_status *next = a->next;
-            free_shadow_page( p, a->spfn_and_flags & PSH_pfn_mask );
+            free_shadow_page( m, a->spfn_and_flags & PSH_pfn_mask );
             a->pfn = 0;
             a->spfn_and_flags = 0;
-            a->next = p->mm.shadow_ht_free;
-            p->mm.shadow_ht_free = a;
+            a->next = m->shadow_ht_free;
+            m->shadow_ht_free = a;
             a=next;
 		}
 	}
 }
 
-static void flush_shadow_table( struct task_struct *p )
+
+int shadow_mode_enable( struct mm_struct *m, unsigned int mode )
 {
+	struct shadow_status **fptr;
+	int i;
+
+
+	spin_lock_init(&m->shadow_lock);
+	spin_lock(&m->shadow_lock);
+
+    m->shadow_mode = mode;
 	
-    // XXX synchronously stop domain (needed for SMP guests)
+	// allocate hashtable
+    m->shadow_ht = kmalloc( shadow_ht_buckets * 
+							   sizeof(struct shadow_status), GFP_KERNEL );
+	if( ! m->shadow_ht )
+		goto nomem;
 
-    // switch to idle task's page tables
+	memset( m->shadow_ht, 0, shadow_ht_buckets * 
+							   sizeof(struct shadow_status) );
+
+
+	// allocate space for first lot of extra nodes
+    m->shadow_ht_extras = kmalloc( sizeof(void*) + (shadow_ht_extra_size * 
+							   sizeof(struct shadow_status)), GFP_KERNEL );
+
+	if( ! m->shadow_ht_extras )
+		goto nomem;
+
+	memset( m->shadow_ht_extras, 0, sizeof(void*) + (shadow_ht_extra_size * 
+							   sizeof(struct shadow_status)) );
+	
+    // add extras to free list
+	fptr = &m->shadow_ht_free;
+	for ( i=0; i<shadow_ht_extra_size; i++ )
+	{
+		*fptr = &m->shadow_ht_extras[i];
+		fptr = &(m->shadow_ht_extras[i].next);
+	}
+	*fptr = NULL;
+	*((struct shadow_status ** ) 
+        &m->shadow_ht_extras[shadow_ht_extra_size]) = NULL;
+
+	spin_unlock(&m->shadow_lock);
+
+    // call shadow_mk_pagetable
+	shadow_mk_pagetable( m );
+
+	return 0;
+
+nomem:
+	spin_unlock(&m->shadow_lock);
+	return -ENOMEM;
+}
+
+static void shadow_mode_disable( struct mm_struct *m )
+{
+
+    // free the hash buckets as you go
+
+    // free the hashtable itself
+}
+
+static void shadow_mode_flush( struct mm_struct *m )
+{
+
+    // since Dom0 did the hypercall, we should be running with it's page
+    // tables right now. Calling flush on yourself would be really
+    // stupid.
+
+    if ( m == &current->mm )
+    {
+        printk("Don't try and flush your own page tables!\n");
+        return;
+    }
+   
+    spin_lock(&m->shadow_lock);
+	__free_shadow_table( m );
+	spin_unlock(&m->shadow_lock);
+
+    // call shadow_mk_pagetable
+    shadow_mk_pagetable( m );
+
+}
+
+
+int shadow_mode_control( struct task_struct *p, unsigned int op )
+{
+    int  we_paused = 0;
  
-    // walk the hash table and call free_shadow_page on all pages
-	spin_lock(&p->mm.shadow_lock);
-	__free_shadow_table( p );
-	spin_unlock(&p->mm.shadow_lock);
+    // don't call if already shadowed...
 
-    // XXX unpause domain
+	// sychronously stop domain
+    if( !(p->state & TASK_STOPPED) && !(p->state & TASK_PAUSED))
+    {
+	    sched_pause_sync(p);
+        printk("paused domain\n");
+        we_paused = 1;
+    }
+
+	if (p->mm.shadow_mode && op == DOM0_SHADOW_CONTROL_OP_OFF )
+    {
+		shadow_mode_disable(&p->mm);
+	}
+	else if (p->mm.shadow_mode && op == DOM0_SHADOW_CONTROL_OP_ENABLE_TEST )
+	{
+        shadow_mode_disable(&p->mm);
+        shadow_mode_enable(&p->mm, SHM_test);
+	}	
+	else if (p->mm.shadow_mode && op == DOM0_SHADOW_CONTROL_OP_FLUSH )
+    {
+		shadow_mode_flush(&p->mm);
+    }
+	else
+    {
+		return -EINVAL;
+    }
+
+    if ( we_paused ) wake_up(p);
+	return 0;
+}
+
+
+
+static inline struct pfn_info *alloc_shadow_page( struct mm_struct *m )
+{
+	m->shadow_page_count++;
+
+	return alloc_domain_page( NULL );
 }
 
 
@@ -199,8 +219,8 @@ void unshadow_table( unsigned long gpfn, unsigned int type )
 	// even in the SMP guest case, there won't be a race here as
     // this CPU was the one that cmpxchg'ed the page to invalid
 
-	spfn = __shadow_status(current, gpfn) & PSH_pfn_mask;
-	delete_shadow_status(current, gpfn);
+	spfn = __shadow_status(&current->mm, gpfn) & PSH_pfn_mask;
+	delete_shadow_status(&current->mm, gpfn);
 
 #if 0 // XXX leave as might be useful for later debugging
 	{ 
@@ -220,13 +240,13 @@ void unshadow_table( unsigned long gpfn, unsigned int type )
     else
 		perfc_decr(shadow_l2_pages);
 
-	free_shadow_page( current, spfn );
+	free_shadow_page( &current->mm, spfn );
 
 }
 
 
-static unsigned long shadow_l2_table( 
-                     struct task_struct *p, unsigned long gpfn )
+unsigned long shadow_l2_table( 
+                     struct mm_struct *m, unsigned long gpfn )
 {
 	struct pfn_info *spfn_info;
 	unsigned long spfn;
@@ -234,7 +254,6 @@ static unsigned long shadow_l2_table(
 	int i;
 
 	SH_VVLOG("shadow_l2_table( %08lx )",gpfn);
-	spin_lock(&p->mm.shadow_lock);
 
 	perfc_incrc(shadow_l2_table_count);
 	perfc_incr(shadow_l2_pages);
@@ -242,14 +261,14 @@ static unsigned long shadow_l2_table(
     // XXX in future, worry about racing in SMP guests 
     //      -- use cmpxchg with PSH_pending flag to show progress (and spin)
 
-	spfn_info = alloc_shadow_page(p);
+	spfn_info = alloc_shadow_page(m);
 
     ASSERT( spfn_info ); // XXX deal with failure later e.g. blow cache
 
 	spfn = (unsigned long) (spfn_info - frame_table);
 
 	// mark pfn as being shadowed, update field to point at shadow
-	set_shadow_status(p, gpfn, spfn | PSH_shadowed);
+	set_shadow_status(m, gpfn, spfn | PSH_shadowed);
 	
 	// we need to do this before the linear map is set up
 	spl2e = (l2_pgentry_t *) map_domain_mem(spfn << PAGE_SHIFT);
@@ -315,33 +334,9 @@ static unsigned long shadow_l2_table(
 
 	SH_VLOG("shadow_l2_table( %08lx -> %08lx)",gpfn,spfn);
 
-	spin_unlock(&p->mm.shadow_lock);
 	return spfn;
 }
 
-pagetable_t shadow_mk_pagetable( struct task_struct *p, 
-											   unsigned long gptbase)
-{
-	unsigned long gpfn, spfn=0;
-
-	SH_VVLOG("shadow_mk_pagetable( gptbase=%08lx, mode=%d )",
-			 gptbase, p->mm.shadow_mode );
-
-	if ( likely(p->mm.shadow_mode) )  // should always be true if we're here
-	{
-		gpfn =  gptbase >> PAGE_SHIFT;
-		
-		if ( unlikely((spfn=__shadow_status(p, gpfn)) == 0 ) )
-		{
-			spfn = shadow_l2_table(p, gpfn );
-		}      
-	}
-
-	SH_VVLOG("leaving shadow_mk_pagetable( gptbase=%08lx, mode=%d )",
-			 gptbase, p->mm.shadow_mode );
-
-	return mk_pagetable(spfn<<PAGE_SHIFT);
-}
 
 int shadow_fault( unsigned long va, long error_code )
 {
@@ -433,7 +428,7 @@ int shadow_fault( unsigned long va, long error_code )
         gl1pfn = gpde>>PAGE_SHIFT;
 
         
-        if ( ! (sl1pfn=__shadow_status(current, gl1pfn) ) )
+        if ( ! (sl1pfn=__shadow_status(&current->mm, gl1pfn) ) )
         {
             // this L1 is NOT already shadowed so we need to shadow it
             struct pfn_info *sl1pfn_info;
@@ -446,7 +441,7 @@ int shadow_fault( unsigned long va, long error_code )
 	        perfc_incrc(shadow_l1_table_count);
 	        perfc_incr(shadow_l1_pages);
 
-            set_shadow_status(current, gl1pfn, PSH_shadowed | sl1pfn);
+            set_shadow_status(&current->mm, gl1pfn, PSH_shadowed | sl1pfn);
 
             gpde = gpde | _PAGE_ACCESSED | _PAGE_DIRTY;
             spde = (gpde & ~PAGE_MASK) | _PAGE_RW | (sl1pfn<<PAGE_SHIFT);
@@ -530,13 +525,13 @@ void shadow_l1_normal_pt_update( unsigned long pa, unsigned long gpte,
     l1_pgentry_t * spl1e, * prev_spl1e = *prev_spl1e_ptr;
 
 
-SH_VVLOG("shadow_l1_normal_pt_update pa=%08lx, gpte=%08lx, prev_spfn=%08lx, prev_spl1e=%08lx\n",
+SH_VVLOG("shadow_l1_normal_pt_update pa=%08lx, gpte=%08lx, prev_spfn=%08lx, prev_spl1e=%p\n",
 pa,gpte,prev_spfn, prev_spl1e);
 
     // to get here, we know the l1 page *must* be shadowed
 
     gpfn = pa >> PAGE_SHIFT;
-    spfn = __shadow_status(current, gpfn) & PSH_pfn_mask;
+    spfn = __shadow_status(&current->mm, gpfn) & PSH_pfn_mask;
 
     if ( spfn == prev_spfn )
     {
@@ -581,13 +576,13 @@ void shadow_l2_normal_pt_update( unsigned long pa, unsigned long gpte )
     // to get here, we know the l2 page has a shadow
 
     gpfn = pa >> PAGE_SHIFT;
-    spfn = __shadow_status(current, gpfn) & PSH_pfn_mask;
+    spfn = __shadow_status(&current->mm, gpfn) & PSH_pfn_mask;
 
 
     spte = 0;
 
 	if( gpte & _PAGE_PRESENT )
-		s_sh = __shadow_status(current, gpte >> PAGE_SHIFT);
+		s_sh = __shadow_status(&current->mm, gpte >> PAGE_SHIFT);
 
     sp2le = (l2_pgentry_t *) map_domain_mem( spfn << PAGE_SHIFT );
     // no real need for a cache here
@@ -622,7 +617,7 @@ char * sh_check_name;
 #define FAIL(_f, _a...)                             \
 {printk("XXX %s-FAIL (%d,%d)" _f " g=%08lx s=%08lx\n",  sh_check_name, level, i, ## _a , gpte, spte ); BUG();}
 
-static int check_pte( struct task_struct *p, 
+static int check_pte( struct mm_struct *m, 
 			   unsigned long gpte, unsigned long spte, int level, int i )
 {
 	unsigned long mask, gpfn, spfn;
@@ -680,7 +675,7 @@ static int check_pte( struct task_struct *p,
 }
 
 
-static int check_l1_table( struct task_struct *p, unsigned long va, 
+static int check_l1_table( struct mm_struct *m, unsigned long va, 
 					unsigned long g2, unsigned long s2 )
 {
 	int j;
@@ -709,7 +704,7 @@ static int check_l1_table( struct task_struct *p, unsigned long va,
 #define FAILPT(_f, _a...)                             \
 {printk("XXX FAIL %s-PT" _f "\n", s, ## _a ); BUG();}
 
-int check_pagetable( struct task_struct *p, pagetable_t pt, char *s )
+int check_pagetable( struct mm_struct *m, pagetable_t pt, char *s )
 {
 	unsigned long gptbase = pagetable_val(pt);
 	unsigned long gpfn, spfn;

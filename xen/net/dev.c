@@ -548,7 +548,7 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
     }
 
     if ( p->mm.shadow_mode && 
-	 (spte_pfn=get_shadow_status(p, pte_page-frame_table)) )
+	 (spte_pfn=get_shadow_status(&p->mm, pte_page-frame_table)) )
     {
 	unsigned long *sptr = map_domain_mem( (spte_pfn<<PAGE_SHIFT) |
 			(((unsigned long)ptep)&~PAGE_MASK) );
@@ -557,7 +557,7 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
 	*sptr = new_pte;
 
 	unmap_domain_mem(sptr);
-	put_shadow_status(p);
+	put_shadow_status(&p->mm);
     }
 
     machine_to_phys_mapping[new_page - frame_table] 
@@ -2113,14 +2113,14 @@ static void get_rx_bufs(net_vif_t *vif)
         }
 
 	if ( p->mm.shadow_mode && 
-	     (spfn=get_shadow_status(p, rx.addr>>PAGE_SHIFT)) )
+	     (spfn=get_shadow_status(&p->mm, rx.addr>>PAGE_SHIFT)) )
 	  {
 	    unsigned long * sptr = 
 	      map_domain_mem( (spfn<<PAGE_SHIFT) | (rx.addr&~PAGE_MASK) );
 
 	    *sptr = 0;
 	    unmap_domain_mem( sptr );
-	    put_shadow_status(p);
+	    put_shadow_status(&p->mm);
 	  }
         
         buf_pfn  = pte >> PAGE_SHIFT;

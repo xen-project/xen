@@ -766,20 +766,22 @@ void free_page_type(struct pfn_info *page, unsigned int type)
     case PGT_l1_page_table:
         free_l1_table(page);
 	if ( unlikely(current->mm.shadow_mode) && 
-	     (get_shadow_status(current, page-frame_table) & PSH_shadowed) )
+	     (get_shadow_status(&current->mm, 
+				page-frame_table) & PSH_shadowed) )
 	{
 	    unshadow_table( page-frame_table, type );
-	    put_shadow_status(current);
+	    put_shadow_status(&current->mm);
         }
 	return;
 
     case PGT_l2_page_table:
         free_l2_table(page);
 	if ( unlikely(current->mm.shadow_mode) && 
-	     (get_shadow_status(current, page-frame_table) & PSH_shadowed) )
+	     (get_shadow_status(&current->mm, 
+				page-frame_table) & PSH_shadowed) )
 	{
 	    unshadow_table( page-frame_table, type );
-	    put_shadow_status(current);
+	    put_shadow_status(&current->mm);
         }
 	return;
 
@@ -854,16 +856,10 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
             old_base_pfn = pagetable_val(current->mm.pagetable) >> PAGE_SHIFT;
             current->mm.pagetable = mk_pagetable(pfn << PAGE_SHIFT);
 
-            if( unlikely(current->mm.shadow_mode))
-            {
-                current->mm.shadow_table = 
-                    shadow_mk_pagetable(current, pfn<<PAGE_SHIFT);
-                write_cr3_counted(pagetable_val(current->mm.shadow_table));
-            }
-            else
-            {
-                write_cr3_counted(pfn << PAGE_SHIFT);
-            }
+            shadow_mk_pagetable(&current->mm);
+
+	    write_ptbase(&current->mm);
+
             put_page_and_type(&frame_table[old_base_pfn]);    
         }
         else
@@ -1002,12 +998,12 @@ int do_mmu_update(mmu_update_t *ureqs, int count)
                                         mk_l1_pgentry(req.val)); 
 
 		    if ( okay && unlikely(current->mm.shadow_mode) &&
-			 (get_shadow_status(current, page-frame_table) &
+			 (get_shadow_status(&current->mm, page-frame_table) &
 			  PSH_shadowed) )
 		    {
 		        shadow_l1_normal_pt_update( req.ptr, req.val, 
 						    &prev_spfn, &prev_spl1e );
-			put_shadow_status(current);
+			put_shadow_status(&current->mm);
 		    }
 
                     put_page_type(page);
@@ -1021,11 +1017,11 @@ int do_mmu_update(mmu_update_t *ureqs, int count)
                                         pfn); 
 
 		    if ( okay && unlikely(current->mm.shadow_mode) &&
-			 (get_shadow_status(current, page-frame_table) & 
+			 (get_shadow_status(&current->mm, page-frame_table) & 
 			  PSH_shadowed) )
 		    {
 		        shadow_l2_normal_pt_update( req.ptr, req.val );
-			put_shadow_status(current);
+			put_shadow_status(&current->mm);
 		    }
 
                     put_page_type(page);
@@ -1093,14 +1089,7 @@ int do_mmu_update(mmu_update_t *ureqs, int count)
 
     if ( deferred_ops & DOP_FLUSH_TLB )
     {
-        if ( unlikely(current->mm.shadow_mode) )
-	{
-            check_pagetable( current, 
-			     current->mm.pagetable, "pre-stlb-flush" );
-	    write_cr3_counted(pagetable_val(current->mm.shadow_table));
-        }
-        else
-  	    write_cr3_counted(pagetable_val(current->mm.pagetable));
+        write_ptbase(&current->mm);
     }
 
     if ( deferred_ops & DOP_RELOAD_LDT )
@@ -1172,10 +1161,7 @@ int do_update_va_mapping(unsigned long page_nr,
     if ( unlikely(deferred_ops & DOP_FLUSH_TLB) || 
          unlikely(flags & UVMF_FLUSH_TLB) )
     {
-        if ( unlikely(p->mm.shadow_mode) )
-            write_cr3_counted(pagetable_val(p->mm.shadow_table));
-        else
-            write_cr3_counted(pagetable_val(p->mm.pagetable));
+        write_ptbase(&p->mm);
     }
     else if ( unlikely(flags & UVMF_INVLPG) )
         __flush_tlb_one(page_nr << PAGE_SHIFT);

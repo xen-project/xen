@@ -102,3 +102,14 @@ int xc_domain_getinfo(int xc_handle,
 
     return nr_doms;
 }
+
+int xc_shadow_control(int xc_handle,
+                     u64 domid, 
+                     unsigned int sop)
+{
+    dom0_op_t op;
+    op.cmd = DOM0_SHADOW_CONTROL;
+    op.u.shadow_control.domain = (domid_t)domid;
+    op.u.shadow_control.op  = sop;
+    return do_dom0_op(xc_handle, &op);
+}

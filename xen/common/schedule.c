@@ -300,9 +300,8 @@ void sched_pause_sync(struct task_struct *p)
     /* spin until domain is descheduled by its local scheduler */
     while ( schedule_data[cpu].curr == p )
     {
-            set_bit(_HYP_EVENT_NEED_RESCHED, &p->hyp_events);
-            hyp_event_notify(1 << cpu);
-            do_yield();
+		send_hyp_event(p, _HYP_EVENT_NEED_RESCHED );
+		do_yield();
     }
     
     
