@@ -83,6 +83,9 @@ ioreq_t* bx_cpu_c::get_ioreq(void)
 void bx_cpu_c::dispatch_ioreq(ioreq_t *req)
 {
 	int ret, i;
+    int sign;
+
+    sign = (req->df) ? -1 : 1;
 
 	if ((!req->pdata_valid) && (req->dir == IOREQ_WRITE)) {
 		if (req->size != 4) {
@@ -99,7 +102,7 @@ void bx_cpu_c::dispatch_ioreq(ioreq_t *req)
 
 				for (i = 0; i < req->count; i++) {
 					tmp = BX_INP(req->addr, req->size);
-					BX_MEM_WRITE_PHYSICAL((Bit32u) req->u.pdata + (i * req->size), 
+					BX_MEM_WRITE_PHYSICAL((Bit32u) req->u.pdata + (sign * i * req->size), 
 							       req->size, &tmp);
 				}
 			}
@@ -110,7 +113,7 @@ void bx_cpu_c::dispatch_ioreq(ioreq_t *req)
 				for (i = 0; i < req->count; i++) {
 					unsigned long tmp;
 
-					BX_MEM_READ_PHYSICAL((Bit32u) req->u.pdata + (i * req->size), req->size, 
+					BX_MEM_READ_PHYSICAL((Bit32u) req->u.pdata + (sign * i * req->size), req->size, 
 							 &tmp);
 					BX_OUTP(req->addr, (Bit32u) tmp, req->size);
 				}
@@ -129,14 +132,14 @@ void bx_cpu_c::dispatch_ioreq(ioreq_t *req)
 			if (req->dir == IOREQ_READ) {
 				//BX_INFO(("<READ>addr:%llx, pdata:%llx, size: %x, count: %x\n", req->addr, req->u.pdata, req->size, req->count));
 				for (i = 0; i < req->count; i++) {
-					BX_MEM_READ_PHYSICAL(req->addr + (i * req->size), req->size, &tmp);
-					BX_MEM_WRITE_PHYSICAL((Bit32u) req->u.pdata + (i * req->size), req->size, &tmp);
+					BX_MEM_READ_PHYSICAL(req->addr + (sign * i * req->size), req->size, &tmp);
+					BX_MEM_WRITE_PHYSICAL((Bit32u) req->u.pdata + (sign * i * req->size), req->size, &tmp);
 				}
 			} else if (req->dir == IOREQ_WRITE) {
 				//BX_INFO(("<WRITE>addr:%llx, pdata:%llx, size: %x, count: %x\n", req->addr, req->u.pdata, req->size, req->count));
 				for (i = 0; i < req->count; i++) {
-					BX_MEM_READ_PHYSICAL((Bit32u)req->u.pdata + (i * req->size), req->size, &tmp);
-					BX_MEM_WRITE_PHYSICAL(req->addr + (i * req->size), req->size, &tmp);
+					BX_MEM_READ_PHYSICAL((Bit32u)req->u.pdata + (sign * i * req->size), req->size, &tmp);
+					BX_MEM_WRITE_PHYSICAL(req->addr + (sign * i * req->size), req->size, &tmp);
 				}
 			}
 		}
