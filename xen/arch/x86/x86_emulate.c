@@ -181,7 +181,7 @@ static u8 twobyte_table[256] = {
     /* 0xB8 - 0xBF */
     0, 0, DstMem|SrcImmByte|ModRM, DstMem|SrcReg|ModRM, 0, 0, 0, 0,
     /* 0xC0 - 0xCF */
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, ImplicitOps|ModRM, 0, 0, 0, 0, 0, 0, 0, 0,
     /* 0xD0 - 0xDF */
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     /* 0xE0 - 0xEF */
@@ -963,8 +963,63 @@ x86_emulate_memop(
     goto writeback;
 
  twobyte_special_insn:
-    /* Only prefetch instructions get here, so nothing to do. */
-    dst.orig_val = dst.val; /* disable writeback */
+    /* Disable writeback. */
+    dst.orig_val = dst.val;
+    switch ( b )
+    {
+    case 0x0d: /* GrpP (prefetch) */
+    case 0x18: /* Grp16 (prefetch/nop) */
+        break;
+    case 0xc7: /* Grp9 (cmpxchg8b) */
+#if defined(__i386__)
+    {
+        unsigned long old_lo, old_hi;
+        if ( ((rc = ops->read_emulated(cr2+0, &old_lo, 4)) != 0) ||
+             ((rc = ops->read_emulated(cr2+4, &old_hi, 4)) != 0) )
+            goto done;
+        if ( (old_lo != _regs.eax) || (old_hi != _regs.edx) )
+        {
+            _regs.eax = old_lo;
+            _regs.edx = old_hi;
+            _regs.eflags &= ~EFLG_ZF;
+        }
+        else if ( ops->cmpxchg8b_emulated == NULL )
+        {
+            rc = X86EMUL_UNHANDLEABLE;
+            goto done;
+        }
+        else
+        {
+            if ( (rc = ops->cmpxchg8b_emulated(cr2, old_lo, old_hi,
+                                               _regs.ebx, _regs.ecx)) != 0 )
+                goto done;
+            _regs.eflags |= EFLG_ZF;
+        }
+        break;
+    }
+#elif defined(__x86_64__)
+    {
+        unsigned long old, new;
+        if ( (rc = ops->read_emulated(cr2, &old, 8)) != 0 )
+            goto done;
+        if ( ((u32)(old>>0) != (u32)_regs.eax) ||
+             ((u32)(old>>32) != (u32)_regs.edx) )
+        {
+            _regs.eax = (u32)(old>>0);
+            _regs.edx = (u32)(old>>32);
+            _regs.eflags &= ~EFLG_ZF;
+        }
+        else
+        {
+            new = (_regs.ecx<<32)|(u32)_regs.ebx;
+            if ( (rc = ops->cmpxchg_emulated(cr2, old, new, 8)) != 0 )
+                goto done;
+            _regs.eflags |= EFLG_ZF;
+        }
+        break;
+    }
+#endif
+    }
     goto writeback;
 
  cannot_emulate:

@@ -60,15 +60,28 @@ static int cmpxchg_any(
     return X86EMUL_CONTINUE;
 }
 
+static int cmpxchg8b_any(
+    unsigned long addr,
+    unsigned long old_lo,
+    unsigned long old_hi,
+    unsigned long new_lo,
+    unsigned long new_hi)
+{
+    ((unsigned long *)addr)[0] = new_lo;
+    ((unsigned long *)addr)[1] = new_hi;
+    return X86EMUL_CONTINUE;
+}
+
 static struct x86_mem_emulator emulops = {
-    read_any, write_any, read_any, write_any, cmpxchg_any
+    read_any, write_any, read_any, write_any, cmpxchg_any, cmpxchg8b_any
 };
 
 int main(int argc, char **argv)
 {
     struct xen_regs regs;
-    char instr[] = { 0x01, 0x08 }; /* add %ecx,(%eax) */
+    char instr[20] = { 0x01, 0x08 }; /* add %ecx,(%eax) */
     unsigned int res = 0x7FFFFFFF;
+    u32 cmpxchg8b_res[2] = { 0x12345678, 0x87654321 };
     unsigned long cr2;
     int rc;
 
@@ -170,6 +183,41 @@ int main(int argc, char **argv)
          (res != 0x2233445D) ||
          ((regs.eflags&0x201) != 0x201) ||
          (regs.eip != (unsigned long)&instr[4]) )
+        goto fail;
+    printf("okay\n");
+
+    printf("%-40s", "Testing cmpxchg (%edi) [succeeding]...");
+    instr[0] = 0x0f; instr[1] = 0xc7; instr[2] = 0x0f;
+    regs.eflags = 0x200;
+    regs.eax    = cmpxchg8b_res[0];
+    regs.edx    = cmpxchg8b_res[1];
+    regs.ebx    = 0x9999AAAA;
+    regs.ecx    = 0xCCCCFFFF;
+    regs.eip    = (unsigned long)&instr[0];
+    regs.edi    = (unsigned long)cmpxchg8b_res;
+    cr2         = regs.edi;
+    rc = x86_emulate_memop(&regs, cr2, &emulops, 4);
+    if ( (rc != 0) || 
+         (cmpxchg8b_res[0] != 0x9999AAAA) ||
+         (cmpxchg8b_res[1] != 0xCCCCFFFF) ||
+         ((regs.eflags&0x240) != 0x240) ||
+         (regs.eip != (unsigned long)&instr[3]) )
+        goto fail;
+    printf("okay\n");
+
+    printf("%-40s", "Testing cmpxchg (%edi) [failing]...");
+    instr[0] = 0x0f; instr[1] = 0xc7; instr[2] = 0x0f;
+    regs.eip    = (unsigned long)&instr[0];
+    regs.edi    = (unsigned long)cmpxchg8b_res;
+    cr2         = regs.edi;
+    rc = x86_emulate_memop(&regs, cr2, &emulops, 4);
+    if ( (rc != 0) || 
+         (cmpxchg8b_res[0] != 0x9999AAAA) ||
+         (cmpxchg8b_res[1] != 0xCCCCFFFF) ||
+         (regs.eax != 0x9999AAAA) ||
+         (regs.edx != 0xCCCCFFFF) ||
+         ((regs.eflags&0x240) != 0x200) ||
+         (regs.eip != (unsigned long)&instr[3]) )
         goto fail;
     printf("okay\n");
 

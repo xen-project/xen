@@ -34,6 +34,8 @@
  *     some out-of-band mechanism, unknown to the emulator. The memop signals
  *     failure by returning X86EMUL_PROPAGATE_FAULT to the emulator, which will
  *     then immediately bail.
+ *  3. Valid access sizes are 1, 2, 4 and 8 bytes. On x86/32 systems only
+ *     cmpxchg8b_emulated need support 8-byte accesses.
  */
 /* Access completed successfully: continue emulation as normal. */
 #define X86EMUL_CONTINUE        0
@@ -104,6 +106,25 @@ struct x86_mem_emulator
         unsigned long old,
         unsigned long new,
         unsigned int bytes);
+
+    /*
+     * cmpxchg_emulated: Emulate an atomic (LOCKed) CMPXCHG8B operation on an
+     *                   emulated/special memory area.
+     *  @addr:  [IN ] Linear address to access.
+     *  @old:   [IN ] Value expected to be current at @addr.
+     *  @new:   [IN ] Value to write to @addr.
+     * NOTES:
+     *  1. This function is only ever called when emulating a real CMPXCHG8B.
+     *  2. This function is *never* called on x86/64 systems.
+     *  2. Not defining this function (i.e., specifying NULL) is equivalent
+     *     to defining a function that always returns X86EMUL_UNHANDLEABLE.
+     */
+    int (*cmpxchg8b_emulated)(
+        unsigned long addr,
+        unsigned long old_lo,
+        unsigned long old_hi,
+        unsigned long new_lo,
+        unsigned long new_hi);
 };
 
 /* Standard reader/writer functions that callers may wish to use. */
