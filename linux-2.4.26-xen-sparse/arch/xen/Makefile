@@ -24,8 +24,8 @@ override EXTRAVERSION := $(subst linux-$(VERSION).$(PATCHLEVEL).$(SUBLEVEL),,$(s
 # defconfig file. It would be much better if there was a hook in the
 # main Makefile to do this, but this works.
 ifneq (.config,$(wildcard .config))
-X=$(shell cp arch/xen/defconfig$(EXTRAVERSION) .config)
--include .config
+X=$(shell cp $(TOPDIR)/arch/xen/defconfig$(EXTRAVERSION) $(TOPDIR)/.config)
+-include $(TOPDIR)/.config
 endif
 
 LD=$(CROSS_COMPILE)ld -m elf_i386
