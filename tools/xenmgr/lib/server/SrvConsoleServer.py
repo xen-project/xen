@@ -291,6 +291,12 @@ class EventProtocol(protocol.Protocol):
             else:
                 self.send_error()
 
+    def loseConnection(self):
+        if self.transport:
+            self.transport.loseConnection()
+        if self.connected:
+            reactor.callLater(0, self.connectionLost)
+
     def connectionLost(self, reason=None):
         self.unsubscribe()
 
@@ -663,7 +669,7 @@ class Daemon:
         """
         dom = int(id)
         if dom <= 0: return 0 
-        return xc.domain_destroy(dom=dom, force=0)
+        return xc.domain_destroy(dom=dom, force=force)
     
 
 def instance():

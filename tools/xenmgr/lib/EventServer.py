@@ -85,7 +85,8 @@ class EventServer:
         hl = self.handlers.get(event)
         if hl is None:
             return
-        hl.remove(handler)
+        if handler in hl:
+            hl.remove(handler)
 
     def inject(self, event, val):
         """Inject an event. Handlers for it are called if runing, otherwise

@@ -37,9 +37,7 @@ class CtrlMsgRcvr:
     
     def registerChannel(self):
         self.channel = self.channelFactory.domChannel(self.dom)
-        #print 'registerChannel> channel=', self.channel, self
         self.idx = self.channel.getIndex()
-        #print 'registerChannel> idx=', self.idx
         if self.majorTypes:
             self.channel.registerDevice(self.majorTypes, self)
         
@@ -90,7 +88,7 @@ class ControllerFactory(CtrlMsgRcvr):
         return None
 
     def delInstance(self, instance):
-        if instance in self.instances:
+        if instance.idx in self.instances:
             del self.instances[instance.idx]
 
     def createInstance(self, dom):

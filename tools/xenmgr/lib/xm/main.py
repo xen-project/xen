@@ -76,6 +76,7 @@ class Xm:
         """List domains."""
         if help: self.help('xm_' + args[0], args); return
         doms = server.xend_domains()
+        doms.sort()
         print 'Dom  Name             Mem(MB)  CPU  State  Time(s)'
         for dom in doms:
             info = server.xend_domain(dom)
@@ -86,7 +87,7 @@ class Xm:
             d['cpu'] = int(sxp.child_value(info, 'cpu', '0'))
             d['state'] = sxp.child_value(info, 'state', '??')
             d['cpu_time'] = float(sxp.child_value(info, 'cpu_time', '0'))
-            print ("%(dom)-4d %(name)-16s %(mem)4d     %(cpu)3d %(state)5s %(cpu_time)10.2f" % d)
+            print ("%(dom)-4d %(name)-16s %(mem)7d  %(cpu)3d  %(state)5s  %(cpu_time)7.1f" % d)
 
     def xm_domain(self, help, args):
         """Get information about a domain."""
@@ -143,32 +144,6 @@ class Xm:
         if len(args) != 3: self.err("%s: Invalid argument(s)" % args[0])
         v = map(int, args[1:3])
         server.xend_domain_pincpu(*v)
-
-##     def xm_vif_stats(self, help, args):
-##         """Get stats for a virtual interface."""
-##         if help:
-##             print args[0], 'DOM VIF'
-##             print '\nGet stats for interface VIF on domain DOM.'
-##             return
-##         if len(args) != 3: self.err("%s: Invalid argument(s)" % args[0])
-##         v = map(int, args[1:3])
-##         print server.xend_domain_vif_stats(*v)
-
-##     def xm_vif_rate(self, help, args):
-##         """Set or get vif rate params."""
-##         if help:
-##             print args[0], "DOM VIF [BYTES USECS]"
-##             print '\nSet or get rate controls for interface VIF on domain DOM.'
-##             return
-##         n = len(args)
-##         if n == 3:
-##             v = map(int, args[1:n])
-##             print server.xend_domain_vif_scheduler_get(*v)
-##         elif n == 5:
-##             v = map(int, args[1:n])
-##             server.xend_domain_vif_scheduler_set(*v)
-##         else:
-##             self.err("%s: Invalid argument(s)" % args[0])
 
     def xm_bvt(self, help, args):
         """Set BVT scheduler parameters."""
