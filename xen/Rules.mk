@@ -1,11 +1,11 @@
-ARCH    ?= i386
-ARCH    := $(ARCH:i%86=i386)
+COMPILE_ARCH := $(shell uname -m | sed -e s/i.86/i386/)
+TARGET_ARCH  ?= $(COMPILE_ARCH)
 
 TARGET  := $(BASEDIR)/xen
 HDRS    := $(wildcard $(BASEDIR)/include/xeno/*.h)
 HDRS    += $(wildcard $(BASEDIR)/include/scsi/*.h)
 HDRS    += $(wildcard $(BASEDIR)/include/hypervisor-ifs/*.h)
-HDRS    += $(wildcard $(BASEDIR)/include/asm-$(ARCH)/*.h)
+HDRS    += $(wildcard $(BASEDIR)/include/asm-$(TARGET_ARCH)/*.h)
 # compile.h is always regenerated, but other files shouldn't be rebuilt
 HDRS    := $(subst $(BASEDIR)/include/xeno/compile.h,,$(HDRS))
 
@@ -25,12 +25,12 @@ ALL_OBJS += $(BASEDIR)/drivers/cdrom/driver.o
 ALL_OBJS += $(BASEDIR)/drivers/ide/driver.o
 ALL_OBJS += $(BASEDIR)/drivers/scsi/driver.o
 ALL_OBJS += $(BASEDIR)/drivers/message/fusion/driver.o
-ALL_OBJS += $(BASEDIR)/arch/$(ARCH)/arch.o
+ALL_OBJS += $(BASEDIR)/arch/$(TARGET_ARCH)/arch.o
 
 HOSTCC     = gcc
 HOSTCFLAGS = -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer 
 
-include $(BASEDIR)/arch/$(ARCH)/Rules.mk
+include $(BASEDIR)/arch/$(TARGET_ARCH)/Rules.mk
 
 %.o: %.c $(HDRS) Makefile
 	$(CC) $(CFLAGS) -c $< -o $@

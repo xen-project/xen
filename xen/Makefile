@@ -32,7 +32,7 @@ clean: delete-links
 	$(MAKE) -C common clean
 	$(MAKE) -C net clean
 	$(MAKE) -C drivers clean
-	$(MAKE) -C arch/$(ARCH) clean
+	$(MAKE) -C arch/$(TARGET_ARCH) clean
 	rm -f *.o $(TARGET)* *~ core $(GENERATED_FILES)
 
 $(TARGET): delete-unfresh-files make-links $(GENERATED_FILES)
@@ -40,11 +40,11 @@ $(TARGET): delete-unfresh-files make-links $(GENERATED_FILES)
 	$(MAKE) -C common
 	$(MAKE) -C net
 	$(MAKE) -C drivers
-	$(MAKE) -C arch/$(ARCH)
+	$(MAKE) -C arch/$(TARGET_ARCH)
 
 make-links: delete-links
-	ln -sf asm-$(ARCH) include/asm
-	ln -sf arch-$(ARCH) include/hypervisor-ifs/arch
+	ln -sf asm-$(TARGET_ARCH) include/asm
+	ln -sf arch-$(TARGET_ARCH) include/hypervisor-ifs/arch
 
 delete-links:
 	rm -f include/asm include/hypervisor-ifs/arch
@@ -77,7 +77,7 @@ include/xeno/compile.h:
 
 SUBDIRS = arch common drivers net 
 TAGS: 
-	etags `find include/asm-$(ARCH) -name '*.h'`
+	etags `find include/asm-$(TARGET_ARCH) -name '*.h'`
 	find include -type d \( -name "asm-*" -o -name config \) -prune -o -name '*.h' -print | xargs etags -a
 	find $(SUBDIRS) -name '*.[ch]' | xargs etags -a
 MAP:

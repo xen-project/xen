@@ -88,7 +88,7 @@
 3fbd4bd6GtGwZGxYUJPOheYIR7bPaA tools/xc/py/XenoUtil.py
 3fbd0a40yT6G3M9hMpaz5xTUdl0E4g tools/xc/py/setup.py
 40431ac64Hj4ixUnKmlugZKhXPFE_Q tools/xend/Makefile
-40431ac8wrUEj-XM7B8smFtx_HA7lQ tools/xend/xend.c
+40431ac8wrUEj-XM7B8smFtx_HA7lQ tools/xend/xend_utils.c
 403a3edbrr8RE34gkbR40zep98SXbg tools/xentrace/Makefile
 403a3edbVpV2E_wq1zeEkJ_n4Uu2eg tools/xentrace/xentrace.c
 403a3edb0lzD0Fojc-NYNoXr3SYrnA tools/xentrace/xentrace_cpusplit.py
