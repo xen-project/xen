@@ -12,6 +12,7 @@
 #include <linux/cdrom.h>
 #include <linux/tqueue.h>
 #include <linux/sched.h>
+#include <scsi/scsi.h>
 
 #include <linux/interrupt.h>
 
@@ -211,6 +212,10 @@ int xenolinux_block_ioctl(struct inode *inode, struct file *filep,
         for ( i = 0; i < sizeof(struct cdrom_multisession); i++ )
             if ( put_user(0, (byte *)(argument + i)) ) return -EFAULT;
         return 0;
+
+    case SCSI_IOCTL_GET_BUS_NUMBER:
+        DPRINTK("FIXME: SCSI_IOCTL_GET_BUS_NUMBER ioctl in xl_block");
+        return -ENOSYS;
 
     default:
         printk(KERN_ALERT "ioctl %08x not supported by xl_block\n", command);

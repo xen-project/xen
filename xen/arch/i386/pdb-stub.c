@@ -118,6 +118,81 @@ pdb_process_query (char *ptr)
     }
 }
 
+void
+pdb_x86_to_gdb_regs (char *buffer, struct pt_regs *regs)
+{
+    int idx = 0;
+
+    mem2hex ((char *)&regs->eax, &buffer[idx], sizeof(regs->eax));
+    idx += sizeof(regs->eax) * 2;
+    mem2hex ((char *)&regs->ecx, &buffer[idx], sizeof(regs->ecx));
+    idx += sizeof(regs->ecx) * 2;
+    mem2hex ((char *)&regs->edx, &buffer[idx], sizeof(regs->edx));
+    idx += sizeof(regs->edx) * 2;
+    mem2hex ((char *)&regs->ebx, &buffer[idx], sizeof(regs->ebx));
+    idx += sizeof(regs->ebx) * 2;
+    mem2hex ((char *)&regs->esp, &buffer[idx], sizeof(regs->esp));
+    idx += sizeof(regs->esp) * 2;
+    mem2hex ((char *)&regs->ebp, &buffer[idx], sizeof(regs->ebp));
+    idx += sizeof(regs->ebp) * 2;
+    mem2hex ((char *)&regs->esi, &buffer[idx], sizeof(regs->esi));
+    idx += sizeof(regs->esi) * 2;
+    mem2hex ((char *)&regs->edi, &buffer[idx], sizeof(regs->edi));
+    idx += sizeof(regs->edi) * 2;
+    mem2hex ((char *)&regs->eip, &buffer[idx], sizeof(regs->eip));
+    idx += sizeof(regs->eip) * 2;
+    mem2hex ((char *)&regs->eflags, &buffer[idx], sizeof(regs->eflags));
+    idx += sizeof(regs->eflags) * 2;
+    mem2hex ((char *)&regs->xcs, &buffer[idx], sizeof(regs->xcs));
+    idx += sizeof(regs->xcs) * 2;
+    mem2hex ((char *)&regs->xss, &buffer[idx], sizeof(regs->xss));
+    idx += sizeof(regs->xss) * 2;
+    mem2hex ((char *)&regs->xds, &buffer[idx], sizeof(regs->xds));
+    idx += sizeof(regs->xds) * 2;
+    mem2hex ((char *)&regs->xes, &buffer[idx], sizeof(regs->xes));
+    idx += sizeof(regs->xes) * 2;
+    mem2hex ((char *)&regs->xfs, &buffer[idx], sizeof(regs->xfs));
+    idx += sizeof(regs->xfs) * 2;
+    mem2hex ((char *)&regs->xgs, &buffer[idx], sizeof(regs->xgs));
+}
+
+/* at this point we allow any register to be changed, caveat emptor */
+void
+pdb_gdb_to_x86_regs (struct pt_regs *regs, char *buffer)
+{
+    hex2mem(buffer, (char *)&regs->eax, sizeof(regs->eax));
+    buffer += sizeof(regs->eax) * 2;
+    hex2mem(buffer, (char *)&regs->ecx, sizeof(regs->ecx));
+    buffer += sizeof(regs->ecx) * 2;
+    hex2mem(buffer, (char *)&regs->edx, sizeof(regs->edx));
+    buffer += sizeof(regs->edx) * 2;
+    hex2mem(buffer, (char *)&regs->ebx, sizeof(regs->ebx));
+    buffer += sizeof(regs->ebx) * 2;
+    hex2mem(buffer, (char *)&regs->esp, sizeof(regs->esp));
+    buffer += sizeof(regs->esp) * 2;
+    hex2mem(buffer, (char *)&regs->ebp, sizeof(regs->ebp));
+    buffer += sizeof(regs->ebp) * 2;
+    hex2mem(buffer, (char *)&regs->esi, sizeof(regs->esi));
+    buffer += sizeof(regs->esi) * 2;
+    hex2mem(buffer, (char *)&regs->edi, sizeof(regs->edi));
+    buffer += sizeof(regs->edi) * 2;
+    hex2mem(buffer, (char *)&regs->eip, sizeof(regs->eip));
+    buffer += sizeof(regs->eip) * 2;
+    hex2mem(buffer, (char *)&regs->eflags, sizeof(regs->eflags));
+    buffer += sizeof(regs->eflags) * 2;
+    hex2mem(buffer, (char *)&regs->xcs, sizeof(regs->xcs));
+    buffer += sizeof(regs->xcs) * 2;
+    hex2mem(buffer, (char *)&regs->xss, sizeof(regs->xss));
+    buffer += sizeof(regs->xss) * 2;
+    hex2mem(buffer, (char *)&regs->xds, sizeof(regs->xds));
+    buffer += sizeof(regs->xds) * 2;
+    hex2mem(buffer, (char *)&regs->xes, sizeof(regs->xes));
+    buffer += sizeof(regs->xes) * 2;
+    hex2mem(buffer, (char *)&regs->xfs, sizeof(regs->xfs));
+    buffer += sizeof(regs->xfs) * 2;
+    hex2mem(buffer, (char *)&regs->xgs, sizeof(regs->xgs));
+}
+
 int
 pdb_process_command (char *ptr, struct pt_regs *regs)
 {
@@ -139,84 +214,77 @@ pdb_process_command (char *ptr, struct pt_regs *regs)
         pdb_out_buffer[2] = hexchars[sigval % 16];
         pdb_out_buffer[3] = 0;
         break;
-    case 'S':                                        /* step with signal */
-    case 's':                                                    /* step */
+    case 'S':                                            /* step with signal */
+    case 's':                                                        /* step */
         regs->eflags |= 0x100;
         pdb_stepping = 1;
         return 1;                                        
         /* not reached */
-    case 'C':                                    /* continue with signal */
-    case 'c':                                                /* continue */
+    case 'C':                                        /* continue with signal */
+    case 'c':                                                    /* continue */
         regs->eflags &= ~0x100;
         /* jump out before replying to gdb */
         return 1;
         /* not reached */
     case 'd':
-        remote_debug = !(remote_debug);               /* toggle debug flag */
+        remote_debug = !(remote_debug);                 /* toggle debug flag */
         break;
-    case 'D':                                                  /* detach */
+    case 'D':                                                      /* detach */
         return go;
         /* not reached */
-    case 'g':                   /* return the value of the CPU registers */
+    case 'g':                       /* return the value of the CPU registers */
     {
-        int idx = 0;
-        mem2hex ((char *)&regs->eax, &pdb_out_buffer[idx], sizeof(regs->eax));
-        idx += sizeof(regs->eax) * 2;
-        mem2hex ((char *)&regs->ecx, &pdb_out_buffer[idx], sizeof(regs->ecx));
-        idx += sizeof(regs->ecx) * 2;
-        mem2hex ((char *)&regs->edx, &pdb_out_buffer[idx], sizeof(regs->edx));
-        idx += sizeof(regs->edx) * 2;
-        mem2hex ((char *)&regs->ebx, &pdb_out_buffer[idx], sizeof(regs->ebx));
-        idx += sizeof(regs->ebx) * 2;
-        mem2hex ((char *)&regs->esp, &pdb_out_buffer[idx], sizeof(regs->esp));
-        idx += sizeof(regs->esp) * 2;
-        mem2hex ((char *)&regs->ebp, &pdb_out_buffer[idx], sizeof(regs->ebp));
-        idx += sizeof(regs->ebp) * 2;
-        mem2hex ((char *)&regs->esi, &pdb_out_buffer[idx], sizeof(regs->esi));
-        idx += sizeof(regs->esi) * 2;
-        mem2hex ((char *)&regs->edi, &pdb_out_buffer[idx], sizeof(regs->edi));
-        idx += sizeof(regs->edi) * 2;
-        mem2hex ((char *)&regs->eip, &pdb_out_buffer[idx], sizeof(regs->eip));
-        idx += sizeof(regs->eip) * 2;
-        mem2hex ((char *)&regs->eflags, &pdb_out_buffer[idx], sizeof(regs->eflags));
-        idx += sizeof(regs->eflags) * 2;
-        mem2hex ((char *)&regs->xcs, &pdb_out_buffer[idx], sizeof(regs->xcs));
-        idx += sizeof(regs->xcs) * 2;
-        mem2hex ((char *)&regs->xss, &pdb_out_buffer[idx], sizeof(regs->xss));
-        idx += sizeof(regs->xss) * 2;
-        mem2hex ((char *)&regs->xds, &pdb_out_buffer[idx], sizeof(regs->xds));
-        idx += sizeof(regs->xds) * 2;
-        mem2hex ((char *)&regs->xes, &pdb_out_buffer[idx], sizeof(regs->xes));
-        idx += sizeof(regs->xes) * 2;
-        mem2hex ((char *)&regs->xfs, &pdb_out_buffer[idx], sizeof(regs->xfs));
-        idx += sizeof(regs->xfs) * 2;
-        mem2hex ((char *)&regs->xgs, &pdb_out_buffer[idx], sizeof(regs->xgs));
+        pdb_x86_to_gdb_regs (pdb_out_buffer, regs);
 
-        /*
-          TRC(printk ("  reg: %s \n", pdb_out_buffer));
-          TRC(printk ("  ebx: 0x%08lx\n", regs->ebx));
-          TRC(printk ("  ecx: 0x%08lx\n", regs->ecx));
-          TRC(printk ("  edx: 0x%08lx\n", regs->edx));
-          TRC(printk ("  esi: 0x%08lx\n", regs->esi));
-          TRC(printk ("  edi: 0x%08lx\n", regs->edi));
-          TRC(printk ("  ebp: 0x%08lx\n", regs->ebp));
-          TRC(printk ("  eax: 0x%08lx\n", regs->eax));
-          TRC(printk ("  xds: 0x%08x\n", regs->xds));
-          TRC(printk ("  xes: 0x%08x\n", regs->xes));
-          TRC(printk ("  xfs: 0x%08x\n", regs->xfs));
-          TRC(printk ("  xgs: 0x%08x\n", regs->xgs));
-          TRC(printk ("  eip: 0x%08lx\n", regs->eip));
-          TRC(printk ("  xcs: 0x%08x\n", regs->xcs));
-          TRC(printk ("  efl: 0x%08lx\n", regs->eflags));
-          TRC(printk ("  esp: 0x%08lx\n", regs->esp));
-          TRC(printk ("  xss: 0x%08x\n", regs->xss));
-        */
+	/*
+	printk ("  reg: %s",   pdb_out_buffer);
+	printk ("\n");
+	printk ("  eax: 0x%08lx\n", regs->eax);
+	printk ("  ecx: 0x%08lx\n", regs->ecx);
+	printk ("  edx: 0x%08lx\n", regs->edx);
+	printk ("  ebx: 0x%08lx\n", regs->ebx);
+	printk ("  esp: 0x%08lx\n", regs->esp);
+	printk ("  ebp: 0x%08lx\n", regs->ebp);
+	printk ("  esi: 0x%08lx\n", regs->esi);
+	printk ("  edi: 0x%08lx\n", regs->edi);
+	printk ("  eip: 0x%08lx\n", regs->eip);
+	printk ("  efl: 0x%08lx\n", regs->eflags);
+	printk ("  xcs: 0x%08x\n",  regs->xcs);
+	printk ("  xss: 0x%08x\n",  regs->xss);
+	printk ("  xds: 0x%08x\n",  regs->xds);
+	printk ("  xes: 0x%08x\n",  regs->xes);
+	printk ("  xfs: 0x%08x\n",  regs->xfs);
+	printk ("  xgs: 0x%08x\n",  regs->xgs);
+	*/
 
         break;
     }
-    case 'G':          /* set the value of the CPU registers - return OK */
-        break;
+    case 'G':              /* set the value of the CPU registers - return OK */
+    {
+        pdb_gdb_to_x86_regs (regs, ptr);
 
+	/*
+	printk ("  ptr: %s \n\n",   ptr);
+	printk ("  eax: 0x%08lx\n", regs->eax);
+	printk ("  ecx: 0x%08lx\n", regs->ecx);
+	printk ("  edx: 0x%08lx\n", regs->edx);
+	printk ("  ebx: 0x%08lx\n", regs->ebx);
+	printk ("  esp: 0x%08lx\n", regs->esp);
+	printk ("  ebp: 0x%08lx\n", regs->ebp);
+	printk ("  esi: 0x%08lx\n", regs->esi);
+	printk ("  edi: 0x%08lx\n", regs->edi);
+	printk ("  eip: 0x%08lx\n", regs->eip);
+	printk ("  efl: 0x%08lx\n", regs->eflags);
+	printk ("  xcs: 0x%08x\n",  regs->xcs);
+	printk ("  xss: 0x%08x\n",  regs->xss);
+	printk ("  xds: 0x%08x\n",  regs->xds);
+	printk ("  xes: 0x%08x\n",  regs->xes);
+	printk ("  xfs: 0x%08x\n",  regs->xfs);
+	printk ("  xgs: 0x%08x\n",  regs->xgs);
+	*/
+
+        break;
+    }
     case 'H':
     {
         int thread;
@@ -244,9 +312,9 @@ pdb_process_command (char *ptr, struct pt_regs *regs)
         strcpy (pdb_out_buffer, "OK");
         break;
     }
-    case 'k':                                            /* kill request */
+    case 'k':                                                /* kill request */
     {
-        strcpy (pdb_out_buffer, "OK");                    /* ack for fun */
+        strcpy (pdb_out_buffer, "OK");                        /* ack for fun */
         printk ("don't kill bill...\n");
         ack = 0;
         break;
@@ -325,9 +393,9 @@ pdb_process_command (char *ptr, struct pt_regs *regs)
         int thread;
         if (hexToInt (&ptr, &thread))
         {
-            struct task_struct *p;
+	    struct task_struct *p;
             thread -= PDB_DOMAIN_OFFSET;
-            if ( (p = find_domain_by_id(thread)) == NULL )
+            if ( (p = find_domain_by_id(thread)) == NULL)
                 strcpy (pdb_out_buffer, "E00");
             else
                 strcpy (pdb_out_buffer, "OK");
@@ -746,7 +814,7 @@ int pdb_handle_exception(int exceptionVector,
 
 void pdb_key_pressed(u_char key, void *dev_id, struct pt_regs *regs) 
 {
-    pdb_handle_exception(136, regs);
+    pdb_handle_exception(KEYPRESS_EXCEPTION, regs);
     return;
 }
 

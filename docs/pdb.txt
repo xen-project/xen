@@ -1,7 +1,7 @@
 Pervasive Debugging 
 ===================
 
-040205 Alex Ho (alex.ho@cl.cam.ac.uk)
+040205 Alex Ho (alex.ho at cl.cam.ac.uk)
 
 Introduction
 ------------
