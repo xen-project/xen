@@ -2029,7 +2029,7 @@ static void make_tx_response(net_vif_t     *vif,
     resp->status = st;
     pos = TX_RING_INC(pos);
     vif->tx_resp_prod = vif->shared_idxs->tx_resp_prod = pos;
-    if ( pos == vif->shared_idxs->rx_event )
+    if ( pos == vif->shared_idxs->tx_event )
     {
         unsigned long cpu_mask = mark_guest_event(vif->domain, _EVENT_NET);
         guest_event_notify(cpu_mask);    
