@@ -24,6 +24,28 @@
 #include <xen/irq.h>
 #include <xen/event.h>
 #include <xen/shadow.h>
+#include <xen/console.h>
+
+#include <xen/elf.h>
+
+extern int loadelfimage(char *);
+extern int readelfimage_base_and_size(char *, unsigned long,
+                  unsigned long *, unsigned long *, unsigned long *);
+
+#if !defined(CONFIG_X86_64BITMODE)
+/* No ring-3 access in initial page tables. */
+#define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED)
+#else
+/* Allow ring-3 access in long mode as guest cannot use ring 1. */
+#define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_USER)
+#endif
+#define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
+#define L3_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
+#define L4_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
+
+#define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
+#define round_pgdown(_p)  ((_p)&PAGE_MASK)
+
 
 int hlt_counter;
 
@@ -422,3 +444,375 @@ long do_iopl(domid_t domain, unsigned int new_io_pl)
 }
 
 #endif
+
+void domain_relinquish_memory(struct domain *d)
+{
+    struct list_head *ent, *tmp;
+    struct pfn_info  *page;
+    unsigned long     x, y;
+
+    /*
+     * If we're executing the idle task then we may still be running over the 
+     * dead domain's page tables. We'd better fix that before freeing them!
+     */
+    if ( is_idle_task(current) )
+        write_ptbase(&current->mm);
+
+    /* Exit shadow mode before deconstructing final guest page table. */
+    if ( shadow_mode(d) )
+        shadow_mode_disable(d);
+
+    /* Drop the in-use reference to the page-table base. */
+    if ( pagetable_val(d->mm.pagetable) != 0 )
+        put_page_and_type(&frame_table[pagetable_val(d->mm.pagetable) >>
+                                      PAGE_SHIFT]);
+
+    /* Relinquish Xen-heap pages. Currently this can only be 'shared_info'. */
+    page = virt_to_page(d->shared_info);
+    if ( test_and_clear_bit(_PGC_allocated, &page->count_and_flags) )
+        put_page(page);
+
+    /* Relinquish all pages on the domain's allocation list. */
+    spin_lock_recursive(&d->page_alloc_lock); /* may enter free_domain_page */
+    list_for_each_safe ( ent, tmp, &d->page_list )
+    {
+        page = list_entry(ent, struct pfn_info, list);
+
+        if ( test_and_clear_bit(_PGC_guest_pinned, &page->count_and_flags) )
+            put_page_and_type(page);
+
+        if ( test_and_clear_bit(_PGC_allocated, &page->count_and_flags) )
+            put_page(page);
+
+        /*
+         * Forcibly invalidate base page tables at this point to break circular
+         * 'linear page table' references. This is okay because MMU structures
+         * are not shared across domains and this domain is now dead. Thus base
+         * tables are not in use so a non-zero count means circular reference.
+         */
+        y = page->type_and_flags;
+        do {
+            x = y;
+            if ( likely((x & (PGT_type_mask|PGT_validated)) != 
+                        (PGT_base_page_table|PGT_validated)) )
+                break;
+            y = cmpxchg(&page->type_and_flags, x, x & ~PGT_validated);
+            if ( likely(y == x) )
+                free_page_type(page, PGT_base_page_table);
+        }
+        while ( unlikely(y != x) );
+    }
+    spin_unlock_recursive(&d->page_alloc_lock);
+}
+
+
+int construct_dom0(struct domain *p, 
+                   unsigned long alloc_start,
+                   unsigned long alloc_end,
+                   char *image_start, unsigned long image_len, 
+                   char *initrd_start, unsigned long initrd_len,
+                   char *cmdline)
+{
+    char *dst;
+    int i, rc;
+    unsigned long pfn, mfn;
+    unsigned long nr_pages = (alloc_end - alloc_start) >> PAGE_SHIFT;
+    unsigned long nr_pt_pages;
+    unsigned long count;
+    l2_pgentry_t *l2tab, *l2start;
+    l1_pgentry_t *l1tab = NULL, *l1start = NULL;
+    struct pfn_info *page = NULL;
+    start_info_t *si;
+
+    /*
+     * This fully describes the memory layout of the initial domain. All 
+     * *_start address are page-aligned, except v_start (and v_end) which are 
+     * superpage-aligned.
+     */
+    unsigned long v_start;
+    unsigned long vkern_start;
+    unsigned long vkern_entry;
+    unsigned long vkern_end;
+    unsigned long vinitrd_start;
+    unsigned long vinitrd_end;
+    unsigned long vphysmap_start;
+    unsigned long vphysmap_end;
+    unsigned long vstartinfo_start;
+    unsigned long vstartinfo_end;
+    unsigned long vstack_start;
+    unsigned long vstack_end;
+    unsigned long vpt_start;
+    unsigned long vpt_end;
+    unsigned long v_end;
+
+    /* Machine address of next candidate page-table page. */
+    unsigned long mpt_alloc;
+
+    extern void physdev_init_dom0(struct domain *);
+
+    /* Sanity! */
+    if ( p->domain != 0 ) 
+        BUG();
+    if ( test_bit(DF_CONSTRUCTED, &p->flags) ) 
+        BUG();
+
+    printk("*** LOADING DOMAIN 0 ***\n");
+
+    /*
+     * This is all a bit grim. We've moved the modules to the "safe" physical 
+     * memory region above MAP_DIRECTMAP_ADDRESS (48MB). Later in this 
+     * routine we're going to copy it down into the region that's actually 
+     * been allocated to domain 0. This is highly likely to be overlapping, so 
+     * we use a forward copy.
+     * 
+     * MAP_DIRECTMAP_ADDRESS should be safe. The worst case is a machine with 
+     * 4GB and lots of network/disk cards that allocate loads of buffers. 
+     * We'll have to revisit this if we ever support PAE (64GB).
+     */
+
+    rc = readelfimage_base_and_size(image_start, image_len,
+                                    &vkern_start, &vkern_end, &vkern_entry);
+    if ( rc != 0 )
+        return rc;
+
+    /*
+     * Why do we need this? The number of page-table frames depends on the 
+     * size of the bootstrap address space. But the size of the address space 
+     * depends on the number of page-table frames (since each one is mapped 
+     * read-only). We have a pair of simultaneous equations in two unknowns, 
+     * which we solve by exhaustive search.
+     */
+    for ( nr_pt_pages = 2; ; nr_pt_pages++ )
+    {
+        v_start          = vkern_start & ~((1<<22)-1);
+        vinitrd_start    = round_pgup(vkern_end);
+        vinitrd_end      = vinitrd_start + initrd_len;
+        vphysmap_start   = round_pgup(vinitrd_end);
+        vphysmap_end     = vphysmap_start + (nr_pages * sizeof(unsigned long));
+        vpt_start        = round_pgup(vphysmap_end);
+        vpt_end          = vpt_start + (nr_pt_pages * PAGE_SIZE);
+        vstartinfo_start = vpt_end;
+        vstartinfo_end   = vstartinfo_start + PAGE_SIZE;
+        vstack_start     = vstartinfo_end;
+        vstack_end       = vstack_start + PAGE_SIZE;
+        v_end            = (vstack_end + (1<<22)-1) & ~((1<<22)-1);
+        if ( (v_end - vstack_end) < (512 << 10) )
+            v_end += 1 << 22; /* Add extra 4MB to get >= 512kB padding. */
+        if ( (((v_end - v_start) >> L2_PAGETABLE_SHIFT) + 1) <= nr_pt_pages )
+            break;
+    }
+
+    if ( (v_end - v_start) > (nr_pages * PAGE_SIZE) )
+    {
+        printk("Initial guest OS requires too much space\n"
+               "(%luMB is greater than %luMB limit)\n",
+               (v_end-v_start)>>20, (nr_pages<<PAGE_SHIFT)>>20);
+        return -ENOMEM;
+    }
+
+    printk("PHYSICAL MEMORY ARRANGEMENT:\n"
+           " Kernel image:  %p->%p\n"
+           " Initrd image:  %p->%p\n"
+           " Dom0 alloc.:   %08lx->%08lx\n",
+           image_start, image_start + image_len,
+           initrd_start, initrd_start + initrd_len,
+           alloc_start, alloc_end);
+    printk("VIRTUAL MEMORY ARRANGEMENT:\n"
+           " Loaded kernel: %08lx->%08lx\n"
+           " Init. ramdisk: %08lx->%08lx\n"
+           " Phys-Mach map: %08lx->%08lx\n"
+           " Page tables:   %08lx->%08lx\n"
+           " Start info:    %08lx->%08lx\n"
+           " Boot stack:    %08lx->%08lx\n"
+           " TOTAL:         %08lx->%08lx\n",
+           vkern_start, vkern_end, 
+           vinitrd_start, vinitrd_end,
+           vphysmap_start, vphysmap_end,
+           vpt_start, vpt_end,
+           vstartinfo_start, vstartinfo_end,
+           vstack_start, vstack_end,
+           v_start, v_end);
+    printk(" ENTRY ADDRESS: %08lx\n", vkern_entry);
+
+    /*
+     * Protect the lowest 1GB of memory. We use a temporary mapping there
+     * from which we copy the kernel and ramdisk images.
+     */
+    if ( v_start < (1<<30) )
+    {
+        printk("Initial loading isn't allowed to lowest 1GB of memory.\n");
+        return -EINVAL;
+    }
+
+    /* Construct a frame-allocation list for the initial domain. */
+    for ( mfn = (alloc_start>>PAGE_SHIFT); 
+          mfn < (alloc_end>>PAGE_SHIFT); 
+          mfn++ )
+    {
+        page = &frame_table[mfn];
+        page->u.domain        = p;
+        page->type_and_flags  = 0;
+        page->count_and_flags = PGC_allocated | 1;
+        list_add_tail(&page->list, &p->page_list);
+        p->tot_pages++; p->max_pages++;
+    }
+
+    mpt_alloc = (vpt_start - v_start) + alloc_start;
+
+    SET_GDT_ENTRIES(p, DEFAULT_GDT_ENTRIES);
+    SET_GDT_ADDRESS(p, DEFAULT_GDT_ADDRESS);
+
+    /*
+     * We're basically forcing default RPLs to 1, so that our "what privilege
+     * level are we returning to?" logic works.
+     */
+    p->failsafe_selector = FLAT_GUESTOS_CS;
+    p->event_selector    = FLAT_GUESTOS_CS;
+    p->thread.guestos_ss = FLAT_GUESTOS_DS;
+    for ( i = 0; i < 256; i++ ) 
+        p->thread.traps[i].cs = FLAT_GUESTOS_CS;
+
+    /* WARNING: The new domain must have its 'processor' field filled in! */
+    l2start = l2tab = (l2_pgentry_t *)mpt_alloc; mpt_alloc += PAGE_SIZE;
+    memcpy(l2tab, &idle_pg_table[0], PAGE_SIZE);
+    l2tab[LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
+        mk_l2_pgentry((unsigned long)l2start | __PAGE_HYPERVISOR);
+    l2tab[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] =
+        mk_l2_pgentry(__pa(p->mm.perdomain_pt) | __PAGE_HYPERVISOR);
+    p->mm.pagetable = mk_pagetable((unsigned long)l2start);
+
+    l2tab += l2_table_offset(v_start);
+    mfn = alloc_start >> PAGE_SHIFT;
+    for ( count = 0; count < ((v_end-v_start)>>PAGE_SHIFT); count++ )
+    {
+        if ( !((unsigned long)l1tab & (PAGE_SIZE-1)) )
+        {
+            l1start = l1tab = (l1_pgentry_t *)mpt_alloc; 
+            mpt_alloc += PAGE_SIZE;
+            *l2tab++ = mk_l2_pgentry((unsigned long)l1start | L2_PROT);
+            clear_page(l1tab);
+        }
+        *l1tab++ = mk_l1_pgentry((mfn << PAGE_SHIFT) | L1_PROT);
+        
+        page = &frame_table[mfn];
+        set_bit(_PGC_tlb_flush_on_type_change, &page->count_and_flags);
+        if ( !get_page_and_type(page, p, PGT_writeable_page) )
+            BUG();
+
+        mfn++;
+    }
+
+    /* Pages that are part of page tables must be read only. */
+    l2tab = l2start + l2_table_offset(vpt_start);
+    l1start = l1tab = (l1_pgentry_t *)l2_pgentry_to_phys(*l2tab);
+    l1tab += l1_table_offset(vpt_start);
+    l2tab++;
+    for ( count = 0; count < nr_pt_pages; count++ ) 
+    {
+        *l1tab = mk_l1_pgentry(l1_pgentry_val(*l1tab) & ~_PAGE_RW);
+        page = &frame_table[l1_pgentry_to_pagenr(*l1tab)];
+        if ( count == 0 )
+        {
+            page->type_and_flags &= ~PGT_type_mask;
+            page->type_and_flags |= PGT_l2_page_table;
+            get_page(page, p); /* an extra ref because of readable mapping */
+            /* Get another ref to L2 page so that it can be pinned. */
+            if ( !get_page_and_type(page, p, PGT_l2_page_table) )
+                BUG();
+            set_bit(_PGC_guest_pinned, &page->count_and_flags);
+        }
+        else
+        {
+            page->type_and_flags &= ~PGT_type_mask;
+            page->type_and_flags |= PGT_l1_page_table;
+            get_page(page, p); /* an extra ref because of readable mapping */
+        }
+        l1tab++;
+        if( !((unsigned long)l1tab & (PAGE_SIZE - 1)) )
+            l1start = l1tab = (l1_pgentry_t *)l2_pgentry_to_phys(*l2tab);
+    }
+
+    /* Set up shared-info area. */
+    update_dom_time(p->shared_info);
+    p->shared_info->domain_time = 0;
+    /* Mask all upcalls... */
+    for ( i = 0; i < MAX_VIRT_CPUS; i++ )
+        p->shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
+
+    /* Install the new page tables. */
+    __cli();
+    write_ptbase(&p->mm);
+
+    /* Copy the OS image. */
+    (void)loadelfimage(image_start);
+
+    /* Copy the initial ramdisk. */
+    if ( initrd_len != 0 )
+        memcpy((void *)vinitrd_start, initrd_start, initrd_len);
+    
+    /* Set up start info area. */
+    si = (start_info_t *)vstartinfo_start;
+    memset(si, 0, PAGE_SIZE);
+    si->nr_pages     = p->tot_pages;
+    si->shared_info  = virt_to_phys(p->shared_info);
+    si->flags        = SIF_PRIVILEGED | SIF_INITDOMAIN;
+    si->pt_base      = vpt_start;
+    si->nr_pt_frames = nr_pt_pages;
+    si->mfn_list     = vphysmap_start;
+
+    /* Write the phys->machine and machine->phys table entries. */
+    for ( mfn = (alloc_start>>PAGE_SHIFT); 
+          mfn < (alloc_end>>PAGE_SHIFT); 
+          mfn++ )
+    {
+        pfn = mfn - (alloc_start>>PAGE_SHIFT);
+        ((unsigned long *)vphysmap_start)[pfn] = mfn;
+        machine_to_phys_mapping[mfn] = pfn;
+    }
+
+    if ( initrd_len != 0 )
+    {
+        si->mod_start = vinitrd_start;
+        si->mod_len   = initrd_len;
+        printk("Initrd len 0x%lx, start at 0x%08lx\n",
+               si->mod_len, si->mod_start);
+    }
+
+    dst = si->cmd_line;
+    if ( cmdline != NULL )
+    {
+        for ( i = 0; i < 255; i++ )
+        {
+            if ( cmdline[i] == '\0' )
+                break;
+            *dst++ = cmdline[i];
+        }
+    }
+    *dst = '\0';
+
+    /* Reinstate the caller's page tables. */
+    write_ptbase(&current->mm);
+    __sti();
+
+    /* Destroy low mappings - they were only for our convenience. */
+    for ( i = 0; i < DOMAIN_ENTRIES_PER_L2_PAGETABLE; i++ )
+        if ( l2_pgentry_val(l2start[i]) & _PAGE_PSE )
+            l2start[i] = mk_l2_pgentry(0);
+    zap_low_mappings(); /* Do the same for the idle page tables. */
+    
+    /* Give up the VGA console if DOM0 is configured to grab it. */
+    console_endboot(strstr(cmdline, "tty0") != NULL);
+
+    /* DOM0 gets access to everything. */
+    physdev_init_dom0(p);
+
+    set_bit(DF_CONSTRUCTED, &p->flags);
+
+#if 0 /* XXXXX DO NOT CHECK IN ENABLED !!! (but useful for testing so leave) */
+    shadow_mode_enable(&p->mm, SHM_test); 
+#endif
+
+    new_thread(p, vkern_entry, vstack_end, vstartinfo_start);
+
+    return 0;
+}
