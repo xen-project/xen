@@ -48,7 +48,8 @@ void start_of_day(void);
 /* opt_console: If true, Xen sends logging to the VGA console. */
 int opt_console = 1;
 /* opt_ser_baud: Baud rate at which logging is sent to COM1. */
-unsigned int opt_ser_baud = 9600;
+/* NB. Default (0) means that serial I/O is disabled. */
+unsigned int opt_ser_baud = 0;
 /* opt_dom0_mem: Kilobytes of memory allocated to domain 0. */
 unsigned int opt_dom0_mem = 16000;
 /* opt_ifname: Name of physical network interface to use. */
@@ -232,6 +233,9 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
 
 void init_serial(void)
 {
+    if ( !SERIAL_ENABLED )
+        return;
+
     /* 'opt_ser_baud' baud, no parity, 1 stop bit, 8 data bits. */
     outb(0x83, SERIAL_BASE+DATA_FORMAT);
     outb(115200/opt_ser_baud, SERIAL_BASE+DIVISOR_LO);
@@ -249,6 +253,8 @@ void init_serial(void)
 #ifdef CONFIG_OUTPUT_SERIAL
 void putchar_serial(unsigned char c)
 {
+    if ( !SERIAL_ENABLED )
+        return;
     if ( c == '\n' ) putchar_serial('\r');
     while ( !(inb(SERIAL_BASE+LINE_STATUS)&(1<<5)) ) barrier();
     outb(c, SERIAL_BASE+TX_HOLD);

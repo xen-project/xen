@@ -45,13 +45,12 @@ Because of the demo CD's use of RAM disks, make sure you have plenty
 of RAM (256MB+).
 
 To try out the Demo, boot from CD (you may need to change your BIOS
-configuration to do this), hit a key on either the keyboard or serial
-line to pull up the Grub boot menu, then select one of the four boot
-options:
+configuration to do this), then select one of the four boot options 
+from the Grub menu:
 
  Xen / linux-2.4.22 
  Xen / linux-2.4.22 using cmdline IP configuration
- Xen ? linux-2.4.22 in "safe mode"
+ Xen / linux-2.4.22 in "safe mode"
  linux-2.4.22
 
 The last option is a plain linux kernel that runs on the bare machine,
@@ -77,9 +76,9 @@ sequentially for subsequent domains unless told otherwise.
 
 After selecting the kernel to boot, stand back and watch Xen boot,
 closely followed by "domain 0" running the XenoLinux kernel. The boot
-messages are also sent to the serial line (the baud rate can be set on
-the Xen cmdline, but defaults to 115200), which can be very useful for
-debugging should anything important scroll off the screen. Xen's
+messages can also sent to the serial line by specifying the baud rate
+on the Xen cmdline (e.g., 'ser_baud=9600'); this can be very useful
+for debugging should anything important scroll off the screen. Xen's
 startup messages will look quite familiar as much of the hardware
 initialisation (SMP boot, apic setup) and device drivers are derived
 from Linux.
@@ -284,7 +283,7 @@ that may be able to help diagnose problems:
 
  ifname=dummy	  Don't use any network interface.
 
- ser_baud=xxx	  Set serial line baud rate for console.
+ ser_baud=xxx	  Enable serial I/O and set the baud rate.
 
  dom0_mem=xxx 	  Set the initial amount of memory for domain0.
 		  
@@ -358,12 +357,12 @@ title Xen / XenoLinux 2.4.22
         module /boot/xenolinux.gz root=/dev/sda4 ro console=tty0
 
 The first line specifies which Xen image to use, and what command line
-arguments to pass to Xen. In this case, we set the maximum amount of
-memory to allocate to domain0, and the serial baud rate (the default
-is 9600 baud). We could also disable smp support (nosmp) or disable
-hyper-threading support (noht). If you have multiple network interface
-you can use ifname=ethXX to select which one to use. If your network
-card is unsupported, use ifname=dummy
+arguments to pass to Xen. In this case we set the maximum amount of
+memory to allocate to domain0, and enable serial I/O at 9600 baud.
+We could also disable smp support (nosmp) or disable hyper-threading
+support (noht). If you have multiple network interface you can use
+ifname=ethXX to select which one to use. If your network card is
+unsupported, use ifname=dummy
 
 The second line specifies which xenolinux image to use, and the
 standard linux command line arguments to pass to the kernel. In this
@@ -416,8 +415,9 @@ Debugging
 ---------
 
 Xen has a set of debugging features that can be useful to try and
-figure out what's going on. Hit 'h' on the serial line or ScrollLock-h
-on the keyboard to get a list of supported commands. 
+figure out what's going on. Hit 'h' on the serial line (if you
+specified a baud rate on the Xen command line) or ScrollLock-h on the
+keyboard to get a list of supported commands.
 
 If you have a crash you'll likely get a crash dump containing an EIP
 (PC) which, along with an 'objdump -d image', can be useful in

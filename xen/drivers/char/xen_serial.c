@@ -71,6 +71,9 @@ static void serial_rx_int(int irq, void *dev_id, struct pt_regs *regs)
 void initialize_serial() 
 {
     int rc; 
+
+    if ( !SERIAL_ENABLED )
+        return;
     
     /* setup key handler */
     add_key_handler('~', toggle_echo, "toggle serial echo");
