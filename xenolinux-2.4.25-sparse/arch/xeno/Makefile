@@ -51,20 +51,21 @@ HEAD := arch/xeno/kernel/head.o arch/xeno/kernel/init_task.o
 SUBDIRS += arch/xeno/kernel arch/xeno/mm arch/xeno/lib
 SUBDIRS += arch/xeno/drivers/console arch/xeno/drivers/network
 SUBDIRS += arch/xeno/drivers/evtchn arch/xeno/drivers/block
-SUBDIRS += arch/xeno/drivers/balloon
+SUBDIRS += arch/xeno/drivers/balloon arch/xeno/drivers/vnetif
 ifdef CONFIG_XENO_PRIV
 SUBDIRS += arch/xeno/drivers/dom0 
 endif
 
 CORE_FILES += arch/xeno/kernel/kernel.o arch/xeno/mm/mm.o
-CORE_FILES += arch/xeno/drivers/evtchn/evtchn.o
-CORE_FILES += arch/xeno/drivers/console/con.o
-CORE_FILES += arch/xeno/drivers/block/blk.o
-CORE_FILES += arch/xeno/drivers/network/net.o
+CORE_FILES += arch/xeno/drivers/evtchn/drv.o
+CORE_FILES += arch/xeno/drivers/console/drv.o
+CORE_FILES += arch/xeno/drivers/block/drv.o
+CORE_FILES += arch/xeno/drivers/network/drv.o
+CORE_FILES += arch/xeno/drivers/vnetif/drv.o
 ifdef CONFIG_XENO_PRIV
-CORE_FILES += arch/xeno/drivers/dom0/dom0.o
+CORE_FILES += arch/xeno/drivers/dom0/drv.o
 endif
-CORE_FILES += arch/xeno/drivers/balloon/balloon_driver.o
+CORE_FILES += arch/xeno/drivers/balloon/drv.o
 LIBS := $(TOPDIR)/arch/xeno/lib/lib.a $(LIBS) $(TOPDIR)/arch/xeno/lib/lib.a
 
 arch/xeno/kernel: dummy

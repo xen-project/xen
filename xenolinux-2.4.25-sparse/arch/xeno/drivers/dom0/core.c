@@ -1,9 +1,9 @@
 /******************************************************************************
- * dom0_core.c
+ * core.c
  * 
  * Interface to privileged domain-0 commands.
  * 
- * Copyright (c) 2002-2003, K A Fraser, B Dragovic
+ * Copyright (c) 2002-2004, K A Fraser, B Dragovic
  */
 
 #include <linux/config.h>
@@ -31,10 +31,7 @@
 #include <asm/hypervisor-ifs/dom0_ops.h>
 #include <asm/xeno_proc.h>
 
-#include "../block/xl_block.h"
-
 static struct proc_dir_entry *privcmd_intf;
-
 
 static int privcmd_ioctl(struct inode *inode, struct file *file,
                          unsigned int cmd, unsigned long data)
@@ -83,7 +80,6 @@ static int __init init_module(void)
     if ( !(start_info.flags & SIF_PRIVILEGED) )
         return 0;
 
-    /* xeno control interface */
     privcmd_intf = create_xeno_proc_entry("privcmd", 0400);
     if ( privcmd_intf != NULL )
     {

@@ -1,5 +1,5 @@
 /******************************************************************************
- * xl_block.c
+ * block.c
  * 
  * Xenolinux virtual block-device driver.
  * 
@@ -7,7 +7,7 @@
  * Modifications by Mark A. Williamson are (c) Intel Research Cambridge
  */
 
-#include "xl_block.h"
+#include "block.h"
 #include <linux/blk.h>
 #include <linux/cdrom.h>
 #include <linux/tqueue.h>
@@ -219,11 +219,11 @@ int xenolinux_block_ioctl(struct inode *inode, struct file *filep,
         return 0;
 
     case SCSI_IOCTL_GET_BUS_NUMBER:
-        DPRINTK("FIXME: SCSI_IOCTL_GET_BUS_NUMBER ioctl in xl_block");
+        DPRINTK("FIXME: SCSI_IOCTL_GET_BUS_NUMBER ioctl in Xen blkdev");
         return -ENOSYS;
 
     default:
-        printk(KERN_ALERT "ioctl %08x not supported by xl_block\n", command);
+        printk(KERN_ALERT "ioctl %08x not supported by Xen blkdev\n", command);
         return -ENOSYS;
     }
     

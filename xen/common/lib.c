@@ -2,125 +2,6 @@
 #include <xeno/ctype.h>
 #include <xeno/lib.h>
 
-#if 0 // jws - now in string.c, string.h, asm/string.h 
-int memcmp(const void * cs,const void * ct,size_t count)
-{
-	const unsigned char *su1, *su2;
-	signed char res = 0;
-
-	for( su1 = cs, su2 = ct; 0 < count; ++su1, ++su2, count--)
-		if ((res = *su1 - *su2) != 0)
-			break;
-	return res;
-}
-
-void * memcpy(void * dest,const void *src,size_t count)
-{
-	char *tmp = (char *) dest, *s = (char *) src;
-
-	while (count--)
-		*tmp++ = *s++;
-
-	return dest;
-}
-
-int strncmp(const char * cs,const char * ct,size_t count)
-{
-	register signed char __res = 0;
-
-	while (count) {
-		if ((__res = *cs - *ct++) != 0 || !*cs++)
-			break;
-		count--;
-	}
-
-	return __res;
-}
-
-int strcmp(const char * cs,const char * ct)
-{
-        register signed char __res;
-
-        while (1) {
-                if ((__res = *cs - *ct++) != 0 || !*cs++)
-                        break;
-        }
-
-        return __res;
-}
-
-char * strcpy(char * dest,const char *src)
-{
-        char *tmp = dest;
-
-        while ((*dest++ = *src++) != '\0')
-                /* nothing */;
-        return tmp;
-}
-
-char * strncpy(char * dest,const char *src,size_t count)
-{
-        char *tmp = dest;
-
-        while (count-- && (*dest++ = *src++) != '\0')
-                /* nothing */;
-
-        return tmp;
-}
-
-void * memset(void * s,int c,size_t count)
-{
-        char *xs = (char *) s;
-
-        while (count--)
-                *xs++ = c;
-
-        return s;
-}
-
-size_t strnlen(const char * s, size_t count)
-{
-        const char *sc;
-
-        for (sc = s; count-- && *sc != '\0'; ++sc)
-                /* nothing */;
-        return sc - s;
-}
-
-size_t strlen(const char * s)
-{
-	const char *sc;
-
-	for (sc = s; *sc != '\0'; ++sc)
-		/* nothing */;
-	return sc - s;
-}
-
-char * strchr(const char * s, int c)
-{
-        for(; *s != (char) c; ++s)
-                if (*s == '\0')
-                        return NULL;
-        return (char *) s;
-}
-
-char * strstr(const char * s1,const char * s2)
-{
-        int l1, l2;
-
-        l2 = strlen(s2);
-        if (!l2)
-                return (char *) s1;
-        l1 = strlen(s1);
-        while (l1 >= l2) {
-                l1--;
-                if (!memcmp(s1,s2,l2))
-                        return (char *) s1;
-                s1++;
-        }
-        return NULL;
-}
-#endif
 
 /* for inc/ctype.h */
 unsigned char _ctype[] = {
@@ -213,6 +94,7 @@ unsigned char *quad_to_str(unsigned long q, unsigned char *s)
 
 #include <asm/types.h>
 
+#if BITS_PER_LONG == 32
 
 /*
  * Depending on the desired operation, we view a `long long' (aka quad_t) in
@@ -526,7 +408,7 @@ __udivdi3(a, b)
         return (__qdivrem(a, b, (u64 *)0));
 }
 
-
+#endif /* BITS_PER_LONG == 32 */
 
 
 /* HASH/RANDOMISATION FUNCTION
@@ -534,8 +416,6 @@ __udivdi3(a, b)
  * You can use this free for any purpose.  It has no warranty.
  * See http://burlteburtle.net/bob/hash/evahash.html 
  */
-
-typedef unsigned long ub4;
 
 #define mix(a,b,c)                                      \
     do {                                                \
@@ -550,9 +430,9 @@ typedef unsigned long ub4;
         c -= a; c -= b; c = (c ^ (b>>15)) & 0xffffffff; \
     } while ( 0 )
 
-unsigned long hash(unsigned char *k, unsigned long len)
+u32 hash(unsigned char *k, unsigned long len)
 {
-    unsigned long a, b, c, l;
+    u32 a, b, c, l;
 
     l = len;
     a = b = 0x9e3779b9;  /* the golden ratio; an arbitrary value */
@@ -560,9 +440,9 @@ unsigned long hash(unsigned char *k, unsigned long len)
 
     while ( l >= 12 )
     {
-        a += (k[0] + ((ub4)k[1]<<8) + ((ub4)k[2]<<16)  + ((ub4)k[3]<<24));
-        b += (k[4] + ((ub4)k[5]<<8) + ((ub4)k[6]<<16)  + ((ub4)k[7]<<24));
-        c += (k[8] + ((ub4)k[9]<<8) + ((ub4)k[10]<<16) + ((ub4)k[11]<<24));
+        a += (k[0] + ((u32)k[1]<<8) + ((u32)k[2]<<16)  + ((u32)k[3]<<24));
+        b += (k[4] + ((u32)k[5]<<8) + ((u32)k[6]<<16)  + ((u32)k[7]<<24));
+        c += (k[8] + ((u32)k[9]<<8) + ((u32)k[10]<<16) + ((u32)k[11]<<24));
         mix(a,b,c);
         k += 12; l -= 12;
     }
@@ -570,17 +450,17 @@ unsigned long hash(unsigned char *k, unsigned long len)
     c += len;
     switch ( l )
     {
-    case 11: c+=((ub4)k[10]<<24);
-    case 10: c+=((ub4)k[9]<<16);
-    case 9 : c+=((ub4)k[8]<<8);
+    case 11: c+=((u32)k[10]<<24);
+    case 10: c+=((u32)k[9]<<16);
+    case 9 : c+=((u32)k[8]<<8);
         /* the first byte of c is reserved for the length */
-    case 8 : b+=((ub4)k[7]<<24);
-    case 7 : b+=((ub4)k[6]<<16);
-    case 6 : b+=((ub4)k[5]<<8);
+    case 8 : b+=((u32)k[7]<<24);
+    case 7 : b+=((u32)k[6]<<16);
+    case 6 : b+=((u32)k[5]<<8);
     case 5 : b+=k[4];
-    case 4 : a+=((ub4)k[3]<<24);
-    case 3 : a+=((ub4)k[2]<<16);
-    case 2 : a+=((ub4)k[1]<<8);
+    case 4 : a+=((u32)k[3]<<24);
+    case 3 : a+=((u32)k[2]<<16);
+    case 2 : a+=((u32)k[1]<<8);
     case 1 : a+=k[0];
         /* case 0: nothing left to add */
     }

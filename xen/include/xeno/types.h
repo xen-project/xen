@@ -14,8 +14,6 @@
 #define LONG_MIN        (-LONG_MAX - 1)
 #define ULONG_MAX       (~0UL)
 
-typedef unsigned int size_t;
-
 /* bsd */
 typedef unsigned char           u_char;
 typedef unsigned short          u_short;

@@ -1,3 +1,3 @@
-O_TARGET := evtchn.o
-obj-y := xl_evtchn.o
+O_TARGET := drv.o
+obj-y := evtchn.o
 include $(TOPDIR)/Rules.make

@@ -1,9 +1,9 @@
 /******************************************************************************
- * network.c
+ * vnetif.c
  * 
  * Virtual network driver for XenoLinux.
  * 
- * Copyright (c) 2002-2003, K A Fraser
+ * Copyright (c) 2002-2004, K A Fraser
  */
 
 #include <linux/config.h>
@@ -457,92 +457,15 @@ static struct net_device_stats *network_get_stats(struct net_device *dev)
 }
 
 
-/*
- * This notifier is installed for domain 0 only.
- * All other domains have VFR rules installed on their behalf by domain 0
- * when they are created. For bootstrap, Xen creates wildcard rules for
- * domain 0 -- this notifier is used to detect when we find our proper
- * IP address, so we can poke down proper rules and remove the wildcards.
- */
-static int inetdev_notify(struct notifier_block *this, 
-                          unsigned long event, 
-                          void *ptr)
-{
-    struct in_ifaddr  *ifa  = (struct in_ifaddr *)ptr; 
-    struct net_device *dev = ifa->ifa_dev->dev;
-    struct list_head  *ent;
-    struct net_private *np;
-    int idx = -1;
-    network_op_t op;
-
-    list_for_each ( ent, &dev_list )
-    {
-        np = list_entry(dev_list.next, struct net_private, list);
-        if ( np->dev == dev )
-            idx = np->idx;
-    }
-
-    if ( idx == -1 )
-        goto out;
-    
-    memset(&op, 0, sizeof(op));
-    op.u.net_rule.proto         = NETWORK_PROTO_ANY;
-    op.u.net_rule.action        = NETWORK_ACTION_ACCEPT;
-
-    if ( event == NETDEV_UP )
-        op.cmd = NETWORK_OP_ADDRULE;
-    else if ( event == NETDEV_DOWN )
-        op.cmd = NETWORK_OP_DELETERULE;
-    else
-        goto out;
-
-    op.u.net_rule.src_dom       = 0;
-    op.u.net_rule.src_idx       = idx;
-    op.u.net_rule.dst_dom       = VIF_SPECIAL;
-    op.u.net_rule.dst_idx       = VIF_PHYSICAL_INTERFACE;
-    op.u.net_rule.src_addr      = ntohl(ifa->ifa_address);
-    op.u.net_rule.src_addr_mask = ~0UL;
-    op.u.net_rule.dst_addr      = 0;
-    op.u.net_rule.dst_addr_mask = 0;
-    (void)HYPERVISOR_network_op(&op);
-    
-    op.u.net_rule.src_dom       = VIF_SPECIAL;
-    op.u.net_rule.src_idx       = VIF_ANY_INTERFACE;
-    op.u.net_rule.dst_dom       = 0;
-    op.u.net_rule.dst_idx       = idx;
-    op.u.net_rule.src_addr      = 0;
-    op.u.net_rule.src_addr_mask = 0;    
-    op.u.net_rule.dst_addr      = ntohl(ifa->ifa_address);
-    op.u.net_rule.dst_addr_mask = ~0UL;
-    (void)HYPERVISOR_network_op(&op);
-    
- out:
-    return NOTIFY_DONE;
-}
-
-static struct notifier_block notifier_inetdev = {
-    .notifier_call  = inetdev_notify,
-    .next           = NULL,
-    .priority       = 0
-};
-
-
 static int __init init_module(void)
 {
+#if 0
     int i, fixmap_idx=-1, err;
     struct net_device *dev;
     struct net_private *np;
     netop_t netop;
 
     INIT_LIST_HEAD(&dev_list);
-
-    /*
-     * Domain 0 must poke its own network rules as it discovers its IP
-     * addresses. All other domains have a privileged "parent" to do this for
-     * them at start of day.
-     */
-    if ( start_info.flags & SIF_INITDOMAIN )
-        (void)register_inetaddr_notifier(&notifier_inetdev);
 
     err = request_irq(HYPEREVENT_IRQ(_EVENT_NET), network_interrupt, 
                       SA_SAMPLE_RANDOM, "network", NULL);
@@ -604,6 +527,8 @@ static int __init init_module(void)
  fail:
     cleanup_module();
     return err;
+#endif
+    return 0;
 }
 
 
@@ -620,9 +545,6 @@ static void cleanup_module(void)
         unregister_netdev(dev);
         kfree(dev);
     }
-
-    if ( start_info.flags & SIF_INITDOMAIN )
-        (void)unregister_inetaddr_notifier(&notifier_inetdev);
 }
 
 

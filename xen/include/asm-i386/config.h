@@ -118,6 +118,8 @@
   SYMBOL_NAME_LABEL(name)
 #endif
 
+#define PGT_base_page_table PGT_l2_page_table
+
 #define barrier() __asm__ __volatile__("": : :"memory")
 
 #define __HYPERVISOR_CS 0x0808

@@ -1,5 +1,5 @@
 /******************************************************************************
- * xl_evtchn.c
+ * evtchn.c
  * 
  * Xenolinux driver for receiving and demuxing event-channel signals.
  * 

@@ -1,3 +1,3 @@
-O_TARGET := blk.o
-obj-y := xl_block.o xl_vbd.o
+O_TARGET := drv.o
+obj-y := block.o vbd.o
 include $(TOPDIR)/Rules.make

@@ -131,8 +131,8 @@ long do_stack_switch(unsigned long ss, unsigned long esp)
     if ( (ss & 3) == 0 )
         return -EPERM;
 
-    current->thread.ss1  = ss;
-    current->thread.esp1 = esp;
+    current->thread.guestos_ss = ss;
+    current->thread.guestos_sp = esp;
     t->ss1  = ss;
     t->esp1 = esp;
 

@@ -35,13 +35,20 @@
 #define FLAT_RING3_CS64 0x082b	/* GDT index 261 */
 #define FLAT_RING3_DS 0x0833	/* GDT index 262 */
 
+#define FLAT_GUESTOS_DS   FLAT_RING3_DS
+#define FLAT_GUESTOS_CS   FLAT_RING3_CS64
+#define FLAT_GUESTOS_CS32 FLAT_RING3_CS32
+
+#define FLAT_USER_DS      FLAT_RING3_DS
+#define FLAT_USER_CS      FLAT_RING3_CS64
+#define FLAT_USER_CS32    FLAT_RING3_CS32
 
 /* And the trap vector is... */
 #define TRAP_INSTR "syscall"
 
 
 #ifndef machine_to_phys_mapping
-#define machine_to_phys_mapping ((unsigned long *)HYPERVISOR_VIRT_START)
+#define machine_to_phys_mapping ((unsigned long *)0xffff810000000000ULL)
 #endif
 
 #ifndef __ASSEMBLY__
@@ -98,13 +105,12 @@ typedef struct full_execution_context_st
 {
 #define ECF_I387_VALID (1<<0)
     unsigned long flags;
-    execution_context_t x86_64_ctxt;          /* User-level CPU registers     */
-    char          i387_ctxt[512];           /* User-level FPU registers     */
+    execution_context_t cpu_ctxt;           /* User-level CPU registers     */
+    char          fpu_ctxt[512];            /* User-level FPU registers     */
     trap_info_t   trap_ctxt[256];           /* Virtual IDT                  */
-    unsigned int  fast_trap_idx;            /* "Fast trap" vector offset    */
     unsigned long ldt_base, ldt_ents;       /* LDT (linear address, # ents) */
     unsigned long gdt_frames[16], gdt_ents; /* GDT (machine frames, # ents) */
-    unsigned long ring1_ss, ring1_esp;      /* Virtual TSS (only SS1/ESP1)  */
+    unsigned long guestos_ss, guestos_esp;  /* Virtual TSS (only SS1/ESP1)  */
     unsigned long pt_base;                  /* CR3 (pagetable base)         */
     unsigned long debugreg[8];              /* DB0-DB7 (debug registers)    */
     unsigned long event_callback_cs;        /* CS:EIP of event callback     */

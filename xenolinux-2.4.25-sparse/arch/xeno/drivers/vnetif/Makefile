@@ -1,3 +1,3 @@
 O_TARGET := drv.o
-obj-y := network.o
+obj-y := vnetif.o
 include $(TOPDIR)/Rules.make

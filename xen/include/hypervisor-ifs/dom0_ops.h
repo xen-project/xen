@@ -116,10 +116,11 @@ typedef struct dom0_getdomaininfo_st
 typedef struct dom0_getpageframeinfo_st
 {
     /* IN variables. */
-    unsigned long pfn;          /* Machine page frame number to query.       */
+    unsigned long pfn;     /* Machine page frame number to query.       */
     domid_t domain;        /* To which domain does the frame belong?    */
     /* OUT variables. */
-    enum { NONE, L1TAB, L2TAB } type; /* Is the page PINNED to a type?       */
+    /* Is the page PINNED to a type? */
+    enum { NONE, L1TAB, L2TAB, L3TAB, L4TAB } type;
 } dom0_getpageframeinfo_t;
 
 #define DOM0_IOPL             14

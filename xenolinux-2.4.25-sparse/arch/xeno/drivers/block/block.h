@@ -1,11 +1,11 @@
 /******************************************************************************
- * xl_block.h
+ * block.h
  * 
  * Shared definitions between all levels of XenoLinux Virtual block devices.
  */
 
-#ifndef __XL_BLOCK_H__
-#define __XL_BLOCK_H__
+#ifndef __XENO_DRIVERS_BLOCK_H__
+#define __XENO_DRIVERS_BLOCK_H__
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -79,4 +79,4 @@ static inline xl_disk_t *xldev_to_xldisk(kdev_t xldev)
 extern int  xlvbd_init(void);
 extern void xlvbd_cleanup(void); 
 
-#endif /* __XL_BLOCK_H__ */
+#endif /* __XENO_DRIVERS_BLOCK_H__ */

@@ -1,5 +1,5 @@
 /******************************************************************************
- * xl_vbd.c
+ * vbd.c
  * 
  * Xenolinux virtual block-device driver (xvd).
  * 
@@ -7,7 +7,7 @@
  * Modifications by Mark A. Williamson are (c) Intel Research Cambridge
  */
 
-#include "xl_block.h"
+#include "block.h"
 #include <linux/blk.h>
 
 /*

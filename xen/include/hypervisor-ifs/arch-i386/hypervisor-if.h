@@ -35,6 +35,11 @@
 #define FLAT_RING3_CS 0x082b    /* GDT index 261 */
 #define FLAT_RING3_DS 0x0833    /* GDT index 262 */
 
+#define FLAT_GUESTOS_CS FLAT_RING1_CS
+#define FLAT_GUESTOS_DS FLAT_RING1_DS
+#define FLAT_USER_CS    FLAT_RING3_CS
+#define FLAT_USER_DS    FLAT_RING3_DS
+
 /* And the trap vector is... */
 #define TRAP_INSTR "int $0x82"
 
@@ -99,13 +104,13 @@ typedef struct full_execution_context_st
 {
 #define ECF_I387_VALID (1<<0)
     unsigned long flags;
-    execution_context_t i386_ctxt;          /* User-level CPU registers     */
-    char          i387_ctxt[256];           /* User-level FPU registers     */
+    execution_context_t cpu_ctxt;           /* User-level CPU registers     */
+    char          fpu_ctxt[256];            /* User-level FPU registers     */
     trap_info_t   trap_ctxt[256];           /* Virtual IDT                  */
     unsigned int  fast_trap_idx;            /* "Fast trap" vector offset    */
     unsigned long ldt_base, ldt_ents;       /* LDT (linear address, # ents) */
     unsigned long gdt_frames[16], gdt_ents; /* GDT (machine frames, # ents) */
-    unsigned long ring1_ss, ring1_esp;      /* Virtual TSS (only SS1/ESP1)  */
+    unsigned long guestos_ss, guestos_esp;  /* Virtual TSS (only SS1/ESP1)  */
     unsigned long pt_base;                  /* CR3 (pagetable base)         */
     unsigned long debugreg[8];              /* DB0-DB7 (debug registers)    */
     unsigned long event_callback_cs;        /* CS:EIP of event callback     */
@@ -113,6 +118,8 @@ typedef struct full_execution_context_st
     unsigned long failsafe_callback_cs;     /* CS:EIP of failsafe callback  */
     unsigned long failsafe_callback_eip;
 } full_execution_context_t;
+
+#define ARCH_HAS_FAST_TRAP
 
 #endif
 

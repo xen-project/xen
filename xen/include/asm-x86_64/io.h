@@ -2,6 +2,7 @@
 #define _ASM_IO_H
 
 #include <xeno/config.h>
+#include <asm/page.h>
 
 /*
  * This file contains the definitions for the x86 IO instructions
@@ -139,8 +140,11 @@ extern inline void * phys_to_virt(unsigned long address)
 #ifdef CONFIG_DISCONTIGMEM
 #include <asm/mmzone.h>
 #else
-#define page_to_phys(page)	(((page) - frame_table) << PAGE_SHIFT)
+#define page_to_phys(page)      (((page) - frame_table) << PAGE_SHIFT)
 #endif
+
+#define page_to_pfn(page)       ((unsigned long)((_page) - frame_table))
+#define page_to_virt(page)      (phys_to_virt(page_to_phys(_page)))
 
 extern void * __ioremap(unsigned long offset, unsigned long size, unsigned long flags);
 

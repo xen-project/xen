@@ -340,7 +340,8 @@ struct tss_struct {
 } __attribute__((packed)) ____cacheline_aligned;
 
 struct thread_struct {
-	unsigned long	rsp0;
+	unsigned long	guestos_sp;
+	unsigned long	guestos_ss;
 	unsigned long	rip;
 	unsigned long	rsp;
 	unsigned long 	userrsp;	/* Copy from PDA */ 
