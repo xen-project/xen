@@ -75,8 +75,6 @@ class interface:
             # Turn the new socket into a non-blocking listener.
             self.sock.setblocking(False)
             self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER,
-                                 struct.pack('ii', 0, 0))
             self.sock.bind(('', self.port))
             self.sock.listen(1)
 
@@ -99,8 +97,7 @@ class interface:
         except:
             return 0
         sock.setblocking(False)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER,
-                        struct.pack('ii', 0, 0))
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
         # Close the listening socket.
         self.sock.close()

@@ -680,6 +680,7 @@
 4075806d3fJqqDC1pYYPTZPc575iKg xenolinux-2.4.26-sparse/arch/xen/drivers/vblkif/frontend/block.c
 4075806d4-j7vN0Mn0bklI1cRUX1vQ xenolinux-2.4.26-sparse/arch/xen/drivers/vblkif/frontend/block.h
 4075806dibjCcfuXv6CINMhxWTw3jQ xenolinux-2.4.26-sparse/arch/xen/drivers/vblkif/frontend/vbd.c
+40880cc6hHg6s2cPHbqPNQxENefjoQ xenolinux-2.4.26-sparse/arch/xen/drivers/vblkif/vblkif.h
 4083dc16-Kd5y9psK_yk161sme5j5Q xenolinux-2.4.26-sparse/arch/xen/drivers/vnetif/Makefile
 4083dc16UmHXxS9g_UFVnkUpN-oP2Q xenolinux-2.4.26-sparse/arch/xen/drivers/vnetif/backend/Makefile
 4087cf0d5dudKw_DecIJgOhLlBF_0Q xenolinux-2.4.26-sparse/arch/xen/drivers/vnetif/backend/main.c

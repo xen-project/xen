@@ -16,7 +16,7 @@ static blkif_t *blkif_hash[BLKIF_HASHSZ];
 
 blkif_t *blkif_find_by_handle(domid_t domid, unsigned int handle)
 {
-    blkif_t *blkif = &blkif_hash[BLKIF_HASH(domid, handle)];
+    blkif_t *blkif = blkif_hash[BLKIF_HASH(domid, handle)];
     while ( (blkif != NULL) && 
             (blkif->domid != domid) && 
             (blkif->handle != handle) )
@@ -24,7 +24,7 @@ blkif_t *blkif_find_by_handle(domid_t domid, unsigned int handle)
     return blkif;
 }
 
-static void blkif_create(blkif_create_t *create)
+void blkif_create(blkif_create_t *create)
 {
     domid_t       domid  = create->domid;
     unsigned int  handle = create->blkif_handle;
@@ -69,7 +69,7 @@ static void blkif_create(blkif_create_t *create)
     return;
 }
 
-static void blkif_destroy(blkif_destroy_t *destroy)
+void blkif_destroy(blkif_destroy_t *destroy)
 {
     domid_t       domid  = destroy->domid;
     unsigned int  handle = destroy->blkif_handle;
@@ -83,7 +83,7 @@ static void blkif_destroy(blkif_destroy_t *destroy)
         pblkif = &blkif->hash_next;
     }
 
-    destroy->status = BLKIF_STATUS_NO_INTERFACE;
+    destroy->status = BLKIF_STATUS_INTERFACE_NOT_FOUND;
     return;
 
  found_match:

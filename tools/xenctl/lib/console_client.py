@@ -49,9 +49,6 @@ def __send_to_sock(sock):
 
 def connect(host,port):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER,
-                    struct.pack('ii', 0, 0))
     sock.connect((host,port))
 
     oattrs = tcgetattr(0)

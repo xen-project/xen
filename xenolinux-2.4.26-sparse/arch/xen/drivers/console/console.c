@@ -33,7 +33,7 @@
 #define XEN_TTY_MINOR 123
 
 /* The kernel and user-land drivers share a common transmit buffer. */
-#define WBUF_SIZE     1024
+#define WBUF_SIZE     4096
 #define WBUF_MASK(_i) ((_i)&(WBUF_SIZE-1))
 static char wbuf[WBUF_SIZE];
 static unsigned int wc, wp; /* write_cons, write_prod */

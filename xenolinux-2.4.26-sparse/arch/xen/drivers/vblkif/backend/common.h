@@ -12,6 +12,7 @@
 #include <linux/slab.h>
 #include <asm/ctrl_if.h>
 #include <asm/io.h>
+#include "../vblkif.h"
 
 #ifndef NDEBUG
 #define ASSERT(_p) \
@@ -24,7 +25,7 @@
 #define DPRINTK(_f, _a...) ((void)0)
 #endif
 
-typedef struct {
+typedef struct blkif_st {
     /* Unique identifier for this interface. */
     domid_t          domid;
     unsigned int     handle;
@@ -40,10 +41,13 @@ typedef struct {
     rb_root_t        vbd_rb;        /* Mapping from 16-bit vdevices to VBDs. */
     spinlock_t       vbd_lock;      /* Protects VBD mapping. */
     /* Private fields. */
+    struct blkif_st *hash_next;
     struct list_head blkdev_list;
     spinlock_t       blk_ring_lock;
 } blkif_t;
 
+void blkif_create(blkif_create_t *create);
+void blkif_destroy(blkif_destroy_t *destroy);
 blkif_t *blkif_find_by_handle(domid_t domid, unsigned int handle);
 void blkif_get(blkif_t *blkif);
 void blkif_put(blkif_t *blkif);

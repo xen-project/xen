@@ -75,9 +75,10 @@ typedef struct {
  * Message request/response defintions for block-device messages.
  */
 
-typedef u16 blkif_vdev_t;
-typedef u16 blkif_pdev_t;
-typedef u64 blkif_sector_t;
+#define blkif_vdev_t   u16
+#define blkif_pdev_t   u16
+#define blkif_sector_t u64
+
 typedef struct {
     blkif_pdev_t   device;
     blkif_sector_t sector_start;
@@ -104,7 +105,7 @@ typedef struct {
     /* IN */
     domid_t        domid;             /* Domain attached to new interface.   */
     unsigned int   blkif_handle;      /* Domain-specific interface handle.   */
-    unsigned int   evtchn_port;       /* Event channel for notifications.    */
+    unsigned int   evtchn;            /* Event channel for notifications.    */
     unsigned long  shmem_frame;       /* Page cont. shared comms window.     */
     /* OUT */
     unsigned int   status;

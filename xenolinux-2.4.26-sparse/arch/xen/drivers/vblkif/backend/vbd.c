@@ -8,18 +8,25 @@
 
 #include "common.h"
 
-long __vbd_create(struct task_struct *p,
-                  unsigned short vdevice,
-                  unsigned char mode,
-                  unsigned char type)
+void vbd_create(blkif_vbd_create_t *create) 
 {
-    vbd_t *vbd; 
-    rb_node_t **rb_p, *rb_parent = NULL;
-    long ret = 0;
+    vbd_t       *vbd; 
+    rb_node_t  **rb_p, *rb_parent = NULL;
+    blkif_t     *blkif;
+    blkif_vdev_t vdevice = create->vdevice;
 
-    spin_lock(&p->vbd_lock);
+    blkif = blkif_find_by_handle(create->domid, create->blkif_handle);
+    if ( unlikely(blkif == NULL) )
+    {
+        DPRINTK("vbd_create attempted for non-existent blkif (%llu,&u)\n", 
+                create->domid, create->blkif_handle); 
+        create->status = BLKIF_STATUS_INTERFACE_NOT_FOUND;
+        return;
+    }
 
-    rb_p = &p->vbd_rb.rb_node;
+    spin_lock(&blkif->vbd_lock);
+
+    rb_p = &blkif->vbd_rb.rb_node;
     while ( *rb_p != NULL )
     {
         rb_parent = *rb_p;
@@ -35,7 +42,7 @@ long __vbd_create(struct task_struct *p,
         else
         {
             DPRINTK("vbd_create attempted for already existing vbd\n");
-            ret = -EINVAL;
+            create->status = BLKIF_STATUS_VBD_EXISTS;
             goto out;
         }
     }
@@ -43,60 +50,47 @@ long __vbd_create(struct task_struct *p,
     if ( unlikely((vbd = kmalloc(sizeof(vbd_t), GFP_KERNEL)) == NULL) )
     {
         DPRINTK("vbd_create: out of memory\n");
-        ret = -ENOMEM;
+        create->status = BLKIF_STATUS_OUT_OF_MEMORY;
         goto out;
     }
 
     vbd->vdevice = vdevice; 
-    vbd->mode    = mode; 
-    vbd->type    = type;
+    vbd->mode    = create->mode; 
+    vbd->type    = VDISK_TYPE_DISK | VDISK_FLAG_VIRT;
     vbd->extents = NULL; 
 
     rb_link_node(&vbd->rb, rb_parent, rb_p);
-    rb_insert_color(&vbd->rb, &p->vbd_rb);
+    rb_insert_color(&vbd->rb, &blkif->vbd_rb);
+
+    create->status = BLKIF_STATUS_OKAY;
 
  out:
-    spin_unlock(&p->vbd_lock);
-    return ret; 
+    spin_unlock(&blkif->vbd_lock);
+    blkif_put(blkif);
 }
 
 
-long vbd_create(vbd_create_t *create) 
+/* Grow a VBD by appending a new extent. Fails if the VBD doesn't exist. */
+void vbd_grow(blkif_vbd_grow_t *grow) 
 {
-    struct task_struct *p;
-    long rc;
+    blkif_t          *blkif;
+    xen_extent_le_t **px, *x; 
+    vbd_t            *vbd = NULL;
+    rb_node_t        *rb;
+    blkif_vdev_t      vdevice = grow->vdevice;
 
-    if ( unlikely(!IS_PRIV(current)) )
-        return -EPERM;
-
-    if ( unlikely((p = find_domain_by_id(create->domain)) == NULL) )
+    blkif = blkif_find_by_handle(grow->domid, grow->blkif_handle);
+    if ( unlikely(blkif == NULL) )
     {
-        DPRINTK("vbd_create attempted for non-existent domain %llu\n", 
-                create->domain); 
-        return -EINVAL; 
+        DPRINTK("vbd_grow attempted for non-existent blkif (%llu,&u)\n", 
+                grow->domid, grow->blkif_handle); 
+        grow->status = BLKIF_STATUS_INTERFACE_NOT_FOUND;
+        return;
     }
 
-    rc = __vbd_create(p, create->vdevice, create->mode,
-                      XD_TYPE_DISK | XD_FLAG_VIRT);
+    spin_lock(&blkif->vbd_lock);
 
-    put_task_struct(p);
-
-    return rc;
-}
-
-
-long __vbd_grow(struct task_struct *p,
-                unsigned short vdevice,
-                xen_extent_t *extent)
-{
-    xen_extent_le_t **px, *x; 
-    vbd_t *vbd = NULL;
-    rb_node_t *rb;
-    long ret = 0;
-
-    spin_lock(&p->vbd_lock);
-
-    rb = p->vbd_rb.rb_node;
+    rb = blkif->vbd_rb.rb_node;
     while ( rb != NULL )
     {
         vbd = rb_entry(rb, vbd_t, rb);
@@ -111,95 +105,75 @@ long __vbd_grow(struct task_struct *p,
     if ( unlikely(vbd == NULL) || unlikely(vbd->vdevice != vdevice) )
     {
         DPRINTK("vbd_grow: attempted to append extent to non-existent VBD.\n");
-        ret = -EINVAL;
+        grow->status = BLKIF_STATUS_VBD_NOT_FOUND;
         goto out;
     } 
 
     if ( unlikely((x = kmalloc(sizeof(xen_extent_le_t), GFP_KERNEL)) == NULL) )
     {
         DPRINTK("vbd_grow: out of memory\n");
-        ret = -ENOMEM;
+        grow->status = BLKIF_STATUS_OUT_OF_MEMORY;
         goto out;
     }
  
-    x->extent.device       = extent->device; 
-    x->extent.start_sector = extent->start_sector; 
-    x->extent.nr_sectors   = extent->nr_sectors; 
-    x->next                = (xen_extent_le_t *)NULL; 
+    x->extent.device        = grow->extent.device; 
+    x->extent.sector_start  = grow->extent.sector_start; 
+    x->extent.sector_length = grow->extent.sector_length; 
+    x->next                 = (xen_extent_le_t *)NULL; 
 
     for ( px = &vbd->extents; *px != NULL; px = &(*px)->next ) 
         continue;
 
     *px = x;
 
+    grow->status = BLKIF_STATUS_OKAY;
+
  out:
-    spin_unlock(&p->vbd_lock);
-    return ret;
+    spin_unlock(&blkif->vbd_lock);
+    blkif_put(blkif);
 }
 
 
-/* Grow a VBD by appending a new extent. Fails if the VBD doesn't exist. */
-long vbd_grow(vbd_grow_t *grow) 
+void vbd_shrink(blkif_vbd_shrink_t *shrink)
 {
-    struct task_struct *p;
-    long rc;
-
-    if ( unlikely(!IS_PRIV(current)) )
-        return -EPERM; 
-
-    if ( unlikely((p = find_domain_by_id(grow->domain)) == NULL) )
-    {
-        DPRINTK("vbd_grow: attempted for non-existent domain %llu\n", 
-                grow->domain); 
-        return -EINVAL; 
-    }
-
-    rc = __vbd_grow(p, grow->vdevice, &grow->extent);
-
-    put_task_struct(p);
-
-    return rc;
-}
-
-
-long vbd_shrink(vbd_shrink_t *shrink)
-{
-    struct task_struct *p; 
+    blkif_t          *blkif;
     xen_extent_le_t **px, *x; 
-    vbd_t *vbd = NULL;
-    rb_node_t *rb;
-    long ret = 0;
+    vbd_t            *vbd = NULL;
+    rb_node_t        *rb;
+    blkif_vdev_t      vdevice = shrink->vdevice;
 
-    if ( !IS_PRIV(current) )
-        return -EPERM; 
-
-    if ( (p = find_domain_by_id(shrink->domain)) == NULL )
+    blkif = blkif_find_by_handle(shrink->domid, shrink->blkif_handle);
+    if ( unlikely(blkif == NULL) )
     {
-        DPRINTK("vbd_shrink attempted for non-existent domain %llu\n", 
-                shrink->domain); 
-        return -EINVAL; 
+        DPRINTK("vbd_shrink attempted for non-existent blkif (%llu,&u)\n", 
+                shrink->domid, shrink->blkif_handle); 
+        shrink->status = BLKIF_STATUS_INTERFACE_NOT_FOUND;
+        return;
     }
 
-    spin_lock(&p->vbd_lock);
+    spin_lock(&blkif->vbd_lock);
 
-    rb = p->vbd_rb.rb_node;
+    rb = blkif->vbd_rb.rb_node;
     while ( rb != NULL )
     {
         vbd = rb_entry(rb, vbd_t, rb);
-        if ( shrink->vdevice < vbd->vdevice )
+        if ( vdevice < vbd->vdevice )
             rb = rb->rb_left;
-        else if ( shrink->vdevice > vbd->vdevice )
+        else if ( vdevice > vbd->vdevice )
             rb = rb->rb_right;
         else
             break;
     }
 
-    if ( unlikely(vbd == NULL) || 
-         unlikely(vbd->vdevice != shrink->vdevice) ||
-         unlikely(vbd->extents == NULL) )
+    if ( unlikely(vbd == NULL) || unlikely(vbd->vdevice != vdevice) )
     {
-        DPRINTK("vbd_shrink: attempt to remove non-existent extent.\n"); 
-        ret = -EINVAL;
+        shrink->status = BLKIF_STATUS_VBD_NOT_FOUND;
+        goto out;
+    }
+
+    if ( unlikely(vbd->extents == NULL) )
+    {
+        shrink->status = BLKIF_STATUS_EXTENT_NOT_FOUND;
         goto out;
     }
 
@@ -211,147 +185,50 @@ long vbd_shrink(vbd_shrink_t *shrink)
     *px = x->next;
     kfree(x);
 
+    shrink->status = BLKIF_STATUS_OKAY;
+
  out:
-    spin_unlock(&p->vbd_lock);
-    put_task_struct(p);
-    return ret; 
+    spin_unlock(&blkif->vbd_lock);
+    blkif_put(blkif);
 }
 
 
-long vbd_setextents(vbd_setextents_t *setextents)
+void vbd_destroy(blkif_vbd_destroy_t *destroy) 
 {
-    struct task_struct *p; 
-    xen_extent_t e;
-    xen_extent_le_t *new_extents, *x, *t; 
-    vbd_t *vbd = NULL;
-    rb_node_t *rb;
-    int i;
-    long ret = 0;
-
-    if ( !IS_PRIV(current) )
-        return -EPERM; 
-
-    if ( (p = find_domain_by_id(setextents->domain)) == NULL )
-    {
-        DPRINTK("vbd_setextents attempted for non-existent domain %llu\n", 
-                setextents->domain); 
-        return -EINVAL; 
-    }
-
-    spin_lock(&p->vbd_lock);
-
-    rb = p->vbd_rb.rb_node;
-    while ( rb != NULL )
-    {
-        vbd = rb_entry(rb, vbd_t, rb);
-        if ( setextents->vdevice < vbd->vdevice )
-            rb = rb->rb_left;
-        else if ( setextents->vdevice > vbd->vdevice )
-            rb = rb->rb_right;
-        else
-            break;
-    }
-
-    if ( unlikely(vbd == NULL) || 
-         unlikely(vbd->vdevice != setextents->vdevice) )
-    {
-        DPRINTK("vbd_setextents: attempt to modify non-existent VBD.\n"); 
-        ret = -EINVAL;
-        goto out;
-    }
-
-    /* Construct the new extent list. */
-    new_extents = NULL;
-    for ( i = setextents->nr_extents - 1; i >= 0; i-- )
-    {
-        if ( unlikely(copy_from_user(&e, 
-                                     &setextents->extents[i], 
-                                     sizeof(e)) != 0) )
-        {
-            DPRINTK("vbd_setextents: copy_from_user failed\n");
-            ret = -EFAULT;
-            goto free_and_out;
-        }
-        
-        if ( unlikely((x = kmalloc(sizeof(xen_extent_le_t), GFP_KERNEL))
-                      == NULL) )
-        {
-            DPRINTK("vbd_setextents: out of memory\n");
-            ret = -ENOMEM;
-            goto free_and_out;
-        }
-        
-        x->extent = e;
-        x->next   = new_extents;
-
-        new_extents = x;
-    }
-
-    /* Delete the old extent list _after_ successfully creating the new. */
-    for ( x = vbd->extents; x != NULL; x = t )
-    {
-        t = x->next;
-        kfree(x);
-    }
-
-    /* Make the new list visible. */
-    vbd->extents = new_extents;
-
- out:
-    spin_unlock(&p->vbd_lock);
-    put_task_struct(p);
-    return ret;
-
- free_and_out:
-    /* Failed part-way through the new list. Delete all that we managed. */
-    for ( x = new_extents; x != NULL; x = t )
-    {
-        t = x->next;
-        kfree(x);
-    }
-    goto out;
-}
-
-
-long vbd_delete(vbd_delete_t *delete) 
-{
-    struct task_struct *p; 
-    vbd_t *vbd;
-    rb_node_t *rb;
+    blkif_t         *blkif;
+    vbd_t           *vbd;
+    rb_node_t       *rb;
     xen_extent_le_t *x, *t;
+    blkif_vdev_t     vdevice = destroy->vdevice;
 
-    if( !IS_PRIV(current) )
-        return -EPERM; 
-
-    if ( (p = find_domain_by_id(delete->domain)) == NULL )
+    blkif = blkif_find_by_handle(destroy->domid, destroy->blkif_handle);
+    if ( unlikely(blkif == NULL) )
     {
-        DPRINTK("vbd_delete attempted for non-existent domain %llu\n", 
-                delete->domain); 
-        return -EINVAL; 
+        DPRINTK("vbd_destroy attempted for non-existent blkif (%llu,&u)\n", 
+                destroy->domid, destroy->blkif_handle); 
+        destroy->status = BLKIF_STATUS_INTERFACE_NOT_FOUND;
+        return;
     }
 
-    spin_lock(&p->vbd_lock);
+    spin_lock(&blkif->vbd_lock);
 
-    rb = p->vbd_rb.rb_node;
+    rb = blkif->vbd_rb.rb_node;
     while ( rb != NULL )
     {
         vbd = rb_entry(rb, vbd_t, rb);
-        if ( delete->vdevice < vbd->vdevice )
+        if ( vdevice < vbd->vdevice )
             rb = rb->rb_left;
-        else if ( delete->vdevice > vbd->vdevice )
+        else if ( vdevice > vbd->vdevice )
             rb = rb->rb_right;
         else
             goto found;
     }
 
-    DPRINTK("vbd_delete attempted for non-existing VBD.\n");
-
-    spin_unlock(&p->vbd_lock);
-    put_task_struct(p);
-    return -EINVAL;
+    destroy->status = BLKIF_STATUS_VBD_NOT_FOUND;
+    goto out;
 
  found:
-    rb_erase(rb, &p->vbd_rb);
+    rb_erase(rb, &blkif->vbd_rb);
     x = vbd->extents;
     kfree(vbd);
 
@@ -362,25 +239,25 @@ long vbd_delete(vbd_delete_t *delete)
         x = t;
     }
     
-    spin_unlock(&p->vbd_lock);
-    put_task_struct(p);
-    return 0;
+ out:
+    spin_unlock(&blkif->vbd_lock);
+    blkif_put(blkif);
 }
 
 
-void destroy_all_vbds(struct task_struct *p)
+void destroy_all_vbds(blkif_t *blkif)
 {
     vbd_t *vbd;
     rb_node_t *rb;
     xen_extent_le_t *x, *t;
 
-    spin_lock(&p->vbd_lock);
+    spin_lock(&blkif->vbd_lock);
 
-    while ( (rb = p->vbd_rb.rb_node) != NULL )
+    while ( (rb = blkif->vbd_rb.rb_node) != NULL )
     {
         vbd = rb_entry(rb, vbd_t, rb);
 
-        rb_erase(rb, &p->vbd_rb);
+        rb_erase(rb, &blkif->vbd_rb);
         x = vbd->extents;
         kfree(vbd);
         
@@ -392,7 +269,7 @@ void destroy_all_vbds(struct task_struct *p)
         }          
     }
 
-    spin_unlock(&p->vbd_lock);
+    spin_unlock(&blkif->vbd_lock);
 }
 
 

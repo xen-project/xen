@@ -57,4 +57,5 @@ static void blkif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
 int blkif_ctrlif_init(void)
 {
     (void)ctrl_if_register_receiver(CMSG_BLKIF_BE, blkif_ctrlif_rx);
+    return 0;
 }

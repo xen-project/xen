@@ -22,7 +22,7 @@ def new_control_interface(dom, console_port=-1):
     if console_port < 0:
         console_port = 9600 + port.local_port
 
-    # Create a listenign console interface.
+    # Create a listening console interface.
     con_if = xend.console.interface(console_port, port.local_port)
     con_if.listen()
 
