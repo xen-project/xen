@@ -16,6 +16,8 @@
 #include <asm/msr.h>
 #include <xeno/blkdev.h>
 #include <xeno/console.h>
+#include <hypervisor-ifs/block.h>
+#include <xeno/physdisk.h>
 
 /*
  * NB. No ring-3 access in initial guestOS pagetables. Note that we allow

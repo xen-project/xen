@@ -18,6 +18,7 @@
 #include <xeno/interrupt.h>
 #include <xeno/segment.h>
 #include <xeno/slab.h>
+#include <xeno/physdisk.h>
 
 #if 0
 #define DPRINTK(_f, _a...) printk( _f , ## _a )
@@ -676,7 +677,7 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
 	        goto bad_descriptor;
 	    }
 	    if (p->domain != 0 &&
-		!xen_physdisk_access_okay(&phys_seg, p, operation)) {
+		!xen_physdisk_access_okay(&phys_seg[nr_psegs], p, operation)) {
 	      DPRINTK("access denied\n");
 	      /* XXX not quite right, but close enough. */
 	      goto bad_descriptor;

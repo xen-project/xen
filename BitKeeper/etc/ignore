@@ -419,3 +419,4 @@ xen/tools/figlet/figlet
 xenolinux-2.4.16-sparse/arch/xeno/drivers/block/Makefile.orig
 xenolinux-2.4.16-sparse/arch/xeno/drivers/block/block.c.orig
 xenolinux-2.4.16-sparse/scripts/kconfig.tk
+xen/include/xeno/physdisk.h~
