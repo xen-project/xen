@@ -68,7 +68,7 @@ static int write_ldt(void * ptr, unsigned long bytecount, int oldmode)
 {
     struct mm_struct * mm = current->mm;
     __u32 entry_1, entry_2, *lp;
-    unsigned long phys_lp;
+    unsigned long phys_lp, max_limit;
     int error;
     struct modify_ldt_ldt_s ldt_info;
 
@@ -88,6 +88,13 @@ static int write_ldt(void * ptr, unsigned long bytecount, int oldmode)
         if (ldt_info.seg_not_present == 0)
             goto out;
     }
+
+    /*
+     * This makes our tests for overlap with Xen space easier. There's no good
+     * reason to have a user segment starting this high anyway.
+     */
+    if (ldt_info.base_addr >= PAGE_OFFSET)
+        goto out;
 
     down_write(&mm->mmap_sem);
     if (!mm->context.segments) {
@@ -121,6 +128,13 @@ static int write_ldt(void * ptr, unsigned long bytecount, int oldmode)
             goto install;
         }
     }
+
+    max_limit = HYPERVISOR_VIRT_START - ldt_info.base_addr;
+    if ( ldt_info.limit_in_pages )
+        max_limit >>= PAGE_SHIFT;
+    max_limit--;
+    if ( (ldt_info.limit & 0xfffff) > (max_limit & 0xfffff) )
+        ldt_info.limit = max_limit;
 
     entry_1 = ((ldt_info.base_addr & 0x0000ffff) << 16) |
         (ldt_info.limit & 0x0ffff);
