@@ -53,6 +53,10 @@ int xc_domain_getinfo(int xc_handle,
                       unsigned int max_doms,
                       xc_dominfo_t *info);
 
+int xc_shadow_control(int xc_handle,
+                      u64 domid, 
+                      unsigned int sop);
+
 int xc_linux_save(int xc_handle,
                   u64 domid, 
                   const char *state_file, 
@@ -83,7 +87,7 @@ int xc_bvtsched_domain_set(int xc_handle,
                            unsigned long warpu);
 
 int xc_bvtsched_global_get(int xc_handle,
-			   unsigned long *ctx_allow);
+                           unsigned long *ctx_allow);
 
 int xc_bvtsched_domain_get(int xc_handle,
                            u64 domid,
@@ -93,20 +97,18 @@ int xc_bvtsched_domain_get(int xc_handle,
                            unsigned long *warpu);
 
 int xc_atropos_domain_set(int xc_handle,
-			  u64 domid,
-			  u64 period, u64 slice, u64 latency,
-			  int xtratime);
+                          u64 domid,
+                          u64 period, u64 slice, u64 latency,
+                          int xtratime);
 
 int xc_atropos_domain_get(int xc_handle,
                           u64 domid,
                           u64* period, u64 *slice, u64 *latency,
                           int *xtratime);
 
-int xc_rrobin_global_set(int xc_handle,
-			 u64 slice);
+int xc_rrobin_global_set(int xc_handle, u64 slice);
 
-int xc_rrobin_global_get(int xc_handle,
-                         u64 *slice);
+int xc_rrobin_global_get(int xc_handle, u64 *slice);
 
 typedef struct {
     unsigned long credit_bytes;
@@ -231,6 +233,6 @@ int xc_readconsolering(int xc_handle,
                        int clear);
 
 int xc_physinfo(int xc_handle,
-		xc_physinfo_t *info);
+                xc_physinfo_t *info);
 
 #endif /* __XC_H__ */
