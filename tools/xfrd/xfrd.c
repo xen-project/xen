@@ -738,22 +738,18 @@ int xfr_send(Args *args, XfrState *state, Conn *xend, uint32_t addr, uint32_t po
  */
 int xfr_save(Args *args, XfrState *state, Conn *xend, char *file){
     int err = 0;
-    int flags = (O_CREAT | O_EXCL | O_WRONLY);
-    int mode = 0644;
-    int fd;
+    int compress = 0;
     IOStream *io = NULL;
 
     dprintf("> file=%s\n", file);
-    fd = open(file, flags, mode);
-    if(fd < 0) {
-        eprintf("> Failed to open %s\n", file);
-        err = -EIO;
-        goto exit;
+    if(compress){
+        io = gzip_stream_fopen(file, "wb1");
+    } else {
+        io = file_stream_fopen(file, "wb");
     }
-    io = gzip_stream_fdopen(fd, "wb1");
     if(!io){
-        eprintf("> Failed to allocate gzip state for %s\n", file);
-        err = -ENOMEM;
+        eprintf("> Failed to open %s\n", file);
+        err = -EINVAL;
         goto exit;
     }
     err = xen_domain_snd(xend, io, state->vmid, state->vmconfig, state->vmconfig_n);

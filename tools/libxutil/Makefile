@@ -27,16 +27,14 @@ MAJOR    := 1.3
 MINOR    := 0
 LIB_NAME := libxutil
 LIB      := $(LIB_NAME).so 
-LIB      += $(LIB_NAME).so.$(MAJOR)
-LIB      += $(LIB_NAME).so.$(MAJOR).$(MINOR)
 
 all: check-for-zlib $(LIB)
 
-$(LIB_NAME).so:
-	ln -sf $(LIB_NAME).so.$(MAJOR) $@
+$(LIB_NAME).so: $(LIB_NAME).so.$(MAJOR)
+	ln -sf $^ $@
 
-$(LIB_NAME).so.$(MAJOR):
-	ln -sf $(LIB_NAME).so.$(MAJOR).$(MINOR) $@
+$(LIB_NAME).so.$(MAJOR): $(LIB_NAME).so.$(MAJOR).$(MINOR)
+	ln -sf $^ $@
 
 $(LIB_NAME).so.$(MAJOR).$(MINOR): $(LIB_OBJS)
 	$(CC) -Wl,-soname -Wl,$(LIB_NAME).so.$(MAJOR) -shared -o $@ $^
@@ -54,7 +52,7 @@ install: all
 	install -m0755 $(LIB) $(prefix)/usr/lib
 
 clean:
-	$(RM) *.a *.so *.o *.rpm $(LIB)
+	$(RM) *.a *.so *.so.* *.o *.rpm 
 	$(RM) *~
 	$(RM) $(DEPS)
 
