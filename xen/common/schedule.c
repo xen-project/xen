@@ -85,8 +85,6 @@ static struct scheduler ops;
          (( ops.fn != NULL ) ? ops.fn( __VA_ARGS__ )      \
           : (typeof(ops.fn(__VA_ARGS__)))0 )
 
-spinlock_t schedule_lock[NR_CPUS] __cacheline_aligned;
-
 /* Per-CPU periodic timer sends an event to the currently-executing domain. */
 static struct ac_timer t_timer[NR_CPUS]; 
 
@@ -168,10 +166,10 @@ void domain_sleep(struct domain *d)
     unsigned long flags;
     int           cpu = d->processor;
 
-    spin_lock_irqsave(&schedule_lock[cpu], flags);
+    spin_lock_irqsave(&schedule_data[cpu].schedule_lock, flags);
     if ( likely(!domain_runnable(d)) )
         SCHED_OP(sleep, d);
-    spin_unlock_irqrestore(&schedule_lock[cpu], flags);
+    spin_unlock_irqrestore(&schedule_data[cpu].schedule_lock, flags);
 
     /* Synchronous. */
     while ( test_bit(DF_RUNNING, &d->flags) && !domain_runnable(d) )
@@ -185,7 +183,7 @@ void domain_wake(struct domain *d)
 {
     unsigned long       flags;
     int                 cpu = d->processor;
-    spin_lock_irqsave(&schedule_lock[cpu], flags);
+    spin_lock_irqsave(&schedule_data[cpu].schedule_lock, flags);
     if ( likely(domain_runnable(d)) )
     {
         TRACE_2D(TRC_SCHED_WAKE, d->domain, d);
@@ -194,7 +192,7 @@ void domain_wake(struct domain *d)
         d->wokenup = NOW();
 #endif
     }
-    spin_unlock_irqrestore(&schedule_lock[cpu], flags);
+    spin_unlock_irqrestore(&schedule_data[cpu].schedule_lock, flags);
 }
 
 /* Block the currently-executing domain until a pertinent event occurs. */
@@ -326,7 +324,7 @@ void __enter_scheduler(void)
 
     perfc_incrc(sched_run);
 
-    spin_lock_irq(&schedule_lock[cpu]);
+    spin_lock_irq(&schedule_data[cpu].schedule_lock);
 
     now = NOW();
 
@@ -360,7 +358,7 @@ void __enter_scheduler(void)
     schedule_data[cpu].s_timer.expires  = now + r_time;
     add_ac_timer(&schedule_data[cpu].s_timer);
 
-    spin_unlock_irq(&schedule_lock[cpu]);
+    spin_unlock_irq(&schedule_data[cpu].schedule_lock);
 
     /* Ensure that the domain has an up-to-date time base. */
     if ( !is_idle_task(next) )
@@ -481,7 +479,7 @@ void __init scheduler_init(void)
 
     for ( i = 0; i < NR_CPUS; i++ )
     {
-        spin_lock_init(&schedule_lock[i]);
+        spin_lock_init(&schedule_data[i].schedule_lock);
         schedule_data[i].curr = &idle0_task;
         
         init_ac_timer(&schedule_data[i].s_timer);

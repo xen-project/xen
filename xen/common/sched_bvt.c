@@ -148,11 +148,11 @@ int bvt_init_idle_task(struct domain *p)
 
     bvt_add_task(p);
 
-    spin_lock_irqsave(&schedule_lock[p->processor], flags);
+    spin_lock_irqsave(&schedule_data[p->processor].schedule_lock, flags);
     set_bit(DF_RUNNING, &p->flags);
     if ( !__task_on_runqueue(RUNLIST(p)) )
         __add_to_runqueue_head(RUNLIST(p), RUNQUEUE(p->processor));
-    spin_unlock_irqrestore(&schedule_lock[p->processor], flags);
+    spin_unlock_irqrestore(&schedule_data[p->processor].schedule_lock, flags);
 
     return 0;
 }
@@ -218,7 +218,7 @@ int bvt_adjdom(struct domain *p,
         if ( mcu_adv == 0 )
             return -EINVAL;
         
-        spin_lock_irqsave(&schedule_lock[p->processor], flags);   
+        spin_lock_irqsave(&schedule_data[p->processor].schedule_lock, flags);   
         inf->mcu_advance = mcu_adv;
         inf->warp = warp;
         inf->warpl = warpl;
@@ -229,18 +229,18 @@ int bvt_adjdom(struct domain *p,
                 p->domain, inf->mcu_advance, inf->warp,
                 inf->warpl, inf->warpu );
 
-        spin_unlock_irqrestore(&schedule_lock[p->processor], flags);
+        spin_unlock_irqrestore(&schedule_data[p->processor].schedule_lock, flags);
     }
     else if ( cmd->direction == SCHED_INFO_GET )
     {
         struct bvt_dom_info *inf = BVT_INFO(p);
 
-        spin_lock_irqsave(&schedule_lock[p->processor], flags);   
+        spin_lock_irqsave(&schedule_data[p->processor].schedule_lock, flags);   
         params->mcu_adv = inf->mcu_advance;
         params->warp    = inf->warp;
         params->warpl   = inf->warpl;
         params->warpu   = inf->warpu;
-        spin_unlock_irqrestore(&schedule_lock[p->processor], flags);
+        spin_unlock_irqrestore(&schedule_data[p->processor].schedule_lock, flags);
     }
     
     return 0;
@@ -411,7 +411,7 @@ static void bvt_dump_cpu_state(int i)
     struct bvt_dom_info *d_inf;
     struct domain *d;
     
-    spin_lock_irqsave(&schedule_lock[i], flags);
+    spin_lock_irqsave(&schedule_data[i].schedule_lock, flags);
     printk("svt=0x%08lX ", CPU_SVT(i));
 
     queue = RUNQUEUE(i);
@@ -430,7 +430,7 @@ static void bvt_dump_cpu_state(int i)
             (unsigned long)list, (unsigned long)list->next,
             (unsigned long)list->prev);
     }
-    spin_unlock_irqrestore(&schedule_lock[i], flags);        
+    spin_unlock_irqrestore(&schedule_data[i].schedule_lock, flags);        
 }
 
 /* We use cache to create the bvt_dom_infos 
