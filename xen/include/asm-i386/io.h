@@ -22,23 +22,55 @@
 //#define __io_phys(x) __pa(x)
 #endif
 
-/*
- * Change virtual addresses to physical addresses and vv.
- * These are pretty trivial
+
+/**
+ *  virt_to_phys    -   map virtual addresses to physical
+ *  @address: address to remap
+ *
+ *  The returned physical address is the physical (CPU) mapping for
+ *  the memory address given. It is only valid to use this function on
+ *  addresses directly mapped or allocated via kmalloc.
+ *
+ *  This function does not give bus mappings for DMA transfers. In
+ *  almost all conceivable cases a device driver should not be using
+ *  this function
  */
+
 static inline unsigned long virt_to_phys(volatile void * address)
 {
-	return __pa(address);
+    return __pa(address);
 }
+
+/**
+ *  phys_to_virt    -   map physical address to virtual
+ *  @address: address to remap
+ *
+ *  The returned virtual address is a current CPU mapping for
+ *  the memory address given. It is only valid to use this function on
+ *  addresses that have a kernel mapping
+ *
+ *  This function does not handle bus mappings for DMA transfers. In
+ *  almost all conceivable cases a device driver should not be using
+ *  this function
+ */
 
 static inline void * phys_to_virt(unsigned long address)
 {
-	return __va(address);
+    return __va(address);
 }
 
+/*
+ * Change "struct pfn_info" to physical address.
+ */
+#ifdef CONFIG_HIGHMEM64G
+#define page_to_phys(page)  ((u64)(page - frame_table) << PAGE_SHIFT)
+#else
+#define page_to_phys(page)  ((page - frame_table) << PAGE_SHIFT)
+#endif
+
 #define page_to_pfn(_page)  ((unsigned long)((_page) - frame_table))
-#define page_to_phys(_page) (page_to_pfn(_page) << PAGE_SHIFT)
 #define page_to_virt(_page) phys_to_virt(page_to_phys(_page))
+
 
 extern void * __ioremap(unsigned long offset, unsigned long size, unsigned long flags);
 

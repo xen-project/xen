@@ -78,7 +78,8 @@ struct buffer_head {
         kdev_t b_dev;                   /* device (B_FREE = free) */
         unsigned long b_state;          /* buffer state bitmap (see above) */
         struct buffer_head *b_reqnext;  /* request queue */
-        char *b_data;                  /* pointer to data block */
+        char *b_data;                   /* pointer to data block */
+	struct pfn_info *b_page;        /* the page this bh is mapped to */
         void (*b_end_io)(struct buffer_head *bh, int uptodate);
         pending_req_t *pending_req;
 };
@@ -247,6 +248,8 @@ struct request_queue
 	 */
 	char			head_active;
 
+	unsigned long bounce_pfn; // XXX SMH: backported from 2.4.24
+
 	/*
 	 * Is meant to protect the queue in the future instead of
 	 * io_request_lock
@@ -260,6 +263,34 @@ struct request_queue
 	wait_queue_head_t	wait_for_requests[2];
 #endif
 };
+
+
+
+#ifdef CONFIG_HIGHMEM
+extern struct buffer_head *create_bounce(int, struct buffer_head *);
+extern inline struct buffer_head *blk_queue_bounce(request_queue_t *q, int rw,
+						   struct buffer_head *bh)
+{
+	struct page *page = bh->b_page;
+
+#ifndef CONFIG_DISCONTIGMEM
+	if (page - mem_map <= q->bounce_pfn)
+#else
+	if ((page - page_zone(page)->zone_mem_map) + (page_zone(page)->zone_start_paddr >> PAGE_SHIFT) <= q->bounce_pfn)
+#endif
+		return bh;
+
+	return create_bounce(rw, bh);
+}
+#else
+#define blk_queue_bounce(q, rw, bh)	(bh)
+#endif
+
+#define bh_phys(bh)		(page_to_phys((bh)->b_page) + bh_offset((bh)))
+
+#define BH_CONTIG(b1, b2)	(bh_phys((b1)) + (b1)->b_size == bh_phys((b2)))
+#define BH_PHYS_4G(b1, b2)	((bh_phys((b1)) | 0xffffffff) == ((bh_phys((b2)) + (b2)->b_size - 1) | 0xffffffff))
+
 
 struct blk_dev_struct {
 	/*
@@ -300,6 +331,7 @@ extern void blk_cleanup_queue(request_queue_t *);
 extern void blk_queue_headactive(request_queue_t *, int);
 extern void blk_queue_make_request(request_queue_t *, make_request_fn *);
 extern void generic_unplug_device(void *);
+extern inline int blk_seg_merge_ok(struct buffer_head *, struct buffer_head *);
 
 extern int * blk_size[MAX_BLKDEV];
 
@@ -312,6 +344,8 @@ extern int * hardsect_size[MAX_BLKDEV];
 extern int * max_sectors[MAX_BLKDEV];
 
 extern int * max_segments[MAX_BLKDEV];
+
+extern int read_ahead[];
 
 #define MAX_SEGMENTS 128
 #define MAX_SECTORS 255
@@ -365,5 +399,7 @@ static inline unsigned int block_size(kdev_t dev)
 	}
 	return retval;
 }
+
+
 
 #endif

@@ -117,6 +117,7 @@ int * max_readahead[MAX_BLKDEV];
  */
 int * max_sectors[MAX_BLKDEV];
 
+
 static inline int get_max_sectors(kdev_t dev)
 {
 	if (!max_sectors[MAJOR(dev)])
@@ -238,6 +239,21 @@ void blk_queue_make_request(request_queue_t * q, make_request_fn * mfn)
 	q->make_request_fn = mfn;
 }
 
+
+/*
+ * can we merge the two segments, or do we need to start a new one?
+ */
+inline int blk_seg_merge_ok(struct buffer_head *bh, struct buffer_head *nxt)
+{
+	/*
+	 * if bh and nxt are contigous and don't cross a 4g boundary, it's ok
+	 */
+	if (BH_CONTIG(bh, nxt) && BH_PHYS_4G(bh, nxt))
+		return 1;
+
+	return 0;
+}
+
 static inline int ll_new_segment(request_queue_t *q, struct request *req, int max_segments)
 {
 	if (req->nr_segments < max_segments) {
@@ -250,16 +266,18 @@ static inline int ll_new_segment(request_queue_t *q, struct request *req, int ma
 static int ll_back_merge_fn(request_queue_t *q, struct request *req, 
 			    struct buffer_head *bh, int max_segments)
 {
-	if (req->bhtail->b_data + req->bhtail->b_size == bh->b_data)
+	if (blk_seg_merge_ok(req->bhtail, bh))
 		return 1;
+
 	return ll_new_segment(q, req, max_segments);
 }
 
 static int ll_front_merge_fn(request_queue_t *q, struct request *req, 
 			     struct buffer_head *bh, int max_segments)
 {
-	if (bh->b_data + bh->b_size == req->bh->b_data)
+	if (blk_seg_merge_ok(bh, req->bh))
 		return 1;
+
 	return ll_new_segment(q, req, max_segments);
 }
 
@@ -268,7 +286,7 @@ static int ll_merge_requests_fn(request_queue_t *q, struct request *req,
 {
 	int total_segments = req->nr_segments + next->nr_segments;
 
-	if (req->bhtail->b_data + req->bhtail->b_size == next->bh->b_data)
+	if (blk_seg_merge_ok(req->bhtail, next->bh))
 		total_segments--;
     
 	if (total_segments > max_segments)
@@ -1448,3 +1466,4 @@ EXPORT_SYMBOL(generic_make_request);
 EXPORT_SYMBOL(blkdev_release_request);
 EXPORT_SYMBOL(req_finished_io);
 EXPORT_SYMBOL(generic_unplug_device);
+EXPORT_SYMBOL(blk_seg_merge_ok);

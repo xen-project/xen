@@ -535,3 +535,6 @@ xen/drivers/scsi/sym53c8xx_2/sym_malloc.o
 xen/drivers/scsi/sym53c8xx_2/sym_misc.o
 xen/drivers/scsi/sym53c8xx_2/sym_nvram.o
 xen/arch/i386/flushtlb.o
+xen/common/rbtree.o
+xen/drivers/block/cciss.o
+xen/drivers/block/cciss_scsi.o

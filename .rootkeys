@@ -153,6 +153,11 @@
 3ddb79c0ppNeJtjC4va8j41ADCnchA xen/drivers/Makefile
 3ddb79beWzgPS8ozf2BL2g3ZkiWhhQ xen/drivers/block/Makefile
 3ddb79be04dyXzyXqDbMRS_1funwXQ xen/drivers/block/blkpg.c
+400be8220k_K_8-GFqi_KI7DtnG4wg xen/drivers/block/cciss.c
+400be822U6rx3myRzz2fCoqMbQTKjQ xen/drivers/block/cciss.h
+400be822MTFR0Ue17PyB6X6vU5lmzw xen/drivers/block/cciss_cmd.h
+400be822o5kwrfC5oI8PY4A-GoXeoA xen/drivers/block/cciss_scsi.c
+400be822HEA8ZLcYGxSl_CprccJDkg xen/drivers/block/cciss_scsi.h
 3ddb79beME_0abStePF6fU8XLuQnWw xen/drivers/block/elevator.c
 3ddb79beNQVrdGyoI4njXhgAjD6a4A xen/drivers/block/genhd.c
 3ddb79beyWwLRP_BiM2t1JKgr_plEw xen/drivers/block/ll_rw_blk.c
