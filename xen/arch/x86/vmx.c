@@ -685,6 +685,8 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
     if ((error = __vmread(VM_EXIT_REASON, &exit_reason)))
         __vmx_bug(&regs);
     
+    perfc_incra(vmexits, exit_reason);
+
     __vmread(IDT_VECTORING_INFO_FIELD, &idtv_info_field);
     if (idtv_info_field & INTR_INFO_VALID_MASK) {
         __vmwrite(VM_ENTRY_INTR_INFO_FIELD, idtv_info_field);
@@ -728,6 +730,8 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
             && !(vector & INTR_INFO_VALID_MASK))
             __vmx_bug(&regs);
         vector &= 0xff;
+
+        perfc_incra(cause_vector, vector);
 
         switch (vector) {
 #ifdef XEN_DEBUGGER

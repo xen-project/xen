@@ -55,17 +55,25 @@ extern struct perfcounter_t perfcounters;
 
 #define perfc_value(x)    atomic_read(&perfcounters.x[0])
 #define perfc_valuec(x)   atomic_read(&perfcounters.x[smp_processor_id()])
-#define perfc_valuea(x,y) atomic_read(&perfcounters.x[y])
+#define perfc_valuea(x,y) \
+  { if(y<(sizeof(perfcounters.x)/sizeof(*perfcounters.x))) \
+    atomic_read(&perfcounters.x[y]); }
 #define perfc_set(x,v)    atomic_set(&perfcounters.x[0], v)
 #define perfc_setc(x,v)   atomic_set(&perfcounters.x[smp_processor_id()], v)
-#define perfc_seta(x,y,v) atomic_set(&perfcounters.x[y], v)
+#define perfc_seta(x,y,v) \
+  { if(y<(sizeof(perfcounters.x)/sizeof(*perfcounters.x))) \
+    atomic_set(&perfcounters.x[y], v); }
 #define perfc_incr(x)     atomic_inc(&perfcounters.x[0])
 #define perfc_decr(x)     atomic_dec(&perfcounters.x[0])
 #define perfc_incrc(x)    atomic_inc(&perfcounters.x[smp_processor_id()])
-#define perfc_incra(x,y)  atomic_inc(&perfcounters.x[y])
+#define perfc_incra(x,y)  \
+  { if(y<(sizeof(perfcounters.x)/sizeof(*perfcounters.x))) \
+    atomic_inc(&perfcounters.x[y]); }
 #define perfc_add(x,y)    atomic_add((y), &perfcounters.x[0])
 #define perfc_addc(x,y)   atomic_add((y), &perfcounters.x[smp_processor_id()])
-#define perfc_adda(x,y,z) atomic_add((z), &perfcounters.x[y])
+#define perfc_adda(x,y,z) \
+  { if(y<(sizeof(perfcounters.x)/sizeof(*perfcounters.x))) \
+    atomic_add((z), &perfcounters.x[y]); }
 
 #else /* PERF_COUNTERS */
 
