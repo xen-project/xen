@@ -149,7 +149,7 @@ static struct dev_name_struct {
 	const int num;
 } root_dev_names[] __initdata = {
 	{ "nfs",     0x00ff },
-        { "blk",     0x7b00 },
+    { "xhda",    0x7b00 },
 	{ "hda",     0x0300 },
 	{ "hdb",     0x0340 },
 	{ "loop",    0x0700 },

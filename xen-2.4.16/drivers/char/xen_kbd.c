@@ -1,5 +1,6 @@
 #include <asm-i386/io.h>
 #include <xeno/sched.h>    /* this has request_irq() proto for some reason */
+#include <xeno/keyhandler.h>  
 
 #define KEYBOARD_IRQ 1
 
@@ -22,74 +23,148 @@
 #define kbd_read_status() inb(KBD_STATUS_REG)
 
 
+static int keyboard_shift = 0;
+static int keyboard_control = 0;
 
-static void
-dispatch_scancode (unsigned char scancode)
+/* the following is pretty gross... 
+ * stop reading if you don't want to throw up!
+ */
+
+static unsigned char keymap_normal[] =
 {
+   0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,
+   0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,
+   0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,
+   0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,
 
-    /*
-     * we could be a bit more clever here, but why?
-     * just add a jump to your debug routine for the appropriate character.
-     */
-    switch (scancode)
-    {
-    case 0x01 :                                                       /* esc */
-	printk ("<esc>");
+   0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,
+   0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,
+   0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,
+   0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,
+
+   0 , 0 ,'1','2', '3','4','5','6',    '7','8','9','0', '-','=','\b','\t',
+  'q','w','e','r', 't','y','u','i',    'o','p','[',']','\r', 0 ,'a','s',
+  'd','f','g','h', 'j','k','l',';',   '\'','`', 0 ,'#', 'z','x','c','v',
+  'b','n','m',',', '.','/', 0 , 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,
+
+   0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,
+   0 , 0 , 0 , 0 ,  0 , 0 ,'\\', 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,
+   0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,
+   0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 
+};
+
+static unsigned char keymap_shift[] =
+{
+   0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,
+   0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,
+   0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,
+   0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,
+
+   0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,
+   0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,
+   0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,
+   0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,
+
+   0 , 0 ,'!','"', '#','$','%','^',    '&','*','(',')', '_','+','\b','\t',
+  'Q','W','E','R', 'T','Y','U','I',    'O','P','{','}','\r', 0 ,'A','S',
+  'D','F','G','H', 'J','K','L',':',    '@', 0 , 0 ,'~', 'Z','X','C','V',
+  'B','N','M','<', '>','?', 0 , 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,
+
+   0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,
+   0 , 0 , 0 , 0 ,  0 , 0 ,'|', 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,
+   0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,
+   0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 
+};
+
+
+static unsigned char keymap_control[] =
+{ /* same as normal, except for a-z -> 1 to 26 */
+   0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,
+   0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,
+   0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,
+   0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,
+
+   0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,
+   0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,
+   0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,
+   0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,
+
+   0 , 0 ,'1','2', '3','4','5','6',    '7','8','9','0', '-','=','\b','\t',
+   17, 23, 5 , 18,  20, 25, 21, 9 ,     15, 16,'[',']','\r', 0 , 1 , 19,
+   4 , 6 , 7 , 8 ,  10, 11, 12,';',   '\'','`', 0 ,'#', 26, 24, 3 , 22,
+   2 , 14, 13,',', '.','/', 0 , 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,
+
+   0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,
+   0 , 0 , 0 , 0 ,  0 , 0 ,'\\', 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,
+   0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,
+   0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 ,     0 , 0 , 0 , 0 ,  0 , 0 , 0 , 0 
+};
+
+
+static unsigned char convert_scancode (unsigned char scancode)
+{
+    unsigned char value = 0;
+
+    switch (scancode) {
+
+    case 0xba: /* caps lock UP */
+    case 0x9d: /* ctrl (left) UP */
+	keyboard_control = 0;
 	break;
-    case 0x9e :                                                         /* a */
-	printk ("a");
+
+    case 0x3a: /* caps lock DOWN */
+    case 0x1d: /* ctrl (left) DOWN */
+	keyboard_control = 1;
 	break;
-    case 0x9f :                                                         /* s */
-	printk ("s");
+
+    case 0xaa: /* shift (left) UP */
+    case 0xb6: /* shift (right) UP */
+	keyboard_shift = 0;
 	break;
-    case 0xae :                                                         /* c */
-	printk ("c");
+
+    case 0x2a: /* shift (left) DOWN */
+    case 0x36: /* shift (right) DOWN */
+	keyboard_shift = 1;
 	break;
-    case 0xb0 :                                                         /* b */
-	printk ("b");
-	break;
-    case 0xbb :                                                        /* f1 */
-	printk ("<f1>");
-	break;
-    case 0xbc :                                                        /* f2 */
-	printk ("<f2>");
-	break;
-    case 0xbd :                                                        /* f3 */
-	printk ("<f3>");
-	break;
-    case 0xbe :                                                        /* f4 */
-	printk ("<f4>");
-	break;
-    case 0xbf :                                                        /* f5 */
-	/* xen_block_dump_state(); */
-	break;
-    default :
-	/* printk ("%x ", scancode); */
+
+    default:   /* normal keys */
+	if (keyboard_control)
+	    value = keymap_control[scancode];
+	else if (keyboard_shift)
+	    value = keymap_shift[scancode];
+	else
+	    value = keymap_normal[scancode];
+
     }
 
-    return; 
+    if (value) printk ("%c", value);
+
+    return value;
 }
 
-
-/* regs should be struct pt_regs */
-
-static void keyboard_interrupt(int irq, void *dev_id, void *regs)
+static void keyboard_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
     unsigned char status = kbd_read_status();
     unsigned int work = 10000;
-    
+
     while ((--work > 0) && (status & KBD_STAT_OBF))
     {
 	unsigned char scancode;
-	
 	scancode = kbd_read_input();
 	
 	if (!(status & (KBD_STAT_GTO | KBD_STAT_PERR)))
 	{
 	    if (status & KBD_STAT_MOUSE_OBF)
 		/* mouse event, ignore */;
-	    else
-		dispatch_scancode (scancode);
+	    else {
+		unsigned char key; 
+		key_handler *handler; 
+		
+		if((key = convert_scancode (scancode)) && 
+		   (handler = get_key_handler(key))) 
+		    (*handler)(key, dev_id, regs); 
+		
+	    }
 	}
 	status = kbd_read_status();
     }
