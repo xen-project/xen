@@ -30,8 +30,8 @@
 #include <unistd.h>
 #include <time.h>
 
-#define DEFAULT_SCRIPT  "/var/xen/netwatch"
-#define DEFAULT_LOGFILE "/etc/xen/netwatch"
+#define DEFAULT_SCRIPT  "/etc/xen/netwatch"
+#define DEFAULT_LOGFILE "/var/xen/netwatch"
 
 #define LOG(_f, _a...)                                  \
     do {                                                \

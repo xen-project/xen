@@ -1,0 +1,33 @@
+#!/bin/sh
+
+# Example xen_netwatch script for Red Hat systems.
+# If the network interface goes up or down then standard Red Hat
+# scripts are executed. This may be necessary to reconfigure default
+# routes, for example.
+#
+# This script should be placed at /etc/xen/netwatch
+# You should make sure that the directory /var/xen/ exists.
+#
+# Something like the follwoing should be placed in a startup script
+# such as /etc/rc.d/rc.local:
+#
+# if [ -x /usr/bin/xen_netwatch ]; then
+#     if [ -a /etc/xen/netwatch ]; then
+#         mkdir -p /var/xen
+#         /usr/bin/xen_netwatch
+#     fi
+# fi
+
+cd /etc/sysconfig/network-scripts || exit 1
+
+if [ "x$2" == "xup" ]; then
+        if [ -x ./ifup ]; then
+                ./ifup $1
+        fi
+fi
+
+if [ "x$2" == "xdown" ] ; then
+        if [ -x ./ifdown ]; then
+                ./ifdown $1
+        fi
+fi
