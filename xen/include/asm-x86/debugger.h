@@ -17,6 +17,14 @@
  *  hook to drop into a debug session. It can also be used to hook off
  *  deliberately caused traps (which you then handle and return non-zero)
  *  but really these should be hooked off 'debugger_trap_entry'.
+ *
+ * 3. debugger_trap_immediate():
+ *  Called if we want to drop into a debugger now.  This is essentially the
+ *  same as debugger_trap_fatal, except that we use the current register state
+ *  rather than the state which was in effect when we took the trap.
+ *  Essentially, if we're dying because of an unhandled exception, we call
+ *  debugger_trap_fatal; if we're dying because of a panic() we call
+ *  debugger_trap_immediate().
  */
 
 #ifndef __X86_DEBUGGER_H__
