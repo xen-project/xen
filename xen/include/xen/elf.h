@@ -526,9 +526,8 @@ typedef struct {
 #endif
 
 struct domain_setup_info;
-extern int loadelfimage(char *);
-extern int loadelfsymtab(char *, int, struct domain_setup_info *);
-extern int parseelfimage(char *, unsigned long, struct domain_setup_info *);
+extern int loadelfimage(struct domain_setup_info *);
+extern int parseelfimage(struct domain_setup_info *);
 
 #ifdef Elf_Ehdr
 extern int elf_sanity_check(Elf_Ehdr *ehdr);

@@ -111,6 +111,8 @@ int construct_dom0(struct domain *d,
         BUG();
 
     memset(&dsi, 0, sizeof(struct domain_setup_info));
+    dsi.image_addr = (unsigned long)image_start;
+    dsi.image_len  = image_len;
 
     printk("*** LOADING DOMAIN 0 ***\n");
 
@@ -125,12 +127,8 @@ int construct_dom0(struct domain *d,
     alloc_start = page_to_phys(page);
     alloc_end   = alloc_start + (d->tot_pages << PAGE_SHIFT);
     
-    rc = parseelfimage(image_start, image_len, &dsi);
-    if ( rc != 0 )
+    if ( (rc = parseelfimage(&dsi)) != 0 )
         return rc;
-
-    if (dsi.load_bsd_symtab)
-        loadelfsymtab(image_start, 0, &dsi);
 
     /* Align load address to 4MB boundary. */
     dsi.v_start &= ~((1UL<<22)-1);
@@ -424,10 +422,7 @@ int construct_dom0(struct domain *d,
     write_ptbase(ed);
 
     /* Copy the OS image and free temporary buffer. */
-    (void)loadelfimage(image_start);
-
-    if (dsi.load_bsd_symtab)
-        loadelfsymtab(image_start, 1, &dsi);
+    (void)loadelfimage(&dsi);
 
     init_domheap_pages(
         _image_start, (_image_start+image_len+PAGE_SIZE-1) & PAGE_MASK);

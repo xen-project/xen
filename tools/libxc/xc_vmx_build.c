@@ -26,11 +26,6 @@ struct domain_setup_info
     unsigned long v_kernstart;
     unsigned long v_kernend;
     unsigned long v_kernentry;
-
-    unsigned int load_bsd_symtab;
-
-    unsigned long symtab_addr;
-    unsigned long symtab_len;
 };
 
 static int
@@ -40,10 +35,6 @@ static int
 loadelfimage(
     char *elfbase, int xch, u32 dom, unsigned long *parray,
     unsigned long vstart);
-static int
-loadelfsymtab(
-    char *elfbase, int xch, u32 dom, unsigned long *parray,
-    struct domain_setup_info *dsi);
 
 static void build_e820map(struct mem_map *mem_mapp, unsigned long mem_size)
 {
@@ -193,12 +184,8 @@ static int setup_guest(int xc_handle,
 
     memset(&dsi, 0, sizeof(struct domain_setup_info));
 
-    rc = parseelfimage(image, image_size, &dsi);
-    if ( rc != 0 )
+    if ( (rc = parseelfimage(image, image_size, &dsi)) != 0 )
         goto error_out;
-
-    if (dsi.load_bsd_symtab)
-        loadelfsymtab(image, xc_handle, dom, NULL, &dsi);
 
     if ( (dsi.v_start & (PAGE_SIZE-1)) != 0 )
     {
@@ -268,9 +255,6 @@ static int setup_guest(int xc_handle,
     }
 
     loadelfimage(image, xc_handle, dom, page_array, dsi.v_start);
-
-    if (dsi.load_bsd_symtab)
-        loadelfsymtab(image, xc_handle, dom, page_array, &dsi);
 
     /* Load the initial ramdisk image. */
     if ( initrd_len != 0 )
@@ -708,7 +692,6 @@ static int parseelfimage(char *elfbase,
     }
 
     dsi->v_start = 0x00000000;
-    dsi->load_bsd_symtab = 0;
 
     dsi->v_kernstart = kernstart - LINUX_PAGE_OFFSET;
     dsi->v_kernend   = kernend - LINUX_PAGE_OFFSET;
@@ -766,104 +749,6 @@ loadelfimage(
             munmap(va, PAGE_SIZE);
         }
     }
-
-    return 0;
-}
-
-
-#define ELFROUND (ELFSIZE / 8)
-
-static int
-loadelfsymtab(
-    char *elfbase, int xch, u32 dom, unsigned long *parray,
-    struct domain_setup_info *dsi)
-{
-    Elf_Ehdr *ehdr = (Elf_Ehdr *)elfbase, *sym_ehdr;
-    Elf_Shdr *shdr;
-    unsigned long maxva, symva;
-    char *p;
-    int h, i;
-
-    p = malloc(sizeof(int) + sizeof(Elf_Ehdr) +
-               ehdr->e_shnum * sizeof(Elf_Shdr));
-    if (p == NULL)
-        return 0;
-
-    maxva = (dsi->v_kernend + ELFROUND - 1) & ~(ELFROUND - 1);
-    symva = maxva;
-    maxva += sizeof(int);
-    dsi->symtab_addr = maxva;
-    dsi->symtab_len = 0;
-    maxva += sizeof(Elf_Ehdr) + ehdr->e_shnum * sizeof(Elf_Shdr);
-    maxva = (maxva + ELFROUND - 1) & ~(ELFROUND - 1);
-
-    shdr = (Elf_Shdr *)(p + sizeof(int) + sizeof(Elf_Ehdr));
-    memcpy(shdr, elfbase + ehdr->e_shoff, ehdr->e_shnum * sizeof(Elf_Shdr));
-
-    for ( h = 0; h < ehdr->e_shnum; h++ ) 
-    {
-        if ( shdr[h].sh_type == SHT_STRTAB )
-        {
-            /* Look for a strtab @i linked to symtab @h. */
-            for ( i = 0; i < ehdr->e_shnum; i++ )
-                if ( (shdr[i].sh_type == SHT_SYMTAB) &&
-                     (shdr[i].sh_link == h) )
-                    break;
-            /* Skip symtab @h if we found no corresponding strtab @i. */
-            if ( i == ehdr->e_shnum )
-            {
-                shdr[h].sh_offset = 0;
-                continue;
-            }
-        }
-
-        if ( (shdr[h].sh_type == SHT_STRTAB) ||
-             (shdr[h].sh_type == SHT_SYMTAB) )
-        {
-            if ( parray != NULL )
-                xc_map_memcpy(maxva, elfbase + shdr[h].sh_offset, shdr[h].sh_size,
-                           xch, dom, parray, dsi->v_start);
-
-            /* Mangled to be based on ELF header location. */
-            shdr[h].sh_offset = maxva - dsi->symtab_addr;
-
-            dsi->symtab_len += shdr[h].sh_size;
-            maxva += shdr[h].sh_size;
-            maxva = (maxva + ELFROUND - 1) & ~(ELFROUND - 1);
-        }
-
-        shdr[h].sh_name = 0;  /* Name is NULL. */
-    }
-
-    if ( dsi->symtab_len == 0 )
-    {
-        dsi->symtab_addr = 0;
-        goto out;
-    }
-
-    if ( parray != NULL )
-    {
-        *(int *)p = maxva - dsi->symtab_addr;
-        sym_ehdr = (Elf_Ehdr *)(p + sizeof(int));
-        memcpy(sym_ehdr, ehdr, sizeof(Elf_Ehdr));
-        sym_ehdr->e_phoff = 0;
-        sym_ehdr->e_shoff = sizeof(Elf_Ehdr);
-        sym_ehdr->e_phentsize = 0;
-        sym_ehdr->e_phnum = 0;
-        sym_ehdr->e_shstrndx = SHN_UNDEF;
-
-        /* Copy total length, crafted ELF header and section header table */
-        xc_map_memcpy(symva, p, sizeof(int) + sizeof(Elf_Ehdr) +
-                   ehdr->e_shnum * sizeof(Elf_Shdr), xch, dom, parray,
-                   dsi->v_start);
-    }
-
-    dsi->symtab_len = maxva - dsi->symtab_addr;
-    dsi->v_end = round_pgup(maxva);
-
- out:
-    if ( p != NULL )
-        free(p);
 
     return 0;
 }
