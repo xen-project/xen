@@ -277,20 +277,21 @@ asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
      * Cunning trick to allow arbitrary "INT n" handling.
      * 
      * We set DPL == 0 on all vectors in the IDT. This prevents any INT <n>
-     * instruction from trapping to the appropriate vector, when that might not 
+     * instruction from trapping to the appropriate vector, when that might not
      * be expected by Xen or the guest OS. For example, that entry might be for
      * a fault handler (unlike traps, faults don't increment EIP), or might
      * expect an error code on the stack (which a software trap never
      * provides), or might be a hardware interrupt handler that doesn't like
-     * being called spuriously.  
+     * being called spuriously.
      * 
      * Instead, a GPF occurs with the faulting IDT vector in the error code.
-     * Bit 1 is set to indicate that an IDT entry caused the fault.
-     * Bit 0 is clear to indicate that it's a software fault, not hardware.
+     * Bit 1 is set to indicate that an IDT entry caused the fault. Bit 0 is 
+     * clear to indicate that it's a software fault, not hardware.
      * 
-     * NOTE: Vectors 3 and 4 are dealt with from their own handler. This is okay
-     * because they can only be triggered by an explicit DPL-checked instruction.
-     * The DPL specified by the guest OS for these vectors is NOT CHECKED!!
+     * NOTE: Vectors 3 and 4 are dealt with from their own handler. This is
+     * okay because they can only be triggered by an explicit DPL-checked
+     * instruction. The DPL specified by the guest OS for these vectors is NOT
+     * CHECKED!!
      */
     if ( (error_code & 3) == 2 )
     {
@@ -298,6 +299,7 @@ asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
         ti = current->thread.traps + (error_code>>3);
         if ( ti->dpl >= (regs->xcs & 3) )
         {
+            if ( (error_code>>3)==0x80 ) { printk("!!!\n"); BUG(); }
             gtb->flags = GTBF_TRAP_NOCODE;
             gtb->cs    = ti->cs;
             gtb->eip   = ti->address;
@@ -567,6 +569,43 @@ long do_set_trap_table(trap_info_t *traps)
     }
 
     return(0);
+}
+
+
+long do_set_fast_trap(int idx)
+{
+    trap_info_t *ti;
+
+    /* Index 0 is special: it disables fast traps. */
+    if ( idx == 0 )
+    {
+        CLEAR_FAST_TRAP(&current->thread);
+        memset(idt_table+current->thread.fast_trap_idx, 0, 8);
+        current->thread.fast_trap_idx    = 0x20;
+        current->thread.fast_trap_desc.a = 0;
+        current->thread.fast_trap_desc.b = 0;
+        return 0;
+    }
+
+    /*
+     * We only fast-trap vectors 0x20-0x2f, and vector 0x80.
+     * The former range is used by Windows and MS-DOS.
+     * Vector 0x80 is used by Linux and the BSD variants.
+     */
+    if ( (idx != 0x80) && ((idx < 0x20) || (idx > 0x2f)) ) return -1;
+
+    ti = current->thread.traps + idx;
+
+    CLEAR_FAST_TRAP(&current->thread);
+
+    current->thread.fast_trap_idx    = idx;
+    current->thread.fast_trap_desc.a = (ti->cs << 16) | (ti->address & 0xffff);
+    current->thread.fast_trap_desc.b = 
+        (ti->address & 0xffff0000) | 0x8f00 | (ti->dpl&3)<<13;
+
+    SET_FAST_TRAP(&current->thread);
+
+    return 0;
 }
 
 

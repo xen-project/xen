@@ -10,8 +10,6 @@
 #define SA_SHIRQ        0x04000000
 
 #define TIMER_IRQ 0
-/* 256 in architecture, minus 16 allocated to processor. */
-#define NR_IRQS 224
 
 extern void disable_irq(unsigned int);
 extern void disable_irq_nosync(unsigned int);
@@ -21,14 +19,14 @@ extern void enable_irq(unsigned int);
  * IDT vectors usable for external interrupt sources start
  * at 0x20:
  */
-#define FIRST_EXTERNAL_VECTOR	0x20
+#define FIRST_EXTERNAL_VECTOR	0x30
 
-#define SYSCALL_VECTOR		0x80   /* application -> OS     */
-#define KDBENTER_VECTOR		0x81   /* anyone      -> KDB    */
-#define HYPERVISOR_CALL_VECTOR	0x82   /* OS          -> monitor*/
+#define NR_IRQS (256 - FIRST_EXTERNAL_VECTOR)
+
+#define HYPERVISOR_CALL_VECTOR	0x82
 
 /*
- * Vectors 0x20-0x2f are used for ISA interrupts.
+ * Vectors 0x30-0x3f are used for ISA interrupts.
  */
 
 /*
@@ -55,11 +53,11 @@ extern void enable_irq(unsigned int);
 #define LOCAL_TIMER_VECTOR	0xef
 
 /*
- * First APIC vector available to drivers: (vectors 0x30-0xee)
- * we start at 0x31 to spread out vectors evenly between priority
- * levels. (0x80 is the syscall vector)
+ * First APIC vector available to drivers: (vectors 0x40-0xee)
+ * we start at 0x41 to spread out vectors evenly between priority
+ * levels. (0x82 is the syscall vector)
  */
-#define FIRST_DEVICE_VECTOR	0x31
+#define FIRST_DEVICE_VECTOR	0x41
 #define FIRST_SYSTEM_VECTOR	0xef
 
 extern int irq_vector[NR_IRQS];

@@ -562,5 +562,6 @@ static trap_info_t trap_table[] = {
 void __init trap_init(void)
 {
     HYPERVISOR_set_trap_table(trap_table);    
+    HYPERVISOR_set_fast_trap(SYSCALL_VECTOR);
     cpu_init();
 }

@@ -326,6 +326,11 @@ void new_thread(struct task_struct *p,
 
     __save_flags(regs->eflags);
     regs->eflags |= X86_EFLAGS_IF;
+
+    /* No fast trap at start of day. */
+    p->thread.fast_trap_idx    = 0x20;
+    p->thread.fast_trap_desc.a = 0;
+    p->thread.fast_trap_desc.b = 0;
 }
 
 
@@ -363,11 +368,16 @@ void new_thread(struct task_struct *p,
 /* NB. prev_p passed in %eax, next_p passed in %edx */
 void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 {
+    extern struct desc_struct idt_table[];
     struct thread_struct *prev = &prev_p->thread,
         *next = &next_p->thread;
     struct tss_struct *tss = init_tss + smp_processor_id();
 
     unlazy_fpu(prev_p);
+
+    /* Switch the fast-trap handler. */
+    CLEAR_FAST_TRAP(&prev_p->thread);
+    SET_FAST_TRAP(&next_p->thread);
 
     tss->esp0 = next->esp0;
     tss->esp1 = next->esp1;

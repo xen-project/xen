@@ -10,6 +10,7 @@
 #include <asm/page.h>
 #include <asm/types.h>
 #include <asm/cpufeature.h>
+#include <asm/desc.h>
 #include <xeno/config.h>
 #include <hypervisor-ifs/hypervisor-if.h>
 
@@ -352,8 +353,15 @@ struct thread_struct {
 /* floating point info */
     union i387_union	i387;
 /* Trap info. */
+    int                 fast_trap_idx;
+    struct desc_struct  fast_trap_desc;
     trap_info_t         traps[256];
 };
+
+#define CLEAR_FAST_TRAP(_p) \
+    (memset(idt_table + (_p)->fast_trap_idx, 0, 8))
+#define SET_FAST_TRAP(_p)   \
+    (memcpy(idt_table + (_p)->fast_trap_idx, &((_p)->fast_trap_desc), 8))
 
 #define INIT_THREAD  {						\
 	sizeof(idle0_stack) + (long) &idle0_stack, /* esp0 */   \
@@ -361,6 +369,7 @@ struct thread_struct {
 	{ [0 ... 7] = 0 },	/* debugging registers */	\
 	0, 0, 0,						\
 	{ { 0, }, },		/* 387 state */			\
+	0, { 0, 0 },						\
 	{ {0} }			/* io permissions */		\
 }
 
