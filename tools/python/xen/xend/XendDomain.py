@@ -19,6 +19,7 @@ xroot = XendRoot.instance()
 import XendDB
 import XendDomainInfo
 import XendConsole
+import XendMigrate
 import EventServer
 
 from xen.xend.server import SrvDaemon
@@ -423,7 +424,9 @@ class XendDomain:
         """
         # Need a cancel too?
         # Don't forget to cancel restart for it.
-        pass
+        dom = int(id)
+        xmigrate = XendMigrate.instance()
+        return xmigrate.migrate_begin(dom, dst)
 
     def domain_save(self, id, dst, progress=0):
         """Save domain state to file, destroy domain on success.

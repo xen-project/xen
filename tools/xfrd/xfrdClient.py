@@ -34,13 +34,11 @@ class TCPClient:
         
         self.sockin = self.sock.makefile("r")
         self.sockout = self.sock.makefile("w")
-        self.packer = SxpPacker(self.sockout)
-        self.unpacker = SxpUnpacker(self.sockin)
         #pass
 
     def request(self, req):
         print "request>", req
-        self.packer.pack(req)
+        sxp.show(req, out=self.sockout)
         self.sockout.flush()
         print "request<"
 
@@ -52,10 +50,10 @@ class TCPClient:
 
     def read(self):
         while(1):
-            v = self.unpacker.unpack()
+            v = self.sockin.read()
             print 'read>', v
-            if v[0] == 'xfr.err' and v[1]: return
-            if v[0] == 'xfr.ok': return
+            #if v[0] == 'xfr.err' and v[1]: return
+            #if v[0] == 'xfr.ok': return
 
 XFR_PROTO_MAJOR = 1
 XFR_PROTO_MINOR = 0

@@ -18,6 +18,12 @@
 #include "sys_net.h"
 #include "sys_string.h"
 
+#ifdef __KERNEL__
+#  include <linux/errno.h>
+#else
+#  include <errno.h>
+#endif
+
 /** @file
  * All network data are kept in network order and only converted to
  * host order for display. Network data includes IP addresses, port numbers and
@@ -80,7 +86,7 @@ inline static int indexof(const char *s, int n, char c){
  *
  * @param s input string
  * @param address where to put the address
- * @return 0 on success, -1 on error
+ * @return 0 on success, negative on error
  */
 int get_inet_addr(const char *s, unsigned long *address){
     // Number of bits in a byte.
@@ -96,7 +102,7 @@ int get_inet_addr(const char *s, unsigned long *address){
     unsigned long addr = 0;
     unsigned long v;
     int i;
-    int err = -1;
+    int err = -EINVAL;
     // Bit shift for the current byte.
     int shift = BYTE_BITS * (WORD_BYTES - 1);
     char buf[64];
@@ -168,18 +174,18 @@ int inet_aton(const char *address, struct in_addr *inp){
  *
  * @param name input hostname or address string
  * @param address where to put the address
- * @return 1 if address found OK, 0 otherwise
+ * @return 0 if address found OK, nonzero otherwise
  */
 int get_host_address(const char *name, unsigned long *address){
 #ifdef __KERNEL__
-    return get_inet_addr(name, address) == 0;
+    return get_inet_addr(name, address);
 #else
     struct hostent *host = gethostbyname(name);
     if(!host){
-        return 0;
+        return -EINVAL;
     }
     *address = ((struct in_addr *)(host->h_addr))->s_addr;
-    return 1;
+    return 0;
 #endif
 }
 
@@ -187,33 +193,33 @@ int get_host_address(const char *name, unsigned long *address){
  *
  * @param name service name
  * @param port where to put the port
- * @return 1 if service port found OK, 0 otherwise
+ * @return 0 if service port found OK, negative otherwise
  */
 int get_service_port(const char *name, unsigned long *port){
 #ifdef __KERNEL__
-    return 0;
+    return -ENOSYS;
 #else
     struct servent *service;
     service = getservbyname(name, 0);
     if(!service){
-        return 0;
+        return -EINVAL;
     }
     *port = service->s_port;
-    return 1;
+    return 0;
 #endif
 }
 
 /** Convert a port number (in network order) to a service name.
  *
  * @param port the port number
- * @return service name if found OK, 0 otherwise
+ * @return service name if found OK, NULL otherwise
  */
 char *get_port_service(unsigned long port){
 #ifdef __KERNEL__
-    return 0;
+    return NULL;
 #else
     struct servent *service = getservbyport(port, 0);
-    return (service ? service->s_name : 0);
+    return (service ? service->s_name : NULL);
 #endif
 }
 
@@ -221,19 +227,27 @@ char *get_port_service(unsigned long port){
  *
  * @param s input to convert
  * @param port where to put the port
- * @return 1 if port found OK, 0 otherwise
+ * @return 0 if port found OK, -1 otherwise
  */
 int convert_service_to_port(const char *s, unsigned long *port){
-    int ok = 0;
+    int err = 0;
     unsigned long value;
-    if(convert_atoul(s, &value)){
-        ok = get_service_port(s, &value);
+    printf("%s> %s\n", __FUNCTION__, s);
+    if(convert_atoul(s, &value) == 0){
+        int ok = (0 <= value) && (value <= PORT_MAX);
+        printf("> value = %ld\n", value);
+        if(ok){
+            value = htons((unsigned short)value);
+        } else {
+            err = -EINVAL;
+        }
     } else {
-        ok = (0 <= value) && (value <= PORT_MAX);
-        value = htons((unsigned short)value);
+        printf("> get_service_port...\n");
+        err = get_service_port(s, &value);
     }
-    *port = (ok ? value : 0);
-    return ok;
+    *port = (err ? 0: value);
+    printf("%s< err=%d\n", __FUNCTION__, err);
+    return err;
 }
 
 #define MAC_ELEMENT_N  6 // Number of elements in a MAC address.
