@@ -254,7 +254,6 @@ extern vm_assist_info_t vm_assist_info[];
 typedef struct {
     unsigned long l1va;
     l1_pgentry_t *page;
-    unsigned long pte;
     l1_pgentry_t *pl1e;
 } ptwr_ptinfo_t;
 

@@ -1642,35 +1642,12 @@ void ptwr_flush(const int which)
 {
     unsigned long pte, *ptep;
     l1_pgentry_t *pl1e;
+    l2_pgentry_t *pl2e, nl2e;
     int cpu = smp_processor_id();
     int i;
 
     ptep = (unsigned long *)&linear_pg_table
         [ptwr_info[cpu].ptinfo[which].l1va>>PAGE_SHIFT];
-
-    pl1e = ptwr_info[cpu].ptinfo[which].pl1e;
-    for ( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ ) {
-        l1_pgentry_t ol1e, nl1e;
-        nl1e = ptwr_info[cpu].ptinfo[which].page[i];
-        ol1e = pl1e[i];
-        if (likely(l1_pgentry_val(ol1e) == l1_pgentry_val(nl1e)))
-            continue;
-        if (likely(l1_pgentry_val(ol1e) == (l1_pgentry_val(nl1e) | _PAGE_RW)))
-        {
-            if (likely(readonly_page_from_l1e(nl1e))) {
-                pl1e[i] = nl1e;
-                continue;
-            }
-        }
-        if (unlikely(l1_pgentry_val(ol1e) & _PAGE_PRESENT))
-            put_page_from_l1e(ol1e, current);
-        if (unlikely(!get_page_from_l1e(nl1e, current))) {
-            MEM_LOG("ptwr: Could not re-validate l1 page\n");
-            domain_crash();
-        }
-        pl1e[i] = nl1e;
-    }
-    unmap_domain_mem(pl1e);
 
     /* make pt page write protected */
     if ( unlikely(__get_user(pte, ptep)) ) {
@@ -1679,19 +1656,46 @@ void ptwr_flush(const int which)
     }
     PTWR_PRINTK(PP_ALL, ("disconnected_l1va at %p is %08lx\n",
                          ptep, pte));
-    pte = (ptwr_info[cpu].ptinfo[which].pte & PAGE_MASK) |
-        (pte & ~(PAGE_MASK|_PAGE_RW));
+    pte &= ~_PAGE_RW;
     if ( unlikely(__put_user(pte, ptep)) ) {
         MEM_LOG("ptwr: Could not update pte at %p\n", ptep);
         domain_crash();
+    }
+    __flush_tlb_one(ptwr_info[cpu].ptinfo[which].l1va);
+    PTWR_PRINTK(PP_ALL, ("disconnected_l1va at %p now %08lx\n",
+                         ptep, pte));
+
+    pl1e = ptwr_info[cpu].ptinfo[which].pl1e;
+    for ( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ ) {
+        l1_pgentry_t ol1e, nl1e;
+        ol1e = ptwr_info[cpu].ptinfo[which].page[i];
+        nl1e = pl1e[i];
+        if (likely(l1_pgentry_val(ol1e) == l1_pgentry_val(nl1e)))
+            continue;
+        if (likely(l1_pgentry_val(ol1e) == (l1_pgentry_val(nl1e) | _PAGE_RW))
+	    && readonly_page_from_l1e(nl1e))
+	    continue;
+        if (unlikely(l1_pgentry_val(ol1e) & _PAGE_PRESENT))
+            put_page_from_l1e(ol1e, current);
+        if (unlikely(!get_page_from_l1e(nl1e, current))) {
+            MEM_LOG("ptwr: Could not re-validate l1 page\n");
+            domain_crash();
+        }
+    }
+    unmap_domain_mem(pl1e);
+
+    if (which == PTWR_PT_ACTIVE) {
+	/* reconnect l1 page */
+	pl2e = &linear_l2_table[ptwr_info[cpu].active_pteidx];
+	nl2e = mk_l2_pgentry(l2_pgentry_val(*pl2e) | _PAGE_PRESENT);
+	update_l2e(pl2e, *pl2e, nl2e);
     }
 
     if ( unlikely(current->mm.shadow_mode) )
     {
         unsigned long spte;
         unsigned long sstat = 
-            get_shadow_status(&current->mm, 
-                              ptwr_info[cpu].ptinfo[which].pte >> PAGE_SHIFT);
+            get_shadow_status(&current->mm, pte >> PAGE_SHIFT);
 
         if ( sstat & PSH_shadowed ) 
         { 
@@ -1715,10 +1719,6 @@ void ptwr_flush(const int which)
                    [ptwr_info[cpu].ptinfo[which].l1va>>PAGE_SHIFT]);
     }
 
-    __flush_tlb_one(ptwr_info[cpu].ptinfo[which].l1va);
-    PTWR_PRINTK(PP_ALL, ("disconnected_l1va at %p now %08lx\n",
-                         ptep, pte));
-
     ptwr_info[cpu].ptinfo[which].l1va = 0;
 }
 
@@ -1727,7 +1727,7 @@ int ptwr_do_page_fault(unsigned long addr)
     /* write page fault, check if we're trying to modify an l1 page table */
     unsigned long pte, pfn;
     struct pfn_info *page;
-    l2_pgentry_t *pl2e;
+    l2_pgentry_t *pl2e, nl2e;
     int cpu = smp_processor_id();
     int which;
 
@@ -1771,8 +1771,13 @@ int ptwr_do_page_fault(unsigned long addr)
                 ptwr_flush(which);
             ptwr_info[cpu].ptinfo[which].l1va = addr | 1;
 
-            if (which == PTWR_PT_ACTIVE)
+            if (which == PTWR_PT_ACTIVE) {
                 ptwr_info[cpu].active_pteidx = va_mask;
+		/* disconnect l1 page */
+		nl2e = mk_l2_pgentry((l2_pgentry_val(*pl2e) & ~_PAGE_PRESENT));
+		update_l2e(pl2e, *pl2e, nl2e);
+		flush_tlb();
+	    }
 
             ptwr_info[cpu].ptinfo[which].pl1e =
                 map_domain_mem(pfn << PAGE_SHIFT);
@@ -1781,10 +1786,7 @@ int ptwr_do_page_fault(unsigned long addr)
                    ENTRIES_PER_L1_PAGETABLE * sizeof(l1_pgentry_t));
 
             /* make pt page writable */
-            ptwr_info[cpu].ptinfo[which].pte = pte;
-            pte = (virt_to_phys(ptwr_info[cpu].ptinfo[which].page) &
-                   PAGE_MASK) | _PAGE_RW | (pte & ~PAGE_MASK);
-
+            pte |= _PAGE_RW;
             PTWR_PRINTK(PP_ALL, ("update %p pte to %08lx\n",
                                  &linear_pg_table[addr>>PAGE_SHIFT], pte));
             if ( unlikely(__put_user(pte, (unsigned long *)
