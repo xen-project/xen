@@ -2,6 +2,7 @@ COMPILE_ARCH := $(shell uname -m | sed -e s/i.86/i386/)
 TARGET_ARCH  ?= $(COMPILE_ARCH)
 
 nodev ?= n
+debug ?= n
 
 TARGET  := $(BASEDIR)/xen
 HDRS    := $(wildcard $(BASEDIR)/include/xen/*.h)
