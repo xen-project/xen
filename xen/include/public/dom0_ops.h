@@ -405,6 +405,15 @@ typedef struct {
     MEMORY_PADDING;
 } PACKED dom0_perfccontrol_t; /* 16 bytes */
 
+#define DOM0_MICROCODE           35
+typedef struct {
+    /* IN variables. */
+    void   *data;                     /* 0: Pointer to microcode data */
+    MEMORY_PADDING;
+    u32     length;                   /* 8: Length of microcode data. */
+    u32     _pad0;
+} PACKED dom0_microcode_t; /* 16 bytes */
+
 typedef struct {
     u32 cmd;                          /* 0 */
     u32 interface_version;            /* 4 */ /* DOM0_INTERFACE_VERSION */
@@ -439,6 +448,7 @@ typedef struct {
         dom0_del_memtype_t       del_memtype;
         dom0_read_memtype_t      read_memtype;
         dom0_perfccontrol_t      perfccontrol;
+        dom0_microcode_t         microcode;
     } PACKED u;
 } PACKED dom0_op_t; /* 80 bytes */
 
