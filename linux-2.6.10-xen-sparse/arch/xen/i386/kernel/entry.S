@@ -91,7 +91,8 @@ VM_MASK		= 0x00020000
 				shl  $sizeof_vcpu_shift,reg		; \
 				addl HYPERVISOR_shared_info,reg
 #define XEN_UNLOCK_VCPU_INFO_SMP(reg) preempt_enable(%ebp)
-#define XEN_UNLOCK_VCPU_INFO_SMP_fixup .byte 0x00,0x00,0x00
+#define XEN_UNLOCK_VCPU_INFO_SMP_fixup .byte 0xff,0xff,0xff
+#define Ux00 0xff
 #define XEN_BLOCK_EVENTS(reg)	XEN_LOCK_VCPU_INFO_SMP(reg)		; \
 				movb $1,evtchn_upcall_mask(reg)		; \
     				XEN_UNLOCK_VCPU_INFO_SMP(reg)
@@ -108,6 +109,7 @@ VM_MASK		= 0x00020000
 #define XEN_LOCK_VCPU_INFO_SMP(reg)
 #define XEN_UNLOCK_VCPU_INFO_SMP(reg)
 #define XEN_UNLOCK_VCPU_INFO_SMP_fixup
+#define Ux00 0x00
 #define XEN_BLOCK_EVENTS(reg)	movb $1,evtchn_upcall_mask(reg)
 #define XEN_UNBLOCK_EVENTS(reg)	movb $0,evtchn_upcall_mask(reg)
 #define XEN_SAVE_UPCALL_MASK(reg,tmp,off) \
@@ -522,24 +524,32 @@ ecrit:  /**** END OF CRITICAL REGION ****/
 critical_region_fixup:
 	addl $critical_fixup_table-scrit,%eax
 	movzbl (%eax),%eax		# %eax contains num bytes popped
-	mov  %esp,%esi
+#ifdef CONFIG_SMP
+	cmpb $0xff,%al
+	jne  15f
+	add  $1,%al
+	GET_THREAD_INFO(%ebp)
+	XEN_UNLOCK_VCPU_INFO_SMP(%esi)
+15:
+#endif
+    	mov  %esp,%esi
 	add  %eax,%esi			# %esi points at end of src region
 	mov  %esp,%edi
 	add  $0x34,%edi			# %edi points at end of dst region
 	mov  %eax,%ecx
 	shr  $2,%ecx			# convert words to bytes
-	je   16f			# skip loop if nothing to copy
-15:	subl $4,%esi			# pre-decrementing copy loop
+	je   17f			# skip loop if nothing to copy
+16:	subl $4,%esi			# pre-decrementing copy loop
 	subl $4,%edi
 	movl (%esi),%eax
 	movl %eax,(%edi)
-	loop 15b
-16:	movl %edi,%esp			# final %edi is top of merged stack
+	loop 16b
+17:	movl %edi,%esp			# final %edi is top of merged stack
 	jmp  11b
 
 critical_fixup_table:
-	.byte 0x00,0x00,0x00		# testb $0xff,(%esi) = XEN_TEST_PENDING
-	.byte 0x00,0x00			# jnz  14f
+	.byte Ux00,Ux00,Ux00		# testb $0xff,(%esi) = XEN_TEST_PENDING
+	.byte Ux00,Ux00			# jnz  14f
 	XEN_UNLOCK_VCPU_INFO_SMP_fixup
 	.byte 0x00			# pop  %ebx
 	.byte 0x04			# pop  %ecx
@@ -552,7 +562,7 @@ critical_fixup_table:
 	.byte 0x20			# pop  %es
 	.byte 0x24,0x24,0x24		# add  $4,%esp
 	.byte 0x28			# iret
-	.byte 0x00,0x00,0x00,0x00	# movb $1,1(%esi)
+	.byte Ux00,Ux00,Ux00,Ux00	# movb $1,1(%esi)
 	XEN_UNLOCK_VCPU_INFO_SMP_fixup
 	.byte 0x00,0x00			# jmp  11b
 
