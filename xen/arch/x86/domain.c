@@ -529,6 +529,8 @@ static void relinquish_list(struct domain *d, struct list_head *list)
 
 void domain_relinquish_memory(struct domain *d)
 {
+    struct exec_domain *ed;
+
     audit_domain(d);
 
     /* Ensure that noone is running over the dead domain's page tables. */
@@ -538,9 +540,11 @@ void domain_relinquish_memory(struct domain *d)
     shadow_mode_disable(d);
 
     /* Drop the in-use reference to the page-table base. */
-    if ( pagetable_val(d->exec_domain[0]->mm.pagetable) != 0 )
-        put_page_and_type(&frame_table[pagetable_val(d->exec_domain[0]->mm.pagetable) >>
-                                      PAGE_SHIFT]);
+    for_each_exec_domain(d, ed) {
+        if ( pagetable_val(ed->mm.pagetable) != 0 )
+            put_page_and_type(&frame_table[pagetable_val(ed->mm.pagetable) >>
+                                           PAGE_SHIFT]);
+    }
 
     /*
      * Relinquish GDT mappings. No need for explicit unmapping of the LDT as 
