@@ -20,6 +20,10 @@ EXPORT_SYMBOL(__dev_alloc_skb);
 /* Referenced in netback.c. */
 /*static*/ kmem_cache_t *skbuff_cachep;
 
+/* Size must be cacheline-aligned (alloc_skb uses SKB_DATA_ALIGN). */
+#define XEN_SKB_SIZE \
+    ((PAGE_SIZE - sizeof(struct skb_shared_info)) & ~(SMP_CACHE_BYTES - 1))
+
 struct sk_buff *__dev_alloc_skb(unsigned int length, int gfp_mask)
 {
     struct sk_buff *skb;
@@ -41,8 +45,7 @@ struct sk_buff *__dev_alloc_skb(unsigned int length, int gfp_mask)
         return NULL;
     }
 
-    new_shinfo = 
-        new_data + PAGE_SIZE - sizeof(struct skb_shared_info);
+    new_shinfo = new_data + XEN_SKB_SIZE;
     memcpy(new_shinfo, skb_shinfo(skb), sizeof(struct skb_shared_info));
 
     kfree(skb->head);
