@@ -1,3 +1,6 @@
+# Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+"""Domain creation.
+"""
 import string
 import sys
 
@@ -13,7 +16,7 @@ Create a domain.
 """)
 
 gopts.opt('help', short='h',
-         fn=set_value, default=0,
+         fn=set_true, default=0,
          use="Print this help.")
 
 gopts.opt('quiet', short='q',
@@ -36,20 +39,18 @@ gopts.opt('load', short='L', val='FILE',
           fn=set_value, default=None,
           use='Domain saved state to load.')
 
-def set_var(opt, k, v):
-    opt.set(v)
-    for d in string.split(v, ';' ):
-        (k, v) = string.split(d, '=')
-        opt.opts.setvar(k, v)
-
 gopts.opt('define', short='D', val='VAR=VAL',
          fn=set_var, default=None,
-         use="""Set variables before loading defaults, e.g. '-D vmid=3;ip=1.2.3.4'
-         to set vmid and ip.""")
+         use="""Set a variable before loading defaults, e.g. '-D vmid=3'
+         to set vmid. May be repeated to set more thanone variable.""")
 
 gopts.opt('dryrun', short='n',
          fn=set_true, default=0,
          use="Dry run - print the config but don't create the domain.")
+
+gopts.opt('name', short='N', val='NAME',
+          fn=set_value, default=None,
+          use="Domain name.")
 
 gopts.opt('console', short='c',
          fn=set_true, default=0,
@@ -71,34 +72,48 @@ gopts.opt('memory', short='m', val='MEMORY',
          fn=set_value, default=128,
          use="Domain memory in MB.")
 
+gopts.opt('blkif',
+          fn=set_true, default=0,
+          use="Make the domain a block device backend.")
+
+gopts.opt('netif',
+          fn=set_true, default=0,
+          use="Make the domain a network interface backend.")
+
 gopts.opt('disk', short='d', val='phy:DEV,VDEV,MODE',
          fn=append_value, default=[],
          use="""Add a disk device to a domain. The physical device is DEV, which
-         is exported to the domain as VDEV. The disk is read-only if MODE is r,
-         read-write if mode is 'w'.""")
+         is exported to the domain as VDEV. The disk is read-only if MODE
+         is 'r', read-write if MODE is 'w'.
+         The option may be repeated to add more than one disk.
+         """)
 
 gopts.opt('pci', val='BUS,DEV,FUNC',
          fn=append_value, default=[],
-         use="""Add a PCI device to a domain, using given params (in hex).""")
+         use="""Add a PCI device to a domain, using given params (in hex).
+         For example '-pci c0,02,1a'.
+         The option may be repeated to add more than one pci device.
+         """)
 
 gopts.opt('ipaddr', short='i', val="IPADDR",
          fn=append_value, default=[],
          use="Add an IP address to the domain.")
 
-gopts.opt('mac', short='M', val="MAC",
+gopts.opt('vif', val="mac=MAC,bridge=BRIDGE",
          fn=append_value, default=[],
-         use="""Add a network interface with the given mac address to the domain.
-         More than one interface may be specified. Interfaces with unspecified MAC addresses
-         are allocated a random address.""")
+         use="""Add a network interface with the given MAC address and bridge.
+         If mac is not specified a random MAC address is used.
+         If bridge is not specified the default bridge is used.
+         This option may be repeated to add more than one vif.
+         Specifying vifs will increase the number of interfaces as needed.
+         """)
 
-gopts.opt('nics', val="N",
+gopts.opt('nics', val="NUM",
          fn=set_int, default=1,
-         use="Set the number of network interfaces.")
-
-gopts.opt('vnet', val='VNET',
-         fn=append_value, default=[],
-         use="""Define the vnets for the network interfaces.
-         More than one vnet may be given, they are used in order.
+         use="""Set the number of network interfaces.
+         Use the vif option to define interface parameters, otherwise
+         defaults are used. Specifying vifs will increase the
+         number of interfaces as needed.
          """)
 
 gopts.opt('root', short='R', val='DEVICE',
@@ -116,15 +131,15 @@ gopts.opt('ip', short='I', val='IPADDR',
 
 gopts.opt('gateway', val="IPADDR",
          fn=set_value, default='',
-         use="Set kernel IP gateway.")
+         use="Set the kernel IP gateway.")
 
 gopts.opt('netmask', val="MASK",
          fn=set_value, default = '',
-         use="Set kernel IP netmask.")
+         use="Set the kernel IP netmask.")
 
 gopts.opt('hostname', val="NAME",
          fn=set_value, default='',
-         use="Set kernel IP hostname.")
+         use="Set the kernel IP hostname.")
 
 gopts.opt('interface', val="INTF",
          fn=set_value, default="eth0",
@@ -132,7 +147,7 @@ gopts.opt('interface', val="INTF",
 
 gopts.opt('dhcp', val="off|dhcp",
          fn=set_value, default='off',
-         use="Set kernel dhcp option.")
+         use="Set the kernel dhcp option.")
 
 gopts.opt('nfs_server', val="IPADDR",
          fn=set_value, default=None,
@@ -143,19 +158,16 @@ gopts.opt('nfs_root', val="PATH",
          use="Set the path of the root NFS directory.")
 
 def strip(pre, s):
+    """Strip prefix 'pre' if present.
+    """
     if s.startswith(pre):
         return s[len(pre):]
     else:
         return s
 
-def make_config(opts):
-    
-    config = ['config',
-              ['name', opts.name ],
-              ['memory', opts.memory ] ]
-    if opts.cpu:
-        config.append(['cpu', opts.cpu])
-    
+def configure_image(config, opts):
+    """Create the image config.
+    """
     config_image = [ opts.builder ]
     config_image.append([ 'kernel', os.path.abspath(opts.kernel) ])
     if opts.ramdisk:
@@ -169,8 +181,10 @@ def make_config(opts):
     if opts.extra:
         config_image.append(['args', opts.extra])
     config.append(['image', config_image ])
-    	
-    config_devs = []
+    
+def configure_disks(config_devs, opts):
+    """Create the config for disks (virtual block devices).
+    """
     for (uname, dev, mode) in opts.disk:
         config_vbd = ['vbd',
                       ['uname', uname],
@@ -178,17 +192,33 @@ def make_config(opts):
                       ['mode', mode ] ]
         config_devs.append(['device', config_vbd])
 
+def configure_pci(config_devs, opts):
+    """Create the config for pci devices.
+    """
     for (bus, dev, func) in opts.pci:
         config_pci = ['pci', ['bus', bus], ['dev', dev], ['func', func]]
         config_devs.append(['device', config_pci])
 
-    for idx in range(0, opts.nics):
-        config_vif = ['vif', ['@', ['id', 'vif%d' % idx]]]
-        if idx < len(opts.mac):
-            config_vif.append(['mac', opts.mac[idx]])
-        config_devs.append(['device', config_vif])
+def configure_vifs(config_devs, opts):
+    """Create the config for virtual network interfaces.
+    """
+    vifs = opts.vif
+    vifs_n = max(opts.nics, len(vifs))
 
-    config += config_devs
+    for idx in range(0, vifs_n):
+        if idx < len(vifs):
+            d = vifs[idx]
+            mac = d.get('mac')
+            bridge = d.get('bridge')
+        else:
+            mac = None
+            bridge = None
+        config_vif = ['vif']
+        if mac:
+            config_vif.append(['mac', mac])
+        if bridge:
+            config_vif.append(['bridge', bridge])
+        config_devs.append(['device', config_vif])
 
 ##     if vfr_ipaddr:
 ##         config_vfr = ['vfr']
@@ -197,15 +227,27 @@ def make_config(opts):
 ##             config_vfr.append(['vif', ['id', idx], ['ip', ip]])
 ##         config.append(config_vfr)
 
-    if opts.vnet:
-        config_vnet = ['vnet']
-        idx = 0
-        for vnet in opts.vnet:
-            config_vif = ['vif', ['id', 'vif%d' % idx], ['vnet', vnet]]
-            config_vnet.append(config_vif)
-            idx += 1
-        config.append(config_vnet)
-            
+
+def make_config(opts):
+    """Create the domain configuration.
+    """
+    
+    config = ['vm',
+              ['name', opts.name ],
+              ['memory', opts.memory ] ]
+    if opts.cpu:
+        config.append(['cpu', opts.cpu])
+    if opts.blkif:
+        config.append(['backend', ['blkif']])
+    if opts.netif:
+        config.append(['backend', ['netif']])
+    
+    configure_image(config, opts)
+    config_devs = []
+    configure_disks(config_devs, opts)
+    configure_pci(config_devs, opts)
+    configure_vifs(config_devs, opts)
+    config += config_devs
     return config
 
 def preprocess_disk(opts):
@@ -213,7 +255,6 @@ def preprocess_disk(opts):
     disk = []
     for v in opts.disk:
         d = v.split(',')
-        print 'disk', v, d
         if len(d) != 3:
             opts.err('Invalid disk specifier: ' + v)
         disk.append(d)
@@ -230,6 +271,22 @@ def preprocess_pci(opts):
         hexd = map(lambda v: '0x'+v, d)
         pci.append(hexd)
     opts.pci = pci
+
+def preprocess_vifs(opts):
+    if not opts.vif: return
+    vifs = []
+    for vif in opts.vif:
+        d = {}
+        a = vif.split(',')
+        for b in a:
+            (k, v) = b.strip().split('=')
+            k = k.strip()
+            v = v.strip()
+            if k not in ['mac', 'bridge']:
+                opts.err('Invalid vif specifier: ' + vif)
+            d[k] = v
+        vifs.append(d)
+    opts.vif = vifs
 
 def preprocess_ip(opts):
     setip = (opts.hostname or opts.netmask
@@ -259,6 +316,7 @@ def preprocess(opts):
         opts.err("No kernel specified")
     preprocess_disk(opts)
     preprocess_pci(opts)
+    preprocess_vifs(opts)
     preprocess_ip(opts)
     preprocess_nfs(opts)
          
@@ -266,8 +324,8 @@ def make_domain(opts, config):
     """Create, build and start a domain.
     Returns: [int] the ID of the new domain.
     """
-    if opts.load:
-        filename = os.path.abspath(opts.load)
+    if opts.vals.load:
+        filename = os.path.abspath(opts.vals.load)
         dominfo = server.xend_domain_restore(filename, config)
     else:
         dominfo = server.xend_domain_create(config)
@@ -280,7 +338,7 @@ def make_domain(opts, config):
         console_port = None
     
     if server.xend_domain_unpause(dom) < 0:
-        server.xend_domain_halt(dom)
+        server.xend_domain_destroy(dom)
         opts.err("Failed to start domain %d" % dom)
     opts.info("Started domain %d, console on port %d"
               % (dom, console_port))
@@ -289,16 +347,16 @@ def make_domain(opts, config):
 def main(argv):
     opts = gopts
     args = opts.parse(argv)
-    if opts.help:
+    if opts.vals.help:
         opts.usage()
         return
-    if opts.config:
+    if opts.vals.config:
         pass
     else:
         opts.load_defaults()
-    preprocess(opts)
-    config = make_config(opts)
-    if opts.dryrun:
+    preprocess(opts.vals)
+    config = make_config(opts.vals)
+    if opts.vals.dryrun:
         PrettyPrint.prettyprint(config)
     else:
         make_domain(opts, config)

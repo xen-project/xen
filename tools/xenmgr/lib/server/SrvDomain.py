@@ -32,8 +32,8 @@ class SrvDomain(SrvDir):
         req.setHeader("Location", "%s/.." % req.prePathURL())
         return val
 
-    def op_halt(self, op, req):
-        val = self.xd.domain_halt(self.dom.id)
+    def op_destroy(self, op, req):
+        val = self.xd.domain_destroy(self.dom.id)
         req.setHeader("Location", "%s/.." % req.prePathURL())
         return val
 
@@ -196,7 +196,7 @@ class SrvDomain(SrvDir):
         req.write('<input type="submit" name="op" value="unpause">')
         req.write('<input type="submit" name="op" value="pause">')
         req.write('<input type="submit" name="op" value="shutdown">')
-        req.write('<input type="submit" name="op" value="halt">')
+        req.write('<input type="submit" name="op" value="destroy">')
         req.write('<br><input type="submit" name="op" value="migrate">')
         req.write('To: <input type="text" name="destination">')
         req.write('</form>')

@@ -1,5 +1,9 @@
 import random
 
+from twisted.internet import defer
+
+from xenmgr import XendBridge
+
 import channel
 import controller
 from messages import *
@@ -22,7 +26,7 @@ class NetifControllerFactory(controller.ControllerFactory):
         self.attached = 1
         self.registerChannel()
 
-    def createInstance(self, dom):
+    def createInstance(self, dom, recreate=0):
         """Create or find the network interface controller for a domain.
         """
         #print 'netif>createInstance> dom=', dom
@@ -40,12 +44,13 @@ class NetifControllerFactory(controller.ControllerFactory):
         netif = self.getInstanceByDom(dom)
         return (netif and netif.getDevice(vif)) or None
         
-    def setControlDomain(self, dom):
+    def setControlDomain(self, dom, recreate=0):
         """Set the 'back-end' device driver domain.
         """
         if self.dom == dom: return
         self.deregisterChannel()
-        self.attached = 0
+        if not recreate:
+            self.attached = 0
         self.dom = dom
         self.registerChannel()
         #
@@ -98,20 +103,38 @@ class NetifControllerFactory(controller.ControllerFactory):
 ##                 print "Done notifying guests"
 ##                 recovery = False
                 
-class NetDev:
+class NetDev(controller.Dev):
     """Info record for a network device.
     """
 
-    def __init__(self, vif, mac):
+    def __init__(self, ctrl, vif, mac):
+        controller.Dev.__init__(self, ctrl)
         self.vif = vif
         self.mac = mac
         self.evtchn = None
+        self.bridge = None
 
     def sxpr(self):
         vif = str(self.vif)
         mac = ':'.join(map(lambda x: "%x" % x, self.mac))
-        return ['netif', ['vif', vif], ['mac', mac]]
-    
+        val = ['netif', ['vif', vif], ['mac', mac]]
+        if self.bridge:
+            val += ['bridge', self.bridge]
+        return val
+
+    def bridge_add(self, bridge):
+        self.bridge = XendBridge.vif_bridge_add(self.controller.dom, self.vif, bridge)
+
+    def bridge_rem(self):
+        if not self.bridge: return
+        XendBridge.vif_bridge_rem(self.controller.dom, self.vif, self.bridge)
+        self.bridge = None
+
+    def destroy(self):
+        self.bridge_rem()
+        self.controller.send_be_destroy(self.vif)
+        
+
 class NetifController(controller.Controller):
     """Network interface controller. Handles all network devices for a domain.
     """
@@ -150,8 +173,7 @@ class NetifController(controller.Controller):
 
     def lostChannel(self):
         print 'NetifController>lostChannel>', 'dom=', self.dom
-        #for vif in self.devices:
-        #    self.send_be_destroy(vif)
+        #self.destroyDevices()
         controller.Controller.lostChannel(self)
 
     def getDevices(self):
@@ -167,11 +189,18 @@ class NetifController(controller.Controller):
             mac = [ int(x, 16) for x in vmac.split(':') ]
         if len(mac) != 6: raise ValueError("invalid mac")
         #print "attach_device>", "vif=", vif, "mac=", mac
-        dev = NetDev(vif, mac)
+        dev = NetDev(self, vif, mac)
         self.devices[vif] = dev
         return dev
 
-    def attach_device(self, vif, vmac):
+    def destroy(self):
+        self.destroyDevices()
+        
+    def destroyDevices(self):
+        for dev in self.getDevices():
+            dev.destroy()
+
+    def attachDevice(self, vif, vmac, recreate=0):
         """Attach a network device.
         If vmac is None a random mac address is assigned.
 
@@ -179,8 +208,12 @@ class NetifController(controller.Controller):
         @param vmac mac address (string)
         """
         self.addDevice(vif, vmac)
-        d = self.factory.addDeferred()
-        self.send_be_create(vif)
+        if recreate:
+            d = defer.Deferred()
+            d.callback(self)
+        else:
+            d = self.factory.addDeferred()
+            self.send_be_create(vif)
         return d
 
     def reattach_devices(self):

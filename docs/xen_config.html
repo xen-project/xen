@@ -86,13 +86,13 @@ Defines a netbsd kernel image and its command-line parameters.
     <li>args: string, optional. Extra kernel args.
 </ul>
 
-<h2>(controller (block)) element</h2>
-Define that the vm is a block device controller backend.
+<h2>(backend (blkif)) element</h2>
+The vm is a block device backend.
 The vm can have pci devices configured, but no virtual
 block devices.
 
-<h2>(controller (net)) element</h2>
-Define that the vm is a net device controller backend.
+<h2>(backend (netif)) element</h2>
+The vm is a net device backend.
 The domain may not have virtual network interfaces (vifs) configured.
 
 <h2>(device (vif)) element</h2>
