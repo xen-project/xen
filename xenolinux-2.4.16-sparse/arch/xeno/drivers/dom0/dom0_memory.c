@@ -336,6 +336,8 @@ int direct_disc_unmap(unsigned long from, unsigned long first_pg, int tot_pages)
     struct list_head * curr;
     struct list_head * direct_list = &current->mm->context.direct_list;    
 
+	printk(KERN_ALERT "bd240 debug: direct_disc_unmap\n");
+
     curr = direct_list->next;
     while(curr != direct_list){
         node = list_entry(curr, direct_mmap_node_t, list);
@@ -348,8 +350,12 @@ int direct_disc_unmap(unsigned long from, unsigned long first_pg, int tot_pages)
     if(curr == direct_list)
         return -1;
 
+	printk(KERN_ALERT "bd240 debug: direct_disc_unmap, deleted from direct_list\n");
+
     list_del(&node->list);
     kfree(node);
+
+	printk(KERN_ALERT "bd240 debug: direct_disc_unmap, from %lx, tot_pages %lx\n", from, tot_pages);
 
     while(count < tot_pages){
             direct_zap_page_range(current->mm, from, PAGE_SIZE);
