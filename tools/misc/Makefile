@@ -23,10 +23,10 @@ all: $(TARGETS)
 	$(MAKE) -C miniterm
 
 install: all
-	$(INSTALL_DIR) $(prefix)/usr/bin
-	$(INSTALL_DIR) $(prefix)/usr/sbin
-	$(INSTALL_PROG) $(INSTALL_BIN) $(prefix)/usr/bin
-	$(INSTALL_PROG) $(INSTALL_SBIN) $(prefix)/usr/sbin
+	$(INSTALL_DIR) $(DESTDIR)/usr/bin
+	$(INSTALL_DIR) $(DESTDIR)/usr/sbin
+	$(INSTALL_PROG) $(INSTALL_BIN) $(DESTDIR)/usr/bin
+	$(INSTALL_PROG) $(INSTALL_SBIN) $(DESTDIR)/usr/sbin
 	$(MAKE) -C miniterm install
 
 clean:

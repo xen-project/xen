@@ -72,10 +72,10 @@ check-for-zlib:
 	fi
 
 install: all
-	$(INSTALL_DIR) -p $(prefix)/usr/lib
-	$(INSTALL_PROG) $(LIB) $(prefix)/usr/lib
-	ln -sf $(LIB_NAME).so.$(MAJOR).$(MINOR) $(prefix)/usr/lib/$(LIB_NAME).so.$(MAJOR)
-	ln -sf $(LIB_NAME).so.$(MAJOR) $(prefix)/usr/lib/$(LIB_NAME).so
+	$(INSTALL_DIR) -p $(DESTDIR)/usr/lib
+	$(INSTALL_PROG) $(LIB) $(DESTDIR)/usr/lib
+	ln -sf $(LIB_NAME).so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/lib/$(LIB_NAME).so.$(MAJOR)
+	ln -sf $(LIB_NAME).so.$(MAJOR) $(DESTDIR)/usr/lib/$(LIB_NAME).so
 
 clean:
 	$(RM) *.a *.so *.so.* *.o *.opic *.rpm 

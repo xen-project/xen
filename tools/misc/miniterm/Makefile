@@ -9,8 +9,8 @@ TARGET = miniterm
 all: $(TARGET)
 
 install: all
-	$(INSTALL_DIR) $(prefix)/usr/bin
-	$(INSTALL_PROG) $(TARGET) $(prefix)/usr/bin
+	$(INSTALL_DIR) $(DESTDIR)/usr/bin
+	$(INSTALL_PROG) $(TARGET) $(DESTDIR)/usr/bin
 
 clean:
 	$(RM) *.o $(TARGET) *~

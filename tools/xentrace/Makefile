@@ -24,12 +24,12 @@ MAN8     = $(wildcard *.8)
 all: $(BIN)
 
 install: all
-	$(INSTALL_DIR) $(prefix)/usr/bin
-	$(INSTALL_DIR) $(prefix)/usr/man/man1
-	$(INSTALL_DIR) $(prefix)/usr/man/man8
-	$(INSTALL_PROG) $(BIN) $(SCRIPTS) $(prefix)/usr/bin
-	$(INSTALL_DATA) $(MAN1) $(prefix)/usr/man/man1
-	$(INSTALL_DATA) $(MAN8) $(prefix)/usr/man/man8
+	$(INSTALL_DIR) $(DESTDIR)/usr/bin
+	$(INSTALL_DIR) $(DESTDIR)/usr/man/man1
+	$(INSTALL_DIR) $(DESTDIR)/usr/man/man8
+	$(INSTALL_PROG) $(BIN) $(SCRIPTS) $(DESTDIR)/usr/bin
+	$(INSTALL_DATA) $(MAN1) $(DESTDIR)/usr/man/man1
+	$(INSTALL_DATA) $(MAN8) $(DESTDIR)/usr/man/man8
 
 clean:
 	$(RM) *.a *.so *.o *.rpm $(BIN)

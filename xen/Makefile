@@ -8,7 +8,8 @@ export XEN_VERSION       = 2
 export XEN_SUBVERSION    = 0
 export XEN_EXTRAVERSION  = ""
 
-export BASEDIR          := $(shell pwd)
+export BASEDIR          := $(CURDIR)
+DESTDIR			:= $(CURDIR)/../dist/install
 
 include Rules.mk
 
@@ -21,16 +22,15 @@ debug:
 	objdump -D -S $(TARGET)-syms > $(TARGET).s
 
 install: $(TARGET).gz
-	$(INSTALL_DIR) $(prefix)/boot
-	$(INSTALL_DATA) $(TARGET).gz $(prefix)/boot
-	$(INSTALL_DATA) $(TARGET)-syms $(prefix)/boot
-	$(INSTALL_DIR) $(prefix)/usr/include/xen/io
-	$(INSTALL_DATA) include/public/*.h $(prefix)/usr/include/xen
-	$(INSTALL_DATA) include/public/io/*.h $(prefix)/usr/include/xen/io
-	$(INSTALL_DATA) include/public/COPYING $(prefix)/usr/include/xen
+	$(INSTALL_DIR) $(DESTDIR)/boot
+	$(INSTALL_DATA) $(TARGET).gz $(DESTDIR)/boot
+	$(INSTALL_DATA) $(TARGET)-syms $(DESTDIR)/boot
+	$(INSTALL_DIR) $(DESTDIR)/usr/include/xen/io
+	$(INSTALL_DATA) include/public/*.h $(DESTDIR)/usr/include/xen
+	$(INSTALL_DATA) include/public/io/*.h $(DESTDIR)/usr/include/xen/io
+	$(INSTALL_DATA) include/public/COPYING $(DESTDIR)/usr/include/xen
 
-dist: $(TARGET)
-	$(MAKE) prefix=`pwd`/../dist/install dist=yes install
+dist: install
 
 clean: tools.clean common.clean drivers.clean arch/$(TARGET_ARCH).clean
 	rm -f include/asm *.o $(TARGET)* *~ core include/xen/compile.h

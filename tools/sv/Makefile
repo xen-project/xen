@@ -1,4 +1,4 @@
-sv_insdir	:= $(prefix)/var/lib/xen/sv
+sv_insdir := /var/lib/xen/sv
 INSTALL		= install
 INSTALL_DIR	= $(INSTALL) -d -m0755
 INSTALL_DATA	= $(INSTALL) -m0644
@@ -17,16 +17,16 @@ IMAGES	+= next.png previous.png finish.png
 
 install:
 	# copy XenSV Main.rpy file
-	@$(INSTALL_DIR) $(sv_insdir)
-	@$(INSTALL_DATA) Main.rpy $(sv_insdir)
+	@$(INSTALL_DIR) $(DESTDIR)$(sv_insdir)
+	@$(INSTALL_DATA) Main.rpy $(DESTDIR)$(sv_insdir)
 
 	# copy XenSV images
-	@($(INSTALL_DIR) $(sv_insdir)/images
-	@(cd images && $(INSTALL_DATA) $(IMAGES) $(sv_insdir)/images)
+	@$(INSTALL_DIR) $(DESTDIR)$(sv_insdir)/images
+	@(cd images && $(INSTALL_DATA) $(IMAGES) $(DESTDIR)$(sv_insdir)/images)
 
 	# copy XenSV stylesheet
-	@$(INSTALL_DIR) $(sv_insdir)/inc
-	@$(INSTALL_DATA) inc/style.css inc/script.js $(sv_insdir)/inc
+	@$(INSTALL_DIR) $(DESTDIR)$(sv_insdir)/inc
+	@$(INSTALL_DATA) inc/style.css inc/script.js $(DESTDIR)$(sv_insdir)/inc
 
 clean:
 

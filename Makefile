@@ -2,8 +2,9 @@
 # Grand Unified Makefile for Xen.
 #
 
-DIST_DIR    ?= $(shell pwd)/dist
-INSTALL_DIR ?= $(DIST_DIR)/install
+DIST_DIR	:= $(CURDIR)/dist
+DESTDIR		:= $(DIST_DIR)/install
+
 INSTALL		:= install
 INSTALL_DIR	:= $(INSTALL) -d -m0755
 INSTALL_DATA	:= $(INSTALL) -m0644
@@ -18,7 +19,7 @@ ALLSPARSETREES = $(patsubst %-xen-sparse,%,$(wildcard *-xen-sparse))
 XKERNELS := $(foreach kernel, $(KERNELS), $(patsubst buildconfigs/mk.%,%,$(wildcard buildconfigs/mk.$(kernel))) )
 
 
-export INSTALL_DIR
+export DESTDIR
 
 include buildconfigs/Rules.mk
 
@@ -56,10 +57,10 @@ dist: xen.dist tools.dist kernels docs.install
 	$(INSTALL_PROG) tools/check/chk tools/check/check_* $(DIST_DIR)/check
 
 xen:
-	$(MAKE) prefix=$(INSTALL_DIR) dist=yes -C xen install
+	$(MAKE) dist=yes -C xen install
 
 tools:
-	$(MAKE) prefix=$(INSTALL_DIR) dist=yes -C tools install
+	$(MAKE) dist=yes -C tools install
 
 kernels: $(addsuffix -build,$(XKERNELS))
 

@@ -68,12 +68,12 @@ mk-symlinks:
 	  ln -sf ../../$(LINUX_ROOT)/include/asm-xen/linux-public/*.h . )
 
 install: all
-	$(INSTALL_DIR) $(prefix)/usr/lib
-	$(INSTALL_DIR) $(prefix)/usr/include
-	$(INSTALL_PROG) $(LIB) $(prefix)/usr/lib
-	ln -sf $(LIB_NAME).so.$(MAJOR).$(MINOR) $(prefix)/usr/lib/$(LIB_NAME).so.$(MAJOR)
-	ln -sf $(LIB_NAME).so.$(MAJOR) $(prefix)/usr/lib/$(LIB_NAME).so
-	$(INSTALL_DATA) xc.h $(prefix)/usr/include
+	$(INSTALL_DIR) $(DESTDIR)/usr/lib
+	$(INSTALL_DIR) $(DESTDIR)/usr/include
+	$(INSTALL_PROG) $(LIB) $(DESTDIR)/usr/lib
+	ln -sf $(LIB_NAME).so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/lib/$(LIB_NAME).so.$(MAJOR)
+	ln -sf $(LIB_NAME).so.$(MAJOR) $(DESTDIR)/usr/lib/$(LIB_NAME).so
+	$(INSTALL_DATA) xc.h $(DESTDIR)/usr/include
 
 clean:
 	rm -rf *.a *.so *.o *.opic *.rpm $(LIB) *~ $(DEPS) xen

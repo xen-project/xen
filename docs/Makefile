@@ -11,7 +11,8 @@ TGIF		:= tgif
 LATEX2HTML	:= latex2html
 
 package		= xen
-docdir		= /usr/share/doc
+prefix		= /usr
+docdir		= $(prefix)/share/doc
 pkgdocdir	= $(docdir)/$(package)
 
 DOC_TEX		:= $(wildcard src/*.tex)
@@ -37,11 +38,11 @@ clean:
 	rm -rf $(GFX) ps pdf html
 
 install: all
-	rm -rf $(prefix)$(pkgdocdir)
-	$(INSTALL_DIR) $(prefix)$(pkgdocdir)
-	cp -dR ps $(prefix)$(pkgdocdir)
-	cp -dR pdf $(prefix)$(pkgdocdir)
-	cp -dR html $(prefix)$(pkgdocdir)
+	rm -rf $(DESTDIR)$(pkgdocdir)
+	$(INSTALL_DIR) $(DESTDIR)$(pkgdocdir)
+	cp -dR ps $(DESTDIR)$(pkgdocdir)
+	cp -dR pdf $(DESTDIR)$(pkgdocdir)
+	cp -dR html $(DESTDIR)$(pkgdocdir)
 
 pdf/%.pdf: ps/%.ps
 	$(INSTALL_DIR) $(@D)
