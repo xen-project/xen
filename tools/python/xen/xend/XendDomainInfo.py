@@ -288,6 +288,18 @@ def append_deferred(dlist, v):
     if isinstance(v, defer.Deferred):
         dlist.append(v)
 
+def dlist_err(val):
+    """Error callback suitable for a deferred list.
+    In a deferred list the error callback is called with with Failure((error, index)).
+    This callback extracts the error and returns it.
+
+    @param val: Failure containing (error, index)
+    @type val: twisted.internet.failure.Failure 
+    """
+    
+    (error, index) = val.value
+    return error
+
 class XendDomainInfo:
     """Virtual machine object."""
 
@@ -760,6 +772,7 @@ class XendDomainInfo:
             append_deferred(dlist, v)
             index[dev_name] = dev_index + 1
         deferred = defer.DeferredList(dlist, fireOnOneErrback=1)
+        deferred.addErrback(dlist_err)
         return deferred
 
     def device_create(self, dev_config):
@@ -991,6 +1004,7 @@ class XendDomainInfo:
                 log.warning("Unknown config field %s", field_name)
             index[field_name] = field_index + 1
         d = defer.DeferredList(dlist, fireOnOneErrback=1)
+        deferred.addErrback(dlist_err)
         return d
 
 

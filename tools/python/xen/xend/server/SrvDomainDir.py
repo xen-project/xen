@@ -5,6 +5,7 @@ from StringIO import StringIO
 
 from twisted.protocols import http
 from twisted.web import error
+from twisted.python.failure import Failure
 
 from xen.xend import sxp
 from xen.xend import XendDomain
@@ -94,6 +95,8 @@ class SrvDomainDir(SrvDir):
     def _op_create_err(self, err, req):
         """Callback to handle errors in deferred domain creation.
         """
+        if isinstance(err, Failure):
+            err = err.getErrorMessage()
         print 'op_create> Deferred Exception creating domain:', err
         req.setResponseCode(http.BAD_REQUEST, "Error creating domain: " + str(err))
         return str(err)
@@ -127,6 +130,8 @@ class SrvDomainDir(SrvDir):
             return val
 
     def _op_restore_err(self, err, req):
+        if isinstance(err, Failure):
+            err = err.getErrorMessage()
         print 'op_create> Deferred Exception restoring domain:', err
         req.setResponseCode(http.BAD_REQUEST, "Error restoring domain: "+ str(err))
         return str(err)
