@@ -55,6 +55,8 @@ gopts.opt('defconfig', short='f', val='FILE',
           After the script is loaded, option values that were not set on the
           command line are replaced by the values set in the script.""")
 
+gopts.default('defconfig')
+
 gopts.opt('config', short='F', val='FILE',
           fn=set_value, default=None,
           use="""Domain configuration to use (SXP).

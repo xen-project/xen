@@ -204,6 +204,8 @@ class Opts:
         self.vals.quiet = 0
         # Variables for default scripts.
         self.vars = {}
+        # Option to use for bare words.
+        self.default_opt = None
 
     def __repr__(self):
         return '\n'.join(map(str, self.options))
@@ -220,6 +222,15 @@ class Opts:
         self.options.append(x)
         self.options_map[name] = x
         return x
+
+    def default(self, name):
+        self.default_opt = name
+
+    def getdefault(self, val):
+        if self.default_opt is None:
+            return 0
+        opt = self.option(self.default_opt)
+        return opt.set(val)
 
     def var(self, name, **args):
         x = OptVar(self, name, **args)
@@ -284,27 +295,27 @@ class Opts:
         """
         self.argv = argv
 
-        try:
-            (vals, args) = getopt(argv[1:], self.short_opts(), self.long_opts())
-        except GetoptError, err:
-            self.err(str(err))
-
-	# hack to work around lack of gnu getopts parsing in python 2.2
-	xargs = args
-	while xargs[1:]:
-	    (v,xargs) = getopt(xargs[1:], self.short_opts(), self.long_opts())
-	    vals = vals + v
-
-	# back to the real work
-        self.args = args
-        for (k, v) in vals:
-            for opt in self.options:
-                if opt.specify(k, v): break
-            else:
-                print >>sys.stderr, "Error: Unknown option:", k
-                self.usage()
+        # hack to work around lack of gnu getopts parsing in python 2.2
+        args = argv[1:]
         xargs = []
-        for arg in args:
+        while args:
+            # let getopt parse whatever it feels like -- if anything
+            try:
+                (xvals, args) = getopt(args[0:],
+                                       self.short_opts(), self.long_opts())
+            except GetoptError, err:
+                self.err(str(err))
+                
+            for (k, v) in xvals:
+                for opt in self.options:
+                    if opt.specify(k, v): break
+                else:
+                    print >>sys.stderr, "Error: Unknown option:", k
+                    self.usage()
+
+            # then process the 1st arg 
+            (arg,args) = (args[0], args[1:])
+
             isvar = 0
             if '=' in arg:
                 (k, v) = arg.split('=', 1)
@@ -312,8 +323,11 @@ class Opts:
                     if opt.specify(k, v):
                         isvar = 1
                         break
+            elif self.getdefault(arg):
+                isvar = 1
             if not isvar:
                 xargs.append(arg)
+
         return xargs
 
     def short_opts(self):
