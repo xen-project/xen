@@ -305,7 +305,7 @@ unsigned long allocate_empty_lowmem_region(unsigned long pages)
     flush_page_update_queue();
 
     ret = HYPERVISOR_dom_mem_op(MEMOP_decrease_reservation, 
-                                pfn_array, 1<<order);
+                                pfn_array, 1<<order, 0);
     if ( unlikely(ret != (1<<order)) )
     {
         printk(KERN_WARNING "Unable to reduce memory reservation (%d)\n", ret);
@@ -332,7 +332,7 @@ void deallocate_lowmem_region(unsigned long vstart, unsigned long pages)
         BUG();
 
     ret = HYPERVISOR_dom_mem_op(MEMOP_increase_reservation,
-                                pfn_array, 1<<order);
+                                pfn_array, 1<<order, 0);
     if ( unlikely(ret != (1<<order)) )
     {
         printk(KERN_WARNING "Unable to increase memory reservation (%d)\n",

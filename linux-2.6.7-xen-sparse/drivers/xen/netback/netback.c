@@ -71,7 +71,7 @@ static spinlock_t mfn_lock = SPIN_LOCK_UNLOCKED;
 static void __refresh_mfn_list(void)
 {
     int ret = HYPERVISOR_dom_mem_op(MEMOP_increase_reservation,
-                                    mfn_list, MAX_MFN_ALLOC);
+                                    mfn_list, MAX_MFN_ALLOC, 0);
     if ( unlikely(ret != MAX_MFN_ALLOC) )
         BUG();
     alloc_index = MAX_MFN_ALLOC;
@@ -94,7 +94,8 @@ static void dealloc_mfn(unsigned long mfn)
     spin_lock_irqsave(&mfn_lock, flags);
     if ( alloc_index != MAX_MFN_ALLOC )
         mfn_list[alloc_index++] = mfn;
-    else if ( HYPERVISOR_dom_mem_op(MEMOP_decrease_reservation, &mfn, 1) != 1 )
+    else if ( HYPERVISOR_dom_mem_op(MEMOP_decrease_reservation,
+                                    &mfn, 1, 0) != 1 )
         BUG();
     spin_unlock_irqrestore(&mfn_lock, flags);
 }

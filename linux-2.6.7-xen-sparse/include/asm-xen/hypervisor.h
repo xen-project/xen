@@ -3,7 +3,7 @@
  * 
  * Linux-specific hypervisor handling.
  * 
- * Copyright (c) 2002, K A Fraser
+ * Copyright (c) 2002-2004, K A Fraser
  */
 
 #ifndef __HYPERVISOR_H__
@@ -366,14 +366,16 @@ static inline int HYPERVISOR_set_fast_trap(int idx)
 }
 
 static inline int HYPERVISOR_dom_mem_op(unsigned int   op,
-                                        unsigned long *pages,
-                                        unsigned long  nr_pages)
+                                        unsigned long *extent_list,
+                                        unsigned long  nr_extents,
+                                        unsigned int   extent_order)
 {
     int ret;
     __asm__ __volatile__ (
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_dom_mem_op),
-        "b" (op), "c" (pages), "d" (nr_pages) : "memory" );
+        "b" (op), "c" (extent_list), "d" (nr_extents), "S" (extent_order)
+        : "memory" );
 
     return ret;
 }
