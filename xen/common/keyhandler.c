@@ -1,8 +1,6 @@
 #include <xeno/keyhandler.h> 
 #include <xeno/reboot.h>
 
-extern void perfc_printall (u_char key, void *dev_id, struct pt_regs *regs);
-
 #define KEY_MAX 256
 #define STR_MAX  64
 
@@ -71,8 +69,6 @@ void halt_machine(u_char key, void *dev_id, struct pt_regs *regs)
     return; 
 }
 
-
-
 /* XXX SMH: this is keir's fault */
 static char *task_states[] = 
 { 
@@ -110,6 +106,8 @@ void do_task_queues(u_char key, void *dev_id, struct pt_regs *regs)
 }
 
 
+extern void perfc_printall (u_char key, void *dev_id, struct pt_regs *regs);
+extern void perfc_reset (u_char key, void *dev_id, struct pt_regs *regs);
 extern void dump_timerq(u_char key, void *dev_id, struct pt_regs *regs);
 extern void dump_runq(u_char key, void *dev_id, struct pt_regs *regs);
 
@@ -127,6 +125,7 @@ void initialize_keytable()
     add_key_handler('d', dump_registers, "dump registers"); 
     add_key_handler('h', show_handlers,  "show this message");
     add_key_handler('p', perfc_printall, "print performance counters"); 
+    add_key_handler('P', perfc_reset,    "reset performance counters"); 
     add_key_handler('q', do_task_queues, "dump task queues + guest state");
     add_key_handler('r', dump_runq,      "dump run queue"); 
     add_key_handler('R', halt_machine,   "reboot machine ungracefully"); 

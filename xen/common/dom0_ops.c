@@ -126,14 +126,22 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     }
     break;
 
+    case DOM0_BVTCTL:
+    {
+        unsigned long  ctx_allow = op.u.bvtctl.ctx_allow;
+        ret = sched_bvtctl(ctx_allow);
+        
+    }
+    break;
+
     case DOM0_ADJUSTDOM:
     {
         unsigned int   dom     = op.u.adjustdom.domain;
-		unsigned long  mcu_adv = op.u.adjustdom.mcu_adv;
-		unsigned long  warp    = op.u.adjustdom.warp;
-		unsigned long  warpl   = op.u.adjustdom.warpl;
-		unsigned long  warpu   = op.u.adjustdom.warpu;
-		
+        unsigned long  mcu_adv = op.u.adjustdom.mcu_adv;
+        unsigned long  warp    = op.u.adjustdom.warp;
+        unsigned long  warpl   = op.u.adjustdom.warpl;
+        unsigned long  warpu   = op.u.adjustdom.warpu;
+        
 
         if ( dom == IDLE_DOMAIN_ID )
         {

@@ -182,6 +182,7 @@
 3e4d00468-FN2VDeEHo96zxrMHK_mA tools/domain_builder/Makefile
 3e4d0046SPau_y0sw2WLJz8QkqNoRA tools/domain_builder/README
 3e4d0046bbdH0GsI9J_1Eb4ZQHfIiQ tools/domain_builder/dom0_defs.h
+3e71f9b871pvOAxDrhxpC4N4mHkbww tools/domain_builder/dom0_ops.h
 3e4d0046ouLij_CMN_j7-dUHZIBI_A tools/domain_builder/dom_builder.c
 3e4d0046EKs06fY0CWDEgZQcn7DYUg tools/domain_builder/dom_kill.c
 3e4d0046aPbGiRTtdWxqY5b3ytWurA tools/domain_builder/hypervisor_defs.h

@@ -16,26 +16,33 @@
  *
  * Commands understood by the interface:
  *
- * S <did> <mcu advance> [ <warp> <warp limit> <unwarp limit> ]
  * C <context swith allowance>
+ * S <did> <mcu advance> <warp> <warp limit> <unwarp limit>
  *
  ****************************************************************************
  * $Id: c-insert.c,v 1.7 2002/11/08 16:04:34 rn Exp $
  ****************************************************************************
  */
 
-
+#include <linux/config.h>
+#include <linux/module.h>
+#include <linux/kernel.h>
+#include <linux/sched.h>
+#include <linux/ctype.h>
+#include <linux/string.h>
+#include <linux/errno.h>
 #include <linux/proc_fs.h>
-#include <asm/hypervisor.h>
+
 #include "dom0_ops.h"
 
 #define SCHED_ENTRY    "sched"
 extern struct proc_dir_entry *xeno_base;
 static struct proc_dir_entry *sched_pde;
 
+static unsigned char readbuf[1024];
 
 static int sched_read_proc(char *page, char **start, off_t off,
-						   int count, int *eof, void *data)
+                           int count, int *eof, void *data)
 {   
     strcpy(page, readbuf);
     *readbuf = '\0';
@@ -46,35 +53,57 @@ static int sched_read_proc(char *page, char **start, off_t off,
 
 
 static int sched_write_proc(struct file *file, const char *buffer,
-							u_long count, void *data)
+                            u_long count, void *data)
 {
-	dom0_op_t op;
+    dom0_op_t op;
 
-	int ret, len;
-	int ts, te, tl; /* token start, end, and length */
+    int ret, len;
+    int ts, te, tl; /* token start, end, and length */
 
     /* Only admin can adjust scheduling parameters */
     if ( !capable(CAP_SYS_ADMIN) )
         return -EPERM;
 
-	/* parse the commands  */
-	len = count;
-	ts = te = 0;
+    /* parse the commands  */
+    len = count;
+    ts = te = 0;
 
-	while ( count && isspace(buffer[ts]) ) { ts++; count--; } // skip spaces.
-	te = ts;
-	if ( te <= ts ) goto bad;
-	tl = te - ts;
+    while ( count && isspace(buffer[ts]) ) { ts++; count--; } /*skip spaces*/
+    te = ts;
+    while ( count && !isspace(buffer[te]) ) { te++; count--; } /*command end*/
+    if ( te <= ts ) goto bad;
+    tl = te - ts;
 
-	if ( strncmp(&buffer[ts], "S", tl) == 0 )
-	{
-		op.cmd = NETWORK_OP_ADDRULE;
-	}
-	else if ( strncmp(&buffer[ts], "C", tl) == 0 )
-	{
-		op.cmd = NETWORK_OP_DELETERULE;
-	}
+    if ( strncmp(&buffer[ts], "C", tl) == 0 ) {
+        op.cmd = DOM0_BVTCTL;
+    } else if ( strncmp(&buffer[ts], "S", tl) == 0 ) {
+        op.cmd = DOM0_ADJUSTDOM;
+    } else
+        goto bad;
 
+    /* skip whitspaces and get first parameter */
+    ts = te; while ( count &&  isspace(buffer[ts]) ) { ts++; count--; }
+    te = ts; while ( count && !isspace(buffer[te]) ) { te++; count--; }
+    if ( te <= ts ) goto bad;
+    tl = te - ts;
+    if ( !isdigit(buffer[ts]) ) goto bad;
+
+    if (op.cmd == DOM0_BVTCTL) {
+        /* get context switch allowance  */
+        sscanf(&buffer[ts], "%lu", &op.u.bvtctl.ctx_allow);
+    } else if (op.cmd == DOM0_ADJUSTDOM) {
+        sscanf(&buffer[ts], "%u %lu %lu %lu %lu",
+               &op.u.adjustdom.domain,
+               &op.u.adjustdom.mcu_adv,
+               &op.u.adjustdom.warp,
+               &op.u.adjustdom.warpl,
+               &op.u.adjustdom.warpu);
+    }
+    ret = HYPERVISOR_dom0_op(&op);
+    return sizeof(op);
+    
+ bad:
+    return -EINVAL;
 
 }
 

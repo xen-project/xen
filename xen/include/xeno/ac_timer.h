@@ -43,10 +43,10 @@
  */
 
 struct ac_timer {
-	struct list_head timer_list;
-	s_time_t         expires;	/* system time time out value */
-	unsigned long    data;
-	void             (*function)(unsigned long);
+    struct list_head timer_list;
+    s_time_t         expires;   /* system time time out value */
+    unsigned long    data;
+    void             (*function)(unsigned long);
 };
 
 /* interface for "clients" */
@@ -55,7 +55,7 @@ extern int rem_ac_timer(struct ac_timer *timer);
 extern int mod_ac_timer(struct ac_timer *timer, s_time_t new_time);
 static inline void init_ac_timer(struct ac_timer *timer)
 {
-	//timer->next = NULL;
+    timer->timer_list.next = NULL;
 }
 
 /* interface used by programmable timer, implemented hardware dependent */

@@ -58,9 +58,10 @@ struct task_struct *do_newdomain(unsigned int dom_id, unsigned int cpu)
     SET_GDT_ADDRESS(p, DEFAULT_GDT_ADDRESS);
 
     p->addr_limit = USER_DS;
-    p->state      = TASK_UNINTERRUPTIBLE;
     p->active_mm  = &p->mm;
     p->num_net_vifs = 0;
+
+    sched_add_domain(p);
 
     p->net_ring_base = (net_ring_t *)(p->shared_info + 1);
     INIT_LIST_HEAD(&p->pg_head);
@@ -115,7 +116,8 @@ void kill_domain(void)
     }
 
     printk("Killing domain %d\n", current->domain);
-    current->state = TASK_DYING;
+    
+    sched_rem_domain(current);
     schedule();
     BUG(); /* never get here */
 }
@@ -293,7 +295,7 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
 
     /* set up the shared info structure */
     update_dom_time(p->shared_info);
-    p->shared_info->cpu_freq	 = cpu_freq;
+    p->shared_info->cpu_freq     = cpu_freq;
     p->shared_info->domain_time  = 0;
 
     /* we pass start info struct to guest os as function parameter on stack */
@@ -516,8 +518,8 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
     unmap_domain_mem(l1start);
 
     /* Set up shared info area. */
-	update_dom_time(p->shared_info);
-	p->shared_info->cpu_freq	 = cpu_freq;
+    update_dom_time(p->shared_info);
+    p->shared_info->cpu_freq     = cpu_freq;
     p->shared_info->domain_time  = 0;
 
 
@@ -555,7 +557,7 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
 #define SHIP2GUEST(_x) (virt_shinfo_address | (((unsigned long)(_x)) & 0xFFF))
 
     virt_startinfo_address->net_rings = 
-	(net_ring_t *)SHIP2GUEST(p->net_ring_base); 
+    (net_ring_t *)SHIP2GUEST(p->net_ring_base); 
     virt_startinfo_address->num_net_rings = p->num_net_vifs;
 
     /* Add block io interface */
@@ -597,7 +599,5 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params)
 
 void __init domain_init(void)
 {
-	printk("Initialising domains\n");
+    printk("Initialising domains\n");
 }
-
-

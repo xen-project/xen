@@ -10,14 +10,18 @@
  * PERFCOUNTER_ARRY (counter, string, size)   define an array of counters
  * 
  * unsigned long perfc_value  (counter)        get value of a counter  
+ * unsigned long perfc_valuec (counter)        get value of a per CPU counter
  * unsigned long perfc_valuea (counter, index) get value of an array counter
- * void perfc_incr  (counter)                 increment a counter          
- * void perfc_incrc (counter, index)          increment a per CPU counter   
- * void perfc_incra (counter, index)          increment an array counter   
- * void perfc_add   (counter, value)          add a value to a counter     
- * void perfc_addc  (counter, value)          add a value to a per CPU counter 
- * void perfc_adda  (counter, index, value)   add a value to array counter 
- * void perfc_print (counter)                 print out the counter
+ * unsigned long perfc_set  (counter, val)     set value of a counter  
+ * unsigned long perfc_setc (counter, val)     set value of a per CPU counter
+ * unsigned long perfc_seta (counter, index, val) set value of an array counter
+ * void perfc_incr  (counter)                  increment a counter          
+ * void perfc_incrc (counter, index)           increment a per CPU counter   
+ * void perfc_incra (counter, index)           increment an array counter   
+ * void perfc_add   (counter, value)           add a value to a counter     
+ * void perfc_addc  (counter, value)           add a value to a per CPU counter
+ * void perfc_adda  (counter, index, value)    add a value to array counter 
+ * void perfc_print (counter)                  print out the counter
  */
 
 #define PERFCOUNTER( var, name ) \
@@ -38,6 +42,9 @@ extern char *perfc_name[];
 #define perfc_value(x)    perfcounters.x[0]
 #define perfc_valuec(x)   perfcounters.x[smp_processor_id()]
 #define perfc_valuea(x,y) perfcounters.x[y]
+#define perfc_set(x,v)    perfcounters.x[0] = v
+#define perfc_setc(x,v)   perfcounters.x[smp_processor_id()] = v
+#define perfc_seta(x,y,v) perfcounters.x[y] = v
 #define perfc_incr(x)     perfcounters.x[0]++
 #define perfc_incrc(x)    perfcounters.x[smp_processor_id()]++
 #define perfc_incra(x,y)  perfcounters.x[y]++

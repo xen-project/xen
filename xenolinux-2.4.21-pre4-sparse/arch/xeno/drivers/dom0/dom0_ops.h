@@ -6,6 +6,7 @@
  * Copyright (c) 2002, K A Fraser, B Dragovic
  * 
  * MUST BE KEPT IN SYNC WITH xen/include/xeno/dom0_ops.h
+ * MUST BE KEPT IN SYNC WITH tools/domain_builder/dom0_ops.h
  */
 
 #define DOM0_NEWDOMAIN   0
@@ -43,16 +44,16 @@ typedef struct dom0_getmemlist_st
 
 typedef struct dom0_bvtctl_st
 {
-	unsigned long ctx_allow;	/* context switch allowance */
+    unsigned long ctx_allow;    /* context switch allowance */
 } dom0_bvtctl_t;
 
 typedef struct dom0_adjustdom_st
 {
-    unsigned int  domain;	/* domain id */
-	unsigned long mcu_adv;	/* mcu advance: inverse of weight */
-	unsigned long warp;     /* time warp */
-	unsigned long warpl;    /* warp limit */
-	unsigned long warpu;    /* unwarp time requirement */
+    unsigned int  domain;   /* domain id */
+    unsigned long mcu_adv;  /* mcu advance: inverse of weight */
+    unsigned long warp;     /* time warp */
+    unsigned long warpl;    /* warp limit */
+    unsigned long warpu;    /* unwarp time requirement */
 } dom0_adjustdom_t;
 
 /* This is entirely processed by XenoLinux */
@@ -92,8 +93,8 @@ typedef struct dom0_op_st
         dom0_newdomain_t newdomain;
         dom0_killdomain_t killdomain;
         dom0_getmemlist_t getmemlist;
-		dom0_bvtctl_t bvtctl;
-		dom0_adjustdom_t adjustdom;
+        dom0_bvtctl_t bvtctl;
+        dom0_adjustdom_t adjustdom;
         dom_mem_t dommem;
         dom_pgupdate_t pgupdate;
         dom_meminfo_t meminfo;
