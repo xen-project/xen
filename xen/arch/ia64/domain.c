@@ -470,8 +470,6 @@ void alloc_dom0(void)
 }
 
 int construct_dom0(struct domain *d, 
-                   unsigned long alloc_start,
-                   unsigned long alloc_end,
                    unsigned long image_start, unsigned long image_len, 
                    unsigned long initrd_start, unsigned long initrd_len,
                    char *cmdline)
