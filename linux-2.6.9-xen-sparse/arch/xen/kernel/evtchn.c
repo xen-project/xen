@@ -108,9 +108,12 @@ asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
             l1i--;
             l1 &= ~(1 << l1i);
         
-            l2 = s->evtchn_pending[l1i] & ~s->evtchn_mask[l1i];
-            while ( (l2i = ffs(l2)) != 0 )
+            for ( ;; )
             {
+                l2 = s->evtchn_pending[l1i] & ~s->evtchn_mask[l1i];
+                l2i = ffs(l2);
+                if ( l2i == 0 )
+                    break;
                 l2i--;
                 l2 &= ~(1 << l2i);
             
