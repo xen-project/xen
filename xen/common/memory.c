@@ -776,6 +776,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
     int okay = 1, cpu = smp_processor_id();
     unsigned int cmd = val & MMUEXT_CMD_MASK;
     unsigned long pfn = ptr >> PAGE_SHIFT;
+    unsigned long old_base_pfn;
     struct pfn_info *page = &frame_table[pfn];
 
     switch ( cmd )
@@ -831,10 +832,10 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         {
             invalidate_shadow_ldt();
             percpu_info[cpu].deferred_ops &= ~DOP_FLUSH_TLB;
+            old_base_pfn = pagetable_val(current->mm.pagetable) >> PAGE_SHIFT;
             current->mm.pagetable = mk_pagetable(pfn << PAGE_SHIFT);
-            write_cr3_counted(pagetable_val(current->mm.pagetable));
-            put_page_and_type(&frame_table[pagetable_val(current->mm.pagetable)
-                                          >> PAGE_SHIFT]);
+            write_cr3_counted(pfn << PAGE_SHIFT);
+            put_page_and_type(&frame_table[old_base_pfn]);
         }
         else
         {
