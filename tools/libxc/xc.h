@@ -25,18 +25,18 @@ typedef int64_t            s64;
 #include <xen/event_channel.h>
 #include <xen/sched_ctl.h>
 
-
 /*
  *  DEFINITIONS FOR CPU BARRIERS
  */ 
 
 #if defined(__i386__)
-#define rmb() __asm__ __volatile__ ("lock; addl $0,0(%%esp)" : : : "memory")
-#define wmb() __asm__ __volatile__ ("" : : : "memory")
+#define mb()  __asm__ __volatile__ ( "lock; addl $0,0(%%esp)" : : : "memory" )
+#define rmb() __asm__ __volatile__ ( "lock; addl $0,0(%%esp)" : : : "memory" )
+#define wmb() __asm__ __volatile__ ( "" : : : "memory")
 #elif defined(__x86_64__)
-#define mb()     asm volatile("mfence":::"memory")
-#define rmb()    asm volatile("lfence":::"memory")
-#define wmb()    asm volatile( "" :::"memory")
+#define mb()  __asm__ __volatile__ ( "mfence" : : : "memory")
+#define rmb() __asm__ __volatile__ ( "lfence" : : : "memory")
+#define wmb() __asm__ __volatile__ ( "" : : : "memory")
 #else
 #error "Define barriers"
 #endif

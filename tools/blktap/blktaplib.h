@@ -8,8 +8,7 @@
 #ifndef __BLKTAPLIB_H__
 #define __BLKTAPLIB_H__
 
-#include <stdint.h>
-
+#include <xc.h>
 #include <sys/user.h>
 #include <xen/xen.h>
 #include <xen/io/blkif.h>
