@@ -34,8 +34,6 @@
 
 #ifdef CONFIG_X86_IO_APIC
 
-static unsigned int nmi_watchdog;  /* XXXX XEN */
-
 #undef APIC_LOCKUP_DEBUG
 
 #define APIC_LOCKUP_DEBUG
@@ -1641,15 +1639,8 @@ static inline void check_timer(void)
 		 * Ok, does IRQ0 through the IOAPIC work?
 		 */
 		unmask_IO_APIC_irq(0);
-		if (timer_irq_works()) {
-			if (nmi_watchdog == NMI_IO_APIC) {
-				disable_8259A_irq(0);
-				setup_nmi();
-				enable_8259A_irq(0);
-				// XXX Xen check_nmi_watchdog();
-			}
+		if (timer_irq_works())
 			return;
-		}
 		clear_IO_APIC_pin(0, pin1);
 		printk(KERN_ERR "..MP-BIOS bug: 8254 timer not connected to IO-APIC\n");
 	}
@@ -1667,10 +1658,6 @@ static inline void check_timer(void)
 				replace_pin_at_irq(0, 0, pin1, 0, pin2);
 			else
 				add_pin_to_irq(0, 0, pin2);
-			if (nmi_watchdog == NMI_IO_APIC) {
-				setup_nmi();
-				// XXX Xen check_nmi_watchdog();
-			}
 			return;
 		}
 		/*
@@ -1679,11 +1666,6 @@ static inline void check_timer(void)
 		clear_IO_APIC_pin(0, pin2);
 	}
 	printk(" failed.\n");
-
-	if (nmi_watchdog) {
-		printk(KERN_WARNING "timer doesn't work through the IO-APIC - disabling NMI Watchdog!\n");
-		nmi_watchdog = 0;
-	}
 
 	printk(KERN_INFO "...trying to set up timer as Virtual Wire IRQ...");
 

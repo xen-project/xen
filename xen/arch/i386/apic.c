@@ -353,6 +353,9 @@ void __init setup_local_APIC (void)
     } else {
         printk("No ESR for 82489DX.\n");
     }
+
+	if (nmi_watchdog == NMI_LOCAL_APIC)
+		setup_apic_nmi_watchdog();
 }
 
 
@@ -413,6 +416,8 @@ static int __init detect_init_APIC (void)
     set_bit(X86_FEATURE_APIC, &boot_cpu_data.x86_capability);
     mp_lapic_addr = APIC_DEFAULT_PHYS_BASE;
     boot_cpu_physical_apicid = 0;
+	if (nmi_watchdog != NMI_NONE)
+		nmi_watchdog = NMI_LOCAL_APIC;
 
     printk("Found and enabled local APIC!\n");
     apic_pm_init1();

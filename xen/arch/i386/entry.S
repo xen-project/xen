@@ -131,7 +131,7 @@ CF_MASK		= 0x00000001
 IF_MASK		= 0x00000200
 NT_MASK		= 0x00004000
 
-#define SAVE_ALL \
+#define SAVE_ALL_NOSTI \
 	cld; \
 	pushl %gs; \
 	pushl %fs; \
@@ -146,8 +146,11 @@ NT_MASK		= 0x00004000
 	pushl %ebx; \
 	movl $(__HYPERVISOR_DS),%edx; \
 	movl %edx,%ds; \
-	movl %edx,%es; \
-        sti; 
+	movl %edx,%es;
+
+#define SAVE_ALL \
+	SAVE_ALL_NOSTI \
+	sti;
 
 #define RESTORE_ALL	\
 	popl %ebx;	\
@@ -554,7 +557,7 @@ ENTRY(debug)
 
 ENTRY(nmi)
 	pushl %eax
-	SAVE_ALL
+	SAVE_ALL_NOSTI
 	movl %esp,%edx
 	pushl $0
 	pushl %edx
