@@ -44,6 +44,8 @@ source "drivers/media/Kconfig"
 source "drivers/video/Kconfig"
 source "sound/Kconfig"
 source "drivers/usb/Kconfig"
+source "drivers/mmc/Kconfig"
+source "drivers/infiniband/Kconfig"
 endif
 
 if !XEN_PHYSDEV_ACCESS
