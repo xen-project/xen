@@ -15,6 +15,7 @@ import pwd
 import re
 import StringIO
 import traceback
+import time
 
 from twisted.internet import pollreactor
 pollreactor.install()
@@ -516,8 +517,8 @@ class Daemon:
         self.install_child_reaper()
 
         if self.fork_pid(XEND_PID_FILE):
-            #Parent
-            pass
+            #Parent. Sleep to give child time to start.
+            time.sleep(1)
         else:
             # Child
             self.tracing(trace)
