@@ -157,6 +157,8 @@ static ssize_t dom_mem_write(struct file * file, const char * buff,
 {
     dom_mem_t mem_data;
     
+    printk("dom_mem_write called: Shouldn't happen.\n");
+
     copy_from_user(&mem_data, (dom_mem_t *)buff, sizeof(dom_mem_t));
     
     if(direct_disc_unmap(mem_data.vaddr, mem_data.start_pfn, 
@@ -177,6 +179,9 @@ static ssize_t dom_mem_read(struct file * file, char * buff, size_t size, loff_t
     prot = PAGE_SHARED; 
 
     /* remap the range using xen specific routines */
+
+    printk("Calling direct_mmap with pfn %x, tot pages %x.\n",
+	   mem_data->pfn, mem_data->tot_pages);
 
     addr = direct_mmap(mem_data->pfn << PAGE_SHIFT, mem_data->tot_pages << PAGE_SHIFT, prot, MAP_DISCONT, mem_data->tot_pages);
     
@@ -204,6 +209,7 @@ static int dom_map_mem(unsigned int dom, unsigned long pfn, int tot_pages)
             /* check if there is already an entry for mem and if so
              * remove it.
              */
+	    /* XXX does this not leak the memdata? */
             remove_proc_entry("mem", pd);
 
             /* create new entry with parameters describing what to do
@@ -265,6 +271,10 @@ static int dom0_cmd_write(struct file *file, const char *buffer, size_t size,
     {
         ret = dom_map_mem(op.u.dommem.domain, op.u.dommem.start_pfn, 
                           op.u.dommem.tot_pages); 
+      /* This is now an ioctl, and shouldn't be being written to
+	 the command file. */
+	//      printk("map_dom_mem dom0_cmd used!\n");
+	//      ret = -EOPNOTSUPP;
     }
     else if ( op.cmd == DO_PGUPDATES )
     {
@@ -387,20 +397,16 @@ static int handle_dom0_cmd_createdomain(unsigned long data)
   dom0_op_t op;
   int ret;
 
-  if (copy_from_user(&argbuf, (void *)data, sizeof(argbuf))) {
-    printk("fault getting argbuf.\n");
+  if (copy_from_user(&argbuf, (void *)data, sizeof(argbuf)))
     return -EFAULT;
-  }
 
   op.cmd = DOM0_CREATEDOMAIN;
   op.u.newdomain.domain = -666;
   op.u.newdomain.memory_kb = argbuf.kb_mem;
   op.u.newdomain.num_vifs = 0; /* Not used anymore, I hope... */
   namelen = strnlen_user(argbuf.name, MAX_DOMAIN_NAME);
-  if (copy_from_user(op.u.newdomain.name, argbuf.name, namelen + 1)) {
-    printk("Fault getting domain name\n");
+  if (copy_from_user(op.u.newdomain.name, argbuf.name, namelen + 1))
     return -EFAULT;
-  }
 
   /* Error checking?  The old code deosn't appear to do any, and I
      can't see where the return values are documented... */
@@ -423,6 +429,42 @@ static int handle_dom0_cmd_createdomain(unsigned long data)
   return ret;
 }
 
+static unsigned long handle_dom0_cmd_mapdommem(unsigned long data)
+{
+  struct dom0_mapdommem_args argbuf;
+  unsigned long addr;
+
+  if (copy_from_user(&argbuf, (void *)data, sizeof(argbuf)))
+    return -EFAULT;
+  /* This seems to be assuming that the root of the page table is in
+     the first frame of the new domain's physical memory? */
+  /* XXX do I really mean this? */
+  /* XXX what happens if userspace forgets to do the unmap? */
+  printk("direct_maping w/ start pfn %x, tot_pages %x.\n",
+	 argbuf.start_pfn, argbuf.tot_pages);
+
+  addr = direct_mmap(argbuf.start_pfn << PAGE_SHIFT,
+		     argbuf.tot_pages << PAGE_SHIFT,
+		     PAGE_SHARED,
+		     MAP_DISCONT,
+		     argbuf.tot_pages);
+
+  printk("Picked vaddr %x.\n", addr);
+
+  return addr;
+}
+
+static int handle_dom0_cmd_unmapdommem(unsigned long data)
+{
+  struct dom0_unmapdommem_args argbuf;
+
+  if (copy_from_user(&argbuf, (void *)data, sizeof(argbuf)))
+    return -EFAULT;
+
+  return direct_disc_unmap(argbuf.vaddr, argbuf.start_pfn,
+			   argbuf.tot_pages);
+}
+
 static int dom0_cmd_ioctl(struct inode *inode, struct file *file,
 			  unsigned int cmd, unsigned long data)
 {
@@ -430,6 +472,10 @@ static int dom0_cmd_ioctl(struct inode *inode, struct file *file,
   switch (cmd) {
   case IOCTL_DOM0_CREATEDOMAIN:
     return handle_dom0_cmd_createdomain(data);
+  case IOCTL_DOM0_MAPDOMMEM:
+    return handle_dom0_cmd_mapdommem(data);
+  case IOCTL_DOM0_UNMAPDOMMEM:
+    return handle_dom0_cmd_unmapdommem(data);
   default:
     printk("Unknown dom0_cmd ioctl!\n");
     return -EINVAL;

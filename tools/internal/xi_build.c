@@ -12,6 +12,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <stdlib.h>
+#include <sys/ioctl.h>
 
 #include "hypervisor_defs.h"
 #include "dom0_ops.h"
@@ -47,23 +48,23 @@ static void dbstatus(char * msg)
 /* clean up domain's memory allocations */
 static void dom_mem_cleanup(dom_mem_t * dom_mem)
 {
-    char mem_path[MAX_PATH];
-    int mem_fd;
+    int fd;
+    struct dom0_unmapdommem_args argbuf;
 
-    /* open the domain's /proc mem interface */
-    sprintf(mem_path, "%s%s%s%s%d%s%s", "/proc/", PROC_XENO_ROOT, "/", 
-            PROC_DOM_PREFIX, dom_mem->domain, "/", PROC_DOM_MEM);
-
-    mem_fd = open(mem_path, O_WRONLY);
-    if(mem_fd < 0){
+    fd = open("/proc/xeno/dom0_cmd", O_WRONLY);
+    if(fd < 0){
         perror(PERR_STRING);
     }
     
-    if(write(mem_fd, (dom_mem_t *)dom_mem, sizeof(dom_mem_t)) < 0){
-	dbstatus("Error unmapping domain's memory.\n");
+    argbuf.vaddr = dom_mem->vaddr;
+    argbuf.start_pfn = dom_mem->start_pfn;
+    argbuf.tot_pages = dom_mem->tot_pages;
+
+    if (ioctl(fd, IOCTL_DOM0_UNMAPDOMMEM, &argbuf) < 0) {
+        dbstatus("Error unmapping domain's memory.\n");
     }
 
-    close(mem_fd);
+    close(fd);
 }
 
 /* ask dom0 to export domains memory through /proc */
@@ -121,21 +122,30 @@ static unsigned long get_vaddr(unsigned int dom)
 static int map_dom_mem(unsigned long pfn, int pages, int dom, 
                        dom_mem_t * dom_mem)
 {
+  struct dom0_mapdommem_args argbuf;
+  int fd;
 
-    if(setup_dom_memmap(pfn, pages, dom)){
-        perror(PERR_STRING);
-        return -1;
-    }
+  argbuf.domain = dom;
+  argbuf.start_pfn = pfn;
+  argbuf.tot_pages = pages;
+  
+  fd = open("/proc/xeno/dom0_cmd", O_RDWR);
+  if (fd < 0) {
+    perror("openning /proc/xeno/dom0_cmd");
+    return -1;
+  }
+  
+  dom_mem->domain = dom;
+  dom_mem->start_pfn = pfn;
+  dom_mem->tot_pages = pages;
+  dom_mem->vaddr = ioctl(fd, IOCTL_DOM0_MAPDOMMEM, &argbuf);
 
-    dom_mem->domain = dom;
-    dom_mem->start_pfn = pfn;
-    dom_mem->tot_pages = pages;
-    if((dom_mem->vaddr = get_vaddr(dom)) == 0){
-        dberr("Error mapping dom memory.");
-        return -1;
-    }
-    
-    return 0;
+  if (dom_mem->vaddr == -1) {
+    perror("mapping domain memory");
+    return -1;
+  }
+
+  return 0;
 }
 
 /* open kernel image and do some sanity checks */
@@ -220,7 +230,7 @@ static dom_meminfo_t *setup_guestos(int dom, int kernel_fd, int initrd_fd,
     pgt_updates = (page_update_request_t *)dom_mem->vaddr;
     alloc_index = dom_mem->tot_pages - 1;
 
-    memset(meminfo, 0, sizeof(meminfo));
+    memset(meminfo, 0, sizeof(*meminfo));
 
     memcpy(page_array, (void *)dom_mem->vaddr, dom_mem->tot_pages * 4);
 
