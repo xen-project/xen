@@ -82,7 +82,6 @@
 #include <xeno/config.h>
 #include <xeno/errno.h>
 #include <hypervisor-ifs/hypervisor-if.h>
-#include <asm/smp.h>
 
 EBX		= 0x00
 ECX		= 0x04

@@ -90,7 +90,7 @@ net_vif_t *create_net_vif(int domain)
     if ( sizeof(net_ring_t) > PAGE_SIZE ) BUG();
     new_ring = (net_ring_t *)get_free_page(GFP_KERNEL);
     clear_page(new_ring);
-    SHARE_PFN_WITH_DOMAIN(virt_to_page(new_ring), domain);
+    SHARE_PFN_WITH_DOMAIN(virt_to_page(new_ring), p);
 
     /*
      * Fill in the new vif struct. Note that, while the vif's refcnt is

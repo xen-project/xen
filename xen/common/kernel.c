@@ -181,6 +181,13 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
         for ( ; ; ) ;
     }
 
+    /* The array of pfn_info structures must fit into the reserved area. */
+    if ( sizeof(struct pfn_info) > 24 )
+    {
+        printk("'struct pfn_info' too large to fit in Xen address space!\n");
+        for ( ; ; ) ;
+    }
+
     set_current(&idle0_task);
 
     max_page = (mbi->mem_upper+1024) >> (PAGE_SHIFT - 10);

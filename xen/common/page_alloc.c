@@ -188,12 +188,12 @@ void __init init_page_allocator(unsigned long min, unsigned long max)
 /* Release a PHYSICAL address range to the allocator. */
 void release_bytes_to_allocator(unsigned long min, unsigned long max)
 {
-    min = round_pgup  (min) + PAGE_OFFSET;
-    max = round_pgdown(max) + PAGE_OFFSET;
+    min = round_pgup  (min);
+    max = round_pgdown(max);
 
     while ( min < max )
     {
-        __free_pages(min, 0);
+        __free_pages(min+PAGE_OFFSET, 0);
         min += PAGE_SIZE;
     }
 }
@@ -209,7 +209,6 @@ unsigned long __get_free_pages(int mask, int order)
 
 retry:
     spin_lock_irqsave(&alloc_lock, flags);
-
 
     /* Find smallest order which can satisfy the request. */
     for ( i = order; i < FREELIST_SIZE; i++ ) {

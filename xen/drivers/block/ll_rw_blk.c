@@ -14,30 +14,14 @@
 #include <xeno/types.h>
 #include <xeno/lib.h>
 #include <xeno/sched.h>
-/*#include <xeno/kernel_stat.h>*/
 #include <xeno/errno.h>
-/*#include <xeno/locks.h>*/
 #include <xeno/mm.h>
-/*#include <xeno/swap.h>*/
 #include <xeno/init.h>
-/*#include <xeno/smp_lock.h>*/
-/*#include <xeno/completion.h>*/
-
 #include <asm/system.h>
 #include <asm/io.h>
 #include <xeno/blk.h>
-/*#include <xeno/highmem.h>*/
 #include <xeno/slab.h>
 #include <xeno/module.h>
-
-/*
- * KAF: We can turn off noise relating to barking guest-OS requests.
- */
-#if 0
-#define DPRINTK(_f, _a...) printk(_f , ## _a)
-#else
-#define DPRINTK(_f, _a...) ((void)0)
-#endif
 
 /* This will die as all synchronous stuff is coming to an end */
 #if 0 
@@ -46,8 +30,6 @@
 // XXX SMH: we spin when waiting for completion so just toggle flag 
 #define complete(_r) (*(int *)(_r) = 0)
 #endif
-
-
 
 /*
  * MAC Floppy IWM hooks

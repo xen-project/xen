@@ -40,7 +40,7 @@ static void DEBUG_allow_pt_reads(void)
         pte = update_debug_queue[i].ptep;
         if ( pte == NULL ) continue;
         update_debug_queue[i].ptep = NULL;
-        update.ptr = pte;
+        update.ptr = virt_to_machine(pte);
         update.val = update_debug_queue[i].pteval;
         HYPERVISOR_mmu_update(&update, 1);
     }
@@ -59,7 +59,7 @@ static void DEBUG_disallow_pt_read(unsigned long va)
     pgd = pgd_offset_k(va);
     pmd = pmd_offset(pgd, va);
     pte = pte_offset(pmd, va);
-    update.ptr = pte;
+    update.ptr = virt_to_machine(pte);
     pteval = *(unsigned long *)pte;
     update.val = pteval & ~_PAGE_PRESENT;
     HYPERVISOR_mmu_update(&update, 1);
@@ -95,7 +95,9 @@ void MULTICALL_flush_page_update_queue(void)
 #if MMU_UPDATE_DEBUG > 0
         DEBUG_allow_pt_reads();
 #endif
-        queue_multicall2(__HYPERVISOR_mmu_update, (unsigned long)update_queue, idx);
+        queue_multicall2(__HYPERVISOR_mmu_update, 
+                         (unsigned long)update_queue, 
+                         idx);
         idx = 0;
     }
     spin_unlock_irqrestore(&update_lock, flags);
@@ -134,7 +136,7 @@ void queue_l1_entry_update(pte_t *ptr, unsigned long val)
 #if MMU_UPDATE_DEBUG > 0
     DEBUG_disallow_pt_read((unsigned long)ptr);
 #endif
-    update_queue[idx].ptr = (unsigned long)ptr;
+    update_queue[idx].ptr = virt_to_machine(ptr);
     update_queue[idx].val = val;
     increment_index();
     spin_unlock_irqrestore(&update_lock, flags);
@@ -144,7 +146,7 @@ void queue_l2_entry_update(pmd_t *ptr, unsigned long val)
 {
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
-    update_queue[idx].ptr = (unsigned long)ptr;
+    update_queue[idx].ptr = virt_to_machine(ptr);
     update_queue[idx].val = val;
     increment_index();
     spin_unlock_irqrestore(&update_lock, flags);

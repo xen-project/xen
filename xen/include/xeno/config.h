@@ -145,6 +145,13 @@
 
 #define capable(_c) 0
 
+#ifndef NDEBUG
+#define DPRINTK(_f, _a...) printk("(file=%s, line=%d) " _f, \
+                           __FILE__, __LINE__, ## _a)
+#else
+#define DPRINTK(_f, _a...) ((void)0)
+#endif
+
 #ifndef __ASSEMBLY__
 
 #include <xeno/compiler.h>

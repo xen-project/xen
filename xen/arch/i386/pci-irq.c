@@ -6,16 +6,15 @@
 
 #include <linux/config.h>
 #include <linux/types.h>
-/*#include <linux/kernel.h>*/
 #include <linux/pci.h>
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
 #include <linux/sched.h>
-
 #include <asm/io.h>
 #include <asm/smp.h>
+#include <asm/mpspec.h>
 #include <asm/io_apic.h>
 
 #include "pci-i386.h"

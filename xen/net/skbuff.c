@@ -133,41 +133,20 @@ static __inline__ void skb_head_to_pool(struct sk_buff *skb)
 
 static inline u8 *alloc_skb_data_page(struct sk_buff *skb)
 {
-    struct list_head *list_ptr;
-    struct pfn_info  *pf;
-    unsigned long flags;
-        
-    spin_lock_irqsave(&free_list_lock, flags);
-
-    if (!free_pfns) return NULL;
-
-    list_ptr = free_list.next;
-    pf = list_entry(list_ptr, struct pfn_info, list);
-    pf->flags = 0;
-    list_del(&pf->list);
-    free_pfns--;
-
-    spin_unlock_irqrestore(&free_list_lock, flags);
-
+    struct pfn_info *pf;
+    if ( unlikely((pf = alloc_domain_page(NULL)) == NULL) )
+        return NULL;
     skb->pf = pf;
     return (u8 *)((pf - frame_table) << PAGE_SHIFT);
 }
 
 static inline void dealloc_skb_data_page(struct sk_buff *skb)
 {
-    struct pfn_info  *pf;
+    struct pfn_info *pf = skb->pf;
     unsigned long flags;
-
-    pf = skb->pf;
-
     spin_lock_irqsave(&free_list_lock, flags);
-        
-    pf->flags = 0;
-    set_page_type_count(pf, 0);
-    set_page_tot_count(pf, 0);
     list_add(&pf->list, &free_list);
     free_pfns++;
-
     spin_unlock_irqrestore(&free_list_lock, flags);
 
 }

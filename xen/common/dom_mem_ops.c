@@ -16,58 +16,26 @@
 #include <xeno/event.h>
 #include <asm/domain_page.h>
 
-#if 0
-#define DPRINTK(_f, _a...) printk( _f , ## _a )
-#else
-#define DPRINTK(_f, _a...) ((void)0)
-#endif
-
 static long alloc_dom_mem(struct task_struct *p, reservation_increase_t op)
 {
-    struct list_head *temp;
-    struct pfn_info  *pf;     /* pfn_info of current page */
+    struct pfn_info  *page;
     unsigned long     mpfn;   /* machine frame number of current page */
     void             *va;     /* Xen-usable mapping of current page */
     unsigned long     i;
-    unsigned long     flags;
 
-    /*
-     * POLICY DECISION: Each domain has a page limit.
-     * NB. The first part of test is because op.size could be so big that
-     * tot_pages + op.size overflows a u_long.
-     */
-    if( (op.size > p->max_pages) ||
-        ((p->tot_pages + op.size) > p->max_pages) )
-        return -ENOMEM;
-
-    spin_lock_irqsave(&free_list_lock, flags);
-
-    if ( free_pfns < (op.size + (SLACK_DOMAIN_MEM_KILOBYTES >> 
-                                  (PAGE_SHIFT-10))) ) 
-    {
-        spin_unlock_irqrestore(&free_list_lock, flags);
-        return -ENOMEM;
-    }
-
-    spin_lock(&p->page_lock);
-    
-    temp = free_list.next;
     for ( i = 0; i < op.size; i++ )
     {
-        /* Get a free page and add it to the domain's page list. */
-        pf = list_entry(temp, struct pfn_info, list);
-        pf->flags |= p->domain;
-        set_page_type_count(pf, 0);
-        set_page_tot_count(pf, 0);
-        temp = temp->next;
-        list_del(&pf->list);
-        list_add_tail(&pf->list, &p->pg_head);
-        free_pfns--;
+        /* Leave some slack pages; e.g., for the network. */
+        if ( unlikely(free_pfns < (SLACK_DOMAIN_MEM_KILOBYTES >> 
+                                   (PAGE_SHIFT-10))) ) 
+            break;
 
-        p->tot_pages++;
-
+        /* NB. 'alloc_domain_page' does limit checking on pages per domain. */
+        if ( unlikely((page = alloc_domain_page(p)) == NULL) )
+            break;
+        
         /* Inform the domain of the new page's machine address. */ 
-        mpfn = (unsigned long)(pf - frame_table);
+        mpfn = (unsigned long)(page - frame_table);
         copy_to_user(op.pages, &mpfn, sizeof(mpfn));
         op.pages++; 
 
@@ -77,26 +45,17 @@ static long alloc_dom_mem(struct task_struct *p, reservation_increase_t op)
         unmap_domain_mem(va);
     }
 
-    spin_unlock(&p->page_lock);
-    spin_unlock_irqrestore(&free_list_lock, flags);
-    
-    return op.size;
+    return i;
 }
     
 static long free_dom_mem(struct task_struct *p, reservation_decrease_t op)
 {
-    struct list_head *temp;
-    struct pfn_info  *pf;     /* pfn_info of current page */
+    struct pfn_info  *page;
     unsigned long     mpfn;   /* machine frame number of current page */
     unsigned long     i;
-    unsigned long     flags;
     long              rc = 0;
     int               need_flush = 0;
 
-    spin_lock_irqsave(&free_list_lock, flags);
-    spin_lock(&p->page_lock);
-
-    temp = free_list.next;
     for ( i = 0; i < op.size; i++ )
     {
         copy_from_user(&mpfn, op.pages, sizeof(mpfn));
@@ -109,37 +68,28 @@ static long free_dom_mem(struct task_struct *p, reservation_decrease_t op)
             goto out;
         }
 
-        pf = &frame_table[mpfn];
-        if ( (page_type_count(pf) != 0) || 
-             (page_tot_count(pf) != 0) ||
-             ((pf->flags & PG_domain_mask) != p->domain) )
+        page = &frame_table[mpfn];
+        if ( unlikely(!get_page(page, p)) )
         {
-            DPRINTK("Bad page free for domain %d (%ld, %ld, %08lx)\n",
-                    p->domain, page_type_count(pf), 
-                    page_tot_count(pf), pf->flags);
+            DPRINTK("Bad page free for domain %d\n", p->domain);
             rc = -EINVAL;
             goto out;
         }
 
-        need_flush |= pf->flags & PG_need_flush;
+        if ( test_and_clear_bit(_PGC_guest_pinned, &page->count_and_flags) )
+            put_page_and_type(page);
 
-        pf->flags = 0;
+        if ( test_and_clear_bit(_PGC_allocated, &page->count_and_flags) )
+            put_page(page);
 
-        list_del(&pf->list);
-        list_add(&pf->list, &free_list);
-        free_pfns++;
-
-        p->tot_pages--;
+        put_page(page);
     }
 
  out:
-    spin_unlock(&p->page_lock);
-    spin_unlock_irqrestore(&free_list_lock, flags);
-    
     if ( need_flush )
     {
         __flush_tlb();
-        perfc_incrc(need_flush_tlb_flush);
+        perfc_incr(need_flush_tlb_flush);
     }
 
     return rc ? rc : op.size;

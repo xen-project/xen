@@ -38,31 +38,6 @@ static unsigned int get_domnr(void)
     return 0;
 }
 
-static void build_page_list(struct task_struct *p)
-{
-    unsigned long *list;
-    unsigned long curr;
-    struct list_head *list_ent;
-
-    curr = list_entry(p->pg_head.next, struct pfn_info, list) - frame_table;
-    list = (unsigned long *)map_domain_mem(curr << PAGE_SHIFT);
-
-    list_for_each(list_ent, &p->pg_head)
-    {
-        *list++ = list_entry(list_ent, struct pfn_info, list) - frame_table;
-
-        if( ((unsigned long)list & ~PAGE_MASK) == 0 )
-        {
-            struct list_head *ent = frame_table[curr].list.next;
-            curr = list_entry(ent, struct pfn_info, list) - frame_table;
-            unmap_domain_mem(list-1);
-            list = (unsigned long *)map_domain_mem(curr << PAGE_SHIFT);
-        }
-    }
-
-    unmap_domain_mem(list);
-}
-
 static int msr_cpu_mask;
 static unsigned long msr_addr;
 static unsigned long msr_lo;
@@ -164,8 +139,6 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             goto exit_create;
         }
 
-        build_page_list(p);
-        
         ret = p->domain;
         
         op.u.createdomain.domain = ret;
@@ -245,7 +218,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     case DOM0_GETMEMLIST:
     {
         int i;
-        struct task_struct * p = find_domain_by_id(op.u.getmemlist.domain);
+        struct task_struct *p = find_domain_by_id(op.u.getmemlist.domain);
         unsigned long max_pfns = op.u.getmemlist.max_pfns;
         unsigned long pfn;
         unsigned long *buffer = op.u.getmemlist.buffer;
@@ -254,28 +227,27 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         ret = -EINVAL;
         if ( p != NULL )
         {
-            list_ent = p->pg_head.next;
-            pfn = list_entry(list_ent, struct pfn_info, list) - frame_table;
-            
-            for ( i = 0; (i < max_pfns) && (list_ent != &p->pg_head); i++ )
+            ret = 0;
+
+            spin_lock(&p->page_list_lock);
+            list_ent = p->page_list.next;
+            for ( i = 0; (i < max_pfns) && (list_ent != &p->page_list); i++ )
             {
+                pfn = list_entry(list_ent, struct pfn_info, list) - 
+                    frame_table;
                 if ( put_user(pfn, buffer) )
                 {
                     ret = -EFAULT;
-                    goto out_getmemlist;
+                    break;
                 }
                 buffer++;
                 list_ent = frame_table[pfn].list.next;
-                pfn = list_entry(list_ent, struct pfn_info, list) - 
-                    frame_table;
             }
+            spin_unlock(&p->page_list_lock);
 
             op.u.getmemlist.num_pfns = i;
             copy_to_user(u_dom0_op, &op, sizeof(op));
-
-            ret = 0;
-
-        out_getmemlist:
+            
             put_task_struct(p);
         }
     }
@@ -368,21 +340,24 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     {
         struct pfn_info *page;
         unsigned long pfn = op.u.getpageframeinfo.pfn;
-        
-        if ( pfn >= max_page )
-        {
-            ret = -EINVAL;
-        }
-        else
-        {
-            page = frame_table + pfn;
-            
-            op.u.getpageframeinfo.domain = page->flags & PG_domain_mask;
-            op.u.getpageframeinfo.type   = NONE;
+        unsigned int dom = op.u.getpageframeinfo.domain;
+        struct task_struct *p;
 
-            if ( page_type_count(page) != 0 )
+        ret = -EINVAL;
+
+        if ( unlikely(pfn >= max_page) || 
+             unlikely((p = find_domain_by_id(dom)) == NULL) )
+            break;
+
+        page = &frame_table[pfn];
+
+        if ( likely(get_page(page, p)) )
+        {
+            op.u.getpageframeinfo.type = NONE;
+
+            if ( (page->type_and_flags & PGT_count_mask) != 0 )
             {
-                switch ( page->flags & PG_type_mask )
+                switch ( page->type_and_flags & PGT_type_mask )
                 {
                 case PGT_l1_page_table:
                     op.u.getpageframeinfo.type = L1TAB;
@@ -392,9 +367,13 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
                     break;
                 }
             }
-
-            copy_to_user(u_dom0_op, &op, sizeof(op));
+            
+            put_page(page);
         }
+
+        put_task_struct(p);
+
+        copy_to_user(u_dom0_op, &op, sizeof(op));
     }
     break;
 

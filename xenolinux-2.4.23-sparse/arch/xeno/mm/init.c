@@ -113,13 +113,10 @@ static inline void set_pte_phys (unsigned long vaddr,
     }
     pte = pte_offset(pmd, vaddr);
 
-#if 0 /* Not in Xen, since this breaks clear_fixmap. */
-    if (pte_val(*pte))
-        pte_ERROR(*pte);
-#endif
-
-    /* We queue directly, avoiding hidden phys->machine translation. */
-    queue_l1_entry_update(pte, phys | pgprot_val(prot));
+    if ( pte_io(*pte) || (pgprot_val(prot) & _PAGE_IO) )
+        queue_unchecked_mmu_update(pte, phys | pgprot_val(prot));
+    else
+        queue_l1_entry_update(pte, phys | pgprot_val(prot));
 
     /*
      * It's enough to flush this one mapping.
@@ -137,8 +134,7 @@ void __set_fixmap(enum fixed_addresses idx, unsigned long phys,
         printk("Invalid __set_fixmap\n");
         return;
     }
-    set_pte_phys(address, phys, 
-                 __pgprot(pgprot_val(PAGE_KERNEL)|pgprot_val(flags)));
+    set_pte_phys(address, phys, flags);
 }
 
 void clear_fixmap(enum fixed_addresses idx)

@@ -44,6 +44,8 @@
 #include <xeno/smp.h>
 #include <asm/msr.h>
 #include <asm/system.h>
+#include <asm/mpspec.h>
+#include <asm/io_apic.h>
 #include <xeno/sched.h>
 #include <xeno/delay.h>
 #include <xeno/lib.h>
