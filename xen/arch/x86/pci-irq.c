@@ -843,10 +843,6 @@ static struct irq_info *pirq_get_info(struct pci_dev *dev)
 	return NULL;
 }
 
-static void pcibios_test_irq_handler(int irq, void *dev_id, struct pt_regs *regs)
-{
-}
-
 static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 {
 	u8 pin;
