@@ -7,7 +7,7 @@ CC       = gcc
 CFLAGS   = -c -Werror -O3 -fno-strict-aliasing
 CFLAGS  += -I../../../xen/include/hypervisor-ifs
 CFLAGS  += -I../../xend/lib
-CFLAGS  += -I../../../xenolinux-sparse/include
+CFLAGS  += -I../../../linux-xen-sparse/include
 
 HDRS     = $(wildcard *.h)
 OBJS     = $(patsubst %.c,%.o,$(wildcard *.c))

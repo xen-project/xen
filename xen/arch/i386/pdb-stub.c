@@ -1187,7 +1187,7 @@ int pdb_handle_exception(int exceptionVector,
 	 !pdb_system_call &&
 	 xen_regs->eip != pdb_system_call_next_addr + 1 &&
 	 (exceptionVector != KEYPRESS_EXCEPTION) &&
-	 xen_regs->eip < 0xc0000000)                   /* xenolinux for now! */
+	 xen_regs->eip < 0xc0000000)  /* Linux-specific for now! */
     {
         TRC(printf("pdb: user bkpt (0x%x) at 0x%lx:0x%lx\n", 
 		   exceptionVector, cr3, xen_regs->eip));

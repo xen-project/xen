@@ -2,7 +2,7 @@
 CC       = gcc
 CFLAGS   = -Wall -O3 -Werror
 CFLAGS  += -I../../xen/include/hypervisor-ifs
-CFLAGS  += -I../../xenolinux-sparse/include
+CFLAGS  += -I../../linux-xen-sparse/include
 CFLAGS  += -I../xend/lib
 
 HDRS     = $(wildcard *.h)

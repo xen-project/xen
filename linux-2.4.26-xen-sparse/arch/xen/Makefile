@@ -109,17 +109,17 @@ FORCE: ;
 .PHONY: bzImage compressed clean archclean archmrproper archdep
 
 bzImage: vmlinux
-	@$(MAKEBOOT) xenolinux.gz
+	@$(MAKEBOOT) bzImage
 
 install: bzImage
 	mkdir -p $(prefix)/boot
-	install -m0644 arch/$(ARCH)/boot/xenolinux.gz $(prefix)/boot/xenolinux.gz
-	install -m0644 vmlinux $(prefix)/boot/xenolinux.dbg
+	install -m0644 arch/$(ARCH)/boot/bzImage $(prefix)/boot/vmlinuz-2.4.26-xen
+	install -m0644 vmlinux $(prefix)/boot/vmlinux-syms-2.4.26-xen
 
 dist: bzImage
 	mkdir -p ../install/boot
-	install -m0644 arch/$(ARCH)/boot/xenolinux.gz ../install/boot/xenolinux.gz
-	install -m0644 vmlinux ../install/boot/xenolinux.dbg
+	install -m0644 arch/$(ARCH)/boot/xenolinux.gz ../install/boot/vmlinuz-2.4.26-xen
+	install -m0644 vmlinux ../install/boot/vmlinux-syms-2.4.26-xen
 
 archclean:
 	@$(MAKEBOOT) clean

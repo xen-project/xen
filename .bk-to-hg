@@ -1,6 +1,2 @@
-#!/bin/sh -x
-set -e
-test -L xenolinux-sparse
-rm      xenolinux-sparse
-(find -depth -type d -print | xargs -r rmdir 2>/dev/null) || true
+#!/bin/sh
 exit 0
