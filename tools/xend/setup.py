@@ -2,6 +2,7 @@
 from distutils.core import setup, Extension
 
 utils = Extension("utils",
+                  extra_compile_args   = ["-fno-strict-aliasing"],
                   include_dirs         = ["../xc/lib"],
                   library_dirs         = ["../xc/lib"],
                   libraries            = ["xc"],
