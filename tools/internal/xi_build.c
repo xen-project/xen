@@ -296,8 +296,6 @@ static int setup_guestos(
         /* The last PTE we consider is filled in later by Xen. */
         if ( count == tot_pages ) break;
 		
-        printf("%lu: %08lx\n", count, page_array[count]);
-
         if ( count < pt_start )
         {
             pgt_updates->ptr = l1tab;
@@ -322,9 +320,6 @@ static int setup_guestos(
         pgt_updates++;
         num_pgt_updates++;
     }
-
-    printf("XHDHFDHGFGHFGXXX\n");
-    sleep(4);
 
     meminfo->virt_startinfo_addr =
         virt_load_addr + ((alloc_index-1)<<PAGE_SHIFT);
