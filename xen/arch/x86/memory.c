@@ -1682,6 +1682,8 @@ void ptwr_flush(const int which)
              */
             memcpy(&pl1e[i], &ptwr_info[cpu].ptinfo[which].page[i],
                    (ENTRIES_PER_L1_PAGETABLE - i) * sizeof(l1_pgentry_t));
+            unmap_domain_mem(pl1e);
+            ptwr_info[cpu].ptinfo[which].l1va = 0;
             domain_crash();
         }
         
