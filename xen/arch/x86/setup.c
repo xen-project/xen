@@ -19,6 +19,7 @@
 #include <asm/domain_page.h>
 #include <asm/pdb.h>
 #include <asm/shadow.h>
+#include <asm/e820.h>
 
 /* opt_dom0_mem: Kilobytes of memory allocated to domain 0. */
 static unsigned int opt_dom0_mem = 16000;
@@ -467,10 +468,12 @@ void __init __start_xen(multiboot_info_t *mbi)
     unsigned long max_mem;
     unsigned long dom0_memory_start, dom0_memory_end;
     unsigned long initial_images_start, initial_images_end;
+    struct e820entry e820_raw[E820MAX];
+    int e820_raw_nr = 0, bytes = 0;
 
     /* Parse the command-line options. */
-    cmdline = (unsigned char *)(mbi->cmdline ? __va(mbi->cmdline) : NULL);
-    cmdline_parse(cmdline);
+    if ( (mbi->flags & MBI_CMDLINE) && (mbi->cmdline != 0) )
+        cmdline_parse(__va(mbi->cmdline));
 
     /* Must do this early -- e.g., spinlocks rely on get_current(). */
     set_current(&idle0_task);
@@ -480,28 +483,53 @@ void __init __start_xen(multiboot_info_t *mbi)
 
     init_console();
 
-    /* We require memory and module information. */
-    if ( (mbi->flags & 9) != 9 )
+    /* Check that we have at least one Multiboot module. */
+    if ( !(mbi->flags & MBI_MODULES) || (mbi->mods_count == 0) )
     {
-        printk("FATAL ERROR: Bad flags passed by bootloader: 0x%x\n", 
-               (unsigned)mbi->flags);
-        for ( ; ; ) ;
-    }
-
-    if ( mbi->mods_count == 0 )
-    {
-        printk("Require at least one Multiboot module!\n");
+        printk("FATAL ERROR: Require at least one Multiboot module.\n");
         for ( ; ; ) ;
     }
 
     if ( opt_xenheap_megabytes < 4 )
     {
-        printk("Xen heap size is too small to safely continue!\n");
+        printk("FATAL ERROR: Xen heap is too small to safely continue!\n");
         for ( ; ; ) ;
     }
 
     xenheap_phys_end = opt_xenheap_megabytes << 20;
 
+    if ( mbi->flags & MBI_MEMMAP )
+    {
+        while ( bytes < mbi->mmap_length )
+        {
+            memory_map_t *map = __va(mbi->mmap_addr + bytes);
+            e820_raw[e820_raw_nr].addr = 
+                ((u64)map->base_addr_high << 32) | (u64)map->base_addr_low;
+            e820_raw[e820_raw_nr].size = 
+                ((u64)map->length_high << 32) | (u64)map->length_low;
+            e820_raw[e820_raw_nr].type = 
+                (map->type > E820_NVS) ? E820_RESERVED : map->type;
+            e820_raw_nr++;
+            bytes += map->size + 4;
+        }
+    }
+    else if ( mbi->flags & MBI_MEMLIMITS )
+    {
+        e820_raw[0].addr = 0;
+        e820_raw[0].size = mbi->mem_lower << 10;
+        e820_raw[0].type = E820_RAM;
+        e820_raw[0].addr = 0x100000;
+        e820_raw[0].size = mbi->mem_upper << 10;
+        e820_raw[0].type = E820_RAM;
+        e820_raw_nr = 2;
+    }
+    else
+    {
+        printk("FATAL ERROR: Bootloader provided no memory information.\n");
+        for ( ; ; ) ;
+    }
+
+    max_mem = max_page = init_e820(e820_raw, e820_raw_nr);
     max_mem = max_page = (mbi->mem_upper+1024) >> (PAGE_SHIFT - 10);
 
 #if defined(__i386__)

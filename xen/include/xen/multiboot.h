@@ -21,6 +21,13 @@
 /* The magic number passed by a Multiboot-compliant boot loader. */
 #define MULTIBOOT_BOOTLOADER_MAGIC 0x2BADB002
 
+#define MBI_MEMLIMITS  (1<<0)
+#define MBI_DRIVES     (1<<1)
+#define MBI_CMDLINE    (1<<2)
+#define MBI_MODULES    (1<<3)
+#define MBI_MEMMAP     (1<<6)
+#define MBI_LOADERNAME (1<<9)
+
 /* The symbol table for a.out.  */
 typedef struct {
     u32 tabsize;
