@@ -17,7 +17,7 @@
 #include <xeno/keyhandler.h>
 #include <xeno/interrupt.h>
 
-#if 1
+#if 0
 #define DPRINTK(_f, _a...) printk( _f , ## _a )
 #else
 #define DPRINTK(_f, _a...) ((void)0)

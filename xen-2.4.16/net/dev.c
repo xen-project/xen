@@ -38,7 +38,7 @@
 #define rtnl_lock() ((void)0)
 #define rtnl_unlock() ((void)0)
 
-#if 0
+#if 1
 #define DPRINTK(_f, _a...) printk(_f , ## _a)
 #else 
 #define DPRINTK(_f, _a...) ((void)0)
@@ -497,7 +497,7 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
     }
     shadow_ring = vif->shadow_ring;
 
-    if ( (i = shadow_ring->rx_cons) == shadow_ring->rx_prod )
+    if ( (i = shadow_ring->rx_idx) == shadow_ring->rx_prod )
     {
         return;
     }
@@ -505,7 +505,7 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
     if ( shadow_ring->rx_ring[i].status != RING_STATUS_OK )
     {
         DPRINTK("Bad buffer in deliver_packet()\n");
-        shadow_ring->rx_cons = RX_RING_INC(i);
+        shadow_ring->rx_idx = RX_RING_INC(i);
         return;
     }
 
@@ -537,7 +537,7 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
     /* Our skbuff now points at the guest's old frame. */
     skb->pf = g_pfn;
         
-    shadow_ring->rx_cons = RX_RING_INC(i);
+    shadow_ring->rx_idx = RX_RING_INC(i);
 }
 
 /**
@@ -684,7 +684,7 @@ static void add_to_net_schedule_list_tail(net_vif_t *vif)
 static void tx_skb_release(struct sk_buff *skb)
 {
     int i;
-    net_ring_t *ring;
+    net_vif_t *vif = sys_vif_list[skb->src_vif];
     
     for ( i = 0; i < skb_shinfo(skb)->nr_frags; i++ )
         put_page_tot(skb_shinfo(skb)->frags[i].page);
@@ -694,16 +694,20 @@ static void tx_skb_release(struct sk_buff *skb)
 
     skb_shinfo(skb)->nr_frags = 0; 
 
+    /* This would mean that the guest OS has fiddled with our index. */
+    if ( vif->shadow_ring->tx_cons != vif->net_ring->tx_cons )
+        DPRINTK("Shadow and shared rings out of sync (%d/%d)\n",
+                vif->shadow_ring->tx_cons, vif->net_ring->tx_cons);
+
     /*
      * XXX This assumes that, per vif, SKBs are processed in-order!
      * Also assumes no concurrency. This is safe because each vif
      * maps to one NIC. This is executed in NIC interrupt code, so we have
      * mutual exclusion from do_IRQ().
      */
-    ring = sys_vif_list[skb->src_vif]->net_ring;
-    ring->tx_cons = TX_RING_INC(ring->tx_cons);
-
-    if ( ring->tx_cons == ring->tx_event )
+    vif->shadow_ring->tx_cons = TX_RING_INC(vif->shadow_ring->tx_cons);
+    vif->net_ring->tx_cons = vif->shadow_ring->tx_cons;
+    if ( vif->net_ring->tx_cons == vif->net_ring->tx_event )
         set_bit(_EVENT_NET_TX, 
                 &sys_vif_list[skb->src_vif]->domain->shared_info->events);
 }
@@ -803,29 +807,27 @@ void update_shared_ring(void)
     {
         net_ring = current->net_vif_list[nvif]->net_ring;
         shadow_ring = current->net_vif_list[nvif]->shadow_ring;
-        
-        if ( shadow_ring->rx_idx != net_ring->rx_cons )
-        {
-            DPRINTK("Shadow and shared rings out of sync (%d/%d)\n",
-                    shadow_ring->rx_idx, net_ring->rx_cons);
-        }
 
-        while ( (shadow_ring->rx_idx != shadow_ring->rx_cons) &&
-                (net_ring->rx_cons != net_ring->rx_prod) )
+        /* This would mean that the guest OS has fiddled with our index. */
+        if ( shadow_ring->rx_cons != net_ring->rx_cons )
+            DPRINTK("Shadow and shared rings out of sync (%d/%d)\n",
+                    shadow_ring->rx_cons, net_ring->rx_cons);
+
+        while ( shadow_ring->rx_cons != shadow_ring->rx_idx )
         {
-            rx = shadow_ring->rx_ring + shadow_ring->rx_idx;
+            rx = shadow_ring->rx_ring + shadow_ring->rx_cons;
             copy_to_user(net_ring->rx_ring + net_ring->rx_cons, rx, 
                          sizeof(rx_entry_t));
 
-            shadow_ring->rx_idx = RX_RING_INC(shadow_ring->rx_idx);
-            net_ring->rx_cons   = RX_RING_INC(net_ring->rx_cons);
-            
             if ( rx->flush_count == tlb_flush_count[smp_processor_id()] )
                 __flush_tlb();
 
-            if ( net_ring->rx_cons == net_ring->rx_event )
+            shadow_ring->rx_cons = RX_RING_INC(shadow_ring->rx_cons);
+
+            if ( shadow_ring->rx_cons == net_ring->rx_event )
                 set_bit(_EVENT_NET_RX, &s->events);
         }
+        net_ring->rx_cons = shadow_ring->rx_cons;
     }
 }
 
@@ -1820,8 +1822,14 @@ long do_net_update(void)
          * PHASE 1 -- TRANSMIT RING
          */
 
+        /*
+         * Collect up new transmit buffers. We collect up to the guest OS's
+         * new producer index, but take care not to catch up with our own
+         * consumer index.
+         */
         for ( i = shadow_ring->tx_prod; 
-              i != net_ring->tx_prod; 
+              (i != net_ring->tx_prod) && 
+                  (((shadow_ring->tx_cons-i) & (TX_RING_SIZE-1)) != 1); 
               i = TX_RING_INC(i) )
         {
             if ( copy_from_user(&tx, net_ring->tx_ring+i, sizeof(tx)) )
@@ -1836,13 +1844,13 @@ long do_net_update(void)
 
             if ( tx.size < PKT_PROT_LEN )
             {
-                DPRINTK("Runt packet %ld\n", tx.size);
+                DPRINTK("Runt packet %d\n", tx.size);
                 continue; 
             }
 
             if ( ((tx.addr & ~PAGE_MASK) + tx.size) >= PAGE_SIZE ) 
             {
-                DPRINTK("tx.addr: %lx, size: %lu, end: %lu\n", 
+                DPRINTK("tx.addr: %lx, size: %u, end: %lu\n", 
                         tx.addr, tx.size, (tx.addr &~PAGE_MASK) + tx.size);
                 continue;
             }
@@ -1906,15 +1914,23 @@ long do_net_update(void)
         }
         smp_wmb(); /* Let other CPUs see new descriptors first. */
         shadow_ring->tx_prod = i;
+
+        /* XXX: This should be more consevative. */
         add_to_net_schedule_list_tail(current_vif);
-        tasklet_schedule(&net_tx_tasklet); /* XXX */
+        tasklet_schedule(&net_tx_tasklet);
 
         /*
          * PHASE 2 -- RECEIVE RING
          */
 
+        /*
+         * Collect up new receive buffers. We collect up to the guest OS's
+         * new producer index, but take care not to catch up with our own
+         * consumer index.
+         */
         for ( i = shadow_ring->rx_prod; 
-              i != net_ring->rx_prod; 
+              (i != net_ring->rx_prod) && 
+                  (((shadow_ring->rx_cons-i) & (RX_RING_SIZE-1)) != 1); 
               i = RX_RING_INC(i) )
         {
             /* 

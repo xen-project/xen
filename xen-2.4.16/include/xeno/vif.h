@@ -42,8 +42,26 @@ typedef struct tx_shadow_entry_st {
 typedef struct net_shadow_ring_st {
     rx_shadow_entry_t *rx_ring;
     tx_shadow_entry_t *tx_ring;
-    unsigned int rx_prod, rx_cons, rx_idx;
-    unsigned int tx_prod, tx_cons, tx_idx;
+
+    /*
+     * Private copy of producer. Follows guest OS version, but never
+     * catches up with our consumer index.
+     */
+    unsigned int rx_prod;
+    /* Points at next buffer to be filled by NIC. Chases rx_prod. */
+    unsigned int rx_idx;
+    /* Points at next buffer to be returned to the guest OS. Chases rx_idx. */
+    unsigned int rx_cons;
+
+    /*
+     * Private copy of producer. Follows guest OS version, but never
+     * catches up with our consumer index.
+     */
+    unsigned int tx_prod;
+    /* Points at next buffer to be scheduled. Chases tx_prod. */
+    unsigned int tx_idx;
+    /* Points at next buffer to be returned to the guest OS. Chases tx_idx. */
+    unsigned int tx_cons;
 } net_shadow_ring_t;
 
 typedef struct net_vif_st {
