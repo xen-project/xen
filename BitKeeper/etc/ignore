@@ -42,7 +42,7 @@ docs/user/labels.pl
 docs/user/user.css
 docs/user/user.html
 extras/mini-os/h/hypervisor-ifs
-install/*
+dist/*
 linux-*-xen0/*
 linux-*-xenU/*
 linux-xen-sparse

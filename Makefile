@@ -2,13 +2,14 @@
 # Grand Unified Makefile for Xen.
 #
 
-INSTALL_DIR ?= $(shell pwd)/install
+DIST_DIR    ?= $(shell pwd)/dist
+INSTALL_DIR ?= $(DIST_DIR)/install
 
 SOURCEFORGE_MIRROR := http://heanet.dl.sourceforge.net/sourceforge
 #http://voxel.dl.sourceforge.net/sourceforge/
 #http://easynews.dl.sourceforge.net/sourceforge
 
-.PHONY: docs delete-symlinks clean
+.PHONY: docs delete-symlinks clean all install dist
 
 # a not partcularly useful but safe default target
 all:
@@ -22,13 +23,16 @@ install: dist
 	$(MAKE) -C xen install
 	$(MAKE) -C tools install
 	sh ./docs/check_pkgs && $(MAKE) -C docs install
-	$(shell cp -dR install/boot/*$(LINUX_VER)* /boot/)
-	$(shell cp -dR install/lib/modules/* /lib/modules/)
+	$(shell cp -dR $(INSTALL_DIR)/boot/*$(LINUX_VER)* $(prefix)/boot/)
+	$(shell cp -dR $(INSTALL_DIR)/lib/modules/* $(prefix)/lib/modules/)
 
 # install xen and tools into the install directory
 dist: all
 	$(MAKE) linux-xenU
 	$(MAKE) linux-xen0
+	install -m0644 ./COPYING $(DIST_DIR)
+	install -m0644 ./README $(DIST_DIR)
+	install -m0755 ./install.sh $(DIST_DIR)
 
 LINUX_RELEASE    ?= 2.6
 LINUX_VER        ?= $(shell ( /bin/ls -ld linux-$(LINUX_RELEASE).*-xen-sparse ) 2>/dev/null | \
@@ -202,7 +206,7 @@ clean:
 
 # clean, but blow away linux build tree plus src tar ball
 mrproper: clean
-	rm -rf install/* patches $(LINUX_TREES) linux-$(LINUX_VER).tar.*
+	rm -rf dist patches $(LINUX_TREES) linux-$(LINUX_VER).tar.*
 
 install-twisted:
 	wget http://www.twistedmatrix.com/products/get-current.epy
