@@ -584,28 +584,31 @@ class Daemon:
         reactor.diconnectAll()
         sys.exit(0)
 
-    def blkif_set_control_domain(self, dom):
+    def blkif_set_control_domain(self, dom, recreate=0):
         """Set the block device backend control domain.
         """
-        return self.blkifCF.setControlDomain(dom)
+        return self.blkifCF.setControlDomain(dom, recreate=recreate)
     
     def blkif_get_control_domain(self, dom):
         """Get the block device backend control domain.
         """
         return self.blkifCF.getControlDomain()
     
-    def blkif_create(self, dom):
+    def blkif_create(self, dom, recreate=0):
         """Create a block device interface controller.
         
         Returns Deferred
         """
-        d = self.blkifCF.createInstance(dom)
+        d = self.blkifCF.createInstance(dom, recreate=recreate)
         return d
+
+    def blkif_get(self, dom):
+        return self.blkifCF.getInstanceByDom(dom)
 
     def blkif_dev(self, dom, vdev):
         return self.blkifCF.getDomainDevice(dom, vdev)
 
-    def blkif_dev_create(self, dom, vdev, mode, segment):
+    def blkif_dev_create(self, dom, vdev, mode, segment, recreate=0):
         """Create a block device.
         
         Returns Deferred
@@ -614,26 +617,29 @@ class Daemon:
         if not ctrl:
             raise ValueError('No blkif controller: %d' % dom)
         print 'blkif_dev_create>', dom, vdev, mode, segment
-        d = ctrl.attach_device(vdev, mode, segment)
+        d = ctrl.attachDevice(vdev, mode, segment, recreate=recreate)
         return d
 
-    def netif_set_control_domain(self, dom):
+    def netif_set_control_domain(self, dom, recreate=0):
         """Set the network interface backend control domain.
         """
-        return self.netifCF.setControlDomain(dom)
+        return self.netifCF.setControlDomain(dom, recreate=recreate)
 
     def netif_get_control_domain(self, dom):
         """Get the network interface backend control domain.
         """
         return self.netifCF.getControlDomain()
     
-    def netif_create(self, dom):
+    def netif_create(self, dom, recreate=0):
         """Create a network interface controller.
         
         """
-        return self.netifCF.createInstance(dom)
+        return self.netifCF.createInstance(dom, recreate=recreate)
 
-    def netif_dev_create(self, dom, vif, vmac):
+    def netif_get(self, dom):
+        return self.netifCF.getInstanceByDom(dom)
+
+    def netif_dev_create(self, dom, vif, vmac, recreate=0):
         """Create a network device.
 
         todo
@@ -641,7 +647,7 @@ class Daemon:
         ctrl = self.netifCF.getInstanceByDom(dom)
         if not ctrl:
             raise ValueError('No netif controller: %d' % dom)
-        d = ctrl.attach_device(vif, vmac)
+        d = ctrl.attachDevice(vif, vmac, recreate=recreate)
         return d
 
     def netif_dev(self, dom, vif):

@@ -76,6 +76,9 @@ blkif_formats = {
     'blkif_be_vbd_grow_t':
     (CMSG_BLKIF_BE, CMSG_BLKIF_BE_VBD_GROW),
 
+    'blkif_be_vbd_destroy_t':
+    (CMSG_BLKIF_BE, CMSG_BLKIF_BE_VBD_DESTROY),
+
     'blkif_fe_interface_status_changed_t':
     (CMSG_BLKIF_FE, CMSG_BLKIF_FE_INTERFACE_STATUS_CHANGED),
 
