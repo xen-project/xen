@@ -548,7 +548,7 @@ class Xend:
         return self.xendPost(self.domainurl(id),
                              {'op'      : 'device_destroy',
                               'type'    : type,
-                              'index'   : idx })
+                              'idx'     : idx })
 
     def xend_consoles(self):
         return self.xendGet(self.consoleurl())

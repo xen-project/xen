@@ -576,6 +576,16 @@ class XendDomainInfo:
         dl.append(dev)
         self.devices[type] = dl
 
+    def remove_device(self, type, dev):
+        """Remove a device from a virtual machine.
+
+        @param type: device type
+        @param dev:  device
+        """
+        dl = self.devices.get(type, [])
+        if dev in dl:
+            dl.remove(dev)
+
     def get_devices(self, type):
         """Get a list of the devices of a given type.
 
@@ -812,7 +822,7 @@ class XendDomainInfo:
         devs = self.get_devices(dev_name)
         dev_index = len(devs)
         self.config.append(['device', dev_config])
-        d = dev_handler(self, dev_config, dev_index)
+        d = dev_handler(self, dev_config, dev_index, change=1)
         return d
 
     def device_destroy(self, type, idx):
@@ -829,7 +839,8 @@ class XendDomainInfo:
         dev_config = self.config_device(type, index)
         if dev_config:
             self.config.remove(['device', dev_config])
-        dev.destroy()
+        dev.destroy(change=1)
+        self.remove_device(type, dev)
 
     def configure_memory(self):
         """Configure vm memory limit.
@@ -1053,7 +1064,7 @@ def vm_image_netbsd(vm, image):
     return vm
 
 
-def vm_dev_vif(vm, val, index):
+def vm_dev_vif(vm, val, index, change=0):
     """Create a virtual network interface (vif).
 
     @param vm:        virtual machine
@@ -1069,11 +1080,13 @@ def vm_dev_vif(vm, val, index):
     def cbok(dev):
         dev.vifctl('up', vmname=vm.name)
         vm.add_device('vif', dev)
+        if change:
+            dev.interfaceChanged()
         return dev
     defer.addCallback(cbok)
     return defer
 
-def vm_dev_vbd(vm, val, index):
+def vm_dev_vbd(vm, val, index, change=0):
     """Create a virtual block device (vbd).
 
     @param vm:        virtual machine
@@ -1094,6 +1107,8 @@ def vm_dev_vbd(vm, val, index):
         vbd.dev = dev
         vbd.uname = uname
         vm.add_device('vbd', vbd)
+        if change:
+            vbd.interfaceChanged()
         return vbd
     defer.addCallback(fn)
     return defer
@@ -1110,7 +1125,7 @@ def parse_pci(val):
         v = val
     return v
 
-def vm_dev_pci(vm, val, index):
+def vm_dev_pci(vm, val, index, change=0):
     """Add a pci device.
 
     @param vm: virtual machine
