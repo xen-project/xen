@@ -627,7 +627,7 @@ static void net_rx_action(struct softirq_action *h)
          * for ethernet header, plus any other alignment padding added by the
          * driver.
          */
-        offset = (int)skb->data & ~PAGE_MASK; 
+        offset = (int)(long)skb->data & ~PAGE_MASK; 
         skb->head = (u8 *)map_domain_mem(((skb->pf - frame_table) << 
                                           PAGE_SHIFT));
         skb->data = skb->nh.raw = skb->head + offset;

@@ -3,6 +3,8 @@
 
 typedef unsigned short umode_t;
 
+typedef unsigned int size_t;
+
 /*
  * __xx is ok: it doesn't pollute the POSIX namespace. Use these in the
  * header files exported to user space

@@ -265,7 +265,6 @@ struct bug_frame {
 #ifndef CONFIG_DISCONTIGMEM
 #define virt_to_page(kaddr)	(frame_table + (__pa(kaddr) >> PAGE_SHIFT))
 #define pfn_to_page(pfn)	(frame_table + (pfn)) 
-#define page_to_pfn(page)   ((page) - frame_table)
 #define page_address(_p)        (__va(((_p) - frame_table) << PAGE_SHIFT))
 #define VALID_PAGE(page)	(((page) - frame_table) < max_mapnr)
 #endif

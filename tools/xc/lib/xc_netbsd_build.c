@@ -273,32 +273,32 @@ int xc_netbsd_build(int xc_handle,
 
     /*
      * Initial register values:
-     *  DS,ES,FS,GS = FLAT_RING1_DS
-     *       CS:EIP = FLAT_RING1_CS:start_pc
-     *       SS:ESP = FLAT_RING1_DS:start_stack
+     *  DS,ES,FS,GS = FLAT_GUESTOS_DS
+     *       CS:EIP = FLAT_GUESTOS_CS:start_pc
+     *       SS:ESP = FLAT_GUESTOS_DS:start_stack
      *          ESI = start_info
      *  [EAX,EBX,ECX,EDX,EDI,EBP are zero]
      *       EFLAGS = IF | 2 (bit 1 is reserved and should always be 1)
      */
-    ctxt->i386_ctxt.ds = FLAT_RING1_DS;
-    ctxt->i386_ctxt.es = FLAT_RING1_DS;
-    ctxt->i386_ctxt.fs = FLAT_RING1_DS;
-    ctxt->i386_ctxt.gs = FLAT_RING1_DS;
-    ctxt->i386_ctxt.ss = FLAT_RING1_DS;
-    ctxt->i386_ctxt.cs = FLAT_RING1_CS;
-    ctxt->i386_ctxt.eip = load_addr;
-    ctxt->i386_ctxt.esp = virt_startinfo_addr;
-    ctxt->i386_ctxt.esi = virt_startinfo_addr;
-    ctxt->i386_ctxt.eflags = (1<<9) | (1<<2);
+    ctxt->cpu_ctxt.ds = FLAT_GUESTOS_DS;
+    ctxt->cpu_ctxt.es = FLAT_GUESTOS_DS;
+    ctxt->cpu_ctxt.fs = FLAT_GUESTOS_DS;
+    ctxt->cpu_ctxt.gs = FLAT_GUESTOS_DS;
+    ctxt->cpu_ctxt.ss = FLAT_GUESTOS_DS;
+    ctxt->cpu_ctxt.cs = FLAT_GUESTOS_CS;
+    ctxt->cpu_ctxt.eip = load_addr;
+    ctxt->cpu_ctxt.esp = virt_startinfo_addr;
+    ctxt->cpu_ctxt.esi = virt_startinfo_addr;
+    ctxt->cpu_ctxt.eflags = (1<<9) | (1<<2);
 
     /* FPU is set up to default initial state. */
-    memset(ctxt->i387_ctxt, 0, sizeof(ctxt->i387_ctxt));
+    memset(ctxt->fpu_ctxt, 0, sizeof(ctxt->fpu_ctxt));
 
     /* Virtual IDT is empty at start-of-day. */
     for ( i = 0; i < 256; i++ )
     {
         ctxt->trap_ctxt[i].vector = i;
-        ctxt->trap_ctxt[i].cs     = FLAT_RING1_CS;
+        ctxt->trap_ctxt[i].cs     = FLAT_GUESTOS_CS;
     }
     ctxt->fast_trap_idx = 0;
 
@@ -309,16 +309,16 @@ int xc_netbsd_build(int xc_handle,
     ctxt->gdt_ents = 0;
 
     /* Ring 1 stack is the initial stack. */
-    ctxt->ring1_ss  = FLAT_RING1_DS;
-    ctxt->ring1_esp = virt_startinfo_addr;
+    ctxt->guestos_ss  = FLAT_GUESTOS_DS;
+    ctxt->guestos_esp = virt_startinfo_addr;
 
     /* No debugging. */
     memset(ctxt->debugreg, 0, sizeof(ctxt->debugreg));
 
     /* No callback handlers. */
-    ctxt->event_callback_cs     = FLAT_RING1_CS;
+    ctxt->event_callback_cs     = FLAT_GUESTOS_CS;
     ctxt->event_callback_eip    = 0;
-    ctxt->failsafe_callback_cs  = FLAT_RING1_CS;
+    ctxt->failsafe_callback_cs  = FLAT_GUESTOS_CS;
     ctxt->failsafe_callback_eip = 0;
 
     launch_op.u.builddomain.domain   = (domid_t)domid;

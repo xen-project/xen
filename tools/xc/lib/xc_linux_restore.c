@@ -313,13 +313,13 @@ int xc_linux_restore(int xc_handle,
     verbose_printf("\b\b\b\b100%%\nMemory reloaded.\n");
 
     /* Uncanonicalise the suspend-record frame number and poke resume rec. */
-    pfn = ctxt.i386_ctxt.esi;
+    pfn = ctxt.cpu_ctxt.esi;
     if ( (pfn >= nr_pfns) || (pfn_type[pfn] != NONE) )
     {
         ERROR("Suspend record frame number is bad");
         goto out;
     }
-    ctxt.i386_ctxt.esi = mfn = pfn_to_mfn_table[pfn];
+    ctxt.cpu_ctxt.esi = mfn = pfn_to_mfn_table[pfn];
     p_srec = map_pfn_writeable(pm_handle, mfn);
     p_srec->resume_info.nr_pages    = nr_pfns;
     p_srec->resume_info.shared_info = shared_info_frame << PAGE_SHIFT;
@@ -370,13 +370,13 @@ int xc_linux_restore(int xc_handle,
 
     /*
      * Safety checking of saved context:
-     *  1. i386_ctxt is fine, as Xen checks that on context switch.
-     *  2. i387_ctxt is fine, as it can't hurt Xen.
+     *  1. cpu_ctxt is fine, as Xen checks that on context switch.
+     *  2. fpu_ctxt is fine, as it can't hurt Xen.
      *  3. trap_ctxt needs the code selectors checked.
      *  4. fast_trap_idx is checked by Xen.
      *  5. ldt base must be page-aligned, no more than 8192 ents, ...
      *  6. gdt already done, and further checking is done by Xen.
-     *  7. check that ring1_ss is safe.
+     *  7. check that guestos_ss is safe.
      *  8. pt_base is already done.
      *  9. debugregs are checked by Xen.
      *  10. callback code selectors need checking.
@@ -385,14 +385,14 @@ int xc_linux_restore(int xc_handle,
     {
         ctxt.trap_ctxt[i].vector = i;
         if ( (ctxt.trap_ctxt[i].cs & 3) == 0 )
-            ctxt.trap_ctxt[i].cs = FLAT_RING1_CS;
+            ctxt.trap_ctxt[i].cs = FLAT_GUESTOS_CS;
     }
-    if ( (ctxt.ring1_ss & 3) == 0 )
-        ctxt.ring1_ss = FLAT_RING1_DS;
+    if ( (ctxt.guestos_ss & 3) == 0 )
+        ctxt.guestos_ss = FLAT_GUESTOS_DS;
     if ( (ctxt.event_callback_cs & 3) == 0 )
-        ctxt.event_callback_cs = FLAT_RING1_CS;
+        ctxt.event_callback_cs = FLAT_GUESTOS_CS;
     if ( (ctxt.failsafe_callback_cs & 3) == 0 )
-        ctxt.failsafe_callback_cs = FLAT_RING1_CS;
+        ctxt.failsafe_callback_cs = FLAT_GUESTOS_CS;
     if ( ((ctxt.ldt_base & (PAGE_SIZE - 1)) != 0) ||
          (ctxt.ldt_ents > 8192) ||
          (ctxt.ldt_base > HYPERVISOR_VIRT_START) ||

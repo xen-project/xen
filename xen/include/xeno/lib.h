@@ -51,6 +51,6 @@ unsigned long simple_strtoul(const char *cp,char **endp,unsigned int base);
 long long simple_strtoll(const char *cp,char **endp,unsigned int base);
 
 /* Produce a 32-bit hash from a key string 'k' of length 'len' bytes. */
-unsigned long hash(unsigned char *k, unsigned long len);
+u32 hash(unsigned char *k, unsigned long len);
 
 #endif /* __LIB_H__ */

@@ -26,7 +26,7 @@ static inline void set_current(struct task_struct *p)
 static inline execution_context_t *get_execution_context(void)
 {
     execution_context_t *execution_context;
-    __asm__( "andq %%rsp,%0; addl %2,%0"
+    __asm__( "andq %%rsp,%0; addq %2,%0"
 	    : "=r" (execution_context)
 	    : "0" (~(STACK_SIZE-1)), "i" (STACK_SIZE-STACK_RESERVED) ); 
     return execution_context;
@@ -42,7 +42,7 @@ static inline unsigned long get_stack_top(void)
 
 #define schedule_tail(_p)                                         \
     __asm__ __volatile__ (                                        \
-        "andq %%rsp,%0; addq %2,%0; movl %0,%%rsp; jmp *%1"       \
+        "andq %%rsp,%0; addq %2,%0; movq %0,%%rsp; jmp *%1"       \
         : : "r" (~(STACK_SIZE-1)),                                \
             "r" (unlikely(is_idle_task((_p))) ?                   \
                                 continue_cpu_idle_loop :          \

@@ -27,10 +27,8 @@ int pcibios_set_irq_routing(struct pci_dev *dev, int pin, int irq);
 #include <xeno/types.h>
 #include <xeno/slab.h>
 #include <asm/scatterlist.h>
-/*#include <xeno/string.h>*/
 #include <asm/io.h>
 #include <asm/page.h>
-#include <asm/mmzone.h>
 
 struct pci_dev;
 extern int force_mmu;
@@ -96,14 +94,16 @@ static inline void pci_dma_sync_single(struct pci_dev *hwdev,
 				       dma_addr_t dma_handle,
 				       size_t size, int direction)
 {
-	BUG_ON(direction == PCI_DMA_NONE); 
+	if (direction == PCI_DMA_NONE)
+		out_of_line_bug();
 } 
 
 static inline void pci_dma_sync_sg(struct pci_dev *hwdev, 
 				   struct scatterlist *sg,
 				   int nelems, int direction)
 { 
-	BUG_ON(direction == PCI_DMA_NONE); 
+	if (direction == PCI_DMA_NONE)
+		out_of_line_bug();
 } 
 
 /* The PCI address space does equal the physical memory
@@ -162,6 +162,19 @@ static inline dma_addr_t pci_map_page(struct pci_dev *hwdev, struct pfn_info *pa
 
 #define BAD_DMA_ADDRESS (-1UL)
 
+
+/* Unmap a set of streaming mode DMA translations.
+ * Again, cpu read rules concerning calls here are the same as for
+ * pci_unmap_single() above.
+ */
+static inline void pci_unmap_sg(struct pci_dev *dev, struct scatterlist *sg,
+                                  int nents, int dir)
+{
+	if (dir == PCI_DMA_NONE)
+		out_of_line_bug();
+}
+	
+
 /* Map a set of buffers described by scatterlist in streaming
  * mode for DMA.  This is the scather-gather version of the
  * above pci_map_single interface.  Here the scatter gather list
@@ -181,18 +194,20 @@ static inline int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
 			     int nents, int direction)
 {
 	int i;
-											   
-	BUG_ON(direction == PCI_DMA_NONE);
-											   
+
+	if (direction == PCI_DMA_NONE)
+		out_of_line_bug();
+
 	/*
 	 * temporary 2.4 hack
 	 */
 	for (i = 0; i < nents; i++ ) {
 		struct scatterlist *s = &sg[i];
 		void *addr = s->address;
-		if (addr)
-			BUG_ON(s->page || s->offset);
-		else if (s->page)
+		if (addr) {
+			if (s->page || s->offset)
+				out_of_line_bug();
+		} else if (s->page)
 			addr = page_address(s->page) + s->offset;
 #if 0
 		/* Invalid check, since address==0 is valid. */
@@ -208,17 +223,6 @@ static inline int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
  error:
 	pci_unmap_sg(hwdev, sg, i, direction);
 	return 0;
-}
-											   
-/* Unmap a set of streaming mode DMA translations.
- * Again, cpu read rules concerning calls here are the same as for
- * pci_unmap_single() above.
- */
-static inline void pci_unmap_sg(struct pci_dev *dev, struct scatterlist *sg,
-                                  int nents, int dir)
-{
-	if (direction == PCI_DMA_NONE)
-		out_of_line_bug();
 }
 
 	
@@ -259,11 +263,6 @@ static inline void pci_dma_sync_sg(struct pci_dev *hwdev,
 
 #endif
 
-extern int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
-		      int nents, int direction);
-extern void pci_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg,
-			 int nents, int direction);
-
 #define pci_unmap_page pci_unmap_single
 
 /* Return whether the given PCI device DMA address mask can
@@ -297,6 +296,7 @@ pci_dac_page_to_dma(struct pci_dev *pdev, struct pfn_info *page, unsigned long o
 static __inline__ struct pfn_info *
 pci_dac_dma_to_page(struct pci_dev *pdev, dma64_addr_t dma_addr)
 {
+	unsigned long poff = (dma_addr >> PAGE_SHIFT);
 	return frame_table + poff;
 }
 

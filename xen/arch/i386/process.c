@@ -264,8 +264,8 @@ void switch_to(struct task_struct *prev_p, struct task_struct *next_p)
         SET_FAST_TRAP(&next_p->thread);
 
         /* Switch the guest OS ring-1 stack. */
-        tss->esp1 = next->esp1;
-        tss->ss1  = next->ss1;
+        tss->esp1 = next->guestos_sp;
+        tss->ss1  = next->guestos_ss;
 
         /* Maybe switch the debug registers. */
         if ( next->debugreg[7] )

@@ -8,7 +8,7 @@
 #define __FIRST_PER_CPU_ENTRY (FIRST_RESERVED_GDT_ENTRY + 8)
 
 #define __CPU_DESC_INDEX(x,field) \
-	((x) * sizeof(struct per_cpu_gdt) + offsetof(struct per_cpu_gdt, field) + (FIRST_PER_CPU_ENTRY*8))
+	((x) * sizeof(struct per_cpu_gdt) + offsetof(struct per_cpu_gdt, field) + (__FIRST_PER_CPU_ENTRY*8))
 #define __LDT(n) (((n)<<1) + __FIRST_LDT_ENTRY)
 
 #define load_TR(cpu) asm volatile("ltr %w0"::"r" (__CPU_DESC_INDEX(cpu, tss)));

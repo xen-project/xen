@@ -290,23 +290,25 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             {
                 rmb(); /* Ensure that we see saved register state. */
                 op->u.getdomaininfo.ctxt.flags = 0;
-                memcpy(&op->u.getdomaininfo.ctxt.i386_ctxt, 
+                memcpy(&op->u.getdomaininfo.ctxt.cpu_ctxt, 
                        &p->shared_info->execution_context,
                        sizeof(p->shared_info->execution_context));
                 if ( test_bit(PF_DONEFPUINIT, &p->flags) )
                     op->u.getdomaininfo.ctxt.flags |= ECF_I387_VALID;
-                memcpy(&op->u.getdomaininfo.ctxt.i387_ctxt,
+                memcpy(&op->u.getdomaininfo.ctxt.fpu_ctxt,
                        &p->thread.i387,
                        sizeof(p->thread.i387));
                 memcpy(&op->u.getdomaininfo.ctxt.trap_ctxt,
                        p->thread.traps,
                        sizeof(p->thread.traps));
+#ifdef ARCH_HAS_FAST_TRAP
                 if ( (p->thread.fast_trap_desc.a == 0) &&
                      (p->thread.fast_trap_desc.b == 0) )
                     op->u.getdomaininfo.ctxt.fast_trap_idx = 0;
                 else
                     op->u.getdomaininfo.ctxt.fast_trap_idx = 
                         p->thread.fast_trap_idx;
+#endif
                 op->u.getdomaininfo.ctxt.ldt_base = p->mm.ldt_base;
                 op->u.getdomaininfo.ctxt.ldt_ents = p->mm.ldt_ents;
                 op->u.getdomaininfo.ctxt.gdt_ents = 0;
@@ -318,8 +320,8 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
                     op->u.getdomaininfo.ctxt.gdt_ents = 
                         (GET_GDT_ENTRIES(p) + 1) >> 3;
                 }
-                op->u.getdomaininfo.ctxt.ring1_ss  = p->thread.ss1;
-                op->u.getdomaininfo.ctxt.ring1_esp = p->thread.esp1;
+                op->u.getdomaininfo.ctxt.guestos_ss  = p->thread.guestos_ss;
+                op->u.getdomaininfo.ctxt.guestos_esp = p->thread.guestos_sp;
                 op->u.getdomaininfo.ctxt.pt_base   = 
                     pagetable_val(p->mm.pagetable);
                 memcpy(op->u.getdomaininfo.ctxt.debugreg, 
@@ -370,6 +372,12 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
                     break;
                 case PGT_l2_page_table:
                     op->u.getpageframeinfo.type = L2TAB;
+                    break;
+                case PGT_l3_page_table:
+                    op->u.getpageframeinfo.type = L3TAB;
+                    break;
+                case PGT_l4_page_table:
+                    op->u.getpageframeinfo.type = L4TAB;
                     break;
                 }
             }

@@ -19,13 +19,16 @@
 #include <xeno/vbd.h>
 #include <asm/i387.h>
 
-/*
- * NB. No ring-3 access in initial guestOS pagetables. Note that we allow
- * ring-3 privileges in the page directories, so that the guestOS may later
- * decide to share a 4MB region with applications.
- */
+#if !defined(CONFIG_X86_64BITMODE)
+/* No ring-3 access in initial page tables. */
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED)
+#else
+/* Allow ring-3 access in long mode as guest cannot use ring 1. */
+#define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_USER)
+#endif
 #define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
+#define L3_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
+#define L4_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
 
 /* Both these structures are protected by the tasklist_lock. */
 rwlock_t tasklist_lock __cacheline_aligned = RW_LOCK_UNLOCKED;
@@ -426,20 +429,20 @@ void free_all_dom_mem(struct task_struct *p)
             put_page(page);
 
         /*
-         * Forcibly invalidate L2 tables at this point to break circular
+         * Forcibly invalidate base page tables at this point to break circular
          * 'linear page table' references. This is okay because MMU structures
-         * are not shared across domains and this domain is now dead. Thus L2
+         * are not shared across domains and this domain is now dead. Thus base
          * tables are not in use so a non-zero count means circular reference.
          */
         y = page->type_and_flags;
         do {
             x = y;
             if ( likely((x & (PGT_type_mask|PGT_validated)) != 
-                        (PGT_l2_page_table|PGT_validated)) )
+                        (PGT_base_page_table|PGT_validated)) )
                 break;
             y = cmpxchg(&page->type_and_flags, x, x & ~PGT_validated);
             if ( likely(y == x) )
-                free_page_type(page, PGT_l2_page_table);
+                free_page_type(page, PGT_base_page_table);
         }
         while ( unlikely(y != x) );
 
@@ -504,7 +507,7 @@ void release_task(struct task_struct *p)
  */
 int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *builddomain)
 {
-    unsigned long phys_l2tab;
+    unsigned long phys_basetab;
     int i;
 
     if ( test_bit(PF_CONSTRUCTED, &p->flags) )
@@ -514,16 +517,18 @@ int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *builddomain)
     if ( builddomain->ctxt.flags & ECF_I387_VALID )
         set_bit(PF_DONEFPUINIT, &p->flags);
     memcpy(&p->shared_info->execution_context,
-           &builddomain->ctxt.i386_ctxt,
+           &builddomain->ctxt.cpu_ctxt,
            sizeof(p->shared_info->execution_context));
     memcpy(&p->thread.i387,
-           &builddomain->ctxt.i387_ctxt,
+           &builddomain->ctxt.fpu_ctxt,
            sizeof(p->thread.i387));
     memcpy(p->thread.traps,
            &builddomain->ctxt.trap_ctxt,
            sizeof(p->thread.traps));
+#ifdef ARCH_HAS_FAST_TRAP
     SET_DEFAULT_FAST_TRAP(&p->thread);
     (void)set_fast_trap(p, builddomain->ctxt.fast_trap_idx);
+#endif
     p->mm.ldt_base = builddomain->ctxt.ldt_base;
     p->mm.ldt_ents = builddomain->ctxt.ldt_ents;
     SET_GDT_ENTRIES(p, DEFAULT_GDT_ENTRIES);
@@ -532,8 +537,8 @@ int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *builddomain)
         (void)set_gdt(p,
                       builddomain->ctxt.gdt_frames,
                       builddomain->ctxt.gdt_ents);
-    p->thread.ss1  = builddomain->ctxt.ring1_ss;
-    p->thread.esp1 = builddomain->ctxt.ring1_esp;
+    p->thread.guestos_ss = builddomain->ctxt.guestos_ss;
+    p->thread.guestos_sp = builddomain->ctxt.guestos_esp;
     for ( i = 0; i < 8; i++ )
         (void)set_debugreg(p, i, builddomain->ctxt.debugreg[i]);
     p->event_selector    = builddomain->ctxt.event_callback_cs;
@@ -541,10 +546,10 @@ int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *builddomain)
     p->failsafe_selector = builddomain->ctxt.failsafe_callback_cs;
     p->failsafe_address  = builddomain->ctxt.failsafe_callback_eip;
     
-    phys_l2tab = builddomain->ctxt.pt_base;
-    p->mm.pagetable = mk_pagetable(phys_l2tab);
-    get_page_and_type(&frame_table[phys_l2tab>>PAGE_SHIFT], p, 
-                      PGT_l2_page_table);
+    phys_basetab = builddomain->ctxt.pt_base;
+    p->mm.pagetable = mk_pagetable(phys_basetab);
+    get_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT], p, 
+                      PGT_base_page_table);
 
     /* Set up the shared info structure. */
     update_dom_time(p->shared_info);
@@ -620,6 +625,7 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
     if ( strncmp(data_start, "XenoGues", 8) )
     {
         printk("DOM%llu: Invalid guest OS image\n", dom);
+        unmap_domain_mem(data_start);
         return -1;
     }
 
@@ -628,12 +634,14 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
     {
         printk("DOM%llu: Guest OS load address not page-aligned (%08lx)\n",
                dom, virt_load_address);
+        unmap_domain_mem(data_start);
         return -1;
     }
 
     if ( alloc_new_dom_mem(p, params->memory_kb) )
     {
         printk("DOM%llu: Not enough memory --- reduce dom0_mem ??\n", dom);
+        unmap_domain_mem(data_start);
         return -ENOMEM;
     }
 
@@ -650,6 +658,7 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
                dom, data_len>>20,
                (params->memory_kb)>>11,
                (params->memory_kb)>>10);
+        unmap_domain_mem(data_start);
         free_all_dom_mem(p);
         return -1;
     }
@@ -664,11 +673,11 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
      * We're basically forcing default RPLs to 1, so that our "what privilege
      * level are we returning to?" logic works.
      */
-    p->failsafe_selector = FLAT_RING1_CS;
-    p->event_selector    = FLAT_RING1_CS;
-    p->thread.ss1        = FLAT_RING1_DS;
+    p->failsafe_selector = FLAT_GUESTOS_CS;
+    p->event_selector    = FLAT_GUESTOS_CS;
+    p->thread.guestos_ss = FLAT_GUESTOS_DS;
     for ( i = 0; i < 256; i++ ) 
-        p->thread.traps[i].cs = FLAT_RING1_CS;
+        p->thread.traps[i].cs = FLAT_GUESTOS_CS;
 
     /*
      * WARNING: The new domain must have its 'processor' field
@@ -770,11 +779,11 @@ int setup_guestos(struct task_struct *p, dom0_createdomain_t *params,
 	src++;
 	if ( (((unsigned long)src) & (PAGE_SIZE-1)) == 0 )
         {
-	    unmap_domain_mem( vsrc-1 );
-	    vsrc = map_domain_mem( (unsigned long)src );
+	    unmap_domain_mem(vsrc-1);
+	    vsrc = map_domain_mem((unsigned long)src);
         }
     }
-    unmap_domain_mem( vsrc );
+    unmap_domain_mem(vsrc);
     
     /* Set up start info area. */
     memset(virt_startinfo_address, 0, sizeof(*virt_startinfo_address));

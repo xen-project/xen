@@ -354,7 +354,7 @@ struct tss_struct {
 };
 
 struct thread_struct {
-    unsigned long esp1, ss1;
+    unsigned long guestos_sp, guestos_ss;
 /* Hardware debugging registers */
     unsigned long	debugreg[8];  /* %%db0-7 debug registers */
 /* floating point info */

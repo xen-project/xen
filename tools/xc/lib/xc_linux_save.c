@@ -182,14 +182,14 @@ int xc_linux_save(int xc_handle,
         goto out;
 
     /* Is the suspend-record MFN actually valid for this domain? */
-    if ( !check_pfn_ownership(xc_handle, ctxt.i386_ctxt.esi, domid) )
+    if ( !check_pfn_ownership(xc_handle, ctxt.cpu_ctxt.esi, domid) )
     {
         ERROR("Invalid state record pointer");
         goto out;
     }
 
     /* If the suspend-record MFN is okay then grab a copy of it to @srec. */
-    p_srec = map_pfn_readonly(pm_handle, ctxt.i386_ctxt.esi);
+    p_srec = map_pfn_readonly(pm_handle, ctxt.cpu_ctxt.esi);
     memcpy(&srec, p_srec, sizeof(srec));
     unmap_pfn(pm_handle, p_srec);
 
@@ -272,7 +272,7 @@ int xc_linux_save(int xc_handle,
     }
 
     /* Canonicalise the suspend-record frame number. */
-    if ( !translate_mfn_to_pfn(&ctxt.i386_ctxt.esi) )
+    if ( !translate_mfn_to_pfn(&ctxt.cpu_ctxt.esi) )
     {
         ERROR("State record is not in range of pseudophys map");
         goto out;

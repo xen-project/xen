@@ -190,16 +190,22 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
         for ( ; ; ) ;
     }
 
+    max_page = (mbi->mem_upper+1024) >> (PAGE_SHIFT - 10);
+
     /* The array of pfn_info structures must fit into the reserved area. */
-    if ( sizeof(struct pfn_info) > 24 )
+    if ( (sizeof(struct pfn_info) * max_page) > 
+         (FRAMETABLE_VIRT_END - FRAMETABLE_VIRT_START) )
     {
-        printk("'struct pfn_info' too large to fit in Xen address space!\n");
-        for ( ; ; ) ;
+        unsigned long new_max = 
+            (FRAMETABLE_VIRT_END - FRAMETABLE_VIRT_START) /
+            sizeof(struct pfn_info);
+	printk("Truncating available memory to %lu/%luMB\n", 
+               new_max >> (20 - PAGE_SHIFT), max_page >> (20 - PAGE_SHIFT));
+	max_page = new_max;
     }
 
     set_current(&idle0_task);
 
-    max_page = (mbi->mem_upper+1024) >> (PAGE_SHIFT - 10);
     init_frametable(max_page);
     printk("Initialised all memory on a %luMB machine\n",
            max_page >> (20-PAGE_SHIFT));
