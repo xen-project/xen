@@ -1059,7 +1059,14 @@ substituting the appropriate scheduler name.  Details of the schedulers
 and their parameters are included below; future versions of the tools
 will provide a higher-level interface to these tools.
 
+It is expected that system administrators configure their system to
+use the scheduler most appropriate to their needs.  Currently, the BVT
+scheduler is the recommended choice, since the Atropos scheduler is
+not finished.
+
 \section{Borrowed Virtual Time}
+
+{\tt sched=bvt } (the default) \\ 
 
 BVT provides proportional fair shares of the CPU time.  It has been
 observed to penalise domains that block frequently (e.g. IO intensive
@@ -1092,25 +1099,27 @@ domains), but this can be compensated by using warping.
   run unwarped for before it can warp again
 \end{description}
 
-\section{Fair Borrowed Virtual Time}
-
-This is a derivative for BVT that aims to provide better fairness for
-IO intensive domains as well as for CPU intensive domains.
-
-\subsection{Global Parameters}
-
-Same as for BVT.
-
-\subsection{Per-domain parameters}
-
-Same as for BVT.
-
 \section{Atropos}
+
+{\tt sched=atropos } \\
 
 Atropos is a Soft Real Time scheduler.  It provides guarantees about
 absolute shares of the CPU (with a method for optionally sharing out
 slack CPU time on a best-effort basis) and can provide timeliness
 guarantees for latency-sensitive domains.
+
+Every domain has an associated period and slice.  The domain should
+receive 'slice' nanoseconds every 'period' nanoseconds.  This allows
+the administrator to configure both the absolute share of the CPU a
+domain receives and the frequency with which it is scheduled.  When
+domains unblock, their period is reduced to the value of the latency
+hint (the slice is scaled accordingly so that they still get the same
+proportion of the CPU).  For each subsequent period, the slice and
+period times are doubled until they reach their original values.
+
+Note: don't overcommit the CPU when using Atropos (i.e. don't reserve
+more CPU than is available - the utilisation should be kept to
+slightly less than 100% in order to ensure predictable behaviour).
 
 \subsection{Per-domain parameters}
 
@@ -1129,6 +1138,8 @@ guarantees for latency-sensitive domains.
 \end{description}
 
 \section{Round Robin}
+
+{\tt sched=rrobin } \\
 
 The Round Robin scheduler is included as a simple demonstration of
 Xen's internal scheduler API.  It is not intended for production use
@@ -1562,3 +1573,31 @@ simply copying the image file.  Once this is done, modify the
 image-specific settings (hostname, network settings, etc).
 
 \end{document}
+
+
+%% Other stuff without a home
+
+%% Instructions Re Python API
+
+%% Other Control Tasks using Python
+%% ================================
+
+%% A Python module 'Xc' is installed as part of the tools-install
+%% process. This can be imported, and an 'xc object' instantiated, to
+%% provide access to privileged command operations:
+
+%% # import Xc
+%% # xc = Xc.new()
+%% # dir(xc)
+%% # help(xc.domain_create)
+
+%% In this way you can see that the class 'xc' contains useful
+%% documentation for you to consult.
+
+%% A further package of useful routines (xenctl) is also installed:
+
+%% # import xenctl.utils
+%% # help(xenctl.utils)
+
+%% You can use these modules to write your own custom scripts or you can
+%% customise the scripts supplied in the Xen distribution.
