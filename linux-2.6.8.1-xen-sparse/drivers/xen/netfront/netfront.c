@@ -26,6 +26,9 @@
 #include <asm-xen/hypervisor-ifs/io/netif.h>
 #include <asm/page.h>
 
+#include <net/arp.h>
+#include <net/route.h>
+
 #if 0
 #define DPRINTK(fmt, args...) \
     printk(KERN_INFO "[XEN] %s" fmt, __FUNCTION__, ##args)
@@ -169,6 +172,32 @@ static int netctrl_connected_count(void)
     DPRINTK("> connected_n=%d interface_n=%d\n",
             netctrl.connected_n, netctrl.interface_n);
     return connected;
+}
+
+/** Send a packet on a net device to encourage switches to learn the
+ * MAC. We send a fake ARP request.
+ *
+ * @param dev device
+ * @return 0 on success, error code otherwise
+ */
+static int vif_wake(struct net_device *dev){
+    int err = 0;
+    struct sk_buff *skb;
+    u32 src_ip;
+    u32 dst_ip = INADDR_BROADCAST;
+    unsigned char dst_hw[ETH_ALEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+
+    src_ip = inet_select_addr(dev, dst_ip, RT_SCOPE_LINK);
+    skb = arp_create(ARPOP_REQUEST, ETH_P_ARP,
+                     dst_ip, dev, src_ip,
+                     dst_hw, dev->dev_addr, NULL);
+    if(skb == NULL){
+        err = -ENOMEM;
+        goto exit;
+    }
+    err = dev_queue_xmit(skb);
+  exit:
+    return err;
 }
 
 static inline struct sk_buff *alloc_skb_page(void)
@@ -739,6 +768,7 @@ static void netif_status_change(netif_fe_interface_status_changed_t *status)
         (void)request_irq(np->irq, netif_int, SA_SAMPLE_RANDOM, 
                           dev->name, dev);
         netctrl_connected_count();
+        vif_wake(dev);
         break;
 
     default:
