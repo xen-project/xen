@@ -19,12 +19,19 @@
 unsigned long syscall_stats[NR_syscalls];
 static unsigned char foobar[4];
 
+unsigned long c_do_page_fault;
+unsigned long c_minor_page_fault;
+unsigned long c_major_page_fault;
+
 /* a write just resests the counter */
 static ssize_t syscall_write(struct file *f, const  char *data,
                              size_t size, loff_t  *pos)
 {
     printk("resetting syscall stats\n");
     memset(&syscall_stats, 0, sizeof(syscall_stats));
+    c_do_page_fault = 0;
+    c_minor_page_fault = 0;
+    c_major_page_fault = 0;
     return size;
 }
 
@@ -36,6 +43,9 @@ static int show_syscall(struct seq_file *m, void *v)
         seq_printf(m, "%lu ", syscall_stats[i]);
     }
     seq_printf(m, "\n");
+    seq_printf(m, "%lu %lu %lu\n", c_do_page_fault,
+               c_minor_page_fault, c_major_page_fault);
+    
     return 0;
 }
 
