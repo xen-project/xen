@@ -379,6 +379,7 @@ class ProgBvtslice(Prog):
     def main(self, args):
         if len(args) < 2: self.err('%s: Missing context switch allowance'
                                                             % args[0])
+        slice = int(args[1])
         server.xend_node_cpu_bvt_slice_set(slice)
 
 xm.prog(ProgBvtslice)
@@ -411,7 +412,8 @@ class ProgFbvtslice(Prog):
     def main(self, args):
         if len(args) < 2: self.err('%s: Missing context switch allowance.' 
                                                                 % args[0])
-        server.xend_node_cpu_fbvt_slice_set(slice)
+        ctx_allow = int(args[1])
+        server.xend_node_cpu_fbvt_slice_set(ctx_allow)
 
 xm.prog(ProgFbvtslice)
 
