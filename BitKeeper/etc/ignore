@@ -32,3 +32,6 @@ xen/figlet/figlet
 xen/xen
 xen/xen-syms
 xen/xen.*
+tools/xfrd/xfrd
+xen/tools/elf-reloc
+xen/tools/figlet/figlet
