@@ -5,9 +5,13 @@
 from twisted.internet import defer
 
 from xen.xend import sxp
+from xen.xend import Blkctl
 from xen.xend.XendLogging import log
-from xen.xend.XendError import XendError
+from xen.xend.XendError import XendError, VmError
 
+import os
+import re
+import string
 import channel
 import controller
 from messages import *
@@ -257,6 +261,11 @@ class BlkDev(controller.SplitDev):
             val.append(['uname', self.uname])
         return val
 
+    def unbind(self):
+        log.debug("Unbinding block dev (type %s) from %s"
+                  % (self.type, self.node))
+        Blkctl.block('unbind', self.type, self.node)
+
     def destroy(self, change=0):
         """Destroy the device. If 'change' is true notify the front-end interface.
 
@@ -266,6 +275,7 @@ class BlkDev(controller.SplitDev):
         d = self.send_be_vbd_destroy()
         if change:
             d.addCallback(lambda val: self.interfaceChanged())
+        d.addCallback(lambda val: self.unbind())
 
     def interfaceChanged(self):
         """Tell the back-end to notify the front-end that a device has been
@@ -345,7 +355,47 @@ class BlkDev(controller.SplitDev):
         backend.writeRequest(msg, response=d)
         return d
         
-        
+
+def blkdev_name_to_number(name):
+    """Take the given textual block-device name (e.g., '/dev/sda1',
+    'hda') and return the device number used by the OS. """
+
+    if not re.match( '^/dev/', name ):
+	n = '/dev/' + name
+    else:
+	n = name
+    
+    try:
+	return os.stat(n).st_rdev
+    except Exception, e:
+        print "blkdev_name_to_number> exception looking up device number for %s: %s" % (name, e)
+	pass
+
+    # see if this is a hex device number
+    if re.match( '^(0x)?[0-9a-fA-F]+$', name ):
+	return string.atoi(name,16)
+	
+    return None
+
+def lookup_raw_partn(name):
+    """Take the given block-device name (e.g., '/dev/sda1', 'hda')
+    and return a dictionary { device, start_sector,
+    nr_sectors, type }
+        device:       Device number of the given partition
+        start_sector: Index of first sector of the partition
+        nr_sectors:   Number of sectors comprising this partition
+        type:         'Disk' or identifying name for partition type
+    """
+
+    n = blkdev_name_to_number(name)
+    if n:
+	return [ { 'device' : n,
+		   'start_sector' : long(0),
+		   'nr_sectors' : long(1L<<63),
+		   'type' : 'Disk' } ]
+    else:
+	return None
+
 class BlkifController(controller.SplitController):
     """Block device interface controller. Handles all block devices
     for a domain.
@@ -386,7 +436,7 @@ class BlkifController(controller.SplitController):
         self.devices[idx] = dev
         return dev
 
-    def attachDevice(self, idx, config, vdev, mode, segment, recreate=0):
+    def attachDevice(self, idx, config, uname, vdev, mode, recreate=0):
         """Attach a device to the specified interface.
         On success the returned deferred will be called with the device.
 
@@ -403,10 +453,30 @@ class BlkifController(controller.SplitController):
         @return: deferred
         @rtype:  Deferred
         """
+        if not recreate:
+            # Split into type and type-specific details (which are passed to the
+            # type-specific control script).
+            type, dets = string.split(uname, ':', 1)
+            # Special case: don't bother calling a script for phy.  Could
+            # alternatively provide a "do nothing" script for phy devices...
+            node = Blkctl.block('bind', type, dets)
+
+        segments = lookup_raw_partn(node)
+
+        if not segments:
+            raise VmError("vbd: Segments not found: uname=%s" % uname)
+        if len(segments) > 1:
+            raise VmError("vbd: Multi-segment vdisk: uname=%s" % uname)
+
+        segment = segments[0]            
+
         dev = self.addDevice(idx, config, vdev, mode, segment)
+            
         if recreate:
             d = defer.succeed(dev)
         else:
+            dev.node = node
+            dev.type = type
             d = dev.attach()
         return d
 

@@ -46,6 +46,9 @@ class XendRoot:
     """Where network control scripts live."""
     network_script_dir = "/etc/xen/scripts"
 
+    """Where block control scripts live."""
+    block_script_dir = "/etc/xen/scripts"
+
     logfile_default = "/var/log/xend.log"
 
     loglevel_default = 'DEBUG'
@@ -259,6 +262,9 @@ class XendRoot:
 
     def get_xend_address(self):
         return self.get_config_value('xend-address', '')
+
+    def get_block_script(self, type):
+        return self.get_config_value('block-%s' % type, '')
 
     def get_network_script(self):
         return self.get_config_value('network-script', 'network')

@@ -1,0 +1,31 @@
+#!/bin/sh
+
+# Usage: block_loop [bind file|unbind node]
+#
+# The file argument to the bind command is the file we are to bind to a
+# loop device.  We print the path to the loop device node to stdout.
+#
+# The node argument to unbind is the name of the device node we are to
+# unbind.
+
+case $1 in
+	bind)
+		for dev in /dev/loop*; do
+			if losetup $dev $2; then
+				echo $dev
+				exit 0
+			fi
+		done
+		exit 1
+	;;
+
+	unbind)
+		losetup -d $2
+		exit 0
+	;;
+
+	*)
+		echo 'Unknown command: ' $1
+		echo 'Valid commands are: bind, unbind'
+		exit 1
+esac

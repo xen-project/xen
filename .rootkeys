@@ -314,6 +314,8 @@
 4124b308O8yPHMKbj4YPR_grPGZmdA tools/check/chk
 401d7e160vaxMBAUSLSicuZ7AQjJ3w tools/examples/Makefile
 401d7e16UgeqroJQTIhwkrDVkoWgZQ tools/examples/README
+41597996VhTbNuHbuscYSfRb-WR6fA tools/examples/block-enbd
+41597996GHP2_yVih2UspXh328fgMQ tools/examples/block-file
 405ff55dawQyCHFEnJ067ChPRoXBBA tools/examples/init.d/xend
 40278d94cIUWl2eRgnwZtr4hTyWT1Q tools/examples/init.d/xendomains
 40ee75a9xFz6S05sDKu-JCLqyVTkDA tools/examples/network
@@ -453,6 +455,7 @@
 40c9c468IienauFHQ_xJIcqnPJ8giQ tools/python/xen/util/ip.py
 4059c6a0pnxhG8hwSOivXybbGOwuXw tools/python/xen/util/tempfile.py
 40c9c468SNuObE_YWARyS0hzTPSzKg tools/python/xen/xend/Args.py
+41597996WNvJA-DVCBmc0xU9w_XmoA tools/python/xen/xend/Blkctl.py
 40c9c468Um_qc66OQeLEceIz1pgD5g tools/python/xen/xend/EventServer.py
 40c9c468U8EVl0d3G--8YXVg6VJD3g tools/python/xen/xend/EventTypes.py
 40c9c468QJTEuk9g4qHxGpmIi70PEQ tools/python/xen/xend/PrettyPrint.py

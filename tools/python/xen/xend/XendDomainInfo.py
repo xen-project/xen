@@ -33,6 +33,8 @@ xend = server.SrvDaemon.instance()
 
 from XendError import VmError
 
+from server.blkif import blkdev_name_to_number
+
 """The length of domain names that Xen can handle.
 The names stored in Xen itself are not used for much, and
 xend can handle domain names of any length.
@@ -90,61 +92,6 @@ def shutdown_reason(code):
     """
     return shutdown_reasons.get(code, "?")
 
-def blkdev_name_to_number(name):
-    """Take the given textual block-device name (e.g., '/dev/sda1',
-    'hda') and return the device number used by the OS. """
-
-    if not re.match( '^/dev/', name ):
-	n = '/dev/' + name
-    else:
-	n = name
-        
-    try:
-	return os.stat(n).st_rdev
-    except:
-	pass
-
-    # see if this is a hex device number
-    if re.match( '^(0x)?[0-9a-fA-F]+$', name ):
-	return string.atoi(name,16)
-	
-    return None
-
-def lookup_raw_partn(name):
-    """Take the given block-device name (e.g., '/dev/sda1', 'hda')
-    and return a dictionary { device, start_sector,
-    nr_sectors, type }
-        device:       Device number of the given partition
-        start_sector: Index of first sector of the partition
-        nr_sectors:   Number of sectors comprising this partition
-        type:         'Disk' or identifying name for partition type
-    """
-
-    n = blkdev_name_to_number(name)
-    if n:
-	return [ { 'device' : n,
-		   'start_sector' : long(0),
-		   'nr_sectors' : long(1L<<63),
-		   'type' : 'Disk' } ]
-    else:
-	return None
-
-def lookup_disk_uname(uname):
-    """Lookup a list of segments for a physical device.
-    
-    @param uname: name of the device in the format \'phy:dev\' for a physical device
-    @type  uname: string
-    @return: list of extents that make up the named device
-    @rtype: [dict]
-    """
-    ( type, d_name ) = string.split( uname, ':' )
-
-    if type == "phy":
-        segments = lookup_raw_partn( d_name )
-    else:
-        segments = None
-    return segments
-
 def make_disk(vm, config, uname, dev, mode, recreate=0):
     """Create a virtual disk device for a domain.
 
@@ -156,18 +103,12 @@ def make_disk(vm, config, uname, dev, mode, recreate=0):
     @return: deferred
     """
     idx = vm.next_device_index('vbd')
-    segments = lookup_disk_uname(uname)
-    if not segments:
-        raise VmError("vbd: Segments not found: uname=%s" % uname)
-    if len(segments) > 1:
-        raise VmError("vbd: Multi-segment vdisk: uname=%s" % uname)
-    segment = segments[0]
     # todo: The 'dev' should be looked up in the context of the domain.
     vdev = blkdev_name_to_number(dev)
     if not vdev:
         raise VmError("vbd: Device not found: uname=%s dev=%s" % (uname, dev))
     ctrl = xend.blkif_create(vm.dom, recreate=recreate)
-    return ctrl.attachDevice(idx, config, vdev, mode, segment, recreate=recreate)
+    return ctrl.attachDevice(idx, config, uname, vdev, mode, recreate=recreate)
         
 def vif_up(iplist):
     """send an unsolicited ARP reply for all non link-local IP addresses.
