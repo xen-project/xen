@@ -1,46 +1,46 @@
 package org.xenoserver.cmdline;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
+
 import org.xenoserver.control.CommandFailedException;
 import org.xenoserver.control.Defaults;
 
 public class Main {
-  private static ParseHelp help = new ParseHelp();
-  static CommandParser commands[] =
+  static final ParseHelp help = new ParseHelp();
+  static final CommandParser domaincommands[] =
+    { new ParseDomainNew(),
+      new ParseDomainStart(),
+      new ParseDomainStop(),
+      new ParseDomainDestroy(),
+      new ParseDomainList()
+    };
+  static final CommandParser commands[] =
     { help,
-      new ParseNew(),
-      new ParseStart(),
-      new ParseStop(),
-      new ParseDestroy(),
-      new ParseList() };
+      new ParseGroup( "domain", domaincommands )
+    };
+  static final CommandParser parser = new ParseGroup( null, commands );
 
   public static void main(String[] args) {
     Defaults d = new Defaults();
     int ec = -1;
+    LinkedList arglist = new LinkedList();
+    for ( int i=0; i<args.length; i++ )
+      arglist.add( args[i] );
 
     if (args.length == 0) {
-      help.parse(d, args);
+      help.parse(d, arglist);
     } else {
-      String c = args[0];
-      int i;
-      for (i = 0; i < commands.length; i++) {
-        if (commands[i].getName().equals(c)) {
-          if (commands[i].getFlagParameter(args, '?')) {
-            help.doHelpFor(commands[i]);
-          } else {
-            try {
-              commands[i].parse(d, args);
-              ec = 0;
-            } catch (ParseFailedException e) {
-              System.err.println( e.getMessage() );
-            } catch (CommandFailedException e) {
-              System.err.println( e.getMessage() );
-            }
-          }
-          break;
-        }
-      }
-      if (i == commands.length) {
-        System.out.println("Unknown command " + c);
+      try
+      {
+        parser.parse(d, arglist);
+        ec = 0;
+      } catch (ParseFailedException e) {
+        System.err.println( e.getMessage() );
+      } catch (CommandFailedException e) {
+        System.err.println( e.getMessage() );
       }
     }
 

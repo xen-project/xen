@@ -1,13 +1,16 @@
 package org.xenoserver.cmdline;
 
+import java.util.LinkedList;
+import java.util.List;
+
 import org.xenoserver.control.Command;
 import org.xenoserver.control.CommandFailedException;
-import org.xenoserver.control.CommandNew;
+import org.xenoserver.control.CommandDomainNew;
 import org.xenoserver.control.Defaults;
 
-public class ParseNew extends CommandParser {
+public class ParseDomainNew extends CommandParser {
 
-  public void parse(Defaults d, String[] args) throws ParseFailedException, CommandFailedException {
+  public void parse(Defaults d, LinkedList args) throws ParseFailedException, CommandFailedException {
     String name = getStringParameter(args, 'n', d.domainName);
     int size = getIntParameter(args, 'k', d.domainSizeKB);
     String image = getStringParameter(args, 'i', d.domainImage);
@@ -24,7 +27,7 @@ public class ParseNew extends CommandParser {
 
     d.describe();
 
-    CommandNew c = new CommandNew(d, name, size, image, initrd, vifs,
+    CommandDomainNew c = new CommandDomainNew(d, name, size, image, initrd, vifs,
                                   bargs, root_dev, nfs_root_path,
                                   nw_ip, nw_gw, nw_mask, nw_nfs_server, nw_host);
     c.execute();

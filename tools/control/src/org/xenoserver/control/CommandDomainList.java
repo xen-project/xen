@@ -9,15 +9,15 @@ import java.util.Vector;
  * Lists details of all domains. After execute() has been called, call
  * domains() to get the array of domains.
  */
-public class CommandList extends Command {
+public class CommandDomainList extends Command {
   private Defaults d;
   private Domain[] array;
 
   /**
-   * Constructor for CommandList.
+   * Constructor for CommandDomainList.
    * @param d Defaults object to use.
    */
-  public CommandList(Defaults d) {
+  public CommandDomainList(Defaults d) {
     this.d = d;
   }
 

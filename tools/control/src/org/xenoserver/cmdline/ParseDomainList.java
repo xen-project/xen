@@ -1,15 +1,18 @@
 package org.xenoserver.cmdline;
 
+import java.util.LinkedList;
+import java.util.List;
+
 import org.xenoserver.control.Command;
 import org.xenoserver.control.CommandFailedException;
-import org.xenoserver.control.CommandList;
+import org.xenoserver.control.CommandDomainList;
 import org.xenoserver.control.Defaults;
 import org.xenoserver.control.Domain;
 
-public class ParseList extends CommandParser {
+public class ParseDomainList extends CommandParser {
 
-  public void parse(Defaults d, String[] args) throws ParseFailedException, CommandFailedException {
-    CommandList list = new CommandList(d);
+  public void parse(Defaults d, LinkedList args) throws ParseFailedException, CommandFailedException {
+    CommandDomainList list = new CommandDomainList(d);
     String output = list.execute();
     if ( output != null )
       System.out.println( output );

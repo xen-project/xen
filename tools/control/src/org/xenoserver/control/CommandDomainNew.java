@@ -14,7 +14,7 @@ import java.util.zip.GZIPInputStream;
  * Creates a new domain. As this command returns a multi-line result,
  * call output() to get an array of strings.
  */
-public class CommandNew extends Command {
+public class CommandDomainNew extends Command {
   private Defaults d;
   private String name;
   private int size;
@@ -36,7 +36,7 @@ public class CommandNew extends Command {
   }
   
   /**
-   * Constructor for CommandNew.
+   * Constructor for CommandDomainNew.
    * @param d Defaults object to use.
    * @param name Name for the domain.
    * @param size Memory size for the domain.
@@ -52,7 +52,7 @@ public class CommandNew extends Command {
    * @param nw_nfs_server NFS server to be used by the domain.
    * @param nw_host Hostname to be used by the domain.
    */
-  public CommandNew(
+  public CommandDomainNew(
     Defaults d,
     String name,
     int size,

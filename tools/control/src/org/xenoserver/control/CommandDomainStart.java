@@ -3,16 +3,16 @@ package org.xenoserver.control;
 /**
  * Starts a domain.
  */
-public class CommandStart extends Command {
+public class CommandDomainStart extends Command {
   private Defaults d;
   private int domain_id;
   
   /**
-   * Constructor for CommandStart.
+   * Constructor for CommandDomainStart.
    * @param d Defaults object to use.
    * @param domain_id Domain to start.
    */
-  public CommandStart(Defaults d, int domain_id) {
+  public CommandDomainStart(Defaults d, int domain_id) {
     this.d = d;
     this.domain_id = domain_id;
   }

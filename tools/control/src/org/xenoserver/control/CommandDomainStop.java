@@ -3,16 +3,16 @@ package org.xenoserver.control;
 /**
  * Stops a domain.
  */
-public class CommandStop extends Command {
+public class CommandDomainStop extends Command {
   private Defaults d;
   private int domain_id;
   
   /**
-   * Constructor for CommandStop.
+   * Constructor for CommandDomainStop.
    * @param d The defaults object to use.
    * @param domain_id The domain to stop.
    */
-  public CommandStop(Defaults d, int domain_id) {
+  public CommandDomainStop(Defaults d, int domain_id) {
     this.d = d;
     this.domain_id = domain_id;
   }

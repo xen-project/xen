@@ -3,19 +3,19 @@ package org.xenoserver.control;
 /**
  * Destroys a domain.
  */
-public class CommandDestroy extends Command {
+public class CommandDomainDestroy extends Command {
   private Defaults d;
   private int domain_id;
   private boolean force;
 
   /**
-   * Constructor for CommandDestroy.
+   * Constructor for CommandDomainDestroy.
    * 
    * @param d Defaults object to use.
    * @param domain_id Domain ID number to destroy.
    * @param force Force destruction.
    */
-  public CommandDestroy(Defaults d, int domain_id, boolean force) {
+  public CommandDomainDestroy(Defaults d, int domain_id, boolean force) {
     this.d = d;
     this.domain_id = domain_id;
     this.force = force;
