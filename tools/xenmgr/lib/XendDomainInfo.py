@@ -126,7 +126,7 @@ class XendDomainInfo:
             sxpr.append(['state', state])
             if self.info['shutdown']:
                 reasons = ["poweroff", "reboot", "suspend"]
-                reason = reasons[info['shutdown_reason']]
+                reason = reasons[self.info['shutdown_reason']]
                 sxpr.append(['shutdown_reason', reason])
             sxpr.append(['cpu', self.info['cpu']])
             sxpr.append(['cpu_time', self.info['cpu_time']/1e9])
