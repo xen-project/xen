@@ -40,6 +40,8 @@ typedef struct
 #define __HYPERVISOR_exit            8
 #define __HYPERVISOR_dom0_op         9
 #define __HYPERVISOR_network_op     10
+#define __HYPERVISOR_set_debugreg   11
+#define __HYPERVISOR_get_debugreg   12
 
 #define TRAP_INSTR "int $0x82"
 

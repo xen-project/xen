@@ -187,6 +187,7 @@ void flush_thread(void)
     struct task_struct *tsk = current;
 
     memset(tsk->thread.debugreg, 0, sizeof(unsigned long)*8);
+
     /*
      * Forget coprocessor state..
      */
@@ -307,14 +308,6 @@ void dump_thread(struct pt_regs * regs, struct user * dump)
 }
 
 /*
- * This special macro can be used to load a debugging register
- */
-#define loaddebug(thread,register) \
-		__asm__("movl %0,%%db" #register  \
-			: /* no output */ \
-			:"r" (thread->debugreg[register]))
-
-/*
  *	switch_to(x,yn) should switch tasks from x to y.
  *
  * We fsave/fwait so that an exception goes off at the right time
@@ -359,20 +352,19 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
     loadsegment(fs, next->fs);
     loadsegment(gs, next->gs);
 
-#if 0
     /*
      * Now maybe reload the debug registers
      */
-    if (next->debugreg[7]){
-        loaddebug(next, 0);
-        loaddebug(next, 1);
-        loaddebug(next, 2);
-        loaddebug(next, 3);
+    if ( next->debugreg[7] != 0 )
+    {
+        HYPERVISOR_set_debugreg(0, next->debugreg[0]);
+        HYPERVISOR_set_debugreg(1, next->debugreg[1]);
+        HYPERVISOR_set_debugreg(2, next->debugreg[2]);
+        HYPERVISOR_set_debugreg(3, next->debugreg[3]);
         /* no 4 and 5 */
-        loaddebug(next, 6);
-        loaddebug(next, 7);
+        HYPERVISOR_set_debugreg(6, next->debugreg[6]);
+        HYPERVISOR_set_debugreg(7, next->debugreg[7]);
     }
-#endif
 }
 
 asmlinkage int sys_fork(struct pt_regs regs)

@@ -324,11 +324,60 @@ gp_in_kernel:
 
 asmlinkage void do_debug(struct pt_regs * regs, long error_code)
 {
-    /*
-     * We don't mess with breakpoints, so the only way this exception
-     * type can occur is through single-step mode.
+    unsigned int condition;
+    struct task_struct *tsk = current;
+    siginfo_t info;
+
+    condition = HYPERVISOR_get_debugreg(6);
+
+    /* Mask out spurious debug traps due to lazy DR7 setting */
+    if (condition & (DR_TRAP0|DR_TRAP1|DR_TRAP2|DR_TRAP3)) {
+        if (!tsk->thread.debugreg[7])
+            goto clear_dr7;
+    }
+
+    /* Save debug status register where ptrace can see it */
+    tsk->thread.debugreg[6] = condition;
+
+    /* Mask out spurious TF errors due to lazy TF clearing */
+    if (condition & DR_STEP) {
+        /*
+         * The TF error should be masked out only if the current
+         * process is not traced and if the TRAP flag has been set
+         * previously by a tracing process (condition detected by
+         * the PT_DTRACE flag); remember that the i386 TRAP flag
+         * can be modified by the process itself in user mode,
+         * allowing programs to debug themselves without the ptrace()
+         * interface.
+         */
+        if ((tsk->ptrace & (PT_DTRACE|PT_PTRACED)) == PT_DTRACE)
+            goto clear_TF;
+    }
+
+    /* Ok, finally something we can handle */
+    tsk->thread.trap_no = 1;
+    tsk->thread.error_code = error_code;
+    info.si_signo = SIGTRAP;
+    info.si_errno = 0;
+    info.si_code = TRAP_BRKPT;
+        
+    /* If this is a kernel mode trap, save the user PC on entry to 
+     * the kernel, that's what the debugger can make sense of.
      */
+    info.si_addr = ((regs->xcs & 3) == 0) ? (void *)tsk->thread.eip : 
+                                            (void *)regs->eip;
+    force_sig_info(SIGTRAP, &info, tsk);
+
+    /* Disable additional traps. They'll be re-enabled when
+     * the signal is delivered.
+     */
+ clear_dr7:
+    HYPERVISOR_set_debugreg(7, 0);
+    return;
+
+ clear_TF:
     regs->eflags &= ~TF_MASK;
+    return;
 }
 
 

@@ -163,4 +163,26 @@ static inline int HYPERVISOR_network_op(void *network_op)
     return ret;
 }
 
+static inline int HYPERVISOR_set_debugreg(int reg, unsigned long value)
+{
+    int ret;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret) : "0" (__HYPERVISOR_set_debugreg),
+        "b" (reg), "c" (value) );
+
+    return ret;
+}
+
+static inline unsigned long HYPERVISOR_get_debugreg(int reg)
+{
+    unsigned long ret;
+    __asm__ __volatile__ (
+        TRAP_INSTR
+        : "=a" (ret) : "0" (__HYPERVISOR_get_debugreg),
+        "b" (reg) );
+
+    return ret;
+}
+
 #endif /* __HYPERVISOR_H__ */
