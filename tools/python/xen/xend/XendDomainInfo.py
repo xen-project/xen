@@ -50,6 +50,16 @@ shutdown_reasons = {
     DOMAIN_REBOOT  : "reboot",
     DOMAIN_SUSPEND : "suspend" }
 
+RESTART_ALWAYS   = 'always'
+RESTART_ONREBOOT = 'onreboot'
+RESTART_NEVER    = 'never'
+
+restart_modes = [
+    RESTART_ALWAYS,
+    RESTART_ONREBOOT,
+    RESTART_NEVER,
+    ]
+
 def shutdown_reason(code):
     """Get a shutdown reason from a code.
 
@@ -117,7 +127,12 @@ def lookup_disk_uname(uname):
 def make_disk(dom, uname, dev, mode, recreate=0):
     """Create a virtual disk device for a domain.
 
-    @returns Deferred
+    @param dom:      domain id
+    @param uname:    device to export
+    @param dev:      device name in domain
+    @param mode:     read/write mode
+    @param recreate: recreate flag (after xend restart)
+    @return: deferred
     """
     segments = lookup_disk_uname(uname)
     if not segments:
@@ -234,7 +249,6 @@ def vm_create(config):
     returns Deferred
     raises VmError for invalid configuration
     """
-    print 'vm_create>'
     vm = XendDomainInfo()
     return vm.construct(config)
 
@@ -289,28 +303,21 @@ def append_deferred(dlist, v):
 
 def _vm_configure1(val, vm):
     d = vm.create_devices()
-    #print '_vm_configure1> made devices...'
     def cbok(x):
-        #print '_vm_configure1> cbok', x
         return x
     d.addCallback(cbok)
     d.addCallback(_vm_configure2, vm)
-    #print '_vm_configure1<'
     return d
 
 def _vm_configure2(val, vm):
-    #print '>callback _vm_configure2...'
     d = vm.configure_fields()
     def cbok(results):
-        #print '_vm_configure2> cbok', results
         return vm
     def cberr(err):
-        #print '_vm_configure2> cberr', err
         vm.destroy()
         return err
     d.addCallback(cbok)
     d.addErrback(cberr)
-    #print '<_vm_configure2'
     return d
 
 class XendDomainInfo:
@@ -341,7 +348,7 @@ class XendDomainInfo:
         #todo: set to migrate info if migrating
         self.migrate = None
         #Whether to auto-restart
-        self.autorestart = 0
+        self.restart_mode = RESTART_ONREBOOT
 
     def setdom(self, dom):
         self.dom = int(dom)
@@ -381,8 +388,7 @@ class XendDomainInfo:
             state = run + block + stop + susp + crash
             sxpr.append(['state', state])
             if self.info['shutdown']:
-                reasons = ["poweroff", "reboot", "suspend"]
-                reason = reasons[self.info['shutdown_reason']]
+                reason = shutdown_reason(self.info['shutdown_reason'])
                 sxpr.append(['shutdown_reason', reason])
             sxpr.append(['cpu', self.info['cpu']])
             sxpr.append(['cpu_time', self.info['cpu_time']/1e9])
@@ -398,8 +404,7 @@ class XendDomainInfo:
         try:
             self.name = sxp.child_value(config, 'name')
             self.memory = int(sxp.child_value(config, 'memory', '128'))
-            if sxp.child(config, 'autorestart', None):
-                self.autorestart = 1
+            self.configure_restart()
             self.configure_backends()
             image = sxp.child_value(config, 'image')
             if image is None:
@@ -413,7 +418,6 @@ class XendDomainInfo:
             image_handler(self, image)
             deferred = self.configure()
             def cbok(x):
-                print 'vm_create> cbok', x
                 return x
             def cberr(err):
                 self.destroy()
@@ -424,7 +428,6 @@ class XendDomainInfo:
             # Catch errors, cleanup and re-raise.
             self.destroy()
             raise
-        print 'vm_create<'
         return deferred
 
     def config_devices(self, name):
@@ -514,7 +517,6 @@ class XendDomainInfo:
     def cleanup(self):
         """Cleanup vm resources: release devices.
         """
-        print 'cleanup>', self.dom
         self.state = self.STATE_TERMINATED
         self.release_devices()
 
@@ -526,7 +528,6 @@ class XendDomainInfo:
     def release_devices(self):
         """Release all vm devices.
         """
-        print 'release_devices>', self.dom
         self.release_vifs()
         self.release_vbds()
         self.devices = {}
@@ -534,7 +535,6 @@ class XendDomainInfo:
     def release_vifs(self):
         """Release vm virtual network devices (vifs).
         """
-        print 'release_vifs>', self.dom
         if self.dom is None: return
         ctrl = xend.netif_get(self.dom)
         if ctrl:
@@ -543,7 +543,6 @@ class XendDomainInfo:
     def release_vbds(self):
         """Release vm virtual block devices (vbds).
         """
-        print 'release_vbds>', self.dom
         if self.dom is None: return
         ctrl = xend.blkif_get(self.dom)
         if ctrl:
@@ -574,7 +573,7 @@ class XendDomainInfo:
         memory = self.memory
         name = self.name
         cpu = int(sxp.child_value(self.config, 'cpu', '-1'))
-        print 'init_domain>', memory, name, cpu
+        #print 'init_domain>', memory, name, cpu
         dom = xc.domain_create(mem_kb= memory * 1024, name= name, cpu= cpu)
         if dom <= 0:
             raise VmError('Creating domain failed: name=%s memory=%d'
@@ -589,7 +588,7 @@ class XendDomainInfo:
             print 'Warning: kernel cmdline too long'
         dom = self.dom
         buildfn = getattr(xc, '%s_build' % ostype)
-        print 'build_domain>', ostype, dom, kernel, cmdline, ramdisk
+        #print 'build_domain>', ostype, dom, kernel, cmdline, ramdisk
         flags = 0
         if self.netif_backend: flags |= SIF_NET_BE_DOMAIN
         if self.blkif_backend: flags |= SIF_BLK_BE_DOMAIN
@@ -612,15 +611,12 @@ class XendDomainInfo:
         cmdline kernel commandline
         vifs_n  number of network interfaces
         """
-        print 'create_domain>', ostype, kernel
         if not self.recreate:
             if not os.path.isfile(kernel):
                 raise VmError('Kernel image does not exist: %s' % kernel)
             if ramdisk and not os.path.isfile(ramdisk):
                 raise VmError('Kernel ramdisk does not exist: %s' % ramdisk)
-        print 'create-domain> init_domain...'
         self.init_domain()
-        print 'create_domain>', 'dom=', self.dom
         self.console = xendConsole.console_create(self.dom)
         self.build_domain(ostype, kernel, ramdisk, cmdline, vifs_n)
         self.image = kernel
@@ -633,7 +629,6 @@ class XendDomainInfo:
         returns Deferred
         raises VmError for invalid devices
         """
-        print '>create_devices'
         dlist = []
         devices = sxp.children(self.config, 'device')
         index = {}
@@ -650,7 +645,6 @@ class XendDomainInfo:
             append_deferred(dlist, v)
             index[dev_name] = dev_index + 1
         deferred = defer.DeferredList(dlist, fireOnOneErrback=1)
-        print '<create_devices'
         return deferred
 
     def device_create(self, dev_config):
@@ -685,6 +679,21 @@ class XendDomainInfo:
         if dev_config:
             self.config.remove(['device', dev_config])
         dev.destroy()
+
+    def configure_restart(self):
+        r = sxp.child_value(self.config, 'restart', RESTART_ONREBOOT)
+        if r not in restart_modes:
+            raise VmError('invalid restart mode: ' + str(r))
+        self.restart_mode = r;
+
+    def restart_needed(self, reason):
+        if self.restart_mode == RESTART_NEVER:
+            return 0
+        if self.restart_mode == RESTART_ALWAYS:
+            return 1
+        if self.restart_mode == RESTART_ONREBOOT:
+            return reason == 'reboot'
+        return 0
 
     def configure_backends(self):
         """Set configuration flags if the vm is a backend for netif of blkif.
@@ -807,7 +816,7 @@ def vm_image_netbsd(vm, image):
     args = sxp.child_value(image, "args")
     if args:
         cmdline += " " + args
-    ramdisk = sxp.child_value(image, "ramdisk")
+    ramdisk = sxp.child_value(image, "ramdisk", '')
     vifs = vm.config_devices("vif")
     vm.create_domain("netbsd", kernel, ramdisk, cmdline, len(vifs))
     return vm
@@ -830,7 +839,6 @@ def vm_dev_vif(vm, val, index):
         dev = xend.netif_dev(vm.dom, vif)
         dev.vifctl('up', vmname=vm.name)
         vm.add_device('vif', dev)
-        print 'vm_dev_vif> created', dev
         return id
     defer.addCallback(fn)
     return defer

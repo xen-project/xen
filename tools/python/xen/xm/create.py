@@ -97,9 +97,13 @@ gopts.var('memory', val='MEMORY',
          fn=set_value, default=128,
          use="Domain memory in MB.")
 
-gopts.var('autorestart', val='no|yes',
-         fn=set_bool, default=0,
-         use="Whether to restart the domain on exit.")
+gopts.var('restart', val='onreboot|always|never',
+         fn=set_value, default=None,
+         use="""Whether the domain should be restarted on exit.
+         - onreboot: restart on exit with shutdown code reboot
+         - always:   always restart on exit, ignore exit code
+         - never:    never restart on exit, ignore exit code
+         """)
 
 gopts.var('blkif', val='no|yes',
           fn=set_bool, default=0,
@@ -294,8 +298,8 @@ def make_config(vals):
         config.append(['backend', ['blkif']])
     if vals.netif:
         config.append(['backend', ['netif']])
-    if vals.autorestart:
-        config.append(['autorestart'])
+    if vals.restart:
+        config.append(['restart', vals.restart])
     
     configure_image(config, vals)
     config_devs = []

@@ -11,7 +11,7 @@ from xen.xend import PrettyPrint
 from xen.xend import sxp
 from xen.xend.XendClient import XendError, server
 from xen.xend.XendClient import main as xend_client_main
-from xen.xm import create, shutdown
+from xen.xm import create, destroy, shutdown
 
 class Prog:
     """Base class for sub-programs.
@@ -268,13 +268,10 @@ class ProgDestroy(Prog):
     info = """Terminate a domain immediately."""
 
     def help(self, args):
-        print args[0], 'DOM'
-        print '\nTerminate domain DOM immediately.'
+        destroy.main([args[0], '-h'])
 
     def main(self, args):
-        if len(args) < 2: self.err("%s: Missing domain" % args[0])
-        dom = args[1]
-        server.xend_domain_destroy(dom)
+        destroy.main(args)
 
 xm.prog(ProgDestroy)
 
