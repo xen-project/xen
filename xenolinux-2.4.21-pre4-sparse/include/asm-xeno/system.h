@@ -10,10 +10,16 @@
 
 #ifdef __KERNEL__
 
-struct task_struct;	/* one of the stranger aspects of C forward declarations.. */
-extern void FASTCALL(__switch_to(struct task_struct *prev, struct task_struct *next));
+struct task_struct;
+extern void FASTCALL(__switch_to(struct task_struct *prev, 
+                                 struct task_struct *next));
 
-#define prepare_to_switch()	do { } while(0)
+#define prepare_to_switch()                                             \
+do {                                                                    \
+    struct thread_struct *__t = &current->thread;                       \
+    __asm__ __volatile__ ( "movl %%fs,%0" : "=m" (*(int *)&__t->fs) );  \
+    __asm__ __volatile__ ( "movl %%gs,%0" : "=m" (*(int *)&__t->gs) );  \
+} while (0)
 #define switch_to(prev,next,last) do {					\
 	asm volatile("pushl %%esi\n\t"					\
 		     "pushl %%edi\n\t"					\
