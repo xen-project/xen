@@ -8,7 +8,7 @@
 
 #include <sys/time.h>
 #include "xc_private.h"
-#include <asm-xen/suspend.h>
+#include <xen/linux/suspend.h>
 #include <time.h>
 
 #define BATCH_SIZE 1024   /* 1024 pages (4MB) at a time */

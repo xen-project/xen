@@ -11,7 +11,7 @@ SOURCEFORGE_MIRROR := http://heanet.dl.sourceforge.net/sourceforge
 .PHONY: docs delete-symlinks clean
 
 # a not partcularly useful but safe default target
-all: make-symlinks
+all:
 	$(MAKE) prefix=$(INSTALL_DIR) dist=yes -C xen install
 	$(MAKE) prefix=$(INSTALL_DIR) dist=yes -C tools install
 
@@ -192,7 +192,7 @@ netbsd:
 	$(MAKE) mk-netbsd-trees
 	$(MAKE) netbsd-xenU
 
-clean: delete-symlinks
+clean:
 	$(MAKE) -C xen clean
 	$(MAKE) -C tools clean
 	$(MAKE) -C docs clean
@@ -201,13 +201,6 @@ clean: delete-symlinks
 mrproper: clean
 	rm -rf install/* patches $(LINUX_TREES) linux-$(LINUX_VER).tar.*
 
-make-symlinks: delete-symlinks
-	ln -sf linux-$(LINUX26_VER)-xen-sparse linux-xen-sparse
-
-delete-symlinks:
-	$(RM) linux-xen-sparse
-
-# handy target to install twisted (use rpm or apt-get in preference)
 install-twisted:
 	wget http://www.twistedmatrix.com/products/get-current.epy
 	tar -zxf Twisted-*.tar.gz

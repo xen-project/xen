@@ -1,5 +1,5 @@
 /******************************************************************************
- * core.c
+ * privcmd.c
  * 
  * Interface to privileged domain-0 commands.
  * 
@@ -25,7 +25,7 @@
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
 #include <asm/tlb.h>
-#include <asm-xen/proc_cmd.h>
+#include <asm-xen/linux-public/privcmd.h>
 #include <asm-xen/xen-public/dom0_ops.h>
 #include <asm-xen/xen_proc.h>
 

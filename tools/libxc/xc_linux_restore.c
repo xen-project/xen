@@ -7,7 +7,7 @@
  */
 
 #include "xc_private.h"
-#include <asm-xen/suspend.h>
+#include <xen/linux/suspend.h>
 
 #define MAX_BATCH_SIZE 1024
 

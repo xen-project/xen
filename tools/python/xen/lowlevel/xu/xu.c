@@ -25,8 +25,7 @@
 
 #include <xen/xen.h>
 #include <xen/io/domain_controller.h>
-
-#include <asm-xen/proc_cmd.h>
+#include <xen/linux/privcmd.h>
 
 #define XENPKG "xen.lowlevel.xu"
 

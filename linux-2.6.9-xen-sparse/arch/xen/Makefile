@@ -52,7 +52,8 @@ install: vmlinuz
 	install -m0644 vmlinux $(INSTALL_PATH)/boot/vmlinux-syms-$(XINSTALL_NAME)$(INSTALL_SUFFIX)
 	install -m0664 .config $(INSTALL_PATH)/boot/config-$(XINSTALL_NAME)$(INSTALL_SUFFIX)
 	install -m0664 System.map $(INSTALL_PATH)/boot/System.map-$(XINSTALL_NAME)$(INSTALL_SUFFIX)
-
+	mkdir -p $(INSTALL_PATH)/usr/include/xen/linux
+	install -m0644 include/asm-xen/linux-public/*.h $(INSTALL_PATH)/usr/include/xen/linux
 dist:
 	$(MAKE) INSTALL_PATH=../install install
 

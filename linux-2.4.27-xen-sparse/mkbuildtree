@@ -209,9 +209,11 @@ ln -sf ../../${LINUX_26}/include/asm-xen/evtchn.h
 ln -sf ../../${LINUX_26}/include/asm-xen/gnttab.h
 ln -sf ../../${LINUX_26}/include/asm-xen/hypervisor.h
 ln -sf ../../${LINUX_26}/include/asm-xen/multicall.h
-ln -sf ../../${LINUX_26}/include/asm-xen/proc_cmd.h
-ln -sf ../../${LINUX_26}/include/asm-xen/suspend.h
 ln -sf ../../${LINUX_26}/include/asm-xen/xen_proc.h
+
+mkdir -p linux-public && cd linux-public
+ln -sf ../../../${LINUX_26}/include/asm-xen/linux-public/privcmd.h
+ln -sf ../../../${LINUX_26}/include/asm-xen/linux-public/suspend.h
 
 cd ${AD}/arch/xen/kernel
 ln -sf ../../i386/kernel/i387.c

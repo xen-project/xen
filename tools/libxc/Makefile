@@ -8,9 +8,6 @@ CC       = gcc
 XEN_ROOT = ../..
 include $(XEN_ROOT)/tools/Make.defs
 
-vpath %h       $(XEN_LINUX_INCLUDE)
-INCLUDES += -I $(XEN_LINUX_INCLUDE)
-
 vpath %c       $(XEN_LIBXUTIL)
 INCLUDES += -I $(XEN_LIBXUTIL)
 
@@ -32,7 +29,7 @@ CFLAGS   += -Wall
 CFLAGS   += -Werror
 CFLAGS   += -O3
 CFLAGS   += -fno-strict-aliasing
-CFLAGS   += $(INCLUDES)
+CFLAGS   += $(INCLUDES) -I.
 # Get gcc to generate the dependencies for us.
 CFLAGS   += -Wp,-MD,.$(@F).d
 DEPS     = .*.d
@@ -51,8 +48,11 @@ check-for-zlib:
 	false; \
 	fi
 
+LINUX_ROOT := $(wildcard $(XEN_ROOT)/linux-2.6.*-xen-sparse)
 mk-symlinks:
-	[ -e xen ] || ln -sf $(XEN_HYPERVISOR_IFS) xen
+	[ -e xen/linux ] || mkdir -p xen/linux
+	lndir -silent ../$(XEN_ROOT)/xen/include/public xen
+	lndir -silent ../../$(LINUX_ROOT)/include/asm-xen/linux-public xen/linux
 
 install: all
 	mkdir -p $(prefix)/usr/lib
@@ -63,7 +63,7 @@ install: all
 	install -m0644 xc.h $(prefix)/usr/include
 
 clean:
-	$(RM) *.a *.so *.o *.rpm $(LIB) *~ $(DEPS) xen
+	rm -rf *.a *.so *.o *.rpm $(LIB) *~ $(DEPS) xen
 
 rpm: all
 	rm -rf staging

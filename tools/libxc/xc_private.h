@@ -16,8 +16,7 @@
 
 #include "xc.h"
 
-#include <asm-xen/proc_cmd.h>
-
+#include <xen/linux/privcmd.h>
 
 #define _PAGE_PRESENT   0x001
 #define _PAGE_RW        0x002

@@ -18,11 +18,11 @@ typedef signed short       s16;
 typedef signed long        s32;
 typedef signed long long   s64;
 
-#include "xen/xen.h"
-#include "xen/dom0_ops.h"
-#include "xen/event_channel.h"
-#include "xen/sched_ctl.h"
-#include "xen/io/domain_controller.h"
+#include <xen/xen.h>
+#include <xen/dom0_ops.h>
+#include <xen/event_channel.h>
+#include <xen/sched_ctl.h>
+#include <xen/io/domain_controller.h>
 
 /* Obtain or relinquish a handle on the 'xc' library. */
 int xc_interface_open(void);
