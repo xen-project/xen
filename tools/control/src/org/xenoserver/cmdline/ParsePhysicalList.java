@@ -15,7 +15,7 @@ import org.xenoserver.control.PartitionManager;
 public class ParsePhysicalList extends CommandParser {
     public void parse(Defaults d, LinkedList args)
         throws ParseFailedException, CommandFailedException {
-        int domain_id = getIntParameter(args, 'n', 0);
+        int domain_id = getIntParameter(args, 'n', d.domainNumber);
         if (domain_id == 0) {
             throw new ParseFailedException("Expected -n<domain_id>");
         }

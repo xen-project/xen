@@ -10,7 +10,7 @@ import org.xenoserver.control.Mode;
 public class ParsePhysicalGrant extends CommandParser {
     public void parse(Defaults d, LinkedList args)
         throws ParseFailedException, CommandFailedException {
-        int domain_id = getIntParameter(args, 'n', 0);
+        int domain_id = getIntParameter(args, 'n', d.domainNumber);
         boolean force = getFlagParameter(args, 'f');
         String partition_name = getStringParameter(args, 'p', "");
         boolean write = getFlagParameter(args, 'w');
@@ -44,7 +44,7 @@ public class ParsePhysicalGrant extends CommandParser {
     }
 
     public String getUsage() {
-        return "-n<domain_id> -p<partition_name> [-f] [-w]";
+        return "-p<partition_name> [-n<domain_id>] [-f] [-w]";
     }
 
     public String getHelpText() {

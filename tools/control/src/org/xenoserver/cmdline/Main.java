@@ -43,11 +43,22 @@ public class Main {
       new ParseGroup( "domain", domaincommands ),
       new ParseGroup( "partitions", partitioncommands ),
       new ParseGroup( "physical", physicalcommands ),
+      new ParseScript(),
       new ParseGroup( "vd", vdcommands ),
       new ParseGroup( "vbd", vbdcommands )
     };
   /** The top-level parser. */
   static final CommandParser parser = new ParseGroup( null, commands );
+
+  public static void executeArgList (Defaults d, LinkedList arglist)
+     throws ParseFailedException, CommandFailedException 
+  {
+    if (arglist.size() == 0) {
+      help.parse(null, null);
+    } else {
+      parser.parse(d, arglist);
+    }
+  }
 
   public static void main(String[] args) {
     Defaults d = new Defaults();
@@ -57,20 +68,15 @@ public class Main {
       arglist.add( args[i] );
     }
 
-    if (args.length == 0) {
+    try {
+      executeArgList (d, arglist);
+      ec = 0;
+    } catch (NoSuchElementException e) {
       help.parse(null, null);
-    } else {
-      try
-      {
-        parser.parse(d, arglist);
-        ec = 0;
-      } catch (NoSuchElementException e) {
-          help.parse(null, null);
-      } catch (ParseFailedException e) {
-        System.err.println( e.getMessage() );
-      } catch (CommandFailedException e) {
-        System.err.println( e.getMessage() );
-      }
+    } catch (ParseFailedException e) {
+      System.err.println( e.getMessage() );
+    } catch (CommandFailedException e) {
+      System.err.println( e.getMessage() );
     }
 
     System.exit(ec);
