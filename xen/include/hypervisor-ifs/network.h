@@ -169,5 +169,6 @@ int add_net_rule(net_rule_t *rule);
 /* Descriptor status values */
 #define RING_STATUS_OK               0  /* Everything is gravy. */
 #define RING_STATUS_BAD_PAGE         1  /* What they gave us was pure evil */
+#define RING_STATUS_DROPPED          2  /* Unrouteable packet */
 
 #endif

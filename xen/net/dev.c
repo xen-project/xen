@@ -619,14 +619,8 @@ int netif_rx(struct sk_buff *skb)
     if ( skb->dst_vif == NULL )
         skb->dst_vif = net_get_target_vif(skb->data, skb->len, skb->src_vif);
         
-    if ( (skb->dst_vif == VIF_PHYS) || (skb->dst_vif == VIF_DROP) )
-    {
-        netdev_rx_stat[this_cpu].dropped++;
-        unmap_domain_mem(skb->head);
-        kfree_skb(skb);
-        local_irq_restore(flags);
-        return NET_RX_DROP;
-    }
+    if ( !VIF_LOCAL(skb->dst_vif) )
+        skb->dst_vif = find_vif_by_id(0);
 
     deliver_packet(skb, skb->dst_vif);
     put_vif(skb->dst_vif);
@@ -1844,24 +1838,7 @@ long do_net_update(void)
 
             target = net_get_target_vif(g_data, tx.size, vif);
 
-            if ( target == VIF_PHYS )
-            {
-                vif->tx_shadow_ring[j].id     = tx.id;
-                vif->tx_shadow_ring[j].size   = tx.size;
-                vif->tx_shadow_ring[j].header = 
-                    kmem_cache_alloc(net_header_cachep, GFP_KERNEL);
-                if ( vif->tx_shadow_ring[j].header == NULL )
-                { 
-                    make_tx_response(vif, tx.id, RING_STATUS_OK);
-                    goto tx_unmap_and_continue;
-                }
-
-                memcpy(vif->tx_shadow_ring[j].header, g_data, PKT_PROT_LEN);
-                vif->tx_shadow_ring[j].payload = tx.addr + PKT_PROT_LEN;
-                get_page_tot(buf_page);
-                j = TX_RING_INC(j);
-            }
-            else if ( target != VIF_DROP )
+            if ( VIF_LOCAL(target) )
             {
                 /* Local delivery */
                 if ( (skb = dev_alloc_skb(ETH_FRAME_LEN + 32)) == NULL )
@@ -1896,6 +1873,27 @@ long do_net_update(void)
                 interdom_skb = skb;
 
                 make_tx_response(vif, tx.id, RING_STATUS_OK);
+            }
+            else if ( (target == VIF_PHYS) || IS_PRIV(current) )
+            {
+                vif->tx_shadow_ring[j].id     = tx.id;
+                vif->tx_shadow_ring[j].size   = tx.size;
+                vif->tx_shadow_ring[j].header = 
+                    kmem_cache_alloc(net_header_cachep, GFP_KERNEL);
+                if ( vif->tx_shadow_ring[j].header == NULL )
+                { 
+                    make_tx_response(vif, tx.id, RING_STATUS_OK);
+                    goto tx_unmap_and_continue;
+                }
+
+                memcpy(vif->tx_shadow_ring[j].header, g_data, PKT_PROT_LEN);
+                vif->tx_shadow_ring[j].payload = tx.addr + PKT_PROT_LEN;
+                get_page_tot(buf_page);
+                j = TX_RING_INC(j);
+            }
+            else
+            {
+                make_tx_response(vif, tx.id, RING_STATUS_DROPPED);
             }
 
         tx_unmap_and_continue:

@@ -100,8 +100,9 @@ net_vif_t *find_vif_by_id(unsigned long id);
  *  VIF_DROP -- Drop this packet
  *  others   -- Send to specified VIF (reference held on return)
  */
-#define VIF_PHYS ((net_vif_t *)0)
-#define VIF_DROP ((net_vif_t *)1)
+#define VIF_PHYS  ((net_vif_t *)0)
+#define VIF_DROP  ((net_vif_t *)1)
+#define VIF_LOCAL(_vif) ((unsigned long)(_vif) > 1)
 
 #endif /* __XENO_VIF_H__ */
 

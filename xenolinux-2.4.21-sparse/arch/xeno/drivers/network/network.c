@@ -446,11 +446,10 @@ static int inetdev_notify(struct notifier_block *this,
     struct net_private *np;
     int idx = -1;
     network_op_t op;
-    static int removed_bootstrap_rules = 0;
 
     list_for_each ( ent, &dev_list )
     {
-        np  = list_entry(dev_list.next, struct net_private, list);
+        np = list_entry(dev_list.next, struct net_private, list);
         if ( np->dev == dev )
             idx = np->idx;
     }
@@ -484,27 +483,6 @@ static int inetdev_notify(struct notifier_block *this,
     op.u.net_rule.dst_addr      = ntohl(ifa->ifa_address);
     op.u.net_rule.dst_addr_mask = ~0UL;
     (void)HYPERVISOR_network_op(&op);
-
-    /*
-     * When the first real interface is brought up we delete the start-of-day
-     * bootstrap rules -- they were only installed to allow an initial DHCP
-     * request and response.
-     */
-    if ( (idx == 0) && (event == NETDEV_UP) && !removed_bootstrap_rules )
-    {
-        memset(&op, 0, sizeof(op));
-        op.cmd = NETWORK_OP_DELETERULE;
-        op.u.net_rule.proto         = NETWORK_PROTO_ANY;
-        op.u.net_rule.action        = NETWORK_ACTION_ACCEPT;
-        op.u.net_rule.src_vif       = 0;
-        op.u.net_rule.dst_vif       = VIF_PHYSICAL_INTERFACE;
-        (void)HYPERVISOR_network_op(&op);
-        op.u.net_rule.src_vif       = VIF_ANY_INTERFACE;
-        op.u.net_rule.dst_vif       = 0;
-        (void)HYPERVISOR_network_op(&op);
-
-        removed_bootstrap_rules = 1;
-    }
     
  out:
     return NOTIFY_DONE;
@@ -525,32 +503,13 @@ int __init init_module(void)
 
     INIT_LIST_HEAD(&dev_list);
 
+    /*
+     * Domain 0 must poke its own network rules as it discovers its IP
+     * addresses. All other domains have a privileged "parent" to do this for
+     * them at start of day.
+     */
     if ( start_info.dom_id == 0 )
-    {
-        /*
-         * Domain 0 creates wildcard rules to allow DHCP to find its first IP
-         * address. These wildcard rules are deleted when the first inet
-         * interface is brought up.
-         */
-        network_op_t op;
-        memset(&op, 0, sizeof(op));
-        op.cmd = NETWORK_OP_ADDRULE;
-        op.u.net_rule.proto         = NETWORK_PROTO_ANY;
-        op.u.net_rule.action        = NETWORK_ACTION_ACCEPT;
-        op.u.net_rule.src_vif       = 0;
-        op.u.net_rule.dst_vif       = VIF_PHYSICAL_INTERFACE;
-        (void)HYPERVISOR_network_op(&op);
-        op.u.net_rule.src_vif       = VIF_ANY_INTERFACE;
-        op.u.net_rule.dst_vif       = 0;
-        (void)HYPERVISOR_network_op(&op);        
-
-        /*
-         * Domain 0 must poke its own network rules as it discovers its IP
-         * addresses. All other domains have a privileged "parent" to do this
-         * for them at start of day.
-         */
         (void)register_inetaddr_notifier(&notifier_inetdev);
-    }
 
     for ( i = 0; i < MAX_DOMAIN_VIFS; i++ )
     {
