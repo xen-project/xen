@@ -235,6 +235,11 @@ long do_block_io_op(block_io_op_t *u_block_io_op)
         }
         break;
 
+    case BLOCK_IO_OP_RING_ADDRESS:
+        op.u.ring_mfn = virt_to_phys(p->blk_ring_base) >> PAGE_SHIFT;
+        ret = copy_to_user(u_block_io_op, &op, sizeof(op)) ? -EFAULT : 0;
+        break;
+
     case BLOCK_IO_OP_VBD_CREATE:  
 	/* create a new VBD for a given domain; caller must be privileged  */
 	if(!IS_PRIV(p))

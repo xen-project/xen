@@ -36,12 +36,13 @@ typedef struct {
 /* Block I/O trap operations and associated structures.
  */
 
-#define BLOCK_IO_OP_SIGNAL      0    /* let xen know we have work to do */ 
-#define BLOCK_IO_OP_RESET       1    /* reset ring indexes on quiescent i/f */
-#define BLOCK_IO_OP_VBD_CREATE  2    /* create a new VBD for a given domain */
-#define BLOCK_IO_OP_VBD_ADD     3    /* add an extent to a given VBD */
-#define BLOCK_IO_OP_VBD_REMOVE  4    /* remove an extent from a given VBD */
-#define BLOCK_IO_OP_VBD_DELETE  5    /* delete a VBD */
+#define BLOCK_IO_OP_SIGNAL       0    /* let xen know we have work to do */ 
+#define BLOCK_IO_OP_RESET        1    /* reset ring indexes on quiescent i/f */
+#define BLOCK_IO_OP_RING_ADDRESS 2 /* returns machine address of I/O ring */
+#define BLOCK_IO_OP_VBD_CREATE   3    /* create a new VBD for a given domain */
+#define BLOCK_IO_OP_VBD_ADD      4    /* add an extent to a given VBD */
+#define BLOCK_IO_OP_VBD_REMOVE   5    /* remove an extent from a given VBD */
+#define BLOCK_IO_OP_VBD_DELETE   6    /* delete a VBD */
 
 
 typedef struct _xen_extent { 
@@ -84,11 +85,12 @@ typedef struct block_io_op_st
     union
     {
         /* no entry for BLOCK_IO_OP_SIGNAL */
+        /* no entry for BLOCK_IO_OP_RESET  */
+	unsigned long ring_mfn; 
 	vbd_create_t  create_info; 
 	vbd_add_t     add_info; 
 	vbd_remove_t  remove_info; 
 	vbd_delete_t  delete_info; 
-        /* no entry for BLOCK_IO_OP_RESET  */
     }
     u;
 } block_io_op_t;
