@@ -212,7 +212,7 @@ static void end_block_io_op(struct buffer_head *bh, int uptodate)
         unsigned long *buff = map_domain_mem(virt_to_phys(bh->b_data));
         if ( (buff[  0] == 0xdeadbeef) &&
              (buff[127] == 0xdeadbeef) )
-            printk("An unmodified buffer at sector %ld\n", bh->b_rsector);
+            printk("An unmodified buffer at sector %ld. b_data = %08x, phys = %08x\n", bh->b_rsector,bh->b_data,virt_to_phys(bh->b_data));
         unmap_domain_mem(buff);
     }
 #endif
