@@ -194,16 +194,12 @@ void xen_segment_probe_all(xen_segment_info_t *raw_xsi)
 	if ( xsegments[loop].mode == XEN_SEGMENT_UNUSED )
 	    continue;
 
-        device = MK_VIRTUAL_XENDEV(xsegments[loop].segment_number);
-
-	printk("Doing seg %d.\n", xsi->count);
-	xsi->segments[xsi->count].device = device;
+	xsi->segments[xsi->count].mode = xsegments[loop].mode;
 	xsi->segments[xsi->count].domain = xsegments[loop].domain;
 	memcpy(xsi->segments[xsi->count].key,
 	       xsegments[loop].key,
 	       XEN_SEGMENT_KEYSIZE);
 	xsi->segments[xsi->count].seg_nr = xsegments[loop].segment_number;
-	printk("Done.\n");
         xsi->count++;	
     }
 
