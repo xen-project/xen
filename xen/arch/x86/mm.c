@@ -1147,13 +1147,16 @@ int get_page_type(struct pfn_info *page, u32 type)
                  * may be unnecessary (e.g., page was GDT/LDT) but those
                  * circumstances should be very rare.
                  */
-                struct domain *d = page_get_owner(page);
-                if ( unlikely(NEED_FLUSH(tlbflush_time[d->exec_domain[0]->
-                                                      processor],
-                                         page->tlbflush_timestamp)) )
+                struct exec_domain *ed;
+                unsigned long mask = 0;
+                for_each_exec_domain ( page_get_owner(page), ed )
+                    mask |= 1 << ed->processor;
+                mask = tlbflush_filter_cpuset(mask, page->tlbflush_timestamp);
+
+                if ( unlikely(mask != 0) )
                 {
-                    perfc_incr(need_flush_tlb_flush);
-                    flush_tlb_cpu(d->exec_domain[0]->processor);
+                    perfc_incrc(need_flush_tlb_flush);
+                    flush_tlb_mask(mask);
                 }
 
                 /* We lose existing type, back pointer, and validity. */

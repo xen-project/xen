@@ -470,41 +470,28 @@ void init_domheap_pages(unsigned long ps, unsigned long pe)
 struct pfn_info *alloc_domheap_pages(struct domain *d, unsigned int order)
 {
     struct pfn_info *pg;
-    unsigned long mask, flushed_mask, pfn_stamp, cpu_stamp;
-    int i, j;
+    unsigned long mask = 0;
+    int i;
 
     ASSERT(!in_irq());
 
     if ( unlikely((pg = alloc_heap_pages(MEMZONE_DOM, order)) == NULL) )
         return NULL;
 
-    flushed_mask = 0;
     for ( i = 0; i < (1 << order); i++ )
     {
-        if ( (mask = (pg[i].u.free.cpu_mask & ~flushed_mask)) != 0 )
-        {
-            pfn_stamp = pg[i].tlbflush_timestamp;
-            for ( j = 0; (mask != 0) && (j < smp_num_cpus); j++ )
-            {
-                if ( mask & (1UL<<j) )
-                {
-                    cpu_stamp = tlbflush_time[j];
-                    if ( !NEED_FLUSH(cpu_stamp, pfn_stamp) )
-                        mask &= ~(1UL<<j);
-                }
-            }
-            
-            if ( unlikely(mask != 0) )
-            {
-                flush_tlb_mask(mask);
-                perfc_incrc(need_flush_tlb_flush);
-                flushed_mask |= mask;
-            }
-        }
+        mask |= tlbflush_filter_cpuset(
+            pg[i].u.free.cpu_mask & ~mask, pg[i].tlbflush_timestamp);
 
         pg[i].count_info        = 0;
         pg[i].u.inuse._domain   = 0;
         pg[i].u.inuse.type_info = 0;
+    }
+
+    if ( unlikely(mask != 0) )
+    {
+        perfc_incrc(need_flush_tlb_flush);
+        flush_tlb_mask(mask);
     }
 
     if ( d == NULL )
@@ -570,7 +557,7 @@ void free_domheap_pages(struct pfn_info *pg, unsigned int order)
         /* NB. May recursively lock from domain_relinquish_memory(). */
         spin_lock_recursive(&d->page_alloc_lock);
 
-        for_each_exec_domain(d, ed)
+        for_each_exec_domain ( d, ed )
             cpu_mask |= 1 << ed->processor;
 
         for ( i = 0; i < (1 << order); i++ )
