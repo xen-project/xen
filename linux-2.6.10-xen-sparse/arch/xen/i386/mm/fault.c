@@ -228,7 +228,9 @@ fastcall void do_page_fault(struct pt_regs *regs, unsigned long error_code,
 	/* Set the "privileged fault" bit to something sane. */
 	error_code &= 3;
 	error_code |= (regs->xcs & 2) << 1;
-
+	if (regs->eflags & X86_EFLAGS_VM)
+		error_code |= 4;
+		
  	if (notify_die(DIE_PAGE_FAULT, "page fault", regs, error_code, 14,
  					SIGSEGV) == NOTIFY_STOP)
  		return;
