@@ -77,9 +77,24 @@ void grant_table_destroy(
     struct domain *d);
 
 /* Create/destroy host-CPU mappings via a grant-table entry. */
+#define GNTTAB_MAP_RO   0
+#define GNTTAB_MAP_RW   1
+#define GNTTAB_UNMAP_RO 2
+#define GNTTAB_UNMAP_RW 3
 int gnttab_try_map(
-    struct domain *rd, struct domain *ld, struct pfn_info *page, int readonly);
-int gnttab_try_unmap(
-    struct domain *rd, struct domain *ld, struct pfn_info *page, int readonly);
+    struct domain *rd, struct domain *ld, unsigned long frame, int op);
+
+/*
+ * Check that the given grant reference (rd,ref) allows 'ld' to transfer
+ * ownership of a page frame. If so, lock down the grant entry.
+ */
+int 
+gnttab_prepare_for_transfer(
+    struct domain *rd, struct domain *ld, grant_ref_t ref);
+
+/* Notify 'rd' of a completed transfer via an already-locked grant entry. */
+void 
+gnttab_notify_transfer(
+    struct domain *rd, grant_ref_t ref, unsigned long frame);
 
 #endif /* __XEN_GRANT_H__ */

@@ -443,7 +443,8 @@ get_page_from_l1e(
         if ( unlikely((count_info & PGC_count_mask) == 0) ||
              unlikely(e == NULL) || unlikely(!get_domain(e)) )
              return 0;
-        rc = gnttab_try_map(e, d, page, l1v & _PAGE_RW);
+        rc = gnttab_try_map(
+            e, d, pfn, (l1v & _PAGE_RW) ? GNTTAB_MAP_RW : GNTTAB_MAP_RO);
         put_domain(e);
         return rc;
     }
@@ -484,11 +485,12 @@ get_page_from_l2e(
 
 static void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
 {
-    struct pfn_info *page = &frame_table[l1_pgentry_to_pagenr(l1e)];
     unsigned long    l1v  = l1_pgentry_val(l1e);
+    unsigned long    pfn  = l1_pgentry_to_pagenr(l1e);
+    struct pfn_info *page = &frame_table[pfn];
     struct domain   *e = page->u.inuse.domain;
 
-    if ( !(l1v & _PAGE_PRESENT) || !pfn_is_ram(l1v >> PAGE_SHIFT) )
+    if ( !(l1v & _PAGE_PRESENT) || !pfn_is_ram(pfn) )
         return;
 
     if ( unlikely(e != d) )
@@ -504,7 +506,8 @@ static void put_page_from_l1e(l1_pgentry_t l1e, struct domain *d)
          * mappings and which unmappings are counted via the grant entry, but
          * really it doesn't matter as privileged domains have carte blanche.
          */
-        if ( likely(gnttab_try_unmap(e, d, page, l1v & _PAGE_RW)) )
+        if ( likely(gnttab_try_map(e, d, pfn, (l1v & _PAGE_RW) ? 
+                                   GNTTAB_UNMAP_RW : GNTTAB_UNMAP_RO)) )
             return;
         /* Assume this mapping was made via MMUEXT_SET_FOREIGNDOM... */
     }
@@ -824,6 +827,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
     struct domain *d = current, *nd, *e;
     u32 x, y;
     domid_t domid;
+    grant_ref_t gntref;
 
     switch ( cmd )
     {
@@ -976,6 +980,88 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
                 }
             }
         }
+        break;
+
+    case MMUEXT_TRANSFER_PAGE:
+        domid  = (domid_t)(val >> 16);
+        gntref = (grant_ref_t)((val & 0xFF00) | ((ptr >> 2) & 0x00FF));
+        
+        if ( unlikely(IS_XEN_HEAP_FRAME(page)) ||
+             unlikely(!pfn_is_ram(pfn)) ||
+             unlikely((e = find_domain_by_id(domid)) == NULL) )
+        {
+            MEM_LOG("Bad frame (%08lx) or bad domid (%d).\n", pfn, domid);
+            okay = 0;
+            break;
+        }
+
+        spin_lock(&d->page_alloc_lock);
+
+        /*
+         * The tricky bit: atomically release ownership while there is just one
+         * benign reference to the page (PGC_allocated). If that reference
+         * disappears then the deallocation routine will safely spin.
+         */
+        nd = page->u.inuse.domain;
+        y  = page->count_info;
+        do {
+            x = y;
+            if ( unlikely((x & (PGC_count_mask|PGC_allocated)) != 
+                          (1|PGC_allocated)) ||
+                 unlikely(nd != d) )
+            {
+                MEM_LOG("Bad page values %08lx: ed=%p(%u), sd=%p,"
+                        " caf=%08x, taf=%08x\n", page_to_pfn(page),
+                        d, d->domain, nd, x, page->u.inuse.type_info);
+                spin_unlock(&d->page_alloc_lock);
+                put_domain(e);
+                okay = 0;
+                break;
+            }
+            __asm__ __volatile__(
+                LOCK_PREFIX "cmpxchg8b %2"
+                : "=d" (nd), "=a" (y),
+                "=m" (*(volatile u64 *)(&page->count_info))
+                : "0" (d), "1" (x), "c" (NULL), "b" (x) );
+        } 
+        while ( unlikely(nd != d) || unlikely(y != x) );
+
+        /*
+         * Unlink from 'd'. At least one reference remains (now anonymous), so
+         * noone else is spinning to try to delete this page from 'd'.
+         */
+        d->tot_pages--;
+        list_del(&page->list);
+        
+        spin_unlock(&d->page_alloc_lock);
+
+        spin_lock(&e->page_alloc_lock);
+
+        /* Check that 'e' will accept the page and has reservation headroom. */
+        ASSERT(e->tot_pages <= e->max_pages);
+        if ( unlikely(e->tot_pages == e->max_pages) ||
+             unlikely(!gnttab_prepare_for_transfer(e, d, gntref)) )
+        {
+            MEM_LOG("Transferee has no reservation headroom (%ld,%ld), or "
+                    "provided a bad grant ref.\n", e->tot_pages, e->max_pages);
+            spin_unlock(&e->page_alloc_lock);
+            put_domain(e);
+            okay = 0;
+            break;
+        }
+
+        /* Okay, add the page to 'e'. */
+        if ( unlikely(e->tot_pages++ == 0) )
+            get_knownalive_domain(e);
+        list_add_tail(&page->list, &e->page_list);
+        page->u.inuse.domain = e;
+
+        spin_unlock(&e->page_alloc_lock);
+
+        /* Transfer is all done: tell the guest about its new page frame. */
+        gnttab_notify_transfer(e, gntref, pfn);
+        
+        put_domain(e);
         break;
 
     case MMUEXT_REASSIGN_PAGE:

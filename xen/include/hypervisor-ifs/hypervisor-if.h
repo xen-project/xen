@@ -121,17 +121,23 @@
  *   ptr[:2]  -- Linear address of LDT base (NB. must be page-aligned).
  *   val[:8]  -- Number of entries in LDT.
  * 
+ *   val[7:0] == MMUEXT_TRANSFER_PAGE:
+ *   val[31:16] -- Domain to whom page is to be transferred.
+ *   (val[15:8],ptr[9:2]) -- 16-bit reference into transferee's grant table.
+ *   ptr[:12]  -- Page frame to be reassigned to the FD.
+ *                (NB. The frame must currently belong to the calling domain).
+ * 
  *   val[7:0] == MMUEXT_SET_FOREIGNDOM:
- *   val[31:15] -- Domain to set as the Foreign Domain (FD).
+ *   val[31:16] -- Domain to set as the Foreign Domain (FD).
  *                 (NB. DOMID_SELF is not recognised)
  *                 If FD != DOMID_IO then the caller must be privileged.
+ * 
+ *   val[7:0] == MMUEXT_CLEAR_FOREIGNDOM:
+ *   Clears the FD.
  * 
  *   val[7:0] == MMUEXT_REASSIGN_PAGE:
  *   ptr[:2]  -- A machine address within the page to be reassigned to the FD.
  *               (NB. page must currently belong to the calling domain).
- * 
- *   val[7:0] == MMUEXT_CLEAR_FOREIGNDOM:
- *   Clears the FD.
  */
 #define MMU_NORMAL_PT_UPDATE     0 /* checked '*ptr = val'. ptr is MA.       */
 #define MMU_MACHPHYS_UPDATE      2 /* ptr = MA of frame to modify entry for  */
@@ -145,9 +151,10 @@
 #define MMUEXT_TLB_FLUSH         6 /* ptr = NULL                             */
 #define MMUEXT_INVLPG            7 /* ptr = VA to invalidate                 */
 #define MMUEXT_SET_LDT           8 /* ptr = VA of table; val = # entries     */
-#define MMUEXT_SET_FOREIGNDOM    9 /* val[31:15] = dom                       */
-#define MMUEXT_REASSIGN_PAGE    10
+#define MMUEXT_TRANSFER_PAGE     9 /* ptr = MA of frame; val[31:16] = dom    */
+#define MMUEXT_SET_FOREIGNDOM   10 /* val[31:16] = dom                       */
 #define MMUEXT_CLEAR_FOREIGNDOM 11
+#define MMUEXT_REASSIGN_PAGE    12
 #define MMUEXT_CMD_MASK        255
 #define MMUEXT_CMD_SHIFT         8
 

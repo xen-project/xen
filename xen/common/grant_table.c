@@ -73,11 +73,21 @@ gnttab_update_pin_status(
     grant_ref_t    ref;
     u16            pin_flags;
     struct domain *ld, *rd;
-    u16            sflags, prev_sflags;
+    u16            sflags;
     active_grant_entry_t *act;
     grant_entry_t *sha;
     long           rc = 0;
     unsigned long  frame;
+
+    /*
+     * We bound the number of times we retry CMPXCHG on memory locations
+     * that we share with a guest OS. The reason is that the guest can modify
+     * that location at a higher rate than we can read-modify-CMPXCHG, so
+     * the guest could cause us to livelock. There are a few cases
+     * where it is valid for the guest to race our updates (e.g., to change
+     * the GTF_readonly flag), so we allow a few retries before failing.
+     */
+    int            retries = 0;
 
     ld = current;
 
@@ -127,7 +137,7 @@ gnttab_update_pin_status(
 
         for ( ; ; )
         {
-            u32 scombo, prev_scombo;
+            u32 scombo, prev_scombo, new_scombo;
 
             if ( unlikely((sflags & GTF_type_mask) != GTF_permit_access) ||
                  unlikely(sdom != ld->domain) )
@@ -135,28 +145,33 @@ gnttab_update_pin_status(
                          "Bad flags (%x) or dom (%d). (NB. expected dom %d)\n",
                         sflags, sdom, ld->domain);
 
-            sflags |= GTF_reading;
+            /* Merge two 16-bit values into a 32-bit combined update. */
+            /* NB. Endianness! */
+            prev_scombo = scombo = ((u32)sdom << 16) | (u32)sflags;
+
+            new_scombo = scombo | GTF_reading;
             if ( !(pin_flags & GNTPIN_readonly) )
             {
-                sflags |= GTF_writing;
+                new_scombo |= GTF_writing;
                 if ( unlikely(sflags & GTF_readonly) )
                     PIN_FAIL(EINVAL,
                              "Attempt to write-pin a r/o grant entry.\n");
             }
 
-            /* Merge two 16-bit values into a 32-bit combined update. */
-            /* NB. Endianness! */
-            prev_scombo = scombo = ((u32)sdom << 16) | (u32)sflags;
-
-            /* NB. prev_sflags is updated in place to seen value. */
-            if ( unlikely(cmpxchg_user((u32 *)&sha->flags, prev_scombo, 
-                                       prev_scombo | GTF_writing)) )
+            /* NB. prev_scombo is updated in place to seen value. */
+            if ( unlikely(cmpxchg_user((u32 *)&sha->flags,
+                                       prev_scombo, 
+                                       new_scombo)) )
                 PIN_FAIL(EINVAL,
                          "Fault while modifying shared flags and domid.\n");
 
             /* Did the combined update work (did we see what we expected?). */
-            if ( prev_scombo == scombo )
+            if ( likely(prev_scombo == scombo) )
                 break;
+
+            if ( retries++ == 4 )
+                PIN_FAIL(EINVAL,
+                         "Shared grant entry is unstable.\n");
 
             /* Didn't see what we expected. Split out the seen flags & dom. */
             /* NB. Endianness! */
@@ -243,10 +258,12 @@ gnttab_update_pin_status(
         else if ( act->status & GNTPIN_readonly )
         {
             sflags = sha->flags;
-            do {
-                prev_sflags = sflags;
 
-                if ( unlikely(prev_sflags & GTF_readonly) )
+            for ( ; ; )
+            {
+                u16 prev_sflags;
+                
+                if ( unlikely(sflags & GTF_readonly) )
                     PIN_FAIL(EINVAL,
                              "Attempt to write-pin a r/o grant entry.\n");
 
@@ -255,13 +272,23 @@ gnttab_update_pin_status(
                     PIN_FAIL(EINVAL,
                              "Attempt to write-pin a unwritable page.\n");
 
+                prev_sflags = sflags;
+
                 /* NB. prev_sflags is updated in place to seen value. */
                 if ( unlikely(cmpxchg_user(&sha->flags, prev_sflags, 
                                            prev_sflags | GTF_writing)) )
                     PIN_FAIL(EINVAL,
                              "Fault while modifying shared flags.\n");
+
+                if ( likely(prev_sflags == sflags) )
+                    break;
+
+                if ( retries++ == 4 )
+                    PIN_FAIL(EINVAL,
+                             "Shared grant entry is unstable.\n");
+
+                sflags = prev_sflags;
             }
-            while ( prev_sflags != sflags );
         }
 
         /* Update status word -- this includes device accessibility. */
@@ -281,6 +308,51 @@ gnttab_update_pin_status(
     return rc;
 }
 
+static long 
+gnttab_setup_table(
+    gnttab_setup_table_t *uop)
+{
+    gnttab_setup_table_t  op;
+    struct domain        *d;
+
+    if ( unlikely(__copy_from_user(&op, uop, sizeof(op)) != 0) )
+    {
+        DPRINTK("Fault while reading gnttab_setup_table_t.\n");
+        return -EFAULT;
+    }
+
+    if ( unlikely(op.nr_frames > 1) )
+    {
+        DPRINTK("Xen only supports one grant-table frame per domain.\n");
+        return -EINVAL;
+    }
+
+    if ( op.dom == DOMID_SELF )
+        op.dom = current->domain;
+
+    if ( unlikely((d = find_domain_by_id(op.dom)) == NULL) )
+    {
+        DPRINTK("Bad domid %d.\n", op.dom);
+        return -ESRCH;
+    }
+
+    if ( op.nr_frames == 1 )
+    {
+        ASSERT(d->grant_table != NULL);
+
+        if ( unlikely(put_user(virt_to_phys(d->grant_table) >> PAGE_SHIFT,
+                               &op.frame_list[0])) )
+        {
+            DPRINTK("Fault while writing frame list.\n");
+            put_domain(d);
+            return -EFAULT;
+        }
+    }
+
+    put_domain(d);
+    return 0;
+}
+
 long 
 do_grant_table_op(
     gnttab_op_t *uop)
@@ -297,6 +369,9 @@ do_grant_table_op(
     case GNTTABOP_update_pin_status:
         rc = gnttab_update_pin_status(&uop->u.update_pin_status);
         break;
+    case GNTTABOP_setup_table:
+        rc = gnttab_setup_table(&uop->u.setup_table);
+        break;
     default:
         rc = -ENOSYS;
         break;
@@ -307,16 +382,144 @@ do_grant_table_op(
 
 int
 gnttab_try_map(
-    struct domain *rd, struct domain *ld, struct pfn_info *page, int readonly)
+    struct domain *rd, struct domain *ld, unsigned long frame, int op)
 {
+    grant_table_t        *t;
+    active_grant_entry_t *a;
+    u16                  *ph, h;
+
+    if ( unlikely((t = rd->grant_table) == NULL) )
+        return 0;
+
+    spin_lock(&t->lock);
+
+    ph = &t->maphash[GNT_MAPHASH(frame)];
+    while ( (h = *ph) != GNT_MAPHASH_INVALID )
+    {
+        if ( (a = &t->active[*ph])->frame != frame )
+            goto found;
+        ph = &a->next;
+    }
+    
+ fail:
+    spin_unlock(&t->lock);
+    return 0;
+
+ found:
+    if ( !(a->status & GNTPIN_host_accessible) )
+        goto fail;
+
+    switch ( op )
+    {
+    case GNTTAB_MAP_RO:
+        if ( (a->status & GNTPIN_rmap_mask) == GNTPIN_rmap_mask )
+            goto fail;
+        a->status += 1 << GNTPIN_rmap_shift;
+        break;
+
+    case GNTTAB_MAP_RW:
+        if ( (a->status & GNTPIN_wmap_mask) == GNTPIN_wmap_mask )
+            goto fail;
+        a->status += 1 << GNTPIN_wmap_shift;
+        break;
+
+    case GNTTAB_UNMAP_RO:
+        if ( (a->status & GNTPIN_rmap_mask) == 0 )
+            goto fail;
+        a->status -= 1 << GNTPIN_rmap_shift;
+        break;
+
+    case GNTTAB_UNMAP_RW:
+        if ( (a->status & GNTPIN_wmap_mask) == 0 )
+            goto fail;
+        a->status -= 1 << GNTPIN_wmap_shift;
+        break;
+
+    default:
+        BUG();
+    }
+
+    spin_unlock(&t->lock);
+    return 1;
+}
+
+int 
+gnttab_prepare_for_transfer(
+    struct domain *rd, struct domain *ld, grant_ref_t ref)
+{
+    grant_table_t *t;
+    grant_entry_t *e;
+    domid_t        sdom;
+    u16            sflags;
+    u32            scombo, prev_scombo;
+    int            retries = 0;
+
+    if ( unlikely((t = rd->grant_table) == NULL) ||
+         unlikely(ref >= NR_GRANT_ENTRIES) )
+    {
+        DPRINTK("Dom %d has no g.t., or ref is bad (%d).\n", rd->domain, ref);
+        return 0;
+    }
+
+    spin_lock(&t->lock);
+
+    e = &t->shared[ref];
+    
+    sflags = e->flags;
+    sdom   = e->domid;
+
+    for ( ; ; )
+    {
+        if ( unlikely(sflags != GTF_accept_transfer) ||
+             unlikely(sdom != ld->domain) )
+        {
+            DPRINTK("Bad flags (%x) or dom (%d). (NB. expected dom %d)\n",
+                    sflags, sdom, ld->domain);
+            goto fail;
+        }
+
+        /* Merge two 16-bit values into a 32-bit combined update. */
+        /* NB. Endianness! */
+        prev_scombo = scombo = ((u32)sdom << 16) | (u32)sflags;
+
+        /* NB. prev_scombo is updated in place to seen value. */
+        if ( unlikely(cmpxchg_user((u32 *)&e->flags, prev_scombo, 
+                                   prev_scombo | GTF_transfer_committed)) )
+        {
+            DPRINTK("Fault while modifying shared flags and domid.\n");
+            goto fail;
+        }
+
+        /* Did the combined update work (did we see what we expected?). */
+        if ( likely(prev_scombo == scombo) )
+            break;
+
+        if ( retries++ == 4 )
+        {
+            DPRINTK("Shared grant entry is unstable.\n");
+            goto fail;
+        }
+
+        /* Didn't see what we expected. Split out the seen flags & dom. */
+        /* NB. Endianness! */
+        sflags = (u16)prev_scombo;
+        sdom   = (u16)(prev_scombo >> 16);
+    }
+
+    spin_unlock(&t->lock);
+    return 1;
+
+ fail:
+    spin_unlock(&t->lock);
     return 0;
 }
 
-int
-gnttab_try_unmap(
-    struct domain *rd, struct domain *ld, struct pfn_info *page, int readonly)
+void 
+gnttab_notify_transfer(
+    struct domain *rd, grant_ref_t ref, unsigned long frame)
 {
-    return 0;
+    wmb(); /* Ensure that the reassignment is globally visible. */
+    rd->grant_table->shared[ref].frame = frame;
 }
 
 int 
