@@ -32,5 +32,5 @@ clean:
 	$(MAKE) -C xentrace clean
 	$(MAKE) -C xenctl clean
 	$(MAKE) -C xend clean
-	$(MAKE) -C xenmgr install
+	$(MAKE) -C xenmgr clean
 

@@ -3,7 +3,7 @@ import sys
 import time
 
 from xenmgr.XendClient import server
-from xenmgr.xm import opts
+from xenmgr.xm.opts import *
 
 opts = Opts(use="""[options] [DOM]
 

@@ -32,7 +32,7 @@ class Xm:
                 return 1
         return 0
 
-    def unknown(self, args):
+    def unknown(self, help, args):
         self.err("Unknown command: %s\nTry '%s help' for more information."
                  % (args[0], self.prog))
 

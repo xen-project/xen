@@ -86,7 +86,7 @@ opts.opt('nics', val="N",
          use="Set the number of network interfaces.")
 
 opts.opt('vnet', val='VNET',
-         fn=set_append_value, default=[],
+         fn=append_value, default=[],
          use="""Define the vnets for the network interfaces.
          More than one vnet may be given, they are used in order.
          """)
@@ -227,7 +227,7 @@ def preprocess_ip(opts):
           + ':' + opts.gateway
           + ':' + opts.netmask
           + ':' + opts.hostname
-          + ':' : opts.interface
+          + ':' + opts.interface
           + ':' + opts.dhcp)
     opts.cmdline_ip = ip
 
