@@ -53,8 +53,8 @@ struct bvt_cpu_info
 
 #define BVT_INFO(p)   ((struct bvt_dom_info *)(p)->sched_priv)
 #define CPU_INFO(cpu) ((struct bvt_cpu_info *)(schedule_data[cpu]).sched_priv)
-#define RUNLIST(p)    &(BVT_INFO(p)->run_list)
-#define RUNQUEUE(cpu) &(CPU_INFO(cpu)->runqueue)
+#define RUNLIST(p)    ((struct list_head *)&(BVT_INFO(p)->run_list))
+#define RUNQUEUE(cpu) ((struct list_head *)&(CPU_INFO(cpu)->runqueue))
 #define CPU_SVT(cpu)  (CPU_INFO(cpu)->svt)
 
 #define MCU            (s32)MICROSECS(100)    /* Minimum unit */
@@ -64,6 +64,32 @@ static s32 ctx_allow = (s32)MILLISECS(5);     /* context switch allowance */
 
 /* SLAB cache for struct bvt_dom_info objects */
 static xmem_cache_t *dom_info_cache;
+
+/*
+ * Wrappers for run-queue management. Must be called with the run_lock
+ * held.
+ */
+static inline void __add_to_runqueue_head(struct domain *d)
+{
+    list_add(RUNLIST(d), RUNQUEUE(d->processor));
+}
+
+static inline void __add_to_runqueue_tail(struct domain *d)
+{
+    list_add_tail(RUNLIST(d), RUNQUEUE(d->processor));
+}
+
+static inline void __del_from_runqueue(struct domain *d)
+{
+    struct list_head *runlist = RUNLIST(d);
+    list_del(runlist);
+    runlist->next = NULL;
+}
+
+static inline int __task_on_runqueue(struct domain *d)
+{
+    return (RUNLIST(d))->next != NULL;
+}
 
 /*
  * Calculate the effective virtual time for a domain. Take into account 
@@ -152,8 +178,8 @@ int bvt_init_idle_task(struct domain *p)
     spin_lock_irqsave(&CPU_INFO(p->processor)->run_lock, flags);
     
     set_bit(DF_RUNNING, &p->flags);
-    if ( !__task_on_runqueue(RUNLIST(p)) )
-        __add_to_runqueue_head(RUNLIST(p), RUNQUEUE(p->processor));
+    if ( !__task_on_runqueue(p) )
+        __add_to_runqueue_head(p);
         
     spin_unlock_irqrestore(&CPU_INFO(p->processor)->run_lock, flags);
 
@@ -172,13 +198,13 @@ void bvt_wake(struct domain *d)
     spin_lock_irqsave(&CPU_INFO(cpu)->run_lock, flags);
     
     /* If on the runqueue already then someone has done the wakeup work. */
-    if ( unlikely(__task_on_runqueue(RUNLIST(d))) )
+    if ( unlikely(__task_on_runqueue(d)) )
     {
         spin_unlock_irqrestore(&CPU_INFO(cpu)->run_lock, flags);
         return;
     }
 
-    __add_to_runqueue_head(RUNLIST(d), RUNQUEUE(d->processor));
+    __add_to_runqueue_head(d);
 
     now = NOW();
 
@@ -222,8 +248,8 @@ static void bvt_sleep(struct domain *d)
         spin_lock_irqsave(&CPU_INFO(d->processor)->run_lock, flags);
         
         
-        if ( __task_on_runqueue(RUNLIST(d)) )
-            __del_from_runqueue(RUNLIST(d));
+        if ( __task_on_runqueue(d) )
+            __del_from_runqueue(d);
 
         spin_unlock_irqrestore(&CPU_INFO(d->processor)->run_lock, flags);    
     }
@@ -347,7 +373,7 @@ static task_slice_t bvt_do_schedule(s_time_t now)
     ASSERT(prev_inf != NULL);
     spin_lock_irqsave(&CPU_INFO(cpu)->run_lock, flags);
 
-    ASSERT(__task_on_runqueue(RUNLIST(prev)));
+    ASSERT(__task_on_runqueue(prev));
 
     if ( likely(!is_idle_task(prev)) ) 
     {
@@ -358,10 +384,10 @@ static task_slice_t bvt_do_schedule(s_time_t now)
         
         __calc_evt(prev_inf);
         
-        __del_from_runqueue(RUNLIST(prev));
+        __del_from_runqueue(prev);
         
         if ( domain_runnable(prev) )
-            __add_to_runqueue_tail(RUNLIST(prev), RUNQUEUE(cpu));
+            __add_to_runqueue_tail(prev);
     }
 
  

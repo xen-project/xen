@@ -56,28 +56,4 @@ struct scheduler
 /* per CPU scheduler information */
 extern schedule_data_t schedule_data[];
 
-/*
- * Wrappers for run-queue management. Must be called with the schedule_lock
- * held.
- */
-static inline void __add_to_runqueue_head(struct list_head *run_list, struct list_head *runqueue)
-{
-    list_add(run_list, runqueue);
-}
-
-static inline void __add_to_runqueue_tail(struct list_head *run_list, struct list_head *runqueue)
-{
-    list_add_tail(run_list, runqueue);
-}
-
-static inline void __del_from_runqueue(struct list_head *run_list)
-{
-    list_del(run_list);
-    run_list->next = NULL;
-}
-
-static inline int __task_on_runqueue(struct list_head *run_list)
-{
-    return run_list->next != NULL;
-}
 
