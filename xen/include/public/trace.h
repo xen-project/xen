@@ -1,5 +1,7 @@
 /******************************************************************************
  * trace.h
+ * 
+ * Mark Williamson, (C) 2004 Intel Research Cambridge
  */
 
 #ifndef __XEN_PUBLIC_TRACE_H__
