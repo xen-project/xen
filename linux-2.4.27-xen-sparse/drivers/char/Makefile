@@ -177,6 +177,7 @@ endif
 
 obj-$(CONFIG_VT) += vt.o vc_screen.o consolemap.o consolemap_deftbl.o $(CONSOLE) selection.o
 obj-$(CONFIG_SERIAL) += $(SERIAL)
+obj-$(CONFIG_PARPORT_SERIAL) += parport_serial.o
 obj-$(CONFIG_SERIAL_HCDP) += hcdp_serial.o
 obj-$(CONFIG_SERIAL_21285) += serial_21285.o
 obj-$(CONFIG_SERIAL_SA1100) += serial_sa1100.o
@@ -326,7 +327,6 @@ obj-$(CONFIG_SC1200_WDT) += sc1200wdt.o
 obj-$(CONFIG_SCx200_WDT) += scx200_wdt.o
 obj-$(CONFIG_WAFER_WDT) += wafer5823wdt.o
 obj-$(CONFIG_SOFT_WATCHDOG) += softdog.o
-obj-$(CONFIG_AMD7XX_TCO) += amd7xx_tco.o
 obj-$(CONFIG_INDYDOG) += indydog.o
 obj-$(CONFIG_8xx_WDT) += mpc8xx_wdt.o
 

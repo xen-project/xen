@@ -276,9 +276,9 @@ struct user_struct {
 };
 
 #define get_current_user() ({ 				\
-	struct user_struct *__user = current->user;	\
-	atomic_inc(&__user->__count);			\
-	__user; })
+	struct user_struct *__tmp_user = current->user;	\
+	atomic_inc(&__tmp_user->__count);		\
+	__tmp_user; })
 
 extern struct user_struct root_user;
 #define INIT_USER (&root_user)

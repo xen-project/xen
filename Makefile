@@ -45,16 +45,17 @@ ifeq ($(LINUX_SRC),)
 LINUX_SRC := ./linux-$(LINUX_VER).tar.bz2 
 endif
 
-patches/ebtables-brnf-5_vs_2.4.25.diff:
+patches/ebtables.diff:
 	mkdir -p patches
-	wget $(SOURCEFORGE_MIRROR)/ebtables/ebtables-brnf-5_vs_2.4.25.diff.gz \
+	#wget $(SOURCEFORGE_MIRROR)/ebtables/ebtables-brnf-5_vs_2.4.25.diff.gz \
 	     -O- | gunzip -c > $@
+	wget http://www.cl.cam.ac.uk/netos/xen/downloads/ebtables-brnf-5_vs_2.4.27.diff.gz -O- | gunzip -c > $@
 
 LINUX_TREES := linux-$(LINUX_VER)-xen0 linux-$(LINUX_VER)-xenU
 
 # make a linux-xen build tree from a pristine kernel plus sparse tree
 ifeq ($(LINUX_RELEASE),2.4)
-mk-linux-trees: patches/ebtables-brnf-5_vs_2.4.25.diff pristine-linux-src 
+mk-linux-trees: patches/ebtables.diff pristine-linux-src 
 	$(RM) -rf $(LINUX_TREES)
 	echo $(LINUX_SRC) | grep -q bz2 && \
 	    tar -jxf $(LINUX_SRC) || tar -zxf $(LINUX_SRC)
@@ -63,7 +64,7 @@ mk-linux-trees: patches/ebtables-brnf-5_vs_2.4.25.diff pristine-linux-src
           ./mkbuildtree ../linux-$(LINUX_VER)-xen0 )
 	cp -al linux-$(LINUX_VER)-xen0 linux-$(LINUX_VER)-xenU
 	( cd linux-$(LINUX_VER)-xen0 ; \
-          patch -p1 -F3 < ../patches/ebtables-brnf-5_vs_2.4.25.diff )
+          patch -p1 -F3 < ../patches/ebtables.diff )
 else
 mk-linux-trees: pristine-linux-src 
 	$(RM) -rf $(LINUX_TREES)

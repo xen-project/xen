@@ -1168,7 +1168,18 @@ nf_conntrack_get(struct nf_ct_info *nfct)
 	if (nfct)
 		atomic_inc(&nfct->master->use);
 }
+static inline void
+nf_reset(struct sk_buff *skb)
+{
+	nf_conntrack_put(skb->nfct);
+	skb->nfct = NULL;
+#ifdef CONFIG_NETFILTER_DEBUG
+	skb->nf_debug = 0;
 #endif
+}
+#else /* CONFIG_NETFILTER */
+static inline void nf_reset(struct sk_buff *skb) {}
+#endif /* CONFIG_NETFILTER */
 
 #endif	/* __KERNEL__ */
 #endif	/* _LINUX_SKBUFF_H */
