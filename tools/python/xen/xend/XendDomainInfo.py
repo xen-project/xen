@@ -321,6 +321,7 @@ class XendDomainInfo:
         self.console_port = None
         self.savedinfo = None
         self.is_vmx = 0
+        self.vcpus = 1
 
     def setdom(self, dom):
         """Set the domain id.
@@ -448,6 +449,11 @@ class XendDomainInfo:
             cpu = sxp.child_value(config, 'cpu')
             if self.recreate and self.dom and cpu is not None:
                 xc.domain_pincpu(self.dom, int(cpu))
+            try:
+                image = sxp.child_value(self.config, 'image')
+                self.vcpus = int(sxp.child_value(image, 'vcpus'))
+            except:
+                raise VmError('invalid vcpus value')
 
             self.init_domain()
             self.configure_console()
@@ -746,12 +752,14 @@ class XendDomainInfo:
                       	ramdisk        = ramdisk,
                       	flags          = flags)
 	else:
+        	log.warning('building dom with %d vcpus', self.vcpus)
         	err = buildfn(dom            = dom,
                	      	image          = kernel,
                       	control_evtchn = self.console.getRemotePort(),
                       	cmdline        = cmdline,
                       	ramdisk        = ramdisk,
-                      	flags          = flags)
+                      	flags          = flags,
+                      	vcpus          = self.vcpus)
         if err != 0:
             raise VmError('Building domain failed: type=%s dom=%d err=%d'
                           % (ostype, dom, err))
@@ -1280,6 +1288,7 @@ add_config_handler('console',    vm_field_ignore)
 add_config_handler('image',      vm_field_ignore)
 add_config_handler('device',     vm_field_ignore)
 add_config_handler('backend',    vm_field_ignore)
+add_config_handler('vcpus',      vm_field_ignore)
 
 # Register other config handlers.
 add_config_handler('maxmem',     vm_field_maxmem)

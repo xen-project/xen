@@ -97,7 +97,8 @@ int xc_linux_build(int xc_handle,
                    const char *ramdisk_name,
                    const char *cmdline,
                    unsigned int control_evtchn,
-                   unsigned long flags);
+                   unsigned long flags,
+                   unsigned int vcpus);
 
 int
 xc_plan9_build (int xc_handle,

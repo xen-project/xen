@@ -25,6 +25,9 @@ name = "ExampleDomain"
 # Which CPU to start domain on? 
 #cpu = -1   # leave to Xen to pick
 
+# Number of Virtual CPUS to use, default is 1
+#vcpus = 1
+
 #----------------------------------------------------------------------------
 # Define network interfaces.
 
