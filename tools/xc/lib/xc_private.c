@@ -168,29 +168,7 @@ void * mfn_mapper_queue_entry(mfn_mapper_t *t, int offset,
 
 /*******************/
 
-typedef struct dom0_op_compact_getpageframeinfo {
-    unsigned long cmd;
-    unsigned long interface_version; /* DOM0_INTERFACE_VERSION */
-    dom0_getpageframeinfo_t getpageframeinfo;
-}  dom0_op_compact_getpageframeinfo_t;
-
-
-typedef struct mfn_typer {
-    domid_t dom;
-    int max;
-    int nr_multicall_ents;
-    multicall_entry_t *multicall_list;
-    dom0_op_compact_getpageframeinfo_t *gpf_list;
-} mfn_typer_t;
-
-
-mfn_typer_t *mfn_typer_init(int xc_handle, domid_t dom, int num );
-
-void mfn_typer_queue_entry(mfn_typer_t *t, unsigned long mfn );
-
-int mfn_typer_flush_queue(mfn_typer_t *t);
-
-unsigned int mfn_typer_get_result(mfn_typer_t *t, int idx);
+#if 0
 
 mfn_typer_t *mfn_typer_init(int xc_handle, domid_t dom, int num )
 {
@@ -199,8 +177,8 @@ mfn_typer_t *mfn_typer_init(int xc_handle, domid_t dom, int num )
     dom0_op_compact_getpageframeinfo_t *d;
 
     t = calloc(1, sizeof(mfn_typer_t) );
-    m = calloc(1, sizeof(multicall_entry_t)*num );
-    d = calloc(1, sizeof(dom0_op_compact_getpageframeinfo_t)*num );
+    m = calloc(num, sizeof(multicall_entry_t));
+    d = calloc(num, sizeof(dom0_op_compact_getpageframeinfo_t));
 
     if (!t || !m || !d)
     {
@@ -210,6 +188,16 @@ mfn_typer_t *mfn_typer_init(int xc_handle, domid_t dom, int num )
 	return NULL;
     }
 
+printf("sizeof(m)=%d sizeof(d)=%d m=%p d=%p\n",sizeof(multicall_entry_t), sizeof(dom0_op_compact_getpageframeinfo_t),m,d);
+
+    if ( (mlock(m, sizeof(multicall_entry_t)*num ) != 0) || 
+	 (mlock(d, sizeof(dom0_op_compact_getpageframeinfo_t)*num ) != 0) )
+    {
+        PERROR("Could not lock memory for Xen hypercall");
+        return NULL;
+    }
+    
+    t->xc_handle = xc_handle;
     t->max = num;
     t->nr_multicall_ents=0;
     t->multicall_list=m;
@@ -229,7 +217,7 @@ void mfn_typer_queue_entry(mfn_typer_t *t, unsigned long mfn )
     d->interface_version = DOM0_INTERFACE_VERSION;
     d->getpageframeinfo.pfn = mfn;
     d->getpageframeinfo.domain = t->dom;
-    d->getpageframeinfo.type = ~0UL;
+    d->getpageframeinfo.type = 1000; //~0UL;
       
     m->op = __HYPERVISOR_dom0_op;
     m->args[0] = (unsigned long)d;
@@ -240,13 +228,45 @@ void mfn_typer_queue_entry(mfn_typer_t *t, unsigned long mfn )
 int mfn_typer_flush_queue(mfn_typer_t *t)
 {
     if (t->nr_multicall_ents == 0) return 0;
-    (void)HYPERVISOR_multicall(t->multicall_list, t->nr_multicall_ents);
+    do_multicall_op(t->xc_handle, t->multicall_list, t->nr_multicall_ents);
     t->nr_multicall_ents = 0;
 }
 
 unsigned int mfn_typer_get_result(mfn_typer_t *t, int idx)
 {
     return t->gpf_list[idx].getpageframeinfo.type;
+}
+
+#endif
+
+/* NB: arr must be mlock'ed */
+
+int get_pfn_type_batch(int xc_handle, 
+		       u64 dom, int num, unsigned long *arr)
+{
+    dom0_op_t op;
+    op.cmd = DOM0_GETPAGEFRAMEINFO2;
+    op.u.getpageframeinfo2.domain = (domid_t)dom;
+    op.u.getpageframeinfo2.num    = num;
+    op.u.getpageframeinfo2.array  = arr;
+    return do_dom0_op(xc_handle, &op);
+}
+
+#define GETPFN_ERR (~0U)
+unsigned int get_pfn_type(int xc_handle, 
+			  unsigned long mfn, 
+			  u64 dom)
+{
+    dom0_op_t op;
+    op.cmd = DOM0_GETPAGEFRAMEINFO;
+    op.u.getpageframeinfo.pfn    = mfn;
+    op.u.getpageframeinfo.domain = (domid_t)dom;
+    if ( do_dom0_op(xc_handle, &op) < 0 )
+    {
+        PERROR("Unexpected failure when getting page frame info!");
+        return GETPFN_ERR;
+    }
+    return op.u.getpageframeinfo.type;
 }
 
 

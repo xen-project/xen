@@ -110,6 +110,27 @@ static inline int do_dom0_op(int xc_handle, dom0_op_t *op)
  out1: return ret;
 }
 
+static inline int do_multicall_op(int xc_handle, 
+				  void *call_list, int nr_calls) 
+{
+    int ret = -1;
+    privcmd_hypercall_t hypercall;
+
+    hypercall.op     = __HYPERVISOR_multicall;
+    hypercall.arg[0] = (unsigned long)call_list;
+    hypercall.arg[1] = (unsigned long)nr_calls;
+
+    if ( (ret = do_xen_hypercall(xc_handle, &hypercall)) < 0 )
+    {
+        if ( errno == EACCES )
+            fprintf(stderr, "Dom0 operation failed -- need to"
+                    " rebuild the user-space tool set?\n");
+        goto out1;
+    }
+
+ out1: return ret;
+}
+
 static inline int do_network_op(int xc_handle, network_op_t *op)
 {
     int ret = -1;
@@ -222,5 +243,31 @@ int mfn_mapper_flush_queue(mfn_mapper_t *t);
 void * mfn_mapper_queue_entry(mfn_mapper_t *t, int offset, 
 			      unsigned long mfn, int size );
 
+/*********************/
+
+
+#if 0
+typedef struct mfn_typer {
+    domid_t dom;
+    int xc_handle;
+    int max;
+    dom0_op_t op;
+} mfn_typer_t;
+
+
+mfn_typer_t *mfn_typer_init(int xc_handle, domid_t dom, int num );
+
+void mfn_typer_queue_entry(mfn_typer_t *t, unsigned long mfn );
+
+int mfn_typer_flush_queue(mfn_typer_t *t);
+#endif
+
+int get_pfn_type_batch(int xc_handle, 
+		       u64 dom, int num, unsigned long *arr);
+
+unsigned int get_pfn_type(int xc_handle, 
+			  unsigned long mfn, 
+			  u64 dom);
+    
 
 #endif /* __XC_PRIVATE_H__ */

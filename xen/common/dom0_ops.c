@@ -564,6 +564,84 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     }
     break;
 
+    case DOM0_GETPAGEFRAMEINFO2:
+    {
+#define GPF2_BATCH 128
+	int n,j;
+        int num = op->u.getpageframeinfo2.num;
+        domid_t dom = op->u.getpageframeinfo2.domain;
+	unsigned long *s_ptr = (unsigned long*) op->u.getpageframeinfo2.array;
+        struct task_struct *p;
+	unsigned long l_arr[GPF2_BATCH];
+        ret = -ESRCH;
+
+	if ( unlikely((p = find_domain_by_id(dom)) == NULL) )
+	    break;
+
+	if ( unlikely(num>1024) )
+	{
+	    ret = -E2BIG;
+	    break;
+	}
+	
+	ret = 0;    
+	for(n=0;n<num;)
+	{
+	    int k = ((num-n)>GPF2_BATCH)?GPF2_BATCH:(num-n);
+
+	    if( copy_from_user( l_arr, &s_ptr[n], k*sizeof(unsigned long) ) )
+	    {
+		ret = -EINVAL;
+		break;
+	    }
+	    
+	    for(j=0;j<k;j++)
+	    {		    
+		struct pfn_info *page;
+		unsigned long mfn = l_arr[j];
+
+		if ( unlikely(mfn >= max_page) )
+		    goto e2_err;
+
+		page = &frame_table[mfn];
+		
+		if ( likely(get_page(page, p)) )
+		{
+		    unsigned long type = 0;
+		    switch( page->type_and_flags & PGT_type_mask )
+		    {
+		    case PGT_l1_page_table:
+		    case PGT_l2_page_table:
+		    case PGT_l3_page_table:
+		    case PGT_l4_page_table:
+			type = page->type_and_flags & PGT_type_mask;
+
+		    }
+		    l_arr[j] |= type;
+		    put_page(page);
+		}
+		else
+		{
+		e2_err:
+		    l_arr[j] |= PGT_type_mask; /* error */
+		}
+
+	    }
+
+	    if( copy_to_user( &s_ptr[n], l_arr, k*sizeof(unsigned long) ) )
+	    {
+		ret = -EINVAL;
+		break;
+	    }
+
+	    n+=j;	    
+	}
+
+	put_task_struct(p);
+
+    }
+    break;
+
     default:
         ret = -ENOSYS;
 

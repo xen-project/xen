@@ -137,7 +137,10 @@ elif cmd == 'suspend':
         os.kill(pid, signal.SIGTERM)
 
     xc.domain_stop( dom=dom )
-    time.sleep(0.1);
+    
+    while not xc.domain_getinfo( first_dom=dom, max_doms=1 )[0]['stopped']:
+	time.sleep(0.1);
+
     rc = xc.linux_save( dom=dom, state_file=file, progress=1)
     if rc == 0 : xc.domain_destroy( dom=dom, force=1 )
 

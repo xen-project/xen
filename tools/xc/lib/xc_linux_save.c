@@ -10,6 +10,8 @@
 #include <asm-xen/suspend.h>
 #include <zlib.h>
 
+#define BATCH_SIZE 512   /* 1024 pages (4MB) at a time */
+
 /* This may allow us to create a 'quiet' command-line option, if necessary. */
 #define verbose_printf(_f, _a...) \
     do {                          \
@@ -38,33 +40,7 @@
     _res;                                   \
 })
 
-static int check_pfn_ownership(int xc_handle, 
-                               unsigned long mfn, 
-                               u64 dom)
-{
-    dom0_op_t op;
-    op.cmd = DOM0_GETPAGEFRAMEINFO;
-    op.u.getpageframeinfo.pfn    = mfn;
-    op.u.getpageframeinfo.domain = (domid_t)dom;
-    return (do_dom0_op(xc_handle, &op) >= 0);
-}
 
-#define GETPFN_ERR (~0U)
-static unsigned int get_pfn_type(int xc_handle, 
-                                 unsigned long mfn, 
-                                 u64 dom)
-{
-    dom0_op_t op;
-    op.cmd = DOM0_GETPAGEFRAMEINFO;
-    op.u.getpageframeinfo.pfn    = mfn;
-    op.u.getpageframeinfo.domain = (domid_t)dom;
-    if ( do_dom0_op(xc_handle, &op) < 0 )
-    {
-        PERROR("Unexpected failure when getting page frame info!");
-        return GETPFN_ERR;
-    }
-    return op.u.getpageframeinfo.type;
-}
 
 static int checked_write(gzFile fd, void *buf, size_t count)
 {
@@ -281,28 +257,59 @@ int xc_linux_save(int xc_handle,
 
 
     /*
-     * Construct the local pfn-to-mfn and mfn-to-pfn tables. On exit from this
-     * loop we have each MFN mapped at most once. Note that there may be MFNs
-     * that aren't mapped at all: we detect these by MFN_IS_IN_PSEUDOPHYS_MAP.
+     * Quick sanity check.
      */
 
     for ( i = 0; i < srec.nr_pfns; i++ )
     {
         mfn = live_pfn_to_mfn_table[i];
 
-#if 1  /* XXX use the master mfn_to_pfn table???? */
-
-
 	if( live_mfn_to_pfn_table[mfn] != i )
 	    printf("i=%d mfn=%d live_mfn_to_pfn_table=%d\n",
 		   i,mfn,live_mfn_to_pfn_table[mfn]);
+    }
 
-        /* Query page type by MFN, but store it by PFN. */
-        if ( (pfn_type[i] = get_pfn_type(xc_handle, mfn, domid)) == 
-             GETPFN_ERR )
-            goto out;
-#endif
 
+/* test new pfn_type stuff */
+    {
+	int n, i, j;
+
+	if ( mlock( pfn_type, srec.nr_pfns * sizeof(unsigned long) ) )
+	{
+	    ERROR("Unable to mlock");
+	    goto out;
+	}
+	for ( n = 0; n < srec.nr_pfns; )
+	{
+
+	    for( j = 0, i = n; j < BATCH_SIZE && i < srec.nr_pfns ; j++, i++ )
+	    {		
+		pfn_type[i] = live_pfn_to_mfn_table[i];
+	    }
+
+	    if ( get_pfn_type_batch(xc_handle, domid, j, &pfn_type[n]) )
+	    {
+		ERROR("get_pfn_type_batch failed");
+		goto out;
+	    }
+
+	    for( j = 0, i = n; j < BATCH_SIZE && i < srec.nr_pfns ; j++, i++ )
+	    {
+		
+		pfn_type[i] >>= 29;
+
+		if(pfn_type[i] == 7)
+		{
+		    ERROR("bogus page");
+		    goto out;
+		}
+
+/*		if(pfn_type[i])
+		    printf("i=%d type=%d\n",i,pfn_type[i]);    */
+	    }
+
+	    n+=j;
+	}
     }
 
 
@@ -354,13 +361,6 @@ int xc_linux_save(int xc_handle,
         goto out;
     }
 
-    /* Belts and braces safety check on the shared info record */
-    if ( !check_pfn_ownership(xc_handle, shared_info_frame, domid) )
-    {
-        ERROR("Invalid shared_info_frame");
-        goto out;
-    }
-
     if ( !checked_write(gfd, "LinuxGuestRecord",    16) ||
          !checked_write(gfd, name,                  sizeof(name)) ||
          !checked_write(gfd, &srec.nr_pfns,         sizeof(unsigned long)) ||
@@ -375,8 +375,6 @@ int xc_linux_save(int xc_handle,
     munmap(live_shinfo, PAGE_SIZE);
 
     verbose_printf("Saving memory pages:   0%%");
-
-#define BATCH_SIZE 1024   /* 1024 pages (4MB) at a time */
 
     if ( (mapper_handle2 = mfn_mapper_init(xc_handle, domid,
 					   BATCH_SIZE*4096, PROT_READ )) 
