@@ -171,6 +171,44 @@ void pdb_linux_get_values(char *buffer, int length, unsigned long address,
     }
 }
 
+ 
+void pdb_linux_set_value(int pid, unsigned long cr3, unsigned long addr,
+			 u_char *value)
+{
+    unsigned long pgd;
+    unsigned long l2tab, page;
+ 
+    /* get the process' pgd */
+    pgd = pdb_linux_pid_ptbr(cr3, pid);
+ 
+    /* get the l2 table entry */
+    pdb_get_values((u_char *) &l2tab, sizeof(l2tab),
+		   cr3, pgd + (addr >> PGDIR_SHIFT) * 4);
+    l2tab = (unsigned long)__va(machine_to_phys(cr3, l2tab) & PAGE_MASK);
+ 
+    /* get the page table entry */
+    pdb_get_values((u_char *) &page, sizeof(page),
+		   cr3, l2tab + ((addr & L1_PAGE_BITS) >> PAGE_SHIFT) * 4);
+    page = (unsigned long)__va(machine_to_phys(cr3, page) & PAGE_MASK);
+ 
+    /* set the byte */
+    pdb_set_values(value, sizeof(u_char), cr3, page + (addr & ~PAGE_MASK));
+}
+ 
+void pdb_linux_set_values(char *buffer, int length, unsigned long address,
+			  int pid, unsigned long cr3)
+{
+    int loop;
+ 
+    /* it's difficult to imagine a more inefficient algorithm */
+    for (loop = 0; loop < length; loop++)
+    {
+        pdb_linux_set_value(pid, cr3, address + loop, &buffer[loop * 2]);
+    }
+}
+
+/**********************************************************************/
+
 /*
  * return 1 if is the virtual address is in the operating system's
  * address space, else 0 
