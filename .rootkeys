@@ -261,6 +261,7 @@
 3ddb79c3uPGcP_l_2xyGgBSWd5aC-Q xen/include/asm-i386/unaligned.h
 3ddb79c2YTaZwOqWin9-QNgHge5RVw xen/include/hypervisor-ifs/block.h
 3ddb79c25UE59iu4JJcbRalx95mvcg xen/include/hypervisor-ifs/hypervisor-if.h
+3ead095dE_VF-QA88rl_5cWYRWtRVQ xen/include/hypervisor-ifs/kbd.h
 3ddb79c2oRPrzClk3zbTkRHlpumzKA xen/include/hypervisor-ifs/network.h
 3ddb79c4qbCoOFHrv9sCGshbWzBVlQ xen/include/scsi/scsi.h
 3ddb79c4R4iVwqIIeychVQYmIH4FUg xen/include/scsi/scsi_ioctl.h
@@ -398,6 +399,9 @@
 3e5a4e66qRlSTcjafidMB6ulECADvg xenolinux-2.4.21-pre4-sparse/arch/xeno/vmlinux.lds
 3e5a4e668yELUdtr3HiJZBIqxqUyuA xenolinux-2.4.21-pre4-sparse/drivers/block/Config.in
 3e5a4e66mrtlmV75L1tjKDg8RaM5gA xenolinux-2.4.21-pre4-sparse/drivers/block/ll_rw_blk.c
+3ead095dEkj9JJWYYBnbvW3OYbKFxg xenolinux-2.4.21-pre4-sparse/drivers/char/Config.in
+3ead095d00j61GCBaYdu_SwmY-vdSQ xenolinux-2.4.21-pre4-sparse/drivers/char/Makefile
+3ead095dPseRoFELVf_xcnVXjq02hw xenolinux-2.4.21-pre4-sparse/drivers/char/dummy_console.c
 3e5a4e66rw65CxyolW9PKz4GG42RcA xenolinux-2.4.21-pre4-sparse/drivers/char/tty_io.c
 3e5a4e669uzIE54VwucPYtGwXLAbzA xenolinux-2.4.21-pre4-sparse/fs/exec.c
 3e5a4e66wbeCpsJgVf_U8Jde-CNcsA xenolinux-2.4.21-pre4-sparse/include/asm-xeno/bugs.h
@@ -408,6 +412,7 @@
 3e5a4e677VBavzM1UZIEcH1B-RlXMA xenolinux-2.4.21-pre4-sparse/include/asm-xeno/hypervisor.h
 3e5a4e67Ulv-Ll8Zp4j2GwMwQ8aAXQ xenolinux-2.4.21-pre4-sparse/include/asm-xeno/io.h
 3e5a4e673p7PEOyHFm3nHkYX6HQYBg xenolinux-2.4.21-pre4-sparse/include/asm-xeno/irq.h
+3ead095db_LRUXnxaqs0dA1DWhPoQQ xenolinux-2.4.21-pre4-sparse/include/asm-xeno/keyboard.h
 3e5a4e67zoNch27qYhEBpr2k6SABOg xenolinux-2.4.21-pre4-sparse/include/asm-xeno/mmu.h
 3e5a4e678ddsQOpbSiRdy1GRcDc9WA xenolinux-2.4.21-pre4-sparse/include/asm-xeno/mmu_context.h
 3e7270deQqtGPSnFxcW4AvJZuTUWfg xenolinux-2.4.21-pre4-sparse/include/asm-xeno/multicall.h
