@@ -1967,7 +1967,8 @@ static int get_tx_bufs(net_vif_t *vif)
             skb->len = tx.size - ETH_HLEN;
             unmap_domain_mem(skb->head);
 
-            netif_rx(skb);
+            if ( netif_rx(skb) == NET_RX_DROP )
+                kfree_skb(skb);
 
             __make_tx_response(vif, tx.id, RING_STATUS_OK);
         }
