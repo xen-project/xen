@@ -56,6 +56,13 @@ static void map_alloc(unsigned long first_page, unsigned long nr_pages)
 {
     unsigned long start_off, end_off, curr_idx, end_idx;
 
+#ifndef NDEBUG
+    unsigned long i;
+    /* Check that the block isn't already allocated. */
+    for ( i = 0; i < nr_pages; i++ )
+        ASSERT(!allocated_in_map(first_page + i));
+#endif
+
     curr_idx  = first_page / PAGES_PER_MAPWORD;
     start_off = first_page & (PAGES_PER_MAPWORD-1);
     end_idx   = (first_page + nr_pages) / PAGES_PER_MAPWORD;
@@ -77,6 +84,13 @@ static void map_alloc(unsigned long first_page, unsigned long nr_pages)
 static void map_free(unsigned long first_page, unsigned long nr_pages)
 {
     unsigned long start_off, end_off, curr_idx, end_idx;
+
+#ifndef NDEBUG
+    unsigned long i;
+    /* Check that the block isn't already freed. */
+    for ( i = 0; i < nr_pages; i++ )
+        ASSERT(allocated_in_map(first_page + i));
+#endif
 
     curr_idx = first_page / PAGES_PER_MAPWORD;
     start_off = first_page & (PAGES_PER_MAPWORD-1);
@@ -227,7 +241,7 @@ void __init init_page_allocator(unsigned long min, unsigned long max)
     /* Allocate space for the allocation bitmap. */
     bitmap_size  = (max+1) >> (PAGE_SHIFT+3);
     bitmap_size  = round_pgup(bitmap_size);
-    alloc_bitmap = (unsigned long *)__va(min);
+    alloc_bitmap = (unsigned long *)phys_to_virt(min);
     min         += bitmap_size;
     range        = max - min;
 
@@ -239,6 +253,8 @@ void __init init_page_allocator(unsigned long min, unsigned long max)
     /* The buddy lists are addressed in high memory. */
     min += PAGE_OFFSET;
     max += PAGE_OFFSET;
+
+    printk("Initialising Xen allocator with %luMB memory\n", range >> 20);
 
     p         = min;
     remaining = range;
@@ -315,7 +331,7 @@ retry:
         GUARD(spare_ch, i);
     }
     
-    map_alloc(__pa(alloc_ch)>>PAGE_SHIFT, 1<<order);
+    map_alloc(virt_to_phys(alloc_ch)>>PAGE_SHIFT, 1<<order);
 
     spin_unlock_irqrestore(&alloc_lock, flags);
 
@@ -349,14 +365,11 @@ void __free_pages(unsigned long p, int order)
     chunk_head_t *ch;
     chunk_tail_t *ct;
     unsigned long flags;
-    unsigned long pagenr = __pa(p) >> PAGE_SHIFT;
+    unsigned long pfn = virt_to_phys((void *)p) >> PAGE_SHIFT;
 
     spin_lock_irqsave(&alloc_lock, flags);
 
 #ifdef MEMORY_GUARD
-    /* Check that the block isn't already freed. */
-    if ( !allocated_in_map(pagenr) )
-        BUG();
     /* Check that the block isn't already guarded. */
     if ( __put_user(1, (int*)p) )
         BUG();
@@ -364,7 +377,7 @@ void __free_pages(unsigned long p, int order)
     memset((void *)p, 0xaa, size);
 #endif
 
-    map_free(pagenr, 1<<order);
+    map_free(pfn, 1<<order);
     
     /* Merge chunks as far as possible. */
     for ( ; ; )
@@ -372,18 +385,19 @@ void __free_pages(unsigned long p, int order)
         if ( (p & size) )
         {
             /* Merge with predecessor block? */
-            if ( allocated_in_map(pagenr-1) )
+            if ( allocated_in_map(pfn-1) )
                 break;
             ct = (chunk_tail_t *)p - 1;
             if ( TAIL_LEVEL(ct) != order )
                 break;
-            ch = (chunk_head_t *)(p - size);
-            p -= size;
+            p   -= size;
+            pfn -= 1<<order;
+            ch   = (chunk_head_t *)p;
         }
         else
         {
             /* Merge with successor block? */
-            if ( allocated_in_map(pagenr+(1<<order)) )
+            if ( allocated_in_map(pfn+(1<<order)) )
                 break;
             ch = (chunk_head_t *)(p + size);
             if ( HEAD_LEVEL(ch) != order )
