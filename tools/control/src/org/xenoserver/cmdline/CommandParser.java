@@ -84,7 +84,7 @@ public abstract class CommandParser {
      */
     public int getIntParameter(List args, char key, int def) {
         String r = getParameter(args, key);
-        return (r == null) ? def : (Integer.parseInt(r));
+        return (r == null) ? def : (Integer.parseInt(r.trim()));
     }
 
     /**

@@ -64,8 +64,27 @@ public class Main {
     Defaults d = new Defaults();
     int ec = -1;
     LinkedList arglist = new LinkedList();
+    boolean seen_arg = false;
+    String collected = null;
     for ( int i=0; i<args.length; i++ ) {
-      arglist.add( args[i] );
+      if (!(args[i].startsWith("-"))) {
+	if (seen_arg) {
+	  collected += " " + args[i];
+	} else {
+	  arglist.add(args[i]);
+	}
+      }
+      if (args[i].startsWith("-")) {
+	if (collected != null) {
+	  arglist.add ( collected );
+	  collected = null;
+	}
+	collected = args[i];
+	seen_arg = true;
+      }
+    }
+    if (collected != null) {
+      arglist.add( collected );
     }
 
     try {

@@ -212,6 +212,7 @@ public class CommandDomainNew extends Command {
                 }
 
                 /* Set up boot parameters to pass to xi_build. */
+		bargs = StringPattern.parse(bargs).resolve(domain_id) + " ";
                 if (root_dev.equals("/dev/nfs")) {
                     if (vifs == 0) {
                         throw new CommandFailedException("Cannot use NFS root without VIFs configured");
@@ -224,7 +225,7 @@ public class CommandDomainNew extends Command {
                     }
                     bargs =
                         (bargs
-                            + " root=/dev/nfs " + root_args + " " 
+                            + " root=/dev/nfs " + StringPattern.parse(root_args).resolve(domain_id) + " " 
                             + "nfsroot="
                             + StringPattern.parse(nfs_root_path).resolve(
                                 domain_id)
@@ -234,7 +235,7 @@ public class CommandDomainNew extends Command {
                         (bargs
                             + " root="
                             + StringPattern.parse(root_dev).resolve(domain_id)
-                            + " " + root_args + " ");
+                            + " " + StringPattern.parse(root_args).resolve(domain_id) + " ");
 
                 }
                 
@@ -258,19 +259,19 @@ public class CommandDomainNew extends Command {
                         ("ip="
                             + domain_ip
                             + ":"
-                            + ((nw_nfs_server == null)
+                            + ((nw_nfs_server == null || nw_nfs_server.equals(""))
                                 ? ""
                                 : (InetAddressPattern
                                     .parse(nw_nfs_server)
                                     .resolve(domain_id)))
                             + ":"
-                            + ((nw_gw == null)
+                            + ((nw_gw == null || nw_gw.equals(""))
                                 ? ""
                                 : (InetAddressPattern
                                     .parse(nw_gw)
                                     .resolve(domain_id)))
                             + ":"
-                            + ((nw_mask == null)
+                            + ((nw_mask == null || nw_mask.equals(""))
                                 ? ""
                                 : InetAddressPattern.parse(nw_mask).resolve(
                                     domain_id))
@@ -342,6 +343,7 @@ public class CommandDomainNew extends Command {
         } catch (CommandFailedException e) {
             throw e;
         } catch (Exception e) {
+					     e.printStackTrace();
             throw new CommandFailedException(
                 "Could not create new domain (" + e + ")",
                 e);

@@ -17,7 +17,7 @@ public class ParseDomainNew extends CommandParser {
         String image = getStringParameter(args, 'i', d.domainImage);
         String initrd = getStringParameter(args, 'r', d.domainInitRD);
         int vifs = getIntParameter(args, 'v', d.domainVIFs);
-        String bargs = getStringParameter(args, 'a', d.args) + " ";
+        String bargs = getStringParameter(args, 'a', d.args);
         String root_dev = getStringParameter(args, 'd', d.rootDevice);
         String root_args = getStringParameter(args, 't', d.rootArgs);
         String usr_dev = getStringParameter(args, 'u', d.usrDevice);
