@@ -315,6 +315,7 @@
 422e4430-gOD358H8nGGnNWes08Nng netbsd-2.0-xen-sparse/sys/miscfs/kernfs/kernfs_vnops.c
 413cb3b53nyOv1OIeDSsCXhBFDXvJA netbsd-2.0-xen-sparse/sys/nfs/files.nfs
 413aa1d0oNP8HXLvfPuMe6cSroUfSA patches/linux-2.6.11/agpgart.patch
+42372652KCUP-IOH9RN19YQmGhs4aA patches/linux-2.6.11/iomap.patch
 3f776bd1Hy9rn69ntXBhPReUFw9IEA tools/Makefile
 40e1b09db5mN69Ijj0X_Eol-S7dXiw tools/Rules.mk
 4209033eUwhDBJ_bxejiv5c6gjXS4A tools/blktap/Makefile
