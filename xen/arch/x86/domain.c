@@ -714,7 +714,7 @@ long do_switch_to_user(void)
 			: /* no output */ \
 			:"r" ((_ed)->debugreg[_reg]))
 
-void switch_to(struct exec_domain *prev_p, struct exec_domain *next_p)
+void context_switch(struct exec_domain *prev_p, struct exec_domain *next_p)
 {
     struct tss_struct *tss = init_tss + smp_processor_id();
     execution_context_t *stack_ec = get_execution_context();
@@ -805,6 +805,18 @@ void switch_to(struct exec_domain *prev_p, struct exec_domain *next_p)
     __sti();
 
     switch_segments(stack_ec, prev_p, next_p);
+
+    /*
+     * We do this late on because it doesn't need to be protected by the
+     * schedule_lock, and because we want this to be the very last use of
+     * 'prev' (after this point, a dying domain's info structure may be freed
+     * without warning). 
+     */
+    clear_bit(EDF_RUNNING, &prev_p->ed_flags);
+
+    schedule_tail(next_p);
+
+    BUG();
 }
 
 
@@ -968,16 +980,15 @@ void domain_relinquish_memory(struct domain *d)
     {
         if ( pagetable_val(ed->arch.guest_table) != 0 )
         {
-            put_page_and_type(
-                &frame_table[pagetable_val(ed->arch.guest_table) >> PAGE_SHIFT]);
+            put_page_and_type(&frame_table[
+                pagetable_val(ed->arch.guest_table) >> PAGE_SHIFT]);
             ed->arch.guest_table = mk_pagetable(0);
         }
 
         if ( pagetable_val(ed->arch.guest_table_user) != 0 )
         {
-            put_page_and_type(
-                &frame_table[pagetable_val(ed->arch.guest_table_user) >>
-                            PAGE_SHIFT]);
+            put_page_and_type(&frame_table[
+                pagetable_val(ed->arch.guest_table_user) >> PAGE_SHIFT]);
             ed->arch.guest_table_user = mk_pagetable(0);
         }
     }

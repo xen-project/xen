@@ -446,23 +446,11 @@ void __enter_scheduler(void)
 
     TRACE_2D(TRC_SCHED_SWITCH, next->domain->id, next);
 
-    switch_to(prev, next);
-
-    /*
-     * We do this late on because it doesn't need to be protected by the
-     * schedule_lock, and because we want this to be the very last use of
-     * 'prev' (after this point, a dying domain's info structure may be freed
-     * without warning). 
-     */
-    clear_bit(EDF_RUNNING, &prev->ed_flags);
-
     /* Ensure that the domain has an up-to-date time base. */
     if ( !is_idle_task(next->domain) && update_dom_time(next) )
         send_guest_virq(next, VIRQ_TIMER);
 
-    schedule_tail(next);
-
-    BUG();
+    context_switch(prev, next);
 }
 
 /* No locking needed -- pointer comparison is safe :-) */
