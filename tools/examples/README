@@ -5,7 +5,7 @@ This directory contains a set of example scripts for common Xen operations.
 For many operations you will either be able to use these scripts directly, or
 incorporate code from them into your own scripts.
 
-The Xc and XenoUtil Python modules provide an API for accessing all this
+The Xc and xenctl.utils Python modules provide an API for accessing all this
 functionality - and more - from your own Python programs.  These libraries may
 contain features for which there aren't yet example scripts written for...
 

@@ -23,6 +23,7 @@ all:
 	$(MAKE) -C misc
 	$(MAKE) -C examples
 	$(MAKE) -C xentrace
+	$(MAKE) -C xenctl
 	$(MAKE) -C xend
 
 install: all
@@ -31,6 +32,7 @@ install: all
 	$(MAKE) -C misc install
 	$(MAKE) -C examples install
 	$(MAKE) -C xentrace install
+	$(MAKE) -C xenctl install
 	$(MAKE) -C xend install
 
 clean:
@@ -40,5 +42,6 @@ clean:
 	$(MAKE) -C examples clean
 	$(MAKE) -C nsplitd clean
 	$(MAKE) -C xentrace clean
+	$(MAKE) -C xenctl clean
 	$(MAKE) -C xend clean
 

@@ -464,11 +464,6 @@ You can rebuild Xen and the tools by typing 'make'. You can install
 them to the standard directories with 'make install', or into the
 ../install subtree with 'make dist'.
 
-/usr/local/bin/xc_*   	the domain control tools
-/lib/libxc.so		the xc library
-/usr/lib/python2.2/site-packages/XenoUtil.py	python util library
-/usr/lib/python2.2/site-packages/Xc.c		python xc bindings
-
 If you're using the virtual disk control tools (xc_vd_tool) you'll
 need the SQLite library and python binding pysqlite.  There's a tar
 ball containing the necessary binaries on the project downloads page.

@@ -57,10 +57,10 @@ except:
 
 #vfr_ipaddr = ["111.222.333.444","222.333.444.555"]
 try:
-    vfr_ipaddr = [ip, XenoUtil.add_offset_to_ip('169.254.1.0',vmid),]
+    vfr_ipaddr = [ip, xenctl.utils.add_offset_to_ip('169.254.1.0',vmid),]
 except:
-    vfr_ipaddr = [XenoUtil.add_offset_to_ip(XenoUtil.get_current_ipaddr(),vmid),
-                  XenoUtil.add_offset_to_ip('169.254.1.0',vmid),]
+    vfr_ipaddr = [xenctl.utils.add_offset_to_ip(xenctl.utils.get_current_ipaddr(),vmid),
+                  xenctl.utils.add_offset_to_ip('169.254.1.0',vmid),]
 
 
 # STEP 5a. Identify any physcial partitions or virtual disks you want the
@@ -89,8 +89,8 @@ vbd_expert = 0
 # You can use 'extrabit' to set the runlevel and custom environment
 # variables used by custom rc scripts (e.g. VMID=, usr= )
 
-netmask = XenoUtil.get_current_ipmask()
-gateway = XenoUtil.get_current_ipgw()
+netmask = xenctl.utils.get_current_ipmask()
+gateway = xenctl.utils.get_current_ipgw()
 try:
     nfsserv
 except:

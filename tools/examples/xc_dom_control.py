@@ -184,8 +184,8 @@ elif cmd == 'vif_addip':
     ip  = sys.argv[4]
 
     # XXX This function should be moved to Xc once we sort out the VFR
-    import XenoUtil
-    XenoUtil.setup_vfr_rules_for_vif( dom, vif, ip )
+    import xenctl.utils
+    xenctl.utils.setup_vfr_rules_for_vif( dom, vif, ip )
 
 elif cmd == 'vif_setsched':
     if len(sys.argv) < 6:
@@ -211,9 +211,9 @@ elif cmd == 'vif_getsched':
 
 
 elif cmd == 'vbd_add':
-    import XenoUtil
+    import xenctl.utils
     
-    XenoUtil.VBD_EXPERT_LEVEL = 0 # sets the allowed level of potentially unsafe mappings
+    xenctl.utils.VBD_EXPERT_LEVEL = 0 # sets the allowed level of potentially unsafe mappings
 
     if len(sys.argv) < 6:
 	usage()
@@ -227,17 +227,17 @@ elif cmd == 'vbd_add':
     if mode == 'rw' or mode == 'w':
 	writeable = 1;
 
-    segments = XenoUtil.lookup_disk_uname(uname)
+    segments = xenctl.utils.lookup_disk_uname(uname)
 
     if not segments:
         print "Lookup Failed"
         sys.exit(1)
 
-    if XenoUtil.vd_extents_validate(segments,writeable) < 0:
+    if xenctl.utils.vd_extents_validate(segments,writeable) < 0:
 	print "That mapping is too unsafe for the current VBD expertise level"
 	sys.exit(1)
 
-    virt_dev = XenoUtil.blkdev_name_to_number(dev)
+    virt_dev = xenctl.utils.blkdev_name_to_number(dev)
 
     xc.vbd_create(dom,virt_dev,writeable)
 
@@ -248,14 +248,14 @@ elif cmd == 'vbd_add':
     print "Added disk/partition %s to domain %d as device %s (%x)" % (uname, dom, dev, virt_dev)
 
 elif cmd == 'vbd_remove':
-    import XenoUtil
+    import xenctl.utils
 
     if len(sys.argv) < 4:
 	usage()
 	sys.exit(1)
 
     dev = sys.argv[3]
-    virt_dev = XenoUtil.blkdev_name_to_number(dev)
+    virt_dev = xenctl.utils.blkdev_name_to_number(dev)
 
     if not xc.vbd_destroy(dom,virt_dev):
 	print "Removed disk/partition attached as device %s (%x) in domain %d" % (dev, virt_dev, dom)

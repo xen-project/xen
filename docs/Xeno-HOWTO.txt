@@ -312,10 +312,10 @@ provide access to privileged command operations:
 In this way you can see that the class 'xc' contains useful
 documentation for you to consult.
 
-A further module of useful routines (XenoUtil) is also installed:
+A further package of useful routines (xenctl) is also installed:
 
-# import XenoUtil
-# help(XenoUtil)
+# import xenctl.utils
+# help(xenctl.utils)
 
 You can use these modules to write your own custom scripts or you can
 customise the scripts supplied in the Xen distribution.

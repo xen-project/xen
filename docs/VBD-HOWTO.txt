@@ -152,7 +152,7 @@ freespace -	     Get the free space (in megabytes) available for allocating
 		     new virtual disk extents.
 
 The functionality provided by these scripts is also available directly from
-Python functions in the XenoUtil module - you can use this functionality in
+Python functions in the xenctl.utils module - you can use this functionality in
 your own scripts.
 
 Populating VDs:

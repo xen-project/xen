@@ -49,7 +49,7 @@ else:
 # appropriately.
 
 #vfr_ipaddr = ["111.222.333.444","222.333.444.555"]
-#vfr_ipaddr  = [XenoUtil.add_offset_to_ip(XenoUtil.get_current_ipaddr(),vmid)]
+#vfr_ipaddr  = [xenctl.utils.add_offset_to_ip(xenctl.utils.get_current_ipaddr(),vmid)]
 vfr_ipaddr  = map(socket.gethostbyname,string.split(ip,','))
 
 
@@ -83,7 +83,7 @@ vbd_expert = 0
 # see if we have a local IP at all
 localip=''
 for i in vfr_ipaddr:
-    if XenoUtil.check_subnet(i,'169.254.0.0','255.255.0.0'):
+    if xenctl.utils.check_subnet(i,'169.254.0.0','255.255.0.0'):
 	localip=i
 	break
 
@@ -99,15 +99,15 @@ try:
     myip = vfr_ipaddr[0]
 
 except NameError:
-    netmask = XenoUtil.get_current_ipmask()
-    gateway = XenoUtil.get_current_ipgw()
+    netmask = xenctl.utils.get_current_ipmask()
+    gateway = xenctl.utils.get_current_ipgw()
 
 # if we haven't got an address, see if we have one that matches the LAN
 
 if not myip:
     if netmask and gateway:
 	for i in vfr_ipaddr:
-	    if XenoUtil.check_subnet(i,gateway,netmask): 
+	    if xenctl.utils.check_subnet(i,gateway,netmask): 
 		myip=i
 		break
 

@@ -86,8 +86,12 @@
 3fbba6dc38q-ioRlwSR_quw4G3qUeQ tools/xc/lib/xc_vif.c
 3fbd0a3dTwnDcfdw0-v46dPbX98zDw tools/xc/py/Makefile
 3fbd0a42l40lM0IICw2jXbQBVZSdZg tools/xc/py/Xc.c
-3fbd4bd6GtGwZGxYUJPOheYIR7bPaA tools/xc/py/XenoUtil.py
 3fbd0a40yT6G3M9hMpaz5xTUdl0E4g tools/xc/py/setup.py
+4055ee41IfFazrwadCH2J72nz-A9YA tools/xenctl/Makefile
+4055ee4b_4Rvns_KzE12csI14EKK6Q tools/xenctl/lib/__init__.py
+4055ee4dwy4l0MghZosxoiu6zmhc9Q tools/xenctl/lib/console_client.py
+3fbd4bd6GtGwZGxYUJPOheYIR7bPaA tools/xenctl/lib/utils.py
+4055ee44Bu6oP7U0WxxXypbUt4dNPQ tools/xenctl/setup.py
 40431ac64Hj4ixUnKmlugZKhXPFE_Q tools/xend/Makefile
 4055ad95Se-FqttgxollqOAAHB94zA tools/xend/lib/__init__.py
 4055ad97wMLUj0BZT0e_T0EwQN0Bvw tools/xend/lib/console.py

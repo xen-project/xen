@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
-import Xc, XenoUtil, string, sys, os, time, socket, getopt, signal, syslog
+import string, sys, os, time, socket, getopt, signal, syslog
+import Xc, xenctl.utils, xenctl.console_client
 
 config_dir  = '/etc/xc/'
 config_file = xc_config_file = config_dir + 'defaults'
@@ -29,6 +30,7 @@ Arguments to control the parsing of the defaults file:
 def extra_usage ():
     print >>sys.stderr,"""
 Arguments to override current config read from '%s':
+ -c               -- Turn into console terminal after domain is created
  -k image         -- Path to kernel image ['%s']
  -r ramdisk       -- Path to ramdisk (or empty) ['%s']
  -b builder_fn    -- Function to use to build domain ['%s']
@@ -86,12 +88,13 @@ mem_size=0; domain_name=''; vfr_ipaddr=[];
 vbd_expert=0; auto_restart=False;
 vbd_list = []; cmdline_ip = ''; cmdline_root=''; cmdline_extra=''
 pci_device_list = []
+auto_console = False
 
 ##### Determine location of defautls file
 #####
 
 try:
-    opts, args = getopt.getopt(sys.argv[1:], "h?nqf:D:k:r:b:m:N:a:e:d:i:I:R:E:L:" )
+    opts, args = getopt.getopt(sys.argv[1:], "h?nqcf:D:k:r:b:m:N:a:e:d:i:I:R:E:L:" )
 
     for opt in opts:
 	if opt[0] == '-f': config_file= opt[1]
@@ -160,6 +163,7 @@ for opt in opts:
     if opt[0] == '-R': cmdline_root = opt[1]
     if opt[0] == '-E': cmdline_extra = opt[1]
     if opt[0] == '-i': x_vfr_ipaddr.append(opt[1])
+    if opt[0] == '-c': auto_console = True
     if opt[0] == '-d':
 	try:
 	    vv = string.split(opt[1],';')	    
@@ -238,7 +242,7 @@ def make_domain():
             sys.exit()
 
     cmsg = 'new_control_interface(dom='+str(id)+')'
-    xend_response = XenoUtil.xend_control_message(cmsg)
+    xend_response = xenctl.utils.xend_control_message(cmsg)
     if not xend_response['success']:
         print "Error creating initial event channel"
         print "Error type: " + xend_response['error_type']
@@ -251,12 +255,12 @@ def make_domain():
     # setup the virtual block devices
 
     # set the expertise level appropriately
-    XenoUtil.VBD_EXPERT_MODE = vbd_expert
+    xenctl.utils.VBD_EXPERT_MODE = vbd_expert
     
     for ( uname, virt_name, rw ) in vbd_list:
-	virt_dev = XenoUtil.blkdev_name_to_number( virt_name )
+	virt_dev = xenctl.utils.blkdev_name_to_number( virt_name )
 
-	segments = XenoUtil.lookup_disk_uname( uname )
+	segments = xenctl.utils.lookup_disk_uname( uname )
 	if not segments:
 	    print "Error looking up %s\n" % uname
 	    xc.domain_destroy ( dom=id )
@@ -264,7 +268,7 @@ def make_domain():
 
         # check that setting up this VBD won't violate the sharing
         # allowed by the current VBD expertise level
-        if XenoUtil.vd_extents_validate(segments, rw=='w' or rw=='rw') < 0:
+        if xenctl.utils.vd_extents_validate(segments, rw=='w' or rw=='rw') < 0:
             xc.domain_destroy( dom = id )
             sys.exit()
             
@@ -282,7 +286,7 @@ def make_domain():
 
     # setup virtual firewall rules for all aliases
     for ip in vfr_ipaddr:
-	XenoUtil.setup_vfr_rules_for_vif( id, 0, ip )
+	xenctl.utils.setup_vfr_rules_for_vif( id, 0, ip )
 
     # check for physical device access
     for (pci_bus, pci_dev, pci_func) in pci_device_list:
@@ -327,6 +331,9 @@ def death_handler(dummy1,dummy2):
 # start the domain and record its ID number
 (current_id, current_port) = make_domain()
 output("VM started in domain %d. Console I/O available on TCP port %d." % (current_id,current_port))
+
+if auto_console:
+    xenctl.console_client.connect('127.0.0.1',int(current_port))
 
 # if the auto_restart flag is set then keep polling to see if the domain is
 # alive - restart if it is not by calling make_domain() again (it's necessary

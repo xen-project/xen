@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import XenoUtil, sys, re, string
+import xenctl.utils, sys, re, string
 
 def usage():
 
@@ -50,7 +50,7 @@ if cmd == 'initialise':
     print "Device: " + dev
     print "Extent size: " + str(extent_size) + "MB"
 
-    rc = XenoUtil.vd_format(dev, extent_size)
+    rc = xenctl.utils.vd_format(dev, extent_size)
 
 elif cmd == 'create':
  
@@ -63,7 +63,7 @@ elif cmd == 'create':
     print "Size: %d" % size
     print "Expiry time (seconds from now): %d" % expiry_time
 
-    src = XenoUtil.vd_create(size, expiry_time)
+    src = xenctl.utils.vd_create(size, expiry_time)
 
 elif cmd == 'enlarge':
 
@@ -71,7 +71,7 @@ elif cmd == 'enlarge':
 
     extra_size = int(sys.argv[3])
 
-    rc = XenoUtil.vd_enlarge(id, extra_size)
+    rc = xenctl.utils.vd_enlarge(id, extra_size)
 
 elif cmd == 'delete':
 
@@ -79,7 +79,7 @@ elif cmd == 'delete':
 
     print "Deleting a virtual disk with ID: " + id
 
-    rc = XenoUtil.vd_delete(id)
+    rc = xenctl.utils.vd_delete(id)
 
 elif cmd == 'import':
 
@@ -90,7 +90,7 @@ elif cmd == 'import':
 
     print "Allocate new virtual disk and populate from file : %s" % file
 
-    print XenoUtil.vd_read_from_file(file, expiry_time)
+    print xenctl.utils.vd_read_from_file(file, expiry_time)
 
 elif cmd == 'export':
 
@@ -99,7 +99,7 @@ elif cmd == 'export':
 
     print "Dump contents of virtual disk to file : %s" % file
 
-    rc = XenoUtil.vd_cp_to_file(id, file )
+    rc = xenctl.utils.vd_cp_to_file(id, file )
 
 elif cmd == 'setexpiry':
 
@@ -112,19 +112,19 @@ elif cmd == 'setexpiry':
     print "Id: " + id
     print "Expiry time (seconds from now [or 0]): " + str(expiry_time)
 
-    rc = XenoUtil.vd_refresh(id, expiry_time)
+    rc = xenctl.utils.vd_refresh(id, expiry_time)
 
 elif cmd == 'list':
     print 'ID    Size(MB)      Expiry'
 
-    for vbd in XenoUtil.vd_list():
+    for vbd in xenctl.utils.vd_list():
         vbd['size_mb'] = vbd['size'] / 2048
         vbd['expiry'] = (vbd['expires'] and vbd['expiry_time']) or 'never'
         print '%(vdisk_id)-4s  %(size_mb)-12d  %(expiry)s' % vbd
 
 elif cmd == 'freespace':
 
-    print XenoUtil.vd_freespace()
+    print xenctl.utils.vd_freespace()
 
 elif cmd == 'undelete':
 
@@ -133,7 +133,7 @@ elif cmd == 'undelete':
     if len(sys.argv) > 3:
 	expiry_time = int(sys.argv[3])
    
-    if XenoUtil.vd_undelete(id, expiry_time):
+    if xenctl.utils.vd_undelete(id, expiry_time):
 	print "Undelete operation failed for virtual disk: " + id
     else:
 	print "Undelete operation succeeded for virtual disk: " + id

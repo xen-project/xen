@@ -448,9 +448,9 @@ def vd_lookup(id):
                  'start_sector' : long(part_offset + lookup_raw_partn(partition)[0]['start_sector']),
                  # extent size, in sectors
                  'nr_sectors' : nr_sectors,
-                 # partition device this extent is on (useful to know for XenoUtil fns)
+                 # partition device this extent is on (useful to know for xenctl.utils fns)
                  'part_device' : part_device,
-                 # start sector within this partition (useful to know for XenoUtil fns)
+                 # start sector within this partition (useful to know for xenctl.utils fns)
                  'part_start_sector' : part_offset,
                  # type of this extent - handy to know
                  'type' : 'VD Extent' }

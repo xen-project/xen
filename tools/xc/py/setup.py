@@ -8,5 +8,3 @@ module = Extension("Xc",
                    sources              = ["Xc.c"])
 
 setup(name = "Xc", version = "1.0", ext_modules = [module])
-
-setup(name = "XenoUtil", version = "1.0", py_modules = ["XenoUtil"])
