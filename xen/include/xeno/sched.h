@@ -72,6 +72,10 @@ struct task_struct {
     int hyp_events;              /* 08: pending intra-Xen events */
     unsigned int domain;         /* 12: domain id */
 
+    // SMH: replace below when have explicit 'priv' flag or bitmask
+#define IS_PRIV(_p) ((_p)->domain == 0) 
+
+
     /* An unsafe pointer into a shared data area. */
     shared_info_t *shared_info;  /* 16: shared data area */
 
