@@ -25,6 +25,15 @@ all:
 	$(MAKE) -C tools/internal
 	$(MAKE) -C tools/vdmanager
 
+install: all
+	$(MAKE) -C xen install
+	$(MAKE) -C tools/balloon install
+	$(MAKE) -C tools/domain_builder install
+	$(MAKE) -C tools/domctl install
+	$(MAKE) -C tools/internal install
+	$(MAKE) -C tools/vdmanager install
+
+
 clean:
 	$(MAKE) -C xen clean
 	$(MAKE) -C tools/balloon clean
