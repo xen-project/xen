@@ -135,7 +135,7 @@ static int network_open(struct net_device *dev)
     }
 
 #if 1
-    request_irq( _EVENT_DEBUG, dbg_network_int, SA_SHARED, "debug", dev);    
+    request_irq( _EVENT_DEBUG, dbg_network_int, SA_SHIRQ, "debug", dev);    
 #endif
 
 
