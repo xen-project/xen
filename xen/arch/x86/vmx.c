@@ -41,6 +41,11 @@ unsigned int opt_vmx_debug_level;
 extern long evtchn_send(int lport);
 extern long do_block(void);
 
+#define VECTOR_DB   1
+#define VECTOR_BP   3
+#define VECTOR_GP   13
+#define VECTOR_PG   14
+
 int start_vmx()
 {
     struct vmcs_struct *vmcs;
@@ -102,7 +107,7 @@ static int vmx_do_page_fault(unsigned long va, unsigned long error_code)
 {
     unsigned long eip, pfn;
     unsigned int index;
-    unsigned long gpde = 0;
+    unsigned long gpde = 0, gpte, gpa;
     int result;
     struct exec_domain *ed = current;
     struct mm_struct *m = &ed->mm;
@@ -132,6 +137,15 @@ static int vmx_do_page_fault(unsigned long va, unsigned long error_code)
         m->guest_pl2e_cache[index] = 
             mk_l2_pgentry((pfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
     }
+    
+    if (unlikely(__get_user(gpte, (unsigned long *)
+                            &linear_pg_table[va >> PAGE_SHIFT])))
+        return 0;
+    
+    gpa = (gpte & PAGE_MASK) | (va & (PAGE_SIZE - 1));
+
+    if (mmio_space(gpa))
+        handle_mmio(va, gpte, gpa);
 
     if ((result = shadow_fault(va, error_code)))
         return result;
@@ -142,19 +156,26 @@ static int vmx_do_page_fault(unsigned long va, unsigned long error_code)
 static void vmx_do_general_protection_fault(struct xen_regs *regs) 
 {
     unsigned long eip, error_code;
+    unsigned long intr_fields;
 
     __vmread(GUEST_EIP, &eip);
     __vmread(VM_EXIT_INTR_ERROR_CODE, &error_code);
 
-    VMX_DBG_LOG(DBG_LEVEL_1, 
+    VMX_DBG_LOG(DBG_LEVEL_1,
             "vmx_general_protection_fault: eip = %lx, erro_code = %lx\n",
             eip, error_code);
 
-    VMX_DBG_LOG(DBG_LEVEL_1, 
+    VMX_DBG_LOG(DBG_LEVEL_1,
             "eax=%x, ebx=%x, ecx=%x, edx=%x, esi=%x, edi=%x\n",
             regs->eax, regs->ebx, regs->ecx, regs->edx, regs->esi, regs->edi);
 
-    __vmx_bug(regs);
+    /* Reflect it back into the guest */
+    intr_fields = (INTR_INFO_VALID_MASK | 
+		   INTR_TYPE_EXCEPTION |
+		   INTR_INFO_DELIEVER_CODE_MASK |
+		   VECTOR_GP);
+    __vmwrite(VM_ENTRY_INTR_INFO_FIELD, intr_fields);
+    __vmwrite(VM_ENTRY_EXCEPTION_ERROR_CODE, error_code);
 }
 
 static void vmx_vmexit_do_cpuid(unsigned long input, struct xen_regs *regs) 
@@ -271,7 +292,7 @@ static inline void guest_pl2e_cache_invalidate(struct mm_struct *m)
     memset(m->guest_pl2e_cache, 0, PAGE_SIZE);
 }
 
-static inline unsigned long gva_to_gpa(unsigned long gva)
+inline unsigned long gva_to_gpa(unsigned long gva)
 {
     unsigned long gpde, gpte, pfn, index;
     struct exec_domain *d = current;
@@ -340,6 +361,10 @@ static void vmx_io_instruction(struct xen_regs *regs,
     p->size = (exit_qualification & 7) + 1;
 
     if (test_bit(4, &exit_qualification)) {
+        unsigned long eflags;
+
+        __vmread(GUEST_EFLAGS, &eflags);
+        p->df = (eflags & X86_EFLAGS_DF) ? 1 : 0;
         p->pdata_valid = 1;
         p->u.pdata = (void *) ((p->dir == IOREQ_WRITE) ?
             regs->esi
@@ -725,11 +750,6 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
     switch (exit_reason) {
     case EXIT_REASON_EXCEPTION_NMI:
     {
-#define VECTOR_DB   1
-#define VECTOR_BP   3
-#define VECTOR_GP   13
-#define VECTOR_PG   14
-
         /*
          * We don't set the software-interrupt exiting (INT n). 
          * (1) We can get an exception (e.g. #PG) in the guest, or
@@ -773,6 +793,7 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
             __vmread(VM_EXIT_INTR_ERROR_CODE, &error_code);
             VMX_DBG_LOG(DBG_LEVEL_VMMU, 
                     "eax=%x, ebx=%x, ecx=%x, edx=%x, esi=%x, edi=%x\n", regs.eax, regs.ebx, regs.ecx, regs.edx, regs.esi, regs.edi);
+            d->thread.arch_vmx.vmx_platform.mpci.inst_decoder_regs = &regs;
 
             if (!(error = vmx_do_page_fault(va, error_code))) {
                 /*

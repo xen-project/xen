@@ -891,6 +891,7 @@
 3ddb79bcOftONV9h4QCxXOfiT0h91w xen/arch/x86/traps.c
 41c0c411tD3C7TpfDMiFTf7BaNd_Dg xen/arch/x86/vmx.c
 41c0c411ODt8uEmV-yUxpQLpqimE5Q xen/arch/x86/vmx_io.c
+41f97ef5139vN42cOYHfX_Ac8WOOjA xen/arch/x86/vmx_platform.c
 41c0c4128URE0dxcO15JME_MuKBPfg xen/arch/x86/vmx_vmcs.c
 419cbedeQDg8IrO3izo3o5rQNlo0kQ xen/arch/x86/x86_32/asm-offsets.c
 3e32af9aRnYGl4GMOaDKp7JdfhOGhg xen/arch/x86/x86_32/domain_page.c

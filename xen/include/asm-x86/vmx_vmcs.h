@@ -39,15 +39,7 @@ union vmcs_arbytes {
     unsigned int bytes;
 };
 
-struct virutal_platform_def {
-    unsigned long   *real_mode_data; /* E820, etc. */
-    unsigned long   shared_page_va;
-};
-
-int vmx_setup_platform(struct exec_domain *, execution_context_t *);
-
 #define VMX_CPU_STATE_PG_ENABLED        0       
-
 #define VMCS_SIZE                       0x1000
 
 struct vmcs_struct {
@@ -62,10 +54,6 @@ struct arch_vmx_struct {
     unsigned long           cpu_cr3;
     unsigned long           cpu_state;
     struct virutal_platform_def     vmx_platform; 
-#if 0
-    /* open */
-    unsigned long *page_list; /* page list for MMIO */
-#endif
 };
 
 #define vmx_schedule_tail(next)         \
