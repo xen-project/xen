@@ -1,3 +1,22 @@
+IMPORTANT! DATA LOSS POTENTIAL!
+-------------------------------
+
+It is important that no changes be made to the virtual disk manager through
+the command line while the web interface is running!
+
+If you use the web interface at all, it is NOT safe to call:
+xenctl partitions add
+xenctl vd create
+xenctl vd delete
+xenctl vd refresh
+
+Your changes will likely be lost, or the virtual disks left in an
+inconsistent state, or data on them corrupted or erased.
+
+Other xenctl functions do not modify VDM state and are therefore safe,
+e.g. it's okay to do domain control from the command line if the web
+interface is running.
+
 General
 -------
 
