@@ -320,10 +320,10 @@ For example, the following hypercall is used to specify a new GDT:
 \begin{quote}
 int {\bf set\_gdt}(unsigned long *{\em frame\_list}, int {\em entries})
 
-{\em frame\_list}: An array of up to 16 page frames within which the
-GDT resides.  Any frame registered as a GDT frame may only be mapped
-read-only within the guest's address space (e.g., no writable
-mappings, no use as a page-table page, and so on).
+{\em frame\_list}: An array of up to 16 machine page frames within
+which the GDT resides.  Any frame registered as a GDT frame may only
+be mapped read-only within the guest's address space (e.g., no
+writable mappings, no use as a page-table page, and so on).
 
 {\em entries}: The number of descriptor-entry slots in the GDT.  Note
 that the table must be large enough to contain Xen's reserved entries;
@@ -722,35 +722,66 @@ of TLB flush, if any, should follow the update.
 \end{quote} 
 
 Finally, sufficiently privileged domains may occasionally wish to manipulate 
-the page tables of others: 
+the pages of others: 
 \begin{quote}
 
 \hypercall{update\_va\_mapping\_otherdomain(unsigned long page\_nr,
 unsigned long val, unsigned long flags, uint16\_t domid)}
 
-Identical to {\tt update\_va\_mapping()} save that it operates 
-on the page tables of the domain with id {\tt domid}. 
+Identical to {\tt update\_va\_mapping()} save that the pages being
+mapped must belong to the domain {\tt domid}. 
 
 \end{quote}
 
 This privileged operation is currently used by backend virtual device
-drivers to efficiently implement `page flipping'.
+drivers to safely map pages containing I/O data. 
 
 
 
 \section{Segmentation Support}
 
+Xen allows guest OSes to install a custom GDT if they require it; 
+this is context switched transparently whenever a domain is 
+[de]scheduled.  The following hypercall is effectively a 
+`safe' version of {\tt lgdt}: 
 
+\begin{quote}
 \hypercall{set\_gdt(unsigned long *frame\_list, int entries)} 
 
-Set the global descriptor table - virtualization for lgdt.
+Install a global descriptor table for a domain; {\tt frame\_list} is
+an array of up to 16 machine page frames within which the GDT resides,
+with {\tt entries} being the actual number of descriptor-entry
+slots. All page frames must be mapped read-only within the guest's
+address space, and the table must be large enough to contain Xen's
+reserved entries (see {\tt xen/include/public/arch-x86\_32.h}).
+
+\end{quote}
+
+Many guest OSes will also wish to install LDTs; this is achieved by
+using {\tt mmu\_update()} with an extended commmand, passing the
+linear address of the LDT base along with the number of entries. No
+special safety checks are required; Xen needs to perform this task
+simply since {\tt lldt} requires CPL 0.
 
 
+Xen also allows guest operating systems to update just an 
+individual segment descriptor in the GDT or LDT:  
 
-\hypercall{update\_descriptor(unsigned long ma, unsigned long word1, unsigned long word2)} 
+\begin{quote}
+\hypercall{update\_descriptor(unsigned long ma, unsigned long word1,
+unsigned long word2)}
+
+Update the GDT/LDT entry at machine address {\tt ma}; the new
+8-byte descriptor is stored in {\tt word1} and {\tt word2}.
+Xen performs a number of checks to ensure the descriptor is 
+valid. 
+
+\end{quote}
 
 
 \section{Context Switching} 
+
+
 
 \hypercall{stack\_switch(unsigned long ss, unsigned long esp)} 
 
