@@ -138,7 +138,7 @@
 /* Dynamic binding of event channels and VIRQ sources to Linux IRQ space. */
 extern int  bind_virq_to_irq(int virq);
 extern void unbind_virq_from_irq(int virq);
-extern int  bind_ipi_on_cpu(int cpu, int ipi);
+extern void bind_ipi_on_cpu(int cpu, int ipi);
 extern void unbind_ipi_on_cpu(int cpu, int ipi);
 extern int  bind_evtchn_to_irq(int evtchn);
 extern void unbind_evtchn_from_irq(int evtchn);
