@@ -221,7 +221,7 @@ signal_return:
 	movl %esp,%eax
 	xorl %edx,%edx
 	call SYMBOL_NAME(do_signal)
-	jmp  ret_from_sys_call
+	jmp  safesti
 
 	ALIGN
 restore_all:
