@@ -203,6 +203,7 @@ bad_multicall_address:
         .long multicall_fault4, multicall_fixup4
         .long multicall_fault5, multicall_fixup5
         .long multicall_fault6, multicall_fixup6
+        .long multicall_fault7, multicall_fixup6
 .previous
                
 .section .fixup,"ax"
