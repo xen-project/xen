@@ -97,7 +97,6 @@ struct domain
 
     /* Scheduling. */
     int              shutdown_code; /* code value from OS (if DF_SHUTDOWN). */
-    spinlock_t       sleep_lock;    /* wake/sleep lock                      */
     s_time_t         lastschd;      /* time this domain was last scheduled */
     s_time_t         lastdeschd;    /* time this domain was last descheduled */
     s_time_t         cpu_time;      /* total CPU time received till now */
