@@ -213,9 +213,9 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
     set_current(&idle0_task);
 
     init_frametable(max_page);
-    printk("Initialised %luMB memory on a %luMB machine\n",
-           max_page >> (20-PAGE_SHIFT),
-	   max_mem  >> (20-PAGE_SHIFT) );
+    printk("Initialised %luMB memory (%lu pages) on a %luMB machine\n",
+           max_page >> (20-PAGE_SHIFT), max_page,
+	   max_mem  >> (20-PAGE_SHIFT));
 
     initial_images_start = MAX_DIRECTMAP_ADDRESS;
     initial_images_end   = initial_images_start + 

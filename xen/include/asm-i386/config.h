@@ -67,12 +67,11 @@
 #define READONLY_MPT_VIRT_START (HYPERVISOR_VIRT_START)
 #define READONLY_MPT_VIRT_END   (READONLY_MPT_VIRT_START + (4*1024*1024))
 /*
- * Next 16MB is fixed monitor space, which is part of a 44MB direct-mapped
+ * Next 12MB is fixed monitor space, which is part of a 40MB direct-mapped
  * memory region. The following are machine addresses.
  */
-#define MAX_MONITOR_ADDRESS   (16*1024*1024)
-#define MAX_DMA_ADDRESS       (16*1024*1024)
-#define MAX_DIRECTMAP_ADDRESS (40*1024*1024) // XXX was 44
+#define MAX_MONITOR_ADDRESS   (12*1024*1024)
+#define MAX_DIRECTMAP_ADDRESS (40*1024*1024)
 /* And the virtual addresses for the direct-map region... */
 #define DIRECTMAP_VIRT_START  (READONLY_MPT_VIRT_END)
 #define DIRECTMAP_VIRT_END    (DIRECTMAP_VIRT_START + MAX_DIRECTMAP_ADDRESS)
@@ -86,8 +85,8 @@
 #define LINEAR_PT_VIRT_START  (DIRECTMAP_VIRT_END)
 #define LINEAR_PT_VIRT_END    (LINEAR_PT_VIRT_START + (4*1024*1024))
 /* Next 4MB of virtual address space is used as a shadow linear p.t. map. */
-#define SH_LINEAR_PT_VIRT_START  (LINEAR_PT_VIRT_END)
-#define SH_LINEAR_PT_VIRT_END    (SH_LINEAR_PT_VIRT_START + (4*1024*1024))
+#define SH_LINEAR_PT_VIRT_START (LINEAR_PT_VIRT_END)
+#define SH_LINEAR_PT_VIRT_END (SH_LINEAR_PT_VIRT_START + (4*1024*1024))
 /* Next 4MB of virtual address space used for per-domain mappings (eg. GDT). */
 #define PERDOMAIN_VIRT_START  (SH_LINEAR_PT_VIRT_END)
 #define PERDOMAIN_VIRT_END    (PERDOMAIN_VIRT_START + (4*1024*1024))
