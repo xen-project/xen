@@ -1125,10 +1125,11 @@ static void blkif_status_change(blkif_fe_interface_status_changed_t *status)
             recovery = 0;
             wmb();
 
-	    blkif_state = BLKIF_STATE_CONNECTED;
-
             /* Kicks things back into life. */
             flush_requests();
+
+	    /* Now safe to left other peope use interface */
+	    blkif_state = BLKIF_STATE_CONNECTED;
         }
         else
         {
