@@ -65,7 +65,9 @@
 #define VIRQ_DEBUG      2  /* Request guest to dump debug info.           */
 #define VIRQ_CONSOLE    3  /* (DOM0) bytes received on emergency console. */
 #define VIRQ_DOM_EXC    4  /* (DOM0) Exceptional event for some domain.   */
-#define NR_VIRQS        5
+#define VIRQ_PARITY_ERR 5  /* (DOM0) NMI parity error.                    */
+#define VIRQ_IO_ERR     6  /* (DOM0) NMI I/O error.                       */
+#define NR_VIRQS        7
 
 /*
  * MMU-UPDATE REQUESTS

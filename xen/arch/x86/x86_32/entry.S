@@ -58,6 +58,7 @@
 
 #include <xen/config.h>
 #include <xen/errno.h>
+#include <xen/softirq.h>
 #include <hypervisor-ifs/hypervisor-if.h>
 
 EBX		= 0x00
@@ -598,8 +599,7 @@ ENTRY(nmi)
 	pushl %eax
 	SAVE_ALL_NOSEGREGS
 
-        # Check for hardware problems. These are always fatal so we can
-        # reload DS and ES when handling them.
+        # Check for hardware problems.
         inb   $0x61,%al
         testb $0x80,%al
         jne   nmi_parity_err
@@ -656,25 +656,45 @@ nmi_badseg:
         addl $20,%esp
         iret
 
-nmi_parity_err: 
-        movl $(__HYPERVISOR_DS),%edx
+nmi_parity_err:
+        # Clear and disable the parity-error line
+        andb $0xf,%al
+        orb  $0x4,%al
+        outb %al,$0x61
+        cmpb $'i',%ss:SYMBOL_NAME(opt_nmi) # nmi=ignore
+        je   nmi_badseg
+        bts  $0,%ss:SYMBOL_NAME(nmi_softirq_reason)
+        bts  $NMI_SOFTIRQ,%ss:SYMBOL_NAME(irq_stat)
+        cmpb $'d',%ss:SYMBOL_NAME(opt_nmi) # nmi=dom0
+        je   nmi_badseg
+        movl $(__HYPERVISOR_DS),%edx       # nmi=fatal
         movl %edx,%ds
         movl %edx,%es
         movl %esp,%edx
         push %edx
-        push %eax
         call SYMBOL_NAME(mem_parity_error)
-        ud2
-        
+        addl $4,%esp
+        jmp  ret_from_intr
+                
 nmi_io_err: 
-        movl $(__HYPERVISOR_DS),%edx
+        # Clear and disable the I/O-error line
+        andb $0xf,%al
+        orb  $0x8,%al
+        outb %al,$0x61
+        cmpb $'i',%ss:SYMBOL_NAME(opt_nmi) # nmi=ignore
+        je   nmi_badseg
+        bts  $1,%ss:SYMBOL_NAME(nmi_softirq_reason)
+        bts  $NMI_SOFTIRQ,%ss:SYMBOL_NAME(irq_stat)
+        cmpb $'d',%ss:SYMBOL_NAME(opt_nmi) # nmi=dom0
+        je   nmi_badseg
+        movl $(__HYPERVISOR_DS),%edx       # nmi=fatal
         movl %edx,%ds
         movl %edx,%es
         movl %esp,%edx
         push %edx
-        push %eax
         call SYMBOL_NAME(io_check_error)                        
-        ud2   
+        addl $4,%esp
+        jmp  ret_from_intr
              
 .data
 ENTRY(hypercall_table)

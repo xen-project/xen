@@ -777,43 +777,43 @@ The available commands are as follows:
 \begin{description}
 \item[Atropos]             One of the CPU schedulers provided by Xen.
                            Atropos provides domains with absolute shares
-			   of the CPU, with timeliness guarantees and a
-			   mechanism for sharing out ``slack time''.
+                           of the CPU, with timeliness guarantees and a
+                           mechanism for sharing out ``slack time''.
 
 \item[BVT]                 The BVT scheduler is used to give propotional
                            fair shares of the CPU to domains.
 
 \item[Exokernel]           A minimal piece of privileged code, similar to
                            a {\bf microkernel} but providing a more
-			   `hardware-like' interface to the tasks it
-			   manages.  This is similar to a paravirtualising
-			   VMM like {\bf Xen} but was designed as a new
-			   operating system structure, rather than
-			   specifically to run multiple conventional OSs.
+                           `hardware-like' interface to the tasks it
+                           manages.  This is similar to a paravirtualising
+                           VMM like {\bf Xen} but was designed as a new
+                           operating system structure, rather than
+                           specifically to run multiple conventional OSs.
 
 \item[FBVT]                A derivative of the { \bf BVT } scheduler that
                            aims to give better fairness performance to IO
-			   intensive domains in competition with CPU
-			   intensive domains.
+                           intensive domains in competition with CPU
+                           intensive domains.
 
 \item[Domain]              A domain is the execution context that
                            contains a running { \bf virtual machine }.
-			   The relationship between virtual machines
-			   and domains on Xen is similar to that between
-			   programs and processes in an operating
-			   system: a virtual machine is a persistent
-			   entity that resides on disk (somewhat like
-			   a program).  When it is loaded for execution,
-			   it runs in a domain.  Each domain has a
-			   { \bf domain ID }.
+                           The relationship between virtual machines
+                           and domains on Xen is similar to that between
+                           programs and processes in an operating
+                           system: a virtual machine is a persistent
+                           entity that resides on disk (somewhat like
+                           a program).  When it is loaded for execution,
+                           it runs in a domain.  Each domain has a
+                           { \bf domain ID }.
 
 \item[Domain 0]            The first domain to be started on a Xen
                            machine.  Domain 0 is responsible for managing
-			   the system.
+                           the system.
 
 \item[Domain ID]           A unique identifier for a { \bf domain },
                            analagous to a process ID in an operating
-			   system.  Apart from domain
+                           system.  Apart from domain
 
 \item[Full virtualisation] An approach to virtualisation which
                            requires no modifications to the hosted
@@ -822,18 +822,18 @@ The available commands are as follows:
 
 \item[Hypervisor]          An alternative term for { \bf VMM }, used
                            because it means ``beyond supervisor'',
-			   since it is responsible for managing multiple
-			   ``supervisor'' kernels.
+                           since it is responsible for managing multiple
+                           ``supervisor'' kernels.
 
 \item[Microkernel]         A small base of code running at the highest
                            hardware privilege level.  A microkernel is
-			   responsible for sharing CPU and memory (and
-			   sometimes other devices) between less
-			   privileged tasks running on the system.
-			   This is similar to a VMM, particularly a
-			   {\bf paravirtualising} VMM but typically
-			   addressing a different problem space and
-			   providing different kind of interface.
+                           responsible for sharing CPU and memory (and
+                           sometimes other devices) between less
+                           privileged tasks running on the system.
+                           This is similar to a VMM, particularly a
+                           {\bf paravirtualising} VMM but typically
+                           addressing a different problem space and
+                           providing different kind of interface.
 
 \item[NetBSD/Xen]          A port of NetBSD to the Xen architecture.
 
@@ -853,12 +853,12 @@ The available commands are as follows:
 
 \item[VMM]                 Virtual Machine Monitor - the software that
                            allows multiple virtual machines to be
-			   multiplexed on a single physical machine.
+                           multiplexed on a single physical machine.
 
 \item[Xen]                 Xen is a paravirtualising virtual machine
                            monitor, developed primarily by the
-			   Systems Research Group at the University
-			   of Cambridge Computer Laboratory.
+                           Systems Research Group at the University
+                           of Cambridge Computer Laboratory.
 
 \item[XenLinux]            Official name for the port of the Linux kernel
                            that runs on Xen.
@@ -1140,12 +1140,6 @@ editting \path{grub.conf}.
 {\bf noht } \\
  Disable Hyperthreading. \\
 
-{\bf ifname=ethXX }\\ 
- Select which Ethernet interface to use. \\
-
-{\bf ifname=dummy } \\
- Don't use any network interface. \\
-
 {\bf com1=$<$baud$>$,DPS[,$<$io\_base$>$,$<$irq$>$] \\
  com2=$<$baud$>$,DPS[,$<$io\_base$>$,$<$irq$>$] } \\
  Xen supports up to two 16550-compatible serial ports.
@@ -1183,6 +1177,13 @@ editting \path{grub.conf}.
  then auto-switching is disabled. Any other value, or
  omitting the character, enables auto-switching.
  [NB. Default for this option is 'a'] \\
+
+{\bf nmi=xxx } \\
+ Specify what to do with an NMI parity or I/O error. \\
+ 'nmi=fatal':  Xen prints a diagnostic and then hangs. \\
+ 'nmi=dom0':   Inform DOM0 of the NMI. \\
+ 'nmi=ignore': Ignore the NMI. \\
+ [NB. Default is 'dom0' ('fatal' for debug builds).] \\
 
 {\bf dom0\_mem=xxx } \\
  Set the maximum amount of memory for domain0. \\

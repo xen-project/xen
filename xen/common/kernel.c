@@ -80,6 +80,17 @@ char opt_leveltrigger[30] = "", opt_edgetrigger[30] = "";
  * pfn_info table and allocation bitmap.
  */
 unsigned int opt_xenheap_megabytes = XENHEAP_DEFAULT_MB;
+/*
+ * opt_nmi: one of 'ignore', 'dom0', or 'fatal'.
+ *  fatal:  Xen prints diagnostic message and then hangs.
+ *  dom0:   The NMI is virtualised to DOM0.
+ *  ignore: The NMI error is cleared and ignored.
+ */
+#ifdef NDEBUG
+char opt_nmi[10] = "dom0";
+#else
+char opt_nmi[10] = "fatal";
+#endif
 
 static struct {
     unsigned char *name;
@@ -104,6 +115,7 @@ static struct {
     { "leveltrigger",      OPT_STR,  &opt_leveltrigger },
     { "edgetrigger",       OPT_STR,  &opt_edgetrigger },
     { "xenheap_megabytes", OPT_UINT, &opt_xenheap_megabytes },
+    { "nmi",               OPT_STR,  &opt_nmi },
     { NULL,               0,        NULL     }
 };
 

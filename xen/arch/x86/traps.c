@@ -36,9 +36,11 @@
 #include <xen/console.h>
 #include <asm/ptrace.h>
 #include <xen/delay.h>
+#include <xen/event.h>
 #include <xen/spinlock.h>
 #include <xen/irq.h>
 #include <xen/perfc.h>
+#include <xen/softirq.h>
 #include <asm/shadow.h>
 #include <asm/domain_page.h>
 #include <asm/system.h>
@@ -51,6 +53,8 @@
 #include <asm/uaccess.h>
 #include <asm/i387.h>
 #include <asm/pdb.h>
+
+extern char opt_nmi[];
 
 struct guest_trap_bounce guest_trap_bounce[NR_CPUS] = { { 0 } };
 
@@ -472,16 +476,11 @@ asmlinkage void do_general_protection(struct pt_regs *regs, long error_code)
     die("general protection fault", regs, error_code);
 }
 
-asmlinkage void mem_parity_error(unsigned char reason, struct pt_regs *regs)
+asmlinkage void mem_parity_error(struct pt_regs *regs)
 {
     console_force_unlock();
 
-    printk("\n\nNMI received. Dazed and confused, but trying to continue\n");
-    printk("You probably have a hardware problem with your RAM chips\n");
-
-    /* Clear and disable the memory parity error line. */
-    reason = (reason & 0xf) | 4;
-    outb(reason, 0x61);
+    printk("\n\n");
 
     show_registers(regs);
 
@@ -497,14 +496,11 @@ asmlinkage void mem_parity_error(unsigned char reason, struct pt_regs *regs)
     for ( ; ; ) ;
 }
 
-asmlinkage void io_check_error(unsigned char reason, struct pt_regs *regs)
+asmlinkage void io_check_error(struct pt_regs *regs)
 {
     console_force_unlock();
 
-    printk("\n\nNMI: IOCK error (debug interrupt?)\n");
-
-    reason = (reason & 0xf) | 8;
-    outb(reason, 0x61);
+    printk("\n\n");
 
     show_registers(regs);
 
@@ -537,6 +533,23 @@ asmlinkage void do_nmi(struct pt_regs * regs, unsigned long reason)
     else
 #endif
         unknown_nmi_error((unsigned char)(reason&0xff), regs);
+}
+
+unsigned long nmi_softirq_reason;
+static void nmi_softirq(void)
+{
+    struct domain *d = find_domain_by_id(0);
+
+    if ( d == NULL )
+        return;
+
+    if ( test_and_clear_bit(0, &nmi_softirq_reason) )
+        send_guest_virq(d, VIRQ_PARITY_ERR);
+
+    if ( test_and_clear_bit(1, &nmi_softirq_reason) )
+        send_guest_virq(d, VIRQ_IO_ERR);
+
+    put_domain(d);
 }
 
 asmlinkage void math_state_restore(struct pt_regs *regs, long error_code)
@@ -751,6 +764,8 @@ void __init trap_init(void)
         extern void cpu_init(void);
         cpu_init();
     }
+
+    open_softirq(NMI_SOFTIRQ, nmi_softirq);
 }
 
 
