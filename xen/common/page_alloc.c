@@ -116,16 +116,11 @@ static void map_free(unsigned long first_page, unsigned long nr_pages)
  */
 
 typedef struct chunk_head_st chunk_head_t;
-typedef struct chunk_tail_st chunk_tail_t;
 
 struct chunk_head_st {
     chunk_head_t  *next;
     chunk_head_t **pprev;
     int            level;
-};
-
-struct chunk_tail_st {
-    int level;
 };
 
 /* Linked lists of free chunks of different powers-of-two in size. */
@@ -170,17 +165,6 @@ static inline int HEAD_LEVEL(chunk_head_t *ch)
     return l;
 }
 
-/* Safe form of 'ct->level'. */
-static inline int TAIL_LEVEL(chunk_tail_t *ct)
-{
-    int l;
-    ASSERT(memguard_is_guarded(ct));
-    UNGUARD(ct, 0);
-    l = ct->level;
-    GUARD(ct, 0);
-    return l;
-}
-
 /* Safe form of '*ch->pprev = l'. */
 static inline void UPDATE_PREV_FORWARDLINK(chunk_head_t *ch, chunk_head_t *l)
 {
@@ -210,7 +194,6 @@ static inline void UPDATE_NEXT_BACKLINK(chunk_head_t *ch, chunk_head_t **l)
 #define GUARD(_p,_o) ((void)0)
 #define UNGUARD(_p,_o) ((void)0)
 #define HEAD_LEVEL(_ch) ((_ch)->level)
-#define TAIL_LEVEL(_ct) ((_ct)->level)
 #define UPDATE_PREV_FORWARDLINK(_ch,_link) (*(_ch)->pprev = (_link))
 #define UPDATE_NEXT_BACKLINK(_ch,_link) ((_ch)->next->pprev = (_link))
 
@@ -226,7 +209,6 @@ void __init init_page_allocator(unsigned long min, unsigned long max)
     int i;
     unsigned long range, bitmap_size, p, remaining;
     chunk_head_t *ch;
-    chunk_tail_t *ct;
 
     for ( i = 0; i < FREELIST_SIZE; i++ )
     {
@@ -268,14 +250,12 @@ void __init init_page_allocator(unsigned long min, unsigned long max)
         ch = (chunk_head_t *)p;
         p         += (1<<i);
         remaining -= (1<<i);
-        ct = (chunk_tail_t *)p - 1;
         i -= PAGE_SHIFT;
         ch->level       = i;
         ch->next        = free_head[i];
         ch->pprev       = &free_head[i];
         ch->next->pprev = &ch->next;
         free_head[i]    = ch;
-        ct->level       = i;
     }
 
     memguard_guard_range((void *)min, range);
@@ -287,7 +267,6 @@ unsigned long __get_free_pages(int mask, int order)
 {
     int i, attempts = 0;
     chunk_head_t *alloc_ch, *spare_ch;
-    chunk_tail_t            *spare_ct;
     unsigned long           flags;
 
 retry:
@@ -314,13 +293,11 @@ retry:
         /* Split into two equal parts. */
         i--;
         spare_ch = (chunk_head_t *)((char *)alloc_ch + (1<<(i+PAGE_SHIFT)));
-        spare_ct = (chunk_tail_t *)((char *)spare_ch + (1<<(i+PAGE_SHIFT)))-1;
 
         /* Create new header for spare chunk. */
         spare_ch->level = i;
         spare_ch->next  = free_head[i];
         spare_ch->pprev = &free_head[i];
-        spare_ct->level = i;
 
         /* Link in the spare chunk. */
         /* spare_ch->next->pprev = &spare_ch->next */
@@ -334,7 +311,6 @@ retry:
     spin_unlock_irqrestore(&alloc_lock, flags);
 
 #ifdef MEMORY_GUARD
-    /* Now we blast the contents of the block. */
     memset(alloc_ch, 0x55, 1 << (order + PAGE_SHIFT));
 #endif
 
@@ -361,17 +337,12 @@ void __free_pages(unsigned long p, int order)
 {
     unsigned long size = 1 << (order + PAGE_SHIFT);
     chunk_head_t *ch;
-    chunk_tail_t *ct;
     unsigned long flags;
     unsigned long pfn = virt_to_phys((void *)p) >> PAGE_SHIFT;
 
     spin_lock_irqsave(&alloc_lock, flags);
 
 #ifdef MEMORY_GUARD
-    /* Check that the block isn't already guarded. */
-    if ( __put_user(1, (int*)p) )
-        BUG();
-    /* Now we blast the contents of the block. */
     memset((void *)p, 0xaa, size);
 #endif
 
@@ -383,14 +354,13 @@ void __free_pages(unsigned long p, int order)
         if ( (p & size) )
         {
             /* Merge with predecessor block? */
-            if ( allocated_in_map(pfn-1) )
+            if ( allocated_in_map(pfn-(1<<order)) )
                 break;
-            ct = (chunk_tail_t *)p - 1;
-            if ( TAIL_LEVEL(ct) != order )
+            ch = (chunk_head_t *)(p - size);
+            if ( HEAD_LEVEL(ch) != order )
                 break;
             p   -= size;
             pfn -= 1<<order;
-            ch   = (chunk_head_t *)p;
         }
         else
         {
@@ -415,8 +385,6 @@ void __free_pages(unsigned long p, int order)
 
     /* Okay, add the final chunk to the appropriate free list. */
     ch = (chunk_head_t *)p;
-    ct = (chunk_tail_t *)(p+size)-1;
-    ct->level = order;
     ch->level = order;
     ch->pprev = &free_head[order];
     ch->next  = free_head[order];
