@@ -1,17 +1,18 @@
 /*
  * tg3.c: Broadcom Tigon3 ethernet driver.
  *
- * Copyright (C) 2001, 2002 David S. Miller (davem@redhat.com)
- * Copyright (C) 2001, 2002 Jeff Garzik (jgarzik@pobox.com)
+ * Copyright (C) 2001, 2002, 2003 David S. Miller (davem@redhat.com)
+ * Copyright (C) 2001, 2002, 2003 Jeff Garzik (jgarzik@pobox.com)
  */
 
 #include <linux/config.h>
 
 #include <linux/module.h>
 
-#include <linux/lib.h>
+#include <linux/kernel.h>
 #include <linux/types.h>
-#include <linux/tqueue.h>
+#include <linux/tqueue.h> // Xen
+#include <linux/compiler.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/init.h>
@@ -23,14 +24,20 @@
 #include <linux/ethtool.h>
 #include <linux/mii.h>
 #include <linux/if_vlan.h>
+//#include <linux/ip.h>
+//#include <linux/tcp.h>
+
+//#include <net/checksum.h>
 
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/byteorder.h>
 #include <asm/uaccess.h>
 
-#ifndef PCI_DMA_BUS_IS_PHYS
-#define PCI_DMA_BUS_IS_PHYS 1
+#ifdef CONFIG_SPARC64
+#include <asm/idprom.h>
+#include <asm/oplib.h>
+#include <asm/pbm.h>
 #endif
 
 #if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
@@ -40,18 +47,17 @@
 #endif
 
 #ifdef NETIF_F_TSO
-/* XXX some bug in tso firmware hangs tx cpu, disabled until fixed */
-#define TG3_DO_TSO	0
+#define TG3_TSO_SUPPORT	1
 #else
-#define TG3_DO_TSO	0
+#define TG3_TSO_SUPPORT	0
 #endif
 
 #include "tg3.h"
 
 #define DRV_MODULE_NAME		"tg3"
 #define PFX DRV_MODULE_NAME	": "
-#define DRV_MODULE_VERSION	"1.4c"
-#define DRV_MODULE_RELDATE	"Feb 18, 2003"
+#define DRV_MODULE_VERSION	"2.3"
+#define DRV_MODULE_RELDATE	"November 5, 2003"
 
 #define TG3_DEF_MAC_MODE	0
 #define TG3_DEF_RX_MODE		0
@@ -73,7 +79,8 @@
 
 /* hardware minimum and maximum for a single frame's data payload */
 #define TG3_MIN_MTU			60
-#define TG3_MAX_MTU			9000
+#define TG3_MAX_MTU(tp)	\
+	(GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705 ? 9000 : 1500)
 
 /* These numbers seem to be hard coded in the NIC firmware somehow.
  * You can't change the ring sizes, but you can change where you place
@@ -83,7 +90,17 @@
 #define TG3_DEF_RX_RING_PENDING		200
 #define TG3_RX_JUMBO_RING_SIZE		256
 #define TG3_DEF_RX_JUMBO_RING_PENDING	100
-#define TG3_RX_RCB_RING_SIZE		1024
+
+/* Do not place this n-ring entries value into the tp struct itself,
+ * we really want to expose these constants to GCC so that modulo et
+ * al.  operations are done with shifts and masks instead of with
+ * hw multiply/modulo instructions.  Another solution would be to
+ * replace things like '% foo' with '& (foo - 1)'.
+ */
+#define TG3_RX_RCB_RING_SIZE(tp)	\
+	(GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705 ? \
+	 512 : 1024)
+
 #define TG3_TX_RING_SIZE		512
 #define TG3_DEF_TX_RING_PENDING		(TG3_TX_RING_SIZE - 1)
 
@@ -91,8 +108,8 @@
 				 TG3_RX_RING_SIZE)
 #define TG3_RX_JUMBO_RING_BYTES	(sizeof(struct tg3_rx_buffer_desc) * \
 			         TG3_RX_JUMBO_RING_SIZE)
-#define TG3_RX_RCB_RING_BYTES	(sizeof(struct tg3_rx_buffer_desc) * \
-			         TG3_RX_RCB_RING_SIZE)
+#define TG3_RX_RCB_RING_BYTES(tp) (sizeof(struct tg3_rx_buffer_desc) * \
+			           TG3_RX_RCB_RING_SIZE(tp))
 #define TG3_TX_RING_BYTES	(sizeof(struct tg3_tx_buffer_desc) * \
 				 TG3_TX_RING_SIZE)
 #define TX_RING_GAP(TP)	\
@@ -120,7 +137,7 @@ MODULE_PARM_DESC(tg3_debug, "Tigon3 bitmapped debugging message enable value");
 
 static int tg3_debug = -1;	/* -1 == use TG3_DEF_MSG_ENABLE as value */
 
-static struct pci_device_id tg3_pci_tbl[] __devinitdata = {
+static struct pci_device_id tg3_pci_tbl[] = {
 	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5700,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5701,
@@ -133,6 +150,14 @@ static struct pci_device_id tg3_pci_tbl[] __devinitdata = {
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5702FE,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5705,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5705_2,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5705M,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5705M_2,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5702X,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5703X,
@@ -143,9 +168,23 @@ static struct pci_device_id tg3_pci_tbl[] __devinitdata = {
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5703A3,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
-	{ PCI_VENDOR_ID_SYSKONNECT, 0x4400,
+	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5782,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5788,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5901,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_BROADCOM, PCI_DEVICE_ID_TIGON3_5901_2,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_SYSKONNECT, PCI_DEVICE_ID_SYSKONNECT_9DXX,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_SYSKONNECT, PCI_DEVICE_ID_SYSKONNECT_9MXX,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ PCI_VENDOR_ID_ALTIMA, PCI_DEVICE_ID_ALTIMA_AC1000,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_ALTIMA, PCI_DEVICE_ID_ALTIMA_AC1001,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
+	{ PCI_VENDOR_ID_ALTIMA, PCI_DEVICE_ID_ALTIMA_AC1003,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
 	{ PCI_VENDOR_ID_ALTIMA, PCI_DEVICE_ID_ALTIMA_AC9100,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
@@ -228,39 +267,13 @@ static void tg3_enable_ints(struct tg3 *tp)
 	tg3_cond_int(tp);
 }
 
-#ifdef NAPI
-/* these netif_xxx funcs should be moved into generic net layer */
-static void netif_poll_disable(struct net_device *dev)
-{
-	while (test_and_set_bit(__LINK_STATE_RX_SCHED, &dev->state)) {
-		current->state = TASK_INTERRUPTIBLE;
-		schedule_timeout(1);
-	}
-}
-
-static inline void netif_poll_enable(struct net_device *dev)
-{
-	clear_bit(__LINK_STATE_RX_SCHED, &dev->state);
-}
-
-/* same as netif_rx_complete, except that local_irq_save(flags)
- * has already been issued
- */
-static inline void __netif_rx_complete(struct net_device *dev)
-{
-	if (!test_bit(__LINK_STATE_RX_SCHED, &dev->state)) BUG();
-	list_del(&dev->poll_list);
-	clear_bit(__LINK_STATE_RX_SCHED, &dev->state);
-}
-#endif
-
 static inline void netif_tx_disable(struct net_device *dev)
 {
-	spin_lock_bh(&dev->xmit_lock);
-	netif_stop_queue(dev);
-	spin_unlock_bh(&dev->xmit_lock);
+        spin_lock_bh(&dev->xmit_lock);
+        netif_stop_queue(dev);
+        spin_unlock_bh(&dev->xmit_lock);
 }
-
+                                                                                
 static inline void tg3_netif_stop(struct tg3 *tp)
 {
 #ifdef NAPI
@@ -284,17 +297,28 @@ static inline void tg3_netif_start(struct tg3 *tp)
 
 static void tg3_switch_clocks(struct tg3 *tp)
 {
-	if (tr32(TG3PCI_CLOCK_CTRL) & CLOCK_CTRL_44MHZ_CORE) {
+	u32 clock_ctrl = tr32(TG3PCI_CLOCK_CTRL);
+	u32 orig_clock_ctrl;
+
+	orig_clock_ctrl = clock_ctrl;
+	clock_ctrl &= (CLOCK_CTRL_FORCE_CLKRUN |
+		       CLOCK_CTRL_CLKRUN_OENABLE |
+		       0x1f);
+	tp->pci_clock_ctrl = clock_ctrl;
+
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705 &&
+	    (orig_clock_ctrl & CLOCK_CTRL_44MHZ_CORE) != 0) {
 		tw32(TG3PCI_CLOCK_CTRL,
+		     clock_ctrl |
 		     (CLOCK_CTRL_44MHZ_CORE | CLOCK_CTRL_ALTCLK));
 		tr32(TG3PCI_CLOCK_CTRL);
 		udelay(40);
 		tw32(TG3PCI_CLOCK_CTRL,
-		     (CLOCK_CTRL_ALTCLK));
+		     clock_ctrl | (CLOCK_CTRL_ALTCLK));
 		tr32(TG3PCI_CLOCK_CTRL);
 		udelay(40);
 	}
-	tw32(TG3PCI_CLOCK_CTRL, 0);
+	tw32(TG3PCI_CLOCK_CTRL, clock_ctrl);
 	tr32(TG3PCI_CLOCK_CTRL);
 	udelay(40);
 }
@@ -397,24 +421,22 @@ static int tg3_writephy(struct tg3 *tp, int reg, u32 val)
 	return ret;
 }
 
-/* This will reset the tigon3 PHY if there is no valid
- * link unless the FORCE argument is non-zero.
- */
-static int tg3_phy_reset(struct tg3 *tp, int force)
+static void tg3_phy_set_wirespeed(struct tg3 *tp)
 {
-	u32 phy_status, phy_control;
-	int err, limit;
+	u32 val;
 
-	err  = tg3_readphy(tp, MII_BMSR, &phy_status);
-	err |= tg3_readphy(tp, MII_BMSR, &phy_status);
-	if (err != 0)
-		return -EBUSY;
+	if (tp->tg3_flags2 & TG3_FLG2_NO_ETH_WIRE_SPEED)
+		return;
 
-	/* If we have link, and not forcing a reset, then nothing
-	 * to do.
-	 */
-	if ((phy_status & BMSR_LSTATUS) != 0 && (force == 0))
-		return 0;
+	tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x7007);
+	tg3_readphy(tp, MII_TG3_AUX_CTRL, &val);
+	tg3_writephy(tp, MII_TG3_AUX_CTRL, (val | (1 << 15) | (1 << 4)));
+}
+
+static int tg3_bmcr_reset(struct tg3 *tp)
+{
+	u32 phy_control;
+	int limit, err;
 
 	/* OK, reset it, and poll the BMCR_RESET bit until it
 	 * clears or we time out.
@@ -432,12 +454,303 @@ static int tg3_phy_reset(struct tg3 *tp, int force)
 
 		if ((phy_control & BMCR_RESET) == 0) {
 			udelay(40);
-			return 0;
+			break;
 		}
 		udelay(10);
 	}
+	if (limit <= 0)
+		return -EBUSY;
 
-	return -EBUSY;
+	return 0;
+}
+
+static int tg3_wait_macro_done(struct tg3 *tp)
+{
+	int limit = 100;
+
+	while (limit--) {
+		u32 tmp32;
+
+		tg3_readphy(tp, 0x16, &tmp32);
+		if ((tmp32 & 0x1000) == 0)
+			break;
+	}
+	if (limit <= 0)
+		return -EBUSY;
+
+	return 0;
+}
+
+static int tg3_phy_write_and_check_testpat(struct tg3 *tp, int *resetp)
+{
+	static const u32 test_pat[4][6] = {
+	{ 0x00005555, 0x00000005, 0x00002aaa, 0x0000000a, 0x00003456, 0x00000003 },
+	{ 0x00002aaa, 0x0000000a, 0x00003333, 0x00000003, 0x0000789a, 0x00000005 },
+	{ 0x00005a5a, 0x00000005, 0x00002a6a, 0x0000000a, 0x00001bcd, 0x00000003 },
+	{ 0x00002a5a, 0x0000000a, 0x000033c3, 0x00000003, 0x00002ef1, 0x00000005 }
+	};
+	int chan;
+
+	for (chan = 0; chan < 4; chan++) {
+		int i;
+
+		tg3_writephy(tp, MII_TG3_DSP_ADDRESS,
+			     (chan * 0x2000) | 0x0200);
+		tg3_writephy(tp, 0x16, 0x0002);
+
+		for (i = 0; i < 6; i++)
+			tg3_writephy(tp, MII_TG3_DSP_RW_PORT,
+				     test_pat[chan][i]);
+
+		tg3_writephy(tp, 0x16, 0x0202);
+		if (tg3_wait_macro_done(tp)) {
+			*resetp = 1;
+			return -EBUSY;
+		}
+
+		tg3_writephy(tp, MII_TG3_DSP_ADDRESS,
+			     (chan * 0x2000) | 0x0200);
+		tg3_writephy(tp, 0x16, 0x0082);
+		if (tg3_wait_macro_done(tp)) {
+			*resetp = 1;
+			return -EBUSY;
+		}
+
+		tg3_writephy(tp, 0x16, 0x0802);
+		if (tg3_wait_macro_done(tp)) {
+			*resetp = 1;
+			return -EBUSY;
+		}
+
+		for (i = 0; i < 6; i += 2) {
+			u32 low, high;
+
+			tg3_readphy(tp, MII_TG3_DSP_RW_PORT, &low);
+			tg3_readphy(tp, MII_TG3_DSP_RW_PORT, &high);
+			if (tg3_wait_macro_done(tp)) {
+				*resetp = 1;
+				return -EBUSY;
+			}
+			low &= 0x7fff;
+			high &= 0x000f;
+			if (low != test_pat[chan][i] ||
+			    high != test_pat[chan][i+1]) {
+				tg3_writephy(tp, MII_TG3_DSP_ADDRESS, 0x000b);
+				tg3_writephy(tp, MII_TG3_DSP_RW_PORT, 0x4001);
+				tg3_writephy(tp, MII_TG3_DSP_RW_PORT, 0x4005);
+
+				return -EBUSY;
+			}
+		}
+	}
+
+	return 0;
+}
+
+static int tg3_phy_reset_chanpat(struct tg3 *tp)
+{
+	int chan;
+
+	for (chan = 0; chan < 4; chan++) {
+		int i;
+
+		tg3_writephy(tp, MII_TG3_DSP_ADDRESS,
+			     (chan * 0x2000) | 0x0200);
+		tg3_writephy(tp, 0x16, 0x0002);
+		for (i = 0; i < 6; i++)
+			tg3_writephy(tp, MII_TG3_DSP_RW_PORT, 0x000);
+		tg3_writephy(tp, 0x16, 0x0202);
+		if (tg3_wait_macro_done(tp))
+			return -EBUSY;
+	}
+
+	return 0;
+}
+
+static int tg3_phy_reset_5703_4_5(struct tg3 *tp)
+{
+	u32 reg32, phy9_orig;
+	int retries, do_phy_reset, err;
+
+	retries = 10;
+	do_phy_reset = 1;
+	do {
+		if (do_phy_reset) {
+			err = tg3_bmcr_reset(tp);
+			if (err)
+				return err;
+			do_phy_reset = 0;
+		}
+
+		/* Disable transmitter and interrupt.  */
+		tg3_readphy(tp, MII_TG3_EXT_CTRL, &reg32);
+		reg32 |= 0x3000;
+		tg3_writephy(tp, MII_TG3_EXT_CTRL, reg32);
+
+		/* Set full-duplex, 1000 mbps.  */
+		tg3_writephy(tp, MII_BMCR,
+			     BMCR_FULLDPLX | TG3_BMCR_SPEED1000);
+
+		/* Set to master mode.  */
+		tg3_readphy(tp, MII_TG3_CTRL, &phy9_orig);
+		tg3_writephy(tp, MII_TG3_CTRL,
+			     (MII_TG3_CTRL_AS_MASTER |
+			      MII_TG3_CTRL_ENABLE_AS_MASTER));
+
+		/* Enable SM_DSP_CLOCK and 6dB.  */
+		tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x0c00);
+
+		/* Block the PHY control access.  */
+		tg3_writephy(tp, MII_TG3_DSP_ADDRESS, 0x8005);
+		tg3_writephy(tp, MII_TG3_DSP_RW_PORT, 0x0800);
+
+		err = tg3_phy_write_and_check_testpat(tp, &do_phy_reset);
+		if (!err)
+			break;
+	} while (--retries);
+
+	err = tg3_phy_reset_chanpat(tp);
+	if (err)
+		return err;
+
+	tg3_writephy(tp, MII_TG3_DSP_ADDRESS, 0x8005);
+	tg3_writephy(tp, MII_TG3_DSP_RW_PORT, 0x0000);
+
+	tg3_writephy(tp, MII_TG3_DSP_ADDRESS, 0x8200);
+	tg3_writephy(tp, 0x16, 0x0000);
+
+	tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x0400);
+
+	tg3_writephy(tp, MII_TG3_CTRL, phy9_orig);
+
+	tg3_readphy(tp, MII_TG3_EXT_CTRL, &reg32);
+	reg32 &= ~0x3000;
+	tg3_writephy(tp, MII_TG3_EXT_CTRL, reg32);
+
+	return err;
+}
+
+/* This will reset the tigon3 PHY if there is no valid
+ * link unless the FORCE argument is non-zero.
+ */
+static int tg3_phy_reset(struct tg3 *tp, int force)
+{
+	u32 phy_status;
+	int err;
+
+	err  = tg3_readphy(tp, MII_BMSR, &phy_status);
+	err |= tg3_readphy(tp, MII_BMSR, &phy_status);
+	if (err != 0)
+		return -EBUSY;
+
+	/* If we have link, and not forcing a reset, then nothing
+	 * to do.
+	 */
+	if ((phy_status & BMSR_LSTATUS) != 0 && (force == 0))
+		return 0;
+
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5703 ||
+	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704 ||
+	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705) {
+		err = tg3_phy_reset_5703_4_5(tp);
+		if (err)
+			return err;
+		goto out;
+	}
+
+	err = tg3_bmcr_reset(tp);
+	if (err)
+		return err;
+
+out:
+	tg3_phy_set_wirespeed(tp);
+	return 0;
+}
+
+static void tg3_frob_aux_power(struct tg3 *tp)
+{
+	struct tg3 *tp_peer = tp;
+
+	if ((tp->tg3_flags & TG3_FLAG_EEPROM_WRITE_PROT) != 0)
+		return;
+
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704) {
+		tp_peer = pci_get_drvdata(tp->pdev_peer);
+		if (!tp_peer)
+			BUG();
+	}
+
+
+	if ((tp->tg3_flags & TG3_FLAG_WOL_ENABLE) != 0 ||
+	    (tp_peer->tg3_flags & TG3_FLAG_WOL_ENABLE) != 0) {
+		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5700 ||
+		    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5701) {
+			tw32(GRC_LOCAL_CTRL, tp->grc_local_ctrl |
+			     (GRC_LCLCTRL_GPIO_OE0 |
+			      GRC_LCLCTRL_GPIO_OE1 |
+			      GRC_LCLCTRL_GPIO_OE2 |
+			      GRC_LCLCTRL_GPIO_OUTPUT0 |
+			      GRC_LCLCTRL_GPIO_OUTPUT1));
+			tr32(GRC_LOCAL_CTRL);
+			udelay(100);
+		} else {
+			if (tp_peer != tp &&
+			    (tp_peer->tg3_flags & TG3_FLAG_INIT_COMPLETE) != 0)
+				return;
+
+			tw32(GRC_LOCAL_CTRL, tp->grc_local_ctrl |
+			     (GRC_LCLCTRL_GPIO_OE0 |
+			      GRC_LCLCTRL_GPIO_OE1 |
+			      GRC_LCLCTRL_GPIO_OE2 |
+			      GRC_LCLCTRL_GPIO_OUTPUT1 |
+			      GRC_LCLCTRL_GPIO_OUTPUT2));
+			tr32(GRC_LOCAL_CTRL);
+			udelay(100);
+
+			tw32(GRC_LOCAL_CTRL, tp->grc_local_ctrl |
+			     (GRC_LCLCTRL_GPIO_OE0 |
+			      GRC_LCLCTRL_GPIO_OE1 |
+			      GRC_LCLCTRL_GPIO_OE2 |
+			      GRC_LCLCTRL_GPIO_OUTPUT0 |
+			      GRC_LCLCTRL_GPIO_OUTPUT1 |
+			      GRC_LCLCTRL_GPIO_OUTPUT2));
+			tr32(GRC_LOCAL_CTRL);
+			udelay(100);
+
+			tw32(GRC_LOCAL_CTRL, tp->grc_local_ctrl |
+			     (GRC_LCLCTRL_GPIO_OE0 |
+			      GRC_LCLCTRL_GPIO_OE1 |
+			      GRC_LCLCTRL_GPIO_OE2 |
+			      GRC_LCLCTRL_GPIO_OUTPUT0 |
+			      GRC_LCLCTRL_GPIO_OUTPUT1));
+			tr32(GRC_LOCAL_CTRL);
+			udelay(100);
+		}
+	} else {
+		if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5700 &&
+		    GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5701) {
+			if (tp_peer != tp &&
+			    (tp_peer->tg3_flags & TG3_FLAG_INIT_COMPLETE) != 0)
+				return;
+
+			tw32(GRC_LOCAL_CTRL, tp->grc_local_ctrl |
+			     (GRC_LCLCTRL_GPIO_OE1 |
+			      GRC_LCLCTRL_GPIO_OUTPUT1));
+			tr32(GRC_LOCAL_CTRL);
+			udelay(100);
+
+			tw32(GRC_LOCAL_CTRL, tp->grc_local_ctrl |
+			     (GRC_LCLCTRL_GPIO_OE1));
+			tr32(GRC_LOCAL_CTRL);
+			udelay(100);
+
+			tw32(GRC_LOCAL_CTRL, tp->grc_local_ctrl |
+			     (GRC_LCLCTRL_GPIO_OE1 |
+			      GRC_LCLCTRL_GPIO_OUTPUT1));
+			tr32(GRC_LOCAL_CTRL);
+			udelay(100);
+		}
+	}
 }
 
 static int tg3_setup_phy(struct tg3 *);
@@ -543,88 +856,64 @@ static int tg3_set_power_state(struct tg3 *tp, int state)
 		udelay(10);
 	}
 
-	if (tp->tg3_flags & TG3_FLAG_WOL_SPEED_100MB) {
+	if (!(tp->tg3_flags & TG3_FLAG_WOL_SPEED_100MB) &&
+	    (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5700 ||
+	     GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5701)) {
 		u32 base_val;
 
-		base_val = 0;
-		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5700 ||
-		    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5701)
-			base_val |= (CLOCK_CTRL_RXCLK_DISABLE |
-				     CLOCK_CTRL_TXCLK_DISABLE);
-
-		tw32(TG3PCI_CLOCK_CTRL, base_val |
-		     CLOCK_CTRL_ALTCLK);
-		tr32(TG3PCI_CLOCK_CTRL);
-		udelay(40);
-
-		tw32(TG3PCI_CLOCK_CTRL, base_val |
-		     CLOCK_CTRL_ALTCLK |
-		     CLOCK_CTRL_44MHZ_CORE);
-		tr32(TG3PCI_CLOCK_CTRL);
-		udelay(40);
-
-		tw32(TG3PCI_CLOCK_CTRL, base_val |
-		     CLOCK_CTRL_44MHZ_CORE);
-		tr32(TG3PCI_CLOCK_CTRL);
-		udelay(40);
-	} else {
-		u32 base_val;
-
-		base_val = 0;
-		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5700 ||
-		    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5701)
-			base_val |= (CLOCK_CTRL_RXCLK_DISABLE |
-				     CLOCK_CTRL_TXCLK_DISABLE);
+		base_val = tp->pci_clock_ctrl;
+		base_val |= (CLOCK_CTRL_RXCLK_DISABLE |
+			     CLOCK_CTRL_TXCLK_DISABLE);
 
 		tw32(TG3PCI_CLOCK_CTRL, base_val |
 		     CLOCK_CTRL_ALTCLK |
 		     CLOCK_CTRL_PWRDOWN_PLL133);
 		tr32(TG3PCI_CLOCK_CTRL);
 		udelay(40);
-	}
+	} else {
+		u32 newbits1, newbits2;
 
-	if (!(tp->tg3_flags & TG3_FLAG_EEPROM_WRITE_PROT) &&
-	    (tp->tg3_flags & TG3_FLAG_WOL_ENABLE)) {
 		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5700 ||
 		    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5701) {
-			tw32(GRC_LOCAL_CTRL,
-			     (GRC_LCLCTRL_GPIO_OE0 |
-			      GRC_LCLCTRL_GPIO_OE1 |
-			      GRC_LCLCTRL_GPIO_OE2 |
-			      GRC_LCLCTRL_GPIO_OUTPUT0 |
-			      GRC_LCLCTRL_GPIO_OUTPUT1));
-			tr32(GRC_LOCAL_CTRL);
-			udelay(100);
+			newbits1 = (CLOCK_CTRL_RXCLK_DISABLE |
+				    CLOCK_CTRL_TXCLK_DISABLE |
+				    CLOCK_CTRL_ALTCLK);
+			newbits2 = newbits1 | CLOCK_CTRL_44MHZ_CORE;
+		} else if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705) {
+			newbits1 = CLOCK_CTRL_625_CORE;
+			newbits2 = newbits1 | CLOCK_CTRL_ALTCLK;
 		} else {
-			tw32(GRC_LOCAL_CTRL,
-			     (GRC_LCLCTRL_GPIO_OE0 |
-			      GRC_LCLCTRL_GPIO_OE1 |
-			      GRC_LCLCTRL_GPIO_OE2 |
-			      GRC_LCLCTRL_GPIO_OUTPUT1 |
-			      GRC_LCLCTRL_GPIO_OUTPUT2));
-			tr32(GRC_LOCAL_CTRL);
-			udelay(100);
+			newbits1 = CLOCK_CTRL_ALTCLK;
+			newbits2 = newbits1 | CLOCK_CTRL_44MHZ_CORE;
+		}
 
-			tw32(GRC_LOCAL_CTRL,
-			     (GRC_LCLCTRL_GPIO_OE0 |
-			      GRC_LCLCTRL_GPIO_OE1 |
-			      GRC_LCLCTRL_GPIO_OE2 |
-			      GRC_LCLCTRL_GPIO_OUTPUT0 |
-			      GRC_LCLCTRL_GPIO_OUTPUT1 |
-			      GRC_LCLCTRL_GPIO_OUTPUT2));
-			tr32(GRC_LOCAL_CTRL);
-			udelay(100);
+		tw32(TG3PCI_CLOCK_CTRL, tp->pci_clock_ctrl | newbits1);
+		tr32(TG3PCI_CLOCK_CTRL);
+		udelay(40);
 
-			tw32(GRC_LOCAL_CTRL,
-			     (GRC_LCLCTRL_GPIO_OE0 |
-			      GRC_LCLCTRL_GPIO_OE1 |
-			      GRC_LCLCTRL_GPIO_OE2 |
-			      GRC_LCLCTRL_GPIO_OUTPUT0 |
-			      GRC_LCLCTRL_GPIO_OUTPUT1));
-			tr32(GRC_LOCAL_CTRL);
-			udelay(100);
+		tw32(TG3PCI_CLOCK_CTRL, tp->pci_clock_ctrl | newbits2);
+		tr32(TG3PCI_CLOCK_CTRL);
+		udelay(40);
+
+		if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705) {
+			u32 newbits3;
+
+			if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5700 ||
+			    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5701) {
+				newbits3 = (CLOCK_CTRL_RXCLK_DISABLE |
+					    CLOCK_CTRL_TXCLK_DISABLE |
+					    CLOCK_CTRL_44MHZ_CORE);
+			} else {
+				newbits3 = CLOCK_CTRL_44MHZ_CORE;
+			}
+
+			tw32(TG3PCI_CLOCK_CTRL, tp->pci_clock_ctrl | newbits3);
+			tr32(TG3PCI_CLOCK_CTRL);
+			udelay(40);
 		}
 	}
+
+	tg3_frob_aux_power(tp);
 
 	/* Finally, set the new power state. */
 	pci_write_config_word(tp->pdev, pm + PCI_PM_CTRL, power_control);
@@ -944,11 +1233,10 @@ static int tg3_setup_copper_phy(struct tg3 *tp)
 
 	/* Some third-party PHYs need to be reset on link going
 	 * down.
-	 *
-	 * XXX 5705 note: This workaround also applies to 5705_a0
 	 */
 	if ((GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5703 ||
-	     GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704) &&
+	     GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704 ||
+	     tp->pci_chip_rev_id == CHIPREV_ID_5705_A0) &&
 	    netif_carrier_ok(tp->dev)) {
 		tg3_readphy(tp, MII_BMSR, &bmsr);
 		tg3_readphy(tp, MII_BMSR, &bmsr);
@@ -1752,7 +2040,7 @@ static void tg3_tx(struct tg3 *tp)
 
 		pci_unmap_single(tp->pdev,
 				 pci_unmap_addr(ri, mapping),
-				 (skb->len - skb->data_len),
+				 skb_headlen(skb),
 				 PCI_DMA_TODEVICE);
 
 		ri->skb = NULL;
@@ -1923,7 +2211,7 @@ static int tg3_vlan_rx(struct tg3 *tp, struct sk_buff *skb, u16 vlan_tag)
  * Each TG3_BDINFO specifies a MAXLEN field and the first TG3_BDINFO
  * which is within the range of the new packet's length is chosen.
  *
- * The "seperate ring for rx status" scheme may sound queer, but it makes
+ * The "separate ring for rx status" scheme may sound queer, but it makes
  * sense from a cache coherency perspective.  If only the host writes
  * to the buffer post rings, and only the chip writes to the rx status
  * rings, then cache lines never move beyond shared-modified state.
@@ -1938,7 +2226,7 @@ static int tg3_rx(struct tg3 *tp, int budget)
 	int received;
 
 	hw_idx = tp->hw_status->idx[0].rx_producer;
-	sw_idx = rx_rcb_ptr % TG3_RX_RCB_RING_SIZE;
+	sw_idx = rx_rcb_ptr % TG3_RX_RCB_RING_SIZE(tp);
 	work_mask = 0;
 	received = 0;
 	while (sw_idx != hw_idx && budget > 0) {
@@ -2042,13 +2330,13 @@ next_pkt:
 		(*post_ptr)++;
 next_pkt_nopost:
 		rx_rcb_ptr++;
-		sw_idx = rx_rcb_ptr % TG3_RX_RCB_RING_SIZE;
+		sw_idx = rx_rcb_ptr % TG3_RX_RCB_RING_SIZE(tp);
 	}
 
 	/* ACK the status ring. */
 	tp->rx_rcb_ptr = rx_rcb_ptr;
 	tw32_mailbox(MAILBOX_RCVRET_CON_IDX_0 + TG3_64BIT_REG_LOW,
-		     (rx_rcb_ptr % TG3_RX_RCB_RING_SIZE));
+		     (rx_rcb_ptr % TG3_RX_RCB_RING_SIZE(tp)));
 	if (tp->tg3_flags & TG3_FLAG_MBOX_WRITE_REORDER)
 		tr32(MAILBOX_RCVRET_CON_IDX_0 + TG3_64BIT_REG_LOW);
 
@@ -2076,11 +2364,12 @@ static int tg3_poll(struct net_device *netdev, int *budget)
 	struct tg3 *tp = netdev->priv;
 	struct tg3_hw_status *sblk = tp->hw_status;
 	int done;
+
 #ifdef NAPI
 	unsigned long flags;
+
 	spin_lock_irqsave(&tp->lock, flags);
 #endif
-
 	/* handle link change and other phy events */
 	if (!(tp->tg3_flags &
 	      (TG3_FLAG_USE_LINKCHG_REG |
@@ -2098,11 +2387,9 @@ static int tg3_poll(struct net_device *netdev, int *budget)
 		tg3_tx(tp);
 		spin_unlock(&tp->tx_lock);
 	}
-
 #ifdef NAPI
 	spin_unlock_irqrestore(&tp->lock, flags);
 #endif
-
 	/* run RX thread, within the bounds set by NAPI.
 	 * All RX "locking" is done by ensuring outside
 	 * code synchronizes with dev->poll()
@@ -2159,14 +2446,13 @@ static inline unsigned int tg3_has_work(struct net_device *dev, struct tg3 *tp)
 	return work_exists;
 }
 
-static void tg3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t tg3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_id;
 	struct tg3 *tp = dev->priv;
-#ifdef NAPI
 	struct tg3_hw_status *sblk = tp->hw_status;
-#endif
 	unsigned long flags;
+	unsigned int handled = 1;
 
 	spin_lock_irqsave(&tp->lock, flags);
 #ifdef NAPI
@@ -2198,20 +2484,28 @@ static void tg3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			tr32(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW);
 		}
 	}
+	else {        /* shared interrupt */
+                handled = 0;
+        } 
 #else
-	{
-		int budget = 1000;
-		tg3_poll( dev, &budget );
-
-		tw32_mailbox(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW,
-		       0x00000000);
-		tr32(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW);
+	if (sblk->status & SD_STATUS_UPDATED) {
+                int budget = 1000;
+                tg3_poll( dev, &budget );
+                                                                                
+                tw32_mailbox(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW,
+                       0x00000000);
+                tr32(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW);
+        }
+	else {	      /* shared interrupt */
+		handled = 0;
 	}
 #endif
+
 	spin_unlock_irqrestore(&tp->lock, flags);
+
+	return IRQ_RETVAL(handled);
 }
 
-static void tg3_init_rings(struct tg3 *);
 static int tg3_init_hw(struct tg3 *);
 static int tg3_halt(struct tg3 *);
 
@@ -2229,7 +2523,6 @@ static void tg3_reset_task(void *_data)
 	tp->tg3_flags2 &= ~TG3_FLG2_RESTART_TIMER;
 
 	tg3_halt(tp);
-	tg3_init_rings(tp);
 	tg3_init_hw(tp);
 
 	spin_unlock(&tp->tx_lock);
@@ -2243,49 +2536,14 @@ static void tg3_reset_task(void *_data)
 
 static void tg3_tx_timeout(struct net_device *dev)
 {
-        struct tg3 *tp = dev->priv;
+	struct tg3 *tp = dev->priv;
 
-        printk(KERN_ERR PFX "%s: transmit timed out, resetting\n",
-               dev->name);
+	printk(KERN_ERR PFX "%s: transmit timed out, resetting\n",
+	       dev->name);
 
-        spin_lock_irq(&tp->lock);
-        spin_lock(&tp->tx_lock);
-
-        tg3_halt(tp);
-        tg3_init_rings(tp);
-        tg3_init_hw(tp);
-
-        spin_unlock(&tp->tx_lock);
-        spin_unlock_irq(&tp->lock);
-
-        netif_wake_queue(dev);
+	//schedule_task(&tp->reset_task);
+	tg3_reset_task(tp);
 }
-
-#if !PCI_DMA_BUS_IS_PHYS
-static void tg3_set_txd_addr(struct tg3 *tp, int entry, dma_addr_t mapping)
-{
-	if (tp->tg3_flags & TG3_FLAG_HOST_TXDS) {
-		struct tg3_tx_buffer_desc *txd = &tp->tx_ring[entry];
-
-		txd->addr_hi = ((u64) mapping >> 32);
-		txd->addr_lo = ((u64) mapping & 0xffffffff);
-	} else {
-		unsigned long txd;
-
-		txd = (tp->regs +
-		       NIC_SRAM_WIN_BASE +
-		       NIC_SRAM_TX_BUFFER_DESC);
-		txd += (entry * TXD_SIZE);
-
-		if (sizeof(dma_addr_t) != sizeof(u32))
-			writel(((u64) mapping >> 32),
-			       txd + TXD_ADDR + TG3_64BIT_REG_HIGH);
-
-		writel(((u64) mapping & 0xffffffff),
-		       txd + TXD_ADDR + TG3_64BIT_REG_LOW);
-	}
-}
-#endif
 
 static void tg3_set_txd(struct tg3 *, int, dma_addr_t, int, u32, u32);
 
@@ -2293,47 +2551,17 @@ static int tigon3_4gb_hwbug_workaround(struct tg3 *tp, struct sk_buff *skb,
 				       u32 guilty_entry, int guilty_len,
 				       u32 last_plus_one, u32 *start, u32 mss)
 {
+	struct sk_buff *new_skb = skb_copy(skb, GFP_ATOMIC);
 	dma_addr_t new_addr;
 	u32 entry = *start;
 	int i;
-
-#if !PCI_DMA_BUS_IS_PHYS
-	/* IOMMU, just map the guilty area again which is guarenteed to
-	 * use different addresses.
-	 */
-
-	i = 0;
-	while (entry != guilty_entry) {
-		entry = NEXT_TX(entry);
-		i++;
-	}
-	if (i == 0) {
-		new_addr = pci_map_single(tp->pdev, skb->data, guilty_len,
-					  PCI_DMA_TODEVICE);
-	} else {
-		skb_frag_t *frag = &skb_shinfo(skb)->frags[i - 1];
-
-		new_addr = pci_map_page(tp->pdev,
-					frag->page, frag->page_offset,
-					guilty_len, PCI_DMA_TODEVICE);
-	}
-	pci_unmap_single(tp->pdev, pci_unmap_addr(&tp->tx_buffers[guilty_entry],
-						  mapping),
-			 guilty_len, PCI_DMA_TODEVICE);
-	tg3_set_txd_addr(tp, guilty_entry, new_addr);
-	pci_unmap_addr_set(&tp->tx_buffers[guilty_entry], mapping,
-			   new_addr);
-	*start = last_plus_one;
-#else
-	/* Oh well, no IOMMU, have to allocate a whole new SKB. */
-	struct sk_buff *new_skb = skb_copy(skb, GFP_ATOMIC);
 
 	if (!new_skb) {
 		dev_kfree_skb(skb);
 		return -1;
 	}
 
-	/* New SKB is guarenteed to be linear. */
+	/* New SKB is guaranteed to be linear. */
 	entry = *start;
 	new_addr = pci_map_single(tp->pdev, new_skb->data, new_skb->len,
 				  PCI_DMA_TODEVICE);
@@ -2348,7 +2576,7 @@ static int tigon3_4gb_hwbug_workaround(struct tg3 *tp, struct sk_buff *skb,
 		int len;
 
 		if (i == 0)
-			len = skb->len - skb->data_len;
+			len = skb_headlen(skb);
 		else
 			len = skb_shinfo(skb)->frags[i-1].size;
 		pci_unmap_single(tp->pdev,
@@ -2364,7 +2592,6 @@ static int tigon3_4gb_hwbug_workaround(struct tg3 *tp, struct sk_buff *skb,
 	}
 
 	dev_kfree_skb(skb);
-#endif
 
 	return 0;
 }
@@ -2433,7 +2660,7 @@ static int tg3_start_xmit_4gbug(struct sk_buff *skb, struct net_device *dev)
 	int would_hit_hwbug;
 	unsigned long flags;
 
-	len = (skb->len - skb->data_len);
+	len = skb_headlen(skb);
 
 	/* No BH disabling for tx_lock here.  We are running in BH disabled
 	 * context and TX reclaim runs via tp->poll inside of a software
@@ -2469,10 +2696,36 @@ static int tg3_start_xmit_4gbug(struct sk_buff *skb, struct net_device *dev)
 	base_flags = 0;
 	if (skb->ip_summed == CHECKSUM_HW)
 		base_flags |= TXD_FLAG_TCPUDP_CSUM;
-#if TG3_DO_TSO != 0
-	if ((mss = skb_shinfo(skb)->tso_size) != 0)
+#if TG3_TSO_SUPPORT != 0
+	mss = 0;
+	if (skb->len > (tp->dev->mtu + ETH_HLEN) &&
+	    (mss = skb_shinfo(skb)->tso_size) != 0) {
+		int tcp_opt_len, ip_tcp_len;
+
+		tcp_opt_len = ((skb->h.th->doff - 5) * 4);
+		ip_tcp_len = (skb->nh.iph->ihl * 4) + sizeof(struct tcphdr);
+
 		base_flags |= (TXD_FLAG_CPU_PRE_DMA |
 			       TXD_FLAG_CPU_POST_DMA);
+
+		skb->nh.iph->check = 0;
+		skb->nh.iph->tot_len = ntohs(mss + ip_tcp_len + tcp_opt_len);
+		skb->h.th->check = ~csum_tcpudp_magic(skb->nh.iph->saddr,
+						      skb->nh.iph->daddr,
+						      0, IPPROTO_TCP, 0);
+
+		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705) {
+			if (tcp_opt_len || skb->nh.iph->ihl > 5) {
+				int tsflags;
+
+				tsflags = ((skb->nh.iph->ihl - 5) +
+					   (tcp_opt_len >> 2));
+				mss |= (tsflags << 11);
+			}
+		} else {
+			mss += tcp_opt_len;
+		}
+	}
 #else
 	mss = 0;
 #endif
@@ -2523,7 +2776,7 @@ static int tg3_start_xmit_4gbug(struct sk_buff *skb, struct net_device *dev)
 			}
 
 			tg3_set_txd(tp, entry, mapping, len,
-				    base_flags, (i == last) | (mss << 1));
+				    base_flags, (i == last));
 
 			entry = NEXT_TX(entry);
 		}
@@ -2541,7 +2794,7 @@ static int tg3_start_xmit_4gbug(struct sk_buff *skb, struct net_device *dev)
 		i = 0;
 		while (entry != last_plus_one) {
 			if (i == 0)
-				len = skb->len - skb->data_len;
+				len = skb_headlen(skb);
 			else
 				len = skb_shinfo(skb)->frags[i-1].size;
 
@@ -2614,7 +2867,7 @@ static int tg3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	u32 len, entry, base_flags, mss;
 	unsigned long flags;
 
-	len = (skb->len - skb->data_len);
+	len = skb_headlen(skb);
 
 	/* No BH disabling for tx_lock here.  We are running in BH disabled
 	 * context and TX reclaim runs via tp->poll inside of a software
@@ -2650,10 +2903,36 @@ static int tg3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	base_flags = 0;
 	if (skb->ip_summed == CHECKSUM_HW)
 		base_flags |= TXD_FLAG_TCPUDP_CSUM;
-#if TG3_DO_TSO != 0
-	if ((mss = skb_shinfo(skb)->tso_size) != 0)
+#if TG3_TSO_SUPPORT != 0
+	mss = 0;
+	if (skb->len > (tp->dev->mtu + ETH_HLEN) &&
+	    (mss = skb_shinfo(skb)->tso_size) != 0) {
+		int tcp_opt_len, ip_tcp_len;
+
+		tcp_opt_len = ((skb->h.th->doff - 5) * 4);
+		ip_tcp_len = (skb->nh.iph->ihl * 4) + sizeof(struct tcphdr);
+
 		base_flags |= (TXD_FLAG_CPU_PRE_DMA |
 			       TXD_FLAG_CPU_POST_DMA);
+
+		skb->nh.iph->check = 0;
+		skb->nh.iph->tot_len = ntohs(mss + ip_tcp_len + tcp_opt_len);
+		skb->h.th->check = ~csum_tcpudp_magic(skb->nh.iph->saddr,
+						      skb->nh.iph->daddr,
+						      0, IPPROTO_TCP, 0);
+
+		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705) {
+			if (tcp_opt_len || skb->nh.iph->ihl > 5) {
+				int tsflags;
+
+				tsflags = ((skb->nh.iph->ihl - 5) +
+					   (tcp_opt_len >> 2));
+				mss |= (tsflags << 11);
+			}
+		} else {
+			mss += tcp_opt_len;
+		}
+	}
 #else
 	mss = 0;
 #endif
@@ -2693,7 +2972,7 @@ static int tg3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 			pci_unmap_addr_set(&tp->tx_buffers[entry], mapping, mapping);
 
 			tg3_set_txd(tp, entry, mapping, len,
-				    base_flags, (i == last) | (mss << 1));
+				    base_flags, (i == last));
 
 			entry = NEXT_TX(entry);
 		}
@@ -2753,7 +3032,7 @@ static int tg3_change_mtu(struct net_device *dev, int new_mtu)
 {
 	struct tg3 *tp = dev->priv;
 
-	if (new_mtu < TG3_MIN_MTU || new_mtu > TG3_MAX_MTU)
+	if (new_mtu < TG3_MIN_MTU || new_mtu > TG3_MAX_MTU(tp))
 		return -EINVAL;
 
 	if (!netif_running(dev)) {
@@ -2772,7 +3051,6 @@ static int tg3_change_mtu(struct net_device *dev, int new_mtu)
 
 	tg3_set_mtu(dev, tp, new_mtu);
 
-	tg3_init_rings(tp);
 	tg3_init_hw(tp);
 
 	spin_unlock(&tp->tx_lock);
@@ -2835,7 +3113,7 @@ static void tg3_free_rings(struct tg3 *tp)
 
 		pci_unmap_single(tp->pdev,
 				 pci_unmap_addr(txp, mapping),
-				 (skb->len - skb->data_len),
+				 skb_headlen(skb),
 				 PCI_DMA_TODEVICE);
 		txp->skb = NULL;
 
@@ -2858,8 +3136,8 @@ static void tg3_free_rings(struct tg3 *tp)
  *
  * The chip has been shut down and the driver detached from
  * the networking, so no interrupts or new tx packets will
- * end up in the driver.  tp->{tx,}lock is not held and we are not
- * in an interrupt context and thus may sleep.
+ * end up in the driver.  tp->{tx,}lock are held and thus
+ * we may not sleep.
  */
 static void tg3_init_rings(struct tg3 *tp)
 {
@@ -2872,7 +3150,7 @@ static void tg3_init_rings(struct tg3 *tp)
 	/* Zero out all descriptors. */
 	memset(tp->rx_std, 0, TG3_RX_RING_BYTES);
 	memset(tp->rx_jumbo, 0, TG3_RX_JUMBO_RING_BYTES);
-	memset(tp->rx_rcb, 0, TG3_RX_RCB_RING_BYTES);
+	memset(tp->rx_rcb, 0, TG3_RX_RCB_RING_BYTES(tp));
 
 	if (tp->tg3_flags & TG3_FLAG_HOST_TXDS) {
 		memset(tp->tx_ring, 0, TG3_TX_RING_BYTES);
@@ -2955,7 +3233,7 @@ static void tg3_free_consistent(struct tg3 *tp)
 		tp->rx_jumbo = NULL;
 	}
 	if (tp->rx_rcb) {
-		pci_free_consistent(tp->pdev, TG3_RX_RCB_RING_BYTES,
+		pci_free_consistent(tp->pdev, TG3_RX_RCB_RING_BYTES(tp),
 				    tp->rx_rcb, tp->rx_rcb_mapping);
 		tp->rx_rcb = NULL;
 	}
@@ -3013,7 +3291,7 @@ static int tg3_alloc_consistent(struct tg3 *tp)
 	if (!tp->rx_jumbo)
 		goto err_out;
 
-	tp->rx_rcb = pci_alloc_consistent(tp->pdev, TG3_RX_RCB_RING_BYTES,
+	tp->rx_rcb = pci_alloc_consistent(tp->pdev, TG3_RX_RCB_RING_BYTES(tp),
 					  &tp->rx_rcb_mapping);
 	if (!tp->rx_rcb)
 		goto err_out;
@@ -3059,6 +3337,23 @@ static int tg3_stop_block(struct tg3 *tp, unsigned long ofs, u32 enable_bit)
 {
 	unsigned int i;
 	u32 val;
+
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705) {
+		switch (ofs) {
+		case RCVLSC_MODE:
+		case DMAC_MODE:
+		case MBFREE_MODE:
+		case BUFMGR_MODE:
+		case MEMARB_MODE:
+			/* We can't enable/disable these bits of the
+			 * 5705, just say success.
+			 */
+			return 0;
+
+		default:
+			break;
+		};
+	}
 
 	val = tr32(ofs);
 	val &= ~enable_bit;
@@ -3106,6 +3401,7 @@ static int tg3_abort_hw(struct tg3 *tp)
 	err |= tg3_stop_block(tp, SNDDATAI_MODE, SNDDATAI_MODE_ENABLE);
 	err |= tg3_stop_block(tp, RDMAC_MODE, RDMAC_MODE_ENABLE);
 	err |= tg3_stop_block(tp, SNDDATAC_MODE, SNDDATAC_MODE_ENABLE);
+	err |= tg3_stop_block(tp, DMAC_MODE, DMAC_MODE_ENABLE);
 	err |= tg3_stop_block(tp, SNDBDC_MODE, SNDBDC_MODE_ENABLE);
 	if (err)
 		goto out;
@@ -3155,18 +3451,20 @@ static void tg3_chip_reset(struct tg3 *tp)
 	u32 val;
 	u32 flags_save;
 
-	/* Force NVRAM to settle.
-	 * This deals with a chip bug which can result in EEPROM
-	 * corruption.
-	 */
-	if (tp->tg3_flags & TG3_FLAG_NVRAM) {
-		int i;
+	if (!(tp->tg3_flags2 & TG3_FLG2_SUN_5704)) {
+		/* Force NVRAM to settle.
+		 * This deals with a chip bug which can result in EEPROM
+		 * corruption.
+		 */
+		if (tp->tg3_flags & TG3_FLAG_NVRAM) {
+			int i;
 
-		tw32(NVRAM_SWARB, SWARB_REQ_SET1);
-		for (i = 0; i < 100000; i++) {
-			if (tr32(NVRAM_SWARB) & SWARB_GNT1)
-				break;
-			udelay(10);
+			tw32(NVRAM_SWARB, SWARB_REQ_SET1);
+			for (i = 0; i < 100000; i++) {
+				if (tr32(NVRAM_SWARB) & SWARB_GNT1)
+					break;
+				udelay(10);
+			}
 		}
 	}
 
@@ -3180,7 +3478,10 @@ static void tg3_chip_reset(struct tg3 *tp)
 	tp->tg3_flags &= ~TG3_FLAG_5701_REG_WRITE_BUG;
 
 	/* do the reset */
-	tw32(GRC_MISC_CFG, GRC_MISC_CFG_CORECLK_RESET);
+	val = GRC_MISC_CFG_CORECLK_RESET;
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705)
+		val |= GRC_MISC_CFG_KEEP_GPHY_POWER;
+	tw32(GRC_MISC_CFG, val);
 
 	/* restore 5701 hardware bug workaround flag */
 	tp->tg3_flags = flags_save;
@@ -3215,6 +3516,13 @@ static void tg3_chip_reset(struct tg3 *tp)
 	pci_write_config_dword(tp->pdev, TG3PCI_X_CAPS, val);
 
 	tw32(MEMARB_MODE, MEMARB_MODE_ENABLE);
+
+	if ((tp->nic_sram_data_cfg & NIC_SRAM_DATA_CFG_MINI_PCI) != 0 &&
+	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705) {
+		tp->pci_clock_ctrl |=
+			(CLOCK_CTRL_FORCE_CLKRUN | CLOCK_CTRL_CLKRUN_OENABLE);
+		tw32(TG3PCI_CLOCK_CTRL, tp->pci_clock_ctrl);
+	}
 
 	tw32(TG3PCI_MISC_HOST_CTRL, tp->misc_host_ctrl);
 }
@@ -3259,7 +3567,8 @@ static int tg3_halt(struct tg3 *tp)
 		udelay(10);
 	}
 
-	if (i >= 100000) {
+	if (i >= 100000 &&
+	    !(tp->tg3_flags2 & TG3_FLG2_SUN_5704)) {
 		printk(KERN_ERR PFX "tg3_halt timed out for %s, "
 		       "firmware will not restart magic=%08x\n",
 		       tp->dev->name, val);
@@ -3397,7 +3706,7 @@ static u32 tg3FwRodata[(TG3_FW_RODATA_LEN / sizeof(u32)) + 1] = {
 	0x00000000
 };
 
-#if 0 /* All zeros, dont eat up space with it. */
+#if 0 /* All zeros, don't eat up space with it. */
 u32 tg3FwData[(TG3_FW_DATA_LEN / sizeof(u32)) + 1] = {
 	0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
 	0x00000000, 0x00000000, 0x00000000, 0x00000000
@@ -3410,28 +3719,32 @@ u32 tg3FwData[(TG3_FW_DATA_LEN / sizeof(u32)) + 1] = {
 #define TX_CPU_SCRATCH_SIZE	0x04000
 
 /* tp->lock is held. */
-static int tg3_reset_cpu(struct tg3 *tp, u32 offset)
+static int tg3_halt_cpu(struct tg3 *tp, u32 offset)
 {
 	int i;
 
-	tw32(offset + CPU_STATE, 0xffffffff);
-	tw32(offset + CPU_MODE,  CPU_MODE_RESET);
+	if (offset == TX_CPU_BASE &&
+	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705)
+		BUG();
+
 	if (offset == RX_CPU_BASE) {
-		for (i = 0; i < 10000; i++)
-			if (!(tr32(offset + CPU_MODE) & CPU_MODE_RESET))
+		for (i = 0; i < 10000; i++) {
+			tw32(offset + CPU_STATE, 0xffffffff);
+			tw32(offset + CPU_MODE,  CPU_MODE_HALT);
+			if (tr32(offset + CPU_MODE) & CPU_MODE_HALT)
 				break;
+		}
+
 		tw32(offset + CPU_STATE, 0xffffffff);
-		tw32(offset + CPU_MODE,  CPU_MODE_RESET);
+		tw32(offset + CPU_MODE,  CPU_MODE_HALT);
 		tr32(offset + CPU_MODE);
 		udelay(10);
 	} else {
 		for (i = 0; i < 10000; i++) {
-			if (!(tr32(offset + CPU_MODE) & CPU_MODE_RESET))
-				break;
 			tw32(offset + CPU_STATE, 0xffffffff);
-			tw32(offset + CPU_MODE,  CPU_MODE_RESET);
-			tr32(offset + CPU_MODE);
-			udelay(10);
+			tw32(offset + CPU_MODE,  CPU_MODE_HALT);
+			if (tr32(offset + CPU_MODE) & CPU_MODE_HALT)
+				break;
 		}
 	}
 
@@ -3463,38 +3776,52 @@ static int tg3_load_firmware_cpu(struct tg3 *tp, u32 cpu_base, u32 cpu_scratch_b
 {
 	int err, i;
 	u32 orig_tg3_flags = tp->tg3_flags;
+	void (*write_op)(struct tg3 *, u32, u32);
+
+	if (cpu_base == TX_CPU_BASE &&
+	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705) {
+		printk(KERN_ERR PFX "tg3_load_firmware_cpu: Trying to load "
+		       "TX cpu firmware on %s which is 5705.\n",
+		       tp->dev->name);
+		return -EINVAL;
+	}
+
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705)
+		write_op = tg3_write_mem;
+	else
+		write_op = tg3_write_indirect_reg32;
 
 	/* Force use of PCI config space for indirect register
 	 * write calls.
 	 */
 	tp->tg3_flags |= TG3_FLAG_PCIX_TARGET_HWBUG;
 
-	err = tg3_reset_cpu(tp, cpu_base);
+	err = tg3_halt_cpu(tp, cpu_base);
 	if (err)
 		goto out;
 
 	for (i = 0; i < cpu_scratch_size; i += sizeof(u32))
-		tg3_write_indirect_reg32(tp, cpu_scratch_base + i, 0);
+		write_op(tp, cpu_scratch_base + i, 0);
 	tw32(cpu_base + CPU_STATE, 0xffffffff);
 	tw32(cpu_base + CPU_MODE, tr32(cpu_base+CPU_MODE)|CPU_MODE_HALT);
 	for (i = 0; i < (info->text_len / sizeof(u32)); i++)
-		tg3_write_indirect_reg32(tp, (cpu_scratch_base +
-					      (info->text_base & 0xffff) +
-					      (i * sizeof(u32))),
-					 (info->text_data ?
-					  info->text_data[i] : 0));
+		write_op(tp, (cpu_scratch_base +
+			      (info->text_base & 0xffff) +
+			      (i * sizeof(u32))),
+			 (info->text_data ?
+			  info->text_data[i] : 0));
 	for (i = 0; i < (info->rodata_len / sizeof(u32)); i++)
-		tg3_write_indirect_reg32(tp, (cpu_scratch_base +
-					      (info->rodata_base & 0xffff) +
-					      (i * sizeof(u32))),
-					 (info->rodata_data ?
-					  info->rodata_data[i] : 0));
+		write_op(tp, (cpu_scratch_base +
+			      (info->rodata_base & 0xffff) +
+			      (i * sizeof(u32))),
+			 (info->rodata_data ?
+			  info->rodata_data[i] : 0));
 	for (i = 0; i < (info->data_len / sizeof(u32)); i++)
-		tg3_write_indirect_reg32(tp, (cpu_scratch_base +
-					      (info->data_base & 0xffff) +
-					      (i * sizeof(u32))),
-					 (info->data_data ?
-					  info->data_data[i] : 0));
+		write_op(tp, (cpu_scratch_base +
+			      (info->data_base & 0xffff) +
+			      (i * sizeof(u32))),
+			 (info->data_data ?
+			  info->data_data[i] : 0));
 
 	err = 0;
 
@@ -3565,335 +3892,595 @@ static int tg3_load_5701_a0_firmware_fix(struct tg3 *tp)
 	return 0;
 }
 
-#if TG3_DO_TSO != 0
+#if TG3_TSO_SUPPORT != 0
 
 #define TG3_TSO_FW_RELEASE_MAJOR	0x1
-#define TG3_TSO_FW_RELASE_MINOR		0x8
+#define TG3_TSO_FW_RELASE_MINOR		0x3
 #define TG3_TSO_FW_RELEASE_FIX		0x0
 #define TG3_TSO_FW_START_ADDR		0x08000000
 #define TG3_TSO_FW_TEXT_ADDR		0x08000000
-#define TG3_TSO_FW_TEXT_LEN		0x1650
+#define TG3_TSO_FW_TEXT_LEN		0x1ac0
 #define TG3_TSO_FW_RODATA_ADDR		0x08001650
-#define TG3_TSO_FW_RODATA_LEN		0x30
+#define TG3_TSO_FW_RODATA_LEN		0x60
 #define TG3_TSO_FW_DATA_ADDR		0x080016a0
 #define TG3_TSO_FW_DATA_LEN		0x20
 #define TG3_TSO_FW_SBSS_ADDR		0x080016c0
-#define TG3_TSO_FW_SBSS_LEN		0x14
+#define TG3_TSO_FW_SBSS_LEN		0x2c
 #define TG3_TSO_FW_BSS_ADDR		0x080016e0
-#define TG3_TSO_FW_BSS_LEN		0x8fc
+#define TG3_TSO_FW_BSS_LEN		0x890
 
 static u32 tg3TsoFwText[] = {
 	0x00000000, 0x10000003, 0x00000000, 0x0000000d, 0x0000000d, 0x3c1d0800,
 	0x37bd4000, 0x03a0f021, 0x3c100800, 0x26100000, 0x0e000010, 0x00000000,
-	0x0000000d, 0x00000000, 0x00000000, 0x00000000, 0x27bdffe0, 0x3c1bc000,
-	0xafbf0018, 0x0e000058, 0xaf60680c, 0x3c040800, 0x24841650, 0x03602821,
-	0x24060001, 0x24070004, 0xafa00010, 0x0e00006c, 0xafa00014, 0x8f625c50,
-	0x34420001, 0xaf625c50, 0x8f625c90, 0x34420001, 0xaf625c90, 0x2402ffff,
-	0x0e000098, 0xaf625404, 0x8fbf0018, 0x03e00008, 0x27bd0020, 0x00000000,
-	0x00000000, 0x00000000, 0x24030b60, 0x24050fff, 0xac000b50, 0x00002021,
-	0xac640000, 0x24630004, 0x0065102b, 0x1440fffc, 0x24840001, 0x24030b60,
-	0x0065102b, 0x10400011, 0x00002021, 0x24090b54, 0x3c06dead, 0x34c6beef,
-	0x24080b58, 0x24070b5c, 0x8c620000, 0x50440006, 0x24630004, 0xad260000,
-	0x8c620000, 0xace40000, 0xad020000, 0x24630004, 0x0065102b, 0x1440fff6,
-	0x24840001, 0x03e00008, 0x00000000, 0x27bdfff8, 0x18800009, 0x00002821,
-	0x8f63680c, 0x8f62680c, 0x1043fffe, 0x00000000, 0x24a50001, 0x00a4102a,
-	0x1440fff9, 0x00000000, 0x03e00008, 0x27bd0008, 0x3c020800, 0x34423000,
-	0x3c030800, 0x34633000, 0x3c040800, 0x348437ff, 0x3c010800, 0xac2216c4,
-	0x24020040, 0x3c010800, 0xac2216c8, 0x3c010800, 0xac2016c0, 0xac600000,
-	0x24630004, 0x0083102b, 0x5040fffd, 0xac600000, 0x03e00008, 0x00000000,
-	0x00804821, 0x8faa0010, 0x3c020800, 0x8c4216c0, 0x3c040800, 0x8c8416c8,
-	0x8fab0014, 0x24430001, 0x0044102b, 0x3c010800, 0xac2316c0, 0x14400003,
-	0x00004021, 0x3c010800, 0xac2016c0, 0x3c020800, 0x8c4216c0, 0x3c030800,
-	0x8c6316c4, 0x91240000, 0x00021140, 0x00431021, 0x00481021, 0x25080001,
-	0xa0440000, 0x29020008, 0x1440fff4, 0x25290001, 0x3c020800, 0x8c4216c0,
-	0x3c030800, 0x8c6316c4, 0x8f64680c, 0x00021140, 0x00431021, 0xac440008,
-	0xac45000c, 0xac460010, 0xac470014, 0xac4a0018, 0x03e00008, 0xac4b001c,
-	0x00000000, 0x00000000, 0x27bdffe0, 0xafbf0018, 0xafb10014, 0x0e0000b6,
-	0xafb00010, 0x24110001, 0x8f706820, 0x32020100, 0x10400003, 0x00000000,
-	0x0e000127, 0x00000000, 0x8f706820, 0x32022000, 0x10400004, 0x32020001,
-	0x0e00025a, 0x24040001, 0x32020001, 0x10400003, 0x00000000, 0x0e0000e6,
-	0x00000000, 0x0a00009e, 0xaf715028, 0x8fbf0018, 0x8fb10014, 0x8fb00010,
-	0x03e00008, 0x27bd0020, 0x27bdffe0, 0x3c040800, 0x24841660, 0x00002821,
-	0x00003021, 0x00003821, 0xafbf0018, 0xafa00010, 0x0e00006c, 0xafa00014,
-	0x3c010800, 0xa4201fb8, 0x3c010800, 0xa02016f8, 0x3c010800, 0xac2016fc,
-	0x3c010800, 0xac201700, 0x3c010800, 0xac201704, 0x3c010800, 0xac20170c,
-	0x3c010800, 0xac201718, 0x3c010800, 0xac20171c, 0x8f624434, 0x3c010800,
-	0xac2216e8, 0x8f624438, 0x3c010800, 0xac2216ec, 0x8f624410, 0x3c010800,
-	0xac2016e0, 0x3c010800, 0xac2016e4, 0x3c010800, 0xac201fc0, 0x3c010800,
-	0xac201f68, 0x3c010800, 0xac201f6c, 0x3c010800, 0xac2216f0, 0x8fbf0018,
-	0x03e00008, 0x27bd0020, 0x27bdffe0, 0x3c040800, 0x2484166c, 0x00002821,
-	0x00003021, 0x00003821, 0xafbf0018, 0xafa00010, 0x0e00006c, 0xafa00014,
-	0x3c040800, 0x24841660, 0x00002821, 0x00003021, 0x00003821, 0xafa00010,
-	0x0e00006c, 0xafa00014, 0x3c010800, 0xa4201fb8, 0x3c010800, 0xa02016f8,
-	0x3c010800, 0xac2016fc, 0x3c010800, 0xac201700, 0x3c010800, 0xac201704,
-	0x3c010800, 0xac20170c, 0x3c010800, 0xac201718, 0x3c010800, 0xac20171c,
-	0x8f624434, 0x3c010800, 0xac2216e8, 0x8f624438, 0x3c010800, 0xac2216ec,
-	0x8f624410, 0x3c010800, 0xac2016e0, 0x3c010800, 0xac2016e4, 0x3c010800,
-	0xac201fc0, 0x3c010800, 0xac201f68, 0x3c010800, 0xac201f6c, 0x3c010800,
-	0xac2216f0, 0x0e000120, 0x00002021, 0x8fbf0018, 0x03e00008, 0x27bd0020,
-	0x24020001, 0x8f636820, 0x00821004, 0x00021027, 0x00621824, 0x03e00008,
-	0xaf636820, 0x27bdffd0, 0x3c0300ff, 0xafbf002c, 0xafb60028, 0xafb50024,
-	0xafb40020, 0xafb3001c, 0xafb20018, 0xafb10014, 0xafb00010, 0x8f665c5c,
-	0x3c040800, 0x2484171c, 0x8c820000, 0x3463fff8, 0x14460005, 0x00c38824,
-	0x3c020800, 0x904216f8, 0x14400115, 0x00000000, 0x00111902, 0x306300ff,
-	0x30c20003, 0x000211c0, 0x00623825, 0x00e02821, 0x00061602, 0xac860000,
-	0x3c030800, 0x906316f8, 0x3044000f, 0x1460002b, 0x00804021, 0x24020001,
-	0x3c010800, 0xa02216f8, 0x00071100, 0x00821025, 0x3c010800, 0xac2016fc,
-	0x3c010800, 0xac201700, 0x3c010800, 0xac201704, 0x3c010800, 0xac20170c,
-	0x3c010800, 0xac201718, 0x3c010800, 0xac201710, 0x3c010800, 0xac201714,
-	0x3c010800, 0xa4221fb8, 0x9623000c, 0x30628000, 0x10400008, 0x30627fff,
-	0x2442003e, 0x3c010800, 0xa42216f6, 0x24020001, 0x3c010800, 0x0a00016e,
-	0xac221fd4, 0x24620036, 0x3c010800, 0xa42216f6, 0x3c010800, 0xac201fd4,
-	0x3c010800, 0xac201fd0, 0x3c010800, 0x0a000176, 0xac201fd8, 0x9622000c,
-	0x3c010800, 0xa4221fcc, 0x3c040800, 0x248416fc, 0x8c820000, 0x00021100,
-	0x3c010800, 0x00220821, 0xac311728, 0x8c820000, 0x00021100, 0x3c010800,
-	0x00220821, 0xac26172c, 0x8c820000, 0x24a30001, 0x306701ff, 0x00021100,
-	0x3c010800, 0x00220821, 0xac271730, 0x8c820000, 0x00021100, 0x3c010800,
-	0x00220821, 0xac281734, 0x96230008, 0x3c020800, 0x8c42170c, 0x00432821,
-	0x3c010800, 0xac25170c, 0x9622000a, 0x30420004, 0x14400019, 0x00071100,
-	0x3c02c000, 0x00c21825, 0xaf635c5c, 0x8f625c50, 0x30420002, 0x1440fffc,
-	0x00000000, 0x8f630c14, 0x3063000f, 0x2c620002, 0x1440001e, 0x00000000,
-	0x8f630c14, 0x3c020800, 0x8c4216b4, 0x3063000f, 0x24420001, 0x3c010800,
-	0xac2216b4, 0x2c620002, 0x1040fff7, 0x00000000, 0x0a0001c1, 0x00000000,
-	0x3c030800, 0x8c6316e0, 0x3c040800, 0x948416f4, 0x01021025, 0x3c010800,
-	0xa4221fba, 0x24020001, 0x3c010800, 0xac221718, 0x24630001, 0x0085202a,
-	0x3c010800, 0x10800003, 0xac2316e0, 0x3c010800, 0xa42516f4, 0x3c030800,
-	0x246316fc, 0x8c620000, 0x24420001, 0xac620000, 0x28420080, 0x14400005,
-	0x24020001, 0x0e0002df, 0x24040002, 0x0a000250, 0x00000000, 0x3c030800,
-	0x906316f8, 0x1462007c, 0x24020003, 0x3c160800, 0x96d616f6, 0x3c050800,
-	0x8ca5170c, 0x32c4ffff, 0x00a4102a, 0x14400078, 0x00000000, 0x3c020800,
-	0x8c421718, 0x10400005, 0x32c2ffff, 0x14a40003, 0x00000000, 0x3c010800,
-	0xac231fd0, 0x10400062, 0x00009021, 0x0040a021, 0x3c150800, 0x26b51700,
-	0x26b30010, 0x8ea20000, 0x00028100, 0x3c110800, 0x02308821, 0x0e0002e1,
-	0x8e311728, 0x00403021, 0x10c00059, 0x00000000, 0x9628000a, 0x31020040,
-	0x10400004, 0x2407180c, 0x8e22000c, 0x2407188c, 0xacc20018, 0x31021000,
-	0x10400004, 0x34e32000, 0x00081040, 0x3042c000, 0x00623825, 0x3c030800,
-	0x00701821, 0x8c631730, 0x3c020800, 0x00501021, 0x8c421734, 0x00031d00,
-	0x00021400, 0x00621825, 0xacc30014, 0x8ea30004, 0x96220008, 0x00432023,
-	0x3242ffff, 0x3083ffff, 0x00431021, 0x0282102a, 0x14400002, 0x02d22823,
-	0x00802821, 0x8e620000, 0x30a4ffff, 0x00441021, 0xae620000, 0x8e220000,
-	0xacc20000, 0x8e220004, 0x8e63fff4, 0x00431021, 0xacc20004, 0xa4c5000e,
-	0x8e62fff4, 0x00441021, 0xae62fff4, 0x96230008, 0x0043102a, 0x14400005,
-	0x02459021, 0x8e62fff0, 0xae60fff4, 0x24420001, 0xae62fff0, 0xacc00008,
-	0x3242ffff, 0x14540008, 0x24020305, 0x31020080, 0x54400001, 0x34e70010,
-	0x24020905, 0xa4c2000c, 0x0a000233, 0x34e70020, 0xa4c2000c, 0x30e2ffff,
-	0xacc20010, 0x3c020800, 0x8c421fd0, 0x10400003, 0x3c024b65, 0x0a00023d,
-	0x34427654, 0x3c02b49a, 0x344289ab, 0xacc2001c, 0x0e000560, 0x00c02021,
-	0x3242ffff, 0x0054102b, 0x1440ffa4, 0x00000000, 0x24020002, 0x3c010800,
-	0x0a000250, 0xa02216f8, 0x8ea208bc, 0x24420001, 0x0a000250, 0xaea208bc,
-	0x14620003, 0x00000000, 0x0e000450, 0x00000000, 0x8fbf002c, 0x8fb60028,
-	0x8fb50024, 0x8fb40020, 0x8fb3001c, 0x8fb20018, 0x8fb10014, 0x8fb00010,
-	0x03e00008, 0x27bd0030, 0x27bdffd8, 0xafb3001c, 0x00809821, 0xafbf0020,
-	0xafb20018, 0xafb10014, 0xafb00010, 0x8f725c9c, 0x3c0200ff, 0x3442fff8,
-	0x3c040800, 0x24841714, 0x02428824, 0x9623000e, 0x8c820000, 0x00431021,
-	0xac820000, 0x8e220010, 0x30420020, 0x14400011, 0x00000000, 0x0e0002f7,
-	0x02202021, 0x3c02c000, 0x02421825, 0xaf635c9c, 0x8f625c90, 0x30420002,
-	0x10400061, 0x00000000, 0xaf635c9c, 0x8f625c90, 0x30420002, 0x1040005c,
-	0x00000000, 0x0a000278, 0x00000000, 0x8e220008, 0x00021c02, 0x000321c0,
-	0x3042ffff, 0x3c030800, 0x906316f8, 0x000229c0, 0x24020002, 0x14620003,
-	0x3c034b65, 0x0a000290, 0x00008021, 0x8e22001c, 0x34637654, 0x10430002,
-	0x24100002, 0x24100001, 0x0e000300, 0x02003021, 0x24020003, 0x3c010800,
-	0xa02216f8, 0x24020002, 0x1202000a, 0x24020001, 0x3c030800, 0x8c631fd0,
-	0x10620006, 0x00000000, 0x3c020800, 0x94421fb8, 0x00021400, 0x0a0002cd,
-	0xae220014, 0x3c040800, 0x24841fba, 0x94820000, 0x00021400, 0xae220014,
-	0x3c020800, 0x8c42171c, 0x3c03c000, 0x3c010800, 0xa02016f8, 0x00431025,
-	0xaf625c5c, 0x8f625c50, 0x30420002, 0x10400009, 0x00000000, 0x2484f762,
-	0x8c820000, 0x00431025, 0xaf625c5c, 0x8f625c50, 0x30420002, 0x1440fffa,
-	0x00000000, 0x3c020800, 0x244216e4, 0x8c430000, 0x24630001, 0xac430000,
-	0x8f630c14, 0x3063000f, 0x2c620002, 0x1440000b, 0x00009821, 0x8f630c14,
-	0x3c020800, 0x8c4216b4, 0x3063000f, 0x24420001, 0x3c010800, 0xac2216b4,
-	0x2c620002, 0x1040fff7, 0x00009821, 0x3c024000, 0x02421825, 0xaf635c9c,
-	0x8f625c90, 0x30420002, 0x1440fffc, 0x00000000, 0x12600003, 0x00000000,
-	0x0e000450, 0x00000000, 0x8fbf0020, 0x8fb3001c, 0x8fb20018, 0x8fb10014,
-	0x8fb00010, 0x03e00008, 0x27bd0028, 0x0a0002df, 0x00000000, 0x8f634450,
-	0x3c040800, 0x248416e8, 0x8c820000, 0x00031c02, 0x0043102b, 0x14400007,
-	0x3c038000, 0x8c840004, 0x8f624450, 0x00021c02, 0x0083102b, 0x1040fffc,
-	0x3c038000, 0xaf634444, 0x8f624444, 0x00431024, 0x1440fffd, 0x00000000,
-	0x8f624448, 0x03e00008, 0x3042ffff, 0x3c024000, 0x00822025, 0xaf645c38,
-	0x8f625c30, 0x30420002, 0x1440fffc, 0x00000000, 0x03e00008, 0x00000000,
-	0x27bdffe0, 0x00805021, 0x14c00017, 0x254c0008, 0x3c020800, 0x8c421fd4,
-	0x1040000a, 0x2402003e, 0x3c010800, 0xa4221fb0, 0x24020016, 0x3c010800,
-	0xa4221fb2, 0x2402002a, 0x3c010800, 0x0a00031a, 0xa4221fb4, 0x95420014,
-	0x3c010800, 0xa4221fb0, 0x8d430010, 0x00031402, 0x3c010800, 0xa4221fb2,
-	0x3c010800, 0xa4231fb4, 0x3c040800, 0x94841fb4, 0x3c030800, 0x94631fb2,
-	0x958d0006, 0x3c020800, 0x94421fb0, 0x00832023, 0x01a27023, 0x3065ffff,
-	0x24a20028, 0x01824021, 0x3082ffff, 0x14c0001a, 0x01025821, 0x9562000c,
-	0x3042003f, 0x3c010800, 0xa4221fb6, 0x95620004, 0x95630006, 0x3c010800,
-	0xac201fc4, 0x3c010800, 0xac201fc8, 0x00021400, 0x00431025, 0x3c010800,
-	0xac221720, 0x95020004, 0x3c010800, 0xa4221724, 0x95030002, 0x01a51023,
-	0x0043102a, 0x10400010, 0x24020001, 0x3c010800, 0x0a00034e, 0xac221fd8,
-	0x3c030800, 0x8c631fc8, 0x3c020800, 0x94421724, 0x00431021, 0xa5020004,
-	0x3c020800, 0x94421720, 0xa5620004, 0x3c020800, 0x8c421720, 0xa5620006,
-	0x3c020800, 0x8c421fd0, 0x3c070800, 0x8ce71fc4, 0x3c050800, 0x144000c7,
-	0x8ca51fc8, 0x3c020800, 0x94421724, 0x00451821, 0x3063ffff, 0x0062182b,
-	0x24020002, 0x10c2000d, 0x00a32823, 0x3c020800, 0x94421fb6, 0x30420009,
-	0x10400008, 0x00000000, 0x9562000c, 0x3042fff6, 0xa562000c, 0x3c020800,
-	0x94421fb6, 0x30420009, 0x00e23823, 0x3c020800, 0x8c421fd8, 0x1040004b,
-	0x24020002, 0x01003021, 0x3c020800, 0x94421fb2, 0x00003821, 0xa500000a,
-	0x01a21023, 0xa5020002, 0x3082ffff, 0x00021042, 0x18400008, 0x00002821,
-	0x00401821, 0x94c20000, 0x24e70001, 0x00a22821, 0x00e3102a, 0x1440fffb,
-	0x24c60002, 0x00051c02, 0x30a2ffff, 0x00622821, 0x00051402, 0x00a22821,
-	0x00a04821, 0x00051027, 0xa502000a, 0x00002821, 0x2506000c, 0x00003821,
-	0x94c20000, 0x24e70001, 0x00a22821, 0x2ce20004, 0x1440fffb, 0x24c60002,
-	0x95020002, 0x00003821, 0x91030009, 0x00442023, 0x01603021, 0x3082ffff,
-	0xa4c00010, 0x00621821, 0x00021042, 0x18400010, 0x00a32821, 0x00404021,
-	0x94c20000, 0x24c60002, 0x00a22821, 0x30c2007f, 0x14400006, 0x24e70001,
-	0x8d430000, 0x3c02007f, 0x3442ff80, 0x00625024, 0x25460008, 0x00e8102a,
-	0x1440fff3, 0x00000000, 0x30820001, 0x10400005, 0x00051c02, 0xa0c00001,
-	0x94c20000, 0x00a22821, 0x00051c02, 0x30a2ffff, 0x00622821, 0x00051402,
-	0x00a22821, 0x0a000415, 0x30a5ffff, 0x14c20063, 0x00000000, 0x3c090800,
-	0x95291fb2, 0x95030002, 0x01a91023, 0x1062005d, 0x01003021, 0x00003821,
-	0x00002821, 0x01a91023, 0xa5020002, 0x3082ffff, 0x00021042, 0x18400008,
-	0xa500000a, 0x00401821, 0x94c20000, 0x24e70001, 0x00a22821, 0x00e3102a,
-	0x1440fffb, 0x24c60002, 0x00051c02, 0x30a2ffff, 0x00622821, 0x00051402,
-	0x00a22821, 0x00a04821, 0x00051027, 0xa502000a, 0x00002821, 0x2506000c,
-	0x00003821, 0x94c20000, 0x24e70001, 0x00a22821, 0x2ce20004, 0x1440fffb,
-	0x24c60002, 0x95020002, 0x00003821, 0x91030009, 0x00442023, 0x01603021,
-	0x3082ffff, 0xa4c00010, 0x3c040800, 0x94841fb4, 0x00621821, 0x00a32821,
-	0x00051c02, 0x30a2ffff, 0x00622821, 0x00051c02, 0x3c020800, 0x94421fb0,
-	0x00a34021, 0x00441023, 0x00021fc2, 0x00431021, 0x00021043, 0x18400010,
-	0x00002821, 0x00402021, 0x94c20000, 0x24c60002, 0x00a22821, 0x30c2007f,
-	0x14400006, 0x24e70001, 0x8d430000, 0x3c02007f, 0x3442ff80, 0x00625024,
-	0x25460008, 0x00e4102a, 0x1440fff3, 0x00000000, 0x3c020800, 0x94421fcc,
-	0x00a22821, 0x00051c02, 0x30a2ffff, 0x00622821, 0x00051402, 0x00a22821,
-	0x3102ffff, 0x00a22821, 0x00051c02, 0x30a2ffff, 0x00622821, 0x00051402,
-	0x00a22821, 0x00a02021, 0x00051027, 0xa5620010, 0xad800014, 0x0a000435,
-	0xad800000, 0x8d830010, 0x00602021, 0x10a00007, 0x00034c02, 0x01252821,
-	0x00051402, 0x30a3ffff, 0x00432821, 0x00051402, 0x00a24821, 0x00091027,
-	0xa502000a, 0x3c030800, 0x94631fb4, 0x3082ffff, 0x01a21021, 0x00432823,
-	0x00a72821, 0x00051c02, 0x30a2ffff, 0x00622821, 0x00051402, 0x00a22821,
-	0x00a02021, 0x00051027, 0xa5620010, 0x3082ffff, 0x00091c00, 0x00431025,
-	0xad820010, 0x3c020800, 0x8c421fd4, 0x10400002, 0x25a2fff2, 0xa5820034,
-	0x3c020800, 0x8c421fc8, 0x3c030800, 0x8c631720, 0x24420001, 0x3c010800,
-	0xac221fc8, 0x3c020800, 0x8c421fc4, 0x31c4ffff, 0x00641821, 0x3c010800,
-	0xac231720, 0x00441021, 0x3c010800, 0xac221fc4, 0x03e00008, 0x27bd0020,
-	0x27bdffc8, 0x3c040800, 0x248416f8, 0xafbf0034, 0xafbe0030, 0xafb7002c,
+	0x0000000d, 0x00000000, 0x00000000, 0x00000000, 0x27bdffe0, 0x3c04fefe,
+	0xafbf0018, 0x0e0005e0, 0x34840002, 0x0e000670, 0x00000000, 0x3c030800,
+	0x90631b78, 0x24020002, 0x3c040800, 0x24841acc, 0x14620003, 0x24050001,
+	0x3c040800, 0x24841ac0, 0x24060002, 0x00003821, 0xafa00010, 0x0e000684,
+	0xafa00014, 0x8f625c50, 0x34420001, 0xaf625c50, 0x8f625c90, 0x34420001,
+	0xaf625c90, 0x2402ffff, 0x0e000034, 0xaf625404, 0x8fbf0018, 0x03e00008,
+	0x27bd0020, 0x00000000, 0x00000000, 0x00000000, 0x27bdffe0, 0xafbf0018,
+	0xafb10014, 0x0e000052, 0xafb00010, 0x24110001, 0x8f706820, 0x32020100,
+	0x10400003, 0x00000000, 0x0e0000b2, 0x00000000, 0x8f706820, 0x32022000,
+	0x10400004, 0x32020001, 0x0e0001e3, 0x24040001, 0x32020001, 0x10400003,
+	0x00000000, 0x0e00009a, 0x00000000, 0x0a00003a, 0xaf715028, 0x8fbf0018,
+	0x8fb10014, 0x8fb00010, 0x03e00008, 0x27bd0020, 0x27bdffe0, 0x3c040800,
+	0x24841ae0, 0x00002821, 0x00003021, 0x00003821, 0xafbf0018, 0xafa00010,
+	0x0e000684, 0xafa00014, 0x3c040800, 0x248423e8, 0xa4800000, 0x3c010800,
+	0xa0201ba8, 0x3c010800, 0xac201bac, 0x3c010800, 0xac201bb0, 0x3c010800,
+	0xac201bb4, 0x3c010800, 0xac201bbc, 0x3c010800, 0xac201bc8, 0x3c010800,
+	0xac201bcc, 0x8f624434, 0x3c010800, 0xac221b98, 0x8f624438, 0x3c010800,
+	0xac221b9c, 0x8f624410, 0xac80f7a8, 0x3c010800, 0xac201b94, 0x3c010800,
+	0xac2023f0, 0x3c010800, 0xac2023d8, 0x3c010800, 0xac2023dc, 0x3c010800,
+	0xac202410, 0x3c010800, 0xac221ba0, 0x8f620068, 0x24030007, 0x00021702,
+	0x10430005, 0x00000000, 0x8f620068, 0x00021702, 0x14400004, 0x24020001,
+	0x3c010800, 0x0a00008e, 0xac20241c, 0xac820034, 0x3c040800, 0x24841aec,
+	0x3c050800, 0x8ca5241c, 0x00003021, 0x00003821, 0xafa00010, 0x0e000684,
+	0xafa00014, 0x8fbf0018, 0x03e00008, 0x27bd0020, 0x27bdffe0, 0x3c040800,
+	0x24841af8, 0x00002821, 0x00003021, 0x00003821, 0xafbf0018, 0xafa00010,
+	0x0e000684, 0xafa00014, 0x0e000052, 0x00000000, 0x0e0000ab, 0x00002021,
+	0x8fbf0018, 0x03e00008, 0x27bd0020, 0x24020001, 0x8f636820, 0x00821004,
+	0x00021027, 0x00621824, 0x03e00008, 0xaf636820, 0x27bdffd0, 0xafbf002c,
 	0xafb60028, 0xafb50024, 0xafb40020, 0xafb3001c, 0xafb20018, 0xafb10014,
-	0xafb00010, 0x90830000, 0x24020003, 0x146200f4, 0x00000000, 0x3c020800,
-	0x8c421710, 0x3c030800, 0x8c63170c, 0x3c1e0800, 0x97de16f6, 0x0043102a,
-	0x104000eb, 0x3c168000, 0x249708c4, 0x33d5ffff, 0x24920018, 0x3c020800,
-	0x8c421718, 0x104000e4, 0x00000000, 0x3c140800, 0x96941fb0, 0x3282ffff,
-	0x104000d6, 0x00008021, 0x00409821, 0x00008821, 0x8f634450, 0x3c020800,
-	0x8c4216e8, 0x00031c02, 0x0043102b, 0x14400008, 0x00000000, 0x3c040800,
-	0x8c8416ec, 0x8f624450, 0x00021c02, 0x0083102b, 0x1040fffc, 0x00000000,
-	0xaf764444, 0x8f624444, 0x00561024, 0x10400006, 0x00000000, 0x3c038000,
-	0x8f624444, 0x00431024, 0x1440fffd, 0x00000000, 0x8f624448, 0x3046ffff,
-	0x10c0005f, 0x00000000, 0x3c090800, 0x01314821, 0x8d291728, 0x9528000a,
-	0x31020040, 0x10400004, 0x2407180c, 0x8d22000c, 0x2407188c, 0xacc20018,
+	0xafb00010, 0x8f665c5c, 0x3c030800, 0x24631bcc, 0x8c620000, 0x14460005,
+	0x3c0200ff, 0x3c020800, 0x90421ba8, 0x14400115, 0x3c0200ff, 0x3442fff8,
+	0x00c28824, 0xac660000, 0x00111902, 0x306300ff, 0x30c20003, 0x000211c0,
+	0x00623825, 0x00e02821, 0x00061602, 0x3c030800, 0x90631ba8, 0x3044000f,
+	0x1460002b, 0x00804021, 0x24020001, 0x3c010800, 0xa0221ba8, 0x00071100,
+	0x00821025, 0x3c010800, 0xac201bac, 0x3c010800, 0xac201bb0, 0x3c010800,
+	0xac201bb4, 0x3c010800, 0xac201bbc, 0x3c010800, 0xac201bc8, 0x3c010800,
+	0xac201bc0, 0x3c010800, 0xac201bc4, 0x3c010800, 0xa42223e8, 0x9623000c,
+	0x30628000, 0x10400008, 0x30627fff, 0x2442003e, 0x3c010800, 0xa4221ba6,
+	0x24020001, 0x3c010800, 0x0a0000f9, 0xac222404, 0x24620036, 0x3c010800,
+	0xa4221ba6, 0x3c010800, 0xac202404, 0x3c010800, 0xac202400, 0x3c010800,
+	0x0a000101, 0xac202408, 0x9622000c, 0x3c010800, 0xa42223fc, 0x3c040800,
+	0x24841bac, 0x8c820000, 0x00021100, 0x3c010800, 0x00220821, 0xac311bd8,
+	0x8c820000, 0x00021100, 0x3c010800, 0x00220821, 0xac261bdc, 0x8c820000,
+	0x24a30001, 0x306701ff, 0x00021100, 0x3c010800, 0x00220821, 0xac271be0,
+	0x8c820000, 0x00021100, 0x3c010800, 0x00220821, 0xac281be4, 0x96230008,
+	0x3c020800, 0x8c421bbc, 0x00432821, 0x3c010800, 0xac251bbc, 0x9622000a,
+	0x30420004, 0x14400018, 0x00071100, 0x8f630c14, 0x3063000f, 0x2c620002,
+	0x1440000b, 0x3c02c000, 0x8f630c14, 0x3c020800, 0x8c421b50, 0x3063000f,
+	0x24420001, 0x3c010800, 0xac221b50, 0x2c620002, 0x1040fff7, 0x3c02c000,
+	0x00c21825, 0xaf635c5c, 0x8f625c50, 0x30420002, 0x10400014, 0x00000000,
+	0x0a000133, 0x00000000, 0x3c030800, 0x8c631b90, 0x3c040800, 0x94841ba4,
+	0x01021025, 0x3c010800, 0xa42223ea, 0x24020001, 0x3c010800, 0xac221bc8,
+	0x24630001, 0x0085202a, 0x3c010800, 0x10800003, 0xac231b90, 0x3c010800,
+	0xa4251ba4, 0x3c060800, 0x24c61bac, 0x8cc20000, 0x24420001, 0xacc20000,
+	0x28420080, 0x14400005, 0x00000000, 0x0e00065e, 0x24040002, 0x0a0001d9,
+	0x00000000, 0x3c020800, 0x8c421bc8, 0x1040007f, 0x24020001, 0x3c040800,
+	0x90841ba8, 0x14820077, 0x24020003, 0x3c150800, 0x96b51ba6, 0x3c050800,
+	0x8ca51bbc, 0x32a3ffff, 0x00a3102a, 0x14400073, 0x00000000, 0x14a30003,
+	0x00000000, 0x3c010800, 0xac242400, 0x10600061, 0x00009021, 0x24d60004,
+	0x0060a021, 0x24d30014, 0x8ec20000, 0x00028100, 0x3c110800, 0x02308821,
+	0x0e00062d, 0x8e311bd8, 0x00403021, 0x10c00059, 0x00000000, 0x9628000a,
+	0x31020040, 0x10400004, 0x2407180c, 0x8e22000c, 0x2407188c, 0xacc20018,
 	0x31021000, 0x10400004, 0x34e32000, 0x00081040, 0x3042c000, 0x00623825,
-	0x31020080, 0x54400001, 0x34e70010, 0x3c020800, 0x00511021, 0x8c421730,
-	0x3c030800, 0x00711821, 0x8c631734, 0x00021500, 0x00031c00, 0x00431025,
-	0xacc20014, 0x95240008, 0x3202ffff, 0x00821021, 0x0262102a, 0x14400002,
-	0x02902823, 0x00802821, 0x8d220000, 0x02058021, 0xacc20000, 0x8d220004,
-	0x00c02021, 0x26310010, 0xac820004, 0x30e2ffff, 0xac800008, 0xa485000e,
-	0xac820010, 0x24020305, 0x0e000560, 0xa482000c, 0x3202ffff, 0x0053102b,
-	0x1440ffaf, 0x3202ffff, 0x0a00054c, 0x00000000, 0x8e420000, 0x8e43fffc,
-	0x0043102a, 0x10400084, 0x00000000, 0x8e45fff0, 0x8f644450, 0x3c030800,
-	0x8c6316e8, 0x00051100, 0x3c090800, 0x01224821, 0x8d291728, 0x00041402,
-	0x0062182b, 0x14600008, 0x00000000, 0x3c030800, 0x8c6316ec, 0x8f624450,
-	0x00021402, 0x0062102b, 0x1040fffc, 0x00000000, 0xaf764444, 0x8f624444,
-	0x00561024, 0x10400006, 0x00000000, 0x3c038000, 0x8f624444, 0x00431024,
-	0x1440fffd, 0x00000000, 0x8f624448, 0x3046ffff, 0x14c00005, 0x00000000,
-	0x8ee20000, 0x24420001, 0x0a000554, 0xaee20000, 0x9528000a, 0x31020040,
-	0x10400004, 0x2407180c, 0x8d22000c, 0x2407188c, 0xacc20018, 0x31021000,
-	0x10400004, 0x34e32000, 0x00081040, 0x3042c000, 0x00623825, 0x00051900,
-	0x3c020800, 0x00431021, 0x8c421730, 0x3c010800, 0x00230821, 0x8c231734,
-	0x00021500, 0x00031c00, 0x00431025, 0xacc20014, 0x3c030800, 0x8c631704,
-	0x95220008, 0x00432023, 0x3202ffff, 0x3083ffff, 0x00431021, 0x02a2102a,
-	0x14400002, 0x03d02823, 0x00802821, 0x8e420000, 0x30a4ffff, 0x00441021,
-	0xae420000, 0xa4c5000e, 0x8d220000, 0xacc20000, 0x8d220004, 0x8e43fff4,
-	0x00431021, 0xacc20004, 0x8e43fff4, 0x95220008, 0x00641821, 0x0062102a,
-	0x14400006, 0x02058021, 0x8e42fff0, 0xae40fff4, 0x24420001, 0x0a000530,
-	0xae42fff0, 0xae43fff4, 0xacc00008, 0x3202ffff, 0x10550003, 0x31020004,
-	0x10400006, 0x24020305, 0x31020080, 0x54400001, 0x34e70010, 0x34e70020,
-	0x24020905, 0xa4c2000c, 0x30e2ffff, 0xacc20010, 0x3c030800, 0x8c63170c,
-	0x3c020800, 0x8c421710, 0x54620004, 0x3c02b49a, 0x3c024b65, 0x0a000548,
-	0x34427654, 0x344289ab, 0xacc2001c, 0x0e000560, 0x00c02021, 0x3202ffff,
-	0x0055102b, 0x1440ff7e, 0x00000000, 0x8e420000, 0x8e43fffc, 0x0043102a,
-	0x1440ff1a, 0x00000000, 0x8fbf0034, 0x8fbe0030, 0x8fb7002c, 0x8fb60028,
-	0x8fb50024, 0x8fb40020, 0x8fb3001c, 0x8fb20018, 0x8fb10014, 0x8fb00010,
-	0x03e00008, 0x27bd0038, 0x27bdffe8, 0xafbf0014, 0xafb00010, 0x8f624450,
-	0x8f634410, 0x0a00056f, 0x00808021, 0x8f626820, 0x30422000, 0x10400003,
-	0x00000000, 0x0e00025a, 0x00002021, 0x8f624450, 0x8f634410, 0x3042ffff,
-	0x0043102b, 0x1440fff5, 0x00000000, 0x8f630c14, 0x3063000f, 0x2c620002,
-	0x1440000b, 0x00000000, 0x8f630c14, 0x3c020800, 0x8c4216b4, 0x3063000f,
-	0x24420001, 0x3c010800, 0xac2216b4, 0x2c620002, 0x1040fff7, 0x00000000,
-	0xaf705c18, 0x8f625c10, 0x30420002, 0x10400009, 0x00000000, 0x8f626820,
-	0x30422000, 0x1040fff8, 0x00000000, 0x0e00025a, 0x00002021, 0x0a000582,
-	0x00000000, 0x8fbf0014, 0x8fb00010, 0x03e00008, 0x27bd0018, 0x00000000,
-	0x00000000
+	0x3c030800, 0x00701821, 0x8c631be0, 0x3c020800, 0x00501021, 0x8c421be4,
+	0x00031d00, 0x00021400, 0x00621825, 0xacc30014, 0x8ec30004, 0x96220008,
+	0x00432023, 0x3242ffff, 0x3083ffff, 0x00431021, 0x0282102a, 0x14400002,
+	0x02b22823, 0x00802821, 0x8e620000, 0x30a4ffff, 0x00441021, 0xae620000,
+	0x8e220000, 0xacc20000, 0x8e220004, 0x8e63fff4, 0x00431021, 0xacc20004,
+	0xa4c5000e, 0x8e62fff4, 0x00441021, 0xae62fff4, 0x96230008, 0x0043102a,
+	0x14400005, 0x02459021, 0x8e62fff0, 0xae60fff4, 0x24420001, 0xae62fff0,
+	0xacc00008, 0x3242ffff, 0x14540008, 0x24020305, 0x31020080, 0x54400001,
+	0x34e70010, 0x24020905, 0xa4c2000c, 0x0a0001bc, 0x34e70020, 0xa4c2000c,
+	0x3c020800, 0x8c422400, 0x10400003, 0x3c024b65, 0x0a0001c4, 0x34427654,
+	0x3c02b49a, 0x344289ab, 0xacc2001c, 0x30e2ffff, 0xacc20010, 0x0e0005aa,
+	0x00c02021, 0x3242ffff, 0x0054102b, 0x1440ffa4, 0x00000000, 0x24020002,
+	0x3c010800, 0x0a0001d9, 0xa0221ba8, 0x8ec2083c, 0x24420001, 0x0a0001d9,
+	0xaec2083c, 0x14820003, 0x00000000, 0x0e0004b9, 0x00000000, 0x8fbf002c,
+	0x8fb60028, 0x8fb50024, 0x8fb40020, 0x8fb3001c, 0x8fb20018, 0x8fb10014,
+	0x8fb00010, 0x03e00008, 0x27bd0030, 0x27bdffd0, 0xafbf0028, 0xafb30024,
+	0xafb20020, 0xafb1001c, 0xafb00018, 0x8f725c9c, 0x3c0200ff, 0x3442fff8,
+	0x3c060800, 0x24c61bc4, 0x02428824, 0x9623000e, 0x8cc20000, 0x00431021,
+	0xacc20000, 0x8e220010, 0x30420020, 0x14400011, 0x00809821, 0x0e000643,
+	0x02202021, 0x3c02c000, 0x02421825, 0xaf635c9c, 0x8f625c90, 0x30420002,
+	0x10400121, 0x00000000, 0xaf635c9c, 0x8f625c90, 0x30420002, 0x1040011c,
+	0x00000000, 0x0a000200, 0x00000000, 0x8e240008, 0x8e230014, 0x00041402,
+	0x000241c0, 0x00031502, 0x304201ff, 0x2442ffff, 0x3042007f, 0x00031942,
+	0x30637800, 0x00021100, 0x24424000, 0x00625021, 0x9542000a, 0x3084ffff,
+	0x30420008, 0x104000b3, 0x000429c0, 0x3c020800, 0x8c422410, 0x1440002d,
+	0x25050008, 0x95020014, 0x3c010800, 0xa42223e0, 0x8d070010, 0x00071402,
+	0x3c010800, 0xa42223e2, 0x3c010800, 0xa42723e4, 0x9502000e, 0x30e3ffff,
+	0x00431023, 0x3c010800, 0xac222418, 0x8f626800, 0x3c030010, 0x00431024,
+	0x10400005, 0x00000000, 0x9503001a, 0x9502001c, 0x0a000235, 0x00431021,
+	0x9502001a, 0x3c010800, 0xac22240c, 0x3c02c000, 0x02421825, 0x3c010800,
+	0xac282410, 0x3c010800, 0xac322414, 0xaf635c9c, 0x8f625c90, 0x30420002,
+	0x104000df, 0x00000000, 0xaf635c9c, 0x8f625c90, 0x30420002, 0x104000da,
+	0x00000000, 0x0a000242, 0x00000000, 0x9502000e, 0x3c030800, 0x946323e4,
+	0x00434823, 0x3123ffff, 0x2c620008, 0x1040001c, 0x00000000, 0x95020014,
+	0x24420028, 0x00a22821, 0x00031042, 0x1840000b, 0x00002021, 0x24c60848,
+	0x00403821, 0x94a30000, 0x8cc20000, 0x24840001, 0x00431021, 0xacc20000,
+	0x0087102a, 0x1440fff9, 0x24a50002, 0x31220001, 0x1040001f, 0x3c024000,
+	0x3c040800, 0x2484240c, 0xa0a00001, 0x94a30000, 0x8c820000, 0x00431021,
+	0x0a000281, 0xac820000, 0x8f626800, 0x3c030010, 0x00431024, 0x10400009,
+	0x00000000, 0x9502001a, 0x3c030800, 0x8c63240c, 0x00431021, 0x3c010800,
+	0xac22240c, 0x0a000282, 0x3c024000, 0x9502001a, 0x9504001c, 0x3c030800,
+	0x8c63240c, 0x00441023, 0x00621821, 0x3c010800, 0xac23240c, 0x3c024000,
+	0x02421825, 0xaf635c9c, 0x8f625c90, 0x30420002, 0x1440fffc, 0x00000000,
+	0x9542000a, 0x30420010, 0x10400095, 0x00000000, 0x3c060800, 0x24c62410,
+	0x3c020800, 0x944223e4, 0x8cc50000, 0x3c040800, 0x8c842418, 0x24420030,
+	0x00a22821, 0x94a20004, 0x3c030800, 0x8c63240c, 0x00441023, 0x00621821,
+	0x00603821, 0x00032402, 0x30e2ffff, 0x00823821, 0x00071402, 0x00e23821,
+	0x00071027, 0x3c010800, 0xac23240c, 0xa4a20006, 0x3c030800, 0x8c632414,
+	0x3c0200ff, 0x3442fff8, 0x00628824, 0x96220008, 0x24040001, 0x24034000,
+	0x000241c0, 0x00e01021, 0xa502001a, 0xa500001c, 0xacc00000, 0x3c010800,
+	0xac241b70, 0xaf635cb8, 0x8f625cb0, 0x30420002, 0x10400003, 0x00000000,
+	0x3c010800, 0xac201b70, 0x8e220008, 0xaf625cb8, 0x8f625cb0, 0x30420002,
+	0x10400003, 0x00000000, 0x3c010800, 0xac201b70, 0x3c020800, 0x8c421b70,
+	0x1040ffec, 0x00000000, 0x3c040800, 0x0e000643, 0x8c842414, 0x0a000320,
+	0x00000000, 0x3c030800, 0x90631ba8, 0x24020002, 0x14620003, 0x3c034b65,
+	0x0a0002d7, 0x00008021, 0x8e22001c, 0x34637654, 0x10430002, 0x24100002,
+	0x24100001, 0x01002021, 0x0e000346, 0x02003021, 0x24020003, 0x3c010800,
+	0xa0221ba8, 0x24020002, 0x1202000a, 0x24020001, 0x3c030800, 0x8c632400,
+	0x10620006, 0x00000000, 0x3c020800, 0x944223e8, 0x00021400, 0x0a000315,
+	0xae220014, 0x3c040800, 0x248423ea, 0x94820000, 0x00021400, 0xae220014,
+	0x3c020800, 0x8c421bcc, 0x3c03c000, 0x3c010800, 0xa0201ba8, 0x00431025,
+	0xaf625c5c, 0x8f625c50, 0x30420002, 0x10400009, 0x00000000, 0x2484f7e2,
+	0x8c820000, 0x00431025, 0xaf625c5c, 0x8f625c50, 0x30420002, 0x1440fffa,
+	0x00000000, 0x3c020800, 0x24421b94, 0x8c430000, 0x24630001, 0xac430000,
+	0x8f630c14, 0x3063000f, 0x2c620002, 0x1440000c, 0x3c024000, 0x8f630c14,
+	0x3c020800, 0x8c421b50, 0x3063000f, 0x24420001, 0x3c010800, 0xac221b50,
+	0x2c620002, 0x1040fff7, 0x00000000, 0x3c024000, 0x02421825, 0xaf635c9c,
+	0x8f625c90, 0x30420002, 0x1440fffc, 0x00000000, 0x12600003, 0x00000000,
+	0x0e0004b9, 0x00000000, 0x8fbf0028, 0x8fb30024, 0x8fb20020, 0x8fb1001c,
+	0x8fb00018, 0x03e00008, 0x27bd0030, 0x8f634450, 0x3c040800, 0x24841b98,
+	0x8c820000, 0x00031c02, 0x0043102b, 0x14400007, 0x3c038000, 0x8c840004,
+	0x8f624450, 0x00021c02, 0x0083102b, 0x1040fffc, 0x3c038000, 0xaf634444,
+	0x8f624444, 0x00431024, 0x1440fffd, 0x00000000, 0x8f624448, 0x03e00008,
+	0x3042ffff, 0x3c024000, 0x00822025, 0xaf645c38, 0x8f625c30, 0x30420002,
+	0x1440fffc, 0x00000000, 0x03e00008, 0x00000000, 0x27bdffe0, 0x00805821,
+	0x14c00017, 0x256e0008, 0x3c020800, 0x8c422404, 0x1040000a, 0x2402003e,
+	0x3c010800, 0xa42223e0, 0x24020016, 0x3c010800, 0xa42223e2, 0x2402002a,
+	0x3c010800, 0x0a000360, 0xa42223e4, 0x95620014, 0x3c010800, 0xa42223e0,
+	0x8d670010, 0x00071402, 0x3c010800, 0xa42223e2, 0x3c010800, 0xa42723e4,
+	0x3c040800, 0x948423e4, 0x3c030800, 0x946323e2, 0x95cf0006, 0x3c020800,
+	0x944223e0, 0x00832023, 0x01e2c023, 0x3065ffff, 0x24a20028, 0x01c24821,
+	0x3082ffff, 0x14c0001a, 0x01226021, 0x9582000c, 0x3042003f, 0x3c010800,
+	0xa42223e6, 0x95820004, 0x95830006, 0x3c010800, 0xac2023f4, 0x3c010800,
+	0xac2023f8, 0x00021400, 0x00431025, 0x3c010800, 0xac221bd0, 0x95220004,
+	0x3c010800, 0xa4221bd4, 0x95230002, 0x01e51023, 0x0043102a, 0x10400010,
+	0x24020001, 0x3c010800, 0x0a000394, 0xac222408, 0x3c030800, 0x8c6323f8,
+	0x3c020800, 0x94421bd4, 0x00431021, 0xa5220004, 0x3c020800, 0x94421bd0,
+	0xa5820004, 0x3c020800, 0x8c421bd0, 0xa5820006, 0x3c020800, 0x8c422400,
+	0x3c0d0800, 0x8dad23f4, 0x3c0a0800, 0x144000e5, 0x8d4a23f8, 0x3c020800,
+	0x94421bd4, 0x004a1821, 0x3063ffff, 0x0062182b, 0x24020002, 0x10c2000d,
+	0x01435023, 0x3c020800, 0x944223e6, 0x30420009, 0x10400008, 0x00000000,
+	0x9582000c, 0x3042fff6, 0xa582000c, 0x3c020800, 0x944223e6, 0x30420009,
+	0x01a26823, 0x3c020800, 0x8c422408, 0x1040004a, 0x01203821, 0x3c020800,
+	0x944223e2, 0x00004021, 0xa520000a, 0x01e21023, 0xa5220002, 0x3082ffff,
+	0x00021042, 0x18400008, 0x00003021, 0x00401821, 0x94e20000, 0x25080001,
+	0x00c23021, 0x0103102a, 0x1440fffb, 0x24e70002, 0x00061c02, 0x30c2ffff,
+	0x00623021, 0x00061402, 0x00c23021, 0x00c02821, 0x00061027, 0xa522000a,
+	0x00003021, 0x2527000c, 0x00004021, 0x94e20000, 0x25080001, 0x00c23021,
+	0x2d020004, 0x1440fffb, 0x24e70002, 0x95220002, 0x00004021, 0x91230009,
+	0x00442023, 0x01803821, 0x3082ffff, 0xa4e00010, 0x00621821, 0x00021042,
+	0x18400010, 0x00c33021, 0x00404821, 0x94e20000, 0x24e70002, 0x00c23021,
+	0x30e2007f, 0x14400006, 0x25080001, 0x8d630000, 0x3c02007f, 0x3442ff80,
+	0x00625824, 0x25670008, 0x0109102a, 0x1440fff3, 0x00000000, 0x30820001,
+	0x10400005, 0x00061c02, 0xa0e00001, 0x94e20000, 0x00c23021, 0x00061c02,
+	0x30c2ffff, 0x00623021, 0x00061402, 0x00c23021, 0x0a000479, 0x30c6ffff,
+	0x24020002, 0x14c20081, 0x00000000, 0x3c020800, 0x8c42241c, 0x14400007,
+	0x00000000, 0x3c020800, 0x944223e2, 0x95230002, 0x01e21023, 0x10620077,
+	0x00000000, 0x3c020800, 0x944223e2, 0x01e21023, 0xa5220002, 0x3c020800,
+	0x8c42241c, 0x1040001a, 0x31e3ffff, 0x8dc70010, 0x3c020800, 0x94421ba6,
+	0x00e04021, 0x00072c02, 0x00aa2021, 0x00431023, 0x00823823, 0x00072402,
+	0x30e2ffff, 0x00823821, 0x00071027, 0xa522000a, 0x3102ffff, 0x3c040800,
+	0x948423e4, 0x00453023, 0x00e02821, 0x00641823, 0x006d1821, 0x00c33021,
+	0x00061c02, 0x30c2ffff, 0x0a000479, 0x00623021, 0x01203821, 0x00004021,
+	0x3082ffff, 0x00021042, 0x18400008, 0x00003021, 0x00401821, 0x94e20000,
+	0x25080001, 0x00c23021, 0x0103102a, 0x1440fffb, 0x24e70002, 0x00061c02,
+	0x30c2ffff, 0x00623021, 0x00061402, 0x00c23021, 0x00c02821, 0x00061027,
+	0xa522000a, 0x00003021, 0x2527000c, 0x00004021, 0x94e20000, 0x25080001,
+	0x00c23021, 0x2d020004, 0x1440fffb, 0x24e70002, 0x95220002, 0x00004021,
+	0x91230009, 0x00442023, 0x01803821, 0x3082ffff, 0xa4e00010, 0x3c040800,
+	0x948423e4, 0x00621821, 0x00c33021, 0x00061c02, 0x30c2ffff, 0x00623021,
+	0x00061c02, 0x3c020800, 0x944223e0, 0x00c34821, 0x00441023, 0x00021fc2,
+	0x00431021, 0x00021043, 0x18400010, 0x00003021, 0x00402021, 0x94e20000,
+	0x24e70002, 0x00c23021, 0x30e2007f, 0x14400006, 0x25080001, 0x8d630000,
+	0x3c02007f, 0x3442ff80, 0x00625824, 0x25670008, 0x0104102a, 0x1440fff3,
+	0x00000000, 0x3c020800, 0x944223fc, 0x00c23021, 0x3122ffff, 0x00c23021,
+	0x00061c02, 0x30c2ffff, 0x00623021, 0x00061402, 0x00c23021, 0x00c04021,
+	0x00061027, 0xa5820010, 0xadc00014, 0x0a000499, 0xadc00000, 0x8dc70010,
+	0x00e04021, 0x11400007, 0x00072c02, 0x00aa3021, 0x00061402, 0x30c3ffff,
+	0x00433021, 0x00061402, 0x00c22821, 0x00051027, 0xa522000a, 0x3c030800,
+	0x946323e4, 0x3102ffff, 0x01e21021, 0x00433023, 0x00cd3021, 0x00061c02,
+	0x30c2ffff, 0x00623021, 0x00061402, 0x00c23021, 0x00c04021, 0x00061027,
+	0xa5820010, 0x3102ffff, 0x00051c00, 0x00431025, 0xadc20010, 0x3c020800,
+	0x8c422404, 0x10400002, 0x25e2fff2, 0xa5c20034, 0x3c020800, 0x8c4223f8,
+	0x3c040800, 0x8c8423f4, 0x24420001, 0x3c010800, 0xac2223f8, 0x3c020800,
+	0x8c421bd0, 0x3303ffff, 0x00832021, 0x3c010800, 0xac2423f4, 0x00431821,
+	0x0062102b, 0x10400003, 0x2482ffff, 0x3c010800, 0xac2223f4, 0x3c010800,
+	0xac231bd0, 0x03e00008, 0x27bd0020, 0x27bdffb8, 0x3c050800, 0x24a51ba8,
+	0xafbf0044, 0xafbe0040, 0xafb7003c, 0xafb60038, 0xafb50034, 0xafb40030,
+	0xafb3002c, 0xafb20028, 0xafb10024, 0xafb00020, 0x90a30000, 0x24020003,
+	0x146200d5, 0x00000000, 0x3c090800, 0x95291ba6, 0x3c020800, 0x944223e0,
+	0x3c030800, 0x8c631bc0, 0x3c040800, 0x8c841bbc, 0x01221023, 0x0064182a,
+	0xa7a9001e, 0x106000c8, 0xa7a20016, 0x24be0020, 0x97b6001e, 0x24b30018,
+	0x24b70014, 0x8fc20000, 0x14400008, 0x00000000, 0x8fc2fff8, 0x97a30016,
+	0x8fc4fff4, 0x00431021, 0x0082202a, 0x148000ba, 0x00000000, 0x97d50818,
+	0x32a2ffff, 0x104000ad, 0x00009021, 0x0040a021, 0x00008821, 0x0e00062d,
+	0x00000000, 0x00403021, 0x14c00007, 0x00000000, 0x3c020800, 0x8c4223ec,
+	0x24420001, 0x3c010800, 0x0a00059e, 0xac2223ec, 0x3c100800, 0x02118021,
+	0x8e101bd8, 0x9608000a, 0x31020040, 0x10400004, 0x2407180c, 0x8e02000c,
+	0x2407188c, 0xacc20018, 0x31021000, 0x10400004, 0x34e32000, 0x00081040,
+	0x3042c000, 0x00623825, 0x31020080, 0x54400001, 0x34e70010, 0x3c020800,
+	0x00511021, 0x8c421be0, 0x3c030800, 0x00711821, 0x8c631be4, 0x00021500,
+	0x00031c00, 0x00431025, 0xacc20014, 0x96040008, 0x3242ffff, 0x00821021,
+	0x0282102a, 0x14400002, 0x02b22823, 0x00802821, 0x8e020000, 0x02459021,
+	0xacc20000, 0x8e020004, 0x00c02021, 0x26310010, 0xac820004, 0x30e2ffff,
+	0xac800008, 0xa485000e, 0xac820010, 0x24020305, 0x0e0005aa, 0xa482000c,
+	0x3242ffff, 0x0054102b, 0x1440ffc0, 0x3242ffff, 0x0a000596, 0x00000000,
+	0x8e620000, 0x8e63fffc, 0x0043102a, 0x1040006c, 0x00000000, 0x8e62fff0,
+	0x00028900, 0x3c100800, 0x02118021, 0x0e00062d, 0x8e101bd8, 0x00403021,
+	0x14c00005, 0x00000000, 0x8e62082c, 0x24420001, 0x0a00059e, 0xae62082c,
+	0x9608000a, 0x31020040, 0x10400004, 0x2407180c, 0x8e02000c, 0x2407188c,
+	0xacc20018, 0x31021000, 0x10400004, 0x34e32000, 0x00081040, 0x3042c000,
+	0x00623825, 0x3c020800, 0x00511021, 0x8c421be0, 0x3c030800, 0x00711821,
+	0x8c631be4, 0x00021500, 0x00031c00, 0x00431025, 0xacc20014, 0x8e63fff4,
+	0x96020008, 0x00432023, 0x3242ffff, 0x3083ffff, 0x00431021, 0x02c2102a,
+	0x10400003, 0x00802821, 0x97a9001e, 0x01322823, 0x8e620000, 0x30a4ffff,
+	0x00441021, 0xae620000, 0xa4c5000e, 0x8e020000, 0xacc20000, 0x8e020004,
+	0x8e63fff4, 0x00431021, 0xacc20004, 0x8e63fff4, 0x96020008, 0x00641821,
+	0x0062102a, 0x14400006, 0x02459021, 0x8e62fff0, 0xae60fff4, 0x24420001,
+	0x0a000579, 0xae62fff0, 0xae63fff4, 0xacc00008, 0x3242ffff, 0x10560003,
+	0x31020004, 0x10400006, 0x24020305, 0x31020080, 0x54400001, 0x34e70010,
+	0x34e70020, 0x24020905, 0xa4c2000c, 0x8ee30000, 0x8ee20004, 0x14620007,
+	0x3c02b49a, 0x8ee20860, 0x54400001, 0x34e70400, 0x3c024b65, 0x0a000590,
+	0x34427654, 0x344289ab, 0xacc2001c, 0x30e2ffff, 0xacc20010, 0x0e0005aa,
+	0x00c02021, 0x3242ffff, 0x0056102b, 0x1440ff96, 0x00000000, 0x8e620000,
+	0x8e63fffc, 0x0043102a, 0x1440ff3e, 0x00000000, 0x8fbf0044, 0x8fbe0040,
+	0x8fb7003c, 0x8fb60038, 0x8fb50034, 0x8fb40030, 0x8fb3002c, 0x8fb20028,
+	0x8fb10024, 0x8fb00020, 0x03e00008, 0x27bd0048, 0x27bdffe8, 0xafbf0014,
+	0xafb00010, 0x8f624450, 0x8f634410, 0x0a0005b9, 0x00808021, 0x8f626820,
+	0x30422000, 0x10400003, 0x00000000, 0x0e0001e3, 0x00002021, 0x8f624450,
+	0x8f634410, 0x3042ffff, 0x0043102b, 0x1440fff5, 0x00000000, 0x8f630c14,
+	0x3063000f, 0x2c620002, 0x1440000b, 0x00000000, 0x8f630c14, 0x3c020800,
+	0x8c421b50, 0x3063000f, 0x24420001, 0x3c010800, 0xac221b50, 0x2c620002,
+	0x1040fff7, 0x00000000, 0xaf705c18, 0x8f625c10, 0x30420002, 0x10400009,
+	0x00000000, 0x8f626820, 0x30422000, 0x1040fff8, 0x00000000, 0x0e0001e3,
+	0x00002021, 0x0a0005cc, 0x00000000, 0x8fbf0014, 0x8fb00010, 0x03e00008,
+	0x27bd0018, 0x00000000, 0x00000000, 0x00000000, 0x27bdffe8, 0x3c1bc000,
+	0xafbf0014, 0xafb00010, 0xaf60680c, 0x8f626804, 0x34420082, 0xaf626804,
+	0x8f634000, 0x24020b50, 0x3c010800, 0xac221b64, 0x24020b78, 0x3c010800,
+	0xac221b74, 0x34630002, 0xaf634000, 0x0e00060d, 0x00808021, 0x3c010800,
+	0xa0221b78, 0x304200ff, 0x24030002, 0x14430005, 0x00000000, 0x3c020800,
+	0x8c421b64, 0x0a000600, 0xac5000c0, 0x3c020800, 0x8c421b64, 0xac5000bc,
+	0x8f624434, 0x8f634438, 0x8f644410, 0x3c010800, 0xac221b6c, 0x3c010800,
+	0xac231b7c, 0x3c010800, 0xac241b68, 0x8fbf0014, 0x8fb00010, 0x03e00008,
+	0x27bd0018, 0x3c040800, 0x8c870000, 0x3c03aa55, 0x3463aa55, 0x3c06c003,
+	0xac830000, 0x8cc20000, 0x14430007, 0x24050002, 0x3c0355aa, 0x346355aa,
+	0xac830000, 0x8cc20000, 0x50430001, 0x24050001, 0x3c020800, 0xac470000,
+	0x03e00008, 0x00a01021, 0x27bdfff8, 0x18800009, 0x00002821, 0x8f63680c,
+	0x8f62680c, 0x1043fffe, 0x00000000, 0x24a50001, 0x00a4102a, 0x1440fff9,
+	0x00000000, 0x03e00008, 0x27bd0008, 0x8f634450, 0x3c020800, 0x8c421b6c,
+	0x00031c02, 0x0043102b, 0x14400008, 0x3c038000, 0x3c040800, 0x8c841b7c,
+	0x8f624450, 0x00021c02, 0x0083102b, 0x1040fffc, 0x3c038000, 0xaf634444,
+	0x8f624444, 0x00431024, 0x1440fffd, 0x00000000, 0x8f624448, 0x03e00008,
+	0x3042ffff, 0x3082ffff, 0x2442e000, 0x2c422001, 0x14400003, 0x3c024000,
+	0x0a000650, 0x2402ffff, 0x00822025, 0xaf645c38, 0x8f625c30, 0x30420002,
+	0x1440fffc, 0x00001021, 0x03e00008, 0x00000000, 0x8f624450, 0x3c030800,
+	0x8c631b68, 0x0a000659, 0x3042ffff, 0x8f624450, 0x3042ffff, 0x0043102b,
+	0x1440fffc, 0x00000000, 0x03e00008, 0x00000000, 0x27bdffe0, 0x00802821,
+	0x3c040800, 0x24841b10, 0x00003021, 0x00003821, 0xafbf0018, 0xafa00010,
+	0x0e000684, 0xafa00014, 0x0a000668, 0x00000000, 0x8fbf0018, 0x03e00008,
+	0x27bd0020, 0x00000000, 0x00000000, 0x00000000, 0x3c020800, 0x34423000,
+	0x3c030800, 0x34633000, 0x3c040800, 0x348437ff, 0x3c010800, 0xac221b84,
+	0x24020040, 0x3c010800, 0xac221b88, 0x3c010800, 0xac201b80, 0xac600000,
+	0x24630004, 0x0083102b, 0x5040fffd, 0xac600000, 0x03e00008, 0x00000000,
+	0x00804821, 0x8faa0010, 0x3c020800, 0x8c421b80, 0x3c040800, 0x8c841b88,
+	0x8fab0014, 0x24430001, 0x0044102b, 0x3c010800, 0xac231b80, 0x14400003,
+	0x00004021, 0x3c010800, 0xac201b80, 0x3c020800, 0x8c421b80, 0x3c030800,
+	0x8c631b84, 0x91240000, 0x00021140, 0x00431021, 0x00481021, 0x25080001,
+	0xa0440000, 0x29020008, 0x1440fff4, 0x25290001, 0x3c020800, 0x8c421b80,
+	0x3c030800, 0x8c631b84, 0x8f64680c, 0x00021140, 0x00431021, 0xac440008,
+	0xac45000c, 0xac460010, 0xac470014, 0xac4a0018, 0x03e00008, 0xac4b001c,
+	0x00000000, 0x00000000,
 };
 
 u32 tg3TsoFwRodata[] = {
-	0x4d61696e, 0x43707542, 0x00000000, 0x00000000, 0x74637073, 0x6567496e,
-	0x00000000, 0x53774576, 0x656e7430, 0x00000000, 0x00000000, 0x00000000,
-	0x00000000
+	0x4d61696e, 0x43707542, 0x00000000, 0x4d61696e, 0x43707541,
+	0x00000000, 0x00000000, 0x00000000, 0x73746b6f, 0x66666c64,
+	0x496e0000, 0x73746b6f, 0x66662a2a, 0x00000000, 0x53774576,
+	0x656e7430, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+	0x66617461, 0x6c457272, 0x00000000, 0x00000000, 0x00000000
 };
 
-#if 0 /* All zeros, dont eat up space with it. */
+#if 0 /* All zeros, don't eat up space with it. */
 u32 tg3TsoFwData[] = {
 	0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
 	0x00000000, 0x00000000, 0x00000000
 };
 #endif
 
+/* 5705 needs a special version of the TSO firmware.  */
+#define TG3_TSO5_FW_RELEASE_MAJOR	0x1
+#define TG3_TSO5_FW_RELASE_MINOR	0x1
+#define TG3_TSO5_FW_RELEASE_FIX		0x0
+#define TG3_TSO5_FW_START_ADDR		0x00010000
+#define TG3_TSO5_FW_TEXT_ADDR		0x00010000
+#define TG3_TSO5_FW_TEXT_LEN		0xeb0
+#define TG3_TSO5_FW_RODATA_ADDR		0x00010eb0
+#define TG3_TSO5_FW_RODATA_LEN		0x50
+#define TG3_TSO5_FW_DATA_ADDR		0x00010f20
+#define TG3_TSO5_FW_DATA_LEN		0x20
+#define TG3_TSO5_FW_SBSS_ADDR		0x00010f40
+#define TG3_TSO5_FW_SBSS_LEN		0x28
+#define TG3_TSO5_FW_BSS_ADDR		0x00010f70
+#define TG3_TSO5_FW_BSS_LEN		0x88
+
+static u32 tg3Tso5FwText[] = {
+	0x0c004003, 0x00000000, 0x00010f30, 0x00000000, 0x10000003, 0x00000000,
+	0x0000000d, 0x0000000d, 0x3c1d0001, 0x37bde000, 0x03a0f021, 0x3c100001,
+	0x26100000, 0x0c004010, 0x00000000, 0x0000000d, 0x27bdffe0, 0x3c04fefe,
+	0xafbf0018, 0x0c0042f0, 0x34840002, 0x0c00436c, 0x00000000, 0x3c030001,
+	0x90630f54, 0x24020002, 0x3c040001, 0x24840ebc, 0x14620003, 0x24050001,
+	0x3c040001, 0x24840eb0, 0x24060001, 0x00003821, 0xafa00010, 0x0c004380,
+	0xafa00014, 0x0c00402c, 0x00000000, 0x8fbf0018, 0x03e00008, 0x27bd0020,
+	0x00000000, 0x00000000, 0x27bdffe0, 0xafbf001c, 0xafb20018, 0xafb10014,
+	0x0c0042d3, 0xafb00010, 0x3c128000, 0x24110001, 0x8f706810, 0x32020400,
+	0x10400007, 0x00000000, 0x8f641008, 0x00921024, 0x14400003, 0x00000000,
+	0x0c004064, 0x00000000, 0x3c020001, 0x90420f76, 0x10510003, 0x32020200,
+	0x1040fff1, 0x00000000, 0x0c0041b4, 0x00000000, 0x08004034, 0x00000000,
+	0x8fbf001c, 0x8fb20018, 0x8fb10014, 0x8fb00010, 0x03e00008, 0x27bd0020,
+	0x27bdffe0, 0x3c040001, 0x24840ed0, 0x00002821, 0x00003021, 0x00003821,
+	0xafbf0018, 0xafa00010, 0x0c004380, 0xafa00014, 0x0000d021, 0x24020130,
+	0xaf625000, 0x3c010001, 0xa4200f70, 0x3c010001, 0xa0200f77, 0x8fbf0018,
+	0x03e00008, 0x27bd0020, 0x00000000, 0x00000000, 0x3c030001, 0x24630f80,
+	0x90620000, 0x27bdfff0, 0x14400003, 0x0080c021, 0x08004073, 0x00004821,
+	0x3c022000, 0x03021024, 0x10400003, 0x24090002, 0x08004073, 0xa0600000,
+	0x24090001, 0x00181040, 0x30431f80, 0x346f8008, 0x1520004b, 0x25eb0028,
+	0x3c040001, 0x00832021, 0x8c848010, 0x3c050001, 0x24a50f9a, 0x00041402,
+	0xa0a20000, 0x3c010001, 0xa0240f9b, 0x3c020001, 0x00431021, 0x94428014,
+	0x3c010001, 0xa0220f9c, 0x3c0c0001, 0x01836021, 0x8d8c8018, 0x304200ff,
+	0x24420008, 0x000220c3, 0x24020001, 0x3c010001, 0xa0220f80, 0x0124102b,
+	0x1040000c, 0x00003821, 0x24a6000e, 0x01602821, 0x8ca20000, 0x8ca30004,
+	0x24a50008, 0x24e70001, 0xacc20000, 0xacc30004, 0x00e4102b, 0x1440fff8,
+	0x24c60008, 0x00003821, 0x3c080001, 0x25080f9b, 0x91060000, 0x3c020001,
+	0x90420f9c, 0x2503000d, 0x00c32821, 0x00461023, 0x00021fc2, 0x00431021,
+	0x00021043, 0x1840000c, 0x00002021, 0x91020001, 0x00461023, 0x00021fc2,
+	0x00431021, 0x00021843, 0x94a20000, 0x24e70001, 0x00822021, 0x00e3102a,
+	0x1440fffb, 0x24a50002, 0x00041c02, 0x3082ffff, 0x00622021, 0x00041402,
+	0x00822021, 0x3c02ffff, 0x01821024, 0x3083ffff, 0x00431025, 0x3c010001,
+	0x080040fa, 0xac220fa0, 0x3c050001, 0x24a50f9c, 0x90a20000, 0x3c0c0001,
+	0x01836021, 0x8d8c8018, 0x000220c2, 0x1080000e, 0x00003821, 0x01603021,
+	0x24a5000c, 0x8ca20000, 0x8ca30004, 0x24a50008, 0x24e70001, 0xacc20000,
+	0xacc30004, 0x00e4102b, 0x1440fff8, 0x24c60008, 0x3c050001, 0x24a50f9c,
+	0x90a20000, 0x30430007, 0x24020004, 0x10620011, 0x28620005, 0x10400005,
+	0x24020002, 0x10620008, 0x000710c0, 0x080040fa, 0x00000000, 0x24020006,
+	0x1062000e, 0x000710c0, 0x080040fa, 0x00000000, 0x00a21821, 0x9463000c,
+	0x004b1021, 0x080040fa, 0xa4430000, 0x000710c0, 0x00a21821, 0x8c63000c,
+	0x004b1021, 0x080040fa, 0xac430000, 0x00a21821, 0x8c63000c, 0x004b2021,
+	0x00a21021, 0xac830000, 0x94420010, 0xa4820004, 0x95e70006, 0x3c020001,
+	0x90420f9c, 0x3c030001, 0x90630f9a, 0x00e2c823, 0x3c020001, 0x90420f9b,
+	0x24630028, 0x01e34021, 0x24420028, 0x15200012, 0x01e23021, 0x94c2000c,
+	0x3c010001, 0xa4220f98, 0x94c20004, 0x94c30006, 0x3c010001, 0xa4200f96,
+	0x3c010001, 0xa4200f92, 0x00021400, 0x00431025, 0x3c010001, 0xac220f8c,
+	0x95020004, 0x3c010001, 0x08004124, 0xa4220f90, 0x3c020001, 0x94420f90,
+	0x3c030001, 0x94630f92, 0x00431021, 0xa5020004, 0x3c020001, 0x94420f8c,
+	0xa4c20004, 0x3c020001, 0x8c420f8c, 0xa4c20006, 0x3c040001, 0x94840f92,
+	0x3c020001, 0x94420f90, 0x3c0a0001, 0x954a0f96, 0x00441821, 0x3063ffff,
+	0x0062182a, 0x24020002, 0x1122000b, 0x00832023, 0x3c030001, 0x94630f98,
+	0x30620009, 0x10400006, 0x3062fff6, 0xa4c2000c, 0x3c020001, 0x94420f98,
+	0x30420009, 0x01425023, 0x24020001, 0x1122001b, 0x29220002, 0x50400005,
+	0x24020002, 0x11200007, 0x31a2ffff, 0x08004197, 0x00000000, 0x1122001d,
+	0x24020016, 0x08004197, 0x31a2ffff, 0x3c0e0001, 0x95ce0fa0, 0x10800005,
+	0x01806821, 0x01c42021, 0x00041c02, 0x3082ffff, 0x00627021, 0x000e1027,
+	0xa502000a, 0x3c030001, 0x90630f9b, 0x31a2ffff, 0x00e21021, 0x0800418d,
+	0x00432023, 0x3c020001, 0x94420fa0, 0x00442021, 0x00041c02, 0x3082ffff,
+	0x00622021, 0x00807021, 0x00041027, 0x08004185, 0xa502000a, 0x3c050001,
+	0x24a50f9a, 0x90a30000, 0x14620002, 0x24e2fff2, 0xa5e20034, 0x90a20000,
+	0x00e21023, 0xa5020002, 0x3c030001, 0x94630fa0, 0x3c020001, 0x94420f7a,
+	0x30e5ffff, 0x00641821, 0x00451023, 0x00622023, 0x00041c02, 0x3082ffff,
+	0x00622021, 0x00041027, 0xa502000a, 0x3c030001, 0x90630f9c, 0x24620001,
+	0x14a20005, 0x00807021, 0x01631021, 0x90420000, 0x08004185, 0x00026200,
+	0x24620002, 0x14a20003, 0x306200fe, 0x004b1021, 0x944c0000, 0x3c020001,
+	0x94420fa2, 0x3183ffff, 0x3c040001, 0x90840f9b, 0x00431021, 0x00e21021,
+	0x00442023, 0x008a2021, 0x00041c02, 0x3082ffff, 0x00622021, 0x00041402,
+	0x00822021, 0x00806821, 0x00041027, 0xa4c20010, 0x31a2ffff, 0x000e1c00,
+	0x00431025, 0x3c040001, 0x24840f92, 0xade20010, 0x94820000, 0x3c050001,
+	0x94a50f96, 0x3c030001, 0x8c630f8c, 0x24420001, 0x00b92821, 0xa4820000,
+	0x3322ffff, 0x00622021, 0x0083182b, 0x3c010001, 0xa4250f96, 0x10600003,
+	0x24a2ffff, 0x3c010001, 0xa4220f96, 0x3c024000, 0x03021025, 0x3c010001,
+	0xac240f8c, 0xaf621008, 0x03e00008, 0x27bd0010, 0x3c030001, 0x90630f76,
+	0x27bdffe8, 0x24020001, 0xafbf0014, 0x10620026, 0xafb00010, 0x8f620cf4,
+	0x2442ffff, 0x3042007f, 0x00021100, 0x8c434000, 0x3c010001, 0xac230f84,
+	0x8c434008, 0x24444000, 0x8c5c4004, 0x30620040, 0x14400002, 0x24020088,
+	0x24020008, 0x3c010001, 0xa4220f88, 0x30620004, 0x10400005, 0x24020001,
+	0x3c010001, 0xa0220f77, 0x080041d5, 0x00031402, 0x3c010001, 0xa0200f77,
+	0x00031402, 0x3c010001, 0xa4220f74, 0x9483000c, 0x24020001, 0x3c010001,
+	0xa4200f70, 0x3c010001, 0xa0220f76, 0x3c010001, 0xa4230f82, 0x24020001,
+	0x1342001e, 0x00000000, 0x13400005, 0x24020003, 0x13420067, 0x00000000,
+	0x080042cf, 0x00000000, 0x3c020001, 0x94420f82, 0x241a0001, 0x3c010001,
+	0xa4200f7e, 0x3c010001, 0xa4200f72, 0x304407ff, 0x00021bc2, 0x00031823,
+	0x3063003e, 0x34630036, 0x00021242, 0x3042003c, 0x00621821, 0x3c010001,
+	0xa4240f78, 0x00832021, 0x24630030, 0x3c010001, 0xa4240f7a, 0x3c010001,
+	0xa4230f7c, 0x3c060001, 0x24c60f72, 0x94c50000, 0x94c30002, 0x3c040001,
+	0x94840f7a, 0x00651021, 0x0044102a, 0x10400013, 0x3c108000, 0x00a31021,
+	0xa4c20000, 0x3c02a000, 0xaf620cf4, 0x3c010001, 0xa0200f76, 0x8f641008,
+	0x00901024, 0x14400003, 0x00000000, 0x0c004064, 0x00000000, 0x8f620cf4,
+	0x00501024, 0x104000b7, 0x00000000, 0x0800420f, 0x00000000, 0x3c030001,
+	0x94630f70, 0x00851023, 0xa4c40000, 0x00621821, 0x3042ffff, 0x3c010001,
+	0xa4230f70, 0xaf620ce8, 0x3c020001, 0x94420f88, 0x34420024, 0xaf620cec,
+	0x94c30002, 0x3c020001, 0x94420f70, 0x14620012, 0x3c028000, 0x3c108000,
+	0x3c02a000, 0xaf620cf4, 0x3c010001, 0xa0200f76, 0x8f641008, 0x00901024,
+	0x14400003, 0x00000000, 0x0c004064, 0x00000000, 0x8f620cf4, 0x00501024,
+	0x1440fff7, 0x00000000, 0x080042cf, 0x241a0003, 0xaf620cf4, 0x3c108000,
+	0x8f641008, 0x00901024, 0x14400003, 0x00000000, 0x0c004064, 0x00000000,
+	0x8f620cf4, 0x00501024, 0x1440fff7, 0x00000000, 0x080042cf, 0x241a0003,
+	0x3c070001, 0x24e70f70, 0x94e20000, 0x03821021, 0xaf620ce0, 0x3c020001,
+	0x8c420f84, 0xaf620ce4, 0x3c050001, 0x94a50f74, 0x94e30000, 0x3c040001,
+	0x94840f78, 0x3c020001, 0x94420f7e, 0x00a32823, 0x00822023, 0x30a6ffff,
+	0x3083ffff, 0x00c3102b, 0x14400043, 0x00000000, 0x3c020001, 0x94420f7c,
+	0x00021400, 0x00621025, 0xaf620ce8, 0x94e20000, 0x3c030001, 0x94630f74,
+	0x00441021, 0xa4e20000, 0x3042ffff, 0x14430021, 0x3c020008, 0x3c020001,
+	0x90420f77, 0x10400006, 0x3c03000c, 0x3c020001, 0x94420f88, 0x34630624,
+	0x0800427c, 0x0000d021, 0x3c020001, 0x94420f88, 0x3c030008, 0x34630624,
+	0x00431025, 0xaf620cec, 0x3c108000, 0x3c02a000, 0xaf620cf4, 0x3c010001,
+	0xa0200f76, 0x8f641008, 0x00901024, 0x14400003, 0x00000000, 0x0c004064,
+	0x00000000, 0x8f620cf4, 0x00501024, 0x10400015, 0x00000000, 0x08004283,
+	0x00000000, 0x3c030001, 0x94630f88, 0x34420624, 0x3c108000, 0x00621825,
+	0x3c028000, 0xaf630cec, 0xaf620cf4, 0x8f641008, 0x00901024, 0x14400003,
+	0x00000000, 0x0c004064, 0x00000000, 0x8f620cf4, 0x00501024, 0x1440fff7,
+	0x00000000, 0x3c010001, 0x080042cf, 0xa4200f7e, 0x3c020001, 0x94420f7c,
+	0x00021400, 0x00c21025, 0xaf620ce8, 0x3c020001, 0x90420f77, 0x10400009,
+	0x3c03000c, 0x3c020001, 0x94420f88, 0x34630624, 0x0000d021, 0x00431025,
+	0xaf620cec, 0x080042c1, 0x3c108000, 0x3c020001, 0x94420f88, 0x3c030008,
+	0x34630604, 0x00431025, 0xaf620cec, 0x3c020001, 0x94420f7e, 0x00451021,
+	0x3c010001, 0xa4220f7e, 0x3c108000, 0x3c02a000, 0xaf620cf4, 0x3c010001,
+	0xa0200f76, 0x8f641008, 0x00901024, 0x14400003, 0x00000000, 0x0c004064,
+	0x00000000, 0x8f620cf4, 0x00501024, 0x1440fff7, 0x00000000, 0x8fbf0014,
+	0x8fb00010, 0x03e00008, 0x27bd0018, 0x27bdffe0, 0x3c040001, 0x24840ee0,
+	0x00002821, 0x00003021, 0x00003821, 0xafbf0018, 0xafa00010, 0x0c004380,
+	0xafa00014, 0x0000d021, 0x24020130, 0xaf625000, 0x3c010001, 0xa4200f70,
+	0x3c010001, 0xa0200f77, 0x8f636804, 0x3c020001, 0x3442e000, 0x00621824,
+	0x3c020001, 0x14620003, 0x00000000, 0x080042eb, 0x00000000, 0x8fbf0018,
+	0x03e00008, 0x27bd0020, 0x27bdffe8, 0x3c1bc000, 0xafbf0014, 0xafb00010,
+	0xaf60680c, 0x8f626804, 0x34420082, 0xaf626804, 0x8f634000, 0x24020b50,
+	0x3c010001, 0xac220f40, 0x24020b78, 0x3c010001, 0xac220f50, 0x34630002,
+	0xaf634000, 0x0c00431d, 0x00808021, 0x3c010001, 0xa0220f54, 0x304200ff,
+	0x24030002, 0x14430005, 0x00000000, 0x3c020001, 0x8c420f40, 0x08004310,
+	0xac5000c0, 0x3c020001, 0x8c420f40, 0xac5000bc, 0x8f624434, 0x8f634438,
+	0x8f644410, 0x3c010001, 0xac220f48, 0x3c010001, 0xac230f58, 0x3c010001,
+	0xac240f44, 0x8fbf0014, 0x8fb00010, 0x03e00008, 0x27bd0018, 0x03e00008,
+	0x24020001, 0x27bdfff8, 0x18800009, 0x00002821, 0x8f63680c, 0x8f62680c,
+	0x1043fffe, 0x00000000, 0x24a50001, 0x00a4102a, 0x1440fff9, 0x00000000,
+	0x03e00008, 0x27bd0008, 0x8f634450, 0x3c020001, 0x8c420f48, 0x00031c02,
+	0x0043102b, 0x14400008, 0x3c038000, 0x3c040001, 0x8c840f58, 0x8f624450,
+	0x00021c02, 0x0083102b, 0x1040fffc, 0x3c038000, 0xaf634444, 0x8f624444,
+	0x00431024, 0x1440fffd, 0x00000000, 0x8f624448, 0x03e00008, 0x3042ffff,
+	0x3082ffff, 0x2442e000, 0x2c422001, 0x14400003, 0x3c024000, 0x0800434f,
+	0x2402ffff, 0x00822025, 0xaf645c38, 0x8f625c30, 0x30420002, 0x1440fffc,
+	0x00001021, 0x03e00008, 0x00000000, 0x8f624450, 0x3c030001, 0x8c630f44,
+	0x08004358, 0x3042ffff, 0x8f624450, 0x3042ffff, 0x0043102b, 0x1440fffc,
+	0x00000000, 0x03e00008, 0x00000000, 0x27bdffe0, 0x00802821, 0x3c040001,
+	0x24840ef0, 0x00003021, 0x00003821, 0xafbf0018, 0xafa00010, 0x0c004380,
+	0xafa00014, 0x08004367, 0x00000000, 0x8fbf0018, 0x03e00008, 0x27bd0020,
+	0x3c020001, 0x3442d600, 0x3c030001, 0x3463d600, 0x3c040001, 0x3484ddff,
+	0x3c010001, 0xac220f60, 0x24020040, 0x3c010001, 0xac220f64, 0x3c010001,
+	0xac200f5c, 0xac600000, 0x24630004, 0x0083102b, 0x5040fffd, 0xac600000,
+	0x03e00008, 0x00000000, 0x00804821, 0x8faa0010, 0x3c020001, 0x8c420f5c,
+	0x3c040001, 0x8c840f64, 0x8fab0014, 0x24430001, 0x0044102b, 0x3c010001,
+	0xac230f5c, 0x14400003, 0x00004021, 0x3c010001, 0xac200f5c, 0x3c020001,
+	0x8c420f5c, 0x3c030001, 0x8c630f60, 0x91240000, 0x00021140, 0x00431021,
+	0x00481021, 0x25080001, 0xa0440000, 0x29020008, 0x1440fff4, 0x25290001,
+	0x3c020001, 0x8c420f5c, 0x3c030001, 0x8c630f60, 0x8f64680c, 0x00021140,
+	0x00431021, 0xac440008, 0xac45000c, 0xac460010, 0xac470014, 0xac4a0018,
+	0x03e00008, 0xac4b001c, 0x00000000, 0x00000000,
+};
+
+u32 tg3Tso5FwRodata[] = {
+	0x4d61696e, 0x43707542, 0x00000000, 0x4d61696e, 0x43707541, 0x00000000,
+	0x00000000, 0x00000000, 0x73746b6f, 0x66666c64, 0x00000000, 0x00000000,
+	0x73746b6f, 0x66666c64, 0x00000000, 0x00000000, 0x66617461, 0x6c457272,
+	0x00000000, 0x00000000, 0x00000000
+};
+
+u32 tg3Tso5FwData[] = {
+	0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x73746b6f, 
+	0x66666c64, 0x5f76312e, 0x312e3000, 0x00000000
+};
+
 /* tp->lock is held. */
 static int tg3_load_tso_firmware(struct tg3 *tp)
 {
 	struct fw_info info;
+	unsigned long cpu_base, cpu_scratch_base, cpu_scratch_size;
 	int err, i;
 
-	info.text_base = TG3_TSO_FW_TEXT_ADDR;
-	info.text_len = TG3_TSO_FW_TEXT_LEN;
-	info.text_data = &tg3TsoFwText[0];
-	info.rodata_base = TG3_TSO_FW_RODATA_ADDR;
-	info.rodata_len = TG3_TSO_FW_RODATA_LEN;
-	info.rodata_data = &tg3TsoFwRodata[0];
-	info.data_base = TG3_TSO_FW_DATA_ADDR;
-	info.data_len = TG3_TSO_FW_DATA_LEN;
-	info.data_data = NULL;
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705) {
+		info.text_base = TG3_TSO5_FW_TEXT_ADDR;
+		info.text_len = TG3_TSO5_FW_TEXT_LEN;
+		info.text_data = &tg3Tso5FwText[0];
+		info.rodata_base = TG3_TSO5_FW_RODATA_ADDR;
+		info.rodata_len = TG3_TSO5_FW_RODATA_LEN;
+		info.rodata_data = &tg3Tso5FwRodata[0];
+		info.data_base = TG3_TSO5_FW_DATA_ADDR;
+		info.data_len = TG3_TSO5_FW_DATA_LEN;
+		info.data_data = &tg3Tso5FwData[0];
+		cpu_base = RX_CPU_BASE;
+		cpu_scratch_base = NIC_SRAM_MBUF_POOL_BASE5705;
+		cpu_scratch_size = (info.text_len +
+				    info.rodata_len +
+				    info.data_len +
+				    TG3_TSO5_FW_SBSS_LEN +
+				    TG3_TSO5_FW_BSS_LEN);
+	} else {
+		info.text_base = TG3_TSO_FW_TEXT_ADDR;
+		info.text_len = TG3_TSO_FW_TEXT_LEN;
+		info.text_data = &tg3TsoFwText[0];
+		info.rodata_base = TG3_TSO_FW_RODATA_ADDR;
+		info.rodata_len = TG3_TSO_FW_RODATA_LEN;
+		info.rodata_data = &tg3TsoFwRodata[0];
+		info.data_base = TG3_TSO_FW_DATA_ADDR;
+		info.data_len = TG3_TSO_FW_DATA_LEN;
+		info.data_data = NULL;
+		cpu_base = TX_CPU_BASE;
+		cpu_scratch_base = TX_CPU_SCRATCH_BASE;
+		cpu_scratch_size = TX_CPU_SCRATCH_SIZE;
+	}
 
-	err = tg3_load_firmware_cpu(tp, TX_CPU_BASE,
-				    TX_CPU_SCRATCH_BASE, TX_CPU_SCRATCH_SIZE,
+	err = tg3_load_firmware_cpu(tp, cpu_base,
+				    cpu_scratch_base, cpu_scratch_size,
 				    &info);
 	if (err)
 		return err;
 
-	/* Now startup only the TX cpu. */
-	tw32(TX_CPU_BASE + CPU_STATE, 0xffffffff);
-	tw32(TX_CPU_BASE + CPU_PC,    TG3_TSO_FW_TEXT_ADDR);
+	/* Now startup the cpu. */
+	tw32(cpu_base + CPU_STATE, 0xffffffff);
+	tw32(cpu_base + CPU_PC,    info.text_base);
 
 	/* Flush posted writes. */
-	tr32(TX_CPU_BASE + CPU_PC);
+	tr32(cpu_base + CPU_PC);
 	for (i = 0; i < 5; i++) {
-		if (tr32(TX_CPU_BASE + CPU_PC) == TG3_TSO_FW_TEXT_ADDR)
+		if (tr32(cpu_base + CPU_PC) == info.text_base)
 			break;
-		tw32(TX_CPU_BASE + CPU_STATE, 0xffffffff);
-		tw32(TX_CPU_BASE + CPU_MODE,  CPU_MODE_HALT);
-		tw32(TX_CPU_BASE + CPU_PC,    TG3_TSO_FW_TEXT_ADDR);
+		tw32(cpu_base + CPU_STATE, 0xffffffff);
+		tw32(cpu_base + CPU_MODE,  CPU_MODE_HALT);
+		tw32(cpu_base + CPU_PC,    info.text_base);
 
 		/* Flush posted writes. */
-		tr32(TX_CPU_BASE + CPU_PC);
+		tr32(cpu_base + CPU_PC);
 
 		udelay(1000);
 	}
 	if (i >= 5) {
 		printk(KERN_ERR PFX "tg3_load_tso_firmware fails for %s "
-		       "to set TX CPU PC, is %08x should be %08x\n",
-		       tp->dev->name, tr32(TX_CPU_BASE + CPU_PC),
-		       TG3_TSO_FW_TEXT_ADDR);
+		       "to set CPU PC, is %08x should be %08x\n",
+		       tp->dev->name, tr32(cpu_base + CPU_PC),
+		       info.text_base);
 		return -ENODEV;
 	}
-	tw32(TX_CPU_BASE + CPU_STATE, 0xffffffff);
-	tw32(TX_CPU_BASE + CPU_MODE,  0x00000000);
+	tw32(cpu_base + CPU_STATE, 0xffffffff);
+	tw32(cpu_base + CPU_MODE,  0x00000000);
 
 	/* Flush posted writes. */
-	tr32(TX_CPU_BASE + CPU_MODE);
+	tr32(cpu_base + CPU_MODE);
 
 	return 0;
 }
 
-#endif /* TG3_DO_TSO != 0 */
+#endif /* TG3_TSO_SUPPORT != 0 */
 
 /* tp->lock is held. */
 static void __tg3_set_mac_addr(struct tg3 *tp)
@@ -3910,6 +4497,15 @@ static void __tg3_set_mac_addr(struct tg3 *tp)
 	for (i = 0; i < 4; i++) {
 		tw32(MAC_ADDR_0_HIGH + (i * 8), addr_high);
 		tw32(MAC_ADDR_0_LOW + (i * 8), addr_low);
+	}
+
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5700 &&
+	    GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5701 &&
+	    GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705) {
+		for (i = 0; i < 12; i++) {
+			tw32(MAC_EXTADDR_0_HIGH + (i * 8), addr_high);
+			tw32(MAC_EXTADDR_0_LOW + (i * 8), addr_low);
+		}
 	}
 
 	addr_high = (tp->dev->dev_addr[0] +
@@ -3945,23 +4541,19 @@ static void tg3_set_bdinfo(struct tg3 *tp, u32 bdinfo_addr,
 			   u32 nic_addr)
 {
 	tg3_write_mem(tp,
-		      (bdinfo_addr +
-		       TG3_BDINFO_HOST_ADDR +
-		       TG3_64BIT_REG_HIGH),
+		      (bdinfo_addr + TG3_BDINFO_HOST_ADDR + TG3_64BIT_REG_HIGH),
 		      ((u64) mapping >> 32));
 	tg3_write_mem(tp,
-		      (bdinfo_addr +
-		       TG3_BDINFO_HOST_ADDR +
-		       TG3_64BIT_REG_LOW),
+		      (bdinfo_addr + TG3_BDINFO_HOST_ADDR + TG3_64BIT_REG_LOW),
 		      ((u64) mapping & 0xffffffff));
 	tg3_write_mem(tp,
-		      (bdinfo_addr +
-		       TG3_BDINFO_MAXLEN_FLAGS),
+		      (bdinfo_addr + TG3_BDINFO_MAXLEN_FLAGS),
 		       maxlen_flags);
-	tg3_write_mem(tp,
-		      (bdinfo_addr +
-		       TG3_BDINFO_NIC_ADDR),
-		      nic_addr);
+
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705)
+		tg3_write_mem(tp,
+			      (bdinfo_addr + TG3_BDINFO_NIC_ADDR),
+			      nic_addr);
 }
 
 static void __tg3_set_rx_mode(struct net_device *);
@@ -3969,8 +4561,8 @@ static void __tg3_set_rx_mode(struct net_device *);
 /* tp->lock is held. */
 static int tg3_reset_hw(struct tg3 *tp)
 {
-	u32 val;
-	int i, err;
+	u32 val, rdmac_mode;
+	int i, err, limit;
 
 	tg3_disable_ints(tp);
 
@@ -4003,7 +4595,8 @@ static int tg3_reset_hw(struct tg3 *tp)
 			break;
 		udelay(10);
 	}
-	if (i >= 100000) {
+	if (i >= 100000 &&
+	    !(tp->tg3_flags2 & TG3_FLG2_SUN_5704)) {
 		printk(KERN_ERR PFX "tg3_reset_hw timed out for %s, "
 		       "firmware will not restart magic=%08x\n",
 		       tp->dev->name, val);
@@ -4021,9 +4614,8 @@ static int tg3_reset_hw(struct tg3 *tp)
 	 * B3 tigon3 silicon.  This bit has no effect on any
 	 * other revision.
 	 */
-	val = tr32(TG3PCI_CLOCK_CTRL);
-	val |= CLOCK_CTRL_DELAY_PCI_GRANT;
-	tw32(TG3PCI_CLOCK_CTRL, val);
+	tp->pci_clock_ctrl |= CLOCK_CTRL_DELAY_PCI_GRANT;
+	tw32(TG3PCI_CLOCK_CTRL, tp->pci_clock_ctrl);
 	tr32(TG3PCI_CLOCK_CTRL);
 
 	if (tp->pci_chip_rev_id == CHIPREV_ID_5704_A0 &&
@@ -4033,12 +4625,21 @@ static int tg3_reset_hw(struct tg3 *tp)
 		tw32(TG3PCI_PCISTATE, val);
 	}
 
+	/* Descriptor ring init may make accesses to the
+	 * NIC SRAM area to setup the TX descriptors, so we
+	 * can only do this after the hardware has been
+	 * successfully reset.
+	 */
+	tg3_init_rings(tp);
+
 	/* Clear statistics/status block in chip, and status block in ram. */
-	for (i = NIC_SRAM_STATS_BLK;
-	     i < NIC_SRAM_STATUS_BLK + TG3_HW_STATUS_SIZE;
-	     i += sizeof(u32)) {
-		tg3_write_mem(tp, i, 0);
-		udelay(40);
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705) {
+		for (i = NIC_SRAM_STATS_BLK;
+	     	     i < NIC_SRAM_STATUS_BLK + TG3_HW_STATUS_SIZE;
+	     	     i += sizeof(u32)) {
+			tg3_write_mem(tp, i, 0);
+			udelay(40);
+		}
 	}
 	memset(tp->hw_status, 0, TG3_HW_STATUS_SIZE);
 
@@ -4069,13 +4670,31 @@ static int tg3_reset_hw(struct tg3 *tp)
 	     (65 << GRC_MISC_CFG_PRESCALAR_SHIFT));
 
 	/* Initialize MBUF/DESC pool. */
-	tw32(BUFMGR_MB_POOL_ADDR, NIC_SRAM_MBUF_POOL_BASE);
-	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704)
-		tw32(BUFMGR_MB_POOL_SIZE, NIC_SRAM_MBUF_POOL_SIZE64);
-	else
-		tw32(BUFMGR_MB_POOL_SIZE, NIC_SRAM_MBUF_POOL_SIZE96);
-	tw32(BUFMGR_DMA_DESC_POOL_ADDR, NIC_SRAM_DMA_DESC_POOL_BASE);
-	tw32(BUFMGR_DMA_DESC_POOL_SIZE, NIC_SRAM_DMA_DESC_POOL_SIZE);
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705) {
+		tw32(BUFMGR_MB_POOL_ADDR, NIC_SRAM_MBUF_POOL_BASE);
+		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704)
+			tw32(BUFMGR_MB_POOL_SIZE, NIC_SRAM_MBUF_POOL_SIZE64);
+		else
+			tw32(BUFMGR_MB_POOL_SIZE, NIC_SRAM_MBUF_POOL_SIZE96);
+		tw32(BUFMGR_DMA_DESC_POOL_ADDR, NIC_SRAM_DMA_DESC_POOL_BASE);
+		tw32(BUFMGR_DMA_DESC_POOL_SIZE, NIC_SRAM_DMA_DESC_POOL_SIZE);
+	}
+#if TG3_TSO_SUPPORT != 0
+	else if (tp->tg3_flags2 & TG3_FLG2_TSO_CAPABLE) {
+		int fw_len;
+
+		fw_len = (TG3_TSO5_FW_TEXT_LEN +
+			  TG3_TSO5_FW_RODATA_LEN +
+			  TG3_TSO5_FW_DATA_LEN +
+			  TG3_TSO5_FW_SBSS_LEN +
+			  TG3_TSO5_FW_BSS_LEN);
+		fw_len = (fw_len + (0x80 - 1)) & ~(0x80 - 1);
+		tw32(BUFMGR_MB_POOL_ADDR,
+		     NIC_SRAM_MBUF_POOL_BASE5705 + fw_len);
+		tw32(BUFMGR_MB_POOL_SIZE,
+		     NIC_SRAM_MBUF_POOL_SIZE5705 - fw_len - 0xa00);
+	}
+#endif
 
 	if (!(tp->tg3_flags & TG3_FLAG_JUMBO_ENABLE)) {
 		tw32(BUFMGR_MB_RDMA_LOW_WATER,
@@ -4122,6 +4741,9 @@ static int tg3_reset_hw(struct tg3 *tp)
 		return -ENODEV;
 	}
 
+	/* Setup replenish threshold. */
+	tw32(RCVBDI_STD_THRESH, tp->rx_pending / 8);
+
 	/* Initialize TG3_BDINFO's at:
 	 *  RCVDBDI_STD_BD:	standard eth size rx ring
 	 *  RCVDBDI_JUMBO_BD:	jumbo frame rx ring
@@ -4143,35 +4765,50 @@ static int tg3_reset_hw(struct tg3 *tp)
 	     ((u64) tp->rx_std_mapping >> 32));
 	tw32(RCVDBDI_STD_BD + TG3_BDINFO_HOST_ADDR + TG3_64BIT_REG_LOW,
 	     ((u64) tp->rx_std_mapping & 0xffffffff));
-	tw32(RCVDBDI_STD_BD + TG3_BDINFO_MAXLEN_FLAGS,
-	     RX_STD_MAX_SIZE << BDINFO_FLAGS_MAXLEN_SHIFT);
 	tw32(RCVDBDI_STD_BD + TG3_BDINFO_NIC_ADDR,
 	     NIC_SRAM_RX_BUFFER_DESC);
 
-	tw32(RCVDBDI_MINI_BD + TG3_BDINFO_MAXLEN_FLAGS,
-	     BDINFO_FLAGS_DISABLED);
-
-	if (tp->tg3_flags & TG3_FLAG_JUMBO_ENABLE) {
-		tw32(RCVDBDI_JUMBO_BD + TG3_BDINFO_HOST_ADDR + TG3_64BIT_REG_HIGH,
-		     ((u64) tp->rx_jumbo_mapping >> 32));
-		tw32(RCVDBDI_JUMBO_BD + TG3_BDINFO_HOST_ADDR + TG3_64BIT_REG_LOW,
-		     ((u64) tp->rx_jumbo_mapping & 0xffffffff));
-		tw32(RCVDBDI_JUMBO_BD + TG3_BDINFO_MAXLEN_FLAGS,
-		     RX_JUMBO_MAX_SIZE << BDINFO_FLAGS_MAXLEN_SHIFT);
-		tw32(RCVDBDI_JUMBO_BD + TG3_BDINFO_NIC_ADDR,
-		     NIC_SRAM_RX_JUMBO_BUFFER_DESC);
+	/* Don't even try to program the JUMBO/MINI buffer descriptor
+	 * configs on 5705.
+	 */
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705) {
+		tw32(RCVDBDI_STD_BD + TG3_BDINFO_MAXLEN_FLAGS,
+		     RX_STD_MAX_SIZE_5705 << BDINFO_FLAGS_MAXLEN_SHIFT);
 	} else {
-		tw32(RCVDBDI_JUMBO_BD + TG3_BDINFO_MAXLEN_FLAGS,
+		tw32(RCVDBDI_STD_BD + TG3_BDINFO_MAXLEN_FLAGS,
+		     RX_STD_MAX_SIZE << BDINFO_FLAGS_MAXLEN_SHIFT);
+
+		tw32(RCVDBDI_MINI_BD + TG3_BDINFO_MAXLEN_FLAGS,
 		     BDINFO_FLAGS_DISABLED);
+
+		/* Setup replenish threshold. */
+		tw32(RCVBDI_JUMBO_THRESH, tp->rx_jumbo_pending / 8);
+
+		if (tp->tg3_flags & TG3_FLAG_JUMBO_ENABLE) {
+			tw32(RCVDBDI_JUMBO_BD + TG3_BDINFO_HOST_ADDR + TG3_64BIT_REG_HIGH,
+			     ((u64) tp->rx_jumbo_mapping >> 32));
+			tw32(RCVDBDI_JUMBO_BD + TG3_BDINFO_HOST_ADDR + TG3_64BIT_REG_LOW,
+			     ((u64) tp->rx_jumbo_mapping & 0xffffffff));
+			tw32(RCVDBDI_JUMBO_BD + TG3_BDINFO_MAXLEN_FLAGS,
+			     RX_JUMBO_MAX_SIZE << BDINFO_FLAGS_MAXLEN_SHIFT);
+			tw32(RCVDBDI_JUMBO_BD + TG3_BDINFO_NIC_ADDR,
+			     NIC_SRAM_RX_JUMBO_BUFFER_DESC);
+		} else {
+			tw32(RCVDBDI_JUMBO_BD + TG3_BDINFO_MAXLEN_FLAGS,
+			     BDINFO_FLAGS_DISABLED);
+		}
+
 	}
 
-	/* Setup replenish thresholds. */
-	tw32(RCVBDI_STD_THRESH, tp->rx_pending / 8);
-	tw32(RCVBDI_JUMBO_THRESH, tp->rx_jumbo_pending / 8);
-
-	/* Clear out send RCB ring in SRAM. */
-	for (i = NIC_SRAM_SEND_RCB; i < NIC_SRAM_RCV_RET_RCB; i += TG3_BDINFO_SIZE)
-		tg3_write_mem(tp, i + TG3_BDINFO_MAXLEN_FLAGS, BDINFO_FLAGS_DISABLED);
+	/* There is only one send ring on 5705, no need to explicitly
+	 * disable the others.
+	 */
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705) {
+		/* Clear out send RCB ring in SRAM. */
+		for (i = NIC_SRAM_SEND_RCB; i < NIC_SRAM_RCV_RET_RCB; i += TG3_BDINFO_SIZE)
+			tg3_write_mem(tp, i + TG3_BDINFO_MAXLEN_FLAGS,
+				      BDINFO_FLAGS_DISABLED);
+	}
 
 	tp->tx_prod = 0;
 	tp->tx_cons = 0;
@@ -4193,9 +4830,15 @@ static int tg3_reset_hw(struct tg3 *tp)
 			       NIC_SRAM_TX_BUFFER_DESC);
 	}
 
-	for (i = NIC_SRAM_RCV_RET_RCB; i < NIC_SRAM_STATS_BLK; i += TG3_BDINFO_SIZE) {
-		tg3_write_mem(tp, i + TG3_BDINFO_MAXLEN_FLAGS,
-			      BDINFO_FLAGS_DISABLED);
+	/* There is only one receive return ring on 5705, no need to explicitly
+	 * disable the others.
+	 */
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705) {
+		for (i = NIC_SRAM_RCV_RET_RCB; i < NIC_SRAM_STATS_BLK;
+		     i += TG3_BDINFO_SIZE) {
+			tg3_write_mem(tp, i + TG3_BDINFO_MAXLEN_FLAGS,
+				      BDINFO_FLAGS_DISABLED);
+		}
 	}
 
 	tp->rx_rcb_ptr = 0;
@@ -4205,7 +4848,7 @@ static int tg3_reset_hw(struct tg3 *tp)
 
 	tg3_set_bdinfo(tp, NIC_SRAM_RCV_RET_RCB,
 		       tp->rx_rcb_mapping,
-		       (TG3_RX_RCB_RING_SIZE <<
+		       (TG3_RX_RCB_RING_SIZE(tp) <<
 			BDINFO_FLAGS_MAXLEN_SHIFT),
 		       0);
 
@@ -4242,8 +4885,36 @@ static int tg3_reset_hw(struct tg3 *tp)
 	tw32(MAC_RCV_RULE_CFG, RCV_RULE_CFG_DEFAULT_CLASS);
 	tw32(RCVLPC_CONFIG, 0x0181);
 
+	/* Calculate RDMAC_MODE setting early, we need it to determine
+	 * the RCVLPC_STATE_ENABLE mask.
+	 */
+	rdmac_mode = (RDMAC_MODE_ENABLE | RDMAC_MODE_TGTABORT_ENAB |
+		      RDMAC_MODE_MSTABORT_ENAB | RDMAC_MODE_PARITYERR_ENAB |
+		      RDMAC_MODE_ADDROFLOW_ENAB | RDMAC_MODE_FIFOOFLOW_ENAB |
+		      RDMAC_MODE_FIFOURUN_ENAB | RDMAC_MODE_FIFOOREAD_ENAB |
+		      RDMAC_MODE_LNGREAD_ENAB);
+	if (tp->tg3_flags & TG3_FLAG_SPLIT_MODE)
+		rdmac_mode |= RDMAC_MODE_SPLIT_ENABLE;
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705) {
+		if (tp->pci_chip_rev_id != CHIPREV_ID_5705_A0) {
+			if (tp->tg3_flags2 & TG3_FLG2_TSO_CAPABLE) {
+				rdmac_mode |= RDMAC_MODE_FIFO_SIZE_128;
+			} else if (!(tr32(TG3PCI_PCISTATE) & PCISTATE_BUS_SPEED_HIGH) &&
+				   !(tp->tg3_flags2 & TG3_FLG2_IS_5788)) {
+				rdmac_mode |= RDMAC_MODE_FIFO_LONG_BURST;
+			}
+		}
+	}
+
 	/* Receive/send statistics. */
-	tw32(RCVLPC_STATS_ENABLE, 0xffffff);
+	if ((rdmac_mode & RDMAC_MODE_FIFO_SIZE_128) &&
+	    (tp->tg3_flags2 & TG3_FLG2_TSO_CAPABLE)) {
+		val = tr32(RCVLPC_STATS_ENABLE);
+		val &= ~RCVLPC_STATSENAB_LNGBRST_RFIX;
+		tw32(RCVLPC_STATS_ENABLE, val);
+	} else {
+		tw32(RCVLPC_STATS_ENABLE, 0xffffff);
+	}
 	tw32(RCVLPC_STATSCTRL, RCVLPC_STATSCTRL_ENABLE);
 	tw32(SNDDATAI_STATSENAB, 0xffffff);
 	tw32(SNDDATAI_STATSCTRL,
@@ -4259,46 +4930,54 @@ static int tg3_reset_hw(struct tg3 *tp)
 	}
 
 #ifdef NAPI
-	tw32(HOSTCC_RXCOL_TICKS, 0);
-	tw32(HOSTCC_RXMAX_FRAMES, 1);
-	tw32(HOSTCC_RXCOAL_TICK_INT, 0);
-	tw32(HOSTCC_RXCOAL_MAXF_INT, 1);
-	tw32(HOSTCC_TXCOL_TICKS, LOW_TXCOL_TICKS);
-	tw32(HOSTCC_TXMAX_FRAMES, LOW_RXMAX_FRAMES);
-	tw32(HOSTCC_TXCOAL_TICK_INT, 0);
-	tw32(HOSTCC_TXCOAL_MAXF_INT, 0);
-	tw32(HOSTCC_STAT_COAL_TICKS,
-	     DEFAULT_STAT_COAL_TICKS);
+        tw32(HOSTCC_RXCOL_TICKS, 0);
+        tw32(HOSTCC_TXCOL_TICKS, LOW_TXCOL_TICKS);
+        tw32(HOSTCC_RXMAX_FRAMES, 1);
+        tw32(HOSTCC_TXMAX_FRAMES, LOW_RXMAX_FRAMES);
+        if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705)
+                tw32(HOSTCC_RXCOAL_TICK_INT, 0);
+        if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705)
+                tw32(HOSTCC_TXCOAL_TICK_INT, 0);
+        tw32(HOSTCC_RXCOAL_MAXF_INT, 1);
+        tw32(HOSTCC_TXCOAL_MAXF_INT, 0);
 #else
-	tw32(HOSTCC_RXCOL_TICKS, DEFAULT_RXCOL_TICKS);
+        tw32(HOSTCC_RXCOL_TICKS, DEFAULT_RXCOL_TICKS);
+        tw32(HOSTCC_TXCOL_TICKS, DEFAULT_TXCOL_TICKS);
 	tw32(HOSTCC_RXMAX_FRAMES, DEFAULT_RXMAX_FRAMES);
+        tw32(HOSTCC_TXMAX_FRAMES, DEFAULT_TXMAX_FRAMES);
 	tw32(HOSTCC_RXCOAL_TICK_INT, DEFAULT_RXCOAL_TICK_INT);
-	tw32(HOSTCC_RXCOAL_MAXF_INT, DEFAULT_RXCOAL_MAXF_INT);
-	tw32(HOSTCC_TXCOL_TICKS, DEFAULT_TXCOL_TICKS);
-	tw32(HOSTCC_TXMAX_FRAMES, DEFAULT_TXMAX_FRAMES);
-	tw32(HOSTCC_TXCOAL_TICK_INT, DEFAULT_TXCOAL_TICK_INT);
-	tw32(HOSTCC_TXCOAL_MAXF_INT, DEFAULT_TXCOAL_MAXF_INT);
-	tw32(HOSTCC_STAT_COAL_TICKS,
-	     DEFAULT_STAT_COAL_TICKS);
+        tw32(HOSTCC_TXCOAL_TICK_INT, DEFAULT_TXCOAL_TICK_INT);
+        tw32(HOSTCC_RXCOAL_MAXF_INT, DEFAULT_RXCOAL_MAXF_INT);
+        tw32(HOSTCC_TXCOAL_MAXF_INT, DEFAULT_TXCOAL_MAXF_INT);
 #endif
 
-	/* Status/statistics block address. */
-	tw32(HOSTCC_STATS_BLK_HOST_ADDR + TG3_64BIT_REG_HIGH,
-	     ((u64) tp->stats_mapping >> 32));
-	tw32(HOSTCC_STATS_BLK_HOST_ADDR + TG3_64BIT_REG_LOW,
-	     ((u64) tp->stats_mapping & 0xffffffff));
+	/* set status block DMA address */
 	tw32(HOSTCC_STATUS_BLK_HOST_ADDR + TG3_64BIT_REG_HIGH,
 	     ((u64) tp->status_mapping >> 32));
 	tw32(HOSTCC_STATUS_BLK_HOST_ADDR + TG3_64BIT_REG_LOW,
 	     ((u64) tp->status_mapping & 0xffffffff));
-	tw32(HOSTCC_STATS_BLK_NIC_ADDR, NIC_SRAM_STATS_BLK);
-	tw32(HOSTCC_STATUS_BLK_NIC_ADDR, NIC_SRAM_STATUS_BLK);
+
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705) {
+		/* Status/statistics block address.  See tg3_timer,
+		 * the tg3_periodic_fetch_stats call there, and
+		 * tg3_get_stats to see how this works for 5705 chips.
+		 */
+		tw32(HOSTCC_STAT_COAL_TICKS,
+		     DEFAULT_STAT_COAL_TICKS);
+		tw32(HOSTCC_STATS_BLK_HOST_ADDR + TG3_64BIT_REG_HIGH,
+		     ((u64) tp->stats_mapping >> 32));
+		tw32(HOSTCC_STATS_BLK_HOST_ADDR + TG3_64BIT_REG_LOW,
+		     ((u64) tp->stats_mapping & 0xffffffff));
+		tw32(HOSTCC_STATS_BLK_NIC_ADDR, NIC_SRAM_STATS_BLK);
+		tw32(HOSTCC_STATUS_BLK_NIC_ADDR, NIC_SRAM_STATUS_BLK);
+	}
 
 	tw32(HOSTCC_MODE, HOSTCC_MODE_ENABLE | tp->coalesce_mode);
 
 	tw32(RCVCC_MODE, RCVCC_MODE_ENABLE | RCVCC_MODE_ATTN_ENABLE);
 	tw32(RCVLPC_MODE, RCVLPC_MODE_ENABLE);
-	tw32(RCVLSC_MODE, RCVLSC_MODE_ENABLE | RCVLSC_MODE_ATTN_ENABLE);
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705)
+		tw32(RCVLSC_MODE, RCVLSC_MODE_ENABLE | RCVLSC_MODE_ATTN_ENABLE);
 
 	tp->mac_mode = MAC_MODE_TXSTAT_ENABLE | MAC_MODE_RXSTAT_ENABLE |
 		MAC_MODE_TDE_ENABLE | MAC_MODE_RDE_ENABLE | MAC_MODE_FHDE_ENABLE;
@@ -4317,42 +4996,47 @@ static int tg3_reset_hw(struct tg3 *tp)
 	tw32_mailbox(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW, 0);
 	tr32(MAILBOX_INTERRUPT_0);
 
-	tw32(DMAC_MODE, DMAC_MODE_ENABLE);
-	tr32(DMAC_MODE);
-	udelay(40);
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705) {
+		tw32(DMAC_MODE, DMAC_MODE_ENABLE);
+		tr32(DMAC_MODE);
+		udelay(40);
+	}
 
-	tw32(WDMAC_MODE, (WDMAC_MODE_ENABLE | WDMAC_MODE_TGTABORT_ENAB |
-			  WDMAC_MODE_MSTABORT_ENAB | WDMAC_MODE_PARITYERR_ENAB |
-			  WDMAC_MODE_ADDROFLOW_ENAB | WDMAC_MODE_FIFOOFLOW_ENAB |
-			  WDMAC_MODE_FIFOURUN_ENAB | WDMAC_MODE_FIFOOREAD_ENAB |
-			  WDMAC_MODE_LNGREAD_ENAB));
+	val = (WDMAC_MODE_ENABLE | WDMAC_MODE_TGTABORT_ENAB |
+	       WDMAC_MODE_MSTABORT_ENAB | WDMAC_MODE_PARITYERR_ENAB |
+	       WDMAC_MODE_ADDROFLOW_ENAB | WDMAC_MODE_FIFOOFLOW_ENAB |
+	       WDMAC_MODE_FIFOURUN_ENAB | WDMAC_MODE_FIFOOREAD_ENAB |
+	       WDMAC_MODE_LNGREAD_ENAB);
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705 &&
+	    (tr32(TG3PCI_PCISTATE) & PCISTATE_BUS_SPEED_HIGH) != 0 &&
+	    !(tp->tg3_flags2 & TG3_FLG2_IS_5788))
+		val |= WDMAC_MODE_RX_ACCEL;
+	tw32(WDMAC_MODE, val);
 	tr32(WDMAC_MODE);
 	udelay(40);
 
-	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704 &&
-	    (tp->tg3_flags & TG3_FLAG_PCIX_MODE)) {
+	if ((tp->tg3_flags & TG3_FLAG_PCIX_MODE) != 0) {
 		val = tr32(TG3PCI_X_CAPS);
-		val &= ~(PCIX_CAPS_SPLIT_MASK | PCIX_CAPS_BURST_MASK);
-		val |= (PCIX_CAPS_MAX_BURST_5704 << PCIX_CAPS_BURST_SHIFT);
-		if (tp->tg3_flags & TG3_FLAG_SPLIT_MODE)
-			val |= (tp->split_mode_max_reqs <<
-				PCIX_CAPS_SPLIT_SHIFT);
+		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5703) {
+			val &= ~PCIX_CAPS_BURST_MASK;
+			val |= (PCIX_CAPS_MAX_BURST_CPIOB << PCIX_CAPS_BURST_SHIFT);
+		} else if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704) {
+			val &= ~(PCIX_CAPS_SPLIT_MASK | PCIX_CAPS_BURST_MASK);
+			val |= (PCIX_CAPS_MAX_BURST_CPIOB << PCIX_CAPS_BURST_SHIFT);
+			if (tp->tg3_flags & TG3_FLAG_SPLIT_MODE)
+				val |= (tp->split_mode_max_reqs <<
+					PCIX_CAPS_SPLIT_SHIFT);
+		}
 		tw32(TG3PCI_X_CAPS, val);
 	}
 
-	val = (RDMAC_MODE_ENABLE | RDMAC_MODE_TGTABORT_ENAB |
-	       RDMAC_MODE_MSTABORT_ENAB | RDMAC_MODE_PARITYERR_ENAB |
-	       RDMAC_MODE_ADDROFLOW_ENAB | RDMAC_MODE_FIFOOFLOW_ENAB |
-	       RDMAC_MODE_FIFOURUN_ENAB | RDMAC_MODE_FIFOOREAD_ENAB |
-	       RDMAC_MODE_LNGREAD_ENAB);
-	if (tp->tg3_flags & TG3_FLAG_SPLIT_MODE)
-		val |= RDMAC_MODE_SPLIT_ENABLE;
-	tw32(RDMAC_MODE, val);
+	tw32(RDMAC_MODE, rdmac_mode);
 	tr32(RDMAC_MODE);
 	udelay(40);
 
 	tw32(RCVDCC_MODE, RCVDCC_MODE_ENABLE | RCVDCC_MODE_ATTN_ENABLE);
-	tw32(MBFREE_MODE, MBFREE_MODE_ENABLE);
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705)
+		tw32(MBFREE_MODE, MBFREE_MODE_ENABLE);
 	tw32(SNDDATAC_MODE, SNDDATAC_MODE_ENABLE);
 	tw32(SNDBDC_MODE, SNDBDC_MODE_ENABLE | SNDBDC_MODE_ATTN_ENABLE);
 	tw32(RCVBDI_MODE, RCVBDI_MODE_ENABLE | RCVBDI_MODE_RCB_ATTN_ENAB);
@@ -4367,10 +5051,12 @@ static int tg3_reset_hw(struct tg3 *tp)
 			return err;
 	}
 
-#if TG3_DO_TSO != 0
-	err = tg3_load_tso_firmware(tp);
-	if (err)
-		return err;
+#if TG3_TSO_SUPPORT != 0
+	if (tp->tg3_flags2 & TG3_FLG2_TSO_CAPABLE) {
+		err = tg3_load_tso_firmware(tp);
+		if (err)
+			return err;
+	}
 #endif
 
 	tp->tx_mode = TX_MODE_ENABLE;
@@ -4397,9 +5083,11 @@ static int tg3_reset_hw(struct tg3 *tp)
 
 	tw32(MAC_LED_CTRL, 0);
 	tw32(MAC_MI_STAT, MAC_MI_STAT_LNKSTAT_ATTN_ENAB);
-	tw32(MAC_RX_MODE, RX_MODE_RESET);
-	tr32(MAC_RX_MODE);
-	udelay(10);
+	if (tp->phy_id == PHY_ID_SERDES) {
+		tw32(MAC_RX_MODE, RX_MODE_RESET);
+		tr32(MAC_RX_MODE);
+		udelay(10);
+	}
 	tw32(MAC_RX_MODE, tp->rx_mode);
 	tr32(MAC_RX_MODE);
 	udelay(10);
@@ -4433,22 +5121,48 @@ static int tg3_reset_hw(struct tg3 *tp)
 	tw32(MAC_RCV_VALUE_0, 0xffffffff & RCV_RULE_DISABLE_MASK);
 	tw32(MAC_RCV_RULE_1,  0x86000004 & RCV_RULE_DISABLE_MASK);
 	tw32(MAC_RCV_VALUE_1, 0xffffffff & RCV_RULE_DISABLE_MASK);
-#if 0
-	tw32(MAC_RCV_RULE_2,  0); tw32(MAC_RCV_VALUE_2,  0);
-	tw32(MAC_RCV_RULE_3,  0); tw32(MAC_RCV_VALUE_3,  0);
-#endif
-	tw32(MAC_RCV_RULE_4,  0); tw32(MAC_RCV_VALUE_4,  0);
-	tw32(MAC_RCV_RULE_5,  0); tw32(MAC_RCV_VALUE_5,  0);
-	tw32(MAC_RCV_RULE_6,  0); tw32(MAC_RCV_VALUE_6,  0);
-	tw32(MAC_RCV_RULE_7,  0); tw32(MAC_RCV_VALUE_7,  0);
-	tw32(MAC_RCV_RULE_8,  0); tw32(MAC_RCV_VALUE_8,  0);
-	tw32(MAC_RCV_RULE_9,  0); tw32(MAC_RCV_VALUE_9,  0);
-	tw32(MAC_RCV_RULE_10,  0); tw32(MAC_RCV_VALUE_10,  0);
-	tw32(MAC_RCV_RULE_11,  0); tw32(MAC_RCV_VALUE_11,  0);
-	tw32(MAC_RCV_RULE_12,  0); tw32(MAC_RCV_VALUE_12,  0);
-	tw32(MAC_RCV_RULE_13,  0); tw32(MAC_RCV_VALUE_13,  0);
-	tw32(MAC_RCV_RULE_14,  0); tw32(MAC_RCV_VALUE_14,  0);
-	tw32(MAC_RCV_RULE_15,  0); tw32(MAC_RCV_VALUE_15,  0);
+
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705)
+		limit = 8;
+	else
+		limit = 16;
+	if (tp->tg3_flags & TG3_FLAG_ENABLE_ASF)
+		limit -= 4;
+	switch (limit) {
+	case 16:
+		tw32(MAC_RCV_RULE_15,  0); tw32(MAC_RCV_VALUE_15,  0);
+	case 15:
+		tw32(MAC_RCV_RULE_14,  0); tw32(MAC_RCV_VALUE_14,  0);
+	case 14:
+		tw32(MAC_RCV_RULE_13,  0); tw32(MAC_RCV_VALUE_13,  0);
+	case 13:
+		tw32(MAC_RCV_RULE_12,  0); tw32(MAC_RCV_VALUE_12,  0);
+	case 12:
+		tw32(MAC_RCV_RULE_11,  0); tw32(MAC_RCV_VALUE_11,  0);
+	case 11:
+		tw32(MAC_RCV_RULE_10,  0); tw32(MAC_RCV_VALUE_10,  0);
+	case 10:
+		tw32(MAC_RCV_RULE_9,  0); tw32(MAC_RCV_VALUE_9,  0);
+	case 9:
+		tw32(MAC_RCV_RULE_8,  0); tw32(MAC_RCV_VALUE_8,  0);
+	case 8:
+		tw32(MAC_RCV_RULE_7,  0); tw32(MAC_RCV_VALUE_7,  0);
+	case 7:
+		tw32(MAC_RCV_RULE_6,  0); tw32(MAC_RCV_VALUE_6,  0);
+	case 6:
+		tw32(MAC_RCV_RULE_5,  0); tw32(MAC_RCV_VALUE_5,  0);
+	case 5:
+		tw32(MAC_RCV_RULE_4,  0); tw32(MAC_RCV_VALUE_4,  0);
+	case 4:
+		/* tw32(MAC_RCV_RULE_3,  0); tw32(MAC_RCV_VALUE_3,  0); */
+	case 3:
+		/* tw32(MAC_RCV_RULE_2,  0); tw32(MAC_RCV_VALUE_2,  0); */
+	case 2:
+	case 1:
+
+	default:
+		break;
+	};
 
 	if (tp->tg3_flags & TG3_FLAG_INIT_COMPLETE)
 		tg3_enable_ints(tp);
@@ -4478,6 +5192,50 @@ out:
 	return err;
 }
 
+#define TG3_STAT_ADD32(PSTAT, REG) \
+do {	u32 __val = tr32(REG); \
+	(PSTAT)->low += __val; \
+	if ((PSTAT)->low < __val) \
+		(PSTAT)->high += 1; \
+} while (0)
+
+static void tg3_periodic_fetch_stats(struct tg3 *tp)
+{
+	struct tg3_hw_stats *sp = tp->hw_stats;
+
+	if (!netif_carrier_ok(tp->dev))
+		return;
+
+	TG3_STAT_ADD32(&sp->tx_octets, MAC_TX_STATS_OCTETS);
+	TG3_STAT_ADD32(&sp->tx_collisions, MAC_TX_STATS_COLLISIONS);
+	TG3_STAT_ADD32(&sp->tx_xon_sent, MAC_TX_STATS_XON_SENT);
+	TG3_STAT_ADD32(&sp->tx_xoff_sent, MAC_TX_STATS_XOFF_SENT);
+	TG3_STAT_ADD32(&sp->tx_mac_errors, MAC_TX_STATS_MAC_ERRORS);
+	TG3_STAT_ADD32(&sp->tx_single_collisions, MAC_TX_STATS_SINGLE_COLLISIONS);
+	TG3_STAT_ADD32(&sp->tx_mult_collisions, MAC_TX_STATS_MULT_COLLISIONS);
+	TG3_STAT_ADD32(&sp->tx_deferred, MAC_TX_STATS_DEFERRED);
+	TG3_STAT_ADD32(&sp->tx_excessive_collisions, MAC_TX_STATS_EXCESSIVE_COL);
+	TG3_STAT_ADD32(&sp->tx_late_collisions, MAC_TX_STATS_LATE_COL);
+	TG3_STAT_ADD32(&sp->tx_ucast_packets, MAC_TX_STATS_UCAST);
+	TG3_STAT_ADD32(&sp->tx_mcast_packets, MAC_TX_STATS_MCAST);
+	TG3_STAT_ADD32(&sp->tx_bcast_packets, MAC_TX_STATS_BCAST);
+
+	TG3_STAT_ADD32(&sp->rx_octets, MAC_RX_STATS_OCTETS);
+	TG3_STAT_ADD32(&sp->rx_fragments, MAC_RX_STATS_FRAGMENTS);
+	TG3_STAT_ADD32(&sp->rx_ucast_packets, MAC_RX_STATS_UCAST);
+	TG3_STAT_ADD32(&sp->rx_mcast_packets, MAC_RX_STATS_MCAST);
+	TG3_STAT_ADD32(&sp->rx_bcast_packets, MAC_RX_STATS_BCAST);
+	TG3_STAT_ADD32(&sp->rx_fcs_errors, MAC_RX_STATS_FCS_ERRORS);
+	TG3_STAT_ADD32(&sp->rx_align_errors, MAC_RX_STATS_ALIGN_ERRORS);
+	TG3_STAT_ADD32(&sp->rx_xon_pause_rcvd, MAC_RX_STATS_XON_PAUSE_RECVD);
+	TG3_STAT_ADD32(&sp->rx_xoff_pause_rcvd, MAC_RX_STATS_XOFF_PAUSE_RECVD);
+	TG3_STAT_ADD32(&sp->rx_mac_ctrl_rcvd, MAC_RX_STATS_MAC_CTRL_RECVD);
+	TG3_STAT_ADD32(&sp->rx_xoff_entered, MAC_RX_STATS_XOFF_ENTERED);
+	TG3_STAT_ADD32(&sp->rx_frame_too_long_errors, MAC_RX_STATS_FRAME_TOO_LONG);
+	TG3_STAT_ADD32(&sp->rx_jabbers, MAC_RX_STATS_JABBERS);
+	TG3_STAT_ADD32(&sp->rx_undersize_packets, MAC_RX_STATS_UNDERSIZE);
+}
+
 static void tg3_timer(unsigned long __opaque)
 {
 	struct tg3 *tp = (struct tg3 *) __opaque;
@@ -4502,15 +5260,13 @@ static void tg3_timer(unsigned long __opaque)
 		tp->tg3_flags2 |= TG3_FLG2_RESTART_TIMER;
 		spin_unlock(&tp->tx_lock);
 		spin_unlock_irqrestore(&tp->lock, flags);
-#if 0
-		schedule_task(&tp->reset_task);
-#else
-                tg3_halt(tp);
-                tg3_init_rings(tp);
-                tg3_init_hw(tp);
-#endif
+		//schedule_task(&tp->reset_task);
+		tg3_reset_task(tp);
 		return;
 	}
+
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705)
+		tg3_periodic_fetch_stats(tp);
 
 	/* This part only runs once per second. */
 	if (!--tp->timer_counter) {
@@ -4610,8 +5366,6 @@ static int tg3_open(struct net_device *dev)
 
 	spin_lock_irq(&tp->lock);
 	spin_lock(&tp->tx_lock);
-
-	tg3_init_rings(tp);
 
 	err = tg3_init_hw(tp);
 	if (err) {
@@ -4971,7 +5725,9 @@ static struct net_device_stats *tg3_get_stats(struct net_device *dev)
 		get_stat64(&hw_stats->rx_bcast_packets);
 		
 	stats->tx_packets = old_stats->tx_packets +
-		get_stat64(&hw_stats->COS_out_packets[0]);
+		get_stat64(&hw_stats->tx_ucast_packets) +
+		get_stat64(&hw_stats->tx_mcast_packets) +
+		get_stat64(&hw_stats->tx_bcast_packets);
 
 	stats->rx_bytes = old_stats->rx_bytes +
 		get_stat64(&hw_stats->rx_octets);
@@ -5114,16 +5870,20 @@ static void tg3_set_rx_mode(struct net_device *dev)
 
 #define TG3_REGDUMP_LEN		(32 * 1024)
 
-static u8 *tg3_get_regs(struct tg3 *tp)
+static int tg3_get_regs_len(struct net_device *dev)
 {
-	u8 *orig_p = kmalloc(TG3_REGDUMP_LEN, GFP_KERNEL);
-	u8 *p;
+	return TG3_REGDUMP_LEN;
+}
+
+static void tg3_get_regs(struct net_device *dev, struct ethtool_regs *regs, void *p)
+{
+	struct tg3 *tp = dev->priv;
+	u8 *orig_p = p;
 	int i;
 
-	if (orig_p == NULL)
-		return NULL;
+	regs->version = 0;
 
-	memset(orig_p, 0, TG3_REGDUMP_LEN);
+	memset(p, 0, TG3_REGDUMP_LEN);
 
 	spin_lock_irq(&tp->lock);
 	spin_lock(&tp->tx_lock);
@@ -5177,390 +5937,283 @@ do {	p = orig_p + (reg);	\
 
 	spin_unlock(&tp->tx_lock);
 	spin_unlock_irq(&tp->lock);
-
-	return orig_p;
 }
 
-static int tg3_ethtool_ioctl (struct net_device *dev, void *useraddr)
+static int tg3_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+{
+  	struct tg3 *tp = dev->priv;
+  
+	if (!(tp->tg3_flags & TG3_FLAG_INIT_COMPLETE) ||
+					tp->link_config.phy_is_low_power)
+		return -EAGAIN;
+
+	cmd->supported = (SUPPORTED_Autoneg);
+
+	if (!(tp->tg3_flags & TG3_FLAG_10_100_ONLY))
+		cmd->supported |= (SUPPORTED_1000baseT_Half |
+				   SUPPORTED_1000baseT_Full);
+
+	if (tp->phy_id != PHY_ID_SERDES)
+		cmd->supported |= (SUPPORTED_100baseT_Half |
+				  SUPPORTED_100baseT_Full |
+				  SUPPORTED_10baseT_Half |
+				  SUPPORTED_10baseT_Full |
+				  SUPPORTED_MII);
+	else
+		cmd->supported |= SUPPORTED_FIBRE;
+  
+	cmd->advertising = tp->link_config.advertising;
+	cmd->speed = tp->link_config.active_speed;
+	cmd->duplex = tp->link_config.active_duplex;
+	cmd->port = 0;
+	cmd->phy_address = PHY_ADDR;
+	cmd->transceiver = 0;
+	cmd->autoneg = tp->link_config.autoneg;
+	cmd->maxtxpkt = 0;
+	cmd->maxrxpkt = 0;
+	return 0;
+}
+  
+static int tg3_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 {
 	struct tg3 *tp = dev->priv;
-	struct pci_dev *pci_dev = tp->pdev;
-	u32 ethcmd;
+  
+	if (!(tp->tg3_flags & TG3_FLAG_INIT_COMPLETE) ||
+					tp->link_config.phy_is_low_power)
+		return -EAGAIN;
 
-	if (copy_from_user (&ethcmd, useraddr, sizeof (ethcmd)))
-		return -EFAULT;
+	spin_lock_irq(&tp->lock);
+	spin_lock(&tp->tx_lock);
 
-	switch (ethcmd) {
-	case ETHTOOL_GDRVINFO:{
-		struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
-		strcpy (info.driver, DRV_MODULE_NAME);
-		strcpy (info.version, DRV_MODULE_VERSION);
-		memset(&info.fw_version, 0, sizeof(info.fw_version));
-		strcpy (info.bus_info, pci_dev->slot_name);
-		info.eedump_len = 0;
-		info.regdump_len = TG3_REGDUMP_LEN;
-		if (copy_to_user (useraddr, &info, sizeof (info)))
-			return -EFAULT;
-		return 0;
-	}
-
-	case ETHTOOL_GSET: {
-		struct ethtool_cmd cmd = { ETHTOOL_GSET };
-
-		if (!(tp->tg3_flags & TG3_FLAG_INIT_COMPLETE) ||
-		    tp->link_config.phy_is_low_power)
-			return -EAGAIN;
-		cmd.supported = (SUPPORTED_Autoneg);
-
-		if (!(tp->tg3_flags & TG3_FLAG_10_100_ONLY))
-			cmd.supported |= (SUPPORTED_1000baseT_Half |
-					  SUPPORTED_1000baseT_Full);
-
-		if (tp->phy_id != PHY_ID_SERDES)
-			cmd.supported |= (SUPPORTED_100baseT_Half |
-					  SUPPORTED_100baseT_Full |
-					  SUPPORTED_10baseT_Half |
-					  SUPPORTED_10baseT_Full |
-					  SUPPORTED_MII);
-		else
-			cmd.supported |= SUPPORTED_FIBRE;
-
-		cmd.advertising = tp->link_config.advertising;
-		cmd.speed = tp->link_config.active_speed;
-		cmd.duplex = tp->link_config.active_duplex;
-		cmd.port = 0;
-		cmd.phy_address = PHY_ADDR;
-		cmd.transceiver = 0;
-		cmd.autoneg = tp->link_config.autoneg;
-		cmd.maxtxpkt = 0;
-		cmd.maxrxpkt = 0;
-		if (copy_to_user(useraddr, &cmd, sizeof(cmd)))
-			return -EFAULT;
-		return 0;
-	}
-	case ETHTOOL_SSET: {
-		struct ethtool_cmd cmd;
-
-		if (!(tp->tg3_flags & TG3_FLAG_INIT_COMPLETE) ||
-		    tp->link_config.phy_is_low_power)
-			return -EAGAIN;
-
-		if (copy_from_user(&cmd, useraddr, sizeof(cmd)))
-			return -EFAULT;
-
-		/* Fiber PHY only supports 1000 full/half */
-		if (cmd.autoneg == AUTONEG_ENABLE) {
-			if (tp->phy_id == PHY_ID_SERDES &&
-			    (cmd.advertising &
-			     (ADVERTISED_10baseT_Half |
-			      ADVERTISED_10baseT_Full |
-			      ADVERTISED_100baseT_Half |
-			      ADVERTISED_100baseT_Full)))
-				return -EINVAL;
-			if ((tp->tg3_flags & TG3_FLAG_10_100_ONLY) &&
-			    (cmd.advertising &
-			     (ADVERTISED_1000baseT_Half |
-			      ADVERTISED_1000baseT_Full)))
-				return -EINVAL;
-		} else {
-			if (tp->phy_id == PHY_ID_SERDES &&
-			    (cmd.speed == SPEED_10 ||
-			     cmd.speed == SPEED_100))
-				return -EINVAL;
-			if ((tp->tg3_flags & TG3_FLAG_10_100_ONLY) &&
-			    (cmd.speed == SPEED_10 ||
-			     cmd.speed == SPEED_100))
-				return -EINVAL;
-		}
-
-		spin_lock_irq(&tp->lock);
-		spin_lock(&tp->tx_lock);
-
-		tp->link_config.autoneg = cmd.autoneg;
-		if (cmd.autoneg == AUTONEG_ENABLE) {
-			tp->link_config.advertising = cmd.advertising;
-			tp->link_config.speed = SPEED_INVALID;
-			tp->link_config.duplex = DUPLEX_INVALID;
-		} else {
-			tp->link_config.speed = cmd.speed;
-			tp->link_config.duplex = cmd.duplex;
-		}
-
-		tg3_setup_phy(tp);
-		spin_unlock(&tp->tx_lock);
-		spin_unlock_irq(&tp->lock);
-
-		return 0;
-	}
-
-	case ETHTOOL_GREGS: {
-		struct ethtool_regs regs;
-		u8 *regbuf;
-		int ret;
-
-		if (copy_from_user(&regs, useraddr, sizeof(regs)))
-			return -EFAULT;
-		if (regs.len > TG3_REGDUMP_LEN)
-			regs.len = TG3_REGDUMP_LEN;
-		regs.version = 0;
-		if (copy_to_user(useraddr, &regs, sizeof(regs)))
-			return -EFAULT;
-
-		regbuf = tg3_get_regs(tp);
-		if (!regbuf)
-			return -ENOMEM;
-
-		useraddr += offsetof(struct ethtool_regs, data);
-		ret = 0;
-		if (copy_to_user(useraddr, regbuf, regs.len))
-			ret = -EFAULT;
-		kfree(regbuf);
-		return ret;
-	}
-	case ETHTOOL_GWOL: {
-		struct ethtool_wolinfo wol = { ETHTOOL_GWOL };
-
-		wol.supported = WAKE_MAGIC;
-		wol.wolopts = 0;
-		if (tp->tg3_flags & TG3_FLAG_WOL_ENABLE)
-			wol.wolopts = WAKE_MAGIC;
-		memset(&wol.sopass, 0, sizeof(wol.sopass));
-		if (copy_to_user(useraddr, &wol, sizeof(wol)))
-			return -EFAULT;
-		return 0;
-	}
-	case ETHTOOL_SWOL: {
-		struct ethtool_wolinfo wol;
-
-		if (copy_from_user(&wol, useraddr, sizeof(wol)))
-			return -EFAULT;
-		if (wol.wolopts & ~WAKE_MAGIC)
-			return -EINVAL;
-		if ((wol.wolopts & WAKE_MAGIC) &&
-		    tp->phy_id == PHY_ID_SERDES &&
-		    !(tp->tg3_flags & TG3_FLAG_SERDES_WOL_CAP))
-			return -EINVAL;
-
-		spin_lock_irq(&tp->lock);
-		if (wol.wolopts & WAKE_MAGIC)
-			tp->tg3_flags |= TG3_FLAG_WOL_ENABLE;
-		else
-			tp->tg3_flags &= ~TG3_FLAG_WOL_ENABLE;
-		spin_unlock_irq(&tp->lock);
-
-		return 0;
-	}
-	case ETHTOOL_GMSGLVL: {
-		struct ethtool_value edata = { ETHTOOL_GMSGLVL };
-		edata.data = tp->msg_enable;
-		if (copy_to_user(useraddr, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
-	}
-	case ETHTOOL_SMSGLVL: {
-		struct ethtool_value edata;
-		if (copy_from_user(&edata, useraddr, sizeof(edata)))
-			return -EFAULT;
-		tp->msg_enable = edata.data;
-		return 0;
-	}
-	case ETHTOOL_NWAY_RST: {
-		u32 bmcr;
-		int r;
-
-		spin_lock_irq(&tp->lock);
-		tg3_readphy(tp, MII_BMCR, &bmcr);
-		tg3_readphy(tp, MII_BMCR, &bmcr);
-		r = -EINVAL;
-		if (bmcr & BMCR_ANENABLE) {
-			tg3_writephy(tp, MII_BMCR,
-				     bmcr | BMCR_ANRESTART);
-			r = 0;
-		}
-		spin_unlock_irq(&tp->lock);
-
-		return r;
-	}
-	case ETHTOOL_GLINK: {
-		struct ethtool_value edata = { ETHTOOL_GLINK };
-		edata.data = netif_carrier_ok(tp->dev) ? 1 : 0;
-		if (copy_to_user(useraddr, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
-	}
-	case ETHTOOL_GRINGPARAM: {
-		struct ethtool_ringparam ering = { ETHTOOL_GRINGPARAM };
-
-		ering.rx_max_pending = TG3_RX_RING_SIZE - 1;
-		ering.rx_mini_max_pending = 0;
-		ering.rx_jumbo_max_pending = TG3_RX_JUMBO_RING_SIZE - 1;
-
-		ering.rx_pending = tp->rx_pending;
-		ering.rx_mini_pending = 0;
-		ering.rx_jumbo_pending = tp->rx_jumbo_pending;
-		ering.tx_pending = tp->tx_pending;
-
-		if (copy_to_user(useraddr, &ering, sizeof(ering)))
-			return -EFAULT;
-		return 0;
-	}
-	case ETHTOOL_SRINGPARAM: {
-		struct ethtool_ringparam ering;
-
-		if (copy_from_user(&ering, useraddr, sizeof(ering)))
-			return -EFAULT;
-
-		if ((ering.rx_pending > TG3_RX_RING_SIZE - 1) ||
-		    (ering.rx_jumbo_pending > TG3_RX_JUMBO_RING_SIZE - 1) ||
-		    (ering.tx_pending > TG3_TX_RING_SIZE - 1))
-			return -EINVAL;
-
-		tg3_netif_stop(tp);
-		spin_lock_irq(&tp->lock);
-		spin_lock(&tp->tx_lock);
-
-		tp->rx_pending = ering.rx_pending;
-		tp->rx_jumbo_pending = ering.rx_jumbo_pending;
-		tp->tx_pending = ering.tx_pending;
-
-		tg3_halt(tp);
-		tg3_init_rings(tp);
-		tg3_init_hw(tp);
-		netif_wake_queue(tp->dev);
-		spin_unlock(&tp->tx_lock);
-		spin_unlock_irq(&tp->lock);
-		tg3_netif_start(tp);
-
-		return 0;
-	}
-	case ETHTOOL_GPAUSEPARAM: {
-		struct ethtool_pauseparam epause = { ETHTOOL_GPAUSEPARAM };
-
-		epause.autoneg =
-			(tp->tg3_flags & TG3_FLAG_PAUSE_AUTONEG) != 0;
-		epause.rx_pause =
-			(tp->tg3_flags & TG3_FLAG_PAUSE_RX) != 0;
-		epause.tx_pause =
-			(tp->tg3_flags & TG3_FLAG_PAUSE_TX) != 0;
-		if (copy_to_user(useraddr, &epause, sizeof(epause)))
-			return -EFAULT;
-		return 0;
-	}
-	case ETHTOOL_SPAUSEPARAM: {
-		struct ethtool_pauseparam epause;
-
-		if (copy_from_user(&epause, useraddr, sizeof(epause)))
-			return -EFAULT;
-
-		tg3_netif_stop(tp);
-		spin_lock_irq(&tp->lock);
-		spin_lock(&tp->tx_lock);
-		if (epause.autoneg)
-			tp->tg3_flags |= TG3_FLAG_PAUSE_AUTONEG;
-		else
-			tp->tg3_flags &= ~TG3_FLAG_PAUSE_AUTONEG;
-		if (epause.rx_pause)
-			tp->tg3_flags |= TG3_FLAG_PAUSE_RX;
-		else
-			tp->tg3_flags &= ~TG3_FLAG_PAUSE_RX;
-		if (epause.tx_pause)
-			tp->tg3_flags |= TG3_FLAG_PAUSE_TX;
-		else
-			tp->tg3_flags &= ~TG3_FLAG_PAUSE_TX;
-		tg3_halt(tp);
-		tg3_init_rings(tp);
-		tg3_init_hw(tp);
-		spin_unlock(&tp->tx_lock);
-		spin_unlock_irq(&tp->lock);
-		tg3_netif_start(tp);
-
-		return 0;
-	}
-	case ETHTOOL_GRXCSUM: {
-		struct ethtool_value edata = { ETHTOOL_GRXCSUM };
-
-		edata.data =
-			(tp->tg3_flags & TG3_FLAG_RX_CHECKSUMS) != 0;
-		if (copy_to_user(useraddr, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
-	}
-	case ETHTOOL_SRXCSUM: {
-		struct ethtool_value edata;
-
-		if (copy_from_user(&edata, useraddr, sizeof(edata)))
-			return -EFAULT;
-
-		if (tp->tg3_flags & TG3_FLAG_BROKEN_CHECKSUMS) {
-			if (edata.data != 0)
-				return -EINVAL;
-			return 0;
-		}
-
-		spin_lock_irq(&tp->lock);
-		if (edata.data)
-			tp->tg3_flags |= TG3_FLAG_RX_CHECKSUMS;
-		else
-			tp->tg3_flags &= ~TG3_FLAG_RX_CHECKSUMS;
-		spin_unlock_irq(&tp->lock);
-
-		return 0;
-	}
-	case ETHTOOL_GTXCSUM: {
-		struct ethtool_value edata = { ETHTOOL_GTXCSUM };
-
-		edata.data =
-			(tp->dev->features & NETIF_F_IP_CSUM) != 0;
-		if (copy_to_user(useraddr, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
-	}
-	case ETHTOOL_STXCSUM: {
-		struct ethtool_value edata;
-
-		if (copy_from_user(&edata, useraddr, sizeof(edata)))
-			return -EFAULT;
-
-		if (tp->tg3_flags & TG3_FLAG_BROKEN_CHECKSUMS) {
-			if (edata.data != 0)
-				return -EINVAL;
-			return 0;
-		}
-
-		if (edata.data)
-			tp->dev->features |= NETIF_F_IP_CSUM;
-		else
-			tp->dev->features &= ~NETIF_F_IP_CSUM;
-
-		return 0;
-	}
-	case ETHTOOL_GSG: {
-		struct ethtool_value edata = { ETHTOOL_GSG };
-
-		edata.data =
-			(tp->dev->features & NETIF_F_SG) != 0;
-		if (copy_to_user(useraddr, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
-	}
-	case ETHTOOL_SSG: {
-		struct ethtool_value edata;
-
-		if (copy_from_user(&edata, useraddr, sizeof(edata)))
-			return -EFAULT;
-
-		if (edata.data)
-			tp->dev->features |= NETIF_F_SG;
-		else
-			tp->dev->features &= ~NETIF_F_SG;
-
-		return 0;
-	}
-	};
-
-	return -EOPNOTSUPP;
+	tp->link_config.autoneg = cmd->autoneg;
+	if (cmd->autoneg == AUTONEG_ENABLE) {
+		tp->link_config.advertising = cmd->advertising;
+		tp->link_config.speed = SPEED_INVALID;
+		tp->link_config.duplex = DUPLEX_INVALID;
+	} else {
+		tp->link_config.speed = cmd->speed;
+		tp->link_config.duplex = cmd->duplex;
+  	}
+  
+	tg3_setup_phy(tp);
+	spin_unlock(&tp->tx_lock);
+	spin_unlock_irq(&tp->lock);
+  
+	return 0;
 }
+  
+static void tg3_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
+{
+	struct tg3 *tp = dev->priv;
+  
+	strcpy(info->driver, DRV_MODULE_NAME);
+	strcpy(info->version, DRV_MODULE_VERSION);
+	strcpy(info->bus_info, pci_name(tp->pdev));
+}
+  
+static void tg3_get_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
+{
+	struct tg3 *tp = dev->priv;
+  
+	wol->supported = WAKE_MAGIC;
+	wol->wolopts = 0;
+	if (tp->tg3_flags & TG3_FLAG_WOL_ENABLE)
+		wol->wolopts = WAKE_MAGIC;
+	memset(&wol->sopass, 0, sizeof(wol->sopass));
+}
+  
+static int tg3_set_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
+{
+	struct tg3 *tp = dev->priv;
+  
+	if (wol->wolopts & ~WAKE_MAGIC)
+		return -EINVAL;
+	if ((wol->wolopts & WAKE_MAGIC) &&
+	    tp->phy_id == PHY_ID_SERDES &&
+	    !(tp->tg3_flags & TG3_FLAG_SERDES_WOL_CAP))
+		return -EINVAL;
+  
+	spin_lock_irq(&tp->lock);
+	if (wol->wolopts & WAKE_MAGIC)
+		tp->tg3_flags |= TG3_FLAG_WOL_ENABLE;
+	else
+		tp->tg3_flags &= ~TG3_FLAG_WOL_ENABLE;
+	spin_unlock_irq(&tp->lock);
+  
+	return 0;
+}
+  
+static u32 tg3_get_msglevel(struct net_device *dev)
+{
+	struct tg3 *tp = dev->priv;
+	return tp->msg_enable;
+}
+  
+static void tg3_set_msglevel(struct net_device *dev, u32 value)
+{
+	struct tg3 *tp = dev->priv;
+	tp->msg_enable = value;
+}
+  
+#if TG3_TSO_SUPPORT != 0
+static int tg3_set_tso(struct net_device *dev, u32 value)
+{
+	struct tg3 *tp = dev->priv;
 
+	if (!(tp->tg3_flags2 & TG3_FLG2_TSO_CAPABLE)) {
+		if (value)
+			return -EINVAL;
+		return 0;
+	}
+	return ethtool_op_set_tso(dev, value);
+}
+#endif
+  
+static int tg3_nway_reset(struct net_device *dev)
+{
+	struct tg3 *tp = dev->priv;
+	u32 bmcr;
+	int r;
+  
+	spin_lock_irq(&tp->lock);
+	tg3_readphy(tp, MII_BMCR, &bmcr);
+	tg3_readphy(tp, MII_BMCR, &bmcr);
+	r = -EINVAL;
+	if (bmcr & BMCR_ANENABLE) {
+		tg3_writephy(tp, MII_BMCR, bmcr | BMCR_ANRESTART);
+		r = 0;
+	}
+	spin_unlock_irq(&tp->lock);
+  
+	return r;
+}
+  
+static void tg3_get_ringparam(struct net_device *dev, struct ethtool_ringparam *ering)
+{
+	struct tg3 *tp = dev->priv;
+  
+	ering->rx_max_pending = TG3_RX_RING_SIZE - 1;
+	ering->rx_mini_max_pending = 0;
+	ering->rx_jumbo_max_pending = TG3_RX_JUMBO_RING_SIZE - 1;
+
+	ering->rx_pending = tp->rx_pending;
+	ering->rx_mini_pending = 0;
+	ering->rx_jumbo_pending = tp->rx_jumbo_pending;
+	ering->tx_pending = tp->tx_pending;
+}
+  
+static int tg3_set_ringparam(struct net_device *dev, struct ethtool_ringparam *ering)
+{
+	struct tg3 *tp = dev->priv;
+  
+	if ((ering->rx_pending > TG3_RX_RING_SIZE - 1) ||
+	    (ering->rx_jumbo_pending > TG3_RX_JUMBO_RING_SIZE - 1) ||
+	    (ering->tx_pending > TG3_TX_RING_SIZE - 1))
+		return -EINVAL;
+  
+	tg3_netif_stop(tp);
+	spin_lock_irq(&tp->lock);
+	spin_lock(&tp->tx_lock);
+  
+	tp->rx_pending = ering->rx_pending;
+
+	if ((tp->tg3_flags2 & TG3_FLG2_MAX_RXPEND_64) &&
+	    tp->rx_pending > 63)
+		tp->rx_pending = 63;
+	tp->rx_jumbo_pending = ering->rx_jumbo_pending;
+	tp->tx_pending = ering->tx_pending;
+
+	tg3_halt(tp);
+	tg3_init_hw(tp);
+	netif_wake_queue(tp->dev);
+	spin_unlock(&tp->tx_lock);
+	spin_unlock_irq(&tp->lock);
+	tg3_netif_start(tp);
+  
+	return 0;
+}
+  
+static void tg3_get_pauseparam(struct net_device *dev, struct ethtool_pauseparam *epause)
+{
+	struct tg3 *tp = dev->priv;
+  
+	epause->autoneg = (tp->tg3_flags & TG3_FLAG_PAUSE_AUTONEG) != 0;
+	epause->rx_pause = (tp->tg3_flags & TG3_FLAG_PAUSE_RX) != 0;
+	epause->tx_pause = (tp->tg3_flags & TG3_FLAG_PAUSE_TX) != 0;
+}
+  
+static int tg3_set_pauseparam(struct net_device *dev, struct ethtool_pauseparam *epause)
+{
+	struct tg3 *tp = dev->priv;
+  
+	tg3_netif_stop(tp);
+	spin_lock_irq(&tp->lock);
+	spin_lock(&tp->tx_lock);
+	if (epause->autoneg)
+		tp->tg3_flags |= TG3_FLAG_PAUSE_AUTONEG;
+	else
+		tp->tg3_flags &= ~TG3_FLAG_PAUSE_AUTONEG;
+	if (epause->rx_pause)
+		tp->tg3_flags |= TG3_FLAG_PAUSE_RX;
+	else
+		tp->tg3_flags &= ~TG3_FLAG_PAUSE_RX;
+	if (epause->tx_pause)
+		tp->tg3_flags |= TG3_FLAG_PAUSE_TX;
+	else
+		tp->tg3_flags &= ~TG3_FLAG_PAUSE_TX;
+	tg3_halt(tp);
+	tg3_init_hw(tp);
+	spin_unlock(&tp->tx_lock);
+	spin_unlock_irq(&tp->lock);
+	tg3_netif_start(tp);
+  
+	return 0;
+}
+  
+static u32 tg3_get_rx_csum(struct net_device *dev)
+{
+	struct tg3 *tp = dev->priv;
+	return (tp->tg3_flags & TG3_FLAG_RX_CHECKSUMS) != 0;
+}
+  
+static int tg3_set_rx_csum(struct net_device *dev, u32 data)
+{
+	struct tg3 *tp = dev->priv;
+  
+	if (tp->tg3_flags & TG3_FLAG_BROKEN_CHECKSUMS) {
+		if (data != 0)
+			return -EINVAL;
+  		return 0;
+  	}
+  
+	spin_lock_irq(&tp->lock);
+	if (data)
+		tp->tg3_flags |= TG3_FLAG_RX_CHECKSUMS;
+	else
+		tp->tg3_flags &= ~TG3_FLAG_RX_CHECKSUMS;
+	spin_unlock_irq(&tp->lock);
+  
+	return 0;
+}
+  
+static int tg3_set_tx_csum(struct net_device *dev, u32 data)
+{
+	struct tg3 *tp = dev->priv;
+  
+	if (tp->tg3_flags & TG3_FLAG_BROKEN_CHECKSUMS) {
+		if (data != 0)
+			return -EINVAL;
+  		return 0;
+  	}
+  
+	if (data)
+		dev->features |= NETIF_F_IP_CSUM;
+	else
+		dev->features &= ~NETIF_F_IP_CSUM;
+
+	return 0;
+}
+  
 static int tg3_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&ifr->ifr_data;
@@ -5568,8 +6221,6 @@ static int tg3_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	int err;
 
 	switch(cmd) {
-	case SIOCETHTOOL:
-		return tg3_ethtool_ioctl(dev, (void *) ifr->ifr_data);
 	case SIOCGMIIPHY:
 		data->phy_id = PHY_ADDR;
 
@@ -5633,10 +6284,43 @@ static void tg3_vlan_rx_kill_vid(struct net_device *dev, unsigned short vid)
 }
 #endif
 
+#ifdef ETHTOOL
+static struct ethtool_ops tg3_ethtool_ops = {
+	.get_settings		= tg3_get_settings,
+	.set_settings		= tg3_set_settings,
+	.get_drvinfo		= tg3_get_drvinfo,
+	.get_regs_len		= tg3_get_regs_len,
+	.get_regs		= tg3_get_regs,
+	.get_wol		= tg3_get_wol,
+	.set_wol		= tg3_set_wol,
+	.get_msglevel		= tg3_get_msglevel,
+	.set_msglevel		= tg3_set_msglevel,
+	.nway_reset		= tg3_nway_reset,
+	.get_link		= ethtool_op_get_link,
+	.get_ringparam		= tg3_get_ringparam,
+	.set_ringparam		= tg3_set_ringparam,
+	.get_pauseparam		= tg3_get_pauseparam,
+	.set_pauseparam		= tg3_set_pauseparam,
+	.get_rx_csum		= tg3_get_rx_csum,
+	.set_rx_csum		= tg3_set_rx_csum,
+	.get_tx_csum		= ethtool_op_get_tx_csum,
+	.set_tx_csum		= tg3_set_tx_csum,
+	.get_sg			= ethtool_op_get_sg,
+	.set_sg			= ethtool_op_set_sg,
+#if TG3_TSO_SUPPORT != 0
+	.get_tso		= ethtool_op_get_tso,
+	.set_tso		= tg3_set_tso,
+#endif
+};
+#endif
+
 /* Chips other than 5700/5701 use the NVRAM for fetching info. */
 static void __devinit tg3_nvram_init(struct tg3 *tp)
 {
 	int j;
+
+	if (tp->tg3_flags2 & TG3_FLG2_SUN_5704)
+		return;
 
 	tw32(GRC_EEPROM_ADDR,
 	     (EEPROM_ADDR_FSM_RESET |
@@ -5709,6 +6393,11 @@ static int __devinit tg3_nvram_read(struct tg3 *tp,
 				    u32 offset, u32 *val)
 {
 	int i, saw_done_clear;
+
+	if (tp->tg3_flags2 & TG3_FLG2_SUN_5704) {
+		printk(KERN_ERR PFX "Attempt to do nvram_read on Sun 5704\n");
+		return -EINVAL;
+	}
 
 	if (!(tp->tg3_flags & TG3_FLAG_NVRAM))
 		return tg3_nvram_read_using_eeprom(tp, offset, val);
@@ -5825,6 +6514,7 @@ static int __devinit tg3_phy_probe(struct tg3 *tp)
 		u32 nic_cfg;
 
 		tg3_read_mem(tp, NIC_SRAM_DATA_CFG, &nic_cfg);
+		tp->nic_sram_data_cfg = nic_cfg;
 
 		eeprom_signature_found = 1;
 
@@ -5858,8 +6548,10 @@ static int __devinit tg3_phy_probe(struct tg3 *tp)
 			eeprom_led_mode = led_mode_auto;
 			break;
 		};
-		if ((tp->pci_chip_rev_id == CHIPREV_ID_5703_A1 ||
-		     tp->pci_chip_rev_id == CHIPREV_ID_5703_A2) &&
+
+		if (((GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5703) ||
+		     (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704) ||
+		     (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705)) &&
 		    (nic_cfg & NIC_SRAM_DATA_CFG_EEPROM_WP))
 			tp->tg3_flags |= TG3_FLAG_EEPROM_WRITE_PROT;
 
@@ -5941,9 +6633,7 @@ static int __devinit tg3_phy_probe(struct tg3 *tp)
 	}
 
 	/* Enable Ethernet@WireSpeed */
-	tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x7007);
-	tg3_readphy(tp, MII_TG3_AUX_CTRL, &val);
-	tg3_writephy(tp, MII_TG3_AUX_CTRL, (val | (1 << 15) | (1 << 4)));
+	tg3_phy_set_wirespeed(tp);
 
 	if (!err && ((tp->phy_id & PHY_ID_MASK) == PHY_ID_BCM5401)) {
 		err = tg3_init_5401phy_dsp(tp);
@@ -5977,6 +6667,14 @@ static void __devinit tg3_read_partno(struct tg3 *tp)
 {
 	unsigned char vpd_data[256];
 	int i;
+
+	if (tp->tg3_flags2 & TG3_FLG2_SUN_5704) {
+		/* Sun decided not to put the necessary bits in the
+		 * NVRAM of their onboard tg3 parts :(
+		 */
+		strcpy(tp->board_part_number, "Sun 5704");
+		return;
+	}
 
 	for (i = 0; i < 256; i += 4) {
 		u32 tmp;
@@ -6034,6 +6732,34 @@ out_not_found:
 	strcpy(tp->board_part_number, "none");
 }
 
+#ifdef CONFIG_SPARC64
+static int __devinit tg3_is_sun_5704(struct tg3 *tp)
+{
+	struct pci_dev *pdev = tp->pdev;
+	struct pcidev_cookie *pcp = pdev->sysdata;
+
+	if (pcp != NULL) {
+		int node = pcp->prom_node;
+		u32 venid, devid;
+		int err;
+
+		err = prom_getproperty(node, "subsystem-vendor-id",
+				       (char *) &venid, sizeof(venid));
+		if (err == 0 || err == -1)
+			return 0;
+		err = prom_getproperty(node, "subsystem-id",
+				       (char *) &devid, sizeof(devid));
+		if (err == 0 || err == -1)
+			return 0;
+
+		if (venid == PCI_VENDOR_ID_SUN &&
+		    devid == PCI_DEVICE_ID_TIGON3_5704)
+			return 1;
+	}
+	return 0;
+}
+#endif
+
 static int __devinit tg3_get_invariants(struct tg3 *tp)
 {
 	u32 misc_ctrl_reg;
@@ -6042,7 +6768,12 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	u16 pci_cmd;
 	int err;
 
-	/* If we have an AMD 762 or Intel ICH/ICH0 chipset, write
+#ifdef CONFIG_SPARC64
+	if (tg3_is_sun_5704(tp))
+		tp->tg3_flags2 |= TG3_FLG2_SUN_5704;
+#endif
+
+	/* If we have an AMD 762 or Intel ICH/ICH0/ICH2 chipset, write
 	 * reordering to the mailbox registers done by the host
 	 * controller can cause major troubles.  We read back from
 	 * every mailbox register write to force the writes to be
@@ -6052,13 +6783,17 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 			    PCI_DEVICE_ID_INTEL_82801AA_8, NULL) ||
 	    pci_find_device(PCI_VENDOR_ID_INTEL,
 			    PCI_DEVICE_ID_INTEL_82801AB_8, NULL) ||
+	    pci_find_device(PCI_VENDOR_ID_INTEL,
+			    PCI_DEVICE_ID_INTEL_82801BA_11, NULL) ||
+	    pci_find_device(PCI_VENDOR_ID_INTEL,
+			    PCI_DEVICE_ID_INTEL_82801BA_6, NULL) ||
 	    pci_find_device(PCI_VENDOR_ID_AMD,
 			    PCI_DEVICE_ID_AMD_FE_GATE_700C, NULL))
 		tp->tg3_flags |= TG3_FLAG_MBOX_WRITE_REORDER;
 
 	/* Force memory write invalidate off.  If we leave it on,
 	 * then on 5700_BX chips we have to enable a workaround.
-	 * The workaround is to set the TG3PCI_DMA_RW_CTRL boundry
+	 * The workaround is to set the TG3PCI_DMA_RW_CTRL boundary
 	 * to match the cacheline size.  The Broadcom driver have this
 	 * workaround but turns MWI off all the times so never uses
 	 * it.  This seems to suggest that the workaround is insufficient.
@@ -6200,7 +6935,15 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 		tp->tg3_flags |= TG3_FLAG_WOL_SPEED_100MB;
 	}
 
+	/* A few boards don't want Ethernet@WireSpeed phy feature */
+	if ((GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5700) ||
+	    ((GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705) &&
+	     (tp->pci_chip_rev_id != CHIPREV_ID_5705_A0) &&
+	     (tp->pci_chip_rev_id != CHIPREV_ID_5705_A1)))
+		tp->tg3_flags2 |= TG3_FLG2_NO_ETH_WIRE_SPEED;
+
 	/* Only 5701 and later support tagged irq status mode.
+	 * Also, 5788 chips cannot use tagged irq status.
 	 *
 	 * However, since we are using NAPI avoid tagged irq status
 	 * because the interrupt condition is more difficult to
@@ -6257,7 +7000,8 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	/* Determine if TX descriptors will reside in
 	 * main memory or in the chip SRAM.
 	 */
-	if (tp->tg3_flags & TG3_FLAG_PCIX_TARGET_HWBUG)
+	if ((tp->tg3_flags & TG3_FLAG_PCIX_TARGET_HWBUG) != 0 ||
+	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705)
 		tp->tg3_flags |= TG3_FLAG_HOST_TXDS;
 
 	grc_misc_cfg = tr32(GRC_MISC_CFG);
@@ -6269,8 +7013,18 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 		tp->split_mode_max_reqs = SPLIT_MODE_5704_MAX_REQ;
 	}
 
-	/* this one is limited to 10/100 only */
-	if (grc_misc_cfg == GRC_MISC_CFG_BOARD_ID_5702FE)
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705 &&
+	    (grc_misc_cfg == GRC_MISC_CFG_BOARD_ID_5788 ||
+	     grc_misc_cfg == GRC_MISC_CFG_BOARD_ID_5788M))
+		tp->tg3_flags2 |= TG3_FLG2_IS_5788;
+
+	/* these are limited to 10/100 only */
+	if ((GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5703 &&
+	     (grc_misc_cfg == 0x8000 || grc_misc_cfg == 0x4000)) ||
+	    (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705 &&
+	     tp->pdev->vendor == PCI_VENDOR_ID_BROADCOM &&
+	     (tp->pdev->device == PCI_DEVICE_ID_TIGON3_5901 ||
+	      tp->pdev->device == PCI_DEVICE_ID_TIGON3_5901_2)))
 		tp->tg3_flags |= TG3_FLAG_10_100_ONLY;
 
 	err = tg3_phy_probe(tp);
@@ -6350,10 +7104,43 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	return err;
 }
 
+#ifdef CONFIG_SPARC64
+static int __devinit tg3_get_macaddr_sparc(struct tg3 *tp)
+{
+	struct net_device *dev = tp->dev;
+	struct pci_dev *pdev = tp->pdev;
+	struct pcidev_cookie *pcp = pdev->sysdata;
+
+	if (pcp != NULL) {
+		int node = pcp->prom_node;
+
+		if (prom_getproplen(node, "local-mac-address") == 6) {
+			prom_getproperty(node, "local-mac-address",
+					 dev->dev_addr, 6);
+			return 0;
+		}
+	}
+	return -ENODEV;
+}
+
+static int __devinit tg3_get_default_macaddr_sparc(struct tg3 *tp)
+{
+	struct net_device *dev = tp->dev;
+
+	memcpy(dev->dev_addr, idprom->id_ethaddr, 6);
+	return 0;
+}
+#endif
+
 static int __devinit tg3_get_device_address(struct tg3 *tp)
 {
 	struct net_device *dev = tp->dev;
 	u32 hi, lo, mac_offset;
+
+#ifdef CONFIG_SPARC64
+	if (!tg3_get_macaddr_sparc(tp))
+		return 0;
+#endif
 
 	if (PCI_FUNC(tp->pdev->devfn) == 0)
 		mac_offset = 0x7c;
@@ -6373,7 +7160,8 @@ static int __devinit tg3_get_device_address(struct tg3 *tp)
 		dev->dev_addr[5] = (lo >>  0) & 0xff;
 	}
 	/* Next, try NVRAM. */
-	else if (!tg3_nvram_read(tp, mac_offset + 0, &hi) &&
+	else if (!(tp->tg3_flags & TG3_FLG2_SUN_5704) &&
+		 !tg3_nvram_read(tp, mac_offset + 0, &hi) &&
 		 !tg3_nvram_read(tp, mac_offset + 4, &lo)) {
 		dev->dev_addr[0] = ((hi >> 16) & 0xff);
 		dev->dev_addr[1] = ((hi >> 24) & 0xff);
@@ -6395,9 +7183,13 @@ static int __devinit tg3_get_device_address(struct tg3 *tp)
 		dev->dev_addr[0] = (hi >> 8) & 0xff;
 	}
 
-	if (!is_valid_ether_addr(&dev->dev_addr[0]))
+	if (!is_valid_ether_addr(&dev->dev_addr[0])) {
+#ifdef CONFIG_SPARC64
+		if (!tg3_get_default_macaddr_sparc(tp))
+			return 0;
+#endif
 		return -EINVAL;
-
+	}
 	return 0;
 }
 
@@ -6492,8 +7284,6 @@ static int __devinit tg3_test_dma(struct tg3 *tp)
 		goto out_nofree;
 	}
 
-	tw32(TG3PCI_CLOCK_CTRL, 0);
-
 	if ((tp->tg3_flags & TG3_FLAG_PCIX_MODE) == 0) {
 		tp->dma_rwctrl =
 			(0x7 << DMA_RWCTRL_PCI_WRITE_CMD_SHIFT) |
@@ -6501,7 +7291,9 @@ static int __devinit tg3_test_dma(struct tg3 *tp)
 			(0x7 << DMA_RWCTRL_WRITE_WATER_SHIFT) |
 			(0x7 << DMA_RWCTRL_READ_WATER_SHIFT) |
 			(0x0f << DMA_RWCTRL_MIN_DMA_SHIFT);
-		/* XXX 5705 note: set MIN_DMA to zero here */
+		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705)
+			tp->dma_rwctrl &= ~(DMA_RWCTRL_MIN_DMA
+					    << DMA_RWCTRL_MIN_DMA_SHIFT);
 	} else {
 		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704)
 			tp->dma_rwctrl =
@@ -6602,13 +7394,20 @@ static int __devinit tg3_test_dma(struct tg3 *tp)
 		tp->dma_rwctrl |= DMA_RWCTRL_USE_MEM_READ_MULT;
 	}
 
+	tp->dma_rwctrl |= DMA_RWCTRL_ASSERT_ALL_BE;
+
 	tw32(TG3PCI_DMA_RW_CTRL, tp->dma_rwctrl);
 
-	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5700 &&
-	    GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5701)
-		return 0;
+#if 0
+	/* Unneeded, already done by tg3_get_invariants.  */
+	tg3_switch_clocks(tp);
+#endif
 
 	ret = 0;
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5700 &&
+	    GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5701)
+		goto out;
+
 	while (1) {
 		u32 *p, i;
 
@@ -6708,10 +7507,33 @@ static char * __devinit tg3_phy_string(struct tg3 *tp)
 	case PHY_ID_BCM5701:	return "5701";
 	case PHY_ID_BCM5703:	return "5703";
 	case PHY_ID_BCM5704:	return "5704";
+	case PHY_ID_BCM5705:	return "5705";
 	case PHY_ID_BCM8002:	return "8002";
 	case PHY_ID_SERDES:	return "serdes";
 	default:		return "unknown";
 	};
+}
+
+static struct pci_dev * __devinit tg3_find_5704_peer(struct tg3 *tp)
+{
+	struct pci_dev *peer = NULL;
+	unsigned int func;
+
+	for (func = 0; func < 7; func++) {
+		unsigned int devfn = tp->pdev->devfn;
+
+		devfn &= ~7;
+		devfn |= func;
+
+		if (devfn == tp->pdev->devfn)
+			continue;
+		peer = pci_find_slot(tp->pdev->bus->number, devfn);
+		if (peer)
+			break;
+	}
+	if (!peer || peer == tp->pdev)
+		BUG();
+	return peer;
 }
 
 static int __devinit tg3_init_one(struct pci_dev *pdev,
@@ -6758,10 +7580,10 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 	}
 
 	/* Configure DMA attributes. */
-	if (!pci_set_dma_mask(pdev, (u64) 0xffffffffffffffff)) {
+	if (!pci_set_dma_mask(pdev, 0xffffffffffffffffULL)) {
 		pci_using_dac = 1;
 	} else {
-		err = pci_set_dma_mask(pdev, (u64) 0xffffffff);
+		err = pci_set_dma_mask(pdev, 0xffffffffULL);
 		if (err) {
 			printk(KERN_ERR PFX "No usable DMA configuration, "
 			       "aborting.\n");
@@ -6788,9 +7610,6 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 	dev->features |= NETIF_F_HW_VLAN_TX | NETIF_F_HW_VLAN_RX;
 	dev->vlan_rx_register = tg3_vlan_rx_register;
 	dev->vlan_rx_kill_vid = tg3_vlan_rx_kill_vid;
-#endif
-#if TG3_DO_TSO != 0
-	dev->features |= NETIF_F_TSO;
 #endif
 
 	tp = dev->priv;
@@ -6830,7 +7649,7 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 	spin_lock_init(&tp->lock);
 	spin_lock_init(&tp->tx_lock);
 	spin_lock_init(&tp->indirect_lock);
-	PREPARE_TQUEUE(&tp->reset_task, tg3_reset_task, tp);
+	INIT_TQUEUE(&tp->reset_task, tg3_reset_task, tp);
 
 	tp->regs = (unsigned long) ioremap(tg3reg_base, tg3reg_len);
 	if (tp->regs == 0UL) {
@@ -6857,6 +7676,11 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 	dev->tx_timeout = tg3_tx_timeout;
 #ifdef NAPI
 	dev->poll = tg3_poll;
+#endif
+#ifdef ETHTOOL
+	dev->ethtool_ops = &tg3_ethtool_ops;
+#endif
+#ifdef NAPI
 	dev->weight = 64;
 #endif
 	dev->watchdog_timeo = TG3_TX_TIMEOUT;
@@ -6869,6 +7693,44 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 		       "aborting.\n");
 		goto err_out_iounmap;
 	}
+
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705) {
+		tp->bufmgr_config.mbuf_read_dma_low_water =
+			DEFAULT_MB_RDMA_LOW_WATER_5705;
+		tp->bufmgr_config.mbuf_mac_rx_low_water =
+			DEFAULT_MB_MACRX_LOW_WATER_5705;
+		tp->bufmgr_config.mbuf_high_water =
+			DEFAULT_MB_HIGH_WATER_5705;
+	}
+
+#if TG3_TSO_SUPPORT != 0
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5700 ||
+	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5701 ||
+	    tp->pci_chip_rev_id == CHIPREV_ID_5705_A0 ||
+	    (tp->tg3_flags & TG3_FLAG_ENABLE_ASF) != 0 ||
+	    (tp->tg3_flags2 & TG3_FLG2_IS_5788)) {
+		tp->tg3_flags2 &= ~TG3_FLG2_TSO_CAPABLE;
+	} else {
+		tp->tg3_flags2 |= TG3_FLG2_TSO_CAPABLE;
+	}
+
+	/* TSO is off by default, user can enable using ethtool.  */
+#if 0
+	if (tp->tg3_flags2 & TG3_FLG2_TSO_CAPABLE)
+		dev->features |= NETIF_F_TSO;
+#endif
+
+#endif
+
+	if (tp->pci_chip_rev_id == CHIPREV_ID_5705_A1 &&
+	    !(tp->tg3_flags2 & TG3_FLG2_TSO_CAPABLE) &&
+	    !(tr32(TG3PCI_PCISTATE) & PCISTATE_BUS_SPEED_HIGH)) {
+		tp->tg3_flags2 |= TG3_FLG2_MAX_RXPEND_64;
+		tp->rx_pending = 63;
+	}
+
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704)
+		tp->pdev_peer = tg3_find_5704_peer(tp);
 
 	err = tg3_get_device_address(tp);
 	if (err) {
@@ -6891,6 +7753,9 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 		tp->tg3_flags |= TG3_FLAG_RX_CHECKSUMS;
 	} else
 		tp->tg3_flags &= ~TG3_FLAG_RX_CHECKSUMS;
+
+	if (tp->tg3_flags2 & TG3_FLG2_IS_5788)
+		dev->features &= ~NETIF_F_HIGHDMA;
 
 	err = register_netdev(dev);
 	if (err) {
@@ -6965,6 +7830,8 @@ static int tg3_suspend(struct pci_dev *pdev, u32 state)
 
 	tg3_netif_stop(tp);
 
+	del_timer_sync(&tp->timer);
+
 	spin_lock_irq(&tp->lock);
 	spin_lock(&tp->tx_lock);
 	tg3_disable_ints(tp);
@@ -6984,8 +7851,10 @@ static int tg3_suspend(struct pci_dev *pdev, u32 state)
 		spin_lock_irq(&tp->lock);
 		spin_lock(&tp->tx_lock);
 
-		tg3_init_rings(tp);
 		tg3_init_hw(tp);
+
+		tp->timer.expires = jiffies + tp->timer_offset;
+		add_timer(&tp->timer);
 
 		spin_unlock(&tp->tx_lock);
 		spin_unlock_irq(&tp->lock);
@@ -7015,8 +7884,11 @@ static int tg3_resume(struct pci_dev *pdev)
 	spin_lock_irq(&tp->lock);
 	spin_lock(&tp->tx_lock);
 
-	tg3_init_rings(tp);
 	tg3_init_hw(tp);
+
+	tp->timer.expires = jiffies + tp->timer_offset;
+	add_timer(&tp->timer);
+
 	tg3_enable_ints(tp);
 
 	spin_unlock(&tp->tx_lock);

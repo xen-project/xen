@@ -294,6 +294,11 @@ static inline int skb_is_nonlinear(const struct sk_buff *skb)
     return skb->data_len;
 }
 
+static inline unsigned int skb_headlen(const struct sk_buff *skb)
+{
+        return skb->len - skb->data_len;
+}
+                                                                                
 #define SKB_LINEAR_ASSERT(skb) do { if (skb_is_nonlinear(skb)) BUG(); } while (0)
 
 /*
