@@ -325,6 +325,7 @@ if (!ed->vcpu_info) { printf("Stopping in init_all_rr\n"); dummy(); }
 	ed->vcpu_info->arch.rrs[3] = rrv.rrval;
 	ed->vcpu_info->arch.rrs[4] = rrv.rrval;
 	ed->vcpu_info->arch.rrs[5] = rrv.rrval;
+	rrv.ve = 0; 
 	ed->vcpu_info->arch.rrs[6] = rrv.rrval;
 //	ed->shared_info->arch.rrs[7] = rrv.rrval;
 }
@@ -367,10 +368,13 @@ unsigned long load_region_regs(struct exec_domain *ed)
 	if (ed->vcpu_info->arch.metaphysical_mode) {
 		ia64_rr rrv;
 
+		rrv.rrval = 0;
 		rrv.rid = ed->domain->metaphysical_rid;
 		rrv.ps = PAGE_SHIFT;
 		rrv.ve = 1;
-		rr0 = rr1 = rr2 = rr3 = rr4 = rr5 = rr6 = newrr7 = rrv.rrval;
+		rr0 = rr1 = rr2 = rr3 = rr4 = rr5 = newrr7 = rrv.rrval;
+		rrv.ve = 0;
+		rr6 = rrv.rrval;
 	}
 	else {
 		rr0 = physicalize_rid(ed, ed->vcpu_info->arch.rrs[0]);
