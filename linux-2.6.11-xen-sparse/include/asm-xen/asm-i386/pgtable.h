@@ -485,7 +485,10 @@ int __direct_remap_area_pages(struct mm_struct *mm,
 			      mmu_update_t *v);
 
 #define io_remap_page_range(vma,from,phys,size,prot) \
-	direct_remap_area_pages(vma->vm_mm,from,phys,size,prot,DOMID_IO)
+direct_remap_area_pages(vma->vm_mm,from,phys,size,prot,DOMID_IO)
+
+#define io_remap_pfn_range(vma,from,pfn,size,prot) \
+direct_remap_area_pages(vma->vm_mm,from,pfn<<PAGE_SHIFT,size,prot,DOMID_IO)
 
 #define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_YOUNG
 #define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_DIRTY
