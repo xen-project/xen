@@ -1573,10 +1573,26 @@ int do_update_va_mapping(unsigned long page_nr,
             &shadow_linear_pg_table[page_nr])))) )
         {
             /*
-             * Since L2's are guranteed RW, failure indicates the page was not 
-             * shadowed, so ignore.
+             * Since L2's are guranteed RW, failure indicates either that the
+             * page was not shadowed, or that the L2 entry has not yet been
+             * updated to reflect the shadow.
              */
-            perfc_incrc(shadow_update_va_fail);
+            unsigned l2_idx = page_nr >> (L2_PAGETABLE_SHIFT - L1_PAGETABLE_SHIFT);
+            l2_pgentry_t gpde = linear_l2_table[l2_idx];
+            unsigned long gpfn = l2_pgentry_val(gpde) >> PAGE_SHIFT;
+
+            if (get_shadow_status(&d->mm, gpfn))
+            {
+                unsigned long *gl1e = map_domain_mem(gpfn << PAGE_SHIFT);
+                unsigned l1_idx = page_nr & (ENTRIES_PER_L1_PAGETABLE - 1);
+                gl1e[l1_idx] = sval;
+                unmap_domain_mem(gl1e);
+                put_shadow_status(&d->mm);
+
+                perfc_incrc(shadow_update_va_fail1);
+            }
+            else
+                perfc_incrc(shadow_update_va_fail2);
         }
 
         /*
