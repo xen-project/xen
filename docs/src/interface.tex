@@ -196,6 +196,7 @@ implement timeout values when they block.
 
 
 \chapter{Memory}
+\label{c:memory} 
 
 Xen is responsible for managing the allocation of physical memory to
 domains, and for ensuring safe use of the paging and segmentation
@@ -530,7 +531,6 @@ hypercall to be invoked is contained in {\tt EAX} --- a list
 mapping these values to symbolic hypercall names can be found 
 in {\tt xen/include/public/xen.h}. 
 
-
 On some occasions a set of hypercalls will be required to carry
 out a higher-level function; a good example is when a guest 
 operating wishes to context switch to a new process which 
@@ -574,7 +574,7 @@ have RPL 1; in XenLinux we simply use the kernel's CS for both
 
 The value {\tt event\_address} specifies the address of the guest OSes
 event handling and dispatch routine; the {\tt failsafe\_address}
-specifies separate entry point which is used only if a fault occurs
+specifies a separate entry point which is used only if a fault occurs
 when Xen attempts to use the normal callback. 
 \end{quote} 
 
@@ -609,63 +609,121 @@ any purpose.
 \hypercall{set\_fast\_trap(int idx)}
 
 Install the handler for exception vector {\tt idx} as the ``fast
-trap'' for this domaim. Note that this installs the current handler 
-(i.e. that which has been installed previously via a call 
+trap'' for this domain. Note that this installs the current handler 
+(i.e. that which has been installed more recently via a call 
 to {\tt set\_trap\_table()}). 
 
 \end{quote}
 
 
 
-\section{Scheduling} 
+\section{Scheduling and Timer}
 
+Domains are premptively scheduled by Xen according to the 
+parameters installed by Domain-0 (see Section~\ref{s:dom0ops}). 
+In addition, however, a domain may choose to explicitly 
+control certain behaviour with the following hypercall: 
 
-\hypercall{stack\_switch(unsigned long ss, unsigned long esp)} 
-
-Request context switch from hypervisor.
-
-
-\hypercall{fpu\_taskswitch(void)} 
-
-Notify hypervisor that fpu registers needed to be save on context switch.
-
-
+\begin{quote} 
 \hypercall{sched\_op(unsigned long op)} 
 
 Request scheduling operation from hypervisor. The options are: {\it
 yield}, {\it block}, and {\it shutdown}.  {\it yield} keeps the
-calling domain run-able but may cause a reschedule if other domains
-are run-able.  {\it block} removes the calling domain from the run
-queue and the domains sleeps until an event is delivered to it.  {\it
-shutdown} is used to end the domain's execution and allows to specify
-whether the domain should reboot, halt or suspend..
+calling domain runnable but may cause a reschedule if other domains
+are runnable.  {\it block} removes the calling domain from the run
+queue and cause is to sleeps until an event is delivered to it.  {\it
+shutdown} is used to end the domain's execution; the caller can
+additionally specify whether the domain should reboot, halt or
+suspend.
+\end{quote} 
 
+To aid the implementation of a process scheduler within a guest OS,
+Xen provides a virtual programmable timer:
+
+\begin{quote}
 \hypercall{set\_timer\_op(uint64\_t timeout)} 
 
-Request a timer event to be sent at the specified system time.
+Request a timer event to be sent at the specified system time (time 
+in nanoseconds since system boot). The hypercall actually passes the 
+64-bit timeout value as a pair of 32-bit values. 
+
+\end{quote} 
+
+Note that calling {\tt set\_timer\_op()} prior to {\tt sched\_op} 
+allows block-with-timeout semantics. 
 
 
 \section{Page Table Management} 
 
+Since guest operating systems have read-only access to their page 
+tables, Xen must be involved when making any changes. The following
+multi-purpose hypercall can be used to modify page-table entries, 
+update the machine-to-physical mapping table, flush the TLB, install 
+a new page-table base pointer, and more.
+
+\begin{quote} 
 \hypercall{mmu\_update(mmu\_update\_t *req, int count, int *success\_count)} 
 
-Update the page table for the domain. Updates can be batched.
-success\_count will be updated to report the number of successfull
-updates.  The update types are:
+Update the page table for the domain; a set of {\tt count} updates are
+submitted for processing in a batch, with {\tt success\_count} being 
+updated to report the number of successfull updates.  
 
-{\it MMU\_NORMAL\_PT\_UPDATE}:
+Each element of {\tt req[]} contains a pointer (address) and value; 
+the least significant 2-bits of the pointer are used to distinguish 
+the type of update requested as follows:
+\begin{description} 
 
-{\it MMU\_MACHPHYS\_UPDATE}:
+\item[\it MMU\_NORMAL\_PT\_UPDATE:] update a page directory entry or
+page table entry to the associated value; Xen will check that the
+update is safe, as described in Chapter~\ref{c:memory}.
 
-{\it MMU\_EXTENDED\_COMMAND}:
+\item[\it MMU\_MACHPHYS\_UPDATE:] update an entry in the
+  machine-to-physical table. The calling domain must own the machine
+  page in question (or be privileged).
+
+\item[\it MMU\_EXTENDED\_COMMAND:] perform additional MMU operations.
+The set of additional MMU operations is considerable, and includes
+updating {\tt cr3} (or just re-installing it for a TLB flush),
+flushing the cache, installing a new LDT, or pinning \& unpinning
+page-table pages (to ensure their reference count doesn't drop to zero
+which would require a revalidation of all entries).
+
+Further extended commands are used to deal with granting and 
+acquiring page ownership; see Section~\ref{s:idc}. 
 
 
-\hypercall{update\_va\_mapping(unsigned long page\_nr, unsigned long val, unsigned long flags)}
+\end{description}
 
+More details on the precise format of all commands can be 
+found in {\tt xen/include/public/xen.h}. 
+
+
+\end{quote}
+
+Explicitly updating batches of page table entries is extremely
+efficient, but can require a number of alterations to the guest 
+OS. Using the writable page table mode is recommended 
+for new OS ports. 
+
+However in either mode, there are some occasions (in particular
+handling a demand page fault) where a guest OS will wish to 
+modify exactly one PTE rather than a batch. This is catered 
+for by the following hypercall: 
+
+\begin{quote} 
+\hypercall{update\_va\_mapping(unsigned long page\_nr, unsigned long
+val, unsigned long flags)}
+
+\end{quote} 
+
+Finally, privileged domains may be able to xxx. 
+
+\begin{quote}
 
 \hypercall{update\_va\_mapping\_otherdomain(unsigned long page\_nr,
 unsigned long val, unsigned long flags, uint16\_t domid)}
 
+\end{quote}
 
 \section{Segmentation Support}
 
@@ -679,9 +737,22 @@ Set the global descriptor table - virtualization for lgdt.
 \hypercall{update\_descriptor(unsigned long ma, unsigned long word1, unsigned long word2)} 
 
 
+\section{Context Switching} 
+
+\hypercall{stack\_switch(unsigned long ss, unsigned long esp)} 
+
+Request context switch from hypervisor.
+
+
+\hypercall{fpu\_taskswitch(void)} 
+
+Notify hypervisor that fpu registers needed to be save on context switch.
+
+
 
 
 \section{Inter-Domain Communication}
+\label{s:idc} 
 
 
 \hypercall{event\_channel\_op(void *op)} 
@@ -706,7 +777,7 @@ Increase or decrease memory reservations for guest OS
 
 
 \section{Administrative Operations}
-
+\label{s:dom0ops}
 
 \hypercall{dom0\_op(dom0\_op\_t *op)} 
 
