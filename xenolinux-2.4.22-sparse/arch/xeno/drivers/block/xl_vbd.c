@@ -271,9 +271,6 @@ int __init xlvbd_init(xen_disk_info_t *xdi)
 		break; 
 		
 	    case XD_TYPE_DISK: 
-		printk(KERN_ALERT 
-		       "Calling register_disk for device %04x [gd=%p]\n", 
-		       device, gd); 
 		register_disk(gd, device, gd->nr_real, &xlvbd_block_fops, 
 			      xdi->disks[i].capacity);
 		break; 
