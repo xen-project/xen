@@ -1130,6 +1130,11 @@
 421098b6AUdbxR3wyn1ATcmNuTao_Q xen/arch/ia64/tools/README.xenia64
 42376c6dfyY0eq8MS2dK3BW2rFuEGg xen/arch/ia64/tools/README.xenia64linux
 421098b6rQ2BQ103qu1n1HNofbS2Og xen/arch/ia64/tools/mkbuildtree
+4252ace7eQQmDdwOqsKWdHo8JpKqnQ xen/arch/ia64/tools/privify/Makefile
+4252ace76fKAIizJRS6S84KbK6yXYw xen/arch/ia64/tools/privify/README.privify
+4252ace7uR0Th8eEXiLyafNPTDYrOg xen/arch/ia64/tools/privify/privify.c
+4252ace7H2dIMPFeFwczAVoP4yAHxA xen/arch/ia64/tools/privify/privify.h
+4252ace74lKUPFnO8PmF0Dtpk7Xkng xen/arch/ia64/tools/privify/privify_elf64.c
 41a26ebc--sjlYZQxmIxyCx3jw70qA xen/arch/ia64/vcpu.c
 421098b6M2WhsJ_ZMzFamAQcdc5gzw xen/arch/ia64/vhpt.c
 41a26ebc4jSBGQOuyNIPDST58mNbBw xen/arch/ia64/xenasm.S

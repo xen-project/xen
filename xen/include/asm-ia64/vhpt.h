@@ -135,7 +135,7 @@ struct vhpt_lf_entry {
 // VHPT_CCHAIN_LOOKUP is intended to run with psr.i+ic off
 #define VHPT_CCHAIN_LOOKUP(Name, i_or_d) 			\
 								\
-Name:;								\
+CC_##Name:;							\
 	mov r31 = pr;						\
 	mov r16 = cr.ifa;					\
 	movl r30 = int_counts;					\
