@@ -396,8 +396,8 @@ int cpucount;
 int __init start_secondary(void *unused)
 {
     unsigned int cpu = smp_processor_id();
-    /* A 'mem64' suitable for passing to LIDT instruction. */
-    unsigned long idt_load[2] = { (IDT_ENTRIES*8)-1, 0 };
+    /* 6 bytes suitable for passing to LIDT instruction. */
+    unsigned char idt_load[6];
 
     extern void cpu_init(void);
 
@@ -418,7 +418,8 @@ int __init start_secondary(void *unused)
      */
     idt_tables[cpu] = kmalloc(IDT_ENTRIES*8, GFP_KERNEL);
     memcpy(idt_tables[cpu], idt_table, IDT_ENTRIES*8);
-    idt_load[2] = (unsigned long)idt_tables[cpu];
+    *(unsigned short *)(&idt_load[0]) = (IDT_ENTRIES*8)-1;
+    *(unsigned long  *)(&idt_load[2]) = (unsigned long)idt_tables[cpu];
     __asm__ __volatile__ ( "lidt %0" : "=m" (idt_load) );
 
     /*
