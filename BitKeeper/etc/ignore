@@ -124,3 +124,5 @@ tools/blktap/vdi_validate
 tools/blktap/xen/*
 tools/cmdline/*
 tools/tests/test_x86_emulator
+tools/blktap/blockstored
+tools/blktap/bstest
