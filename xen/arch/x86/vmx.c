@@ -927,6 +927,8 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
     default:
         __vmx_bug(&regs);       /* should not happen */
     }
+
+    vmx_intr_assist(d);
     return;
 }
 

@@ -167,6 +167,9 @@ bx_cpu_c::timer_handler(void)
 #define rdtscl(low) \
      __asm__ __volatile__("rdtsc" : "=a" (low) : : "edx")
 
+#define rdtscll(val) \
+     __asm__ __volatile__("rdtsc" : "=A" (val))
+
 void
 bx_cpu_c::cpu_loop(int max_instr_count)
 {
@@ -180,7 +183,8 @@ bx_cpu_c::cpu_loop(int max_instr_count)
 	FD_ZERO(&rfds);
 
 	while (1) {
-		unsigned long t1, t2;
+                static unsigned long long t1 = 0;
+		unsigned long long t2;
 
 		/* Wait up to one seconds. */
 		tv.tv_sec = 0;
@@ -188,18 +192,30 @@ bx_cpu_c::cpu_loop(int max_instr_count)
 		FD_SET(evtchn_fd, &rfds);
 
 		send_event = 0;
-		rdtscl(t1);		
+
+		if (t1 == 0) // the first time
+			rdtscll(t1);
+
 		retval = select(evtchn_fd+1, &rfds, NULL, NULL, &tv);
-		rdtscl(t2);
 		if (retval == -1) {
 			perror("select");
 			return;
 		}
-		//stime_usec = 1000000 * (1 - tv.tv_sec)  - tv.tv_usec;
-		if (t2 > t1)
-			BX_TICKN((t2 - t1) / 2000);	// should match ips in bochsrc
+
+		rdtscll(t2);
+
+#if __WORDSIZE == 32
+#define ULONGLONG_MAX   0xffffffffffffffffULL
+#else
+#define ULONGLONG_MAX   ULONG_MAX
+#endif
+
+		if (t2 <= t1)
+			BX_TICKN((t2 + ULONGLONG_MAX - t1));
 		else
-			BX_TICKN((MAXINT - t1 + t2) / 2000);	// should match ips in bochsrc
+			BX_TICKN((t2 - t1));
+		t1 = t2;
+
 		timer_handler();
 		if (BX_CPU_INTR) {
 #if BX_SUPPORT_APIC
@@ -248,7 +264,7 @@ bx_cpu_c::interrupt(Bit8u vector)
 	// page.
 
 	rdtscl(tscl);
-	BX_INFO(("%lx: injecting vector: %x\n", tscl, vector));
+	BX_DEBUG(("%lx: injecting vector: %x\n", tscl, vector));
 	intr = &(((vcpu_iodata_t *) shared_page)->vp_intr[0]);
 	set_bit(vector, intr);
 	
