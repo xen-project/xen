@@ -667,6 +667,9 @@ int construct_dom0(struct domain *p,
     if ( rc != 0 )
         return rc;
 
+    if (dsi.load_bsd_symtab)
+        loadelfsymtab(image_start, 0, &dsi);
+
     /* Set up domain options */
     if ( dsi.use_writable_pagetables )
         vm_assist(p, VMASST_CMD_enable, VMASST_TYPE_writable_pagetables);
@@ -684,7 +687,7 @@ int construct_dom0(struct domain *p,
      * read-only). We have a pair of simultaneous equations in two unknowns, 
      * which we solve by exhaustive search.
      */
-    vinitrd_start    = round_pgup(dsi.v_kernend);
+    vinitrd_start    = round_pgup(dsi.v_end);
     vinitrd_end      = vinitrd_start + initrd_len;
     vphysmap_start   = round_pgup(vinitrd_end);
     vphysmap_end     = vphysmap_start + (nr_pages * sizeof(unsigned long));
@@ -883,6 +886,9 @@ int construct_dom0(struct domain *p,
 
     /* Copy the OS image. */
     (void)loadelfimage(image_start);
+
+    if (dsi.load_bsd_symtab)
+        loadelfsymtab(image_start, 1, &dsi);
 
     /* Copy the initial ramdisk. */
     if ( initrd_len != 0 )

@@ -125,11 +125,17 @@ int parseelfimage(char *elfbase,
         
         if ( (p = strstr(guestinfo, "PT_MODE_WRITABLE")) != NULL )
             dsi->use_writable_pagetables = 1;
+
+        if ( (p = strstr(guestinfo, "BSD_SYMTAB")) != NULL )
+            dsi->load_bsd_symtab = 1;
+
     }
 
     dsi->v_kernstart = kernstart;
     dsi->v_kernend   = kernend;
     dsi->v_kernentry = ehdr->e_entry;
+
+    dsi->v_end       = dsi->v_kernend;
 
     return 0;
 }
@@ -152,6 +158,100 @@ int loadelfimage(char *elfbase)
             memset((char *)phdr->ELF_ADDR + phdr->p_filesz, 0, 
                    phdr->p_memsz - phdr->p_filesz);
     }
+
+    return 0;
+}
+
+#define ELFROUND (ELFSIZE / 8)
+
+int loadelfsymtab(char *elfbase, int doload, struct domain_setup_info *dsi)
+{
+    Elf_Ehdr *ehdr = (Elf_Ehdr *)elfbase, *sym_ehdr;
+    Elf_Shdr *shdr;
+    unsigned long maxva, symva;
+    char *p;
+    int h, i;
+
+    maxva = (dsi->v_kernend + ELFROUND - 1) & ~(ELFROUND - 1);
+    symva = maxva;
+    maxva += sizeof(int);
+    dsi->symtab_addr = maxva;
+    dsi->symtab_len = 0;
+    maxva += sizeof(Elf_Ehdr) + ehdr->e_shnum * sizeof(Elf_Shdr);
+    maxva = (maxva + ELFROUND - 1) & ~(ELFROUND - 1);
+    if (doload) {
+	p = (void *)symva;
+
+	shdr = (Elf_Shdr *)(p + sizeof(int) + sizeof(Elf_Ehdr));
+	memcpy(shdr, elfbase + ehdr->e_shoff, ehdr->e_shnum * sizeof(Elf_Shdr));
+    } else {
+	shdr = (Elf_Shdr *)(elfbase + ehdr->e_shoff);
+	p = NULL; /* XXX: gcc */
+    }
+
+    for ( h = 0; h < ehdr->e_shnum; h++ ) 
+    {
+        if ( shdr[h].sh_type == SHT_STRTAB )
+        {
+            /* Look for a strtab @i linked to symtab @h. */
+            for ( i = 0; i < ehdr->e_shnum; i++ )
+                if ( (shdr[i].sh_type == SHT_SYMTAB) &&
+                     (shdr[i].sh_link == h) )
+                    break;
+            /* Skip symtab @h if we found no corresponding strtab @i. */
+            if ( i == ehdr->e_shnum )
+            {
+		if (doload) {
+		    shdr[h].sh_offset = 0;
+		}
+                continue;
+            }
+        }
+
+        if ( (shdr[h].sh_type == SHT_STRTAB) ||
+             (shdr[h].sh_type == SHT_SYMTAB) )
+        {
+	    if (doload) {
+		memcpy((void *)maxva, elfbase + shdr[h].sh_offset,
+		    shdr[h].sh_size);
+
+		/* Mangled to be based on ELF header location. */
+		shdr[h].sh_offset = maxva - dsi->symtab_addr;
+
+	    }
+	    dsi->symtab_len += shdr[h].sh_size;
+	    maxva += shdr[h].sh_size;
+	    maxva = (maxva + ELFROUND - 1) & ~(ELFROUND - 1);
+        }
+
+        if (doload) {
+	    shdr[h].sh_name = 0;  /* Name is NULL. */
+	}
+    }
+
+    if ( dsi->symtab_len == 0 )
+    {
+        dsi->symtab_addr = 0;
+        goto out;
+    }
+
+    if (doload) {
+	*(int *)p = maxva - dsi->symtab_addr;
+	sym_ehdr = (Elf_Ehdr *)(p + sizeof(int));
+	memcpy(sym_ehdr, ehdr, sizeof(Elf_Ehdr));
+	sym_ehdr->e_phoff = 0;
+	sym_ehdr->e_shoff = sizeof(Elf_Ehdr);
+	sym_ehdr->e_phentsize = 0;
+	sym_ehdr->e_phnum = 0;
+	sym_ehdr->e_shstrndx = SHN_UNDEF;
+    }
+
+#define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK) /* XXX */
+
+    dsi->symtab_len = maxva - dsi->symtab_addr;
+    dsi->v_end = round_pgup(maxva);
+
+ out:
 
     return 0;
 }

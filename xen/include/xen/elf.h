@@ -526,6 +526,7 @@ typedef struct {
 
 struct domain_setup_info;
 extern int loadelfimage(char *);
+extern int loadelfsymtab(char *, int, struct domain_setup_info *);
 extern int parseelfimage(char *, unsigned long, struct domain_setup_info *);
 
 #endif /* __XEN_ELF_H__ */
