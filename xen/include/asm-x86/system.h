@@ -131,6 +131,7 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
  * If no fault occurs then _o is updated to teh value we saw at _p. If this
  * is the same as the initial value of _o then _n is written to location _p.
  */
+#ifdef __i386__
 #define cmpxchg_user(_p,_o,_n)                                          \
 ({                                                                      \
     int _rc;                                                            \
@@ -150,6 +151,9 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
         : "memory");                                                    \
     _rc;                                                                \
 })
+#else
+#define cmpxchg_user(_p,_o,_n) ({ __asm__ __volatile__ ( "" : : "r" (_p), "r" (_o), "r" (_n) ); BUG(); 0; })
+#endif
 
 /*
  * Force strict CPU ordering.

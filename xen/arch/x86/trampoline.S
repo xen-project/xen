@@ -55,8 +55,12 @@ idt_48:
 
 gdt_48:
 	.word	(LAST_RESERVED_GDT_ENTRY*8)+7
+#ifdef __i386__
 	.long	gdt_table-__PAGE_OFFSET
-
+#else
+	.long   0x100200 # gdt_table
+#endif
+        
 .globl SYMBOL_NAME(trampoline_end)
 SYMBOL_NAME_LABEL(trampoline_end)
 
