@@ -521,24 +521,56 @@ categorizes and describes the current set of hypercalls.
 
 \section{Invoking Hypercalls} 
 
+Hypercalls are invoked in a manner analogous to system calls in a
+conventional operating system; a software interrupt is issued which
+vectors to an entry point within Xen. On x86\_32 machines the
+instruction required is {\tt int \$82}; the (real) IDT is setup so
+that this may only be issued from within ring 1.
+
+On some occasions a set of hypercalls will be required to carry
+out a higher-level function; a good example is when a guest 
+operating wishes to context switch to a new process which 
+requires updating various privileged CPU state. As an optimization
+for these cases, there is a generic mechanism to issue a set of 
+hypercalls as a batch: 
+
+\begin{quote}
 \hypercall{multicall(void *call\_list, int nr\_calls)}
 
-Execute a series of hypervisor calls
-
+Execute a series of hypervisor calls; {\tt nr\_calls} is the length of
+the array of {\tt multicall\_entry\_t} structures pointed to be {\tt
+call\_list}. Each entry contains the hypercall operation code followed
+by up to 7 word-sized arguments.
+\end{quote}
 
 
 
 \section{Virtual CPU Setup} 
 
+At start of day, a guest operating system needs to setup the virtual
+CPU it is executing on. This includes installing vectors for the
+virtual IDT so that the guest OS can handle interrupts, page faults,
+etc. However the very first thing a guest OS must setup is a pair 
+of hypervisor callbacks: these are the entry points which Xen will
+use when it wishes to notify the guest OS of an occurrence. 
+
+\begin{quote}
 \hypercall{set\_callbacks(unsigned long event\_selector, unsigned long
   event\_address, unsigned long failsafe\_selector, unsigned long
   failsafe\_address) }
 
-Register OS event processing routine.  In
-Linux both the event\_selector and failsafe\_selector are the
-kernel's CS.  The value event\_address specifies the address for an
-interrupt handler dispatch routine and failsafe\_address specifies a
-handler for application faults.
+Register the normal (``event'') and failsafe callbacks for 
+event processing. In each case the code segment selector and 
+address withing that segment are provided. The selectors must
+have RPL 1; in XenLinux we simply use the kernel's CS for both 
+{\tt event\_selector} and {\tt failsafe\_selector}.
+
+The value {\tt event\_address} specifies the address of the guest OSes
+event handling and dispatch routine; the {\tt failsafe\_address}
+specifies separate entry point which is used only if a fault occurs
+when Xen attempts to use the normal callback. 
+\end{quote} 
+
 
 \hypercall{set\_trap\_table(trap\_info\_t *table)} 
 
