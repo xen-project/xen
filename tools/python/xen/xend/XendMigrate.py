@@ -295,6 +295,11 @@ class XendMigrateInfo(XfrdInfo):
         eserver.inject('xend.domain.migrate',
                        [ self.dominfo.name, self.dominfo.id,
                          "begin", self.sxpr() ])
+        # Special case for localhost: destroy all devices early.
+        if 0 and self.dst_host in ["localhost", "127.0.0.1"]:
+            self.dominfo.restart_cancel()
+            self.dominfo.cleanup()
+            #self.dominfo.destroy_console()
         xfrd.request(['xfr.migrate',
                       self.src_dom,
                       vmconfig,
