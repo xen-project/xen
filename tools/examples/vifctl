@@ -138,10 +138,10 @@ class VifControl:
         params = self.vifparams(args[1:])
         # Remove the vif from its bridge.
         Brctl.vif_bridge_rem(params)
-        if params['ip']:
+        if params['ipaddr']:
             # Remove iptables rules for the ip addresses.
             vif = params['vif']
-            for ip in params['ip']:
+            for ip in params['ipaddr']:
                Brctl.vif_restrict_addr(vif, ip, delete=1)
 
 
