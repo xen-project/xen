@@ -1,31 +1,32 @@
 /******************************************************************************
- * arch/xen/drivers/blkif/backend/vbd.c
+ * blkback/vbd.c
  * 
  * Routines for managing virtual block devices (VBDs).
+ * 
+ * NOTE: vbd_lock protects updates to the rb_tree against concurrent lookups 
+ * in vbd_translate.  All other lookups are implicitly protected because the 
+ * only caller (the control message dispatch routine) serializes the calls.
  * 
  * Copyright (c) 2003-2004, Keir Fraser & Steve Hand
  */
 
 #include "common.h"
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 static dev_t vbd_map_devnum(blkif_pdev_t);
-
-/* vbd_lock: protects updates to the rb_tree against concurrent
- * lookups in vbd_translate.  All other lookups are implicitly
- * protected because the only caller (the control message dispatch
- * routine) serializes the calls. */
+#endif
 
 void vbd_create(blkif_be_vbd_create_t *create) 
 {
     vbd_t       *vbd; 
-    struct rb_node **rb_p, *rb_parent = NULL;
+    rb_node_t  **rb_p, *rb_parent = NULL;
     blkif_t     *blkif;
     blkif_vdev_t vdevice = create->vdevice;
 
     blkif = blkif_find_by_handle(create->domid, create->blkif_handle);
     if ( unlikely(blkif == NULL) )
     {
-        PRINTK("vbd_create attempted for non-existent blkif (%u,%u)\n", 
+        DPRINTK("vbd_create attempted for non-existent blkif (%u,%u)\n", 
                 create->domid, create->blkif_handle); 
         create->status = BLKIF_BE_STATUS_INTERFACE_NOT_FOUND;
         return;
@@ -46,7 +47,7 @@ void vbd_create(blkif_be_vbd_create_t *create)
         }
         else
         {
-            PRINTK("vbd_create attempted for already existing vbd\n");
+            DPRINTK("vbd_create attempted for already existing vbd\n");
             create->status = BLKIF_BE_STATUS_VBD_EXISTS;
             return;
         }
@@ -54,7 +55,7 @@ void vbd_create(blkif_be_vbd_create_t *create)
 
     if ( unlikely((vbd = kmalloc(sizeof(vbd_t), GFP_KERNEL)) == NULL) )
     {
-        PRINTK("vbd_create: out of memory\n");
+        DPRINTK("vbd_create: out of memory\n");
         create->status = BLKIF_BE_STATUS_OUT_OF_MEMORY;
         return;
     }
@@ -81,15 +82,14 @@ void vbd_grow(blkif_be_vbd_grow_t *grow)
     blkif_t            *blkif;
     blkif_extent_le_t **px, *x; 
     vbd_t              *vbd = NULL;
-    struct rb_node     *rb;
+    rb_node_t          *rb;
     blkif_vdev_t        vdevice = grow->vdevice;
     unsigned long       sz;
-
 
     blkif = blkif_find_by_handle(grow->domid, grow->blkif_handle);
     if ( unlikely(blkif == NULL) )
     {
-        PRINTK("vbd_grow attempted for non-existent blkif (%u,%u)\n", 
+        DPRINTK("vbd_grow attempted for non-existent blkif (%u,%u)\n", 
                 grow->domid, grow->blkif_handle); 
         grow->status = BLKIF_BE_STATUS_INTERFACE_NOT_FOUND;
         return;
@@ -109,22 +109,22 @@ void vbd_grow(blkif_be_vbd_grow_t *grow)
 
     if ( unlikely(vbd == NULL) || unlikely(vbd->vdevice != vdevice) )
     {
-        PRINTK("vbd_grow: attempted to append extent to non-existent VBD.\n");
+        DPRINTK("vbd_grow: attempted to append extent to non-existent VBD.\n");
         grow->status = BLKIF_BE_STATUS_VBD_NOT_FOUND;
         return;
     } 
 
     if ( grow->extent.sector_start > 0 )
     {
-        PRINTK("vbd_grow: device %08x start not zero!\n", grow->extent.device);
-	grow->status = BLKIF_BE_STATUS_EXTENT_NOT_FOUND;
-	return;
+        DPRINTK("vbd_grow: dev %08x start not zero.\n", grow->extent.device);
+        grow->status = BLKIF_BE_STATUS_EXTENT_NOT_FOUND;
+        return;
     }
 
     if ( unlikely((x = kmalloc(sizeof(blkif_extent_le_t), 
                                GFP_KERNEL)) == NULL) )
     {
-        PRINTK("vbd_grow: out of memory\n");
+        DPRINTK("vbd_grow: out of memory\n");
         grow->status = BLKIF_BE_STATUS_OUT_OF_MEMORY;
         return;
     }
@@ -134,28 +134,45 @@ void vbd_grow(blkif_be_vbd_grow_t *grow)
     x->extent.sector_length = grow->extent.sector_length;
     x->next                 = (blkif_extent_le_t *)NULL;
 
-#if 01
-    /* XXXcl see comments at top of open_by_devnum */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
     x->bdev = open_by_devnum(vbd_map_devnum(x->extent.device),
-			     vbd->readonly ? FMODE_READ : FMODE_WRITE);
-    if (IS_ERR(x->bdev)) {
-	PRINTK("vbd_grow: device %08x doesn't exist.\n", x->extent.device);
-	grow->status = BLKIF_BE_STATUS_EXTENT_NOT_FOUND;
-	goto out;
+                             vbd->readonly ? FMODE_READ : FMODE_WRITE);
+    if ( IS_ERR(x->bdev) )
+    {
+        DPRINTK("vbd_grow: device %08x doesn't exist.\n", x->extent.device);
+        grow->status = BLKIF_BE_STATUS_EXTENT_NOT_FOUND;
+        goto out;
     }
     /* XXXcl maybe bd_claim? */
 
-    if( x->bdev->bd_disk == NULL || x->bdev->bd_part == NULL )
+    if ( (x->bdev->bd_disk == NULL) || (x->bdev->bd_part == NULL) )
     {
-        PRINTK("vbd_grow: device %08x doesn't exist.\n", x->extent.device);
-	grow->status = BLKIF_BE_STATUS_EXTENT_NOT_FOUND;
-	blkdev_put(x->bdev);
-	goto out;
+        DPRINTK("vbd_grow: device %08x doesn't exist.\n", x->extent.device);
+        grow->status = BLKIF_BE_STATUS_EXTENT_NOT_FOUND;
+        blkdev_put(x->bdev);
+        goto out;
     }
-#endif
    
     /* get size in sectors */
     sz = x->bdev->bd_part->nr_sects;
+#else
+    if( !blk_size[MAJOR(x->extent.device)] )
+    {
+        DPRINTK("vbd_grow: device %08x doesn't exist.\n", x->extent.device);
+        grow->status = BLKIF_BE_STATUS_EXTENT_NOT_FOUND;
+        goto out;
+    }
+    
+    /* convert blocks (1KB) to sectors */
+    sz = blk_size[MAJOR(x->extent.device)][MINOR(x->extent.device)] * 2;    
+    
+    if ( sz == 0 )
+    {
+        DPRINTK("vbd_grow: device %08x zero size!\n", x->extent.device);
+        grow->status = BLKIF_BE_STATUS_EXTENT_NOT_FOUND;
+        goto out;
+    }
+#endif
 
     /*
      * NB. This test assumes sector_start == 0, which is always the case
@@ -171,7 +188,7 @@ void vbd_grow(blkif_be_vbd_grow_t *grow)
     for ( px = &vbd->extents; *px != NULL; px = &(*px)->next ) 
         continue;
     
-    *px = x;
+    *px = x; /* ATOMIC: no need for vbd_lock. */
 
     DPRINTK("Successful grow of vdev=%04x (dom=%u)\n",
             vdevice, grow->domid);
@@ -189,7 +206,7 @@ void vbd_shrink(blkif_be_vbd_shrink_t *shrink)
     blkif_t            *blkif;
     blkif_extent_le_t **px, *x; 
     vbd_t              *vbd = NULL;
-    struct rb_node     *rb;
+    rb_node_t          *rb;
     blkif_vdev_t        vdevice = shrink->vdevice;
 
     blkif = blkif_find_by_handle(shrink->domid, shrink->blkif_handle);
@@ -216,13 +233,13 @@ void vbd_shrink(blkif_be_vbd_shrink_t *shrink)
     if ( unlikely(vbd == NULL) || unlikely(vbd->vdevice != vdevice) )
     {
         shrink->status = BLKIF_BE_STATUS_VBD_NOT_FOUND;
-	return;
+        return;
     }
 
     if ( unlikely(vbd->extents == NULL) )
     {
         shrink->status = BLKIF_BE_STATUS_EXTENT_NOT_FOUND;
-	return;
+        return;
     }
 
     /* Find the last extent. We now know that there is at least one. */
@@ -230,9 +247,11 @@ void vbd_shrink(blkif_be_vbd_shrink_t *shrink)
         continue;
 
     x   = *px;
-    *px = x->next;
+    *px = x->next; /* ATOMIC: no need for vbd_lock. */
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
     blkdev_put(x->bdev);
+#endif
     kfree(x);
 
     shrink->status = BLKIF_BE_STATUS_OKAY;
@@ -243,14 +262,14 @@ void vbd_destroy(blkif_be_vbd_destroy_t *destroy)
 {
     blkif_t           *blkif;
     vbd_t             *vbd;
-    struct rb_node    *rb;
+    rb_node_t         *rb;
     blkif_extent_le_t *x, *t;
     blkif_vdev_t       vdevice = destroy->vdevice;
 
     blkif = blkif_find_by_handle(destroy->domid, destroy->blkif_handle);
     if ( unlikely(blkif == NULL) )
     {
-        PRINTK("vbd_destroy attempted for non-existent blkif (%u,%u)\n", 
+        DPRINTK("vbd_destroy attempted for non-existent blkif (%u,%u)\n", 
                 destroy->domid, destroy->blkif_handle); 
         destroy->status = BLKIF_BE_STATUS_INTERFACE_NOT_FOUND;
         return;
@@ -290,8 +309,8 @@ void vbd_destroy(blkif_be_vbd_destroy_t *destroy)
 
 void destroy_all_vbds(blkif_t *blkif)
 {
-    vbd_t *vbd;
-    struct rb_node *rb;
+    vbd_t             *vbd;
+    rb_node_t         *rb;
     blkif_extent_le_t *x, *t;
 
     spin_lock(&blkif->vbd_lock);
@@ -334,8 +353,8 @@ static int vbd_probe_single(blkif_t *blkif, vdisk_t *vbd_info, vbd_t *vbd)
 
 int vbd_probe(blkif_t *blkif, vdisk_t *vbd_info, int max_vbds)
 {
-    int rc = 0, nr_vbds = 0;
-    struct rb_node *rb;
+    int        rc = 0, nr_vbds = 0;
+    rb_node_t *rb;
 
     spin_lock(&blkif->vbd_lock);
 
@@ -389,7 +408,7 @@ int vbd_translate(phys_seg_t *pseg, blkif_t *blkif, int operation)
 {
     blkif_extent_le_t *x; 
     vbd_t             *vbd;
-    struct rb_node    *rb;
+    rb_node_t         *rb;
     blkif_sector_t     sec_off;
     unsigned long      nr_secs;
 
@@ -400,9 +419,9 @@ int vbd_translate(phys_seg_t *pseg, blkif_t *blkif, int operation)
     while ( rb != NULL )
     {
         vbd = rb_entry(rb, vbd_t, rb);
-        if ( pseg->ps_device < vbd->vdevice )
+        if ( pseg->dev < vbd->vdevice )
             rb = rb->rb_left;
-        else if ( pseg->ps_device > vbd->vdevice )
+        else if ( pseg->dev > vbd->vdevice )
             rb = rb->rb_right;
         else
             goto found;
@@ -432,11 +451,8 @@ int vbd_translate(phys_seg_t *pseg, blkif_t *blkif, int operation)
     { 
         if ( sec_off < x->extent.sector_length )
         {
-#if 0
-            pseg->ps_device = x->extent.device;
-#else
-	    pseg->ps_bdev = x->bdev;
-#endif
+            pseg->dev  = x->extent.device;
+            pseg->bdev = x->bdev;
             pseg->sector_number = x->extent.sector_start + sec_off;
             if ( unlikely((sec_off + nr_secs) > x->extent.sector_length) )
                 goto overrun;
@@ -475,19 +491,19 @@ int vbd_translate(phys_seg_t *pseg, blkif_t *blkif, int operation)
     }
 
     /* Store the real device and start sector for the second chunk. */
-#if 0
-    pseg[1].ps_device     = x->extent.device;
-#else
-    pseg->ps_bdev         = x->bdev;
-#endif
+    pseg[1].dev           = x->extent.device;
+    pseg[1].bdev          = x->bdev;
     pseg[1].sector_number = x->extent.sector_start;
     
     spin_unlock(&blkif->vbd_lock);
     return 2;
 }
 
-#define MAJOR_XEN(dev)	((dev)>>8)
-#define MINOR_XEN(dev)	((dev) & 0xff)
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+
+#define MAJOR_XEN(dev) ((dev)>>8)
+#define MINOR_XEN(dev) ((dev) & 0xff)
 
 #ifndef FANCY_REMAPPING
 static dev_t vbd_map_devnum(blkif_pdev_t cookie)
@@ -498,25 +514,25 @@ static dev_t vbd_map_devnum(blkif_pdev_t cookie)
     return MKDEV(major, minor);
 }
 #else
-#define	XEN_IDE0_MAJOR IDE0_MAJOR
-#define	XEN_IDE1_MAJOR IDE1_MAJOR
-#define	XEN_IDE2_MAJOR IDE2_MAJOR
-#define	XEN_IDE3_MAJOR IDE3_MAJOR
-#define	XEN_IDE4_MAJOR IDE4_MAJOR
-#define	XEN_IDE5_MAJOR IDE5_MAJOR
-#define	XEN_IDE6_MAJOR IDE6_MAJOR
-#define	XEN_IDE7_MAJOR IDE7_MAJOR
-#define	XEN_IDE8_MAJOR IDE8_MAJOR
-#define	XEN_IDE9_MAJOR IDE9_MAJOR
-#define	XEN_SCSI_DISK0_MAJOR SCSI_DISK0_MAJOR
-#define	XEN_SCSI_DISK1_MAJOR SCSI_DISK1_MAJOR
-#define	XEN_SCSI_DISK2_MAJOR SCSI_DISK2_MAJOR
-#define	XEN_SCSI_DISK3_MAJOR SCSI_DISK3_MAJOR
-#define	XEN_SCSI_DISK4_MAJOR SCSI_DISK4_MAJOR
-#define	XEN_SCSI_DISK5_MAJOR SCSI_DISK5_MAJOR
-#define	XEN_SCSI_DISK6_MAJOR SCSI_DISK6_MAJOR
-#define	XEN_SCSI_DISK7_MAJOR SCSI_DISK7_MAJOR
-#define	XEN_SCSI_CDROM_MAJOR SCSI_CDROM_MAJOR
+#define XEN_IDE0_MAJOR IDE0_MAJOR
+#define XEN_IDE1_MAJOR IDE1_MAJOR
+#define XEN_IDE2_MAJOR IDE2_MAJOR
+#define XEN_IDE3_MAJOR IDE3_MAJOR
+#define XEN_IDE4_MAJOR IDE4_MAJOR
+#define XEN_IDE5_MAJOR IDE5_MAJOR
+#define XEN_IDE6_MAJOR IDE6_MAJOR
+#define XEN_IDE7_MAJOR IDE7_MAJOR
+#define XEN_IDE8_MAJOR IDE8_MAJOR
+#define XEN_IDE9_MAJOR IDE9_MAJOR
+#define XEN_SCSI_DISK0_MAJOR SCSI_DISK0_MAJOR
+#define XEN_SCSI_DISK1_MAJOR SCSI_DISK1_MAJOR
+#define XEN_SCSI_DISK2_MAJOR SCSI_DISK2_MAJOR
+#define XEN_SCSI_DISK3_MAJOR SCSI_DISK3_MAJOR
+#define XEN_SCSI_DISK4_MAJOR SCSI_DISK4_MAJOR
+#define XEN_SCSI_DISK5_MAJOR SCSI_DISK5_MAJOR
+#define XEN_SCSI_DISK6_MAJOR SCSI_DISK6_MAJOR
+#define XEN_SCSI_DISK7_MAJOR SCSI_DISK7_MAJOR
+#define XEN_SCSI_CDROM_MAJOR SCSI_CDROM_MAJOR
 
 static dev_t vbd_map_devnum(blkif_pdev_t cookie)
 {
@@ -537,8 +553,8 @@ static dev_t vbd_map_devnum(blkif_pdev_t cookie)
     case XEN_IDE9_MAJOR: new_major = IDE9_MAJOR; break;
     case XEN_SCSI_DISK0_MAJOR: new_major = SCSI_DISK0_MAJOR; break;
     case XEN_SCSI_DISK1_MAJOR ... XEN_SCSI_DISK7_MAJOR:
-	new_major = SCSI_DISK1_MAJOR + major - XEN_SCSI_DISK1_MAJOR;
-	break;
+        new_major = SCSI_DISK1_MAJOR + major - XEN_SCSI_DISK1_MAJOR;
+        break;
     case XEN_SCSI_CDROM_MAJOR: new_major = SCSI_CDROM_MAJOR; break;
     default: new_major = 0; break;
     }
@@ -546,3 +562,5 @@ static dev_t vbd_map_devnum(blkif_pdev_t cookie)
     return MKDEV(new_major, minor);
 }
 #endif
+
+#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION_CODE(2,6,0) */

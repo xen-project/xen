@@ -1,6 +1,3 @@
-/******************************************************************************
- * arch/xen/drivers/blkif/backend/common.h
- */
 
 #ifndef __BLKIF__BACKEND__COMMON_H__
 #define __BLKIF__BACKEND__COMMON_H__
@@ -30,8 +27,12 @@
 #define DPRINTK(_f, _a...) ((void)0)
 #endif
 
-#define PRINTK(_f, _a...) printk(KERN_ALERT "(file=%s, line=%d) " _f, \
-                           __FILE__ , __LINE__ , ## _a )
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+typedef struct rb_root rb_root_t;
+typedef struct rb_node rb_node_t;
+#else
+struct block_device;
+#endif
 
 typedef struct blkif_st {
     /* Unique identifier for this interface. */
@@ -46,7 +47,7 @@ typedef struct blkif_st {
     BLKIF_RING_IDX     blk_req_cons;  /* Request consumer. */
     BLKIF_RING_IDX     blk_resp_prod; /* Private version of resp. producer. */
     /* VBDs attached to this interface. */
-    struct rb_root   vbd_rb;        /* Mapping from 16-bit vdevices to VBDs. */
+    rb_root_t        vbd_rb;        /* Mapping from 16-bit vdevices to VBDs. */
     spinlock_t       vbd_lock;      /* Protects VBD mapping. */
     /* Private fields. */
     enum { DISCONNECTED, DISCONNECTING, CONNECTED } status;
@@ -86,7 +87,7 @@ typedef struct _vbd {
     unsigned char      readonly;  /* Non-zero -> read-only */
     unsigned char      type;      /* VDISK_TYPE_xxx */
     blkif_extent_le_t *extents;   /* list of xen_extents making up this vbd */
-    struct rb_node     rb;        /* for linking into R-B tree lookup struct */
+    rb_node_t          rb;        /* for linking into R-B tree lookup struct */
 } vbd_t; 
 
 void vbd_create(blkif_be_vbd_create_t *create); 
@@ -98,16 +99,12 @@ void destroy_all_vbds(blkif_t *blkif);
 
 /* Describes a [partial] disk extent (part of a block io request) */
 typedef struct {
-    union {
-	unsigned short dev;
-	struct block_device *bdev;
-    } _dev;
-    unsigned short nr_sects;
-    unsigned long  buffer;
-    blkif_sector_t sector_number;
+    unsigned short       dev;
+    unsigned short       nr_sects;
+    struct block_device *bdev;
+    unsigned long        buffer;
+    blkif_sector_t       sector_number;
 } phys_seg_t;
-#define ps_device _dev.dev
-#define ps_bdev _dev.bdev
 
 int vbd_translate(phys_seg_t *pseg, blkif_t *blkif, int operation); 
 

@@ -71,7 +71,7 @@ typedef unsigned int PEND_RING_IDX;
 static PEND_RING_IDX pending_prod, pending_cons;
 #define NR_PENDING_REQS (MAX_PENDING_REQS - pending_prod + pending_cons)
 
-#if 0
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
 static kmem_cache_t *buffer_head_cachep;
 #endif
 
@@ -176,8 +176,8 @@ static int blkio_schedule(void *arg)
                 add_to_blkdev_list_tail(blkif);
             blkif_put(blkif);
         }
-        
-#if 0				/* XXXcl tq */
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
         /* Push the batch through to disc. */
         run_task_queue(&tq_disk);
 #endif
@@ -229,18 +229,21 @@ static void __end_block_io_op(pending_req_t *pending_req, int uptodate)
     }
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+static void end_block_io_op(struct buffer_head *bh, int uptodate)
+{
+    __end_block_io_op(bh->b_private, uptodate);
+    kmem_cache_free(buffer_head_cachep, bh);
+}
+#else
 static int end_block_io_op(struct bio *bio, unsigned int done, int error)
 {
-    if (done || error)		/* XXXcl */
-	__end_block_io_op(bio->bi_private, done);
-#if 0
-    kmem_cache_free(buffer_head_cachep, bh);
-#else
+    if ( done || error )
+        __end_block_io_op(bio->bi_private, (done && !error));
     bio_put(bio);
-#endif
     return error;
 }
-
+#endif
 
 
 /******************************************************************************
@@ -336,15 +339,10 @@ static void dispatch_probe(blkif_t *blkif, blkif_request_t *req)
 static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 {
     extern void ll_rw_block(int rw, int nr, struct buffer_head * bhs[]); 
-#if 0
-    struct buffer_head *bh;
-#else
-    struct bio *bio;
-#endif
     int operation = (req->operation == BLKIF_OP_WRITE) ? WRITE : READ;
     short nr_sects;
     unsigned long buffer, fas;
-    int i, j, tot_sects, pending_idx = pending_ring[MASK_PEND_IDX(pending_cons)];
+    int i, tot_sects, pending_idx = pending_ring[MASK_PEND_IDX(pending_cons)];
     pending_req_t *pending_req;
     unsigned long  remap_prot;
     multicall_entry_t mcl[MMAP_PAGES_PER_REQUEST];
@@ -376,7 +374,7 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
         if ( nr_sects <= 0 )
             goto bad_descriptor;
 
-        phys_seg[nr_psegs].ps_device     = req->device;
+        phys_seg[nr_psegs].dev           = req->device;
         phys_seg[nr_psegs].sector_number = req->sector_number + tot_sects;
         phys_seg[nr_psegs].buffer        = buffer;
         phys_seg[nr_psegs].nr_sects      = nr_sects;
@@ -443,15 +441,18 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
     blkif_get(blkif);
 
     /* Now we pass each segment down to the real blkdev layer. */
-#if 0
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
     for ( i = 0; i < nr_psegs; i++ )
     {
+        struct buffer_head *bh;
+
         bh = kmem_cache_alloc(buffer_head_cachep, GFP_ATOMIC);
         if ( unlikely(bh == NULL) )
         {
             __end_block_io_op(pending_req, 0);
-            continue;		/* XXXcl continue!? */
+            continue;
         }
+
         memset(bh, 0, sizeof (struct buffer_head));
 
         init_waitqueue_head(&bh->b_wait);
@@ -478,35 +479,31 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 #else
     for ( i = 0; i < nr_psegs; i++ )
     {
-	int nr_iovecs = PFN_UP(phys_seg[i].nr_sects << 9);
-	ASSERT(nr_iovecs == 1);
-	bio = bio_alloc(GFP_ATOMIC, nr_iovecs);
-	if ( unlikely(bio == NULL) )
-	{
-	    __end_block_io_op(pending_req, 0);
-	    break;
-	}
-	bio->bi_bdev = phys_seg[i].ps_bdev;
-	bio->bi_private = pending_req;
-	bio->bi_end_io = end_block_io_op;
-	bio->bi_sector = phys_seg[i].sector_number;
-	bio->bi_rw = operation;
+        struct bio *bio;
+        struct bio_vec *bv;
 
-	bio->bi_size = 0;
+        bio = bio_alloc(GFP_ATOMIC, 1);
+        if ( unlikely(bio == NULL) )
+        {
+            __end_block_io_op(pending_req, 0);
+            continue;
+        }
 
-	for ( j = 0; j < nr_iovecs; j++ )
-	{
-	    struct bio_vec *bv = bio_iovec_idx(bio, j);
+        bio->bi_bdev    = phys_seg[i].bdev;
+        bio->bi_private = pending_req;
+        bio->bi_end_io  = end_block_io_op;
+        bio->bi_sector  = phys_seg[i].sector_number;
+        bio->bi_rw      = operation;
 
-	    bv->bv_page = virt_to_page(MMAP_VADDR(pending_idx, i));
-	    bv->bv_len = phys_seg[i].nr_sects << 9;
-	    bv->bv_offset = phys_seg[i].buffer & ~PAGE_MASK;
+        bv = bio_iovec_idx(bio, 0);
+        bv->bv_page   = virt_to_page(MMAP_VADDR(pending_idx, i));
+        bv->bv_len    = phys_seg[i].nr_sects << 9;
+        bv->bv_offset = phys_seg[i].buffer & ~PAGE_MASK;
 
-	    bio->bi_size =+ bv->bv_len;
-	    bio->bi_vcnt++;
-	}
+        bio->bi_size    = bv->bv_len;
+        bio->bi_vcnt++;
 
-	submit_bio(operation, bio);
+        submit_bio(operation, bio);
     }
 #endif
 
@@ -553,8 +550,8 @@ static int __init blkif_init(void)
 {
     int i;
 
-    if ( !(start_info.flags & SIF_INITDOMAIN)
-	 && !(start_info.flags & SIF_BLK_BE_DOMAIN) )
+    if ( !(start_info.flags & SIF_INITDOMAIN) &&
+         !(start_info.flags & SIF_BLK_BE_DOMAIN) )
         return 0;
 
     blkif_interface_init();
@@ -574,7 +571,7 @@ static int __init blkif_init(void)
     if ( kernel_thread(blkio_schedule, 0, CLONE_FS | CLONE_FILES) < 0 )
         BUG();
 
-#if 0
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
     buffer_head_cachep = kmem_cache_create(
         "buffer_head_cache", sizeof(struct buffer_head),
         0, SLAB_HWCACHE_ALIGN, NULL, NULL);

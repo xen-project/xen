@@ -259,5 +259,8 @@ ln -sf ../../../../../${LINUX_26}/drivers/xen/netback/interface.c
 ln -sf ../../../../../${LINUX_26}/drivers/xen/netback/netback.c main.c
 
 cd ${AD}/arch/xen/drivers/blkif/backend
+ln -sf ../../../../../${LINUX_26}/drivers/xen/blkback/common.h
+ln -sf ../../../../../${LINUX_26}/drivers/xen/blkback/blkback.c main.c
 ln -sf ../../../../../${LINUX_26}/drivers/xen/blkback/control.c
 ln -sf ../../../../../${LINUX_26}/drivers/xen/blkback/interface.c
+ln -sf ../../../../../${LINUX_26}/drivers/xen/blkback/vbd.c
