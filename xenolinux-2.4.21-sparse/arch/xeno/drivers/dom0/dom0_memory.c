@@ -50,7 +50,7 @@ static int direct_remap_page(unsigned long from, unsigned long phys_addr, pgprot
     pmd = pmd_alloc(mm, dir, from);
     if (!pmd)
 	return -ENOMEM;
-    pte = pte_alloc(mm, pmd, address);
+    pte = pte_alloc(mm, pmd, from);
     if (!pte) {
 	/* XXX free pmd? */
 	return -ENOMEM;
@@ -148,11 +148,11 @@ unsigned long direct_mmap(unsigned long phys_addr, unsigned long size,
 	list_add_tail(&dmmap->list, &current->mm->context.direct_list);
     }
 
-    /* Acquire mm sem? */
+    /* Acquire mm sem? XXX */
     /* and perform the mapping */
     ret = direct_remap_disc_page_range(addr, phys_addr >> PAGE_SHIFT, 
 				       tot_pages, prot);
-    /* Drop mm sem? */
+    /* Drop mm sem? XXX */
 
     if(ret == 0)
         return addr;
