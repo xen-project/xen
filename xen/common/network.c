@@ -5,7 +5,7 @@
  * with the virtual interfaces (vifs) and the virtual firewall/router through
  * the use of rules.
  *
- * Copyright (c) 2002, A K Warfield and K A Fraser
+ * Copyright (c) 2002-2003, A K Warfield and K A Fraser
  */
 
 #include <hypervisor-ifs/network.h>
@@ -67,7 +67,8 @@ net_vif_t *create_net_vif(int domain)
 
     shadow_ring = kmalloc(sizeof(net_shadow_ring_t), GFP_KERNEL);
     if ( shadow_ring == NULL ) goto fail;
-    
+    memset(shadow_ring, 0, sizeof(*shadow_ring));
+
     shadow_ring->rx_ring = kmalloc(RX_RING_SIZE
                     * sizeof(rx_shadow_entry_t), GFP_KERNEL);
     shadow_ring->tx_ring = kmalloc(TX_RING_SIZE
@@ -75,9 +76,6 @@ net_vif_t *create_net_vif(int domain)
     if ( (shadow_ring->rx_ring == NULL) || (shadow_ring->tx_ring == NULL) )
             goto fail;
 
-    shadow_ring->rx_prod = shadow_ring->rx_cons = shadow_ring->rx_idx = 0;
-    shadow_ring->tx_prod = shadow_ring->tx_cons = shadow_ring->tx_idx = 0;
-    
     /*
      * Fill in the new vif struct. Note that, while the vif's refcnt is
      * non-zero, we hold a reference to the task structure.
@@ -121,7 +119,7 @@ void destroy_net_vif(net_vif_t *vif)
     /* Return any outstanding receive buffers to the guest OS. */
     spin_lock_irqsave(&p->page_lock, flags);
     for ( i  = vif->shadow_ring->rx_idx; 
-          i != vif->shadow_ring->rx_prod; 
+          i != vif->shadow_ring->rx_req_cons;
           i  = ((i+1) & (RX_RING_SIZE-1)) )
     {
         rx_shadow_entry_t *rx = vif->shadow_ring->rx_ring + i;
@@ -263,7 +261,7 @@ void add_default_net_rule(int vif_id, u32 ipaddr)
     memset(&new_rule, 0, sizeof(net_rule_t));
     new_rule.dst_addr = ipaddr;
     new_rule.dst_addr_mask = 0xffffffff;
-    new_rule.src_interface = VIF_PHYSICAL_INTERFACE;
+    new_rule.src_interface = VIF_ANY_INTERFACE;
     new_rule.dst_interface = vif_id;
     new_rule.action = NETWORK_ACTION_ACCEPT;
     new_rule.proto = NETWORK_PROTO_ANY;
@@ -319,9 +317,8 @@ void print_net_rule_list()
  * Apply the rules to this skbuff and return the vif id that it is bound for.
  * If there is no match, VIF_DROP is returned.
  */
-
-int net_find_rule(u8 nproto, u8 tproto, u32 src_addr, u32 dst_addr, u16 src_port, u16 dst_port, 
-                  int src_vif)
+int net_find_rule(u8 nproto, u8 tproto, u32 src_addr, u32 dst_addr, 
+                  u16 src_port, u16 dst_port, int src_vif)
 {
     net_rule_ent_t *ent;
     int dest = VIF_DROP;
@@ -330,7 +327,7 @@ int net_find_rule(u8 nproto, u8 tproto, u32 src_addr, u32 dst_addr, u16 src_port
     
     ent = net_rule_list;
     
-    while (ent)
+    while ( ent != NULL )
     {
         if ( ((ent->r.src_interface == src_vif)
               || (ent->r.src_interface == VIF_ANY_INTERFACE)) &&
@@ -351,12 +348,19 @@ int net_find_rule(u8 nproto, u8 tproto, u32 src_addr, u32 dst_addr, u16 src_port
                (tproto == IPPROTO_UDP)))
            )
         {
-            break;
+            /*
+             * XXX FFS! We keep going to find the "best" rule. Where best 
+             * corresponds to vaguely sane routing of a packet. We need a less 
+             * shafted model for aour "virtual firewall/router" methinks!
+             */
+            if ( dest < 0 )
+                dest = ent->r.dst_interface;
+            if ( dest >= 0 )
+                break;
         }
         ent = ent->next;
     }
 
-    if (ent) (dest = ent->r.dst_interface);
     read_unlock(&net_rule_lock);
     return dest;
 }
@@ -423,6 +427,7 @@ int __net_get_target_vif(u8 *data, unsigned int len, int src_vif)
     return target;
     
  drop:
+    printk("VIF%d: pkt to drop!\n", src_vif);
     return VIF_DROP;
 }
 
