@@ -800,6 +800,28 @@ Create a virtual block device for a domain.
 
 xm.prog(ProgVbdCreate)
 
+class ProgVbdRefresh(Prog):
+    group = 'vbd'
+    name  = 'vbd-refresh'
+    info = """Refresh a virtual block device for a domain"""
+
+    def help(self, args):
+        print args[0], "DOM DEV"
+        print """
+Refresh a virtual block device for a domain.
+
+  DEV     - idx field in the device information
+"""
+
+    def main(self, args):
+        if len(args) != 3: self.err("%s: Invalid argument(s)" % args[0])
+        dom = args[1]
+        dev = args[2]
+        server.xend_domain_device_refresh(dom, 'vbd', dev)
+
+xm.prog(ProgVbdRefresh)
+
+
 class ProgVbdDestroy(Prog):
     group = 'vbd'
     name = 'vbd-destroy'
