@@ -1346,5 +1346,157 @@ Although there is no specific user support list, the developers try to
 assist users who post on xen-devel.  As the bulk of traffic on this
 list increases, a dedicated user support list may be introduced.
 
+\appendix
+
+\chapter{Installing Debian}
+
+The Debian project provides a tool called {\tt debootstrap} which
+allows a base Debian system to be installed into a filesystem without
+requiring the host system to have any Debian-specific software (such
+as {\tt apt}).
+
+Here's some info how to install Debian 3.1 (Sarge) for an unprivileged
+Xen domain:
+
+\begin{enumerate}
+\item Set up Xen 2.0 and test that it's working, as described earlier in
+      this manual.
+
+\item Create disk images for root-fs and swap (alternatively, you might create
+      dedicated partitions, LVM logical volumes, etc. if that suits your setup).
+\begin{verbatim}  
+dd if=/dev/zero of=/path/diskimage bs=1024k count=size_in_mbytes
+dd if=/dev/zero of=/path/swapimage bs=1024k count=size_in_mbytes
+\end{verbatim}
+      If you're going to use this filesystem / diskimage only as a `template' for
+      other vm diskimages, something like 300 MB should be enough.. (of course it 
+      depends what kind of packages you are planning to install to the template)
+
+\item Create filesystem and swap to the images
+\begin{verbatim}
+mkfs.ext3 /path/diskimage
+mkswap /path/swapimage
+\end{verbatim}
+
+\item Mount the diskimage for installation
+\begin{verbatim}
+mount -o loop /path/diskimage /mnt/disk
+\end{verbatim}
+
+\item Install {\tt debootstrap}
+
+Make sure you have debootstrap installed on the host. If you are
+running Debian sarge (3.1 / testing) or unstable you can install it by
+running {\tt apt-get install debootstrap}.  Otherwise, it can be
+downloaded from the Debian project website.
+
+\item Install debian base to the diskimage:
+\begin{verbatim}
+debootstrap --arch i386 sarge /mnt/disk  \
+            http://ftp.<countrycode>.debian.org/debian
+\end{verbatim}
+
+You can use any other Debian http/ftp mirror you want.
+
+\item When debootstrap completes successfully, modify settings:
+\begin{verbatim}
+chroot /mnt/disk /bin/bash
+\end{verbatim}
+
+Edit the following files using vi or nano and make needed settings:
+\begin{verbatim}
+/etc/hostname
+/etc/hosts
+/etc/resolv.conf
+/etc/network/interfaces
+/etc/networks
+\end{verbatim}
+
+Set up access to the services, edit:
+\begin{verbatim}
+/etc/hosts.deny
+/etc/hosts.allow
+/etc/inetd.conf
+\end{verbatim}
+
+Add Debian mirror to:   
+\begin{verbatim}
+/etc/apt/sources.list
+\end{verbatim}
+
+And create fstab like this:
+\begin{verbatim}
+/dev/sda1       /       ext3    errors=remount-ro       0       1
+/dev/sda2       none    swap    sw                      0       0
+proc            /proc   proc    defaults                0       0
+\end{verbatim}
+
+Logout
+
+\item      Umount the diskimage
+\begin{verbatim}
+umount /mnt/disk
+\end{verbatim}
+
+\item      Create Xen 2.0 configuration file for the new domain. You can use the
+        example-configurations coming with xen as a template.
+
+        Make sure you have the following set up:
+\begin{verbatim}
+disk = [ 'file:/path/diskimage,sda1,w', 'file:/path/swapimage,sda2,w' ]
+root = "/dev/sda1 ro"
+\end{verbatim}
+
+\item Start the new domain
+\begin{verbatim}
+xm create -f domain_config_file
+\end{verbatim}
+
+Check that the new domain is running:
+\begin{verbatim}
+xm list
+\end{verbatim}
+
+\item   Attach to the console of the new domain.
+        You should see something like this when starting the new domain:
+
+\begin{verbatim}
+Started domain testdomain2, console on port 9626
+\end{verbatim}
+        
+        There you can see the ID of the console: 26. You can also
+        list the consoles with {\tt xm consoles"}. (ID is the last two digits of
+        the portnumber.)
+
+        Attach to the console:
+
+\begin{verbatim}
+xm console 26
+\end{verbatim}
+
+        or by telnetting to the port 9626 of localhost (the xm console progam works better).
+
+\item   Log in and run base-config
+
+        As a default there's no password for the root.
+
+        Check that everything looks OK, and the system started without
+        errors. Check that the swap is active, and the network settings are
+        correct.
+
+        Run {\tt /usr/sbin/base-config} to set up the Debian settings.
+
+        Set up the password for root using passwd.
+
+\item     Done. You can exit the console by pressing {\tt Ctrl + ]}
+
+\end{enumerate}
+
+If you need to create new domains, you can just copy the contents of
+the `template'-image to the new disk images, either by mounting the
+template and the new image, and using {\tt cp -a} or {\tt tar} or by
+simply copying the image file.  Once this is done, modify the
+image-specific settings (hostname, network settings, etc).
+
 \end{document}
 
