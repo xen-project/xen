@@ -2152,33 +2152,32 @@ int setup_network_devices(void)
 {
     int i, ret;
     extern char opt_ifname[];
-    struct net_device *dev;
-
-    if ( (dev = dev_get_by_name(opt_ifname)) == NULL ) 
-    {
-        printk("Could not find device %s: using dummy device\n", opt_ifname);
-        strcpy(opt_ifname, "dummy");
-        if ( (dev = dev_get_by_name(opt_ifname)) == NULL )
-        {
-            printk("Failed to find the dummy device!\n");
-            return 0;
-        }
-    }
-
-    if ( (ret = dev_open(dev)) != 0 )
-    {
-        printk("Error opening device %s for use (%d)\n", opt_ifname, ret);
-        return 0;
-    }
-
-    printk("Device %s opened and ready for use.\n", opt_ifname);
-    the_dev = dev;
 
     for ( i = 0; i < smp_num_cpus; i++ )
         skb_queue_head_init(&rx_skb_queue[i]);
 
     open_softirq(NET_RX_SOFTIRQ, net_rx_action, NULL);
     tasklet_enable(&net_tx_tasklet);
+
+    if ( (the_dev = dev_get_by_name(opt_ifname)) == NULL ) 
+    {
+        printk("Could not find device %s: using dummy device\n", opt_ifname);
+        strcpy(opt_ifname, "dummy");
+        if ( (the_dev = dev_get_by_name(opt_ifname)) == NULL )
+        {
+            printk("Failed to find the dummy device!\n");
+            return 0;
+        }
+    }
+
+    if ( (ret = dev_open(the_dev)) != 0 )
+    {
+        printk("Error opening device %s for use (%d)\n", opt_ifname, ret);
+        the_dev = NULL;
+        return 0;
+    }
+
+    printk("Device %s opened and ready for use.\n", opt_ifname);
 
     return 1;
 }
