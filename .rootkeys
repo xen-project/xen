@@ -256,8 +256,7 @@
 3ddb79beNQVrdGyoI4njXhgAjD6a4A xen/drivers/block/genhd.c
 3ddb79beyWwLRP_BiM2t1JKgr_plEw xen/drivers/block/ll_rw_blk.c
 3e4a8cb7RhubVgsPwO7cK0pgAN8WCQ xen/drivers/block/xen_block.c
-3f045882spujO81dMl-fYWGiZ8WcPw xen/drivers/block/xen_physdisk.c
-3e5d129asHNyZOjBKTkqs-9AFzxemA xen/drivers/block/xen_segment.c
+3e5d129asHNyZOjBKTkqs-9AFzxemA xen/drivers/block/xen_vbd.c
 3e9c248afxxsnAzIt2na7Ej24yNFzg xen/drivers/cdrom/Makefile
 3e9c248ajUkn2W3n4vgm72Hp2ftZ8A xen/drivers/cdrom/cdrom.c
 3e4a8cb7alzQCDKS7MlioPoHBKYkdQ xen/drivers/char/Makefile
@@ -461,7 +460,7 @@
 3ddb79c25UE59iu4JJcbRalx95mvcg xen/include/hypervisor-ifs/hypervisor-if.h
 3ead095dE_VF-QA88rl_5cWYRWtRVQ xen/include/hypervisor-ifs/kbd.h
 3ddb79c2oRPrzClk3zbTkRHlpumzKA xen/include/hypervisor-ifs/network.h
-3f0d22cbroqp_BkoDPwkfRJhaw1LiQ xen/include/hypervisor-ifs/segment.h
+3f0d22cbroqp_BkoDPwkfRJhaw1LiQ xen/include/hypervisor-ifs/vbd.h
 3ddb79c4qbCoOFHrv9sCGshbWzBVlQ xen/include/scsi/scsi.h
 3ddb79c4R4iVwqIIeychVQYmIH4FUg xen/include/scsi/scsi_ioctl.h
 3ddb79c4yw_mfd4Uikn3v_IOPRpa1Q xen/include/scsi/scsicam.h
@@ -471,7 +470,6 @@
 3ddb79c0nTsjSpVK4ZVTI9WwN24xtQ xen/include/xeno/blk.h
 3ddb79c0dVhTHLsv6CPTf4baKix4mA xen/include/xeno/blkdev.h
 3ddb79c18ePBgitnOs7GiOCFilODVw xen/include/xeno/blkpg.h
-3ddb79c2SisDOHDyTeK5-MV3m7pNbA xen/include/xeno/block.h
 3ddb79c1oOjpQbp68MW7yiUpoi-S-w xen/include/xeno/brlock.h
 3ddb79c1x7Ie3kifu7dQRx8y7HVyvA xen/include/xeno/byteorder/big_endian.h
 3ddb79c1qFXOEX1eD0yXJ_gsGkUt8w xen/include/xeno/byteorder/generic.h
@@ -525,11 +523,9 @@
 3ddb79c0MOVXq8qZDQRGb6z64_xAwg xen/include/xeno/pci_ids.h
 3e54c38dlSCVdyVM4PKcrSfzLLxWUQ xen/include/xeno/perfc.h
 3e54c38de9SUSYSAwxDf_DwkpAnQFA xen/include/xeno/perfc_defn.h
-3f055a3dwldYR102YcSuBaxIf9t3Jw xen/include/xeno/physdisk.h
 3ddb79c04nQVR3EYM5L4zxDV_MCo1g xen/include/xeno/prefetch.h
 3e4540ccU1sgCx8seIMGlahmMfv7yQ xen/include/xeno/reboot.h
 3ddb79c0LzqqS0LhAQ50ekgj4oGl7Q xen/include/xeno/sched.h
-3e5d129a2bbGTpVSZFN_mAnbm97ixw xen/include/xeno/segment.h
 3ddb79c0VDeD-Oft5eNfMneTU3D1dQ xen/include/xeno/skbuff.h
 3ddb79c14dXIhP7C2ahnoD08K90G_w xen/include/xeno/slab.h
 3ddb79c09xbS-xxfKxuV3JETIhBzmg xen/include/xeno/smp.h
@@ -542,6 +538,7 @@
 3ddb79c2_m8lT9jDKse_tePj7zcnNQ xen/include/xeno/timex.h
 3ddb79c2e2C14HkndNEJlYwXaPrF5A xen/include/xeno/tqueue.h
 3ddb79c1-kVvF8cVa0k3ZHDdBMj01Q xen/include/xeno/types.h
+3f055a3dwldYR102YcSuBaxIf9t3Jw xen/include/xeno/vbd.h
 3e8827bdaqPeZAWGVOwswgY9bWSx4g xen/include/xeno/version.h
 3ddb79c2Ae5KpzhC9LCYG7mP_Vi4Aw xen/include/xeno/vif.h
 3ddb79c4YQCQ6r0xNLLu0jfbM7pVmA xen/net/Makefile
@@ -572,8 +569,7 @@
 3e67f822FOPwqHiaRKbrskgWgoNL5g xenolinux-2.4.22-sparse/arch/xeno/drivers/block/xl_block.h
 3e677190SjkzJIvFifRVeYpIZOCtYA xenolinux-2.4.22-sparse/arch/xeno/drivers/block/xl_ide.c
 3e677193nOKKTLJzcAu4SYdbZaia8g xenolinux-2.4.22-sparse/arch/xeno/drivers/block/xl_scsi.c
-3e676eb5RXnHzSHgA1BvM0B1aIm4qg xenolinux-2.4.22-sparse/arch/xeno/drivers/block/xl_segment.c
-3e5d129aDldt6geU2-2SzBae34sQzg xenolinux-2.4.22-sparse/arch/xeno/drivers/block/xl_segment_proc.c
+3e676eb5RXnHzSHgA1BvM0B1aIm4qg xenolinux-2.4.22-sparse/arch/xeno/drivers/block/xl_vbd.c
 3e5a4e65G3e2s0ghPMgiJ-gBTUJ0uQ xenolinux-2.4.22-sparse/arch/xeno/drivers/console/Makefile
 3e5a4e651TH-SXHoufurnWjgl5bfOA xenolinux-2.4.22-sparse/arch/xeno/drivers/console/console.c
 3e5a4e656nfFISThfbyXQOA6HN6YHw xenolinux-2.4.22-sparse/arch/xeno/drivers/dom0/Makefile

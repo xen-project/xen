@@ -38,9 +38,14 @@ static unsigned long sg_next_sect;
 
 static inline void signal_requests_to_xen(void)
 {
+    block_io_op_t op; 
+
     DISABLE_SCATTERGATHER();
     blk_ring->req_prod = req_prod;
-    HYPERVISOR_block_io_op();
+
+    op.cmd = BLOCK_IO_OP_SIGNAL; 
+    HYPERVISOR_block_io_op(&op);
+    return;
 }
 
 
@@ -117,7 +122,7 @@ static inline struct gendisk *xldev_to_gendisk(kdev_t xldev)
 	break; 
 
     case XLVIRT_MAJOR:
-        gd = xlsegment_gendisk;
+        gd = xlvbd_gendisk;
         break;
     }
 
@@ -194,8 +199,8 @@ int xenolinux_block_ioctl(struct inode *inode, struct file *filep,
 
         case XLVIRT_MAJOR:
 	    DPRINTK_IOCTL("   BLKSSZGET: %x 0x%x\n", BLKSSZGET, 
-			  xlsegment_hwsect(MINOR(dev)));
-	    return xlsegment_hwsect(MINOR(dev)); 
+			  xlsbd_hwsect(MINOR(dev)));
+	    return xlvbd_hwsect(MINOR(dev)); 
 
 	default: 
 	    printk(KERN_ALERT "BLKSSZGET ioctl() on bogus disk!\n"); 
@@ -289,7 +294,7 @@ int xenolinux_block_revalidate(kdev_t dev)
         if ( xdi != NULL )
         {
             memset(xdi, 0, sizeof(*xdi));
-            xenolinux_control_msg(XEN_BLOCK_PROBE_SEG, 
+            xenolinux_control_msg(XEN_BLOCK_PROBE, 
                                   (char *)xdi, sizeof(*xdi));
             for ( i = 0; i < xdi->count; i++ )
                 if ( IS_VIRTUAL_XENDEV(xdi->disks[i].device) &&
@@ -313,7 +318,7 @@ int xenolinux_block_revalidate(kdev_t dev)
  * request block io 
  * 
  * id: for guest use only.
- * operation: XEN_BLOCK_{READ,WRITE,PROBE*,SEG*}
+ * operation: XEN_BLOCK_{READ,WRITE,PROBE,VBD*}
  * buffer: buffer to read/write into. this should be a
  *   virtual address in the guest os.
  */
@@ -335,13 +340,11 @@ static int hypervisor_request(unsigned long   id,
 
     switch ( operation )
     {
-    case XEN_BLOCK_SEG_CREATE:
-    case XEN_BLOCK_SEG_DELETE:
+    case XEN_BLOCK_VBD_CREATE:
+    case XEN_BLOCK_VBD_DELETE:
     case XEN_BLOCK_PHYSDEV_GRANT:
     case XEN_BLOCK_PHYSDEV_PROBE:
-    case XEN_BLOCK_PROBE_BLK:
-    case XEN_BLOCK_PROBE_SEG:
-    case XEN_BLOCK_PROBE_SEG_ALL:
+    case XEN_BLOCK_PROBE:
         if ( RING_FULL ) return 1;
 	phys_device = (kdev_t) 0;
 	sector_number = 0;
@@ -507,11 +510,9 @@ static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
             }
 	    break;
 	    
-        case XEN_BLOCK_SEG_CREATE:
-        case XEN_BLOCK_SEG_DELETE:
-        case XEN_BLOCK_PROBE_SEG:
-	case XEN_BLOCK_PROBE_SEG_ALL:
-        case XEN_BLOCK_PROBE_BLK:
+        case XEN_BLOCK_VBD_CREATE:
+        case XEN_BLOCK_VBD_DELETE:
+        case XEN_BLOCK_PROBE:
 	case XEN_BLOCK_PHYSDEV_GRANT:
 	case XEN_BLOCK_PHYSDEV_PROBE:
             xlblk_control_msg_pending = bret->status;
@@ -570,7 +571,7 @@ int xenolinux_control_msg(int operation, char *buffer, int size)
 
 int __init xlblk_init(void)
 {
-    int error;
+    int error; 
 
     xlblk_control_msg_pending = 0;
     nr_pending = 0;
@@ -589,7 +590,7 @@ int __init xlblk_init(void)
 
     /* Probe for disk information. */
     memset(&xlblk_disk_info, 0, sizeof(xlblk_disk_info));
-    error = xenolinux_control_msg(XEN_BLOCK_PROBE_BLK, 
+    error = xenolinux_control_msg(XEN_BLOCK_PROBE, 
                                   (char *)&xlblk_disk_info,
                                   sizeof(xen_disk_info_t));
     if ( error )
@@ -599,9 +600,25 @@ int __init xlblk_init(void)
         goto fail;
     }
 
+    { 
+	int i; 
+	printk(KERN_ALERT "xlblk_init: xen returned info for %d disks\n", 
+	       xlblk_disk_info.count); 
+	for(i=0; i < xlblk_disk_info.count; i++) { 
+            printk("%d -- device no=%x, type=%d, capacity=%ldMB\n",
+                   i, xlblk_disk_info.disks[i].device, 
+		   xlblk_disk_info.disks[i].type, 
+		   xlblk_disk_info.disks[i].capacity >> 11); 
+
+	}
+	
+    }	
     /* Pass the information to our fake IDE and SCSI susbystems. */
     xlide_init(&xlblk_disk_info);
     xlscsi_init(&xlblk_disk_info);
+
+    /* And do the same for the 'virtual block device' world */
+    xlvbd_init(&xlblk_disk_info);
 
     return 0;
 
@@ -611,8 +628,9 @@ int __init xlblk_init(void)
 
 static void __exit xlblk_cleanup(void)
 {
-    xlide_cleanup();
+    xlvbd_cleanup();
     xlscsi_cleanup();
+    xlide_cleanup();
     free_irq(XLBLK_RESPONSE_IRQ, NULL);
 }
 

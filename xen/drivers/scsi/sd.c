@@ -1310,16 +1310,21 @@ static void sd_finish()
 
 
 /* 
-** XXX SMH: gross 'probe' function to allow xeno world to grope us; 
-** this should really not be in the disk-specific code as it should
-** report tapes, CDs, etc. But for now this looks like the easiest 
-** place to hook it in :-( 
+** scsi_probe_devices: 
+** 
+** add the scsi block devices for this domain to a xen_disk_info_t; 
+** we assume xdi->count points to the first unused place in the array. 
+**
+** XXX SMH: this is a rather gross 'probe' function to allow xeno world 
+** to grope us; this should really not be in the disk-specific code as 
+** it should report tapes, CDs, etc. But for now this looks like the 
+** easiest place to hook it in :-( 
+**
 */
 void scsi_probe_devices(xen_disk_info_t *xdi)
 {
     Scsi_Disk *sd; 
     int i;
-    xen_disk_info_t *xen_xdi = map_domain_mem(virt_to_phys(xdi));
     unsigned long capacity, device;
 
     for ( sd = rscsi_disks, i = 0; i < sd_template.dev_max; i++, sd++ )
@@ -1330,16 +1335,16 @@ void scsi_probe_devices(xen_disk_info_t *xdi)
         capacity = sd->capacity;
 
 	/* XXX SMH: if make generic, need to properly determine 'type' */
-        xen_xdi->disks[xen_xdi->count].device   = device;
-	xen_xdi->disks[xen_xdi->count].type     = XD_TYPE_DISK; 
-        xen_xdi->disks[xen_xdi->count].capacity = capacity; 
-        xen_xdi->count++; 
+        xdi->disks[xdi->count].device   = device;
+	xdi->disks[xdi->count].type     = XD_TYPE_DISK; 
+        xdi->disks[xdi->count].capacity = capacity; 
+        xdi->count++; 
                 
         printk("Device %d: SCSI-XENO (disk) capacity %ldkB (%ldMB)\n",
-               xen_xdi->count, capacity>>1, capacity>>11);
+               xdi->count, capacity>>1, capacity>>11);
     }
 
-    unmap_domain_mem(xen_xdi);
+    return; 
 }	
 
 

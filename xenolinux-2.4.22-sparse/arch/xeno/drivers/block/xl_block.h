@@ -21,8 +21,8 @@
 #include <linux/blkdev.h>
 #include <linux/major.h>
 
-#include <asm/hypervisor-ifs/block.h>
 #include <asm/hypervisor-ifs/hypervisor-if.h>
+#include <asm/hypervisor-ifs/vbd.h>
 #include <asm/io.h>
 #include <asm/atomic.h>
 #include <asm/uaccess.h>
@@ -101,8 +101,10 @@ extern void xlscsi_cleanup(void);
 extern struct gendisk *xlscsi_gendisk;
 
 /* Virtual block-device subsystem. */
-extern int  xlsegment_hwsect(int minor); 
-extern struct gendisk *xlsegment_gendisk;
+extern int  xlvbd_init(xen_disk_info_t *xdi);
+extern int  xlvbd_hwsect(int minor); 
+extern void xlvbd_cleanup(void); 
+extern struct gendisk *xlvbd_gendisk;
 
 extern unsigned short xldev_to_physdev(kdev_t xldev);
 extern kdev_t physdev_to_xldev(unsigned short physdev);

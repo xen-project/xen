@@ -61,8 +61,7 @@ extern struct mm_struct init_mm;
 #define PF_CONSTRUCTED  0x8  /* Has the guest OS been fully built yet? */
 
 #include <xeno/vif.h>
-#include <xeno/block.h>
-#include <xeno/segment.h>
+#include <xeno/vbd.h>
 
 /* SMH: replace below when have explicit 'priv' flag or bitmask */
 #define IS_PRIV(_p) ((_p)->domain == 0) 
@@ -134,7 +133,7 @@ struct task_struct
 				       the process can do raw access
 				       to. */
     spinlock_t physdev_lock;
-    segment_t *segment_list[XEN_MAX_SEGMENTS];                        /* xvd */
+    vbd_t     *vbd_list[XEN_MAX_VBDS]; /* vbds for this domain */
 
     /* VM */
     struct mm_struct mm;

@@ -13,12 +13,12 @@
 #include <hypervisor-ifs/block.h>
 #include <hypervisor-ifs/hypervisor-if.h>
 #include <asm-i386/io.h>
+#include <asm/domain_page.h>
 #include <xeno/spinlock.h>
 #include <xeno/keyhandler.h>
 #include <xeno/interrupt.h>
-#include <xeno/segment.h>
+#include <xeno/vbd.h>
 #include <xeno/slab.h>
-#include <xeno/physdisk.h>
 
 #if 0
 #define DPRINTK(_f, _a...) printk( _f , ## _a )
@@ -100,12 +100,10 @@ static void unlock_buffer(struct task_struct *p,
 static void io_schedule(unsigned long unused);
 static int do_block_io_op_domain(struct task_struct *p, int max_to_do);
 static void dispatch_rw_block_io(struct task_struct *p, int index);
-static void dispatch_probe_blk(struct task_struct *p, int index);
-static void dispatch_probe_seg(struct task_struct *p, int index);
-static void dispatch_probe_seg_all(struct task_struct *p, int index);
+static void dispatch_probe(struct task_struct *p, int index);
 static void dispatch_debug_block_io(struct task_struct *p, int index);
-static void dispatch_create_segment(struct task_struct *p, int index);
-static void dispatch_delete_segment(struct task_struct *p, int index);
+static void dispatch_create_vbd(struct task_struct *p, int index);
+static void dispatch_delete_vbd(struct task_struct *p, int index);
 static void dispatch_grant_physdev(struct task_struct *p, int index);
 static void dispatch_probe_physdev(struct task_struct *p, int index);
 static void make_response(struct task_struct *p, unsigned long id, 
@@ -236,16 +234,43 @@ static void end_block_io_op(struct buffer_head *bh, int uptodate)
 }
 
 
-
-/******************************************************************
- * GUEST-OS SYSCALL -- Indicates there are requests outstanding.
- */
-
-long do_block_io_op(void)
+long vbd_attach(vbd_attach_t *info) 
 {
-    add_to_blkdev_list_tail(current);
-    maybe_trigger_io_schedule();
-    return 0L;
+    printk("vbd_attach called!!!\n"); 
+    return -ENOSYS; 
+}
+
+/* ----[ Syscall Interface ]------------------------------------------------*/
+
+long do_block_io_op(block_io_op_t *u_block_io_op)
+{
+    long ret = 0;
+    block_io_op_t op; 
+
+    if (copy_from_user(&op, u_block_io_op, sizeof(op)))
+        return -EFAULT;
+
+    switch (op.cmd) {
+
+    case BLOCK_IO_OP_SIGNAL: 
+	/* simply indicates there're reqs outstanding => add current to list */
+	add_to_blkdev_list_tail(current);
+	maybe_trigger_io_schedule();
+	break; 
+
+    case BLOCK_IO_OP_ATTACH_VBD:  
+	/* attach a VBD to a given domain; caller must be privileged  */
+	if(!IS_PRIV(current))
+	    return -EPERM; 
+	ret = vbd_attach(&op.u.attach_info); 
+	break; 
+
+    default: 
+	ret = -ENOSYS; 
+    } 
+
+
+    return ret;
 }
 
 
@@ -375,28 +400,20 @@ static int do_block_io_op_domain(struct task_struct *p, int max_to_do)
 	    dispatch_rw_block_io(p, i);
 	    break;
 
-	case XEN_BLOCK_PROBE_BLK:
-	    dispatch_probe_blk(p, i);
-	    break;
-
-	case XEN_BLOCK_PROBE_SEG:
-	    dispatch_probe_seg(p, i);
-	    break;
-
-	case XEN_BLOCK_PROBE_SEG_ALL:
-	    dispatch_probe_seg_all(p, i);
+	case XEN_BLOCK_PROBE:
+	    dispatch_probe(p, i);
 	    break;
 
 	case XEN_BLOCK_DEBUG:
 	    dispatch_debug_block_io(p, i);
 	    break;
 
-	case XEN_BLOCK_SEG_CREATE:
-	    dispatch_create_segment(p, i);
+	case XEN_BLOCK_VBD_CREATE:
+	    dispatch_create_vbd(p, i);
 	    break;
 
-	case XEN_BLOCK_SEG_DELETE:
-	    dispatch_delete_segment(p, i);
+	case XEN_BLOCK_VBD_DELETE:
+	    dispatch_delete_vbd(p, i);
 	    break;
 
 	case XEN_BLOCK_PHYSDEV_GRANT:
@@ -491,7 +508,7 @@ static void dispatch_grant_physdev(struct task_struct *p, int index)
                   XEN_BLOCK_PHYSDEV_GRANT, result); 
 }
   
-static void dispatch_create_segment(struct task_struct *p, int index)
+static void dispatch_create_vbd(struct task_struct *p, int index)
 {
     blk_ring_t *blk_ring = p->blk_ring_base;
     unsigned long flags, buffer;
@@ -500,7 +517,7 @@ static void dispatch_create_segment(struct task_struct *p, int index)
 
     if ( p->domain != 0 )
     {
-        DPRINTK("dispatch_create_segment called by dom%d\n", p->domain);
+        DPRINTK("dispatch_create_vbd called by dom%d\n", p->domain);
         result = 1;
         goto out;
     }
@@ -510,7 +527,7 @@ static void dispatch_create_segment(struct task_struct *p, int index)
     spin_lock_irqsave(&p->page_lock, flags);
     if ( !__buffer_is_valid(p, buffer, sizeof(xv_disk_t), 1) )
     {
-        DPRINTK("Bad buffer in dispatch_create_segment\n");
+        DPRINTK("Bad buffer in dispatch_create_vbd\n");
         spin_unlock_irqrestore(&p->page_lock, flags);
         result = 1;
         goto out;
@@ -519,24 +536,25 @@ static void dispatch_create_segment(struct task_struct *p, int index)
     spin_unlock_irqrestore(&p->page_lock, flags);
 
     xvd = phys_to_virt(buffer);
-    result = xen_segment_create(xvd);
+    result = xen_vbd_create(xvd);
 
     unlock_buffer(p, buffer, sizeof(xv_disk_t), 1);    
 
  out:
     make_response(p, blk_ring->ring[index].req.id, 
-                  XEN_BLOCK_SEG_CREATE, result); 
+                  XEN_BLOCK_VBD_CREATE, result); 
 }
 
-static void dispatch_delete_segment(struct task_struct *p, int index)
+static void dispatch_delete_vbd(struct task_struct *p, int index)
 {
-    DPRINTK("dispatch_delete_segment: unimplemented\n"); 
+    DPRINTK("dispatch_delete_vbd: unimplemented\n"); 
 }
 
-static void dispatch_probe_blk(struct task_struct *p, int index)
+static void dispatch_probe(struct task_struct *p, int index)
 {
     extern void ide_probe_devices(xen_disk_info_t *xdi);
     extern void scsi_probe_devices(xen_disk_info_t *xdi);
+    extern void vbd_probe_devices(xen_disk_info_t *xdi, struct task_struct *p);
 
     blk_ring_t *blk_ring = p->blk_ring_base;
     xen_disk_info_t *xdi;
@@ -553,80 +571,30 @@ static void dispatch_probe_blk(struct task_struct *p, int index)
         rc = 1;
         goto out;
     }
+
     __lock_buffer(buffer, sizeof(xen_disk_info_t), 1);
     spin_unlock_irqrestore(&p->page_lock, flags);
 
-    xdi = phys_to_virt(buffer);
-    ide_probe_devices(xdi);
-    scsi_probe_devices(xdi);
+    /* 
+    ** XXX SMH: all three of the below probe functions /append/ their 
+    ** info to the xdi array; i.e.  they assume that all earlier slots 
+    ** are correctly filled, and that xdi->count points to the first 
+    ** free entry in the array. All kinda gross but it'll do for now.  
+    */
+    xdi = map_domain_mem(buffer);
+    xdi->count = 0; 
+    if(IS_PRIV(p)) { 
+	/* privilege domains always gets access to the 'real' devices */
+	ide_probe_devices(xdi);
+	scsi_probe_devices(xdi);
+    } 
+    vbd_probe_devices(xdi, p); 
+    unmap_domain_mem(xdi);
 
     unlock_buffer(p, buffer, sizeof(xen_disk_info_t), 1);
 
  out:
-    make_response(p, blk_ring->ring[index].req.id, XEN_BLOCK_PROBE_BLK, rc);
-}
-
-static void dispatch_probe_seg(struct task_struct *p,
-			       int index)
-{
-    extern void xen_segment_probe(struct task_struct *, xen_disk_info_t *);
-
-    blk_ring_t *blk_ring = p->blk_ring_base;
-    xen_disk_info_t *xdi;
-    unsigned long flags, buffer;
-    int rc = 0;
-
-    buffer = blk_ring->ring[index].req.buffer_and_sects[0] & ~0x1FF;
-
-    spin_lock_irqsave(&p->page_lock, flags);
-    if ( !__buffer_is_valid(p, buffer, sizeof(xen_disk_info_t), 1) )
-    {
-        DPRINTK("Bad buffer in dispatch_probe_seg\n");
-        spin_unlock_irqrestore(&p->page_lock, flags);
-        rc = 1;
-        goto out;
-    }
-    __lock_buffer(buffer, sizeof(xen_disk_info_t), 1);
-    spin_unlock_irqrestore(&p->page_lock, flags);
-
-    xdi = phys_to_virt(buffer);
-    xen_segment_probe(p, xdi);
-
-    unlock_buffer(p, buffer, sizeof(xen_disk_info_t), 1);
-
- out:
-    make_response(p, blk_ring->ring[index].req.id, XEN_BLOCK_PROBE_SEG, rc);
-}
-
-static void dispatch_probe_seg_all(struct task_struct *p, int index)
-{
-    extern void xen_segment_probe_all(xen_segment_info_t *);
-
-    blk_ring_t *blk_ring = p->blk_ring_base;
-    xen_segment_info_t *xsi;
-    unsigned long flags, buffer;
-    int rc = 0;
-
-    buffer = blk_ring->ring[index].req.buffer_and_sects[0] & ~0x1FF;
-
-    spin_lock_irqsave(&p->page_lock, flags);
-    if ( !__buffer_is_valid(p, buffer, sizeof(xen_segment_info_t), 1) )
-    {
-        DPRINTK("Bad buffer in dispatch_probe_seg_all\n");
-        spin_unlock_irqrestore(&p->page_lock, flags);
-        rc = 1;
-        goto out;
-    }
-    __lock_buffer(buffer, sizeof(xen_segment_info_t), 1);
-    spin_unlock_irqrestore(&p->page_lock, flags);
-
-    xsi = phys_to_virt(buffer);
-    xen_segment_probe_all(xsi);
-
-    unlock_buffer(p, buffer, sizeof(xen_segment_info_t), 1);
-
- out:
-    make_response(p, blk_ring->ring[index].req.id, XEN_BLOCK_PROBE_SEG_ALL, rc);
+    make_response(p, blk_ring->ring[index].req.id, XEN_BLOCK_PROBE, rc);
 }
 
 static void dispatch_rw_block_io(struct task_struct *p, int index)
@@ -680,14 +648,14 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
         /* Get the physical device and block index. */
         if ( (req->device & XENDEV_TYPE_MASK) == XENDEV_VIRTUAL )
         {
-            new_segs = xen_segment_map_request(
+            new_segs = xen_vbd_map_request(
                 &phys_seg[nr_psegs], p, operation,
                 req->device, 
                 req->sector_number + tot_sects,
                 buffer, nr_sects);
             if ( new_segs <= 0 ) 
 	    {
-	        DPRINTK("bogus xen_segment_map_request\n");
+	        DPRINTK("bogus xen_vbd_map_request\n");
 		goto bad_descriptor;
 	    }
         }
@@ -861,10 +829,10 @@ void init_blkdev_info(struct task_struct *p)
     SHARE_PFN_WITH_DOMAIN(virt_to_page(p->blk_ring_base), p->domain);
     p->blkdev_list.next = NULL;
 
-    memset(p->segment_list, 0, sizeof(p->segment_list));
+    memset(p->vbd_list, 0, sizeof(p->vbd_list));
 
     /* Get any previously created segments. */
-    xen_refresh_segment_list(p);
+    xen_refresh_vbd_list(p);
 }
 
 /* End-of-day teardown for a domain. */
@@ -905,7 +873,7 @@ void initialize_block_io ()
         "buffer_head_cache", sizeof(struct buffer_head),
         0, SLAB_HWCACHE_ALIGN, NULL, NULL);
 
-    xen_segment_initialize();
+    xen_vbd_initialize();
     
     add_key_handler('b', dump_blockq, "dump xen ide blkdev statistics");
 }

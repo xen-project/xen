@@ -27,6 +27,7 @@ typedef signed long long   s64;
 #include <asm-xeno/proc_cmd.h>
 #include <hypervisor-ifs/hypervisor-if.h>
 #include <hypervisor-ifs/dom0_ops.h>
+#include <hypervisor-ifs/vbd.h>
 
 #define ERROR(_m)  \
     fprintf(stderr, "ERROR: %s\n", (_m))

@@ -57,8 +57,6 @@ extern int tapeblock_init(void);
 
 #if defined(CONFIG_XENOLINUX_BLOCK)
 extern int xlblk_init(void);
-extern int xlseg_init(void);
-extern int xlseg_proc_init(void);
 #endif /* CONFIG_ARCH_XENO */
 
 extern void set_device_ro(kdev_t dev,int flag);

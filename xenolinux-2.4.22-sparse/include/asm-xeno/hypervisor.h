@@ -281,12 +281,13 @@ static inline int HYPERVISOR_network_op(void *network_op)
     return ret;
 }
 
-static inline int HYPERVISOR_block_io_op(void)
+static inline int HYPERVISOR_block_io_op(void *block_io_op)
 {
     int ret;
     __asm__ __volatile__ (
         TRAP_INSTR
-        : "=a" (ret) : "0" (__HYPERVISOR_block_io_op) ); 
+        : "=a" (ret) : "0" (__HYPERVISOR_block_io_op),
+		"b" (block_io_op) ); 
 
     return ret;
 }

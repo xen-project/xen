@@ -5,7 +5,7 @@
 #include <linux/blk.h>
 #include <linux/slab.h>
 #include <linux/genhd.h>
-#include <asm/hypervisor-ifs/block.h>
+#include <asm/hypervisor-ifs/vbd.h>
 #include <linux/pagemap.h>
 
 #include "check.h"
