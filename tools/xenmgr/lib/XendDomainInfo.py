@@ -122,8 +122,12 @@ class XendDomainInfo:
             susp  = (self.info['shutdown'] and 's') or '-'
             crash = (self.info['crashed'] and 'c') or '-'
             state = run + block + stop + susp + crash
-            sxpr.append(['cpu', self.info['cpu']])
             sxpr.append(['state', state])
+            if self.info['shutdown']:
+                reasons = ["poweroff", "reboot", "suspend"]
+                reason = reasons[info['shutdown_reason']]
+                sxpr.append(['shutdown_reason', reason])
+            sxpr.append(['cpu', self.info['cpu']])
             sxpr.append(['cpu_time', self.info['cpu_time']/1e9])
         if self.console:
             sxpr.append(self.console.sxpr())

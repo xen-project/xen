@@ -36,6 +36,7 @@ import channel
 import blkif
 import netif
 import console
+import domain
 from params import *
 
 DEBUG = 1
@@ -408,6 +409,16 @@ class EventFactory(protocol.Factory):
         proto.factory = self
         return proto
 
+class VirqClient:
+    def __init__(self, daemon):
+        self.daemon = daemon
+
+    def virqReceived(self, virq):
+        print 'VirqClient.virqReceived>', virq
+
+    def lostChannel(self, channel):
+        print 'VirqClient.lostChannel>', channel
+        
 class Daemon:
     """The xend daemon.
     """
@@ -537,11 +548,13 @@ class Daemon:
         self.listenMgmt()
         self.listenEvent()
         self.listenNotifier()
+        self.listenVirq()
         SrvServer.create()
         reactor.run()
 
     def createFactories(self):
         self.channelF = channel.channelFactory()
+        self.domainCF = domain.DomainControllerFactory()
         self.blkifCF = blkif.BlkifControllerFactory()
         self.netifCF = netif.NetifControllerFactory()
         self.consoleCF = console.ConsoleControllerFactory()
@@ -562,6 +575,10 @@ class Daemon:
         p = NotifierPort(self, self.channelF.notifier, protocol, reactor)
         p.startListening()
         return p
+
+    def listenVirq(self):
+        virqChan = self.channelF.virqChannel(channel.VIRQ_DOM_EXC)
+        virqChan.registerClient(VirqClient(self))
 
     def exit(self):
         reactor.diconnectAll()
@@ -650,28 +667,15 @@ class Daemon:
         if console.conn:
             console.conn.loseConnection()
 
-    def domain_start(self, id):
-        """Start domain running.
+    def domain_shutdown(self, dom, reason):
+        """Shutdown a domain.
         """
-        dom = int(id)
-        if dom <= 0: return 0
-        return xc.domain_start(dom=dom)
+        ctrl = self.domainCF.getInstanceByDom(dom)
+        if not ctrl:
+            raise ValueError('No domain controller: %d' % dom)
+        ctrl.shutdown(reason)
+        return 0
         
-    def domain_stop(self, id):
-        """Stop domain running.
-        """
-        dom = int(id)
-        if dom <= 0: return 0 
-        xc.domain_stop(dom=dom)
-
-    def domain_destroy(self, id, force=0):
-        """Destroy a domain. Shutdown if force=0, terminate immediately if force=1.
-        """
-        dom = int(id)
-        if dom <= 0: return 0 
-        return xc.domain_destroy(dom=dom, force=force)
-    
-
 def instance():
     global inst
     try:

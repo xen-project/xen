@@ -235,7 +235,7 @@ def preprocess_ip(opts):
     setip = (opts.hostname or opts.netmask
              or opts.gateway or opts.dhcp or opts.interface)
     if not setip: return
-    if not opts
+    #if not opts
     ip = (opts.ip
           + ':'
           + ':' + opts.gateway

@@ -16,7 +16,7 @@ msg_formats = {}
 
 CMSG_CONSOLE  = 0
 
-console_formats = { 'console_data': (CMSG_CONSOLE, 0, "?") }
+console_formats = { 'console_data': (CMSG_CONSOLE, 0) }
 
 msg_formats.update(console_formats)
 
@@ -62,28 +62,28 @@ BLKIF_BE_STATUS_MAPPING_ERROR       = 9
 
 blkif_formats = {
     'blkif_be_connect_t':
-    (CMSG_BLKIF_BE, CMSG_BLKIF_BE_CONNECT, "QIILI"),
+    (CMSG_BLKIF_BE, CMSG_BLKIF_BE_CONNECT),
 
     'blkif_be_create_t':
-    (CMSG_BLKIF_BE, CMSG_BLKIF_BE_CREATE, "QII"),
+    (CMSG_BLKIF_BE, CMSG_BLKIF_BE_CREATE),
 
     'blkif_be_destroy_t':
-    (CMSG_BLKIF_BE, CMSG_BLKIF_BE_DESTROY, "QII"),
+    (CMSG_BLKIF_BE, CMSG_BLKIF_BE_DESTROY),
 
     'blkif_be_vbd_create_t':
-    (CMSG_BLKIF_BE, CMSG_BLKIF_BE_VBD_CREATE, "QIHII"),
+    (CMSG_BLKIF_BE, CMSG_BLKIF_BE_VBD_CREATE),
 
     'blkif_be_vbd_grow_t':
-    (CMSG_BLKIF_BE, CMSG_BLKIF_BE_VBD_GROW , "QIHHHQQI"),
+    (CMSG_BLKIF_BE, CMSG_BLKIF_BE_VBD_GROW),
 
     'blkif_fe_interface_status_changed_t':
-    (CMSG_BLKIF_FE, CMSG_BLKIF_FE_INTERFACE_STATUS_CHANGED, "III"),
+    (CMSG_BLKIF_FE, CMSG_BLKIF_FE_INTERFACE_STATUS_CHANGED),
 
     'blkif_fe_driver_status_changed_t':
-    (CMSG_BLKIF_FE, CMSG_BLKIF_FE_DRIVER_STATUS_CHANGED, "?"),
+    (CMSG_BLKIF_FE, CMSG_BLKIF_FE_DRIVER_STATUS_CHANGED),
 
     'blkif_fe_interface_connect_t':
-    (CMSG_BLKIF_FE, CMSG_BLKIF_FE_INTERFACE_CONNECT, "IL"),
+    (CMSG_BLKIF_FE, CMSG_BLKIF_FE_INTERFACE_CONNECT),
 }
 
 msg_formats.update(blkif_formats)
@@ -115,59 +115,55 @@ NETIF_DRIVER_STATUS_UP     = 1
 
 netif_formats = {
     'netif_be_connect_t':
-    (CMSG_NETIF_BE, CMSG_NETIF_BE_CONNECT, "QIILLI"),
+    (CMSG_NETIF_BE, CMSG_NETIF_BE_CONNECT),
 
     'netif_be_create_t':
-    (CMSG_NETIF_BE, CMSG_NETIF_BE_CREATE, "QIBBBBBBBBI"),
+    (CMSG_NETIF_BE, CMSG_NETIF_BE_CREATE),
 
     'netif_be_destroy_t':
-    (CMSG_NETIF_BE, CMSG_NETIF_BE_DESTROY, "QII"),
+    (CMSG_NETIF_BE, CMSG_NETIF_BE_DESTROY),
 
     'netif_be_disconnect_t':
-    (CMSG_NETIF_BE, CMSG_NETIF_BE_DISCONNECT, "QII"),
+    (CMSG_NETIF_BE, CMSG_NETIF_BE_DISCONNECT),
 
     'netif_be_driver_status_changed_t':
-    (CMSG_NETIF_BE, CMSG_NETIF_BE_DRIVER_STATUS_CHANGED, "QII"),
+    (CMSG_NETIF_BE, CMSG_NETIF_BE_DRIVER_STATUS_CHANGED),
 
     'netif_fe_driver_status_changed_t':
-    (CMSG_NETIF_FE, CMSG_NETIF_FE_DRIVER_STATUS_CHANGED, "II"),
+    (CMSG_NETIF_FE, CMSG_NETIF_FE_DRIVER_STATUS_CHANGED),
 
     'netif_fe_interface_connect_t':
-    (CMSG_NETIF_FE, CMSG_NETIF_FE_INTERFACE_CONNECT, "ILL"),
+    (CMSG_NETIF_FE, CMSG_NETIF_FE_INTERFACE_CONNECT),
 
     'netif_fe_interface_status_changed_t':
-    (CMSG_NETIF_FE, CMSG_NETIF_FE_INTERFACE_STATUS_CHANGED, "IIIBBBBBBBB"),
+    (CMSG_NETIF_FE, CMSG_NETIF_FE_INTERFACE_STATUS_CHANGED),
     }
 
 msg_formats.update(netif_formats)
 
 #============================================================================
-CMSG_SUSPEND  = 5
 CMSG_SHUTDOWN = 6
 
-CMSG_SHUTDOWN_HALT      = 0
-CMSG_SHUTDOWN_POWEROFF  = 1
-CMSG_SHUTDOWN_REBOOT    = 2
+CMSG_SHUTDOWN_POWEROFF  = 0
+CMSG_SHUTDOWN_REBOOT    = 1
+CMSG_SHUTDOWN_SUSPEND   = 2
 
 STOPCODE_shutdown       = 0
 STOPCODE_reboot         = 1
 STOPCODE_suspend        = 2
 
-ctrlif_formats = {
-    'ctrlif_suspend_t':
-    (CMSG_SUSPEND, 0, "??"),
+shutdown_formats = {
+    'shutdown_poweroff_t':
+    (CMSG_SHUTDOWN, CMSG_SHUTDOWN_POWEROFF),
+    
+    'shutdown_reboot_t':
+    (CMSG_SHUTDOWN, CMSG_SHUTDOWN_REBOOT),
 
-    'ctrlif_shutdown_halt_t':
-    (CMSG_SHUTDOWN, CMSG_SHUTDOWN_HALT, "??"),
-    
-    'ctrlif_shutdown_poweroff_t':
-    (CMSG_SHUTDOWN, CMSG_SHUTDOWN_POWEROFF, "??"),
-    
-    'ctrlif_shutdown_reboot_t':
-    (CMSG_SHUTDOWN, CMSG_SHUTDOWN_REBOOT, "??"),
+    'shutdown_suspend_t':
+    (CMSG_SHUTDOWN, CMSG_SHUTDOWN_SUSPEND),
     }
 
-msg_formats.update(ctrlif_formats)
+msg_formats.update(shutdown_formats)
 
 #============================================================================
 
@@ -176,7 +172,7 @@ class Msg:
 
 def packMsg(ty, params):
     if DEBUG: print '>packMsg', ty, params
-    (major, minor, packing) = msg_formats[ty]
+    (major, minor) = msg_formats[ty]
     args = {}
     for (k, v) in params.items():
         if k == 'mac':

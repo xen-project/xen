@@ -36,12 +36,14 @@ class CtrlMsgRcvr:
         pass
     
     def registerChannel(self):
+        print 'CtrlMsgRcvr>registerChannel>', self
         self.channel = self.channelFactory.domChannel(self.dom)
         self.idx = self.channel.getIndex()
         if self.majorTypes:
             self.channel.registerDevice(self.majorTypes, self)
         
     def deregisterChannel(self):
+        print 'CtrlMsgRcvr>deregisterChannel>', self
         if self.channel:
             self.channel.deregisterDevice(self)
             del self.channel
@@ -71,6 +73,8 @@ class ControllerFactory(CtrlMsgRcvr):
         self.instances = {}
         self.dlist = []
         self.dom = 0
+        # Timeout (in seconds) for deferreds.
+        self.timeout = 10
         
     def addInstance(self, instance):
         self.instances[instance.idx] = instance
@@ -99,6 +103,9 @@ class ControllerFactory(CtrlMsgRcvr):
 
     def addDeferred(self):
         d = defer.Deferred()
+        if self.timeout > 0:
+            # The deferred will error if not called before timeout.
+            d.setTimeout(self.timeout)
         self.dlist.append(d)
         return d
 

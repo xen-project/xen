@@ -262,6 +262,7 @@
 40c9c469hJ_IlatRne-9QEa0-wlquw tools/xenmgr/lib/server/console.py
 40c9c469UcNJh_NuLU0ytorM0Lk5Ow tools/xenmgr/lib/server/controller.py
 40c9c469vHh-qLiiubdbKEQbJf18Zw tools/xenmgr/lib/server/cstruct.py
+40d83983OXjt-y3HjSCcuoPp9rzvmw tools/xenmgr/lib/server/domain.py
 40c9c469yrm31i60pGKslTi2Zgpotg tools/xenmgr/lib/server/messages.py
 40c9c46925x-Rjb0Cv2f1-l2jZrPYg tools/xenmgr/lib/server/netif.py
 40c9c469ZqILEQ8x6yWy0_51jopiCg tools/xenmgr/lib/server/params.py

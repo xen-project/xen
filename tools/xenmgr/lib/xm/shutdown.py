@@ -10,7 +10,7 @@ gopts = Opts(use="""[options] [DOM]
 Shutdown one or more domains gracefully.""")
 
 gopts.opt('help', short='h',
-         fn=set_value, default=0,
+         fn=set_true, default=0,
          use="Print this help.")
 
 gopts.opt('all', short='a',
@@ -46,8 +46,8 @@ def main_all(opts, args):
     shutdown(opts, None, opts.wait)
 
 def main_dom(opts, args):
-    if len(args) < 2: opts.err('Missing domain')
-    dom = argv[1]
+    if len(args) < 1: opts.err('Missing domain')
+    dom = args[0]
     try:
         domid = int(dom)
     except:
@@ -59,6 +59,8 @@ def main(argv):
     args = opts.parse(argv)
     if opts.help:
         opts.usage()
+        return
+    print 'shutdown.main>', len(args), args
     if opts.all:
         main_all(opts, args)
     else:

@@ -2,6 +2,12 @@ import Xc; xc = Xc.new()
 import xend.utils
 from messages import msgTypeName
 
+VIRQ_MISDIRECT  = 0  # Catch-all interrupt for unbound VIRQs.
+VIRQ_TIMER      = 1  # Timebase update, and/or requested timeout.
+VIRQ_DEBUG      = 2  # Request guest to dump debug info.
+VIRQ_CONSOLE    = 3  # (DOM0) bytes received on emergency console.
+VIRQ_DOM_EXC    = 4  # (DOM0) Exceptional event for some domain.
+
 def eventChannel(dom1, dom2):
     return xc.evtchn_bind_interdomain(dom1=dom1, dom2=dom2)
 
@@ -143,7 +149,7 @@ class VirqChannel(BaseChannel):
         self.virq = virq
         # Notification port (int).
         self.port = xc.evtchn_bind_virq(virq)
-        self.idx = port
+        self.idx = self.port
         # Clients to call when a virq arrives.
         self.clients = []
 

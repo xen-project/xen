@@ -203,21 +203,22 @@ class XendDomain:
         """Pause domain execution.
         """
         dom = int(id)
+        eserver.inject('xend.domain.pause', id)
         return xc.domain_pause(dom=dom)
     
-    def domain_shutdown(self, id):
+    def domain_shutdown(self, id, reason='poweroff'):
         """Shutdown domain (nicely).
         """
         dom = int(id)
         if dom <= 0:
             return 0
-        eserver.inject('xend.domain.shutdown', id)
-        val = xc.domain_destroy(dom=dom) # FIXME -- send CMSG_SHUTDOWN
+        eserver.inject('xend.domain.shutdown', [id, reason])
+        val = xend.domain_shutdown(dom, reason)
         self.refresh()
         return val
     
     def domain_halt(self, id):
-        """Shutdown domain immediately.
+        """Terminate domain immediately.
         """
         dom = int(id)
         if dom <= 0:

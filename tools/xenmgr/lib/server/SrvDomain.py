@@ -193,8 +193,8 @@ class SrvDomain(SrvDir):
 
     def form(self, req):
         req.write('<form method="post" action="%s">' % req.prePathURL())
-        req.write('<input type="submit" name="op" value="start">')
-        req.write('<input type="submit" name="op" value="stop">')
+        req.write('<input type="submit" name="op" value="unpause">')
+        req.write('<input type="submit" name="op" value="pause">')
         req.write('<input type="submit" name="op" value="shutdown">')
         req.write('<input type="submit" name="op" value="halt">')
         req.write('<br><input type="submit" name="op" value="migrate">')
