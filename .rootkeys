@@ -316,6 +316,7 @@
 3ddb79batzR40ZFY9dvgs5f1aM9I6g xenolinux-2.4.16-sparse/include/asm-xeno/hdreg.h
 3ddb79b90xBgbeYgCcImS2ZxJakxBA xenolinux-2.4.16-sparse/include/asm-xeno/highmem.h
 3ddb79baXLZV3dUKQI2gIYpAy67RuA xenolinux-2.4.16-sparse/include/asm-xeno/hw_irq.h
+3deb3f5bhXnxocVMiXaeZ0L7fQBGaw xenolinux-2.4.16-sparse/include/asm-xeno/hypervisor-ifs
 3ddb79bapQ9Z9ewa5O1pqAVaNBTazg xenolinux-2.4.16-sparse/include/asm-xeno/hypervisor.h
 3ddb79baL-pjPI8hg5xjPgd4__SlOA xenolinux-2.4.16-sparse/include/asm-xeno/i387.h
 3ddb79ba66TwvG7HpbBo04fRhmj3KQ xenolinux-2.4.16-sparse/include/asm-xeno/ide.h
