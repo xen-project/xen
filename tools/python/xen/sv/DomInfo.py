@@ -1,4 +1,5 @@
-from xen.xend.XendClient import aserver as server
+from xen.xend.XendClient import getAsynchServer
+server = getAsynchServer()
 from xen.xend import PrettyPrint
 
 from xen.sv.HTMLBase import HTMLBase

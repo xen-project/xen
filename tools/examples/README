@@ -12,7 +12,6 @@ send it (preferably with a little summary to go in this file) to
 network             - default network setup script called by xend at startup.
 vif-bridge          - default virtual network interface setup script.
 xend-config.sxp     - default xend configuration file.
-xmdefconfig         - default configuration script for 'xm create'.
-xmdefconfig-example - a more complex configuration script for 'xm create'.
-xmdefconfig-netbsd  - an 'xm create' configuration script for NetBSD domains.
+xmexample1          - example configuration script for 'xm create'.
+xmexample2          - a more complex configuration script for 'xm create'.
 
