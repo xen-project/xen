@@ -289,7 +289,7 @@ int map_ldt_shadow_page(unsigned int off)
     /* Success! */
     get_page_type(page);
     get_page_tot(page);
-    p->mm.perdomain_pt[off+16] = mk_l1_pgentry((l1e&PAGE_MASK)|_PAGE_RW);
+    p->mm.perdomain_pt[off+16] = mk_l1_pgentry(l1e|_PAGE_RW);
     p->mm.shadow_ldt_mapcnt++;
 
     ret = 0;
