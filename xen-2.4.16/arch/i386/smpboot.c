@@ -684,11 +684,9 @@ static void __init do_boot_cpu (int apicid)
     /*
      * We can't use kernel_thread since we must avoid to reschedule the child.
      */
-    if ( (idle = do_newdomain()) == NULL )
+    if ( (idle = do_newdomain(IDLE_DOMAIN_ID, cpu)) == NULL )
         panic("failed 'newdomain' for CPU %d", cpu);
  
-    idle->processor    = cpu;
-    idle->domain       = IDLE_DOMAIN_ID;
     pagetable = (void *)get_free_page(GFP_KERNEL);
     memcpy(pagetable, idle0_pg_table, PAGE_SIZE);
     idle_pg_table[cpu] = pagetable;

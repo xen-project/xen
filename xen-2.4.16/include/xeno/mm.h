@@ -104,6 +104,15 @@ typedef struct pfn_info {
 #define PageSetSlab(page)	set_bit(PG_slab, &(page)->flags)
 #define PageClearSlab(page)	clear_bit(PG_slab, &(page)->flags)
 
+#define SHARE_PFN_WITH_DOMAIN(_pfn, _dom)            \
+    do {                                             \
+        (_pfn)->flags = (_dom) | PGT_writeable_page; \
+        (_pfn)->tot_count = (_pfn)->type_count = 1;  \
+    } while ( 0 )
+
+#define UNSHARE_PFN(_pfn) \
+    (_pfn)->flags = (_pfn)->type_count = (_pfn)->tot_count = 0
+
 /* The array of struct pfn_info,  
  * free pfn list and number of free pfns in the free list
  */

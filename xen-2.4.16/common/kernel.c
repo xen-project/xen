@@ -41,8 +41,7 @@ void init_serial(void);
 void start_of_day(void);
 
 /* Command line options and variables. */
-unsigned long opt_ipbase=0, opt_nfsserv=0, opt_gateway=0, opt_netmask=0;
-unsigned char opt_nfsroot[50]="";
+unsigned long opt_dom0_ip = 0;
 unsigned int opt_dom0_mem = 16000; /* default kbytes for DOM0 */
 unsigned int opt_ne_base = 0; /* NE2k NICs cannot be probed */
 unsigned char opt_ifname[10] = "eth0";
@@ -52,11 +51,7 @@ static struct {
     int type;
     void *var;
 } opts[] = {
-    { "ipbase",   OPT_IP,   &opt_ipbase  },
-    { "nfsserv",  OPT_IP,   &opt_nfsserv },
-    { "gateway",  OPT_IP,   &opt_gateway },
-    { "netmask",  OPT_IP,   &opt_netmask },
-    { "nfsroot",  OPT_STR,  &opt_nfsroot },
+    { "dom0_ip",  OPT_IP,   &opt_dom0_ip },
     { "dom0_mem", OPT_UINT, &opt_dom0_mem }, 
     { "ne_base",  OPT_UINT, &opt_ne_base },
     { "ifname",   OPT_STR,  &opt_ifname },
@@ -178,12 +173,14 @@ void cmain (unsigned long magic, multiboot_info_t *mbi)
     /* Create initial domain 0. */
     dom0_params.num_vifs  = 1;
     dom0_params.memory_kb = opt_dom0_mem;
-    add_default_net_rule(0, opt_ipbase); // add vfr info for dom0
 
-    new_dom = do_newdomain();
+    if ( opt_dom0_ip == 0 )
+        panic("Must specify an IP address for domain 0!\n");
+
+    add_default_net_rule(0, opt_dom0_ip); // add vfr info for dom0
+
+    new_dom = do_newdomain(0, 0);
     if ( new_dom == NULL ) panic("Error creating domain 0\n");
-    new_dom->processor = 0;
-    new_dom->domain    = 0;
     if ( setup_guestos(new_dom, &dom0_params) != 0 )
     {
         panic("Could not set up DOM0 guest OS\n");
@@ -435,7 +432,7 @@ int console_export(char *str, int len)
     iph->id      = 0xdead;
     iph->ttl     = 255;
     iph->protocol= 17;
-    iph->daddr   = htonl(opt_ipbase);
+    iph->daddr   = htonl(opt_dom0_ip);
     iph->saddr   = htonl(0xa9fe0001); 
     iph->tot_len = htons(hdr_size + len); 
     iph->check	 = 0;

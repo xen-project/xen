@@ -129,8 +129,6 @@
 #define capable(_c) 0
 
 #ifndef __ASSEMBLY__
-extern unsigned long opt_ipbase, opt_nfsserv, opt_gateway, opt_netmask;
-extern unsigned char opt_nfsroot[];
 extern void __out_of_line_bug(int line) __attribute__((noreturn));
 #define out_of_line_bug() __out_of_line_bug(__LINE__)
 #endif

@@ -90,14 +90,10 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         static unsigned int pro = 0;
         unsigned int dom = get_domnr();
         ret = -ENOMEM;
-        if ( !dom ) break;
-        p = do_newdomain();
-        if ( !p ) break;
-        p->domain = dom;
+        if ( dom == 0 ) break;
         pro = (pro+1) % smp_num_cpus;
-        p->processor = pro;
-
-        if ( dom == 0 ) BUG();
+        p = do_newdomain(dom, pro);
+        if ( p == NULL ) break;
 
         ret = alloc_new_dom_mem(p, op.u.newdomain.memory_kb);
         if ( ret != 0 ) break;

@@ -155,7 +155,7 @@ union task_union {
 extern union task_union idle0_task_union;
 extern struct task_struct first_task_struct;
 
-extern struct task_struct *do_newdomain(void);
+extern struct task_struct *do_newdomain(unsigned int dom_id, unsigned int cpu);
 extern int setup_guestos(struct task_struct *p, dom0_newdomain_t *params);
 extern int final_setup_guestos(struct task_struct *p, dom_meminfo_t *);
 
