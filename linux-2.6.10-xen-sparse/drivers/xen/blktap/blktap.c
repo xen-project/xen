@@ -16,7 +16,7 @@
 
 #include "blktap.h"
 
-int __init xlblk_init(void)
+int __init xlblktap_init(void)
 {
     ctrl_msg_t               cmsg;
     blkif_fe_driver_status_t fe_st;
@@ -64,6 +64,7 @@ int __init xlblk_init(void)
     return 0;
 }
 
+#if 0 /* tap doesn't handle suspend/resume */
 void blkdev_suspend(void)
 {
 }
@@ -81,6 +82,6 @@ void blkdev_resume(void)
     memcpy(cmsg.msg, &st, sizeof(st));
     ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
 }
+#endif
 
-
-__initcall(xlblk_init);
+__initcall(xlblktap_init);

@@ -48,6 +48,12 @@
 #define WPRINTK(fmt, args...) printk(KERN_WARNING "blk_tap: " fmt, ##args)
 
 
+/* -------[ state descriptors ]--------------------------------------- */
+
+#define BLKIF_STATE_CLOSED       0
+#define BLKIF_STATE_DISCONNECTED 1
+#define BLKIF_STATE_CONNECTED    2
+
 /* -------[ connection tracking ]------------------------------------- */
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
@@ -99,7 +105,6 @@ typedef struct {
     unsigned long  mach_fas[BLKIF_MAX_SEGMENTS_PER_REQUEST];
     unsigned long  virt_fas[BLKIF_MAX_SEGMENTS_PER_REQUEST];
     int            next_free;
-    int inuse; /* debugging */
 } active_req_t;
 
 typedef unsigned int ACTIVE_RING_IDX;
@@ -181,7 +186,7 @@ extern unsigned long mmap_vstart;
  * for shared memory rings.
  */
 
-#define RING_PAGES 128 
+#define RING_PAGES 3 /* Ctrl, Front, and Back */ 
 extern unsigned long rings_vstart;
 
 
@@ -190,11 +195,10 @@ extern unsigned long blktap_mode;
 
 /* Connection to a single backend domain. */
 extern blkif_front_ring_t blktap_be_ring;
+extern unsigned int blktap_be_evtchn;
+extern unsigned int blktap_be_state;
 
-/* Event channel to backend domain. */
-extern unsigned int blkif_ptbe_evtchn;
-
-/* User ring status... this will soon vanish into a ring struct. */
+/* User ring status. */
 extern unsigned long blktap_ring_ok;
 
 /* -------[ ...and function prototypes. ]----------------------------- */
@@ -213,8 +217,7 @@ void blktap_kick_user(void);
 /* user ring access functions: */
 int blktap_write_fe_ring(blkif_request_t *req);
 int blktap_write_be_ring(blkif_response_t *rsp);
-int blktap_read_fe_ring(void);
-int blktap_read_be_ring(void);
+int blktap_write_ctrl_ring(ctrl_msg_t *msg);
 
 /* fe/be ring access functions: */
 int write_resp_to_fe_ring(blkif_t *blkif, blkif_response_t *rsp);
