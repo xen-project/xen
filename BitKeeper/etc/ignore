@@ -24,7 +24,7 @@ install
 install/*
 linux-*-xen0/*
 linux-*-xenU/*
-linux-xen-sparse
+pristine-*
 netbsd-*-xen0
 netbsd-*-xenU
 netbsd-*-tools

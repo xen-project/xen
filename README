@@ -17,7 +17,7 @@ About the Xen Virtual Machine Monitor
 
 "Xen" is a Virtual Machine Monitor (VMM) originally developed by the
 Systems Research Group of the University of Cambridge Computer
-Laboratory, as part of the UK-EPSRC funded XenoServers project. 
+Laboratory as part of the UK-EPSRC funded XenoServers project. 
 
 The XenoServers project aims to provide a "public infrastructure for
 global distributed computing", and Xen plays a key part in that,
@@ -32,9 +32,7 @@ Xen has since grown into a project in its own right, enabling us to
 investigate interesting research issues regarding the best techniques
 for virtualizing resources such as the CPU, memory, disk and network.
 The project has been bolstered by support from Intel Research
-Cambridge, and HP Labs, who are now working closely with us. We're
-also in receipt of support from Microsoft Research Cambridge to port
-Windows XP to run on Xen.
+Cambridge, and HP Labs, who are now working closely with us. 
 
 Xen enables multiple operating system images to execute concurrently 
 on the same hardware with very low performance overhead --- much lower
@@ -55,43 +53,37 @@ and performance is contained in our October 2003 SOSP paper, available
 at http://www.cl.cam.ac.uk/netos/papers/2003-xensosp.pdf
 [update: work to port Xen to x86_64 and IA64 is underway]
 
-Five different operating systems have been ported to run on Xen: 
-Linux 2.4/2.6, Windows XP, NetBSD, FreeBSD and Plan 9.
+To date five different operating systems have been ported to run on
+Xen 2.0: Linux 2.4/2.6, NetBSD, FreeBSD and Plan 9.
 
-The Linux 2.4 port (currently Linux 2.4.26) works very well -- we
-regularly use it to host complex applications such as PostgreSQL,
-Apache, BK servers etc. It runs every user-space applications we've
-tried.  We refer to our version of Linux ported to run on Xen as
-"XenLinux", although really it's just standard Linux ported to a new
-virtual CPU architecture that we call xen-x86.
+The Linux 2.4 and 2.6 ports works very well -- we regularly use them
+to host complex applications such as PostgreSQL, Apache, BK servers
+etc. It runs every user-space applications we've tried.  We refer to
+our version of Linux ported to run on Xen as "XenLinux", although
+really it's just standard Linux ported to a new virtual CPU
+architecture that we call xen-x86.
 
 NetBSD has been ported to Xen by Christian Limpach, and will hopefully
 soon become part of the standard release. Work on a FreeBSD port has
 been started by Kip Macy, and we hope to see this complete for the 2.0
 release. Ron Minnich has been working on Plan 9.
 
-The Windows XP port is nearly finished. It's running user space
-applications and is generally in pretty good shape thanks to some hard
-work by a team over the summer.  Of course, there are issues with
-releasing this code to others.  We should be able to release the
-source and binaries to anyone that has signed the Microsoft academic
-source license, which these days has very reasonable terms. We are in
-discussions with Microsoft about the possibility of being able to make
-binary releases to a larger user community. Obviously, there are
-issues with product activation in this environment which need to be 
-thought through.
+A version of Windows XP was ported to an earlier version of Xen, but
+can not be released due to licensing restrictions. We are
+investigating alternative approaches to getting Windows XP/2003
+running on Xen, but have no firm timetable as yet.
 
 So, for the moment, you only get to run Linux 2.4/2.6 and NetBSD on
-Xen, but we hope this will change before too long.  Even running
-multiple copies of the same OS can be very useful, as it provides a
-means of containing faults to one OS image, and also for providing
-performance isolation between the various OS, enabling you to either
-restrict, or reserve resources for, particular VM instances.
+Xen, but we hope this will change before long.  Even running multiple
+copies of the same OS can be very useful, as it provides a means of
+containing faults to one OS image, and also for providing performance
+isolation between the various OS, enabling you to either restrict, or
+reserve resources for, particular VM instances.
 
 It's also useful for development -- each version of Linux can have
 different patches applied, enabling different kernels to be tried
 out. For example, the "vservers" patch used by PlanetLab applies
-cleanly to our ported version of Linux.
+easily to our ported version of Linux.
 
 We've successfully booted over 128 copies of Linux on the same machine
 (a dual CPU hyperthreaded Xeon box) but we imagine that it would be
@@ -130,17 +122,18 @@ run on Opterons in 32-bit mode just fine).
 
 Xen can currently use up to 4GB of memory. It's possible for x86
 machines to address more than that (64GB), but it requires using a
-different page table format (3-level rather than 2-level) that we
-don't currently support, as we are concentrating on an x86_64 port
-that will more easily support large-memory configurations.
+different page table format (3-level rather than 2-level). We
+currently don't support the 3-level format, as we are concentrating
+our efforts on an x86_64 port that will provide a better solution to
+large memory configurations.
 
 In contrast to previous Xen versions, in Xen 2.0 device drivers run
 within a privileged guest OS rather than within Xen itself. This means
-that we should be compatible with the full set of device hardware
-supported by Linux.  The default XenLinux build contains support for
-relatively modern server-class network and disk hardware, but you can
-add suppport for other hardware by configuring your XenLinux kernel in
-the normal way (e.g. "make xconfig").
+that we should be compatible with almost the full set of device
+hardware supported by Linux.  The default XenLinux build contains
+support for relatively modern server-class network and disk hardware,
+but you can add suppport for other hardware by configuring your
+XenLinux kernel in the normal way (e.g. "make xconfig").
 
 
 Building Xen and XenLinux
@@ -214,3 +207,4 @@ The primary tool for starting and controlling domains is "xm".
 Further documentation is in the docs/ directory. Postscript, PDF and
 HTML versions of the user manual can be found in the ps/, pdf/ and
 html/ subdirectories.
+
