@@ -271,7 +271,6 @@ void stop_domain(void)
        kick Dom0 */
     {
 	struct task_struct *p;
-	printk("S\n");
 	guest_schedule_to_run( p = find_domain_by_id(0ULL) );
 	put_task_struct(p);
     }

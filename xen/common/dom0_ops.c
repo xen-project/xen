@@ -113,7 +113,6 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 	if( ret == 0 && op->u.stopdomain.sync == 1 )
 	{
 	    extern long do_block( void );
-	    printk("T\n");
 	    do_block(); // Yuk...
 	}
     }

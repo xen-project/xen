@@ -93,51 +93,44 @@ long long tvdelta( struct timeval *new, struct timeval *old )
 	(new->tv_usec - old->tv_usec);
 }
 
-int track_cpu_usage_dom0( int xc_handle, int print )
+int track_cpu_usage( int xc_handle, u64 domid, int pages, int print )
 {
     static struct timeval wall_last;
-    static long long      cpu_last;
+    static long long      d0_cpu_last;
+    static long long      d1_cpu_last;
 
     struct timeval        wall_now;
-    long long             cpu_now, wall_delta, cpu_delta;
+    long long             wall_delta;
+    long long             d0_cpu_now, d0_cpu_delta;
+    long long             d1_cpu_now, d1_cpu_delta;
+
 
     gettimeofday(&wall_now, NULL);
 
-    cpu_now = xc_domain_get_cpu_usage( xc_handle, 0 )/1000;
+    d0_cpu_now = xc_domain_get_cpu_usage( xc_handle, 0 )/1000;
+    d1_cpu_now = xc_domain_get_cpu_usage( xc_handle, domid )/1000;
+
+    if ( d0_cpu_now == -1 || d1_cpu_now == -1 )	
+    {
+	printf("ARRHHH!!\n");
+    }
 
     wall_delta = tvdelta(&wall_now,&wall_last)/1000;
-    cpu_delta  = (cpu_now - cpu_last)/1000;
+
+    if ( wall_delta == 0 ) wall_delta = 1;
+
+    d0_cpu_delta  = (d0_cpu_now - d0_cpu_last)/1000;
+    d1_cpu_delta  = (d1_cpu_now - d1_cpu_last)/1000;
 
     if(print)
-	printf("Dom0  : wall delta %lldms, cpu delta %lldms    : %d%%\n",
-	   wall_delta, cpu_delta, (cpu_delta*100)/wall_delta);
+	printf("interval %lldms, dom0 used %lldms (%d%%), target used %lldms (%d%%), b/w %dMb/s\n",
+	       wall_delta, 
+	       d0_cpu_delta, (int)((d0_cpu_delta*100)/wall_delta),
+	       d1_cpu_delta, (int)((d1_cpu_delta*100)/wall_delta),
+	       (int)((pages*PAGE_SIZE*8)/(wall_delta*1000)));
 
-    cpu_last  = cpu_now;
-    wall_last = wall_now;	
-
-    return 0;
-}
-
-int track_cpu_usage_target( int xc_handle, u64 domid, int print )
-{
-    static struct timeval wall_last;
-    static long long      cpu_last;
-
-    struct timeval        wall_now;
-    long long             cpu_now, wall_delta, cpu_delta;
-
-    gettimeofday(&wall_now, NULL);
-
-    cpu_now = xc_domain_get_cpu_usage( xc_handle, domid )/1000;
-
-    wall_delta = tvdelta(&wall_now,&wall_last)/1000;
-    cpu_delta  = (cpu_now - cpu_last)/1000;
-
-    if(print)
-	printf("Target: wall delta %lldms, cpu delta %lldms    : %d%%\n",
-	   wall_delta, cpu_delta, (cpu_delta*100)/wall_delta);
-
-    cpu_last  = cpu_now;
+    d0_cpu_last  = d0_cpu_now;
+    d1_cpu_last  = d1_cpu_now;
     wall_last = wall_now;	
 
     return 0;
@@ -422,8 +415,7 @@ int xc_linux_save(int xc_handle,
         goto out;
     }
 
-    track_cpu_usage_dom0(xc_handle, 0);
-    track_cpu_usage_target( xc_handle, domid, 0);
+    track_cpu_usage( xc_handle, domid, 0, 0);
 
     /* Now write out each data page, canonicalising page tables as we go... */
     
@@ -657,9 +649,7 @@ int xc_linux_save(int xc_handle,
 	verbose_printf("\b\b\b\b100%% (pages sent= %d, skipped= %d )\n", 
 		       sent_this_iter, skip_this_iter );
 
-	track_cpu_usage_dom0(xc_handle, 1);
-	track_cpu_usage_target( xc_handle, domid, 1);
-
+	track_cpu_usage( xc_handle, domid, sent_this_iter, 1);
 	
 	if ( last_iter )
 	{

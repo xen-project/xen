@@ -318,6 +318,10 @@ static PyObject *pyxc_linux_save(PyObject *self,
 
 	if ( xc_linux_save(xc->xc_handle, dom, flags, writerfn, gfd) == 0 )
 	{
+	    /* kill domain. We don't want to do this for checkpointing, but
+	       if we don't do it here I think people will hurt themselves
+	       by accident... */
+	    xc_domain_destroy( xc->xc_handle, dom, 1 );
 	    gzclose(gfd);
 	    close(fd);
 
