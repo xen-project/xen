@@ -111,7 +111,6 @@ static void warp_timer_fn(unsigned long pointer)
     
     /* set unwarp timer */
     inf->unwarp_timer.expires = NOW() + inf->warpu;
-    rem_ac_timer(&inf->unwarp_timer);
     add_ac_timer(&inf->unwarp_timer);
     spin_unlock_irqrestore(&CPU_INFO(inf->domain->processor)->run_lock, flags);
 
@@ -362,14 +361,23 @@ int bvt_adjdom(struct domain *p,
         
         struct bvt_dom_info *inf = BVT_INFO(p);
         
-        DPRINTK("Get domain %u bvt mcu_adv=%u, warpback=%d, warpvalue=%d"
+        DPRINTK("Get domain %u bvt mcu_adv=%u, warpback=%d, warpvalue=%d, "
                 "warpl=%lld, warpu=%lld\n",
                 p->domain, inf->mcu_advance, inf->warpback, inf->warp_value,
                 inf->warpl, inf->warpu);
 
         /* Sanity -- this can avoid divide-by-zero. */
         if ( mcu_adv == 0 )
+        {
+            printk("Mcu advance must not be set to 0 (domain %d)\n",p->domain);
             return -EINVAL;
+        }
+        else if ( warpl < 0 || warpu < 0)
+        {
+            printk("Warp limits must be >= 0 (domain %d)\n", p->domain);
+            return -EINVAL;
+        }
+        
         
         spin_lock_irqsave(&CPU_INFO(p->processor)->run_lock, flags);   
         inf->mcu_advance = mcu_adv;
@@ -377,14 +385,20 @@ int bvt_adjdom(struct domain *p,
         /* The warp should be the same as warpback */
         inf->warp = warpback;
         inf->warp_value = warpvalue;
-        inf->warpl = warpl;
-        inf->warpu = warpu;
-
-        DPRINTK("Get domain %u bvt mcu_adv=%u, warpback=%d, warpvalue=%d"
-                "warpl=%lld, warpu=%lld, values(%lld, %lld)\n",
+        inf->warpl = MILLISECS(warpl);
+        inf->warpu = MILLISECS(warpu);
+        
+        /* If the unwarp timer set up it needs to be removed */
+        rem_ac_timer(&inf->unwarp_timer);
+        /* If we stop warping the warp timer needs to be removed */
+        if(!warpback)
+            rem_ac_timer(&inf->warp_timer);
+        
+        DPRINTK("Get domain %u bvt mcu_adv=%u, warpback=%d, warpvalue=%d, "
+                "warpl=%lld, warpu=%lld\n",
                 p->domain, inf->mcu_advance, inf->warpback, inf->warp_value,
-                inf->warpl, inf->warpu, warpl, warpu);
-
+                inf->warpl, inf->warpu);
+                
         spin_unlock_irqrestore(&CPU_INFO(p->processor)->run_lock, flags);
     }
     else if ( cmd->direction == SCHED_INFO_GET )
