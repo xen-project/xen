@@ -249,7 +249,6 @@ asmlinkage void schedule(void)
  need_resched_back:
     perfc_incrc(sched_run2);
 
-
     prev = current;
     next = NULL;
 
@@ -262,13 +261,10 @@ asmlinkage void schedule(void)
     /* remove timer  */
     rem_ac_timer(&schedule_data[this_cpu].s_timer);
 
-    /*
-     * deschedule the current domain
-     */
+    /* deschedule the current domain */
 
     ASSERT(!in_interrupt());
     ASSERT(__task_on_runqueue(prev));
-
 
     if (is_idle_task(prev)) 
         goto deschedule_done;
@@ -371,11 +367,10 @@ asmlinkage void schedule(void)
     r_time = ((next_prime->evt - next->evt)/next->mcu_advance) + ctx_allow;
 
  sched_done:
-    ASSERT(r_time != 0);
     ASSERT(r_time >= ctx_allow);
 
 #ifndef NDEBUG
-    if ( (r_time==0) || (r_time < ctx_allow)) {
+    if (r_time < ctx_allow) {
         printk("[%02d]: %lx\n", this_cpu, r_time);
         dump_rqueue(&schedule_data[this_cpu].runqueue, "foo");
     }
@@ -393,7 +388,7 @@ asmlinkage void schedule(void)
  timer_redo:
     schedule_data[this_cpu].s_timer.expires  = now + r_time;
     if (add_ac_timer(&schedule_data[this_cpu].s_timer) == 1) {
-        printk("SCHED[%02d]: Shit this shouldn't happen r_time=%lu\n", 
+        printk("SCHED[%02d]: timeout already happened! r_time=%u\n",
                this_cpu, r_time);
         now = NOW();
         goto timer_redo;

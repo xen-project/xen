@@ -748,8 +748,10 @@ unsigned int apic_timer_irqs [NR_CPUS];
 void smp_apic_timer_interrupt(struct pt_regs * regs)
 {
     int cpu = smp_processor_id();
+#ifndef NDEBUG
     u32 cc_start, cc_end;
     rdtscl(cc_start);
+#endif
 
     /*
      * the NMI deadlock-detector uses this.
@@ -771,9 +773,11 @@ void smp_apic_timer_interrupt(struct pt_regs * regs)
     if (softirq_pending(cpu))
         do_softirq();
 
+#ifndef NDEBUG
     rdtscl(cc_end);
     if ( (cc_end - cc_start) > (cpu_khz * 100) )
         printk("APIC Long ISR on CPU=%02d %08X -> %08X\n",cpu,cc_start,cc_end);
+#endif
 }
 
 /*
