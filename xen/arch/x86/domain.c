@@ -695,6 +695,8 @@ int construct_dom0(struct domain *p,
             mpt_alloc += PAGE_SIZE;
             *l2tab++ = mk_l2_pgentry((unsigned long)l1start | L2_PROT);
             clear_page(l1tab);
+            if ( count == 0 )
+                l1tab += l1_table_offset(v_start);
         }
         *l1tab++ = mk_l1_pgentry((mfn << PAGE_SHIFT) | L1_PROT);
         
