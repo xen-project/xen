@@ -500,9 +500,9 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
     unsigned short size;
     unsigned char  offset, status = RING_STATUS_OK;
 
-    memset(skb->mac.ethernet->h_dest, 0, ETH_ALEN);
+    memcpy(skb->mac.ethernet->h_dest, vif->vmac, ETH_ALEN);
     if ( ntohs(skb->mac.ethernet->h_proto) == ETH_P_ARP )
-        memset(skb->nh.raw + 18, 0, ETH_ALEN);
+        memcpy(skb->nh.raw + 18, vif->vmac, ETH_ALEN);
 
     if ( (i = vif->rx_cons) == vif->rx_prod )
         return;
@@ -741,7 +741,7 @@ static void net_tx_action(unsigned long unused)
             add_to_net_schedule_list_tail(vif);
 
         skb->destructor = tx_skb_release;
-        
+
         skb->head = skb->data = tx->header;
         skb->end  = skb->tail = skb->head + PKT_PROT_LEN;
         
@@ -1728,7 +1728,7 @@ inline int init_tx_header(u8 *data, unsigned int len, struct net_device *dev)
     {
     case ETH_P_ARP:
         if ( len < 42 ) break;
-        memcpy(data + 22, dev->dev_addr, 6);
+        memcpy(data + 22, dev->dev_addr, ETH_ALEN);
         return ETH_P_ARP;
     case ETH_P_IP:
         return ETH_P_IP;
@@ -1939,7 +1939,7 @@ long do_net_update(void)
                   (PGT_writeable_page | current->domain)) || 
                  (buf_page->tot_count != 1) )
             {
-		DPRINTK("Need a mapped-once writeable page (%d/%d/%08x)\n",
+		DPRINTK("Need a mapped-once writeable page (%ld/%ld/%08lx)\n",
       		buf_page->type_count, buf_page->tot_count, buf_page->flags);
                 make_rx_response(vif, rx.id, 0, RING_STATUS_BAD_PAGE, 0);
                 goto rx_unmap_and_continue;

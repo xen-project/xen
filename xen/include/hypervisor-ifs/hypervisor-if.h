@@ -241,6 +241,7 @@ typedef struct start_info_st {
     unsigned long mod_len;	  /* size (bytes) of pre-loaded module */
     /* Machine address of net rings for each VIF. Will be page aligned. */
     unsigned long net_rings[MAX_DOMAIN_VIFS];
+    unsigned char net_vmac[MAX_DOMAIN_VIFS][6];
     /* Machine address of block-device ring. Will be page aligned. */
     unsigned long blk_ring;
     unsigned int  dom_id;

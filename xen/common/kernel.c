@@ -424,7 +424,6 @@ unsigned short compute_cksum(unsigned short *buf, int count)
 /* XXX SMH: below is rather vile; pulled in to allow network console */
 
 extern int netif_rx(struct sk_buff *); 
-extern struct net_device *the_dev;
 
 typedef struct my_udphdr {
     __u16 source;
@@ -499,8 +498,8 @@ int console_export(char *str, int len)
     iph->id      = 0xdead;
     iph->ttl     = 255;
     iph->protocol= 17;
-    iph->daddr   = htonl(0xa9fe0001);  /* 169.254.0.1 */
-    iph->saddr   = htonl(0xa9fe0001);  /* 169.254.0.1 */
+    iph->daddr   = htonl(0xa9fe0100);  /* 169.254.1.0 */
+    iph->saddr   = htonl(0xa9fe0100);  /* 169.254.1.0 */
     iph->tot_len = htons(hdr_size + len); 
     iph->check	 = 0;
     iph->check   = compute_cksum((__u16 *)iph, sizeof(struct my_iphdr)/2); 

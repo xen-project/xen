@@ -377,6 +377,8 @@ int final_setup_guestos(struct task_struct * p, dom_meminfo_t * meminfo)
         if ( p->net_vif_list[i] == NULL ) continue;
         virt_startinfo_addr->net_rings[i] = 
             virt_to_phys(p->net_vif_list[i]->shared_rings);
+        memcpy(virt_startinfo_addr->net_vmac[i],
+               p->net_vif_list[i]->vmac, ETH_ALEN);
     }
 
     /* Add block io interface */
@@ -645,6 +647,8 @@ int setup_guestos(struct task_struct *p, dom0_newdomain_t *params,
         if ( p->net_vif_list[i] == NULL ) continue;
         virt_startinfo_address->net_rings[i] = 
             virt_to_phys(p->net_vif_list[i]->shared_rings);
+        memcpy(virt_startinfo_address->net_vmac[i],
+               p->net_vif_list[i]->vmac, ETH_ALEN);
     }
 
     /* Add block io interface */

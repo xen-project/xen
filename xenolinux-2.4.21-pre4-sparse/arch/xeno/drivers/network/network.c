@@ -470,9 +470,9 @@ static int inetdev_notify(struct notifier_block *this,
     (void)HYPERVISOR_network_op(&op);
 
     /*
-     * Xen creates a pair of bootstrap rules which allows domain 0 to
-     * send and receive any packet. These rules can be removed once we
-     * have configured an IP address.
+     * When the first real interface is brought up we delete the start-of-day
+     * bootstrap rules -- they were only installed to allow an initial DHCP
+     * request and response.
      */
     if ( (idx == 0) && (event == NETDEV_UP) && !removed_bootstrap_rules )
     {
@@ -480,11 +480,9 @@ static int inetdev_notify(struct notifier_block *this,
         op.cmd = NETWORK_OP_DELETERULE;
         op.u.net_rule.proto         = NETWORK_PROTO_ANY;
         op.u.net_rule.action        = NETWORK_ACTION_ACCEPT;
-
         op.u.net_rule.src_vif       = 0;
         op.u.net_rule.dst_vif       = VIF_PHYSICAL_INTERFACE;
         (void)HYPERVISOR_network_op(&op);
-
         op.u.net_rule.src_vif       = VIF_ANY_INTERFACE;
         op.u.net_rule.dst_vif       = 0;
         (void)HYPERVISOR_network_op(&op);
@@ -511,13 +509,32 @@ int __init init_module(void)
 
     INIT_LIST_HEAD(&dev_list);
 
-    /*
-     * Domain 0 must poke its own network rules as it discovers its IP
-     * addresses. All other domains have a privileged "parent" to do this
-     * for them at start of day.
-     */
     if ( start_info.dom_id == 0 )
+    {
+        /*
+         * Domain 0 creates wildcard rules to allow DHCP to find its first IP
+         * address. These wildcard rules are deleted when the first inet
+         * interface is brought up.
+         */
+        network_op_t op;
+        memset(&op, 0, sizeof(op));
+        op.cmd = NETWORK_OP_ADDRULE;
+        op.u.net_rule.proto         = NETWORK_PROTO_ANY;
+        op.u.net_rule.action        = NETWORK_ACTION_ACCEPT;
+        op.u.net_rule.src_vif       = 0;
+        op.u.net_rule.dst_vif       = VIF_PHYSICAL_INTERFACE;
+        (void)HYPERVISOR_network_op(&op);
+        op.u.net_rule.src_vif       = VIF_ANY_INTERFACE;
+        op.u.net_rule.dst_vif       = 0;
+        (void)HYPERVISOR_network_op(&op);        
+
+        /*
+         * Domain 0 must poke its own network rules as it discovers its IP
+         * addresses. All other domains have a privileged "parent" to do this
+         * for them at start of day.
+         */
         (void)register_inetaddr_notifier(&notifier_inetdev);
+    }
 
     for ( i = 0; i < MAX_DOMAIN_VIFS; i++ )
     {
@@ -548,8 +565,7 @@ int __init init_module(void)
         dev->stop            = network_close;
         dev->get_stats       = network_get_stats;
 
-        memset(dev->dev_addr, 0, ETH_ALEN);
-        *(unsigned int *)(dev->dev_addr + 1) = i;
+        memcpy(dev->dev_addr, start_info.net_vmac[i], ETH_ALEN);
 
         if ( (err = register_netdev(dev)) != 0 )
         {

@@ -104,6 +104,14 @@ net_vif_t *create_net_vif(int domain)
     spin_lock_init(&new_vif->rx_lock);
     spin_lock_init(&new_vif->tx_lock);
 
+    /*
+     * Virtual MAC is a hash of the real physical MAC. Chosen so that the 
+     * first vif of domain 0 gets the physical MAC address.
+     */
+    memcpy(new_vif->vmac, the_dev->dev_addr, ETH_ALEN);
+    ((unsigned short *)new_vif->vmac)[1] ^= htons(p->domain);
+    ((unsigned short *)new_vif->vmac)[2] ^= htons(dom_vif_idx);
+
     p->net_vif_list[dom_vif_idx] = new_vif;
     
     write_unlock_irqrestore(&tasklist_lock, flags);
@@ -496,8 +504,6 @@ long do_network_op(network_op_t *u_network_op)
 
 void __init net_init (void)
 {
-    net_rule_t new_rule;
-
     net_rule_list = NULL;
     net_vif_cache = kmem_cache_create("net_vif_cache", 
                                       sizeof(net_vif_t),
@@ -505,20 +511,4 @@ void __init net_init (void)
     net_rule_cache = kmem_cache_create("net_rule_cache", 
                                        sizeof(net_rule_ent_t),
                                        0, SLAB_HWCACHE_ALIGN, NULL, NULL);
-
-    /* Bootstrap outbound rule. */
-    memset(&new_rule, 0, sizeof(net_rule_t));
-    new_rule.src_vif = 0;
-    new_rule.dst_vif = VIF_PHYSICAL_INTERFACE;
-    new_rule.action = NETWORK_ACTION_ACCEPT;
-    new_rule.proto = NETWORK_PROTO_ANY;
-    add_net_rule(&new_rule);
-
-    /* Bootstrap inbound rule. */
-    memset(&new_rule, 0, sizeof(net_rule_t));
-    new_rule.src_vif = VIF_ANY_INTERFACE;
-    new_rule.dst_vif = 0;
-    new_rule.action = NETWORK_ACTION_ACCEPT;
-    new_rule.proto = NETWORK_PROTO_ANY;
-    add_net_rule(&new_rule);
 }

@@ -20,6 +20,10 @@
 
 #include <hypervisor-ifs/network.h>
 
+#include <xeno/if_ether.h>
+
+extern struct net_device *the_dev;
+
 /* 
  * shadow ring structures are used to protect the descriptors from
  * tampering after they have been passed to the hypervisor.
@@ -69,6 +73,7 @@ typedef struct net_vif_st {
     struct list_head    list;     /* scheduling list */
     atomic_t            refcnt;
     spinlock_t          rx_lock, tx_lock;
+    unsigned char       vmac[ETH_ALEN];
 } net_vif_t;
 
 #define get_vif(_v) (atomic_inc(&(_v)->refcnt))
