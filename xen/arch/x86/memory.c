@@ -1225,12 +1225,18 @@ int do_update_va_mapping_otherdomain(unsigned long page_nr,
 
 
 /*  */
-unsigned long ptwr_disconnected = ENTRIES_PER_L2_PAGETABLE;
-static unsigned long *ptwr_writable_l1;
+unsigned long ptwr_disconnected[NR_CPUS] __cacheline_aligned =
+	{ [ 0 ... NR_CPUS-1 ] = ENTRIES_PER_L2_PAGETABLE };
+static unsigned long *ptwr_writable_l1[NR_CPUS] __cacheline_aligned;
 #define	PTWR_NR_WRITABLES 4
-static unsigned long *ptwr_writables[PTWR_NR_WRITABLES];
-int ptwr_writable_idx = 0;
-#define PTWR_PRINTK if (0) printk
+static unsigned long *ptwr_writables[NR_CPUS][PTWR_NR_WRITABLES] __cacheline_aligned;
+int ptwr_writable_idx[NR_CPUS] __cacheline_aligned = { 0, };
+#ifdef TRACK_PTWR_DOMAIN
+domid_t ptwr_domain[NR_CPUS] = { 0, };
+#endif
+
+int ptwr_debug = 0;
+#define PTWR_PRINTK if (ptwr_debug) printk
 
 void ptwr_reconnect_disconnected(unsigned long addr)
 {
@@ -1238,39 +1244,64 @@ void ptwr_reconnect_disconnected(unsigned long addr)
     unsigned long pfn;
     struct pfn_info *page;
     l2_pgentry_t *pl2e;
-    PTWR_PRINTK("page fault in disconnected space: addr %08lx space %08lx\n",
-                addr, ptwr_disconnected << L2_PAGETABLE_SHIFT);
-    pl2e = &linear_l2_table[ptwr_disconnected];
+    int cpu = smp_processor_id();
 
-    if (__get_user(pte, ptwr_writable_l1))
+#ifdef TRACK_PTWR_DOMAIN
+    if (ptwr_domain[cpu] != get_current()->domain)
+        printk("ptwr_reconnect_disconnected domain mismatch %d != %d\n",
+               ptwr_domain[cpu], get_current()->domain);
+#endif
+    PTWR_PRINTK("page fault in disconnected space: addr %08lx space %08lx\n",
+                addr, ptwr_disconnected[cpu] << L2_PAGETABLE_SHIFT);
+    pl2e = &linear_l2_table[ptwr_disconnected[cpu]];
+
+    if (__get_user(pte, ptwr_writable_l1[cpu]))
         BUG();
     pfn = pte >> PAGE_SHIFT;
     page = &frame_table[pfn];
 
     /* reconnect l1 page */
-    PTWR_PRINTK("    pl2e %p l2e %08lx pfn %08lx taf %08x/%08x\n", pl2e,
+    PTWR_PRINTK("    pl2e %p l2e %08lx pfn %08lx taf %08x/%08x/%u\n", pl2e,
                 l2_pgentry_val(*pl2e),
                 l1_pgentry_val(linear_pg_table[(unsigned long)pl2e >>
                                                PAGE_SHIFT]) >> PAGE_SHIFT,
-                frame_table[l2_pgentry_to_pagenr(*pl2e)].type_and_flags,
-                frame_table[pfn].type_and_flags);
-    mod_l2_entry(pl2e, mk_l2_pgentry((l2_pgentry_val(*pl2e) & ~0x800) |
-                                     _PAGE_PRESENT),
-                 l1_pgentry_val(linear_pg_table[(unsigned long)pl2e >>
-                                                PAGE_SHIFT]) >> PAGE_SHIFT);
-    PTWR_PRINTK("now pl2e %p l2e %08lx              taf %08x/%08x\n", pl2e,
+                frame_table[pfn].type_and_flags,
+                frame_table[pfn].count_and_flags,
+                frame_table[pfn].u.domain->domain);
+    if (!mod_l2_entry(pl2e, mk_l2_pgentry((l2_pgentry_val(*pl2e) & ~0x800) |
+                                          _PAGE_PRESENT),
+                      l1_pgentry_val(linear_pg_table[(unsigned long)pl2e >>
+                                                     PAGE_SHIFT]) >> PAGE_SHIFT)) {
+        l2_pgentry_t nl2e = mk_l2_pgentry((l2_pgentry_val(*pl2e) & ~0x800) |
+                                          _PAGE_PRESENT);
+        l1_pgentry_t *pl1e;
+        int i;
+
+        printk("ptrw mod_l2_entry failed on %p: %08lx -> %08lx\n", pl2e,
+               l2_pgentry_val(*pl2e), l2_pgentry_val(nl2e));
+        pl1e = map_domain_mem(l2_pgentry_to_pagenr(nl2e) << PAGE_SHIFT);
+        for ( i = 0; i < ENTRIES_PER_L1_PAGETABLE; i++ ) {
+            printk("%03x: %08lx ", i, l1_pgentry_val(pl1e[i]));
+            if (i % 4 == 3)
+                printk("\n");
+        }
+        unmap_domain_mem(pl1e);
+
+        BUG();
+    }
+    PTWR_PRINTK("now pl2e %p l2e %08lx              taf %08x/%08x/%u\n", pl2e,
                 l2_pgentry_val(*pl2e),
-                frame_table[l2_pgentry_to_pagenr(*pl2e)].type_and_flags,
-                frame_table[pfn].type_and_flags);
-    ptwr_disconnected = ENTRIES_PER_L2_PAGETABLE;
+                frame_table[pfn].type_and_flags,
+                frame_table[pfn].count_and_flags, frame_table[pfn].u.domain->domain);
+    ptwr_disconnected[cpu] = ENTRIES_PER_L2_PAGETABLE;
     /* make pt page write protected */
-    if (__get_user(pte, ptwr_writable_l1))
+    if (__get_user(pte, ptwr_writable_l1[cpu]))
         BUG();
-    PTWR_PRINTK("writable_l1 at %p is %08lx\n", ptwr_writable_l1, pte);
+    PTWR_PRINTK("writable_l1 at %p is %08lx\n", ptwr_writable_l1[cpu], pte);
     pte &= ~_PAGE_RW;
-    if (__put_user(pte, ptwr_writable_l1))
+    if (__put_user(pte, ptwr_writable_l1[cpu]))
         BUG();
-    PTWR_PRINTK("writable_l1 at %p now %08lx\n", ptwr_writable_l1, pte);
+    PTWR_PRINTK("writable_l1 at %p now %08lx\n", ptwr_writable_l1[cpu], pte);
     /* and try again */
     return;
 }
@@ -1280,9 +1311,15 @@ void ptwr_flush_inactive(void)
     unsigned long pte, pfn;
     struct pfn_info *page;
     int i;
+    int cpu = smp_processor_id();
 
-    for (i = 0; i < ptwr_writable_idx; i++) {
-        if (__get_user(pte, ptwr_writables[i]))
+#ifdef TRACK_PTWR_DOMAIN
+    if (ptwr_domain[cpu] != get_current()->domain)
+        printk("ptwr_flush_inactive domain mismatch %d != %d\n",
+               ptwr_domain[cpu], get_current()->domain);
+#endif
+    for (i = 0; i < ptwr_writable_idx[cpu]; i++) {
+        if (__get_user(pte, ptwr_writables[cpu][i]))
             BUG();
         pfn = pte >> PAGE_SHIFT;
         page = &frame_table[pfn];
@@ -1290,13 +1327,13 @@ void ptwr_flush_inactive(void)
         if (!get_page_type(page, PGT_l1_page_table))
             BUG();
         /* make pt page writable */
-        PTWR_PRINTK("writable_l1 at %p is %08lx\n", ptwr_writables[i], pte);
+        PTWR_PRINTK("writable_l1 at %p is %08lx\n", ptwr_writables[cpu][i], pte);
         pte &= ~_PAGE_RW;
-        if (__put_user(pte, ptwr_writables[i]))
+        if (__put_user(pte, ptwr_writables[cpu][i]))
             BUG();
-        PTWR_PRINTK("writable_l1 at %p now %08lx\n", ptwr_writables[i], pte);
+        PTWR_PRINTK("writable_l1 at %p now %08lx\n", ptwr_writables[cpu][i], pte);
     }
-    ptwr_writable_idx = 0;
+    ptwr_writable_idx[cpu] = 0;
 }
 
 int ptwr_do_page_fault(unsigned long addr)
@@ -1306,17 +1343,28 @@ int ptwr_do_page_fault(unsigned long addr)
     unsigned long pte, pfn;
     struct pfn_info *page;
     l2_pgentry_t *pl2e;
+    int cpu = smp_processor_id();
+
+#if 0
     PTWR_PRINTK("get user %p for va %08lx\n",
                 &linear_pg_table[addr>>PAGE_SHIFT], addr);
+#endif
     if (l2_pgentry_val(linear_l2_table[addr >> L2_PAGETABLE_SHIFT]) &
         _PAGE_PRESENT &&
         __get_user(pte, (unsigned long *)
                    &linear_pg_table[addr >> PAGE_SHIFT]) == 0) {
         pfn = pte >> PAGE_SHIFT;
+#if 0
         PTWR_PRINTK("check pte %08lx = pfn %08lx for va %08lx\n", pte, pfn,
                     addr);
+#endif
         page = &frame_table[pfn];
         if ((page->type_and_flags & PGT_type_mask) == PGT_l1_page_table) {
+#ifdef TRACK_PTWR_DOMAIN
+            if (ptwr_domain[cpu] != get_current()->domain)
+                printk("ptwr_do_page_fault domain mismatch %d != %d\n",
+                       ptwr_domain[cpu], get_current()->domain);
+#endif
             pl2e = &linear_l2_table[(page->type_and_flags &
                                      PGT_va_mask) >> PGT_va_shift];
             PTWR_PRINTK("page_fault on l1 pt at va %08lx, pt for %08x, pfn %08lx\n",
@@ -1324,23 +1372,23 @@ int ptwr_do_page_fault(unsigned long addr)
                                PGT_va_shift) << L2_PAGETABLE_SHIFT, pfn);
             if (l2_pgentry_val(*pl2e) >> PAGE_SHIFT != pfn) {
                 PTWR_PRINTK("freeing l1 page %p\n", page);
-                if (ptwr_writable_idx == PTWR_NR_WRITABLES)
+                if (ptwr_writable_idx[cpu] == PTWR_NR_WRITABLES)
                     ptwr_flush_inactive();
-                ptwr_writables[ptwr_writable_idx++] = (unsigned long *)
+                ptwr_writables[cpu][ptwr_writable_idx[cpu]++] = (unsigned long *)
                     &linear_pg_table[addr>>PAGE_SHIFT];
                 if ((page->type_and_flags & PGT_count_mask) != 1)
                     BUG();
                 put_page_type(page);
             } else {
-                if (ptwr_disconnected != ENTRIES_PER_L2_PAGETABLE)
+                if (ptwr_disconnected[cpu] != ENTRIES_PER_L2_PAGETABLE)
                     ptwr_reconnect_disconnected(addr);
-                PTWR_PRINTK("    pl2e %p l2e %08lx pfn %08lx taf %08x/%08x\n",
-                       pl2e, l2_pgentry_val(*pl2e),
-                       l1_pgentry_val(linear_pg_table[(unsigned long)pl2e
-                                                      >> PAGE_SHIFT]) >>
-                       PAGE_SHIFT,
-                       frame_table[l2_pgentry_to_pagenr(*pl2e)].
-                       type_and_flags, frame_table[pfn].type_and_flags);
+                PTWR_PRINTK("    pl2e %p l2e %08lx pfn %08lx taf %08x/%08x/%u\n",
+                            pl2e, l2_pgentry_val(*pl2e),
+                            l1_pgentry_val(linear_pg_table[(unsigned long)pl2e
+                                                           >> PAGE_SHIFT]) >>
+                            PAGE_SHIFT,
+                            frame_table[pfn].type_and_flags,
+                            frame_table[pfn].count_and_flags, frame_table[pfn].u.domain->domain);
                 /* disconnect l1 page */
                 mod_l2_entry(pl2e, mk_l2_pgentry((l2_pgentry_val(*pl2e) &
                                                   ~_PAGE_PRESENT) | 0x800),
@@ -1348,14 +1396,13 @@ int ptwr_do_page_fault(unsigned long addr)
                                             [(unsigned long)pl2e
                                              >> PAGE_SHIFT]) >>
                              PAGE_SHIFT);
-                ptwr_disconnected = (page->type_and_flags & PGT_va_mask) >>
+                ptwr_disconnected[cpu] = (page->type_and_flags & PGT_va_mask) >>
                     PGT_va_shift;
-                PTWR_PRINTK("now pl2e %p l2e %08lx              taf %08x/%08x\n",
+                PTWR_PRINTK("now pl2e %p l2e %08lx              taf %08x/%08x/%u\n",
                        pl2e, l2_pgentry_val(*pl2e),
-                       frame_table[l2_pgentry_to_pagenr(*pl2e)].
-                       type_and_flags,
-                       frame_table[pfn].type_and_flags);
-                ptwr_writable_l1 = (unsigned long *)
+                       frame_table[pfn].type_and_flags,
+                       frame_table[pfn].count_and_flags, frame_table[pfn].u.domain->domain);
+                ptwr_writable_l1[cpu] = (unsigned long *)
                     &linear_pg_table[addr>>PAGE_SHIFT];
             }
             /* make pt page writable */
@@ -1369,4 +1416,43 @@ int ptwr_do_page_fault(unsigned long addr)
         }
     }
     return 0;
+}
+
+void ptwr_status(void)
+{
+    int i;
+    unsigned long pte, pfn;
+    struct pfn_info *page;
+    l2_pgentry_t *pl2e;
+    int cpu = smp_processor_id();
+
+    for (i = 0; i < ptwr_writable_idx[cpu]; i++) {
+        if (__get_user(pte, ptwr_writables[cpu][i]))
+            BUG();
+        pfn = pte >> PAGE_SHIFT;
+        page = &frame_table[pfn];
+        printk("need to alloc l1 page %p\n", page);
+        /* make pt page writable */
+        printk("need to make read-only l1-page at %p is %08lx\n",
+               ptwr_writables[cpu][i], pte);
+    }
+
+    if (ptwr_disconnected[cpu] == ENTRIES_PER_L2_PAGETABLE)
+        return;
+
+    printk("disconnected space: space %08lx\n",
+           ptwr_disconnected[cpu] << L2_PAGETABLE_SHIFT);
+    pl2e = &linear_l2_table[ptwr_disconnected[cpu]];
+
+    if (__get_user(pte, ptwr_writable_l1[cpu]))
+        BUG();
+    pfn = pte >> PAGE_SHIFT;
+    page = &frame_table[pfn];
+
+    PTWR_PRINTK("    pl2e %p l2e %08lx pfn %08lx taf %08x/%08x/%u\n", pl2e,
+                l2_pgentry_val(*pl2e),
+                l1_pgentry_val(linear_pg_table[(unsigned long)pl2e >>
+                                               PAGE_SHIFT]) >> PAGE_SHIFT,
+                frame_table[l2_pgentry_to_pagenr(*pl2e)].type_and_flags,
+                frame_table[pfn].type_and_flags, frame_table[pfn].u.domain->domain);
 }

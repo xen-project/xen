@@ -134,7 +134,7 @@ static inline int get_page(struct pfn_info *page,
         p  = np;
         if ( unlikely((x & PGC_count_mask) == 0) ||  /* Not allocated? */
              unlikely((nx & PGC_count_mask) == 0) || /* Count overflow? */
-             unlikely(p != domain) )                 /* Wrong owner? */
+             unlikely(!IS_PRIV(domain) && p != domain) ) /* Wrong owner? */
         {
             DPRINTK("Error pfn %08lx: ed=%p(%u), sd=%p(%u),"
                     " caf=%08x, taf=%08x\n",
@@ -317,8 +317,8 @@ int memguard_is_guarded(void *p);
 #endif
 
 /*  */
-extern unsigned long ptwr_disconnected;
-extern int ptwr_writable_idx;
+extern unsigned long ptwr_disconnected[];
+extern int ptwr_writable_idx[];
 void ptwr_reconnect_disconnected(unsigned long addr);
 void ptwr_flush_inactive(void);
 int ptwr_do_page_fault(unsigned long);
@@ -328,11 +328,13 @@ int ptwr_do_page_fault(unsigned long);
 
 static inline void cleanup_writable_pagetable(const int what)
 {
+    int cpu = smp_processor_id();
+
     if (what & PTRW_CLEANUP_ACTIVE)
-        if (ptwr_disconnected != ENTRIES_PER_L2_PAGETABLE)
+        if (ptwr_disconnected[cpu] != ENTRIES_PER_L2_PAGETABLE)
             ptwr_reconnect_disconnected(0L);
     if (what & PTRW_CLEANUP_INACTIVE)
-        if (ptwr_writable_idx)
+        if (ptwr_writable_idx[cpu])
             ptwr_flush_inactive();
 }
 

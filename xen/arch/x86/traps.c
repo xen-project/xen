@@ -309,6 +309,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
     unsigned long off, addr, fixup;
     struct domain *p = current;
     extern int map_ldt_shadow_page(unsigned int);
+    int cpu = smp_processor_id();
 
     __asm__ __volatile__ ("movl %%cr2,%0" : "=r" (addr) : );
 
@@ -327,7 +328,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
             return; /* successfully copied the mapping */
     }
 
-    if ((addr >> L2_PAGETABLE_SHIFT) == ptwr_disconnected) {
+    if ((addr >> L2_PAGETABLE_SHIFT) == ptwr_disconnected[cpu]) {
         ptwr_reconnect_disconnected(addr);
         return;
     }

@@ -417,6 +417,21 @@ void __enter_scheduler(void)
     if ( unlikely(prev == next) )
         return;
     
+    cleanup_writable_pagetable(PTRW_CLEANUP_ACTIVE | PTRW_CLEANUP_INACTIVE);
+#ifdef TRACK_PTWR_DOMAIN
+    {
+        extern domid_t ptwr_domain[];
+        int cpu = smp_processor_id();
+        if (ptwr_domain[cpu] != prev->domain)
+            printk("switch_to domain mismatch %d != %d\n",
+                   ptwr_domain[cpu], prev->domain);
+        ptwr_domain[cpu] = next->domain;
+        if (ptwr_disconnected[cpu] != ENTRIES_PER_L2_PAGETABLE ||
+            ptwr_writable_idx[cpu])
+            printk("switch_to ptwr dirty!!!\n");
+    }
+#endif
+
     perfc_incrc(sched_ctx);
 
 #if defined(WAKE_HISTO)

@@ -158,8 +158,6 @@ extern struct domain *idle_task[NR_CPUS];
 #define IDLE_DOMAIN_ID   (0x7FFFFFFFU)
 #define is_idle_task(_p) (test_bit(DF_IDLETASK, &(_p)->flags))
 
-#include <xen/slab.h>
-
 void free_domain_struct(struct domain *d);
 struct domain *alloc_domain_struct();
 
@@ -295,6 +293,7 @@ static inline void domain_unpause_by_systemcontroller(struct domain *d)
 #define IS_PRIV(_d) (test_bit(DF_PRIVILEGED, &(_d)->flags))
 #define IS_CAPABLE_PHYSDEV(_d) (test_bit(DF_PHYSDEV, &(_d)->flags))
 
+#include <xen/slab.h>
 #include <asm/domain.h>
 
 #endif /* __SCHED_H__ */
