@@ -26,7 +26,6 @@
 
 #include <asm/uaccess.h>
 #include <asm/io.h>
-#include <asm/pgalloc.h>
 
 #ifdef CONFIG_IA64
 # include <linux/efi.h>
@@ -44,10 +43,10 @@ extern void tapechar_init(void);
 static inline int uncached_access(struct file *file, unsigned long addr)
 {
 #ifdef CONFIG_XEN
-        if (file->f_flags & O_SYNC)
-                return 1;
-        /* Xen sets correct MTRR type on non-RAM for us. */
-        return 0;
+	if (file->f_flags & O_SYNC)
+		return 1;
+	/* Xen sets correct MTRR type on non-RAM for us. */
+	return 0;
 #elif defined(__i386__)
 	/*
 	 * On the PPro and successors, the MTRRs are used to set
@@ -215,6 +214,7 @@ static int mmap_mem(struct file * file, struct vm_area_struct * vma)
 				vma->vm_page_prot))
 		return -EAGAIN;
 #else
+	/* Remap-pfn-range will mark the range VM_IO and VM_RESERVED */
 	if (remap_pfn_range(vma,
 			    vma->vm_start,
 			    vma->vm_pgoff,

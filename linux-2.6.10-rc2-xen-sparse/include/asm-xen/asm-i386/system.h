@@ -124,10 +124,10 @@ static inline unsigned long _get_base(char * addr)
 
 static inline void wbinvd(void)
 {
-    mmu_update_t u;
-    u.ptr = MMU_EXTENDED_COMMAND;
-    u.val = MMUEXT_FLUSH_CACHE;
-    (void)HYPERVISOR_mmu_update(&u, 1, NULL);
+	mmu_update_t u;
+	u.ptr = MMU_EXTENDED_COMMAND;
+	u.val = MMUEXT_FLUSH_CACHE;
+	(void)HYPERVISOR_mmu_update(&u, 1, NULL);
 }
 
 static inline unsigned long get_limit(unsigned long segment)
@@ -449,66 +449,65 @@ struct alt_instr {
  * includes these barriers, for example.
  */
 
-#define __cli()                                                               \
-do {                                                                          \
-    HYPERVISOR_shared_info->vcpu_data[0].evtchn_upcall_mask = 1;              \
-    barrier();                                                                \
+#define __cli()								\
+do {									\
+	HYPERVISOR_shared_info->vcpu_data[0].evtchn_upcall_mask = 1;	\
+	barrier();							\
 } while (0)
 
-#define __sti()                                                               \
-do {                                                                          \
-    shared_info_t *_shared = HYPERVISOR_shared_info;                          \
-    barrier();                                                                \
-    _shared->vcpu_data[0].evtchn_upcall_mask = 0;                             \
-    barrier(); /* unmask then check (avoid races) */                          \
-    if ( unlikely(_shared->vcpu_data[0].evtchn_upcall_pending) )              \
-        force_evtchn_callback();                                              \
+#define __sti()								\
+do {									\
+	shared_info_t *_shared = HYPERVISOR_shared_info;		\
+	barrier();							\
+	_shared->vcpu_data[0].evtchn_upcall_mask = 0;			\
+	barrier(); /* unmask then check (avoid races) */		\
+	if ( unlikely(_shared->vcpu_data[0].evtchn_upcall_pending) )	\
+	force_evtchn_callback();					\
 } while (0)
 
-#define __save_flags(x)                                                       \
-do {                                                                          \
-    (x) = HYPERVISOR_shared_info->vcpu_data[0].evtchn_upcall_mask;            \
+#define __save_flags(x)							\
+do {									\
+	(x) = HYPERVISOR_shared_info->vcpu_data[0].evtchn_upcall_mask;	\
 } while (0)
 
-#define __restore_flags(x)                                                    \
-do {                                                                          \
-    shared_info_t *_shared = HYPERVISOR_shared_info;                          \
-    barrier();                                                                \
-    if ( (_shared->vcpu_data[0].evtchn_upcall_mask = (x)) == 0 ) {            \
-        barrier(); /* unmask then check (avoid races) */                      \
-        if ( unlikely(_shared->vcpu_data[0].evtchn_upcall_pending) )          \
-            force_evtchn_callback();                                          \
-    }                                                                         \
+#define __restore_flags(x)						\
+do {									\
+	shared_info_t *_shared = HYPERVISOR_shared_info;		\
+	barrier();							\
+	if ( (_shared->vcpu_data[0].evtchn_upcall_mask = (x)) == 0 ) {	\
+	barrier(); /* unmask then check (avoid races) */		\
+	if ( unlikely(_shared->vcpu_data[0].evtchn_upcall_pending) )	\
+	    force_evtchn_callback();					\
+	}								\
 } while (0)
 
-#define safe_halt()             ((void)0)
+#define safe_halt()	     ((void)0)
 
-#define __save_and_cli(x)                                                     \
-do {                                                                          \
-    (x) = HYPERVISOR_shared_info->vcpu_data[0].evtchn_upcall_mask;            \
-    HYPERVISOR_shared_info->vcpu_data[0].evtchn_upcall_mask = 1;              \
-    barrier();                                                                \
+#define __save_and_cli(x)						\
+do {									\
+	(x) = HYPERVISOR_shared_info->vcpu_data[0].evtchn_upcall_mask;	\
+	HYPERVISOR_shared_info->vcpu_data[0].evtchn_upcall_mask = 1;	\
+	barrier();							\
 } while (0)
 
-#define __save_and_sti(x)                                                     \
-do {                                                                          \
-    shared_info_t *_shared = HYPERVISOR_shared_info;                          \
-    barrier();                                                                \
-    (x) = _shared->vcpu_data[0].evtchn_upcall_mask;                           \
-    _shared->vcpu_data[0].evtchn_upcall_mask = 0;                             \
-    barrier(); /* unmask then check (avoid races) */                          \
-    if ( unlikely(_shared->vcpu_data[0].evtchn_upcall_pending) )              \
-        force_evtchn_callback();                                              \
+#define __save_and_sti(x)						\
+do {									\
+	shared_info_t *_shared = HYPERVISOR_shared_info;		\
+	barrier();							\
+	(x) = _shared->vcpu_data[0].evtchn_upcall_mask;			\
+	_shared->vcpu_data[0].evtchn_upcall_mask = 0;			\
+	barrier(); /* unmask then check (avoid races) */		\
+	if ( unlikely(_shared->vcpu_data[0].evtchn_upcall_pending) )	\
+	force_evtchn_callback();					\
 } while (0)
 
 #define local_irq_save(x)	__save_and_cli(x)
-#define local_irq_restore(x)    __restore_flags(x)
-#define local_save_flags(x)     __save_flags(x)
-#define local_irq_disable()     __cli()
-#define local_irq_enable()      __sti()
+#define local_irq_restore(x)	__restore_flags(x)
+#define local_save_flags(x)	__save_flags(x)
+#define local_irq_disable()	__cli()
+#define local_irq_enable()	__sti()
 
-#define irqs_disabled()			\
-	HYPERVISOR_shared_info->vcpu_data[0].evtchn_upcall_mask
+#define irqs_disabled() HYPERVISOR_shared_info->vcpu_data[0].evtchn_upcall_mask
 
 /*
  * disable hlt during certain critical i/o operations

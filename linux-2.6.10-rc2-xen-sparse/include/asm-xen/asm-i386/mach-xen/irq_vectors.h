@@ -65,7 +65,7 @@
 #define FIRST_DEVICE_VECTOR	0x31
 #define FIRST_SYSTEM_VECTOR	0xef
 
-/*  #define TIMER_IRQ _EVENT_TIMER */
+#define TIMER_IRQ		timer_irq
 
 /*
  * 16 8259A IRQ's, 208 potential APIC interrupt sources.
@@ -84,23 +84,6 @@
  * should be changed accordingly.
  */
 #define NR_VECTORS 256
-
-#ifdef CONFIG_PCI_USE_VECTOR
-#define NR_IRQS FIRST_SYSTEM_VECTOR
-#define NR_IRQ_VECTORS NR_IRQS
-#else
-#ifdef CONFIG_X86_IO_APIC
-#define NR_IRQS 224
-# if (224 >= 32 * NR_CPUS)
-# define NR_IRQ_VECTORS NR_IRQS
-# else
-# define NR_IRQ_VECTORS (32 * NR_CPUS)
-# endif
-#else
-#define NR_IRQS 16
-#define NR_IRQ_VECTORS NR_IRQS
-#endif
-#endif
 #endif
 
 #define FPU_IRQ			13
@@ -119,20 +102,20 @@
  *     are bound using the provided bind/unbind functions.
  */
 
-#define PIRQ_BASE   0
-#define NR_PIRQS  128
+#define PIRQ_BASE		0
+#define NR_PIRQS		128
 
-#define DYNIRQ_BASE (PIRQ_BASE + NR_PIRQS)
-#define NR_DYNIRQS  128
+#define DYNIRQ_BASE		(PIRQ_BASE + NR_PIRQS)
+#define NR_DYNIRQS		128
 
-#define NR_IRQS   (NR_PIRQS + NR_DYNIRQS)
-#define NR_IRQ_VECTORS NR_IRQS
+#define NR_IRQS			(NR_PIRQS + NR_DYNIRQS)
+#define NR_IRQ_VECTORS		NR_IRQS
 
-#define pirq_to_irq(_x)   ((_x) + PIRQ_BASE)
-#define irq_to_pirq(_x)   ((_x) - PIRQ_BASE)
+#define pirq_to_irq(_x)		((_x) + PIRQ_BASE)
+#define irq_to_pirq(_x)		((_x) - PIRQ_BASE)
 
-#define dynirq_to_irq(_x) ((_x) + DYNIRQ_BASE)
-#define irq_to_dynirq(_x) ((_x) - DYNIRQ_BASE)
+#define dynirq_to_irq(_x)	((_x) + DYNIRQ_BASE)
+#define irq_to_dynirq(_x)	((_x) - DYNIRQ_BASE)
 
 #ifndef __ASSEMBLY__
 /* Dynamic binding of event channels and VIRQ sources to Linux IRQ space. */

@@ -89,7 +89,7 @@ void paging_init(void);
 # define VMALLOC_END	(FIXADDR_START-2*PAGE_SIZE)
 #endif
 
-extern void * high_memory;
+extern void *high_memory;
 extern unsigned long vmalloc_earlyreserve;
 
 /*
@@ -215,7 +215,7 @@ extern unsigned long pg0[];
    can temporarily clear it. */
 #define pmd_present(x)	(pmd_val(x))
 /* pmd_clear below */
-#define	pmd_bad(x)	((pmd_val(x) & (~PAGE_MASK & ~_PAGE_USER & ~_PAGE_PRESENT)) != (_KERNPG_TABLE & ~_PAGE_PRESENT))
+#define pmd_bad(x)	((pmd_val(x) & (~PAGE_MASK & ~_PAGE_USER & ~_PAGE_PRESENT)) != (_KERNPG_TABLE & ~_PAGE_PRESENT))
 
 
 #define pages_to_mb(x) ((x) >> (20-PAGE_SHIFT))
@@ -421,30 +421,19 @@ extern pte_t *lookup_address(unsigned long address);
 #define update_mmu_cache(vma,address,pte) do { } while (0)
 #define  __HAVE_ARCH_PTEP_SET_ACCESS_FLAGS
 
-#if 0
 #define ptep_set_access_flags(__vma, __address, __ptep, __entry, __dirty) \
 	do {								  \
 		if (__dirty) {						  \
-			queue_l1_entry_update((__ptep), (__entry).pte_low); \
-			flush_tlb_page(__vma, __address);                 \
-			xen_flush_page_update_queue();                    \
+			if (likely(vma->vm_mm == current->mm)) {	  \
+			    xen_flush_page_update_queue();		  \
+			    HYPERVISOR_update_va_mapping(address>>PAGE_SHIFT, \
+							 entry, UVMF_INVLPG); \
+			} else {					  \
+			    xen_l1_entry_update((__ptep), (__entry).pte_low); \
+			    flush_tlb_page(__vma, __address);	          \
+			}						  \
 		}							  \
 	} while (0)
-#else
-#define ptep_set_access_flags(__vma, __address, __ptep, __entry, __dirty) \
-	do {								  \
-		if (__dirty) {						  \
-		        if ( likely(vma->vm_mm == current->mm) ) {        \
-			    xen_flush_page_update_queue();                \
-			    HYPERVISOR_update_va_mapping(address>>PAGE_SHIFT, entry, UVMF_INVLPG); \
-			} else {                                          \
-                            xen_l1_entry_update((__ptep), (__entry).pte_low); \
-			    flush_tlb_page(__vma, __address);             \
-			}                                                 \
-		}							  \
-	} while (0)
-
-#endif
 
 #define __HAVE_ARCH_PTEP_ESTABLISH
 #define ptep_establish(__vma, __address, __ptep, __entry)		\
@@ -455,7 +444,7 @@ do {				  					\
 #define __HAVE_ARCH_PTEP_ESTABLISH_NEW
 #define ptep_establish_new(__vma, __address, __ptep, __entry)		\
 do {				  					\
-	if ( likely((__vma)->vm_mm == current->mm) ) {			\
+	if (likely((__vma)->vm_mm == current->mm)) {			\
 		xen_flush_page_update_queue();				\
 		HYPERVISOR_update_va_mapping((__address)>>PAGE_SHIFT,	\
 					     __entry, 0);		\
@@ -487,8 +476,19 @@ static inline unsigned long arbitrary_virt_to_phys(void *va)
 #define kern_addr_valid(addr)	(1)
 #endif /* !CONFIG_DISCONTIGMEM */
 
-#define io_remap_page_range(vma,from,phys,size,prot)                     \
-        direct_remap_area_pages(vma->vm_mm,from,phys,size,prot,DOMID_IO)
+#define io_remap_page_range(vma,from,phys,size,prot) \
+	direct_remap_area_pages(vma->vm_mm,from,phys,size,prot,DOMID_IO)
+
+int direct_remap_area_pages(struct mm_struct *mm,
+			    unsigned long address, 
+			    unsigned long machine_addr,
+			    unsigned long size, 
+			    pgprot_t prot,
+			    domid_t  domid);
+int __direct_remap_area_pages(struct mm_struct *mm,
+			      unsigned long address, 
+			      unsigned long size, 
+			      mmu_update_t *v);
 
 #define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_YOUNG
 #define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_DIRTY

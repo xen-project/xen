@@ -60,15 +60,15 @@ extern unsigned long *phys_to_machine_mapping;
 #define mfn_to_pfn(_mfn) (machine_to_phys_mapping[(_mfn)])
 static inline unsigned long phys_to_machine(unsigned long phys)
 {
-    unsigned long machine = pfn_to_mfn(phys >> PAGE_SHIFT);
-    machine = (machine << PAGE_SHIFT) | (phys & ~PAGE_MASK);
-    return machine;
+	unsigned long machine = pfn_to_mfn(phys >> PAGE_SHIFT);
+	machine = (machine << PAGE_SHIFT) | (phys & ~PAGE_MASK);
+	return machine;
 }
 static inline unsigned long machine_to_phys(unsigned long machine)
 {
-    unsigned long phys = mfn_to_pfn(machine >> PAGE_SHIFT);
-    phys = (phys << PAGE_SHIFT) | (machine & ~PAGE_MASK);
-    return phys;
+	unsigned long phys = mfn_to_pfn(machine >> PAGE_SHIFT);
+	phys = (phys << PAGE_SHIFT) | (machine & ~PAGE_MASK);
+	return phys;
 }
 
 /*
@@ -89,16 +89,8 @@ typedef struct { unsigned long pmd; } pmd_t;
 typedef struct { unsigned long pgd; } pgd_t;
 typedef struct { unsigned long pgprot; } pgprot_t;
 #define boot_pte_t pte_t /* or would you rather have a typedef */
-#if 0				/* XXXcl for MMU_UPDATE_DEBUG */
-static inline unsigned long pte_val(pte_t x)
-{
-	unsigned long ret = x.pte_low;
-	if ( (ret & 1) ) ret = machine_to_phys(ret);
-	return ret;
-}
-#else
-#define pte_val(x)	(((x).pte_low & 1) ? machine_to_phys((x).pte_low) : (x).pte_low)
-#endif
+#define pte_val(x)	(((x).pte_low & 1) ? machine_to_phys((x).pte_low) : \
+			 (x).pte_low)
 #define pte_val_ma(x)	((x).pte_low)
 #define HPAGE_SHIFT	22
 #endif
@@ -114,25 +106,25 @@ static inline unsigned long pte_val(pte_t x)
 
 static inline unsigned long pmd_val(pmd_t x)
 {
-    unsigned long ret = x.pmd;
-    if ( (ret) ) ret = machine_to_phys(ret);
-    return ret;
+	unsigned long ret = x.pmd;
+	if (ret) ret = machine_to_phys(ret);
+	return ret;
 }
 #define pgd_val(x)	({ BUG(); (unsigned long)0; })
 #define pgprot_val(x)	((x).pgprot)
 
 static inline pte_t __pte(unsigned long x)
 {
-	if ( (x & 1) ) x = phys_to_machine(x);
+	if (x & 1) x = phys_to_machine(x);
 	return ((pte_t) { (x) });
 }
-#define __pte_ma(x) ((pte_t) { (x) } )
+#define __pte_ma(x)	((pte_t) { (x) } )
 static inline pmd_t __pmd(unsigned long x)
 {
-	if ( (x & 1) ) x = phys_to_machine(x);
+	if ((x & 1)) x = phys_to_machine(x);
 	return ((pmd_t) { (x) });
 }
-#define __pgd(x) ({ BUG(); (pgprot_t) { 0 }; })
+#define __pgd(x)	({ BUG(); (pgprot_t) { 0 }; })
 #define __pgprot(x)	((pgprot_t) { (x) } )
 
 #endif /* !__ASSEMBLY__ */
@@ -179,14 +171,6 @@ extern int sysctl_legacy_va_layout;
 
 #endif /* __ASSEMBLY__ */
 
-/* 
- * XXXcl two options for PAGE_OFFSET
- * - 0xC0000000:
- *   change text offset in arch/xen/i386/kernel/vmlinux.lds.S
- *   change __pa/__va macros
- * - 0xC0100000:
- *   change TASK_SIZE 
- */
 #ifdef __ASSEMBLY__
 #define __PAGE_OFFSET		(0xC0000000)
 #else

@@ -17,7 +17,6 @@ static inline void pmd_populate(struct mm_struct *mm, pmd_t *pmd, struct page *p
 		((unsigned long long)page_to_pfn(pte) <<
 			(unsigned long long) PAGE_SHIFT)));
 	flush_page_update_queue();
-	/* XXXcl queue */
 }
 /*
  * Allocate and free page tables.
@@ -38,7 +37,7 @@ static inline void pte_free_kernel(pte_t *pte)
 
 extern void pte_free(struct page *pte);
 
-#define __pte_free_tlb(tlb,pte)	tlb_remove_page((tlb),(pte))
+#define __pte_free_tlb(tlb,pte) tlb_remove_page((tlb),(pte))
 
 /*
  * allocating and freeing a pmd is trivial: the 1-entry pmd is
@@ -52,16 +51,5 @@ extern void pte_free(struct page *pte);
 #define pgd_populate(mm, pmd, pte)	BUG()
 
 #define check_pgt_cache()	do { } while (0)
-
-int direct_remap_area_pages(struct mm_struct *mm,
-                            unsigned long address, 
-                            unsigned long machine_addr,
-                            unsigned long size, 
-                            pgprot_t prot,
-                            domid_t  domid);
-int __direct_remap_area_pages(struct mm_struct *mm,
-			      unsigned long address, 
-			      unsigned long size, 
-			      mmu_update_t *v);
 
 #endif /* _I386_PGALLOC_H */

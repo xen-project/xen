@@ -24,7 +24,7 @@ static inline int pgd_present(pgd_t pgd)	{ return 1; }
  * hook is made available.
  */
 #define set_pte_batched(pteptr, pteval) \
-queue_l1_entry_update(pteptr, (pteval).pte_low)
+	queue_l1_entry_update(pteptr, (pteval).pte_low)
 #define set_pte(pteptr, pteval) (*(pteptr) = pteval)
 #define set_pte_atomic(pteptr, pteval) set_pte(pteptr,pteval)
 /*
@@ -60,7 +60,7 @@ static inline pte_t ptep_get_and_clear(pte_t *xp)
 }
 
 #define pte_same(a, b)		((a).pte_low == (b).pte_low)
-/*                                 
+/*
  * We detect special mappings in one of two ways:
  *  1. If the MFN is an I/O page then Xen will set the m2p entry
  *     to be outside our maximum possible pseudophys range.
@@ -82,19 +82,18 @@ static inline pte_t ptep_get_and_clear(pte_t *xp)
  */
 #define INVALID_P2M_ENTRY (~0UL)
 #define FOREIGN_FRAME(_m) ((_m) | (1UL<<((sizeof(unsigned long)*8)-1)))
-#define pte_pfn(_pte)                                                   \
-({                                                                      \
-    unsigned long mfn = (_pte).pte_low >> PAGE_SHIFT;                   \
-    unsigned long pfn = mfn_to_pfn(mfn);                                \
-    if ( (pfn >= max_mapnr) || (pfn_to_mfn(pfn) != mfn) )               \
-        pfn = max_mapnr; /* special: force !pfn_valid() */              \
-    pfn;                                                                \
+#define pte_pfn(_pte)							\
+({									\
+	unsigned long mfn = (_pte).pte_low >> PAGE_SHIFT;		\
+	unsigned long pfn = mfn_to_pfn(mfn);				\
+	if ((pfn >= max_mapnr) || (pfn_to_mfn(pfn) != mfn))		\
+		pfn = max_mapnr; /* special: force !pfn_valid() */	\
+	pfn;								\
 })
 
 #define pte_page(_pte) pfn_to_page(pte_pfn(_pte))
 
 #define pte_none(x)		(!(x).pte_low)
-
 #define pfn_pte(pfn, prot)	__pte(((pfn) << PAGE_SHIFT) | pgprot_val(prot))
 #define pfn_pte_ma(pfn, prot)	__pte_ma(((pfn) << PAGE_SHIFT) | pgprot_val(prot))
 #define pfn_pmd(pfn, prot)	__pmd(((pfn) << PAGE_SHIFT) | pgprot_val(prot))
