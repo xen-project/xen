@@ -32,36 +32,36 @@ Xen has since grown into a project in its own right, enabling us to
 investigate interesting research issues regarding the best techniques
 for virtualizing resources such as the CPU, memory, disk and network.
 The project has been bolstered by support from Intel Research
-Cambridge, who are now working closely with us. We've now also
-received support from Microsoft Research Cambridge to port Windows XP
-to run on Xen.
+Cambridge, who are now working closely with us. We're also in receipt
+of support from Microsoft Research Cambridge to port Windows XP to 
+run on Xen.
 
-Xen enables multiple operating system images to be run simultaneously
+Xen enables multiple operating system images to execute concurrently 
 on the same hardware with very low performance overhead --- much lower
-than commercial offerings on the same x86 platform.
+than commercial offerings for the same x86 platform.
 
 This is achieved by requiring OSs to be specifically ported to run on
 Xen, rather than allowing unmodified OS images to be used. Crucially,
 only the OS needs to be changed -- all of the user-level application
-binaries, libraries etc can run unmodified. Hence, the modified OS
+binaries, libraries etc can run unmodified. Hence the modified OS
 kernel can typically just be dropped into any existing OS distribution
 or installation.
 
 Xen currently runs on the x86 architecture, but could in principle be
-ported to other CPUs. In fact, it would have been rather easier to
-write Xen for pretty much any other architecture as x86 doesn't do us
-any favours at all. The best description of Xen's deign,
-implementation and performance is contained in our October 2003 SOSP
-paper: http://www.cl.cam.ac.uk/netos/papers/2003-xensosp.pdf
+ported to others. In fact, it would have been rather easier to write
+Xen for pretty much any other architecture as x86 is particularly 
+tricky to handle. A good description of Xen's design, implementation 
+and performance is contained in our October 2003 SOSP paper, available
+at http://www.cl.cam.ac.uk/netos/papers/2003-xensosp.pdf
 
 We have been working on porting 3 different operating systems to run
 on Xen: Linux 2.4, Windows XP, and NetBSD.
 
 The Linux 2.4 port (currently Linux 2.4.22) works very well -- we
 regularly use it to host complex applications such as PostgreSQL,
-Apache, BK servers etc. It runs all user-space applications we've
+Apache, BK servers etc. It runs every user-space applications we've
 tried.  We refer to our version of Linux ported to run on Xen as
-"XenoLinux", through really it's just standard Linux ported to a new
+"XenoLinux", although really it's just standard Linux ported to a new
 virtual CPU architecture that we call xeno-x86 (abbreviated to just
 "xeno").
 
@@ -78,8 +78,8 @@ source and binaries to anyone that has signed the Microsoft academic
 source license, which these days has very reasonable terms. We are in
 discussions with Microsoft about the possibility of being able to make
 binary releases to a larger user community. Obviously, there are
-issues with product activation in this environment and such like,
-which need to be thought through.
+issues with product activation in this environment which need to be 
+thought through.
 
 So, for the moment, you only get to run multiple copies of Linux on
 Xen, but we hope this will change before too long.  Even running
@@ -88,7 +88,7 @@ means of containing faults to one OS image, and also for providing
 performance isolation between the various OS, enabling you to either
 restrict, or reserve resources for, particular VM instances.
 
-Its also useful for development -- each version of Linux can have
+It's also useful for development -- each version of Linux can have
 different patches applied, enabling different kernels to be tried
 out. For example, the "vservers" patch used by PlanetLab applies
 cleanly to our ported version of Linux.
@@ -109,24 +109,35 @@ for us to write drivers for "legacy" hardware.
 Xen requires a "P6" or newer processor (e.g. Pentium Pro, Celeron,
 Pentium II, Pentium III, Pentium IV, Xeon, AMD Athlon, AMD Duron).
 Multiprocessor machines are supported, and we also have basic support
-for HyperThreading (SMT), though this remains a topic for ongoing
+for HyperThreading (SMT), although this remains a topic for ongoing
 research. We're also looking at an AMD x86_64 port (though it should
-run on Opterons in 32 bit mode just fine).
+run on Opterons in 32-bit mode just fine).
 
-Xen can currently use up to 4GB of memory. Its possible for x86
+Xen can currently use up to 4GB of memory. It's possible for x86
 machines to address more than that (64GB), but it requires using a
 different page table format (3-level rather than 2-level) that we
 currently don't support. Adding 3-level PAE support wouldn't be
 difficult, but we'd also need to add support to all the guest
 OSs. Volunteers welcome!
 
-We currently support a relative modern set of network cards: Intel
+We currently support a relatively modern set of network cards: Intel
 e1000, Broadcom BCM 57xx (tg3), 3COM 3c905 (3c59x). Adding support for
 other NICs that support hardware DMA scatter/gather from half-word
-aligned addresses is relatively straight forward, by porting the
+aligned addresses is relatively straightforward, by porting the
 equivalent Linux driver. Drivers for a number of other older cards
 have recently been added [pcnet32, e100, tulip], but are untested and
 not recommended.
+
+
+Building Xen and XenoLinux
+==========================
+
+Take a look at the tools/misc/xen-clone script in the BK repository,
+which will 'bk clone' the live master tree, and then set about 
+building everything. The build procedure for xenolinux is slightly 
+complicated as its done by running the 'mkbuildtree' script over
+a pristine Linux tree to patch it for xenolinux.
+
 
 
 Ian Pratt

@@ -19,10 +19,10 @@ Executive Summary
 =================
 
 This CD is a standalone demo of the Xen Virtual Machine Monitor (VMM)
-and Linux-2.4 OS port (xenolinux). It runs entirely off the CD,
-without requiring hard disk installation. This is acheived using a ram
+and Linux-2.4 OS port (XenoLinux). It runs entirely off the CD,
+without requiring hard disk installation. This is achieved using a RAM
 disk to store mutable file system data while using the CD for
-everything else. The CD can also be used for installing Xen/xenolinux
+everything else. The CD can also be used for installing Xen/XenoLinux
 to disk, and includes a source code snapshot along with all of the
 tools required to build it.
 
@@ -30,7 +30,7 @@ Booting the CD
 ==============
 
 The Xen VMM is currently fairly h/w specific, but porting new device
-drivers is relatively straight forward thanks to Xen's Linux driver
+drivers is relatively straightforward thanks to Xen's Linux driver
 compatibility layer. The current snapshot supports the following
 hardware:
 
@@ -38,15 +38,15 @@ CPU:  Pentium Pro/II/III/IV/Xeon, Athlon (i.e. P6 or newer) SMP supported
 IDE:  Intel PIIX chipset, others will be PIO only (slow)
 SCSI: Adaptec / Dell PERC Raid (aacraid), megaraid, Adaptec aic7xxx
 Net:  Recommended: Intel e1000, Broadcom BCM57xx (tg3), 3c905 (3c59x)
-      Tested but requires extra copies : pcnet32, Intel e100
+      Tested but require extra copies : pcnet32, Intel e100
       Untested and also requires extra copies : tulip
 
-Because of the demo CD's use of ram disks, make sure you have plenty
+Because of the demo CD's use of RAM disks, make sure you have plenty
 of RAM (256MB+).
 
 To try out the Demo, boot from CD (you may need to change your BIOS
 configuration to do this), hit a key on either the keyboard or serial
-line to pull up the Grub boot menu, then select one of the four boot
+line to pull up the Grub boot menu, then select one of the three boot
 options:
 
  Xen / linux-2.4.22 
@@ -59,19 +59,19 @@ problems. If you are going for a command line IP config, hit "e" at
 the grub menu, then edit the "ip=" parameters to reflect your setup
 e.g. "ip=<ipaddr>::<gateway>:<netmask>::eth0:off". It shouldn't be
 necessary to set either the nfs server or hostname
-parameters. Alternatively, once xenolinux has booted you can login and
+parameters. Alternatively, once XenoLinux has booted you can login and
 setup networking with 'dhclient' or 'ifconfig' and 'route' in the
 normal way.
 
-To make things easier for yourself, its worth trying to arrange for an
+To make things easier for yourself, it's worth trying to arrange for an
 IP address which is the first in a sequential range of free IP
-addresses.  Its useful to give each VM instance its own public IP
-address (though it is possible to do NAT or use private addresses
-etc), and the configuration files on the CD allocate IP addresses
+addresses.  It's useful to give each VM instance its own public IP
+address (though it is possible to do NAT or use private addresses), 
+and the configuration files on the CD allocate IP addresses
 sequentially for subsequent domains unless told otherwise.
 
 After selecting the kernel to boot, stand back and watch Xen boot,
-closely followed by "domain 0" running the xenolinux kernel. The boot
+closely followed by "domain 0" running the XenoLinux kernel. The boot
 messages are also sent to the serial line (the baud rate can be set on
 the Xen cmdline, but defaults to 115200), which can be very useful for
 debugging should anything important scroll off the screen. Xen's
@@ -91,10 +91,10 @@ best to start by configuring networking, either with 'dhclient' or
 manually via ifconfig and route, remembering to edit /etc/resolv.conf
 if you want DNS.
 
-You can start an xserver with 'startx'. It defaults to a conservative
+You can start an X server with 'startx'. It defaults to a conservative
 1024x768, but you can edit the script for higher resoloutions.  The CD
 contains a load of standard software. You should be able to start
-Apache, PostgreSQL, Mozzila etc in the normal way, the because
+Apache, PostgreSQL, Mozzila etc in the normal way, but because
 everything is running off CD the performance will be very sluggish and
 you may run out of memory for the 'tmpfs' file system.  You may wish
 to go ahead and install Xen/XenoLinux on your hard drive, either
@@ -102,7 +102,7 @@ dropping Xen and the XenoLinux kernel down onto a pre-existing Linux
 distribution, or using the file systems from the CD (which are based
 on RH9). See the installation instructions later in this document.
 
-If you want to browse the Xen / Xenolinux source, it's all located
+If you want to browse the Xen / XenoLinux source, it's all located
 under /usr/local/src, complete with BitKeeper repository. We've also
 included source code and configuration information for the various
 benchmarks we used in the SOSP paper.
@@ -116,12 +116,14 @@ but since we generally use the command line tools they're probably
 rather better debugged at present. The key command is 'xenctl' which
 lives in /usr/local/bin and uses /etc/xenctl.xml for its default
 configuration. Run 'xenctl' without any arguments to get a help
-message.
+message. Note that xenctl is a java front end to various underlying 
+internal tools written in C (xi_*). Running off CD, it seems to take 
+an age to start...
 
-The first thing to do is to set up a window in which you will receive
-console output from other domains. Console output will arrive as UDP
-packets destined for 169.254.1.0, so its necessary to setup an alias
-on eth0. The easiest way to do this is to run:
+Abyway, the first thing to do is to set up a window in which you will
+receive console output from other domains. Console output will arrive
+as UDP packets destined for 169.254.1.0, so its necessary to setup an
+alias on eth0. The easiest way to do this is to run:
 
   xen_nat_enable
 
@@ -136,27 +138,24 @@ Next, run a the xen UDP console displayer:
   xen_read_console &
 
 
-The tool used for starting and controlling domains is 'xenctl'. It's a
-java front end to various underlying internal tools written in C
-(xi_*). Running off CD, it seems to take an age to start...
+As mentioned above, xenctl uses /etc/xenctl.xml as its default
+configuration. The directory contains two different configs depending
+on whether you want to use NAT, or multiple sequential external IPs
+(it's possible to override any of the parameters on the command line
+if you want to set specific IPs, etc).
 
-xenctl uses /etc/xenctl.xml as its default configuration. The
-directory contains two different configs depending on whether you want
-to use NAT, or multiple sequential external IPs (its possible to
-override any of the parameters on the command line, if you want to set
-specific IPs etc).
+The default configuration file supports NAT. To change to use multiple IPs:
 
-The default file supports NAT. To change to use multiple IPs:
  cp /etc/xenctl.xml-publicip /etc/xenctl.xml
 
-A sequence of commands must be given to xenctl to start a
+A sequence of commands must be given to xenctl to start a new 
 domain. First a new domain must be created, which requires specifying
 the initial memory allocation, the kernel image to use, and the kernel
 command line. As well as the root file system details, you'll need to
 set the IP address on the command line: since Xen currently doesn't
 support a virtual console for domains >1, you won't be able to log to
 your new domain unless you've got networking configured and an sshd
-running! (using dhcp for new domains should work too.)
+running! (using dhcp for new domains should work too).
 
 After creating the domain, xenctl must be used to grant the domain
 access to other resources such as physical or virtual disk partions.
@@ -171,7 +170,7 @@ referring to (-nX). To use the sample script:
 You should see the domain booting on your xen_read_console window.
 
 The xml defaults start another domain running off the CD, using a
-separate ram based file system for mutable data in root (just like
+separate RAM-based file system for mutable data in root (just like
 domain 0). 
 
 The new domain is started with a '4' on the kernel command line to
@@ -179,7 +178,7 @@ tell 'init' to go to runlevel 4 rather than the default of 3. This is
 done simply to suppress a bunch of harmless error messages that would
 otherwise occur when the new (unprivileged) domain tried to access
 physical hardware resources to try setting the hwclock, system font,
-gpm etc.
+run gpm etc.
 
 After it's booted, you should be able to ssh into your new domain. If
 you went for a NATed address, from domain 0 you should be able to ssh
@@ -201,14 +200,14 @@ xenctl to 'stop' (pause) a domain, or 'kill' a domain. You can either
 kill it nicely by sending a shutdown event and waiting for it to
 terminate, or blow the sucker away with extreme prejudice. 
 
-If you want to configure the new domain differently, type 'xenctl' to
+If you want to configure a new domain differently, type 'xenctl' to
 get a list of arguments, e.g. at the 'xenctl domain new' command line
 use the "-4" option to set a diffrent IPv4 address. 
 
 xenctl can be used to set the new kernel's command line, and hence
-determine what it uses as a root file system etc. Although the default
+determine what it uses as a root file system, etc. Although the default
 is to boot in the same manner that domain0 did (using the RAM-based
-file system for root and the CD for usr) it's possible to configure any
+file system for root and the CD for /usr) it's possible to configure any
 of the following possibilities, for example:
 
  * initrd=/boot/initrd init=/linuxrc
@@ -219,7 +218,7 @@ of the following possibilities, for example:
 
  * root=/dev/xvda1 ro
      boot using a pre-configured 'virtual block device' that will be
-     attached to a virtual disk that will previously had a file system
+     attached to a virtual disk that previously has had a file system
      installed on it.
 
  * root=/dev/nfs nfsroot=/path/on/server ip=<blah_including server_IP>
@@ -234,18 +233,18 @@ read-only usr partition might make sense.
 
 Alternatively, you can use 'virtual disks', which are stored as files
 within a custom file system. "xenctl partitions add" can be used to
-'format' a partition with the file system, then virtual disks can be
-created with "xenctl vd create". Virtual disks can then be attached to
-a running domain as a 'virtual block device' using "xenctl vdb
-create". The virtual disk can then optionally be partitioned
-(e.g. "fdisk /dev/xvda") or have a file system created on it directly
-(e.g. "mkfs -t ext3 /dev/xvda").  The virtual disk can then accessed
-by a virtual block device associated with another domain, and even
-used as a boot device.
+'format' a partition with the file system, and then virtual disks can
+be created with "xenctl vd create". Virtual disks can then be attached
+to a running domain as a 'virtual block device' using "xenctl vdb
+create". The virtual disk can optionally be partitioned (e.g. "fdisk
+/dev/xvda") or have a file system created on it directly (e.g. "mkfs
+-t ext3 /dev/xvda").  The virtual disk can then be accessed by a
+virtual block device associated with another domain, and even used as
+a boot device.
 
 Both virtual disks and real partitions should only be shared between
 domains in a read-only fashion otherwise the linux kernels will
-obviously get very confused if the file system structure changes
+obviously get very confused as the file system structure may change
 underneath them (having the same partition mounted rw twice is a sure
 fire way to cause irreparable damage)!  If you want read-write
 sharing, export the directory to other domains via NFS from domain0.
@@ -254,12 +253,13 @@ sharing, export the directory to other domains via NFS from domain0.
 About The Xen Demo CD
 =====================
 
-The purpose of the Demo CD is to distribute a snapshot of Xen's source,
-and simultaneously provide a convenient means for enabling people to
-get experience playing with Xen without needing to install it on their
-hard drive. If you decide to install Xen/XenoLinux you can do so
-simply by following the INSTALL instructions and copying the contents of
-the CD on to a suitably formated disk partition and install the Grub
+The purpose of the Demo CD is to distribute a snapshot of Xen's
+source, and simultaneously provide a convenient means for enabling
+people to get experience playing with Xen without needing to install
+it on their hard drive. If you decide to install Xen/XenoLinux you can
+do so simply by following the installation instructions below -- which
+essentially involves copying the contents of the CD on to a suitably
+formated disk partition, and then installing or updating the Grub
 bootloader.
 
 This is a bootable CD that loads Xen, and then a Linux 2.4.22 OS image
@@ -269,7 +269,7 @@ the RedHat 9 distribution that is able to run directly off the CD
 /var etc). Changes you make to the tmpfs will obviously not be
 persistent across reboots!
 
-Because of the use of a ram-based file system for root, you'll need
+Because of the use of a RAM-based file system for root, you'll need
 plenty of memory to run this CD -- something like 96MB per VM. This is
 not a restriction of Xen : once you've installed Xen, XenoLinux and
 the file system images on your hard drive you'll find you can boot VMs
@@ -277,10 +277,10 @@ in just a few MBs.
 
 The CD contains a snapshot of the Xen and XenoLinux code base that we
 believe to be pretty stable, but lacks some of the features that are
-currently still work in progress e.g. OS suspend/resume to file, and
+currently still work in progress e.g. OS suspend/resume to disk, and
 various memory management enhancements to provide fast inter-OS
 communication and sharing of memory pages between OSs. We'll release
-newer snapshots as required, in the form of a BitKeeper repository
+newer snapshots as required, making use of a BitKeeper repository
 hosted on http://xen.bkbits.net (follow instructions from the project
 home page).  We're obviously grateful to receive any bug fixes or
 other code you can contribute. We suggest you join the
@@ -314,7 +314,7 @@ title Xen / XenoLinux 2.4.22
         kernel /boot/image.gz dom0_mem=131072 ser_baud=115200 noht
         module /boot/xenolinux.gz root=/dev/sda4 ro console=tty0
 
-The first line specifies which xen image to use, and what command line
+The first line specifies which Xen image to use, and what command line
 arguments to pass to Xen. In this case, we set the maximum amount of
 memory to allocate to domain0, and the serial baud rate (the default
 is 9600 baud). We could also disable smp support (nosmp) or disable
@@ -328,7 +328,7 @@ case, we're configuring the root partition and stating that it should
 be mounted read-only (normal practice). 
 
 If we were booting with an initial ram disk (initrd), then this would
-require a second "module" line, with no arguments.
+require a second "module" line.
 
 
 Installing the file systems from the CD
@@ -348,7 +348,7 @@ Next, mount the file system(s) e.g.:
   mkdir /mnt/root && mount /dev/hda3 /mnt/root
   [mkdir /mnt/usr && mount /dev/hda4 /mnt/usr]
   
-To install the root file system, simply untar /usr/XenDemoCD/root.tar.gz
+To install the root file system, simply untar /usr/XenDemoCD/root.tar.gz:
   cd /mnt/root && tar -zxpf /usr/XenDemoCD/root.tar.gz
 
 You'll need to edit /mnt/root/etc/fstab to reflect your file system
@@ -360,13 +360,14 @@ though leaving out the "XenDemoCD" and "boot" directories:
   cd /usr && cp -a X11R6 etc java libexec root src bin dict kerberos local sbin tmp doc include lib man share /mnt/usr
 
 If you intend to boot off these file systems (i.e. use them for
-domain0), then you probably want to copy the /usr/boot directory on
+domain 0), then you probably want to copy the /usr/boot directory on
 the cd over the top of the current symlink to /boot on your root
 filesystem (after deleting the current symlink) i.e.:
   cd /mnt/root ; rm boot ; cp -a /usr/boot .
 
 The XenDemoCD directory is only useful if you want to build your own
 version of the XenDemoCD (see below).
+
 
 Debugging
 ---------
@@ -375,15 +376,16 @@ Xen has a set of debugging features that can be useful to try and
 figure out what's going on. Hit 'h' on the serial line or ScrollLock-h
 on the keyboard to get a list of supported commands. 
 
-If you have a crash you'll likely get a crash dump containing and EIP
-(PC), which along with and 'objdump -d image' can be useful in
-figuring out what's happened.  Debug a xenolinux image just as you
+If you have a crash you'll likely get a crash dump containing an EIP
+(PC) which, along with an 'objdump -d image', can be useful in
+figuring out what's happened.  Debug a XenoLinux image just as you
 would any other Linux kernel.
+
 
 Description of how the XenDemoCD boots
 --------------------------------------
 
-1. Grub is used to load Xen, a xenolinux kernel, and an initrd (initial
+1. Grub is used to load Xen, a XenoLinux kernel, and an initrd (initial
 ram disk). [The source of the version of Grub used is in /usr/local/src]
 
 2. the init=/linuxrc command line causes linux to execute /linuxrc in
@@ -394,7 +396,7 @@ locations : /dev/hd[abcd].
 
 4. it then creates a 'tmpfs' file system and untars the
 'XenDemoCD/root.tar.gz' file into the tmpfs. This contains hopefully
-all the files that need to be mutable. (this would be so much easier
+all the files that need to be mutable (this would be so much easier
 if Linux supported 'stacked' or union file systems...)
 
 5. Next, /linuxrc uses the pivot_root call to change the root file
@@ -407,7 +409,7 @@ normally.
 Building your own version of the XenDemoCD
 ------------------------------------------
 
-The 'live ISO' version of RedHat isbased heavily on Peter Anvin's
+The 'live ISO' version of RedHat is based heavily on Peter Anvin's
 SuperRescue CD version 2.1.2 and J. McDaniel's Plan-B:
 
  http://www.kernel.org/pub/dist/superrescue/v2/
@@ -461,22 +463,27 @@ echo '<put_your_name_here>' > Builder
 This process can take 30 mins even on a fast machine, but you should
 eventually end up with an iso image in the build directory.
 
-notes:
+Notes:
 
-root - the root of the file system heirarchy as presented to the running system
+  root      - the root of the file system heirarchy as presented to the
+              running system
 
-rootpatch - contains files that have been modified from the standard RH, and copied over the root tree as part of the build procedure.
+  rootpatch - contains files that have been modified from the standard
+              RH, and copied over the root tree as part of the build
+              procedure.
 
-irtree - the filie system tree that will go into the initrd (initial ram disk)
+  irtree    - the file system tree that will go into the initrd (initial
+              ram disk)
 
-work - a working directory used in the build process
+  work      - a working directory used in the build process
 
-usr - this should really be in 'work' as its created as part of the
-build process. It contains the 'immutable' files that will be served
-from the CD rather than the tmpfs containing the contents of root.tar.gz
-Some files that are normally in /etc or /var that are large and
-actually unlikely to need changing have been moved into /usr/root
-and replaced with links.
+  usr       - this should really be in 'work' as its created as part of the
+              build process. It contains the 'immutable' files that will
+              be served from the CD rather than the tmpfs containing the
+              contents of root.tar.gz. Some files that are normally in /etc 
+              or /var that are large and actually unlikely to need changing 
+              have been moved into /usr/root and replaced with links.
+
 
 Ian Pratt
 9 Sep 2003
