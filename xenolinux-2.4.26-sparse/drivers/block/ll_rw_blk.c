@@ -942,6 +942,15 @@ static void attempt_merge(request_queue_t * q,
 		return;
 
 	q->elevator.elevator_merge_req_fn(req, next);
+	
+	/* At this point we have either done a back merge
+	 * or front merge. We need the smaller start_time of
+	 * the merged requests to be the current request
+	 * for accounting purposes.
+	 */
+	if (time_after(req->start_time, next->start_time))
+		req->start_time = next->start_time;
+		
 	req->bhtail->b_reqnext = next->bh;
 	req->bhtail = next->bhtail;
 	req->nr_sectors = req->hard_nr_sectors += next->hard_nr_sectors;

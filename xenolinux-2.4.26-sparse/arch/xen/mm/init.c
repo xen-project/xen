@@ -393,7 +393,17 @@ void __init mem_init(void)
 
     if (!mem_map)
         BUG();
-	
+
+#ifdef CONFIG_HIGHMEM
+    /* check that fixmap and pkmap do not overlap */
+    if (PKMAP_BASE+LAST_PKMAP*PAGE_SIZE >= FIXADDR_START) {
+	printk(KERN_ERR "fixmap and kmap areas overlap - this will crash\n");
+	printk(KERN_ERR "pkstart: %lxh pkend: %lxh fixstart %lxh\n",
+	       PKMAP_BASE, PKMAP_BASE+LAST_PKMAP*PAGE_SIZE, FIXADDR_START);
+	BUG();
+    }
+#endif
+
     set_max_mapnr_init();
 
     high_memory = (void *) __va(max_low_pfn * PAGE_SIZE);

@@ -2255,7 +2255,7 @@ void __init console_init(void)
 	au1x00_serial_console_init();
 #endif
 #ifdef CONFIG_SERIAL_CONSOLE
-#if (defined(CONFIG_8xx) || defined(CONFIG_8260))
+#if (defined(CONFIG_8xx) || defined(CONFIG_CPM2))
 	console_8xx_init();
 #elif defined(CONFIG_MAC_SERIAL) && defined(CONFIG_SERIAL)
 	if (_machine == _MACH_Pmac)
@@ -2444,7 +2444,7 @@ void __init tty_init(void)
 #ifdef CONFIG_SPECIALIX
 	specialix_init();
 #endif
-#if (defined(CONFIG_8xx) || defined(CONFIG_8260))
+#if (defined(CONFIG_8xx) || defined(CONFIG_CPM2))
 	rs_8xx_init();
 #endif /* CONFIG_8xx */
 	pty_init();

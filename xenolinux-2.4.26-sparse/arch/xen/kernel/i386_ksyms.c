@@ -138,6 +138,10 @@ EXPORT_SYMBOL(smp_call_function);
 
 /* TLB flushing */
 EXPORT_SYMBOL(flush_tlb_page);
+
+/* HT support */
+EXPORT_SYMBOL(smp_num_siblings);
+EXPORT_SYMBOL(cpu_sibling_map);
 #endif
 
 #ifdef CONFIG_X86_IO_APIC

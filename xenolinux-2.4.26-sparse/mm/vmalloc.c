@@ -159,8 +159,8 @@ static inline int __vmalloc_area_pages (unsigned long address,
 					struct page ***pages)
 {
 	pgd_t * dir;
+	unsigned long start = address;
 	unsigned long end = address + size;
-	int ret;
 
 	dir = pgd_offset_k(address);
 	spin_lock(&init_mm.page_table_lock);
@@ -168,22 +168,24 @@ static inline int __vmalloc_area_pages (unsigned long address,
 		pmd_t *pmd;
 		
 		pmd = pmd_alloc(&init_mm, dir, address);
-		ret = -ENOMEM;
 		if (!pmd)
-			break;
+			goto err;
 
-		ret = -ENOMEM;
 		if (alloc_area_pmd(pmd, address, end - address, gfp_mask, prot, pages))
-			break;
+			goto err;	// The kernel NEVER reclaims pmds, so no need to undo pmd_alloc() here
 
 		address = (address + PGDIR_SIZE) & PGDIR_MASK;
 		dir++;
-
-		ret = 0;
 	} while (address && (address < end));
 	spin_unlock(&init_mm.page_table_lock);
 	flush_cache_all();
-	return ret;
+	return 0;
+err:
+	spin_unlock(&init_mm.page_table_lock);
+	flush_cache_all();
+	if (address > start)
+		vmfree_area_pages(start, address - start);
+	return -ENOMEM;
 }
 
 int vmalloc_area_pages(unsigned long address, unsigned long size,
@@ -234,7 +236,7 @@ out:
 	return NULL;
 }
 
-void vfree(void * addr)
+void __vfree(void * addr, int free_area_pages)
 {
 	struct vm_struct **p, *tmp;
 
@@ -253,7 +255,8 @@ void vfree(void * addr)
 				zap_page_range(&init_mm, VMALLOC_VMADDR(tmp->addr), tmp->size);
 			else
 #endif
-			vmfree_area_pages(VMALLOC_VMADDR(tmp->addr), tmp->size);
+			if (free_area_pages)
+			    vmfree_area_pages(VMALLOC_VMADDR(tmp->addr), tmp->size);
 			write_unlock(&vmlist_lock);
 			kfree(tmp);
 			return;
@@ -261,6 +264,11 @@ void vfree(void * addr)
 	}
 	write_unlock(&vmlist_lock);
 	printk(KERN_ERR "Trying to vfree() nonexistent vm area (%p)\n", addr);
+}
+
+void vfree(void * addr)
+{
+	__vfree(addr,1);
 }
 
 void * __vmalloc (unsigned long size, int gfp_mask, pgprot_t prot)
@@ -277,7 +285,7 @@ void * __vmalloc (unsigned long size, int gfp_mask, pgprot_t prot)
 	addr = area->addr;
 	if (__vmalloc_area_pages(VMALLOC_VMADDR(addr), size, gfp_mask,
 				 prot, NULL)) {
-		vfree(addr);
+		__vfree(addr, 0);
 		return NULL;
 	}
 	return addr;
@@ -299,7 +307,7 @@ void * vmap(struct page **pages, int count,
 	addr = area->addr;
 	if (__vmalloc_area_pages(VMALLOC_VMADDR(addr), size, 0,
 				 prot, &pages)) {
-		vfree(addr);
+		__vfree(addr, 0);
 		return NULL;
 	}
 	return addr;
