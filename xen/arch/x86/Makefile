@@ -36,8 +36,7 @@ clean:
 	rm -f x86_64/*.o x86_64/*~ x86_64/core
 	rm -f mtrr/*.o mtrr/*~ mtrr/core
 
-# setup.o contains bits of compile.h so it must be blown away
 delete-unfresh-files:
-	rm -f setup.o
+	# nothing
 
 .PHONY: default clean delete-unfresh-files
