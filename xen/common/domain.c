@@ -239,8 +239,6 @@ void domain_destruct(struct domain *d)
     if ( _atomic_read(old) != 0 )
         return;
 
-    DPRINTK("Releasing task %u\n", d->id);
-
     /* Delete from task list and task hashtable. */
     write_lock_irqsave(&tasklist_lock, flags);
     pd = &task_list;

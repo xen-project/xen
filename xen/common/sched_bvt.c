@@ -306,11 +306,6 @@ int bvt_adjdom(
         
         struct bvt_dom_info *inf = BVT_INFO(d);
         
-        DPRINTK("Get domain %u bvt mcu_adv=%u, warpback=%d, warpvalue=%d, "
-                "warpl=%lld, warpu=%lld\n",
-                d->id, inf->mcu_advance, inf->warpback, inf->warp_value,
-                inf->warpl, inf->warpu);
-
         /* Sanity -- this can avoid divide-by-zero. */
         if ( (mcu_adv == 0) || (warpl < 0) || (warpu < 0) )
             return -EINVAL;
@@ -328,12 +323,6 @@ int bvt_adjdom(
         /* If we stop warping the warp timer needs to be removed */
         if ( !warpback )
             rem_ac_timer(&inf->warp_timer);
-        
-        DPRINTK("Get domain %u bvt mcu_adv=%u, warpback=%d, warpvalue=%d, "
-                "warpl=%lld, warpu=%lld\n",
-                d->id, inf->mcu_advance, inf->warpback, inf->warp_value,
-                inf->warpl, inf->warpu);
-                
     }
     else if ( cmd->direction == SCHED_INFO_GET )
     {
