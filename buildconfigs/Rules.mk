@@ -47,6 +47,7 @@ pristine-%: %.tar.bz2
 	tar -C tmp-$(@F) -jxf $<
 	mv tmp-$(@F)/* $@
 	touch $@ # update timestamp to avoid rebuild
+	touch $@/.bk_skip
 	@rm -rf tmp-$(@F)
 	[ -d patches/$* ] && \
 	  for i in patches/$*/*.patch ; do ( cd $@ ; patch -p1 <../$$i ) ; done || \
