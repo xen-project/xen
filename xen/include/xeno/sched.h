@@ -122,8 +122,8 @@ struct task_struct
 
     /* Block I/O */
     blk_ring_t *blk_ring_base;
-    unsigned int blk_req_cons;  /* request consumer */
-    unsigned int blk_resp_prod; /* (private version of) response producer */
+    BLK_RING_IDX blk_req_cons;  /* request consumer */
+    BLK_RING_IDX blk_resp_prod; /* (private version of) response producer */
     struct list_head blkdev_list;
     spinlock_t blk_ring_lock;
     vbd_t *vbdtab[VBD_HTAB_SZ];   /* mapping from 16-bit vdevices to vbds */

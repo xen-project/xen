@@ -54,17 +54,17 @@ typedef struct net_vif_st {
 
     /* The private rings and indexes. */
     rx_shadow_entry_t rx_shadow_ring[RX_RING_SIZE];
-    unsigned int rx_prod;  /* More buffers for filling go here. */
-    unsigned int rx_cons;  /* Next buffer to fill is here. */
+    NET_RING_IDX rx_prod;  /* More buffers for filling go here. */
+    NET_RING_IDX rx_cons;  /* Next buffer to fill is here. */
     tx_shadow_entry_t tx_shadow_ring[TX_RING_SIZE];
-    unsigned int tx_prod;  /* More packets for sending go here. */
-    unsigned int tx_cons;  /* Next packet to send is here. */
+    NET_RING_IDX tx_prod;  /* More packets for sending go here. */
+    NET_RING_IDX tx_cons;  /* Next packet to send is here. */
 
     /* Private indexes into shared ring. */
-    unsigned int rx_req_cons;
-    unsigned int rx_resp_prod; /* private version of shared variable */
-    unsigned int tx_req_cons;
-    unsigned int tx_resp_prod; /* private version of shared variable */
+    NET_RING_IDX rx_req_cons;
+    NET_RING_IDX rx_resp_prod; /* private version of shared variable */
+    NET_RING_IDX tx_req_cons;
+    NET_RING_IDX tx_resp_prod; /* private version of shared variable */
 
     /* Usage accounting */
     long long total_bytes_sent;

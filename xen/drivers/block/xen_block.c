@@ -1,4 +1,4 @@
-/*
+/******************************************************************************
  * xen_block.c
  *
  * process incoming block io requests from guestos's.
@@ -21,36 +21,38 @@
 #include <xeno/slab.h>
 
 /*
- * These are rather arbitrary. They are fairly large because adjacent
- * requests pulled from a communication ring are quite likely to end
- * up being part of the same scatter/gather request at the disc.
+ * These are rather arbitrary. They are fairly large because adjacent requests
+ * pulled from a communication ring are quite likely to end up being part of
+ * the same scatter/gather request at the disc.
  * 
  * ** TRY INCREASING 'MAX_PENDING_REQS' IF WRITE SPEEDS SEEM TOO LOW **
  * This will increase the chances of being able to write whole tracks.
- * '64' should be enough to keep us competitive with Linux.
+ * 64 should be enough to keep us competitive with Linux.
  */
 #define MAX_PENDING_REQS 64
 #define BATCH_PER_DOMAIN 16
 
 /*
- * Each outstanding request which we've passed to the lower device layers
- * has a 'pending_req' allocated to it. Each buffer_head that completes
- * decrements the pendcnt towards zero. When it hits zero, the specified
- * domain has a response queued for it, with the saved 'id' passed back.
+ * Each outstanding request that we've passed to the lower device layers has a 
+ * 'pending_req' allocated to it. Each buffer_head that completes decrements 
+ * the pendcnt towards zero. When it hits zero, the specified domain has a 
+ * response queued for it, with the saved 'id' passed back.
  * 
- * We can't allocate pending_req's in order, since they may complete out
- * of order. We therefore maintain an allocation ring. This ring also 
- * indicates when enough work has been passed down -- at that point the
- * allocation ring will be empty.
+ * We can't allocate pending_req's in order, since they may complete out of 
+ * order. We therefore maintain an allocation ring. This ring also indicates 
+ * when enough work has been passed down -- at that point the allocation ring 
+ * will be empty.
  */
 static pending_req_t pending_reqs[MAX_PENDING_REQS];
 static unsigned char pending_ring[MAX_PENDING_REQS];
-static unsigned int pending_prod, pending_cons;
 static spinlock_t pend_prod_lock = SPIN_LOCK_UNLOCKED;
-#define PENDREQ_IDX_INC(_i) ((_i) = ((_i)+1) & (MAX_PENDING_REQS-1))
+/* NB. We use a different index type to differentiate from shared blk rings. */
+typedef unsigned int PEND_RING_IDX;
+#define MASK_PEND_IDX(_i) ((_i)&(MAX_PENDING_REQS-1))
+static PEND_RING_IDX pending_prod, pending_cons;
+#define NR_PENDING_REQS (MAX_PENDING_REQS - pending_prod + pending_cons)
 
 static kmem_cache_t *buffer_head_cachep;
-static atomic_t nr_pending;
 
 static struct buffer_head *completed_bhs[NR_CPUS] __cacheline_aligned;
 
@@ -64,8 +66,8 @@ static void unlock_buffer(unsigned long buffer,
 
 static void io_schedule(unsigned long unused);
 static int do_block_io_op_domain(struct task_struct *p, int max_to_do);
-static void dispatch_rw_block_io(struct task_struct *p, int index);
-static void dispatch_debug_block_io(struct task_struct *p, int index);
+static void dispatch_rw_block_io(struct task_struct *p, 
+                                 blk_ring_req_entry_t *req);
 static void make_response(struct task_struct *p, unsigned long id, 
                           unsigned short op, unsigned long st);
 
@@ -122,7 +124,7 @@ static void io_schedule(unsigned long unused)
     struct list_head *ent;
 
     /* Queue up a batch of requests. */
-    while ( (atomic_read(&nr_pending) < MAX_PENDING_REQS) &&
+    while ( (NR_PENDING_REQS < MAX_PENDING_REQS) &&
             !list_empty(&io_schedule_list) )
     {
         ent = io_schedule_list.next;
@@ -147,11 +149,9 @@ static void maybe_trigger_io_schedule(void)
      */
     smp_mb();
 
-    if ( (atomic_read(&nr_pending) < (MAX_PENDING_REQS/2)) &&
+    if ( (NR_PENDING_REQS < (MAX_PENDING_REQS/2)) &&
          !list_empty(&io_schedule_list) )
-    {
         tasklet_schedule(&io_schedule_tasklet);
-    }
 }
 
 
@@ -185,10 +185,10 @@ static void end_block_io_op_softirq(struct softirq_action *h)
                           pending_req->operation, pending_req->status);
             put_task_struct(pending_req->domain);
             spin_lock(&pend_prod_lock);
-            pending_ring[pending_prod] = pending_req - pending_reqs;
-            PENDREQ_IDX_INC(pending_prod);
+            pending_ring[MASK_PEND_IDX(pending_prod)] = 
+                pending_req - pending_reqs;
+            pending_prod++;
             spin_unlock(&pend_prod_lock);
-            atomic_dec(&nr_pending);
             maybe_trigger_io_schedule();
         }
         
@@ -227,7 +227,7 @@ long do_block_io_op(block_io_op_t *u_block_io_op)
     block_io_op_t op; 
     struct task_struct *p = current;
 
-    if ( copy_from_user(&op, u_block_io_op, sizeof(op)) )
+    if ( unlikely(copy_from_user(&op, u_block_io_op, sizeof(op)) != 0) )
         return -EFAULT;
 
     switch ( op.cmd )
@@ -285,18 +285,16 @@ long do_block_io_op(block_io_op_t *u_block_io_op)
 
     case BLOCK_IO_OP_VBD_PROBE: 
 	/* query VBD information for self or others (or all) */
-	ret = vbd_probe(&op.u.probe_params); 
-	if(ret == 0)
+	if ( (ret = vbd_probe(&op.u.probe_params)) == 0 )
 	    copy_to_user(u_block_io_op, &op, sizeof(op)); 
 	break; 
 
     case BLOCK_IO_OP_VBD_INFO: 
 	/* query information about a particular VBD */
-	ret = vbd_info(&op.u.info_params); 
-	if(ret == 0)
+        if ( (ret = vbd_info(&op.u.info_params)) == 0 ) 
 	    copy_to_user(u_block_io_op, &op, sizeof(op)); 
 	break; 
-
+        
     default: 
 	ret = -ENOSYS; 
     } 
@@ -369,33 +367,27 @@ static void unlock_buffer(unsigned long buffer,
 static int do_block_io_op_domain(struct task_struct *p, int max_to_do)
 {
     blk_ring_t *blk_ring = p->blk_ring_base;
-    int i, more_to_do = 0;
+    blk_ring_req_entry_t *req;
+    BLK_RING_IDX i;
+    int more_to_do = 0;
 
-    /*
-     * Take items off the comms ring, taking care not to catch up
-     * with the response-producer index.
-     */
+    /* Take items off the comms ring, taking care not to overflow. */
     for ( i = p->blk_req_cons; 
-	  (i != blk_ring->req_prod) &&
-              (((p->blk_resp_prod-i) & (BLK_RING_SIZE-1)) != 1); 
-	  i = BLK_RING_INC(i) ) 
+	  (i != blk_ring->req_prod) && ((i-p->blk_resp_prod) != BLK_RING_SIZE);
+          i++ )
     {
-        if ( (max_to_do-- == 0) || 
-             (atomic_read(&nr_pending) == MAX_PENDING_REQS) )
+        if ( (max_to_do-- == 0) || (NR_PENDING_REQS == MAX_PENDING_REQS) )
         {
             more_to_do = 1;
             break;
         }
         
-	switch ( blk_ring->ring[i].req.operation )
+        req = &blk_ring->ring[MASK_BLK_IDX(i)].req;
+	switch ( req->operation )
         {
 	case XEN_BLOCK_READ:
 	case XEN_BLOCK_WRITE:
-	    dispatch_rw_block_io(p, i);
-	    break;
-
-	case XEN_BLOCK_DEBUG:
-	    dispatch_debug_block_io(p, i);
+	    dispatch_rw_block_io(p, req);
 	    break;
 
 	default:
@@ -411,16 +403,10 @@ static int do_block_io_op_domain(struct task_struct *p, int max_to_do)
     return more_to_do;
 }
 
-static void dispatch_debug_block_io(struct task_struct *p, int index)
-{
-    DPRINTK("dispatch_debug_block_io: unimplemented\n"); 
-}
-
-static void dispatch_rw_block_io(struct task_struct *p, int index)
+static void dispatch_rw_block_io(struct task_struct *p, 
+                                 blk_ring_req_entry_t *req)
 {
     extern void ll_rw_block(int rw, int nr, struct buffer_head * bhs[]); 
-    blk_ring_t *blk_ring = p->blk_ring_base;
-    blk_ring_req_entry_t *req = &blk_ring->ring[index].req;
     struct buffer_head *bh;
     int operation = (req->operation == XEN_BLOCK_WRITE) ? WRITE : READ;
     unsigned short nr_sects;
@@ -479,9 +465,9 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
             }
 
 	    /*
-             * XXX Clear any 'partition' info in device. This works because IDE
-             * ignores the partition bits anyway. Only SCSI needs this hack,
-             * and it has four bits to clear.
+             * Clear any 'partition' bits in the device id. This works because
+             * IDE ignores the partition bits anyway. Only SCSI needs this
+             * hack, and we know that always requires the four LSBs cleared.
              */
 	    phys_seg[nr_psegs].dev = req->device & 0xFFF0;
             new_segs = 1;
@@ -506,9 +492,7 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
 	}
     }
 
-    atomic_inc(&nr_pending);
-    pending_req = pending_reqs + pending_ring[pending_cons];
-    PENDREQ_IDX_INC(pending_cons);
+    pending_req = &pending_reqs[pending_ring[MASK_PEND_IDX(pending_cons++)]];
     pending_req->domain    = p;
     pending_req->id        = req->id;
     pending_req->operation = operation;
@@ -563,17 +547,16 @@ static void make_response(struct task_struct *p, unsigned long id,
 			  unsigned short op, unsigned long st)
 {
     unsigned long cpu_mask;
-    int position;
-    blk_ring_t *blk_ring;
+    blk_ring_resp_entry_t *resp;
 
     /* Place on the response ring for the relevant domain. */ 
     spin_lock(&p->blk_ring_lock);
-    blk_ring = p->blk_ring_base;
-    position = p->blk_resp_prod;
-    blk_ring->ring[position].resp.id        = id;
-    blk_ring->ring[position].resp.operation = op;
-    blk_ring->ring[position].resp.status    = st;
-    p->blk_resp_prod = blk_ring->resp_prod = BLK_RING_INC(position);
+    resp = &p->blk_ring_base->ring[MASK_BLK_IDX(p->blk_resp_prod)].resp;
+    resp->id        = id;
+    resp->operation = op;
+    resp->status    = st;
+    wmb();
+    p->blk_ring_base->resp_prod = ++p->blk_resp_prod;
     spin_unlock(&p->blk_ring_lock);
     
     /* Kick the relevant domain. */
@@ -585,11 +568,12 @@ static void dump_blockq(u_char key, void *dev_id, struct pt_regs *regs)
 {
     unsigned long flags;
     struct task_struct *p;
-    blk_ring_t *blk_ring ;
+    blk_ring_t *blk_ring;
     int i;
 
-    printk("Dumping block queue stats: nr_pending = %d (prod=%d,cons=%d)\n",
-           atomic_read(&nr_pending), pending_prod, pending_cons);
+    printk("Dumping block queue stats: nr_pending = %d"
+           " (prod=0x%08x,cons=0x%08x)\n",
+           NR_PENDING_REQS, pending_prod, pending_cons);
 
     read_lock_irqsave(&tasklist_lock, flags);
     p = &idle0_task;
@@ -599,7 +583,8 @@ static void dump_blockq(u_char key, void *dev_id, struct pt_regs *regs)
             printk("Domain: %d\n", p->domain);
             blk_ring = p->blk_ring_base;
             
-            printk("  req_prod:%d, req_cons:%d resp_prod:%d/%d on_list=%d\n",
+            printk("  req_prod:0x%08x, req_cons:0x%08x resp_prod:0x%08x/"
+                   "0x%08x on_list=%d\n",
                    blk_ring->req_prod, p->blk_req_cons,
                    blk_ring->resp_prod, p->blk_resp_prod,
                    __on_blkdev_list(p));
@@ -621,7 +606,9 @@ static void dump_blockq(u_char key, void *dev_id, struct pt_regs *regs)
 /* Start-of-day initialisation for a new domain. */
 void init_blkdev_info(struct task_struct *p)
 {
-    if ( sizeof(*p->blk_ring_base) > PAGE_SIZE ) BUG();
+    if ( unlikely(sizeof(*p->blk_ring_base) > PAGE_SIZE) )
+        BUG();
+
     p->blk_ring_base = (blk_ring_t *)get_free_page(GFP_KERNEL);
     clear_page(p->blk_ring_base);
     SHARE_PFN_WITH_DOMAIN(virt_to_page(p->blk_ring_base), p);
@@ -655,8 +642,8 @@ void initialize_block_io ()
 {
     int i;
 
-    atomic_set(&nr_pending, 0);
-    pending_prod = pending_cons = 0;
+    pending_cons = 0;
+    pending_prod = MAX_PENDING_REQS;
     memset(pending_reqs, 0, sizeof(pending_reqs));
     for ( i = 0; i < MAX_PENDING_REQS; i++ )
         pending_ring[i] = i;

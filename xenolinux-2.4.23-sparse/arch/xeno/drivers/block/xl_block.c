@@ -20,14 +20,14 @@ typedef unsigned char byte; /* from linux/ide.h */
 static unsigned int state = STATE_SUSPENDED;
 
 static blk_ring_t *blk_ring;
-static unsigned int resp_cons; /* Response consumer for comms ring. */
-static unsigned int req_prod;  /* Private request producer.         */
+static BLK_RING_IDX resp_cons; /* Response consumer for comms ring. */
+static BLK_RING_IDX req_prod;  /* Private request producer.         */
 
 #define XDI_MAX 64 
 static xen_disk_info_t xlblk_disk_info; /* information about our disks/VBDs */
 
 /* We plug the I/O ring if the driver is suspended or if the ring is full. */
-#define RING_PLUGGED ((BLK_RING_INC(req_prod) == resp_cons) || \
+#define RING_PLUGGED (((req_prod - resp_cons) == BLK_RING_SIZE) || \
                       (state != STATE_ACTIVE))
 
 /*
@@ -260,10 +260,12 @@ static int hypervisor_request(unsigned long   id,
     blk_ring_req_entry_t *req;
     struct buffer_head *bh;
 
-    if ( nr_sectors >= (1<<9) ) BUG();
-    if ( (buffer_ma & ((1<<9)-1)) != 0 ) BUG();
+    if ( unlikely(nr_sectors >= (1<<9)) )
+        BUG();
+    if ( unlikely((buffer_ma & ((1<<9)-1)) != 0) )
+        BUG();
 
-    if ( state == STATE_CLOSED )
+    if ( unlikely(state == STATE_CLOSED) )
         return 1;
 
     switch ( operation )
@@ -273,16 +275,18 @@ static int hypervisor_request(unsigned long   id,
     case XEN_BLOCK_WRITE:
         gd = get_gendisk(device); 
 
-        /* Update the sector_number we'll pass down as appropriate; note 
-           that we could sanity check that resulting sector will be in 
-           this partition, but this will happen in xen anyhow */
+        /*
+         * Update the sector_number we'll pass down as appropriate; note that
+         * we could sanity check that resulting sector will be in this
+         * partition, but this will happen in xen anyhow.
+         */
         sector_number += gd->part[MINOR(device)].start_sect;
 
         if ( (sg_operation == operation) &&
              (sg_dev == device) &&
              (sg_next_sect == sector_number) )
         {
-            req = &blk_ring->ring[(req_prod-1)&(BLK_RING_SIZE-1)].req;
+            req = &blk_ring->ring[MASK_BLK_IDX(req_prod-1)].req;
             bh = (struct buffer_head *)id;
             bh->b_reqnext = (struct buffer_head *)req->id;
             req->id = id;
@@ -310,14 +314,14 @@ static int hypervisor_request(unsigned long   id,
     }
 
     /* Fill out a communications ring structure. */
-    req = &blk_ring->ring[req_prod].req;
+    req = &blk_ring->ring[MASK_BLK_IDX(req_prod)].req;
     req->id            = id;
     req->operation     = operation;
     req->sector_number = sector_number;
     req->device        = device; 
     req->nr_segments   = 1;
     req->buffer_and_sects[0] = buffer_ma | nr_sectors;
-    req_prod = BLK_RING_INC(req_prod);
+    req_prod++;
 
     return 0;
 }
@@ -345,8 +349,9 @@ void do_xlblk_request(request_queue_t *rq)
                 req->current_nr_sectors, req->nr_sectors, req->bh);
 
         rw = req->cmd;
-        if ( rw == READA ) rw = READ;
-        if ((rw != READ) && (rw != WRITE))
+        if ( rw == READA )
+            rw = READ;
+        if ( unlikely((rw != READ) && (rw != WRITE)) )
             panic("XenoLinux Virtual Block Device: bad cmd: %d\n", rw);
 
         req->errors = 0;
@@ -362,13 +367,13 @@ void do_xlblk_request(request_queue_t *rq)
                 (rw == READ) ? XEN_BLOCK_READ : XEN_BLOCK_WRITE, 
                 bh->b_data, bh->b_rsector, bh->b_size>>9, bh->b_rdev);
 
-            if(full) { 
-
+            if ( full )
+            { 
                 bh->b_reqnext = next_bh;
                 pending_queues[nr_pending++] = rq;
-                if ( nr_pending >= MAX_PENDING ) BUG();
+                if ( unlikely(nr_pending >= MAX_PENDING) )
+                    BUG();
                 goto out; 
-
             }
 
             queued++;
@@ -390,7 +395,8 @@ void do_xlblk_request(request_queue_t *rq)
             else
             {
                 /* That was the last buffer head. Finalise the request. */
-                if ( end_that_request_first(req, 1, "XenBlk") ) BUG();
+                if ( unlikely(end_that_request_first(req, 1, "XenBlk")) )
+                    BUG();
                 blkdev_dequeue_request(req);
                 end_that_request_last(req);
             }
@@ -406,40 +412,34 @@ static void kick_pending_request_queues(void)
 {
     /* We kick pending request queues if the ring is reasonably empty. */
     if ( (nr_pending != 0) && 
-         (((req_prod - resp_cons) & (BLK_RING_SIZE - 1)) < 
-          (BLK_RING_SIZE >> 1)) )
+         ((req_prod - resp_cons) < (BLK_RING_SIZE >> 1)) )
     {
         /* Attempt to drain the queue, but bail if the ring becomes full. */
-        while ( nr_pending != 0 )
-        {
+        while ( (nr_pending != 0) && !RING_PLUGGED )
             do_xlblk_request(pending_queues[--nr_pending]);
-            if ( RING_PLUGGED ) break;
-        }
     }
 }
 
 
 static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
 {
-    int i; 
+    BLK_RING_IDX i; 
     unsigned long flags; 
     struct buffer_head *bh, *next_bh;
 
-    if ( state == STATE_CLOSED )
+    if ( unlikely(state == STATE_CLOSED) )
         return;
     
     spin_lock_irqsave(&io_request_lock, flags);     
 
-    for ( i  = resp_cons;
-          i != blk_ring->resp_prod;
-          i  = BLK_RING_INC(i) )
+    for ( i = resp_cons; i != blk_ring->resp_prod; i++ )
     {
-        blk_ring_resp_entry_t *bret = &blk_ring->ring[i].resp;
-        switch (bret->operation)
+        blk_ring_resp_entry_t *bret = &blk_ring->ring[MASK_BLK_IDX(i)].resp;
+        switch ( bret->operation )
         {
         case XEN_BLOCK_READ:
         case XEN_BLOCK_WRITE:
-            if ( bret->status )
+            if ( unlikely(bret->status != 0) )
                 DPRINTK("Bad return from blkdev data request: %lx\n",
                         bret->status);
             for ( bh = (struct buffer_head *)bret->id; 

@@ -24,7 +24,6 @@
 
 /* NB. Ring size must be small enough for sizeof(blk_ring_t) <= PAGE_SIZE. */
 #define BLK_RING_SIZE        64
-#define BLK_RING_INC(_i)     (((_i)+1) & (BLK_RING_SIZE-1))
 
 /*
  * Maximum scatter/gather segments per request.
@@ -50,10 +49,23 @@ typedef struct blk_ring_resp_entry
     unsigned long   status;               /* cuurently boolean good/bad   */
 } blk_ring_resp_entry_t;
 
+/*
+ * We use a special capitalised type name because it is _essential_ that all 
+ * arithmetic on indexes is done on an integer type of the correct size.
+ */
+typedef unsigned int BLK_RING_IDX;
+
+/*
+ * Ring indexes are 'free running'. That is, they are not stored modulo the
+ * size of the ring buffer. The following macro converts a free-running counter
+ * into a value that can directly index a ring-buffer array.
+ */
+#define MASK_BLK_IDX(_i) ((_i)&(BLK_RING_SIZE-1))
+
 typedef struct blk_ring_st 
 {
-    unsigned int req_prod;  /* Request producer. Updated by guest OS. */
-    unsigned int resp_prod; /* Response producer. Updated by Xen.     */
+    BLK_RING_IDX req_prod;  /* Request producer. Updated by guest OS. */
+    BLK_RING_IDX resp_prod; /* Response producer. Updated by Xen.     */
     union {
         blk_ring_req_entry_t  req;
         blk_ring_resp_entry_t resp;

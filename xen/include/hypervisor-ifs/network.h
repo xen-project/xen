@@ -85,6 +85,20 @@ typedef struct net_ring_st
     rx_entry_t rx_ring[RX_RING_SIZE];
 } net_ring_t;
 
+/*
+ * We use a special capitalised type name because it is _essential_ that all 
+ * arithmetic on indexes is done on an integer type of the correct size.
+ */
+typedef unsigned int NET_RING_IDX;
+
+/*
+ * Ring indexes are 'free running'. That is, they are not stored modulo the
+ * size of the ring buffer. The following macros convert a free-running counter
+ * into a value that can directly index a ring-buffer array.
+ */
+#define MASK_NET_RX_IDX(_i) ((_i)&(RX_RING_SIZE-1))
+#define MASK_NET_TX_IDX(_i) ((_i)&(TX_RING_SIZE-1))
+
 typedef struct net_idx_st
 {
     /*
@@ -93,8 +107,8 @@ typedef struct net_idx_st
      * Guest OS places empty buffers into ring at rx_req_prod.
      * Guest OS receives EVENT_NET when rx_rssp_prod passes rx_event.
      */
-    unsigned int tx_req_prod, tx_resp_prod, tx_event;
-    unsigned int rx_req_prod, rx_resp_prod, rx_event;
+    NET_RING_IDX tx_req_prod, tx_resp_prod, tx_event;
+    NET_RING_IDX rx_req_prod, rx_resp_prod, rx_event;
 } net_idx_t;
 
 /*

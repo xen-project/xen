@@ -39,11 +39,6 @@
 #define rtnl_lock() ((void)0)
 #define rtnl_unlock() ((void)0)
 
-#define TX_RING_INC(_i)    (((_i)+1) & (TX_RING_SIZE-1))
-#define RX_RING_INC(_i)    (((_i)+1) & (RX_RING_SIZE-1))
-#define TX_RING_ADD(_i,_j) (((_i)+(_j)) & (TX_RING_SIZE-1))
-#define RX_RING_ADD(_i,_j) (((_i)+(_j)) & (RX_RING_SIZE-1))
-
 struct skb_completion_queues skb_queue[NR_CPUS] __cacheline_aligned;
 
 static int get_tx_bufs(net_vif_t *vif);
@@ -495,7 +490,6 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
     rx_shadow_entry_t *rx;
     unsigned long *ptep, pte; 
     struct pfn_info *old_page, *new_page, *pte_page;
-    unsigned int i; 
     unsigned short size;
     unsigned char  offset, status = RING_STATUS_OK;
     struct task_struct *p = vif->domain;
@@ -506,14 +500,13 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
 
     spin_lock(&vif->rx_lock);
 
-    if ( (i = vif->rx_cons) == vif->rx_prod )
+    if ( unlikely(vif->rx_cons == vif->rx_prod) )
     {
         spin_unlock(&vif->rx_lock);
         perfc_incr(net_rx_capacity_drop);
         return;
     }
-    rx = &vif->rx_shadow_ring[i];
-    vif->rx_cons = RX_RING_INC(i);
+    rx = &vif->rx_shadow_ring[MASK_NET_RX_IDX(vif->rx_cons++)];
 
     size   = (unsigned short)skb->len;
     offset = (unsigned char)((unsigned long)skb->data & ~PAGE_MASK);
@@ -739,7 +732,7 @@ static void net_tx_action(unsigned long unused)
 
         add_to_net_schedule_list_tail(vif);
 
-        if ( (skb = alloc_skb_nodata(GFP_ATOMIC)) == NULL )
+        if ( unlikely((skb = alloc_skb_nodata(GFP_ATOMIC)) == NULL) )
         {
             printk("Out of memory in net_tx_action()!\n");
             add_to_net_schedule_list_tail(vif);
@@ -748,8 +741,7 @@ static void net_tx_action(unsigned long unused)
         }
         
         /* Pick an entry from the transmit queue. */
-        tx = &vif->tx_shadow_ring[vif->tx_cons];
-        vif->tx_cons = TX_RING_INC(vif->tx_cons);
+        tx = &vif->tx_shadow_ring[MASK_NET_TX_IDX(vif->tx_cons++)];
 
         skb->destructor = tx_skb_release;
 
@@ -776,7 +768,7 @@ static void net_tx_action(unsigned long unused)
         vif->total_bytes_sent += tx->size;
 
         /* Is the NIC crap? */
-        if ( !(dev->features & NETIF_F_SG) )
+        if ( unlikely(!(dev->features & NETIF_F_SG)) )
         {
             nskb = skb_copy(skb, GFP_KERNEL);
             kfree_skb(skb);
@@ -784,7 +776,7 @@ static void net_tx_action(unsigned long unused)
         }
 
         /* Transmit should always work, or the queue would be stopped. */
-        if ( dev->hard_start_xmit(skb, dev) != 0 )
+        if ( unlikely(dev->hard_start_xmit(skb, dev) != 0) )
         {
             printk("Weird failure in hard_start_xmit!\n");
             kfree_skb(skb);
@@ -1849,7 +1841,9 @@ static int get_tx_bufs(net_vif_t *vif)
     unsigned short      protocol;
     struct sk_buff     *skb;
     tx_req_entry_t      tx;
-    int                 i, j, ret = 0;
+    tx_shadow_entry_t  *stx;
+    NET_RING_IDX        i, j;
+    int                 ret = 0;
 
     if ( vif->tx_req_cons == shared_idxs->tx_req_prod )
         return 0;
@@ -1870,13 +1864,14 @@ static int get_tx_bufs(net_vif_t *vif)
  again:
     for ( i = vif->tx_req_cons; 
           (i != shared_idxs->tx_req_prod) && 
-              (((vif->tx_resp_prod-i) & (TX_RING_SIZE-1)) != 1); 
-          i = TX_RING_INC(i) )
+              ((i-vif->tx_resp_prod) != TX_RING_SIZE);
+          i++ )
     {
-        tx     = shared_rings->tx_ring[i].req;
+        tx     = shared_rings->tx_ring[MASK_NET_TX_IDX(i)].req;
         target = VIF_DROP;
 
-        if ( (tx.size <= PKT_PROT_LEN) || (tx.size > ETH_FRAME_LEN) )
+        if ( unlikely(tx.size <= PKT_PROT_LEN) || 
+             unlikely(tx.size > ETH_FRAME_LEN) )
         {
             DPRINTK("Bad packet size: %d\n", tx.size);
             make_tx_response(vif, tx.id, RING_STATUS_BAD_PAGE);
@@ -1940,7 +1935,7 @@ static int get_tx_bufs(net_vif_t *vif)
         if ( VIF_LOCAL(target) )
         {
             /* Local delivery */
-            if ( (skb = dev_alloc_skb(ETH_FRAME_LEN + 32)) == NULL )
+            if ( unlikely((skb = dev_alloc_skb(ETH_FRAME_LEN + 32)) == NULL) )
             {
                 make_tx_response(vif, tx.id, RING_STATUS_BAD_PAGE);
                 put_vif(target);
@@ -1972,20 +1967,21 @@ static int get_tx_bufs(net_vif_t *vif)
         }
         else if ( (target == VIF_PHYS) || IS_PRIV(p) )
         {
-            vif->tx_shadow_ring[j].id     = tx.id;
-            vif->tx_shadow_ring[j].size   = tx.size;
-            vif->tx_shadow_ring[j].header = 
-                kmem_cache_alloc(net_header_cachep, GFP_KERNEL);
-            if ( vif->tx_shadow_ring[j].header == NULL )
+            stx = &vif->tx_shadow_ring[MASK_NET_TX_IDX(j)];
+            stx->id     = tx.id;
+            stx->size   = tx.size;
+            stx->header = kmem_cache_alloc(net_header_cachep, GFP_KERNEL);
+            if ( unlikely(stx->header == NULL) )
             { 
                 make_tx_response(vif, tx.id, RING_STATUS_OK);
                 goto cleanup_and_continue;
             }
 
-            memcpy(vif->tx_shadow_ring[j].header, g_data, PKT_PROT_LEN);
-            vif->tx_shadow_ring[j].payload = tx.addr + PKT_PROT_LEN;
+            memcpy(stx->header, g_data, PKT_PROT_LEN);
+            stx->payload = tx.addr + PKT_PROT_LEN;
+
+            j++;
             buf_page = NULL; /* hand off our page reference */
-            j = TX_RING_INC(j);
         }
         else
         {
@@ -2023,8 +2019,9 @@ static void get_rx_bufs(net_vif_t *vif)
     struct task_struct *p = vif->domain;
     net_ring_t *shared_rings = vif->shared_rings;
     net_idx_t *shared_idxs = vif->shared_idxs;
-    unsigned int i, j;
+    NET_RING_IDX i, j;
     rx_req_entry_t rx;
+    rx_shadow_entry_t *srx;
     unsigned long  pte_pfn, buf_pfn;
     struct pfn_info *pte_page, *buf_page;
     unsigned long *ptep, pte;
@@ -2039,10 +2036,10 @@ static void get_rx_bufs(net_vif_t *vif)
     j = vif->rx_prod;
     for ( i = vif->rx_req_cons; 
           (i != shared_idxs->rx_req_prod) && 
-              (((vif->rx_resp_prod-i) & (RX_RING_SIZE-1)) != 1); 
-          i = RX_RING_INC(i) )
+              ((i-vif->rx_resp_prod) != RX_RING_SIZE);
+          i++ )
     {
-        rx = shared_rings->rx_ring[i].req;
+        rx = shared_rings->rx_ring[MASK_NET_RX_IDX(i)].req;
 
         pte_pfn  = rx.addr >> PAGE_SHIFT;
         pte_page = &frame_table[pte_pfn];
@@ -2116,10 +2113,10 @@ static void get_rx_bufs(net_vif_t *vif)
         list_del(&buf_page->list);
         spin_unlock(&p->page_list_lock);
 
-        vif->rx_shadow_ring[j].id      = rx.id;
-        vif->rx_shadow_ring[j].pte_ptr = rx.addr;
-        vif->rx_shadow_ring[j].buf_pfn = buf_pfn;
-        j = RX_RING_INC(j);
+        srx = &vif->rx_shadow_ring[MASK_NET_RX_IDX(j++)];
+        srx->id      = rx.id;
+        srx->pte_ptr = rx.addr;
+        srx->buf_pfn = buf_pfn;
             
     rx_unmap_and_continue:
         unmap_domain_mem(ptep);
@@ -2153,7 +2150,7 @@ static long get_bufs_from_vif(net_vif_t *vif)
 
 long flush_bufs_for_vif(net_vif_t *vif)
 {
-    int i;
+    NET_RING_IDX i;
     unsigned long *ptep, pte;
     struct pfn_info *page;
     struct task_struct *p = vif->domain;
@@ -2164,17 +2161,17 @@ long flush_bufs_for_vif(net_vif_t *vif)
     /* Return any outstanding receive buffers to the guest OS. */
     spin_lock(&vif->rx_lock);
     for ( i = vif->rx_req_cons; 
-          (i != shared_idxs->rx_req_prod) && 
-              (((vif->rx_resp_prod-i) & (RX_RING_SIZE-1)) != 1); 
-          i = RX_RING_INC(i) )
+          (i != shared_idxs->rx_req_prod) &&
+              ((i-vif->rx_resp_prod) != RX_RING_SIZE);
+          i++ );
     {
-        make_rx_response(vif, shared_rings->rx_ring[i].req.id, 0,
-                         RING_STATUS_DROPPED, 0);
+        make_rx_response(vif, shared_rings->rx_ring[MASK_NET_RX_IDX(i)].req.id,
+                         0, RING_STATUS_DROPPED, 0);
     }
     vif->rx_req_cons = i;
-    for ( i = vif->rx_cons; i != vif->rx_prod; i = RX_RING_INC(i) )
+    for ( i = vif->rx_cons; i != vif->rx_prod; i++ )
     {
-        rx = &vif->rx_shadow_ring[i];
+        rx = &vif->rx_shadow_ring[MASK_NET_RX_IDX(i)];
 
         /* Give the buffer page back to the domain. */
         page = &frame_table[rx->buf_pfn];
@@ -2209,12 +2206,12 @@ long flush_bufs_for_vif(net_vif_t *vif)
      */
     spin_lock(&vif->tx_lock);
     for ( i = vif->tx_req_cons; 
-          (i != shared_idxs->tx_req_prod) && 
-              (((vif->tx_resp_prod-i) & (TX_RING_SIZE-1)) != 1); 
-          i = TX_RING_INC(i) )
+          (i != shared_idxs->tx_req_prod) &&
+              ((i-vif->tx_resp_prod) != TX_RING_SIZE);
+          i++ )
     {
-        make_tx_response(vif, shared_rings->tx_ring[i].req.id, 
-                           RING_STATUS_DROPPED);
+        make_tx_response(vif, shared_rings->tx_ring[MASK_NET_TX_IDX(i)].req.id,
+                         RING_STATUS_DROPPED);
     }
     vif->tx_req_cons = i;
     spin_unlock(&vif->tx_lock);
@@ -2237,11 +2234,11 @@ long do_net_io_op(netop_t *uop)
 
     perfc_incr(net_hypercalls);
 
-    if ( copy_from_user(&op, uop, sizeof(op)) )
+    if ( unlikely(copy_from_user(&op, uop, sizeof(op)) != 0) )
         return -EFAULT;
 
-    if ( (op.vif >= MAX_DOMAIN_VIFS) || 
-         ((vif = current->net_vif_list[op.vif]) == NULL) )
+    if ( unlikely(op.vif >= MAX_DOMAIN_VIFS) || 
+         unlikely((vif = current->net_vif_list[op.vif]) == NULL) )
         return -EINVAL;
 
     switch ( op.cmd )
@@ -2292,18 +2289,17 @@ static void make_tx_response(net_vif_t     *vif,
                              unsigned short id, 
                              unsigned char  st)
 {
-    unsigned int pos;
+    NET_RING_IDX i = vif->tx_resp_prod;
     tx_resp_entry_t *resp;
 
-    /* Place on the response ring for the relevant domain. */ 
-    pos  = vif->tx_resp_prod;
-    resp = &vif->shared_rings->tx_ring[pos].resp;
+    resp = &vif->shared_rings->tx_ring[MASK_NET_TX_IDX(i)].resp;
     resp->id     = id;
     resp->status = st;
-    pos = TX_RING_INC(pos);
-    vif->tx_resp_prod = vif->shared_idxs->tx_resp_prod = pos;
+    wmb();
+    vif->shared_idxs->tx_resp_prod = vif->tx_resp_prod = ++i;
+
     smp_mb(); /* Update producer before checking event threshold. */
-    if ( pos == vif->shared_idxs->tx_event )
+    if ( i == vif->shared_idxs->tx_event )
     {
         unsigned long cpu_mask = mark_guest_event(vif->domain, _EVENT_NET);
         guest_event_notify(cpu_mask);    
@@ -2317,20 +2313,19 @@ static void make_rx_response(net_vif_t     *vif,
                              unsigned char  st,
                              unsigned char  off)
 {
-    unsigned int pos;
+    NET_RING_IDX i = vif->rx_resp_prod;
     rx_resp_entry_t *resp;
 
-    /* Place on the response ring for the relevant domain. */ 
-    pos  = vif->rx_resp_prod;
-    resp = &vif->shared_rings->rx_ring[pos].resp;
+    resp = &vif->shared_rings->rx_ring[MASK_NET_RX_IDX(i)].resp;
     resp->id     = id;
     resp->size   = size;
     resp->status = st;
     resp->offset = off;
-    pos = RX_RING_INC(pos);
-    vif->rx_resp_prod = vif->shared_idxs->rx_resp_prod = pos;
+    wmb();
+    vif->shared_idxs->rx_resp_prod = vif->rx_resp_prod = ++i;
+
     smp_mb(); /* Update producer before checking event threshold. */
-    if ( pos == vif->shared_idxs->rx_event )
+    if ( i == vif->shared_idxs->rx_event )
     {
         unsigned long cpu_mask = mark_guest_event(vif->domain, _EVENT_NET);
         guest_event_notify(cpu_mask);    

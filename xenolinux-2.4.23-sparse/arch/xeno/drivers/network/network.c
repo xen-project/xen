@@ -27,14 +27,6 @@
 
 #define NET_IRQ _EVENT_NET
 
-#define TX_MAX_ENTRIES (TX_RING_SIZE - 2)
-#define RX_MAX_ENTRIES (RX_RING_SIZE - 2)
-
-#define TX_RING_INC(_i)    (((_i)+1) & (TX_RING_SIZE-1))
-#define RX_RING_INC(_i)    (((_i)+1) & (RX_RING_SIZE-1))
-#define TX_RING_ADD(_i,_j) (((_i)+(_j)) & (TX_RING_SIZE-1))
-#define RX_RING_ADD(_i,_j) (((_i)+(_j)) & (RX_RING_SIZE-1))
-
 #define RX_BUF_SIZE ((PAGE_SIZE/2)+1) /* Fool the slab allocator :-) */
 
 static void network_interrupt(int irq, void *dev_id, struct pt_regs *ptregs);
@@ -50,12 +42,11 @@ struct net_private
     struct net_device *dev;
 
     struct net_device_stats stats;
-    atomic_t tx_entries;
-    unsigned int rx_resp_cons, tx_resp_cons, tx_full;
-    unsigned int net_ring_fixmap_idx;
-    net_ring_t *net_ring;
-    net_idx_t  *net_idx;
-    spinlock_t tx_lock;
+    NET_RING_IDX rx_resp_cons, tx_resp_cons;
+    unsigned int net_ring_fixmap_idx, tx_full;
+    net_ring_t  *net_ring;
+    net_idx_t   *net_idx;
+    spinlock_t   tx_lock;
     unsigned int idx; /* Domain-specific index of this VIF. */
 
     unsigned int rx_bufs_to_notify;
@@ -80,7 +71,7 @@ struct net_private
 #define GET_ID_FROM_FREELIST(_list)                \
  ({ unsigned long _id = (unsigned long)(_list)[0]; \
     (_list)[0]  = (_list)[_id];                    \
-    _id; })
+    (unsigned short)_id; })
 
 
 static void _dbg_network_int(struct net_device *dev)
@@ -90,14 +81,15 @@ static void _dbg_network_int(struct net_device *dev)
     if ( np->state == STATE_CLOSED )
         return;
     
-    printk(KERN_ALERT "tx_full = %d, tx_entries = %d, tx_resp_cons = %d,"
-           " tx_req_prod = %d, tx_resp_prod = %d, tx_event = %d, state=%d\n",
-           np->tx_full, atomic_read(&np->tx_entries), np->tx_resp_cons, 
+    printk(KERN_ALERT "tx_full = %d, tx_resp_cons = 0x%08x,"
+           " tx_req_prod = 0x%08x, tx_resp_prod = 0x%08x,"
+           " tx_event = 0x%08x, state=%d\n",
+           np->tx_full, np->tx_resp_cons, 
            np->net_idx->tx_req_prod, np->net_idx->tx_resp_prod, 
            np->net_idx->tx_event,
            test_bit(__LINK_STATE_XOFF, &dev->state));
-    printk(KERN_ALERT "rx_resp_cons = %d,"
-           " rx_req_prod = %d, rx_resp_prod = %d, rx_event = %d\n",
+    printk(KERN_ALERT "rx_resp_cons = 0x%08x,"
+           " rx_req_prod = 0x%08x, rx_resp_prod = 0x%08x, rx_event = 0x%08x\n",
            np->rx_resp_cons, np->net_idx->rx_req_prod,
            np->net_idx->rx_resp_prod, np->net_idx->rx_event);
 }
@@ -149,7 +141,6 @@ static int network_open(struct net_device *dev)
     np->rx_resp_cons = np->tx_resp_cons = np->tx_full = 0;
     memset(&np->stats, 0, sizeof(np->stats));
     spin_lock_init(&np->tx_lock);
-    atomic_set(&np->tx_entries, 0);
     memset(np->net_ring, 0, sizeof(*np->net_ring));
     memset(np->net_idx, 0, sizeof(*np->net_idx));
 
@@ -174,33 +165,40 @@ static int network_open(struct net_device *dev)
 
 static void network_tx_buf_gc(struct net_device *dev)
 {
-    unsigned int i;
+    NET_RING_IDX i, prod;
+    unsigned short id;
     struct net_private *np = dev->priv;
     struct sk_buff *skb;
-    unsigned int prod;
     tx_entry_t *tx_ring = np->net_ring->tx_ring;
 
     do {
         prod = np->net_idx->tx_resp_prod;
 
-        for ( i = np->tx_resp_cons; i != prod; i = TX_RING_INC(i) )
+        for ( i = np->tx_resp_cons; i != prod; i++ )
         {
-            skb = np->tx_skbs[tx_ring[i].resp.id];
-            ADD_ID_TO_FREELIST(np->tx_skbs, tx_ring[i].resp.id);
+            id  = tx_ring[MASK_NET_TX_IDX(i)].resp.id;
+            skb = np->tx_skbs[id];
+            ADD_ID_TO_FREELIST(np->tx_skbs, id);
             dev_kfree_skb_any(skb);
-            atomic_dec(&np->tx_entries);
         }
         
         np->tx_resp_cons = prod;
         
-        /* Set a new event, then check for race with update of tx_cons. */
-        np->net_idx->tx_event =
-            TX_RING_ADD(prod, (atomic_read(&np->tx_entries)>>1) + 1);
+        /*
+         * Set a new event, then check for race with update of tx_cons. Note
+         * that it is essential to schedule a callback, no matter how few
+         * buffers are pending. Even if there is space in the transmit ring,
+         * higher layers may be blocked because too much data is outstanding:
+         * in such cases notification from Xen is likely to be the only kick
+         * that we'll get.
+         */
+        np->net_idx->tx_event = 
+            prod + ((np->net_idx->tx_req_prod - prod) >> 1) + 1;
         mb();
     }
     while ( prod != np->net_idx->tx_resp_prod );
 
-    if ( np->tx_full && (atomic_read(&np->tx_entries) < TX_MAX_ENTRIES) )
+    if ( np->tx_full && ((np->net_idx->tx_req_prod - prod) < TX_RING_SIZE) )
     {
         np->tx_full = 0;
         if ( np->state == STATE_ACTIVE )
@@ -221,19 +219,21 @@ static inline pte_t *get_ppte(void *addr)
 
 static void network_alloc_rx_buffers(struct net_device *dev)
 {
-    unsigned int i, id;
+    unsigned short id;
     struct net_private *np = dev->priv;
     struct sk_buff *skb;
-    unsigned int end = RX_RING_ADD(np->rx_resp_cons, RX_MAX_ENTRIES);    
     netop_t netop;
+    NET_RING_IDX i = np->net_idx->rx_req_prod;
 
-    if ( ((i = np->net_idx->rx_req_prod) == end) ||
-         (np->state != STATE_ACTIVE) )
+    if ( unlikely((i - np->rx_resp_cons) == RX_RING_SIZE) || 
+         unlikely(np->state != STATE_ACTIVE) )
         return;
 
     do {
         skb = dev_alloc_skb(RX_BUF_SIZE);
-        if ( skb == NULL ) break;
+        if ( unlikely(skb == NULL) )
+            break;
+
         skb->dev = dev;
 
         if ( unlikely(((unsigned long)skb->head & (PAGE_SIZE-1)) != 0) )
@@ -242,13 +242,13 @@ static void network_alloc_rx_buffers(struct net_device *dev)
         id = GET_ID_FROM_FREELIST(np->rx_skbs);
         np->rx_skbs[id] = skb;
 
-        np->net_ring->rx_ring[i].req.id   = (unsigned short)id;
-        np->net_ring->rx_ring[i].req.addr = 
+        np->net_ring->rx_ring[MASK_NET_RX_IDX(i)].req.id   = id;
+        np->net_ring->rx_ring[MASK_NET_RX_IDX(i)].req.addr = 
             virt_to_machine(get_ppte(skb->head));
 
         np->rx_bufs_to_notify++;
     }
-    while ( (i = RX_RING_INC(i)) != end );
+    while ( (++i - np->rx_resp_cons) != RX_RING_SIZE );
 
     /*
      * We may have allocated buffers which have entries outstanding in the page
@@ -257,10 +257,10 @@ static void network_alloc_rx_buffers(struct net_device *dev)
     flush_page_update_queue();
 
     np->net_idx->rx_req_prod = i;
-    np->net_idx->rx_event    = RX_RING_INC(np->rx_resp_cons);
+    np->net_idx->rx_event    = np->rx_resp_cons + 1;
         
     /* Batch Xen notifications. */
-    if ( np->rx_bufs_to_notify > (RX_MAX_ENTRIES/4) )
+    if ( np->rx_bufs_to_notify > (RX_RING_SIZE/4) )
     {
         netop.cmd = NETOP_PUSH_BUFFERS;
         netop.vif = np->idx;
@@ -272,21 +272,25 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 
 static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-    unsigned int i, id;
+    unsigned short id;
     struct net_private *np = (struct net_private *)dev->priv;
+    tx_req_entry_t *tx;
     netop_t netop;
+    NET_RING_IDX i;
 
-    if ( np->tx_full )
+    if ( unlikely(np->tx_full) )
     {
         printk(KERN_ALERT "%s: full queue wasn't stopped!\n", dev->name);
         netif_stop_queue(dev);
         return -ENOBUFS;
     }
 
-    if ( (((unsigned long)skb->data & ~PAGE_MASK) + skb->len) >= PAGE_SIZE )
+    if ( unlikely((((unsigned long)skb->data & ~PAGE_MASK) + skb->len) >=
+                  PAGE_SIZE) )
     {
         struct sk_buff *new_skb = dev_alloc_skb(RX_BUF_SIZE);
-        if ( new_skb == NULL ) return 1;
+        if ( unlikely(new_skb == NULL) )
+            return 1;
         skb_put(new_skb, skb->len);
         memcpy(new_skb->data, skb->data, skb->len);
         dev_kfree_skb(skb);
@@ -300,16 +304,18 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
     id = GET_ID_FROM_FREELIST(np->tx_skbs);
     np->tx_skbs[id] = skb;
 
-    np->net_ring->tx_ring[i].req.id   = (unsigned short)id;
-    np->net_ring->tx_ring[i].req.addr =
-        phys_to_machine(virt_to_phys(skb->data));
-    np->net_ring->tx_ring[i].req.size = skb->len;
-    np->net_idx->tx_req_prod = TX_RING_INC(i);
-    atomic_inc(&np->tx_entries);
+    tx = &np->net_ring->tx_ring[MASK_NET_TX_IDX(i)].req;
+
+    tx->id   = id;
+    tx->addr = phys_to_machine(virt_to_phys(skb->data));
+    tx->size = skb->len;
+
+    wmb();
+    np->net_idx->tx_req_prod = i + 1;
 
     network_tx_buf_gc(dev);
 
-    if ( atomic_read(&np->tx_entries) >= TX_MAX_ENTRIES )
+    if ( (i - np->tx_resp_cons) == TX_RING_SIZE )
     {
         np->tx_full = 1;
         netif_stop_queue(dev);
@@ -336,12 +342,12 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 static inline void _network_interrupt(struct net_device *dev)
 {
     struct net_private *np = dev->priv;
-    unsigned int i;
     unsigned long flags;
     struct sk_buff *skb;
     rx_resp_entry_t *rx;
+    NET_RING_IDX i;
 
-    if ( np->state == STATE_CLOSED )
+    if ( unlikely(np->state == STATE_CLOSED) )
         return;
     
     spin_lock_irqsave(&np->tx_lock, flags);
@@ -349,16 +355,14 @@ static inline void _network_interrupt(struct net_device *dev)
     spin_unlock_irqrestore(&np->tx_lock, flags);
 
  again:
-    for ( i  = np->rx_resp_cons; 
-          i != np->net_idx->rx_resp_prod; 
-          i  = RX_RING_INC(i) )
+    for ( i = np->rx_resp_cons; i != np->net_idx->rx_resp_prod; i++ )
     {
-        rx  = &np->net_ring->rx_ring[i].resp;
+        rx = &np->net_ring->rx_ring[MASK_NET_RX_IDX(i)].resp;
 
         skb = np->rx_skbs[rx->id];
         ADD_ID_TO_FREELIST(np->rx_skbs, rx->id);
 
-        if ( rx->status != RING_STATUS_OK )
+        if ( unlikely(rx->status != RING_STATUS_OK) )
         {
             /* Gate this error. We get a (valid) slew of them on suspend. */
             if ( np->state == STATE_ACTIVE )
@@ -396,7 +400,8 @@ static inline void _network_interrupt(struct net_device *dev)
     
     /* Deal with hypervisor racing our resetting of rx_event. */
     mb();
-    if ( np->net_idx->rx_resp_prod != i ) goto again;
+    if ( np->net_idx->rx_resp_prod != i )
+        goto again;
 }
 
 
