@@ -560,7 +560,7 @@ static int parseelfimage(char *elfbase,
     Elf_Phdr *phdr;
     Elf_Shdr *shdr;
     unsigned long kernstart = ~0UL, kernend=0UL;
-    char *shstrtab, *guestinfo, *p;
+    char *shstrtab, *guestinfo=NULL, *p;
     int h;
 
     if ( !IS_ELF(*ehdr) )
@@ -608,13 +608,9 @@ static int parseelfimage(char *elfbase,
             return -EINVAL;
         }
 
-        *pvirtstart = kernstart;
-        if ( (p = strstr(guestinfo, "VIRT_BASE=")) != NULL )
-            *pvirtstart = strtoul(p+10, &p, 0);
-
         break;
     }
-    if ( h == ehdr->e_shnum )
+    if ( guestinfo == NULL )
     {
         ERROR("Not a Xen-ELF image: '__xen_guest' section not found.");
         return -EINVAL;
@@ -638,6 +634,10 @@ static int parseelfimage(char *elfbase,
         ERROR("Malformed ELF image.");
         return -EINVAL;
     }
+
+    *pvirtstart = kernstart;
+    if ( (p = strstr(guestinfo, "VIRT_BASE=")) != NULL )
+        *pvirtstart = strtoul(p+10, &p, 0);
 
     *pkernstart = kernstart;
     *pkernend   = kernend;
