@@ -240,6 +240,11 @@ static void network_alloc_rx_buffers(struct net_device *dev)
 
     np->net_ring->rx_event = RX_RING_INC(np->rx_idx);
 
+    /*
+     * We may have allocated buffers which have entries outstanding in
+     * the page update queue -- make sure we flush those first!
+     */
+    flush_page_update_queue();
     HYPERVISOR_net_update();
 }
 
