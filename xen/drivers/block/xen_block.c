@@ -128,6 +128,7 @@ static void remove_from_blkdev_list(struct task_struct *p)
     {
         list_del(&p->blkdev_list);
         p->blkdev_list.next = NULL;
+        free_task_struct(p);
     }
     spin_unlock_irqrestore(&io_schedule_list_lock, flags);
 }
@@ -140,6 +141,7 @@ static void add_to_blkdev_list_tail(struct task_struct *p)
     if ( !__on_blkdev_list(p) )
     {
         list_add_tail(&p->blkdev_list, &io_schedule_list);
+        get_task_struct(p);
     }
     spin_unlock_irqrestore(&io_schedule_list_lock, flags);
 }
@@ -162,9 +164,11 @@ static void io_schedule(unsigned long unused)
     {
         ent = io_schedule_list.next;
         p = list_entry(ent, struct task_struct, blkdev_list);
+        get_task_struct(p);
         remove_from_blkdev_list(p);
         if ( do_block_io_op_domain(p, BATCH_PER_DOMAIN) )
             add_to_blkdev_list_tail(p);
+        free_task_struct(p);
     }
 
     /* Push the batch through to disc. */
@@ -214,6 +218,7 @@ static void end_block_io_op(struct buffer_head *bh, int uptodate)
     {
         make_response(pending_req->domain, pending_req->id,
                       pending_req->operation, pending_req->status);
+        free_task_struct(pending_req->domain);
         spin_lock_irqsave(&pend_prod_lock, flags);
         pending_ring[pending_prod] = pending_req - pending_reqs;
         PENDREQ_IDX_INC(pending_prod);
@@ -598,6 +603,8 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
     pending_req->status    = 0;
     atomic_set(&pending_req->pendcnt, nr_psegs);
 
+    get_task_struct(p);
+
     /* Now we pass each segment down to the real blkdev layer. */
     for ( i = 0; i < nr_psegs; i++ )
     {
@@ -732,12 +739,26 @@ void init_blkdev_info(struct task_struct *p)
     xen_refresh_segment_list(p);
 }
 
-/* End-of-day teardown for a domain. XXX Outstanding requests? */
+/* End-of-day teardown for a domain. */
 void destroy_blkdev_info(struct task_struct *p)
 {
-    remove_from_blkdev_list(p);
+    ASSERT(!__on_blkdev_list(p));
     UNSHARE_PFN(virt_to_page(p->blk_ring_base));
     free_page((unsigned long)p->blk_ring_base);
+}
+
+void unlink_blkdev_info(struct task_struct *p)
+{
+    unsigned long flags;
+
+    spin_lock_irqsave(&io_schedule_list_lock, flags);
+    if ( __on_blkdev_list(p) )
+    {
+        list_del(&p->blkdev_list);
+        p->blkdev_list.next = (void *)0xdeadbeef; /* prevent reinsertion */
+        free_task_struct(p);
+    }
+    spin_unlock_irqrestore(&io_schedule_list_lock, flags);
 }
 
 void initialize_block_io ()

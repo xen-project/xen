@@ -66,6 +66,8 @@ struct task_struct *do_newdomain(unsigned int dom_id, unsigned int cpu)
 
     sched_add_domain(p);
 
+    INIT_LIST_HEAD(&p->net_vifs);
+
     p->net_ring_base = (net_ring_t *)(p->shared_info + 1);
     INIT_LIST_HEAD(&p->pg_head);
     p->max_pages = p->tot_pages = 0;
@@ -111,6 +113,9 @@ void kill_domain_with_errmsg(const char *err)
 /* Kill the currently executing domain. */
 void kill_domain(void)
 {
+    struct list_head *ent;
+    net_vif_t *vif;
+
     if ( current->domain == 0 )
     {
         extern void machine_restart(char *);
@@ -119,8 +124,17 @@ void kill_domain(void)
     }
 
     printk("Killing domain %d\n", current->domain);
-    
+
     sched_rem_domain(current);
+
+    unlink_blkdev_info(current);
+
+    while ( (ent = current->net_vifs.next) != &current->net_vifs )
+    {
+        vif = list_entry(ent, net_vif_t, dom_list);
+        unlink_net_vif(vif);
+    }    
+    
     schedule();
     BUG(); /* never get here */
 }
@@ -182,13 +196,14 @@ unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes)
         list_del(&pf->list);
         list_add_tail(&pf->list, &p->pg_head);
         free_pfns--;
+        ASSERT(free_pfns != 0);
     }
    
     spin_unlock_irqrestore(&free_list_lock, flags);
     
     p->tot_pages = req_pages;
 
-    // temporary, max_pages should be explicitly specified
+    /* TEMPORARY: max_pages should be explicitly specified. */
     p->max_pages = p->tot_pages;
 
     return 0;
@@ -197,15 +212,21 @@ unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes)
 
 void free_all_dom_mem(struct task_struct *p)
 {
-    struct list_head *list_ent, *tmp;
+    struct list_head *ent;
+    unsigned long flags;
 
-    list_for_each_safe(list_ent, tmp, &p->pg_head)
+    spin_lock_irqsave(&free_list_lock, flags);
+    while ( (ent = p->pg_head.next) != &p->pg_head )
     {
-        struct pfn_info *pf = list_entry(list_ent, struct pfn_info, list);
+        struct pfn_info *pf = list_entry(ent, struct pfn_info, list);
         pf->type_count = pf->tot_count = pf->flags = 0;
-        list_del(list_ent);
-        list_add(list_ent, &free_list);
+        ASSERT(ent->next->prev == ent);
+        ASSERT(ent->prev->next == ent);
+        list_del(ent);
+        list_add(ent, &free_list);
+        free_pfns++;
     }
+    spin_unlock_irqrestore(&free_list_lock, flags);
 
     p->tot_pages = 0;
 }
@@ -216,36 +237,25 @@ void release_task(struct task_struct *p)
 {
     ASSERT(p->state == TASK_DYING);
     ASSERT(!p->has_cpu);
+
+    printk("Releasing task %d\n", p->domain);
+
     write_lock_irq(&tasklist_lock);
     REMOVE_LINKS(p);
     write_unlock_irq(&tasklist_lock);
 
-    /* XXX SMH: so below is screwed currently; need ref counting on vifs,
-       vhds, etc and proper clean up. Until then just blow the memory :-( */
-#if 0
     /*
-     * Safe! Only queue skbuffs with tasklist_lock held.
-     * Only access shared_info with tasklist_lock held.
-     * And free_task_struct() only releases if refcnt == 0.
+     * This frees up blkdev rings. Totally safe since blkdev ref counting
+     * actually uses the task_struct refcnt.
      */
-    while ( p->num_net_vifs )
-    {
-        destroy_net_vif(p);
-    }
-    
-    free_page((unsigned long)p->mm.perdomain_pt);
-
     destroy_blkdev_info(p);
 
+    /* Free all memory associated with this domain. */
+    free_page((unsigned long)p->mm.perdomain_pt);
     UNSHARE_PFN(virt_to_page(p->shared_info));
     free_page((unsigned long)p->shared_info);
-
     free_all_dom_mem(p);
-
-    free_task_struct(p);
-#else 
-    printk("XEN::release_task: not freeing memory etc yet XXX FIXME.\n"); 
-#endif
+    free_pages((unsigned long)p, 1);
 }
 
 

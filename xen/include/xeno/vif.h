@@ -71,8 +71,16 @@ typedef struct net_vif_st {
     net_shadow_ring_t  *shadow_ring;
     int                 id;
     struct task_struct *domain;
-    struct list_head    list;
+    struct list_head    list;     /* scheduling list */
+    struct list_head    dom_list; /* domain list     */
+    atomic_t            refcnt;
 } net_vif_t;
+
+#define get_vif(_v) (atomic_inc(&(_v)->refcnt))
+#define put_vif(_v)                                                \
+do {                                                               \
+    if ( atomic_dec_and_test(&(_v)->refcnt) ) destroy_net_vif(_v); \
+} while (0)                                                        \
 
 /* VIF-related defines. */
 #define MAX_GUEST_VIFS    2 // each VIF is a small overhead in task_struct
@@ -81,10 +89,12 @@ typedef struct net_vif_st {
 /* vif globals */
 extern int sys_vif_count;
 extern net_vif_t *sys_vif_list[];
+extern rwlock_t sys_vif_lock; /* protects the sys_vif_list */
 
 /* vif prototypes */
 net_vif_t *create_net_vif(int domain);
-void destroy_net_vif(struct task_struct *p);
+void destroy_net_vif(net_vif_t *vif);
+void unlink_net_vif(net_vif_t *vif);
 void add_default_net_rule(int vif_id, u32 ipaddr);
 int __net_get_target_vif(u8 *data, unsigned int len, int src_vif);
 void add_default_net_rule(int vif_id, u32 ipaddr);
