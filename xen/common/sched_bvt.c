@@ -230,13 +230,12 @@ void bvt_wake(struct domain *d)
              ((inf->evt - curr_evt) / BVT_INFO(curr)->mcu_advance) +
              ctx_allow;
 
-
-    spin_unlock_irqrestore(&schedule_data[cpu].schedule_lock, flags);   
     if ( is_idle_task(curr) || (inf->evt <= curr_evt) )
         cpu_raise_softirq(cpu, SCHEDULE_SOFTIRQ);
     else if ( schedule_data[cpu].s_timer.expires > r_time )
         mod_ac_timer(&schedule_data[cpu].s_timer, r_time);
 
+    spin_unlock_irqrestore(&schedule_data[cpu].schedule_lock, flags);  
 }
 
 
