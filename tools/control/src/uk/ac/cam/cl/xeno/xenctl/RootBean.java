@@ -1,0 +1,223 @@
+/*
+ * RootBean.java
+ * 03.05.05 aho creation
+ */
+
+package uk.ac.cam.cl.xeno.xenctl;
+
+import java.io.FileWriter;
+import java.util.Date;
+import java.util.Enumeration;
+import javax.servlet.http.HttpSessionBindingEvent;
+import javax.servlet.http.HttpSessionBindingListener;
+
+public class
+RootBean
+  implements HttpSessionBindingListener
+{
+  static String state_filename_in  = "/var/lib/xen/vdstate.xml";
+  static String state_filename_out = "/var/lib/xen/vdstate.xml";
+  static String partition_filename = "/proc/partitions";
+  static int    default_sector_size = 512;
+
+  PartitionManager pm;
+  VirtualDiskManager vdm;
+
+  int counter = 0;
+
+  public
+  RootBean ()
+  {
+    valueBound(null);
+  }
+
+  public void
+  valueBound (HttpSessionBindingEvent event)
+  {
+    pm = new PartitionManager(partition_filename);
+    vdm = new VirtualDiskManager();
+    XML.load_state(pm, vdm, state_filename_in);
+  }
+
+  public void
+  valueUnbound (HttpSessionBindingEvent event)
+  {
+    doFlushState();
+  }
+
+  public int
+  getDebugCounter()
+  {
+    return counter++;
+  }
+
+  /*************************************************************************/
+
+  public int
+  getPartitionCount()
+  {
+    return pm.getPartitionCount();
+  }
+
+  public Partition
+  getPartition(int index)
+  {
+    return pm.getPartition(index);
+  }
+
+  public String
+  doAddPartition(String partition, String chunksize )
+  {
+    Partition p = pm.get_partition(partition);
+    String result="done";
+    int loop;
+
+    if (p == null)
+    {
+      return (" eh? what partition: " + partition);
+    }
+
+    vdm.add_xeno_partition(p, 
+			   Library.parse_size(chunksize)/default_sector_size);
+    pm.add_xeno_partition(p);
+
+    /*    return pm.dump(true); */
+    return "done";
+  }
+
+  /*************************************************************************/
+
+  public int
+  getVirtualDiskCount ()
+  {
+    return vdm.getVirtualDiskCount();
+  }
+
+  public VirtualDisk
+  getVirtualDisk (int index)
+  {
+    return vdm.getVirtualDisk(index);
+  }
+
+  public VirtualDisk
+  getVirtualDiskKey (String key)
+  {
+    return vdm.get_virtual_disk_key(key);
+  }
+
+  public String
+  doCreateVirtualDisk (String name, String size, long expiry)
+  {
+    VirtualDisk vd;
+    Date date = new Date();
+
+    vd = vdm.create_virtual_disk(name,
+				 Library.parse_size(size)/default_sector_size,
+				 new Date(date.getTime() + expiry));
+
+    return ("Virtual Disk created with key: " + vd.get_key());
+
+  }
+
+  public String
+  doDeleteVirtualDisk (String key)
+  {
+    vdm.delete_virtual_disk(key);
+
+    return ("okay");
+  }
+
+  public String
+  doRefreshVirtualDisk (String key, long expiry)
+  {
+    VirtualDisk vd = vdm.get_virtual_disk_key(key);
+    Date date;
+    String s = "";
+
+    if (vd == null) 
+    {
+      return ("disk not found: " + key);
+    }
+    s = vd.get_expiry().toString();
+    date =  new Date(vd.get_expiry().getTime() + expiry);
+    vd.set_expiry(date);
+
+    return ("okay " + expiry + " " + s + " " + date.toString());
+  }
+
+  /*************************************************************************/
+
+  public int
+  getFreeExtentCount ()
+  {
+    VirtualDisk free = vdm.getFreeVirtualDisk();
+    return free.getExtentCount();
+  }
+
+  public Extent
+  getFreeExtent (int index)
+  {
+    VirtualDisk free = vdm.getFreeVirtualDisk();
+    return free.getExtent(index);
+  }
+
+  /*************************************************************************/
+
+  public Enumeration
+  getVirtualBlockDevices ()
+  {
+    return vdm.getVirtualBlockDevices();
+  }
+
+  public String
+  doCreateVirtualBlockDevice (String vd_key, int domain, 
+			      int vbd_num, String mode)
+  {
+    VirtualBlockDevice vbd;
+    VirtualDisk vd;
+
+    vbd = vdm.create_virtual_block_device(vd_key, domain, vbd_num, mode);
+    if (vbd != null)
+    {
+      String command;
+      FileWriter fw;
+
+      vd = vdm.get_virtual_disk_key(vd_key);
+      command = vd.dump_xen(vbd);
+
+      try
+      {
+	fw = new FileWriter("/proc/xeno/dom0/vhd");
+	fw.write(command);
+	fw.flush();
+	fw.close();
+      }
+      catch (Exception e)
+      {
+	return (e.toString());
+      }
+      return command;
+    }
+    else
+    {
+      return "Error encountered";
+    }
+  }
+
+  public String
+  doFlushVirtualBlockDevices()
+  {
+    vdm.flush_virtual_block_devices();
+    return "done";
+  }
+
+  /*************************************************************************/
+
+
+  public void
+  doFlushState ()
+  {
+    XML.dump_state(pm, vdm, state_filename_out);
+  }
+
+}

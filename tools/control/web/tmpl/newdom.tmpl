@@ -1,0 +1,172 @@
+New Domain
+SECTION&XenoServers
+
+<!-- content -->
+<img src="pixel.gif" class="block" width="1" height="12">
+
+<form>
+<table cellpadding="0" cellspacing="0" border="0">
+<tbody>
+<tr>
+  <td width="50"></td>
+  <td></td>
+  <td></td>
+  <td width="7"></td>
+  <td></td>
+</tr>
+
+<tr>
+  <td></td>
+  <td class="block" colspan=4><b>Create A New Domain</b></td>
+</tr>
+
+##WHITESPACE## ##GREYLINE14## ##WHITESPACE##
+
+<tr>
+  <td></td>
+  <td class="block" colspan=4>Memory Size</td>
+</tr>
+<tr>
+  <td></td>  <td></td>  <td></td>  <td></td>
+  <td> <input type="text" size="5" value="64"> MB </td>
+</tr>
+
+##WHITESPACE## ##GREYLINE14## ##WHITESPACE##
+
+<tr>
+  <td></td>
+  <td class="block" colspan=4>Kernel Image</td>
+</tr>
+<tr>
+  <td></td> 
+  <td colspan=2 align="right">path</td>
+  <td></td>
+  <td> <input type="text" size="40" value="/usr/src/xeno/install/xenolinux.gz"> </td>
+</tr>
+
+##WHITESPACE## ##GREYLINE14## ##WHITESPACE##
+
+<tr>
+  <td></td>
+  <td class="block" colspan=4>IP Config</td>
+</tr>
+<tr>
+  <td></td> <td></td>
+  <td class="block" align="right">IP address</td>
+  <td></td>
+  <td> <input type="text" size="15" value="128.232.35.202"> </td>
+</tr>
+<tr>
+  <td></td>   <td></td> 
+  <td class="block" align="right">Gateway</td>
+  <td></td>
+  <td> <input type="text" size="15" value="128.232.32.1"> </td>
+</tr>
+<tr>
+  <td></td>   <td></td> 
+  <td class="block" align="right">Netmask</td>
+  <td></td>
+  <td> <input type="text" size="15" value="255.255.240.0"> </td>
+</tr>
+<tr>
+  <td></td>   <td></td> 
+  <td class="block" align="right">New Name</td>
+  <td></td>
+  <td> <input type="text" size="15"> </td>
+</tr>
+
+##WHITESPACE## ##GREYLINE14## ##WHITESPACE##
+
+<tr>
+  <td></td>
+  <td class="block" colspan=2>Root File System</td>
+</tr>
+
+##WHITESPACE##
+
+<tr>
+  <td></td>
+  <td align="right">NFS<input type="radio" name="root" value="nfs"></td>
+  <td align="right">path</td>
+  <td></td>
+  <td><input type="text" size="40" value="/usr/groups/xeno/srgboot/mousetrap/root0"></td>
+</tr>
+<tr>
+  <td></td>  <td></td>
+  <td align="right">server</td>
+  <td></td>
+  <td><input type="text" size="15" value="128.232.32.20"></td>
+</tr>
+ ##WHITESPACE##
+<tr>
+  <td></td>
+  <td align="right">ramdisk<input type="radio" name="root" value="ram"></td>
+  <td align="right">path</td>
+  <td></td>
+  <td><input type="text" size="40" value="/usr/isolinux/initrd.gz"></td>
+</tr>
+ ##WHITESPACE##
+<tr>
+  <td></td>
+  <td align="right">raw partition<input type="radio" name="root" value="raw"></td>
+  <td align="right">path</td>
+  <td></td>
+  <td><input type="text" size="40" value="/dev/xsda8"></td>
+</tr>
+ ##WHITESPACE##
+<tr>
+  <td></td>
+  <td align="right">virtual disk<input type="radio" checked name="root" value="virtual"></td>
+  <td align="right">path</td>
+  <td></td>
+  <td><input type="text" size="40" value="/dev/xvda0"></td>
+</tr>
+
+##WHITESPACE## ##GREYLINE14## ##WHITESPACE##
+
+<tr>
+  <td></td>
+  <td class="block" colspan=4>Extra Arguments</td>
+</tr>
+<tr>
+  <td></td> 
+  <td colspan=2 align="right"></td>
+  <td></td>
+  <td> <input type="text" size="40"> </td>
+</tr>
+
+
+##WHITESPACE## ##GREYLINE14## ##WHITESPACE##
+
+<tr>
+  <td></td>
+  <td><input type="submit" value="refresh"></td>
+</tr>
+
+##WHITESPACE## 
+
+<tr>
+  <td></td>
+  <td colspan=4>
+  <textarea cols="60" rows="5" name="commandline">
+When you press refresh, the sample command line shows
+up here. The user has the option of editing it before
+pressing execute below.  e.g.
+./newdom 16000 image 128.232.35.202 ip=128.232.35.202:128.232.32.20:128.232.32.1:255.255.240.0::eth0:off root=/dev/xsda9 ro
+</textarea>
+</td></tr>
+
+##WHITESPACE## 
+
+<tr>
+  <td></td>
+  <td><input type="submit" value="execute"></td>
+</tr>
+
+</tbody>
+</table>
+</form>
+
+
+
+<!-- end content -->

@@ -1,0 +1,15 @@
+#!/bin/bash
+
+if [ -z "$QUERY_DEV" ] ; then QUERY_DEV=eth0 ; fi
+
+if [ "$1" = "ip" ] ; then
+  /sbin/ifconfig $QUERY_DEV | grep 'inet addr' | tr ':' '\t' | awk '{ print $3}';
+fi
+
+if [ "$1" = "mask" ] ; then
+  /sbin/ifconfig $QUERY_DEV | grep 'Mask' | tr ':' '\t' | awk '{print $7}';
+fi
+
+if [ "$1" = "route" ] ; then
+  /sbin/route -n | grep $QUERY_DEV | grep 'G' | awk '{print $2}'
+fi

@@ -8,10 +8,11 @@
 #  1. Domain id
 #  2. Processor
 #  3. Has CPU (1 => true, 0 => false)
-#  4. State (RUNNING, INTERRUPTABLE, UNINTERRUPTABLE, WAIT, SUSPENDED, DYING)
-#  5. MCU advance
-#  6. Total pages
-#  7. Name
+#  4. State (integer)
+#  5. State (RUNNING, INTERRUPTABLE, UNINTERRUPTABLE, WAIT, SUSPENDED, DYING)
+#  6. MCU advance
+#  7. Total pages
+#  8. Name
 
 INPUT_FILE=/proc/xeno/domains
 
@@ -36,7 +37,7 @@ awk -f - $INPUT_FILE <<EOF
 
   tot_pages = \$8;
 
-  printf "%d %d %d %s %d %d %s", dom_id, processor, has_cpu, state, mcu_advance, tot_pages, \$9;
+  printf "%d %d %d %d %s %d %d %s", dom_id, processor, has_cpu, \$4, state, mcu_advance, tot_pages, \$9;
   for (i = 10; i < NF; i ++) {
     printf " %s", \$i;
   }

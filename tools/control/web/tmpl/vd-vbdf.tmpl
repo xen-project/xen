@@ -1,0 +1,59 @@
+Flush Virtual Block Devices
+SECTION&XenoServers
+BREADCRUMB&Virtual Disk Manager&vd.jsp
+
+<!-- content -->
+<img src="pixel.gif" class="block" width="1" height="12">
+
+<table cellpadding="0" cellspacing="0" border="0">
+<tbody>
+INCLUDE&vdmenu.tmpl
+<td valign="top">
+
+<form method="post" action="vd-vbdfr.jsp">
+<table cellpadding="0" cellspacing="0" border="0">
+<tbody>
+
+<tr><td>
+<table cellpadding="2" cellspacing="0" border="0">
+<tbody>
+  <tr class="vdh"><td>vd key</td><td>dom</td><td>vbd</td><td>mode</td></tr>
+
+  <%
+    for (Enumeration e = root.getVirtualBlockDevices(); e.hasMoreElements();)
+    {
+      VirtualBlockDevice vbd = (VirtualBlockDevice) e.nextElement();
+  %>
+    <tr class="vdt">
+      <td><%= vbd.getKey() %></td>
+      <td><%= vbd.getDomain() %></td>
+      <td><%= vbd.getVBDNum() %></td>
+      <td><%= vbd.getMode().toString() %></td>
+    </tr>
+  <%
+    }
+  %>
+
+</tbody>
+</table>
+</td></tr>
+
+##WHITESPACE## ##GREYLINE1## ##WHITESPACE##
+
+<tr>
+  <td><font color="red">Warning, this will remove all virtual block devices</font></td>
+</tr>
+
+<tr>
+  <td><input type="submit" value="flush all vbds"></td>
+</tr>
+</form>
+
+</td>
+</tbody>
+</table>
+
+
+
+
+<!-- end content -->

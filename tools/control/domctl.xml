@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<domctl_defaults>
+<xi_tools_dir>/usr/local/bin/</xi_tools_dir>
+<domain_name>XenoLinux</domain_name>
+<domain_size_kb>16000</domain_size_kb>
+<domain_image>./image</domain_image>
+<domain_vifs>1</domain_vifs>
+<root_device>/dev/nfs</root_device>
+<nw_ip>=+</nw_ip>
+<nw_gw>=</nw_gw>
+<nw_mask>=</nw_mask>
+<nw_nfs_server>128.232.32.20</nw_nfs_server>
+<nw_nfs_root>/usr/groups/srgboot/moonraider/roots/root+</nw_nfs_root>
+<max_domain_number>10</max_domain_number>
+</domctl_defaults>

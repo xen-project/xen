@@ -1,0 +1,50 @@
+Domain List
+SECTION&XenoServers
+BREADCRUMB&Domain Manager&dom.jsp
+
+<!-- content -->
+<img src="pixel.gif" class="block" width="1" height="12">
+
+<table cellpadding="0" cellspacing="0" border="0">
+<tbody>
+INCLUDE&dommenu.tmpl
+<td valign="top">
+
+<%
+  CommandList command_list = new CommandList();
+  Defaults d = sc.getDefaults(); 
+  Domain domains[] = command_list.executeCommand(d);
+%>
+
+<table cellpadding="2" cellspacing="0" border="0">
+<tbody>
+  <tr class="vdh"><td>domain<br>id</td><td>processor</td><td>has<br>cpu</td><td>state</td><td>mcu<br>advance</td><td>total<br>pages</td><td>name</td></tr>
+  <%
+    /* assert: domains != null, otherwise, where is the servlet engine? */
+    for (int loop = 0; loop < domains.length; loop++)
+    {
+  %>
+  <tr>
+    <td align="center"><%= domains[loop].id %></td>
+    <td align="center"><%= domains[loop].processor %></td>
+    <td align="center"><%= domains[loop].cpu %> </td>
+    <td><%= domains[loop].state %> </td>
+    <td align="center"><%= domains[loop].mcu %> </td>
+    <td align="center"><%= domains[loop].pages %> </td>
+    <td><%= domains[loop].name %> </td>
+  </tr>
+  <%
+    }
+  %>
+</tbody>
+</table>
+
+
+</td>
+</tbody>
+</table>
+
+
+
+
+<!-- end content -->

@@ -1,0 +1,60 @@
+View Free Space
+SECTION&XenoServers
+BREADCRUMB&Virtual Disk Manager&vd.jsp
+
+<!-- content -->
+<img src="pixel.gif" class="block" width="1" height="12">
+
+<table cellpadding="0" cellspacing="0" border="0">
+<tbody>
+INCLUDE&vdmenu.tmpl
+<td valign="top">
+
+
+<table cellpadding="0" cellspacing="0" border="0">
+<tbody>
+
+<tr><td>
+<table cellpadding="2" cellspacing="0" border="0">
+<tbody>
+  <tr class="vdh"><td>idx</td><td>disk</td><td>offset</td><td>size </td></tr>
+
+  <%
+    long space = 0;
+    int count = root.getFreeExtentCount();
+    for (int loop = 0; loop < count; loop++)
+    {
+      Extent e = root.getFreeExtent(loop);
+      space += e.getSize();
+  %>
+  <tr class="vdt">
+  <td              ><%= loop %></td>
+  <td              ><%= e.getDisk() %></td>
+  <td align="right"><%= e.getOffset() %> </td>
+  <td align="right"><%= e.getSize() %> </td>
+  </tr>
+  <%
+    }
+  %>
+</tbody>
+</table>
+</td></tr>
+
+
+##WHITESPACE## ##GREYLINE1## ##WHITESPACE##
+
+<tr><td>
+Total available freespace: <%= space * 512 / (1024 * 1024) %> MB
+</td></tr>
+
+</tbody>
+</table>
+
+</td>
+</tbody>
+</table>
+
+
+
+
+<!-- end content -->

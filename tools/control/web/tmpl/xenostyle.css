@@ -1,0 +1,91 @@
+body {background-color: #ffffff; color: #000000;}
+
+p, ul, ol, li, table, td {font-family: Arial, Helvetica, sans-serif; }
+
+a {text-decoration:none;}
+a:link {color: #003399; font-family: Arial, Helvetica, sans-serif;}
+a:visited {color: #cc3333; font-family: Arial, Helvetica, sans-serif;}
+a:hover {text-decoration: underline; font-family: Arial, Helvetica, sans-serif;}
+a:active {color: #cc0000; font-family: Arial, Helvetica, sans-serif;}
+
+a.bread {font-size: 80%; font-weight: bold;}
+a.univbread {font-size: 90%; font-weight: bold;}
+p.small {font-size: 90%;}
+p.smallc {font-size: 90%; text-align:center; font-weight: bold;}
+p.foot {font-size: 110%; text-align:center;}
+p.nav {font-size: 80%;}
+span.activenav {font-size: 80%; color: #000000}
+
+.bigb {font-size: 110%; font-weight: bold;} 
+.small {font-size: 90%;}
+.deptitle {font-size: 140%; color: #000000; font-weight: bold;}
+.deptitle {font-size: 120%; color: #000000; font-weight: bold;}
+.title {font-size: 130%; color: #990000; font-weight: bold;}
+.center {text-align:center;}
+div.footer {font-size: 80%;}
+
+h1 {font-weight: bold; font-size: 120%; color: #990000; font-family: Arial, Helvetica, sans-serif;}
+h2 {font-weight: bold; font-size: 110%; color: #333333; font-family: Arial, Helvetica, sans-serif;}
+h3 {font-weight: bold; font-style: italic; font-size: 100%; color: #333333; font-family: Arial, Helvetica, sans-serif;}
+h4 {font-weight: bold; font-size: 90%; color: #333333; font-family: Arial, Helvetica, sans-serif;}
+h5 {font-weight: bold; font-size: 80%; color: #333333; font-family: Arial, Helvetica, sans-serif;}
+
+
+/* netscape 6 correction */
+.null {font-size: 1px;}
+
+/* linux correction */
+.block {display: block;}
+
+
+/* home page */
+.homeheading {font-weight: bold; font-size: 80%; font-family: arial, helvetica, sans-serif;  color: #990000;}
+
+a.homemenu  {font-weight: bold; font-family: arial, helvetica, sans-serif;}
+a.homemenu2 {font-size: 80%; font-family: arial, helvetica, sans-serif;}
+
+p.homealert {font-size: 80%; color: #990000; font-family: arial, helvetica, sans-serif;}
+p.homenews {font-size: 80%; font-family: arial, helvetica, sans-serif;}
+
+
+<!--from admin styles-->
+.linkcell { background: #003399; color: #ffffff }
+a.cell { font-family: sans-serif; text-decoration:none }
+a.cell:link { color: #ffffff } 
+a.cell:visited { color: #ffffff } 
+a.cell:active { color: #ffff33 }
+
+
+.sidemenu {
+   /*font-weight : 400; */
+   /*font-size : 13px; */
+   /*line-height : 12px; */
+   /*font-family : Verdana, Arial, Helvetica, sans-serif, "MS sans serif"; */
+   /*letter-spacing : 0px; */
+   /*text-decoration : none; */
+   text-align : left; 
+}
+
+.menuheader {
+   color : #003366;
+   font-weight : bold; 
+   /*font-size : 13px; */
+   /*line-height : 15px; */
+   /*font-family : Verdana, Arial, Helvetica, sans-serif, "MS sans serif"; */
+   /*letter-spacing : -1px; */
+   text-decoration : none; 
+   text-align : left; 
+}
+
+.vdh {
+   background-color: #003366;
+   color : #ffffff;
+   font-weight : bold; 
+   text-align : center; 
+}
+.vdt {
+   background-color: #f0f0f0;
+}
+.vds {
+   background-color: #aaaaaa;
+}

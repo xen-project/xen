@@ -1,0 +1,44 @@
+Create Virtual Block Device
+SECTION&XenoServers
+BREADCRUMB&Virtual Disk Manager&vd.jsp
+
+<!-- content -->
+<img src="pixel.gif" class="block" width="1" height="12">
+
+<table cellpadding="0" cellspacing="0" border="0">
+<tbody>
+INCLUDE&vdmenu.tmpl
+<td valign="top">
+
+<b>Create Virtual Block Device Results</b>
+<br>
+
+<%
+  HttpServletRequestWrapper hsrw = new HttpServletRequestWrapper(request);
+%>
+output = <%= root.doCreateVirtualBlockDevice(hsrw.getParameter("vd"),
+                    Integer.decode(hsrw.getParameter("domain")).intValue(),
+                    Integer.decode(hsrw.getParameter("vbd")).intValue(),
+                                             hsrw.getParameter("mode"))
+         %>
+<br>
+vd = <%= hsrw.getParameter("vd") %>
+<br>
+domain = <%= hsrw.getParameter("domain") %>
+<br>
+vbd = <%= hsrw.getParameter("vbd") %>
+<br>
+mode = <%= hsrw.getParameter("mode") %>
+
+<%
+  root.doFlushState();
+%>
+
+</td>
+</tbody>
+</table>
+
+
+
+
+<!-- end content -->

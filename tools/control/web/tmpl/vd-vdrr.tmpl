@@ -1,0 +1,72 @@
+Refresh Virtual Disk Results
+SECTION&XenoServers
+BREADCRUMB&Virtual Disk Manager&vd.jsp
+
+<!-- content -->
+<img src="pixel.gif" class="block" width="1" height="12">
+
+<table cellpadding="0" cellspacing="0" border="0">
+<tbody>
+INCLUDE&vdmenu.tmpl
+<td valign="top">
+
+<%
+  HttpServletRequestWrapper hsrw = new HttpServletRequestWrapper(request);
+
+  String vds[] = hsrw.getParameterValues("vd");
+  long expiry = Long.decode(hsrw.getParameter("expiry")).longValue(); 
+
+  /* not perfect, but good enough for now... */
+    if ( hsrw.getParameter("expiryunits").equals("d"))
+  {
+    expiry *= 24 * 60 * 60 * 1000;
+  }
+  else if ( hsrw.getParameter("expiryunits").equals("w"))
+  {
+    expiry *= 24 * 60 * 60 * 1000 * 7;
+  }
+  else if ( hsrw.getParameter("expiryunits").equals("m"))
+  {
+    expiry *= 24 * 60 * 60 * 1000 * 30;
+  }
+  else if ( hsrw.getParameter("expiryunits").equals("y"))
+  {
+    expiry *= 24 * 60 * 60 * 1000 * 365;
+  }
+
+  if (vds == null)
+  { 
+%>
+no virtual disks selected.
+<%
+  }
+  else
+  {
+    for (int i = 0; i < vds.length; i++)
+    {
+%>
+vd = <%= root.doRefreshVirtualDisk(vds[i], expiry) %> <br>
+<%
+    }
+  }
+%>
+
+<br>
+expiry = <%= hsrw.getParameter("expiry") %>
+<br>
+expiryunits = <%= hsrw.getParameter("expiryunits") %>
+<br>
+
+<%
+  root.doFlushState();
+%>
+
+
+</td>
+</tbody>
+</table>
+
+
+
+
+<!-- end content -->

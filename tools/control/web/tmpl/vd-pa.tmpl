@@ -1,0 +1,97 @@
+Add Partition
+SECTION&XenoServers
+BREADCRUMB&Virtual Disk Manager&vd.jsp
+
+<!-- content -->
+<img src="pixel.gif" class="block" width="1" height="12">
+
+<table cellpadding="0" cellspacing="0" border="0">
+<tbody>
+INCLUDE&vdmenu.tmpl
+<td valign="top">
+
+<form method="post" action="vd-par.jsp">
+<table cellpadding="0" cellspacing="0" border="0">
+<tbody>
+
+<tr><td>
+
+<table cellpadding="2" cellspacing="0" border="0">
+<tbody>
+  <tr class="vdh"><td></td><td>maj:min</td><td>blocks</td><td>start sect</td><td>num sects</td><td>name</td></tr>
+  <%
+    int count = root.getPartitionCount();
+    for (int loop = 0; loop < count; loop++)
+    {
+	Partition p = root.getPartition(loop);
+	if (p.getIsXeno() == true)
+        {
+  %>
+  <tr class="vds"><td></td>
+  <%
+        }
+        else
+        {
+  %>
+  <tr class="vdt">
+    <td><input type="checkbox" name="p" value="<%= p.getName() %>"></td>
+  <%
+        }
+  %>
+    <td><%= p.getMajor() %>:<%= p.getMinor() %></td>
+    <td align="right"><%= p.getBlocks() %></td>
+    <td align="right"><%= p.getStartSect() %> </td>
+    <td align="right"><%= p.getNumSects() %> </td>
+    <td><%= p.getName() %> </td>
+  </tr>
+  <%
+    }
+  %>
+</tbody>
+</table>
+
+</td></tr>
+
+##WHITESPACE## ##GREYLINE1## ##WHITESPACE##
+
+
+<tr><td>
+<table cellpadding="0" cellspacing="0" border="0">
+<tbody>
+
+<tr>
+  <td width="50"></td>
+  <td width="7"></td>
+  <td></td>
+</tr>
+
+<tr>
+  <td align="right">chunksize</td>
+  <td></td>
+  <td> <input type="text" size="5" name="chunk" value="256">
+       <input type="radio" name="chunkunits" value="m" checked>MB
+       <input type="radio" name="chunkunits" value="g">GB
+  </td>
+</tr>
+</tbody>
+</table>
+</td></tr>
+
+##WHITESPACE## ##GREYLINE1## ##WHITESPACE##
+
+<tr>
+  <td><input type="submit" name="action" value="add partition"></td>
+</tr>
+
+</tbody>
+</table>
+</form>
+
+</td>
+</tbody>
+</table>
+
+
+
+
+<!-- end content -->
