@@ -1,9 +1,12 @@
 
+XEN_ROOT = ../..
+include $(XEN_ROOT)/tools/Rules.mk
+
 all:
-	python setup.py build
+	CFLAGS="$(CFLAGS)" python setup.py build
 
 install: all
-	python setup.py install --home="$(DESTDIR)/usr"
+	CFLAGS="$(CFLAGS)" python setup.py install --home="$(DESTDIR)/usr"
 
 clean:
 	rm -rf build *.pyc *.pyo *.o *.a *~
