@@ -181,7 +181,6 @@ ENTRY(lcall27)
 	popl %eax
 	jmp ret_from_sys_call
 
-        
 ENTRY(ret_from_fork)
 	pushl %ebx
 	call SYMBOL_NAME(schedule_tail)
@@ -197,7 +196,6 @@ ENTRY(ret_from_fork)
  * go as quickly as possible which is why some of this is
  * less clear than it otherwise should be.
  */
-
 ENTRY(system_call)
 	pushl %eax			# save orig_eax
 	SAVE_ALL
@@ -211,7 +209,7 @@ ENTRY(system_call)
 ENTRY(ret_from_sys_call)
         movl SYMBOL_NAME(HYPERVISOR_shared_info),%esi
         btrl $EVENTS_MASTER_ENABLE_BIT,4(%esi) # make tests atomic
-ret_syscall_tests:      
+ret_syscall_tests:
 	cmpl $0,need_resched(%ebx)
 	jne reschedule
 	cmpl $0,sigpending(%ebx)
@@ -314,13 +312,12 @@ ENTRY(hypervisor_callback)
         call do_hypervisor_callback
         add  $4,%esp
         movl SYMBOL_NAME(HYPERVISOR_shared_info),%esi
-        xorl %eax,%eax
         movb CS(%esp),%cl
 	test $2,%cl          # slow return to ring 2 or 3
 	jne  ret_syscall_tests
 safesti:btsl $EVENTS_MASTER_ENABLE_BIT,4(%esi) # reenable event callbacks
 scrit:  /**** START OF CRITICAL REGION ****/
-        cmpl %eax,(%esi)
+        cmpl $0,(%esi)
         jne  14f              # process more events if necessary...
         RESTORE_ALL
 14:     btrl $EVENTS_MASTER_ENABLE_BIT,4(%esi)
@@ -352,7 +349,7 @@ critical_region_fixup:
         jmp  11b
         
 critical_fixup_table:        
-        .byte 0x00,0x00                       # cmpl %eax,(%esi)
+        .byte 0x00,0x00,0x00                  # cmpl $0,(%esi)
         .byte 0x00,0x00                       # jne  14f
         .byte 0x00                            # pop  %ebx
         .byte 0x04                            # pop  %ecx

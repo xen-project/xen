@@ -871,6 +871,6 @@ int do_process_page_updates(page_update_request_t *ureqs, int count)
 
     }
 
-    return(0);
+    return 0;
 }
 
