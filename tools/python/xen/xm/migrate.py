@@ -33,7 +33,7 @@ def main(argv):
         opts.usage()
         return
     if len(args) != 2:
-        opts.err('Invalid arguments')
+        opts.err('Invalid arguments: ' + str(args))
     dom = args[0]
     dst = args[1]
     if dom in [DOM0_NAME, DOM0_ID]:

@@ -305,7 +305,7 @@ class ProgMigrate(Prog):
         migrate.help([self.name] + args)
     
     def main(self, args):
-        migrate.main([self.name] + args)
+        migrate.main(args)
 
 xm.prog(ProgMigrate)
 
