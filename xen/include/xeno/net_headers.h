@@ -119,9 +119,9 @@ struct arphdr
 
     /* This next bit is variable sized, and as coded only allows ETH-IPv4 */
     __u8    ar_sha[ETH_ALEN];            /* sender hardware address       */
-    __u32   ar_sip;                      /* sender IP address             */
+    __u8    ar_sip[4];                   /* sender IP address             */
     __u8    ar_tha[ETH_ALEN];            /* target hardware address       */
-    __u32   ar_tip;                      /* target IP address             */
+    __u8    ar_tip[4];                   /* target IP address             */
 };
 
 
