@@ -1870,30 +1870,32 @@ void audit_domain( struct domain *d)
 
             if ( tcount < 0 )
             {
+		// This will only come out once
                 printk("Audit %d: type count whent below zero pfn=%x taf=%x otaf=%x\n",
                        d->domain, page-frame_table,
                        page->u.inuse.type_info,
                        page->tlbflush_timestamp);
-                return;
             }
             
             page->u.inuse.type_info =
-                (page->u.inuse.type_info & ~PGT_count_mask) | tcount;
+                (page->u.inuse.type_info & ~PGT_count_mask) | 
+		(tcount & PGT_count_mask);
         }
 
         ctot++;
         count += dir;
         if ( count < 0 )
         {
+	    // This will only come out once
             printk("Audit %d: general count whent below zero pfn=%x taf=%x otaf=%x\n",
                    d->domain, page-frame_table,
                    page->u.inuse.type_info,
                    page->tlbflush_timestamp);
-            return;
         }
             
         page->count_info =
-            (page->count_info & ~PGC_count_mask) | count;            
+            (page->count_info & ~PGC_count_mask) | 
+	    (count & PGC_count_mask);            
 
     }
 
@@ -2055,11 +2057,34 @@ void audit_domain( struct domain *d)
 
                     if ( (l1page->u.inuse.type_info & PGT_type_mask) !=
                          PGT_l1_page_table )
-                        printk("Audit %d: [%x] Expected L1 t=%x pfn=%lx\n",
-                               d->domain, i,
-                               l1page->u.inuse.type_info,
-                               l1pfn);
+		    {
+			if( (l1page->u.inuse.type_info & PGT_type_mask) ==
+			    PGT_l2_page_table )
+			{
+			    if( l1pfn == pfn )			    
+			    {
+				printk("Audit %d: [%x] Found Self Linear PT t=%x pfn=%lx\n",
+				       d->domain, i,
+				       l1page->u.inuse.type_info,
+				       l1pfn);
+			    }
+			    else
+			    {
+				printk("Audit %d: [%x] Found Other Linear PT t=%x pfn=%lx\n",
+				       d->domain, i,
+				       l1page->u.inuse.type_info,
+				       l1pfn);
+			    }
+			}
+			else
+			{
+			    printk("Audit %d: [%x] Expected L1 t=%x pfn=%lx\n",
+				   d->domain, i,
+				   l1page->u.inuse.type_info,
+				   l1pfn);
+			}
 
+		    }
                     adjust( l1page, -1, 1 );
                 }
             }
