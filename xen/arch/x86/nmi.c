@@ -20,7 +20,6 @@
 #include <xen/delay.h>
 #include <xen/interrupt.h>
 #include <xen/time.h>
-#include <xen/timex.h>
 #include <xen/sched.h>
 
 #include <asm/mc146818rtc.h>
@@ -103,7 +102,7 @@ int __init check_nmi_watchdog (void)
         cpu = cpu_logical_map(j);
         prev_nmi_count[cpu] = irq_stat[cpu].__nmi_count;
     }
-    sti();
+    __sti();
     mdelay((10*1000)/nmi_hz); /* wait 10 ticks */
 
     for ( j = 0; j < smp_num_cpus; j++ ) 
