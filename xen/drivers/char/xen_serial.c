@@ -2,6 +2,7 @@
 #include <xeno/sched.h>    /* this has request_irq() proto for some reason */
 #include <xeno/keyhandler.h> 
 #include <xeno/reboot.h>
+#include <xeno/irq.h>
 
 /* Register offsets */
 #define NS16550_RBR	0x00	/* receive buffer	*/
@@ -42,27 +43,21 @@
 
 #define SERIAL_BASE 0x3f8  /* XXX SMH: horrible hardwired COM1   */
 
-
-
 static int serial_echo = 0;   /* default is not to echo; change with 'e' */
+
 
 void toggle_echo(u_char key, void *dev_id, struct pt_regs *regs) 
 {
     serial_echo = !serial_echo; 
-    return; 
 }
-
-
 
 static void serial_rx_int(int irq, void *dev_id, struct pt_regs *regs)
 {
     u_char c; 
     key_handler *handler; 
 
-    /* XXX SMH: should probably check this is an RX interrupt :-) */
-
     /* clear the interrupt by reading the character */
-    c = inb(SERIAL_BASE + NS16550_RBR );
+    c = inb(SERIAL_BASE + NS16550_RBR);
 
     /* if there's a handler, call it: we trust it won't screw us too badly */
     if((handler = get_key_handler(c)) != NULL) 
@@ -70,8 +65,6 @@ static void serial_rx_int(int irq, void *dev_id, struct pt_regs *regs)
 
     if(serial_echo) 
 	printk("%c", c); 
-
-    return; 
 }
 
 void initialize_serial() 
@@ -92,12 +85,6 @@ void initialize_serial()
     outb(NS16550_MCR_OUT2, SERIAL_BASE + NS16550_MCR);   /* Modem control */
     outb(NS16550_IER_ERDAI, SERIAL_BASE + NS16550_IER ); /* Setup interrupts */
 
-    /* XXX SMH: this is a hack; probably is IRQ4 but grab both anyway */
-    if((rc = request_irq(4, serial_rx_int, 0, "serial", (void *)0x1234)))
+    if((rc = request_irq(4, serial_rx_int, 0, "serial", 0)))
 	printk("initialize_serial: failed to get IRQ4, rc=%d\n", rc); 
-
-    if((rc = request_irq(3, serial_rx_int, 0, "serial", (void *)0x1234)))
-	printk("initialize_serial: failed to get IRQ3, rc=%d\n", rc); 
-    
-    return; 
 }
