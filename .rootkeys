@@ -254,7 +254,6 @@
 412f46c0LJuKAgSPGoC0Z1DEkLfuLA linux-2.6.10-rc3-xen-sparse/mm/memory.c
 410a94a4KT6I6X0LVc7djB39tRDp4g linux-2.6.10-rc3-xen-sparse/mm/page_alloc.c
 41505c572m-s9ATiO1LiD1GPznTTIg linux-2.6.10-rc3-xen-sparse/net/core/skbuff.c
-4149ec79wMpIHdvbntxqVGLRZZjPxw linux-2.6.10-rc3-xen-sparse/net/ipv4/raw.c
 413cb1e4zst25MDYjg63Y-NGC5_pLg netbsd-2.0-xen-sparse/Makefile
 413cb1e5c_Mkxf_X0zimEhTKI_l4DA netbsd-2.0-xen-sparse/mkbuildtree
 413cb1e5kY_Zil7-b0kI6hvCIxBEYg netbsd-2.0-xen-sparse/nbconfig-xen
