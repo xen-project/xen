@@ -13,6 +13,7 @@
 #include <hypervisor-ifs/kbd.h>
 #include <xen/event.h>
 #include <xen/console.h>
+#include <xen/interrupt.h>
 
 /* Hash-defines torn from <xen/pc_keyb.h> and <asm/keyboard.h> */
 
@@ -241,23 +242,13 @@ static void keyboard_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 }
     
     
+static struct irqaction keyb = { keyboard_interrupt, "Keyboard",   NULL };
+static struct irqaction aux  = { keyboard_interrupt, "PS/2 Mouse", NULL };
 
 void initialize_keyboard()
 {
     spin_lock_init(&kbd_lock);
-
-    if( request_irq(KEYBOARD_IRQ, keyboard_interrupt, 
-                    SA_NOPROFILE, "keyboard", NULL)) 
-    {
-        printk("initialize_keyboard: failed to alloc IRQ %d\n", KEYBOARD_IRQ); 
-        return;
-    }
-
-    if ( request_irq(AUX_IRQ, keyboard_interrupt, 
-                     SA_NOPROFILE, "PS/2 Mouse", NULL)) 
-    {
-        printk("initialize_keyboard: failed to alloc IRQ %d\n", AUX_IRQ); 
-        return;
-    }
+    (void)setup_irq(KEYBOARD_IRQ, &keyb);
+    (void)setup_irq(AUX_IRQ,      &aux);
 }
 

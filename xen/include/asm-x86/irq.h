@@ -6,14 +6,6 @@
 #include <xen/config.h>
 #include <asm/atomic.h>
 
-#define SA_INTERRUPT    0x20000000
-#define SA_SHIRQ        0x04000000
-#define SA_NOPROFILE	0x02000000
-
-#define SA_SAMPLE_RANDOM  0   /* Linux driver compatibility */
-
-#define TIMER_IRQ 0
-
 extern void disable_irq(unsigned int);
 extern void disable_irq_nosync(unsigned int);
 extern void enable_irq(unsigned int);
@@ -34,12 +26,6 @@ extern void enable_irq(unsigned int);
 
 /*
  * Special IRQ vectors used by the SMP architecture, 0xf0-0xff
- *
- *  some of the following vectors are 'rare', they are merged
- *  into a single vector (CALL_FUNCTION_VECTOR) to save vector space.
- *  TLB, reschedule and local APIC vectors are performance-critical.
- *
- *  Vectors 0xf0-0xfa are free (reserved for future Linux use).
  */
 #define SPURIOUS_APIC_VECTOR	0xff
 #define ERROR_APIC_VECTOR	0xfe
@@ -186,7 +172,7 @@ SYMBOL_NAME_STR(IRQ) #nr "_interrupt:\n\t" \
 	"jmp common_interrupt");
 
 extern unsigned long prof_cpu_mask;
-extern unsigned int * prof_buffer;
+extern unsigned int *prof_buffer;
 extern unsigned long prof_len;
 extern unsigned long prof_shift;
 

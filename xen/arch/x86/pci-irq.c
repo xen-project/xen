@@ -903,10 +903,8 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 			if (!(mask & (1 << i)))
 				continue;
 			if (pirq_penalty[i] < pirq_penalty[newirq] &&
-			    !request_irq(i, pcibios_test_irq_handler, SA_SHIRQ, "pci-test", dev)) {
-				free_irq(i, dev);
+			    pirq_guest_bindable(i,1))
 				newirq = i;
-			}
 		}
 	}
 	DBG(" -> newirq=%d", newirq);

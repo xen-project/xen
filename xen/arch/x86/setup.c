@@ -300,8 +300,8 @@ unsigned long pci_mem_start = 0x10000000;
 
 void __init start_of_day(void)
 {
-    extern void trap_init(void);
     extern void init_IRQ(void);
+    extern void trap_init(void);
     extern void time_init(void);
     extern void ac_timer_init(void);
     extern void initialize_keytable(); 
@@ -350,8 +350,8 @@ void __init start_of_day(void)
         get_smp_config();
 #endif
     scheduler_init();	
-    trap_init();
     init_IRQ();  /* installs simple interrupt wrappers. Starts HZ clock. */
+    trap_init();
     time_init(); /* installs software handler for HZ clock. */
     softirq_init();
     init_apic_mappings(); /* make APICs addressable in our pagetables. */

@@ -12,6 +12,7 @@
 #include <xen/sched.h>
 #include <xen/keyhandler.h> 
 #include <xen/reboot.h>
+#include <xen/interrupt.h>
 #include <xen/irq.h>
 #include <xen/serial.h>
 #include <asm/pdb.h>
@@ -73,11 +74,12 @@
 #define RXBUFSZ 32
 #define MASK_RXBUF_IDX(_i) ((_i)&(RXBUFSZ-1))
 typedef struct {
-    int           baud, data_bits, parity, stop_bits, io_base, irq;
-    serial_rx_fn  rx_lo, rx_hi, rx;
-    spinlock_t    lock;
-    unsigned char rxbuf[RXBUFSZ];
-    unsigned int  rxbufp, rxbufc;
+    int              baud, data_bits, parity, stop_bits, io_base, irq;
+    serial_rx_fn     rx_lo, rx_hi, rx;
+    spinlock_t       lock;
+    unsigned char    rxbuf[RXBUFSZ];
+    unsigned int     rxbufp, rxbufc;
+    struct irqaction irqaction;
 } uart_t;
 
 static uart_t com[2] = {
@@ -249,12 +251,10 @@ static void uart_config_stage2(uart_t *uart)
     if ( !UART_ENABLED(uart) )
         return;
 
-    rc = request_irq(uart->irq, 
-                     serial_interrupt, 
-                     SA_NOPROFILE, 
-                     "serial", 
-                     uart);
-    if ( rc != 0 )
+    uart->irqaction.handler = serial_interrupt;
+    uart->irqaction.name    = "serial";
+    uart->irqaction.dev_id  = uart;
+    if ( (rc = setup_irq(uart->irq, &uart->irqaction)) != 0 )
         printk("ERROR: Failed to allocate serial IRQ %d\n", uart->irq);
 
     /* For sanity, clear the receive FIFO. */

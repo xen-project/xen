@@ -48,7 +48,7 @@ BUILD_COMMON_IRQ()
  * ISA PIC or low IO-APIC triggered (INTA-cycle or APIC) interrupts:
  * (these are usually mapped to vectors 0x30-0x3f)
  */
-    BUILD_16_IRQS(0x0)
+BUILD_16_IRQS(0x0)
 
 #ifdef CONFIG_X86_IO_APIC
 /*
@@ -61,10 +61,10 @@ BUILD_COMMON_IRQ()
  *
  * (these are usually mapped into the 0x30-0xff vector range)
  */
-    BUILD_16_IRQS(0x1) BUILD_16_IRQS(0x2) BUILD_16_IRQS(0x3)
-    BUILD_16_IRQS(0x4) BUILD_16_IRQS(0x5) BUILD_16_IRQS(0x6) BUILD_16_IRQS(0x7)
-    BUILD_16_IRQS(0x8) BUILD_16_IRQS(0x9) BUILD_16_IRQS(0xa) BUILD_16_IRQS(0xb)
-    BUILD_16_IRQS(0xc)
+BUILD_16_IRQS(0x1) BUILD_16_IRQS(0x2) BUILD_16_IRQS(0x3)
+BUILD_16_IRQS(0x4) BUILD_16_IRQS(0x5) BUILD_16_IRQS(0x6) BUILD_16_IRQS(0x7)
+BUILD_16_IRQS(0x8) BUILD_16_IRQS(0x9) BUILD_16_IRQS(0xa) BUILD_16_IRQS(0xb)
+BUILD_16_IRQS(0xc)
 #endif
 
 #undef BUILD_16_IRQS
@@ -77,23 +77,21 @@ BUILD_COMMON_IRQ()
  * through the ICC by us (IPIs)
  */
 #ifdef CONFIG_SMP
-    BUILD_SMP_INTERRUPT(event_check_interrupt,EVENT_CHECK_VECTOR)
-    BUILD_SMP_INTERRUPT(invalidate_interrupt,INVALIDATE_TLB_VECTOR)
-    BUILD_SMP_INTERRUPT(call_function_interrupt,CALL_FUNCTION_VECTOR)
+BUILD_SMP_INTERRUPT(event_check_interrupt,EVENT_CHECK_VECTOR)
+BUILD_SMP_INTERRUPT(invalidate_interrupt,INVALIDATE_TLB_VECTOR)
+BUILD_SMP_INTERRUPT(call_function_interrupt,CALL_FUNCTION_VECTOR)
 #endif
 
 /*
- * every pentium local APIC has two 'local interrupts', with a
+ * Every pentium local APIC has two 'local interrupts', with a
  * soft-definable vector attached to both interrupts, one of
  * which is a timer interrupt, the other one is error counter
  * overflow. Linux uses the local APIC timer interrupt to get
  * a much simpler SMP time architecture:
  */
-#ifdef CONFIG_X86_LOCAL_APIC
-    BUILD_SMP_TIMER_INTERRUPT(apic_timer_interrupt,LOCAL_TIMER_VECTOR)
-    BUILD_SMP_INTERRUPT(error_interrupt,ERROR_APIC_VECTOR)
-    BUILD_SMP_INTERRUPT(spurious_interrupt,SPURIOUS_APIC_VECTOR)
-#endif
+BUILD_SMP_TIMER_INTERRUPT(apic_timer_interrupt,LOCAL_TIMER_VECTOR)
+BUILD_SMP_INTERRUPT(error_interrupt,ERROR_APIC_VECTOR)
+BUILD_SMP_INTERRUPT(spurious_interrupt,SPURIOUS_APIC_VECTOR)
 
 #define IRQ(x,y) \
 	IRQ##x##y##_interrupt
@@ -374,56 +372,24 @@ void __init init_8259A(int auto_eoi)
     spin_unlock_irqrestore(&i8259A_lock, flags);
 }
 
-
-/*
- * IRQ2 is cascade interrupt to second interrupt controller
- */
-
-static struct irqaction irq2 = { no_action, 0, 0, "cascade", NULL, NULL};
-
-void __init init_ISA_irqs (void)
-{
-    int i;
-
-#ifdef CONFIG_X86_LOCAL_APIC
-    init_bsp_APIC();
-#endif
-    init_8259A(0);
-
-    for (i = 0; i < NR_IRQS; i++) {
-        irq_desc[i].status = IRQ_DISABLED;
-        irq_desc[i].action = 0;
-        irq_desc[i].depth = 1;
-
-        if (i < 16) {
-            /*
-             * 16 old-style INTA-cycle interrupts:
-             */
-            irq_desc[i].handler = &i8259A_irq_type;
-        } else {
-            /*
-             * 'high' PCI IRQs filled in on demand
-             */
-            irq_desc[i].handler = &no_irq_type;
-        }
-    }
-}
+static struct irqaction cascade = { no_action, "cascade", NULL};
 
 void __init init_IRQ(void)
 {
     int i;
 
-    init_ISA_irqs();
+    init_bsp_APIC();
 
-    /*
-     * Cover the whole vector space, no vector can escape
-     * us. (some of these will be overridden and become
-     * 'special' SMP interrupts)
-     */
-    for (i = 0; i < NR_IRQS; i++) {
-        int vector = FIRST_EXTERNAL_VECTOR + i;
-        if (vector != HYPERVISOR_CALL_VECTOR) 
-            set_intr_gate(vector, interrupt[i]);
+    init_8259A(0);
+
+    for ( i = 0; i < NR_IRQS; i++ )
+    {
+        irq_desc[i].status  = IRQ_DISABLED;
+        irq_desc[i].handler = (i<16) ? &i8259A_irq_type : &no_irq_type;
+        irq_desc[i].action  = NULL;
+        irq_desc[i].depth   = 1;
+        spin_lock_init(&irq_desc[i].lock);
+        set_intr_gate(FIRST_EXTERNAL_VECTOR+i, interrupt[i]);
     }
 
 #ifdef CONFIG_SMP
@@ -433,38 +399,26 @@ void __init init_IRQ(void)
      */
     set_intr_gate(FIRST_DEVICE_VECTOR, interrupt[0]);
 
-    /*
-     * The reschedule interrupt is a CPU-to-CPU reschedule-helper
-     * IPI, driven by wakeup.
-     */
+    /* Various IPI functions. */
     set_intr_gate(EVENT_CHECK_VECTOR, event_check_interrupt);
-
-    /* IPI for invalidation */
     set_intr_gate(INVALIDATE_TLB_VECTOR, invalidate_interrupt);
-
-    /* IPI for generic function call */
     set_intr_gate(CALL_FUNCTION_VECTOR, call_function_interrupt);
 #endif	
 
-#ifdef CONFIG_X86_LOCAL_APIC
-    /* self generated IPI for local APIC timer */
+    /* Self-generated IPI for local APIC timer. */
     set_intr_gate(LOCAL_TIMER_VECTOR, apic_timer_interrupt);
 
-    /* IPI vectors for APIC spurious and error interrupts */
+    /* IPI vectors for APIC spurious and error interrupts. */
     set_intr_gate(SPURIOUS_APIC_VECTOR, spurious_interrupt);
     set_intr_gate(ERROR_APIC_VECTOR, error_interrupt);
-#endif
 
-    /*
-     * Set the clock to HZ Hz, we already have a valid
-     * vector now:
-     */
+    /* Set the clock to HZ Hz */
 #define CLOCK_TICK_RATE 1193180 /* crystal freq (Hz) */
 #define LATCH (((CLOCK_TICK_RATE)+(HZ/2))/HZ)
     outb_p(0x34,0x43);		/* binary, mode 2, LSB/MSB, ch 0 */
     outb_p(LATCH & 0xff , 0x40);	/* LSB */
     outb(LATCH >> 8 , 0x40);	/* MSB */
 
-    setup_irq(2, &irq2);
+    setup_irq(2, &cascade);
 }
 
