@@ -19,6 +19,9 @@ RETVAL=0
 
 INITD=/etc/init.d/
 
+AUTODIR=/etc/xen/auto
+LOCKFILE=/var/lock/subsys/xendomains
+
 if [ -e /lib/lsb ]; then
     # assume an LSB-compliant distro (Debian with LSB package,
     # recent-enough SuSE, others...)
@@ -52,24 +55,23 @@ fi
 
 
 start() {
-    if [ -f /var/lock/subsys/xendomains ]; then return; fi
+    if [ -f $LOCKFILE ]; then return; fi
 
     echo -n $"Starting auto Xen domains:"
 
-    # we expect config scripts for auto starting domains to be in
-    # /etc/xc/auto/ - they could just be symlinks to files elsewhere
-    if [ -d /etc/xc/auto ] &&
-	    [ $(ls /etc/xc/auto/ | wc -l) -gt 0 ]; then
+    # We expect config scripts for auto starting domains to be in
+    # AUTODIR - they could just be symlinks to files elsewhere
+    if [ -d $AUTODIR ] && [ $(ls $AUTODIR | wc -l) -gt 0 ]; then
+	touch $LOCKFILE
 	
-       # create all domains with config files in /etc/xc/auto
-	for dom in /etc/xc/auto/*; do
-	    xc_dom_create.py -q -f $dom
+       # Create all domains with config files in AUTODIR.
+	for dom in  $AUTODIR/*; do
+	    xm create --quiet --defaults $dom
 	    if [ $? -ne 0 ]; then
 		RETVAL=$?
 	    fi
 	done
 
-	touch /var/lock/subsys/xendomains
     fi
 
     on_fn_exit
@@ -78,40 +80,24 @@ start() {
 stop()
 {
     # NB. this shuts down ALL Xen domains (politely), not just the ones in
-    # /etc/xc/auto/*
+    # AUTODIR/*
     # This is because it's easier to do ;-) but arguably if this script is run
     # on system shutdown then it's also the right thing to do.
     
     echo -n $"Shutting down all Xen domains:"
 
-    if [ -d /var/run/xendomains ] &&
-	    [ $(ls /var/run/xendomains/ | wc -l) -gt 0 ]; then
-	
-	cd /var/run/xendomains/
+    xm shutdown --all --wait --norestart
 
-	for pid in *; do
-	   
-	    kill -s SIGTERM $(cat $pid)
-
-	done
-
-    fi
-
-    sleep 3 # avoid races
-
-    xc_dom_control.py shutdown all -w # shut down all domains, politely and wait
-                                      # for all to exit
-    
     RETVAL=$?
 
-    [ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/xendomains
+    [ $RETVAL -eq 0 ] && rm -f $LOCKFILE
 
     on_fn_exit
 }
 
 # This does NOT necessarily restart all running domains: instead it
 # stops all running domains and then boots all the domains specified in
-# /etc/xc/auto.  If other domains have been started manually then they will
+# AUTODIR.  If other domains have been started manually then they will
 # not get restarted.
 # Commented out to avoid confusion!
 #
@@ -149,7 +135,7 @@ case "$1" in
 #	;;
 
     status)
-	xc_dom_control.py list
+	xm list
 	;;
 
     *)

@@ -24,11 +24,11 @@ gopts.opt('quiet', short='q',
          use="Quiet.")
 
 gopts.opt('path', val='PATH',
-         fn=set_value, default='.:/etc/xc',
+         fn=set_value, default='.:/etc/xen',
          use="Search path for default scripts.")
 
 gopts.opt('defaults', short='f', val='FILE',
-         fn=set_value, default='xmdefaults',
+         fn=set_value, default='defaults',
          use="Use the given default script.")
 
 gopts.opt('config', short='F', val='FILE',
@@ -220,12 +220,13 @@ def configure_vifs(config_devs, opts):
             config_vif.append(['bridge', bridge])
         config_devs.append(['device', config_vif])
 
-##     if vfr_ipaddr:
-##         config_vfr = ['vfr']
-##         idx = 0 # No way of saying which IP is for which vif?
-##         for ip in vfr_ipaddr:
-##             config_vfr.append(['vif', ['id', idx], ['ip', ip]])
-##         config.append(config_vfr)
+def configure_vfr(config, opts):
+     if not opts.ipaddr: return
+     config_vfr = ['vfr']
+     idx = 0 # No way of saying which IP is for which vif?
+     for ip in opts.ipaddr:
+         config_vfr.append(['vif', ['id', idx], ['ip', ip]])
+     config.append(config_vfr)
 
 
 def make_config(opts):

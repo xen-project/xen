@@ -24,6 +24,10 @@ gopts.opt('wait', short='w',
          fn=set_true, default=0,
          use='Wait for shutdown to complete.')
 
+gopts.opt('norestart', short='n',
+          fn=set_true, default=0,
+          use='Prevent domain restart.')
+
 def shutdown(opts, doms, wait):
     def domains():
         return [ int(a) for a in server.xend_domains() ]

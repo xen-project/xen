@@ -30,13 +30,13 @@ def last_reboot():
 class XendRoot:
     """Root of the management classes."""
 
-    lastboot_default = "/etc/xen/xend/lastboot"
+    lastboot_default = "/var/xen/lastboot"
 
     """Default path to the root of the database."""
-    dbroot_default = "/etc/xen/xend/xenmgr-db"
+    dbroot_default = "/var/xen/xend-db"
 
     """Default path to the config file."""
-    config_default = "/etc/xen/xenmgr-config.sxp"
+    config_default = "/etc/xen/xend-config.sxp"
 
     """Environment variable used to override config_default."""
     config_var     = "XEND_CONFIG"

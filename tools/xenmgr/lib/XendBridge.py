@@ -12,6 +12,7 @@ os.defpath = os.defpath + ':/sbin:/usr/sbin:/usr/local/sbin'
 CMD_IFCONFIG = 'ifconfig'
 CMD_ROUTE    = 'route'
 CMD_BRCTL    = 'brctl'
+CMD_IPTABLES = "iptables"
 
 DEFAULT_BRIDGE = 'nbe-br'
 DEFAULT_INTERFACE = 'eth0'
@@ -60,6 +61,16 @@ def vif_bridge_rem(dom, vif, bridge=None):
     print 'vif_bridge_rem>', dom, vif, bridge
     d = { 'bridge': bridge, 'vif': vif_dev(dom, vif) }
     cmd(CMD_BRCTL, 'delif %(bridge)s %(vif)s' % d)
+
+def vif_restrict_addr(dom, vif, addr, delete=0):
+    d = { 'vif': vif_dev(dom, vif), 'addr': addr}
+    if delete:
+        d['flag'] = '-D'
+    else:
+        d['flag' = '-A'
+    cmd(CMD_IPTABLES, '-P FORWARD DROP')
+    cmd(CMD_IPTABLES, '%(flag)s FORWARD -m physdev --physdev-in %(vif)s -s %(addr)s -j ACCEPT' % d)
+    cmd(CMD_IPTABLES, '%(flag)s FORWARD -m physdev --physdev-out %(vif)s -d %(addr)s -j ACCEPT' % d)
 
 def bridge_create(bridge=None, **kwd):
     """Create a bridge.
