@@ -23,7 +23,7 @@ install: all
 	mkdir -p ../../../../install/lib
 	mkdir -p ../../../../install/include
 	cp -a $(LIBS) ../../../../install/lib
-	for i in $(LIBS) do ; chmod 755 ../../../../install/bin/$i ; done
+	for i in $(LIBS); do chmod 755 ../../../../install/bin/$i ; done
 	cp -a xc.h ../../../../install/include
 	chmod 644 ../../../../install/include/xc.h
 
