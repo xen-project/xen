@@ -178,7 +178,29 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             break;
 
         if ( op->u.createdomain.cpu == -1 )
-            pro = (unsigned int)dom % smp_num_cpus;
+	{
+	    /* Do an initial placement. Fix me for hyperthreading! */
+	    struct domain    *d;
+	    int i, j=0, c[smp_num_cpus];
+	    
+	    pro=0; /* keep compiler happy */
+
+	    for (i=0;i<smp_num_cpus;i++) 
+		c[i]=0;
+
+	    for_each_domain ( d ) {
+		c[d->processor]++;
+		j++;
+	    }
+
+	    for (i=0;i<smp_num_cpus;i++) {
+		if( c[i]<j )
+		{
+		    j = c[i];
+		    pro = i;
+		}
+	    }
+	}
         else
             pro = op->u.createdomain.cpu % smp_num_cpus;
 
