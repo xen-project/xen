@@ -92,7 +92,6 @@ void do_task_queues(u_char key, void *dev_id, struct pt_regs *regs)
     unsigned long       flags; 
     struct task_struct *p; 
     shared_info_t      *s; 
-    net_vif_t          *v;
 
     printk("'%c' pressed -> dumping task queues\n", key); 
 
