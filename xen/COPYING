@@ -1,7 +1,7 @@
  XEN NOTICE
  ==========
 
-This copyright does *not* cover guest operating systems that use
+This license does *not* cover guest operating systems that use
 Xen services via normal hypercalls - this is merely considered normal
 use of Xen, and does *not* fall under the heading of "derived work".
 Also note that the GPL below is copyrighted by the Free Software
