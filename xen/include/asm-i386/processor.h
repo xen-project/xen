@@ -287,9 +287,12 @@ extern unsigned int mca_pentium_flag;
 #define TASK_UNMAPPED_BASE	(TASK_SIZE / 3)
 
 /*
- * Size of io_bitmap in longwords: 32 is ports 0-0x3ff.
+ * Size of io_bitmap in longwords:
+ * For Xen we support the full 8kbyte IO bitmap but use the io_bitmap_sel field
+ * of the task_struct to avoid a full 8kbyte copy when switching to / from
+ * domains with bits cleared.
  */
-#define IO_BITMAP_SIZE	32
+#define IO_BITMAP_SIZE	2048
 #define IO_BITMAP_BYTES (IO_BITMAP_SIZE * 4)
 #define IO_BITMAP_OFFSET offsetof(struct tss_struct,io_bitmap)
 #define INVALID_IO_BITMAP_OFFSET 0x8000
@@ -429,7 +432,7 @@ long set_fast_trap(struct task_struct *p, int idx);
 	0,0,0,0,0,0, /* ds,fs,gs */				\
 	0,0, /* ldt */						\
 	0, INVALID_IO_BITMAP_OFFSET, /* tace, bitmap */		\
-	{~0, } /* ioperm */					\
+	{ [0 ... IO_BITMAP_SIZE] = ~0UL }, /* ioperm */         \
 }
 
 struct mm_struct {

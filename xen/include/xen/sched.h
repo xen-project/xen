@@ -44,11 +44,13 @@ extern struct mm_struct init_mm;
 #define PF_IDLETASK     4 /* Is this one of the per-CPU idle domains?    */
 #define PF_PRIVILEGED   5 /* Is this domain privileged?                  */
 #define PF_CONSOLEWRITEBUG 6 /* Has this domain used the obsolete console? */
+#define PF_PHYSDEV      7 /* May this domain do IO to physical devices? */
 
 #include <xen/vif.h>
 #include <xen/vbd.h>
 
 #define IS_PRIV(_p) (test_bit(PF_PRIVILEGED, &(_p)->flags))
+#define IS_CAPABLE_PHYSDEV(_p) (test_bit(PF_PHYSDEV, &(_p)->flags))
 
 struct task_struct;
 
@@ -173,6 +175,14 @@ struct task_struct
     /* Physical I/O */
     spinlock_t       pcidev_lock;
     struct list_head pcidev_list;
+
+    /* The following IO bitmap stuff is x86-dependent. */
+    u64 io_bitmap_sel; /* Selector to tell us which part of the IO bitmap are
+                        * "interesting" (i.e. have clear bits) */
+
+    /* Handy macro - number of bytes of the IO bitmap, per selector bit. */
+#define IOBMP_SELBIT_LWORDS ( IO_BITMAP_SIZE / 64 )
+    unsigned long *io_bitmap; /* Pointer to task's IO bitmap or NULL */
 
     unsigned long flags;
 

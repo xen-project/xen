@@ -126,7 +126,7 @@ int physdev_pci_access_modify(
 {
     struct task_struct *p;
     struct pci_dev *pdev;
-    int rc = 0;
+    int i, j, rc = 0;
  
     if ( !IS_PRIV(current) )
         BUG();
@@ -146,7 +146,7 @@ int physdev_pci_access_modify(
         return -ESRCH;
 
     /* Make the domain privileged. */
-    set_bit(PF_PRIVILEGED, &p->flags);
+    set_bit(PF_PHYSDEV, &p->flags);
 
     /* Grant write access to the specified device. */
     if ( (pdev = pci_find_slot(bus, PCI_DEVFN(dev, func))) == NULL )
@@ -164,6 +164,55 @@ int physdev_pci_access_modify(
     if ( pdev->hdr_type != PCI_HEADER_TYPE_NORMAL )
         INFO("XXX can't give access to bridge devices yet\n");
 
+    /* Now, setup access to the IO ports and memory regions for the device. */
+
+    if ( p->io_bitmap == NULL )
+    {
+        p->io_bitmap = kmalloc(IO_BITMAP_BYTES, GFP_KERNEL);
+        if ( p->io_bitmap == NULL )
+        {
+            rc = -ENOMEM;
+            goto out;
+        }
+        memset(p->io_bitmap, 0xFF, IO_BITMAP_BYTES);
+
+        p->io_bitmap_sel = ~0ULL;
+    }
+
+    for ( i = 0; i < DEVICE_COUNT_RESOURCE; i++ )
+    {
+        struct resource *r = &pdev->resource[i];
+        
+        if ( r->flags & IORESOURCE_IO )
+        {
+            /* Give the domain access to the IO ports it needs.  Currently,
+             * this will allow all processes in that domain access to those
+             * ports as well.  This will do for now, since driver domains don't
+             * run untrusted processes! */
+            INFO("Giving domain %llu IO resources (%lx - %lx) "
+                 "for device %s\n", dom, r->start, r->end, pdev->slot_name);
+            for ( j = r->start; j < r->end + 1; j++ )
+            {
+                clear_bit(j, p->io_bitmap);
+                /* Record that we cleared a bit using bit n of the selector:
+                 * n = (j / (4 bytes in a word * 8 bits in a byte))
+                 *     / number of words per selector bit
+                 */
+                clear_bit((j / (8 * 4)) / IOBMP_SELBIT_LWORDS,
+                          &p->io_bitmap_sel);
+            }
+        }
+        else if ( r->flags & IORESOURCE_MEM )
+        {
+            /* allow domain to map IO memory for this device */
+            INFO("Giving domain %llu memory resources (%lx - %lx) "
+                 "for device %s\n", dom, r->start, r->end, pdev->slot_name);
+            for ( j = r->start; j < r->end + 1; j += PAGE_SIZE )
+                SHARE_PFN_WITH_DOMAIN(frame_table + (j >> PAGE_SHIFT), p);
+        }
+    }
+
+
  out:
     put_task_struct(p);
     return rc;
@@ -180,8 +229,8 @@ inline static int check_dev_acc (struct task_struct *p,
 
     *pdev = NULL;
 
-    if ( !IS_PRIV(p) )
-        return -EPERM; /* no pci acces permission */
+     if ( !IS_CAPABLE_PHYSDEV(p) )
+         return -EPERM; /* no pci access permission */
 
     if ( bus > PCI_BUSMAX || dev > PCI_DEVMAX || func > PCI_FUNCMAX )
         return -EINVAL;
@@ -651,5 +700,7 @@ void physdev_init_dom0(struct task_struct *p)
                    dev->slot_name);
         }
     }
+
+    set_bit(PF_PHYSDEV, &p->flags);
 }
 

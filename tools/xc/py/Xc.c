@@ -228,19 +228,18 @@ static PyObject *pyxc_linux_build(PyObject *self,
 
     u64   dom;
     char *image, *ramdisk = NULL, *cmdline = "";
-    int   control_evtchn, io_priv = 0;
+    int   control_evtchn;
 
     static char *kwd_list[] = { "dom", "control_evtchn", 
-                                "image", "ramdisk", "cmdline", "io_priv",
-				NULL };
+                                "image", "ramdisk", "cmdline", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "Lis|ssi", kwd_list, 
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "Lis|ss", kwd_list, 
                                       &dom, &control_evtchn, 
-                                      &image, &ramdisk, &cmdline, &io_priv) )
+                                      &image, &ramdisk, &cmdline) )
         return NULL;
 
     if ( xc_linux_build(xc->xc_handle, dom, image, 
-                        ramdisk, cmdline, control_evtchn, io_priv) != 0 )
+                        ramdisk, cmdline, control_evtchn) != 0 )
         return PyErr_SetFromErrno(xc_error);
     
     Py_INCREF(zero);
@@ -255,19 +254,18 @@ static PyObject *pyxc_netbsd_build(PyObject *self,
 
     u64   dom;
     char *image, *ramdisk = NULL, *cmdline = "";
-    int   control_evtchn, io_priv = 0;
+    int   control_evtchn;
 
     static char *kwd_list[] = { "dom", "control_evtchn",
-                                "image", "ramdisk", "cmdline", "io_priv",
-				NULL };
+                                "image", "ramdisk", "cmdline", NULL };
 
     if ( !PyArg_ParseTupleAndKeywords(args, kwds, "Lis|ssi", kwd_list, 
                                       &dom, &control_evtchn,
-                                      &image, &ramdisk, &cmdline, &io_priv) )
+                                      &image, &ramdisk, &cmdline) )
         return NULL;
 
     if ( xc_netbsd_build(xc->xc_handle, dom, image, 
-                         cmdline, control_evtchn, io_priv) != 0 )
+                         cmdline, control_evtchn) != 0 )
         return PyErr_SetFromErrno(xc_error);
     
     Py_INCREF(zero);
@@ -1162,8 +1160,7 @@ static PyMethodDef pyxc_methods[] = {
       " dom     [long]:     Identifier of domain to build into.\n"
       " image   [str]:      Name of kernel image file. May be gzipped.\n"
       " ramdisk [str, n/a]: Name of ramdisk file, if any.\n"
-      " cmdline [str, n/a]: Kernel parameters, if any.\n"
-      " io_priv [boolean]:  Does the domain have IO privileges?\n\n"
+      " cmdline [str, n/a]: Kernel parameters, if any.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "netbsd_build", 
@@ -1172,15 +1169,14 @@ static PyMethodDef pyxc_methods[] = {
       "Build a new NetBSD guest OS.\n"
       " dom     [long]:     Identifier of domain to build into.\n"
       " image   [str]:      Name of kernel image file. May be gzipped.\n"
-      " cmdline [str, n/a]: Kernel parameters, if any.\n"
-      " io_priv [boolean]:  Does the domain have IO privileges?\n\n"
+      " cmdline [str, n/a]: Kernel parameters, if any.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "bvtsched_global_set",
       (PyCFunction)pyxc_bvtsched_global_set,
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Set global tuning parameters for Borrowed Virtual Time scheduler.\n"
-      " ctx_allow [int]: Minimal guaranteed quantum (I think!).\n\n"
+      " ctx_allow [int]: Minimal guaranteed quantum.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "bvtsched_global_get",
@@ -1195,10 +1191,10 @@ static PyMethodDef pyxc_methods[] = {
       METH_VARARGS | METH_KEYWORDS, "\n"
       "Set per-domain tuning parameters for Borrowed Virtual Time scheduler.\n"
       " dom    [long]: Identifier of domain to be tuned.\n"
-      " mcuadv [int]:  Internal BVT parameter.\n"
-      " warp   [int]:  Internal BVT parameter.\n"
-      " warpl  [int]:  Internal BVT parameter.\n"
-      " warpu  [int]:  Internal BVT parameter.\n\n"
+      " mcuadv [int]:  Proportional to the inverse of the domain's weight.\n"
+      " warp   [int]:  How far to warp domain's EVT on unblock.\n"
+      " warpl  [int]:  How long the domain can run warped.\n"
+      " warpu  [int]:  How long before the domain can warp again.\n\n"
       "Returns: [int] 0 on success; -1 on error.\n" },
 
     { "bvtsched_domain_get",
