@@ -40,6 +40,7 @@ from xen.util.ip import _readline, _readlines
 import channel
 import blkif
 import netif
+import usbif
 import console
 import domain
 from params import *
@@ -261,6 +262,7 @@ class EventProtocol(protocol.Protocol):
         val += self.daemon.consoles()
         val += self.daemon.blkifs()
         val += self.daemon.netifs()
+        val += self.daemon.usbifs()
         return val
 
     def op_sys_subscribe(self, name, v):
@@ -617,6 +619,7 @@ class Daemon:
         self.domainCF = domain.DomainControllerFactory()
         self.blkifCF = blkif.BlkifControllerFactory()
         self.netifCF = netif.NetifControllerFactory()
+        self.usbifCF = usbif.UsbifControllerFactory()
         self.consoleCF = console.ConsoleControllerFactory()
 
     def listenEvent(self):
@@ -682,6 +685,15 @@ class Daemon:
 
     def netif_get(self, dom):
         return self.netifCF.getControllerByDom(dom)
+
+    def usbif_create(self, dom, recreate=0):
+        return self.usbifCF.getController(dom)
+    
+    def usbifs(self):
+        return [ x.sxpr() for x in self.usbifCF.getControllers() ]
+
+    def usbif_get(self, dom):
+        return self.usbifCF.getControllerByDom(dom)
 
     def console_create(self, dom, console_port=None):
         """Create a console for a domain.

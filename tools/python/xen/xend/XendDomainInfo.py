@@ -658,6 +658,7 @@ class XendDomainInfo:
         """
         self.release_vifs()
         self.release_vbds()
+        self.release_usbifs()
         
         self.devices = {}
         self.device_index = {}
@@ -680,6 +681,15 @@ class XendDomainInfo:
         ctrl = xend.blkif_get(self.dom)
         if ctrl:
             log.debug("Destroying vbds for domain %d", self.dom)
+            ctrl.destroy()
+
+    def release_usbifs(self):
+        """Release vm virtual USB devices (usbifs).
+        """
+        if self.dom is None: return
+        ctrl = xend.usbif_get(self.dom)
+        if ctrl:
+            log.debug("Destroying usbifs for domain %d", self.dom)
             ctrl.destroy()
 
     def show(self):
@@ -994,6 +1004,8 @@ class XendDomainInfo:
                 self.blkif_backend = 1
             elif name == 'netif':
                 self.netif_backend = 1
+            elif name == 'usbif':
+                self.usbif_backend = 1
             else:
                 raise VmError('invalid backend type:' + str(name))
 
@@ -1174,6 +1186,23 @@ def vm_dev_vif(vm, val, index, change=0):
     defer.addCallback(cbok)
     return defer
 
+def vm_dev_usb(vm, val, index):
+    """Attach the relevant physical ports to the domains' USB interface.
+
+    @param vm:    virtual machine
+    @param val:   USB interface config
+    @param index: USB interface index
+    @return: deferred
+    """
+    ctrl = xend.usbif_create(vm.dom, recreate=vm.recreate)
+    log.debug("Creating USB interface dom=%d", vm.dom)
+    defer = ctrl.attachDevice(val, recreate=vm.recreate)
+    def cbok(path):
+        vm.add_device('usb', val[1][1])
+        return path
+    defer.addCallback(cbok)
+    return defer
+
 def vm_dev_vbd(vm, val, index, change=0):
     """Create a virtual block device (vbd).
 
@@ -1278,6 +1307,7 @@ add_image_handler('vmx',  vm_image_vmx)
 add_device_handler('vif',  vm_dev_vif)
 add_device_handler('vbd',  vm_dev_vbd)
 add_device_handler('pci',  vm_dev_pci)
+add_device_handler('usb',  vm_dev_usb)
 
 # Ignore the fields we already handle.
 add_config_handler('name',       vm_field_ignore)

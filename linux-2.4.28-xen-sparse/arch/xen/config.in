@@ -16,14 +16,18 @@ mainmenu_option next_comment
 comment 'Xen'
 bool 'Support for privileged operations (domain 0)' CONFIG_XEN_PRIVILEGED_GUEST
 bool 'Device-driver domain (physical device access)' CONFIG_XEN_PHYSDEV_ACCESS
+if [ "$CONFIG_XEN_PHYSDEV_ACCESS" = "y" ]; then
+    bool 'USB-device backend driver' CONFIG_XEN_USB_BACKEND
+fi
 bool 'Scrub memory before freeing it to Xen' CONFIG_XEN_SCRUB_PAGES
 bool 'Network-device frontend driver' CONFIG_XEN_NETDEV_FRONTEND
 bool 'Block-device frontend driver' CONFIG_XEN_BLKDEV_FRONTEND
+bool 'USB-device frontend driver' CONFIG_XEN_USB_FRONTEND
 endmenu
 # The IBM S/390 patch needs this.
 define_bool CONFIG_NO_IDLE_HZ y
 
-if [ "$CONFIG_XEN_PHYSDEV_ACCESS" == "y" ]; then
+if [ "$CONFIG_XEN_PHYSDEV_ACCESS" = "y" ]; then
    define_bool CONFIG_FOREIGN_PAGES y
 else
    define_bool CONFIG_FOREIGN_PAGES n
@@ -262,7 +266,7 @@ fi
 
 source drivers/char/Config.in
 
-if [ "$CONFIG_XEN_PHYSDEV_ACCESS" = "y" ]; then
+if [ "$CONFIG_XEN_PHYSDEV_ACCESS" = "y" -o "$CONFIG_XEN_USB_FRONTEND" = "y" ]; then
    source drivers/media/Config.in
 fi
 
@@ -295,9 +299,16 @@ if [ "$CONFIG_XEN_PHYSDEV_ACCESS" = "y" ]; then
       source drivers/sound/Config.in
    fi
    endmenu
+fi
 
+if [ "$CONFIG_XEN_PHYSDEV_ACCESS" = "y" -o "$CONFIG_XEN_USB_FRONTEND" = "y" ]; then
+   if [ "$CONFIG_XEN_USB_FRONTEND" = "y" -o "$CONFIG_XEN_USB_BACKEND" = "y" ]; then
+       define_bool CONFIG_USB y
+   fi
    source drivers/usb/Config.in
+fi
 
+if [ "$CONFIG_XEN_PHYSDEV_ACCESS" = "y" ]; then
    source net/bluetooth/Config.in
 fi
 

@@ -64,7 +64,8 @@ typedef struct {
 #define CMSG_NETIF_FE       4  /* Network-device frontend */
 #define CMSG_SHUTDOWN       6  /* Shutdown messages       */
 #define CMSG_MEM_REQUEST    7  /* Memory reservation reqs */
-
+#define CMSG_USBIF_BE       8  /* USB controller backend  */
+#define CMSG_USBIF_FE       9  /* USB controller frontend */
 
 /******************************************************************************
  * CONSOLE DEFINITIONS
@@ -553,6 +554,208 @@ typedef struct {
     u32        status;        /*  0: NETIF_DRIVER_STATUS_??? */
 } PACKED netif_be_driver_status_t; /* 4 bytes */
 
+
+
+/******************************************************************************
+ * USB-INTERFACE FRONTEND DEFINITIONS
+ */
+
+/* Messages from domain controller to guest. */
+#define CMSG_USBIF_FE_INTERFACE_STATUS_CHANGED   0
+
+/* Messages from guest to domain controller. */
+#define CMSG_USBIF_FE_DRIVER_STATUS_CHANGED     32
+#define CMSG_USBIF_FE_INTERFACE_CONNECT         33
+#define CMSG_USBIF_FE_INTERFACE_DISCONNECT      34
+/*
+ * CMSG_USBIF_FE_INTERFACE_STATUS_CHANGED:
+ *  Notify a guest about a status change on one of its block interfaces.
+ *  If the interface is DESTROYED or DOWN then the interface is disconnected:
+ *   1. The shared-memory frame is available for reuse.
+ *   2. Any unacknowledged messages pending on the interface were dropped.
+ */
+#define USBIF_INTERFACE_STATUS_DESTROYED    0 /* Interface doesn't exist.    */
+#define USBIF_INTERFACE_STATUS_DISCONNECTED 1 /* Exists but is disconnected. */
+#define USBIF_INTERFACE_STATUS_CONNECTED    2 /* Exists and is connected.    */
+typedef struct {
+    u32 status; /*  0 */
+    u16 evtchn; /*  4: (only if status == BLKIF_INTERFACE_STATUS_CONNECTED). */
+    domid_t domid; /* 6: status != BLKIF_INTERFACE_STATUS_DESTROYED */
+    u32 bandwidth; /* 8 */
+    u32 num_ports; /* 12 */
+} PACKED usbif_fe_interface_status_changed_t; /* 12 bytes */
+
+/*
+ * CMSG_USBIF_FE_DRIVER_STATUS_CHANGED:
+ *  Notify the domain controller that the front-end driver is DOWN or UP.
+ *  When the driver goes DOWN then the controller will send no more
+ *  status-change notifications.
+ *  If the driver goes DOWN while interfaces are still UP, the domain
+ *  will automatically take the interfaces DOWN.
+ * 
+ *  NB. The controller should not send an INTERFACE_STATUS_CHANGED message
+ *  for interfaces that are active when it receives an UP notification. We
+ *  expect that the frontend driver will query those interfaces itself.
+ */
+#define USBIF_DRIVER_STATUS_DOWN   0
+#define USBIF_DRIVER_STATUS_UP     1
+typedef struct {
+    /* IN */
+    u32 status;        /*  0: USBIF_DRIVER_STATUS_??? */
+} PACKED usbif_fe_driver_status_changed_t; /* 4 bytes */
+
+/*
+ * CMSG_USBIF_FE_INTERFACE_CONNECT:
+ *  If successful, the domain controller will acknowledge with a
+ *  STATUS_CONNECTED message.
+ */
+typedef struct {
+    u32      __pad;
+    memory_t shmem_frame; /*  8 */
+    MEMORY_PADDING;
+} PACKED usbif_fe_interface_connect_t; /* 16 bytes */
+
+/*
+ * CMSG_BLKIF_FE_INTERFACE_DISCONNECT:
+ *  If successful, the domain controller will acknowledge with a
+ *  STATUS_DISCONNECTED message.
+ */
+typedef struct {} PACKED usbif_fe_interface_disconnect_t; /* 4 bytes */
+
+
+/******************************************************************************
+ * USB-INTERFACE BACKEND DEFINITIONS
+ */
+
+/* Messages from domain controller. */
+#define CMSG_USBIF_BE_CREATE       0  /* Create a new block-device interface. */
+#define CMSG_USBIF_BE_DESTROY      1  /* Destroy a block-device interface.    */
+#define CMSG_USBIF_BE_CONNECT      2  /* Connect i/f to remote driver.        */
+#define CMSG_USBIF_BE_DISCONNECT   3  /* Disconnect i/f from remote driver.   */
+#define CMSG_USBIF_BE_CLAIM_PORT   4  /* Claim host port for a domain.        */
+#define CMSG_USBIF_BE_RELEASE_PORT 5  /* Release host port.                   */
+/* Messages to domain controller. */
+#define CMSG_USBIF_BE_DRIVER_STATUS_CHANGED 32
+
+/* Non-specific 'okay' return. */
+#define USBIF_BE_STATUS_OKAY                0
+/* Non-specific 'error' return. */
+#define USBIF_BE_STATUS_ERROR               1
+/* The following are specific error returns. */
+#define USBIF_BE_STATUS_INTERFACE_EXISTS    2
+#define USBIF_BE_STATUS_INTERFACE_NOT_FOUND 3
+#define USBIF_BE_STATUS_INTERFACE_CONNECTED 4
+#define USBIF_BE_STATUS_OUT_OF_MEMORY       7
+#define USBIF_BE_STATUS_MAPPING_ERROR       9
+
+/* This macro can be used to create an array of descriptive error strings. */
+#define USBIF_BE_STATUS_ERRORS {    \
+    "Okay",                         \
+    "Non-specific error",           \
+    "Interface already exists",     \
+    "Interface not found",          \
+    "Interface is still connected", \
+    "Out of memory",                \
+    "Could not map domain memory" }
+
+/*
+ * CMSG_USBIF_BE_CREATE:
+ *  When the driver sends a successful response then the interface is fully
+ *  created. The controller will send a DOWN notification to the front-end
+ *  driver.
+ */
+typedef struct { 
+    /* IN */
+    domid_t    domid;         /*  0: Domain attached to new interface.   */
+    u16        __pad;
+    /* OUT */
+    u32        status;        /*  8 */
+} PACKED usbif_be_create_t; /* 12 bytes */
+
+/*
+ * CMSG_USBIF_BE_DESTROY:
+ *  When the driver sends a successful response then the interface is fully
+ *  torn down. The controller will send a DESTROYED notification to the
+ *  front-end driver.
+ */
+typedef struct { 
+    /* IN */
+    domid_t    domid;         /*  0: Identify interface to be destroyed. */
+    u16        __pad;
+    /* OUT */
+    u32        status;        /*  8 */
+} PACKED usbif_be_destroy_t; /* 12 bytes */
+
+/*
+ * CMSG_USBIF_BE_CONNECT:
+ *  When the driver sends a successful response then the interface is fully
+ *  connected. The controller will send a CONNECTED notification to the
+ *  front-end driver.
+ */
+typedef struct { 
+    /* IN */
+    domid_t    domid;         /*  0: Domain attached to new interface.   */
+    u16        __pad;
+    memory_t   shmem_frame;   /*  8: Page cont. shared comms window.     */
+    MEMORY_PADDING;
+    u32        evtchn;        /* 16: Event channel for notifications.    */
+    u32        bandwidth;     /* 20: Bandwidth allocated for isoch / int - us
+                               * per 1ms frame (ie between 0 and 900 or 800
+                               * depending on USB version). */
+    /* OUT */
+    u32        status;        /* 24 */
+} PACKED usbif_be_connect_t;  /* 28 bytes */
+
+/*
+ * CMSG_USBIF_BE_DISCONNECT:
+ *  When the driver sends a successful response then the interface is fully
+ *  disconnected. The controller will send a DOWN notification to the front-end
+ *  driver.
+ */
+typedef struct { 
+    /* IN */
+    domid_t    domid;         /*  0: Domain attached to new interface.   */
+    u16        __pad;
+    /* OUT */
+    u32        status;        /*  8 */
+} PACKED usbif_be_disconnect_t; /* 12 bytes */
+
+/*
+ * CMSG_USBIF_BE_DRIVER_STATUS_CHANGED:
+ *  Notify the domain controller that the back-end driver is DOWN or UP.
+ *  If the driver goes DOWN while interfaces are still UP, the controller
+ *  will automatically send DOWN notifications.
+ */
+typedef struct {
+    u32        status;        /*  0: USBIF_DRIVER_STATUS_??? */
+} PACKED usbif_be_driver_status_changed_t; /* 4 bytes */
+
+#define USB_PATH_LEN 16
+
+/*
+ * CMSG_USBIF_BE_CLAIM_PORT:
+ * Instruct the backend driver to claim any device plugged into the specified
+ * host port and to allow the specified domain to control that port.
+ */
+typedef struct 
+{
+    /* IN */
+    domid_t  domid;        /* 0:  which domain                 */
+    u32      usbif_port;   /* 6:  port on the virtual root hub */
+    u32      status;       /* 10: status of operation          */
+    char path[USB_PATH_LEN]; /* Currently specified in the Linux style - may need to be
+                    * converted to some OS-independent format at some stage. */
+} PACKED usbif_be_claim_port_t;
+
+/*
+ * CMSG_USBIF_BE_RELEASE_PORT: 
+ * Instruct the backend driver to release any device plugged into the specified
+ * host port.
+ */
+typedef struct
+{
+    char     path[USB_PATH_LEN];
+} PACKED usbif_be_release_port_t;
 
 /******************************************************************************
  * SHUTDOWN DEFINITIONS

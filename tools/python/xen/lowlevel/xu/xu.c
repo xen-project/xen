@@ -562,6 +562,24 @@ static PyTypeObject xu_notifier_type = {
         PyDict_SetItemString(dict, #_field, obj);                         \
     } while ( 0 )
 
+#define PSTR2CHAR(_struct, _field)                                        \
+ do {                                                                     \
+     PyObject *obj;                                                       \
+        if ( (obj = PyDict_GetItemString(payload, #_field)) != NULL )     \
+        {                                                                 \
+            if ( PyString_Check(obj) )                                    \
+            {                                                             \
+                char *buffer = PyString_AsString(obj);                    \
+                                                                          \
+                strcpy(((_struct *)&xum->msg.msg[0])->_field,             \
+                        buffer);                                          \
+                /* Should complain about length - think later */          \
+                dict_items_parsed++;                                      \
+            }                                                             \
+        }                                                                 \
+        xum->msg.length = sizeof(_struct);                                \
+ } while ( 0 )
+
 typedef struct {
     PyObject_HEAD;
     control_msg_t msg;
@@ -753,6 +771,52 @@ static PyObject *xu_message_get_payload(PyObject *self, PyObject *args)
     case TYPE(CMSG_NETIF_BE, CMSG_NETIF_BE_DRIVER_STATUS):
         C2P(netif_be_driver_status_t, status, Int, Long);
         return dict;
+    case TYPE(CMSG_USBIF_FE, CMSG_USBIF_FE_INTERFACE_STATUS_CHANGED):
+        C2P(usbif_fe_interface_status_changed_t, status, Int, Long);
+        C2P(usbif_fe_interface_status_changed_t, evtchn, Int, Long);
+        C2P(usbif_fe_interface_status_changed_t, domid, Int, Long);
+        C2P(usbif_fe_interface_status_changed_t, bandwidth, Int, Long);
+	C2P(usbif_fe_interface_status_changed_t, num_ports, Int, Long);
+        return dict;
+    case TYPE(CMSG_USBIF_FE, CMSG_USBIF_FE_DRIVER_STATUS_CHANGED):
+        C2P(usbif_fe_driver_status_changed_t, status, Int, Long);
+        return dict;
+    case TYPE(CMSG_USBIF_FE, CMSG_USBIF_FE_INTERFACE_CONNECT):
+        C2P(usbif_fe_interface_connect_t, shmem_frame, Int, Long);
+        return dict;
+    case TYPE(CMSG_USBIF_FE, CMSG_USBIF_FE_INTERFACE_DISCONNECT):
+        return dict;
+    case TYPE(CMSG_USBIF_BE, CMSG_USBIF_BE_CREATE):
+        C2P(usbif_be_create_t, domid, Int, Long);
+        C2P(usbif_be_create_t, status, Int, Long);
+        return dict;
+    case TYPE(CMSG_USBIF_BE, CMSG_USBIF_BE_DESTROY):
+        C2P(usbif_be_destroy_t, domid, Int, Long);
+        C2P(usbif_be_destroy_t, status, Int, Long);
+        return dict;
+    case TYPE(CMSG_USBIF_BE, CMSG_USBIF_BE_CONNECT):
+        C2P(usbif_be_connect_t, domid, Int, Long);
+        C2P(usbif_be_connect_t, shmem_frame, Int, Long);
+        C2P(usbif_be_connect_t, evtchn, Int, Long);
+        C2P(usbif_be_connect_t, bandwidth, Int, Long);
+        C2P(usbif_be_connect_t, status, Int, Long);
+        return dict;
+    case TYPE(CMSG_USBIF_BE, CMSG_USBIF_BE_DISCONNECT):
+        C2P(usbif_be_disconnect_t, domid, Int, Long);
+        C2P(usbif_be_disconnect_t, status, Int, Long);
+        return dict;
+    case TYPE(CMSG_USBIF_BE, CMSG_USBIF_BE_DRIVER_STATUS_CHANGED):
+        C2P(usbif_be_driver_status_changed_t, status, Int, Long);
+        return dict;
+    case TYPE(CMSG_USBIF_BE, CMSG_USBIF_BE_CLAIM_PORT):
+        C2P(usbif_be_claim_port_t, domid, Int, Long);
+        C2P(usbif_be_claim_port_t, usbif_port, Int, Long);
+        C2P(usbif_be_claim_port_t, status, Int, Long);
+        C2P(usbif_be_claim_port_t, path, String, String);
+        return dict;
+    case TYPE(CMSG_USBIF_BE, CMSG_USBIF_BE_RELEASE_PORT):
+        C2P(usbif_be_release_port_t, path, String, String);
+        return dict;
     case TYPE(CMSG_MEM_REQUEST, CMSG_MEM_REQUEST_SET):
         C2P(mem_request_t, target, Int, Long);
         C2P(mem_request_t, status, Int, Long);
@@ -921,6 +985,53 @@ static PyObject *xu_message_new(PyObject *self, PyObject *args)
     case TYPE(CMSG_MEM_REQUEST, CMSG_MEM_REQUEST_SET):
         P2C(mem_request_t, target, u32);
         P2C(mem_request_t, status, u32);
+        break;
+    case TYPE(CMSG_USBIF_FE, CMSG_USBIF_FE_INTERFACE_STATUS_CHANGED):
+        P2C(usbif_fe_interface_status_changed_t, status, u32);
+        P2C(usbif_fe_interface_status_changed_t, evtchn, u16);
+        P2C(usbif_fe_interface_status_changed_t, domid, domid_t);
+        P2C(usbif_fe_interface_status_changed_t, bandwidth, u32);
+	P2C(usbif_fe_interface_status_changed_t, num_ports, u32);
+        break;
+    case TYPE(CMSG_USBIF_FE, CMSG_USBIF_FE_DRIVER_STATUS_CHANGED):
+        P2C(usbif_fe_driver_status_changed_t, status, u32);
+        break;
+    case TYPE(CMSG_USBIF_FE, CMSG_USBIF_FE_INTERFACE_CONNECT):
+        P2C(usbif_fe_interface_connect_t, shmem_frame, memory_t);
+        break;
+    case TYPE(CMSG_USBIF_FE, CMSG_USBIF_FE_INTERFACE_DISCONNECT):
+        break;
+    case TYPE(CMSG_USBIF_BE, CMSG_USBIF_BE_CREATE):
+        P2C(usbif_be_create_t, domid, domid_t);
+        P2C(usbif_be_create_t, status, u32);
+        break;
+    case TYPE(CMSG_USBIF_BE, CMSG_USBIF_BE_DESTROY):
+        P2C(usbif_be_destroy_t, domid, domid_t);
+        P2C(usbif_be_destroy_t, status, u32);
+        break;
+    case TYPE(CMSG_USBIF_BE, CMSG_USBIF_BE_CONNECT):
+        P2C(usbif_be_connect_t, domid, domid_t);
+        P2C(usbif_be_connect_t, shmem_frame, memory_t);
+        P2C(usbif_be_connect_t, evtchn, u32);
+        P2C(usbif_be_connect_t, bandwidth, u32);
+        P2C(usbif_be_connect_t, status, u32);
+        break;
+    case TYPE(CMSG_USBIF_BE, CMSG_USBIF_BE_DISCONNECT):
+        P2C(usbif_be_disconnect_t, domid, domid_t);
+        P2C(usbif_be_disconnect_t, status, u32);
+        break;
+    case TYPE(CMSG_USBIF_BE, CMSG_USBIF_BE_DRIVER_STATUS_CHANGED):
+        P2C(usbif_be_driver_status_changed_t, status, u32);
+        break;
+    case TYPE(CMSG_USBIF_BE, CMSG_USBIF_BE_CLAIM_PORT):
+        P2C(usbif_be_claim_port_t, domid, domid_t);
+        P2C(usbif_be_claim_port_t, usbif_port, u32);
+        P2C(usbif_be_claim_port_t, status, u32);
+        PSTR2CHAR(usbif_be_claim_port_t, path);
+        printf("dict items parsed = %d", dict_items_parsed);
+        break;
+    case TYPE(CMSG_USBIF_BE, CMSG_USBIF_BE_RELEASE_PORT):
+        PSTR2CHAR(usbif_be_release_port_t, path);
         break;
     }
 

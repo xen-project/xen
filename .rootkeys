@@ -63,6 +63,16 @@
 4083dc16-Kd5y9psK_yk161sme5j5Q linux-2.4.28-xen-sparse/arch/xen/drivers/netif/Makefile
 4083dc16UmHXxS9g_UFVnkUpN-oP2Q linux-2.4.28-xen-sparse/arch/xen/drivers/netif/backend/Makefile
 405853f2wg7JXZJNltspMwOZJklxgw linux-2.4.28-xen-sparse/arch/xen/drivers/netif/frontend/Makefile
+41ee5e8b_2rt-qHzbDXtIoBzOli0EA linux-2.4.28-xen-sparse/arch/xen/drivers/usbif/Makefile
+41ee5e8bUhF4tH7OoJaVbUxdXqneVw linux-2.4.28-xen-sparse/arch/xen/drivers/usbif/backend/Makefile
+41ee5e8bYDQkjRVKnFn5uFyy0KreCw linux-2.4.28-xen-sparse/arch/xen/drivers/usbif/backend/common.h
+41ee5e8bt7xeBUJqG5XJS-ofukdsgA linux-2.4.28-xen-sparse/arch/xen/drivers/usbif/backend/control.c
+41ee5e8bSs3BGC7yegM_ek2Tn0Ahvw linux-2.4.28-xen-sparse/arch/xen/drivers/usbif/backend/interface.c
+41ee5e8bglvqKvZSY5uJ5JGQejEwyQ linux-2.4.28-xen-sparse/arch/xen/drivers/usbif/backend/main.c
+41ee5e8bSPpxzhGO6TrY20TegW3cZg linux-2.4.28-xen-sparse/arch/xen/drivers/usbif/frontend/Makefile
+41ee5e8ckZ9xVNvu9NHIZDK7JqApmQ linux-2.4.28-xen-sparse/arch/xen/drivers/usbif/frontend/main.c
+41ee5e8ck9scpGirfqEZRARbGDyTXA linux-2.4.28-xen-sparse/arch/xen/drivers/usbif/frontend/xhci.h
+41ee5e8c6mLxIx82KPsbpt_uts_vSA linux-2.4.28-xen-sparse/arch/xen/drivers/usbif/usbif.h
 3e5a4e65lWzkiPXsZdzPt2RNnJGG1g linux-2.4.28-xen-sparse/arch/xen/kernel/Makefile
 3e5a4e65_hqfuxtGG8IUy6wRM86Ecg linux-2.4.28-xen-sparse/arch/xen/kernel/entry.S
 3e5a4e65Hy_1iUvMTPsNqGNXd9uFpg linux-2.4.28-xen-sparse/arch/xen/kernel/head.S
@@ -87,6 +97,7 @@
 3f108aeaLcGDgQdFAANLTUEid0a05w linux-2.4.28-xen-sparse/drivers/char/mem.c
 3e5a4e66rw65CxyolW9PKz4GG42RcA linux-2.4.28-xen-sparse/drivers/char/tty_io.c
 40c9c0c1pPwYE3-4i-oI3ubUu7UgvQ linux-2.4.28-xen-sparse/drivers/scsi/aic7xxx/Makefile
+41ee5e8c__abdO50ZtQjPeSa5VN2dg linux-2.4.28-xen-sparse/drivers/usb/hcd.c
 3e5a4e669uzIE54VwucPYtGwXLAbzA linux-2.4.28-xen-sparse/fs/exec.c
 3e5a4e66wbeCpsJgVf_U8Jde-CNcsA linux-2.4.28-xen-sparse/include/asm-xen/bugs.h
 3e5a4e66HdSkvIV6SJ1evG_xmTmXHA linux-2.4.28-xen-sparse/include/asm-xen/desc.h
@@ -680,6 +691,7 @@
 40c9c4694eu5759Dehr4Uhakei0EMg tools/python/xen/xend/server/SrvNode.py
 40c9c469TaZ83ypsrktmPSHLEZiP5w tools/python/xen/xend/server/SrvRoot.py
 40c9c469W3sgDMbBJYQdz5wbQweL0Q tools/python/xen/xend/server/SrvServer.py
+41ee5e8cFlODpYxhBMZqo9ZgGtcHbg tools/python/xen/xend/server/SrvUsbif.py
 40c9c469aq7oXrE1Ngqf3_lBqL0RoQ tools/python/xen/xend/server/SrvVnetDir.py
 4108f181GtRoD1U9TBuJXMfBbGJwdQ tools/python/xen/xend/server/SrvXendLog.py
 40c9c469Y_aimoOFfUZoS-4eV8gEKg tools/python/xen/xend/server/__init__.py
@@ -691,6 +703,7 @@
 40c9c469yrm31i60pGKslTi2Zgpotg tools/python/xen/xend/server/messages.py
 40c9c46925x-Rjb0Cv2f1-l2jZrPYg tools/python/xen/xend/server/netif.py
 40c9c469ZqILEQ8x6yWy0_51jopiCg tools/python/xen/xend/server/params.py
+41ee5e8dq9NtihbL4nWKjuSLOhXPUg tools/python/xen/xend/server/usbif.py
 40c9c469LNxLVizOUpOjEaTKKCm8Aw tools/python/xen/xend/sxp.py
 4189125cL90jKSOcBJ3Vx4nWGiXXvA tools/python/xen/xend/util.py
 40d05079aFRp6NQdo5wIh5Ly31c0cg tools/python/xen/xm/__init__.py
