@@ -55,6 +55,11 @@ int xc_linux_build(int xc_handle,
                    const char *ramdisk_name,
                    const char *cmdline);
 
+int xc_netbsd_build(int xc_handle,
+                    unsigned int domid,
+                    const char *image_name,
+                    const char *cmdline);
+
 int xc_bvtsched_global_set(int xc_handle,
                            unsigned long ctx_allow);
 int xc_bvtsched_domain_set(int xc_handle,

@@ -8,6 +8,14 @@ def config_usage ():
 The config file '%s' requires the following variable to be defined:
  vmid             -- Numeric identifier for the new domain, used to calculate
                      the VM's IP address and root partition. E.g. -Dvmid=1
+
+Additionally the following variable may be defined:
+ image            -- Path to kernel image, can be gzip'ed. [/boot/netbsd]
+ mem              -- Memory size. [16]
+ name             -- Domain name. [NetBSD VM vmid]
+ ip               -- Primary IP address for domain. [this domain's IP + vmid]
+ nfsserv          -- NFS server IP address. [169.254.1.0]
+ nfsroot          -- Path to nfs root filesystem. [/netboot/netbsd]
 """ % config_file
 
 
@@ -22,18 +30,24 @@ if vmid == 0:
     assert()
 
 
-# STEP 1. Specify kernel image file and otional ramdisk. Can be gzip'ed.
-image = "../../../install/boot/xenolinux.gz"
-ramdisk = ""
-#ramdisk = "/boot/initrd.gz"
-builder_fn='linux' # this is a linux domain
+# STEP 1. Specify kernel image file. Can be gzip'ed.
+if image == "": image = "/boot/netbsd"
+
+builder_fn='netbsd' # this is a NetBSD domain
+
 
 # STEP 2. The initial memory allocation (in megabytes) for the new domain.
-mem_size = 64
+try:
+    mem_size = int(mem)
+except:
+    mem_size = 16
 
 
 # STEP 3. A handy name for your new domain.
-domain_name = "This is VM %d" % vmid
+try:
+    domain_name = name
+except:
+    domain_name = "NetBSD VM %d" % vmid
 
 
 # STEP 4. Specify IP address(es), for the new domain.  You need to
@@ -42,8 +56,11 @@ domain_name = "This is VM %d" % vmid
 # appropriately.
 
 #vfr_ipaddr = ["111.222.333.444","222.333.444.555"]
-vfr_ipaddr  = [XenoUtil.add_offset_to_ip(XenoUtil.get_current_ipaddr(),vmid),
-	       XenoUtil.add_offset_to_ip('169.254.1.0',vmid),]
+try:
+    vfr_ipaddr = [ip, XenoUtil.add_offset_to_ip('169.254.1.0',vmid),]
+except:
+    vfr_ipaddr = [XenoUtil.add_offset_to_ip(XenoUtil.get_current_ipaddr(),vmid),
+                  XenoUtil.add_offset_to_ip('169.254.1.0',vmid),]
 
 
 # STEP 5a. Identify any physcial partitions or virtual disks you want the
@@ -53,8 +70,8 @@ vfr_ipaddr  = [XenoUtil.add_offset_to_ip(XenoUtil.get_current_ipaddr(),vmid),
 #	 ('vd:as73gd784dh','hda1','w'),
 #	 ('phy:cdrom','hdd','r')
 
-vbd_list = [ ('phy:sda%d'%(7+vmid),'sda1','w' ), 
-	     ('phy:sda6','sda6','r') ]
+#vbd_list = [ ('phy:sda%d'%(7+vmid),'sda1','w' ), 
+#	     ('phy:sda6','sda6','r') ]
 
 
 
@@ -74,12 +91,19 @@ vbd_expert = 0
 
 netmask = XenoUtil.get_current_ipmask()
 gateway = XenoUtil.get_current_ipgw()
-nfsserv = '169.254.1.0'  
+try:
+    nfsserv
+except:
+    nfsserv = '169.254.1.0'
 
 cmdline_ip = "ip="+vfr_ipaddr[0]+":"+nfsserv+":"+gateway+":"+netmask+"::eth0:off"
-cmdline_root = "root=/dev/sda1 ro"
-#cmdline_root = "root=/dev/nfs nfsroot=/full/path/to/root/directory"
-cmdline_extra = "4 VMID=%d usr=/dev/sda6" % vmid
+try:
+    cmdline_root = "nfsroot="+nfsserv+":"+nfsroot
+except:
+    cmdline_root = "nfsroot="+nfsserv+":/netboot/netbsd"
+    #cmdline_root = "nfsroot=/full/path/to/root/directory"
+
+cmdline_extra = "bootdev=xennet0"
 
 
 # STEP 7. Set according to whether you want the script to watch the domain 

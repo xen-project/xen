@@ -8,7 +8,8 @@ SRCS     = $(wildcard *.c)
 OBJS     = $(patsubst %.c,%.o,$(SRCS))
 
 INSTALL  = $(wildcard *.py)
-ETC	 = defaults democd
+ETC	 = defaults democd netbsd
+INITD    = xendomains
 
 all: 
 
@@ -17,14 +18,18 @@ install: all
 	cp -a $(INSTALL) /usr/bin
 	#chmod 755 $(INSTALL)
 	mkdir -p /etc/xc
-	for i in $(ETC) ; do [ ! -e /etc/xc/$$i ] && echo Install $$i && cp $$i /etc/xc/ ; done || true 
+	for i in $(ETC) ; do [ ! -e /etc/xc/$$i ] && echo Install $$i && cp $$i /etc/xc/ ; done || true
+	mkdir -p /etc/xc/auto
+	for i in $(INITD) ; do [ -e /etc/init.d/ ] && [ ! -e /etc/init.d/$$i ] && cp $$i /etc/init.d/ ; done || true
 
 dist: all
 	mkdir -p ../../../install/bin
 	mkdir -p ../../../install/etc
+	mkdir -p ../../../install/init.d
 	cp -a $(INSTALL) ../../../install/bin
 	cp -a $(ETC) ../../../install/etc
 	#chmod 755 $(INSTALL)
+	cp -a $(INITD) ../../../install/init.d
 
 clean:
 

@@ -18,10 +18,12 @@ xc_dom_control.py
   Usage: xc_dom_control.py [command] <params>
   stop      [dom]        -- pause a domain
   start     [dom]        -- un-pause a domain
-  shutdown  [dom]        -- request a domain to shutdown
+  shutdown  [dom]        -- request a domain to shutdown (can specify 'all')
+                            (optionally wait for complete shutdown)
   destroy   [dom]        -- immediately terminate a domain
   pincpu    [dom] [cpu]  -- pin a domain to the specified CPU
-  save      [dom] [file] -- suspend a domain's memory to file
+  suspend   [dom] [file] -- write domain's memory to a file and terminate
+			    (resume by re-running xc_dom_create with -L option)
   restore   [file]       -- resume a domain from a file
   list                   -- print info about all domains
   listvbds               -- print info about all virtual block devs
@@ -34,7 +36,7 @@ xc_dom_control.py
   vif_getsched [dom] [vif] -- print vif's scheduling parameters
   vbd_add [dom] [uname] [dev] [mode] -- make disk/partition uname available to 
                             domain as dev e.g. 'vbd_add phy:sda3 hda1 rw'
-  vbd_remove [dom] [dev] -- remove disk or partition attached as 'dev' 
+  vbd_remove [dom] [dev] -- remove disk or partition attached as 'dev'
 
 
 xc_dom_create.py
@@ -47,10 +49,12 @@ in [] brackets. Arguments are as follows:
 Arguments to control the parsing of the defaults file:
  -f config_file   -- Use the specified defaults script. 
                      Default: ['/etc/xc/defaults']
+ -L state_file    -- Load virtual machine memory state from state_file
  -D foo=bar       -- Set variable foo=bar before parsing config
-                     E.g. '-D vmid=3:ip=1.2.3.4'
+                     E.g. '-D vmid=3;ip=1.2.3.4'
  -h               -- Print extended help message, including all arguments
  -n               -- Dry run only, don't actually create domain
+ -q               -- Quiet - write output only to the system log
 
 
 The config file 'defaults' requires the following variable to be defined:
@@ -69,7 +73,7 @@ Arguments to override current config read from 'defaults':
  -d udisk,dev,rw  -- Add disk, partition, or virtual disk to domain. E.g. to 
                      make partion sda4 available to the domain as hda1 with 
                      read-write access: '-b phy:sda4,hda1,rw' To add 
-                     multiple disks use multiple -d flags or seperate with ':'
+                     multiple disks use multiple -d flags or seperate with ';'
                      Default: ['']
  -i vfr_ipaddr    -- Add IP address to the list which Xen will route to
                      the domain. Use multiple times to add more IP addrs.
@@ -107,3 +111,18 @@ xc_vd_tool
    device    - physical partition to 'format' to hold vd's. e.g. hda4
    ext_size  - extent size (default 64MB)
 
+
+xendomains
+This is a Sys-V init script for RedHat systems.
+
+ - Usage: xendomains {start|stop|status}
+
+   start  -- starts all the domains with config files in /etc/xc/auto/
+   stop   -- stops ALL running domains, waiting for them to shutdown cleanly
+             (if possible) before returning
+   status -- prints a list of the running domains, the same as
+             "xc_dom_control.py list"
+
+On a RedHat system it should be possible to issue commands to this
+script using the "service" command and to configure if / when it is
+run automatically, using the "chkconfig" command.

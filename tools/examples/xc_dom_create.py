@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import Xc, XenoUtil, string, sys, os, time, socket, getopt
+import Xc, XenoUtil, string, sys, os, time, socket, getopt, signal, syslog
 
 config_dir  = '/etc/xc/'
 config_file = xc_config_file = config_dir + 'defaults'
@@ -18,10 +18,12 @@ in [] brackets. Arguments are as follows:
 Arguments to control the parsing of the defaults file:
  -f config_file   -- Use the specified defaults script. 
                      Default: ['%s']
+ -L state_file    -- Load virtual machine memory state from state_file
  -D foo=bar       -- Set variable foo=bar before parsing config
-                     E.g. '-D vmid=3:ip=1.2.3.4'
+                     E.g. '-D vmid=3;ip=1.2.3.4'
  -h               -- Print extended help message, including all arguments
  -n               -- Dry run only, don't actually create domain
+ -q               -- Quiet - write output only to the system log
 """ % (sys.argv[0], xc_config_file)
 
 def extra_usage ():
@@ -36,8 +38,8 @@ Arguments to override current config read from '%s':
  -e vbd_expert    -- Saftey catch to avoid some disk accidents ['%d'] 
  -d udisk,dev,rw  -- Add disk, partition, or virtual disk to domain. E.g. to 
                      make partion sda4 available to the domain as hda1 with 
-                     read-write access: '-b phy:sda4,hda1,rw' To add 
-                     multiple disks use multiple -d flags or seperate with ':'
+                     read-write access: '-d phy:sda4,hda1,rw' To add 
+                     multiple disks use multiple -d flags or seperate with ';'
                      Default: ['%s']
  -i vfr_ipaddr    -- Add IP address to the list which Xen will route to
                      the domain. Use multiple times to add more IP addrs.
@@ -68,30 +70,38 @@ def answer ( s ):
 def printvbds ( v ):
     s=''
     for (a,b,c) in v:
-	s = s + ':%s,%s,%s' % (a,b,c)
-    return s[1:]
+	s = s + '; %s,%s,%s' % (a,b,c)
+    return s[2:]
 
+def output(string):
+    global quiet
+    syslog.syslog(string)
+    if not quiet:
+        print string
+    return
 
-bail=False; dryrun=False; extrahelp=False
-image=''; ramdisk=''; builder_fn=''; 
-mem_size=0; domain_name=''; vfr_ipaddr=[]; 
-vbd_expert=0; auto_restart=0;
+bail=False; dryrun=False; extrahelp=False; quiet = False
+image=''; ramdisk=''; builder_fn=''; restore=0; state_file=''
+mem_size=0; domain_name=''; vfr_ipaddr=[];
+vbd_expert=0; auto_restart=False;
 vbd_list = []; cmdline_ip = ''; cmdline_root=''; cmdline_extra=''
 
 ##### Determine location of defautls file
 #####
 
 try:
-    opts, args = getopt.getopt(sys.argv[1:], "h?nf:D:k:r:b:m:N:a:e:d:i:I:R:E:" )
+    opts, args = getopt.getopt(sys.argv[1:], "h?nqf:D:k:r:b:m:N:a:e:d:i:I:R:E:L:" )
 
     for opt in opts:
 	if opt[0] == '-f': config_file= opt[1]
 	if opt[0] == '-h' or opt[0] == '-?' : bail=True; extrahelp=True
 	if opt[0] == '-n': dryrun=True
 	if opt[0] == '-D': 
-	    for o in string.split( opt[1], ':' ):
+	    for o in string.split( opt[1], ';' ):
 		(l,r) = string.split( o, '=' )
 		exec "%s='%s'" % (l,r)
+        if opt[0] == '-q': quiet = True
+        if opt[0] == '-L': restore = True; state_file = opt[1]
 
 
 except getopt.GetoptError:
@@ -113,7 +123,8 @@ except:
 ##### Parse the config file
 #####
 
-print "Parsing config file '%s'" % config_file
+if not quiet:
+    print "Parsing config file '%s'" % config_file
 
 try:
     execfile ( config_file )
@@ -139,7 +150,7 @@ x_vfr_ipaddr  = []
 for opt in opts:
     if opt[0] == '-k': image = opt[1]
     if opt[0] == '-r': ramdisk = opt[1]
-    if opt[0] == '-b': builder_fn = opt[1]  #XXXX
+    if opt[0] == '-b': builder_fn = opt[1]  
     if opt[0] == '-m': mem_size = int(opt[1])
     if opt[0] == '-N': domain_name = opt[1]
     if opt[0] == '-a': auto_restart = answer(opt[1])
@@ -150,7 +161,7 @@ for opt in opts:
     if opt[0] == '-i': x_vfr_ipaddr.append(opt[1])
     if opt[0] == '-d':
 	try:
-	    vv = string.split(opt[1],':')	    
+	    vv = string.split(opt[1],';')	    
 	    for v in vv:
 		(udisk,dev,mode) = string.split(v,',')
 		x_vbd_list.append( (udisk,dev,mode) )
@@ -163,17 +174,18 @@ if x_vfr_ipaddr: vfr_ipaddr = x_vfr_ipaddr
 
 cmdline = cmdline_ip +' '+ cmdline_root +' '+ cmdline_extra
 
+syslog.openlog('xc_dom_create.py %s' % config_file, 0, syslog.LOG_DAEMON)
+
 ##### Print some debug info just incase things don't work out...
 ##### 
 
-print
-print 'VM image           : "%s"' % image
-print 'VM ramdisk         : "%s"' % ramdisk
-print 'VM memory (MB)     : "%d"' % mem_size
-print 'VM IP address(es)  : "%s"' % reduce((lambda a,b: a+':'+b),vfr_ipaddr,'' )[1:]
-print 'VM block device(s) : "%s"' % printvbds( vbd_list )
-print 'VM cmdline         : "%s"' % cmdline
-print
+output('VM image           : "%s"' % image)
+output('VM ramdisk         : "%s"' % ramdisk)
+output('VM memory (MB)     : "%d"' % mem_size)
+output('VM IP address(es)  : "%s"'
+                % reduce((lambda a,b: a+'; '+b),vfr_ipaddr,'' )[2:])
+output('VM block device(s) : "%s"' % printvbds( vbd_list ))
+output('VM cmdline         : "%s"' % cmdline)
 
 if dryrun:
     sys.exit(1)
@@ -194,7 +206,7 @@ def make_domain():
 
     # set up access to the global variables declared above
     global image, ramdisk, mem_size, domain_name, vfr_ipaddr, netmask
-    global vbd_list, cmdline, xc, vbd_expert
+    global vbd_list, cmdline, xc, vbd_expert, builder_fn
     	
     if not os.path.isfile( image ):
         print "Image file '" + image + "' does not exist"
@@ -204,18 +216,25 @@ def make_domain():
         print "Ramdisk file '" + ramdisk + "' does not exist"
         sys.exit()
 
-    id = xc.domain_create( mem_kb=mem_size*1024, name=domain_name )
-    if id <= 0:
-        print "Error creating domain"
-        sys.exit()
-
-    ret = xc.linux_build( dom=id, image=image, ramdisk=ramdisk, 
-			  cmdline=cmdline )
-    if ret < 0:
-        print "Error building Linux guest OS: "
-        print "Return code from linux_build = " + str(ret)
-        xc.domain_destroy ( dom=id )
-        sys.exit()
+    if restore:
+        ret = eval('xc.%s_restore ( state_file=state_file, progress=1 )' % builder_fn)
+        if ret < 0:
+            print "Error restoring domain"
+            sys.exit()
+        else:
+            id = ret
+    else:
+        id = xc.domain_create( mem_kb=mem_size*1024, name=domain_name )
+        if id <= 0:
+            print "Error creating domain"
+            sys.exit()
+            
+        ret = eval('xc.%s_build ( dom=id, image=image, ramdisk=ramdisk, cmdline=cmdline )' % builder_fn)
+        if ret < 0:
+            print "Error building Linux guest OS: "
+            print "Return code = " + str(ret)
+            xc.domain_destroy ( dom=id )
+            sys.exit()
 
     # setup the virtual block devices
 
@@ -261,13 +280,33 @@ def make_domain():
     return id
 # end of make_domain()
 
+def mkpidfile():
+    global current_id
+    if not os.path.isdir('/var/run/xendomains/'):
+        os.mkdir('/var/run/xendomains/')
 
+    fd = open('/var/run/xendomains/%d.pid' % current_id, 'w')
+    print >> fd, str(os.getpid())
+    fd.close()
+    return
+
+def rmpidfile():
+    global current_id
+    os.unlink('/var/run/xendomains/%d.pid' % current_id)
+
+def death_handler(dummy1,dummy2):
+    global current_id
+    os.unlink('/var/run/xendomains/%d.pid' % current_id)
+    output('Auto-restart daemon: daemon PID = %d for domain %d is now exiting'
+              % (os.getpid(),current_id))
+    sys.exit(0)
+    return
 
 # The starting / monitoring of the domain actually happens here...
 
 # start the domain and record its ID number
 current_id = make_domain()
-print "VM started in domain %d" % current_id
+output("VM started in domain %d" % current_id)
 
 # if the auto_restart flag is set then keep polling to see if the domain is
 # alive - restart if it is not by calling make_domain() again (it's necessary
@@ -282,15 +321,22 @@ if auto_restart:
 	os.setsid()
 	pid = os.fork()
 	if pid > 0:
-	    print >> sys.stderr, 'Auto-restart daemon PID = %d' % pid
+            output('Auto-restart daemon PID = %d' % pid)
 	    sys.exit(0)
-    except:
-	print >> sys.stderr, 'Problem starting daemon'
+        signal.signal(signal.SIGTERM,death_handler)
+    except OSError:
+	print >> sys.stderr, 'Problem starting auto-restart daemon'
 	sys.exit(1)
 
-    while auto_restart:
+    mkpidfile()
+
+    while True:
 	time.sleep(1)
-	if not xc.domain_getinfo(current_id):
-	    print "Domain %d has terminated, restarting VM in new domain" % current_id
+        info = xc.domain_getinfo(current_id, 1)
+	if info == [] or info[0]['dom'] != current_id:
+	    output("Auto-restart daemon: Domain %d has terminated, restarting VM in new domain"
+                                     % current_id)
+            rmpidfile()
 	    current_id = make_domain()
-	    print "VM started in domain %d" % current_id
+            mkpidfile()
+	    output("Auto-restart daemon: VM restarted in domain %d" % current_id)

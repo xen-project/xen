@@ -11,11 +11,13 @@ Usage: %s [command] <params>
 
   stop      [dom]        -- pause a domain
   start     [dom]        -- un-pause a domain
-  shutdown  [dom]        -- request a domain to shutdown
+  shutdown  [dom] [[-w]] -- request a domain to shutdown (can specify 'all')
+                            (optionally wait for complete shutdown)
   destroy   [dom]        -- immediately terminate a domain
   pincpu    [dom] [cpu]  -- pin a domain to the specified CPU
-  save      [dom] [file] -- suspend a domain's memory to file
-  restore   [file]       -- resume a domain from a file
+  suspend   [dom] [file] -- write domain's memory to a file and terminate
+			    (resume by re-running xc_dom_create with -L option)
+  unwatch   [dom]        -- kill the auto-restart daemon for a domain
   list                   -- print info about all domains
   listvbds               -- print info about all virtual block devs
   cpu_bvtset [dom] [mcuadv] [warp] [warpl] [warpu]
@@ -30,7 +32,7 @@ Usage: %s [command] <params>
   vbd_remove [dom] [dev] -- remove disk or partition attached as 'dev' 
 """ % sys.argv[0]
 
-import Xc, sys, re, string
+import Xc, sys, re, string, time, os, signal
 
 if len(sys.argv) < 2:
     usage()
@@ -41,6 +43,8 @@ cmd = sys.argv[1]
 
 xc = Xc.new()
 rc = ''
+dom = None
+
 
 if len( sys.argv ) > 2 and re.match('\d+$', sys.argv[2]):
     dom = string.atoi(sys.argv[2])
@@ -52,7 +56,24 @@ elif cmd == 'start':
     rc = xc.domain_start( dom=dom )    
 
 elif cmd == 'shutdown':
-    rc = xc.domain_destroy( dom=dom, force=0 )    
+    list = []
+    if dom != None:
+        rc = xc.domain_destroy( dom=dom, force=0 )
+        list.append(dom)
+    elif sys.argv[2] == 'all':
+        for i in xc.domain_getinfo():
+            if i['dom'] != 0: # don't shutdown dom0!
+                ret = xc.domain_destroy( dom=i['dom'], force=0 )
+                if ret !=0: rc = ret
+                else: list.append(i['dom'])
+
+    if len(sys.argv) == 4 and sys.argv[3] == "-w":
+        # wait for all domains we shut down to terminate
+        for dom in list:
+            while True:
+                info = xc.domain_getinfo(dom,1)
+                if not ( info != [] and info[0]['dom'] == dom ): break
+                time.sleep(1)
 
 elif cmd == 'destroy':
     rc = xc.domain_destroy( dom=dom, force=1 )    
@@ -76,27 +97,55 @@ elif cmd == 'pincpu':
 	xc.domain_start( dom=dom )
 
 elif cmd == 'list':
-    for i in xc.domain_getinfo(): print i
+    print 'Dom  Name             Mem(kb)  CPU  State  Time(s)'
+    for domain in xc.domain_getinfo():
+
+	run = (domain['running'] and 'r') or '-'		# domain['running'] ? run='r' : run='-'
+	stop = (domain['stopped'] and 's') or '-'		# domain['stopped'] ? stop='s': stop='-'
+
+        domain['state'] = run + stop
+        domain['cpu_time'] = domain['cpu_time']/1e8
+
+        print "%(dom)-4d %(name)-16s %(mem_kb)7d %(cpu)3d %(state)5s %(cpu_time)8d" % domain
+
+elif cmd == 'unwatch':
+
+    # the auto-restart daemon's pid file
+    watcher = '/var/run/xendomains/%d.pid' % dom
+
+    if os.path.isfile(watcher):
+        fd = open(watcher,'r')
+        pid = int(fd.readline())
+        os.kill(pid, signal.SIGTERM)
 
 elif cmd == 'listvbds':
-    for i in xc.vbd_probe(): print i
+    vbdInfo = xc.vbd_probe()
+    for vbd in vbdInfo:
+        print 'dom:' + str(vbd['dom'])
+	del vbd['dom']
+        print '-----'
+        for field in vbd:
+                print field + ': ' + str(vbd[field])
+        print '\n'
 
-elif cmd == 'save':
+elif cmd == 'suspend':
     if len(sys.argv) < 4:
         usage()
         sys.exit(-1)
 
     file = sys.argv[3]
-        
-    rc = xc.linux_save( dom=dom, state_file=file, progress=1)
 
-elif cmd == 'restore':
-    if len(sys.argv) < 3:
-        usage()
-        sys.exit(-1)
-        
-    file = sys.argv[2]
-    rc = xc.linux_restore( state_file=file, progress=1 )
+    # the auto-restart daemon's pid file
+    watcher = '/var/run/xendomains/%d.pid' % dom
+
+    if os.path.isfile(watcher):
+        fd = open(watcher,'r')
+        pid = int(fd.readline())
+        os.kill(pid, signal.SIGTERM)
+
+    xc.domain_stop( dom=dom )
+    rc = xc.linux_save( dom=dom, state_file=file, progress=1)
+    if rc == 0 : xc.domain_destroy( dom=dom, force=1 )
 
 elif cmd == 'cpu_bvtslice':
     if len(sys.argv) < 3:
@@ -164,7 +213,8 @@ elif cmd == 'vif_getsched':
 
 
 elif cmd == 'vbd_add':
-
+    import XenoUtil
+    
     XenoUtil.VBD_EXPERT_LEVEL = 0 # sets the allowed level of potentially unsafe mappings
 
     if len(sys.argv) < 6:
@@ -196,6 +246,7 @@ elif cmd == 'vbd_add':
     print "Added disk/partition %s to domain %d as device %s (%x)" % (uname, dom, dev, virt_dev)
 
 elif cmd == 'vbd_remove':
+    import XenoUtil
 
     if len(sys.argv) < 4:
 	usage()
