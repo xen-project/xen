@@ -224,6 +224,7 @@ long do_block(void)
     ASSERT(current->domain != IDLE_DOMAIN_ID);
     current->shared_info->vcpu_data[0].evtchn_upcall_mask = 0;
     current->state = TASK_INTERRUPTIBLE;
+    SCHED_OP(do_block, current);
     TRACE_2D(TRC_SCHED_BLOCK, current->domain, current);
     __enter_scheduler();
     return 0;
@@ -461,9 +462,10 @@ asmlinkage void __enter_scheduler(void)
     {
         /* this check is needed to avoid a race condition */
         if ( signal_pending(prev) )
+        {
             prev->state = TASK_RUNNING;
-        else
-            SCHED_OP(do_block, prev);
+            SCHED_OP(wake_up, prev);
+        }
     }
 
     prev->cpu_time += now - prev->lastschd;

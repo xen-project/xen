@@ -170,6 +170,7 @@ void bvt_wake_up(struct task_struct *p)
 static void bvt_do_block(struct task_struct *p)
 {
     BVT_INFO(p)->warpback = 0; 
+	__del_from_runqueue(p);
 }
 
 /* Control the scheduler. */
@@ -276,7 +277,8 @@ static task_slice_t bvt_do_schedule(s_time_t now)
         
         __calc_evt(prev_inf);
         
-        __del_from_runqueue(prev);
+        if( __task_on_runqueue(prev))
+			__del_from_runqueue(prev);
         
         if ( likely(prev->state == TASK_RUNNING) )
             __add_to_runqueue_tail(prev);
