@@ -479,23 +479,35 @@ void console_force_lock(void)
 static unsigned char *debugtrace_buf; /* Debug-trace buffer */
 static unsigned int   debugtrace_prd; /* Producer index     */
 static unsigned int   debugtrace_kilobytes = 128, debugtrace_bytes;
+static int            debugtrace_send_to_console = 0;
 static spinlock_t debugtrace_lock = SPIN_LOCK_UNLOCKED;
 integer_param("debugtrace", debugtrace_kilobytes);
 
-void debugtrace_reset(void)
-{
-    unsigned long  flags;
 
-    spin_lock_irqsave(&debugtrace_lock, flags);
+static void _debugtrace_reset(int send_to_console)
+{
+    if (send_to_console)
+        printk("debugtrace_printk now writting to console\n");
+    else
+        printk("debugtrace_printk now writting to buffer\n");
 
     if ( debugtrace_bytes != 0 )
         memset(debugtrace_buf, '\0', debugtrace_bytes);
-    debugtrace_prd = 0;
 
+    debugtrace_prd = 0;
+    debugtrace_send_to_console = send_to_console;
+}
+
+void debugtrace_reset(int send_to_console)
+{
+    unsigned long flags;
+
+    spin_lock_irqsave(&debugtrace_lock, flags);
+    _debugtrace_reset(send_to_console);
     spin_unlock_irqrestore(&debugtrace_lock, flags);
 }
 
-void debugtrace_dump(void)
+void debugtrace_dump(int send_to_console)
 {
     int _watchdog_on = watchdog_on;
 
@@ -514,8 +526,7 @@ void debugtrace_dump(void)
     debugtrace_buf[debugtrace_prd] = '\0';
     serial_puts(sercon_handle, &debugtrace_buf[0]);
 
-    memset(debugtrace_buf, '\0', debugtrace_bytes);
-    debugtrace_prd = 0;
+    _debugtrace_reset(send_to_console);
 
     spin_unlock(&debugtrace_lock);
 
@@ -537,15 +548,22 @@ void debugtrace_printk(const char *fmt, ...)
 
     va_start(args, fmt);
     (void)vsnprintf(buf, sizeof(buf), fmt, args);
-    va_end(args);        
+    va_end(args);
 
-    for ( p = buf; *p != '\0'; p++ )
+    if (debugtrace_send_to_console)
     {
-        debugtrace_buf[debugtrace_prd++] = *p;
-
-        /* always leave a null byte at the end of the buffer */
-        if (debugtrace_prd == debugtrace_bytes-1)
-            debugtrace_prd = 0;
+        serial_puts(sercon_handle, buf);
+    }
+    else
+    {
+        for ( p = buf; *p != '\0'; p++ )
+        {
+            debugtrace_buf[debugtrace_prd++] = *p;
+            
+            /* always leave a null byte at the end of the buffer */
+            if (debugtrace_prd == debugtrace_bytes-1)
+                debugtrace_prd = 0;
+        }
     }
 
     spin_unlock_irqrestore(&debugtrace_lock, flags);
@@ -568,7 +586,7 @@ static int __init debugtrace_init(void)
     debugtrace_buf = (unsigned char *)alloc_xenheap_pages(order);
     ASSERT(debugtrace_buf != NULL);
 
-    memset(debugtrace_buf, '\0', debugtrace_bytes);
+    debugtrace_reset(0);
 
     return 0;
 }
@@ -593,6 +611,8 @@ void panic(const char *fmt, ...)
     unsigned long flags;
     extern void machine_restart(char *);
     
+    debugtrace_dump(0);
+
     va_start(args, fmt);
     (void)vsnprintf(buf, sizeof(buf), fmt, args);
     va_end(args);
@@ -610,8 +630,6 @@ void panic(const char *fmt, ...)
     __putstr("****************************************\n\n");
     __putstr("Reboot in five seconds...\n");
     spin_unlock_irqrestore(&console_lock, flags);
-
-    debugtrace_dump();
 
     mdelay(5000);
     machine_restart(0);

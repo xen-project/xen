@@ -158,7 +158,10 @@ void do_debug_key(unsigned char key, struct xen_regs *regs)
 #ifndef NDEBUG
 void debugtrace_key(unsigned char key)
 {
-    debugtrace_dump();
+    static int send_to_console = 0;
+
+    send_to_console = !send_to_console;
+    debugtrace_dump(send_to_console);
 }
 #endif
 
