@@ -7,7 +7,7 @@
  * 2004
  * university of cambridge computer laboratory
  *
- * code adapted originally from kgdb & nemesis
+ * code adapted originally from kgdb, nemesis, & gdbserver
  */
 
 #include <xen/lib.h>
@@ -21,8 +21,8 @@
 #include <xen/list.h>
 #include <xen/serial.h>
 
-#undef DEBUG_TRACE
-#ifdef DEBUG_TRACE
+#undef PDB_DEBUG_TRACE
+#ifdef PDB_DEBUG_TRACE
 #define TRC(_x) _x
 #else
 #define TRC(_x)
