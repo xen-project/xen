@@ -349,6 +349,9 @@ void cmain(multiboot_info_t *mbi)
 
     init_trace_bufs();
 
+    /* Give up the VGA console if DOM0 is configured to grab it. */
+    console_endboot(cmdline && strstr(cmdline, "tty0"));
+
     domain_unpause_by_systemcontroller(current);
     domain_unpause_by_systemcontroller(dom0);
     startup_cpu_idle_loop();
