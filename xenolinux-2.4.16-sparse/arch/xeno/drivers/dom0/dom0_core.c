@@ -191,12 +191,14 @@ struct file_operations dom_mem_ops = {
 
 static int dom_map_mem(unsigned int dom, unsigned long pfn, int tot_pages)
 {
+	printk(KERN_ALERT "bd240 debug: dom_map_mem: invoked\n");
+
     int ret = -ENOENT;
     struct proc_dir_entry * pd = xeno_base->subdir;
     struct proc_dir_entry * file;
     proc_memdata_t * memdata;
 
-	printk("bd240 debug: dom_map_mem invoked, xeno_base %lx, subdir %lx\n", xeno_base, xeno_base->subdir);
+	printk(KERN_ALERT "bd240 debug: dom_map_mem invoked, xeno_base %lx, subdir %lx\n", xeno_base, xeno_base->subdir);
  
     while(pd != NULL){
 
