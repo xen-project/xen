@@ -670,7 +670,7 @@ static void unmap_control_interface(int fd, control_if_t *c)
     (void)munmap(vaddr, PAGE_SIZE);
 }
 
-typedef struct {
+typedef struct xu_port_object {
     PyObject_HEAD;
     int mem_fd;
     int xc_handle;
@@ -682,6 +682,42 @@ typedef struct {
 } xu_port_object;
 
 static PyObject *port_error;
+
+static int xup_connect(xu_port_object *xup, domid_t dom,
+                       int local_port, int remote_port){
+    // From our prespective rx = producer, tx = consumer.
+    int err = 0;
+    printf("%s> dom=%u %d:%d\n", __FUNCTION__, dom, local_port, remote_port);
+
+    // Consumer = tx.
+    //xup->interface->tx_resp_prod = 0;
+    //xup->interface->tx_req_prod = 0;
+    xup->tx_resp_prod = xup->interface->tx_resp_prod;
+    xup->tx_req_cons = xup->interface->tx_resp_prod;
+    printf("%s> tx: %p %p : %p %p\n", __FUNCTION__,
+           xup->interface->tx_resp_prod,
+           xup->tx_resp_prod,
+           xup->tx_req_cons,
+           xup->interface->tx_req_prod);
+
+    // Producer = rx.
+    //xup->interface->rx_req_prod  = 0;
+    //xup->interface->rx_resp_prod = 0;
+    xup->rx_req_prod  = xup->interface->rx_req_prod;
+    xup->rx_resp_cons = xup->interface->rx_resp_prod;
+    printf("%s> rx: %p %p : %p %p\n", __FUNCTION__,
+           xup->rx_resp_cons,
+           xup->interface->rx_resp_prod,
+           xup->interface->rx_req_prod,
+           xup->rx_req_prod);
+
+    xup->remote_dom   = dom;
+    xup->local_port   = local_port;
+    xup->remote_port  = remote_port;
+
+    printf("%s< err=%d\n", __FUNCTION__, err);
+    return err;
+}
 
 static PyObject *xu_port_notify(PyObject *self, PyObject *args)
 {
@@ -988,19 +1024,7 @@ static PyObject *xu_port_new(PyObject *self, PyObject *args)
         goto fail4;
     }
 
-    xup->interface->tx_resp_prod = 0;
-    xup->interface->rx_req_prod  = 0;
-    xup->interface->tx_req_prod = 0;
-    xup->interface->rx_resp_prod = 0;
-
-    xup->tx_req_cons  = 0;
-    xup->tx_resp_prod = 0;
-    xup->rx_req_prod  = 0;
-    xup->rx_resp_cons = 0;
-    xup->remote_dom   = dom;
-    xup->local_port   = port1;
-    xup->remote_port  = port2;
-
+    xup_connect(xup, dom, port1, port2);
     return (PyObject *)xup;
 
     

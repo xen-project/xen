@@ -253,6 +253,9 @@ def make_domain_config():
                       ['func', func] ]
         config_devs.append(['device', config_pci])
 
+    # Add one vif with unspecified MAC.
+    config_devs.append(['device', ['vif']])
+
     config += config_devs
     
     config_vfr = ['vfr']

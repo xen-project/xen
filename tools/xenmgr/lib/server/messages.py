@@ -2,6 +2,8 @@ import struct
 
 import xend.utils
 
+DEBUG = 0
+
 """ All message formats.
 Added to incrementally for the various message types.
 See below.
@@ -145,7 +147,7 @@ class Msg:
     pass
 
 def packMsg(ty, params):
-    print '>packMsg', ty, params
+    if DEBUG: print '>packMsg', ty, params
     (major, minor, packing) = msg_formats[ty]
     args = {}
     for (k, v) in params.items():
@@ -154,8 +156,9 @@ def packMsg(ty, params):
                 args['mac[%d]' % i] = v[i]
         else:
             args[k] = v
-    for (k, v) in args.items():
-        print 'packMsg>', k, v, type(v)
+    if DEBUG:
+        for (k, v) in args.items():
+            print 'packMsg>', k, v, type(v)
     msgid = 0
     msg = xend.utils.message(major, minor, msgid, args)
     return msg
@@ -175,7 +178,7 @@ def unpackMsg(ty, msg):
         args['mac'] = mac
         for k in macs:
             del args[k]
-    print '<unpackMsg', ty, args
+    if DEBUG: print '<unpackMsg', ty, args
     return args
 
 def msgTypeName(ty, subty):

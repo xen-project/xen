@@ -6,10 +6,8 @@ from messages import *
 
 class NetifControllerFactory(controller.ControllerFactory):
     """Factory for creating network interface controllers.
-    Also handles the 'back-end' channel to dom0.
+    Also handles the 'back-end' channel to the device driver domain.
     """
-    # todo: add support for setting dom controlling blkifs (don't assume 0).
-    # todo: add support for 'recovery'.
 
     def __init__(self):
         controller.ControllerFactory.__init__(self)
@@ -25,6 +23,8 @@ class NetifControllerFactory(controller.ControllerFactory):
         self.registerChannel()
 
     def createInstance(self, dom):
+        """Create or find the network interface controller for a domain.
+        """
         #print 'netif>createInstance> dom=', dom
         netif = self.getInstanceByDom(dom)
         if netif is None:
@@ -33,6 +33,8 @@ class NetifControllerFactory(controller.ControllerFactory):
         return netif
         
     def setControlDomain(self, dom):
+        """Set the 'back-end' device driver domain.
+        """
         self.deregisterChannel()
         self.attached = 0
         self.dom = dom
@@ -129,6 +131,12 @@ class NetifController(controller.Controller):
         return mac
 
     def attach_device(self, vif, vmac):
+        """Attach a network device.
+        If vmac is None a random mac address is assigned.
+
+        @param vif interface index
+        @param vmac mac address (string)
+        """
         if vmac is None:
             mac = self.randomMAC()
         else:

@@ -3,6 +3,7 @@
 *.pyc
 *.so
 *.so.*
+*~
 BitKeeper/*/*
 PENDING/*
 TAGS
@@ -18,6 +19,7 @@ tools/misc/miniterm/miniterm
 tools/misc/xen_cpuperf
 tools/misc/xen_log
 tools/misc/xen_read_console
+tools/xend-2004-06-10_1309.tgz
 tools/xentrace/xentrace
 xen/drivers/pci/classlist.h
 xen/drivers/pci/devlist.h
