@@ -172,7 +172,7 @@ static void __get_time_values_from_xen(void)
 }
 
 #define TIME_VALUES_UP_TO_DATE \
-	(shadow_time_version == HYPERVISOR_shared_info->time_version2)
+ ({ rmb(); (shadow_time_version == HYPERVISOR_shared_info->time_version2); })
 
 /*
  * This version of gettimeofday has microsecond resolution
@@ -367,12 +367,15 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 	s64 delta, nsec;
 	long sec_diff, wtm_nsec;
 
+ retry:
 	__get_time_values_from_xen();
 
 	delta = (s64)(shadow_system_time +
 		      (cur_timer->get_offset() * NSEC_PER_USEC) -
 		      processed_system_time);
 	if (delta < 0) {
+		if (!TIME_VALUES_UP_TO_DATE)
+			goto retry;
 		printk("Timer ISR: Time went backwards: %lld\n", delta);
 		return;
 	}

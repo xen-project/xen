@@ -224,7 +224,7 @@ static void __get_time_values_from_xen(void)
 }
 
 #define TIME_VALUES_UP_TO_DATE \
-    (shadow_time_version == HYPERVISOR_shared_info->time_version2)
+ ({ rmb(); (shadow_time_version == HYPERVISOR_shared_info->time_version2); })
 
 
 /*
@@ -393,11 +393,14 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
     unsigned long ticks = 0;
     long sec_diff;
 
+ retry:
     __get_time_values_from_xen();
 
     if ( (delta = (s64)(shadow_system_time + __get_time_delta_usecs() * 1000 -
 						processed_system_time)) < 0 )
     {
+		if (!TIME_VALUES_UP_TO_DATE)
+			goto retry;
         printk("Timer ISR: Time went backwards: %lld\n", delta);
         return;
     }

@@ -132,6 +132,9 @@ static void serial_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 static inline void __serial_putc(uart_t *uart, int handle, unsigned char c)
 {
+    unsigned long flags;
+    int space;
+
     if ( (c == '\n') && (handle & SERHND_COOKED) )
         __serial_putc(uart, handle, '\r');
 
@@ -140,10 +143,13 @@ static inline void __serial_putc(uart_t *uart, int handle, unsigned char c)
     else if ( handle & SERHND_LO )
         c &= 0x7f;
 
-    while ( !(inb(uart->io_base + LSR) & LSR_THRE) )
-        barrier();
-
-    outb(c, uart->io_base + THR);
+    do { 
+        spin_lock_irqsave(&uart->lock, flags);
+        if ( (space = (inb(uart->io_base + LSR) & LSR_THRE)) )
+            outb(c, uart->io_base + THR);
+        spin_unlock_irqrestore(&uart->lock, flags);
+    }
+    while ( !space );
 }
 
 #define PARSE_ERR(_f, _a...)                 \
@@ -376,32 +382,22 @@ void serial_set_rx_handler(int handle, serial_rx_fn fn)
 void serial_putc(int handle, unsigned char c)
 {
     uart_t *uart = &com[handle & SERHND_IDX];
-    unsigned long flags;
 
     if ( handle == -1 )
         return;
 
-    spin_lock_irqsave(&uart->lock, flags);
-
     __serial_putc(uart, handle, c);
-
-    spin_unlock_irqrestore(&uart->lock, flags);
 }
 
 void serial_puts(int handle, const unsigned char *s)
 {
     uart_t *uart = &com[handle & SERHND_IDX];
-    unsigned long flags;
 
     if ( handle == -1 )
         return;
 
-    spin_lock_irqsave(&uart->lock, flags);
-
     while ( *s != '\0' )
         __serial_putc(uart, handle, *s++);
-
-    spin_unlock_irqrestore(&uart->lock, flags);
 }
 
 /* Returns TRUE if given character (*pc) matches the serial handle. */
