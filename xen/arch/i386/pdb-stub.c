@@ -325,16 +325,12 @@ pdb_process_command (char *ptr, struct pt_regs *regs)
         int thread;
         if (hexToInt (&ptr, &thread))
         {
+            struct task_struct *p;
             thread -= PDB_DOMAIN_OFFSET;
-            struct task_struct *p = find_domain_by_id(thread);
-            if (p == NULL)
-            {
+            if ( (p = find_domain_by_id(thread)) == NULL )
                 strcpy (pdb_out_buffer, "E00");
-            }
             else
-            {
                 strcpy (pdb_out_buffer, "OK");
-            }
             put_task_struct(p);
         }
         break;
