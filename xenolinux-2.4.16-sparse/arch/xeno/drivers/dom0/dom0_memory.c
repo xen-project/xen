@@ -317,7 +317,7 @@ int direct_unmap(unsigned long addr, unsigned long size)
     curr = direct_list->next;
     while(curr != direct_list){
         node = list_entry(curr, direct_mmap_node_t, list);
-        if(node->addr == addr)
+        if(node->vm_start == addr)
             break;
         curr = curr->next;
     }
@@ -346,7 +346,7 @@ int direct_disc_unmap(unsigned long from, unsigned long first_pg, int tot_pages)
     while(curr != direct_list){
         node = list_entry(curr, direct_mmap_node_t, list);
 
-        if(node->addr == from)
+        if(node->vm_start == from)
             break;
         curr = curr->next;
     }
