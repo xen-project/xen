@@ -3,7 +3,6 @@
 3ddb6b0buTaC5zg1_a8FoAR9FWi_mw BitKeeper/etc/ignore
 3ddb79c9_hgSp-gsQm8HqWM_9W3B_A BitKeeper/etc/logging_ok
 3eb788d6Kleck_Cut0ouGneviGzliQ Makefile
-3f53f4baY9FRwHSgNT5KKYw8IcRvlw README
 3e6377b24eQqYMsDi9XrFkIgTzZ47A tools/balloon/Makefile
 3e6377d6eiFjF1hHIS6JEIOFk62xSA tools/balloon/README
 3e6377dbGcgnisKw16DPCaND7oGO3Q tools/balloon/balloon.c
@@ -144,7 +143,6 @@
 3f1668d4-FUY6Enc7MB3GcwUtfJ5HA tools/misc/mkdevnodes
 3f1668d4F29Jsw0aC0bJEIkOBiagiQ tools/misc/read_console_udp.c
 3ddb79bcbOVHh38VJzc97-JEGD4dJQ xen/Makefile
-3ddb79bcCa2VbsMp7mWKlhgwLQUQGA xen/README
 3ddb79bcWnTwYsQRWl_PaneJfa6p0w xen/Rules.mk
 3e74d2be6ELqhaY1sW0yyHRKhpOvDQ xen/TODO
 3ddb79bcZbRBzT3elFWSX7u6NtMagQ xen/arch/i386/Makefile
