@@ -143,6 +143,9 @@ void __kill_domain(struct task_struct *p)
 
     unlink_blkdev_info(p);
 
+    for ( i = 0; i < XEN_MAX_SEGMENTS; i++ )
+	xen_segment_delete(p, i);
+
     for ( i = 0; i < MAX_DOMAIN_VIFS; i++ )
         unlink_net_vif(p->net_vif_list[i]);
 
