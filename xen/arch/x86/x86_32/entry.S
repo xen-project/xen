@@ -630,12 +630,12 @@ do_watchdog_tick:
 defer_nmi:
         movl  $FIXMAP_apic_base,%eax
         # apic_wait_icr_idle()
-1:      movl  APIC_ICR(%eax),%ebx
+1:      movl  %ss:APIC_ICR(%eax),%ebx
         testl $APIC_ICR_BUSY,%ebx
         jnz   1b
         # __send_IPI_shortcut(APIC_DEST_SELF, TRAP_deferred_nmi)
         movl  $(APIC_DM_FIXED | APIC_DEST_SELF | APIC_DEST_LOGICAL | \
-                TRAP_deferred_nmi),APIC_ICR(%eax)
+                TRAP_deferred_nmi),%ss:APIC_ICR(%eax)
         jmp   restore_all_xen
 
 nmi_parity_err:
