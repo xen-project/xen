@@ -4,8 +4,6 @@ from twisted.internet import reactor
 class HTMLBase( resource.Resource ):
 	
     isLeaf = True
-    
-    defaultPath = "/usr/lib/python2.2/site-packages/xen/xend/sv/"
 		
     def __init__( self ):
         resource.Resource.__init__(self)
@@ -22,9 +20,8 @@ class HTMLBase( resource.Resource ):
 		request.write( "BODY" )
         
     def write_TOP( self, request ):
-        f = open( self.defaultPath + 'inc/top.htm', 'r' )
-        request.write( f.read() )
+        request.write( '<html><head><title>Xen</title><link rel="stylesheet" type="text/css" href="inc/style.css" />' )
+        request.write( '</head><body>' )
 
     def write_BOTTOM( self, request ):
-        f = open( self.defaultPath + 'inc/bottom.htm', 'r' )
-        request.write( f.read() )
+        request.write( "</body></html>" )
