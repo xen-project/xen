@@ -19,26 +19,30 @@ Executive Summary
 =================
 
 This CD is a standalone demo of the Xen Virtual Machine Monitor (VMM)
-and Linux-2.4 OS port (XenoLinux). It runs entirely off the CD,
+and Linux-2.4 OS port (Xenlinux). It runs entirely off the CD,
 without requiring hard disk installation. This is achieved using a RAM
 disk to store mutable file system data while using the CD for
-everything else. The CD can also be used for installing Xen/XenoLinux
+everything else. The CD can also be used for installing Xen/Xenlinux
 to disk, and includes a source code snapshot along with all of the
 tools required to build it.
 
 Booting the CD
 ==============
 
-The Xen VMM is currently fairly h/w specific, but porting new device
-drivers is relatively straightforward thanks to Xen's Linux driver
-compatibility layer. The current snapshot supports the following
-hardware:
+It should be possible to get Xen working with any relatively modern
+hardware supported by standard Linux. However, the version of XenLinux
+built for the DemoCD is fairly h/w specific. If you need other
+hardware, you'll have to configure and build your own xenlinux kernel.
+Xen does require an 'i686'-class CPU or newer, so won't work on 486's
+or plain Pentiums.
+
+We have compiled in drivers for the following hardware:
 
 CPU:  Pentium Pro/II/III/IV/Xeon, Athlon (i.e. P6 or newer) SMP supported
 IDE:  Intel PIIX chipset, others will be PIO only (slow)
 SCSI: Adaptec / Dell PERC Raid (aacraid), fusion MPT, megaraid, Adaptec aic7xxx
 Net:  Recommended: Intel e1000, Broadcom BCM57xx (tg3), 3c905 (3c59x)
-      Working, but require extra copies : pcnet32, Intel e100, tulip
+      Also supported: pcnet32, Intel e100, tulip
 
 Because of the demo CD's use of RAM disks, make sure you have plenty
 of RAM (256MB+).
@@ -47,9 +51,9 @@ To try out the Demo, boot from CD (you may need to change your BIOS
 configuration to do this), then select one of the four boot options 
 from the Grub menu:
 
- Xen / linux-2.4.24
- Xen / linux-2.4.24 using cmdline IP configuration
- Xen / linux-2.4.24 in "safe mode"
+ Xen / linux-2.4.26
+ Xen / linux-2.4.26 using cmdline IP configuration
+ Xen / linux-2.4.26 in "safe mode"
  linux-2.4.22
 
 The last option is a plain linux kernel that runs on the bare machine,
@@ -62,7 +66,7 @@ If you are going for a command line IP config, hit "e" at
 the grub menu, then edit the "ip=" parameters to reflect your setup
 e.g. "ip=<ipaddr>::<gateway>:<netmask>::eth0:off". It shouldn't be
 necessary to set either the nfs server or hostname
-parameters. Alternatively, once XenoLinux has booted you can login and
+parameters. Alternatively, once Xenlinux has booted you can login and
 setup networking with 'dhclient' or 'ifconfig' and 'route' in the
 normal way. 
 
@@ -74,7 +78,7 @@ and the configuration files on the CD allocate IP addresses
 sequentially for subsequent domains unless told otherwise.
 
 After selecting the kernel to boot, stand back and watch Xen boot,
-closely followed by "domain 0" running the XenoLinux kernel. The boot
+closely followed by "domain 0" running the Xenlinux kernel. The boot
 messages can also sent to the serial line by specifying the baud rate
 on the Xen cmdline (e.g., 'com1=9600,8n1'); this can be very useful
 for debugging should anything important scroll off the screen. Xen's
@@ -93,7 +97,7 @@ the usual tools and commands should work as per usual.  However,
 because of the poor random access performance of CD drives, the
 machine will feel very slugish, and you may run out of memory if you
 make significant modifications to the ramfs filesystem -- for the full
-experience, install a Xen and XenoLinux image on you hard drive :-)
+experience, install a Xen and Xenlinux image on you hard drive :-)
 
 You can configure networking, either with 'dhclient' or manually via
 'ifconfig' and 'route', remembering to edit /etc/resolv.conf if you
@@ -105,8 +109,8 @@ contains a load of standard software. You should be able to start
 Apache, PostgreSQL, Mozilla etc in the normal way, but because
 everything is running off CD the performance will be very sluggish and
 you may run out of memory for the 'tmpfs' file system.  You may wish
-to go ahead and install Xen/XenoLinux on your hard drive, either
-dropping Xen and the XenoLinux kernel down onto a pre-existing Linux
+to go ahead and install Xen/Xenlinux on your hard drive, either
+dropping Xen and the Xenlinux kernel down onto a pre-existing Linux
 distribution, or using the file systems from the CD (which are based
 on RH9). See the installation instructions later in this document.
 
@@ -114,8 +118,8 @@ If your video card requires 'agpgart' then it unfortunately won't yet
 work with Xen, and you'll only be able to configure a VGA X
 server. We're working on a fix for this for the next release.
 
-If you want to browse the Xen / XenoLinux source, it's all located
-under /usr/local/src/xeno-1.2, complete with BitKeeper
+If you want to browse the Xen / Xenlinux source, it's all located
+under /usr/local/src/xeno-1.3, complete with BitKeeper
 repository. We've also included source code and configuration
 information for the various benchmarks we used in the SOSP paper.
 
@@ -123,22 +127,14 @@ information for the various benchmarks we used in the SOSP paper.
 Starting other domains
 ======================
 
-Xen's privileged control interfaces can be accessed using a C library
-(libxc.so) or an easier-to-use Python wrapper module (Xc). Example
-script templates are provided in tools/examples/.
-
-Abyway, the first thing to do is to set up a window in which you will
-receive console output from other domains. Console output will arrive
-as UDP packets destined for 169.254.1.0. The DemoCD's startup scripts
-automatically bring up 169.254.1.0 as an alias called eth0:xen (see
-/etc/sysconfig/network-scripts/ifcfg-eth0 )
+The first thing you need to do is to start the "xend" control daemon
+with "xend start". You may wish to add an appropriate link to xend in
+you /etc/rcX.d directory e.g. "ln -sf ../init.d/xend S97xend"
 
 If you're not intending to configure the new domain with an IP address
 on your LAN, then you'll probably want to use NAT. The
 'xen_nat_enable' installs a few useful iptables rules into domain0 to
-enable NAT. [ NB: The intention is that in future Xen will do NAT
-itsel (actually RSIP), but this is part of a larger work package that
-isn't ready to release.]
+enable NAT. [NB: We plan to support RSIP in future]
 
 Xen has a management interface that can be manipulated from domain0 to
 create new domains, control their CPU, network and memory resource
@@ -194,7 +190,7 @@ have e.g.:
   [root@xendemo]# xc_dom_create.py -D ip=commando-1.xeno,169.254.2.3 -Dmem=100
   Parsing config file 'defaults'
 
-  VM image           : "/boot/xenolinux.gz"
+  VM image           : "/boot/xenlinux.gz"
   VM ramdisk         : "/boot/initrd.gz"
   VM memory (MB)     : "100"
   VM IP address(es)  : "128.232.38.51:169.254.2.3"
@@ -330,7 +326,7 @@ About The Xen Demo CD
 The purpose of the Demo CD is to distribute a snapshot of Xen's
 source, and simultaneously provide a convenient means for enabling
 people to get experience playing with Xen without needing to install
-it on their hard drive. If you decide to install Xen/XenoLinux you can
+it on their hard drive. If you decide to install Xen/Xenlinux you can
 do so simply by following the installation instructions below -- which
 essentially involves copying the contents of the CD on to a suitably
 formated disk partition, and then installing or updating the Grub
@@ -345,11 +341,11 @@ persistent across reboots!
 
 Because of the use of a RAM-based file system for root, you'll need
 plenty of memory to run this CD -- something like 96MB per VM. This is
-not a restriction of Xen : once you've installed Xen, XenoLinux and
+not a restriction of Xen : once you've installed Xen, Xenlinux and
 the file system images on your hard drive you'll find you can boot VMs
 in just a few MBs.
 
-The CD contains a snapshot of the Xen and XenoLinux code base that we
+The CD contains a snapshot of the Xen and Xenlinux code base that we
 believe to be pretty stable, but lacks some of the features that are
 currently still work in progress e.g. OS suspend/resume to disk, and
 various memory management enhancements to provide fast inter-OS
@@ -364,9 +360,9 @@ xen-devel@lists.sourceforge.net mailing list.
 Installing from the CD
 ======================
 
-If you're installing Xen/XenoLinux onto an existing linux file system
-distribution, just copy the Xen VMM (/boot/image.gz) and XenoLinux
-kernels (/boot/xenolinux.gz), then modify the Grub config
+If you're installing Xen/Xenlinux onto an existing linux file system
+distribution, just copy the Xen VMM (/boot/image.gz) and Xenlinux
+kernels (/boot/xenlinux.gz), then modify the Grub config
 (/boot/grub/menu.lst or /boot/grub/grub.conf) on the target system.
 It should work on pretty much any distribution.
 
@@ -384,9 +380,9 @@ config file.
 
 A typical Grub menu option might look like:
 
-title Xen / XenoLinux 2.4.22
+title Xen / Xenlinux 2.4.22
         kernel /boot/image.gz dom0_mem=131072 com1=115200,8n1 noht
-        module /boot/xenolinux.gz root=/dev/sda4 ro console=tty0
+        module /boot/xenlinux.gz root=/dev/sda4 ro console=tty0
 
 The first line specifies which Xen image to use, and what command line
 arguments to pass to Xen. In this case we set the maximum amount of
@@ -396,7 +392,7 @@ support (noht). If you have multiple network interface you can use
 ifname=ethXX to select which one to use. If your network card is
 unsupported, use ifname=dummy
 
-The second line specifies which xenolinux image to use, and the
+The second line specifies which xenlinux image to use, and the
 standard linux command line arguments to pass to the kernel. In this
 case, we're configuring the root partition and stating that it should
 initially be mounted read-only (normal practice).
@@ -469,7 +465,7 @@ Installing the file systems from the CD
 =======================================
 
 If you haven't got an existing Linux installation onto which you can
-just drop down the Xen and XenoLinux images, then the file systems on
+just drop down the Xen and Xenlinux images, then the file systems on
 the CD provide a quick way of doing an install. However, you're
 probably better off in the long run doing a proper Redhat, Fedora,
 Debian etc install rather than just doing the hack described below:
@@ -515,7 +511,7 @@ keyboard to get a list of supported commands.
 
 If you have a crash you'll likely get a crash dump containing an EIP
 (PC) which, along with an 'objdump -d image', can be useful in
-figuring out what's happened.  Debug a XenoLinux image just as you
+figuring out what's happened.  Debug a Xenlinux image just as you
 would any other Linux kernel.
 
 We supply a handy debug terminal program which you can find in
@@ -527,10 +523,10 @@ then we supply a dumb TCP terminal client:
  'tools/xenctl/lib/console_client.py <server host> <server port>'
 
 
-Installing Xen / XenoLinux on a RedHat distribution
+Installing Xen / Xenlinux on a RedHat distribution
 ===================================================
 
-When using Xen / Xenolinux on a standard Linux distribution there are
+When using Xen / Xenlinux on a standard Linux distribution there are
 a couple of things to watch out for:
 
 The first Linux VM that is started when Xen boots start (Domain 0) is
@@ -544,7 +540,7 @@ remove ttyN from /etc/inittab for domains>0.  Due to a bug in the RH9
 /etc/rc.sysinit script #'ing the lines out of /etc/inittab won't work
 as it ignores the '#' and tries to access them anyway.
 
-Every Xenolinux instance owns a bidirectional 'virtual console'.
+Every Xenlinux instance owns a bidirectional 'virtual console'.
 The device node to which this console is attached can be configured
 by specifying 'xencons=' on the OS command line:
  'xencons=off'  --> disable virtual console
@@ -570,7 +566,7 @@ levels. For example, on the Xen Demo CD we use run level 3 for domain
 scripts to be run in depending on the run level number passed on the
 kernel command line.
 
-Xenolinux kernels can be built to use runtime loadable modules just
+Xenlinux kernels can be built to use runtime loadable modules just
 like normal linux kernels. Modules should be installed under
 /lib/modules in the normal way.
 
@@ -625,7 +621,7 @@ should have written a little statically linked C program...
 Description of how the XenDemoCD boots
 ======================================
 
-1. Grub is used to load Xen, a XenoLinux kernel, and an initrd (initial
+1. Grub is used to load Xen, a Xenlinux kernel, and an initrd (initial
 ram disk). [The source of the version of Grub used is in /usr/local/src]
 
 2. the init=/linuxrc command line causes linux to execute /linuxrc in
