@@ -79,39 +79,9 @@ static int count2; /* counter for mark_offset_tsc() */
  */
 static unsigned long fast_gettimeoffset_quotient;
 
-
-/* These are peridically updated in shared_info, and then copied here. */
-static u32 shadow_tsc_stamp;
-u64 shadow_system_time;
-static u32 shadow_time_version;
-static struct timeval shadow_tv;
-u32 shadow_time_delta_usecs;
-static unsigned int rdtsc_bitshift;
-extern u64 processed_system_time;
-
-#define NS_PER_TICK (1000000000ULL/HZ)
-
-/*
- * Reads a consistent set of time-base values from Xen, into a shadow data
- * area. Must be called with the xtime_lock held for writing.
- */
-void __get_time_values_from_xen(void)
-{
-	do {
-		shadow_time_version = HYPERVISOR_shared_info->time_version2;
-		rmb();
-		shadow_tv.tv_sec    = HYPERVISOR_shared_info->wc_sec;
-		shadow_tv.tv_usec   = HYPERVISOR_shared_info->wc_usec;
-		shadow_tsc_stamp    = HYPERVISOR_shared_info->tsc_timestamp.tsc_bits;
-		shadow_system_time  = HYPERVISOR_shared_info->system_time;
-		rmb();
-	}
-	while (shadow_time_version != HYPERVISOR_shared_info->time_version1);
-}
-
-#define TIME_VALUES_UP_TO_DATE \
-	(shadow_time_version == HYPERVISOR_shared_info->time_version2)
-
+unsigned int rdtsc_bitshift;
+extern u32 shadow_tsc_stamp;
+extern u64 shadow_system_time;
 
 static unsigned long get_offset_tsc(void)
 {
@@ -188,23 +158,9 @@ unsigned long long sched_clock(void)
 
 static void mark_offset_tsc(void)
 {
-	s64 delta;
-	unsigned int ticks = 0;
-
-	write_seqlock(&monotonic_lock);
-
-	delta = (s64)(shadow_system_time + shadow_time_delta_usecs -
-		      processed_system_time);
-
-	/* Process elapsed jiffies since last call. */
-	while (delta >= NS_PER_TICK) {
-		ticks++;
-		delta -= NS_PER_TICK;
-		processed_system_time += NS_PER_TICK;
-	}
-	jiffies_64 += ticks - 1;
 
 	/* update the monotonic base value */
+	write_seqlock(&monotonic_lock);
 	monotonic_base = shadow_system_time;
 	monotonic_offset = shadow_tsc_stamp;
 	write_sequnlock(&monotonic_lock);
@@ -383,7 +339,8 @@ static int __init init_tsc(char* override)
 	printk(KERN_INFO "Xen reported: %lu.%03lu MHz processor.\n", 
 	       cpu_khz / 1000, cpu_khz % 1000);
 
-	/* (10^6 * 2^32) / cpu_khz = (2^32 * 1 / (clocks/us)) */
+	/* (10^6 * 2^32) / cpu_hz = (10^3 * 2^32) / cpu_khz =
+	   (2^32 * 1 / (clocks/us)) */
 	{	
 		unsigned long eax=0, edx=1000;
 		__asm__("divl %2"
@@ -395,9 +352,6 @@ static int __init init_tsc(char* override)
 	rdtsc_bitshift = HYPERVISOR_shared_info->tsc_timestamp.tsc_bitshift;
 
 	set_cyc2ns_scale(cpu_khz/1000);
-
-	__get_time_values_from_xen();
-	processed_system_time = shadow_system_time;
 
 	rdtscll(alarm);
 

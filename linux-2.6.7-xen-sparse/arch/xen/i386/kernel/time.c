@@ -87,14 +87,70 @@ EXPORT_SYMBOL(i8253_lock);
 
 struct timer_opts *cur_timer = &timer_none;
 
-extern u64 shadow_system_time;
-extern u32 shadow_time_delta_usecs;
-extern void __get_time_values_from_xen(void);
+/* These are peridically updated in shared_info, and then copied here. */
+u32 shadow_tsc_stamp;
+u64 shadow_system_time;
+static u32 shadow_time_version;
+static struct timeval shadow_tv;
+extern u64 processed_system_time;
+
+#define NS_PER_TICK (1000000000ULL/HZ)
+
+/*
+ * Reads a consistent set of time-base values from Xen, into a shadow data
+ * area. Must be called with the xtime_lock held for writing.
+ */
+int __get_time_values_from_xen(void)
+{
+	s64 delta;
+	unsigned int ticks = 0;
+
+	do {
+		shadow_time_version = HYPERVISOR_shared_info->time_version2;
+		rmb();
+		shadow_tv.tv_sec    = HYPERVISOR_shared_info->wc_sec;
+		shadow_tv.tv_usec   = HYPERVISOR_shared_info->wc_usec;
+		shadow_tsc_stamp    = HYPERVISOR_shared_info->tsc_timestamp.tsc_bits;
+		shadow_system_time  = HYPERVISOR_shared_info->system_time;
+		rmb();
+	}
+	while (shadow_time_version != HYPERVISOR_shared_info->time_version1);
+
+	delta = (s64)(shadow_system_time +
+		      cur_timer->get_offset() * NSEC_PER_USEC -
+		      processed_system_time);
+	if (delta < 0) {
+		printk("Timer ISR: Time went backwards: %lld\n", delta);
+		return 1;
+	}
+
+	if (delta < NS_PER_TICK)
+		return 1;
+
+	/* Process elapsed jiffies since last call. */
+	while (delta >= NS_PER_TICK) {
+		ticks++;
+		delta -= NS_PER_TICK;
+		processed_system_time += NS_PER_TICK;
+	}
+	jiffies_64 += ticks - 1;
+	/* We leave one tick for the caller to add to jiffies since
+	 * the timer interrupt will call do_timer(). */
+
+	return 0;
+}
+
+#define TIME_VALUES_UP_TO_DATE \
+	(shadow_time_version == HYPERVISOR_shared_info->time_version2)
+
+/*
+ * We use this to ensure that gettimeofday() is monotonically increasing. We
+ * only break this guarantee if the wall clock jumps backwards "a long way".
+ */
+static struct timeval last_seen_tv = {0,0};
 
 /* Keep track of last time we did processing/updating of jiffies and xtime. */
 u64 processed_system_time;   /* System time (ns) at last processing. */
-
-#define NS_PER_TICK (1000000000ULL/HZ)
 
 /*
  * This version of gettimeofday has microsecond resolution
@@ -130,12 +186,37 @@ void do_gettimeofday(struct timeval *tv)
 			usec += lost * (USEC_PER_SEC / HZ);
 
 		sec = xtime.tv_sec;
-		usec += (xtime.tv_nsec / 1000);
+		usec += (xtime.tv_nsec / NSEC_PER_USEC);
+
+		if (unlikely(!TIME_VALUES_UP_TO_DATE)) {
+			/*
+			 * We may have blocked for a long time,
+			 * rendering our calculations invalid
+			 * (e.g. the time delta may have
+			 * overflowed). Detect that and recalculate
+			 * with fresh values.
+			 */
+			write_seqlock(&xtime_lock);
+			if (__get_time_values_from_xen() == 0)
+				jiffies_64++;
+			write_sequnlock(&xtime_lock);
+			continue;
+		}
 	} while (read_seqretry(&xtime_lock, seq));
 
 	while (usec >= 1000000) {
 		usec -= 1000000;
 		sec++;
+	}
+
+	/* Ensure that time-of-day is monotonically increasing. */
+	if ((sec < last_seen_tv.tv_sec) ||
+	    ((sec == last_seen_tv.tv_sec) && (usec < last_seen_tv.tv_usec))) {
+		sec = last_seen_tv.tv_sec;
+		usec = last_seen_tv.tv_usec;
+	} else {
+		last_seen_tv.tv_sec = sec;
+		last_seen_tv.tv_usec = usec;
 	}
 
 	tv->tv_sec = sec;
@@ -172,6 +253,9 @@ int do_settimeofday(struct timespec *tv)
 	time_status |= STA_UNSYNC;
 	time_maxerror = NTP_PHASE_LIMIT;
 	time_esterror = NTP_PHASE_LIMIT;
+
+	last_seen_tv.tv_sec = 0;
+
 	write_sequnlock_irq(&xtime_lock);
 	clock_was_set();
 	return 0;
@@ -236,8 +320,7 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
 	}
 #endif
 
-	if (regs)
-		do_timer_interrupt_hook(regs);
+	do_timer_interrupt_hook(regs);
 
 #if 0				/* XEN PRIV */
 	/*
@@ -288,8 +371,6 @@ static inline void do_timer_interrupt(int irq, void *dev_id,
  */
 irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	s64 delta;
-
 	/*
 	 * Here we are in the timer irq handler. We just have irqs locally
 	 * disabled but we don't know if the timer_bh is running on the other
@@ -299,17 +380,7 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	 */
 	write_seqlock(&xtime_lock);
 
-	__get_time_values_from_xen();
-
-	shadow_time_delta_usecs = cur_timer->get_offset() * NSEC_PER_USEC;
-	delta = (s64)(shadow_system_time + shadow_time_delta_usecs -
-		      processed_system_time);
-	if (delta < 0) {
-		printk("Timer ISR: Time went backwards: %lld\n", delta);
-		goto out;
-	}
-
-	if (delta < NS_PER_TICK)
+	if (__get_time_values_from_xen())
 		goto out;
 
 	cur_timer->mark_offset();
@@ -426,11 +497,14 @@ void __init time_init(void)
 #endif
 	xtime.tv_sec = HYPERVISOR_shared_info->wc_sec;
 	wall_to_monotonic.tv_sec = -xtime.tv_sec;
-	xtime.tv_nsec = HYPERVISOR_shared_info->wc_usec * 1000;
+	xtime.tv_nsec = HYPERVISOR_shared_info->wc_usec * NSEC_PER_USEC;
 	wall_to_monotonic.tv_nsec = -xtime.tv_nsec;
 
 	cur_timer = select_timer();
 	printk(KERN_INFO "Using %s for high-res timesource\n",cur_timer->name);
+
+	__get_time_values_from_xen();
+	processed_system_time = shadow_system_time;
 
 	time_irq  = bind_virq_to_irq(VIRQ_TIMER);
 
