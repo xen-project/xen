@@ -197,9 +197,17 @@ void machine_restart(char * __unused)
     panic("Need to reinclude BIOS reboot code\n");
 }
 
+
+void __attribute__((noreturn)) __machine_halt(void *unused)
+{
+    for ( ; ; )
+        __asm__ __volatile__ ( "cli; hlt" );
+}
+
 void machine_halt(void)
 {
-    while(1){ safe_halt(); }
+    smp_call_function(__machine_halt, NULL, 1, 1);
+    __machine_halt(NULL);
 }
 
 void arch_do_createdomain(struct domain *d)
