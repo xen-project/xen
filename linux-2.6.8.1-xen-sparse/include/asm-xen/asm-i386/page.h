@@ -170,9 +170,9 @@ static __inline__ int get_order(unsigned long size)
  *   change TASK_SIZE 
  */
 #ifdef __ASSEMBLY__
-#define __PAGE_OFFSET		(0xC0100000)
+#define __PAGE_OFFSET		(0xC0000000)
 #else
-#define __PAGE_OFFSET		(0xC0100000UL)
+#define __PAGE_OFFSET		(0xC0000000UL)
 #endif
 
 

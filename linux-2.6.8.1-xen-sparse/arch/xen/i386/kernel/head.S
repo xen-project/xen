@@ -2,7 +2,7 @@
 #include <linux/config.h>
 
 .section __xen_guest
-	.ascii	"GUEST_OS=linux,GUEST_VER=2.6,XEN_VER=2.0"
+	.ascii	"GUEST_OS=linux,GUEST_VER=2.6,XEN_VER=2.0,VIRT_BASE=0xC0000000"
 	.ascii	",LOADER=generic"
 #ifdef CONFIG_XEN_WRITABLE_PAGETABLES
 	.ascii	",PT_MODE_WRITABLE"

@@ -217,8 +217,13 @@ static inline void set_in_cr4 (unsigned long mask)
 	case X86_CR4_OSXMMEXCPT:
 		break;
 	default:
-		printk("Xen unsupported cr4 update\n");
-		BUG();
+		do {
+			const char *msg = "Xen unsupported cr4 update\n";
+			(void)HYPERVISOR_console_io(
+				CONSOLEIO_write, __builtin_strlen(msg),
+				(char *)msg);
+			BUG();
+		} while (0);
 	}
 }
 
@@ -295,7 +300,7 @@ extern unsigned int mca_pentium_flag;
 /*
  * User space process size: 3GB (default).
  */
-#define TASK_SIZE	(PAGE_OFFSET & PGDIR_MASK)
+#define TASK_SIZE	(PAGE_OFFSET)
 
 /* This decides where the kernel will search for a free chunk of vm
  * space during mmap's.
