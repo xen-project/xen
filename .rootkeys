@@ -237,6 +237,7 @@
 40f5623bxUbeGjkRrjDguCy_Gm8RLw linux-2.6.9-xen-sparse/include/asm-xen/asm-i386/xor.h
 40f5623bYNP7tHE2zX6YQxp9Zq2utQ linux-2.6.9-xen-sparse/include/asm-xen/ctrl_if.h
 40f5623b3Eqs8pAc5WpPX8_jTzV2qw linux-2.6.9-xen-sparse/include/asm-xen/evtchn.h
+419b4e9367PjTEvdjwavWN12BeBBXg linux-2.6.9-xen-sparse/include/asm-xen/foreign_page.h
 412dfaeazclyNDM0cpnp60Yo4xulpQ linux-2.6.9-xen-sparse/include/asm-xen/gnttab.h
 40f5623aGPlsm0u1LTO-NVZ6AGzNRQ linux-2.6.9-xen-sparse/include/asm-xen/hypervisor.h
 3f108af1ylCIm82H052FVTfXACBHrw linux-2.6.9-xen-sparse/include/asm-xen/linux-public/privcmd.h
@@ -245,7 +246,7 @@
 4122466356eIBnC9ot44WSVVIFyhQA linux-2.6.9-xen-sparse/include/asm-xen/queues.h
 3f689063BoW-HWV3auUJ-OqXfcGArw linux-2.6.9-xen-sparse/include/asm-xen/xen_proc.h
 4124d8c4aocX7A-jIbuGraWN84pxGQ linux-2.6.9-xen-sparse/include/linux/bio.h
-4124f66fp5QwbDHEfoUIa7pqO5Xhag linux-2.6.9-xen-sparse/include/linux/page-flags.h
+419b4e93z2S0gR17XTy8wg09JEwAhg linux-2.6.9-xen-sparse/include/linux/gfp.h
 4124f66f4NaKNa0xPiGGykn9QaZk3w linux-2.6.9-xen-sparse/include/linux/skbuff.h
 40f56a0ddHCSs3501MY4hRf22tctOw linux-2.6.9-xen-sparse/mkbuildtree
 412f46c0LJuKAgSPGoC0Z1DEkLfuLA linux-2.6.9-xen-sparse/mm/memory.c
