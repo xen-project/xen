@@ -574,9 +574,16 @@ static void net_tx_action(unsigned long unused)
         skb->dev      = netif->dev;
         skb->protocol = eth_type_trans(skb, skb->dev);
 
-        /* Destructor information. */
-        atomic_set(&page->count, 1);
+        /*
+         * Destructor information. We hideously abuse the 'mapping' pointer,
+         * which isn't otherwise used by us. The page deallocator is modified
+         * to interpret a non-NULL value as a destructor function to be called.
+         * This works okay because in all other cases the pointer must be NULL
+         * when the page is freed (normally Linux will explicitly bug out if
+         * it sees otherwise.
+         */
         page->mapping = (struct address_space *)netif_page_release;
+        atomic_set(&page->count, 1);
         pending_id[pending_idx] = txreq.id;
         pending_netif[pending_idx] = netif;
 
@@ -594,6 +601,9 @@ static void netif_page_release(struct page *page)
 {
     unsigned long flags;
     u16 pending_idx = page - virt_to_page(mmap_vstart);
+
+    /* Stop the abuse. */
+    page->mapping = NULL;
 
     spin_lock_irqsave(&dealloc_lock, flags);
     dealloc_ring[MASK_PEND_IDX(dealloc_prod++)] = pending_idx;
