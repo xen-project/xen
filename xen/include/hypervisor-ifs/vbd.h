@@ -28,7 +28,7 @@ typedef struct _xen_extent {
 #define VBD_MODE_W         0x2
 
 #define VBD_CAN_READ(_v)  ((_v)->mode & VBD_MODE_R)
-#define VBD_CAN_WRITE(_v) ((_v)->mode & VBD_MODE_R)
+#define VBD_CAN_WRITE(_v) ((_v)->mode & VBD_MODE_W)
 
   
 typedef struct _vbd_create { 

@@ -189,11 +189,13 @@ void vbd_probe_devices(xen_disk_info_t *xdi, struct task_struct *p)
 
     for(i = 0; i < VBD_HTAB_SZ; i++) { 
 	for(v = p->vbdtab[i]; v; v = v->next) { 
+
 	    xdi->disks[xdi->count].device   = v->vdevice; 
 	    xdi->disks[xdi->count].info     = XD_FLAG_VIRT | XD_TYPE_DISK; 
 
-	    /* XXX SMH: and now set XD_FLAG_RO if necessary */
-
+	    if(!VBD_CAN_WRITE(v))
+		xdi->disks[xdi->count].info    |= XD_FLAG_RO; 
+		
 	    xdi->disks[xdi->count].capacity = 0; 
 	    for(x = v->extents; x; x = x->next) 
 		xdi->disks[xdi->count].capacity += x->extent.nr_sectors; 
