@@ -43,10 +43,10 @@
  */
 
 /* Entry point for notifications into Linux subsystems. */
-void evtchn_do_upcall(struct pt_regs *regs);
+asmlinkage void evtchn_do_upcall(struct pt_regs *regs);
 
 /* Entry point for notifications into the userland character device. */
-asmlinkage void evtchn_device_upcall(int port);
+void evtchn_device_upcall(int port);
 
 #ifdef XEN_EVTCHN_MASK_OPS
 
