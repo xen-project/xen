@@ -18,7 +18,6 @@ override TARGET_ARCH     := $(patsubst x86%,x86,$(TARGET_ARCH))
 
 TARGET  := $(BASEDIR)/xen
 HDRS    := $(wildcard $(BASEDIR)/include/xen/*.h)
-HDRS    += $(wildcard $(BASEDIR)/include/scsi/*.h)
 HDRS    += $(wildcard $(BASEDIR)/include/public/*.h)
 HDRS    += $(wildcard $(BASEDIR)/include/asm-$(TARGET_ARCH)/*.h)
 HDRS    += $(wildcard $(BASEDIR)/include/asm-$(TARGET_ARCH)/$(TARGET_SUBARCH)/*.h)
