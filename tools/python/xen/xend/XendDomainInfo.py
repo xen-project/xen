@@ -780,7 +780,7 @@ def vm_dev_vif(vm, val, index):
     defer = xend.netif_dev_create(vm.dom, vif, val, recreate=vm.recreate)
     def fn(id):
         dev = xend.netif_dev(vm.dom, vif)
-        dev.vifctl('up')
+        dev.vifctl('up', vmname=vm.name)
         vm.add_device('vif', dev)
         print 'vm_dev_vif> created', dev
         return id

@@ -161,12 +161,9 @@ class NetDev(controller.Dev):
         """
         return ':'.join(map(lambda x: "%x" % x, self.mac))
 
-    def vifctl_params(self):
-        from xen.xend import XendDomain
-        xd = XendDomain.instance()
+    def vifctl_params(self, vmname=None):
         dom = self.controller.dom
-        dominfo = xd.domain_get(dom)
-        name = (dominfo and dominfo.name) or ('DOM%d' % dom)
+        name = vmname or ('DOM%d' % dom)
         return { 'domain': name,
                  'vif'   : self.get_vifname(), 
                  'mac'   : self.get_mac(),
@@ -174,10 +171,10 @@ class NetDev(controller.Dev):
                  'script': self.script,
                  'ipaddr': self.ipaddr, }
 
-    def vifctl(self, op):
+    def vifctl(self, op, vmname=None):
         """Bring the device up or down.
         """
-        Vifctl.vifctl(op, **self.vifctl_params())
+        Vifctl.vifctl(op, **self.vifctl_params(vmname=vmname))
 
     def destroy(self):
         """Destroy the device's resources and disconnect from the back-end
@@ -186,7 +183,6 @@ class NetDev(controller.Dev):
         def cb_destroy(val):
             self.controller.send_be_destroy(self.vif)
         self.vifctl('down')
-        #d = self.controller.factory.addDeferred()
         d = defer.Deferred()
         d.addCallback(cb_destroy)
         self.controller.send_be_disconnect(self.vif, response=d)
@@ -272,7 +268,6 @@ class NetifController(controller.Controller):
     def reattach_devices(self):
         """Reattach all devices when the back-end control domain has changed.
         """
-        #d = self.factory.addDeferred()
         self.send_be_create(vif)
         self.attach_fe_devices()
 
