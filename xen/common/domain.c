@@ -283,9 +283,6 @@ int final_setup_guest(struct domain *p, dom0_builddomain_t *builddomain)
     if ( (rc = arch_final_setup_guest(p->exec_domain[0],c)) != 0 )
         goto out;
 
-    /* Set up the shared info structure. */
-    update_dom_time(p);
-
     set_bit(DF_CONSTRUCTED, &p->d_flags);
 
  out:    
@@ -338,9 +335,6 @@ long do_boot_vcpu(unsigned long vcpu, full_execution_context_t *ctxt)
         sched_rem_domain(ed);
         goto out;
     }
-
-    /* Set up the shared info structure. */
-    update_dom_time(d);
 
     /* domain_unpause_by_systemcontroller */
     if ( test_and_clear_bit(EDF_CTRLPAUSE, &ed->ed_flags) )

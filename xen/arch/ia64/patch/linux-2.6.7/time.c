@@ -71,7 +71,7 @@
 +    return now; 
 +}
 +
-+void update_dom_time(struct domain *d)
++void update_dom_time(struct exec_domain *ed)
 +{
 +// FIXME: implement this?
 +	printf("update_dom_time: called, not implemented, skipping\n");

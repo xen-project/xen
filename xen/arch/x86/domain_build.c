@@ -406,9 +406,6 @@ int construct_dom0(struct domain *d,
 
 #endif /* __x86_64__ */
 
-    /* Set up shared-info area. */
-    update_dom_time(d);
-    d->shared_info->domain_time = 0;
     /* Mask all upcalls... */
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
         d->shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
