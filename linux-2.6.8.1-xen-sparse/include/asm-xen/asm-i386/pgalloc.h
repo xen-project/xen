@@ -36,21 +36,9 @@ static inline void pte_free_kernel(pte_t *pte)
 	flush_page_update_queue();
 }
 
-static inline void pte_free(struct page *pte)
-{
-#ifdef CONFIG_HIGHPTE
-	if (pte < highmem_start_page)
-#endif
-		kmem_cache_free(pte_cache,
-				phys_to_virt(page_to_pseudophys(pte)));
-#ifdef CONFIG_HIGHPTE
-	else
-		__free_page(pte);
-#endif
-}
+extern void pte_free(struct page *pte);
 
-
-#define __pte_free_tlb(tlb,pte)		pte_free(pte)
+#define __pte_free_tlb(tlb,pte)	tlb_remove_page((tlb),(pte))
 
 /*
  * allocating and freeing a pmd is trivial: the 1-entry pmd is

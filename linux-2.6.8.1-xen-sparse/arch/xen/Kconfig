@@ -45,8 +45,7 @@ endmenu
 
 config FOREIGN_PAGES
 	bool
-	default y if XEN_PHYSDEV_ACCESS
-	default n if !XEN_PHYSDEV_ACCESS
+	default y
 
 config PAGESIZED_SKBS
 	bool

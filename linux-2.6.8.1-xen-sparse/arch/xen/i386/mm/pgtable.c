@@ -187,6 +187,9 @@ pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 
 void pte_ctor(void *pte, kmem_cache_t *cache, unsigned long unused)
 {
+	struct page *page = virt_to_page(pte);
+	SetPageForeign(page, pte_free);
+	set_page_count(page, 1);
 
 	clear_page(pte);
 	__make_page_readonly(pte);
@@ -196,6 +199,8 @@ void pte_ctor(void *pte, kmem_cache_t *cache, unsigned long unused)
 
 void pte_dtor(void *pte, kmem_cache_t *cache, unsigned long unused)
 {
+	struct page *page = virt_to_page(pte);
+	ClearPageForeign(page);
 
 	queue_pte_unpin(virt_to_phys(pte));
 	__make_page_writable(pte);
@@ -223,6 +228,20 @@ struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 	if (ptep)
 		return virt_to_page(ptep);
 	return NULL;
+}
+
+void pte_free(struct page *pte)
+{
+	set_page_count(pte, 1);
+#ifdef CONFIG_HIGHPTE
+	if (pte < highmem_start_page)
+#endif
+		kmem_cache_free(pte_cache,
+				phys_to_virt(page_to_pseudophys(pte)));
+#ifdef CONFIG_HIGHPTE
+	else
+		__free_page(pte);
+#endif
 }
 
 void pmd_ctor(void *pmd, kmem_cache_t *cache, unsigned long flags)
