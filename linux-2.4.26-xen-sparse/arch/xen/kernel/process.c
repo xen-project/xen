@@ -125,14 +125,7 @@ void machine_restart(char *__unused)
 
 void machine_halt(void)
 {
-    /* We really want to get pending console data out before we die. */
-    extern void xencons_force_flush(void);
-    xencons_force_flush();
-    for ( ; ; ) /* loop without wasting cpu cycles */
-    {
-        HYPERVISOR_shared_info->vcpu_data[0].evtchn_upcall_pending = 0;
-        HYPERVISOR_block();
-    }
+    machine_power_off();
 }
 
 void machine_power_off(void)
