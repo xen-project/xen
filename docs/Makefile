@@ -4,7 +4,7 @@
 # Xfig and tgif diagrams should be in the fig/ subdirectory.
 # DOCUMENTS should be a list of the target Postscript files.
 
-DOCUMENTS = interface.ps interface.pdf
+DOCUMENTS = interface.ps interface.pdf user.ps user.pdf
 
 GFX  = $(patsubst %.obj, %.eps, $(wildcard figs/*.obj))
 GFX += $(patsubst %.fig, %.eps, $(wildcard figs/*.fig))

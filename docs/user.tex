@@ -49,6 +49,13 @@
 \part{Introduction and Tutorial}
 \chapter{Introduction}
 
+{\bf
+DISCLAIMER: This documentation is currently under active development
+and as such there may be mistakes and omissions --- watch out for
+these and please report any you find to the developer's mailing list.
+Contributions of material, suggestions and corrections are welcome.
+}
+
 Xen is a { \em paravirtualising } virtual machine monitor (VMM) or
 ``Hypervisor'' for the x86 processor architecture.  Xen can securely
 multiplex heterogeneous virtual machines on a single physical with
@@ -160,7 +167,18 @@ Prerequisites:
 \item A working installation of your favourite Linux distribution.
 \item A working installation of the GRUB bootloader.
 \item An installation of Twisted v1.3 or above (see {\tt
-http://www.twistedmatrix.com}.
+http://www.twistedmatrix.com}.  There may be a package available for
+your distribution; alternatively it can be installed by running {\tt \#
+make install-twisted} in the root of the Xen source tree.
+\item The Linux bridge control tools (see {\tt
+http://bridge.sourceforge.net }).  There may be a packages of these
+tools available for your distribution.
+\end{itemize}
+
+Optional:
+\begin{itemize}
+\item The Python logging package (see {\tt http://www.red-dove.com/})
+for additional Xend logging functionality.
 \end{itemize}
 
 \section{Download the Xen source code}
@@ -192,20 +210,16 @@ To update to the newest changes to the repository, run
 The Xen source code repository is structured as follows:
 
 \begin{description}
-\item[tools] Xen node controller daemon (Xend), command line tools, 
+\item[\path{tools/}] Xen node controller daemon (Xend), command line tools, 
   control libraries
-\item[xen] The Xen hypervisor itself.
-\item[linux-2.4.26-xen] Linux 2.4 support for Xen
-\item[linux-2.6.7-xen] Linux 2.6 support for Xen
-\item[doc] various documentation files for users and developers
-\item[extras] currently this contains the Mini OS, aimed at developers
+\item[\path{xen/}] The Xen hypervisor itself.
+\item[\path{linux-2.4.26-xen}] Linux 2.4 support for Xen
+\item[\path{linux-2.6.7-xen}] Linux 2.6 support for Xen
+\item[\path{doc}] various documentation files for users and developers
+\item[\path{extras}] currently this contains the Mini OS, aimed at developers
 \end{description}
 
 \section{Build and install}
-
-\begin{verbatim}
-# make world
-\end{verbatim}
 
 The Xen makefile includes a target ``world'' that will do the
 following:
@@ -221,8 +235,18 @@ following:
       unprivileged virtual machines.
 \end{itemize}
 
-The files produced are stored under the \path{install/} directory.  To
-install them in their default locations, do:
+\begin{verbatim}
+# make world
+\end{verbatim}
+
+To build the unprivileged port of Linux 2.6, do:
+\begin{verbatim}
+# make linux26
+\end{verbatim}
+
+The files produced by the build process are stored under the
+\path{install/} directory.  To install them in their default
+locations, do:
 
 \begin{verbatim}
 # make install
@@ -288,7 +312,46 @@ require a more complex setup, you will want to write a custom
 configuration file --- details of the configuration file formats are
 included in Chapter~\ref{cha:config}.
 
-XXX More explanation needed here...
+The \path{xmdefaults} file is a template description that is intended
+to be reused for multiple virtual machines.  Setting the value of the
+{\tt vmid} variable fills in parts of this template.
+
+\subsection{Editing \path{xmdefaults}}
+
+At minimum, you should edit the following variables in \path{xmdefaults}:
+
+\begin{description}
+\item[kernel] Set this to the path of the kernel you compiled for use
+              with Xen. [e.g. {\tt kernel =
+              '/root/xeno-unstable.bk/install/boot/vmlinuz-2.4.26-xenU'}]
+\item[memory] Set this to the size of the domain's memory in
+megabytes. [e.g. {\tt memory = 64 } ]
+\item[disk] Set the first entry in this list to calculate the offset
+of the domain's root partition, based on the domain ID.  Set the
+second to the location of \path{/usr} (if you are sharing it between
+domains). [i.e. {\tt disk = ['phy:your\_hard\_drive\%d,sda1,w' \%
+(base\_partition\_number + vmid), 'phy:your\_usr\_partition,sda6,r' ]}
+\item[dhcp] Uncomment the dhcp variable, so that the domain will
+receive its IP address from a DHCP server. [i.e. {\tt dhcp=''dhcp''}]
+\end{description}
+
+\subsection{Starting the domain}
+
+The {\tt xm} tool provides a variety of commands for managing domains.
+Use the {\tt create} command to start new domains.  To start the
+virtual machine with virtual machine ID 1.
+
+\begin{verbatim}
+# xm create -c vmid=1
+\end{verbatim}
+
+The {\tt -c} switch causes {\tt xm} to turn into the domain's console
+after creation.  The {\tt vmid=1} sets the {\tt vmid} variable used in
+the {\tt xmdefaults} file.  The tool uses the
+\path{/etc/xen/xmdefaults} file, since no custom configuration file
+was specified on the command line.
+
+ XXX More explanation needed here...
 
 \part{Quick Reference}
 
