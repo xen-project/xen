@@ -442,21 +442,36 @@ static struct pci_ops pci_direct_conf2 = {
 static int __devinit pci_sanity_check(struct pci_ops *o)
 {
 	u16 x;
-	struct pci_bus bus;		/* Fake bus and device */
-	struct pci_dev dev;
+	struct pci_bus *bus;		/* Fake bus and device */
+	struct pci_dev *dev;
+	int ret = 0;
 
 	if (pci_probe & PCI_NO_CHECKS)
 		return 1;
-	bus.number = 0;
-	dev.bus = &bus;
-	for(dev.devfn=0; dev.devfn < 0x100; dev.devfn++)
-		if ((!o->read_word(&dev, PCI_CLASS_DEVICE, &x) &&
+
+	bus = kmalloc(sizeof(*bus), GFP_KERNEL);
+	dev = kmalloc(sizeof(*dev), GFP_KERNEL);
+	if ( (bus == NULL) || (dev == NULL) )
+		goto out;
+
+	bus->number = 0;
+	dev->bus = bus;
+	for(dev->devfn=0; dev->devfn < 0x100; dev->devfn++)
+		if ((!o->read_word(dev, PCI_CLASS_DEVICE, &x) &&
 		     (x == PCI_CLASS_BRIDGE_HOST || x == PCI_CLASS_DISPLAY_VGA)) ||
-		    (!o->read_word(&dev, PCI_VENDOR_ID, &x) &&
+		    (!o->read_word(dev, PCI_VENDOR_ID, &x) &&
 		     (x == PCI_VENDOR_ID_INTEL || x == PCI_VENDOR_ID_COMPAQ)))
-			return 1;
+		{
+			ret = 1;
+			break;
+		}
+ out:
+	if ( bus != NULL )
+		kfree(bus);
+	if ( dev != NULL)
+		kfree(dev);
 	DBG("PCI: Sanity check failed\n");
-	return 0;
+	return ret;
 }
 
 static struct pci_ops * __devinit pci_check_direct(void)

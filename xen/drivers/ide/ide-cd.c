@@ -818,7 +818,7 @@ static void cdrom_buffer_sectors (ide_drive_t *drive, unsigned long sector,
 				 (SECTOR_BUFFER_SIZE >> SECTOR_BITS) -
 				 info->nsectors_buffered);
 
-    char *dest;
+    char *dest, *dum;
 
     /* If we couldn't get a buffer, don't try to buffer anything... */
     if (info->buffer == NULL)
@@ -839,11 +839,12 @@ static void cdrom_buffer_sectors (ide_drive_t *drive, unsigned long sector,
     }
 
     /* Throw away any remaining data. */
+    dum = kmalloc(SECTOR_SIZE, GFP_ATOMIC);
     while (sectors_to_transfer > 0) {
-	char dum[SECTOR_SIZE];
-	atapi_input_bytes (drive, dum, sizeof (dum));
+	atapi_input_bytes (drive, dum, SECTOR_SIZE);
 	--sectors_to_transfer;
     }
+    kfree(dum);
 }
 
 /*
@@ -896,6 +897,7 @@ static ide_startstop_t cdrom_read_intr (ide_drive_t *drive)
     struct cdrom_info *info = drive->driver_data;
     int i, dma = info->dma, dma_error = 0;
     ide_startstop_t startstop;
+    char *dum;
 
     struct request *rq = HWGROUP(drive)->rq;
 
@@ -965,15 +967,20 @@ static ide_startstop_t cdrom_read_intr (ide_drive_t *drive)
     nskip = MIN ((int)(rq->current_nr_sectors - (rq->bh->b_size >> SECTOR_BITS)),
 		 sectors_to_transfer);
 
+    if ( (dum = kmalloc(SECTOR_SIZE, GFP_ATOMIC)) == NULL )
+    {
+	cdrom_end_request (0, drive);
+	return ide_stopped;        
+    }
     while (nskip > 0) {
 	/* We need to throw away a sector. */
-	char dum[SECTOR_SIZE];
-	atapi_input_bytes (drive, dum, sizeof (dum));
+	atapi_input_bytes (drive, dum, SECTOR_SIZE);
 
 	--rq->current_nr_sectors;
 	--nskip;
 	--sectors_to_transfer;
     }
+    kfree(dum);
 
     /* Now loop while we still have data to read from the drive. */
     while (sectors_to_transfer > 0) {
