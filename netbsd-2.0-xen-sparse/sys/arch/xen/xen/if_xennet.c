@@ -121,8 +121,8 @@ static void xennet_hex_dump(unsigned char *, size_t, char *, int);
 int xennet_match (struct device *, struct cfdata *, void *);
 void xennet_attach (struct device *, struct device *, void *);
 static void xennet_ctrlif_rx(ctrl_msg_t *, unsigned long);
-static void xennet_driver_status_change(netif_fe_driver_status_changed_t *);
-static void xennet_status_change(netif_fe_interface_status_changed_t *);
+static void xennet_driver_status_change(netif_fe_driver_status_t *);
+static void xennet_status_change(netif_fe_interface_status_t *);
 static void xennet_tx_mbuf_free(struct mbuf *, caddr_t, size_t, void *);
 static void xennet_rx_mbuf_free(struct mbuf *, caddr_t, size_t, void *);
 static int xen_network_handler(void *);
@@ -176,7 +176,7 @@ xennet_scan(struct device *self, struct xennet_attach_args *xneta,
     cfprint_t print)
 {
 	ctrl_msg_t cmsg;
-	netif_fe_driver_status_changed_t st;
+	netif_fe_driver_status_t st;
 	int err = 0;
 
 	if ((xen_start_info.flags & SIF_INITDOMAIN) ||
@@ -193,8 +193,8 @@ xennet_scan(struct device *self, struct xennet_attach_args *xneta,
 
 	/* Send a driver-UP notification to the domain controller. */
 	cmsg.type      = CMSG_NETIF_FE;
-	cmsg.subtype   = CMSG_NETIF_FE_DRIVER_STATUS_CHANGED;
-	cmsg.length    = sizeof(netif_fe_driver_status_changed_t);
+	cmsg.subtype   = CMSG_NETIF_FE_DRIVER_STATUS;
+	cmsg.length    = sizeof(netif_fe_driver_status_t);
 	st.status      = NETIF_DRIVER_STATUS_UP;
 	st.max_handle  = 0;
 	memcpy(cmsg.msg, &st, sizeof(st));
@@ -276,18 +276,18 @@ xennet_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
 	int respond = 1;
 
 	switch (msg->subtype) {
-	case CMSG_NETIF_FE_INTERFACE_STATUS_CHANGED:
-		if (msg->length != sizeof(netif_fe_interface_status_changed_t))
+	case CMSG_NETIF_FE_INTERFACE_STATUS:
+		if (msg->length != sizeof(netif_fe_interface_status_t))
 			goto error;
 		xennet_status_change(
-			(netif_fe_interface_status_changed_t *)&msg->msg[0]);
+			(netif_fe_interface_status_t *)&msg->msg[0]);
 		break;
 
-	case CMSG_NETIF_FE_DRIVER_STATUS_CHANGED:
-		if (msg->length != sizeof(netif_fe_driver_status_changed_t))
+	case CMSG_NETIF_FE_DRIVER_STATUS:
+		if (msg->length != sizeof(netif_fe_driver_status_t))
 			goto error;
 		xennet_driver_status_change(
-			(netif_fe_driver_status_changed_t *)&msg->msg[0]);
+			(netif_fe_driver_status_t *)&msg->msg[0]);
 		break;
 
 	error:
@@ -301,7 +301,7 @@ xennet_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
 }
 
 static void
-xennet_driver_status_change(netif_fe_driver_status_changed_t *status)
+xennet_driver_status_change(netif_fe_driver_status_t *status)
 {
 	struct xennet_attach_args xneta;
 	int i;
@@ -321,7 +321,7 @@ xennet_driver_status_change(netif_fe_driver_status_changed_t *status)
 }
 
 static void
-xennet_status_change(netif_fe_interface_status_changed_t *status)
+xennet_status_change(netif_fe_interface_status_t *status)
 {
 	ctrl_msg_t cmsg;
 	netif_fe_interface_connect_t up;
@@ -350,8 +350,8 @@ xennet_status_change(netif_fe_interface_status_changed_t *status)
 	ifp = &sc->sc_ethercom.ec_if;
 
 	switch (status->status) {
-	case NETIF_INTERFACE_STATUS_DESTROYED:
-		printf("Unexpected netif-DESTROYED message in state %d\n",
+	case NETIF_INTERFACE_STATUS_CLOSED:
+		printf("Unexpected netif-CLOSED message in state %d\n",
 		    sc->sc_backend_state);
 		break;
 
