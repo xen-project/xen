@@ -21,10 +21,10 @@ class XendConsoleInfo:
 
     def __init__(self, console, dom1, port1, dom2, port2, conn=None):
         self.console = console
-        self.dom1  = dom1
-        self.port1 = port1
-        self.dom2  = dom2
-        self.port2 = port2
+        self.dom1  = int(dom1)
+        self.port1 = int(port1)
+        self.dom2  = int(dom2)
+        self.port2 = int(port2)
         self.conn  = conn
         #self.id = "%d.%d-%d.%d" % (self.dom1, self.port1, self.dom2, self.port2)
         self.id = str(port1)
@@ -81,6 +81,7 @@ class XendConsole:
             print 'XendConsole> rebooted: removing all console info'
             self.rm_all()
         eserver.subscribe('xend.domain.died', self.onDomainDied)
+        eserver.subscribe('xend.domain.destroy', self.onDomainDied)
 
     def rm_all(self):
         """Remove all console info. Used after reboot.
@@ -104,11 +105,15 @@ class XendConsole:
                 self._delete_console(c.id)
 
     def onDomainDied(self, event, val):
-        print 'onDomainDied', "dom=", dom,
         dom = int(val)
+        #print 'XendConsole>onDomainDied', 'event', event, "dom=", dom
         for c in self.consoles():
-            print 'onDomainDied', "dom=", dom, "dom1=", c.dom1, "dom2=", c.dom2
+            #print 'onDomainDied', "dom=", dom, "dom1=", c.dom1, "dom2=", c.dom2
             if (c.dom1 == dom) or (c.dom2 == dom):
+                'XendConsole>onDomainDied', 'delete console dom=', dom
+                ctrl = xcd.get_domain_console(dom)
+                if ctrl:
+                    ctrl.close()
                 self._delete_console(c.id)
 
     def sync(self):

@@ -36,14 +36,14 @@ class CtrlMsgRcvr:
         pass
     
     def registerChannel(self):
-        print 'CtrlMsgRcvr>registerChannel>', self
+        #print 'CtrlMsgRcvr>registerChannel>', self
         self.channel = self.channelFactory.domChannel(self.dom)
         self.idx = self.channel.getIndex()
         if self.majorTypes:
             self.channel.registerDevice(self.majorTypes, self)
         
     def deregisterChannel(self):
-        print 'CtrlMsgRcvr>deregisterChannel>', self
+        #print 'CtrlMsgRcvr>deregisterChannel>', self
         if self.channel:
             self.channel.deregisterDevice(self)
             del self.channel
@@ -92,13 +92,16 @@ class ControllerFactory(CtrlMsgRcvr):
         return None
 
     def delInstance(self, instance):
+        #print 'ControllerFactory>delInstance>', instance.idx
         if instance.idx in self.instances:
+            #print 'ControllerFactory>delInstance> remove', instance.idx
             del self.instances[instance.idx]
 
     def createInstance(self, dom, recreate=0):
         raise NotImplementedError()
 
     def instanceClosed(self, instance):
+        #print 'ControllerFactory>instanceClosed>', instance.idx, instance
         self.delInstance(instance)
 
     def addDeferred(self):
@@ -126,7 +129,7 @@ class Controller(CtrlMsgRcvr):
     def __init__(self, factory, dom):
         CtrlMsgRcvr.__init__(self)
         self.factory = factory
-        self.dom = dom
+        self.dom = int(dom)
         self.channel = None
         self.idx = None
 
@@ -135,6 +138,7 @@ class Controller(CtrlMsgRcvr):
         self.lostChannel()
 
     def lostChannel(self):
+        #print 'Controller>lostChannel>', self, self.factory
         self.factory.instanceClosed(self)
 
 class Dev:

@@ -18,7 +18,8 @@ class SrvConsoleDir(SrvDir):
         try:
             info = self.xconsole.console_get(x)
             val = SrvConsole(info)
-        except KeyError:
+        except KeyError, ex:
+            print 'SrvConsoleDir>', ex
             pass
         return val
 

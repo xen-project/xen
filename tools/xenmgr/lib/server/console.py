@@ -103,7 +103,7 @@ class ConsoleController(controller.Controller):
     """
 
     def __init__(self, factory, dom, console_port):
-        #print 'ConsoleController> dom=', dom
+        #print 'ConsoleController> dom=', dom, type(dom)
         controller.Controller.__init__(self, factory, dom)
         self.majorTypes = [ CMSG_CONSOLE ]
         self.status = "new"
@@ -120,6 +120,7 @@ class ConsoleController(controller.Controller):
 
     def sxpr(self):
         val =['console',
+              ['status',       self.status ],
               ['id',           self.idx ],
               ['domain',       self.dom ],
               ['local_port',   self.channel.getLocalPort() ],
@@ -139,10 +140,17 @@ class ConsoleController(controller.Controller):
         return self.status == 'connected'
 
     def close(self):
-        self.status = "closed"
-        self.listener.stopListening()
-        self.deregisterChannel()
-        self.lostChannel()
+        try:
+            #print 'ConsoleController> close dom=', self.dom
+            self.status = "closed"
+            if self.conn:
+                self.conn.loseConnection()
+            self.listener.stopListening()
+            self.deregisterChannel()
+            self.lostChannel()
+        except Exception, ex:
+            print 'ConsoleController>close>', ex
+            raise
 
     def listen(self):
         """Listen for TCP connections to the console port..
@@ -166,6 +174,8 @@ class ConsoleController(controller.Controller):
         return 0
 
     def disconnect(self):
+        if self.conn:
+            self.conn.loseConnection()
         self.addr = None
         self.conn = None
         self.listen()

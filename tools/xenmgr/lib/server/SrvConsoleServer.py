@@ -378,7 +378,10 @@ class EventProtocol(protocol.Protocol):
         return ['ok']
 
     def op_info(self, name, req):
-        val = self.daemon.consoles()
+        val = ['info']
+        val += self.daemon.consoles()
+        val += self.daemon.blkifs()
+        val += self.daemon.netifs()
         return val
 
     def op_sys_subscribe(self, name, v):
@@ -603,6 +606,9 @@ class Daemon:
         d = self.blkifCF.createInstance(dom, recreate=recreate)
         return d
 
+    def blkifs(self):
+        return [ x.sxpr() for x in self.blkifCF.getInstances() ]
+
     def blkif_get(self, dom):
         return self.blkifCF.getInstanceByDom(dom)
 
@@ -636,6 +642,9 @@ class Daemon:
         
         """
         return self.netifCF.createInstance(dom, recreate=recreate)
+
+    def netifs(self):
+        return [ x.sxpr() for x in self.netifCF.getInstances() ]
 
     def netif_get(self, dom):
         return self.netifCF.getInstanceByDom(dom)
@@ -677,8 +686,7 @@ class Daemon:
         console = self.get_console(id)
         if not console:
             raise ValueError('Invalid console id')
-        if console.conn:
-            console.conn.loseConnection()
+        console.disconnect()
 
     def domain_shutdown(self, dom, reason):
         """Shutdown a domain.

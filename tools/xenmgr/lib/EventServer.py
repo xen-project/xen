@@ -4,6 +4,8 @@
 """
 import string
 
+from twisted.internet import reactor
+
 # subscribe a.b.c h: map a.b.c -> h
 # subscribe a.b.* h: map a.b.* -> h
 # subscribe a.b.? h: map a.b.? -> h
@@ -73,7 +75,7 @@ class EventServer:
         """
         if event == None:
             self.handlers.clear()
-        else:
+        elif event in self.handlers:
             del self.handlers[event]
         
     def unsubscribe(self, event, handler):
@@ -88,20 +90,28 @@ class EventServer:
         if handler in hl:
             hl.remove(handler)
 
-    def inject(self, event, val):
-        """Inject an event. Handlers for it are called if runing, otherwise
+    def inject(self, event, val, async=1):
+        """Inject an event. Handlers for it are called if running, otherwise
         it is queued.
 
         event	event type
         val	event value
         """
         if self.run:
-            #print ">event", event, val
-            self.call_event_handlers(event, event, val)
-            self.call_query_handlers(event, val)
-            self.call_star_handlers(event, val)
+            if async:
+                reactor.callLater(0, self.call_handlers, event, val)
+            else:
+                self.notify_handlers(event, val)
         else:
             self.queue.append( (event, val) )
+
+    def call_handlers(self, event, val):
+        """Internal method to call event handlers.
+        """
+        #print ">event", event, val
+        self.call_event_handlers(event, event, val)
+        self.call_query_handlers(event, val)
+        self.call_star_handlers(event, val)
 
     def call_event_handlers(self, key, event, val):
         """Call the handlers for an event.

@@ -79,11 +79,10 @@ class XendDomain:
                 self._delete_domain(domid)
         deferred = defer.DeferredList(dlist, fireOnOneErrback=1)
         def cbok(val):
-            print "doms:"
-            for d in self.domain.values(): print 'dom', d
-            print "refresh..."
+            #print "doms:"
+            #for d in self.domain.values(): print 'dom', d
             self.refresh()
-            print "doms:"
+            print "XendDomain>initial_refresh> doms:"
             for d in self.domain.values(): print 'dom', d
         deferred.addCallback(cbok)
 
@@ -148,11 +147,14 @@ class XendDomain:
             self.db.delete(id)
 
     def reap(self):
-        print 'reap>'
+        """Go through the domains looking for ones that have crashed or stopped.
+        Tidy them up.
+        """
+        print 'XendDomain>reap>'
         domlist = xc.domain_getinfo()
         casualties = []
         for d in domlist:
-            print 'dom', d
+            #print 'dom', d
             dead = 0
             dead = dead or (d['crashed'] or d['shutdown'])
             dead = dead or (d['dying'] and
@@ -161,12 +163,12 @@ class XendDomain:
                 casualties.append(d)
         for d in casualties:
             id = str(d['dom'])
-            print 'died> id=', id, d
+            print 'XendDomain>reap> died id=', id, d
             dominfo = self.domain.get(id)
             if not dominfo: continue
             dominfo.died()
             self.domain_destroy(id, refresh=0)
-        print 'reap<'
+        print 'XendDomain>reap<'
 
     def refresh(self):
         """Refresh domain list from Xen.
@@ -203,6 +205,8 @@ class XendDomain:
             try:
                 self._delete_domain(id)
             except:
+                print 'refresh_domain: error'
+                raise
                 pass
         else:
             d = self.domain.get(id)

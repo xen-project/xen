@@ -24,7 +24,8 @@ class SrvDomainDir(SrvDir):
         try:
             dom = self.xd.domain_get(x)
             val = SrvDomain(dom)
-        except KeyError:
+        except KeyError, ex:
+            print 'SrvDomainDir>', ex
             pass
         return val
 
@@ -46,7 +47,7 @@ class SrvDomainDir(SrvDir):
             config = pin.get_val()
             ok = 1
         except Exception, ex:
-            print ex
+            print 'op_create>', ex
         if not ok:
             req.setResponseCode(http.BAD_REQUEST, "Invalid configuration")
             return "Invalid configuration"

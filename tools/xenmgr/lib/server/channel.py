@@ -49,6 +49,7 @@ class ChannelFactory:
         """Get the channel for the given domain.
         Construct if necessary.
         """
+        dom = int(dom)
         for chan in self.channels.values():
             if not isinstance(chan, Channel): continue
             if chan.dom == dom:
@@ -199,7 +200,7 @@ class Channel(BaseChannel):
         """
         BaseChannel.__init__(self, factory)
         # Domain.
-        self.dom = dom
+        self.dom = int(dom)
         # Domain port (object).
         self.port = self.factory.createPort(dom)
         # Channel port (int).
@@ -210,6 +211,7 @@ class Channel(BaseChannel):
         self.devs_by_type = {}
         # Output queue.
         self.queue = []
+        self.closed = 0
 
     def getLocalPort(self):
         """Get the local port.
@@ -225,11 +227,12 @@ class Channel(BaseChannel):
         """Close the channel. Calls lostChannel() on all its devices and
         channelClosed() on the factory.
         """
+        self.closed = 1
         for d in self.devs:
             d.lostChannel()
         self.factory.channelClosed(self)
-        del self.devs
-        del self.devs_by_type
+        self.devs = []
+        self.devs_by_type = {}
 
     def registerDevice(self, types, dev):
         """Register a device controller.
@@ -237,20 +240,21 @@ class Channel(BaseChannel):
         @param types message types the controller handles
         @param dev   device controller
         """
+        if self.closed: return
         self.devs.append(dev)
         for ty in types:
             self.devs_by_type[ty] = dev
 
-    def unregisterDevice(self, dev):
+    def deregisterDevice(self, dev):
         """Remove the registration for a device controller.
 
         @param dev device controller
         """
-        self.devs.remove(dev)
-        types = [ ty for (ty, d) in self.devs_by_type.items()
-                  if d == dev ]
+        if dev in self.devs:
+            self.devs.remove(dev)
+        types = [ ty for (ty, d) in self.devs_by_type.items() if d == dev ]
         for ty in types:
-            del devs_by_type[ty]
+            del self.devs_by_type[ty]
 
     def getDevice(self, type):
         """Get the device controller handling a message type.
