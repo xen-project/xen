@@ -494,9 +494,6 @@ static void netif_status_change(netif_fe_interface_status_changed_t *status)
     netif_fe_interface_connect_t up;
     struct net_device *dev;
     struct net_private *np;
-    int i;
-
-    unsigned long tsc;
 
     if ( status->handle != 0 )
     {
@@ -608,7 +605,7 @@ static void netif_status_change(netif_fe_interface_status_changed_t *status)
              */
             for ( requeue_idx = 0, i = 1; i <= NETIF_TX_RING_SIZE; i++ )
             {
-                if ( np->tx_skbs[i] >= __PAGE_OFFSET )
+                if ( (unsigned long)np->tx_skbs[i] >= __PAGE_OFFSET )
                 {
                     struct sk_buff *skb = np->tx_skbs[i];
                     
@@ -627,7 +624,7 @@ static void netif_status_change(netif_fe_interface_status_changed_t *status)
 
             /* Rebuild the RX buffer freelist and the RX ring itself. */
             for ( requeue_idx = 0, i = 1; i <= NETIF_RX_RING_SIZE; i++ )
-                if ( np->rx_skbs[i] >= __PAGE_OFFSET )
+                if ( (unsigned long)np->rx_skbs[i] >= __PAGE_OFFSET )
                     np->rx->ring[requeue_idx++].req.id = i;
             wmb();                
             np->rx->req_prod = requeue_idx;
@@ -642,7 +639,7 @@ static void netif_status_change(netif_fe_interface_status_changed_t *status)
 
             notify_via_evtchn(status->evtchn);  
 
-	    network_tx_buf_gc();
+	    network_tx_buf_gc(dev);
 
             printk(KERN_INFO "Recovery completed\n");
 
