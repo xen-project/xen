@@ -365,6 +365,11 @@
 3ddb79c4TZj1wXPKQt36O72SddtBNQ xen/net/skbuff.c
 3ddb79c4x8dvwPtzclghWAKFWpEBFA xen/tools/Makefile
 3ddb79c4yGZ7_22QAFFwPzqP4NSHwA xen/tools/elf-reloc.c
+3eb3c87fc79FXLA6R9TvdBJNTvQDwA xen/tools/figlet/LICENSE
+3eb3c87fPL2T_zBb0bHlbZY-ACEKRw xen/tools/figlet/Makefile
+3eb3c87fmKYTC5GCh_rydFakZp9ayw xen/tools/figlet/README
+3eb3c87fdQKQ5OBGbM-KjZfi9Us4ng xen/tools/figlet/figlet.c
+3eb3c87fS7DNbg0i6yhFs28UIqAK5g xen/tools/figlet/xen.flf
 3e5a4e6589G-U42lFKs43plskXoFxQ xenolinux-2.4.21-pre4-sparse/Makefile
 3e5a4e65IEPjnWPZ5w3TxS5scV8Ewg xenolinux-2.4.21-pre4-sparse/arch/xeno/Makefile
 3e5a4e65n-KhsEAs-A4ULiStBp-r6w xenolinux-2.4.21-pre4-sparse/arch/xeno/boot/Makefile
