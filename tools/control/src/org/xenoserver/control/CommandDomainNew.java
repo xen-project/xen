@@ -31,6 +31,8 @@ public class CommandDomainNew extends Command {
     private String bargs;
     /** Root device */
     private String root_dev;
+    /** Usr device */
+    private String usr_dev;
     /** NFS root path */
     private String nfs_root_path;
     /** IP address */
@@ -45,12 +47,21 @@ public class CommandDomainNew extends Command {
     private String nw_host;
     /** Output from domain creation */
     private String[] output;
+    /** Domain ID created. */
+    private int domain_id;
 
     /**
      * @return Output from domain creation.
      */
     public String[] output() {
         return output;
+    }
+    
+    /**
+     * @return The domain id this command created.
+     */
+    public int domain_id() {
+        return domain_id;
     }
 
     /**
@@ -85,20 +96,40 @@ public class CommandDomainNew extends Command {
         String nw_mask,
         String nw_nfs_server,
         String nw_host) {
-        this.d = d;
-        this.name = name;
-        this.size = size;
-        this.image = image;
-        this.initrd = initrd;
-        this.vifs = vifs;
-        this.bargs = bargs;
-        this.root_dev = root_dev;
-        this.nfs_root_path = nfs_root_path;
-        this.nw_ip = nw_ip;
-        this.nw_gw = nw_gw;
-        this.nw_mask = nw_mask;
-        this.nw_nfs_server = nw_nfs_server;
-        this.nw_host = nw_host;
+        this(d,name,size,image,initrd,vifs,bargs,root_dev,nfs_root_path,nw_ip,nw_gw,nw_mask,nw_nfs_server,nw_host,null);
+    }
+    
+    public CommandDomainNew(
+        Defaults d,
+        String name,
+        int size,
+        String image,
+        String initrd,
+        int vifs,
+        String bargs,
+        String root_dev,
+        String nfs_root_path,
+        String nw_ip,
+        String nw_gw,
+        String nw_mask,
+        String nw_nfs_server,
+        String nw_host,
+        String usr_dev) {
+            this.d = d;
+            this.name = name;
+            this.size = size;
+            this.image = image;
+            this.initrd = initrd;
+            this.vifs = vifs;
+            this.bargs = bargs;
+            this.root_dev = root_dev;
+            this.nfs_root_path = nfs_root_path;
+            this.nw_ip = nw_ip;
+            this.nw_gw = nw_gw;
+            this.nw_mask = nw_mask;
+            this.nw_nfs_server = nw_nfs_server;
+            this.nw_host = nw_host;
+            this.usr_dev = usr_dev;
     }
 
     /**
@@ -189,8 +220,12 @@ public class CommandDomainNew extends Command {
                         (bargs
                             + " root="
                             + StringPattern.parse(root_dev).resolve(domain_id)
-                            + " ");
+                            + " ro ");
 
+                }
+                
+                if (usr_dev != null && !usr_dev.equals("")) {
+                    bargs = bargs + " usr=" + StringPattern.parse(usr_dev).resolve(domain_id) + " ";
                 }
 
                 if (vifs > 0) {
@@ -316,6 +351,8 @@ public class CommandDomainNew extends Command {
                 output[5] += vifinit_cmdarray[i] + " ";
             }
         }
+        
+        this.domain_id = domain_id;
 
         return null;
     }

@@ -29,6 +29,8 @@ public class Defaults {
     public int domainVIFs;
     /** Default root device. */
     public String rootDevice;
+    /** Default usr device. */
+    public String usrDevice;
     /** Default IP address pattern. */
     public String nwIP;
     /** Default gateway pattern. */
@@ -84,6 +86,7 @@ public class Defaults {
         System.out.println("   domainImage     " + domainImage);
         System.out.println("   domainInitRD    " + domainInitRD);
         System.out.println("   rootDevice      " + rootDevice);
+        System.out.println("   usrDevice       " + usrDevice);
         System.out.println("   NWIP            " + nwIP);
         System.out.println("   NWGW            " + nwGateway);
         System.out.println("   NWMask          " + nwMask);
@@ -146,6 +149,8 @@ public class Defaults {
                     domainVIFs = Integer.parseInt(s);
                 } else if (lastName.equals("root_device")) {
                     rootDevice = s;
+                } else if (lastName.equals("usr_device")) {
+                    usrDevice = s;
                 } else if (lastName.equals("nw_ip")) {
                     nwIP =
                         expandDefault(

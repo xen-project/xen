@@ -4,7 +4,10 @@ import java.util.LinkedList;
 
 import org.xenoserver.control.CommandDomainNew;
 import org.xenoserver.control.CommandFailedException;
+import org.xenoserver.control.CommandPhysicalGrant;
 import org.xenoserver.control.Defaults;
+import org.xenoserver.control.Mode;
+import org.xenoserver.control.StringPattern;
 
 public class ParseDomainNew extends CommandParser {
     public void parse(Defaults d, LinkedList args)
@@ -16,6 +19,7 @@ public class ParseDomainNew extends CommandParser {
         int vifs = getIntParameter(args, 'v', d.domainVIFs);
         String bargs = getStringParameter(args, 'a', d.args) + " ";
         String root_dev = getStringParameter(args, 'd', d.rootDevice);
+        String usr_dev = getStringParameter(args, 'u', d.usrDevice);
         String nfs_root_path = getStringParameter(args, 'f', d.nwNFSRoot);
         String nw_ip = getStringParameter(args, '4', d.nwIP);
         String nw_gw = getStringParameter(args, 'g', d.nwGateway);
@@ -40,11 +44,32 @@ public class ParseDomainNew extends CommandParser {
                 nw_gw,
                 nw_mask,
                 nw_nfs_server,
-                nw_host);
+                nw_host,
+                usr_dev);
         c.execute();
         String[] output = c.output();
         for (int i = 0; i < output.length; i++) {
             System.out.println(output[i]);
+        }
+        
+        if (root_dev.startsWith("/dev/sda") || root_dev.startsWith("/dev/hda")) {
+            String real_root = StringPattern.parse(root_dev).resolve(c.domain_id());
+            String device = real_root.substring(real_root.indexOf('/',1)+1);
+            CommandPhysicalGrant cg = new CommandPhysicalGrant(d,c.domain_id(),device,Mode.READ_WRITE,false);
+            String output2 = cg.execute();
+            if ( output2 != null ) {
+                System.out.println(output2);
+            }
+        }
+        
+        if (usr_dev != null && (usr_dev.startsWith("/dev/sda")) || usr_dev.startsWith("/dev/hda")) {
+            String real_usr = StringPattern.parse(usr_dev).resolve(c.domain_id());
+            String device = real_usr.substring(real_usr.indexOf('/',1)+1);
+            CommandPhysicalGrant cg = new CommandPhysicalGrant(d,c.domain_id(),device,Mode.READ_ONLY,false);
+            String output2 = cg.execute();
+            if ( output2 != null ) {
+                System.out.println(output2);
+            }
         }
     }
 
@@ -53,7 +78,7 @@ public class ParseDomainNew extends CommandParser {
     }
 
     public String getUsage() {
-        return "[-n<domain_name>] [-k<size>] [-i<image>] [-v<num_vifs>] [-r<initrd>] [-d<root_device>] [-f<nfs_root>] [-s<nfs_boot_server>] [-4<ipv4_boot_address>] [-g<ipv4_boot_gateway>] [-m<ipv4_boot_netmask>] [-h<hostname>] [-a<args>]";
+        return "[-n<domain_name>] [-k<size>] [-i<image>] [-v<num_vifs>] [-r<initrd>] [-d<root_device>] [-u<usr_device>] [-f<nfs_root>] [-s<nfs_boot_server>] [-4<ipv4_boot_address>] [-g<ipv4_boot_gateway>] [-m<ipv4_boot_netmask>] [-h<hostname>] [-a<args>]";
     }
 
     public String getHelpText() {
@@ -68,7 +93,8 @@ public class ParseDomainNew extends CommandParser {
             + "  -v  Number of VIFs                           domain_vifs\n"
             + "  -r  InitRD (if required)                     domain_init_rd\n"
             + "  -d  Root device (e.g /dev/nfs, /dev/hda3)    root_device\n"
-            + "  -a  Additional boot parameters\n"
+            + "  -u  Usr dev/path (e.g /dev/hda3, server:path)usr_device\n"
+            + "  -a  Additional boot parameters               args\n"
             + "\n"
             + "Networking options:\n"
             + "  -f  NFS root (if /dev/nfs specified)         nw_nfs_root\n"

@@ -18,7 +18,7 @@ public class StringPattern {
      * @param t The pattern string to parse.
      * @return A usable pattern object.
      */
-    static StringPattern parse(String t) {
+    public static StringPattern parse(String t) {
         StringPattern result = new StringPattern();
         char[] ca = t.toCharArray();
         int idx = 0;
@@ -53,7 +53,7 @@ public class StringPattern {
      * @param domain The domain number to use.
      * @return The expanded pattern for the given domain.
      */
-    String resolve(int domain) {
+    public String resolve(int domain) {
         if (addDom) {
             return base + (bn + domain);
         } else if (appendDom) {
