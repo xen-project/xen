@@ -11,8 +11,8 @@ int main(int argc, char *argv[])
   int fd;
   char *strbuf;
 
-  if (argc != 6) {
-    fprintf(stderr, "Usage: xi_physdev_grant <r/rw> <domain> <device> <start sector> <n_sectors>\n");
+  if (argc != 7) {
+    fprintf(stderr, "Usage: xi_physdev_grant <r/rw> <domain> <device> <start sector> <n_sectors> <partition>\n");
     return 1;
   }
 
@@ -26,7 +26,7 @@ int main(int argc, char *argv[])
   else if (argv[1][1] == 'w')
     buf.mode |= 2;
   
-  buf.device = atol(argv[3]);
+  buf.device = atol(argv[3]) + atol(argv[6]);
   buf.start_sect = atol(argv[4]);
   buf.n_sectors = atol(argv[5]);
 
