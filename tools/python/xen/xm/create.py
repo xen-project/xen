@@ -73,9 +73,13 @@ gopts.opt('dryrun', short='n',
 The defaults file is loaded and the SXP configuration is created and printed.         
 """)
 
+gopts.opt('paused', short='p',
+          fn=set_true, default=0,
+          use='Leave the domain paused after it is created.')
+
 gopts.opt('console_autoconnect', short='c',
           fn=set_true, default=0,
-          use="Connect to console after domain is created.")
+          use="Connect to the console after the domain is created.")
 
 gopts.var('name', val='NAME',
           fn=set_value, default=None,
@@ -407,10 +411,11 @@ def make_domain(opts, config):
         console_port = int(sxp.child_value(console_info, 'console_port'))
     else:
         console_port = None
-    
-    if server.xend_domain_unpause(dom) < 0:
-        server.xend_domain_destroy(dom)
-        opts.err("Failed to unpause domain %s" % dom)
+
+    if not opts.vals.paused:
+        if server.xend_domain_unpause(dom) < 0:
+            server.xend_domain_destroy(dom)
+            opts.err("Failed to unpause domain %s" % dom)
     opts.info("Started domain %s, console on port %d"
               % (dom, console_port))
     return (dom, console_port)
