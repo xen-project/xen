@@ -4,7 +4,7 @@ from distutils.core import setup, Extension
 module = Extension("Xc",
                    include_dirs         = ["../lib"],
                    library_dirs         = ["../lib"],
-                   sources              = ["xc_py.c"])
+                   sources              = ["Xc.c"])
 
 # Include the following line to link against shared libxc.so
 #module.libraries = ["xc"]

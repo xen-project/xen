@@ -1,5 +1,5 @@
 /******************************************************************************
- * xc_py.c
+ * Xc.c
  * 
  * Copyright (c) 2003, K A Fraser
  */
@@ -690,7 +690,7 @@ static PyTypeObject PyXcType = {
 };
 
 static PyMethodDef PyXc_methods[] = {
-    { "new", PyXc_new, METH_VARARGS, "Craate a new Xc object." },
+    { "new", PyXc_new, METH_VARARGS, "Create a new Xc object." },
     { NULL, NULL, 0, NULL }
 };
 
