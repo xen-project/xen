@@ -25,6 +25,7 @@
 #include <xen/smp.h>
 #include <xen/trace.h>
 #include <xen/errno.h>
+#include <xen/init.h>
 #include <asm/atomic.h>
 #include <public/dom0_ops.h>
 
