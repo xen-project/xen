@@ -309,6 +309,7 @@ def vm_restore(src, progress=0):
     deferred = vm.dom_construct(dom, config)
     def vifs_cb(val, vm):
         vif_up(vm.ipaddrs)
+        return vm
     deferred.addCallback(vifs_cb, vm)
     return deferred
     
@@ -318,7 +319,7 @@ def dom_get(dom):
     @param dom: domain id
     @return: info or None
     """
-    domlist = xc.domain_getinfo(dom=dom)
+    domlist = xc.domain_getinfo(dom, 1)
     if domlist and dom == domlist[0]['dom']:
         return domlist[0]
     return None
@@ -633,7 +634,7 @@ class XendDomainInfo:
         try:
             return xc.domain_destroy(dom=self.dom)
         except Exception, err:
-            log.exception("Domain destroy failed: ", self.name)
+            log.exception("Domain destroy failed: %s", self.name)
 
     def cleanup(self):
         """Cleanup vm resources: release devices.
@@ -937,21 +938,15 @@ class XendDomainInfo:
         d = dom_get(dom)
         if not d:
             raise VmError("Domain not found: %d" % dom)
+        print 'dom_construct>', dom, config
         try:
-            self.config = config
             self.restore = 1
             self.setdom(dom)
             self.name = d['name']
-            self.memory = d['memory']/1024
-            deferred = self.construct()
-            def cberr(err):
-                self.destroy()
-                return err
-            deferred.addErrback(cberr)
+            self.memory = d['mem_kb']/1024
+            deferred = self.construct(config)
+        finally:
             self.restore = 0
-        except StandardError, ex:
-            self.destroy()
-            raise
         return deferred
 
     def configure_fields(self):
