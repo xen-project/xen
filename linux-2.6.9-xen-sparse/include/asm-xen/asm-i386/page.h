@@ -90,16 +90,7 @@ typedef struct { unsigned long pmd; } pmd_t;
 typedef struct { unsigned long pgd; } pgd_t;
 typedef struct { unsigned long pgprot; } pgprot_t;
 #define boot_pte_t pte_t /* or would you rather have a typedef */
-#if 0				/* XXXcl for MMU_UPDATE_DEBUG */
-static inline unsigned long pte_val(pte_t x)
-{
-	unsigned long ret = x.pte_low;
-	if ( (ret & 1) ) ret = machine_to_phys(ret);
-	return ret;
-}
-#else
 #define pte_val(x)	(((x).pte_low & 1) ? machine_to_phys((x).pte_low) : (x).pte_low)
-#endif
 #define pte_val_ma(x)	((x).pte_low)
 #define HPAGE_SHIFT	22
 #endif

@@ -7,9 +7,12 @@ INSTALL_DIR ?= $(DIST_DIR)/install
 
 KERNELS ?= linux-2.6-xen0 linux-2.6-xenU
 # linux-2.4-xen0 linux-2.4-xenU netbsd-2.0-xenU
+# You may use wildcards in the above e.g. KERNELS=*2.4*
 
 ALLKERNELS = $(patsubst buildconfigs/mk.%,%,$(wildcard buildconfigs/mk.*))
 ALLSPARSETREES = $(patsubst %-xen-sparse,%,$(wildcard *-xen-sparse))
+XKERNELS := $(foreach kernel, $(KERNELS), $(patsubst buildconfigs/mk.%,%,$(wildcard buildconfigs/mk.$(kernel))) )
+
 
 export INSTALL_DIR
 
@@ -46,7 +49,7 @@ tools:
 	$(MAKE) prefix=$(INSTALL_DIR) dist=yes -C tools install
 
 kernels:
-	for i in $(KERNELS) ; do $(MAKE) $$i-build ; done
+	for i in $(XKERNELS) ; do $(MAKE) $$i-build ; done
 
 docs:
 	sh ./docs/check_pkgs && \
@@ -57,11 +60,11 @@ kbuild: kernels
 
 # Delete the kernel build trees entirely
 kdelete:
-	for i in $(KERNELS) ; do $(MAKE) $$i-delete ; done
+	for i in $(XKERNELS) ; do $(MAKE) $$i-delete ; done
 
 # Clean the kernel build trees
 kclean:
-	for i in $(KERNELS) ; do $(MAKE) $$i-clean ; done
+	for i in $(XKERNELS) ; do $(MAKE) $$i-clean ; done
 
 # Make patches from kernel sparse trees
 mkpatches:

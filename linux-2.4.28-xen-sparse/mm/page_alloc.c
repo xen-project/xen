@@ -109,7 +109,7 @@ static struct tq_struct free_pages_ok_no_irq_task = {
  * -- wli
  */
 
-static void __free_pages_ok (struct page *page, unsigned int order)
+static void fastcall __free_pages_ok (struct page *page, unsigned int order)
 {
 	unsigned long index, page_idx, mask, flags;
 	free_area_t *area;
@@ -242,7 +242,7 @@ static inline struct page * expand (zone_t *zone, struct page *page,
 }
 
 static FASTCALL(struct page * rmqueue(zone_t *zone, unsigned int order));
-static struct page * rmqueue(zone_t *zone, unsigned int order)
+static struct page * fastcall rmqueue(zone_t *zone, unsigned int order)
 {
 	free_area_t * area = zone->free_area + order;
 	unsigned int curr_order = order;
@@ -288,7 +288,7 @@ static struct page * rmqueue(zone_t *zone, unsigned int order)
 }
 
 #ifndef CONFIG_DISCONTIGMEM
-struct page *_alloc_pages(unsigned int gfp_mask, unsigned int order)
+struct page * fastcall _alloc_pages(unsigned int gfp_mask, unsigned int order)
 {
 	return __alloc_pages(gfp_mask, order,
 		contig_page_data.node_zonelists+(gfp_mask & GFP_ZONEMASK));
@@ -296,7 +296,7 @@ struct page *_alloc_pages(unsigned int gfp_mask, unsigned int order)
 #endif
 
 static struct page * FASTCALL(balance_classzone(zone_t *, unsigned int, unsigned int, int *));
-static struct page * balance_classzone(zone_t * classzone, unsigned int gfp_mask, unsigned int order, int * freed)
+static struct page * fastcall balance_classzone(zone_t * classzone, unsigned int gfp_mask, unsigned int order, int * freed)
 {
 	struct page * page = NULL;
 	int __freed;
@@ -374,7 +374,7 @@ static inline unsigned long zone_free_pages(zone_t * zone, unsigned int order)
 /*
  * This is the 'heart' of the zoned buddy allocator:
  */
-struct page * __alloc_pages(unsigned int gfp_mask, unsigned int order, zonelist_t *zonelist)
+struct page * fastcall __alloc_pages(unsigned int gfp_mask, unsigned int order, zonelist_t *zonelist)
 {
 	zone_t **zone, * classzone;
 	struct page * page;
@@ -487,7 +487,7 @@ struct page * __alloc_pages(unsigned int gfp_mask, unsigned int order, zonelist_
 /*
  * Common helper functions.
  */
-unsigned long __get_free_pages(unsigned int gfp_mask, unsigned int order)
+fastcall unsigned long __get_free_pages(unsigned int gfp_mask, unsigned int order)
 {
 	struct page * page;
 
@@ -497,7 +497,7 @@ unsigned long __get_free_pages(unsigned int gfp_mask, unsigned int order)
 	return (unsigned long) page_address(page);
 }
 
-unsigned long get_zeroed_page(unsigned int gfp_mask)
+fastcall unsigned long get_zeroed_page(unsigned int gfp_mask)
 {
 	struct page * page;
 
@@ -510,13 +510,13 @@ unsigned long get_zeroed_page(unsigned int gfp_mask)
 	return 0;
 }
 
-void __free_pages(struct page *page, unsigned int order)
+fastcall void __free_pages(struct page *page, unsigned int order)
 {
 	if (!PageReserved(page) && put_page_testzero(page))
 		__free_pages_ok(page, order);
 }
 
-void free_pages(unsigned long addr, unsigned int order)
+fastcall void free_pages(unsigned long addr, unsigned int order)
 {
 	if (addr != 0)
 		__free_pages(virt_to_page(addr), order);

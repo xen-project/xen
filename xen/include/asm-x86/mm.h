@@ -221,9 +221,6 @@ extern unsigned long *machine_to_phys_mapping;
 #define machine_to_phys_mapping ((unsigned long *)RDWR_MPT_VIRT_START)
 #endif
 
-/* Part of the domain API. */
-int do_mmu_update(mmu_update_t *updates, int count, int *success_count);
-
 #define DEFAULT_GDT_ENTRIES     (LAST_RESERVED_GDT_ENTRY+1)
 #define DEFAULT_GDT_ADDRESS     ((unsigned long)gdt_table)
 

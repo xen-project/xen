@@ -814,8 +814,13 @@ long do_set_trap_table(trap_info_t *traps)
 
     for ( ; ; )
     {
-        locked_hypercall_may_preempt(current->domain,
-                                     __HYPERVISOR_set_trap_table, 1, traps);
+        if ( hypercall_preempt_check() )
+        {
+            hypercall_create_continuation(
+                __HYPERVISOR_set_trap_table, 1, traps);
+            UNLOCK_BIGLOCK(current->domain);
+            return __HYPERVISOR_set_trap_table;
+        }
 
         if ( copy_from_user(&cur, traps, sizeof(cur)) ) return -EFAULT;
 
