@@ -125,6 +125,7 @@ int physdev_pci_access_modify(
     domid_t dom, int bus, int dev, int func, int enable)
 {
     struct domain *p;
+    struct exec_domain *ed;
     struct pci_dev *pdev;
     int i, j, rc = 0;
  
@@ -144,6 +145,8 @@ int physdev_pci_access_modify(
 
     if ( (p = find_domain_by_id(dom)) == NULL ) 
         return -ESRCH;
+
+    ed = p->exec_domain[0];     /* XXX */
 
     /* Make the domain privileged. */
     set_bit(DF_PHYSDEV, &p->d_flags);
@@ -169,16 +172,16 @@ int physdev_pci_access_modify(
 
     /* Now, setup access to the IO ports and memory regions for the device. */
 
-    if ( p->thread.io_bitmap == NULL )
+    if ( ed->thread.io_bitmap == NULL )
     {
-        if ( (p->thread.io_bitmap = xmalloc(IOBMP_BYTES)) == NULL )
+        if ( (ed->thread.io_bitmap = xmalloc(IOBMP_BYTES)) == NULL )
         {
             rc = -ENOMEM;
             goto out;
         }
-        memset(p->thread.io_bitmap, 0xFF, IOBMP_BYTES);
+        memset(ed->thread.io_bitmap, 0xFF, IOBMP_BYTES);
 
-        p->thread.io_bitmap_sel = ~0ULL;
+        ed->thread.io_bitmap_sel = ~0ULL;
     }
 
     for ( i = 0; i < DEVICE_COUNT_RESOURCE; i++ )
@@ -195,8 +198,8 @@ int physdev_pci_access_modify(
                  "for device %s\n", dom, r->start, r->end, pdev->slot_name);
             for ( j = r->start; j < r->end + 1; j++ )
             {
-                clear_bit(j, p->thread.io_bitmap);
-                clear_bit(j / IOBMP_BITS_PER_SELBIT, &p->thread.io_bitmap_sel);
+                clear_bit(j, ed->thread.io_bitmap);
+                clear_bit(j / IOBMP_BITS_PER_SELBIT, &ed->thread.io_bitmap_sel);
             }
         }
 

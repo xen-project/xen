@@ -391,7 +391,7 @@ asmlinkage int do_page_fault(struct xen_regs *regs, long error_code)
              ((error_code & 3) == 3) && /* write-protection fault */
              ptwr_do_page_fault(addr) )
         {
-            if ( unlikely(d->mm.shadow_mode) )
+            if ( unlikely(ed->mm.shadow_mode) )
                 (void)shadow_fault(addr, error_code);
             return EXCRET_fault_fixed;
         }
