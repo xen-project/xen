@@ -520,6 +520,14 @@ static void netif_status_change(netif_fe_interface_status_changed_t *status)
 	    printk(KERN_INFO "Attempting to reconnect network interface\n");
 
             /* Begin interface recovery.
+	     *
+	     * NB. Whilst we're recovering, we turn the carrier state off.  We
+	     * take measures to ensure that this device isn't used for
+	     * anything.  We also stop the queue for this device.  Various
+	     * different approaches (e.g. continuing to buffer packets) have
+	     * been tested but don't appear to improve the overall impact on
+             * TCP connections.
+	     *
              * TODO: (MAW) Change the Xend<->Guest protocol so that a recovery
              * is initiated by a special "RESET" message - disconnect could
              * just mean we're not allowed to use this interface any more.
@@ -527,17 +535,16 @@ static void netif_status_change(netif_fe_interface_status_changed_t *status)
 
             /* Stop old i/f to prevent errors whilst we rebuild the state. */
             spin_lock_irq(&np->tx_lock);
-            spin_lock_irq(&np->rx_lock);
+            spin_lock(&np->rx_lock);
             netif_stop_queue(dev);
             netif_carrier_off(dev);
             np->state  = NETIF_STATE_DISCONNECTED;
-            spin_unlock_irq(&np->rx_lock);
+            spin_unlock(&np->rx_lock);
             spin_unlock_irq(&np->tx_lock);
 
             /* Free resources. */
             free_irq(np->irq, dev);
             unbind_evtchn_from_irq(np->evtchn);
-
 	    free_page((unsigned long)np->tx);
             free_page((unsigned long)np->rx);
         }
@@ -589,17 +596,18 @@ static void netif_status_change(netif_fe_interface_status_changed_t *status)
             np->rx->event = 1;
 
             /* Step 2: Rebuild the RX and TX ring contents.
-             * NB. We could just throw away the queued TX packets but we hope
+             * NB. We could just free the queued TX packets now but we hope
              * that sending them out might do some good.  We have to rebuild
              * the RX ring because some of our pages are currently flipped out
              * so we can't just free the RX skbs.
 	     * NB2. Freelist index entries are always going to be less than
 	     *  __PAGE_OFFSET, whereas pointers to skbs will always be equal or
-	     * greater than __PAGE_OFFSET, so we use this to distinguish them.
+	     * greater than __PAGE_OFFSET: we use this property to distinguish
+             * them.
              */
 
             /* Rebuild the TX buffer freelist and the TX ring itself.
-             * NB. This reorders packets :-( We could keep more private state
+             * NB. This reorders packets.  We could keep more private state
              * to avoid this but maybe it doesn't matter so much given the
              * interface has been down.
              */
@@ -609,7 +617,7 @@ static void netif_status_change(netif_fe_interface_status_changed_t *status)
                 {
                     struct sk_buff *skb = np->tx_skbs[i];
                     
-                    tx = &np->tx->ring[MASK_NET_TX_IDX(requeue_idx++)].req;
+                    tx = &np->tx->ring[requeue_idx++].req;
                     
                     tx->id   = i;
                     tx->addr = virt_to_machine(skb->data);
@@ -629,10 +637,11 @@ static void netif_status_change(netif_fe_interface_status_changed_t *status)
             wmb();                
             np->rx->req_prod = requeue_idx;
 
-            /* Step 3: All public and private state should now be sane.  Start
-             * sending and receiving packets again and give the driver domain a
-	     * kick because we've probably just requeued some packets. */
-
+            /* Step 3: All public and private state should now be sane.  Get
+             * ready to start sending and receiving packets and give the driver
+             * domain a kick because we've probably just requeued some
+             * packets.
+             */
             netif_carrier_on(dev);
             netif_start_queue(dev);
             np->state = NETIF_STATE_ACTIVE;
