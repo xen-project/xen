@@ -73,9 +73,9 @@ static inline void shadow_invalidate(struct exec_domain *ed) {
     memset(ed->arch.shadow_vtable, 0, PAGE_SIZE);
 }
 
-#define SHADOW_DEBUG 1
+#define SHADOW_DEBUG 0
 #define SHADOW_VERBOSE_DEBUG 0
-#define SHADOW_HASH_DEBUG 1
+#define SHADOW_HASH_DEBUG 0
 
 struct shadow_status {
     unsigned long pfn;            /* Guest pfn.             */
