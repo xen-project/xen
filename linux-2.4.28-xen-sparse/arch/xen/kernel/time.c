@@ -266,6 +266,9 @@ void do_gettimeofday(struct timeval *tv)
     _tv.tv_sec   = xtime.tv_sec;
     _tv.tv_usec += xtime.tv_usec;
 
+    _tv.tv_usec += 
+        (unsigned long)(shadow_system_time - processed_system_time) / 1000UL;
+
     if ( unlikely(!TIME_VALUES_UP_TO_DATE) )
     {
         /*
@@ -315,6 +318,8 @@ void do_settimeofday(struct timeval *tv)
      */
  again:
     usec = tv->tv_usec - __get_time_delta_usecs();
+    usec -= 
+        (unsigned long)(shadow_system_time - processed_system_time) / 1000UL;
     if ( unlikely(!TIME_VALUES_UP_TO_DATE) )
     {
         __get_time_values_from_xen();
