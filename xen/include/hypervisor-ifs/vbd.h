@@ -63,10 +63,14 @@ typedef struct _vbd_probe {
 } vbd_probe_t; 
 
 typedef struct _vbd_info { 
+    /* IN variables  */
     unsigned      domain;             // domain in question 
     u16           vdevice;            // 16 bit id domain refers to VBD as 
-    u16           nextents;           // max no. of extents to return info for
-    xen_extent_t *extents;            // pointer to space for list of extents
+    u16           maxextents;         // max no. of extents to return info for
+    xen_extent_t *extents;            // pointer to space for array of extents
+    /* OUT variables */
+    u16           nextents;           // no of extents in the above  
+    u16           mode;               // VBD_MODE_{READONLY,READWRITE}
 } vbd_info_t; 
 
 

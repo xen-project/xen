@@ -47,19 +47,19 @@ int main(int argc, char *argv[])
 
     ret = do_block_io_op(&op);
 
-    if(ret < 0) 
-	fprintf(stderr, "error %d attempting to probe VBDs\n", ret);
-
     (void)munlock(xdi->disks, XDA_SIZE); 
 
-    for(i = 0; i < xdi->count; i++) { 
-	fprintf(stderr, 
-		"Domain %02d %cBD: [R/%c] device %04x capacity %ldkB\n", 
-		xdi->disks[i].domain, XD_VIRTUAL(xdi->disks[i].info) ? 'V' : 
-		'P', XD_READONLY(xdi->disks[i].info) ? 'O' : 'W', 
-		xdi->disks[i].device,  xdi->disks[i].capacity >> 1); 
+
+    if(ret < 0) {
+	fprintf(stderr, "error %d attempting to probe VBDs\n", ret);
+    } else {
+	for(i = 0; i < xdi->count; i++)
+	    fprintf(stderr, 
+		    "Domain %02d %cBD: [R/%c] device %04x capacity %ldkB\n", 
+		    xdi->disks[i].domain, XD_VIRTUAL(xdi->disks[i].info) ? 
+		    'V' : 'P', XD_READONLY(xdi->disks[i].info) ? 'O' : 'W', 
+		    xdi->disks[i].device,  xdi->disks[i].capacity >> 1); 
     }
-
-
+    
     return ret;
 }

@@ -488,3 +488,7 @@ tools/internal/xi_vbd_create
 tools/internal/xi_vbd_info
 tools/internal/xi_vbd_list
 xen/drivers/scsi/BusLogic.o
+tools/misc/xen_netwatch
+xen/drivers/scsi/scsi_obsolete.o
+xen/xen
+xen/xen.gz

@@ -26,11 +26,6 @@ static unsigned int req_prod;  /* Private request producer.         */
 #define XDI_MAX 64 
 static xen_disk_info_t xlblk_disk_info; /* information about our disks/VBDs */
 
-#if 0
-static int xlblk_control_msg_pending;
-#endif
-
-
 /* We plug the I/O ring if the driver is suspended or if the ring is full. */
 #define RING_PLUGGED ((BLK_RING_INC(req_prod) == resp_cons) || \
                       (state != STATE_ACTIVE))
@@ -71,7 +66,14 @@ static inline xl_disk_t *xldev_to_xldisk(kdev_t xldev)
 
 int xenolinux_block_open(struct inode *inode, struct file *filep)
 {
+    short xldev = inode->i_rdev; 
+    struct gendisk *gd = xldev_to_gendisk(xldev);
     xl_disk_t *disk = xldev_to_xldisk(inode->i_rdev);
+
+    /* Don't allow open if device doesn't exist :-) */
+    if(!gd->part[MINOR(xldev)].nr_sects) 
+	return -ENXIO; // no such device 
+
     disk->usage++;
     DPRINTK("xenolinux_block_open\n");
     return 0;
@@ -253,18 +255,18 @@ static int hypervisor_request(unsigned long   id,
 
     switch ( operation )
     {
-#if 0
-    case XEN_BLOCK_PROBE:
-        if ( RING_PLUGGED ) return 1;
-	sector_number = 0;
-        DISABLE_SCATTERGATHER();
-        break;
-#endif
 
     case XEN_BLOCK_READ:
     case XEN_BLOCK_WRITE:
+
+	/* Get the appropriate gendisk */
 	gd = xldev_to_gendisk(device); 
+
+	/* Update the sector_number we'll pass down as appropriate; note 
+	   that we could sanity check that resulting sector will be in 
+	   this partition, but this will happen in xen anyhow */
 	sector_number += gd->part[MINOR(device)].start_sect;
+
         if ( (sg_operation == operation) &&
              (sg_dev == device) &&
              (sg_next_sect == sector_number) )
@@ -349,12 +351,13 @@ void do_xlblk_request(request_queue_t *rq)
                 (rw == READ) ? XEN_BLOCK_READ : XEN_BLOCK_WRITE, 
                 bh->b_data, bh->b_rsector, bh->b_size>>9, bh->b_rdev);
 
-            if ( full )
-            {
-                bh->b_reqnext = next_bh;
-                pending_queues[nr_pending++] = rq;
-                if ( nr_pending >= MAX_PENDING ) BUG();
-                goto out;
+	    if(full) { 
+
+		bh->b_reqnext = next_bh;
+		pending_queues[nr_pending++] = rq;
+		if ( nr_pending >= MAX_PENDING ) BUG();
+		goto out; 
+
             }
 
             queued++;
@@ -438,12 +441,6 @@ static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
             }
 	    break;
 	    
-#if 0
-        case XEN_BLOCK_PROBE:
-            xlblk_control_msg_pending = bret->status;
-            break;
-#endif
-	  
         default:
             BUG();
 	}
@@ -457,40 +454,11 @@ static void xlblk_response_int(int irq, void *dev_id, struct pt_regs *ptregs)
 }
 
 
-#if 0
-/* Send a synchronous message to Xen. */
-int xenolinux_control_msg(int operation, char *buffer, int size)
-{
-    unsigned long flags;
-    char *aligned_buf;
-
-    /* We copy from an aligned buffer, as interface needs sector alignment. */
-    aligned_buf = (char *)get_free_page(GFP_KERNEL);
-    if ( aligned_buf == NULL ) BUG();
-    memcpy(aligned_buf, buffer, size);
-
-    xlblk_control_msg_pending = 2;
-    spin_lock_irqsave(&io_request_lock, flags);
-    /* Note that size gets rounded up to a sector-sized boundary. */
-    if ( hypervisor_request(0, operation, aligned_buf, 0, (size+511)/512, 0) )
-        return -EAGAIN;
-    signal_requests_to_xen();
-    spin_unlock_irqrestore(&io_request_lock, flags);
-    while ( xlblk_control_msg_pending == 2 ) barrier();
-
-    memcpy(buffer, aligned_buf, size);
-    free_page((unsigned long)aligned_buf);
-    
-    return xlblk_control_msg_pending ? -EINVAL : 0;
-}
-#endif
-
 
 static void reset_xlblk_interface(void)
 {
     block_io_op_t op; 
 
-//    xlblk_control_msg_pending = 0;
     nr_pending = 0;
 
     op.cmd = BLOCK_IO_OP_RESET;
