@@ -36,9 +36,11 @@ class ConsoleProtocol(protocol.Protocol):
             self.loseConnection()
             return
         else:
-            self.transport.write("Connected to console %d on domain %d\n"
-                                 % (self.idx, self.controller.dom))
-            self.setTelnetTransmitBinary()
+            # KAF: A nice quiet successful connect. Don't bother with telnet
+            # control sequence -- telnet is not the appropriate protocol here. 
+            #self.transport.write("Connected to console %d on domain %d\n"
+            #                     % (self.idx, self.controller.dom))
+            #self.setTelnetTransmitBinary()
             eserver.inject('xend.console.connect',
                            [self.idx, self.addr[0], self.addr[1]])
 
