@@ -5,7 +5,6 @@ import os.path
 import sys
 import string
 
-from xen.xend import util
 from xen.xend import XendRoot
 xroot = XendRoot.instance()
 
@@ -36,7 +35,7 @@ def block(op, type, dets, script=None):
     script = os.path.join(SCRIPT_DIR, script)
     args = [op] + string.split(dets, ':')
     args = ' '.join(args)
-    out = util.popen(script + ' ' + args)
+    out = os.popen(script + ' ' + args)
 
     output = out.readline()
     out.close()

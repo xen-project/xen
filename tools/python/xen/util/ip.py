@@ -4,8 +4,6 @@ import socket
 import struct
 import errno
 
-from xen.xend import util
-
 def _readlines(fd):
     """Version of readlines safe against EINTR.
     """
@@ -51,7 +49,7 @@ def get_current_ipaddr(dev='eth0'):
 
     returns interface address as a string
     """
-    fd = util.popen( '/sbin/ifconfig ' + dev + ' 2>/dev/null' )
+    fd = os.popen( '/sbin/ifconfig ' + dev + ' 2>/dev/null' )
     lines = _readlines(fd)
     for line in lines:
         m = re.search( '^\s+inet addr:([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+).*',
@@ -69,7 +67,7 @@ def get_current_ipmask(dev='eth0'):
 
     returns interface netmask as a string
     """
-    fd = util.popen( '/sbin/ifconfig ' + dev + ' 2>/dev/null' )
+    fd = os.popen( '/sbin/ifconfig ' + dev + ' 2>/dev/null' )
     lines = _readlines(fd)
     for line in lines:
         m = re.search( '^.+Mask:([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+).*',
@@ -87,7 +85,7 @@ def get_current_ipgw(dev='eth0'):
 
     returns gateway address as a string
     """
-    fd = util.popen( '/sbin/route -n' )
+    fd = os.popen( '/sbin/route -n' )
     lines = _readlines(fd)
     for line in lines:
         m = re.search( '^\S+\s+([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)' +

@@ -5,8 +5,6 @@ import os.path
 import re
 import sys
 
-from xen.xend import util
-
 os.defpath = os.defpath + ':/sbin:/usr/sbin:/usr/local/sbin'
 CMD_IFCONFIG = 'ifconfig'
 CMD_ROUTE    = 'route'
@@ -83,7 +81,7 @@ def bridge_del(bridge):
 def routes():
     """Return a list of the routes.
     """
-    fin = util.popen(CMD_ROUTE + ' -n', 'r')
+    fin = os.popen(CMD_ROUTE + ' -n', 'r')
     routes = []
     for x in fin:
         if x.startswith('Kernel'): continue
@@ -104,7 +102,7 @@ def routes():
 def ifconfig(interface):
     """Return the ip config for an interface,
     """
-    fin = util.popen(CMD_IFCONFIG + ' %s' % interface, 'r')
+    fin = os.popen(CMD_IFCONFIG + ' %s' % interface, 'r')
     inetre = re.compile('\s*inet\s*addr:(?P<address>\S*)\s*Bcast:(?P<broadcast>\S*)\s*Mask:(?P<mask>\S*)')
     info = None
     for x in fin:
