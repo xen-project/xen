@@ -125,6 +125,10 @@ int vmx_setup_platform(struct exec_domain *d, execution_context_t *context)
 
     e820p = (struct e820entry *) ((unsigned long) p + offset); 
 
+#ifndef NDEBUG
+    print_e820_memory_map(e820p, n);
+#endif
+
     for (i = 0; i < n; i++) {
         if (e820p[i].type == E820_SHARED_PAGE) {
             gpfn = (e820p[i].addr >> PAGE_SHIFT);

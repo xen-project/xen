@@ -27,6 +27,10 @@ struct e820map {
 extern unsigned long init_e820(struct e820entry *, int);
 extern struct e820map e820;
 
+#ifndef NDEBUG
+extern void print_e820_memory_map(struct e820entry *map, int entries);
+#endif
+
 #endif /*!__ASSEMBLY__*/
 
 #define PFN_DOWN(x)   ((x) >> PAGE_SHIFT)
