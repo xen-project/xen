@@ -339,12 +339,15 @@
 42090340_mvZtozMjghPJO0qsjk4NQ tools/blktap/blkint.h
 42090340rc2q1wmlGn6HtiJAkqhtNQ tools/blktap/blktaplib.c
 42090340C-WkRPT7N3t-8Lzehzogdw tools/blktap/blktaplib.h
+423f270cAbkh2f-DHtT0hmCtFFXVXg tools/blktap/blockstore-tls.c
 42277b02WrfP1meTDPv1M5swFq8oHQ tools/blktap/blockstore.c
 42277b02P1C0FYj3gqwTZUD8sxKCug tools/blktap/blockstore.h
 42090340B3mDvcxvd9ehDHUkg46hvw tools/blktap/libgnbd/Makefile
 42090340ZWkc5Xhf9lpQmDON8HJXww tools/blktap/libgnbd/gnbdtest.c
 42090340ocMiUScJE3OpY7QNunvSbg tools/blktap/libgnbd/libgnbd.c
 42090340G5_F_EeVnPORKB0pTMGGhA tools/blktap/libgnbd/libgnbd.h
+423f270cbEKiTMapKnCyqkuwGvgOMA tools/blktap/parallax-threaded.c
+423f270cFdXryIcD7HTPUl_Dbk4DAQ tools/blktap/parallax-threaded.h
 42277b03930x2TJT3PZlw6o0GERXpw tools/blktap/parallax.c
 42277b03XQYq8bujXSz7JAZ8N7j_pA tools/blktap/radix.c
 42277b03vZ4-jno_mgKmAcCW3ycRAg tools/blktap/radix.h
@@ -356,6 +359,7 @@
 42277b04xB_iUmiSm6nKcy8OV8bckA tools/blktap/vdi_fill.c
 42277b045CJGD_rKH-ZT_-0X4knhWA tools/blktap/vdi_list.c
 42277b043ZKx0NJSbcgptQctQ5rerg tools/blktap/vdi_snap.c
+423f270c_QDjGLQ_YdaOtyBM5n9BDg tools/blktap/vdi_snap_delete.c
 42277b043Fjy5-H7LyBtUPyDlZFo6A tools/blktap/vdi_snap_list.c
 42277b04vhqD6Lq3WmGbaESoAAKdhw tools/blktap/vdi_tree.c
 42277b047H8fTVyUf75BWAjh6Zpsqg tools/blktap/vdi_validate.c

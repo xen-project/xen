@@ -5,9 +5,13 @@
  * Snapshot log on-disk data structure.
  *
  */
-
+ 
+#include "radix.h"
 #include "blockstore.h"    /* for BLOCK_SIZE */
  
+#ifndef __SNAPLOG_H__
+#define __SNAPLOG_H__
+
 typedef struct snap_id {
     u64            block;
     unsigned int   index;
@@ -16,11 +20,14 @@ typedef struct snap_id {
 typedef struct snap_rec {
     u64            radix_root;
     struct timeval timestamp;
+    /* flags: */
+    unsigned       deleted:1;
 } snap_rec_t;
 
 
 int  snap_block_create(snap_id_t *parent_id, snap_id_t *new_id);
 int  snap_append(snap_id_t *id, snap_rec_t *rec, snap_id_t *new_id);
+int  snap_collapse(int height, snap_id_t *p_id, snap_id_t *c_id);
 void snap_print_history(snap_id_t *snap_id);
 int  snap_get_id(snap_id_t *id, snap_rec_t *target);
 
@@ -50,3 +57,5 @@ typedef struct snap_block {
     
 
 snap_block_t *snap_get_block(u64 block);
+
+#endif /* __SNAPLOG_H__ */

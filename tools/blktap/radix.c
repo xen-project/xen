@@ -219,7 +219,78 @@ u64 snapshot(u64 root) {
         return writable(root);
 }
 
-void print_root(u64 root, int height, u64 val, FILE *dot_f)
+/**
+ * collapse: collapse a parent onto a child.
+ * 
+ * NOTE: This assumes that parent and child really are, and further that
+ * there are no other children forked from this parent. (children of the
+ * child are okay...)
+ */
+
+int collapse(int height, u64 proot, u64 croot)
+{
+    int i, numlinks, ret, total = 0;
+    radix_tree_node pnode, cnode;
+    
+//printf("proot: %Ld\n", getid(proot));
+    if (height == 0) {
+        height = -1; /* terminate recursion */
+    } else {        
+        height = ((height - 1) / RADIX_TREE_MAP_SHIFT) * RADIX_TREE_MAP_SHIFT;
+    }
+    numlinks = (1UL << RADIX_TREE_MAP_SHIFT);
+
+    /* Terminal cases: */
+
+    if ( (getid(proot) == ZERO) || (getid(croot) == ZERO) )
+        return -1;
+    
+    /* get roots */
+    if ((pnode = readblock(getid(proot))) == NULL)
+        return -1;
+    
+    if ((cnode = readblock(getid(croot))) == NULL)
+    {
+        freeblock(pnode);
+        return -1;
+    }
+    
+    /* For each writable link in proot */
+    for (i=0; i<numlinks; i++)
+    {
+        if ( pnode[i] == cnode[i] ) continue;
+        
+        /* collapse (next level) */
+        /* if height != 0 and writable... */
+        if (( height >= 0 ) && ( iswritable(pnode[i]) ) )
+        {
+            //printf("   %Ld is writable (i=%d).\n", getid(pnode[i]), i);
+            ret = collapse(height, pnode[i], cnode[i]);
+            if (ret == -1) 
+            {
+                total = -1;
+            } else {
+                total += ret;
+            }
+        }
+    
+        
+    }
+    
+    /* if plink is writable, AND clink is writable -> free plink block */
+    if ( ( iswritable(proot) ) && ( iswritable(croot) ) ) 
+    {
+        releaseblock(getid(proot));
+        if (ret >=0) total++;
+        //printf("   Delete %Ld\n", getid(proot));
+    }
+//printf("done : %Ld\n", getid(proot));
+    return total;
+
+}
+
+
+void print_root(u64 root, int height, FILE *dot_f)
 {
     FILE *f;
     int i;
@@ -241,7 +312,9 @@ void print_root(u64 root, int height, u64 val, FILE *dot_f)
                 getid(root), style[iswritable(root)], getid(root));
     }
     
-    /* base case--return val */
+    printf("print_root(%Ld)\n", getid(root));
+    
+    /* base case */
     if (height == 0) {
         /* add a node and edge for each child root */
         node = (radix_tree_node) readblock(getid(root));
@@ -249,7 +322,7 @@ void print_root(u64 root, int height, u64 val, FILE *dot_f)
             return;
         
         for (i = 0; i < RADIX_TREE_MAP_ENTRIES; i++) {
-            if (node[i] != 0) {
+            if (node[i] != ZERO) {
                 fprintf(f, "   n%Ld [%sshape=box,label=\"%Ld\"];\n", 
                         getid(node[i]), style[iswritable(node[i])], 
                         getid(node[i]));
@@ -257,6 +330,7 @@ void print_root(u64 root, int height, u64 val, FILE *dot_f)
                         getid(node[i]), i);
             }
         }
+        freeblock(node);
         return;
     }
 
@@ -272,28 +346,17 @@ void print_root(u64 root, int height, u64 val, FILE *dot_f)
 
     /* add a node and edge for each child root */
     for (i = 0; i < RADIX_TREE_MAP_ENTRIES; i++)
-        if (node[i] != 0) {
+        if (node[i] != ZERO) {
             fprintf(f, "   n%Ld [%sshape=box,label=\"%Ld\"];\n", 
                     getid(node[i]), style[iswritable(node[i])], 
                     getid(node[i]));
-            print_root(node[i], height-RADIX_TREE_MAP_SHIFT, 
-                    val + (((u64)i)<<height), f);
+
+            print_root(node[i], height-RADIX_TREE_MAP_SHIFT, f);
             fprintf(f, "   n%Ld -> n%Ld [label=\"%d\"]\n", getid(root), 
                     getid(node[i]), i);
         }
-        
-        /*
-        
-        root = node[(key >> height) & RADIX_TREE_MAP_MASK];
-        freeblock(state, getid(oldroot), node);
 
-        if (height == 0)
-            return root;
-
-        height -= RADIX_TREE_MAP_SHIFT;
-        */
-    //}
-
+    freeblock(node);
     
     /* write graph postamble */
     if (dot_f == NULL) {
@@ -306,7 +369,9 @@ void print_root(u64 root, int height, u64 val, FILE *dot_f)
 
 int main(int argc, char **argv) {
     u64 key = ZERO, val = ZERO;
-    u64 root = writable(ONE);
+    u64 root = writable(2ULL);
+    u64 p = ZERO, c = ZERO;
+    int v;
     char buff[4096];
 
     __init_blockstore();
@@ -321,18 +386,23 @@ int main(int argc, char **argv) {
     if (lseek(fp, 0, SEEK_END) == 0) {
         write(fp, buff, 4096);
     }*/
-           
+        
+    allocblock(buff);
+            
     printf("Recognized commands:\n"
            "Note: the LSB of a node number indicates if it is writable\n"
            "  root <node>               set root to <node>\n"
            "  snapshot                  take a snapshot of the root\n"
            "  set <key> <val>           set key=val\n"
            "  get <key>                 query key\n"
+           "  c <proot> <croot>         collapse\n"
+           "  pr                        print tree to dot\n"
+           "  pf <1=verbose>            print freelist\n"
            "  quit\n"
            "\nroot = %Ld\n", root);
     for (;;) {
-        print_root(root, 34, 0, NULL);
-        system("dot radix.dot -Tps -o radix.ps");
+        //print_root(root, 34, NULL);
+        //system("dot radix.dot -Tps -o radix.ps");
 
         printf("> ");
         fflush(stdout);
@@ -344,8 +414,11 @@ int main(int argc, char **argv) {
         } else if (sscanf(buff, " set %Ld %Ld", &key, &val) == 2) {
             root = update(34, root, key, val);
             printf("root = %Ld\n", root);
+        } else if (sscanf(buff, " c %Ld %Ld", &p, &c) == 2) {
+            v = collapse(34, p, c);
+            printf("reclaimed %d blocks.\n", v);
         } else if (sscanf(buff, " get %Ld", &key) == 1) {
-            val = lookup(34, root, key, NULL);
+            val = lookup(34, root, key);
             printf("value = %Ld\n", val);
         } else if (!strcmp(buff, "quit\n")) {
             break;
@@ -353,7 +426,11 @@ int main(int argc, char **argv) {
             root = snapshot(root);
             printf("new root = %Ld\n", root);
         } else if (sscanf(buff, " pr %Ld", &root) == 1) {
-            print_root(root, 34, 0, NULL);
+            print_root(root, 34, NULL);
+        } else if (sscanf(buff, " pf %d", &v) == 1) {
+            freelist_count(v);
+        } else if (!strcmp(buff, "pf\n")) {
+            freelist_count(0);
         } else {
             printf("command not recognized\n");
         }

@@ -3,6 +3,8 @@
  * 
  * userspace interface routines for the blktap driver.
  *
+ * (threadsafe(r) version) 
+ *
  * (c) 2004 Andrew Warfield.
  */
 
@@ -21,11 +23,13 @@
 #include <sys/ioctl.h>
 #include <string.h>
 #include <unistd.h>
+#include <pthread.h>
+
                                                                      
 #define __COMPILING_BLKTAP_LIB
 #include "blktaplib.h"
 
-#if 1
+#if 0
 #define DPRINTF(_f, _a...) printf ( _f , ## _a )
 #else
 #define DPRINTF(_f, _a...) ((void)0)
@@ -194,15 +198,19 @@ void print_hooks(void)
         
 /*-----[ Data to/from Backend (server) VM ]------------------------------*/
 
+
+
 inline int write_req_to_be_ring(blkif_request_t *req)
 {
     blkif_request_t *req_d;
+    static pthread_mutex_t be_prod_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-    //req_d = FRONT_RING_NEXT_EMPTY_REQUEST(&be_ring);
+    pthread_mutex_lock(&be_prod_mutex);
     req_d = RING_GET_REQUEST(&be_ring, be_ring.req_prod_pvt);
     memcpy(req_d, req, sizeof(blkif_request_t));
     wmb();
     be_ring.req_prod_pvt++;
+    pthread_mutex_unlock(&be_prod_mutex);
     
     return 0;
 }
@@ -210,12 +218,14 @@ inline int write_req_to_be_ring(blkif_request_t *req)
 inline int write_rsp_to_fe_ring(blkif_response_t *rsp)
 {
     blkif_response_t *rsp_d;
+    static pthread_mutex_t fe_prod_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-    //rsp_d = BACK_RING_NEXT_EMPTY_RESPONSE(&fe_ring);
+    pthread_mutex_lock(&fe_prod_mutex);
     rsp_d = RING_GET_RESPONSE(&fe_ring, fe_ring.rsp_prod_pvt);
     memcpy(rsp_d, rsp, sizeof(blkif_response_t));
     wmb();
     fe_ring.rsp_prod_pvt++;
+    pthread_mutex_unlock(&fe_prod_mutex);
 
     return 0;
 }
@@ -336,6 +346,10 @@ int blktap_listen(void)
     ctrl_sring_t     *csring;
     RING_IDX          rp, i, pfd_count; 
     
+    /* pending rings */
+    blkif_request_t req_pending[BLKIF_RING_SIZE];
+    blkif_response_t rsp_pending[BLKIF_RING_SIZE];
+    
     /* handler hooks: */
     request_hook_t   *req_hook;
     response_hook_t  *rsp_hook;
@@ -447,6 +461,8 @@ int blktap_listen(void)
                 int done = 0; /* stop forwarding this request */
 
                 req = RING_GET_REQUEST(&fe_ring, i);
+                memcpy(&req_pending[ID_TO_IDX(req->id)], req, sizeof(*req));
+                req = &req_pending[ID_TO_IDX(req->id)];
 
                 DPRINTF("copying an fe request\n");
 
@@ -487,6 +503,8 @@ int blktap_listen(void)
             {
 
                 rsp = RING_GET_RESPONSE(&be_ring, i);
+                memcpy(&rsp_pending[ID_TO_IDX(rsp->id)], rsp, sizeof(*rsp));
+                rsp = &rsp_pending[ID_TO_IDX(rsp->id)];
 
                 DPRINTF("copying a be request\n");
 
