@@ -164,10 +164,10 @@ config MCRUSOE
 	  like a 586 with TSC, and sets some GCC optimization flags (like a
 	  Pentium Pro with no alignment requirements).
 
-config MEFFICEON
-	bool "Efficeon"
-	help
-	  Select this for a Transmeta Efficeon processor.
+#config MEFFICEON
+#	bool "Efficeon"
+#	help
+#	  Select this for a Transmeta Efficeon processor.
 
 #config MWINCHIPC6
 #	bool "Winchip-C6"
