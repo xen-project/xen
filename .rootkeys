@@ -70,8 +70,10 @@
 3ddb79bdYcxXT-2UEaDcG0Ic4MIK1g xen-2.4.16/drivers/ide/ide-pci.c
 3ddb79bdOXTbcImJo8DwmlNX88k78Q xen-2.4.16/drivers/ide/ide-probe.c
 3ddb79bdDWFwINnKn29RlFDwGJhjYg xen-2.4.16/drivers/ide/ide-taskfile.c
+3e4a8d40XMqvT05EwZwJg1HMsFDUBA xen-2.4.16/drivers/ide/ide-xeno.c
 3ddb79bdkDY1bSOYkToP1Cc49VdBxg xen-2.4.16/drivers/ide/ide.c
 3ddb79bdPyAvT_WZTAFhaX0jp-yXSw xen-2.4.16/drivers/ide/ide_modes.h
+3e4a8d401aSwOzCScQXR3lsmNlAwUQ xen-2.4.16/drivers/ide/piix.c
 3ddb79bfogeJNHTIepPjd8fy1TyoTw xen-2.4.16/drivers/net/3c509.c
 3ddb79bfMlOcWUwjtg6oMYhGySHDDw xen-2.4.16/drivers/net/3c59x.c
 3ddb79bfl_DWxZQFKiJ2BXrSedV4lg xen-2.4.16/drivers/net/8139cp.c
