@@ -59,6 +59,7 @@ struct xen_npx_attach_args {
 #include <machine/hypervisor-ifs/event_channel.h>
 #include <machine/hypervisor-ifs/io/domain_controller.h>
 #include <machine/hypervisor-ifs/io/netif.h>
+#include <machine/hypervisor-ifs/io/blkif.h>
 
 #undef u8
 #undef u16

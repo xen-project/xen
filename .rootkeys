@@ -283,6 +283,7 @@
 413cb3b4bRsqiHQLTKEZk4-zOksf8A netbsd-2.0-xen-sparse/sys/arch/xen/include/hypervisor.h
 413cb3b4OqY83qI8GztIZGADpvrpSw netbsd-2.0-xen-sparse/sys/arch/xen/include/if_xennetvar.h
 413cb3b42GG0LffraTnpZKlSUq57wg netbsd-2.0-xen-sparse/sys/arch/xen/include/pmap.h
+41580792kPzxLiPb47k_GDEMSbAbzA netbsd-2.0-xen-sparse/sys/arch/xen/include/xbdvar.h
 413cb3b4F0ArkWVBRyspkw7ivfXihg netbsd-2.0-xen-sparse/sys/arch/xen/include/xen.h
 413cb3b4ullQud70n4JClwoEEUBh8Q netbsd-2.0-xen-sparse/sys/arch/xen/include/xenfunc.h
 413cb3b4y1Ffq8BOhbdSpn-fGmKuEg netbsd-2.0-xen-sparse/sys/arch/xen/include/xenpmap.h

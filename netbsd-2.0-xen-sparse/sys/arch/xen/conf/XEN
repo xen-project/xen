@@ -132,10 +132,10 @@ npx0		at hypervisor?		# x86 math coprocessor
 xencons*	at hypervisor?		# Xen virtual console
 xennet* 	at hypervisor?		# Xen virtual network interface
 
-#xbd*		at hypervisor?		# Xen virtual block device
-#wd*		at hypervisor?		# Xen vbd (wd identity)
-#sd*		at hypervisor?		# Xen vbd (sd identity)
-#cd*		at hypervisor?		# Xen vbd (cd identity)
+xbd*		at hypervisor?		# Xen virtual block device
+wd*		at hypervisor?		# Xen vbd (wd identity)
+sd*		at hypervisor?		# Xen vbd (sd identity)
+cd*		at hypervisor?		# Xen vbd (cd identity)
 
 #xenkbc* 	at hypervisor?		# Xen Keyboard/Mouse Interface
 #pckbd*		at xenkbc?		# Keyboard
