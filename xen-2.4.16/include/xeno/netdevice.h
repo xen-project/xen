@@ -311,13 +311,13 @@ struct net_device
 	void                    *dn_ptr;        /* DECnet specific data */
 	void                    *ip6_ptr;       /* IPv6 specific data */
 	void			*ec_ptr;	/* Econet specific data	*/
-
+#if 0
 						/* IAP: add fields but
 						nothing else */		
 	struct list_head        poll_list;      /* Link to poll list    */
 	int                     quota;
 	int                     weight;
-
+#endif
 	struct Qdisc		*qdisc;
 	struct Qdisc		*qdisc_sleeping;
 	struct Qdisc		*qdisc_list;
@@ -361,7 +361,9 @@ struct net_device
 	int			(*stop)(struct net_device *dev);
 	int			(*hard_start_xmit) (struct sk_buff *skb,
 						    struct net_device *dev);
+#if 0
 	int                     (*poll) (struct net_device *dev, int *quota); /* XXX IAP */
+#endif
 	int			(*hard_header) (struct sk_buff *skb,
 						struct net_device *dev,
 						unsigned short type,
