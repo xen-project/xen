@@ -331,7 +331,7 @@ unsigned long __copy_from_user_ll(void *to, const void __user *from, unsigned lo
  * Returns number of bytes that could not be copied.
  * On success, this will be zero.
  */
-static inline unsigned long
+static always_inline unsigned long
 __copy_to_user(void __user *to, const void *from, unsigned long n)
 {
 	if (__builtin_constant_p(n)) {
@@ -369,7 +369,7 @@ __copy_to_user(void __user *to, const void *from, unsigned long n)
  * If some data could not be copied, this function will pad the copied
  * data to the requested size using zero bytes.
  */
-static inline unsigned long
+static always_inline unsigned long
 __copy_from_user(void *to, const void __user *from, unsigned long n)
 {
 	if (__builtin_constant_p(n)) {

@@ -13,6 +13,8 @@
 #define offsetof(_p,_f) ((unsigned long)&(((_p *)0)->_f))
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
+#define always_inline __inline__ __attribute__ ((always_inline))
+
 /* syslog levels ==> nothing! */
 #define KERN_NOTICE  ""
 #define KERN_WARNING ""

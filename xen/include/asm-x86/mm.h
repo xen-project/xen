@@ -364,7 +364,9 @@ void ptwr_reconnect_disconnected(unsigned long addr);
 void ptwr_flush_inactive(void);
 int ptwr_do_page_fault(unsigned long);
 
-static inline void __cleanup_writable_pagetable(const int what)
+static always_inline void 
+__cleanup_writable_pagetable(
+    const int what)
 {
     int cpu = smp_processor_id();
 
@@ -376,7 +378,9 @@ static inline void __cleanup_writable_pagetable(const int what)
             ptwr_flush_inactive();
 }
 
-static inline void cleanup_writable_pagetable(struct domain *d, const int what)
+static always_inline void
+cleanup_writable_pagetable(
+    struct domain *d, const int what)
 {
     if ( unlikely(VM_ASSIST(d, VMASST_TYPE_writable_pagetables)) )
         __cleanup_writable_pagetable(what);
