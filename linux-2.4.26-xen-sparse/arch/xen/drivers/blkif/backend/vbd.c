@@ -126,33 +126,30 @@ void vbd_grow(blkif_be_vbd_grow_t *grow)
     x->next                 = (blkif_extent_le_t *)NULL; 
 
     gd = get_gendisk(x->extent.device);
-
-    if (!gd || !gd->part)
+    if ( (gd == NULL) || (gd->part == NULL) )
     {
         grow->status = BLKIF_BE_STATUS_VBD_NOT_FOUND; 
         DPRINTK("vbd_grow: device %08x doesn't exist.\n", x->extent.device);
         goto out;
     }
 
-    hd = &gd->part[MINOR(x->extent.device)];
-
-    if (!hd)
+    if ( (hd = &gd->part[MINOR(x->extent.device)]) == NULL )
     {
         grow->status = BLKIF_BE_STATUS_VBD_NOT_FOUND; 
         DPRINTK("vbd_grow: HD device %08x doesn't exist.\n", x->extent.device);
         goto out;
     }
 
-    printk("vbd_grow: requested_len %llu actual_len %lu\n", 
-	   x->extent.sector_length,  hd->nr_sects );
+    DPRINTK("vbd_grow: requested_len %llu actual_len %lu\n", 
+            x->extent.sector_length, hd->nr_sects);
 
-    /* this test assumes sector_start is zero, which in the new
-       IO world it always will be -- We need to simpligy the 
-       grow/shrink interface as we'll always be deadling with whole
-       devices
-    */
+    /*
+     * NB. This test assumes sector_start == 0, which is always the case
+     * in Xen 1.3. In fact the whole grow/shrink interface could do with
+     * some simplification.
+     */
     if ( x->extent.sector_length > hd->nr_sects )
-	x->extent.sector_length = hd->nr_sects;    
+        x->extent.sector_length = hd->nr_sects;    
 
     for ( px = &vbd->extents; *px != NULL; px = &(*px)->next ) 
         continue;
