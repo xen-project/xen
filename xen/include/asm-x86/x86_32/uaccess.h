@@ -243,7 +243,6 @@ struct __large_struct { unsigned long buf[100]; };
  * aliasing issues.
  */
 #define __put_user_asm(x, addr, err, itype, rtype, ltype, errret)	\
-	ASSERT_no_criticalregion();					\
 	__asm__ __volatile__(						\
 		"1:	mov"itype" %"rtype"1,%2\n"			\
 		"2:\n"							\
@@ -292,7 +291,6 @@ do {									\
 } while (0)
 
 #define __get_user_asm(x, addr, err, itype, rtype, ltype, errret)	\
-	ASSERT_no_criticalregion();					\
 	__asm__ __volatile__(						\
 		"1:	mov"itype" %2,%"rtype"1\n"			\
 		"2:\n"							\
@@ -336,7 +334,6 @@ unsigned long __copy_from_user_ll(void *to, const void __user *from, unsigned lo
 static always_inline unsigned long
 __copy_to_user(void __user *to, const void *from, unsigned long n)
 {
-	ASSERT_no_criticalregion();
 	if (__builtin_constant_p(n)) {
 		unsigned long ret;
 
@@ -375,7 +372,6 @@ __copy_to_user(void __user *to, const void *from, unsigned long n)
 static always_inline unsigned long
 __copy_from_user(void *to, const void __user *from, unsigned long n)
 {
-	ASSERT_no_criticalregion();
 	if (__builtin_constant_p(n)) {
 		unsigned long ret;
 

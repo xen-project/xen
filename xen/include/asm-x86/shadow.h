@@ -24,8 +24,8 @@
 
 #define shadow_mode(_d)      ((_d)->mm.shadow_mode)
 #define shadow_lock_init(_d) spin_lock_init(&(_d)->mm.shadow_lock)
-#define shadow_lock(_m)      spin_lock_nochecking(&(_m)->shadow_lock)
-#define shadow_unlock(_m)    spin_unlock_nochecking(&(_m)->shadow_lock)
+#define shadow_lock(_m)      spin_lock(&(_m)->shadow_lock)
+#define shadow_unlock(_m)    spin_unlock(&(_m)->shadow_lock)
 
 extern void shadow_mode_init(void);
 extern int shadow_mode_control(struct domain *p, dom0_shadow_control_t *sc);

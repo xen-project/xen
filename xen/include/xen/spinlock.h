@@ -72,46 +72,6 @@ typedef struct { int gcc_is_buggy; } rwlock_t;
 
 #endif
 
-#ifndef NDEBUG
-
-extern void criticalregion_enter(void);
-extern void criticalregion_exit(void);
-extern void ASSERT_no_criticalregion(void);
-extern void disable_criticalregion_checking(void);
-
-#define spin_lock(_lock) \
-    do { criticalregion_enter(); _raw_spin_lock(_lock); } while (0)
-#define spin_unlock(_lock) \
-    do { _raw_spin_unlock(_lock); criticalregion_exit(); } while (0)
-#define spin_lock_recursive(_lock) \
-    do { criticalregion_enter(); _raw_spin_lock_recursive(_lock); } while (0)
-#define spin_unlock_recursive(_lock) \
-    do { _raw_spin_unlock_recursive(_lock); criticalregion_exit(); } while (0)
-#define read_lock(_lock) \
-    do { criticalregion_enter(); _raw_read_lock(_lock); } while (0)
-#define read_unlock(_lock) \
-    do { _raw_read_unlock(_lock); criticalregion_exit(); } while (0)
-#define write_lock(_lock) \
-    do { criticalregion_enter(); _raw_write_lock(_lock); } while (0)
-#define write_unlock(_lock) \
-    do { _raw_write_unlock(_lock); criticalregion_exit(); } while (0)
-
-static inline int spin_trylock(spinlock_t *lock)
-{
-    criticalregion_enter();
-    if ( !_raw_spin_trylock(lock) )
-    {
-        criticalregion_exit();
-        return 0;
-    }
-    return 1;
-}
-
-#else
-
-#define ASSERT_no_criticalregion()        ((void)0)
-#define disable_criticalregion_checking() ((void)0)
-
 #define spin_lock(_lock)             _raw_spin_lock(_lock)
 #define spin_trylock(_lock)          _raw_spin_trylock(_lock)
 #define spin_unlock(_lock)           _raw_spin_unlock(_lock)
@@ -121,16 +81,5 @@ static inline int spin_trylock(spinlock_t *lock)
 #define read_unlock(_lock)           _raw_read_unlock(_lock)
 #define write_lock(_lock)            _raw_write_lock(_lock)
 #define write_unlock(_lock)          _raw_write_unlock(_lock)
-
-#endif
-
-/*
- * Use these if you have taken special care to ensure that certain unsafe
- * things can occur in your critical region (e.g., faults, user-space
- * accesses). 
- */
-#define spin_lock_nochecking(_lock)    _raw_spin_lock(_lock)
-#define spin_trylock_nochecking(_lock) _raw_spin_trylock(_lock)
-#define spin_unlock_nochecking(_lock)  _raw_spin_unlock(_lock)
 
 #endif /* __SPINLOCK_H__ */

@@ -288,7 +288,6 @@ void nmi_watchdog_tick (struct pt_regs * regs)
         if ( alert_counter[cpu] == 5*nmi_hz )
         {
             console_force_unlock();
-            disable_criticalregion_checking();
             die("NMI Watchdog detected LOCKUP on CPU", regs, cpu);
         }
     } 

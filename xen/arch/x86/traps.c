@@ -342,9 +342,6 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
 
     perfc_incrc(page_faults);
 
-    ASSERT_no_criticalregion();
-
-
     if ( likely(VM_ASSIST(d, VMASST_TYPE_writable_pagetables)) )
     {
         if ( unlikely(ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l1va) &&
@@ -445,8 +442,6 @@ asmlinkage void do_general_protection(struct pt_regs *regs, long error_code)
     trap_info_t *ti;
     unsigned long fixup;
 
-    ASSERT_no_criticalregion();
-
     /* Badness if error in ring 0, or result of an interrupt. */
     if ( !(regs->xcs & 3) || (error_code & 1) )
         goto gp_in_kernel;
@@ -527,7 +522,6 @@ asmlinkage void do_general_protection(struct pt_regs *regs, long error_code)
 asmlinkage void mem_parity_error(struct pt_regs *regs)
 {
     console_force_unlock();
-    disable_criticalregion_checking();
 
     printk("\n\n");
 
@@ -548,7 +542,6 @@ asmlinkage void mem_parity_error(struct pt_regs *regs)
 asmlinkage void io_check_error(struct pt_regs *regs)
 {
     console_force_unlock();
-    disable_criticalregion_checking();
 
     printk("\n\n");
 
