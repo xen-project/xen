@@ -84,7 +84,7 @@ class ConsoleControllerFactory(controller.ControllerFactory):
 
     def createController(self, dom, console_port=None):
         if console_port is None:
-            console_port = CONSOLE_PORT_BASE + dom
+            console_port = xroot.get_console_port_base() + dom
         for c in self.getControllers():
             if c.console_port == console_port:
                 raise XendError('console port in use: ' + str(console_port))
