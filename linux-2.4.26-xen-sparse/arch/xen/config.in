@@ -20,7 +20,10 @@ endmenu
 # The IBM S/390 patch needs this.
 define_bool CONFIG_NO_IDLE_HZ y
 
-if [ "$CONFIG_XEN_PHYSDEV_ACCESS" != "y" ]; then
+if [ "$CONFIG_XEN_PHYSDEV_ACCESS" == "y" ]; then
+   define_bool CONFIG_FOREIGN_PAGES y
+else
+   define_bool CONFIG_FOREIGN_PAGES n
    define_bool CONFIG_NETDEVICES y
    define_bool CONFIG_VT n
 fi
@@ -102,8 +105,6 @@ fi
 if [ "$CONFIG_HIGHMEM" = "y" ]; then
    bool 'HIGHMEM I/O support' CONFIG_HIGHIO
 fi
-
-define_int CONFIG_FORCE_MAX_ZONEORDER 12
 
 #bool 'Symmetric multi-processing support' CONFIG_SMP
 #if [ "$CONFIG_SMP" = "y" -a "$CONFIG_X86_CMPXCHG" = "y" ]; then

@@ -88,6 +88,13 @@ static inline void * phys_to_virt(unsigned long address)
 #define page_to_pseudophys(page) ((dma_addr_t)page_to_pfn(page) << PAGE_SHIFT)
 #define page_to_phys(page)       (phys_to_machine(page_to_pseudophys(page)))
 
+#define bio_to_pseudophys(bio)	(page_to_pseudophys(bio_page((bio))) + (unsigned long) bio_offset((bio)))
+#define bvec_to_pseudophys(bv)	(page_to_pseudophys((bv)->bv_page) + (unsigned long) (bv)->bv_offset)
+
+#define BIOVEC_PHYS_MERGEABLE(vec1, vec2)	\
+	(((bvec_to_phys((vec1)) + (vec1)->bv_len) == bvec_to_phys((vec2))) && \
+	 ((bvec_to_pseudophys((vec1)) + (vec1)->bv_len) == bvec_to_pseudophys((vec2))))
+
 extern void * __ioremap(unsigned long offset, unsigned long size, unsigned long flags);
 
 /**

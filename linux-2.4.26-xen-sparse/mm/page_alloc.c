@@ -89,6 +89,9 @@ static void __free_pages_ok (struct page *page, unsigned int order)
 	struct page *base;
 	zone_t *zone;
 
+	if (PageForeign(page))
+		return (PageForeignDestructor(page))(page);
+
 	/*
 	 * Yes, think what happens when other parts of the kernel take 
 	 * a reference to a page in order to pin it for io. -ben
@@ -102,7 +105,7 @@ static void __free_pages_ok (struct page *page, unsigned int order)
 	if (page->buffers)
 		BUG();
 	if (page->mapping)
-		return (*(void(*)(struct page *))page->mapping)(page);
+		BUG();
 	if (!VALID_PAGE(page))
 		BUG();
 	if (PageLocked(page))

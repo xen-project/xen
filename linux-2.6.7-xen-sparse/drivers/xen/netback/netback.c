@@ -376,7 +376,6 @@ static void net_tx_action(unsigned long unused)
     netif_tx_request_t txreq;
     u16 pending_idx;
     NETIF_RING_IDX i;
-    struct page *page;
     multicall_entry_t *mcl;
     PEND_RING_IDX dc, dp;
 
@@ -567,10 +566,9 @@ static void net_tx_action(unsigned long unused)
                (void *)(MMAP_VADDR(pending_idx)|(txreq.addr&~PAGE_MASK)),
                PKT_PROT_LEN);
 
-        page = virt_to_page(MMAP_VADDR(pending_idx));
-
         /* Append the packet payload as a fragment. */
-        skb_shinfo(skb)->frags[0].page        = page;
+        skb_shinfo(skb)->frags[0].page        = 
+            virt_to_page(MMAP_VADDR(pending_idx));
         skb_shinfo(skb)->frags[0].size        = txreq.size - PKT_PROT_LEN;
         skb_shinfo(skb)->frags[0].page_offset = 
             (txreq.addr + PKT_PROT_LEN) & ~PAGE_MASK;
@@ -580,17 +578,6 @@ static void net_tx_action(unsigned long unused)
 
         skb->dev      = netif->dev;
         skb->protocol = eth_type_trans(skb, skb->dev);
-
-        /*
-         * Destructor information. We hideously abuse the 'mapping' pointer,
-         * which isn't otherwise used by us. The page deallocator is modified
-         * to interpret a non-NULL value as a destructor function to be called.
-         * This works okay because in all other cases the pointer must be NULL
-         * when the page is freed (normally Linux will explicitly bug out if
-         * it sees otherwise.
-         */
-        page->mapping = (struct address_space *)netif_page_release;
-        set_page_count(page, 1);
 
         netif->stats.tx_bytes += txreq.size;
         netif->stats.tx_packets++;
@@ -607,8 +594,8 @@ static void netif_page_release(struct page *page)
     unsigned long flags;
     u16 pending_idx = page - virt_to_page(mmap_vstart);
 
-    /* Stop the abuse. */
-    page->mapping = NULL;
+    /* Ready for next use. */
+    set_page_count(page, 1);
 
     spin_lock_irqsave(&dealloc_lock, flags);
     dealloc_ring[MASK_PEND_IDX(dealloc_prod++)] = pending_idx;
@@ -742,6 +729,7 @@ static irqreturn_t netif_be_dbg(int irq, void *dev_id, struct pt_regs *regs)
 static int __init netback_init(void)
 {
     int i;
+    struct page *page;
 
     if ( !(start_info.flags & SIF_NET_BE_DOMAIN) &&
 	 !(start_info.flags & SIF_INITDOMAIN) )
@@ -756,6 +744,13 @@ static int __init netback_init(void)
 
     if ( (mmap_vstart = allocate_empty_lowmem_region(MAX_PENDING_REQS)) == 0 )
         BUG();
+
+    for ( i = 0; i < MAX_PENDING_REQS; i++ )
+    {
+        page = virt_to_page(MMAP_VADDR(i));
+        SetPageForeign(page);
+        PageForeignDestructor(page) = netif_page_release;
+    }
 
     pending_cons = 0;
     pending_prod = MAX_PENDING_REQS;
