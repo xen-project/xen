@@ -1,10 +1,38 @@
 #  -*- mode: python; -*-
 #============================================================================
-# Python defaults setup for 'xm create'.
+# Example Python setup script for 'xm create'.
 # This script sets the parameters used when a domain is created using 'xm create'.
-# You use a separate script for each domain you want to create, or 
-# you can set the parameters for the domain on the xm command line.
+#
+# This is a relatively advanced script that uses a parameter, vmid, to control
+# the settings. So this script can be used to start a set of domains by
+# setting the vmid parameter on the 'xm create' command line. For example:
+#
+# xm create vmid=1
+# xm create vmid=2
+# xm create vmid=3
+#
+# The vmid is purely a script variable, and has no effect on the the domain
+# id assigned to the new domain.
 #============================================================================
+
+# Define script variables here.
+# xm_vars is defined automatically, use xm_vars.var() to define a variable.
+
+# This function checks that 'vmid' has been given a valid value.
+# It is called automatically by 'xm create'.
+def vmid_check(var, val):
+    val = int(val)
+    if val <= 0:
+        raise ValueError
+    return val
+
+# Define the 'vmid' variable so that 'xm create' knows about it.
+xm_vars.var('vmid',
+            use="Virtual machine id. Integer greater than 0.",
+            check=vmid_check)
+
+# Check the defined variables have valid values..
+xm_vars.check()
 
 #----------------------------------------------------------------------------
 # Kernel image file.
@@ -20,11 +48,13 @@ kernel = "/boot/vmlinuz-2.4.26-xenU"
 # Initial memory allocation (in megabytes) for the new domain.
 memory = 64
 
-# A name for your domain. All domains must have different names.
-name = "ExampleDomain"
+# A name for the new domain. All domains have to have different names,
+# so we use the vmid to create a name.
+name = "VM%d" % vmid
 
 # Which CPU to start domain on? 
 #cpu = -1   # leave to Xen to pick
+cpu = vmid  # set based on vmid (mod number of CPUs)
 
 #----------------------------------------------------------------------------
 # Define network interfaces.
@@ -43,7 +73,12 @@ name = "ExampleDomain"
 # where UNAME is the device, DEV is the device name the domain will see,
 # and MODE is r for read-only, w for read-write.
 
-disk = [ 'phy:hda1,xda1,r' ]
+# This makes the disk device depend on the vmid - assuming
+# that devices sda7, sda8 etc. exist. The device is exported
+# to all domains as sda1.
+# All domains get sda6 read-only (to use for /usr, see below).
+disk = [ 'phy:sda%d,sda1,w' % (7+vmid),
+         'phy:sda6,sda6,r' ]
 
 #----------------------------------------------------------------------------
 # Set the kernel command line for the new domain.
@@ -62,7 +97,7 @@ disk = [ 'phy:hda1,xda1,r' ]
 #hostname= "vm%d" % vmid
 
 # Set root device.
-root = "/dev/xda1 ro"
+root = "/dev/sda1 ro"
 
 # Root device for nfs.
 #root = "/dev/nfs"
@@ -71,8 +106,8 @@ root = "/dev/xda1 ro"
 # Root directory on the nfs server.
 #nfs_root   = '/full/path/to/root/directory'
 
-# Sets runlevel 4.
-extra = "4"
+# Sets runlevel 4 and the device for /usr.
+extra = "4 VMID=%d usr=/dev/sda6" % vmid
 
 #----------------------------------------------------------------------------
 # Set according to whether you want the domain restarted when it exits.

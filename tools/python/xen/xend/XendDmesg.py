@@ -1,4 +1,4 @@
-# Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
+ # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
 
 """Get dmesg output for this node.
 """
@@ -11,7 +11,7 @@ class XendDmesg:
         self.xc = xen.lowlevel.xc.new()
 
     def info(self):
-        return [ self.xc.readconsolering() ]
+        return self.xc.readconsolering()
         
 
 def instance():

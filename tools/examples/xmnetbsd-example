@@ -1,23 +1,37 @@
 #  -*- mode: python; -*-
 #============================================================================
-# Python defaults setup for 'xm create'.
-# Edit this file to reflect the configuration of your system.
+# Example Python setup script for 'xm create'.
+# This script sets the parameters used when a domain is created using 'xm create'.
+#
+# This is a relatively advanced script that uses a parameter, vmid, to control
+# the settings. So this script can be used to start a set of domains by
+# setting the vmid parameter on the 'xm create' command line. For example:
+#
+# xm create vmid=1
+# xm create vmid=2
+# xm create vmid=3
+#
+# The vmid is purely a script variable, and has no effect on the the domain
+# id assigned to the new domain.
 #============================================================================
 
 # Define script variables here.
 # xm_vars is defined automatically, use xm_vars.var() to define a variable.
 
+# This function checks that 'vmid' has been given a valid value.
+# It is called automatically by 'xm create'.
 def vmid_check(var, val):
     val = int(val)
     if val <= 0:
         raise ValueError
     return val
-    
+
+# Define the 'vmid' variable so that 'xm create' knows about it.
 xm_vars.var('vmid',
             use="Virtual machine id. Integer greater than 0.",
             check=vmid_check)
 
-# This checks the script variables.
+# Check the defined variables have valid values..
 xm_vars.check()
 
 #----------------------------------------------------------------------------
@@ -30,8 +44,9 @@ builder='netbsd'
 # Initial memory allocation (in megabytes) for the new domain.
 memory = 16
 
-# A handy name for your new domain.
-name = "NetBSD VM %d" % vmid
+# A name for the new domain. All domains have to have different names,
+# so we use the vmid to create a name.
+name = "NETBSD%d" % vmid
 
 #----------------------------------------------------------------------------
 # Define network interfaces.
@@ -55,12 +70,16 @@ name = "NetBSD VM %d" % vmid
 #----------------------------------------------------------------------------
 # Define the disk devices you want the domain to have access to, and
 # what you want them accessible as.
-# Each disk entry is of the form phy:DEV,VDEV,MODE
-# where DEV is the device, VDEV is the device name the domain will see,
+# Each disk entry is of the form phy:UNAME,DEV,MODE
+# where UNAME is the device, DEV is the device name the domain will see,
 # and MODE is r for read-only, w for read-write.
 
-#disk = [ 'phy:sda%d,sda1,w' % (7+vmid),
-#         'phy:sda6,sda6,r' ]
+# This makes the disk device depend on the vmid - assuming
+# that devices sda7, sda8 etc. exist. The device is exported
+# to all domains as sda1.
+# All domains get sda6 read-only (to use for /usr, see below).
+disk = [ 'phy:sda%d,sda1,w' % (7+vmid),
+         'phy:sda6,sda6,r' ]
 
 #----------------------------------------------------------------------------
 # Set the kernel command line for the new domain.
@@ -100,4 +119,5 @@ extra = "4 VMID=%d bootdev=xennet0" % vmid
 # Other values are 'always', and 'never'.
 #
 #restart = 'onreboot'
+
 #============================================================================

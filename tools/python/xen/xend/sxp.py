@@ -366,10 +366,11 @@ def show(sxpr, out=sys.stdout):
             show(x, out)
             i += 1
         out.write(k_list_close)
+    elif isinstance(sxpr, (types.IntType, types.FloatType)):
+        out.write(str(sxpr))
     elif isinstance(sxpr, types.StringType) and atomp(sxpr):
         out.write(sxpr)
     else:
-        #out.write("'" + str(sxpr) + "'")
         out.write(repr(str(sxpr)))
 
 def show_xml(sxpr, out=sys.stdout):

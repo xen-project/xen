@@ -27,14 +27,10 @@ def main(argv):
         return
     if len(args) < 1: opts.err('Missing domain')
     dom = args[0]
-    try:
-        domid = int(dom)
-    except:
-        opts.err('Invalid domain: ' + dom)
     if opts.vals.reboot:
         mode = 'reboot'
     else:
         mode = 'halt'
-    server.xend_domain_destroy(domid, mode)
+    server.xend_domain_destroy(dom, mode)
     
         

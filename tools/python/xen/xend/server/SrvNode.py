@@ -1,6 +1,7 @@
 # Copyright (C) 2004 Mike Wray <mike.wray@hp.com>
 
 import os
+
 from SrvDir import SrvDir
 from xen.xend import sxp
 from xen.xend import XendNode
@@ -14,6 +15,7 @@ class SrvNode(SrvDir):
         SrvDir.__init__(self)
         self.xn = XendNode.instance()
         self.add('dmesg', 'SrvDmesg')
+        self.add('log', 'SrvXendLog')
 
     def op_shutdown(self, op, req):
         val = self.xn.shutdown()
@@ -58,7 +60,8 @@ class SrvNode(SrvDir):
                 req.write('<ul>')
                 for d in self.info():
                     req.write('<li> %10s: %s' % (d[0], str(d[1])))
-                req.write('<li><a href="' + url + 'dmesg">Xen dmesg output</a>')
+                req.write('<li><a href="%sdmesg">Xen dmesg output</a>' % url)
+                req.write('<li><a href="%slog>Xend log</a>' % url)
                 req.write('</ul>')
                 req.write('</body></html>')
             return ''

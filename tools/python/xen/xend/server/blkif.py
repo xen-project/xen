@@ -160,13 +160,15 @@ class BlkifControllerFactory(controller.ControllerFactory):
         else:
             pass
     
-    def respond_be_vbd_create(self, msg, d):
+    def respond_be_vbd_create(self, msg, dev, d):
         """Response handler for a be_vbd_create message.
         Tries to grow the vbd, and passes the deferred I{d} on for
         the grow to call.
 
         @param msg: message
         @type  msg: xu message
+        @param dev: device
+        @type  dev: BlkDev
         @param d: deferred to call
         @type  d: Deferred
         """
@@ -174,17 +176,19 @@ class BlkifControllerFactory(controller.ControllerFactory):
         blkif = self.getInstanceByDom(val['domid'])
         if blkif:
             d1 = defer.Deferred()
-            d1.addCallback(self.respond_be_vbd_grow, d)
+            d1.addCallback(self.respond_be_vbd_grow, dev, d)
             if d: d1.addErrback(d.errback)
             blkif.send_be_vbd_grow(val['vdevice'], response=d1)
         else:
             pass
     
-    def respond_be_vbd_grow(self, msg, d):
+    def respond_be_vbd_grow(self, msg, dev, d):
         """Response handler for a be_vbd_grow message.
 
         @param msg: message
         @type  msg: xu message
+        @param dev: device
+        @type  dev: BlkDev
         @param d: deferred to call
         @type  d: Deferred or None
         """
@@ -192,7 +196,7 @@ class BlkifControllerFactory(controller.ControllerFactory):
         # Check status?
         if self.attached:
             if d:
-                d.callback(0)
+                d.callback(dev)
         else:
             self.reattachDevice(val['domid'], val['vdevice'])
 
@@ -215,7 +219,9 @@ class BlkDev(controller.Dev):
     """
 
     def __init__(self, ctrl, vdev, mode, segment):
-        controller.Dev.__init__(self, ctrl)
+        controller.Dev.__init__(self,  segment['device'], ctrl)
+        self.dev = None
+        self.uname = None
         self.vdev = vdev
         self.mode = mode
         self.device = segment['device']
@@ -227,7 +233,15 @@ class BlkDev(controller.Dev):
         return 'w' not in self.mode
 
     def sxpr(self):
-        val = ['blkdev', ['vdev', self.vdev], ['mode', self.mode] ]
+        val = ['blkdev',
+               ['idx', self.idx],
+               ['vdev', self.vdev],
+               ['device', self.device],
+               ['mode', self.mode]]
+        if self.dev:
+            val.append(['dev', self.dev])
+        if self.uname:
+            val.append(['uname', self.uname])
         return val
 
     def destroy(self):
@@ -288,6 +302,7 @@ class BlkifController(controller.Controller):
 
     def attachDevice(self, vdev, mode, segment, recreate=0):
         """Attach a device to the specified interface.
+        On success the returned deferred will be called with the device.
 
         @param vdev:     device index
         @type  vdev:     int
@@ -304,10 +319,10 @@ class BlkifController(controller.Controller):
         if not dev: return -1
         d = defer.Deferred()
         if recreate:
-            d.callback(self)
+            d.callback(dev)
         else:
             d1 = defer.Deferred()
-            d1.addCallback(self.factory.respond_be_vbd_create, d)
+            d1.addCallback(self.factory.respond_be_vbd_create, dev, d)
             d1.addErrback(d.errback)
             self.send_be_vbd_create(vdev, response=d1)
         return d
@@ -331,7 +346,7 @@ class BlkifController(controller.Controller):
         for dev in self.devices.values():
             dev.attached = 0
             d1 = defer.Deferred()
-            d1.addCallback(self.factory.respond_be_vbd_create, None)
+            d1.addCallback(self.factory.respond_be_vbd_create, None, None)
             self.send_be_vbd_create(vdev, response=d1)
 
     def reattachDevice(self, vdev):

@@ -112,7 +112,7 @@ class NetDev(controller.Dev):
     """
 
     def __init__(self, ctrl, vif, config):
-        controller.Dev.__init__(self, ctrl)
+        controller.Dev.__init__(self, vif, ctrl)
         self.vif = vif
         self.evtchn = None
         self.configure(config)
@@ -122,7 +122,7 @@ class NetDev(controller.Dev):
         self.mac = None
         self.bridge = None
         self.script = None
-        self.ipaddr = None
+        self.ipaddr = []
         
         vmac = sxp.child_value(config, 'mac')
         if not vmac: raise XendError("invalid mac")
@@ -140,7 +140,10 @@ class NetDev(controller.Dev):
     def sxpr(self):
         vif = str(self.vif)
         mac = self.get_mac()
-        val = ['vif', ['idx', vif], ['mac', mac]]
+        val = ['vif',
+               ['idx', self.idx],
+               ['vif', vif],
+               ['mac', mac]]
         if self.bridge:
             val.append(['bridge', self.bridge])
         if self.script:
@@ -161,7 +164,7 @@ class NetDev(controller.Dev):
     def get_mac(self):
         """Get the MAC address as a string.
         """
-        return ':'.join(map(lambda x: "%x" % x, self.mac))
+        return ':'.join(map(lambda x: "%02x" % x, self.mac))
 
     def vifctl_params(self, vmname=None):
         dom = self.controller.dom
