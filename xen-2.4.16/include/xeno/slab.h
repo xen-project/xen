@@ -59,6 +59,9 @@ extern void *kmalloc(size_t, int);
 extern void kfree(const void *);
 
 extern int FASTCALL(kmem_cache_reap(int));
+
+extern void dump_slabinfo();
+
 #if 0
 extern int slabinfo_read_proc(char *page, char **start, off_t off,
 				 int count, int *eof, void *data);
