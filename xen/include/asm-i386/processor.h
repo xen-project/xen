@@ -356,7 +356,6 @@ struct thread_struct {
     int                 fast_trap_idx;
     struct desc_struct  fast_trap_desc;
     trap_info_t         traps[256];
-    int                 hypercall_pl;
 };
 
 #define IDT_ENTRIES 256

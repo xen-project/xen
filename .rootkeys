@@ -105,17 +105,6 @@
 3ec41f7ek1RffqN2yRUzSTkD5m1J6w tools/control/web/tmpl/xenohead.def
 3ec41f7e1ZpfCsgQ2qRJBooBn_iRtA tools/control/web/tmpl/xenostyle.css
 3eb781fc6vgq5yhkJRGDLY9gWWRY2A tools/control/xenctl
-3e4d00468-FN2VDeEHo96zxrMHK_mA tools/domain_builder/Makefile
-3e4d0046SPau_y0sw2WLJz8QkqNoRA tools/domain_builder/README
-3e4d0046bbdH0GsI9J_1Eb4ZQHfIiQ tools/domain_builder/dom0_defs.h
-3ee609abdxnu1GvbtXnPlMfEkTEIwQ tools/domain_builder/dom0_ops.h
-3e4d0046ouLij_CMN_j7-dUHZIBI_A tools/domain_builder/dom_builder.c
-3e4d0046EKs06fY0CWDEgZQcn7DYUg tools/domain_builder/dom_kill.c
-3e4d0046aPbGiRTtdWxqY5b3ytWurA tools/domain_builder/hypervisor_defs.h
-3e4d00468aE86IfyjfrJwYoxzM7pAw tools/domain_builder/mem_defs.h
-3e71afadoAI0VvAGKebLpToVQxUKfQ tools/domain_builder/mynewdom
-3e4d0046VHhXwFuG5FK34AVxqd5A_A tools/domain_builder/newdom
-3e4d0046IBzDIeaMbQB-e2QB2ahbig tools/domain_builder/vifinit
 3eb781fdl4lXWYZzmqDDUAYhAThRqQ tools/internal/Makefile
 3eb781fdc539MQQm47rYRCCR3N5i-Q tools/internal/dom0_defs.h
 3ee609b3Yr4aggmLSKmhiIzT8-nURA tools/internal/dom0_ops.h

@@ -18,9 +18,8 @@
 #endif
 
 /* Extra commands dealt with by Xenolinux. */
-#define MAP_DOM_MEM        14
-#define DO_PGUPDATES       15
-#define MAX_CMD            16
+#define MAP_DOM_MEM        1014
+#define DO_PGUPDATES       1015
 
 typedef struct dom_mem 
 {
@@ -50,8 +49,8 @@ typedef struct dom0_op_st
         dom_pgupdate_t pgupdate;
         dom_meminfo_t meminfo;
         dom0_getdominfo_t getdominfo;
-   }
-    u;
+        dom0_iopl_t iopl;
+   } u;
 } dom0_op_t;
 
 #endif /* __DOM0_DOM0_OPS_H__ */

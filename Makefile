@@ -21,7 +21,6 @@ all:
 	$(MAKE) -C xen
 	$(MAKE) -C tools/balloon
 	$(MAKE) -C tools/control
-	$(MAKE) -C tools/domain_builder
 	$(MAKE) -C tools/internal
 	$(MAKE) -C tools/vdmanager
 
@@ -29,7 +28,6 @@ install: all
 	$(MAKE) -C xen install
 	$(MAKE) -C tools/balloon install
 	$(MAKE) -C tools/control install
-	$(MAKE) -C tools/domain_builder install
 	$(MAKE) -C tools/internal install
 	$(MAKE) -C tools/vdmanager install
 
@@ -38,7 +36,6 @@ clean:
 	$(MAKE) -C xen clean
 	$(MAKE) -C tools/balloon clean
 	$(MAKE) -C tools/control clean
-	$(MAKE) -C tools/domain_builder clean
 	$(MAKE) -C tools/internal clean
 	$(MAKE) -C tools/vdmanager clean
 

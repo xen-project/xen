@@ -19,9 +19,10 @@
 #define DOM0_STOPDOMAIN    11
 #define DOM0_GETDOMAININFO 12
 #define DOM0_BUILDDOMAIN   13
+#define DOM0_IOPL          14
 
-#define MAX_CMD_LEN    256
-#define MAX_DOMAIN_NAME 16
+#define MAX_CMD_LEN       256
+#define MAX_DOMAIN_NAME    16
 
 typedef struct dom0_newdomain_st 
 {
@@ -60,31 +61,37 @@ typedef struct domain_launch
 
 typedef struct dom0_bvtctl_st
 {
-	unsigned long ctx_allow;	/* context switch allowance */
+    unsigned long ctx_allow;	/* context switch allowance */
 } dom0_bvtctl_t;
 
 typedef struct dom0_adjustdom_st
 {
     unsigned int  domain;	/* domain id */
-	unsigned long mcu_adv;	/* mcu advance: inverse of weight */
-	unsigned long warp;     /* time warp */
-	unsigned long warpl;    /* warp limit */
-	unsigned long warpu;    /* unwarp time requirement */
+    unsigned long mcu_adv;	/* mcu advance: inverse of weight */
+    unsigned long warp;     /* time warp */
+    unsigned long warpl;    /* warp limit */
+    unsigned long warpu;    /* unwarp time requirement */
 } dom0_adjustdom_t;
 
 typedef struct dom0_getdominfo_st
 {
-  unsigned int domain;          /* All returns except domain */
-  char name[MAX_DOMAIN_NAME];
-  int processor;
-  int has_cpu;
-  int state;
-  int hyp_events;
-  unsigned long mcu_advance;
-  unsigned long pg_head;
-  unsigned int tot_pages;
-  long long cpu_time;
+    unsigned int domain;          /* All returns except domain */
+    char name[MAX_DOMAIN_NAME];
+    int processor;
+    int has_cpu;
+    int state;
+    int hyp_events;
+    unsigned long mcu_advance;
+    unsigned long pg_head;
+    unsigned int tot_pages;
+    long long cpu_time;
 } dom0_getdominfo_t;
+
+typedef struct dom0_iopl_st
+{
+    unsigned int domain;
+    unsigned int iopl;
+} dom0_iopl_t;
 
 #ifndef NO_DOM0_OP_T
 typedef struct dom0_op_st
@@ -95,11 +102,12 @@ typedef struct dom0_op_st
         dom0_newdomain_t newdomain;
         dom0_killdomain_t killdomain;
         dom0_getmemlist_t getmemlist;
-		dom0_bvtctl_t bvtctl;
-		dom0_adjustdom_t adjustdom;
+        dom0_bvtctl_t bvtctl;
+        dom0_adjustdom_t adjustdom;
         dom_meminfo_t meminfo;
         dom0_getdominfo_t getdominfo;
-   }
+        dom0_iopl_t iopl;
+    }
     u;
 } dom0_op_t;
 #endif

@@ -32,9 +32,6 @@
 
 #include "dom0_ops.h"
 
-#define TRUE  1
-#define FALSE 0
-
 /* Private proc-file data structures. */
 typedef struct proc_data {
     unsigned int domain;
@@ -46,18 +43,7 @@ typedef struct proc_mem_data {
     int tot_pages;
 } proc_memdata_t;
 
-#define XENO_BASE       "xeno"
-#define DOM0_CMD_INTF   "dom0_cmd"
-#define DOM0_NEWDOM     "new_dom_data"
-#define DOM_LIST_INTF   "domains"
-
-#define MAX_LEN         16
-#define DOM_DIR         "dom"
-#define DOM_MEM         "mem"
-#define DOM_VIF         "vif"
-#define DOM_USAGE       "usage"
 #define DOM_PHD         "phd"
-
 #define MAP_DISCONT     1
 
 extern struct file_operations dom0_phd_fops;
@@ -73,7 +59,7 @@ int direct_disc_unmap(unsigned long, unsigned long, int);
 static unsigned char readbuf[1204];
 
 static int cmd_read_proc(char *page, char **start, off_t off,
-                          int count, int *eof, void *data)
+                         int count, int *eof, void *data)
 {
     strcpy(page, readbuf);
     *readbuf = '\0';
@@ -81,50 +67,6 @@ static int cmd_read_proc(char *page, char **start, off_t off,
     *start = page;
     return strlen(page);
 }
-
-static ssize_t dom_vif_read(struct file * file, char * buff, size_t size, loff_t * off)
-{
-    int hyp_buf[32];
-    char buf[128];
-    network_op_t op;
-    static int finished = 0;
-
-    if ( finished ) 
-    {
-        finished = 0;
-        return 0;
-    }
-    
-    op.cmd = NETWORK_OP_VIFQUERY;
-    op.u.vif_query.domain = (unsigned int)
-        ((struct proc_dir_entry *)file->f_dentry->d_inode->u.generic_ip)->data;
-    op.u.vif_query.buf = hyp_buf;
-
-    (void) HYPERVISOR_network_op(&op);
-
-    if(hyp_buf[0] < 0) {
-        strcpy(buf, "Error getting domain's vif list from hypervisor.\n");
-    } else {
-        int i;
-        int len = 0;
-        strcpy(buf, "No vif found");
-
-        for(i = 1; i <= hyp_buf[0] && len < 127; i++)
-            len += snprintf(buf + len, 127 - len, "%d\n", hyp_buf[i]);
-    }
-
-    if (*off >= (strlen(buf)+1)) return 0;
-    
-    copy_to_user(buff, buf, strlen(buf));
-    
-    finished = 1;
-    
-    return strlen(buf)+1;
-}
-
-struct file_operations dom_vif_ops = {
-    read:    dom_vif_read
-};
 
 static ssize_t dom_usage_read(struct file * file, char * buff, size_t size, loff_t * off)
 {
@@ -166,13 +108,13 @@ static ssize_t dom_usage_read(struct file * file, char * buff, size_t size, loff
         (void) HYPERVISOR_network_op(&netop);
 
         end += snprintf(str + end, 255 - end,
-                "vif%d: sent %lld bytes (%lld packets) "
-                "received %lld bytes (%lld packets)\n",
-                vifs[i],
-                netop.u.vif_getinfo.total_bytes_sent,
-                netop.u.vif_getinfo.total_packets_sent,
-                netop.u.vif_getinfo.total_bytes_received,
-                netop.u.vif_getinfo.total_packets_received);
+                        "vif%d: sent %lld bytes (%lld packets) "
+                        "received %lld bytes (%lld packets)\n",
+                        vifs[i],
+                        netop.u.vif_getinfo.total_bytes_sent,
+                        netop.u.vif_getinfo.total_packets_sent,
+                        netop.u.vif_getinfo.total_bytes_received,
+                        netop.u.vif_getinfo.total_packets_received);
     }
 
     if (*off >= end + 1) return 0;
@@ -193,10 +135,10 @@ static void create_proc_dom_entries(int dom)
 {
     struct proc_dir_entry * dir;
     dom_procdata_t * dom_data;
-    char dir_name[MAX_LEN];
+    char dir_name[16];
     struct proc_dir_entry * file;
 
-    snprintf(dir_name, MAX_LEN, "%s%d", DOM_DIR, dom);
+    sprintf(dir_name, "dom%d", dom);
 
     dom_data = (dom_procdata_t *)kmalloc(sizeof(dom_procdata_t), GFP_KERNEL);
     dom_data->domain = dom;
@@ -204,16 +146,7 @@ static void create_proc_dom_entries(int dom)
     dir = proc_mkdir(dir_name, xeno_base);
     dir->data = dom_data;
     
-    file = create_proc_entry(DOM_VIF, 0600, dir);
-    if (file != NULL)
-    {
-        file->owner         = THIS_MODULE;
-        file->nlink         = 1;
-        file->proc_fops     = &dom_vif_ops;
-        file->data          = (void *) dom;
-    }
-
-    file = create_proc_entry(DOM_USAGE, 0600, dir);
+    file = create_proc_entry("usage", 0600, dir);
     if (file != NULL)
     {
         file->owner         = THIS_MODULE;
@@ -233,14 +166,14 @@ static void create_proc_dom_entries(int dom)
 }
 
 static ssize_t dom_mem_write(struct file * file, const char * buff, 
-	size_t size , loff_t * off)
+                             size_t size , loff_t * off)
 {
     dom_mem_t mem_data;
     
     copy_from_user(&mem_data, (dom_mem_t *)buff, sizeof(dom_mem_t));
     
     if(direct_disc_unmap(mem_data.vaddr, mem_data.start_pfn, 
-        mem_data.tot_pages) == 0){
+                         mem_data.tot_pages) == 0){
         return sizeof(sizeof(dom_mem_t));
     } else {
         return -1;
@@ -284,12 +217,12 @@ static int dom_map_mem(unsigned int dom, unsigned long pfn, int tot_pages)
             /* check if there is already an entry for mem and if so
              * remove it.
              */
-            remove_proc_entry(DOM_MEM, pd);
+            remove_proc_entry("mem", pd);
 
             /* create new entry with parameters describing what to do
              * when it is mmaped.
              */
-            file = create_proc_entry(DOM_MEM, 0600, pd);
+            file = create_proc_entry("mem", 0600, pd);
             if(file != NULL)
             {
                 file->owner = THIS_MODULE;
@@ -322,7 +255,7 @@ static ssize_t dom_data_read(struct file * file, char * buff, size_t size, loff_
 
     copy_to_user((dom0_newdomain_t *)buff, dom_data, sizeof(dom0_newdomain_t));
 
-    remove_proc_entry(DOM0_NEWDOM, xeno_base);
+    remove_proc_entry("new_dom_data", xeno_base);
 
     kfree(dom_data);
 
@@ -334,7 +267,7 @@ struct file_operations newdom_data_fops = {
 };
 
 static int cmd_write_proc(struct file *file, const char *buffer, 
-                           u_long count, void *data)
+                          u_long count, void *data)
 {
     dom0_op_t op;
     int ret = 0;
@@ -343,16 +276,10 @@ static int cmd_write_proc(struct file *file, const char *buffer,
     
     copy_from_user(&op, buffer, sizeof(dom0_op_t));
 
-    /* do some sanity checks */
-    if(op.cmd > MAX_CMD){
-        ret = -ENOSYS;
-        goto out;
-    }
-
     if ( op.cmd == MAP_DOM_MEM )
     {
         ret = dom_map_mem(op.u.dommem.domain, op.u.dommem.start_pfn, 
-                        op.u.dommem.tot_pages); 
+                          op.u.dommem.tot_pages); 
     }
     else if ( op.cmd == DO_PGUPDATES )
     {
@@ -368,14 +295,14 @@ static int cmd_write_proc(struct file *file, const char *buffer,
             create_proc_dom_entries(ret);
 
             params = (dom0_newdomain_t *)kmalloc(sizeof(dom0_newdomain_t),
-                GFP_KERNEL);
+                                                 GFP_KERNEL);
             params->memory_kb = op.u.newdomain.memory_kb;
             params->pg_head = op.u.newdomain.pg_head;
             params->num_vifs = op.u.newdomain.num_vifs;
             params->domain = op.u.newdomain.domain;
 
             /* now notify user space of the new domain's id */
-            new_dom_id = create_proc_entry(DOM0_NEWDOM, 0600, xeno_base);
+            new_dom_id = create_proc_entry("new_dom_data", 0600, xeno_base);
             if ( new_dom_id != NULL )
             {
                 new_dom_id->owner      = THIS_MODULE;
@@ -383,14 +310,11 @@ static int cmd_write_proc(struct file *file, const char *buffer,
                 new_dom_id->proc_fops  = &newdom_data_fops; 
                 new_dom_id->data       = (void *)params; 
             }
-
         }
-
     }
     
-out:
-    return ret;
-    
+ out:
+    return ret;   
 }
 
 /***********************************************************************
@@ -404,83 +328,87 @@ static rwlock_t proc_xeno_domains_lock = RW_LOCK_UNLOCKED;
 
 static void *xeno_domains_next(struct seq_file *s, void *v, loff_t *pos)
 {
-  int ret;
+    int ret;
 
-  if (pos != NULL) { ++ (*pos); }
-  if (!proc_domains_finished) {
-    proc_domains_op.u.getdominfo.domain ++;
-    ret = HYPERVISOR_dom0_op(&proc_domains_op);
-    if (ret < 0) proc_domains_finished = TRUE;
-  }
+    if ( pos != NULL )
+        ++(*pos); 
+
+    if ( !proc_domains_finished ) 
+    {
+        proc_domains_op.u.getdominfo.domain++;
+        ret = HYPERVISOR_dom0_op(&proc_domains_op);
+        if ( ret < 0 ) 
+            proc_domains_finished = 1;
+    }
   
-  return (proc_domains_finished) ? NULL : &proc_domains_op;
+    return (proc_domains_finished) ? NULL : &proc_domains_op;
 }
 
 static void *xeno_domains_start(struct seq_file *s, loff_t *ppos)
 { 
-  loff_t pos = *ppos;
+    loff_t pos = *ppos;
   
-  write_lock (&proc_xeno_domains_lock);
-  proc_domains_op.cmd = DOM0_GETDOMAININFO;
-  proc_domains_op.u.getdominfo.domain = 0;
-  (void)HYPERVISOR_dom0_op(&proc_domains_op);
-  proc_domains_finished = FALSE;
+    write_lock (&proc_xeno_domains_lock);
+    proc_domains_op.cmd = DOM0_GETDOMAININFO;
+    proc_domains_op.u.getdominfo.domain = 0;
+    (void)HYPERVISOR_dom0_op(&proc_domains_op);
+    proc_domains_finished = 0;
   
-  while (pos > 0) {
-    pos --;
-    xeno_domains_next (s, NULL, NULL);
-  }
+    while (pos > 0) {
+        pos --;
+        xeno_domains_next (s, NULL, NULL);
+    }
   
-  return (proc_domains_finished) ? NULL : &proc_domains_op;
+    return (proc_domains_finished) ? NULL : &proc_domains_op;
 }
 
 static void xeno_domains_stop(struct seq_file *s, void *v)
 { 
-  write_unlock (&proc_xeno_domains_lock);
+    write_unlock (&proc_xeno_domains_lock);
 }
 
 static int xeno_domains_show(struct seq_file *s, void *v)
 { 
-  dom0_op_t *di = v;
+    dom0_op_t *di = v;
   
-  /*
-   * Output one domain's details to dom0.
-   *
-   * If you update this format string then change xi_list to match.
-   */
+    /*
+     * Output one domain's details to dom0.
+     *
+     * If you update this format string then change xi_list to match.
+     */
 
-  seq_printf (s, 
-              "%8d %2d %1d %2d %8d %8ld %p %8d %s\n",
-              di -> u.getdominfo.domain, 
-              di -> u.getdominfo.processor,
-              di -> u.getdominfo.has_cpu,
-              di -> u.getdominfo.state,
-              di -> u.getdominfo.hyp_events,
-              di -> u.getdominfo.mcu_advance,
-              (void *)di -> u.getdominfo.pg_head,
-              di -> u.getdominfo.tot_pages,
-              di -> u.getdominfo.name);
+    seq_printf (s, 
+                "%8d %2d %1d %2d %8d %8ld %p %8d %s\n",
+                di -> u.getdominfo.domain, 
+                di -> u.getdominfo.processor,
+                di -> u.getdominfo.has_cpu,
+                di -> u.getdominfo.state,
+                di -> u.getdominfo.hyp_events,
+                di -> u.getdominfo.mcu_advance,
+                di -> u.getdominfo.pg_head,
+                di -> u.getdominfo.tot_pages,
+                di -> u.getdominfo.name);
+    return 0;
 
-  return 0;
 }
 
 struct seq_operations xeno_domains_op = {
-        .start          = xeno_domains_start,
-        .next           = xeno_domains_next,
-        .stop           = xeno_domains_stop,
-        .show           = xeno_domains_show,
+    .start          = xeno_domains_start,
+    .next           = xeno_domains_next,
+    .stop           = xeno_domains_stop,
+    .show           = xeno_domains_show,
 };
 
 static int xeno_domains_open(struct inode *inode, struct file *file)
 {
-        return seq_open(file, &xeno_domains_op);
+    return seq_open(file, &xeno_domains_op);
 }
 
 static struct file_operations proc_xeno_domains_operations = {
-        open:           xeno_domains_open,
-        read:           seq_read,
-        llseek:         seq_lseek,
-        release:        seq_release,
+    open:           xeno_domains_open,
+    read:           seq_read,
+    llseek:         seq_lseek,
+    release:        seq_release,
 };
 
 /***********************************************************************/
@@ -490,11 +418,11 @@ static struct file_operations proc_xeno_domains_operations = {
 static int __init init_module(void)
 {
     /* xeno proc root setup */
-    xeno_base = proc_mkdir(XENO_BASE, &proc_root); 
+    xeno_base = proc_mkdir("xeno", &proc_root); 
 
     /* xeno control interface */
     *readbuf = '\0';
-    dom0_cmd_intf = create_proc_entry (DOM0_CMD_INTF, 0600, xeno_base);
+    dom0_cmd_intf = create_proc_entry("dom0_cmd", 0600, xeno_base);
     if ( dom0_cmd_intf != NULL )
     {
         dom0_cmd_intf->owner      = THIS_MODULE;
@@ -504,13 +432,13 @@ static int __init init_module(void)
     }
 
     /* domain list interface */
-    dom_list_intf = create_proc_entry (DOM_LIST_INTF, 0400, xeno_base);
+    dom_list_intf = create_proc_entry("domains", 0400, xeno_base);
     if ( dom_list_intf != NULL )
-      {
-        dom_list_intf -> owner = THIS_MODULE;
-        dom_list_intf -> nlink = 1;
-        dom_list_intf -> proc_fops = &proc_xeno_domains_operations;
-      }
+    {
+        dom_list_intf->owner = THIS_MODULE;
+        dom_list_intf->nlink = 1;
+        dom_list_intf->proc_fops = &proc_xeno_domains_operations;
+    }
 
     /* set up /proc entries for dom 0 */
     create_proc_dom_entries(0);

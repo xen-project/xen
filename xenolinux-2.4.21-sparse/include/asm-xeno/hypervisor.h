@@ -364,16 +364,4 @@ static inline long HYPERVISOR_kbd_op(unsigned char op, unsigned char val)
     return ret;
 }
 
-static inline long HYPERVISOR_set_priv_levels(unsigned int new_io_pl,
-                                              unsigned int new_hypercall_pl)
-{
-    int ret;
-    __asm__ __volatile__ (
-        TRAP_INSTR
-        : "=a" (ret) : "0" (__HYPERVISOR_set_priv_levels),
-        "b" (new_io_pl), "c" (new_hypercall_pl) );
-
-    return ret;
-}
-
 #endif /* __HYPERVISOR_H__ */
