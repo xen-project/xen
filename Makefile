@@ -54,10 +54,14 @@ linux_%_config:
 
 # build and install to a specified install name
 linux_%: 
+	$(MAKE) -C linux-$(LINUX_VER)-xen ARCH=xen modules
+	$(MAKE) -C linux-$(LINUX_VER)-xen ARCH=xen INSTALL_NAME=$(subst linux_,$(LINUX_VER)-,$(@)) INSTALL_MOD_PATH=$(INSTALL_DIR) modules_install
 	$(MAKE) -C linux-$(LINUX_VER)-xen ARCH=xen INSTALL_NAME=$(subst linux_,$(LINUX_VER)-,$(@)) INSTALL_PATH=$(INSTALL_DIR) install
 
 # shorthand with no siffix
 linux:	
+	$(MAKE) -C linux-$(LINUX_VER)-xen ARCH=xen modules
+	$(MAKE) -C linux-$(LINUX_VER)-xen ARCH=xen INSTALL_NAME=$(subst linux_,$(LINUX_VER)-,$(@)) INSTALL_MOD_PATH=$(INSTALL_DIR) modules_install
 	$(MAKE) -C linux-$(LINUX_VER)-xen ARCH=xen INSTALL_PATH=$(INSTALL_DIR) install	
 
 # build xen, the tools, and a domain 0 plus unprivileged linux-xen images,
