@@ -1503,7 +1503,7 @@ int do_update_va_mapping(unsigned long page_nr,
     {
         unsigned long sval;
 
-        l1pte_no_fault(&d->mm, &val, &sval);
+        l1pte_propagate_from_guest(&d->mm, &val, &sval);
 
         if ( unlikely(__put_user(sval, ((unsigned long *)(
             &shadow_linear_pg_table[page_nr])))) )
@@ -1521,9 +1521,9 @@ int do_update_va_mapping(unsigned long page_nr,
          * for this.
          */
         if ( d->mm.shadow_mode == SHM_logdirty )
-            mark_dirty( &current->mm, va_to_l1mfn(page_nr<<PAGE_SHIFT) );  
+            mark_dirty(&current->mm, va_to_l1mfn(page_nr << PAGE_SHIFT));  
   
-        check_pagetable(d, d->mm.pagetable, "va"); /* debug */
+        check_pagetable(&d->mm, d->mm.pagetable, "va"); /* debug */
     }
 
     deferred_ops = percpu_info[cpu].deferred_ops;
@@ -1613,7 +1613,7 @@ void ptwr_flush(const int which)
     if ( unlikely(d->mm.shadow_mode) )
     {
         /* Write-protect the p.t. page in the shadow page table. */
-        l1pte_no_fault(&d->mm, &pte, &spte);
+        l1pte_propagate_from_guest(&d->mm, &pte, &spte);
         __put_user(
             spte, (unsigned long *)&shadow_linear_pg_table[l1va>>PAGE_SHIFT]);
 
@@ -1657,7 +1657,7 @@ void ptwr_flush(const int which)
             if ( likely(l1_pgentry_val(nl1e) & _PAGE_PRESENT) )
             {
                 if ( unlikely(sl1e != NULL) )
-                    l1pte_no_fault(
+                    l1pte_propagate_from_guest(
                         &d->mm, &l1_pgentry_val(nl1e), 
                         &l1_pgentry_val(sl1e[i]));
                 put_page_type(&frame_table[l1_pgentry_to_pagenr(nl1e)]);
@@ -1672,7 +1672,7 @@ void ptwr_flush(const int which)
         }
         
         if ( unlikely(sl1e != NULL) )
-            l1pte_no_fault(
+            l1pte_propagate_from_guest(
                 &d->mm, &l1_pgentry_val(nl1e), &l1_pgentry_val(sl1e[i]));
 
         if ( unlikely(l1_pgentry_val(ol1e) & _PAGE_PRESENT) )

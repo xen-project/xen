@@ -19,7 +19,7 @@
  * This makes sure that old versions of dom0 tools will stop working in a
  * well-defined way (rather than crashing the machine, for instance).
  */
-#define DOM0_INTERFACE_VERSION   0xAAAA0015
+#define DOM0_INTERFACE_VERSION   0xAAAA0016
 
 #define MAX_DOMAIN_NAME    16
 
@@ -275,7 +275,6 @@ typedef struct {
 #define DOM0_SHADOW_CONTROL_OP_FLUSH       10     /* table ops */
 #define DOM0_SHADOW_CONTROL_OP_CLEAN       11
 #define DOM0_SHADOW_CONTROL_OP_PEEK        12
-#define DOM0_SHADOW_CONTROL_OP_CLEAN2      13
 
 typedef struct dom0_shadow_control
 {

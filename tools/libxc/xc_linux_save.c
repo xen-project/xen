@@ -210,7 +210,7 @@ static int analysis_phase( int xc_handle, u32 domid,
         int i;
 
         xc_shadow_control( xc_handle, domid, 
-                           DOM0_SHADOW_CONTROL_OP_CLEAN2,
+                           DOM0_SHADOW_CONTROL_OP_CLEAN,
                            arr, nr_pfns, NULL);
         printf("#Flush\n");
         for ( i = 0; i < 100; i++ )
@@ -829,7 +829,7 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
             } 
 
             if ( xc_shadow_control( xc_handle, domid, 
-                                    DOM0_SHADOW_CONTROL_OP_CLEAN2,
+                                    DOM0_SHADOW_CONTROL_OP_CLEAN,
                                     to_send, nr_pfns, &stats ) != nr_pfns ) 
             {
                 xcio_error(ioctxt, "Error flushing shadow PT");
