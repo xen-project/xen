@@ -75,14 +75,14 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         /* if we are not booting dom 0 than only mem 
          * needs to be allocated
          */
-        //if(dom != 0){
-        //    if(alloc_new_dom_mem(p, op.u.newdomain.memory_kb) != 0){
-        //        ret = -1;
-        //        break;
-        //    }
-        //    ret = p->domain;
-        //    break;
-        //}
+        if(dom != 0){
+            if(alloc_new_dom_mem(p, op.u.newdomain.memory_kb) != 0){
+                ret = -1;
+                break;
+            }
+            ret = p->domain;
+            break;
+        }
 
         /* executed only in case of domain 0 */
         ret = setup_guestos(p, &op.u.newdomain);    /* Load guest OS into @p */
