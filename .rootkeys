@@ -239,6 +239,7 @@
 40c9c468icGyC5RAF1bRKsCXPDCvsA tools/xen/Makefile
 40dc4076hGpwa8-sWRN0jtXZeQJuKg tools/xen/lib/__init__.py
 40dfd40aMOhnw_cQLve9462UR5yYxQ tools/xen/lib/ext/__init__.py
+40d8915cyoVA0hJxiBFNymL7YvDaRg tools/xen/lib/util/Brctl.py
 40dfd40aGqGkiopOOgJxSF4iCbHM0Q tools/xen/lib/util/__init__.py
 4055ee4dwy4l0MghZosxoiu6zmhc9Q tools/xen/lib/util/console_client.py
 40c9c468IienauFHQ_xJIcqnPJ8giQ tools/xen/lib/util/ip.py
@@ -247,7 +248,7 @@
 40c9c468Um_qc66OQeLEceIz1pgD5g tools/xen/lib/xend/EventServer.py
 40c9c468U8EVl0d3G--8YXVg6VJD3g tools/xen/lib/xend/EventTypes.py
 40c9c468QJTEuk9g4qHxGpmIi70PEQ tools/xen/lib/xend/PrettyPrint.py
-40d8915cyoVA0hJxiBFNymL7YvDaRg tools/xen/lib/xend/XendBridge.py
+40e15b7eeQxWE_hUPB2YTgM9fsZ1PQ tools/xen/lib/xend/Vifctl.py
 40c9c4688m3eqnC8fhLu1APm36VOVA tools/xen/lib/xend/XendClient.py
 40c9c468t6iIKTjwuYoe-UMCikDcOQ tools/xen/lib/xend/XendConsole.py
 40c9c468WnXs6eOUSff23IIGI4kMfQ tools/xen/lib/xend/XendDB.py
@@ -291,6 +292,7 @@
 40cf2937Z8WCNOnO2FcWdubvEAF9QQ tools/xen/lib/xm/shutdown.py
 40c9c469kT0H9COWzA4XzPBjWK0WsA tools/xen/netfix
 40c9c469n2RRwCmjWdjdyyVRWKmgWg tools/xen/setup.py
+40e15b7edWEtBf_oe3eBwGKuh1dyzQ tools/xen/vifctl
 40c9c4697z76HDfkCLdMhmaEwzFoNQ tools/xen/xend
 40cf2937dqM1jWW87O5OoOYND8leuA tools/xen/xm
 40431ac64Hj4ixUnKmlugZKhXPFE_Q tools/xend-old/Makefile

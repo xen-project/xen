@@ -5,17 +5,11 @@ import os.path
 import re
 import sys
 
-from xen.xend import XendRoot
-xroot = XendRoot.instance()
-
 os.defpath = os.defpath + ':/sbin:/usr/sbin:/usr/local/sbin'
 CMD_IFCONFIG = 'ifconfig'
 CMD_ROUTE    = 'route'
 CMD_BRCTL    = 'brctl'
 CMD_IPTABLES = "iptables"
-
-DEFAULT_BRIDGE = 'nbe-br'
-DEFAULT_INTERFACE = 'eth0'
 
 opts = None
 
@@ -35,35 +29,19 @@ def cmd(p, s):
     if not opts.dryrun:
         os.system(c)
 
-def default_bridge():
-    return xroot.get_config_value('bridge', DEFAULT_BRIDGE)
-
-def default_interface():
-    return xroot.get_config_value('interface', DEFAULT_INTERFACE)
-
-def vif_dev(dom, vif):
-    """Return the name of the network interface for vif on domain dom.
-    """
-    return "vif%d.%d" % (dom, vif)
-
-def vif_bridge_add(dom, vif, bridge=None):
+def vif_bridge_add(params):
     """Add the network interface for vif on dom to a bridge.
     """
-    if not bridge: bridge = default_bridge()
-    d = { 'bridge': bridge, 'vif': vif_dev(dom, vif) }
-    cmd(CMD_BRCTL, 'addif %(bridge)s %(vif)s' % d)
+    cmd(CMD_BRCTL, 'addif %(bridge)s %(vif)s' % params)
     return bridge
 
-def vif_bridge_rem(dom, vif, bridge=None):
+def vif_bridge_rem(params):
     """Remove the network interface for vif on dom from a bridge.
     """
-    if not bridge: bridge = default_bridge()
-    print 'vif_bridge_rem>', dom, vif, bridge
-    d = { 'bridge': bridge, 'vif': vif_dev(dom, vif) }
-    cmd(CMD_BRCTL, 'delif %(bridge)s %(vif)s' % d)
+    cmd(CMD_BRCTL, 'delif %(bridge)s %(vif)s' % params)
 
-def vif_restrict_addr(dom, vif, addr, delete=0):
-    d = { 'vif': vif_dev(dom, vif), 'addr': addr}
+def vif_restrict_addr(vif, addr, delete=0):
+    d = { 'vif': vif, 'addr': addr}
     if delete:
         d['flag'] = '-D'
     else:
@@ -72,11 +50,10 @@ def vif_restrict_addr(dom, vif, addr, delete=0):
     cmd(CMD_IPTABLES, '%(flag)s FORWARD -m physdev --physdev-in %(vif)s -s %(addr)s -j ACCEPT' % d)
     cmd(CMD_IPTABLES, '%(flag)s FORWARD -m physdev --physdev-out %(vif)s -d %(addr)s -j ACCEPT' % d)
 
-def bridge_create(bridge=None, **kwd):
+def bridge_create(bridge, **kwd):
     """Create a bridge.
     Defaults hello time to 0, forward delay to 0 and stp off.
     """
-    if not bridge: bridge = default_bridge()
     cmd(CMD_BRCTL, 'addbr %s' % bridge)
     if kwd.get('hello', None) is None:
         kwd['hello'] = 0
@@ -96,10 +73,9 @@ def bridge_set(bridge, hello=None, fd=None, stp=None):
     if stp is not None:
         cmd(CMD_BRCTL, 'stp %s %s' % (bridge, stp))
 
-def bridge_del(bridge=None):
+def bridge_del(bridge):
     """Delete a bridge.
     """
-    if not bridge: bridge = default_bridge()
     cmd(CMD_BRCTL, 'delbr %s' % bridge)
 
 def routes():
@@ -137,22 +113,17 @@ def ifconfig(interface):
         break
     return info
 
-def reconfigure(interface=None, bridge=None):
+def reconfigure(interface, bridge):
     """Reconfigure an interface to be attached to a bridge, and give the bridge
     the IP address etc. from interface. Move the default route to the interface
     to the bridge.
 
-    If opts.create is true, creates the bridge.
     """
     global opts
-    if not interface: interface = default_interface()
-    if not bridge: bridge = default_bridge()
     intf_info = ifconfig(interface)
     if not intf_info:
         print 'Interface not found:', interface
         return
-    if opts.create:
-        bridge_create(bridge)
     #bridge_info = ifconfig(bridge)
     #if not bridge_info:
     #    print 'Bridge not found:', bridge
@@ -178,11 +149,8 @@ def reconfigure(interface=None, bridge=None):
     cmd(CMD_IFCONFIG, '%(interface)s 0.0.0.0' % intf_info)
 
 defaults = {
-    'interface': default_interface(),
-    'bridge'   : default_bridge(),
     'verbose'  : 1,
     'dryrun'   : 0,
-    'create'   : 0,
     }
 
 opts = Opts(defaults)
