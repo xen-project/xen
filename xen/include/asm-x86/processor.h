@@ -280,7 +280,7 @@ static inline void clear_in_cr4 (unsigned long mask)
 #define IOBMP_BYTES             8192
 #define IOBMP_BYTES_PER_SELBIT  (IOBMP_BYTES / 64)
 #define IOBMP_BITS_PER_SELBIT   (IOBMP_BYTES_PER_SELBIT * 8)
-#define IOBMP_OFFSET            offsetof(struct tss_struct,io_bitmap)
+#define IOBMP_OFFSET            offsetof(struct tss_struct, io_bitmap)
 #define IOBMP_INVALID_OFFSET    0x8000
 
 struct i387_state {
@@ -322,9 +322,9 @@ struct tss_struct {
     u16 trace;
 #endif
     u16 bitmap;
-    u8  io_bitmap[IOBMP_BYTES];
+    u8  io_bitmap[IOBMP_BYTES+1];
     /* Pads the TSS to be cacheline-aligned (total size is 0x2080). */
-    u32 __cacheline_filler[6];
+    u8 __cacheline_filler[23];
 };
 
 struct trap_bounce {

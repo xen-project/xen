@@ -23,7 +23,7 @@
 #ifdef CONFIG_X86_INTEL_USERCOPY
 extern struct movsl_mask {
 	int mask;
-} ____cacheline_aligned_in_smp movsl_mask;
+} __cacheline_aligned movsl_mask;
 #endif
 
 #define __addr_ok(addr) ((unsigned long)(addr) < HYPERVISOR_VIRT_START)

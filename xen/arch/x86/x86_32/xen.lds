@@ -65,9 +65,6 @@ SECTIONS
   . = ALIGN(4096);
   .data.page_aligned : { *(.data.idt) } :text
 
-  . = ALIGN(32);
-  .data.cacheline_aligned : { *(.data.cacheline_aligned) } :text
-
   __bss_start = .;		/* BSS */
   .bss : {
 	*(.bss)

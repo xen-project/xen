@@ -17,7 +17,7 @@
 
 irq_cpustat_t irq_stat[NR_CPUS];
 
-static softirq_handler softirq_handlers[NR_SOFTIRQS] __cacheline_aligned;
+static softirq_handler softirq_handlers[NR_SOFTIRQS];
 
 asmlinkage void do_softirq()
 {

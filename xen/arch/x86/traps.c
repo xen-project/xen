@@ -713,7 +713,11 @@ __asm__ __volatile__ ("movw %w3,0(%2)\n\t" \
 
 void set_tss_desc(unsigned int n, void *addr)
 {
-    _set_tssldt_desc(gdt_table+__TSS(n), (int)addr, 8299, 0x89);
+    _set_tssldt_desc(
+        gdt_table + __TSS(n),
+        (int)addr,
+        offsetof(struct tss_struct, __cacheline_filler) - 1,
+        0x89);
 }
 
 void __init trap_init(void)
