@@ -295,11 +295,20 @@ static int shadow_mode_table_op(
             int bytes = ((((d->max_pages - i) > chunk) ?
                           chunk : (d->max_pages - i)) + 7) / 8;
      
-            copy_to_user(
-                sc->dirty_bitmap + (i/(8*sizeof(unsigned long))),
-                m->shadow_dirty_bitmap +(i/(8*sizeof(unsigned long))),
-                bytes);
-     
+            if (copy_to_user(
+                    sc->dirty_bitmap + (i/(8*sizeof(unsigned long))),
+                    m->shadow_dirty_bitmap +(i/(8*sizeof(unsigned long))),
+                    bytes))
+            {
+                // copy_to_user can fail when copying to guest app memory.
+                // app should zero buffer after mallocing, and pin it
+                rc = -EINVAL;
+                memset(
+                    m->shadow_dirty_bitmap + (i/(8*sizeof(unsigned long))),
+                    0, (d->max_pages/8) - (i/(8*sizeof(unsigned long))));
+                break;
+            }
+
             memset(
                 m->shadow_dirty_bitmap + (i/(8*sizeof(unsigned long))),
                 0, bytes);
@@ -322,8 +331,12 @@ static int shadow_mode_table_op(
         }
  
         sc->pages = d->max_pages;
-        copy_to_user(
-            sc->dirty_bitmap, m->shadow_dirty_bitmap, (d->max_pages+7)/8);
+        if (copy_to_user(
+            sc->dirty_bitmap, m->shadow_dirty_bitmap, (d->max_pages+7)/8))
+        {
+            rc = -EINVAL;
+            break;
+        }
 
         break;
 
