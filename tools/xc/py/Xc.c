@@ -13,6 +13,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <arpa/inet.h>
 
 /* Needed for Python versions earlier than 2.3. */
 #ifndef PyMODINIT_FUNC
@@ -199,15 +200,16 @@ static PyObject *pyxc_linux_save(PyObject *self,
                                       &dom, &state_file, &progress) )
         return NULL;
 
-    if (progress) flags |= XCFLAGS_VERBOSE;
+    if ( progress )
+        flags |= XCFLAGS_VERBOSE;
 
-    if (strncmp(state_file,"tcp:", strlen("tcp:")) == 0)
+    if ( strncmp(state_file,"tcp:", strlen("tcp:")) == 0 )
     {
 #define max_namelen 64
 	char server[max_namelen];
 	char *port_s;
 	int port=777;
-	int sd = 0;
+	int sd = -1;
 	struct hostent *h;
 	struct sockaddr_in s;
 	int sockbufsize;
@@ -215,19 +217,18 @@ static PyObject *pyxc_linux_save(PyObject *self,
 	int writerfn(void *fd, const void *buf, size_t count)
 	{
 	    int tot = 0, rc;
-	    do 
-	    {
+	    do {
 		rc = write( (int) fd, ((char*)buf)+tot, count-tot );
-		if (rc<0) { perror("WRITE"); return rc; };
+		if ( rc < 0 ) { perror("WRITE"); return rc; };
 		tot += rc;
 	    }
-	    while(tot<count);
+	    while ( tot < count );
 	    return 0;
 	}
 
 	strncpy( server, state_file+strlen("tcp://"), max_namelen);
 	server[max_namelen-1]='\0';
-	if( port_s = strchr(server,':') )
+	if ( (port_s = strchr(server,':')) != NULL )
 	{
 	    *port_s = '\0';
 	    port = atoi(port_s+1);
@@ -237,36 +238,36 @@ static PyObject *pyxc_linux_save(PyObject *self,
 	
 	h = gethostbyname(server);
 	sd = socket (AF_INET,SOCK_STREAM,0);
-	if(sd<0) goto serr;
+	if ( sd < 0 )
+            goto serr;
 	s.sin_family = AF_INET;
 	bcopy ( h->h_addr, &(s.sin_addr.s_addr), h->h_length);
 	s.sin_port = htons(port);
-	if( connect(sd, (struct sockaddr *) &s, sizeof(s)) ) 
+	if ( connect(sd, (struct sockaddr *) &s, sizeof(s)) ) 
 	    goto serr;
 
 	sockbufsize=128*1024;
-	if (setsockopt(sd, SOL_SOCKET, SO_SNDBUF, &sockbufsize, sizeof sockbufsize) < 0) 
-	{
+	if ( setsockopt(sd, SOL_SOCKET, SO_SNDBUF, 
+                        &sockbufsize, sizeof sockbufsize) < 0 ) 
 	    goto serr;
-	}
 
-	if ( xc_linux_save(xc->xc_handle, dom, flags, writerfn, (void*)sd) == 0 )
+	if ( xc_linux_save(xc->xc_handle, dom, flags, 
+                           writerfn, (void*)sd) == 0 )
 	{
 	    close(sd);
 	    Py_INCREF(zero);
 	    return zero;
 	}
 
-	serr:
-
+    serr:
 	PyErr_SetFromErrno(xc_error);
-	if(sd)close(sd);
+	if ( sd >= 0 ) close(sd);
 	return NULL;
     }    
     else
     {
-	int fd;
-	gzFile gfd;
+	int fd = -1;
+	gzFile gfd = NULL;
 
 	int writerfn(void *fd, const void *buf, size_t count)
 	{
@@ -310,10 +311,11 @@ static PyObject *pyxc_linux_save(PyObject *self,
 
     err:
 	PyErr_SetFromErrno(xc_error);
-	if(gfd)gzclose(gfd);
-	if(fd)close(fd);
+	if ( gfd != NULL )
+            gzclose(gfd);
+	if ( fd >= 0 )
+            close(fd);
 	unlink(state_file);
-
 	return NULL;
     }
 
@@ -336,15 +338,16 @@ static PyObject *pyxc_linux_restore(PyObject *self,
                                       &dom, &state_file, &progress) )
         return NULL;
 
-    if (progress) flags |= XCFLAGS_VERBOSE;
+    if ( progress )
+        flags |= XCFLAGS_VERBOSE;
 
-    if (strncmp(state_file,"tcp:", strlen("tcp:")) == 0)
+    if ( strncmp(state_file,"tcp:", strlen("tcp:")) == 0 )
     {
 #define max_namelen 64
 	char server[max_namelen];
 	char *port_s;
 	int port=777;
-	int ld = 0, sd = 0;
+	int ld = -1, sd = -1;
 	struct hostent *h;
 	struct sockaddr_in s, d, p;
 	socklen_t dlen, plen;
@@ -356,20 +359,16 @@ static PyObject *pyxc_linux_restore(PyObject *self,
 	    int rc, tot = 0;
 	    do { 
 		rc = read( (int) fd, ((char*)buf)+tot, count-tot ); 
-		if (rc<0)
-		    {
-			perror("READ");
-			return rc;
-		    }
+		if ( rc < 0 ) { perror("READ"); return rc; }
 		tot += rc;
-	    } while( tot<count );
-
+	    } 
+            while ( tot < count );
 	    return 0;
 	}
 
 	strncpy( server, state_file+strlen("tcp://"), max_namelen);
 	server[max_namelen-1]='\0';
-	if( port_s = strchr(server,':') )
+	if ( (port_s = strchr(server,':')) != NULL )
 	{
 	    *port_s = '\0';
 	    port = atoi(port_s+1);
@@ -379,58 +378,55 @@ static PyObject *pyxc_linux_restore(PyObject *self,
 	
 	h = gethostbyname(server);
 	ld = socket (AF_INET,SOCK_STREAM,0);
-	if(ld<0) goto serr;
+	if ( ld < 0 ) goto serr;
 	s.sin_family = AF_INET;
 	//bcopy ( h->h_addr, &(s.sin_addr.s_addr), h->h_length);
 	s.sin_addr.s_addr = htonl(INADDR_ANY);
 	s.sin_port = htons(port);
 
-	if (setsockopt(ld, SOL_SOCKET, SO_REUSEADDR, &on, sizeof (on)) < 0)
+	if ( setsockopt(ld, SOL_SOCKET, SO_REUSEADDR, &on, sizeof (on)) < 0 )
 	    goto serr;
 
-	if( bind(ld, (struct sockaddr *) &s, sizeof(s)) ) 
+	if ( bind(ld, (struct sockaddr *) &s, sizeof(s)) ) 
 	    goto serr;
 
-	if( listen(ld, 1) )
+	if ( listen(ld, 1) )
 	    goto serr;
 
 	dlen=sizeof(struct sockaddr);
-	if( (sd = accept(ld, (struct sockaddr *) &d, &dlen )) < 0 )
+	if ( (sd = accept(ld, (struct sockaddr *) &d, &dlen )) < 0 )
 	    goto serr;
 
         plen = sizeof(p);
-	if (getpeername(sd, (struct sockaddr_in *) &p, 
-			&plen) < 0) {
+	if ( getpeername(sd, (struct sockaddr_in *) &p, 
+                         &plen) < 0 )
 	    goto serr;
-	}
 
-	printf("Accepted connection from %s\n",
-			inet_ntoa(p.sin_addr));
+	printf("Accepted connection from %s\n", inet_ntoa(p.sin_addr));
 	
 	sockbufsize=128*1024;
-	if (setsockopt(sd, SOL_SOCKET, SO_SNDBUF, &sockbufsize, sizeof sockbufsize) < 0) 
-	{
+	if ( setsockopt(sd, SOL_SOCKET, SO_SNDBUF, &sockbufsize, 
+                        sizeof sockbufsize) < 0 ) 
 	    goto serr;
-	}
 
-	if ( xc_linux_restore(xc->xc_handle, dom, flags, readerfn, (void*)sd, &dom) == 0 )
+	if ( xc_linux_restore(xc->xc_handle, dom, flags, 
+                              readerfn, (void*)sd, &dom) == 0 )
 	{
 	    close(sd);
 	    Py_INCREF(zero);
 	    return zero;
 	}
 
-	serr:
-
+    serr:
 	PyErr_SetFromErrno(xc_error);
-	if(ld)close(ld);
-	if(sd)close(sd);
+	if ( ld >= 0 ) close(ld);
+	if ( sd >= 0 ) close(sd);
 	return NULL;
     }    
     else
     {
-	int fd;
-	gzFile gfd;
+	int fd = -1;
+	gzFile gfd = NULL;
 
 	int readerfn(void *fd, void *buf, size_t count)
 	{
@@ -441,7 +437,7 @@ static PyObject *pyxc_linux_restore(PyObject *self,
 	    return ! (rc == count);
 	}
 
-	if (strncmp(state_file,"file:",strlen("file:")) == 0)
+	if ( strncmp(state_file,"file:",strlen("file:")) == 0 )
 	    state_file += strlen("file:");
 
 	if ( (fd = open(state_file, O_RDONLY)) == -1 )
@@ -463,7 +459,8 @@ static PyObject *pyxc_linux_restore(PyObject *self,
 	}
 
 
-	if ( xc_linux_restore(xc->xc_handle, dom, flags, readerfn, gfd, &dom) == 0 )
+	if ( xc_linux_restore(xc->xc_handle, dom, flags, 
+                              readerfn, gfd, &dom) == 0 )
 	{
 	    gzclose(gfd);
 	    close(fd);
@@ -474,8 +471,8 @@ static PyObject *pyxc_linux_restore(PyObject *self,
 
     err:
 	PyErr_SetFromErrno(xc_error);
-	if(gfd)gzclose(gfd);
-	if(fd)close(fd);
+	if ( gfd != NULL ) gzclose(gfd);
+	if ( fd >= 0 ) close(fd);
 	return NULL;
     }
 
