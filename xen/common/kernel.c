@@ -389,3 +389,44 @@ long do_ni_hypercall(void)
     /* No-op hypercall. */
     return -ENOSYS;
 }
+
+/*
+ * Lock debugging
+ */
+
+#ifndef NDEBUG
+
+static int crit_count[NR_CPUS];
+static int crit_checking = 1;
+
+void disable_criticalregion_checking(void)
+{
+    crit_checking = 0;
+}
+
+void criticalregion_enter(void)
+{
+    int cpu = smp_processor_id();
+    ASSERT(crit_count[cpu] >= 0);
+    crit_count[cpu]++;
+}
+
+void criticalregion_exit(void)
+{
+    int cpu = smp_processor_id();
+    crit_count[cpu]--;
+    ASSERT(crit_count[cpu] >= 0);
+}
+
+void ASSERT_no_criticalregion(void)
+{
+    int cpu = smp_processor_id();
+    if ( (crit_count[cpu] == 0) || !crit_checking )
+        return;
+    disable_criticalregion_checking();
+    ASSERT(crit_count[cpu] >= 0); /* -ve count is a special kind of bogus! */
+    ASSERT(crit_count[cpu] == 0); /* we should definitely take this path   */
+    ASSERT(1); /* NEVER GET HERE! */
+}
+
+#endif /* !NDEBUG */
