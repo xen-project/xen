@@ -2398,8 +2398,7 @@ void ptwr_flush(const int which)
             l1pte_propagate_from_guest(
                 d, &l1_pgentry_val(nl1e), &l1_pgentry_val(sl1e[i]));
 
-        if ( unlikely(l1_pgentry_val(ol1e) & _PAGE_PRESENT) )
-            put_page_from_l1e(ol1e, d);
+        put_page_from_l1e(ol1e, d);
     }
     unmap_domain_mem(pl1e);
 
@@ -2443,7 +2442,7 @@ static int ptwr_emulated_update(
     struct domain *d = current->domain;
 
     /* Aligned access only, thank you. */
-    if ( (addr & (bytes-1)) != 0 )
+    if ( !access_ok(VERIFY_WRITE, addr, bytes) || ((addr & (bytes-1)) != 0) )
     {
         MEM_LOG("ptwr_emulate: Unaligned or bad size ptwr access (%d, %p)\n",
                 bytes, addr);
@@ -2481,7 +2480,8 @@ static int ptwr_emulated_update(
 
     /* We are looking only for read-only mappings of p.t. pages. */
     if ( ((pte & (_PAGE_RW | _PAGE_PRESENT)) != _PAGE_PRESENT) ||
-         ((page->u.inuse.type_info & PGT_type_mask) != PGT_l1_page_table) )
+         ((page->u.inuse.type_info & PGT_type_mask) != PGT_l1_page_table) ||
+         (page_get_owner(page) != d) )
     {
         MEM_LOG("ptwr_emulate: Page is mistyped or bad pte (%p, %x)\n",
                 pte, page->u.inuse.type_info);
@@ -2501,6 +2501,7 @@ static int ptwr_emulated_update(
         if ( cmpxchg((unsigned long *)pl1e, old, val) != old )
         {
             unmap_domain_mem(pl1e);
+            put_page_from_l1e(nl1e, d);
             return X86EMUL_CMPXCHG_FAILED;
         }
     }
@@ -2526,8 +2527,7 @@ static int ptwr_emulated_update(
     }
 
     /* Finally, drop the old PTE. */
-    if ( unlikely(l1_pgentry_val(ol1e) & _PAGE_PRESENT) )
-        put_page_from_l1e(ol1e, d);
+    put_page_from_l1e(ol1e, d);
 
     return X86EMUL_CONTINUE;
 }
@@ -2587,7 +2587,8 @@ int ptwr_do_page_fault(unsigned long addr)
 
     /* We are looking only for read-only mappings of p.t. pages. */
     if ( ((pte & (_PAGE_RW | _PAGE_PRESENT)) != _PAGE_PRESENT) ||
-         ((page->u.inuse.type_info & PGT_type_mask) != PGT_l1_page_table) )
+         ((page->u.inuse.type_info & PGT_type_mask) != PGT_l1_page_table) ||
+         (page_get_owner(page) != ed->domain) )
     {
         return 0;
     }
