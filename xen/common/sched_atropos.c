@@ -513,7 +513,7 @@ task_slice_t ksched_scheduler(s_time_t time)
     cur_sdom->min_slice = newtime - time;
     DOM_INFO(cur_sdom)->reason = reason;
 
-    TRACE_2D(0, (cur_sdom->domain >> 32), ((u32)cur_sdom->domain));
+    TRACE_1D(0, cur_sdom->domain);
  
     return ret;
 }

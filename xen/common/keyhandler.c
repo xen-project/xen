@@ -22,20 +22,20 @@ void add_key_handler(u_char key, key_handler *handler, char *desc)
     char *str; 
 
     if ( key_table[key].handler != NULL ) 
-	printk("Warning: overwriting handler for key 0x%x\n", key); 
+        printk("Warning: overwriting handler for key 0x%x\n", key); 
 
     key_table[key].handler = handler; 
 
     str = key_table[key].desc; 
     for ( i = 0; i < STR_MAX; i++ )
     {
-	if ( *desc != '\0' ) 
-	    *str++ = *desc++; 
-	else
+        if ( *desc != '\0' ) 
+            *str++ = *desc++; 
+        else
             break; 
     }
     if ( i == STR_MAX ) 
-	key_table[key].desc[STR_MAX-1] = '\0'; 
+        key_table[key].desc[STR_MAX-1] = '\0'; 
 }
 
 key_handler *get_key_handler(u_char key)
@@ -49,10 +49,10 @@ static void show_handlers(u_char key, void *dev_id, struct pt_regs *regs)
 
     printk("'%c' pressed -> showing installed handlers\n", key); 
     for ( i = 0; i < KEY_MAX; i++ ) 
-	if ( key_table[i].handler != NULL ) 
-	    printk(" key '%c' (ascii '%02x') => %s\n", 
-			(i<33 || i>126)?(' '):(i),i,
-			key_table[i].desc);
+        if ( key_table[i].handler != NULL ) 
+            printk(" key '%c' (ascii '%02x') => %s\n", 
+                   (i<33 || i>126)?(' '):(i),i,
+                   key_table[i].desc);
 }
 
 
@@ -89,10 +89,10 @@ void do_task_queues(u_char key, void *dev_id, struct pt_regs *regs)
 
     for_each_domain ( p )
     {
-        printk("Xen: DOM %llu, CPU %d [has=%c], state = ",
+        printk("Xen: DOM %u, CPU %d [has=%c], state = ",
                p->domain, p->processor, p->has_cpu ? 'T':'F'); 
         sched_prn_state(p ->state);
-	printk(", hyp_events = %08x\n", p->hyp_events);
+        printk(", hyp_events = %08x\n", p->hyp_events);
         s = p->shared_info; 
         printk("Guest: upcall_pend = %02x, upcall_mask = %02x\n", 
                s->vcpu_data[0].evtchn_upcall_pending, 
@@ -123,8 +123,8 @@ void initialize_keytable(void)
 
     /* first initialize key handler table */
     for ( i = 0; i < KEY_MAX; i++ ) 
-	key_table[i].handler = (key_handler *)NULL; 
-	
+        key_table[i].handler = (key_handler *)NULL; 
+
     /* setup own handlers */
     add_key_handler('d', dump_registers, "dump registers"); 
     add_key_handler('h', show_handlers, "show this message");

@@ -64,7 +64,7 @@ static long free_dom_mem(struct task_struct *p,
 
         if ( unlikely(mpfn >= max_page) )
         {
-            DPRINTK("Domain %llu page number out of range (%08lx>=%08lx)\n", 
+            DPRINTK("Domain %u page number out of range (%08lx>=%08lx)\n", 
                     p->domain, mpfn, max_page);
             rc = -EINVAL;
             break;
@@ -73,7 +73,7 @@ static long free_dom_mem(struct task_struct *p,
         page = &frame_table[mpfn];
         if ( unlikely(!get_page(page, p)) )
         {
-            DPRINTK("Bad page free for domain %llu\n", p->domain);
+            DPRINTK("Bad page free for domain %u\n", p->domain);
             rc = -EINVAL;
             break;
         }

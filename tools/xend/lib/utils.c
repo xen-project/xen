@@ -408,7 +408,7 @@ typedef struct {
     PyObject_HEAD;
     int mem_fd;
     int xc_handle;
-    u64 remote_dom;
+    u32 remote_dom;
     int local_port, remote_port;
     control_if_t    *interface;
     CONTROL_RING_IDX tx_req_cons, tx_resp_prod;
@@ -661,11 +661,11 @@ staticforward PyTypeObject xu_port_type;
 static PyObject *xu_port_new(PyObject *self, PyObject *args)
 {
     xu_port_object *xup;
-    u64 dom;
+    u32 dom;
     int port1, port2;
     xc_dominfo_t info;
 
-    if ( !PyArg_ParseTuple(args, "L", &dom) )
+    if ( !PyArg_ParseTuple(args, "i", &dom) )
         return NULL;
 
     xup = PyObject_New(xu_port_object, &xu_port_type);
@@ -677,8 +677,7 @@ static PyObject *xu_port_new(PyObject *self, PyObject *args)
     }
 
     /* Set the General-Purpose Subject whose page frame will be mapped. */
-    (void)ioctl(xup->mem_fd, _IO('M', 1), (unsigned long)(dom>> 0)); /* low  */
-    (void)ioctl(xup->mem_fd, _IO('M', 2), (unsigned long)(dom>>32)); /* high */
+    (void)ioctl(xup->mem_fd, _IO('M', 1), (unsigned long)dom);
 
     if ( (xup->xc_handle = xc_interface_open()) == -1 )
     {
@@ -686,7 +685,7 @@ static PyObject *xu_port_new(PyObject *self, PyObject *args)
         goto fail2;
     }
 
-    if ( dom == 0ULL )
+    if ( dom == 0 )
     {
         /*
          * The control-interface event channel for DOM0 is already set up.
@@ -758,7 +757,7 @@ static PyObject *xu_port_getattr(PyObject *obj, char *name)
     if ( strcmp(name, "remote_port") == 0 )
         return PyInt_FromLong(xup->remote_port);
     if ( strcmp(name, "remote_dom") == 0 )
-        return PyLong_FromUnsignedLongLong(xup->remote_dom);
+        return PyInt_FromLong(xup->remote_dom);
     return Py_FindMethod(xu_port_methods, obj, name);
 }
 
@@ -766,7 +765,7 @@ static void xu_port_dealloc(PyObject *self)
 {
     xu_port_object *xup = (xu_port_object *)self;
     unmap_control_interface(xup->mem_fd, xup->interface);
-    if ( xup->remote_dom != 0ULL )
+    if ( xup->remote_dom != 0 )
         (void)xc_evtchn_close(xup->xc_handle, DOMID_SELF, xup->local_port);
     (void)xc_interface_close(xup->xc_handle);
     (void)close(xup->mem_fd);

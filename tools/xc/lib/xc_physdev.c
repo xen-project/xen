@@ -10,7 +10,7 @@
 #include "xc_private.h"
 
 int xc_physdev_pci_access_modify(int xc_handle,
-                                 u64 domid,
+                                 u32 domid,
                                  int bus,
                                  int dev,
                                  int func,

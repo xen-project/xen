@@ -86,7 +86,7 @@ long vbd_create(vbd_create_t *create)
 
     if ( unlikely((p = find_domain_by_id(create->domain)) == NULL) )
     {
-        DPRINTK("vbd_create attempted for non-existent domain %llu\n", 
+        DPRINTK("vbd_create attempted for non-existent domain %u\n", 
                 create->domain); 
         return -EINVAL; 
     }
@@ -166,7 +166,7 @@ long vbd_grow(vbd_grow_t *grow)
 
     if ( unlikely((p = find_domain_by_id(grow->domain)) == NULL) )
     {
-        DPRINTK("vbd_grow: attempted for non-existent domain %llu\n", 
+        DPRINTK("vbd_grow: attempted for non-existent domain %u\n", 
                 grow->domain); 
         return -EINVAL; 
     }
@@ -192,7 +192,7 @@ long vbd_shrink(vbd_shrink_t *shrink)
 
     if ( (p = find_domain_by_id(shrink->domain)) == NULL )
     {
-        DPRINTK("vbd_shrink attempted for non-existent domain %llu\n", 
+        DPRINTK("vbd_shrink attempted for non-existent domain %u\n", 
                 shrink->domain); 
         return -EINVAL; 
     }
@@ -252,7 +252,7 @@ long vbd_setextents(vbd_setextents_t *setextents)
 
     if ( (p = find_domain_by_id(setextents->domain)) == NULL )
     {
-        DPRINTK("vbd_setextents attempted for non-existent domain %llu\n", 
+        DPRINTK("vbd_setextents attempted for non-existent domain %u\n", 
                 setextents->domain); 
         return -EINVAL; 
     }
@@ -346,7 +346,7 @@ long vbd_delete(vbd_delete_t *delete)
 
     if ( (p = find_domain_by_id(delete->domain)) == NULL )
     {
-        DPRINTK("vbd_delete attempted for non-existent domain %llu\n", 
+        DPRINTK("vbd_delete attempted for non-existent domain %u\n", 
                 delete->domain); 
         return -EINVAL; 
     }
@@ -530,7 +530,7 @@ long vbd_probe(vbd_probe_t *probe)
         if ( (probe->domain != VBD_PROBE_ALL) &&
              ((p = find_domain_by_id(probe->domain)) == NULL) )
         {
-            DPRINTK("vbd_probe attempted for non-existent domain %llu\n", 
+            DPRINTK("vbd_probe attempted for non-existent domain %u\n", 
                     probe->domain); 
             return -EINVAL; 
         }
@@ -581,7 +581,7 @@ long vbd_info(vbd_info_t *info)
 
     if ( (p = find_domain_by_id(info->domain)) == NULL )
     {
-        DPRINTK("vbd_info attempted for non-existent domain %llu\n", 
+        DPRINTK("vbd_info attempted for non-existent domain %u\n", 
                 info->domain); 
         return -EINVAL; 
     }
@@ -654,7 +654,7 @@ int vbd_translate(phys_seg_t *pseg, struct task_struct *p, int operation)
             goto found;
     }
 
-    DPRINTK("vbd_translate; domain %llu attempted to access "
+    DPRINTK("vbd_translate; domain %u attempted to access "
             "non-existent VBD.\n", p->domain); 
 
     spin_unlock(&p->vbd_lock);

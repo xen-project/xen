@@ -264,7 +264,7 @@ long do_sched_op(unsigned long op)
 
     case SCHEDOP_exit:
     {
-        DPRINTK("DOM%llu killed itself!\n", current->domain);
+        DPRINTK("DOM%u killed itself!\n", current->domain);
         DPRINTK(" EIP == %08lx\n", get_execution_context()->eip);
         kill_domain();
         break;
@@ -272,7 +272,7 @@ long do_sched_op(unsigned long op)
 
     case SCHEDOP_stop:
     {
-        DPRINTK("DOM%llu stopped itself!\n", current->domain);
+        DPRINTK("DOM%u stopped itself!\n", current->domain);
         DPRINTK(" EIP == %08lx\n", get_execution_context()->eip);
         stop_domain();
         break;
@@ -673,7 +673,7 @@ static void dump_rqueue(struct list_head *queue, char *name)
             (unsigned long) queue->next, (unsigned long) queue->prev);
     list_for_each (list, queue) {
         p = list_entry(list, struct task_struct, run_list);
-        printk("%3d: %llu has=%c ", loop++, p->domain, p->has_cpu ? 'T':'F');
+        printk("%3d: %u has=%c ", loop++, p->domain, p->has_cpu ? 'T':'F');
         SCHED_OP(dump_runq_el, p);
         printk("c=0x%X%08X\n", (u32)(p->cpu_time>>32), (u32)p->cpu_time);
         printk("         l: %lx n: %lx  p: %lx\n",

@@ -18,7 +18,7 @@ void vbd_create(blkif_be_vbd_create_t *create)
     blkif = blkif_find_by_handle(create->domid, create->blkif_handle);
     if ( unlikely(blkif == NULL) )
     {
-        DPRINTK("vbd_create attempted for non-existent blkif (%llu,%u)\n", 
+        DPRINTK("vbd_create attempted for non-existent blkif (%u,%u)\n", 
                 create->domid, create->blkif_handle); 
         create->status = BLKIF_BE_STATUS_INTERFACE_NOT_FOUND;
         return;
@@ -62,7 +62,7 @@ void vbd_create(blkif_be_vbd_create_t *create)
     rb_link_node(&vbd->rb, rb_parent, rb_p);
     rb_insert_color(&vbd->rb, &blkif->vbd_rb);
 
-    DPRINTK("Successful creation of vdev=%04x (dom=%llu)\n",
+    DPRINTK("Successful creation of vdev=%04x (dom=%u)\n",
             vdevice, create->domid);
     create->status = BLKIF_BE_STATUS_OKAY;
 
@@ -83,7 +83,7 @@ void vbd_grow(blkif_be_vbd_grow_t *grow)
     blkif = blkif_find_by_handle(grow->domid, grow->blkif_handle);
     if ( unlikely(blkif == NULL) )
     {
-        DPRINTK("vbd_grow attempted for non-existent blkif (%llu,%u)\n", 
+        DPRINTK("vbd_grow attempted for non-existent blkif (%u,%u)\n", 
                 grow->domid, grow->blkif_handle); 
         grow->status = BLKIF_BE_STATUS_INTERFACE_NOT_FOUND;
         return;
@@ -128,7 +128,7 @@ void vbd_grow(blkif_be_vbd_grow_t *grow)
 
     *px = x;
 
-    DPRINTK("Successful grow of vdev=%04x (dom=%llu)\n",
+    DPRINTK("Successful grow of vdev=%04x (dom=%u)\n",
             vdevice, grow->domid);
     grow->status = BLKIF_BE_STATUS_OKAY;
 
@@ -148,7 +148,7 @@ void vbd_shrink(blkif_be_vbd_shrink_t *shrink)
     blkif = blkif_find_by_handle(shrink->domid, shrink->blkif_handle);
     if ( unlikely(blkif == NULL) )
     {
-        DPRINTK("vbd_shrink attempted for non-existent blkif (%llu,%u)\n", 
+        DPRINTK("vbd_shrink attempted for non-existent blkif (%u,%u)\n", 
                 shrink->domid, shrink->blkif_handle); 
         shrink->status = BLKIF_BE_STATUS_INTERFACE_NOT_FOUND;
         return;
@@ -206,7 +206,7 @@ void vbd_destroy(blkif_be_vbd_destroy_t *destroy)
     blkif = blkif_find_by_handle(destroy->domid, destroy->blkif_handle);
     if ( unlikely(blkif == NULL) )
     {
-        DPRINTK("vbd_destroy attempted for non-existent blkif (%llu,%u)\n", 
+        DPRINTK("vbd_destroy attempted for non-existent blkif (%u,%u)\n", 
                 destroy->domid, destroy->blkif_handle); 
         destroy->status = BLKIF_BE_STATUS_INTERFACE_NOT_FOUND;
         return;
@@ -365,7 +365,7 @@ int vbd_translate(phys_seg_t *pseg, blkif_t *blkif, int operation)
             goto found;
     }
 
-    DPRINTK("vbd_translate; domain %llu attempted to access "
+    DPRINTK("vbd_translate; domain %u attempted to access "
             "non-existent VBD.\n", blkif->domid);
 
     spin_unlock(&blkif->vbd_lock);

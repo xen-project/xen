@@ -141,7 +141,7 @@ typedef struct net_rule_st
 } net_rule_t;
 
 /* These are specified in the 'idx' if the 'dom' is SPECIAL. */
-#define VIF_SPECIAL             (~0ULL)
+#define VIF_SPECIAL             (0x7FFFFFFFU)
 #define VIF_UNKNOWN_INTERFACE   0
 #define VIF_PHYSICAL_INTERFACE  1
 #define VIF_ANY_INTERFACE       2

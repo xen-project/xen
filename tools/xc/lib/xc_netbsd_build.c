@@ -22,7 +22,7 @@ static int loadelfimage(gzFile, int, unsigned long *, unsigned long,
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED)
 #define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
 
-static long get_tot_pages(int xc_handle, u64 domid)
+static long get_tot_pages(int xc_handle, u32 domid)
 {
     dom0_op_t op;
     op.cmd = DOM0_GETDOMAININFO;
@@ -33,7 +33,7 @@ static long get_tot_pages(int xc_handle, u64 domid)
 }
 
 static int get_pfn_list(int xc_handle,
-                        u64 domid, 
+                        u32 domid, 
                         unsigned long *pfn_buf, 
                         unsigned long max_pfns)
 {
@@ -55,12 +55,12 @@ static int get_pfn_list(int xc_handle,
 }
 
 static int setup_guestos(int xc_handle,
-                         u64 dom, 
+                         u32 dom, 
                          gzFile kernel_gfd, 
                          unsigned long tot_pages,
                          unsigned long *virt_startinfo_addr, 
                          unsigned long *virt_load_addr, 
-			 full_execution_context_t *ctxt,
+                         full_execution_context_t *ctxt,
                          const char *cmdline,
                          unsigned long shared_info_frame,
                          unsigned int control_evtchn)
@@ -209,7 +209,7 @@ static int setup_guestos(int xc_handle,
 }
 
 int xc_netbsd_build(int xc_handle,
-                    u64 domid,
+                    u32 domid,
                     const char *image_name,
                     const char *cmdline,
                     unsigned int control_evtchn)
@@ -253,7 +253,7 @@ int xc_netbsd_build(int xc_handle,
     op.u.getdomaininfo.domain = (domid_t)domid;
     op.u.getdomaininfo.ctxt = ctxt;
     if ( (do_dom0_op(xc_handle, &op) < 0) || 
-         ((u64)op.u.getdomaininfo.domain != domid) )
+         ((u32)op.u.getdomaininfo.domain != domid) )
     {
         PERROR("Could not get info on domain");
         goto error_out;

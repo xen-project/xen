@@ -60,7 +60,7 @@ typedef struct _vbd_delete {
     u16          vdevice;             /* 16 bit id domain refers to VBD as */
 } vbd_delete_t; 
 
-#define VBD_PROBE_ALL (~0ULL)
+#define VBD_PROBE_ALL (0x7FFFFFFFU)
 typedef struct _vbd_probe { 
     domid_t          domain;          /* domain in question or VBD_PROBE_ALL */
     xen_disk_info_t  xdi;             /* where's our space for VBD/disk info */

@@ -205,10 +205,10 @@ int bvt_adjdom(struct task_struct *p,
         
         struct bvt_dom_info *inf = BVT_INFO(p);
         
-
-		printk("Get domain %lld bvt mcu_adv=%ld, warp=%ld, warpl=%ld, warpu=%ld\n",
-			   p->domain, inf->mcu_advance, inf->warp,
-			   inf->warpl, inf->warpu );
+        DPRINTK("Get domain %u bvt mcu_adv=%ld, warp=%ld, "
+                "warpl=%ld, warpu=%ld\n",
+                p->domain, inf->mcu_advance, inf->warp,
+                inf->warpl, inf->warpu );
 
         /* Sanity -- this can avoid divide-by-zero. */
         if ( mcu_adv == 0 )
@@ -220,9 +220,10 @@ int bvt_adjdom(struct task_struct *p,
         inf->warpl = warpl;
         inf->warpu = warpu;
 
-		printk("Set domain %lld bvt mcu_adv=%ld, warp=%ld, warpl=%ld, warpu=%ld\n",
-			   p->domain, inf->mcu_advance, inf->warp,
-			   inf->warpl, inf->warpu );
+        DPRINTK("Set domain %u bvt mcu_adv=%ld, warp=%ld, "
+                "warpl=%ld, warpu=%ld\n",
+                p->domain, inf->mcu_advance, inf->warp,
+                inf->warpl, inf->warpu );
 
         spin_unlock_irqrestore(&schedule_lock[p->processor], flags);
     }

@@ -40,7 +40,7 @@ def backend_rx_rsp(port, msg):
         xend.main.send_management_response(rsp, xend.netif.pendaddr)
     elif subtype == CMSG_NETIF_BE_CONNECT:
         (dom,hnd,evtchn,tx_frame,rx_frame,st) = \
-           struct.unpack("QIILLI", msg.get_payload())
+           struct.unpack("IIILLI", msg.get_payload())
         netif = interface.list[xend.main.port_from_dom(dom).local_port]
         msg = xend.utils.message(CMSG_NETIF_FE, \
                                  CMSG_NETIF_FE_INTERFACE_STATUS_CHANGED, 0)
@@ -88,7 +88,7 @@ class interface:
                 
         interface.list[key] = self
         msg = xend.utils.message(CMSG_NETIF_BE, CMSG_NETIF_BE_CREATE, 0)
-        msg.append_payload(struct.pack("QIBBBBBBBBI",dom,0, \
+        msg.append_payload(struct.pack("IIBBBBBBBBI",dom,0, \
                                        self.mac[0],self.mac[1], \
                                        self.mac[2],self.mac[3], \
                                        self.mac[4],self.mac[5], \
@@ -101,7 +101,7 @@ class interface:
     def destroy(self):
         del interface.list[self.key]
         msg = xend.utils.message(CMSG_NETIF_BE, CMSG_NETIF_BE_DESTROY, 0)
-        msg.append_payload(struct.pack("QII",self.dom,0,0))
+        msg.append_payload(struct.pack("III",self.dom,0,0))
         backend_tx_req(msg)        
 
 
@@ -138,7 +138,7 @@ class interface:
             self.evtchn = xc.evtchn_bind_interdomain(dom1=0,dom2=self.dom)
             msg = xend.utils.message(CMSG_NETIF_BE, \
                                      CMSG_NETIF_BE_CONNECT, 0)
-            msg.append_payload(struct.pack("QIILLI",self.dom,0, \
+            msg.append_payload(struct.pack("IIILLI",self.dom,0, \
                                            self.evtchn['port1'],tx_frame, \
                                            rx_frame,0))
             backend_tx_req(msg)

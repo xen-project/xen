@@ -142,8 +142,8 @@
 #include <asm/ldt.h>
 
 #ifndef NDEBUG
-#define MEM_LOG(_f, _a...)                             \
-  printk("DOM%llu: (file=memory.c, line=%d) " _f "\n", \
+#define MEM_LOG(_f, _a...)                           \
+  printk("DOM%u: (file=memory.c, line=%d) " _f "\n", \
          current->domain , __LINE__ , ## _a )
 #else
 #define MEM_LOG(_f, _a...) ((void)0)
@@ -177,7 +177,6 @@ static struct {
 #define DOP_RELOAD_LDT  (1<<1) /* Reload the LDT shadow mapping. */
     unsigned long       deferred_ops;
     unsigned long       cr0;
-    domid_t             subject_id;
     /* General-Purpose Subject, Page-Table Subject */
     struct task_struct *gps, *pts;
 } percpu_info[NR_CPUS] __cacheline_aligned;
@@ -219,9 +218,9 @@ void __init init_frametable(unsigned long nr_pages)
           mfn < virt_to_phys((void *)RDWR_MPT_VIRT_END)>>PAGE_SHIFT;
           mfn++ )
     {
-	frame_table[mfn].count_and_flags = 1 | PGC_allocated;
-	frame_table[mfn].type_and_flags = 1 | PGT_gdt_page; /* non-RW type */
-	frame_table[mfn].u.domain = &idle0_task;
+        frame_table[mfn].count_and_flags = 1 | PGC_allocated;
+        frame_table[mfn].type_and_flags = 1 | PGT_gdt_page; /* non-RW type */
+        frame_table[mfn].u.domain = &idle0_task;
     }
 }
 
@@ -427,9 +426,9 @@ static int get_page_from_l1e(l1_pgentry_t l1e)
     if ( unlikely(!pfn_is_ram(pfn)) )
     {
         if ( IS_PRIV(current) )
-            return 1;	
+            return 1;
 
-	if ( IS_CAPABLE_PHYSDEV(current) )
+        if ( IS_CAPABLE_PHYSDEV(current) )
             return domain_iomem_in_pfn(current, pfn);
 
         MEM_LOG("Non-privileged attempt to map I/O space %08lx", pfn);
@@ -805,6 +804,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
     unsigned long old_base_pfn;
     struct pfn_info *page = &frame_table[pfn];
     struct task_struct *p = current, *q;
+    domid_t domid;
 
     switch ( cmd )
     {
@@ -914,17 +914,12 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         break;
     }
 
-    case MMUEXT_SET_SUBJECTDOM_L:
-        percpu_info[cpu].subject_id = (domid_t)((ptr&~0xFFFF)|(val>>16));
-        break;
-
-    case MMUEXT_SET_SUBJECTDOM_H:
-        percpu_info[cpu].subject_id |= 
-            ((domid_t)((ptr&~0xFFFF)|(val>>16)))<<32;
+    case MMUEXT_SET_SUBJECTDOM:
+        domid = ((domid_t)((ptr&~0xFFFF)|(val>>16)));
 
         if ( !IS_PRIV(p) )
         {
-            MEM_LOG("Dom %llu has no privilege to set subject domain",
+            MEM_LOG("Dom %u has no privilege to set subject domain",
                     p->domain);
             okay = 0;
         }
@@ -932,13 +927,12 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
         {
             if ( percpu_info[cpu].gps != NULL )
                 put_task_struct(percpu_info[cpu].gps);
-            percpu_info[cpu].gps = find_domain_by_id(
-                percpu_info[cpu].subject_id);
+            percpu_info[cpu].gps = find_domain_by_id(domid);
             percpu_info[cpu].pts = (val & SET_PAGETABLE_SUBJECTDOM) ? 
                 percpu_info[cpu].gps : NULL;
             if ( percpu_info[cpu].gps == NULL )
             {
-                MEM_LOG("Unknown domain '%llu'", percpu_info[cpu].subject_id);
+                MEM_LOG("Unknown domain '%u'", domid);
                 okay = 0;
             }
         }
@@ -947,7 +941,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
     case MMUEXT_REASSIGN_PAGE:
         if ( unlikely(!IS_PRIV(p)) )
         {
-            MEM_LOG("Dom %llu has no privilege to reassign page ownership",
+            MEM_LOG("Dom %u has no privilege to reassign page ownership",
                     p->domain);
             okay = 0;
         }
@@ -1102,10 +1096,12 @@ int do_mmu_update(mmu_update_t *ureqs, int count, int *success_count)
             machine_to_phys_mapping[pfn] = req.val;
             okay = 1;
 
-	    /*  if in log dirty shadow mode, mark the corresponding 
-		psuedo-physical page as dirty */
-	    if( unlikely(current->mm.shadow_mode == SHM_logdirty) )
-		mark_dirty( &current->mm, pfn );
+            /*
+             * If in log-dirty mode, mark the corresponding pseudo-physical
+             * page as dirty.
+             */
+            if( unlikely(current->mm.shadow_mode == SHM_logdirty) )
+                mark_dirty( &current->mm, pfn );
 
             put_page(&frame_table[pfn]);
             break;
@@ -1155,7 +1151,7 @@ int do_mmu_update(mmu_update_t *ureqs, int count, int *success_count)
     }
 
     if ( unlikely(success_count != NULL) )
-	put_user(count, success_count);
+        put_user(count, success_count);
 
     return rc;
 }
@@ -1241,7 +1237,7 @@ int do_update_va_mapping_otherdomain(unsigned long page_nr,
     percpu_info[cpu].gps = p = find_domain_by_id(domid);
     if ( unlikely(p == NULL) )
     {
-        MEM_LOG("Unknown domain '%llu'", domid);
+        MEM_LOG("Unknown domain '%u'", domid);
         return -ESRCH;
     }
 

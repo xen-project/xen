@@ -19,7 +19,7 @@
  * This makes sure that old versions of dom0 tools will stop working in a
  * well-defined way (rather than crashing the machine, for instance).
  */
-#define DOM0_INTERFACE_VERSION   0xAAAA000D
+#define DOM0_INTERFACE_VERSION   0xAAAA000E
 
 #define MAX_DOMAIN_NAME    16
 
@@ -29,6 +29,7 @@
 typedef struct {
     /* IN variables. */
     domid_t       domain;             /*  0 */
+    u32           __pad;
     memory_t      max_pfns;           /*  8 */
     MEMORY_PADDING;
     void         *buffer;             /* 16 */
@@ -56,20 +57,20 @@ typedef struct {
     u32          __pad;               /* 28 */
     /* OUT parameters. */
     domid_t      domain;              /* 32 */
-} PACKED dom0_createdomain_t; /* 40 bytes */
+} PACKED dom0_createdomain_t; /* 36 bytes */
 
 #define DOM0_DESTROYDOMAIN     9
 typedef struct {
     /* IN variables. */
     domid_t      domain;              /*  0 */
-    u32          force;               /*  8 */
-} PACKED dom0_destroydomain_t; /* 12 bytes */
+    u32          force;               /*  4 */
+} PACKED dom0_destroydomain_t; /* 8 bytes */
 
 #define DOM0_STARTDOMAIN      10
 typedef struct {
     /* IN parameters. */
     domid_t domain;                   /*  0 */
-} PACKED dom0_startdomain_t; /* 8 bytes */
+} PACKED dom0_startdomain_t; /* 4 bytes */
 
 #define DOM0_STOPDOMAIN       11
 typedef struct {
@@ -77,26 +78,27 @@ typedef struct {
     domid_t domain;                   /*  0 */
     /* hack to indicate that you want to wait for other domain -- replace
        with proper sychronous stop soon! */
-    u32     sync;                     /*  8 */
-} PACKED dom0_stopdomain_t; /* 12 bytes */
+    u32     sync;                     /*  4 */
+} PACKED dom0_stopdomain_t; /* 8 bytes */
 
 #define DOM0_GETDOMAININFO    12
 typedef struct {
     /* IN variables. */
     domid_t domain;                   /*  0 */
+    u32     __pad;
     full_execution_context_t *ctxt;   /*  8 */
     MEMORY_PADDING;
     /* OUT variables. */
-    char name[MAX_DOMAIN_NAME];       /* 16 */
-    u32 processor;                    /* 32 */
-    u32 has_cpu;                      /* 36 */
+    u8      name[MAX_DOMAIN_NAME];    /* 16 */
+    u32     processor;                /* 32 */
+    u32     has_cpu;                  /* 36 */
 #define DOMSTATE_ACTIVE              0
 #define DOMSTATE_STOPPED             1
-    u32 state;                        /* 40 */
-    u32 hyp_events;                   /* 44 */
-    u32 tot_pages;                    /* 48 */
-    u32 max_pages;                    /* 52 */
-    u64 cpu_time;                     /* 56 */
+    u32     state;                    /* 40 */
+    u32     hyp_events;               /* 44 */
+    u32     tot_pages;                /* 48 */
+    u32     max_pages;                /* 52 */
+    u64     cpu_time;                 /* 56 */
     memory_t shared_info_frame;       /* 64: MFN of shared_info struct */
     MEMORY_PADDING;
 } PACKED dom0_getdomaininfo_t; /* 72 bytes */
@@ -104,19 +106,18 @@ typedef struct {
 #define DOM0_BUILDDOMAIN      13
 typedef struct {
     /* IN variables. */
-    domid_t                  domain;  /*  0 */
-    u32                      num_vifs;/*  8 */
-    u32                      __pad;   /* 12 */
+    domid_t                 domain;   /*  0 */
+    u32                     num_vifs; /*  4 */
     /* IN/OUT parameters */
-    full_execution_context_t *ctxt;   /* 16 */
+    full_execution_context_t *ctxt;   /*  8 */
     MEMORY_PADDING;
-} PACKED dom0_builddomain_t; /* 24 bytes */
+} PACKED dom0_builddomain_t; /* 16 bytes */
 
 #define DOM0_IOPL             14
 typedef struct {
     domid_t domain;                   /*  0 */
-    u32     iopl;                     /*  8 */
-} PACKED dom0_iopl_t; /* 12 bytes */
+    u32     iopl;                     /*  4 */
+} PACKED dom0_iopl_t; /* 8 bytes */
 
 #define DOM0_MSR              15
 typedef struct {
@@ -135,17 +136,17 @@ typedef struct {
 typedef struct {
     /* IN variables. */
     domid_t domain;                   /*  0 */
-    u8  opcode;                       /*  8 */
+    u8  opcode;                       /*  4 */
     u8  __pad0, __pad1, __pad2;
-    u32 in1;                          /* 12 */
-    u32 in2;                          /* 16 */
-    u32 in3;                          /* 20 */
-    u32 in4;                          /* 24 */
+    u32 in1;                          /*  8 */
+    u32 in2;                          /* 12 */
+    u32 in3;                          /* 16 */
+    u32 in4;                          /* 20 */
     /* OUT variables. */
-    u32 status;                       /* 28 */
-    u32 out1;                         /* 32 */
-    u32 out2;                         /* 36 */
-} PACKED dom0_debug_t; /* 40 bytes */
+    u32 status;                       /* 24 */
+    u32 out1;                         /* 28 */
+    u32 out2;                         /* 32 */
+} PACKED dom0_debug_t; /* 36 bytes */
 
 /*
  * Set clock such that it would read <secs,usecs> after 00:00:00 UTC,
@@ -174,8 +175,8 @@ typedef struct {
     domid_t domain;        /*  8: To which domain does the frame belong?    */
     /* OUT variables. */
     /* Is the page PINNED to a type? */
-    u32 type;              /* 16: see above type defs */
-} PACKED dom0_getpageframeinfo_t; /* 20 bytes */
+    u32 type;              /* 12: see above type defs */
+} PACKED dom0_getpageframeinfo_t; /* 16 bytes */
 
 /*
  * Read console content from Xen buffer ring.
@@ -195,8 +196,8 @@ typedef struct {
 typedef struct {
     /* IN variables. */
     domid_t      domain;              /*  0 */
-    s32          cpu;                 /*  8: -1 implies unpin */
-} PACKED dom0_pincpudomain_t; /* 12 bytes */
+    s32          cpu;                 /*  4: -1 implies unpin */
+} PACKED dom0_pincpudomain_t; /* 8 bytes */
 
 /* Get trace buffers physical base pointer */
 #define DOM0_GETTBUFS         21
@@ -229,11 +230,11 @@ typedef struct {
 typedef struct {
     /* IN variables. */
     domid_t      domain;              /*  0 */
-    u32          bus;                 /*  8 */
-    u32          dev;                 /* 12 */
-    u32          func;                /* 16 */
-    u32          enable;              /* 20 */
-} PACKED dom0_pcidev_access_t; /* 24 bytes */
+    u32          bus;                 /*  4 */
+    u32          dev;                 /*  8 */
+    u32          func;                /* 12 */
+    u32          enable;              /* 16 */
+} PACKED dom0_pcidev_access_t; /* 20 bytes */
 
 /*
  * Get the ID of the current scheduler.
@@ -259,31 +260,31 @@ typedef struct {
 typedef struct {
     /* IN variables. */
     domid_t        domain;            /*  0 */
-    u32            op;                /*  8 */
-    u32            __pad;             /* 12 */
-    unsigned long *dirty_bitmap;      /* 16: pointer to locked buffer */
+    u32            op;                /*  4 */
+    unsigned long *dirty_bitmap;      /*  8: pointer to locked buffer */
     MEMORY_PADDING;
     /* IN/OUT variables. */
-    memory_t       pages;  /* 24: size of buffer, updated with actual size */
+    memory_t       pages;  /* 16: size of buffer, updated with actual size */
     MEMORY_PADDING;
     /* OUT variables. */
-    memory_t       fault_count;       /* 32 */
+    memory_t       fault_count;       /* 24 */
     MEMORY_PADDING;
-    memory_t       dirty_count;       /* 40 */
+    memory_t       dirty_count;       /* 32 */
     MEMORY_PADDING;
-} PACKED dom0_shadow_control_t; /* 48 bytes */
+} PACKED dom0_shadow_control_t; /* 40 bytes */
 
 #define DOM0_SETDOMAINNAME     26
 typedef struct {
     /* IN variables. */
     domid_t  domain;                  /*  0 */
-    char     name[MAX_DOMAIN_NAME];   /*  8 */
-} PACKED dom0_setdomainname_t; /* 24 bytes */
+    u8       name[MAX_DOMAIN_NAME];   /*  4 */
+} PACKED dom0_setdomainname_t; /* 20 bytes */
 
 #define DOM0_SETDOMAININITIALMEM   27
 typedef struct {
     /* IN variables. */
     domid_t     domain;               /*  0 */
+    u32         __pad;
     memory_t    initial_memkb;        /*  8 */
     MEMORY_PADDING;
 } PACKED dom0_setdomaininitialmem_t; /* 16 bytes */
@@ -292,6 +293,7 @@ typedef struct {
 typedef struct {
     /* IN variables. */
     domid_t     domain;               /*  0 */
+    u32         __pad;
     memory_t    max_memkb;            /*  8 */
     MEMORY_PADDING;
 } PACKED dom0_setdomainmaxmem_t; /* 16 bytes */
@@ -300,6 +302,7 @@ typedef struct {
 typedef struct {
     /* IN variables. */
     domid_t  domain;                  /*  0 */
+    u32         __pad;
     memory_t num;                     /*  8 */
     MEMORY_PADDING;
     /* IN/OUT variables. */

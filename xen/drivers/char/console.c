@@ -43,8 +43,8 @@ spinlock_t console_lock = SPIN_LOCK_UNLOCKED;
  */
 
 /* VGA text (mode 3) definitions. */
-#define COLUMNS	    80
-#define LINES	    25
+#define COLUMNS     80
+#define LINES       25
 #define ATTRIBUTE    7
 
 /* Clear the screen and initialize VIDEO, XPOS and YPOS.  */
@@ -209,7 +209,7 @@ long read_console_ring(unsigned long str, unsigned int count, unsigned cmd)
         return -EFAULT;
 
     if ( cmd & CONSOLE_RING_CLEAR )
-	console_ring.len = 0;
+        console_ring.len = 0;
     
     return len;
 }
@@ -418,7 +418,7 @@ long do_console_write(char *str, unsigned int count)
         return -EFAULT;
     safe_str[count] = '\0';
     
-    sprintf(line_header, "DOM%llu: ", current->domain);
+    sprintf(line_header, "DOM%u: ", current->domain);
     
     p = safe_str;
     while ( *p != '\0' )
@@ -447,7 +447,7 @@ long do_console_write(char *str, unsigned int count)
 #else
     if ( !test_and_set_bit(PF_CONSOLEWRITEBUG, &current->flags) )
     {
-        printk("DOM%llu is attempting to use the deprecated "
+        printk("DOM%u is attempting to use the deprecated "
                "HYPERVISOR_console_write() interface.\n", current->domain);
         printk(" - For testing, create a debug build of Xen\n");
         printk(" - For production, your OS must use the new console model\n");

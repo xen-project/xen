@@ -226,7 +226,7 @@ struct task_struct
 extern struct task_struct idle0_task;
 
 extern struct task_struct *idle_task[NR_CPUS];
-#define IDLE_DOMAIN_ID   (~0ULL)
+#define IDLE_DOMAIN_ID   (0x7FFFFFFFU)
 #define is_idle_task(_p) (test_bit(PF_IDLETASK, &(_p)->flags))
 
 #include <xen/slab.h>

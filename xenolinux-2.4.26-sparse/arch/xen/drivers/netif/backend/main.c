@@ -36,7 +36,7 @@ typedef struct {
 } rx_info_t;
 static struct sk_buff_head rx_queue;
 static multicall_entry_t rx_mcl[NETIF_RX_RING_SIZE*2];
-static mmu_update_t rx_mmu[NETIF_RX_RING_SIZE*4];
+static mmu_update_t rx_mmu[NETIF_RX_RING_SIZE*3];
 static unsigned char rx_notify[NR_EVENT_CHANNELS];
 
 /* Don't currently gate addition of an interface to the tx scheduling list. */
@@ -217,14 +217,10 @@ static void net_rx_action(unsigned long unused)
         mmu[0].val  = __pa(vdata) >> PAGE_SHIFT;        
         mmu[1].val  = (unsigned long)(netif->domid<<16) & ~0xFFFFUL;
         mmu[1].ptr  = (unsigned long)(netif->domid<< 0) & ~0xFFFFUL;
-        mmu[2].val  = (unsigned long)(netif->domid>>16) & ~0xFFFFUL;
-        mmu[2].ptr  = (unsigned long)(netif->domid>>32) & ~0xFFFFUL;
         mmu[1].ptr |= MMU_EXTENDED_COMMAND;
-        mmu[1].val |= MMUEXT_SET_SUBJECTDOM_L;
-        mmu[2].ptr |= MMU_EXTENDED_COMMAND;
-        mmu[2].val |= MMUEXT_SET_SUBJECTDOM_H;
-        mmu[3].ptr  = (mdata & PAGE_MASK) | MMU_EXTENDED_COMMAND;
-        mmu[3].val  = MMUEXT_REASSIGN_PAGE;
+        mmu[1].val |= MMUEXT_SET_SUBJECTDOM;
+        mmu[2].ptr  = (mdata & PAGE_MASK) | MMU_EXTENDED_COMMAND;
+        mmu[2].val  = MMUEXT_REASSIGN_PAGE;
 
         mcl[0].op = __HYPERVISOR_update_va_mapping;
         mcl[0].args[0] = vdata >> PAGE_SHIFT;
@@ -232,10 +228,10 @@ static void net_rx_action(unsigned long unused)
         mcl[0].args[2] = 0;
         mcl[1].op = __HYPERVISOR_mmu_update;
         mcl[1].args[0] = (unsigned long)mmu;
-        mcl[1].args[1] = 4;
+        mcl[1].args[1] = 3;
         mcl[1].args[2] = 0;
 
-        mmu += 4;
+        mmu += 3;
         mcl += 2;
 
         ((rx_info_t *)&skb->cb[0])->old_mach_ptr = mdata;
@@ -265,7 +261,7 @@ static void net_rx_action(unsigned long unused)
         /* Check the reassignment error code. */
         if ( unlikely(mcl[1].args[5] != 0) )
         {
-            DPRINTK("Failed MMU update transferring to DOM%llu\n",
+            DPRINTK("Failed MMU update transferring to DOM%u\n",
                     netif->domid);
             (void)HYPERVISOR_update_va_mapping(
                 (unsigned long)skb->head >> PAGE_SHIFT,
@@ -514,8 +510,7 @@ static void net_tx_action(unsigned long unused)
         mcl[0].args[0] = MMAP_VADDR(pending_idx) >> PAGE_SHIFT;
         mcl[0].args[1] = (txreq.addr & PAGE_MASK) | __PAGE_KERNEL;
         mcl[0].args[2] = 0;
-        mcl[0].args[3] = (unsigned long)netif->domid;
-        mcl[0].args[4] = (unsigned long)(netif->domid>>32);
+        mcl[0].args[3] = netif->domid;
         mcl++;
         
         ((tx_info_t *)&skb->cb[0])->idx = pending_idx;
@@ -760,7 +755,7 @@ static int __init init_module(void)
 
     (void)request_irq(bind_virq_to_irq(VIRQ_DEBUG),
                       netif_be_dbg, SA_SHIRQ, 
-                      "net-be-dbg", NULL);
+                      "net-be-dbg", &netif_be_dbg);
 
     return 0;
 }

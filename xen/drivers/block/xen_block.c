@@ -579,7 +579,7 @@ static void dump_blockq(u_char key, void *dev_id, struct pt_regs *regs)
     read_lock_irqsave(&tasklist_lock, flags);
     for_each_domain ( p )
     {
-        printk("Domain: %llu\n", p->domain);
+        printk("Domain: %u\n", p->domain);
         blk_ring = p->blk_ring_base;
         printk("  req_prod:0x%08x, req_cons:0x%08x resp_prod:0x%08x/"
                "0x%08x on_list=%d\n",

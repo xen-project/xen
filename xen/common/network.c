@@ -370,12 +370,12 @@ void print_net_rule(net_rule_t *r)
     if ( r->src_dom == VIF_SPECIAL )
         printk("=] src_dom/idx      : %s\n", idx_to_name(r->src_idx));
     else
-        printk("=] src_dom/idx      : %llu/%u\n", r->src_dom, r->src_idx);
+        printk("=] src_dom/idx      : %u/%u\n", r->src_dom, r->src_idx);
 
     if ( r->dst_dom == VIF_SPECIAL )
         printk("=] dst_dom/idx      : %s\n", idx_to_name(r->dst_idx));
     else
-        printk("=] dst_dom/idx      : %llu/%u\n", r->dst_dom, r->dst_idx);
+        printk("=] dst_dom/idx      : %u/%u\n", r->dst_dom, r->dst_idx);
 
     printk("=] action           : %u\n", r->action);
 }
@@ -530,8 +530,7 @@ net_vif_t *net_get_target_vif(u8 *data, unsigned int len, net_vif_t *src_vif)
     return target;
     
  drop:
-    printk("VIF%llu/%u: pkt to drop!\n", 
-           src_dom, src_idx);
+    DPRINTK("VIF%u/%u: pkt to drop!\n", src_dom, src_idx);
     return VIF_DROP;
 }
 

@@ -2094,7 +2094,7 @@ static void get_rx_bufs(net_vif_t *vif)
         if ( unlikely(pte_pfn >= max_page) ||
              unlikely(!get_page_and_type(pte_page, p, PGT_l1_page_table)) )
         {
-            DPRINTK("Bad page frame for ppte %llu,%08lx,%08lx,%08x\n",
+            DPRINTK("Bad page frame for ppte %u,%08lx,%08lx,%08x\n",
                     p->domain, pte_pfn, max_page, pte_page->type_and_flags);
             make_rx_response(vif, rx.id, 0, RING_STATUS_BAD_PAGE, 0);
             continue;
@@ -2265,24 +2265,13 @@ long flush_bufs_for_vif(net_vif_t *vif)
 
         put_page_and_type(&frame_table[rx->pte_ptr >> PAGE_SHIFT]);
 
-	/* if in shadow mode, mark the PTE as dirty */
-	if( p->mm.shadow_mode == SHM_logdirty )
-	{
-	    mark_dirty( &p->mm, rx->pte_ptr>>PAGE_SHIFT );
-#if 0
-	    mark_dirty( &p->mm, rx->buf_pfn ); // XXXXXXX debug
-
-	    {
-		unsigned long * p = map_domain_mem( rx->buf_pfn<<PAGE_SHIFT );
-		p[2] = 0xdeadc001;
-		unmap_domain_mem(p);
-	    }
-#endif
-
-	}
-	/* assume the shadow page table is about to be blown away,
-	   and that its not worth marking the buffer as dirty */
-
+	/*
+         * If in shadow mode, mark the PTE as dirty.
+         * (We assume the shadow page table is about to be blown away,
+         * and so it's not worth marking the buffer as dirty.)
+         */
+	if ( p->mm.shadow_mode == SHM_logdirty )
+	    mark_dirty(&p->mm, rx->pte_ptr>>PAGE_SHIFT);
 
         make_rx_response(vif, rx->id, 0, RING_STATUS_DROPPED, 0);
     }

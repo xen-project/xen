@@ -9,7 +9,7 @@
 #include "xc_private.h"
 
 int xc_atropos_domain_set(int xc_handle,
-			  u64 domid, u64 period, u64 slice, u64 latency,
+                          u32 domid, u64 period, u64 slice, u64 latency,
                           int xtratime)
 {
     dom0_op_t op;
@@ -28,7 +28,7 @@ int xc_atropos_domain_set(int xc_handle,
     return do_dom0_op(xc_handle, &op);
 }
 
-int xc_atropos_domain_get(int xc_handle, u64 domid, u64 *period,
+int xc_atropos_domain_get(int xc_handle, u32 domid, u64 *period,
                           u64 *slice, u64 *latency, int *xtratime)
 {
     dom0_op_t op;

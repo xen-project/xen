@@ -10,10 +10,7 @@ int init_pfn_mapper(domid_t domid)
 {
     int fd = open("/dev/mem", O_RDWR);
     if ( fd >= 0 )
-    {
-        (void)ioctl(fd, _IO('M', 1), (unsigned long)(domid>> 0)); /* low  */
-        (void)ioctl(fd, _IO('M', 2), (unsigned long)(domid>>32)); /* high */
-    }
+        (void)ioctl(fd, _IO('M', 1), (unsigned long)domid);
     return fd;
 }
 
@@ -48,23 +45,23 @@ void unmap_pfn(int pm_handle, void *vaddr)
 /*******************/
 
 void * mfn_mapper_map_batch(int xc_handle, domid_t dom, int prot,
-			    unsigned long *arr, int num )
+                            unsigned long *arr, int num )
 {
     privcmd_mmapbatch_t ioctlx; 
     void *addr;
     addr = mmap( NULL, num*PAGE_SIZE, prot, MAP_SHARED, xc_handle, 0 );
     if (addr)
     {
-	ioctlx.num=num;
-	ioctlx.dom=dom;
-	ioctlx.addr=(unsigned long)addr;
-	ioctlx.arr=arr;
-	if ( ioctl( xc_handle, IOCTL_PRIVCMD_MMAPBATCH, &ioctlx ) <0 )
-	{
-	    perror("XXXXXXXX");
-	    munmap(addr, num*PAGE_SIZE);
-	    return 0;
-	}
+        ioctlx.num=num;
+        ioctlx.dom=dom;
+        ioctlx.addr=(unsigned long)addr;
+        ioctlx.arr=arr;
+        if ( ioctl( xc_handle, IOCTL_PRIVCMD_MMAPBATCH, &ioctlx ) < 0 )
+        {
+            perror("XXXXXXXX");
+            munmap(addr, num*PAGE_SIZE);
+            return 0;
+        }
     }
     return addr;
 
@@ -73,8 +70,8 @@ void * mfn_mapper_map_batch(int xc_handle, domid_t dom, int prot,
 /*******************/
 
 void * mfn_mapper_map_single(int xc_handle, domid_t dom,
-			     int size, int prot,
-			     unsigned long mfn )
+                             int size, int prot,
+                             unsigned long mfn )
 {
     privcmd_mmap_t ioctlx; 
     privcmd_mmap_entry_t entry; 
@@ -82,17 +79,17 @@ void * mfn_mapper_map_single(int xc_handle, domid_t dom,
     addr = mmap( NULL, size, prot, MAP_SHARED, xc_handle, 0 );
     if (addr)
     {
-	ioctlx.num=1;
-	ioctlx.dom=dom;
-	ioctlx.entry=&entry;
-	entry.va=(unsigned long) addr;
-	entry.mfn=mfn;
-	entry.npages=(size+PAGE_SIZE-1)>>PAGE_SHIFT;
-	if ( ioctl( xc_handle, IOCTL_PRIVCMD_MMAP, &ioctlx ) <0 )
-	{
-	    munmap(addr, size);
-	    return 0;
-	}
+        ioctlx.num=1;
+        ioctlx.dom=dom;
+        ioctlx.entry=&entry;
+        entry.va=(unsigned long) addr;
+        entry.mfn=mfn;
+        entry.npages=(size+PAGE_SIZE-1)>>PAGE_SHIFT;
+        if ( ioctl( xc_handle, IOCTL_PRIVCMD_MMAP, &ioctlx ) <0 )
+        {
+            munmap(addr, size);
+            return 0;
+        }
     }
     return addr;
 }
@@ -101,7 +98,7 @@ void * mfn_mapper_map_single(int xc_handle, domid_t dom,
 
 /* NB: arr must be mlock'ed */
 int get_pfn_type_batch(int xc_handle, 
-		       u64 dom, int num, unsigned long *arr)
+                       u32 dom, int num, unsigned long *arr)
 {
     dom0_op_t op;
     op.cmd = DOM0_GETPAGEFRAMEINFO2;
@@ -113,8 +110,8 @@ int get_pfn_type_batch(int xc_handle,
 
 #define GETPFN_ERR (~0U)
 unsigned int get_pfn_type(int xc_handle, 
-			  unsigned long mfn, 
-			  u64 dom)
+                          unsigned long mfn, 
+                          u32 dom)
 {
     dom0_op_t op;
     op.cmd = DOM0_GETPAGEFRAMEINFO;
@@ -132,7 +129,7 @@ unsigned int get_pfn_type(int xc_handle,
 
 /*******************/
 
-#define FIRST_MMU_UPDATE 2
+#define FIRST_MMU_UPDATE 1
 
 static int flush_mmu_updates(int xc_handle, mmu_t *mmu)
 {
@@ -145,12 +142,8 @@ static int flush_mmu_updates(int xc_handle, mmu_t *mmu)
     /* The first two requests set the correct subject domain (PTS and GPS). */
     mmu->updates[0].val  = (unsigned long)(mmu->subject<<16) & ~0xFFFFUL;
     mmu->updates[0].ptr  = (unsigned long)(mmu->subject<< 0) & ~0xFFFFUL;
-    mmu->updates[1].val  = (unsigned long)(mmu->subject>>16) & ~0xFFFFUL;
-    mmu->updates[1].ptr  = (unsigned long)(mmu->subject>>32) & ~0xFFFFUL;
     mmu->updates[0].ptr |= MMU_EXTENDED_COMMAND;
-    mmu->updates[0].val |= MMUEXT_SET_SUBJECTDOM_L;
-    mmu->updates[1].ptr |= MMU_EXTENDED_COMMAND;
-    mmu->updates[1].val |= MMUEXT_SET_SUBJECTDOM_H | SET_PAGETABLE_SUBJECTDOM;
+    mmu->updates[0].val |= MMUEXT_SET_SUBJECTDOM | SET_PAGETABLE_SUBJECTDOM;
 
     hypercall.op     = __HYPERVISOR_mmu_update;
     hypercall.arg[0] = (unsigned long)mmu->updates;
@@ -211,46 +204,43 @@ int finish_mmu_updates(int xc_handle, mmu_t *mmu)
 /* this function is a hack until we get proper synchronous domain stop */
 
 int xc_domain_stop_sync( int xc_handle, domid_t domid,
-			 dom0_op_t *op, full_execution_context_t *ctxt)
+                         dom0_op_t *op, full_execution_context_t *ctxt)
 {
     int i;
 
     printf("Sleep:");
 
-    for(i=0;;i++)
+    for( i = 0; ; i++ )
     {    
 
-	op->cmd = DOM0_STOPDOMAIN;
-	op->u.stopdomain.domain = (domid_t)domid;
-	op->u.stopdomain.sync = 1;
-	do_dom0_op(xc_handle, op);
-	/* can't trust return code due to sync stop hack :-(( */
+        op->cmd = DOM0_STOPDOMAIN;
+        op->u.stopdomain.domain = (domid_t)domid;
+        op->u.stopdomain.sync = 1;
+        do_dom0_op(xc_handle, op);
+        /* can't trust return code due to sync stop hack :-(( */
 
-       
         op->cmd = DOM0_GETDOMAININFO;
         op->u.getdomaininfo.domain = (domid_t)domid;
         op->u.getdomaininfo.ctxt = ctxt;
         if ( (do_dom0_op(xc_handle, op) < 0) || 
-             ((u64)op->u.getdomaininfo.domain != domid) )
+             ((u32)op->u.getdomaininfo.domain != domid) )
         {
             PERROR("Could not get info on domain");
             goto out;
         }
 
         if ( op->u.getdomaininfo.state == DOMSTATE_STOPPED )
-	{
-	    printf("Domain %lld stopped\n",domid);
+        {
+            printf("Domain %u stopped\n",domid);
             return 0;
-	}
-	
-	printf(".");
-
-	//usleep(1000);
+        }
+ 
+        printf(".");
     }
 
     printf("\n");
 
-out:
+ out:
     return -1;    
 }
 
@@ -262,10 +252,10 @@ long long  xc_domain_get_cpu_usage( int xc_handle, domid_t domid )
     op.u.getdomaininfo.domain = (domid_t)domid;
     op.u.getdomaininfo.ctxt = NULL;
     if ( (do_dom0_op(xc_handle, &op) < 0) || 
-	 ((u64)op.u.getdomaininfo.domain != domid) )
+         ((u32)op.u.getdomaininfo.domain != domid) )
     {
-	PERROR("Could not get info on domain");
-	return -1;
+        PERROR("Could not get info on domain");
+        return -1;
     }
     return op.u.getdomaininfo.cpu_time;
 }
@@ -273,18 +263,15 @@ long long  xc_domain_get_cpu_usage( int xc_handle, domid_t domid )
 
 /**********************************************************************/
 
-// this is shared between save and restore, and may be useful.
-
-unsigned long csum_page ( void * page )
+/* This is shared between save and restore, and may generally be useful. */
+unsigned long csum_page (void * page)
 {
     int i;
     unsigned long *p = page;
     unsigned long long sum=0;
 
-    for (i=0;i<PAGE_SIZE/sizeof(unsigned long);i++)
-    {
-	sum += p[i];
-    }
+    for ( i = 0; i < (PAGE_SIZE/sizeof(unsigned long)); i++ )
+        sum += p[i];
 
     return sum ^ (sum>>32);
 }

@@ -382,8 +382,7 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
         mcl[i].args[0] = MMAP_VADDR(pending_idx, i) >> PAGE_SHIFT;
         mcl[i].args[1] = (phys_seg[i].buffer & PAGE_MASK) | remap_prot;
         mcl[i].args[2] = 0;
-        mcl[i].args[3] = (unsigned long)blkif->domid;
-        mcl[i].args[4] = (unsigned long)(blkif->domid>>32);
+        mcl[i].args[3] = blkif->domid;
 
         phys_to_machine_mapping[__pa(MMAP_VADDR(pending_idx, i))>>PAGE_SHIFT] =
             phys_seg[i].buffer >> PAGE_SHIFT;

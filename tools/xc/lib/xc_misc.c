@@ -20,7 +20,7 @@ int xc_interface_close(int xc_handle)
 }
 
 
-#define CONSOLE_RING_CLEAR	1
+#define CONSOLE_RING_CLEAR 1
 
 int xc_readconsolering(int xc_handle,
                        char *str, 
@@ -48,7 +48,7 @@ int xc_readconsolering(int xc_handle,
 
 
 int xc_physinfo(int xc_handle,
-		xc_physinfo_t *put_info)
+                xc_physinfo_t *put_info)
 {
     int ret;
     dom0_op_t op;

@@ -73,139 +73,133 @@ static int privcmd_ioctl(struct inode *inode, struct file *file,
     case IOCTL_PRIVCMD_MMAP:
     {
 #define PRIVCMD_MMAP_SZ 32
-	privcmd_mmap_t mmapcmd;
-	privcmd_mmap_entry_t msg[PRIVCMD_MMAP_SZ], *p;
-	int i, rc;
+        privcmd_mmap_t mmapcmd;
+        privcmd_mmap_entry_t msg[PRIVCMD_MMAP_SZ], *p;
+        int i, rc;
 
         if ( copy_from_user(&mmapcmd, (void *)data, sizeof(mmapcmd)) )
             return -EFAULT;
 
-	p = mmapcmd.entry;
+        p = mmapcmd.entry;
 
-	for (i=0; i<mmapcmd.num; i+=PRIVCMD_MMAP_SZ, p+=PRIVCMD_MMAP_SZ)
-	{
-	    int j, n = ((mmapcmd.num-i)>PRIVCMD_MMAP_SZ)?
-		PRIVCMD_MMAP_SZ:(mmapcmd.num-i);
-	    if ( copy_from_user(&msg, p, n*sizeof(privcmd_mmap_entry_t)) )
-		return -EFAULT;
-	    
-	    for ( j = 0; j < n; j++ )
-	    {
-		struct vm_area_struct *vma = 
-		    find_vma( current->mm, msg[j].va );
+        for (i=0; i<mmapcmd.num; i+=PRIVCMD_MMAP_SZ, p+=PRIVCMD_MMAP_SZ)
+        {
+            int j, n = ((mmapcmd.num-i)>PRIVCMD_MMAP_SZ)?
+                PRIVCMD_MMAP_SZ:(mmapcmd.num-i);
+            if ( copy_from_user(&msg, p, n*sizeof(privcmd_mmap_entry_t)) )
+                return -EFAULT;
+     
+            for ( j = 0; j < n; j++ )
+            {
+                struct vm_area_struct *vma = 
+                    find_vma( current->mm, msg[j].va );
 
-		if ( !vma )
-		    return -EINVAL;
+                if ( !vma )
+                    return -EINVAL;
 
-		if ( msg[j].va > PAGE_OFFSET )
-		    return -EINVAL;
+                if ( msg[j].va > PAGE_OFFSET )
+                    return -EINVAL;
 
-		if ( (msg[j].va + (msg[j].npages<<PAGE_SHIFT)) > vma->vm_end )
-		    return -EINVAL;
+                if ( (msg[j].va + (msg[j].npages<<PAGE_SHIFT)) > vma->vm_end )
+                    return -EINVAL;
 
-		if ( (rc = direct_remap_area_pages(vma->vm_mm, 
-					    msg[j].va&PAGE_MASK, 
-					    msg[j].mfn<<PAGE_SHIFT, 
-					    msg[j].npages<<PAGE_SHIFT, 
-					    vma->vm_page_prot,
-					    mmapcmd.dom)) < 0 )
-		    return rc;
-	    }
-	}
-	ret = 0;
+                if ( (rc = direct_remap_area_pages(vma->vm_mm, 
+                                                   msg[j].va&PAGE_MASK, 
+                                                   msg[j].mfn<<PAGE_SHIFT, 
+                                                   msg[j].npages<<PAGE_SHIFT, 
+                                                   vma->vm_page_prot,
+                                                   mmapcmd.dom)) < 0 )
+                    return rc;
+            }
+        }
+        ret = 0;
     }
     break;
 
     case IOCTL_PRIVCMD_MMAPBATCH:
     {
 #define MAX_DIRECTMAP_MMU_QUEUE 130
-	mmu_update_t u[MAX_DIRECTMAP_MMU_QUEUE], *w, *v;
-	privcmd_mmapbatch_t m;
-	struct vm_area_struct *vma = NULL;
-	unsigned long *p, addr;
-	unsigned long mfn;
-	int i;
+        mmu_update_t u[MAX_DIRECTMAP_MMU_QUEUE], *w, *v;
+        privcmd_mmapbatch_t m;
+        struct vm_area_struct *vma = NULL;
+        unsigned long *p, addr;
+        unsigned long mfn;
+        int i;
 
         if ( copy_from_user(&m, (void *)data, sizeof(m)) )
-	{ ret = -EFAULT; goto batch_err; }
+        { ret = -EFAULT; goto batch_err; }
 
-	vma = find_vma( current->mm, m.addr );
+        vma = find_vma( current->mm, m.addr );
 
-	if ( !vma )
-	{ ret = -EINVAL; goto batch_err; }
+        if ( !vma )
+        { ret = -EINVAL; goto batch_err; }
 
-	if ( m.addr > PAGE_OFFSET )
-	{ ret = -EFAULT; goto batch_err; }
+        if ( m.addr > PAGE_OFFSET )
+        { ret = -EFAULT; goto batch_err; }
 
-	if ( (m.addr + (m.num<<PAGE_SHIFT)) > vma->vm_end )
-	{ ret = -EFAULT; goto batch_err; }
+        if ( (m.addr + (m.num<<PAGE_SHIFT)) > vma->vm_end )
+        { ret = -EFAULT; goto batch_err; }
 
-	if ( m.dom != 0 )
-	{
-	    u[0].val  = (unsigned long)(m.dom<<16) & ~0xFFFFUL;
-	    u[0].ptr  = (unsigned long)(m.dom<< 0) & ~0xFFFFUL;
-	    u[1].val  = (unsigned long)(m.dom>>16) & ~0xFFFFUL;
-	    u[1].ptr  = (unsigned long)(m.dom>>32) & ~0xFFFFUL;
-	    u[0].ptr |= MMU_EXTENDED_COMMAND;
-	    u[0].val |= MMUEXT_SET_SUBJECTDOM_L;
-	    u[1].ptr |= MMU_EXTENDED_COMMAND;
-	    u[1].val |= MMUEXT_SET_SUBJECTDOM_H;
-	    v = w = &u[2];
-	}
-	else
-	{
-	    v = w = &u[0];
-	}
+        if ( m.dom != 0 )
+        {
+            u[0].val  = (unsigned long)(m.dom<<16) & ~0xFFFFUL;
+            u[0].ptr  = (unsigned long)(m.dom<< 0) & ~0xFFFFUL;
+            u[0].ptr |= MMU_EXTENDED_COMMAND;
+            u[0].val |= MMUEXT_SET_SUBJECTDOM;
+            v = w = &u[1];
+        }
+        else
+        {
+            v = w = &u[0];
+        }
 
-	p = m.arr;
-	addr = m.addr;
-	for ( i = 0; i < m.num; i++, addr += PAGE_SIZE, p++ )
-	{
-	    if ( get_user(mfn, p) ) return -EFAULT;
+        p = m.arr;
+        addr = m.addr;
+        for ( i = 0; i < m.num; i++, addr += PAGE_SIZE, p++ )
+        {
+            if ( get_user(mfn, p) ) return -EFAULT;
 
-	    v->val = (mfn << PAGE_SHIFT) | pgprot_val(vma->vm_page_prot) |
-		_PAGE_IO;
+            v->val = (mfn << PAGE_SHIFT) | pgprot_val(vma->vm_page_prot) |
+                _PAGE_IO;
 
-	    __direct_remap_area_pages(vma->vm_mm,
+            __direct_remap_area_pages(vma->vm_mm,
                                       addr, 
                                       PAGE_SIZE, 
                                       v);
 
-	    if ( unlikely(HYPERVISOR_mmu_update(u, v - u + 1, NULL) < 0) )
-		put_user( 0xF0000000 | mfn, p );
+            if ( unlikely(HYPERVISOR_mmu_update(u, v - u + 1, NULL) < 0) )
+                put_user( 0xF0000000 | mfn, p );
 
-	    v = w;
-	}
-	ret = 0;
-	break;
+            v = w;
+        }
+        ret = 0;
+        break;
 
     batch_err:
-	printk("batch_err ret=%d vma=%p addr=%lx num=%d arr=%p %lx-%lx\n", 
-	       ret, vma, m.addr, m.num, m.arr, vma->vm_start, vma->vm_end);
-	break;
+        printk("batch_err ret=%d vma=%p addr=%lx num=%d arr=%p %lx-%lx\n", 
+               ret, vma, m.addr, m.num, m.arr, vma->vm_start, vma->vm_end);
+        break;
     }
     break;
 
-
-
     default:
         ret = -EINVAL;
-    	break;
+        break;
     }
     return ret;
 }
 
 static int privcmd_mmap(struct file * file, struct vm_area_struct * vma)
 {
-	/* DONTCOPY is essential for Xen as copy_page_range is broken. */
-	vma->vm_flags |= VM_RESERVED | VM_IO | VM_DONTCOPY;
+    /* DONTCOPY is essential for Xen as copy_page_range is broken. */
+    vma->vm_flags |= VM_RESERVED | VM_IO | VM_DONTCOPY;
 
-	return 0;
+    return 0;
 }
 
 static struct file_operations privcmd_file_ops = {
-  ioctl : privcmd_ioctl,
-  mmap:   privcmd_mmap
+    ioctl : privcmd_ioctl,
+    mmap:   privcmd_mmap
 };
 
 
@@ -236,3 +230,4 @@ static void __exit cleanup_module(void)
 
 module_init(init_module);
 module_exit(cleanup_module);
+#

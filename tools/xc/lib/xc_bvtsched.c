@@ -22,7 +22,7 @@ int xc_bvtsched_global_set(int xc_handle,
 }
 
 int xc_bvtsched_global_get(int xc_handle,
-			   unsigned long *ctx_allow)
+                           unsigned long *ctx_allow)
 {
     dom0_op_t op;
     int ret;
@@ -39,7 +39,7 @@ int xc_bvtsched_global_get(int xc_handle,
 }
 
 int xc_bvtsched_domain_set(int xc_handle,
-                           u64 domid,
+                           u32 domid,
                            unsigned long mcuadv,
                            unsigned long warp,
                            unsigned long warpl,
@@ -62,9 +62,9 @@ int xc_bvtsched_domain_set(int xc_handle,
 
 
 int xc_bvtsched_domain_get(int xc_handle,
-			   u64 domid,
-			   unsigned long *mcuadv,
-			   unsigned long *warp,
+                           u32 domid,
+                           unsigned long *mcuadv,
+                           unsigned long *warp,
                            unsigned long *warpl,
                            unsigned long *warpu)
 {

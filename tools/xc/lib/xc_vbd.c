@@ -10,7 +10,7 @@
 #include "xc_private.h"
 
 int xc_vbd_create(int xc_handle,
-                  u64 domid, 
+                  u32 domid, 
                   unsigned short vbdid, 
                   int writeable)
 {
@@ -24,7 +24,7 @@ int xc_vbd_create(int xc_handle,
 
 
 int xc_vbd_destroy(int xc_handle,
-                   u64 domid, 
+                   u32 domid, 
                    unsigned short vbdid)
 {
     block_io_op_t op; 
@@ -36,7 +36,7 @@ int xc_vbd_destroy(int xc_handle,
 
 
 int xc_vbd_grow(int xc_handle,
-                u64 domid, 
+                u32 domid, 
                 unsigned short vbdid,
                 xc_vbdextent_t *extent)
 {
@@ -52,7 +52,7 @@ int xc_vbd_grow(int xc_handle,
 
 
 int xc_vbd_shrink(int xc_handle,
-                  u64 domid, 
+                  u32 domid, 
                   unsigned short vbdid)
 {
     block_io_op_t op; 
@@ -64,7 +64,7 @@ int xc_vbd_shrink(int xc_handle,
 
 
 int xc_vbd_setextents(int xc_handle,
-                      u64 domid, 
+                      u32 domid, 
                       unsigned short vbdid,
                       unsigned int nr_extents,
                       xc_vbdextent_t *extents)
@@ -112,7 +112,7 @@ int xc_vbd_setextents(int xc_handle,
 
 
 int xc_vbd_getextents(int xc_handle,
-                      u64 domid, 
+                      u32 domid, 
                       unsigned short vbdid,
                       unsigned int max_extents,
                       xc_vbdextent_t *extents,
@@ -161,7 +161,7 @@ int xc_vbd_getextents(int xc_handle,
 
 
 int xc_vbd_probe(int xc_handle,
-                 u64 domid,
+                 u32 domid,
                  unsigned int max_vbds,
                  xc_vbd_t *vbds)
 {
@@ -194,7 +194,7 @@ int xc_vbd_probe(int xc_handle,
             if ( !(xdi->disks[i].info & XD_FLAG_VIRT) )
                 continue;
             
-            vbds[j].domid = (u64)xdi->disks[i].domain;
+            vbds[j].domid = (u32)xdi->disks[i].domain;
             vbds[j].vbdid = xdi->disks[i].device;
             vbds[j].flags = (xdi->disks[i].info & XD_FLAG_RO) ? 
                 0 : XC_VBDF_WRITEABLE;

@@ -30,8 +30,8 @@ static int do_evtchn_op(int xc_handle, evtchn_op_t *op)
 }
 
 int xc_evtchn_bind_interdomain(int xc_handle,
-                               u64 dom1,
-                               u64 dom2,
+                               u32 dom1,
+                               u32 dom2,
                                int *port1,
                                int *port2)
 {
@@ -55,7 +55,7 @@ int xc_evtchn_bind_interdomain(int xc_handle,
 
 
 int xc_evtchn_close(int xc_handle,
-                    u64 dom,
+                    u32 dom,
                     int port)
 {
     evtchn_op_t op;
@@ -77,7 +77,7 @@ int xc_evtchn_send(int xc_handle,
 
 
 int xc_evtchn_status(int xc_handle,
-                     u64 dom,
+                     u32 dom,
                      int port,
                      xc_evtchn_status_t *status)
 {
@@ -93,7 +93,7 @@ int xc_evtchn_status(int xc_handle,
         switch ( status->status = op.u.status.status )
         {
         case EVTCHNSTAT_interdomain:
-            status->u.interdomain.dom  = (u64)op.u.status.u.interdomain.dom;
+            status->u.interdomain.dom  = (u32)op.u.status.u.interdomain.dom;
             status->u.interdomain.port = op.u.status.u.interdomain.port;
             break;
         case EVTCHNSTAT_pirq:

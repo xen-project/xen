@@ -189,7 +189,7 @@ int physdev_pci_access_modify(
              * this will allow all processes in that domain access to those
              * ports as well.  This will do for now, since driver domains don't
              * run untrusted processes! */
-            INFO("Giving domain %llu IO resources (%lx - %lx) "
+            INFO("Giving domain %u IO resources (%lx - %lx) "
                  "for device %s\n", dom, r->start, r->end, pdev->slot_name);
             for ( j = r->start; j < r->end + 1; j++ )
             {
@@ -204,7 +204,7 @@ int physdev_pci_access_modify(
         }
 
         /* rights to IO memory regions are checked when the domain maps them */
-	}
+    }
  out:
     put_task_struct(p);
     return rc;
@@ -217,7 +217,7 @@ int domain_iomem_in_pfn(struct task_struct *p, unsigned long pfn)
     int ret = 0;
     struct list_head *l;
 
-    VERBOSE_INFO("Checking if physdev-capable domain %llu needs access to "
+    VERBOSE_INFO("Checking if physdev-capable domain %u needs access to "
                  "pfn %08lx\n", p->domain, pfn);
     
     spin_lock(&p->pcidev_lock);
@@ -245,7 +245,7 @@ int domain_iomem_in_pfn(struct task_struct *p, unsigned long pfn)
     
     spin_unlock(&p->pcidev_lock);
 
-    VERBOSE_INFO("Domain %llu %s mapping of pfn %08lx\n",
+    VERBOSE_INFO("Domain %u %s mapping of pfn %08lx\n",
                  p->domain, ret ? "allowed" : "disallowed", pfn);
 
     return ret;
@@ -300,8 +300,8 @@ inline static int check_dev_acc (struct task_struct *p,
  * to work out the length of the io region a device probe typically does:
  * 1) a = read_base_addr_reg()
  * 2) write_base_addr_reg(0xffffffff)
- * 3) b = read_base_addr_reg() // device zeros lower bits
- * 4) write_base_addr_reg(a) // restore original value
+ * 3) b = read_base_addr_reg()  [device zeros lower bits]
+ * 4) write_base_addr_reg(a)    [restore original value]
  * this function fakes out step 2-4. *no* writes are made to the device.
  * 
  * phys_dev_t contains a bit field (a bit for each base address register).
@@ -328,7 +328,7 @@ static int do_base_address_access(phys_dev_t *pdev, int acc, int idx,
         /* We could set *val to some value but the guest may well be in trouble
          * anyway if this write fails.  Hopefully the printk will give us a
          * clue what went wrong. */
-        printk("Guest %llu attempting sub-dword %s to BASE_ADDRESS %d\n",
+        printk("Guest %u attempting sub-dword %s to BASE_ADDRESS %d\n",
                pdev->owner->domain, (acc == ACC_READ) ? "read" : "write", idx);
         
         return -EPERM;

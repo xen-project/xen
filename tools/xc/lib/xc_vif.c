@@ -9,7 +9,7 @@
 #include "xc_private.h"
 
 int xc_vif_scheduler_set(int xc_handle,
-                         u64 domid, 
+                         u32 domid, 
                          unsigned int vifid, 
                          xc_vif_sched_params_t *params)
 {
@@ -24,7 +24,7 @@ int xc_vif_scheduler_set(int xc_handle,
 
 
 int xc_vif_scheduler_get(int xc_handle,
-                         u64 domid, 
+                         u32 domid, 
                          unsigned int vifid, 
                          xc_vif_sched_params_t *params)
 {
@@ -46,7 +46,7 @@ int xc_vif_scheduler_get(int xc_handle,
 
 
 int xc_vif_stats_get(int xc_handle,
-                     u64 domid, 
+                     u32 domid, 
                      unsigned int vifid, 
                      xc_vif_stats_t *stats)
 {

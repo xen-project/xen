@@ -9,8 +9,7 @@
 #include "common.h"
 
 #define BLKIF_HASHSZ 1024
-#define BLKIF_HASH(_d,_h) \
-    (((int)(_d)^(int)((_d)>>32)^(int)(_h))&(BLKIF_HASHSZ-1))
+#define BLKIF_HASH(_d,_h) (((int)(_d)^(int)(_h))&(BLKIF_HASHSZ-1))
 
 static kmem_cache_t *blkif_cachep;
 static blkif_t      *blkif_hash[BLKIF_HASHSZ];
@@ -151,7 +150,7 @@ void blkif_connect(blkif_be_connect_t *connect)
     blkif = blkif_find_by_handle(domid, handle);
     if ( unlikely(blkif == NULL) )
     {
-        DPRINTK("blkif_connect attempted for non-existent blkif (%llu,%u)\n", 
+        DPRINTK("blkif_connect attempted for non-existent blkif (%u,%u)\n", 
                 connect->domid, connect->blkif_handle); 
         connect->status = BLKIF_BE_STATUS_INTERFACE_NOT_FOUND;
         return;
@@ -208,7 +207,7 @@ int blkif_disconnect(blkif_be_disconnect_t *disconnect, u8 rsp_id)
     if ( unlikely(blkif == NULL) )
     {
         DPRINTK("blkif_disconnect attempted for non-existent blkif"
-                " (%llu,%u)\n", disconnect->domid, disconnect->blkif_handle); 
+                " (%u,%u)\n", disconnect->domid, disconnect->blkif_handle); 
         disconnect->status = BLKIF_BE_STATUS_INTERFACE_NOT_FOUND;
         return 1; /* Caller will send response error message. */
     }

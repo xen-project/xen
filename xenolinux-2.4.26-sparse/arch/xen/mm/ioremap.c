@@ -119,13 +119,9 @@ int direct_remap_area_pages(struct mm_struct *mm,
     {
         u[0].val  = (unsigned long)(domid<<16) & ~0xFFFFUL;
         u[0].ptr  = (unsigned long)(domid<< 0) & ~0xFFFFUL;
-        u[1].val  = (unsigned long)(domid>>16) & ~0xFFFFUL;
-        u[1].ptr  = (unsigned long)(domid>>32) & ~0xFFFFUL;
         u[0].ptr |= MMU_EXTENDED_COMMAND;
-        u[0].val |= MMUEXT_SET_SUBJECTDOM_L;
-        u[1].ptr |= MMU_EXTENDED_COMMAND;
-        u[1].val |= MMUEXT_SET_SUBJECTDOM_H;
-        v = w = &u[2];
+        u[0].val |= MMUEXT_SET_SUBJECTDOM;
+        v = w = &u[1];
     }
     else
     {

@@ -10,8 +10,7 @@
 #include <linux/rtnetlink.h>
 
 #define NETIF_HASHSZ 1024
-#define NETIF_HASH(_d,_h) \
-    (((int)(_d)^(int)((_d)>>32)^(int)(_h))&(NETIF_HASHSZ-1))
+#define NETIF_HASH(_d,_h) (((int)(_d)^(int)(_h))&(NETIF_HASHSZ-1))
 
 static netif_t *netif_hash[NETIF_HASHSZ];
 static struct net_device *bridge_dev;
@@ -185,7 +184,7 @@ void netif_connect(netif_be_connect_t *connect)
     netif = netif_find_by_handle(domid, handle);
     if ( unlikely(netif == NULL) )
     {
-        DPRINTK("netif_connect attempted for non-existent netif (%llu,%u)\n", 
+        DPRINTK("netif_connect attempted for non-existent netif (%u,%u)\n", 
                 connect->domid, connect->netif_handle); 
         connect->status = NETIF_BE_STATUS_INTERFACE_NOT_FOUND;
         return;
@@ -271,7 +270,7 @@ int netif_disconnect(netif_be_disconnect_t *disconnect, u8 rsp_id)
     if ( unlikely(netif == NULL) )
     {
         DPRINTK("netif_disconnect attempted for non-existent netif"
-                " (%llu,%u)\n", disconnect->domid, disconnect->netif_handle); 
+                " (%u,%u)\n", disconnect->domid, disconnect->netif_handle); 
         disconnect->status = NETIF_BE_STATUS_INTERFACE_NOT_FOUND;
         return 1; /* Caller will send response error message. */
     }

@@ -43,18 +43,18 @@ def backend_rx_rsp(port, msg):
         rsp = { 'success': True }
         xend.main.send_management_response(rsp, xend.blkif.pendaddr)
     elif subtype == CMSG_BLKIF_BE_CONNECT:
-        (dom,hnd,evtchn,frame,st) = struct.unpack("QIILI", msg.get_payload())
+        (dom,hnd,evtchn,frame,st) = struct.unpack("IIILI", msg.get_payload())
         blkif = interface.list[xend.main.port_from_dom(dom).local_port]
         msg = xend.utils.message(CMSG_BLKIF_FE, \
                                  CMSG_BLKIF_FE_INTERFACE_STATUS_CHANGED, 0)
         msg.append_payload(struct.pack("III",0,2,blkif.evtchn['port2']))
         blkif.ctrlif_tx_req(xend.main.port_list[blkif.key], msg)
     elif subtype == CMSG_BLKIF_BE_VBD_CREATE:
-        (dom,hnd,vdev,ro,st) = struct.unpack("QIHII", msg.get_payload())
+        (dom,hnd,vdev,ro,st) = struct.unpack("IIHII", msg.get_payload())
         blkif = interface.list[xend.main.port_from_dom(dom).local_port]
         (pdev, start_sect, nr_sect, readonly) = blkif.devices[vdev]
         msg = xend.utils.message(CMSG_BLKIF_BE, CMSG_BLKIF_BE_VBD_GROW, 0)
-        msg.append_payload(struct.pack("QIHHHQQI",dom,0,vdev,0, \
+        msg.append_payload(struct.pack("IIHHHQQI",dom,0,vdev,0, \
                                        pdev,start_sect,nr_sect,0))
         backend_tx_req(msg)
     elif subtype == CMSG_BLKIF_BE_VBD_GROW:
@@ -84,7 +84,7 @@ class interface:
         self.pendmsg = None
         interface.list[key] = self
         msg = xend.utils.message(CMSG_BLKIF_BE, CMSG_BLKIF_BE_CREATE, 0)
-        msg.append_payload(struct.pack("QII",dom,0,0))
+        msg.append_payload(struct.pack("III",dom,0,0))
         xend.blkif.pendaddr = xend.main.mgmt_req_addr
         backend_tx_req(msg)
 
@@ -94,7 +94,7 @@ class interface:
             return False
         self.devices[vdev] = (pdev, start_sect, nr_sect, readonly)
         msg = xend.utils.message(CMSG_BLKIF_BE, CMSG_BLKIF_BE_VBD_CREATE, 0)
-        msg.append_payload(struct.pack("QIHII",self.dom,0,vdev,readonly,0))
+        msg.append_payload(struct.pack("IIHII",self.dom,0,vdev,readonly,0))
         xend.blkif.pendaddr = xend.main.mgmt_req_addr
         backend_tx_req(msg)
         return True
@@ -104,7 +104,7 @@ class interface:
     def destroy(self):
         del interface.list[self.key]
         msg = xend.utils.message(CMSG_BLKIF_BE, CMSG_BLKIF_BE_DESTROY, 0)
-        msg.append_payload(struct.pack("QII",self.dom,0,0))
+        msg.append_payload(struct.pack("III",self.dom,0,0))
         backend_tx_req(msg)        
 
 
@@ -138,6 +138,6 @@ class interface:
             self.evtchn = xc.evtchn_bind_interdomain(dom1=0,dom2=self.dom)
             msg = xend.utils.message(CMSG_BLKIF_BE, \
                                      CMSG_BLKIF_BE_CONNECT, 0)
-            msg.append_payload(struct.pack("QIILI",self.dom,0, \
+            msg.append_payload(struct.pack("IIILI",self.dom,0, \
                                            self.evtchn['port1'],frame,0))
             backend_tx_req(msg)

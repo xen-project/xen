@@ -19,10 +19,10 @@
 #define EVTCHNOP_bind_interdomain 0
 typedef struct {
     /* IN parameters. */
-    domid_t dom1, dom2;               /*  0,  8 */
+    domid_t dom1, dom2;               /*  0,  4 */
     /* OUT parameters. */
-    u32     port1, port2;             /* 16, 20 */
-} PACKED evtchn_bind_interdomain_t; /* 24 bytes */
+    u32     port1, port2;             /*  8, 12 */
+} PACKED evtchn_bind_interdomain_t; /* 16 bytes */
 
 /*
  * EVTCHNOP_bind_virq: Bind a local event channel to IRQ <irq>.
@@ -65,9 +65,9 @@ typedef struct {
 typedef struct {
     /* IN parameters. */
     domid_t dom;                      /*  0 */
-    u32     port;                     /*  8 */
+    u32     port;                     /*  4 */
     /* No OUT parameters. */
-} PACKED evtchn_close_t; /* 12 bytes */
+} PACKED evtchn_close_t; /* 8 bytes */
 
 /*
  * EVTCHNOP_send: Send an event to the remote end of the channel whose local
@@ -92,23 +92,23 @@ typedef struct {
 typedef struct {
     /* IN parameters */
     domid_t dom;                      /*  0 */
-    u32     port;                     /*  8 */
+    u32     port;                     /*  4 */
     /* OUT parameters */
 #define EVTCHNSTAT_closed       0  /* Chennel is not in use.                 */
 #define EVTCHNSTAT_unbound      1  /* Channel is not bound to a source.      */
 #define EVTCHNSTAT_interdomain  2  /* Channel is connected to remote domain. */
 #define EVTCHNSTAT_pirq         3  /* Channel is bound to a phys IRQ line.   */
 #define EVTCHNSTAT_virq         4  /* Channel is bound to a virtual IRQ line */
-    u32     status;                   /* 12 */
-    union {
+    u32     status;                   /*  8 */
+    union {                           /* 12 */
         struct {
-            domid_t dom;                              /* 16 */
-            u32     port;                             /* 24 */
+            domid_t dom;                              /* 12 */
+            u32     port;                             /* 16 */
         } PACKED interdomain; /* EVTCHNSTAT_interdomain */
-        u32 pirq;      /* EVTCHNSTAT_pirq        */   /* 16 */
-        u32 virq;      /* EVTCHNSTAT_virq        */   /* 16 */
+        u32 pirq;      /* EVTCHNSTAT_pirq        */   /* 12 */
+        u32 virq;      /* EVTCHNSTAT_virq        */   /* 12 */
     } PACKED u;
-} PACKED evtchn_status_t; /* 28 bytes */
+} PACKED evtchn_status_t; /* 20 bytes */
 
 typedef struct {
     u32 cmd; /* EVTCHNOP_* */         /*  0 */
@@ -120,8 +120,8 @@ typedef struct {
         evtchn_close_t            close;
         evtchn_send_t             send;
         evtchn_status_t           status;
-        u8                        __dummy[32];
+        u8                        __dummy[24];
     } PACKED u;
-} PACKED evtchn_op_t; /* 40 bytes */
+} PACKED evtchn_op_t; /* 32 bytes */
 
 #endif /* __HYPERVISOR_IFS__EVENT_CHANNEL_H__ */

@@ -84,14 +84,14 @@
  *  This domain that must own all non-page-table pages that are involved in
  *  MMU updates. By default it is the domain that executes mmu_update(). If the
  *  caller has sufficient privilege then it can be changed by executing
- *  MMUEXT_SET_SUBJECTDOM_{L,H}.
+ *  MMUEXT_SET_SUBJECTDOM.
  * 
  * PTS (Page-Table Subject)
  * ------------------------
  *  This domain must own all the page-table pages that are subject to MMU
  *  updates. By default it is the domain that executes mmu_update(). If the
  *  caller has sufficient privilege then it can be changed by executing
- *  MMUEXT_SET_SUBJECTDOM_H with val[14] (SET_PAGETABLE_SUBJECTDOM) set.
+ *  MMUEXT_SET_SUBJECTDOM with val[14] (SET_PAGETABLE_SUBJECTDOM) set.
  * 
  * ptr[1:0] == MMU_NORMAL_PT_UPDATE:
  * Updates an entry in a page table.
@@ -122,13 +122,9 @@
  *   ptr[:2]  -- linear address of LDT base (NB. must be page-aligned)
  *   val[:8]  -- number of entries in LDT
  * 
- *   val[7:0] == MMUEXT_SET_SUBJECTDOM_L:
- *   (ptr[31:15],val[31:15]) -- dom[31:0]
- * 
- *   val[7:0] == MMUEXT_SET_SUBJECTDOM_H:
+ *   val[7:0] == MMUEXT_SET_SUBJECTDOM:
  *   val[14]  -- if TRUE then sets the PTS in addition to the GPS.
- *   (ptr[31:15],val[31:15]) -- dom[63:32]
- *   NB. This command must be immediately preceded by SET_SUBJECTDOM_L.
+ *   (ptr[31:15],val[31:15]) -- dom[31:0]
  * 
  *   val[7:0] == MMUEXT_REASSIGN_PAGE:
  *   ptr[:2]  -- machine address within page to be reassigned to the GPS.
@@ -156,12 +152,10 @@
 #define MMUEXT_TLB_FLUSH         6 /* ptr = NULL                             */
 #define MMUEXT_INVLPG            7 /* ptr = VA to invalidate                 */
 #define MMUEXT_SET_LDT           8 /* ptr = VA of table; val = # entries     */
-/* NB. MMUEXT_SET_SUBJECTDOM must consist of *_L followed immediately by *_H */
-#define MMUEXT_SET_SUBJECTDOM_L  9 /* (ptr[31:15],val[31:15]) = dom[31:0]    */
-#define MMUEXT_SET_SUBJECTDOM_H 10 /* (ptr[31:15],val[31:15]) = dom[63:32]   */
-#define SET_PAGETABLE_SUBJECTDOM (1<<14) /* OR into 'val' arg of SUBJECTDOM_H*/
-#define MMUEXT_REASSIGN_PAGE    11
-#define MMUEXT_RESET_SUBJECTDOM 12
+#define MMUEXT_SET_SUBJECTDOM    9 /* (ptr[31:15],val[31:15]) = dom[31:0]    */
+#define SET_PAGETABLE_SUBJECTDOM (1<<14) /* OR into 'val' arg of SUBJECTDOM  */
+#define MMUEXT_REASSIGN_PAGE    10
+#define MMUEXT_RESET_SUBJECTDOM 11
 #define MMUEXT_CMD_MASK        255
 #define MMUEXT_CMD_SHIFT         8
 
@@ -192,9 +186,9 @@
 
 #ifndef __ASSEMBLY__
 
-typedef u64 domid_t;
+typedef u32 domid_t;
 /* DOMID_SELF is used in certain contexts to refer to oneself. */
-#define DOMID_SELF (~1ULL)
+#define DOMID_SELF (0x7FFFFFFEU)
 
 #include "network.h"
 #include "block.h"

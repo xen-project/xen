@@ -42,9 +42,10 @@ struct sched_ctl_cmd
 
 struct sched_adjdom_cmd
 {
-    u32 sched_id;                     /*  0 */
-    u32 direction;                    /*  4 */
+    u32     sched_id;                 /*  0 */
+    u32     direction;                /*  4 */
     domid_t domain;                   /*  8 */
+    u32     __pad;
     union {                           /* 16 */
         struct bvt_adjdom
         {

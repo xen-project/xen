@@ -75,7 +75,7 @@ struct task_struct *do_createdomain(domid_t dom_id, unsigned int cpu)
         }
         
         /* We use a large intermediate to avoid overflow in sprintf. */
-        sprintf(buf, "Domain-%llu", dom_id);
+        sprintf(buf, "Domain-%u", dom_id);
         strncpy(p->name, buf, MAX_DOMAIN_NAME);
         p->name[MAX_DOMAIN_NAME-1] = '\0';
 
@@ -90,15 +90,13 @@ struct task_struct *do_createdomain(domid_t dom_id, unsigned int cpu)
         p->shared_info = (void *)get_free_page(GFP_KERNEL);
         memset(p->shared_info, 0, PAGE_SIZE);
         SHARE_PFN_WITH_DOMAIN(virt_to_page(p->shared_info), p);
-        
-	machine_to_phys_mapping[virt_to_phys(p->shared_info) >> PAGE_SHIFT] =
-	    0x80000000UL;  // set m2p table to magic marker (helps debug)
+        machine_to_phys_mapping[virt_to_phys(p->shared_info) >> 
+                               PAGE_SHIFT] = 0x80000000UL;  /* debug */
 
         p->mm.perdomain_pt = (l1_pgentry_t *)get_free_page(GFP_KERNEL);
         memset(p->mm.perdomain_pt, 0, PAGE_SIZE);
-        
-	machine_to_phys_mapping[virt_to_phys(p->mm.perdomain_pt) >> PAGE_SHIFT] =
-	    0x0fffdeadUL;  // set m2p table to magic marker (helps debug)
+        machine_to_phys_mapping[virt_to_phys(p->mm.perdomain_pt) >> 
+                               PAGE_SHIFT] = 0x0fffdeadUL;  /* debug */
 
         init_blkdev_info(p);
         
@@ -161,8 +159,8 @@ struct task_struct *find_last_domain(void)
     p = plast->next_list;
     while ( p != NULL )
     {
-	if ( p->create_time > plast->create_time )
-	    plast = p;
+        if ( p->create_time > plast->create_time )
+            plast = p;
         p = p->next_list;
     }
     get_task_struct(plast);
@@ -174,7 +172,7 @@ struct task_struct *find_last_domain(void)
 
 void kill_domain_with_errmsg(const char *err)
 {
-    printk("DOM%llu FATAL ERROR: %s\n", current->domain, err);
+    printk("DOM%u FATAL ERROR: %s\n", current->domain, err);
     kill_domain();
 }
 
@@ -196,7 +194,7 @@ void __kill_domain(struct task_struct *p)
     if ( !sched_rem_domain(p) )
         return;
 
-    DPRINTK("Killing domain %llu\n", p->domain);
+    DPRINTK("Killing domain %u\n", p->domain);
 
     unlink_blkdev_info(p);
 
@@ -270,9 +268,9 @@ void stop_domain(void)
     /* OK, this is grim, but helps speed up live migrate. When a domain stops,
        kick Dom0 */
     {
-	struct task_struct *p;
-	guest_schedule_to_run( p = find_domain_by_id(0ULL) );
-	put_task_struct(p);
+        struct task_struct *p;
+        guest_schedule_to_run( p = find_domain_by_id(0ULL) );
+        put_task_struct(p);
     }
 
     __enter_scheduler();
@@ -355,7 +353,7 @@ struct pfn_info *alloc_domain_page(struct task_struct *p)
         spin_lock(&p->page_list_lock);
         if ( unlikely(p->tot_pages >= p->max_pages) )
         {
-            DPRINTK("Over-allocation for domain %llu: %u >= %u\n",
+            DPRINTK("Over-allocation for domain %u: %u >= %u\n",
                     p->domain, p->tot_pages, p->max_pages);
             spin_unlock(&p->page_list_lock);
             goto free_and_exit;
@@ -393,14 +391,14 @@ void free_domain_page(struct pfn_info *page)
         if ( !(page->count_and_flags & PGC_zombie) )
         {
             page->tlbflush_timestamp = tlbflush_clock;
-	    if ( likely(p != NULL) )
-	    {
+            if ( likely(p != NULL) )
+            {
                 page->u.cpu_mask = 1 << p->processor;
                 spin_lock(&p->page_list_lock);
-		list_del(&page->list);
-		p->tot_pages--;
-		spin_unlock(&p->page_list_lock);
-	    }
+                list_del(&page->list);
+                p->tot_pages--;
+                spin_unlock(&p->page_list_lock);
+            }
         }
 
         page->count_and_flags = 0;
@@ -533,16 +531,16 @@ unsigned int alloc_new_dom_mem(struct task_struct *p, unsigned int kbytes)
             return -ENOMEM;
         }
 
-	/* initialise to machine_to_phys_mapping table to likely pfn */
-	machine_to_phys_mapping[page-frame_table] = alloc_pfns;
+        /* initialise to machine_to_phys_mapping table to likely pfn */
+        machine_to_phys_mapping[page-frame_table] = alloc_pfns;
 
 #ifndef NDEBUG
-	{
-	    // initialise with magic marker if in DEBUG mode
-	    void * a = map_domain_mem( (page-frame_table)<<PAGE_SHIFT );
-	    memset( a, 0x80 | (char) p->domain, PAGE_SIZE );
-	    unmap_domain_mem( a );
-	}
+        {
+            /* Initialise with magic marker if in DEBUG mode. */
+            void * a = map_domain_mem( (page-frame_table)<<PAGE_SHIFT );
+            memset( a, 0x80 | (char) p->domain, PAGE_SIZE );
+            unmap_domain_mem( a );
+        }
 #endif
 
     }
@@ -559,7 +557,7 @@ void release_task(struct task_struct *p)
     ASSERT(p->state == TASK_DYING);
     ASSERT(!p->has_cpu);
 
-    DPRINTK("Releasing task %llu\n", p->domain);
+    DPRINTK("Releasing task %u\n", p->domain);
 
     /*
      * This frees up blkdev rings and vbd-access lists. Totally safe since
@@ -588,12 +586,12 @@ int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *builddomain)
     full_execution_context_t *c;
 
     if ( (c = kmalloc(sizeof(*c), GFP_KERNEL)) == NULL )
-	return -ENOMEM;
+        return -ENOMEM;
 
     if ( test_bit(PF_CONSTRUCTED, &p->flags) )
     {
         rc = -EINVAL;
-	goto out;
+        goto out;
     }
 
     if ( copy_from_user(c, builddomain->ctxt, sizeof(*c)) )
@@ -649,7 +647,7 @@ int final_setup_guestos(struct task_struct *p, dom0_builddomain_t *builddomain)
 
     set_bit(PF_CONSTRUCTED, &p->flags);
 
-out:    
+ out:    
     if (c) kfree(c);
     
     return rc;
@@ -682,13 +680,13 @@ static int readelfimage_base_and_size(char *elfbase,
 
     if ( (ehdr->e_phoff + (ehdr->e_phnum * ehdr->e_phentsize)) > elfsize )
     {
-	printk("ELF program headers extend beyond end of image.\n");
+        printk("ELF program headers extend beyond end of image.\n");
         return -EINVAL;
     }
 
     if ( (ehdr->e_shoff + (ehdr->e_shnum * ehdr->e_shentsize)) > elfsize )
     {
-	printk("ELF section headers extend beyond end of image.\n");
+        printk("ELF section headers extend beyond end of image.\n");
         return -EINVAL;
     }
 
@@ -760,7 +758,7 @@ static int loadelfimage(char *elfbase)
     {
         phdr = (Elf_Phdr *)(elfbase + ehdr->e_phoff + (h*ehdr->e_phentsize));
         if ( !is_loadable_phdr(phdr) )
-	    continue;
+            continue;
         if ( phdr->p_filesz != 0 )
             memcpy((char *)phdr->p_vaddr, elfbase + phdr->p_offset, 
                    phdr->p_filesz);
@@ -1045,10 +1043,10 @@ int construct_dom0(struct task_struct *p,
 
     if ( initrd_len != 0 )
     {
-	si->mod_start = vinitrd_start;
-	si->mod_len   = initrd_len;
-	printk("Initrd len 0x%lx, start at 0x%08lx\n",
-	       si->mod_len, si->mod_start);
+        si->mod_start = vinitrd_start;
+        si->mod_len   = initrd_len;
+        printk("Initrd len 0x%lx, start at 0x%08lx\n",
+               si->mod_len, si->mod_start);
     }
 
     dst = si->cmd_line;

@@ -11,8 +11,8 @@
 int xc_domain_create(int xc_handle,
                      unsigned int mem_kb, 
                      const char *name,
-		     int cpu,
-                     u64 *pdomid)
+                     int cpu,
+                     u32 *pdomid)
 {
     int err;
     dom0_op_t op;
@@ -24,14 +24,14 @@ int xc_domain_create(int xc_handle,
     op.u.createdomain.cpu = cpu;
 
     if ( (err = do_dom0_op(xc_handle, &op)) == 0 )
-        *pdomid = (u64)op.u.createdomain.domain;
+        *pdomid = (u32)op.u.createdomain.domain;
 
     return err;
 }    
 
 
 int xc_domain_start(int xc_handle,
-                    u64 domid)
+                    u32 domid)
 {
     dom0_op_t op;
     op.cmd = DOM0_STARTDOMAIN;
@@ -41,18 +41,18 @@ int xc_domain_start(int xc_handle,
 
 
 int xc_domain_stop(int xc_handle, 
-                   u64 domid)
+                   u32 domid)
 {
     dom0_op_t op;
     op.cmd = DOM0_STOPDOMAIN;
     op.u.stopdomain.domain = (domid_t)domid;
-    op.u.stopdomain.sync = 0; // async
+    op.u.stopdomain.sync = 0; /* async */
     return do_dom0_op(xc_handle, &op);
 }    
 
 
 int xc_domain_destroy(int xc_handle,
-                      u64 domid, 
+                      u32 domid, 
                       int force)
 {
     dom0_op_t op;
@@ -63,7 +63,7 @@ int xc_domain_destroy(int xc_handle,
 }
 
 int xc_domain_pincpu(int xc_handle,
-                     u64 domid, 
+                     u32 domid, 
                      int cpu)
 {
     dom0_op_t op;
@@ -75,22 +75,22 @@ int xc_domain_pincpu(int xc_handle,
 
 
 int xc_domain_getinfo(int xc_handle,
-                      u64 first_domid,
+                      u32 first_domid,
                       unsigned int max_doms,
                       xc_dominfo_t *info)
 {
     unsigned int nr_doms;
-    u64 next_domid = first_domid;
+    u32 next_domid = first_domid;
     dom0_op_t op;
 
     for ( nr_doms = 0; nr_doms < max_doms; nr_doms++ )
     {
         op.cmd = DOM0_GETDOMAININFO;
         op.u.getdomaininfo.domain = (domid_t)next_domid;
-        op.u.getdomaininfo.ctxt = NULL; // no exec context info, thanks.
+        op.u.getdomaininfo.ctxt = NULL; /* no exec context info, thanks. */
         if ( do_dom0_op(xc_handle, &op) < 0 )
             break;
-        info->domid   = (u64)op.u.getdomaininfo.domain;
+        info->domid   = (u32)op.u.getdomaininfo.domain;
         info->cpu     = op.u.getdomaininfo.processor;
         info->has_cpu = op.u.getdomaininfo.has_cpu;
         info->stopped = (op.u.getdomaininfo.state == DOMSTATE_STOPPED);
@@ -101,7 +101,7 @@ int xc_domain_getinfo(int xc_handle,
         strncpy(info->name, op.u.getdomaininfo.name, XC_DOMINFO_MAXNAME);
         info->name[XC_DOMINFO_MAXNAME-1] = '\0';
 
-        next_domid = (u64)op.u.getdomaininfo.domain + 1;
+        next_domid = (u32)op.u.getdomaininfo.domain + 1;
         info++;
     }
 
@@ -109,12 +109,12 @@ int xc_domain_getinfo(int xc_handle,
 }
 
 int xc_shadow_control(int xc_handle,
-                      u64 domid, 
+                      u32 domid, 
                       unsigned int sop,
-		      unsigned long *dirty_bitmap,
-		      unsigned long pages,
-		      unsigned long *fault_count,
-		      unsigned long *dirty_count)
+                      unsigned long *dirty_bitmap,
+                      unsigned long pages,
+                      unsigned long *fault_count,
+                      unsigned long *dirty_count)
 {
     int rc;
     dom0_op_t op;
@@ -126,18 +126,17 @@ int xc_shadow_control(int xc_handle,
 
     rc = do_dom0_op(xc_handle, &op);
 
-    if(fault_count) *fault_count = op.u.shadow_control.fault_count;
-    if(dirty_count) *dirty_count = op.u.shadow_control.dirty_count;
+    if ( fault_count ) 
+        *fault_count = op.u.shadow_control.fault_count;
+    if ( dirty_count )
+        *dirty_count = op.u.shadow_control.dirty_count;
 
-    if ( rc == 0 )
-	return op.u.shadow_control.pages;
-    else
-	return rc;
+    return (rc == 0) ? op.u.shadow_control.pages : rc;
 }
 
 int xc_domain_setname(int xc_handle,
-                      u64 domid, 
-		      char *name)
+                      u32 domid, 
+                      char *name)
 {
     dom0_op_t op;
     op.cmd = DOM0_SETDOMAINNAME;
@@ -147,8 +146,8 @@ int xc_domain_setname(int xc_handle,
 }
 
 int xc_domain_setinitialmem(int xc_handle,
-			    u64 domid, 
-			    unsigned int initial_memkb)
+                            u32 domid, 
+                            unsigned int initial_memkb)
 {
     dom0_op_t op;
     op.cmd = DOM0_SETDOMAININITIALMEM;
@@ -158,8 +157,8 @@ int xc_domain_setinitialmem(int xc_handle,
 }
 
 int xc_domain_setmaxmem(int xc_handle,
-			    u64 domid, 
-			    unsigned int max_memkb)
+                        u32 domid, 
+                        unsigned int max_memkb)
 {
     dom0_op_t op;
     op.cmd = DOM0_SETDOMAINMAXMEM;
