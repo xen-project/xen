@@ -441,7 +441,7 @@ static int get_page(unsigned long page_nr, int writeable)
             page->flags &= ~PG_type_mask;
             page->flags |= PGT_writeable_page;
         }
-        page->flags &= ~PG_noflush;
+        page->flags |= PG_need_flush;
         get_page_type(page);
     }
 
@@ -500,9 +500,13 @@ static void put_page(unsigned long page_nr, int writeable)
     ASSERT(DOMAIN_OKAY(page->flags));
     ASSERT((!writeable) || 
            ((page_type_count(page) != 0) && 
-            ((page->flags & PG_type_mask) == PGT_writeable_page)));
+            ((page->flags & PG_type_mask) == PGT_writeable_page) &&
+            ((page->flags & PG_need_flush) == PG_need_flush)));
     if ( writeable && (put_page_type(page) == 0) )
+    {
         tlb_flush[smp_processor_id()] = 1;
+        page->flags &= ~PG_need_flush;
+    }
     put_page_tot(page);
 }
 

@@ -306,9 +306,9 @@ static void __lock_buffer(unsigned long buffer,
         {
             if ( page->type_count == 0 )
             {
-                page->flags &= ~PG_type_mask;
+                page->flags &= ~(PG_type_mask | PG_need_flush);
                 /* NB. This ref alone won't cause a TLB flush. */
-                page->flags |= PGT_writeable_page | PG_noflush;
+                page->flags |= PGT_writeable_page;
             }
             get_page_type(page);
         }
@@ -332,11 +332,11 @@ static void unlock_buffer(struct task_struct *p,
         page = frame_table + pfn;
         if ( writeable_buffer &&
              (put_page_type(page) == 0) &&
-             !(page->flags & PG_noflush) )
+             (page->flags & PG_need_flush) )
         {
             __flush_tlb();
+            page->flags &= ~PG_need_flush;
         }
-        page->flags &= ~PG_noflush;
         put_page_tot(page);
     }
     spin_unlock_irqrestore(&p->page_lock, flags);

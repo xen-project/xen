@@ -98,17 +98,17 @@ typedef struct pfn_info {
 #define PGT_net_rx_buf      (8<<24) /* this page has been pirated by the net code. */
 
 /*
- * This bit is sometimes set by Xen when it holds a writeable reference to a 
- * page that shouldn't cause a TLB flush when it is dropped. For example, a 
- * disk write to a page with initial type_count == 0, which returns to 0 after 
- * the I/O. In this case, we'd normally flush the TLB because a writeable page 
- * has just lost its mutually-exclusive type. But this isn't necessary here 
- * because the writeable reference never made it into user-accessible TLB 
- * (didn't make it into TLB at all, in fact).
+ * This bit indicates that the TLB must be flushed when the type count of this
+ * frame drops to zero. This is needed on current x86 processors only for
+ * frames which have guestos-accessible writeable mappings. In this case we must 
+ * prevent stale TLB entries allowing the frame to be written if it used for a
+ * page table, for example.
  * 
- * This bit is obviously nuked in a few places, for safety.
+ * We have this bit because the writeable type is actually also used to pin a page
+ * when it is used as a disk read buffer. This doesn't require a TLB flush because
+ * the frame never has a mapping in the TLB.
  */
-#define PG_noflush          (1<<28)
+#define PG_need_flush       (1<<28)
 
 #define PageSlab(page)		test_bit(PG_slab, &(page)->flags)
 #define PageSetSlab(page)	set_bit(PG_slab, &(page)->flags)
