@@ -14,6 +14,19 @@ public abstract class Command {
      * @throws CommandFailedException if the command could not be completed.
      */
     public abstract String execute() throws CommandFailedException;
+    
+    /**
+     * Wraps execute() suitable for the web interface: all exceptions are
+     * converted into output strings.
+     * @return Output string, whether command succeeded or not.
+     */
+    public String executeWeb() {
+        try {
+            return execute();
+        } catch (CommandFailedException e) {
+            return e.getMessage();
+        }
+    }
 
     /**
      * Construct a string to report the execution of a command.

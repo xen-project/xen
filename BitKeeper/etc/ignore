@@ -2,6 +2,7 @@ BitKeeper/*/*
 PENDING/*
 URK
 tools/balloon/balloon
+tools/control/.checkstyle
 tools/control/.classpath
 tools/control/.project
 tools/control/build-cmdline/**
@@ -19,6 +20,7 @@ tools/control/build-dom/uk/ac/cam/cl/xeno/domctl/InetAddressPattern.class
 tools/control/build-dom/uk/ac/cam/cl/xeno/domctl/Main.class
 tools/control/build-dom/uk/ac/cam/cl/xeno/domctl/Settings.class
 tools/control/build-dom/uk/ac/cam/cl/xeno/domctl/StringPattern.class
+tools/control/build-web/**
 tools/control/build-xen/WEB-INF/classes/uk/ac/cam/cl/xeno/domctl/Command.class
 tools/control/build-xen/WEB-INF/classes/uk/ac/cam/cl/xeno/domctl/CommandDestroy.class
 tools/control/build-xen/WEB-INF/classes/uk/ac/cam/cl/xeno/domctl/CommandHelp.class
@@ -126,6 +128,7 @@ tools/control/build-xen/vd-vdrr.jsp
 tools/control/build-xen/vd-vdv.jsp
 tools/control/build-xen/vd.jsp
 tools/control/build-xen/xenostyle.css
+tools/control/dist-web/**
 tools/control/dist/docs/api/allclasses-frame.html
 tools/control/dist/docs/api/allclasses-noframe.html
 tools/control/dist/docs/api/constant-values.html
@@ -233,10 +236,13 @@ tools/internal/xi_create.o
 tools/internal/xi_destroy
 tools/internal/xi_destroy.o
 tools/internal/xi_phys_grant
+tools/internal/xi_phys_grant.c~
 tools/internal/xi_phys_grant.o
 tools/internal/xi_phys_probe
+tools/internal/xi_phys_probe.c~
 tools/internal/xi_phys_probe.o
 tools/internal/xi_phys_revoke
+tools/internal/xi_phys_revoke.c~
 tools/internal/xi_phys_revoke.o
 tools/internal/xi_start
 tools/internal/xi_start.o
@@ -329,7 +335,9 @@ xen/drivers/block/driver.o
 xen/drivers/block/elevator.o
 xen/drivers/block/genhd.o
 xen/drivers/block/ll_rw_blk.o
+xen/drivers/block/xen_block.c~
 xen/drivers/block/xen_block.o
+xen/drivers/block/xen_physdisk.c~
 xen/drivers/block/xen_physdisk.o
 xen/drivers/block/xen_segment.o
 xen/drivers/cdrom/cdrom.o
@@ -412,6 +420,7 @@ xen/image.gz
 xen/image.s
 xen/include/asm
 xen/include/hypervisor-ifs/hypervisor-ifs
+xen/include/hypervisor-ifs/segment.h~
 xen/include/linux
 xen/include/xeno/compile.h
 xen/include/xeno/physdisk.h~
@@ -426,14 +435,7 @@ xen/tools/figlet/figlet
 xenolinux-2.4.16-sparse/arch/xeno/drivers/block/Makefile.orig
 xenolinux-2.4.16-sparse/arch/xeno/drivers/block/block.c.orig
 xenolinux-2.4.16-sparse/scripts/kconfig.tk
-xenolinux-2.4.21-sparse/include/linux/blk.h~
-tools/control/.checkstyle
 xenolinux-2.4.21-sparse/arch/xeno/drivers/block/xl_block.c~
 xenolinux-2.4.21-sparse/arch/xeno/drivers/block/xl_physdisk_proc.c.bak
 xenolinux-2.4.21-sparse/arch/xeno/drivers/block/xl_physdisk_proc.c~
-xen/drivers/block/xen_block.c~
-xen/drivers/block/xen_physdisk.c~
-tools/internal/xi_phys_grant.c~
-tools/internal/xi_phys_probe.c~
-tools/internal/xi_phys_revoke.c~
-xen/include/hypervisor-ifs/segment.h~
+xenolinux-2.4.21-sparse/include/linux/blk.h~

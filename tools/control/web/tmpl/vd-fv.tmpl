@@ -10,25 +10,32 @@ BREADCRUMB&Virtual Disk Manager&vd.jsp
 INCLUDE&vdmenu.tmpl
 <td valign="top">
 
+<%
+  VirtualDisk free = root.vdm().getFreeDisk();  
+%>
 
 <table cellpadding="0" cellspacing="0" border="0">
 <tbody>
 
 <tr><td>
+Total available free space: <%= Library.formatSize(free.getSize() * Settings.SECTOR_SIZE,8,true) %>
+</td></tr>
+
+
+##WHITESPACE## ##GREYLINE1## ##WHITESPACE##
+
+<tr><td>
 <table cellpadding="2" cellspacing="0" border="0">
 <tbody>
-  <tr class="vdh"><td>idx</td><td>disk</td><td>offset</td><td>size </td></tr>
+  <tr class="vdh"><td>disk</td><td>offset</td><td>size </td></tr>
 
   <%
-    long space = 0;
-    int count = root.getFreeExtentCount();
-    for (int loop = 0; loop < count; loop++)
+    Iterator i = free.extents();
+    while (i.hasNext())
     {
-      Extent e = root.getFreeExtent(loop);
-      space += e.getSize();
+      Extent e = (Extent) i.next();
   %>
   <tr class="vdt">
-  <td              ><%= loop %></td>
   <td              ><%= e.getDisk() %></td>
   <td align="right"><%= e.getOffset() %> </td>
   <td align="right"><%= e.getSize() %> </td>
@@ -38,13 +45,6 @@ INCLUDE&vdmenu.tmpl
   %>
 </tbody>
 </table>
-</td></tr>
-
-
-##WHITESPACE## ##GREYLINE1## ##WHITESPACE##
-
-<tr><td>
-Total available freespace: <%= space * 512 / (1024 * 1024) %> MB
 </td></tr>
 
 </tbody>

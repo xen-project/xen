@@ -15,9 +15,15 @@ INCLUDE&dommenu.tmpl
 <tbody>
 <tr><td>
 <%
-  CommandList command_list = new CommandList();
-  Defaults d = sc.getDefaults(); 
-  Domain domains[] = command_list.executeCommand(d);
+  CommandDomainList list = new CommandDomainList(sc.getDefaults());
+  String output = list.executeWeb();
+  Domain domains[] = list.domains();
+  if (output != null)
+  {
+%>
+<%= output %>
+<%
+  } else {
 %>
 
 <table cellpadding="2" cellspacing="0" border="0">
@@ -44,6 +50,9 @@ INCLUDE&dommenu.tmpl
 </tbody>
 </table>
 </td></tr>
+<%
+  }
+%>
 
 ##WHITESPACE## ##GREYLINE1## ##WHITESPACE##
 

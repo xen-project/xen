@@ -16,7 +16,6 @@ INCLUDE&dommenu.tmpl
 <%
   HttpServletRequestWrapper hsrw = new HttpServletRequestWrapper(request);
   Defaults d = sc.getDefaults(); 
-  CommandNew command_new = new CommandNew();
   String root_device = hsrw.getParameter("root");
 
   String nfsroot = null;
@@ -73,8 +72,9 @@ nw_host = <%= hsrw.getParameter("hostname") %>
 <br>
 root = <%= disk %>
 <br>
-output = <br><%=
-  command_new.executeCommand(d,
+output = <br>
+<%
+  CommandDomainNew command_new = new CommandDomainNew(d,
                              hsrw.getParameter("name"),
                              Integer.parseInt(hsrw.getParameter("size")),
                              hsrw.getParameter("image"),
@@ -87,7 +87,20 @@ output = <br><%=
                              hsrw.getParameter("gw"),
                              hsrw.getParameter("mask"),
                              nfsserver,
-                             hsrw.getParameter("hostname"))
+                             hsrw.getParameter("hostname"));
+  String oneline = command_new.executeWeb();
+  if ( oneline != null ) {
+%>
+<%= oneline %><br>
+<%
+  } else {
+    String[] output = command_new.output();
+    for (int i = 0; i < output.length; i++) {
+%>
+<%= output[i] %><br>
+<%
+    }
+  }
 %>
 
 </td>

@@ -95,19 +95,19 @@ INCLUDE&dommenu.tmpl
   <td></td> <td></td>
   <td class="block" align="right">IP address</td>
   <td></td>
-  <td> <input type="text" size="15" name="ip" value="<%= d.NWIP %>"> </td>
+  <td> <input type="text" size="15" name="ip" value="<%= d.nwIP %>"> </td>
 </tr>
 <tr>
   <td></td>   <td></td> 
   <td class="block" align="right">Gateway</td>
   <td></td>
-  <td> <input type="text" size="15" name="gw" value="<%= d.NWGW %>"> </td>
+  <td> <input type="text" size="15" name="gw" value="<%= d.nwGateway %>"> </td>
 </tr>
 <tr>
   <td></td>   <td></td> 
   <td class="block" align="right">Netmask</td>
   <td></td>
-  <td> <input type="text" size="15" name="mask" value="<%= d.NWMask %>"> </td>
+  <td> <input type="text" size="15" name="mask" value="<%= d.nwMask %>"> </td>
 </tr>
 
 ##WHITESPACE## ##GREYLINE14## ##WHITESPACE##
@@ -121,11 +121,11 @@ INCLUDE&dommenu.tmpl
 
 <tr>
   <td></td>
-  <td align="right">NFS<input type="radio" name="root" value="nfs"></td>
+  <td align="right">NFS<input type="radio" checked name="root" value="nfs"></td>
   <td align="right">path</td>
   <td></td>
   <td>
-    <input type="text" size="40" name="nfsroot" value="<%= d.NWNFSRoot %>">
+    <input type="text" size="40" name="nfsroot" value="<%= d.nwNFSRoot %>">
   </td>
 </tr>
 <tr>
@@ -133,7 +133,7 @@ INCLUDE&dommenu.tmpl
   <td align="right">server</td>
   <td></td>
   <td>
-    <input type="text" size="15" name="nfsserver" value="<%= d.NWNFSServer%>">
+    <input type="text" size="15" name="nfsserver" value="<%= d.nwNFSServer%>">
   </td>
 </tr>
  ##WHITESPACE##
@@ -143,13 +143,13 @@ INCLUDE&dommenu.tmpl
   <td align="right">path</td>
   <td></td>
   <td>
-    <input type="text" size="40" name="rd" value="/usr/isolinux/initrd.gz">
+    <input type="text" size="40" name="rd" value="<%= d.domainInitRD %>">
   </td>
 </tr>
  ##WHITESPACE##
 <tr>
   <td></td>
-  <td align="right">physical disk<input type="radio" checked name="root" value="pdisk"></td>
+  <td align="right">physical disk<input type="radio" name="root" value="pdisk"></td>
   <td align="right">path</td>
   <td></td>
   <td><input type="text" size="40" name="pdisk" value="/dev/sda8"></td>
@@ -172,7 +172,7 @@ INCLUDE&dommenu.tmpl
   <td></td> 
   <td colspan=2 align="right"></td>
   <td></td>
-  <td> <input type="text" size="40" name="args" value="ro"> </td>
+  <td> <input type="text" size="40" name="args" value="<%= d.args %>"> </td>
 </tr>
 
 

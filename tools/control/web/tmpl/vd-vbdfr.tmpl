@@ -17,7 +17,7 @@ INCLUDE&vdmenu.tmpl
 <%
   HttpServletRequestWrapper hsrw = new HttpServletRequestWrapper(request);
 %>
-output = <%= root.doFlushVirtualBlockDevices()  %>
+output = <%= new CommandVbdFlush().execute()  %>
 <%
   root.doFlushState();
 %>

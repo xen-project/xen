@@ -16,11 +16,11 @@ note: highlighted entries are currently being used as xeno partitions.
 <tbody>
   <tr class="vdh"><td>maj:min</td><td>blocks</td><td>start sect</td><td>num sects</td><td>name</td></tr>
   <%
-    int count = root.getPartitionCount();
+    int count = root.pm().getPartitionCount();
     for (int loop = 0; loop < count; loop++)
     {
-      Partition p = root.getPartition(loop);
-      if (p.getIsXeno() == true)
+      Partition p = root.pm().getPartition(loop);
+      if (p.isXeno() == true)
       {
   %>
   <tr class="vds">

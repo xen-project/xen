@@ -12,13 +12,13 @@ INCLUDE&vdmenu.tmpl
 
 <table cellpadding="2" cellspacing="0" border="0">
 <tbody>
-  <tr class="vdh"><td>key</td><td width="5"></td><td>name</td><td width="5"></td><td>expiry</td></tr>
+  <tr class="vdh"><td>key</td><td width="5"></td><td>name</td><td width="5"></td><td>expiry</td><td width="5"></td><td>size</td></tr>
 
   <%
-    int count = root.getVirtualDiskCount();
-    for (int loop = 0; loop < count; loop++)
+    Iterator i = root.vdm().getVirtualDisks();
+    while (i.hasNext())
     {
-      VirtualDisk vd = root.getVirtualDisk(loop);
+      VirtualDisk vd = (VirtualDisk) i.next();
   %>
     <tr class="vdt">
       <td><%= vd.getKey() %></td>
@@ -26,6 +26,8 @@ INCLUDE&vdmenu.tmpl
       <td><%= vd.getName() %></td>
       <td></td>
       <td><%= vd.getExpiry() %></td>
+      <td></td>
+      <td><%= Library.formatSize(vd.getSize()*Settings.SECTOR_SIZE,8,false) %></td>
     </tr>
   <%
     }
