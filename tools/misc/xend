@@ -23,7 +23,7 @@ import os
 import sys
 
 # Default install path for Xen binary packages.
-sys.path.append('/lib/python')
+sys.path = [ '/usr/lib/python' ] + sys.path
 from xen.xend.server import SrvDaemon
 
 class CheckError(ValueError):
