@@ -69,16 +69,10 @@ static PEND_RING_IDX pending_prod, pending_cons;
 static kmem_cache_t *buffer_head_cachep;
 #else
 static request_queue_t *plugged_queue;
-void bdev_put(struct block_device *bdev)
+static inline void bdev_flush_queue(request_queue_t *q)
 {
-    request_queue_t *q = plugged_queue;
-    /* We might be giving up last reference to plugged queue. Flush if so. */
-    if ( (q != NULL) &&
-         (q == bdev_get_queue(bdev)) && 
-         (cmpxchg(&plugged_queue, q, NULL) == q) )
-        blk_run_queue(q);
-    /* It's now safe to drop the block device. */
-    blkdev_put(bdev);
+    if ( q->unplug_fn != NULL )
+        q->unplug_fn(q);
 }
 #endif
 
@@ -208,7 +202,7 @@ static int blkio_schedule(void *arg)
 #else
         if ( plugged_queue != NULL )
         {
-            blk_run_queue(plugged_queue);
+            bdev_flush_queue(plugged_queue);
             plugged_queue = NULL;
         }
 #endif
@@ -554,7 +548,7 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
         if ( (q = bdev_get_queue(bio->bi_bdev)) != plugged_queue )
         {
             if ( plugged_queue != NULL )
-                blk_run_queue(plugged_queue);
+                bdev_flush_queue(plugged_queue);
             plugged_queue = q;
         }
 

@@ -17,8 +17,10 @@ static inline dev_t vbd_map_devnum(blkif_pdev_t cookie)
 { return MKDEV(cookie>>8, cookie&0xff); }
 #define vbd_sz(_v)   ((_v)->bdev->bd_part ? \
     (_v)->bdev->bd_part->nr_sects : (_v)->bdev->bd_disk->capacity)
+#define bdev_put(_b) blkdev_put(_b)
 #else
 #define vbd_sz(_v)   (blk_size[MAJOR((_v)->pdevice)][MINOR((_v)->pdevice)]*2)
+#define bdev_put(_b) ((void)0)
 #endif
 
 void vbd_create(blkif_be_vbd_create_t *create) 
