@@ -37,12 +37,12 @@ install: $(TARGET).gz
 	$(INSTALL_DATA) include/public/io/*.h $(DESTDIR)/usr/include/xen/io
 	$(INSTALL_DATA) include/public/COPYING $(DESTDIR)/usr/include/xen
 
-clean:
+clean: delete-unfresh-files
 	$(MAKE) -C tools clean
 	$(MAKE) -C common clean
 	$(MAKE) -C drivers clean
 	$(MAKE) -C arch/$(TARGET_ARCH) clean
-	rm -f include/asm *.o $(TARGET)* *~ core include/xen/compile.h
+	rm -f include/asm *.o $(TARGET)* *~ core
 	rm -f include/asm-*/asm-offsets.h
 	rm -f tools/figlet/*.o tools/figlet/figlet
 

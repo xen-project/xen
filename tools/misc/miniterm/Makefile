@@ -14,3 +14,6 @@ install: all
 
 clean:
 	$(RM) *.o $(TARGET) *~
+
+$(TARGET): $(TARGET).c
+	$(CC) $(CFLAGS) -o $@ $<
