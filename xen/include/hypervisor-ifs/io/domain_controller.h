@@ -76,6 +76,7 @@ typedef struct {
 #define CMSG_BLKIF_FE_DRIVER_STATUS_CHANGED     32
 #define CMSG_BLKIF_FE_INTERFACE_CONNECT         33
 #define CMSG_BLKIF_FE_INTERFACE_DISCONNECT      34
+#define CMSG_BLKIF_FE_INTERFACE_QUERY           35
 
 /* These are used by both front-end and back-end drivers. */
 #define blkif_vdev_t   u16
@@ -87,7 +88,7 @@ typedef struct {
  *  Notify a guest about a status change on one of its block interfaces.
  *  If the interface is DESTROYED or DOWN then the interface is disconnected:
  *   1. The shared-memory frame is available for reuse.
- *   2. Any unacknowledged messgaes pending on the interface were dropped.
+ *   2. Any unacknowledged messages pending on the interface were dropped.
  */
 #define BLKIF_INTERFACE_STATUS_DESTROYED    0 /* Interface doesn't exist.    */
 #define BLKIF_INTERFACE_STATUS_DISCONNECTED 1 /* Exists but is disconnected. */
@@ -103,10 +104,13 @@ typedef struct {
  * CMSG_BLKIF_FE_DRIVER_STATUS_CHANGED:
  *  Notify the domain controller that the front-end driver is DOWN or UP.
  *  When the driver goes DOWN then the controller will send no more
- *  status-change notifications. When the driver comes UP then the controller
- *  will send a notification for each interface that currently exists.
+ *  status-change notifications.
  *  If the driver goes DOWN while interfaces are still UP, the domain
  *  will automatically take the interfaces DOWN.
+ * 
+ *  NB. The controller should not send an INTERFACE_STATUS_CHANGED message
+ *  for interfaces that are active when it receives an UP notification. We
+ *  expect that the frontend driver will query those interfaces itself.
  */
 #define BLKIF_DRIVER_STATUS_DOWN   0
 #define BLKIF_DRIVER_STATUS_UP     1
@@ -114,11 +118,8 @@ typedef struct {
     /* IN */
     u32 status;        /*  0: BLKIF_DRIVER_STATUS_??? */
     /* OUT */
-    /*
-     * Tells driver how many interfaces it should expect to immediately
-     * receive notifications about.
-     */
-    u32 nr_interfaces; /*  4 */
+    /* Driver should query interfaces [0..max_handle]. */
+    u32 max_handle;    /*  4 */
 } PACKED blkif_fe_driver_status_changed_t; /* 8 bytes */
 
 /*
@@ -141,6 +142,18 @@ typedef struct {
 typedef struct {
     u32 handle; /*  0 */
 } PACKED blkif_fe_interface_disconnect_t; /* 4 bytes */
+
+/*
+ * CMSG_BLKIF_FE_INTERFACE_QUERY:
+ */
+typedef struct {
+    /* IN */
+    u32 handle; /*  0 */
+    /* OUT */
+    u32 status; /*  4 */
+    u16 evtchn; /*  8: (only if status == BLKIF_INTERFACE_STATUS_CONNECTED). */
+    domid_t domid; /* 10: status != BLKIF_INTERFACE_STATUS_DESTROYED */
+} PACKED blkif_fe_interface_query_t; /* 12 bytes */
 
 
 /******************************************************************************
@@ -332,6 +345,7 @@ typedef struct {
 #define CMSG_NETIF_FE_DRIVER_STATUS_CHANGED     32
 #define CMSG_NETIF_FE_INTERFACE_CONNECT         33
 #define CMSG_NETIF_FE_INTERFACE_DISCONNECT      34
+#define CMSG_NETIF_FE_INTERFACE_QUERY           35
 
 /*
  * CMSG_NETIF_FE_INTERFACE_STATUS_CHANGED:
@@ -355,10 +369,13 @@ typedef struct {
  * CMSG_NETIF_FE_DRIVER_STATUS_CHANGED:
  *  Notify the domain controller that the front-end driver is DOWN or UP.
  *  When the driver goes DOWN then the controller will send no more
- *  status-change notifications. When the driver comes UP then the controller
- *  will send a notification for each interface that currently exists.
+ *  status-change notifications.
  *  If the driver goes DOWN while interfaces are still UP, the domain
  *  will automatically take the interfaces DOWN.
+ * 
+ *  NB. The controller should not send an INTERFACE_STATUS_CHANGED message
+ *  for interfaces that are active when it receives an UP notification. We
+ *  expect that the frontend driver will query those interfaces itself.
  */
 #define NETIF_DRIVER_STATUS_DOWN   0
 #define NETIF_DRIVER_STATUS_UP     1
@@ -366,11 +383,8 @@ typedef struct {
     /* IN */
     u32        status;        /*  0: NETIF_DRIVER_STATUS_??? */
     /* OUT */
-    /*
-     * Tells driver how many interfaces it should expect to immediately
-     * receive notifications about.
-     */
-    u32        nr_interfaces; /*  4 */
+    /* Driver should query interfaces [0..max_handle]. */
+    u32        max_handle;    /*  4 */
 } PACKED netif_fe_driver_status_changed_t; /* 8 bytes */
 
 /*
@@ -395,6 +409,19 @@ typedef struct {
 typedef struct {
     u32        handle;        /*  0 */
 } PACKED netif_fe_interface_disconnect_t; /* 4 bytes */
+
+/*
+ * CMSG_NETIF_FE_INTERFACE_QUERY:
+ */
+typedef struct {
+    /* IN */
+    u32        handle; /*  0 */
+    /* OUT */
+    u32        status; /*  4 */
+    u16        evtchn; /*  8: status == NETIF_INTERFACE_STATUS_CONNECTED */
+    u8         mac[6]; /* 10: status == NETIF_INTERFACE_STATUS_CONNECTED */
+    domid_t    domid;  /* 16: status != NETIF_INTERFACE_STATUS_DESTROYED */
+} PACKED netif_fe_interface_query_t; /* 18 bytes */
 
 
 /******************************************************************************

@@ -37,7 +37,8 @@ typedef void (*ctrl_msg_handler_t)(ctrl_msg_t *, unsigned long);
  *     function returns.
  *  2. If @hnd is NULL then no callback is executed.
  */
-int ctrl_if_send_message_noblock(
+int
+ctrl_if_send_message_noblock(
     ctrl_msg_t *msg, 
     ctrl_msg_handler_t hnd,
     unsigned long id);
@@ -52,10 +53,21 @@ int ctrl_if_send_message_noblock(
  *     function returns.
  *  2. If @hnd is NULL then no callback is executed.
  */
-int ctrl_if_send_message_block(
+int
+ctrl_if_send_message_block(
     ctrl_msg_t *msg, 
     ctrl_msg_handler_t hnd, 
     unsigned long id, 
+    long wait_state);
+
+/*
+ * Send @msg to the domain controller. Block until the response is received,
+ * and then copy it into the provided buffer, @rmsg.
+ */
+int
+ctrl_if_send_message_and_get_response(
+    ctrl_msg_t *msg,
+    ctrl_msg_t *rmsg,
     long wait_state);
 
 /*
@@ -65,7 +77,9 @@ int ctrl_if_send_message_block(
  * still be executed. If this function returns 1 then the callback /will/ be
  * executed when space becomes available.
  */
-int ctrl_if_enqueue_space_callback(struct tq_struct *task);
+int
+ctrl_if_enqueue_space_callback(
+    struct tq_struct *task);
 
 /*
  * Send a response (@msg) to a message from the domain controller. This will 
@@ -74,7 +88,9 @@ int ctrl_if_enqueue_space_callback(struct tq_struct *task);
  *  1. The @msg is copied and so can be freed after this function returns.
  *  2. The @msg may be the original request message, modified in-place.
  */
-void ctrl_if_send_response(ctrl_msg_t *msg);
+void
+ctrl_if_send_response(
+    ctrl_msg_t *msg);
 
 /*
  * Register a receiver for typed messages from the domain controller. The 
@@ -93,7 +109,9 @@ int ctrl_if_register_receiver(
  * Unregister a receiver for typed messages from the domain controller. The 
  * handler (@hnd) will not be executed after this function returns.
  */
-void ctrl_if_unregister_receiver(u8 type, ctrl_msg_handler_t hnd);
+void
+ctrl_if_unregister_receiver(
+    u8 type, ctrl_msg_handler_t hnd);
 
 /* Suspend/resume notifications. */
 void ctrl_if_suspend(void);

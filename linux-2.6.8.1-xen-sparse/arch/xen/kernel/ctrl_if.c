@@ -201,7 +201,8 @@ static irqreturn_t ctrl_if_interrupt(int irq, void *dev_id,
     return IRQ_HANDLED;
 }
 
-int ctrl_if_send_message_noblock(
+int
+ctrl_if_send_message_noblock(
     ctrl_msg_t *msg, 
     ctrl_msg_handler_t hnd,
     unsigned long id)
@@ -245,7 +246,8 @@ int ctrl_if_send_message_noblock(
     return 0;
 }
 
-int ctrl_if_send_message_block(
+int
+ctrl_if_send_message_block(
     ctrl_msg_t *msg, 
     ctrl_msg_handler_t hnd, 
     unsigned long id,
@@ -280,7 +282,59 @@ int ctrl_if_send_message_block(
     return rc;
 }
 
-int ctrl_if_enqueue_space_callback(struct tq_struct *task)
+/* Allow a reponse-callback handler to find context of a blocked requester.  */
+struct rsp_wait {
+    ctrl_msg_t         *msg;  /* Buffer for the response message.            */
+    struct task_struct *task; /* The task that is blocked on the response.   */
+    int                 done; /* Indicate to 'task' that response is rcv'ed. */
+};
+
+static void __ctrl_if_get_response(ctrl_msg_t *msg, unsigned long id)
+{
+    struct rsp_wait    *wait = (struct rsp_wait *)id;
+    struct task_struct *task = wait->task;
+
+    memcpy(wait->msg, msg, sizeof(*msg));
+    wmb();
+    wait->done = 1;
+
+    wake_up_process(task);
+}
+
+int
+ctrl_if_send_message_and_get_response(
+    ctrl_msg_t *msg, 
+    ctrl_msg_t *rmsg,
+    long wait_state)
+{
+    struct rsp_wait wait;
+    int rc;
+
+    wait.msg  = rmsg;
+    wait.done = 0;
+    wait.task = current;
+
+    if ( (rc = ctrl_if_send_message_block(msg, __ctrl_if_get_response,
+                                          (unsigned long)&wait,
+                                          wait_state)) != 0 )
+        return rc;
+
+    for ( ; ; )
+    {
+        /* NB. Can't easily support TASK_INTERRUPTIBLE here. */
+        set_current_state(TASK_UNINTERRUPTIBLE);
+        if ( wait.done )
+            break;
+        schedule();
+    }
+
+    set_current_state(TASK_RUNNING);
+    return 0;
+}
+
+int
+ctrl_if_enqueue_space_callback(
+    struct tq_struct *task)
 {
     control_if_t *ctrl_if = get_ctrl_if();
 
@@ -299,7 +353,9 @@ int ctrl_if_enqueue_space_callback(struct tq_struct *task)
     return TX_FULL(ctrl_if);
 }
 
-void ctrl_if_send_response(ctrl_msg_t *msg)
+void
+ctrl_if_send_response(
+    ctrl_msg_t *msg)
 {
     control_if_t *ctrl_if = get_ctrl_if();
     unsigned long flags;
@@ -327,7 +383,8 @@ void ctrl_if_send_response(ctrl_msg_t *msg)
     ctrl_if_notify_controller();
 }
 
-int ctrl_if_register_receiver(
+int
+ctrl_if_register_receiver(
     u8 type, 
     ctrl_msg_handler_t hnd, 
     unsigned int flags)
@@ -361,7 +418,10 @@ int ctrl_if_register_receiver(
     return !inuse;
 }
 
-void ctrl_if_unregister_receiver(u8 type, ctrl_msg_handler_t hnd)
+void 
+ctrl_if_unregister_receiver(
+    u8 type,
+    ctrl_msg_handler_t hnd)
 {
     unsigned long flags;
 
