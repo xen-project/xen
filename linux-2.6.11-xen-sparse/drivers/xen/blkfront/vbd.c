@@ -354,7 +354,6 @@ static int xlvbd_init_device(vdisk_t *xd)
     return err;
 }
 
-#if 0
 /*
  * xlvbd_remove_device - remove a device node if possible
  * @device:       numeric device ID
@@ -364,14 +363,16 @@ static int xlvbd_init_device(vdisk_t *xd)
  * This is OK for now but in future, should perhaps consider where this should
  * deallocate gendisks / unregister devices.
  */
-static int xlvbd_remove_device(int device)
+static int xlvbd_remove_device(int dev16)
 {
-    int i, rc = 0, minor = MINOR(device);
+    int i, rc = 0, minor = MINOR(dev16);
     struct gendisk *gd;
     struct block_device *bd;
-    xen_block_t *disk = NULL;
+    struct xlbd_disk_info *di;
+    dev_t device = MKDEV(MAJOR_XEN(dev16), MINOR_XEN(dev16));
 
-    if ( (bd = bdget(device)) == NULL )
+    bd = bdget(device);
+    if (!bd)
         return -1;
 
     /*
@@ -380,67 +381,25 @@ static int xlvbd_remove_device(int device)
      */
     down(&bd->bd_sem);
 
-    if ( ((gd = get_gendisk(device)) == NULL) ||
-         ((disk = xldev_to_xldisk(device)) == NULL) )
-        BUG();
+    gd = get_gendisk(device, &i);
+    BUG_ON(gd == NULL);
+    di = (struct xlbd_disk_info *) gd->private_data;
+    BUG_ON(di == NULL);
 
-    if ( disk->usage != 0 )
+    if ( di->mi->usage != 0 )
     {
         printk(KERN_ALERT "VBD removal failed - in use [dev=%x]\n", device);
         rc = -1;
         goto out;
     }
- 
-    if ( (minor & (gd->max_p-1)) != 0 )
-    {
-        /* 1: The VBD is mapped to a partition rather than a whole unit. */
-        invalidate_device(device, 1);
-        gd->part[minor].start_sect = 0;
-        gd->part[minor].nr_sects   = 0;
-        gd->sizes[minor]           = 0;
 
-        /* Clear the consists-of-virtual-partitions flag if possible. */
-        gd->flags[minor >> gd->minor_shift] &= ~GENHD_FL_VIRT_PARTNS;
-        for ( i = 1; i < gd->max_p; i++ )
-            if ( gd->sizes[(minor & ~(gd->max_p-1)) + i] != 0 )
-                gd->flags[minor >> gd->minor_shift] |= GENHD_FL_VIRT_PARTNS;
+    BUG_ON(minor != gd->first_minor);
+    /* The VBD is mapped to an entire unit. */
+    
+    invalidate_partition(gd, 0);
+    set_capacity(gd, 0);
 
-        /*
-         * If all virtual partitions are now gone, and a 'whole unit' VBD is
-         * present, then we can try to grok the unit's real partition table.
-         */
-        if ( !(gd->flags[minor >> gd->minor_shift] & GENHD_FL_VIRT_PARTNS) &&
-             (gd->sizes[minor & ~(gd->max_p-1)] != 0) &&
-             !(gd->flags[minor >> gd->minor_shift] & GENHD_FL_REMOVABLE) )
-        {
-            register_disk(gd,
-                          device&~(gd->max_p-1), 
-                          gd->max_p, 
-                          &xlvbd_block_fops,
-                          gd->part[minor&~(gd->max_p-1)].nr_sects);
-        }
-    }
-    else
-    {
-        /*
-         * 2: The VBD is mapped to an entire 'unit'. Clear all partitions.
-         * NB. The partition entries are only cleared if there are no VBDs
-         * mapped to individual partitions on this unit.
-         */
-        i = gd->max_p - 1; /* Default: clear subpartitions as well. */
-        if ( gd->flags[minor >> gd->minor_shift] & GENHD_FL_VIRT_PARTNS )
-            i = 0; /* 'Virtual' mode: only clear the 'whole unit' entry. */
-        while ( i >= 0 )
-        {
-            invalidate_device(device+i, 1);
-            gd->part[minor+i].start_sect = 0;
-            gd->part[minor+i].nr_sects   = 0;
-            gd->sizes[minor+i]           = 0;
-            i--;
-        }
-    }
-
- out:
+out:
     up(&bd->bd_sem);
     bdput(bd);
     return rc;
@@ -460,11 +419,11 @@ void xlvbd_update_vbds(void)
     old_nr   = nr_vbds;
 
     new_info = kmalloc(MAX_VBDS * sizeof(vdisk_t), GFP_KERNEL);
-    if ( unlikely(new_nr = xlvbd_get_vbd_info(new_info)) < 0 )
-    {
-        kfree(new_info);
+    if (!new_info)
         return;
-    }
+
+    if ( unlikely(new_nr = xlvbd_get_vbd_info(new_info)) < 0 )
+        goto out;
 
     /*
      * Final list maximum size is old list + new list. This occurs only when
@@ -472,6 +431,8 @@ void xlvbd_update_vbds(void)
      * VBDs in the old list because the usage counts are busy.
      */
     merged_info = kmalloc((old_nr + new_nr) * sizeof(vdisk_t), GFP_KERNEL);
+    if (!merged_info)
+        goto out;
 
     /* @i tracks old list; @j tracks new list; @k tracks merged list. */
     i = j = k = 0;
@@ -518,9 +479,9 @@ void xlvbd_update_vbds(void)
     nr_vbds  = k;
 
     kfree(old_info);
+out:
     kfree(new_info);
 }
-#endif
 
 /*
  * Set up all the linux device goop for the virtual block devices

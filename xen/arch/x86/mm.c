@@ -101,6 +101,7 @@
 #include <asm/uaccess.h>
 #include <asm/domain_page.h>
 #include <asm/ldt.h>
+#include <asm/x86_emulate.h>
 
 #ifdef VERBOSE
 #define MEM_LOG(_f, _a...)                           \
@@ -265,8 +266,7 @@ int map_ldt_shadow_page(unsigned int off)
 #define TOGGLE_MODE() ((void)0)
 #endif
 
-    if ( unlikely(in_irq()) )
-        BUG();
+    BUG_ON(unlikely(in_irq()));
 
     TOGGLE_MODE();
     __get_user(l1e, (unsigned long *)
@@ -1939,12 +1939,13 @@ void update_shadow_va_mapping(unsigned long va,
         &shadow_linear_pg_table[l1_linear_offset(va)])))) )
     {
         /*
-         * Since L2's are guranteed RW, failure indicates either that the
+         * Since L2's are guaranteed RW, failure indicates either that the
          * page was not shadowed, or that the L2 entry has not yet been
          * updated to reflect the shadow.
          */
-        if ( shadow_mode_external(current->domain) )
-            BUG(); // can't use linear_l2_table with external tables.
+
+        /* Can't use linear_l2_table with external tables. */
+        BUG_ON(shadow_mode_external(current->domain));
 
         l2_pgentry_t gpde = linear_l2_table[l2_table_offset(va)];
         unsigned long gpfn = l2_pgentry_val(gpde) >> PAGE_SHIFT;
@@ -2294,9 +2295,7 @@ void ptwr_flush(const int which)
     int            i, cpu = smp_processor_id();
     struct exec_domain *ed = current;
     struct domain *d = ed->domain;
-#ifdef PERF_COUNTERS
     unsigned int   modified = 0;
-#endif
 
     l1va = ptwr_info[cpu].ptinfo[which].l1va;
     ptep = (unsigned long *)&linear_pg_table[l1_linear_offset(l1va)];
@@ -2344,11 +2343,7 @@ void ptwr_flush(const int which)
 
     /* Ensure that there are no stale writable mappings in any TLB. */
     /* NB. INVLPG is a serialising instruction: flushes pending updates. */
-#if 1
     __flush_tlb_one(l1va); /* XXX Multi-CPU guests? */
-#else
-    flush_tlb_all();
-#endif
     PTWR_PRINTK("[%c] disconnected_l1va at %p now %p\n",
                 PTWR_PRINT_WHICH, ptep, pte);
 
@@ -2365,10 +2360,8 @@ void ptwr_flush(const int which)
         if ( likely(l1_pgentry_val(ol1e) == l1_pgentry_val(nl1e)) )
             continue;
 
-#ifdef PERF_COUNTERS
         /* Update number of entries modified. */
         modified++;
-#endif
 
         /*
          * Fast path for PTEs that have merely been write-protected
@@ -2411,6 +2404,8 @@ void ptwr_flush(const int which)
     unmap_domain_mem(pl1e);
 
     perfc_incr_histo(wpt_updates, modified, PT_UPDATES);
+    ptwr_info[cpu].ptinfo[which].prev_exec_domain = ed;
+    ptwr_info[cpu].ptinfo[which].prev_nr_updates  = modified;
 
     /*
      * STEP 3. Reattach the L1 p.t. page into the current address space.
@@ -2435,6 +2430,133 @@ void ptwr_flush(const int which)
     }
 }
 
+static int ptwr_emulated_update(
+    unsigned long addr,
+    unsigned long old,
+    unsigned long val,
+    unsigned int bytes,
+    unsigned int do_cmpxchg)
+{
+    unsigned long sstat, pte, pfn;
+    struct pfn_info *page;
+    l1_pgentry_t ol1e, nl1e, *pl1e, *sl1e;
+    struct domain *d = current->domain;
+
+    /* Aligned access only, thank you. */
+    if ( (addr & (bytes-1)) != 0 )
+    {
+        MEM_LOG("ptwr_emulate: Unaligned or bad size ptwr access (%d, %p)\n",
+                bytes, addr);
+        return X86EMUL_UNHANDLEABLE;
+    }
+
+    /* Turn a sub-word access into a full-word access. */
+    if ( (addr & ((BITS_PER_LONG/8)-1)) != 0 )
+    {
+        int           rc;
+        unsigned long full;
+        unsigned int  mask = addr & ((BITS_PER_LONG/8)-1);
+        /* Align address; read full word. */
+        addr &= ~((BITS_PER_LONG/8)-1);
+        if ( (rc = x86_emulate_read_std(addr, &full, BITS_PER_LONG/8)) )
+            return rc;
+        /* Mask out bits provided by caller. */
+        full &= ~((1UL << (bytes*8)) - 1UL) << (mask*8);
+        /* Shift the caller value and OR in the missing bits. */
+        val  &= (1UL << (bytes*8)) - 1UL;
+        val <<= mask*8;
+        val  |= full;
+    }
+
+    /* Read the PTE that maps the page being updated. */
+    if ( __get_user(pte, (unsigned long *)
+                    &linear_pg_table[l1_linear_offset(addr)]) )
+    {
+        MEM_LOG("ptwr_emulate: Cannot read thru linear_pg_table\n");
+        return X86EMUL_UNHANDLEABLE;
+    }
+
+    pfn  = pte >> PAGE_SHIFT;
+    page = &frame_table[pfn];
+
+    /* We are looking only for read-only mappings of p.t. pages. */
+    if ( ((pte & (_PAGE_RW | _PAGE_PRESENT)) != _PAGE_PRESENT) ||
+         ((page->u.inuse.type_info & PGT_type_mask) != PGT_l1_page_table) )
+    {
+        MEM_LOG("ptwr_emulate: Page is mistyped or bad pte (%p, %x)\n",
+                pte, page->u.inuse.type_info);
+        return X86EMUL_UNHANDLEABLE;
+    }
+
+    /* Check the new PTE. */
+    nl1e = mk_l1_pgentry(val);
+    if ( unlikely(!get_page_from_l1e(nl1e, d)) )
+        return X86EMUL_UNHANDLEABLE;
+
+    /* Checked successfully: do the update (write or cmpxchg). */
+    pl1e = map_domain_mem(page_to_phys(page) + (addr & ~PAGE_MASK));
+    if ( do_cmpxchg )
+    {
+        ol1e = mk_l1_pgentry(old);
+        if ( cmpxchg((unsigned long *)pl1e, old, val) != old )
+        {
+            unmap_domain_mem(pl1e);
+            return X86EMUL_CMPXCHG_FAILED;
+        }
+    }
+    else
+    {
+        ol1e  = *pl1e;
+        *pl1e = nl1e;
+    }
+    unmap_domain_mem(pl1e);
+
+    /* Propagate update to shadow cache. */
+    if ( unlikely(shadow_mode_enabled(d)) )
+    {
+        sstat = get_shadow_status(d, page_to_pfn(page));
+        if ( sstat & PSH_shadowed )
+        {
+            sl1e = map_domain_mem(
+                ((sstat & PSH_pfn_mask) << PAGE_SHIFT) + (addr & ~PAGE_MASK));
+            l1pte_propagate_from_guest(
+                d, &l1_pgentry_val(nl1e), &l1_pgentry_val(*sl1e));
+            unmap_domain_mem(sl1e);
+        }
+    }
+
+    /* Finally, drop the old PTE. */
+    if ( unlikely(l1_pgentry_val(ol1e) & _PAGE_PRESENT) )
+        put_page_from_l1e(ol1e, d);
+
+    return X86EMUL_CONTINUE;
+}
+
+static int ptwr_emulated_write(
+    unsigned long addr,
+    unsigned long val,
+    unsigned int bytes)
+{
+    return ptwr_emulated_update(addr, 0, val, bytes, 0);
+}
+
+static int ptwr_emulated_cmpxchg(
+    unsigned long addr,
+    unsigned long old,
+    unsigned long new,
+    unsigned int bytes)
+{
+    return ptwr_emulated_update(addr, old, new, bytes, 1);
+}
+
+static struct x86_mem_emulator ptwr_mem_emulator = {
+    .read_std         = x86_emulate_read_std,
+    .write_std        = x86_emulate_write_std,
+    .read_emulated    = x86_emulate_read_std,
+    .write_emulated   = ptwr_emulated_write,
+    .cmpxchg_emulated = ptwr_emulated_cmpxchg
+};
+
 /* Write page fault handler: check if guest is trying to modify a PTE. */
 int ptwr_do_page_fault(unsigned long addr)
 {
@@ -2448,13 +2570,13 @@ int ptwr_do_page_fault(unsigned long addr)
     return 0; /* Writable pagetables need fixing for x86_64. */
 #endif
 
+    /* Can't use linear_l2_table with external tables. */
+    BUG_ON(shadow_mode_external(current->domain));
+
     /*
      * Attempt to read the PTE that maps the VA being accessed. By checking for
      * PDE validity in the L2 we avoid many expensive fixups in __get_user().
      */
-    if ( shadow_mode_external(current->domain) )
-        BUG(); // can't use linear_l2_table with external tables.
-
     if ( !(l2_pgentry_val(linear_l2_table[addr>>L2_PAGETABLE_SHIFT]) &
            _PAGE_PRESENT) ||
          __get_user(pte, (unsigned long *)
@@ -2472,47 +2594,35 @@ int ptwr_do_page_fault(unsigned long addr)
     {
         return 0;
     }
-    
+
     /* Get the L2 index at which this L1 p.t. is always mapped. */
     l2_idx = page->u.inuse.type_info & PGT_va_mask;
     if ( unlikely(l2_idx >= PGT_va_unknown) )
-    {
-        domain_crash(); /* Urk! This L1 is mapped in multiple L2 slots! */
-    }
+        goto emulate; /* Urk! This L1 is mapped in multiple L2 slots! */
     l2_idx >>= PGT_va_shift;
 
-    if ( l2_idx == (addr >> L2_PAGETABLE_SHIFT) )
-    {
-        MEM_LOG("PTWR failure! Pagetable maps itself at %p\n", addr);
-        domain_crash();
-    }
+    if ( unlikely(l2_idx == (addr >> L2_PAGETABLE_SHIFT)) )
+        goto emulate; /* Urk! Pagetable maps itself! */
 
     /*
      * Is the L1 p.t. mapped into the current address space? If so we call it
      * an ACTIVE p.t., otherwise it is INACTIVE.
      */
-    if ( shadow_mode_external(current->domain) )
-        BUG(); // can't use linear_l2_table with external tables.
-
     pl2e = &linear_l2_table[l2_idx];
     l2e  = l2_pgentry_val(*pl2e);
     which = PTWR_PT_INACTIVE;
     if ( (l2e >> PAGE_SHIFT) == pfn )
     {
-        /* Check the PRESENT bit to set ACTIVE. */
-        if ( likely(l2e & _PAGE_PRESENT) )
+        /*
+         * Check the PRESENT bit to set ACTIVE mode.
+         * If the PRESENT bit is clear, we may be conflicting with the current 
+         * ACTIVE p.t. (it may be the same p.t. mapped at another virt addr).
+         * The ptwr_flush call below will restore the PRESENT bit.
+         */
+        if ( likely(l2e & _PAGE_PRESENT) ||
+             (ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l1va &&
+              (l2_idx == ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l2_idx)) )
             which = PTWR_PT_ACTIVE;
-        else {
-            /*
-             * If the PRESENT bit is clear, we may be conflicting with
-             * the current ACTIVE p.t. (it may be the same p.t. mapped
-             * at another virt addr).
-             * The ptwr_flush call below will restore the PRESENT bit.
-             */
-            if ( ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l1va &&
-                 l2_idx == ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l2_idx )
-                which = PTWR_PT_ACTIVE;
-        }
     }
     
     PTWR_PRINTK("[%c] page_fault on l1 pt at va %p, pt for %08x, "
@@ -2526,6 +2636,18 @@ int ptwr_do_page_fault(unsigned long addr)
     if ( ptwr_info[cpu].ptinfo[which].l1va )
         ptwr_flush(which);
 
+    /*
+     * If last batch made no updates then we are probably stuck. Emulate this 
+     * update to ensure we make progress.
+     */
+    if ( (ptwr_info[cpu].ptinfo[which].prev_exec_domain == current) &&
+         (ptwr_info[cpu].ptinfo[which].prev_nr_updates  == 0) )
+    {
+        /* Force non-emul next time, or we can get stuck emulating forever. */
+        ptwr_info[cpu].ptinfo[which].prev_exec_domain = NULL;
+        goto emulate;
+    }
+
     ptwr_info[cpu].ptinfo[which].l1va   = addr | 1;
     ptwr_info[cpu].ptinfo[which].l2_idx = l2_idx;
     
@@ -2534,11 +2656,7 @@ int ptwr_do_page_fault(unsigned long addr)
          likely(!shadow_mode_enabled(current->domain)) )
     {
         *pl2e = mk_l2_pgentry(l2e & ~_PAGE_PRESENT);
-#if 1
         flush_tlb(); /* XXX Multi-CPU guests? */
-#else
-        flush_tlb_all();
-#endif
     }
     
     /* Temporarily map the L1 page, and make a copy of it. */
@@ -2562,6 +2680,13 @@ int ptwr_do_page_fault(unsigned long addr)
         domain_crash();
     }
     
+    return EXCRET_fault_fixed;
+
+ emulate:
+    if ( x86_emulate_memop(get_execution_context(), addr,
+                           &ptwr_mem_emulator, BITS_PER_LONG/8) )
+        return 0;
+    perfc_incrc(ptwr_emulations);
     return EXCRET_fault_fixed;
 }
 
@@ -2762,8 +2887,7 @@ void audit_domain(struct domain *d)
         pfn = list_entry(list_ent, struct pfn_info, list) - frame_table;       
         page = &frame_table[pfn];
 
-        if ( page_get_owner(page) != d )
-            BUG();
+        BUG_ON(page_get_owner(page) != d);
 
         if ( (page->u.inuse.type_info & PGT_count_mask) >
              (page->count_info & PGC_count_mask) )
@@ -2809,8 +2933,7 @@ void audit_domain(struct domain *d)
         pfn = list_entry(list_ent, struct pfn_info, list) - frame_table;       
         page = &frame_table[pfn];
 
-        if ( page_get_owner(page) != d )
-            BUG();
+        BUG_ON(page_get_owner(page) != d);
 
         switch ( page->u.inuse.type_info & PGT_type_mask )
         {
@@ -3060,7 +3183,10 @@ void audit_domain(struct domain *d)
             d->exec_domain[0]->arch.guest_table)>>PAGE_SHIFT], 1, 1);
 
     spin_unlock(&d->page_alloc_lock);
-    printk("Audit %d: Done. ref=%d xenpages=%d pages=%d l1=%d l2=%d ctot=%d ttot=%d\n", d->id, atomic_read(&d->refcnt), d->xenheap_pages, d->tot_pages, l1, l2, ctot, ttot );
+    printk("Audit %d: Done. ref=%d xenpages=%d pages=%d l1=%d"
+           " l2=%d ctot=%d ttot=%d\n", 
+           d->id, atomic_read(&d->refcnt), d->xenheap_pages, d->tot_pages,
+           l1, l2, ctot, ttot );
 
     if ( d != current->domain )
         domain_unpause(d);
