@@ -115,5 +115,5 @@ archmrproper:
 
 archdep:
 	rm -f include/asm-xeno/hypervisor-ifs/arch
-	( cd include/asm-xeno/hypervisor-ifs ; ln -sf arch-$(SUBARCH) arch)
+	( cd include/asm-xeno/hypervisor-ifs ; rm -rf arch ; ln -sf arch-$(SUBARCH) arch)
 	@$(MAKEBOOT) dep
