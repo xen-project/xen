@@ -5,7 +5,7 @@
 # DOCUMENTS should be a list of the target Postscript files.
 
 DOCUMENTS = interface.ps interface.pdf interface.html user.ps \
-	    user.pdf user.html
+	    user.pdf user.html xend.ps xend.pdf xend.html
 
 GFX  = $(patsubst %.obj, %.eps, $(wildcard figs/*.obj))
 GFX += $(patsubst %.fig, %.eps, $(wildcard figs/*.fig))
