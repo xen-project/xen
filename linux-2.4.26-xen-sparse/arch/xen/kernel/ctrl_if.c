@@ -17,6 +17,13 @@
 #include <asm/ctrl_if.h>
 #include <asm/evtchn.h>
 
+#if 0
+#define DPRINTK(_f, _a...) printk(KERN_ALERT "(file=%s, line=%d) " _f, \
+                           __FILE__ , __LINE__ , ## _a )
+#else
+#define DPRINTK(_f, _a...) ((void)0)
+#endif
+
 /*
  * Only used by initial domain which must create its own control-interface
  * event channel. This value is picked up by the user-space domain controller
@@ -86,6 +93,11 @@ static void __ctrl_if_tx_tasklet(unsigned long data)
     {
         msg = &ctrl_if->tx_ring[MASK_CONTROL_IDX(ctrl_if_tx_resp_cons)];
 
+        DPRINTK("Rx-Rsp %u/%u :: %d/%d\n", 
+                ctrl_if_tx_resp_cons,
+                ctrl_if->tx_resp_prod,
+                msg->type, msg->subtype);
+
         /* Execute the callback handler, if one was specified. */
         if ( msg->id != 0xFF )
         {
@@ -131,8 +143,15 @@ static void __ctrl_if_rx_tasklet(unsigned long data)
     {
         pmsg = &ctrl_if->rx_ring[MASK_CONTROL_IDX(ctrl_if_rx_req_cons++)];
         memcpy(&msg, pmsg, offsetof(ctrl_msg_t, msg));
+
+        DPRINTK("Rx-Req %u/%u :: %d/%d\n", 
+                ctrl_if_rx_req_cons-1,
+                ctrl_if->rx_req_prod,
+                msg.type, msg.subtype);
+
         if ( msg.length != 0 )
             memcpy(msg.msg, pmsg->msg, msg.length);
+
         if ( test_bit(msg.type, &ctrl_if_rxmsg_blocking_context) )
         {
             pmsg = &ctrl_if_rxmsg_deferred[MASK_CONTROL_IDX(
@@ -184,6 +203,11 @@ int ctrl_if_send_message_noblock(
         ctrl_if_txmsg_id_mapping[i].id = id;
         msg->id = i;
     }
+
+    DPRINTK("Tx-Req %u/%u :: %d/%d\n", 
+            ctrl_if->tx_req_prod, 
+            ctrl_if_tx_resp_cons,
+            msg->type, msg->subtype);
 
     memcpy(&ctrl_if->tx_ring[MASK_CONTROL_IDX(ctrl_if->tx_req_prod)], 
            msg, sizeof(*msg));
@@ -262,11 +286,18 @@ void ctrl_if_send_response(ctrl_msg_t *msg)
      * In this situation we may have src==dst, so no copying is required.
      */
     spin_lock_irqsave(&ctrl_if_lock, flags);
+
+    DPRINTK("Tx-Rsp %u :: %d/%d\n", 
+            ctrl_if->rx_resp_prod, 
+            msg->type, msg->subtype);
+
     dmsg = &ctrl_if->rx_ring[MASK_CONTROL_IDX(ctrl_if->rx_resp_prod)];
     if ( dmsg != msg )
         memcpy(dmsg, msg, sizeof(*msg));
+
     wmb(); /* Write the message before letting the controller peek at it. */
     ctrl_if->rx_resp_prod++;
+
     spin_unlock_irqrestore(&ctrl_if_lock, flags);
 
     ctrl_if_notify_controller();
