@@ -24,6 +24,7 @@ $(TARGET): make-links
 	$(MAKE) -C net
 	$(MAKE) -C drivers
 	$(MAKE) -C arch/$(ARCH)
+	gzip -f -9 < $(TARGET) > $(TARGET).gz
 
 make-links:
 	ln -sf xeno include/linux
