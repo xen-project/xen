@@ -310,9 +310,9 @@ unsigned long alloc_xenheap_pages(int order)
 
     for ( i = 0; i < (1 << order); i++ )
     {
-        pg[i].u.inuse.count_info = PGC_always_set;
-        pg[i].u.inuse.domain     = NULL;
-        pg[i].u.inuse.type_info  = 0;
+        pg[i].count_info        = PGC_always_set;
+        pg[i].u.inuse.domain    = NULL;
+        pg[i].u.inuse.type_info = 0;
     }
 
     return (unsigned long)page_to_virt(pg);
@@ -383,9 +383,9 @@ struct pfn_info *alloc_domheap_pages(struct domain *d, int order)
             }
         }
 
-        pg[i].u.inuse.count_info = PGC_always_set;
-        pg[i].u.inuse.domain     = NULL;
-        pg[i].u.inuse.type_info  = 0;
+        pg[i].count_info        = PGC_always_set;
+        pg[i].u.inuse.domain    = NULL;
+        pg[i].u.inuse.type_info = 0;
     }
 
     if ( d == NULL )
@@ -411,7 +411,7 @@ struct pfn_info *alloc_domheap_pages(struct domain *d, int order)
     {
         pg[i].u.inuse.domain = d;
         wmb(); /* Domain pointer must be visible before updating refcnt. */
-        pg[i].u.inuse.count_info |= PGC_allocated | 1;
+        pg[i].count_info |= PGC_allocated | 1;
         list_add_tail(&pg[i].list, &d->page_list);
     }
 

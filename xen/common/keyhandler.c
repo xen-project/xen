@@ -82,14 +82,14 @@ void do_task_queues(unsigned char key, void *dev_id,
             {
                 page = list_entry(ent, struct pfn_info, list);
                 printk("Page %08x: caf=%08x, taf=%08x\n",
-                       page_to_phys(page), page->u.inuse.count_info,
+                       page_to_phys(page), page->count_info,
                        page->u.inuse.type_info);
             }
         }
 
         page = virt_to_page(d->shared_info);
         printk("Shared_info@%08x: caf=%08x, taf=%08x\n",
-               page_to_phys(page), page->u.inuse.count_info,
+               page_to_phys(page), page->count_info,
                page->u.inuse.type_info);
                
         printk("Guest: upcall_pend = %02x, upcall_mask = %02x\n", 

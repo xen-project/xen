@@ -628,7 +628,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
                         break;
                     }
 
-		    if ( page->u.inuse.count_info & PGC_guest_pinned )
+		    if ( page->count_info & PGC_guest_pinned )
 			type |= LPINTAB;
 		    l_arr[j] |= type;
                     put_page(page);

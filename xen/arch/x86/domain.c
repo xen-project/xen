@@ -480,7 +480,7 @@ void domain_relinquish_memory(struct domain *d)
     {
         page = list_entry(ent, struct pfn_info, list);
 
-        if ( test_and_clear_bit(_PGC_allocated, &page->u.inuse.count_info) )
+        if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
             put_page(page);
     }
 
@@ -489,10 +489,10 @@ void domain_relinquish_memory(struct domain *d)
     {
         page = list_entry(ent, struct pfn_info, list);
 
-        if ( test_and_clear_bit(_PGC_guest_pinned, &page->u.inuse.count_info) )
+        if ( test_and_clear_bit(_PGC_guest_pinned, &page->count_info) )
             put_page_and_type(page);
 
-        if ( test_and_clear_bit(_PGC_allocated, &page->u.inuse.count_info) )
+        if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
             put_page(page);
 
         /*
@@ -668,9 +668,9 @@ int construct_dom0(struct domain *p,
           mfn++ )
     {
         page = &frame_table[mfn];
-        page->u.inuse.domain     = p;
-        page->u.inuse.type_info  = 0;
-        page->u.inuse.count_info = PGC_always_set | PGC_allocated | 1;
+        page->u.inuse.domain    = p;
+        page->u.inuse.type_info = 0;
+        page->count_info        = PGC_always_set | PGC_allocated | 1;
         list_add_tail(&page->list, &p->page_list);
         p->tot_pages++; p->max_pages++;
     }
@@ -715,7 +715,7 @@ int construct_dom0(struct domain *p,
         *l1tab++ = mk_l1_pgentry((mfn << PAGE_SHIFT) | L1_PROT);
         
         page = &frame_table[mfn];
-        set_bit(_PGC_tlb_flush_on_type_change, &page->u.inuse.count_info);
+        set_bit(_PGC_tlb_flush_on_type_change, &page->count_info);
         if ( !get_page_and_type(page, p, PGT_writable_page) )
             BUG();
 
@@ -739,7 +739,7 @@ int construct_dom0(struct domain *p,
             /* Get another ref to L2 page so that it can be pinned. */
             if ( !get_page_and_type(page, p, PGT_l2_page_table) )
                 BUG();
-            set_bit(_PGC_guest_pinned, &page->u.inuse.count_info);
+            set_bit(_PGC_guest_pinned, &page->count_info);
         }
         else
         {

@@ -82,12 +82,10 @@ static long free_dom_mem(struct domain *d,
                 return i;
             }
 
-            if ( test_and_clear_bit(_PGC_guest_pinned, 
-                                    &page->u.inuse.count_info) )
+            if ( test_and_clear_bit(_PGC_guest_pinned, &page->count_info) )
                 put_page_and_type(page);
             
-            if ( test_and_clear_bit(_PGC_allocated,
-                                    &page->u.inuse.count_info) )
+            if ( test_and_clear_bit(_PGC_allocated, &page->count_info) )
                 put_page(page);
 
             put_page(page);

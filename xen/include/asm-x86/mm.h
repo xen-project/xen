@@ -30,25 +30,24 @@ struct pfn_info
     /* Each frame can be threaded onto a doubly-linked list. */
     struct list_head list;
 
+    /* Reference count and various PGC_xxx flags and fields. */
+    u32 count_info;
+
     /* Context-dependent fields follow... */
     union {
 
-        /* Page is in use by a domain. */
+        /* Page is in use: ((count_info & PGC_count_mask) != 0). */
         struct {
-            /* Owner of this page. */
+            /* Owner of this page (NULL if page is anonymous). */
             struct domain *domain;
-            /* Reference count and various PGC_xxx flags and fields. */
-            u32 count_info;
             /* Type reference count and various PGT_xxx flags and fields. */
             u32 type_info;
         } inuse;
 
-        /* Page is on a free list. */
+        /* Page is on a free list: ((count_info & PGC_count_mask) == 0). */
         struct {
             /* Mask of possibly-tainted TLBs. */
             unsigned long cpu_mask;
-            /* Must be at same offset as 'u.inuse.count_flags'. */
-            u32 __unavailable;
             /* Order-size of the free chunk this page is the head of. */
             u8 order;
         } free;
@@ -108,8 +107,8 @@ struct pfn_info
         wmb(); /* install valid domain ptr before updating refcnt. */       \
         spin_lock(&(_dom)->page_alloc_lock);                                \
         /* _dom holds an allocation reference */                            \
-        ASSERT((_pfn)->u.inuse.count_info == PGC_always_set);               \
-        (_pfn)->u.inuse.count_info |= PGC_allocated | 1;                    \
+        ASSERT((_pfn)->count_info == PGC_always_set);                       \
+        (_pfn)->count_info |= PGC_allocated | 1;                            \
         if ( unlikely((_dom)->xenheap_pages++ == 0) )                       \
             get_knownalive_domain(_dom);                                    \
         list_add_tail(&(_pfn)->list, &(_dom)->xenpage_list);                \
@@ -126,13 +125,13 @@ void free_page_type(struct pfn_info *page, unsigned int type);
 
 static inline void put_page(struct pfn_info *page)
 {
-    u32 nx, x, y = page->u.inuse.count_info;
+    u32 nx, x, y = page->count_info;
 
     do {
         x  = y;
         nx = x - 1;
     }
-    while ( unlikely((y = cmpxchg(&page->u.inuse.count_info, x, nx)) != x) );
+    while ( unlikely((y = cmpxchg(&page->count_info, x, nx)) != x) );
 
     if ( unlikely((nx & PGC_count_mask) == 0) )
         free_domheap_page(page);
@@ -142,7 +141,7 @@ static inline void put_page(struct pfn_info *page)
 static inline int get_page(struct pfn_info *page,
                            struct domain *domain)
 {
-    u32 x, nx, y = page->u.inuse.count_info;
+    u32 x, nx, y = page->count_info;
     struct domain *p, *np = page->u.inuse.domain;
 
     do {
@@ -160,9 +159,9 @@ static inline int get_page(struct pfn_info *page,
         }
         __asm__ __volatile__(
             LOCK_PREFIX "cmpxchg8b %3"
-            : "=a" (np), "=d" (y), "=b" (p),
-              "=m" (*(volatile u64 *)(&page->u.inuse.domain))
-            : "0" (p), "1" (x), "b" (p), "c" (nx) );
+            : "=d" (np), "=a" (y), "=c" (p),
+              "=m" (*(volatile u64 *)(&page->count_info))
+            : "0" (p), "1" (x), "c" (p), "b" (nx) );
     }
     while ( unlikely(np != p) || unlikely(y != x) );
 
@@ -254,7 +253,7 @@ static inline int get_page_type(struct pfn_info *page, u32 type)
             DPRINTK("Error while validating pfn %08lx for type %08x."
                     " caf=%08x taf=%08x\n",
                     page_to_pfn(page), type,
-		    page->u.inuse.count_info,
+		    page->count_info,
 		    page->u.inuse.type_info);
             put_page_type(page);
             return 0;
@@ -292,7 +291,7 @@ static inline int get_page_and_type(struct pfn_info *page,
     ASSERT(((_p)->u.inuse.type_info & PGT_type_mask) == (_t)); \
     ASSERT(((_p)->u.inuse.type_info & PGT_count_mask) != 0)
 #define ASSERT_PAGE_IS_DOMAIN(_p, _d)                          \
-    ASSERT(((_p)->u.inuse.count_info & PGC_count_mask) != 0);  \
+    ASSERT(((_p)->count_info & PGC_count_mask) != 0);          \
     ASSERT((_p)->u.inuse.domain == (_d))
 
 int check_descriptor(unsigned long *d);

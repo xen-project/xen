@@ -146,6 +146,23 @@ void arch_init_memory(void)
     static void ptwr_disable(void);
     unsigned long mfn;
 
+    /*
+     * We are rather picky about the layout of 'struct pfn_info'. The
+     * count_info and domain fields must be adjacent, as we perform atomic
+     * 64-bit operations on them. Also, just for sanity, we assert the size
+     * of the structure here.
+     */
+    if ( (offsetof(struct pfn_info, u.inuse.domain) != 
+          (offsetof(struct pfn_info, count_info) + sizeof(u32))) ||
+         (sizeof(struct pfn_info) != 24) )
+    {
+        printk("Weird pfn_info layout (%ld,%ld,%d)\n",
+               offsetof(struct pfn_info, count_info),
+               offsetof(struct pfn_info, u.inuse.domain),
+               sizeof(struct pfn_info));
+        for ( ; ; ) ;
+    }
+
     memset(percpu_info, 0, sizeof(percpu_info));
 
     vm_assist_info[VMASST_TYPE_writable_pagetables].enable =
@@ -154,7 +171,7 @@ void arch_init_memory(void)
         ptwr_disable;
 
     for ( mfn = 0; mfn < max_page; mfn++ )
-        frame_table[mfn].u.inuse.count_info |= PGC_always_set;
+        frame_table[mfn].count_info |= PGC_always_set;
 
     /* Initialise to a magic of 0x55555555 so easier to spot bugs later. */
     memset(machine_to_phys_mapping, 0x55, 4<<20);
@@ -182,9 +199,9 @@ void arch_init_memory(void)
           mfn < virt_to_phys(&machine_to_phys_mapping[1<<20])>>PAGE_SHIFT;
           mfn++ )
     {
-        frame_table[mfn].u.inuse.count_info |= PGC_allocated | 1;
-        frame_table[mfn].u.inuse.type_info   = PGT_gdt_page | 1; /* non-RW */
-        frame_table[mfn].u.inuse.domain      = dom_xen;
+        frame_table[mfn].count_info        |= PGC_allocated | 1;
+        frame_table[mfn].u.inuse.type_info  = PGT_gdt_page | 1; /* non-RW */
+        frame_table[mfn].u.inuse.domain     = dom_xen;
     }
 }
 
@@ -417,11 +434,12 @@ get_page_from_l1e(
          * No need for LOCK prefix -- we know that count_info is never zero
          * because it contains PGC_always_set.
          */
+        ASSERT(test_bit(_PGC_always_set, &page->count_info));
         __asm__ __volatile__(
             "cmpxchg8b %2"
-            : "=a" (e), "=d" (count_info),
-              "=m" (*(volatile u64 *)(&page->u.inuse.domain))
-            : "0" (0), "1" (0), "b" (0), "c" (0) );
+            : "=d" (e), "=a" (count_info),
+              "=m" (*(volatile u64 *)(&page->count_info))
+            : "0" (0), "1" (0), "c" (0), "b" (0) );
         if ( unlikely((count_info & PGC_count_mask) == 0) ||
              unlikely(e == NULL) || unlikely(!get_domain(e)) )
              return 0;
@@ -434,7 +452,7 @@ get_page_from_l1e(
     {
         if ( unlikely(!get_page_type(page, PGT_writable_page)) )
             return 0;
-        set_bit(_PGC_tlb_flush_on_type_change, &page->u.inuse.count_info);
+        set_bit(_PGC_tlb_flush_on_type_change, &page->count_info);
     }
 
     return 1;
@@ -741,7 +759,7 @@ static int mod_l1_entry(l1_pgentry_t *pl1e, l1_pgentry_t nl1e)
 int alloc_page_type(struct pfn_info *page, unsigned int type)
 {
     if ( unlikely(test_and_clear_bit(_PGC_tlb_flush_on_type_change, 
-                                     &page->u.inuse.count_info)) )
+                                     &page->count_info)) )
     {
         struct domain *p = page->u.inuse.domain;
         if ( unlikely(NEED_FLUSH(tlbflush_time[p->processor],
@@ -822,8 +840,8 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
             break;
         }
 
-        if ( unlikely(test_and_set_bit(_PGC_guest_pinned, 
-                                       &page->u.inuse.count_info)) )
+        if ( unlikely(test_and_set_bit(_PGC_guest_pinned,
+                                       &page->count_info)) )
         {
             MEM_LOG("Pfn %08lx already pinned", pfn);
             put_page_and_type(page);
@@ -840,7 +858,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
                     ptr, page->u.inuse.domain);
         }
         else if ( likely(test_and_clear_bit(_PGC_guest_pinned, 
-                                            &page->u.inuse.count_info)) )
+                                            &page->count_info)) )
         {
             put_page_and_type(page);
             put_page(page);
@@ -1007,7 +1025,7 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
          * disappears then the deallocation routine will safely spin.
          */
         nd = page->u.inuse.domain;
-        y  = page->u.inuse.count_info;
+        y  = page->count_info;
         do {
             x = y;
             if ( unlikely((x & (PGC_count_mask|PGC_allocated)) != 
@@ -1022,9 +1040,9 @@ static int do_extended_command(unsigned long ptr, unsigned long val)
             }
             __asm__ __volatile__(
                 LOCK_PREFIX "cmpxchg8b %3"
-                : "=a" (nd), "=d" (y), "=b" (e),
-                "=m" (*(volatile u64 *)(&page->u.inuse.domain))
-                : "0" (d), "1" (x), "b" (e), "c" (x) );
+                : "=d" (nd), "=a" (y), "=c" (e),
+                "=m" (*(volatile u64 *)(&page->count_info))
+                : "0" (d), "1" (x), "c" (e), "b" (x) );
         } 
         while ( unlikely(nd != d) || unlikely(y != x) );
         
@@ -1395,7 +1413,7 @@ void ptwr_reconnect_disconnected(unsigned long addr)
                  l1_pgentry_val(linear_pg_table[(unsigned long)pl2e >>
                                                 PAGE_SHIFT]) >> PAGE_SHIFT,
                  frame_table[pfn].u.inuse.type_info,
-                 frame_table[pfn].u.inuse.count_info,
+                 frame_table[pfn].count_info,
                  frame_table[pfn].u.inuse.domain->domain));
 
     nl2e = mk_l2_pgentry(l2_pgentry_val(*pl2e) | _PAGE_PRESENT);
@@ -1417,7 +1435,7 @@ void ptwr_reconnect_disconnected(unsigned long addr)
     PTWR_PRINTK(("[A] now pl2e %p l2e %08lx              taf %08x/%08x/%u\n",
                  pl2e, l2_pgentry_val(*pl2e),
                  frame_table[pfn].u.inuse.type_info,
-                 frame_table[pfn].u.inuse.count_info,
+                 frame_table[pfn].count_info,
                  frame_table[pfn].u.inuse.domain->domain));
     ptwr_info[cpu].disconnected = ENTRIES_PER_L2_PAGETABLE;
     /* make pt page write protected */
@@ -1535,7 +1553,7 @@ int ptwr_do_page_fault(unsigned long addr)
                 l1_pgentry_t *pl1e;
                 PTWR_PRINTK(("[I] freeing l1 page %p taf %08x/%08x\n", page,
                              page->u.inuse.type_info,
-                             page->u.inuse.count_info));
+                             page->count_info));
                 if (ptwr_info[cpu].writable_idx == PTWR_NR_WRITABLES)
                     ptwr_flush_inactive();
                 ptwr_info[cpu].writables[ptwr_info[cpu].writable_idx] = addr;
@@ -1560,7 +1578,7 @@ int ptwr_do_page_fault(unsigned long addr)
                                                             >> PAGE_SHIFT]) >>
                              PAGE_SHIFT,
                              frame_table[pfn].u.inuse.type_info,
-                             frame_table[pfn].u.inuse.count_info,
+                             frame_table[pfn].count_info,
                              frame_table[pfn].u.inuse.domain->domain));
                 /* disconnect l1 page */
                 nl2e = mk_l2_pgentry((l2_pgentry_val(*pl2e) & ~_PAGE_PRESENT));
@@ -1571,7 +1589,7 @@ int ptwr_do_page_fault(unsigned long addr)
                 PTWR_PRINTK(("[A] now pl2e %p l2e %08lx              "
                              "taf %08x/%08x/%u\n", pl2e, l2_pgentry_val(*pl2e),
                              frame_table[pfn].u.inuse.type_info,
-                             frame_table[pfn].u.inuse.count_info,
+                             frame_table[pfn].count_info,
                              frame_table[pfn].u.inuse.domain->domain));
                 ptwr_info[cpu].writable_l1 = addr;
                 pl1e = map_domain_mem(l2_pgentry_to_pagenr(nl2e) <<

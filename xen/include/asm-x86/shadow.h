@@ -121,7 +121,7 @@ static inline int __mark_dirty( struct mm_struct *m, unsigned int mfn )
                mfn, pfn, m->shadow_dirty_bitmap_size, m );
         SH_LOG("dom=%u caf=%08x taf=%08x\n", 
                frame_table[mfn].u.inuse.domain->domain,
-               frame_table[mfn].u.inuse.count_info, 
+               frame_table[mfn].count_info, 
                frame_table[mfn].u.inuse.type_info );
     }
 
