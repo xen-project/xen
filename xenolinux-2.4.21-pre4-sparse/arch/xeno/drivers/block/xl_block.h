@@ -40,18 +40,33 @@
 #endif
 
 /* XL IDE and SCSI use same major/minor numbers as normal Linux devices. */
-#define XLIDE_MAJOR IDE0_MAJOR
+#define XLIDE_MAJOR_0 IDE0_MAJOR
+#define XLIDE_MAJOR_1 IDE1_MAJOR
 #define XLSCSI_MAJOR SCSI_DISK0_MAJOR
 
-/* IDE has < 64 partitions per device. VIRT and SCSI have < 16. */
-#define PARTN_SHIFT(_dev) ((MAJOR(_dev)==IDE0_MAJOR) ? 6 : 4)
 #define XLIDE_PARTN_SHIFT  6
 #define XLSCSI_PARTN_SHIFT 4
 #define XLVIRT_PARTN_SHIFT 4
 
-#define XLIDE_DEVS_PER_MAJOR  (256 >> XLIDE_PARTN_SHIFT)
-#define XLSCSI_DEVS_PER_MAJOR (256 >> XLSCSI_PARTN_SHIFT)
-#define XLVIRT_DEVS_PER_MAJOR (256 >> XLVIRT_PARTN_SHIFT)
+static inline int PARTN_SHIFT(kdev_t dev)
+{
+    switch ( MAJOR(dev) )
+    {
+    case XLIDE_MAJOR_0:
+    case XLIDE_MAJOR_1:
+        return XLIDE_PARTN_SHIFT;
+    case XLSCSI_MAJOR:
+        return XLSCSI_PARTN_SHIFT;
+    case XLVIRT_MAJOR:
+        return XLVIRT_PARTN_SHIFT;
+    default:
+        BUG();
+    }
+}
+
+#define XLIDE_DEVS_PER_MAJOR   2
+#define XLSCSI_DEVS_PER_MAJOR 16
+#define XLVIRT_DEVS_PER_MAJOR 16
 
 /*
  * We have one of these per XL-IDE, XL-SCSI, and XL-VIRT device.
@@ -77,7 +92,7 @@ extern void do_xlblk_request (request_queue_t *rq);
 extern int  xlide_init(xen_disk_info_t *xdi);
 extern int  xlide_hwsect(int minor); 
 extern void xlide_cleanup(void); 
-extern struct gendisk *xlide_gendisk;
+extern struct gendisk *xlide_gendisk[];
 
 /* Fake SCSI subsystem. */
 extern int  xlscsi_init(xen_disk_info_t *xdi);
