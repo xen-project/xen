@@ -42,7 +42,6 @@
 3fbe2f12OPAkzIUtumU3wRAihnhocQ tools/examples/createlinuxdom.py
 3fbe2f12dZbmXLlgQdMgkmnSUj23AQ tools/examples/destroydom.py
 3fbe2f12ltvweb13kBSsxqzZDAq4sg tools/examples/listdoms.py
-3fca7788tBihusQSq3HJI-YKQTN2iQ tools/examples/mynewdom.py
 3fca7700PVj36cZObaFZlQicRiw1pQ tools/examples/pincpu.py
 3fd8bc48ww3aOqPhYjCr8KGulG0NQQ tools/examples/readxenconsolering.py
 3fccbe068ov0YCxnk-2m4law19QMmA tools/examples/startdom.py

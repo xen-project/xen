@@ -22,7 +22,7 @@ install: all
 	mkdir -p /usr/lib
 	mkdir -p /usr/include
 	cp -a $(LIB) /usr/lib
-	chmod 755 /usr/bin/$(LIB)
+	chmod 755 /usr/lib/$(LIB)
 	cp -a xc.h /usr/include
 	chmod 644 /usr/include/xc.h
 
@@ -30,7 +30,7 @@ dist: all
 	mkdir -p ../../../../install/lib
 	mkdir -p ../../../../install/include
 	cp -a $(LIB) ../../../../install/lib
-	chmod 755 ../../../../install/bin/$(LIB)
+	chmod 755 ../../../../install/lib/$(LIB)
 	cp -a xc.h ../../../../install/include
 	chmod 644 ../../../../install/include/xc.h
 
