@@ -1,13 +1,13 @@
-CC      = gcc
-CFLAGS  = -O3 -march=i686 -Wall
 
-all: miniterm
+CC     = gcc
+CFLAGS = -Wall -O3
+TARGET = miniterm
+
+all: $(TARGET)
 
 install: all
-	cp -a miniterm $(prefix)/usr/bin/	
-
-dist: all
-	cp -a miniterm ../../../../install/bin/	
+	mkdir -p $(prefix)/usr/bin
+	install -m0755 $(TARGET) $(prefix)/usr/bin
 
 clean:
-	rm -f *.o miniterm *~
+	$(RM) *.o $(TARGET) *~

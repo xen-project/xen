@@ -1,25 +1,22 @@
 
-CC       = gcc
-CFLAGS  = -Wall -g -O3
-CFILES	= $(wildcard *.c)
+CC     = gcc
+CFLAGS = -Wall -O3
+CFILES = $(wildcard *.c)
 
 HDRS     = $(wildcard *.h)
 OBJS     = $(patsubst %.c,%.o,$(wildcard *.c))
 
-INSTALL_BINS := nsplitd
+TARGET   = nsplitd
 
-all: nsplitd
-
-nsplitd: $(OBJS)
-	$(CC) $(CFLAGS) -o nsplitd $(OBJS)
+all: $(TARGET)
 
 install: all
 
-dist: all
-
 clean:
-	$(RM) *.o $(INSTALL_BINS)
+	$(RM) *.o $(TARGET) *~
 
+$(TARGET): $(OBJS)
+	$(CC) $(CFLAGS) -o $@ $^
 
 %.o: %.c $(HDRS) Makefile
 	$(CC) $(CFLAGS) -c -o $@ $<

@@ -4,22 +4,9 @@ all:
 
 install: all
 	if [ "$(prefix)" = "" ]; then python setup.py install; \
-	else python setup.py install --root "$(prefix)"; fi
-	install --mode=755 xend $(prefix)/usr/sbin
-
-dist: all
-	mkdir -p ../../../../install/lib/python
-	for i in `find . -name 'xend_utils.so'` ; do           \
-		install --mode=755 $$i ../../../../install/lib/python/`basename $$i` ; \
-	done
-	python -c 'import py_compile, sys; py_compile.compile("XenoUtil.py")'
-	install --mode=755 xend ../../../../install/sbin
+	else python setup.py install --home="$(prefix)"; fi
+	mkdir -p $(prefix)/usr/sbin
+	install -m0755 xend $(prefix)/usr/sbin
 
 clean:
 	rm -rf build *.pyc *.pyo *.a *.so *.o *~ *.rpm 
-
-$(BIN): $(OBJS)
-	$(CC) -o $@ $^ -L../xc/lib -lxc
-
-%.o: %.c $(HDRS) Makefile
-	$(CC) $(CFLAGS) -c -o $@ $<

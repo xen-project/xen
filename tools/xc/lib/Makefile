@@ -26,18 +26,8 @@ check-for-zlib:
 install: all
 	mkdir -p $(prefix)/usr/lib
 	mkdir -p $(prefix)/usr/include
-	cp -a $(LIB) $(prefix)/usr/lib
-	chmod 755 $(prefix)/usr/lib/$(LIB)
-	cp xc.h $(prefix)/usr/include
-	chmod 644 $(prefix)/usr/include/xc.h
-
-dist: all
-	mkdir -p ../../../../install/lib
-	mkdir -p ../../../../install/include
-	cp -a $(LIB) ../../../../install/lib
-	chmod 755 ../../../../install/lib/$(LIB)
-	cp xc.h ../../../../install/include
-	chmod 644 ../../../../install/include/xc.h
+	install -m0755 $(LIB) $(prefix)/usr/lib
+	install -m0644 xc.h $(prefix)/usr/include
 
 clean:
 	$(RM) *.a *.so *.o *.rpm $(LIB)

@@ -1,17 +1,13 @@
-CC = gcc
-TARGET=balloon
 
-$(TARGET): balloon.c
-	$(CC) -O2 -Wall -o $(TARGET) balloon.c
+CC     = gcc
+CFLAGS = -Wall -O3
+TARGET = balloon
 
-install: $(TARGET)
+all: $(TARGET)
+
+install: all
 	mkdir -p $(prefix)/usr/bin
-	cp -a $(TARGET) $(prefix)/usr/bin
-
-dist: $(TARGET)
-	mkdir -p ../../../install/bin
-	cp -a $(TARGET) ../../../install/bin
+	install -m0755 $(TARGET) $(prefix)/usr/bin
 
 clean:
 	$(RM) *.o $(TARGET) *~
-

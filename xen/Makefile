@@ -20,12 +20,7 @@ debug:
 install: $(TARGET)
 	gzip -f -9 < $(TARGET) > $(TARGET).gz
 	mkdir -p $(prefix)/boot
-	cp -a $(TARGET).gz $(prefix)/boot
-
-dist: $(TARGET)
-	gzip -f -9 < $(TARGET) > $(TARGET).gz
-	mkdir -p ../../install/boot
-	cp -a $(TARGET).gz ../../install/boot/
+	install -m0644 $(TARGET).gz $(prefix)/boot
 
 clean: delete-links
 	$(MAKE) -C tools clean

@@ -33,14 +33,6 @@ install: all
 	$(MAKE) -C xentrace install
 	$(MAKE) -C xend install
 
-dist: all
-	$(MAKE) -C balloon dist
-	$(MAKE) -C xc dist
-	$(MAKE) -C misc dist
-	$(MAKE) -C examples dist
-	$(MAKE) -C xentrace dist
-	$(MAKE) -C xend dist
-
 clean:
 	$(MAKE) -C balloon clean
 	$(MAKE) -C xc clean

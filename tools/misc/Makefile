@@ -1,3 +1,4 @@
+
 CC         = gcc
 CFLAGS     = -Wall -O3 
 EXTRA_INC  = -I../../xen/include/hypervisor-ifs
@@ -12,24 +13,16 @@ TARGETS  = xen_cpuperf
 INSTALL  = $(TARGETS) xen-mkdevnodes xen_nat_enable xen-clone 
 
 all: $(TARGETS)
-	$(MAKE) -C miniterm	
+	$(MAKE) -C miniterm
 
 install: all
 	mkdir -p $(prefix)/usr/bin
-	cp $(INSTALL) $(prefix)/usr/bin
-	for i in $(INSTALL); do chmod 755 $(prefix)/usr/bin/$i ; done
+	install -m0755 $(INSTALL) $(prefix)/usr/bin
 	$(MAKE) -C miniterm install
 
-dist: all
-	mkdir -p ../../../install/bin
-	cp $(INSTALL) ../../../install/bin
-	for i in $(INSTALL); do chmod 755 ../../../install/bin/$i ; done
-	$(MAKE) -C miniterm dist
-
 clean:
-	$(RM) *.o $(TARGETS)
+	$(RM) *.o $(TARGETS) *~
 	$(MAKE) -C miniterm clean	
 
 %: %.c $(HDRS) Makefile
 	$(CC) $(CFLAGS) $(EXTRA_INC) -o $@ $<
-
