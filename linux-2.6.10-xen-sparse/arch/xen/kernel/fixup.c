@@ -33,10 +33,17 @@
 #include <linux/slab.h>
 #include <linux/kernel.h>
 #include <linux/delay.h>
+#include <linux/version.h>
 
 #define DP(_f) printk(KERN_ALERT "  " _f "\n")
 
-fastcall void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+#define __LINKAGE fastcall
+#else
+#define __LINKAGE asmlinkage
+#endif
+
+__LINKAGE void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
 {
     static unsigned long printed = 0;
     int i;
