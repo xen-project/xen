@@ -337,8 +337,6 @@ void __init bt_iounmap(void *addr, unsigned long size)
 
 #endif /* CONFIG_XEN_PHYSDEV_ACCESS */
 
-#if defined(CONFIG_XEN_PRIVILEGED_GUEST)
-
 /* These hacky macros avoid phys->machine translations. */
 #define __direct_pte(x) ((pte_t) { (x) } )
 #define __direct_mk_pte(page_nr,pgprot) \
@@ -481,6 +479,3 @@ int direct_remap_area_pages(struct mm_struct *mm,
     
     return 0;
 }
-
-
-#endif /* CONFIG_XEN_PRIVILEGED_GUEST */

@@ -1,11 +1,11 @@
 
 
-obj-y	+= blkfront/
 obj-y	+= console/
 obj-y	+= evtchn/
-obj-y	+= netfront/
 obj-y	+= privcmd/
 
-obj-$(CONFIG_XEN_PHYSDEV_ACCESS)	+= blkback/
-obj-$(CONFIG_XEN_PHYSDEV_ACCESS)	+= netback/
+obj-$(CONFIG_XEN_BLKDEV_BACKEND)	+= blkback/
+obj-$(CONFIG_XEN_NETDEV_BACKEND)	+= netback/
+obj-$(CONFIG_XEN_BLKDEV_FRONTEND)	+= blkfront/
+obj-$(CONFIG_XEN_NETDEV_FRONTEND)	+= netfront/
 

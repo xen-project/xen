@@ -40,6 +40,19 @@
 #define __GFP_NOWARN 0
 #endif
 
+/*
+ * If the backend driver is pipelining transmit requests then we can be very
+ * aggressive in avoiding new-packet notifications -- only need to send a
+ * notification if there are no outstanding unreceived responses.
+ * If the backend may be buffering our transmit buffers for any reason then we
+ * are rather more conservative.
+ */
+#ifdef CONFIG_XEN_NETDEV_FRONTEND_PIPELINED_TRANSMITTER
+#define TX_TEST_IDX resp_prod /* aggressive: any outstanding responses? */
+#else
+#define TX_TEST_IDX req_cons  /* conservative: not seen all our requests? */
+#endif
+
 static void network_tx_buf_gc(struct net_device *dev);
 static void network_alloc_rx_buffers(struct net_device *dev);
 
@@ -408,15 +421,9 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
     np->stats.tx_bytes += skb->len;
     np->stats.tx_packets++;
 
-    /* Only notify Xen if there are no outstanding responses. */
-    /*
-     * KAF (16/9/04): Checking outstanding responses is unsafe, as pending work
-     * may be dependent on packets not yet seen by the backend (e.g., he may
-     * have a partially-assembled fragmented IP packet). For now, the check is
-     * more conservative -- has the backend seen all previous requests?
-     */
+    /* Only notify Xen if we really have to. */
     mb();
-    if ( np->tx->req_cons/*resp_prod*/ == i )
+    if ( np->tx->TX_TEST_IDX == i )
         notify_via_evtchn(np->evtchn);
 
     return 0;
