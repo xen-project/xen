@@ -46,6 +46,7 @@ static inline void switch_mm(struct mm_struct *prev,
 			     struct task_struct *tsk)
 {
 	int cpu = smp_processor_id();
+	struct mmuext_op _op[2], *op = _op;
 
 	if (likely(prev != next)) {
 		/* stop flush ipis for the previous mm */
@@ -56,14 +57,24 @@ static inline void switch_mm(struct mm_struct *prev,
 #endif
 		cpu_set(cpu, next->cpu_vm_mask);
 
-		/* Re-load page tables */
-		load_cr3(next->pgd);
+		/* Re-load page tables: load_cr3(next->pgd) */
+		per_cpu(cur_pgd, cpu) = next->pgd;
+		op->cmd = MMUEXT_NEW_BASEPTR;
+		op->mfn = pfn_to_mfn(__pa(next->pgd) >> PAGE_SHIFT);
+		op++;
 
 		/*
 		 * load the LDT, if the LDT is different:
 		 */
-		if (unlikely(prev->context.ldt != next->context.ldt))
-			load_LDT_nolock(&next->context, cpu);
+		if (unlikely(prev->context.ldt != next->context.ldt)) {
+			/* load_LDT_nolock(&next->context, cpu) */
+			op->cmd = MMUEXT_SET_LDT;
+			op->linear_addr = (unsigned long)next->context.ldt;
+			op->nr_ents     = next->context.size;
+			op++;
+		}
+
+		BUG_ON(HYPERVISOR_mmuext_op(_op, op-_op, NULL, DOMID_SELF));
 	}
 #if 0 /* XEN */
 	else {

@@ -31,17 +31,25 @@ extern pgd_t *cur_pgd;
 
 static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next, struct task_struct *tsk, unsigned cpu)
 {
+	struct mmuext_op _op[2], *op = _op;
 	if (prev != next) {
 		/* stop flush ipis for the previous mm */
 		clear_bit(cpu, &prev->cpu_vm_mask);
 		/* Re-load page tables */
 		cur_pgd = next->pgd;
-		xen_pt_switch(__pa(cur_pgd));
+		op->cmd = MMUEXT_NEW_BASEPTR;
+		op->mfn = pfn_to_mfn(__pa(next->pgd) >> PAGE_SHIFT);
+		op++;
 		/* load_LDT, if either the previous or next thread
 		 * has a non-default LDT.
 		 */
-		if (next->context.size+prev->context.size)
-			load_LDT(&next->context);
+		if (next->context.size+prev->context.size) {
+			op->cmd = MMUEXT_SET_LDT;
+			op->linear_addr = (unsigned long)next->context.ldt;
+			op->nr_ents     = next->context.size;
+			op++;
+		}
+		BUG_ON(HYPERVISOR_mmuext_op(_op, op-_op, NULL, DOMID_SELF));
 	}
 }
 
