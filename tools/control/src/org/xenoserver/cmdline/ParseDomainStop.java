@@ -9,7 +9,7 @@ import org.xenoserver.control.Defaults;
 public class ParseDomainStop extends CommandParser {
     public void parse(Defaults d, LinkedList args)
         throws ParseFailedException, CommandFailedException {
-        int domain_id = getIntParameter(args, 'n', 0);
+        int domain_id = getIntParameter(args, 'n', d.domainNumber);
 
         if (domain_id == 0) {
             throw new ParseFailedException("Expected -n<domain_id>");
@@ -25,7 +25,7 @@ public class ParseDomainStop extends CommandParser {
     }
 
     public String getUsage() {
-        return "-n<domain_id>";
+        return "[-n<domain_id>]";
     }
 
     public String getHelpText() {

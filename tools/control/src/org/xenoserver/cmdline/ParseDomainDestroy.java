@@ -9,7 +9,7 @@ import org.xenoserver.control.Defaults;
 public class ParseDomainDestroy extends CommandParser {
     public void parse(Defaults d, LinkedList args)
         throws ParseFailedException, CommandFailedException {
-        int domain_id = getIntParameter(args, 'n', 0);
+        int domain_id = getIntParameter(args, 'n', d.domainNumber);
         boolean force = getFlagParameter(args, 'f');
 
         if (domain_id == 0) {
@@ -27,7 +27,7 @@ public class ParseDomainDestroy extends CommandParser {
     }
 
     public String getUsage() {
-        return "-n<domain_id> [-f]";
+        return "[-n<domain_id>] [-f]";
     }
 
     public String getHelpText() {

@@ -185,6 +185,7 @@ public class CommandDomainNew extends Command {
                     domain_id = Integer.parseInt(br.readLine());
                     create_rc = create_p.waitFor();
                 }
+		d.domainNumber = domain_id;
 
                 if (create_rc != 0) {
                     throw CommandFailedException.xiCommandFailed(

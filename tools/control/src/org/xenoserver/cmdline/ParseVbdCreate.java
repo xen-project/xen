@@ -13,7 +13,7 @@ public class ParseVbdCreate extends CommandParser {
         throws ParseFailedException, CommandFailedException {
         String vd_key = getStringParameter(args, 'k', "");
         String partition_name = getStringParameter(args, 'p', "");
-        int domain_id = getIntParameter(args, 'n', 0);
+        int domain_id = getIntParameter(args, 'n', d.domainNumber);
         int vbd_num = getIntParameter(args, 'v', -1);
         boolean write = getFlagParameter(args, 'w');
 
@@ -53,7 +53,7 @@ public class ParseVbdCreate extends CommandParser {
     }
 
     public String getUsage() {
-        return "-n<domain_id> {-k<key>|-p<partition} -v<vbd_num> [-w]";
+        return "{-k<key>|-p<partition} -v<vbd_num> [-n<domain_id>] [-w]";
     }
 
     public String getHelpText() {

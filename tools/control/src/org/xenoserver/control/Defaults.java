@@ -49,6 +49,8 @@ public class Defaults {
     public String args = "";
     /** Directory to find XI tools. */
     public String xiToolsDir = "";
+    /** Domain number */
+    public int domainNumber;
 
     
     /**
@@ -143,6 +145,8 @@ public class Defaults {
                     domainImage = s;
                 } else if (lastName.equals("domain_name")) {
                     domainName = s;
+                } else if (lastName.equals("domain_number")) {
+                    domainNumber = Integer.parseInt(s);
                 } else if (lastName.equals("domain_init_rd")) {
                     domainInitRD = s;
                 } else if (lastName.equals("domain_vifs")) {

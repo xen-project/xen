@@ -14,12 +14,6 @@ public final class Settings {
     /** Path to search for the defaults file. */
     public static final String DEFAULTS_PATH =
         System.getProperty("DEFAULTS_PATH", ".:/etc:/var/lib/xen");
-    /** IP address of domain 0. */
-    public static final String LOCAL_IP = System.getProperty("LOCAL_IP");
-    /** Network mask of domain 0. */
-    public static final String LOCAL_MASK = System.getProperty("LOCAL_MASK");
-    /** Gateway of domain 0. */
-    public static final String LOCAL_GW = System.getProperty("LOCAL_ROUTE");
     /** If set, do not call any xi_ commands, just print their command lines. */
     public static final boolean TEST = (System.getProperty("TEST") != null);
     /** Name of xi_helper utility. */

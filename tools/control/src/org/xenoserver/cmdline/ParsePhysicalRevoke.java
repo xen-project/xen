@@ -9,7 +9,7 @@ import org.xenoserver.control.Defaults;
 public class ParsePhysicalRevoke extends CommandParser {
     public void parse(Defaults d, LinkedList args)
         throws ParseFailedException, CommandFailedException {
-        int domain_id = getIntParameter(args, 'n', 0);
+        int domain_id = getIntParameter(args, 'n', d.domainNumber);
         String partition_name = getStringParameter(args, 'p', "");
 
         if (domain_id == 0) {
@@ -32,7 +32,7 @@ public class ParsePhysicalRevoke extends CommandParser {
     }
 
     public String getUsage() {
-        return "-n<domain_id> -p<partition_name>";
+        return "-p<partition_name> [-n<domain_id>]";
     }
 
     public String getHelpText() {
