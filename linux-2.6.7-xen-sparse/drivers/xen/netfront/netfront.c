@@ -874,4 +874,21 @@ static int __init netif_init(void)
     return err;
 }
 
+void netif_resume(void)
+{
+    ctrl_msg_t                       cmsg;
+    netif_fe_driver_status_changed_t st;
+
+    /* Send a driver-UP notification to the domain controller. */
+    cmsg.type      = CMSG_NETIF_FE;
+    cmsg.subtype   = CMSG_NETIF_FE_DRIVER_STATUS_CHANGED;
+    cmsg.length    = sizeof(netif_fe_driver_status_changed_t);
+    st.status      = NETIF_DRIVER_STATUS_UP;
+    st.nr_interfaces = 0;
+    memcpy(cmsg.msg, &st, sizeof(st));
+    ctrl_if_send_message_block(&cmsg, NULL, 0, TASK_UNINTERRUPTIBLE);
+
+}
+
+
 __initcall(netif_init);

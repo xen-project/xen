@@ -555,14 +555,14 @@ config HAVE_ARCH_BOOTMEM_NODE
 	depends on NUMA
 	default y
 
-config HIGHPTE
-	bool "Allocate 3rd-level pagetables from highmem"
-	depends on HIGHMEM4G || HIGHMEM64G
-	help
-	  The VM uses one page table entry for each page of physical memory.
-	  For systems with a lot of RAM, this can be wasteful of precious
-	  low memory.  Setting this option will put user-space page table
-	  entries in high memory.
+#config HIGHPTE
+#	bool "Allocate 3rd-level pagetables from highmem"
+#	depends on HIGHMEM4G || HIGHMEM64G
+#	help
+#	  The VM uses one page table entry for each page of physical memory.
+#	  For systems with a lot of RAM, this can be wasteful of precious
+#	  low memory.  Setting this option will put user-space page table
+#	  entries in high memory.
 
 #config MTRR
 #	 bool "MTRR (Memory Type Range Register) support"

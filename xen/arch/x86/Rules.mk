@@ -8,6 +8,9 @@ CFLAGS  := -nostdinc -fno-builtin -fno-common -fno-strict-aliasing -O3
 CFLAGS  += -iwithprefix include -Wall -Werror -fomit-frame-pointer -pipe
 CFLAGS  += -I$(BASEDIR)/include -Wno-pointer-arith -Wredundant-decls
 
+# Prevent floating-point variables from creeping into Xen.
+CFLAGS  += -msoft-float
+
 ifeq ($(TARGET_SUBARCH),x86_32)
 CFLAGS  += -m32 -march=i686
 LDFLAGS := --oformat elf32-i386 

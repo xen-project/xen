@@ -176,4 +176,5 @@ EXPORT_SYMBOL(create_xen_proc_entry);
 EXPORT_SYMBOL(remove_xen_proc_entry);
 
 EXPORT_SYMBOL(evtchn_do_upcall);
+EXPORT_SYMBOL(force_evtchn_callback);
 EXPORT_SYMBOL(HYPERVISOR_shared_info);
