@@ -6,10 +6,11 @@
 3eb788d6Kleck_Cut0ouGneviGzliQ Makefile
 3f5ef5a24IaQasQE2tyMxrfxskMmvw README
 41880852AtdVfSsfKGtrLdajX1vEXQ buildconfigs/Rules.mk
-41880852oSxvHJSmnzI6hlpFvHuQqQ buildconfigs/linux-2.4-xen0
-41880852YWbPAO-cofTsGkFW1x7tGw buildconfigs/linux-2.4-xenU
-41880852Cwk_14PhDA9XZToJ5B2iMQ buildconfigs/linux-2.6-xen0
-41880852siMCKilMpoBLtpP_bhYC2Q buildconfigs/linux-2.6-xenU
+41880852oSxvHJSmnzI6hlpFvHuQqQ buildconfigs/mk.linux-2.4-xen0
+41880852YWbPAO-cofTsGkFW1x7tGw buildconfigs/mk.linux-2.4-xenU
+41880852Cwk_14PhDA9XZToJ5B2iMQ buildconfigs/mk.linux-2.6-xen0
+41880852siMCKilMpoBLtpP_bhYC2Q buildconfigs/mk.linux-2.6-xenU
+4188d881_D8HpHnhHabA46_ycKwQyw buildconfigs/mk.netbsd-2.0-xenU
 3f9e7d53iC47UnlfORp9iC1vai6kWw docs/Makefile
 4187c1c7IWmBinGdI19kL4MuZ6RLbQ docs/check_pkgs
 3f9e7d60PWZJeVh5xdnk0nLUdxlqEA docs/figs/xenlogo.eps

@@ -22,6 +22,7 @@ clean:
 	rm -rf $(GFX) ps pdf html
 
 install: all
+	rm -rf $(prefix)/usr/share/doc/xen
 	mkdir -p $(prefix)/usr/share/doc/xen
 	cp -dR ps $(prefix)/usr/share/doc/xen
 	cp -dR pdf $(prefix)/usr/share/doc/xen

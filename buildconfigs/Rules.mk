@@ -1,4 +1,11 @@
 
+# We expect these two to already be set if people 
+# are using the top-level Makefile
+DIST_DIR    ?= $(shell pwd)/dist
+INSTALL_DIR ?= $(DIST_DIR)/install
+
+
+# Figure out which Linux version
 LINUX_26VER ?= $(shell ( /bin/ls -ld linux-2.6.*-xen-sparse ) \
 		2>/dev/null | sed -e 's!^.*linux-\(.\+\)-xen-sparse!\1!' )
 
@@ -24,7 +31,7 @@ LINUX_26SRC := ./linux-$(LINUX_26VER).tar.bz2
 endif
 
 pristine-linux-$(LINUX_26VER): $(LINUX_26SRC)
-	rm -rf tmp $@ && mkdir -p tmp && tar -C tmp -jxf $(LINUX_26SRC) && mv tmp/* $@
+	rm -rf tmp-linux-$(LINUX_26VER) $@ && mkdir -p tmp-linux-$(LINUX_26VER) && tar -C tmp-linux-$(LINUX_26VER) -jxf $(LINUX_26SRC) && mv tmp-linux-$(LINUX_26VER)/* $@
 	touch $@ # update timestamp to avoid rebuild
 
 
@@ -37,7 +44,7 @@ LINUX_24SRC := ./linux-$(LINUX_24VER).tar.bz2
 endif
 
 pristine-linux-$(LINUX_24VER): $(LINUX_24SRC)
-	rm -rf tmp $@ && mkdir -p tmp && tar -C tmp -jxf $(LINUX_24SRC) && mv tmp/* $@
+	rm -rf tmp-linux-$(LINUX_24VER) $@ && mkdir -p tmp-linux-$(LINUX_24VER) && tar -C tmp-linux-$(LINUX_24VER) -jxf $(LINUX_24SRC) && mv tmp-linux-$(LINUX_24VER)/* $@
 	touch $@ # update timestamp to avoid rebuild
 
 linux-$(LINUX_24VER)-xen.patch: pristine-linux-$(LINUX_24VER)	
@@ -62,3 +69,4 @@ mrproper:
 	rm -rf pristine-linux-$(LINUX_24VER) linux-$(LINUX_24VER).tar.bz2
 	rm -rf pristine-linux-$(LINUX_26VER) linux-$(LINUX_26VER).tar.bz2
 	rm -rf linux-$(LINUX_24VER)-xen.patch linux-$(LINUX_26VER)-xen.patch
+	rm -rf pristine-netbsd-2.0
