@@ -96,7 +96,6 @@ create_bridge () {
         brctl addbr ${bridge}
         brctl stp ${bridge} off
         brctl setfd ${bridge} 0
-        brctl sethello ${bridge} 0
     fi
     ifconfig ${bridge} up
 }
