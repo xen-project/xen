@@ -287,7 +287,7 @@ CONFIG_JBD=y
 # CONFIG_CRAMFS is not set
 # CONFIG_TMPFS is not set
 # CONFIG_RAMFS is not set
-# CONFIG_ISO9660_FS is not set
+CONFIG_ISO9660_FS=y
 # CONFIG_MINIX_FS is not set
 # CONFIG_VXFS_FS is not set
 # CONFIG_NTFS_FS is not set

@@ -82,10 +82,14 @@
 3ddb79beyWwLRP_BiM2t1JKgr_plEw xen/drivers/block/ll_rw_blk.c
 3e4a8cb7RhubVgsPwO7cK0pgAN8WCQ xen/drivers/block/xen_block.c
 3e5d129asHNyZOjBKTkqs-9AFzxemA xen/drivers/block/xen_segment.c
+3e9c248afxxsnAzIt2na7Ej24yNFzg xen/drivers/cdrom/Makefile
+3e9c248ajUkn2W3n4vgm72Hp2ftZ8A xen/drivers/cdrom/cdrom.c
 3e4a8cb7alzQCDKS7MlioPoHBKYkdQ xen/drivers/char/Makefile
 3e4a8cb7WmiYdC-ASGiCSG_CL8vsqg xen/drivers/char/xen_kbd.c
 3e4a8cb7nMChlro4wvOBo76n__iCFA xen/drivers/char/xen_serial.c
 3ddb79bdhcqD9ebrslr0O0oHqTiiXg xen/drivers/ide/Makefile
+3e9c248aCM6Lex1Am8_NJIeesN4kKg xen/drivers/ide/ide-cd.c
+3e9c248aFfSNR_hl-WQBbv-R9CTgzg xen/drivers/ide/ide-cd.h
 3ddb79bdErDn_WC3G-fWxKNR3viLnA xen/drivers/ide/ide-disk.c
 3ddb79bdIPNW36FrlId94jTXaW8HoA xen/drivers/ide/ide-dma.c
 3ddb79be5Ysvhn4se_Z-LQY_hI6UPw xen/drivers/ide/ide-features.c
@@ -276,6 +280,7 @@
 3ddb79c116WbJV8bwGZXFFJy_GNNvw xen/include/xeno/byteorder/swab.h
 3ddb79c1pwmlw8VXW8aaSKAVGVmjDA xen/include/xeno/byteorder/swabb.h
 3ddb79c0c0cX_DZE209-Bb-Rx1v-Aw xen/include/xeno/cache.h
+3e9c248aEG_nCngztiFmv5CfayNkcA xen/include/xeno/cdrom.h
 3ddb79c259jh8hE7vre_8NuE7nwNSA xen/include/xeno/config.h
 3ddb79c1V44RD26YqCUm-kqIupM37A xen/include/xeno/ctype.h
 3ddb79c05DdHQ0UxX_jKsXdR4QlMCA xen/include/xeno/delay.h

@@ -40,7 +40,14 @@
 #endif
 
 /* This will die as all synchronous stuff is coming to an end */
+#if 0 
 #define complete(_r) panic("completion.h stuff may be needed...")
+#else
+// XXX SMH: we spin when waiting for completion so just toggle flag 
+#define complete(_r) (*(int *)(_r) = 0)
+#endif
+
+
 
 /*
  * MAC Floppy IWM hooks
