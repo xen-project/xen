@@ -50,6 +50,8 @@ typedef struct evtchn_bind_pirq
 {
     /* IN parameters. */
     int pirq;
+#define BIND_PIRQ__WILL_SHARE 1
+    unsigned int flags; /* BIND_PIRQ__* */
     /* OUT parameters. */
     int port;
 } evtchn_bind_pirq_t;

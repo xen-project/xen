@@ -59,7 +59,7 @@ extern void no_action(int cpl, void *dev_id, struct pt_regs *regs);
 
 struct task_struct;
 extern int pirq_guest_unmask(struct task_struct *p);
-extern int pirq_guest_bind(struct task_struct *p, int irq);
+extern int pirq_guest_bind(struct task_struct *p, int irq, int will_share);
 extern int pirq_guest_unbind(struct task_struct *p, int irq);
 
 #endif /* __XEN_IRQ_H__ */

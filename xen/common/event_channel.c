@@ -194,7 +194,9 @@ static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
         goto out;
 
     p->pirq_to_evtchn[pirq] = port;
-    if ( (rc = pirq_guest_bind(p, pirq)) != 0 )
+    rc = pirq_guest_bind(p, pirq, 
+                         !!(bind->flags & BIND_PIRQ__WILL_SHARE));
+    if ( rc != 0 )
     {
         p->pirq_to_evtchn[pirq] = 0;
         DPRINTK("Couldn't bind to PIRQ %d (error=%d)\n", pirq, rc);

@@ -6,32 +6,17 @@
  * 
  * Description: allows a domain to access devices on the PCI bus
  *
- * a guest os may be given access to particular devices on the PCI
- * bus. to allow the standard PCI device discovery to work it may
- * also have limited access to devices (bridges) in the PCI device
- * tree between the device and the PCI root device.
- *
- * for each domain a list of PCI devices is maintained, describing the
+ * A guest OS may be given access to particular devices on the PCI bus.
+ * For each domain a list of PCI devices is maintained, describing the
  * access mode for the domain. 
  *
- * guests can figure out the virtualised, or better, partioned PCI space
- * through normal pci config register access. Some of the accesses, in
- * particular write access are faked out. For example the sequence for
- * for detecting the IO regions, which require writes to determine the
- * size of teh region, is faked out by a very simple state machine, 
- * preventing direct writes to the PCI config registers by a guest.
- *
- * Interrupt handling is currently done in a very cheese fashion.
- * We take the default irq controller code and replace it with our own.
- * If an interrupt comes in it is acked using the PICs normal routine. Then
- * an event is send to the receiving domain which has to explicitly call
- * once it is finished dealing with the interrupt. Only then the PICs end
- * handler is called. very cheesy with all sorts of problems but it seems 
- * to work in normal cases. No shared interrupts are allowed.
- *
- * XXX this code is not SMP safe at the moment!
+ * Guests can figure out the virtualised PCI space through normal PCI config
+ * register access. Some of the accesses, in particular write accesses, are
+ * faked. For example the sequence for detecting the IO regions, which requires
+ * writes to determine the size of the region, is faked out by a very simple
+ * state machine, preventing direct writes to the PCI config registers by a
+ * guest.
  */
-
 
 #include <xen/config.h>
 #include <xen/lib.h>
@@ -47,22 +32,29 @@
 /* Called by PHYSDEV_PCI_INITIALISE_DEVICE to finalise IRQ routing. */
 extern void pcibios_enable_irq(struct pci_dev *dev);
 
-#if 1
-#define DBG(_x...)
+#if 0
+#define VERBOSE_INFO(_f, _a...) printk( _f , ## _a )
 #else
-#define DBG(_x...) printk(_x)
+#define VERBOSE_INFO(_f, _a...) ((void)0)
 #endif
+
+#if 1 || !defined(NDEBUG)
+#define INFO(_f, _a...) printk( _f, ## _a )
+#else
+#define INFO(_f, _a...) ((void)0)
+#endif
+
 
 #define ACC_READ  1
 #define ACC_WRITE 2
 
-/* upper bounds for PCI  devices */
+/* Upper bounds for PCI-device addressing. */
 #define PCI_BUSMAX  255
 #define PCI_DEVMAX   31
 #define PCI_FUNCMAX   7
 #define PCI_REGMAX  255
 
-/* bit offsets into state */
+/* Bit offsets into state. */
 #define ST_BASE_ADDRESS  0   /* bits 0-5: are for base address access */
 #define ST_ROM_ADDRESS   6   /* bit 6: is for rom address access */    
 
@@ -75,13 +67,7 @@ typedef struct _phys_dev_st {
 } phys_dev_t;
 
 
-/*
- * 
- * General functions
- * 
- */
-
-/* find a device on the device list */
+/* Find a device on a per-domain device list. */
 static phys_dev_t *find_pdev(struct task_struct *p, struct pci_dev *dev)
 {
     phys_dev_t *t, *res = NULL;
@@ -99,24 +85,22 @@ static phys_dev_t *find_pdev(struct task_struct *p, struct pci_dev *dev)
     return res;
 }
 
-/* add the device to the list of devices task p can access */
+/* Add a device to a per-domain device-access list. */
 static void add_dev_to_task(struct task_struct *p, 
                             struct pci_dev *dev, int acc)
 {
-    
     phys_dev_t *pdev;
     
     if ( (pdev = find_pdev(p, dev)) )
     {
-        /* device already on list, update access  */
+        /* Sevice already on list: update access permissions. */
         pdev->flags = acc;
         return;
     }
 
-    /* add device */
     if ( !(pdev = kmalloc(sizeof(phys_dev_t), GFP_KERNEL)) )
     {
-        printk("error allocating pdev structure\n");
+        INFO("Error allocating pdev structure.\n");
         return;
     }
     
@@ -127,7 +111,6 @@ static void add_dev_to_task(struct task_struct *p,
 
     if ( acc == ACC_WRITE )
         pdev->owner = p;
-
 }
 
 /*
@@ -151,11 +134,11 @@ int physdev_pci_access_modify(
 
     if ( !enable )
     {
-        DPRINTK("Disallowing access is not yet supported.\n");
+        INFO("Disallowing access is not yet supported.\n");
         return -EINVAL;
     }
 
-    DPRINTK("physdev_pci_access_modify: %02x:%02x:%02x\n", bus, dev, func);
+    INFO("physdev_pci_access_modify: %02x:%02x:%02x\n", bus, dev, func);
 
     if ( (p = find_domain_by_id(dom)) == NULL ) 
         return -ESRCH;
@@ -166,36 +149,36 @@ int physdev_pci_access_modify(
     /* Grant write access to the specified device. */
     if ( (pdev = pci_find_slot(bus, PCI_DEVFN(dev, func))) == NULL )
     {
-        DPRINTK("  dev does not exist\n");
+        INFO("  dev does not exist\n");
         return -ENODEV;
     }
     add_dev_to_task(p, pdev, ACC_WRITE);
-    DPRINTK("  add RW %02x:%02x:%02x\n", pdev->bus->number,
-            PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn));
+    INFO("  add RW %02x:%02x:%02x\n", pdev->bus->number,
+         PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn));
 
 
     /* Grant read access to the root device. */
     if ( (rdev = pci_find_slot(0, PCI_DEVFN(0, 0))) == NULL )
     {
-        DPRINTK("  bizarre -- no PCI root dev\n");
+        INFO("  bizarre -- no PCI root dev\n");
         return -ENODEV;
     }
     add_dev_to_task(p, rdev, ACC_READ);
-    DPRINTK("  add R0 %02x:%02x:%02x\n", 0, 0, 0);
+    INFO("  add R0 %02x:%02x:%02x\n", 0, 0, 0);
 
     /* Grant read access to all devices on the path to the root. */
     for ( tdev = pdev->bus->self; tdev != NULL; tdev = tdev->bus->self )
     {
         add_dev_to_task(p, tdev, ACC_READ);
-        DPRINTK("  add RO %02x:%02x:%02x\n", tdev->bus->number,
-                PCI_SLOT(tdev->devfn), PCI_FUNC(tdev->devfn));
+        INFO("  add RO %02x:%02x:%02x\n", tdev->bus->number,
+             PCI_SLOT(tdev->devfn), PCI_FUNC(tdev->devfn));
     }
 
     if ( pdev->hdr_type == PCI_HEADER_TYPE_NORMAL )
         return 0;
     
-    /* The  device is a bridge or cardbus. */
-    printk("XXX can't give access to bridge devices yet\n");
+    /* The device is a bridge or cardbus. */
+    INFO("XXX can't give access to bridge devices yet\n");
 
     return 0;
 }
@@ -217,15 +200,15 @@ inline static int check_dev_acc (struct task_struct *p,
     if ( bus > PCI_BUSMAX || dev > PCI_DEVMAX || func > PCI_FUNCMAX )
         return -EINVAL;
 
-    DBG("a=%c b=%x d=%x f=%x ", (acc == ACC_READ) ? 'R' : 'W',
-        mask, bus, dev, func);
+    VERBOSE_INFO("a=%c b=%x d=%x f=%x ", (acc == ACC_READ) ? 'R' : 'W',
+                 mask, bus, dev, func);
 
     /* check target device */
     target_devfn = PCI_DEVFN(dev, func);
     target_dev   = pci_find_slot(bus, target_devfn);
     if ( !target_dev )
     {
-        DBG("target does not exist\n");
+        VERBOSE_INFO("target does not exist\n");
         return -ENODEV;
     }
 
@@ -233,7 +216,7 @@ inline static int check_dev_acc (struct task_struct *p,
     target_pdev = find_pdev(p, target_dev);
     if ( !target_pdev )
     {
-        DBG("dom has no access to target\n");
+        VERBOSE_INFO("dom has no access to target\n");
         return -EPERM;
     }
 
@@ -241,11 +224,6 @@ inline static int check_dev_acc (struct task_struct *p,
     return 0;
 }
 
-/*
- * 
- * PCI config space access
- * 
- */
 
 /*
  * Base address registers contain the base address for IO regions.
@@ -266,60 +244,58 @@ inline static int check_dev_acc (struct task_struct *p,
  * cleared again. If the guest attempts to "restores" a wrong value an
  * error is flagged.
  */
-static int do_base_address_access(phys_dev_t *pdev, int acc,
-                                  int bus, int dev, int func, 
-                                  int reg, int len, u32 *val)
+static int do_base_address_access(phys_dev_t *pdev, int acc, int idx, 
+                                  int len, u32 *val)
 {
-    int idx, st_bit, ret = -EINVAL;
+    int st_bit, reg = PCI_BASE_ADDRESS_0 + (idx*4), ret = -EINVAL;
+    struct pci_dev *dev = pdev->dev;
     u32 orig_val, sz;
     struct resource *res;
 
-    idx    = (reg - PCI_BASE_ADDRESS_0)/4;
+    if ( len != sizeof(u32) )
+    {
+        INFO("Guest attempting sub-dword %s to BASE_ADDRESS %d\n", 
+             (acc == ACC_READ) ? "read" : "write", idx);
+        return -EPERM;
+    }
+
     st_bit = idx + ST_BASE_ADDRESS;
     res    = &(pdev->dev->resource[idx]);
 
     if ( acc == ACC_WRITE )
     {
-        if ( *val == 0xffffffff || 
-             ((res->flags & IORESOURCE_IO) && *val == 0xffff) )
+        if ( (*val == 0xffffffff) || 
+             ((res->flags & IORESOURCE_IO) && (*val == 0xffff)) )
         {
-            /* set bit and return */
+            /* Set bit and return. */
             set_bit(st_bit, &pdev->state);
             ret = 0;
         }
         else
         {
-            /* assume guest wants to set the base address */
+            /* Assume guest wants to set the base address. */
             clear_bit(st_bit, &pdev->state);
 
             /* check if guest tries to restore orig value */
-            ret = pci_config_read(0, bus, dev, func, reg, len, &orig_val);
-            if ( *val != orig_val ) 
+            ret = pci_read_config_dword(dev, reg, &orig_val);
+            if ( (ret == 0) && (*val != orig_val) ) 
             {
-                printk("caution: guest tried to change base address range.\n");
+                INFO("Guest attempting update to BASE_ADDRESS %d\n", idx);
                 ret = -EPERM;
             }
         }
-        DBG("fixed pci write: %02x:%02x:%02x reg=0x%02x len=0x%02x"
-            " val=0x%08x %lx\n", bus, dev, func, reg, len, *val,
-            pdev->state);
-
+        VERBOSE_INFO("fixed pci write: %02x:%02x:%02x reg=0x%02x len=0x%02x"
+                     " val=0x%08x %lx\n", 
+                     dev->bus->number, PCI_SLOT(dev->devfn), 
+                     PCI_FUNC(dev->devfn), reg, len, *val, pdev->state);
     }
-
     else if ( acc == ACC_READ )
     {
-        if ( !test_bit(st_bit, &pdev->state) )
+        ret = pci_read_config_dword(dev, reg, val);
+        if ( (ret == 0) && test_bit(st_bit, &pdev->state) )
         {
-            /* just read and return */
-            ret = pci_config_read(0, bus, dev, func, reg, len, val);
-        }
-        else
-        {
-            /* fake value */
-            ret = pci_config_read(0, bus, dev, func, reg, len, &orig_val);
-
+            /* Cook the value. */
             sz  = res->end - res->start;
-
             if ( res->flags & IORESOURCE_MEM )
             {
                 /* this is written out explicitly for clarity */
@@ -344,77 +320,75 @@ static int do_base_address_access(phys_dev_t *pdev, int acc,
                 *val = *val & (sz << 2);
                 *val = *val | 0x1;
             }
-            ret = 0;
         }
-        DBG("fixed pci read : %02x:%02x:%02x reg=0x%02x len=0x%02x"
-            " val=0x%08x %lx\n", bus, dev, func, reg, len, *val, pdev->state);
+        VERBOSE_INFO("fixed pci read: %02x:%02x:%02x reg=0x%02x len=0x%02x"
+                     " val=0x%08x %lx\n", 
+                     dev->bus->number, PCI_SLOT(dev->devfn), 
+                     PCI_FUNC(dev->devfn), reg, len, *val, pdev->state);
     }
 
     return ret;
 }
 
-/*
- * fake out read/write access to rom address register
- * pretty much the same as a above
- */
-static int do_rom_address_access(phys_dev_t *pdev, int acc,
-                                 int bus, int dev, int func, 
-                                 int reg, int len, u32 *val)
+
+static int do_rom_address_access(phys_dev_t *pdev, int acc, int len, u32 *val)
 {
     int st_bit, ret = -EINVAL;
+    struct pci_dev *dev = pdev->dev;
     u32 orig_val, sz;
     struct resource *res;
+
+    if ( len != sizeof(u32) )
+    {
+        INFO("Guest attempting sub-dword %s to ROM_ADDRESS\n", 
+             (acc == ACC_READ) ? "read" : "write");
+        return -EPERM;
+    }
 
     st_bit = ST_ROM_ADDRESS;
     res = &(pdev->dev->resource[PCI_ROM_RESOURCE]);
 
     if ( acc == ACC_WRITE )
     {
-        if ( *val == 0xffffffff || *val == 0xfffffffe)
+        if ( (*val == 0xffffffff) || (*val == 0xfffffffe) )
         {
-            /* 0xffffffff would be unusual, but we check anyway */
-            /* set bit and return */
+            /* NB. 0xffffffff would be unusual, but we trap it anyway. */
             set_bit(st_bit, &pdev->state);
             ret = 0;
         }
         else
         {
-            /* assume guest wants to set the base address */
+            /* Assume guest wants simply to set the base address. */
             clear_bit(st_bit, &pdev->state);
             
-            /* check if guest tries to restore orig value */
-            ret = pci_config_read(0, bus, dev, func, reg, len, &orig_val);
-            if ( (*val != orig_val) ) 
+            /* Check if guest tries to restore the original value. */
+            ret = pci_read_config_dword(dev, PCI_ROM_ADDRESS, &orig_val);
+            if ( (ret == 0) && (*val != orig_val) ) 
             {
-                if (*val != 0x00000000 )
+                if ( (*val != 0x00000000) )
                 {
-                    printk("caution: guest tried to change rom address.\n");
+                    INFO("caution: guest tried to change rom address.\n");
                     ret = -EPERM;
                 }
                 else
                 {
-                    printk ("guest disabled rom access for %02x:%02x:%02x\n",
-                            bus, dev, func);
-                    ret = 0;
+                    INFO("guest disabled rom access for %02x:%02x:%02x\n",
+                         dev->bus->number, PCI_SLOT(dev->devfn), 
+                         PCI_FUNC(dev->devfn));
                 }
             }
-
         }
-        DBG("fixed pci write: %02x:%02x:%02x reg=0x%02x len=0x%02x"
-            " val=0x%08x %lx\n", bus, dev, func, reg, len, *val, pdev->state);
-     
+        VERBOSE_INFO("fixed pci write: %02x:%02x:%02x reg=0x%02x len=0x%02x"
+                     " val=0x%08x %lx\n", 
+                     dev->bus->number, PCI_SLOT(dev->devfn), 
+                     PCI_FUNC(dev->devfn), reg, len, *val, pdev->state);
     }
     else if ( acc == ACC_READ )
     {
-       if ( !test_bit(st_bit, &pdev->state) )
+        ret = pci_read_config_dword(dev, PCI_ROM_ADDRESS, val);
+        if ( (ret == 0) && test_bit(st_bit, &pdev->state) )
         {
-            /* just read and return */
-            ret = pci_config_read(0, bus, dev, func, reg, len, val);
-        }
-        else
-        {
-            /* fake value */
-            ret = pci_config_read(0, bus, dev, func, reg, len, &orig_val);
+            /* Cook the value. */
             sz  = res->end - res->start;
             *val = 0xffffffff;
             /* leave bit 0 untouched */
@@ -424,19 +398,18 @@ static int do_rom_address_access(phys_dev_t *pdev, int acc,
             *val = *val & (sz << 11);
             *val = *val | (orig_val & 0x1);
         }
-
-        DBG("fixed pci read : %02x:%02x:%02x reg=0x%02x len=0x%02x"
-            " val=0x%08x %lx\n", bus, dev, func, reg, len, *val, pdev->state);
+        VERBOSE_INFO("fixed pci read: %02x:%02x:%02x reg=0x%02x len=0x%02x"
+                     " val=0x%08x %lx\n", 
+                     dev->bus->number, PCI_SLOT(dev->devfn), 
+                     PCI_FUNC(dev->devfn), reg, len, *val, pdev->state);
     }
+
     return ret;
 
 }
 
 /*
- * handle a domains pci config space read access if it has access to
- * the device.
- * For some registers for read-only devices (e.g. address base registers)
- * we need to maintain a state machine.
+ * Handle a PCI config space read access if the domain has access privileges.
  */
 static long pci_cfgreg_read(int bus, int dev, int func, int reg,
                             int len, u32 *val)
@@ -451,39 +424,51 @@ static long pci_cfgreg_read(int bus, int dev, int func, int reg,
     switch ( reg )
     {
     case PCI_BASE_ADDRESS_0:
+        ret = do_base_address_access(pdev, ACC_READ, 0, len, val);
+        break;
+
     case PCI_BASE_ADDRESS_1:
+        ret = do_base_address_access(pdev, ACC_READ, 1, len, val);
+        break;
+
     case PCI_BASE_ADDRESS_2:
+        ret = do_base_address_access(pdev, ACC_READ, 2, len, val);
+        break;
+
     case PCI_BASE_ADDRESS_3:
+        ret = do_base_address_access(pdev, ACC_READ, 3, len, val);
+        break;
+
     case PCI_BASE_ADDRESS_4:
+        ret = do_base_address_access(pdev, ACC_READ, 4, len, val);
+        break;
+
     case PCI_BASE_ADDRESS_5:
-        ret = do_base_address_access(pdev, ACC_READ, bus, dev, 
-                                     func, reg, len, val);
+        ret = do_base_address_access(pdev, ACC_READ, 5, len, val);
         break;
 
     case PCI_ROM_ADDRESS:
-        ret = do_rom_address_access(pdev, ACC_READ, bus, dev, 
-                                    func, reg, len, val);
+        ret = do_rom_address_access(pdev, ACC_READ, len, val);
         break;        
 
     case PCI_INTERRUPT_LINE:
-        ret = pdev->dev->irq;
+        *val = pdev->dev->irq;
+        ret = 0;
         break;
 
     default:
         ret = pci_config_read(0, bus, dev, func, reg, len, val);        
-        DBG("pci read : %02x:%02x:%02x reg=0x%02x len=0x%02x val=0x%08x\n",
-            bus, dev, func, reg, len, *val);
+        VERBOSE_INFO("pci read : %02x:%02x:%02x reg=0x%02x len=0x%02x "
+                     "val=0x%08x\n", bus, dev, func, reg, len, *val);
         break;
     }
 
     return ret;
 }
 
+
 /*
- * handle a domains pci config space write accesses if it has access to
- * the device.
- * for some registers a state machine is maintained to fake out r/w access.
- * By default no write access is allowed but we may change that in the future.
+ * Handle a PCI config space write access if the domain has access privileges.
  */
 static long pci_cfgreg_write(int bus, int dev, int func, int reg,
                              int len, u32 val)
@@ -498,35 +483,46 @@ static long pci_cfgreg_write(int bus, int dev, int func, int reg,
     switch (reg)
     {
     case PCI_BASE_ADDRESS_0:
+        ret = do_base_address_access(pdev, ACC_WRITE, 0, len, &val);
+        break;
+
     case PCI_BASE_ADDRESS_1:
+        ret = do_base_address_access(pdev, ACC_WRITE, 1, len, &val);
+        break;
+
     case PCI_BASE_ADDRESS_2:
+        ret = do_base_address_access(pdev, ACC_WRITE, 2, len, &val);
+        break;
+
     case PCI_BASE_ADDRESS_3:
+        ret = do_base_address_access(pdev, ACC_WRITE, 3, len, &val);
+        break;
+
     case PCI_BASE_ADDRESS_4:
+        ret = do_base_address_access(pdev, ACC_WRITE, 4, len, &val);
+        break;
+
     case PCI_BASE_ADDRESS_5:
-        ret = do_base_address_access (pdev, ACC_WRITE, bus, dev, 
-                                      func, reg, len, &val);
-        return ret;
+        ret = do_base_address_access(pdev, ACC_WRITE, 5, len, &val);
         break;
 
     case PCI_ROM_ADDRESS:
-        ret = do_rom_address_access (pdev, ACC_WRITE, bus, dev, 
-                                      func, reg, len, &val);
-        return ret;
+        ret = do_rom_address_access(pdev, ACC_WRITE, len, &val);
         break;        
 
     default:
         if ( pdev->flags != ACC_WRITE ) 
         {
-            printk("pci write not allowed %02x:%02x:%02x: "
-                   "reg=0x%02x len=0x%02x val=0x%08x\n",
-                   bus, dev, func, reg, len, val);
+            INFO("pci write not allowed %02x:%02x:%02x: "
+                 "reg=0x%02x len=0x%02x val=0x%08x\n",
+                 bus, dev, func, reg, len, val);
             ret = -EPERM;
         }
         else
         {
             ret = pci_config_write(0, bus, dev, func, reg, len, val);
-            DBG("pci write: %02x:%02x:%02x reg=0x%02x len=0x%02x val=0x%08x\n",
-                bus, dev, func, reg, len, val);
+            VERBOSE_INFO("pci write: %02x:%02x:%02x reg=0x%02x len=0x%02x "
+                         "val=0x%08x\n", bus, dev, func, reg, len, val);
         }
         break;
     }
@@ -617,11 +613,13 @@ void physdev_init_dom0(struct task_struct *p)
     struct pci_dev *dev;
     phys_dev_t *pdev;
 
-    printk("Give DOM0 read access to all PCI devices\n");
+    INFO("Give DOM0 read access to all PCI devices\n");
 
     pci_for_each_dev(dev)
     {
-        /* add device */
+        /* Skip bridges and other peculiarities for now. */
+        if ( dev->hdr_type != PCI_HEADER_TYPE_NORMAL )
+            continue;
         pdev = kmalloc(sizeof(phys_dev_t), GFP_KERNEL);
         pdev->dev = dev;
         pdev->flags = ACC_WRITE;

@@ -941,8 +941,9 @@ int setup_irq(unsigned int irq, struct irqaction * new)
 
 #define IRQ_MAX_GUESTS 7
 typedef struct {
-    unsigned short nr_guests;
-    unsigned short in_flight;
+    u8 nr_guests;
+    u8 in_flight;
+    u8 shareable;
     struct task_struct *guest[IRQ_MAX_GUESTS];
 } irq_guest_action_t;
 
@@ -989,7 +990,7 @@ int pirq_guest_unmask(struct task_struct *p)
     return 0;
 }
 
-int pirq_guest_bind(struct task_struct *p, int irq)
+int pirq_guest_bind(struct task_struct *p, int irq, int will_share)
 {
     unsigned long flags;
     irq_desc_t *desc = &irq_desc[irq];
@@ -1000,6 +1001,8 @@ int pirq_guest_bind(struct task_struct *p, int irq)
         return -EPERM;
 
     spin_lock_irqsave(&desc->lock, flags);
+
+    action = (irq_guest_action_t *)desc->action;
 
     if ( !(desc->status & IRQ_GUEST) )
     {
@@ -1021,14 +1024,19 @@ int pirq_guest_bind(struct task_struct *p, int irq)
 
         action->nr_guests = 0;
         action->in_flight = 0;
+        action->shareable = will_share;
         
         desc->depth = 0;
         desc->status |= IRQ_GUEST;
         desc->status &= ~(IRQ_DISABLED | IRQ_AUTODETECT | IRQ_WAITING);
         desc->handler->startup(irq);
     }
-
-    action = (irq_guest_action_t *)desc->action;
+    else if ( !will_share || !action->shareable )
+    {
+        DPRINTK("Cannot bind IRQ %d to guest. Will not share with others.\n");
+        rc = -EBUSY;
+        goto out;
+    }
 
     rc = -EBUSY;
     if ( action->nr_guests == IRQ_MAX_GUESTS )

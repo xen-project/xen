@@ -38,6 +38,8 @@ static int irq_bindcount[NR_IRQS];
 /* Upcall to generic IRQ layer. */
 extern asmlinkage unsigned int do_IRQ(int irq, struct pt_regs *regs);
 
+#define VALID_EVTCHN(_chn) ((_chn) != -1)
+
 void evtchn_do_upcall(struct pt_regs *regs)
 {
     unsigned long  l1, l2;
@@ -233,15 +235,27 @@ static inline void pirq_unmask_notify(int pirq)
     (void)HYPERVISOR_physdev_op(&op);
 }
 
+/*
+ * On startup, if there is no action associated with the IRQ then we are
+ * probing. In this case we should not share with others as it will confuse us.
+ */
+#define probing_irq(_irq) (irq_desc[(_irq)].action == NULL)
+
 static unsigned int startup_pirq(unsigned int irq)
 {
     evtchn_op_t op;
     int evtchn;
 
-    op.cmd              = EVTCHNOP_bind_pirq;
-    op.u.bind_pirq.pirq = irq;
+    op.cmd               = EVTCHNOP_bind_pirq;
+    op.u.bind_pirq.pirq  = irq;
+    /* NB. We are happy to share unless we are probing. */
+    op.u.bind_pirq.flags = probing_irq(irq) ? 0 : BIND_PIRQ__WILL_SHARE;
     if ( HYPERVISOR_event_channel_op(&op) != 0 )
-        panic("Failed to obtain physical IRQ %d\n", irq);
+    {
+        if ( !probing_irq(irq) ) /* Some failures are expected when probing. */
+            printk(KERN_INFO "Failed to obtain physical IRQ %d\n", irq);
+        return 0;
+    }
     evtchn = op.u.bind_pirq.port;
 
     evtchn_to_irq[evtchn] = irq;
@@ -258,6 +272,9 @@ static void shutdown_pirq(unsigned int irq)
     evtchn_op_t op;
     int evtchn = irq_to_evtchn[irq];
 
+    if ( !VALID_EVTCHN(evtchn) )
+        return;
+
     mask_evtchn(evtchn);
 
     op.cmd          = EVTCHNOP_close;
@@ -272,26 +289,38 @@ static void shutdown_pirq(unsigned int irq)
 
 static void enable_pirq(unsigned int irq)
 {
-    unmask_evtchn(irq_to_evtchn[irq]);
+    int evtchn = irq_to_evtchn[irq];
+    if ( !VALID_EVTCHN(evtchn) )
+        return;
+    unmask_evtchn(evtchn);
     pirq_unmask_notify(irq_to_pirq(irq));
 }
 
 static void disable_pirq(unsigned int irq)
 {
-    mask_evtchn(irq_to_evtchn[irq]);
+    int evtchn = irq_to_evtchn[irq];
+    if ( !VALID_EVTCHN(evtchn) )
+        return;
+    mask_evtchn(evtchn);
 }
 
 static void ack_pirq(unsigned int irq)
 {
-    mask_evtchn(irq_to_evtchn[irq]);
-    clear_evtchn(irq_to_evtchn[irq]);
+    int evtchn = irq_to_evtchn[irq];
+    if ( !VALID_EVTCHN(evtchn) )
+        return;
+    mask_evtchn(evtchn);
+    clear_evtchn(evtchn);
 }
 
 static void end_pirq(unsigned int irq)
 {
+    int evtchn = irq_to_evtchn[irq];
+    if ( !VALID_EVTCHN(evtchn) )
+        return;
     if ( !(irq_desc[irq].status & IRQ_DISABLED) )
     {
-        unmask_evtchn(irq_to_evtchn[irq]);
+        unmask_evtchn(evtchn);
         pirq_unmask_notify(irq_to_pirq(irq));
     }
 }
