@@ -77,6 +77,8 @@ int opt_ignorebiostables=0;
 int opt_watchdog=0;
 /* opt_pdb: Name of serial port for Xen pervasive debugger (and enable pdb) */
 unsigned char opt_pdb[10] = "none";
+/* opt_tbuf_size: trace buffer size (in pages) */
+unsigned int opt_tbuf_size = 1;
 
 static struct {
     unsigned char *name;
@@ -96,6 +98,7 @@ static struct {
     { "ignorebiostables", OPT_BOOL, &opt_ignorebiostables },
     { "watchdog",         OPT_BOOL, &opt_watchdog },
     { "pdb",              OPT_STR,  &opt_pdb },
+    { "tbuf_size",        OPT_UINT, &opt_tbuf_size },
     { NULL,               0,        NULL     }
 };
 

@@ -21,12 +21,6 @@
 #ifndef __XENO_TRACE_H__
 #define __XENO_TRACE_H__
 
-/*
- * How much space is allowed for a single trace buffer, including data and
- * metadata (and maybe some waste).
- */
-#define TB_SIZE PAGE_SIZE
-
 /* This structure represents a single trace buffer record. */
 struct t_rec {
     u64 cycles;               /* 64 bit cycle counter timestamp */
@@ -63,12 +57,13 @@ struct t_buf {
 #include <asm/atomic.h>
 #include <asm/current.h>
 #include <asm/msr.h>
+#include <hypervisor-ifs/dom0_ops.h>
 
 /* Used to initialise trace buffer functionality */
 void init_trace_bufs(void);
 
 /* used to retrieve the physical address of the trace buffers */
-struct t_buf *get_tb_ptr(void);
+int get_tb_info(dom0_gettbufs_t *st);
 
 /**
  * trace - Enters a trace tuple into the trace buffer for the current CPU.

@@ -435,9 +435,8 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 #ifdef TRACE_BUFFER
     case DOM0_GETTBUFS:
     {
-	op->u.gettbufs.phys_addr = get_tb_ptr();
+        ret = get_tb_info(&op->u.gettbufs);
 	copy_to_user(u_dom0_op, op, sizeof(*op));
-	ret = 0;
     }
     break;
 #endif
