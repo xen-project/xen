@@ -62,10 +62,6 @@
 
 #define yield() ((void)0)
 
-#define schedule_timeout(_t)       \
-  set_current_state(TASK_RUNNING); \
-  mdelay((_t)*(1000/HZ))
-
 #define E100_REGS_LEN 1
 /*
  *  Configure parameters for buffers per controller.

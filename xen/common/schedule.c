@@ -594,78 +594,12 @@ void schedulers_start(void)
 }
 
 
-/****************************************************************************
- * Functions for legacy support. 
- * Schedule timeout is used at a number of places and is a bit meaningless 
- * in the context of Xen, as Domains are not able to call these and all 
- * there entry points into Xen should be asynchronous. If a domain wishes
- * to block for a while it should use Xen's sched_op/yield entry point.
- ****************************************************************************/
-
 static void process_timeout(unsigned long __data)
 {
     struct task_struct * p = (struct task_struct *) __data;
     wake_up(p);
 }
 
-long schedule_timeout(long timeout)
-{
-    struct timer_list timer;
-    unsigned long expire;
-
-    switch (timeout)
-    {
-    case MAX_SCHEDULE_TIMEOUT:
-        /* Sanity! This just wouldn't make sense. */
-        if ( is_idle_task(current) )
-            panic("Arbitrary sleep in idle task!");
-        /*
-         * These two special cases are useful to be comfortable in the caller.
-         * Nothing more. We could take MAX_SCHEDULE_TIMEOUT from one of the
-         * negative value but I' d like to return a valid offset (>=0) to allow
-         * the caller to do everything it want with the retval.
-         */
-        schedule();
-        goto out;
-
-    default:
-        /*
-         * Another bit of PARANOID. Note that the retval will be 0 since no
-         * piece of kernel is supposed to do a check for a negative retval of
-         * schedule_timeout() (since it should never happens anyway). You just
-         * have the printk() that will tell you if something is gone wrong and
-         * where.
-         */
-        if (timeout < 0)
-        {
-            printk(KERN_ERR "schedule_timeout: wrong timeout "
-                   "value %lx from %p\n", timeout,
-                   __builtin_return_address(0));
-            current->state = TASK_RUNNING;
-            goto out;
-        }
-    }
-    
-    expire = timeout + jiffies;
-    
-    init_timer(&timer);
-    timer.expires = expire;
-    timer.data = (unsigned long) current;
-    timer.function = process_timeout;
-    
-    add_timer(&timer);
-    schedule();
-    del_timer_sync(&timer);
-    
-    timeout = expire - jiffies;
-
- out:
-    return timeout < 0 ? 0 : timeout;
-}
-
-/****************************************************************************
- * debug function
- ****************************************************************************/
 
 static void dump_rqueue(struct list_head *queue, char *name)
 {

@@ -15,6 +15,7 @@
 #include <xeno/list.h>
 #include <xeno/time.h>
 #include <xeno/ac_timer.h>
+#include <xeno/delay.h>
 
 #define MAX_DOMAIN_NAME 16
 
@@ -263,7 +264,6 @@ extern unsigned long wait_init_idle;
  * Scheduler functions (in schedule.c)
  */
 #define set_current_state(_s) do { current->state = (_s); } while (0)
-#define MAX_SCHEDULE_TIMEOUT LONG_MAX
 void scheduler_init(void);
 void schedulers_start(void);
 void sched_add_domain(struct task_struct *p);
@@ -273,11 +273,18 @@ long sched_adjdom(int dom, unsigned long mcu_adv, unsigned long warp,
                   unsigned long warpl, unsigned long warpu);
 void init_idle_task(void);
 int  wake_up(struct task_struct *p);
-long schedule_timeout(long timeout);
 long do_yield(void);
 void reschedule(struct task_struct *p);
 asmlinkage void schedule(void);
 
+/* A compatibility hack for Linux drivers. */
+#define MAX_SCHEDULE_TIMEOUT 0UL
+static inline long schedule_timeout(long timeout)
+{
+    set_current_state(TASK_RUNNING);
+    mdelay(timeout*(1000/HZ));
+    return 0;
+}
 
 #define signal_pending(_p) ((_p)->hyp_events || \
                             (_p)->shared_info->events)

@@ -107,11 +107,10 @@ void do_task_queues(u_char key, void *dev_id, struct pt_regs *regs)
 	s = p->shared_info; 
 	if( !is_idle_task(p) )
         {
-            net_vif_t *v = find_vif_by_id((p->domain)<<VIF_DOMAIN_SHIFT);
 	    printk("Guest: events = %08lx, events_mask = %08lx\n", 
 		   s->events, s->events_mask); 
 	  
-	    if ( v != NULL )
+	    if ( (v = find_vif_by_id((p->domain)<<VIF_DOMAIN_SHIFT)) != NULL )
             {
                 printk("rx_prod=%d ,rx_cons=%d, tx_prod=%d, tx_cons=%d\n",
                        v->rx_prod, v->rx_cons, v->tx_prod, v->tx_cons );
