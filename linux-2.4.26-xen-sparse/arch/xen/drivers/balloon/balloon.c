@@ -39,6 +39,7 @@ typedef struct user_balloon_op {
 
 static struct proc_dir_entry *balloon_pde;
 unsigned long credit;
+static unsigned long current_pages, max_pages;
 
 static inline pte_t *get_ptep(unsigned long addr)
 {
@@ -221,50 +222,86 @@ unsigned long deflate_balloon(unsigned long num_pages)
     return ret;
 }
 
+#define PAGE_TO_MB_SHIFT 8
+
 static int balloon_write(struct file *file, const char *buffer,
                          u_long count, void *data)
 {
-    user_balloon_op_t bop;
+    char memstring[64], *endchar;
+    int len, i, pages;
+    unsigned long long target;
 
     /* Only admin can play with the balloon :) */
     if ( !capable(CAP_SYS_ADMIN) )
         return -EPERM;
 
-    if ( copy_from_user(&bop, buffer, sizeof(bop)) )
-        return -EFAULT;
-
-    switch ( bop.op )
-    {
-    case USER_INFLATE_BALLOON:
-        if ( inflate_balloon(bop.size) < bop.size )
-            return -EAGAIN;
-        break;
-        
-    case USER_DEFLATE_BALLOON:
-        deflate_balloon(bop.size);
-        break;
-
-    default:
-        printk("Unknown command to balloon driver.");
-        return -EFAULT;
+    if (count>sizeof memstring) {
+	    return -EFBIG;
     }
 
-    return sizeof(bop);
+    len = strnlen_user(buffer, count);
+    if (len==0) return -EBADMSG;
+    if (len==1) return 1; /* input starts with a NUL char */
+    if ( strncpy_from_user(memstring, buffer, len) < 0)
+        return -EFAULT;
+
+    endchar = memstring;
+    for(i=0; i<len; ++i,++endchar) {
+	    if ('0'>memstring[i] || memstring[i]>'9') break;
+    }
+    if (i==0) return -EBADMSG;
+
+    target = memparse(memstring,&endchar);
+    pages = target >> PAGE_SHIFT;
+
+    if (pages < current_pages) {
+	    int change = inflate_balloon(current_pages-pages);
+	    if (change<0) return change;
+
+	    current_pages -= change;
+    	    printk("Relinquish %dMB to xen. Domain now has %dMB\n",
+		    change>>PAGE_TO_MB_SHIFT, current_pages>>PAGE_TO_MB_SHIFT);
+    }
+    else if (pages > current_pages) {
+	    int change = deflate_balloon(min(pages,max_pages) - current_pages);
+	    if (change<0) return change;
+
+	    current_pages += change;
+    	    printk("Reclaim %dMB from xen. Domain now has %dMB\n",
+		    change>>PAGE_TO_MB_SHIFT, current_pages>>PAGE_TO_MB_SHIFT);
+    }
+
+    return len;
+}
+
+
+static int balloon_read(char *page, char **start, off_t off,
+	  int count, int *eof, void *data)
+{
+	int len;
+	len = sprintf(page,"%ul\n",current_pages<<PAGE_SHIFT);
+
+	if (len <= off+count) *eof = 1;
+	*start = page + off;
+	len -= off;
+	if (len>count) len = count;
+	if (len<0) len = 0;
+	return len;
 }
 
 static int __init init_module(void)
 {
     printk(KERN_ALERT "Starting Xen Balloon driver\n");
 
-    credit = 0;
-
-    if ( (balloon_pde = create_xen_proc_entry("balloon", 0600)) == NULL )
+    max_pages = current_pages = start_info.nr_pages;
+    if ( (balloon_pde = create_xen_proc_entry("memory_target", 0644)) == NULL )
     {
         printk(KERN_ALERT "Unable to create balloon driver proc entry!");
         return -1;
     }
 
     balloon_pde->write_proc = balloon_write;
+    balloon_pde->read_proc = balloon_read;
 
     return 0;
 }
