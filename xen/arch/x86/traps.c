@@ -591,14 +591,14 @@ asmlinkage void io_check_error(struct xen_regs *regs)
     fatal_trap(TRAP_nmi, regs);
 }
 
-static void unknown_nmi_error(unsigned char reason, struct xen_regs * regs)
+static void unknown_nmi_error(unsigned char reason)
 {
     printk("Uhhuh. NMI received for unknown reason %02x.\n", reason);
     printk("Dazed and confused, but trying to continue\n");
     printk("Do you have a strange power saving mode enabled?\n");
 }
 
-asmlinkage void do_nmi(struct xen_regs * regs, unsigned long reason)
+asmlinkage void do_nmi(struct xen_regs *regs, unsigned long reason)
 {
     ++nmi_count(smp_processor_id());
 
@@ -607,7 +607,7 @@ asmlinkage void do_nmi(struct xen_regs * regs, unsigned long reason)
         nmi_watchdog_tick(regs);
     else
 #endif
-        unknown_nmi_error((unsigned char)(reason&0xff), regs);
+        unknown_nmi_error((unsigned char)(reason&0xff));
 }
 
 unsigned long nmi_softirq_reason;
@@ -693,6 +693,13 @@ asmlinkage int do_debug(struct xen_regs *regs)
 asmlinkage int do_spurious_interrupt_bug(struct xen_regs *regs)
 {
     return EXCRET_not_a_fault;
+}
+
+BUILD_SMP_INTERRUPT(deferred_nmi, TRAP_deferred_nmi)
+asmlinkage void smp_deferred_nmi(struct xen_regs regs)
+{
+    ack_APIC_irq();
+    do_nmi(&regs, 0);
 }
 
 #define _set_gate(gate_addr,type,dpl,addr) \
@@ -803,7 +810,7 @@ void __init trap_init(void)
     set_intr_gate(TRAP_alignment_check,&alignment_check);
     set_intr_gate(TRAP_machine_check,&machine_check);
     set_intr_gate(TRAP_simd_error,&simd_coprocessor_error);
-    set_intr_gate(TRAP_deferred_nmi,&nmi);
+    set_intr_gate(TRAP_deferred_nmi,&deferred_nmi);
 
     /* Only ring 1 can access Xen services. */
     _set_gate(idt_table+HYPERCALL_VECTOR,14,1,&hypercall);
