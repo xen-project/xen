@@ -35,3 +35,14 @@ xen/xen.*
 tools/xfrd/xfrd
 xen/tools/elf-reloc
 xen/tools/figlet/figlet
+docs/interface.aux
+docs/interface.log
+docs/interface.pdf
+docs/interface.ps
+docs/interface.toc
+docs/user.aux
+docs/user.log
+docs/user.pdf
+docs/user.ps
+docs/user.toc
+tools/web-shutdown.tap

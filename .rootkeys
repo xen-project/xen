@@ -310,6 +310,7 @@
 3f870808zS6T6iFhqYPGelroZlVfGQ tools/misc/xen_cpuperf.c
 405eedf6_nnNhFQ1I85lhCkLK6jFGA tools/misc/xencons
 40c9c4697z76HDfkCLdMhmaEwzFoNQ tools/misc/xend
+4107986eMWVdBoz4tXYoOscpN_BCYg tools/misc/xensv
 4056f5155QYZdsk-1fLdjsZPFTnlhg tools/misc/xensymoops.py
 40cf2937dqM1jWW87O5OoOYND8leuA tools/misc/xm
 40c9c468icGyC5RAF1bRKsCXPDCvsA tools/python/Makefile
@@ -372,6 +373,7 @@
 40dc4076pVeE1kEEWzcUaNZin65kCA tools/python/xen/lowlevel/xu/domain_controller.h
 40dc4076CwBYRTUQDdbdU1L6KcLgSw tools/python/xen/lowlevel/xu/xu.c
 41052eb84_irpx0E9N_kqBp9eoin5g tools/python/xen/sv/CreateDomain.py
+4107986egkTAMIHW7n-i4ShvCGWpLQ tools/python/xen/sv/Daemon.py
 40fcefb2qm13BbRZBydAatOavaS0fQ tools/python/xen/sv/DomInfo.py
 40fcefb2-RIU8GB67mJMRzybME9bxw tools/python/xen/sv/DomList.py
 40fcefb23FfQn-ZBCbcHqA0cPGqQxw tools/python/xen/sv/GenTabbed.py
@@ -381,6 +383,7 @@
 40fcefb2Sif__6AqrANeBQZZfvP-6w tools/python/xen/sv/TabView.py
 41052eb8UrgtUkuJPg7oY1tutVQHsg tools/python/xen/sv/Wizzard.py
 40fcefb2DqteqCCZYDCvvh4Q5jBd0w tools/python/xen/sv/__init__.py
+4107986e6qN1IdvIDdId0AYFmDMkiQ tools/python/xen/sv/params.py
 40fcefb4rnaZNjqsBu7A5V2rlLyqRw tools/python/xen/sv/util.py
 40d8915cyoVA0hJxiBFNymL7YvDaRg tools/python/xen/util/Brctl.py
 40dfd40aGqGkiopOOgJxSF4iCbHM0Q tools/python/xen/util/__init__.py

@@ -21,7 +21,7 @@ OBJS     = $(patsubst %.c,%.o,$(SRCS))
 TARGETS  = xen_cpuperf
 
 INSTALL_BIN  = $(TARGETS) xencons
-INSTALL_SBIN = netfix xm xend
+INSTALL_SBIN = netfix xm xend xensv
 
 all: $(TARGETS)
 	$(MAKE) -C miniterm

@@ -18,7 +18,32 @@ def sxp2hash( s ):
         else:
             sxphash[ child[0] ] = child[1]
         
-    return sxphash   
+    return sxphash  
+    
+def ssxp2hash( s ):
+    sxphash = {}
+    
+    for i in s:
+       if isinstance( i, types.ListType ) and len( i ) > 1:
+          sxphash[ i[0] ] = i[1]
+    
+    return sxphash 
+    
+def hash2sxp( h ):
+    hashsxp = []
+    
+    for (key, item) in h.items():
+    	hashsxp.append( [key, item] )
+        
+    return hashsxp    
+    
+def string2sxp( string ):
+    pin = sxp.Parser()
+    pin.input( string )
+    return pin.get_val()    
+
+def sxp2string( sexp ):
+    return sxp.to_string( sexp )    
     
 def sxp2prettystring( sxp ):
     class tmp:
