@@ -16,8 +16,6 @@
 #include <scsi/scsi.h>
 #include <asm/ctrl_if.h>
 
-
-
 typedef unsigned char byte; /* from linux/ide.h */
 
 #define BLKIF_STATE_CLOSED       0
@@ -95,6 +93,7 @@ static inline void translate_req_to_mfn(blkif_request_t *xreq,
 static inline void flush_requests(void)
 {
     DISABLE_SCATTERGATHER();
+    wmb(); /* Ensure that the frontend can see the requests. */
     blk_ring->req_prod = req_prod;
     notify_via_evtchn(blkif_evtchn);
 }
@@ -533,7 +532,7 @@ static void kick_pending_request_queues(void)
 
 static void blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 {
-    BLKIF_RING_IDX i; 
+    BLKIF_RING_IDX i, rp; 
     unsigned long flags; 
     struct buffer_head *bh, *next_bh;
     
@@ -541,13 +540,14 @@ static void blkif_int(int irq, void *dev_id, struct pt_regs *ptregs)
 
     if ( unlikely(blkif_state == BLKIF_STATE_CLOSED || recovery) )
     {
-        printk("Bailed out\n");
-        
         spin_unlock_irqrestore(&io_request_lock, flags);
         return;
     }
 
-    for ( i = resp_cons; i != blk_ring->resp_prod; i++ )
+    rp = blk_ring->resp_prod;
+    rmb(); /* Ensure we see queued responses up to 'rp'. */
+
+    for ( i = resp_cons; i != rp; i++ )
     {
         blkif_response_t *bret = &blk_ring->ring[MASK_BLKIF_IDX(i)].resp;
         switch ( bret->operation )
