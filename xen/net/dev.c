@@ -492,21 +492,16 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
 
     memset(skb->mac.ethernet->h_dest, 0, ETH_ALEN);
     if ( ntohs(skb->mac.ethernet->h_proto) == ETH_P_ARP )
-    {
         memset(skb->nh.raw + 18, 0, ETH_ALEN);
-    }
     shadow_ring = vif->shadow_ring;
 
     if ( (i = shadow_ring->rx_idx) == shadow_ring->rx_prod )
-    {
         return;
-    }
 
     if ( shadow_ring->rx_ring[i].status != RING_STATUS_OK )
     {
         DPRINTK("Bad buffer in deliver_packet()\n");
-        shadow_ring->rx_idx = RX_RING_INC(i);
-        return;
+        goto inc_and_out;
     }
 
     rx = shadow_ring->rx_ring + i;
@@ -536,7 +531,8 @@ void deliver_packet(struct sk_buff *skb, net_vif_t *vif)
 
     /* Our skbuff now points at the guest's old frame. */
     skb->pf = g_pfn;
-        
+
+ inc_and_out:        
     shadow_ring->rx_idx = RX_RING_INC(i);
 }
 
@@ -644,6 +640,20 @@ int netif_rx(struct sk_buff *skb)
 
 /*************************************************************
  * NEW TRANSMIT SCHEDULER
+ * 
+ * NB. We ought also to only send a limited number of bytes to the NIC
+ * for transmission at any one time (to avoid head-of-line blocking).
+ * However, driver rings are small enough that they provide a reasonable
+ * limit.
+ * 
+ * eg. 3c905 has 16 descriptors == 8 packets, at 100Mbps
+ *     e1000 has 256 descriptors == 128 packets, at 1000Mbps
+ *     tg3 has 512 descriptors == 256 packets, at 1000Mbps
+ * 
+ * So, worst case is tg3 with 256 1500-bytes packets == 375kB.
+ * This would take 3ms, and represents our worst-case HoL blocking cost.
+ * 
+ * We think this is reasonable.
  */
 
 struct list_head net_schedule_list;
@@ -685,6 +695,8 @@ static void tx_skb_release(struct sk_buff *skb)
 {
     int i;
     net_vif_t *vif = sys_vif_list[skb->src_vif];
+    unsigned int idx;
+    tx_shadow_entry_t *tx;
     
     for ( i = 0; i < skb_shinfo(skb)->nr_frags; i++ )
         put_page_tot(skb_shinfo(skb)->frags[i].page);
@@ -705,11 +717,35 @@ static void tx_skb_release(struct sk_buff *skb)
      * maps to one NIC. This is executed in NIC interrupt code, so we have
      * mutual exclusion from do_IRQ().
      */
-    vif->shadow_ring->tx_cons = TX_RING_INC(vif->shadow_ring->tx_cons);
+
+    /* Skip over a sequence of bad descriptors, plus the first good one. */
+    do {
+        idx = vif->shadow_ring->tx_cons;
+        /* There must be at least one good descriptor outstanding. */
+        if ( idx == vif->shadow_ring->tx_idx ) BUG();
+        tx  = &vif->shadow_ring->tx_ring[idx];
+        vif->shadow_ring->tx_cons = TX_RING_INC(idx);
+        if ( vif->shadow_ring->tx_cons == vif->net_ring->tx_event )
+            set_bit(_EVENT_NET_TX, 
+                    &sys_vif_list[skb->src_vif]->domain->shared_info->events);
+    } while ( tx->status != RING_STATUS_OK );
+
+    /* Now skip over any more bad descriptors, up to the next good one. */
+    do {
+        idx = vif->shadow_ring->tx_cons;
+        tx  = &vif->shadow_ring->tx_ring[idx];
+        /* Carry on until we find a good descriptor, or reach scheduler idx. */
+        if ( (idx == vif->shadow_ring->tx_idx) || 
+             (tx->status == RING_STATUS_OK) )
+            break;
+        vif->shadow_ring->tx_cons = TX_RING_INC(idx);
+        if ( vif->shadow_ring->tx_cons == vif->net_ring->tx_event )
+            set_bit(_EVENT_NET_TX, 
+                    &sys_vif_list[skb->src_vif]->domain->shared_info->events);
+    } while ( 1 );
+
+    /* Finally, update shared consumer index to the new private value. */
     vif->net_ring->tx_cons = vif->shadow_ring->tx_cons;
-    if ( vif->net_ring->tx_cons == vif->net_ring->tx_event )
-        set_bit(_EVENT_NET_TX, 
-                &sys_vif_list[skb->src_vif]->domain->shared_info->events);
 }
 
     
@@ -720,11 +756,9 @@ static void net_tx_action(unsigned long unused)
     struct sk_buff *skb;
     net_vif_t *vif;
     tx_shadow_entry_t *tx;
-    int pending_bytes = 0, pending_bytes_max = 1;
 
     spin_lock(&dev->xmit_lock);
     while ( !netif_queue_stopped(dev) &&
-            (pending_bytes < pending_bytes_max) &&
             !list_empty(&net_schedule_list) )
     {
         /* Get a vif from the list with work to do. */
@@ -782,6 +816,14 @@ static void net_tx_action(unsigned long unused)
 }
 
 DECLARE_TASKLET_DISABLED(net_tx_tasklet, net_tx_action, 0);
+
+static inline void maybe_schedule_tx_action(void)
+{
+    smp_mb();
+    if ( !netif_queue_stopped(the_dev) &&
+         !list_empty(&net_schedule_list) )
+        tasklet_schedule(&net_tx_tasklet);
+}
 
 
 /*
@@ -1912,12 +1954,14 @@ long do_net_update(void)
         unmap_and_continue:
             unmap_domain_mem(g_data);
         }
-        smp_wmb(); /* Let other CPUs see new descriptors first. */
-        shadow_ring->tx_prod = i;
 
-        /* XXX: This should be more consevative. */
-        add_to_net_schedule_list_tail(current_vif);
-        tasklet_schedule(&net_tx_tasklet);
+        if ( shadow_ring->tx_prod != i )
+        {
+            smp_mb(); /* Let other CPUs see new descriptors first. */
+            shadow_ring->tx_prod = i;
+            add_to_net_schedule_list_tail(current_vif);
+            maybe_schedule_tx_action();
+        }
 
         /*
          * PHASE 2 -- RECEIVE RING
@@ -1984,9 +2028,14 @@ long do_net_update(void)
             
             unmap_domain_mem(g_pte);
         }
-        smp_wmb(); /* Let other CPUs see new descriptors first. */
-        shadow_ring->rx_prod = net_ring->rx_prod;
+
+        if ( shadow_ring->rx_prod != i )
+        {
+            smp_mb(); /* Let other CPUs see new descriptors first. */
+            shadow_ring->rx_prod = i;
+        }
     }
+
     return 0;
 }
 
