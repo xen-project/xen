@@ -194,9 +194,9 @@ void arch_do_createdomain(struct exec_domain *ed)
 	if (!allocate_rid_range(d,DOMAIN_RID_BITS_DEFAULT)) // FIXME
 		BUG();
 	// the following will eventually need to be negotiated dynamically
-	d->xen_vastart = 0xfffc000000000000;
-	d->xen_vaend = 0xfffe000000000000;
-	d->shared_info_va = 0xfffd000000000000;
+	d->xen_vastart = 0xf000000000000000;
+	d->xen_vaend = 0xf300000000000000;
+	d->shared_info_va = 0xf100000000000000;
 	d->breakimm = 0x1000;
 	// stay on kernel stack because may get interrupts!
 	// ia64_ret_from_clone (which b0 gets in new_thread) switches

@@ -1,5 +1,5 @@
---- /home/djm/src/xen/xeno-ia64.bk/xen/linux-2.6.7/arch/ia64/kernel/head.S	2005-01-23 13:23:36.000000000 -0700
-+++ /home/djm/src/xen/xeno-ia64.bk/xen/arch/ia64/head.S	2004-12-17 13:47:03.000000000 -0700
+--- ../../linux-2.6.7/arch/ia64/kernel/head.S	2005-03-24 19:39:56.000000000 -0700
++++ arch/ia64/head.S	2005-04-01 12:56:01.000000000 -0700
 @@ -1,3 +1,8 @@
 +#ifdef XEN
 +#define	console_print	printf
@@ -14,7 +14,7 @@
  	;;
  	or r18=r17,r18
 +#ifdef XEN
-+	dep r2=-1,r3,50,14	// IMVA of task
++	dep r2=-1,r3,60,4	// IMVA of task
 +#else
  	dep r2=-1,r3,61,3	// IMVA of task
 +#endif
@@ -26,7 +26,7 @@
  	mov ar.rsc=0x3		// place RSE in eager mode
  
 +#ifdef XEN
-+(isBP)	dep r28=-1,r28,50,14	// make address virtual
++(isBP)	dep r28=-1,r28,60,4	// make address virtual
 +#else
  (isBP)	dep r28=-1,r28,61,3	// make address virtual
 +#endif
@@ -69,8 +69,8 @@
  	dep r3=0,r3,KERNEL_TR_PAGE_SHIFT,64-KERNEL_TR_PAGE_SHIFT
  	dep r14=0,r14,KERNEL_TR_PAGE_SHIFT,64-KERNEL_TR_PAGE_SHIFT
 +#ifdef XEN
-+	dep r17=-1,r17,50,14
-+	dep sp=-1,sp,50,14
++	dep r17=-1,r17,60,4
++	dep sp=-1,sp,60,4
 +#else
  	dep r17=-1,r17,61,3
  	dep sp=-1,sp,61,3

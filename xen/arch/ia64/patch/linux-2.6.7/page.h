@@ -1,5 +1,5 @@
 --- ../../linux-2.6.7/include/asm-ia64/page.h	2004-06-15 23:18:58.000000000 -0600
-+++ include/asm-ia64/page.h	2005-03-23 14:54:11.000000000 -0700
++++ include/asm-ia64/page.h	2005-04-01 12:56:37.000000000 -0700
 @@ -12,6 +12,9 @@
  #include <asm/intrinsics.h>
  #include <asm/types.h>
@@ -43,8 +43,8 @@
 +#ifdef XEN
 +typedef union xen_va {
 +	struct {
-+		unsigned long off : 50;
-+		unsigned long reg : 14;
++		unsigned long off : 60;
++		unsigned long reg : 4;
 +	} f;
 +	unsigned long l;
 +	void *p;
@@ -67,7 +67,7 @@
  #endif /* !STRICT_MM_TYPECHECKS */
  
 +#ifdef XEN
-+#define PAGE_OFFSET			0xfffc000000000000
++#define PAGE_OFFSET			0xf000000000000000
 +#else
  #define PAGE_OFFSET			0xe000000000000000
 +#endif

@@ -132,7 +132,7 @@ GLOBAL_ENTRY(ia64_new_rr7)
 (p7)	br.cond.sptk	.stack_overlaps
 	;;
 	movl r25=PAGE_KERNEL
-	dep r20=0,r13,50,14		// physical address of "current"
+	dep r20=0,r13,60,4		// physical address of "current"
 	;;
 	or r23=r25,r20			// construct PA | page properties
 	mov r25=IA64_GRANULE_SHIFT<<2
