@@ -69,7 +69,6 @@ typedef struct
  */
 typedef struct {
     usbif_priv_t       *usbif_priv;
-    usbif_iso_t        *iso_sched;
     unsigned long      id;
     int                nr_pages;
     unsigned short     operation;
@@ -279,8 +278,6 @@ static void __end_usb_io_op(struct urb *purb)
     {
         int i;
         usbif_iso_t *sched = (usbif_iso_t *)MMAP_VADDR(pending_idx, pending_req->nr_pages - 1);
-
-        ASSERT(sched == pending_req->sched);
 
         /* If we're dealing with an iso pipe, we need to copy back the schedule. */
         for ( i = 0; i < purb->number_of_packets; i++ )
@@ -501,6 +498,32 @@ static void dispatch_usb_probe(usbif_priv_t *up, unsigned long id, unsigned long
     make_response(up, id, USBIF_OP_PROBE, ret, portid, 0);
 }
 
+/**
+ * check_iso_schedule - safety check the isochronous schedule for an URB
+ * @purb : the URB in question
+ */
+static int check_iso_schedule(struct urb *purb)
+{
+    int i;
+    unsigned long total_length = 0;
+    
+    for ( i = 0; i < purb->number_of_packets; i++ )
+    {
+        struct usb_iso_packet_descriptor *desc = &purb->iso_frame_desc[i];
+        
+        if ( desc->offset >= purb->transfer_buffer_length
+            || ( desc->offset + desc->length) > purb->transfer_buffer_length )
+            return -EINVAL;
+
+        total_length += desc->length;
+
+        if ( total_length > purb->transfer_buffer_length )
+            return -EINVAL;
+    }
+    
+    return 0;
+}
+
 owned_port_t *find_port_for_request(usbif_priv_t *up, usbif_request_t *req);
 
 static void dispatch_usb_io(usbif_priv_t *up, usbif_request_t *req)
@@ -588,7 +611,6 @@ static void dispatch_usb_io(usbif_priv_t *up, usbif_request_t *req)
         kfree(setup);
         return;
     }
-
     else if ( setup[0] == 0x1 && setup[1] == 0xB )
     {
         /* The host kernel needs to know what device interface is in use
@@ -719,8 +741,11 @@ static void dispatch_usb_io(usbif_priv_t *up, usbif_request_t *req)
 
     purb->number_of_packets = req->num_iso;
 
+    if ( purb->number_of_packets * sizeof(usbif_iso_t) > PAGE_SIZE )
+        goto urb_error;
+
     /* Make sure there's always some kind of timeout. */
-    purb->timeout = ( req->timeout > 0 ) ?  (req->timeout * HZ) / 1000
+    purb->timeout = ( req->timeout > 0 ) ? (req->timeout * HZ) / 1000
                     :  1000;
 
     purb->setup_packet = setup;
@@ -731,30 +756,26 @@ static void dispatch_usb_io(usbif_priv_t *up, usbif_request_t *req)
         usbif_iso_t *iso_sched = (usbif_iso_t *)MMAP_VADDR(pending_idx, i - 1);
 
         /* If we're dealing with an iso pipe, we need to copy in a schedule. */
-        for ( j = 0; j < req->num_iso; j++ )
+        for ( j = 0; j < purb->number_of_packets; j++ )
         {
             purb->iso_frame_desc[j].length = iso_sched[j].length;
             purb->iso_frame_desc[j].offset = iso_sched[j].buffer_offset;
             iso_sched[j].status = 0;
         }
-        pending_req->iso_sched = iso_sched;
     }
 
-    {
-        int ret;
-        ret = usb_submit_urb(purb);
-        
-        dump_urb(purb);
-        
-        if ( ret != 0 )
-        {
-            usbif_put(up);
-            free_pending(pending_idx);
-            goto bad_descriptor;
-        }
-    }
-    
+    if ( check_iso_schedule(purb) != 0 )
+        goto urb_error;
+
+    if ( usb_submit_urb(purb) != 0 )
+        goto urb_error;
+
     return;
+
+ urb_error:
+    dump_urb(purb);    
+    usbif_put(up);
+    free_pending(pending_idx);
 
  bad_descriptor:
     kfree ( setup );
