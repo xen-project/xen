@@ -60,7 +60,7 @@ struct shadow_status {
 #define shadow_ht_extra_size         128 /*128*/
 #define shadow_ht_buckets            256 /*256*/
 
-#ifndef NDEBUG
+#ifdef VERBOSE
 #define SH_LOG(_f, _a...)                             \
 printk("DOM%u: (file=shadow.c, line=%d) " _f "\n",    \
        current->domain , __LINE__ , ## _a )

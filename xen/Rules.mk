@@ -40,6 +40,11 @@ include $(BASEDIR)/arch/$(TARGET_ARCH)/Rules.mk
 
 ifneq ($(debug),y)
 CFLAGS += -DNDEBUG
+ifeq ($(verbose),y)
+CFLAGS += -DVERBOSE
+endif
+else
+CFLAGS += -DVERBOSE
 endif
 
 ifeq ($(debugger),y)

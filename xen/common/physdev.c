@@ -38,7 +38,7 @@ extern void pcibios_enable_irq(struct pci_dev *dev);
 #define VERBOSE_INFO(_f, _a...) ((void)0)
 #endif
 
-#ifndef NDEBUG
+#ifdef VERBOSE
 #define INFO(_f, _a...) printk( _f, ## _a )
 #else
 #define INFO(_f, _a...) ((void)0)

@@ -808,7 +808,7 @@ void __init UNEXPECTED_IO_APIC(void)
 
 void __init print_IO_APIC(void)
 {
-#ifndef NDEBUG
+#ifdef VERBOSE
 	int apic, i;
 	struct IO_APIC_reg_00 reg_00;
 	struct IO_APIC_reg_01 reg_01;
