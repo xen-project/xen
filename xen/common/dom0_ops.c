@@ -126,6 +126,26 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     }
     break;
 
+    case DOM0_ADJUSTDOM:
+    {
+        unsigned int   dom     = op.u.adjustdom.domain;
+		unsigned long  mcu_adv = op.u.adjustdom.mcu_adv;
+		unsigned long  warp    = op.u.adjustdom.warp;
+		unsigned long  warpl   = op.u.adjustdom.warpl;
+		unsigned long  warpu   = op.u.adjustdom.warpu;
+		
+
+        if ( dom == IDLE_DOMAIN_ID )
+        {
+            ret = -EPERM;
+        }
+        else
+        {
+            ret = sched_adjdom(dom, mcu_adv, warp, warpl, warpu);
+        }
+    }
+    break;
+
     case DOM0_GETMEMLIST:
     {
         int i;

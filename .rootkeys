@@ -481,6 +481,7 @@
 3e5a4e65BXtftInNHUC2PjDfPhdZZA xenolinux-2.4.21-pre4-sparse/arch/xeno/drivers/dom0/dom0_core.c
 3e5a4e65uXAx05p6B1-HU2tijuw8qA xenolinux-2.4.21-pre4-sparse/arch/xeno/drivers/dom0/dom0_memory.c
 3e5a4e65EOOLlPwXnhSuX-iVdWLmnA xenolinux-2.4.21-pre4-sparse/arch/xeno/drivers/dom0/dom0_ops.h
+3e6dba59C8o0kBks7UZ4IW_FY853Aw xenolinux-2.4.21-pre4-sparse/arch/xeno/drivers/dom0/sched_ops.c
 3e5a4e65gfn_ltB8ujHMVFApnTTNRQ xenolinux-2.4.21-pre4-sparse/arch/xeno/drivers/dom0/vfr.c
 3e5a4e65gZBRBB6RsSVg1c9iahigAw xenolinux-2.4.21-pre4-sparse/arch/xeno/drivers/network/Makefile
 3e5a4e65ZxKrbFetVB84JhrTyZ1YuQ xenolinux-2.4.21-pre4-sparse/arch/xeno/drivers/network/network.c
