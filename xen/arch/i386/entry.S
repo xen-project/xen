@@ -247,10 +247,6 @@ restore_all_guest:
         movsl
         movsl
         movsl
-        # Third, reenable interrupts. They will definitely be reenabled by IRET
-        # in any case. They could be disabled here if we are returning from an
-        # interrupt. We need interrupts enabled if we take a fault.
-        sti
         # Finally, restore guest registers -- faults will cause failsafe
         popl %ebx
 	popl %ecx
@@ -541,11 +537,14 @@ error_code:
 	movl  %edx,%es
 	movl  %edx,%fs
 	movl  %edx,%gs
-	movl  EFLAGS(%esp),%edx
-	testl $0x200,%edx               # Is IF asserted in saved EFLAGS?
-	jz    1f                        # Don't STI if it isn't.
+        # We force a STI here. In most cases it is illegal to fault with
+        # interrupts disabled, so no need to check EFLAGS. There is one
+        # case when it /is/ valid -- on final return to guest context, we
+        # CLI so we can atomically check for events to notify guest about and
+        # return, all in one go. If we fault it is necessary to STI and the
+        # worst that will happen is that our return code is no longer atomic.
+        # This will do -- noone will ever notice. :-)
 	sti
-1:	movl  %esp,%edx
 	pushl %esi			# push the error code
 	pushl %edx			# push the pt_regs pointer
 	GET_CURRENT(%ebx)
