@@ -107,8 +107,8 @@ void arch_getdomaininfo_ctxt(struct domain *d, full_execution_context_t *c)
 
     c->flags = 0;
     memcpy(&c->cpu_ctxt, 
-           &d->shared_info->execution_context,
-           sizeof(d->shared_info->execution_context));
+           &d->thread.user_ctxt,
+           sizeof(d->thread.user_ctxt));
     if ( test_bit(DF_DONEFPUINIT, &d->flags) )
         c->flags |= ECF_I387_VALID;
     memcpy(&c->fpu_ctxt,

@@ -358,8 +358,6 @@ typedef struct shared_info_st
     u64                wall_timeout;    /* 312 */
     u64                domain_timeout;  /* 320 */
 
-    execution_context_t execution_context; /* 328 */
-
     arch_shared_info_t arch;
 
 } PACKED shared_info_t;
