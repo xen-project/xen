@@ -1319,6 +1319,11 @@ void __init setup_arch(char **cmdline_p)
 
         unsigned long max_low_pfn;
 
+	/* Force a quick death if the kernel panics. */
+	extern int panic_timeout;
+	if ( panic_timeout == 0 )
+		panic_timeout = 1;
+
 	HYPERVISOR_vm_assist(VMASST_CMD_enable,
 			     VMASST_TYPE_4gb_segments);
 

@@ -1577,7 +1577,7 @@ void ptwr_flush(const int which)
 {
     unsigned long  sstat, spte, pte, *ptep, l1va;
     l1_pgentry_t  *sl1e = NULL, *pl1e, ol1e, nl1e;
-    l2_pgentry_t  *pl2e, nl2e;
+    l2_pgentry_t  *pl2e;
     int            i, cpu = smp_processor_id();
     struct domain *d = current;
 
@@ -1691,8 +1691,7 @@ void ptwr_flush(const int which)
     if ( (which == PTWR_PT_ACTIVE) && likely(!d->mm.shadow_mode) )
     {
         pl2e = &linear_l2_table[ptwr_info[cpu].ptinfo[which].l2_idx];
-        nl2e = mk_l2_pgentry(l2_pgentry_val(*pl2e) | _PAGE_PRESENT);
-        update_l2e(pl2e, *pl2e, nl2e);
+        *pl2e = mk_l2_pgentry(l2_pgentry_val(*pl2e) | _PAGE_PRESENT); 
     }
 
     /*
@@ -1711,9 +1710,9 @@ void ptwr_flush(const int which)
 /* Write page fault handler: check if guest is trying to modify a PTE. */
 int ptwr_do_page_fault(unsigned long addr)
 {
-    unsigned long    pte, pfn;
+    unsigned long    pte, pfn, l2e;
     struct pfn_info *page;
-    l2_pgentry_t    *pl2e, nl2e;
+    l2_pgentry_t    *pl2e;
     int              which, cpu = smp_processor_id();
     u32              l2_idx;
 
@@ -1739,14 +1738,34 @@ int ptwr_do_page_fault(unsigned long addr)
     if ( unlikely(l2_idx >= PGT_va_unknown) )
         domain_crash(); /* Urk! This L1 is mapped in multiple L2 slots! */
     l2_idx >>= PGT_va_shift;
-        
+
+    if ( l2_idx == (addr >> L2_PAGETABLE_SHIFT) )
+    {
+        MEM_LOG("PTWR failure! Pagetable maps itself at %08lx\n", addr);
+        domain_crash();
+    }
+
     /*
      * Is the L1 p.t. mapped into the current address space? If so we call it
      * an ACTIVE p.t., otherwise it is INACTIVE.
      */
     pl2e = &linear_l2_table[l2_idx];
-    which = (l2_pgentry_val(*pl2e) >> PAGE_SHIFT != pfn) ?
-        PTWR_PT_INACTIVE : PTWR_PT_ACTIVE;
+    l2e  = l2_pgentry_val(*pl2e);
+    which = PTWR_PT_INACTIVE;
+    if ( (l2e >> PAGE_SHIFT) == pfn )
+    {
+        /*
+         * If the PRESENT bit is clear, we may be conflicting with the current 
+         * ACTIVE p.t. (it may be the same p.t. mapped at another virt addr).
+         */
+        if ( unlikely(!(l2e & _PAGE_PRESENT)) &&
+             ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l1va )
+            ptwr_flush(PTWR_PT_ACTIVE);
+        
+        /* Now do a final check of the PRESENT bit to set ACTIVE. */
+        if ( likely(l2e & _PAGE_PRESENT) )
+            which = PTWR_PT_ACTIVE;
+    }
     
     PTWR_PRINTK("[%c] page_fault on l1 pt at va %08lx, pt for %08x, "
                 "pfn %08lx\n", PTWR_PRINT_WHICH,
@@ -1765,8 +1784,7 @@ int ptwr_do_page_fault(unsigned long addr)
     /* For safety, disconnect the L1 p.t. page from current space. */
     if ( (which == PTWR_PT_ACTIVE) && likely(!current->mm.shadow_mode) )
     {
-        nl2e = mk_l2_pgentry(l2_pgentry_val(*pl2e) & ~_PAGE_PRESENT);
-        update_l2e(pl2e, *pl2e, nl2e);
+        *pl2e = mk_l2_pgentry(l2e & ~_PAGE_PRESENT);
         flush_tlb(); /* XXX Multi-CPU guests? */
     }
     
