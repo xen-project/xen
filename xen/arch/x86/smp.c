@@ -261,15 +261,9 @@ void flush_tlb_mask(unsigned long mask)
     }
 }
 
-/*
- * NB. Must be called with no locks held and interrupts enabled.
- *     (e.g., softirq context).
- */
+/* Call with no locks held and interrupts enabled (e.g., softirq context). */
 void new_tlbflush_clock_period(void)
 {
-    /* Only the leader gets here. Noone else should tick the clock. */
-    ASSERT(((tlbflush_clock+1) & TLBCLOCK_EPOCH_MASK) == 0);
-
     /* Flush everyone else. We definitely flushed just before entry. */
     if ( smp_num_cpus > 1 )
     {
@@ -285,6 +279,7 @@ void new_tlbflush_clock_period(void)
     }
 
     /* No need for atomicity: we are the only possible updater. */
+    ASSERT(tlbflush_clock == 0);
     tlbflush_clock++;
 }
 

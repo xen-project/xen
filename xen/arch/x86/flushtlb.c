@@ -12,7 +12,14 @@
 #include <xen/softirq.h>
 #include <asm/flushtlb.h>
 
-u32 tlbflush_clock;
+/* Debug builds: Wrap frequently to stress-test the wrap logic. */
+#ifdef NDEBUG
+#define WRAP_MASK (0xFFFFFFFFU)
+#else
+#define WRAP_MASK (0x000003FFU)
+#endif
+
+u32 tlbflush_clock = 1U;
 u32 tlbflush_time[NR_CPUS];
 
 void write_cr3(unsigned long cr3)
@@ -20,38 +27,42 @@ void write_cr3(unsigned long cr3)
     u32 t, t1, t2;
     unsigned long flags;
 
+    /* This non-reentrant function is sometimes called in interrupt context. */
     local_irq_save(flags);
 
     /*
-     * Tick the clock, which is incremented by two each time. The L.S.B. is
-     * used to decide who will control the epoch change, when one is required.
+     * STEP 1. Increment the virtual clock *before* flushing the TLB.
+     *         If we do it after, we race other CPUs invalidating PTEs.
+     *         (e.g., a page invalidated after the flush might get the old 
+     *          timestamp, but this CPU can speculatively fetch the mapping
+     *          into its TLB after the flush but before inc'ing the clock).
      */
+
     t = tlbflush_clock;
     do {
-        t1 = t;      /* t1: Time before this clock tick. */
-        t2 = t + 2;  /* t2: Time after this clock tick. */
-        if ( unlikely(t2 & 1) )
-        {
-            /* Epoch change: someone else is leader. */
-            t2 = t; /* no tick */
+        t1 = t2 = t;
+        /* Clock wrapped: someone else is leading a global TLB shootodiown. */
+        if ( unlikely(t1 == 0) )
             goto skip_clocktick;
-        }
-        else if ( unlikely((t2 & TLBCLOCK_EPOCH_MASK) == 0) )
-        {
-            /* Epoch change: we may become leader. */
-            t2--; /* half tick */
-        }
+        t2 = (t + 1) & WRAP_MASK;
     }
     while ( unlikely((t = cmpxchg(&tlbflush_clock, t1, t2)) != t1) );
 
-    /* Epoch change: we are the leader. */
-    if ( unlikely(t2 & 1) )
+    /* Clock wrapped: we will lead a global TLB shootdown. */
+    if ( unlikely(t2 == 0) )
         raise_softirq(NEW_TLBFLUSH_CLOCK_PERIOD_SOFTIRQ);
+
+    /*
+     * STEP 2. Update %CR3, thereby flushing the TLB.
+     */
 
  skip_clocktick:
     __asm__ __volatile__ ( "mov"__OS" %0, %%cr3" : : "r" (cr3) : "memory" );
 
-    /* Update this CPU's timestamp to new time. */
+    /*
+     * STEP 3. Update this CPU's timestamp.
+     */
+
     tlbflush_time[smp_processor_id()] = t2;
 
     local_irq_restore(flags);
