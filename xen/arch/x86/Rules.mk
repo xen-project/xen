@@ -4,9 +4,16 @@
 CC := gcc
 LD := ld
 
-CFLAGS  := -nostdinc -fno-builtin -fno-common -fno-strict-aliasing -O3
-CFLAGS  += -iwithprefix include -Wall -Werror -fomit-frame-pointer -pipe
+CFLAGS  := -nostdinc -fno-builtin -fno-common -fno-strict-aliasing
+CFLAGS  += -iwithprefix include -Wall -Werror -pipe
 CFLAGS  += -I$(BASEDIR)/include -Wno-pointer-arith -Wredundant-decls
+
+ifeq ($(optimize),y)
+CFLAGS  += -O3 -fomit-frame-pointer
+else
+x86_32/usercopy.o: CFLAGS += -O1
+endif
+
 
 # Prevent floating-point variables from creeping into Xen.
 CFLAGS  += -msoft-float

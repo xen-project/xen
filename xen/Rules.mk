@@ -4,6 +4,7 @@ debug       ?= n
 debugger    ?= n
 perfc       ?= n
 trace       ?= n
+optimize    ?= y
 
 # Currently supported architectures:
 #  {COMPILE,TARGET}_ARCH    := x86
@@ -19,6 +20,7 @@ HDRS    := $(wildcard $(BASEDIR)/include/xen/*.h)
 HDRS    += $(wildcard $(BASEDIR)/include/scsi/*.h)
 HDRS    += $(wildcard $(BASEDIR)/include/hypervisor-ifs/*.h)
 HDRS    += $(wildcard $(BASEDIR)/include/asm-$(TARGET_ARCH)/*.h)
+HDRS    += $(wildcard $(BASEDIR)/include/asm-$(TARGET_ARCH)/$(TARGET_SUBARCH)/*.h)
 # compile.h is always regenerated, but other files shouldn't be rebuilt
 HDRS    := $(subst $(BASEDIR)/include/xen/compile.h,,$(HDRS))
 
