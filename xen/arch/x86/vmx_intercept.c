@@ -69,7 +69,7 @@ static void pit_cal_count(struct vmx_virpit_t *vpit)
 {
     unsigned int usec_delta = (unsigned int)((NOW() - vpit->inject_point) / 1000);
     if (usec_delta > vpit->period * 1000)
-        VMX_DBG_LOG(DBG_LEVEL_1, "VMX_PIT:long time has passed from last injection!\n");
+        VMX_DBG_LOG(DBG_LEVEL_1, "VMX_PIT:long time has passed from last injection!");
     vpit->count = vpit->init_val - ((usec_delta * PIT_FREQ / 1000000) % vpit->init_val );
 }
 

@@ -42,7 +42,7 @@
 #ifdef CONFIG_VMX
 
 int vmcs_size;
-unsigned int opt_vmx_debug_level;
+unsigned int opt_vmx_debug_level = 0;
 
 extern long evtchn_send(int lport);
 extern long do_block(void);
@@ -120,7 +120,7 @@ static int vmx_do_page_fault(unsigned long va, unsigned long error_code)
     {
         __vmread(GUEST_EIP, &eip);
         VMX_DBG_LOG(DBG_LEVEL_VMMU, 
-                "vmx_do_page_fault = 0x%lx, eip = %lx, erro_code = %lx\n", 
+                "vmx_do_page_fault = 0x%lx, eip = %lx, erro_code = %lx",
                 va, eip, error_code);
     }
 #endif
@@ -157,11 +157,11 @@ static void vmx_do_general_protection_fault(struct xen_regs *regs)
     __vmread(VM_EXIT_INTR_ERROR_CODE, &error_code);
 
     VMX_DBG_LOG(DBG_LEVEL_1,
-            "vmx_general_protection_fault: eip = %lx, erro_code = %lx\n",
+            "vmx_general_protection_fault: eip = %lx, erro_code = %lx",
             eip, error_code);
 
     VMX_DBG_LOG(DBG_LEVEL_1,
-            "eax=%lx, ebx=%lx, ecx=%lx, edx=%lx, esi=%lx, edi=%lx\n",
+            "eax=%lx, ebx=%lx, ecx=%lx, edx=%lx, esi=%lx, edi=%lx",
             regs->eax, regs->ebx, regs->ecx, regs->edx, regs->esi, regs->edi);
 
     /* Reflect it back into the guest */
@@ -182,7 +182,7 @@ static void vmx_vmexit_do_cpuid(unsigned long input, struct xen_regs *regs)
 
     VMX_DBG_LOG(DBG_LEVEL_1, 
                 "do_cpuid: (eax) %lx, (ebx) %lx, (ecx) %lx, (edx) %lx,"
-                " (esi) %lx, (edi) %lx\n",
+                " (esi) %lx, (edi) %lx",
                 regs->eax, regs->ebx, regs->ecx, regs->edx,
                 regs->esi, regs->edi);
 
@@ -200,7 +200,7 @@ static void vmx_vmexit_do_cpuid(unsigned long input, struct xen_regs *regs)
     regs->edx = (unsigned long) edx;
 
     VMX_DBG_LOG(DBG_LEVEL_1, 
-            "vmx_vmexit_do_cpuid: eip: %lx, input: %lx, out:eax=%x, ebx=%x, ecx=%x, edx=%x\n", 
+            "vmx_vmexit_do_cpuid: eip: %lx, input: %lx, out:eax=%x, ebx=%x, ecx=%x, edx=%x",
             eip, input, eax, ebx, ecx, edx);
 
 }
@@ -220,7 +220,7 @@ static void vmx_dr_access (unsigned long exit_qualification, struct xen_regs *re
     reg = exit_qualification & DEBUG_REG_ACCESS_NUM;
 
     VMX_DBG_LOG(DBG_LEVEL_1, 
-                "vmx_dr_access : eip=%lx, reg=%d, exit_qualification = %lx\n",
+                "vmx_dr_access : eip=%lx, reg=%d, exit_qualification = %lx",
                 eip, reg, exit_qualification);
 
     switch(exit_qualification & DEBUG_REG_ACCESS_REG) {
@@ -270,7 +270,7 @@ static void vmx_vmexit_do_invlpg(unsigned long va)
 
     __vmread(GUEST_EIP, &eip);
 
-    VMX_DBG_LOG(DBG_LEVEL_VMMU, "vmx_vmexit_do_invlpg:eip=%p, va=%p\n",
+    VMX_DBG_LOG(DBG_LEVEL_VMMU, "vmx_vmexit_do_invlpg:eip=%p, va=%p",
             eip, va);
 
     /*
@@ -303,7 +303,7 @@ static void vmx_io_instruction(struct xen_regs *regs,
     __vmread(GUEST_EIP, &eip);
 
     VMX_DBG_LOG(DBG_LEVEL_1, 
-            "vmx_io_instruction: eip=%p, exit_qualification = %lx\n",
+            "vmx_io_instruction: eip=%p, exit_qualification = %lx",
             eip, exit_qualification);
 
     if (test_bit(6, &exit_qualification))
@@ -318,7 +318,7 @@ static void vmx_io_instruction(struct xen_regs *regs,
 
     vio = (vcpu_iodata_t *) d->arch.arch_vmx.vmx_platform.shared_page_va;
     if (vio == 0) {
-        VMX_DBG_LOG(DBG_LEVEL_1, "bad shared page: %lx\n", (unsigned long) vio);
+        VMX_DBG_LOG(DBG_LEVEL_1, "bad shared page: %lx", (unsigned long) vio);
         domain_crash(); 
     }
     p = &vio->vp_ioreq;
@@ -400,8 +400,8 @@ static void mov_to_cr(int gp, int cr, struct xen_regs *regs)
         __vmx_bug(regs);
     }
     
-    VMX_DBG_LOG(DBG_LEVEL_1, "mov_to_cr: CR%d, value = %lx, \n", cr, value);
-    VMX_DBG_LOG(DBG_LEVEL_1, "current = %lx, \n", (unsigned long) current);
+    VMX_DBG_LOG(DBG_LEVEL_1, "mov_to_cr: CR%d, value = %lx,", cr, value);
+    VMX_DBG_LOG(DBG_LEVEL_1, "current = %lx,", (unsigned long) current);
 
     switch(cr) {
     case 0: 
@@ -427,7 +427,7 @@ static void mov_to_cr(int gp, int cr, struct xen_regs *regs)
             if (!(pfn = phys_to_machine_mapping(
                       d->arch.arch_vmx.cpu_cr3 >> PAGE_SHIFT))) 
             {
-                VMX_DBG_LOG(DBG_LEVEL_VMMU, "Invalid CR3 value = %lx\n", 
+                VMX_DBG_LOG(DBG_LEVEL_VMMU, "Invalid CR3 value = %lx", 
                         d->arch.arch_vmx.cpu_cr3);
                 domain_crash(); /* need to take a clean path */
             }
@@ -447,14 +447,14 @@ static void mov_to_cr(int gp, int cr, struct xen_regs *regs)
             d->arch.guest_table = mk_pagetable(pfn << PAGE_SHIFT);
             update_pagetables(d);
 
-            VMX_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx\n", 
+            VMX_DBG_LOG(DBG_LEVEL_VMMU, "New arch.guest_table = %lx", 
                     (unsigned long) (pfn << PAGE_SHIFT));
 
             __vmwrite(GUEST_CR3, pagetable_val(d->arch.shadow_table));
             /* 
              * arch->shadow_table should hold the next CR3 for shadow
              */
-            VMX_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx, pfn = %lx\n", 
+            VMX_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx, pfn = %lx", 
                     d->arch.arch_vmx.cpu_cr3, pfn);
             /* undo the get_page done in the para virt case */
             put_page_and_type(&frame_table[old_base_pfn]);
@@ -494,11 +494,11 @@ static void mov_to_cr(int gp, int cr, struct xen_regs *regs)
              * If different, make a shadow. Check if the PDBR is valid
              * first.
              */
-            VMX_DBG_LOG(DBG_LEVEL_VMMU, "CR3 value = %lx\n", value);
+            VMX_DBG_LOG(DBG_LEVEL_VMMU, "CR3 value = %lx", value);
             if ((value >> PAGE_SHIFT) > d->domain->max_pages)
             {
                 VMX_DBG_LOG(DBG_LEVEL_VMMU, 
-                        "Invalid CR3 value=%lx\n", value);
+                        "Invalid CR3 value=%lx", value);
                 domain_crash(); /* need to take a clean path */
             }
             pfn = phys_to_machine_mapping(value >> PAGE_SHIFT);
@@ -509,7 +509,7 @@ static void mov_to_cr(int gp, int cr, struct xen_regs *regs)
              * arch.shadow_table should now hold the next CR3 for shadow
              */
             d->arch.arch_vmx.cpu_cr3 = value;
-            VMX_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx\n", 
+            VMX_DBG_LOG(DBG_LEVEL_VMMU, "Update CR3 value = %lx",
                     value);
             __vmwrite(GUEST_CR3, pagetable_val(d->arch.shadow_table));
         }
@@ -576,7 +576,7 @@ static void mov_from_cr(int cr, int gp, struct xen_regs *regs)
         __vmx_bug(regs);
     }
 
-    VMX_DBG_LOG(DBG_LEVEL_VMMU, "mov_from_cr: CR%d, value = %lx, \n", cr, value);
+    VMX_DBG_LOG(DBG_LEVEL_VMMU, "mov_from_cr: CR%d, value = %lx,", cr, value);
 }
 
 static void vmx_cr_access (unsigned long exit_qualification, struct xen_regs *regs)
@@ -631,7 +631,7 @@ static inline void vmx_vmexit_do_hlt()
     unsigned long eip;
     __vmread(GUEST_EIP, &eip);
 #endif
-    VMX_DBG_LOG(DBG_LEVEL_1, "vmx_vmexit_do_hlt:eip=%p\n", eip);
+    VMX_DBG_LOG(DBG_LEVEL_1, "vmx_vmexit_do_hlt:eip=%p", eip);
     __enter_scheduler();
 }
 
@@ -641,7 +641,7 @@ static inline void vmx_vmexit_do_mwait()
     unsigned long eip;
     __vmread(GUEST_EIP, &eip);
 #endif
-    VMX_DBG_LOG(DBG_LEVEL_1, "vmx_vmexit_do_mwait:eip=%p\n", eip);
+    VMX_DBG_LOG(DBG_LEVEL_1, "vmx_vmexit_do_mwait:eip=%p", eip);
     __enter_scheduler();
 }
 
@@ -733,7 +733,7 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
             __vmread(VM_EXIT_INTR_ERROR_CODE, &error_code);
             printk("#PG error code: %lx\n", error_code);
         }
-        VMX_DBG_LOG(DBG_LEVEL_1, "idtv_info_field=%x\n", 
+        VMX_DBG_LOG(DBG_LEVEL_1, "idtv_info_field=%x",
                 idtv_info_field);
     }
 
@@ -741,7 +741,7 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
     if (exit_reason != EXIT_REASON_EXTERNAL_INTERRUPT &&
         exit_reason != EXIT_REASON_VMCALL &&
         exit_reason != EXIT_REASON_IO_INSTRUCTION)
-        VMX_DBG_LOG(DBG_LEVEL_0, "exit reason = %x\n", exit_reason);
+        VMX_DBG_LOG(DBG_LEVEL_0, "exit reason = %x", exit_reason);
 
     if (exit_reason & VMX_EXIT_REASONS_FAILED_VMENTRY) {
         domain_crash();         
@@ -799,7 +799,7 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
             __vmread(EXIT_QUALIFICATION, &va);
             __vmread(VM_EXIT_INTR_ERROR_CODE, &error_code);
             VMX_DBG_LOG(DBG_LEVEL_VMMU, 
-                    "eax=%lx, ebx=%lx, ecx=%lx, edx=%lx, esi=%lx, edi=%lx\n",
+                    "eax=%lx, ebx=%lx, ecx=%lx, edx=%lx, esi=%lx, edi=%lx",
                         regs.eax, regs.ebx, regs.ecx, regs.edx, regs.esi,
                         regs.edi);
             ed->arch.arch_vmx.vmx_platform.mpci.inst_decoder_regs = &regs;
@@ -893,7 +893,7 @@ asmlinkage void vmx_vmexit_handler(struct xen_regs regs)
         __get_instruction_length(inst_len);
         __vmread(EXIT_QUALIFICATION, &exit_qualification);
 
-        VMX_DBG_LOG(DBG_LEVEL_1, "eip = %lx, inst_len =%lx, exit_qualification = %lx\n", 
+        VMX_DBG_LOG(DBG_LEVEL_1, "eip = %lx, inst_len =%lx, exit_qualification = %lx", 
                 eip, inst_len, exit_qualification);
         vmx_cr_access(exit_qualification, &regs);
         __update_guest_eip(inst_len);
