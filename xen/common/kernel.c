@@ -541,7 +541,7 @@ int console_export(char *str, int len)
     iph->ttl     = 255;
     iph->protocol= 17;
     iph->daddr   = htonl(0xa9fe0100);  /* 169.254.1.0 */
-    iph->saddr   = htonl(0xa9fe0100);  /* 169.254.1.0 */
+    iph->saddr   = htonl(0xa9fefeff);  /* 169.254.254.255 */
     iph->tot_len = htons(hdr_size + len); 
     iph->check	 = 0;
     iph->check   = compute_cksum((__u16 *)iph, sizeof(struct my_iphdr)/2); 
