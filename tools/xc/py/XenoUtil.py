@@ -219,6 +219,7 @@ def vd_format(partition, extent_size_mb):
     cx.close()
     return 0
 
+
 def vd_create(size_mb, expiry):
     """Create a new virtual disk.
     size_mb [int]: size in megabytes for the new virtual disk
@@ -252,10 +253,10 @@ def vd_create(size_mb, expiry):
 
     if expiry:
         expiry_ts = "datetime('now', '" + str(expiry) + " seconds')"
-        expires = 1;
+        expires = 1
     else:
         expiry_ts = "NULL"
-        expires = 0;
+        expires = 0
 
     # we'll use this to build the SQL statement we want
     building_sql = "INSERT INTO vdisks(vdisk_id, size, expires, expiry_time)" \
@@ -269,6 +270,7 @@ def vd_create(size_mb, expiry):
         if not row:
             cx.close()
             return -1
+        
 
         (vdisk_id, vdisk_extent_no, part_extent_no, part_id, extent_size) = row
         allocated += extent_size
@@ -310,6 +312,19 @@ def vd_lookup(id):
     cx = sqlite.connect(VD_DB_FILE)
     cu = cx.cursor()
 
+    cu.execute("-- types int")
+    cu.execute("""SELECT COUNT(*)
+                  FROM vdisks
+                  WHERE (expiry_time > datetime('now') OR NOT expires)
+                              AND vdisk_id = """ + id)
+    count, = cu.fetchone()
+
+    if not count:
+        cx.close()
+        return -1
+
+    cu.execute("SELECT size from vdisks WHERE vdisk_id = " + id)
+    real_size, = cu.fetchone()
   
     # This query tells PySQLite how to convert the data returned from the
     # following query - the use of the multiplication confuses it otherwise ;-)
@@ -326,11 +341,10 @@ def vd_lookup(id):
                   FROM vdisk_extents NATURAL JOIN vdisks
                                                 NATURAL JOIN vdisk_part
                                                 
-                  WHERE (expiry_time > datetime('now') OR not expires)
-                                    AND vdisk_extents.vdisk_id = """ + id
+                  WHERE vdisk_extents.vdisk_id = """ + id
                )
 
-    ret = cu.fetchall()
+    extent_tuples = cu.fetchall()
 
     # use this function to map the results from the database into a dict
     # list of extents, for consistency with the rest of the code
@@ -341,13 +355,204 @@ def vd_lookup(id):
     cx.commit()
     cx.close()
 
-    return map(transform, ret) # transforms the tuples into dicts to return
+    extent_dicts = map(transform, extent_tuples)
+
+    # calculate the over-allocation in sectors (happens because
+    # we allocate whole extents)
+    allocated_size = 0
+    for i in extent_dicts:
+        allocated_size += i['nr_sectors']
+
+    over_allocation = allocated_size - real_size
+
+    # trim down the last extent's length so the resulting VBD will be the
+    # size requested, rather than being rounded up to the nearest extent
+    extent_dicts[len(extent_dicts) - 1]['nr_sectors'] -= over_allocation
+
+    return extent_dicts
+
+
+def vd_enlarge(vdisk_id, extra_size_mb):
+    """Create a new virtual disk.
+    vdisk_id [string]   :    ID of the virtual disk to enlarge
+    extra_size_mb  [int]:    size in megabytes to increase the allocation by
+    returns  [int]      :    0 on success, otherwise non-zero
+    """
+
+    if not os.path.isfile(VD_DB_FILE):
+        __vd_no_database()
+
+    cx = sqlite.connect(VD_DB_FILE)
+    cu = cx.cursor()
+
+    extra_size = extra_size_mb * 2048
+
+    cu.execute("-- types int")
+    cu.execute("SELECT COUNT(*) FROM vdisks WHERE vdisk_id = " + vdisk_id
+               + " AND (expiry_time > datetime('now') OR NOT expires)")
+    count, = cu.fetchone()
+
+    if not count: # no such vdisk
+        cx.close()
+        return -1
+
+    cu.execute("-- types int")
+    cu.execute("""SELECT SUM(extent_size)
+                  FROM vdisks NATURAL JOIN vdisk_extents
+                                         NATURAL JOIN vdisk_part
+                  WHERE vdisks.vdisk_id = """ + vdisk_id)
+
+    real_size, = cu.fetchone() # get the true allocated size
+
+    cu.execute("-- types int")
+    cu.execute("SELECT size FROM vdisks WHERE vdisk_id = " + vdisk_id)
+
+    old_size, = cu.fetchone()
+
+
+    cu.execute("--- types int")
+    cu.execute("""SELECT MAX(vdisk_extent_no)
+                  FROM vdisk_extents
+                  WHERE vdisk_id = """ + vdisk_id)
+
+    counter = cu.fetchone()[0] + 1 # this stores the extent numbers
+
+
+    # because of the extent-based allocation, the VD may already have more
+    # allocated space than they asked for.  Find out how much we really
+    # need to add.
+    add_size = extra_size + old_size - real_size
+
+    # fetch a list of extents from the expired disks, along with information
+    # about their size
+    cu.execute("""SELECT vdisks.vdisk_id, vdisk_extent_no, part_extent_no,
+                         vdisk_extents.part_id, extent_size
+                  FROM vdisk_extents NATURAL JOIN vdisks
+                                                  NATURAL JOIN vdisk_part
+                  WHERE expires AND expiry_time < datetime('now')
+                  ORDER BY expiry_time asc, vdisk_extent_no desc
+               """)  # aims to reuse the last extents
+                     # from the longest-expired disks first
+
+    allocated = 0
+
+    building_sql = "UPDATE vdisks SET size = " + str(old_size + extra_size)\
+                   + " WHERE vdisk_id = " + vdisk_id + "; "
+
+    while allocated < add_size:
+        row = cu.fetchone()
+        if not row:
+            cx.close()
+            return -1
+
+        (dead_vd_id, vdisk_extent_no, part_extent_no, part_id, extent_size) = row
+        allocated += extent_size
+        building_sql += "UPDATE vdisk_extents SET vdisk_id = " + vdisk_id    \
+                        + ", " + "vdisk_extent_no = " + str(counter)         \
+                        + " WHERE vdisk_extent_no = " + str(vdisk_extent_no) \
+                        + " AND vdisk_id = " + str(dead_vd_id) + "; "
+
+        counter += 1
+        
+
+    # this will execute the SQL query we build to store details of the new
+    # virtual disk and allocate space to it print building_sql
+    cu.execute(building_sql)
+    
+    cx.commit()
+    cx.close()
+    return 0
+
+
+def vd_undelete(vdisk_id, expiry_time):
+    """Create a new virtual disk.
+    vdisk_id      [int]: size in megabytes for the new virtual disk
+    expiry_time   [int]: expiry time, in seconds from now
+    returns       [int]: zero on success, non-zero on failure
+    """
+
+    if not os.path.isfile(VD_DB_FILE):
+        __vd_no_database()
+
+    cx = sqlite.connect(VD_DB_FILE)
+    cu = cx.cursor()
+
+    cu.execute("-- types int")
+    cu.execute("SELECT COUNT(*) FROM vdisks WHERE vdisk_id = " + vdisk_id)
+    count, = cu.fetchone()
+
+    if not count:
+        cx.close()
+        return -1
+
+    cu.execute("-- types int")
+    cu.execute("""SELECT SUM(extent_size)
+                  FROM vdisks NATURAL JOIN vdisk_extents
+                                         NATURAL JOIN vdisk_part
+                  WHERE vdisks.vdisk_id = """ + vdisk_id)
+
+    real_size, = cu.fetchone() # get the true allocated size
+
+
+    cu.execute("-- types int")
+    cu.execute("SELECT size FROM vdisks WHERE vdisk_id = " + vdisk_id)
+
+    old_size, = cu.fetchone()
+
+    if real_size < old_size:
+        cx.close()
+        return -1
+
+    if expiry_time == 0:
+        expires = '0'
+    else:
+        expires = '1'
+
+    # this will execute the SQL query we build to store details of the new
+    # virtual disk and allocate space to it print building_sql
+    cu.execute("UPDATE vdisks SET expiry_time = datetime('now','"
+               + str(expiry_time) + " seconds'), expires = " + expires
+               + " WHERE vdisk_id = " + vdisk_id)
+    
+    cx.commit()
+    cx.close()
+    return 0
+
+
+
+
+def vd_list():
+    """Lists all the virtual disks registered in the system.
+    returns [list of dicts]
+    """
+    
+    if not os.path.isfile(VD_DB_FILE):
+        __vd_no_database()
+
+    cx = sqlite.connect(VD_DB_FILE)
+    cu = cx.cursor()
+
+    cu.execute("""SELECT vdisk_id, size, expires, expiry_time
+                  FROM vdisks
+                  WHERE (NOT expires) OR expiry_time > datetime('now')
+               """)
+
+    ret = cu.fetchall()
+
+    cx.close()
+
+    def makedicts((vdisk_id, size, expires, expiry_time)):
+        return { 'vdisk_id' : str(vdisk_id), 'size': size,
+                 'expires' : expires, 'expiry_time' : expiry_time }
+
+    return map(makedicts, ret)
 
 
 def vd_refresh(id, expiry):
     """Change the expiry time of a virtual disk.
-    id [string]: a virtual disk identifier
-    expiry [int]: expiry time in seconds from now (0 = never expire)
+    id [string]  : a virtual disk identifier
+    expiry [int] : expiry time in seconds from now (0 = never expire)
+    returns [int]: zero on success, non-zero on failure
     """
 
     if not os.path.isfile(VD_DB_FILE):
@@ -355,6 +560,15 @@ def vd_refresh(id, expiry):
     
     cx = sqlite.connect(VD_DB_FILE)
     cu = cx.cursor()
+
+    cu.execute("-- types int")
+    cu.execute("SELECT COUNT(*) FROM vdisks WHERE vdisk_id = " + id
+               + " AND (expiry_time > datetime('now') OR NOT expires)")
+    count, = cu.fetchone()
+
+    if not count:
+        cx.close()
+        return -1
 
     if expiry:
         expires = 1
@@ -365,17 +579,20 @@ def vd_refresh(id, expiry):
 
     cu.execute("UPDATE vdisks SET expires = " + str(expires)
                + ", expiry_time = " + expiry_ts
-               + " WHERE vdisk_id = " + id)
+               + " WHERE (expiry_time > datetime('now') OR NOT expires)"
+               + " AND vdisk_id = " + id)
 
     cx.commit()
     cx.close()
     
-    return
+    return 0
+
 
 def vd_delete(id):
-    """Deletes a Virtual Disk, making its extents available for future
-    virtual disks.
-       [id] identifier for the virtual disk to delete
+    """Deletes a Virtual Disk, making its extents available for future VDs.
+       id [string]   : identifier for the virtual disk to delete
+       returns [int] : 0 on success, -1 on failure (VD not found
+                       or already deleted)
     """
 
     if not os.path.isfile(VD_DB_FILE):
@@ -384,13 +601,46 @@ def vd_delete(id):
     cx = sqlite.connect(VD_DB_FILE)
     cu = cx.cursor()
 
+    cu.execute("-- types int")
+    cu.execute("SELECT COUNT(*) FROM vdisks WHERE vdisk_id = " + id
+               + " AND (expiry_time > datetime('now') OR NOT expires)")
+    count, = cu.fetchone()
+
+    if not count:
+        cx.close()
+        return -1
+
     cu.execute("UPDATE vdisks SET expires = 1, expiry_time = datetime('now')"
                + " WHERE vdisk_id = " + id)
 
     cx.commit()
     cx.close()
     
-    return
+    return 0
+
+
+def vd_freespace():
+    """Returns the amount of free space available for new virtual disks, in MB
+    returns [int] : free space for VDs in MB
+    """
+
+    if not os.path.isfile(VD_DB_FILE):
+        __vd_no_database()
+ 
+    cx = sqlite.connect(VD_DB_FILE)
+    cu = cx.cursor()
+
+    cu.execute("-- types int")
+
+    cu.execute("""SELECT SUM(extent_size)
+                  FROM vdisks NATURAL JOIN vdisk_extents
+                                           NATURAL JOIN vdisk_part
+                  WHERE expiry_time <= datetime('now') AND expires""")
+
+    sum, = cu.fetchone()
+
+    return sum / 2048
+
 
 def vd_init_db(path):
     """Initialise the VD SQLite database
@@ -461,12 +711,12 @@ def vd_extents_validate(new_extents,new_writeable):
         this_vbd_extents = xc.vbd_getextents(vbd['dom'],vbd['vbd'])
         for vbd_ext in this_vbd_extents:
             vbd_ext['writeable'] = vbd['writeable']
-            old_extents.append(vbd_ext);
-
+            old_extents.append(vbd_ext)
+            
     ##### Now scan /proc/mounts for compile a list of extents corresponding to
     ##### any devices mounted in DOM0.  This list is added on to old_extents
 
-    regexp = re.compile("/dev/(\S*) \S* \S* (..).*");
+    regexp = re.compile("/dev/(\S*) \S* \S* (..).*")
     fd = open('/proc/mounts', "r")
 
     while True:

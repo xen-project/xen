@@ -18,3 +18,6 @@ else:
 print "Deleting a virtual disk with ID: " + id
 
 ret = XenoUtil.vd_delete(id)
+
+if ret:
+    print "Deletion failed: invalid ID, or disk already expired / deleted"

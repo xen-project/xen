@@ -53,7 +53,10 @@
 40083bb4LeyQyL-0riaV3UYDfHkl5g tools/examples/vd_create.py
 40083bb4TmKs8pcFkOcJj1bKn3zcmg tools/examples/vd_delete.py
 40083bb4u9Od6ujgect6mrxWfkk1pQ tools/examples/vd_format.py
+400c33000SvWkdG92u4Bvdu6BPjGPw tools/examples/vd_freespace.py
+400c3300jb_Ufz2kWsovGKNoDPEf-A tools/examples/vd_list.py
 40083bb4NhDpKiYTrebI3ZjX__oI_w tools/examples/vd_refresh.py
+400c33001-uDKTfHBchTKUwuMFcqTA tools/examples/vd_undelete.py
 3f776bd2Xd-dUcPKlPN2vG89VGtfvQ tools/misc/Makefile
 3f6dc136ZKOjd8PIqLbFBl_v-rnkGg tools/misc/miniterm/Makefile
 3f6dc140C8tAeBfroAF24VrmCS4v_w tools/misc/miniterm/README

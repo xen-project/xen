@@ -29,3 +29,5 @@ print "Expiry time (seconds from now): " + sys.argv[2]
 
 ret = XenoUtil.vd_refresh(id, expiry_time)
 
+if ret:
+    print "Refresh failed, non-existent virtual disk or disk is expired / deleted"
