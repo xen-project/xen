@@ -18,7 +18,7 @@
 # the initial system setup.
 
 all:	
-	bk -r co
+	bk -r co ; true
 	$(MAKE) -C xen
 	$(MAKE) -C tools/balloon
 	$(MAKE) -C tools/domain_builder
