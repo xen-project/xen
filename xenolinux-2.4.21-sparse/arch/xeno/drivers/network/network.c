@@ -318,7 +318,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
     np->stats.tx_packets++;
 
     /* Only notify Xen if there are no outstanding responses. */
-    smp_wmb();
+    smp_mb();
     if ( np->net_idx->tx_resp_prod == i )
         HYPERVISOR_net_update();
 

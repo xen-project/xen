@@ -840,7 +840,7 @@ static void tx_skb_release(struct sk_buff *skb)
      * Checks below must happen after the above response is posted.
      * This avoids a possible race with a guest OS on another CPU.
      */
-    smp_rmb();
+    smp_mb();
 
     if ( (vif->tx_cons == vif->tx_prod) && get_tx_bufs(vif) )
     {
