@@ -61,6 +61,8 @@ void *dma_alloc_coherent(struct device *dev, size_t size,
 			pte = pte_offset_kernel(pmd, (vstart + (i*PAGE_SIZE)));
 			pfn = pte->pte_low >> PAGE_SHIFT;
 			queue_l1_entry_update(pte, 0);
+			phys_to_machine_mapping[(__pa(ret)>>PAGE_SHIFT)+i] =
+				INVALID_P2M_ENTRY;
 			flush_page_update_queue();
 			if (HYPERVISOR_dom_mem_op(MEMOP_decrease_reservation, 
 						  &pfn, 1, 0) != 1) BUG();
@@ -79,7 +81,6 @@ void *dma_alloc_coherent(struct device *dev, size_t size,
 				pfn+i, (__pa(ret)>>PAGE_SHIFT)+i);
 			phys_to_machine_mapping[(__pa(ret)>>PAGE_SHIFT)+i] =
 				pfn+i;
-                        flush_page_update_queue();
 		}
 		flush_page_update_queue();
 	}
