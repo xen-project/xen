@@ -37,11 +37,14 @@ __all__ = [
     "child2", 
     "child3", 
     "child4", 
-    "child_value", 
+    "child_value",
     "has_id", 
     "with_id", 
     "child_with_id", 
     "elements", 
+    "to_string",
+    "from_string",
+    "all_from_string",
     "parse", 
     ]
 
@@ -339,6 +342,8 @@ class Parser:
             self.state_start(c)
 
 def atomp(sxpr):
+    """Check if an sxpr is an atom.
+    """
     if sxpr.isalnum() or sxpr == '@':
         return 1
     for c in sxpr:
@@ -351,6 +356,8 @@ def atomp(sxpr):
     return 1
     
 def show(sxpr, out=sys.stdout):
+    """Print an sxpr in bracketed (lisp-style) syntax.
+    """
     if isinstance(sxpr, types.ListType):
         out.write(k_list_open)
         i = 0
@@ -366,6 +373,8 @@ def show(sxpr, out=sys.stdout):
         out.write(repr(str(sxpr)))
 
 def show_xml(sxpr, out=sys.stdout):
+    """Print an sxpr in XML syntax.
+    """
     if isinstance(sxpr, types.ListType):
         element = name(sxpr)
         out.write('<%s' % element)
@@ -384,11 +393,24 @@ def show_xml(sxpr, out=sys.stdout):
         out.write(str(sxpr))
 
 def elementp(sxpr, elt=None):
+    """Check if an sxpr is an element of the given type.
+
+    sxpr sxpr
+    elt  element type
+    """
     return (isinstance(sxpr, types.ListType)
             and len(sxpr)
             and (None == elt or sxpr[0] == elt))
 
 def name(sxpr):
+    """Get the element name of an sxpr.
+    If the sxpr is not an element (i.e. it's an atomic value) its name
+    is None.
+
+    sxpr
+
+    returns name (None if not an element).
+    """
     val = None
     if isinstance(sxpr, types.StringType):
         val = sxpr
@@ -397,6 +419,12 @@ def name(sxpr):
     return val
 
 def attributes(sxpr):
+    """Get the attribute list of an sxpr.
+
+    sxpr
+
+    returns attribute list
+    """
     val = []
     if isinstance(sxpr, types.ListType) and len(sxpr) > 1:
         attr = sxpr[1]
@@ -405,6 +433,14 @@ def attributes(sxpr):
     return val
 
 def attribute(sxpr, key, val=None):
+    """Get an attribute of an sxpr.
+
+    sxpr sxpr
+    key  attribute key
+    val  default value (default None)
+
+    returns attribute value
+    """
     for x in attributes(sxpr):
         if x[0] == key:
             val = x[1]
@@ -412,6 +448,13 @@ def attribute(sxpr, key, val=None):
     return val
 
 def children(sxpr, elt=None):
+    """Get children of an sxpr.
+
+    sxpr sxpr
+    elt  optional element type to filter by
+
+    returns children (filtered by elt if specified)
+    """
     val = []
     if isinstance(sxpr, types.ListType) and len(sxpr) > 1:
         i = 1
@@ -426,6 +469,12 @@ def children(sxpr, elt=None):
     return val
 
 def child(sxpr, elt, val=None):
+    """Get the first child of the given element type.
+
+    sxpr sxpr
+    elt  element type
+    val  default value
+    """
     for x in children(sxpr):
         if elementp(x, elt):
             val = x
@@ -433,27 +482,50 @@ def child(sxpr, elt, val=None):
     return val
 
 def child_at(sxpr, index, val=None):
+    """Get the child at the given index (zero-based).
+
+    sxpr  sxpr
+    index index
+    val   default value
+    """
     kids = children(sxpr)
     if len(kids) > index:
         val = kids[index]
     return val
 
 def child0(sxpr, val=None):
+    """Get the zeroth child.
+    """
     return child_at(sxpr, 0, val)
 
 def child1(sxpr, val=None):
+    """Get the first child.
+    """
     return child_at(sxpr, 1, val)
 
 def child2(sxpr, val=None):
+    """Get the second child.
+    """
     return child_at(sxpr, 2, val)
 
 def child3(sxpr, val=None):
+    """Get the third child.
+    """
     return child_at(sxpr, 3, val)
 
 def child4(sxpr, val=None):
+    """Get the fourth child.
+    """
     return child_at(sxpr, 4, val)
 
 def child_value(sxpr, elt, val=None):
+    """Get the value of the first child of the given element type.
+    Assumes the child has an atomic value.
+
+    sxpr sxpr
+    elt  element type
+    val  default value
+    """
     kid = child(sxpr, elt)
     if kid:
         val = child_at(kid, 0, val)
@@ -542,7 +614,21 @@ def from_string(str):
     returns sxpr
     """
     io = StringIO(str)
-    return parse(io)
+    vals = parse(io)
+    if vals is []:
+        return None
+    else:
+        return vals[0]
+    
+
+def all_from_string(str):
+    """Create an sxpr list by parsing a string.
+
+    str string
+    returns sxpr list
+    """    io = StringIO(str)
+    vals = parse(io)
+    return vals
 
 def parse(io):
     """Completely parse all input from 'io'.
