@@ -864,6 +864,16 @@ int __sync_lazy_execstate(void)
     return 1;
 }
 
+void sync_lazy_execstate_cpuset(unsigned long cpuset)
+{
+    flush_tlb_mask(cpuset);
+}
+
+void sync_lazy_execstate_all(void)
+{
+    flush_tlb_all();
+}
+
 unsigned long __hypercall_create_continuation(
     unsigned int op, unsigned int nr_args, ...)
 {
