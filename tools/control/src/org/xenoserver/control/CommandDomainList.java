@@ -81,6 +81,9 @@ public class CommandDomainList extends Command {
                         domain.state = st.nextToken().toLowerCase();
                     }
                     if (st.hasMoreTokens()) {
+                        domain.ev = Integer.parseInt(st.nextToken());
+                    }
+                    if (st.hasMoreTokens()) {
                         domain.mcu = Integer.parseInt(st.nextToken());
                     }
                     if (st.hasMoreTokens()) {

@@ -17,6 +17,8 @@ public class Domain {
     public int nstate;
     /** State string. */
     public String state;
+    /** State string. */
+    public int ev;
     /** MCU advances. */
     public int mcu;
     /** Total pages. */
