@@ -121,8 +121,9 @@ static void xennet_hex_dump(unsigned char *, size_t, char *, int);
 int xennet_match (struct device *, struct cfdata *, void *);
 void xennet_attach (struct device *, struct device *, void *);
 static void xennet_ctrlif_rx(ctrl_msg_t *, unsigned long);
+static int xennet_driver_count_connected(void);
 static void xennet_driver_status_change(netif_fe_driver_status_t *);
-static void xennet_status_change(netif_fe_interface_status_t *);
+static void xennet_interface_status_change(netif_fe_interface_status_t *);
 static void xennet_tx_mbuf_free(struct mbuf *, caddr_t, size_t, void *);
 static void xennet_rx_mbuf_free(struct mbuf *, caddr_t, size_t, void *);
 static int xen_network_handler(void *);
@@ -156,6 +157,8 @@ struct xennet_ctrl {
 	int xc_connected;
 	/** Error code. */
 	int xc_err;
+	/** Driver status. */
+	int xc_up;
 
 	cfprint_t xc_cfprint;
 	struct device *xc_parent;
@@ -279,7 +282,7 @@ xennet_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
 	case CMSG_NETIF_FE_INTERFACE_STATUS:
 		if (msg->length != sizeof(netif_fe_interface_status_t))
 			goto error;
-		xennet_status_change(
+		xennet_interface_status_change(
 			(netif_fe_interface_status_t *)&msg->msg[0]);
 		break;
 
@@ -303,49 +306,60 @@ xennet_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
 static void
 xennet_driver_status_change(netif_fe_driver_status_t *status)
 {
-	struct xennet_attach_args xneta;
-	int i;
 
-	DPRINTFN(XEDB_EVENT, ("> max_handle=%d\n", status->max_handle));
+	DPRINTFN(XEDB_EVENT, ("> status=%d\n", status->status));
 
-	/* XXX FIXME: Abuse of 'max_handle' as interface count. */
-	netctrl.xc_interfaces = status->max_handle;
-	netctrl.xc_connected = 0;
+	netctrl.xc_up = status->status;
+	xennet_driver_count_connected();
+}
 
-	xneta.xa_device = "xennet";
+static int
+xennet_driver_count_connected(void)
+{
+	struct device *dv;
+	struct xennet_softc *xs = NULL;
 
-	for (i = 0; i < netctrl.xc_interfaces; i++) {
-		xneta.xa_handle = i;
-		config_found(netctrl.xc_parent, &xneta, netctrl.xc_cfprint);
+	netctrl.xc_interfaces = netctrl.xc_connected = 0;
+	for (dv = alldevs.tqh_first; dv != NULL; dv = dv->dv_list.tqe_next) {
+		if (dv->dv_cfattach == NULL ||
+		    dv->dv_cfattach->ca_attach != xennet_attach)
+			continue;
+		xs = (struct xennet_softc *)dv;
+		netctrl.xc_interfaces++;
+		if (xs->sc_backend_state == BEST_CONNECTED)
+			netctrl.xc_connected++;
 	}
+
+	return netctrl.xc_connected;
 }
 
 static void
-xennet_status_change(netif_fe_interface_status_t *status)
+xennet_interface_status_change(netif_fe_interface_status_t *status)
 {
 	ctrl_msg_t cmsg;
 	netif_fe_interface_connect_t up;
 	struct xennet_softc *sc;
 	struct ifnet *ifp;
 	struct vm_page *pg_tx, *pg_rx;
+	struct xennet_attach_args xneta;
 
-	DPRINTFN(XEDB_EVENT, (">\n"));
 	DPRINTFN(XEDB_EVENT, ("> status=%d handle=%d mac=%02x:%02x:%02x:%02x:%02x:%02x\n",
 	    status->status,
 	    status->handle,
 	    status->mac[0], status->mac[1], status->mac[2],
 	    status->mac[3], status->mac[4], status->mac[5]));
 
-	if (netctrl.xc_interfaces <= 0) {
-		printf("Status change: no interfaces\n");
-		return;
-	}
-
 	sc = find_device(status->handle);
 	if (sc == NULL) {
-		printf("Status change: invalid netif handle %u\n",
-		    status->handle);
-		return;
+		xneta.xa_device = "xennet";
+		xneta.xa_handle = status->handle;
+		config_found(netctrl.xc_parent, &xneta, netctrl.xc_cfprint);
+		sc = find_device(status->handle);
+		if (sc == NULL) {
+			printf("Status change: invalid netif handle %u\n",
+			    status->handle);
+			return;
+		}
 	}
 	ifp = &sc->sc_ethercom.ec_if;
 
@@ -484,7 +498,7 @@ xennet_status_change(netif_fe_interface_status_t *status)
 		sc->sc_irq = bind_evtchn_to_irq(sc->sc_evtchn);
 		event_set_handler(sc->sc_irq, &xen_network_handler, sc, IPL_NET);
 		hypervisor_enable_irq(sc->sc_irq);
-		netctrl.xc_connected++;
+		xennet_driver_count_connected();
 
 		aprint_normal("%s: MAC address %s\n", sc->sc_dev.dv_xname,
 		    ether_sprintf(sc->sc_enaddr));

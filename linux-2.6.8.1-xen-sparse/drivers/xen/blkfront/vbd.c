@@ -101,6 +101,8 @@ static int xlvbd_get_vbd_info(vdisk_t *disk_info)
          nr = MAX_VBDS;
     memcpy(disk_info, buf, nr * sizeof(vdisk_t));
 
+    free_page((unsigned long)buf);
+
     return nr;
 }
 
