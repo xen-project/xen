@@ -22,12 +22,6 @@
 
 extern struct list_head * find_direct(struct list_head *, unsigned long);
 
-/* now, this is grimm, kmalloc seems to have problems allocating small mem
- * blocks, so i have decided to use fixed (a bit) larger blocks... this needs
- * to be traced down but no time now.
- */
-#define KMALLOC_SIZE	128
-
 /* bd240: functions below perform direct mapping to the real physical pages needed for
  * mapping various hypervisor specific structures needed in dom0 userspace by various
  * management applications such as domain builder etc.
@@ -189,10 +183,10 @@ unsigned long direct_mmap(unsigned long phys_addr, unsigned long size,
     dmmap->vm_end = addr + size;
 	entry = find_direct(&current->mm->context.direct_list, addr);
 	if(entry != &current->mm->context.direct_list){
-		list_add(&dmmap->list, entry);
+		list_add_tail(&dmmap->list, entry);
 		printk(KERN_ALERT "bd240 debug: added node %lx in the middle\n", dmmap->vm_start);
 	} else {
-    	list_add(&dmmap->list, &current->mm->context.direct_list);
+    	list_add_tail(&dmmap->list, &current->mm->context.direct_list);
 		printk(KERN_ALERT "bd240 debug: added node %lx at tail\n", dmmap->vm_start);
 	}
 
