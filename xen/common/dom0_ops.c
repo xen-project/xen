@@ -118,7 +118,11 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         if ( (dom = get_domnr()) == 0 ) 
             goto exit_create;
 
-        pro = (pro+1) % smp_num_cpus;
+	if (op->u.createdomain.cpu == -1 )
+	    pro = (pro+1) % smp_num_cpus;
+	else
+	    pro = op->u.createdomain.cpu % smp_num_cpus;
+
         p = do_createdomain(dom, pro);
         if ( p == NULL ) 
             goto exit_create;

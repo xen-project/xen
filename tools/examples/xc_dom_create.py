@@ -156,6 +156,7 @@ for opt in opts:
     if opt[0] == '-r': ramdisk = opt[1]
     if opt[0] == '-b': builder_fn = opt[1]  
     if opt[0] == '-m': mem_size = int(opt[1])
+    if opt[0] == '-C': cpu = int(opt[1])
     if opt[0] == '-N': domain_name = opt[1]
     if opt[0] == '-a': auto_restart = answer(opt[1])
     if opt[0] == '-e': vbd_expert = answer(opt[1])
@@ -219,7 +220,7 @@ def make_domain():
     """
 
     # set up access to the global variables declared above
-    global image, ramdisk, mem_size, domain_name, vfr_ipaddr, netmask
+    global image, ramdisk, mem_size, cpu, domain_name, vfr_ipaddr, netmask
     global vbd_list, cmdline, xc, vbd_expert, builder_fn
     	
     if not os.path.isfile( image ):
@@ -230,7 +231,7 @@ def make_domain():
         print "Ramdisk file '" + ramdisk + "' does not exist"
         sys.exit()
 
-    id = xc.domain_create( mem_kb=mem_size*1024, name=domain_name )
+    id = xc.domain_create( mem_kb=mem_size*1024, name=domain_name, cpu=cpu )
     if id <= 0:
 	print "Error creating domain"
 	sys.exit()

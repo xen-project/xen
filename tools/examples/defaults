@@ -31,12 +31,15 @@ builder_fn='linux' # this is a linux domain
 # STEP 2. The initial memory allocation (in megabytes) for the new domain.
 mem_size = 64
 
-
 # STEP 3. A handy name for your new domain.
 domain_name = "This is VM %d" % vmid
 
+# STEP 4. Which CPU to start domain on? 
+#cpu = -1   # leave to Xen to pick
+cpu = vmid  # set based on vmid (mod number of CPUs)
 
-# STEP 4. Specify IP address(es), for the new domain.  You need to
+
+# STEP 5. Specify IP address(es), for the new domain.  You need to
 # configure IP addrs within the domain just as you do normally.  This
 # is just to let Xen know about them so it can route packets
 # appropriately.
@@ -46,7 +49,7 @@ vfr_ipaddr  = [xenctl.utils.add_offset_to_ip(xenctl.utils.get_current_ipaddr(),v
 	       xenctl.utils.add_offset_to_ip('169.254.1.0',vmid),]
 
 
-# STEP 5a. Identify any physcial partitions or virtual disks you want the
+# STEP 6. Identify any physcial partitions or virtual disks you want the
 # domain to have access to, and what you want them accessible as
 # e.g. vbd_list = [ ('phy:sda1','sda1', 'w'),
 #	 ('phy:sda%d' % (3+vmid), 'hda2', 'r'), 
@@ -66,7 +69,7 @@ vbd_list = [ ('phy:sda%d'%(7+vmid),'sda1','w' ),
 vbd_expert = 0
 
 
-# STEP 6. Build the command line for the new domain. Edit as req'd.
+# STEP 7. Build the command line for the new domain. Edit as req'd.
 # You only need the ip= line if you're NFS booting or the root file system
 # doesn't set it later e.g. in ifcfg-eth0 or via DHCP
 # You can use 'extrabit' to set the runlevel and custom environment
@@ -82,12 +85,12 @@ cmdline_root = "root=/dev/sda1 ro"
 cmdline_extra = "4 VMID=%d usr=/dev/sda6" % vmid
 
 
-# STEP 7. Set according to whether you want the script to watch the domain 
+# STEP 8. Set according to whether you want the script to watch the domain 
 # and auto-restart it should it die or exit.
 
 auto_restart = False
 #auto_restart = True
 
-# STEP 8. (Optional) Define a console port number for the new domain.
+# STEP 9. (Optional) Define a console port number for the new domain.
 
 # console_port = 9610+vmid

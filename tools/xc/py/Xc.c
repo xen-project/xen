@@ -38,16 +38,17 @@ static PyObject *pyxc_domain_create(PyObject *self,
 
     unsigned int mem_kb = 0;
     char        *name   = "(anon)";
+    int          cpu = -1;
     u64          dom;
     int          ret;
 
-    static char *kwd_list[] = { "mem_kb", "name", NULL };
+    static char *kwd_list[] = { "mem_kb", "name", "cpu", NULL };
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|is", kwd_list, 
-                                      &mem_kb, &name) )
+    if ( !PyArg_ParseTupleAndKeywords(args, kwds, "|isi", kwd_list, 
+                                      &mem_kb, &name, &cpu) )
         return NULL;
 
-    if ( (ret = xc_domain_create(xc->xc_handle, mem_kb, name, &dom)) < 0 )
+    if ( (ret = xc_domain_create(xc->xc_handle, mem_kb, name, cpu, &dom)) < 0 )
         return PyErr_SetFromErrno(xc_error);
 
     return PyLong_FromUnsignedLongLong(dom);

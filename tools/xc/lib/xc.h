@@ -38,6 +38,7 @@ typedef struct {
 int xc_domain_create(int xc_handle, 
                      unsigned int mem_kb, 
                      const char *name,
+		     int cpu,
                      u64 *pdomid);
 int xc_domain_start(int xc_handle, 
                     u64 domid);

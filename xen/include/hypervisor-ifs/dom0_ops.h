@@ -49,6 +49,7 @@ typedef struct dom0_createdomain_st
     /* IN parameters. */
     unsigned int memory_kb; 
     char         name[MAX_DOMAIN_NAME];
+    int          cpu;
     /* OUT parameters. */
     domid_t      domain; 
 } dom0_createdomain_t;

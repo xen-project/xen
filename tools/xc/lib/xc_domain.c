@@ -11,6 +11,7 @@
 int xc_domain_create(int xc_handle,
                      unsigned int mem_kb, 
                      const char *name,
+		     int cpu,
                      u64 *pdomid)
 {
     int err;
@@ -20,6 +21,7 @@ int xc_domain_create(int xc_handle,
     op.u.createdomain.memory_kb = mem_kb;
     strncpy(op.u.createdomain.name, name, MAX_DOMAIN_NAME);
     op.u.createdomain.name[MAX_DOMAIN_NAME-1] = '\0';
+    op.u.createdomain.cpu = cpu;
 
     if ( (err = do_dom0_op(xc_handle, &op)) == 0 )
         *pdomid = (u64)op.u.createdomain.domain;
