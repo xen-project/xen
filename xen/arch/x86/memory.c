@@ -1307,6 +1307,9 @@ int do_mmu_update(mmu_update_t *ureqs, int count, int *success_count)
 
     for ( i = 0; i < count; i++ )
     {
+        hypercall_may_preempt(
+            __HYPERVISOR_mmu_update, 3, ureqs, count-i, success_count);
+
         if ( unlikely(__copy_from_user(&req, ureqs, sizeof(req)) != 0) )
         {
             MEM_LOG("Bad __copy_from_user");
@@ -1462,7 +1465,7 @@ int do_mmu_update(mmu_update_t *ureqs, int count, int *success_count)
     }
 
     if ( unlikely(success_count != NULL) )
-        put_user(count, success_count);
+        put_user(i, success_count);
 
     UNLOCK_BIGLOCK(d);
     return rc;

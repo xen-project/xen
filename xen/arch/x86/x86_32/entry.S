@@ -95,6 +95,11 @@ do_multicall:
         jnc   bad_multicall_address
 multicall_loop:
         pushl %ecx
+        movl  4(%esp),%ecx               # %ecx = struct domain
+        movl  DOMAIN_processor(%ecx),%eax
+        shl   $6,%eax                    # sizeof(irq_cpustat) == 64
+        testl $~0,SYMBOL_NAME(irq_stat)(%eax,1)
+        jnz   multicall_preempt
 multicall_fault1: 
         pushl 20(%ebx)      # args[4]
 multicall_fault2: 
@@ -120,6 +125,17 @@ multicall_fault7:
         xorl  %eax,%eax
         jmp   ret_from_hypercall
 
+multicall_preempt:
+        # NB. remaining nr_calls is already at top of stack
+        pushl %ebx                             # call_list
+        pushl $2                               # nr_args == 2
+        pushl $__HYPERVISOR_multicall          # op == __HYPERVISOR_multicall
+        call  hypercall_create_continuation
+        addl  $16,%esp
+        popl  %ebx
+        movl  $__HYPERVISOR_multicall,%eax        
+        jmp   ret_from_hypercall
+        
 bad_multicall_address:
         popl  %ebx
         movl  $-EFAULT,%eax
