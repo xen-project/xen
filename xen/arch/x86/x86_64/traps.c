@@ -248,31 +248,6 @@ void __init percpu_traps_init(void)
     wrmsr(MSR_SYSCALL_MASK, EF_VM|EF_RF|EF_NT|EF_DF|EF_IE|EF_TF, 0U);
 }
 
-void *decode_reg(struct xen_regs *regs, u8 b)
-{
-    switch ( b )
-    {
-    case  0: return &regs->rax;
-    case  1: return &regs->rcx;
-    case  2: return &regs->rdx;
-    case  3: return &regs->rbx;
-    case  4: return &regs->rsp;
-    case  5: return &regs->rbp;
-    case  6: return &regs->rsi;
-    case  7: return &regs->rdi;
-    case  8: return &regs->r8;
-    case  9: return &regs->r9;
-    case 10: return &regs->r10;
-    case 11: return &regs->r11;
-    case 12: return &regs->r12;
-    case 13: return &regs->r13;
-    case 14: return &regs->r14;
-    case 15: return &regs->r15;
-    }
-
-    return NULL;
-}
-
 long do_set_callbacks(unsigned long event_address,
                       unsigned long failsafe_address,
                       unsigned long syscall_address)
