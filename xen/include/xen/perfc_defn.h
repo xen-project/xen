@@ -31,6 +31,7 @@ PERFCOUNTER_CPU( shadow_update_va_fail2, "shadow_update_va_fail2" )
 /* STATUS counters do not reset when 'P' is hit */
 PERFSTATUS( shadow_l2_pages, "current # shadow L2 pages" )
 PERFSTATUS( shadow_l1_pages, "current # shadow L1 pages" )
+PERFSTATUS( hl2_table_pages, "current # hl2 pages" )
 
 PERFCOUNTER_CPU( check_pagetable, "calls to check_pagetable" )
 PERFCOUNTER_CPU( check_all_pagetables, "calls to check_all_pagetables" )

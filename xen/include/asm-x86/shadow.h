@@ -9,8 +9,9 @@
 #include <asm/processor.h>
 #include <asm/domain_page.h>
 
-/* Shadow PT flag bits in pfn_info */
+/* Shadow PT flag bits in shadow_status */
 #define PSH_shadowed    (1<<31) /* page has a shadow. PFN points to shadow */
+#define PSH_hl2         (1<<30) /* page is an hl2 */
 #define PSH_pfn_mask    ((1<<21)-1)
 
 /* Shadow PT operation mode : shadow-mode variable in arch_domain. */
@@ -44,6 +45,7 @@ extern void unshadow_table(unsigned long gpfn, unsigned int type);
 extern int shadow_mode_enable(struct domain *p, unsigned int mode);
 extern void free_shadow_state(struct domain *d);
 extern void shadow_invlpg(struct exec_domain *, unsigned long);
+extern unsigned long mk_hl2_table(struct exec_domain *ed);
 
 extern void vmx_shadow_clear_state(struct domain *);
 
@@ -68,7 +70,7 @@ extern unsigned long shadow_l2_table(
     struct domain *d, unsigned long gmfn);
   
 static inline void shadow_invalidate(struct exec_domain *ed) {
-    if ( !shadow_mode_translate(ed->domain))
+    if ( !ed->arch.arch_vmx.flags )
         BUG();
     memset(ed->arch.shadow_vtable, 0, PAGE_SIZE);
 }
@@ -118,29 +120,27 @@ struct shadow_status {
 static inline void __shadow_get_l2e(
     struct exec_domain *ed, unsigned long va, unsigned long *sl2e)
 {
-    if ( likely(shadow_mode_enabled(ed->domain)) ) {
-        if ( shadow_mode_translate(ed->domain) )
-            *sl2e = l2_pgentry_val(
-                ed->arch.shadow_vtable[l2_table_offset(va)]);       
-        else 
-            *sl2e = l2_pgentry_val(
-                shadow_linear_l2_table[l2_table_offset(va)]);
-    }
-    else
+    if ( !likely(shadow_mode_enabled(ed->domain)) )
         BUG();
+
+    if ( shadow_mode_translate(ed->domain) )
+        *sl2e = l2_pgentry_val(
+            ed->arch.shadow_vtable[l2_table_offset(va)]);       
+    else 
+        *sl2e = l2_pgentry_val(
+            shadow_linear_l2_table[l2_table_offset(va)]);
 }
 
 static inline void __shadow_set_l2e(
     struct exec_domain *ed, unsigned long va, unsigned long value)
 {
-    if ( likely(shadow_mode_enabled(ed->domain)) ) {
-        if ( shadow_mode_translate(ed->domain) ) 
-            ed->arch.shadow_vtable[l2_table_offset(va)] = mk_l2_pgentry(value);
-        else 
-            shadow_linear_l2_table[l2_table_offset(va)] = mk_l2_pgentry(value);
-    }
-    else
+    if ( !likely(shadow_mode_enabled(ed->domain)) )
         BUG();
+
+    if ( shadow_mode_translate(ed->domain) ) 
+        ed->arch.shadow_vtable[l2_table_offset(va)] = mk_l2_pgentry(value);
+    else 
+        shadow_linear_l2_table[l2_table_offset(va)] = mk_l2_pgentry(value);
 }
 
 static inline void __guest_get_l2e(
@@ -347,8 +347,14 @@ static void shadow_audit(struct domain *d, int print)
     for ( j = 0; j < shadow_ht_buckets; j++ )
     {
         a = &d->arch.shadow_ht[j];        
-        if ( a->pfn ) { live++; ASSERT(a->smfn_and_flags & PSH_pfn_mask); }
-        ASSERT(a->pfn < 0x00100000UL);
+        if ( a->pfn )
+        {
+            live++;
+            ASSERT(a->smfn_and_flags & PSH_pfn_mask);
+        }
+        else
+            ASSERT(!a->next);
+        ASSERT( (a->pfn & ~PSH_hl2) < 0x00100000UL);
         a = a->next;
         while ( a && (live < 9999) )
         { 
@@ -359,7 +365,7 @@ static void shadow_audit(struct domain *d, int print)
                        live, a->pfn, a->smfn_and_flags, a->next);
                 BUG();
             }
-            ASSERT(a->pfn < 0x00100000UL);
+            ASSERT( (a->pfn & ~PSH_hl2) < 0x00100000UL);
             ASSERT(a->smfn_and_flags & PSH_pfn_mask);
             a = a->next; 
         }
@@ -369,15 +375,22 @@ static void shadow_audit(struct domain *d, int print)
     for ( a = d->arch.shadow_ht_free; a != NULL; a = a->next )
         free++; 
 
-    if ( print)
+    if ( print )
         printk("Xlive=%d free=%d\n",live,free);
 
-    abs = (perfc_value(shadow_l1_pages) + perfc_value(shadow_l2_pages)) - live;
+    // BUG: this only works if there's only a single domain which is
+    //      using shadow tables.
+    //
+    abs = ( perfc_value(shadow_l1_pages) +
+            perfc_value(shadow_l2_pages) +
+            perfc_value(hl2_table_pages) ) - live;
 #ifdef PERF_COUNTERS
     if ( (abs < -1) || (abs > 1) )
     {
-        printk("live=%d free=%d l1=%d l2=%d\n",live,free,
-               perfc_value(shadow_l1_pages), perfc_value(shadow_l2_pages) );
+        printk("live=%d free=%d l1=%d l2=%d hl2=%d\n", live, free,
+               perfc_value(shadow_l1_pages),
+               perfc_value(shadow_l2_pages),
+               perfc_value(hl2_table_pages));
         BUG();
     }
 #endif
@@ -404,6 +417,8 @@ static inline unsigned long __shadow_status(
     struct domain *d, unsigned int gpfn)
 {
     struct shadow_status *p, *x, *head;
+
+    ASSERT(spin_is_locked(&d->arch.shadow_lock));
 
     x = head = hash_bucket(d, gpfn);
     p = NULL;
@@ -570,7 +585,7 @@ static inline void set_shadow_status(
 
     ASSERT(spin_is_locked(&d->arch.shadow_lock));
     ASSERT(gpfn != 0);
-    ASSERT(s & PSH_shadowed);
+    ASSERT(s & (PSH_shadowed | PSH_hl2));
 
     x = head = hash_bucket(d, gpfn);
    
@@ -658,7 +673,7 @@ static inline unsigned long gva_to_gpte(unsigned long gva)
     if (!(gpde & _PAGE_PRESENT))
         return 0;
 
-    index = (gva >> L2_PAGETABLE_SHIFT);
+    index = l2_table_offset(gva);
 
     if (!l2_pgentry_val(ed->arch.hl2_vtable[index])) {
         pfn = phys_to_machine_mapping(gpde >> PAGE_SHIFT);
@@ -684,6 +699,14 @@ static inline unsigned long gva_to_gpa(unsigned long gva)
     return (gpte & PAGE_MASK) + (gva & ~PAGE_MASK); 
 }
 
+static inline void hl2_table_invalidate(struct exec_domain *ed)
+{
+    /*
+     * Need to optimize this
+     */
+    memset(ed->arch.hl2_vtable, 0, PAGE_SIZE);
+}
+
 static inline void __update_pagetables(struct exec_domain *ed)
 {
     struct domain *d = ed->domain;
@@ -698,63 +721,83 @@ static inline void __update_pagetables(struct exec_domain *ed)
 
     ed->arch.shadow_table = mk_pagetable(smfn<<PAGE_SHIFT);
 
-    if  ( shadow_mode_translate(ed->domain) )
+    if ( shadow_mode_translate(d) )
     {
+        l2_pgentry_t *mpl2e = ed->arch.monitor_vtable;
         l2_pgentry_t *gpl2e, *spl2e;
+        unsigned long hl2_status, hl2mfn, offset;
+        int need_flush = 0;
 
         if ( ed->arch.guest_vtable )
             unmap_domain_mem(ed->arch.guest_vtable);
         if ( ed->arch.shadow_vtable )
             unmap_domain_mem(ed->arch.shadow_vtable);
+        if ( ed->arch.hl2_vtable )
+            unmap_domain_mem(ed->arch.hl2_vtable);
 
         gpl2e = ed->arch.guest_vtable =
             map_domain_mem(pagetable_val(ed->arch.guest_table));
         spl2e = ed->arch.shadow_vtable =
             map_domain_mem(pagetable_val(ed->arch.shadow_table));
 
-        if ( shadow_mode_external(ed->domain ) )
+        hl2_status = __shadow_status(d, gpfn | PSH_hl2);
+        if ( unlikely(!(hl2_status & PSH_hl2)) )
+            hl2_status = mk_hl2_table(ed);
+
+        hl2mfn = hl2_status & PSH_pfn_mask;
+        ed->arch.hl2_vtable = map_domain_mem(hl2mfn << PAGE_SHIFT);
+
+        offset = l2_table_offset(LINEAR_PT_VIRT_START);
+        if ( hl2mfn != (l2_pgentry_val(mpl2e[offset]) >> PAGE_SHIFT) )
         {
-            l2_pgentry_t *mpl2e = ed->arch.monitor_vtable;
-            unsigned long old_smfn;
-            unsigned sh_l2offset = l2_table_offset(SH_LINEAR_PT_VIRT_START);
-            
-            old_smfn = l2_pgentry_val(mpl2e[sh_l2offset]) >> PAGE_SHIFT;
-            if ( old_smfn != smfn )
+            mpl2e[offset] =
+                mk_l2_pgentry((hl2mfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
+            need_flush = 1;
+        }
+
+        if ( shadow_mode_external(d ) )
+        {
+            offset = l2_table_offset(SH_LINEAR_PT_VIRT_START);
+            if ( smfn != (l2_pgentry_val(mpl2e[offset]) >> PAGE_SHIFT) )
             {
-                mpl2e[sh_l2offset] =
+                mpl2e[offset] =
                     mk_l2_pgentry((smfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
-                local_flush_tlb();
+                need_flush = 1;
             }
         }
 
         if ( ed->arch.arch_vmx.flags )
         {
             // Why is VMX mode doing this?
-            memset(spl2e, 0, L2_PAGETABLE_ENTRIES * sizeof(l2_pgentry_t));
+            shadow_invalidate(ed);
+            hl2_table_invalidate(ed);
         }
+
+        if ( need_flush )
+            local_flush_tlb();
     }
 }
 
 static inline void update_pagetables(struct exec_domain *ed)
 {
-     if ( unlikely(shadow_mode_enabled(ed->domain)) )
-     {
-         shadow_lock(ed->domain);
-         __update_pagetables(ed);
-         shadow_unlock(ed->domain);
-     }
-     if ( !shadow_mode_external(ed->domain) )
-     {
+    if ( unlikely(shadow_mode_enabled(ed->domain)) )
+    {
+        shadow_lock(ed->domain);
+        __update_pagetables(ed);
+        shadow_unlock(ed->domain);
+    }
+    if ( !shadow_mode_external(ed->domain) )
+    {
 #ifdef __x86_64__
-         if ( !(ed->arch.flags & TF_kernel_mode) )
-             ed->arch.monitor_table = ed->arch.guest_table_user;
-         else
+        if ( !(ed->arch.flags & TF_kernel_mode) )
+            ed->arch.monitor_table = ed->arch.guest_table_user;
+        else
 #endif
-         if ( shadow_mode_enabled(ed->domain) )
-             ed->arch.monitor_table = ed->arch.shadow_table;
-         else
-             ed->arch.monitor_table = ed->arch.guest_table;
-     }
+        if ( shadow_mode_enabled(ed->domain) )
+            ed->arch.monitor_table = ed->arch.shadow_table;
+        else
+            ed->arch.monitor_table = ed->arch.guest_table;
+    }
 }
 
 #if SHADOW_DEBUG

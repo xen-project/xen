@@ -410,8 +410,8 @@ static int vmx_final_setup_guest(struct exec_domain *ed,
     }
 
     /* We don't call update_pagetables() as we actively want fields such as 
-     * the linear_pg_table to be null so that we bail out early of 
-     * shadow_fault in case the vmx guest tries illegal accesses with
+     * the linear_pg_table to be inaccessible so that we bail out early of 
+     * shadow_fault() in case the vmx guest tries illegal accesses with
      * paging turned off. 
      */
     //update_pagetables(ed);     /* this assigns shadow_pagetable */

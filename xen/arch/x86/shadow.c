@@ -111,6 +111,10 @@ static inline int clear_shadow_page(
     int              restart = 0;
     struct pfn_info *spage = &frame_table[x->smfn_and_flags & PSH_pfn_mask];
 
+    // We don't clear hl2_table's here.  At least not yet.
+    if ( x->pfn & PSH_hl2 )
+        return 0;
+
     switch ( spage->u.inuse.type_info & PGT_type_mask )
     {
         /* We clear L2 pages by zeroing the guest entries. */
@@ -486,7 +490,7 @@ unsigned long shadow_l2_table(
     spfn_info->u.inuse.type_info = PGT_l2_page_table;
     perfc_incr(shadow_l2_pages);
 
-    spfn = spfn_info - frame_table;
+    spfn = page_to_pfn(spfn_info);
   /* Mark pfn as being shadowed; update field to point at shadow. */
     set_shadow_status(d, gpfn, spfn | PSH_shadowed);
  
@@ -770,6 +774,41 @@ void shadow_l2_normal_pt_update(unsigned long pa, unsigned long gpde)
     unmap_domain_mem(spl2e);
 }
 
+unsigned long mk_hl2_table(struct exec_domain *ed)
+{
+    struct domain *d = ed->domain;
+    unsigned long gmfn = pagetable_val(ed->arch.guest_table) >> PAGE_SHIFT;
+    unsigned long gpfn = __mfn_to_gpfn(d, gmfn);
+    unsigned long hl2mfn, status;
+    struct pfn_info *hl2_info;
+    l1_pgentry_t *hl2;
+
+    perfc_incr(hl2_table_pages);
+
+    if ( (hl2_info = alloc_shadow_page(d)) == NULL )
+        BUG(); /* XXX Deal gracefully with failure. */
+
+    hl2_info->u.inuse.type_info = PGT_l1_page_table;
+
+    hl2mfn = page_to_pfn(hl2_info);
+    status = hl2mfn | PSH_hl2;
+    set_shadow_status(ed->domain, gpfn | PSH_hl2, status);
+
+    // need to optimize this...
+    hl2 = map_domain_mem(hl2mfn << PAGE_SHIFT);
+    memset(hl2, 0, PAGE_SIZE);
+    unmap_domain_mem(hl2);
+
+    // install this hl2 as the linear_pg_table
+    if ( shadow_mode_external(d) )
+        ed->arch.monitor_vtable[l2_table_offset(LINEAR_PT_VIRT_START)] =
+            mk_l2_pgentry((hl2mfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
+    else
+        ed->arch.shadow_vtable[l2_table_offset(LINEAR_PT_VIRT_START)] =
+            mk_l2_pgentry((hl2mfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
+
+    return status;
+}
 
 
 
