@@ -287,9 +287,14 @@ int check_descriptor(struct desc_struct *d)
     if ( (b & _SEGMENT_DPL) != 3 )
         goto bad;
 
-    /* Any code or data segment is okay. No base/limit checking. */
+    /* Most code and data segments are okay. No base/limit checking. */
     if ( (b & _SEGMENT_S) )
+    {
+        /* Disallow conforming code segments. I'm not sure they're safe. */
+        if ( (b & (_SEGMENT_CODE|_SEGMENT_EC)) == (_SEGMENT_CODE|_SEGMENT_EC) )
+            goto bad;
         goto good;
+    }
 
     /* Invalid type 0 is harmless. It is used for 2nd half of a call gate. */
     if ( (b & _SEGMENT_TYPE) == 0x000 )

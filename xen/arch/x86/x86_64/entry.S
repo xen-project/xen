@@ -162,20 +162,19 @@ process_softirqs:
 /* %rdx: trap_bounce, %rbx: struct exec_domain                           */
 /* On return only %rbx is guaranteed non-clobbered.                      */
 create_bounce_frame:
-        /* Push new frame at existing %rsp if already in guest-OS mode. */
-        movq  XREGS_rsp+8(%rsp),%rsi
         testb $TF_kernel_mode,EDOMAIN_thread_flags(%rbx)
-        /* Set kernel-mode indicator byte (RFLAGS[63:56]). */
-        setnz XREGS_eflags+15(%rsp)
         jnz   1f
         /* Push new frame at registered guest-OS stack base. */
-        /* Then call to C: toggle_guest_mode(current) */
         movq  EDOMAIN_kernel_sp(%rbx),%rsi
-        movq  %rbx,%rdi
         pushq %rdx
+        movq  %rbx,%rdi
         call  SYMBOL_NAME(toggle_guest_mode)
         popq  %rdx
-1:      movq  $HYPERVISOR_VIRT_START,%rax
+        jmp   2f
+1:      /* In kernel context already: push new frame at existing %rsp. */
+        movq  XREGS_rsp+8(%rsp),%rsi
+        andb  $0xfc,XREGS_cs+8(%rsp)    # Indicate kernel context to guest.
+2:      movq  $HYPERVISOR_VIRT_START,%rax
         cmpq  %rax,%rsi
         jb    1f                        # In +ve address space? Then okay.
         movq  $HYPERVISOR_VIRT_END+60,%rax

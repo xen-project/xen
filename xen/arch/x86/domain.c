@@ -655,11 +655,10 @@ static void switch_segments(
             (unsigned long *)regs->rsp : 
             (unsigned long *)n->arch.kernel_sp;
 
-        /* Set the kernel-mode indicator byte at the top of RFLAGS. */
-        ((char *)regs->rflags)[7] = !!(n->arch.flags & TF_kernel_mode);
-
         if ( !(n->arch.flags & TF_kernel_mode) )
             toggle_guest_mode(n);
+        else
+            regs->cs &= ~3;
 
         if ( put_user(regs->ss,     rsp- 1) |
              put_user(regs->rsp,    rsp- 2) |
@@ -699,10 +698,10 @@ long do_switch_to_user(void)
     toggle_guest_mode(ed);
 
     regs->rip    = stu.rip;
-    regs->cs     = stu.cs;
+    regs->cs     = stu.cs | 3; /* force guest privilege */
     regs->rflags = stu.rflags;
     regs->rsp    = stu.rsp;
-    regs->ss     = stu.ss;
+    regs->ss     = stu.ss | 3; /* force guest privilege */
 
     if ( !(stu.flags & ECF_IN_SYSCALL) )
     {
