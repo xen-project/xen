@@ -7,7 +7,7 @@
        	.text
 
 ENTRY(start)
-        jmp hal_entry
+        jmp __start
 
         .align	4
 
@@ -19,7 +19,10 @@ ENTRY(start)
 	/* Checksum: must be the negated sum of the first two fields. */
 	.long	-0x1BADB004
         
-hal_entry:
+bad_cpu:
+        jmp     bad_cpu
+        
+__start:
         /* Set up a few descriptors: on entry only CS is guaranteed good. */
         lgdt    %cs:nopaging_gdt_descr-__PAGE_OFFSET
         mov     $(__HYPERVISOR_DS),%ecx
@@ -47,34 +50,18 @@ hal_entry:
         and     %edx,%ecx
         je      bad_cpu            # ID bit should be set
 
-        /* Set up CR0. */
-        mov     %cr0,%ecx
-        and     $0x00000011,%ecx   # save ET and PE
-        or      $0x00050022,%ecx   # set AM, WP, NE and MP
-        mov     %ecx,%cr0
-
         /* Set up FPU. */
         fninit
         
         /* Set up CR4, except global flag which Intel requires should be     */
         /* left until after paging is enabled (IA32 Manual Vol. 3, Sec. 2.5) */
-        mov     %cr4,%ecx
-        or      mmu_cr4_features-__PAGE_OFFSET,%ecx
-        mov     %ecx,mmu_cr4_features-__PAGE_OFFSET
-        and     $0x7f,%ecx /* disable GLOBAL bit */
+        mov     mmu_cr4_features-__PAGE_OFFSET,%ecx
+        and     $0x7f,%cl   # CR4.PGE (global enable)
         mov     %ecx,%cr4
                 
-#ifdef CONFIG_SMP
-        /* Is this a non-boot processor? */
         cmp     $(SECONDARY_CPU_FLAG),%ebx
-        jne     continue_boot_cpu
-        
-        call    start_paging
-        lidt    idt_descr                        
-        jmp     start_secondary
-#endif
-        
-continue_boot_cpu:
+        je      start_paging
+                
 	add     $__PAGE_OFFSET,%ebx
         push    %ebx /* Multiboot info struct */
         push    %eax /* Multiboot magic value */
@@ -86,31 +73,6 @@ continue_boot_cpu:
         xor     %eax,%eax
         rep     stosb
 
-        /* Copy all modules (dom0 + initrd if present) out of the Xen heap */
-        mov     (%esp),%eax
-        cmp     $0x2BADB002,%eax
-        jne     skip_dom0_copy
-        sub     $__PAGE_OFFSET,%ebx          /* turn back into a phys addr */
-        mov     0x14(%ebx),%edi              /* mbi->mods_count */
-        dec     %edi                         /* mbi->mods_count-- */
-        jb      skip_dom0_copy               /* skip if no modules */
-        mov     0x18(%ebx),%eax              /* mbi->mods_addr */
-        mov     (%eax),%ebx                  /* %ebx = mod[0]->mod_start */
-        shl     $4,%edi                    
-        add     %edi,%eax
-        mov     0x4(%eax),%eax               /* %eax = mod[mod_count-1]->end */
-        mov     %eax,%ecx
-        sub     %ebx,%ecx                    /* %ecx = byte len of all mods */
-        mov     $(DIRECTMAP_PHYS_END), %edi
-        add     %ecx, %edi                   /* %edi = src + length */        
-        shr     $2,%ecx                      /* %ecx = length/4 */
-1:      sub     $4,%eax                      /* %eax = src, %edi = dst */
-        sub     $4,%edi
-        mov     (%eax),%ebx
-        mov     %ebx,(%edi)
-        loop 1b
-skip_dom0_copy:              
-
         /* Initialize low and high mappings of all memory with 4MB pages */
         mov     $idle_pg_table-__PAGE_OFFSET,%edi
         mov     $0x1e3,%eax                  /* PRESENT+RW+A+D+4MB+GLOBAL */
@@ -119,20 +81,27 @@ skip_dom0_copy:
         add     $(1<<L2_PAGETABLE_SHIFT),%eax
         cmp     $DIRECTMAP_PHYS_END+0x1e3,%eax
         jne     1b
-
-        call    start_paging        
-        call    setup_idt
-        lidt    idt_descr
-                
-        /* Call into main C routine. This should never return.*/
-       	call	cmain
-        ud2     /* Force a panic (invalid opcode). */
+1:      stosl   /* low mappings cover as much physmem as possible */
+        add     $(1<<L2_PAGETABLE_SHIFT),%eax
+        cmp     $__HYPERVISOR_VIRT_START+0x1e3,%eax
+        jne     1b
+        
+        /* Initialise IDT with simple error defaults. */
+        lea     ignore_int,%edx
+        mov     $(__HYPERVISOR_CS << 16),%eax
+        mov     %dx,%ax            /* selector = 0x0010 = cs */
+        mov     $0x8E00,%dx        /* interrupt gate - dpl=0, present */
+        lea     SYMBOL_NAME(idt_table)-__PAGE_OFFSET,%edi
+        mov     $256,%ecx
+1:      mov     %eax,(%edi)
+        mov     %edx,4(%edi)
+        add     $8,%edi
+        loop    1b
 
 start_paging:
         mov     $idle_pg_table-__PAGE_OFFSET,%eax
         mov     %eax,%cr3
-        mov     %cr0,%eax
-        or      $0x80010000,%eax /* set PG and WP bits */
+        mov     $0x80050033,%eax /* hi-to-lo: PG,AM,WP,NE,ET,MP,PE */
         mov     %eax,%cr0
         jmp     1f
 1:      /* Install relocated selectors (FS/GS unused). */
@@ -143,31 +112,19 @@ start_paging:
         mov     %ecx,%ss
         ljmp    $(__HYPERVISOR_CS),$1f
 1:      /* Paging enabled, so we can now enable GLOBAL mappings in CR4. */
-        movl    mmu_cr4_features,%ecx
-        movl    %ecx,%cr4
+        mov     mmu_cr4_features,%ecx
+        mov     %ecx,%cr4
         /* Relocate ESP */
         add     $__PAGE_OFFSET,%esp
-        /* Relocate EIP via return jump */
-        pop     %ecx
-        add     $__PAGE_OFFSET,%ecx
-        jmp     *%ecx
-    
-            
-/*** INTERRUPT INITIALISATION ***/
-        
-setup_idt:
-        lea     ignore_int,%edx
-        mov     $(__HYPERVISOR_CS << 16),%eax
-        mov     %dx,%ax            /* selector = 0x0010 = cs */
-        mov     $0x8E00,%dx        /* interrupt gate - dpl=0, present */
 
-        lea     SYMBOL_NAME(idt_table),%edi
-        mov     $256,%ecx
-1:      mov     %eax,(%edi)
-        mov     %edx,4(%edi)
-        add     $8,%edi
-        loop    1b
-        ret
+        lidt    idt_descr
+                
+        cmp     $(SECONDARY_CPU_FLAG),%ebx
+        je      start_secondary
+
+        /* Call into main C routine. This should never return.*/
+       	call	cmain
+        ud2     /* Force a panic (invalid opcode). */
 
 /* This is the default interrupt handler. */
 int_msg:
@@ -175,11 +132,6 @@ int_msg:
         ALIGN
 ignore_int:
         cld
-        push    %eax
-        push    %ecx
-        push    %edx
-        pushl   %es
-        pushl   %ds
         mov     $(__HYPERVISOR_DS),%eax
         mov     %eax,%ds
         mov     %eax,%es
@@ -187,14 +139,6 @@ ignore_int:
         call    SYMBOL_NAME(printf)
 1:      jmp     1b
 
-bad_cpu_msg:
-        .asciz  "Bad CPU type. Need P6+."
-        ALIGN
-bad_cpu:
-        pushl   $bad_cpu_msg
-        call    SYMBOL_NAME(printf)
-1:      jmp     1b
-        
 /*** STACK LOCATION ***/
         
 ENTRY(stack_start)

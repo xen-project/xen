@@ -281,7 +281,8 @@
 3ddb79bcBQF85CfLS4i1WGZ4oLLaCA xen/arch/x86/Rules.mk
 3e5636e5FAYZ5_vQnmgwFJfSdmO5Mw xen/arch/x86/acpi.c
 3ddb79bcsjinG9k1KcvbVBuas1R2dA xen/arch/x86/apic.c
-3ddb79bcSC_LvnmFlX-T5iTgaR0SKg xen/arch/x86/boot/boot.S
+3ddb79bcSC_LvnmFlX-T5iTgaR0SKg xen/arch/x86/boot/x86_32.S
+40e42bdbNu4MjI750THP_8J1S-Sa0g xen/arch/x86/boot/x86_64.S
 3ddb79bcUrk2EIaM5VsT6wUudH1kkg xen/arch/x86/delay.c
 3e32af9aRnYGl4GMOaDKp7JdfhOGhg xen/arch/x86/domain_page.c
 3ddb79bcecupHj56ZbTa3B0FxDowMg xen/arch/x86/entry.S

@@ -15,9 +15,9 @@ LOAD_BASE := 0x00100000 # Xen is loaded here
 # segment offsets from LINK_BASE-relative to LOAD_BASE-relative.
 # (NB. Linux gets round this by turning its image into raw binary, then 
 # wrapping that with a low-memory bootstrapper.)
-default: boot/boot.o $(OBJS)
+default: boot/$(TARGET_SUBARCH).o $(OBJS)
 	$(LD) -r -o arch.o $(OBJS)
-	$(LD) $(LDFLAGS) boot/boot.o $(ALL_OBJS) -o $(TARGET)-syms
+	$(LD) $(LDFLAGS) boot/$(TARGET_SUBARCH).o $(ALL_OBJS) -o $(TARGET)-syms
 	objcopy -R .note -R .comment -S $(TARGET)-syms $(TARGET)
 	$(BASEDIR)/tools/elf-reloc $(LINK_BASE) $(LOAD_BASE) $(TARGET)
 
