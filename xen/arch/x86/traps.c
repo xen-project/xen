@@ -359,10 +359,11 @@ asmlinkage void do_page_fault(struct pt_regs *regs, long error_code)
 
     if ( likely(VM_ASSIST(d, VMASST_TYPE_writable_pagetables)) )
     {
-        if ( unlikely((addr >> L2_PAGETABLE_SHIFT) ==
-                      ptwr_info[cpu].disconnected_pteidx ))
+        if ( unlikely(ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l1va &&
+                      (addr >> L2_PAGETABLE_SHIFT) ==
+                      ptwr_info[cpu].active_pteidx ))
         {
-            ptwr_reconnect_disconnected();
+            ptwr_flush(PTWR_PT_ACTIVE);
             return;
         }
 

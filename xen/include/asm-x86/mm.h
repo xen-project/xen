@@ -250,35 +250,37 @@ extern vm_assist_info_t vm_assist_info[];
 
 /* Writable Pagetables */
 typedef struct {
-    unsigned long disconnected_l1va;
-    l1_pgentry_t *disconnected_page;
-    long disconnected_pteidx;
-    unsigned long disconnected_pte;
-    l1_pgentry_t *disconnected_pl1e;
-    unsigned long writable_l1va;
-    l1_pgentry_t *writable_page;
-    unsigned long writable_pte;
-    l1_pgentry_t *writable_pl1e;
+    unsigned long l1va;
+    l1_pgentry_t *page;
+    unsigned long pte;
+    l1_pgentry_t *pl1e;
+} ptwr_ptinfo_t;
+
+typedef struct {
+    ptwr_ptinfo_t ptinfo[2];
+    long active_pteidx;
 } __cacheline_aligned ptwr_info_t;
 
 extern ptwr_info_t ptwr_info[];
 
-#define PTWR_CLEANUP_ACTIVE	1
-#define PTWR_CLEANUP_INACTIVE	2
+#define PTWR_PT_ACTIVE 0
+#define PTWR_PT_INACTIVE 1
 
-void ptwr_reconnect_disconnected(void);
-void ptwr_flush_inactive(void);
+#define PTWR_CLEANUP_ACTIVE 1
+#define PTWR_CLEANUP_INACTIVE 2
+
+void ptwr_flush(const int);
 int ptwr_do_page_fault(unsigned long);
 
 #define __cleanup_writable_pagetable(_what)                                 \
 do {                                                                        \
     int cpu = smp_processor_id();                                           \
     if ((_what) & PTWR_CLEANUP_ACTIVE)                                      \
-        if (ptwr_info[cpu].disconnected_pteidx >= 0)                        \
-            ptwr_reconnect_disconnected();                                  \
+        if (ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l1va)                     \
+            ptwr_flush(PTWR_PT_ACTIVE);                                     \
     if ((_what) & PTWR_CLEANUP_INACTIVE)                                    \
-        if (ptwr_info[cpu].writable_l1va)                                   \
-            ptwr_flush_inactive();                                          \
+        if (ptwr_info[cpu].ptinfo[PTWR_PT_INACTIVE].l1va)                   \
+            ptwr_flush(PTWR_PT_INACTIVE);                                   \
 } while ( 0 )
 
 #define cleanup_writable_pagetable(_d, _w)                                \
