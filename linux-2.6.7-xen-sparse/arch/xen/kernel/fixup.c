@@ -409,6 +409,22 @@ asmlinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
     *(unsigned long *)&patch[1] = 
         (fixup_buf_user + fe->fixup_idx) - (eip + 5);
 
+    /*
+     * Check that the page to be patched is part of a read-only VMA. This 
+     * means that our patch will never erroneously get flushed to disc.
+     */
+    if ( eip < PAGE_OFFSET ) /* don't need to check the fixmap area */
+    {
+        /* [SMP] Need to the mmap_sem semaphore. */
+        struct vm_area_struct *vma = find_vma(current->mm, eip);
+        if ( (vma == NULL) || (vma->vm_flags & VM_MAYSHARE) )
+        {
+            DPRINTK("Cannot patch a shareable VMA.");
+            return;
+        }
+    }
+
+    /* [SMP] Need to pause other threads while patching. */
     pgd = pgd_offset(current->mm, eip);
     pmd = pmd_offset(pgd, eip);
     pte = pte_offset_kernel(pmd, eip);
