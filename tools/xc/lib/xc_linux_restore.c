@@ -10,6 +10,8 @@
 #include <asm-xen/suspend.h>
 #include <zlib.h>
 
+#define MAX_BATCH_SIZE 1024
+
 /* This may allow us to create a 'quiet' command-line option, if necessary. */
 #define verbose_printf(_f, _a...) \
     do {                          \
@@ -92,6 +94,9 @@ int xc_linux_restore(int xc_handle,
 
     /* A temporary mapping of the guest's suspend record. */
     suspend_record_t *p_srec;
+
+    mfn_mapper_t *region_mapper, *mapper_handle1;
+    char *region_base;
 
     /* The name and descriptor of the file that we are reading from. */
     int    fd;
@@ -215,6 +220,15 @@ int xc_linux_restore(int xc_handle,
         goto out;
     }
 
+
+    if ( (region_mapper = mfn_mapper_init(xc_handle, dom,
+					  MAX_BATCH_SIZE*PAGE_SIZE, 
+					  PROT_WRITE )) 
+	 == NULL )
+        goto out;
+
+    region_base = mfn_mapper_base( region_mapper );
+
     verbose_printf("Reloading memory pages:   0%%");
 
     /*
@@ -242,7 +256,7 @@ int xc_linux_restore(int xc_handle,
             goto out;
         }
 
-	printf("batch=%d\n",j);
+	//printf("batch=%d\n",j);
 	
 	if(j==0) break;  // our work here is done
 	
@@ -254,6 +268,24 @@ int xc_linux_restore(int xc_handle,
 
 	for(i=0;i<j;i++)
 	{
+	    pfn = region_pfn_type[i] & ~PGT_type_mask;
+	    mfn = pfn_to_mfn_table[pfn];
+	    
+	    mfn_mapper_queue_entry( region_mapper, i<<PAGE_SHIFT, 
+				    mfn, PAGE_SIZE );
+	}
+
+	if( mfn_mapper_flush_queue(region_mapper) )
+	{
+	    ERROR("Couldn't map page region");
+	    goto out;
+	}
+
+
+	for(i=0;i<j;i++)
+	{
+	    unsigned long *ppage;
+
 	    pfn = region_pfn_type[i] & ~PGT_type_mask;
 	    	  	    
 //if(pfn_type[i])printf("^pfn=%d %08lx\n",pfn,pfn_type[i]);
@@ -270,9 +302,9 @@ int xc_linux_restore(int xc_handle,
 
 	    mfn = pfn_to_mfn_table[pfn];
 
-if(region_pfn_type[i])printf("i=%d pfn=%d mfn=%d type=%lx\n",i,pfn,mfn,region_pfn_type[i]);
+//if(region_pfn_type[i])printf("i=%d pfn=%d mfn=%d type=%lx\n",i,pfn,mfn,region_pfn_type[i]);
 
-	    ppage = map_pfn_writeable(pm_handle, mfn);
+            ppage = (unsigned long*) (region_base + i*PAGE_SIZE);
 
 	    if ( !checked_read(gfd, ppage, PAGE_SIZE) )
 	    {
@@ -327,15 +359,17 @@ if(region_pfn_type[i])printf("i=%d pfn=%d mfn=%d type=%lx\n",i,pfn,mfn,region_pf
 		}
 	    }
 
-	    unmap_pfn(pm_handle, ppage);
-
 	    if ( add_mmu_update(xc_handle, mmu,
 				(mfn<<PAGE_SHIFT) | MMU_MACHPHYS_UPDATE, pfn) )
 		goto out;
 
 	}
 
+	n+=j; // crude stats
+
     }
+
+    mfn_mapper_close( region_mapper );
 
     /*
      * Pin page tables. Do this after writing to them as otherwise Xen
@@ -409,20 +443,39 @@ if(region_pfn_type[i])printf("i=%d pfn=%d mfn=%d type=%lx\n",i,pfn,mfn,region_pf
     ctxt.pt_base = pfn_to_mfn_table[pfn] << PAGE_SHIFT;
 
     /* Uncanonicalise the pfn-to-mfn table frame-number list. */
-    for ( i = 0; i < nr_pfns; i += 1024 )
+
+
+    if ( (mapper_handle1 = mfn_mapper_init(xc_handle, dom,
+					   1024*1024, PROT_WRITE )) 
+	 == NULL )
+        goto out;
+	
+    for ( i = 0; i < (nr_pfns+1023)/1024; i++ )
     {
-        unsigned long copy_size = (nr_pfns - i) * sizeof(unsigned long);
-        if ( copy_size > PAGE_SIZE ) copy_size = PAGE_SIZE;
-        pfn = pfn_to_mfn_frame_list[i/1024];
+	unsigned long pfn, mfn;
+
+        pfn = pfn_to_mfn_frame_list[i];
         if ( (pfn >= nr_pfns) || (pfn_type[pfn] != NONE) )
         {
             ERROR("PFN-to-MFN frame number is bad");
             goto out;
         }
-        ppage = map_pfn_writeable(pm_handle, pfn_to_mfn_table[pfn]);
-        memcpy(ppage, &pfn_to_mfn_table[i], copy_size);        
-        unmap_pfn(pm_handle, ppage);
+	mfn = pfn_to_mfn_table[pfn];
+
+	mfn_mapper_queue_entry( mapper_handle1, i<<PAGE_SHIFT, 
+				mfn, PAGE_SIZE );
     }
+    
+    if ( mfn_mapper_flush_queue(mapper_handle1) )
+    {
+        ERROR("Couldn't map pfn_to_mfn table");
+        goto out;
+    }
+
+    memcpy( mfn_mapper_base( mapper_handle1 ), pfn_to_mfn_table, 
+	    nr_pfns*sizeof(unsigned long) );
+
+    mfn_mapper_close( mapper_handle1 );
 
     /*
      * Safety checking of saved context:
