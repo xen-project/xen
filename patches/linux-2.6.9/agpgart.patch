@@ -1,5 +1,6 @@
---- linux-2.6.8.1/drivers/char/agp/ali-agp.c	2004-08-14 11:55:35.000000000 +0100
-+++ linux-2.6.8.1-xen0/drivers/char/agp/ali-agp.c	2004-09-05 05:55:58.876495340 +0100
+diff -ur linux-2.6.9/drivers/char/agp/ali-agp.c linux-2.6.9-new/drivers/char/agp/ali-agp.c
+--- linux-2.6.9/drivers/char/agp/ali-agp.c	2004-10-18 22:54:38.000000000 +0100
++++ linux-2.6.9-new/drivers/char/agp/ali-agp.c	2004-11-28 19:32:03.000000000 +0000
 @@ -150,7 +150,7 @@
  	pci_read_config_dword(agp_bridge->dev, ALI_CACHE_FLUSH_CTRL, &temp);
  	pci_write_config_dword(agp_bridge->dev, ALI_CACHE_FLUSH_CTRL,
@@ -18,8 +19,9 @@
  	agp_generic_destroy_page(addr);
  }
  
---- linux-2.6.8.1/drivers/char/agp/amd-k7-agp.c	2004-08-14 11:56:24.000000000 +0100
-+++ linux-2.6.8.1-xen0/drivers/char/agp/amd-k7-agp.c	2004-09-05 05:55:58.877495108 +0100
+diff -ur linux-2.6.9/drivers/char/agp/amd-k7-agp.c linux-2.6.9-new/drivers/char/agp/amd-k7-agp.c
+--- linux-2.6.9/drivers/char/agp/amd-k7-agp.c	2004-10-18 22:55:36.000000000 +0100
++++ linux-2.6.9-new/drivers/char/agp/amd-k7-agp.c	2004-11-28 19:36:39.000000000 +0000
 @@ -43,7 +43,7 @@
  
  	SetPageReserved(virt_to_page(page_map->real));
@@ -32,23 +34,24 @@
 @@ -152,7 +152,7 @@
  
  	agp_bridge->gatt_table_real = (u32 *)page_dir.real;
- 	agp_bridge->gatt_table = (u32 *)page_dir.remapped;
+ 	agp_bridge->gatt_table = (u32 __iomem *)page_dir.remapped;
 -	agp_bridge->gatt_bus_addr = virt_to_phys(page_dir.real);
 +	agp_bridge->gatt_bus_addr = virt_to_bus(page_dir.real);
  
  	/* Get the address for the gart region.
  	 * This is a bus address even on the alpha, b/c its
-@@ -166,7 +166,7 @@
+@@ -165,7 +165,7 @@
+ 
  	/* Calculate the agp offset */
  	for (i = 0; i < value->num_entries / 1024; i++, addr += 0x00400000) {
- 		page_dir.remapped[GET_PAGE_DIR_OFF(addr)] =
--			virt_to_phys(amd_irongate_private.gatt_pages[i]->real);
-+			virt_to_bus(amd_irongate_private.gatt_pages[i]->real);
- 		page_dir.remapped[GET_PAGE_DIR_OFF(addr)] |= 0x00000001;
+-		writel(virt_to_phys(amd_irongate_private.gatt_pages[i]->real) | 1,
++		writel(virt_to_bus(amd_irongate_private.gatt_pages[i]->real) | 1,
+ 			page_dir.remapped+GET_PAGE_DIR_OFF(addr));
  	}
  
---- linux-2.6.8.1/drivers/char/agp/amd64-agp.c	2004-08-14 11:55:47.000000000 +0100
-+++ linux-2.6.8.1-xen0/drivers/char/agp/amd64-agp.c	2004-09-05 05:55:58.877495108 +0100
+diff -ur linux-2.6.9/drivers/char/agp/amd64-agp.c linux-2.6.9-new/drivers/char/agp/amd64-agp.c
+--- linux-2.6.9/drivers/char/agp/amd64-agp.c	2004-10-18 22:54:38.000000000 +0100
++++ linux-2.6.9-new/drivers/char/agp/amd64-agp.c	2004-11-28 19:32:03.000000000 +0000
 @@ -212,7 +212,7 @@
  
  static int amd_8151_configure(void)
@@ -67,8 +70,9 @@
  			   amd64_aperture_sizes[bridge->aperture_size_idx].size);
  	agp_remove_bridge(bridge);
  	agp_put_bridge(bridge);
---- linux-2.6.8.1/drivers/char/agp/ati-agp.c	2004-08-14 11:55:48.000000000 +0100
-+++ linux-2.6.8.1-xen0/drivers/char/agp/ati-agp.c	2004-09-05 05:55:58.877495108 +0100
+diff -ur linux-2.6.9/drivers/char/agp/ati-agp.c linux-2.6.9-new/drivers/char/agp/ati-agp.c
+--- linux-2.6.9/drivers/char/agp/ati-agp.c	2004-10-18 22:54:40.000000000 +0100
++++ linux-2.6.9-new/drivers/char/agp/ati-agp.c	2004-11-28 19:32:03.000000000 +0000
 @@ -64,7 +64,7 @@
  
  	/* CACHE_FLUSH(); */
@@ -78,8 +82,9 @@
  					    PAGE_SIZE);
  	if (page_map->remapped == NULL || err) {
  		ClearPageReserved(virt_to_page(page_map->real));
---- linux-2.6.8.1/drivers/char/agp/backend.c	2004-08-14 11:55:47.000000000 +0100
-+++ linux-2.6.8.1-xen0/drivers/char/agp/backend.c	2004-09-05 05:55:58.878494876 +0100
+diff -ur linux-2.6.9/drivers/char/agp/backend.c linux-2.6.9-new/drivers/char/agp/backend.c
+--- linux-2.6.9/drivers/char/agp/backend.c	2004-10-18 22:54:39.000000000 +0100
++++ linux-2.6.9-new/drivers/char/agp/backend.c	2004-11-28 19:32:03.000000000 +0000
 @@ -142,7 +142,7 @@
  			return -ENOMEM;
  		}
@@ -107,9 +112,22 @@
  }
  
  static const drm_agp_t drm_agp = {
---- linux-2.6.8.1/drivers/char/agp/generic.c	2004-08-14 11:55:10.000000000 +0100
-+++ linux-2.6.8.1-xen0/drivers/char/agp/generic.c	2004-09-05 05:55:58.879494644 +0100
-@@ -127,7 +127,7 @@
+diff -ur linux-2.6.9/drivers/char/agp/efficeon-agp.c linux-2.6.9-new/drivers/char/agp/efficeon-agp.c
+--- linux-2.6.9/drivers/char/agp/efficeon-agp.c	2004-10-18 22:53:06.000000000 +0100
++++ linux-2.6.9-new/drivers/char/agp/efficeon-agp.c	2004-11-28 19:38:28.000000000 +0000
+@@ -219,7 +219,7 @@
+ 
+ 		efficeon_private.l1_table[index] = page;
+ 
+-		value = __pa(page) | pati | present | index;
++		value = virt_to_bus(page) | pati | present | index;
+ 
+ 		pci_write_config_dword(agp_bridge->dev,
+ 			EFFICEON_ATTPAGE, value);
+diff -ur linux-2.6.9/drivers/char/agp/generic.c linux-2.6.9-new/drivers/char/agp/generic.c
+--- linux-2.6.9/drivers/char/agp/generic.c	2004-10-18 22:53:50.000000000 +0100
++++ linux-2.6.9-new/drivers/char/agp/generic.c	2004-11-28 19:32:03.000000000 +0000
+@@ -128,7 +128,7 @@
  	}
  	if (curr->page_count != 0) {
  		for (i = 0; i < curr->page_count; i++) {
@@ -118,7 +136,7 @@
  		}
  	}
  	agp_free_key(curr->key);
-@@ -181,7 +181,7 @@
+@@ -182,7 +182,7 @@
  			return NULL;
  		}
  		new->memory[i] =
@@ -127,7 +145,7 @@
  		new->page_count++;
  	}
  
-@@ -636,6 +636,7 @@
+@@ -637,6 +637,7 @@
  	int i;
  	void *temp;
  	struct page *page;
@@ -135,7 +153,7 @@
  
  	/* The generic routines can't handle 2 level gatt's */
  	if (agp_bridge->driver->size_type == LVL2_APER_SIZE)
-@@ -674,8 +675,10 @@
+@@ -675,8 +676,10 @@
  				break;
  			}
  
@@ -148,7 +166,7 @@
  
  			if (table == NULL) {
  				i++;
-@@ -706,7 +709,9 @@
+@@ -707,7 +710,9 @@
  		size = ((struct aper_size_info_fixed *) temp)->size;
  		page_order = ((struct aper_size_info_fixed *) temp)->page_order;
  		num_entries = ((struct aper_size_info_fixed *) temp)->num_entries;
@@ -159,7 +177,7 @@
  	}
  
  	if (table == NULL)
-@@ -721,7 +726,7 @@
+@@ -722,7 +727,7 @@
  	agp_gatt_table = (void *)table;
  
  	agp_bridge->driver->cache_flush();
@@ -168,7 +186,7 @@
  					(PAGE_SIZE * (1 << page_order)));
  	agp_bridge->driver->cache_flush();
  
-@@ -729,11 +734,12 @@
+@@ -730,11 +735,12 @@
  		for (page = virt_to_page(table); page <= virt_to_page(table_end); page++)
  			ClearPageReserved(page);
  
@@ -183,7 +201,7 @@
  
  	/* AK: bogus, should encode addresses > 4GB */
  	for (i = 0; i < num_entries; i++)
-@@ -785,7 +791,8 @@
+@@ -786,7 +792,8 @@
  	for (page = virt_to_page(table); page <= virt_to_page(table_end); page++)
  		ClearPageReserved(page);
  
@@ -193,8 +211,9 @@
  
  	agp_gatt_table = NULL;
  	agp_bridge->gatt_table = NULL;
---- linux-2.6.8.1/drivers/char/agp/hp-agp.c	2004-08-14 11:55:59.000000000 +0100
-+++ linux-2.6.8.1-xen0/drivers/char/agp/hp-agp.c	2004-09-05 05:55:58.879494644 +0100
+diff -ur linux-2.6.9/drivers/char/agp/hp-agp.c linux-2.6.9-new/drivers/char/agp/hp-agp.c
+--- linux-2.6.9/drivers/char/agp/hp-agp.c	2004-10-18 22:54:55.000000000 +0100
++++ linux-2.6.9-new/drivers/char/agp/hp-agp.c	2004-11-28 19:32:03.000000000 +0000
 @@ -110,7 +110,7 @@
  	hp->gart_size = HP_ZX1_GART_SIZE;
  	hp->gatt_entries = hp->gart_size / hp->io_page_size;
@@ -213,8 +232,9 @@
  		OUTREG64(hp->ioc_regs, HP_ZX1_TCNFG, hp->io_tlb_ps);
  		OUTREG64(hp->ioc_regs, HP_ZX1_IMASK, ~(HP_ZX1_IOVA_SIZE - 1));
  		OUTREG64(hp->ioc_regs, HP_ZX1_IBASE, hp->iova_base | 0x1);
---- linux-2.6.8.1/drivers/char/agp/i460-agp.c	2004-08-14 11:55:34.000000000 +0100
-+++ linux-2.6.8.1-xen0/drivers/char/agp/i460-agp.c	2004-09-05 05:55:58.879494644 +0100
+diff -ur linux-2.6.9/drivers/char/agp/i460-agp.c linux-2.6.9-new/drivers/char/agp/i460-agp.c
+--- linux-2.6.9/drivers/char/agp/i460-agp.c	2004-10-18 22:54:32.000000000 +0100
++++ linux-2.6.9-new/drivers/char/agp/i460-agp.c	2004-11-28 19:32:03.000000000 +0000
 @@ -371,7 +371,7 @@
  	}
  	memset(lp->alloced_map, 0, map_size);
@@ -233,8 +253,9 @@
  	atomic_sub(I460_KPAGES_PER_IOPAGE, &agp_bridge->current_memory_agp);
  }
  
---- linux-2.6.8.1/drivers/char/agp/intel-agp.c	2004-08-14 11:55:32.000000000 +0100
-+++ linux-2.6.8.1-xen0/drivers/char/agp/intel-agp.c	2004-09-05 05:55:58.880494412 +0100
+diff -ur linux-2.6.9/drivers/char/agp/intel-agp.c linux-2.6.9-new/drivers/char/agp/intel-agp.c
+--- linux-2.6.9/drivers/char/agp/intel-agp.c	2004-10-18 22:54:08.000000000 +0100
++++ linux-2.6.9-new/drivers/char/agp/intel-agp.c	2004-11-28 19:37:22.000000000 +0000
 @@ -285,7 +285,7 @@
  	if (new == NULL)
  		return NULL;
@@ -251,14 +272,15 @@
 -			i8xx_destroy_pages(phys_to_virt(curr->memory[0]));
 +			i8xx_destroy_pages(bus_to_virt(curr->memory[0]));
  		else
- 	   		agp_bridge->driver->agp_destroy_page(
+ 			agp_bridge->driver->agp_destroy_page(
 -				 phys_to_virt(curr->memory[0]));
 +				 bus_to_virt(curr->memory[0]));
  		vfree(curr->memory);
  	}
  	kfree(curr);
---- linux-2.6.8.1/drivers/char/agp/intel-mch-agp.c	2004-08-14 11:54:49.000000000 +0100
-+++ linux-2.6.8.1-xen0/drivers/char/agp/intel-mch-agp.c	2004-09-05 05:55:58.880494412 +0100
+diff -ur linux-2.6.9/drivers/char/agp/intel-mch-agp.c linux-2.6.9-new/drivers/char/agp/intel-mch-agp.c
+--- linux-2.6.9/drivers/char/agp/intel-mch-agp.c	2004-10-18 22:53:13.000000000 +0100
++++ linux-2.6.9-new/drivers/char/agp/intel-mch-agp.c	2004-11-28 19:32:03.000000000 +0000
 @@ -51,7 +51,7 @@
  	if (new == NULL)
  		return NULL;
@@ -277,8 +299,9 @@
  		vfree(curr->memory);
  	}
  	kfree(curr);
---- linux-2.6.8.1/drivers/char/agp/sworks-agp.c	2004-08-14 11:55:10.000000000 +0100
-+++ linux-2.6.8.1-xen0/drivers/char/agp/sworks-agp.c	2004-09-05 05:55:58.881494180 +0100
+diff -ur linux-2.6.9/drivers/char/agp/sworks-agp.c linux-2.6.9-new/drivers/char/agp/sworks-agp.c
+--- linux-2.6.9/drivers/char/agp/sworks-agp.c	2004-10-18 22:53:50.000000000 +0100
++++ linux-2.6.9-new/drivers/char/agp/sworks-agp.c	2004-11-28 19:38:02.000000000 +0000
 @@ -51,7 +51,7 @@
  	}
  	SetPageReserved(virt_to_page(page_map->real));
@@ -288,35 +311,36 @@
  					    PAGE_SIZE);
  	if (page_map->remapped == NULL) {
  		ClearPageReserved(virt_to_page(page_map->real));
-@@ -164,7 +164,7 @@
+@@ -162,7 +162,7 @@
+ 	/* Create a fake scratch directory */
  	for(i = 0; i < 1024; i++) {
- 		serverworks_private.scratch_dir.remapped[i] = (unsigned long) agp_bridge->scratch_page;
- 		page_dir.remapped[i] =
--			virt_to_phys(serverworks_private.scratch_dir.real);
-+			virt_to_bus(serverworks_private.scratch_dir.real);
- 		page_dir.remapped[i] |= 0x00000001;
+ 		writel(agp_bridge->scratch_page, serverworks_private.scratch_dir.remapped+i);
+-		writel(virt_to_phys(serverworks_private.scratch_dir.real) | 1, page_dir.remapped+i);
++		writel(virt_to_bus(serverworks_private.scratch_dir.real) | 1, page_dir.remapped+i);
  	}
  
-@@ -177,7 +177,7 @@
+ 	retval = serverworks_create_gatt_pages(value->num_entries / 1024);
+@@ -174,7 +174,7 @@
  
  	agp_bridge->gatt_table_real = (u32 *)page_dir.real;
- 	agp_bridge->gatt_table = (u32 *)page_dir.remapped;
+ 	agp_bridge->gatt_table = (u32 __iomem *)page_dir.remapped;
 -	agp_bridge->gatt_bus_addr = virt_to_phys(page_dir.real);
 +	agp_bridge->gatt_bus_addr = virt_to_bus(page_dir.real);
  
  	/* Get the address for the gart region.
  	 * This is a bus address even on the alpha, b/c its
-@@ -191,7 +191,7 @@
+@@ -187,7 +187,7 @@
+ 	/* Calculate the agp offset */	
  
- 	for(i = 0; i < value->num_entries / 1024; i++) {
- 		page_dir.remapped[i] =
--			virt_to_phys(serverworks_private.gatt_pages[i]->real);
-+			virt_to_bus(serverworks_private.gatt_pages[i]->real);
- 		page_dir.remapped[i] |= 0x00000001;
- 	}
+ 	for(i = 0; i < value->num_entries / 1024; i++)
+-		writel(virt_to_phys(serverworks_private.gatt_pages[i]->real)|1, page_dir.remapped+i);
++		writel(virt_to_bus(serverworks_private.gatt_pages[i]->real)|1, page_dir.remapped+i);
  
---- linux-2.6.8.1/drivers/char/agp/uninorth-agp.c	2004-08-14 11:55:32.000000000 +0100
-+++ linux-2.6.8.1-xen0/drivers/char/agp/uninorth-agp.c	2004-09-05 05:55:58.881494180 +0100
+ 	return 0;
+ }
+diff -ur linux-2.6.9/drivers/char/agp/uninorth-agp.c linux-2.6.9-new/drivers/char/agp/uninorth-agp.c
+--- linux-2.6.9/drivers/char/agp/uninorth-agp.c	2004-10-18 22:54:29.000000000 +0100
++++ linux-2.6.9-new/drivers/char/agp/uninorth-agp.c	2004-11-28 19:32:03.000000000 +0000
 @@ -200,7 +200,7 @@
  
  	agp_bridge->gatt_table_real = (u32 *) table;
@@ -326,8 +350,9 @@
  
  	for (i = 0; i < num_entries; i++) {
  		agp_bridge->gatt_table[i] =
---- linux-2.6.8.1/include/asm-i386/agp.h	2004-08-14 11:54:47.000000000 +0100
-+++ linux-2.6.8.1-xen0/include/asm-i386/agp.h	2004-09-05 05:57:26.040268956 +0100
+diff -ur linux-2.6.9/include/asm-i386/agp.h linux-2.6.9-new/include/asm-i386/agp.h
+--- linux-2.6.9/include/asm-i386/agp.h	2004-10-18 22:53:06.000000000 +0100
++++ linux-2.6.9-new/include/asm-i386/agp.h	2004-11-28 19:32:03.000000000 +0000
 @@ -3,6 +3,7 @@
  
  #include <asm/pgtable.h>
