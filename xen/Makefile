@@ -1,3 +1,7 @@
+# Default is to install to local 'dist' directory.
+DISTDIR ?= ../dist
+DESTDIR ?= $(DISTDIR)/install
+
 INSTALL			= install
 INSTALL_DATA		= $(INSTALL) -m0644
 INSTALL_DIR		= $(INSTALL) -d -m0755
@@ -19,6 +23,9 @@ $(TARGET).gz: $(TARGET)
 
 debug:	
 	objdump -D -S $(TARGET)-syms > $(TARGET).s
+
+dist:
+	$(MAKE) install
 
 install: $(TARGET).gz
 	[ -d $(DESTDIR)/boot ] || $(INSTALL_DIR) $(DESTDIR)/boot
