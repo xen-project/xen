@@ -7,7 +7,6 @@ PS2PDF		:= ps2pdf
 DVIPS		:= dvips
 LATEX		:= latex
 FIG2DEV		:= fig2dev
-TGIF		:= tgif
 LATEX2HTML	:= latex2html
 
 pkgdocdir	:= /usr/share/doc/xen
@@ -17,8 +16,7 @@ DOC_PS		:= $(patsubst src/%.tex,ps/%.ps,$(DOC_TEX))
 DOC_PDF		:= $(patsubst src/%.tex,pdf/%.pdf,$(DOC_TEX))
 DOC_HTML	:= $(patsubst src/%.tex,html/%/index.html,$(DOC_TEX))
 
-GFX  = $(patsubst %.obj, %.eps, $(wildcard figs/*.obj))
-GFX += $(patsubst %.fig, %.eps, $(wildcard figs/*.fig))
+GFX = $(patsubst %.fig, %.eps, $(wildcard figs/*.fig))
 
 all: ps pdf html
 	rm -f *.aux *.dvi *.bbl *.blg *.glo *.idx *.ilg *.log *.ind *.toc
@@ -57,9 +55,6 @@ ps/%.ps: %.dvi
 
 %.eps: %.fig
 	$(FIG2DEV) -L eps $< $@
-
-%.eps: %.obj
-	$(TGIF) -print -color -eps $<
 
 html/%/index.html: src/%.tex
 	$(INSTALL_DIR) $(@D)
