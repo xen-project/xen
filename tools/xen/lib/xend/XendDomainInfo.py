@@ -17,7 +17,7 @@ import os
 from twisted.internet import defer
 
 import xen.ext.xc; xc = xen.ext.xc.new()
-import xenctl.ip
+import xen.util.ip
 
 import sxp
 
@@ -167,14 +167,14 @@ def vif_up(iplist):
         print >> open(IP_NONLOCAL_BIND, 'w'), str(v)
 
     def link_local(ip):
-        return xenctl.ip.check_subnet(ip, '169.254.0.0', '255.255.0.0')
+        return xen.util.ip.check_subnet(ip, '169.254.0.0', '255.255.0.0')
 
     def arping(ip, gw):
         cmd = '/usr/sbin/arping -A -b -I eth0 -c 1 -s %s %s' % (ip, gw)
         print cmd
         os.system(cmd)
         
-    gateway = xenctl.ip.get_current_ipgw() or '255.255.255.255'
+    gateway = xen.util.ip.get_current_ipgw() or '255.255.255.255'
     nlb = get_ip_nonlocal_bind()
     if not nlb: set_ip_nonlocal_bind(1)
     try:
@@ -272,22 +272,23 @@ def vm_recreate(config, info):
         d.callback(vm)
     return d
 
-def vm_restore(src, config, progress=0):
+def vm_restore(src, progress=0):
     """Restore a VM from a disk image.
 
     src      saved state to restore
-    config   configuration
     progress progress reporting flag
     returns  deferred
     raises   VmError for invalid configuration
     """
     vm = XendDomainInfo()
-    vm.config = config
-    ostype = "linux" #todo set from config
+    ostype = "linux" #todo Set from somewhere (store in the src?).
     restorefn = getattr(xc, "%s_restore" % ostype)
-    dom = restorefn(state_file=src, progress=progress)
+    d = restorefn(state_file=src, progress=progress)
+    dom = int(d['dom'])
     if dom < 0:
         raise VMError('restore failed')
+    vmconfig = sxp.from_string(d['vmconfig'])
+    vm.config = sxp.child_value(vmconfig, 'config')
     deferred = vm.dom_configure(dom)
     def vifs_cb(val, vm):
         vif_up(vm.ipaddrs)
@@ -855,9 +856,7 @@ def vm_field_vfr(vm, config, val, index):
         if not ip:
             raise VmError('vfr: missing ip address')
         ipaddrs.append(ip);
-        #Don't do this in new i/o model.
-        #print 'vm_field_vfr> add rule', 'dom=', vm.dom, 'vif=', vif, 'ip=', ip
-        #xenctl.ip.setup_vfr_rules_for_vif(vm.dom, vif, ip)
+        # todo: Configure the ipaddrs.
     vm.ipaddrs = ipaddrs
 
 def vnet_bridge(vnet, vmac, dom, idx):

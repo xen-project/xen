@@ -4,6 +4,7 @@ CFLAGS     = -Wall -O3
 EXTRA_INC  = -I../../xen/include/hypervisor-ifs
 EXTRA_INC += -I../../linux-xen-sparse/include -I../xc/lib
 EXTRA_INC += -I../xu/lib
+EXTRA_INC += -I../lib
 
 HDRS     = $(wildcard *.h)
 SRCS     = $(wildcard *.c)

@@ -75,18 +75,9 @@ int xc_shadow_control(int xc_handle,
 #define XCFLAGS_LIVE    2
 #define XCFLAGS_DEBUG   4
 
-int xc_linux_save(int xc_handle,
-                  u32 domid, 
-                  unsigned int flags,
-                  int (*writerfn)(void *, const void *, size_t),
-                  void *writerst);
-
-int xc_linux_restore(int xc_handle,
-                     u32 domid,
-                     unsigned int flags,
-                     int (*readerfn)(void *, void *, size_t),
-                     void *readerst,
-                     u32 *pdomid);
+struct XcIOContext;
+int xc_linux_save(int xc_handle, struct XcIOContext *ioctxt);
+int xc_linux_restore(int xc_handle, struct XcIOContext *ioctxt);
 
 int xc_linux_build(int xc_handle,
                    u32 domid,

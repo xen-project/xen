@@ -16,6 +16,7 @@ import sys
 import types
 import errno
 import string
+from StringIO import StringIO
 
 __all__ = [
     "mime_type", 
@@ -520,6 +521,28 @@ def elements(sxpr, ctxt=None):
             for v in elements(n, (i, sxpr, ctxt)):
                 yield v
         i += 1
+
+def to_string(sxpr):
+    """Convert an sxpr to a string.
+
+    sxpr sxpr
+    returns string
+    """
+    io = StringIO()
+    show(sxpr, io)
+    io.seek(0)
+    val = io.getvalue()
+    io.close()
+    return val
+
+def from_string(str):
+    """Create an sxpr by parsing a string.
+
+    str string
+    returns sxpr
+    """
+    io = StringIO(str)
+    return parse(io)
 
 def parse(io):
     """Completely parse all input from 'io'.
