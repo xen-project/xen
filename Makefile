@@ -58,7 +58,7 @@ tools:
 	$(MAKE) prefix=$(INSTALL_DIR) dist=yes -C tools install
 
 kernels:
-	for i in $(XKERNELS) ; do $(MAKE) $$i-build ; done
+	for i in $(XKERNELS) ; do $(MAKE) $$i-build || exit 1; done
 
 docs:
 	sh ./docs/check_pkgs && \
@@ -77,7 +77,7 @@ kclean:
 
 # Make patches from kernel sparse trees
 mkpatches:
-	for i in $(ALLSPARSETREES) ; do $(MAKE) $$i-xen.patch ; done
+	for i in $(ALLSPARSETREES) ; do $(MAKE) $$i-xen.patch || exit 1; done
 
 
 # build xen, the tools, and a domain 0 plus unprivileged linux-xen images,
