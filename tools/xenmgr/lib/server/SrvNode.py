@@ -45,15 +45,10 @@ class SrvNode(SrvDir):
             self.print_path(req)
             req.write('<ul>')
             for d in self.info():
-                req.write('<li> %10s: %s' % (d[0], d[1]))
+                req.write('<li> %10s: %s' % (d[0], str(d[1])))
             req.write('</ul>')
             req.write('</body></html>')
         return ''
             
     def info(self):
-        (sys, host, rel, ver, mch) = os.uname()
-        return [['system',  sys],
-                ['host',    host],
-                ['release', rel],
-                ['version', ver],
-                ['machine', mch]]
+        return self.xn.info()

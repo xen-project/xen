@@ -17,7 +17,6 @@ class SrvRoot(SrvDir):
         ('domain',  'SrvDomainDir'  ),
         ('console', 'SrvConsoleDir' ),
         ('event',   'SrvEventDir'   ),
-        ('vdisk',   'SrvVdiskDir'   ),
         ('device',  'SrvDeviceDir'  ),
         ('vnet',    'SrvVnetDir'    ),
         ]

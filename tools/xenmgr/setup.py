@@ -9,6 +9,6 @@ setup(name            = PACKAGE,
       description     = 'Xen Management API',
       author          = 'Mike Wray',
       author_email    = 'mike.wray@hp.com',
-      packages        = [ PACKAGE, PACKAGE + '.server' ],
+      packages        = [ PACKAGE, PACKAGE + '.server', PACKAGE + '.xm' ],
       package_dir     = { PACKAGE: 'lib' },
       )

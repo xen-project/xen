@@ -8,6 +8,7 @@ import os
 import os.path
 import signal
 
+from xenmgr import sxp
 from xenmgr.XendClient import server
 
 # usage: xc_dom_control [command] <params>
@@ -131,13 +132,13 @@ elif cmd == 'list':
     for dom in server.xend_domains():
         info = server.xend_domain(dom)
         d = {}
-        d['dom'] = dom
-        d['name'] = sxp.get_child_value(info, 'name', '??')
-        d['mem'] = int(sxp.get_child_value(info, 'memory', '0'))
-        d['cpu'] = int(sxp.get_child_value(info, 'cpu', '0'))
-        d['state'] = sxp.get_child_value(info, 'state', '??')
-        d['cpu_time'] = sxp.get_child_value(info, 'cpu_time', '0')
-        print ("%(dom)-4d %(name)-16s %(mem)7d %(cpu)3d %(state)5s %(cpu_time)8d"
+        d['dom'] = int(dom)
+        d['name'] = sxp.child_value(info, 'name', '??')
+        d['mem'] = int(sxp.child_value(info, 'memory', '0'))
+        d['cpu'] = int(sxp.child_value(info, 'cpu', '0'))
+        d['state'] = sxp.child_value(info, 'state', '??')
+        d['cpu_time'] = float(sxp.child_value(info, 'cpu_time', '0')
+        print ("%(dom)-4d %(name)-16s %(mem)7d %(cpu)3d %(state)5s %(cpu_time)8.2f"
                % d)
 
 elif cmd == 'unwatch':
