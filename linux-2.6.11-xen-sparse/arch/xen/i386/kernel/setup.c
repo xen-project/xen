@@ -1491,15 +1491,26 @@ void __init setup_arch(char **cmdline_p)
 #endif
 	paging_init();
 
-	/* Make sure we have a large enough P->M table. */
-	if (max_pfn > xen_start_info.nr_pages) {
+	/* Make sure we have a correctly sized P->M table. */
+	if (max_pfn != xen_start_info.nr_pages) {
 		phys_to_machine_mapping = alloc_bootmem_low_pages(
 			max_pfn * sizeof(unsigned long));
-		memset(phys_to_machine_mapping, ~0,
-			max_pfn * sizeof(unsigned long));
-		memcpy(phys_to_machine_mapping,
-			(unsigned long *)xen_start_info.mfn_list,
-			xen_start_info.nr_pages * sizeof(unsigned long));
+		if (max_pfn > xen_start_info.nr_pages) {
+			memset(phys_to_machine_mapping, ~0,
+				max_pfn * sizeof(unsigned long));
+			memcpy(phys_to_machine_mapping,
+				(unsigned long *)xen_start_info.mfn_list,
+				xen_start_info.nr_pages * sizeof(unsigned long));
+		} else {
+			memcpy(phys_to_machine_mapping,
+				(unsigned long *)xen_start_info.mfn_list,
+				max_pfn * sizeof(unsigned long));
+			if (HYPERVISOR_dom_mem_op(
+				MEMOP_decrease_reservation,
+				(unsigned long *)xen_start_info.mfn_list + max_pfn,
+				xen_start_info.nr_pages - max_pfn, 0) !=
+			    (xen_start_info.nr_pages - max_pfn)) BUG();
+		}
 		free_bootmem(
 			__pa(xen_start_info.mfn_list), 
 			PFN_PHYS(PFN_UP(xen_start_info.nr_pages *
