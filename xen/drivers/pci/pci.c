@@ -930,27 +930,10 @@ pci_clear_mwi(struct pci_dev *dev)
 	}
 }
 
-int
-pci_set_dma_mask(struct pci_dev *dev, u64 mask)
-{
-	if (!pci_dma_supported(dev, mask))
-		return -EIO;
-
-	dev->dma_mask = mask;
-
-	return 0;
-}
-    
-int
-pci_dac_set_dma_mask(struct pci_dev *dev, u64 mask)
-{
-	if (!pci_dac_dma_supported(dev, mask))
-		return -EIO;
-
-	dev->dma_mask = mask;
-
-	return 0;
-}
+#if 0 /* NOT IN XEN */
+int pci_set_dma_mask(struct pci_dev *dev, u64 mask)
+int pci_dac_set_dma_mask(struct pci_dev *dev, u64 mask)
+#endif
     
 /*
  * Translate the low bits of the PCI base

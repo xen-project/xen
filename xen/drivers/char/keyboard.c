@@ -6,8 +6,8 @@
  * This file contains portions of code from Linux.
  */
 
-#include <asm-i386/io.h>
-#include <asm-i386/irq.h>
+#include <asm/io.h>
+#include <asm/irq.h>
 #include <xen/sched.h>
 #include <xen/keyhandler.h>  
 #include <hypervisor-ifs/kbd.h>

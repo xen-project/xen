@@ -8,7 +8,7 @@
  * Copyright (c) 2003-2004, K A Fraser
  */
 
-#include <asm-i386/io.h>
+#include <asm/io.h>
 #include <xen/sched.h>
 #include <xen/keyhandler.h> 
 #include <xen/reboot.h>

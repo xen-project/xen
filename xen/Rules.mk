@@ -4,8 +4,14 @@ debugger    ?= n
 perfc       ?= n
 trace       ?= n
 
-COMPILE_ARCH := $(shell uname -m | sed -e s/i.86/i386/)
-TARGET_ARCH  ?= $(COMPILE_ARCH)
+# Currently supported architectures:
+#  {COMPILE,TARGET}_ARCH    := x86
+#  {COMPILE,TARGET}_SUBARCH := x86_32 | x86_64
+COMPILE_ARCH    := x86
+COMPILE_SUBARCH := $(shell uname -m | sed -e s/i.86/x86_32/)
+
+TARGET_ARCH     ?= $(COMPILE_ARCH)
+TARGET_SUBARCH  ?= $(COMPILE_SUBARCH)
 
 TARGET  := $(BASEDIR)/xen
 HDRS    := $(wildcard $(BASEDIR)/include/xen/*.h)

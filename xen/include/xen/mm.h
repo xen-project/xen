@@ -9,7 +9,6 @@
 #include <xen/sched.h>
 
 #include <asm/processor.h>
-#include <asm/pgalloc.h>
 #include <asm/atomic.h>
 #include <asm/desc.h>
 #include <asm/flushtlb.h>
