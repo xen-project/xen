@@ -9,11 +9,6 @@
 #ifndef __XEN_PUBLIC_XEN_H__
 #define __XEN_PUBLIC_XEN_H__
 
-#ifndef PACKED
-/* GCC-specific way to pack structure definitions (no implicit padding). */
-#define PACKED __attribute__ ((packed))
-#endif
-
 #if defined(__i386__)
 #include "arch-x86_32.h"
 #elif defined(__x86_64__)
@@ -180,6 +175,16 @@
 #define SCHEDOP_shutdown        2   /* Stop executing this domain.        */
 #define SCHEDOP_cmdmask       255   /* 8-bit command. */
 #define SCHEDOP_reasonshift     8   /* 8-bit reason code. (SCHEDOP_shutdown) */
+
+/*
+ * Reason codes for SCHEDOP_shutdown. These may be interpreted by control 
+ * software to determine the appropriate action. For the most part, Xen does
+ * not care about the shutdown code (SHUTDOWN_crash excepted).
+ */
+#define SHUTDOWN_poweroff   0  /* Domain exited normally. Clean up and kill. */
+#define SHUTDOWN_reboot     1  /* Clean up, kill, and then restart.          */
+#define SHUTDOWN_suspend    2  /* Clean up, save suspend info, kill.         */
+#define SHUTDOWN_crash      3  /* Tell controller we've crashed.             */
 
 /*
  * Commands to HYPERVISOR_console_io().

@@ -368,8 +368,8 @@ int varp_send(u16 opcode, struct net_device *dev, struct sk_buff *skbin,
     // Varp header.
     varph = (void*)skb_put(skbout, varp_n);
     *varph = (VarpHdr){};
-    varph->id                = htons(VARP_ID);
-    varph->opcode            = htons(opcode);
+    varph->hdr.id            = htons(VARP_ID);
+    varph->hdr.opcode        = htons(opcode);
     varph->vnet              = htonl(vnet);
     varph->vmac              = *vmac;
     varph->addr              = saddr;
@@ -1076,9 +1076,9 @@ int varp_handle_message(struct sk_buff *skb){
         goto exit;
     }
     mine = 1;
-    if(varph->id != htons(VARP_ID)){
+    if(varph->hdr.id != htons(VARP_ID)){
         // It's not varp at all - ignore it.
-        wprintf("> Unknown id: %d \n", ntohs(varph->id));
+        wprintf("> Unknown id: %d \n", ntohs(varph->hdr.id));
         goto exit;
     }
     if(1){
@@ -1086,13 +1086,13 @@ int varp_handle_message(struct sk_buff *skb){
                 NIPQUAD(skb->nh.iph->saddr), NIPQUAD(skb->nh.iph->daddr));
         dprintf("> sport=%u dport=%u\n", ntohs(skb->h.uh->source), ntohs(skb->h.uh->dest));
         dprintf("> opcode=%d vnet=%u vmac=" MACFMT " addr=" IPFMT "\n",
-                ntohs(varph->opcode),
+                ntohs(varph->hdr.opcode),
                 ntohl(varph->vnet),
                 MAC6TUPLE(varph->vmac.mac),
                 NIPQUAD(varph->addr));
         varp_dprint();
     }
-    switch(ntohs(varph->opcode)){
+    switch(ntohs(varph->hdr.opcode)){
     case VARP_OP_REQUEST:
         err = varp_handle_request(skb, varph);
         break;
@@ -1100,7 +1100,7 @@ int varp_handle_message(struct sk_buff *skb){
         err = varp_handle_announce(skb, varph);
         break;
     default:
-        wprintf("> Unknown opcode: %d \n", ntohs(varph->opcode));
+        wprintf("> Unknown opcode: %d \n", ntohs(varph->hdr.opcode));
        break;
     }
   exit:

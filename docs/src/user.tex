@@ -229,7 +229,7 @@ tree.
 \item [$*$] Development installation of libcurl (e.g., libcurl-devel) 
 \item [$*$] Development installation of zlib (e.g., zlib-dev).
 \item [$*$] Development installation of Python v2.2 or later (e.g., python-dev).
-\item [$*$] \LaTeX, transfig and tgif are required to build the documentation.
+\item [$*$] \LaTeX and transfig are required to build the documentation.
 \end{itemize}
 
 Once you have satisfied the relevant prerequisites, you can 
@@ -1770,7 +1770,7 @@ editing \path{grub.conf}.
  possibilities are `bvt' (default), `atropos' and `rrobin'. 
  For more information see Section~\ref{s:sched}. 
 
-\item [pci\_dom0\_hide=(xx.xx.x)(yy.yy.y)\ldots ] 
+\item [physdev\_dom0\_hide=(xx:xx.x)(yy:yy.y)\ldots ]
 Hide selected PCI devices from domain 0 (for instance, to stop it
 taking ownership of them so that they can be driven by another
 domain).  Device IDs should be given in hex format.  Bridge devices do
@@ -1850,23 +1850,23 @@ documentation (including the lateset version of the FAQ).
 
 \section{Mailing Lists}
 
-There are currently three official Xen mailing lists:
+There are currently four official Xen mailing lists:
 
 \begin{description}
-\item[xen-devel@lists.sourceforge.net] Used for development
+\item[xen-devel@lists.xensource.com] Used for development
+discussions and bug reports.  Subscribe at: \\
+{\small {\tt http://lists.xensource.com/xen-devel}}
+\item[xen-users@lists.xensource.com] Used for installation and usage
 discussions and requests for help.  Subscribe at: \\
-\path{http://lists.sourceforge.net/mailman/listinfo/xen-devel}
-\item[xen-announce@lists.sourceforge.net] Used for announcements only.
+{\small {\tt http://lists.xensource.com/xen-users}}
+\item[xen-announce@lists.xensource.com] Used for announcements only.
 Subscribe at: \\
-\path{http://lists.sourceforge.net/mailman/listinfo/xen-announce}
-\item[xen-changelog@lists.sourceforge.net]  Changelog feed
+{\small {\tt http://lists.xensource.com/xen-announce}}
+\item[xen-changelog@lists.xensource.com]  Changelog feed
 from the unstable and 2.0 trees - developer oriented.  Subscribe at: \\
-\path{http://lists.sourceforge.net/mailman/listinfo/xen-changelog}
+{\small {\tt http://lists.xensource.com/xen-changelog}}
 \end{description}
 
-Although there is no specific user support list, the developers try to
-assist users who post on xen-devel.  As the bulk of traffic on this
-list increases, a dedicated user support list may be introduced.
 
 \appendix
 

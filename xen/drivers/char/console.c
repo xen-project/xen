@@ -18,6 +18,7 @@
 #include <xen/serial.h>
 #include <xen/keyhandler.h>
 #include <asm/uaccess.h>
+#include <asm/mm.h>
 
 /* opt_console: comma-separated list of console outputs. */
 static unsigned char opt_console[30] = "com1,vga";
@@ -31,7 +32,7 @@ static unsigned char opt_conswitch[5] = "a";
 string_param("conswitch", opt_conswitch);
 
 static int xpos, ypos;
-static unsigned char *video = __va(0xB8000);
+static unsigned char *video;
 
 #define CONSOLE_RING_SIZE 16392
 typedef struct console_ring_st
@@ -136,6 +137,8 @@ static void init_vga(void)
         vgacon_enabled = 0;
         return;
     }
+
+    video = __va(0xB8000);
 
     tmp = inb(0x3da);
     outb(0x00, 0x3c0);
@@ -503,6 +506,7 @@ void panic(const char *fmt, ...)
     __putstr("Reboot in five seconds...\n");
     spin_unlock_irqrestore(&console_lock, flags);
 
+    watchdog_on = 0;
     mdelay(5000);
     machine_restart(0);
 }

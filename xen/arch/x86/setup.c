@@ -452,10 +452,7 @@ static void __init start_of_day(void)
     smp_threads_ready = 1;
     smp_commence(); /* Tell other CPUs that state of the world is stable. */
     while ( wait_init_idle != 0 )
-    {
         cpu_relax();
-        barrier();
-    }
 #endif
 
     watchdog_on = 1;

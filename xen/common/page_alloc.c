@@ -28,6 +28,7 @@
 #include <xen/spinlock.h>
 #include <xen/slab.h>
 #include <xen/irq.h>
+#include <xen/softirq.h>
 #include <asm/domain_page.h>
 
 /*
@@ -39,6 +40,9 @@ string_param("badpage", opt_badpage);
 
 #define round_pgdown(_p)  ((_p)&PAGE_MASK)
 #define round_pgup(_p)    (((_p)+(PAGE_SIZE-1))&PAGE_MASK)
+
+static spinlock_t page_scrub_lock;
+struct list_head page_scrub_list;
 
 /*********************
  * ALLOCATION BITMAP
@@ -176,7 +180,7 @@ unsigned long alloc_boot_pages(unsigned long size, unsigned long align)
     size  = round_pgup(size) >> PAGE_SHIFT;
     align = round_pgup(align) >> PAGE_SHIFT;
 
-    for ( pg = 0; (pg + size) < (bitmap_size*PAGES_PER_MAPWORD); pg += align )
+    for ( pg = 0; (pg + size) < (bitmap_size*8); pg += align )
     {
         for ( i = 0; i < size; i++ )
             if ( allocated_in_map(pg + i) )
@@ -203,10 +207,8 @@ unsigned long alloc_boot_pages(unsigned long size, unsigned long align)
 #define NR_ZONES    2
 
 /* Up to 2^10 pages can be allocated at once. */
-#define MIN_ORDER  0
 #define MAX_ORDER 10
-#define NR_ORDERS (MAX_ORDER - MIN_ORDER + 1)
-static struct list_head heap[NR_ZONES][NR_ORDERS];
+static struct list_head heap[NR_ZONES][MAX_ORDER+1];
 
 static unsigned long avail[NR_ZONES];
 
@@ -220,7 +222,7 @@ void end_boot_allocator(void)
     memset(avail, 0, sizeof(avail));
 
     for ( i = 0; i < NR_ZONES; i++ )
-        for ( j = 0; j < NR_ORDERS; j++ )
+        for ( j = 0; j <= MAX_ORDER; j++ )
             INIT_LIST_HEAD(&heap[i][j]);
 
     /* Pages that are free now go to the domain sub-allocator. */
@@ -236,9 +238,12 @@ void end_boot_allocator(void)
 }
 
 /* Hand the specified arbitrary page range to the specified heap zone. */
-void init_heap_pages(int zone, struct pfn_info *pg, unsigned long nr_pages)
+void init_heap_pages(
+    unsigned int zone, struct pfn_info *pg, unsigned long nr_pages)
 {
     unsigned long i;
+
+    ASSERT(zone < NR_ZONES);
 
     for ( i = 0; i < nr_pages; i++ )
         free_heap_pages(zone, pg+i, 0);
@@ -246,24 +251,28 @@ void init_heap_pages(int zone, struct pfn_info *pg, unsigned long nr_pages)
 
 
 /* Allocate 2^@order contiguous pages. */
-struct pfn_info *alloc_heap_pages(int zone, int order)
+struct pfn_info *alloc_heap_pages(unsigned int zone, unsigned int order)
 {
     int i;
     struct pfn_info *pg;
 
-    if ( unlikely(order < MIN_ORDER) || unlikely(order > MAX_ORDER) )
+    ASSERT(zone < NR_ZONES);
+
+    if ( unlikely(order > MAX_ORDER) )
         return NULL;
 
     spin_lock(&heap_lock);
 
     /* Find smallest order which can satisfy the request. */
-    for ( i = order; i < NR_ORDERS; i++ )
+    for ( i = order; i <= MAX_ORDER; i++ )
 	if ( !list_empty(&heap[zone][i]) )
-	    break;
+	    goto found;
 
-    if ( i == NR_ORDERS ) 
-        goto no_memory;
- 
+    /* No suitable memory blocks. Fail the request. */
+    spin_unlock(&heap_lock);
+    return NULL;
+
+ found: 
     pg = list_entry(heap[zone][i].next, struct pfn_info, list);
     list_del(&pg->list);
 
@@ -281,17 +290,17 @@ struct pfn_info *alloc_heap_pages(int zone, int order)
     spin_unlock(&heap_lock);
 
     return pg;
-
- no_memory:
-    spin_unlock(&heap_lock);
-    return NULL;
 }
 
 
 /* Free 2^@order set of pages. */
-void free_heap_pages(int zone, struct pfn_info *pg, int order)
+void free_heap_pages(
+    unsigned int zone, struct pfn_info *pg, unsigned int order)
 {
     unsigned long mask;
+
+    ASSERT(zone < NR_ZONES);
+    ASSERT(order <= MAX_ORDER);
 
     spin_lock(&heap_lock);
 
@@ -387,13 +396,20 @@ void init_xenheap_pages(unsigned long ps, unsigned long pe)
 
     memguard_guard_range(__va(ps), pe - ps);
 
+    /*
+     * Yuk! Ensure there is a one-page buffer between Xen and Dom zones, to
+     * prevent merging of power-of-two blocks across the zone boundary.
+     */
+    if ( !IS_XEN_HEAP_FRAME(phys_to_page(pe)) )
+        pe -= PAGE_SIZE;
+
     local_irq_save(flags);
     init_heap_pages(MEMZONE_XEN, phys_to_page(ps), (pe - ps) >> PAGE_SHIFT);
     local_irq_restore(flags);
 }
 
 
-unsigned long alloc_xenheap_pages(int order)
+unsigned long alloc_xenheap_pages(unsigned int order)
 {
     unsigned long flags;
     struct pfn_info *pg;
@@ -431,7 +447,7 @@ unsigned long alloc_xenheap_pages(int order)
 }
 
 
-void free_xenheap_pages(unsigned long p, int order)
+void free_xenheap_pages(unsigned long p, unsigned int order)
 {
     unsigned long flags;
 
@@ -459,7 +475,7 @@ void init_domheap_pages(unsigned long ps, unsigned long pe)
 }
 
 
-struct pfn_info *alloc_domheap_pages(struct domain *d, int order)
+struct pfn_info *alloc_domheap_pages(struct domain *d, unsigned int order)
 {
     struct pfn_info *pg;
     unsigned long mask, flushed_mask, pfn_stamp, cpu_stamp;
@@ -535,11 +551,10 @@ struct pfn_info *alloc_domheap_pages(struct domain *d, int order)
 }
 
 
-void free_domheap_pages(struct pfn_info *pg, int order)
+void free_domheap_pages(struct pfn_info *pg, unsigned int order)
 {
     int            i, drop_dom_ref;
     struct domain *d = pg->u.inuse.domain;
-    void          *p;
 
     ASSERT(!in_irq());
 
@@ -567,18 +582,6 @@ void free_domheap_pages(struct pfn_info *pg, int order)
             pg[i].tlbflush_timestamp  = tlbflush_current_time();
             pg[i].u.free.cpu_mask     = 1 << d->processor;
             list_del(&pg[i].list);
-
-            /*
-             * Normally we expect a domain to clear pages before freeing them,
-             * if it cares about the secrecy of their contents. However, after
-             * a domain has died we assume responsibility for erasure.
-             */
-            if ( unlikely(test_bit(DF_DYING, &d->flags)) )
-            {
-                p = map_domain_mem(page_to_phys(&pg[i]));
-                clear_page(p);
-                unmap_domain_mem(p);
-            }
         }
 
         d->tot_pages -= 1 << order;
@@ -586,7 +589,24 @@ void free_domheap_pages(struct pfn_info *pg, int order)
 
         spin_unlock_recursive(&d->page_alloc_lock);
 
-        free_heap_pages(MEMZONE_DOM, pg, order);
+        if ( likely(!test_bit(DF_DYING, &d->flags)) )
+        {
+            free_heap_pages(MEMZONE_DOM, pg, order);
+        }
+        else
+        {
+            /*
+             * Normally we expect a domain to clear pages before freeing them,
+             * if it cares about the secrecy of their contents. However, after
+             * a domain has died we assume responsibility for erasure.
+             */
+            for ( i = 0; i < (1 << order); i++ )
+            {
+                spin_lock(&page_scrub_lock);
+                list_add(&pg[i].list, &page_scrub_list);
+                spin_unlock(&page_scrub_lock);
+            }
+        }
     }
     else
     {
@@ -604,3 +624,63 @@ unsigned long avail_domheap_pages(void)
 {
     return avail[MEMZONE_DOM];
 }
+
+
+
+/*************************
+ * PAGE SCRUBBING
+ */
+
+static void page_scrub_softirq(void)
+{
+    struct list_head *ent;
+    struct pfn_info  *pg;
+    void             *p;
+    int               i;
+    s_time_t          start = NOW();
+
+    /* Aim to do 1ms of work (ten percent of a 10ms jiffy). */
+    do {
+        spin_lock(&page_scrub_lock);
+
+        if ( unlikely((ent = page_scrub_list.next) == &page_scrub_list) )
+        {
+            spin_unlock(&page_scrub_lock);
+            return;
+        }
+        
+        /* Peel up to 16 pages from the list. */
+        for ( i = 0; i < 16; i++ )
+        {
+            if ( ent->next == &page_scrub_list )
+                break;
+            ent = ent->next;
+        }
+        
+        /* Remove peeled pages from the list. */
+        ent->next->prev = &page_scrub_list;
+        page_scrub_list.next = ent->next;
+        
+        spin_unlock(&page_scrub_lock);
+        
+        /* Working backwards, scrub each page in turn. */
+        while ( ent != &page_scrub_list )
+        {
+            pg = list_entry(ent, struct pfn_info, list);
+            ent = ent->prev;
+            p = map_domain_mem(page_to_phys(pg));
+            clear_page(p);
+            unmap_domain_mem(p);
+            free_heap_pages(MEMZONE_DOM, pg, 0);
+        }
+    } while ( (NOW() - start) < MILLISECS(1) );
+}
+
+static __init int page_scrub_init(void)
+{
+    spin_lock_init(&page_scrub_lock);
+    INIT_LIST_HEAD(&page_scrub_list);
+    open_softirq(PAGE_SCRUB_SOFTIRQ, page_scrub_softirq);
+    return 0;
+}
+__initcall(page_scrub_init);

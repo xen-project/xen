@@ -49,8 +49,7 @@
 #include "select.h"
 
 #define MODULE_NAME "XFRD"
-#define DEBUG 1
-#undef DEBUG
+
 #include "debug.h"
 
 /*
@@ -1008,6 +1007,8 @@ int xfrd_accept(Args *args, int sock){
     }
     iprintf("> Accepted connection from %s:%d on %d\n",
             inet_ntoa(peer_in.sin_addr), htons(peer_in.sin_port), sock);
+    fflush(stdout);
+    fflush(stderr);
     pid = fork();
     if(pid > 0){
         // Parent, fork succeeded.

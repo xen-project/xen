@@ -1,20 +1,34 @@
+#!/usr/bin/make -f
 
-DOC_TEX  := $(wildcard src/*.tex)
-DOC_PS   := $(patsubst src/%.tex,ps/%.ps,$(DOC_TEX))
-DOC_PDF  := $(patsubst src/%.tex,pdf/%.pdf,$(DOC_TEX))
-DOC_HTML := $(patsubst src/%.tex,html/%/index.html,$(DOC_TEX))
+INSTALL		= install
+INSTALL_DIR	= $(INSTALL) -d -m0755
 
-GFX  = $(patsubst %.obj, %.eps, $(wildcard figs/*.obj))
-GFX += $(patsubst %.fig, %.eps, $(wildcard figs/*.fig))
+PS2PDF		:= ps2pdf
+DVIPS		:= dvips
+LATEX		:= latex
+FIG2DEV		:= fig2dev
+LATEX2HTML	:= latex2html
 
-all: ps pdf html
+pkgdocdir	:= /usr/share/doc/xen
+
+DOC_TEX		:= $(wildcard src/*.tex)
+DOC_PS		:= $(patsubst src/%.tex,ps/%.ps,$(DOC_TEX))
+DOC_PDF		:= $(patsubst src/%.tex,pdf/%.pdf,$(DOC_TEX))
+DOC_HTML	:= $(patsubst src/%.tex,html/%/index.html,$(DOC_TEX))
+
+GFX = $(patsubst %.fig, %.eps, $(wildcard figs/*.fig))
+
+all: build
+build: ps pdf html
 	rm -f *.aux *.dvi *.bbl *.blg *.glo *.idx *.ilg *.log *.ind *.toc
 
 ps: $(DOC_PS)
 
 pdf: $(DOC_PDF)
 
-html: $(DOC_HTML)
+html:
+	@if which $(LATEX2HTML) 1>/dev/null 2>/dev/null; then \
+	$(MAKE) $(DOC_HTML); fi
 
 clean:
 	rm -rf .word_count *.aux *.dvi *.bbl *.blg *.glo *.idx *~ 
@@ -22,30 +36,31 @@ clean:
 	rm -rf $(GFX) ps pdf html
 
 install: all
-	rm -rf $(prefix)/usr/share/doc/xen
-	mkdir -p $(prefix)/usr/share/doc/xen
-	cp -dR ps $(prefix)/usr/share/doc/xen
-	cp -dR pdf $(prefix)/usr/share/doc/xen
-	cp -dR html $(prefix)/usr/share/doc/xen
+	rm -rf $(DESTDIR)$(pkgdocdir)
+	$(INSTALL_DIR) $(DESTDIR)$(pkgdocdir)
+	cp -dR ps $(DESTDIR)$(pkgdocdir)
+	cp -dR pdf $(DESTDIR)$(pkgdocdir)
+	[ ! -d html ] || cp -dR html $(DESTDIR)$(pkgdocdir)
 
 pdf/%.pdf: ps/%.ps
-	mkdir -p pdf ; ps2pdf $< $@
+	$(INSTALL_DIR) $(@D)
+	$(PS2PDF) $< $@.new
+	mv $@.new $@
 
 ps/%.ps: %.dvi
-	mkdir -p ps ; dvips -Ppdf -G0 -o $@ $<
+	$(INSTALL_DIR) $(@D)
+	$(DVIPS) -Ppdf -G0 -o $@.new $<
+	mv $@.new $@
 
 %.dvi: src/%.tex $(GFX)
-	latex $< >/dev/null
-	if [ -e $*.toc ] ; then latex $< >/dev/null ; fi
+	$(LATEX) $< >/dev/null
+	if [ -e $*.toc ] ; then $(LATEX) $< >/dev/null ; fi
 
 %.eps: %.fig
-	fig2dev -L eps $< $@
-
-%.eps: %.obj
-	tgif -print -color -eps $<
+	$(FIG2DEV) -L eps $< $@
 
 html/%/index.html: src/%.tex
-	mkdir -p html/$*
-	latex2html -split 0 -show_section_numbers -toc_depth 3 -nonavigation \
-	-numbered_footnotes -local_icons -noinfo -math -dir html/$* \
+	$(INSTALL_DIR) $(@D)
+	$(LATEX2HTML) -split 0 -show_section_numbers -toc_depth 3 -nonavigation \
+	-numbered_footnotes -local_icons -noinfo -math -dir $(@D) \
 	$< 1>/dev/null 2>/dev/null

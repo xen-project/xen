@@ -309,8 +309,33 @@ static void __init machine_specific_memory_setup(
     struct e820entry *raw, int raw_nr)
 {
     char nr = (char)raw_nr;
+    int i;
+
     sanitize_e820_map(raw, &nr);
+
     (void)copy_e820_map(raw, nr);
+
+#ifdef __i386__
+    /* 32-bit systems restricted to a 4GB physical memory map. */
+    for ( i = 0; i < e820.nr_map; i++ )
+    {
+        if ( (e820.map[i].addr + e820.map[i].size) <= 0x100000000ULL )
+            continue;
+        printk("WARNING: Only the first 4GB of the physical memory map "
+               "can be accessed\n"
+               "         by Xen in 32-bit mode. "
+               "Truncating the memory map...\n");
+        if ( e820.map[i].addr >= 0x100000000ULL )
+        {
+            e820.nr_map = i;
+        }
+        else
+        {
+            e820.map[i].size = 0x100000000ULL - e820.map[i].addr;
+            e820.nr_map = i + 1;                
+        }            
+    }
+#endif
 }
 
 unsigned long init_e820(struct e820entry *raw, int raw_nr)

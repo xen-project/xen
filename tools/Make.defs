@@ -1,4 +1,0 @@
-#  -*- mode: Makefile; -*-
-XEN_XC             = $(XEN_ROOT)/tools/python/xen/lowlevel/xc
-XEN_LIBXC          = $(XEN_ROOT)/tools/libxc
-XEN_LIBXUTIL       = $(XEN_ROOT)/tools/libxutil

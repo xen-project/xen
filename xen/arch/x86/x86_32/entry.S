@@ -57,6 +57,7 @@
 #include <xen/errno.h>
 #include <xen/softirq.h>
 #include <asm/asm_defns.h>
+#include <asm/apicdef.h>
 #include <public/xen.h>
 
 #define GET_CURRENT(reg)   \
@@ -111,7 +112,7 @@ DBLFLT1:GET_CURRENT(%ebx)
         jmp   test_all_events
 DBLFIX1:GET_CURRENT(%ebx)
         testb $TF_failsafe_return,DOMAIN_thread_flags(%ebx)
-        jnz   domain_crash             # cannot reenter failsafe code
+        jnz   domain_crash_synchronous # cannot reenter failsafe code
         orb   $TF_failsafe_return,DOMAIN_thread_flags(%ebx)
         jmp   test_all_events          # will return via failsafe code
 .previous
@@ -329,7 +330,7 @@ DBLFLT2:jmp   process_guest_exception_and_events
 	.long FLT23,FIX7 , FLT24,FIX7 , FLT25,FIX7 , FLT26,FIX7 , FLT27,FIX7
 .previous
 .section __ex_table,"a"
-        .long DBLFLT2,domain_crash
+        .long DBLFLT2,domain_crash_synchronous
 .previous
 
         ALIGN
@@ -378,7 +379,7 @@ exception_with_ints_disabled:
         testl $(3|X86_EFLAGS_VM),%eax   # interrupts disabled outside Xen?
         jnz   1b                        # it really does happen!
                                         #  (e.g., DOM0 X server)
-        pushl XREGS_eip(%esp)
+        pushl %esp
         call  search_pre_exception_table
         addl  $4,%esp
         testl %eax,%eax                 # no fixup code for faulting EIP?
@@ -497,10 +498,10 @@ ENTRY(nmi)
         jnz   do_watchdog_tick
         movl  %ds,%eax
         cmpw  $(__HYPERVISOR_DS),%ax
-        jne   restore_all_xen
+        jne   defer_nmi
         movl  %es,%eax
         cmpw  $(__HYPERVISOR_DS),%ax
-        jne   restore_all_xen
+        jne   defer_nmi
 
 do_watchdog_tick:
         movl  $(__HYPERVISOR_DS),%edx
@@ -517,6 +518,17 @@ do_watchdog_tick:
 	jz    restore_all_xen
         GET_CURRENT(%ebx)
         jmp   restore_all_guest
+
+defer_nmi:
+        movl  $FIXMAP_apic_base,%eax
+        # apic_wait_icr_idle()
+1:      movl  %ss:APIC_ICR(%eax),%ebx
+        testl $APIC_ICR_BUSY,%ebx
+        jnz   1b
+        # __send_IPI_shortcut(APIC_DEST_SELF, TRAP_deferred_nmi)
+        movl  $(APIC_DM_FIXED | APIC_DEST_SELF | APIC_DEST_LOGICAL | \
+                TRAP_deferred_nmi),%ss:APIC_ICR(%eax)
+        jmp   restore_all_xen
 
 nmi_parity_err:
         # Clear and disable the parity-error line
@@ -608,9 +620,9 @@ VFLT3:  movl %gs:(%esi),%eax
         jmp test_all_events
 
 .section __ex_table,"a"
-        .long VFLT1,domain_crash
-        .long VFLT2,domain_crash
-        .long VFLT3,domain_crash
+        .long VFLT1,domain_crash_synchronous
+        .long VFLT2,domain_crash_synchronous
+        .long VFLT3,domain_crash_synchronous
 .previous
 
 .data

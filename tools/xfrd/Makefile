@@ -4,8 +4,12 @@
 # Mike Wray <mike.wray@hp.com>
 #============================================================================
 
+INSTALL		= install
+INSTALL_PROG	= $(INSTALL) -m0755
+INSTALL_DIR	= $(INSTALL) -d -m0755
+
 XEN_ROOT  = ../..
-include $(XEN_ROOT)/tools/Make.defs
+include $(XEN_ROOT)/tools/Rules.mk
 
 XFRD_INSTALL_DIR = /usr/sbin
 
@@ -32,9 +36,7 @@ endif
 
 CC := gcc
 
-CFLAGS += -g
-CFLAGS += -Wall
-CFLAGS += -Werror
+CFLAGS += -Wall -Werror -O3 -fno-strict-aliasing
 CFLAGS += $(INCLUDES)
 # Make gcc generate dependencies.
 CFLAGS += -Wp,-MD,.$(@F).d
@@ -61,15 +63,17 @@ XFRD_LIBS += $(CURL_LIBS)
 
 #$(warning XFRD_LIBS = $(XFRD_LIBS))
 
-all: xfrd
+all: build
+build: xfrd
 
 xfrd: $(XFRD_PROG_OBJ)
 	$(CC) -o $@ $^ $(XFRD_LIBS)
 
 .PHONY: install
 install: xfrd
-	mkdir -p $(prefix)/$(XFRD_INSTALL_DIR)
-	install -m 0755 xfrd $(prefix)/$(XFRD_INSTALL_DIR)
+	[ -d $(DESTDIR)$(XFRD_INSTALL_DIR) ] || \
+		$(INSTALL_DIR) $(DESTDIR)$(XFRD_INSTALL_DIR)
+	$(INSTALL_PROG) xfrd $(DESTDIR)$(XFRD_INSTALL_DIR)
 
 .PHONY: libutil
 libutil: $(UTIL_LIB)

@@ -449,9 +449,9 @@ class XendDomainInfo:
 
             self.init_domain()
             self.configure_console()
+            self.configure_backends()
             self.construct_image()
             self.configure_restart()
-            self.configure_backends()
             deferred = self.configure()
             def cberr(err):
                 self.destroy()
@@ -1227,6 +1227,7 @@ add_config_handler('memory',     vm_field_ignore)
 add_config_handler('cpu',        vm_field_ignore)
 add_config_handler('cpu_weight', vm_field_ignore)
 add_config_handler('console',    vm_field_ignore)
+add_config_handler('restart',    vm_field_ignore)
 add_config_handler('image',      vm_field_ignore)
 add_config_handler('device',     vm_field_ignore)
 add_config_handler('backend',    vm_field_ignore)

@@ -14,7 +14,9 @@
  *  Copyright (C) 1991, 1992, 1995  Linus Torvalds
  */
 
+#include <xen/config.h>
 #include <xen/errno.h>
+#include <xen/event.h>
 #include <xen/sched.h>
 #include <xen/lib.h>
 #include <xen/config.h>
@@ -134,7 +136,7 @@ static unsigned long __init calibrate_tsc(void)
 
     diff = end - start;
 
-#if defined(_i386__)
+#if defined(__i386__)
     /* If quotient doesn't fit in 32 bits then we return error (zero). */
     if ( diff & ~0xffffffffULL )
         return 0;
@@ -274,12 +276,18 @@ s_time_t get_s_time(void)
 }
 
 
-void update_dom_time(shared_info_t *si)
+int update_dom_time(struct domain *d)
 {
+    shared_info_t *si = d->shared_info;
     unsigned long flags;
+
+    if ( d->last_propagated_timestamp == full_tsc_irq )
+        return 0;
 
     read_lock_irqsave(&time_lock, flags);
 
+    d->last_propagated_timestamp = full_tsc_irq;
+    
     si->time_version1++;
     wmb();
 
@@ -293,6 +301,8 @@ void update_dom_time(shared_info_t *si)
     si->time_version2++;
 
     read_unlock_irqrestore(&time_lock, flags);
+
+    return 1;
 }
 
 
@@ -318,7 +328,10 @@ void do_settime(unsigned long secs, unsigned long usecs, u64 system_time_base)
 
     write_unlock_irq(&time_lock);
 
-    update_dom_time(current->shared_info);
+    /* Others will pick up the change at the next tick. */
+    current->last_propagated_timestamp = 0; /* force propagation */
+    (void)update_dom_time(current);
+    send_guest_virq(current, VIRQ_TIMER);
 }
 
 

@@ -1,8 +1,8 @@
 
 # We expect these two to already be set if people 
 # are using the top-level Makefile
-DIST_DIR	?= $(shell pwd)/dist
-INSTALL_DIR	?= $(DIST_DIR)/install
+DISTDIR	?= $(CURDIR)/dist
+DESTDIR	?= $(DISTDIR)/install
 
 .PHONY:	mkpatches mrproper
 
@@ -27,7 +27,7 @@ linux-%.tar.bz2:
 # Expand NetBSD release to NetBSD version
 NETBSD_RELEASE  ?= 2.0
 NETBSD_VER      ?= $(patsubst netbsd-%-xen-sparse,%,$(wildcard netbsd-$(NETBSD_RELEASE)*-xen-sparse))
-NETBSD_CVSSNAP  ?= 20041103
+NETBSD_CVSSNAP  ?= 20050309
 
 # Setup NetBSD search path
 NETBSD_SRC_PATH	?= .:..

@@ -1,12 +1,16 @@
 
+INSTALL		= install
+INSTALL_PROG	= $(INSTALL) -m0755
+INSTALL_DATA	= $(INSTALL) -m0644
+INSTALL_DIR	= $(INSTALL) -d -m0755
+
 MAJOR    = 2.0
 MINOR    = 0
-SONAME   = libxc.so.$(MAJOR)
 
 CC       = gcc
 
 XEN_ROOT = ../..
-include $(XEN_ROOT)/tools/Make.defs
+include $(XEN_ROOT)/tools/Rules.mk
 
 vpath %c       $(XEN_LIBXUTIL)
 INCLUDES += -I $(XEN_LIBXUTIL)
@@ -36,11 +40,13 @@ CFLAGS   += $(INCLUDES) -I.
 CFLAGS   += -Wp,-MD,.$(@F).d
 DEPS     = .*.d
 
-OBJS     = $(patsubst %.c,%.o,$(SRCS))
+LIB_OBJS := $(patsubst %.c,%.o,$(SRCS))
+PIC_OBJS := $(patsubst %.c,%.opic,$(SRCS))
 
-LIB      = libxc.so libxc.so.$(MAJOR) libxc.so.$(MAJOR).$(MINOR)
+LIB      := libxc.a libxc.so libxc.so.$(MAJOR) libxc.so.$(MAJOR).$(MINOR)
 
-all: check-for-zlib mk-symlinks
+all: build
+build: check-for-zlib mk-symlinks
 	$(MAKE) $(LIB)
 
 check-for-zlib:
@@ -62,18 +68,19 @@ mk-symlinks:
 	( cd xen/linux >/dev/null ; \
 	  ln -sf ../../$(LINUX_ROOT)/include/asm-xen/linux-public/*.h . )
 
-install: all
-	mkdir -p $(prefix)/usr/lib
-	mkdir -p $(prefix)/usr/include
-	install -m0755 $(LIB) $(prefix)/usr/lib
-	ln -sf libxc.so.$(MAJOR).$(MINOR) $(prefix)/usr/lib/libxc.so.$(MAJOR)
-	ln -sf libxc.so.$(MAJOR) $(prefix)/usr/lib/libxc.so
-	install -m0644 xc.h $(prefix)/usr/include
+install: build
+	[ -d $(DESTDIR)/usr/lib ] || $(INSTALL_DIR) $(DESTDIR)/usr/lib
+	[ -d $(DESTDIR)/usr/include ] || $(INSTALL_DIR) $(DESTDIR)/usr/include
+	$(INSTALL_PROG) libxc.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/lib
+	$(INSTALL_DATA) libxc.a $(DESTDIR)/usr/lib
+	ln -sf libxc.so.$(MAJOR).$(MINOR) $(DESTDIR)/usr/lib/libxc.so.$(MAJOR)
+	ln -sf libxc.so.$(MAJOR) $(DESTDIR)/usr/lib/libxc.so
+	$(INSTALL_DATA) xc.h $(DESTDIR)/usr/include
 
 clean:
-	rm -rf *.a *.so *.o *.rpm $(LIB) *~ $(DEPS) xen
+	rm -rf *.a *.so* *.o *.opic *.rpm $(LIB) *~ $(DEPS) xen
 
-rpm: all
+rpm: build
 	rm -rf staging
 	mkdir staging
 	mkdir staging/i386
@@ -82,11 +89,15 @@ rpm: all
 	mv staging/i386/*.rpm .
 	rm -rf staging
 
-libxc.so:
-	ln -sf libxc.so.$(MAJOR) $@
-libxc.so.$(MAJOR):
-	ln -sf libxc.so.$(MAJOR).$(MINOR) $@
-libxc.so.$(MAJOR).$(MINOR): $(OBJS)
-	$(CC) -Wl,-soname -Wl,$(SONAME) -shared -o $@ $^ -L../libxutil -lxutil -lz
+libxc.a: $(OBJS)
+	$(AR) rc $@ $^
+
+libxc.so: libxc.so.$(MAJOR)
+	ln -sf $< $@
+libxc.so.$(MAJOR): libxc.so.$(MAJOR).$(MINOR)
+	ln -sf $< $@
+
+libxc.so.$(MAJOR).$(MINOR): $(PIC_OBJS)
+	$(CC) -Wl,-soname -Wl,libxc.so.$(MAJOR) -shared -o $@ $^ -L../libxutil -lxutil -lz
 
 -include $(DEPS)

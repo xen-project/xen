@@ -2,6 +2,11 @@
 
 """Xend root class.
 Creates the event server and handles configuration.
+
+Other classes get config variables by importing this module,
+using instance() to get a XendRoot instance, and then
+the config functions (e.g. get_xend_port()) to get
+configured values.
 """
 
 import os
@@ -20,7 +25,7 @@ class XendRoot:
     """Root of the management classes."""
 
     """Default path to the root of the database."""
-    dbroot_default = "/var/xen/xend-db"
+    dbroot_default = "/var/lib/xen/xend-db"
 
     """Default path to the config file."""
     config_default = "/etc/xen/xend-config.sxp"
@@ -34,9 +39,25 @@ class XendRoot:
     """Where block control scripts live."""
     block_script_dir = "/etc/xen/scripts"
 
+    """Default path to the log file. """
     logfile_default = "/var/log/xend.log"
 
     loglevel_default = 'DEBUG'
+
+    """Default interface address xend listens at. """
+    xend_address_default      = ''
+
+    """Default port xend serves HTTP at. """
+    xend_port_default         = '8000'
+
+    """Default port xend serves events at. """
+    xend_event_port_default   = '8001'
+
+    """Default inteface address xend listens at for consoles."""
+    console_address_default   = ''
+
+    """Default port xend serves consoles at. """
+    console_port_base_default = '9600'
 
     components = {}
 
@@ -44,7 +65,7 @@ class XendRoot:
         self.dbroot = None
         self.config_path = None
         self.config = None
-        self.logger = None
+        self.logging = None
         self.configure()
         eserver.subscribe('xend.*', self.event_handler)
         #eserver.subscribe('xend.domain.created', self.event_handler)
@@ -73,9 +94,9 @@ class XendRoot:
 
     def _format(self, msg, args):
         if args:
-            return str(msg)
-        else:
             return str(msg) % args
+        else:
+            return str(msg)
 
     def _log(self, mode, fmt, args):
         """Logging function that uses the logger if it exists, otherwise
@@ -90,7 +111,7 @@ class XendRoot:
         if log:
             getattr(log, mode)(fmt, *args)
         else:
-            print >>stderr, "xend", "[%s]" % level, self._format(msg, args)
+            print >>sys.stderr, "xend", "[%s]" % level, self._format(fmt, args)
 
     def logDebug(self, fmt, *args):
         """Log a debug message.
@@ -132,7 +153,6 @@ class XendRoot:
         self.configure_logger()
         self.dbroot = self.get_config_value("dbroot", self.dbroot_default)
 
-
     def configure_logger(self):
         logfile = self.get_config_value("logfile", self.logfile_default)
         loglevel = self.get_config_value("loglevel", self.loglevel_default)
@@ -146,7 +166,7 @@ class XendRoot:
     def get_logger(self):
         """Get the logger.
         """
-        return self.logging.getLogger()
+        return self.logging and self.logging.getLogger()
 
     def get_dbroot(self):
         """Get the path to the database root.
@@ -160,14 +180,20 @@ class XendRoot:
         """
         self.config_path = os.getenv(self.config_var, self.config_default)
         if os.path.exists(self.config_path):
-            fin = file(self.config_path, 'rb')
+            #self.logInfo('Reading config file %s', self.config_path)
             try:
-                config = sxp.parse(fin)
+                fin = file(self.config_path, 'rb')
+                try:
+                    config = sxp.parse(fin)
+                finally:
+                    fin.close()
                 config.insert(0, 'xend-config')
                 self.config = config
-            finally:
-                fin.close()
+            except Exception, ex:
+                self.logError('Reading config file %s: %s', self.config_path, str(ex))
+                raise
         else:
+            self.logError('Config file does not exist: %s', self.config_path)
             self.config = ['xend-config']
 
     def get_config(self, name=None):
@@ -193,10 +219,35 @@ class XendRoot:
         return sxp.child_value(self.config, name, val=val)
 
     def get_xend_port(self):
-        return int(self.get_config_value('xend-port', '8000'))
+        """Get the port xend listens at for its HTTP interface.
+        """
+        return int(self.get_config_value('xend-port', self.xend_port_default))
+
+    def get_xend_event_port(self):
+        """Get the port xend listens at for connection to its event server.
+        """
+        return int(self.get_config_value('xend-event-port', self.xend_event_port_default))
 
     def get_xend_address(self):
-        return self.get_config_value('xend-address', '')
+        """Get the address xend listens at for its HTTP and event ports.
+        This defaults to the empty string which allows all hosts to connect.
+        If this is set to 'localhost' only the localhost will be able to connect
+        to the HTTP and event ports.
+        """
+        return self.get_config_value('xend-address', self.xend_address_default)
+
+    def get_console_address(self):
+        """Get the address xend listens at for its console ports.
+        This defaults to the empty string which allows all hosts to connect.
+        If this is set to 'localhost' only the localhost will be able to connect
+        to the console ports.
+        """
+        return self.get_config_value('console-address', self.console_address_default)
+
+    def get_console_port_base(self):
+        """Get the base port number used to generate console ports for domains.
+        """
+        return int(self.get_config_value('console-port-base', self.console_port_base_default))
 
     def get_block_script(self, type):
         return self.get_config_value('block-%s' % type, '')

@@ -187,7 +187,7 @@ static void rr_dump_domain(struct domain *d)
 
 static void rr_dump_cpu_state(int i)
 {
-    struct list_head *list, *queue;
+    struct list_head *queue;
     int loop = 0;
     struct rrobin_dom_info *d_inf;
 
@@ -199,10 +199,9 @@ static void rr_dump_cpu_state(int i)
     d_inf = list_entry(queue, struct rrobin_dom_info, run_list);
     rr_dump_domain(d_inf->domain);
  
-    list_for_each ( list, queue )
+    list_for_each_entry ( d_inf, queue, run_list )
     {
         printk("%3d: ",loop++);
-        d_inf = list_entry(list, struct rrobin_dom_info, run_list);
         rr_dump_domain(d_inf->domain);
     }
 }

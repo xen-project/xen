@@ -69,7 +69,10 @@ static __attribute_used__ void idle_loop(void)
     {
         irq_stat[cpu].idle_timestamp = jiffies;
         while ( !softirq_pending(cpu) )
+        {
+            page_scrub_schedule_work();
             default_idle();
+        }
         do_softirq();
     }
 }
@@ -79,7 +82,8 @@ void startup_cpu_idle_loop(void)
     /* Just some sanity to ensure that the scheduler is set up okay. */
     ASSERT(current->id == IDLE_DOMAIN_ID);
     domain_unpause_by_systemcontroller(current);
-    __enter_scheduler();
+    raise_softirq(SCHEDULE_SOFTIRQ);
+    do_softirq();
 
     /*
      * Declares CPU setup done to the boot processor.
@@ -194,6 +198,46 @@ void machine_halt(void)
 {
     smp_call_function(__machine_halt, NULL, 1, 1);
     __machine_halt(NULL);
+}
+
+void dump_pageframe_info(struct domain *d)
+{
+    struct pfn_info *page;
+
+    if ( d->tot_pages < 10 )
+    {
+        list_for_each_entry ( page, &d->page_list, list )
+        {
+            printk("Page %08x: caf=%08x, taf=%08x\n",
+                   page_to_phys(page), page->count_info,
+                   page->u.inuse.type_info);
+        }
+    }
+    
+    page = virt_to_page(d->shared_info);
+    printk("Shared_info@%08x: caf=%08x, taf=%08x\n",
+           page_to_phys(page), page->count_info,
+           page->u.inuse.type_info);
+}
+
+xmem_cache_t *domain_struct_cachep;
+void __init domain_startofday(void)
+{
+    domain_struct_cachep = xmem_cache_create(
+        "domain_cache", sizeof(struct domain),
+        0, SLAB_HWCACHE_ALIGN, NULL, NULL);
+    if ( domain_struct_cachep == NULL )
+        panic("No slab cache for domain structs.");
+}
+
+struct domain *arch_alloc_domain_struct(void)
+{
+    return xmem_cache_alloc(domain_struct_cachep);
+}
+
+void arch_free_domain_struct(struct domain *d)
+{
+    xmem_cache_free(domain_struct_cachep, d);
 }
 
 void free_perdomain_pt(struct domain *d)
@@ -538,8 +582,11 @@ void domain_relinquish_memory(struct domain *d)
 
     /* Drop the in-use reference to the page-table base. */
     if ( pagetable_val(d->mm.pagetable) != 0 )
+    {
         put_page_and_type(&frame_table[pagetable_val(d->mm.pagetable) >>
                                       PAGE_SHIFT]);
+	d->mm.pagetable = mk_pagetable(0);
+    }
 
     /*
      * Relinquish GDT mappings. No need for explicit unmapping of the LDT as 
@@ -620,6 +667,9 @@ int construct_dom0(struct domain *p,
     if ( rc != 0 )
         return rc;
 
+    if (dsi.load_bsd_symtab)
+        loadelfsymtab(image_start, 0, &dsi);
+
     /* Set up domain options */
     if ( dsi.use_writable_pagetables )
         vm_assist(p, VMASST_CMD_enable, VMASST_TYPE_writable_pagetables);
@@ -637,7 +687,7 @@ int construct_dom0(struct domain *p,
      * read-only). We have a pair of simultaneous equations in two unknowns, 
      * which we solve by exhaustive search.
      */
-    vinitrd_start    = round_pgup(dsi.v_kernend);
+    vinitrd_start    = round_pgup(dsi.v_end);
     vinitrd_end      = vinitrd_start + initrd_len;
     vphysmap_start   = round_pgup(vinitrd_end);
     vphysmap_end     = vphysmap_start + (nr_pages * sizeof(unsigned long));
@@ -721,6 +771,7 @@ int construct_dom0(struct domain *p,
     printk("done.\n");
 
     /* Construct a frame-allocation list for the initial domain. */
+    p->max_pages = ~0U;
     for ( mfn = (alloc_start>>PAGE_SHIFT); 
           mfn < (alloc_end>>PAGE_SHIFT); 
           mfn++ )
@@ -730,7 +781,7 @@ int construct_dom0(struct domain *p,
         page->u.inuse.type_info = 0;
         page->count_info        = PGC_allocated | 1;
         list_add_tail(&page->list, &p->page_list);
-        p->tot_pages++; p->max_pages++;
+        p->tot_pages++; 
     }
 
     mpt_alloc = (vpt_start - dsi.v_start) + alloc_start;
@@ -825,9 +876,6 @@ int construct_dom0(struct domain *p,
             l1start = l1tab = (l1_pgentry_t *)l2_pgentry_to_phys(*l2tab);
     }
 
-    /* Set up shared-info area. */
-    update_dom_time(p->shared_info);
-    p->shared_info->domain_time = 0;
     /* Mask all upcalls... */
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
         p->shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
@@ -838,6 +886,9 @@ int construct_dom0(struct domain *p,
 
     /* Copy the OS image. */
     (void)loadelfimage(image_start);
+
+    if (dsi.load_bsd_symtab)
+        loadelfsymtab(image_start, 1, &dsi);
 
     /* Copy the initial ramdisk. */
     if ( initrd_len != 0 )

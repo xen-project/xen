@@ -159,7 +159,7 @@ static inline u32 calc_evt(struct domain *d, u32 avt)
  *
  * Returns non-zero on failure.
  */
-int bvt_alloc_task(struct domain *d)
+static int bvt_alloc_task(struct domain *d)
 {
     if ( (d->sched_priv = xmem_cache_alloc(dom_info_cache)) == NULL )
         return -1;
@@ -170,7 +170,7 @@ int bvt_alloc_task(struct domain *d)
 /*
  * Add and remove a domain
  */
-void bvt_add_task(struct domain *d) 
+static void bvt_add_task(struct domain *d) 
 {
     struct bvt_dom_info *inf = BVT_INFO(d);
     ASSERT(inf != NULL);
@@ -206,7 +206,7 @@ void bvt_add_task(struct domain *d)
     }
 }
 
-int bvt_init_idle_task(struct domain *p)
+static int bvt_init_idle_task(struct domain *p)
 {
     if ( bvt_alloc_task(p) < 0 )
         return -1;
@@ -220,7 +220,7 @@ int bvt_init_idle_task(struct domain *p)
     return 0;
 }
 
-void bvt_wake(struct domain *d)
+static void bvt_wake(struct domain *d)
 {
     struct bvt_dom_info *inf = BVT_INFO(d);
     struct domain       *curr;
@@ -271,14 +271,14 @@ static void bvt_sleep(struct domain *d)
  * bvt_free_task - free BVT private structures for a task
  * @d:             task
  */
-void bvt_free_task(struct domain *d)
+static void bvt_free_task(struct domain *d)
 {
     ASSERT(d->sched_priv != NULL);
     xmem_cache_free(dom_info_cache, d->sched_priv);
 }
 
 /* Control the scheduler. */
-int bvt_ctl(struct sched_ctl_cmd *cmd)
+static int bvt_ctl(struct sched_ctl_cmd *cmd)
 {
     struct bvt_ctl *params = &cmd->u.bvt;
 
@@ -291,7 +291,7 @@ int bvt_ctl(struct sched_ctl_cmd *cmd)
 }
 
 /* Adjust scheduling parameter for a given domain. */
-int bvt_adjdom(
+static int bvt_adjdom(
     struct domain *d, struct sched_adjdom_cmd *cmd)
 {
     struct bvt_adjdom *params = &cmd->u.bvt;
@@ -348,7 +348,6 @@ int bvt_adjdom(
 static task_slice_t bvt_do_schedule(s_time_t now)
 {
     struct domain      *prev = current, *next = NULL, *next_prime, *p; 
-    struct list_head   *tmp;
     int                 cpu = prev->processor;
     s32                 r_time;     /* time for new dom to run */
     u32                 next_evt, next_prime_evt, min_avt;
@@ -392,10 +391,8 @@ static task_slice_t bvt_do_schedule(s_time_t now)
     next_prime_evt = ~0U;
     min_avt        = ~0U;
 
-    list_for_each ( tmp, RUNQUEUE(cpu) )
+    list_for_each_entry ( p_inf, RUNQUEUE(cpu), run_list )
     {
-        p_inf = list_entry(tmp, struct bvt_dom_info, run_list);
-
         if ( p_inf->evt < next_evt )
         {
             next_prime_inf  = next_inf;
@@ -505,7 +502,7 @@ static void bvt_dump_settings(void)
 
 static void bvt_dump_cpu_state(int i)
 {
-    struct list_head *list, *queue;
+    struct list_head *queue;
     int loop = 0;
     struct bvt_dom_info *d_inf;
     struct domain *d;
@@ -516,22 +513,20 @@ static void bvt_dump_cpu_state(int i)
     printk("QUEUE rq %lx   n: %lx, p: %lx\n",  (unsigned long)queue,
            (unsigned long) queue->next, (unsigned long) queue->prev);
 
-    list_for_each ( list, queue )
+    list_for_each_entry ( d_inf, queue, run_list )
     {
-        d_inf = list_entry(list, struct bvt_dom_info, run_list);
         d = d_inf->domain;
         printk("%3d: %u has=%c ", loop++, d->id,
                test_bit(DF_RUNNING, &d->flags) ? 'T':'F');
         bvt_dump_runq_el(d);
         printk("c=0x%X%08X\n", (u32)(d->cpu_time>>32), (u32)d->cpu_time);
-        printk("         l: %lx n: %lx  p: %lx\n",
-               (unsigned long)list, (unsigned long)list->next,
-               (unsigned long)list->prev);
+        printk("         l: %p n: %p  p: %p\n",
+               &d_inf->run_list, d_inf->run_list.next, d_inf->run_list.prev);
     }
 }
 
 /* Initialise the data structures. */
-int bvt_init_scheduler()
+static int bvt_init_scheduler(void)
 {
     int i;
 

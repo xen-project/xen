@@ -69,18 +69,28 @@ IOStream *iostdout = &_iostdout;
 /** IOStream for stderr. */
 IOStream *iostderr = &_iostderr;
 
-/** Get the underlying FILE*.
- * 
+/* Get the underlying FILE*.
+ *
  * @param s file stream
  * @return the stream s wraps
  */
 static inline FILE *get_file(IOStream *s){
-    switch((long)s->data){
-    case 1: s->data = stdin; break;
-    case 2: s->data = stdout; break;
-    case 3: s->data = stderr; break;
-    }
-    return (FILE*)s->data;
+     FILE *data = NULL;
+     switch((long)s->data){
+     case 1:
+         data = stdin;
+         break;
+     case 2:
+         data = stdout;
+         break;
+     case 3:
+         data = stderr;
+         break;
+     default:
+         data = (FILE*)s->data;
+         break;
+     }
+     return data;
 }
 
 /** Control buffering on the underlying stream, like setvbuf().

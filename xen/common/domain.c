@@ -9,6 +9,7 @@
 #include <xen/lib.h>
 #include <xen/errno.h>
 #include <xen/sched.h>
+#include <xen/softirq.h>
 #include <xen/mm.h>
 #include <xen/event.h>
 #include <xen/time.h>
@@ -16,23 +17,14 @@
 #include <asm/shadow.h>
 #include <public/dom0_ops.h>
 #include <asm/domain_page.h>
+#include <public/io/domain_controller.h>
 
 /* Both these structures are protected by the domlist_lock. */
 rwlock_t domlist_lock = RW_LOCK_UNLOCKED;
 struct domain *domain_hash[DOMAIN_HASH_SIZE];
 struct domain *domain_list;
 
-xmem_cache_t *domain_struct_cachep;
 struct domain *dom0;
-
-void __init domain_startofday(void)
-{
-    domain_struct_cachep = xmem_cache_create(
-        "domain_cache", sizeof(struct domain),
-        0, SLAB_HWCACHE_ALIGN, NULL, NULL);
-    if ( domain_struct_cachep == NULL )
-        panic("No slab cache for domain structs.");
-}
 
 struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
 {
@@ -155,8 +147,15 @@ void domain_crash(void)
 
     send_guest_virq(dom0, VIRQ_DOM_EXC);
     
-    __enter_scheduler();
-    BUG();
+    raise_softirq(SCHEDULE_SOFTIRQ);
+}
+
+
+void domain_crash_synchronous(void)
+{
+    domain_crash();
+    for ( ; ; )
+        do_softirq();
 }
 
 void domain_shutdown(u8 reason)
@@ -166,7 +165,7 @@ void domain_shutdown(u8 reason)
         extern void machine_restart(char *);
         extern void machine_halt(void);
 
-        if ( reason == 0 ) 
+        if ( reason == SHUTDOWN_poweroff ) 
         {
             printk("Domain 0 halted: halting machine.\n");
             machine_halt();
@@ -178,12 +177,14 @@ void domain_shutdown(u8 reason)
         }
     }
 
-    current->shutdown_code = reason;
-    set_bit(DF_SHUTDOWN, &current->flags);
+    if ( (current->shutdown_code = reason) == SHUTDOWN_crash )
+        set_bit(DF_CRASHED, &current->flags);
+    else
+        set_bit(DF_SHUTDOWN, &current->flags);
 
     send_guest_virq(dom0, VIRQ_DOM_EXC);
 
-    __enter_scheduler();
+    raise_softirq(SCHEDULE_SOFTIRQ);
 }
 
 unsigned int alloc_new_dom_mem(struct domain *d, unsigned int kbytes)
@@ -200,11 +201,11 @@ unsigned int alloc_new_dom_mem(struct domain *d, unsigned int kbytes)
         if ( unlikely((page = alloc_domheap_page(d)) == NULL) )
         {
             domain_relinquish_memory(d);
-            return -ENOMEM;
+            return list_empty(&page_scrub_list) ? -ENOMEM : -EAGAIN;
         }
 
-        /* initialise to machine_to_phys_mapping table to likely pfn */
-        machine_to_phys_mapping[page-frame_table] = alloc_pfns;
+        /* Initialise the machine-to-phys mapping for this page. */
+        set_machinetophys(page_to_pfn(page), alloc_pfns);
     }
 
     return 0;
@@ -276,9 +277,6 @@ int final_setup_guestos(struct domain *p, dom0_builddomain_t *builddomain)
     
     if ( (rc = arch_final_setup_guestos(p,c)) != 0 )
         goto out;
-
-    /* Set up the shared info structure. */
-    update_dom_time(p->shared_info);
 
     set_bit(DF_CONSTRUCTED, &p->flags);
 

@@ -1,9 +1,13 @@
+INSTALL		= install
+INSTALL_PROG	= $(INSTALL) -m0755
+INSTALL_DIR	= $(INSTALL) -d -m0755
+INSTALL_DATA	= $(INSTALL) -m0644
 
 XEN_ROOT=../..
-include $(XEN_ROOT)/tools/Make.defs
+include $(XEN_ROOT)/tools/Rules.mk
 
 CC       = gcc
-CFLAGS   = -Wall -Werror -O3
+CFLAGS  += -Wall -Werror -O3
 
 CFLAGS  += -I $(XEN_XC)
 CFLAGS  += -I $(XEN_LIBXC)
@@ -17,15 +21,18 @@ SCRIPTS  = xentrace_format
 MAN1     = $(wildcard *.1)
 MAN8     = $(wildcard *.8)
 
-all: $(BIN)
+all: build
+build: $(BIN)
 
-install: all
-	mkdir -p $(prefix)/usr/bin
-	mkdir -p $(prefix)/usr/man/man1
-	mkdir -p $(prefix)/usr/man/man8
-	install -m0755 $(BIN) $(SCRIPTS) $(prefix)/usr/bin
-	install -m0644 $(MAN1) $(prefix)/usr/man/man1
-	install -m0644 $(MAN8) $(prefix)/usr/man/man8
+install: build
+	[ -d $(DESTDIR)/usr/bin ] || $(INSTALL_DIR) $(DESTDIR)/usr/bin
+	[ -d $(DESTDIR)/usr/man/man1 ] || \
+		$(INSTALL_DIR) $(DESTDIR)/usr/man/man1
+	[ -d $(DESTDIR)/usr/man/man8 ] || \
+		$(INSTALL_DIR) $(DESTDIR)/usr/man/man8
+	$(INSTALL_PROG) $(BIN) $(SCRIPTS) $(DESTDIR)/usr/bin
+	$(INSTALL_DATA) $(MAN1) $(DESTDIR)/usr/man/man1
+	$(INSTALL_DATA) $(MAN8) $(DESTDIR)/usr/man/man8
 
 clean:
 	$(RM) *.a *.so *.o *.rpm $(BIN)

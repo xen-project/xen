@@ -2,8 +2,14 @@
 # Grand Unified Makefile for Xen.
 #
 
-DIST_DIR    ?= $(shell pwd)/dist
-INSTALL_DIR ?= $(DIST_DIR)/install
+# Default is to install to local 'dist' directory.
+DISTDIR ?= $(CURDIR)/dist
+DESTDIR ?= $(DISTDIR)/install
+
+INSTALL		:= install
+INSTALL_DIR	:= $(INSTALL) -d -m0755
+INSTALL_DATA	:= $(INSTALL) -m0644
+INSTALL_PROG	:= $(INSTALL) -m0755
 
 KERNELS ?= linux-2.6-xen0 linux-2.6-xenU
 # linux-2.4-xen0 linux-2.4-xenU netbsd-2.0-xenU
@@ -13,56 +19,48 @@ ALLKERNELS = $(patsubst buildconfigs/mk.%,%,$(wildcard buildconfigs/mk.*))
 ALLSPARSETREES = $(patsubst %-xen-sparse,%,$(wildcard *-xen-sparse))
 XKERNELS := $(foreach kernel, $(KERNELS), $(patsubst buildconfigs/mk.%,%,$(wildcard buildconfigs/mk.$(kernel))) )
 
+export DESTDIR
 
-export INSTALL_DIR
+# Export target architecture overrides to Xen and Linux sub-trees.
+ifneq ($(TARGET_ARCH),)
+SUBARCH := $(subst x86_32,i386,$(TARGET_ARCH))
+export TARGET_ARCH SUBARCH
+endif
 
 include buildconfigs/Rules.mk
 
 .PHONY:	all dist install xen tools kernels docs world clean mkpatches mrproper
-.PHONY:	kbuild kdelete kclean install-tools install-xen install-docs
-.PHONY: install-kernels
+.PHONY:	kbuild kdelete kclean
 
 all: dist
 
-# install everything into the standard system directories
-# NB: install explicitly does not check that everything is up to date!
-install: install-tools install-xen install-kernels install-docs
+# build and install everything into the standard system directories
+install: install-xen install-tools install-kernels install-docs
 
-install-xen:
-	$(MAKE) -C xen install
-
-install-tools:
-	$(MAKE) -C tools install
-
-install-kernels:
-	$(shell cp -a $(INSTALL_DIR)/boot/* /boot/)
-	$(shell cp -a $(INSTALL_DIR)/lib/modules/* /lib/modules/)
-	$(shell cp -dR $(INSTALL_DIR)/boot/*$(LINUX_VER)* $(prefix)/boot/)
-	$(shell cp -dR $(INSTALL_DIR)/lib/modules/* $(prefix)/lib/modules/)
-
-install-docs:
-	sh ./docs/check_pkgs && $(MAKE) -C docs install || true
+build: kernels
+	$(MAKE) -C xen build
+	$(MAKE) -C tools build
+	$(MAKE) -C docs build
 
 # build and install everything into local dist directory
 dist: xen tools kernels docs
-	install -m0644 ./COPYING $(DIST_DIR)
-	install -m0644 ./README $(DIST_DIR)
-	install -m0755 ./install.sh $(DIST_DIR)
-	mkdir -p $(DIST_DIR)/check
-	install -m0755 tools/check/chk tools/check/check_* $(DIST_DIR)/check
+	$(INSTALL_DIR) $(DISTDIR)/check
+	$(INSTALL_DATA) ./COPYING $(DISTDIR)
+	$(INSTALL_DATA) ./README $(DISTDIR)
+	$(INSTALL_PROG) ./install.sh $(DISTDIR)
+	$(INSTALL_PROG) tools/check/chk tools/check/check_* $(DISTDIR)/check
 
 xen:
-	$(MAKE) prefix=$(INSTALL_DIR) dist=yes -C xen install
+	$(MAKE) -C xen install
 
 tools:
-	$(MAKE) prefix=$(INSTALL_DIR) dist=yes -C tools install
+	$(MAKE) -C tools install
 
 kernels:
-	for i in $(XKERNELS) ; do $(MAKE) $$i-build ; done
+	for i in $(XKERNELS) ; do $(MAKE) $$i-build || exit 1; done
 
 docs:
-	sh ./docs/check_pkgs && \
-		$(MAKE) prefix=$(INSTALL_DIR) dist=yes -C docs install || true
+	sh ./docs/check_pkgs && $(MAKE) -C docs install || true
 
 # Build all the various kernels and modules
 kbuild: kernels
@@ -77,7 +75,7 @@ kclean:
 
 # Make patches from kernel sparse trees
 mkpatches:
-	for i in $(ALLSPARSETREES) ; do $(MAKE) $$i-xen.patch ; done
+	for i in $(ALLSPARSETREES) ; do $(MAKE) $$i-xen.patch || exit 1; done
 
 
 # build xen, the tools, and a domain 0 plus unprivileged linux-xen images,
@@ -103,38 +101,41 @@ mrproper: clean
 install-twisted:
 	wget http://www.twistedmatrix.com/products/get-current.epy
 	tar -zxf Twisted-*.tar.gz
-	( cd Twisted-* ; python setup.py install )
+	cd Twisted-* && python setup.py install
 
 install-logging: LOGGING=logging-0.4.9.2
 install-logging:
 	[ -f $(LOGGING).tar.gz ] || wget http://www.red-dove.com/$(LOGGING).tar.gz
 	tar -zxf $(LOGGING).tar.gz
-	( cd $(LOGGING) && python setup.py install )
+	cd $(LOGGING) && python setup.py install
 
 # handy target to upgrade iptables (use rpm or apt-get in preference)
 install-iptables:
 	wget http://www.netfilter.org/files/iptables-1.2.11.tar.bz2
-	tar -jxf iptables-*.tar.bz2
-	( cd iptables-* ; \
-	  make PREFIX= KERNEL_DIR=../linux-$(LINUX_VER)-xen0 install)
+	tar -jxf iptables-1.2.11.tar.bz2
+	$(MAKE) -C iptables-1.2.11 PREFIX= KERNEL_DIR=../linux-$(LINUX_VER)-xen0 install
+
+install-%: DESTDIR=
+install-%: %
+	@: # do nothing
 
 help:
 	@echo 'Installation targets:'
-	@echo '  install          - install everything'
-	@echo '  install-xen      - install the Xen hypervisor'
-	@echo '  install-tools    - install the control tools'
-	@echo '  install-kernels  - install guest kernels'
-	@echo '  install-docs     - install documentation'
+	@echo '  install          - build and install everything'
+	@echo '  install-xen      - build and install the Xen hypervisor'
+	@echo '  install-tools    - build and install the control tools'
+	@echo '  install-kernels  - build and install guest kernels'
+	@echo '  install-docs     - build and install documentation'
 	@echo ''
 	@echo 'Building targets:'
-	@echo '  dist             - build everything and place in dist/'
+	@echo '  dist             - build and install everything into local dist directory'
 	@echo '  world            - clean everything, delete guest kernel build'
 	@echo '                     trees then make dist'
-	@echo '  xen              - build Xen hypervisor and place in dist/'
-	@echo '  tools            - build tools and place in dist/'
-	@echo '  kernels          - build guest kernels and place in dist/'
+	@echo '  xen              - build and install Xen hypervisor'
+	@echo '  tools            - build and install tools'
+	@echo '  kernels          - build and install guest kernels'
 	@echo '  kbuild           - synonym for make kernels'
-	@echo '  docs             - build docs and place in dist/'
+	@echo '  docs             - build and install docs'
 	@echo ''
 	@echo 'Cleaning targets:'
 	@echo '  clean            - clean the Xen, tools and docs (but not'
@@ -156,9 +157,20 @@ help:
 	@echo '                     with extreme care!)'
 
 # Use this target with extreme care!
+uninstall: DESTDIR=
+uninstall: D=$(DESTDIR)
 uninstall:
-	cp -a /etc/xen /etc/xen.old && rm -rf /etc/xen 
-	rm -rf "/usr/lib/python2.?/site-packages/xen* /usr/lib/libxc* /usr/lib/python2.?/site-packages/Xc*"
+	[ ! -d $(D)/etc/xen ] || mv -f $(D)/etc/xen $(D)/etc/xen.old
+	rm -rf $(D)/etc/init.d/xend*
+	rm -rf $(D)/usr/lib/libxc* $(D)/usr/lib/libxutil*
+	rm -rf $(D)/usr/lib/python/xen $(D)/usr/include/xen
+	rm -rf $(D)/usr/include/xcs_proto.h $(D)/usr/include/xc.h
+	rm -rf $(D)/usr/sbin/xcs $(D)/usr/sbin/xcsdump $(D)/usr/sbin/xen*
+	rm -rf $(D)/usr/sbin/netfix
+	rm -rf $(D)/usr/sbin/xfrd $(D)/usr/sbin/xm $(D)/var/lib/xen
+	rm -rf $(D)/usr/share/doc/xen  $(D)/usr/man/man*/xentrace*
+	rm -rf $(D)/usr/bin/xen* $(D)/usr/bin/miniterm
+	rm -rf $(D)/boot/*xen*
 
 # Legacy targets for compatibility
 linux24:
@@ -171,3 +183,4 @@ linux26:
 
 netbsd20:
 	$(MAKE) netbsd-2.0-xenU-build
+

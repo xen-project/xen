@@ -102,6 +102,9 @@ struct domain
     u16 virq_to_evtchn[NR_VIRQS];
     u32 pirq_mask[NR_PIRQS/32];
 
+    /* Last point at which timestamp info was propagated to the guest. */
+    u64 last_propagated_timestamp;
+
     /* Physical I/O */
     spinlock_t       pcidev_lock;
     struct list_head pcidev_list;
@@ -116,11 +119,16 @@ struct domain
 struct domain_setup_info
 {
     unsigned long v_start;
+    unsigned long v_end;
     unsigned long v_kernstart;
     unsigned long v_kernend;
     unsigned long v_kernentry;
 
     unsigned int use_writable_pagetables;
+    unsigned int load_bsd_symtab;
+
+    unsigned long symtab_addr;
+    unsigned long symtab_len;
 };
 
 #include <asm/uaccess.h> /* for KERNEL_DS */
@@ -181,8 +189,19 @@ struct domain *find_domain_by_id(domid_t dom);
 struct domain *find_last_domain(void);
 extern void domain_destruct(struct domain *d);
 extern void domain_kill(struct domain *d);
-extern void domain_crash(void);
 extern void domain_shutdown(u8 reason);
+
+/*
+ * Mark current domain as crashed. This function returns: the domain is not
+ * synchronously descheduled from any processor.
+ */
+extern void domain_crash(void);
+
+/*
+ * Mark current domain as crashed and synchronously deschedule from the local
+ * processor. This function never returns.
+ */
+extern void domain_crash_synchronous(void) __attribute__((noreturn));
 
 void new_thread(struct domain *d,
                 unsigned long start_pc,
@@ -203,8 +222,6 @@ int  sched_id();
 void init_idle_task(void);
 void domain_wake(struct domain *d);
 void domain_sleep(struct domain *d);
-
-void __enter_scheduler(void);
 
 extern void switch_to(struct domain *prev, 
                       struct domain *next);

@@ -83,7 +83,8 @@ static struct scheduler *schedulers[] = {
     NULL
 };
 
-/* Operations for the current scheduler. */
+static void __enter_scheduler(void);
+
 static struct scheduler ops;
 
 #define SCHED_OP(fn, ...)                                 \
@@ -93,26 +94,24 @@ static struct scheduler ops;
 /* Per-CPU periodic timer sends an event to the currently-executing domain. */
 static struct ac_timer t_timer[NR_CPUS]; 
 
-extern xmem_cache_t *domain_struct_cachep;
-
 void free_domain_struct(struct domain *d)
 {
     SCHED_OP(free_task, d);
-    xmem_cache_free(domain_struct_cachep, d);
+    arch_free_domain_struct(d);
 }
 
 struct domain *alloc_domain_struct(void)
 {
     struct domain *d;
 
-    if ( (d = xmem_cache_alloc(domain_struct_cachep)) == NULL )
+    if ( (d = arch_alloc_domain_struct()) == NULL )
         return NULL;
     
     memset(d, 0, sizeof(*d));
 
     if ( SCHED_OP(alloc_task, d) < 0 )
     {
-        xmem_cache_free(domain_struct_cachep, d);
+        arch_free_domain_struct(d);
         return NULL;
     }
 
@@ -171,10 +170,7 @@ void domain_sleep(struct domain *d)
  
     /* Synchronous. */
     while ( test_bit(DF_RUNNING, &d->flags) && !domain_runnable(d) )
-    {
-        smp_mb();
         cpu_relax();
-    }
 }
 
 void domain_wake(struct domain *d)
@@ -324,16 +320,13 @@ long sched_adjdom(struct sched_adjdom_cmd *cmd)
  * - deschedule the current domain (scheduler independent).
  * - pick a new domain (scheduler dependent).
  */
-void __enter_scheduler(void)
+static void __enter_scheduler(void)
 {
     struct domain *prev = current, *next = NULL;
     int                 cpu = prev->processor;
     s_time_t            now;
     task_slice_t        next_slice;
     s32                 r_time;     /* time for new dom to run */
-
-    cleanup_writable_pagetable(
-        prev, PTWR_CLEANUP_ACTIVE | PTWR_CLEANUP_INACTIVE);
 
     perfc_incrc(sched_run);
     
@@ -381,10 +374,6 @@ void __enter_scheduler(void)
 
     spin_unlock_irq(&schedule_data[cpu].schedule_lock);
 
-    /* Ensure that the domain has an up-to-date time base. */
-    if ( !is_idle_task(next) )
-        update_dom_time(next->shared_info);
-
     if ( unlikely(prev == next) ) {
 #ifdef ADV_SCHED_HISTO
         adv_sched_hist_to_stop(cpu);
@@ -392,6 +381,8 @@ void __enter_scheduler(void)
         return;
     }
     perfc_incrc(sched_ctx);
+
+    cleanup_writable_pagetable(prev);
 
 #if defined(WAKE_HISTO)
     if ( !is_idle_task(next) && next->wokenup ) {
@@ -422,9 +413,10 @@ void __enter_scheduler(void)
      */
     clear_bit(DF_RUNNING, &prev->flags);
 
-    /* Mark a timer event for the newly-scheduled domain. */
-    if ( !is_idle_task(next) )
+    /* Ensure that the domain has an up-to-date time base. */
+    if ( !is_idle_task(next) && update_dom_time(next) )
         send_guest_virq(next, VIRQ_TIMER);
+
 
 #ifdef ADV_SCHED_HISTO
     adv_sched_hist_to_stop(cpu);
@@ -468,11 +460,10 @@ static void t_timer_fn(unsigned long unused)
 
     TRACE_0D(TRC_SCHED_T_TIMER_FN);
 
-    if ( !is_idle_task(d) )
-    {
-        update_dom_time(d->shared_info);
+    if ( !is_idle_task(d) && update_dom_time(d) )
         send_guest_virq(d, VIRQ_TIMER);
-    }
+
+    page_scrub_schedule_work();
 
     t_timer[d->processor].expires = NOW() + MILLISECS(10);
     add_ac_timer(&t_timer[d->processor]);
@@ -483,7 +474,7 @@ static void dom_timer_fn(unsigned long data)
 {
     struct domain *d = (struct domain *)data;
     TRACE_0D(TRC_SCHED_DOM_TIMER_FN);
-    update_dom_time(d->shared_info);
+    (void)update_dom_time(d);
     send_guest_virq(d, VIRQ_TIMER);
 }
 

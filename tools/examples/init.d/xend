@@ -7,6 +7,10 @@
 # chkconfig: 2345 98 01
 # description: Starts and stops the Xen control daemon.
 
+if ! [ -e /proc/xen/privcmd ]; then
+	exit 0
+fi
+
 # Wait for Xend / Xfrd to be up
 function await_daemons_up
 {
@@ -32,14 +36,14 @@ case "$1" in
   status)
 	xend status
 	;;
-  restart|reload)
+  restart|reload|force-reload)
 	xend restart
 	await_daemons_up
 	;;
   *)
 	# do not advertise unreasonable commands that there is no reason
 	# to use with this device
-	echo $"Usage: $0 {start|stop|status|restart|reload}"
+	echo $"Usage: $0 {start|stop|status|restart|reload|force-reload}"
 	exit 1
 esac
 

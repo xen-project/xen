@@ -108,6 +108,7 @@
 #define TRAP_alignment_check 17
 #define TRAP_machine_check   18
 #define TRAP_simd_error      19
+#define TRAP_deferred_nmi    31
 
 /*
  * Non-fatal fault/trap handlers return an error code to the caller. If the
@@ -570,10 +571,10 @@ struct extended_sigtable {
 /* REP NOP (PAUSE) is a good thing to insert into busy-wait loops. */
 static inline void rep_nop(void)
 {
-    __asm__ __volatile__("rep;nop");
+    __asm__ __volatile__ ( "rep;nop" : : : "memory" );
 }
 
-#define cpu_relax()	rep_nop()
+#define cpu_relax() rep_nop()
 
 /* Prefetch instructions for Pentium III and AMD Athlon */
 #ifdef 	CONFIG_MPENTIUMIII

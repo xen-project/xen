@@ -73,11 +73,9 @@ typedef struct _phys_dev_st {
 static phys_dev_t *find_pdev(struct domain *p, struct pci_dev *dev)
 {
     phys_dev_t *t, *res = NULL;
-    struct list_head *tmp;
 
-    list_for_each(tmp, &p->pcidev_list)
+    list_for_each_entry ( t, &p->pcidev_list, node )
     {
-        t = list_entry(tmp,  phys_dev_t, node);
         if ( dev == t->dev )
         {
             res = t;
@@ -149,9 +147,9 @@ int physdev_pci_access_modify(
 
     /* Make the domain privileged. */
     set_bit(DF_PHYSDEV, &p->flags);
-	/* FIXME: MAW for now make the domain REALLY privileged so that it
-	 * can run a backend driver (hw access should work OK otherwise) */
-	set_bit(DF_PRIVILEGED, &p->flags);
+    /* FIXME: MAW for now make the domain REALLY privileged so that it
+     * can run a backend driver (hw access should work OK otherwise) */
+    set_bit(DF_PRIVILEGED, &p->flags);
 
     /* Grant write access to the specified device. */
     if ( (pdev = pci_find_slot(bus, PCI_DEVFN(dev, func))) == NULL )
@@ -214,17 +212,16 @@ int physdev_pci_access_modify(
 int domain_iomem_in_pfn(struct domain *p, unsigned long pfn)
 {
     int ret = 0;
-    struct list_head *l;
+    phys_dev_t *phys_dev;
 
     VERBOSE_INFO("Checking if physdev-capable domain %u needs access to "
                  "pfn %08lx\n", p->id, pfn);
     
     spin_lock(&p->pcidev_lock);
 
-    list_for_each(l, &p->pcidev_list)
+    list_for_each_entry ( phys_dev, &p->pcidev_list, node )
     {
         int i;
-        phys_dev_t *phys_dev = list_entry(l, phys_dev_t, node);
         struct pci_dev *pci_dev = phys_dev->dev;
 
         for ( i = 0; (i < DEVICE_COUNT_RESOURCE) && (ret == 0); i++ )
@@ -619,15 +616,11 @@ static long pci_cfgreg_write(int bus, int dev, int func, int reg,
 static long pci_probe_root_buses(u32 *busmask)
 {
     phys_dev_t *pdev;
-    struct list_head *tmp;
 
     memset(busmask, 0, 256/8);
 
-    list_for_each ( tmp, &current->pcidev_list )
-    {
-        pdev = list_entry(tmp, phys_dev_t, node);
+    list_for_each_entry ( pdev, &current->pcidev_list, node )
         set_bit(pdev->dev->bus->number, busmask);
-    }
 
     return 0;
 }
@@ -711,7 +704,7 @@ string_param("physdev_dom0_hide", opt_physdev_dom0_hide);
 
 /* Test if boot params specify this device should NOT be visible to DOM0
  * (e.g. so that another domain can control it instead) */
-int pcidev_dom0_hidden(struct pci_dev *dev)
+static int pcidev_dom0_hidden(struct pci_dev *dev)
 {
     char cmp[10] = "(.......)";
     
@@ -740,22 +733,6 @@ void physdev_init_dom0(struct domain *p)
             continue;
         }
 
-        /* Skip bridges and other peculiarities for now.
-         *
-         * Note that this can prevent the guest from detecting devices
-         * with fn>0 on slots where the fn=0 device is a bridge.  We
-         * can identify such slots by looking at the multifunction bit
-         * (top bit of hdr_type, masked out in dev->hdr_type).
-         *
-         * In Linux2.4 we find all devices because the detection code
-         * scans all functions if the read of the fn=0 device's header
-         * type fails.
-         *
-         * In Linux2.6 we set pcibios_scan_all_fns().
-         */
-        if ( (dev->hdr_type != PCI_HEADER_TYPE_NORMAL) &&
-             (dev->hdr_type != PCI_HEADER_TYPE_CARDBUS) )
-            continue;
         pdev = xmalloc(sizeof(phys_dev_t));
         pdev->dev = dev;
         pdev->flags = ACC_WRITE;

@@ -904,10 +904,7 @@ int get_page_type(struct pfn_info *page, u32 type)
         {
             /* Someone else is updating validation of this page. Wait... */
             while ( (y = page->u.inuse.type_info) == x )
-            {
-                rep_nop();
-                barrier();
-            }
+                cpu_relax();
             goto again;
         }
     }
@@ -1325,7 +1322,7 @@ int do_mmu_update(
     u32 type_info;
     domid_t domid;
 
-    cleanup_writable_pagetable(d, PTWR_CLEANUP_ACTIVE | PTWR_CLEANUP_INACTIVE);
+    cleanup_writable_pagetable(d);
 
     /*
      * If we are resuming after preemption, read how much work we have already
@@ -1552,7 +1549,7 @@ int do_update_va_mapping(unsigned long page_nr,
     if ( unlikely(page_nr >= (HYPERVISOR_VIRT_START >> PAGE_SHIFT)) )
         return -EINVAL;
 
-    cleanup_writable_pagetable(d, PTWR_CLEANUP_ACTIVE | PTWR_CLEANUP_INACTIVE);
+    cleanup_writable_pagetable(d);
 
     /*
      * XXX When we make this support 4MB superpages we should also deal with 
@@ -1573,10 +1570,26 @@ int do_update_va_mapping(unsigned long page_nr,
             &shadow_linear_pg_table[page_nr])))) )
         {
             /*
-             * Since L2's are guranteed RW, failure indicates the page was not 
-             * shadowed, so ignore.
+             * Since L2's are guranteed RW, failure indicates either that the
+             * page was not shadowed, or that the L2 entry has not yet been
+             * updated to reflect the shadow.
              */
-            perfc_incrc(shadow_update_va_fail);
+            unsigned l2_idx = page_nr >> (L2_PAGETABLE_SHIFT - L1_PAGETABLE_SHIFT);
+            l2_pgentry_t gpde = linear_l2_table[l2_idx];
+            unsigned long gpfn = l2_pgentry_val(gpde) >> PAGE_SHIFT;
+
+            if (get_shadow_status(&d->mm, gpfn))
+            {
+                unsigned long *gl1e = map_domain_mem(gpfn << PAGE_SHIFT);
+                unsigned l1_idx = page_nr & (ENTRIES_PER_L1_PAGETABLE - 1);
+                gl1e[l1_idx] = sval;
+                unmap_domain_mem(gl1e);
+                put_shadow_status(&d->mm);
+
+                perfc_incrc(shadow_update_va_fail1);
+            }
+            else
+                perfc_incrc(shadow_update_va_fail2);
         }
 
         /*
@@ -1670,7 +1683,7 @@ void ptwr_flush(const int which)
         MEM_LOG("ptwr: Could not read pte at %p\n", ptep);
         /*
          * Really a bug. We could read this PTE during the initial fault,
-         * and pagetables can't have changed meantime. XXX Multi-CPU guests?
+         * and pagetables can't have changed meantime.
          */
         BUG();
     }
@@ -1697,7 +1710,7 @@ void ptwr_flush(const int which)
         MEM_LOG("ptwr: Could not update pte at %p\n", ptep);
         /*
          * Really a bug. We could write this PTE during the initial fault,
-         * and pagetables can't have changed meantime. XXX Multi-CPU guests?
+         * and pagetables can't have changed meantime.
          */
         BUG();
     }
@@ -1749,7 +1762,13 @@ void ptwr_flush(const int which)
                    (ENTRIES_PER_L1_PAGETABLE - i) * sizeof(l1_pgentry_t));
             unmap_domain_mem(pl1e);
             ptwr_info[cpu].ptinfo[which].l1va = 0;
+            if ( (which == PTWR_PT_ACTIVE) && likely(!d->mm.shadow_mode) )
+            {
+                pl2e = &linear_l2_table[ptwr_info[cpu].ptinfo[which].l2_idx];
+                *pl2e = mk_l2_pgentry(l2_pgentry_val(*pl2e) | _PAGE_PRESENT); 
+            }
             domain_crash();
+            return;
         }
         
         if ( unlikely(sl1e != NULL) )
@@ -1813,13 +1832,17 @@ int ptwr_do_page_fault(unsigned long addr)
     /* Get the L2 index at which this L1 p.t. is always mapped. */
     l2_idx = page->u.inuse.type_info & PGT_va_mask;
     if ( unlikely(l2_idx >= PGT_va_unknown) )
+    {
         domain_crash(); /* Urk! This L1 is mapped in multiple L2 slots! */
+        return 0;
+    }
     l2_idx >>= PGT_va_shift;
 
     if ( l2_idx == (addr >> L2_PAGETABLE_SHIFT) )
     {
         MEM_LOG("PTWR failure! Pagetable maps itself at %08lx\n", addr);
         domain_crash();
+        return 0;
     }
 
     /*
@@ -1887,6 +1910,7 @@ int ptwr_do_page_fault(unsigned long addr)
         unmap_domain_mem(ptwr_info[cpu].ptinfo[which].pl1e);
         ptwr_info[cpu].ptinfo[which].l1va = 0;
         domain_crash();
+        return 0;
     }
     
     return EXCRET_fault_fixed;
@@ -1916,40 +1940,6 @@ __initcall(ptwr_init);
 /************************************************************************/
 
 #ifndef NDEBUG
-
-void ptwr_status(void)
-{
-    unsigned long pte, *ptep, pfn;
-    struct pfn_info *page;
-    int cpu = smp_processor_id();
-
-    ptep = (unsigned long *)&linear_pg_table
-        [ptwr_info[cpu].ptinfo[PTWR_PT_INACTIVE].l1va>>PAGE_SHIFT];
-
-    if ( __get_user(pte, ptep) ) {
-        MEM_LOG("ptwr: Could not read pte at %p\n", ptep);
-        domain_crash();
-    }
-
-    pfn = pte >> PAGE_SHIFT;
-    page = &frame_table[pfn];
-    printk("need to alloc l1 page %p\n", page);
-    /* make pt page writable */
-    printk("need to make read-only l1-page at %p is %08lx\n",
-           ptep, pte);
-
-    if ( ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l1va == 0 )
-        return;
-
-    if ( __get_user(pte, (unsigned long *)
-                    ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l1va) ) {
-        MEM_LOG("ptwr: Could not read pte at %p\n", (unsigned long *)
-                ptwr_info[cpu].ptinfo[PTWR_PT_ACTIVE].l1va);
-        domain_crash();
-    }
-    pfn = pte >> PAGE_SHIFT;
-    page = &frame_table[pfn];
-}
 
 void audit_domain(struct domain *d)
 {
@@ -2039,7 +2029,7 @@ void audit_domain(struct domain *d)
             scan_for_pfn( e, xpfn );            
     }   
 
-    int i;
+    int i, l1, l2;
     unsigned long pfn;
     struct list_head *list_ent;
     struct pfn_info *page;
@@ -2098,8 +2088,8 @@ void audit_domain(struct domain *d)
 
 
     /* PHASE 1 */
-
-    adjust(&frame_table[pagetable_val(d->mm.pagetable)>>PAGE_SHIFT], -1, 1);
+    if( pagetable_val(d->mm.pagetable) )
+	adjust(&frame_table[pagetable_val(d->mm.pagetable)>>PAGE_SHIFT], -1, 1);
 
     list_ent = d->page_list.next;
     for ( i = 0; (list_ent != &d->page_list); i++ )
@@ -2279,8 +2269,8 @@ void audit_domain(struct domain *d)
     }
 
     /* PHASE 3 */
-
     list_ent = d->page_list.next;
+    l1 = l2 = 0;
     for ( i = 0; (list_ent != &d->page_list); i++ )
     {
         unsigned long *pt;
@@ -2290,6 +2280,7 @@ void audit_domain(struct domain *d)
         switch ( page->u.inuse.type_info & PGT_type_mask )
         {
         case PGT_l2_page_table:
+	    l2++;
             if ( (page->u.inuse.type_info & PGT_pinned) == PGT_pinned )
                 adjust( page, 1, 1 );          
 
@@ -2300,7 +2291,12 @@ void audit_domain(struct domain *d)
                 if ( pt[i] & _PAGE_PRESENT )
                 {
                     unsigned long l1pfn = pt[i]>>PAGE_SHIFT;
-                    struct pfn_info *l1page = &frame_table[l1pfn];
+                    struct pfn_info *l1page;
+
+                    if (l1pfn>max_page)
+                        continue;
+
+                    l1page = &frame_table[l1pfn];
 
                     if ( l1page->u.inuse.domain == d)
                         adjust(l1page, 1, 1);
@@ -2311,6 +2307,7 @@ void audit_domain(struct domain *d)
             break;
 
         case PGT_l1_page_table:
+	    l1++;
             if ( (page->u.inuse.type_info & PGT_pinned) == PGT_pinned )
                 adjust( page, 1, 1 );
 
@@ -2321,7 +2318,12 @@ void audit_domain(struct domain *d)
                 if ( pt[i] & _PAGE_PRESENT )
                 {
                     unsigned long l1pfn = pt[i]>>PAGE_SHIFT;
-                    struct pfn_info *l1page = &frame_table[l1pfn];
+                    struct pfn_info *l1page;
+
+                    if (l1pfn>max_page)
+                        continue;
+
+                    l1page = &frame_table[l1pfn];
 
                     if ( (l1page->u.inuse.domain != d) ||
                          (l1pfn < 0x100) || (l1pfn > max_page) )
@@ -2343,9 +2345,10 @@ void audit_domain(struct domain *d)
 
     spin_unlock(&d->page_alloc_lock);
 
-    adjust(&frame_table[pagetable_val(d->mm.pagetable)>>PAGE_SHIFT], 1, 1);
+    if( pagetable_val(d->mm.pagetable) )
+	adjust(&frame_table[pagetable_val(d->mm.pagetable)>>PAGE_SHIFT], 1, 1);
 
-    printk("Audit %d: Done. ctot=%d ttot=%d\n", d->id, ctot, ttot );
+    printk("Audit %d: Done. pages=%d l1=%d l2=%d ctot=%d ttot=%d\n", d->id, i, l1, l2, ctot, ttot );
 
     if ( d != current )
         domain_unpause(d);

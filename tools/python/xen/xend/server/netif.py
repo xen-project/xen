@@ -130,7 +130,13 @@ class NetDev(controller.SplitDev):
         self.bridge = None
         self.script = None
         self.ipaddr = []
+        self.vifname = None
 
+        self.vifname = sxp.child_value(config, 'vifname')
+        if self.vifname is None:
+            self.vifname = self.default_vifname()
+        if len(self.vifname) > 15:
+            raise XendError('invalid vifname: too long: ' + self.vifname)
         mac = self._get_config_mac(config)
         if mac is None:
             raise XendError("invalid mac")
@@ -140,7 +146,8 @@ class NetDev(controller.SplitDev):
         self.ipaddr = self._get_config_ipaddr(config) or []
         
         try:
-            self.backendDomain = int(sxp.child_value(config, 'backend', '0'))
+            xd = get_component('xen.xend.XendDomain')
+            self.backendDomain = int(xd.domain_lookup(sxp.child_value(config, 'backend', '0')).id)
         except:
             raise XendError('invalid backend domain')
 
@@ -161,7 +168,8 @@ class NetDev(controller.SplitDev):
         bridge = sxp.child_value(config, 'bridge')
         script = sxp.child_value(config, 'script')
         ipaddr = self._get_config_ipaddr(config)
-        backendDomain = sxp.child_value(config, 'backend', '0')
+        xd = get_component('xen.xend.XendDomain')
+        backendDomain = str(xd.domain_lookup(sxp.child_value(config, 'backend', '0')).id)
         if (mac is not None) and (mac != self.mac):
             raise XendError("cannot change mac")
         if (backendDomain is not None) and (backendDomain != str(self.backendDomain)):
@@ -187,7 +195,9 @@ class NetDev(controller.SplitDev):
         val = ['vif',
                ['idx', self.idx],
                ['vif', vif],
-               ['mac', mac]]
+               ['mac', mac],
+               ['vifname', self.vifname],
+               ]
         if self.bridge:
             val.append(['bridge', self.bridge])
         if self.script:
@@ -205,8 +215,11 @@ class NetDev(controller.SplitDev):
     def get_vifname(self):
         """Get the virtual interface device name.
         """
-        return "vif%d.%d" % (self.controller.dom, self.vif)
+        return self.vifname
 
+    def default_vifname(self):
+        return "vif%d.%d" % (self.controller.dom, self.vif)
+    
     def get_mac(self):
         """Get the MAC address as a string.
         """
@@ -238,6 +251,8 @@ class NetDev(controller.SplitDev):
         @param op: operation name (up, down)
         @param vmname: vmname
         """
+        if op == 'up':
+            Vifctl.set_vif_name(self.default_vifname(), self.vifname)
         Vifctl.vifctl(op, **self.vifctl_params(vmname=vmname))
         vnet = XendVnet.instance().vnet_of_bridge(self.bridge)
         if vnet:
@@ -265,7 +280,9 @@ class NetDev(controller.SplitDev):
         msg = packMsg('netif_be_create_t',
                       { 'domid'        : self.controller.dom,
                         'netif_handle' : self.vif,
-                        'mac'          : self.mac })
+                        'mac'          : self.mac,
+                        #'vifname'      : self.vifname
+                        })
         self.getBackendInterface().writeRequest(msg, response=d)
         return d
 
@@ -286,6 +303,8 @@ class NetDev(controller.SplitDev):
             if change:
                 self.reportStatus()
         log.debug("Destroying vif domain=%d vif=%d", self.controller.dom, self.vif)
+        if self.evtchn:
+            channel.eventChannelClose(self.evtchn)
         self.vifctl('down')
         d = self.send_be_disconnect()
         d.addCallback(cb_destroy)

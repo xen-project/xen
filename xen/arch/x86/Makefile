@@ -12,11 +12,17 @@ OBJS += $(patsubst %.c,%.o,$(wildcard mtrr/*.c))
 
 OBJS := $(subst $(TARGET_SUBARCH)/asm-offsets.o,,$(OBJS))
 
-default: boot/$(TARGET_SUBARCH).o $(OBJS) boot/mkelf32
-	$(LD) $(LDFLAGS) -r -o arch.o $(OBJS)
-	$(LD) $(LDFLAGS) -T $(TARGET_SUBARCH)/xen.lds -N \
-	    boot/$(TARGET_SUBARCH).o $(ALL_OBJS) -o $(TARGET)-syms
+default: $(TARGET)
+
+$(TARGET): $(TARGET)-syms boot/mkelf32
 	./boot/mkelf32 $(TARGET)-syms $(TARGET) 0x100000
+
+$(CURDIR)/arch.o: $(OBJS)
+	$(LD) $(LDFLAGS) -r -o $@ $(OBJS)
+
+$(TARGET)-syms: boot/$(TARGET_SUBARCH).o $(ALL_OBJS) $(TARGET_SUBARCH)/xen.lds
+	$(LD) $(LDFLAGS) -T $(TARGET_SUBARCH)/xen.lds -N \
+	    boot/$(TARGET_SUBARCH).o $(ALL_OBJS) -o $@
 
 asm-offsets.s: $(TARGET_SUBARCH)/asm-offsets.c
 	$(CC) $(CFLAGS) -S -o $@ $<
@@ -28,5 +34,9 @@ clean:
 	rm -f *.o *.s *~ core boot/*.o boot/*~ boot/core boot/mkelf32
 	rm -f x86_32/*.o x86_32/*~ x86_32/core
 	rm -f x86_64/*.o x86_64/*~ x86_64/core
+	rm -f mtrr/*.o mtrr/*~ mtrr/core
 
-.PHONY: default clean
+delete-unfresh-files:
+	# nothing
+
+.PHONY: default clean delete-unfresh-files
