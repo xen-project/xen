@@ -91,6 +91,10 @@ static struct timer_list balloon_timer;
 #define LIST_TO_PAGE(l) ( list_entry(l, struct page, list) )
 #define UNLIST_PAGE(p)  ( list_del(&p->list) )
 #define pte_offset_kernel pte_offset
+#define pud_t pgd_t
+#define pud_offset(d, va) d
+#define pud_none(d) 0
+#define pud_bad(d) 0
 #define subsys_initcall(_fn) __initcall(_fn)
 #define pfn_to_page(_pfn) (mem_map + (_pfn))
 #endif

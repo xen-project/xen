@@ -49,8 +49,12 @@ static spinlock_t update_lock = SPIN_LOCK_UNLOCKED;
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
 #define QUEUE_SIZE 2048
 #define pte_offset_kernel pte_offset
+#define pmd_val_ma(v) (v).pmd;
+#define pud_t pgd_t
+#define pud_offset(d, va) d
 #else
 #define QUEUE_SIZE 128
+#define pmd_val_ma(v) (v).pud.pgd.pgd;
 #endif
 
 static mmu_update_t update_queue[QUEUE_SIZE];
@@ -125,7 +129,7 @@ void queue_l2_entry_update(pmd_t *ptr, pmd_t val)
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
     update_queue[idx].ptr = virt_to_machine(ptr);
-    update_queue[idx].val = val.pud.pgd.pgd; /* XXX pmd_val_ma */
+    update_queue[idx].val = pmd_val_ma(val);
     increment_index();
     spin_unlock_irqrestore(&update_lock, flags);
 }
@@ -242,7 +246,7 @@ void xen_l2_entry_update(pmd_t *ptr, pmd_t val)
     unsigned long flags;
     spin_lock_irqsave(&update_lock, flags);
     update_queue[idx].ptr = virt_to_machine(ptr);
-    update_queue[idx].val = val.pud.pgd.pgd; /* XXX pmd_val_ma */
+    update_queue[idx].val = pmd_val_ma(val);
     increment_index_and_flush();
     spin_unlock_irqrestore(&update_lock, flags);
 }

@@ -30,6 +30,7 @@
 #ifndef __HYPERVISOR_H__
 #define __HYPERVISOR_H__
 
+#include <linux/config.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/version.h>
@@ -38,7 +39,9 @@
 #include <asm-xen/xen-public/io/domain_controller.h>
 #include <asm/ptrace.h>
 #include <asm/page.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 #include <asm-generic/pgtable-nopmd.h>
+#endif
 
 /* arch/xen/i386/kernel/setup.c */
 union xen_start_info_union
