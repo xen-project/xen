@@ -155,6 +155,13 @@ void do_debug_key(unsigned char key, struct xen_regs *regs)
                              bit. */
 }
 
+#ifndef NDEBUG
+void debugtrace_key(unsigned char key)
+{
+    debugtrace_dump();
+}
+#endif
+
 void initialize_keytable(void)
 {
     open_softirq(KEYPRESS_SOFTIRQ, keypress_softirq);
@@ -176,7 +183,9 @@ void initialize_keytable(void)
 
 #ifndef NDEBUG
     register_keyhandler(
-        'o', audit_domains_key,  "audit domains >0 EXPERIMENTAL"); 
+        'o', audit_domains_key,  "audit domains >0 EXPERIMENTAL");
+    register_keyhandler(
+        'T', debugtrace_key, "dump debugtrace");
 #endif
 
 #ifdef PERF_COUNTERS
