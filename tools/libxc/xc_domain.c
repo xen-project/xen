@@ -10,7 +10,6 @@
 
 int xc_domain_create(int xc_handle,
                      unsigned int mem_kb, 
-                     const char *name,
                      int cpu,
                      float cpu_weight,
                      u32 *pdomid)
@@ -21,8 +20,6 @@ int xc_domain_create(int xc_handle,
     op.cmd = DOM0_CREATEDOMAIN;
     op.u.createdomain.domain = (domid_t)*pdomid;
     op.u.createdomain.memory_kb = mem_kb;
-    strncpy(op.u.createdomain.name, name, MAX_DOMAIN_NAME);
-    op.u.createdomain.name[MAX_DOMAIN_NAME-1] = '\0';
     op.u.createdomain.cpu = cpu;
 
     if ( (err = do_dom0_op(xc_handle, &op)) == 0 )
@@ -113,8 +110,6 @@ int xc_domain_getinfo(int xc_handle,
         info->max_memkb = op.u.getdomaininfo.max_pages<<(PAGE_SHIFT);
         info->shared_info_frame = op.u.getdomaininfo.shared_info_frame;
         info->cpu_time = op.u.getdomaininfo.cpu_time;
-        strncpy(info->name, op.u.getdomaininfo.name, XC_DOMINFO_MAXNAME);
-        info->name[XC_DOMINFO_MAXNAME-1] = '\0';
 
         next_domid = (u16)op.u.getdomaininfo.domain + 1;
         info++;
@@ -163,17 +158,6 @@ int xc_shadow_control(int xc_handle,
                sizeof(xc_shadow_control_stats_t));
 
     return (rc == 0) ? op.u.shadow_control.pages : rc;
-}
-
-int xc_domain_setname(int xc_handle,
-                      u32 domid, 
-                      char *name)
-{
-    dom0_op_t op;
-    op.cmd = DOM0_SETDOMAINNAME;
-    op.u.setdomainname.domain = (domid_t)domid;
-    strncpy(op.u.setdomainname.name, name, MAX_DOMAIN_NAME);
-    return do_dom0_op(xc_handle, &op);
 }
 
 int xc_domain_setcpuweight(int xc_handle,

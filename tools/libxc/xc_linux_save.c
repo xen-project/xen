@@ -303,9 +303,6 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
     /* A copy of the CPU context of the guest. */
     full_execution_context_t ctxt;
 
-    /* A copy of the domain's name. */
-    char name[MAX_DOMAIN_NAME];
-
     /* A table containg the type of each PFN (/not/ MFN!). */
     unsigned long *pfn_type = NULL;
     unsigned long *pfn_batch = NULL;
@@ -359,7 +356,6 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
         xcio_error(ioctxt, "Could not get full domain info");
         goto out;
     }
-    memcpy(name, op.u.getdomaininfo.name, sizeof(name));
     shared_info_frame = op.u.getdomaininfo.shared_info_frame;
 
     /* A cheesy test to see whether the domain contains valid state. */
@@ -539,7 +535,6 @@ int xc_linux_save(int xc_handle, XcIOContext *ioctxt)
     /* Start writing out the saved-domain record. */
 
     if ( xcio_write(ioctxt, "LinuxGuestRecord",    16) ||
-         xcio_write(ioctxt, name,                  sizeof(name)) ||
          xcio_write(ioctxt, &nr_pfns,              sizeof(unsigned long)) ||
          xcio_write(ioctxt, pfn_to_mfn_frame_list, PAGE_SIZE) ){
         xcio_error(ioctxt, "Error writing header");

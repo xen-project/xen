@@ -42,9 +42,10 @@ static inline int is_free_domid(domid_t dom)
     return 0;
 }
 
-/** Allocate a free domain id. We try to reuse domain ids in a fairly low range,
- * only expanding the range when there are no free domain ids. This is to
- * keep domain ids in a range depending on the number that exist simultaneously,
+/*
+ * Allocate a free domain id. We try to reuse domain ids in a fairly low range,
+ * only expanding the range when there are no free domain ids. This is to keep 
+ * domain ids in a range depending on the number that exist simultaneously,
  * rather than incrementing domain ids in the full 32-bit range.
  */
 static int allocate_domid(domid_t *pdom)
@@ -208,12 +209,6 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         if ( (d = do_createdomain(dom, pro)) == NULL )
             break;
 
-        if ( op->u.createdomain.name[0] )
-        {
-            strncpy(d->name, op->u.createdomain.name, MAX_DOMAIN_NAME);
-            d->name[MAX_DOMAIN_NAME - 1] = '\0';
-        }
-
         ret = alloc_new_dom_mem(d, op->u.createdomain.memory_kb);
         if ( ret != 0 ) 
         {
@@ -359,7 +354,6 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         read_unlock_irqrestore(&tasklist_lock, flags);
 
         op->u.getdomaininfo.domain = d->domain;
-        strcpy(op->u.getdomaininfo.name, d->name);
         
         op->u.getdomaininfo.flags =
             (test_bit(DF_DYING,     &d->flags) ? DOMFLAGS_DYING    : 0) |
@@ -540,20 +534,6 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         op->u.sched_id.sched_id = sched_id();
         copy_to_user(u_dom0_op, op, sizeof(*op));
         ret = 0;        
-    }
-    break;
-
-    case DOM0_SETDOMAINNAME:
-    {
-        struct domain *d; 
-        ret = -ESRCH;
-        d = find_domain_by_id( op->u.setdomainname.domain );
-        if ( d != NULL )
-        {
-            strncpy(d->name, op->u.setdomainname.name, MAX_DOMAIN_NAME);
-            put_domain(d);
-            ret = 0;
-        }
     }
     break;
 

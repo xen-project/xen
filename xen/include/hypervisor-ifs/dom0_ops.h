@@ -19,9 +19,7 @@
  * This makes sure that old versions of dom0 tools will stop working in a
  * well-defined way (rather than crashing the machine, for instance).
  */
-#define DOM0_INTERFACE_VERSION   0xAAAA0017
-
-#define MAX_DOMAIN_NAME    16
+#define DOM0_INTERFACE_VERSION   0xAAAA0019
 
 /************************************************************************/
 
@@ -53,15 +51,14 @@ typedef struct {
     /* IN parameters. */
     memory_t     memory_kb;           /*  0 */
     MEMORY_PADDING;
-    u8           name[MAX_DOMAIN_NAME]; /*  8 */
-    u32          cpu;                 /* 24 */
-    u32          __pad0;              /* 28 */
+    u32          cpu;                 /*  8 */
+    u32          __pad0;              /* 12 */
     /* IN/OUT parameters. */
     /* If 0, domain is allocated. If non-zero use it unless in use. */
-    domid_t      domain;              /* 32 */
+    domid_t      domain;              /* 16 */
     u16          __pad1;
     /* OUT parameters. */
-} PACKED dom0_createdomain_t; /* 36 bytes */
+} PACKED dom0_createdomain_t; /* 20 bytes */
 
 #define DOM0_DESTROYDOMAIN     9
 typedef struct {
@@ -101,17 +98,16 @@ typedef struct {
 #define DOMFLAGS_SHUTDOWNMASK 255 /* DOMFLAGS_SHUTDOWN guest-supplied code.  */
 #define DOMFLAGS_SHUTDOWNSHIFT 16
     u32      flags;                   /*  4 */
-    u8       name[MAX_DOMAIN_NAME];   /*  8 */
-    full_execution_context_t *ctxt;   /* 24 */ /* NB. IN/OUT variable. */
+    full_execution_context_t *ctxt;   /*  8 */ /* NB. IN/OUT variable. */
     MEMORY_PADDING;
-    memory_t tot_pages;               /* 32 */
+    memory_t tot_pages;               /* 16 */
     MEMORY_PADDING;
-    memory_t max_pages;               /* 40 */
+    memory_t max_pages;               /* 24 */
     MEMORY_PADDING;
-    memory_t shared_info_frame;       /* 48: MFN of shared_info struct */
+    memory_t shared_info_frame;       /* 32: MFN of shared_info struct */
     MEMORY_PADDING;
-    u64      cpu_time;                /* 56 */
-} PACKED dom0_getdomaininfo_t; /* 64 bytes */
+    u64      cpu_time;                /* 40 */
+} PACKED dom0_getdomaininfo_t; /* 48 bytes */
 
 #define DOM0_BUILDDOMAIN      13
 typedef struct {
@@ -298,15 +294,6 @@ typedef struct {
     dom0_shadow_control_stats_t stats;
 } PACKED dom0_shadow_control_t;
 
-
-#define DOM0_SETDOMAINNAME     26
-typedef struct {
-    /* IN variables. */
-    domid_t  domain;                  /*  0 */
-    u16      __pad;
-    u8       name[MAX_DOMAIN_NAME];   /*  4 */
-} PACKED dom0_setdomainname_t; /* 20 bytes */
-
 #define DOM0_SETDOMAININITIALMEM   27
 typedef struct {
     /* IN variables. */
@@ -375,7 +362,6 @@ typedef struct {
         dom0_pcidev_access_t     pcidev_access;
         dom0_sched_id_t          sched_id;
 	dom0_shadow_control_t    shadow_control;
-	dom0_setdomainname_t     setdomainname;
 	dom0_setdomaininitialmem_t setdomaininitialmem;
 	dom0_setdomainmaxmem_t   setdomainmaxmem;
 	dom0_getpageframeinfo2_t getpageframeinfo2;
