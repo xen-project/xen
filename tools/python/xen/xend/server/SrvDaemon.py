@@ -337,7 +337,7 @@ class Daemon:
         cmdex = '(?P<cmd>.*)'
         procre = re.compile('^\s*' + pidex + '\s*' + pythonex + '\s*' + cmdex + '$')
         xendre = re.compile('^/usr/sbin/xend\s*(start|restart)\s*.*$')
-        procs = util.popen('ps -e -o pid,args')
+        procs = util.popen('ps -e -o pid,args 2>/dev/null')
         for proc in procs:
             pm = procre.match(proc)
             if not pm: continue
@@ -383,7 +383,7 @@ class Daemon:
         """
         running = 0
         if pid:
-            lines = util.popen('ps %d' % pid).readlines()
+            lines = util.popen('ps %d 2>/dev/null' % pid).readlines()
             exp = '^ *%d.+%s' % (pid, name)
             for line in lines:
                 if re.search(exp, line):
