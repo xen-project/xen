@@ -6,11 +6,10 @@
 */
 #include <xen/sched.h>
 
-typedef void key_handler(unsigned char key, void *dev_id, 
-			 struct pt_regs *regs); 
+typedef void key_handler(unsigned char key);
 
 extern void add_key_handler(unsigned char key, 
 			    key_handler *handler, char *desc); 
 
-extern key_handler *get_key_handler(unsigned char key); 
+extern void handle_keypress(unsigned char key);
 

@@ -1,13 +1,13 @@
 #ifndef __XEN_SOFTIRQ_H__
 #define __XEN_SOFTIRQ_H__
 
+/* Common softirqs come first in the following list. */
 #define AC_TIMER_SOFTIRQ                  0
-#define NEW_TLBFLUSH_CLOCK_PERIOD_SOFTIRQ 1
-#define DEBUGGER_SOFTIRQ                  2
-#define NMI_SOFTIRQ                       3
-#define SCHEDULE_SOFTIRQ                  4
-#define MEMAUDIT_SOFTIRQ                  5
-#define NR_SOFTIRQS                       6
+#define SCHEDULE_SOFTIRQ                  1
+#define NEW_TLBFLUSH_CLOCK_PERIOD_SOFTIRQ 2
+#define KEYPRESS_SOFTIRQ                  3
+#define NMI_SOFTIRQ                       4
+#define NR_SOFTIRQS                       5
 
 #ifndef __ASSEMBLY__
 

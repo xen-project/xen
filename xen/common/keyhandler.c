@@ -5,6 +5,7 @@
 #include <xen/console.h>
 #include <xen/serial.h>
 #include <xen/sched.h>
+#include <xen/softirq.h>
 
 #define KEY_MAX 256
 #define STR_MAX  64
@@ -14,6 +15,22 @@ static struct {
     char         desc[STR_MAX]; 
 } key_table[KEY_MAX]; 
 
+static unsigned char keypress_key;
+
+void keypress_softirq(void)
+{
+    key_handler  *h;
+    unsigned char key = keypress_key;
+    if ( (h = key_table[key].handler) != NULL )
+        (*h)(key);
+}
+
+void handle_keypress(unsigned char key)
+{
+    keypress_key = key;
+    raise_softirq(KEYPRESS_SOFTIRQ);
+}
+
 void add_key_handler(unsigned char key, key_handler *handler, char *desc)
 {
     key_table[key].handler = handler; 
@@ -21,13 +38,7 @@ void add_key_handler(unsigned char key, key_handler *handler, char *desc)
     key_table[key].desc[STR_MAX-1] = '\0'; 
 }
 
-key_handler *get_key_handler(unsigned char key)
-{
-    return key_table[key].handler; 
-}
-
-static void show_handlers(unsigned char key, void *dev_id,
-                          struct pt_regs *regs)
+static void show_handlers(unsigned char key)
 {
     int i; 
     printk("'%c' pressed -> showing installed handlers\n", key);
@@ -39,23 +50,21 @@ static void show_handlers(unsigned char key, void *dev_id,
 }
 
 
-static void dump_registers(unsigned char key, void *dev_id,
-                           struct pt_regs *regs)
+static void dump_registers(unsigned char key)
 {
+    struct pt_regs *regs = (struct pt_regs *)get_execution_context();
     extern void show_registers(struct pt_regs *regs); 
     printk("'%c' pressed -> dumping registers\n", key); 
     show_registers(regs); 
 }
 
-static void halt_machine(unsigned char key, void *dev_id,
-                         struct pt_regs *regs) 
+static void halt_machine(unsigned char key)
 {
     printk("'%c' pressed -> rebooting machine\n", key); 
     machine_restart(NULL); 
 }
 
-void do_task_queues(unsigned char key, void *dev_id,
-                    struct pt_regs *regs) 
+void do_task_queues(unsigned char key)
 {
     unsigned long  flags;
     struct domain *d;
@@ -102,26 +111,22 @@ void do_task_queues(unsigned char key, void *dev_id,
     read_unlock_irqrestore(&tasklist_lock, flags); 
 }
 
-extern void dump_runq(unsigned char key, void *dev_id, 
-                      struct pt_regs *regs);
-extern void print_sched_histo(unsigned char key, void *dev_id, 
-                              struct pt_regs *regs);
-extern void reset_sched_histo(unsigned char key, void *dev_id, 
-                              struct pt_regs *regs);
+extern void dump_runq(unsigned char key);
+extern void print_sched_histo(unsigned char key);
+extern void reset_sched_histo(unsigned char key);
 #ifndef NDEBUG
-extern void audit_domains_key(unsigned char key, void *dev_id,
-                           struct pt_regs *regs);
+extern void audit_domains_key(unsigned char key);
 #endif
 
 #ifdef PERF_COUNTERS
-extern void perfc_printall(unsigned char key, void *dev_id,
-                           struct pt_regs *regs);
-extern void perfc_reset(unsigned char key, void *dev_id,
-                        struct pt_regs *regs);
+extern void perfc_printall(unsigned char key);
+extern void perfc_reset(unsigned char key);
 #endif
 
 void initialize_keytable(void)
 {
+    open_softirq(KEYPRESS_SOFTIRQ, keypress_softirq);
+
     add_key_handler('d', dump_registers, "dump registers"); 
     add_key_handler('h', show_handlers, "show this message");
     add_key_handler('l', print_sched_histo, "print sched latency histogram");

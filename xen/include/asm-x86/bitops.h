@@ -340,6 +340,27 @@ static __inline__ int ffs(int x)
 	return r+1;
 }
 
+/*
+ * These are the preferred 'find first' functions in Xen.
+ * Both return the appropriate bit index, with the l.s.b. having index 0.
+ * If an appropriate bit is not found then the result is undefined.
+ */
+static __inline__ unsigned long find_first_clear_bit(unsigned long word)
+{
+	__asm__("bsf"__OS" %1,%0"
+		:"=r" (word)
+		:"r" (~word));
+	return word;
+}
+
+static __inline__ unsigned long find_first_set_bit(unsigned long word)
+{
+	__asm__("bsf"__OS" %1,%0"
+		:"=r" (word)
+		:"r" (word));
+	return word;
+}
+
 /**
  * hweightN - returns the hamming weight of a N-bit word
  * @x: the word to weigh

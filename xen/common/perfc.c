@@ -31,7 +31,7 @@ static struct {
 
 struct perfcounter_t perfcounters;
 
-void perfc_printall(u_char key, void *dev_id, struct pt_regs *regs)
+void perfc_printall(unsigned char key)
 {
     int i, j, sum;
     s_time_t now = NOW();
@@ -73,7 +73,7 @@ void perfc_printall(u_char key, void *dev_id, struct pt_regs *regs)
     }
 }
 
-void perfc_reset(u_char key, void *dev_id, struct pt_regs *regs)
+void perfc_reset(unsigned char key)
 {
     int i, j, sum;
     s_time_t now = NOW();
@@ -82,7 +82,7 @@ void perfc_reset(u_char key, void *dev_id, struct pt_regs *regs)
     printk("Xen performance counters RESET (now = 0x%08X:%08X)\n",
            (u32)(now>>32), (u32)now);
 
-    // leave STATUS counters alone -- don't reset
+    /* leave STATUS counters alone -- don't reset */
 
     for ( i = 0; i < NR_PERFCTRS; i++ ) 
     {

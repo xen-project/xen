@@ -2261,11 +2261,9 @@ void audit_domains(void)
         audit_domain(d);
 }
 
-void audit_domains_key(unsigned char key, void *dev_id,
-                       struct pt_regs *regs)
+void audit_domains_key(unsigned char key)
 {
-    open_softirq(MEMAUDIT_SOFTIRQ, audit_domains);
-    raise_softirq(MEMAUDIT_SOFTIRQ);
+    audit_domains();
 }
 
 #endif

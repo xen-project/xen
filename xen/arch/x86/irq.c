@@ -210,16 +210,17 @@ static void __do_IRQ_guest(int irq)
 int pirq_guest_unmask(struct domain *d)
 {
     irq_desc_t    *desc;
-    int            i, j, pirq;
+    unsigned int   i, j, pirq;
     u32            m;
     shared_info_t *s = d->shared_info;
 
     for ( i = 0; i < ARRAY_SIZE(d->pirq_mask); i++ )
     {
         m = d->pirq_mask[i];
-        while ( (j = ffs(m)) != 0 )
+        while ( m != 0 )
         {
-            m &= ~(1 << --j);
+            j = find_first_set_bit(m);
+            m &= ~(1 << j);
             pirq = (i << 5) + j;
             desc = &irq_desc[pirq];
             spin_lock_irq(&desc->lock);

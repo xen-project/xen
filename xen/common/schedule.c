@@ -544,7 +544,7 @@ void schedulers_start(void)
 }
 
 
-void dump_runq(u_char key, void *dev_id, struct pt_regs *regs)
+void dump_runq(unsigned char key)
 {
     s_time_t      now = NOW();
     int           i;
@@ -568,7 +568,7 @@ void dump_runq(u_char key, void *dev_id, struct pt_regs *regs)
 }
 
 #if defined(WAKE_HISTO) || defined(BLOCKTIME_HISTO)
-void print_sched_histo(u_char key, void *dev_id, struct pt_regs *regs)
+void print_sched_histo(unsigned char key)
 {
     int i, j, k;
     for ( k = 0; k < smp_num_cpus; k++ )
@@ -591,7 +591,7 @@ void print_sched_histo(u_char key, void *dev_id, struct pt_regs *regs)
     }
       
 }
-void reset_sched_histo(u_char key, void *dev_id, struct pt_regs *regs)
+void reset_sched_histo(unsigned char key)
 {
     int i, j;
     for ( j = 0; j < smp_num_cpus; j++ )
@@ -599,10 +599,6 @@ void reset_sched_histo(u_char key, void *dev_id, struct pt_regs *regs)
             schedule_data[j].hist[i] = 0;
 }
 #else
-void print_sched_histo(u_char key, void *dev_id, struct pt_regs *regs)
-{
-}
-void reset_sched_histo(u_char key, void *dev_id, struct pt_regs *regs)
-{
-}
+void print_sched_histo(unsigned char key) { }
+void reset_sched_histo(unsigned char key) { }
 #endif
