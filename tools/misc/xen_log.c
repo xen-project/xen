@@ -1,3 +1,5 @@
+
+#include <netinet/in.h>
 #include <sys/types.h>
 #include <tcpd.h>
 #include <sys/socket.h>
@@ -23,20 +25,21 @@ int logoutput;
 
 void stripit(char *str)
 {
-  register int i;
-
-  for (i = 0; str[i]; i++) {
-      if (str[i] == '\n') str[i] = '\0';
-      if (str[i] == '\r') str[i] = '\0';
-  }
+    int i;
+    for ( i = 0; str[i]; i++ )
+        if ( (str[i] == '\n') || (str[i] == '\r') ) 
+            str[i] = '\0';
 }
 
 void errexit(char *str)
 {
-    if(logoutput == SYSLOG) {
+    if ( logoutput == SYSLOG )
+    {
         stripit(str);
         syslog(LOG_ERR, "%s failed: %d (%m)", str, errno);
-    } else {
+    } 
+    else 
+    {
         printf("%s", str);
     }
     exit(1);
@@ -44,15 +47,18 @@ void errexit(char *str)
 
 void log(char *str)
 {
-    if(logoutput == SYSLOG) {
+    if ( logoutput == SYSLOG )
+    {
         stripit(str);
         syslog(LOG_INFO, "%s", str);
-    } else {
+    } 
+    else 
+    {
         printf("%s", str);
     }
 }
 
-void process()
+void process(void)
 {
     dom0_op_t op;
     unsigned char buf[208], obuf[224];
@@ -75,20 +81,20 @@ void process()
     op.cmd = DOM0_GETDOMAININFO;
 
     while ( (len = recvfrom(fd, buf, sizeof(buf), 0,
-            (struct sockaddr *)&from, &fromlen)) >= 0 )
+                            (struct sockaddr *)&from, &fromlen)) >= 0 )
     {
         curport = ntohs(from.sin_port);
-        if(lastport != curport) {
-           op.u.getdominfo.domain = (int)curport;
-           if ( do_dom0_op(&op) < 0 ) {
-              log("Error resolving domain name\n");
-           } else {
-              lastport = curport;
-           }
+        if ( lastport != curport )
+        {
+            op.u.getdominfo.domain = (int)curport;
+            if ( do_dom0_op(&op) < 0 )
+                log("Error resolving domain name\n");
+            else
+                lastport = curport;
         }
 
         sprintf(obuf, "[%s] %s", op.u.getdominfo.name, buf);
-		log(obuf);
+        log(obuf);
 
         fromlen = sizeof(from);
     }
@@ -99,30 +105,30 @@ void closeall(int fd)
     int fdlimit = sysconf(_SC_OPEN_MAX);
 
     while (fd < fdlimit)
-      close(fd++);
+        close(fd++);
 }
 
 int daemon(int nochdir, int noclose)
 {
     switch (fork())
     {
-        case 0:  break;
-        case -1: return -1;
-        default: _exit(0);
+    case 0:  break;
+    case -1: return -1;
+    default: _exit(0);
     }
 
     if (setsid() < 0)
-      return -1;
+        return -1;
 
     switch (fork())
     {
-        case 0:  break;
-        case -1: return -1;
-        default: _exit(0);
+    case 0:  break;
+    case -1: return -1;
+    default: _exit(0);
     }
 
     if (!nochdir)
-      chdir("/");
+        chdir("/");
 
     if (!noclose)
     {
@@ -145,22 +151,22 @@ int main(int argc, char **argv)
     {
         switch(c)
         {
-            case 'd':
-                logoutput = SYSLOG;
-                if (daemon(0,0) < 0)
-                {
-                    errno = 2;
-                    errexit("daemon");
-                } else {
-                    openlog("xenolog", LOG_PID, SYSLOGTO);
-                }
-                break;
-            case 'h':
-                printf("Usage: xenolog [options]\n");
-                printf("Capture and display output of xen domains.\n\n");
-                printf("  -d       Daemonize and send output to syslog.\n");
-                exit(0);
-                break;
+        case 'd':
+            logoutput = SYSLOG;
+            if (daemon(0,0) < 0)
+            {
+                errno = 2;
+                errexit("daemon");
+            } else {
+                openlog("xenolog", LOG_PID, SYSLOGTO);
+            }
+            break;
+        case 'h':
+            printf("Usage: xenolog [options]\n");
+            printf("Capture and display output of xen domains.\n\n");
+            printf("  -d       Daemonize and send output to syslog.\n");
+            exit(0);
+            break;
         }
     }
 
