@@ -3,16 +3,10 @@
 
 
 #ifndef __ASSEMBLY__
-#ifdef CONFIG_DEBUG_BUGVERBOSE
-extern void do_BUG(const char *file, int line);
 #define BUG() do {					\
-	do_BUG(__FILE__, __LINE__);			\
+	printk("BUG at %s:%d\n", __FILE__, __LINE__);	\
 	__asm__ __volatile__("ud2");			\
 } while (0)
-#else
-#include <xeno/lib.h>
-#define BUG() (panic("BUG at %s:%d\n", __FILE__, __LINE__))
-#endif
 #endif /* __ASSEMBLY__ */
 
 

@@ -119,6 +119,8 @@ void show_stack(unsigned long * esp)
     if(esp==NULL)
         esp=(unsigned long*)&esp;
 
+    printk("Stack trace from ESP=%p:\n", esp);
+
     stack = esp;
     for(i=0; i < kstack_depth_to_print; i++) {
         if (((long) stack & (THREAD_SIZE-1)) == 0)
@@ -128,7 +130,7 @@ void show_stack(unsigned long * esp)
         printk("%08lx ", *stack++);
     }
     printk("\n");
-    show_trace(esp);
+    //show_trace(esp);
 }
 
 void show_registers(struct pt_regs *regs)
@@ -152,6 +154,8 @@ void show_registers(struct pt_regs *regs)
            regs->esi, regs->edi, regs->ebp, esp);
     printk("ds: %04x   es: %04x   ss: %04x\n",
            regs->xds & 0xffff, regs->xes & 0xffff, ss);
+
+    show_stack(&regs->esp);
 }	
 
 
