@@ -170,7 +170,7 @@ int check_descriptor(unsigned long a, unsigned long b)
     if ( (b & _SEGMENT_G) )
         limit <<= 12;
     if ( ((base + limit) <= base) || 
-         ((base + limit) >= PAGE_OFFSET) )
+         ((base + limit) > PAGE_OFFSET) )
         goto bad;
 
  good:
@@ -183,7 +183,7 @@ int check_descriptor(unsigned long a, unsigned long b)
 long do_set_gdt(unsigned long *frame_list, unsigned int entries)
 {
     /* NB. There are 512 8-byte entries per GDT page. */
-    unsigned int i, nr_pages = (entries + 511) / 512;
+    unsigned int i, j, nr_pages = (entries + 511) / 512;
     unsigned long frames[16], pfn, *gdt_page, flags;
     long ret = -EINVAL;
     struct pfn_info *page;
@@ -213,8 +213,8 @@ long do_set_gdt(unsigned long *frame_list, unsigned int entries)
 
             /* Check all potential GDT entries in the page. */
             gdt_page = map_domain_mem(frames[0] << PAGE_SHIFT);
-            for ( i = 0; i < 512; i++ )
-                if ( !check_descriptor(gdt_page[i*2], gdt_page[i*2+1]) )
+            for ( j = 0; j < 512; j++ )
+                if ( !check_descriptor(gdt_page[j*2], gdt_page[j*2+1]) )
                     goto out;
             unmap_domain_mem(gdt_page);
         }
