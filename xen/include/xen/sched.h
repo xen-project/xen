@@ -87,12 +87,18 @@ struct exec_domain
 
 };
 
-#if 01
+/*
+** SMH: do_mmu_update() grabs big_lock and subsequently can fault 
+** on map_ldt_shadow_page(), enter do_page_fault() and then deadlock 
+** trying to reacquire big_lock. A temporary fix is to make big_lock
+** recursive; overall probably needs more thought. 
+*/
+#if 0
 #define LOCK_BIGLOCK(_d) spin_lock(&(_d)->big_lock)
 #define UNLOCK_BIGLOCK(_d) spin_unlock(&(_d)->big_lock)
 #else
-#define LOCK_BIGLOCK(_d) (void)(_d)
-#define UNLOCK_BIGLOCK(_d)
+#define LOCK_BIGLOCK(_d) spin_lock_recursive(&(_d)->big_lock)
+#define UNLOCK_BIGLOCK(_d) spin_unlock_recursive(&(_d)->big_lock)
 #endif
 
 struct domain {
