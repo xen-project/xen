@@ -69,7 +69,7 @@ XFRD_LIBS += $(CURL_LIBS)
 all: xfrd
 
 xfrd: $(XFRD_PROG_OBJ)
-	$(CC) -shared -o $@ $^ $(XFRD_LIBS)
+	$(CC) -o $@ $^ $(XFRD_LIBS)
 
 .PHONY: install
 install: xfrd
