@@ -480,10 +480,11 @@ class Xend:
                              {'op'      : 'save',
                               'file'    : filename })
 
-    def xend_domain_migrate(self, id, dst):
+    def xend_domain_migrate(self, id, dst, live=0):
         return self.xendPost(self.domainurl(id),
-                             {'op'      : 'migrate',
-                              'destination': dst })
+                             {'op'         : 'migrate',
+                              'destination': dst,
+                              'live'       : live })
 
     def xend_domain_pincpu(self, id, cpu):
         return self.xendPost(self.domainurl(id),

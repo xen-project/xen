@@ -259,7 +259,7 @@ class XendMigrateInfo(XfrdInfo):
     """Representation of a migrate in-progress and its interaction with xfrd.
     """
 
-    def __init__(self, xid, dom, host, port):
+    def __init__(self, xid, dom, host, port, live):
         XfrdInfo.__init__(self)
         self.xid = xid
         self.state = 'begin'
@@ -268,10 +268,14 @@ class XendMigrateInfo(XfrdInfo):
         self.dst_host = host
         self.dst_port = port
         self.dst_dom = None
+        self.live = live
         self.start = 0
         
     def sxpr(self):
-        sxpr = ['migrate', ['id', self.xid], ['state', self.state] ]
+        sxpr = ['migrate',
+                ['id',    self.xid   ],
+                ['state', self.state ],
+                ['live',  self.live  ] ]
         sxpr_src = ['src', ['host', self.src_host], ['domain', self.src_dom] ]
         sxpr.append(sxpr_src)
         sxpr_dst = ['dst', ['host', self.dst_host] ]
@@ -289,7 +293,8 @@ class XendMigrateInfo(XfrdInfo):
                       self.src_dom,
                       vmconfig,
                       self.dst_host,
-                      self.dst_port])
+                      self.dst_port,
+                      self.live ])
         
     def xfr_migrate_ok(self, xfrd, val):
         dom = int(sxp.child0(val))
@@ -410,7 +415,7 @@ class XendMigrate:
         reactor.connectTCP('localhost', XFRD_PORT, xcf)
         return info
     
-    def migrate_begin(self, dom, host, port=XFRD_PORT):
+    def migrate_begin(self, dom, host, port=XFRD_PORT, live=0):
         """Begin to migrate a domain to another host.
 
         @param dom:  domain
@@ -421,7 +426,7 @@ class XendMigrate:
         # Check dom for existence, not migrating already.
         # Subscribe to migrate notifications (for updating).
         xid = self.nextid()
-        info = XendMigrateInfo(xid, dom, host, port)
+        info = XendMigrateInfo(xid, dom, host, port, live)
         self.session_begin(info)
         return info.deferred
 
