@@ -280,8 +280,9 @@ ENTRY(hypercall)
 	SAVE_ALL(b)
         sti
         GET_CURRENT(%ebx)
-	andl $(NR_hypercalls-1),%eax
-	call *SYMBOL_NAME(hypercall_table)(,%eax,4)
+        andl $(NR_hypercalls-1),%eax
+        PERFC_INCR(PERFC_hypercalls, %eax)
+        call *SYMBOL_NAME(hypercall_table)(,%eax,4)
         movl %eax,XREGS_eax(%esp)       # save the return value
 
 test_all_events:
@@ -468,6 +469,7 @@ error_code:
         movl  %esp,%edx
 	pushl %edx			# push the xen_regs pointer
 	GET_CURRENT(%ebx)
+        PERFC_INCR(PERFC_exceptions, %eax)
 	call  *SYMBOL_NAME(exception_table)(,%eax,4)
         addl  $4,%esp
         movl  XREGS_eflags(%esp),%eax

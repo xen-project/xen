@@ -76,6 +76,16 @@
         popq  %rsi; \
         popq  %rdi;
 
+#ifdef PERF_COUNTERS
+#define PERFC_INCR(_name,_idx) \
+    pushq %rdx; \
+    leaq SYMBOL_NAME(perfcounters)+_name(%rip),%rdx; \
+    lock incl (%rdx,_idx,4); \
+    popq %rdx;
+#else
+#define PERFC_INCR(_name,_idx)
+#endif
+
 #endif
 
 #define BUILD_SMP_INTERRUPT(x,v) XBUILD_SMP_INTERRUPT(x,v)

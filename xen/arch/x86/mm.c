@@ -1687,6 +1687,7 @@ int do_mmu_update(
 
     perfc_incrc(calls_to_mmu_update); 
     perfc_addc(num_page_updates, count);
+    perfc_incr_histo(bpt_updates, count, PT_UPDATES);
 
     if ( unlikely(!array_access_ok(VERIFY_READ, ureqs, count, sizeof(req))) )
     {
@@ -2234,6 +2235,9 @@ void ptwr_flush(const int which)
     int            i, cpu = smp_processor_id();
     struct exec_domain *ed = current;
     struct domain *d = ed->domain;
+#ifdef PERF_COUNTERS
+    unsigned int   modified = 0;
+#endif
 
     l1va = ptwr_info[cpu].ptinfo[which].l1va;
     ptep = (unsigned long *)&linear_pg_table[l1_linear_offset(l1va)];
@@ -2302,6 +2306,11 @@ void ptwr_flush(const int which)
         if ( likely(l1_pgentry_val(ol1e) == l1_pgentry_val(nl1e)) )
             continue;
 
+#ifdef PERF_COUNTERS
+        /* Update number of entries modified. */
+        modified++;
+#endif
+
         /*
          * Fast path for PTEs that have merely been write-protected
          * (e.g., during a Unix fork()). A strict reduction in privilege.
@@ -2342,6 +2351,8 @@ void ptwr_flush(const int which)
             put_page_from_l1e(ol1e, d);
     }
     unmap_domain_mem(pl1e);
+
+    perfc_incr_histo(wpt_updates, modified, PT_UPDATES);
 
     /*
      * STEP 3. Reattach the L1 p.t. page into the current address space.

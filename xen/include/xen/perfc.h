@@ -54,26 +54,51 @@ extern struct perfcounter perfcounters;
 
 #define perfc_value(x)    atomic_read(&perfcounters.x[0])
 #define perfc_valuec(x)   atomic_read(&perfcounters.x[smp_processor_id()])
-#define perfc_valuea(x,y) \
-  { if(y<(sizeof(perfcounters.x)/sizeof(*perfcounters.x))) \
-    atomic_read(&perfcounters.x[y]); }
+#define perfc_valuea(x,y)                                               \
+    do {                                                                \
+        if ( (y) < (sizeof(perfcounters.x) / sizeof(*perfcounters.x)) ) \
+            atomic_read(&perfcounters.x[y]);                            \
+    } while ( 0 )
 #define perfc_set(x,v)    atomic_set(&perfcounters.x[0], v)
 #define perfc_setc(x,v)   atomic_set(&perfcounters.x[smp_processor_id()], v)
-#define perfc_seta(x,y,v) \
-  { if(y<(sizeof(perfcounters.x)/sizeof(*perfcounters.x))) \
-    atomic_set(&perfcounters.x[y], v); }
+#define perfc_seta(x,y,v)                                               \
+    do {                                                                \
+        if ( (y) < (sizeof(perfcounters.x) / sizeof(*perfcounters.x)) ) \
+            atomic_set(&perfcounters.x[y], v);                          \
+    } while ( 0 )
 #define perfc_incr(x)     atomic_inc(&perfcounters.x[0])
 #define perfc_decr(x)     atomic_dec(&perfcounters.x[0])
 #define perfc_incrc(x)    atomic_inc(&perfcounters.x[smp_processor_id()])
-#define perfc_incra(x,y)  \
-  { if(y<(sizeof(perfcounters.x)/sizeof(*perfcounters.x))) \
-    atomic_inc(&perfcounters.x[y]); }
+#define perfc_incra(x,y)                                                \
+    do {                                                                \
+        if ( (y) < (sizeof(perfcounters.x) / sizeof(*perfcounters.x)) ) \
+            atomic_inc(&perfcounters.x[y]);                             \
+    } while ( 0 )
 #define perfc_add(x,y)    atomic_add((y), &perfcounters.x[0])
 #define perfc_addc(x,y)   atomic_add((y), &perfcounters.x[smp_processor_id()])
-#define perfc_adda(x,y,z) \
-  { if(y<(sizeof(perfcounters.x)/sizeof(*perfcounters.x))) \
-    atomic_add((z), &perfcounters.x[y]); }
+#define perfc_adda(x,y,z)                                               \
+    do {                                                                \
+        if ( (y) < (sizeof(perfcounters.x) / sizeof(*perfcounters.x)) ) \
+            atomic_add((z), &perfcounters.x[y]);                        \
+    } while ( 0 )
 
+/*
+ * Histogram: special treatment for 0 and 1 count. After that equally spaced 
+ * with last bucket taking the rest.
+ */
+#define perfc_incr_histo(_x,_v,_n)                                          \
+    do {                                                                    \
+        if ( (_v) == 0 )                                                    \
+            perfc_incra(_x, 0);                                             \
+        else if ( (_v) == 1 )                                               \
+            perfc_incra(_x, 1);                                             \
+        else if ( (((_v)-2) / PERFC_ ## _n ## _BUCKET_SIZE) <               \
+                  (PERFC_MAX_ ## _n - 3) )                                  \
+            perfc_incra(_x, (((_v)-2) / PERFC_ ## _n ## _BUCKET_SIZE) + 2); \
+        else                                                                \
+            perfc_incra(_x, PERFC_MAX_ ## _n - 1);                          \
+    } while ( 0 )
+    
 #else /* PERF_COUNTERS */
 
 #define perfc_value(x)    (0)
@@ -89,6 +114,7 @@ extern struct perfcounter perfcounters;
 #define perfc_add(x,y)    ((void)0)
 #define perfc_addc(x,y)   ((void)0)
 #define perfc_adda(x,y,z) ((void)0)
+#define perfc_incr_histo(x,y,z) ((void)0)
 
 #endif /* PERF_COUNTERS */
 
