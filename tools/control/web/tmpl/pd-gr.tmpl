@@ -51,7 +51,7 @@ Error: No domain specified.<br>
       {
 %>
 output[<%= i %>] =<br>
-<%= new CommandPhysicalGrant(d, domain, partitions[i], mode, false).execute() %> <br>
+<%= new CommandPhysicalGrant(d, domain, partitions[i], mode, false).executeWeb() %> <br>
 <%
       }
     } catch (NumberFormatException e) {

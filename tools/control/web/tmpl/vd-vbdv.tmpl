@@ -9,16 +9,26 @@ BREADCRUMB&Virtual Disk Manager&vd.jsp
 <tbody>
 INCLUDE&vdmenu.tmpl
 <td valign="top">
-
+<%
+  CommandVbdList list = new CommandVbdList();
+  String output = list.executeWeb();
+  VirtualBlockDevice[] vbds = list.vbds();
+  if (output != null)
+  {
+%>
+<%= output %>
+<%
+  } else {
+%>
 <table cellpadding="2" cellspacing="0" border="0">
 <tbody>
   <tr class="vdh"><td>dom</td><td>vbd</td><td>mode</td><td>vd key</td><td>vd name</td></tr>
 
 
   <%
-    for (Iterator i = root.vdm().getVirtualBlockDevices(); i.hasNext();)
+    for (int i=0;i<vbds.length;i++)
     {
-      VirtualBlockDevice vbd = (VirtualBlockDevice) i.next();
+      VirtualBlockDevice vbd = vbds[i];
       VirtualDisk vd = vbd.getVirtualDisk(); 
   %>
     <tr class="vdt">
@@ -33,6 +43,9 @@ INCLUDE&vdmenu.tmpl
   %>
 </tbody>
 </table>
+<%
+  }
+%>
 
 </td>
 </tbody>

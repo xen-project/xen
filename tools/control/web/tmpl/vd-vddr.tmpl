@@ -18,7 +18,7 @@ INCLUDE&vdmenu.tmpl
 
 vd= <%= hsrw.getParameter("vd") %>
 
-vd= <%= new CommandVdDelete(hsrw.getParameter("vd")).execute() %>
+vd= <%= new CommandVdDelete(hsrw.getParameter("vd"),false).executeWeb() %>
 
 <%
   root.doFlushState();

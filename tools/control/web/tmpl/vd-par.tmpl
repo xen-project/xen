@@ -40,7 +40,7 @@ Error: chunk size not specified.<br>
     {
 %>
 output[<%= i %>] =<br>
-<%= new CommandPartitionAdd(partitions[i], Library.parseSize(size), false).execute() %> <br>
+<%= new CommandPartitionAdd(partitions[i], Library.parseSize(size), false).executeWeb() %> <br>
 <%
     }
   }

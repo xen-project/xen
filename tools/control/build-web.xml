@@ -109,14 +109,12 @@
 
 -->
 
-  <property name="app.name"      value="myapp"/>
+  <property name="app.name"      value="xenctl"/>
   <property name="app.path"      value="/${app.name}"/>
   <property name="app.version"   value="0.1-dev"/>
   <property name="build.home"    value="${basedir}/build-web"/>
   <property name="catalina.home" value="../../../.."/> <!-- UPDATE THIS! -->
   <property name="dist.home"     value="${basedir}/dist-web"/>
-  <property name="docs.home"     value="${basedir}/docs"/>
-<!--  <property name="manager.url"   value="http://localhost:8080/manager"/> -->
   <property name="src.home"      value="${basedir}/src"/>
   <property name="web.home"      value="${basedir}/web"/>
 
@@ -308,23 +306,15 @@
 
   The "dist" target creates a binary distribution of your application
   in a directory structure ready to be archived in a tar.gz or zip file.
-  Note that this target depends on two others:
+  Note that this target depends on:
 
   * "compile" so that the entire web application (including external
     dependencies) will have been assembled
-
-  * "javadoc" so that the application Javadocs will have been created
 
 -->
 
   <target name="dist" depends="compile"
    description="Create binary distribution">
-
-    <!-- Copy documentation subdirectories -->
-    <mkdir   dir="${dist.home}/docs"/>
-    <copy    todir="${dist.home}/docs">
-      <fileset dir="${docs.home}"/>
-    </copy>
 
     <!-- Create application JAR file -->
     <jar jarfile="${dist.home}/${app.name}-${app.version}.war"
@@ -367,31 +357,6 @@
              war="file://${build.home}"/>
 
   </target>
-
-
-<!-- ==================== Javadoc Target ================================== -->
-
-<!--
-
-  The "javadoc" target creates Javadoc API documentation for the Java
-  classes included in your application.  Normally, this is only required
-  when preparing a distribution release, but is available as a separate
-  target in case the developer wants to create Javadocs independently.
-
--->
-
-  <target name="javadoc" depends="compile"
-   description="Create Javadoc API documentation">
-
-    <mkdir          dir="${dist.home}/docs/api"/>
-    <javadoc sourcepath="${src.home}"
-                destdir="${dist.home}/docs/api"
-           packagenames="*">
-      <classpath refid="compile.classpath"/>
-    </javadoc>
-
-  </target>
-
 
 
 <!-- ====================== List Target =================================== -->

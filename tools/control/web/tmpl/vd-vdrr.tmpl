@@ -56,7 +56,7 @@ Error: expiry time not specified.<br>
     for (int i = 0; i < vds.length; i++)
     {
 %>
-vd = <%= new CommandVdRefresh(vds[i], new Date(expiry)).execute() %> <br>
+vd = <%= new CommandVdRefresh(vds[i], new Date(expiry)).executeWeb() %> <br>
 <%
     }
   }

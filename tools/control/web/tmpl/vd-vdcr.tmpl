@@ -64,7 +64,7 @@ Error: expiry time not specified.<br>
       expiry += System.currentTimeMillis();
 %>
 output =<br>
-<%= new CommandVdCreate( hsrw.getParameter("name"), Library.parseSize(size), new Date(expiry)).execute() %>
+<%= new CommandVdCreate( hsrw.getParameter("name"), Library.parseSize(size), new Date(expiry)).executeWeb() %>
 <br>
 <%
     }

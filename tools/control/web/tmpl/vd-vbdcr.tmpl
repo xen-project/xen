@@ -57,7 +57,7 @@ Error: No virtual block device number specified.<br>
 output =<br>
 <%= new CommandVbdCreate(hsrw.getParameter("vd"),
                                     domain, vbd,
-                                     mode).execute()  %>
+                                     mode).executeWeb()  %>
 <%
     }
     catch (NumberFormatException e)

@@ -30,7 +30,7 @@ Error: No partitions chosen.<br>
       String partition = partitions[i].substring(partitions[i].indexOf(" ")+1);
 %>
 output[<%= i %>] =<br>
-<%= new CommandPhysicalRevoke(sc.getDefaults(),domain,partition).execute() %> <br>
+<%= new CommandPhysicalRevoke(sc.getDefaults(),domain,partition).executeWeb() %> <br>
 <%
     }
   }
