@@ -88,25 +88,10 @@ int reprogram_ac_timer(s_time_t timeout)
 }
 
 ///////////////////////////////
-// from arch/x86/dompage.c
+// from arch/ia64/page_alloc.c
 ///////////////////////////////
-
-struct pfn_info *alloc_domheap_pages(struct domain *d, unsigned int order)
-{
-	printf("alloc_domheap_pages: called, not implemented\n");
-}
-
-void free_domheap_pages(struct pfn_info *pg, unsigned int order)
-{
-	printf("free_domheap_pages: called, not implemented\n");
-}
-
-
-unsigned long avail_domheap_pages(void)
-{
-	printf("avail_domheap_pages: called, not implemented\n");
-	return 0;
-}
+DEFINE_PER_CPU(struct page_state, page_states) = {0};
+unsigned long totalram_pages;
 
 ///////////////////////////////
 // from arch/x86/flushtlb.c

@@ -44,7 +44,6 @@ void vhpt_map(void)
 void vhpt_init(void)
 {
 	unsigned long vhpt_total_size, vhpt_alignment, vhpt_imva;
-	extern unsigned long __alloc_bootmem(unsigned long, unsigned long, unsigned long);
 #if !VHPT_ENABLED
 	return;
 #endif
@@ -52,8 +51,12 @@ void vhpt_init(void)
 	vhpt_total_size = 1 << VHPT_SIZE_LOG2;	// 4MB, 16MB, 64MB, or 256MB
 	vhpt_alignment = 1 << VHPT_SIZE_LOG2;	// 4MB, 16MB, 64MB, or 256MB
 	printf("vhpt_init: vhpt size=%p, align=%p\n",vhpt_total_size,vhpt_alignment);
-	vhpt_imva = __alloc_bootmem(vhpt_total_size,vhpt_alignment,
-		__pa(MAX_DMA_ADDRESS));
+	/* This allocation only holds true if vhpt table is unique for
+	 * all domains. Or else later new vhpt table should be allocated
+	 * from domain heap when each domain is created. Assume xen buddy
+	 * allocator can provide natural aligned page by order?
+	 */
+	vhpt_imva = alloc_xenheap_pages(VHPT_SIZE_LOG2 - PAGE_SHIFT);
 	if (!vhpt_imva) {
 		printf("vhpt_init: can't allocate VHPT!\n");
 		while(1);

@@ -18,6 +18,12 @@
 //#include <asm/smpboot.h>
 #include <asm/hardirq.h>
 
+
+//Huh? This seems to be used on ia64 even if !CONFIG_SMP
+void flush_tlb_mask(unsigned long mask)
+{
+	dummy();
+}
 //#if CONFIG_SMP || IA64
 #if CONFIG_SMP
 //Huh? This seems to be used on ia64 even if !CONFIG_SMP
@@ -27,11 +33,6 @@ void smp_send_event_check_mask(unsigned long cpu_mask)
 	//send_IPI_mask(cpu_mask, EVENT_CHECK_VECTOR);
 }
 
-//Huh? This seems to be used on ia64 even if !CONFIG_SMP
-void flush_tlb_mask(unsigned long mask)
-{
-	dummy();
-}
 
 //Huh? This seems to be used on ia64 even if !CONFIG_SMP
 int try_flush_tlb_mask(unsigned long mask)

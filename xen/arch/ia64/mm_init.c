@@ -163,24 +163,6 @@ out:
 #endif /* XEN */
 
 void
-check_pgt_cache (void)
-{
-	int low, high;
-
-	low = pgt_cache_water[0];
-	high = pgt_cache_water[1];
-
-	if (pgtable_cache_size > (u64) high) {
-		do {
-			if (pgd_quicklist)
-				free_page((unsigned long)pgd_alloc_one_fast(0));
-			if (pmd_quicklist)
-				free_page((unsigned long)pmd_alloc_one_fast(0, 0));
-		} while (pgtable_cache_size > (u64) low);
-	}
-}
-
-void
 update_mmu_cache (struct vm_area_struct *vma, unsigned long vaddr, pte_t pte)
 {
 	unsigned long addr;
@@ -261,132 +243,9 @@ printf("ia64_init_addr_space: called, not implemented\n");
 #endif
 }
 
-void
-free_initmem (void)
-{
-	unsigned long addr, eaddr;
-
-	addr = (unsigned long) ia64_imva(__init_begin);
-	eaddr = (unsigned long) ia64_imva(__init_end);
-	while (addr < eaddr) {
-		ClearPageReserved(virt_to_page(addr));
-		set_page_count(virt_to_page(addr), 1);
-		free_page(addr);
-		++totalram_pages;
-		addr += PAGE_SIZE;
-	}
-	printk(KERN_INFO "Freeing unused kernel memory: %ldkB freed\n",
-	       (__init_end - __init_begin) >> 10);
-}
-
-void
-free_initrd_mem (unsigned long start, unsigned long end)
-{
-	struct page *page;
-	/*
-	 * EFI uses 4KB pages while the kernel can use 4KB  or bigger.
-	 * Thus EFI and the kernel may have different page sizes. It is
-	 * therefore possible to have the initrd share the same page as
-	 * the end of the kernel (given current setup).
-	 *
-	 * To avoid freeing/using the wrong page (kernel sized) we:
-	 *	- align up the beginning of initrd
-	 *	- align down the end of initrd
-	 *
-	 *  |             |
-	 *  |=============| a000
-	 *  |             |
-	 *  |             |
-	 *  |             | 9000
-	 *  |/////////////|
-	 *  |/////////////|
-	 *  |=============| 8000
-	 *  |///INITRD////|
-	 *  |/////////////|
-	 *  |/////////////| 7000
-	 *  |             |
-	 *  |KKKKKKKKKKKKK|
-	 *  |=============| 6000
-	 *  |KKKKKKKKKKKKK|
-	 *  |KKKKKKKKKKKKK|
-	 *  K=kernel using 8KB pages
-	 *
-	 * In this example, we must free page 8000 ONLY. So we must align up
-	 * initrd_start and keep initrd_end as is.
-	 */
-	start = PAGE_ALIGN(start);
-	end = end & PAGE_MASK;
-
-	if (start < end)
-		printk(KERN_INFO "Freeing initrd memory: %ldkB freed\n", (end - start) >> 10);
-
-	for (; start < end; start += PAGE_SIZE) {
-		if (!virt_addr_valid(start))
-			continue;
-		page = virt_to_page(start);
-		ClearPageReserved(page);
-		set_page_count(page, 1);
-		free_page(start);
-		++totalram_pages;
-	}
-}
-
-/*
- * This installs a clean page in the kernel's page table.
- */
-struct page *
-put_kernel_page (struct page *page, unsigned long address, pgprot_t pgprot)
-{
-	pgd_t *pgd;
-	pmd_t *pmd;
-	pte_t *pte;
-
-	if (!PageReserved(page))
-		printk(KERN_ERR "put_kernel_page: page at 0x%p not in reserved memory\n",
-		       page_address(page));
-
-	pgd = pgd_offset_k(address);		/* note: this is NOT pgd_offset()! */
-
-	spin_lock(&init_mm.page_table_lock);
-	{
-		pmd = pmd_alloc(&init_mm, pgd, address);
-		if (!pmd)
-			goto out;
-		pte = pte_alloc_map(&init_mm, pmd, address);
-		if (!pte)
-			goto out;
-		if (!pte_none(*pte)) {
-			pte_unmap(pte);
-			goto out;
-		}
-		set_pte(pte, mk_pte(page, pgprot));
-		pte_unmap(pte);
-	}
-  out:	spin_unlock(&init_mm.page_table_lock);
-	/* no need for flush_tlb */
-	return page;
-}
-
-static void
 setup_gate (void)
 {
-#ifndef XEN
-	struct page *page;
-
-	/*
-	 * Map the gate page twice: once read-only to export the ELF headers etc. and once
-	 * execute-only page to enable privilege-promotion via "epc":
-	 */
-	page = virt_to_page(ia64_imva(__start_gate_section));
-	put_kernel_page(page, GATE_ADDR, PAGE_READONLY);
-#ifdef HAVE_BUGGY_SEGREL
-	page = virt_to_page(ia64_imva(__start_gate_section + PAGE_SIZE));
-	put_kernel_page(page, GATE_ADDR + PAGE_SIZE, PAGE_GATE);
-#else
-	put_kernel_page(page, GATE_ADDR + PERCPU_PAGE_SIZE, PAGE_GATE);
-#endif
-	ia64_patch_gate();
-#endif
+	printk("setup_gate not-implemented.\n");
 }
 
 void __devinit
@@ -441,8 +300,8 @@ ia64_mmu_init (void *my_cpu_data)
 
 #ifdef XEN
 	vhpt_init();
-	alloc_dom0();
-#else
+#endif
+#if 0
 	/* place the VMLPT at the end of each page-table mapped region: */
 	pta = POW2(61) - POW2(vmlpt_bits);
 
@@ -457,7 +316,6 @@ ia64_mmu_init (void *my_cpu_data)
 	 */
 	ia64_set_pta(pta | (0 << 8) | (vmlpt_bits << 2) | VHPT_ENABLE_BIT);
 #endif
-
 	ia64_tlb_init();
 
 #ifdef	CONFIG_HUGETLB_PAGE
@@ -643,14 +501,6 @@ __setup("nolwsys", nolwsys_setup);
 void
 mem_init (void)
 {
-	long reserved_pages, codesize, datasize, initsize;
-	unsigned long num_pgt_pages;
-	pg_data_t *pgdat;
-	int i;
-#ifndef XEN
-	static struct kcore_list kcore_mem, kcore_vmem, kcore_kernel;
-#endif
-
 #ifdef CONFIG_PCI
 	/*
 	 * This needs to be called _after_ the command line has been parsed but _before_
@@ -660,65 +510,4 @@ mem_init (void)
 	platform_dma_init();
 #endif
 
-#ifndef CONFIG_DISCONTIGMEM
-	if (!mem_map)
-		BUG();
-	max_mapnr = max_low_pfn;
-#endif
-
-	high_memory = __va(max_low_pfn * PAGE_SIZE);
-
-#ifndef XEN
-	kclist_add(&kcore_mem, __va(0), max_low_pfn * PAGE_SIZE);
-	kclist_add(&kcore_vmem, (void *)VMALLOC_START, VMALLOC_END-VMALLOC_START);
-	kclist_add(&kcore_kernel, _stext, _end - _stext);
-#endif
-
-	for_each_pgdat(pgdat)
-		totalram_pages += free_all_bootmem_node(pgdat);
-
-	reserved_pages = 0;
-	efi_memmap_walk(count_reserved_pages, &reserved_pages);
-
-	codesize =  (unsigned long) _etext - (unsigned long) _stext;
-	datasize =  (unsigned long) _edata - (unsigned long) _etext;
-	initsize =  (unsigned long) __init_end - (unsigned long) __init_begin;
-
-	printk(KERN_INFO "Memory: %luk/%luk available (%luk code, %luk reserved, "
-	       "%luk data, %luk init)\n", (unsigned long) nr_free_pages() << (PAGE_SHIFT - 10),
-	       num_physpages << (PAGE_SHIFT - 10), codesize >> 10,
-	       reserved_pages << (PAGE_SHIFT - 10), datasize >> 10, initsize >> 10);
-
-	/*
-	 * Allow for enough (cached) page table pages so that we can map the entire memory
-	 * at least once.  Each task also needs a couple of page tables pages, so add in a
-	 * fudge factor for that (don't use "threads-max" here; that would be wrong!).
-	 * Don't allow the cache to be more than 10% of total memory, though.
-	 */
-#	define NUM_TASKS	500	/* typical number of tasks */
-	num_pgt_pages = nr_free_pages() / PTRS_PER_PGD + NUM_TASKS;
-	if (num_pgt_pages > nr_free_pages() / 10)
-		num_pgt_pages = nr_free_pages() / 10;
-	if (num_pgt_pages > (u64) pgt_cache_water[1])
-		pgt_cache_water[1] = num_pgt_pages;
-
-#ifndef XEN
-	/*
-	 * For fsyscall entrpoints with no light-weight handler, use the ordinary
-	 * (heavy-weight) handler, but mark it by setting bit 0, so the fsyscall entry
-	 * code can tell them apart.
-	 */
-	for (i = 0; i < NR_syscalls; ++i) {
-		extern unsigned long fsyscall_table[NR_syscalls];
-		extern unsigned long sys_call_table[NR_syscalls];
-
-		if (!fsyscall_table[i] || nolwsys)
-			fsyscall_table[i] = sys_call_table[i] | 1;
-	}
-#endif
-	setup_gate();	/* setup gate pages before we free up boot memory... */
-
-#ifdef CONFIG_IA32_SUPPORT
-	ia32_boot_gdt_init();
-#endif
 }

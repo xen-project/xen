@@ -25,13 +25,10 @@ typedef int pid_t;
 
 //////////////////////////////////////
 
-// FIXME: generated automatically into offsets.h??
-#define IA64_TASK_SIZE 0 // this probably needs to be fixed
-//#define IA64_TASK_SIZE sizeof(struct task_struct)
-
 #define FASTCALL(x) x	// see linux/include/linux/linkage.h
 #define fastcall	// " "
 
+#define touch_nmi_watchdog()
 // from linux/include/linux/types.h
 #define BITS_TO_LONGS(bits) \
 	(((bits)+BITS_PER_LONG-1)/BITS_PER_LONG)
@@ -45,6 +42,10 @@ typedef int pid_t;
 
 // FIXME?: x86-ism used in xen/mm.h
 #define LOCK_PREFIX
+
+extern unsigned long xenheap_phys_end;
+extern unsigned long xen_pstart;
+extern unsigned long xenheap_size;
 
 // from linux/include/linux/mm.h
 extern struct page *mem_map;
@@ -72,7 +73,9 @@ extern char _end[]; /* standard ELF symbol */
 
 ///////////////////////////////////////////////////////////////
 // xen/include/asm/config.h
-#define XENHEAP_DEFAULT_MB (16)
+// Natural boundary upon TR size to define xenheap space
+#define XENHEAP_DEFAULT_MB (1 << (KERNEL_TR_PAGE_SHIFT - 20))
+#define XENHEAP_DEFAULT_SIZE	(1 << KERNEL_TR_PAGE_SHIFT)
 #define	ELFSIZE	64
 
 ///////////////////////////////////////////////////////////////
@@ -183,15 +186,6 @@ void sort_main_extable(void);
 #define IO_BITMAP_BYTES (IO_BITMAP_SIZE * 4)
 
 #define printk printf
-
-#define __ARCH_HAS_SLAB_ALLOCATOR  // see include/xen/slab.h
-#define xmem_cache_t kmem_cache_t
-#define	xmem_cache_alloc(a)	kmem_cache_alloc(a,GFP_KERNEL)
-#define	xmem_cache_free(a,b)	kmem_cache_free(a,b)
-#define	xmem_cache_create	kmem_cache_create
-#define	xmalloc(_type)		kmalloc(sizeof(_type),GFP_KERNEL)
-#define	xmalloc_array(_type,_num)	kmalloc(sizeof(_type)*_num,GFP_KERNEL)
-#define	xfree(a)		kfree(a)
 
 #undef  __ARCH_IRQ_STAT
 
