@@ -193,7 +193,7 @@ __gnttab_map_grant_ref(
 
         /* rmb(); */ /* not on x86 */
 
-        frame = __translate_gpfn_to_mfn(rd, sha->frame);
+        frame = __gpfn_to_mfn_foreign(rd, sha->frame);
 
         if ( unlikely(!pfn_is_ram(frame)) ||
              unlikely(!((flags & GNTMAP_readonly) ?

@@ -190,12 +190,12 @@ static inline void shadow_mode_disable(struct domain *d)
            phys_to_machine_mapping(gpfn); })           \
       : (gpfn) )
 
-#define __translate_gpfn_to_mfn(_d, gpfn)              \
+#define __gpfn_to_mfn_foreign(_d, gpfn)                \
     ( (shadow_mode_translate(_d))                      \
-      ? translate_gpfn_to_mfn(_d, gpfn)                \
+      ? gpfn_to_mfn_foreign(_d, gpfn)                  \
       : (gpfn) )
 
-extern unsigned long translate_gpfn_to_mfn(
+extern unsigned long gpfn_to_mfn_foreign(
     struct domain *d, unsigned long gpfn);
 
 /************************************************************************/
@@ -661,7 +661,7 @@ static inline void hl2e_propagate_from_guest(
             // This isn't common -- it only happens during shadow mode setup
             // and mode changes.
             //
-            mfn = translate_gpfn_to_mfn(d, pfn);
+            mfn = gpfn_to_mfn_foreign(d, pfn);
         }
         else
             mfn = __gpfn_to_mfn(d, pfn);

@@ -1245,11 +1245,11 @@ void vmx_shadow_clear_state(struct domain *d)
 }
 
 unsigned long
-translate_gpfn_to_mfn(struct domain *d, unsigned long gpfn)
+gpfn_to_mfn_foreign(struct domain *d, unsigned long gpfn)
 {
     ASSERT( shadow_mode_translate(d) );
 
-    perfc_incrc(translate_gpfn_to_mfn);
+    perfc_incrc(gpfn_to_mfn_foreign);
 
     unsigned long va = gpfn << PAGE_SHIFT;
     unsigned long phystab = pagetable_val(d->arch.phys_table);
@@ -1258,7 +1258,7 @@ translate_gpfn_to_mfn(struct domain *d, unsigned long gpfn)
     unmap_domain_mem(l2);
     if ( !(l2_pgentry_val(l2e) & _PAGE_PRESENT) )
     {
-        printk("translate_gpfn_to_mfn(d->id=%d, gpfn=%p) => 0 l2e=%p\n",
+        printk("gpfn_to_mfn_foreign(d->id=%d, gpfn=%p) => 0 l2e=%p\n",
                d->id, gpfn, l2_pgentry_val(l2e));
         return INVALID_MFN;
     }
@@ -1268,13 +1268,13 @@ translate_gpfn_to_mfn(struct domain *d, unsigned long gpfn)
     unmap_domain_mem(l1);
 
 #if 0
-    printk("translate_gpfn_to_mfn(d->id=%d, gpfn=%p) => %p phystab=%p l2e=%p l1tab=%p, l1e=%p\n",
+    printk("gpfn_to_mfn_foreign(d->id=%d, gpfn=%p) => %p phystab=%p l2e=%p l1tab=%p, l1e=%p\n",
            d->id, gpfn, l1_pgentry_val(l1e) >> PAGE_SHIFT, phystab, l2e, l1tab, l1e);
 #endif
 
     if ( !(l1_pgentry_val(l1e) & _PAGE_PRESENT) )
     {
-        printk("translate_gpfn_to_mfn(d->id=%d, gpfn=%p) => 0 l1e=%p\n",
+        printk("gpfn_to_mfn_foreign(d->id=%d, gpfn=%p) => 0 l1e=%p\n",
                d->id, gpfn, l1_pgentry_val(l1e));
         return INVALID_MFN;
     }
@@ -2852,7 +2852,7 @@ int _check_all_pagetables(struct exec_domain *ed, char *s)
                 BUG(); // XXX - ought to fix this...
                 break;
             case PGT_snapshot:
-            case PGT_writable_ref:
+            case PGT_writable_pred:
                 break;
             default:
                 errors++;
