@@ -6868,7 +6868,8 @@ ahd_calc_residual(struct ahd_softc *ahd, struct scb *scb)
 	struct initiator_status *spkt;
 	uint32_t sgptr;
 	uint32_t resid_sgptr;
-	uint32_t resid;
+/* SAE */
+	uint32_t resid = 0;
 
 	/*
 	 * 5 cases.

@@ -62,11 +62,13 @@ int		 ahd_linux_abort(Scsi_Cmnd *);
  * Scsi_Host_Template (see hosts.h) for AIC-79xx - some fields
  * to do with card config are filled in after the card is detected.
  */
+/* SAE:
+	proc_dir: NULL,						\
+	proc_info: ahd_linux_proc_info,				\
+*/
 #define AIC79XX	{						\
 	next: NULL,						\
 	module: NULL,						\
-	proc_dir: NULL,						\
-	proc_info: ahd_linux_proc_info,				\
 	name: NULL,						\
 	detect: ahd_linux_detect,				\
 	release: ahd_linux_release,				\

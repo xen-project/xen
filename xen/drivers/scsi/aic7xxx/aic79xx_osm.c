@@ -52,12 +52,12 @@
 #include "aic79xx_inline.h"
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0)
-#include <linux/init.h>		/* __setup */
+#include <xeno/init.h>		/* __setup */
 #endif
 
 #include "../sd.h"		/* For geometry detection */
 
-#include <linux/mm.h>		/* For fetching system memory size */
+#include <xeno/mm.h>		/* For fetching system memory size */
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,0)
 /*
@@ -66,6 +66,8 @@
 spinlock_t ahd_list_spinlock;
 #endif
 
+/* SAE: */
+/*
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
 struct proc_dir_entry proc_scsi_aic79xx = {
 	PROC_SCSI_AIC79XX, 7, "aic79xx",
@@ -73,6 +75,7 @@ struct proc_dir_entry proc_scsi_aic79xx = {
 	0, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL
 };
 #endif
+*/
 
 /*
  * Set this to the delay in seconds after SCSI bus reset.
@@ -83,7 +86,7 @@ struct proc_dir_entry proc_scsi_aic79xx = {
 #ifdef CONFIG_AIC79XX_RESET_DELAY_MS
 #define AIC79XX_RESET_DELAY CONFIG_AIC79XX_RESET_DELAY_MS
 #else
-#define AIC79XX_RESET_DELAY 5000
+#define AIC79XX_RESET_DELAY 500
 #endif
 
 /*
@@ -226,11 +229,13 @@ static uint16_t aic79xx_rd_strm_info[] =
 void
 ahd_print_path(struct ahd_softc *ahd, struct scb *scb)
 {
-	printk("(scsi%d:%c:%d:%d): ",
+/* SAE: */
+	printf("(scsi%d:%c:%d:%d): ",
 	       ahd->platform_data->host->host_no,
 	       scb != NULL ? SCB_GET_CHANNEL(ahd, scb) : 'X',
 	       scb != NULL ? SCB_GET_TARGET(ahd, scb) : -1,
 	       scb != NULL ? SCB_GET_LUN(scb) : -1);
+
 }
 
 /*
@@ -336,31 +341,30 @@ MODULE_DESCRIPTION("Adaptec Aic77XX/78XX SCSI Host Bus Adapter driver");
 MODULE_LICENSE("Dual BSD/GPL");
 #endif
 MODULE_PARM(aic79xx, "s");
-MODULE_PARM_DESC(aic79xx, "period delimited, options string.
-	verbose			Enable verbose/diagnostic logging
-	debug			Bitmask of debug values to enable
-	no_reset		Supress initial bus resets
-	extended		Enable extended geometry on all controllers
-	periodic_otag		Send an ordered tagged transaction periodically
-				to prevent tag starvation.  This may be
-				required by some older disk drives/RAID arrays. 
-	reverse_scan		Sort PCI devices highest Bus/Slot to lowest
-	tag_info:<tag_str>	Set per-target tag depth
-	rd_strm:<rd_strm_masks> Set per-target read streaming setting.
-	seltime:<int>		Selection Timeout(0/256ms,1/128ms,2/64ms,3/32ms)
-
-	Sample /etc/modules.conf line:
-		Enable verbose logging
-		Set tag depth on Controller 2/Target 2 to 10 tags
-		Shorten the selection timeout to 128ms from its default of 256
-
-	options aic79xx='\"verbose.tag_info:{{}.{}.{..10}}.seltime:1\"'
-
-	Sample /etc/modules.conf line:
-		Change Read Streaming for Controller's 2 and 3
-
-	options aic79xx='\"rd_strm:{..0xFFF0.0xC0F0}\"'
-");
+MODULE_PARM_DESC(aic79xx, "period delimited, options string.\n"
+	"verbose			Enable verbose/diagnostic logging\n"
+	"debug			Bitmask of debug values to enable\n"
+	"no_reset		Supress initial bus resets\n"
+	"extended		Enable extended geometry on all controllers\n"
+	"periodic_otag		Send an ordered tagged transaction periodically\n"
+				"to prevent tag starvation.  This may be\n"
+				"required by some older disk drives/RAID arrays. \n"
+	"reverse_scan		Sort PCI devices highest Bus/Slot to lowest\n"
+	"tag_info:<tag_str>	Set per-target tag depth\n"
+	"rd_strm:<rd_strm_masks> Set per-target read streaming setting.\n"
+	"seltime:<int>		Selection Timeout(0/256ms,1/128ms,2/64ms,3/32ms)\n"
+"\n"
+	"Sample /etc/modules.conf line:\n"
+		"Enable verbose logging\n"
+		"Set tag depth on Controller 2/Target 2 to 10 tags\n"
+		"Shorten the selection timeout to 128ms from its default of 256\n"
+"\n"
+	"options aic79xx='\"verbose.tag_info:{{}.{}.{..10}}.seltime:1\"'\n"
+"\n"
+	"Sample /etc/modules.conf line:\n"
+		"Change Read Streaming for Controller's 2 and 3\n"
+"\n"
+	"options aic79xx='\"rd_strm:{..0xFFF0.0xC0F0}\"'\n");
 #endif
 
 static void ahd_linux_handle_scsi_status(struct ahd_softc *,
@@ -369,10 +373,12 @@ static void ahd_linux_handle_scsi_status(struct ahd_softc *,
 static void ahd_linux_filter_command(struct ahd_softc*, Scsi_Cmnd*,
 				     struct scb*);
 static void ahd_linux_dev_timed_unfreeze(u_long arg);
-#if NO_YET
+/* SAE */
+#if XENO_KILLED
 static void ahd_linux_sem_timeout(u_long arg);
+#endif
 static int  ahd_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag);
-#endif 
+
 static void ahd_linux_initialize_scsi_bus(struct ahd_softc *ahd);
 static void ahd_linux_select_queue_depth(struct Scsi_Host *host,
 					 Scsi_Device *scsi_devs);
@@ -395,6 +401,8 @@ static void ahd_linux_setup_tag_info(char *p, char *end);
 static void ahd_linux_setup_rd_strm_info(char *p, char *end);
 static int ahd_linux_next_unit(void);
 static void ahd_runq_tasklet(unsigned long data);
+/* SAE: .... */
+struct notifier_block;
 static int ahd_linux_halt(struct notifier_block *nb, u_long event, void *buf);
 
 static __inline struct ahd_linux_device*
@@ -640,12 +648,14 @@ ahd_runq_tasklet(unsigned long data)
 }
 
 /************************ Shutdown/halt/reboot hook ***************************/
-#include <linux/notifier.h>
-#include <linux/reboot.h>
-
+#include <xeno/notifier.h>
+#include <xeno/reboot.h>
+/* SAE: */
+/*
 static struct notifier_block ahd_linux_notifier = {
 	ahd_linux_halt, NULL, 0
 };
+*/
 
 static int ahd_linux_halt(struct notifier_block *nb, u_long event, void *buf)
 {
@@ -1184,11 +1194,14 @@ ahd_linux_register_host(struct ahd_softc *ahd, Scsi_Host_Template *template)
 
 uint64_t
 ahd_linux_get_memsize()
-{
+{/*
 	struct sysinfo si;
 
 	si_meminfo(&si);
 	return (si.totalram << PAGE_SHIFT);
+*/
+	printf("SAE: aic79xx_osm: get_memsize\n");
+	return 0;
 }
 
 /*
@@ -1264,6 +1277,7 @@ ahd_linux_initialize_scsi_bus(struct ahd_softc *ahd)
 	}
 	/* Give the bus some time to recover */
 	if ((ahd->flags & AHD_RESET_BUS_A) != 0) {
+/* SAE: No timers
 		ahd_freeze_simq(ahd);
 		init_timer(&ahd->platform_data->reset_timer);
 		ahd->platform_data->reset_timer.data = (u_long)ahd;
@@ -1272,6 +1286,8 @@ ahd_linux_initialize_scsi_bus(struct ahd_softc *ahd)
 		ahd->platform_data->reset_timer.function =
 		    (ahd_linux_callback_t *)ahd_release_simq;
 		add_timer(&ahd->platform_data->reset_timer);
+*/
+		mdelay(AIC79XX_RESET_DELAY);
 	}
 }
 
@@ -1289,19 +1305,24 @@ ahd_platform_alloc(struct ahd_softc *ahd, void *platform_arg)
 	ahd->platform_data->hw_dma_mask = 0xFFFFFFFF;
 	ahd_lockinit(ahd);
 	ahd_done_lockinit(ahd);
+/* SAE */
+#if XENO_KILLED
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0)
 	init_MUTEX_LOCKED(&ahd->platform_data->eh_sem);
 #else
 	ahd->platform_data->eh_sem = MUTEX_LOCKED;
+#endif
 #endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 	tasklet_init(&ahd->platform_data->runq_tasklet, ahd_runq_tasklet,
 		     (unsigned long)ahd);
 #endif
 	ahd->seltime = (aic79xx_seltime & 0x3) << 4;
-	
+/* SAE */
+#if XENO_KILLED
 	if (TAILQ_EMPTY(&ahd_tailq))
 		register_reboot_notifier(&ahd_linux_notifier);
+#endif
 	return (0);
 }
 
@@ -1342,7 +1363,9 @@ ahd_platform_free(struct ahd_softc *ahd)
 		free(ahd->platform_data, M_DEVBUF);
 	}
 	if (TAILQ_EMPTY(&ahd_tailq)) {
+/* SAE:
 		unregister_reboot_notifier(&ahd_linux_notifier);
+*/
 #ifdef CONFIG_PCI
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 		pci_unregister_driver(&aic79xx_pci_driver);
@@ -2082,7 +2105,10 @@ ahd_done(struct ahd_softc *ahd, struct scb * scb)
 
 	if ((scb->flags & SCB_RECOVERY_SCB) != 0) {
 		printf("Recovery SCB completes\n");
+/* SAE: */
+#if XENO_KILLED
 		up(&ahd->platform_data->eh_sem);
+#endif
 	}
 
 	ahd_free_scb(ahd, scb);
@@ -2422,7 +2448,8 @@ ahd_release_simq(struct ahd_softc *ahd)
 	}
 }
 
-#if NOT_YET
+/* SAE */
+#if XENO_KILLED
 static void
 ahd_linux_sem_timeout(u_long arg)
 {
@@ -2431,6 +2458,7 @@ ahd_linux_sem_timeout(u_long arg)
 	sem = (struct semaphore *)arg;
 	up(sem);
 }
+#endif
 
 static int
 ahd_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag)
@@ -2672,6 +2700,10 @@ done:
 	if (paused)
 		ahd_unpause(ahd);
 	if (wait) {
+/* SAE */
+		printf("SAE: aic79xxx: recovery failed\n");
+		retval=FAILED;
+#if XENO_KILLED
 		struct timer_list timer;
 		int ret;
 
@@ -2690,6 +2722,7 @@ done:
 			retval = FAILED;
 		}
 		ahd_lock(ahd, &s);
+#endif
 	}
 	acmd = TAILQ_FIRST(&ahd->platform_data->completeq);
 	TAILQ_INIT(&ahd->platform_data->completeq);
@@ -2700,7 +2733,6 @@ done:
 	spin_lock_irq(&io_request_lock);
 	return (retval);
 }
-#endif
 
 static void
 ahd_linux_dev_timed_unfreeze(u_long arg)
@@ -2823,12 +2855,20 @@ ahd_linux_biosparam(Disk *disk, kdev_t dev, int geom[])
 	int	heads;
 	int	sectors;
 	int	cylinders;
+/* SAE */
+#if XENO_KILLED
 	int	ret;
+#endif
 	int	extended;
 	struct	ahd_softc *ahd;
+/* SAE */
+#if XENO_KILLED
 	struct	buffer_head *bh;
+#endif
 
 	ahd = *((struct ahd_softc **)disk->device->host->hostdata);
+/* SAE: */
+#if XENO_KILLED
 	bh = bread(MKDEV(MAJOR(dev), MINOR(dev) & ~0xf), 0, 1024);
 
 	if (bh) {
@@ -2838,6 +2878,7 @@ ahd_linux_biosparam(Disk *disk, kdev_t dev, int geom[])
 		if (ret != -1)
 			return (ret);
 	}
+#endif
 	heads = 64;
 	sectors = 32;
 	cylinders = disk->capacity / (heads * sectors);
@@ -2923,5 +2964,5 @@ ahd_platform_dump_card_state(struct ahd_softc *ahd)
 #if defined(MODULE) || LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 static Scsi_Host_Template driver_template = AIC79XX;
 Scsi_Host_Template *aic79xx_driver_template = &driver_template;
-#include "../scsi_module.c"
+#include "../scsi_module.c.inc"
 #endif

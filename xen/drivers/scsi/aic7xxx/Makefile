@@ -35,9 +35,14 @@ obj-aic7xxx += aic7xxx_pci.o
 #obj-aic79xx = aic79xx_osm.o 
 #obj-aic79xx += aic79xx_proc.o
 #obj-aic79xx += aic79xx_osm_pci.o
+obj-aic7xxx += aic79xx_osm.o 
+obj-aic7xxx += aic79xx_proc.o
+obj-aic7xxx += aic79xx_osm_pci.o
 # Core Files
 #obj-aic79xx += aic79xx_core.o
 #obj-aic79xx += aic79xx_pci.o
+obj-aic7xxx += aic79xx_core.o
+obj-aic7xxx += aic79xx_pci.o
 
 default: aic7xxx.o
 

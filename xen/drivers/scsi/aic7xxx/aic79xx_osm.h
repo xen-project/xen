@@ -42,29 +42,35 @@
 #ifndef _AIC79XX_LINUX_H_
 #define _AIC79XX_LINUX_H_
 
-#include <linux/types.h>
-#include <linux/blk.h>
-#include <linux/blkdev.h>
-#include <linux/delay.h>
-#include <linux/ioport.h>
-#include <linux/pci.h>
-#include <linux/version.h>
+#include <xeno/types.h>
+#include <xeno/blk.h>
+#include <xeno/blkdev.h>
+#include <xeno/delay.h>
+#include <xeno/ioport.h>
+#include <xeno/pci.h>
+/* SAE */
+#if XENO_KILLED
+#include <xeno/version.h>
+#endif
 #ifndef AHD_MODVERSION_FILE
 #define __NO_VERSION__
 #endif
-#include <linux/module.h>
+#include <xeno/module.h>
 #include <asm/byteorder.h>
 
 #ifndef KERNEL_VERSION
 #define KERNEL_VERSION(x,y,z) (((x)<<16)+((y)<<8)+(z))
 #endif
 
+/* SAE */
+#define LINUX_VERSION_CODE KERNEL_VERSION(2,4,0)
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-#include <linux/interrupt.h> /* For tasklet support. */
-#include <linux/config.h>
-#include <linux/slab.h>
+#include <xeno/interrupt.h> /* For tasklet support. */
+#include <xeno/config.h>
+#include <xeno/slab.h>
 #else
-#include <linux/malloc.h>
+#include <xeno/malloc.h>
 #endif
 
 /* Core SCSI definitions */
@@ -134,16 +140,22 @@ typedef Scsi_Cmnd      *ahd_io_ctx_t;
 #endif
 #endif /* BYTE_ORDER */
 
+/* SAE: */
+#define off_t int
+
 /************************* Configuration Data *********************************/
 extern int aic79xx_detect_complete;
 extern Scsi_Host_Template* aic79xx_driver_template;
 
 /***************************** Bus Space/DMA **********************************/
-
+/* SAE */
+typedef dma_addr_t bus_addr_t;
+#if XENO_KILLED
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,2,17)
 typedef dma_addr_t bus_addr_t;
 #else
 typedef uint32_t bus_addr_t;
+#endif
 #endif
 typedef uint32_t bus_size_t;
 
@@ -426,11 +438,15 @@ ahd_timer_reset(ahd_timer_t *timer, int usec, ahd_callback_t *func, void *arg)
 }
 
 /***************************** SMP support ************************************/
+/* SAE */
+#include <xeno/spinlock.h>
+/*
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,17)
-#include <linux/spinlock.h>
+#include <xeno/spinlock.h>
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,93)
-#include <linux/smp.h>
+#include <xeno/smp.h>
 #endif
+*/
 
 #define AIC79XX_DRIVER_VERSION  "1.0.0"
 
@@ -591,8 +607,12 @@ struct scb_platform_data {
 	struct ahd_linux_device	*dev;
 	bus_addr_t		 buf_busaddr;
 	uint32_t		 xfer_len;
+/* SAE */
+	uint32_t		 resid;		/* Transfer residual */
+#if XENO_KILLED
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
 	uint32_t		 resid;		/* Transfer residual */
+#endif
 #endif
 };
 
@@ -610,16 +630,23 @@ struct ahd_platform_data {
 	struct ahd_linux_target *targets[AHD_NUM_TARGETS]; 
 	TAILQ_HEAD(, ahd_linux_device) device_runq;
 	struct ahd_completeq	 completeq;
-
+/* SAE */
+	spinlock_t		 spin_lock;
+	struct tasklet_struct	 runq_tasklet;
+#if XENO_KILLED
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,0)
 	spinlock_t		 spin_lock;
 #endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 	struct tasklet_struct	 runq_tasklet;
 #endif
+#endif
 	u_int			 qfrozen;
 	struct timer_list	 reset_timer;
+/* SAE: No semaphores */
+#if XENO_KILLED
 	struct semaphore	 eh_sem;
+#endif
 	struct Scsi_Host        *host;		/* pointer to scsi host */
 #define AHD_LINUX_NOIRQ	((uint32_t)~0)
 	uint32_t		 irq;		/* IRQ for this adapter */
@@ -988,7 +1015,7 @@ void ahd_power_state_change(struct ahd_softc *ahd,
 #if defined(__sparc_v9__) || defined(__powerpc__)
 #error "PPC and Sparc platforms are only support under 2.1.92 and above"
 #endif
-#include <linux/bios32.h>
+#include <xeno/bios32.h>
 #endif
 
 int			 ahd_linux_pci_probe(Scsi_Host_Template *);
