@@ -27,14 +27,10 @@
 #ifndef __XEN_TIME_H__
 #define __XEN_TIME_H__
 
-#include <asm/ptrace.h>  /* XXX Only used for do_timer which should be moved */
 #include <asm/time.h>    /* pull in architecture specific time definition */
 #include <xen/types.h>
 #include <hypervisor-ifs/hypervisor-if.h>
 
-/*
- * Init time
- */
 extern int init_xen_time();
 
 
@@ -49,22 +45,13 @@ extern int init_xen_time();
 
 s_time_t get_s_time(void);
 
-#define NOW()				((s_time_t)get_s_time())
-#define SECONDS(_s)			(((s_time_t)(_s))  * 1000000000ULL )
-#define MILLISECS(_ms)		(((s_time_t)(_ms)) * 1000000ULL )
-#define MICROSECS(_us)		(((s_time_t)(_us)) * 1000ULL )
-#define Time_Max			((s_time_t) 0x7fffffffffffffffLL)
-#define FOREVER				Time_Max
+#define NOW()           ((s_time_t)get_s_time())
+#define SECONDS(_s)     (((s_time_t)(_s))  * 1000000000ULL )
+#define MILLISECS(_ms)  (((s_time_t)(_ms)) * 1000000ULL )
+#define MICROSECS(_us)  (((s_time_t)(_us)) * 1000ULL )
 
-/* Wall Clock Time */
-struct timeval {
-    long            tv_sec;         /* seconds */
-    long            tv_usec;        /* microseconds */
-};
-  
 extern void update_dom_time(shared_info_t *si);
 extern void do_settime(unsigned long secs, unsigned long usecs, 
                        u64 system_time_base);
-extern void do_timer(struct pt_regs *regs);
 
 #endif /* __XEN_TIME_H__ */

@@ -23,7 +23,6 @@
 #include <xen/time.h>
 #include <xen/ac_timer.h>
 #include <xen/interrupt.h>
-#include <xen/timer.h>
 #include <xen/perfc.h>
 #include <xen/sched-if.h>
 #include <hypervisor-ifs/sched_ctl.h>
@@ -583,8 +582,6 @@ void __init scheduler_init(void)
 {
     int i;
 
-    printk("Initialising schedulers\n");
-
     for ( i = 0; i < NR_CPUS; i++ )
     {
         INIT_LIST_HEAD(&schedule_data[i].runqueue);
@@ -613,9 +610,8 @@ void __init scheduler_init(void)
 
     for ( i = 0; schedulers[i] != NULL; i++ )
     {
-        ops = *schedulers[i]; /* fetch operations structure */
-
-        if(strcmp(ops.opt_name, opt_sched) == 0)
+        ops = *schedulers[i];
+        if ( strcmp(ops.opt_name, opt_sched) == 0 )
             break;
     }
     
@@ -623,9 +619,6 @@ void __init scheduler_init(void)
         printk("Could not find scheduler: %s\n", opt_sched);
 
     printk("Using scheduler: %s (%s)\n", ops.name, ops.opt_name);
-    
-    if ( ops.do_schedule == NULL)
-        panic("Chosen scheduler has NULL do_schedule!");
 
     if ( SCHED_OP(init_scheduler) < 0 )
         panic("Initialising scheduler failed!");
@@ -637,8 +630,6 @@ void __init scheduler_init(void)
  */
 void schedulers_start(void) 
 {   
-    printk("Start schedulers\n");
-
     s_timer_fn(0);
     smp_call_function((void *)s_timer_fn, NULL, 1, 1);
 

@@ -342,7 +342,6 @@
 3ddb79bdB9RNMnkQnUyZ5C9hhMSQQw xen/common/slab.c
 3ddb79bd0gVQYmL2zvuJnldvD0AGxQ xen/common/softirq.c
 3e7f358awXBC3Vw-wFRwPw18qL1khg xen/common/string.c
-3ddb79bdQqFHtHRGEO2dsxGgo6eAhw xen/common/timer.c
 403a3edbejm33XLTGMuinKEwQBrOIg xen/common/trace.c
 3ddb79bd3zgV33PHdt-cgh3sxcb1hw xen/common/vsprintf.c
 3ddb79c0ppNeJtjC4va8j41ADCnchA xen/drivers/Makefile
@@ -500,9 +499,7 @@
 3ddb79c2iIcESrDAB8samy_yAh6olQ xen/include/xen/spinlock.h
 3e7f358aMtFMUVvN_Zjg5qvEJIqEBA xen/include/xen/string.h
 3ddb79c0BnA20PbgmuMPSGIBljNRQw xen/include/xen/time.h
-3ddb79c2HFkXuRxi1CriJtSFmY6Ybw xen/include/xen/timer.h
 3ddb79c2_m8lT9jDKse_tePj7zcnNQ xen/include/xen/timex.h
-3ddb79c2e2C14HkndNEJlYwXaPrF5A xen/include/xen/tqueue.h
 403a3edbG9K5uZjuY19_LORbQGmFbA xen/include/xen/trace.h
 3ddb79c1-kVvF8cVa0k3ZHDdBMj01Q xen/include/xen/types.h
 3e8827bdaqPeZAWGVOwswgY9bWSx4g xen/include/xen/version.h

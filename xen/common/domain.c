@@ -1057,9 +1057,3 @@ int construct_dom0(struct task_struct *p,
 
     return 0;
 }
-
-
-void __init domain_init(void)
-{
-    printk("Initialising domains\n");
-}

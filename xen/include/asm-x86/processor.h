@@ -340,32 +340,9 @@ long set_fast_trap(struct task_struct *p, int idx);
 	{ {0} }			/* io permissions */		\
 }
 
-#define INIT_TSS  {						\
-	0,0, /* back_link, __blh */				\
-	0, /* esp0 */						\
-	0, 0, /* ss0 */						\
-	0,0,0,0,0,0, /* stack1, stack2 */			\
-	0, /* cr3 */						\
-	0,0, /* eip,eflags */					\
-	0,0,0,0, /* eax,ecx,edx,ebx */				\
-	0,0,0,0, /* esp,ebp,esi,edi */				\
-	0,0,0,0,0,0, /* es,cs,ss */				\
-	0,0,0,0,0,0, /* ds,fs,gs */				\
-	0,0, /* ldt */						\
-	0, INVALID_IO_BITMAP_OFFSET, /* tace, bitmap */		\
-	{ [0 ... IO_BITMAP_SIZE] = ~0UL }, /* ioperm */         \
-}
-
 #elif defined(__x86_64__)
 
 #define INIT_THREAD { 0 }
-
-#define INIT_TSS {                                              \
-	0,0,                                                    \
-	0,0,0,0,{0},0,0,                                        \
-	0, INVALID_IO_BITMAP_OFFSET,                            \
-	{ [0 ... IO_BITMAP_SIZE] = ~0UL }                       \
-}
 
 #endif /* __x86_64__ */
 

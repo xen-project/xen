@@ -6,11 +6,6 @@
  *
  *        File: i386/time.c
  *      Author: Rolf Neugebar & Keir Fraser
- * 
- * Environment: Xen Hypervisor
- * Description: modified version of Linux' time.c
- *              implements system and wall clock time.
- *              based on freebsd's implementation.
  */
 
 /*
@@ -37,15 +32,13 @@
 #include <asm/fixmap.h>
 #include <asm/mc146818rtc.h>
 
-extern rwlock_t xtime_lock;
-extern unsigned long wall_jiffies;
-
 /* GLOBAL */
 unsigned long cpu_khz;  /* Detected as we calibrate the TSC */
 unsigned long ticks_per_usec; /* TSC ticks per microsecond. */
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 int timer_ack = 0;
 int do_timer_lists_from_pit = 0;
+unsigned long volatile jiffies;
 
 /* PRIVATE */
 static unsigned int    rdtsc_bitshift;  /* Which 32 bits of TSC do we use?   */
@@ -54,12 +47,14 @@ static u32             st_scale_f;      /* Cycles -> ns, fractional part     */
 static u32             st_scale_i;      /* Cycles -> ns, integer part        */
 static u32             tsc_irq;         /* CPU0's TSC at last 'time update'  */
 static s_time_t        stime_irq;       /* System time at last 'time update' */
+static unsigned long   wc_sec, wc_usec; /* UTC time at last 'time update'.   */
+static rwlock_t        time_lock = RW_LOCK_UNLOCKED;
 
 static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
     u64 full_tsc;
 
-    write_lock(&xtime_lock);
+    write_lock(&time_lock);
 
 #ifdef CONFIG_X86_IO_APIC
     if ( timer_ack ) 
@@ -80,13 +75,21 @@ static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
     rdtscll(full_tsc);
     tsc_irq = (u32)(full_tsc >> rdtsc_bitshift);
 
-    /* Updates xtime (wallclock time). */
-    do_timer(regs);
+    /* Update jiffies counter. */
+    (*(unsigned long *)&jiffies)++;
+
+    /* Update wall time. */
+    wc_usec += 1000000/HZ;
+    if ( wc_usec >= 1000000 )
+    {
+        wc_usec -= 1000000;
+        wc_sec++;
+    }
 
     /* Updates system time (nanoseconds since boot). */
     stime_irq += MILLISECS(1000/HZ);
 
-    write_unlock(&xtime_lock);
+    write_unlock(&time_lock);
 
     /* Rough hack to allow accurate timers to sort-of-work with no APIC. */
     if ( do_timer_lists_from_pit )
@@ -253,7 +256,7 @@ s_time_t get_s_time(void)
     s_time_t now;
     unsigned long flags;
 
-    read_lock_irqsave(&xtime_lock, flags);
+    read_lock_irqsave(&time_lock, flags);
 
     now = stime_irq + get_time_delta();
 
@@ -265,7 +268,7 @@ s_time_t get_s_time(void)
         prev_now = now;
     }
 
-    read_unlock_irqrestore(&xtime_lock, flags);
+    read_unlock_irqrestore(&time_lock, flags);
 
     return now; 
 }
@@ -275,7 +278,7 @@ void update_dom_time(shared_info_t *si)
 {
     unsigned long flags;
 
-    read_lock_irqsave(&xtime_lock, flags);
+    read_lock_irqsave(&time_lock, flags);
 
     si->time_version1++;
     wmb();
@@ -284,19 +287,13 @@ void update_dom_time(shared_info_t *si)
     si->tsc_timestamp.tsc_bitshift = rdtsc_bitshift;
     si->tsc_timestamp.tsc_bits     = tsc_irq;
     si->system_time    = stime_irq;
-    si->wc_sec         = xtime.tv_sec;
-    si->wc_usec        = xtime.tv_usec;
-    si->wc_usec       += (jiffies - wall_jiffies) * (1000000 / HZ);
-    while ( si->wc_usec >= 1000000 )
-    {
-        si->wc_usec -= 1000000;
-        si->wc_sec++;
-    }
+    si->wc_sec         = wc_sec;
+    si->wc_usec        = wc_usec;
 
     wmb();
     si->time_version2++;
 
-    read_unlock_irqrestore(&xtime_lock, flags);
+    read_unlock_irqrestore(&time_lock, flags);
 }
 
 
@@ -306,23 +303,21 @@ void do_settime(unsigned long secs, unsigned long usecs, u64 system_time_base)
     s64 delta;
     long _usecs = (long)usecs;
 
-    write_lock_irq(&xtime_lock);
+    write_lock_irq(&time_lock);
 
     delta = (s64)(stime_irq - system_time_base);
 
-	_usecs += (long)(delta/1000);
-	_usecs -= (jiffies - wall_jiffies) * (1000000 / HZ);
-
-	while ( _usecs < 0 ) 
+    _usecs += (long)(delta/1000);
+    while ( _usecs >= 1000000 ) 
     {
-		_usecs += 1000000;
-		secs--;
-	}
+        _usecs -= 1000000;
+        secs++;
+    }
 
-    xtime.tv_sec  = secs;
-    xtime.tv_usec = _usecs;
+    wc_sec  = secs;
+    wc_usec = _usecs;
 
-    write_unlock_irq(&xtime_lock);
+    write_unlock_irq(&time_lock);
 
     update_dom_time(current->shared_info);
 }
@@ -350,17 +345,13 @@ int __init init_xen_time()
     tsc_irq   = (u32)(full_tsc >> rdtsc_bitshift);
 
     /* Wallclock time starts as the initial RTC time. */
-    xtime.tv_sec  = get_cmos_time();
+    wc_sec  = get_cmos_time();
 
     printk("Time init:\n");
-    printk(".... System Time: %lldns\n", 
-           NOW());
-    printk(".... cpu_freq:    %08X:%08X\n", 
-           (u32)(cpu_freq>>32), (u32)cpu_freq);
-    printk(".... scale:       %08X:%08X\n", 
-           (u32)(scale>>32), (u32)scale);
-    printk(".... Wall Clock:  %lds %ldus\n", 
-           xtime.tv_sec, xtime.tv_usec);
+    printk(".... System Time: %lldns\n", NOW());
+    printk(".... cpu_freq:    %08X:%08X\n", (u32)(cpu_freq>>32),(u32)cpu_freq);
+    printk(".... scale:       %08X:%08X\n", (u32)(scale>>32),(u32)scale);
+    printk(".... Wall Clock:  %lds %ldus\n", wc_sec, wc_usec);
 
     return 0;
 }

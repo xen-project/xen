@@ -24,11 +24,7 @@
 extern unsigned long volatile jiffies;
 extern rwlock_t tasklist_lock;
 
-extern struct timeval xtime;
-
 #include <xen/spinlock.h>
-
-extern struct mm_struct init_mm;
 
 #define _HYP_EVENT_NEED_RESCHED 0
 #define _HYP_EVENT_DIE          1

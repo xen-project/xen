@@ -49,8 +49,6 @@ unsigned int opt_ser_baud = 0;
 unsigned char opt_com1[30] = "", opt_com2[30] = "";
 /* opt_dom0_mem: Kilobytes of memory allocated to domain 0. */
 unsigned int opt_dom0_mem = 16000;
-/* opt_ifname: Name of physical network interface to use. */
-unsigned char opt_ifname[10] = "eth0";
 /* opt_noht: If true, Hyperthreading is ignored. */
 int opt_noht=0;
 /* opt_noacpi: If true, ACPI tables are not parsed. */
@@ -80,7 +78,7 @@ char opt_leveltrigger[30] = "", opt_edgetrigger[30] = "";
 
 static struct {
     unsigned char *name;
-    enum { OPT_IP, OPT_STR, OPT_UINT, OPT_BOOL } type;
+    enum { OPT_STR, OPT_UINT, OPT_BOOL } type;
     void *var;
 } opts[] = {
     { "console",           OPT_STR,  &opt_console },
@@ -88,7 +86,6 @@ static struct {
     { "com1",              OPT_STR,  &opt_com1 },
     { "com2",              OPT_STR,  &opt_com2 },
     { "dom0_mem",          OPT_UINT, &opt_dom0_mem }, 
-    { "ifname",            OPT_STR,  &opt_ifname },
     { "noht",              OPT_BOOL, &opt_noht },
     { "noacpi",            OPT_BOOL, &opt_noacpi },
     { "nosmp",             OPT_BOOL, &opt_nosmp },
@@ -137,10 +134,6 @@ void cmain(unsigned long magic, multiboot_info_t *mbi)
                 if ( strcmp(opts[i].name, cmdline ) != 0 ) continue;
                 switch ( opts[i].type )
                 {
-                case OPT_IP:
-                    if ( opt != NULL )
-                        *(unsigned long *)opts[i].var = str_to_quad(opt);
-                    break;
                 case OPT_STR:
                     if ( opt != NULL )
                         strcpy(opts[i].var, opt);

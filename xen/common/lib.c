@@ -31,26 +31,6 @@ _L,_L,_L,_L,_L,_L,_L,_L,_L,_L,_L,_L,_L,_L,_L,_L,       /* 224-239 */
 _L,_L,_L,_L,_L,_L,_L,_P,_L,_L,_L,_L,_L,_L,_L,_L};      /* 240-255 */
 
 
-unsigned long str_to_quad(unsigned char *s)
-{
-    unsigned long quad = 0;
-    do {
-        quad <<= 8;
-        quad  |= simple_strtol(s, (char **)&s, 10);
-    }  
-    while ( *s++ == '.' );
-    return quad;
-}
-
-
-unsigned char *quad_to_str(unsigned long q, unsigned char *s)
-{
-    sprintf(s, "%ld.%ld.%ld.%ld", 
-            (q>>24)&255, (q>>16)&255, (q>>8)&255, (q>>0)&255);
-    return s;
-}
-   
-
 /* a couple of 64 bit operations ported from freebsd */
 
 /*-
@@ -409,63 +389,3 @@ __udivdi3(a, b)
 }
 
 #endif /* BITS_PER_LONG == 32 */
-
-
-/* HASH/RANDOMISATION FUNCTION
- * Based on lookup2.c, by Bob Jenkins, December 1996, Public Domain.
- * You can use this free for any purpose.  It has no warranty.
- * See http://burlteburtle.net/bob/hash/evahash.html 
- */
-
-#define mix(a,b,c)                                      \
-    do {                                                \
-        a -= b; a -= c; a ^= (c>>13);                   \
-        b -= c; b -= a; b ^= (a<< 8);                   \
-        c -= a; c -= b; c ^= ((b&0xffffffff)>>13);      \
-        a -= b; a -= c; a ^= ((c&0xffffffff)>>12);      \
-        b -= c; b -= a; b = (b ^ (a<<16)) & 0xffffffff; \
-        c -= a; c -= b; c = (c ^ (b>> 5)) & 0xffffffff; \
-        a -= b; a -= c; a = (a ^ (c>> 3)) & 0xffffffff; \
-        b -= c; b -= a; b = (b ^ (a<<10)) & 0xffffffff; \
-        c -= a; c -= b; c = (c ^ (b>>15)) & 0xffffffff; \
-    } while ( 0 )
-
-u32 hash(unsigned char *k, unsigned long len)
-{
-    u32 a, b, c, l;
-
-    l = len;
-    a = b = 0x9e3779b9;  /* the golden ratio; an arbitrary value */
-    c = 0xa5a5a5a5;      /* another arbitrary value (KAF, 13/5/03) */
-
-    while ( l >= 12 )
-    {
-        a += (k[0] + ((u32)k[1]<<8) + ((u32)k[2]<<16)  + ((u32)k[3]<<24));
-        b += (k[4] + ((u32)k[5]<<8) + ((u32)k[6]<<16)  + ((u32)k[7]<<24));
-        c += (k[8] + ((u32)k[9]<<8) + ((u32)k[10]<<16) + ((u32)k[11]<<24));
-        mix(a,b,c);
-        k += 12; l -= 12;
-    }
-
-    c += len;
-    switch ( l )
-    {
-    case 11: c+=((u32)k[10]<<24);
-    case 10: c+=((u32)k[9]<<16);
-    case 9 : c+=((u32)k[8]<<8);
-        /* the first byte of c is reserved for the length */
-    case 8 : b+=((u32)k[7]<<24);
-    case 7 : b+=((u32)k[6]<<16);
-    case 6 : b+=((u32)k[5]<<8);
-    case 5 : b+=k[4];
-    case 4 : a+=((u32)k[3]<<24);
-    case 3 : a+=((u32)k[2]<<16);
-    case 2 : a+=((u32)k[1]<<8);
-    case 1 : a+=k[0];
-        /* case 0: nothing left to add */
-    }
-
-    mix(a,b,c);
-
-    return c;
-}

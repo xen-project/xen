@@ -15,7 +15,6 @@
 #include <xen/sched.h>
 #include <xen/interrupt.h>
 #include <xen/init.h>
-#include <xen/tqueue.h>
 
 irq_cpustat_t irq_stat[NR_CPUS];
 
@@ -196,85 +195,8 @@ void tasklet_kill(struct tasklet_struct *t)
     clear_bit(TASKLET_STATE_SCHED, &t->state);
 }
 
-
-
-/* Old style BHs */
-
-static void (*bh_base[32])(void);
-struct tasklet_struct bh_task_vec[32];
-
-spinlock_t global_bh_lock = SPIN_LOCK_UNLOCKED;
-
-static void bh_action(unsigned long nr)
-{
-    int cpu = smp_processor_id();
-
-    if ( !spin_trylock(&global_bh_lock) )
-        goto resched;
-
-    if ( !hardirq_trylock(cpu) )
-        goto resched_unlock;
-
-    if ( likely(bh_base[nr] != NULL) )
-        bh_base[nr]();
-
-    hardirq_endlock(cpu);
-    spin_unlock(&global_bh_lock);
-    return;
-
- resched_unlock:
-    spin_unlock(&global_bh_lock);
- resched:
-    mark_bh(nr);
-}
-
-void init_bh(int nr, void (*routine)(void))
-{
-    bh_base[nr] = routine;
-    mb();
-}
-
-void remove_bh(int nr)
-{
-    tasklet_kill(bh_task_vec+nr);
-    bh_base[nr] = NULL;
-}
-
 void __init softirq_init()
 {
-    int i;
-
-    for ( i = 0; i < 32; i++)
-        tasklet_init(bh_task_vec+i, bh_action, i);
-
     open_softirq(TASKLET_SOFTIRQ, tasklet_action, NULL);
     open_softirq(HI_SOFTIRQ, tasklet_hi_action, NULL);
 }
-
-void __run_task_queue(task_queue *list)
-{
-    struct list_head  head, *next;
-    unsigned long     flags;
-    void              (*f) (void *);
-    struct tq_struct *p;
-    void             *data;
-
-    spin_lock_irqsave(&tqueue_lock, flags);
-    list_add(&head, list);
-    list_del_init(list);
-    spin_unlock_irqrestore(&tqueue_lock, flags);
-
-    next = head.next;
-    while ( next != &head )
-    {
-        p = list_entry(next, struct tq_struct, list);
-        next = next->next;
-        f = p->routine;
-        data = p->data;
-        wmb();
-        p->sync = 0;
-        if ( likely(f != NULL) )
-            f(data);
-    }
-}
-

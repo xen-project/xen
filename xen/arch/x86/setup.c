@@ -257,6 +257,9 @@ void __init cpu_init(void)
         panic("CPU#%d already initialized!!!\n", nr);
     printk("Initializing CPU#%d\n", nr);
 
+    t->bitmap = INVALID_IO_BITMAP_OFFSET;
+    memset(t->io_bitmap, ~0, sizeof(t->io_bitmap));
+
     /* Set up GDT and IDT. */
     SET_GDT_ENTRIES(current, DEFAULT_GDT_ENTRIES);
     SET_GDT_ADDRESS(current, DEFAULT_GDT_ADDRESS);
@@ -294,31 +297,6 @@ static void __init do_initcalls(void)
         (*call)();
 }
 
-/*
- * IBM-compatible BIOSes place drive info tables at initial interrupt
- * vectors 0x41 and 0x46. These are in the for of 16-bit-mode far ptrs.
- */
-struct drive_info_struct { unsigned char dummy[32]; } drive_info;
-void get_bios_driveinfo(void)
-{
-    unsigned long seg, off, tab1, tab2;
-
-    off  = (unsigned long)*(unsigned short *)(4*0x41+0);
-    seg  = (unsigned long)*(unsigned short *)(4*0x41+2);
-    tab1 = (seg<<4) + off;
-    
-    off  = (unsigned long)*(unsigned short *)(4*0x46+0);
-    seg  = (unsigned long)*(unsigned short *)(4*0x46+2);
-    tab2 = (seg<<4) + off;
-
-    printk("Reading BIOS drive-info tables at 0x%05lx and 0x%05lx\n", 
-           tab1, tab2);
-
-    memcpy(drive_info.dummy+ 0, (char *)tab1, 16);
-    memcpy(drive_info.dummy+16, (char *)tab2, 16);
-}
-
-
 unsigned long pci_mem_start = 0x10000000;
 
 void __init start_of_day(void)
@@ -326,8 +304,6 @@ void __init start_of_day(void)
     extern void trap_init(void);
     extern void init_IRQ(void);
     extern void time_init(void);
-    extern void timer_bh(void);
-    extern void init_timervecs(void);
     extern void ac_timer_init(void);
     extern void initialize_keytable(); 
     extern void initialize_keyboard(void);
@@ -347,12 +323,6 @@ void __init start_of_day(void)
 
     if ( opt_watchdog ) 
         nmi_watchdog = NMI_LOCAL_APIC;
-
-    /*
-     * We do this early, but tables are in the lowest 1MB (usually
-     * 0xfe000-0xfffff). Therefore they're unlikely to ever get clobbered.
-     */
-    get_bios_driveinfo();
 
     /* Tell the PCI layer not to allocate too close to the RAM area.. */
     low_mem_size = ((max_page << PAGE_SHIFT) + 0xfffff) & ~0xfffff;
@@ -380,14 +350,11 @@ void __init start_of_day(void)
     if ( smp_found_config ) 
         get_smp_config();
 #endif
-    domain_init();
     scheduler_init();	
     trap_init();
     init_IRQ();  /* installs simple interrupt wrappers. Starts HZ clock. */
     time_init(); /* installs software handler for HZ clock. */
     softirq_init();
-    init_timervecs();
-    init_bh(TIMER_BH, timer_bh);
     init_apic_mappings(); /* make APICs addressable in our pagetables. */
 
 #ifndef CONFIG_SMP    

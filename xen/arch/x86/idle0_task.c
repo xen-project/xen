@@ -11,5 +11,4 @@ struct task_struct idle0_task = IDLE0_TASK(idle0_task);
  * section. Since TSS's are completely CPU-local, we want them
  * on exact cacheline boundaries, to eliminate cacheline ping-pong.
  */ 
-struct tss_struct init_tss[NR_CPUS] __cacheline_aligned = { [0 ... NR_CPUS-1] = INIT_TSS };
-
+struct tss_struct init_tss[NR_CPUS] __cacheline_aligned;

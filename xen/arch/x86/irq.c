@@ -179,7 +179,7 @@ static inline void wait_on_irq(int cpu)
          * already executing in one..
          */
         if (!irqs_running())
-            if (local_bh_count(cpu) || !spin_is_locked(&global_bh_lock))
+            if (local_bh_count(cpu))
                 break;
 
         /* Duh, we have to loop. Release the lock to avoid deadlocks */
@@ -193,7 +193,7 @@ static inline void wait_on_irq(int cpu)
                 continue;
             if (global_irq_lock)
                 continue;
-            if (!local_bh_count(cpu) && spin_is_locked(&global_bh_lock))
+            if (!local_bh_count(cpu))
                 continue;
             if (!test_and_set_bit(0,&global_irq_lock))
                 break;
