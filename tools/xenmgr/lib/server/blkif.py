@@ -4,11 +4,8 @@ from messages import *
 
 class BlkifControllerFactory(controller.ControllerFactory):
     """Factory for creating block device interface controllers.
-    Also handles the 'back-end' channel to dom0.
+    Also handles the 'back-end' channel to the device driver domain.
     """
-
-    # todo: add support for setting dom controlling blkifs (don't assume 0).
-    # todo: add support for 'recovery'.
 
     def __init__(self):
         controller.ControllerFactory.__init__(self)
