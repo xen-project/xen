@@ -11,9 +11,17 @@
 
 #define load_TR(n)  __asm__ __volatile__ ("ltr  %%ax" : : "a" (__TSS(n)<<3) )
 
-/* Guest OS must provide its own code selectors, or use the one we provide. */
-#define VALID_CODESEL(_s) \
-    ((((_s)>>2) >= FIRST_DOMAIN_GDT_ENTRY) || ((_s) == FLAT_RING1_CS))
+/*
+ * Guest OS must provide its own code selectors, or use the one we provide.
+ * The RPL must be 1, as we only create bounce frames to ring 1.
+ */
+#define VALID_CODESEL(_s)                                                  \
+    (((((_s)>>2) >= FIRST_DOMAIN_GDT_ENTRY) || ((_s) == FLAT_RING1_CS)) && \
+     (((_s)&3) == 1))
+
+#define VALID_DATASEL(_s)                                                  \
+    (((((_s)>>2) >= FIRST_DOMAIN_GDT_ENTRY) || ((_s) == FLAT_RING1_DS)) && \
+     (((_s)&3) == 1))
 
 /* These are bitmasks for the first 32 bits of a descriptor table entry. */
 #define _SEGMENT_TYPE    (15<< 8)

@@ -103,8 +103,8 @@ long do_stack_switch(unsigned long ss, unsigned long esp)
     int nr = smp_processor_id();
     struct tss_struct *t = &init_tss[nr];
 
-    if ( (ss == __HYPERVISOR_CS) || (ss == __HYPERVISOR_DS) )
-        return -1;
+    if ( !VALID_DATASEL(ss) )
+        return -EINVAL;
 
     current->thread.ss1  = ss;
     current->thread.esp1 = esp;

@@ -34,7 +34,7 @@ struct task_struct *task_hash[TASK_HASH_SIZE];
  */
 struct task_struct *do_newdomain(unsigned int dom_id, unsigned int cpu)
 {
-    int retval;
+    int retval, i;
     struct task_struct *p = NULL;
     unsigned long flags;
 
@@ -67,6 +67,15 @@ struct task_struct *do_newdomain(unsigned int dom_id, unsigned int cpu)
 
     p->addr_limit = USER_DS;
     p->active_mm  = &p->mm;
+
+    /*
+     * We're basically forcing default RPLs to 1, so that our "what privilege
+     * level are we returning to?" logic works.
+     */
+    p->failsafe_selector = FLAT_RING1_CS;
+    p->event_selector    = FLAT_RING1_CS;
+    p->thread.ss1        = FLAT_RING1_DS;
+    for ( i = 0; i < 256; i++ ) p->thread.traps[i].cs = FLAT_RING1_CS;
 
     sched_add_domain(p);
 
