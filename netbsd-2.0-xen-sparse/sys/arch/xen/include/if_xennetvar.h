@@ -81,6 +81,8 @@ struct xennet_softc {
 
 	netif_tx_interface_t	*sc_tx;
 	netif_rx_interface_t	*sc_rx;
+	struct vm_page		*sc_pg_tx;
+	struct vm_page		*sc_pg_rx;
 
 	uint32_t		sc_tx_entries;
 	uint32_t		sc_tx_resp_cons;
@@ -102,6 +104,7 @@ struct xennet_attach_args {
 struct nfs_diskless;
 
 int xennet_scan(struct device *, struct xennet_attach_args *, cfprint_t);
+void xennet_scan_finish(struct device *);
 void xennet_start(struct ifnet *);
 int xennet_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data);
 void xennet_watchdog(struct ifnet *ifp);

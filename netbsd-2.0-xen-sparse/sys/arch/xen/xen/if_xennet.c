@@ -106,8 +106,9 @@ __KERNEL_RCSID(0, "$NetBSD: if_xennet.c,v 1.1.2.1 2004/05/22 15:58:29 he Exp $")
 #define XEDB_MBUF	0x08
 #define XEDB_MEM	0x10
 int xennet_debug = 0x0;
-#define DPRINTF(x) if (xennet_debug) printf x;
-#define DPRINTFN(n,x) if (xennet_debug & (n)) printf x;
+void printk(char *, ...);
+#define DPRINTF(x) if (xennet_debug) printk x;
+#define DPRINTFN(n,x) if (xennet_debug & (n)) printk x;
 #else
 #define DPRINTF(x)
 #define DPRINTFN(n,x)
@@ -174,13 +175,21 @@ static int nxennet_media = (sizeof(xennet_media)/sizeof(xennet_media[0]));
 #endif
 
 
+static int
+xennet_wait_for_interfaces(void)
+{
+
+	while (netctrl.xc_interfaces != netctrl.xc_connected)
+		HYPERVISOR_yield();
+	return 0;
+}
+
 int
 xennet_scan(struct device *self, struct xennet_attach_args *xneta,
     cfprint_t print)
 {
 	ctrl_msg_t cmsg;
 	netif_fe_driver_status_t st;
-	int err = 0;
 
 	if ((xen_start_info.flags & SIF_INITDOMAIN) ||
 	    (xen_start_info.flags & SIF_NET_BE_DOMAIN))
@@ -203,13 +212,17 @@ xennet_scan(struct device *self, struct xennet_attach_args *xneta,
 	memcpy(cmsg.msg, &st, sizeof(st));
 	ctrl_if_send_message_block(&cmsg, NULL, 0, 0);
 
-#if 0
+	return 0;
+}
+
+void
+xennet_scan_finish(struct device *parent)
+{
+	int err;
+
 	err = xennet_wait_for_interfaces();
 	if (err)
 		ctrl_if_unregister_receiver(CMSG_NETIF_FE, xennet_ctrlif_rx);
-#endif
-
-	return err;
 }
 
 int
@@ -270,7 +283,7 @@ find_device(int handle)
 		if (xs->sc_ifno == handle)
 			break;
 	}
-	return xs;
+	return dv ? xs : NULL;
 }
 
 static void
@@ -278,6 +291,7 @@ xennet_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
 {
 	int respond = 1;
 
+	DPRINTFN(XEDB_EVENT, ("> ctrlif_rx=%d\n", msg->subtype));
 	switch (msg->subtype) {
 	case CMSG_NETIF_FE_INTERFACE_STATUS:
 		if (msg->length != sizeof(netif_fe_interface_status_t))
@@ -307,7 +321,8 @@ static void
 xennet_driver_status_change(netif_fe_driver_status_t *status)
 {
 
-	DPRINTFN(XEDB_EVENT, ("> status=%d\n", status->status));
+	DPRINTFN(XEDB_EVENT, ("xennet_driver_status_change(%d)\n",
+		     status->status));
 
 	netctrl.xc_up = status->status;
 	xennet_driver_count_connected();
@@ -340,10 +355,9 @@ xennet_interface_status_change(netif_fe_interface_status_t *status)
 	netif_fe_interface_connect_t up;
 	struct xennet_softc *sc;
 	struct ifnet *ifp;
-	struct vm_page *pg_tx, *pg_rx;
 	struct xennet_attach_args xneta;
 
-	DPRINTFN(XEDB_EVENT, ("> status=%d handle=%d mac=%02x:%02x:%02x:%02x:%02x:%02x\n",
+	DPRINTFN(XEDB_EVENT, ("xennet_interface_status_change(%d,%d,%02x:%02x:%02x:%02x:%02x:%02x)\n",
 	    status->status,
 	    status->handle,
 	    status->mac[0], status->mac[1], status->mac[2],
@@ -362,6 +376,11 @@ xennet_interface_status_change(netif_fe_interface_status_t *status)
 		}
 	}
 	ifp = &sc->sc_ethercom.ec_if;
+
+	DPRINTFN(XEDB_EVENT, ("xennet_interface_status_change(%d,%p,%02x:%02x:%02x:%02x:%02x:%02x)\n",
+		     status->handle, sc,
+		     status->mac[0], status->mac[1], status->mac[2],
+		     status->mac[3], status->mac[4], status->mac[5]));
 
 	switch (status->status) {
 	case NETIF_INTERFACE_STATUS_CLOSED:
@@ -411,28 +430,30 @@ xennet_interface_status_change(netif_fe_interface_status_t *status)
 		}
 #endif
 
-		/* Move from CLOSED to DISCONNECTED state. */
-		sc->sc_tx = (netif_tx_interface_t *)
-			uvm_km_valloc_align(kernel_map, PAGE_SIZE, PAGE_SIZE);
-		if (sc->sc_tx == NULL)
-			panic("netif: no tx va");
-		sc->sc_rx = (netif_rx_interface_t *)
-			uvm_km_valloc_align(kernel_map, PAGE_SIZE, PAGE_SIZE);
-		if (sc->sc_rx == NULL)
-			panic("netif: no rx va");
-		pg_tx = uvm_pagealloc(NULL, 0, NULL, UVM_PGA_ZERO);
-		if (pg_tx == NULL) {
-			panic("netif: no tx pages");
+		if (sc->sc_backend_state == BEST_CLOSED) {
+			/* Move from CLOSED to DISCONNECTED state. */
+			sc->sc_tx = (netif_tx_interface_t *)
+				uvm_km_valloc_align(kernel_map, PAGE_SIZE, PAGE_SIZE);
+			if (sc->sc_tx == NULL)
+				panic("netif: no tx va");
+			sc->sc_rx = (netif_rx_interface_t *)
+				uvm_km_valloc_align(kernel_map, PAGE_SIZE, PAGE_SIZE);
+			if (sc->sc_rx == NULL)
+				panic("netif: no rx va");
+			sc->sc_pg_tx = uvm_pagealloc(NULL, 0, NULL, UVM_PGA_ZERO);
+			if (sc->sc_pg_tx == NULL) {
+				panic("netif: no tx pages");
+			}
+			pmap_kenter_pa((vaddr_t)sc->sc_tx, VM_PAGE_TO_PHYS(sc->sc_pg_tx),
+			    VM_PROT_READ | VM_PROT_WRITE);
+			sc->sc_pg_rx = uvm_pagealloc(NULL, 0, NULL, UVM_PGA_ZERO);
+			if (sc->sc_pg_rx == NULL) {
+				panic("netif: no rx pages");
+			}
+			pmap_kenter_pa((vaddr_t)sc->sc_rx, VM_PAGE_TO_PHYS(sc->sc_pg_rx),
+			    VM_PROT_READ | VM_PROT_WRITE);
+			sc->sc_backend_state = BEST_DISCONNECTED;
 		}
-		pmap_kenter_pa((vaddr_t)sc->sc_tx, VM_PAGE_TO_PHYS(pg_tx),
-		    VM_PROT_READ | VM_PROT_WRITE);
-		pg_rx = uvm_pagealloc(NULL, 0, NULL, UVM_PGA_ZERO);
-		if (pg_rx == NULL) {
-			panic("netif: no rx pages");
-		}
-		pmap_kenter_pa((vaddr_t)sc->sc_rx, VM_PAGE_TO_PHYS(pg_rx),
-		    VM_PROT_READ | VM_PROT_WRITE);
-		sc->sc_backend_state = BEST_DISCONNECTED;
 
 		/* Construct an interface-CONNECT message for the
 		 * domain controller. */
@@ -440,8 +461,8 @@ xennet_interface_status_change(netif_fe_interface_status_t *status)
 		cmsg.subtype   = CMSG_NETIF_FE_INTERFACE_CONNECT;
 		cmsg.length    = sizeof(netif_fe_interface_connect_t);
 		up.handle      = status->handle;
-		up.tx_shmem_frame = xpmap_ptom(VM_PAGE_TO_PHYS(pg_tx)) >> PAGE_SHIFT;
-		up.rx_shmem_frame = xpmap_ptom(VM_PAGE_TO_PHYS(pg_rx)) >> PAGE_SHIFT;
+		up.tx_shmem_frame = xpmap_ptom(VM_PAGE_TO_PHYS(sc->sc_pg_tx)) >> PAGE_SHIFT;
+		up.rx_shmem_frame = xpmap_ptom(VM_PAGE_TO_PHYS(sc->sc_pg_rx)) >> PAGE_SHIFT;
 		memcpy(cmsg.msg, &up, sizeof(up));
 
 		/* Tell the controller to bring up the interface. */
@@ -514,6 +535,7 @@ xennet_interface_status_change(netif_fe_interface_status_t *status)
 		    status->status);
 		break;
 	}
+	DPRINTFN(XEDB_EVENT, ("xennet_interface_status_change()\n"));
 }
 
 static void
@@ -806,8 +828,6 @@ network_alloc_rx_buffers(struct xennet_softc *sc)
 	int s;
 
 	ringidx = sc->sc_rx->req_prod;
-	if (0) printf("network_alloc_rx_buffers prod %d cons %d\n", ringidx,
-	    sc->sc_rx_resp_cons);
 	if ((ringidx - sc->sc_rx_resp_cons) > (RX_MAX_ENTRIES / 2))
 		return;
 

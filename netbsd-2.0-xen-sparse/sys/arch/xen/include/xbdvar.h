@@ -52,5 +52,6 @@ struct xbd_attach_args {
 };
 
 int xbd_scan(struct device *, struct xbd_attach_args *, cfprint_t);
+void xbd_scan_finish(struct device *);
 
 #endif /* _XEN_XBDVAR_H_ */

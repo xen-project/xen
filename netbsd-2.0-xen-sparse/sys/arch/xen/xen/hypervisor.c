@@ -133,6 +133,18 @@ hypervisor_match(parent, match, aux)
 	return 0;
 }
 
+static void
+scan_finish(struct device *parent)
+{
+
+#if NXENNET > 0
+	xennet_scan_finish(parent);
+#endif
+#if NXBD > 0
+	xbd_scan_finish(parent);
+#endif
+}
+
 /*
  * Attach the hypervisor.
  */
@@ -182,6 +194,9 @@ hypervisor_attach(parent, self, aux)
 		xenmachmem_init();
 		xenvfr_init();
 	}
+#endif
+#if NXENNET > 0 || NXBD > 0
+	config_interrupts(self, scan_finish);
 #endif
 }
 

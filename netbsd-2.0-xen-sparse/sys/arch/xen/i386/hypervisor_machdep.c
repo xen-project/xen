@@ -127,8 +127,7 @@ stipending()
 					hypervisor_acknowledge_irq(irq);
 					ci->ci_ipending |= (1 << irq);
 					if (ret == 0 && ci->ci_ilevel <
-					    ci->ci_isources[irq]->is_handlers
-					    ->ih_level)
+					    ci->ci_isources[irq]->is_maxlevel)
 						ret = 1;
 				}
 #if 0 /* XXXcl dev/evtchn */

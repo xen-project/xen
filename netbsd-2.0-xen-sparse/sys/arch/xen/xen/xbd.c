@@ -809,7 +809,7 @@ send_driver_status(int ok)
 		.subtype = CMSG_BLKIF_FE_DRIVER_STATUS,
 		.length  = sizeof(blkif_fe_driver_status_t),
 	};
-	blkif_fe_driver_status_t *msg = (void*)cmsg.msg;
+	blkif_fe_driver_status_t *msg = (blkif_fe_driver_status_t *)cmsg.msg;
     
 	msg->status = ok ? BLKIF_DRIVER_STATUS_UP : BLKIF_DRIVER_STATUS_DOWN;
 
@@ -825,7 +825,8 @@ send_interface_connect(void)
 		.subtype = CMSG_BLKIF_FE_INTERFACE_CONNECT,
 		.length  = sizeof(blkif_fe_interface_connect_t),
 	};
-	blkif_fe_interface_connect_t *msg = (void*)cmsg.msg;
+	blkif_fe_interface_connect_t *msg =
+		(blkif_fe_interface_connect_t *)cmsg.msg;
     	paddr_t pa;
 
 	pmap_extract(pmap_kernel(), (vaddr_t)blk_ring, &pa);
@@ -864,6 +865,15 @@ setup_sysctl(void)
 
 	if (pnode)
 		diskcookies = pnode;
+}
+
+static int
+xbd_wait_for_interfaces(void)
+{
+
+	while (state != STATE_CONNECTED)
+		HYPERVISOR_yield();
+	return 0;
 }
 
 int
@@ -912,11 +922,17 @@ xbd_scan(struct device *self, struct xbd_attach_args *mainbus_xbda,
 
 	send_driver_status(1);
 
-#if 0
-	enable_update_events(self);
-#endif
-
 	return 0;
+}
+
+void
+xbd_scan_finish(struct device *parent)
+{
+	int err;
+
+	err = xbd_wait_for_interfaces();
+	if (err)
+		ctrl_if_unregister_receiver(CMSG_NETIF_FE, xbd_ctrlif_rx);
 }
 
 #if NXBD > 0
