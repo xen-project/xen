@@ -50,7 +50,7 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
     if (phys_addr >= 0xA0000 && last_addr < 0x100000)
         return phys_to_virt(phys_addr);
 
-    if(remap_base + size > IOREMAP_VIRT_END) {
+    if(remap_base + size > IOREMAP_VIRT_END-1) {
       printk("ioremap: going past end of reserved space!\n");
       return NULL;
     }
