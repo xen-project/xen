@@ -265,6 +265,7 @@ static inline int HYPERVISOR_exit(void)
 static inline int HYPERVISOR_dom0_op(void *dom0_op)
 {
     int ret;
+    op->interface_version = DOM0_INTERFACE_VERSION;
     __asm__ __volatile__ (
         TRAP_INSTR
         : "=a" (ret) : "0" (__HYPERVISOR_dom0_op),

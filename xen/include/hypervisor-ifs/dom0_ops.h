@@ -12,6 +12,13 @@
 
 #include "hypervisor-if.h"
 
+/*
+ * Make sure you increment the interface version whenever you modify this file!
+ * This makes sure that old versions of dom0 tools will stop working in a
+ * well-defined way (rather than crashing the machine, for instance).
+ */
+#define DOM0_INTERFACE_VERSION   0xAAAA0001
+
 
 /*
  * The following is all CPU context. Note that the i387_ctxt block is filled 
@@ -178,6 +185,7 @@ typedef struct dom0_settime_st
 typedef struct dom0_op_st
 {
     unsigned long cmd;
+    unsigned long interface_version; /* DOM0_INTERFACE_VERSION */
     union
     {
         dom0_createdomain_t     createdomain;

@@ -85,6 +85,8 @@ static inline int do_dom0_op(dom0_op_t *op)
     int ret = -1;
     privcmd_hypercall_t hypercall;
 
+    op->interface_version = DOM0_INTERFACE_VERSION;
+
     hypercall.op     = __HYPERVISOR_dom0_op;
     hypercall.arg[0] = (unsigned long)op;
 
@@ -95,7 +97,12 @@ static inline int do_dom0_op(dom0_op_t *op)
     }
 
     if ( do_xen_hypercall(&hypercall) < 0 )
+    {
+        if ( errno == EINVAL )
+            fprintf(stderr, "Dom0 operation failed -- need to"
+                    " rebuild the user-space tool set?\n");
         goto out2;
+    }
 
     ret = 0;
 

@@ -92,6 +92,9 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     if ( copy_from_user(&op, u_dom0_op, sizeof(op)) )
         return -EFAULT;
 
+    if ( op.interface_version != DOM0_INTERFACE_VERSION )
+        return -EINVAL;
+
     switch ( op.cmd )
     {
 
