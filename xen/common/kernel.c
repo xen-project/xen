@@ -29,6 +29,7 @@
 unsigned long xenheap_phys_end;
 
 xmem_cache_t *domain_struct_cachep;
+xmem_cache_t *exec_domain_struct_cachep;
 struct domain *dom0;
 
 vm_assist_info_t vm_assist_info[MAX_VMASST_TYPE + 1];
@@ -184,7 +185,7 @@ void cmain(multiboot_info_t *mbi)
     }
 
     /* Must do this early -- e.g., spinlocks rely on get_current(). */
-    set_current(&idle0_task);
+    set_current(&idle0_exec_domain);
 
     /* We initialise the serial devices very early so we can get debugging. */
     serial_init_stage1();
@@ -304,6 +305,12 @@ void cmain(multiboot_info_t *mbi)
     if ( domain_struct_cachep == NULL )
         panic("No slab cache for task structs.");
 
+    exec_domain_struct_cachep = xmem_cache_create(
+        "exec_dom_cache", sizeof(struct exec_domain),
+        0, SLAB_HWCACHE_ALIGN, NULL, NULL);
+    if ( exec_domain_struct_cachep == NULL )
+        panic("No slab cache for task structs.");
+
     start_of_day();
 
     grant_table_init();
@@ -313,7 +320,7 @@ void cmain(multiboot_info_t *mbi)
     if ( dom0 == NULL )
         panic("Error creating domain 0\n");
 
-    set_bit(DF_PRIVILEGED, &dom0->flags);
+    set_bit(DF_PRIVILEGED, &dom0->d_flags);
 
     shadow_mode_init();
 
@@ -352,7 +359,7 @@ void cmain(multiboot_info_t *mbi)
     /* Give up the VGA console if DOM0 is configured to grab it. */
     console_endboot(cmdline && strstr(cmdline, "tty0"));
 
-    domain_unpause_by_systemcontroller(current);
+    domain_unpause_by_systemcontroller(current->domain);
     domain_unpause_by_systemcontroller(dom0);
     startup_cpu_idle_loop();
 }
@@ -370,7 +377,7 @@ long do_xen_version(int cmd)
 
 long do_vm_assist(unsigned int cmd, unsigned int type)
 {
-    return vm_assist(current, cmd, type);
+    return vm_assist(current->domain, cmd, type);
 }
 
 long do_ni_hypercall(void)

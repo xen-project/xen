@@ -71,7 +71,7 @@ static int get_free_port(struct domain *d)
 
 static long evtchn_alloc_unbound(evtchn_alloc_unbound_t *alloc)
 {
-    struct domain *d = current;
+    struct domain *d = current->domain;
     int            port;
 
     spin_lock(&d->event_channel_lock);
@@ -100,16 +100,16 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
     domid_t        dom1 = bind->dom1, dom2 = bind->dom2;
     long           rc = 0;
 
-    if ( !IS_PRIV(current) && (dom1 != DOMID_SELF) )
+    if ( !IS_PRIV(current->domain) && (dom1 != DOMID_SELF) )
         return -EPERM;
 
     if ( (port1 < 0) || (port2 < 0) )
         return -EINVAL;
 
     if ( dom1 == DOMID_SELF )
-        dom1 = current->id;
+        dom1 = current->domain->id;
     if ( dom2 == DOMID_SELF )
-        dom2 = current->id;
+        dom2 = current->domain->id;
 
     if ( ((d1 = find_domain_by_id(dom1)) == NULL) ||
          ((d2 = find_domain_by_id(dom2)) == NULL) )
@@ -183,7 +183,7 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
     switch ( d2->event_channel[port2].state )
     {
     case ECS_FREE:
-        if ( !IS_PRIV(current) && (dom2 != DOMID_SELF) )
+        if ( !IS_PRIV(current->domain) && (dom2 != DOMID_SELF) )
             ERROR_EXIT(-EPERM);
         break;
 
@@ -235,7 +235,7 @@ static long evtchn_bind_interdomain(evtchn_bind_interdomain_t *bind)
 
 static long evtchn_bind_virq(evtchn_bind_virq_t *bind)
 {
-    struct domain *d = current;
+    struct domain *d = current->domain;
     int            port, virq = bind->virq;
 
     if ( virq >= ARRAY_SIZE(d->virq_to_evtchn) )
@@ -271,7 +271,7 @@ static long evtchn_bind_virq(evtchn_bind_virq_t *bind)
 
 static long evtchn_bind_pirq(evtchn_bind_pirq_t *bind)
 {
-    struct domain *d = current;
+    struct domain *d = current->domain;
     int            port, rc, pirq = bind->pirq;
 
     if ( pirq >= ARRAY_SIZE(d->pirq_to_evtchn) )
@@ -417,8 +417,8 @@ static long evtchn_close(evtchn_close_t *close)
     domid_t        dom = close->dom;
 
     if ( dom == DOMID_SELF )
-        dom = current->id;
-    else if ( !IS_PRIV(current) )
+        dom = current->domain->id;
+    else if ( !IS_PRIV(current->domain) )
         return -EPERM;
 
     if ( (d = find_domain_by_id(dom)) == NULL )
@@ -433,7 +433,7 @@ static long evtchn_close(evtchn_close_t *close)
 
 static long evtchn_send(int lport)
 {
-    struct domain *ld = current, *rd;
+    struct domain *ld = current->domain, *rd;
     int            rport;
 
     spin_lock(&ld->event_channel_lock);
@@ -466,8 +466,8 @@ static long evtchn_status(evtchn_status_t *status)
     long             rc = 0;
 
     if ( dom == DOMID_SELF )
-        dom = current->id;
-    else if ( !IS_PRIV(current) )
+        dom = current->domain->id;
+    else if ( !IS_PRIV(current->domain) )
         return -EPERM;
 
     if ( (d = find_domain_by_id(dom)) == NULL )

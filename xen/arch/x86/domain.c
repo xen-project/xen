@@ -91,7 +91,7 @@ void startup_cpu_idle_loop(void)
 {
     /* Just some sanity to ensure that the scheduler is set up okay. */
     ASSERT(current->id == IDLE_DOMAIN_ID);
-    domain_unpause_by_systemcontroller(current);
+    domain_unpause_by_systemcontroller(current->domain);
     __enter_scheduler();
 
     /*
@@ -210,18 +210,18 @@ void machine_halt(void)
     __machine_halt(NULL);
 }
 
-void free_perdomain_pt(struct domain *d)
+void free_perdomain_pt(struct exec_domain *d)
 {
     free_xenheap_page((unsigned long)d->mm.perdomain_pt);
 }
 
-void arch_do_createdomain(struct domain *d)
+void arch_do_createdomain(struct exec_domain *d)
 {
     d->shared_info = (void *)alloc_xenheap_page();
     memset(d->shared_info, 0, PAGE_SIZE);
     d->shared_info->arch.mfn_to_pfn_start = 
 	virt_to_phys(&machine_to_phys_mapping[0])>>PAGE_SHIFT;
-    SHARE_PFN_WITH_DOMAIN(virt_to_page(d->shared_info), d);
+    SHARE_PFN_WITH_DOMAIN(virt_to_page(d->shared_info), d->domain);
     machine_to_phys_mapping[virt_to_phys(d->shared_info) >> 
                            PAGE_SHIFT] = INVALID_P2M_ENTRY;
 
@@ -231,14 +231,14 @@ void arch_do_createdomain(struct domain *d)
                            PAGE_SHIFT] = INVALID_P2M_ENTRY;
 }
 
-int arch_final_setup_guestos(struct domain *d, full_execution_context_t *c)
+int arch_final_setup_guestos(struct exec_domain *d, full_execution_context_t *c)
 {
     unsigned long phys_basetab;
     int i, rc;
 
-    clear_bit(DF_DONEFPUINIT, &d->flags);
+    clear_bit(EDF_DONEFPUINIT, &d->ed_flags);
     if ( c->flags & ECF_I387_VALID )
-        set_bit(DF_DONEFPUINIT, &d->flags);
+        set_bit(EDF_DONEFPUINIT, &d->ed_flags);
 
     memcpy(&d->thread.user_ctxt,
            &c->cpu_ctxt,
@@ -283,7 +283,7 @@ int arch_final_setup_guestos(struct domain *d, full_execution_context_t *c)
     
     phys_basetab = c->pt_base;
     d->mm.pagetable = mk_pagetable(phys_basetab);
-    if ( !get_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT], d, 
+    if ( !get_page_and_type(&frame_table[phys_basetab>>PAGE_SHIFT], d->domain, 
                             PGT_base_page_table) )
         return -EINVAL;
 
@@ -304,7 +304,7 @@ int arch_final_setup_guestos(struct domain *d, full_execution_context_t *c)
 
 #if defined(__i386__)
 
-void new_thread(struct domain *d,
+void new_thread(struct exec_domain *d,
                 unsigned long start_pc,
                 unsigned long start_stack,
                 unsigned long start_info)
@@ -342,7 +342,7 @@ void new_thread(struct domain *d,
 			:"r" (thread->debugreg[register]))
 
 
-void switch_to(struct domain *prev_p, struct domain *next_p)
+void switch_to(struct exec_domain *prev_p, struct exec_domain *next_p)
 {
     struct thread_struct *next = &next_p->thread;
     struct tss_struct *tss = init_tss + smp_processor_id();
@@ -352,7 +352,7 @@ void switch_to(struct domain *prev_p, struct domain *next_p)
     __cli();
 
     /* Switch guest general-register state. */
-    if ( !is_idle_task(prev_p) )
+    if ( !is_idle_task(prev_p->domain) )
     {
         memcpy(&prev_p->thread.user_ctxt,
                stack_ec, 
@@ -361,7 +361,7 @@ void switch_to(struct domain *prev_p, struct domain *next_p)
         CLEAR_FAST_TRAP(&prev_p->thread);
     }
 
-    if ( !is_idle_task(next_p) )
+    if ( !is_idle_task(next_p->domain) )
     {
         memcpy(stack_ec,
                &next_p->thread.user_ctxt,
@@ -389,36 +389,36 @@ void switch_to(struct domain *prev_p, struct domain *next_p)
         write_ptbase(&next_p->mm);
     }
 
-    if ( unlikely(prev_p->io_bitmap != NULL) || 
-         unlikely(next_p->io_bitmap != NULL) )
+    if ( unlikely(prev_p->domain->io_bitmap != NULL) || 
+         unlikely(next_p->domain->io_bitmap != NULL) )
     {
-        if ( next_p->io_bitmap != NULL )
+        if ( next_p->domain->io_bitmap != NULL )
         {
             /* Copy in the appropriate parts of the IO bitmap.  We use the
              * selector to copy only the interesting parts of the bitmap. */
 
             u64 old_sel = ~0ULL; /* IO bitmap selector for previous task. */
 
-            if ( prev_p->io_bitmap != NULL)
+            if ( prev_p->domain->io_bitmap != NULL)
             {
-                old_sel = prev_p->io_bitmap_sel;
+                old_sel = prev_p->domain->io_bitmap_sel;
 
                 /* Replace any areas of the IO bitmap that had bits cleared. */
-                for ( i = 0; i < sizeof(prev_p->io_bitmap_sel) * 8; i++ )
-                    if ( !test_bit(i, &prev_p->io_bitmap_sel) )
+                for ( i = 0; i < sizeof(prev_p->domain->io_bitmap_sel) * 8; i++ )
+                    if ( !test_bit(i, &prev_p->domain->io_bitmap_sel) )
                         memcpy(&tss->io_bitmap[i * IOBMP_SELBIT_LWORDS],
-                               &next_p->io_bitmap[i * IOBMP_SELBIT_LWORDS],
+                               &next_p->domain->io_bitmap[i * IOBMP_SELBIT_LWORDS],
                                IOBMP_SELBIT_LWORDS * sizeof(unsigned long));
             }
 
             /* Copy in any regions of the new task's bitmap that have bits
              * clear and we haven't already dealt with. */
-            for ( i = 0; i < sizeof(prev_p->io_bitmap_sel) * 8; i++ )
+            for ( i = 0; i < sizeof(prev_p->domain->io_bitmap_sel) * 8; i++ )
             {
                 if ( test_bit(i, &old_sel)
-                     && !test_bit(i, &next_p->io_bitmap_sel) )
+                     && !test_bit(i, &next_p->domain->io_bitmap_sel) )
                     memcpy(&tss->io_bitmap[i * IOBMP_SELBIT_LWORDS],
-                           &next_p->io_bitmap[i * IOBMP_SELBIT_LWORDS],
+                           &next_p->domain->io_bitmap[i * IOBMP_SELBIT_LWORDS],
                            IOBMP_SELBIT_LWORDS * sizeof(unsigned long));
             }
 
@@ -430,8 +430,8 @@ void switch_to(struct domain *prev_p, struct domain *next_p)
             /* In this case, we're switching FROM a task with IO port access,
              * to a task that doesn't use the IO bitmap.  We set any TSS bits
              * that might have been cleared, ready for future use. */
-            for ( i = 0; i < sizeof(prev_p->io_bitmap_sel) * 8; i++ )
-                if ( !test_bit(i, &prev_p->io_bitmap_sel) )
+            for ( i = 0; i < sizeof(prev_p->domain->io_bitmap_sel) * 8; i++ )
+                if ( !test_bit(i, &prev_p->domain->io_bitmap_sel) )
                     memset(&tss->io_bitmap[i * IOBMP_SELBIT_LWORDS],
                            0xFF, IOBMP_SELBIT_LWORDS * sizeof(unsigned long));
 
@@ -536,8 +536,8 @@ void domain_relinquish_memory(struct domain *d)
     shadow_mode_disable(d);
 
     /* Drop the in-use reference to the page-table base. */
-    if ( pagetable_val(d->mm.pagetable) != 0 )
-        put_page_and_type(&frame_table[pagetable_val(d->mm.pagetable) >>
+    if ( pagetable_val(d->exec_domain[0]->mm.pagetable) != 0 )
+        put_page_and_type(&frame_table[pagetable_val(d->exec_domain[0]->mm.pagetable) >>
                                       PAGE_SHIFT]);
 
     /*
@@ -569,6 +569,7 @@ int construct_dom0(struct domain *p,
     l1_pgentry_t *l1tab = NULL, *l1start = NULL;
     struct pfn_info *page = NULL;
     start_info_t *si;
+    struct exec_domain *ed = p->exec_domain[0];
 
     /*
      * This fully describes the memory layout of the initial domain. All 
@@ -596,7 +597,7 @@ int construct_dom0(struct domain *p,
     /* Sanity! */
     if ( p->id != 0 ) 
         BUG();
-    if ( test_bit(DF_CONSTRUCTED, &p->flags) ) 
+    if ( test_bit(DF_CONSTRUCTED, &p->d_flags) ) 
         BUG();
 
     memset(&dsi, 0, sizeof(struct domain_setup_info));
@@ -734,18 +735,18 @@ int construct_dom0(struct domain *p,
 
     mpt_alloc = (vpt_start - dsi.v_start) + alloc_start;
 
-    SET_GDT_ENTRIES(p, DEFAULT_GDT_ENTRIES);
-    SET_GDT_ADDRESS(p, DEFAULT_GDT_ADDRESS);
+    SET_GDT_ENTRIES(ed, DEFAULT_GDT_ENTRIES);
+    SET_GDT_ADDRESS(ed, DEFAULT_GDT_ADDRESS);
 
     /*
      * We're basically forcing default RPLs to 1, so that our "what privilege
      * level are we returning to?" logic works.
      */
-    p->failsafe_selector = FLAT_GUESTOS_CS;
-    p->event_selector    = FLAT_GUESTOS_CS;
-    p->thread.guestos_ss = FLAT_GUESTOS_DS;
+    ed->failsafe_selector = FLAT_GUESTOS_CS;
+    ed->event_selector    = FLAT_GUESTOS_CS;
+    ed->thread.guestos_ss = FLAT_GUESTOS_DS;
     for ( i = 0; i < 256; i++ ) 
-        p->thread.traps[i].cs = FLAT_GUESTOS_CS;
+        ed->thread.traps[i].cs = FLAT_GUESTOS_CS;
 
     /* WARNING: The new domain must have its 'processor' field filled in! */
     l2start = l2tab = (l2_pgentry_t *)mpt_alloc; mpt_alloc += PAGE_SIZE;
@@ -753,8 +754,8 @@ int construct_dom0(struct domain *p,
     l2tab[LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
         mk_l2_pgentry((unsigned long)l2start | __PAGE_HYPERVISOR);
     l2tab[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] =
-        mk_l2_pgentry(__pa(p->mm.perdomain_pt) | __PAGE_HYPERVISOR);
-    p->mm.pagetable = mk_pagetable((unsigned long)l2start);
+        mk_l2_pgentry(__pa(ed->mm.perdomain_pt) | __PAGE_HYPERVISOR);
+    ed->mm.pagetable = mk_pagetable((unsigned long)l2start);
 
     l2tab += l2_table_offset(dsi.v_start);
     mfn = alloc_start >> PAGE_SHIFT;
@@ -825,15 +826,16 @@ int construct_dom0(struct domain *p,
     }
 
     /* Set up shared-info area. */
-    update_dom_time(p->shared_info);
-    p->shared_info->domain_time = 0;
+    update_dom_time(ed->shared_info);
+    ed->shared_info->domain_time = 0;
     /* Mask all upcalls... */
     for ( i = 0; i < MAX_VIRT_CPUS; i++ )
-        p->shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
+        ed->shared_info->vcpu_data[i].evtchn_upcall_mask = 1;
+    ed->shared_info->n_vcpu = 1;
 
     /* Install the new page tables. */
     __cli();
-    write_ptbase(&p->mm);
+    write_ptbase(&ed->mm);
 
     /* Copy the OS image. */
     (void)loadelfimage(image_start);
@@ -846,7 +848,7 @@ int construct_dom0(struct domain *p,
     si = (start_info_t *)vstartinfo_start;
     memset(si, 0, PAGE_SIZE);
     si->nr_pages     = p->tot_pages;
-    si->shared_info  = virt_to_phys(p->shared_info);
+    si->shared_info  = virt_to_phys(ed->shared_info);
     si->flags        = SIF_PRIVILEGED | SIF_INITDOMAIN;
     si->pt_base      = vpt_start;
     si->nr_pt_frames = nr_pt_pages;
@@ -898,9 +900,9 @@ int construct_dom0(struct domain *p,
     /* DOM0 gets access to everything. */
     physdev_init_dom0(p);
 
-    set_bit(DF_CONSTRUCTED, &p->flags);
+    set_bit(DF_CONSTRUCTED, &p->d_flags);
 
-    new_thread(p, dsi.v_kernentry, vstack_end, vstartinfo_start);
+    new_thread(ed, dsi.v_kernentry, vstack_end, vstartinfo_start);
 
 #if 0 /* XXXXX DO NOT CHECK IN ENABLED !!! (but useful for testing so leave) */
     shadow_lock(&p->mm);

@@ -40,7 +40,7 @@ extern int shadow_mode_enable(struct domain *p, unsigned int mode);
 extern void __shadow_mode_disable(struct domain *d);
 static inline void shadow_mode_disable(struct domain *d)
 {
-    if ( shadow_mode(d) )
+    if ( shadow_mode(d->exec_domain[0]) )
         __shadow_mode_disable(d);
 }
 
@@ -62,7 +62,7 @@ struct shadow_status {
 #ifdef VERBOSE
 #define SH_LOG(_f, _a...)                             \
 printk("DOM%u: (file=shadow.c, line=%d) " _f "\n",    \
-       current->id , __LINE__ , ## _a )
+       current->domain->id , __LINE__ , ## _a )
 #else
 #define SH_LOG(_f, _a...) 
 #endif

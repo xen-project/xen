@@ -18,6 +18,7 @@
 #include <public/xen.h>
 
 struct domain;
+struct exec_domain;
 
 /*
  * Default implementation of macro that returns current
@@ -327,7 +328,7 @@ extern struct desc_struct *idt_tables[];
             &((_p)->fast_trap_desc), 8))
 #endif
 
-long set_fast_trap(struct domain *p, int idx);
+long set_fast_trap(struct exec_domain *p, int idx);
 
 #define INIT_THREAD  {						\
 	0, 0,		      		       			\
@@ -420,11 +421,11 @@ static inline void write_ptbase(struct mm_struct *mm)
 #define GET_GDT_ADDRESS(_p)     (*(unsigned long *)((_p)->mm.gdt + 2))
 
 void destroy_gdt(struct domain *d);
-long set_gdt(struct domain *d, 
+long set_gdt(struct exec_domain *d, 
              unsigned long *frames, 
              unsigned int entries);
 
-long set_debugreg(struct domain *p, int reg, unsigned long value);
+long set_debugreg(struct exec_domain *p, int reg, unsigned long value);
 
 struct microcode {
     unsigned int hdrver;

@@ -22,7 +22,8 @@
 
 static inline void evtchn_set_pending(struct domain *d, int port)
 {
-    shared_info_t *s = d->shared_info;
+    struct exec_domain *ed = d->exec_domain[0];
+    shared_info_t *s = ed->shared_info;
     int            running;
 
     /* These three operations must happen in strict order. */
@@ -42,10 +43,10 @@ static inline void evtchn_set_pending(struct domain *d, int port)
          * NB2. We save DF_RUNNING across the unblock to avoid a needless
          * IPI for domains that we IPI'd to unblock.
          */
-        running = test_bit(DF_RUNNING, &d->flags);
-        domain_unblock(d);
+        running = test_bit(EDF_RUNNING, &ed->ed_flags);
+        exec_domain_unblock(ed);
         if ( running )
-            smp_send_event_check_cpu(d->processor);
+            smp_send_event_check_cpu(ed->processor);
     }
 }
 
@@ -54,8 +55,9 @@ static inline void evtchn_set_pending(struct domain *d, int port)
  *  @d:        Domain to which virtual IRQ should be sent
  *  @virq:     Virtual IRQ number (VIRQ_*)
  */
-static inline void send_guest_virq(struct domain *d, int virq)
+static inline void send_guest_virq(struct exec_domain *ed, int virq)
 {
+    struct domain *d = ed->domain;
     evtchn_set_pending(d, d->virq_to_evtchn[virq]);
 }
 

@@ -26,7 +26,7 @@
 extern unsigned int alloc_new_dom_mem(struct domain *, unsigned int);
 extern long arch_do_dom0_op(dom0_op_t *op, dom0_op_t *u_dom0_op);
 extern void arch_getdomaininfo_ctxt(
-    struct domain *, full_execution_context_t *);
+    struct exec_domain *, full_execution_context_t *);
 
 static inline int is_free_domid(domid_t dom)
 {
@@ -96,7 +96,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     long ret = 0;
     dom0_op_t curop, *op = &curop;
 
-    if ( !IS_PRIV(current) )
+    if ( !IS_PRIV(current->domain) )
         return -EPERM;
 
     if ( copy_from_user(op, u_dom0_op, sizeof(*op)) )
@@ -131,7 +131,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         if ( d != NULL )
         {
             ret = -EINVAL;
-            if ( d != current )
+            if ( d != current->domain )
             {
                 domain_pause_by_systemcontroller(d);
                 ret = 0;
@@ -148,7 +148,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         if ( d != NULL )
         {
             ret = -EINVAL;
-            if ( test_bit(DF_CONSTRUCTED, &d->flags) )
+            if ( test_bit(DF_CONSTRUCTED, &d->d_flags) )
             {
                 domain_unpause_by_systemcontroller(d);
                 ret = 0;
@@ -178,11 +178,14 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         {
             /* Do an initial placement. Pick the least-populated CPU. */
             struct domain *d;
+            struct exec_domain *ed;
             unsigned int i, cnt[NR_CPUS] = { 0 };
 
             read_lock(&domlist_lock);
-            for_each_domain ( d )
-                cnt[d->processor]++;
+            for_each_domain ( d ) {
+                for_each_exec_domain ( d, ed )
+                    cnt[ed->processor]++;
+            }
             read_unlock(&domlist_lock);
 
             for ( i = 0; i < smp_num_cpus; i++ )
@@ -217,7 +220,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         if ( d != NULL )
         {
             ret = -EINVAL;
-            if ( d != current )
+            if ( d != current->domain )
             {
                 domain_kill(d);
                 ret = 0;
@@ -231,6 +234,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     {
         domid_t dom = op->u.pincpudomain.domain;
         struct domain *d = find_domain_by_id(dom);
+        struct exec_domain *ed;
         int cpu = op->u.pincpudomain.cpu;
 
         if ( d == NULL )
@@ -239,7 +243,15 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
             break;
         }
         
-        if ( d == current )
+        ed = d->exec_domain[op->u.pincpudomain.exec_domain];
+        if ( ed == NULL )
+        {
+            ret = -ESRCH;
+            put_domain(d);
+            break;
+        }
+
+        if ( ed == current )
         {
             ret = -EINVAL;
             put_domain(d);
@@ -248,17 +260,17 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
 
         if ( cpu == -1 )
         {
-            clear_bit(DF_CPUPINNED, &d->flags);
+            clear_bit(EDF_CPUPINNED, &ed->ed_flags);
         }
         else
         {
-            domain_pause(d);
+            exec_domain_pause(ed);
             synchronise_pagetables(~0UL);
-            if ( d->processor != (cpu % smp_num_cpus) )
-                set_bit(DF_MIGRATED, &d->flags);
-            set_bit(DF_CPUPINNED, &d->flags);
-            d->processor = cpu % smp_num_cpus;
-            domain_unpause(d);
+            if ( ed->processor != (cpu % smp_num_cpus) )
+                set_bit(EDF_MIGRATED, &ed->ed_flags);
+            set_bit(EDF_CPUPINNED, &ed->ed_flags);
+            ed->processor = cpu % smp_num_cpus;
+            exec_domain_unpause(ed);
         }
 
         put_domain(d);
@@ -321,6 +333,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
     { 
         full_execution_context_t *c;
         struct domain            *d;
+        struct exec_domain       *ed;
 
         read_lock(&domlist_lock);
 
@@ -340,24 +353,26 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         read_unlock(&domlist_lock);
 
         op->u.getdomaininfo.domain = d->id;
-        
-        op->u.getdomaininfo.flags =
-            (test_bit(DF_DYING,     &d->flags) ? DOMFLAGS_DYING    : 0) |
-            (test_bit(DF_CRASHED,   &d->flags) ? DOMFLAGS_CRASHED  : 0) |
-            (test_bit(DF_SHUTDOWN,  &d->flags) ? DOMFLAGS_SHUTDOWN : 0) |
-            (test_bit(DF_CTRLPAUSE, &d->flags) ? DOMFLAGS_PAUSED   : 0) |
-            (test_bit(DF_BLOCKED,   &d->flags) ? DOMFLAGS_BLOCKED  : 0) |
-            (test_bit(DF_RUNNING,   &d->flags) ? DOMFLAGS_RUNNING  : 0);
 
-        op->u.getdomaininfo.flags |= d->processor << DOMFLAGS_CPUSHIFT;
+        ed = d->exec_domain[0]; // op->u.getdomaininfo.exec_domain];
+
+        op->u.getdomaininfo.flags =
+            (test_bit( DF_DYING,      &d->d_flags)  ? DOMFLAGS_DYING    : 0) |
+            (test_bit( DF_CRASHED,    &d->d_flags)  ? DOMFLAGS_CRASHED  : 0) |
+            (test_bit( DF_SHUTDOWN,   &d->d_flags)  ? DOMFLAGS_SHUTDOWN : 0) |
+            (test_bit(EDF_CTRLPAUSE, &ed->ed_flags) ? DOMFLAGS_PAUSED   : 0) |
+            (test_bit(EDF_BLOCKED,   &ed->ed_flags) ? DOMFLAGS_BLOCKED  : 0) |
+            (test_bit(EDF_RUNNING,   &ed->ed_flags) ? DOMFLAGS_RUNNING  : 0);
+
+        op->u.getdomaininfo.flags |= ed->processor << DOMFLAGS_CPUSHIFT;
         op->u.getdomaininfo.flags |= 
             d->shutdown_code << DOMFLAGS_SHUTDOWNSHIFT;
 
         op->u.getdomaininfo.tot_pages   = d->tot_pages;
         op->u.getdomaininfo.max_pages   = d->max_pages;
-        op->u.getdomaininfo.cpu_time    = d->cpu_time;
+        op->u.getdomaininfo.cpu_time    = ed->cpu_time;
         op->u.getdomaininfo.shared_info_frame = 
-            __pa(d->shared_info) >> PAGE_SHIFT;
+            __pa(ed->shared_info) >> PAGE_SHIFT;
 
         if ( op->u.getdomaininfo.ctxt != NULL )
         {
@@ -368,13 +383,13 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
                 break;
             }
 
-            if ( d != current )
-                domain_pause(d);
+            if ( ed != current )
+                exec_domain_pause(ed);
 
-            arch_getdomaininfo_ctxt(d,c);
+            arch_getdomaininfo_ctxt(ed,c);
 
-            if ( d != current )
-                domain_unpause(d);
+            if ( ed != current )
+                exec_domain_unpause(ed);
 
             if ( copy_to_user(op->u.getdomaininfo.ctxt, c, sizeof(*c)) )
                 ret = -EINVAL;
@@ -524,7 +539,7 @@ long do_dom0_op(dom0_op_t *u_dom0_op)
         if ( d != NULL )
         { 
             /* should only be used *before* domain is built. */
-            if ( !test_bit(DF_CONSTRUCTED, &d->flags) )
+            if ( !test_bit(DF_CONSTRUCTED, &d->d_flags) )
                 ret = alloc_new_dom_mem( 
                     d, op->u.setdomaininitialmem.initial_memkb );
             else

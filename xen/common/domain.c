@@ -25,20 +25,23 @@ struct domain *domain_list;
 struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
 {
     struct domain *d, **pd;
+    struct exec_domain *ed;
 
     if ( (d = alloc_domain_struct()) == NULL )
         return NULL;
 
-    atomic_set(&d->refcnt, 1);
-    atomic_set(&d->pausecnt, 0);
+    ed = d->exec_domain[0];
 
-    shadow_lock_init(d);
+    atomic_set(&d->refcnt, 1);
+    atomic_set(&ed->pausecnt, 0);
+
+    shadow_lock_init(ed);
 
     d->id          = dom_id;
-    d->processor   = cpu;
+    ed->processor   = cpu;
     d->create_time = NOW();
  
-    memcpy(&d->thread, &idle0_task.thread, sizeof(d->thread));
+    memcpy(&ed->thread, &idle0_exec_domain.thread, sizeof(ed->thread));
 
     spin_lock_init(&d->page_alloc_lock);
     INIT_LIST_HEAD(&d->page_list);
@@ -57,7 +60,7 @@ struct domain *do_createdomain(domid_t dom_id, unsigned int cpu)
             return NULL;
         }
 
-        arch_do_createdomain(d);
+        arch_do_createdomain(ed);
 
         sched_add_domain(d);
 
@@ -128,7 +131,7 @@ struct domain *find_last_domain(void)
 void domain_kill(struct domain *d)
 {
     domain_pause(d);
-    if ( !test_and_set_bit(DF_DYING, &d->flags) )
+    if ( !test_and_set_bit(DF_DYING, &d->d_flags) )
     {
         sched_rem_domain(d);
         domain_relinquish_memory(d);
@@ -139,12 +142,14 @@ void domain_kill(struct domain *d)
 
 void domain_crash(void)
 {
-    if ( current->id == 0 )
+    struct domain *d = current->domain;
+
+    if ( d->id == 0 )
         BUG();
 
-    set_bit(DF_CRASHED, &current->flags);
+    set_bit(DF_CRASHED, &d->d_flags);
 
-    send_guest_virq(dom0, VIRQ_DOM_EXC);
+    send_guest_virq(dom0->exec_domain[0], VIRQ_DOM_EXC);
     
     __enter_scheduler();
     BUG();
@@ -152,7 +157,9 @@ void domain_crash(void)
 
 void domain_shutdown(u8 reason)
 {
-    if ( current->id == 0 )
+    struct domain *d = current->domain;
+
+    if ( d->id == 0 )
     {
         extern void machine_restart(char *);
         extern void machine_halt(void);
@@ -169,10 +176,10 @@ void domain_shutdown(u8 reason)
         }
     }
 
-    current->shutdown_code = reason;
-    set_bit(DF_SHUTDOWN, &current->flags);
+    d->shutdown_code = reason;
+    set_bit(DF_SHUTDOWN, &d->d_flags);
 
-    send_guest_virq(dom0, VIRQ_DOM_EXC);
+    send_guest_virq(dom0->exec_domain[0], VIRQ_DOM_EXC);
 
     __enter_scheduler();
 }
@@ -206,9 +213,10 @@ unsigned int alloc_new_dom_mem(struct domain *d, unsigned int kbytes)
 void domain_destruct(struct domain *d)
 {
     struct domain **pd;
+    struct exec_domain *ed;
     atomic_t      old, new;
 
-    if ( !test_bit(DF_DYING, &d->flags) )
+    if ( !test_bit(DF_DYING, &d->d_flags) )
         BUG();
 
     /* May be already destructed, or get_domain() can race us. */
@@ -233,8 +241,9 @@ void domain_destruct(struct domain *d)
     destroy_event_channels(d);
     grant_table_destroy(d);
 
-    free_perdomain_pt(d);
-    free_xenheap_page((unsigned long)d->shared_info);
+    for_each_exec_domain(d, ed)
+        free_perdomain_pt(ed);
+    free_xenheap_page((unsigned long)d->exec_domain[0]->shared_info);
 
     free_domain_struct(d);
 }
@@ -253,7 +262,7 @@ int final_setup_guestos(struct domain *p, dom0_builddomain_t *builddomain)
     if ( (c = xmalloc(sizeof(*c))) == NULL )
         return -ENOMEM;
 
-    if ( test_bit(DF_CONSTRUCTED, &p->flags) )
+    if ( test_bit(DF_CONSTRUCTED, &p->d_flags) )
     {
         rc = -EINVAL;
         goto out;
@@ -265,13 +274,13 @@ int final_setup_guestos(struct domain *p, dom0_builddomain_t *builddomain)
         goto out;
     }
     
-    if ( (rc = arch_final_setup_guestos(p,c)) != 0 )
+    if ( (rc = arch_final_setup_guestos(p->exec_domain[0],c)) != 0 )
         goto out;
 
     /* Set up the shared info structure. */
-    update_dom_time(p->shared_info);
+    update_dom_time(p->exec_domain[0]->shared_info);
 
-    set_bit(DF_CONSTRUCTED, &p->flags);
+    set_bit(DF_CONSTRUCTED, &p->d_flags);
 
  out:    
     if ( c != NULL )

@@ -171,7 +171,7 @@ void shadow_mode_init(void)
 
 int shadow_mode_enable(struct domain *p, unsigned int mode)
 {
-    struct mm_struct *m = &p->mm;
+    struct mm_struct *m = &p->exec_domain[0]->mm;
 
     m->shadow_ht = xmalloc(
         shadow_ht_buckets * sizeof(struct shadow_status));
@@ -206,7 +206,7 @@ int shadow_mode_enable(struct domain *p, unsigned int mode)
 
 void __shadow_mode_disable(struct domain *d)
 {
-    struct mm_struct *m = &d->mm;
+    struct mm_struct *m = &d->exec_domain[0]->mm;
     struct shadow_status *x, *n;
 
     free_shadow_state(m);
@@ -243,7 +243,7 @@ static int shadow_mode_table_op(
     struct domain *d, dom0_shadow_control_t *sc)
 {
     unsigned int      op = sc->op;
-    struct mm_struct *m = &d->mm;
+    struct mm_struct *m = &d->exec_domain[0]->mm;
     int               i, rc = 0;
 
     ASSERT(spin_is_locked(&m->shadow_lock));
@@ -356,7 +356,7 @@ int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
     unsigned int op = sc->op;
     int          rc = 0;
 
-    if ( unlikely(d == current) )
+    if ( unlikely(d == current->domain) )
     {
         DPRINTK("Don't try to do a shadow op on yourself!\n");
         return -EINVAL;
@@ -365,7 +365,7 @@ int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
     domain_pause(d);
     synchronise_pagetables(~0UL);
 
-    shadow_lock(&d->mm);
+    shadow_lock(&d->exec_domain[0]->mm);
 
     switch ( op )
     {
@@ -384,11 +384,11 @@ int shadow_mode_control(struct domain *d, dom0_shadow_control_t *sc)
         break;
 
     default:
-        rc = shadow_mode(d) ? shadow_mode_table_op(d, sc) : -EINVAL;
+        rc = shadow_mode(d->exec_domain[0]) ? shadow_mode_table_op(d, sc) : -EINVAL;
         break;
     }
 
-    shadow_unlock(&d->mm);
+    shadow_unlock(&d->exec_domain[0]->mm);
 
     domain_unpause(d);
 
@@ -428,9 +428,9 @@ void unshadow_table(unsigned long gpfn, unsigned int type)
      * guests there won't be a race here as this CPU was the one that 
      * cmpxchg'ed the page to invalid.
      */
-    spfn = __shadow_status(&d->mm, gpfn) & PSH_pfn_mask;
-    delete_shadow_status(&d->mm, gpfn);
-    free_shadow_page(&d->mm, &frame_table[spfn]);
+    spfn = __shadow_status(&d->exec_domain[0]->mm, gpfn) & PSH_pfn_mask;
+    delete_shadow_status(&d->exec_domain[0]->mm, gpfn);
+    free_shadow_page(&d->exec_domain[0]->mm, &frame_table[spfn]);
 }
 
 unsigned long shadow_l2_table( 
@@ -473,7 +473,7 @@ unsigned long shadow_l2_table(
     spl2e[SH_LINEAR_PT_VIRT_START >> L2_PAGETABLE_SHIFT] =
         mk_l2_pgentry((spfn << PAGE_SHIFT) | __PAGE_HYPERVISOR);
     spl2e[PERDOMAIN_VIRT_START >> L2_PAGETABLE_SHIFT] =
-        mk_l2_pgentry(__pa(frame_table[gpfn].u.inuse.domain->mm.perdomain_pt) |
+        mk_l2_pgentry(__pa(frame_table[gpfn].u.inuse.domain->exec_domain[0]->mm.perdomain_pt) |
                       __PAGE_HYPERVISOR);
 #endif
 

@@ -253,7 +253,7 @@ static void __serial_rx(unsigned char c, struct xen_regs *regs)
     {
         serial_rx_ring[SERIAL_RX_MASK(serial_rx_prod)] = c;
         if ( serial_rx_prod++ == serial_rx_cons )
-            send_guest_virq(dom0, VIRQ_CONSOLE);
+            send_guest_virq(dom0->exec_domain[0], VIRQ_CONSOLE);
     }
 }
 
@@ -286,7 +286,7 @@ long do_console_io(int cmd, int count, char *buffer)
 
 #ifndef VERBOSE
     /* Only domain-0 may access the emergency console. */
-    if ( current->id != 0 )
+    if ( current->domain->id != 0 )
         return -EPERM;
 #endif
 

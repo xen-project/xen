@@ -212,7 +212,7 @@ int pirq_guest_unmask(struct domain *d)
     irq_desc_t    *desc;
     unsigned int   i, j, pirq;
     u32            m;
-    shared_info_t *s = d->shared_info;
+    shared_info_t *s = d->exec_domain[0]->shared_info;
 
     for ( i = 0; i < ARRAY_SIZE(d->pirq_mask); i++ )
     {
@@ -279,7 +279,7 @@ int pirq_guest_bind(struct domain *d, int irq, int will_share)
         /* Attempt to bind the interrupt target to the correct CPU. */
         if ( desc->handler->set_affinity != NULL )
             desc->handler->set_affinity(
-                irq, apicid_to_phys_cpu_present(d->processor));
+                irq, apicid_to_phys_cpu_present(d->exec_domain[0]->processor));
     }
     else if ( !will_share || !action->shareable )
     {

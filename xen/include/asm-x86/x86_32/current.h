@@ -6,9 +6,9 @@ struct domain;
 #define STACK_RESERVED \
     (sizeof(execution_context_t) + sizeof(struct domain *))
 
-static inline struct domain * get_current(void)
+static inline struct exec_domain * get_current(void)
 {
-    struct domain *current;
+    struct exec_domain *current;
     __asm__ ( "orl %%esp,%0; andl $~3,%0; movl (%0),%0" 
               : "=r" (current) : "0" (STACK_SIZE-4) );
     return current;
@@ -16,7 +16,7 @@ static inline struct domain * get_current(void)
  
 #define current get_current()
 
-static inline void set_current(struct domain *p)
+static inline void set_current(struct exec_domain *p)
 {
     __asm__ ( "orl %%esp,%0; andl $~3,%0; movl %1,(%0)" 
               : : "r" (STACK_SIZE-4), "r" (p) );    
@@ -43,7 +43,7 @@ static inline unsigned long get_stack_top(void)
     __asm__ __volatile__ (                                        \
         "andl %%esp,%0; addl %2,%0; movl %0,%%esp; jmp *%1"       \
         : : "r" (~(STACK_SIZE-1)),                                \
-            "r" (unlikely(is_idle_task((_p))) ?                   \
+            "r" (unlikely(is_idle_task((_p)->domain)) ?           \
                                 continue_cpu_idle_loop :          \
                                 continue_nonidle_task),           \
             "i" (STACK_SIZE-STACK_RESERVED) )

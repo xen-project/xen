@@ -74,7 +74,7 @@ __gnttab_map_grant_ref(
      */
     int            retries = 0;
 
-    ld = current;
+    ld = current->domain;
 
     /* Bitwise-OR avoids short-circuiting which screws control flow. */
     if ( unlikely(__get_user(dom, &uop->dom) |
@@ -291,7 +291,7 @@ __gnttab_unmap_grant_ref(
     s16            rc = 0;
     unsigned long  frame, virt;
 
-    ld = current;
+    ld = current->domain;
 
     /* Bitwise-OR avoids short-circuiting which screws control flow. */
     if ( unlikely(__get_user(virt, &uop->host_virt_addr) |
@@ -404,9 +404,9 @@ gnttab_setup_table(
 
     if ( op.dom == DOMID_SELF )
     {
-        op.dom = current->id;
+        op.dom = current->domain->id;
     }
-    else if ( unlikely(!IS_PRIV(current)) )
+    else if ( unlikely(!IS_PRIV(current->domain)) )
     {
         (void)put_user(GNTST_permission_denied, &uop->status);
         return 0;

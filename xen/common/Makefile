@@ -19,6 +19,9 @@ ifneq ($(trace),y)
 OBJS := $(subst trace.o,,$(OBJS))
 endif
 
+OBJS := $(subst sched_atropos.o,,$(OBJS))
+OBJS := $(subst sched_rrobin.o,,$(OBJS))
+
 default: $(OBJS)
 	$(LD) $(LDFLAGS) -r -o common.o $(OBJS)
 

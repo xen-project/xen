@@ -456,13 +456,13 @@ struct pfn_info *alloc_domheap_pages(struct domain *d, int order)
 
     spin_lock(&d->page_alloc_lock);
 
-    if ( unlikely(test_bit(DF_DYING, &d->flags)) ||
+    if ( unlikely(test_bit(DF_DYING, &d->d_flags)) ||
          unlikely((d->tot_pages + (1 << order)) > d->max_pages) )
     {
         DPRINTK("Over-allocation for domain %u: %u > %u\n",
                 d->id, d->tot_pages + (1 << order), d->max_pages);
         DPRINTK("...or the domain is dying (%d)\n", 
-                !!test_bit(DF_DYING, &d->flags));
+                !!test_bit(DF_DYING, &d->d_flags));
         spin_unlock(&d->page_alloc_lock);
         free_heap_pages(MEMZONE_DOM, pg, order);
         return NULL;
@@ -491,7 +491,9 @@ void free_domheap_pages(struct pfn_info *pg, int order)
 {
     int            i, drop_dom_ref;
     struct domain *d = pg->u.inuse.domain;
+    struct exec_domain *ed;
     void          *p;
+    int cpu_mask = 0;
 
     ASSERT(!in_irq());
 
@@ -513,11 +515,14 @@ void free_domheap_pages(struct pfn_info *pg, int order)
         /* NB. May recursively lock from domain_relinquish_memory(). */
         spin_lock_recursive(&d->page_alloc_lock);
 
+        for_each_exec_domain(d, ed)
+            cpu_mask |= 1 << ed->processor;
+
         for ( i = 0; i < (1 << order); i++ )
         {
             ASSERT((pg[i].u.inuse.type_info & PGT_count_mask) == 0);
             pg[i].tlbflush_timestamp  = tlbflush_current_time();
-            pg[i].u.free.cpu_mask     = 1 << d->processor;
+            pg[i].u.free.cpu_mask     = cpu_mask;
             list_del(&pg[i].list);
 
             /*
@@ -525,7 +530,7 @@ void free_domheap_pages(struct pfn_info *pg, int order)
              * if it cares about the secrecy of their contents. However, after
              * a domain has died we assume responsibility for erasure.
              */
-            if ( unlikely(test_bit(DF_DYING, &d->flags)) )
+            if ( unlikely(test_bit(DF_DYING, &d->d_flags)) )
             {
                 p = map_domain_mem(page_to_phys(&pg[i]));
                 clear_page(p);

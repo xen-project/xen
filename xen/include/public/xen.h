@@ -251,7 +251,7 @@ typedef struct
 #define NR_EVENT_CHANNELS 1024
 
 /* No support for multi-processor guests. */
-#define MAX_VIRT_CPUS 1
+#define MAX_VIRT_CPUS 4
 
 /*
  * Xen/guestos shared data -- pointer provided in start_info.
@@ -293,6 +293,8 @@ typedef struct shared_info_st
         u8 evtchn_upcall_mask;
         u8 pad0, pad1;
     } PACKED vcpu_data[MAX_VIRT_CPUS];  /*   0 */
+
+    u32 n_vcpu;
 
     /*
      * A domain can have up to 1024 "event channels" on which it can send

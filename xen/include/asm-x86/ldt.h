@@ -3,7 +3,7 @@
 
 #ifndef __ASSEMBLY__
 
-static inline void load_LDT(struct domain *p)
+static inline void load_LDT(struct exec_domain *p)
 {
     unsigned int cpu;
     struct desc_struct *desc;

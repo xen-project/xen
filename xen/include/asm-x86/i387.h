@@ -15,16 +15,16 @@
 #include <asm/processor.h>
 
 extern void init_fpu(void);
-extern void save_init_fpu( struct domain *tsk );
-extern void restore_fpu( struct domain *tsk );
+extern void save_init_fpu( struct exec_domain *tsk );
+extern void restore_fpu( struct exec_domain *tsk );
 
 #define unlazy_fpu( tsk ) do { \
-	if ( test_bit(DF_USEDFPU, &tsk->flags) ) \
+	if ( test_bit(EDF_USEDFPU, &tsk->ed_flags) ) \
 		save_init_fpu( tsk ); \
 } while (0)
 
 #define clear_fpu( tsk ) do { \
-	if ( test_and_clear_bit(DF_USEDFPU, &tsk->flags) ) { \
+	if ( test_and_clear_bit(EDF_USEDFPU, &tsk->ed_flags) ) { \
 		asm volatile("fwait"); \
 		stts(); \
 	} \

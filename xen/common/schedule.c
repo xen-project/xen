@@ -68,12 +68,12 @@ static void fallback_timer_fn(unsigned long unused);
 schedule_data_t schedule_data[NR_CPUS];
 
 extern struct scheduler sched_bvt_def;
-extern struct scheduler sched_rrobin_def;
-extern struct scheduler sched_atropos_def;
+// extern struct scheduler sched_rrobin_def;
+// extern struct scheduler sched_atropos_def;
 static struct scheduler *schedulers[] = { 
     &sched_bvt_def,
-    &sched_rrobin_def,
-    &sched_atropos_def,
+//     &sched_rrobin_def,
+//     &sched_atropos_def,
     NULL
 };
 
@@ -94,29 +94,46 @@ static struct ac_timer t_timer[NR_CPUS];
 static struct ac_timer fallback_timer[NR_CPUS];
 
 extern xmem_cache_t *domain_struct_cachep;
+extern xmem_cache_t *exec_domain_struct_cachep;
 
 void free_domain_struct(struct domain *d)
 {
+    struct exec_domain *ed;
+
     SCHED_OP(free_task, d);
+    for_each_exec_domain(d, ed)
+        xmem_cache_free(exec_domain_struct_cachep, ed);
     xmem_cache_free(domain_struct_cachep, d);
 }
 
 struct domain *alloc_domain_struct(void)
 {
     struct domain *d;
+    struct exec_domain *ed = NULL;
 
     if ( (d = xmem_cache_alloc(domain_struct_cachep)) == NULL )
         return NULL;
     
     memset(d, 0, sizeof(*d));
 
-    if ( SCHED_OP(alloc_task, d) < 0 )
-    {
-        xmem_cache_free(domain_struct_cachep, d);
-        return NULL;
-    }
+    if ( (ed = xmem_cache_alloc(exec_domain_struct_cachep)) == NULL )
+        goto out;
+
+    memset(ed, 0, sizeof(*ed));
+
+    d->exec_domain[0] = ed;
+    ed->domain = d;
+
+    if ( SCHED_OP(alloc_task, ed) < 0 )
+        goto out;
 
     return d;
+
+ out:
+    if ( ed )
+        xmem_cache_free(exec_domain_struct_cachep, ed);
+    xmem_cache_free(domain_struct_cachep, d);
+    return NULL;
 }
 
 /*
@@ -124,23 +141,27 @@ struct domain *alloc_domain_struct(void)
  */
 void sched_add_domain(struct domain *d) 
 {
-    /* Must be unpaused by control software to start execution. */
-    set_bit(DF_CTRLPAUSE, &d->flags);
+    struct exec_domain *ed;
+
+    for_each_exec_domain(d, ed) {
+        /* Must be unpaused by control software to start execution. */
+        set_bit(EDF_CTRLPAUSE, &ed->ed_flags);
+    }
 
     if ( d->id != IDLE_DOMAIN_ID )
     {
         /* Initialise the per-domain timer. */
         init_ac_timer(&d->timer);
-        d->timer.cpu      = d->processor;
+        d->timer.cpu      = d->exec_domain[0]->processor;
         d->timer.data     = (unsigned long)d;
         d->timer.function = &dom_timer_fn;
     }
     else
     {
-        schedule_data[d->processor].idle = d;
+        schedule_data[d->exec_domain[0]->processor].idle = d->exec_domain[0];
     }
 
-    SCHED_OP(add_task, d);
+    SCHED_OP(add_task, d->exec_domain[0]);
 
     TRACE_2D(TRC_SCHED_DOM_ADD, d->id, d);
 }
@@ -158,7 +179,7 @@ void init_idle_task(void)
         BUG();
 }
 
-void domain_sleep(struct domain *d)
+void domain_sleep(struct exec_domain *d)
 {
     unsigned long flags;
 
@@ -170,14 +191,14 @@ void domain_sleep(struct domain *d)
     spin_unlock_irqrestore(&schedule_data[d->processor].schedule_lock, flags);
  
     /* Synchronous. */
-    while ( test_bit(DF_RUNNING, &d->flags) && !domain_runnable(d) )
+    while ( test_bit(EDF_RUNNING, &d->ed_flags) && !domain_runnable(d) )
     {
         smp_mb();
         cpu_relax();
     }
 }
 
-void domain_wake(struct domain *d)
+void domain_wake(struct exec_domain *d)
 {
     unsigned long flags;
 
@@ -192,7 +213,7 @@ void domain_wake(struct domain *d)
 #endif
     }
     
-    clear_bit(DF_MIGRATED, &d->flags);
+    clear_bit(EDF_MIGRATED, &d->ed_flags);
     
     spin_unlock_irqrestore(&schedule_data[d->processor].schedule_lock, flags);
 }
@@ -202,7 +223,7 @@ long do_block(void)
 {
     ASSERT(current->id != IDLE_DOMAIN_ID);
     current->shared_info->vcpu_data[0].evtchn_upcall_mask = 0;
-    set_bit(DF_BLOCKED, &current->flags);
+    set_bit(EDF_BLOCKED, &current->ed_flags);
     TRACE_2D(TRC_SCHED_BLOCK, current->id, current);
     __enter_scheduler();
     return 0;
@@ -254,7 +275,7 @@ long do_sched_op(unsigned long op)
 /* Per-domain one-shot-timer hypercall. */
 long do_set_timer_op(unsigned long timeout_hi, unsigned long timeout_lo)
 {
-    struct domain *p = current;
+    struct domain *p = current->domain;
 
     rem_ac_timer(&p->timer);
     
@@ -303,9 +324,9 @@ long sched_adjdom(struct sched_adjdom_cmd *cmd)
 
     TRACE_1D(TRC_SCHED_ADJDOM, d->id);
 
-    spin_lock_irq(&schedule_data[d->processor].schedule_lock);
+    spin_lock_irq(&schedule_data[d->exec_domain[0]->processor].schedule_lock);
     SCHED_OP(adjdom, d, cmd);
-    spin_unlock_irq(&schedule_data[d->processor].schedule_lock);
+    spin_unlock_irq(&schedule_data[d->exec_domain[0]->processor].schedule_lock);
 
     put_domain(d);
     return 0;
@@ -318,14 +339,14 @@ long sched_adjdom(struct sched_adjdom_cmd *cmd)
  */
 void __enter_scheduler(void)
 {
-    struct domain *prev = current, *next = NULL;
+    struct exec_domain *prev = current, *next = NULL;
     int                 cpu = prev->processor;
     s_time_t            now;
     task_slice_t        next_slice;
     s32                 r_time;     /* time for new dom to run */
 
     cleanup_writable_pagetable(
-        prev, PTWR_CLEANUP_ACTIVE | PTWR_CLEANUP_INACTIVE);
+        prev->domain, PTWR_CLEANUP_ACTIVE | PTWR_CLEANUP_INACTIVE);
 
     perfc_incrc(sched_run);
     
@@ -337,11 +358,11 @@ void __enter_scheduler(void)
     
     ASSERT(!in_irq());
 
-    if ( test_bit(DF_BLOCKED, &prev->flags) )
+    if ( test_bit(EDF_BLOCKED, &prev->ed_flags) )
     {
         /* This check is needed to avoid a race condition. */
         if ( event_pending(prev) )
-            clear_bit(DF_BLOCKED, &prev->flags);
+            clear_bit(EDF_BLOCKED, &prev->ed_flags);
         else
             SCHED_OP(do_block, prev);
     }
@@ -363,12 +384,12 @@ void __enter_scheduler(void)
     add_ac_timer(&schedule_data[cpu].s_timer);
 
     /* Must be protected by the schedule_lock! */
-    set_bit(DF_RUNNING, &next->flags);
+    set_bit(EDF_RUNNING, &next->ed_flags);
 
     spin_unlock_irq(&schedule_data[cpu].schedule_lock);
 
     /* Ensure that the domain has an up-to-date time base. */
-    if ( !is_idle_task(next) )
+    if ( !is_idle_task(next->domain) )
         update_dom_time(next->shared_info);
 
     if ( unlikely(prev == next) )
@@ -404,10 +425,10 @@ void __enter_scheduler(void)
      * 'prev' (after this point, a dying domain's info structure may be freed
      * without warning). 
      */
-    clear_bit(DF_RUNNING, &prev->flags);
+    clear_bit(EDF_RUNNING, &prev->ed_flags);
 
     /* Mark a timer event for the newly-scheduled domain. */
-    if ( !is_idle_task(next) )
+    if ( !is_idle_task(next->domain) )
         send_guest_virq(next, VIRQ_TIMER);
     
     schedule_tail(next);
@@ -418,7 +439,7 @@ void __enter_scheduler(void)
 /* No locking needed -- pointer comparison is safe :-) */
 int idle_cpu(int cpu)
 {
-    struct domain *p = schedule_data[cpu].curr;
+    struct exec_domain *p = schedule_data[cpu].curr;
     return p == idle_task[cpu];
 }
 
@@ -442,11 +463,11 @@ static void s_timer_fn(unsigned long unused)
 /* Periodic tick timer: send timer event to current domain*/
 static void t_timer_fn(unsigned long unused)
 {
-    struct domain *p = current;
+    struct exec_domain *p = current;
 
     TRACE_0D(TRC_SCHED_T_TIMER_FN);
 
-    if ( !is_idle_task(p) ) {
+    if ( !is_idle_task(p->domain) ) {
         update_dom_time(p->shared_info);
         send_guest_virq(p, VIRQ_TIMER);
     }
@@ -459,24 +480,26 @@ static void t_timer_fn(unsigned long unused)
 static void dom_timer_fn(unsigned long data)
 {
     struct domain *p = (struct domain *)data;
+    struct exec_domain *ed = p->exec_domain[0];
     TRACE_0D(TRC_SCHED_DOM_TIMER_FN);
-    update_dom_time(p->shared_info);
-    send_guest_virq(p, VIRQ_TIMER);
+    update_dom_time(ed->shared_info);
+    send_guest_virq(ed, VIRQ_TIMER);
 }
 
 
 /* Fallback timer to ensure guests get time updated 'often enough'. */
 static void fallback_timer_fn(unsigned long unused)
 {
-    struct domain *p = current;
+    struct exec_domain *ed = current;
+    struct domain *p = ed->domain;
 
     TRACE_0D(TRC_SCHED_FALLBACK_TIMER_FN);
 
     if ( !is_idle_task(p) )
-        update_dom_time(p->shared_info);
+        update_dom_time(ed->shared_info);
 
-    fallback_timer[p->processor].expires = NOW() + MILLISECS(500);
-    add_ac_timer(&fallback_timer[p->processor]);
+    fallback_timer[ed->processor].expires = NOW() + MILLISECS(500);
+    add_ac_timer(&fallback_timer[ed->processor]);
 }
 
 /* Initialise the data structures. */
@@ -489,7 +512,7 @@ void __init scheduler_init(void)
     for ( i = 0; i < NR_CPUS; i++ )
     {
         spin_lock_init(&schedule_data[i].schedule_lock);
-        schedule_data[i].curr = &idle0_task;
+        schedule_data[i].curr = &idle0_exec_domain;
         
         init_ac_timer(&schedule_data[i].s_timer);
         schedule_data[i].s_timer.cpu      = i;
@@ -507,7 +530,7 @@ void __init scheduler_init(void)
         fallback_timer[i].function = &fallback_timer_fn;
     }
 
-    schedule_data[0].idle = &idle0_task;
+    schedule_data[0].idle = &idle0_exec_domain;
 
     extern char opt_sched[];
 

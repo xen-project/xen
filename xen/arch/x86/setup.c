@@ -38,7 +38,7 @@ EXPORT_SYMBOL(mmu_cr4_features);
 
 unsigned long wait_init_idle;
 
-struct domain *idle_task[NR_CPUS] = { &idle0_task };
+struct exec_domain *idle_task[NR_CPUS] = { &idle0_exec_domain };
 
 #ifdef	CONFIG_ACPI_INTERPRETER
 int acpi_disabled = 0;
