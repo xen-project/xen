@@ -658,8 +658,6 @@ do_grant_table_op(
 {
     long rc;
 
-    DPRINTK("Grant: table operation (%u) count: (%u)\n", cmd, count);
-
     if ( count > 512 )
         return -EINVAL;
 
@@ -846,7 +844,7 @@ grant_table_create(
     return -ENOMEM;
 }
 
-static void
+void
 gnttab_release_all_mappings(grant_table_t *gt)
 {
     grant_mapping_t        *map;
@@ -895,9 +893,10 @@ gnttab_release_all_mappings(grant_table_t *gt)
                        ((act->pin & GNTPIN_devw_mask) >> GNTPIN_devw_shift);
 
             if ( pincount > 0 )
-                put_page_types(&frame_table[frame], pincount);
+                put_page_type(&frame_table[frame]);
 
-            put_page(&frame_table[frame]);
+            if (act->pin)
+                put_page(&frame_table[frame]);
 
             act->pin = 0;
 
@@ -905,6 +904,8 @@ gnttab_release_all_mappings(grant_table_t *gt)
             clear_bit(_GTF_writing, &sha->flags);
 
             spin_unlock(&rd->grant_table->lock);
+
+            map->ref_and_flags = 0;
 
             put_domain(rd);
         }

@@ -19,6 +19,7 @@
 #include <xen/smp.h>
 #include <xen/delay.h>
 #include <xen/softirq.h>
+#include <xen/grant_table.h>
 #include <asm/regs.h>
 #include <asm/mc146818rtc.h>
 #include <asm/system.h>
@@ -955,6 +956,9 @@ void domain_relinquish_memory(struct domain *d)
 
     /* Ensure that noone is running over the dead domain's page tables. */
     synchronise_pagetables(~0UL);
+
+    /* Release mappings of other domains */
+    gnttab_release_all_mappings( d->grant_table );
 
     /* Exit shadow mode before deconstructing final guest page table. */
     shadow_mode_disable(d);

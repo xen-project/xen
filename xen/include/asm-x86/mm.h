@@ -182,13 +182,8 @@ static inline int get_page(struct pfn_info *page,
     return 1;
 }
 
-void put_page_types(struct pfn_info *page, u32 decrement);
+void put_page_type(struct pfn_info *page);
 int  get_page_type(struct pfn_info *page, u32 type);
-
-static inline void put_page_type(struct pfn_info *page)
-{
-    put_page_types(page, 1);
-}
 
 static inline void put_page_and_type(struct pfn_info *page)
 {

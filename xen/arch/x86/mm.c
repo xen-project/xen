@@ -1060,14 +1060,14 @@ void free_page_type(struct pfn_info *page, unsigned int type)
 }
 
 
-void put_page_types(struct pfn_info *page, u32 decrement)
+void put_page_type(struct pfn_info *page)
 {
     u32 nx, x, y = page->u.inuse.type_info;
 
  again:
     do {
         x  = y;
-        nx = x - decrement;
+        nx = x - 1;
 
         ASSERT((x & PGT_count_mask) != 0);
 
