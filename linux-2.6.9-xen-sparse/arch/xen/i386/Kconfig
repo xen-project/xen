@@ -564,6 +564,11 @@ config HAVE_ARCH_BOOTMEM_NODE
 #	  low memory.  Setting this option will put user-space page table
 #	  entries in high memory.
 
+config MTRR
+	bool
+	depends on XEN_PRIVILEGED_GUEST
+	default y
+
 #config MTRR
 #	 bool "MTRR (Memory Type Range Register) support"
 #	 ---help---
