@@ -45,10 +45,10 @@
 void force_evtchn_callback(void);
 
 /* Entry point for notifications into Linux subsystems. */
-void evtchn_do_upcall(struct pt_regs *regs);
+asmlinkage void evtchn_do_upcall(struct pt_regs *regs);
 
 /* Entry point for notifications into the userland character device. */
-asmlinkage void evtchn_device_upcall(int port);
+void evtchn_device_upcall(int port);
 
 static inline void mask_evtchn(int port)
 {
