@@ -76,8 +76,8 @@ typedef struct {
 
 /* Messages from guest to domain controller. */
 #define CMSG_BLKIF_FE_DRIVER_STATUS_CHANGED     32
-#define CMSG_BLKIF_FE_INTERFACE_UP              33
-#define CMSG_BLKIF_FE_INTERFACE_DOWN            34
+#define CMSG_BLKIF_FE_INTERFACE_CONNECT         33
+#define CMSG_BLKIF_FE_INTERFACE_DISCONNECT      34
 
 /* These are used by both front-end and back-end drivers. */
 #define blkif_vdev_t   u16
@@ -91,13 +91,13 @@ typedef struct {
  *   1. The shared-memory frame is available for reuse.
  *   2. Any unacknowledged messgaes pending on the interface were dropped.
  */
-#define BLKIF_INTERFACE_STATUS_DESTROYED 0 /* Interface doesn't exist.      */
-#define BLKIF_INTERFACE_STATUS_DOWN      1 /* Interface exists but is down. */
-#define BLKIF_INTERFACE_STATUS_UP        2 /* Interface exists and is up.   */
+#define BLKIF_INTERFACE_STATUS_DESTROYED    0 /* Interface doesn't exist.    */
+#define BLKIF_INTERFACE_STATUS_DISCONNECTED 1 /* Exists but is disconnected. */
+#define BLKIF_INTERFACE_STATUS_CONNECTED    2 /* Exists and is connected.    */
 typedef struct {
     unsigned int handle;
     unsigned int status;
-    unsigned int evtchn; /* status == BLKIF_INTERFACE_STATUS_UP */
+    unsigned int evtchn; /* status == BLKIF_INTERFACE_STATUS_CONNECTED */
 } blkif_fe_interface_status_changed_t;
 
 /*
@@ -109,30 +109,37 @@ typedef struct {
  *  If the driver goes DOWN while interfaces are still UP, the domain
  *  will automatically take the interfaces DOWN.
  */
-#define BLKIF_DRIVER_STATUS_DOWN         0
-#define BLKIF_DRIVER_STATUS_UP           1
+#define BLKIF_DRIVER_STATUS_DOWN   0
+#define BLKIF_DRIVER_STATUS_UP     1
 typedef struct {
     unsigned int status; /* BLKIF_DRIVER_STATUS_??? */
 } blkif_fe_driver_status_changed_t;
 
 /*
- * CMSG_BLKIF_FE_INTERFACE_UP:
- *  If successful, the domain controller will acknowledge with a STATUS_UP
- *  message.
+ * CMSG_BLKIF_FE_INTERFACE_CONNECT:
+ *  If successful, the domain controller will acknowledge with a
+ *  STATUS_CONNECTED message.
  */
 typedef struct {
     unsigned int  handle;
     unsigned long shmem_frame;
-} blkif_fe_interface_up_t;
+} blkif_fe_interface_connect_t;
 
 /*
- * CMSG_BLKIF_FE_INTERFACE_DOWN:
- *  If successful, the domain controller will acknowledge with a STATUS_DOWN
- *  message.
+ * CMSG_BLKIF_FE_INTERFACE_DISCONNECT:
+ *  If successful, the domain controller will acknowledge with a
+ *  STATUS_DISCONNECTED message.
  */
 typedef struct {
+    /* IN */
     unsigned int handle;
-} blkif_fe_interface_down_t;
+    /* OUT */
+    /*
+     * Tells driver how many interfaces it should expect to immediately
+     * receive notifications about.
+     */
+    unsigned int nr_interfaces;
+} blkif_fe_interface_disconnect_t;
 
 
 /******************************************************************************
@@ -142,10 +149,12 @@ typedef struct {
 /* Messages from domain controller. */
 #define CMSG_BLKIF_BE_CREATE      0  /* Create a new block-device interface. */
 #define CMSG_BLKIF_BE_DESTROY     1  /* Destroy a block-device interface.    */
-#define CMSG_BLKIF_BE_VBD_CREATE  2  /* Create a new VBD for an interface.   */
-#define CMSG_BLKIF_BE_VBD_DESTROY 3  /* Delete a VBD from an interface.      */
-#define CMSG_BLKIF_BE_VBD_GROW    4  /* Append an extent to a given VBD.     */
-#define CMSG_BLKIF_BE_VBD_SHRINK  5  /* Remove last extent from a given VBD. */
+#define CMSG_BLKIF_BE_CONNECT     2  /* Connect i/f to remote driver.        */
+#define CMSG_BLKIF_BE_DISCONNECT  3  /* Disconnect i/f from remote driver.   */
+#define CMSG_BLKIF_BE_VBD_CREATE  4  /* Create a new VBD for an interface.   */
+#define CMSG_BLKIF_BE_VBD_DESTROY 5  /* Delete a VBD from an interface.      */
+#define CMSG_BLKIF_BE_VBD_GROW    6  /* Append an extent to a given VBD.     */
+#define CMSG_BLKIF_BE_VBD_SHRINK  7  /* Remove last extent from a given VBD. */
 
 /* Messages to domain controller. */
 #define CMSG_BLKIF_BE_DRIVER_STATUS_CHANGED 32
@@ -167,29 +176,59 @@ typedef struct {
 /* The following are specific error returns. */
 #define BLKIF_BE_STATUS_INTERFACE_EXISTS    2
 #define BLKIF_BE_STATUS_INTERFACE_NOT_FOUND 3
-#define BLKIF_BE_STATUS_VBD_EXISTS          4
-#define BLKIF_BE_STATUS_VBD_NOT_FOUND       5
-#define BLKIF_BE_STATUS_OUT_OF_MEMORY       6
-#define BLKIF_BE_STATUS_EXTENT_NOT_FOUND    7
-#define BLKIF_BE_STATUS_MAPPING_ERROR       8
+#define BLKIF_BE_STATUS_INTERFACE_CONNECTED 4
+#define BLKIF_BE_STATUS_VBD_EXISTS          5
+#define BLKIF_BE_STATUS_VBD_NOT_FOUND       6
+#define BLKIF_BE_STATUS_OUT_OF_MEMORY       7
+#define BLKIF_BE_STATUS_EXTENT_NOT_FOUND    8
+#define BLKIF_BE_STATUS_MAPPING_ERROR       9
 
 /* This macro can be used to create an array of descriptive error strings. */
-#define BLKIF_BE_STATUS_ERRORS {   \
-    "Okay",                        \
-    "Non-specific error",          \
-    "Interface already exists",    \
-    "Interface not found",         \
-    "VBD already exists",          \
-    "VBD not found",               \
-    "Out of memory",               \
-    "Extent not found for VBD",    \
+#define BLKIF_BE_STATUS_ERRORS {    \
+    "Okay",                         \
+    "Non-specific error",           \
+    "Interface already exists",     \
+    "Interface not found",          \
+    "Interface is still connected", \
+    "VBD already exists",           \
+    "VBD not found",                \
+    "Out of memory",                \
+    "Extent not found for VBD",     \
     "Could not map domain memory" }
 
 /*
  * CMSG_BLKIF_BE_CREATE:
  *  When the driver sends a successful response then the interface is fully
- *  set up. The controller will send an UP notification to the front-end
+ *  created. The controller will send a DOWN notification to the front-end
  *  driver.
+ */
+typedef struct { 
+    /* IN */
+    domid_t        domid;             /* Domain attached to new interface.   */
+    unsigned int   blkif_handle;      /* Domain-specific interface handle.   */
+    /* OUT */
+    unsigned int   status;
+} blkif_be_create_t; 
+
+/*
+ * CMSG_BLKIF_BE_DESTROY:
+ *  When the driver sends a successful response then the interface is fully
+ *  torn down. The controller will send a DESTROYED notification to the
+ *  front-end driver.
+ */
+typedef struct { 
+    /* IN */
+    domid_t        domid;             /* Identify interface to be destroyed. */
+    unsigned int   blkif_handle;      /* ...ditto...                         */
+    /* OUT */
+    unsigned int   status;
+} blkif_be_destroy_t; 
+
+/*
+ * CMSG_BLKIF_BE_CONNECT:
+ *  When the driver sends a successful response then the interface is fully
+ *  connected. The controller will send a CONNECTED notification to the
+ *  front-end driver.
  */
 typedef struct { 
     /* IN */
@@ -199,21 +238,21 @@ typedef struct {
     unsigned long  shmem_frame;       /* Page cont. shared comms window.     */
     /* OUT */
     unsigned int   status;
-} blkif_be_create_t; 
+} blkif_be_connect_t; 
 
 /*
- * CMSG_BLKIF_BE_DESTROY:
+ * CMSG_BLKIF_BE_DISCONNECT:
  *  When the driver sends a successful response then the interface is fully
- *  torn down. The controller will send a DOWN notification to the front-end
+ *  disconnected. The controller will send a DOWN notification to the front-end
  *  driver.
  */
 typedef struct { 
     /* IN */
-    domid_t        domid;             /* Identify interface to be destroyed. */
-    unsigned int   blkif_handle;      /* ...ditto...                         */
+    domid_t        domid;             /* Domain attached to new interface.   */
+    unsigned int   blkif_handle;      /* Domain-specific interface handle.   */
     /* OUT */
     unsigned int   status;
-} blkif_be_destroy_t; 
+} blkif_be_disconnect_t; 
 
 /* CMSG_BLKIF_BE_VBD_CREATE */
 typedef struct { 
@@ -264,7 +303,14 @@ typedef struct {
  *  will automatically send DOWN notifications.
  */
 typedef struct {
+    /* IN */
     unsigned int status; /* BLKIF_DRIVER_STATUS_??? */
+    /* OUT */
+    /*
+     * Tells driver how many interfaces it should expect to immediately
+     * receive notifications about.
+     */
+    unsigned int nr_interfaces;
 } blkif_be_driver_status_changed_t;
 
 #endif /* __DOMAIN_CONTROLLER_H__ */

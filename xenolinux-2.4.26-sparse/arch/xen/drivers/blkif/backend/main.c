@@ -33,8 +33,8 @@ static struct vm_struct *mmap_vma;
     (MAX_PENDING_REQS * MMAP_PAGES_PER_REQUEST)
 #define MMAP_VADDR(_req,_seg)            \
     ((unsigned long)mmap_vma->addr +     \
-     ((_req) * MMAP_PAGES_PER_REQUEST) + \
-     ((_seg) * MMAP_PAGES_PER_SEGMENT))
+     ((_req) * MMAP_PAGES_PER_REQUEST * PAGE_SIZE) + \
+     ((_seg) * MMAP_PAGES_PER_SEGMENT * PAGE_SIZE))
 
 /*
  * Each outstanding request that we've passed to the lower device layers has a 
@@ -96,7 +96,7 @@ static void add_to_blkdev_list_tail(blkif_t *blkif)
     unsigned long flags;
     if ( __on_blkdev_list(blkif) ) return;
     spin_lock_irqsave(&io_schedule_list_lock, flags);
-    if ( !__on_blkdev_list(blkif) )
+    if ( !__on_blkdev_list(blkif) && (blkif->status == CONNECTED) )
     {
         list_add_tail(&blkif->blkdev_list, &io_schedule_list);
         blkif_get(blkif);
@@ -168,7 +168,8 @@ static void end_block_io_op(struct buffer_head *bh, int uptodate)
     if ( atomic_dec_and_test(&pending_req->pendcnt) )
     {
         int pending_idx = pending_req - pending_reqs;
-        vmfree_area_pages(MMAP_VADDR(pending_idx, 0), MMAP_PAGES_PER_REQUEST);
+        vmfree_area_pages(MMAP_VADDR(pending_idx, 0), 
+                          MMAP_PAGES_PER_REQUEST * PAGE_SIZE);
         make_response(pending_req->blkif, pending_req->id,
                       pending_req->operation, pending_req->status);
         blkif_put(pending_req->blkif);
@@ -260,10 +261,11 @@ static void dispatch_probe(blkif_t *blkif, blkif_request_t *req)
     {
         if ( (req->buffer_and_sects[i] & ~PAGE_MASK) != (PAGE_SIZE / 512) )
             goto bad_descriptor;
-        if ( direct_remap_area_pages(&init_mm, 
+        rc = direct_remap_area_pages(&init_mm, 
                                      MMAP_VADDR(pending_idx, i),
                                      req->buffer_and_sects[i] & PAGE_MASK, 
-                                     PAGE_SIZE, prot, blkif->domid) != 0 )
+                                     PAGE_SIZE, prot, blkif->domid);
+        if ( rc != 0 )
             goto bad_descriptor;
     }
 
@@ -271,12 +273,13 @@ static void dispatch_probe(blkif_t *blkif, blkif_request_t *req)
                    (req->nr_segments * PAGE_SIZE) / sizeof(vdisk_t));
 
     vmfree_area_pages(MMAP_VADDR(pending_idx, 0), 
-                      MMAP_PAGES_PER_REQUEST);
+                      MMAP_PAGES_PER_REQUEST * PAGE_SIZE);
     make_response(blkif, req->id, req->operation, rc);
     return;
 
  bad_descriptor:
-    vmfree_area_pages(MMAP_VADDR(pending_idx, 0), MMAP_PAGES_PER_REQUEST);
+    vmfree_area_pages(MMAP_VADDR(pending_idx, 0), 
+                      MMAP_PAGES_PER_REQUEST * PAGE_SIZE);
     make_response(blkif, req->id, req->operation, BLKIF_RSP_ERROR);
 }
 
@@ -284,7 +287,7 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
 {
     extern void ll_rw_block(int rw, int nr, struct buffer_head * bhs[]); 
     struct buffer_head *bh;
-    int operation = (req->operation == XEN_BLOCK_WRITE) ? WRITE : READ;
+    int operation = (req->operation == BLKIF_OP_WRITE) ? WRITE : READ;
     unsigned short nr_sects;
     unsigned long buffer;
     int i, tot_sects, pending_idx = pending_ring[MASK_PEND_IDX(pending_cons)];
@@ -358,14 +361,15 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
         unsigned long sz = ((phys_seg[i].buffer & ~PAGE_MASK) + 
                             (phys_seg[i].nr_sects << 9) + 
                             (PAGE_SIZE - 1)) & PAGE_MASK;
-        if ( direct_remap_area_pages(&init_mm, 
-                                     MMAP_VADDR(pending_idx, i),
-                                     phys_seg[i].buffer & PAGE_MASK, 
-                                     sz, prot, blkif->domid) != 0 )
+        int rc = direct_remap_area_pages(&init_mm, 
+                                         MMAP_VADDR(pending_idx, i),
+                                         phys_seg[i].buffer & PAGE_MASK, 
+                                         sz, prot, blkif->domid);
+        if ( rc != 0 )
         {
             DPRINTK("invalid buffer\n");
             vmfree_area_pages(MMAP_VADDR(pending_idx, 0), 
-                              MMAP_PAGES_PER_REQUEST);
+                              MMAP_PAGES_PER_REQUEST * PAGE_SIZE);
             goto bad_descriptor;
         }
     }
@@ -374,7 +378,7 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
     pending_req->blkif     = blkif;
     pending_req->id        = req->id;
     pending_req->operation = operation;
-    pending_req->status    = BLKIF_RSP_ERROR;
+    pending_req->status    = BLKIF_RSP_OKAY;
     atomic_set(&pending_req->pendcnt, nr_psegs);
 
     blkif_get(blkif);
@@ -382,29 +386,30 @@ static void dispatch_rw_block_io(blkif_t *blkif, blkif_request_t *req)
     /* Now we pass each segment down to the real blkdev layer. */
     for ( i = 0; i < nr_psegs; i++ )
     {
-        bh = kmem_cache_alloc(buffer_head_cachep, GFP_KERNEL);
+        bh = kmem_cache_alloc(buffer_head_cachep, GFP_ATOMIC);
         if ( unlikely(bh == NULL) )
             panic("bh is null\n");
         memset(bh, 0, sizeof (struct buffer_head));
-    
+
+        init_waitqueue_head(&bh->b_wait);
         bh->b_size          = phys_seg[i].nr_sects << 9;
         bh->b_dev           = phys_seg[i].dev;
+        bh->b_rdev          = phys_seg[i].dev;
         bh->b_rsector       = (unsigned long)phys_seg[i].sector_number;
-        bh->b_data          = (char *)MMAP_VADDR(pending_idx, i) + 
+        bh->b_data          = (char *)MMAP_VADDR(pending_idx, i) +
             (phys_seg[i].buffer & ~PAGE_MASK);
-        /* SMH: bh_phys() uses the below field as a 'cheap' virt_to_phys */
-        bh->b_page          = &mem_map[phys_seg[i].buffer>>PAGE_SHIFT]; 
         bh->b_end_io        = end_block_io_op;
         bh->b_private       = pending_req;
 
-        bh->b_state = (1 << BH_Mapped) | (1 << BH_Lock);
+        bh->b_state = (1 << BH_Mapped) | (1 << BH_Lock) | 
+            (1 << BH_Req) | (1 << BH_Launder);
         if ( operation == WRITE )
             bh->b_state |= (1 << BH_JBD) | (1 << BH_Req) | (1 << BH_Uptodate);
 
         atomic_set(&bh->b_count, 1);
 
         /* Dispatch a single request. We'll flush it to disc later. */
-        submit_bh(operation, bh);
+        generic_make_request(operation, bh);
     }
 
     pending_cons++;
@@ -444,16 +449,7 @@ static void make_response(blkif_t *blkif, unsigned long id,
 
 void blkif_deschedule(blkif_t *blkif)
 {
-    unsigned long flags;
-
-    spin_lock_irqsave(&io_schedule_list_lock, flags);
-    if ( __on_blkdev_list(blkif) )
-    {
-        list_del(&blkif->blkdev_list);
-        blkif->blkdev_list.next = (void *)0xdeadbeef;
-        blkif_put(blkif);
-    }
-    spin_unlock_irqrestore(&io_schedule_list_lock, flags);
+    remove_from_blkdev_list(blkif);
 }
 
 static int __init init_module(void)

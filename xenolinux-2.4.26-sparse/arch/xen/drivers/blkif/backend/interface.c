@@ -14,60 +14,153 @@
 
 static kmem_cache_t *blkif_cachep;
 static blkif_t      *blkif_hash[BLKIF_HASHSZ];
-static spinlock_t    blkif_hash_lock;
 
 blkif_t *blkif_find_by_handle(domid_t domid, unsigned int handle)
 {
-    blkif_t      *blkif;
-    unsigned long flags;
-    
-    spin_lock_irqsave(&blkif_hash_lock, flags);
-    blkif = blkif_hash[BLKIF_HASH(domid, handle)];
-    while ( blkif != NULL )
-    {
-        if ( (blkif->domid == domid) && (blkif->handle == handle) )
-        {
-            blkif_get(blkif);
-            break;
-        }
+    blkif_t *blkif = blkif_hash[BLKIF_HASH(domid, handle)];
+    while ( (blkif != NULL) && 
+            ((blkif->domid != domid) || (blkif->handle != handle)) )
         blkif = blkif->hash_next;
-    }
-    spin_unlock_irqrestore(&blkif_hash_lock, flags);
-
     return blkif;
 }
 
-void __blkif_destroy(blkif_t *blkif)
+void __blkif_disconnect_complete(blkif_t *blkif)
 {
-    free_irq(blkif->irq, NULL);
+    ctrl_msg_t            cmsg;
+    blkif_be_disconnect_t disc;
+
+    /*
+     * These can't be done in __blkif_disconnect() because at that point there
+     * may be outstanding requests at the disc whose asynchronous responses
+     * must still be notified to the remote driver.
+     */
     unbind_evtchn_from_irq(blkif->evtchn);
     vfree(blkif->blk_ring_base);
-    destroy_all_vbds(blkif);
-    kmem_cache_free(blkif_cachep, blkif);    
+
+    /* Construct the deferred response message. */
+    cmsg.type         = CMSG_BLKIF_BE;
+    cmsg.subtype      = CMSG_BLKIF_BE_DISCONNECT;
+    cmsg.id           = blkif->disconnect_rspid;
+    cmsg.length       = sizeof(blkif_be_disconnect_t);
+    disc.domid        = blkif->domid;
+    disc.blkif_handle = blkif->handle;
+    disc.status       = BLKIF_BE_STATUS_OKAY;
+    memcpy(cmsg.msg, &disc, sizeof(disc));
+
+    /*
+     * Make sure message is constructed /before/ status change, because
+     * after the status change the 'blkif' structure could be deallocated at
+     * any time. Also make sure we send the response /after/ status change,
+     * as otherwise a subsequent CONNECT request could spuriously fail if
+     * another CPU doesn't see the status change yet.
+     */
+    mb();
+    if ( blkif->status != DISCONNECTING )
+        BUG();
+    blkif->status = DISCONNECTED;
+    mb();
+
+    /* Send the successful response. */
+    ctrl_if_send_response(&cmsg);
 }
 
 void blkif_create(blkif_be_create_t *create)
 {
     domid_t       domid  = create->domid;
     unsigned int  handle = create->blkif_handle;
-    unsigned int  evtchn = create->evtchn;
-    unsigned long shmem_frame = create->shmem_frame;
-    unsigned long flags;
     blkif_t     **pblkif, *blkif;
-    struct vm_struct *vma;
-    pgprot_t      prot;
-    int           error;
 
-    if ( (vma = get_vm_area(PAGE_SIZE, VM_IOREMAP)) == NULL )
+    if ( (blkif = kmem_cache_alloc(blkif_cachep, GFP_ATOMIC)) == NULL )
     {
+        DPRINTK("Could not create blkif: out of memory\n");
         create->status = BLKIF_BE_STATUS_OUT_OF_MEMORY;
         return;
     }
 
-    if ( (blkif = kmem_cache_alloc(blkif_cachep, GFP_KERNEL)) == NULL )
+    memset(blkif, 0, sizeof(*blkif));
+    blkif->domid  = domid;
+    blkif->handle = handle;
+    blkif->status = DISCONNECTED;
+    spin_lock_init(&blkif->vbd_lock);
+    spin_lock_init(&blkif->blk_ring_lock);
+    atomic_set(&blkif->refcnt, 0);
+
+    pblkif = &blkif_hash[BLKIF_HASH(domid, handle)];
+    while ( *pblkif != NULL )
     {
-        create->status = BLKIF_BE_STATUS_OUT_OF_MEMORY;
-        goto fail1;
+        if ( ((*pblkif)->domid == domid) && ((*pblkif)->handle == handle) )
+        {
+            DPRINTK("Could not create blkif: already exists\n");
+            create->status = BLKIF_BE_STATUS_INTERFACE_EXISTS;
+            kmem_cache_free(blkif_cachep, blkif);
+            return;
+        }
+        pblkif = &(*pblkif)->hash_next;
+    }
+
+    blkif->hash_next = *pblkif;
+    *pblkif = blkif;
+
+    DPRINTK("Successfully created blkif\n");
+    create->status = BLKIF_BE_STATUS_OKAY;
+}
+
+void blkif_destroy(blkif_be_destroy_t *destroy)
+{
+    domid_t       domid  = destroy->domid;
+    unsigned int  handle = destroy->blkif_handle;
+    blkif_t     **pblkif, *blkif;
+
+    pblkif = &blkif_hash[BLKIF_HASH(domid, handle)];
+    while ( (blkif = *pblkif) != NULL )
+    {
+        if ( (blkif->domid == domid) && (blkif->handle == handle) )
+        {
+            if ( blkif->status != DISCONNECTED )
+                goto still_connected;
+            goto destroy;
+        }
+        pblkif = &blkif->hash_next;
+    }
+
+    destroy->status = BLKIF_BE_STATUS_INTERFACE_NOT_FOUND;
+    return;
+
+ still_connected:
+    destroy->status = BLKIF_BE_STATUS_INTERFACE_CONNECTED;
+    return;
+
+ destroy:
+    *pblkif = blkif->hash_next;
+    destroy_all_vbds(blkif);
+    kmem_cache_free(blkif_cachep, blkif);
+    destroy->status = BLKIF_BE_STATUS_OKAY;
+}
+
+void blkif_connect(blkif_be_connect_t *connect)
+{
+    domid_t       domid  = connect->domid;
+    unsigned int  handle = connect->blkif_handle;
+    unsigned int  evtchn = connect->evtchn;
+    unsigned long shmem_frame = connect->shmem_frame;
+    struct vm_struct *vma;
+    pgprot_t      prot;
+    int           error;
+    blkif_t      *blkif;
+
+    blkif = blkif_find_by_handle(domid, handle);
+    if ( unlikely(blkif == NULL) )
+    {
+        DPRINTK("blkif_connect attempted for non-existent blkif (%llu,%u)\n", 
+                connect->domid, connect->blkif_handle); 
+        connect->status = BLKIF_BE_STATUS_INTERFACE_NOT_FOUND;
+        return;
+    }
+
+    if ( (vma = get_vm_area(PAGE_SIZE, VM_IOREMAP)) == NULL )
+    {
+        connect->status = BLKIF_BE_STATUS_OUT_OF_MEMORY;
+        return;
     }
 
     prot = __pgprot(_PAGE_PRESENT | _PAGE_RW | _PAGE_DIRTY | _PAGE_ACCESSED);
@@ -77,81 +170,60 @@ void blkif_create(blkif_be_create_t *create)
     if ( error != 0 )
     {
         if ( error == -ENOMEM )
-            create->status = BLKIF_BE_STATUS_OUT_OF_MEMORY;
+            connect->status = BLKIF_BE_STATUS_OUT_OF_MEMORY;
         else if ( error == -EFAULT )
-            create->status = BLKIF_BE_STATUS_MAPPING_ERROR;
+            connect->status = BLKIF_BE_STATUS_MAPPING_ERROR;
         else
-            create->status = BLKIF_BE_STATUS_ERROR;
-        goto fail2;
+            connect->status = BLKIF_BE_STATUS_ERROR;
+        vfree(vma->addr);
+        return;
     }
 
-    memset(blkif, 0, sizeof(*blkif));
-    blkif->domid         = domid;
-    blkif->handle        = handle;
+    if ( blkif->status != DISCONNECTED )
+    {
+        connect->status = BLKIF_BE_STATUS_INTERFACE_CONNECTED;
+        vfree(vma->addr);
+        return;
+    }
+
     blkif->evtchn        = evtchn;
     blkif->irq           = bind_evtchn_to_irq(evtchn);
     blkif->shmem_frame   = shmem_frame;
     blkif->blk_ring_base = (blkif_ring_t *)vma->addr;
-    spin_lock_init(&blkif->vbd_lock);
-    spin_lock_init(&blkif->blk_ring_lock);
-
-    spin_lock_irqsave(&blkif_hash_lock, flags);
-
-    pblkif = &blkif_hash[BLKIF_HASH(domid, handle)];
-    while ( *pblkif == NULL )
-    {
-        if ( ((*pblkif)->domid == domid) && ((*pblkif)->handle == handle) )
-        {
-            spin_unlock_irqrestore(&blkif_hash_lock, flags);
-            create->status = BLKIF_BE_STATUS_INTERFACE_EXISTS;
-            goto fail3;
-        }
-        pblkif = &(*pblkif)->hash_next;
-    }
-
-    atomic_set(&blkif->refcnt, 1);
-    blkif->hash_next = *pblkif;
-    *pblkif = blkif;
-
-    spin_unlock_irqrestore(&blkif_hash_lock, flags);
+    blkif->status        = CONNECTED;
+    blkif_get(blkif);
 
     request_irq(blkif->irq, blkif_be_int, 0, "blkif-backend", blkif);
 
-    create->status = BLKIF_BE_STATUS_OKAY;
-    return;
-
- fail3: unbind_evtchn_from_irq(evtchn);
- fail2: kmem_cache_free(blkif_cachep, blkif);
- fail1: vfree(vma->addr);
+    connect->status = BLKIF_BE_STATUS_OKAY;
 }
 
-void blkif_destroy(blkif_be_destroy_t *destroy)
+int blkif_disconnect(blkif_be_disconnect_t *disconnect, u8 rsp_id)
 {
-    domid_t       domid  = destroy->domid;
-    unsigned int  handle = destroy->blkif_handle;
-    unsigned long flags;
-    blkif_t     **pblkif, *blkif;
+    domid_t       domid  = disconnect->domid;
+    unsigned int  handle = disconnect->blkif_handle;
+    blkif_t      *blkif;
 
-    spin_lock_irqsave(&blkif_hash_lock, flags);
-
-    pblkif = &blkif_hash[BLKIF_HASH(domid, handle)];
-    while ( (blkif = *pblkif) == NULL )
+    blkif = blkif_find_by_handle(domid, handle);
+    if ( unlikely(blkif == NULL) )
     {
-        if ( (blkif->domid == domid) && (blkif->handle == handle) )
-        {
-            *pblkif = blkif->hash_next;
-            spin_unlock_irqrestore(&blkif_hash_lock, flags);
-            blkif_deschedule(blkif);
-            blkif_put(blkif);
-            destroy->status = BLKIF_BE_STATUS_OKAY;
-            return;
-        }
-        pblkif = &blkif->hash_next;
+        DPRINTK("blkif_disconnect attempted for non-existent blkif"
+                " (%llu,%u)\n", disconnect->domid, disconnect->blkif_handle); 
+        disconnect->status = BLKIF_BE_STATUS_INTERFACE_NOT_FOUND;
+        return 1; /* Caller will send response error message. */
     }
 
-    spin_unlock_irqrestore(&blkif_hash_lock, flags);
+    if ( blkif->status == CONNECTED )
+    {
+        blkif->status = DISCONNECTING;
+        blkif->disconnect_rspid = rsp_id;
+        wmb(); /* Let other CPUs see the status change. */
+        free_irq(blkif->irq, NULL);
+        blkif_deschedule(blkif);
+        blkif_put(blkif);
+    }
 
-    destroy->status = BLKIF_BE_STATUS_INTERFACE_NOT_FOUND;
+    return 0; /* Caller should not send response message. */
 }
 
 void __init blkif_interface_init(void)
@@ -159,5 +231,4 @@ void __init blkif_interface_init(void)
     blkif_cachep = kmem_cache_create("blkif_cache", sizeof(blkif_t), 
                                      0, 0, NULL, NULL);
     memset(blkif_hash, 0, sizeof(blkif_hash));
-    spin_lock_init(&blkif_hash_lock);
 }

@@ -10,6 +10,8 @@
 
 static void blkif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
 {
+    DPRINTK("Received blkif backend message, subtype=%d\n", msg->subtype);
+    
     switch ( msg->subtype )
     {
     case CMSG_BLKIF_BE_CREATE:
@@ -21,6 +23,17 @@ static void blkif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
         if ( msg->length != sizeof(blkif_be_destroy_t) )
             goto parse_error;
         blkif_destroy((blkif_be_destroy_t *)&msg->msg[0]);
+        break;        
+    case CMSG_BLKIF_BE_CONNECT:
+        if ( msg->length != sizeof(blkif_be_connect_t) )
+            goto parse_error;
+        blkif_connect((blkif_be_connect_t *)&msg->msg[0]);
+        break;        
+    case CMSG_BLKIF_BE_DISCONNECT:
+        if ( msg->length != sizeof(blkif_be_disconnect_t) )
+            goto parse_error;
+        if ( !blkif_disconnect((blkif_be_disconnect_t *)&msg->msg[0],msg->id) )
+            return; /* Sending the response is deferred until later. */
         break;        
     case CMSG_BLKIF_BE_VBD_CREATE:
         if ( msg->length != sizeof(blkif_be_vbd_create_t) )
@@ -50,6 +63,8 @@ static void blkif_ctrlif_rx(ctrl_msg_t *msg, unsigned long id)
     return;
 
  parse_error:
+    DPRINTK("Parse error while reading message subtype %d, len %d\n",
+            msg->subtype, msg->length);
     msg->length = 0;
     ctrl_if_send_response(msg);
 }

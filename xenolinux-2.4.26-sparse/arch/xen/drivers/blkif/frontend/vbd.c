@@ -512,7 +512,7 @@ void xlvbd_update_vbds(void)
  * linux -- this is just for convenience as it means e.g. that the same 
  * /etc/fstab can be used when booting with or without Xen.
  */
-int __init xlvbd_init(void)
+int xlvbd_init(void)
 {
     int i;
     
@@ -559,8 +559,3 @@ int __init xlvbd_init(void)
 
     return 0;
 }
-
-
-#ifdef MODULE
-module_init(xlvbd_init);
-#endif

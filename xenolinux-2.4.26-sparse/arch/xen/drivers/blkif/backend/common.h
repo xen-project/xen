@@ -41,6 +41,12 @@ typedef struct blkif_st {
     rb_root_t        vbd_rb;        /* Mapping from 16-bit vdevices to VBDs. */
     spinlock_t       vbd_lock;      /* Protects VBD mapping. */
     /* Private fields. */
+    enum { DISCONNECTED, DISCONNECTING, CONNECTED } status;
+    /*
+     * DISCONNECT response is deferred until pending requests are ack'ed.
+     * We therefore need to store the id from the original request.
+     */
+    u8               disconnect_rspid;
     struct blkif_st *hash_next;
     struct list_head blkdev_list;
     spinlock_t       blk_ring_lock;
@@ -49,13 +55,15 @@ typedef struct blkif_st {
 
 void blkif_create(blkif_be_create_t *create);
 void blkif_destroy(blkif_be_destroy_t *destroy);
-void __blkif_destroy(blkif_t *blkif);
+void blkif_connect(blkif_be_connect_t *connect);
+int  blkif_disconnect(blkif_be_disconnect_t *disconnect, u8 rsp_id);
+void __blkif_disconnect_complete(blkif_t *blkif);
 blkif_t *blkif_find_by_handle(domid_t domid, unsigned int handle);
 #define blkif_get(_b) (atomic_inc(&(_b)->refcnt))
 #define blkif_put(_b)                             \
     do {                                          \
         if ( atomic_dec_and_test(&(_b)->refcnt) ) \
-            __blkif_destroy(_b);                  \
+            __blkif_disconnect_complete(_b);      \
     } while (0)
 
 /* An entry in a list of xen_extents. */
