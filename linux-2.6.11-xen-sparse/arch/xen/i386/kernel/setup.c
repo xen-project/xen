@@ -1495,6 +1495,7 @@ void __init setup_arch(char **cmdline_p)
 	if (max_pfn > xen_start_info.nr_pages) {
 		phys_to_machine_mapping = alloc_bootmem_low_pages(
 			max_pfn * sizeof(unsigned long));
+		/* set to IVALID_P2M_ENTRY */
 		memset(phys_to_machine_mapping, ~0,
 			max_pfn * sizeof(unsigned long));
 		memcpy(phys_to_machine_mapping,
