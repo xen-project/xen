@@ -17,8 +17,11 @@
 #include <xeno/keyhandler.h>
 #include <xeno/interrupt.h>
 
-#define XEN_BLK_DEBUG 0
-#define XEN_BLK_DEBUG_LEVEL KERN_ALERT
+#if 0
+#define DPRINTK(_f, _a...) printk( _f , ## _a )
+#else
+#define DPRINTK(_f, _a...) ((void)0)
+#endif
 
 typedef struct blk_request
 {
@@ -136,11 +139,9 @@ void end_block_io_op(struct buffer_head * bh)
     int position = 0;
     blk_ring_t *blk_ring;
 
-    if ( XEN_BLK_DEBUG )  
-	printk(XEN_BLK_DEBUG_LEVEL "XEN end_block_io_op,  bh: %lx\n",
-	       (unsigned long)bh);
+    DPRINTK("XEN end_block_io_op, bh: %p\n", bh);
     
-    if ( (blk_request = (blk_request_t *)bh->b_xen_request) == NULL) 
+    if ( (blk_request = (blk_request_t *)bh->b_xen_request) == NULL ) 
         goto bad_interrupt;
 
     atomic_dec(&nr_pending);
@@ -170,11 +171,7 @@ void end_block_io_op(struct buffer_head * bh)
     return;
 
  bad_interrupt:
-    printk (KERN_ALERT
-            "   block io interrupt received for unknown buffer [0x%lx]\n",
-            (unsigned long) bh);
-    BUG();
-    return;
+    panic("Block IO interrupt received for unknown buffer [%p]\n", bh);
 }
 
 
@@ -200,22 +197,30 @@ static int do_block_io_op_domain(struct task_struct* task, int max_to_do)
 {
     blk_ring_t *blk_ring = task->blk_ring_base;
     int loop, more_to_do = 0;
+    int resp_ring_ents = 
+        (blk_ring->resp_prod - blk_ring->resp_cons) & (BLK_RESP_RING_SIZE - 1);
 
-    if (XEN_BLK_DEBUG)  
-	printk(XEN_BLK_DEBUG_LEVEL "XEN do_block_io_op %d %d\n",
-	       blk_ring->req_cons, blk_ring->req_prod);
+    DPRINTK("XEN do_block_io_op %d %d\n",
+            blk_ring->req_cons, blk_ring->req_prod);
 
     for ( loop = blk_ring->req_cons; 
 	  loop != blk_ring->req_prod; 
 	  loop = BLK_REQ_RING_INC(loop) ) 
     {
-        if ( max_to_do-- == 0 )
+        /*
+         * Bail if we've reached the batch allowance for thsi interface,
+         * or if we risk producing enough responses to overflow the
+         * communication ring.
+         */
+        if ( (max_to_do-- == 0) ||
+             ((atomic_read(&nr_pending) + resp_ring_ents) >
+              BLK_RESP_RING_MAX_ENTRIES) )
         {
             more_to_do = 1;
             break;
         }
         
-	switch (blk_ring->req_ring[loop].operation)
+	switch ( blk_ring->req_ring[loop].operation )
         {
 	case XEN_BLOCK_READ:
 	case XEN_BLOCK_WRITE:
@@ -231,9 +236,8 @@ static int do_block_io_op_domain(struct task_struct* task, int max_to_do)
 	    break;
 
 	default:
-	    printk (KERN_ALERT "error: unknown block io operation [%d]\n",
-		    blk_ring->req_ring[loop].operation);
-	    BUG();
+	    panic("error: unknown block io operation [%d]\n",
+                  blk_ring->req_ring[loop].operation);
 	}
     }
 
@@ -243,7 +247,7 @@ static int do_block_io_op_domain(struct task_struct* task, int max_to_do)
 
 static void dispatch_debug_block_io(struct task_struct *p, int index)
 {
-    printk (KERN_ALERT "dispatch_debug_block_io: UNIMPL\n"); 
+    DPRINTK("dispatch_debug_block_io: unimplemented\n"); 
 }
 
 static void dispatch_probe_block_io(struct task_struct *p, int index)
@@ -281,26 +285,18 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
      * a bit legitimate
      */
     if ( (blk_ring->req_ring[index].block_size & (0x200 - 1)) != 0 )
-    {
-	printk(KERN_ALERT "    error: dodgy block size: %d\n", 
-	       blk_ring->req_ring[index].block_size);
-	BUG();
-    }
+	panic("error: dodgy block size: %d\n", 
+              blk_ring->req_ring[index].block_size);
     
     if ( blk_ring->req_ring[index].buffer == NULL )
-    { 
-	printk(KERN_ALERT "xen_block: bogus buffer from guestOS\n"); 
-	BUG();
-    }
+	panic("xen_block: bogus buffer from guestOS\n"); 
 
-    if (XEN_BLK_DEBUG)
-	printk(XEN_BLK_DEBUG_LEVEL "    req_cons: %d  req_prod %d  index: %d "
-	       "op: %s, pri: %s\n", blk_ring->req_cons, blk_ring->req_prod, 
-	       index, 
-	       (blk_ring->req_ring[index].operation == XEN_BLOCK_READ ? 
-		"read" : "write"), 
-	       (blk_ring->req_ring[index].priority == XEN_BLOCK_SYNC ? 
-		"sync" : "async"));
+    DPRINTK("req_cons: %d  req_prod %d  index: %d, op: %s, pri: %s\n",
+            blk_ring->req_cons, blk_ring->req_prod, index, 
+            (blk_ring->req_ring[index].operation == XEN_BLOCK_READ ? 
+             "read" : "write"), 
+            (blk_ring->req_ring[index].priority == XEN_BLOCK_SYNC ? 
+             "sync" : "async"));
 
     atomic_inc(&nr_pending);
     blk_request = kmem_cache_alloc(blk_request_cachep, GFP_ATOMIC);
@@ -308,11 +304,7 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
     /* we'll be doing this frequently, would a cache be appropriate? */
     bh = (struct buffer_head *) kmalloc(sizeof(struct buffer_head), 
 					GFP_KERNEL);
-    if ( bh == NULL )
-    {
-	printk(KERN_ALERT "ERROR: bh is null\n");
-	BUG();
-    }
+    if ( bh == NULL ) panic("bh is null\n");
 
     /* set just the important bits of the buffer header */
     memset (bh, 0, sizeof (struct buffer_head));
@@ -326,7 +318,7 @@ static void dispatch_rw_block_io(struct task_struct *p, int index)
     bh->b_count.counter = 1;
     bh->b_xen_request   = (void *)blk_request;  
     
-    if (blk_ring->req_ring[index].operation == XEN_BLOCK_WRITE)
+    if ( blk_ring->req_ring[index].operation == XEN_BLOCK_WRITE )
     {
 	bh->b_state = ((1 << BH_JBD) | (1 << BH_Mapped) | (1 << BH_Req) |
 		       (1 << BH_Dirty) | (1 << BH_Uptodate));
