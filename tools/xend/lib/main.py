@@ -46,11 +46,13 @@ def daemon_loop():
 
     # The DOM0 control interface is not set up via the management interface.
     # Note that console messages don't come our way (actually, only driver
-    # back-ends should use the DOM0 control interface). We therefore don't
-    # need to set up console structures.
-    xend.utils.port(0)
-    xend.main.notifier.bind(port.local_port)
-    xend.main.control_list[port.local_port] = (port, 0, 0, 0)
+    # back-ends should use the DOM0 control interface) -- the console
+    # structures are dummies.
+    dom0_port = xend.utils.port(0)
+    xend.main.notifier.bind(dom0_port.local_port)
+    xend.main.control_list[dom0_port.local_port] =          \
+      (dom0_port, xend.utils.buffer(), xend.utils.buffer(), \
+       xend.console.interface(0, dom0_port.local_port))
 
     ##
     ## MAIN LOOP

@@ -258,13 +258,13 @@ typedef struct {
 } blkif_be_vbd_shrink_t; 
 
 /*
- * CMSG_BLKIF_FE_DRIVER_STATUS_CHANGED:
+ * CMSG_BLKIF_BE_DRIVER_STATUS_CHANGED:
  *  Notify the domain controller that the back-end driver is DOWN or UP.
  *  If the driver goes DOWN while interfaces are still UP, the domain
  *  will automatically send DOWN notifications.
  */
 typedef struct {
     unsigned int status; /* BLKIF_DRIVER_STATUS_??? */
-} blkif_be_driver_status_changed;
+} blkif_be_driver_status_changed_t;
 
 #endif /* __DOMAIN_CONTROLLER_H__ */
