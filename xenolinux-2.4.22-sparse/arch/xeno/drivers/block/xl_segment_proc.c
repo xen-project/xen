@@ -5,7 +5,7 @@
  */
 
 #include "xl_block.h"
-#include <linux/proc_fs.h>
+#include <asm/xeno_proc.h>
 #include <linux/delay.h>
 #include <linux/seq_file.h>
 #include <asm/hypervisor-ifs/segment.h>
@@ -132,6 +132,9 @@ static int proc_write_vhd(struct file *file, const char *buffer,
     int loop;
     xv_disk_t xvd;
     int res;
+
+    if( !(start_info.flags & SIF_PRIVILEGED) )
+        return -EPERM;
 
     if (!local)
       return -ENOMEM;
@@ -310,7 +313,7 @@ int __init xlseg_proc_init(void)
     if ( !(start_info.flags & SIF_PRIVILEGED) )
         return 0;
 
-    vhd = create_proc_entry("xeno/vhd", 0600, NULL);
+    vhd = create_xeno_proc_entry("vhd", 0600);
     if ( vhd == NULL )
         panic ("xlseg_init: unable to create vhd proc entry\n");
 
@@ -318,13 +321,14 @@ int __init xlseg_proc_init(void)
     vhd->proc_fops  = &proc_vhd_operations;
     vhd->owner      = THIS_MODULE;
 
-    printk(KERN_ALERT "XenoLinux Virtual Disk Device Monitor installed\n");
     return 0;
 }
 
 static void __exit xlseg_proc_cleanup(void)
 {
-    printk(KERN_ALERT "XenoLinux Virtual Disk Device Monitor uninstalled\n");
+    if ( vhd == NULL ) return;
+    remove_xeno_proc_entry("vhd");
+    vhd = NULL;
 }
 
 #ifdef MODULE

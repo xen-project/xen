@@ -842,9 +842,8 @@ static int init_dev(kdev_t device, struct tty_struct **ret_tty)
 	int idx;
 
 	driver = get_tty_driver(device);
-	if (!driver) {
-	  return -ENODEV;
-	}
+	if (!driver)
+		return -ENODEV;
 
 	idx = MINOR(device) - driver->minor_start;
 
@@ -2219,7 +2218,7 @@ int tty_unregister_driver(struct tty_driver *driver)
  */
 void __init console_init(void)
 {
-        /* Setup the default TTY line discipline. */
+	/* Setup the default TTY line discipline. */
 	memset(ldiscs, 0, sizeof(ldiscs));
 	(void) tty_register_ldisc(N_TTY, &tty_ldisc_N_TTY);
 
@@ -2250,7 +2249,6 @@ void __init console_init(void)
 #ifdef CONFIG_VT
 	con_init();
 #endif
-
 #ifdef CONFIG_AU1X00_SERIAL_CONSOLE
 	au1x00_serial_console_init();
 #endif

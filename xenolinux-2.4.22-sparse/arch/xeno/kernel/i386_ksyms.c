@@ -152,3 +152,8 @@ EXPORT_SYMBOL(atomic_dec_and_lock);
 #ifdef CONFIG_MULTIQUAD
 EXPORT_SYMBOL(xquad_portio);
 #endif
+
+#include <asm/xeno_proc.h>
+EXPORT_SYMBOL(create_xeno_proc_entry);
+EXPORT_SYMBOL(remove_xeno_proc_entry);
+

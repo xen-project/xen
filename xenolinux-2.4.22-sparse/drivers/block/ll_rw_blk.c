@@ -859,8 +859,6 @@ static inline void add_request(request_queue_t * q, struct request * req,
 
 	if (!q->plugged && q->head_active && insert_here == &q->queue_head) {
 		spin_unlock_irq(&io_request_lock);
-		printk("list_empty(&q->queue_head) is %d\n", 
-		       list_empty(&q->queue_head)); 
 		BUG();
 	}
 

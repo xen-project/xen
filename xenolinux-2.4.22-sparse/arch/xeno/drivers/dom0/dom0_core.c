@@ -13,7 +13,6 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/errno.h>
-#include <linux/proc_fs.h>
 #include <linux/mm.h>
 #include <linux/mman.h>
 #include <linux/swap.h>
@@ -30,10 +29,10 @@
 #include <asm/tlb.h>
 #include <asm/proc_cmd.h>
 #include <asm/hypervisor-ifs/dom0_ops.h>
+#include <asm/xeno_proc.h>
 
 #include "../block/xl_block.h"
 
-struct proc_dir_entry *xeno_base;
 static struct proc_dir_entry *privcmd_intf;
 
 
@@ -133,11 +132,8 @@ static int __init init_module(void)
     if ( !(start_info.flags & SIF_PRIVILEGED) )
         return 0;
 
-    /* xeno proc root setup */
-    xeno_base = proc_mkdir("xeno", &proc_root); 
-
     /* xeno control interface */
-    privcmd_intf = create_proc_entry("privcmd", 0400, xeno_base);
+    privcmd_intf = create_xeno_proc_entry("privcmd", 0400);
     if ( privcmd_intf != NULL )
     {
         privcmd_intf->owner      = THIS_MODULE;
@@ -152,7 +148,7 @@ static int __init init_module(void)
 static void __exit cleanup_module(void)
 {
     if ( privcmd_intf == NULL ) return;
-    remove_proc_entry("xeno", &proc_root);
+    remove_xeno_proc_entry("privcmd");
     privcmd_intf = NULL;
 }
 

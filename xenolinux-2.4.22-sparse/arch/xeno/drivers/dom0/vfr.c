@@ -12,15 +12,12 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/errno.h>
-#include <linux/proc_fs.h>
-
+#include <asm/xeno_proc.h>
 #include <asm/hypervisor-ifs/network.h>
 
 static struct proc_dir_entry *proc_vfr;
 
 static unsigned char readbuf[1024];
-
-extern struct proc_dir_entry *xeno_base;
 
 /* Helpers, implemented at the bottom. */
 u32 getipaddr(const char *buff, unsigned int len);
@@ -225,8 +222,11 @@ static int vfr_write_proc(struct file *file, const char *buffer,
 
 static int __init init_module(void)
 {
+    if ( !(start_info.flags & SIF_PRIVILEGED) )
+        return 0;
+
     *readbuf = '\0';
-    proc_vfr = create_proc_entry ("vfr", 0600, xeno_base);
+    proc_vfr = create_xeno_proc_entry("vfr", 0600);
     if ( proc_vfr != NULL )
     {
         proc_vfr->owner      = THIS_MODULE;
@@ -241,7 +241,7 @@ static int __init init_module(void)
 static void __exit cleanup_module(void)
 {
     if ( proc_vfr == NULL ) return;
-    remove_proc_entry("vfr", xeno_base);
+    remove_xeno_proc_entry("vfr");
     proc_vfr = NULL;
 }
 
