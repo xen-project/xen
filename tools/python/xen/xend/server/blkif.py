@@ -198,9 +198,8 @@ class BlkifControllerFactory(controller.ControllerFactory):
         val = unpackMsg('blkif_be_vbd_grow_t', msg)
 	status = val['status']
 	if status != BLKIF_BE_STATUS_OKAY:
-            raise XendError("Adding extent to vbd failed: device %x, error %d",
-                            val['extent.device'],
-                            status)
+            raise XendError("Adding extent to vbd failed: device %x, error %d"
+                            % (val['extent.device'], status))
         if self.attached:
             if d:
                 d.callback(dev)
